@@ -1,9 +1,14 @@
-# Susceptibility Infectivity and Recoverability Estimation (SIRE)
+# Bayesian Individual-based Compartmental Inference (BICI)
 
 ## Introduction
 
+Compartmental models have long been used as a means of understanding the collective dynamics of interacting agents, with notable applications in epidemiology and ecology. BICI allows for arbitrary compartmental model specification and performs simulation and/or inference on that model.
+For inference BICI takes in a variety of individual-based or population-based data, priors can be specified from a large range of possibilities, and the outputs consist of posterior trace plots for model parameters, distributions, correlations, visualisations of transitions, dynamic population estimates, and summary statistics (means and 95% credible intervals) as well as diagnostics.
+
+## Features
+
 This multipurpose software allows for sophisticated Bayesian analysis of data using an easy point and click interface.
-The current version (1.0) contains the following features:
+The current version (v1.0) contains the following features:
 
 * Arbitrary compartmental models. The interface allows for easy model specification and can accommodate multiple classifications (e.g. disease status as well as location and sex of individuals).
 
