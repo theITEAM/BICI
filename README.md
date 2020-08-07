@@ -32,7 +32,7 @@ The following files can be downloaded:
 
 ## Documentation
 
-Information about the software can be obtained from the [BICI manual](https://github.com/BioSS-EAT/BICI/blob/master/BICI Manual_v1.0.pdf). A [website](https://bioss-eat.github.io/BICI.html) provides screenshots of the software.
+Information about the software can be obtained from the [BICI manual]("https://github.com/BioSS-EAT/BICI/blob/master/BICI Manual_v1.0.pdf"). A [website](https://bioss-eat.github.io/BICI.html) provides screenshots of the software.
 
 ## Build
 
