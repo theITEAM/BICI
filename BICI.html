@@ -1,0 +1,201 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd"><html><head><meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/><meta name='keywords' content='Roslin Institute' /><meta name='description' content='' /><title>EAT</title><link href='styles.css' rel='stylesheet' type='text/css'/><link rel='shortcut icon' href='favicon.ico' type='image/x-icon' /><link rel='icon' href='favicon.ico' type='image/x-icon' /><script type= "text/javascript"> function ById(su){ return document.getElementById(su);} </script><script type= "text/javascript"> var ie; if(navigator.appName.substring(0,9) != "Microsoft") ie = 0; else ie = 1; </script><script>
+var nslide = 10;
+var pic=[], picload=[];
+var GX = 20, GY = 12, TX = 35, TY = 25;
+var s = 1, cv, width=700, height=300, stat = -2, loop, loopmax = 70, dir = 0;
+
+function slideshow()
+{
+	myc = ById("can");
+	cv = myc.getContext("2d");
+
+	for(i = 0; i < nslide; i++) picload[i] = 0;		
+	load(1); load(2);
+	
+	setInterval(function(){ plot();},50);
+}
+
+function load(i)
+{
+	if(picload[i] == 0){		
+		pic[i] = new Image(); 
+		pic[i].src = "slides/slide"+i+"b.png";
+		pic[i].onload = function(){
+			num = parseInt(this.src.substr(this.src.substr.length-8,1));
+			picload[num] = 1;
+		}
+	}
+		
+}
+
+function plot()
+{
+	switch(stat){
+	case -2:
+		if(picload[s] == 1 && picload[(s+1)%nslide] == 1){ stat = -1; frac = 0;}		
+		break;
+	
+	case -1:
+		x1 = (pic[s].width-width)/2; y1 = (pic[s].height - height)/2;
+		cv.globalAlpha = frac;
+		cv.drawImage(pic[s],x1,y1,width,height,0,0,width,height);
+		cv.globalAlpha = 1;
+		frac += 0.1;
+		if(frac > 1) stat = 0;
+		break;
+		
+	case 0:
+		if(picload[s] == 1 && picload[(s+1)%nslide] == 1){
+			stat = 1;
+			x1 = (pic[s].width-width)/2; y1 = (pic[s].height - height)/2; x2 = pic[s].width-width; y2 = pic[s].height - height;
+			x3 = 0; y3 = 0; x4 = (pic[(s+1)%nslide].width-width)/2; y4 = (pic[(s+1)%nslide].height - height)/2;
+		
+			x1 = (pic[s].width-width)/2; y1 = (pic[s].height - height)/2; x2 = x1; y2 = pic[s].height - height;
+			x3 = (pic[(s+1)%nslide].width-width)/2; y3 = 0; x4 = x3; y4 = (pic[(s+1)%nslide].height - height)/2;
+		
+			load((s+2)%nslide);
+			loop = 0;
+		}
+		break;
+	
+	case 1:
+		xxa = Math.floor(x1+(x2-x1)*loop/loopmax); yya = Math.floor(y1+(y2-y1)*loop/loopmax);
+		xxb = Math.floor(x3+(x4-x3)*loop/loopmax); yyb = Math.floor(y3+(y4-y3)*loop/loopmax);
+		//xxa = (x1+(x2-x1)*loop/loopmax); yya = (y1+(y2-y1)*loop/loopmax);
+		//xxb = (x3+(x4-x3)*loop/loopmax); yyb =(y3+(y4-y3)*loop/loopmax);
+		
+		for(gx = 0; gx < GX; gx++){
+			for(gy = 0; gy < GY; gy++){
+				if((gx+gy)%2 == 0){
+					frac = 2 + (gx+gy)/32 - 6*loop/loopmax;
+				}
+				else{
+					frac = 2.5 + (gx+0.5*gy)/32 - 6*loop/loopmax;
+				}
+				if(frac > 1) frac = 1; if(frac < 0) frac = 0;
+		
+				if(frac == 1) cv.drawImage(pic[s],xxa+gx*TX,yya+gy*TY,TX,TY,gx*TX,gy*TY,TX,TY);
+				else{
+					if(frac == 0) cv.drawImage(pic[(s+1)%nslide],xxb+gx*TX,yyb+gy*TY,TX,TY,gx*TX,gy*TY,TX,TY);
+					else{
+						cv.beginPath();
+						cv.rect(gx*TX,gy*TY,TX,TY);
+						cv.fillStyle = "#aaaaaa";
+						cv.fill();
+						
+						cv.globalAlpha = frac;
+						cv.drawImage(pic[s],xxa+gx*TX,yya+gy*TY,TX,TY,gx*TX,gy*TY,TX,TY);
+						cv.globalAlpha = 1-frac;
+						cv.drawImage(pic[(s+1)%nslide],xxb+gx*TX,yyb+gy*TY,TX,TY,gx*TX,gy*TY,TX,TY);
+						cv.globalAlpha = 1;
+					}
+				}
+			}
+		}
+		loop++; if(loop == loopmax){ s++; if(s == nslide) s = 0; stat = 0;}
+
+		
+		break;
+	}
+	drawcorners(0,0,width,height,30,"#f0f0ff","#9999ff");
+}
+
+function drawcorners(x,y,dx,dy,r,col,col2)
+{
+
+	var th, i, nth = Math.floor(r/6);
+	if(nth < 1) nth = 1;
+
+       r=0; nth = 1;
+
+	cv.lineWidth = 2;
+/*
+	cv.beginPath();
+	cv.fillStyle = col; 
+
+	cv.moveTo(x+dx,y);
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+dx-r+r*Math.sin(th),y+r-r*Math.cos(th));
+	} 
+	cv.closePath();
+	cv.fill();
+
+	cv.moveTo(x+dx,y+dy);
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+dx-r+r*Math.cos(th),y+dy-r+r*Math.sin(th));
+	}
+	cv.closePath();
+	cv.fill();
+
+	cv.moveTo(x,y+dy);
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+r-r*Math.sin(th),y+dy-r+r*Math.cos(th));
+	}
+	cv.closePath();
+	cv.fill();
+
+	cv.moveTo(x,y);
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+r-r*Math.cos(th),y+r-r*Math.sin(th));
+	}
+	cv.closePath();
+	cv.fill();
+	*/
+
+	cv.beginPath();
+cv.moveTo(x,y);
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+dx-r+r*Math.sin(th),y+r-r*Math.cos(th));
+	} 
+
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+dx-r+r*Math.cos(th),y+dy-r+r*Math.sin(th));
+	}
+	
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+r-r*Math.sin(th),y+dy-r+r*Math.cos(th));
+	}
+	
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+r-r*Math.cos(th),y+r-r*Math.sin(th));
+	}
+
+	cv.closePath();
+	cv.strokeStyle = col2;
+	cv.stroke();
+}
+
+function ById(a){ return document.getElementById(a);}
+
+function pr(te){ console.log(te);}
+</script>
+</head><body style = 'margin: 0 0 0 0; background:#ffffff; font-size:14px; LINE-HEIGHT: 145%; color:#663333;  text-align:center;' onload = 'slideshow();; ' onunload = '; ' onresize = '; ' ><div  style = "width:870px; margin-right:auto; margin-left:auto; border:0px; padding:0px; background-color:#ffffff; text-align:left; "><div id="pageheader"><div  style = "float:right; margin:7px; margin-top:4px; margin-right:11px;">
+  </div>
+
+
+<img width=600 height=60 src="logoEAT.png" style="margin:0px; padding:0px; margin-left:10px; margin-top:5px; margin-bottom:10px;"/>
+<div style = "width:10px; height:2px; background:#ffffff;"></div></div><div id = "menu" style = "float:left; width:130px; margin:0px; padding:0px; padding-left:0px; padding-right:0px; padding-top:0px; background:#ffffff; overflow:hidden;"><div style="height:30px; width:1px;"></div><a href="index.html"><div style="margin-left:7px;"><img width=10 height=9 src="Picsite/arrow.gif" style="position:relative; top:6px; float:left; border:0px;" /> <div style="margin-left:15px;">Home</div></div></a><span id = "selected"><div style="margin-left:7px;"><img width=10 height=9 src="Picsite/arrowinv.gif" style="position:relative; top:6px; float:left; border:0px;" /> <div style="margin-left:15px;">BICI</div></div></span><div style="margin-left:10px;; background:#ffffff;"></div><a href="SIRE.html"><div style="margin-left:7px;"><img width=10 height=9 src="Picsite/arrow.gif" style="position:relative; top:6px; float:left; border:0px;" /> <div style="margin-left:15px;">SIRE</div></div></a><a href="PAC.html"><div style="margin-left:7px;"><img width=10 height=9 src="Picsite/arrow.gif" style="position:relative; top:6px; float:left; border:0px;" /> <div style="margin-left:15px;">PAC</div></div></a><a href="Contact.html"><div style="margin-left:7px;"><img width=10 height=9 src="Picsite/arrow.gif" style="position:relative; top:6px; float:left; border:0px;" /> <div style="margin-left:15px;">Contact</div></div></a><div style="background:#ffffff;"></div></div><div style="background:#f0f0ff; margin:0px; padding:0px; margin-left:130px;"><div style="float:left; width:25px; height:19px; margin:0px; padding:0px; border:0px;"> <img width=25 height=19 src="Picsite/curveul.gif" style="margin:0px; padding:0px; border:0px;"/></div><div style="float:right; width:25px; height:19px; margin:0px; padding:0px; border:0px;"> <img width=25 height=19 src="Picsite/curveur.gif" style="margin:0px; padding:0px; border:0px;"/></div><div style="position:relative; top:10px; left:5px; height:10px; text-align:right;"><span id='breadcrumb'><a href='index.html'>Home</a> > BICI</span></div><div id = "rightme" style = "float:right; width:-7px;  margin:0px; padding:0px; padding-left:0px; padding-right:15px; padding-top:0px;"></div><div id = "mainte" style = " width:690px; margin:0px; padding:0px; padding-left:20px; padding-right:20px; padding-top:0px;"><h1>Bayesian Individual-based Compartmental Inference (BICI)</h1><canvas id="can" width=700 height=300></canvas><p>Compartmental models have long been used as a means of understanding the collective dynamics of interacting agents, with notable applications in epidemiology and ecology. BICI allows for arbitrary compartmental model specification (using an easy point and click interface) and performs simulation and/or inference on that model. </p><p>The current version (v1.0) supports the following features:</p><div style='margin-top:6px; margin-left:7px;'><img width = 13 height = 15 src='Picsite/rightarrow.png' style='float:left; margin-top:2px;'/><div style='margin-left:25px;'><p><b>Arbitrary compartmental models</b>. The interface allows for easy model specification and can  accommodate multiple classifications (e.g. disease status as well as location and sex of individuals).</p></div></div><div style='margin-top:6px; margin-left:7px;'><img width = 13 height = 15 src='Picsite/rightarrow.png' style='float:left; margin-top:2px;'/><div style='margin-left:25px;'><p><b>Markovian and Non-Markovian transitions</b>. This allows for more realistic models (e.g. disease recovery can be modeled using a more adaptable gamma distribution instead of assuming an exponential distribution). </p></div></div><div style='margin-top:6px; margin-left:7px;'><img width = 13 height = 15 src='Picsite/rightarrow.png' style='float:left; margin-top:2px;'/><div style='margin-left:25px;'><p><b>Simulation.</b> The initial conditions can be set and the dynamic variation in the model can be graphically represented in a variety of ways. </p></div></div><div style='margin-top:6px; margin-left:7px;'><img width = 13 height = 15 src='Picsite/rightarrow.png' style='float:left; margin-top:2px;'/><div style='margin-left:25px;'><p><b>Inference.</b> BICI can take a variety of different data types (e.g. state data, population estimates, event times or even uncertain data such as disease diagnostic test results) and infer model parameters as well as underlying model dynamics.  </p></div></div><div style='margin-top:6px; margin-left:7px;'><img width = 13 height = 15 src='Picsite/rightarrow.png' style='float:left; margin-top:2px;'/><div style='margin-left:25px;'><p><b>Variation in time.</b> The software allows for the the possibility of model parameters discretely varying in time. Also variation in parameters with the age of individuals can be incorporated.</p></div></div><p><p>BICI is provided freely for anyone to use under a GNU General Public License. We only request that those who use BICI analysis in their publications <a href="BICI_Citing.html">cite</a> this tool.</p></p><p><p>BICI runs as a desktop application and can be download by clicking on one of the following links (the downloaded file needs to be extracted and the software is run by clicking on the BICI icon):</p> </p><p><div style="width:220px; float:right; font-size:20px; text-align:center"><a href="https://github.com/BioSS-EAT/BICI/releases/download/v1.0/BICI_v1.0_windows.zip"><img src="down2.png"/></a><br>(Windows)</div></p><p><div style="width:220px; float:right; font-size:20px; text-align:center"><a href="https://github.com/BioSS-EAT/BICI/releases/download/v1.0/BICI_v1.0_Mac.zip"><img src="down2.png"/></a><br>(Mac)</div></p><p><div style="width:220px; float:right; font-size:20px; text-align:center"><a href="javascript:alert('Currently the Linux version is under development');"><img src="down2.png" style="opacity:0.2"/></a><br>(Linux)</div></p><div style = "height:1px; clear:right; " ></div></div><div style="width:600px; height:1px;"></div><div style="height:19px; backgroud:#f0f0ff;"><div style="float:left; width:25px; height:19px; margin:0px; padding:0px; border:0px;"><img width=25 height=19 src="Picsite/curvedl.gif" style="margin:0px; padding:0px; border:0px;"/></div><div style="float:right; width:25px; height:19px; margin:0px; padding:0px; border:0px;"> <img width=25 height=19 src="Picsite/curvedr.gif" style="margin:0px; padding:0px; border:0px;"/></div></div></div><div id="pagefooter"><div style = "height:10px; background:#ffffff;"></div>
+<div style="background:#a4a3e6;">
+<div style="float:left; width:14px; height:30px; margin:0px; padding:0px; border:0px;"><img width = 14 height=30 style="margin:0px; padding:0px; border:0px;" src="Picsite/endl.gif"/></div>
+<div style="float:right; width:14px; height:30px; margin:0px; padding:0px; border:0px;"><img width = 14 height=30 style="margin:0px; padding:0px; border:0px;" src="Picsite/endr.gif"/></div>
+<div style="height:30px; background-color:#a4a3e6; margin:0px; padding:0px; border:0px;">
+<center>
+<div style="font-size:15px; color:#ffffff; padding-top:4px;">
+<font face="trebuchet ms, helvetica, georgia, courier, arial"> 
+<b>© BioSS Epidemilogical Analytical Tools - 2020</b> 
+</font>
+</div>
+</div>
+</center>
+<div id="quote" style = "visibility:hidden; position:absolute; width:0px; height:0px; left:0px; top:0px;"><a href="javascript:boxoff();"><img width=196 height=123 style="border:0px;" src="quote.gif"/></a></div>
+</div>
+<div style = "width:10px; height:10px; background:#ffffff;"></div>
+</div></div></body></html>
