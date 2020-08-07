@@ -10,25 +10,25 @@ For inference BICI takes in a variety of individual-based or population-based da
 This multipurpose software allows for sophisticated Bayesian analysis of data using an easy point and click interface.
 The current version (v1.0) contains the following features:
 
-* Arbitrary compartmental models. The interface allows for easy model specification and can accommodate multiple classifications (e.g. disease status as well as location and sex of individuals).
+* **Arbitrary compartmental models.** The interface allows for easy model specification and can accommodate multiple classifications (e.g. disease status as well as location and sex of individuals).
 
-* Markovian and Non-Markovian transitions. This allows for more realistic models (e.g. disease recovery can be modeled using a more adaptable gamma distribution instead of assuming an exponential distribution).
+* **Markovian and Non-Markovian transitions.** This allows for more realistic models (e.g. disease recovery can be modeled using a more adaptable gamma distribution instead of assuming an exponential distribution).
 
-* Simulation. The initial conditions can be set and the dynamic variation in the model can be graphically represented in a variety of ways.
+* **Simulation.** The initial conditions can be set and the dynamic variation in the model can be graphically represented in a variety of ways.
 
-* Inference. BICI can take a variety of different data types (e.g. state data, population estimates, event times or even uncertain data such as disease diagnostic test results) and infer model parameters as well as underlying model dynamics.
+* **Inference.** BICI can take a variety of different data types (e.g. state data, population estimates, event times or even uncertain data such as disease diagnostic test results) and infer model parameters as well as underlying model dynamics.
 
-* Variation in time. The software allows for the the possibility of model parameters discretely varying in time. Also variation in parameters with the age of individuals can be incorporated.
+* **Variation in time.** The software allows for the the possibility of model parameters discretely varying in time. Also variation in parameters with the age of individuals can be incorporated.
 
 ## Download
 
 The following files can be downloaded:
 
-* Windows: [BICI_v1.0_windows.zip](https://github.com/BioSS-EAT/SIRE/releases/download/v1.0/BICI_v1.0_windows.zip). Once unzipped SIRE is run by clicking on the “BICI.exe” icon.
+* **Windows:** [BICI_v1.0_windows.zip](https://github.com/BioSS-EAT/SIRE/releases/download/v1.0/BICI_v1.0_windows.zip). Once unzipped SIRE is run by clicking on the “BICI.exe” icon.
 
-* Linux: BICI_v1.0_linux.tar.gz(Currently not availalbe). This can then be extracted by using the terminal command “tar -zxvf BICI_v1.0_linux.tar.gz”. The code is executed using “./BICI”.
+* **Linux:** BICI_v1.0_linux.tar.gz(Currently not availalbe). This can then be extracted by using the terminal command “tar -zxvf BICI_v1.0_linux.tar.gz”. The code is executed using “./BICI”.
 
-* Mac: [BICI_v1.0_Mac](https://github.com/BioSS-EAT/BICI/releases/download/v1.0/BICI_v1.0_Mac) BICI is run by clicking on the “BICI.app” icon.
+* **Mac:** [BICI_v1.0_Mac](https://github.com/BioSS-EAT/BICI/releases/download/v1.0/BICI_v1.0_Mac) BICI is run by clicking on the “BICI.app” icon.
 
 ## Documentation
 
