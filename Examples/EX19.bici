@@ -1,0 +1,64 @@
+﻿modelsetup:1
+cla:[{"name":"Pop","zoomfac":1.008139534883721,"ncomp":1,"comp":[{"name":"P","col":"#22FF22","x":386.49011627906975,"y":272.29651162790697,"w":71.57790697674419,"h":50.406976744186046,"loadinit":[],"simpopinit":1,"simfracinit":1}],"ntra":2,"tra":[{"type":"Source","i":-2,"f":0,"l":165.8389534883721,"midx":303.5706395348837,"midy":297.5,"middx":1,"middy":0,"pline":[{"x":220.65116279069764,"y":297.5},{"x":386.49011627906975,"y":297.5}],"p":[{"x":220.65116279069764,"y":297.5}],"ratetime":0,"rateother":["All","All","All"],"rate":"[ν]{P}(1-{P}/[κ])","nratevar":2,"ratevar":["ν","κ"],"ratevardep":["",""],"pair":1},{"type":"Sink","i":0,"f":-2,"l":155.7575581395349,"midx":535.9468023255814,"midy":297.5,"middx":1,"middy":0,"pline":[{"x":458.06802325581396,"y":297.5},{"x":613.8255813953489,"y":297.5}],"p":[{"x":613.8255813953489,"y":297.5}],"ratetime":0,"rateother":["All","All","All"],"rate":"[μ]","nratevar":1,"ratevar":["μ"],"ratevardep":[""],"pair":1}],"desc":"ν is the birth rate, {P} is the total population size and κ is the carrying capacity. Individuals die with mortality rate μ.","descon":1},{"name":"Age","zoomfac":1.008139534883721,"ncomp":1,"comp":[{"name":"A0+","col":"#bbbbbb","x":331.54651162790697,"loadinit":[],"simpopinit":0,"simfracinit":1,"y":284.05813953488376,"w":201.62790697674419,"h":67.2093023255814}],"ntra":0,"tra":[],"desc":"Click to add a description...","descon":0},{"name":"Time","zoomfac":1.008139534883721,"ncomp":1,"comp":[{"name":"All","col":"#FF44FF","x":330,"y":306.6666666666667,"w":200,"h":66.66666666666667}],"ntra":0,"tra":[],"desc":"Click to add a description...","descon":0}]
+ncla:3
+age:[]
+time:[]
+param:[{"name":"ν","dep":[],"classname":"Pop","prior":"Flat","val":[0,1],"dist":0},{"name":"κ","dep":[],"classname":"Pop","prior":"Flat","val":[0,1000],"dist":0},{"name":"μ","dep":[],"classname":"Pop","prior":"Flat","val":[0.08,0.12],"dist":0}]
+paramsim:[{"name":"ν","dep":[],"classname":"Pop","sim":0.4},{"name":"κ","dep":[],"classname":"Pop","sim":100},{"name":"μ","dep":[],"classname":"Pop","sim":0.1}]
+paramagesmooth:[]
+paramtimesmooth:[]
+derive:[]
+termtype:0
+tsimmin:0
+tsimmax:100
+tpostmin:0
+tpostmax:100
+simpopinitset:0
+simpopinitlist:["Pop","Age"]
+simty:0
+simindinit:[]
+siminit:"Manualpop"
+clagendata:["All","All","All"]
+detectprob:1
+datagenttype:0
+tgenmin:0
+tgenmax:100
+dtgen:10
+tgenuserdef:"0, 10, 20, 30, 40, 50, 60, 70, 80, 90"
+data:[{"name":"Population","nrow":11,"ncol":3,"colname":["Time","Population","Standard deviation"],"variety":"pop","t":[0,10,20,30,40,50,60,70,80,90,100],"val":[1,21,54,71,79,79,79,73,87,79,78],"sd":[0.6124,2.318,3.691,4.228,4.458,4.458,4.458,4.287,4.677,4.458,4.43],"errbar":[{"min":0.2458046653532241,"max":2.0685506405394105},{"min":17.227557350866693,"max":24.79908827508784},{"min":47.99306047543096,"max":60.049367913437976},{"min":64.11911668656789,"max":77.92948456733019},{"min":71.74480184217589,"max":86.30644328314996},{"min":71.74480184217589,"max":86.30644328314996},{"min":71.74480184217589,"max":86.30644328314996},{"min":66.02309679170212,"max":80.02618267269264},{"min":79.38838901208089,"max":94.6653735386479},{"min":71.74480184217589,"max":86.30644328314996},{"min":70.790370605841,"max":85.26055265687624}],"popcl":["All","All","All"],"tmin":0,"tmax":100}]
+nchain:3
+indshow:[1,0,0]
+claselect:["Pop","Age","Time"]
+transpos:[{"desc":"Transistion duration for + → P","name":"+ → P","cl":0,"i":-2,"f":0},{"desc":"Transistion duration for P → -","name":"P → -","cl":0,"i":0,"f":-2}]
+transmat:[[-1,1],[0,-1]]
+transsel:[1]
+transindfilt:"All"
+depsel:[]
+histoplot:[]
+depop:[]
+depopsel:"Time"
+distCI:1
+distmean:1
+inddata:{"nindtotal":0,"ind":[]}
+simnumber:10
+indmaxnumber:100000
+datares:{"indlist":[],"tmin":0,"tmax":100,"ncla":3,"cla":[{"name":"Pop","zoomfac":1.008139534883721,"ncomp":1,"comp":[{"name":"P","col":"#22FF22","x":386.49011627906975,"y":272.29651162790697,"w":71.57790697674419,"h":50.406976744186046,"loadinit":[],"simpopinit":1,"simfracinit":1}],"ntra":2,"tra":[{"type":"Source","i":-2,"f":0,"l":165.8389534883721,"midx":303.5706395348837,"midy":297.5,"middx":1,"middy":0,"pline":[{"x":220.65116279069764,"y":297.5},{"x":386.49011627906975,"y":297.5}],"p":[{"x":220.65116279069764,"y":297.5}],"ratetime":0,"rateother":["All","All","All"],"rate":"[ν]{P}(1-{P}/[κ])","nratevar":2,"ratevar":["ν","κ"],"ratevardep":["",""],"pair":1},{"type":"Sink","i":0,"f":-2,"l":155.7575581395349,"midx":535.9468023255814,"midy":297.5,"middx":1,"middy":0,"pline":[{"x":458.06802325581396,"y":297.5},{"x":613.8255813953489,"y":297.5}],"p":[{"x":613.8255813953489,"y":297.5}],"ratetime":0,"rateother":["All","All","All"],"rate":"[μ]","nratevar":1,"ratevar":["μ"],"ratevardep":[""],"pair":1}],"desc":"Place a comment about the model.","descon":0},{"name":"Age","zoomfac":1.008139534883721,"ncomp":1,"comp":[{"name":"A0+","col":"#bbbbbb","x":331.54651162790697,"loadinit":[],"simpopinit":0,"simfracinit":1,"y":284.05813953488376,"w":201.62790697674419,"h":67.2093023255814}],"ntra":0,"tra":[],"desc":"Click to add a description...","descon":0},{"name":"Time","zoomfac":1.008139534883721,"ncomp":1,"comp":[{"name":"All","col":"#FF44FF","x":330,"y":306.6666666666667,"w":200,"h":66.66666666666667}],"ntra":0,"tra":[],"desc":"Click to add a description...","descon":0}],"agecl":1,"settimecl":2}
+data:[{"name":"Population","nrow":11,"ncol":3,"colname":["Time","Population","Standard deviation"],"variety":"pop","t":[0,10,20,30,40,50,60,70,80,90,100],"val":[1,21,54,71,79,79,79,73,87,79,78],"sd":[0.6124,2.318,3.691,4.228,4.458,4.458,4.458,4.287,4.677,4.458,4.43],"errbar":[{"min":0.2458046653532241,"max":2.0685506405394105},{"min":17.227557350866693,"max":24.79908827508784},{"min":47.99306047543096,"max":60.049367913437976},{"min":64.11911668656789,"max":77.92948456733019},{"min":71.74480184217589,"max":86.30644328314996},{"min":71.74480184217589,"max":86.30644328314996},{"min":71.74480184217589,"max":86.30644328314996},{"min":66.02309679170212,"max":80.02618267269264},{"min":79.38838901208089,"max":94.6653735386479},{"min":71.74480184217589,"max":86.30644328314996},{"min":70.790370605841,"max":85.26055265687624}],"popcl":["All","All","All"],"tmin":0,"tmax":100}]
+simdata:[{"name":[],"variety":"state","id":["Ind. 1"],"t":[0],"val":["P"],"cl":0,"type":"binary","pos":["P"],"posbinary":[[1]],"posexpression":[],"sensitive":[],"postestres":[],"testname":"T1"},{"name":[],"variety":"state","id":["Ind. 1"],"t":[0],"val":["A0+"],"cl":1,"type":"binary","pos":["A0+"],"posbinary":[[1]],"posexpression":[],"sensitive":[],"postestres":[],"testname":"T1"},{"name":[],"variety":"state","id":["Ind. 1"],"t":[0],"val":["All"],"cl":2,"type":"binary","pos":["All"],"posbinary":[[1]],"posexpression":[],"sensitive":[],"postestres":[],"testname":"T1"}]
+radlab:2
+radstyle:0
+radstyle2:1
+radnamlab:1
+nid:undefined
+id:"Ind. 1"
+widthst:1007
+heightst:600
+datanote:"The data consists of periodic population estimates (Dataset 32). Simulated data was generated with a single initial individual (ν=0.4, κ=100 and μ=0.1).\n"
+datanoteon:1
+descnote:"Wildlife populations fluctuate due to births and deaths.\n\nThis is modelled by assuming individuals enter the population via a birth rate ν which is moderated by a carry capacity κ (this accounts for the fact that the available local resources limit the maximum size of the population).\n\nIndividuals are assumed to die at a constant mortality rate μ.\n\nSimulated data is generated assuming an initially small population which increases until it reaches a (stochastically varying) steady state. \n\nPeriodic measurements of population size are used to perform inference. Note here that this data is insufficient to accurately estimate all three parameters so a semi-informative prior is placed on μ.\n "
+nsampmax:10000
+nsampevmax:1000
+GRmax:1.1
+ESSmin:400
+fileToLoadlist:[]
+induoflag:1
