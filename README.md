@@ -24,7 +24,7 @@ The current version (v1.0) contains the following features:
 
 The following files can be downloaded:
 
-* **Windows:** [BICI_v1.0_windows.zip](https://github.com/BioSS-EAT/SIRE/releases/download/v1.0/BICI_v1.0_windows.zip). Once unzipped SIRE is run by clicking on the “BICI.exe” icon.
+* **Windows:** [BICI_v1.0_windows.zip](https://github.com/BioSS-EAT/BICI/releases/download/v1.0/BICI_v1.0_windows.zip). Once unzipped SIRE is run by clicking on the “BICI.exe” icon.
 
 * **Linux:** BICI_v1.0_linux.tar.gz(Currently not availalbe). This can then be extracted by using the terminal command “tar -zxvf BICI_v1.0_linux.tar.gz”. The code is executed using “./BICI”.
 
