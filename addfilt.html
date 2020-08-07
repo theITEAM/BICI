@@ -1,0 +1,333 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="keywords" content="Roslin Institute">
+<meta name="description" content="">
+<title>Filter</title>
+<!--<link href="styles.css" rel="stylesheet" type="text/css">-->
+
+<script>
+var nbut, buttext=[], butx=[], buty=[], butdx=[], butdy=[], butac=[], buttype=[], butover=[], butval=[], butval2=[];
+var canw, canh;
+var mx, my;
+var par;
+var radioval=[];
+
+var GREEKBUT = 0, BUBBLETEXTBUT = 1, CHECKBUT = 2, ADDBUT = 3, CANCELBUT = 4, RADIOBUT = 5;
+var GREEKAC = 0, RADIOAC = 1, ADDAC = 2, CANCELAC = 3;
+
+var BLACK = "#000000", GREEN = "#22FF22", RED = "#FF2222", BLUE = "#4444FF", PURPLE = "#FF44FF";
+var WHITE = "#ffffff", GREY = "#bbbbbb"; 
+var LGREEN = "#aaFFaa", LRED = "#FFaaaa", LBLUE = "#aaaaFF", LPURPLE = "#FFaaFF", LGREY = "#dddddd";
+var DGREEN = "#009900", DRED = "#990000", DBLUE = "#000099", DPURPLE = "#FF00FF", DGREY = "#777777";
+var LLGREEN = "#ddFFdd", LLRED = "#FFdddd", LLBLUE = "#ddddFF", LLPURPLE = "#FFddFF", LLGREY = "#eeeeee";
+var LLLBLUE = "#eeeeFF";
+var LLLGREY = "#eeeeee", LLGREY = "#cccccc";
+var ORANGE = "#ff9900", DORANGE = "#773300", LORANGE = "#ffbb11", LLORANGE = "#ffdd77";
+var DDBLUE = "#000055";
+
+var ngreek = 25;
+var greek = new Array("\u03B1","\u03B2","\u03B3","\u03B4","\u03B5","\u03B6","\u03B7","\u03B8","\u03B9",
+"\u03Ba","\u03Bb","\u03Bc","\u03Bd","\u03Be","\u03Bf","\u03C0","\u03C1","\u03C2","\u03C3","\u03C4","\u03C5","\u03C6","\u03C7","\u03C8","\u03C9");
+
+function ById(a){ return document.getElementById(a);}
+
+function pr(te){ console.log(te);}
+ 
+function init()
+{
+	//require('nw.gui').Window.get().showDevTools();
+
+	canw = 0;// window.opener.popdx;
+	canh = 0;//window.opener.popdy;
+	
+	myc = ById("myCanvas");
+	
+	cv = myc.getContext("2d");
+	
+	a = ById("main");
+	
+	a.addEventListener('mousemove', function(evt) {
+		var mousePos = getMousePos(myc, evt);
+		mousemove(mousePos.x,mousePos.y);
+	}, false);
+
+	a.addEventListener('mouseup', function(evt) {
+		var mousePos = getMousePos(myc, evt); 
+		mup(mousePos.x,mousePos.y);
+	}, false);
+	
+	cursy = 8;
+
+	nbut = 0;
+	
+  	par = window.opener;
+	
+	for(cl = 0; cl < par.ncla; cl++){	
+		cursx = 10;
+		if(par.cla[par.selectbubval].tra[par.selectbubval2].ratefilt[0][cl] == -1) radioval[cl] = -1; else radioval[cl] = 0;
+	
+		if(cl != par.pagesub[par.MODELPAGE]){
+			addbutton(par.cla[cl].name+":",cursx,cursy,0,0,-1,BUBBLETEXTBUT,-1,-1);
+			cursx += wid(par.cla[cl].name)+30;
+		
+			st = "No filter"; addbutton(st,cursx,cursy,12,12,RADIOAC,RADIOBUT,cl,-1); cursx += wid(st)+50;
+			st = "Filter"; addbutton(st,cursx,cursy,12,12,RADIOAC,RADIOBUT,cl,0); cursx += wid(st)+50;
+			if(cursx > canw) canw = cursx;
+			cursy += 30;
+		}
+	}
+	canh = cursy+30;
+	
+	myc.width = canw;
+    myc.height = canh;
+	
+	resize();
+	
+	w = 65; addbutton("Apply",canw-w-10,canh-20,w,20,ADDAC,ADDBUT,-1,-1);
+	addbutton("Cancel",canw-w-10-w-10,canh-20,w,20,CANCELAC,CANCELBUT,-1,-1);
+
+	buttonplot();
+	
+	var gui = require('nw.gui');
+	var win = gui.Window.get();
+	win.show();
+}
+
+function wid(te)
+{
+	cv.font = "14px arial";
+	return cv.measureText(te).width;
+}
+
+function resize()
+{
+	window.resizeTo(canw+16,canh+44);
+ }
+ 
+function getMousePos(canvas, evt)
+{
+	var rect = canvas.getBoundingClientRect();
+	return {
+		x: evt.clientX - rect.left,
+		y: evt.clientY - rect.top
+	};
+}
+
+function addbutton(text,x,y,dx,dy,ac,type,val,val2)
+{
+	var i;
+	buttext[nbut] = text;
+	butx[nbut] = x;
+	buty[nbut] = y;
+	butdx[nbut] = dx;
+	butdy[nbut] = dy;
+	butac[nbut] = ac; 	
+	buttype[nbut] = type;
+	butover[nbut] = -1;
+	butval[nbut] = val;
+	butval2[nbut] = val2;
+	nbut++;
+}
+
+function mousemove(x,y)
+{
+	mx = x; my = y;
+
+	buttonplot();
+}
+
+function buttonplot()
+{
+	var i, os;
+	
+	allbutplot = 1;
+	cv.clearRect (0,0,canw,canh);
+	for(i = 0; i < nbut; i++){
+		x = Math.floor(butx[i]); y = Math.floor(buty[i]); dx = Math.floor(butdx[i]); dy = Math.floor(butdy[i]); text = buttext[i]; val = butval[i]; val2 = butval2[i];
+
+		ov = 0; if(mx > x && mx < x+dx && my > y && my < y+dy) ov = 1;
+
+		switch(buttype[i]){
+		case GREEKBUT:
+			if(ov == 1){ col = LLBLUE; drawroundrect(x,y,dx,dy,4,col,darkcol(col));}
+			cancentertext(x+10,y+18,greek[val],"bold italic 16px times",BLUE); 
+			break;
+			
+		case BUBBLETEXTBUT:
+			cantext(x+5,y+12,text,"bold 14px arial",BLACK); 
+			break;
+			
+		case RADIOBUT:
+			col=DGREY; 
+			if(val2 == radioval[val]) col2 = BLACK;
+			else{
+				if(ov == 1) col2 = DGREY;
+				else col2 = WHITE
+			}
+
+			cantext(x+20,y+12,text,"14px arial",BLACK); 
+		
+			r = dx/2;
+			drawroundrect(x,y,2*r,2*r,r,WHITE,col);
+
+			if(col2 != WHITE){
+				x += 2; y += 2; r -= 2;
+				drawroundrect(x,y,2*r,2*r,r,col2,col2);
+			}
+
+			break;
+			
+		case ADDBUT:
+			col = LBLUE; col2 = BLUE; col3 = WHITE; if(ov == 1) col3 = DBLUE;
+			drawroundrect(butx[i],buty[i],butdx[i],butdy[i],7,col,col2);
+			cancentertext(x+dx/2,y+15,text,"bold 14px arial",col3);
+			break;
+			
+		case CANCELBUT:
+			col = LRED; col2 = RED; col3 = WHITE; if(ov == 1) col3 = DRED;
+			drawroundrect(butx[i],buty[i],butdx[i],butdy[i],7,col,col2);
+			cancentertext(x+dx/2,y+15,text,"bold 14px arial",col3);
+			break;
+		}
+	}
+	allbutplot = 0;
+}
+
+function mup(x,y)
+{
+	mx = x; my = y;
+	
+	for(i = 0; i < nbut; i++){
+		x = Math.floor(butx[i]); y = Math.floor(buty[i]); dx = Math.floor(butdx[i]); dy = Math.floor(butdy[i]); text = buttext[i]; val = butval[i]; val2 = butval2[i];
+
+		if(mx > x && mx < x+dx && my > y && my < y+dy){
+			switch(butac[i]){
+			case GREEKAC:
+				inserttext(greek[val]);
+				break;
+			case RADIOAC:
+				radioval[val] = val2;
+				break;
+			case ADDAC:
+				window.opener.updatefilt(radioval);
+				par.focus();
+				par.document.getElementById("inp").focus();
+				window.close();
+				break;
+			case CANCELAC:
+				par.focus();
+				par.document.getElementById("inp").focus();
+				window.close();
+				break;
+			}
+		}
+	}
+	buttonplot();
+}
+
+function cantext(x,y,te,fo,col)
+{
+	cv.font = fo;
+	cv.textAlign = 'left';
+	cv.fillStyle = col;
+	cv.fillText(te, x, y);	
+}
+
+function cancentertext(x,y,te,fo,col)
+{
+	cv.font = fo;
+	cv.textAlign = 'center';
+	cv.fillStyle = col;
+	cv.fillText(te, x, y);	
+}
+
+function darkcol(col)
+{ 
+	var bigint, r, g, b, frac = 0.7;
+	bigint = parseInt(col.substring(1), 16);	
+	r = (bigint >> 16) & 255;
+	g = (bigint >> 8) & 255;
+	b = bigint & 255;
+	return "#" + hex(frac*r) + hex(frac*g) + hex(frac*b);
+}
+
+function hex(c) {
+	var hex = (Math.floor(c)).toString(16);
+	return hex.length == 1 ? "0" + hex : hex;
+}
+
+function drawroundrect(x,y,dx,dy,r,col,col2)
+{
+	var th, i, nth = Math.floor(r/2);
+	if(nth < 1) nth = 1;
+
+	cv.lineWidth = 1;
+	cv.beginPath();
+ 
+	cv.moveTo(x+r,y);
+
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+dx-r+r*Math.sin(th),y+r-r*Math.cos(th));
+	}
+
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+dx-r+r*Math.cos(th),y+dy-r+r*Math.sin(th));
+	}
+
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+r-r*Math.sin(th),y+dy-r+r*Math.cos(th));
+	}
+
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+r-r*Math.cos(th),y+r-r*Math.sin(th));
+	}
+
+	cv.closePath();
+	cv.fillStyle = col; 
+	cv.fill();
+	cv.strokeStyle = col2;
+	cv.stroke();
+}
+
+function drawrect(x1, y1, x2, y2, col)
+{
+	cv.beginPath();
+	cv.lineWidth = 1; 
+	cv.rect(x1,y1,x2,y2);
+	cv.strokeStyle = col;
+	cv.stroke();
+}
+
+function fillrect(x1, y1, x2, y2, col)
+{
+	cv.beginPath();
+	cv.rect(x1,y1,x2,y2);
+	cv.fillStyle = col;
+	cv.fill();
+}
+
+function inserttext(text)
+{
+	a = ById("inp");
+	startPos = a.selectionStart; endPos = a.selectionEnd;
+	st = ById("inp").value;
+	ById("inp").value = st.substr(0,startPos)+text+st.substr(endPos,st.length);
+	
+	a.selectionStart = startPos+text.length;  a.selectionEnd = a.selectionStart;
+}
+
+</script>
+</head>
+
+<body id="main" style="background:#eeeeff;  margin:0px; border:0px; padding:0px; margin-left:0px;  margin-right:0px; margin-top:0px;" onload="init()" onunload="" onresize="resize()" onclose="" >
+
+<canvas id="myCanvas" style="background:#eeeeff; margin:0px; border:0px; padding:0px; margin-left:0px;  margin-right:0px; margin-top:0px;"></canvas> 
+
+</body>
+</html>

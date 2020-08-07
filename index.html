@@ -1,0 +1,89 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+		<meta name="keywords" content="The Roslin Institute,BioSS,BICI,Bayesian Inference on Populations">
+		<meta name="description" content="BICI stands for 'Bayesian individual-based compartmental inference'. The aim of this software is to facilate estimation of compartmental model parameters from individual-based and/or population data">
+		<meta name="author" content="C M Pooley">
+		 
+		<title>BICI</title>
+		
+		<link href="styles.css" rel="stylesheet" type="text/css">
+
+		<script>
+			var ver="windows";         // Determines platform
+			//var ver="linux";
+			//var ver="mac";
+		</script>
+		
+		<script src="js/const.js"></script>       <!-- Interface -->
+		<script src="js/var.js"></script>
+		<script src="js/init.js"></script>
+		<script src="js/button.js"></script>
+		<script src="js/canbutton.js"></script>
+		<script src="js/buttonplot.js"></script>
+		<script src="js/mousemove.js"></script>
+		<script src="js/mouseclick.js"></script>
+		<script src="js/bubble.js"></script>
+		<script src="js/ob.js"></script>
+		<script src="js/help.js"></script>
+		<script src="js/rightmenu.js"></script>
+	
+		<script src="js/home.js"></script>         <!-- Main Pages -->
+		<script src="js/desc.js"></script> 
+		<script src="js/simulate.js"></script>
+		<script src="js/model.js"></script>
+		<script src="js/inference.js"></script>
+		<script src="js/data.js"></script>
+		<script src="js/convdata.js"></script>
+		<script src="js/prior.js"></script>
+
+		<script src="js/popplot.js"></script>       <!-- Output -->
+		<script src="js/plots.js"></script> 
+		<script src="js/statistics.js"></script> 
+		<script src="js/import.js"></script>
+		<script src="js/export.js"></script>
+		<script src="js/io.js"></script>
+	</head>
+
+	<body id="bod" style="margin: 0pt; background: none repeat scroll 0% 0% #ddddff; font-size: 14px; line-height: 145%; color: rgb(102, 51, 51); text-align: center; visibility:hidden;" onload="init();" onunload="" onresize="setsize();">
+
+		<div id="main">
+
+			<div id="pw" style="width:10px; margin-right:auto; margin-left:auto; border:0px; padding:0px; background-color:#ddddff; text-align:left; ">
+				<canvas id="myCanvas" style="background:#ffffff; margin:0px; border:0px; padding:0px; margin-left:0px;  margin-right:0px; margin-top:10px">
+				</canvas> 
+
+				<div id="pagefooter" style="height:30px; overflow:hidden; margin: 0px; padding: 0px; border: 0px none;  background:#00ffff;">
+					<div style="height:5px; background:#ddddff;"></div>
+					<div style="background:#a4a3e6;">
+						<div style="float:left; width:14px; height:25px; margin:0px; padding:0px; border:0px;">
+							<img style="margin: 0px; padding: 0px; border: 0px none;" src="pics/endlblue.png" height="25" width="14"> 
+						</div>
+						<div style="float:right; width:14px; height:25px; margin:0px; padding:0px; border:0px;">
+							<img style="margin: 0px; padding: 0px; border: 0px none;" src="pics/endrblue.png" height="25" width="14">
+						</div>
+						<div style="height:25px; background-color:#a4a3e6; margin:0px; padding:0px; border:0px;">
+							<center>
+							<div style="font-size:15px; color:#ffffff; padding-top:2px;">
+								<font face="trebuchet ms, helvetica, georgia, courier, arial"><b>© BICI 2019</b></font>
+							</div>
+							</center>
+						</div>
+					</div>
+				</div> 
+			</div>
+
+			<canvas id="overlay" style="position:absolute; margin:0px; border:0px; padding:0px; margin-left:0px; margin-top:0px">
+			</canvas> 
+		</div>
+
+		<input style="display:none;" id="fileToLoad" type="file" oncancel="loading=0" onchange="loadfile();" />
+		<input style="display:none;" id="fileToSave" type="file" oncancel="loading=0" onchange="saveFileAsText();" nwsaveas/>
+		<div id="add" style="background-color:#333333"></div>
+		 
+		<input style="display:none;" id="fileDialog" type="file" />
+
+	</body>
+</html>
+

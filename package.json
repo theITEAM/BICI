@@ -1,0 +1,10 @@
+{
+  "name": "BIP",
+  "main": "index.html",
+   "window": {
+    "toolbar": true,
+    "width": 934,
+    "height": 582,
+	"resizable": true
+  }
+}

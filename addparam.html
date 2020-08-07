@@ -1,0 +1,342 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="keywords" content="Roslin Institute">
+<meta name="description" content="">
+<title>Add</title>
+<!--<link href="styles.css" rel="stylesheet" type="text/css">-->
+
+<script>
+var nbut, buttext=[], butx=[], buty=[], butdx=[], butdy=[], butac=[], buttype=[], butover=[], butval=[], butval2=[];
+var canw, canh;
+var mx, my;
+var chon=[], par;
+
+var GREEKBUT = 0, BUBBLETEXTBUT = 1, CHECKBUT = 2, ADDBUT = 3, CANCELBUT = 4;
+var GREEKAC = 0, CHECKAC = 1, ADDAC = 2, CANCELAC = 3;
+
+var BLACK = "#000000", GREEN = "#22FF22", RED = "#FF2222", BLUE = "#4444FF", PURPLE = "#FF44FF";
+var WHITE = "#ffffff", GREY = "#bbbbbb"; 
+var LGREEN = "#aaFFaa", LRED = "#FFaaaa", LBLUE = "#aaaaFF", LPURPLE = "#FFaaFF", LGREY = "#dddddd";
+var DGREEN = "#009900", DRED = "#990000", DBLUE = "#000099", DPURPLE = "#FF00FF", DGREY = "#777777";
+var LLGREEN = "#ddFFdd", LLRED = "#FFdddd", LLBLUE = "#ddddFF", LLPURPLE = "#FFddFF", LLGREY = "#eeeeee";
+var LLLBLUE = "#eeeeFF";
+var LLLGREY = "#eeeeee", LLGREY = "#cccccc";
+var ORANGE = "#ff9900", DORANGE = "#773300", LORANGE = "#ffbb11", LLORANGE = "#ffdd77";
+var DDBLUE = "#000055";
+
+var ngreek = 25;
+var greek = new Array("\u03B1","\u03B2","\u03B3","\u03B4","\u03B5","\u03B6","\u03B7","\u03B8","\u03B9",
+"\u03Ba","\u03Bb","\u03Bc","\u03Bd","\u03Be","\u03Bf","\u03C0","\u03C1","\u03C2","\u03C3","\u03C4","\u03C5","\u03C6","\u03C7","\u03C8","\u03C9");
+
+var nclass, classname=[];
+
+function ById(a){ return document.getElementById(a);}
+
+function pr(te){ console.log(te);}
+ 
+function init()
+{
+	//require('nw.gui').Window.get().showDevTools();
+
+	canw = window.opener.popdx;
+	canh = window.opener.popdy;
+	
+	myc = ById("myCanvas");
+	myc.width = canw;
+    myc.height = canh;
+	
+	cv = myc.getContext("2d");
+	
+	a = ById("main");
+	
+	a.addEventListener('mousemove', function(evt) {
+		var mousePos = getMousePos(myc, evt);
+		mousemove(mousePos.x,mousePos.y);
+	}, false);
+
+	a.addEventListener('mouseup', function(evt) {
+		var mousePos = getMousePos(myc, evt); 
+		mup(mousePos.x,mousePos.y);
+	}, false);
+	
+	cursy = 8; cursx = 10;
+
+	nbut = 0;
+	addbutton("Name:",cursx,cursy,0,0,-1,BUBBLETEXTBUT,-1,-1); cursy += 20;
+  
+	cursx = 20; cursy += 5; 
+	for(i = 0; i < 25; i++){
+		addbutton("",cursx,cursy,22,26,GREEKAC,GREEKBUT,i,-1);
+		cursx += 26; if(i%5 == 4){ cursx = 20; cursy += 25;}
+	}
+	cursy += 10;
+ 
+	par = window.opener;
+
+	if(par.page == par.MODELPAGE &&  par.pagesub[par.MODELPAGE] >= 0){
+		if(par.ncla > 1){ addbutton("Dependencies:",10,cursy,0,0,-1,BUBBLETEXTBUT,-1,-1); cursy += 27;}
+		
+		nclass = par.ncla;
+		for(cl = 0; cl < par.ncla; cl++){
+			classname.push(par.cla[cl].name);
+		}
+		
+		
+		for(cl = 0; cl < nclass; cl++){
+			chon[cl] = 0;
+			if(cl != par.pagesub[par.MODELPAGE]){
+				addbutton(classname[cl],30,cursy,12,12,CHECKAC,CHECKBUT,cl,-1); cursy += 20;
+			}
+		}
+	}
+
+	resize();
+	
+	w = 65; addbutton("Add",canw-w-10,canh-20,w,20,ADDAC,ADDBUT,-1,-1);
+	addbutton("Cancel",10,canh-20,w,20,CANCELAC,CANCELBUT,-1,-1);
+
+	buttonplot();
+	ById("inp").focus();
+	var gui = require('nw.gui');
+	var win = gui.Window.get();
+	win.show();
+}
+
+function resize()
+{
+	window.resizeTo(canw+16,canh+44);
+ }
+ 
+function getMousePos(canvas, evt)
+{
+	var rect = canvas.getBoundingClientRect();
+	return {
+		x: evt.clientX - rect.left,
+		y: evt.clientY - rect.top
+	};
+}
+
+function addbutton(text,x,y,dx,dy,ac,type,val,val2)
+{
+	var i;
+	buttext[nbut] = text;
+	butx[nbut] = x;
+	buty[nbut] = y;
+	butdx[nbut] = dx;
+	butdy[nbut] = dy;
+	butac[nbut] = ac; 	
+	buttype[nbut] = type;
+	butover[nbut] = -1;
+	butval[nbut] = val;
+	butval2[nbut] = val2;
+	nbut++;
+}
+
+function mousemove(x,y)
+{
+	mx = x; my = y;
+
+	buttonplot();
+}
+
+function buttonplot()
+{
+	var i, os;
+	
+	allbutplot = 1;
+	cv.clearRect (0,0,canw,canh);
+	for(i = 0; i < nbut; i++){
+		x = Math.floor(butx[i]); y = Math.floor(buty[i]); dx = Math.floor(butdx[i]); dy = Math.floor(butdy[i]); text = buttext[i]; val = butval[i]; val2 = butval2[i];
+
+		ov = 0; if(mx > x && mx < x+dx && my > y && my < y+dy) ov = 1;
+
+		switch(buttype[i]){
+		case GREEKBUT:
+			if(ov == 1){ col = LLBLUE; drawroundrect(x,y,dx,dy,4,col,darkcol(col));}
+			cancentertext(x+10,y+18,greek[val],"bold italic 16px times",BLUE); 
+			break;
+			
+		case BUBBLETEXTBUT:
+			cantext(x+5,y+12,text,"14px arial",BLACK); 
+			break;
+			
+		case CHECKBUT:
+			fillrect(x,y,dx,dy,WHITE);
+			drawrect(x,y,dx,dy,BLACK);
+			if(chon[val] == 1) fillrect(x+2,y+2,dx-4,dy-4,BLACK);
+			else{ if(ov == 1) fillrect(x+2,y+2,dx-4,dy-4,GREY);}
+			
+			cantext(x+20,y+12,text,"14px arial",BLACK); 
+			break;
+			
+		case ADDBUT:
+			col = LBLUE; col2 = BLUE; col3 = WHITE; if(ov == 1) col3 = DBLUE;
+			drawroundrect(butx[i],buty[i],butdx[i],butdy[i],7,col,col2);
+			cancentertext(x+dx/2,y+15,text,"bold 14px arial",col3);
+			break;
+			
+		case CANCELBUT:
+			col = LRED; col2 = RED; col3 = WHITE; if(ov == 1) col3 = DRED;
+			drawroundrect(butx[i],buty[i],butdx[i],butdy[i],7,col,col2);
+			cancentertext(x+dx/2,y+15,text,"bold 14px arial",col3);
+			break;
+		}
+	}
+	allbutplot = 0;
+}
+
+function mup(x,y)
+{
+	mx = x; my = y;
+	
+	for(i = 0; i < nbut; i++){
+		x = Math.floor(butx[i]); y = Math.floor(buty[i]); dx = Math.floor(butdx[i]); dy = Math.floor(butdy[i]); text = buttext[i]; val = butval[i]; val2 = butval2[i];
+
+		if(mx > x && mx < x+dx && my > y && my < y+dy){
+			switch(butac[i]){
+			case GREEKAC:
+				inserttext(greek[val]);
+				break;
+			case CHECKAC:
+				chon[val] = 1-chon[val];
+				break;
+			case ADDAC:
+				na = ById("inp").value;
+				if(na.length == 0){ alert("Please insert text"); return;}
+				st = "["+na;
+				fl = 0;
+				for(cl = 0; cl < nclass; cl++){
+					if(chon[cl] == 1){
+						if(fl == 0) st += "_"; else st += ",";
+						fl = 1;
+						st += classname[cl];
+					}
+				}
+				st += "]";
+			
+				window.opener.inserttext(st);
+				
+				//par.focus();
+				//par.document.getElementById("inp").focus();
+				window.close();
+				break;
+
+			case CANCELAC:
+				par.focus();
+				//par.document.getElementById("inp").focus();
+				window.close();
+				break;
+			}
+		}
+	}
+	buttonplot();
+}
+
+function cantext(x,y,te,fo,col)
+{
+	cv.font = fo;
+	cv.textAlign = 'left';
+	cv.fillStyle = col;
+	cv.fillText(te, x, y);	
+}
+
+function cancentertext(x,y,te,fo,col)
+{
+	cv.font = fo;
+	cv.textAlign = 'center';
+	cv.fillStyle = col;
+	cv.fillText(te, x, y);	
+}
+
+function darkcol(col)
+{ 
+	var bigint, r, g, b, frac = 0.7;
+	bigint = parseInt(col.substring(1), 16);	
+	r = (bigint >> 16) & 255;
+	g = (bigint >> 8) & 255;
+	b = bigint & 255;
+	return "#" + hex(frac*r) + hex(frac*g) + hex(frac*b);
+}
+
+function hex(c) {
+	var hex = (Math.floor(c)).toString(16);
+	return hex.length == 1 ? "0" + hex : hex;
+}
+
+function drawroundrect(x,y,dx,dy,r,col,col2)
+{
+	var th, i, nth = Math.floor(r/2);
+	if(nth < 1) nth = 1;
+
+	cv.lineWidth = 1;
+	cv.beginPath();
+ 
+	cv.moveTo(x+r,y);
+
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+dx-r+r*Math.sin(th),y+r-r*Math.cos(th));
+	}
+
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+dx-r+r*Math.cos(th),y+dy-r+r*Math.sin(th));
+	}
+
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+r-r*Math.sin(th),y+dy-r+r*Math.cos(th));
+	}
+
+	for(i = 0; i <= nth; i++){
+		th = i*Math.PI/(2*nth);
+		cv.lineTo(x+r-r*Math.cos(th),y+r-r*Math.sin(th));
+	}
+
+	cv.closePath();
+	cv.fillStyle = col; 
+	cv.fill();
+	cv.strokeStyle = col2;
+	cv.stroke();
+}
+
+function drawrect(x1, y1, x2, y2, col)
+{
+	cv.beginPath();
+	cv.lineWidth = 1; 
+	cv.rect(x1,y1,x2,y2);
+	cv.strokeStyle = col;
+	cv.stroke();
+}
+
+function fillrect(x1, y1, x2, y2, col)
+{
+	cv.beginPath();
+	cv.rect(x1,y1,x2,y2);
+	cv.fillStyle = col;
+	cv.fill();
+}
+
+function inserttext(text)
+{
+	a = ById("inp");
+	startPos = a.selectionStart; endPos = a.selectionEnd;
+	st = ById("inp").value;
+	ById("inp").value = st.substr(0,startPos)+text+st.substr(endPos,st.length);
+	
+	a.selectionStart = startPos+text.length;  a.selectionEnd = a.selectionStart;
+}
+
+</script>
+</head>
+
+<body id="main" style="background:#eeeeff;  margin:0px; border:0px; padding:0px; margin-left:0px;  margin-right:0px; margin-top:0px;" onload="init()" onunload="" onresize="resize()">
+
+<canvas id="myCanvas" style="background:#eeeeff; margin:0px; border:0px; padding:0px; margin-left:0px;  margin-right:0px; margin-top:0px;"></canvas> 
+
+<input id='inp' style='text-align:left; position:absolute; top:3px; left:65px; width:80px; height:20px; background=#ffffff;' value=''  onblur='setTimeout(function() {ById("inp").focus();}, 0);' type='text'/>
+
+</body>
+</html>
