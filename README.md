@@ -28,7 +28,7 @@ The following files can be downloaded:
 
 * **Linux:** BICI_v1.0_linux.tar.gz(Currently not availalbe). This can then be extracted by using the terminal command “tar -zxvf BICI_v1.0_linux.tar.gz”. The code is executed using “./BICI”.
 
-* **Mac:** [BICI_v1.0_Mac](https://github.com/BioSS-EAT/BICI/releases/download/v1.0/BICI_v1.0_Mac) BICI is run by clicking on the “BICI.app” icon.
+* **Mac:** [BICI_v1.0_Mac.zip](https://github.com/BioSS-EAT/BICI/releases/download/v1.0/BICI_v1.0_Mac.zip) BICI is run by clicking on the “BICI.app” icon.
 
 ## Documentation
 
