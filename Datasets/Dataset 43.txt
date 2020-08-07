@@ -1,0 +1,12 @@
+﻿Capture name	Compartments	Time	Detection probability
+Cap:t=0	All	0	1
+Cap:t=20	All	20	1
+Cap:t=40	All	40	1
+Cap:t=60	All	60	1
+Cap:t=80	All	80	1
+Cap:t=100	All	100	1
+Cap:t=120	All	120	1
+Cap:t=140	All	140	1
+Cap:t=160	All	160	1
+Cap:t=180	All	180	1
+Cap:t=200	All	200	1

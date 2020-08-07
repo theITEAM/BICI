@@ -1,0 +1,2 @@
+﻿ID	Time	Pop	Capture name
+Ind. 1	0	P	Cap:t=0
