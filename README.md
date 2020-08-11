@@ -24,15 +24,15 @@ The current version (v1.0) contains the following features:
 
 The following files can be downloaded:
 
-* **Windows:** [BICI_v1.0_windows.zip](https://github.com/BioSS-EAT/BICI/releases/download/v1.0/BICI_v1.0_windows.zip). Once unzipped SIRE is run by clicking on the “BICI.exe” icon.
+* **Windows:** [BICI_v1.0_windows.zip](https://github.com/theITEAM/BICI/releases/download/v1.0/BICI_v1.0_windows.zip). Once unzipped SIRE is run by clicking on the “BICI.exe” icon.
 
 * **Linux:** BICI_v1.0_linux.tar.gz(Currently not availalbe). This can then be extracted by using the terminal command “tar -zxvf BICI_v1.0_linux.tar.gz”. The code is executed using “./BICI”.
 
-* **Mac:** [BICI_v1.0_Mac.zip](https://github.com/BioSS-EAT/BICI/releases/download/v1.0/BICI_v1.0_Mac.zip) BICI is run by clicking on the “BICI.app” icon.
+* **Mac:** [BICI_v1.0_Mac.zip](https://github.com/theITEAM/BICI/releases/download/v1.0/BICI_v1.0_Mac.zip) BICI is run by clicking on the “BICI.app” icon.
 
 ## Documentation
 
-Information about the software can be obtained from the [BICI manual](https://github.com/BioSS-EAT/BICI/blob/master/BICI_Manual_v1.0.pdf). A [website](https://bioss-eat.github.io/BICI.html) provides screenshots of the software.
+Information about the software can be obtained from the [BICI manual](https://github.com/theITEAM/BICI/blob/master/BICI_Manual_v1.0.pdf). A [website](https://theITEAM.github.io/BICI.html) provides screenshots of the software.
 
 ## Build
 
