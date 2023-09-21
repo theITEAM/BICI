@@ -24,9 +24,9 @@ The current version contains the following features:
 
 The following files can be downloaded:
 
-* **Windows:** [BICI_windows.zip](https://github.com/theITEAM/BICI/releases/download/v1.1/BICI_windows.zip). Once unzipped SIRE is run by clicking on the “BICI.exe” icon.
+* **Windows:** [BICI_windows.zip](https://github.com/theITEAM/BICI/releases/download/v1.2/BICI_windows.zip). Once unzipped SIRE is run by clicking on the “BICI.exe” icon (if you get the message “Windows protected your PC” you must click “More info” and “Run anyway”).
 
-* **Mac:** [BICI_v1.0_Mac.zip](https://github.com/theITEAM/BICI/releases/download/v1.0/BICI_v1.0_Mac.zip) BICI is run by clicking on the “BICI.app” icon.
+* **Mac:** [BICI_mac.zip](https://github.com/theITEAM/BICI/releases/download/v1.2/BICI_mac.zip) BICI is run by clicking on the “BICI.app” icon.
 
 
 ## Documentation
