@@ -1,0 +1,61 @@
+SPECIES: People   type: inidividual-based
+
+N: 3
+Classification: DS  index: b  coord: cartesian
+
+Compartments:
+S  branch: false  x: -13  y: 0
+I  branch: false  x: -1  y: 0
+R  branch: false  x: 11  y: 0
+
+Transitions:
+S→I   S -> I    Exp(rate)    normal   bp_set: false   branch: false
+I→R   I -> R    Exp(rate)    normal   bp_set: false   branch: false
+
+Global Compartments:
+S
+DS no branch: S→I, 
+pop affect: 
+I
+DS no branch: I→R, 
+pop affect: {I}, 
+R
+DS no branch: 
+pop affect: 
+Global Transitions:
+S→I     S -> I
+I→R     I -> R
+DATA:
+Add ind  add-ind-sim.csv  ncol: 3  nrow: 100
+
+NM_TRANS
+
+INDIVIDUAL EFFECT GROUPS
+
+BRANCH PARAM GROUPS:
+POPULATIONS:
+{I} in People: I,1   ME: β×{I}/N  
+
+PARAMETERS
+N   const  time_dep: false  age_dep: false  auto: false
+  value: 100, parent: []   child: []  
+
+β   const  time_dep: false  age_dep: false  auto: false
+  value: 0.25, parent: []   child: []  
+
+μ   const  time_dep: false  age_dep: false  auto: false
+  value: 0.1, parent: []   child: []  
+
+PARAMETER VECTOR:
+
+SPLINES:
+
+EQUATIONS:
+β/μ  
+β×{I}/N  
+μ  
+
+DERIVED:
+R
+β/μ   ref: 0
+

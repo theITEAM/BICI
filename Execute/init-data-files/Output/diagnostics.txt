@@ -1,0 +1,23 @@
+MCMC PROPOSAL DIAGNOSTICS
+
+Parameter proposal: β
+ Acceptance: 34%   Size:0.77596
+CPU time: 3%
+
+Parameter proposal: μ
+ Acceptance: 42%   Size:0.250447
+CPU time: 0%
+
+Individual event proposals: 
+S→I    Acceptance: 68%   Size:2.16915
+I→R    Acceptance: 63%   Size:2.93721
+CPU time: 4%
+
+Individual sampler proposals: 
+
+ Acceptance: 79% 
+CPU time: 57%
+
+Check CPU  time: 0%
+
+Total CPU  time: 1 seconds

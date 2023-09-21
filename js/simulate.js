@@ -1,1629 +1,644 @@
-function simulatebuts()                                      // Sets up the buttons on the simulation page
+"use strict";
+
+/// Starts a simulation
+function start_simulation()
 {
-	var x, y;
-	x = menux+tab; y = 30;
-	cv = resultcv;
+	start("sim",1);
+}
 
-	res = simres; 
-	 
-	switch(pagesub[SIMULATEPAGE]){
-	case 0:
-		addbutton("Set model parameters",x,y,0,0,-1,TITLEBUT,25,-1); y += 50;
+
+/// Starts a simulation or inference 
+function start(siminf,nchain)
+{
+	let stat = create_output_file(siminf,"Execute/init.txt"); 
+	
+	if(stat == "success"){
+		inter.running_status = true;
+		generate_screen();
+		start_loading_symbol(1);
 		
-		if(paramsim.length == 0) addbutton("There are no model parameters.",x+18,y,900,0,-1,PARAGRAPHBUT,1,-1);
-		else{
-			addbutton("",x+20,y,siminitwidth,simheight,CANVASBUT,CANVASBUT,-1,-1);
-
-			drawparaminit();
-				
-			tableyfrac = simheight/ytot;
-			if(tableyfrac < 1) addbutton("",width-30,y,13,simheight,SLIDEAC,YSLIDEBUT,-1,-1);
+		inter.chain = [];
+		
+		if(siminf == "sim"){
+			sim_result = clear_result();			
+			results_add_model(sim_result,model.sim_details,siminf);
 		}
-		addbutton("Next",width-105,height-45,90,30,NEXTSIMAC,NEXTBUT,0,-1);		
-		break;
+		else{
+			inf_result = clear_result();			
+			results_add_model(inf_result,model.inf_details,siminf);
+		}
 		
-	case 1:
-		switch(showsimindinit){
-		case 0:
-			addbutton("Set initial polulation",x,y,0,0,-1,TITLEBUT,26,-1); y += 50;
-			
-			cornx = menux+20;
-			addbutton("",cornx,y,modeldx,modeldy+50,CANVASBUT,CANVASBUT,-1,-1);
-		
-			x = 10; y = 0;
-			addcanbutton("Manually set",x+40,y,350,22,CANRADIOBUT,CANRADIOBUT,"Manualpop",CANRADIOMANUAL);
-			addcanbutton("Load initial individuals",x+350,y,350,22,CANRADIOBUT,CANRADIOBUT,"Load",CANRADIOMANUAL);
-			y += 30;
-			
-			switch(siminit){
-			case "":
-				addcanbutton("Please select how the initial conditions for the simulation are defined.",x+60,y,150,0,-1,TEXTBUT2,-1,-1);
-				break;
-				
-			case "Manualpop":
-				addcanbutton("Specify the initial populations in each of the compartments:",x,y,150,0,-1,TEXTBUT2,-1,-1); y += 30;
+		let nchain = 1; if(siminf == "inf") nchain = model.inf_details.nchain;
+		for(let ch = 0; ch < nchain; ch++){
+			startspawn(ch,siminf);  
+		}
+	}
+}
 
-				rightmenu(width-rwid,125,"Manualpop");
-				
-				drawmodel(viewpopinitset,0,y,modeldx,modeldy-y,"frame","popinit");
-				
-				addbutton("Next",width-105,height-45,90,30,NEXTSIMAC,NEXTBUT,0,-1);		
-				break;
+
+/// Clears any results
+function clear_result()
+{
+	return {sample:[], par_sample:[]};
+}
+
+
+/// Starts execution of C++ code
+function startspawn(ch,siminf)                                    
+{		
+	let num = Math.floor(Math.random()*1000); 
+	
+	inter.chain[ch] = { done:false, siminf:siminf, term:false, prog:0, leftover:"", lines:[]};
+	
+	switch(ver){
+	case "windows": inter.child[ch] = spawn('Execute/bici.exe',[num]); break;
+	}
+	
+	funct(inter.child[ch],ch);
+}
+
+
+/// This function executes the c++ code
+function funct(chi,ch)                                      // Gathers output of C++ file
+{
+	chi.stdout.on('data', function (data) {
+		//pr(data+" data");
+		let cha = inter.chain[ch];
+		let st = cha.leftover + data;
 		
-			case "Load":
-				y += 20;
-				
-				if(simindinit.length == 0){
-					addcanbutton("Please upload a file specifying the initial population:",x,y,150,0,-1,TEXTBUT2,-1,-1);
-					addbutton("Upload",width-rwid,129,80,30,SIMLOADINITAC,UPLOADBUT,-1,-1);
+		let lines = st.split('\n');
+		cha.leftover = lines[lines.length-1];
+		
+		for(let li = 0; li < lines.length-1; li++){
+			let line = lines[li];
+	
+			if(line.length > 10 && line.substr(0,10) == "<PROGRESS>"){
+				cha.prog = Number(line.substr(10));
+				let progmin = LARGE;
+				for(let ch2 = 0; ch2 < inter.chain.length; ch2++){
+					if(inter.chain[ch2].prog < progmin) progmin = inter.chain[ch2].prog;
 				}
-				else{
-					drawmodel(viewpopinitset,0,y,modeldx,modeldy-y,"frame","loadinit");
-					addbutton("Reload",width-rwid,125,80,30,SIMLOADINITAC,UPLOADBUT,-1,-1);
-					addbutton("Edit",width-rwid,125+40,80,30,SIMVIEWINITAC,GREENBUT,-1,-1);
+				if(progmin > 0) set_loading_percent(progmin);
+			}
+			
+			cha.lines.push(line);
+		}
+	});
+
+	chi.stderr.on('data', function (data) {
+		alertp("There was a problem running the code: "+endl+data); 
+		terminate(); 
+	});
+
+	chi.on('close', function (code) {
+		//pr("close");
+		inter.chain[ch].done = true;
+		
+		let j = 0; 
+		while(j < inter.chain.length && inter.chain[j].done == true && inter.chain[j].term == false) j++;
+		if(j == inter.chain.length){
+			setTimeout(function(){ process_all_chains()}, 10);
+		}
+		/*
+		if(inter.chain[ch].term == false){
+			setTimeout(function(){pr("ch"+ch); process_info(ch);}, 10);
+		}
+		*/
+	});
+}	
+
+
+/// Processes information from all chains
+function process_all_chains()
+{
+	let siminf = inter.chain[0].siminf;
+	
+	let result;
+	switch(siminf){
+	case "sim": result = sim_result; break;
+	case "inf": result = inf_result; break;
+	}
+	
+	for(let ch = 0; ch < inter.chain.length; ch++) process_info(ch,result);
+	
+	inter.running_status = false;
+	stop_loading_symbol();
+
+	intialise_plot_filters(result);
+	initialise_pages();
+	
+	let newpage = "Simulation"; if(siminf == "inf") newpage = "Inference";
+	change_page({pa:newpage, su:"Results"});
+}
+
+/// Processes the output from the c++ code
+function process_info(ch,result)
+{
+	let lines = inter.chain[ch].lines;
+	
+	for(let c = 0; c < lines.length; c++){ lines[c] = lines[c].replace(/\r/g, "");}
+
+	// checks for any errors in the 
+	let c = 0; 
+	while(c < lines.length){
+		let line = lines[c];
+	
+		if(line == "<<PARAMS>>" || line == "<<STATES>>" || line == "<<ERROR>>"){
+			c++;
+			let content="";
+			while(c < lines.length && lines[c] != "<<END>>"){
+				content += lines[c]+endl;
+				c++;
+			}
+		
+			if(c == lines.length){
+				alertp("There was a problem running the code."); 
+				terminate(); 
+				return;
+			}
+			
+			switch(line){
+			case "<<PARAMS>>":
+				{
+					let warn = "Problem trasfering data";
 					
-					rightmenu(width-rwid,240,"loadinitpop");
-					
-					addbutton("Next",width-105,height-45,90,30,NEXTSIMAC,NEXTBUT,0,-1);		
+					read_param_samples(ch+1,content,result,warn);
+				}
+				break;
+			
+			case "<<STATES>>":
+				read_state_samples(ch+1,content,result);
+				break;
+				
+			case "<<ERROR>>":
+				{
+					alertp("The following error was found:"+endl+content);
+					terminate(); 
+					return;
 				}
 				break;
 			}
-			break;
-			
-		case 1:
-			addbutton("Initial population",x,y,0,0,-1,TITLEBUT,26,-1); y += 50;
-			
-			addbutton("The following table defines the initial population:",x+18,y,900,0,-1,PARAGRAPHBUT,1,-1);
-			y += 45;
-			
-			cornx = x+40; corny = y;
-			addbutton("",cornx,corny,tablewidth,tableheight,CANVASBUT,CANVASBUT,-1,-1);
-			
-			drawtable();
-			
-			tableyfrac = rowmax/nrow;
-			if(tableyfrac < 1) addbutton("",x+40+ tablewidth+10,y+22,13,tableheight-22,SLIDEAC,YSLIDEBUT,-1,-1);
-
-			tablexfrac = tablewidth/tottablewidth;
-			if(tablexfrac < 1) addbutton("",x+40,y+tableheight+10,tablewidth,13,SLIDEAC,XSLIDEBUT,-1,-1);
-			
-			addbutton("Cancel",width-205,height-45,90,30,SIMINITCANCELAC,CANCELBUT2,0,-1);
-			
-			addbutton("Done",width-105,height-45,90,30,SIMINITPOPBACKAC,ADDDATABUT,0,-1);	
-			break;
 		}
-		break;
-
-	case 2:
-		if(warning.length > 0){ addwarning(); return;}
 	
-		na = simpagename[pagesubsub[SIMULATEPAGE][2]];
-
-		switch(na){
-		case "Start":
-			if(simres.result != 0){
-				cornx = menux+tab+20; corny = 80;
-				addbutton("",cornx,corny,setupwidth,setupheight,CANVASBUT,CANVASBUT,-1,-1);
+		c++;
+	}
+	
+	/*
+	let j = 0; 
+	while(j < inter.chain.length && inter.chain[j].done == true && inter.chain[j].term == false) j++;
+	if(j == inter.chain.length){
+		inter.running_status = false;
+		stop_loading_symbol();
+	
+		intialise_plot_filters(result);
+		initialise_pages();
 		
-				if(advop == 0){
-					addbutton("Run",x,y,0,0,-1,TITLEBUT,224,-1);
-					drawsimsetup();
-				}
-				else{
-					addbutton("Advanced options",x,y,0,0,-1,TITLEBUT,223,-1);
-					drawsimadvop();
-				}
-				loading = 0;
+		let newpage = "Simulation"; if(siminf == "inf") newpage = "Inference";
+		change_page({pa:newpage, su:"Results"});
+	}
+	*/
+}
+
+
+/// Terminates the code
+function terminate()
+{
+	if(inter.running_status == false) return;
+	
+	for(let ch = 0; ch < inter.chain.length; ch++){
+		let cha = inter.child[ch];
+		inter.chain[ch].term = true;
+		inter.child[ch].stdin.pause();
+		inter.child[ch].kill();
+	}
+	
+	inter.running_status = false;
+	stop_loading_symbol();
+	generate_screen();
+}
+
+
+/// Adds buttons to start a simulation		
+function add_sim_start_buts(lay)
+{
+	if(inter.running_status == true) return;
+	
+	let cx = corner.x;
+	let cy = corner.y;
+	
+	if(inter.options == false){
+		cy = lay.add_title("Start simulation",cx,cy,{te:start_sim_text});
+		
+		cy += 2;
+		
+		cy = lay.add_subtitle("Time range",cx,cy,WHITE,{te:time_range_text});
+		cy = lay.add_paragraph("Set the time range over which simulation is performed:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+		
+		let yy = cy-2.5;
+		add_right_input_field(yy,"Start time",{type:"sim_t_start",update:true},lay);
+		add_right_input_field(yy+4,"End time",{type:"sim_t_end",update:true},lay);
+
+		cy += 6;
+		
+		cy = lay.add_subtitle("Simulation number",cx,cy,WHITE,{te:sim_num_text});
+		cy = lay.add_paragraph("Set the number of simulations to be generated:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+		
+		yy = cy-2.5;
+		add_right_input_field(yy,"Number",{type:"sim_number",update:true},lay);
+		
+		cy += 2;
+		
+		cy = lay.add_subtitle("Time-step",cx,cy,WHITE,{te:sim_timestep});
+
+		if(model.sim_details.algorithm == undefined) model.sim_details.algorithm = {value:"gillespie"};
+		
+		let xx = 33;
+		
+		cy = lay.add_paragraph("Set the time-step used to simulate",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+
+		yy = cy-2.5;
+		add_right_input_field(yy,"Time-step",{type:"sim_timestep",update:true},lay);
+		
+		add_corner_link("> Further options","Options",lay);
+		
+		lay.add_corner_button([["Start","Grey","StartSimulation"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
+	}
+	else{
+		let te = "Further simulation options";
+		cy = lay.add_title(te,cx,cy,{te:further_sim_text});
+		
+		cy += 2;
+		
+		let gap = 2;
+		
+		cy = lay.add_subtitle("Individual max",cx,cy,WHITE,{te:indmax_text});
+		
+		cy = lay.add_paragraph("Maximum number of individuals (for individual-based models)",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+	
+		let yy = cy-2.5;
+		add_right_input_field(yy,"Maximum",{type:"sim_indmax",update:true},lay);
+		
+		cy += gap;
+		
+		/*
+		cy = lay.add_subtitle("Seed",cx,cy,WHITE,{te:seed_text});
+		
+		cy = lay.add_paragraph("Set the random seed",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+	
+		let yy = cy-2.5;
+		add_right_input_field(yy,"Maximum",{type:"sim_indmax",update:true},lay);
+		*/
+		
+		
+		lay.add_corner_button([["Done","Grey","OptionsDone"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
+	}
+}
+
+
+function add_right_input_field(yy,te,op,lay)
+{
+	let dx = 8;
+	let xx = lay.inner_dx-dx-3;
+	add_input_field(xx,yy,dx,te,op,lay);
+}
+	
+function add_input_field(xx,yy,dx,te,op,lay)
+{
+	lay.add_button({te:te, x:xx, y:yy, dx:dx, dy:0.8, type:"InputBoxName", back_col:WHITE});
+	yy += 1.2;
+	lay.add_input(xx,yy,dx,op);
+	
+	yy += 2;
+	let sto = inter.textbox_store;
+	let k = 0; while(k < sto.length && sto[k].ref != op.type) k++;
+	
+	if(k < sto.length){
+		let warn = sto[k].warning;
+		if(warn != undefined){
+			lay.add_paragraph(warn,dx,xx,yy-0.4,RED,warn_si,warn_lh,undefined,"center");
+		}
+	}
+}
+		
+
+/// Adds the button for the page in which simulation parameters are input
+function add_param_value_buts(lay)
+{
+	let cx = corner.x;
+	let cy = corner.y;
+	
+	cy = lay.add_title("Simulation parameter values",cx,cy, {te:sim_text});
+		
+	cy += 0.5;
+		
+	add_layer("ParamValueContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-2,{});	
+}
+
+
+function get_param_cat(filt_list,filt_type)
+{
+	let param = model.param;
+	
+	let param_cat = [];
+	param_cat.push({name:"Parameters", sim_te:sim_uni_text, inf_te:inf_uni_text, list:[]});
+	param_cat.push({name:"Parameter vectors", sim_te:sim_vector_text, inf_te:inf_vector_text, list:[]});
+	param_cat.push({name:"Parameter matrices", sim_te:sim_matrix_text, inf_te:inf_matrix_text, list:[]});
+	param_cat.push({name:"Parameter tensors", sim_te:sim_tensor_text, inf_te:inf_tensor_text, list:[]});
+	param_cat.push({name:"Individual effects", sim_te:sim_ie_variance_text, inf_te:inf_ie_variance_text, list:[]});
+	param_cat.push({name:"Fixed effects", sim_te:fixed_eff_text, inf_te:fixed_eff_text, list:[]});
+	
+	for(let i = 0; i < param.length; i++){
+		if(find_in(filt_list,param[i].type) == undefined && 
+		!(filt_type == "only normal" && param[i].variety != "normal") &&
+		!(filt_type == "for sim" && param[i].variety == "const") &&
+		!(filt_type == "for sim" && param[i].variety == "reparam")
+		){
+			if(param[i].type == "fixed effect"){
+				 param_cat[5].list.push(i);
 			}
 			else{
-				if(loading == 0) startloading();
-				addbutton("",menux+(width-menux)/2,height/2+60,0,0,-1,PROGRESSBUT,0,-1);
-				addbutton("Cancel",width-115,height-45,100,30,STARTAC,ADDDATABUT,0,-1);
-			}
-			break;
-			
-		case "Populations": case "Derived":
-			if(simres.result == 1) addbutton("Stop!",width-115,height-45,100,30,STARTAC,UPLOADBUT,0,-1);
-		
-			rightmenu(width-rwid,75,"pop");
-		
-			showpopulations(2);
-			y = height-120;
-			
-			addbutton("Rerun", width-115,height-45,100,30,STARTAC,GREENBUT,0,-1);
-			break;
-			
-		case "Individuals":
-			if(simres.result == 1) addbutton("Stop!",width-115,height-45,100,30,STARTAC,UPLOADBUT,0,-1);
-		
-			indplot();
-			addbutton("Rerun", width-115,height-45,100,30,STARTAC,GREENBUT,0,-1);
-			break;
-		
-		case "Statistics":
-			addbutton("Statistics",x,30,0,0,-1,TITLEBUT,48,-1);
-			rightmenu(width-rwid,75,"Statistics"); 
-			showstatistics();
-			break;
-			
-		case "Gen. Data":
-			switch(gentype){
-			case -1:
-				addbutton("Generate data",x,y,0,0,-1,TITLEBUT,28,-1); y += 40;
-	 
-				if(simres.nderive == 0){ addbutton("Three basic types of data can be generated:",x+20,y,800,0,-1,PARAGRAPHBUT,-1,-1); y += 95;}
-				else{ addbutton("Four basic types of data can be generated:",x+20,y,800,0,-1,PARAGRAPHBUT,-1,-1); y += 45;}
-					
-				addbutton("State data",x+20,y,800,0,-1,TEXTSUBTITLEBUT,-1,-1); y += 25;
-				addbutton("Generate", width-155,y,100,30,GENSTARTAC,UPLOADBUT,0,-1);
-				addbutton("Output state measurements of individuals at specified points in time.",x+20,y,600,0,-1,PARAGRAPHBUT,-1,-1);
-				y += 90;
-				
-				addbutton("Transition data",x+20,y,800,0,-1,TEXTSUBTITLEBUT,-1,-1); y += 25;
-				addbutton("Generate", width-155,y,100,30,GENSTARTAC,UPLOADBUT,1,-1);
-				addbutton("Output the times of a specified transition.",x+20,y,600,0,-1,PARAGRAPHBUT,-1,-1);
-				y += 90;
-				
-				addbutton("Population data",x+20,y,800,0,-1,TEXTSUBTITLEBUT,-1,-1); y += 25;
-				addbutton("Generate", width-155,y,100,30,GENSTARTAC,UPLOADBUT,2,-1);
-				addbutton("Output population data at specified points in time.",x+20,y,600,0,-1,PARAGRAPHBUT,-1,-1);
-				y += 90;
-				
-				if(simres.nderive > 0){
-					addbutton("Derived data",x+20,y,800,0,-1,TEXTSUBTITLEBUT,-1,-1); y += 25;
-					addbutton("Generate", width-155,y,100,30,GENSTARTAC,UPLOADBUT,3,-1);
-					addbutton("Output derived data at specified points in time.",x+20,y,600,0,-1,PARAGRAPHBUT,-1,-1);
-					y += 90;
-				}				
-				break;
-				
-			case 0:	
-				switch(drawgennum){
-				case -2: case -1: addbutton("Individuals observed",x,y,0,0,-1,TITLEBUT,-1,-1); break;
-				default: 
-					if(drawgennum < sellist.length){
-						addbutton("Observation model for '"+cla[sellist[drawgennum]].name+"'",x,y,0,0,-1,TITLEBUT,-1,-1);
-					}
-					else{
-						if(drawgennum == sellist.length) addbutton("State Data",x,y,0,0,-1,TITLEBUT,-1,-1);
-						if(drawgennum == sellist.length+1) addbutton("Capture Data",x,y,0,0,-1,TITLEBUT,-1,-1);
-					}
-				}
-				y += 50;
-		
-				cornx = x+20; corny = y;
-				if(drawgennum < sellist.length){
-					drawgendata();
-					addbutton("",x+20,y,tablewidth,simheight,CANVASBUT,CANVASBUT,-1,-1);
-					tableyfrac = simheight/ytot;
-					if(tableyfrac < 1) addbutton("",menux+tab+20+tablewidth+10,y,13,simheight,SLIDEAC,YSLIDEBUT,-1,-1);
-					
-					if(drawgennum >= 0 || drawgennum == -1){
-						addbutton("Back",width-305,height-45,90,30,BACKGENAC,BACKBUT,0,-1);
-						addbutton("Cancel",width-205,height-45,90,30,GENCANCAC,CANCELBUT2,0,-1);
-					}
-					else addbutton("Cancel",width-205,height-45,90,30,GENCANCAC,CANCELBUT2,0,-1);
-					addbutton("Next",width-105,height-45,90,30,NEXTGENAC,NEXTBUT,0,-1);
-				}
+				if(param[i].type == "variance" || param[i].type == "correlation") param_cat[4].list.push(i);
 				else{
-					if(drawgennum == sellist.length){
-						addbutton("Here is the state data generated from the simulation and based on the specified observation model:",x+20,y,800,0,-1,PARAGRAPHBUT,-1,-1);
-					}
-					else{
-						addbutton("This data provides information on when and which individuals are captured:",x+20,y,800,0,-1,PARAGRAPHBUT,-1,-1);
-					}
-					y += 40;
-					cornx = x+40; corny = y;
-					addbutton("",cornx,corny,tablewidth,tableheight,CANVASBUT,CANVASBUT,-1,-1);
-					tableyfrac = rowmax/nrow;
-					if(tableyfrac < 1) addbutton("",x+40+ tablewidth+10,y+22,13,tableheight-22,SLIDEAC,YSLIDEBUT,-1,-1);
-
-					tablexfrac = tablewidth/tottablewidth;
-					if(tablexfrac < 1) addbutton("",x+40,y+tableheight+10,tablewidth,13,SLIDEAC,XSLIDEBUT,-1,-1);
-					drawtable();
-					
-					addbutton("Back",width-305,height-45,90,30,BACKGENAC,BACKBUT,0,-1);
-					addbutton("Save",width-205,height-45,90,30,SAVEGENAC,EXPORTBUT,0,-1);
-					if(ncoldef == (sellist.length+2) || drawgennum == sellist.length+1){
-						addbutton("Done",width-105,height-45,90,30,GENCANCAC,ADDDATABUT,0,-1);
-					}
-					else addbutton("Next",width-105,height-45,90,30,NEXTGENAC,NEXTBUT,0,-1);
-		
-				}
-				break;
-			
-			case 1:
-				addbutton("Generate event data",x,y,0,0,-1,TITLEBUT,-1,-1); y += 40;
-				switch(drawgennum){
-				case 0: 
-					transop(x,y);
-					break;
-					
-				case 1:
-					cornx = x+20; corny = y;
-
-					addbutton("",x+20,y,tablewidth,tableheight,CANVASBUT,CANVASBUT,-1,-1);
-					
-					addingdata = 0;
-					drawfilter(transcl);
-					
-					tableyfrac = tableheight/ytot;
-					if(tableyfrac < 1) addbutton("",menux+tab+20+tablewidth+10,y,13,tableheight,SLIDEAC,YSLIDEBUT,-1,-1);
-					addbutton("Back",width-305,height-45,90,30,BACKGENAC,BACKBUT,0,-1);
-					addbutton("Cancel",width-205,height-45,90,30,GENCANCAC,CANCELBUT2,0,-1);
-					addbutton("Next",width-105,height-45,90,30,NEXTGENEVAC,NEXTBUT,0,-1);
-					break;
-					
-				case 2:
-					st = "This data provides information on ";
-					switch(transty){
-					case "trans": st += "'"+transni+" → "+transnf+"'"; break;
-					case "+": st += "source"; break;
-					case "-": st += "sink"; break;
-					}
-					
-					st += " transitions";
-					var st2=""; for(cl = 0; cl < ncla; cl++) if(clagendata[cl] != "All" && cl != transcl) st2 += clagendata[cl]+",";
-					if(st2 != "") st += " (for individuals in "+st2.substr(0,st2.length-1)+")";
-					addbutton(st+":",x+20,y,800,0,-1,PARAGRAPHBUT,-1,-1);
-					y += 40;
-					cornx = x+40; corny = y;
-					addbutton("",cornx,corny,tablewidth,tableheight,CANVASBUT,CANVASBUT,-1,-1);
-					tableyfrac = rowmax/nrow;
-					if(tableyfrac < 1) addbutton("",x+40+ tablewidth+10,y+22,13,tableheight-22,SLIDEAC,YSLIDEBUT,-1,-1);
-
-					tablexfrac = tablewidth/tottablewidth;
-					if(tablexfrac < 1) addbutton("",x+40,y+tableheight+10,tablewidth,13,SLIDEAC,XSLIDEBUT,-1,-1);
-					drawtable();
-					
-					addbutton("Back",width-305,height-45,90,30,BACKGENAC,BACKBUT,0,-1);
-					addbutton("Save",width-205,height-45,90,30,SAVEGENAC,EXPORTBUT,0,-1);
-					addbutton("Done",width-105,height-45,90,30,GENCANCAC,ADDDATABUT,0,-1);
-					break;
-				}
-				break;
-				
-			case 2:  // generate population data
-				addbutton("Generate population data",x,y,0,0,-1,TITLEBUT,-1,-1); y += 40;
-				switch(drawgennum){
-				case 0: 
-					drawgenpopdata();
-					addbutton("Next",width-105,height-45,90,30,NEXTGENAC3,NEXTBUT,0,-1);
-					addbutton("Cancel",width-205,height-45,90,30,GENCANCAC,CANCELBUT2,0,-1);
-					break;
-					
-				case 1:
-					addbutton("This table provides population data:",x+20,y,800,0,-1,PARAGRAPHBUT,-1,-1);
-					y += 40;
-					
-					drawtable();	
-					cornx = x+40; corny = y;
-					addbutton("",cornx,corny,tablewidth,tableheight,CANVASBUT,CANVASBUT,-1,-1);
-					tableyfrac = rowmax/nrow;
-					if(tableyfrac < 1) addbutton("",x+40+ tablewidth+10,y+22,13,tableheight-22,SLIDEAC,YSLIDEBUT,-1,-1);
-
-					tablexfrac = tablewidth/tottablewidth;
-					if(tablexfrac < 1) addbutton("",x+40,y+tableheight+10,tablewidth,13,SLIDEAC,XSLIDEBUT,-1,-1);
-					
-					addbutton("Back",width-305,height-45,90,30,BACKGENAC,BACKBUT,0,-1);
-					addbutton("Save",width-205,height-45,90,30,SAVEGENAC,EXPORTBUT,0,-1);
-					addbutton("Done",width-105,height-45,90,30,GENCANCAC,ADDDATABUT,0,-1);
-					break;
-				}
-				break;
-			
-			case 3:  // generate derived data
-				addbutton("Generate derived data",x,y,0,0,-1,TITLEBUT,-1,-1); y += 40;
-				switch(drawgennum){
-				case 0: 
-					drawgenderdata();
-					
-					addbutton("Next",width-105,height-45,90,30,NEXTGENAC4,NEXTBUT,0,-1);
-					addbutton("Cancel",width-205,height-45,90,30,GENCANCAC,CANCELBUT2,0,-1);
-					break;
-					
-				case 1:
-					addbutton("This table provides derived data:",x+20,y,800,0,-1,PARAGRAPHBUT,-1,-1);
-					y += 40;
-					
-					drawtable();	
-					cornx = x+40; corny = y;
-					addbutton("",cornx,corny,tablewidth,tableheight,CANVASBUT,CANVASBUT,-1,-1);
-					tableyfrac = rowmax/nrow;
-					if(tableyfrac < 1) addbutton("",x+40+ tablewidth+10,y+22,13,tableheight-22,SLIDEAC,YSLIDEBUT,-1,-1);
-
-					tablexfrac = tablewidth/tottablewidth;
-					if(tablexfrac < 1) addbutton("",x+40,y+tableheight+10,tablewidth,13,SLIDEAC,XSLIDEBUT,-1,-1);
-					
-					addbutton("Back",width-305,height-45,90,30,BACKGENAC,BACKBUT,0,-1);
-					addbutton("Save",width-205,height-45,90,30,SAVEGENAC,EXPORTBUT,0,-1);
-					addbutton("Done",width-105,height-45,90,30,GENCANCAC,ADDDATABUT,0,-1);
-					break;
-				}
-				break;
-			}		
-			break;
-		}
-		break;
-	}
-}
-
-function drawsimsetup()
-{
-	x = 10; y = 10;
-
-	addcanbutton("Time Range",x,y,150,0,-1,TEXTBUT,-1,-1); y += 30;
-
-	addcanbutton("Begin: "+tsimmin,rightval,y-15,135,30,MINMAXBIGBUT,MINMAXBIGBUT,-1,3);
-	addcanbutton("End: "+tsimmax,rightval,y+15,135,30,MINMAXBIGBUT,MINMAXBIGBUT,-1,7);
-
-	addcanbutton("This represented the range in time over which simulation is performed.",x+15,y,150,0,-1,TEXTBUT2,-1,-1); y += 25;
-	y += 25;
-	te = "Advanced options..."; addcanbutton(te,x,y,textwidth(te,"14px arial"),20,ADVOPAC,LINKBUT,-1,-1);
-	
-	addbutton("Start", width-115,height-45,100,30,STARTAC,GREENBUT,0,-1);
-}
-
-function drawsimadvop()
-{
-	x = 10; y = 10;
-	
-	addcanbutton("Limit",x,y,150,0,-1,TEXTBUT,-1,-1); y += 30;
-	
-	addcanbutton("The maximum number of allowable individuals.",x+15,y,150,0,-1,TEXTBUT2,-1,-1);
-	addcanbutton(indmaxnumber,rightval,y-8,129,30,MINMAXBIGBUT,MINMAXBIGBUT,0,99); y += 50;
-
-	addcanbutton("Simulation number",x,y,150,0,-1,TEXTBUT,-1,-1); y += 30;
-				
-	addcanbutton("The total number of simulations to be performed. Since the model is stochastic,",x+15,y,150,0,-1,TEXTBUT2,-1,-1); y += 25;
-	addcanbutton("each simulation will geneate a different result.",x+15,y,150,0,-1,TEXTBUT2,-1,-1); y += 50;
-
-	addcanbutton("Single simulation",x+40,y,180,22,CANRADIOBUT,CANRADIOBUT,0,CANRADIOSIMTY);
-	addcanbutton("Multiple simulations",x+240,y,180,22,CANRADIOBUT,CANRADIOBUT,1,CANRADIOSIMTY);
-	if(simty == 1) addcanbutton("Number: "+simnumber,rightval,y-8,129,30,MINMAXBIGBUT,MINMAXBIGBUT,0,6); y += 40;
-
-	addbutton("Back",width-105,height-45,90,30,ADVOPAC2,BACKBUT,0,-1);	
-}
-
-function transop(x,y)                                      // Page giving options for transitions
-{
-	var canac;
-	if(page == INFERENCEPAGE) canac = CANCELBUT2; else canac = GENCANCAC;
-		
-	y += 5;
-	addbutton("Transition",x+20,y,180,20,RADIOBUT,RADIOBUT,"trans",RADIOTRANSTY);
-	addbutton("Source",x+20+180,y,180,20,RADIOBUT,RADIOBUT,"+",RADIOTRANSTY);
-	addbutton("Sink",x+20+2*180,y,180,20,RADIOBUT,RADIOBUT,"-",RADIOTRANSTY);
-	y += 35;
-	
-	switch(transty){
-	case "trans":
-		addbutton("Please select which transition to generate data for:",x+20,y,800,0,-1,PARAGRAPHBUT,-1,-1); y += 50;
-		addbutton("",x+20,y,modeldx,modeldytrans,CANVASBUT,CANVASBUT,-1,-1);	
-
-		drawmodel(transcl,0,0,modeldx,modeldytrans,"frame","seltrans");
-		addbutton("Cancel",width-105,height-45,90,30,canac,CANCELBUT2,0,-1);
-		rightmenu(width-rwid,125,"seltrans");
-		break;
-		
-	case "+":
-		addbutton("Source data is generated (i.e. transitions in which individuals enter the system).",x+20,y,800,0,-1,PARAGRAPHBUT,-1,-1); 
-		addbutton("Cancel",width-205,height-45,90,30,canac,CANCELBUT2,0,-1);
-		if(page == INFERENCEPAGE && datatype == "move"){
-			addbutton("Done",width-105,height-45,90,30,DONEAC,ADDDATABUT,0,-1);
-		}
-		else addbutton("Next",width-105,height-45,90,30,NEXTGENAC2,NEXTBUT,0,-1);
-		break;
-		
-	case "-":
-		addbutton("Sink data is generated (i.e. transitions in which individuals leave the system).",x+20,y,800,0,-1,PARAGRAPHBUT,-1,-1); 
-		addbutton("Cancel",width-205,height-45,90,30,canac,CANCELBUT2,0,-1);
-		if(page == INFERENCEPAGE && datatype == "move"){
-			addbutton("Done",width-105,height-45,90,30,DONEAC,ADDDATABUT,0,-1);
-		}
-		else addbutton("Next",width-105,height-45,90,30,NEXTGENAC2,NEXTBUT,0,-1);
-		break;
-	}	
-}
-
-function loadsiminit(textFromFile)                       // Loads the initial state for simulation
-{
-	var li, co;
-	var lines = textFromFile.split('\n');
-	
-	canover = -1; tableyfr = 0;
-	ncol = ncla; ncoldef = ncol; ncoldefmax = ncol;
-	nrow = 0;
-
-	row = [];
-	for(li = 0; li < lines.length; li++){
-		temp = lines[li].split('\t');
-		for(j = 0; j < temp.length; j++) temp[j] = temp[j].trim();
-		if(!(temp.length == 1 && temp[0].length == 0)){
-			row[nrow]=[];
-			row[nrow][0] = temp[0];
-			for(cl = 0; cl < ncla-1; cl++) if(cla[cl].ncomp == 1) row[nrow][1+cl] = cla[cl].comp[0].name;
-
-			for(j = 1; j < temp.length; j++){
-				na = temp[j];
-				for(cl = 0; cl < ncla-1; cl++){
-					for(c = 0; c < cla[cl].ncomp; c++) if(cla[cl].comp[c].name == na) break;
-					if(c < cla[cl].ncomp) break;
-				}
-				if(cl < ncla-1) row[nrow][cl+1] = na;
-				else{ errormsg = "On line "+(li+1)+": '"+na+"' is not a compatment name"; return 1;}
-			}
-			
-			for(cl = 0; cl < ncla-1; cl++){
-				if(row[nrow][cl] == undefined){ errormsg = "On line "+(li+1)+": Not all compartments have been specified"; return 1;}
-			}
-			
-			nrow++;
-		}
-	}
-	calcrowwidth();
-
-	colname[0] = "ID";
-	for(cl = 0; cl < ncla-1; cl++) colname[1+cl] = cla[cl].name;
-	setcolumns();
-	showsimindinit = 1;
-	return 0;
-}
-
-function showsimind()                                   // Shows the individuals in the simulation
-{
-	canover = -1; tableyfr = 0;
-	ncol = ncla; ncoldef = ncol; ncoldefmax = ncol;
-	nrow = simindinit.length;
-	row=[];
-	for(r = 0; r < nrow; r++){
-		row[r]=[];
-		row[r][0] = simindinit[r].id;
-		for(cl = 0; cl < ncla-1; cl++) row[r][cl+1] = simindinit[r].state[cl];
-	}
-	calcrowwidth();
-	
-	colname[0] = "ID";
-	for(cl = 0; cl < ncla-1; cl++) colname[1+cl] = cla[cl].name;
-	setcolumns();
-	showsimindinit = 1;
-}
-
-function setsimind()                                      // Sets simulated inidividuals from the table
-{
-	var r, cl, j, i;
-
-	simindinit=[];
-	for(r = 0; r < nrow; r++){
-		simindinit[r]={id:row[r][0], state:[]};
-		for(cl = 0; cl < ncla-1; cl++) simindinit[r].state[cl] = row[r][1+cl];
-	}
-	
-	for(cl = 0; cl < ncla-1; cl++){
-		for(j = 0; j < cla[cl].ncomp; j++) cla[cl].comp[j].loadinit = [];
-	}
-	
-	for(i = 0; i < simindinit.length; i++){
-		for(cl = 0; cl < ncla-1; cl++){
-			val = simindinit[i].state[cl];
-			j = 0; while(j < cla[cl].ncomp && cla[cl].comp[j].name != val) j++;
-			if(j == cla[cl].ncomp){
-				selectelement(i,cl+1,TABLEBUT);
-				errmsg = "This is not a compartment"; 
-				return 1;
-			}
-			cla[cl].comp[j].loadinit.push(simindinit[i].id);  
-		}
-	}
-	return 0; 
-}
-
-function drawparaminit()                                // Draws the simulation parameter set
-{
-	var x, y, dyparam = 26;
-	
-	nob = 0;
-	
-	x = 0; y = 0;
-	
-	addob(x,y,OBTEXT2,"Please select the model parameter values used for running the simulation:",0); y += 50; 
-	
-	if(paramsim.length == 0){ addob(x+20,y,OBTEXT,"The model contains no parameters",0); y += 30;}
-	else{
-		for(p = 0; p < paramsim.length; p++){ addob(x+20,y,OBPARAM,p,0); y += dyparam;}
-	}
-	ytot = y;
-	placeob();
-}
-
-function simsetup()                                      // Sets up the simulation xml file
-{
-	var j, nsimdata, simfr=[], possum=[];
-	
-	nchrun = 1;
-	simdone = 1;
-	 
-	nsimdata = 0; simdata=[];
-	for(cl = 0; cl < ncla; cl++){
-		simdata[nsimdata] = {name:[], variety:"state", id:[], t:[], val:[], cl:cl, type:"binary", pos:[], posbinary:[], posexpression:[], sensitive:[], postestres:[], testname:"T1"};
-			
-		for(i = 0; i < cla[cl].ncomp; i++){
-			simdata[nsimdata].pos[i] = cla[cl].comp[i].name;
-			simdata[nsimdata].posbinary[i] = [];
-			for(ii = 0; ii < cla[cl].ncomp; ii++){
-				if(i == ii) simdata[nsimdata].posbinary[i][ii] = 1;		
-				else simdata[nsimdata].posbinary[i][ii] = 0;	
-			}
-		}
-		nsimdata++;
-	}
-		
-	switch(siminit){
-	case "Manualpop":			
-		cl = simpopinitset;
-		nind = 0;
-		for(j = cla[cl].ncomp-1; j >= 0; j--){
-			for(i = 0; i < cla[cl].comp[j].simpopinit; i++){
-				for(cl2 = 0; cl2 < ncla; cl2++){
-					if(cl2 == cl){
-						simdata[cl2].id.push("Ind. "+(nind+1));
-						simdata[cl2].t.push(tsimmin);
-						simdata[cl2].val.push(cla[cl].comp[j].name);
-					}
-				}
-				nind++;
-			}
-		}
-
-		for(cl = 0; cl < ncla; cl++){
-			if(cl != simpopinitset){
-				if(cla[cl].name == "Time"){
-					for(i = 0; i < nind; i++){
-						simdata[cl].id.push("Ind. "+(i+1));
-						simdata[cl].t.push(tsimmin);
-						simdata[cl].val.push(cla[cl].comp[0].name);
-					}
-				}
-				else{
-					for(j = 0; j < cla[cl].ncomp; j++) simfr[j] = cla[cl].comp[j].simfracinit;
-					
-					for(i = 0; i < nind; i++){
-						sum = 0; for(j = 0; j < cla[cl].ncomp; j++){ sum += simfr[j]; possum[j] = sum;}
-						if(sum == 0){ alertsim("Error code EC13"); return;}
-						
-						z = Math.random()*sum; j = 0; while(j < cla[cl].ncomp && z > possum[j]) j++;
-						if(j == cla[cl].ncomp){ alertsim("Error code EC14"); return;}
-						simfr[j] -= 1/nind; if(simfr[j] < 0) simfr[j] = 0;
-						
-						simdata[cl].id.push("Ind. "+(i+1));
-						simdata[cl].t.push(tsimmin);
-						simdata[cl].val.push(cla[cl].comp[j].name);
-					}
+					let n = param[i].dep.length; if(n > 3) n = 3;
+					param_cat[n].list.push(i);
 				}
 			}
 		}
-		break;
-		
-	case "Load":
-		nind = simindinit.length;	
-		for(i = 0; i < nind; i++){
-			for(cl = 0; cl < ncla; cl++){
-				if(simindinit[i].id == ""){ alertsim("For initial individual ID blank"); return;}
-					
-				simdata[cl].id.push(simindinit[i].id);
-				simdata[cl].t.push(tsimmin);
-				if(cl < ncla-1){
-					val = simindinit[i].state[cl];
-					if(val == ""){
-						changepage(SIMULATEPAGE,1,0);
-						alertsim("The value for individual '"+simindinit[i].id+"' in classification '"+cla[cl].name+"' is not set. Please check the population initialisation.");
-						return;
-					}
-					for(c = 0; c < cla[cl].ncomp; c++){ if(cla[cl].comp[c].name == val) break;}
-					if(c == cla[cl].ncomp){
-						alertsim("The value '"+val+"' for individual '"+simindinit[i].id+"' in classification '"+cla[cl].name+"' is not valid");
-						return;
-					}
-					simdata[cl].val.push(val);
-				}
-				else simdata[cl].val.push(cla[cl].comp[0].name);	
-			}
-		}
-		break;
 	}
 	
-	converttoobs("sim");
-	startinference(1,1);
+	return param_cat;
 }
 
-function drawfilter(notcl)                                 // Draws the time filter
+
+/// Adds a screen allowing simulation parameters to be edited
+function add_param_value_content(lay)
 {
-	var cl;
+	let si_small = 0.8;
+	let fo_small = get_font(si_small);
 	
-	nob = 0;
-	x = 0; y = 20;
-	
-	for(cl = 0; cl < ncla; cl++) if(cla[cl].ncomp > 1 && cla[cl].name != "Time" && cl != notcl) break;
-	if(cl < ncla){
-		addob(x,y,OBTEXT,"Population:"); addob(x+110,y,OBRADIOWHICH); y += 30;
+	let y = 0;
+	let dy = 2.0;
 
-		switch(whichind){
-		case "all":
-			addob(x,y,OBTEXT2,"The selected transition is observed for individuals in all compartments.");
-			break;
+	let vector_flag = false;
+	
+	let x = maximim_label_width() + 4;
+
+	let param = model.param;
+	
+	let param_cat = get_param_cat(sim_param_not_needed,"for sim");
+	
+	if(no_param(param_cat)) center_message("No parameters need to be set.",lay);
+		
+	for(let cat = 0; cat < param_cat.length; cat++){
+		let pc = param_cat[cat];
+		if(pc.list.length > 0){
+			y = lay.add_subtitle(pc.name,1,y+0.2,WHITE,{te:pc.sim_te});
+		
+			for(let cati = 0; cati < pc.list.length; cati++){
+				let i = pc.list[cati];
+				let par = param[i];
 			
-		case "sub":
-			addob(x,y,OBTEXT2,"The selected transition is observed for individuals in the following subpopulation:"); y += 25;
-			y += 20;
-			
-			x = 10; 
-			for(cl = 0; cl < ncla; cl++){
-				if(cla[cl].ncomp > 1 && cla[cl].name != "Time" && cl != notcl){ 
-					dx = textwidth(cla[cl].name,"bold 16px arial")+10;
-					if(x+dx + 100 > 700){ x = 10; y += 30;}
-					//addob(x,y,OBSELIND,cl,dx);
-					if(addingdata == 2) addob(x,y,OBSELIND2,cl,dx);
-					else addob(x,y,OBSELIND,cl,dx);	
-					x += dx+130;
-				}
-			}
-			if(x > 10) y += 30;
-			break;
-		}
-	}
-	else{ 
-		addob(x,y,OBTEXT,"Population: Entire"); y += 30;
-		addob(x,y,OBTEXT2,"The selected transition is observed for individuals in all compartments.");
-	}
-	
-	x = 0; y = 160;
-	addob(x,y,OBTEXT,"Detection:"); addob(x+110,y,OBRADIOEVPD); y += 30;
-	
-	st = ""; if(whichind == "sub"){ for(cl = 0; cl < ncla; cl++) if(clagendata[cl] != "All") st += clagendata[cl]+",";}
-	if(st != "") st = st.substring(0,st.length-1);
-			
-	switch(obspd){
-	case "all":
-		if(st == "") addob(x,y,OBTEXT2,"All transitions of selected type are observed.");
-		else addob(x,y,OBTEXT2,"Transition on all individuals in "+st+" are observed.");
-		break;
-	
-	case "set":
-		if(st == "") addob(x,y,OBTEXT2,"Transitions observed with the following probability:");
-		else addob(x,y,OBTEXT2,"Transitions in "+st+" are observed with the following probabbility:");
-		if(page == SIMULATEPAGE) addob(x+20,y+35,OBMINMAX,"Probability: "+detectprob,14,200);
-		else addob(x+20,y+35,OBPD,"Probability: "+datatemp.pd,17,200);
-		break;
-	}
-		
-	x = 0; y = 320;
-	addob(x,y,OBTEXT,"Times:"); x += 70; y -= 4;
-	addob(x,y,OBTEXT2,"From"); x += 54;
-	
-	dx = textwidth(tgenmin,tablefont);
-	addob(x,y+3,OBMINMAX,tgenmin,9,dx+10);
-	x += dx+20;
-	addob(x,y,OBTEXT2,"to"); x += 30;
-	dx = textwidth(tgenmax,tablefont); 
-	addob(x,y+3,OBMINMAX,tgenmax,10,dx+10);
-	x += dx+20;
-
-	ytot = y;
-	
-	placeob();
-	
-	if(addingdata == 2) addcanbutton("",0,0,canvasdx,canvasdy,INACTIVEBUT,INACTIVEBUT,-1,-1);
-}
-
-function generatepopdata()                               // Generates population data from simulated data
-{
-	var st;
-
-	ncol = 3; ncoldef = ncol; ncoldefmax = ncol; datashow = "table";
-
-	nrow = 0; row=[];
-	for(ti = 0; ti < tlist.length; ti++){
-		row[ti]=[];
-		row[ti][0] = tlist[ti]; row[ti][1] = poplist[ti]; row[ti][2] = tpre(errbarlist[ti],4);
-		nrow++;
-	}
-		
-	calcrowwidth();
-	
-	st = getclagenname();
-	
-	colname[0] = "Time"; colname[1] = st+" population"; colname[2] = "Standard deviation"; 
-	setcolumns();
-}
-
-function generatederdata()                             // Generates population data from simulated data
-{
-	var st
-	
-	d = 0; while(d < derive.length && derive[d].name != dergensel) d++;
-	if(d == derive.length) alertp("Error code EC15");
-	
-	ncol = 3+derive[d].dep.length; ncoldef = ncol; ncoldefmax = ncol; datashow = "table";
-
-	nrow = 0; row=[];
-	for(ti = 0; ti < tlist.length; ti++){
-		var list = getder(dergensel,tlist[ti]); 
-		for(j = 0; j < list.length; j++){
-			row[nrow]=[];
-			row[nrow][0] = tlist[ti]; row[nrow][1] = tpre(list[j].val,4);
-
-			switch(errbar){
-			case 0: eb = errbarscale*Math.sqrt(row[nrow][0]+0.5); break;
-			case 1: eb = errbarfix; break;
-			}
-			row[nrow][2] = tpre(eb,4);
-			
-			for(k = 0; k < list[j].dep.length; k++) row[nrow][3+k] = list[j].dep[k]; 
-			nrow++;
-		}
-	}
-		
-	calcrowwidth();
-	
-	colname[0] = "Time"; colname[1] = dergensel; colname[2] = "Standard deviation";
-	for(k = 0; k < derive[d].dep.length; k++) colname[3+k] = derive[d].dep[k];
-
-	setcolumns();
-}
-
-function getderval(name,t)
-{
-	var temp = getder(name,t);
-	return temp[0].val;
-}
-
-function getder(name,t)                                   // Gets the values for derived quantites
-{
-	var list=[], d, ch;
-	
-	ch = 0;
-	d = 0;
-	i = -1; while(i < simres.DX-1 && simres.ch[ch].derivepl[d][i+1].t < t) i++;
-	
-	if(i >= 0 && i < res.DX-1){
-		f = t - simres.ch[ch].derivepl[d][i].t; ff = simres.ch[ch].derivepl[d][i+1].t - t;			
-		for(d = 0; d < simres.nderive; d++){
-			var spl = splitname(simres.derive[d]);
-			if(spl.name == name){
-				list.push({val:(simres.ch[ch].derivepl[d][i].av*ff + simres.ch[ch].derivepl[d][i+1].av*f)/(f+ff), dep:spl.dep});
-			}
-		}
-	}
-	return list;
-}
-
-function drawpopderdata(type)                           // Draws generated population derived data
-{
-	var r, x, y, bound=[];
-	
-	cv = resultcv;
-	
-	cornx = menux+20; corny = 80;
-	
-	x = 10; y = 10;
-	switch(type){
-	case 0:
-		addcanbutton("Population:",x,y,150,0,-1,TEXTBUT,-1,-1); x += 100; y -= 4;
-		for(cl = 0; cl < ncla; cl++){
-			if(cla[cl].ncomp > 1 || cl < ncla-2){
-				dx = textwidth(cla[cl].name,"bold 16px arial")+10;
-				if(x+dx + 100 > 700){ x = 110; y += 30;}
-				
-				var ops=[]; for(j = 0; j < cla[cl].ncomp; j++) ops.push(cla[cl].comp[j].name); ops.push("All");
-				
-				addcanbutton(cla[cl].name,x,y,150,20,-1,TEXTBUT2,-1,-1);
-				gdropinfo.push({val:clagendata[cl], x:cornx+x+dx+3, y:corny+y+2, dx:95, dy:20, style:2, options:ops, click:"gendata", cl:cl});
-				x += dx+130;
-			}
-		}
-		break;
-		
-	case 1:
-		addcanbutton("Derived quantity:",x,y,150,0,-1,TEXTBUT,-1,-1); x += 150; y -= 4;
-		var ops=[]; for(j = 0; j < derive.length; j++) ops.push(derive[j].name);
-		gdropinfo.push({val:dergensel, x:cornx+x+3, y:corny+y+2, dx:95, dy:20, style:2, options:ops, click:"dergen"});
-		break;
-	}
-	
-	if(x > 10) y += 30;
-	
-	axxmin = large; axxmax = -large;
-	ma = 1;
-	for(r = 0; r < nrow; r++){
-		t = parseFloat(row[r][0]); if(t < axxmin) axxmin = t; if(t > axxmax) axxmax = t;
-		bound[r] = geterrorbar(row[r][1],row[r][2]);
-		if(bound[r].max > ma) ma = bound[r].max;
-	}
-	
-	dx = axxmax - axxmin; if(dx == 0) dx = 1;
-	axxmin -= 0.05*dx; axxmax += 0.05*dx; setxtics();
-	axymin = 0; axymax = ma*1.1; w = setytics();
-		
-	graphframe(cornx,corny,40+w,50,20,80,w,"Time","Population","genpop");
-	
-	cv.clearRect(0,0,graphdx,graphdy);
-	
-	rr = 5;
-	for(r = 0; r < nrow; r++){
-		x = Math.floor(graphdx*(row[r][0]-axxmin)/(axxmax-axxmin));
-		y = Math.floor(graphdy-graphdy*(row[r][1] -axymin)/(axymax-axymin));
-		drawline(x-rr,y-rr,x+rr,y+rr,RED,THICKLINE);
-		drawline(x-rr,y+rr,x+rr,y-rr,RED,THICKLINE);
-	
-		ymi = Math.floor(graphdy-graphdy*(bound[r].min-axymin)/(axymax-axymin));
-		yma = Math.floor(graphdy-graphdy*(bound[r].max-axymin)/(axymax-axymin));
-		drawline(x,ymi,x,yma,RED,THICKLINE);
-		drawline(x-rr,ymi,x+rr,ymi,RED,THICKLINE);
-		drawline(x-rr,yma,x+rr,yma,RED,THICKLINE);
-	}	
-}
-
-function drawgenpopdata()                                // Sets up drawing of population data
-{
-	var poppro=[], timax = 200, ma, bound=[];
-
-	cornx = menux+20; corny = 80;
-	
-	for(cl = 0; cl < ncla; cl++){ if(cla[cl].ncomp > 1) break;}
-	
-	x = 10; y = 10;
-	if(cl < ncla){
-		addcanbutton("Population:",x,y,150,0,-1,TEXTBUT,-1,-1);
-		x += 100; y -= 4;
-		for(cl = 0; cl < ncla; cl++){
-			if(cla[cl].ncomp > 1){
-				dx = textwidth(cla[cl].name,"bold 16px arial")+10;
-				if(x+dx + 100 > 700){ x = 110; y += 30;}
-				
-				var ops=[]; for(j = 0; j < cla[cl].ncomp; j++) ops.push(cla[cl].comp[j].name); ops.push("All");
-				
-				addcanbutton(cla[cl].name,x,y,150,20,-1,TEXTBUT2,-1,-1);
-				gdropinfo.push({val:clagendata[cl], x:cornx+x+dx+3, y:corny+y+2, dx:95, dy:20, style:2, 
-				                options:ops, click:"gendata", cl:cl});
-				x += dx+130;
-			}
-		}
-		if(x > 10) y += 30;
-	}
-
-	x = 10; y += 5; 
-	addcanbutton("Times:",x,y,150,0,-1,TEXTBUT,-1,-1); x += 90;
-	addcanbutton("Periodic",x,y,130,22,CANRADIOBUT,CANRADIOBUT,0,CANRADIOGENT2); x += 130;
-	addcanbutton("User defined",x,y,130,22,CANRADIOBUT,CANRADIOBUT,1,CANRADIOGENT2); 
-	x += 150; y -= 4;
-	
-	switch(datagenttype2){
-	case 0:
-		addcanbutton("From",x,y,150,0,-1,TEXTBUT2,-1,-1); x += 54;
-		dx = textwidth(tgenmin,tablefont); addcanbutton(tgenmin,x,y-4,dx+10,30,MINMAXBUT,MINMAXBUT,0,9); x += dx+20;
-		addcanbutton("to",x,y,150,0,-1,TEXTBUT2,-1,-1); x += 30;
-		dx = textwidth(tgenmax,tablefont); addcanbutton(tgenmax,x,y-4,dx+10,30,MINMAXBUT,MINMAXBUT,0,10); x += dx+20;
-		addcanbutton("in steps of",x,y,150,0,-1,TEXTBUT2,-1,-1); x += 90;
-		dx = textwidth(dtgen,tablefont); addcanbutton(dtgen,x,y-4,dx+10,30,MINMAXBUT,MINMAXBUT,0,11); x += dx+20;
-		break;
-	
-	case 1:
-		addcanbutton("Time points:",x,y,150,0,-1,TEXTBUT2,-1,-1); x += 95;
-		dx = textwidth(tgenuserdef,tablefont);
-		if(x + dx > canvasdx-20) dx = canvasdx-20-x;
-		addcanbutton(tgenuserdef,x,y-5,dx+10,30,GENUSERBUT,GENUSERBUT,-1,-1);	
-		break;
-	}
-	
-	x = 10; y += 33;
-	addcanbutton("Error bars:",x,y,150,0,-1,TEXTBUT,-1,-1); x += 90;
-	addcanbutton("Square root",x,y,130,22,CANRADIOBUT,CANRADIOBUT,0,CANRADIOERRBAR); x += 130;
-	addcanbutton("Fixed",x,y,130,22,CANRADIOBUT,CANRADIOBUT,1,CANRADIOERRBAR); 
-	x += 150; y -= 4;
-
-	switch(errbar){
-	case 0:
-		addcanbutton("Scale",x,y,150,0,-1,TEXTBUT2,-1,-1); x += 54;
-		dx = textwidth(errbarscale,tablefont); addcanbutton(errbarscale,x,y-4,dx+10,30,MINMAXBUT,MINMAXBUT,0,15); x += dx+20;
-		break;
-	case 1:
-		addcanbutton("Value",x,y,150,0,-1,TEXTBUT2,-1,-1); x += 54;
-		dx = textwidth(errbarfix,tablefont); addcanbutton(errbarfix,x,y-4,dx+10,30,MINMAXBUT,MINMAXBUT,0,16); x += dx+20;
-		break;
-	}
-	
-	tlist=[];
-	switch(datagenttype2){
-	case 0: for(tt = parseFloat(tgenmin); tt <= parseFloat(tgenmax); tt += parseFloat(dtgen)) tlist.push(tt); break;
-	case 1: tlist = tgenuserdef.split(","); for(j = 0; j < tlist.length; j++) tlist[j] = parseFloat(tlist[j]); break;
-	}
-	
-	ma = 1;
-	
-	for(ti = 0; ti < tlist.length; ti++){
-		t = tlist[ti]; if(t == simres.tmin) t += tiny;
-		poplist[ti] = getpop(res.ch[0].sampev[0],t);
-		switch(errbar){
-		case 0: 
-			errbarlist[ti] = errbarscale*Math.sqrt(poplist[ti]+0.5); break;
-		case 1: errbarlist[ti] = errbarfix; break;
-		}
-		
-		bound[ti] = geterrorbar(poplist[ti],errbarlist[ti]);
-		if(bound[ti].max > ma) ma = bound[ti].max;
-	}
-	
-	for(ti = 0; ti < timax; ti++){
-		poppro[ti] = getpop(res.ch[0].sampev[0],simres.tmin+ti*(simres.tmax-simres.tmin)/timax+tiny);
-		if(poppro[ti] > ma) ma = poppro[ti];
-	}
-	
-	axxmin = simres.tmin; axxmax = simres.tmax+tiny; setxtics();
-	axymin = 0; axymax = ma*1.1; w = setytics();
-		
-	graphframe(cornx,corny,40+w,50,20,130,w,"Time","Population","genpop");
-	
-	cv.clearRect(0,0,graphdx,graphdy);
-	cv.beginPath(); 
-	for(ti = 0; ti < timax; ti++){
-		t = simres.tmin+ti*(simres.tmax-simres.tmin)/timax;
-		x = Math.floor(graphdx*(t-axxmin)/(axxmax-axxmin));
-		y = Math.floor(graphdy-graphdy*(poppro[ti]-axymin)/(axymax-axymin));
-		if(ti == 0) cv.moveTo(x,y);
-		else cv.lineTo(x,y);
-	}
-	cv.lineWidth = 3;
-	cv.strokeStyle = BLUE;
-	cv.stroke();
-	
-	r = 5;
-	for(ti = 0; ti < tlist.length; ti++){
-		x = Math.floor(graphdx*(tlist[ti]-axxmin)/(axxmax-axxmin));
-		y = Math.floor(graphdy-graphdy*(poplist[ti] -axymin)/(axymax-axymin));
-		
-		drawline(x-r,y-r,x+r,y+r,RED,THICKLINE);
-		drawline(x-r,y+r,x+r,y-r,RED,THICKLINE);
-		
-		ymi = Math.floor(graphdy-graphdy*(bound[ti].min -axymin)/(axymax-axymin));
-		yma = Math.floor(graphdy-graphdy*(bound[ti].max -axymin)/(axymax-axymin));
-		drawline(x,ymi,x,yma,RED,THICKLINE);
-		drawline(x-r,ymi,x+r,ymi,RED,THICKLINE);
-		drawline(x-r,yma,x+r,yma,RED,THICKLINE);
-	}	
-}
-
-function drawgenderdata()                                // Sets up drawing of derived data
-{
-	var poppro=[], timax = 200, ma, bound=[];
-
-	cornx = menux+20; corny = 80;
-	
-	for(cl = 0; cl < ncla; cl++){ if(cla[cl].ncomp > 1) break;}
-	
-	x = 10; y = 10;
-	addcanbutton("Derived quantity:",x,y,150,0,-1,TEXTBUT,-1,-1);
-	x += 150; y -= 4;
-
-	var ops=[]; for(j = 0; j < simres.nderive; j++) ops.push(simres.derive[j]);
-	gdropinfo.push({val:dergensel, x:cornx+x+3, y:corny+y+2, dx:95, dy:20, style:2, options:ops, click:"dergen"});
-	
-	y += 30;
-	x = 10; y += 5;
-	addcanbutton("Times:",x,y,150,0,-1,TEXTBUT,-1,-1); x += 90;
-	addcanbutton("Periodic",x,y,130,22,CANRADIOBUT,CANRADIOBUT,0,CANRADIOGENT2); x += 130;
-	addcanbutton("User defined",x,y,130,22,CANRADIOBUT,CANRADIOBUT,1,CANRADIOGENT2);
-	x += 150; y -= 4;
-	
-	switch(datagenttype2){
-	case 0:
-		addcanbutton("From",x,y,150,0,-1,TEXTBUT2,-1,-1); x += 54;
-		dx = textwidth(tgenmin,tablefont); addcanbutton(tgenmin,x,y-4,dx+10,30,MINMAXBUT,MINMAXBUT,0,9); x += dx+20;
-		addcanbutton("to",x,y,150,0,-1,TEXTBUT2,-1,-1); x += 30;
-		dx = textwidth(tgenmax,tablefont); addcanbutton(tgenmax,x,y-4,dx+10,30,MINMAXBUT,MINMAXBUT,0,10); x += dx+20;
-		addcanbutton("in steps of",x,y,150,0,-1,TEXTBUT2,-1,-1); x += 90;
-		dx = textwidth(dtgen,tablefont); addcanbutton(dtgen,x,y-4,dx+10,30,MINMAXBUT,MINMAXBUT,0,11); x += dx+20;
-		break;
-	
-	case 1:
-		addcanbutton("Time points:",x,y,150,0,-1,TEXTBUT2,-1,-1); x += 100;
-		dx = textwidth(tgenuserdef,tablefont);
-		if(x + dx > canvasdx-20) dx = canvasdx-20-x;
-		addcanbutton(tgenuserdef,x,y-5,dx+10,30,GENUSERBUT,GENUSERBUT,-1,-1);	
-		break;
-	}
-	
-	x = 10; y += 33;
-	addcanbutton("Error bars:",x,y,150,0,-1,TEXTBUT,-1,-1); x += 90;
-	addcanbutton("Square root",x,y,130,22,CANRADIOBUT,CANRADIOBUT,0,CANRADIOERRBAR); x += 130
-	addcanbutton("Fixed",x,y,130,22,CANRADIOBUT,CANRADIOBUT,1,CANRADIOERRBAR);
-	x += 150; y -= 4;
-
-	switch(errbar){
-	case 0:
-		addcanbutton("Scale",x,y,150,0,-1,TEXTBUT2,-1,-1); x += 54;
-		dx = textwidth(errbarscale,tablefont); addcanbutton(errbarscale,x,y-4,dx+10,30,MINMAXBUT,MINMAXBUT,0,15); x += dx+20;
-		break;
-	case 1:
-		addcanbutton("Value",x,y,150,0,-1,TEXTBUT2,-1,-1); x += 54;
-		dx = textwidth(errbarfix,tablefont); addcanbutton(errbarfix,x,y-4,dx+10,30,MINMAXBUT,MINMAXBUT,0,16); x += dx+20;
-		break;
-	}
-	
-	tlist=[];
-	switch(datagenttype2){
-	case 0: for(tt = parseFloat(tgenmin); tt <= parseFloat(tgenmax); tt += parseFloat(dtgen)) tlist.push(tt); break;
-	case 1: tlist = tgenuserdef.split(","); for(j = 0; j < tlist.length; j++) tlist[j] = parseFloat(tlist[j]); break;
-	}
-	
-	ma = -large;
-	for(ti = 0; ti < tlist.length; ti++){
-		t = tlist[ti]; if(t == simres.tmin) t += tiny;
-		
-		poplist[ti] = getderval(dergensel,t);
-		switch(errbar){
-		case 0: errbarlist[ti] = errbarscale*Math.sqrt(poplist[ti]+0.00001); break;
-		case 1: errbarlist[ti] = errbarfix; break;
-		}
-		
-		bound[ti] = geterrorbar(poplist[ti],errbarlist[ti]);
-		if(bound[ti].max > ma) ma = bound[ti].max;
-	}
-	
-	for(ti = 0; ti < timax; ti++){
-		//poppro[ti] = getpop(res.ch[0].sampev[0],simres.tmin+ti*(simres.tmax-simres.tmin)/timax+tiny);
-		poppro[ti] = getderval(dergensel,simres.tmin+ti*(simres.tmax-simres.tmin)/timax+tiny);
-		
-		if(poppro[ti] > ma) ma = poppro[ti];
-	}
-	
-	axxmin = simres.tmin; axxmax = simres.tmax+tiny; setxtics();
-	axymin = 0; axymax = ma*1.1; w = setytics();
-		
-	graphframe(cornx,corny,40+w,50,20,130,w,"Time",dergensel,"gender");
-	
-	cv.clearRect(0,0,graphdx,graphdy);
-	cv.beginPath(); 
-	for(ti = 0; ti < timax; ti++){
-		t = simres.tmin+ti*(simres.tmax-simres.tmin)/timax;
-		x = Math.floor(graphdx*(t-axxmin)/(axxmax-axxmin));
-		y = Math.floor(graphdy-graphdy*(poppro[ti]-axymin)/(axymax-axymin));
-		if(ti == 0) cv.moveTo(x,y);
-		else cv.lineTo(x,y);
-	}
-	cv.lineWidth = 3;
-	cv.strokeStyle = BLUE;
-	cv.stroke();
-	
-	r = 5;
-	for(ti = 0; ti < tlist.length; ti++){
-		x = Math.floor(graphdx*(tlist[ti]-axxmin)/(axxmax-axxmin));
-		y = Math.floor(graphdy-graphdy*(poplist[ti] -axymin)/(axymax-axymin));
-		
-		drawline(x-r,y-r,x+r,y+r,RED,THICKLINE);
-		drawline(x-r,y+r,x+r,y-r,RED,THICKLINE);
-		
-		ymi = Math.floor(graphdy-graphdy*(bound[ti].min -axymin)/(axymax-axymin));
-		yma = Math.floor(graphdy-graphdy*(bound[ti].max -axymin)/(axymax-axymin));
-		drawline(x,ymi,x,yma,RED,THICKLINE);
-		drawline(x-r,ymi,x+r,ymi,RED,THICKLINE);
-		drawline(x-r,yma,x+r,yma,RED,THICKLINE);
-	}	
-	
-	for(d = 0; d < derive.length; d++) if(derive[d].name == dergensel) break;
-	
-	x = width-rwid; y = 275;
-	for(j = 0; j < derive[d].dep.length; j++){
-		addbutton(derive[d].dep[j],x,y,0,0,-1,SMALLTEXTBUT,BLACK,-1); y += 20;
-		y += 40;
-	}
-}
-
-function inserttimes(y)                                 // Inputs for how time sampling is performed
-{
-	x = 10; y = 330;
-	addob(x,y,OBTEXT,"Times:"); addob(x+110,y,OBTIMEP); y += 30;	
-	switch(datagenttype){
-	case 0:
-		addob(x,y,OBTEXT2,"From"); x += 54;
-		dx = textwidth(tgenmin,tablefont); addob(x,y+3,OBMINMAX,tgenmin,9,dx+10); x += dx+20;
-		addob(x,y,OBTEXT2,"to"); x += 30;
-		dx = textwidth(tgenmax,tablefont); addob(x,y+3,OBMINMAX,tgenmax,10,dx+10); x += dx+20;
-		addob(x,y,OBTEXT2,"in steps of"); x += 90;
-		dx = textwidth(dtgen,tablefont); addob(x,y+3,OBMINMAX,dtgen,11,dx+10);	
-		break;
-		
-	case 1:
-		addob(x,y,OBTEXT2,"Initial time: "+simres.tmin);
-		break;
-		
-	case 2:
-		addob(x,y,OBTEXT2,"Time points:"); x += 100;
-		dx = textwidth(tgenuserdef,tablefont);
-		addcanbutton(tgenuserdef,x,y-5,dx+10,30,GENUSERBUT,GENUSERBUT,-1,-1);	
-		break;
-		
-	case 3: 
-		addob(x,y,OBTEXT2,"Transition:"); x += 80;
-		te = "Select";
-		var postrans=[], clop=[], trop=[], cl, tr, ci, cf, transni, transnf;
-		for(cl = 0; cl < ncla; cl++){
-			for(tr = 0; tr < cla[cl].ntra; tr++){
-				ci = cla[cl].tra[tr].i; if(ci < 0) transni = "+"; else transni = cla[cl].comp[ci].name;
-				cf = cla[cl].tra[tr].f; if(cf < 0) transnf = "-"; else transnf = cla[cl].comp[cf].name;
-				postrans.push(transni+" → "+transnf);
-				clop.push(cl); trop.push(tr);
-				if(cl == transselcl && tr == transseltr) te = transni+" → "+transnf;
-			}	
-		}
-		gdropinfo.push({val:te, x:cornx+x+10, y:corny+y+3, dx:selbutdx, dy:20, style:4, options:postrans, clop:clop, trop:trop, click:"transsel"});
-
-		break;
-	}
-	return y;
-}
-
-function drawgendata()                                  // Pages related to generating data from simulation
-{
-	var x, y, j;
-	
-	nob = 0;
-	x = 0; y = 10;
-
-	switch(drawgennum){
-	case -2:
-		y = 30;
-		for(cl = 0; cl < ncla; cl++) if(cla[cl].ncomp > 1) break;
-		if(cl < ncla){
-			addob(x,y,OBTEXT,"Population:"); addob(x+110,y,OBRADIOWHICH); y += 30;
-
-			switch(whichind){
-			case "all": addob(x,y,OBTEXT2,"Individuals in all compartments are observed."); break;
-			case "sub":
-				addob(x,y,OBTEXT2,"Only individuals from the following subpopulation are observed:"); y += 25;
-				y += 20;
-				
-				x = 10; 
-				for(cl = 0; cl < ncla; cl++){
-					if(cla[cl].ncomp > 1){
-						dx = textwidth(cla[cl].name,"bold 16px arial")+10;
-						if(x+dx + 100 > 700){ x = 10; y += 30;}
-						addob(x,y,OBSELIND,cl,dx);
-						x += dx+130;
-					}
-				}
-				if(x > 10) y += 30;
-				break;
-			}
-		}
-		else addob(x,y,OBTEXT,"Population: Entire");
-		
-		x = 0; y = 180;
-		addob(x,y,OBTEXT,"Detection:"); addob(x+110,y,OBRADIOPD); y += 30;
-		
-		st = ""; if(whichind == "sub"){ for(cl = 0; cl < ncla; cl++) if(clagendata[cl] != "All") st += clagendata[cl]+",";}
-		if(st != "") st = st.substring(0,st.length-1);
-				
-		switch(obspd){
-		case "all":
-			if(st == "") addob(x,y,OBTEXT2,"All individuals in the entire population are observed.");
-			else addob(x,y,OBTEXT2,"All individuals in "+st+" are observed.");
-			break;
-		
-		case "set":
-			if(st == "") addob(x,y,OBTEXT2,"Individuals are observed with the following probability:");
-			else addob(x,y,OBTEXT2,"Individuals in "+st+" are observed with the following probabbility:");
-			
-			addob(x+20,y+35,OBMINMAX,"Probability: "+detectprob,14,150);
-			break;
-		}
-	
-		y = inserttimes();
-		break;
-	
-	case -1:
-		addob(x,y,OBTEXT2,"For observed individuals, which classifications are actually measured? "); y += 25;
-		
-		x = 20; y += 25;
-		
-		for(cl = 0; cl < ncla-1; cl++){
-			if(cl == 0 || cla[cl].ncomp > 1){
-				w = textwidth(cla[cl].name,INPUTFONT)+50;
-				if(x+w > width-menux-30){ x = 20; y += 50;} 
-				addob(x,y,OBCHOOSECLA,cl,w); 
-				x += w + 30;
-			}
-		}
-		if(x > 20){ x = 0; y += 50;}
-		y += 10;
-		break;
-	
-	default:
-		cl = sellist[drawgennum]; clgl = cl;
-		dg = datagen[cl];
-	
-		addob(x,y,OBTEXT,"Type of observation model:"); addob(x+250,y,OBRADIOGEN,CANRADIOCHECK2,cla[cl].ncomp); y += 30;
-
-		switch(dg.type){
-		case "simple":
-			addob(x+15,y,OBTEXT2,"Here the data D is the compartment name in which the individual resides."); y += 25;
-			y += 10;
-			
-			dg.pos.length = cla[cl].ncomp;
-			for(j = 0; j < cla[cl].ncomp; j++){
-				dg.pos[j] = cla[cl].comp[j].name;
-				dg.posref[j] = j;
-			}
-			break;
-			
-		case "binary":
-			addob(x+15,y,OBTEXT2,"Define the data output D for each possible state:"); y += 25;
-			y += 10;
-			
-			dg.pos.length = cla[cl].ncomp;
-			for(j = 0; j < cla[cl].ncomp; j++){
-				if(dg.posedit[j] == undefined) dg.posedit[j] = cla[cl].comp[j].name;
-				dg.posref[j] = j;
-			}
-			break;
-			
-		case "test":
-			dg.pos.length = 2; dg.pos[0] = "1"; dg.pos[1] = "0";
-			
-			addob(x+15,y,OBTEXT2,"Generate diagnotic test data assuming the test is sensitive to a defined set of"); y += 25;
-			addob(x+15,y,OBTEXT2,"compartments. A sensitivity Se and specificity Sp account for inaccuracies in the test."); y += 25;
-			y += 40;
-			
-			addob(x,y,OBTEXT,"Test sensitive to:");
-			x = 160; y -= 6;
-			for(k = 0; k < cla[cl].ncomp; k++){
-				if(dg.sensitive[k] == undefined){ if(k == 0) dg.sensitive[k] = 1; else dg.sensitive[k] = 0;}
-			
-				if(dg.sensitive[k] == 1) st = cla[cl].comp[k].name+" ✓";
-				else st = cla[cl].comp[k].name+" ✖"; 
-				w = textwidth(st,"20px georgia")
-			
-				if(x+w > tablewidth-40){ x = 160; y += 50;}
-				addob(x,y,OBCOMP3,k,st,SENSAC);
-				x += w+50;		
-			}
-			y += 80;
-			
-			x = 0; addob(x,y,OBSESP); y += 20;
-			break;
-		}
-		
-		y += 35;
-		
-		if(dg.type == "test") istest = 1; else istest = 0;
-		
-		na = dg.testname;
-		
-		var wmax = 0;
-		for(j = 0; j < dg.pos.length; j++){
-			w = textwidth(dg.pos[j],"bold 16px arial");
-			if(w > wmax) wmax = w;
-		}
-
-		for(j = 0; j < dg.pos.length; j++){	
-			ysta = y;
-			x = wmax+105;
-				
-			for(k = 0; k < cla[cl].ncomp; k++){
-				st = "Pr(D|"+cla[cl].comp[k].name+") = ";
-				
-				switch(dg.type){
-				case "test":
-					switch(j){
-					case 0:
-						if(dg.sensitive[k] == 1) st += "Se";
-						else st += "1-Sp";
+				if(par.variety != "const" && par.variety != "reparam"){
+					switch(par.type){
+					case "Se": case "Sp": case "trap_prob": case "comp_prob": case "derive_param":
 						break;
 					
-					case 1:
-						if(dg.sensitive[k] == 1) st += "1-Se";
-						else  st += "Sp";
+					default:
+						{
+							let w = wright;
+							
+							if(add_view_button(par,w-4,y,i,lay,model)) w -= 4.5;
+							
+							if(par.variety == "dist"){
+								lay.add_checkbox(w-4.5,y+0.4,"Sample","Sample",par.sim_sample,WHITE);
+								w -= 4.5;
+							}
+							
+							if(par.variety == "dist" && par.sim_sample.check == true){
+								if(par.dep.length == 0 || par.prior_split_check.check == false){
+									display_distribution(i,x,y,lay,true,false,w);
+								}
+								else{
+									display_distribution_split(i,x,y,lay,true,false,"dist",w);
+								}
+							}
+							else{
+								if(par.type == "trans_bp" && par.auto_value != undefined){
+									let si = 1;
+									let ac, allow_edit = false, te = "Auto";
+									if(par.auto_value == false){
+										ac = "Auto";
+										te = "Auto";
+										allow_edit = true;
+										lay.add_button({te:te, x:38.5, y:y+0.25, dx:3, dy:1, ac:ac, type:"ViewSmall", i:i});
+									}
+									
+									//if(is_dist(par) == true) 
+									
+									display_constant(i,x,y,lay,w-3,allow_edit);
+								}	
+								else{
+									display_constant(i,x,y,lay,w);
+								}
+							}
+						
+							y += dy;
+						}
 						break;
-					}	
-					w = textwidth(st,"16px georgia")
-					if(x+w > tablewidth-40){ x = wmax+105; y += 30;}
-					addob(x,y,OBCOMP4,j,k,st,-1);
-					x += w+30;
-					break;
-				
-				case "simple": case "binary":
-					if(k == dg.posref[j]){
-						st = cla[cl].comp[k].name;
-					
-						w = textwidth(st,"20px georgia")
-						if(x+w > tablewidth-40){ x = wmax+105; y += 50;}
-						addob(x,y,OBCOMP8,j,k,st);
-						x += w+50;
 					}
-					break;
 				}
 			}
-			
-			if(dg.type == "binary") addob(20,Math.floor((ysta+y)/2),OBTEXTEDIT,'D="'+dg.posedit[j]+'"',wmax+48,j);
-			else addob(25,Math.floor((ysta+y)/2+5),OBTEXT,'D="'+dg.pos[j]+'"',0);
-
-			ma = 5;
-			addob(wmax+85,ysta-ma,OBBRACKET,y-ysta+30+2*ma);
-			
-			y += 60;
 		}
-		break;
 	}
-	
-	ytot = y;
-	
-	placeob();
 }
 
-function generatestatedata()                            // Generate state data from simulated data
+
+/// Determines if there are no parameters in param_cat
+function no_param(param_cat)
 {
-	var j, ch = 0, s = 0, stat=[], cl, tr;
-	
-	ncol = 2+sellist.length; ncol++;
-	if(obspd == "all"){  // If all individuals detected and no births and deaths then capture not needed.
-		for(cl =0; cl < ncla; cl++){
-			for(tr = 0; tr < cla[cl].ntra; tr++) if(cla[cl].tra[tr].i < 0 || cla[cl].tra[tr].f < 0) break;
-			if(tr < cla[cl].ntra) break;
-		}
-		if(cl == ncla) ncol--;
-	}	
-	ncoldef = ncol;
-	
-	res = simres;
+	for(let cat = 0; cat < param_cat.length; cat++){
+		if(param_cat[cat].list.length > 0) return false;
+	}
+	return true;
+}
 
-	nrow = 0; row=[];
-		
-	if(datagenttype == 3){  // Data at transitions
-		cl = transselcl; tr = transseltr;
-		w = res.ch[ch].sampev[s];
-		for(i = 0; i < w.nind; i++){
-			w = res.ch[ch].sampev[s];
-			wi = w.ind[i];
-			c = NOTALIVE;
-			for(e = 0; e < wi.nev; e++){
-				cf = wi.evc[e];
+	
+/// Displays a row allowing a variable constant to be set
+function display_constant(i,x,y,lay,w,allow_edit,source)
+{
+	if(source == undefined) source = model;
+	let par = source.param[i];
+	
+	lay.display_param(x-par.label_info.dx-0.7,y-0.1,par.label_info);
 
-				fl = 0;
-				if(c == NOTALIVE){ if(cla[cl].tra[tr].i < 0) fl++;}
-				else{ if(cla[cl].tra[tr].i == compval[c][cl]) fl++;}
-					
-				if(cf == NOTALIVE){ cc = c; if(cla[cl].tra[tr].f < 0) fl++;}
-				else{ cc = cf; if(cla[cl].tra[tr].f == compval[cf][cl]) fl++;}
-				
-				if(fl == 2 && wi.evt[e] != res.tmin) addstatemeas(i,cc,wi.evt[e]);		
-				c = cf;
-			}
-		}
+	let si = 1.5;
+	lay.add_button({te:"=", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
+	
+	let te;
+	if(par.dep.length == 0){
+		te = par.value;
+		if(allow_edit == false && isNaN(te)) te = "Auto calculate"; 
 	}
 	else{
-		tlist=[];
-		switch(datagenttype){
-		case 0: for(tt = parseFloat(tgenmin); tt <= parseFloat(tgenmax); tt += parseFloat(dtgen)) tlist.push(tt); break;
-		case 1: tlist.push(simres.tmin); break;
-		case 2: tlist = tgenuserdef.split(","); for(j = 0; j < tlist.length; j++) tlist[j] = parseFloat(tlist[j]); break;
-		}
+		if(par.set == false){
+			te = "Unset ";
+			switch(par.dep.length){
+			case 1: 
+				te += "Vector("+par.list[0].length+")";
+				break;
 
-		for(j = 0; j < tlist.length; j++){
-			t = tlist[j];
-			w = res.ch[ch].sampev[s];
-			for(i = 0; i < w.nind; i++){
-				wi = w.ind[i];
-				c = NOTALIVE; e = 0; while(e < wi.nev && (wi.evt[e] < t || (wi.evt[e] == t && t == simres.tmin))){ c = wi.evc[e]; e++;} 
-				addstatemeas(i,c,t);			
-			}
-		}
-	}
-	calcrowwidth()
-	colname[0] = "ID"; colname[1] = "Time"; 
-	for(k = 0; k < sellist.length; k++){
-		var st = cla[sellist[k]].name; if(datagen[sellist[k]].type == "test") st += " test";
-		colname[2+k] = st;	
-	}
-	if(2+sellist.length < ncoldef) colname[2+sellist.length] = "Capture name";
-	setcolumns();
-}
+			case 2:
+				te += "Matrix("+par.list[0].length+"×"+par.list[1].length+")";
+				break;
 
-function addstatemeas(i,c,t)                             // Adds a state measurement onto the generated data
-{
-	var cl, fl, indi;
-	
-	fl = 0;
-	if(c != NOTALIVE){ // works out if the individual is captured
-		for(cl = 0; cl < ncla-1; cl++){
-			if(clagendata[cl] != "All" && clagendata[cl] != cla[cl].comp[compval[c][cl]].name) break;
-		}
-		if(cl == ncla-1){ if(Math.random() < parseFloat(detectprob)) fl = 1;}
-	}
-	
-	if(fl == 1){
-		row[nrow]=[];
-		indi = indsim.ind[i]; 
-		if(!indi) row[nrow][0] = "Ind. "+(i+1); else row[nrow][0] = indi.id; // New individuals
-		row[nrow][1] = t;
-		for(k = 0; k < sellist.length; k++){
-			cl = sellist[k];
-			dg = datagen[cl];
-			switch(dg.type){
-			case "simple": row[nrow][2+k] = cla[cl].comp[compval[c][cl]].name; break;
-			case "binary": row[nrow][2+k] = dg.posedit[compval[c][cl]]; break;
-			case "test":
-				if(dg.sensitive[compval[c][cl]] == 1){
-					if(Math.random() < Segen) row[nrow][2+k] = 1;
-					else row[nrow][2+k] = 0;
+			default:
+				te += "Tensor("+par.list[0].length;
+				for(let k = 1; k < par.dep.length; k++){
+					te += "×"+par.list[k].length;
 				}
-				else{
-					if(Math.random() < Spgen) row[nrow][2+k] = 0;
-					else row[nrow][2+k] = 1;
-				}
+				te += ")";
 				break;
 			}
 		}
-		if(2+sellist.length < ncoldef) row[nrow][2+sellist.length] = getcapname(t);
-		nrow++;
-	}
-}
-
-function getcapname(t)                                   // Makes up the capture name
-{
-	var cl, st;
-	
-	st = "Cap:t="+t;
-	if(whichind == "sub"){
-		for(cl = 0; cl < ncla; cl++){
-			if(clagendata[cl] != "All") st += ","+clagendata[cl];
+		else{
+			te = JSON.stringify(par.value);
+			te = te.replace(/\"/g," ");
 		}
 	}
-	return st;
-}
-
-function getclagenname()                                 // Gets filter name based on clagendata
-{
-	var st = ""; for(cl = 0; cl < ncla; cl++){ if(clagendata[cl] != "All"){ if(st != "") st += ","; st += clagendata[cl];}}
-	if(st == "") st = "All";
-	return st;
-}
-
-function generatecapturedata()                           // Generates capture data from simulated data
-{
-	var j, tlist=[]; 
 	
-	switch(datagenttype){
-	case 0: for(tt = parseFloat(tgenmin); tt <= parseFloat(tgenmax); tt += parseFloat(dtgen)) tlist.push(tt); break;
-	case 1: tlist.push(simres.tmin); break;
-	case 2: tlist = tgenuserdef.split(","); for(j = 0; j < tlist.length; j++) tlist[j] = parseFloat(tlist[j]); break;
+	let fo = get_font(1.1,"","times");
+		
+	let ac; if(allow_edit != false) ac = "EditSimValue";
+	
+	lay.add_button({te:te, x:x+1.6, y:y+0., dx:w-x-1.6, dy:1.6, type:"ParamSimElement", source:source, font:fo, ac:ac, i:i, name:par.name, label_info:par.label_info});
+}
+
+
+/// Displays a row allowing a variable constant to be set
+function display_reparam(i,x,y,lay,w)
+{
+	let par = model.param[i];
+	
+	lay.display_param(x-par.label_info.dx-0.7,y-0.1,par.label_info);
+
+	let si = 1.5;
+	lay.add_button({te:"=", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
+	
+	let te, ac;
+	if(par.dep.length == 0){
+		te = par.value;
 	}
-	
-	st = getclagenname();
-	
-	ncol = 4; ncoldef = ncol; datashow = "table";
-	nrow = 0; row=[];
-	for(j = 0; j < tlist.length; j++){
-		t = tlist[j];
-		row[nrow] = [];
-		row[nrow][0] = getcapname(t); row[nrow][1] = st; row[nrow][2] = t; row[nrow][3] = detectprob;  
-		nrow++;
-	}
-	calcrowwidth();
-	colname[0] = "Capture name"; colname[1] = "Compartments"; colname[2] = "Time"; colname[3] = "Detection probability";
-	setcolumns();
-}
+	else{
+		if(par.set == false){
+			te = "Unset ";
+			switch(par.dep.length){
+			case 1: 
+				te += "Vector("+par.list[0].length+")";
+				break;
 
-function generateeventdata()                             // Generates event data from simulated data
-{
-	var i, ch = 0, s = 0, c, cf, cc, cl, tr, wi, fl, pd;
-	
-	cl = transcl;
-	ressa = simres.ch[0].sampev[0];
-	 
-	ncol = 2; ncoldef = ncol; ncoldefmax = ncol; datashow = "table";
+			case 2:
+				te += "Matrix("+par.list[0].length+"×"+par.list[1].length+")";
+				break;
 
-	nrow = 0; row=[];
-
-	for(i = 0; i < ressa.nind; i++){
-		wi = ressa.ind[i];				
-		c = NOTALIVE; 
-		for(e = 0; e < wi.nev; e++){
-			fl = 0;	
-			cf = wi.evc[e];
-			if(wi.evt[e] != simres.tmin && wi.evt[e] != simres.tmax){
-				switch(transty){
-				case "+":
-					if(c == NOTALIVE) fl = 2;
-					break;
-					
-				case "-":
-					if(cf == NOTALIVE) fl = 2;
-					break;
-					
-				case "trans":
-					if(cla[cl].comp[compval[c][cl]].name == transni) fl++;
-					if(cla[cl].comp[compval[cf][cl]].name == transnf) fl++;
-					break;
+			default:
+				te += "Tensor("+par.list[0].length;
+				for(let k = 1; k < par.dep.length; k++){
+					te += "×"+par.list[k].length;
 				}
+				te += ")";
+				break;
+			}
+		}
+		else{
+			te = JSON.stringify(par.value);
+			te = te.replace(/\"/g," ");
+		}
+	}
+	
+	let fo = get_font(1.1,"","times");
+	
+	lay.add_button({te:te, x:x+1.6, y:y+0., dx:w-x-1.6, dy:1.6, type:"ReparamElement", font:fo, ac:"EditReparamValue", i:i, name:par.name, label_info:par.label_info});
+}
+
+
+/// Click to edit simulation value
+function edit_sim_value(th,lay_name,i,source)
+{
+	let par = source.param[th];
+
+	if(par.dep.length == 0){
+		select_bubble(lay_name,i,{});
+	}
+	else{
+		inter.edit_param = {type:"Value", source:source, value:copy(par.value), label_info:par.label_info, i:th};	
+	}
+}
+
+
+/// Click to edit reparameterised expressions
+function edit_reparam_value(th,lay_name,i)
+{
+	let par = model.param[th];
+
+	if(par.dep.length == 0){
+		select_bubble_over();
+		inter.bubble.th = th;
+	}
+	else{
+		inter.edit_param = {type:"Reparam", value:copy(par.value), label_info:par.label_info, i:th};	
+	}
+}
+
+
+/// Works out the maximum width of a parameter label
+function maximim_label_width()
+{
+	let w_max = 0;
+	for(let i = 0; i < model.param.length; i++){
+		let par =  model.param[i];
+		if(par.label_info.dx > w_max) w_max = par.label_info.dx;
+	}
+	
+	return w_max;
+}
+
+
+/// Adds a "View" button to allow for the data to be visualised
+function add_view_button(par,x,y,i,lay,source)
+{
+	if(par.variety == "normal" || par.variety == "const"){
+		if(par.spline.on == true){
+			lay.add_button({te:"View", source:source, x:x, y:y+0.3, dx:3.7, dy:1, ac:"ViewSpline", type:"CombineIE", i:i});
+			return true;
+		}
+		else{
+			if(par.dep.length == 1){
+				lay.add_button({te:"View", source:source, x:x, y:y+0.3, dx:3.7, dy:1, ac:"ViewVector", type:"CombineIE", i:i});
+				return true;
 			}
 			
-			if(fl == 2){
-				cc = c; if(cc == NOTALIVE) cc = cf;
-				if(checkfil(cc,wi.evt[e]) == 1){
-					if(obspd == "all") pd = 1;
-					else pd = detectprob;
-	
-					if(Math.random() < pd){ 
-						row[nrow] = [];
-						indi = indsim.ind[i]; 
-						if(!indi) row[nrow][0] = "Ind. "+(i+1); else row[nrow][0] = indi.id; // New individual
-						row[nrow][1] = wi.evt[e];
-						nrow++;
-					}
-				}
+			if(par.dep.length == 2){
+				lay.add_button({te:"View", source:source, x:x, y:y+0.3, dx:3.7, dy:1, ac:"ViewMatrix", type:"CombineIE", i:i});
+				return true;
 			}
-			c = cf;
 		}
 	}
-		
-	calcrowwidth();
-	colname[0] = "ID"; colname[1] = "Time";
-	setcolumns();	
-}
-
-function checkfil(c,t)                                 // Checks compartment c at time t agrees with filter
-{
-	var cl;
-	if(t < tgenmin || t > tgenmax) return 0;
-	for(cl = 0; cl < ncla; cl++){ 
-		if(clagendata[cl] != "All" && clagendata[cl] != cla[cl].comp[compval[c][cl]].name) return 0;
-	}
-	return 1;
-}
-
-function gendatastart(val)                             // Initialises generation of data
-{
-	var cl, i;
-
-	for(cl = 0; cl < ncla; cl++) clagendata[cl] = "All";
- 
-	whichind = "all"; obspd = "all"; detectprob = 1;
- 
-	tgenmin = simres.tmin; tgenmax = simres.tmax;
- 
-	switch(val){
-	case 0: case 2: case 3:
-		tgenuserdef = ""; for(t = tgenmin; t < tgenmax; t += parseFloat(dtgen)) tgenuserdef += t+", ";
-		tgenuserdef = tgenuserdef.substr(0,tgenuserdef.length-2);
-	}
 	
-	switch(val){
-	case 0:           // state data
-		gentype = 0;
-		drawgennum = -2;
-		for(cl = 0; cl < ncla; cl++){
-			datagen[cl] = {type:"simple", pos:[], posedit:[],  posref:[], sensitive:[]};
-			if(cl == 0 || cla[cl].ncomp > 1) selclass[cl] = 1; else selclass[cl] = 0;
+	return false;
+}
+
+
+/// Adds a distance checkbox for a matrix
+function add_distance_button(par,x,y,lay)
+{
+	if(par.dep.length == 2){
+		let index = remove_prime(par.dep[0]);
+		if(index == remove_prime(par.dep[1])){
+			lay.add_checkbox(x+0.5,y+0.3,par,"Distance",par.dist_matrix,WHITE,{title:"Distance matrix", te:distmat_text});	
+			return true;
 		}
-		dtgen = ((simres.tmax-simres.tmin)/10).toPrecision(3);
-		detectprob = 1;
-		transselcl = -1;
-		break;
-
-	case 1:            // event data
-		gentype = 1; drawgennum = 0; transcl = 0; transty = "trans";
-		break;
-		
-	case 2:            // population data	
-		gentype = 2; drawgennum = 0;
-		break;
-	
-	case 3:            // Derived data
-		gentype = 3; drawgennum = 0; dergensel = simres.derive[0]; 
-		break;
 	}
+	
+	return false;
 }
-
-function changegennum(val)                               // Changes the page under data generation
-{
-	canover = -1; tableyfr = 0; drawgennum = val;	
-}
+	

@@ -1,681 +1,444 @@
-function priorbuts()                                      // Prior page                      
+"use strict";
+
+
+/// Adds the button for the page in which parameter priors are input
+function add_param_prior_buts(lay)
 {
-	x = menux+tab; y = 100; 
-
-	cornx = x+20; corny = y;
-	addbutton("",cornx,corny,priorwidth,priorheight,CANVASBUT,CANVASBUT,-1,-1);
-
-	if(drawpriors() == 1){
-		addbutton("This page defines the prior distributions for all the parameters in the model.",x+15,70,150,0,-1,NTEXTBUT,-1,-1);
-	}
-	else{
-		y = 70;
-		if(page == MODELPAGE) addbutton("There are currently no distributions.",x+18,y,900,0,-1,PARAGRAPHBUT,1,-1);
-		else addbutton("There are no model parameters.",x+18,y,900,0,-1,PARAGRAPHBUT,1,-1);
-	}
-
-	if(tableyfrac < 1) addbutton("",menux+tab+20+priorwidth+10,corny,13,priorheight,SLIDEAC,YSLIDEBUT,-1,-1);
+	let cx = corner.x;
+	let cy = corner.y;
+	
+	cy = lay.add_title("Parameter priors",cx,cy,{te:editprior_text2});
+	
+	cy += 0.5;
+		
+	add_layer("ParamPriorContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-2,{});	
 }
 
-function drawpriors()                                     // Draws the prior buttons
-{
-	var x, y, fl = 0, list=[], j, dy1 = 19, dy2 = 25, dy1 = priordy, dy2 = priordy;
-	
-	x = 0; nob = 0;
-	
-	switch(page){
-	case INFERENCEPAGE:
-		y = -8;
-		list=[];
-		for(p = 0; p < param.length; p++){ 
-			if(param[p].classname != "Obs. Mod." && param[p].classname != "Initial"){
-				if(param[p].dist == 1){ list.push(p); fl = 1;}
-			}
-		}
-		if(list.length > 0){
-			y += dy1; addob(x,y,OBPRIORTITLE,"Defined",217); y += dy2;
-			for(j = 0; j < list.length; j++){ addob(x,y,OBPRIOR,list[j]); y += priordy;}
-		}
-		
-		list=[];
-		for(p = 0; p < param.length; p++){ 
-			if(param[p].classname != "Obs. Mod." && param[p].classname != "Initial"){
-				if(param[p].dist == 0){ list.push(p); fl = 1;}
-			}
-		}
-		if(list.length > 0){
-			y += dy1; addob(x,y,OBPRIORTITLE,"Compartmental model",218); y += dy2;
-			for(j = 0; j < list.length; j++){ addob(x,y,OBPRIOR,list[j]); y += priordy;}
-		}
 
-		list=[];
-		for(p = 0; p < param.length; p++){ 
-			if(param[p].classname == "Obs. Mod."){ list.push(p); fl = 1;}
-		}
-		if(list.length > 0){
-			y += dy1; addob(x,y,OBPRIORTITLE,"Observation model",219); y += dy2;
-			for(j = 0; j < list.length; j++){ addob(x,y,OBPRIOR,list[j]); y += priordy;}
-		}
+/// Adds a screen allowing parameters priors to be edited
+function add_param_prior_content(lay)
+{
+	let y = 0;
+	let dy = 2.0;
+	
+	let x = maximim_label_width() + 4;
 		
-		list=[];
-		for(p = 0; p < param.length; p++){ 
-			if(param[p].classname == "Initial"){ list.push(p); fl = 1;}
-		}
-		if(list.length > 0){
-			y += dy1; addob(x,y,OBPRIORTITLE,"Initial state",220); y += dy2;
-			for(j = 0; j < list.length; j++){ addob(x,y,OBPRIOR,list[j]); y += priordy;}
-		}
-		
-		if(paramagesmooth.length > 0){
-			y += dy1; addob(x,y,OBPRIORTITLE,"Age smoothing",221); y += dy2;
-			for(j = 0; j < paramagesmooth.length; j++){ addob(x,y,OBAGESMOOTH,j); y += priordy;}
-		}
-		
-		if(paramtimesmooth.length > 0){
-			y += dy1; addob(x,y,OBPRIORTITLE,"Time smoothing",222); y += dy2;
-			for(j = 0; j < paramtimesmooth.length; j++){ addob(x,y,OBTIMESMOOTH,j); y += priordy;}
-		}
-		break;
-		
-	case MODELPAGE:
-		y = 15;
-		for(p = 0; p < param.length; p++){ 
-			if(param[p].classname != "Obs. Mod." && param[p].classname != "Initial"){
-				if(adddepfl == 1){
-					if(param[p].dist == 0){ addob(x,y,OBPRIOR2,p); fl = 1; y += priordy;}
+	let param_cat = get_param_cat(inf_param_not_needed,"only normal");
+	
+	if(no_param(param_cat)) center_message("No priors need to be set.",lay);
+	
+	for(let cat = 0; cat < param_cat.length; cat++){
+		let pc = param_cat[cat];
+		if(pc.list.length > 0){
+			y = lay.add_subtitle(pc.name,1,y+0.2,WHITE,{te:pc.inf_te});
+	
+			for(let cati = 0; cati < pc.list.length; cati++){
+				let i = pc.list[cati];
+				let par = model.param[i];
+			
+				let w = 37;
+				
+				if(par.dep.length > 0){
+					lay.add_checkbox(37,y+0.4,"Split","Split",par.prior_split_check,WHITE);
+					w -= 1.5;
+				}
+				
+				if(par.dep.length == 0 || par.prior_split_check.check == false){
+					display_distribution(i,x,y,lay,true,true,w);
 				}
 				else{
-					if(param[p].dist == 1){ addob(x,y,OBPRIOR,p); fl = 1; y += priordy;}
-				}
-			}
-		}
-		break;
-	}
-	y += 70;
-	ytot = y;
-	
-	tableyfrac = priorheight/ytot;
-	placeob();	
-	return fl;
-}
-
-function priorsubbut(param,p,k)                           // Expands a subscript on a prior variable
-{
-	q = param[p].dep[k];
-	cl = 0; while(cl < ncla && cla[cl].name != q) cl++;
-	if(cl < ncla){ // A class name
-		for(j = 0; j < cla[cl].ncomp-1; j++){
-			var v = copy(param[p]);
-			param.splice(p,0,v);
-		}
-		for(j = 0; j < cla[cl].ncomp; j++) param[p+j].dep[k] = cla[cl].comp[j].name;
-	}
-	else{
-		for(cl = 0; cl < ncla; cl++){
-			for(j = 0; j < cla[cl].ncomp; j++) if(cla[cl].comp[j].name == q) break;
-			if(j < cla[cl].ncomp) break;
-		}
-		if(cl < ncla){
-			dif = 0;
-			oth=[];
-			for(pp = 0; pp < param.length; pp++){
-				if(param[pp].name == param[p].name){
-					kkmax = param[pp].dep.length; 
-					if(kkmax == param[p].dep.length){
-						for(kk = 0; kk < kkmax; kk++){
-							if(kk != k){
-								if(param[pp].dep[kk] != param[p].dep[kk]) break;
-							}
-						}
-						if(kk == kkmax){
-							if(param[pp].prior){
-								if(param[pp].prior != param[p].prior) dif = 1;
-								for(j = 0; j < param[p].val.length; j++) if(param[p].val[j] != param[pp].val[j]) dif = 1;
-							}
-							else{
-								if(param[pp].sim != param[p].sim) dif = 1;
-							}
-							
-							oth.push(pp);
-						}
-					}
-				}
-			}
-			
-			if(dif == 0 || (dif == 1 && confirm("Are you sure?"))){
-				param[p].dep[k] = cla[cl].name;
-				for(j = oth.length-1; j >= 0; j--) if(oth[j] != p) param.splice(oth[j],1);
-			}
-		}
-		else alertp("Error code EC36");
-	}
-	return param;
-}
-
-function findparam(na)                                   // Finds a paramter from a name
-{
-	var vpri, dep=[], p, k, kk, cl, clname;
-
-	sp = na.split("_");
-	if(sp.length > 1){
-		if(sp.length == 2) dep = sp[1].split(",");
-		else alert("There is a problem with this expression:"+na);
-	}
-	
-	for(p = 0; p < param.length; p++){
-		if(param[p].name == sp[0] && param[p].dep.length == dep.length){
-			for(k = 0; k < dep.length; k++){
-				st = dep[k]; 
-				clname = "";
-				for(cl = 0; cl < ncla; cl++){
-					for(kk = 0; kk < cla[cl].ncomp; kk++) if(cla[cl].comp[kk].name == st) clname = cla[cl].name;
+					display_distribution_split(i,x,y,lay,true,true,"prior",w);
 				}
 				
-				for(kk = 0; kk < param[p].dep.length; kk++){ if(param[p].dep[kk] == st || param[p].dep[kk] == clname) break;}
-				if(kk == param[p].dep.length) break; 
+				y += dy;
 			}
-			if(k == dep.length) return p;
 		}
 	}
-	
-	return param.length;
 }
 
-function collectvariables()                               // Collects together all the variables in the model
-{
-	var cl, i, n, d;
 
-	paramnew = []; paramsimnew = [];
-	for(cl = 0; cl < ncla; cl++){   // makes a list of parameters based on transitions
-		for(i = 0; i < cla[cl].ntra; i++){
-			for(n = 0; n < cla[cl].tra[i].nratevar; n++){
-				addvar(cla[cl].name,cla[cl].tra[i].ratevar[n],cla[cl].tra[i].ratevardep[n]);
-			}
-		}
-	}
+/// Displays a row allowing a variable distribution to be set
+function display_distribution(i,x,y,lay,allow_eqn,allow_edit,w)
+{		
+	let par = model.param[i];
+	let prior = par.prior;
 
-	for(d = 0; d < data.length; d++){
-		dat = data[d];
-		switch(dat.variety){
-		case "cap":
-			if(dat.obspd == "set" && dat.pdsame == "same"){
-				for(n = 0; n < dat.npdvar; n++){
-					if("["+dat.pdvar[n]+"]" == dat.pd) addvar("Obs. Mod.",dat.pdvar[n],dat.pdvardep[n],"flat");
-					else addvar("Obs. Mod.",dat.pdvar[n],dat.pdvardep[n]);
-				}
-			}
-			break;
-			
-		case "trans":
-			if(dat.obspd == "set"){
-				for(n = 0; n < dat.npdvar; n++) addvar("Obs. Mod.",dat.pdvar[n],dat.pdvardep[n]);
-			}
-			break;
-		
-		case "cappd":
-			for(n = 0; n < dat.npdvar; n++) addvar("Obs. Mod.",dat.pdvar[n],dat.pdvardep[n]);	
-			break;
-		
-		case "state":
-			switch(dat.type){
-			case "test":
-				na = dat.testname;
-				//addvar("Obs. Mod.","Se("+na+")","","flat");
-				//addvar("Obs. Mod.","Sp("+na+")","","flat2");
-				addvar("Obs. Mod.","Se("+na+")","");
-				addvar("Obs. Mod.","Sp("+na+")","");
-				break;
-			}			
-			break;
-		}
-	}
-			
-	for(d = 0; d < derive.length; d++){
-		for(n = 0; n < derive[d].ndervar; n++) addvar("Derived",derive[d].dervar[n],[]);
-	}	
-		
-	st = ""; for(cl = 0; cl < ncla-1; cl++){ if(cla[cl].ncomp > 1){ if(st != "") st += ","; st += cla[cl].name;}}
-	if(st != "") addvar("Initial","ξ",st);
-
-	for(p = 0; p < param.length; p++){
-		if(param[p].dist == 1 && onparamnew(p,param,paramnew) >= 0){
-			switch(param[p].prior){			
-			case "Gamma": case "Normal": case "Log-Normal": case "Beta": case "Weibull":
-				if(param[p].val[0] != ""){
-					nvarlist = 0; varlist=[]; vardeplist=[];   
-					checkeqn(param[p].val[0]);
-					for(j = 0; j < nvarlist; j++) addvar("Hyper",varlist[j],"");
-				}
-				
-				if(param[p].val[1] != ""){
-					nvarlist = 0; varlist=[]; vardeplist=[];   
-					checkeqn(param[p].val[1]);
-					for(j = 0; j < nvarlist; j++) addvar("Hyper",varlist[j],"");
-				}
-				
-				break;
-		
-			case "Exponential":
-				if(param[p].val[0] != ""){
-					nvarlist = 0; varlist=[]; vardeplist=[];   
-					checkeqn(param[p].val[0]);
-					for(j = 0; j < nvarlist; j++) addvar("Hyper",varlist[j],"");
-				}
-				break;
-			}
-		}
-	}
-	paramnew = paramexpand(paramnew);
-	param = paramexpand(param);	
+	lay.display_param(x-par.label_info.dx-0.7,y-0.1,par.label_info);
 	
-	param = paramcombine(param,paramnew);
+	let si = 1.5;
+	lay.add_button({te:"~", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
+
+	let te = get_prior_string(prior);
 	
-	for(p = 0; p < param.length; p++){
-		if(param[p].dist == 0 && param[p].classname != "Initial" && param[p].classname != "Obs. Mod."){
-			paramsimnew.push({name:param[p].name, dep:copy(param[p].dep), classname:param[p].classname, sim:"Unspecified"});
-		}
-	}
-	param = paramcontract(param);
-
-	paramsim = paramexpand(paramsim);
-	paramsim = paramcombine(paramsim,paramsimnew);
-	paramsim = paramcontract(paramsim);	
-
-	smoothing();
+	let fo = get_font(1.1,"","times");
+	
+	let ac; if(allow_edit != false) ac = "EditPriorElement";
+	
+	let ty = "PriorElement"; if(par.variety == "dist") ty = "DistElement";
+	
+	lay.add_button({te:te, x:x+1.6, y:y, dx:w-x-1.6, dy:1.6, type:ty, font:fo, ac:ac, i:i, name:par.name, allow_eqn:allow_eqn});
 }
 
-function addvar(clname,st,dep,prior)                           // Adds a variables to the model
+
+// Converts a prior to a string
+function get_prior_string(prior)
 {
-	if(dep == "") depa=[]; else depa = dep.split(",");
+	switch(prior.type.te){
+	case select_str:
+		return select_str;
+		
+	case "fix":
+		return "fix("+prior.value.mean_eqn.te+")";
+		
+	case "uniform":
+		return "uniform("+prior.value.min_eqn.te+","+prior.value.max_eqn.te+")";
+		
+	case "exp":
+		return "exp("+prior.value.mean_eqn.te+")";
+		
+	case "normal":
+		return "normal("+prior.value.mean_eqn.te+","+prior.value.sd_eqn.te+")";
+		
+	case "gamma":
+		return "gamma("+prior.value.mean_eqn.te+","+prior.value.cv_eqn.te+")";
+		
+	case "log-normal":
+		return "log-normal("+prior.value.mean_eqn.te+","+prior.value.cv_eqn.te+")";
+		
+	case "beta":
+		return "beta("+prior.value.alpha_eqn.te+","+prior.value.beta_eqn.te+")";
 	
-	v = 0; while(v < paramnew.length && paramnew[v].name != st) v++;
-	if(v == paramnew.length){
-		switch(clname){
-		case  "Initial":
-			paramnew.push({name:st, dep:depa, classname:clname, prior:"Dirichlet", val:[1], dist:0});
+	case "bernoulli":
+		return "bernoulli("+prior.value.mean_eqn.te+")";
+	
+	case "flat":
+		return "flat";
+	
+	case "dirichlet":
+		return "dir("+prior.value.alpha_eqn.te+")";
+		
+	default: error("Option not recognised 105"); break;
+	}
+}
+
+
+/// Displays a row allowing a variable distribution to be set
+function display_distribution_split(i,x,y,lay,allow_eqn,allow_edit,variety,w)
+{
+	let par = model.param[i];
+	
+	lay.display_param(x-par.label_info.dx-0.7,y-0.1,par.label_info);
+
+	let si = 1.5;
+	lay.add_button({te:"~", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
+	
+	let te;
+	if(par.dep.length == 0){
+		error("Should not be here");
+		return;
+	}
+	
+	if(par.prior_split_set == false){
+		te = "Unset ";
+		switch(par.dep.length){
+		case 1: 
+			te += "Vector("+par.list[0].length+")";
 			break;
-			
-		case "Obs. Mod.":
-			if(prior == "flat"){
-				paramnew.push({name:st, dep:depa, classname:clname, prior:"Flat", val:[0,1], dist:0});
-			}
-			else{
-				if(prior == "flat2"){
-					paramnew.push({name:st, dep:depa, classname:clname, prior:"Flat", val:[0.5,1], dist:0});
-				}
-				else{
-					paramnew.push({name:st, dep:depa, classname:clname, prior:"Unspecified", val:[], dist:0});	
-				}
-			}
+
+		case 2:
+			te += "Matrix("+par.list[0].length+"×"+par.list[1].length+")";
 			break;
-			
+
 		default:
-			paramnew.push({name:st, dep:depa, classname:clname, prior:"Unspecified", val:[], dist:0});
+			te += "Tensor("+par.list[0].length;
+			for(let k = 1; k < par.dep.length; k++){
+				te += "×"+par.list[k].length;
+			}
+			te += ")";
 			break;
 		}
 	}
 	else{
-		fl = 0;
-		if(paramnew[v].dep.length != depa.length) fl = 1;
-		else{ for(j = 0; j < depa.length; j++) if(paramnew[v].dep[j] != depa[j]) fl = 1;}
-		if(fl == 1){ alertp("Error: Parameter "+st+" has different dependancies"); return;}
+		let tensor = get_prior_split_tensor(par);
+		te = JSON.stringify(tensor);
+		te = te.replace(/\"/g," ");
 	}
-}
-
-function getparamname(param,p)                           // Gives the name of a parameter
-{
-	st = param[p].name;
-	dmax = param[p].dep.length;
-	if(dmax > 0){
-		st += "_";
-		for(d = 0; d < dmax; d++){
-			st += param[p].dep[d]; if(d < dmax-1) st += ",";
-		}
-	}
-	return st;
-}
-
-function paramchname(param,fr,to)                        // Changes the name of a parameter
-{
-	var p, j;
 	
-	for(p = 0; p < param.length; p++){
-		if(param[p].classname == fr) param[p].classname = to;
+	let fo = get_font(1.1,"","times");
 		
-		for(j = 0; j < param[p].dep.length; j++){
-			if(param[p].dep[j] == fr) param[p].dep[j] = to;
-		}
+	let ac;
+	if(allow_edit != false){
+		ac = "EditDistSplitValue"; 
+		if(variety == "prior") ac = "EditPriorSplitValue";
 	}
-}
-					
-function paramcombine(param,paramnew)                    // Combines equal parameters together
-{
-	var p, pp;
 	
-	for(p = 0; p < param.length; p++){
-		pp = onparamnew(p,param,paramnew);
-		if(pp != -1) paramnew[pp] = copy(param[p]);
-	}
-	param = copy(paramnew);
-
-	return param;
+	lay.add_button({te:te, x:x+1.6, y:y+0., dx:w-x-1.6, dy:1.6, type:"ParamSimElement", font:fo, ac:ac, i:i, name:par.name, label_info:par.label_info, allow_eqn:allow_eqn});
 }
 
-function onparamnew(p,param,paramnew)                    // Works out if parameter already exists
-{
-	var pp, kmax, k;
-	for(pp = 0; pp < paramnew.length; pp++){
-		if(param[p].name == paramnew[pp].name){
-			kmax = param[p].dep.length;
-			if(kmax == paramnew[pp].dep.length){
-				for(k = 0; k < kmax; k++) if(param[p].dep[k] != paramnew[pp].dep[k]) break;
-				if(k == kmax) break;
-			}
-		}	
-	}
-	if(pp < paramnew.length) return pp; else return -1;
-}
 
-function paramexpand(paramin)                            // Exapands subscripts in parameters
+/// Creates a text tensor from prior_split
+function get_prior_split_tensor(par)
 {
-	var k, kmax, param=[], nparam;
+	let pri = par.prior_split;
+
+	let tensor = copy(par.value);
+		
+	let dim = get_dimentions(tensor);
+	let ele_list = get_element_list(tensor,dim);
 	
-	kmax = 1; for(p = 0; p < paramin.length; p++){ nd = paramin[p].dep.length; if(nd > kmax) kmax = nd;}
-	
-	for(k = 0; k < kmax; k++){
-		param=[];
-		nparam = 0;
-		for(p = 0; p < paramin.length; p++){
-			nd = paramin[p].dep.length;
-			don = 0;
-			if(k < nd){
-				na = paramin[p].dep[k];
-				cl = 0; while(cl < ncla && na != cla[cl].name) cl++;
-				if(cl < ncla){
-					don = 1;
-					for(j = 0; j < cla[cl].ncomp; j++){
-						param[nparam] = copy(paramin[p]);
-						param[nparam].dep[k] = cla[cl].comp[j].name;
-						nparam++;
-					}
-				}
-			}
+	for(let k = 0; k < ele_list.length; k++){
+		let pindex = ele_list[k];
 			
-			if(don == 0){ param[nparam] = copy(paramin[p]); nparam++;}
-		}
-		paramin = param;
+		let te;
+		//if(get_element(tensor,pindex) == true){
+		te = get_prior_string(get_element(pri,pindex)); 
+		//}
+			
+		set_element(tensor,pindex,te);
 	}
 	
-	return param;
+	return tensor;
 }
 
-function copy(inp){ return JSON.parse(JSON.stringify(inp));} // Copies an object
 
-function paramcontract(param)                                // Contracts a parameter list
+/// Converts a text string to a prior specification
+function convert_text_to_prior(te,pri_pos,dist)
 {
-	var oth=[];
-	kmax = 0; for(p = 0; p < param.length; p++){ nd = param[p].dep.length; if(nd > kmax) kmax = nd;}
+	let pri = unset_prior();
+	
+	let spl = te.trim().split("(");
+	if(spl.length != 2) return "Prior has a syntax error";
+	
+	if(spl[1].length == 0) return "Prior has a syntax error";
+	if(spl[1].substr(spl[1].length-1,1) != ")") return "Prior has a syntax error";
+	
+	let type = spl[0].toLowerCase();
+	if(type == "dir") type = "dirichlet";
+	if(type == "bern") type = "bernoulli";
+	
+	if(!pri_pos) error("prior pos is not set!");
 
-	for(k = kmax-1; k >= 0; k--){
-		for(p = 0; p < param.length; p++){
-			if(k < param[p].dep.length){ 
-				na = param[p].dep[k];
-				for(cl = 0; cl < ncla; cl++){
-					for(j = 0; j < cla[cl].ncomp; j++) if(cla[cl].comp[j].name == na) break;
-					if(j < cla[cl].ncomp) break;
-				}
-
-				oth=[];
-				for(pp = p+1; pp < param.length; pp++){
-					same = 0;
-					if(param[pp].name == param[p].name){
-						if(param[p].prior){
-							if(param[pp].prior == param[p].prior){
-								for(j = 0; j < param[p].val.length; j++) if(param[p].val[j] != param[pp].val[j]) break;
-								if(j == param[p].val.length) same = 1;
-							}
-						}
-						else{
-							if(param[pp].sim == param[p].sim) same = 1;
-						}
-					}
-					
-					if(same == 1){
-						kkmax = param[pp].dep.length; 
-						if(kkmax == param[p].dep.length){
-							for(kk = 0; kk < kkmax; kk++){
-								if(kk != k){
-									if(param[pp].dep[kk] != param[p].dep[kk]) break;
-								}
-							}
-							if(kk == kkmax) oth.push(pp);
-						}
-					}
-				}
-				
-				if(cl < ncla){
-					if(oth.length > cla[cl].ncomp-1) alertp("Error code EC35");
-					if(oth.length == cla[cl].ncomp-1){
-						param[p].dep[k] = cla[cl].name;
-						for(j = oth.length-1; j >= 0; j--) param.splice(oth[j],1);
-					}
-				}					
-			}
+	if(find_in(pri_pos,type) == undefined){
+		if(find_in(prior_pos_all,type) == undefined){
+			return "'"+type+"' is not a valid prior type";
+		}
+		else{
+			return "The prior type '"+type+"' cannot be used for this parameter";
 		}
 	}
-	return param;
-}
-
-function checkprior(dist)                               // Checks the values in the priors
-{
-	var p, val1, val2, pa, su, ty;
-
-	if(dist == 0){ pa = INFERENCEPAGE; su = 1; ty = "Prior";} else{ pa = MODELPAGE; su = -3; ty = "Distribution";}
-
-	for(p = 0; p < param.length; p++){
-		if(param[p].dist == dist){
-			if(param[p].prior == "Unspecified"){ changepage(pa,su,0); alertp2(ty+" unspecified for "+param[p].name+"."); return 1;}
+	
+	let bra = spl[1].substr(0,spl[1].length-1);
+	let spl2 = bra.split(",");
 		
-			if(param[p].val.length == 0){ changepage(pa,su,0); alertp2(ty+" not set for "+param[p].name+"."); return 1;}
+	pri.type.te = type;
+	
+	switch(type){
+	case "fix":
+	{
+		if(spl2.length != 1) return "Expected one value in the brackets";
+			if(dist == true){
+				if(!is_eqn(spl2[0],"value",{positive:true})) return "'"+spl2[0]+"' is not valid";
+			}
+			else{
+				if(isNaN(spl2[0])) return "'"+spl2[0]+"' is not a number";
+				if(Number(spl2[0]) <= 0) return "Value must be positive";
+			}
+			pri.value.mean_eqn.te = spl2[0];
+		}
+		break;
 		
-			if(dist == 0){
-				val1 = parseFloat(param[p].val[0]);
-				if(isNaN(val1)){ changepage(pa,su,0); alertp2(ty+" for "+param[p].name+" must be set."); return 1;}
-
-				if(typeof param[p].val[1] != "undefined"){
-					val2 = parseFloat(param[p].val[1]);
-					if(isNaN(val2)){ changepage(pa,su,0); alertp2(ty+" for "+param[p].name+" must be set."); return 1;}
+	case "uniform":
+		{
+			if(spl2.length != 2) return "Expected two values in the brackets";
+			if(dist == true){
+				if(!is_eqn(spl2[0],"min",{})) return "'"+spl2[0]+"' is not valid";
+				if(!is_eqn(spl2[1],"max",{})) return "'"+spl2[1]+"' is not valid";
+				if(!isNaN(spl2[0]) && !isNaN(spl2[1]) && Number(spl2[0]) >= Number(spl2[1])){
+					return "Minimum must be smaller than maximum";
 				}
 			}
 			else{
-				param[p].val[0] = param[p].val[0].trim();
-				if(param[p].val[0].length == 0){ alertp2(ty+" for "+param[p].name+" must be set."); return 1;}
-				
-				if(typeof param[p].val[1] != "undefined"){
-					param[p].val[1] = param[p].val[1].trim();
-					if(param[p].val[1].length == 0){ alertp2(ty+" for "+param[p].name+" must be set."); return 1;}
-				}				
+				if(isNaN(spl2[0])) return "'"+spl2[0]+"' is not a number";
+				if(isNaN(spl2[1])) return "'"+spl2[1]+"' is not a number";
+				if(Number(spl2[0]) >= Number(spl2[1])) return "Minimum must be smaller than maximum";
+			}
+			pri.value.min_eqn.te = spl2[0];
+			pri.value.max_eqn.te = spl2[1];
+		}
+		break;
+	
+	case "exp":
+		{
+			if(spl2.length != 1) return "Expected one value in the brackets";
+			if(dist == true){
+				if(!is_eqn(spl2[0],"mean",{positive:true})) return "'"+spl2[0]+"' is not valid";
+			}
+			else{
+				if(isNaN(spl2[0])) return "'"+spl2[0]+"' is not a number";
+				if(Number(spl2[0]) <= 0) return "Mean must be positive";
+			}
+			pri.value.mean_eqn.te = spl2[0];
+		}
+		break;
+		
+	case "normal":
+		{
+			if(spl2.length != 2) return "Expected two values in the brackets";
+			if(dist == true){
+				if(!is_eqn(spl2[0],"mean",{})) return "'"+spl2[0]+"' is not valid";
+				if(!is_eqn(spl2[1],"sd",{positive:true})) return "'"+spl2[1]+"' is not valid";
+			}
+			else{
+				if(isNaN(spl2[0])) return "'"+spl2[0]+"' is not a number";
+				if(isNaN(spl2[1])) return "'"+spl2[1]+"' is not a number";
+				if(Number(spl2[1]) <= 0) return "Standard deviation must be positive";
 			}
 			
-			switch(param[p].prior){
-			case "Unbounded":
-				break;
-				
-			case "Flat":
-				if(dist == 0 && val1 >= val2){
-					changepage(pa,su,0);
-					alertp2("For "+param[p].name+" the maximum must be larger than the minimum.");					
-					return 1;
-				}
-				break;
-				
-			case "Gamma":
-				if(dist == 0 && val1 <= 0){
-					changepage(INFERNECEPAGE,1,0);
-					alertp2("For "+param[p].name+" the mean must be greater than zero.");					
-					return 1;
-				}
-
-				if(dist == 0 && val2 <= 0){
-					changepage(pa,su,0);
-					alertp2("For "+param[p].name+" the standard deviation must be greater than zero.");					
-					return 1;
-				}
-				break;
-		
-			case "Normal": case "Log-Normal":
-				if(dist == 0 && val2 <= 0){
-					changepage(pa,su,0);
-					alertp2("For "+param[p].name+" the standard deviation must be greater than zero.");					
-					return 1;
-				}
-				break;
-				
-			case "Fix":
-				break;
-			}
+			pri.value.mean_eqn.te = spl2[0];
+			pri.value.sd_eqn.te = spl2[1];
 		}
-	}
-
-	if(dist == 0){ 
-		for(p = 0; p < paramagesmooth.length; p++){
-			if(paramagesmooth[p].type != "None"){
-				val = paramagesmooth[p].val;
-				if(val == ""){
-					changepage(pa,su,0);
-					alertp2("The value for the smoothing prior for "+paramagesmooth[p].name+" must be set.");					
-					return 1;
-				}
-				else{
-					if(isNaN(val)){
-						changepage(pa,su,0);
-						alertp2("The value for the smoothing prior for "+paramagesmooth[p].name+" must be a number.");					
-						return 1;
-					}
-				}
-			}
-		}
+		break;
 		
-		for(p = 0; p < paramtimesmooth.length; p++){
-			if(paramtimesmooth[p].type != "None"){
-				val = paramtimesmooth[p].val;
-				if(val == ""){
-					changepage(pa,su,0);
-					alertp2("The value for the smoothing prior for "+paramtimesmooth[p].name+" must be set.");					
-					return 1;
-				}
-				else{
-					if(isNaN(val)){
-						changepage(pa,su,0);
-						alertp2("The value for the smoothing prior for "+paramtimesmooth[p].name+" must be a number.");					
-						return 1;
-					}
-				}
+	case "gamma":
+		{
+			if(spl2.length != 2) return "Expected two values in the brackets";
+			if(dist == true){
+				if(!is_eqn(spl2[0],"mean",{positive:true})) return "'"+spl2[0]+"' is not valid";
+				if(!is_eqn(spl2[1],"cv",{positive:true})) return "'"+spl2[1]+"' is not valid";
 			}
-		}
-	}
-		
-	return 0;
-}
-
-function setsimparam(na,val)                              // Sets the values used for simulation
-{
-	var dep=[], sp = na.split("_"), n;
-	nam = sp[0];
-	if(sp.length > 1){
-		if(sp.length == 2) dep = sp[1].split(",");
-		else{ alertimp("There is a problem with this expression"); return 1;}
-	}
-
-	for(n = 0; n < paramsim.length; n++) if(paramsim[n].name == nam) break;
-	if(n == paramsim.length) collectvariables();
-	for(n = 0; n < paramsim.length; n++) if(paramsim[n].name == nam) break;
-	if(n == paramsim.length){ alertimp("Cannot find parameter"); return 1;}
-		
-	paramsim = paramexpand(paramsim);
-	for(n = 0; n < paramsim.length; n++){
-		if(paramsim[n].name == nam){
-			if(dep.length != paramsim[n].dep.length){ alertimp("The dependencies do not match"); return 1;}
-			for(nn = 0; nn < dep.length; nn++){
-				if(dep[nn] != paramsim[n].dep[nn]){
-					cl2 = getclfromcomp(paramsim[n].dep[nn]);   
-					if(dep[nn] != cla[cl2].name) break;
-				}
+			else{
+				if(isNaN(spl2[0])) return "'"+spl2[0]+"' is not a number";
+				if(isNaN(spl2[1])) return "'"+spl2[1]+"' is not a number";
+				if(Number(spl2[0]) <= 0) return "Mean must be positive";
+				if(Number(spl2[1]) <= 0) return "CV must be positive";
 			}
-			if(nn == dep.length) paramsim[n].sim = val;	
-		}
-	}
-	return 0;
-}
-
-function setinfprior(na,prior,val,dist)                   // Sets the prior used for inference       
-{
-	var dep=[], sp = na.split("_"), n;
-	
-	nam = sp[0];
-	if(sp.length > 1){
-		if(sp.length == 2) dep = sp[1].split(",");
-		else{ alertimp("There is a problem with this expression"); return 1;}
-	}
-
-	for(n = 0; n < param.length; n++) if(param[n].name == nam) break;
-	if(n == param.length) collectvariables();
-	for(n = 0; n < param.length; n++) if(param[n].name == nam) break;
-	if(n == param.length){ alertimp("Cannot find parameter"); return 1;}
 			
-	param = paramexpand(param);
-
-	for(n = 0; n < param.length; n++){
-		if(param[n].name == nam){
-			if(dep.length != param[n].dep.length){ alertimp("The dependencies do not match"); return 1;}
-			for(nn = 0; nn < dep.length; nn++){
-				if(dep[nn] != param[n].dep[nn]){
-					cl2 = getclfromcomp(param[n].dep[nn]);   
-					if(dep[nn] != cla[cl2].name) break;
-				}
-			}
-			if(nn == dep.length){ param[n].prior = prior; param[n].val = val; param[n].dist = dist;}	
+			pri.value.mean_eqn.te = spl2[0];
+			pri.value.cv_eqn.te = spl2[1];
 		}
+		break;
+		
+	case "log-normal":
+		{
+			if(spl2.length != 2) return "Expected two values in the brackets";
+			if(dist == true){
+				if(!is_eqn(spl2[0],"mean",{})) return "'"+spl2[0]+"' is not valid";
+				if(!is_eqn(spl2[1],"cv",{positive:true})) return "'"+spl2[1]+"' is not valid";
+			}
+			else{
+				if(isNaN(spl2[0])) return "'"+spl2[0]+"' is not a number";
+				if(isNaN(spl2[1])) return "'"+spl2[1]+"' is not a number";
+				if(Number(spl2[0]) <= 0) return "Mean must be positive";
+				if(Number(spl2[1]) <= 0) return "CV must be positive";
+			}
+			pri.value.mean_eqn.te = spl2[0];
+			pri.value.cv_eqn.te = spl2[1];
+		}
+		break;
+		
+	case "beta":
+		{
+			if(spl2.length != 2) return "Expected two values in the brackets";
+			if(dist == true){
+				if(!is_eqn(spl2[0],"alpha",{})) return "'"+spl2[0]+"' is not valid";
+				if(!is_eqn(spl2[1],"beta",{positive:true})) return "'"+spl2[1]+"' is not valid";
+			}
+			else{
+				if(isNaN(spl2[0])) return "'"+spl2[0]+"' is not a number";
+				if(isNaN(spl2[1])) return "'"+spl2[1]+"' is not a number";
+				if(Number(spl2[0]) <= 0) return "Alpha must be positive";
+				if(Number(spl2[1]) <= 0) return "Beta must be positive";
+			}
+			
+			pri.value.alpha_eqn.te = spl2[0];
+			pri.value.beta_eqn.te = spl2[1];
+		}
+		break;
+
+	case "bernoulli":
+		{
+			if(spl2.length != 1) return "Expected one value in the brackets";
+			if(dist == true){
+				if(!is_eqn(spl2[0],"mean",{zero_one_range:true})) return "'"+spl2[0]+"' is not valid";
+			}
+			else{
+				if(isNaN(spl2[0])) return "'"+spl2[0]+"' is not a number";
+				if(Number(spl2[0]) < 0 || Number(spl2[0]) > 1) return "Mean must be between 0 and 1";
+			}
+			
+			pri.value.mean_eqn.te = spl2[0];
+		}
+		break;
+		
+	case "flat":
+		break;
+		
+	case "dirichlet":
+		{
+			if(spl2.length != 1) return "Expected one value in the brackets";
+			if(dist == true){
+				if(!is_eqn(spl2[0],"alpha",{positive:true})) return "'"+spl2[0]+"' is not valid";
+			}
+			else{
+				if(isNaN(spl2[0])) return "'"+spl2[0]+"' is not a number";
+				if(Number(spl2[0]) > 0) return "Alpha must be positive";
+			}
+			
+			pri.value.alpha_eqn.te = spl2[0];
+		}
+		break;
+	
+	default: error("Option problem"); return "Unknown problem";
 	}
-	return 0;
+
+	return pri;
 }
 
-function smoothing()
+
+/// This is activated when the 'done' button is pressed on the edit prior bubble
+function done_prior()
 {
-	var paramagesmoothnew=[], paramtimesmoothnew=[];
-	
-	for(p = 0; p < param.length; p++){
-		if(param[p].classname != "Initial"){
-			for(j = 0; j < param[p].dep.length; j++){
-				if(param[p].dep[j] == "Age"){
-					for(pp = 0; pp < paramagesmooth.length; pp++){ if(paramagesmooth[pp].name == param[p].name) break;}
-					if(pp == paramagesmooth.length){
-						paramagesmoothnew.push({name:param[p].name, type:"None", val:""});	
-					}
-					else{
-						paramagesmoothnew.push(paramagesmooth[pp]);
-					}
-				}
-			}
+	if(bubble_check_error() == false){
+		copy_back_to_source();
+		
+		if(invalid_prior() == false){
+			let bubpri = inter.bubble.prior;
+		
+			let pri = model.param[bubpri.i].prior;
+			pri.type = bubpri.type;
+			pri.value = bubpri.value;
+			init_param();
+			close_bubble();
+		}
+	}
+}
+
+
+/// Checks to see if the prior is invalid
+function invalid_prior()
+{
+	let bubpri = inter.bubble.prior;
+		
+	if(bubpri.type.te == "uniform"){
+		if(Number(bubpri.value.max_eqn.te) <= (Number(bubpri.value.min_eqn.te))){
+			set_warning("Must be larger than minimum value","prior_max");
+			return true;
 		}
 	}
 	
-	for(p = 0; p < param.length; p++){
-		if(param[p].classname != "Initial"){
-			for(j = 0; j < param[p].dep.length; j++){
-				if(param[p].dep[j] == "Time"){
-					for(pp = 0; pp < paramtimesmooth.length; pp++){ if(paramtimesmooth[pp].name == param[p].name) break;}
-					if(pp == paramtimesmooth.length){
-						paramtimesmoothnew.push({name:param[p].name, type:"None", val:""});	
-					}
-					else{
-						paramtimesmoothnew.push(paramtimesmooth[pp]);
-					}
-				}
-			}
+	return false;
+}
+
+
+/// Sets a warning 
+function set_warning(te,type)
+{
+	let sto = inter.textbox_store;
+	
+	for(let i = 0; i < sto.length; i++){
+		if(sto[i].source.type == type){
+			sto[i].warning = te; return;
 		}
 	}
-	
-	paramagesmooth = paramagesmoothnew; paramtimesmooth = paramtimesmoothnew;
 }
 

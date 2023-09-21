@@ -16,71 +16,69 @@
 			//var ver="mac";
 		</script>
 		
-		<script src="js/const.js"></script>       <!-- Interface -->
-		<script src="js/var.js"></script>
-		<script src="js/init.js"></script>
-		<script src="js/button.js"></script>
-		<script src="js/canbutton.js"></script>
-		<script src="js/buttonplot.js"></script>
-		<script src="js/mousemove.js"></script>
-		<script src="js/mouseclick.js"></script>
-		<script src="js/bubble.js"></script>
-		<script src="js/ob.js"></script>
+		<script src="js/const.js"></script>
+		<script src="js/layer_funcs.js"></script>  
+		<script src="js/layer.js"></script>  
+		<script src="js/model.js"></script>
+		<script src="js/annotation.js"></script>
+		<script src="js/data.js"></script>
+		<script src="js/data_file.js"></script>
+		<script src="js/data_sim.js"></script>
+		<script src="js/data_update.js"></script>
+		<script src="js/pop_data.js"></script>
 		<script src="js/help.js"></script>
+		<script src="js/help_text.js"></script>
+		<script src="js/equation.js"></script>
+		<script src="js/equation_prop.js"></script>
+		<script src="js/parameter.js"></script>
+		<script src="js/model_param.js"></script>
+		<script src="js/model_indeff.js"></script>
+		<script src="js/model_fixeff.js"></script>
+		
+		<script src="js/initialise.js"></script>     <!-- Interface -->
+		<script src="js/interface.js"></script> 
+		<script src="js/graph.js"></script>
+		<script src="js/var.js"></script>		
+		<script src="js/plot_functions.js"></script>
+		
+		<script src="js/mouse_down_up.js"></script>
+		<script src="js/mouse_move.js"></script>
+		<script src="js/mouse_click.js"></script>
+		<script src="js/bubble.js"></script>
+	
+
 		<script src="js/rightmenu.js"></script>
 	
+		
 		<script src="js/home.js"></script>         <!-- Main Pages -->
-		<script src="js/desc.js"></script> 
+		<script src="js/description.js"></script> 
 		<script src="js/simulate.js"></script>
-		<script src="js/model.js"></script>
+
 		<script src="js/inference.js"></script>
-		<script src="js/data.js"></script>
-		<script src="js/convdata.js"></script>
+
 		<script src="js/prior.js"></script>
 
-		<script src="js/popplot.js"></script>       <!-- Output -->
-		<script src="js/plots.js"></script> 
+		     <!-- Output -->
 		<script src="js/statistics.js"></script> 
 		<script src="js/import.js"></script>
-		<script src="js/export.js"></script>
+		<script src="js/import_commands.js"></script>
+		<script src="js/import_check.js"></script>
+		<script src="js/output_file.js"></script>
+		<script src="js/results.js"></script>
+		<script src="js/results_plots.js"></script>
 		<script src="js/io.js"></script>
+		
+		  <!-- These scripts are related to buttons -->
+		<script src="js/plot_buttons.js"></script>
+		<script src="js/menu.js"></script>		
 	</head>
 
-	<body id="bod" style="margin: 0pt; background: none repeat scroll 0% 0% #ddddff; font-size: 14px; line-height: 145%; color: rgb(102, 51, 51); text-align: center; visibility:hidden;" onload="init();" onunload="" onresize="setsize();">
+	<body id="bod" style="margin: 0pt; background: none repeat scroll 0% 0% #000000; font-size: 14px; line-height: 145%; color: rgb(102, 51, 51); text-align: center; visibility:hidden;" onload="load_pictures(); " onunload="" onresize="generate_screen();">
+		<canvas id="myCanvas" style="background:#000000; margin:0px; border:0px; padding:0px; margin-left:0px;  margin-right:0px; margin-top:0px">
+		</canvas> 
 
-		<div id="main">
-
-			<div id="pw" style="width:10px; margin-right:auto; margin-left:auto; border:0px; padding:0px; background-color:#ddddff; text-align:left; ">
-				<canvas id="myCanvas" style="background:#ffffff; margin:0px; border:0px; padding:0px; margin-left:0px;  margin-right:0px; margin-top:10px">
-				</canvas> 
-
-				<div id="pagefooter" style="height:30px; overflow:hidden; margin: 0px; padding: 0px; border: 0px none;  background:#00ffff;">
-					<div style="height:5px; background:#ddddff;"></div>
-					<div style="background:#a4a3e6;">
-						<div style="float:left; width:14px; height:25px; margin:0px; padding:0px; border:0px;">
-							<img style="margin: 0px; padding: 0px; border: 0px none;" src="pics/endlblue.png" height="25" width="14"> 
-						</div>
-						<div style="float:right; width:14px; height:25px; margin:0px; padding:0px; border:0px;">
-							<img style="margin: 0px; padding: 0px; border: 0px none;" src="pics/endrblue.png" height="25" width="14">
-						</div>
-						<div style="height:25px; background-color:#a4a3e6; margin:0px; padding:0px; border:0px;">
-							<center>
-							<div style="font-size:15px; color:#ffffff; padding-top:2px;">
-								<font face="trebuchet ms, helvetica, georgia, courier, arial"><b>© BICI 2019</b></font>
-							</div>
-							</center>
-						</div>
-					</div>
-				</div> 
-			</div>
-
-			<canvas id="overlay" style="position:absolute; margin:0px; border:0px; padding:0px; margin-left:0px; margin-top:0px">
-			</canvas> 
-		</div>
-
-		<input style="display:none;" id="fileToLoad" type="file" oncancel="loading=0" onchange="loadfile();" />
-		<input style="display:none;" id="fileToSave" type="file" oncancel="loading=0" onchange="saveFileAsText();" nwsaveas/>
-		<div id="add" style="background-color:#333333"></div>
+		<input style="display:none;" id="fileToLoad" type="file" oncancel="loading=0" onchange="load_file();" />
+		<input style="display:none;" id="fileToSave" type="file" oncancel="loading=0" onchange="save_file(ById('fileToSave').value,inter.file_type);" nwsaveas/>
 		 
 		<input style="display:none;" id="fileDialog" type="file" />
 

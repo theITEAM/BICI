@@ -1,204 +1,306 @@
 // Lists all the constant values used within the interface
 
-var fin = 1;
-var nwon = 0;
+const make_file = 1;
+const debug = false;           // Determines if debugger used
 
-// Canvas buttons
- 
-var TABLEHEADBUT = 0, TABLEBUT = 1, TABLECOLBUT = 2, COMPBUT = 3, BUBBLEBUT = 4, BUBBLEOFFBUT = 5,  BUBBLETEXTBUT = 6, COLBUT = 7;
-var ZOOMINBUT = 9, ZOOMOUTBUT = 10, TRANSBUT = 11, TRANSPLBUT = 12, TRANSPBUT = 13, REQUESTBUT = 14, TRANSADDBUT = 15, BUBBLETEXTBUT2 = 16;
-var DONEBUT = 8, ADDPARAMBUT = 17, FUNCTBUT = 18, OPBUT = 19,  NUMBUT = 20, DELBUT = 21;
-var ERRMSGBUT = 26, PRIORBUT = 27, MINMAXBUT = 28,  MINMAXHEADBUT = 29, CANCELBUT = 31, CLASSNAMEBUT = 32, CLASSVALBUT = 33;
-var DRAGBUT = 34, CANRADIOBUT = 35, ADDBUT = 36, CROSSBUT = 37, COMPSMALLBUT = 38, CLEARBUT = 39, COMPSMALLBUT2 = 40, COMPSMALLBUT3 = 41;
-var BRACKETBUT = 42, TEXTBUT = 43, TEXTBUT2 = 44, TESTNAMEBUT = 45, COMPSMALLBUT4 = 46, VIEWBUT = 47;
-var DELETEBUT = 49, TIMELINEBUT = 50, EVBUT = 51, COMPSMALLBUT5 = 52;
-var TABLEBUT3 = 56, EVBUT2 = 57, BUBSELBUT = 58, COMPSMALLPERBUT = 59, COMPSMALLPERBUT2 = 60;
-var COMPSMALLBUT6 = 61, TABLEDROPBUT = 62, EVBUT3 = 63, RESULTBUT = 64, XLABELBUT = 66, YLABELBUT = 67;
-var XTICKBUT = 68, YTICKTRBUT = 69, BURNINBUT = 70, SLIDERBACKBUT = 71, SLIDERBUT = 72, LABBUT = 73, EQBUT = 74, SUBBUT = 75;
-var SUBBUT2 = 76, PARAMBUT = 77, SOURCEBUT = 78, ADDBUT3 = 79, BUBBLETEXTBUT3 = 80, WHITERECTBUT = 81, ARROWBUT = 82;
-var SOURCEMINIBUT = 83, GENUSERBUT = 84, CANUPLOADBUT = 85, COMPSMALLBUT7 = 86, EDITDBUT = 87, EVSOURCEBUT = 88, EVSINKBUT = 89;
-var COMPPOPOUTPUTBUT = 90, PLAYBUT = 91, PLAYLINEBUT = 92, LINKBUT = 93, MODELPICBUT = 94, CANSMALLTEXTBUT = 95;
-var COMPPOPINITBUT = 96, COMPFRACINITBUT = 97, COMPLOADINITBUT = 98;
-var EVBUT4 = 700, EVBUT5 = 701, EVBUT6 = 702, PDBUT = 703, MINMAXBIGBUT = 704, EVBUT7 = 705, EXAMPMODBUT = 706;
-var EXAMPBUT = 707, SPEECHBUT = 708, PARACANBUT = 709, RELOADBUT = 710, NEXTCANBUT = 711, BACKCANBUT = 712;
-var RELOADBUT2 = 714, SPEECHBUT2 = 715, PARACANBUT2 = 716, HELPICONCANBUT = 717, PARACANBUT3 = 718;
-var SELPARBUT = 719, SELPARAMBUT = 720, GREEKBUT = 721, ALPBUT = 722, NOTSELPARAMBUT = 723, INACTIVEBUT = 724, RELOADBUT3 = 725;
-var NOTACTIVEBUT = 726, INDBUT = 727, TTRANSBUT = 728, HISTOBUT = 729, GREENCANBUT = 730, EDITSPEECHBUT = 731;
-var PRTITLEBUT = 732, DESCBUT = 733, CORBUT = 734, HOZLABBUT = 735, VERTLABBUT = 736;
+const check_clone_on = true;   // Turn on to check if cloning is working
 
-// Canvas button actions
+"use strict";
 
-var ADDPOPAC = 100, DELTRANSAC = 102, CONVERTAC = 105, CHNAMEAC = 106, DELROWAC = 107, SEARCHAC = 108;
-var REPLACEAC = 109, DELROWSAC = 110, TESTRESAC = 111, DOSEARCHAC = 112, DOREPLACEAC = 113, DODELROWSAC = 114, SORTAC = 115;
-var ADDCOMPAC = 116, ADDLINKAC = 117, DELCLASSAC = 118, DONEMODELAC = 119, DATADROPAC = 121, ADDDERAC = 122;
-var DELCOMPAC = 123, ADDTIMEPOINTAC = 126, ADDAGEPOINTAC = 127, ADDTRANSAC = 128, INDAC = 129, SENSAC = 130;
-var LOADCOMPAC = 131, EXPANDAC = 134, REDUCEAC = 135, NEXTSEARCHAC = 136, BACKSEARCHAC = 137, UNDOAC = 138, DELDERAC = 139;	
-var JOINCOLSAC = 140, DELDEPAC = 141, DELTRANSAC2 = 142, ADVOPAC = 143, INSROWAC = 144;
+const command_list = ["species","classification","class","set","camera","compartment","comp","transition","trans","source","sink","data-dir","description","desc","label","box","parameter","param","derived","der","init-pop","add-ind","remove-ind","move-ind","init-pop-sim","add-ind-sim","remove-ind-sim","move-ind-sim","init-pop-prior","comp-data","trans-data","source-data","sink-data","test-data","pop-data","pop-trans-data","set-traps-data","ind-trapped-data","genetic-data","simulation","sim","inference","inf","ind-effect","fixed-effect","sim-param","sim-state","inf-param","inf-state"];
+//,"sim-const","inf-const"
+
+const sim_alg_list = ["gillespie","tau"];
+const inf_alg_list = ["DA-MCMC","MFA","ABC","ABC-SMC","ABC-MBP","ABC-PAS","PMCMC","HMC"];
+
+// Possible types of equation
+const eqn_types = [
+{name:"Se", mode:"param only", obs_model:true},
+{name:"Sp", mode:"param only", obs_model:true},
+{name:"trap_prob", mode:"param only", obs_model:true},
+{name:"comp_prob",mode:"param only", obs_model:true},
+{name:"trans_bp", mode:"param with dep"},
+{name:"trans_mean", mode:"all"},
+{name:"trans_rate", mode:"all"},
+{name:"trans_shape", mode:"all"},
+{name:"trans_scale", mode:"all"},
+{name:"trans_cv", mode:"all"},
+{name:"reparam", mode:"param only"},
+{name:"dist", mode:"param only"},
+{name:"derive_param", mode:"derive_param"},
+{name:"derive_eqn", mode:"derive"},
+{name:"test", mode:"param only"}
+];
+
+const param_type = ["normal","const","dist","reparam"]; // Different varieties of parameter
+
+const mask_size = 100;           // Size to make comp. map mask
+
+const pre = 4;                   // The precision of statistics
+
+const menu_width = 7.5;          // The width of the menu bar on the left
+const right_menu_width = 8.5;    // The width of the menu bar on the right
+const right_menu_top = 4;        // Distance from top to right menu
+const graph_width = 50;          // The width of graphs
+const wright = graph_width-6.4;    // The right edge reference used for plotting parameter definitions
+const scrollw = 1.2;             // The width of the scroll bar (used in ploting individuals)
+const but_width = 4.5;           // Size for a standard button
+const but_height = 1.7;   
+const but_width_small = 3.5;     // Size for a standard small button
+const but_height_small = 1.4; 
+const si_radio = 0.8;            // Font size for radio buttons
+const si_title = 1.1;            // Font size for title
+const si_bubble_title = 1;       // Font size for bubble title
+const si_comp_text_frac = 0.85;  // Fraction of comp height for text size
+const si_cogr_text_frac = 0.65;  // Fraction of comp height for text size (in graph mode)
+const si_histo_label = 1;        // Font size for labels on histograms
+
+const graph_mar = { right:2, left:2.6, top:2, bottom:3.5}; // The margins for a graph
+
+const si_table = 1;              // The size of the font used in tables
+const si_drop = 0.8;             // The font size used for drop down menus
+const si_annotation = 1;         // Size of annotation text
+const si_toolbut = 0.8;          // Size of text on toolbar buttons
+const si_clatab = 0.8;           // Size of font in classification tab
+const si_claindextab = 1;        // Size of font in classification tab for index
+
+const si_graph_label = 1.2;      // Size of font for axis labels
+const si_graph_param_label = 1.2;// Size of font for axis labels- (when parameter)
+const si_graph_tick = 0.9;       // Size of font for ticks
+const tick_si = 0.4;             // Size of tick marks
+const yaxisgap = 0.5;            // the extra size on the y-axis tick marks
+
+const si_big = 1.4;              // Used for displaying variable names
+const si_sub = 0.7;
 	
-// Ordinary buttons
+const dy_table = 1.3;            // The gap between lines of a table
+const dy_table_param = 1.8;      // The gap between lines for parameter values
 
-var TABBUT = 0, TITLEBUT = 1, PARAGRAPHBUT = 2,  CANVASBUT = 3,  PAGESUBBUT = 4, UPLOADBUT = 5, XSLIDEBUT = 6, YSLIDEBUT = 7; 
-var MENUBACKBUT = 8, NEXTBUT = 9, LOGOBUT = 10, LOADBUT = 11, BOLDTEXTBUT = 12, CHBUT = 13, CHPLUSBUT = 14, CHMINUSBUT = 15
-var RADIOBUT = 16, GRAPHBUT = 17, RUNSELBUT = 23;
-var STATBUT = 27, STATBUT2 = 28, STATBUT3 = 29, POPSELBUT = 30;
-var EXPORTBUT = 32;
-var BACKBUT = 34, WARNBUT = 35, BULLETBUT = 36, POPFILTBUT = 37, BAYESBUT = 39, EXPORTMINIBUT = 40;
-var ADDCLASSBUT = 41, PAGESUBSUBBUT = 42, ADDBUT2 = 43, ADDDATABUT = 44, CANCELBUT2 = 45, PLOTTIMEBUT = 46;
-var GDROPBUT = 47, GDROPSELBUT = 48, CHOOSETIMEBUT = 49, XTICKBUT2 = 50, XLABELBUT2 = 51, TEXTSUBTITLEBUT =52;
-var SMALLTEXTBUT = 53, CHECKBUT = 54, CHECKBUT2 = 55, GREENBUT = 56, PROGRESSBUT = 57, NEWMODBUT = 58,  RELOADSTATBUT = 59;
-var CLEARBUT2 = 61, PRHEADBUT = 62, HELPBACKBUT = 63, IMPBUT = 64;
-var HELPCLOSEBUT = 65, LOADFILEBUT = 66, HELPICONBUT = 67, PAGESUBBACKBUT = 68, CHECKBUT3 = 69, WHITEBUT = 70, CHECKBUT4 = 71;
-var PDFBUT = 72, PDFBUT2 = 73, ADDDEPBUT = 74, BOLDMEDBUT = 75, DELFILEBUT = 76, CHECKBUT5 = 77, SIMINFBUT = 78;
-var CHECKALLBUT = 79, CHECKBUT6 = 80, TEXTWITHLINKBUT = 81, TEXTWITHLINKBUT2 = 82, NTEXTBUT = 83;
-var DONOTHINGBUT = 84, SMTEXTBUT = 85, CHECKBUT7 = 86, RELOADCORBUT = 87, SMBACKBUT = 88;
+const expand_dx = 1;             // Determines the size of the expand textbox icon
 
-// Button actions
+const latlng_radius = 0.5;       // The size for geographic points
 
-var SLIDEAC = 101, CHPLUSAC2 = 102, CHMINUSAC2 = 103, STARTAC = 104, EXPORTPARAMAC = 105, SAVEAC = 106;
-var EXPORTSTATEAC = 107;
-var EXPORTDIAGNOSTICAC = 108, DONEAC = 109, BACKAC = 110, BACKAC2 = 111, GENERATEAC = 113, RELOADAC = 114;
-var ERRORBACKAC = 115, SIMTYAC = 116, CHOOSECLASSAC = 117, ADDDERIVEAC = 118, NEXTGENAC = 119, BACKGENAC = 120, SAVEGENAC = 121;
-var ADDDATAAC = 122, GENSTARTAC = 123, GENCANCAC = 124, TABBACKAC = 125, ADDCAPAC = 126;
-var NEXTGENAC2 = 127, BACKEVDATAAC = 129, BACKEVDATAAC2 = 130, SIMINITPOPBACKAC = 131;
-var NEXTSIMAC = 132,  SIMLOADINITAC = 133, SIMVIEWINITAC = 134, EXITSIMAC = 135, NEXTGENAC3 = 136, BACKAC3 = 137, IMPORTAC = 138;
-var EXPORTAC = 139, CHOOSEEXISTAC = 140, EXPORTAC2 = 143, NEXTGENAC4 = 144;
-var ADDFILTAC = 145, CHOOSEALLAC = 146, EXPORTAC2 = 147, EDITDESCAC = 148, NEXTDESCAC = 149, LOADEXAC = 150, ADDDISTAC = 151;
-var CANCELDEPAC = 152, SIMINITCANCELAC = 153, NEXTINFAC = 154, BACKEVDATAAC3 = 155, ADVOPAC2 = 156;
-var STOPSTARTAC = 158, ALLAC = 159, NEXTGENEVAC = 160, REMADDFILTAC = 161;
-var CORBACKAC = 162;
+const import_scale_factor = 1;   // Works out how to scale coorinated given in import file
 
-// Canvas radio button types
+const outline_marx = 0.2;
+const outline_mary = 0.1;
+const inputbox_fontsi = 1.1;
+const inputbox_linesi = 1.28;
+const textbox_fontsi = 1.4;
+const textbox_linesi = 1.8;
+const textbox_space = 0.05;
+const textbox_tab = 1.4;
+const input_margin = 0.2;
+const example_space = 1;
 
-var CANRADIORATE = 10, CANRADIOCLASS = 11, CANRADIOCHECK = 12, CANRADIOTESTRES = 13, CANRADIODEFINE = 14, CANRADIOSIMTY = 15;
-var CANRADIOTERM = 16, CANRADIOXAXIS = 17, CANRADIOYAXIS = 18, CANRADIOGENT = 19, CANRADIOCHECK2 = 20;
-var CANRADIOWHICH = 21, CANRADIOPD = 22, CANRADIOMANUAL = 23, CANRADIOGENT2 = 24, CANRADIOERRBAR = 25;
-var CANRADIOPD2 = 26, CANRADIOINDUO = 27, CANRADIOPD3 = 28;
+const warn_si = 0.8, warn_lh = 0.9; // Size and line height for warnings
+const bub_si = 0.8, bub_lh = 0.9; // Size and line height for bubble paragraphs
+const para_si = 1, para_lh = 1.4; // Size and line height for paragraphs
+const para_eq_si = 1.2;
 
-// Radio button types
+const dropdown_height = 1.4;     // The height for a dropdown menu
+const dropdown_opheight = 1.2;   // The height for different options in a dropdown menu
+const dropdown_dymax = 20;       // The maximum size for the dropdown menu 
 
-var RADIOTERM = 0, RADIOVAR = 1, RADIOCHOOSE = 3, RADIOLABEL = 4, RADIOSTYLE = 5, RADIONAMLAB = 6, RADIODER = 7, RADIOTRANS = 8;
-var RADIODEP = 9, RADIOTRANSTY = 10, RADIOSTYLE2 = 11, RADIOSCATTY = 12;
+const playbar_mar = 2;           // The margins around the playbar
 
-// Bubbles
+const index_max = 6;             // The maximum number of indices for a tensor 
 
-var CONVERTDATEBUB = 201, SEARCHBUB = 202, REPLACEBUB = 203, DELROWSBUB = 204, ERRBUB = 205, ADDCLASSBUB = 206;
-var EDITCLASSBUB = 207, EMPTYBUB = 208, MULTISTATEBUB = 209, EDITBUB = 210, EDITAGETIMEBUB = 211, GENDATABUB = 212, TRANSPLBIGBUB = 213;
-var SEARCHRESBUB = 214, REPLACEDONEBUB = 215, DELROWSDONEBUB = 216, JOINBUB = 217;
-var NANBUB = 219, PROBBUB = 220;
+const page_char_wid = 60;//55;
+const page_char_hei = 35;
 
-// Objects
+const scroll_width = 1; 
 
-var OBPARAM = 0, OBTEXT = 1, OBTIME = 2, OBCOMP = 3, OBDATA = 4, OBRADIO = 5, OBCOMP2 = 6, OBBRACKET = 7, OBCOMP3 = 8, OBTEXT2 = 9;
-var OBRADIO2 = 10, OBNAME = 11, OBCOMP4 = 12, OBDATAHEAD = 13, OBIND = 14, OBINDUO = 15, OBRADIO3 = 16, OBSIMNUM = 17, OBRADIO4 = 18;
-var OBCOMPPER = 19, OBCOMPPER2 = 20, OBCOMP6 = 21, OBPRIOR = 23, OBDERIVE = 25;
-var OBSELIND = 26, OBTIMEP = 27, OBDETECTPROB = 28, OBCHOOSECLA = 29, OBCOMP7 = 30, OBTEXTEDIT = 31, OBSESP = 32;
-var OBCOMP8 = 33, OBRADIOGEN = 34, OBRADIOWHICH = 35, OBRADIOPD = 36, OBMINMAX = 37, OBRADIO5 = 38,  OBUPLOAD = 39;
-var OBLINK = 40, OBMODEL = 41, OBRADIOPD2 = 42, OBPD = 43, OBEXAMPPIC = 44, OBEXAMP = 45, OBSPEECH = 46, OBSPEECH2 = 47;
-var OBSPEECHOLD = 48, OBSPEECH3 = 49, OBPRIOR2 = 50, OBSELIND2 = 51, OBINDUOFLAG = 53, OBRADIOEVPD = 54;
-var OBRADIOPD3 = 55, OBPRIORTITLE = 56, OBAGESMOOTH = 57, OBTIMESMOOTH = 58, OBHOZLAB = 59, OBVERTLAB = 60;
-var OBCOR = 61;
+const corner = {x:2, y:1.5};     // The position of the title button
 
-// Fonts
+const button_margin = {dx:2, dy:0.9}; // Position relative corner for buttons
 
-var tableheadfont = "bold 17px arial", tablefont = "17px arial", subfont = "11px arial", classvalfont = "18px arial";
-var addfont = "bold 17px ariel", examplefont = "17px arial", examplefont2 = "bold 17px arial";
+const grid = 1;                  // The gridsize over which points are discretised
 
-var MENUFONT = "bold 17px arial",  MENUFONT2 = "16px arial", MENUFONTSMALL = "bold 14px arial", MENUFONTSMALL2 = "12px arial";
-var HELPFONT = "16px arial", HUGEFONT = "bold 24px Times", RADIOFONT = "16px times", INPUTFONT = "bold 18px arial";
-var LABELFONT = "25px times", NORMFONT = "17px arial",  TICKFONT = "20px times", TILEFONT = "bold 18px arial";
-var BUTFONT = "bold 16px arial", HELPBUTFONT = "bold 20px arial", HELPBUTFONT2 = "bold 17px arial";
-var ADDFONT = "bold 17px ariel", STATFONT = "16px arial", KEYFONT = "18px times", CORFONT = "20px times";
+const compartment_height = 3;    // The height of compartments on this grid
 
+// Lists parameter types not needed for simulation
+const sim_param_not_needed = ["Se","Sp","trap_prob","comp_prob","derive_param"];
+const inf_param_not_needed = ["derive_param"];
+
+const dist_pos = ["exp(rate)","exp(mean)","gamma","erlang","log-normal","weibull"];
+const exp_dist_pos = ["exp(rate)","exp(mean)","erlang"];
+
+const prior_pos = ["uniform","exp","normal","gamma","log-normal","beta","bernoulli","fix"];
+const prior_pos_all = ["uniform","exp","normal","gamma","log-normal","beta","bernoulli","fix","flat","dirichlet"];
+const bp_prior_pos = ["flat","dirichlet","fix"];
+const zeroone_prior_pos = ["uniform","beta","fix"];
+
+const data_types = ["Init. Pop.", "Individual", "Population","Capture","Genetic"];
+
+let chnotallowed = "\"£!$%&=;@~#\\?";
+let notparam_list = "+-*×/0123456789.{<>}()|\n\r ";  // Sets not a parameter character
+let paramend_list = "+-*×/0123456789.{<>}[]$\n\r ";	 // Sets characters which end parameter
+	
+const convert = [
+		{command:"add-ind", type:"Add Ind."},
+		{command:"remove-ind", type:"Remove Ind."},
+		{command:"move-ind", type:"Move Ind."},
+		{command:"fixed-eff", type:"Fixed Eff."},
+		{command:"init-pop", type:"Init. Pop."},
+		{command:"init-pop-prior", type:"Init. Pop. Prior"},
+		{command:"comp-data", type:"Compartment"},
+		{command:"trans-data", type:"Transition"},
+		{command:"source-data", type:"Source"},
+		{command:"sink-data", type:"Sink"},	
+		{command:"test-data", type:"Diag. Test"},	
+		{command:"pop-data", type:"Population"},	
+		{command:"pop-trans-data", type:"Pop. Trans."},	
+		{command:"set-traps-data", type:"Set Traps"},	
+		{command:"ind-trapped-data", type:"Ind. Trapped"},	
+		{command:"genetic-data", type:"Genetic"},	
+	];
+	
+const data_template = [
+// Used in initial population / add / move / remove
+{type:"Init. Pop. Prior", cols:["cl_all","alpha"]},
+{type:"Init. Pop.", cols:["cl_all","pop"]},
+{type:"Add Ind.", cols:["ID","t,the time the individuals are added","cl_all"]},
+{type:"Remove Ind.", cols:["ID","t,the time the individuals are removed"]},
+{type:"Move Ind.", cols:["ID","t,the time the individuals are moved","to"]},
+
+// Used in individual data 
+{type:"Compartment", cols:["ID","t,the time the individual's state is measured","cl_prob"]},
+{type:"Transition", cols:["ID","ttrans,the time the individuals undergo the transition"]},
+{type:"Trans. in time range", cols:["ID","t,the time the individuals undergo the transition","start","end"]},
+{type:"Source", cols:["ID","t,the time the individuals enter the system"]},
+{type:"Source in time range", cols:["ID","t,the time the individuals enter the system","start","end"]},
+{type:"Sink", cols:["ID","t,the time the individuals leave the system"]},
+{type:"Sink in time range", cols:["ID","t,the time the individuals leave the system","start","end"]},
+{type:"Diag. Test", cols:["ID","t,the time the individual's diagnostic test is taken","result"]},
+{type:"Population", cols:["t,the time the population measurement is taken","filt_obspop"]},
+{type:"Pop. Trans.", cols:["t,the time the individuals undergo the transition","filt_obspoptrans"]},
+
+//Capture
+{type:"Set Traps", cols:["setrap_name","t,the time the population measurement is taken","filt_settraps"]},
+{type:"Ind. Trapped", cols:["ID","setrap_name"]},
+
+// Genetic
+{type:"Genetic", cols:["ID","t,the time the genetic measurement is taken","snp,the first SNP column"]},
+
+// Loading directly into model
+{type:"Fixed Effect", cols:["ID","value"]},
+{type:"Comp File Pos", cols:["comp_name","comp_x","comp_y"]},
+{type:"Comp File Pos Colour", cols:["comp_name","comp_x","comp_y","colour"]},
+{type:"Comp File", cols:["comp_name"]},
+{type:"Comp File Colour", cols:["comp_name","colour"]},
+{type:"Trans exp(rate)", cols:["start_comp","end_comp","rate"]},
+{type:"Trans exp(mean)", cols:["start_comp","end_comp","mean"]},
+{type:"Trans gamma", cols:["start_comp","end_comp","mean","cv"]},
+{type:"Trans log-normal", cols:["start_comp","end_comp","mean","cv"]},
+{type:"Trans weibull", cols:["start_comp","end_comp","scale","shape"]},
+{type:"Source exp(rate)", cols:["end_comp","rate"]},
+{type:"Source exp(mean)", cols:["end_comp","mean"]},
+{type:"Sink exp(rate)", cols:["start_comp","rate"]},
+{type:"Sink exp(mean)", cols:["start_comp","mean"]},
+{type:"Sink gamma", cols:["start_comp","mean","cv"]},
+{type:"Sink log-normal", cols:["start_comp","mean","cv"]},
+{type:"Sink weibull", cols:["start_comp","scale","shape"]},
+{type:"Source Pos exp(rate)", cols:["end_comp","source_x","source_y","rate"]},
+{type:"Source Pos exp(mean)", cols:["end_comp","source_x","source_y","mean"]},
+{type:"Sink Pos exp(rate)", cols:["start_comp","sink_x","sink_y","rate"]},
+{type:"Sink Pos exp(mean)", cols:["start_comp","sink_x","sink_y","mean"]},
+{type:"Sink Pos gamma", cols:["start_comp","sink_x","sink_y","mean","cv"]},
+{type:"Sink Pos log-normal", cols:["start_comp","sink_x","sink_y","mean","cv"]},
+{type:"Sink Pos weibull", cols:["start_comp","sink_x","sink_y","scale","shape"]},
+
+/// Load compartment map
+{type:"CompMap", cols:["boundary","comp_name"]},
+
+/// Loading tensor of values for a parameter
+{type:"LoadTensor", cols:["dep","value"]},
+
+/// Loading tensor of values for reparameterisation
+{type:"LoadReparam", cols:["dep","eqn"]},
+
+/// Loading tensor of values for priors
+{type:"LoadPriorSplit", cols:["dep","prior"]},
+
+/// Loading tensor of values for distributions
+{type:"LoadDistSplit", cols:["dep","dist"]},
+
+/// Loads the A matrix into and individual effect group
+{type:"LoadAmatrix", cols:["A"]},
+
+];
+	
 // Colours
 
-var BLACK = "#000000", GREEN = "#22FF22", RED = "#FF2222", BLUE = "#4444FF", PURPLE = "#FF44FF";
-var WHITE = "#ffffff", GREY = "#bbbbbb"; 
-var LGREEN = "#aaFFaa", LRED = "#FFaaaa", LBLUE = "#aaaaFF", LPURPLE = "#ffaaff", LGREY = "#dddddd";
-var DGREEN = "#009900", DRED = "#990000", DBLUE = "#000099", DPURPLE = "#aa00aa", DGREY = "#777777";
-var DDGREEN = "#005500", DDRED = "#550000", DDBLUE = "#000055", DDPURPLE = "#550055", DDGREY = "#444444";
-var LLGREEN = "#ddFFdd", LLRED = "#FFdddd", LLBLUE = "#ddddFF", LLPURPLE = "#FFddFF", LLGREY = "#eeeeee";
-var LLLBLUE = "#eeeeFF";
-var LLLGREY = "#eeeeee", LLGREY = "#cccccc";
-var ORANGE = "#ff9900", DORANGE = "#cc6600", LORANGE = "#ffcc55",  DDORANGE = "#441100", LLORANGE = "#ffee99";
-var DDBLUE = "#000055";
-var BROWN = "#cb6a00", LBROWN = "#edbb99", DBROWN = "#974500", DDBROWN = "#431200";
+const BLACK = "#000000", GREEN = "#22ff22", RED = "#ff2222", BLUE = "#4444ff", PURPLE = "#ff44ff";
+const WHITE = "#ffffff", GREY = "#bbbbbb", CYAN = "#00bbbb"; 
+const LGREEN = "#aaffaa", LRED = "#ffaaaa", LBLUE = "#aaaaff", LPURPLE = "#ffaaff", LGREY = "#dddddd", LCYAN = "#00ffff";
+const DGREEN = "#009900", DRED = "#990000", DBLUE = "#000099", DPURPLE = "#aa00aa", DGREY = "#888888", DCYAN = "#009999";
+const DDGREEN = "#005500", DDRED = "#550000", DDBLUE = "#000055", DDPURPLE = "#550055", DDGREY = "#444444", DDCYAN = "#005555";
+const LLGREEN = "#ddffdd", LLRED = "#ffdddd", LLBLUE = "#ddddff", LLPURPLE = "#ffddff", LLGREY = "#eeeeee", LLCYAN = "#99ffff";
+const LLLBLUE = "#eeeeff";
+const LLLGREY = "#eeeeee";
+const ORANGE = "#ff9900", DORANGE = "#cc6600", LORANGE = "#ffcc55",  DDORANGE = "#441100", LLORANGE = "#ffee99";
+const BROWN = "#cb6a00", LBROWN = "#edbb99", DBROWN = "#974500", DDBROWN = "#431200";
 
-// Miscellaneous
+const DDDGREEN = "#003300";
+const BACKGROUND = "#000000";
+const HELP_BLUE = "#444444";
+const GREY_BACK = "#444444";
+const BLUE_BACK = "#000033";
+const MAP_DEFAULT = LGREY;
+
+const BUBBLE_COL = LLLBLUE, BUBBLE_SURROUND = LBLUE, BUBBLE_TEXT_COL =DBLUE;
+const INPUT_OUTLINE_COL = LBLUE;
+
+const COMPARTMENT_CURVE = 0.25;                       // Determines the curvature put around compartments
+
+const TRANS_OVER_RANGE = 0.5;                         // The width around which a transition is sensitive to mouse over
+
+const SPLIT_SIZE = 0.5;                               // Size of mouse movement needed to split transition
+
+const TRANS_POINT_R = 0.35;                           // The size of transitions points
+
+const collist = [LGREEN,LRED,LBLUE,LPURPLE,LORANGE,LBROWN,LGREY,GREEN,RED,BLUE,PURPLE,ORANGE,BROWN,GREY,DGREEN,DRED,DBLUE,DPURPLE,DORANGE,DBROWN,DGREY,DDGREEN,DDRED,DDBLUE,DDPURPLE,DDORANGE,DDBROWN,BLACK];
+
+//const auto_color = [GREEN,RED,BLUE,PURPLE,ORANGE,BROWN,GREY,DGREEN,DRED,DBLUE,DPURPLE,DORANGE,DBROWN,DGREY,LGREEN,LRED,LBLUE,LPURPLE,LORANGE,LBROWN,LGREY,DDGREEN,DDRED,DDBLUE,DDPURPLE,DDORANGE,DDBROWN,BLACK];
+const auto_color = [BLUE,RED,GREEN,DRED,PURPLE,ORANGE,BROWN,GREY,GREEN,DRED,DBLUE,DPURPLE,DORANGE,DBROWN,DGREY,LGREEN,LRED,LBLUE,LPURPLE,LORANGE,LBROWN,LGREY,DDGREEN,DDRED,DDBLUE,DDPURPLE,DDORANGE,DDBROWN,BLACK];
+
+const OK_butcol = "#444499", OK_butcol2 = "#333399";
+const OK_butcol3 = "#6666cc", OK_butcol4 = "#6666cc";
+
+const endl = '\n';
+
+const set_str = "Please set";
+const select_str = "Please Select";
+const unset_type = "unset_type";
+
+const functi = ["exp","cos","sin","log"];
+
+const opbut = ["+","-","\u00d7","\u2215","^","(",")","Σ","'"];
+
+const numbut = ["0","1","2","3","4","5","6","7","8","9","."];
+
+const char_not_allowed = [":",",",".","!","[","]","{","}","〈","〉","|","*","_","×","-","+","<",">"]; 
+
+const greek = ["\u03B1","\u03B2","\u03B3","\u03B4","\u03B5","\u03B6","\u03B7","\u03B8","\u03B9",
+"\u03Ba","\u03Bb","\u03Bc","\u03Bd","\u03Be","\u03Bf","\u03C0","\u03C1","\u03C3","\u03C4","\u03C5","\u03C6","\u03C7","\u03C8","\u03C9"];
+["Α","Β","Γ","Δ","Ε","Ζ","Η","Θ","Ι","Κ","Λ","Μ","Ν","Ξ","Ο","Π","Ρ","Σ","Τ","Υ","Φ","Χ","Ψ","Ω"];
+const greek_latex = [["alpha","α"],["beta","β"],["gamma","γ"],["Gamma","Γ"],["delta","δ"],["Delta","Δ"],["epsilon","ε"],["zeta","ζ"],["eta","η"],["Eta","Η"],["theta","θ"],["Theta","Θ"],["Iota","ι"],["kappa","κ"],["lambda","λ"],["Lambda","Λ"],["mu","μ"],["nu","ν"],["xi","ξ"],["Xi","Ξ"],["omicron","ο"],["pi","π"],["Pi","Π"],["rho","ρ"],["sigma","σ"],["Sigma","Σ"],["tau","τ"],["upsilon","τ"],["phi","φ"],["Phi","Φ"],["chi","χ"],["psi","ψ"],["Psi","Ψ"],["omega","ω"],["Omega","Ω"],["sum","Σ"]];
+
+const greek_capital = ["A","B","Γ","Δ","E","Z","H","Θ","I","K","Λ","M","N","Ξ","O","Π","P","Σ","T","Y","Φ","X","Ψ","Ω"];
+
+const alphabet = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"];
+
+const like_name = ["L^markov","L^non-markov","L^dist","L^ie","L^obs","Prior"];
+
+// Numeric constants
+
+const UNSET = 99999999;
+const LARGE = 10000000;
+const TINY = 0.000000001;
+const ALMOST_ONE = 0.9999999;
 
 const spawn = require('child_process').spawn;
 
-var menux = 140;
-var tab = 20;
-var dysub, dysubsub;
-
-var cordx = 140, cordy = 45;
-
-var datacol=[0,110,220,320,390,460,540,655];              // The positions of columns
-
-var large = 100000;
-var tiny = 0.000000001;
-
-var slidedx = 8, slidedy = 20, slidex = 70;
-
-var indtablemar = 70;
-var tabledy = 20;
-var priordy = 30;
-var tablexfr=0, tableyfr=0;
-
-var modelplaybar = 25;
-var scale = 1;
-var rwid = 148, radiodx = 116, checkdx = 116;
-
-var RIGHT=0, LEFT=1, UP=2, DOWN=3;
-var bubmar = 10, bubtag = 25, bubtag2 = 20;
-
-var tlinexmin = 50;
-				
-var MOD = 0;
-
-var gridsize = 10;
-
-var nfuncti = 4;
-var functi = new Array("exp","cos","sin","log");
-
-var popviewpos = new Array("Graph","Model");
-var indviewpos = new Array("Timeline","Model");
-
-var nopbut = 7;
-var opbut = new Array("+","-","\u00d7","\u2215","^","(",")");
-
-var nnumbut = 11;
-var numbut = new Array("0","1","2","3","4","5","6","7","8","9",".");
-
-var ngreek = 25;
-var greek = new Array("\u03B1","\u03B2","\u03B3","\u03B4","\u03B5","\u03B6","\u03B7","\u03B8","\u03B9",
-"\u03Ba","\u03Bb","\u03Bc","\u03Bd","\u03Be","\u03Bf","\u03C0","\u03C1","\u03C2","\u03C3","\u03C4","\u03C5","\u03C6","\u03C7","\u03C8","\u03C9");
-
-var alp = new Array("a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z");
-
-var ncollist = 28;
-var collist = new Array(LGREEN,LRED,LBLUE,LPURPLE,LORANGE,LBROWN,LGREY,GREEN,RED,BLUE,PURPLE,ORANGE,BROWN,GREY,DGREEN,DRED,DBLUE,DPURPLE,DORANGE,DBROWN,DGREY,DDGREEN,DDRED,DDBLUE,DDPURPLE,DDORANGE,DDBROWN,BLACK);
-
-var NORMLINE = 1, THICKLINE = 2, MTHICKLINE = 3, VTHICKLINE = 4, VVTHICKLINE = 6;
-
-var tickpo = new Array(1,2,5);
-
-var HOMEPAGE = 0, DESCPAGE = 1, MODELPAGE = 2, SIMULATEPAGE = 3, INFERENCEPAGE = 4;
-
-var OBSFILE = 0, BICIFILE = 1, RELOADOBSFILE = 2, IMPORTFILE = 3, SIMINITFILE = 4;
-
-var CLASSVALDATA = 0, TRANSITIONDATA = 1;
-
-var priortext = new Array("Flat","Gamma","Normal","Log-Normal","Exponential","Beta","Weibull","Fix");
-
-var smoothop = new Array("None","Smooth","Log Smooth");
-
-var distributiontext = new Array("Gamma","Normal","Log-Normal","Exponential","Beta","Weibull");
-
-var INDIVIDUAL = 0;
-
-var scatnumop = [100,200,500,1000,2000,5000,10000,20000,50000,100000];
-
-var chcol = [BLUE,RED,GREEN,ORANGE,PURPLE,LBLUE,LGREEN,LRED,BLUE,GREEN,RED,ORANGE,PURPLE,LBLUE,LGREEN,LRED];
-
-var selbutdx = 100;
+// Different line thicknesses
+const NOLINE = 0, THINLINE = 0.5, NORMLINE = 1, MEDIUMLINE = 1.5, THICKLINE = 2, MTHICKLINE = 3, VTHICKLINE = 4;

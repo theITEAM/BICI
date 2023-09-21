@@ -1,0 +1,12 @@
+Copy simulated parameters
+
+
+
+TO DO
+Sort out prior
+sort out map
+do compartment maps
+menu icon
+sum using prime
+a greek letter must be selected
+

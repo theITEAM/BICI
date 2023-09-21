@@ -1,1712 +1,2643 @@
-function modelbuts()                                      // Draws the model page
+"use strict";
+
+class Model
 {
-	cl = pagesub[MODELPAGE];
-
-	switch(cl){
-	case -3:		// Depend
-		x = menux+tab; y = 30;
-		xx = width-115; yy = height-45;		
-		if(adddepfl == 1){
-			addbutton("Choose parameter to place distribution on:",x,y,0,0,-1,TITLEBUT,-1,-1); y += 20;
-			priorbuts();
-			addbutton("Cancel",xx,yy,100,30,CANCELDEPAC,CANCELBUT2,-1,-1);
-		}
-		else{
-			addbutton("Impose distributions on parameters",x,y,0,0,-1,TITLEBUT,29,-1); y += 50;
-			priorbuts();
-			
-			if(modelsetup == 0){
-				if(ncla > 2) addbutton("Done!",xx,yy,100,30,CLEARBUT2,CLEARBUT2,-1,-1);
-
-				te = "Distribution";
-				var dx = textwidth(te,addfont)+19;
-				addbutton(te,menux+tab+20,height-40,dx,20,ADDDEPBUT,ADDDEPBUT,-1,-1);
-				addbutton("[?]",menux+tab+20+dx,height-40,15,20,HELPICONBUT,HELPICONBUT,96,-1);
-			}
-			else addbutton("Edit",xx,yy,100,30,CLEARBUT2,CLEARBUT2,-1,-1);
-		}
-		return;
+	start;                         // Set to true when a new model is started 
 	
-	case -2:       // Derived
-		x = menux+tab; y = 30;
-		addbutton("Quantities derived from the model",x,y,0,0,-1,TITLEBUT,32,-1); y += 50;
+	description;                   // A description of the analysis
+	filename;                      // The current filename 
+	species = [];                  // Stores information about species
+	param = [];                    // Stores parameter information
+	spline = [];                   // Stores spline information
+	warn = [];                     // Stores model warnings
+	derive = [];                   // Sets derived quantities
 	
-		if(derive.length == 0) addbutton("There are currently no derived quantities.",x+18,y,900,0,-1,PARAGRAPHBUT,1,-1);
-		else{
-			y = 80;
-			addbutton("Derived",x+20,y,100,0,-1,PRHEADBUT,-1,-1);
-			addbutton("Expression",x+180,y,100,0,-1,PRHEADBUT,-1,-1);
-
-			y = 110;
-			cornx = x+20, corny = y;
-			addbutton("",cornx,corny,derwidth,derheight,CANVASBUT,CANVASBUT,-1,-1);
-			
-			drawderived();
-			
-			tableyfrac = derheight/ytot;
-			if(tableyfrac < 1) addbutton("",cornx+derwidth+10,corny,13,derheight-22,SLIDEAC,YSLIDEBUT,-1,-1);
-		}
-			
-		xx = width-115; yy = height-45;		
-		if(modelsetup == 0){
-			if(ncla > 2) addbutton("Done!",xx,yy,100,30,CLEARBUT2,CLEARBUT2,-1,-1);
-			
-			textwidth(te,addfont)+19
-			te = "Derived";
-			var dx = textwidth(te,addfont)+19;
-			addbutton(te,menux+tab+20,height-40,dx,20,ADDDERIVEAC,ADDBUT2,-1,-1);
-			addbutton("[?]",menux+tab+20+dx,height-40,15,20,HELPICONBUT,HELPICONBUT,34,-1);
-		}
-		else addbutton("Edit",xx,yy,100,30,CLEARBUT2,CLEARBUT2,-1,-1);
+	sim_details = {};              // Details of simulation
+	inf_details = {};              // Details of inference
 	
-		return;
+	constructor()
+	{
+		this.start = false;
 	}
-	
-	x = menux+tab; y = 30;
-	addbutton("",menux,0,width-menux,height,CANVASBUT,CANVASBUT,-1,-1);
-	
-	if(cl == -1) return;
-	
-	drawmodel(pagesub[MODELPAGE],0,0,width-menux,height,"noframe","normal");
 
-	xx = width-315-90; addcanbutton("",xx,3,25,22,SPEECHBUT,SPEECHBUT,-1,-1);
-	if(cla[pagesub[MODELPAGE]].descon == 1){
-		dx = width-345-90;
-		alignparagraph(cla[pagesub[MODELPAGE]].desc,dx);
-		addcanbutton("",xx-2,3+25,28,18,EDITSPEECHBUT,EDITSPEECHBUT,ncanbut+1,-1);
-		addcanbutton(cla[pagesub[MODELPAGE]].desc,20,10,dx,nlines*20+20,PARACANBUT2,PARACANBUT2,-1,-1);
-	}
-	
-	if(ncla > 2){
-		xx = width-menux-115; yy = height-45;	
-		if(modelsetup == 0) addcanbutton("Done!",xx,yy,100,30,DONEMODELAC,CLEARBUT,-1,-1);
-		else addcanbutton("Edit",xx,yy,100,30,DONEMODELAC,CLEARBUT,-1,-1);
+	///	Starts a new model
+	start_new(op)
+	{
+		this.description = {te:"Model and analysis description."};
+		this.species = [];
+		this.param = [];
+		this.derive = [];   
+		this.sim_details = { t_start:"", t_end:"", timestep:"", indmax:10000, algorithm:{value:"gillespie"}, number:1};    
+		this.inf_details = { t_start:"", t_end:"", timestep:"", abcsample:"1000", sample:"10000", thinparam:"10", thinstate:"50", accfrac:"0.1", accfracsmc:"0.5", numgen:"5", kernelsize:"0.5", indmax:10000, nchain:"3", algorithm:{value:"DA-MCMC"}}; 
 		
-		xx = width-menux-150; yy = height-25;	
-		dx = 22; dy = 26; dd = 3;
-		addcanbutton("",xx+dd,yy-dy/2,dx,dy,ZOOMINBUT,ZOOMINBUT,UP,-1);
-		addcanbutton("",xx-dd-dx,yy-dy/2,dx,dy,ZOOMOUTBUT,ZOOMOUTBUT,UP,-1); 
-	
-		x = 0; y = height-40;
-	
-		if(modelsetup == 1) return;
-	
-		if(cla[cl].name == "Time"){ 
-			te = "Time transition";
-			var dx = textwidth(te,addfont)+19;
-			addcanbutton(te,20,height-40,dx,20,ADDTIMEPOINTAC,ADDBUT,-1,-1);
-			addcanbutton("[?]",20+dx,height-40,15,20,HELPICONCANBUT,HELPICONCANBUT,37,-1);
-			return;
+		this.start = true;
+		this.filename = "";
+		initialise_pages();
+		zero_page_index();
+		
+		if(op != "without results"){
+			sim_result = clear_result();
+			inf_result = clear_result();
 		}
-		if(cla[cl].name == "Age"){
-			te = "Age transition";
-			var dx = textwidth(te,addfont)+19;
-			addcanbutton(te,20,height-40,dx,20,ADDAGEPOINTAC,ADDBUT,-1,-1);
-			addcanbutton("[?]",20+dx,height-40,15,20,HELPICONCANBUT,HELPICONCANBUT,38,-1);
-			return;
+		
+		initialise_pages();
+	}
+	
+	
+	/// Gets the species number currently being viewed
+	get_p()
+	{
+		let pag = inter.page[inter.pa];
+		let sub = pag.sub[pag.index];
+		if(!(pag.name =="Simulation" && sub.name == "Population") &&
+		  !(pag.name =="Simulation" && sub.name == "Generate Data") &&
+			!(pag.name =="Inference" && sub.name == "Data") &&
+			!(pag.name =="Model" && sub.name == "Compartments")){
+			error("Should not be getting p");
 		}
+		return sub.index;
+	}
+	
+	
+	/// Gets the species currently being viewed
+	get_sp()
+	{
+		return this.species[this.get_p()];
+	}
+	
+	
+	/// Gets the classification being viewed
+	get_cl()
+	{
+		let pag = inter.page[inter.pa];
+		let p = pag.sub[pag.index].index;
+		return pag.sub[pag.index].sub[p].index;
+	}
 
-		if(addtransmode == 1){
-			if(cla[transtempcl].tra[transtempk].i == -1){
-				if(addsourcemode == -1) addrequest("Select compartment");		
-				else addrequest("Select initial compartment");	
-			}				
-			else{
-				if(addsourcemode == -1) addrequest("Place sink");	
-				else addrequest("Select final compartment (along with any intermediary points)");	
+	get_cla()
+	{
+		return this.species[this.get_p()].cla[this.get_cl()];
+	}
+
+	///	Returns true if the compartmental model is being viewed 
+	get_show_model()
+	{
+		if(this.warn.length > 0) return false;
+		
+		let tree = inter.page_name.split("->");
+		if(tree[0] == "Model" && tree[1] == "Compartments"){
+			return true;
+		}
+		return false;
+	}
+	
+	
+	/// Adds all the compartment buttons
+	add_compartment_buts(lay)
+	{
+		let p = this.get_p();
+		let cl = this.get_cl();
+		
+		if(this.species.length == 0 || cl == this.species[p].ncla) return;
+
+		let claa = this.species[p].cla[cl];
+	
+		let mo = inter.mode;
+		if(mo.type == "Add_Transition" || mo.type == "Add_Source" || mo.type == "Add_Sink"){
+			lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, ac:"IntermediateAdd", type:"Nothing", p:p, cl:cl});
+		}
+		
+		let cam = claa.camera;                    // Loads up the camera used to view model
+		let bub = inter.bubble;
+
+		for(let k = 0; k < claa.ncomp; k++){
+			let c = claa.comp[k];
+		
+			let ac = "Compartment";
+			if((inter.mode.type == "Add_Source" || inter.mode.type == "Add_Sink") && inter.mode.midp.length == 0) ac = undefined;	
+
+			if(bub.lay_name != undefined && bub.bu.type == "CompMap" && bub.bu.i == k){
+				ac = undefined;
 			}
-		}		
-		else{
-			if(addcompmode == 1) addrequest("Place compartment");
-			else{
-				if(addsourcemode == 1) addrequest("Places source"); 
-				else{
-					te = "Compartment";
-					var dx = textwidth(te,addfont)+19;
-					addcanbutton(te,x+20,height-40,dx,20,ADDCOMPAC,ADDBUT,-1,-1);
-					addcanbutton("[?]",x+20+dx,y,15,20,HELPICONCANBUT,HELPICONCANBUT,35,-1);
 			
-					te = "Transition";
-					var dx = textwidth(te,addfont)+19;
-					addcanbutton(te,x+220,height-40,dx,20,ADDTRANSAC,ADDBUT,-1,-1);
-					addcanbutton("[?]",x+220+dx,y,15,20,HELPICONCANBUT,HELPICONCANBUT,36,-1);
+			switch(c.type){
+			case "box":
+				{
+					let pt = trans_point(c.x,c.y,cam,lay);
+					let w =	c.w*cam.scale;
+					let h =	c.h*cam.scale; 
+					let x = pt.x-w/2, y = pt.y-h/2;
+					lay.add_button({te:claa.comp[k].name, x:x, y:y, dx:w, dy:h, ac:ac, type:"Compartment", col:c.col, p:p, cl:cl, i:k});
 				}
-			}
-		}
-		
-		if(addcompmode == 1 && canover == -1){ 
-			addcanbutton(dragtext,canmx-dragww/2,canmy-dragdh/2,dragww,dragdh,-1,DRAGBUT,-1,-1);
-		}
-		
-		if(addsourcemode == 1 && canover == -1) addcanbutton("+",canmx,canmy,0,0,-1,SOURCEBUT,-1,-1);
-	}
-}
-
-function modframe(cl,dx,dy)                              // Calculates the bounding box for a model  
-{
-	var k, c, tr, p, xmin = large, xmax=-large, ymin=large, ymax=-large, wmax = 0;
-
-	for(k = 0; k < cla[cl].ncomp; k++){
-		c = cla[cl].comp[k];
-		if(c.x < xmin) xmin = c.x; if(c.x+c.w > xmax) xmax = c.x+c.w;
-		if(c.y < ymin) ymin = c.y; if(c.y+c.h > ymax) ymax = c.y+c.h;
-		if(c.w > wmax) wmax = c.w;
-	}
-
-	for(tr = 0; tr < cla[cl].ntra; tr++){
-		for(p = 0; p < cla[cl].tra[tr].p.length; p++){
-			if(cla[cl].tra[tr].p[p].x < xmin) xmin = cla[cl].tra[tr].p[p].x;
-			if(cla[cl].tra[tr].p[p].x > xmax) xmax = cla[cl].tra[tr].p[p].x;
-			if(cla[cl].tra[tr].p[p].y < ymin) ymin = cla[cl].tra[tr].p[p].y;
-			if(cla[cl].tra[tr].p[p].y > ymax) ymax = cla[cl].tra[tr].p[p].y;
-		}
-	}
-	
-	fac = (dx/(xmax-xmin))/(1.03+1.0/cla[cl].ncomp);
-
-	fac2 = (dy/(ymax-ymin))/(1.03+1.0/cla[cl].ncomp); if(fac2 < fac) fac = fac2;
-	dyideal = Math.floor(fac*(ymax-ymin)*(1.03+1.0/cla[cl].ncomp));
-	
-	fac3 = 0.2*dx/wmax; if(fac3 < fac) fac = fac3;
-	
-	shx = 0.5*(xmax+xmin) - 0.5*dx/fac; shy = 0.5*(ymax+ymin) - 0.5*dy/fac; shfac = fac;	
-
-	return dyideal;
-}
-
-function drawmodel(cl,xco,yco,dx,dy,frame,type)            // Draws all the elements of the model
-{
-	var k;
-
-	modelty = type;
-	
-	if(frame == "noframe"){ shx = 0; shy = 0; shfac = 1;}
-	else modframe(cl,dx,dy);	  
-	
-	cv = resultcv;
-	fillrect(0,0,dx,dy,WHITE); 
-	addcanbutton("",xco,yco,dx,dy,-1,MODELPICBUT,-1,-1);
-
-	if(ncla == 0) return;
-
-	for(k = 0; k < cla[cl].ntra; k++){
-		tr = cla[cl].tra[k];
-		if(tr.i != -1 && tr.f != -1) drawtrans(tr,0);
-		if(type == "normal" || type == "seltrans") addcanbutton("links",0,0,0,0,TRANSPLBUT,TRANSPLBUT,cl,k);
-	}
-
-	if(type == "normal"){
-		for(k = 0; k < cla[cl].ntra; k++){
-			tr = cla[cl].tra[k];
-			for(j = 0; j < tr.p.length; j++){
-				x = (tr.p[j].x-shx)*shfac; y = (tr.p[j].y-shy)*shfac;
-				if(tr.i == -2 && j == 0){ st = "+"; r = 15;}
-				else{
-					if(tr.f == -2 && j == tr.p.length-1){ st = "-"; r = 15;}
-					else{ st = ""; r = 8;}
-				}	
-				addcanbutton(st,x-r,y-r,2*r,2*r,TRANSPBUT,TRANSPBUT,k,j);
-			}
-		}	
-	}
-
-	switch(type){
-	case "seltrans": bu = COMPBUT; break;
-	
-	case "normal": case "indoutput": bu = COMPBUT; break;
-	
-	case "popinit":
-		if(cl == simpopinitset){
-			bu = COMPPOPINITBUT;
-			popmax = 1; for(k = 0; k < cla[cl].ncomp; k++){ c = cla[cl].comp[k]; if(c.simpopinit > popmax) popmax = c.simpopinit;}
-		}
-		else{
-			bu = COMPFRACINITBUT;
-		}
-		break;
-		
-	case "loadinit":
-		bu = COMPLOADINITBUT;
-		popmax = 1; for(k = 0; k < cla[cl].ncomp; k++){ c = cla[cl].comp[k]; if(c.loadinit.length > popmax) popmax = c.loadinit.length;}
-		break;
-		
-	case "popoutput":
-		bu = COMPPOPOUTPUTBUT;
-		break;
-	}
-		
-	for(k = 0; k < cla[cl].ncomp; k++){
-		c = cla[cl].comp[k];
-		x = Math.floor((c.x-shx)*shfac); y = Math.floor((c.y-shy)*shfac);
-		w = Math.floor(c.w*shfac); h = Math.floor(c.h*shfac); 
-		
-		if(type == "indoutput") compplot(cl,k,x,y,w,h,bu,2);
-		else{
-			if(type != "seltrans" && type != "loadinit") addcanbutton(c.name,x+xco,y+yco,w,h,bu,bu,cl,k);
-			if(playing == 0) compplot(cl,k,x,y,w,h,bu,0);
-		}
-		
-		// works out if any sources or sinks
-		sofl = 0; sifl = 0;
-		for(cl2 = 0; cl2 < ncla; cl2++){
-			if(cl2 != cl){ 
-				for(t = 0; t < cla[cl2].ntra; t++){
-					tr = cla[cl2].tra[t]; 
-					if(tr.i == -2) sofl = 1;
-					if(tr.f == -2) sifl = 1;
+				break;
+			
+			case "latlng":
+				{
+					let pt = trans_point(c.x,c.y,cam,lay);
+					let w =	2*latlng_radius*cam.scale*cam.ruler, h = w; 
+					let x = pt.x-w/2, y = pt.y-h/2;
+					lay.add_button({te:claa.comp[k].name, x:x, y:y, dx:w, dy:h, ac:ac, type:"CompLatLng", col:c.col, p:p, cl:cl, i:k});
 				}
+				break;
+				
+			case "boundary":
+				{
+					let box = c.feature.box;
+				
+					let pmin = trans_point(box.xmin,box.ymin,cam,lay);
+					let pmax = trans_point(box.xmax,box.ymax,cam,lay);
+					
+					lay.add_button({x:pmin.x, y:pmin.y, dx:pmax.x-pmin.x, dy:pmax.y-pmin.y, ac:ac, type:"CompMap", polygon:c.feature.polygon, mask:c.mask, col:c.col, p:p, cl:cl, i:k});
+				}
+				break;
+
+			default: error("Option not recognised 82"); break;
 			}
-		}		
+		}
+		
+		if(mo.type == "Add_Compartment" || mo.type == "Add_Label"){
+			lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, ac:"NothingMode", type:"Nothing"});	
+		}
 	}
-	
-	if(type == "indoutput"){
-		cv.globalAlpha = 0.8;
-		fillrect(0,0,dx,dy,WHITE);
-		getminmax();
-		 
-		i = res.indfilt; cl = res.clasel;
-		for(ch = chmin; ch < chmax; ch++){
-			for(s = smin; s < smax; s++){
-				w = res.ch[ch].sampev[s].ind[i];
-				var p=[];
-				for(e = 0; e < w.nev; e++){
-					cc = w.evc[e];
-					if(cc != NOTALIVE){
-						c = cla[cl].comp[compval[cc][cl]];
-						p.push({x:xco+(c.x+c.w/2-shx)*shfac, y:yco+(c.y+c.h/2-shy)*shfac, t:w.evt[e]});
+
+
+	/// Adds all the buttons associated with transitions
+	add_transition_buts(lay)
+	{
+		let pag = inter.page[inter.pa];
+		let p = pag.sub[pag.index].index;
+		let cl = pag.sub[pag.index].sub[p].index;
+		
+		if(this.species.length == 0 || cl == this.species[p].ncla) return;
+				
+		let claa = this.species[p].cla[cl];
+		
+		let mo = inter.mode;
+		
+		let trans_temp_add = false;
+		let add_mouse = false;
+		if(mo.type == "Add_Transition" && within_layer("Compartment") == true){
+			if(mo.i != undefined){
+				let f;
+				let midp=[]; for(let k = 0; k < mo.midp.length; k++) midp.push(mo.midp[k]);
+				
+				let flag = false;
+				
+				let l = inter.over.layer;
+				if(l != undefined){
+					let bu = inter.layer[l].but[inter.over.i];
+					if(bu != undefined){
+						switch(bu.ac){
+						case "Compartment": f = bu.i; break;
+						case "IntermediateAdd": break;
+						default: flag = true; break;
+						}
 					}
 				}
-			
-				dt = p[p.length-1].t - p[0].t;
-				for(e = 0; e < p.length-1; e++){
-					drawgradientline(p[e].x,p[e].y, p[e+1].x,p[e+1].y,(p[e].t- p[0].t)/dt,(p[e+1].t- p[0].t)/dt);
-				}
 				
-				r = 5;
-				drawroundrect(p[0].x-r,p[0].y-r,2*r,2*r,r,BLACK,BLACK);
-				centertext("Start",p[0].x,p[0].y-9,"bold 16px Times",BLUE); 
-				drawroundrect(p[p.length-1].x-r,p[p.length-1].y-r,2*r,2*r,r,WHITE,BLACK);
-				centertext("End",p[p.length-1].x,p[p.length-1].y+19,"bold 16px Times",BLUE); 
+				if(f == undefined){ midp.push(this.get_mouse_to_desktop()); add_mouse = true;}
+				
+				if(flag == false){
+					this.add_transition(p,cl,mo.i,f,midp,"");
+				
+					trans_temp_add = true;
+				}
 			}
 		}
-	}
-}
-	
-function compplot(cl,k,x,y,dx,dy,bu,ov)                   // Plots a compartment button
-{
-	var v, text, col, col2, col3, c = cla[cl].comp[k];
-	
-	switch(bu){
-	case COMPBUT:
-		text = c.name; col = c.col; col2 = darkcol(col); col3 = WHITE;
-		if(ov == 1) col = darkcol(col);
-		break;
-
-	case COMPPOPINITBUT:
-		if(radnamlab == 0) text =  c.name+":"+c.simpopinit; else text = c.simpopinit; 
-		if(radstyle == 0){ col = c.col; col2 = darkcol(col); col3 = WHITE;}
-		else{
-			v = Math.floor(255*(1-parseInt(c.simpopinit)/popmax));
-			col = "rgb("+v+","+v+","+v+")"; col2 = BLACK; if(v > 128) col3 = DBLUE; else col3 = WHITE;
-		}
-		break;
 		
-	case COMPFRACINITBUT:
-		if(radnamlab == 0) text =  c.name+":"+tpre((100*c.simfracinit),3)+"%"; 
-		else text = tpre((100*c.simfracinit),3)+"%";
-		
-		if(radstyle == 0){ col = c.col; col2 = darkcol(col); col3 = WHITE;}
-		else{
-			v = Math.floor(255*(1-c.simfracinit));
-			col = "rgb("+v+","+v+","+v+")"; col2 = BLACK; if(v > 128) col3 = DBLUE; else col3 = WHITE;
-		}
-		break;
-	
-	case COMPLOADINITBUT:
-		if(radnamlab == 0)  text =  c.name+":"+c.loadinit.length;
-		else text = c.loadinit.length;
-		
-		if(radstyle == 0){ col = c.col; col2 = darkcol(col); col3 = WHITE;}
-		else{
-			v = Math.floor(255*(1-c.loadinit.length/popmax));
-			col = "rgb("+v+","+v+","+v+")"; col2 = BLACK; if(v > 128) col3 = DBLUE; else col3 = WHITE;
-		}
-		break;
-		
-	case COMPPOPOUTPUTBUT:
-		switch(radstyle2){
-		case 0:
-			col = c.col; col2 = darkcol(col); col3 = WHITE;
-			break;
-		
-		case 1:
-			v = Math.floor(255*(1-quantmean[playtime][k]/quantmaxitot));
-			col = "rgb("+v+","+v+","+v+")"; col2 = BLACK; if(v > 128) col3 = DBLUE; else col3 = WHITE;
-			break;
+		if(mo.type == "Add_Source" && within_layer("Compartment") == true){		
+			let f;
+			let midp=[]; for(let k = 0; k < mo.midp.length; k++) midp.push(mo.midp[k]);
 			
-		case 2:	
-			v = Math.floor(255*(1-quantmean[playtime][k]/quantmaxi[playtime]));
-			col = "rgb("+v+","+v+","+v+")"; col2 = BLACK; if(v > 128) col3 = DBLUE; else col3 = WHITE;
-			break;
-		}
-		
-		text = "";
-		if(radlab != 0){
-			if(radlab == 1) text = cla[cl].comp[k].name; else text = tpre(quantmean[playtime][k],3);
-		}
-		break;
-	}
-	
-	dy = Math.floor(dy);
-	drawroundrect(Math.floor(x),Math.floor(y),Math.floor(dx),dy,Math.floor(0.2*dy),col,col2);
-	
-	if(ov == 1 && bu != COMPBUT){
-		cv.lineWidth = 3;
-		cv.strokeStyle = RED;
-		cv.stroke();
-	}
-	
-	if(bu != COMPPOPOUTPUTBUT || text != ""){
-		si = dy*0.7; 
-		if(bu == COMPBUT) fo = Math.floor(si)+  "px georgia";
-		else{
-			do{
-				fo = Math.floor(si)+  "px georgia";
-				if(textwidth(text,fo) < dx*0.95) break;
-				si *= 0.8;
-			}while(1 == 1);	
-		}
-		centertext(text,x+dx/2,y+Math.floor(0.5*dy+0.3*si),fo,col3);
-	}
-}
-
-function addrequest(st)                                   // Adds a request on the model page
-{
-	var dx = textwidth(st,"bold 16px arial");
-	
-	addcanbutton(st,(width-menux)/2-10,height-30,0,0,-1,REQUESTBUT,-1,-1);
-	addcanbutton(st,(width-menux)/2-10 + dx/2 + 4,height-27,15,15,CROSSBUT,CROSSBUT,-1,-1);
-}
-
-function newname(na)                                      // Generates a new compartment name
-{
-	var flag, num, st, j, cl;
-	
-	num = 1; 
-	do{
-		flag = 0;
-		st = na; if(num > 1) st += num;
-		for(cl = 0; cl < ncla; cl++){
-			if(cla[cl].name == st) flag = 1;
-			for(j = 0; j < cla[cl].ncomp; j++) if(cla[cl].comp[j].name == st) flag = 1;
-		}
-		if(flag == 0) break;
-		num++;
-	}while(1 == 1);
-	return st;	
-}
-
-function addclass(na)                                     // Adds a new classification
-{	
-	var cl, clin, t, tr, j;
-
-	if(na == "Time" || na == "Age") clin = ncla;
-	else clin = ncla-2;
-
-	for(i = 0; i < simindinit.length; i++){  // Initial state for simulation
-		simindinit[i].state.splice(clin,0,"");
-	}
-		
-	for(d = 0; d < data.length; d++){  // Adjusts fitlers
-		switch(data[d].variety){
-		case "trans": data[d].filt.splice(clin,0,"All"); break;
-		case "pop": data[d].popcl.splice(clin,0,"All"); break;
-		}
-	}
+			let flag = false;
+			let l = inter.over.layer;
+			if(l != undefined){
+				let bu = inter.layer[l].but[inter.over.i];
+				if(bu != undefined){
+					switch(bu.ac){
+					case "Compartment": if(inter.mode.midp.length > 0) f = bu.i; break;
+					case "IntermediateAdd": break;
+					default: flag = true; break;
+					}
+				}
+			}
+				
+			if(f == undefined){ midp.push(this.get_mouse_to_desktop()); add_mouse = true;}
+			
+			if(flag == false){
+				this.add_transition(p,cl,"Source",f,midp,"");
 					
-	cla.splice(clin,0,{name:na, zoomfac:1, ncomp:0, comp:[], ntra:0, tra:[], desc:"Click to add a description...", descon:0});	
-	ncla++;
-	return clin;
-}
+				trans_temp_add = true;
+			}
+		}
+		
+		if(mo.type == "Add_Sink" && within_layer("Compartment") == true){		
+			let i;
+			let midp=[]; for(let k = 0; k < mo.midp.length; k++)	midp.push(mo.midp[k]);
+			
+			let flag = false, flag_na = false;
+			let l = inter.over.layer;
+			if(l != undefined){
+				let bu = inter.layer[l].but[inter.over.i];
+				if(bu != undefined){
+					switch(bu.ac){
+					case "Compartment": if(inter.mode.midp.length > 0) i = bu.i; break;
+					case "IntermediateAdd": break;
+					case "TransitionPoint": flag_na = true; break;
+					default: flag = true; break;
+					}
+				}
+				else flag_na = true;
+			}
+					
+			if(i == undefined && flag_na == false){
+				midp.splice(0,0,this.get_mouse_to_desktop()); add_mouse = true;
+			}
+				
+			if(flag == false){
+				this.add_transition(p,cl,i,"Sink",midp,"");
+						
+				trans_temp_add = true;
+			}
+		}
+		
+		this.add_transition_buts2(p,cl,inter.mode.type,claa,add_mouse,lay);
+	
+		if(trans_temp_add == true){
+			claa.tra.pop(); claa.ntra--;
+		}
+	}
 
-function delclass(cldel)                                 // Deletes an existing classification
-{
-	var j, fr=[], cl, t, tr;
 
-	for(i = 0; i < simindinit.length; i++){  // Initial state for simulation
-		simindinit[i].state.splice(cldel,1);
+	/// Adds the basic transitions
+	add_transition_buts2(p,cl,mode_type,claa,add_mouse,lay)
+	{
+		let cam = claa.camera;
+
+		for(let k = 0; k < claa.ntra; k++){
+			let tr = claa.tra[k];
+		
+			let points=[];
+			for(let i = 0; i < tr.pline.length; i++){
+				let pl = tr.pline[i];
+				points[i] = {x:lay.dx/2 + (pl.x-cam.x)*cam.scale, y:lay.dy/2 + (pl.y-cam.y)*cam.scale, index:pl.index};
+			}
+			
+			let center;
+			if(tr.center != undefined){
+				let cen = tr.center;
+				center = {x:lay.dx/2 + (cen.x-cam.x)*cam.scale, y:lay.dy/2 + (cen.y-cam.y)*cam.scale, nx:cen.nx, ny:cen.ny, w:cen.w};
+			}
+			
+			let d = TRANS_OVER_RANGE;
+		
+			let ac = "Transition";
+			if(mode_type == "Add_Source" || mode_type == "Add_Sink" || mode_type == "No Click") ac = undefined;
+			
+			lay.add_button({x:lay.dx/2 + (tr.box.x-cam.x)*cam.scale - d, y:lay.dy/2 + (tr.box.y-cam.y)*cam.scale-d, dx:tr.box.dx*cam.scale+2*d, dy:tr.box.dy*cam.scale+2*d, ac:ac, type:"Transition", cam:cam, points:points, center:center, tr:tr, p:p, cl:cl, i:k});	
+				
+			for(let j = 0; j < points.length; j++){
+				let po = points[j];
+				if(po.index >= 0 && po.index < tr.midp.length){
+					let r = TRANS_POINT_R; 
+					let variety = "Midpoint";
+					let ac = "TransitionPoint";
+					if(tr.i == "Source" && j == 0){ 
+						r = 0.7*cam.scale*cam.ruler;
+						variety = "Source"; ac = "Transition";
+					}
+					if(tr.f == "Sink" && j == points.length-1){ 
+						r = 0.7*cam.scale*cam.ruler;
+						variety = "Sink"; ac = "Transition";
+					}
+
+					if((variety == "Source" || variety == "Sink") && cam.coord == "latlng") r *= 0.6;
+					
+					if(mode_type == "Add_Transition" || mode_type == "Add_Source" || mode_type == "Add_Sink"){
+						if(k < claa.ntra-1) ac = undefined;
+						else{
+							if(add_mouse == true){
+								if(mode_type == "Add_Sink"){
+									if(po.index == 0) ac = undefined;
+								}
+								else{
+									if(po.index == tr.midp.length-1) ac = undefined;
+								}
+							}
+							if(variety == "Source" || variety == "Sink") ac = undefined;
+						}
+					}
+
+					if(ac != undefined || variety == "Source" || variety == "Sink"){
+						lay.add_button({x:po.x - r, y:po.y - r, dx:2*r, dy:2*r, ac:ac, type:"TransitionPoint", tr:tr, p:p, cl:cl, i:k, index:po.index, variety:variety, center:center, tr:tr, p:p, cl:cl, i:k});
+					}
+				}
+			}
+		}
+	}
+/*
+	/// Sets camera based on the location of compartments, transitions and annotations
+	set_camera(p,cl)
+	{
+		let scw = page_char_wid-menu_width;
+		let sch = page_char_hei;
+		
+		let xmin = LARGE, xmax = -LARGE, ymin = LARGE, ymax = -LARGE;
+		
+		let claa = this.species[p].cla[cl];
+		for(let i = 0; i < claa.ncomp; i++){
+			let co = claa.comp[i];
+			let x = co.x; if(x < xmin) xmin = x; if(x > xmax) xmax = x;
+			let y = co.y; if(y < ymin) ymin = y; if(y > ymax) ymax = y;
+			
+			x = co.x+co.w; if(x < xmin) xmin = x; if(x > xmax) xmax = x;
+		  y = co.y+co.h; if(y < ymin) ymin = y; if(y > ymax) ymax = y;
+		}
+		
+		for(let i = 0; i < claa.ntra; i++){
+			let traa = claa.tra[i];
+			for(let i = 0; i < traa.midp.length; i++){
+				let x = traa.midp[i].x; if(x < xmin) xmin = x; if(x > xmax) xmax = x;
+				let y = traa.midp[i].y; if(y < ymin) ymin = y; if(y > ymax) ymax = y;
+			}
+		}
+	
+		for(let i = 0; i < claa.annotation.length; i++){
+			let an = claa.annotation[i];
+			switch(an.type){
+			case "text":
+		
+				let x = an.x; if(x < xmin) xmin = x; if(x > xmax) xmax = x;
+				let y = an.y; if(y < ymin) ymin = y; if(y > ymax) ymax = y;
+				break;
+			}
+		}
+		
+		let sca = scw/(xmax-xmin);
+		if(0.9*sch/(ymax-ymin) < sca) sca = 0.9*sch/(ymax-ymin);
+		sca *= 0.9;
+		if(sca > 1) sca = 1;
+		
+		claa.camera = {x:(xmin+xmax)/2, y:(ymin+ymax)/2, scale:sca};
+	}
+	*/
+	
+	
+	/// Adds a compartment button
+	add_addcompartment_buts(lay)
+	{
+		inter.mode.l = lay.index;
+
+		lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, type:"AddCompartmentMode"});
 	}
 	
-	d = 0;
-	while(d < data.length){
-		switch(data[d].variety){
-		case "state": case "trans": case "move":
-			if(data[d].cl == cldel) data.splice(d,1);
-			else{ if(data[d].cl > cldel) data[d].cl--; d++;}
+	
+	/// Adds a label button
+	add_addlabel_buts(lay)
+	{
+		let mo = inter.mode;
+		mo.l = lay.index;
+		lay.add_button({te:mo.te, x:0, y:0, dx:lay.dx, dy:lay.dy, si:mo.si, font:mo.fo, type:"Text", col:GREY});
+	}
+	
+
+	/// Adda a label annotation to the model
+	add_label(te,p,cl)
+	{
+		let mo = inter.mode;
+		let claa = this.species[p].cla[cl];
+		claa.annotation.push({type:"text", te:te, tesize:si_annotation, x:mo.mp.x, y:mo.mp.y, color:BLACK});
+	}
+
+	
+	/// Gets the mouse position on the desktop (i.e. the position in pixels is converted to model units accounting for camera)
+	get_mouse_to_desktop()
+	{
+		let lay_main = get_lay("Main");
+			
+		let pag = inter.page[inter.pa];
+		let p = pag.sub[pag.index].index;
+		let cl = pag.sub[pag.index].sub[p].index;
+		let cam = this.species[p].cla[cl].camera;
+
+		let xc = ((inter.mx - lay_main.x - lay_main.dx/2)/cam.scale)+cam.x;
+		let yc = ((inter.my - lay_main.y - lay_main.dy/2)/cam.scale)+cam.y;
+			
+		if(cam.coord == "cartesian"){
+			return {x:Math.round(xc/grid)*grid, y:Math.round(yc/grid)*grid};
+		}
+	
+		return {x:xc, y:yc};	
+	//	return {x:Math.round(xc/grid)*grid, y:Math.round(yc/grid)*grid};
+	}
+
+
+	/// Gets the scale 
+	get_scale()
+	{
+		return this.species[this.get_p()].cla[this.get_cl()].camera.scale;
+	}
+		
+	
+	/// Gets the coordinate system
+	get_coord()
+	{
+		return this.species[this.get_p()].cla[this.get_cl()].camera.coord;
+	}
+	
+	/*
+	/// Gets the coord 
+	get_coord()
+	{
+		let pag = inter.page[inter.pa];
+		let p = pag.sub[pag.index].index;
+		let cl = pag.sub[pag.index].sub[p].index;
+		let cam = this.species[p].cla[cl].camera;
+		return cam.coord;
+	}
+	*/
+	
+	/// Gets the ruler
+	get_ruler()
+	{
+		return this.species[this.get_p()].cla[this.get_cl()].camera.ruler;
+	}
+		
+		
+	/// Converts from posiiton on desktop (i.e. model) to position on screen 
+	get_desktop_to_image(mp)
+	{
+		let lay_main = get_lay("Main");
+			
+		let pag = inter.page[inter.pa];
+		let p = pag.sub[pag.index].index;
+		let cl = pag.sub[pag.index].sub[p].index;
+		let cam = this.species[p].cla[cl].camera;
+
+		let x = lay_main.dx/2 + (mp.x-cam.x)*cam.scale; 
+		let y = lay_main.dy/2 + (mp.y-cam.y)*cam.scale;
+
+		return {x:x, y:y};
+	}
+
+
+	/// In the "add compartment" mode this adds the new compartment
+	place_add_compartment()
+	{
+		let lay_comp = inter.layer[inter.mode.l];
+					
+		lay_comp.x = 1000;
+		
+		let l = inter.over.layer;
+		if(l != undefined){
+			if(inter.layer[l].but[inter.over.i].ac == "NothingMode"){
+				let mp = this.get_mouse_to_desktop();
+				let ip = this.get_desktop_to_image(mp);
+				
+				let lay_main = get_lay("Main");
+			
+				let pag = inter.page[inter.pa];
+				let p = pag.sub[pag.index].index;
+				let cl = pag.sub[pag.index].sub[p].index;
+
+				lay_comp.x = lay_main.x + ip.x-lay_comp.dx/2;
+				lay_comp.y = lay_main.y + ip.y-lay_comp.dy/2; 
+			
+				let mo = inter.mode;
+				mo.mp = mp;
+				mo.p = p;
+				mo.cl = cl;
+				mo.coord = this.species[p].cla[cl].camera.coord;
+			}
+		}
+		
+		plot_screen();
+	}
+
+
+	/// Adds a new species to the model
+	add_species(name,type)
+	{
+		let p = find(this.species,"name",name);
+		if(p != undefined){
+			alertp("There is already a species with the name '"+name+"'");
+			return;
+		}
+		
+		for(let p = 0; p < this.species.length; p++){
+			let sp = this.species[p];
+			
+			let i = find(sp.cla,"name",name);
+			if(i != undefined){
+				alertp("Cannot have the same name as classification '"+sp.cla[i].name+"' ");
+				return;
+			}
+			
+			let j = find(sp.cla,"index",name);
+			if(j != undefined){
+				alertp("Cannot have the same name as index for classification '"+sp.cla[j].name+"' ");
+				return;
+			}
+		
+			for(let cl = 0; cl < sp.ncla; cl++){
+				let c = find(sp.cla[cl].comp,"name",name);
+				if(c != undefined){
+					alertp("Cannot have the same name as compartment '"+sp.cla[cl].comp[i].name+"' in classification '"+sp.cla[cl].name+"'");
+					return;
+				}
+			}
+		}
+		
+		this.species.push({ name:name, sim_source:[], inf_source:[], gen_source:[], data_type:{te:data_types[0]
+		}, cla:[], ncla:0, fix_eff:[], ind_eff_group:[], type:type});		
+			
+		return "success";
+	}
+	
+	/// Adds a new classification to the model
+	add_classification(p,name,index,op)
+	{
+		if(p == undefined){
+			alertp("Cannot add a classification when the species is not set");
+			return;
+		}
+		
+		let cl = find(this.species[p].cla,"name",name);
+		if(cl != undefined){
+			alertp("There is already a classification with the name '"+name+"'");
+			return;
+		}
+		
+		if(name == index){
+			alertp("Name and index must be different");
+			return;
+		}
+		
+		let coord = op.coord; if(coord == undefined) coord = "cartesian";
+		
+	
+		let cam = {x:0, y:0, scale:1, ruler:1, coord:coord};
+		
+		let dmap = false; if(coord == "latlng" && op.default_map == true){ dmap = "loading"; cam.ruler = 0.05;}
+		
+		this.species[p].cla.push({ name:name, index:index, tra:[], ntra:0, comp:[], ncomp:0, annotation:[], default_map:dmap, camera:cam});
+		this.species[p].ncla++;
+		
+		data_update_add_classification(p);
+		check_data_valid();
+		
+		return "success";
+	}
+	
+	
+	/// Loads up default map (if neccesary);
+	load_default_map()
+	{
+		for(let p = 0; p < this.species.length; p++){
+			let sp = this.species[p];
+			for(let cl = 0; cl < sp.ncla; cl++){
+				let claa = this.species[p].cla[cl];
+				if(claa.default_map == "loading"){
+					claa.default_map = true;
+					load_map("world",p,cl);
+				}
+			}
+		}
+	}
+	
+
+	/// Clones a classification from another species
+	clone_class(p_to,p_from,cl_from)
+	{
+		let cla_from = this.species[p_from].cla[cl_from];
+	
+		this.add_classification(p_to,cla_from.name,cla_from.index,{coord:cla_from.camera.coord});
+		
+		let cl = this.species[p_to].ncla-1;
+		
+		this.species[p_to].cla[cl] = copy(cla_from);
+		
+		let cla_to = this.species[p_to].cla[cl];
+		cla_to.tra = [];
+		cla_to.ntra = 0;
+	}
+
+
+	/// Adds a new compartment to the model
+	add_compartment(name,p,cl,x,y,col,fix,include_clone)
+	{
+		if(fix == undefined) fix = false;
+		
+		if(this.check_comp_exist(name,p) == true) return;
+	
+		let claa = this.species[p].cla[cl];
+		let comp = claa.comp;
+			
+		comp.push({name:name, type:"box", x:x, y:y, col:col, fixed:{check:fix}, markov_branch:false});
+		claa.ncomp++;
+			
+		let i = comp.length-1;
+		this.set_compartment_size(comp[i]);
+		
+		this.snap_comp_to_grid(comp[i]);
+		this.determine_branching();
+		
+		data_update_add_compartment(p,cl);
+		
+		if(include_clone == true) this.update_param_index(claa.index); // Updates param
+		
+		check_data_valid();
+
+		if(include_clone == true){  // Adds to clones 
+			let list = this.find_clones(p,cl);
+		
+			for(let li of list){
+				this.add_compartment(name,li.p,li.cl,x,y,col,fix,false);
+			}
+		}
+		
+		return "success";
+	}
+	
+		
+	/// Updates parameter if the is a compartmental change in an index
+	update_param_index(index)
+	{
+		for(let th = 0; th < this.param.length; th++){
+			let par = this.param[th];
+		
+			let j = find_in(par.dep,index);
+			if(j != undefined){
+				let par_copy = copy(par);
+				copy_param_info(par,par_copy);
+			}
+		}
+	}
+	
+	
+	/// Adds a new compartment to the model
+	add_latlng_compartment(name,p,cl,x,y,col,fix)
+	{
+		if(fix == undefined) fix = false;
+	
+		if(this.check_comp_exist(name,p) == true) return;
+		
+		let claa = this.species[p].cla[cl];
+		let comp = claa.comp;
+		comp.push({name:name, type:"latlng", x:x, y:y, col:col, fixed:{check:fix}, markov_branch:false});
+		claa.ncomp++;
+		
+		let i = comp.length-1;
+		
+		this.determine_branching();
+
+		data_update_add_compartment(p,cl);
+		check_data_valid();
+		
+		return "success";
+	}
+	
+	
+	/// Finds all the clones of a given classification
+	find_clones(p,cl)
+	{
+		let list=[];
+		let na =  this.species[p].cla[cl].name;
+		for(let p2 = 0; p2 < this.species.length; p2++){
+			if(p2 != p){
+				let sp2 = this.species[p2];
+				for(let cl2 = 0; cl2 < sp2.ncla; cl2++){
+					let claa2 = sp2.cla[cl2];
+					if(claa2.name == na){
+						list.push({p:p2, cl:cl2});
+					}
+				}
+			}
+		}
+		
+		return list;
+	}
+	
+	
+	/// Gets a new unique compartment name
+	get_new_comp_name()
+	{
+		let num = 0;
+		do{
+			let name = "";
+			if(num > 0) name += "C"+num;
+			
+			let flag = false;
+			
+			for(let p = 0; p < this.species.length; p++){
+				let sp = this.species[p];
+				if(sp.name == name) flag = true;
+				for(let cl = 0; cl < sp.ncla; cl++){
+					let claa = sp.cla[cl];
+					if(claa.name == name) flag = true;
+					if(claa.index == name) flag = true;
+					for(let c = 0; c < claa.ncomp; c++){
+						let co = claa.comp[c];
+						if(co.name == name) flag = true;
+					}
+				}
+			}
+			if(flag == false) return name;
+			num++;
+		}while(true);
+	}
+	
+	
+	/// Adds a new map compartment to the model
+	add_map_compartment(name,p,cl,feature,mask,col)
+	{
+		if(this.check_comp_exist(name,p) == true) return;
+		
+		/// Calculates the midpoint of the region as the middle of the mask
+		let claa = this.species[p].cla[cl];
+		let comp = claa.comp;
+		let xav = 0, yav = 0, nav = 0;
+		for(let j = 0; j < mask_size; j++){
+			for(let i = 0; i < mask_size; i++){
+				if(mask[j*mask_size+i] == 1){
+					xav += i; yav += j; nav++;
+				}
+			}
+		}
+		let box = feature.box;
+		let xmid = box.xmin+((xav/nav)/mask_size)*(box.xmax-box.xmin);
+		let ymid = box.ymin+((yav/nav)/mask_size)*(box.ymax-box.ymin);
+		
+		comp.push({name:name, type:"boundary", xmid:xmid, ymid:ymid, feature:feature, fixed:{check:true}, mask:mask, col:col, markov_branch:false});
+		claa.ncomp++;
+		this.determine_branching();
+	}
+
+	
+	/// Checks if a compartment already exists 
+	check_comp_exist(name,p)
+	{
+		if(name != ""){
+			let sp = this.species[p];
+			for(let cl = 0; cl < sp.ncla; cl++){
+				let claa = sp.cla[cl];
+				if(claa.name == name){
+					alertp("Cannot have a classification and compartment both '"+name+"'");
+				}					
+				
+				if(claa.index == name){
+					alertp("Cannot have a classification index and compartment both '"+name+"'");
+				}		
+				
+				let c = find(claa.comp,"name",name);
+				if(c != undefined){
+					alertp("There is already a compartment with the name '"+name+"'");
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	
+	/// Selects a compartment (i.e. generate a bubble)
+	select_button_bubble(lay_name,type,p,cl,i)
+	{
+		generate_screen();
+		let lay = get_lay(lay_name);
+		
+		for(let b = 0; b < lay.but.length; b++){
+			let bu = lay.but[b];
+			
+			if(bu.type == type && bu.p == p && bu.cl == cl && bu.i == i){
+				select_bubble(lay.name,b);
+				generate_screen();
+				return;
+			}
+		}
+		error("Could not select");
+	}
+	
+
+	/// Selects a transition (i.e. generate a bubble)
+	select_transition_bubble(p,cl,i)
+	{
+		generate_screen();
+		let lay = get_lay("Transition");
+		
+		for(let b = 0; b < lay.but.length; b++){
+			let bu = lay.but[b];
+			
+			if(bu.type == "Transition" && bu.p == p && bu.cl == cl && bu.i == i){
+				select_bubble(lay.name,b);
+				return;
+			}
+		}
+		error("Could not select");
+	}
+	
+	
+	/// Adds a transition to the model
+	add_transition(p,cl,i,f,midp,ty)
+	{
+		let claa = this.species[p].cla[cl];
+		let tra = claa.tra;
+	
+		if(ty != ""){
+			for(let j = 0; j < tra.length; j++){
+				if(tra[j].i == i && tra[j].f == f){
+					if(i == "Source") alertp("Cannot have two sources into the same compartment");
+					else{
+						if(f == "Sink") alertp("Cannot have two sinks leaving the same compartment");
+						else{
+							alertp("Cannot have two transitions with the same source and destination compartments");
+						}
+					}
+					return false;
+				}
+			}
+			
+			if(i == f){
+				alertp("The 'from' and 'to' compartments must be different");
+				return false;
+			}
+		}
+		
+		let value = {};
+		if(ty != ""){
+			if(i == "Source"){
+				let sup2 = claa.comp[f].name;
+				value = this.new_trans_equations(sup2,sup2,true,p,cl);
+			}
+			else{	
+				if(f == "Sink"){
+					let sup = "("+claa.comp[i].name+"→Sink)";
+					let sup2 = claa.comp[i].name;
+					value = this.new_trans_equations(sup,sup2,true,p,cl);
+				}
+				else{
+					let sup = "("+claa.comp[i].name+"→"+claa.comp[f].name+")";
+					let sup2 = claa.comp[i].name;
+					value = this.new_trans_equations(sup,sup2,true,p,cl);
+				}
+			}
+		}
+
+		tra.push({type:ty, i:i, f:f, pline:[], midp:midp, value:value});	
+		this.set_transition_name(p,cl,claa.ntra);
+		claa.ntra++;
+		
+		if(ty != "") this.determine_branching();
+		
+		this.update_pline(p,cl);  
+
+		if(ty != ""){
+			data_update_add_transition(p,cl);
+			check_data_valid();
+		}
+	
+		return true;
+	}
+	
+	
+	/// Creates a new set of transition equations
+	new_trans_equations(sup,sup2,flag,p,cl)
+	{
+		let value = {};
+		if(flag == false){
+			value.mean_eqn = create_equation("μ^"+sup2,"trans_mean",p,cl);
+			value.rate_eqn = create_equation("s^"+sup2,"trans_rate",p,cl);
+		}
+		else{
+			value.mean_eqn = create_equation("μ^"+sup,"trans_mean",p,cl);
+			value.rate_eqn = create_equation("r^"+sup,"trans_rate",p,cl);
+			value.bp_eqn = create_equation("b^"+sup,"trans_bp",p,cl);
+			value.shape_eqn = create_equation("k^"+sup2,"trans_shape",p,cl);
+			value.scale_eqn = create_equation("ν^"+sup2,"trans_scale",p,cl);
+			value.cv_eqn = create_equation("cv^"+sup2,"trans_cv",p,cl);
+			value.shape_erlang = {te:"1"};
+		}
+		
+		return value;
+	}
+	
+	
+	/// Adds a derived quantity to the model
+	add_modify_derived(ob,mod)
+	{
+		extract_equation_properties(ob.eqn1);
+		extract_equation_properties(ob.eqn2);
+		
+		let par = ob.eqn1.param;
+		if(par.length != 1){ 
+			if(par.length == 0){ alertp("Does not contain a parameter"); return;}
+			if(par.length > 1){	alertp("Should not contain more than one parameter"); return;}
+		}
+		
+		let warn = check_derived_param(ob.eqn2,ob.eqn1);
+		if(warn != "success"){ alertp(warn); return;}
+		
+		let name = par[0].name;
+		let i = find(this.param,"name",name);
+		if(i != undefined && !(mod == "modify" && par[0].full_name == this.derive[ob.val].eqn1.param[0].full_name)){
+			alertp("The parameter '"+name+"' is already used in the model"); 
+			return;
+		}
+	
+		if(mod == "modify") this.derive[ob.val] = ob;
+		else this.derive.push(ob);
+		init_param();
+		return "success";
+	}
+	
+	
+	/// Determines if compartments/transition are branching
+	determine_branching()
+	{
+		for(let p = 0; p < this.species.length; p++){
+			let sp = this.species[p];
+			for(let cl = 0; cl < sp.ncla; cl++){
+				let claa = sp.cla[cl];
+				for(let tr = 0; tr < claa.ntra; tr++){
+					claa.tra[tr].branch = false;
+				}
+
+				for(let c = 0; c < claa.ncomp; c++){
+					let co = claa.comp[c];
+					
+					let list=[]; 
+					let flag = false;
+					for(let tr = 0; tr < claa.ntra; tr++){
+						let trr = claa.tra[tr];
+						if(trr.i == c){
+							list.push(tr);
+							if(trr.type != "exp(rate)" && trr.type != "exp(mean)" && tr.type != "erlang") flag = true;
+						}
+					}
+					
+					if(list.length > 1 && flag == false) co.choose_branch = true;
+					else co.choose_branch = false;
+				
+					if(list.length > 1 && (flag == true || co.markov_branch == true)){
+						co.branch = true;
+					}
+					else co.branch = false;
+					
+					for(let i = 0; i < list.length; i++){
+						claa.tra[list[i]].branch = co.branch;
+					}
+				}					
+			}
+		}
+	}
+	
+
+	/// Sets the name of a transition
+	set_transition_name(p,cl,tr)
+	{
+		let claa = this.species[p].cla[cl];
+		let tra = claa.tra[tr];
+		
+		if(tra.type != ""){
+			let variety = "Normal", name;
+			let i = tra.i, f = tra.f;
+			if(i == "Source"){ variety = "Source"; name = "+→"+claa.comp[f].name;}
+			else{
+				if(f == "Sink"){ variety = "Sink"; name = claa.comp[i].name+"→-";}
+				else name = claa.comp[i].name+"→"+claa.comp[f].name;
+			}
+			tra.variety = variety; tra.name = name;
+		}
+	}
+
+
+	/// Sets the size of a compartment (depending on the length of the text which defined it)
+	set_compartment_size(comp)
+	{
+		comp.h  = compartment_height
+		
+		let font = get_font(compartment_height*0.85,"","times");
+		let w = text_width(comp.name,font)+1;
+		if(w < 3) w = 3;
+		
+		w = (Math.floor(w/grid)+1)*grid;
+		comp.w = w;
+	}
+
+
+	/// Adds the lower buttons (e.g. for adding compartments etc...) 
+	add_lower_menu_buts(lay)
+	{
+		let message = "";
+		switch(inter.mode.type){
+		case "Add_Compartment": message = "Place compartment on screen"; break;
+	
+		case "Add_Transition":
+			if(inter.mode.i == undefined) message = "Select initial compartment"; 
+			else message = "Select final compartment (with optional intermediate points)";
 			break;
-		default: d++; break;
-		}
-	}
-	
-	for(d = 0; d < data.length; d++){
-		switch(data[d].variety){
-		case "trans": data[d].filt.splice(cldel,1); break;
-		case "pop": data[d].popcl.splice(cldel,1); break;
-		}
-	}
-
-	fr.push(cla[cldel].name);
-	for(j = 0; j < cla[cldel].ncomp; j++) fr.push(cla[cldel].comp[j].name);
-
-	cla.splice(cldel,1); ncla--;
-	
-	for(j = 0; j < fr.length; j++) adjustrate(fr[j],"");
-	pagesub[MODELPAGE]--; if(pagesub[MODELPAGE] == -1) addclassbubon();
-}
-
-function addclassbubon()                                   // Starts a popup message to add a classification
-{
-	setTimeout(function(){
-		if(ncla == 2){
-			selectbubx = 3; selectbuby = yclass + dysub/2;
-			selectbubdx = 0; selectbubdy = 0; selectbub = ADDCLASSBUB; buttoninit();}
-		},500);
-}
-
-function addcomp()                                         // Adds a compartment and selects
-{
-	cl = pagesub[MODELPAGE];
-	
-	togrid(cl,canmx,canmy);
 		
-	addcompartment(cl,dragtext,dragcol,gx-dragww/2,gy-dragdh/2,dragww,dragdh,0);
-	
-	addcompmode = 0;
-	buttoninit();
-	
-	cl = pagesub[MODELPAGE];
-	i = 0; while(i < ncanbut && !(canbuttype[i] == COMPBUT && canbutval[i] == cl && canbutval2[i] == cla[cl].ncomp-1)) i++;
-	if(i == ncanbut) alertp("find");
-	selbut(i);
-}
-
-function addcompartment(cl,name,col,x,y,w,h,simpopinit)   // Adds compartment to classification
-{	
-	cla[cl].comp.push({name:name, col:col, x:x, y:y, w:w, h:h, loadinit:[], simpopinit:simpopinit, simfracinit:undefined});
-	cla[cl].ncomp++;
-}
-
-function deletecomp(cl,i)                                 // Deletes an existing compartment
-{
-	var tr, d, dat, j, fl;
-	
-	buboff(1);
-	
-	for(tr = cla[cl].ntra-1; tr >= 0; tr--){
-		if(cla[cl].tra[tr].i == i || cla[cl].tra[tr].f == i) deletetrans(cl,tr);
-		else{
-			if(cla[cl].tra[tr].i > i) cla[cl].tra[tr].i--;
-			if(cla[cl].tra[tr].f > i) cla[cl].tra[tr].f--;
+		case "Add_Source":
+			if(inter.mode.midp.length == 0) message = "Select source position"; 
+			else message = "Select compartment individuals entering (with optional intermediate points)";
+			break;
+			
+		case "Add_Sink":
+			if(inter.mode.midp.length == 0) message = "Select sink position"; 
+			else message = "Select compartment individuals leaving (with optional intermediate points)";		
+			break;
+			
+		case "Add_Label": message = "Place label on screen"; break;
+		
+		case "Add_Box": message = "Drag to select a box containing compartments"; break;
 		}
+		
+		if(message != ""){ 		
+			lay.add_button({te:message, x:0, y:0, dx:lay.dx, dy:lay.dy, type:"Message"});
+			lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, ac:"Nothing", type:"Nothing"});
+			lay.add_button({te:message, x:lay.dx-1.5, y:0.2, dx:1, dy:1, ac:"MessageClose", type:"MessageClose"});
+			return;
+		}
+		
+		let x = 1.2, y = lay.dy-1.6;
+		
+		let pag = inter.page[inter.pa];
+		let p = pag.sub[pag.index].index;
+
+		let n = 0; if(this.species.length > 0) n = this.species[p].ncla;
+
+		let cl = pag.sub[pag.index].sub[p].index;
+		
+		let claa; if(cl < n) claa = this.species[p].cla[cl];
+		
+		let gap = 4;
+		let w;		
+		
+		let active;
+		if(cl < n) active = true; else active = false;
+		let coord; if(cl < n) coord = claa.camera.coord;
+		w = this.add_object_button(lay,"Compartment",x,y,"AddCompartment",{active:active, title:"Add a compartment", te:compartment_text, back:WHITE}); x += w+gap;
+	
+		if(cl < n && claa.ncomp > 1) active = true; else active = false;
+		w = this.add_object_button(lay,"Transition",x,y,"AddTransition",{active:active, title:"Add a transition", te:trans_text, back:WHITE}); x += w+gap;
+		
+		if(cl < n && claa.ncomp > 0) active = true; else active = false;
+		w = this.add_object_button(lay,"Source",x,y,"AddSource",{active:active, title:"Add a source", te:source_text, back:WHITE}); x += w+gap;
+		
+		w = this.add_object_button(lay,"Sink",x,y,"AddSink",{active:active, title:"Add a sink", te:sink_text, back:WHITE}); x += w+gap;
+	
+		x += gap;
+		if(cl < n) active = true; else active = false;
+		w = this.add_object_button(lay,"Annotation",x,y,"AddAnnotation",{active:active, p:p, cl:cl, title:"Add an annotation", te:annotation_text, back:WHITE});
+		x += w+gap;
+	
+		let ac_in, ac_out;
+	
+		if(cl < n && (claa.ncomp > 0 || claa.annotation.length > 0)){ 
+			ac_in = "ZoomIn"; ac_out = "ZoomOut";
+		}
+		
+		lay.add_button({x:lay.dx-5, y:0, dx:1.8, dy:2, ac:ac_in, type:"ZoomIn", p:p, cl:cl});
+
+		lay.add_button({x:lay.dx-3, y:0, dx:1.8, dy:1.8, ac:ac_out, type:"ZoomOut", p:p, cl:cl});
 	}
 
-	d = 0;  // adjusts the data
-	while(d < data.length){
-		fl = 0;
-		dat = data[d];
-		if(dat.variety == "state" && dat.cl == cl){
-			for(j = 0; j < dat.pos.length; j++){
-				if(dat.posref[j] == i) fl = 1;
-				if(dat.posref[j] > i) dat.posref[j]--;	
-				dat.posbinary[j].splice(i,1);
-				dat.posexpression[j].splice(i,1);
+
+	/// Generates the popup bubble which appears on the add classification button 
+	add_classification_popup()
+	{
+		let i = get_lay("UpperMenu").search_button_ac("AddClassification");
+
+		select_bubble("UpperMenu",i,{type:"Popup"});
+		generate_screen();
+	}
+	
+	
+	/// Generates the popup bubble which appears on the add compartment button 
+	add_compartment_popup()
+	{
+		let i = get_lay("LowerMenu").search_button_ac("AddCompartment");
+
+		select_bubble("LowerMenu",i,{type:"Popup"});
+		generate_screen();
+	}
+	
+
+	/// Adds the popup bubble which appears next to the add species button 
+	add_species_popup()
+	{
+		let i = get_lay("Menu").search_button_ac("AddSpecies");
+		select_bubble("Menu",i,{type:"Popup"});
+		generate_screen();
+	}
+	
+	
+	/// Adds button on the top menu (e.g. tabs for the different classifications)
+	add_upper_menu_buts(lay)
+	{			
+		let pag = inter.page[inter.pa];
+		let p = pag.sub[pag.index].index;
+		let cl_sel = pag.sub[pag.index].sub[p].index;
+		
+		if(this.species == 0) return;
+		
+		let cla = this.species[p].cla;
+		let x = 0.8, y = 0;
+
+		for(let cl = 0; cl < cla.length; cl++){
+			let si = si_clatab;
+			let font = get_font(si);
+			let te = cla[cl].name;
+			let font_it = get_font(si_claindextab,"italic","times");
+			let index = cla[cl].index;
+			let w = text_width(te,font)+text_width(index,font_it)+2.5;
+			
+			lay.add_button({te:te, index:index, x:x, y:y, dx:w, dy:1.3, ac:"ClassTab", type:"ClassTab", si:si, font:font,font_it:font_it, p:p, cl:cl, cl_sel:cl_sel});
+			
+			x += w+1.5;
+		}
+	
+		x -= 0.5;
+		let yy = y+0.1;
+		if(cla.length == 0){ x = 0; yy = y+0.5;}
+		this.add_object_button(lay,"Classification",x,yy,"AddClassification",{active:true, p:p, title:"Add a classification", te:class_text, back:WHITE});
+	}
+
+
+	/// Adds an add object button (e.g. add compartment) 
+	add_object_button(lay,te,x,y,ac,op)
+	{
+		if(op == undefined) op = {};
+		if(op.active == false) ac = undefined;
+		
+		let si = 0.8;
+		let font = get_font(si);
+		let w = text_width(te,font);
+		lay.add_button({te:te, x:x, y:y, dx:w+1.2, dy:1.1, ac:ac, type:"AddButton", si:si, font:font, op:op});	
+		
+		if(ac && op && op.title){
+			lay.add_help_button(x+w+1.2,y+1.4,{title:op.title, te:op.te, back_col:op.back_col});
+		}
+		
+		return w;
+	}
+
+
+	/// Ensures the positions of the midpoint of compartments an on a grid
+	//snap_comp_to_grid(p,cl,i)
+	snap_comp_to_grid(ob)
+	{
+		if(ob.x == "auto") return;
+		
+		ob.x = Math.round(ob.x/grid)*grid;
+		ob.y = Math.round(ob.y/grid)*grid;
+	}
+
+
+	/// Deletes a transition  point
+	delete_transitionpoint(p,cl,i,index)
+	{
+		this.species[p].cla[cl].tra[i].midp.splice(index,1);
+		this.update_pline(p,cl); 
+	}
+	
+	
+	/// Creates a new transition point from dragging transition
+	split_transitionpoint()
+	{
+		let mo = inter.mode;
+		this.species[mo.p].cla[mo.cl].tra[mo.i].midp.splice(mo.index+1,0,this.get_mouse_to_desktop());
+		this.update_pline(mo.p,mo.cl);
+		
+		inter.mode={ type:"Drag_TransitionPoint", p:mo.p, cl:mo.cl, i: mo.i, index: mo.index+1};
+	}
+
+
+	/// Updates all the plines
+	update_pline_all()
+	{
+		for(let p = 0; p < this.species.length; p++){
+			let sp = this.species[p];
+			for(let cl = 0; cl < sp.ncla; cl++){
+				this.update_pline(p,cl);
 			}
-			dat.sensitive.splice(i,1);
 		}
-		if(fl == 1){ 
-			points = []; points.push("Data source '"+dat.name+"' has been removed because compartment no longer exists.");
-			helptype = 207;
-			data.splice(d,1);
-		}
-		else d++;
 	}
 	
-	cla[cl].comp.splice(i,1);
-	cla[cl].ncomp--;
-}
-
-function addtransp()                                     // Adds intermediary point on a transition
-{
-	togrid(cl,mx-menux,my)
-	tr = cla[transtempcl].tra[transtempk];
-	tr.p.push({x:gx, y:gy});
-	findpline(transtempcl,transtempk);
-}
-
-function addsource()                                     // Adds a source
-{
-	addsourcemode = 0;
-	cl = pagesub[MODELPAGE];
-	addtrans(cl,"Source");
-	tr = cla[cl].tra[cla[cl].ntra-1];
-	tr.i = -2;
 	
-	togrid(cl,canmx,canmy);
-	tr.p=[];
-	tr.p[0]={x:gx, y:gy};
-	cl = pagesub[MODELPAGE];
-}
-
-function addtrans(cl,ty)                                  // Adds a transition
-{
-	addtransmode = 1;
-	ty = ty.toUpperCase().substr(0,1) +	ty.toLowerCase().substring(1);	
-
-	transtempcl = cl;
-	transtempk = cla[cl].ntra;
-
-	switch(ty){
-	case "Exponential": case "Source": case "Sink":
-		cla[cl].tra.push({type:ty, i:-1, f:-1, l:0, midx:0, midy:0, middx:0, middy:0, pline:[], p:[], ratetime:0, rate:"", nratevar:0, ratevar:[], ratevardep:[], pair:0});
-		break;
-		
-	case "Gamma":
-		cla[cl].tra.push({type:ty, i:-1, f:-1, l:0, midx:0, midy:0, middx:0, middy:0, pline:[], p:[], mean:"", shape:"", nratevar:0, ratevar:[], ratevardep:[], pair:0});
-		break;
-		
-	case "Weibull":
-		cla[cl].tra.push({type:ty, i:-1, f:-1, l:0, midx:0, midy:0, middx:0, middy:0, pline:[], p:[], lam:"", k:"", nratevar:0, ratevar:[], ratevardep:[], pair:0});
-		break;
-		
-	case "Fixed":
-		cla[cl].tra.push({type:ty, i:-1, f:-1, l:0, midx:0, midy:0, middx:0, middy:0, pline:[], p:[], time:"", nratevar:0, ratevar:[], ratevardep:[], pair:0});
-		break;
-		
-	default: alertp("Error code EC40"); break;
+	/// Updates all plines in a classification
+	update_pline(p,cl)
+	{
+		for(let i = 0; i < this.species[p].cla[cl].ntra; i++){
+			this.find_trans_pline(p,cl,i);
+		}
 	}
 	
-	cla[cl].ntra++;
-}
+	
+	/// Converts points in a transition to points on the model
+	find_trans_pline(p,cl,i)                                 
+	{
+		let claa = this.species[p].cla[cl];
+		let cam = claa.camera;
+		let r_latlng = latlng_radius*cam.ruler;
+		
+		let tr = claa.tra[i];
 
-function deletetrans(cl,i)                               // Deletes an existing transition
-{
-	var tr;
-	if(cla[cl].tra[i].pair == 1){
-		for(tr = 0; tr < cla[cl].ntra; tr++){
-			if(cla[cl].tra[tr].i == cla[cl].tra[i].f && cla[cl].tra[tr].f == cla[cl].tra[i].i){
-				cla[cl].tra[tr].pair = 0; findpline(cl,tr);
+		tr.pair = false;                        // Finds if a transition is pair with its reverse
+		for(let j = 0; j < claa.ntra; j++){
+			if(j != i){
+				let tr2 = claa.tra[j];
+				if(tr.i == tr2.f && tr.f == tr2.i){
+					if(tr.midp.length == 0 && tr2.midp.length == 0){
+						tr.pair = true;
+					}
+				}
 			}
+		}
+		
+		tr.pline=[];
+		
+		let pair_shift = {x:0, y:0};
+		let co = claa.comp[tr.i];
+		
+		if(tr.pair == true){
+			let pi = this.comp_center(claa.comp[tr.i]);
+			let pf = this.comp_center(claa.comp[tr.f]);
+			
+			let dx = pf.x-pi.x, dy = pf.y-pi.y;
+			let r = Math.sqrt(dx*dx+dy*dy);
+			
+			let shift_gap = 0.3;
+			
+			pair_shift.x = shift_gap*dy/r;
+			pair_shift.y = -shift_gap*dx/r;
 		}			
-	}
-	
-	cla[cl].tra.splice(i,1);
-	cla[cl].ntra--;
-}
-
-function deletetransmode()                                // Stops the "add transtion" mode
-{
-	cla[transtempcl].tra.pop();
-	cla[transtempcl].ntra--;
-	addtransmode = 0;	
-}
-
-function completetrans(cl,k)                              // Completes a transition
-{
-	var tr;
-	
-	for(tr = 0; tr < cla[transtempcl].ntra-1; tr++){
-		if(cla[cl].tra[tr].i == cla[cl].tra[transtempk].i && cla[cl].tra[tr].f == k){
-			alertp("Cannot have more than one transition between the same compartments");
-			deletetransmode(); return;
-		}
-		else{
-			if(cla[cl].tra[tr].i == k && cla[cl].tra[tr].f == cla[cl].tra[transtempk].i){
-				cla[cl].tra[transtempk].pair = 1; 
-				cla[cl].tra[tr].pair = 1; 
-				findpline(cl,tr);
-			}
-		}
-	}
-	
-	cla[cl].tra[transtempk].f = k;
-	findpline(cl,transtempk);
-	seltrans(cl,transtempk);
-	addtransmode = 0;
-}
-
-function seltrans(cl,i)                                  // Selects a transtion
-{
-	var tr;
-	
-	if(selectbub != -1) buboff(); if(selectbub != -1) return;
-
-	tr = cla[cl].tra[i];
-	selectbubx = tr.midx; selectbuby = tr.midy; selectbubdx = 0; selectbubdy = 0;
-	switch(page){
-	case MODELPAGE: selectbub = TRANSPLBUT; break;
-	}
-	selectbubval = cl;
-	selectbubval2 = i;
-}
-
-function zoomin(cl,midx,midy,fac,dx,dy)                   // Zoom in
-{
-	togrid(cl,midx,midy);
-	midx = gx; midy = gy;
-
-	if(dx == undefined) dx = 0; if(dy == undefined) dy = 0;
-	
-	cla[cl].zoomfac *= fac;
-	for(k = 0; k < cla[cl].ncomp; k++){
-		c = cla[cl].comp[k];
-		c.x = midx + fac*(c.x - midx) + dx;
-		c.y = midy + fac*(c.y - midy) + dy;
-		c.w *= fac; c.h *= fac;
-	}
-	for(k = 0; k < cla[cl].ntra; k++){
-		tr = cla[cl].tra[k];
-		for(j = 0; j < tr.p.length; j++){
-			tr.p[j].x = midx + fac*(tr.p[j].x - midx) + dx;
-			tr.p[j].y = midy + fac*(tr.p[j].y - midy) + dy;
-		}
-		for(j = 0; j < tr.pline.length; j++){
-			tr.pline[j].x = midx + fac*(tr.pline[j].x - midx) + dx;
-			tr.pline[j].y = midy + fac*(tr.pline[j].y - midy) + dy;
-		}
-		tr.midx = midx + fac*(tr.midx - midx) + dx;
-		tr.midy = midy + fac*(tr.midy - midy) + dy;
-		tr.l *= fac;
-	}
-}
-
-function transover(cl,i,mmx,mmy)                         // Determines if mouse is over a transition
-{	
-	var tr, p, np, x, y, xx, yy, l;
-
+		
+		if(tr.i != undefined && tr.i != "Source"){
+			let co = claa.comp[tr.i];
 			
-	if(addtransmode == 1) return 0;
-	
-	tr = cla[cl].tra[i];
-	
-	if((tr.i < 0 || tr.f < 0) && modelty == "seltrans") return 0;
-	
-	if(tr.i < 0 && tr.f < 0) return 0;
-	
-	np = tr.pline.length;
-	for(p = 0; p < np-1; p++){
-		x = (tr.pline[p].x-shx)*shfac; y = (tr.pline[p].y-shy)*shfac;
-		xx = (tr.pline[p+1].x-shx)*shfac; yy = (tr.pline[p+1].y-shy)*shfac;
+			let p1 = this.comp_center(co);
 		
-		dx = xx-x; dy = yy-y;
-		dmx = mmx-x; dmy = mmy-y;
-		l = (dx*dmx + dy*dmy)/(dx*dx+dy*dy);
-		if(l > 0 && l < 1){
-			l = (dx*dmy - dy*dmx)/Math.sqrt(dx*dx+dy*dy);
-			if(l < 5 && l > -5){ transoverj = p; return 1;}
-		}
-	}
-
-	return 0;
-}
-
-function findpline(cl,i)                                  // Converts points in a transition to points on the canvas
-{
-	var tr, l, l2, np, p;
-
-	tr = cla[cl].tra[i];
-	tr.pline=[];
-	if(tr.i != -1){
-		k = tr.i;
-		if(k >= 0){
-			xbeg = cla[cl].comp[k].x + cla[cl].comp[k].w/2;
-			ybeg = cla[cl].comp[k].y + cla[cl].comp[k].h/2;
-		}
-		
-		k = tr.f;
-		if(k >= 0){
-			xend = cla[cl].comp[k].x + cla[cl].comp[k].w/2;
-			yend = cla[cl].comp[k].y + cla[cl].comp[k].h/2;
-		}
-		
-		np = tr.p.length;
-		if(np == 0 && tr.pair == 1){
-			dx = yend - ybeg; dy = -(xend - xbeg); r = Math.sqrt(dx*dx+dy*dy); dx /= r; dy /= r;
-			fac = 0.05*(cla[cl].comp[tr.i].h + cla[cl].comp[tr.f].h);
-			xbeg += fac*dx; ybeg += fac*dy; xend += fac*dx; yend += fac*dy; 
-		}
-		
-		for(loop = 0; loop < 2; loop++){
-			if(loop == 0){
-				k = tr.i;
-				if(k >= 0){
-					xc = xbeg; yc = ybeg; 
-					if(np > 0){ x = tr.p[0].x; y = tr.p[0].y;}else{ if(tr.f >= 0){ x = xend; y = yend;}}
-				}
-			}
-			else{ 
-				k = tr.f;
-				if(k >= 0){				
-					xc = xend; yc = yend; 
-					if(np > 0){ x = tr.p[np-1].x; y = tr.p[np-1].y;}else{ x = xbeg; y = ybeg;}
-				}
+			p1.x += pair_shift.x; p1.y += pair_shift.y;
+			
+			let	p2;
+			if(tr.midp.length > 0) p2 = tr.midp[0];
+			else{
+				if(tr.f != "Sink" && tr.f != undefined) p2 = this.comp_center(claa.comp[tr.f]);
 			}
 			
-			if(k >= 0){
-				var lx=[], ly=[], jmax = 4;
-				
-				xx = cla[cl].comp[k].x; yy = cla[cl].comp[k].y;
-				dx = cla[cl].comp[k].w; dy = cla[cl].comp[k].h;
-				
-				nl = 0;
-				r = Math.floor(0.2*dy);
-				for(j = 0; j <= jmax; j++){ th = j*Math.PI/(2*jmax); lx[nl] = xx+dx-r+r*Math.sin(th); ly[nl] = yy+r-r*Math.cos(th); nl++;}
-				for(j = 0; j <= jmax; j++){ th = j*Math.PI/(2*jmax); lx[nl] = xx+dx-r+r*Math.cos(th); ly[nl] = yy+dy-r+r*Math.sin(th); nl++;}
-				for(j = 0; j <= jmax; j++){ th = j*Math.PI/(2*jmax); lx[nl] = xx+r-r*Math.sin(th); ly[nl] = yy+dy-r+r*Math.cos(th); nl++;}
-				for(j = 0; j <= jmax; j++){ th = j*Math.PI/(2*jmax); lx[nl] = xx+r-r*Math.cos(th); ly[nl] = yy+r-r*Math.sin(th); nl++;}
+			if(p2 != undefined){
+				let pos = this.intersect_comp_line(co,p1,p2,r_latlng);
+				tr.pline.push({x:pos.x, y:pos.y, index:-1});
+			}
+		}
+		
+		for(let i = 0; i < tr.midp.length; i++){
+			tr.pline.push({x:tr.midp[i].x, y:tr.midp[i].y, index:i});
+		}
+		
+		if(tr.f != undefined && tr.f != "Sink"){
+			let co = claa.comp[tr.f];
+			
+			let p1 = this.comp_center(co);
+		
+			p1.x += pair_shift.x; p1.y += pair_shift.y;
+			
+			let p2;
+			if(tr.midp.length > 0) p2 = tr.midp[tr.midp.length-1];
+			else{ if(tr.i != "Source") p2 = this.comp_center(claa.comp[tr.i]);}
+		
+			let pos = this.intersect_comp_line(co,p1,p2,r_latlng);
+			tr.pline.push({x:pos.x, y:pos.y, index:tr.midp.length});
+		}
+		
 
-				nx =xc - x; ny = yc - y;
+		let np = tr.pline.length;
+		let l = 0;
+		let dist=[];
+		for(let p = 0; p < np-1; p++){
+			let dx = tr.pline[p+1].x - tr.pline[p].x, dy = tr.pline[p+1].y - tr.pline[p].y;
+			dist[p] = Math.sqrt(dx*dx+dy*dy)+TINY; 
+			l += dist[p];
+		}
 
-				for(ii = 0; ii < nl; ii++){
-					x2 = lx[ii]; y2 = ly[ii];
-					nx2 = lx[(ii+1)%nl]-x2; ny2 = ly[(ii+1)%nl]-y2;
+		let l2 = 0; 
+		for(let p = 0; p < np-1; p++){
+			let dx = tr.pline[p+1].x - tr.pline[p].x, dy = tr.pline[p+1].y - tr.pline[p].y;
+			let dl = dist[p];
+			if(l2+dl > l/2){
+				let f = (l/2-l2)/dl;
+				let nx = dx/dist[p];
+				let ny = dy/dist[p];
+				tr.center = { x:tr.pline[p].x+f*dx, y:tr.pline[p].y+f*dy, nx:nx, ny:ny};
+				break;
+			}
+			l2 += dl;
+		}
+		tr.l = l;
+		
+		if(l > 0){
+			let wmin = LARGE, wmax = -LARGE; // Finds the potential width for the label
+			for(let p = 0; p < np; p++){
+				let dx = tr.pline[p].x - tr.center.x;
+				let dy = tr.pline[p].y - tr.center.y;
+				
+				let d = dx*tr.center.nx + dy*tr.center.ny;
+				if(d < wmin) wmin = d; if(d > wmax) wmax = d;
+			}
+			tr.center.w = wmax-wmin;
+		}
+		
+		let xmax = -LARGE, xmin = LARGE;   // Finds a box around the transition points
+		let ymax = -LARGE, ymin = LARGE;
+			
+		for(let j = 0; j < tr.pline.length; j++){
+			let po = tr.pline[j];
+			if(po.x < xmin) xmin = po.x; if(po.x > xmax) xmax = po.x;
+			if(po.y < ymin) ymin = po.y; if(po.y > ymax) ymax = po.y;	
+		}
+		tr.box = {x:xmin, y:ymin, dx:xmax-xmin, dy:ymax-ymin};
+		
+		let lab="";
+	
+		let val = tr.value;
+
+		switch(tr.type){
+		case "exp(mean)": 
+			if(tr.branch == true) lab = val.bp_eqn.te+"/";
+			else lab = "1/";
+			lab += "("+val.mean_eqn.te+")"; 
+			break;
+			
+		case "exp(rate)": 
+			if(tr.branch == true) lab = val.bp_eqn.te+"×"; 
+			lab += val.rate_eqn.te; 
+			break;
+			
+		case "gamma": 
+			if(tr.branch == true) lab = val.bp_eqn.te+","; 
+			lab += "Γ("+val.mean_eqn.te+" , "+val.cv_eqn.te+")";
+			break;
+			
+		case "erlang": 
+			if(tr.branch == true) lab = val.bp_eqn.te+","; 
+			lab += "EL("+val.mean_eqn.te+" , "+val.shape_erlang.te+")";
+			break;
+			
+		case "log-normal":
+			if(tr.branch == true) lab = val.bp_eqn.te+","; 
+			lab += "LN("+val.mean_eqn.te+" , "+val.cv_eqn.te+")"; 
+			break;
+			
+		case "weibull":
+			if(tr.branch == true) lab = val.bp_eqn.te+","; 
+			lab += "W("+val.scale_eqn.te+" , "+val.shape_eqn.te+")";
+			break;
+			
+		default: delete tr.label; break;
+		}
+		
+		this.set_transition_name(p,cl,i);
+	
+		tr.label = lab;
+	}
+	
+
+	/// 	Returns the center of a compartment
+	comp_center(co)
+	{
+		switch(co.type){
+		case "box": case "latlng": return {x:co.x, y:co.y};
+		case "boundary": return {x:co.xmid, y:co.ymid};
+		default: error("Option not recognised 85"); break;
+		}
+	}
+	
+	
+	/// Finds the intersection between a rounded compartment and a line 
+	intersect_comp_line(co,p1,p2,r_latlng)
+	{
+		switch(co.type){
+		case "box":
+			{
+				let lx=[], ly=[], jmax = 4;
+							
+				let dx = co.w, dy = co.h;
+				let xx = co.x-dx/2, yy = co.y-dy/2;
+		
+				let nl = 0;
+				let r = COMPARTMENT_CURVE*dy;
+				for(let j = 0; j <= jmax; j++){ let th = j*Math.PI/(2*jmax); lx[nl] = xx+dx-r+r*Math.sin(th); ly[nl] = yy+r-r*Math.cos(th); nl++;}
+				for(let j = 0; j <= jmax; j++){ let th = j*Math.PI/(2*jmax); lx[nl] = xx+dx-r+r*Math.cos(th); ly[nl] = yy+dy-r+r*Math.sin(th); nl++;}
+				for(let j = 0; j <= jmax; j++){ let th = j*Math.PI/(2*jmax); lx[nl] = xx+r-r*Math.sin(th); ly[nl] = yy+dy-r+r*Math.cos(th); nl++;}
+				for(let j = 0; j <= jmax; j++){ let th = j*Math.PI/(2*jmax); lx[nl] = xx+r-r*Math.cos(th); ly[nl] = yy+r-r*Math.sin(th); nl++;}
+
+				let nx = p2.x - p1.x, ny = p2.y - p1.y;
+
+				for(let ii = 0; ii < nl; ii++){
+					let x2 = lx[ii], y2 = ly[ii];
+					let nx2 = lx[(ii+1)%nl]-x2, ny2 = ly[(ii+1)%nl]-y2;
 
 					r = nx*ny2-ny*nx2;
 					if(r != 0){
-						al = ((x2-x)*ny2-(y2-y)*nx2)/r;
-						be = ((x2-x)*ny-(y2-y)*nx)/r;
+						let al = ((x2-p1.x)*ny2-(y2-p1.y)*nx2)/r;
+						let be = ((x2-p1.x)*ny-(y2-p1.y)*nx)/r;
 						if(al >= 0 && al <= 1 && be >= 0 && be <= 1){
 							nx *= al; ny *= al;
 						}
 					}
 				}
-				tr.pline.push({x:x+nx, y:y+ny});
+				return {x:p1.x+nx, y:p1.y+ny};
 			}
-			if(loop == 0){
-				for(p = 0; p < np; p++){ tr.pline.push({x:tr.p[p].x, y:tr.p[p].y});}
-			}
-		}
-	}
-
-	np = tr.pline.length;
-	l = 0;
-	for(p = 0; p < np-1; p++){
-		dx = tr.pline[p+1].x - tr.pline[p].x; dy = tr.pline[p+1].y - tr.pline[p].y;
-		l += Math.sqrt(dx*dx+dy*dy);
-	}
-
-	l2 = 0; 
-	for(p = 0; p < np-1; p++){
-		dx = tr.pline[p+1].x - tr.pline[p].x; dy = tr.pline[p+1].y - tr.pline[p].y;
-		dl = Math.sqrt(dx*dx+dy*dy);
-		if(l2+dl > l/2){
-			f = (l/2-l2)/dl;
-			tr.middx = dx/Math.sqrt(dx*dx+dy*dy); tr.middy = dy/Math.sqrt(dx*dx+dy*dy);
-			tr.midx = tr.pline[p].x+f*dx; tr.midy = tr.pline[p].y+f*dy;
-			break;
-		}
-		l2 += dl;
-	}
-	tr.l = l;
-}
-
-function drawtrans(tr,ov,exp)                            // Draws a transition
-{
-	var fosize = "20px Times", fody=0, fosubsize = "12px Times", fosubdy= 4, loop, loopmin;
-	
-	if(exp == 1){
-		fosize = "40px Times", fody=-8, fosubsize = "24px Times", fosubdy=16;
-	}
-	
-	if(tr.i == -1 && tr.f == -1) return;
-	
-	switch(tr.type){
-	case "Exponential": case "Source": case "Sink": dash = 0; break;
-	case "Gamma": case "Weibull": dash = 1; break;
-	case "Fixed": dash = 2; break;
-	case "Grow": dash = 2; break;
-	case "Set": dash = 2; break;
-	}
-
-	if(addtransmode == 1 && i == transtempk) col = GREY;
-	else{ col = BLACK; if(ov == 1) col = DGREY;}
-
-	if(page == SIMULATEPAGE){
-		col = LGREY;
-		if(pagesub[page] == 2 && simpagename[pagesubsub[page][2]] == "Gen. Data"){
-			col = BLACK; if(ov == 1) col = RED;
-		}
-	}	
-	
-	if(page == INFERENCEPAGE && pagesub[page] == 0){ col = BLACK; if(ov == 1) col = RED;}
-	
-	if((tr.i < 0 || tr.f < 0) && modelty == "seltrans") col = LLGREY;
-
-	if(tr.l*shfac > 25) li = THICKLINE; else li = NORMLINE;
-	var arrowsi = 10;
-	if(exp == 1){ li = VTHICKLINE; arrowsi = 20;}
-	
-	np = tr.pline.length;
-
-	for(p = 0; p < np-1; p++){
-		drawline((tr.pline[p].x-shx)*shfac,(tr.pline[p].y-shy)*shfac,(tr.pline[p+1].x-shx)*shfac,(tr.pline[p+1].y-shy)*shfac,col,li,dash);
-	}
-	if(tr.f >= 0 && tr.l*shfac > 25){
-		drawarrow((tr.pline[np-1].x-shx)*shfac,(tr.pline[np-1].y-shy)*shfac,(tr.pline[np-2].x-shx)*shfac,(tr.pline[np-2].y-shy)*shfac,arrowsi,col);
-	}
-	
-	if(tr.i != -1 && tr.f != -1 && tr.l*shfac > 40){	
-		switch(tr.type){
-		case "Exponential": case "Source": case "Sink": stbig = tr.rate; stsmall = "f_"; break;		
-		case "Gamma": stbig = "Γ("+tr.mean+","+tr.shape+")";  stsmall = "Γ_"; break;
-		case "Weibull": stbig = "W("+tr.lam+","+tr.k+")";  stsmall = "W_"; break;
-		case "Fixed": stbig = "Fix("+tr.time+")"; stsmall = "f_"; break;
-		case "Grow": stbig = "";  stsmall = ""; break;
-		case "Set": stbig = ""; stsmall = ""; break;
-		}
 		
-		switch(tr.type){
-		case "Exponential": case "Source": case "Sink":case "Gamma": case "Weibull": case "Fixed":
-			for(j = 0; j < tr.ratevar.length; j++){ stsmall += tr.ratevar[j]; if(j < tr.ratevar.length-1) stsmall += ",";}
-			break;
-		}
-		
-		if(stbig != ""){
-			stbig = stbig.replace(/[\n\r]+/g, '');
-			stbig = stbig.replace(/×/g,"");
+		case "boundary":
+			return {x:co.xmid, y:co.ymid};
 			
-			loopmin = 0; if(stbig.length > 30) loopmin = 1;
-			for(loop = loopmin; loop < 2; loop++){
-				switch(loop){
-				case 0: st = stbig; break;
-				case 1: st = stsmall; break;
+		case "latlng":
+			{
+				let po;
+				if(p1.x == co.x && p1.y == co.y) po = p2;
+				if(p2.x == co.x && p2.y == co.y) po = p1;
+				let ddx = po.x-co.x, ddy = po.y-co.y;
+				
+				let r = Math.sqrt(ddx*ddx + ddy*ddy);
+		
+				if(r < r_latlng) return {x:po.x, y:po.y};
+				else{
+					let fr = r_latlng/r;
+					return {x:co.x+fr*ddx, y:co.y+fr*ddy};
 				}
+			}
+			break;
+
+		default: error("Option not recognised 87"); break;
+		}
+	}
+	
+	
+	/// Deletes a specified compartment
+	delete_compartment(p,cl,i,include_clone)
+	{
+		let claa = this.species[p].cla[cl];
+		
+		// First removes any transitions connected with compartment
+		for(let	tr = claa.ntra-1; tr >= 0; tr--){
+			let traa = claa.tra[tr];
+			if(traa.i == i || traa.f == i) this.delete_transition(p,cl,tr);
+		}
+
+		// Removes compartment from any box annotations
+		let name = claa.comp[i].name;
+		let k = 0;
+		while(k < claa.annotation.length){
+			let an = claa.annotation[k];
+			if(an.type == "box"){
+				let j = 0; 
+				while(j < an.comps.length){
+					if(an.comps[j] == name) an.comps.splice(j,1);
+					else j++;
+				}
+			}
+			
+			if(an.type == "box" && an.comps.length == 0) claa.annotation.splice(k,1);
+			else k++;
+		}
+	
+		claa.comp.splice(i,1);
+		claa.ncomp--;
+
+		for(let	tr = 0; tr < claa.ntra; tr++){
+			let traa = claa.tra[tr];
+			if(traa.i > i) traa.i--;
+			if(traa.f > i) traa.f--;
+		}
+
+		this.determine_branching();
+
+		this.update_pline(p,cl);
+
+		data_update_delete_compartment(p,cl,i,name);
+		
+		if(include_clone == true) this.update_param_index(claa.index); // Updates param
+		
+		if(include_clone == true){  // Adds to clones 
+			let list = this.find_clones(p,cl);
+		
+			for(let li of list){
+				this.delete_compartment(li.p,li.cl,i,false);
+			}
+			
+			check_data_valid();
+		}
+	}
+
+
+  /// Deletes a specified transition
+	delete_transition(p,cl,i)                             
+	{
+		let claa = this.species[p].cla[cl];
+		
+		claa.tra.splice(i,1);
+		claa.ntra--;
+		this.determine_branching();
+		this.update_pline(p,cl); 
+
+		data_update_delete_transition(p,cl,i);
+		check_data_valid();
+	}
+
+
+	/// Changes the name of a compartment
+	rename_compartment(p,cl,c,new_name)
+	{
+		let sp = this.species[p];
+		let p_name = sp.name;
+		let claa = sp.cla[cl];
+		let cl_name = claa.name;
+		let old_name = claa.comp[c].name;
+		
+		let eq_list = this.find_equation_list();
+		
+		let len = old_name.length;
+		let dif = new_name.length - old_name.length;
+		
+		for(let i = 0; i < eq_list.length; i++){
+			let eqn = eq_list[i];
+			extract_equation_properties(eqn);
+		
+			let te = eqn.te;
+			for(let j = 0; j < eqn.comp_name_list.length; j++){
+				let ch = eqn.comp_name_list[j];
+			
+				if(ch.cl_name == cl_name && ch.comp_name == old_name){
+					te = te.substr(0,ch.icur)+new_name+te.substr(ch.icur+len);
+					for(let jj = j+1; jj < eqn.comp_name_list.length; jj++){
+						eqn.comp_name_list[jj].icur += dif;
+					}
+				}
+			}
+			eqn.te = te;
+		}
+		clone_camera(p,cl);
+	
+		// this converts all classification on all species
+		for(let p = 0; p < this.species.length; p++){
+			let sp = this.species[p];
+			for(let cl = 0; cl < sp.ncla; cl++){
+				let claa = sp.cla[cl];
+				if(claa.name == cl_name){
+					for(let c = 0; c < claa.ncomp; c++){
+						let co = claa.comp[c];
+						if(co.name == old_name){
+							co.name = new_name;
+							this.set_compartment_size(co);
+							this.update_pline(p,cl);
+						}
+					}
+				}
+			}
+		}
+
+		// Changes name on param
+		for(let i = 0; i < this.param.length; i++){
+			let par = this.param[i];
+			
+			let flag = false;
+			for(let j = 0; j < par.dep.length; j++){
+				if(par.dep[j] == claa.index){
+					if(c < par.list[j].length){
+						if(par.list[j][c] != old_name) error("Old name not correct");
+						par.list[j][c] = new_name;
+						flag = true;
+					}
+				}
+			}
+			
+			if(flag == true){
+				par.comb_list = generate_comb_list(par.list);
+			}
+		}
+		
+		// Changes any names on box annotations
+		for(let k = 0; k < claa.annotation.length; k++){
+			let an = claa.annotation[k];
+			if(an.type == "box"){
+				for(let k = 0; k < an.comps.length; k++){
+					if(an.comps[k] == old_name) an.comps[k] = new_name;
+				}
+			}
+		}
+	
+		data_update_rename_compartment(p,cl,old_name,new_name);
+		
+		this.rename_ob(model,"model","comp_name",old_name,new_name);
+		this.rename_ob(model,"model","comp_name_store",old_name,new_name);
+	
+		if(false) this.check_ob_string_exist(model,"model",old_name);
+			
+		this.update_pline_all();
+
+		check_data_valid();
+	}
+
+
+	/// Rename a classification
+	rename_classification(new_name,p,cl)
+	{
+		let p_name = this.species[p].name;
+		
+		let old_name = this.species[p].cla[cl].name
+		if(new_name == old_name) return;
+
+		let eq_list = this.find_equation_list();
+		
+		let len = old_name.length;
+		let dif = new_name.length - old_name.length;
+		
+		for(let i = 0; i < eq_list.length; i++){
+			let eqn = eq_list[i];
+			extract_equation_properties(eqn);
+		
+			if(eqn.cl_name == old_name) eqn.cl_name = new_name;
+		}
+	
+		// this converts all classification on all species
+		for(let p = 0; p < this.species.length; p++){
+			let sp = this.species[p];
+			for(let cl = 0; cl < sp.ncla; cl++){
+				if(this.species[p].cla[cl].name == old_name){
+					this.species[p].cla[cl].name = new_name;
+				}
+			}
+		}
+
+		data_update_rename_classification(p,cl,old_name,new_name);
+		
+		this.rename_ob(model,"model","cl_name",old_name,new_name);
+		this.rename_ob(model,"model","cl_name_store",old_name,new_name);
+		
+		if(false) this.check_ob_string_exist(model,"model",old_name);
+		
+		this.update_pline_all();
+		
+		check_data_valid();
+	}
+	
+	/// Rename a species
+	rename_species(new_name,p)
+	{	
+		let old_name = this.species[p].name;
+		if(new_name == old_name) return;
+
+		let eq_list = this.find_equation_list();
+		
+		let len = old_name.length;
+		let dif = new_name.length - old_name.length;
+		
+		for(let i = 0; i < eq_list.length; i++){
+			let eqn = eq_list[i];
+			extract_equation_properties(eqn);
+			if(eqn.p_name == old_name) eqn.p_name = new_name;
+			
+			let te = eqn.te;
+			for(let j = 0; j < eqn.sp_name_list.length; j++){
+				let ch = eqn.sp_name_list[j];
+				if(ch.p_name == old_name){
+					te = te.substr(0,ch.icur)+new_name+te.substr(ch.icur+len);
+					for(let jj = j+1; jj < eqn.sp_name_list.length; jj++){
+						eqn.sp_name_list[jj].icur += dif;
+					}
+				}
+			}
+			eqn.te = te;
+		}
+	
+		this.species[p].name = new_name;
+		
+		this.rename_ob(model,"model","p_name",old_name,new_name);
+	
+		if(false) this.check_ob_string_exist(model,"model",old_name);
+		
+		this.update_pline_all();
+		
+		check_data_valid();
+	}
+	
+	
+	/// Renames an index on a classification
+	rename_index(new_name,p,cl,include_clone)
+	{
+		let claa = this.species[p].cla[cl];
+		
+		let old_name = claa.index;
+		if(new_name == old_name) return "success";
+		
+		claa.index = new_name;
+		
+		if(include_clone == true){ 
+			for(let i = 0; i < this.param.length; i++){
+				let par = this.param[i];
+				for(let d = 0; d < par.dep.length; d++){
+					if(par.dep[d] == old_name){
+						par.dep[d] = new_name;
+						par.label_info = get_label_info(par);
+					}
+				}
+			}
+		}
+		
+		if(include_clone == true){ 
+			let eq_list = this.find_equation_list();
+			
+			for(let i = 0; i < eq_list.length; i++){
+				let eqn = eq_list[i];
+				extract_equation_properties(eqn);
 				
-				var lab=[], j, jst;
+				let te = eqn.te;
+				for(let j = 0; j < eqn.index_name_list.length; j++){
+					let ind = eqn.index_name_list[j];
+					if(ind.index_name == old_name){
+						ind.index_name = new_name;
+						te = te.substr(0,ind.icur)+new_name+te.substr(ind.icur+1);
+					}
+				}
+				eqn.te = te;
+			}
+		}
+		
+		if(include_clone == true){  // Adds to clones 
+			let list = this.find_clones(p,cl);
+		
+			for(let li of list){
+				this.rename_index(new_name,li.p,li.cl,false);
+			}
+			
+			if(false) this.check_ob_string_exist(model,"model",old_name);
+			
+			this.update_pline_all();
+		}
+	}
+
+
+	/// Renames a property within the model
+	rename_ob(ob,root,prop,old_name,new_name)
+	{
+		if(old_name == "") return;
+		
+		for(let ele in ob){
+			if(ele == prop){ 
+				if(ob[ele] == old_name) ob[ele] = new_name; 
+			}
+			else{
+				if(ele != "eqn_appear"){ 
+					let ob2 = ob[ele];
+					
+					if(typeof ob2 == 'object'){
+						this.rename_ob(ob2,root+"->"+ele,prop,old_name,new_name);
+					}
+				}
+			}
+		}
+	}
+	
+	
+	/// Checks if a string exists in an of the properties of an object (diagnostic)
+	check_ob_string_exist(ob,root,name)
+	{
+		if(name == "") return;
+		
+		for(let ele in ob){
+			if(ele != "eqn_appear"){ 
+				let ob2 = ob[ele];
+				if(ob2 == name) error("'"+name+"' found here: "+root);
 				
-				w = 0; 
-				j = 0; 
-				do{
-					jst = j;
-					while(j < st.length && st.substr(j,1) != "_") j++;
-					frag = st.substr(jst,j-jst);
-					frag = frag.replace(/\[/g,"");
-					frag = frag.replace(/\]/g,"");
-					lab.push({frag:frag, size:"big", w:w, font:fosize, dy:fody});
-					w += textwidth(frag,fosize);
+				if(typeof ob2 == 'object'){
+					this.check_ob_string_exist(ob2,root+"->"+ele,name);
+				}
+			}
+		}
+	}
+	
+	
+	/// Checks that the name no longer exist is the model (a diagnostic check)
+	check_rename(name)
+	{
+		let te = JSON.stringify(model);
+		if(te.includes('"'+name+'"')){
+			error("problem still there");
+		}
+	}
+		
+	
+	/// Finds a list of branching points
+	find_branch_list()
+	{
+		let branch_list = [];
+		
+		for(let p = 0; p < this.species.length; p++){
+			let sp = this.species[p];
+			for(let cl = 0; cl < sp.ncla; cl++){
+				let claa = sp.cla[cl];
+				for(let c = 0; c < claa.ncomp; c++){
+					let bl = { p:p, cl:cl, c:c, tra:[]};
+					for(let i = 0; i < claa.ntra; i++){
+						let tr = claa.tra[i];
+						if(tr.branch == true && tr.i == c) bl.tra.push(i);
+					}
+					if(bl.tra.length > 0){
+						if(bl.tra.length == 1) error("Cannot have one branch");
+						branch_list.push(bl); 
+					}
+				}
+			}
+		}
+		
+		return branch_list; 
+	}
+	
+	
+	/// Finds a list of all the equations in the model
+	find_equation_list(all_param)
+	{
+		let eqn_list = [];
+		for(let p = 0; p < this.species.length; p++){
+			let sp = this.species[p];
+			for(let cl = 0; cl < sp.ncla; cl++){
+				let claa = sp.cla[cl];
+				for(let i = 0; i < claa.ntra; i++){
+					let eqn_info = {p:p,cl:cl,i:i};
+					
+					let traa = claa.tra[i];
+				
+					let val = traa.value;
+					if(val.bp_eqn != undefined){
+						if(all_param == true || traa.branch == true){
+							this.add_equation_to_list(eqn_list,val.bp_eqn,eqn_info);
+						}
+					}
+					
+					if(val.mean_eqn != undefined){
+						if(all_param == true || traa.type == "exp(mean)" || traa.type == "gamma" || traa.type == "erlang" || traa.type == "log-normal"){
+							this.add_equation_to_list(eqn_list,val.mean_eqn,eqn_info);
+						}
+					}
+					
+					if(val.rate_eqn != undefined){
+						if(all_param == true || traa.type == "exp(rate)"){
+							this.add_equation_to_list(eqn_list,val.rate_eqn,eqn_info);
+						}
+					}
+					
+					if(val.scale_eqn != undefined){
+						if(all_param == true || traa.type == "weibull"){
+							this.add_equation_to_list(eqn_list,val.scale_eqn,eqn_info);
+						}
+					}
+					
+					if(val.shape_eqn != undefined){
+						if(all_param == true || traa.type == "weibull"){
+							this.add_equation_to_list(eqn_list,val.shape_eqn,eqn_info);
+						}
+					}
 						
-					if(j < st.length){
-						j++; 
-						jst = j;
-						while(j < st.length && st.substr(j,1) != "]") j++;
-						frag = st.substr(jst,j-jst);
-						frag = frag.replace(/\[/g,"");
-						frag = frag.replace(/\]/g,"");
-						if(frag != ""){
-							lab.push({frag:frag, size:"small", w:w, font:fosubsize, dy:fosubdy});
-							w += textwidth(frag,fosubsize);
+					if(val.cv_eqn != undefined){
+						if(all_param == true || traa.type == "gamma" || traa.type == "log-normal"){
+							this.add_equation_to_list(eqn_list,val.cv_eqn,eqn_info);
 						}
-						j++;
 					}
-				}while(j < st.length);
-				
-				if(w < 0.9*tr.l*shfac) break;
+				}
 			}
 			
-			if(w < 0.9*tr.l*shfac){
-				p = -8;
-				midx = (tr.midx -shx)*shfac; midy = (tr.midy -shy)*shfac;
+			for(let i = 0; i < sp.inf_source.length; i++){
+				let so = sp.inf_source[i];
 				
-				nxmid = -tr.middy; nymid = tr.middx; 
-				th = Math.acos(nymid);
-				if(nxmid < 0) th *= -1;
-				for(j = 0; j < lab.length; j++){
-					if(tr.middx > 0){
-						plotangletext(lab[j].frag,midx+(lab[j].w-w/2)*tr.middx+(-8+lab[j].dy)*nxmid,
-											      midy+(lab[j].w-w/2)*tr.middy+(-8+lab[j].dy)*nymid,th,lab[j].font,col);
+				let eqn_info = {p:p, i:i};
+					
+				if(so.type=="Diag. Test"){
+					this.add_equation_to_list(eqn_list,so.spec.Se_eqn,eqn_info);
+					this.add_equation_to_list(eqn_list,so.spec.Sp_eqn,eqn_info);
+				}
+				
+				if(so.type=="Set Traps"){
+					this.add_equation_to_list(eqn_list,so.spec.trap_prob_eqn,eqn_info);
+				}
+				
+				if(so.type == "Compartment"){
+					let tab = so.table;
+					for(let r = 0; r < tab.nrow; r++){
+						let te = tab.ele[r][2];
+						let spl = te.split("|");
+						for(let k = 0; k < spl.length; k++){
+							let spl2 = spl[k].split(":");
+							if(spl2.length == 2){
+								let te2 = spl2[1];
+								
+								if(isNaN(te2)){
+									let eqn_info2 = {p:p,i:i,r:r,c:2};
+									
+									let eqn = create_equation(te2,"comp_prob",p,undefined);  
+									this.add_equation_to_list(eqn_list,eqn,eqn_info2);
+								}
+							}
+						}
 					}
+				}
+			}		
+		}
+		
+		/// Goes through derived parameters
+		for(let i = 0; i < this.derive.length; i++){
+			let der = this.derive[i];
+			
+			let eqn_info = {i:i};
+			
+			this.add_equation_to_list(eqn_list,der.eqn1,eqn_info);		
+		}
+		
+		/*
+		/// Goes through reparameterisation
+		for(let th = 0; th < this.param.length; th++){  
+			let par = this.param[th];
+			if(par.variety == "reparam"){		
+				if(par.dep.length == 0){
+					let ele = par.value;
+					if(isNaN(ele)){
+						let eqn = create_equation(ele,par.variety);
+						let eqn_info = {par_name:par.name};
+						this.add_equation_to_list(eqn_list,eqn,eqn_info);		
+					}
+				}
+				else{
+					for(let i = 0; i < par.comb_list.length; i++){
+						let comb = par.comb_list[i];
+						let ele = get_element(par.value,comb.index);
+						if(isNaN(ele)){
+							let eqn = create_equation(ele,par.variety);
+							let eqn_info = {par_name:par.name, index:comb.index};
+							this.add_equation_to_list(eqn_list,eqn,eqn_info);		
+						}
+					}
+				}
+			}
+			
+			if(par.variety == "dist"){
+				if(par.prior_split_check.check == false){
+					let eqn_info = {par_name:par.name};
+					
+					this.add_distribution_eqn(eqn_list,par.prior,eqn_info);	
+				}
+				else{
+					for(let i = 0; i < par.comb_list.length; i++){
+						let comb = par.comb_list[i];
+						let ele = get_element(par.prior_split,comb.index);
+					
+						let eqn_info = {par_name:par.name, index:comb.index};
+					
+						this.add_distribution_eqn(eqn_list,ele,eqn_info);	
+					}
+				}
+			}
+		}
+		*/
+		
+		return eqn_list;
+	}
+			
+	
+	
+	
+	
+	/*
+	/// Adds a distribution equation to equation list
+	add_dist_eqn(eqn_list,eqn,eqn_info)	
+	{
+		if(isNaN(eqn.te)){
+			this.add_equation_to_list(eqn_list,eqn,eqn_info);
+		}			
+	}
+	*/
+
+
+	/// Adds equation to a list and appends information about source 
+	add_equation_to_list(eqn_list,source,eqn_info)
+	{
+		source.eqn_info = eqn_info;
+		eqn_list.push(source);
+	}
+	
+	
+	/// Deletes a species
+	delete_species(p)
+	{
+		this.species.splice(p,1);
+		
+		if(p == this.species.length && p > 0) change_page({pa:"Model",su:"Compartments",susu:p-1});
+		initialise_pages();
+		reset_info_p();
+	}
+
+
+	/// Deletes a classification
+	delete_classification(p,cl)
+	{
+		let sp = this.species[p];
+		let claa = sp.cla[cl];
+		let name = claa.name;
+		let index =claa.index;
+		
+		let comp_list = [];
+		for(let i = 0; i < claa.ncomp; i++) comp_list.push(claa.comp[i].name);
+
+		sp.cla.splice(cl,1);
+		sp.ncla--;
+	
+		initialise_pages();
+
+		data_update_delete_classification(p,cl,name,comp_list);
+		
+		for(let i = 0; i < this.param.length; i++){
+			let par = this.param[i];
+			
+			let j = find_in(par.dep,index);
+			if(j != undefined){
+				par.dep.splice(j,1);
+				par_set_default(par);
+			}
+		}
+		
+		check_data_valid();
+	}
+
+
+	/// Determines if mouse is over a transition
+	mouse_over_transition(points,lay)                         
+	{		
+		if(inter.mode.type == "Add_Transition") return UNSET;
+		
+		let mx = inter.mx-lay.x, my = inter.my - lay.y;
+		let np = points.length;
+		for(let p = 0; p < np-1; p++){
+			let x = points[p].x, y = points[p].y;
+			let xx = points[p+1].x, yy = points[p+1].y;
+			
+			let dx = xx-x, dy = yy-y;
+			let dmx = mx-x, dmy = my-y;
+			let l = (dx*dmx + dy*dmy)/(dx*dx+dy*dy);
+			if(l > 0 && l < 1){
+				let para = (dx*dmy - dy*dmx)/Math.sqrt(dx*dx+dy*dy);
+				if(para < TRANS_OVER_RANGE && para > -TRANS_OVER_RANGE) return points[p].index;
+			}
+		}
+
+		return UNSET;
+	}
+
+
+	/// Based on the individual classifications, this generates all the compartments in the system
+	get_glob_comp(p)
+	{
+		let sp = this.species[p];
+		
+		let glob_comp=[];
+		
+		let index=[];	
+		for(let cl = 0; cl < sp.ncla; cl++){
+			if(sp.cla[cl].ncomp == 0) return glob_comp;
+			index[cl] = 0;
+		}
+		
+		do{
+			let co = { cla:[]};
+			
+			for(let cl = 0; cl < sp.ncla; cl++){
+				co.cla[cl] = sp.cla[cl].comp[index[cl]].name;
+			}
+			glob_comp.push(co);
+				
+			let cl = 0; 
+			let flag;
+			do{
+				flag = false;
+				index[cl]++; if(index[cl] >= sp.cla[cl].ncomp){ index[cl] = 0; cl++; flag = true;}
+			}while(flag == true && cl < sp.ncla);
+			if(cl == sp.ncla) break;
+		}while(true);
+			
+		return glob_comp;
+	}
+	
+	
+	add_warning_buts(lay)
+	{
+		let cx = corner.x;
+		let cy = corner.y;
+	
+		cy = lay.add_title("Some things need fixing!",cx,cy,{te:fix_text});
+		
+		cy = lay.add_paragraph("The following errors need to be corrected:",lay.inner_dx-cx-1,cx,cy,BLACK,para_si,para_lh);
+		cy += 0.5;
+		
+		add_layer("WarningContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{});
+	}
+	
+	
+	/// Displays a screen giving warning messages
+	add_warning_content(lay)
+	{
+		let x = 0.5;
+		let y = 0.5;
+		let dx = lay.inner_dx;
+	
+		let warn = this.warn;
+		for(let i = 0; i < warn.length; i++){
+			if(warn[i].mess != ""){ 
+				lay.add_button({x:x, y:y+0.5, dx:2.3, dy:2, type:"WarnPic"});
+			}
+			else y -= 1;
+				
+			lay.add_button({te:"View", x:dx-5, y:y+0.9, dx:4, dy:1.5, ac:"ViewModelError", type:"GreyView", i:i});
+	
+			y = lay.add_paragraph("<b>"+warn[i].mess+"</b>",dx-8,x+3,y+0.4,BLACK,para_si,para_lh);
+			
+			let yy = y; if(warn[i].mess == "") yy -= 0.4;
+			
+			y = lay.add_paragraph(warn[i].mess2,dx-8,x+3,yy,BLACK,warn_si,warn_lh);
+			
+			y += 0.5;
+		}
+	}
+	
+
+	/// Adds compartments from a table
+	add_file_compartment(p,cl,tab,col)
+	{
+		let claa = this.species[p].cla[cl];	
+		let cam = claa.camera;
+
+		let pos_x=[], pos_y=[];
+	
+		if(tab.ncol <= 2){ // Makes up a set of points on a grid
+			let font = get_font(compartment_height*0.85,"","times");
+		
+			let w_max = 0;
+			for(let r = 0; r < tab.nrow; r++){
+				let w = text_width(tab.ele[r][0],font)+1;
+				if(w > w_max) w_max = w;
+			}
+			if(w_max < 3) w_max = 3;
+			
+			let gapx = 4, gapy = 4;
+			
+			let ratio = (page_char_wid-menu_width)/page_char_hei;
+			
+			ratio *= (compartment_height+gapy)/(w_max+gapx);
+			
+			let d = 0.7*Math.sqrt(tab.nrow/ratio);
+			let LX, LY;
+			do{
+				d *= 1.01;
+				LX = Math.floor(ratio*d); LY = Math.floor(d); 
+			}while(LX*LY < tab.nrow);
+			
+			for(let j = 0; j < LY; j++){
+				for(let i = 0; i < LX; i++){
+					let r = j*LX+i;
+					if(r < tab.nrow){
+						pos_x[r] = i*(w_max+gapx);
+						pos_y[r] = j*(compartment_height+gapy);
+					}
+				}
+			}
+		}
+		else{
+			for(let r = 0; r < tab.nrow; r++){
+				switch(cam.coord){
+				case "cartesian":								
+					pos_x[r] = Number(tab.ele[r][1])*import_scale_factor;
+					pos_y[r] = Number(tab.ele[r][2])*import_scale_factor;
+					break;
+					
+				case "latlng":
+					let pt = transform_latlng(tab.ele[r][2],tab.ele[r][1]);
+					pos_x[r] = pt.x; pos_y[r] = pt.y; 
+					break;
+
+				default: error("Option not recognised 88"); break;
+				}
+			}
+		}
+		
+		for(let r = 0; r < tab.nrow; r++){	
+			let col2 = col; if(tab.ncol == 2 || tab.ncol == 4) col2 = tab.ele[r][tab.ncol-1];
+			let name = tab.ele[r][0];
+			
+			let x = pos_x[r], y = pos_y[r];
+			
+			switch(cam.coord){
+			case "cartesian":		
+				{		
+					let c = find(claa.comp,"name",name);
+					if(c == undefined) this.add_compartment(name,p,cl,x,y,col2,true,true);		
 					else{
-						plotangletext(lab[j].frag,midx+(-lab[j].w+w/2)*tr.middx+(-19-lab[j].dy)*nxmid,
-											      midy+(-lab[j].w+w/2)*tr.middy+(-19-lab[j].dy)*nymid,th+Math.PI,lab[j].font,col);
+						let co = claa.comp[c];
+						co.x = x; co.y = y; co.col = col2;
+						this.set_compartment_size(co);
 					}
 				}
+				break;
+			
+			case "latlng":
+				{
+					let c = find(claa.comp,"name",name);
+					if(c == undefined) this.add_latlng_compartment(name,p,cl,x,y,col2,true);		
+					else{
+						let co = claa.comp[c];
+						co.x = x; co.y = y; co.col = col2;
+					}
+				}
+				break;
+
+			default: error("Option not recognised 89"); break;
 			}
 		}
+
+		set_camera(p,cl);
 	}
 	
-	if(col == LLGREY) col2 = LGREY; else col2 = DGREY;
-	r = 15; if(exp == 1) r = 30;
-	if(tr.i == -2){
-		x = (tr.pline[0].x-shx)*shfac; y = (tr.pline[0].y-shy)*shfac;
-		fillcircle(x,y,r,col);
-		circle(x,y,r,col2,NORMLINE);
-		if(exp == 1) centertext("+",x,y+17, "bold 50px arial",WHITE);	
-		else centertext("+",x,y+11, "bold 30px arial",WHITE);	
-	}
 	
-	if(tr.f == -2){
-		x = (tr.pline[np-1].x-shx)*shfac; y = (tr.pline[np-1].y-shy)*shfac;	
-		fillcircle(x,y,r,col);
-		circle(x,y,r,col2,NORMLINE);
-		if(exp == 1) centertext("-",x,y+16,"bold 50px arial",WHITE);	
-		else centertext("-",x,y+8,"bold 30px arial",WHITE);	
-	}
-}
-
-/*
-function labtrunc(stin,tr)                               // Truncates a label (so it isn't too long)
-{
-	var li = stin.split("\n"), j, te, st, stsmall; 
-	st = "";for(j = 0; j < li.length; j++){ te = li[j].trim(); if(te != ""){ if(st != "") st += ","; st += te;}}
-
-	//if(st.length > 30){
-	stsmall = "f_";
-	for(j = 0; j < tr.ratevar.length; j++){ stsmall += tr.ratevar[j]; if(j < tr.ratevar.length-1) st += ",";}
-	//if(st.length > 30) st = st.substr(0,30)+"...";
-	stsmall += ")";
-	//}
-	return {st:st, stsmall:stsmall};
-}
-*/
-
-function togrid(cl,x,y)                                   // Shifts canvas points onto a grid
-{
-	var f = gridsize*cla[cl].zoomfac;
-	gx = Math.round(x/f)*f;
-	gy = Math.round(y/f)*f;
-}
-
-function breaktrans()                                     // Add intermidiary point in a transition
-{
-	cl = dragval;
-	k = dragval2;
+	/// Adds compartments from a table
+	add_file_transition(p,cl,tab,type)
+	{
+		let claa = this.species[p].cla[cl];	
+		for(let r = 0; r < tab.nrow; r++){	
+			let i	= find(claa.comp,"name",tab.ele[r][0]);
+			let f	= find(claa.comp,"name",tab.ele[r][1]);
 			
-	tr = cla[cl].tra[k];
-	
-	np = tr.p.length;
-	tr.p[np] = {x:0,y:0};
-	if(np > 0){
-		for(j = np; j > transoverj; j--){ tr.p[j].x = tr.p[j-1].x; tr.p[j].y = tr.p[j-1].y;}
-	}
-	togrid(cl,mx-menux,my)
-	tr.p[transoverj].x = gx; tr.p[transoverj].y = gy;
-	
-	dragval = dragval2;
-	dragval2 = transoverj;
-	mxst = mx; myst = my; mxlast = mx; mylast = my;
-	drag = 5;
-}
-
-function removetransp(k,j)                               // Removes intermidiary point in a transition 
-{
-	cl = pagesub[MODELPAGE];
-	tr = cla[cl].tra[k];
-	
-	if((tr.i == -2 && j == 0) || (tr.f == -2 && j == tr.p.length-1)) return;
-	tr.p.splice(j,1);
-	findpline(cl,k);
-}
-
-function adjustrate(fr,to)                           	 // Changes rates when model changes 
-{
-	var cl, tr, cl2, j;
-	
-	for(cl = 0; cl < ncla-2; cl++){
-		for(tr = 0; tr < cla[cl].ntra; tr++){
-			var tra =  cla[cl].tra[tr];
-			
-			for(j = 0; j < tra.ratevardep.length; j++) tra.ratevardep[j] = adjusttext(tra.ratevardep[j],fr,to);
-		
-			switch(tra.type){
-			case "Exponential": case "Source": case "Sink": tra.rate = adjusttext2(tra.rate,fr,to); break;
-			case "Gamma": tra.mean = adjusttext2(tra.mean,fr,to); tra.shape = adjusttext2(tra.shape,fr,to); break;
-			case "Weibull": tra.lam = adjusttext2(tra.lam,fr,to); tra.k = adjusttext2(tra.k,fr,to); break;
-			}	
-		}
-	}
-}
-
-function adjusttext(te,fr,to)                           // Adjusts text to reflect change in model 
-{
-	var list = te.split(","), k;
-	for(k = 0; k < list.length; k++){ if(list[k] == fr) list[k] = to;}
-	te = ""; for(k = 0; k < list.length; k++){ te += list[k]; if(k < list.length-1) te += ",";}
-	return te;
-}
+			if(i != undefined && f != undefined && i != f){
+				let k = 0; 
+				while(k < claa.tra.length && !(claa.tra[k].i == i && claa.tra[k].f == f)) k++;
 				
-function adjusttext2(te,fr,to)                          // Adjusts text to reflect change in model 
-{
-	var i, ty, fl;
+				let value;
+				if(k < claa.tra.length){
+					let traa = claa.tra[k];
+					traa.type = type;
+					traa.midp = [];
+					value = traa.value;
+				}
+				else{
+					this.add_transition(p,cl,i,f,[],type);
+					value = claa.tra[claa.tra.length-1].value;
+				}
+				
+				switch(type){
+				case "exp(rate)":
+					value.rate_eqn.te = tab.ele[r][2];
+					break;
+					
+				case "exp(mean)": 
+					value.mean_eqn.te = tab.ele[r][2];
+					break;
+					
+				case "erlang": 
+					value.mean_eqn.te = tab.ele[r][2];
+					value.shape_eqn.te = tab.ele[r][3];
+					break;
+					
+				case "gamma":
+					value.mean_eqn.te = tab.ele[r][2];
+					value.cv_eqn.te = tab.ele[r][3];
+					break;
+					
+				case "log-normal": 
+					value.mean_eqn.te = tab.ele[r][2];
+					value.cv_eqn.te = tab.ele[r][3];
+					break;
+					
+				case "weibull": 
+					value.scale_eqn.te = tab.ele[r][2];
+					value.shape_eqn.te = tab.ele[r][3];
+					break;
 
-	i = 0;
-	while(i < te.length){
-		while(i < te.length && te.substr(i,1) != "[" && te.substr(i,1) != "{") i++;
-		if(i < te.length){
-			ty = te.substr(i,1);
-			fl = 0;
-			if(ty == "["){
-				while(i < te.length && te.substr(i,1) != "]" && te.substr(i,1) != "_") i++;
-				if(te.substr(i,1) != "_") fl = 1;
-			}
-			i++;
-			if(fl == 0){
-				ist = i;
-				while(i < te.length && !(ty == "[" && te.substr(i,1) == "]")
-							  	    && !(ty == "{" && te.substr(i,1) == "}")) i++;
-				if(i < te.length){
-					te = te.substr(0,ist) + adjusttext(te.substr(ist,i-ist),fr,to) + te.substring(i);
-					i = ist+1;
+				default: error("Option not recognised 90"); break;
 				}
 			}
-		}		
-	}
-	return te;
-}
-
-function getclfromcomp(cnam)                           // Gets the classification number from compartment name
-{
-	for(cl = 0; cl < ncla; cl++){
-		for(c = 0; c < cla[cl].ncomp; c++) if(cla[cl].comp[c].name == cnam) break;
-		if(c < cla[cl].ncomp) break;
-	}
-	if(cl == ncla) alert("Cannot get cl from comp");
-	return cl;
-}
-	
-function checkrate(cl,i)                               // Checks the rate expression
-{
-	var tr = cla[cl].tra[i];
-	
-	nvarlist = 0; varlist=[]; vardeplist=[]; // Makes a list of variables in transition
-	
-	switch(tr.type){
-	case "Exponential": case "Source": case "Sink": checkeqn(tr.rate); break;
-	case "Gamma": checkeqn(tr.mean); checkeqn(tr.shape); break;
-	case "Weibull": checkeqn(tr.lam); checkeqn(tr.k); break;
-	case "Fixed": checkeqn(tr.time); break;
-	}
-	
-	if(errmsg != ""){ inpon = 0; return;}
-
-	tr.nratevar = nvarlist;
-	tr.ratevar=[]; tr.ratevardep=[];
-	for(n = 0; n < nvarlist; n++){ tr.ratevar[n] = varlist[n]; tr.ratevardep[n] = vardeplist[n];}
-}
-
-function getrateforfile(st,ratetime)                     // Converts rate expression into xml format
-{
-	var lines=[], ratelist=[], filt=[];
-	
-	lines = getratelines(st);
-
-	for(li = 0; li < lines.length; li++){
-		temp = lines[li].split(":");
-		switch(temp.length){
-		case 1:
-			if(ratetime == 1) ra = "1/("+lines[0]+")"; else ra = lines[0];
-			for(cl = 0; cl < ncla; cl++) filt[cl] = "All";
-			ratelist.push({rate:ra, filt:filt});
-			break;
-			
-		case 2:
-			if(temp.length != 2) errmsg("not two");
-			temp2 = temp[0].split(",");
-			var filt=[]; for(cl = 0; cl < ncla; cl++) filt[cl] = "All";
-			for(j = 0; j < temp2.length; j++){
-				for(cl = 0; cl < ncla; cl++){
-					for(c = 0; c < cla[cl].ncomp; c++) if(cla[cl].comp[c].name == temp2[j]) break;
-					if(c < cla[cl].ncomp) break;
-				}
-				if(cl == ncla) alertp("Error code EC41");
-				filt[cl] = temp2[j];
-			}
-			if(ratetime == 1) ra = "1/("+temp[1]+")"; else ra = temp[1];
-		   	ratelist.push({rate:ra, filt:filt});
-			break;
-		
-		default: errmsg("Error code EX98"); break;
 		}
-	}
-	return ratelist;
-}
-
-function eqntidy(st)
-{
-	st = st.replace(/[\r]/g, '');
-	st = st.replace(/[\t]/g, '');
-	st = st.replace(/ /g, '');
-	st = st.replace(/\u00d7/g, '*');
-	st = st.replace(/\u2215/g, '/');	
-	return st;
-}
-
-function getratelines(st)                               // Converts rate expression into lines
-{
-	var lines=[];
-
-	st = eqntidy(st);
-	
-	lines = st.split('\n');
-	li = 0; 
-	while(li < lines.length){
-		lines[li] = lines[li].trim();
-		if(lines[li] == "") lines.splice(li,1);
-		else li++;
-	}
-
-	li = 1;
-	while(li < lines.length){
-		temp = lines[li].split(":");
-		if(temp.length > 2){ errmsg = "Two colons on one line";}
-		if(temp.length == 1){ lines[li-1] += lines[li]; lines.splice(li,1);}
-		else li++;
-	}
-	return lines;
-}
-
-function checkeqn(st)                              // Checks the validity of an equation
-{
-	var an=[], j, jj, ii, val, nnn, lines=[], def=[];
-
-	lines = getratelines(st);
-	if(lines.length == 0){ errmsg = "Please enter an expression"; return;}
-
-	for(li = 0; li < lines.length; li++){
-		st = lines[li];
-		for(cl2 = 0; cl2 < ncla; cl2++) def[cl2] = "";
-			
-		//if(lines.length > 1){ // looks for the prefix
-		temp = st.split(":");
-		if(temp.length > 2){ errmsg = "Line should only contain one colon"; return;}
 		
-		if(temp.length == 2){	
-			an = temp[0].split(",");  // makes sure the bit before the colon is correct
-			for(k = 0; k < an.length; k++){
-				
-				for(cl2 = 0; cl2 < ncla; cl2++){
-					for(c = 0; c < cla[cl2].ncomp; c++) if(cla[cl2].comp[c].name == an[k]) break;
-					if(c < cla[cl2].ncomp){ 
-						if(def[cl2] != ""){ errmsg =cla[cl2].name+" is defined more than once."; return;}
-						def[cl2] = an;		
+		this.determine_branching();
+		this.update_pline(p,cl);   
+			
+		set_camera(p,cl);
+	}
+	
+	
+	/// Adds sources from a table
+	add_file_source(p,cl,tab,type)
+	{
+		let claa = this.species[p].cla[cl];	
+		let cam = claa.camera;
+		
+		let midp_list=[];
+	
+		if(tab.ncol == 2){ 
+			for(let r = 0; r < tab.nrow; r++){	
+				let f	= find(claa.comp,"name",tab.ele[r][0]);
+				if(f != undefined){
+					let co = claa.comp[f];
+					let x, y;
+					switch(cam.coord){
+					case "cartesian":	
+						x = co.x;
+						y = co.y+compartment_height+1;
 						break;
-					}
-				}
-				if(cl2 == ncla){ errmsg = "'"+an[k]+"' is not a compartment name"; return;}
-			}	
-			st = temp[1];
-		}
-		stst = st;
+						
+					case "latlng":
+						x = co.x;
+						y = co.y;
+						break;
 
-		ii = 0;                                // removes variables
-		while(ii < st.length){
-			if(st.substr(ii,1) == "["){
-				j = ii+1; while(j < st.length && st.substr(j,1) != "]") j++;
-				if(j == st.length){ errmsg = "Brackets do not match up"; return;}
-				
-				for(jj = ii+1; jj < j; jj++){
-					if(st.substr(jj,1) == " "){ errmsg = "Cannot have spaces in variables"; return;}
-				}				
-			
-				jj = ii+1; while(jj < j && st.substr(jj,1) != "_") jj++;
-				val = st.substr(ii+1,jj-(ii+1));
-				if(val == ""){ errmsg = "Set variable name"; return;} 
-				nnn = 0; while(nnn < nvarlist && varlist[nnn] != val) nnn++;
-				if(nnn == nvarlist){
-					varlist[nvarlist] = val;
-					if(jj == j) vardeplist[nvarlist] = "";
-					else vardeplist[nvarlist] = st.substr(jj+1,j-(jj+1)); 
-					nvarlist++;
-				}
-				if(jj < j){  // makes sure the class names are correct
-					an = st.substr(jj+1,j-(jj+1)).split(',');
-					for(k = 0; k < an.length; k++){
-						for(cl2 = 0; cl2 < ncla; cl2++){
-							if(cla[cl2].name == an[k]){ cladepflag[cl2] = 1; break;}
-						}
-						if(cl2 == ncla){ errmsg = "'"+an[k]+"' is not a classifcation name"; return;}
+					default: error("Option not recognised 91"); break;
 					}
-				}
-				st = st.substr(0,ii)+"[&q]"+st.substr(j+1);
-				ii += 3;
-			}
-			else ii++;
-		}
-
-		ii = 0;                                       // removes variables
-		while(ii < st.length-1){
-			if(st.substr(ii,1) == "{"){
-				popflag = 1;
-				 
-				j = ii+1; while(j < st.length && st.substr(j,1) != "}") j++;
-				if(j == st.length){ errmsg = "Brackets do not match up"; return;}
-				
-				st2 = st.substr(ii+1,j-(ii+1));
-				if(st2 == "all" || st2 == ""){ st = st.substr(0,ii)+"[&q]"+st.substr(j+1); ii += 4;}
-				else{						
-					an = st2.split(',');
-					for(k = 0; k < an.length; k++){
-						for(cl2 = 0; cl2 < ncla; cl2++){
-							if(cla[cl2].name == an[k]){ cladepflag[cl2] = 1; break;}
-							for(kk = 0; kk < cla[cl2].ncomp; kk++) if(cla[cl2].comp[kk].name == an[k]) break;
-							if(kk < cla[cl2].ncomp) break;
-						}
-						if(cl2 == ncla){ errmsg = "'"+an[k]+"' is not recognised"; return;}
-					}
-					if(k == an.length){
-						st = st.substr(0,ii)+"[&q]"+st.substr(j+1);
-						ii += 3;
-					}
-					else break;
+					midp_list[r] = [{x:x,y:y}];
 				}
 			}
-			else ii++;
-		}
-	                            
-		ii = 0;      // removes numbers
-		while(ii < st.length){
-			if(isnum(st.substr(ii,1)) == 1){
-				j = ii+1; while(j < st.length && isnum(st.substr(j,1)) == 1) j++;
-				if(j < st.length && st.substr(j,1) == "."){
-					j++; while(j < st.length && isnum(st.substr(j,1)) == 1) j++;
-				}
-				st = st.substr(0,ii)+"[&q]"+st.substr(j);
-				ii += 4;
-			}
-			else ii++;
-		}
-	
-		st = st.replace(/\+/g,"[&o]");
-		st = st.replace(/-/g,"[&m]");
-		st = st.replace(/\//g,"[&o]");
-		st = st.replace(/\u2215/g,"[&o]");
-		st = st.replace(/\*/g,"[&o]");
-		st = st.replace(/\^/g,"[&o]");
-		st = st.replace(/\u00d7/g,"[&o]");
-		
-		do{   // tries to reduce
-			lenbeg = st.length;	
-			st = st.replace("[&q][&o][&q]","[&q]");
-			st = st.replace("[&q][&m][&q]","[&q]");
-			st = st.replace("[&q][&q]","[&q]");
-			st = st.replace("([&q])","[&q]");
-			st = st.replace("cos[&q]","[&q]");
-			st = st.replace("sin[&q]","[&q]");
-			st = st.replace("exp[&q]","[&q]");
-			st = st.replace("log[&q]","[&q]");
-			
-			if(st.length == lenbeg){
-				st = st.replace("[&m][&q]","[&q]");
-			}
-		}while(st.length > 4 && st.length < lenbeg);
-		
-		if(st != "[&q]"){
-			errmsg = "There is a problem with this expression!"; return;
-		}
-	}
-}
-
-function isnum(st)                                      // Checks for integer number
-{
-	if(st == "0" || st == "1" || st == "2" || st == "3" || st == "4" || st == "5" || st == "6" || st == "7" || st == "8" || st == "9") return 1; else return 0;  
-}
-
-function settimeon()                                    // Adds the "set time" timeline on
-{
-	var cl, j, na=[], x, xx=[], w, h;
-	
-	cl = 0; while(cl < ncla && cla[cl].name != "Time") cl++;
-	if(cl == ncla) cl = addclass("Time");
-	
-	cla[cl].comp=[];
-	cla[cl].ncomp=0;
-
-	x = 0;
-	for(j = 0; j < time.length+1; j++){
-		if(j == 0){
-			if(j == time.length) st = "All";
-			else st = "T<"+time[j];
 		}
 		else{
-			if(j == time.length) st = "T>"+time[j-1];
-			else st = "T"+ time[j-1]+"-"+time[j];
+			for(let r = 0; r < tab.nrow; r++){	
+				let x,y;
+				switch(cam.coord){
+				case "cartesian":								
+					x = Number(tab.ele[r][1])*import_scale_factor;
+					y = Number(tab.ele[r][2])*import_scale_factor;
+				break;
+				
+				case "latlng":
+					let pt = transform_latlng(tab.ele[r][2],tab.ele[r][1]);
+					x = pt.x; y = pt.y; 
+					break;
+
+				default: error("Option not recognised 92"); break;
+				}
+				
+				midp_list[r] = [{x:x,y:y}];
+			}
 		}
-		na[j] = st;
-	
-		xx[j] = x;
-		x += 1; if(j < time.length) x += 0.6;
-	}
-	
-	widx = width-menux; widy = height;
-	sca = (widx-100)/x; if(sca > 200) sca = 200;
-	w = sca; h = w/3;
-	
-	for(j = 0; j < na.length; j++){
-		if(na.length == 1) co = PURPLE;
-		else{ f = j/(na.length-1); co = "#" + hex(255*f+120*(1-f)) + hex(150*f+0*(1-f)) + hex(255*f+120*(1-f));}
-		cla[cl].comp.push({name:na[j], col:co, x:Math.floor(widx/2-sca*x/2+xx[j]*sca), y:widy/2-h/2, w:w, h:h});
-		cla[cl].ncomp++;
-	}
-	
-	cla[cl].tra=[];
-	cla[cl].ntra=0;
+		
+		for(let r = 0; r < tab.nrow; r++){	
+			let f	= find(claa.comp,"name",tab.ele[r][0]);
+			
+			if(f != undefined){
+				let k = 0; 
+				while(k < claa.tra.length && !(claa.tra[k].i == "Source" && claa.tra[k].f == f)) k++;
+				
+				let value;
+				if(k < claa.tra.length){
+					let traa = claa.tra[k];
+					traa.type = type;
+					traa.midp = midp_list[r];
+					value = traa.value;
+				}
+				else{
+					this.add_transition(p,cl,"Source",f,midp_list[r],type);
+					value = claa.tra[claa.tra.length-1].value;
+				}
+				
+				switch(type){
+				case "exp(rate)":
+					value.rate_eqn.te = tab.ele[r][tab.ncol-1];
+					break;
+					
+				case "exp(mean)": 
+					value.mean_eqn.te = tab.ele[r][tab.ncol-1];
+					break;
 
-	for(j = 0; j < na.length-1; j++){
-		cla[cl].tra.push({type:"Set", time:time[j], i:j, f:j+1, l:0, midx:0, midy:0, middx:0, middy:0, p:[], pline:[]});
-		cla[cl].ntra++;
+				default: error("Option not recognised 93"); break;
+				}
+			}
+		}
+		
+		this.determine_branching();
+		this.update_pline(p,cl);   
+			
+		set_camera(p,cl);
 	}
-	for(tr = 0; tr < cla[cl].ntra; tr++) findpline(cl,tr);
-}
 	
-function setageon()                                     // Adds the age timeline
-{
-	var cl, j, na=[], x, xx=[], w,h;
 	
-	cl = 0; while(cl < ncla && cla[cl].name != "Age") cl++;
-	if(cl == ncla) cl = addclass("Age");
-	cla[cl].comp=[];
-	cla[cl].ncomp=0;
+	/// Adds sinks from a table
+	add_file_sink(p,cl,tab,type)
+	{
+		let claa = this.species[p].cla[cl];	
+		let cam = claa.camera;
+		
+		let midp_list=[];
+	
+		if(tab.ncol == 2){ 
+			for(let r = 0; r < tab.nrow; r++){	
+				let i	= find(claa.comp,"name",tab.ele[r][0]);
+				if(i != undefined){
+					let co = claa.comp[i];
+					let x, y;
+					
+					switch(cam.coord){
+					case "cartesian":	
+						x = co.x;
+						y = co.y+compartment_height+1;
+						break;
+						
+					case "latlng":
+						x = co.x;
+						y = co.y;
+						break;
 
-	x = 0;
-	for(j = 0; j < age.length+1; j++){
-		if(j == 0){
-			if(j == age.length) st = "A0+";
-			else st = "A0-"+age[j];
+					default: error("Option not recognised 95"); break;
+					}
+					midp_list[r] = [{x:x,y:y}];
+				}
+			}
 		}
 		else{
-			if(j == age.length) st = "A"+age[j-1]+"+";
-			else st = "A"+ age[j-1]+"-"+age[j];
-		}
-		na[j] = st;
-	
-		xx[j] = x;
-		x += 1; if(j < age.length) x += 0.6;
-	}
-	
-	widx = width-menux; widy = height;
-	
-	sca = (widx-100)/x; if(sca > 200) sca = 200;
-	w = sca; h = w/3;
-	
-	for(j = 0; j < na.length; j++){
-		if(na.length == 1) co = GREY;
-		else{ f = j/(na.length-1); co = "#" + hex(230*f+60*(1-f)) + hex(230*f+60*(1-f)) + hex(230*f+60*(1-f));}
-		cla[cl].comp.push({name:na[j], col:co, x:Math.floor(widx/2-sca*x/2+xx[j]*sca), loadinit:[], simpopinit:0, simfracinit:1.0/na.length, y:widy/2-h/2, w:w, h:h});
-		cla[cl].ncomp++;
-	}
-	
-	cla[cl].tra=[];
-	cla[cl].ntra=0;
-
-	for(j = 0; j < na.length-1; j++){
-		cla[cl].tra.push({type:"Grow", age:age[j], i:j, f:j+1, l:0, midx:0, midy:0, middx:0, middy:0, p:[], pline:[]});
-		cla[cl].ntra++;
-	}
-	for(tr = 0; tr < cla[cl].ntra; tr++) findpline(cl,tr);
-}
-
-function checkname(st,except)                           // Check a new name for validity
-{
-	var cl2, j, k, sch="_[]{},*=|'\"";
-	 
-	if(st == "") errmsg = "Must enter name";
-	else{
-		if(st == "Age") errmsg = "Cannot use 'Age'";
-		if(st == "Time") errmsg = "Cannot use 'Time'";
-		
-		for(cl2 = 0; cl2 < ncla; cl2++){
-			if(st == cla[cl2].name && st != except) errmsg = "Same name as a classification";
-		}
-		
-		for(j = 0; j < sch.length; j++){
-			for(k = 0; k < st.length; k++) if(st.substr(k,1) == sch.substr(j,1)) errmsg = "Cannot use '"+sch[j]+"' in the name";
-		}
-	}
-}
-
-function startnewmodel()                                // Initialises a new model
-{
-	if(modelstart == 1){
-		if(confirm("Are you sure you want to discard the currently loaded model?")); else return; 
-	}
-	initvar();
-	
-	nchrun=0;
-	derive=[];
-	data=[]; simdata=[];
-	param=[]; paramsim=[];
-	 
-	ncla=0; cla=[];
-	age=[];
-	time=[];
-	setageon(); settimeon();
-	
-	simres={}; infres={};
-	modelstart = 1; modelsetup = -1;
-	induoflag = 0;
-	fileToLoadlist=[];
-	examploaded = "New";
-	
-	changepage(DESCPAGE,-1,0);
-}
-
-function initvar()                                     // Initialises variables for a new model
-{
-	var i;
-	siminit="";
-	
-	datanote = "Click here to place a comment about the data."; datanoteon = 0;
-	descnote = "Place a comment about the data/analysis (optional).";
- 
- 	nsampevmax = 1000; nsampmax = 10000; GRmax = 1.1; ESSmin = 400;
-	indmaxnumber = 100000;
-	
-	nchain = 3;
-	tpostmin=large; tpostmax=-large;
-	termtype = 0;
-	
-	simpopinitset = 0;
-	tsimmin = 0; tsimmax = 100; simty = 0;
-	detectprob=1; datagenttype=0; datagenttype2=0; tgenmin=0; tgenmax=100; dtgen=10; tgenuserdef="";
-	Segen=1; Spgen=1;
-	addtransmode = 0; addcompmode = 0; addsourcemode = 0;
-	kde = 10; kdemin = 1; kdemax = 20;   
-	distCI = 1; distmean = 1;
-	initpages();
-}
-
-function addderive(newna)                                // Adds a derived quantity
-{
-	var i;
-	
-	for(i = 0; i < newna.length; i++){
-		var c = newna.substr(i,1);
-		if(c == " " || c == "_" || c == "," || c == "[" || c == "]" || c == "{" || c == "}"){
-			return 1;
-		}				
-	}
-			
-	derive.push({name:newna, eq:"", popdep:0, dep:[], ndervar:0, dervar:[]});
-	return 0;
-}		
-	
-function setderive(d,val)                                // Sets a derived quantity
-{
-	var cl2, i;
-	
-	nvarlist = 0; varlist=[]; vardeplist=[]; popflag = 0; cladepflag=[]; for(cl2 = 0; cl2 < ncla; cl2++) cladepflag[cl2] = 0;
-	checkeqn(val);
-	if(errmsg != "") return 1;
-	else{
-		for(i = 0; i < nvarlist; i++){
-			if(vardeplist[i].length > 1){ errmsg = "Variable "+vardep[i]+ " cannot have any dependencies"; return 1;}
-		}
-		
-		derive[d].eq = val;
-		derive[d].popdep = popflag;
-		derive[d].dep = []; for(cl2 = 0; cl2 < ncla; cl2++) if(cladepflag[cl2] == 1) derive[d].dep.push(cla[cl2].name);
-		
-		pr(derive);
-		pr(d+"d");
-		derive[d].ndervar = nvarlist; for(i = 0; i < nvarlist; i++) derive[d].dervar[i] = varlist[i]; 
-		return 0;
-	}
-}	
-
-function drawderived()                                  // Draws the derived buttons
-{
-	var x, y;
-	
-	x = 0; y = 8; nob = 0;
-	
-	for(d = 0; d < derive.length; d++){ addob(x,y,OBDERIVE,d); y += priordy;}
-	y += 40;
-		
-	ytot = y;
-	
-	placeob();	
-}
-
-function donemodel()                                     // When "done is clicked on model page
-{	
-	buboff();
-	if(modelsetup == 1){
-		modelsetup = 0;
-		if(runtype != ""){ stopinference();}
-		infres={}; simres={};
-		pagesubsub[SIMULATEPAGE][2] = 0; pagesubsub[INFERENCEPAGE][2] = 0; 
-	}
-	else definemodel();	
-}
-
-function definemodel()                                   // Called when the model is defined
-{
-	var cl, tr, d, j, ci, cf;
-
-	errmsg="";
-	for(cl = 0; cl < ncla; cl++){
-		for(tr = 0; tr < cla[cl].ntra; tr++){
-			checkrate(cl,tr);
-			if(errmsg != ""){
-				changepage(MODELPAGE,0,-1); seltrans(cl,tr); errormsg = errmsg; return 1;
-			}
-		}
-	}
-
-	emsg = "";
-	for(cl = 0; cl < ncla; cl++){
-		if(cla[cl].ncomp == 0){ emsg = "Classifciation '"+cla[cl].name+"' must have at least one compartment!"; break;}
-	}
-	if(emsg != ""){ alertp(emsg); errormsg = emsg; return 1;}
-	
-	if(checkprior(1) == 1){ errormsg = errmsg; return 1;}
-	
-	
-	collectvariables();
-	for(cl = 0; cl < ncla; cl++){
-		if(!popinit[cl]) popinit[cl]=[];
-		for(j = 0; j < cla[cl].ncomp; j++){
-			if(cl == 0){ if(!popinit[cl][j]) popinit[cl][j] = 10;}
-			else{
-				popinit[cl][j] = Math.floor(100/cla[cl].ncomp);
-			}
-		}
-	}
-	
-	simpopinitlist=[];
-	for(cl = 0; cl < ncla-1; cl++) simpopinitlist.push(cla[cl].name);
-	if(simpopinitlist.length == 0) simpopinitlist.push(cla[0].name);
-
-	for(cl = 0; cl < ncla-2; cl++){     // looks at whether simfracinit needs to be defined
-		sum = 0;
-		for(j = 0; j < cla[cl].ncomp; j++){
-			sum += cla[cl].comp[j].simfracinit;
-			if(cla[cl].comp[j].simfracinit == undefined) break;
-		}
-
-		if(j < cla[cl].ncomp || sum > 1.000001 || sum < 0.9999999){
-			for(j = 0; j < cla[cl].ncomp; j++) cla[cl].comp[j].simfracinit = 1.0/cla[cl].ncomp;
-		}
-	}
-
-	claselect=[]; for(cl = 0; cl < ncla; cl++) claselect.push(cla[cl].name);
-		
-	for(cl = 0; cl < ncla; cl++){ if(cl == 0 || cla[cl].ncomp > 1) indshow[cl] = 1; else indshow[cl] = 0;}
-	
-	initcompmult();
-		
-	points=[];
-	d = 0;
-	while(d < data.length){ // changes need to the data and observation models
-		dat = data[d];
-		fl = 0;
-		switch(dat.variety){
-		case "trans": case "move":
-			switch(dat.transty){
-			case "trans":
-				cl = dat.cl;
-				if(cl >= ncla){ fl = 2; points.push("Data source '"+dat.name+"' has been removed because classification no longer exists."); break;}
-				
-				for(tr = 0; tr < cla[cl].ntra; tr++){
-					ci = cla[cl].tra[tr].i;
-					cf = cla[cl].tra[tr].f; 
-					if(dat.transi == cla[cl].comp[ci].name && dat.transf == cla[cl].comp[cf].name) break;
-				}
-				if(tr == cla[cl].ntra){ fl = 2; points.push("Data source '"+dat.name+"' has been removed because transition no longer exists."); break;}
-				break;
-			
-			case "+":
-				for(cl = 0; cl < ncla; cl++){
-					for(tr = 0; tr < cla[cl].ntra; tr++){
-						ci = cla[cl].tra[tr].i;
-						cf = cla[cl].tra[tr].f;
-						if(ci == -2){
-							if(dat.variety == "move") break;
-							if(dat.filt[cl] == "All" || dat.filt[cl] == cla[cl].comp[cf].name) break; 
-						}
-					}
-					if(tr < cla[cl].ntra) break;
-				}
-				if(cl == ncla){ fl = 2; points.push("Data source '"+dat.name+"' has been removed because source transition no longer exists."); break;}
+			for(let r = 0; r < tab.nrow; r++){	
+				let x,y;
+				switch(cam.coord){
+				case "cartesian":								
+					x = Number(tab.ele[r][1])*import_scale_factor;
+					y = Number(tab.ele[r][2])*import_scale_factor;
 				break;
 				
-			case "-":
-				for(cl = 0; cl < ncla; cl++){
-					for(tr = 0; tr < cla[cl].ntra; tr++){
-						ci = cla[cl].tra[tr].i;
-						cf = cla[cl].tra[tr].f;
-						if(cf == -2){
-							if(dat.variety == "move") break;
-							if(dat.filt[cl] == "All" || dat.filt[cl] == cla[cl].comp[ci].name) break; 
-						}
-					}
-					if(tr < cla[cl].ntra) break;
+				case "latlng":
+					let pt = transform_latlng(tab.ele[r][2],tab.ele[r][1]);
+					x = pt.x; y = pt.y; 
+					break;
+
+				default: error("Option not recognised 96"); break;
 				}
-				if(cl == ncla){ fl = 2; points.push("Data source '"+dat.name+"' has been removed because source transition no longer exists."); break;}
-				break;
-			}
-			
-			if(dat.variety == "trans"){
-				if(dat.filt.length != ncla) alert("wrong size");
-				for(cl = 0; cl < ncla; cl++){
-					na = dat.filt[cl];
-					if(na != "All"){ 
-						for(c = 0; c < cla[cl].ncomp; c++) if(cla[cl].comp[c].name == na) break; 
-						if(c == cla[cl].ncomp) alert("transfilt problem");
-					}
-				}
-			}
-			break;
-			
-		case "pop":
-			if(dat.popcl.length != ncla) alert("wrong size");
-			for(cl = 0; cl < ncla; cl++){
-				na = dat.popcl[cl];
-				if(na != "All"){ 
-					for(c = 0; c < cla[cl].ncomp; c++) if(cla[cl].comp[c].name == na) break; 
-					if(c == cla[cl].ncomp) alert("popfilt problem");
-				}
-			}
-			break;
-			
-		case "state":
-			cl = dat.cl; 
-			if(cl >= ncla){fl = 2; points.push("Data source '"+dat.name+"' has been removed because classification no longer exists.");}
-			else{
-				nc = cla[cl].ncomp;
-				len = dat.sensitive.length;
-				if(len < nc){ fl = 1; for(k = len; k < nc; k++) dat.sensitive[k] = 0;}
-				else{ if(len > nc){ fl = 1; dat.sensitive.length = nc;}}
 				
-				for(j = 0; j < dat.pos.length; j++){
-					len = dat.posbinary[j].length;
-					if(len < nc){ fl = 1; for(k = len; k < nc; k++) dat.posbinary[j][k] = 0;}
-					else{ if(len > nc){ fl = 1; dat.posbinary[j].length = nc;}}
-				
-					len = dat.posexpression[j].length;
-					if(len < nc){ fl = 1; for(k = len; k < nc; k++) dat.posexpression[j][k] = "";}
-					else{ if(len > nc){ fl = 1; dat.posexpression[j].length = nc;}}	
-				}
+				midp_list[r] = [{x:x,y:y}];
 			}
-			break;
 		}
 		
-		if(fl != 2){
-			datatemp = data[d];
-			reloaddata();
-			if(checkdata() == 1){ alertp(errormsg); return 1;}
+		for(let r = 0; r < tab.nrow; r++){	
+			let i	= find(claa.comp,"name",tab.ele[r][0]);
+			
+			if(i != undefined){
+				let k = 0; 
+				while(k < claa.tra.length && !(claa.tra[k].i == i && claa.tra[k].f == "Sink")) k++;
+				
+				let value;
+				if(k < claa.tra.length){
+					let traa = claa.tra[k];
+					traa.type = type;
+					traa.midp = midp_list[r];
+					value = traa.value;
+				}
+				else{
+					this.add_transition(p,cl,i,"Sink",midp_list[r],type);
+					value = claa.tra[claa.tra.length-1].value;
+				}
+				
+				switch(type){
+				case "exp(rate)":
+					value.rate_eqn.te = tab.ele[r][tab.ncol-1];
+					break;
+					
+				case "exp(mean)": 
+					value.mean_eqn.te = tab.ele[r][tab.ncol-1];
+					break;
+					
+				case "gamma": 
+					value.mean_eqn.te = tab.ele[r][tab.ncol-2];
+					value.cv_eqn.te = tab.ele[r][tab.ncol-1];
+					break;
+					
+				case "erlang": 
+					value.mean_eqn.te = tab.ele[r][tab.ncol-2];
+					value.shape_eqn.te = tab.ele[r][tab.ncol-1];
+					break;
+					
+				case "log-normal": 
+					value.mean_eqn.te = tab.ele[r][tab.ncol-2];
+					value.cv_eqn.te = tab.ele[r][tab.ncol-1];
+					break;
+					
+				case "weibull": 
+					value.scale_eqn.te = tab.ele[r][tab.ncol-2];
+					value.shape_eqn.te = tab.ele[r][tab.ncol-1];
+					break;
+
+				default: error("Option not recognised 98"); break;
+				}
+			}
 		}
 		
-		if(fl == 2) data.splice(d,1);
+		this.determine_branching();
+		this.update_pline(p,cl);   
+			
+		set_camera(p,cl);
+	}
+
+	
+	/// Adds a classification background buttons (this is activated when clicked)
+	add_classback_buts(lay)
+	{
+		if(this.species.length == 0) return;
+		let p = this.get_p();
+		if(this.species[p].ncla == 0) return;
+		let cl = this.get_cl();
+		lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, ac:"ClassificationBack", type:"Nothing", p:p, cl:cl});
+	}
+	
+	
+	/// Replots the model
+	replot()
+	{
+		if(find(inter.layer,"name","Annotation") == undefined){
+			replot_layer("GraphCompartments");
+			replot_layer("GraphTransitions");
+		}			
 		else{
-			if(fl == 1) points.push("As a result of the alteration to the model, changes have been made to the observation model for data '"+dat.name+"'. Please check!");
-			d++;
+			replot_layer("Annotation");
+			replot_layer("AnnotationMap");
+			replot_layer("Compartment");
+			replot_layer("Transition");
 		}
+		
+		plot_screen();
+	}
+	
+	
+	/// Gets all the values an index cound take
+	get_index_possibility(def_pos)
+	{
+		let pos = [];
+		for(let i = 0; i < alphabet.length; i++){
+			let ch = alphabet[i];
+			let flag = false;
+			if(ch == "a" || ch == "t") flag = true;
+			
+			if(ch != def_pos){
+				for(let p = 0; p < this.species.length; p++){
+					let sp = this.species[p];
+					for(let cl = 0; cl < sp.ncla; cl++){
+						let claa = sp.cla[cl];
+						
+						if(claa.index == ch) flag = true;
+						for(let c = 0; c < claa.ncomp; c++){
+							if(claa.comp[c].name == ch) flag = true;
+						}
+					}
+				}
+			}
+			if(flag == false) pos.push({te:ch});
+		}
+		
+		return pos;
 	}
 
-	modelsetup = 1; 
-	if(points.length > 0) helptype = 207;
-	else helptype = 209;
+	/// Check clones all have the same specifications for compartments
+	check_clones()
+	{
+		if(check_clone_on != true) return;
 	
-	converttoobs(ty);
-	
-	return 0;
+		for(let p = 0; p < this.species.length; p++){
+			let sp = this.species[p];
+			for(let cl = 0; cl < sp.ncla; cl++){
+				let claa = sp.cla[cl];
+				
+				for(let p2 = p+1; p2 < this.species.length; p2++){
+					let sp2 = this.species[p2];
+					for(let cl2 = 0; cl2 < sp2.ncla; cl2++){
+						let claa2 = sp2.cla[cl2];
+				
+						if(claa.name == claa2.name){
+							if(claa.index != claa2.index) error("CLONE index not right");
+							
+							let cam = claa.camera;
+							let cam2 = claa2.camera;
+				
+							if(cam.coord != cam2.coord) error("CLONE cam coord not right");
+							if(cam.ruler != cam2.ruler) error("CLONE cam ruler not right");
+							if(cam.scale != cam2.scale) error("CLONE cam scale not right");
+							if(cam.x != cam2.x) error("CLONE cam x not right");
+							if(cam.y != cam2.y) error("CLONE cam y not right");
+							
+							if(claa.ncomp != claa2.ncomp) error("CLONE ncomp not right");
+							else{
+								for(let c = 0; c < claa.ncomp; c++){
+									let co = claa.comp[c];
+									let co2 = claa2.comp[c];
+						
+									if(cam.coord == "latlng" && co.type == "boundary"){}
+									else{
+										if(co.x != co2.x || co.y != co2.y) error("CLONE x,y not right");
+									}
+									
+									if(co.col != co2.col) error("CLONE col not right");
+						
+									if(co.fixed.check != co2.fixed.check) error("CLONE fixed not right");
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 }

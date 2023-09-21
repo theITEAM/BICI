@@ -1,0 +1,6 @@
+BICI is built into three different version for Window, Linux and Macs
+
+Windows version:
+This is kept in D:BICI_windows
+
+1) Copy cod
