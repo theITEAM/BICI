@@ -26,7 +26,7 @@ The following files can be downloaded:
 
 * **Windows:** [BICI_windows.zip](https://github.com/theITEAM/BICI/releases/download/1.2/BICI_windows.zip). Once unzipped SIRE is run by clicking on the “BICI.exe” icon (if you get the message “Windows protected your PC” you must click “More info” and “Run anyway”).
 
-* **Mac:** [BICI_mac.zip](https://github.com/theITEAM/BICI/releases/download/1.2/BICI_mac.zip) BICI is run by clicking on the “BICI” icon (if you get the message “Can’t be opened because it’s from an unidentified developer” you must press the control button and click the icon and then select “Open”).
+* **Mac:** [BICI_mac.zip](https://github.com/theITEAM/BICI/releases/download/v1.3/BICI_mac.zip) BICI is run by clicking on the “BICI” icon (if you get the message “Can’t be opened because it’s from an unidentified developer” you must press the control button and click the icon and then select “Open”).
 
 
 ## Documentation
