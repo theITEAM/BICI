@@ -7,15 +7,12 @@
 
 using namespace std;
 
-//#define WINDOWS
+#define WINDOWS
 
-const bool testing = true;//false;                           // Set to true for additional testing functions
+const bool testing = false;                           // Set to true for additional testing functions
 
-#ifdef WINDOWS
 const bool com_op = true;                            // Set to true for command line output
-#else
-const bool com_op = false; 
-#endif
+//const bool com_op = false; 
 
 /************************** Enumerated values ******************************/
 

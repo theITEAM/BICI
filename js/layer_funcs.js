@@ -18,6 +18,10 @@ function generate_screen()
 	let ratio = page_char_wid/page_char_hei;
 	let wid_show = Math.round(height*ratio);
 	let hei_show = height;
+	
+	if(wid_show > width){
+		wid_show = width; hei_show = Math.round(wid_show/ratio);
+	}
 
 	inter.sca = wid_show/page_char_wid;
 
@@ -757,6 +761,7 @@ function add_screen_buts(lay)
 	if(inter.equation.te != undefined){
 		add_layer("EquationBackground",0,0,lay.dx,lay.dy,{});
 		let wid = 0.54*(x3-x1);
+		
 		add_layer("Equation",lay.dx/2-wid/2+menu_width/2,0,wid,lay.dy,{});
 	}
 	
@@ -770,9 +775,8 @@ function add_screen_buts(lay)
 	}
 	
 	if(inter.loading_symbol.on){
-		let six = 2.7, siy = 3.7;
+		let six = 4.7, siy = 3.7;
 		add_layer("LoadingSymbol",(x2+x3)/2-six/2,(y1+y2)/2-siy/2,six,siy,{});
-		//this.add_button({x:0, y:this.dx, dx:this.dx, dy:this.dy-this.dx, type:"Stop"});
 	}
 } 
 
@@ -820,7 +824,7 @@ function start_loading_symbol(per)
 {
 	if(!inter.loading_symbol.on){
 		let interval = setInterval(function(){ inter.loading_symbol.offset++; replot_loading_symbol(); plot_screen();},110);
-		inter.loading_symbol = {on:true, offset:0, interval:interval, percent:per};
+		inter.loading_symbol = {on:true, offset:0, interval:interval, processing:false, percent:per};
 		generate_screen();
 	}
 }
@@ -938,7 +942,9 @@ function add_ref(source)
 function replot_loading_symbol()
 {
 	let lay = get_lay("LoadingSymbol");
-	lay.plot_button(lay.but[0]);
+	if(lay){
+		lay.plot_button(lay.but[0]);
+	}
 }
 
 /// Replots a given layer
@@ -1213,9 +1219,9 @@ function check_number(te)
 function check_nonnegative(te)
 {
 	let num = Number(te);
-	if(isNaN(num)) warn = "Must be a number";
+	if(isNaN(num)) return "Must be a number";
 	else{
-		if(num < 0) warn = "Must be non-negative";
+		if(num < 0) return "Must be non-negative";
 	}
 	return "";
 }

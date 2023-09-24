@@ -1,5 +1,5 @@
 #ifndef BICI__ABC_SMC_HH
-#define BEEP__ABC_SMC_HH
+#define BICI__ABC_SMC_HH
 
 #include "struct.hh"
 #include "model.hh"

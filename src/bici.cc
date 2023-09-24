@@ -30,12 +30,14 @@ int main(int argc, char** argv)
 {
 	//test_distribution(); return 0;
 	
-	string file = "Execute/init.txt";
+	string file;
 	
 	auto chain = 0;
 
-	if(argc > 2){ cout << "Too many arguments" << endl; return 0;}
-	if(argc == 2) chain = atoi(argv[1]);
+	if(argc > 3){ cout << "Too many arguments" << endl; return 0;}
+
+	file = argv[1];
+	if(argc == 3) chain = atoi(argv[2]);
 
 
 	//if(argc == 2) file = argv[1];
@@ -54,7 +56,8 @@ int main(int argc, char** argv)
 	//return 0;
 	
 	if(model.mode == SIM) chain += 10;
-	srand(chain+11);
+	//srand(chain+11);
+	sran(chain+11);
 
 	switch(model.mode){
 	case SIM:                               // Simulates from the model

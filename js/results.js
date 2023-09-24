@@ -524,7 +524,7 @@ function read_state_sample(te,chain,result,warning)
 	for(let th = 0; th < result.param.length; th++){
 		let par = result.param[th];
 		if(par.kind == "variable" && sample.param[th] == undefined){
-			if(!(par.type == "derive_param" && par.time_dep == true)){
+			if(!(par.type == "derive_param" && par.time_dep == true) && !(par.variety == "likelihood")){
 				alert_sample(warning+": Parameter '"+result.param[th].name+"' not set",41); return;
 			}
 		}

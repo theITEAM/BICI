@@ -139,7 +139,7 @@ function add_toolbar(te,ytop,lay)
 				lay.add_button({te:alphabet[i], x:x, y:y, dx:bdx, dy:bdy, ac:"Letter_But", type:"Letter_But", col:BLACK, colov:DDGREY});
 				x += bdx+0.2;
 			}			
-			x = 0.5; y += 1.8;
+			x = 0.5; y += 2.0;
 			for(let i = half; i < alphabet.length; i++){
 				lay.add_button({te:alphabet[i], x:x, y:y, dx:bdx, dy:bdy, ac:"Letter_But", type:"Letter_But", col:BLACK, colov:DDGREY});
 				x += bdx+0.2;
@@ -387,7 +387,7 @@ function add_quantity_content_buts(lay)
 /// Adds buttons for the equation editor
 function equation_calulator(lay,cx,cy,width,source,warn,mode)
 {
-	let nrow = 5;
+	let nrow = 4;
 
 	source.warn = warn;
 	lay.add_textbox(cx+0.5,cy,width-1,nrow,source);

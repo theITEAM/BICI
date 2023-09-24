@@ -100,9 +100,11 @@ const para_eq_si = 1.2;
 
 const dropdown_height = 1.4;     // The height for a dropdown menu
 const dropdown_opheight = 1.2;   // The height for different options in a dropdown menu
-const dropdown_dymax = 20;       // The maximum size for the dropdown menu 
+const dropdown_dymax = 17;       // The maximum size for the dropdown menu 
 
 const playbar_mar = 2;           // The margins around the playbar
+
+const loading_si = 2.7;          // The size of the loading button
 
 const index_max = 6;             // The maximum number of indices for a tensor 
 

@@ -501,9 +501,10 @@ class Layer
 	/// Adds loading symbol buttons
 	add_loadingsymbol_buts()
 	{
-		this.add_button({x:0, y:0, dx:this.dx, dy:this.dx, type:"LoadingSymbol"});
+		this.add_button({x:this.dx/2-loading_si/2, y:0, dx:loading_si, dy:loading_si, type:"LoadingSymbol"});
 		
-		this.add_button({x:0, y:this.dx, dx:this.dx, dy:this.dy-this.dx, type:"Stop", ac:"Stop"});
+		if(inter.loading_symbol.processing == true) this.add_button({te:"Processing", x:0, y:loading_si, dx:this.dx, dy:1, type:"Stop"});
+		else this.add_button({te:"Stop", x:0, y:loading_si, dx:this.dx, dy:1, type:"Stop", ac:"Stop"});
 	}
 	
 	

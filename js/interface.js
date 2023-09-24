@@ -1446,7 +1446,8 @@ function view_warning(i)
 		break;
 		
 	case "DataProblem": 
-		change_page({pa:"Inference", su:"Data", susu:warn.p});
+		if(warn.siminf == "sim") change_page({pa:"Simulation", su:"Population", susu:warn.p});
+		else change_page({pa:"Inference", su:"Data", susu:warn.p});
 		break;
 			
 	default:

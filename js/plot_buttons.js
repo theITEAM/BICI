@@ -304,7 +304,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			clear_rectangle(x,y,dx,dy);
 			let col = BLACK; if(ov) col = GREY;
 			let si = 0.7;
-			center_text("Stop",x+dx/2,y+dy/2+0.4*si,get_font(si),col);     
+			center_text(bu.te,x+dx/2,y+dy/2+0.4*si,get_font(si),col);     
 		}
 		break;
 			

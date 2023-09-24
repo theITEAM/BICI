@@ -21,6 +21,7 @@ unsigned int find_in(string st1, string st2);
 unsigned int find_in(const vector <bool> &vec, const bool val);
 double number(string st);
 double ran();
+void sran(const int seed);
 double normal_sample(const double mean, const double sd);
 double normal_probability(const double x, const double mean, const double sd);
 double lognormal_sample(const double mean, const double cv);

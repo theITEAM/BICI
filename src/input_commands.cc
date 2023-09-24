@@ -418,8 +418,8 @@ void Input::datadir_command()
 	if(outputdir == ""){	
 		auto i = input_file.length()-1;
 		while(i > 0 && input_file.substr(i,1) != ".") i--;
-		//outputdir = datadir+"/Output";
-		outputdir = "Output";
+		outputdir = datadir+"/Output";
+		//outputdir = "Output";
 	}
 }
 

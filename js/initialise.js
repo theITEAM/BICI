@@ -198,6 +198,3 @@ function find_pic(name)
 	im.src = "pics/warn.png";
 	return im;
 }
-
-
-

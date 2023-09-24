@@ -10,7 +10,17 @@ function create_output_file(type,filename)
 		let spl = filename.split(".");
 		dir = spl[0]+"-data-files";
 	}
+	if(ver == "mac") dir = "/tmp/"+dir;
 		
+	const fs = require('fs');  // Creates the data directory
+	if (!fs.existsSync(dir)) {
+		fs.mkdir(dir, function(err) {
+			if(err) { 
+				alertp("There was a problem creating the directoy '"+dir+"'");
+			}
+		});
+	}
+	
 	init_param();
 	if(model.warn.length > 0){ generate_screen(); return;}
 	
@@ -41,19 +51,12 @@ function create_output_file(type,filename)
 		
 	if(filename == "NO_SAVE") return te;
 	
-	const fs = require('fs');  // Creates the data directory
-	if (!fs.existsSync(dir)) {
-		fs.mkdir(dir, function(err) {
-			if(err) { 
-				alertp("There was a problem creating the directoy '"+dir+"'");
-			}
-		});
-	}
-	
 	if(map_data.features.length > 0){
 		write_file(JSON.stringify(map_data),dir+"/map-data.json");
 	}
 
+	if(ver == "mac") filename = "/tmp/"+filename;
+	
 	write_file(te,filename);
 	
 	return "success";
@@ -1044,7 +1047,10 @@ function create_output_sim_inf_source(p,type,dir,file_list,exporting)
 	
 		if(so.error == true){
 			if(exporting == false){
-				model.warn.push({mess:"Data source is invalid", mess2:"Data table filename: "+so.table.filename, warn_type:"SourceInvalid", siminf:type, p:p, ind:i});
+				let te;
+				if(so.table.filename == "") te = "Please delete data and reload.";
+				else te = "Data table filename: "+so.table.filename;
+				model.warn.push({mess:"Data source is invalid", mess2:te, warn_type:"SourceInvalid", siminf:type, p:p, ind:i});
 			}
 		}
 		else{
@@ -1073,10 +1079,16 @@ function create_output_sim_inf_source(p,type,dir,file_list,exporting)
 								if(ip.length != claa.ncomp){
 									model.warn.push({mess:"Initial population problem", mess2:"The number of compartments in classification '"+claa.name+"' is not right",warn_type:"Init_pop", pa:pa, p:p, i:i});
 								}
-								
-								for(let c = 0; c < ip.length; c++){
-									if(ip[c].comp_name_store != claa.comp[c].name){
-										model.warn.push({mess:"Initial population problem", mess2:"The names for the compartments '"+ip[c].name+"' and '"+claa.comp[c].name+"' do not agree",warn_type:"Init_pop", pa:pa, p:p, i:i});
+								else{
+									for(let c = 0; c < ip.length; c++){
+										if(ip[c].comp_name_store != claa.comp[c].name){
+											if(ip[c].name == undefined){
+												model.warn.push({mess:"Initial population problem", mess2:"The data source has become invalid",warn_type:"Init_pop", pa:pa, p:p, i:i});
+											}
+											else{
+												model.warn.push({mess:"Initial population problem", mess2:"The names for the compartments '"+ip[c].name+"' and '"+claa.comp[c].name+"' do not agree",warn_type:"Init_pop", pa:pa, p:p, i:i});
+											}
+										}
 									}
 								}
 							}

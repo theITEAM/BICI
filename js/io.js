@@ -98,6 +98,7 @@ function load_BICI_file(te)
 	model.determine_branching();
 
 	check_data_valid();
+	model.check_consistent();
 }
 
 
@@ -558,7 +559,7 @@ function write_file(te,filename,op)
 	//if(op == "export") te = "\ufeff"+te;
 	if(op != "image") te = "\ufeff"+te;
 
-	fs.writeFile(filename, te, function (err) {
+	fs.writeFileSync(filename, te, function (err) {
 		 if (err) {
 			 alertp("There was an error attempting to save your data.");
 			 return;

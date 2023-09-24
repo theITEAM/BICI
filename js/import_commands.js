@@ -731,7 +731,7 @@ function box_command()
 function data_command()
 {
 	load_data();
-	if(inter.help.te != undefined) break;
+	//if(inter.help.te != undefined) break;
 }
 		
 		

@@ -551,6 +551,8 @@ class Model
 		this.species.push({ name:name, sim_source:[], inf_source:[], gen_source:[], data_type:{te:data_types[0]
 		}, cla:[], ncla:0, fix_eff:[], ind_eff_group:[], type:type});		
 			
+		if(debug == true) this.check_consistent();  
+		
 		return "success";
 	}
 	
@@ -585,6 +587,8 @@ class Model
 		
 		data_update_add_classification(p);
 		check_data_valid();
+		
+		if(debug == true) this.check_consistent();  
 		
 		return "success";
 	}
@@ -656,6 +660,8 @@ class Model
 			}
 		}
 		
+		if(debug == true) this.check_consistent();  
+		
 		return "success";
 	}
 	
@@ -693,6 +699,8 @@ class Model
 
 		data_update_add_compartment(p,cl);
 		check_data_valid();
+		
+		if(debug == true) this.check_consistent();  
 		
 		return "success";
 	}
@@ -894,6 +902,8 @@ class Model
 			data_update_add_transition(p,cl);
 			check_data_valid();
 		}
+	
+		if(debug == true) this.check_consistent();  
 	
 		return true;
 	}
@@ -1528,6 +1538,8 @@ class Model
 			
 			check_data_valid();
 		}
+		
+		if(debug == true) this.check_consistent();  
 	}
 
 
@@ -1543,6 +1555,8 @@ class Model
 
 		data_update_delete_transition(p,cl,i);
 		check_data_valid();
+		
+		if(debug == true) this.check_consistent();  
 	}
 
 
@@ -1637,6 +1651,8 @@ class Model
 		this.update_pline_all();
 
 		check_data_valid();
+		
+		if(debug == true) this.check_consistent();  
 	}
 
 
@@ -1680,6 +1696,8 @@ class Model
 		this.update_pline_all();
 		
 		check_data_valid();
+		
+		if(debug == true) this.check_consistent();  
 	}
 	
 	/// Rename a species
@@ -1720,6 +1738,8 @@ class Model
 		this.update_pline_all();
 		
 		check_data_valid();
+		
+		if(debug == true) this.check_consistent();  
 	}
 	
 	
@@ -1775,6 +1795,8 @@ class Model
 			
 			this.update_pline_all();
 		}
+		
+		if(debug == true) this.check_consistent();  
 	}
 
 
@@ -2033,6 +2055,8 @@ class Model
 		if(p == this.species.length && p > 0) change_page({pa:"Model",su:"Compartments",susu:p-1});
 		initialise_pages();
 		reset_info_p();
+		
+		if(debug == true) this.check_consistent();  
 	}
 
 
@@ -2065,9 +2089,26 @@ class Model
 		}
 		
 		check_data_valid();
+		
+		if(debug == true) this.check_consistent();  
 	}
 
 
+	/// Checks that the model has been formed correctly
+	check_consistent()
+	{
+		for(let p = 0; p < model.species.length; p++){
+			let sp = model.species[p];
+			if(sp.ncla != sp.cla.length) pr(sp.ncla+" "+sp.cla.length+" ncla not consistent")
+			for(let cl = 0; cl < sp.ncla; cl++){
+				let claa = sp.cla[cl];
+				if(claa.ntra != claa.tra.length) pr(claa.ntra+" "+claa.tra.length+" ntra ncla not consistent");
+				if(claa.ncomp != claa.comp.length) pr(claa.ncomp+" "+claa.comp.length+" ncomp ncla not consistent")
+			}
+		}
+	}
+	
+	
 	/// Determines if mouse is over a transition
 	mouse_over_transition(points,lay)                         
 	{		
@@ -2159,7 +2200,7 @@ class Model
 			y = lay.add_paragraph("<b>"+warn[i].mess+"</b>",dx-8,x+3,y+0.4,BLACK,para_si,para_lh);
 			
 			let yy = y; if(warn[i].mess == "") yy -= 0.4;
-			
+		
 			y = lay.add_paragraph(warn[i].mess2,dx-8,x+3,yy,BLACK,warn_si,warn_lh);
 			
 			y += 0.5;
@@ -2261,6 +2302,8 @@ class Model
 		}
 
 		set_camera(p,cl);
+		
+		if(debug == true) this.check_consistent();  
 	}
 	
 	
@@ -2326,6 +2369,8 @@ class Model
 		this.update_pline(p,cl);   
 			
 		set_camera(p,cl);
+		
+		if(debug == true) this.check_consistent();  
 	}
 	
 	
@@ -2418,6 +2463,8 @@ class Model
 		this.update_pline(p,cl);   
 			
 		set_camera(p,cl);
+		
+		if(debug == true) this.check_consistent();  
 	}
 	
 	
@@ -2531,6 +2578,8 @@ class Model
 		this.update_pline(p,cl);   
 			
 		set_camera(p,cl);
+		
+		if(debug == true) this.check_consistent();  
 	}
 
 	

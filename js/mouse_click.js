@@ -61,7 +61,8 @@ function button_action(bu,action_type)
 	
 	if(ac != "Dropdown") close_dropdown();
 	
-	//comment(ac+" action  "+bu.type+" type");	
+	//if(debug == true) comment(ac+" action  "+bu.type+" type");	
+	
 	switch(ac){
 	case "Tab":		
 		change_page({pa:val});

@@ -10,8 +10,10 @@ function start_simulation()
 /// Starts a simulation or inference 
 function start(siminf,nchain)
 {
-	let stat = create_output_file(siminf,"Execute/init.txt"); 
-	
+	let stat;
+	if(ver == "mac") stat = create_output_file(siminf,"init.txt"); 
+	else stat = create_output_file(siminf,"Execute/init.txt"); 
+		
 	if(stat == "success"){
 		inter.running_status = true;
 		generate_screen();
@@ -28,7 +30,11 @@ function start(siminf,nchain)
 			results_add_model(inf_result,model.inf_details,siminf);
 		}
 		
-		let nchain = 1; if(siminf == "inf") nchain = model.inf_details.nchain;
+		let nchain = 1; 
+		if(siminf == "inf" && model.inf_details.algorithm.value =="DA-MCMC"){
+			nchain = model.inf_details.nchain;
+		}
+		
 		for(let ch = 0; ch < nchain; ch++){
 			startspawn(ch,siminf);  
 		}
@@ -51,7 +57,8 @@ function startspawn(ch,siminf)
 	inter.chain[ch] = { done:false, siminf:siminf, term:false, prog:0, leftover:"", lines:[]};
 	
 	switch(ver){
-	case "windows": inter.child[ch] = spawn('Execute/bici.exe',[num]); break;
+	case "windows": inter.child[ch] = spawn('Execute/bici.exe',["Execute/init.txt",num]); break;
+	case "mac": inter.child[ch] = spawn('Execute/bici.out',["/tmp/init.txt",num]); break;
 	}
 	
 	funct(inter.child[ch],ch);
@@ -109,9 +116,22 @@ function funct(chi,ch)                                      // Gathers output of
 
 
 /// Processes information from all chains
-function process_all_chains()
+function process_all_chains(ch)
 {
-	let siminf = inter.chain[0].siminf;
+	inter.loading_symbol.processing = true;
+	inter.loading_symbol.percent = 1;
+	
+	replot_layer("LoadingSymbol");
+	replot_loading_symbol(); plot_screen();
+
+	setTimeout(function(){ process_chain(0)}, 10);
+}
+
+
+/// Processes a single chain	
+function process_chain(ch)
+{
+	let siminf = inter.chain[ch].siminf;
 	
 	let result;
 	switch(siminf){
@@ -119,17 +139,26 @@ function process_all_chains()
 	case "inf": result = inf_result; break;
 	}
 	
-	for(let ch = 0; ch < inter.chain.length; ch++) process_info(ch,result);
+	process_info(ch,result);
 	
-	inter.running_status = false;
-	stop_loading_symbol();
+	ch++;
+	
+	inter.loading_symbol.percent = Math.floor(100*ch/inter.chain.length);
+	replot_loading_symbol(); plot_screen();
+	
+	if(ch < inter.chain.length){ setTimeout(function(){ process_chain(ch)}, 10);}
+	else{		
+		inter.running_status = false;
+		stop_loading_symbol();
 
-	intialise_plot_filters(result);
-	initialise_pages();
+		intialise_plot_filters(result);
+		initialise_pages();
 	
-	let newpage = "Simulation"; if(siminf == "inf") newpage = "Inference";
-	change_page({pa:newpage, su:"Results"});
+		let newpage = "Simulation"; if(siminf == "inf") newpage = "Inference";
+		change_page({pa:newpage, su:"Results"});
+	}
 }
+
 
 /// Processes the output from the c++ code
 function process_info(ch,result)
@@ -141,6 +170,9 @@ function process_info(ch,result)
 	// checks for any errors in the 
 	let c = 0; 
 	while(c < lines.length){
+		
+		inter.loading_symbol.percent = Math.floor(100*c/lines.length);
+	
 		let line = lines[c];
 	
 		if(line == "<<PARAMS>>" || line == "<<STATES>>" || line == "<<ERROR>>"){
@@ -182,21 +214,6 @@ function process_info(ch,result)
 	
 		c++;
 	}
-	
-	/*
-	let j = 0; 
-	while(j < inter.chain.length && inter.chain[j].done == true && inter.chain[j].term == false) j++;
-	if(j == inter.chain.length){
-		inter.running_status = false;
-		stop_loading_symbol();
-	
-		intialise_plot_filters(result);
-		initialise_pages();
-		
-		let newpage = "Simulation"; if(siminf == "inf") newpage = "Inference";
-		change_page({pa:newpage, su:"Results"});
-	}
-	*/
 }
 
 

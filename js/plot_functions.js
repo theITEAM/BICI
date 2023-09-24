@@ -883,7 +883,9 @@ function draw_corners(x,y,dx,dy,r,col,col2)
 function text_convert_annotation(te,si,lh,dx,align,col)      
 {
 	let subsi = 0.7*si;
-	
+
+	if(te == undefined){ error("Text is not defined"); return;}
+		
 	let col_basic = col;
 	
 	/// This allows for links to be added (these have format ['Text','Action'] and must be separated from other words)

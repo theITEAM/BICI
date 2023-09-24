@@ -236,7 +236,7 @@ function check_data_valid(type)
 				check_data_source_valid(so);
 				
 				if(so.error == true){
-					model.warn.push({mess:"Data error", mess2:so.error_mess, warn_type:"DataProblem", p:p});
+					model.warn.push({mess:"Data error", mess2:so.error_mess, warn_type:"DataProblem", siminf:type, p:p});
 				}
 			}
 		}
@@ -275,6 +275,8 @@ function check_data_source_valid(so)
 			
 	so.error = false;
 
+	let mess_def = "Data source is invalid";
+
 	if(sp.type == "Population"){
 		switch(so.type){
 		case "Add Ind.":case "Move Ind.":  case "Remove Ind.": case "Compartment":
@@ -299,19 +301,19 @@ function check_data_source_valid(so)
 						source_error(so,"The focal value '"+focal+"' is not a classification",300);
 					}
 					else{
-						if(so.cla.length != sp.ncla) source_error(so,1);
+						if(so.cla.length != sp.ncla) source_error(so,mess_def,1);
 						else{
 							for(let cl = 0; cl < sp.ncla; cl++){
 								let claa = sp.cla[cl];
 								let clz = so.cla[cl];
 
-								if(claa.name != clz.cl_name_store) source_error(so,2);
+								if(claa.name != clz.cl_name_store) source_error(so,mess_def,2);
 								else{
-									if(clz.comp_init_pop.length != claa.ncomp) source_error(so,3);
+									if(clz.comp_init_pop.length != claa.ncomp) source_error(so,mess_def,3);
 									else{
 										for(let c = 0; c < claa.ncomp; c++){
 											if(clz.comp_init_pop[c].comp_name_store != claa.comp[c].name){
-												source_error(so,4);
+												source_error(so,mess_def,4);
 											}
 										}
 									}
@@ -323,15 +325,15 @@ function check_data_source_valid(so)
 
 				case "All":	
 					let glob_comp = model.get_glob_comp(p);
-					if(glob_comp.length != so.glob_comp.length) source_error(so,5);
+					if(glob_comp.length != so.glob_comp.length) source_error(so,mess_def,5);
 					else{
 						for(let j = 0; j < glob_comp.length; j++){
 							let gc = glob_comp[j].cla;
 							let gc2 = so.glob_comp[j].cla;
-							if(gc.length != gc2.length) source_error(so,6);
+							if(gc.length != gc2.length) source_error(so,mess_def,6);
 							else{
 								for(let cl = 0; cl < gc.length; cl++){
-									if(gc[cl] != gc2[cl]) source_error(so,7);
+									if(gc[cl] != gc2[cl]) source_error(so,mess_def,7);
 								}
 							}
 						}
@@ -349,7 +351,7 @@ function check_data_source_valid(so)
 					let focal = so.spec.focal.te;
 					let cl2 = find(sp.cla,"name",focal);
 					if(cl2 == undefined){
-						source_error(so,8);
+						source_error(so,mess_def,8);
 						return "The value '"+focal+"' is not a classification.";
 					}
 					else{
@@ -360,7 +362,7 @@ function check_data_source_valid(so)
 							let val = tab.ele[r][0];
 							
 							if(val == ""){
-								source_error(so,8);
+								source_error(so,mess_def,8);
 								return "The element is empty (col '"+tab.heading[0]+"', row "+(r+2)+").";
 							}
 							
@@ -369,24 +371,24 @@ function check_data_source_valid(so)
 							let cl = 0; 
 							while(cl < sp.ncla && find(sp.cla[cl].comp,"name",val) == undefined) cl++;
 							if(cl == sp.ncla){
-								source_error(so,9);
+								source_error(so,mess_def,9);
 								return "The compartment '"+val+"' does not exist (col '"+tab.heading[0]+"', row "+(r+2)+").";
 							}
 							else{
 								if(cl == cl2){
 									if(is_percent(pop) == true){
-										source_error(so,10);
+										source_error(so,mess_def,10);
 										return "The value '"+pop+"' should not be a percentage (col '"+tab.heading[1]+"', row "+(r+2)+").";
 									}
 								}
 								else{
 									if(is_percent(pop) == false){
-										source_error(so,11);
+										source_error(so,mess_def,11);
 										return "The value '"+pop+"' should be a percentage (col '"+tab.heading[1]+"', row "+(r+2)+").";	
 									}
 								}
 
-								if(find_in(list[cl],val) != undefined) source_error(so,12);
+								if(find_in(list[cl],val) != undefined) source_error(so,mess_def,12);
 								list[cl].push(val);
 							}
 						}
@@ -394,18 +396,18 @@ function check_data_source_valid(so)
 						for(let cl = 0; cl < sp.ncla; cl++){
 							if(cl == cl2){
 								if(list[cl].length != sp.cla[cl].ncomp){
-									source_error(so,13);
+									source_error(so,mess_def,13);
 									return "Not all the compartmental populations are specified in '"+focal+"'"; 
 								}
 							}	
 							else{
 								if(list[cl].length < sp.cla[cl].ncomp-1){
-									source_error(so,14);
+									source_error(so,mess_def,14);
 									return "All but one compartmental percentages/fractions should be specified in '"+sp.cla[cl].name+"'"; 
 								}
 
 								if(list[cl].length == sp.cla[cl].ncomp){
-									source_error(so,14);
+									source_error(so,mess_def,14);
 									return "Every compartmental percentages/fractions should not be specified in '"+sp.cla[cl].name+"'"; 
 								}
 							}
@@ -414,11 +416,11 @@ function check_data_source_valid(so)
 					break;
 
 				case "All":	
-					if(tab.ncol != sp.ncla+1) source_error(so,15);
+					if(tab.ncol != sp.ncla+1) source_error(so,mess_def,15);
 					else{
 						for(let cl = 0; cl < sp.ncla; cl++){
 							let claa = sp.cla[cl];
-							if(tab.heading[cl] != claa.name) source_error(so,1011);
+							if(tab.heading[cl] != claa.name) source_error(so,mess_def,1011);
 						}
 						let glob_comp = model.get_glob_comp(p);
 					
@@ -432,12 +434,12 @@ function check_data_source_valid(so)
 								j++;
 							}
 							if(j == glob_comp.length){
-								source_error(so,1012);
+								source_error(so,mess_def,1012);
 								return "The combination of compartments on line "+(r+1)+" of the table is not valid";
 							}
 
 							if(flag[j] != undefined){
-								source_error(so,117);
+								source_error(so,mess_def,117);
 								return "Line "+(r+1)+" has the same combination of compartments as line "+(flag[j]+1);
 							}	
 							flag[j] = r;
@@ -445,7 +447,7 @@ function check_data_source_valid(so)
 	
 						for(let j = 0; j < glob_comp.length; j++){
 							if(flag[j] == undefined){
-								source_error(so,1006);
+								source_error(so,mess_def,1006);
 								let te = "The combination ";
 								for(let cl = 0; cl < sp.ncla; cl++){
 									if(cl > 0) te += ",";
@@ -474,11 +476,11 @@ function check_data_source_valid(so)
 
 		case "Dirichlet":
 			let tab = so.table;
-			if(tab.ncol != sp.ncla+1) source_error(so,1500);
+			if(tab.ncol != sp.ncla+1) source_error(so,mess_def,1500);
 			else{
 				for(let cl = 0; cl < sp.ncla; cl++){
 					let claa = sp.cla[cl];
-					if(tab.heading[cl] != claa.name) source_error(so,1007);	
+					if(tab.heading[cl] != claa.name) source_error(so,mess_def,1007);	
 				}
 				let glob_comp = model.get_glob_comp(p);
 			
@@ -492,12 +494,12 @@ function check_data_source_valid(so)
 						j++;
 					}
 					if(j == glob_comp.length){
-						source_error(so,1008);
+						source_error(so,mess_def,1008);
 						return "The combination of compartments on line "+(r+1)+" of the table is not valid";
 					}
 
 					if(flag[j] != undefined){
-						source_error(so,1009);
+						source_error(so,mess_def,1009);
 						return "Line "+(r+1)+" has the same combination of compartments as line "+(flag[j]+1);
 					}	
 					flag[j] = r;
@@ -505,7 +507,7 @@ function check_data_source_valid(so)
 
 				for(let j = 0; j < glob_comp.length; j++){
 					if(flag[j] == undefined){
-						source_error(so,1010);
+						source_error(so,mess_def,1010);
 						let te = "The combination ";
 						for(let cl = 0; cl < sp.ncla; cl++){
 							if(cl > 0) te += ",";
@@ -523,17 +525,17 @@ function check_data_source_valid(so)
 	case "Population":
 		{
 			let filt = so.spec.filter;
-			if(filt.cla.length != sp.ncla) source_error(so,21);
+			if(filt.cla.length != sp.ncla) source_error(so,mess_def,21);
 			else{
 				for(let cl = 0; cl < sp.ncla; cl++){
 					let claa = sp.cla[cl];
 					let clz = filt.cla[cl];
-					if(claa.name != clz.cl_name_store) source_error(so,22);
+					if(claa.name != clz.cl_name_store) source_error(so,mess_def,22);
 					else{
-						if(clz.comp.length != claa.ncomp) source_error(so,23);
+						if(clz.comp.length != claa.ncomp) source_error(so,mess_def,23);
 						else{
 							for(let c = 0; c < claa.ncomp; c++){
-								if(clz.comp[c].comp_name_store != claa.comp[c].name) source_error(so,24);
+								if(clz.comp[c].comp_name_store != claa.comp[c].name) source_error(so,mess_def,24);
 							}
 						}
 					}
@@ -545,16 +547,16 @@ function check_data_source_valid(so)
 	case "Add Ind.":
 		{
 			let tab = so.table;
-			if(tab.ncol != sp.ncla+2) source_error(so,25);
+			if(tab.ncol != sp.ncla+2) source_error(so,mess_def,25);
 			else{
 				for(let cl = 0; cl < sp.ncla; cl++){
 					let claa = sp.cla[cl];
 
-					if(tab.heading[cl+2] != claa.name) source_error(so,26);
+					if(tab.heading[cl+2] != claa.name) source_error(so,mess_def,26);
 					else{
 						for(let r = 0; r < tab.nrow; r++){
 							let val = tab.ele[r][cl+2];
-							if(find(claa.comp,"name",val) == undefined) source_error(so,27);
+							if(find(claa.comp,"name",val) == undefined) source_error(so,mess_def,27);
 						}
 					}
 				}
@@ -565,7 +567,7 @@ function check_data_source_valid(so)
 	case "Move Ind.":
 		{
 			let cl = find(sp.cla,"name",so.spec.cl_drop.te);
-			if(cl == undefined) source_error(so,28);
+			if(cl == undefined) source_error(so,mess_def,28);
 			else{
 				let claa = sp.cla[cl];
 
@@ -573,7 +575,7 @@ function check_data_source_valid(so)
 				for(let r = 0; r < tab.nrow; r++){
 					let to = tab.ele[r][2];
 					if(find(claa.comp,"name",to) == undefined){
-						source_error(so,30);
+						source_error(so,mess_def,30);
 						return "The value '"+to+"' is not a compartment in classification '"+claa.name+"' (col '"+tab.heading[3]+"', row "+(r+2)+").";
 					}
 				}
@@ -584,12 +586,12 @@ function check_data_source_valid(so)
 	case "Compartment":
 		{
 			let cl = find(sp.cla,"name",so.spec.cl_drop.te);
-			if(cl == undefined) source_error(so,31);
+			if(cl == undefined) source_error(so,mess_def,31);
 			else{
 				let claa = sp.cla[cl];
 
 				let tab = so.table;
-				if(tab.heading[2] != claa.name) source_error(so,32);
+				if(tab.heading[2] != claa.name) source_error(so,mess_def,32);
 				else{
 				}
 			}
@@ -605,7 +607,7 @@ function check_data_source_valid(so)
 				cl++;
 			}
 			if(cl == sp.ncla){	
-				source_error(so,33);
+				source_error(so,mess_def,33);
 				return "Transition '"+tr_name+"' is not found";
 			}
 		}
@@ -626,7 +628,7 @@ function check_data_source_valid(so)
 				}
 			}
 
-			if(flag == false) source_error(so,34);
+			if(flag == false) source_error(so,mess_def,34);
 		}
 		break;
 
@@ -645,7 +647,7 @@ function check_data_source_valid(so)
 				}
 			}
 
-			if(flag == false) source_error(so,35);
+			if(flag == false) source_error(so,mess_def,35);
 		}
 		break;
 
@@ -653,13 +655,13 @@ function check_data_source_valid(so)
 		{
 			let cb = so.spec.check_box;
 			let cl = find(sp.cla,"name",cb.name);
-			if(cl == undefined) source_error(so,36);
+			if(cl == undefined) source_error(so,mess_def,36);
 			else{
 				let claa = sp.cla[cl];
-				if(cb.value.length != claa.ncomp) source_error(so,37);
+				if(cb.value.length != claa.ncomp) source_error(so,mess_def,37);
 				else{
 					for(let c = 0; c < claa.ncomp; c++){
-						if(cb.value[c].comp_name_store != claa.comp[c].name) source_error(so,38);
+						if(cb.value[c].comp_name_store != claa.comp[c].name) source_error(so,mess_def,38);
 					}
 				}
 			}
@@ -669,40 +671,40 @@ function check_data_source_valid(so)
 	case "Pop. Trans.":
 		{
 			let cl = find(sp.cla,"name",so.spec.cl_drop.te);
-			if(cl == undefined) source_error(so,39);
+			if(cl == undefined) source_error(so,mess_def,39);
 			else{
 				let claa = sp.cla[cl];
 
 				let filt = so.spec.filter;
 
-				if(filt.tra.length != claa.ntra) source_error(so,40); 
+				if(filt.tra.length != claa.ntra) source_error(so,mess_def,40); 
 				else{
 					let flag = false;
 					for(let j = 0; j < claa.ntra; j++){
 						let tra = filt.tra[j];
 					
-						if(tra.tra_name_store != claa.tra[j].name) source_error(so,41);
+						if(tra.tra_name_store != claa.tra[j].name) source_error(so,mess_def,41);
 						if(tra.check == true) flag = true;
 					}
-					if(flag == false) source_error(so,142);
+					if(flag == false) source_error(so,mess_def,142);
 				}
 
 				if(filt.cla.length != sp.ncla){
 					pr(filt.cla.length +" "+ sp.ncla+" filt");
-					source_error(so,42); 
+					source_error(so,mess_def,42); 
 				}
 				else{
 					for(let cl2 = 0; cl2 < sp.ncla; cl2++){
 						if(cl2 != cl){
 							let claa2 = sp.cla[cl2];
 							let clz = filt.cla[cl2];
-							if(clz.cl_name_store != claa2.name) source_error(so,43);
+							if(clz.cl_name_store != claa2.name) source_error(so,mess_def,43);
 							else{	
-								if(claa2.ncomp != clz.comp.length) source_error(so,44);
+								if(claa2.ncomp != clz.comp.length) source_error(so,mess_def,44);
 								else{
 									for(let c = 0; c < claa2.ncomp; c++){
 										if(clz.comp[c].comp_name_store != claa2.comp[c].name){
-											source_error(so,45);
+											source_error(so,mess_def,45);
 										}	
 									}		
 								}
@@ -717,17 +719,17 @@ function check_data_source_valid(so)
 	case "Set Traps":
 		{
 			let filt = so.spec.filter;
-			if(filt.cla.length != sp.ncla) source_error(so,46);
+			if(filt.cla.length != sp.ncla) source_error(so,mess_def,46);
 			else{
 				for(let cl = 0; cl < sp.ncla; cl++){
 					let claa = sp.cla[cl];
 					let clz = filt.cla[cl];
-					if(claa.name != clz.cl_name_store) source_error(so,47);
+					if(claa.name != clz.cl_name_store) source_error(so,mess_def,47);
 					else{
-						if(clz.comp.length != claa.ncomp) source_error(so,48);
+						if(clz.comp.length != claa.ncomp) source_error(so,mess_def,48);
 						else{
 							for(let c = 0; c < claa.ncomp; c++){
-								if(clz.comp[c].comp_name_store != claa.comp[c].name) source_error(so,49);
+								if(clz.comp[c].comp_name_store != claa.comp[c].name) source_error(so,mess_def,49);
 							}
 						}
 					}
