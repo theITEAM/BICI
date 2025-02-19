@@ -1,0 +1,24 @@
+# Model 3.3: Metapopulation model of the UK using a spatial kernel
+
+## Objective
+- Introduce spatial kernels.
+- A kernel is a specified function that gives the probability the disease is transmitted a certain distance.
+- Typically, they have a high value at close distance, but decay away to zero in the large distance limit.
+- This example uses a so-called "power-law" spatial kernel.
+- The 100 largest cities in the UK are incorporated into the model.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains classifications 'DS', which stands for 'disease status', and 'Location'.
+- 'DS' contains three compartments: susceptible $S$, infected $I$ and recovered $R$.
+- 'Location' contains the 100 geographic points.
+- A transmission rate $β$ determines the rate at which individuals transmit disease within a city.
+- The parameter $λ$ determines the rate at which individuals transmit disease between cities.
+- $η$ is an external force of infection.
+- A recovery rate $γ$ determines how fast individuals recover.
+- A matrix $M_l,l'$ gives the transmission between cities. This is reparameterised as a power-law distribution, where $Δ$ gives the range over which transmission occurs and $α$ is the exponent (larger values imply a quicker decay with distance).
+- $N_l$ is the population in city $l$.
+- $P$ is the UK population.
+
+## Population
+- This consists of initially susceptible individuals, with city populations taken from census data.

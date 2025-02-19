@@ -1,0 +1,67 @@
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+data-dir folder="Examples\EX_E7-data-files"
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5
+
+post-sim start=0 end=100
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
+
+species name="People" type="individual" trans-tree="off"
+
+# SPECIES MODEL
+
+class name="DS" index="a"
+
+comp name="S" color="#009900" x=-16 y=-7
+comp name="I" color="#ff2222" x=-4 y=-7
+comp name="R" color="#4444ff" x=11 y=-12
+comp name="D" color="#000000" x=11 y=-2
+
+trans name="S->I" value="exp(rate:β×{I})"
+trans name="I->R" value="log-normal(mean:m^R, cv:c^R)" bp=1
+trans name="I->D" value="gamma(mean:m^D, cv:c^D)" bp="b×[g]"
+
+
+# INDIVIDUAL EFFECTS
+
+ind-effect name="g" ind-list="ind-list-g.csv" A-sparse="A-matrix-g.csv"
+
+# SIMULATION INITIAL CONDITIONS
+
+add-ind-sim file="add-ind-sim.csv"
+
+
+# INFERENCE DATA
+
+add-ind file="add-ind.csv"
+
+trans-data name="S->I" obsrange="all" file="trans-data.csv"
+
+trans-data name="I->R" obsrange="all" file="trans-data-2.csv"
+
+trans-data name="I->D" obsrange="all" file="trans-data-3.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="b" value="0.3" prior="uniform(0,1)"
+param name="c^D" value="0.5" prior="uniform(0,1)"
+param name="c^R" value="0.3" prior="uniform(0,1)"
+param name="m^D" value="20" prior="uniform(0,30)"
+param name="m^R" value="10" prior="uniform(0,30)"
+param name="β" value="0.0005" prior="uniform(0,0.1)"
+param name="Ω^g,g" value="1.5" prior="uniform(0,3)"
+
+

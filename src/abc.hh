@@ -1,5 +1,5 @@
 #ifndef BICI__ABC_HH
-#define BICI__ABC_HH
+#define BEEP__ABC_HH
 
 #include "struct.hh"
 #include "model.hh"
@@ -14,9 +14,9 @@ class ABC
 		void run();
 	
 	private:
-		unsigned int nsample;               // The total number of samples
+		unsigned int nsample;                  // The total number of samples
 		
-		double acc_frac;                    // The acceptance fraction
+		double acc_frac;                       // The acceptance fraction
 		
 		const Model &model;
 		Output &output;

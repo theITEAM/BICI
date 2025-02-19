@@ -1,0 +1,19 @@
+# Model 5.2: Disease transmission experiment looking at infectivity
+
+## Objective
+- Introduce disease transmission experiment for quantifying differences in infectivity.
+- For this it is necessary to combine information from multiple contact groups.
+- In this example we consider the effect of vaccination on susceptibility and infectivity.
+
+## Model
+- A single individual-based species 'Animal' is created.
+- This contains classifications 'DS', which stands for 'disease status', 'Vaccination' and 'Group'.
+- 'DS' contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- 'Vaccination' contains two compartments: 'Vac' and 'Unvac', which represent vaccinated and unvaccinated individuals.
+- 'Group' contains 24 contact groups.
+- A transmission rate $β_v$ determines the susceptibility of individuals with vaccination status $v$.
+- A factor $f_v$ determines the relative infectiousness of individuals with vaccination status $v$.
+
+## Population
+- Each group consists of 10 individuals, half of which are initially infected.
+- The vaccination status of the infected and susceptibility individuals is permuted to create blocks of 4 that are replicated 6 times (to make 24 groups in total).

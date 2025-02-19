@@ -1,26 +1,36 @@
 "use strict";
+// Functions which create graphical plots
 
 class Graph
 {
-	variety;                         // The thing being plotted (e.g. "Population", "Transition")
-	type;                            // The type of graph (e.g. "Graph", "Compartment")
-	data = [];                       // Data for graph
-	view;                            // Shows how the data is viewed (graph or compartments)
-	op;                              // Options for the graph
-	range;                           // Range for axes 
-	range_default;                   // The default range
-	animation = {speed:{te:"×1", value:1}};   // Stores animation information
-	matrix_key;                               // Information about a matrix key
-	tick = {value:[], wmax:0, x:[], y:[]};    // Potential tick marks
-	table_width = [];                // Table width for statistics tables
-	warn;                            // Any warning to show why the graph could not be plotted
+	variety;                                         // The thing being plotted (e.g. "Population", "Transition")
+	type;                                            // The type of graph (e.g. "Graph", "Compartment")
+	data = [];                                       // Data for graph
+	view;                                            // Shows how the data is viewed (graph or compartments)
+	op;                                              // Options for the graph
+	range;                                           // Range for axes 
+	range_default;                                   // The default range
+	animation = {speed:{te:"×1", value:1, noupdate:true}}; // Stores animation information
+	colour_key;                                      // Information about colour key
+	ind_sel;                                         // A selected individual
+	mag;                                             // The magnitude.
+	barh;                                            // The size of bar
+	extra_flag;                                      // Set if extra space on right of line plot
+	complink = [];                                   // Information about links between compartments
+	density_info = {};                               // Information used to make density plots
+	tick = {value:[], wmax:0, x:[], y:[]};           // Potential tick marks
+	table_width = [];                                // Table width for statistics tables
+	bf_store;                                        // Stores information about Bayes factor
+	warn;                                            // Any warning to show why the graph could not be plotted
 	
 	constructor()
 	{
 		this.initialise_ticks();
 	}
 	
-	initialise_ticks()            // Intialises tick marks used when drawing graphs
+	
+	/// Initialises tick marks used when drawing graphs
+	initialise_ticks()           
 	{
 		let tickpo = [1,2,5];
 		
@@ -38,35 +48,109 @@ class Graph
 	/// Defines the type and data
 	define(variety,type,data,op)    
 	{
-		if(data.length == 0){
-			let te = "No data";
-			if(variety == "Transition") te = "No transitions in classification";	
-			variety = "No Graph"; type = "No Graph",op = {label:te, key:[]};
+		if(graph_dia){		
+			pr("GRAPH DIA: variety:"+variety+" type:"+type+" data:"); pr(data); pr("op:"); pr(op);
 		}
 		
+		this.extra_flag = false;
+		
+		if(data.length == 0 && variety != "No Graph"){
+			let te = "No data";
+			if(variety == "Transition") te = "No transitions data";	
+			variety = "No Graph"; 
+			type = "No Graph"; 
+			op = {label:te, key:[]};
+		}
+	
 		this.variety = variety;
 		this.type = type;
 		this.data = data;
+		this.barh = 1;	
 		this.op = op;
+		this.bf_store = undefined;
+		
 		this.set_range();
+	
 		this.expand_boundaries();
 		
-		this.initialise_axes();
+		if(op.def_xrange){ this.range.xmin = op.def_xrange.min; this.range.xmax = op.def_xrange.max;}
 		
+		this.initialise_axes();
 		this.range_default = copy(this.range);
 	}
 	
+	
+	/// Initialises the axes
 	initialise_axes()
 	{
+		if(graph_dia) pr("GRAPH DIA: initialise axes: "+ plot_variety(this.type));
+	
+		this.colour_key = undefined;
+		
 		switch(plot_variety(this.type)){
-		case "Line plot": this.set_axes(); break;
-		case "Scatter plot": this.set_axes(); break;
-		case "Comp plot": this.comp_init(); break;
-		case "Individual plot": this.set_ind_time(); break;
-		case "Histogram plot": this.set_axes(); break;
-		case "Matrix plot": this.set_axes(); this.set_matrix_colour(); break;
+		case "Line plot": 
+			this.set_axes(); 
+			break;
+		
+		case "Scatter plot": 
+			this.set_axes(); 
+			break;
+			
+		case "Comp plot": 
+			this.anim_init(); 
+			this.set_colour_key(this.range.ymin,this.range.ymax); 
+			this.comp_colour_init();
+			break;
+			
+		case "Density plot": 
+			this.anim_init(); 
+			this.set_colour_key(this.range.ymin,this.range.ymax);		
+			this.comp_colour_init();
+			this.density_init(); 	
+			break;
+			
+		case "Individual plot": case "TransTree plot": case "PhyloTree plot":
+			this.set_ind_time(); 
+			break;
+		
+		case "Histogram plot": 
+			this.set_axes(); 
+			break;
+		
+		case "HistoAnim plot": 
+			this.anim_init(); 
+			this.set_axes(); 
+			break;
+			
+		case "Matrix plot":
+			this.set_axes(); 
+			this.set_matrix_colour(); 
+			break;
+			
+		case "MatrixAnim plot":
+			this.anim_init(); 
+			this.set_axes(); 
+			this.set_matrix_colour(); 
+			break;
+			
 		case "Stat table plot": break;
+		
+		case "CompMatrix plot": 
+			this.comp_matrix_init(); 
+			break;
+		
+		case "CompMatrixAnim plot":
+			this.anim_init(); 
+			this.comp_matrix_init(); 
+			break;
+		
+		case "CompVector plot":
+			this.set_colour_key(this.range.ymin,this.range.ymax); 
+			this.comp_colour_init();
+			break;
+			
 		case "No graph plot": break;
+		
 		default: error("Graph variety not recognised:"+this.type+" "+plot_variety(this.type)); break;
 		}
 	}
@@ -79,7 +163,7 @@ class Graph
 		
 		for(let li = 0; li < this.data.length; li++){
 			let da = this.data[li];
-		
+
 			switch(da.type){
 			case "Line CI":
 				for(let i = 0; i < da.point.length; i++){
@@ -95,29 +179,47 @@ class Graph
 				}
 				break;
 				
-			case "Individual":
+			case "Individual": case "InfBar":
 				if(da.tmin < xmin) xmin = da.tmin; if(da.tmax > xmax) xmax = da.tmax;
 				break;
 			
-			case "Bar":
-				if(da.x-0.5 < xmin) xmin = da.x-0.5; if(da.x+0.5 > xmax) xmax = da.x+0.5;
-				if(0 < ymin) ymin = 0; if(da.y > ymax) ymax = da.y;
+			case "Phylo":
 				break;
 				
+			case "Transmission":
+				break;
+				
+			case "Bar":
+				if(da.x-0.5 < xmin) xmin = da.x-0.5; if(da.x+0.5 > xmax) xmax = da.x+0.5;
+				//if(0 < ymin) ymin = 0; 
+				if(da.y < ymin) ymin = da.y;
+				if(da.y > ymax) ymax = da.y;
+				break;
+			
+			case "Cross":
+				if(da.x < xmin) xmin = da.x; if(da.x > xmax) xmax = da.x;
+				if(da.y	< ymin) ymin = da.y; if(da.y > ymax) ymax = da.y;
+				break;
+			
 			case "ErrorBar":
 				if(da.x < xmin) xmin = da.x; if(da.x > xmax) xmax = da.x;
 				if(da.ymin < ymin) ymin = da.ymin; if(da.ymax > ymax) ymax = da.ymax;
 				break;
 				
-			case "Matrix": case "Correlation":
+			case "Matrix": case "MatrixAnim": case "Correlation":
 				xmin = 0; xmax = da.xlab.length;
 				ymin = 0; ymax = da.ylab.length;
 				break;
 		
+			case "CompMatrix": case "CompMatrixAnim":
+				xmin = 0; xmax = 0;
+				ymin = 0; ymax = 0;
+				break;
+				
 			case "Table":
 				break;
 			
-			case "VertLine": case "VertDashLine":
+			case "VertLine": case "VertLine2": case "VertDashLine": 
 				{
 					let x = da.x;
 					if(x < xmin) xmin = x; if(x > xmax) xmax = x;
@@ -128,21 +230,50 @@ class Graph
 				break;
 				
 			case "BurninLine":
+				for(let i = 0; i < da.point.length; i++){
+					let po = da.point[i];		
+					if(po.x < xmin) xmin = po.x; if(po.x > xmax) xmax = po.x;
+				}
+				break;
+			
+			case "SimX":
+				{
+					let x = da.x; if(x < xmin) xmin = x; if(x > xmax) xmax = x;
+				}
+				break;
+				
+			case "SimY":
+				{
+					let y = da.y; if(y < ymin) ymin = y; if(y > ymax) ymax = y;
+				}
+				break;
+				
+			case "Comp Video":
+				{
+					let y_vec = da.y_vec;
+					for(let i = 0; i < y_vec.length; i++){
+						let y = y_vec[i];
+						if(y > ymax) ymax = y;
+						if(y < ymin) ymin = y;
+					}
+				}
 				break;
 				
 			default:
 				for(let i = 0; i < da.point.length; i++){
-					let po = da.point[i];
+					let po = da.point[i];		
 					if(po.x < xmin) xmin = po.x; if(po.x > xmax) xmax = po.x;
 					if(po.y < ymin) ymin = po.y; if(po.y > ymax) ymax = po.y;
-				}
+					if(po.CImin != undefined){ if(po.CImin < ymin) ymin = po.CImin;}
+					if(po.CImax != undefined){ if(po.CImax > ymax) ymax = po.CImax;}
+				}	
 				break;
 			}
 		}
-		
+	
 		if(xmax < xmin+TINY) xmax = xmin;
 		
-		if(xmin == xmax){     // Ensures thay xmin and xmax are not the same
+		if(xmin == xmax){                              // Ensures thay xmin and xmax are not the same
 			if(xmax > 0){ xmin = 0; xmax *= 1.1;}
 			else{
 				if(xmin < 0){ xmax = 0; xmin *= 1.1;}
@@ -157,7 +288,7 @@ class Graph
 		
 		if(ymax < ymin+TINY) ymax = ymin;
 		
-		if(ymin == ymax){     // Ensures thay ymin and ymax are not the same
+		if(ymin == ymax){                              // Ensures thay ymin and ymax are not the same
 			if(ymax > 0){ ymin = 0; ymax *= 1.1;}
 			else{
 				if(ymin < 0){ ymax = 0; ymin *= 1.1;}
@@ -172,6 +303,8 @@ class Graph
 	
 		if(this.op.yaxis == false) ymin = 0;
 		
+		if(this.type == "HistoAnim"){ xmin = 0; xmax = this.data.length;}
+		
 		this.range = {xmin:xmin, ymin:ymin, xmax:xmax, ymax:ymax};
 	}
 	
@@ -180,7 +313,7 @@ class Graph
 	set_axes()           
 	{
 		let ra = this.range;
-		
+
 		this.tick.x = this.get_tick_marks(ra.xmin,ra.xmax,3);
 		
 		let wmax = 0;
@@ -222,8 +355,10 @@ class Graph
 	/// Looks to expand boundaries do they neatly fit with ticks
 	expand_boundaries()
 	{
+		if(this.variety == "Matrix" || this.variety == "MatrixAnim") return;
+		
 		let ra = this.range;
-		if(ra.xmin != LARGE){
+		if(ra.xmin != LARGE && this.variety != "Histogram" && this.type != "HistoAnim" ){
 			let b = this.expand_bound(ra.xmin,ra.xmax,4);
 			ra.xmin = b.minb; ra.xmax = b.maxb;
 		}
@@ -274,6 +409,219 @@ class Graph
 	}
 	
 	
+	/// For comp matrix initilises lines used to represent matrix
+	comp_matrix_init()
+	{
+		let op = this.op;
+		let comp = this.get_cla(op.p,op.cl).comp;
+		
+		let N = comp.length;
+		let p=[];
+		for(let i = 0; i < N; i++) p.push(model.comp_center(comp[i]));
+		
+		let val = this.data[0].value;
+		if(val.length != N){ error("Value wrong size"); return;}
+		if(val[0].length != N){ error("Value wrong size"); return;}
+		
+		// Determines if matrix is symetric
+		let sym = true;
+		let max = 0;
+		for(let j = 0; j < N; j++){
+			for(let i = 0; i < N; i++){
+				if(j != i){
+					if(this.variety == "CompMatrixAnim"){
+						let vec = val[j][i];
+					
+						for(let k = 0; k < vec.length; k++){
+							let va = Number(vec[k]);
+							if(va != val[i][j][k]) sym = false; 
+					
+							if(va > 0){ if(va > max) max = va;}
+							else{ if(-va > max) max = -va;}	
+						}
+					}
+					else{
+						let va = Number(val[j][i]);
+						if(va != val[i][j]) sym = false; 
+					
+						if(va > 0){ if(va > max) max = va;}
+						else{ if(-va > max) max = -va;}	
+					}
+				}					
+			}
+		}
+		
+		let box = get_model_box(op.p,op.cl); 
+	
+		let mar1 = 0.1, mar2 = 1-mar1;
+	
+		let loopmax = 1;
+		if(this.variety == "CompMatrixAnim") loopmax = val[0][0].length;
+	
+		let list = [];
+		
+		let fac = Math.exp(2*inter.compmatrix_slider.value);
+	
+		for(let loop = 0; loop < loopmax; loop++){
+			let clink = [];
+		
+			if(sym == true){
+				for(let j = 0; j < N; j++){
+					let x1 = p[j].x, y1 = p[j].y;
+					for(let i = j+1; i < N; i++){			
+						let va = Number(val[j][i]);
+						if(this.variety == "CompMatrixAnim") va = va[loop];
+						
+						if(va != 0){
+							let w = va/max;
+							
+							let thick = fac*w; if(thick < 0) thick = -thick;
+							if(thick > 0.01){	
+								let alpha = w; if(alpha < 0) alpha = -w;
+							
+								thick *= 0.5/box.scale;
+								let x2 = p[i].x, y2 = p[i].y;
+								let dx = x2-x1, dy = y2-y1;
+								clink.push({alpha:0.1+0.9*alpha, val:va, thick:thick, x1:x1+mar1*dx, y1:y1+mar1*dy, x2:x1+mar2*dx, y2:y1+mar2*dy});
+							}
+						}
+					}
+				}
+			}
+			else{
+				for(let j = 0; j < N; j++){
+					let x1 = p[j].x, y1 = p[j].y;
+					for(let i = 0; i < N; i++){
+						let va = val[j][i];
+						if(this.variety == "CompMatrixAnim") va = va[loop];
+					
+						if(j != i && va != 0){
+							let w = va/max;
+							let thick = fac*w; if(thick < 0) thick = -thick;
+							
+							let va_rev = val[i][j];
+							if(this.variety == "CompMatrixAnim") va_rev = va_rev[loop];
+					
+							let w_rev = va_rev/max;
+							let thick_rev = fac*w_rev; if(thick_rev < 0) thick_rev = -thick_rev;
+							
+							if(thick > 0.01){	
+								let alpha = w; if(alpha < 0) alpha = -w;
+							
+								thick *= 0.25/box.scale;
+								thick_rev *= 0.25/box.scale;
+								
+								let x2 = p[i].x, y2 = p[i].y;
+								let dx = x2-x1, dy = y2-y1;
+								let nx = -dy, ny = dx;
+								let rr = Math.sqrt(nx*nx + ny*ny);
+								
+								let mar3 = mar2 - 3*thick/rr;
+								let mar4 = mar3+0.01;
+							
+								if(mar3 < mar1) mar3 = mar1;
+								 
+								nx *= 0.8*thick/rr; ny *= 0.8*thick/rr;
+								
+								let shx = nx, shy = ny;
+								if(thick_rev > thick){
+									shx *= thick_rev/thick; shy *= thick_rev/thick; 
+								}
+							
+								clink.push({alpha:0.1+0.9*alpha, val:va, thick:thick, arrow:true, x1:x1+mar1*dx+shx, y1:y1+mar1*dy+shy, x2:x1+mar4*dx+shx, y2:y1+mar4*dy+shy, x3:x1+mar2*dx+shx, y3:y1+mar2*dy+shy, x4:x1+mar3*dx+shx-nx, y4:y1+mar3*dy+shy-ny, x5:x1+mar3*dx+shx+nx, y5:y1+mar3*dy+shy+ny});
+							}
+						}
+					}
+				}
+			}
+			list.push(clink);
+		}
+	
+		this.complink = list;
+	}
+		
+		
+	/// Initiailises a compartmental vector plot
+	comp_colour_init()
+	{	
+		if(this.data.length == 0) return;
+	
+		let ckey = this.colour_key;
+		let min = ckey.min;
+		let max = ckey.max;
+		let grad = ckey.grad;
+		
+		if(this.data[0].point){
+			for(let k = 0; k < this.data.length; k++){
+				let dat = this.data[k];
+				for(let j = 0; j < dat.point.length; j++){
+					dat.point[j].col = this.get_matrix_col(dat.point[j].y);
+				}
+			}
+		}
+		
+		{
+			let f = COLOUR_KEY_DIV/(max-min);
+			for(let k = 0; k < this.data.length; k++){
+				let dat = this.data[k];
+				let col_k = [];
+				if(dat.y_vec){
+					let y_vec = dat.y_vec;	
+					for(let j = 0; j < y_vec.length; j++){
+						let k = Math.floor(f*(y_vec[j]-min));
+						if(k < 0 || k > COLOUR_KEY_DIV) error("out of range");
+						col_k.push(k);
+					}
+				}
+				if(dat.point){
+					let point = dat.point;	
+					for(let j = 0; j < point.length; j++){
+						let k = Math.floor(f*(point[j].y-min));
+						if(k < 0 || k > COLOUR_KEY_DIV) error("out of range");
+						col_k.push(k);
+					}
+				}
+				dat.col_k = col_k;
+			}
+		}
+	}
+	
+		
+	/// Draws compartmental links
+	draw_complink(lay)
+	{
+		let p = this.op.p;
+		let cl = this.op.cl;
+	
+		let claa = this.get_cla(p,cl);
+		
+		let cam = claa.camera;
+		
+		let fr = this.animation.playframe;
+		if(this.variety == "CompMatrix") fr = 0;
+	
+		for(let i = 0; i < this.complink[fr].length; i++){
+			let clink = this.complink[fr][i];
+			let p1 = trans_point(clink.x1,clink.y1,cam,lay);
+			let p2 = trans_point(clink.x2,clink.y2,cam,lay);
+		
+			let thick = cam.scale*clink.thick*inter.sca;
+			let col = BLUE; if(clink.val < 0) col = RED; 
+		
+			cv.globalAlpha = clink.alpha;
+			draw_line(p1.x,p1.y,p2.x,p2.y,col,thick);
+			if(clink.arrow == true){
+				let polypoint=[];    
+				polypoint.push(trans_point(clink.x3,clink.y3,cam,lay));
+				polypoint.push(trans_point(clink.x4,clink.y4,cam,lay));
+				polypoint.push(trans_point(clink.x5,clink.y5,cam,lay));
+				draw_polygon(polypoint,col,col,1);
+			}
+		}
+		cv.globalAlpha = 1;
+	}
+	
+	
 	/// Sets the colours used to represent the matrix
 	set_matrix_colour()
 	{
@@ -281,12 +629,20 @@ class Graph
 		let mat = da.mat;
 		da.mat_col = copy(mat);
 		let mat_col = da.mat_col;
-	
+
 		let min = LARGE, max = -LARGE;
 		for(let j = 0; j < mat.length; j++){
 			for(let i = 0; i < mat[j].length; i++){
-				let val = Number(mat[j][i]);
-				if(val < min) min = val; if(val > max) max = val;
+				if(this.variety == "MatrixAnim"){
+					for(let k = 0; k < mat[j][i].length; k++){
+						let val = Number(mat[j][i][k]);
+						if(val < min) min = val; if(val > max) max = val;
+					}
+				}
+				else{
+					let val = Number(mat[j][i]);
+					if(val < min) min = val; if(val > max) max = val;
+				}
 			}
 		}
 		
@@ -300,56 +656,169 @@ class Graph
 			}
 		}
 		
-		let mag = max; if(-min > mag) mag = -min;
+		this.set_colour_key(min,max);
 		
 		for(let j = 0; j < mat.length; j++){
 			for(let i = 0; i < mat[j].length; i++){
-				let val = Number(mat[j][i]);
-				
-				mat_col[j][i] = this.get_matrix_col(val,mag);
+				if(this.variety == "MatrixAnim"){
+					for(let k = 0; k < mat[j][i].length; k++){
+						mat_col[j][i][k] = this.get_matrix_col(Number(mat[j][i][k]));
+					}
+				}
+				else{
+					mat_col[j][i] = this.get_matrix_col(Number(mat[j][i]));
+				}
 			}
 		}
-		
-		let grad = [];
-		let imax = 100;
+	}
+	
+
+	/// Sets the colour key based on a minimum and maximum
+	set_colour_key(min,max)
+	{
+		this.mag = max; if(-min > this.mag) this.mag = -min;
+	 
+		let grad = [], grad_rgb = [];
+		let imax = COLOUR_KEY_DIV;
 		for(let i = 0; i <= imax; i++){
-			grad.push(this.get_matrix_col(min+(max-min)*i/imax,mag));
+			let col = this.get_matrix_col_rgb(min+(max-min)*i/imax);
+			grad_rgb.push(col);
+			grad.push("#"+hex(col.r)+hex(col.g)+hex(col.b));
 		}
 		
-		this.matrix_key = {min:min, max:max, tick:this.get_tick_marks(min,max,3), grad:grad};
+		this.colour_key = {min:min, max:max, tick:this.get_tick_marks(min,max,3), grad:grad, grad_rgb:grad_rgb};
 	}
 	
 	
 	/// Gets a matrix colour from a value
-	get_matrix_col(val,mag)
+	get_matrix_col(val)
 	{
+		let col = this.get_matrix_col_rgb(val);
+		return "#"+hex(col.r)+hex(col.g)+hex(col.b);
+	}
+	
+	
+	/// Gets a matrix colour from a value uisng rgb
+	get_matrix_col_rgb(val)
+	{
+		let ma = 240;
+		
 		if(val > 0){
-			let f = val/mag;
-			return "rgb("+Math.floor(255*(1-f))+","+Math.floor(255*(1-f))+","+255+")";
+			let f = val/this.mag;
+			return {r:Math.floor(ma*(1-f)), g:Math.floor(ma*(1-f)), b:ma};
 		}
 		else{
-			let f = -val/mag;
-			return "rgb("+255+","+Math.floor(255*(1-f))+","+Math.floor(255*(1-f))+")";
+			let f = -val/this.mag;
+			return {r:ma, g:Math.floor(ma*(1-f)), b:ma*(1-f)};
 		}
 	}
 	
 				
 	/// Initialises the view of the comparments
-	comp_init()
+	anim_init()
 	{
-		let species = this.op.species;
+		if(this.variety == "CompVector") return;
+		
+		//let species = this.op.species;
 		let anim = this.animation;
 		
 		anim.playframe = 0;
-		anim.playframe_max = this.data[0].point.length-1;
+		
+		switch(this.variety){
+		case "MatrixAnim": anim.playframe_max = this.data[0].mat[0][0].length-1; break;
+		case "CompMatrixAnim": anim.playframe_max = this.data[0].value[0][0].length-1; break;
+		case "Population": anim.playframe_max = this.data[0].y_vec.length-1; break;
+		default: anim.playframe_max = this.data[0].point.length-1; break;
+		}
+	
 		anim.playing = false;
 	}
 	
 	
-	/// Gets the clock time (in milliseconds)
-	clock()
+	/// Initialises the density view of the comparments
+	density_init()
 	{
-		return (new Date()).getTime();
+		let p = this.op.p;
+		let cl = this.op.cl;
+	
+		let claa = this.get_cla(p,cl);
+		
+		let po=[];
+		let xmax = -LARGE, xmin = LARGE, ymax = -LARGE, ymin = LARGE; 
+		for(let i = 0; i < claa.comp.length; i++){
+			let co = claa.comp[i];
+			let p = model.comp_center(co);
+			let x = p.x, y = p.y;
+			if(x > xmax) xmax = x; if(x < xmin) xmin = x;
+			if(y > ymax) ymax = y; if(y < ymin) ymin = y;
+			
+			po.push({x:x, y:y});
+		}
+
+		if(xmin == xmax && ymin == ymax){
+			xmin -= 10; xmax += 10;
+			ymin -= 10; ymax += 10;
+		}
+		
+		let dx = xmax-xmin, dy = ymax-ymin;
+		let l = dx; if(dy > dx) l = dy;
+	
+		let info = inter.density_slider;
+		
+		let va = 1.0/Math.sqrt(claa.comp.length)
+		if(va > 0.1) va = 0.1;
+		let frac = va*Math.exp(info.value);
+		let r = frac*l;
+		xmin -= r; xmax += r;
+		ymin -= r; ymax += r;
+		dx += 2*r; dy += 2*r;
+		l += 2*r;
+		
+		let rule = l/DEN_X;
+		let DX = Math.round(dx/rule);
+		let DY = Math.round(dy/rule);
+		let sr = r/rule;
+		if(sr < SR_MIN){
+			rule = (l/DEN_X)*(sr/SR_MIN);
+			DX = Math.round(dx/rule);
+			DY = Math.round(dy/rule);
+			sr = r/rule;
+		}
+		
+		let mat=[], mat_dist=[];
+		for(let j = 0; j < DY; j++){
+			mat[j]=[]; mat_dist[j]=[];
+		}
+		
+		for(let k = 0; k < po.length; k++){
+			let sx = (po[k].x-xmin)/rule;
+			let dxmin = Math.floor(sx-sr);
+			let dxmax = Math.floor(1+sx+sr);
+			
+			let sy = (po[k].y-ymin)/rule;
+			let dymin = Math.floor(sy-sr);
+			let dymax = Math.floor(1+sy+sr);
+			
+			for(let j = dymin; j < dymax; j++){
+				if(j >= 0 && j < DY){
+					for(let i = dxmin; i < dxmax; i++){
+						if(i >= 0 && i < DX){
+							let ddx = (i+0.5)-sx, ddy = (j+0.5)-sy;
+							let dist = ddx*ddx+ddy*ddy;
+							if(dist < sr*sr){
+								let val = mat_dist[j][i];
+								if(val == undefined){ mat[j][i] = k; mat_dist[j][i] = dist;}
+								else{
+									if(dist < val){ mat[j][i] = k; mat_dist[j][i] = dist;}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	
+		this.density_info = { x:xmin, y:ymin, dx:dx, dy:dy, mat:mat, DX:DX, DY:DY};
 	}
 	
 	
@@ -362,7 +831,7 @@ class Graph
 			anim.playing = true;
 			if(anim.playframe == anim.playframe_max) anim.playframe = 0;
 			anim.playframe_start = anim.playframe;
-			anim.clock = this.clock();
+			anim.clock = clock();
 			this.playanim();
 		}
 		else{
@@ -375,17 +844,44 @@ class Graph
 	press_timebar(bu)
 	{
 		let lay = get_lay("AnimControls");
+		let anim = inter.graph.animation;
 			
 		let x = inter.mx-bu.x-lay.x;
+
 		let frac = (x-bu.dy/2)/(bu.dx-bu.dy);
 		
-		let anim = inter.graph.animation;
 		anim.playing = false;
 		anim.playframe = Math.round(frac*anim.playframe_max);
 		if(anim.playframe < 0) anim.playframe = 0;
 		if(anim.playframe > anim.playframe_max) anim.playframe = anim.playframe_max;
 	}
 	
+	
+	/// Activates when the timebar is pressed
+	press_slider(bu,update)
+	{
+		let info = bu.info;
+	
+		let lay = get_lay(info.lay);
+		let anim = inter.graph.animation;
+			
+		let x = inter.mx-bu.x-lay.x;
+
+		let frac = (x-slider_dx/2)/(bu.dx-slider_dx);
+		if(frac < 0) frac = 0; if(frac > 1) frac = 1;
+		
+		info.value = info.min+frac*(info.max-info.min);
+		
+		if(update == true){
+			switch(bu.info.update){
+			case "density": inter.graph.density_init(); break;
+			case "compmatrix": this.comp_matrix_init(); break;
+			case "scale": break;
+			default: error("update not recognised"); break;
+			}
+		}
+	}
+
 	
 	/// Changes the frame (forward or backward)
 	change_frame(d)
@@ -404,22 +900,33 @@ class Graph
 		let anim = this.animation;
 	
 		if(anim.playing == true){
-			anim.playframe = Math.round(anim.playframe_start + (anim.speed.value*(this.clock()-anim.clock)/4000)*anim.playframe_max);
-			if(anim.playframe >= anim.playframe_max){
-				anim.playframe = anim.playframe_max;
-				anim.playing = false;
+			let frame_new = Math.round(anim.playframe_start + (anim.speed.value*(clock()-anim.clock)/4000)*anim.playframe_max);
+			if(frame_new > anim.playframe_max) frame_new = anim.playframe_max;
+			
+			if(frame_new != anim.playframe){
+				anim.playframe = frame_new;
+				if(anim.playframe == anim.playframe_max) anim.playing = false;
+				
+				this.replot_anim();
 			}
-			
-			replot_layer("GraphCompartments");
-			replot_layer("AnimControls");
-			plot_screen();
-			
+		
 			if(anim.playframe < anim.playframe_max){
 				setTimeout(function(){ inter.graph.playanim();}, 10);
 			}
 		}
 	}
 	
+	
+	/// Replots the animation
+	replot_anim()
+	{
+		if(layer_exist("GraphCompartments")) replot_layer("GraphCompartments");
+		if(layer_exist("GraphContent")) replot_layer("GraphContent");
+		
+		replot_layer("AnimControls");
+		plot_screen();
+	}
+
 
 	/// Rounds a number when put in interface
 	rn(n)                                           
@@ -438,28 +945,90 @@ class Graph
 	/// Plots the content of the graph
 	content(lay)
 	{
+		if(graph_dia) pr("GRAPH DIA content: "+this.variety);
+		
+		let vari = plot_variety(this.type);
+		
 		switch(this.variety){
-		case "Individual":
+		case "PhyloTree":
 			{
-				let y = 0, dy = 1.8, gap = 0.2; 
+				let left_shift = lay.op.left_shift;
+	
+				let dy = 2*this.barh;
+				
+				let pnode = this.data[0].pnode;
+				let ymax = 0;
+				for(let i = 0; i < pnode.length; i++){ 	
+					if(pnode[i].y > ymax) ymax = pnode[i].y;
+				}
+				let yend = (ymax+1)*dy;
+				
+				lay.add_button({x:left_shift, y:0, dx:lay.dx-scrollw-left_shift, dy:yend, barh:dy, pnode:pnode, type:"PhyloButton"});
+				
+				lay.add_button({x:0, y:0, dx:lay.dx-scrollw, dy:yend, ac:"TimelineGrab", type:"Nothing"});
+			}
+			break;
+			
+		case "TransTree":
+			{
+				let left_shift = lay.op.left_shift;
+				let y = 0, dy = this.barh, gap = 0; 
 				for(let i = 0; i < this.data.length; i++){
 					let da = this.data[i];
-					lay.add_button({x:0, y:y, dx:lay.dx-scrollw, dy:dy, name:da.name, info:da.info, col_timeline:da.col_timeline, obs:da.obs, type:"IndTimelineBut"});
-					y += dy+gap;
+					if(da.type ==  "InfBar"){
+						lay.add_button({x:0, y:y, dx:lay.dx-scrollw, dy:dy, name:da.name, tmin:da.tmin, tmax:da.tmax, inf_line:da.inf_line, left_shift:left_shift, type:"InfBarBut"});
+						y += dy+gap;
+					}
 				}
+				
+				let da = this.data[this.data.length-1];
+				if(da.type != "Transmission") error("Should be transmission");
+			
+				lay.add_button({x:left_shift, y:0, dx:lay.dx-scrollw-left_shift, dy:y, barh:dy, transmission:da.transmission, type:"TransArrow"});
+				
 				lay.add_button({x:0, y:0, dx:lay.dx-scrollw, dy:y, ac:"TimelineGrab", type:"Nothing"});
 			}
 			break;
 			
-		case "Histogram":
+		case "Individual":
+			{
+				let y = 0, dy = 2.5*this.barh, gap = 0.4;
+				for(let i = 0; i < this.data.length; i++){
+					let da = this.data[i];
+				
+					lay.add_button({x:0, y:y, dx:lay.dx-scrollw, dy:dy, name:da.name, info:da.info, col_timeline:da.col_timeline, obs:da.obs, type:"IndTimelineBut"});
+					
+					y += dy+gap;
+				}
+				lay.add_button({x:0, y:0, dx:lay.dx-scrollw, dy:y, ac:"TimelineGrab", type:"Nothing"});
+			
+				{ // Adds links to individuals
+ 					let si = dy/3;
+					let fo = get_font(si);
+			
+					let y = 0;
+					for(let i = 0; i < this.data.length; i++){
+						let da = this.data[i];
+					
+						lay.add_button({te:da.name, x:0.3, y:y, dx:text_width(da.name,fo)+1, dy:si, type:"Link", ac:"SelectInd", si:si, font:fo});
+					
+						y += dy+gap;
+					}
+				}
+			}
+			break;
+			
+		case "Histogram": case "HistoAnim":
 			lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, type:"GraphContentBut"});
 			break;
 			
-		case "Matrix":
+		case "Matrix": case "MatrixAnim":
 			{
 				let da = this.data[0];
+				let fr = this.animation.playframe;
+				
 				for(let j = 0; j < da.ylab.length; j++){
-					let fracj = j/ da.ylab.length;
+					let fracj = j/da.ylab.length;
 					for(let i = 0; i < da.xlab.length; i++){	
 						let fraci = i/da.xlab.length; 
 						
@@ -467,7 +1036,22 @@ class Graph
 						let dy = lay.dy/da.ylab.length;
 						let marx = 0.03*dx;
 						let mary = 0.03*dy;
-						lay.add_button({te:da.mat[j][i], x:fraci*lay.dx+marx, y:fracj*lay.dy+mary, dx:dx-2*marx, dy:dy-2*mary, value:da.mat[j][i], col:da.mat_col[j][i], type:"MatrixEleBut", ac:"MatrixEleBut"});
+						
+						let stat; if(da.mat_stat) stat = da.mat_stat[j][i];
+					
+						let col, value, te;
+						if(this.variety == "MatrixAnim"){
+							col = da.mat_col[j][i][fr];
+							value = da.mat[j][i][fr];
+							te = da.mat[j][i][fr];
+						}
+						else{
+							col = da.mat_col[j][i];
+							value = da.mat[j][i];
+							te = da.mat[j][i];
+						}							
+						
+						lay.add_button({te:precision(te), x:fraci*lay.dx+marx, y:(1-fracj)*lay.dy-dy+mary, dx:dx-2*marx, dy:dy-2*mary, value:value, stat:stat, col:col, type:"MatrixEleBut", ac:"MatrixEleBut"});
 					}
 				}
 			}
@@ -484,10 +1068,16 @@ class Graph
 	/// Draws the content of the graph
 	draw_content_button(x,y,dx,dy)
 	{
+		if(graph_dia){
+			pr("GRAPH DIA draw content button: data:");
+			pr(this.data);
+		}
+		
 		fill_rectangle(x,y,dx,dy,WHITE); 
+		if(this.extra_flag) dx -= GRAPH_EXTRA;
 		
 		let ra = this.range;
-		
+	
 		for(let li = 0; li < this.data.length; li++){
 			let da = this.data[li];
 		
@@ -496,74 +1086,329 @@ class Graph
 			case "PriorLine": this.draw_graph_line(x,y,dx,dy,ra,da); break;
 			case "Line CI": this.draw_graph_CI(x,y,dx,dy,ra,da); this.draw_graph_line(x,y,dx,dy,ra,da); break;
 			case "Bar": this.draw_bar(x,y,dx,dy,ra,da); break;
+			case "SplineAnim": this.draw_splinebar(x,y,dx,dy,ra,da,li); break;
 			case "ErrorBar": this.draw_errorbar(x,y,dx,dy,ra,da); break;
+			case "Cross": this.draw_data_cross(x,y,dx,dy,ra,da); break;
 			case "Distribution": this.draw_distribution(x,y,dx,dy,ra,da); break;
 			case "VertLine": this.draw_vert_line(x,y,dx,dy,ra,da); break;
+			case "VertLine2": this.draw_vert_line2(x,y,dx,dy,ra,da); break;
 			case "VertDashLine": this.draw_vert_dash_line(x,y,dx,dy,ra,da); break;
 			case "Points": this.draw_point(x,y,dx,dy,ra,da); break;
+			case "SimX": this.draw_vert(x,y,dx,dy,ra,da); break;
+			case "SimY": this.draw_hor(x,y,dx,dy,ra,da); break;
 			default: error("Option not recongnised: "+da.type); break;
 			}
 		}
+
+		if(this.bf_store) this.draw_bf(x,y,dx,dy,ra);
+			
+		let title = this.op.title;
+	
+		if(title != undefined){
+			center_text(title,x+dx/2,y+1,get_font(1,"bold"),BLACK,dx-1); 
+		}
 	}
 	
 	
-	/// Draws and individual timeline
+	/// Draws an individual timeline
 	draw_ind_timeline_button(x,y,dx,dy,name,info,col_timeline,obs)
 	{
 		let bar = 1;
-		//fill_rectangle(x,y,dx,dy,RED);
-		plot_text(name,x+0.2,y+0.65,get_font(0.8),BLACK); 
-		right_text(info,x+dx-0.2,y+0.65,get_font(0.8),BLACK); 
+		let yte = y+dy/2-0.3;
+		
+		right_text(info,x+dx-0.2,yte,get_font(0.8),BLACK); 
 		
 		let ra = this.range;
-			
-		let pos = [];
-		for(let i = 0; i < col_timeline.length; i++){
-			pos.push(ro_down(x+dx*((col_timeline[i].t-ra.xmin)/(ra.xmax-ra.xmin))));
-		}
-	
-		let y1 = ro_down(y+dy/2), y2 = ro_down(y+dy);
-
-		for(let i = 0; i < col_timeline.length-1; i++){
-			cv.globalAlpha = col_timeline[i].alpha;
-			cv.beginPath();
-			cv.rect(pos[i],y1,pos[i+1]-pos[i],y2-y1);
-			cv.fillStyle = "rgb("+col_timeline[i].col+")";
-			cv.fill();
-		}
-		cv.globalAlpha = 1;
-	
-		let r = 0.32, si = 0.34, si2 = 0.4;
-		for(let i = 0; i < obs.length; i++){
-			let ob = obs[i];
-			let xx = x+dx*((ob.t-ra.xmin)/(ra.xmax-ra.xmin));
 				
-			switch(ob.type){
-			case "Transition":
-				fill_rectangle(xx-si2/2,y+0.70*dy-si2/2,si2/2,si2,ob.col[0],NORMLINE); 
-				fill_rectangle(xx,y+0.70*dy-si2/2,si2/2,si2,ob.col[1],NORMLINE); 
+		if(col_timeline.length == 0){
+			fill_rectangle(x,y+dy/2,dx,dy/2,"#eeeeee");
+			center_text("Unobserved",x+dx/2,y+0.87*dy,get_font(0.8),BLACK,dx);
+		}
+		else{	
+		let y1 = ro_down(y+dy/2), y2 = ro_down(y+dy);
+		
+			let pos = [];
+			for(let i = 0; i < col_timeline.length; i++){
+				pos.push(ro_down(x+dx*((col_timeline[i].t-ra.xmin)/(ra.xmax-ra.xmin))));
+			}
+		
+			for(let i = 0; i < col_timeline.length-1; i++){
+				cv.globalAlpha = col_timeline[i].alpha;
+				cv.beginPath();
+				cv.rect(pos[i],y1,pos[i+1]-pos[i],y2-y1);
+				cv.fillStyle = "rgb("+col_timeline[i].col+")";
+				cv.fill();
+			}
+			cv.globalAlpha = 1;
+		
+			let fac = dy/2.5;
+			let r = 0.32*fac, si = 0.34*fac, si2 = 0.4*fac;
+			let yy = y+0.74*dy;
 			
-				draw_rectangle(xx-si2/2,y+0.70*dy-si2/2,si2,si2,BLACK,NORMLINE); 
-				break;
-			
-			case "Compartment":
-				fill_circle(xx,y+0.70*dy,r,ob.col,BLACK,NORMLINE);   
-				break;
-			
-			case "Diag. Test":
-				if(ob.res == true) draw_rect(xx-si/2,y+0.70*dy-si/2,si,si,BLACK,BLACK,NORMLINE); 
-				else draw_rect(xx-si/2,y+0.70*dy-si/2,si,si,WHITE,BLACK,NORMLINE);  
-				break;
+			for(let i = 0; i < obs.length; i++){
+				let ob = obs[i];
+				let xx = x+dx*((ob.t-ra.xmin)/(ra.xmax-ra.xmin));
+		
+				switch(ob.type){
+				case "AddObs":
+					{
+						let siw = 0.5, sih = 0.7;
+						multi_triangle(xx,yy-sih/2,siw,sih,ob.col_list,BLACK,NORMLINE);
+						multi_triangle(xx,yy-sih/2,siw,sih,ob.col_list,BLACK,NORMLINE);
+					}
+					break;
+				
+				case "RemObs":
+					{
+						let siw = 0.5, sih = 0.7;
+						rem_triangle(xx-sih,yy-sih/2,siw,sih,BLACK);
+					}
+					break;
+				
+				case "MoveObs":
+					if(ob.col_list.length == 1){
+						fill_semicircle(xx,yy,r,ob.col_list[0].col,BLACK,NORMLINE); 
+					}
+					break;
+					
+				case "TransObs":
+					if(ob.col.length == 2){
+						fill_rectangle(xx-si2/2,yy-si2/2,si2/2,si2,ob.col[0],NORMLINE); 
+						fill_rectangle(xx,yy-si2/2,si2/2,si2,ob.col[1],NORMLINE); 
+					}
+					else{
+						draw_line(xx,yy-si2/2,xx,yy+si2/2,BLACK,NORMLINE);
+					}
+					
+					draw_rectangle(xx-si2/2,yy-si2/2,si2,si2,BLACK,NORMLINE); 
+					break;
+					
+				case "CompObs":
+					if(ob.col_list.length == 1) fill_circle(xx,yy,r,ob.col_list[0].col,BLACK,NORMLINE); 
+					else multi_circle(xx,yy,r,ob.col_list,BLACK,NORMLINE); 
+					break;
+				
+				case "DiagObs":
+					if(ob.res == true) draw_rect(xx-si/2,yy-si/2,si,si,BLACK,BLACK,NORMLINE); 
+					else draw_rect(xx-si/2,yy-si/2,si,si,WHITE,BLACK,NORMLINE);  
+					break;
+				
+				case "GeneticObs":
+					draw_X(xx,yy,1.2*si);
+					break;
+				}
 			}
 		}
 	}
 	
 	
+	/// Draws infection timeline (used for trans tree)
+	draw_ind_infbar_button(x,y,dx,dy,name,inf_line,tmin,tmax,left_shift)
+	{
+		fill_rectangle(x,y,dx,dy,WHITE);
+	
+		let bar = 0.5;
+		
+		let ra = this.range;
+			
+		let dt = (tmax-tmin)/inf_line.length;
+	
+		let pos = [];
+		for(let i = 0; i <= inf_line.length; i++){
+			pos.push(ro_down(x+left_shift+(dx-left_shift)*((tmin+i*dt-ra.xmin)/(ra.xmax-ra.xmin))));
+		}
+
+		let y1 = ro_up(y+0.3*dy), y2 = ro_down(y+0.7*dy);
+
+		cv.fillStyle = RED;
+		for(let i = 0; i < inf_line.length; i++){
+			cv.globalAlpha = inf_line[i];
+			cv.beginPath();
+			cv.rect(pos[i],y1,pos[i+1]-pos[i],y2-y1);
+			cv.fill();
+		}
+		cv.globalAlpha = 1;
+		
+		fill_rectangle(x,y,left_shift,dy,WHITE);
+		
+		plot_text(name,x+0.2,y+dy/2+0.3,get_font(si_transtree),BLACK); 
+		
+		let xx = x+left_shift;
+		draw_line(xx,y,xx,y+dy,BLACK,NORMLINE);
+	}
+
+
+	/// Draws arrows to indicate transmission of infection
+	draw_transarrow_button(x,y,dx,dy,barh,transmission)
+	{
+		let ra = this.range;
+		
+		let fac = dx/(ra.xmax-ra.xmin);
+		for(let j = 0; j < transmission.length; j++){
+			let tr = transmission[j];
+			
+			let xx = x+fac*(tr.t-ra.xmin);
+			
+			if(xx > x && xx < x+dx){
+				{
+					let r = 0.25*barh*Math.sqrt(tr.frac);
+					let yy = y+barh*(tr.k+0.5);
+					fill_circle(xx,yy,r,RED,RED);  
+					
+					r = 0.20*barh*Math.sqrt(tr.frac_out);
+					fill_circle(xx,yy,r,WHITE,WHITE);  
+				}
+				
+				if(tr.min != undefined){
+					let y1 = y+barh*(tr.min+0.5), y2 = y+barh*(tr.max+0.5);
+					if((y1 > y && y1 < y+dy) || (y2 > y && y2 < y+dy) || 
+						(y1 < y || y2 > y+dy) || (y2 < y || y1 > y+dy)){
+							
+						draw_line(xx,y1,xx,y2,BLACK,NORMLINE);
+										
+						for(let j = 0; j < tr.inf_list.length; j++){
+							let ilist = tr.inf_list[j];
+						
+							let r = 0.25*barh*Math.sqrt(ilist.frac);
+							let yy = y+barh*(ilist.k+0.5);
+							fill_circle(xx,yy,r,BLACK,BLACK);  
+						}
+					}
+				}
+			}				
+		}
+	}		
+	
+	
+	/// Converts number to reduce precision
+	num_text(num)
+	{
+		if(num > 5) return Math.round(num);
+		else{
+			return Math.round(num*10)/10;
+		}
+	}
+	
+	
+	/// Draws phylogentic tree
+	draw_phylo_button(x,y,dx,dy,barh,pnode)
+	{
+		let ra = this.range;
+		
+		let fac = dx/(ra.xmax-ra.xmin);
+		
+		// Draw lines
+		for(let i = 0; i < pnode.length; i++){
+			let po = pnode[i];
+			
+			let xx = x+fac*(po.t-ra.xmin);
+			let xx2;
+			if(po.branch != undefined) xx2 = x+fac*(po.branch.t-ra.xmin);
+			else{
+				if(po.obs.length > 0) xx2 = x+fac*(po.obs[po.obs.length-1].t-ra.xmin);
+			}
+			
+			let yy = y+barh*po.y;
+
+			if(po.ty == "ROOT"){
+				fill_circle(xx,yy,0.05*barh,BLACK,BLACK);  
+			}
+
+			draw_line(xx,yy,xx2,yy,BLACK,NORMLINE);
+			
+			if(po.branch != undefined){
+				let br = po.branch.br;
+				switch(br.length){
+				case 1:
+					{
+						let d = 0.1*barh;
+						draw_line(xx2,yy-d,xx2,yy+d,BLACK,NORMLINE);
+					}
+					break;
+					
+				case 2:
+					{
+						let yy1 = y+barh*pnode[br[0]].y;
+						let yy2 = y+barh*pnode[br[1]].y;
+						draw_line(xx2,yy1,xx2,yy2,BLACK,NORMLINE);
+					}
+					break;
+					
+				default: error("wrong num"); break;
+				}
+			}
+		}
+		
+		// Draws text
+		let si; if(barh > 1) si = Math.sqrt(barh); else si = barh;
+		
+		let fo = get_font(0.4*si);
+		let fo2 = get_font(0.4*si);
+		
+		for(let i = 0; i < pnode.length; i++){
+			let po = pnode[i];
+			let xx = x+fac*(po.t-ra.xmin);
+			let yy = y+barh*po.y;
+		
+			{
+				let xx2;
+				if(po.branch != undefined) xx2 = x+fac*(po.branch.t-ra.xmin);
+				else{
+					if(po.obs.length > 0) xx2 = x+fac*(po.obs[po.obs.length-1].t-ra.xmin);
+				}
+				
+				let dx = xx2-xx;
+				if(dx > 2){
+					center_text(po.label,(xx+xx2)/2,yy-0.2*si,fo2,BLACK,dx-1); 
+				}
+			}
+			
+			if(po.ty == "ROOT"){
+				right_text(this.num_text(po.mnum),xx-barh*0.1,yy+0.2*si,fo,BLUE); 
+			}
+			
+			for(let j = 0; j < po.obs.length; j++){
+				let ob = po.obs[j];
+				let xx2 = x+fac*(ob.t-ra.xmin);
+				let dx = xx2-xx;
+				if(dx > 2){
+					center_text(this.num_text(ob.mnum),(xx+xx2)/2,yy+0.4*si,fo2,BLUE,dx-1); 
+				}
+			
+				xx = xx2;
+			}
+			
+			if(po.branch != undefined){
+				let xx2 = x+fac*(po.branch.t-ra.xmin);
+		
+				let dx = xx2-xx;
+				if(dx > 2){	
+					center_text(this.num_text(po.branch.mnum),(xx+xx2)/2,yy+0.4*si,fo2,BLUE,dx-1); 
+				}
+				
+				let te = Math.floor(po.branch.frac*100)+"%";
+				
+				plot_text(te,xx2+barh*0.1,yy+0.12*si,fo,DGREEN); 
+			}
+		}
+		
+		// Draw observations
+		for(let i = 0; i < pnode.length; i++){
+			let po = pnode[i];
+			let yy = y+barh*po.y;
+			for(let j = 0; j < po.obs.length; j++){
+				let xx = x+fac*(po.obs[j].t-ra.xmin);
+				draw_X(xx,yy,0.2*si);	
+			}				
+		}
+	}		
+	
+	
 	/// Draws a graph line
-	draw_graph_line(x,y,dx,dy,ra,da)
+	draw_graph_line(x,y,dx,dy,ra,da) 
 	{
 		cv.beginPath();
-
+		
 		if(da.dash) set_dash_type(da.dash);
 
 		for(let i = 0; i < da.point.length; i++){
@@ -575,15 +1420,18 @@ class Graph
 			else cv.lineTo(xp,yp);
 		}
 		
-		cv.lineWidth = 2;
-		if(da.view == "Graph (lines)") cv.lineWidth = 1;
+		let w = 2;
+		if(da.thick) w = da.thick;
+		if(da.view == "Graph (lines)") w = 1;
+		if(inter.printing) w *= print_line_factor;
+		cv.lineWidth = w;
 		cv.strokeStyle = da.col;
 		cv.stroke();
 		
 		if(da.dash) set_dash_type(0);
 	}
 	
-	
+
 	/// Draws points
 	draw_point(x,y,dx,dy,ra,da)
 	{
@@ -601,6 +1449,26 @@ class Graph
 			cv.arc(xp,yp,r,0,2*Math.PI);
 			cv.fill();
 		}
+	}
+	
+	
+	/// Draws a vertical line
+	draw_vert(x,y,dx,dy,ra,da)
+	{
+		let pox = []; pox.push({x:da.x,y:ra.ymin}); pox.push({x:da.x,y:ra.ymax});
+		let datx = {point:pox, col:da.col, type:"Line", dash:da.dash};
+		
+		this.draw_graph_line(x,y,dx,dy,ra,datx);
+	}
+			
+		
+	/// Draws a horizontal line
+	draw_hor(x,y,dx,dy,ra,da)
+	{	
+		let poy = []; poy.push({x:ra.xmin, y:da.y}); poy.push({x:ra.xmax,y:da.y});
+		let daty = {point:poy, col:da.col, type:"Line", dash:da.dash};
+		
+		this.draw_graph_line(x,y,dx,dy,ra,daty);
 	}
 	
 	
@@ -625,6 +1493,7 @@ class Graph
 		cv.globalAlpha = 0.2;
 		cv.fill();
 		cv.globalAlpha = 1;
+		
 		
 		// Plots lower CI 
 		if(da.CImin){
@@ -654,7 +1523,7 @@ class Graph
 				}
 				xp_old = xp; yp_old = yp;
 			}
-			cv.fillStyle = da.col;//WHITE;
+			cv.fillStyle = da.col;
 			cv.globalAlpha = 0.5;
 			cv.fill();
 			cv.globalAlpha = 1;
@@ -688,7 +1557,7 @@ class Graph
 				}
 				xp_old = xp; yp_old = yp;
 			}
-			cv.fillStyle = da.col;//WHITE;
+			cv.fillStyle = da.col;
 			cv.globalAlpha = 0.5;
 			cv.fill();
 			cv.globalAlpha = 1;
@@ -700,9 +1569,30 @@ class Graph
 			if(i == 0) cv.moveTo(vec[i].xp,vec[i].yp);
 			else cv.lineTo(vec[i].xp,vec[i].yp);
 		}
-		cv.lineWidth = 1;
+		let w = MEDIUMLINE;
+		if(inter.printing) w *= print_line_factor;
+		cv.lineWidth = w;
 		cv.strokeStyle = da.col;
 		cv.stroke();	
+	}
+	
+	
+	
+	/// Draws Bayes factor values
+	draw_bf(x,y,dx,dy,ra)
+	{
+		let bf = this.bf_store;
+		
+		let xx = x+dx*((bf.val-ra.xmin)/(ra.xmax-ra.xmin));
+		let y_post = y+dy-dy*((bf.post_int-ra.ymin)/(ra.ymax-ra.ymin));
+		let y_prior = y+dy-dy*((bf.prior_int-ra.ymin)/(ra.ymax-ra.ymin));
+		let y_base = y+dy-dy*((0-ra.ymin)/(ra.ymax-ra.ymin));
+		let r = 0.3;
+		let yy = y_post; if(y_prior < yy) yy = y_prior;
+		
+		draw_line(xx,y_base,xx,yy,BLACK,THICKLINE);    
+		fill_circle(xx,y_post,r,RED,RED);  
+		fill_circle(xx,y_prior,r,BLUE,BLUE); 
 	}
 	
 	
@@ -715,13 +1605,34 @@ class Graph
 		
 		cv.moveTo(xp,ro(y));
 		cv.lineTo(xp,ro(y+dy));
-		cv.lineWidth = da.thick;
+		
+		let w = da.thick; if(inter.printing) w *= print_line_factor;
+		cv.lineWidth = w;
 		cv.strokeStyle = da.col;
 		cv.stroke();	
 		
 		let fo = get_font(0.8);
 		let wid = text_width(da.te,fo);
 		vert_text(da.te,xx-0.3,y+wid+0.2,fo,da.col,10); 
+	}
+	
+	/// Draws a verticle line with text the other side
+	draw_vert_line2(x,y,dx,dy,ra,da)
+	{
+		let xx = x+dx*((da.x-ra.xmin)/(ra.xmax-ra.xmin));
+		let xp = ro(xx);
+		cv.beginPath();
+		
+		cv.moveTo(xp,ro(y));
+		cv.lineTo(xp,ro(y+dy));
+		let w = da.thick; if(inter.printing) w *= print_line_factor;
+		cv.lineWidth = w;
+		cv.strokeStyle = da.col;
+		cv.stroke();	
+		
+		let fo = get_font(0.8);
+		let wid = text_width(da.te,fo);
+		vert_text(da.te,xx+0.9,y+wid+0.2,fo,da.col,10); 
 	}
 	
 	
@@ -771,8 +1682,32 @@ class Graph
 		let y1 = y+dy-dy*((da.y-ra.ymin)/(ra.ymax-ra.ymin));
 		let y2 = y+dy-dy*((0-ra.ymin)/(ra.ymax-ra.ymin));
 
-		fill_rectangle(x1,y1,x2-x1,y2-y1,da.col);
-		draw_rectangle(x1,y1,x2-x1,y2-y1,dark_colour(da.col),NORMLINE);
+		if(y1 < y2){ let yt = y1; y1 = y2; y2 = yt;}
+
+		fill_rectangle(x1,y1,x2-x1,y2-y1,da.col,dark_colour(da.col),NORMLINE);
+	}
+	
+	
+	/// Draws a bar on a histogram
+	draw_splinebar(x,y,dx,dy,ra,da,i)
+	{
+		let fr = this.animation.playframe;
+		let po = da.point[fr];
+	
+		let x1 = x+dx*((i+(1-bar_thick)/2-ra.xmin)/(ra.xmax-ra.xmin));
+		let x2 = x+dx*((i+1-(1-bar_thick)/2-ra.xmin)/(ra.xmax-ra.xmin));
+		
+		let y1 = y+dy-dy*((po.y-ra.ymin)/(ra.ymax-ra.ymin));
+		let y2 = y+dy-dy*((0-ra.ymin)/(ra.ymax-ra.ymin));
+			
+		let col = po.col;
+		fill_rectangle(x1,y1,x2-x1,y2-y1,col);
+		draw_rectangle(x1,y1,x2-x1,y2-y1,dark_colour(col),NORMLINE);
+		
+		if(po.CImin != undefined){
+			let da2 = { x:i+0.5, y:po.y, ymin:po.CImin, ymax:po.CImax, col:BLACK};
+			this.draw_errorbar(x,y,dx,dy,ra,da2);
+		}
 	}
 	
 	
@@ -785,11 +1720,24 @@ class Graph
 		let ymin = y+dy-dy*((da.ymin-ra.ymin)/(ra.ymax-ra.ymin));
 		let ymax = y+dy-dy*((da.ymax-ra.ymin)/(ra.ymax-ra.ymin));
 
-		let thick = NORMLINE;
+		let thick = MEDIUMLINE;
 		draw_line(xp,ymin,xp,ymax,da.col,thick);
-		draw_line(xp-d,ymin,xp+d,ymin,da.col,NORMLINE);
-		draw_line(xp-d/2,yp,xp+d/2,yp,da.col,NORMLINE);
-		draw_line(xp-d,ymax,xp+d,ymax,da.col,NORMLINE);
+		draw_line(xp-d,ymin,xp+d,ymin,da.col,thick);
+		draw_line(xp-d/2,yp,xp+d/2,yp,da.col,thick);
+		draw_line(xp-d,ymax,xp+d,ymax,da.col,thick);
+	}
+	
+	
+	/// Draws a data cross
+	draw_data_cross(x,y,dx,dy,ra,da)
+	{
+		let d = 0.3;
+		let xp = x+dx*((da.x-ra.xmin)/(ra.xmax-ra.xmin));
+		let yp = y+dy-dy*((da.y-ra.ymin)/(ra.ymax-ra.ymin));
+		
+		let thick = NORMLINE;
+		draw_line(xp-d,yp-d,xp+d,yp+d,da.col,thick);
+		draw_line(xp-d,yp+d,xp+d,yp-d,da.col,thick);
 	}
 	
 	
@@ -808,9 +1756,9 @@ class Graph
 	
 	
 	/// Draws the x tick marks
-	draw_xtick_label(x,y,dx,dy,mar,x_lab,x_vert,x_param,ov)
+	draw_xtick_label(x,y,dx,dy,mar,x_lab,x_vert,x_param,si,ov)
 	{
-		fill_rectangle(x,y,dx,dy,WHITE); 
+		fill_rectangle(x,y,dx-1,dy,WHITE); 
 	
 		let ra = this.range;
 		
@@ -821,14 +1769,20 @@ class Graph
 			
 			for(let i = 0; i < x_lab.length; i++){
 				let xx = x+mar.left + (dx-mar.left-mar.right)*(x_lab[i].x-ra.xmin)/(ra.xmax-ra.xmin);
-		
+				
 				if(x_param == true){
-					if(x_vert == true) right_param_text(x_lab[i].name,xx,y+0.6,si_histo_label,col,wid);	
-					else center_param_text(x_lab[i].name,xx,y+0.6,si_histo_label,col,wid);
+					if(x_vert == true) top_vert_param_text(x_lab[i].name,xx+0.3*si,y+0.2,si,col,dy-0.2);
+					else center_param_text(x_lab[i].name,xx,y+0.6,si,col,wid);
 				}	
 				else{
-					if(x_vert == true) right_text(x_lab[i].name,xx,y+0.6,get_font(si_histo_label),col,wid);	
-					else center_text(x_lab[i].name,xx,y+0.6,get_font(si_histo_label),col,wid);
+					if(x_vert == true){
+						let tsa = text_sup_anno(x_lab[i].name,si,dy-0.2);
+						vert_text_tsa(tsa,xx+0.3*si,y+0.2,si,col);
+					}
+					else{
+						let tsa = text_sup_anno(x_lab[i].name,si,wid);
+						center_text_tsa(tsa,xx,y+0.6,col);
+					}
 				}
 			}
 		}
@@ -837,7 +1791,6 @@ class Graph
 			let ti = this.tick.x;
 			for(let i = 0; i < ti.length; i++){
 				let xx = x+mar.left + (dx-mar.left-mar.right)*(ti[i].value-ra.xmin)/(ra.xmax-ra.xmin);
-			
 				center_text(ti[i].te,xx,y+0.6,fo,col);  
 			}
 		}
@@ -859,26 +1812,26 @@ class Graph
 	
 	
 	/// Draws the y tick marks
-	draw_ytick_label(x,y,dx,dy,mar,y_lab,y_hor,y_param,ov)
+	draw_ytick_label(x,y,dx,dy,mar,y_lab,y_hor,y_param,si,ov)
 	{
 		fill_rectangle(x,y,dx,dy,WHITE); 
 		
 		let ra = this.range;
 		
 		let col = BLACK; if(ov) col = DGREY;
-		
+	
 		if(y_lab){
-			let fo = get_font(si_histo_label);
+			let fo = get_font(si);
 			for(let i = 0; i < y_lab.length; i++){
-				let yy = y + dy - 0.2 - (dy-yaxisgap-mar.top)*(y_lab[i].y-ra.ymin)/(ra.ymax-ra.ymin);
-				
+				let yy = y + dy -yaxisgap - (dy-yaxisgap-mar.top)*(y_lab[i].y-ra.ymin)/(ra.ymax-ra.ymin);
+			
 				if(y_param == true){
-					if(y_hor == true) right_param_text(y_lab[i].name,x+dx,yy,si_histo_label,col,mar.left-2,20);
-					else center_vert_param_text(y_lab[i].name,x+dx,yy,si_histo_label,col,20); 
+					if(y_hor == true) right_param_text(y_lab[i].name,x+dx,yy+0.3*si,si,col,mar.left-2,20);
+					else center_vert_param_text(y_lab[i].name,x+dx,yy,si,col,20); 
 				}
 				else{
-					if(y_hor == true) right_text(y_lab[i].name,x+dx,yy,fo,col,mar.left-2);
-					else center_vert_text(y_lab[i].name,x+dx,yy,fo,col); 
+					if(y_hor == true) right_text(y_lab[i].name,x+dx,yy+0.3*si,fo,col,mar.left-2);
+					else center_vert_text(y_lab[i].name,x+dx,yy,fo,col); 	
 				}
 			}
 		}
@@ -898,23 +1851,28 @@ class Graph
 	axes(lay)
 	{
 		let mar = lay.op.mar;
+		if(graph_dia){ pr("GRAPH_DIA: axes: op:"); pr(lay.op); pr(this.op);}
 		
 		lay.add_button({x:mar.left, y:lay.dy-mar.bottom, dx:lay.dx-mar.left, dy:0, type:"x-axis"});
 		
 		let x_lab = lay.op.x_label;
 		let x_vert = lay.op.x_label_vert;
-		let x_param = lay.op.x_param;
 		
+		let x_param = lay.op.x_param;
+			
 		let yl = lay.dy-mar.bottom;
 		if(x_lab){
-			yl += 0.8;
-			lay.add_button({x:0, y:yl, dx:lay.dx, dy:0.8, mar:mar, x_lab:x_lab, x_vert:x_vert, x_param:x_param, type:"x-tick-label"});
+			let dy = 0.8; 
+			if(x_vert == true){ yl += 0.3; dy = mar.bottom-2.3;} 
+			else yl += 0.8;
+		
+			lay.add_button({x:0, y:yl, dx:lay.dx, dy:dy, mar:mar, x_lab:x_lab, x_vert:x_vert, x_param:x_param, x_si:lay.op.x_si, type:"x-tick-label"});
 			yl += 1;
 		}
 		else{
 			lay.add_button({x:mar.left, y:yl, dx:lay.dx-mar.left-mar.right, dy:tick_si, type:"x-tick"});
 			yl += tick_si+0.3;
-			lay.add_button({x:0, y:yl, dx:lay.dx, dy:0.8, mar:mar, type:"x-tick-label", ac:"X Tick"});
+			lay.add_button({x:0, y:yl, dx:lay.dx, dy:0.8, mar:mar, x_si:si_histo_label, type:"x-tick-label", ac:"X Tick"});
 			yl += 1;
 			
 			let xz = lay.dx-4, yz = lay.dy-1.7, f= 0.8;
@@ -924,17 +1882,23 @@ class Graph
 			
 			if(this.variety == "Distribution"){
 				lay.add_button({x:mar.left, y:yz+0.2, dx:1.4, dy:1.4, ac:"GraphSettings", type:"Settings"});
+				if(tab_name() == "Inference" && subsubtab_name() == "Parameters"){
+					lay.add_button({x:mar.left+2, y:yz+0.2, dx:1.4, dy:1.4, ac:"BayesFactor", type:"BayesFactor"});
+				}
 			}
 			
 			if(this.variety == "Trace"){
 				lay.add_button({x:mar.left, y:yz, dx:1.4, dy:1.4, ac:"TraceSettings", type:"Settings"});
 			}
+			
+			if(this.variety == "Scatter"){
+				lay.add_button({x:mar.left-2.4, y:yz, dx:1.4, dy:1.4, ac:"ScatterSettings", type:"Settings"});
+			}
 		}
 		
-		lay.add_button({te:this.op.x_label, x:mar.left, y:lay.dy-si_graph_label-0.21, dx:lay.dx-mar.left-mar.right, dy:si_graph_label+0.1, mar:mar, param:this.op.x_param, type:"x-label"});
+		lay.add_button({te:this.op.x_label, x:mar.left, y:lay.dy-si_graph_label-0.21, dx:lay.dx-mar.left-mar.right, dy:si_graph_label+0.1, mar:mar, param:this.op.x_param, italic:this.op.italic, type:"x-label"});
 	
-	
-		lay.add_button({x:mar.left, y:0, dx:0, dy:lay.dy-mar.bottom, param:this.op.param, type:"y-axis"});
+		lay.add_button({x:mar.left, y:0, dx:0, dy:lay.dy-mar.bottom, param:this.op.param, italic:this.op.italic, type:"y-axis"});
 		
 		let y_lab = lay.op.y_label;
 		let y_hor = lay.op.y_label_hor;
@@ -942,18 +1906,18 @@ class Graph
 	
 		if(y_lab){
 			let xl = 1;
-			lay.add_button({x:xl, y:0, dx:mar.left-1.5, dy:lay.dy-mar.bottom+yaxisgap, mar:mar, y_lab:y_lab, y_hor:y_hor, y_param:y_param, type:"y-tick-label"});
+			lay.add_button({x:xl, y:0, dx:mar.left-1.5, dy:lay.dy-mar.bottom+yaxisgap, mar:mar, y_lab:y_lab, y_hor:y_hor, y_param:y_param, y_si:lay.op.y_si, type:"y-tick-label"});
 			xl += 1;
 		}
 		else{
 			let xl = mar.left-0.2-this.tick.wmax;
 			xl -= tick_si;
 			lay.add_button({x:mar.left-tick_si, y:mar.top, dx:tick_si, dy:lay.dy-mar.top-mar.bottom, type:"y-tick"});
-			lay.add_button({x:xl, y:0, dx:this.tick.wmax, dy:lay.dy-mar.bottom+yaxisgap, mar:mar, type:"y-tick-label", ac:"Y Tick"});
+			lay.add_button({x:xl, y:0, dx:this.tick.wmax, dy:lay.dy-mar.bottom+yaxisgap, mar:mar, y_si:si_histo_label, type:"y-tick-label", ac:"Y Tick"});
 			xl -= si_graph_label+0.4;
 		}
 		
-		lay.add_button({te:this.op.y_label, x:0, y:mar.top, dx:si_graph_label+0.2, dy:lay.dy-mar.top-mar.bottom, mar:mar, param:this.op.y_param, type:"y-label"});
+		lay.add_button({te:this.op.y_label, x:0, y:mar.top, dx:si_graph_label+0.2, dy:lay.dy-mar.top-mar.bottom, mar:mar, param:this.op.y_param, italic:this.op.italic, type:"y-label"});
 	}
 	
 	
@@ -967,9 +1931,9 @@ class Graph
 		let yl = lay.dy-mar.bottom;
 		lay.add_button({x:mar.left, y:yl, dx:lay.dx-mar.left-mar.right, dy:tick_si, type:"x-tick"});
 		yl += tick_si+0.3;
-		lay.add_button({x:0, y:yl, dx:lay.dx, dy:0.8, mar:mar, type:"x-tick-label", ac:"X Tick"});
+		lay.add_button({x:0, y:yl, dx:lay.dx, dy:0.8, mar:mar, x_si:si_histo_label, type:"x-tick-label", ac:"X Tick"});
 		yl += 1;
-		lay.add_button({te:this.op.x_label, x:mar.left, y:yl, dx:lay.dx-mar.left-mar.right, dy:si_graph_label+0.1, mar:mar, param:this.op.x_param, type:"x-label"});
+		lay.add_button({te:this.op.x_label, x:mar.left, y:yl, dx:lay.dx-mar.left-mar.right, dy:si_graph_label+0.1, mar:mar, param:this.op.x_paramr, italic:this.op.italic, type:"x-label"});
 		
 		let xz = lay.dx-6, yz = lay.dy-1.7, f= 0.8;
 		lay.add_button({x:xz, y:yz, dx:1.8*f, dy:2*f, ac:"ZoomInTimeline", type:"ZoomIn"});
@@ -988,6 +1952,8 @@ class Graph
 		ra.xmin = mean - (mean-ra.xmin)/fac;
 		ra.xmax = mean + (ra.xmax-mean)/fac;
 		this.set_ind_time();
+		
+		this.barh *= fac;
 	}
 	
 	
@@ -1023,7 +1989,7 @@ class Graph
 			replot_layer("Axes");
 			break;
 			
-		case "Individual":
+		case "Individual": case "TransTree": case "PhyloTree":
 			this.set_ind_time();
 			replot_layer("TimeAxis");
 			break;
@@ -1034,68 +2000,222 @@ class Graph
 	}
 	
 	
-	/// Adds all the compartment buttons
-	add_compartment_buts(lay)
+	/// Gets the classiciation
+	get_cla(p,cl)
+	{
+		if(subtab_name() == "Results"){
+			switch(tab_name()){
+			case "Simulation": return model_sim.species[p].cla[cl];
+			case "Inference": return model_inf.species[p].cla[cl];
+			case "Post. Simulation": return model_inf.species[p].cla[cl];
+			default: error("Not found"); break;
+			}
+		}
+		return model.species[p].cla[cl];
+	}
+	
+	
+	/// Adds all the annotation buttons
+	add_annotation_buts(lay)
 	{
 		let p = this.op.p;
 		let cl = this.op.cl;
 		
+		let claa = this.get_cla(p,cl);  
+		
+		let cam = claa.camera;    
+		
+		for(let k = 0; k < claa.annotation.length; k++){
+			let an = claa.annotation[k];
+			switch(an.type){
+				case "map":
+					{
+						let ms = find_map_store(an.map_ref);
+						let box = ms.feature.box;
+			
+						for(let i = 0; i < ms.feature.length; i++){
+							
+							let fea = ms.feature[i];
+							let box = fea.box;
+						
+							let p1 = trans_point(box.xmin,box.ymin,cam,lay);
+							let p2 = trans_point(box.xmax,box.ymax,cam,lay);
+							
+							lay.add_button({x:p1.x, y:p1.y, dx:p2.x-p1.x, dy:p2.y-p1.y, type:"Feature", polygon:fea.polygon});
+						}
+					}
+					break;
+
+				default: break;
+			}
+		}
+	}
+	
+	
+	/// Adds all the compartment buttons
+	add_compartment_buts(lay) 
+	{
+		if(graph_dia) pr("GRAPH DIA: add_compartment_buts");
+		
+		let vari = this.variety;
+		
+		let ckey = this.colour_key;
+	
+		let grad;
+		if(ckey != undefined) grad = ckey.grad;
+		
+		let p = this.op.p;
+		let cl = this.op.cl;
+	
 		lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, p:p, cl:cl, ac:"ClassificationBack", type:"Nothing"});
 	
-		let claa = this.op.species[p].cla[cl];
-		
+		let claa = this.get_cla(p,cl);  	
 		let cam = claa.camera;
 		
-		let ac = "Graph Comp";
-	
-		if(this.data.length != claa.ncomp) error("number of data not right");
-
-		let fr = this.animation.playframe;
-	
-		for(let k = 0; k < claa.ncomp; k++){
-			let c = claa.comp[k];
-		
-			let value = this.data[k].point[fr].y;
-			let val = value/this.range.ymax;
-			if(val > 1) val = 1; if(val < 0) val = 0;
-			let valc = 255-Math.floor(255*val);
-			let col = "rgb("+valc+","+valc+","+valc+")";
-					
-			switch(c.type){
-			case "box":
-				{
-					let pt = trans_point(c.x,c.y,cam,lay);
-					let w =	c.w*cam.scale;
-					let h =	c.h*cam.scale; 
-					let x = pt.x-w/2, y = pt.y-h/2;
-					
-					//lay.add_button({te:claa.comp[k].name, x:x, y:y, dx:w, dy:h, ac:ac, type:"Compartment", col:c.col, p:p, cl:cl, i:k});
-					lay.add_button({te:claa.comp[k].name, x:x, y:y, dx:w, dy:h, ac:ac, type:"CompGraph", value:Math.floor(value), col:col, p:p, cl:cl, i:k});
-				}
-				break;
+		if(this.type == "Density"){
+			let di = this.density_info;
 			
-			case "latlng":
-				{
-					let pt = trans_point(c.x,c.y,cam,lay);
-					let w =	2*latlng_radius*cam.scale*cam.ruler, h = w; 
-					let x = pt.x-w/2, y = pt.y-h/2;
-					lay.add_button({te:claa.comp[k].name, x:x, y:y, dx:w, dy:h, ac:ac, type:"CompLatLng", col:c.col, p:p, cl:cl, i:k});
-				}
-				break;
-				
-			case "boundary":
-				{
-					let box = c.feature.box;
-				
-					let pmin = trans_point(box.xmin,box.ymin,cam,lay);
-					let pmax = trans_point(box.xmax,box.ymax,cam,lay);
-					
-					lay.add_button({x:pmin.x, y:pmin.y, dx:pmax.x-pmin.x, dy:pmax.y-pmin.y, ac:ac, type:"CompMap", polygon:c.feature.polygon, mask:c.mask, col:c.col, p:p, cl:cl, i:k});
-				}
-				break;
+			let pt = trans_point(di.x,di.y,cam,lay);
+			
+			/// Calculates the colour matrix
+			let fr = this.animation.playframe;
+			if(vari == "CompVector") fr = 0;
+			
+			let col_val = [];
 
-			default: error("Option not recognised 82"); break;
+			for(let k = 0; k < claa.ncomp; k++){
+				col_val[k] = LLGREY_CODE;
 			}
+
+			for(let k = 0; k < this.data.length; k++){	
+				let dat = this.data[k];
+				col_val[dat.c] = dat.col_k[fr];
+			}
+		
+			let DX = di.DX, DY = di.DY;
+			let mat = di.mat;
+			
+			let col_k = [];
+			for(let j = 0; j < DY; j++){
+				col_k[j] = [];
+				for(let i = 0; i < DX; i++){
+					let m = mat[j][i];
+					if(m != undefined) col_k[j][i] = col_val[m];
+				}
+			}
+			di.col_k = col_k;
+			
+			lay.add_button({x:pt.x, y:pt.y, dx:di.dx*cam.scale, dy:di.dy*cam.scale, type:"DensityBut"});
+		}
+		else{
+			let ac;
+			
+			if(vari == "CompVector") ac = "CompVectorClick";
+			if(vari == "Population") ac = "CompVectorClick";
+				
+			let co_graph = "CompGraph", co_latlnggraph = "CompLatLngGraph", co_map = "CompMapGraph";
+
+			if(vari == "Population" && this.op.number_comp == true){
+				co_graph = "CompGraph2"; co_latlnggraph = "CompLatLngGraph2";
+			}
+			
+			let fr = this.animation.playframe;
+			if(vari == "CompVector") fr = 0; 
+			
+			for(let k = 0; k < claa.ncomp; k++){
+				let c = claa.comp[k];
+			
+				let value, CImin, CImax;
+				let col = c.col;
+				let name = claa.comp[k].name;
+				
+				switch(this.type){
+				case "CompMatrix": case "CompMatrixAnim": 
+					break;
+				default:
+					{
+						let j = k;
+						if(j >= this.data.length || this.data[j].c != k){
+							j = find(this.data,"c",k);
+						}
+						if(j == undefined){
+							value = "";
+							CImin = "";
+							CImax = "";
+							col = WHITE;
+						}
+						else{
+							let dat = this.data[j];
+							if(dat.y_vec){
+								value = dat.y_vec[fr];
+								CImin = "";
+								CImax = "";
+								col = grad[dat.col_k[fr]];
+							}
+							else{
+								let dp = dat.point[fr];
+								value = dp.y;
+								CImin = dp.CImin;
+								CImax = dp.CImax;
+								col = dp.col; 
+							}
+						}
+					}
+					break;		
+				}
+				
+				switch(c.type){
+				case "box":
+					{
+						let pt = trans_point(c.x,c.y,cam,lay);
+						let w =	c.w*cam.scale;
+						let h =	c.h*cam.scale; 
+						let x = pt.x-w/2, y = pt.y-h/2;
+					
+						lay.add_button({te:name, x:x, y:y, dx:w, dy:h, ac:ac, type:co_graph, value:value, CImin:CImin, CImax:CImax, col:col, col_dark:dark_colour(col), p:p, cl:cl, i:k, show:true});
+					}
+					break;
+				
+				case "latlng":
+					{
+						let si = cam.scale*cam.ruler*Math.exp(inter.lnglat_slider.value);
+						if(si > si_limit_circle){
+							let pt = trans_point(c.x,c.y,cam,lay);
+							let w =	2*latlng_radius*si, h = w; 
+							let x = pt.x-w/2, y = pt.y-h/2;
+							lay.add_button({te:name, x:x, y:y, dx:w, dy:h, ac:ac, type:co_latlnggraph, value:value, CImin:CImin, CImax:CImax, col:col, col_dark:dark_colour(col), p:p, cl:cl, i:k});
+						}
+					}
+					break;
+					
+				case "boundary":
+					{
+						let ms = find_map_store(c.map_ref);
+						let box = ms.feature.box;
+			
+						let pmin = trans_point(box.xmin,box.ymin,cam,lay);
+						let pmax = trans_point(box.xmax,box.ymax,cam,lay);
+						
+						lay.add_button({te:name, value:value, CImin:CImin, CImax:CImax, x:pmin.x, y:pmin.y, dx:pmax.x-pmin.x, dy:pmax.y-pmin.y, ac:ac, type:co_map, polygon:ms.feature.polygon, mask:ms.mask, col:col, p:p, cl:cl, i:k});
+					}
+					break;
+
+				default: error("Option not recognised 82"); break;
+				}
+			}
+		}
+		
+		switch(this.type){
+		case "CompMatrix": case "CompMatrixAnim":
+			lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, lay:lay, type:"CompLink"});
+			break;
+		}
+		
+		let timepoint = this.op.timepoint;
+		let anim = inter.graph.animation;
+		if(timepoint && anim.playing == false){
+			let si = 1.2;
+			lay.add_button({te:"t="+timepoint[anim.playframe], x:lay.dx/2-3, y:0.3, dx:6, dy:si, type:"CenterText", font:get_font(si)}); 
 		}
 	}
 
@@ -1105,46 +2225,138 @@ class Graph
 	{
 		let p = this.op.p;
 		let cl = this.op.cl;
-		let claa = this.op.species[p].cla[cl];
+		let claa = this.get_cla(p,cl);  
 		model.add_transition_buts2(p,cl,"No Click",claa,false,lay);
 	}
-	
 
+	
+	/// Makes a density plot
+	density_plot(x,y,dx,dy)
+	{
+		let di = this.density_info;
+		let DX = di.DX, DY = di.DY;
+		let col_k = di.col_k;
+	
+		let dencan = document.createElement('canvas');
+		dencan.width = DX;
+		dencan.height = DY;
+		let dencv = dencan.getContext('2d');
+
+		let ckey = this.colour_key;
+		let rgb = ckey.grad_rgb;
+
+		let imageData = new ImageData(DX,DY);
+		let data = imageData.data;
+	
+		for(let j = 0; j < DY; j++){
+			for(let i = 0; i < DX; i++){
+				let k = col_k[j][i];
+				if(k != undefined){
+					let p = 4*(j*DX+i);
+					if(k == LLGREY_CODE){
+						data[p] = 240; data[p+1] = 240; data[p+2] = 240; data[p+3] = 255;
+					}
+					else{					
+						let co = rgb[k];
+						
+						data[p] = co.r; data[p+1] = co.g; data[p+2] = co.b; data[p+3] = 255;
+					}
+				}
+			}
+		}
+		dencv.putImageData(imageData,0,0);
+	
+		let x1 = ro(x), y1 = ro(y), x2 = ro(x+dx), y2 = ro(y+dy);
+
+		cv.drawImage(dencan,x1,y1,x2-x1,y2-y1);
+	}
+
+	
 	/// Adds buttons for 
 	add_animcontrol_buts(lay)
 	{
-		let p = this.op.p;
-		let cl = this.op.cl;
-		
-		lay.add_button({x:playbar_mar, y:0.4, dx:lay.dx-2*playbar_mar, dy:1.1, type:"Timebar", ac:"Timebar"});
-			
-		let play_r = 1;
-		lay.add_button({x:lay.dx/2-play_r, y:lay.dy-2*play_r, dx:2*play_r, dy:2*play_r, type:"PlayButton", ac:"PlayButton"});
-		
-	
-		let dx = 3;
-		lay.add_button({x:lay.dx/2-dx-play_r, y:lay.dy-2*play_r, dx:2*play_r, dy:2*play_r, type:"PlayBackward", ac:"PlayBackward"});
-			
-		lay.add_button({x:lay.dx/2+dx-play_r, y:lay.dy-2*play_r, dx:2*play_r, dy:2*play_r, type:"PlayForward", ac:"PlayForward"});
-		
 		let xz = lay.dx-6, yz = lay.dy-2;
-		lay.add_button({x:xz, y:yz, dx:1.8, dy:2, p:p, cl:cl, ac:"ZoomIn", type:"ZoomIn"});
 
-		lay.add_button({x:xz+2, y:yz, dx:1.8, dy:1.8, p:p, cl:cl, ac:"ZoomOut", type:"ZoomOut"});
-		
-		lay.add_button({x:2.4, y:yz+0.2, dx:1.4, dy:1.4, ac:"Settings", type:"Settings"});
-	}
+		let xslid = 2.4;
 	
+		switch(this.variety){
+		case "CompMatrix": case "CompVector":
+			break;
+		
+		default:
+			{	
+				lay.add_button({x:playbar_mar, y:0.4, dx:lay.dx-2*playbar_mar, dy:1.1, type:"Timebar", ac:"Timebar"});
+					
+				let play_r = 1;
+				lay.add_button({x:lay.dx/2-play_r, y:lay.dy-2*play_r, dx:2*play_r, dy:2*play_r, type:"PlayButton", ac:"PlayButton"});
+				
+				let dx = 3;
+				lay.add_button({x:lay.dx/2-dx-play_r, y:lay.dy-2*play_r, dx:2*play_r, dy:2*play_r, type:"PlayBackward", ac:"PlayBackward"});
+					
+				lay.add_button({x:lay.dx/2+dx-play_r, y:lay.dy-2*play_r, dx:2*play_r, dy:2*play_r, type:"PlayForward", ac:"PlayForward"});
+				
+				lay.add_button({x:2.4, y:yz+0.2, dx:1.4, dy:1.4, ac:"Settings", type:"Settings"});
+				/*
+				let timepoint = this.op.timepoint;
+				let anim = inter.graph.animation;
+				if(timepoint && anim.playing == false){
+					let si = 0.9;
+					lay.add_button({te:"t="+timepoint[anim.playframe], x:xz-5, y:2.5, dx:4, dy:si, type:"CenterText", font:get_font(si)}); 
+				}
+				*/
+				
+				xslid = 5.4;
+			}
+			break;
+		}
+		
+		switch(this.type){
+		case "CompMatrix": case "CompMatrixAnim":
+			lay.add_button({x:xslid, y:yz+0.5, dx:5, dy:1, info:inter.compmatrix_slider, ac:"Slider", type:"Slider"});
+			break;
+			
+		case "Density": 
+			lay.add_button({x:xslid, y:yz+0.5, dx:5, dy:1, info:inter.density_slider, ac:"Slider", type:"Slider"});
+			break;
+			
+		case "Compartment":
+			{
+				let op = this.op;
+				let claa = this.get_cla(op.p,op.cl);
+				if(claa.camera.coord == "latlng"){
+					inter.lnglat_slider.lay = lay.name;
+					lay.add_button({x:xslid, y:yz+0.5, dx:5, dy:1, info:inter.lnglat_slider, ac:"Slider", type:"Slider"});
+				}
+			}
+		}
+		
+		switch(this.type){
+		case "HistoAnim": break;
+		
+		default:
+			{
+				let p = this.op.p;
+				let cl = this.op.cl;
+		
+				lay.add_button({x:xz, y:yz, dx:1.8, dy:2, p:p, cl:cl, ac:"ZoomIn", type:"ZoomIn"});
+
+				lay.add_button({x:xz+2, y:yz, dx:1.8, dy:1.8, p:p, cl:cl, ac:"ZoomOut", type:"ZoomOut"});
+			}
+			break;
+		}
+	}
+
 	
 	/// Setting for the distribution plots
 	settings_dist_bubble(cont)
 	{
-		cont.dx = 9;
+		cont.dx = 10;
 		bubble_addtitle(cont,"Settings",{});
 		
 		bubble_add_minititle(cont,"Distribution");
+	
+		let ds = get_inf_res().plot_filter.dist_settings;
 		
-		let ds = inf_result.plot_filter.dist_settings;
 		bubble_addradio(cont,0,"kde","KDE",ds.radio);
 		
 		if(ds.radio.value == "kde"){
@@ -1167,20 +2379,51 @@ class Graph
 		bubble_add_minititle(cont,"Annotation");
 		
 		bubble_addcheckbox(cont,-0.1,"Show mean",ds.show_mean);
-		bubble_addcheckbox(cont,-0.1,"Show prior",ds.show_prior);
+	
+		if(this.op.param){
+			bubble_addcheckbox(cont,-0.1,"Show prior",ds.show_prior);
 		
+			let ds2 = get_inf_res().plot_filter.sim_val;	
+			bubble_addcheckbox(cont,-0.1,"Show simulated values",ds2);
+		}
+		
+		add_end_button(cont,"OK","DistributionPlotOK",{});	
 	}
 		
 	
 	/// Setting for the trace plots
 	settings_trace_bubble(cont)
 	{
-		cont.dx = 9;
+		cont.dx = 10;
 		bubble_addtitle(cont,"Settings",{});
 		bubble_input(cont,"Burn-In %",{type:"burnin"});
+		
+		let ds = get_inf_res().plot_filter.sim_val;
+		
+		bubble_addcheckbox(cont,0,"Show simulated values",ds);
+		
 		add_end_button(cont,"OK","BurninOK",{});	
 	}	
 		
+		
+	/// Setting for the scatter plots
+	settings_scatter_bubble(cont)
+	{
+		cont.dx = 10;
+		bubble_addtitle(cont,"Settings",{});
+		
+		if(subsubtab_name() == "Individuals"){
+			let seb = get_inf_res().plot_filter.scatter_settings.show_eb;
+			bubble_addcheckbox(cont,0,"Show error bars",seb);
+		}
+		else{
+			let ds = get_inf_res().plot_filter.sim_val;	
+			bubble_addcheckbox(cont,0,"Show simulated values",ds);
+		}
+		
+		add_end_button(cont,"OK","ScatterOK",{});	
+	}	
+	
 		
 	/// Alls the user to change the speed of animations
 	settings_speed_bubble(cont)
@@ -1198,17 +2441,36 @@ class Graph
 		add_end_button(cont,"OK","CloseBubble",{});	
 	}
 	
-	// Creates the graph by adding layers for the content and axes
+	
+	/// Adds a graph warning
+	warning(lay)
+	{
+		lay.add_button({te:lay.op.warn, x:0, y:0, dx:lay.dx, dy:lay.dy, type:"BannerWarn"});
+	}
+	
+	
+	/// Creates the graph by adding layers for the content and axes
 	create(x,y,w,h,lay) 
 	{
 		let vari = plot_variety(this.type);
+		if(graph_dia) pr("GRAPH DIA: createL  vari:"+vari);
+		
+		let hei = 4;
+	
+		let warn = "";
+		let warn_upper = false;
+		if(this.op.line_max) warn = "Too many lines to plot";
+		if(this.op.ind_max) warn = "Too many individuals";
+		if(this.op.point_max) warn = "Too many points";
+		if(this.op.param_max){ warn = "Too many parameters to calculate"; warn_upper = true;}
 		
 		switch(vari){
 		case "Line plot":
 			{
 				let mar = copy(graph_mar); mar.left += this.tick.wmax;
 				
-				add_layer("GraphContent",lay.x+x+mar.left,lay.y+y+mar.top,w-mar.right-mar.left,h-mar.top-mar.bottom,{});
+				this.extra_flag = true;
+				add_layer("GraphContent",lay.x+x+mar.left,lay.y+y+mar.top,w-mar.right-mar.left+GRAPH_EXTRA,h-mar.top-mar.bottom,{});
 		
 				add_layer("Axes",lay.x+x,lay.y+y,w,h,{mar:mar});
 			}
@@ -1224,115 +2486,170 @@ class Graph
 			}
 			break;
 			
-		case "Comp plot":
+		case "CompMatrix plot": case "CompMatrixAnim plot": case "CompVector plot":
 			{
 				let mar = { right:0, left:0, top:0, bottom:0};
+				add_layer("GraphAnnotations",lay.x+x+mar.left,lay.y+y+mar.top,w-mar.right-mar.left,h-mar.top-mar.bottom,{});
 				add_layer("GraphCompartments",lay.x+x+mar.left,lay.y+y+mar.top,w-mar.right-mar.left,h-mar.top-mar.bottom,{});
-				add_layer("GraphTransitions",lay.x+x+mar.left,lay.y+y+mar.top,w-mar.right-mar.left,h-mar.top-mar.bottom,{});
 		
-				let hei = 4;
-				add_layer("AnimControls",lay.x+x+mar.left,h+y-mar.top-hei-1,w-mar.right-mar.left,hei,{});
+				add_layer("AnimControls",lay.x+anim_mar,lay.y+lay.dy-anim_mar_bot,lay.dx-right_menu_width-anim_mar,hei,{});		
 			}
 			break;
 			
-		case "Individual plot":
+		case "Comp plot":
+			{
+				let mar = { right:0, left:0, top:0, bottom:0};	
+				let op = this.op;
+				let cam = this.get_cla(op.p,op.cl).camera;
+				let xx = lay.x+x+mar.left;
+				let yy = lay.y+y+mar.top;
+				let ww = w-mar.right-mar.left;
+				let hh = h-mar.top-mar.bottom;
+				
+				model.ensure_lng(cam,ww);
+				add_layer("GraphAnnotations",xx,yy,ww,hh,{});
+				add_layer("GraphCompartments",xx,yy,ww,hh,{});
+				
+				if(this.variety != "CompVector"){
+					add_layer("GraphTransitions",xx,yy,ww,hh,{});
+				}
+				
+				add_layer("AnimControls",lay.x+anim_mar,lay.y+lay.dy-anim_mar_bot,lay.dx-right_menu_width-anim_mar,hei,{});
+			}
+			break;
+			
+		case "Density plot":
+			{
+				let mar = { right:0, left:0, top:0, bottom:0};
+				add_layer("GraphAnnotations",lay.x+x+mar.left,lay.y+y+mar.top,w-mar.right-mar.left,h-mar.top-mar.bottom,{});
+				add_layer("GraphCompartments",lay.x+x+mar.left,lay.y+y+mar.top,w-mar.right-mar.left,h-mar.top-mar.bottom,{});
+			
+				let hei = 4;
+
+				add_layer("AnimControls",lay.x+anim_mar,lay.y+lay.dy-anim_mar_bot,lay.dx-right_menu_width-anim_mar,hei,{});
+			}
+			break;
+			
+		case "Individual plot": case "TransTree plot": case "PhyloTree plot":
 			{
 				let mar = { right:2, left:2, top:0, bottom:3.3};
-	
+				let left_shift = 0;
+				if(vari == "TransTree plot" || vari == "PhyloTree plot"){
+					let fo = get_font(si_transtree);
+					for(let i = 0; i < this.data.length; i++){
+						let da = this.data[i];
+						if(da.type == "InfBar"){
+							let w = text_width(da.name,fo);
+							if(w > left_shift) left_shift = w;
+						}
+					}
+					left_shift += 0.4;
+				}
+				mar.left += left_shift;
+				
 				if(this.data.length == 0){
 					let dx = 20;
 					lay.add_paragraph("There are no individuals in the system.",dx,lay.dx/2-dx/2,lay.dy/2,BLACK,para_si,para_lh);	
 				}
 				else{
-					add_layer("GraphContent",lay.x+x+mar.left,lay.y+y+mar.top,w-mar.right-mar.left+scrollw,h-mar.top-mar.bottom,{});
+					add_layer("GraphContent",lay.x+x+mar.left-left_shift,lay.y+y+mar.top,w-mar.right-mar.left+scrollw+left_shift,h-mar.top-mar.bottom,{left_shift:left_shift,j:"here"});
 
 					add_layer("TimeAxis",lay.x+x,lay.y+y,w,h,{mar:mar});
 				}
 			}
 			break;
 			
-		case "Histogram plot":
+		case "Histogram plot": case "HistoAnim plot":
 			{
 				let mar = copy(graph_mar); mar.left += this.tick.wmax;
 			
-				let fo = get_font(si_histo_label);
-				let x_label = [];
-				let wimax = 0;
-				for(let i = 0; i < this.data.length; i++){
-					let da = this.data[i];
-					if(da.type == "Bar"){
-						x_label.push({name:da.name, x:da.x});
-						let wi = text_width(da.name,fo);
-						if(wi > wimax) wimax = wi;
+				let x_param = this.op.x_param;
+				
+				if(vari == "HistoAnim plot") h -= 4;
+				
+				let lab=[];
+				
+				if(vari == "HistoAnim plot"){
+					let op = this.op;
+					let comp = this.get_cla(op.p,op.cl).comp;
+					for(let c = 0; c < comp.length; c++){
+						lab.push(comp[c].name);
 					}
 				}
-				
-				let ra = this.range;
-		
-				let x_label_vert = false;
-				let dx_label = (w-mar.right-mar.left)/(ra.xmax-ra.xmin);
-				if(dx_label < wimax){
-					x_label_vert = true;
-					if(wimax > 7) wimax = 7;
-					mar.bottom = 2.5+wimax;
+				else{
+					for(let i = 0; i < this.data.length; i++){
+						let da = this.data[i];
+					
+						if(da.type == "Bar"){
+							let name = da.name;
+							lab.push(da.name);
+						}
+					}
 				}
+				x_param = false;
 				
-				add_layer("GraphContent",lay.x+x+mar.left,lay.y+y+mar.top,w-mar.right-mar.left,h-mar.top-mar.bottom,{});
+				let lab_info = this.get_axis_label_info(lab,"x",w-mar.right-mar.left,mar,x_param);
+				let x_label = lab_info.label;
+				let x_label_vert = lab_info.turn;
+				let x_si = lab_info.si;
+				if(x_label_vert == true) mar.bottom = 2.5+lab_info.wimax;
+				else mar.bottom = 3.5;
 			
-				add_layer("Axes",lay.x+x,lay.y+y,w,h,{mar:mar, x_label:x_label, x_label_vert:x_label_vert});
+				add_layer("GraphContent",lay.x+x+mar.left,lay.y+y+mar.top,w-mar.right-mar.left,h-mar.top-mar.bottom,{});
+		
+				add_layer("Axes",lay.x+x,lay.y+y,w,h,{mar:mar, x_label:x_label, x_param:x_param, x_label_vert:x_label_vert, x_si:x_si});
+				
+				if(vari == "HistoAnim plot"){
+					let hei = 4;
+					
+					add_layer("AnimControls",lay.x+anim_mar,lay.y+lay.dy-anim_mar_bot,lay.dx-right_menu_width-anim_mar,hei,{});
+				}
 			}
 			break;
-			
-		case "Matrix plot":
+		
+		case "Matrix plot": case "MatrixAnim plot":
 			{
+				if(vari == "MatrixAnim plot") h -= 4;
+			
 				let mar = { right:2, left:3.3, top:2, bottom:3.3};
-				let fo = get_font(si_histo_label);
-				
+			
 				if(this.data.length != 1) error("Data not right");
 				let da = this.data[0];
 				if(da.type != "Matrix" && da.type != "Correlation") error("Data not right"); 
+				
+				let x_param = this.op.x_param;
+				let lab_info = this.get_axis_label_info(da.xlab,"x",w-mar.right-mar.left,mar,x_param);
+	
+				let x_label = lab_info.label;
+				let x_label_vert = lab_info.turn;
+				let x_si = lab_info.si;
+				if(x_label_vert == true) mar.bottom = 2.5+lab_info.wimax;
+				else mar.bottom = 3.5;
+				
+				let y_param = this.op.y_param;
+				lab_info = this.get_axis_label_info(da.ylab,"y",h-mar.top-mar.bottom,mar,y_param);
+				let y_label = lab_info.label;
+				let y_label_hor = lab_info.turn;
+				let y_si = lab_info.si;
+			
+				if(y_label_hor) mar.left = 2+lab_info.wimax;
+				else mar.left = 3;
 					
-				let ra = this.range;
-		
-				let x_label = [];		
-				let wimax = 0;
-				for(let i = 0; i < da.xlab.length; i++){
-					x_label.push({name:da.xlab[i], x:0.5+i});
-					let wi = text_width(da.xlab[i],fo); if(wi > wimax) wimax = wi;
-				}
-			
-				let x_label_vert = false;
-				let dx_label = (w-mar.right-mar.left)/(ra.xmax-ra.xmin);
-				if(dx_label < wimax){
-					x_label_vert = true;
-					if(wimax > 7) wimax = 7;
-					mar.bottom = 2.5+wimax;
-				}
-				
-				let y_label = [];		
-				wimax = 0;
-				for(let i = 0; i < da.ylab.length; i++){
-					y_label.push({name:da.ylab[i], y:0.5+i});
-					let wi = text_width(da.ylab[i],fo); if(wi > wimax) wimax = wi;
-				}
-			
-				let y_label_hor = false;
-				let dy_label = (h-mar.top-mar.bottom)/(ra.ymax-ra.ymin);
-				if(dy_label < wimax){
-					y_label_hor = true;
-					if(wimax > 7) wimax = 7;
-					mar.left = 2.5+wimax;
-				}
-				
 				add_layer("GraphContent",lay.x+x+mar.left,lay.y+y+mar.top,w-mar.right-mar.left,h-mar.top-mar.bottom,{});
-			
-				add_layer("Axes",lay.x+x,lay.y+y,w,h,{mar:mar, x_label:x_label, x_label_vert:x_label_vert, x_param:da.x_param, y_label:y_label, y_param:da.y_param, y_label_hor:y_label_hor});
+
+				add_layer("Axes",lay.x+x,lay.y+y,w,h,{mar:mar, x_label:x_label, x_label_vert:x_label_vert, x_param:da.x_param, x_si:x_si, y_label:y_label, y_param:da.y_param, y_label_hor:y_label_hor, y_si:y_si});
+				
+				if(vari == "MatrixAnim plot"){
+					let hei = 4;
+					add_layer("AnimControls",lay.x+anim_mar,lay.y+lay.dy-anim_mar_bot,lay.dx-right_menu_width-anim_mar,hei,{});
+				}
 			}
 			break;
 			
 		case "Stat table plot":
 			{
 				let da = this.data[0];
+			
 				add_layer("TableContent",lay.x+x,lay.y+y,w,h,{table:da.table});
 			}
 			break;
@@ -1343,16 +2660,67 @@ class Graph
 			
 		default: error("Variety not recognised:"+vari); break;
 		}
+		
+		if(warn != ""){
+			let yy = lay.y+y-1; if(yy < 3.7) yy = 3.7;
+			if(warn_upper) yy = 1.8;
+			add_layer("GraphWarn",lay.x+x,yy,w,si_graph_label+0.1,{warn:warn});
+		}	
+	}
+	
+	
+	/// Works out how to fit labels around graph
+	get_axis_label_info(lab,dir,room,mar,param)
+	{
+		let si = si_histo_label;
+		let fo = get_font(si);
+		let ra = this.range;
+		
+		let label = [];		
+		let wimax = 0;
+		for(let i = 0; i < lab.length; i++){
+			if(dir == "x") label.push({name:lab[i], x:0.5+i});
+			else label.push({name:lab[i], y:0.5+i});
+			let wi;
+			if(param == true) wi = plot_param_info(lab[i],si).w;
+			else wi = text_width(lab[i],fo); 
+		
+			if(wi > wimax) wimax = wi;
+		}
+		
+		let turn = false;
+		let d_label = room/lab.length;
+		
+		if(d_label < wimax){
+			turn = true;
+			
+			let frac = 1;                               // Ensures font size fits in gap
+			if(d_label*frac < si){ wimax *= d_label*frac/si; si = d_label*frac;}
+			
+			if(wimax > 7){                              // Ensures axes are not too big
+				si *= 7/wimax; wimax = 7;
+			}
+		}
+		
+		return { turn:turn, si:si, wimax:wimax, label:label};
+	}
+
+
+	/// Creates qa message when there is no graph
+	no_graph(x,y,w,h,lay,te) 
+	{
+		if(te == undefined) te = "No data";
+		center_message(te,lay);
 	}
 	
 	
 	/// Exports an image of the graph
 	export_image(filename)
 	{
-		/// Shifts scrollbars to the origin in tables (if necessary)	
+		// Shifts scrollbars to the origin in tables (if necessary)	
 		inter.export_image = true;
 		
-		inter.sca *= 2;
+		inter.printing = true;
 		generate_screen();
 		
 		let xmin = LARGE, xmax = -LARGE, ymin = LARGE, ymax = -LARGE;
@@ -1362,12 +2730,23 @@ class Graph
 		let list = [];
 		for(let l = 0; l < inter.layer.length; l++){
 			let lay = inter.layer[l];
-			switch(lay.name){
-			case "GraphContent": case "Axes": case "TimeAxis": case "RightBotMenu": case "TableContent":
-			case "AnnotationMap": case "Annotation": case "Compartment": case "Transition": 			
-				{
-					if(lay.name == "RightBotMenu") right_bot_menu = lay;
+			let name = lay.name;
+			
+			if(name == "RightBotMenu"){
+				let fl = false;
+				for(let i = 0; i < lay.but.length; i++){
+					if(find_in(graph_but_not_print,lay.but[i].type) == undefined) fl = true;
+				}
+				if(fl == true) right_bot_menu = lay;
+				else name = ""; 
+			}
 					
+			switch(name){
+			case "GraphContent": case "Axes": case "TimeAxis": case "RightBotMenu": case "TableContent":
+			case "AnnotationMap": case "Annotation": case "Compartment": case "Transition":	
+			case "GraphAnnotations": case "GraphCompartments":
+			case "GraphTransitions":
+				{
 					if(lay.name == "TableContent"){
 						let box = get_but_box(lay.but);
 					
@@ -1416,7 +2795,8 @@ class Graph
 
 		for(let i = 0; i < list.length; i++){
 			let lay = inter.layer[list[i]];
-			lay.plot_buttons(["Settings","ZoomIn","ZoomOut"]);
+			
+			lay.plot_buttons(graph_but_not_print);
 			if(lay.can){
 				outcv.drawImage(lay.can,ro(lay.x-xmin+mar),ro(lay.y-ymin+mar));
 			}
@@ -1424,10 +2804,71 @@ class Graph
 
 		inter.export_image = false;
 		
-		inter.sca /= 2;
+		inter.printing = false;
 		generate_screen();
 		
 		if(filename) save_image(outcan,filename);
 		else print_image(outcan)
+	}
+	
+	
+	/// Exports a figure
+	export_figure(filename)
+	{
+		//inter.export_image = true;	
+		inter.printing = true;
+		generate_screen();
+		
+		save_image(inter.canvas,filename);
+		
+		//inter.export_image = false;
+		inter.printing = false;
+		generate_screen();
+	}
+	
+	
+	/// Gets the intersection between the distribuion and the value
+	get_intersection(val,point)
+	{
+		if(point.length == 0) return 0;
+		if(val < point[0].x) return 0;
+		if(val > point[point.length-1].x) return 0;
+	
+		let i = 0; while(i < point.length-1 && point[i+1].x < val) i++;
+		
+		let f = (val-point[i].x)/(point[i+1].x-point[i].x);
+	
+		return point[i].y*(1-f) + point[i+1].y*f;
+	}
+	
+	
+	/// Calculate the Bayes factor
+	calculate_BF()
+	{
+		let data = this.data;
+		let i = 0; while(i < data.length && data[i].type != "Distribution") i++;
+		if(i == data.length){ alert_help("The distribution is not found"); return;}
+		
+		let j = 0; while(j < data.length && data[j].type != "PriorLine") j++;
+		if(j == data.length){ alert_help("The prior is not found"); return;}
+		
+		let val = Number(inter.bubble.BF_val);
+	
+		let post_int = this.get_intersection(val,data[i].point);
+		let prior_int = this.get_intersection(val,data[j].point);
+		
+		if(prior_int == 0){ alert_help("The value is outside the prior range"); return;}
+		
+		let te;
+		if(post_int == 0) te = "The Bayes factor is large in favour of the model without the fixed parameter.";
+		else{
+			let bf = post_int/prior_int;
+			if(bf > 1) te = "The Bayes factor is '"+bf.toFixed(1)+"' in favour of the model with the fixed parameter.";
+			else te = "The Bayes factor is '"+(1/bf).toFixed(1)+"' in favour of the model without the fixed parameter.";
+		}		
+		
+		this.bf_store = { te:te, val:val, post_int:post_int, prior_int:prior_int};
+		
+		change_bubble_mode("bf");
 	}
 }

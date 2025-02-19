@@ -1,0 +1,52 @@
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+data-dir folder="Examples\EX_D3-data-files"
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5
+
+post-sim start=0 end=100
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
+
+species name="People" type="population"
+
+# SPECIES MODEL
+
+class name="DS" index="a"
+
+comp name="S" color="#009900" x=-25 y=-7
+comp name="I" color="#ff2222" x=1 y=-7
+
+trans name="S->I" value="exp(rate:β×exp(Δ×f(t))×{I}/N)"
+
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
+
+
+# INFERENCE DATA
+
+init-pop type="fixed" file="init-pop-People.csv"
+
+pop-data filter="DS=file" error="normal:10%" file="pop-data.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="N" constant="1001"
+param name="β" value="0.13" prior="uniform(0,1)"
+param name="Δ" value="0.9" prior="uniform(0,2)"
+param name="f(t)" constant="constant-f.csv" knot-times="0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100"
+
+

@@ -1,4 +1,4 @@
-/// Loads up model and data fron input file
+/// Loads up model fron the input ./bici file
 
 #include <string>
 #include <sstream>
@@ -6,8 +6,6 @@
 #include <fstream>
 #include <cmath>
  
-//#include "math.h"
-
 using namespace std;
 
 #include "input.hh"
@@ -15,15 +13,20 @@ using namespace std;
 #include "utils.hh"
 
 /// Initialises the model 
-Input::Input(Model &model, string file) : model(model)
+Input::Input(Model &model, string file, unsigned int chain) : model(model)
 {
 	//generate_data();
+	
 	terminate = false;
 	
 	input_file = file;
 	
+	set_outputdir(file);
+	
 	ifstream fin(file);
 	if(!fin) emsg("File '"+file+"' could not be loaded");
+	
+	progress(0,100);
 	
 	do{
 		string line;
@@ -41,16 +44,20 @@ Input::Input(Model &model, string file) : model(model)
 	}while(true);
 
 	auto command_line = extract_command_line(lines); // Converts from text lines to command lines
+
+	load_data_files(command_line);
 	
 	// Import happens in three stages:
-	// (0) Determines if simulation or inference
-	// (1) Load species, classification and compartment information
-	// (2) Load parameter information
-	// (3) Everything else
+	// (0) Determines if simulation, inference or post_sim
+	// (1) Simulation or inference details
+	// (2) Load species, classification and compartment information
+	// (3) Load parameter information
+	// (4) Adds inidividuals to the system
+	// (5) Everything else
 
-	for(auto loop = 0u; loop < 4; loop++){ 
-		//cout << loop << "LOOP\n";
-
+	for(auto loop = 0u; loop < 6; loop++){ 
+		print(loop,"loop");
+		
 		// Keeps track of the current species and classification 
 		p_current = UNSET; cl_current = UNSET; 
 	
@@ -67,32 +74,104 @@ Input::Input(Model &model, string file) : model(model)
 			switch(loop){
 			case 0:  // The initial pass determines if simulation or inference is being performed
 				switch(cname){
-				case SIMULATION: case INFERENCE: case DATA_DIR: break;
+				case DO_SIM: case DO_INF: case DO_POST_SIM: case DATA_DIR:
+					break;
 				default: process = false; break;
 				}
 				break;
 				
-			case 1:   // In the first pass create species, classifications and compartments
+			case 1:  // Gets simulation or inference details
 				switch(cname){
-				case SPECIES: case CLASS: case COMP: break;
+				case SIMULATION: 
+					if(model.mode != SIM) process = false; 
+					break;
+				
+				case INFERENCE:
+					if(model.mode != INF && model.mode != PPC) process = false; 
+					break;
+					
+				case POST_SIM:
+					if(model.mode != PPC) process = false; 
+					break;
+					
 				default: process = false; break;
 				}
 				break;
 				
-			case 2:   // In the next pass the parameters
+			case 2:   // In the first pass create species, classifications and compartments
+				switch(cname){
+				case SPECIES: case CLASS: case COMP: case COMP_ALL: break;
+				default: process = false; break;
+				}
+				break;
+				
+			case 3:   // In the next pass the parameters 
 				switch(cname){
 				case PARAM: case DERIVED: break;
 				default: process = false; break;
 				}
 				break;
-				
-			case 3:   // In the last pass everything else
+			
+			case 4:   // Adding individuals to the system
 				switch(cname){
-				case SIMULATION: case INFERENCE: case DATA_DIR: case PARAM: case DERIVED: case COMP:
+				case SPECIES: break;
+				
+				case PARAM_MULT:
+					if(model.mode != PPC) process = false;
+					break;
+				
+				case ADD_POP: case REMOVE_POP: case ADD_IND: 
+					if(model.mode == SIM) process = false;
+					break;
+					
+				case ADD_POP_SIM: case REMOVE_POP_SIM: case ADD_IND_SIM:
+				case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: case ADD_IND_POST_SIM:
+					if(model.mode == INF) process = false;
+					break;
+					
+				default: process = false; break;
+				}
+				break;
+				
+			case 5:   // In the last pass everything else
+				switch(cname){
+				case DO_SIM: case DO_INF: case DO_POST_SIM: case DATA_DIR: 
+				case SIMULATION: case INFERENCE: case POST_SIM:
+				case PARAM: case DERIVED: 
+				case ADD_POP: case ADD_POP_SIM: case ADD_POP_POST_SIM:
+				case REMOVE_POP: case REMOVE_POP_SIM:  case REMOVE_POP_POST_SIM:
+				case ADD_IND: case ADD_IND_SIM: case ADD_IND_POST_SIM: 
+				case PARAM_MULT:
+				case COMP: case COMP_ALL: 
 					process = false;
 					break;
+					
+				case INIT_POP_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM:
+					if(model.mode == INF) process = false;
+					break;
+					
+				case INIT_POP: case REMOVE_IND: case MOVE_IND:
+				case COMP_DATA: case TRANS_DATA: case TEST_DATA: case POP_DATA: case POP_TRANS_DATA:
+					if(model.mode == SIM) process = false;
+					break;
+				
 				default: break;
 				}
+			}
+			
+			if(model.mode == PPC){ // If PPC then do not load any data
+				switch(cname){
+				case INIT_POP_SIM: 
+				case ADD_POP_SIM: case REMOVE_POP_SIM: case ADD_IND_SIM:
+				case REMOVE_IND_SIM: case MOVE_IND_SIM:
+				case COMP_DATA: case TRANS_DATA: case TEST_DATA:
+				case POP_DATA: case POP_TRANS_DATA: case IND_EFFECT_DATA:
+				case IND_GROUP_DATA: case GENETIC_DATA:
+					process = false;
+					break;
+					
+				default: break;
+				}	
 			}
 			
 			if(process == true){
@@ -104,75 +183,292 @@ Input::Input(Model &model, string file) : model(model)
 				}
 			}
 		}
+		line_num = UNSET;
 		
-		if(loop == 1){
-			check_comp_structure(); 	
+		switch(loop){
+		case 0:
+			if(model.mode == MODE_UNSET){
+				alert_import("Either 'do-simulation' or 'do-inference' must be set"); 
+				return;
+			}
+			break;
+
+		case 1: calculate_timepoint(); break;
+		case 2: check_comp_structure(); break; 		
 		}
 	}
-
-	//raw_process();
 	
-	create_population_erlang();        // If a population-based model convert elang to rate
+	progress(10,100);
+	
+	auto inf = false; if(model.mode == INF) inf = true;
+	
+	print("loaded");
+	
+	set_contains_source();             // Sets flag to determine if source
+	
+	set_trans_tree();                  // Sets if there is a transition tree
+	
+	create_population_erlang();        // If a population-based model convert erlang to rate
+	
+	progress(20,100);
+	
+	print("loaded1");
 	
 	determine_branching();             // Determines which transitions branch from compartments
+	
+	print("loaded2");
+	
+	bp_create_unset();                 // Substitutes "*" with the expression form branching prob
+	
+	print("loaded3");
+	
+	markov_bp_convert();               // If all branches are rates then removes branching
 
-	population_bp_rate_combine();      // Combines branching probabilities with rates in population model
+	print("loaded4");
+	progress(30,100);
+	
+	//population_bp_rate_combine();      // Combines branching probabilities with rates in population model
+	
+	print("loaded5");
 	
 	check_initial_pop_error(true);     // Determines if initial population is specified correctly
 
-	if(datadir == "") alert_import("'datadir' must be set");
-		
+	print("loaded6");
+	
 	check_import_correct();            // Checks import has been successfully acheived
 
+	print("loaded7");
+	progress(40,100);
+	
 	global_comp_trans_init();          // Creates global compartments and transitions
+	
+	print("loaded8");
 
-	create_equations();                // Creates equation calculations
-
-	source_equation_comp();            // Attaches compartments to source equations
-
-	create_markov_eqn();               // Works out which equations are Markovian
-
-	create_markov_comp_gl();           // Works out which markov_eqn applie to a compartment 
-	
-	create_markov_eqn_pop_ref();       // Works out which populations affect which markov eqns (and vice versa)
-
-	create_nm_trans();                 // Creates a list of possible non-Markovian transitions
-	
-	create_pop_ref();                  // Create reference to pop in comp_gl
-	
-	create_param_vector();             // Creates an overall parameter vector
-	
-	calculate_timepoint();             // Caclualte the timepoints used to solve the equations
-	
-	create_spline();                   // Creates any splines in the model
-
-	branch_param_group();              // Determines groups of parameters which determine branching
-	
-	map_ind_effect();                  // Maps individual effects with groups
-	
-	ind_eff_group_trans_ref();         // References markov eqns and nm_trans ind_eff_group
-	
-	ind_eff_pop_ref();                 // References populations in ind_effect
-	
-	if(model.mode == INF){ 	
-		param_affect_likelihood();       // Works out how changes to parameters affect likelihoods
-	}
-	
-	if(model.mode == INF){
-		create_island();                 // Works out how interconnected compartments are
-	}
-	
-	create_trg_from_tr();              // Works out a convertion from tr to trg
-	
-	check_param_used();                // Checks all defined parameters used in the model (and vice versa)
-	
-	for(auto &sp : model.species){
-		sp.create_markov_tree();         // Creates sampler used to sample Markov events
+	for(auto &sp : model.species){	
 		sp.initialise_data();            // Extracts data structures from data sources
+	
 		for(const auto &wa : sp.warn) alert_line(wa.te,wa.line_num);    
 	}
 	
+	progress(50,100);
+	
+	print("loaded9");
+	
+	model.set_hash_all_ind();           // Sets a hash table for all individuals
+	
+	add_genetic_data();                // Adds genetic data (potentially multi-species)
+		
+	source_rate_divide();              // Divides equations for source rates
+	
+	print("h1");
+
+	progress(60,100);
+	
+	create_equations();                // Creates equation calculations
+	
+	progress(70,100);
+	
+	print("h1a");
+	
+	simplify_equations();              // Simplifies equations as much as possible
+
+	progress(80,100);
+	
+	print("h1b");
+		
+	for(auto &sp : model.species){     // Classifies observed transitons as trans, source, or sink
+		sp.set_ob_trans_ev(model.eqn);
+	}
+
+	print("h1c");
+	
+	for(auto &eqn : model.eqn){        // Sets up reference (pop_ref, param_ref) in equations
+		eqn.setup_references();
+	}	
+	
+	print("h1d");
+	map_ind_effect();                  // Maps individual effects with groups
+
+	set_param_use();                   // Sets which parameters are used in the model
+	
+	print("h1e");
+	
+	set_param_parent_child();          // Sets parent child relationships for parameters
+	
+	print("h1f");
+	
+	//exp_nm_convert();                  // If doesn't contain a population then EXP_RATE -> EXP_RATE_NM
+	
+	print("h1g");
+	
+	setup_obs_trans();                 // Sets up obs_trans
+	
+	print("h1h");
+	
+	setup_obs_trans_is_one();          // Sets up obs_trans is_one
+	
+	print("h1i");
+	
+	create_nm_trans();                 // Creates a list of possible non-Markovian transitions
+
+	print("h2");
+	
+	source_equation_comp();            // Attaches compartments to source equations
+
+	print("h3");
+	
+	create_markov_eqn();               // Works out which equations are Markovian
+	
+	print("h4");
+	
+	create_markov_comp_gl();           // Works out which markov_eqn applied to a compartment 
+	
+	print("h5");
+	
+	create_markov_eqn_pop_ref();       // Works out which populations affect which markov eqns (and vice versa)
+	
+	print("h6");
+
+	create_pop_ref();                  // Create reference to pop in comp_gl
+	
+	print("h8");
+	
+	create_param_vector();             // Creates an overall parameter vector
+	
+	print("h9");
+	
+	create_spline();                   // Creates any splines in the model
+
+	print("h10");
+	
+	ind_fix_eff_group_trans_ref();     // References markov eqns and nm_trans ind_eff_group and fix_effect
+	
+	print("h11");
+	
+	ind_fix_eff_pop_ref();             // References populations in ind_effect and fix_effect
+	
+	if(inf) create_trg_from_tr();      // Works out a convertion from tr to trg
+	
+	print("h12");
+	
+	set_tra_ie_fe_affect();            // Sets which ie affect transitions
+	
+	set_tr_leave_markov();             // Sets Markov transitions leaving compartment    
+	
+	print("h13");
+	
+	set_multi_trans_cl();              // Sets if transitions in multiple classification
+	
+	print("h14");
+		
+	set_tr_connected();                // Determines if global transitions are connected
+	
+	for(auto &sp : model.species){     // Determines if individual sampler needed
+		if(inf) sp.set_ind_samp_needed(model.eqn);     
+	}
+	
+	set_comp_period();                 // Determines if compartemnt begins or ends a transition period
+	
+	set_comp_terminal();               // Determines if a compartment is terminal
+	
+	set_sink_exist();                  // Determines if a sink exists
+	
+	set_eqn_ind_eff_exist();           // Sets if ind_eff exist in equations
+	
+	//set_pop_speedup();                 // Sets speedup for update_ind when population is changed
+ 	
+	print("h15");
+	
+	progress(90,100);
+	
+	if(true){
+		for(auto &eq : model.eqn){
+			eq.calculate_linearise();      // Tries to linearise equations in terms of populations
+		}
+	}
+	
+	if(inf) param_affect_likelihood(); // Works out how changes to parameters affect likelihoods
+	
+	print("h16");
+	
+	check_param_used();                // Checks all defined parameters used in the model (and vice versa)
+	
+	print("h18");
+	
+	for(auto &sp : model.species){
+		sp.create_markov_tree();         // Creates sampler used to sample Markov events
+		sp.init_pop_trans_ref();         // Initialises reference from global transition to obs         
+		sp.init_pop_data_ref();          // Initialises reference from global compartment to obs         
+		for(const auto &wa : sp.warn) alert_line(wa.te,wa.line_num);    
+	}
+	
+	print("h19");
+	
+	if(inf) create_island();                   // Works out how interconnected compartments are
+	
+	print("h20");
+	
+	setup_trans_infection();                   // Sets up information about infection down transitions (for trans-tree)
+	
+	for(auto &sp : model.species){
+		sp.create_ind_noobs();                   // Creates an "individual" with no observation
+	}
+	
+	create_trig_ev_ref();                      // Generates trig_ev_ref (events on individual timelines)
+	create_cl_trig_ev_ref();                   // Generates cl_trig_ev_ref (used in sampling)
+	
+	set_precalc_nm_rate();                     // Determines if nm_rate can be precalculated
+	
+	set_tr_enter();                            // Sets transitions entering compartment
+ 	               
+	if(inf) set_joint_param_event();           // Sets any joint parameter and event proposals
+	
+	set_init_c_set();                          // Determines if initial compartment is set
+	
+	if(inf){ 
+		set_local_ind_init();                    // Initialises local individual changes
+		set_comp_global_convert();               // Sets comp_global_convert		
+	}
+	
+	set_tra_global_time_vari();                // Sets the time varying parameter for transitions
+	
+	set_ind_variation();                       // Sets flag determining if individual variation
+	
+	set_cgl_begin_nm();                        // Determines if glob comp starts nm 
+	
+	set_cgl_tr_source_sink();                  // Sets trg reference from compartments
+	
+	if(model.trans_tree){
+		set_inf_cause();                         // Reference to see the population which causes infection 
+	}
+	
+	if(model.mode == PPC && model.sample.size() == 0){
+		alert_import("Samples must be specified for 'post-sim' to be run.");
+	}		
+
+	if(model.mode == PPC) set_ppc_resample();
+		
+	check_markov_or_nm();                      // Checks that transition are either markovian or non-markovian
+	
+	check_nm_pop();                            // Checks no population in species for nm trans
+	
 	output_error_messages(err_mess);
+	
+	set_seed(chain,model.details);             // Sets the psuedo random nunber generator see
+	
+	progress(100,100);
+	
+	if(com_op) cout << "<RUNNING>" << endl;
+	
+	progress(0,100);
+	print("Finish");
+	
+	/*
+	for(auto me : model.species[0].markov_eqn){
+		cout <<  model.eqn[me.eqn_ref].te << " eq\n";
+	}
+	emsg("do");
+	*/
 }
 
 
@@ -181,8 +477,10 @@ vector <CommandLine> Input::extract_command_line(vector <string> lines)
 {
 	vector <CommandLine> command_line;
 	
-	for(line_num = 0; line_num < lines.size(); line_num++){
-		auto trr = trim(lines[line_num]);
+	for(auto j = 0u; j < lines.size(); j++){
+		line_num = j;
+		
+		auto trr = trim(lines[j]);
 	
 		auto flag = false;                    // Ignores line if empty or commented out
 		if(trr.length() == 0) flag = true;
@@ -190,6 +488,28 @@ vector <CommandLine> Input::extract_command_line(vector <string> lines)
 		if(trr.length() >= 1 && trr.substr(0,1) == "#") flag = true;
 		
 		if(flag == false){
+			while(trr.length() > 3 && trr.substr(trr.length()-3,3) == "\"[["){
+				j++;
+				vector <string> file_lines;
+				string file_name = "$FILE"+to_string(files.size())+"&";
+				while(j < lines.size()){
+					auto te = trim(lines[j]);
+					if(te.length() >= 3 && te.substr(0,3) == "]]\""){
+						trr += file_name+te;
+						break;
+					}
+					file_lines.push_back(te);
+					j++;
+				}
+				if(j == lines.size()) alert_import("Cannot find line with ']]\"' to specify end of file");
+			
+				FileStore file_st;
+				file_st.name = "[["+file_name+"]]";
+				file_st.lines = file_lines;
+				file_st.sep = ',';
+				files.push_back(file_st);
+			}
+			
 			auto line = get_command_tags(trr,line_num);
 			if(line.command != EMPTY){
 				command_line.push_back(line);
@@ -200,6 +520,62 @@ vector <CommandLine> Input::extract_command_line(vector <string> lines)
 	return command_line;
 }
 	
+	
+/// Loads up any data files
+void Input::load_data_files(vector <CommandLine> &command_line)
+{
+	string data_dir = "";
+	for(auto j = 0u; j < command_line.size(); j++){
+		if(command_line[j].command == DATA_DIR){
+			for(auto k = 0u; k < command_line[j].tags.size(); k++){
+				const auto &tag = command_line[j].tags[k];
+				if(tag.name == "folder") data_dir = tag.value;
+			}
+		}
+	}
+
+	for(auto j = 0u; j < command_line.size(); j++){
+		const auto &cl = command_line[j];
+			
+		for(auto k = 0u; k < cl.tags.size(); k++){
+			const auto &tag = cl.tags[k];
+			
+			auto na = tag.name;
+			if(na == "value" || na == "prior-split" || na == "dist-split" || na == "A" || na == "X" || na == "file"){
+				auto file = tag.value;
+				
+				if(is_file(file)){
+					auto k = 0u; while(k < files.size() && files[k].name != file) k++;
+					if(k == files.size()){
+						if(data_dir == "") alert_import("The 'data-dir' command must be set");
+							
+						auto full_name = data_dir+"/"+file; 
+						ifstream fin(full_name);
+						if(!fin) emsg("File '"+full_name+"' could not be loaded");
+						
+						vector <string> lines;
+						
+						string line;
+						do{
+							getline(fin,line);
+							if(fin.eof()) break;
+							remove_cr(line);
+							lines.push_back(line);
+						}while(true);
+	
+						FileStore file_st;
+						file_st.name = file;
+						file_st.lines = lines;
+						file_st.sep = ',';
+						auto end = file.substr(file.length()-4); if(end == ".tsv") file_st.sep = '\t';
+						files.push_back(file_st);
+					}
+				}
+			}
+		}
+	}
+}
+
 
 /// Adds text escape characters
 string Input::add_escape_char(string te)
@@ -212,11 +588,11 @@ string Input::add_escape_char(string te)
 	escape_char.push_back({"\\delta","δ"});
 	escape_char.push_back({"\\epsilon","ε"});
 	escape_char.push_back({"\\zeta","ζ"});
-	escape_char.push_back({"\\eta ","η"});
+	escape_char.push_back({"\\eta","η"});
 	escape_char.push_back({"\\theta","θ"});
 	escape_char.push_back({"\\iota","ι"});
 	escape_char.push_back({"\\kappa","κ"});
-	escape_char.push_back({"\\lambda ","λ"});
+	escape_char.push_back({"\\lambda","λ"});
 	escape_char.push_back({"\\mu","μ"});
 	escape_char.push_back({"\\nu","ν"});
 	escape_char.push_back({"\\xi","ξ"});
@@ -233,8 +609,6 @@ string Input::add_escape_char(string te)
 	
 	te = replace(te,"〈","<");
 	te = replace(te,"〉",">");
-	//te = replace(te,"<","〈");
-	//te = replace(te,">","〉");
 	
 	auto i = 0u;
 	while(i < te.length()){
@@ -264,20 +638,20 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 {
 	auto num_quote = 0u;
 	vector <unsigned int> quote_pos;
-	
+			
 	for(auto i = 0u; i < trr.length(); i++){
 		if(trr.substr(i,1) == "\""){ num_quote++; quote_pos.push_back(i);}
 	}
 	
 	if(num_quote%2 != 0){ alert_import("Syntax error: Quotes do not match up."); return syntax_error();}
 	
-	for(auto i = 0u; i < num_quote; i+= 2){
+	for(auto i = 0u; i < num_quote; i += 2){
 		if(quote_pos[i]+1 == quote_pos[i+1]){
 			alert_import("Syntax error: No content within the quotation marks."); 
 			return syntax_error();
 		}
 	}
-	
+
 	vector <Fragment> frag; 
 	
 	auto i = 0u; 
@@ -294,15 +668,16 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 				!(quote == 0 && after_eq == true)){
 			i++;
 		}
-	
+
 		after_eq = false;
 		if(trr.substr(i,1) == "=") after_eq = true;
 		
 		auto te = trr.substr(ist,i-ist);
 		while(te.substr(0,1) == "\n") te = te.substr(1);
 		while(te.substr(te.length()-1,1) == "\n") te = te.substr(0,te.length()-1);
-		
+
 		te = trim(te); if(quote == 0) te = toLower(te);
+
 		if(te != ""){
 			auto pos = ist; while(pos < i && trr.substr(pos,1) == " ") pos++;
 			Fragment fr; fr.text = trim(trr.substr(ist,i-ist)); fr.pos = pos; fr.pos_end = i; fr.quote = quote;
@@ -328,9 +703,9 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 	if(type == "set") com = SET;
 	if(type == "camera") com = CAMERA;
 	if(type == "compartment" || type == "comp") com = COMP;
+	if(type == "compartment-all" || type == "comp-all") com = COMP_ALL;
 	if(type == "transition" || type == "trans") com = TRANS;
-	if(type == "source") com = SOURCE_CD;
-	if(type == "sink") com = SINK_CD;
+	if(type == "transition-all" || type == "trans-all") com = TRANS_ALL;
 	if(type == "data-dir") com = DATA_DIR;
 	if(type == "description" || type == "desc") com = DESC;
 	if(type == "label") com = LABEL;
@@ -338,32 +713,48 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 	if(type == "parameter" || type == "param") com = PARAM;
 	if(type == "derived" || type == "der") com = DERIVED;
 	if(type == "init-pop") com = INIT_POP;
+	if(type == "add-pop") com = ADD_POP;
+	if(type == "remove-pop") com = REMOVE_POP;
 	if(type == "add-ind") com = ADD_IND;
 	if(type == "remove-ind") com = REMOVE_IND;
 	if(type == "move-ind") com = MOVE_IND;
 	if(type == "init-pop-sim") com = INIT_POP_SIM;
+	if(type == "add-pop-sim") com = ADD_POP_SIM;
+	if(type == "remove-pop-sim") com = REMOVE_POP_SIM;
 	if(type == "add-ind-sim") com = ADD_IND_SIM;
 	if(type == "remove-ind-sim") com = REMOVE_IND_SIM;
 	if(type == "move-ind-sim") com = MOVE_IND_SIM;
-	if(type == "init-pop-prior") com = INIT_POP_PRIOR;
+	if(type == "add-pop-post-sim") com = ADD_POP_POST_SIM;
+	if(type == "remove-pop-post-sim") com = REMOVE_POP_POST_SIM;
+	if(type == "add-ind-post-sim") com = ADD_IND_POST_SIM;
+	if(type == "remove-ind-post-sim") com = REMOVE_IND_POST_SIM;
+	if(type == "move-ind-post-sim") com = MOVE_IND_POST_SIM;
 	if(type == "comp-data") com = COMP_DATA;
 	if(type == "trans-data") com = TRANS_DATA;
-	if(type == "source-data") com = SOURCE_DATA;
-	if(type == "sink-data") com = SINK_DATA;
 	if(type == "test-data") com = TEST_DATA;
 	if(type == "pop-data") com = POP_DATA;
 	if(type == "pop-trans-data") com = POP_TRANS_DATA;
-	if(type == "set-traps-data") com = SET_TRAPS_DATA;
-	if(type == "ind-trapped-data") com = IND_TRAPPED_DATA;
+	if(type == "ind-effect-data") com = IND_EFFECT_DATA;
+	if(type == "ind-group-data") com = IND_GROUP_DATA;
 	if(type == "genetic-data") com = GENETIC_DATA;
 	if(type == "simulation" || type == "sim") com = SIMULATION;
 	if(type == "inference" || type == "inf") com = INFERENCE;
+	if(type == "posterior-simulation" || type == "post-sim") com = POST_SIM;
 	if(type == "ind-effect") com = IND_EFFECT;
 	if(type == "fixed-effect") com = FIXED_EFFECT;
 	if(type == "sim-param") com = SIM_PARAM;
 	if(type == "sim-state") com = SIM_STATE;
 	if(type == "inf-param") com = INF_PARAM;
 	if(type == "inf-state") com = INF_STATE;
+	if(type == "post-sim-param") com = POST_SIM_PARAM;
+	if(type == "post-sim-state") com = POST_SIM_STATE;
+	if(type == "map") com = MAP;
+	if(type == "post-sim" || type == "post-simulation" ) com = POST_SIM;
+	
+	if(type == "do-sim" || type == "do-simulation") com = DO_SIM;
+	if(type == "do-inf" || type == "do-inference" ) com = DO_INF;
+	if(type == "do-post-sim" || type == "do-posterior-simulation" ) com = DO_POST_SIM;
+	if(type == "param-mult") com = PARAM_MULT;
 	
 	if(com == EMPTY){ alert_import("Command '"+type+"' not recognised."); return syntax_error();}
 	
@@ -381,15 +772,19 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 		
 		const auto &fr = frag[1+3*n+0];
 		
-		Tag tag; tag.name = fr.text; tag.pos = fr.pos; tag.pos_end = fr.pos_end; tag.value = frag[1+3*n+2].text; tag.done = 0;
+		Tag tag; 
+		tag.name = fr.text; tag.pos = fr.pos; tag.pos_end = fr.pos_end; 
+		tag.value = frag[1+3*n+2].text; tag.done = 0;
 		tags.push_back(tag);
 	}
 	
-	for(auto n = 0u; n < tags.size()-1; n++){
-		for(auto nn = n+1; nn < tags.size(); nn++){
-			if(tags[n].name == tags[nn].name){
-				alert_import("The tag '"+tags[n].name+"' is set more than once");
-				return syntax_error();
+	if(tags.size() > 0){
+		for(auto n = 0u; n < tags.size()-1; n++){
+			for(auto nn = n+1; nn < tags.size(); nn++){
+				if(tags[n].name == tags[nn].name){
+					alert_import("The tag '"+tags[n].name+"' is set more than once");
+					return syntax_error();
+				}
 			}
 		}
 	}
@@ -420,7 +815,9 @@ void Input::alert(string st)
 	em.type = ERROR_FATAL;
 	
 	error_mess.push_back(em);	
-	if(fatal_error() == true && error_mess.size() >= ERR_MSG_MAX) output_error_messages("Total error limit exceeded");
+	if(fatal_error() == true && error_mess.size() >= ERR_MSG_MAX){
+		output_error_messages("Total error limit exceeded");
+	}
 }
 
  
@@ -435,6 +832,8 @@ void Input::alert_import(string st)
 	em.type = ERROR_FATAL;
 	
 	error_mess.push_back(em);	
+	output_error_messages("All mess");  // TURN OFF
+	 
 	if(fatal_error() == true && error_mess.size() >= ERR_MSG_MAX) output_error_messages("Total error limit exceeded");
 }
 
@@ -446,7 +845,7 @@ void Input::alert_line(string st, unsigned int line)
 	
 	auto i = 0u; while(i < error_mess.size() && error_mess[i].line_num != line) i++;
 
-	if(i == error_mess.size()){
+	if(i == error_mess.size() || line == UNSET){
 		ErrorMess em;
 		em.line_num = line;
 		em.error = st;
@@ -455,7 +854,7 @@ void Input::alert_line(string st, unsigned int line)
 		error_mess.push_back(em);	
 	}
 
-	if(fatal_error() == true &&  error_mess.size() >= ERR_MSG_MAX){
+	if(fatal_error() == true && error_mess.size() >= ERR_MSG_MAX){
 		output_error_messages("Total error limit exceeded");
 	}
 }
@@ -532,6 +931,7 @@ void Input::output_error_messages(string te) const
 void Input::process_command(const CommandLine &cline, unsigned int loop)
 {
 	cline_store = cline;
+	all_row = UNSET;
 	
 	auto cname = cline.command;
 	
@@ -541,9 +941,9 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 	case SET: set_command(); break;
 	case CAMERA: camera_command(); break;
 	case COMP: compartment_command(); break;
-	case TRANS: transition_command(cname); break;
-	case SOURCE_CD: transition_command(cname); break;
-	case SINK_CD: transition_command(cname); break;
+	case COMP_ALL: compartment_all_command(); break;
+	case TRANS: transition_command(); break;
+	case TRANS_ALL: transition_all_command(); break;
 	case DATA_DIR: datadir_command(); break;
 	case DESC: description_command(); break;
 	case LABEL: label_command(); break;
@@ -552,28 +952,62 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 	case DERIVED: derived_command(); break;
 	case SIMULATION: simulation_command(); break;
 	case INFERENCE: inference_command(); break;
+	case POST_SIM: post_sim_command(); break;
+	
 	case IND_EFFECT: ind_effect_command(); break;
 	case FIXED_EFFECT: fixed_effect_command(); break;
+	case PARAM_MULT: param_mult_command(); break;
 	
-	case INIT_POP_SIM: case ADD_IND_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM: 
+	case INIT_POP_SIM:
+	case ADD_POP_SIM: case REMOVE_POP_SIM: 
+	case ADD_IND_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM: 
 		if(model.mode == SIM) import_data_table_command(cname);
 		else alert_warning("Line ignored because not need for simulation");
 		break;
 	
-	case INIT_POP: case ADD_IND: case REMOVE_IND: case MOVE_IND: 
-	case INIT_POP_PRIOR: case COMP_DATA: case TRANS_DATA:
-	case SOURCE_DATA: case SINK_DATA:
+	case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: 
+	case ADD_IND_POST_SIM: case REMOVE_IND_POST_SIM: case MOVE_IND_POST_SIM: 
+		if(model.mode == PPC) import_data_table_command(cname);
+		else alert_warning("Line ignored because not need for simulation");
+		break;
+		
+	case INIT_POP: 
+	case ADD_POP: case REMOVE_POP:
+	case ADD_IND: case REMOVE_IND: case MOVE_IND: 
+	case COMP_DATA: case TRANS_DATA:
 	case TEST_DATA: case POP_DATA: case POP_TRANS_DATA: 
-	case SET_TRAPS_DATA: case IND_TRAPPED_DATA:
 	case GENETIC_DATA:
-		if(model.mode == INF) import_data_table_command(cname);
-		else alert_warning("Line ignored because not need for inference");
+		if(model.mode != SIM) import_data_table_command(cname);
+		else{
+			alert_warning("Line ignored because not need for inference");
+			for(auto &ta : cline_store.tags) ta.done = 1;
+		}
+		break;
+	
+	case IND_EFFECT_DATA:
+		get_tag_value("name"); 
+		get_tag_value("file"); 
+		break;
+		
+	case IND_GROUP_DATA:
+		get_tag_value("name"); 
+		get_tag_value("file"); 
 		break;
 	
 	case SIM_PARAM: case SIM_STATE: dummy_file_command(); break;
-	case INF_PARAM: case INF_STATE: dummy_file_command(); break;
+	case POST_SIM_PARAM: case POST_SIM_STATE: dummy_file_command(); break;
+	case INF_PARAM: dummy_file_command(); break;
 	
-	//case SIM_CONST: case INF_CONST: sample_command(); break;
+	case INF_STATE: 
+		if(model.mode == PPC) inf_state_command();
+		else dummy_file_command();
+		break;
+		
+	case MAP: map_command(); break;
+	
+	case DO_SIM: do_sim_command(); break;
+	case DO_INF: do_inf_command(); break;
+	case DO_POST_SIM: do_post_sim_command(); break;
 	
 	default: alert_import("Command not recognised"); return;
 	}
@@ -600,17 +1034,33 @@ string Input::get_tag_value(string st)
 }
 
 
+/// Gets the value of a tag from a specified list
+string Input::get_tag_val(string st, vector <Tag> &tags) 
+{
+	tag_find = st;
+	for(auto i = 0u; i < tags.size(); i++){
+		if(tags[i].name == st){ tags[i].done = 1; return tags[i].value;}
+	}
+	return "";
+}
+
+
 /// Error massage if a tag cannot be found
 void Input::cannot_find_tag()                                   
 {
-	alert_import("Cannot find the '"+tag_find+"' tag for '"+cline_store.command_name+"'");
+	string te = "Cannot find the '"+tag_find+"' tag for '"+cline_store.command_name+"'";
+	if(all_row != UNSET) te += "( line "+to_string(all_row+2)+" in file)";
+	
+	alert_import(te);
 }
 
 
 /// Checks is a particular value is one of a list of possible options
 unsigned int Input::option_error(string na, string te, const vector <string> &pos, const vector <unsigned int> &conv)
 {
-	if(pos.size() != conv.size()){ alert_import("Options do not match up"); return UNSET;}
+	if(pos.size() != conv.size()){ 
+		alert_import("Options do not match up"); return UNSET;
+	}
 	
 	auto k = find_in(pos,te);
 	if(k != UNSET) return conv[k];
@@ -673,109 +1123,6 @@ bool Input::is_zeroone(string num, string tag)
 }
 
 
-/// Converts a text string to a prior specification
-Prior Input::convert_text_to_prior(string te)
-{
-	Prior pri;
-	
-	te = trim(te);
-	
-	auto spl = split(te,'(');
-	if(spl.size() != 2){ pri.error = true; return pri;}
-	
-	if(spl[1].size() == 0){ pri.error = "Prior has a syntax error"; return pri;}
-	if(spl[1].substr(spl[1].length()-1,1) != ")"){ pri.error = "Prior has a syntax error"; return pri;}
-	
-	auto type = toLower(spl[0]);
-	if(type == "dir") type = "dirichlet";
-	if(type == "bern") type = "bernoulli";
-	
-	auto fl = false;
-	if(type == "uniform"){ pri.type = UNIFORM_PR; fl = true;}
-	if(type == "exp"){ pri.type = EXP_PR; fl = true;}
-	if(type == "normal"){ pri.type = NORMAL_PR; fl = true;}
-	if(type == "gamma"){ pri.type = GAMMA_PR; fl = true;}
-	if(type == "log-normal"){ pri.type = LOG_NORMAL_PR; fl = true;}
-	if(type == "beta"){ pri.type = BETA_PR; fl = true;}
-	if(type == "bernoulli"){ pri.type = BERNOULLI_PR; fl = true;}
-	if(type == "fix"){ pri.type = FIX_PR; fl = true;}
-	if(type == "flat"){ pri.type = FLAT_PR; fl = true;}
-	if(type == "dirichlet"){ pri.type = DIRICHLET_PR; fl = true;}
-	
-	if(fl == false){
-		pri.error = "Distribution '"+type+"' not recognised"; return pri;
-	}
-	
-	auto bra = spl[1].substr(0,spl[1].length()-1);
-	auto spl2 = split(bra,',');
-
-	switch(pri.type){
-	case FIX_PR:
-		{
-			if(spl2.size() != 1){ pri.error = "Expected one value in the brackets"; return pri;}
-		}
-		break;
-	
-	case UNIFORM_PR:
-		{
-			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
-		}
-		break;
-	
-	case EXP_PR:
-		{
-			if(spl2.size() != 1){ pri.error = "Expected one value in the brackets"; return pri;}
-		}
-		break;
-		
-	case NORMAL_PR:
-		{
-			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
-		}
-		break;
-		
-	case GAMMA_PR:
-		{
-			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
-		}
-		break;
-		
-	case LOG_NORMAL_PR:
-		{
-			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
-		}
-		break;
-		
-	case BETA_PR:
-		{
-			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
-		}
-		break;
-
-	case BERNOULLI_PR:
-		{
-			if(spl2.size() != 1){ pri.error = "Expected one value in the brackets"; return pri;}
-		}
-		break;
-		
-	case FLAT_PR:
-		break;
-		
-	case DIRICHLET_PR:
-		{
-			if(spl2.size() != 1){ pri.error = "Expected one value in the brackets"; return pri;}
-		}
-		break;
-	}
-
-	for(auto i = 0u; i < spl2.size(); i++){
-		pri.dist_param.push_back(add_equation_info(spl2[i],DIST));
-	}
-	
-	return pri;
-}
-
-
 /// Maps from individual effects on species to those stored in IEgroups
 void Input::map_ind_effect()
 {
@@ -791,7 +1138,7 @@ void Input::map_ind_effect()
 			for(auto j = 0u; j < N; j++){
 				for(auto jj = j; jj < N; jj++){
 					auto ie1 = ieg.list[j].name, ie2 = ieg.list[jj].name;
-					auto sup = "^"+ie1+ie2;
+					auto sup = "^"+ie1+","+ie2;
 					
 					string name;
 					if(j == jj) name = "Ω"+sup;
@@ -860,10 +1207,64 @@ void Input::check_param_used()
 }
 
 	
-/// Orders parameters in a vector such that only dependent on an params with a smnaller index
+/// Orders parameters in a vector such that only dependent on an params with a smaller index
 void Input::create_param_vector()
 {
 	auto N = model.param.size();
+	
+	// This has been moved to "use" in parameter
+	/*
+	// Finds which parameters are actually used in the equations
+	vector < vector <bool> > eqn_used;
+	eqn_used.resize(N);
+	for(auto th = 0u; th < N; th++){
+		const auto &par = model.param[th];
+		eqn_used[th].resize(par.N,false);
+	}
+	
+	for(auto &eq : model.eqn){
+		for(auto &ca : eq.calc){
+			for(auto &it : ca.item){
+				if(it.type == PARAMETER){
+					if(it.num >= model.param.size()) emsg("Out of range1");
+					if(it.index >= model.param[it.num].N) emsg("Out of range2");
+					eqn_used[it.num][it.index] = true;
+				}
+			}
+		}
+	
+		if(eq.ans.type == PARAMETER){
+			if(eq.ans.num == UNSET) emsg("done");
+			eqn_used[eq.ans.num][eq.ans.index] = true;
+		}
+	}
+	
+	for(const auto &sp : model.species){
+		for(const auto &ieg : sp.ind_eff_group){
+			auto N = ieg.list.size(); 
+			for(auto j = 0u; j < N; j++){
+				for(auto i = 0u; i < N; i++){
+					eqn_used[ieg.omega[j][i]][0] = true;
+				}
+			}
+		}
+		
+		for(const auto &fe : sp.fix_effect){
+			eqn_used[fe.th][0] = true;
+		}
+	}
+	
+	if(false){
+		for(auto th = 0u; th < N; th++){
+			const auto &par = model.param[th];
+			cout << par.name << endl;
+			auto imax = eqn_used[th].size(); if(imax > 100) imax = 100;
+			for(auto i = 0u; i < imax; i++) cout << eqn_used[th][i] << " ";
+			cout << endl;
+		}
+		emsg("Shows parameters used");
+	}
+	*/
 	
 	vector < vector <unsigned int> > needed;
 	
@@ -916,23 +1317,36 @@ void Input::create_param_vector()
 		auto &par = model.param[th];
 		
 		par.param_vec_ref.resize(par.N,UNSET);
-			
-		if(par.variety != CONST_PARAM){
+		
+		if(par.variety != CONST_PARAM || par.factor){	
 			for(auto j = 0u; j < par.N; j++){
-				par.param_vec_ref[j] = model.param_vec.size();
+				if(removeparamvec_speedup == false || 
+				   //eqn_used[th][j] == true || par.spline_info.on == true){
+				   par.use[j] == true || par.spline_info.on == true){
+					par.param_vec_ref[j] = model.param_vec.size();
+					
+					ParamVecEle pr; 
+					pr.name = get_param_name_with_dep(par,par.dep,j);
+					pr.th = th; 
+					pr.index = j;
+					pr.prior = par.prior[j];
+					pr.variety = par.variety;
+					pr.ppc_resample = false;
 				
-				ParamVecEle pr; 
-				pr.name = get_param_name_with_dep(par,par.dep,j);
-				pr.th = th; 
-				pr.index = j;
-				pr.prior = par.prior[j];
-				pr.variety = par.variety;
-				model.param_vec.push_back(pr);
+					pr.prop_pos = false;
+					if(pr.variety == PRIOR_PARAM || pr.variety == DIST_PARAM){
+						if(pr.prior.type != FIX_PR){
+							pr.prop_pos = true;
+						}
+					}
+					
+					model.param_vec.push_back(pr);
+				}
 			}		 
 		}
 	}
 	
-	/// Converts parameter references in equation to param_vec
+	// Converts parameter references in equation to param_vec
 	for(auto &eq : model.eqn){
 		for(auto &ca : eq.calc){
 			for(auto &it : ca.item){
@@ -950,8 +1364,17 @@ void Input::create_param_vector()
 			eq.ans.index = UNSET;
 		}
 	}
-	
 	model.nparam_vec = model.param_vec.size();
+	
+	if(false){
+		auto imax = model.nparam_vec;
+		if(imax > 100) imax = 100;
+		for(auto i = 0u; i < imax; i++){
+			cout << model.param_vec[i].name << " vec" << endl;
+		}
+		
+		emsg("param vec");
+	}
 }
 
 
@@ -970,85 +1393,51 @@ void Input::create_pop_ref()
 }
 
 
-/// Performs raw processing of data
-void Input::raw_process()
+/// Simplifies equations as much as possible
+void Input::simplify_equations()
 {
-	vector <string> vecr;
+	if(simplify_eqn == false) return; 
 	
-	vecr.push_back("Clackmannanshire");
-	vecr.push_back("Dumfries and Galloway");
-	vecr.push_back("East Ayrshire");
-	vecr.push_back("East Lothian");
-	vecr.push_back("East Renfrewshire");
-	vecr.push_back("Na h-Eileanan Siar");
-	vecr.push_back("Falkirk");
-	vecr.push_back("Highland");
-	vecr.push_back("Inverclyde");
-	vecr.push_back("Midlothian");
-	vecr.push_back("Moray");
-	vecr.push_back("North Ayrshire");
-	vecr.push_back("Orkney Islands");
-	vecr.push_back("Scottish Borders");
-	vecr.push_back("Shetland Islands");
-	vecr.push_back("South Ayrshire");
-	vecr.push_back("South Lanarkshire");
-	vecr.push_back("Stirling");
-	vecr.push_back("Aberdeen City");
-	vecr.push_back("Aberdeenshire");
-	vecr.push_back("Argyll and Bute");
-	vecr.push_back("City of Edinburgh");
-	vecr.push_back("Renfrewshire");
-	vecr.push_back("West Dunbartonshire");
-	vecr.push_back("West Lothian");
-	vecr.push_back("Angus");
-	vecr.push_back("Dundee City");
-	vecr.push_back("East Dunbartonshire");
-	vecr.push_back("Fife");
-	vecr.push_back("Perth and Kinross");
-	vecr.push_back("Glasgow City");
-	vecr.push_back("North Lanarkshire");
-
-
-	ofstream fout("Testing/Map data/matrix_col.csv");
-	fout << "r',r,Value" << endl;
-	
-	string file = "Testing/Map data/M_Scotland_LA.csv";
-	ifstream in(file);
-	if(!in){ return;}
-	
-	string line;
-	
-	auto j = 0u;
+	bool flag_global;
 	do{
-		getline(in,line);
-		
-		if(in.eof()) break;
-
-		remove_cr(line);
-
-		auto vec = split(line,',');
-	
-		for(auto i = 0u; i < vec.size(); i++){
-			fout << "\"" << vecr[j] << "\",";
-			fout << "\"" << vecr[i] << "\",";
-			fout << vec[i] << endl;
+		flag_global = false;
+			
+		// If a reparameterised parameter is used and it is constant than substitutes 
+		for(auto &eq : model.eqn){
+			auto flag = false;
+			for(auto &ca : eq.calc){
+				for(auto &it : ca.item){
+					if(it.type == PARAMETER){
+						
+						const auto &par = model.param[it.num];
+						if(par.variety == REPARAM_PARAM){
+							const auto &eqn = model.eqn[par.value[it.index].eq_ref];
+							
+							if(eqn.calc.size() == 0){
+								if(eqn.ans.type == NUMERIC){
+									it.type = NUMERIC;
+									it.constant = eqn.ans.constant;
+									flag = true;
+								}
+							}
+						}
+					}
+				}
+			}
+			
+			if(flag == true){
+				eq.simplify();
+				flag_global = true;
+			}
 		}
-		j++;
-	}while(true);
-
+	}while(flag_global == true);
 }
 
 
-/*
-/// Finds the possible set of priors for a parameter type
-vector <PriorPos> Input::set_pri_pos(type)
+/// Sets the default output directory 
+void Input::set_outputdir(string file)
 {
-	let pri_pos = prior_pos;           
-	switch(type){
-	case "trans_bp": pri_pos = bp_prior_pos; break;
-	case "trap_prob": case "Se": case "Sp": pri_pos = zeroone_prior_pos; break;
-	}
-	
-	return pri_pos;
+	auto i = file.length()-1;
+	while(i > 0 && file.substr(i,1) != ".") i--;
+	outputdir = file.substr(0,i)+"_output";
 }
-*/

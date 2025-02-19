@@ -1,10 +1,12 @@
 "use strict";
- 
+// Functions for model parameters
+
 /// Adds the button for the page in which simulation parameters are input
 function add_model_param_buts(lay)
 {
 	let cx = corner.x;
 	let cy = corner.y;
+	
 	
 	cy = lay.add_title("Model parameters",cx,cy,{te:modelparam_text});
 
@@ -34,6 +36,78 @@ function add_model_param_buts(lay)
 }
 
 
+/// Adds the button for the parameter mult page
+function add_param_mult_buts(lay)
+{
+	let cx = corner.x;
+	let cy = corner.y;
+	
+	cy = lay.add_title("Model parameter multipliers",cx,cy,{te:modelparam_text});
+
+	let active = true;
+	if(model.param.length == 0){
+		active = false;
+	}
+	
+	cy += 0.5;
+
+	add_layer("ParamMultContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{});	
+	
+	let x = 1.2, y = lay.dy-1.6;
+	let gap = 3.5;
+	
+	let w = model.add_object_button(lay,"Multiplier",x,y,"AddParamMult",{ back:WHITE, active:active, info:{}, title:"Multiplier", te:add_param_mult_text }); 
+}
+
+
+/// The content within the param mult info
+function add_param_mult_content(lay)
+{
+	let y = 0;
+	let mar = 2;
+	let dy = 4;
+	let col_round = LLLBLUE, col_text = DDBLUE;
+	
+	let x = maximim_label_width() + 4;
+	let del_x = lay.dx - 4.5;
+	let del_dx = 1.3;
+
+	for(let i = 0; i < model.param.length; i++){
+		let par = model.param[i];
+		if(par.type == "param factor"){
+			lay.add_button({te:"Parameter factor", x:1, y:y, dx:lay.dx-3, dy:dy+1.5, col:col_round, col2:col_text, type:"CurvedOutline"});
+			y += 1.4;
+			
+			let si = 1.0, fo = get_font(si,"","times");
+			let xx = x-par.label_info.dx-0.7-1.8;
+			lay.add_button({te:"Knots =", x:xx+1.8, y:y+0.3, dy:si, si:si, font:fo, type:"Text", col:BLACK});
+			
+			let spl = par.spline;
+			let te = stringify(spl.knot);
+					
+			let w = wright;
+				
+			lay.add_button({te:te, x:xx+5.6, y:y+0., dx:w-xx-5.6, dy:1.6, type:"SplineKnots", font: get_font(1.1,"","times"), ac:"EditSplineKnots", i:i});
+			
+			y += 2;
+		
+			if(add_view_button(par,w-4,y,i,lay,model)) w -= 4.5;
+		
+			display_constant(i,x,y,lay,w);
+			
+			lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamMult"});
+			y += dy;
+		}
+	}
+	
+	if(y == 0){
+		let si = 1;
+		let col = BLACK;
+		lay.add_button({te:"There are currently no parameter factors added to the model.", x:0.5, y:0, dx:lay.dx-5, dy:1.3, type:"Text", si:si, font:get_font(si), col:col}); 
+	}		
+}
+
+
 /// Adds a screen allowing simulation parameters to be edited
 function add_model_param_content(lay)
 {
@@ -59,6 +133,7 @@ function add_model_param_content(lay)
 				let i = pc.list[k];
 				let par = model.param[i];
 				let info = par.label_info;
+			
 				if(x+info.dx+1 >= lay.inner_dx){ x = mar; y += dy_param;}
 		
 				lay.add_button({x:x, y:y, dx:info.dx+1, dy:1.4*si_big, type:"ParamLabel2", info:info, col:BLACK, i:i, eqn_appear:par.eqn_appear, ac:"ParamInfo", back_col:WHITE});
@@ -108,12 +183,15 @@ function add_model_param_content(lay)
 					let te = "Load <e>"+ieg.A_matrix.name+"</e> matrix", dx = 8; 
 					if(ieg.A_matrix.loaded == true){ te = "Reload <e>"+ieg.A_matrix.name+"</e> matrix"; dx = 8;}
 						
-					let text_anno = text_convert_annotation(te,si,si,dx,"",BLACK);
+					let text_anno = text_convert_annotation(te,si,si,100,"",BLACK);
 
-					lay.add_button({word:text_anno.word, x:x+1.6, y:y-0.1, dx:dx+0.5, dy:1.1, type:"LinkPara", ac:"LoadAMarix", p:p, i:i});
+					let xload = 4;
+					let dxload = text_anno.wmax+0.5;
+					
+					lay.add_button({word:text_anno.word, x:xload, y:y+0.1, dx:dxload, dy:1.1, type:"LinkPara", ac:"LoadAMarix", p:p, i:i});
 		
 					if(ieg.A_matrix.loaded == true){
-						lay.add_button({te:"Edit", x:x+1.6+dx+1, y:y-0.1, dx:3.7, dy:1, ac:"EditAmatrix", type:"CombineIE", p:p, i:i});
+						lay.add_button({te:"Edit", x:xload+dxload+0.3, y:y-0.2, dx:3.75, dy:1.2, ac:"EditAmatrix", type:"GreyView", p:p, i:i});
 					}
 					
 					y += dy;
@@ -146,154 +224,190 @@ function add_model_param_content(lay)
 				let te = "Load <e>X^"+feg.name+"</e> vector", dx = 7; 
 				if(feg.X_vector.loaded == true){ te = "Reload <e>X^"+feg.name+"</e> vector"; dx = 8;}
 					
-				let text_anno = text_convert_annotation(te,si,si,dx,"",BLACK);
+				
+				let text_anno = text_convert_annotation(te,si,si,100,"",BLACK);
 
-				lay.add_button({word:text_anno.word, x:x+1.6, y:y-0.1, dx:dx+0.5, dy:1.1, type:"LinkPara", ac:"LoadXvector", p:p, i:i});
+				let xload = 4;
+				let dxload = text_anno.wmax+0.5;
+					
+				lay.add_button({word:text_anno.word, x:xload, y:y+0.1, dx:dxload, dy:1.1, type:"LinkPara", ac:"LoadXvector", p:p, i:i});
 
 				if(feg.X_vector.loaded == true){
-					lay.add_button({te:"Edit", x:x+1.6+dx+1, y:y-0.1, dx:3.7, dy:1, ac:"EditXvector", type:"CombineIE", p:p, i:i});
+					lay.add_button({te:"Edit", x:xload+dxload+0.3, y:y-0.1, dx:3.5, dy:1.2, ac:"EditXvector", type:"GreyView", p:p, i:i});
 				}
 				y += dy;
 			}
 			y += 1;
 		}
 	}
-	
-	
-	let num = 0;
-	for(let i = 0; i < model.param.length; i++){
-		if(model.param[i].spline.on == true){
-			num++;
-			if(model.param[i].spline.smooth.check == true) num++;
+
+	// SPLINES
+	{
+		let num = 0;
+		for(let i = 0; i < model.param.length; i++){
+			let par = model.param[i];
+			if(par.spline.on == true && par.type != "derive_param" && par.type != "param factor"){
+				num++;
+				if(model.param[i].spline.smooth.check == true) num++;
+			}
+		}
+
+		if(num > 0){
+			lay.add_button({te:"Splines", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5, col:col_round, col2:col_text, type:"CurvedOutline"});
+			y += 1.4;
+			
+			for(let i = 0; i < model.param.length; i++){
+				let par = model.param[i];
+				let spl = par.spline;
+				if(spl.on == true && par.type != "derive_param" && par.type != "param factor"){
+					lay.display_param(x-par.label_info.dx-0.7,y-0.1,par.label_info);
+				
+					let si = 1.0, fo = get_font(si,"","times");
+					lay.add_button({te:"Knots =", x:x+1.8, y:y+0.3, dy:si, si:si, font:fo, type:"Text", col:BLACK});
+					
+					let te = stringify(spl.knot);
+					
+					let w = wright;
+					
+					lay.add_checkbox(w-4,y+0.3,"Smooth","Smooth",spl.smooth,WHITE,{title:"Smoothing", te:smoothing_text});
+					w -= 4;
+				
+					lay.add_button({te:te, x:x+5.6, y:y+0., dx:w-x-5.6, dy:1.6, type:"SplineKnots", font: get_font(1.1,"","times"), ac:"EditSplineKnots", i:i});
+				
+					y += dy;
+					
+					if(spl.smooth.check == true){
+						lay.add_radio(x+1.6,y,"Log-Normal","Log-Normal",spl.smooth.type);
+						lay.add_radio(x+8.6,y,"Normal","Normal",spl.smooth.type);
+						
+						let si = 0.9, fo = get_font(si,"","times");
+						lay.add_button({te:"Value =", x:x+16.6, y:y+0.03, dy:si, si:si, font:fo, type:"Text", col:BLACK});
+					
+						lay.add_button({te:spl.smooth.value, x:x+19.4, y:y, dx:8, dy:1.2, type:"SmoothValue", font: get_font(0.9), ac:"EditSplineKnots", i:i});
+						y += dy;
+					}
+				}
+			}
+			y += 1;
 		}
 	}
 	
-	if(num > 0){
-		lay.add_button({te:"Splines", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5, col:col_round, col2:col_text, type:"CurvedOutline"});
-		y += 1.4;
-		
+	{ // CONSTS
+		let num = 0;
 		for(let i = 0; i < model.param.length; i++){
 			let par = model.param[i];
-			let spl = par.spline;
-			if(spl.on == true){
-				lay.display_param(x-par.label_info.dx-0.7,y-0.1,par.label_info);
+			if(par.variety == "const" && par.type != "param factor") num++;
+		}
 				
-				//let te = "Set spline knots";
-			
-				let si = 1.0, fo = get_font(si,"","times");
-				lay.add_button({te:"Knots =", x:x+1.8, y:y+0.3, dy:si, si:si, font:fo, type:"Text", col:BLACK});
-				
-				let te = stringify(spl.knot);
-				
-				let w = wright;
-				
-				lay.add_checkbox(w-4,y+0.3,"Smooth","Smooth",spl.smooth,WHITE,{title:"Smoothing", te:smoothing_text});
-				w -= 4;
-			
-				lay.add_button({te:te, x:x+5.6, y:y+0., dx:w-x-5.6, dy:1.6, type:"SplineKnots", font: get_font(1.1,"","times"), ac:"EditSplineKnots", i:i});
-			
-				y += dy;
-				
-				if(spl.smooth.check == true){
-					lay.add_radio(x+1.6,y,"Log-Normal","Log-Normal",spl.smooth.type);
-					lay.add_radio(x+8.6,y,"Normal","Normal",spl.smooth.type);
+		if(num > 0){
+			lay.add_button({te:"Constants", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5, col:col_round, col2:col_text, type:"CurvedOutline"});
+			y += 1.4;
+		
+			for(let i = 0; i < model.param.length; i++){
+				let par = model.param[i];
+				if(par.variety == "const" && par.type != "param factor"){
+					let w = wright;
 					
-					let si = 0.9, fo = get_font(si,"","times");
-					lay.add_button({te:"Value =", x:x+16.6, y:y+0.03, dy:si, si:si, font:fo, type:"Text", col:BLACK});
-				
-					lay.add_button({te:spl.smooth.value, x:x+19.4, y:y, dx:8, dy:1.2, type:"SmoothValue", font: get_font(0.9), ac:"EditSplineKnots", i:i});
+					if(par.value_desc == no_elements){
+						display_no_element(par,x,y,lay,w);
+					}
+					else{
+						if(add_view_button(par,w-4,y,i,lay,model)) w -= 4.5;
+						
+						if(add_distance_button(par,w-6.5,y,lay)) w -= 6;
+					
+						display_constant(i,x,y,lay,w);
+					}
+					
+					if(par.name != dist_matrix_name){
+						lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamConst"});
+					}
+					
 					y += dy;
 				}
 			}
+			y += 1;
 		}
-		y += 1;
 	}
 	
-	num = count(model.param,"variety","const");
-	if(num > 0){
-		lay.add_button({te:"Constants", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5, col:col_round, col2:col_text, type:"CurvedOutline"});
-		y += 1.4;
+	{ // REPARAM
+		let num = count(model.param,"variety","reparam");
+		if(num > 0){
+			lay.add_button({te:"Reparameterised", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5, col:col_round, col2:col_text, type:"CurvedOutline"});
+			y += 1.4;
+
+			for(let i = 0; i < model.param.length; i++){
+				let par = model.param[i];
+				if(par.variety == "reparam"){
+					let w = wright;
+					
+					if(par.value_desc == no_elements && par.reparam_eqn_on != true){
+						display_no_element(par,x,y,lay,w);
+					}
+					else{
+						display_reparam(i,x,y,lay,w);
+					}
+					lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamReparam"});
+					y += dy;
+				}
+			}
+			y += 1;
+		}
+	}
 	
-		for(let i = 0; i < model.param.length; i++){
-			let par = model.param[i];
-			if(par.variety == "const"){
+	{ // DIST
+		let num = count(model.param,"variety","dist");
+		if(num > 0){
+			lay.add_button({te:"Distributions", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5, col:col_round, col2:col_text, type:"CurvedOutline"});
+			y += 1.4;
+
+			for(let i = 0; i < model.param.length; i++){
+				let par = model.param[i];
+				if(par.variety == "dist"){
+					let w = wright;
+					
+					if(par.dep.length > 0){
+						lay.add_checkbox(w-4,y+0.4,"Split","Split",par.prior_split_check,WHITE);
+						w -= 4;
+					}
+		
+					if(par.dep.length == 0 || par.prior_split_check.check == false){
+						display_distribution(i,x,y,lay,true,true,w);
+					}
+					else{
+						if(par.prior_split_desc == no_elements){
+							display_no_element(par,x,y,lay,w);
+						}
+						else{
+							display_distribution_split(i,x,y,lay,true,true,"dist",w);
+						}
+					}
+					
+					lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamDist"});
+					y += dy;
+				}
+			}
+			y += 1;
+		}
+	}
+	
+	{ // DERIVE	
+		let der = model.derive;
+		let num = der.length;
+		if(num > 0){
+			lay.add_button({te:"Derived", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.7, col:col_round, col2:col_text, type:"CurvedOutline"});
+			y += 1.5;
+
+			for(let i = 0; i < der.length; i++){
 				let w = wright;
 				
-				if(add_view_button(par,w-4,y,i,lay,model)) w -= 4.5;
-				
-				if(add_distance_button(par,w-6.5,y,lay)) w -= 6;
-			
-				display_constant(i,x,y,lay,w);
-				
-				lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamConst"});
+				display_derive(i,x,y,lay,true,w);
+					
+				lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", val:i, ac:"DeleteDerive"});
 				y += dy;
 			}
+			y += 1;
 		}
-		y += 1;
-	}
-
-	num = count(model.param,"variety","reparam");
-	if(num > 0){
-		lay.add_button({te:"Reparameterised", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5, col:col_round, col2:col_text, type:"CurvedOutline"});
-		y += 1.4;
-
-		for(let i = 0; i < model.param.length; i++){
-			if(model.param[i].variety == "reparam"){
-				let w = wright;
-				
-				display_reparam(i,x,y,lay,w);
-				
-				lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamReparam"});
-				y += dy;
-			}
-		}
-		y += 1;
-	}
-	
-	num = count(model.param,"variety","dist");
-	if(num > 0){
-		lay.add_button({te:"Distributions", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5, col:col_round, col2:col_text, type:"CurvedOutline"});
-		y += 1.4;
-
-		for(let i = 0; i < model.param.length; i++){
-			let par = model.param[i];
-			if(par.variety == "dist"){
-				let w = wright;
-				
-				if(par.dep.length > 0){
-					lay.add_checkbox(w-4,y+0.4,"Split","Split",par.prior_split_check,WHITE);
-					w -= 4;
-				}
-				
-				if(par.dep.length == 0 || par.prior_split_check.check == false){
-					display_distribution(i,x,y,lay,true,true,w);
-				}
-				else{
-					display_distribution_split(i,x,y,lay,true,true,"dist",w);
-				}
-				
-				lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamDist"});
-				y += dy;
-			}
-		}
-		y += 1;
-	}
-	
-	let der = model.derive;
-	num = der.length;
-	if(num > 0){
-		lay.add_button({te:"Derived", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.7, col:col_round, col2:col_text, type:"CurvedOutline"});
-		y += 1.5;
-
-		for(let i = 0; i < der.length; i++){
-			let w = wright;
-			
-			display_derive(i,x,y,lay,true,w);
-				
-			lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", val:i, ac:"DeleteDerive"});
-			y += dy;
-		}
-		y += 1;
 	}
 }
 
@@ -324,6 +438,17 @@ function set_constant_bubble(cont)
 /// Bubble which allows user to select a reparam parameter
 function set_reparam_bubble(cont)
 {	
+	let bub = inter.bubble;
+	if(bub.set_reparam_type){
+		cont.dx = 15;
+		bubble_addtitle(cont,"Set reparameterisation");
+		bubble_addparagraph(cont,"Set via an equation or split into elements:",0,cont.dx); 
+		bubble_addradio(cont,0,"equation","Equation",bub.radio);
+		bubble_addradio(cont,0,"split","Split",bub.radio);	
+		add_end_button(cont,"Done","AddReparamParam2");		
+		return;
+	}
+	
 	if(check_param_free() == true){
 		cont.dx = 20;
 		bubble_addtitle(cont,"Set reparameterisation");
@@ -332,8 +457,7 @@ function set_reparam_bubble(cont)
 		cont.y += 0.2;
 	
 		bubble_addscrollable(cont,{type:"param sel", ymax:10, ac:"AddReparamParam"});
-		
-		add_bubble_end(cont);
+		add_bubble_end(cont);	
 	}
 	else{
 		cont.dx = 17;
@@ -341,6 +465,15 @@ function set_reparam_bubble(cont)
 
 		bubble_addparagraph(cont,"There are currently no free parameters to set.",0,cont.dx); 
 	}
+}
+
+
+/// Determines if reparameterisation is done via an equation  
+function set_reparam_bubble2(cont)
+{	
+	cont.dx = 20;
+	bubble_addtitle(cont,"Set reparameterisation");
+	bubble_addparagraph(cont,"Set via an equation .",0,cont.dx); 
 }
 
 
@@ -365,6 +498,20 @@ function set_distribution_bubble(cont)
 
 		bubble_addparagraph(cont,"There are currently no free parameters to set.",0,cont.dx); 
 	}
+}
+
+
+/// Bubble which allows user to select a parameter for modification 
+function add_param_mult_bubble(cont)
+{
+	cont.dx = 20;
+	bubble_addtitle(cont,"Set parameter");
+
+	bubble_addparagraph(cont,"Select parameter which is going to be modified:",0,cont.dx);
+	cont.y += 0.2;
+
+	bubble_addscrollable(cont,{type:"trans param sel", ymax:10, ac:"AddParamMultParam"});
+	add_bubble_end(cont);	
 }
 
 
@@ -410,12 +557,10 @@ function alter_derived_bubble(cont,bu)
 	let y_st = cont.y;
 	
 	bubble_input(cont,"",{type:"derive_eqn1", eqn:true, w:x});
-	//bubble_input(cont,"",{type:"deriveparam_eqn", val:bu.val, eqn:true, w:x});
 	let y_end = cont.y;
 	
 	cont.y = y_st;
 	bubble_input(cont,"",{type:"derive_eqn2", eqn:true, x:x+gap, w:cont.dx-x-gap});
-	//bubble_input(cont,"",{type:"derive_eqn", val:bu.val, eqn:true, x:x+gap, w:cont.dx-x-gap});
 	let y_end2 = cont.y;
 	
 	cont.y = y_st;
@@ -446,7 +591,7 @@ function check_param_free(op)
 
 
 /// Allows for a parameter to be selected
-function param_sel_scrollable(lay)
+function param_sel_scrollable(lay,op)
 {
 	let cx = 0, cy = 0;
 	let dy = 2.4;
@@ -455,9 +600,10 @@ function param_sel_scrollable(lay)
 	for(let i = 0; i < model.param.length; i++){
 		let par = model.param[i];
 
-		if(par.variety == "normal" && 
-			!(lay.op.ac == "AddDistParam" && par.dep.length == 0) ){	
-			//&&!(lay.op.ac == "AddReparamParam" && par.dep.length == 0)
+		if(par.variety == "normal"
+			&& !(lay.op.ac == "AddDistParam" && par.dep.length == 0) 
+			&& par.type != "derive_param" && !(op == "trans" && par.type != "trans_rate")
+			){	
 			let info = par.label_info;
 			if(cx+info.dx+1 >= lay.inner_dx){ cx = 0; cy += dy;}
 		
@@ -499,6 +645,7 @@ function display_derive(j,x,y,lay,edit,w)
 
 	lay.add_button({te_eqn1:der.eqn1.te, te_eqn2:der.eqn2.te,  par:par, val:j, x:2, y:y-0.05, x_eq:x, dx:w-2, dy:1.7, si:1.4, type:"Derive", col:BLUE, ac:ac_lab});
 }
+
 
 /// Displays bubble which is selected on model parameter page
 function set_paramselect_bubble(cont,eqn_appear)
@@ -543,8 +690,10 @@ function set_paramselect_bubble(cont,eqn_appear)
 
 	let te2 = "This parameter appears in:";
 	if(te != undefined){
+		cont.y += 0.2;
 		if(fl == false){
-			bubble_addbutton(cont,"View",cont.dx-3,cont.y,3,1,"ViewSmall","SelectParam",{par:par});
+			
+			bubble_addbutton(cont,"View",cont.dx-3.6,cont.y-0.2,3.5,1.2,"GreyView","SelectParam",{par:par});
 		}
 		
 		bubble_addparagraph(cont,te,0,cont.dx);
@@ -563,31 +712,24 @@ function set_paramselect_bubble(cont,eqn_appear)
 	add_bubble_end(cont);	
 }
 
-
-/// Determines if parameter is in the observation model
-function is_in_obsmodel(par)
-{
-	let i = find(eqn_types,"name",par.type);
-	if(i != undefined && eqn_types[i].obs_model == true) return true;
-	return false;
-}
-
 		
 /// Allows for a parameter
 function param_details_scrollable(lay)
 {
-	let cx = 0, cy = 0.1;
+	let cx = 0, cy = 0.2;
 	let dy = 2.4;
 	let gap = 0.5;
 
 	let dx = lay.inner_dx;
+	
+	let store = [];
 	
 	let eq_app = lay.op.eqn_appear;
 	for(let i = 0; i < eq_app.length; i++){
 		let eq = eq_app[i];
 
 		let te, ac;
-		
+	
 		switch(eq.type){
 		case "trans_mean": case "trans_rate": case "trans_shape":
 		case "trans_scale": case "trans_cv":
@@ -595,9 +737,9 @@ function param_details_scrollable(lay)
 				let tr = model.species[eq.eqn_info.p].cla[eq.eqn_info.cl].tra[eq.eqn_info.i];
 				let spl = tr.name.split("→");
 				
-				te = "Transition "+tr.name;
-				if(tr.variety == "Source") te = "Source for "+spl[1];
-				if(tr.variety == "Sink") te = "Sink for "+spl[0];
+				te = "Transition "+tr.name;		
+				if(tr.variety == SOURCE) te = "Source for "+spl[1];
+				if(tr.variety == SINK) te = "Sink for "+spl[0];
 				ac = "SelectTransEqn";
 			}
 			break;
@@ -616,8 +758,8 @@ function param_details_scrollable(lay)
 			ac = "SelectDataSpec";
 			break;
 			
-		case "trap_prob":
-			te = "Trapping probability";
+		case "mut_rate": case "seq_var":
+			te = "Genetic data";
 			ac = "SelectDataSpec";
 			break;
 			
@@ -631,34 +773,46 @@ function param_details_scrollable(lay)
 			ac = "SelectDataElement";
 			break;
 			
+		case "trans_prob":
+			te = "Transition observation prob.";
+			ac = "SelectDataSpec";
+			break;
+		
+			
 		case "reparam":
 			{
-				let name = get_full_parameter_name(eq.eqn_info.par_name);
-				te = "Reparameterisation of <e>"+name+"</e>";
-				ac = "SelectReparam";
+				te = "Reparameterisation";
+				if(eq.eqn_info != undefined){
+					let name = get_full_parameter_name(eq.eqn_info.par_name);
+					te = "Reparameterisation of <e>"+name+"</e>";
+					ac = "SelectReparam";
+				}
 			}
 			break;
 			
 		case "prior": case "dist":
 			{
 				let name = get_full_parameter_name(eq.eqn_info.par_name);
-				te = "Distribution of <e>"+name+"</e>";
+				te = "Distribution for <e>"+name+"</e>";
 				ac = "SelectDist";
 			}
 			break;
 			
 		case "derive_param":
 			break;
-			
+		
 		default: error("Option could not be recognised: "+eq.type); break;
 		}
 		
-		lay.add_button({te:"View", x:dx-3.5, y:cy-0., dx:3, dy:1, ac:ac, type:"ViewSmall", eqn_info:eq.eqn_info});
-		cy = lay.add_paragraph("<b>"+te+"</b>",dx-4,cx,cy,BLACK,warn_si,warn_lh);
+		if(find_in(store,te) == undefined){
+			lay.add_button({te:"View", x:dx-3.6, y:cy-0.2, dx:3.5, dy:1.2, ac:ac, type:"GreyView", eqn_info:eq.eqn_info});
+			cy = lay.add_paragraph("<b>"+te+"</b>",dx-4,cx,cy,BLACK,warn_si,warn_lh);
 		
-		cy += 0.3;
+			cy += 0.5;
+		
+			store.push(te);
+		}
 	}
 	
 	return cy;
 }
-

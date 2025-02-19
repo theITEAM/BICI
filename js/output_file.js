@@ -1,72 +1,92 @@
 "use strict";
+// Functions which generate output .bici file
 
 /// Creates an output file
-function create_output_file(type,filename)
+// save_type has the values:
+// sim - In one file with do-sim
+// inf - In one file with do-inf
+// save - In one file
+// export - References data files
+function create_output_file(save_type,map_store)
 {
 	let file_list=[];  // Used to make sure that files to not share the same name
 	
-	let dir = "data-files";
-	if(filename != undefined){
-		let spl = filename.split(".");
-		dir = spl[0]+"-data-files";
-	}
+	let one_file = true;
+	if(save_type == "export") one_file = false; 
+	
+	percent(0);
+
 	if(ver == "mac") dir = "/tmp/"+dir;
-		
-	const fs = require('fs');  // Creates the data directory
-	if (!fs.existsSync(dir)) {
-		fs.mkdir(dir, function(err) {
-			if(err) { 
-				alertp("There was a problem creating the directoy '"+dir+"'");
-			}
-		});
-	}
 	
-	init_param();
-	if(model.warn.length > 0){ generate_screen(); return;}
-	
-	let map_data = { crs:{},features:[],type:"FeatureCollection"};
-	
-	let exporting = false;
-	if(type == "siminf") exporting = true;
-	
-	let te = create_output_details(type,dir);
+	update_model();
 
+	percent(30);
+	
+	let te = create_output_details(save_type,file_list,one_file);
+
+	percent(40);
+
+	check_data_valid_all(save_type);
+	
+	check_data_time(save_type);
+	
+	check_param_valid(save_type);
+	
+	percent(45);
+	
 	for(let p = 0; p < model.species.length; p++){
-		te += create_output_species(p,map_data,file_list,type,dir,exporting);
+		te += create_output_species(p,file_list,save_type,map_store,one_file);
 	}
 
-	te += create_output_param(type,dir,file_list,exporting);
-		
+	percent(50);
+
+	te += create_output_param(save_type,file_list,one_file);
+	
+	percent(60);
+	
 	te += create_output_derived();
-
-	check_data_valid(type);
 	
-	if(model.warn.length > 0){ generate_screen(); return;}
+	te += endl;
 	
-	check_comp_structure();
-
-	turn_off_import_warning();
-	
-	if(model.warn.length > 0){ generate_screen(); return;}
+	if(save_type == "sim") te += "do-sim"+endl;
+	if(save_type == "inf") te += "do-inf"+endl;
 		
-	if(filename == "NO_SAVE") return te;
+	if(model.warn.length > 0) err_warning();
 	
-	if(map_data.features.length > 0){
-		write_file(JSON.stringify(map_data),dir+"/map-data.json");
-	}
+	percent(70);
+	
+	//check_comp_structure();
 
 	if(ver == "mac") filename = "/tmp/"+filename;
 	
-	write_file(te,filename);
-	
-	return "success";
+	percent(80);
+
+	if(input.type == "View Code"){
+		te = add_escape_char(te);	
+		let	lines = te.split('\n');
+		
+		let pro = process_lines(lines);
+		
+		post({formatted:pro.formatted,  param:strip_heavy(model.param), species:strip_heavy(model.species)});
+	}
+	else{
+		percent(90);
+		write_file_store(te,"bicifile",file_list,"bicifile");
+		percent(100);
+		post({save_type:save_type, file_list:file_list, param:strip_heavy(model.param), species:strip_heavy(model.species)});
+	}
 }
 
 
-/// Turns off any additional import warnings which get set during exporting
-function turn_off_import_warning()
+/// If there are error then display
+function err_warning()
 {
-	if(inter.help.title == "Error importing file!") close_help();
+	if(input.type == "Import output" && model.warn.length > 0){
+		let wa = model.warn[0];
+		alert_import(wa.mess+": "+wa.mess2);
+	}
+	
+	throw({type:"Model warning", command_type:input.type, species:strip_heavy(model.species), warn:model.warn});
 }
 
 
@@ -95,58 +115,105 @@ function mini_banner(name)
 
 
 /// Generates details
-function create_output_details(type,dir)
+function create_output_details(save_type,file_list,one_file)
 {
-	let te = banner("DETAILS");
+	let te = banner("DESCRIPTION");
 		
-	let desc = model.description.te.replace(/\n/g,"|");
-		
-	te += 'description text="'+desc+'"'+endl;
+	let desc = model.description.te;
+	let j = desc.length-1;
+	while(j >= 0 && (desc.substr(j,1) == "\n" || desc.substr(j,1) == "\r")) j--;
+	desc = desc.substr(0,j+1);
+	desc += endl;
+	
+	let file = get_unique_file("description",file_list,'.txt');
+	write_file_store(desc,file,file_list);
+	
+	//output_table_simp_file(file,head,row,file_list);
+	if(one_file) file = get_one_file(file_list);
+							
+	//te += 'description text="[['+endl+desc+endl+']]"'+endl;
+	te += 'description text="'+file+'"'+endl;
 	te += endl;
 	
-	te += 'data-dir folder="'+dir+'"'+endl;
-	te += endl;
+	te += banner("DETAILS");
 	
-	te += create_output_siminf(type);
+	if(save_type == "export"){
+		te += 'data-dir folder="."'+endl;
+		te += endl;
+	}
+	
+	te += create_output_siminf(save_type);
+
 	return te;
 }
 	
 	
 /// Outputs all the results for a given species
-function create_output_species(p,map_data,file_list,type,dir,exporting)
+function create_output_species(p,file_list,save_type,map_store,one_file)
 {
 	let sp = model.species[p];
 		
 	let te = banner("DEFINE MODEL AND DATA FOR SPECIES "+sp.name.toUpperCase());
 	
-	te += 'species name="'+sp.name+'" type="'+sp.type.toLowerCase()+'"'+endl+endl;
+	let ty = sp.type.toLowerCase();
 	
-	te += create_output_compartments(p,map_data,file_list,dir);
-	
-	te += create_output_ind_eff(p,dir,file_list);
+	te += 'species name="'+sp.name+'" type="'+ty+'"';
 
-	te += create_output_fix_eff(p,dir,file_list);
-
-	if(type == "sim" || type == "siminf"){
-		te += create_output_sim_inf_source(p,"sim",dir,file_list,exporting);
-		output_check("sim",exporting);	
-	}
-
-	if(type == "inf" || type == "siminf"){
-		te += create_output_sim_inf_source(p,"inf",dir,file_list,exporting);
-		output_check("inf",exporting);	
+	if(ty == "individual"){
+		te += ' trans-tree="';
+		if(sp.trans_tree.check == true) te += 'on';
+		else te += 'off';
+		te += '"';
 	}
 	
+	te += endl+endl;
+	
+	te += create_output_compartments(p,file_list,map_store,one_file);
+	
+	te += create_output_ind_eff(p,file_list,one_file);
+
+	te += create_output_fix_eff(p,file_list,save_type,one_file);
+
+	te += create_output_sim_inf_source(p,"sim",file_list,one_file);
+	if(save_type == "sim") output_check("sim");	
+
+	te += create_output_sim_inf_source(p,"inf",file_list,one_file);
+	if(save_type == "inf") output_check("inf");	
+	
+	if(model.inf_res.on == true){
+		te += create_output_sim_inf_source(p,"ppc",file_list,one_file);
+		if(save_type == "ppc") output_check("ppc");	
+	}
+
 	return te;
 }
 
 
-/// Creates output for all the compartments in the model
-function create_output_compartments(p,map_data,file_list,dir)
+/// Creates output for all the compartments and transitions in the model
+function create_output_compartments(p,file_list,map_store,one_file)
 {
-	let te = mini_banner("COMPARTMENTS");
-	
+	let te = mini_banner("SPECIES MODEL");
+		
 	let sp = model.species[p];
+	
+	if(sp.type == "Individual" && sp.trans_tree.check == true){
+		if(sp.infection_cl.te == select_str){
+			add_warning({mess:"Transition tree problem", mess2:"The infection classification for species '"+sp.name+"' must be set.", p:p, warn_type:"TransTreeInf"});
+		}
+		else{
+			let cl = find(sp.cla,"name",sp.infection_cl.te);
+			if(cl == undefined) error("Problem with classification name");
+			else{
+				let claa = sp.cla[cl];
+				
+				let c = 0; while(c < claa.ncomp && claa.comp[c].infected.check != true) c++;
+				if(c == claa.ncomp){
+					add_warning({mess:"Transition tree problem", mess2:"The infection state of at least one compartment in classification '"+claa.name+"' must be set.", p:p, cl:cl, warn_type:"ModelClass"});
+				}
+			}
+		}
+	}
+	
 	for(let cl = 0; cl < sp.ncla; cl++){
 		let claa = sp.cla[cl];
 		let cam = claa.camera;
@@ -157,144 +224,206 @@ function create_output_compartments(p,map_data,file_list,dir)
 		
 		let clp = clone_p(p,cl);
 
-		if(clp != undefined) te += ' clone="'+model.species[clp].name+'"';
+		if(clp != undefined) te += ' clone="'+model.species[clp].name+'"'+endl+endl;
 		else{
-			te += ' index="'+claa.index+'" coord="'+cam.coord+'"';
+			te += ' index="'+claa.index+'"';
+			if(cam.coord != COORD_DEFAULT) te += ' coord="'+cam.coord+'"';
 			
 			te += endl+endl;
 		
-			te += 'camera';
-			switch(cam.coord){
-			case "cartesian": 
-				te += ' x='+precision(cam.x)+' y='+precision(cam.y); 
-				break;
-				
-			case "latlng": 
-				let p = transform_latlng_inv(cam.x,cam.y);
-				te += ' lat='+precision(p.lat)+' lng='+precision(p.lng); 
-				break;
-
-			default: error("Option not recognised 110"); break;
+			if(one_file){
+				te += 'camera '+output_coords(cam.x,cam.y,cam);
+		
+				te += ' scale='+precision(cam.scale)+endl+endl;
 			}
 			
-			te += ' scale='+precision(cam.scale)+endl+endl;
-			
+			let store=[];
 			for(let c = 0; c < claa.ncomp; c++){
+				let labs=[];
+				
 				let co = claa.comp[c];
 				
-				te += 'comp name="'+co.name+'"';
+				labs.push({tag:"name", val:co.name});
+				
+				labs.push({tag:"color", val:co.col});
+				
+				labs.push({tag:"fix", val:co.fixed.check});
+			
+				if(sp.type == "Individual" && sp.trans_tree.check == true){
+					if(sp.infection_cl.te == sp.cla[cl].name && co.infected.check != undefined){
+						labs.push({tag:"infected", val:co.infected.check});
+					}
+				}
+					
+				if(co.choose_branch == true){
+					if(co.branch == true) labs.push({tag:"branch-prob", val:"true"});
+					else labs.push({tag:"branch-prob", val:"false"});
+				}
+				
 				switch(cam.coord){
 				case "cartesian": 
-					te += ' x='+precision(co.x/import_scale_factor);
-					te += ' y='+precision(co.y/import_scale_factor);
+					labs.push({tag:"x", val:precision(co.x/import_scale_factor)});
+					labs.push({tag:"y", val:precision(co.y/import_scale_factor)});
 					break;
 					
 				case "latlng":
 					if(co.type == "boundary"){
-						te += ' boundary="map-data.json"';
+						let file = get_unique_file(co.name+"_boundary",file_list,'.geojson');
+					
+						let k = find(map_store,"name",co.map_ref); 
+						if(k == undefined) error("Cannot find feature");
+	
+						let map_da = { crs:{},features:[],type:"FeatureCollection"};
+						map_da.features.push(generate_JSON_feature(co.name,map_store[k].feature));
 						
-						let fea = generate_JSON_feature(co.name,co.feature);
-
-						map_data.features.push(fea);
+						write_file_store(JSON.stringify(map_da)+"\n",file,file_list);
+						
+						if(one_file) file = get_one_file(file_list);
+						
+						labs.push({tag:"boundary", val:file});
 					}
 					else{
 						let p = transform_latlng_inv(co.x,co.y);
-						te += ' lat='+precision(p.lat)+' lng='+precision(p.lng); 
+						labs.push({tag:"lat", val:precision(p.lat)});
+						labs.push({tag:"lng", val:precision(p.lng)});
 					}
 					break;
 
 				default: error("Option not recognised 111"); break;
 				}
-		
-				te += ' color="'+co.col+'"';
-		
-				te += ' fix="'+co.fixed.check+'"';
-
-				if(co.choose_branch == true){
-					if(co.branch == true) te += ' branch-prob="true"';
-					else te += ' branch-prob="false"';
-				}
-				te += endl;
+				
+				store.push(labs);
 			}
-			te += endl;
+			
+			te += output_command_list("comp",claa.name,store,file_list,one_file);
+		
+			te += endl;	
 		}
 	
+		
+	
+		let store=[];
 		for(let j = 0; j < claa.ntra; j++){
+			let labs=[];
+			
 			let tr = claa.tra[j];
 			
 			let mid_start = 0, mid_end = tr.midp.length;
 			let i_sel;
 			
-			switch(tr.variety){
-			case "Normal":
-				te += 'trans from="'+claa.comp[tr.i].name+'"';
-				te += ' to="'+claa.comp[tr.f].name+'"';
-				break;
-				
-			case "Source":
-				te += 'source to="'+claa.comp[tr.f].name+'"';
-				mid_start = 1; i_sel = 0;
-				break;
+			let name = tr.name.replace(/→/g,"->")
+		
+			let splna = name.split("->");
+			if(splna[0] == "+"){ i_sel = 0; mid_start++;}
+			if(splna[1] == "-"){ i_sel = mid_end-1; mid_end--;}
 			
-			case "Sink":
-				te += 'sink from="'+claa.comp[tr.i].name+'"';
-				mid_end--; i_sel = mid_end;
-				break;
-
-			default: error("Option not recognised 112"); break;
-			}
+			labs.push({tag:"name", val:name});
 			
 			if(i_sel != undefined){
 				switch(cam.coord){
 				case "cartesian":
-					te += ' x="'+precision(tr.midp[i_sel].x/import_scale_factor)+'"';
-					te += ' y="'+precision(tr.midp[i_sel].y/import_scale_factor)+'"';
+					labs.push({tag:"x", val:precision(tr.midp[i_sel].x/import_scale_factor)});
+					labs.push({tag:"y", val:precision(tr.midp[i_sel].y/import_scale_factor)});
 					break;
 				
 				case "latlng":
-					let p = transform_latlng_inv(tr.midp[i_sel].x,tr.midp[i_sel].y);
-					te += ' lat="'+precision(p.lat)+'" lng="'+precision(p.lng)+'"';
+					{
+						let p = transform_latlng_inv(tr.midp[i_sel].x,tr.midp[i_sel].y);
+						labs.push({tag:"lat", val:precision(p.lat)});
+						labs.push({tag:"lng", val:precision(p.lng)});
+					}
 					break;
 
 				default: error("Option not recognised 113"); break;
 				}
 			}
+		
+			let tra_type = tr.type.toLowerCase();
+			let nm_flag = false;
+			let err_fl;
 			
-			te += ' type="'+tr.type+'"';
-			switch(tr.type.toLowerCase()){
-			case "exp(rate)": 
-				te += ' rate="'+esc(tr.value.rate_eqn.te)+'"';
-				break;
-			
-			case "exp(mean)": 
-				te += ' mean="'+esc(tr.value.mean_eqn.te)+'"';
+			let te;
+			switch(tra_type){
+			case "exponential": 
+				{
+					let rate = esc(tr.value.rate_eqn.te); if(rate == "") err_fl = "rate";
+					te = "exp(rate:"+rate+")";
+				}
 				break;
 				
 			case "gamma":
-				te += ' mean="'+esc(tr.value.mean_eqn.te)+'"';
-				te += ' cv="'+esc(tr.value.cv_eqn.te)+'"';
+				{
+					let mean = esc(tr.value.mean_eqn.te); if(mean == "") err_fl = "mean";
+					let cv = esc(tr.value.cv_eqn.te); if(cv == "") err_fl = "cv";
+					te = "gamma(mean:"+mean+", cv:"+cv+")";
+					nm_flag = true;
+				}
 				break;
 				
 			case "erlang":
-				te += ' mean="'+esc(tr.value.mean_eqn.te)+'"';
-				te += ' shape="'+esc(tr.value.shape_erlang.te)+'"';
+				{
+					let mean = esc(tr.value.mean_eqn.te); if(mean == "") err_fl = "mean";
+					let sh = esc(tr.value.shape_erlang.te); if(sh == "") err_fl = "shape";
+					te = "erlang(mean:"+mean+", shape:"+sh+")";
+				}
 				break;
 				
 			case "log-normal": 
-				te += ' mean="'+esc(tr.value.mean_eqn.te)+'"';
-				te += ' cv="'+esc(tr.value.cv_eqn.te)+'"';
+				{
+					let mean = esc(tr.value.mean_eqn.te); if(mean == "") err_fl = "mean";
+					let cv = esc(tr.value.cv_eqn.te); if(cv == "") err_fl = "cv";
+					te = "log-normal(mean:"+mean+", cv:"+cv+")";
+					nm_flag = true;
+				}
 				break;
 				
 			case "weibull":
-				te += ' scale="'+esc(tr.value.scale_eqn.te)+'"';
-				te += ' shape="'+esc(tr.value.shape_eqn.te)+'"';
+				{
+					let sc = esc(tr.value.scale_eqn.te); if(sc == "") err_fl = "scale";
+					let sh = esc(tr.value.shape_erlang.te); if(sh == "") err_fl = "shape";
+					te = "weibull(scale:"+sc+", shape:"+sh+")";
+					nm_flag = true;
+				}
 				break;
 
+			case "period": 
+				{
+					let time = esc(tr.value.mean_eqn.te); if(time == "") err_fl = "time";
+					te = "period(time:"+time+")";
+					nm_flag = true;
+				}
+				break;
+			
 			default: error("Option not recognised 114"); break;
 			}
-
+			
+			labs.push({tag:"value", val:te});
+			
+			if(err_fl != undefined){
+				add_warning({mess:"Transition problem.", mess2:"The value for '"+err_fl+"' is not specified", p:p, cl:cl, i:j, warn_type:"TransMistake"});
+			}
+			
+			if(sp.type == "Population" && nm_flag){ 		
+				add_warning({mess:"Transition problem.", mess2:"Transition '"+tr.name+"' cannot have a '"+tra_type+"' distribution because '"+sp.name+"' uses a population-based model.", p:p, cl:cl, i:j, warn_type:"TransMistake"});
+			}
+			
+			let bp_te;
+			
 			if(tr.branch == true){
-				te += ' bp="'+esc(tr.value.bp_eqn.te)+'"';
+				if(tr.all_branches == true) bp_te = esc(tr.value.bp_eqn.te);
+				else{
+					if(tr.branch_select == true) bp_te = esc(tr.value.bp_eqn.te);
+					else bp_te = "*";
+				}
+			}
+			
+			if(bp_te != undefined){
+				if(bp_te == ""){
+					add_warning({mess:"Branching problem", mess2:"Transition '"+tr.name+"' must have a branching probability assocaited with it.", p:p, cl:cl, i:j, warn_type:"TransMistake"});
+				}
+				else{
+					labs.push({tag:"bp", val:bp_te});
+				}
 			}
 			
 			switch(cam.coord){
@@ -308,7 +437,10 @@ function create_output_compartments(p,map_data,file_list,dir)
 					ylist += precision(tr.midp[i].y/import_scale_factor);
 				}
 				
-				if(xlist != '') te += ' mid-x="'+xlist+'" mid-y="'+ylist+'"';
+				if(xlist != ''){
+					labs.push({tag:"mid-x", val:xlist});
+					labs.push({tag:"mid-y", val:ylist});
+				}
 				break;
 				
 			case "latlng":
@@ -323,21 +455,195 @@ function create_output_compartments(p,map_data,file_list,dir)
 					lnglist += precision(p.lng);
 				}
 				
-				if(latlist != '') te += ' mid-lat="'+latlist+'" mid-lng="'+lnglist+'"';
+				if(latlist != ''){
+					labs.push({tag:"mid-lat", val:latlist});
+					labs.push({tag:"mid-lng", val:lnglist});
+				}
 				break;
 
 			default: error("Option not recognised 115"); break;
 			}
-
-			te += endl;
+			
+			store.push(labs);
+		}
+			
+		te += output_command_list("trans",claa.name,store,file_list,one_file);
+		
+		te += endl;
+		
+		for(let i = 0; i < claa.annotation.length; i++){
+			let anno = claa.annotation[i];
+			switch(anno.type){
+			case "box":
+				te += 'box text="'+anno.te+'" comps="';
+				for(let k = 0; k < anno.comps.length; k++){
+					if(k != 0) te += ",";
+					te += anno.comps[k];
+				}						
+				te += '"'
+				if(anno.color != annotation_col_default) te += ' color="'+anno.color+'"';
+				if(anno.size != size_annotation_default) te += ' text-size='+anno.size;
+				te += endl;
+				break;
+				
+			case "text":
+				te += 'label text="'+anno.te+'" '+output_coords(anno.x,anno.y,cam);
+				if(anno.color != annotation_col_default) te += ' color="'+anno.color+'"';
+				if(anno.size != size_annotation_default) te += ' text-size='+anno.size;
+				te += endl;
+				break;
+				
+			case "map":
+				if(anno.default_map != true){
+					let file = get_unique_file("map",file_list,'.geojson');
+					let k = find(map_store,"name",anno.map_ref);
+					if(k == undefined) error("map undefined");
+					else{
+						let map_da = { crs:{},features:[],type:"FeatureCollection"};
+						for(let j = 0; j < map_store[k].feature.length; j++){
+							map_da.features.push(generate_JSON_feature("Feature"+k,map_store[k].feature[j]));
+						}
+					
+						write_file_store(JSON.stringify(map_da)+"\n",file,file_list);
+						if(one_file) file = get_one_file(file_list);
+						te += 'map file="' +file+'"' + endl;
+					}
+				}
+				break;
+				
+			default:
+				break;
+			}
 		}
 		te += endl;
+	}
+
+	return te;
+}
+
+
+/// Gets string for coordinates
+function output_coords(x,y,cam)
+{
+	let te = "";
+	switch(cam.coord){
+	case "cartesian": 
+		te += 'x='+precision(x)+' y='+precision(y); 
+		break;
+		
+	case "latlng": 
+		let p = transform_latlng_inv(x,y);
+		te += 'lat='+precision(p.lat)+' lng='+precision(p.lng); 
+		break;
+
+	default: error("Option not recognised 110"); break;
 	}
 	
 	return te;
 }
 
+	
+/// Outputs a list of commands either seperately or in a file (for comps-all and trans-all)
+function output_command_list(type,claa_name,store,file_list,one_file)
+{
+	let te = "";
+	
+	let fl = false;
+	if(store.length >= 10){
+		fl = true;
+		for(let j = 0; j < store.length; j++){
+			let labs = store[j];
+			for(let i = 0; i < labs.length; i++){
+				if(labs[i].tag == "boundary") fl = false;
+			}
+		}
+	}
+	
+	if(fl == true){	
+		let head=[];
+		for(let j = 0; j < store.length; j++){
+			let labs = store[j];
+			for(let i = 0; i < labs.length; i++){
+				let ta = labs[i].tag;
+				let j = find_in(head,ta);
+				if(j == undefined){ j = head.length; head.push(ta);}
+				labs[i].col = j;
+			}
+		}
 		
+		let row=[];
+		let N = head.length;
+		for(let j = 0; j < store.length; j++){
+			let ro=[];
+			for(let i = 0; i < N; i++) ro[i] = "";
+			
+			let labs = store[j];
+			for(let i = 0; i < labs.length; i++){
+				ro[labs[i].col] = labs[i].val;
+			}
+			
+			row.push(ro);
+		}
+		
+		te += type+'-all';
+		
+		// Looks to remove tags which are all the same
+		let i = 0;
+		while(i < N){
+			let val = row[0][i];
+			
+			let j = 1; while(j < store.length && row[j][i] == row[0][i]) j++;
+			
+			if(j == store.length){
+				te += " "+head[i]+"=";
+				if(is_nan(val)) te += '"'+val+'"';
+				else te += val;
+				
+				head.splice(i,1);
+				for(let j = 0; j < store.length; j++){
+					row[j].splice(i,1);
+				}
+				N--;
+			}
+			else i++;
+		}
+		
+		let file = get_unique_file(type+"-"+claa_name,file_list,'.csv');
+
+		output_table_simp_file(file,head,row,file_list);
+		if(one_file) file = get_one_file(file_list);
+		
+		te += ' file="'+file+'"'+endl;
+	}	
+	else{		
+		for(let j = 0; j < store.length; j++){
+			let labs = store[j];
+			te += type;
+			for(let k = 0; k < labs.length; k++){
+				if(!(labs[k].tag == "fix" && labs[k].val == false)){
+					te += " "+labs[k].tag+"=";
+					let val = labs[k].val;
+					if(is_nan(val)) te += '"'+val+'"';
+					else te += val;
+				}
+			}
+			te += endl;
+		}
+	}
+	
+	return te;
+}
+
+
+/// Determines if not a number
+function is_nan(val)
+{
+	if(isNaN(val)) return true;
+	if(typeof(val) == "boolean") return true;
+	return false
+}
+
+
 /// Determines if cloning is possible because classification compartments already given previously
 function clone_p(p,cl)
 {
@@ -363,10 +669,6 @@ function clone_p(p,cl)
 						if(comp.col != comp2.col) prob = 3;
 						
 						if(comp.fixed.check != comp2.fixed.check) prob = 4;
-						
-						//if(comp.choose_branch != comp2.choose_branch) prob = 5;
-						
-						//if(comp.branch != comp2.branch) prob = 6;
 					}
 					if(prob == 0) return p2;
 				}
@@ -374,163 +676,204 @@ function clone_p(p,cl)
 		}			
 	}
 }
-
-
-/// Sets the precision of the output	
-function precision(x,digit)
-{
-	if(isNaN(x)) error(x+" is not a number");
-	x = Number(x);
-
-	if(digit == undefined) digit = 6;
-	
-	let mod = x; if(mod < 0) mod = -mod; 
-	
-	let digit_min = Math.floor(1+Math.log10(mod));
-	if(digit_min < 1) digit_min = 1;
-
-	if(digit < digit_min) digit = digit_min;
-
-	let val = Number(x).toPrecision(digit);
-	for(let j = digit-1; j >= digit_min; j--){
-		let val2 = x.toPrecision(j);
-		if(Number(val) == Number(val2)) val = val2; else break;
-	}
  
-	return val;
-}
-
 
 /// Create output of parameters
-function create_output_param(type,dir,file_list,exporting)
+function create_output_param(save_type,file_list,one_file)
 {
+	if(model.param.length == 0) return "";
+	
 	let te = banner("PARAMETERS");
 	
 	for(let th = 0; th < model.param.length; th++){
-		let par = model.param[th];
-		
-		let dist_done = false;
-		
-		if(!(type == "sim" && find_in(sim_param_not_needed,par.type) != undefined) &&
-			 !(type == "inf" && find_in(inf_param_not_needed,par.type) != undefined)){
-			let num_warn = model.warn.length;
-		
-			let te1 = 'param name="'+remove_eq_quote(par.full_name); te1 += '"';
-			
-			let te2 = "";
-			let display = false;
-				
-			if(par.dist_matrix.check == true){
-				te1 += ' distance-matrix="true"';
-				display = true;
-			}
-			else{
-				// Constants and simulation parameters
-				if(par.variety == "const" || par.variety == "reparam" || type == "sim" || type == "siminf"){ 
-					if((par.dep.length == 0 && par.value == set_str) || (par.set == false && !(par.variety == "dist" && par.sim_sample.check == true))){
-						if(exporting == false){
-							model.warn.push({mess:"A value for "+par.full_name+" must be set.", mess2:"Parameter values must be set before simulation can be perfomed", warn_type:"MissingSimValue", name:par.name});
-						}
-					}
-					else{
-						if(par.variety == "dist" && par.sim_sample.check == true){
-							te2 += output_add_prior_distribution(par,"dist",file_list,dir);
-							dist_done = true;
-						}
-						else{
-							let exp = "value";
-							if(par.variety == "const") exp = 'constant';
-							else{
-								if(par.variety == "reparam") exp = 'reparam';
-							}
-							te2 += ' '+exp+'=';
-							
-							if(exp == "value" && par.auto_value == true){
-								te2 += '"auto"';
-							}
-							else{
-								let file;				
-								if(par.dep.length > 0){
-									file = get_unique_file(exp+"-"+par.name,file_list,'.csv');
-								}
-								
-								if(file != undefined){
-									te2 += '"'+file+'"';
-									
-									let data = '';
-									for(let d = 0; d < par.dep.length; d++){	
-										data += '"'+par.dep[d]+'",';
-									}
-									data += 'Value' + endl;
-								
-									for(let i = 0; i < par.comb_list.length; i++){
-										let comb = par.comb_list[i];
-										for(let d = 0; d < par.dep.length; d++){
-											data += '"'+comb.combination[d]+'",';
-										}
-										data += '"'+get_element(par.value,comb.index)+'"'+endl;
-									}
-								
-									write_file(data,dir+"/"+file);
-								}
-								else{
-									te2 += JSON.stringify(par.value); 
-								}
-							}
-						}	
-					}
-				}
-				
-				if(par.variety != "const" && par.variety != "reparam" &&
-					(type == "inf" || type == "siminf")){
-					
-					switch(par.variety){
-					case "normal":
-						te2 += output_add_prior_distribution(par,"prior",file_list,dir);
-						break;
-						
-					case "dist":
-						if(dist_done == false){
-							te2 += output_add_prior_distribution(par,"dist",file_list,dir);
-						}
-						break;
-						
-					default: error("Option not recognised 1B"+par.variety); break;
-					}
-				}
-				
-				if(te2 != "") display = true;
-				
-				if(par.spline.on == true){
-					if(par.spline.knot.length == 0) error("There should be knot times specified");
-					
-					te2 += ' knot-times="'+stringify(par.spline.knot)+'"';
-					
-					let sm = par.spline.smooth;
-					if(sm.check == true){
-						te2 += ' smooth="'+sm.type.value.toLowerCase()+'('+sm.value+')"';
-					}
-				}
-			}
-				
-			if(display == true){
-				te += te1+te2+endl;
-			}
-			else{
-				if(num_warn == model.warn.length){
-					model.warn.push({mess:"Parameter "+par.full_name+" could not be exported.", mess2:"Unknown error", warn_type:"", name:par.name});
-				}
-			}
-		}
+		te += output_param(model.param[th],save_type,file_list,one_file);
 	}
+	
 	te += endl;
 
 	return te;
 }
 
 
+/// Outputs a single parameter
+function output_param(par,save_type,file_list,one_file)
+{
+	let te = "";
+	let dist_done = false;
+	
+	if(par.type != "derive_param"){	 
+		let num_warn = model.warn.length;
+	
+		let te1 = "param";
+		if(par.type == "param factor"){
+			let pfac = model.param_factor;
+				
+			let k = 0, kmax = pfac.length; 
+
+			while(k < kmax && pfac[k].f_param.full_name != par.full_name) k++;
+			if(k == kmax) alert_help("Problem loading param factor");
+	
+			te1 += '-mult name="'+remove_eq_quote(pfac[k].param.full_name)+'"';
+		}
+		else{
+			te1 += ' name="'+remove_eq_quote(par.full_name)+'"';
+		}
+		
+		let te2 = "";
+		let display = false;
+		
+		if(par.name == dist_matrix_name){
+			display = true;
+		}
+		else{
+			// Constants and simulation parameters
+			if(par.variety == "reparam" && par.reparam_eqn_on){
+				if(par.reparam_eqn.trim() != ""){
+					te1 += ' reparam="'+par.reparam_eqn+'"';
+				}
+				display = true;
+			}
+			else{
+				if((par.dep.length == 0 && par.value == set_str) || (par.set == false && !(par.variety == "dist" && par.sim_sample.check == true))){
+					if(save_type == "sim"){
+						if(find_in(sim_param_not_needed,par.type) == undefined){
+							add_warning({mess:"A value for parameter "+par.full_name+" must be set.", mess2:"Parameter values must be set before simulation can be perfomed", warn_type:"MissingSimValue", name:par.name});
+						}
+					}
+					
+					if(save_type == "ppc"){
+						add_warning({mess:"A value for parameter multiplier "+par.full_name+" must be set.", mess2:"Parameter multiplier values must be set before posterior simulation can be perfomed", warn_type:"MissingParamMultValue", name:par.name});
+					}
+				}
+				else{
+					if(par.variety == "dist" && par.sim_sample.check == true){
+						te2 += output_add_prior_distribution(save_type,par,"dist",file_list,one_file);
+						dist_done = true;
+					}
+					else{
+						let exp = "value";
+						if(par.variety == "const"){
+							exp = 'constant';
+						}
+						else{
+							if(par.variety == "reparam") exp = 'reparam';
+						}
+									
+						te2 += ' '+exp+'=';
+						
+						let file;				
+						if(par.dep.length > 0){
+							file = get_unique_file(exp+"-"+par.name,file_list,'.csv');
+						}
+						
+						if(file != undefined){
+							let data = '';
+							for(let d = 0; d < par.dep.length; d++){	
+								data += '"'+par.dep[d]+'",';
+							}
+							data += 'Value' + endl;
+						
+							let list = par.list;
+						
+							for(let i = 0; i < par.comb_list.length; i++){
+								let comb = par.comb_list[i];
+								let el = get_element(par.value,comb.index);
+								if(el == undefined){
+									let me = "A value for parameter "+par.full_name+" is undefined (";
+									for(let j = 0; j < par.dep.length; j++){
+										if(j != 0) me += ",";
+										me += list[j][comb.index[j]];
+									}
+									me += ").";
+									
+									add_warning({mess:"Parameter value is undefined", mess2:me, warn_type:"ParamValueProblem", par:par});
+									return;
+								}
+								
+								if(el != 0){	
+									for(let d = 0; d < par.dep.length; d++){
+										data += '"'+list[d][comb.index[d]]+'",';
+									}
+									data += '"'+el+'"'+endl;
+								}
+							}
+						
+							write_file_store(data,file,file_list);
+							if(one_file) file = get_one_file(file_list);
+							te2 += '"'+file+'"';
+						}
+						else{
+							te2 += JSON.stringify(par.value); 
+						}
+					}	
+				}
+			}
+			
+			if(par.variety != "const" && par.variety != "reparam"){
+				switch(par.variety){
+				case "normal":
+					te2 += output_add_prior_distribution(save_type,par,"prior",file_list,one_file);
+					break;
+					
+				case "dist":
+					if(dist_done == false){
+						te2 += output_add_prior_distribution(save_type,par,"dist",file_list,one_file);
+					}
+					break;
+					
+				default: error("Option not recognised 1B"+par.variety); break;
+				}
+			}
+			
+			if(te2 != "") display = true;
+			
+			if(par.spline.on == true){
+				if(par.spline.knot.length == 0) error("There should be knot times specified");
+				
+				// Checks to see if spline is within range
+				if(save_type == "sim" || save_type == "inf"){	
+					let details = model.sim_details;
+					if(save_type == "inf") details =  model.inf_details;
+				
+					let t_start = Number(details.t_start);
+					let t_end = Number(details.t_end);
+					for(let j = 0; j < par.spline.knot.length; j++){
+						let num = par.spline.knot[j];
+						if(num != "start" && num != "end"){
+							num = Number(num);
+							if(num < t_start || num > t_end){
+								add_warning({mess:"Knot problem", mess2:"Knot time '"+num+"' must be between the start and end times", warn_type:"KnotProblem", name:par.name});
+							}
+						}
+					}
+				}
+					
+				te2 += ' knot-times="'+stringify(par.spline.knot)+'"';
+				
+				let sm = par.spline.smooth;
+				if(sm.check == true){
+					te2 += ' smooth="'+sm.type.value.toLowerCase()+'('+sm.value+')"';
+				}
+			}
+		}
+			
+		if(par.name != dist_matrix_name){
+			te += te1+te2+endl;
+		}
+		
+		if(display == false && (save_type == "sim" || save_type == "inf")){
+			if(num_warn == model.warn.length){
+				add_warning({mess:"Parameter "+par.full_name+" could not be exported.", mess2:"Unknown error", warn_type:"", name:par.name});
+			}
+		}
+	}
+	
+	return te;
+}
+	
+
 /// Adds text associated with adding a distribution
-function output_add_prior_distribution(par,variety,file_list,dir,)
+function output_add_prior_distribution(save_type,par,variety,file_list,one_file)
 {
 	let st="";
 
@@ -549,7 +892,7 @@ function output_add_prior_distribution(par,variety,file_list,dir,)
 		}
 			
 		if(par.prior_split_set == false){
-			model.warn.push({mess:"Missing "+key+" distribution information", mess2:"The "+key+" for "+par.full_name+" must be set.", warn_type:warn_type, name:par.name});
+			add_warning({mess:"Missing "+key+" distribution information", mess2:"The "+key+" for parameter "+par.full_name+" must be set.", warn_type:warn_type, name:par.name});
 		}
 		else{
 			let file = get_unique_file(key+"-"+par.name,file_list,'.csv');
@@ -561,8 +904,6 @@ function output_add_prior_distribution(par,variety,file_list,dir,)
 			case "prior": st += ' prior-split'; col = 'Prior'; break;
 			default: error("option prob"); break;
 			}
-			
-			st += '="'+file+'"';
 								
 			let data = '';
 			for(let d = 0; d < par.dep.length; d++){
@@ -570,137 +911,33 @@ function output_add_prior_distribution(par,variety,file_list,dir,)
 			}
 			data += col+endl;
 			
-			//let list = generate_list_from_dep(par);
-			
-			//for(let i = 0; i < list.length; i++){
+			let list = par.list;
 			for(let i = 0; i < par.comb_list.length; i++){
 				let comb = par.comb_list[i];
 				for(let d = 0; d < par.dep.length; d++){
-					data += '"'+comb.combination[d]+'",';
+					data += '"'+list[d][comb.index[d]]+'",';
 				}
 				
 				let pri = get_element(par.prior_split,comb.index);
 				
 				if(pri.type.te == select_str){
-					model.warn.push({mess:"Missing "+key, mess2:"The "+key+" for "+par.full_name+" must be set.", warn_type:"MissingPriorSplitValue", name:par.name});
+					add_warning({mess:"Missing "+key, mess2:"The "+key+" for "+par.full_name+" must be set.", warn_type:"MissingPriorSplitValue", name:par.name});
 					return "";
 				}
 				
 				data += '"'+get_prior_string(pri)+'"'+endl;
 			}
 		
-			write_file(data,dir+"/"+file);
+			write_file_store(data,file,file_list);
+			if(one_file) file = get_one_file(file_list);
+			st += '="'+file+'"';
 		}
 	}
 	else{
 		let pri = par.prior;
 	
-		let tex = pri.type.te;
-		if(tex == select_str){
-			model.warn.push({mess:"Missing "+key, mess2:"The "+key+" for "+par.full_name+" must be set.", warn_type:"MissingPriorValue", name:par.name});
-			return "";
-		}
-		
-		let te = '"'+tex.toLowerCase()+'"';
-	
-		switch(pri.type.te){
-		case "fix":
-			{
-				let mean = esc(pri.value.mean_eqn.te);
-				check_prior_val(mean,variety,par,{positive:true});
-				te += ' fixed="'+mean+'"';
-			}
-			break;
-			
-		case "uniform":
-			{
-				let min = esc(pri.value.min_eqn.te);
-				check_prior_val(min,variety,par,{});
-				te += ' min="'+min+'"';
-				
-				let max = esc(pri.value.max_eqn.te);
-				check_prior_val(max,variety,par,{});
-				te += ' max="'+max+'"';
-			}
-			break;
-
-		case "exp":
-			{
-				let mean = esc(pri.value.mean_eqn.te);
-				check_prior_val(mean,variety,par,{positive:true});
-				te += ' mean="'+mean+'"';
-			}
-			break;
-
-		case "normal":
-			{
-				let mean = esc(pri.value.mean_eqn.te);
-				check_prior_val(mean,variety,par,{});
-				te += ' mean="'+mean+'"';
-				
-				let sd = esc(pri.value.sd_eqn.te);
-				check_prior_val(sd,variety,par,{positive:true});
-				te += ' sd="'+sd+'"';
-			}
-			break;
-
-		case "log-normal":
-			{
-				let mean = esc(pri.value.mean_eqn.te);
-				check_prior_val(mean,variety,par,{positive:true});
-				te += ' mean="'+mean+'"';
-				
-				let cv = esc(pri.value.cv_eqn.te);
-				check_prior_val(cv,variety,par,{positive:true});
-				te += ' cv="'+cv+'"';
-			}
-			break;
-			
-		case "gamma":
-			{
-				let mean = esc(pri.value.mean_eqn.te);
-				check_prior_val(mean,variety,par,{positive:true});
-				te += ' mean="'+mean+'"';
-				
-				let cv = esc(pri.value.cv_eqn.te);
-				check_prior_val(cv,variety,par,{positive:true});
-				te += ' cv="'+cv+'"';
-			}
-			break;
-		
-		case "beta":
-			{
-				let alpha = esc(pri.value.alpha_eqn.te);
-				check_prior_val(alpha,variety,par,{positive:true});
-				te += ' alpha="'+alpha+'"';
-				
-				let beta = esc(pri.value.beta_eqn.te);
-				check_prior_val(beta,variety,par,{positive:true});
-				te += ' beta="'+beta+'"';
-			}
-			break;
-			
-		case "bernoulli":
-			{
-				let mean = esc(pri.value.mean_eqn.te);
-				check_prior_val(mean,variety,par,{positive:true});
-				te += ' mean="'+mean+'"';
-			}
-			break;
-			
-		case "flat":
-			break;
-			
-		case "dirichlet":
-			{
-				let alpha = esc(pri.value.alpha_eqn.te);
-				check_prior_val(alpha,variety,par,{positive:true});
-				te += ' alpha="'+alpha+ '"';
-			}
-			break;
-		
-		default: error("op error"); break;
-		}
+		let prior_string = get_prior_output(save_type,par.prior,variety,par);
+		if(prior_string == "") return "";
 	
 		switch(variety){ 
 		case "dist": st += ' dist'; break;
@@ -708,10 +945,25 @@ function output_add_prior_distribution(par,variety,file_list,dir,)
 		default: error("option prob"); break;
 		}
 		
-		st += '='+te;
+		st += '='+prior_string;
 	}
 		
 	return st;
+}
+
+
+/// Gets the output string from a prior definition
+function get_prior_output(save_type,pri,variety,par)
+{
+	let tex = pri.type.te;
+	if(tex == select_str){
+		if(save_type == "inf"){	
+			add_warning({mess:"Missing "+variety, mess2:"The "+variety+" for parameter "+par.full_name+" must be set.", warn_type:"MissingPriorValue", name:par.name});
+		}
+		return "";
+	}
+	
+	return '"'+get_prior_string(pri)+'"';
 }
 
 
@@ -728,21 +980,24 @@ function check_prior_val(val,variety,par,op)
 		if(isNaN(val)) warn_text = "Not a value";
 		else{
 			if(op.positive == true){
-				if(Number(val) <= 0) warn_text = "Must be positive";
+				if(Number(val) <= 0) warn_text = "Must be positive2";
 			}
 		}
 		break;
 
 	case "dist":
-		key = "distribution"; warn_type = "MissingDistValue"; 
-		if(!is_eqn(val,"min",op)) warn_text = "'"+val+"' is not valid.";
+		{
+			key = "distribution"; warn_type = "MissingDistValue"; 
+			let res = is_eqn(val,"min",op);
+			if(res.err == true) warn_text = "'"+val+"' is not valid.";
+		}
 		break;
 		
 	default: error("not op"); break;
 	}
 
 	if(warn_text != undefined){
-		model.warn.push({mess:"Error in "+key+" for "+par.full_name, mess2:warn_text, warn_type:warn_type, name:par.name});
+		add_warning({mess:"Error in "+key+" for "+par.full_name, mess2:warn_text, warn_type:warn_type, name:par.name});
 	}
 }
 
@@ -772,7 +1027,7 @@ function create_output_derived()
 
 
 /// Create output of individual effects
-function create_output_ind_eff(p,dir,file_list)
+function create_output_ind_eff(p,file_list,one_file)
 {
 	let iegs = model.species[p].ind_eff_group;
 		
@@ -783,39 +1038,67 @@ function create_output_ind_eff(p,dir,file_list)
 	for(let i = 0; i < iegs.length; i++){
 		let ieg = iegs[i];
 		let name = "";
-		for(let j = 0; j < ieg.list.length; j++){
+		for(let j = 0; j < ieg.ie_list.length; j++){
 			if(j > 0) name += ",";
-			name += ieg.list[j].name;
+			name += ieg.ie_list[j].name;
 		}
 			
 		te += 'ind-effect name="'+name+'"';
 		
 		let mat = ieg.A_matrix;
+		
 		if(mat.check == true){
 			if(mat.loaded == false){
-				model.warn.push({mess:"Error in individual effects", mess2:"The A matrix for individual effects '"+name+"' must be loaded", warn_type:"A matrix"});
+				add_warning({mess:"Error in individual effects", mess2:"The A matrix for individual effects '"+name+"' must be loaded", warn_type:"A matrix"});
 			}
 			else{
 				let file = get_unique_file("A-matrix-"+name,file_list,'.csv');
-	
-				te += ' A="'+file+'"';
 				
-				let data = '';
-				for(let c = 0; c < mat.ind_list.length; c++){ 
-					if(c != 0) data += ',';
-					data += '"'+mat.ind_list[c]+'"';
+				if(true){                                   // Sparse representation
+					let file_ind = get_unique_file("ind-list-"+name,file_list,'.csv');
+				
+					let data_ind = 'Individual'+endl;
+					for(let c = 0; c < mat.ind_list.length; c++){ 
+						data_ind += '"'+mat.ind_list[c]+'"'+endl;
+					}
+				
+					write_file_store(data_ind,file_ind,file_list);
+					if(one_file) file_ind = get_one_file(file_list);
+					te += ' ind-list="'+file_ind+'"';
+					
+					let data = 'j,i,value'+endl;
+					for(let r = 0; r <  mat.ind_list.length; r++){
+						for(let c = 0; c <= r; c++){
+							let val = mat.A_value[r][c];
+							
+							if(val != 0) data += r+","+c+","+val+endl;
+						}
+					}
+		
+					write_file_store(data,file,file_list);
+					if(one_file) file = get_one_file(file_list);
+					te += ' A-sparse="'+file+'"';
 				}
-				data += endl;
-
-				for(let r = 0; r <  mat.ind_list.length; r++){
+				else{	
+					let data = '';
 					for(let c = 0; c < mat.ind_list.length; c++){ 
 						if(c != 0) data += ',';
-						data += mat.value[r][c];
+						data += '"'+mat.ind_list[c]+'"';
 					}
 					data += endl;
+
+					for(let r = 0; r <  mat.ind_list.length; r++){
+						for(let c = 0; c < mat.ind_list.length; c++){ 
+							if(c != 0) data += ',';
+							data += mat.A_value[r][c];
+						}
+						data += endl;
+					}
+		
+					write_file_store(data,file,file_list);
+					if(one_file) file = get_one_file(file_list);
+					te += ' A="'+file+'"';
 				}
-	
-				write_file(data,dir+"/"+file);
 			}
 		}		
 		te += endl;
@@ -828,7 +1111,7 @@ function create_output_ind_eff(p,dir,file_list)
 
 
 /// Create output of fixed effects
-function create_output_fix_eff(p,dir,file_list)
+function create_output_fix_eff(p,file_list,save_type,one_file)
 {
 	let fegs = model.species[p].fix_eff;
 	
@@ -844,18 +1127,20 @@ function create_output_fix_eff(p,dir,file_list)
 		
 		let vec = feg.X_vector;
 		if(vec.loaded == false){
-			model.warn.push({mess:"Error in fixed effects", mess2:"The vector <e>X^"+name+"</e> for fixed effect '"+name+"' must be loaded", warn_type:"X vector"});
+			if(save_type == "sim" || save_type == "inf"){
+				add_warning({mess:"Error in fixed effects", mess2:"The vector <e>X^"+name+"</e> for fixed effect '"+name+"' must be loaded", warn_type:"X vector"});
+			}
 		}
 		else{
 			let file = get_unique_file("X-vector-"+name,file_list,'.csv');
 
-			te += ' X="'+file+'"';
-			
 			let data = 'ID,value'+endl;
 			for(let c = 0; c < vec.ind_list.length; c++){ 
-				data += '"'+vec.ind_list[c]+'",'+vec.value[c]+endl;
+				data += '"'+vec.ind_list[c]+'",'+vec.X_value[c]+endl;
 			}
-			write_file(data,dir+"/"+file);
+			write_file_store(data,file,file_list);
+			if(one_file) file = get_one_file(file_list);
+			te += ' X="'+file+'"';
 		}
 		te += endl;
 	}
@@ -865,168 +1150,229 @@ function create_output_fix_eff(p,dir,file_list)
 	return te;
 }
 
-
+	
 /// Creates information about simulation or inference
-function create_output_siminf(type)
+function create_output_siminf(save_type)
 {
 	let te = "";
-	
-	if(type == "sim" || type == "siminf"){
-		let flag = false;
-		
+
+	{                                                // Deals with sim details
 		let details = model.sim_details;
 		
-		if(details.t_start == "" || isNaN(details.t_start)){
-			if(type == "siminf") flag = true;
-			else{
-				model.warn.push({mess:"Error in simulation details", mess2:"The start time must be set", warn_type:"SimDetails"});
+		if(save_type ==  "sim"){
+			if(details.t_start == "" || isNaN(details.t_start)){
+				add_warning({mess:"Error in simulation details", mess2:"The start time must be set", warn_type:"SimDetails"});
+			}
+		
+			if(details.t_end == "" || isNaN(details.t_end)){
+				add_warning({mess:"Error in simulation details", mess2:"The end time must be set", warn_type:"SimDetails"});
+			}
+		
+			let num = Number(details.number);
+			if(details.number == "" || isNaN(num) || num != Math.floor(num) || num <= 0){
+				add_warning({mess:"Error in simulation details", mess2:"The simulation number must be set to a positive integer", warn_type:"SimDetails"});
+			}
+		
+			let timestep = Number(details.timestep);
+			if(details.timestep == "" || isNaN(timestep) || timestep <= 0){
+				add_warning({mess:"Error in simulation details", mess2:"The simulation timestep must be set to a positive number", warn_type:"SimDetails"});
 			}
 		}
 		
-		if(details.t_end == "" || isNaN(details.t_end)){
-			if(type == "siminf") flag = true;
-			else{
-				model.warn.push({mess:"Error in simulation details", mess2:"The end time must be set", warn_type:"SimDetails"});
-			}
+		te += "simulation";
+		if(details.t_start != "") te +=" start="+details.t_start;
+		if(details.t_end != "") te += " end="+details.t_end;
+		
+		if(details.number != ""){
+			let num = Number(details.number);
+			if(num != SIM_NUM_DEFAULT) te += " number="+num;
 		}
 		
-		let num = Number(details.number);
-		if(details.number == "" || isNaN(num) || num != Math.floor(num) || num <= 0){
-			if(type == "siminf") flag = true;
-			else{
-				model.warn.push({mess:"Error in simulation details", mess2:"The simulation number must be set to a positive integer", warn_type:"SimDetails"});
-			}
-		}
+		if(details.timestep != "") te += " timestep="+details.timestep; 
 		
-		let timestep = Number(details.timestep);
-		if(details.timestep == "" || isNaN(timestep) || timestep <= 0){
-			if(type == "siminf") flag = true;
-			else{
-				model.warn.push({mess:"Error in simulation details", mess2:"The simulation timestep must be set to a positive number", warn_type:"SimDetails"});
-			}
-		}
-		
-		if(flag == false){
-			te += "simulation start="+details.t_start+" end="+details.t_end+" number="+num;
-			//if(timestep != "") 
-			te += " timestep="+timestep; 
+		if(details.seed_on.value == "Yes") te += " seed="+details.seed;
 			
+		if(details.indmax != INDMAX_DEFAULT){
 			te += " ind-max="+details.indmax;
-			
-			te += endl;
-			te += endl;
 		}
-	}	
-
-	if(type == "inf" || type == "siminf"){ 
-		let flag = false;
 		
+		if(details.param_output_max != PARAM_OUTPUT_MAX_DEFAULT){
+			te += " param-output-max="+details.param_output_max;
+		}
+		
+		te += endl;
+		te += endl;
+	}
+
+	{                                                // Deals with inf details
 		let details = model.inf_details;
 		
-		if(details.t_start == "" || isNaN(details.t_start)){
-			if(type == "siminf") flag = true;
-			else{
-				model.warn.push({mess:"Error in inference details", mess2:"The start time must be set", warn_type:"InfDetails"});
+		if(save_type == "inf"){
+			if(details.t_start == "" || isNaN(details.t_start)){
+				add_warning({mess:"Error in inference details", mess2:"The start time must be set", warn_type:"InfDetails"});
+			}
+		
+			if(details.t_end == "" || isNaN(details.t_end)){
+				add_warning({mess:"Error in inference details", mess2:"The end time must be set", warn_type:"InfDetails"});
+			}
+
+			let timestep = Number(details.timestep);
+			if(details.timestep == "" || isNaN(timestep) || timestep <= 0){
+				add_warning({mess:"Error in inference details", mess2:"The timestep must be set to a positive number", warn_type:"InfDetails"});
 			}
 		}
 		
-		if(details.t_end == "" || isNaN(details.t_end)){
-			if(type == "siminf") flag = true;
-			else{
-				model.warn.push({mess:"Error in inference details", mess2:"The end time must be set", warn_type:"InfDetails"});
-			}
-		}
-	
-		let timestep = Number(details.timestep);
-		if(details.timestep == "" || isNaN(timestep) || timestep <= 0){
-			if(type == "siminf") flag = true;
-			else{
-				model.warn.push({mess:"Error in inference details", mess2:"The timestep must be set to a positive number", warn_type:"InfDetails"});
-			}
-		}
+		te += "inference";
+		if(details.t_start != "") te +=" start="+details.t_start;
+		if(details.t_end != "") te += " end="+details.t_end;
+		if(details.timestep != "") te += " timestep="+details.timestep; 
 		
-		if(flag == false){
-			te += "inference start="+details.t_start+" end="+details.t_end;
-			if(timestep != "") te += " timestep="+timestep; 
-			
-			
-			switch(details.algorithm.value){
-			case "DA-MCMC":
-				te += " sample="+details.sample;
-				te += " param-thin="+details.thinparam;
-				te += " state-thin="+details.thinstate;
-				break;
-			
-			case "ABC":
-				te += " sample="+details.abcsample;
-				te += " acc-frac="+details.accfrac;
-				break;
+		switch(details.algorithm.value){
+		case "DA-MCMC":
+			{
+				let num_samp = Number(details.sample);
+				if(num_samp != MCMC_SAMPLE_DEFAULT){
+					te += " sample="+num_samp;
+				}
 				
-			case "ABC-SMC":
-				te += " sample="+details.abcsample;
-				te += " acc-frac="+details.accfracsmc;
-				te += " gen="+details.numgen;
-				te += " kernel-size="+details.kernelsize;
-				break;
+				let num_param = Number(details.output_param);
+				if(num_param != MCMC_OP_PARAM_DEFAULT){
+					te += " param-output="+num_param;
+				}
+				
+				let num_state = Number(details.output_state);
+				if(num_state != MCMC_OP_STATE_DEFAULT){
+					te += " state-output="+num_state;
+				}
 			}
+			break;
+		
+		case "ABC":
+			te += " sample="+details.abcsample;
+			te += " acc-frac="+details.accfrac;
+			break;
 			
+		case "ABC-SMC":
+			te += " sample="+details.abcsample;
+			te += " acc-frac="+details.accfracsmc;
+			te += " gen="+details.numgen;
+			te += " kernel-size="+details.kernelsize;
+			break;
+		}
+		
+		if(details.indmax != INDMAX_DEFAULT){
 			te += " ind-max="+details.indmax;
-				
-			te += ' algorithm="'+details.algorithm.value+'"'+endl;
-			te += endl;
 		}
-	}	
+		
+		if(details.param_output_max != PARAM_OUTPUT_MAX_DEFAULT){
+			te += " param-output-max="+details.param_output_max;
+		}
+		
+		if(details.algorithm.value != ALG_DEFAULT){
+			te += ' algorithm="'+details.algorithm.value+'"';
+		}
+		
+		switch(details.algorithm.value){
+		case "DA-MCMC":
+			{	
+				let type = details.anneal_type.te;
+				
+				if(type != ANNEAL_DEFAULT){
+					te += ' anneal="' +type+'"';
+					switch(type){
+					case "scan":
+						te += ' rate="' +details.anneal_rate+'"';
+						break;
+						
+					case "power":
+						te += ' power="' +details.anneal_rate+'"';
+						break;
+					}
+					
+					if(type != "scan"){
+						if(Number(details.burnin_frac) != BURNIN_FRAC_DEFAULT){
+							te += ' burnin-frac="' +details.burnin_frac+'"';
+						}
+					}
+				}
+			}
+			break;
+				
+		case "PAS-MCMC":
+			te += " npart="+details.npart;
+			te += ' gen-update=' +details.gen_update;
+			break;
+		}
+		
+		te += endl;
+		te += endl;
+	}
+	
+	{                                               // Deals with ppc details
+		te += get_ppc_command(save_type)
+		te += endl;
+		te += endl;
+	}
 
 	return te;
 }
 
-/*
-/// given a list of dependencies this provides a list going thorough each
-function generate_list_from_dep(par)
+
+/// Creates text for the ppc command
+function get_ppc_command(save_type)
 {
-	let dep = par.dep;
-	
-	let ndep = dep.length;
-	let list = [];
-	
-	let pos = [];
-	let index=[];
-	for(let d = 0; d < ndep; d++){
-		if(dep[d] == "t" || dep[d] == "a"){
-			pos[d] = par.spline.knot;
+	let details = model.ppc_details;
+		
+	if(save_type == "ppc"){
+		if(details.ppc_t_start == "" || isNaN(details.ppc_t_start)){
+			add_warning({mess:"Error in simulation details", mess2:"The start time must be set", warn_type:"SimDetails"});
 		}
-		else{
-			pos[d] = find_comp_from_index(dep[d]);
+	
+		if(details.ppc_t_end == "" || isNaN(details.ppc_t_end)){
+			add_warning({mess:"Error in simulation details", mess2:"The end time must be set", warn_type:"SimDetails"});
 		}
-		index[d] = 0;
+	
+		let num = Number(details.number);
+		if(details.number == "" || isNaN(num) || num != Math.floor(num) || num <= 0){
+			add_warning({mess:"Error in simulation details", mess2:"The simulation number must be set to a positive integer", warn_type:"SimDetails"});
+		}
 	}
-
-	let flag;
-	do{
-		let comb = [];
-		for(let d = 0; d < ndep; d++) comb.push(pos[d][index[d]]);
-		
-		list.push({combination:comb, index:copy(index)});
-		
-		let i = 0;
-		do{
-			flag = false;
-			
-			index[i]++; 
-			if(index[i] >= pos[i].length){
-				index[i] = 0; 
-				i++; 
-				flag = true;
-			}
-		}while(i < ndep && flag == true);
-	}while(flag == false);
 	
-	return list;
+	let te = "post-sim";
+	if(details.ppc_t_start != "") te +=" start="+details.ppc_t_start;
+	if(details.ppc_t_end != "") te += " end="+details.ppc_t_end;
+	
+	if(details.number != ""){
+		let num = Number(details.number);
+		if(num != PPC_NUM_DEFAULT){
+			te += " number="+details.number;
+		}
+	}
+	
+	let cbl = details.check_box_list;
+
+	if(cbl){
+		let st = "";
+		let fl = false;
+		for(let k = 0; k < cbl.length; k++){
+			if(cbl[k].checkb.check == true){
+				if(fl) st += ",";
+				st += cbl[k].name_simp;
+				fl = true;
+			}
+		}		
+		
+		if(fl){
+			te += ' resample="'+st+'"';	
+		}
+	}
+	
+	return te;
 }
-*/
 
 
-function create_output_sim_inf_source(p,type,dir,file_list,exporting)
+/// Adds information about simulation and inference
+function create_output_sim_inf_source(p,sim_or_inf,file_list,one_file)
 {
 	let sp = model.species[p];
 	
@@ -1034,59 +1380,71 @@ function create_output_sim_inf_source(p,type,dir,file_list,exporting)
 		
 	let te = "";
 	
-	switch(type){
-	case "sim": pa = "Simulation"; source = sp.sim_source; te += mini_banner("SIMULATION DATA"); break;
-	case "inf": pa = "Inference"; source = sp.inf_source; te += mini_banner("DATA"); break;
-	default: error("Option not recognised 116"+type); break;
+	switch(sim_or_inf){
+	case "sim": pa = "Simulation"; source = sp.sim_source; te += mini_banner("SIMULATION INITIAL CONDITIONS"); break;
+	case "inf": pa = "Inference"; source = sp.inf_source; te += mini_banner("INFERENCE DATA"); break;
+	case "ppc": pa = "Population Mod."; source = sp.ppc_source; te += mini_banner("MODIFICATION DATA"); break;
+	default: error("Option not recognised 116"+sim_or_inf); break;
 	}
 	
 	if(source.length == 0) return "";
-	
+
 	for(let i = 0; i < source.length; i++){
 		let so = source[i];
 	
+		so.check_info = {siminf:sim_or_inf, p:p, i:i}; 
+
+		data_source_check_error("warn",so);
+
 		if(so.error == true){
-			if(exporting == false){
-				let te;
-				if(so.table.filename == "") te = "Please delete data and reload.";
-				else te = "Data table filename: "+so.table.filename;
-				model.warn.push({mess:"Data source is invalid", mess2:te, warn_type:"SourceInvalid", siminf:type, p:p, ind:i});
-			}
 		}
 		else{
 			let add_flag = false;
 			
 			switch(so.type){
 			case "Init. Pop.":
-				let com = "init-pop"; if(type == "sim") com = "init-pop-sim";
-	
-				switch(so.spec.radio.value){
-				case "Graphical":				
+				{
+					let com = "init-pop"; if(sim_or_inf == "sim") com = "init-pop-sim";
+		
+					let ic_type = so.spec.radio_dist.value;
+					
 					let head = [];
 					let row = [];
+					
+					te += com;
+					
+					switch(ic_type){
+					case "Fixed": te += ' type="fixed"'; break;
+					case "Dist": te += ' type="dist"'; break;
+					}
 					
 					switch(so.spec.radio2.value){
 					case "Focal":
 						if(so.cla.length != sp.ncla){
-							model.warn.push({mess:"Initial population problem", mess2:"The number of classifications in the initial population for '"+sp.name+"' is not right",warn_type:"Init_pop", pa:pa, p:p, i:i});
+							so.error = true;
+							add_warning({mess:"Initial population problem", mess2:"The number of classifications in the initial population for '"+sp.name+"' is not right",warn_type:"Init_pop", pa:pa, p:p, i:i});
 						}
 						else{
 							for(let cl = 0; cl < sp.ncla; cl++){
 								let claa = sp.cla[cl];
 
 								let ip = so.cla[cl].comp_init_pop;
-							
+								if(ic_type == "Dist") ip = so.cla[cl].comp_init_dist;
+								
 								if(ip.length != claa.ncomp){
-									model.warn.push({mess:"Initial population problem", mess2:"The number of compartments in classification '"+claa.name+"' is not right",warn_type:"Init_pop", pa:pa, p:p, i:i});
+									so.error = true;
+									add_warning({mess:"Initial population problem", mess2:"The number of compartments in classification '"+claa.name+"' is not right",warn_type:"Init_pop", pa:pa, p:p, i:i});
 								}
 								else{
 									for(let c = 0; c < ip.length; c++){
 										if(ip[c].comp_name_store != claa.comp[c].name){
 											if(ip[c].name == undefined){
-												model.warn.push({mess:"Initial population problem", mess2:"The data source has become invalid",warn_type:"Init_pop", pa:pa, p:p, i:i});
+												so.error = true;
+												add_warning({mess:"Initial population problem", mess2:"The data source has become invalid",warn_type:"Init_pop", pa:pa, p:p, i:i});
 											}
 											else{
-												model.warn.push({mess:"Initial population problem", mess2:"The names for the compartments '"+ip[c].name+"' and '"+claa.comp[c].name+"' do not agree",warn_type:"Init_pop", pa:pa, p:p, i:i});
+												so.error = true;
+												add_warning({mess:"Initial population problem", mess2:"The names for the compartments '"+ip[c].name+"' and '"+claa.comp[c].name+"' do not agree",warn_type:"Init_pop", pa:pa, p:p, i:i});
 											}
 										}
 									}
@@ -1096,85 +1454,132 @@ function create_output_sim_inf_source(p,type,dir,file_list,exporting)
 						
 						if(model.warn.length == 0){
 							head.push("Compartment");
-							head.push("Population");
+							switch(ic_type){
+							case "Fixed": head.push("Population"); break;
+							case "Dist": head.push("Distribution"); break;
+							}
 						
 							for(let cl = 0; cl < sp.ncla; cl++){
 								let claa = sp.cla[cl];
 								let cmax = claa.ncomp;
-								if(claa.name != so.spec.focal.te) cmax--;
+								if(ic_type == "Fixed" && claa.name != so.spec.focal.te) cmax--;
 								
 								for(let c = 0; c < cmax; c++){
 									let ele = [];
 									ele.push(claa.comp[c].name);
-									if(claa.name == so.spec.focal.te){
-										ele.push(so.cla[cl].comp_init_pop[c].pop);
+									
+									switch(ic_type){
+									case "Fixed":
+										if(claa.name == so.spec.focal.te){
+											ele.push(so.cla[cl].comp_init_pop[c].pop);
+										}
+										else{
+											ele.push(so.cla[cl].comp_init_pop[c].pop_per+"%");
+										}
+										break;
+										
+									case "Dist":										
+										if(claa.name == so.spec.focal.te){
+											let val = get_prior_string(so.cla[cl].comp_init_dist[c].dist);
+											ele.push(val);
+										}
+										else{
+											ele.push(so.cla[cl].comp_init_dist[c].alpha);
+										}
+										break;
 									}
-									else{
-										ele.push(so.cla[cl].comp_init_pop[c].pop_per+"%");
-									}
+									
 									row.push(ele);
 								}
 							}
 							
 							let file = get_unique_file(com+"-"+sp.name,file_list,'.csv');
-
-							te += com+' focal="'+so.spec.focal.te+'" file="'+file+'"'+endl;
-							output_table_simp_file(dir+"/"+file,head,row);
+							output_table_simp_file(file,head,row,file_list);
+							if(one_file) file = get_one_file(file_list);
+							te += ' focal="'+so.spec.focal.te+'" file="'+file+'"'+endl;
+							
 						}
 						break;
 							
 					case "All":
+						if(so.spec.radio_dist.value == "Dist"){
+							te += " prior="+get_prior_output(sim_or_inf,so.pop_dist,"prior",undefined);
+						}
+						
 						for(let cl = 0; cl < sp.ncla; cl++) head.push(sp.cla[cl].name);
-						head.push("Population");
+						switch(ic_type){
+						case "Fixed": head.push("Population"); break;
+						case "Dist": head.push("Alpha"); break;
+						}
 						
 						for(let j = 0; j < so.glob_comp.length; j++){
 							let gc = so.glob_comp[j];
 							if(gc.cla.length != sp.ncla){
-								model.warn.push({mess:"Initial population problem", mess2:"The number of classifications in the initial population for '"+sp.name+"' is not right",warn_type:"Init_pop", pa:pa, p:p, i:i});
+								so.error = true;
+								add_warning({mess:"Initial population problem", mess2:"The number of classifications in the initial population for '"+sp.name+"' is not right",warn_type:"Init_pop", pa:pa, p:p, i:i});
 								return;
 							}
 					
 							let ele=[];
 							for(let cl = 0; cl < sp.ncla; cl++) ele.push(gc.cla[cl]);
-							ele.push(gc.pop);
 							
+							switch(ic_type){
+							case "Fixed": ele.push(gc.pop); break;
+							case "Dist": ele.push(gc.alpha); break;
+							}
 							row.push(ele);
 						}
 					
 						let file = get_unique_file(com+"-"+sp.name,file_list,'.csv');
 
-						//let file = dir+"/"+get_unique_file("init-pop-"+sp.name,file_list,'.csv');
-
-						te += com + ' file="'+file+'"'+endl;
-						output_table_simp_file(dir+"/"+file,head,row);
+						output_table_simp_file(file,head,row,file_list);
+						if(one_file) file = get_one_file(file_list);
+						te += ' file="'+file+'"'+endl;
 						break;
 					}
-					break;
-					
-				case "File":
-					add_flag = true;
-					break;
-
-				default: error("Option not recognised 120"); break;
 				}
 				break;
-			
-			case "Init. Pop. Prior":
-				switch(so.variety){
-				case "Flat": te += 'init-pop-prior type="flat"'+endl; break;
-				case "Dirichlet": add_flag = true; break;
+
+			case "Add Pop.": case "Remove Pop.":
+				{
+					let tab = so.table;
+					for(let cl = 0; cl < sp.cla.length; cl++){
+						let name = sp.cla[cl].name;
+						if(find_in(tab.heading,name) == undefined){
+							so.error = true;
+							add_warning({mess:so.type+" problem", mess2:"The table does not contain the column '"+name+"'",warn_type:"Init_pop", pa:pa, p:p, i:i});
+							return;
+						}
+					}
 				}
+				add_flag = true;
 				break;
 				
+			case "Add Ind.":                            // Makes sure Add Ind contains all columns
+				{
+					let tab = so.table;
+					for(let cl = 0; cl < sp.cla.length; cl++){
+						let name = sp.cla[cl].name;
+						if(find_in(tab.heading,name) == undefined){
+							so.error = true;
+							add_warning({mess:"Add Ind. problem", mess2:"The table does not contain the column '"+name+"'",warn_type:"Init_pop", pa:pa, p:p, i:i});
+							return;
+						}
+					}
+				}
+				add_flag = true;
+				break;
+			
 			default:
 				add_flag = true;
 				break;
 			}
 			
 			if(add_flag == true){
-				te += add_data_table(so.type,so.table,so,p,i,file_list,type,dir);
+				te += add_data_table(so.type,so.table,so,p,i,file_list,sim_or_inf,one_file);
 			}
 		}
+		te += endl;
 	}
 	te += endl;
 
@@ -1182,8 +1587,18 @@ function create_output_sim_inf_source(p,type,dir,file_list,exporting)
 }
 
 
+/// Gets that last thing added to file_list and outputs directly into the file
+function get_one_file(file_list)
+{
+	if(file_list.length == 0) alert_help("Problem with file");
+	let te = file_list[file_list.length-1].data;
+	file_list.pop();
+	return "[[\n"+te+"]]";
+}
+
+
 /// Generates a data-table and command from a data source
-function add_data_table(type,tab,so,p,index,file_list,siminf,dir)
+function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 {
 	let i = find(convert,"type",type);
 	if(i == undefined){
@@ -1193,12 +1608,24 @@ function add_data_table(type,tab,so,p,index,file_list,siminf,dir)
 	
 	let com = convert[i].command;
 	
-	if(siminf == "sim"){
+	if(sim_or_inf == "sim"){
 		switch(com){
+		case "add-pop": com = "add-pop-sim"; break;
+		case "remove-pop": com = "remove-pop-sim"; break;
 		case "add-ind": com = "add-ind-sim"; break;
 		case "remove-ind": com = "remove-ind-sim"; break;
 		case "move-ind": com = "move-ind-sim"; break;
 		case "init-pop": com = "init-pop-sim"; break;
+		}
+	}
+	
+	if(sim_or_inf == "ppc"){
+		switch(com){
+		case "add-pop": com = "add-pop-post-sim"; break;
+		case "remove-pop": com = "remove-pop-post-sim"; break;
+		case "add-ind": com = "add-ind-post-sim"; break;
+		case "remove-ind": com = "remove-ind-post-sim"; break;
+		case "move-ind": com = "move-ind-post-sim"; break;
 		}
 	}
 	
@@ -1208,15 +1635,11 @@ function add_data_table(type,tab,so,p,index,file_list,siminf,dir)
 	
 	let spec = so.spec;
 	
-	switch(so.type){  // Adds in extra information dependent on data source
+	switch(so.type){                                // Adds information dependent on data source
 	case "Init. Pop.":
 		if(so.spec.radio2.value == "Focal"){
 			te +=  'focal="'+so.spec.focal.te+'" ';
 		}
-		break;
-	
-	case "Init. Pop. Prior": 
-		te += 'type="'+so.variety.toLowerCase()+'" ';
 		break;
 	
 	case "Move Ind.":
@@ -1230,124 +1653,56 @@ function add_data_table(type,tab,so,p,index,file_list,siminf,dir)
 		{
 			let cl_name = so.spec.cl_drop.te;
 			te += 'class="'+cl_name+'" ';
-			file += '-'+cl_name.replace(" ","-");
+			file += '-'+cl_name.replace(/ /g,"-");
 		}
 		break;
 		
-	case "Transition": case "Source": case "Sink":
-		let name = spec.tr_drop.te;
-
-		switch(so.type){
-		case "Transition":
-			let spl = name.split("→");
-			if(spl.length != 2) error("Split not correct");
-			te += 'from="'+spl[0]+'" to="'+spl[1]+'" ';
-			break;
-		case "Source": te += 'to="'+name+'" '; break;
-		case "Sink": te += 'from="'+name+'" '; break;
-		}
-		
-		file += '-'+name;
 	
-		let obsrange = spec.time_radio.value.toLowerCase();
-		
-		switch(spec.time_radio.value){
-		case "All": obsrange = "all"; break;
-		case "Spec": obsrange = "specify"; break;
-		case "File": obsrange = "file"; break;
-		default: error("Option not recognised 1C"); break;
-		}
-		
-		let ty = so.type;
-		te += 'obsrange="'+obsrange+'" ';
-		switch(obsrange){
-		case "all": break;
-		case "specify":
-			let start = spec.time_start;
-			if(isNaN(start)){	
-				model.warn.push({mess:ty+" data", mess2:"The start time for the "+ty.toLowerCase()+" data must be set to a number", warn_type:"TransDataSpecProb", ind:index});
-			}
-			
-			let end = spec.time_end;
-			if(isNaN(end)){	
-				model.warn.push({mess:ty+" data", mess2:"The end time for the "+ty.toLowerCase()+" data must be set to a number", warn_type:"TransDataSpecProb", ind:index});
-			}
-			
-			te += 'start="'+start+'" ';
-			te += 'end="'+end+'" ';
-			break;
-
-		case "file": break;
-
-		default: error("Option not recognised 121"+obsrange); break;
-		}
-		break;
-		
-	case "Diag. Test":
-		te += 'Se="'+esc(so.spec.Se_eqn.te)+'" ';
-		te += 'Sp="'+esc(so.spec.Sp_eqn.te)+'" ';
-		te += 'pos="'+esc(so.spec.pos_result)+'" ';
-		te += 'neg="'+esc(so.spec.neg_result)+'" ';
-		
-		te += 'comp="';
-		let flag = false;
-		
-		let cb = so.spec.check_box;
-		
-		let pcl = get_p_cl_from_claname(cb.name);
-		let claa = model.species[pcl.p].cla[pcl.cl];
-		
-		for(let i = 0; i < cb.value.length; i++){
-			if(cb.value[i].check == true){
-				if(flag == true) te += ',';
-				te += claa.comp[i].name;
-				flag = true;
-			}
-		}
-		te += '" ';
-		break;
-		
-	case "Population": case "Set Traps":
+	case "Transition": 
 		{
-			if(so.type == "Set Traps"){
-				te += 'prob="'+esc(spec.trap_prob_eqn.te)+'" ';
-			}
-			
 			let sp = model.species[p];
-			
-			if(spec.filter.cla.length != sp.ncla){
-				model.warn.push({mess:so.type, mess2:"The population filter does not agree with the model classifications.", warn_type:"SourceProb", p:p, ind:index});
-			}
-			else{
-				let filt='';
-				for(let cl = 0; cl < sp.ncla; cl++){
-					let clz = spec.filter.cla[cl];
-					let claa = sp.cla[cl];
-					switch(clz.radio.value){
-					case "All": break;
-					case "Comp": 
-						filt += claa.name+':';
-						let flag = false;
-						for(let c = 0; c < claa.ncomp; c++){
-							if(clz.comp[c].check == true){
-								if(flag == true) filt += '|'; flag = true;
-								filt += claa.comp[c].name;
-							}
-						}
-						filt += ',';
-						break;
-						
-					case "File":
-						filt += claa.name+':file,';
-						break;
-					}
-				}
-				
-				if(filt != "") te += 'filter="'+filt.substr(0,filt.length-1)+'" ';
+		
+			let cl = find(sp.cla,"name",spec.cl_drop.te);
 
-				if(so.type == "Population"){
-					te += add_obs_model(spec);
+			let name_fi = output_add_trans_filt(spec.filter,p,cl,so,index);
+			if(name_fi != "") te += 'name="'+name_fi+'" ';
+			
+			let filt = output_add_comp_filt(spec,sp,cl,p,so,index);
+			if(filt != "") te += 'filter="'+filt+'" ';
+
+			let obsrange = spec.time_radio.value.toLowerCase();
+			
+			switch(spec.time_radio.value){
+			case "All": obsrange = "all"; break;
+			case "Spec": obsrange = "specify"; break;
+			case "File": obsrange = "file"; break;
+			default: error("Option not recognised 1C"); break;
+			}
+			
+			let ty = so.type;
+			te += 'obsrange="'+obsrange+'" ';
+			switch(obsrange){
+			case "all": break;
+			case "specify":
+				{
+					let start = spec.time_start;
+					if(isNaN(start)){	
+						add_warning({mess:ty+" data", mess2:"The start time for the "+ty.toLowerCase()+" data must be set to a number", warn_type:"TransDataSpecProb", ind:index});
+					}
+					
+					let end = spec.time_end;
+					if(isNaN(end)){	
+						add_warning({mess:ty+" data", mess2:"The end time for the "+ty.toLowerCase()+" data must be set to a number", warn_type:"TransDataSpecProb", ind:index});
+					}
+					
+					te += 'start="'+start+'" ';
+					te += 'end="'+end+'" ';
 				}
+				break;
+
+			case "file": break;
+
+			default: error("Option not recognised 121"+obsrange); break;
 			}
 		}
 		break;
@@ -1357,73 +1712,94 @@ function add_data_table(type,tab,so,p,index,file_list,siminf,dir)
 			let sp = model.species[p];
 		
 			let cl = find(sp.cla,"name",spec.cl_drop.te);
-			let claa = sp.cla[cl];
-			let tra = claa.tra;
-		
-			let trz = spec.filter.tra;
 
-			if(tra.length != trz.length){ 
-				model.warn.push({mess:so.type, mess2:"The transition filter does not agree with the model.", warn_type:"SourceProb", p:p, ind:index});
-			}
-			else{
-				if(spec.filter.cla.length != sp.ncla){
-					model.warn.push({mess:so.type, mess2:"The transition population filter does not agree with with the model.", warn_type:"SourceProb", p:p, ind:index});
-				}
-				else{
-					let fr = "", to = "";
-					for(let j = 0; j < trz.length; j++){
-						if(trz[j].check == true){
-							file += '-'+tra[j].name;
-							
-							let fro, too;
-							if(tra[j].i == "Source") fro = "+"; else fro = claa.comp[tra[j].i].name;
-							if(tra[j].f == "Sink") too = "-"; else too = claa.comp[tra[j].f].name;
-							
-							if(fr != ""){ fr += ","; to += ",";}
-							fr += fro; to += too;
-						}
-					}
-				
-					te += 'from="'+fr+'" to="'+to+'" ';
-					
-					let filt='';
-					for(let cl2 = 0; cl2 < sp.ncla; cl2++){
-						if(cl2 != cl){
-							let clz = spec.filter.cla[cl2];
-							let claa = sp.cla[cl2];
-							switch(clz.radio.value){
-							case "All": break;
-							case "Comp": 
-								filt += claa.name+':';
-								let flag = false;
-								for(let c = 0; c < claa.ncomp; c++){
-									if(clz.comp[c].check == true){
-										if(flag == true) filt += '|'; flag = true;
-										filt += claa.comp[c].name;
-									}
-								}
-								filt += ',';
-								break;
-								
-							case "File":
-								filt += claa.name+':file,';
-								break;
-								
-							default: error("Problem with output option"); break;
-							}
-						}
-					}
-					
-					if(filt != "") te += 'filter="'+filt.substr(0,filt.length-1)+'" ';
-				
-					te += add_obs_model(spec);
-				}
-			}
+			let name_fi = output_add_trans_filt(spec.filter,p,cl,so,index);
+			if(name_fi != "") te += 'name="'+name_fi+'" ';
+			
+			let filt = output_add_comp_filt(spec,sp,cl,p,so,index);
+			if(filt != "") te += 'filter="'+filt+'" ';
+
+			te += add_obs_model(spec);
 		}
 		break;
 
+	case "Diag. Test":
+		{
+			let err_fl;
+			
+			let Se = esc(so.spec.Se_eqn.te); if(Se == "") err_fl = "Se";
+			te += 'Se="'+Se+'" ';
+			
+			let Sp = esc(so.spec.Sp_eqn.te); if(Sp == "") err_fl = "Sp";
+			te += 'Sp="'+Sp+'" ';
+			
+			let pos = esc(so.spec.pos_result); if(pos == "") err_fl = "positive value";
+			te += 'pos="'+pos+'" ';
+			
+			let neg = esc(so.spec.neg_result); if(neg == "") err_fl = "negative value";
+			te += 'neg="'+neg+'" ';
+			
+			if(err_fl != undefined){
+				add_warning({mess:"Problem with diagnostic test data", mess2:"The value for '"+eff_fl+"' is not set", warn_type:"SourceProb", p:p, ind:index});
+		
+			
+			}
+			
+			te += 'comp="';
+			let flag = false;
+			
+			let cb = so.spec.check_box;
+			
+			let pcl = get_p_cl_from_claname(cb.name);
+			let claa = model.species[pcl.p].cla[pcl.cl];
+			
+			for(let i = 0; i < cb.value.length; i++){
+				if(cb.value[i].check == true){
+					if(flag == true) te += ',';
+					te += claa.comp[i].name;
+					flag = true;
+				}
+			}
+			te += '" ';
+		}
+		break;
+		
+	case "Ind. Eff.":
+		{
+			te += 'name="'+so.spec.drop.te+'" ';
+		}
+		break;
+		
+	case "Ind. Group":
+		{
+			te += 'name="'+so.spec.gname+'" ';
+		}
+		break;
+		
+	case "Population": 
+		{
+			let sp = model.species[p];
+		
+			let filt = output_add_comp_filt(spec,sp,undefined,p,so,index);
+			if(filt != "") te += 'filter="'+filt+'" ';
+
+			te += add_obs_model(spec);
+		}
+		break;
+		
 	case "Genetic":
-		te += 'root="SNP" ';
+		switch(so.spec.type_radio.value){
+		case "matrix": 
+			te += 'type="matrix" '; 
+			break;
+			
+		case "snp":	
+			te += 'type="snp" ';
+			te += 'root="'+spec.snp_root+'" ';
+			break;
+		}
+		te += 'mut-rate="'+spec.mut_rate_eqn.te+'" ';
+		te += 'seq-var="'+spec.seq_var_eqn.te+'" ';
 		break;
 
 	default: break;	
@@ -1431,13 +1807,121 @@ function add_data_table(type,tab,so,p,index,file_list,siminf,dir)
 
 	file = get_unique_file(file,file_list,'.csv');
 	
-	output_table_file(dir+"/"+file,tab);
+	output_table_file(file,tab,file_list);
+	if(one_file) file = get_one_file(file_list);
 	
 	te += 'file="'+file+'"'+endl;
+	
 	return te;
 }
 
 
+/// Adds the text for 'filter'
+function output_add_comp_filt(spec,sp,cl_sel,p,so,index)
+{
+	if(spec.filter.cla.length != sp.ncla){
+		so.error = true;
+		add_warning({mess:so.type, mess2:"The population filter does not agree with the model classifications.", warn_type:"SourceProb", p:p, ind:index});
+		return;
+	}
+
+	let filt='';
+	for(let cl = 0; cl < sp.ncla; cl++){
+		if(cl != cl_sel){
+			let clz = spec.filter.cla[cl];
+			let claa = sp.cla[cl];
+			switch(clz.radio.value){
+			case "All": break;
+			case "Comp": 
+				{
+					if(filt != "") filt += ',';
+					filt += claa.name+'=';
+					let flag = false;
+					for(let c = 0; c < claa.ncomp; c++){
+						if(clz.comp[c].check == true){
+							if(flag == true) filt += '|'; flag = true;
+							filt += claa.comp[c].name;
+						}
+					}
+				}
+				break;
+			
+			case "ObsMod":
+				{
+					if(filt != "") filt += ',';
+					filt += claa.name+'=';
+					let flag = false;
+					for(let c = 0; c < claa.ncomp; c++){
+						let prob = clz.comp[c].prob_eqn.te.trim();
+						if(prob != "0"){
+							if(flag == true) filt += '|'; flag = true;
+							filt += claa.comp[c].name+":"+prob;
+						}
+					}
+				}
+				break;
+				
+			case "File":
+				if(filt != "") filt += ',';
+				filt += claa.name+'=file';
+				break;
+			}
+		}
+	}
+
+	return filt;
+}
+				
+
+/// Adds the text for 'name' in pop-trans-data
+function output_add_trans_filt(tfilt,p,cl,so,index)
+{
+	let sp = model.species[p];
+	let claa = sp.cla[cl];
+	let tra = claa.tra;	
+	let trz = tfilt.tra;
+
+	if(tra.length != trz.length){ 
+		add_warning({mess:so.type, mess2:"The transition filter does not agree with the model.", warn_type:"SourceProb", p:p, ind:index});
+		return;
+	}
+
+	if(tfilt.cla.length != sp.ncla){
+		add_warning({mess:so.type, mess2:"The transition population filter does not agree with with the model.", warn_type:"SourceProb", p:p, ind:index});
+		return;
+	}
+	
+	let name_fi = "";
+	
+	for(let j = 0; j < trz.length; j++){
+		let name = tra[j].name.replace(/→/g,"->")
+		
+		switch(tfilt.trans_obs_model.value){
+		case "on":
+			{
+				let prob = esc(trz[j].prob_eqn.te);
+				if(prob != "0"){
+					if(name_fi != "") name_fi += "|";
+					name_fi += name+":"+prob;
+				}
+			}
+			break;
+			
+		case "off":
+			if(trz[j].check == true){
+				if(name_fi != "") name_fi += "|";
+				name_fi += name;
+			}
+			break;
+		
+		default: error("Should bnot be def"); break;
+		}
+	}
+
+	return name_fi;	
+}
+
+				
 // Ensures that all file names are unique 
 function get_unique_file(file,file_list,end)
 {	
@@ -1457,29 +1941,53 @@ function get_unique_file(file,file_list,end)
 	let num = 1;
 	do{
 		file_not_same = file; if(num > 1) file_not_same += "-"+num;
-		if(find_in(file_list,file_not_same) == undefined) break;
+		file_not_same += end;
+
+		if(find(file_list,"file",file_not_same) == undefined) break;
 		num++;
 	}while(true);
 	
-	file_list.push(file_not_same);
-	
-	return file_not_same+end;
+	return file_not_same;
+}
+
+
+/// Saves the files to memory for writing later
+function write_file_store(data,file,file_list,type)
+{
+	file_list.push({file:file, data:data, type:type});
 }
 
 
 function add_obs_model(spec)
 {
-	switch(spec.obs_error.value){
-	case "percent": return 'error="normal:'+spec.percent+'%" ';	
-	case "sd": return 'error="normal:'+spec.sd+'" ';
-	case "file": return 'error="normal:file" ';
-	default: error("Option not recognised 123"); break;
+	switch(spec.obs_error_dist.value){
+	case "Normal":		
+		switch(spec.obs_error.value){
+		case "percent": return 'error="normal:'+spec.percent+'%" ';	
+		case "sd": return 'error="normal:'+spec.sd+'" ';
+		case "file": return 'error="normal:file" ';
+		default: error("Option not recognised 123"); break;
+		}
+		break;
+	
+	case "Poisson":		
+		return 'error="poisson" ';
+		
+	case "Negative binomial":	 
+		switch(spec.obs_error_p.value){
+		case "p": return 'error="neg-binomial:'+spec.p+'" ';	
+		case "file": return 'error="neg-binomial:file" ';
+		default: error("Option not recognised 123"); break;
+		}
+		break;
+		
+	default: error("obs dist not found"); break;
 	}
 }
 
 
 /// Outputs a table 
-function output_table_file(file,tab)
+function output_table_file(file,tab,file_list)
 {
 	var st = '';
 
@@ -1497,18 +2005,19 @@ function output_table_file(file,tab)
 
 		for(let i = 0; i < el.length; i++){
 			if(i != 0) st += ',';
+			
 			if(isNaN(el[i])) st += '"'+el[i]+'"';
 			else st += el[i];
 		}
 		st += endl;
 	}
 	
-	write_file(st,file);
+	write_file_store(st,file,file_list);
 }
 
 
 /// Outputs a simple table 
-function output_table_simp_file(file,head,row)
+function output_table_simp_file(file,head,row,file_list)
 {
 	var st = '';
 	for(let i = 0; i < head.length; i++){
@@ -1531,76 +2040,71 @@ function output_table_simp_file(file,head,row)
 		st += endl;
 	}
 	
-	write_file(st,file);
+	write_file_store(st,file,file_list);
 }
 							
 
 /// Checks the models is correctly specified
-function output_check(type,exporting)
+function output_check(save_type)
 {
 	// Checks to make sure initial population is set correctly
 	for(let p = 0; p < model.species.length; p++){
 		let sp = model.species[p];
 		let source, pa;
 		
-		switch(type){
+		switch(save_type){
 		case "sim": pa = "Simulation"; source = sp.sim_source; break;
 		case "inf": pa = "Inference"; source = sp.inf_source; break;
+		case "ppc": pa = "Modification"; source = sp.ppc_source; break;
 		default: error("Option not recognised 125"); break;
 		}
 		
-		let ninitpopprior = 0, ninitpop = 0, naddind = 0;
+		let ninitpop = 0, naddind = 0, naddpop = 0;
 		
 		for(let i = 0; i < source.length; i++){
 			let so = source[i];
 			
 			switch(so.type){
-			case "Init. Pop. Prior": ninitpopprior++; break;
 			case "Init. Pop.": ninitpop++; break;
 			case "Add Ind.": naddind++; break;
+			case "Add Pop.": naddpop++; break;
 			}
 		}
 
-		switch(type){
+		switch(save_type){
 		case "sim":
-			if(ninitpopprior > 0){
-				model.warn.push({mess:"Initial population prior", mess2:"The initial population prior should not be set for species '"+sp.name+"'", warn_type:"SimPopulationProb", p:p});
-			}
-			
 			if(ninitpop > 0 && sp.fix_eff.length > 0){
-				model.warn.push({mess:"Cannot add individuals with fixed effect", mess2:"The individuals from 'Init. Pop.' cannot be added because of individual fixed effects in the model", warn_type:"SimPopulationProb", p:p});
+				add_warning({mess:"Cannot add individuals with fixed effect", mess2:"The individuals from 'Init. Pop.' cannot be added because of individual fixed effects in the model", warn_type:"SimPopulationProb", p:p});
 			}
-	
-			/*
-			if(ninitpop == 0 && exporting == false){
-				model.warn.push({mess:"Initial population", mess2:"The initial population should be set for species '"+sp.name+"'", warn_type:"SimPopulationProb", p:p});
-			}
-			*/
 			
 			if(ninitpop > 1){
-				model.warn.push({mess:"Initial population", mess2:"Only one initial population should be set for species '"+sp.name+"'", warn_type:"SimPopulationProb", p:p});
+				add_warning({mess:"Initial population", mess2:"Only one initial population should be set for species '"+sp.name+"'", warn_type:"SimPopulationProb", p:p});
 			}
 			break;
 		
 		case "inf":
-			if(ninitpopprior > 1){
-				model.warn.push({mess:"Initial population prior", mess2:"Only one initial population prior should be set for species '"+sp.name+"'", warn_type:"InfPopulationProb", p:p});
-			}
-			
 			if(ninitpop > 1){
-				model.warn.push({mess:"Initial population", mess2:"Only one initial population should be set for species '"+sp.name+"'", warn_type:"InfPopulationProb", p:p});
+				add_warning({mess:"Initial population", mess2:"Only one initial population should be set for species '"+sp.name+"'", warn_type:"InfPopulationProb", p:p});
 			}
 
-			if(ninitpopprior == 0 && ninitpop == 0 && naddind == 0 && exporting == false){
-				model.warn.push({mess:"No individuals", mess2:"Either 'Init. Pop.', 'Init. Pop. Prior' or 'Add Ind' must be set for species '"+sp.name+"'", warn_type:"InfPopulationProb", p:p});
-			}
+			switch(sp.type){
+			case "Population":
+				if(ninitpop == 0 && naddpop == 0 && model.source_exist(p) == false){
+					add_warning({mess:"No individuals", mess2:"Either 'Init. Pop.' or 'Add Pop.' must be set for species '"+sp.name+"'", warn_type:"InfPopulationProb", p:p});
+				}
+				break;
 			
-			if(ninitpopprior == 1 && ninitpop == 1){
-				model.warn.push({mess:"Initial population", mess2:"'Init. Pop.' and 'Init. Pop. Prior' cannot both be set for species '"+sp.name+"'", warn_type:"InfPopulationProb", p:p});
+			case "Individual":
+				if(ninitpop == 0 && naddind == 0 && model.source_exist(p) == false){
+					add_warning({mess:"No individuals", mess2:"Either 'Init. Pop.' or 'Add Ind' must be set for species '"+sp.name+"'", warn_type:"InfPopulationProb", p:p});
+				}
+				break;
+			
+			default: error("op prob"); break;	
 			}
 			
 			if(ninitpop > 0 && sp.fix_eff.length > 0){
-				model.warn.push({mess:"Cannot add individuals with fixed effect", mess2:"The individuals from 'Init. Pop.' cannot be added because of individual fixed effects in the model", warn_type:"InfPopulationProb", p:p});
+				add_warning({mess:"Cannot add individuals with fixed effect", mess2:"The individuals from 'Init. Pop.' cannot be added because of individual fixed effects in the model", warn_type:"InfPopulationProb", p:p});
 			}
 			break;
 
@@ -1627,12 +2131,12 @@ function check_comp_structure()
 					if(!(p == p2 && cl == cl2)){
 						if(claa.name == claa2.name){
 							if(p == p2){
-								model.warn.push({mess:"Repeated classification", mess2:"The classification '"+claa.name+"' is repeated twice in '"+sp.name+"'", warn_type:"ModelClass", p:p, cl:cl});
+								add_warning({mess:"Repeated classification", mess2:"The classification '"+claa.name+"' is repeated twice in '"+sp.name+"'", warn_type:"ModelClass", p:p, cl:cl});
 								return;
 							}
 							else{										
 								if(claa.index != claa2.index){
-									model.warn.push({mess:"Different indices", mess2:"The classification '"+claa.name+"' on species '"+sp.name+"' and '"+sp2.name+"' have different indices.", warn_type:"ModelClass", p:p, cl:cl});
+									add_warning({mess:"Different indices", mess2:"The classification '"+claa.name+"' on species '"+sp.name+"' and '"+sp2.name+"' have different indices.", warn_type:"ModelClass", p:p, cl:cl});
 									return;
 								}
 								else{
@@ -1641,7 +2145,7 @@ function check_comp_structure()
 									for(let c = 0; c < claa2.ncomp; c++) vec2.push(claa2.comp[c].name);
 									
 									if(equal_vec(vec1,vec2) == false){
-										model.warn.push({mess:"Compartments different", mess2:"For classification '"+claa.name+"' the compartments do not agree between species '"+sp.name+"' and '"+sp2.name+"'", warn_type:"ModelClass", p:p, cl:cl});
+										add_warning({mess:"Compartments different", mess2:"For classification '"+claa.name+"' the compartments do not agree between species '"+sp.name+"' and '"+sp2.name+"'", warn_type:"ModelClass", p:p, cl:cl});
 										return;
 									}
 								}
@@ -1650,11 +2154,11 @@ function check_comp_structure()
 						else{
 							if(claa.index == claa2.index){
 								if(p == p2){
-									model.warn.push({mess:"Identical indices", mess2:"In species '"+sp.name+"' the classifications '"+claa.name+"' and '"+claa2.name+"' should not share the same index '"+claa.index+"'", warn_type:"ModelClass", p:p, cl:cl});
+									add_warning({mess:"Identical indices", mess2:"In species '"+sp.name+"' the classifications '"+claa.name+"' and '"+claa2.name+"' should not share the same index '"+claa.index+"'", warn_type:"ModelClass", p:p, cl:cl});
 									return;
 								}
 								else{
-									model.warn.push({mess:"Identical indices", mess2:"Species '"+sp.name+" classifications '"+claa.name+"' and species '"+sp2.name+"' classification '"+claa2.name+"' should not share the same index '"+claa.index+"'", warn_type:"ModelClass", p:p, cl:cl});
+									add_warning({mess:"Identical indices", mess2:"Species '"+sp.name+" classifications '"+claa.name+"' and species '"+sp2.name+"' classification '"+claa2.name+"' should not share the same index '"+claa.index+"'", warn_type:"ModelClass", p:p, cl:cl});
 									return;
 								}
 							}
@@ -1671,5 +2175,125 @@ function check_comp_structure()
 function esc(st)
 {
 	st = st.replace(/\n/g,"");
+	st = st.trim();
 	return st;
+}
+
+
+/// Removes specified commands from a file
+function remove_command(te,com)
+{
+	let pos = com.split(",");
+	
+	let lines = te.split("\n");
+	
+	let te_new = "";
+	
+	for(let li = 0; li < lines.length; li++){
+		let line = lines[li];
+		
+		let fl = false;
+			
+		let i = 0; while(i < line.length && line.substr(i,1) == " ") i++;
+	
+		for(let j = 0; j < pos.length; j++){
+			if(i+pos[j].length <= line.length && line.substr(i,pos[j].length) == pos[j]){
+				if(i+pos[j].length < line.length){
+					if(line.substr(i+pos[j].length,1) == " ") fl = true;
+				}
+				else fl = true;
+			}
+		}
+	
+		if(fl == false) te_new += line+endl;
+		else{
+			let tri = line.trim();
+			if(tri.length > 3 && tri.substr(tri.length-3,3) == '"[['){
+				while(li < lines.length){
+					let tri = lines[li].trim();
+				
+					if(tri.length >= 3 && tri.substr(0,3) == ']]"'){
+						if(tri.substr(tri.length-3,3) != '"[[') break;
+					}
+					li++;
+				}
+			}
+		}
+	}
+	
+	return te_new;
+}
+
+
+/// Tidys the code
+function tidy_code(te)
+{
+	let spl = te.split("\n");
+	
+	// Trims lines
+	for(let li = 0; li < spl.length; li++){
+		spl[li]= spl[li].trim();
+	}
+	
+	// Gets rid of double spaces
+	let li = 0;
+	while(li < spl.length-1){
+		if(spl[li] == "" && spl[li+1] == ""){
+			spl.splice(li,1);
+		}
+		else li++;
+	}
+	
+	let te_new="";
+	for(let li = 0; li < spl.length; li++){
+		te_new += spl[li]+endl;
+	}
+	
+	return te_new;
+}
+
+ 
+/// Creates a file to start a posterior predictive check
+function create_ppc_file()
+{
+	let te = inf_result.import_te;
+	let file_list=[];
+	
+	te = remove_command(te,"post-sim,posterior-simulation,do-sim,do-inf,do-post-sim,do-posterior-simulation,add-pop-post-sim,remove-pop-post-sim,add-ind-post-sim,remove-ind-post-sim,move-ind-post-sim,param-mult,# MODIFICATION DATA");
+	te += endl+get_ppc_command("ppc")+endl+endl;
+
+	te += mini_banner("MODIFICATION DATA");
+
+	for(let p = 0; p < inf_result.species.length; p++){
+		let sp = inf_result.species[p];
+		if(inf_result.species.length > 1) te += 'set species="'+sp.name+'"'+endl;
+		te += create_output_sim_inf_source(p,"ppc",file_list,true);
+	}
+	
+	let pfac_list=[];
+	for(let th = 0; th < model.param.length; th++){
+		let par = model.param[th];
+		if(par.type == "param factor") pfac_list.push(th);
+	}
+	
+	if(pfac_list.length > 0){
+		te += mini_banner("PARAMETER FACTORS");
+		for(let k = 0; k < pfac_list.length; k++){
+			let par = model.param[pfac_list[k]];
+			if(par.type == "param factor"){
+				te += output_param(par,"ppc",file_list,true);
+			}
+		}
+		te += endl;
+	}
+	
+	te += "do-post-sim"+endl;
+	 
+	te = tidy_code(te);
+	
+	if(model.warn.length > 0) err_warning();
+	
+	write_file_store(te,"bicifile",file_list,"bicifile");
+
+	post({type:"Start", save_type:"ppc", file_list:file_list, param:strip_heavy(model.param), species:strip_heavy(model.species)});
 }

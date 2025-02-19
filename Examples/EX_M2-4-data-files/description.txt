@@ -1,0 +1,16 @@
+# Model 2.4: The SIS model
+
+## Objective
+- Introduce a model that allows individuals to be infected multiple times.
+- This can lead to endemic diseases.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$.
+- The backward transition to the $I$ state means that this model is known as the “SIS model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A recovery rate $γ$ determines the rate at which individual return to being susceptible.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

@@ -1,20 +1,37 @@
 "use strict";
+// Fuctions used to generate layers
 
 /// Generates all the layers on the screen
-function generate_screen()
-{
-	let w = window.innerWidth;
-	let h = window.innerHeight;
+function generate_screen(update)
+{		
+	if(update != false && model.update_model_needed == true){
+		let na = inter.page_name;
+		let tree = na.split("->");
+		if((tree[0] == "Model" && tree[1] == "Parameters") ||
+			(tree[0] == "Simulation" && tree[1] == "Parameters") ||
+			(tree[0] == "Inference" && tree[1] == "Prior") ||
+			(tree[0] == "Inference" && tree[1] == "Data") ||
+			(tree[0] == "Post. Simulation" && tree[1] == "Parameter Mult.") ||
+			(tree[0] == "Simulation" && tree[1] == "Generate Data")){
+			model.update_model_needed = false;
+			start_worker("UpdateModel");
+		}
+	}
+
+	let factor = 1; if(inter.printing) factor = print_scale_factor;
+	
+	let w = window.innerWidth*factor;
+	let h = window.innerHeight*factor;
+	
 	let width = w, height = h;
 	inter.canw = width, inter.canh = height;
 
-	if(height < 538) height = 538; 
-	if(width < 917) width = 917;
+	if(height < 538*factor) height = 538*factor; 
+	if(width < 917*factor) width = 917*factor;
 	
 	inter.canvas.width = width;
   inter.canvas.height = height;
-		
-	
+
 	let ratio = page_char_wid/page_char_hei;
 	let wid_show = Math.round(height*ratio);
 	let hei_show = height;
@@ -25,22 +42,22 @@ function generate_screen()
 
 	inter.sca = wid_show/page_char_wid;
 
+	model.get_label_info_all();
+
 	inter.over = {};
 	
 	inter.layer = [];
 
 	turn_off_cursor_flash();
 
-	//check_error_textbox();
-
 	reset_textbox_store();
 	
 	add_layer("Screen",0,0,width/inter.sca,height/inter.sca,{});
-	
+
 	purge_textbox_store();
 	
 	inter.over = get_button_over(inter.mx,inter.my);
-	
+
 	for(let l = 0; l < inter.layer.length; l++){
 		inter.layer[l].plot_buttons() 
 	}
@@ -48,6 +65,14 @@ function generate_screen()
 	start_cursor_flash();
 	
 	plot_screen();
+}
+
+
+/// Determines if a layers exists
+function layer_exist(te)
+{
+	if(find(inter.layer,"name",te) != undefined) return true;
+	return false;
 }
 
 
@@ -66,9 +91,10 @@ function within_layer(name)
 /// Prints the names of all the layers (for diagnostic purposes)
 function print_layer()
 {
-	error("LAYER NAMES:");
+	pr("");
+	pr("LAYER NAMES:");
 	for(let l = 0; l < inter.layer.length; l++){
-		error(inter.layer[l].name);
+		pr(l+": "+inter.layer[l].name);
 	}
 }
 
@@ -83,11 +109,9 @@ function add_layer(na,x,y,dx,dy,op)
 		dx = nearest_pixel(dx); dy = nearest_pixel(dy);
 		break;
 	}
-	//dx = nearest_pixel(dx); dy = nearest_pixel(dy);
 	
 	inter.layer.push(new Layer(na,x,y,dx,dy,op));
 
-	
 	let lay = inter.layer[inter.layer.length-1];
 	
 	let opnew = {lay:lay, style:"Grey", position:"right"};
@@ -105,7 +129,7 @@ function add_layer(na,x,y,dx,dy,op)
 	case "EquationAddQuantity": opnew.style = "White"; wid = scroll_width*0.8; break;
 	case "BubbleScrollable": opnew.style = "Bubble"; wid = scroll_width*0.8; break;
 	case "Menu": opnew.style = "White"; wid = scroll_width*0.8; opnew.position = "left"; break;
-	case "RightBotMenu": opnew.style = "TextBox"; wid = scroll_width*0.8; break;
+	case "RightBotMenu": case "RightMidMenu": opnew.style = "TextBox"; wid = scroll_width*0.8; break;
 	case "DropdownOptions": opnew.style = "TextBox"; wid = scroll_width*0.8; break;
 	case "TextBox": opnew.style = "TextBox"; wid = scroll_width*0.8; break;
 	case "UpperMenu": opnew.style = "TabSlider"; wid = scroll_width*0.7; break;
@@ -122,71 +146,64 @@ function add_layer(na,x,y,dx,dy,op)
 	
 	switch(lay.name){
 	case "Main": case "Compartment": case "Transition": 
+		if(tab_name() == "Model" && subtab_name() == "Compartments") na = "NoScroll";
+		break;
+	
 	case "Annotation": case "AnnotationMap":
-	case "GraphCompartments": case "GraphTransitions":
-		let tree = inter.page_name.split("->");
-		if(tree[0] == "Model" && tree[1] == "Compartments") na = "NoScroll";
+	case "GraphCompartments": case "GraphTransitions": case "GraphAnnotations":
+		na = "NoScroll";
 		break;
 	}
-
+	
 	switch(na){
-	case "Yscroll": case "Xscroll": case "CornerScroll": case "NoScroll": case "Help": case "Menu": case "Expand":
+	case "Yscroll": case "Xscroll": case "CornerScroll": case "NoScroll": case "Menu":case "Expand": case "GraphCompartments": case "GraphTransitions":
+	case "Help": 
 		break;
 
 	default:
 		let box = get_but_box(lay.but);
 
-		if(box.ymax > lay.dy+0.05){
+		if((lay.name == "BubbleScrollable" && box.ymax > lay.dy-0.7) || box.ymax > lay.dy+0.05){
 			lay.y_scroll = true;
 			if(opnew.position == "right") lay.inner_dx -= wid;
 			lay.initialise_buttons();
 
 			box = get_but_box(lay.but);
-
-			if(box.xmax > lay.inner_dx){
+			if(box.xmax > lay.inner_dx && lay.name != "TextBox"){
 				lay.x_scroll = true;
-			
 				lay.inner_dy -= wid;
 				lay.initialise_buttons();
 			}
 		}
 		else{
 			if(box.xmax > lay.dx+TINY){
-				lay.x_scroll = true;
-			
-				lay.inner_dy -= wid;
-				lay.initialise_buttons();
+				switch(na){
+				case "RightMidMenu": case	"RightMenu": case "RightBotMenu": break;
+				default:
+					lay.x_scroll = true;
+					lay.inner_dy -= wid;
+					lay.initialise_buttons();
+					break;
+				}
 			}
 		}
 
 		if(lay.y_scroll == true){
 			let xpos = x+lay.dx-wid;
 
-			//if(lay.name == "TextBox") xpos -= 0.2;
-			//else{
-				if(opnew.position != "right") xpos = x-wid;
-			//}
-
+			if(opnew.position != "right") xpos = x-wid;
+	
 			add_layer("Yscroll",xpos,y,wid,lay.dy,opnew);
-		
-/*
-				if(lay.name == "TextBox") add_layer("Yscroll",x+lay.dx-wid-0.2,y,wid,lay.dy,opnew);
-				else add_layer("Yscroll",x+lay.dx-wid,y,wid,lay.dy,opnew);
-			}	
-			else{
-				add_layer("Yscroll",x-wid,y,wid,lay.dy,opnew);
-			}
-*/
 		}
 
-		if(lay.x_scroll == true) add_layer("Xscroll",x,y+dy-wid,dx,wid,opnew);
+		if(lay.x_scroll == true){
+			add_layer("Xscroll",x,y+dy-wid,dx,wid,opnew);
+		}
 		
 		if(lay.y_scroll == true && lay.x_scroll == true){
 			add_layer("CornerScroll",x+dx-wid,y+dy-wid,wid,wid,opnew);
 		}
 	}
-
-	//lay.plot_buttons();
 }
 
 
@@ -204,6 +221,22 @@ function shift_layer(name,x,y)
 		if(lay.name == "Yscroll"){
 			lay.x += dx;
 			lay.y += dy;
+		}
+	}
+}
+
+
+/// Scrolls a layer by a certain amount
+function scroll_layer(name,dy)
+{
+	let l = find(inter.layer,"name",name);
+	let lay_sc = inter.layer[l];
+	if(l < inter.layer.length-1){
+		let lay = inter.layer[l+1];
+		if(lay.name == "Yscroll"){
+			change_scroll(dy,lay.but[0],"page_shift");
+			replot_layer("Yscroll");
+			replot_layer("GraphContent");
 		}
 	}
 }
@@ -284,7 +317,7 @@ function change_scroll(sign,bu,op)
 		break;
 		
 	default:
-		if(pos.discretise == true) sh += sign*textbox_linesi;
+		if(pos.discretise == true) sh += sign*get_font_info().lh;
 		else sh += 0.8*sign*pos.max*bu.frac;
 		break;
 	}
@@ -360,22 +393,6 @@ function drag_cursor(x,y)
 				let bu = lay.but[last];
 				if(y >= sh_y+bu.y+bu.dy) cur_over = bu.i;
 			}
-			
-		
-			
-			//if(y < lay.y){ // Above upper edge
-			//cur_over = 0;
-			//	}
-			//if(x >= lay.x && x <= lay.x+lay.dx && y >= lay.y && y <= lay.y+lay.dy){
-			/*
-			for(let i = lay.but.length-1; i >= 0; i--){
-				let bu = lay.but[i];
-
-				if(bu.ac && x >= sh_x+bu.x && x <= sh_x+bu.x+bu.dx && y >= sh_y+bu.y && y <= sh_y+bu.y+bu.dy){
-			*/
-
-			
-		
 		}
 
 		if(cur_over != undefined){
@@ -391,80 +408,6 @@ function drag_cursor(x,y)
 	}
 }		
 				
-				
-/// Pastes content at the cursor location
-function cursor_paste(paste)
-{
-	paste = paste.replace(/</g,"〈");
-	paste = paste.replace(/>/g,"〉");
-	paste = paste.replace(/\*/g,"×");
-			
-	let cur = inter.cursor;
-	if(cur.i == undefined) return;
-
-	let i = 0; 
-	while(i < paste.length){
-		let ch = paste.charCodeAt(i);
-		if(ch == 13){
-			if(inter.layer[cur.l].name == "TextBox"){
-				paste = paste.substr(0,i)+"\n"+paste.substr(i+1);
-			}
-		}
-		else{
-			if(ch >= 0 && ch < 32){
-				paste = paste.substr(0,i)+paste.substr(i+1);
-				i--;
-			}
-		}
-		i++;
-	}
-
-	let text_lay = inter.layer[cur.l];
-	
-	let te = text_lay.get_text_from_source();
-
-	let remember = { on:true, i:cur.i, select_pos:cur.select_pos};
-
-	te = remove_selection(te);
-	
-	te = te.substr(0,cur.i)+paste+te.substr(cur.i);
-	text_lay.put_text_in_source(te,remember);
-	cur.i += paste.length; 
-	reset_cursor();
-}
-
-
-/// Copies selected text to clipboard
-function cursor_copy(cut)
-{
-	let te = get_selected_text();
-
-	if(cut == true){
-		let cur = inter.cursor;
-		if(cur.l != undefined){
-			let text_lay = inter.layer[cur.l];
-		
-			let st = text_lay.get_text_from_source();
-
-			if(cur.select_pos != undefined){
-				let remember = { on:true, i:cur.i, select_pos:cur.select_pos};
-				
-				st = remove_selection(st);
-				text_lay.put_text_in_source(st,remember);
-				reset_cursor();
-			}
-		}
-	}
-	
-	let i = 0;
-	while(i < te.length){
-		if(te.substr(i,1) == "\n") te = te.substr(0,i)+"\n"+te.substr(i+1);
-		i++;
-	}
-	
-	navigator.clipboard.writeText(te);
-}
-
 
 /// Gets selected text
 function get_selected_text()
@@ -488,17 +431,19 @@ function unfocus_check()
 	let l = inter.cursor.l;
 	if(l != undefined){
 		let lay = inter.layer[l];
-		let source = lay.op.source;
-			
-		if(source != undefined && input_error(source) == true){
-			let ref = lay.op.source.ref;
-			let sto = inter.textbox_store;
-	
-			let i = 0; while(i < sto.length && sto[i].ref != ref) i++;
-			if(i < sto.length){
-				let warn_before = sto[i].warning;
-				check_error_textbox2(sto[i]);
-				if(sto[i].warning != warn_before) return true;
+		if(lay){
+			let source = lay.op.source;
+				
+			if(source != undefined && input_error(source) == true){
+				let ref = lay.op.source.ref;
+				let sto = inter.textbox_store;
+		
+				let i = 0; while(i < sto.length && sto[i].ref != ref) i++;
+				if(i < sto.length){
+					let warn_before = sto[i].warning;
+					check_error_textbox2(sto[i]);
+					if(sto[i].warning != warn_before) return true;
+				}
 			}
 		}
 	}
@@ -547,10 +492,17 @@ function start_cursor_flash()
 	inter.cursor.interval = setInterval(
 		function (){ 
 			let cur = inter.cursor;
-			if(cur.i != undefined){
-				cur.on = 1-cur.on;
-				inter.layer[cur.l].plot_buttons();
-				plot_screen();
+			
+			if(cur == undefined) inter.cursor.interval = undefined;
+			else{
+				if(cur.i != undefined){
+					cur.on = 1-cur.on;
+					if(inter.layer[cur.l] == undefined) inter.cursor.interval = undefined;
+					else{
+						inter.layer[cur.l].plot_buttons();
+						plot_screen();
+					}
+				}
 			}
 		}, 500);
 }
@@ -584,93 +536,107 @@ function add_screen_buts(lay)
 
 	let show_model = model.get_show_model();
 	
-	let so = inter.edit_source;
+	let so = edit_source;
 	let type = so.type;
 
-	if(inter.edit_param.type != undefined || inter.edit_Amatrix.i != undefined ||
-		inter.edit_Xvector.i != undefined || inter.view_graph.type != undefined ||
-		(type != undefined && so.table_loaded != false && so.edit_spec != true)){
-	
-		if(so.type != undefined && so.table_loaded == undefined){
-			switch(so.type){
-			case "Init. Pop.": add_layer("EditInitPop",x2,y1,x3-x2,y2-y1,{}); break;
-			case "Init. Pop. Prior": add_layer("EditInitPopPrior",x2,y1,x3-x2,y2-y1,{}); break;
-			default: error("Should not be here"); break;
+	if(inter.loading_symbol.on == true || model.show_warning() == true){
+		if(inter.loading_symbol.on == true) add_layer("Blank",x2,y1,x3-x2,y2-y1,{});	
+		else add_layer("ShowWarning",x2,y1,x3-x2,y2-y1,{});
+	}
+	else{
+		if(inter.edit_param.type != undefined || inter.edit_Amatrix.i != undefined ||
+			inter.edit_Xvector.i != undefined || inter.view_graph.value != undefined ||
+			(type != undefined && so.table_loaded != false && so.edit_spec != true)){
+				
+			if(so.type != undefined && so.table_loaded == undefined){
+				switch(so.type){
+				case "Init. Pop.": add_layer("EditInitPop",x2,y1,x3-x2,y2-y1,{}); break;
+				default: error("Should not be here"); break;
+				}
+			}
+			else{
+				if(so.load_datatable == true && so.data_table_use != undefined){
+					add_layer("EditTable",x2,y1,x3-x2,y2-y1,{});
+				}	
+				else{
+					let type = inter.edit_param.type;
+					if(type != undefined){
+						add_layer("EditParam",x2,y1,x3-x2,y2-y1,{type:type});
+					}
+					
+					if(inter.edit_Amatrix.i != undefined){
+						add_layer("EditAmatrix",x2,y1,x3-x2,y2-y1,{});
+					}
+					
+					if(inter.edit_Xvector.i != undefined){
+						add_layer("EditXvector",x2,y1,x3-x2,y2-y1,{});
+					}
+					
+					if(inter.view_graph.value != undefined){
+						add_layer("ViewGraph",x2,y1,x3-x2,y2-y1,{});
+					}
+				}
 			}
 		}
 		else{
-			if(so.load_datatable == true && so.data_table_use != undefined){
-				add_layer("EditTable",x2,y1,x3-x2,y2-y1,{});
-			}	
-			else{
-				let type = inter.edit_param.type;
-				if(type != undefined){
-					add_layer("EditParam",x2,y1,x3-x2,y2-y1,{type:type});
-				}
-				
-				if(inter.edit_Amatrix.i != undefined){
-					add_layer("EditAmatrix",x2,y1,x3-x2,y2-y1,{});
-				}
-				
-				if(inter.edit_Xvector.i != undefined){
-					add_layer("EditXvector",x2,y1,x3-x2,y2-y1,{});
-				}
-				
-				if(inter.view_graph.type != undefined){
-					add_layer("ViewGraph",x2,y1,x3-x2,y2-y1,{});
-				}
-			}
-		}
-	}
-	else{
-		add_layer("Main",x2,y1,x3-x2,y2-y1,{});
-	
-		if(show_model == true){
-			add_layer("AnnotationMap",x2,y1,x3-x2,y2-y1,{});
-			add_layer("Annotation",x2,y1,x3-x2,y2-y1,{});
-			add_layer("Compartment",x2,y1,x3-x2,y2-y1,{});
-			add_layer("Transition",x2,y1,x3-x2,y2-y1,{});
-		}
-	
-		if(inter.mode.type == "Add_Box"){
-			add_layer("Select",x2,y1,x3-x2,y2-y1,{});
-		}
-		
-		switch(inter.mode.type){
-		case "Add_Compartment":
-			{
-				let w, h;
-				let scale = model.get_scale();
-				let coord = model.get_coord();
-				let ruler = model.get_ruler();
-				switch(coord){
-				case "cartesian": w = 4*grid*scale; h = compartment_height*scale; break;
-				case "latlng": w = 3*latlng_radius*scale*ruler; h = w; break;
-				default: error("Option not recognised 67"); break;
-				}
-				add_layer("AddCompartment",1000,10,w,h,{coord:coord});
-			}
-			break;
-		
-		case "Add_Label":
-			{
-				let mo = inter.mode;
-				mo.si = si_annotation*model.get_scale()*model.get_ruler();
-				mo.fo = get_font(mo.si);
-				mo.w = text_width(mo.te,mo.fo)+1;
-				mo.h = mo.si;
-				add_layer("AddLabel",1000,10,mo.w,mo.h,{});
-			}
-			break;
+			add_layer("Main",x2,y1,x3-x2,y2-y1,{});
 			
-		}
+			if(show_model == true){
+				let claa = model.get_cla(); if(claa) model.ensure_lng(claa.camera,x3-x2);
+				add_layer("AnnotationMap",x2,y1,x3-x2,y2-y1,{});
+				add_layer("Annotation",x2,y1,x3-x2,y2-y1,{});
+				add_layer("Compartment",x2,y1,x3-x2,y2-y1,{});
+				add_layer("Transition",x2,y1,x3-x2,y2-y1,{});
+				if(inter.comp_select.sbox && inter.comp_select.list.length > 1){
+					add_layer("CompSelect",x2,y1,x3-x2,y2-y1,{});
+					add_layer("CompSelectButton",x2,y1,x3-x2,y2-y1,{});
+				}
+			}
 		
-		if(show_model == true){
-			add_layer("LowerMenu",x2,y2-2.4,x3-x2,2.4,{});
-			add_layer("UpperMenu",x2+1.2,y1,x3-x2-7,2,{});
+			if(inter.mode.type == "Add_Box"){
+				add_layer("Select",x2,y1,x3-x2,y2-y1,{});
+			}
+			
+			switch(inter.mode.type){
+			case "Add_Compartment":
+				{
+					let w, h;
+					let scale = model.get_scale();
+					let coord = model.get_coord();
+					let ruler = model.get_ruler();
+					switch(coord){
+					case "cartesian": w = 4*grid*scale+marnew; h = compartment_height*scale+marnew; break;
+					case "latlng": w = 2*latlng_radius*scale*ruler+marnew; if(w < 0.4) w = 0.4; h = w; break;
+					default: error("Option not recognised 67"); break;
+					}
+					add_layer("AddCompartment",1000,10,w,h,{coord:coord});
+				}
+				break;
+			
+			case "Add_Label":
+				{
+					let mo = inter.mode;
+					mo.si = si_anno*(mo.size/size_annotation_default)*model.get_scale()*model.get_ruler();
+					mo.fo = get_font(mo.si);	
+					mo.w = text_width(mo.te,mo.fo)+1;
+					mo.h = mo.si;
+				
+					add_layer("AddLabel",1000,10,mo.w,mo.h,{});
+				}
+				break;
+			}
+			
+			if(show_model == true){
+				add_layer("LowerMenu",x2,y2-2.4,x3-x2,2.4,{});
+				add_layer("UpperMenu",x2+1.2,y1,x3-x2-7,2,{});
+			}
+			
+			if(model.show_warning() == "button"){
+				let fr = 0.41;
+				let dx = x3-x2;
+				add_layer("ViewWarning",x2+fr*dx,y1,(1-2*fr)*dx,1.4,{});
+			}
 		}
-		
-		//add_layer("LowerMenu",x2,y2-2.4,x3-x2,2.4,{});
 	}
 	
 	let showbubble = false;
@@ -680,23 +646,34 @@ function add_screen_buts(lay)
 	
 	let tree = inter.page_name.split("->");
 	switch(tree[0]){
-	case "Simulation": case "Inference":
+	case "Simulation": case "Inference": case "Post. Simulation":
 		switch(tree[1]){
-		case "Results":
+		case "Results": 
 			switch(tree[2]){
-			case "Populations": case "Transitions": case "Individuals": case "Splines": case "Parameters":
+			case "Populations": case "Transitions": case "Individuals": case "Derived": case "Parameters":
 				right_menu = tree[2];
-				if(tree[0] == "Inference" && tree[2] == "Parameters"){
-					let rpf = inf_result.plot_filter;
+				
+				let rpf = get_inf_res().plot_filter;
 					
-					switch(rpf.sel_paramview.te){
-					case "Scatter": right_mid = "split"; break;
-					case "Correlation": break;
-					default:
-						let pl = rpf.sel_paramviewtype.te;
-						if(pl == "Trace" || pl =="Samples" || pl == "Distribution") right_mid = "with key";
-						break;
+				if(tree[2] == "Parameters"){
+					if(rpf.sel_paramview){
+						switch(rpf.sel_paramview.te){
+						case "Scatter": right_mid = "split"; break;
+						case "Correlation": right_mid = "with key"; break;
+						default:
+							if(rpf.sel_paramviewtype){
+								let pl = rpf.sel_paramviewtype.te;
+								if(pl == "Trace" || pl =="Samples" || pl == "Distribution" || pl == "Graph (split)"){
+									right_mid = "with key";
+								}
+							}
+							break;
+						}
 					}
+				}
+				
+				if(tree[2] == "Individuals"){
+					if(rpf.sel_indview.te == "Ind. Eff.") right_mid = "with key";
 				}
 				break;
 			}
@@ -705,12 +682,14 @@ function add_screen_buts(lay)
 		break;
 	}
 	
-	if(inter.view_graph.type != undefined) right_menu = "GraphView";
+	if(inter.view_graph.value != undefined) right_menu = "GraphView";
 	
-	if(right_menu != ""){
+	if(right_menu != "" && !inter.loading_symbol.on){	
 		let xr = x3-right_menu_width;
 		let yr = y1 + right_menu_top;
 	
+		add_layer("RightMenuSlider",xr-right_menu_slider,yr,right_menu_slider,y2-yr-1,{});
+		
 		let l = inter.layer.length;
 		add_layer("RightMenu",xr,yr,x3-xr,y2-yr,{type:right_menu});
 		
@@ -725,63 +704,71 @@ function add_screen_buts(lay)
 			switch(right_mid){
 			case "with key":
 				add_layer("RightMidMenu",xr,yr2,x3-xr-0.5,0.63*hh,{});
+				
 				add_layer("RightBotMenu",xr,yr2+0.65*hh,x3-xr-0.5,0.35*hh,{});
 				break;
 				
 			case "split":
-				add_layer("RightMidMenu",xr,yr2,x3-xr-0.5,0.48*hh,{});
-				add_layer("RightBotMenu",xr,yr2+0.50*hh,x3-xr-0.5,0.48*hh,{});
+				{
+					let lay = get_lay("Main");
+					
+					let si = 0.8;
+				
+					let h1 = yr2+0.01*hh;
+					lay.add_button({te:"X-AXIS", x:xr-lay.x+2.5, y:h1-1.4, dx:3, dy:0.8, si:si, font:get_font(si,"bold"), type:"Text", back_col:WHITE, col:BLACK});
+					add_layer("RightMidMenu",xr,h1,x3-xr-0.5,0.43*hh,{});
+					
+					let h2 = yr2+0.55*hh;
+					lay.add_button({te:"Y-AXIS", x:xr-lay.x+2.5, y:h2-1.4, dx:3, dy:0.8, si:si, font:get_font(si,"bold"), type:"Text", back_col:WHITE, col:BLACK});
+					add_layer("RightBotMenu",xr,h2,x3-xr-0.5,0.43*hh,{});
+				}
 				break;
 			}
 		}
 		else{
-			add_layer("RightBotMenu",xr,yr2,x3-xr-0.5,y2-yr2-0.5,{});
+			let dy = y2-yr2-0.5;
+			add_layer("RightBotMenu",xr,yr2,x3-xr-0.5,dy,{});
 		}
 	}
 
-	/*
-	if(inter.bubble.i != undefined && inter.bubble.l < inter.layer.length){
-		add_layer("BubbleBack",x2,y1,x3-x2,y2-y1,{});
-		add_layer("Bubble",10,10,10,10,{});
-		showbubble = true;
-	}
-	*/
-	
 	add_layer("Frame",0,0,lay.dx,lay.dy,{x:x2, y:y1, dx:x3-x2, dy:y2-y1});
 
 	add_layer("Menu",x1,yb,x2-x1,yc-yb,{});
 
-	if(inter.bubble.i != undefined && showbubble == false){
-		add_layer("BubbleBack",x2,y1,x3-x2,y2-y1,{});
-		add_layer("Bubble",10,10,10,10,{});
-	}
-	
-	add_layer("Logo",x1,ya,x2-x1,yb-ya,{});
-
-	if(inter.equation.te != undefined){
-		add_layer("EquationBackground",0,0,lay.dx,lay.dy,{});
-		let wid = 0.54*(x3-x1);
-		
-		add_layer("Equation",lay.dx/2-wid/2+menu_width/2,0,wid,lay.dy,{});
-	}
-	
-	add_dropdown_select();
-	
-	if(inter.help.title != undefined){
-		add_layer("HelpBackground",0,0,lay.dx,lay.dy,{});
-		let wid = 0.6*(x3-x1); 
-		if(inter.help.scroll_to_line != undefined) wid = 0.8*(x3-x1);
-		add_layer("Help",lay.dx/2-wid/2+menu_width/2,0,wid,lay.dy,{});
-	}
-	
 	if(inter.loading_symbol.on){
 		let six = 4.7, siy = 3.7;
 		add_layer("LoadingSymbol",(x2+x3)/2-six/2,(y1+y2)/2-siy/2,six,siy,{});
 	}
+	else{
+		if(inter.bubble.i != undefined && showbubble == false){
+			add_layer("BubbleBack",x2,y1,x3-x2,y2-y1,{});
+			add_layer("Bubble",10,10,10,10,{});
+		}
+		
+		add_layer("Logo",x1,ya,x2-x1,yb-ya,{});
+
+		if(inter.equation.te != undefined){
+			add_layer("EquationBackground",0,0,lay.dx,lay.dy,{});
+			let wid = 0.74*(x3-x1);
+			
+			add_layer("Equation",lay.dx/2-wid/2+menu_width/2,0,wid,lay.dy,{});
+		}
+		
+		add_dropdown_select();
+		
+		if(inter.help.title != undefined){
+			add_layer("HelpBackground",0,0,lay.dx,lay.dy,{});
+			let wid = 0.6*(x3-x1); 
+			if(inter.help.scroll_to_line != undefined) wid = 0.8*(x3-x1);
+			add_layer("Help",lay.dx/2-wid/2+menu_width/2,0,wid,lay.dy,{});
+		}
+	}
+	
+	if(make_fig) add_layer("Figure",0,0,lay.dx,lay.dy,{});
 } 
 
 
-// Places the selected dropdown layer on top of all the others
+/// Places the selected dropdown layer on top of all the others
 function add_dropdown_select()
 {
 	let source = inter.dropdown.source;
@@ -820,20 +807,34 @@ function add_dropdown_select()
 
 
 /// Starts the loading symbol
-function start_loading_symbol(per)                                  
+function start_loading_symbol(per,type)                                  
 {
 	if(!inter.loading_symbol.on){
-		let interval = setInterval(function(){ inter.loading_symbol.offset++; replot_loading_symbol(); plot_screen();},110);
-		inter.loading_symbol = {on:true, offset:0, interval:interval, processing:false, percent:per};
+		let interval = setInterval(function(){ inter.loading_symbol.offset++; replot_loading_symbol();},110);
+		inter.loading_symbol = {on:true, offset:0, interval:interval, percent:per, type:type};
+		
+		switch(type){
+		case "Start": inter.loading_symbol.message = "Creating..."; break;
+		case "Spawn": inter.loading_symbol.message = "Initialising..."; break;
+		}
+		
 		generate_screen();
 	}
 }
 
 
+/// Sets a message to the loading symbol
+function loading_symbol_message(te)
+{
+	inter.loading_symbol.message = te;
+	generate_screen();
+}	
+
+
 /// Sets the loading percentage
 function set_loading_percent(per)
 {
-	inter.loading_symbol.percent = per;
+	inter.loading_symbol.percent = Math.floor(per);
 }
 
 
@@ -851,8 +852,15 @@ function stop_loading_symbol()
 function plot_screen()                                    
 {
 	cv = inter.canvas_cv;
-	
+
 	clear_rectangle(0,0,inter.canw,inter.canh);   
+	
+	if(make_fig){
+		cv.beginPath();
+		cv.rect(0,0,inter.canw,inter.canh);
+		cv.fillStyle = BLACK;
+		cv.fill();
+	}
 	
 	for(let i = 0; i < inter.layer.length; i++){
 		let lay = inter.layer[i];
@@ -866,7 +874,7 @@ function plot_screen()
 					let marx = out.marx, mary = out.mary;
 
 					let extend = 0;
-					if(lay.name == "Input" && lay.op.source.eqn == true) extend = expand_dx; 
+					if(lay.name == "Input" && lay.op.source.eqn == true) extend = expand_dx+0.2; 
 					draw_round_rectangle(lay.x-marx,lay.y-mary,lay.dx+2*marx+extend,lay.dy+2*mary,0.5,WHITE,out.col);  
 				}
 				else{
@@ -874,9 +882,13 @@ function plot_screen()
 				}
 			}
 		
-			cv.drawImage(lay.can,Math.round(lay.x*inter.sca),Math.round(lay.y*inter.sca));
+			if(mask_plot(lay) == false){
+				cv.drawImage(lay.can,Math.round(lay.x*inter.sca),Math.round(lay.y*inter.sca));
+			}
 		}
 	}
+	
+	if(inter.loading_symbol.on) replot_loading_symbol();
 	
 	if(inter.bubble.out_of_range == true){	
 		close_bubble();
@@ -886,13 +898,26 @@ function plot_screen()
 }
 
 
-/// Gets the font based on size (and potenitally if bold ot italic)
-function get_font(fac,te,type)
+/// Used to draw a map mask for density plots
+function mask_plot(lay)
 {
-	if(type == undefined) type = "arial";
-	let fo = Math.round(fac*inter.sca)+"px "+type;
-	if(te) return te+" "+fo;
-	return fo;
+	if(lay.name == "GraphCompartments" && inter.graph.type == "Density"){
+		let lay_mask = get_lay("GraphAnnotations");
+		if(lay_mask && lay_mask.can){
+			let can_mask = document.createElement('canvas');
+			can_mask.width = lay.can.width;
+			can_mask.height = lay.can.height;
+			let cv_mask = can_mask.getContext('2d');
+		
+			cv_mask.drawImage(lay_mask.can,0,0);
+			cv_mask.globalCompositeOperation = "source-in";
+			cv_mask.drawImage(lay.can,0,0);
+			
+			cv.drawImage(can_mask,Math.round(lay_mask.x*inter.sca),Math.round(lay_mask.y*inter.sca));
+			return true;
+		}
+	}
+	return false;
 }
 
 
@@ -929,7 +954,7 @@ function reset_text_box()
 }
 
 
-/// Constructs a unique reference for a text box
+/// Constructs a unique reference for a text box 
 function add_ref(source)
 {
 	let ref = source.type;
@@ -939,24 +964,62 @@ function add_ref(source)
 }
 
 
+
+/// Replots the loading symbol
 function replot_loading_symbol()
 {
 	let lay = get_lay("LoadingSymbol");
 	if(lay){
-		lay.plot_button(lay.but[0]);
+		lay.plot_button(lay.but[0]);	
+		cv = inter.canvas_cv;
+		cv.drawImage(lay.can,Math.round(lay.x*inter.sca),Math.round(lay.y*inter.sca));
 	}
 }
 
+
 /// Replots a given layer
-function replot_layer(name)
+function replot_layer(name,sh)
 {
 	inter.replotting = true;
 	
 	let lay = get_lay(name);
-	
 	if(lay == undefined) return;
 
-	lay.initialise_buttons();
+	if(sh != undefined){
+		let but = lay.but;
+		
+		let shx = sh.x, shy = sh.y;
+		for(let k = 0; k < but.length; k++){
+			let bu = but[k];
+			if(bu.type != "CenterText"){
+				bu.x += shx;
+				bu.y += shy;
+			}
+		}
+		
+		if(name == "Transition" || name == "GraphTransitions"){
+			for(let k = 0; k < but.length; k++){
+				let bu = but[k];
+				let points = bu.points;
+				if(points){
+					for(let j = 0; j < points.length; j++){
+						let po = points[j];
+						po.x += shx;
+						po.y += shy;
+					}						
+				}
+		
+				if(bu.type == "Transition"){
+					let center = bu.center;
+					if(center){
+						center.x += shx;
+						center.y += shy;
+					}
+				}	
+			}
+		}
+	}
+	else lay.initialise_buttons();
 	lay.plot_buttons();
 }
 
@@ -1025,6 +1088,8 @@ function copy_back_to_source()
 	}
 }
 
+
+/// Copies information in the input textbox back to the source
 function copy_back_to_source2(tbs)
 {
 	let so = tbs.source;
@@ -1033,25 +1098,27 @@ function copy_back_to_source2(tbs)
 	switch(so.type){
 	case "equation": inter.equation.te = te; break;
 	case "description": model.description.te = te; break;
-	case "compartment": model.rename_compartment(so.p,so.cl,so.i,te); break;
+	case "compartment": inter.rename_compartment = te; break;
 	case "add_species_name": inter.bubble.species_name = te; break;
 	case "add_classification_name": inter.bubble.classification_name = te; break;
-	case "classification_name": model.rename_classification(te,so.p,so.cl); break;
-	case "species_name": model.rename_species(te,so.p); break;
-	case "init_population": inter.edit_source.cla[so.cl].comp_init_pop[so.c].pop = Number(te); break;
+	case "classification_name": inter.rename_classification = te; break;
+	case "species_name": inter.rename_species = te; break;
+	case "init_population": edit_source.cla[so.cl].comp_init_pop[so.c].pop = Number(te); break;
 		
 	case "init_per":
-		let cip = inter.edit_source.cla[so.cl].comp_init_pop;
-		cip[so.c].pop_per = Number(te);
-	
-		let sum = 0;
-		for(let c = 0; c < cip.length-1; c++) sum += cip[c].pop_per
-		if(sum > 100 && sum < 100+TINY) sum = 100;
-		cip[cip.length-1].pop_per = 100-sum;
+		{
+			let cip = edit_source.cla[so.cl].comp_init_pop;
+			cip[so.c].pop_per = Number(te);
+		
+			let sum = 0;
+			for(let c = 0; c < cip.length-1; c++) sum += cip[c].pop_per
+			if(sum > 100 && sum < 100+TINY) sum = 100;
+			cip[cip.length-1].pop_per = 100-sum;
+		}
 		break;
 		
-	case "init_globpopulation": inter.edit_source.glob_comp[so.c].pop = Number(te); break;
-	case "element": inter.edit_source.table.ele[so.r][so.c] = te;	break;
+	case "init_globpopulation": edit_source.glob_comp[so.c].pop = Number(te); break;
+	case "element": edit_source.table.ele[so.r][so.c] = te;	break;
 	
 	case "element_param": 
 		{
@@ -1070,7 +1137,14 @@ function copy_back_to_source2(tbs)
 	case "reparam_eqn": 
 		{
 			let val = Number(te); if(isNaN(val)) val = te; 
-			model.param[inter.bubble.th].value = val;
+			model.change_param(inter.bubble.th,"value",val);
+		}
+		break;
+		
+	case "reparam_equation": 
+		{
+			let val = Number(te); if(isNaN(val)) val = te; 
+			model.change_param(inter.bubble.th,"reparam_eqn",val);
 		}
 		break;
 		
@@ -1081,63 +1155,67 @@ function copy_back_to_source2(tbs)
 		}
 		break;
 		
-	case "element_Amatrix": inter.edit_Amatrix.value[so.j][so.i] = Number(te); break;	
-	case "element_Xvector": inter.edit_Xvector.value[so.i] = Number(te); break;	
+	case "element_Amatrix": inter.edit_Amatrix.A_value[so.j][so.i] = Number(te); break;	
+	case "element_Xvector": inter.edit_Xvector.X_value[so.i] = Number(te); break;	
 	case "find": inter.bubble.find = te; break;
 	case "burnin": inter.bubble.burnin = Number(te); break;
 	case "replace": inter.bubble.replace = te; break;
-	case "time_start": inter.edit_source.spec.time_start = te; break;
-	case "time_end": inter.edit_source.spec.time_end = te; break;
-	case "pos_result": inter.edit_source.spec.pos_result = te; break;
-	case "neg_result": inter.edit_source.spec.neg_result = te; break;
-	case "percent": inter.edit_source.spec.percent = te; break;
-	case "sd": inter.edit_source.spec.sd = te; break;	
-	
-	// equations
+	case "time_start": edit_source.spec.time_start = te; break;
+	case "time_end": edit_source.spec.time_end = te; break;
+	case "pos_result": edit_source.spec.pos_result = te; break;
+	case "neg_result": edit_source.spec.neg_result = te; break;
+	case "percent": edit_source.spec.percent = te; break;
+	case "sd": edit_source.spec.sd = te; break;	
+	case "p": edit_source.spec.p = te; break;
+
 	case "trans_mean": 
-		model.species[so.p].cla[so.cl].tra[so.i].value.mean_eqn.te = te;
+		update(model.species[so.p].cla[so.cl].tra[so.i].value.mean_eqn,te);
 		model.find_trans_pline(so.p,so.cl,so.i);
 		break;
 		
 	case "trans_rate":
-		model.species[so.p].cla[so.cl].tra[so.i].value.rate_eqn.te = te;
+		update(model.species[so.p].cla[so.cl].tra[so.i].value.rate_eqn,te);
 		model.find_trans_pline(so.p,so.cl,so.i);
 		break;			
 		
 	case "trans_shape": 
-		model.species[so.p].cla[so.cl].tra[so.i].value.shape_eqn.te = te; 
+		update(model.species[so.p].cla[so.cl].tra[so.i].value.shape_eqn,te); 
 		model.find_trans_pline(so.p,so.cl,so.i);
 		break;	
 		
 	case "trans_scale": 
-		model.species[so.p].cla[so.cl].tra[so.i].value.scale_eqn.te = te;
+		update(model.species[so.p].cla[so.cl].tra[so.i].value.scale_eqn,te);
 		model.find_trans_pline(so.p,so.cl,so.i);
 		break;
 		
 	case "trans_cv": 
-		model.species[so.p].cla[so.cl].tra[so.i].value.cv_eqn.te = te; 
+		update(model.species[so.p].cla[so.cl].tra[so.i].value.cv_eqn,te); 
 		model.find_trans_pline(so.p,so.cl,so.i);
 		break;
 		
 	case "trans_bp": 
-		model.species[so.p].cla[so.cl].tra[so.i].value.bp_eqn.te = te; 
+		update(model.species[so.p].cla[so.cl].tra[so.i].value.bp_eqn,te); 
 		model.find_trans_pline(so.p,so.cl,so.i);
 		break;
 
 	case "trans_shape_erlang":
-		model.species[so.p].cla[so.cl].tra[so.i].value.shape_erlang.te = te; 
+		update(model.species[so.p].cla[so.cl].tra[so.i].value.shape_erlang,te); 
 		model.find_trans_pline(so.p,so.cl,so.i);
 		break;
 
-	case "Se": inter.edit_source.spec.Se_eqn.te = te; break;
-	case "Sp": inter.edit_source.spec.Sp_eqn.te = te; break;
-	case "trap_prob": inter.edit_source.spec.trap_prob_eqn.te = te; break;
-	case "param_val":	
-		model.param[so.val].value = te; 
-		if(model.param[so.val].type == "trans_bp") branch_auto_calculate();
-		break; 
+	case "Se": update(edit_source.spec.Se_eqn,te); break;
+	case "Sp": update(edit_source.spec.Sp_eqn,te); break;
+	
+	case "mut_rate": update(edit_source.spec.mut_rate_eqn,te); break;
+	case "seq_var": update(edit_source.spec.seq_var_eqn,te); break;
+	case "snp_root": edit_source.spec.snp_root = te; break;
+	case "num_basep": edit_source.numbp = Number(te); break;
+	case "frac_obs": edit_source.frac_obs = Number(te); break;
+	case "param_val":	model.param[so.val].value = te; update_param(); break; 
 	case "label": inter.bubble.label.te = te; break;
+	case "label_size": inter.bubble.label.size = te; break;
 	case "label_anno": model.species[so.p].cla[so.cl].annotation[so.i].te = te; break;
+	case "label_anno_size": model.species[so.p].cla[so.cl].annotation[so.i].size = te; break;
 	case "prior_min": case "prior_dist_min": 
 		inter.bubble.prior.value.min_eqn.te = te; 
 		break;
@@ -1165,43 +1243,62 @@ function copy_back_to_source2(tbs)
 	case "derive_eqn1": inter.bubble.derived.eqn1.te = te; break;
 	case "derive_eqn2": inter.bubble.derived.eqn2.te = te; break;
 	case "derive_eqn": 
-		model.derive[so.val].eqn2.te = te; 
-		init_param();
+		update(model.derive[so.val].eqn2,te); 
+		update_param();
 		break;
 	case "deriveparam_eqn": 
-		model.derive[so.val].eqn1.te = te; 
-		init_param();
+		update(model.derive[so.val].eqn1,te); 
+		update_param();
 		break;
 	case "sim_t_start": model.sim_details.t_start = te; break;
 	case "sim_t_end": model.sim_details.t_end = te; break;
 	case "sim_number": model.sim_details.number = te; break;
 	case "sim_timestep": model.sim_details.timestep = te; break;
-		
+	case "sim_indmax": model.sim_details.indmax = te; break;
+	case "sim_paramout": model.sim_details.param_output_max = te; break;
+	case "sim_seed": model.sim_details.seed = te; break;
+	case "ppc_t_start": model.ppc_details.ppc_t_start = te; break;
+	case "ppc_t_end": model.ppc_details.ppc_t_end = te; break;
+	case "ppc_number": model.ppc_details.number = te; break;
+	case "ppc_seed": model.ppc_details.seed = te; break;
 	case "inf_t_start": model.inf_details.t_start = te; break;
 	case "inf_t_end": model.inf_details.t_end = te; break;
 	case "inf_timestep": model.inf_details.timestep = te; break;
 	case "inf_sample": model.inf_details.sample = te; break;
-	case "inf_chain": model.inf_details.nchain = te; break;
+	case "inf_seed": model.inf_details.seed = te; break;
 	case "inf_abcsample": model.inf_details.abcsample = te; break;
-	case "inf_thinparam": model.inf_details.thinparam = te; break;
-	case "inf_thinstate": model.inf_details.thinstate = te; break;
+	case "inf_output_param ": model.inf_details.output_param  = te; break;
+	case "inf_outputstate": model.inf_details.output_state = te; break;
 	case "inf_accfrac": model.inf_details.accfrac = te; break;
 	case "inf_accfracsmc": model.inf_details.accfracsmc = te; break;
 	case "inf_numgen": model.inf_details.numgen = te; break;
 	case "inf_kernelsize": model.inf_details.kernelsize = te; break;
 	case "inf_indmax": model.inf_details.indmax = te; break;
-	case "sim_indmax": model.sim_details.indmax = te; break;
-
-
-	case "knot_times": change_spline_knot(model.param[so.val],te.split(",")); break;
+	case "inf_chain": model.inf_details.nchain = te; break;
+	case "inf_npart": model.inf_details.npart = te; break;
+	case "inf_gen_update": model.inf_details.gen_update = te; break;
+	case "anneal_rate": model.inf_details.anneal_rate = te; break;
+	case "anneal_power": model.inf_details.anneal_power = te; break;
+	case "burnin_frac": model.inf_details.burnin_frac = te; break;
+	case "inf_paramout": model.inf_details.param_output_max = te; break;
+	case "knot_times": inter.bubble.knot_times = te; break;
+	case "knot_t_start": inter.bubble.knot_t_start = te; break;
+	case "knot_t_end": inter.bubble.knot_t_end = te; break;
+	case "knot_dt": inter.bubble.knot_dt = te; break;
 	case "smooth_value": model.param[so.i].spline.smooth.value = te; break; 
 	case "min": inter.bubble.min = Number(te); break;
 	case "max": inter.bubble.max = Number(te); break;
 	case "fixed_time": inter.bubble.fixed_time = Number(te); break;
 	case "const_column": inter.bubble.const_column = te; break;
-	case "time_gen": inter.edit_source.time_gen = te; break;
-	case "time_step": inter.edit_source.time_step = te; break;
-	
+	case "time_gen": edit_source.time_gen = te; break;
+	case "time_step": edit_source.time_step = te; break;
+	case "alpha_val": inter.bubble.alpha_val = te; break;
+	case "BF_val": inter.bubble.BF_val = te; break;
+	case "group_name": edit_source.spec.gname = te; break;
+	case "slice_time": inter.bubble.slice_time = te; break;
+	case "suffix": inter.bubble.suffix = te; break;
+	case "wild_card": inter.bubble.wildcard = te; break;
+	case "comp_acc": edit_source.comp_acc = te; break;
 	default: error("SOURCE PROBLEM: "+so.type); break;
 	}
 }
@@ -1214,7 +1311,8 @@ function check_number(te)
 	if(isNaN(num)) return "Must be a number";
 	return "";
 }
-				
+		
+		
 /// Checks that a string is a non-negative number
 function check_nonnegative(te)
 {
@@ -1238,6 +1336,7 @@ function check_posnumber(te)
 	return "";
 }
 
+
 /// Checks that a string is a number between zero and one
 function check_zeroone(te)
 {
@@ -1259,6 +1358,15 @@ function check_percent(te)
 		if(num <= 0) return "Number be positive";
 		if(num > 100) return "Cannot be greater than 100%";
 	}
+	return "";
+}
+
+
+/// Checks is an equation is valid
+function check_eqn(te)
+{
+	let eqn = create_equation(te,"test");		
+	if(eqn.warn.length > 0) return eqn.warn[0].te;
 	return "";
 }
 
@@ -1311,6 +1419,8 @@ function check_error_textbox()
 	return flag;
 }
 	
+	
+/// Checks for error in the text box
 function check_error_textbox2(tbs)
 {
 	let warn = "";
@@ -1326,42 +1436,31 @@ function check_error_textbox2(tbs)
 		
 		let char_lim = 20;
 
-		if(warn == ""){
+		if(warn == ""){	
 			switch(source.type){ 			
 			case "compartment":
 				{
-					let flag = false;
-					
-					let list = model.find_clones(source.p,source.cl);	
-					
-					for(let p = 0; p < model.species.length; p++){
-						let sp = model.species[p];
-						for(let cl = 0; cl < sp.ncla; cl++){
-							for(let c = 0; c < sp.cla[cl].ncomp; c++){
-								if(sp.cla[cl].comp[c].name == te){
-									if(!(p == source.p && cl == source.cl && c == source.i)){
-										let k = 0; 
-										while(k < list.length && !(p == list[k].p && cl == list[k].cl && c == source.i)) k++;
-									
-										if(k == list.length){
-											warn = "Name must be unique";
-										}
-									}
-								}
-							}
+					let warn_comp = model.check_comp_name(te);
+					if(warn_comp != undefined) warn = warn_comp;
+					else{
+						let list = model.find_clones(source.p,source.cl);	
+						let pos = [];
+						pos.push({p:source.p, cl:source.cl, c:source.i});
+						for(let k = 0; k < list.length; k++){
+							let li = list[k];
+							pos.push({p:li.p, cl:li.cl, c:source.i});
 						}
+					
+						let warn_name = model.check_name(te,pos);
+						if(warn_name != undefined) warn = warn_name;		
 					}
 				}
 				break;
 				
 			case "add_classification_name":
 				{
-					//let list = model.find_clones(bu.p,bu.cl);
-					for(let p = 0; p < model.species.length; p++){
-						let claa = model.species[p].cla;	
-						let cl = 0; while(cl < claa.length && claa[cl].name.toLowerCase() != te.toLowerCase()) cl++;
-						if(cl < claa.length) warn = "Classifications must be different";
-					}
+					let warn_name = model.check_name(te,[]);
+					if(warn_name != undefined) warn = warn_name;		
 					char_lim = 20;
 				}
 				break;
@@ -1369,27 +1468,19 @@ function check_error_textbox2(tbs)
 			case "classification_name":
 				{
 					let list = model.find_clones(source.p,source.cl);	
-					
-					for(let p = 0; p < model.species.length; p++){
-						let claa = model.species[p].cla;
-						let cl = 0; 
-						while(cl < claa.length && !(claa[cl].name.toLowerCase() == te.toLowerCase())) cl++;
-						if(cl < claa.length){
-							if(!(p == source.p && cl == source.cl)){
-								let k = 0; 
-								while(k < list.length && !(list[k].p == p && list[k].cl == cl)) k++; 
-	
-								if(k == list.length){
-									warn = "Classifications must be different";
-								}
-							}
-						}
-					}
+					list.push({p:source.p,cl:source.cl});
+			
+					let warn_name = model.check_name(te,list);
+					if(warn_name != undefined) warn = warn_name;		
 					char_lim = 20;
 				}
 				break;
 				
 			case "species_name":
+				{
+					let warn_name = model.check_name(te,[{p:tbs.source.p}]);
+					if(warn_name != undefined) warn = warn_name;		
+				}
 				break;
 			
 			case "init_population": case "init_per": case "init_globpopulation":
@@ -1397,7 +1488,7 @@ function check_error_textbox2(tbs)
 					warn = check_nonnegative(te);
 				
 					if(warn == "" && source.type == "init_per"){
-						let cip = inter.edit_source.cla[source.cl].comp_init_pop
+						let cip = edit_source.cla[source.cl].comp_init_pop
 						let sum = 0;
 						for(let c = 0; c < cip.length-1; c++){
 							sum += cip[c].pop_per;
@@ -1408,17 +1499,11 @@ function check_error_textbox2(tbs)
 				break;
 				
 			case "element":
-				warn = check_element(te,source.c);
+				char_lim = LARGE; 
+				warn = check_element(te,source.c,edit_source);
 				break;
 			
 			case "find":
-				{
-					let c = inter.bubble.bu.c;
-					let tab = inter.edit_source.table;
-					let r = 0;
-					while(r < tab.nrow && String(tab.ele[r][c]).toLowerCase() != te.toLowerCase()) r++;
-					if(r == tab.nrow) warn = "Cannot find";
-				}
 				break;
 			
 			case "replace":
@@ -1431,11 +1516,12 @@ function check_error_textbox2(tbs)
 				}
 				break;
 				
-			case "sim_t_start": case "sim_t_end": case "inf_t_start": case "inf_t_end":
+			case "sim_t_start": case "sim_t_end": case "inf_t_start":
+			case "inf_t_end": case "ppc_t_start": case "ppc_t_end":
 				warn = check_number(te);
 				break;
 				
-			case "sim_timestep": case "inf_timestep":
+			case "sim_timestep": case "inf_timestep": 
 				warn = check_posnumber(te);
 				break;
 
@@ -1446,14 +1532,22 @@ function check_error_textbox2(tbs)
 			
 			case "inf_chain":
 				warn = check_posinteger(te);
-				if(warn == "" && Number(te) > 10) warn = "Cannot be greater than 10";
+				//if(warn == "" && Number(te) > 10) warn = "Cannot be greater than 10";
 				break;
 				
-			case "inf_thinparam": 
+			case "inf_npart":
+				warn = check_posinteger(te);
+				break;
+				
+			case "inf_gen_update":
 				warn = check_posinteger(te);
 				break;
 			
-			case "inf_thinstate":
+			case "inf_output_param ": 
+				warn = check_posinteger(te);
+				break;
+			
+			case "inf_outputstate":
 				warn = check_posinteger(te);
 				break;
 				
@@ -1476,11 +1570,57 @@ function check_error_textbox2(tbs)
 			case "sim_indmax":
 				warn = check_posinteger(te);
 				break;
+				
+			case "anneal_rate":
+				warn = check_posnumber(te);
+				break;
 			
+			case "anneal_power":
+				warn = check_posnumber(te);
+				break;
+				
+			case "burnin_frac":
+				{
+					let num = Number(te);
+					if(isNaN(num)) warn = "Must be a number";
+					else{
+						if(num < 1 || num > 90) warn = "Must be in range 1-90";
+					}
+				}
+				break;
+				
+			case "inf_paramout":
+				warn = check_posinteger(te);
+				break;
+				
+			case "sim_paramout":
+				warn = check_posinteger(te);
+				break;
+				
+			case "sim_seed": case "inf_seed": case "ppc_seed":
+				warn = check_posinteger(te);
+				if(warn == ""){ if(Number(te) > seed_max) warn = "Between 0-"+seed_max;}
+				break;
+				
 			case "Se": case "Sp":
 				warn = check_param_or_number(te,"zeroone");
 				break;
+			
+			case "mut_rate": case "seq_var":
+				warn = check_param_or_number(te,"pos");
+				break;
+			
+			case "snp_root": 
+				break;
 				
+			case "num_basep":
+				warn = check_posinteger(te);
+				break;
+			
+			case "frac_obs":
+				warn = check_zeroone(te);
+				break;
+			
 			case "pos_result": case "neg_result":
 				break;
 				
@@ -1492,7 +1632,11 @@ function check_error_textbox2(tbs)
 				warn = check_posnumber(te);
 				break;
 				
-			case "label_anno":
+			case "p": 
+				warn = check_zeroone(te);
+				break;
+				
+			case "label_anno": case "label":
 				char_lim = 100; 
 				break;
 			
@@ -1500,10 +1644,6 @@ function check_error_textbox2(tbs)
 				warn = check_number(te);
 				break;
 			
-			case "trap_prob":
-				warn = check_param_or_number(te,"zeroone");
-				break;
-
 			case "element_param":
 				break;
 
@@ -1511,6 +1651,9 @@ function check_error_textbox2(tbs)
 				break;
 			
 			case "reparam_eqn":
+				break;
+				
+			case "reparam_equation":
 				break;
 				
 			case "element_param_const": 
@@ -1532,7 +1675,6 @@ function check_error_textbox2(tbs)
 			case "trans_shape":
 			case "trans_bp":
 			case "trans_cv":
-				//warn = check_valid_equation(te);
 				break;
 			
 			case "trans_shape_erlang": 
@@ -1575,6 +1717,14 @@ function check_error_textbox2(tbs)
 				char_lim = 1000;
 				break;
 				
+			case "knot_t_start": case "knot_t_end":
+				warn = check_number(te);
+				break;
+				
+			case "knot_dt":
+				warn = check_posnumber(te);
+				break;
+				
 			case "smooth_value":
 				warn = check_posnumber(te);
 				break;
@@ -1583,13 +1733,12 @@ function check_error_textbox2(tbs)
 				break;
 				
 			case "derive_eqn":
-				//warn = check_valid_equation(te);
 				break;
 			
 			case "derive_eqn1": case "derive_eqn2": break;
 			case "derive_eqn": case "deriveparam_eqn": break;
 			
-			case "sim_number": 
+			case "sim_number": case "ppc_number": 
 				if(isNaN(te)) warn = "Must be a number";
 				let num = Number(te);
 				if(num <= 0 || num != Math.floor(num)) warn = "Must be a positive integer";
@@ -1619,41 +1768,57 @@ function check_error_textbox2(tbs)
 				break;
 			
 			case "time_gen":
-				{
-					let t_start = Number(sim_result.details.t_start);
-					let t_end = Number(sim_result.details.t_end);
-	
-					switch(inter.edit_source.time_radio.value){
-					case "Periodic": case "Fixed time": 
-						let t = Number(te);
-						if(isNaN(te)) warn = "Must be a number"; 
-						else{
-							if(t < t_start || t > t_end) warn = "Must be in the simulation time range"; 
-						}
-						break;
-					
-					case "Specified":
-						let spl = te.split(",");
-						for(let j = 0; j < spl.length; j++){
-							let t = Number(spl[j]);
-							if(isNaN(spl[j])) warn = "Not valid";
-							else{
-								if(t < t_start || t > t_end) warn = "Must be in the simulation time range"; 
-							}
-						}
-						break;
-					}
-				}
 				break;
-				
+			
+			case "comp_acc":
+				warn = check_zeroone(te);
+				break;
+			
 			case "time_step":
 				warn = check_posnumber(te);	
 				break;
 			
+			case "alpha_val":
+				warn = check_posnumber(te);	
+				break;
+				
+			case "BF_val":
+				warn = check_number(te);	
+				break;
+				
+			case "group_name":
+				break;
+				
+			case "wild_card":
+				break;
+				
+			case "slice_time":
+				if(isNaN(te)) warn = "Must be a number";
+				else{
+					let details = bub.bu.rpf.details;
+					let t_start = Number(details.t_start);
+					let t_end = Number(details.t_end);	
+					let t = Number(te);
+					if(t < t_start || t > t_end) warn = "Not in time range";
+				}	
+				break;
+				
+			case "suffix":
+				if(!model.allow_suffix(te)){
+					warn = "Not valid";
+				}
+				break;
+				
+			case "label_size": case "label_anno_size":
+				warn = check_posinteger(te)
+				break;
+				
 			case "":
 				break;
 				
-			default: error("Option not recognised 80"+source.type); break;
+			default:
+				error("Option not recognised 80"+source.type); 
+				break;
 			}
 		}
 				
@@ -1676,8 +1841,8 @@ function check_error_textbox2(tbs)
 					if(source.val != undefined){
 						let eqn1 = model.derive[source.val].eqn1;
 						if(eqn1 != undefined){
-							let wa = check_derived_param(eqn,eqn1);
-							if(wa != "success") warn = wa;
+							let res = check_derived_param(eqn,eqn1);
+							if(res.err == true) warn = res.msg;
 						}
 					}
 				}
@@ -1699,4 +1864,16 @@ function check_error_textbox2(tbs)
 	
 	if(warn != "") return true;
 	return false;
+}
+
+
+/// Gets font information for text box
+function get_font_info()
+{
+	if(subtab_name() != "Description"){
+		return { fsi: equation_fontsi, lh: equation_linesi, font: get_font(equation_fontsi,"","times")};
+	}
+	else{
+		return { fsi: textbox_fontsi, lh: textbox_linesi, font: get_font(textbox_fontsi)};
+	}
 }

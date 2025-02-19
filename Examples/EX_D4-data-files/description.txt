@@ -1,0 +1,18 @@
+# Example D4: Time variation in observed population transition probability
+
+## Objective
+- In this example there is some time variation in observing population transitions.
+- The probability is taken to have the functional form $a+b*cos(0.06*t)$.
+
+## Data
+- Partially observed population transition data
+- Time series population data.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+
+## Population
+- This consists of 1000 initially susceptible individuals and one infected.

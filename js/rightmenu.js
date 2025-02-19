@@ -1,40 +1,55 @@
 "use strict";
+// Functions to set up the right menu bar
 
 /// Generates content for the right bar
 function right_menu_buts(lay)
-{
-	let type = lay.op.type;
-	
-	let result, rpf;
-	if(type != "GraphView"){
-		let tree = inter.page_name.split("->");
+{	
+	if(inter.graph.init != true && inter.graph.init != "no data") return;
 		
-		switch(tree[0]){
-		case "Simulation": result = sim_result; break;
-		case "Inference": result = inf_result; break;
+	let type = lay.op.type;
+
+	let rpf;
+
+	if(type != "GraphView"){	
+		rpf = get_inf_res().plot_filter;
+		/*
+		switch(tab_name()){
+		case "Simulation": res = model.sim_res; break;
+		case "Inference": res = model.inf_res; break;
+		case "Post. Simulation": res = model.ppc_res; break;
 		default: error("Problem tree"); break;
 		}
-		
-		rpf = result.plot_filter;
+		rpf = res.plot_filter;
+		*/
 	}
 	
 	let y = 0.1;
 
+	if(inter.graph.init == "no data"){
+		y = stand_filt(y,rpf,lay);
+		return;
+	}
+	
 	switch(type){
 	case "Populations":
 		{
 			if(rpf.pos_view.length > 1){
 				y = add_filter("View",y,rpf.sel_view,rpf.pos_view,lay);
-				y += 2;		
+				
+				if(rpf.sel_view.te == "Slice"){
+					y = add_slice_time("Time",rpf,y,lay);
+				}
+				
+				y += 1;		
 			}
 			
 			if(rpf.sel_view.te == "Data"){		
 				y = add_filter("Data sources",y,rpf.sel_popdata,rpf.pos_popdata,lay);
-				y = chain_sample_filt(y,rpf,lay,result);
+				if(!rpf.plot_average) y = chain_sample_filt(y,rpf,lay);
 			}
 			else{
-				y = stand_filt(y,rpf,lay,result);
-				y = addutional_filt(y,rpf,lay,result);
+				y = stand_filt(y,rpf,lay,"pop");
+				y = additional_filt(y,rpf,lay);
 			}
 		}
 		break;
@@ -43,16 +58,16 @@ function right_menu_buts(lay)
 		{
 			if(rpf.pos_trans_view.length > 1){
 				y = add_filter("View",y,rpf.sel_trans_view,rpf.pos_trans_view,lay);
-				y += 2;	
+				y += 1;	
 			}
 			
 			if(rpf.sel_trans_view.te == "Data"){		
 				y = add_filter("Data sources",y,rpf.sel_poptransdata,rpf.pos_poptransdata,lay);
-				y = chain_sample_filt(y,rpf,lay,result);
+				if(!rpf.plot_average) y = chain_sample_filt(y,rpf,lay);
 			}
 			else{
-				y = stand_filt(y,rpf,lay,result);
-				y = addutional_filt(y,rpf,lay,result);
+				y = stand_filt(y,rpf,lay,"trans");
+				y = additional_filt(y,rpf,lay);
 			}
 			
 			if(rpf.pos_timestep.length > 1){
@@ -63,41 +78,59 @@ function right_menu_buts(lay)
 		
 	case "Individuals":
 		{
-			if(rpf.pos_indview.length > 1){
+			if(rpf.pos_indview.length > 1 && inter.graph.ind_sel == undefined){
 				y = add_filter("View",y,rpf.sel_indview,rpf.pos_indview,lay);
-				y += 2;	
+				y += 1;	
 			}
 			
-			y = stand_filt(y,rpf,lay,result);
+			if(inter.graph.ind_sel){
+				y = add_filter("View",y,rpf.sel_ind_sel_view,rpf.pos_ind_sel_view,lay);
+				y += 1;	
+			}
+			
+			y = stand_filt(y,rpf,lay);		
+			
+			if(rpf.siminf == "inf" || rpf.siminf == "ppc"){ // Individual group filter
+				let p = model.get_p();
+				let rpf2 = rpf.species[p];
+				if(rpf2.pos_indgroup.length > 1){
+					y = add_filter("Ind. Group",y,rpf2.sel_indgroup,rpf2.pos_indgroup,lay);
+				}
+			}
+	
+			if(false){
+				let dx = right_menu_width-1.6;
+				lay.add_button({te:"Create SIRE", x:0.1, y:y, dx:dx, dy:dropdown_height, ac:"CreateSIRE", type:"SliceTime"}); y += 2;
+			}
+			
+			if(inter.graph.ind_sel){
+				y = additional_filt(y,rpf,lay);
+			}
 		}
 		break;
 		
-	case "Splines":
+	case "Derived":
 		{
-			if(rpf.pos_spline_view.length > 1){
-				y = add_filter("View",y,rpf.sel_spline_view,rpf.pos_spline_view,lay);	
+			if(rpf.pos_spline.length > 1){
+				y = add_filter("Quantity",y,rpf.sel_spline,rpf.pos_spline,lay);
 				y += 2;		
 			}
-		
-			if(rpf.pos_spline.length > 1){
-				y = add_filter("Spline",y,rpf.sel_spline,rpf.pos_spline,lay);
-			}
 			
-			y = chain_sample_filt(y,rpf,lay,result)
+			y = chain_sample_filt(y,rpf,lay);
 		}
 		break;
 	
 	case "Parameters":
 		{
-			if(rpf.pos_paramview.length > 1){
-				y = add_filter("View",y,rpf.sel_paramview,rpf.pos_paramview,lay);
-				y += 2;				
-			}			
+			if(rpf.sel_paramview == undefined) return;
 			
+			y = add_filter("View",y,rpf.sel_paramview,rpf.pos_paramview,lay);
+			y += 2;				
+						
 			switch(rpf.sel_paramview.te){
 			case "Scatter": case "Correlation": break;
 			default:
-				{
+				{			
 					if(rpf.pos_paramviewtype.length > 1){
 						y = add_filter("Graph",y,rpf.sel_paramviewtype,rpf.pos_paramviewtype,lay);
 						y += 2;
@@ -114,38 +147,43 @@ function right_menu_buts(lay)
 						}
 					}
 				}
+				break;
 			}
 		}
 		break;
 	
 	case "GraphView":
+		{
+			let vg = inter.view_graph;
+			if(vg.pos_view.length > 1){
+				add_filter("View",y,vg.sel_view,vg.pos_view,lay);
+			}
+		}
 		break;
 	}
 }
 
 
 /// A standard set of filters (e.g. as used on population)
-function stand_filt(y,rpf,lay,result)
-{
-	if(rpf.pos_species.length > 1){
-		y = add_filter("Species",y,rpf.sel_species,rpf.pos_species,lay);
-	}
-	
-	let p = rpf.sel_species.p;
+function stand_filt(y,rpf,lay,op)
+{	
+	let p = model.get_p();
 	
 	let rpf2 = rpf.species[p];
 	if(rpf2.pos_class.length > 1){
 		y = add_filter("Classification",y,rpf2.sel_class,rpf2.pos_class,lay);
 	}
 	
-	y = chain_sample_filt(y,rpf,lay,result);
+	if(!(rpf.plot_average && (op == "pop" || op == "trans"))){
+		y = chain_sample_filt(y,rpf,lay);
+	}
 	
 	return y;
 }
 
 
 /// Filters chain and sample
-function chain_sample_filt(y,rpf,lay,result)
+function chain_sample_filt(y,rpf,lay)
 {
 	if(rpf.pos_chain.length > 1){
 		y = add_filter("Chain",y,rpf.sel_chain,rpf.pos_chain,lay);
@@ -168,29 +206,54 @@ function chain_sample_filt(y,rpf,lay,result)
 
 
 /// All for filters to be applied to other classification
-function addutional_filt(y,rpf,lay,result)
+function additional_filt(y,rpf,lay)
 {
-	let p = rpf.sel_species.p;
+	let p = model.get_p();
 	
 	let rpf2 = rpf.species[p];
 	
 	for(let i = 0; i < rpf2.filter.length; i++){
 		let rpf3 = rpf2.filter[i];
-		y = add_filter(rpf3.name,y,rpf3.sel_comp,rpf3.pos_comp,lay);
+		let te = "";
+
+		switch(rpf3.radio.value){
+		case "select":
+			let num = 0;
+			for(let c = 0; c < rpf3.comp_name.length; c++){
+				if(rpf3.comp_filt[c].check == true){
+					if(te != "") te += ",";
+					te += rpf3.comp_name[c];
+					num++;
+				}
+			}
+			if(num == rpf3.comp_name.length) te = "All";
+			if(num == 0) te = "None";
+			break;
+			
+		case "single":
+			te = rpf3.radio_sel.value;
+			break;
+			
+		default: error("Option prob"); break;
+		}
+		if(rpf3.fraction.check) te = "Frac. "+te;
+		
+		y = add_population_filter(rpf3.name,y,te,rpf,rpf3,i,lay);
 	}
 	
-	lay.add_button({te:"Add filter", x:0.1, y:y, dx:4.5, dy:1.0, type:"AddFilter", ac:"AddFilter", result:result});
-	y += 2;
+	lay.add_button({te:"Add filter", x:0.1, y:y, dx:4.5, dy:1.0, type:"AddFilter", ac:"AddFilter", rpf:rpf});
+	y += 1.5;
 	
 	return y;
 }
 
-	
+
+/// Used to add a filter to the model
 function add_filter(te,y,source,pos,lay)
 {
 	let dx = right_menu_width-1.6;
 	if(te != undefined){
-		lay.add_button({te:te+":", x:0.1, y:y, dx:dx, dy:0.8, type:"InputBoxName"});
+		lay.add_button({te:te+":", x:0.1, y:y, dx:dx, dy:0.8, type:"InputBoxName", back_col:WHITE});
 		y += 0.9;
 	}
 	
@@ -200,31 +263,71 @@ function add_filter(te,y,source,pos,lay)
 }
 
 
+/// Used to add a filter to the model
+function add_population_filter(te,y,desc,rpf,filter,num,lay)
+{
+	let dx = right_menu_width-2.6;
+	if(te != undefined){
+		lay.add_button({te:te+":", x:0.1, y:y, dx:dx, dy:0.8, type:"InputBoxName"});
+		y += 0.9;
+	}
+	
+	lay.add_button({te:desc, x:0.1, y:y, dx:dx, dy:dropdown_height, rpf:rpf, filter:filter, num:num, ac:"PopFilt", type:"PopFilt"});
+
+	let si = 1;
+	lay.add_button({x:0.1+dx+0.2, y:y+0.1, dx:si, dy:si, op:{p:filter.p, num:num, rpf:rpf}, ac:"RemoveFilter", type:"Delete"});
+	
+	return y+2;
+}
+
+
+/// Used to add slice time
+function add_slice_time(te,rpf,y,lay)
+{
+	let dx = right_menu_width-1.6;
+	lay.add_button({te:te+":", x:0.1, y:y, dx:dx, dy:0.8, type:"InputBoxName"});
+	y += 0.9;
+	
+	lay.add_button({te:rpf.slice_time, x:0.1, y:y, dx:dx, dy:dropdown_height, rpf:rpf, ac:"SliceTime", type:"SliceTime"});
+	
+	return y+2;
+}
+
+
+/// Generates slider for right menu
+function right_menu_slider_buts(lay)
+{
+	lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, type:"TableSlider2", ac:"TableSlider2"});
+}
+
+
 /// Generates content for the right bottom menu
 function rightbot_menu_buts(lay)
 {
 	if(inter.graph.type == undefined) return;
-	
-	if(tab_name() == "Inference"){
-		let result = inf_result;
-		let rpf = result.plot_filter;
 
-		if(rpf.sel_paramview && subsubtab_name() == "Parameters"){
-			let selpv = rpf.sel_paramview;
-		
-			if(selpv.te == "Scatter"){
-				param_list("Y AXIS",selpv.radioy,selpv.list,result,lay);
-				return;
+	let gir = get_inf_res();
+	if(gir){
+		let rpf = gir.plot_filter;
+	
+		if(rpf){
+			if(rpf.sel_paramview && subsubtab_name() == "Parameters"){
+				let selpv = rpf.sel_paramview;
+			
+				if(selpv.te == "Scatter"){
+					tot_param_list("",rpf.yaxis_radio,lay);
+					return;
+				}
 			}
 		}
 	}
 	
 	let key = inter.graph.op.key;
 
-	if(key != undefined){
-		let dy = 1.5;
+	if(key != undefined && inter.graph.init == true){
+		let dy = 1.2;
 
-		let y = lay.dy-key.length*dy-4; 
+    let y = lay.dy-key.length*dy-4; 
 		if(y < 0) y = 0;
 		
 		for(let i = 0; i < key.length; i++){
@@ -232,7 +335,7 @@ function rightbot_menu_buts(lay)
 			
 			switch(ke.type){
 			case "Line": 
-				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:1.3, dash:ke.dash, col:ke.col, type:"Key"}); 
+				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:1.3, dash:ke.dash, thick:ke.thick, col:ke.col, type:"Key"}); 
 				break;
 			
 			case "Rect": 
@@ -243,28 +346,72 @@ function rightbot_menu_buts(lay)
 				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:1.3, col:ke.col, type:"KeyErrBar"}); 
 				break;
 			
-			case "ObsComp": 
-				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:1.3, col:ke.col, type:"KeyObsComp"});
+			case "Cross":
+				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:1.3, col:ke.col, type:"KeyCross"}); 
+				break;
+				
+			case "AddObs": case "RemObs": case "MoveObs": case "TransObs": 
+			case "CompObs": case "DiagObs": case "GeneticObs": 
+				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:1.3, col:ke.col, type:"KeySymb", symb:ke.type});
 				break;
 			}
 			y += dy; 
 		}
 	}
 	
-	if(inter.graph.variety == "Matrix")
-	{
-		let mkey = inter.graph.matrix_key;
+	let mkey = inter.graph.colour_key;
 		
-		let dy = 12;
-		let y = lay.dy-dy-5; 
+	if(mkey && inter.graph.init == true)
+	{
+		let dy = 8;
+		let y = lay.dy-dy-key_gap; if(y < 0){ dy += y; y = 0;}
 		
 		lay.add_button({x:1, y:y, dx:lay.dx-1, dy:dy, mkey:mkey, type:"MatrixKey"});	
+	}		
+}
+
+
+/// Generates content for the right middle menu
+function rightmid_menu_buts(lay)
+{
+	let rpf = get_inf_res().plot_filter;
+	
+	if(rpf){
+		if(subsubtab_name() == "Parameters"){
+			let selpv = rpf.sel_paramview;
+			let title = ""; 
+			
+			switch(selpv.te){
+			case "Correlation":
+				param_check_box(rpf.param_check,lay);
+				break;
+				
+			case "Scatter":
+				tot_param_list("",rpf.xaxis_radio,lay);
+				break;
+			
+			default:
+				switch(rpf.sel_paramviewtype.te){
+				case "Graph (split)": param_list(title,selpv.radio_split,selpv.list_split,lay); break;
+				default: param_list(title,selpv.radio,selpv.list,lay); break;
+				}
+				break;
+			}
+		}
+		
+		if(subsubtab_name() == "Individuals"){
+			let p = model.get_p();
+			
+			let seliev = rpf.sel_ie_view[p];
+		
+			param_list("",seliev.radio,seliev.list,lay);
+		}
 	}
 }
 
 
 /// Generates a list of parameters
-function param_list(title,rad,list,result,lay)
+function param_list(title,rad,list,lay)
 {
 	let cy = 0;
 	
@@ -275,30 +422,63 @@ function param_list(title,rad,list,result,lay)
 	}
 	
 	for(let i = 0; i < list.length; i++){
-		let th = list[i].th;
-		let ind = list[i].index;
-		
-		let par = result.param[th];
-		
-		let name;
-		if(ind) name = param_name_index(par,ind);
-		else name = par.name;
-		
-		lay.add_radio(0,cy,i,name,rad,{});
+		lay.add_radio(0,cy,i,list[i].name,rad,{});
 		cy += 1.3;	
 	}
 }
 	
-
-/// Generates content for the right middle menu
-function rightmid_menu_buts(lay)
-{
-	if(tab_name() == "Inference"){
-		let result = inf_result;
-		let rpf = result.plot_filter;
-		let selpv = rpf.sel_paramview;
-		let title = ""; if(selpv.te == "Scatter") title = "X AXIS";
 	
-		param_list(title,selpv.radio,selpv.list,result,lay);
+/// Generates checkboxes to select parameters
+function param_check_box(param_check,lay)
+{
+	let cy = 0;
+	
+	for(let th = 0; th < param_check.length; th++){
+		let pc = param_check[th];
+		if(pc){
+			lay.add_checkbox(0,cy,pc.name,pc.name,pc.checkb,WHITE);
+			cy += 1.3;
+
+			if(pc.checkb.check && pc.list){
+				if(pc.all_checkb){
+					lay.add_checkbox(0.5,cy,"All","All",pc.all_checkb,WHITE,{});
+					cy += 1.3;	
+				}
+				
+				for(let k = 0; k < pc.list.length; k++){
+					let pcl = pc.list[k];
+					lay.add_checkbox(0.5,cy,pcl.name,pcl.name,pcl.checkb,WHITE,{});
+					cy += 1.3;	
+				}				
+				cy += 0.2;
+			}
+		}
+	}
+}
+
+
+/// Constructs a searchable radio list for parameters
+function tot_param_list(title,param_radio,lay)
+{
+	let cy = 0;
+	
+	if(title != ""){
+		let si = 0.8;
+		lay.add_button({te:title, x:2, y:cy, dx:5, dy:0.8, si:si, font:get_font(si,"bold"), type:"Text", col:BLACK});
+		cy += 1.3;
+	}
+	
+	for(let i = 0; i < param_radio.param_list.length; i++){
+		let prpl = param_radio.param_list[i];
+		lay.add_radio(0,cy,i,prpl.name,param_radio.radio,{});
+		cy += 1.3;	
+		if(param_radio.radio.value == i && prpl.list){
+			for(let j = 0; j < prpl.list.length; j++){
+				let prpll = prpl.list[j];
+				lay.add_radio(0.5,cy,j,prpll.name,prpl.radio,{});
+				cy += 1.3;	
+			}
+			cy += 0.2;	
+		}
 	}
 }

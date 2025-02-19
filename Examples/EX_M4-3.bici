@@ -1,0 +1,41 @@
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+data-dir folder="Examples\EX_M4-3-data-files"
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5
+
+post-sim start=0 end=100
+
+
+####### DEFINE MODEL AND DATA FOR SPECIES LANDSCAPE ########
+
+species name="Landscape" type="individual" trans-tree="off"
+
+# SPECIES MODEL
+
+class name="Location" index="a"
+
+comp-all color="#000099" fix="true" branch-prob="false" file="comp-Location.csv"
+
+trans-all file="trans-Location.csv"
+
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="Location" file="init-pop-sim-Landscape.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="ω" value="0.01"
+
+

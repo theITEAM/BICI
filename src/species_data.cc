@@ -1,4 +1,4 @@
-// Initialises data structure from sources
+// Initialises species data structure from sources
 
 #include <string>
 #include <sstream>
@@ -17,58 +17,44 @@ void Species::initialise_data()
 {
 	T = timepoint.size()-1;
 	
-	trans_not_allow.resize(T); pop_trans_ref.resize(T);
-	for(auto ti = 0u; ti < T; ti++){
-		trans_not_allow[ti].resize(tra_gl.size(),false);
-		pop_trans_ref[ti].resize(tra_gl.size());
-	}
-	
-	init_cond.type = UNSET_INIT;
-
-	// Adds a transition filter on to transition data source
-	for(auto &so : source){
-		switch(so.cname){
-		case TRANS_DATA: case SOURCE_DATA: case SINK_DATA:
-			{	
-				vector <bool> filt;
-				for(auto tr = 0u; tr < tra_gl.size(); tr++){
-					const auto &trg = tra_gl[tr];
-					if(trg.cl == so.cl && trg.tr == so.tr) filt.push_back(true);
-					else filt.push_back(false);
-				}
-				so.trans_filt = filt;
-			}
-			break;
-		
-		default: break;
-		}
-	}
+	init_cond.type = INIT_POP_NONE;
 	
 	for(const auto &so : source){
 		switch(so.cname){
 		case INIT_POP: init_pop_data(so); break;
+		case ADD_POP: add_pop_data(so,1); break;
+		case REMOVE_POP: add_pop_data(so,-1); break;
 		case ADD_IND: add_ind_data(so); break;
 		case REMOVE_IND: remove_ind_data(so); break;
 		case MOVE_IND: move_ind_data(so); break;
-		case TRANS_DATA: case SOURCE_DATA: case SINK_DATA: trans_data(so); break;
 		case COMP_DATA: comp_data(so); break;
 		case TEST_DATA: test_data(so); break;
 		case POP_DATA: population_data(so); break;
-		case POP_TRANS_DATA: population_trans_data(so); break;
+		case TRANS_DATA: trans_data(so); break;
+		case POP_TRANS_DATA: popu_trans_data(so); break;
+		case GENETIC_DATA: genetic_data(so); break;
 		default:
 			emsg("data type not added:"); break;
 		}
 	}
+
+	nindividual_in = individual.size();
+ 
+	add_unobs_Amatrix_ind();
 	
 	X_vector_order();
 	
-	if(init_cond.type == UNSET_INIT){
-		init_cond.type = ZEROPOP_INIT;
-		init_cond.cpop.resize(comp_gl.size(),0);
-	}		
+	order_data_events();
 	
-	order_data_events();   
+	set_default_enter();
+	
+	set_add_rem_pop_change();
 }
+
+
+/// Used to order genetic data
+bool Fraction_ord (Fraction frac1, Fraction frac2)                      
+{ return (frac1.fr > frac2.fr); };  
 
 
 /// init-pop command
@@ -76,196 +62,542 @@ void Species::init_pop_data(const DataSource &so)
 {
 	const auto &tab = so.table;
 	
-	if(init_cond.type != UNSET_INIT) alert_source("Cannot set initial conditions twice",so);
-	
-	init_cond.type = POP_INIT;
-	const auto &comp = comp_gl;
+	if(init_cond.type != INIT_POP_NONE) alert_source("Cannot set initial conditions twice",so);
 	
 	auto foc_cl = so.focal_cl; 
-	if(foc_cl != UNSET){
-		vector < vector <double> > per;
-		per.resize(ncla);
-		for(auto cl = 0u; cl < ncla; cl++){
-			for(auto c = 0u; c < cla[cl].ncomp; c++){
-				double val = UNSET; if(cla[cl].comp[c].erlang_hidden == true) val = 0;
-				per[cl].push_back(val);
-			}
-		}					
+	
+	init_cond.type = so.init_pop_type;
+	init_cond.focal_cl = foc_cl;
+	
+	const auto &comp = comp_gl;
+	
+	switch(init_cond.type){
+	case INIT_POP_FIXED:
+		if(foc_cl != UNSET){	
+			auto per = pop_get_percentage(so);
 		
-		if(tab.ncol != 2) alert_source("Should have two columns",so);
-		for(auto r = 0u; r < tab.nrow; r++){
-			auto name = tab.ele[r][0];
+			if(false){
+				for(auto cl = 0u; cl < ncla; cl++){
+					const auto &claa = cla[cl];	
+					for(auto c = 0u; c < claa.ncomp; c++){
+						cout << claa.comp[c].name << " " << per[cl][c] << " Percent" << endl;
+					}
+				}
+			}
 			
-			auto flag = false;
-			for(auto cl = 0u; cl < ncla; cl++){
-				for(auto c = 0u; c < cla[cl].ncomp; c++){
-					if(cla[cl].comp[c].name == name){
-						if(per[cl][c] != UNSET){
-							alert_source("The comartment '"+name+"' is set more than once",so,0,r);
-						}					
-						
-						auto val = tab.ele[r][1];
+			init_cond.cnum.resize(comp.size(),0);
+			
+			if(false){ // This just rounds based on fraction
+				for(auto c = 0u; c < comp.size(); c++){
+					const auto &co = comp[c];
+					
+					auto fac = 1.0;
+					for(auto cl = 0u; cl < ncla; cl++){
 						if(cl == foc_cl){
-							per[cl][c] = number(val);
-							if(per[cl][c] == UNSET) alert_source("The value '"+val+"' is not a number",so,1,r);
+							fac *= per[cl][co.cla_comp[cl]];
 						}
 						else{
-							if(is_percent(val) == false){
-								alert_source("The value '"+val+"' is not a percentage",so,1,r);
+							fac *= per[cl][co.cla_comp[cl]]/100;
+						}
+					}
+					init_cond.cnum[c] = fac;
+				}
+			}
+			else{  // This gets populations right in the focal classification
+				const auto &claa = cla[foc_cl];
+				
+				for(auto j = 0u; j < claa.comp.size(); j++){
+					auto num = per[foc_cl][j];
+			
+					auto n = 0u;
+			
+					vector <Fraction> frac_list;
+					for(auto c = 0u; c < comp.size(); c++){
+						const auto &co = comp[c];
+						
+						if(co.cla_comp[foc_cl] == j){
+							auto fac = 1.0;
+							for(auto cl = 0u; cl < ncla; cl++){
+								if(cl != foc_cl) fac *= per[cl][co.cla_comp[cl]]/100;
+							}
+						
+							fac *= num;
+							auto faci = (unsigned int)(fac);
+							
+							init_cond.cnum[c] = faci;
+							Fraction frac; frac.c = c; frac.fr = fac-faci;
+							frac_list.push_back(frac);
+							
+							n += faci;
+						}
+					}
+					
+					if(n > num) emsg("Should not be larger");
+					if(n < num){
+						sort(frac_list.begin(),frac_list.end(),Fraction_ord);
+						for(auto k = 0u; k < num-n; k++){
+							init_cond.cnum[frac_list[k].c]++; 
+						}
+					}
+				}
+			}
+		}
+		else{
+			if(tab.ncol != ncla+1){
+				alert_source("Does not have the right number of columns",so);
+				return;
+			}
+			
+			init_cond.cnum.resize(comp.size(),UNSET);
+			
+			for(auto c = 0u; c < comp.size(); c++){
+				if(comp[c].erlang_hidden == true) init_cond.cnum[c] = 0;
+			}
+			
+			for(auto r = 0u; r < tab.nrow; r++){
+				auto c = 0u;
+				for(auto cl = 0u; cl < ncla; cl++){
+					auto name = tab.ele[r][cl];
+				
+					const auto &claa = cla[cl];
+					auto j = 0u; while(j < claa.ncomp && claa.comp[j].name != name) j++;
+					if(j == claa.ncomp){ alert_source("Could not find '"+name+"'",so); return;}
+					
+					c += comp_mult[cl]*j;
+				}
+				
+				auto ele = tab.ele[r][ncla];
+				auto num = number(ele);
+				if(num == UNSET){ alert_source("Not a number '"+ele+"'",so); return;}
+				init_cond.cnum[c] = num;
+			}
+			
+			for(auto i = 0u; i < comp.size(); i++){
+				if(init_cond.cnum[i] == UNSET){
+					alert_source("Population for '"+comp[i].name+"' not set",so); return;
+				}
+			}
+		}
+		
+		if(false){
+			cout << "init pop" << endl;
+			for(auto c = 0u; c < comp.size(); c++){
+				const auto &co = comp[c];
+				cout << co.name << " " << init_cond.cnum[c] << " pop" << endl;
+			}
+		}
+		break;
+	
+	case INIT_POP_DIST:
+		if(foc_cl != UNSET){
+			const auto &claa = cla[foc_cl];
+			
+			init_cond.focal_cl = foc_cl;
+			init_cond.mult = comp_mult[foc_cl];
+			
+			for(auto cgl = 0u; cgl < comp_gl.size(); cgl++){
+				const auto &co = comp_gl[cgl];
+				if(co.cla_comp[foc_cl] == 0){
+					init_cond.comp_reduce.push_back(cgl);
+				}
+			}
+			init_cond.N_reduce = init_cond.comp_reduce.size();
+			
+			init_cond.comp_reduce_ref.resize(comp_gl.size());
+			for(auto c = 0u; c < claa.ncomp; c++){
+				for(auto cred = 0u; cred < init_cond.N_reduce; cred++){
+					auto cgl = init_cond.comp_reduce[cred] + c*init_cond.mult;
+					init_cond.comp_reduce_ref[cgl].c = c;
+					init_cond.comp_reduce_ref[cgl].cred = cred;
+				}
+			}
+		
+			init_cond.comp_prior.resize(claa.ncomp);
+			
+			vector <bool> prior_set(claa.ncomp,false);
+			
+			// Sets internal Erlang 
+			for(auto c = 0u; c < claa.ncomp; c++){
+				const auto &co = claa.comp[c];
+				if(co.erlang_hidden == true){
+					init_cond.comp_prior[c] = convert_text_to_prior("fix(0)",UNSET);
+					prior_set[c] = true;
+				}
+			}
+			
+			auto &af = init_cond.alpha_focal;
+			
+			af.resize(ncla);
+			for(auto cl = 0u; cl < ncla; cl++){
+				if(cl != foc_cl){
+					const auto C = cla[cl].ncomp;
+					af[cl].resize(C,UNSET);
+					for(auto c = 0u; c < C; c++){
+						const auto &co = cla[cl].comp[c];
+						if(co.erlang_hidden) af[cl][c] = ALPHA_ZERO;
+					}
+				}
+			}
+			
+			if(tab.ncol != 2) alert_source("Should have two columns",so);
+			for(auto r = 0u; r < tab.nrow; r++){
+				auto name = tab.ele[r][0];
+				auto val = tab.ele[r][1];
+							
+				auto flag = false;
+				for(auto cl = 0u; cl < ncla; cl++){
+					for(auto c = 0u; c < cla[cl].ncomp; c++){
+						if(cla[cl].comp[c].name == name){
+							if(cl == foc_cl){
+								auto pri = convert_text_to_prior(val,so.line_num);
+								if(pri.error != "") alert_source(pri.error,so,1,r);
+								else{
+									init_cond.comp_prior[c] = pri;
+									prior_set[c] = true;
+								}
 							}
 							else{
-								per[cl][c] = number(val.substr(0,val.length()-1));
+								if(af[cl][c] != UNSET){
+									alert_source("The alpha value for compartment '"+name+"' is set more than once",so,0,r);
+								}	
+								
+								af[cl][c] = number(val);
+								if(af[cl][c] == UNSET){
+									alert_source("The value '"+name+"' must be a number",so,1,r);
+								}
 							}
+							
+							flag = true;
+							break;
 						}
-						
-						flag = true;
-						break;
 					}
+					if(flag == true) break;
 				}
-				if(flag == true) break;
-			}
-			
-			if(flag == false){
-				alert_source("The compartment '"+name+"' is not recognised",so,0,r);
-			}
-		}		
+				
+				if(flag == false){
+					alert_source("The compartment '"+name+"' is not recognised",so,0,r);
+				}
+			}		
 
-		// Fills in missing percentage
-		for(auto cl = 0u; cl < ncla; cl++){
-			const auto &claa = cla[cl];
-			auto sum = 0.0;
-			vector <unsigned int> list;
-			
 			for(auto c = 0u; c < claa.ncomp; c++){
-				if(per[cl][c] == UNSET) list.push_back(c);
-				else sum += per[cl][c];
-			}
+				if(prior_set[c] == false){
+					alert_source("The prior for '"+claa.comp[c].name+"' is not set",so);
+				}				
+			}			
 			
-			string st = ""; 
-			for(auto j = 0u; j < list.size(); j++){
-				if(j != 0) st += ", ";
-				st += claa.comp[list[j]].name;
-			}
-			
-			if(cl == foc_cl){
-				if(list.size() != 0){
-					alert_source("Populations for the compartment(s) '"+st+"' must be set",so);
-				}
-			}
-			else{
-				if(list.size() == 0){
-					alert_source("Not all percentages for compartmental population percentages in '"+claa.name+"' should be set",so);
-				}
-				
-				if(list.size() > 2){
-					alert_source("All but one of the compartmental population percentages in '"+st+"' should be set",so);
-				}
-				
-				if(list.size() == 1){
-					if(sum > 100.0){
-						alert_source("Population percentages in '"+claa.name+"' add to over 100%",so);
-					}
-					else{
-						per[cl][list[0]] = 100-sum; 
+			// By default sets alpha values to 1
+			for(auto cl = 0u; cl < ncla; cl++){
+				if(cl != foc_cl){
+					for(auto c = 0u; c < cla[cl].ncomp; c++){
+						if(af[cl][c] == UNSET) af[cl][c] = 1;
 					}
 				}
 			}
-		}	
-
-		if(false){
-			for(auto cl = 0u; cl < ncla; cl++){
-				const auto &claa = cla[cl];	
-				for(auto c = 0u; c < claa.ncomp; c++){
-					cout << claa.comp[c].name << " " << per[cl][c] << " Percent\n";
-				}
-			}
 		}
-		
-		init_cond.cpop.resize(comp.size(),0);
-		for(auto c = 0u; c < comp.size(); c++){
-			const auto &co = comp[c];
+		else{
+			init_cond.pop_prior = so.pop_prior;
 			
-			auto fac = 1.0;
-			for(auto cl = 0u; cl < ncla; cl++){
-				if(cl == foc_cl){
-					fac *= per[cl][co.cla_comp[cl]];
-				}
-				else{
-					fac *= per[cl][co.cla_comp[cl]]/100;
-				}
+			if(tab.ncol != ncla+1){
+				alert_source("Does not have the right number of columns",so);
+				return;
 			}
-			init_cond.cpop[c] = fac;
-		}
-	}
-	else{
-		if(tab.ncol != ncla+1){
-			alert_source("Does not have the right number of columns",so);
-			return;
-		}
-		
-		init_cond.cpop.resize(comp.size(),UNSET);
-		for(auto r = 0u; r < tab.nrow; r++){
-			auto c = 0u;
-			for(auto cl = 0u; cl < ncla; cl++){
-				auto name = tab.ele[r][cl];
 			
-				const auto &claa = cla[cl];
-				auto j = 0u; while(j < claa.ncomp && claa.comp[j].name != name) j++;
-				if(j == claa.ncomp){ alert_source("Could not find '"+name+"'",so); return;}
+			auto C = comp.size();
+			init_cond.alpha.resize(C,UNSET);
+			
+			for(auto c = 0u; c < C; c++){
+				const auto &co = comp[c];
+				if(co.erlang_hidden) init_cond.alpha[c] = ALPHA_ZERO;
+			}
+			
+			for(auto r = 0u; r < tab.nrow; r++){
+				auto c = 0u;
+				for(auto cl = 0u; cl < ncla; cl++){
+					auto name = tab.ele[r][cl];
 				
-				c += comp_mult[cl]*j;
+					const auto &claa = cla[cl];
+					auto j = 0u; while(j < claa.ncomp && claa.comp[j].name != name) j++;
+					if(j == claa.ncomp){ alert_source("Could not find '"+name+"'",so); return;}
+					
+					c += comp_mult[cl]*j;
+				}
+				
+				auto ele = tab.ele[r][ncla];
+				auto num = number(ele);
+				if(num == UNSET){ alert_source("Not a number '"+ele+"'",so); return;}
+				init_cond.alpha[c] = num;
 			}
 			
-			auto ele = tab.ele[r][ncla];
-			auto num = number(ele);
-			if(num == UNSET){ alert_source("Not a number '"+ele+"'",so); return;}
-			init_cond.cpop[c] = num;
-		}
+			for(auto i = 0u; i < comp.size(); i++){
+				if(init_cond.alpha[i] == UNSET){
+					alert_source("Alpha value for '"+comp[i].name+"' not set",so); return;
+				}
+			}
 		
-		for(auto i = 0u; i < comp.size(); i++){
-			if(init_cond.cpop[i] == UNSET){
-				alert_source("Population for '"+comp[i].name+"' not set",so); return;
+			if(false){
+				cout << init_cond.pop_prior.type << "prior type" << endl;
+				cout << "init pop prior" << endl;
+				for(auto c = 0u; c < comp.size(); c++){
+					const auto &co = comp[c];
+					cout << co.name << " " << init_cond.alpha[c] << " alpha" << endl;
+				}
 			}
 		}
-	}
-	
-	if(false){
-		cout << "init pop\n";
-		for(auto c = 0u; c < comp.size(); c++){
-			const auto &co = comp[c];
-			cout << co.name << " " << init_cond.cpop[c] << " pop" << endl;
-		}
+		break;
+		
+	default: emsg("de f prob"); break;
 	}
 }
 		
+
+/// Fills in missing percentage when defining initial population
+vector < vector <double> > Species::pop_get_percentage(const DataSource &so)
+{
+	const auto &tab = so.table;
+	auto foc_cl = so.focal_cl; 
+	
+	vector < vector <double> > per;
+
+	per.resize(ncla);
+	for(auto cl = 0u; cl < ncla; cl++){
+		for(auto c = 0u; c < cla[cl].ncomp; c++){
+			double val = UNSET; if(cla[cl].comp[c].erlang_hidden == true) val = 0;
+			per[cl].push_back(val);
+		}
+	}					
+	
+	if(tab.ncol != 2) alert_source("Should have two columns",so);
+	for(auto r = 0u; r < tab.nrow; r++){
+		auto name = tab.ele[r][0];
 		
+		auto flag = false;
+		for(auto cl = 0u; cl < ncla; cl++){
+			for(auto c = 0u; c < cla[cl].ncomp; c++){
+				if(cla[cl].comp[c].name == name){
+					if(per[cl][c] != UNSET){
+						alert_source("The comartment '"+name+"' is set more than once",so,0,r);
+					}					
+					
+					auto val = tab.ele[r][1];
+					if(cl == foc_cl){
+						per[cl][c] = number(val);
+						if(per[cl][c] == UNSET) alert_source("The value '"+val+"' is not a number1",so,1,r);
+					}
+					else{
+						if(is_percent(val) == false){
+							alert_source("The value '"+val+"' is not a percentage",so,1,r);
+						}
+						else{
+							per[cl][c] = number(val.substr(0,val.length()-1));
+						}
+					}
+					
+					flag = true;
+					break;
+				}
+			}
+			if(flag == true) break;
+		}
+		
+		if(flag == false){
+			alert_source("The compartment '"+name+"' is not recognised",so,0,r);
+		}
+	}		
+
+	for(auto cl = 0u; cl < ncla; cl++){
+		const auto &claa = cla[cl];
+		auto sum = 0.0;
+		vector <unsigned int> list;
+		
+		for(auto c = 0u; c < claa.ncomp; c++){
+			if(per[cl][c] == UNSET) list.push_back(c);
+			else sum += per[cl][c];
+		}
+		
+		string st = ""; 
+		for(auto j = 0u; j < list.size(); j++){
+			if(j != 0) st += ", ";
+			st += claa.comp[list[j]].name;
+		}
+		
+		if(cl == foc_cl){
+			if(list.size() != 0){
+				alert_source("Populations for the compartment(s) '"+st+"' must be set",so);
+			}
+		}
+		else{
+			if(list.size() == 0){
+				alert_source("Not all percentages for compartmental population percentages in '"+claa.name+"' should be set",so);
+			}
+			
+			if(list.size() > 2){
+				alert_source("All but one of the compartmental population percentages in '"+st+"' should be set",so);
+			}
+			
+			if(list.size() == 1){
+				if(sum > 100.0){
+					alert_source("Population percentages in '"+claa.name+"' add to over 100%",so);
+				}
+				else{
+					per[cl][list[0]] = 100-sum; 
+				}
+			}
+		}
+	}	
+	
+	return per;
+}
+
+
+/// add-pop / remove-pop command
+void Species::add_pop_data(const DataSource &so, int sign) 
+{	
+	const auto &tab = so.table;
+	
+	if(add_rem_pop_on == false){
+		add_rem_pop.resize(T);
+		for(auto ti = 0u; ti < T; ti++){
+			add_rem_pop[ti].resize(comp_gl.size(),0);
+		}
+	}
+	
+	add_rem_pop_on = true;
+	
+	for(auto j = 0u; j < tab.nrow; j++){
+		auto t_str = tab.ele[j][0];
+		double t = number(t_str);
+		if(t_str == "start") t = details.t_start;
+		
+		if(t < details.t_start || t >= details.t_end){
+			 alert_source("The time '"+t_str+"' must be between the start and end times",so); 
+			 return;
+		}
+		
+		auto ti = get_ti(t); if(ti == T) ti--;
+		
+		if(ncla+2 != tab.ncol) emsg("Columns not right1");
+		
+		auto name = t_str;
+		
+		auto c = 0u;
+		for(auto cl = 0u; cl < ncla; cl++){
+			auto name = tab.ele[j][cl+1];
+						
+			const auto &claa = cla[cl];
+			auto j = 0u; while(j < claa.ncomp && claa.comp[j].name != name) j++;
+			if(j == claa.ncomp){ alert_source("Could not find '"+name+"'",so); return;}
+					
+			c += comp_mult[cl]*j;
+		}
+
+		auto value_str = tab.ele[j][tab.ncol-1];
+		double value = number(value_str);
+	
+		add_rem_pop[ti][c] += value*sign; 
+	}
+	
+	if(false){
+		for(auto ti = 0u; ti < T; ti++){
+			cout << ti << ": ";
+			for(auto va : add_rem_pop[ti]) cout << va << ",";
+			cout << " add rem" << endl;
+		}
+		emsg("don");
+	}
+}
+
+
+/// Sets add_rem_pop_change
+void Species::set_add_rem_pop_change()
+{
+	if(add_rem_pop_on == false) return;
+	
+	add_rem_pop_change.resize(T);
+	for(auto ti = 0u; ti < T; ti++){
+		for(auto c = 0u; c < comp_gl.size(); c++){
+			if(add_rem_pop[ti][c] != 0){
+				add_rem_pop_change[ti].push_back(c);
+			}
+		}
+	}
+}
+
+
 /// add-ind command
 void Species::add_ind_data(const DataSource &so)
 {
 	const auto &tab = so.table;
+
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto i = find_individual(tab.ele[j][0]);
 		auto &ind = individual[i];
 
-		
 		auto t_str = tab.ele[j][1];
 		double t = number(t_str);
 		if(t_str == "start") t = details.t_start;
 		
-		if(ncla+2 != tab.ncol) emsg("Columns not right");
+		if(ncla+2 != tab.ncol) emsg("Columns not right2");
 		
-		auto c_gl = 0u;
+		auto name = t_str;
+		vector <string> val;
 		for(auto cl = 0u; cl < ncla; cl++){
-			auto val = tab.ele[j][cl+2];
-			auto c = find_c(cl,val);
-			if(c == UNSET) alert_source("Value '"+val+"' is not a compartment",so,cl+2,j);
-			
-			c_gl += c*comp_mult[cl];
+			const auto &el = tab.ele[j][cl+2]; 
+			name += "&"+el;
+			val.push_back(el);
 		}
+
+		auto vec = hash_enter.get_vec_string(name);
+		auto k = hash_enter.existing(vec);
+		if(k == UNSET){
+			k = enter.size();
+			hash_enter.add(k,vec);
+	
+			// Determines if initial compartment is exactly specified
+			auto c_set = 0u;
+			for(auto cl = 0u; cl < ncla; cl++){
+				const auto &claa = cla[cl];
+
+				//auto vec = claa.hash_comp.get_vec_string(val[cl]);
+				//auto c = claa.hash_comp.existing(vec);
+				auto c = claa.hash_comp.find(val[cl]);
+				if(c == UNSET){ c_set = UNSET; break;}
+				c_set += comp_mult[cl]*c;
+			}
 		
+			Enter ep;
+			ep.name = name; ep.time = t; ep.c_set = c_set;
+			
+			if(c_set == UNSET){
+				ep.cla.resize(ncla);
+				for(auto cl = 0u; cl < ncla; cl++){
+					const auto &claa = cla[cl];
+
+					auto &ent_cl = ep.cla[cl];
+					
+					//auto vec = claa.hash_comp.get_vec_string(val[cl]);
+					//auto c = claa.hash_comp.existing(vec);
+					auto c = claa.hash_comp.find(val[cl]);
+					
+					ent_cl.c_set = c;
+					if(c == UNSET){
+						string emg;
+						auto comp_prob_str = find_comp_prob_str(cl,val[cl],LOWER_BOUND,emg);
+						if(emg != ""){ alert_source(emg,so,cl,j); return;}
+						
+						ent_cl.eqn = create_eqn_vector(comp_prob_str,COMP_PROB,so);
+					}
+				}
+			}
+			ep.set = true;
+			
+			enter.push_back(ep);
+		}
+	
+		ind.enter_ref = k;
+	
 		EventData ev; 
 		ev.type = ENTER_EV;
-		ev.c = c_gl;
+		ev.move_c = UNSET;
 		ev.cl = UNSET;
 		ev.tr = UNSET;
 		ev.t = t;
@@ -286,11 +618,10 @@ void Species::remove_ind_data(const DataSource &so)
 		double t = number(t_str);
 		if(t_str == "start") t = details.t_start;
 		
-		if(tab.ncol != 2) emsg("Columns not right");
+		if(tab.ncol != 2) emsg("Columns not right3");
 		
 		EventData ev; 
 		ev.type = LEAVE_EV;
-		ev.c = UNSET;
 		ev.cl = UNSET;
 		ev.tr = UNSET;
 		ev.t = t;
@@ -311,105 +642,21 @@ void Species::move_ind_data(const DataSource &so)
 		double t = number(t_str);
 		if(t_str == "start") t = details.t_start;
 		
-		if(tab.ncol != 3) emsg("Columns not right");
+		if(tab.ncol != 3) emsg("Columns not right4");
 		
 		auto cl = so.cl;
 		auto val = tab.ele[j][2];
 		auto c = find_c(cl,val);
-		if(c == UNSET) alert_source("Value '"+val+"' is not a compartment",so,2,j);
+		if(c == UNSET) alert_source("Value '"+val+"' is not a compartment2",so,2,j);
 			
 		EventData ev; 
 		ev.type = MOVE_EV;
-		ev.c = c;
+		ev.move_c = c;
 		ev.cl = cl;
 		ev.tr = UNSET;
 		ev.t = t;
 		ind.ev.push_back(ev);
 	}		
-}
-
-
-/// trans-data command
-void Species::trans_data(const DataSource &so)
-{
-	const auto &tab = so.table;
-
-	// Adds the times of events
-	for(auto j = 0u; j < tab.nrow; j++){
-		auto i = find_individual(tab.ele[j][0]);
-		auto &ind = individual[i];
-
-		auto val = tab.ele[j][1];
-		if(val != "no"){
-			auto t = number(val);
-			if(t == UNSET){
-				alert_source("Value '"+val+"' is not a number",so,1,j);
-				return;
-			}
-			
-			ObsData ob; 
-			ob.so = so.index;
-			ob.type = OBS_TRANS_EV;
-			ob.c = UNSET;
-			ob.cl = so.cl;
-			ob.tr = so.tr;
-			ob.t = t;
-			ind.obs.push_back(ob);
-		}
-	}		
-	
-	
-	// Adds the times of non-events
-	for(auto j = 0u; j < tab.nrow; j++){
-		//auto i = find_individual(tab.ele[j][0]);
-		//auto &ind = individual[i];
-			
-		auto ti_min = 0u, ti_max = T; 
-		
-		switch(so.time_range){
-		case ALL_TIME:
-			{
-				if(tab.ncol != 2) emsg("Columns not right");
-			}
-			break;
-			
-		case SPEC_TIME: 
-			{
-				if(tab.ncol != 2) emsg("Columns not right");
-				ti_min = get_ti(so.time_start);
-				ti_max = get_ti(so.time_end);
-			}
-			break;
-	
-		case FILE_TIME:
-			{
-				if(tab.ncol != 4) emsg("Columns not right");
-				auto val = tab.ele[j][2];
-				auto tmin = number(val);
-				if(tmin == UNSET){
-					alert_source("Value '"+val+"' is not a number",so,2,j);
-					return;
-				}
-			
-				val = tab.ele[j][3];
-				auto tmax = number(val);
-				if(tmax == UNSET){
-					alert_source("Value '"+val+"' is not a number",so,3,j);
-					return;
-				}
-				
-				ti_min = get_ti(tmin);
-				ti_max = get_ti(tmax);
-			}
-			break;
-		}
-		
-		for(auto ti = ti_min; ti < ti_max; ti++){
-			for(auto tr = 0u; tr < tra_gl.size(); tr++){
-				if(so.trans_filt[tr] == true) trans_not_allow[ti][tr] = true;
-			}
-		}
-	}
 }
 
 
@@ -425,28 +672,80 @@ void Species::comp_data(const DataSource &so)
 		auto val = tab.ele[j][1];
 		auto t = number(val);
 		if(t == UNSET){
-			alert_source("Value '"+val+"' is not a number",so,1,j);
+			alert_source("Value '"+val+"' is not a number2",so,1,j);
 			return;
 		}
 		
 		auto cl = so.cl;
 		
-		auto c_st = tab.ele[j][2];
-		auto c = find_c(cl,c_st);
-		if(c == UNSET){
-			alert_source("Value '"+val+"' is not a compartment",so,2,j);
-			return;
+		auto comp = tab.ele[j][2];
+		if(comp != missing_str){
+			auto c_exact = find_c(cl,comp);
+			
+			ObsData ob; 
+			ob.so = so.index;
+			ob.type = OBS_COMP_EV;
+			ob.c_exact = c_exact;
+			if(c_exact == UNSET){
+				string emsg;
+				auto prob_str = find_comp_prob_str(cl,comp,LOWER_BOUND,emsg);
+				if(emsg != ""){ alert_source(emsg,so,2,j); return;}
+				ob.c_obs_prob_eqn = create_eqn_vector(prob_str,COMP_PROB,so);
+			}
+			ob.cl = so.cl;
+			ob.t = t;
+			ob.time_vari = false;
+			ind.obs.push_back(ob);		
 		}
+	}
+}
+
+
+/// Genetic data command (this makes sure individual is infected when an observation is made
+void Species::genetic_data(const DataSource &so)
+{
+	if(trans_tree == false) return;
+	
+	const auto &tab = so.table;
+	
+	const auto &claa = cla[infection_cl];
+	string str = "";
+	for(auto c = 0u; c < claa.ncomp; c++){
+		if(claa.comp[c].infected == COMP_INFECTED){
+			if(str != "") str += "|";
+			str += claa.comp[c].name;
+		}
+	}
+	
+	string ems;
+	auto prob_str = find_comp_prob_str(infection_cl,str,LOWER_BOUND,ems);
+	if(ems != "") emsg("SHould not be error");
 		
-		ObsData ob; 
-		ob.so = so.index;
-		ob.type = OBS_COMP_EV;
-		ob.c = c;
-		ob.cl = so.cl;
-		ob.tr = UNSET;
-		ob.t = t;
-		ind.obs.push_back(ob);
-	}		
+	auto p_eqn = create_eqn_vector(prob_str,COMP_PROB,so);
+	
+	for(auto j = 0u; j < tab.nrow; j++){
+		auto i = find_individual(tab.ele[j][0],false);
+		if(i != UNSET){
+			auto &ind = individual[i];
+
+			auto val = tab.ele[j][1];
+			auto t = number(val);
+			if(t == UNSET){
+				alert_source("Value '"+val+"' is not a number2",so,1,j);
+				return;
+			}
+	
+			ObsData ob; 
+			ob.so = so.index;
+			ob.type = OBS_COMP_EV;
+			ob.c_exact = UNSET;
+			ob.c_obs_prob_eqn = p_eqn;
+			ob.cl = infection_cl;
+			ob.t = t;
+			ob.time_vari = false;
+			ind.obs.push_back(ob);		
+		}
+	}
 }
 
 
@@ -462,19 +761,18 @@ void Species::test_data(const DataSource &so)
 		auto val = tab.ele[j][1];
 		auto t = number(val);
 		if(t == UNSET){
-			alert_source("Value '"+val+"' is not a number",so,1,j);
+			alert_source("Value '"+val+"' is not a number3",so,1,j);
 			return;
 		}
 		
 		ObsData ob; 
 		ob.type = OBS_TEST_EV;
 		ob.so = so.index;
-		ob.c = UNSET;
 		ob.cl = so.cl;
-		ob.tr = UNSET;
 		ob.t = t;
-		ob.Se_obs_eqn = add_to_vec(obs_eqn,so.obs_model.Se.eq_ref);
-		ob.Sp_obs_eqn = add_to_vec(obs_eqn,so.obs_model.Sp.eq_ref);
+		ob.time_vari = false;
+		ob.Se_eqn = he(add_equation_info(so.obs_model.Se_str,SE),so);
+		ob.Sp_eqn = he(add_equation_info(so.obs_model.Sp_str,SP),so);
 		
 		auto res = tab.ele[j][2];
 		if(res == so.obs_model.diag_pos) ob.test_res = true;
@@ -496,179 +794,325 @@ void Species::population_data(const DataSource &so)
 {
 	const auto &tab = so.table;
 	
+	auto cf = set_comp_filt(so.filter_str,UNSET,LOWER_BOUND,so);
+
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto time_str = tab.ele[j][0];
 		auto t = number(time_str);
 		if(t == UNSET){
-			alert_source("The time '"+time_str+"' is not a number",so,0,j);
+			alert_source("The time '"+time_str+"' is not a number4",so,0,j);
 			return;
 		}
 		
-		auto val_str = tab.ele[j][1];
-		auto value = number(val_str);
-		if(value == UNSET){
-			alert_source("The value '"+val_str+"' is not a number",so,1,j);
-			return;
-		}
-		
-		auto col = 2;
-		
-		auto cf = so.comp_filt;
+		auto col = 1;
+		auto name = so.filter_str;
 		for(auto cl = 0u; cl < ncla; cl++){
-			const auto &claa = cla[cl];
-			
-			switch(cf.cla[cl].type){
-			case ALL_FILT:
-				for(auto c = 0u; c < claa.ncomp; c++){
-					cf.cla[cl].comp[c] = true;
-				}
-				break;
-			
-			case FILE_FILT:
+			if(cf.cla[cl].type == FILE_FILT){
+				name += "|file:"+tab.ele[j][col];
 				col++;
-				emsg("TO DO FILT");
-				break;
-			
-			case COMP_FILT:
-				break;
 			}
 		}	
-	
-		auto sd = 1.0;
-		switch(so.obs_model.type){
-		case PERCENT_OBSMOD: 
-			sd = value*so.obs_model.percent/100; 
-			break;
-			
-		case SD_OBSMOD: 
-			sd = so.obs_model.sd;
-			break;
-			
-		case FILE_OBSMOD: 
-			{
-				auto sd_str = tab.ele[j][col];
-				auto sd = number(sd_str);
-				if(sd == UNSET){
-					alert_source("The standard deviation '"+sd_str+"' is not a number",so,2,j);
-					return;	
+		
+		auto pf = 0u; while(pf < pop_filter.size() && pop_filter[pf].name != name) pf++;
+		
+		if(pf == pop_filter.size()){
+			auto co = 1;
+			auto cf2 = cf;
+			for(auto cl = 0u; cl < ncla; cl++){
+				if(cf.cla[cl].type == FILE_FILT){
+					cf2.cla[cl].type = COMP_FILT;
+					string emsg;
+					cf2.cla[cl].comp_prob_str = find_comp_prob_str(cl,tab.ele[j][co],LOWER_BOUND,emsg);
+					if(emsg != ""){ alert_source(emsg,so,co,j); return;}
+					co++;
 				}
-			}
-			break;
+			}	
+	
+			
+			PopFilter pofi; 
+			pofi.name = name;
+			pofi.comp_prob_eqn = create_eqn_vector(global_convert(cf2),COMP_PROB,so);
+			pop_filter.push_back(pofi);
 		}
-		if(sd < 1) sd = 1;
+		
+		auto val_str = tab.ele[j][col];
+		auto value = number(val_str);
+		if(value == UNSET){
+			alert_source("The value '"+val_str+"' is not a number5",so,1,j);
+			return;
+		}
+		col++;
 		
 		PopData pd;
 		pd.so = so.index;
 		pd.t = t;
+		pd.ref = pf;
+		pd.type = set_obs_mod_type(so.obs_model);
 		pd.value = value;
-		pd.sd = sd;
-		pd.filt = global_convert(cf);
+		pd.obs_mod_val = set_obs_mod_val(value,j,col,so.obs_model,tab,so);
+		pd.time_vari = false;
 		pop_data.push_back(pd);
 	}		
 }
 
 
-/// pop-trans-data command
-void Species::population_trans_data(const DataSource &so)
+/// Converts from obsmod type to variety 
+ObsModelVariety Species::set_obs_mod_type(const ObsModel &om) const 
+{
+	switch(om.type){
+	case NORMAL_PERCENT_OBSMOD: case NORMAL_SD_OBSMOD: case NORMAL_FILE_OBSMOD: return NORMAL_OBS;
+	case POISSON_OBSMOD: return POISSON_OBS;
+	case NEGBIN_OBSMOD: case NEGBIN_FILE_OBSMOD: return NEGBIN_OBS;
+	}
+	emsg("Option not recognised");
+	return NORMAL_OBS;
+}
+
+ 
+/// Gets the standard deviation (either from observation model or data table)
+double Species::set_obs_mod_val(double value, unsigned int j, unsigned int col, const ObsModel &om, const Table &tab, const DataSource &so)
+{
+	switch(om.type){
+	case NORMAL_PERCENT_OBSMOD: 
+		{
+			auto sd = value*om.percent/100; 
+			if(sd < 1) sd = 1;
+			return sd;
+		}
+		break;
+		
+	case NORMAL_SD_OBSMOD: 
+		{
+			auto sd = om.sd;
+			if(sd < 1) sd = 1;
+			return sd;
+		}
+		break;
+		
+	case NORMAL_FILE_OBSMOD: 
+		{
+			auto sd_str = tab.ele[j][col];
+			auto sd = number(sd_str);
+			if(sd == UNSET){
+				alert_source("The standard deviation '"+sd_str+"' is not a number6",so,2,j);
+				return sd;	
+			}
+			if(sd < 1) sd = 1;
+			return sd;
+		}
+		break;
+		
+	case POISSON_OBSMOD:
+		return UNSET;
+		
+	case NEGBIN_OBSMOD:
+		return om.p;
+		
+	case NEGBIN_FILE_OBSMOD:
+		{
+			auto p_str = tab.ele[j][col];
+			auto p = number(p_str);
+			if(p == UNSET){
+				alert_source("The standard deviation '"+p_str+"' is not a number6",so,2,j);
+				return p;	
+			}
+			return p;
+		}
+		break;
+	}
+	
+	return UNSET;
+}
+
+ 
+/// trans_data  command
+void Species::trans_data(const DataSource &so)
+{
+	const auto &tab = so.table;
+
+	// Adds the times of events
+	for(auto j = 0u; j < tab.nrow; j++){
+		auto i = find_individual(tab.ele[j][0]);
+		auto &ind = individual[i];
+
+		auto val = tab.ele[j][1];
+		auto t = number(val);
+		
+		if(t == UNSET){
+			alert_source("Value '"+val+"' is not a number",so,1,j);
+			return;
+		}
+		
+		{                                               // Moves if on a division boundary
+			auto t_start = details.t_start, dt = details.dt;
+			auto t_bound = t_start+(unsigned int)(((t+TINY)-t_start)/dt)*dt;
+			if(!dif(t,t_bound)){
+				if(t > t_start+dt) t -= 0.0001*dt;
+				else t += 0.0001*dt;
+			}
+		}
+		
+		ObsData ob; 
+		ob.so = so.index;
+		ob.ref = obs_trans.size();
+		ob.type = OBS_TRANS_EV;
+		ob.cl = so.cl;
+		ob.t = t;
+		ob.time_vari = false;
+		
+		ind.obs.push_back(ob);
+	}		
+	
+	// Accounts for the time period measurements are made 
+	auto ti_min = 0u, ti_max = T; 
+	
+	if(so.time_range == SPEC_TIME){
+		ti_min = get_ti(so.time_start);
+		ti_max = get_ti(so.time_end);
+	}
+
+	auto cf = set_comp_filt(so.filter_str,UNSET,LOWER_UPPER_BOUND,so);
+
+	string errmsg;
+	auto trans_filt = set_trans_filt(so.cl,so.filter_trans_str,LOWER_UPPER_BOUND,errmsg);
+	
+	if(errmsg != ""){ alert_source(errmsg,so); return;}
+	
+	auto prob_str = trans_global_convert(so.cl,trans_filt,cf);
+	ObsTrans ob_tr;
+	ob_tr.name = so.filter_trans_str;
+	ob_tr.type = OBS_TRANS_EV; 
+	ob_tr.tra_prob_eqn = create_eqn_vector(prob_str,TRANS_PROB,so);
+	ob_tr.ti_min = ti_min;
+	ob_tr.ti_max = ti_max;
+
+	obs_trans.push_back(ob_tr);
+	
+	obs_trans_exist = true;
+}
+
+
+/// Sets if observation is OBS_SOURCE_EV, OBS_TRANS_EV or OBS_SINK_EV
+void Species::set_ob_trans_ev(const vector <Equation> &eqn)
+{
+	for(auto &ot : obs_trans){
+		auto source_fl = false, trans_fl = false, sink_fl = false;
+
+		for(auto tr = 0u; tr < tra_gl.size(); tr++){
+			const auto &eq = eqn[ot.tra_prob_eqn[tr].eq_ref];
+			if(!eq.is_zero()){
+				switch(tra_gl[tr].variety){
+				case NORMAL: trans_fl = true; break;
+				case SOURCE_TRANS: source_fl = true; break; 
+				case SINK_TRANS: sink_fl = true; break;
+				}
+			}
+		}
+
+		if(source_fl && trans_fl){
+			emsg("Transition data '"+ot.name+"' cannot include source and non-source transitions");
+		}
+
+		if(sink_fl && trans_fl){
+			emsg("Transition data '"+ot.name+"' cannot include sink and non-sink transitions");
+		}
+
+		if(source_fl && sink_fl){
+			emsg("Transition data '"+ot.name+"' cannot include source and sink transitions");
+		}
+
+		ot.type = OBS_TRANS_EV;
+		if(source_fl) ot.type = OBS_SOURCE_EV;
+		if(sink_fl) ot.type = OBS_SINK_EV;
+	}
+
+	for(auto &ind : individual){
+		for(auto &ob : ind.obs){
+			if(ob.type == OBS_TRANS_EV) ob.type = obs_trans[ob.ref].type;
+		}
+	}
+}
+
+
+/// trans_data and pop-trans-data command
+void Species::popu_trans_data(const DataSource &so)
 {
 	const auto &tab = so.table;
 	
-	for(auto j = 0u; j < tab.nrow-1; j++){
-		auto time_str = tab.ele[j][0];
-		auto t = number(time_str);
-		if(t == UNSET){
-			alert_source("The time '"+time_str+"' is not a number",so,0,j);
+	auto cf = set_comp_filt(so.filter_str,UNSET,LOWER_BOUND,so);
+	
+	string emg;
+	auto trans_filt = set_trans_filt(so.cl,so.filter_trans_str,LOWER_BOUND,emg);
+	if(emg != ""){ alert_source(emg,so); return;}
+	
+	for(auto j = 0u; j < tab.nrow; j++){
+		auto tstart_str = tab.ele[j][0];
+		auto tstart = number(tstart_str);
+		if(tstart == UNSET){
+			alert_source("The start time '"+tstart_str+"' is not a number7",so,0,j);
 			return;
 		}
 		
-		auto time_str_next = tab.ele[j+1][0];
-		auto t_next = number(time_str_next);
-		if(t_next == UNSET){
-			alert_source("The time '"+time_str_next+"' is not a number",so,0,j+1);
-			return;
-		}
-		
-		auto val_str = tab.ele[j][1];
-		auto value = number(val_str);
-		if(value == UNSET){
-			alert_source("The value '"+val_str+"' is not a number",so,1,j);
+		auto tend_str = tab.ele[j][1];
+		auto tend = number(tend_str);
+		if(tend == UNSET){
+			alert_source("The end time '"+tend_str+"' is not a number7",so,0,j);
 			return;
 		}
 		
 		auto col = 2;
-		
-		auto tf = so.trans_filt;
-		auto cf = so.comp_filt;
+		auto name = so.filter_trans_str+"|"+so.filter_str;
 		for(auto cl = 0u; cl < ncla; cl++){
-			const auto &claa = cla[cl];
-				
-			if(cl == so.cl){
-				for(auto c = 0u; c < claa.ncomp; c++){
-					cf.cla[cl].comp[c] = true;
+			if(cl != so.cl && cf.cla[cl].type == FILE_FILT){	
+				name += "|file:"+tab.ele[j][col];
+				col++;
+			}
+		}	
+		
+		auto pf = 0u; 
+		while(pf < pop_trans_filter.size() && pop_trans_filter[pf].name != name) pf++;
+		
+		if(pf == pop_trans_filter.size()){
+			auto co = 2;
+			auto cf2 = cf;
+			for(auto cl = 0u; cl < ncla; cl++){
+				if(cl != so.cl && cf.cla[cl].type == FILE_FILT){
+					cf2.cla[cl].type = COMP_FILT;
+					string emsg;
+					cf2.cla[cl].comp_prob_str = find_comp_prob_str(cl,tab.ele[j][co],LOWER_BOUND,emsg);
+					if(emsg != ""){ alert_source(emsg,so,col,j); return;}
+					co++;
 				}
 			}
-			else{
-				switch(cf.cla[cl].type){
-				case ALL_FILT:
-					for(auto c = 0u; c < claa.ncomp; c++){
-						cf.cla[cl].comp[c] = true;
-					}
-					break;
-				
-				case FILE_FILT:
-					col++;
-					emsg("TO DO FILT");
-					break;
-				
-				case COMP_FILT:
-					break;
-				}
-			}	
+		
+			auto prob_str = trans_global_convert(so.cl,trans_filt,cf2);
+	
+			PopTransFilter pofi; 
+			pofi.name = name;
+			pofi.trans_prob_eqn = create_eqn_vector(prob_str,TRANS_PROB,so);
+			pop_trans_filter.push_back(pofi);
 		}
 		
-		auto sd = 1.0;
-		switch(so.obs_model.type){
-		case PERCENT_OBSMOD: 
-			sd = value*so.obs_model.percent/100; 
-			break;
-			
-		case SD_OBSMOD: 
-			sd = so.obs_model.sd;
-			break;
-			
-		case FILE_OBSMOD: 
-			{
-				auto sd_str = tab.ele[j][col];
-				auto sd = number(sd_str);
-				if(sd == UNSET){
-					alert_source("The standard deviation '"+sd_str+"' is not a number",so,2,j);
-					return;	
-				}
-			}
-			break;
-		}
-		if(sd < 1) sd = 1;
-		
-		auto filt = trans_global_convert(so.cl,tf,cf);
-		
-		auto ti_min = get_ti(t);
-		auto ti_max = get_ti(t_next);
-		
-		auto ref = pop_trans_data.size();
-		for(auto ti = ti_min; ti < ti_max; ti++){
-			for(auto tr = 0u; tr < tra_gl.size(); tr++){
-				if(filt[tr] == true) pop_trans_ref[ti][tr].push_back(ref);
-			}
+		auto val_str = tab.ele[j][col];
+		auto value = number(val_str);
+
+		if(value == UNSET){
+			alert_source("The value '"+val_str+"' is not a number9",so,1,j);
+			return;
 		}
 		
 		PopTransData ptd;
 		ptd.so = so.index;
-		ptd.tmin = t;
-		ptd.tmax = t_next;		
+		ptd.tmin = tstart;
+		ptd.tmax = tend;	
+		ptd.ref = pf;		
+		ptd.type = set_obs_mod_type(so.obs_model);
 		ptd.value = value;
-		ptd.sd = sd;
-		ptd.filt = filt;
+		ptd.obs_mod_val = set_obs_mod_val(value,j,col,so.obs_model,tab,so);
+		ptd.time_vari = false;
 		pop_trans_data.push_back(ptd);
+		
+		pop_trans_data_exist = true;
 	}		
 }
 
@@ -676,52 +1120,41 @@ void Species::population_trans_data(const DataSource &so)
 /// Finds the compartment from the name
 unsigned int Species::find_c(unsigned int cl, string name) const
 {
-	const auto &claa = cla[cl];
-	auto c = 0u; while(c < claa.ncomp && claa.comp[c].name != name) c++;
-	if(c == claa.ncomp) return UNSET;
-	return c;
+	//const auto &claa = cla[cl];
+	//auto vec = claa.hash_comp.get_vec_string(name);
+	//return claa.hash_comp.existing(vec);
+	return cla[cl].hash_comp.find(name);
 }
 
 
 /// Finds an individual with a given name, overwise creates a new individual
-unsigned int Species::find_individual(string name)
+unsigned int Species::find_individual(string name, bool create)
 {
-	auto i = 0u; while(i < individual.size() && individual[i].name != name) i++;
-	if(i == individual.size()){
+	auto vec = hash_ind.get_vec_string(name);
+	auto i = hash_ind.existing(vec);
+	
+	if(i == UNSET && create){
+		i = individual.size();
+		if(i >= details.individual_max){
+			emsg("The number of individuals exceeds the limit of "+to_string(details.individual_max)+".");
+		}
+		
+		hash_ind.add(i,vec);
+		
 		IndData ind;
 		ind.name = name;
+		ind.enter_ref = UNSET;
 		individual.push_back(ind);
 	}
+	
 	return i;
-}
-
-
-/// Used to generate some hypotheical data
-void Species::generate_data() const
-{
-	
-	/*
-	ofstream fout("ind_data.csv");
-	
-	fout << "id,cinit,ds,sex,fe" << endl;
-	for(auto i = 0u; i < 100; i++){
-		fout << "Ind. " << i << ",";
-		if(i < 98) fout << "S"; else fout << "I";
-		fout << ",";
-		if(ran() < 0.5) fout << "M"; else fout << "F";
-		fout << ",";
-		fout << normal_sample(0,1);
-		fout << endl;
-	}		
-	cout << "DATA GENERATED" << endl;
-	*/
 }
 
 
 /// Alerts a problem with a data source
 void Species::alert_source(string st, const DataSource &so, unsigned int c, unsigned int r)
 {
-	if(c != UNSET) st += "(col '"+so.table.heading[c]+"', row "+tstr(r+1)+")";
+	if(c != UNSET) st += " (col '"+so.table.heading[c]+"', row "+tstr(r+1)+")";
 	WarnData wa; wa.te = st; wa.line_num = so.line_num;
 	warn.push_back(wa);
 }
@@ -738,28 +1171,39 @@ void Species::X_vector_order()
 			auto name = individual[i].name;
 			xvec_new.ind_list.push_back(name);
 			
-			auto j = find_in(xvec_old.ind_list,name,i);
+			auto j = xvec_old.hash_ind_list.find(name);
+			//auto j = find_in(xvec_old.ind_list,name,i);
 			if(j == UNSET) xvec_new.value.push_back(UNSET);
 			else xvec_new.value.push_back(xvec_old.value[j]);			
 		}
-		
+		xvec_new.hash_ind_list.create(xvec_new.ind_list);
+
 		fe.X_vector = xvec_new;		
 	}
 }
 
 
-/// Converts from a filter in 
-vector <bool> Species::global_convert(const Filter &filt) const
+/// Converts from a filter in different classification to one for each global compartment
+/// This consists of multiplying together a series of equations 
+vector <string> Species::global_convert(const Filter &filt) const
 {
-	vector <bool> gfilt;
+	const auto N = comp_gl.size();
+	vector <string> gfilt(N);
 	
-	for(auto c = 0u; c < comp_gl.size(); c++){
+	for(auto c = 0u; c < N; c++){
 		const auto &cgl = comp_gl[c];
 		
-		auto cl = 0u; while(cl < ncla && filt.cla[cl].comp[cgl.cla_comp[cl]] == true) cl++;
+		string te="";
+		for(auto cl = 0u; cl < ncla; cl++){
+			auto &fcl = filt.cla[cl];
+			if(fcl.type != COMP_FILT) emsg("SHould be COMP_FILT");
+			if(te != "") te += "*";
 		
-		if(cl == ncla) gfilt.push_back(true);
-		else gfilt.push_back(false);
+			const auto cc = cgl.cla_comp[cl];
+			te += "("+fcl.comp_prob_str[cc]+")";
+		}
+	
+		gfilt[c] = te;
 	}
 	
 	return gfilt;
@@ -767,39 +1211,44 @@ vector <bool> Species::global_convert(const Filter &filt) const
 
 
 /// Converts from transition filter in classification to global filter
-vector <bool> Species::trans_global_convert(unsigned int cl, const vector <bool> &trans_filt, const Filter &comp_filt)
+// For each transition gives a list of equations which multiply to give fraction observed
+vector <string> Species::trans_global_convert(unsigned int cl, const vector <string> &trans_str, const Filter &comp_filt)
 {
-	vector <bool> gfilt;
-	
+	vector <string> gfilt;
 	auto filtg = global_convert(comp_filt); 
 	for(auto tr = 0u; tr < tra_gl.size(); tr++){
 		const auto &trg = tra_gl[tr];
-		auto val = false;
-		if(trg.cl == cl && trans_filt[trg.tr] == true){
-			auto c = trg.i; if(c == SOURCE) c = trg.f;
-			if(filtg[c] == true) val = true;
+		if(trg.cl != cl) gfilt.push_back("0");
+		else{
+			auto c = trg.i; if(c == UNSET) c = trg.f;
+			auto str = "("+trans_str[trg.tr]+")*("+filtg[c]+")";
+			gfilt.push_back(str);
 		}
-		
-		gfilt.push_back(val);
 	}	
 	
 	return gfilt;
 }
 
 
-// Used to order events
+/// Used to order events
 bool EventData_ord (EventData ev1, EventData ev2)                      
 { return (ev1.t < ev2.t); };  
 
-// Used to order observations
+
+/// Used to order observations
 bool ObsData_ord (ObsData ob1, ObsData ob2)                      
 { return (ob1.t < ob2.t); };  
 
+
+/// Used to order population data times
 bool PopData_ord (PopData pd1, PopData pd2)                      
 { return (pd1.t < pd2.t); }; 
 
+
+/// Used to order poptrans data times
 bool PopTransData_ord (PopTransData pd1, PopTransData pd2)                      
 { return (pd1.tmin < pd2.tmin); }; 
+
 
 /// Orders individual events by time
 void Species::order_data_events()
@@ -807,41 +1256,408 @@ void Species::order_data_events()
 	sort(pop_data.begin(),pop_data.end(),PopData_ord);    
 	sort(pop_trans_data.begin(),pop_trans_data.end(),PopTransData_ord);    
 	
-	// Adds populations onto the timelines of each individual
-	for(auto j = 0u; j < pop_data.size(); j++){
-		const auto &pd = pop_data[j];
-		for(auto i = 0u; i < individual.size(); i++){
-			auto &ind = individual[i];
-			ObsData ob; 
-			ob.type = OBS_POP;
-			ob.ref = j;
-			ob.t = pd.t;
-			ind.obs.push_back(ob);
-		}
-	}
-	
-	
 	// Sorts events by time
 	for(auto i = 0u; i < individual.size(); i++){
 		auto &ind = individual[i];
 		sort(ind.ev.begin(),ind.ev.end(),EventData_ord);    
 		sort(ind.obs.begin(),ind.obs.end(),ObsData_ord);    
 	}
-	
+		
 	if(false){
-		for(auto i = 0u; i < individual.size(); i++){
-			const auto &ind = individual[i];
-			//print_event_data(ind.name,ind.ev);
-			print_obs_data(ind.name,ind.obs);
-		}
-		
-		
 		for(const auto &pd : pop_data){
-			cout << pd.t << " " << pd.value << " " << pd.sd << " Population data" << endl;
+			cout << pd.t << " " << pd.value << " " << pd.obs_mod_val << " Population data" << endl;
 		}
 		
 		for(const auto &ptd : pop_trans_data){
-			cout << ptd.tmin << " " << ptd.tmax << " " << ptd.value << " " << ptd.sd << " Population trans data" << endl;
+			cout << ptd.tmin << " " << ptd.tmax << " " << ptd.value << " " << ptd.obs_mod_val << " Population trans data" << endl;
+		}
+	}
+}
+
+
+/// Given a string (e.g. "Sex=M,Loc=file") this constructs the filter
+Filter Species::set_comp_filt(string te, unsigned int cl_not_allow, BoundType bound, const DataSource &so)
+{
+	Filter filt;
+	
+	filt.cla.resize(ncla);
+
+	// Sets default values for filter
+	for(auto cl = 0u; cl < ncla; cl++){
+		const auto &claa = cla[cl];
+				
+		filt.cla[cl].type = COMP_FILT;
+		filt.cla[cl].comp_prob_str.resize(claa.ncomp);
+		for(auto c = 0u; c < claa.ncomp; c++){
+			filt.cla[cl].comp_prob_str[c] = "1";
+		}
+	}
+	
+	if(te != ""){
+		auto spl = split(te,',');
+		for(auto j = 0u; j < spl.size(); j++){
+			auto spl2 = split(spl[j],'=');
+			if(spl2.size() != 2){ 
+				alert_source("In 'filter' the expression '"+spl[j]+"' must contain an equals sign",so); 
+				return filt;
+			}
+			
+			if(spl2[0] == ""){
+				alert_source("In 'filter' the value '"+spl[j]+"' does not specify a classification",so);
+				return filt;
+			}
+			
+			auto cl = find_cl(spl2[0]);
+			if(cl == UNSET){ 
+				alert_source("In 'filter' the value '"+spl2[0]+"' is not a classification",so); 
+				return filt;
+			}
+			
+			if(cl == cl_not_allow){ 
+				alert_source("In 'filter' the value '"+spl2[0]+"' cannot be the same as the transition classification",so); 
+				return filt;
+			}
+						
+			if(toLower(spl2[1]) == "file"){
+				filt.cla[cl].type = FILE_FILT;
+			}
+			else{
+				filt.cla[cl].type = COMP_FILT;
+				string emsg;
+				filt.cla[cl].comp_prob_str = find_comp_prob_str(cl,spl2[1],bound,emsg);
+				if(emsg != ""){
+					alert_source(emsg,so); 
+				}
+			}
+		}
+	}
+	
+	if(false){
+		cout << te << " Filter text" << endl;
+		for(auto cl = 0u; cl < ncla; cl++){
+			const auto &claa = cla[cl];
+			for(auto c = 0u; c < claa.ncomp; c++){
+				cout << claa.comp[c].name <<" " << filt.cla[cl].comp_prob_str[c] << " comp prob string" << endl;
+			}
+		}
+	}
+	
+	return filt;
+}
+
+
+/// Given a string, e.g. S|E or M:0.5|F:0.7, works out equations for probability in compartments
+vector <string> Species::find_comp_prob_str(unsigned int cl, string te, BoundType bound, string &emsg) const
+{
+	const auto &claa = cla[cl];
+	
+	emsg = "";
+	
+	vector <string> fil(claa.ncomp);
+	
+	for(auto c = 0u; c < fil.size(); c++){
+		fil[c] = "0";
+	}	
+		
+	if(te == "."){
+		te = "";
+		const auto &claa = cla[cl];
+		for(auto c = 0u; c < claa.comp.size(); c++){
+			if(te != "") te += "|";
+			te += claa.comp[c].name;
+		}
+	}
+	
+	auto spl = split_with_bracket(te,'|');
+	for(auto k = 0u; k < spl.size(); k++){
+		auto spl2 = split(spl[k],':');
+		auto c = find_c(cl,spl2[0]);
+		if(c == UNSET){
+			emsg = "In 'filter' the compartment '"+spl2[0]+"' is not in classification '"+claa.name+"'";
+			return fil;
+		}
+				
+		switch(spl2.size()){
+		case 1:
+			fil[c] = "1";
+			break;
+			
+		case 2:
+			fil[c] = add_bound(spl2[1],bound);
+			break;
+			
+		default:
+			emsg = "In 'filter' the expression '"+spl[k]+"' is not understood";
+			break;
+		}
+	}
+	
+	for(auto c = 0u; c < claa.ncomp; c++){
+		const auto &co = claa.comp[c];
+		if(co.erlang_hidden){
+			//auto vec = claa.hash_comp.get_vec_string(co.erlang_source);
+			//auto cc = claa.hash_comp.existing(vec);
+			auto cc = claa.hash_comp.find(co.erlang_source);
+			if(cc == UNSET) { emsg = "Erlang problem"; return fil;}
+			fil[c] = fil[cc];
+		}
+	}
+
+	return fil;
+}
+
+
+/// Given a string, e.g. S->E or S->E:0.5|S->I:0.7, works out equations for prob in transitions
+vector <string> Species::set_trans_filt(unsigned int cl, string te, BoundType bound, string &errmsg) const
+{
+	const auto &claa = cla[cl];
+	
+	vector <string> fil(claa.ntra);
+	
+	for(auto tr = 0u; tr < fil.size(); tr++){
+		fil[tr] = "0";
+	}	
+	
+	auto spl = split_with_bracket(te,'|');
+	for(auto k = 0u; k < spl.size(); k++){
+		auto spl2 = split(spl[k],':');
+		auto tr_name = replace(spl2[0],"->","→");
+		auto tr = find_tr(cl,tr_name);
+		if(tr == UNSET){
+			errmsg = "The expression '"+spl2[0]+"' is not a transition in '"+claa.name+"'";
+			return fil;
+		}
+				
+		switch(spl2.size()){
+		case 1:
+			fil[tr] = "1";
+			break;
+			
+		case 2:
+			fil[tr] = add_bound(spl2[1],bound);
+			break;
+			
+		default:
+			errmsg = "The expression '"+spl[k]+"' is not understood";
+			break;
+		}
+	}
+		
+	return fil;
+}
+
+			
+/// Adds a boundary to a numeric value 
+string Species::add_bound(string te, BoundType bound) const 
+{
+	stringstream ss;
+	switch(bound){
+	case LOWER_BOUND: ss << "max(" << te << "|" << LOW_BOUND << ")"; break;
+	case LOWER_UPPER_BOUND: ss << "min(max(" << te << "|" << LOW_BOUND << ")|" << UP_BOUND<< ")"; break;
+	default: emsg("Bound not reconginsed"); break;
+	}
+	return ss.str();
+}
+
+			
+/// Creates a vector of euqations from a vector of strings
+vector <EquationInfo> Species::create_eqn_vector(const vector <string> &vec, EqnType type, const DataSource &so)
+{	
+	auto N = vec.size();
+	vector <EquationInfo> eqn(N);
+	for(auto c = 0u; c < N; c++){
+		eqn[c] = he(add_equation_info(vec[c],type),so);
+	}
+	
+	return eqn;
+}
+
+
+/// For each time div and global transition references any transition data associated with it
+void Species::init_pop_trans_ref()
+{
+	T = timepoint.size()-1;
+	
+	pop_trans_ref.resize(T);
+	for(auto ti = 0u; ti < T; ti++){
+		pop_trans_ref[ti].resize(tra_gl.size());
+	}
+	
+	for(auto i = 0u; i < pop_trans_data.size(); i++){
+		const auto &ptd = pop_trans_data[i];
+		const auto &ptf = pop_trans_filter[ptd.ref];
+		
+		auto ti_min = get_ti(ptd.tmin);
+		auto ti_max = get_ti(ptd.tmax);
+		
+		for(auto tr : ptf.tr_nonzero){
+			for(auto ti = ti_min; ti < ti_max; ti++){
+				pop_trans_ref[ti][tr].push_back(i);
+			}
+		}
+	}
+}
+
+
+/// For each time div and global transition references any population data associated with it
+void Species::init_pop_data_ref()
+{
+	T = timepoint.size()-1;
+	
+	pop_data_ref.resize(T);
+	for(auto ti = 0u; ti < T; ti++){
+		pop_data_ref[ti].resize(comp_gl.size());
+	}
+	
+	for(auto i = 0u; i < pop_data.size(); i++){
+		const auto &ptd = pop_data[i];
+		const auto &pf = pop_filter[ptd.ref];
+
+		auto ti = get_ti(ptd.t); if(ti == T) ti--;
+		
+		for(auto c : pf.c_nonzero){
+			pop_data_ref[ti][c].push_back(i);
+		}
+	}
+}
+
+
+/// Returns the classification number from its name
+unsigned int Species::find_cl(string name) const 
+{
+	for(auto cl = 0u; cl < ncla; cl++){
+		if(toLower(cla[cl].name) == toLower(name)) return cl;
+	}
+	return UNSET;
+}
+
+
+/// Returns the transition number from its name
+unsigned int Species::find_tr(unsigned int cl, string name) const 
+{
+	const auto &tra = cla[cl].tra;
+	for(auto tr = 0u; tr < tra.size(); tr++){
+		if(tra[tr].name == name) return tr;
+	}
+	return UNSET;
+}
+
+
+/// Adds a vector of eqn into onto obs_eqn
+vector <unsigned int> Species::obs_eqn_add_vec(vector <EquationInfo> &eqn_info) 
+{
+	vector <unsigned int> vec;
+	for(auto i = 0u; i < eqn_info.size(); i++){
+		vec.push_back(add_to_vec(obs_eqn,eqn_info[i].eq_ref));
+	}	
+	return vec;
+}
+
+
+/// For individuals not added to the system set an uninformative prior on initial state
+void Species::set_default_enter()
+{
+	auto fl = false;
+	for(auto &ind : individual){
+		if(ind.enter_ref == UNSET){ ind.enter_ref = enter.size(); fl = true;}
+	}
+	
+	if(fl == true){
+		Enter ep;
+		ep.name = "Uninformative"; 
+		ep.time = details.t_start; 
+		ep.c_set = UNSET;
+		ep.cla.resize(ncla);
+		for(auto cl = 0u; cl < ncla; cl++){
+			auto &ep_cl = ep.cla[cl];
+			ep_cl.c_set = UNSET;
+			
+			auto N = cla[cl].ncomp;
+			auto val = 1.0/N;
+			auto ei = add_equation_info(to_string(val),CONST_EQN,p_species,UNSET);
+
+			for(auto c = 0u; c < N; c++) ep_cl.eqn.push_back(ei);
+		}
+		ep.set = false;
+		
+		enter.push_back(ep);
+	}
+}
+
+
+/// Handles any error message
+EquationInfo Species::he(EquationInfo eqn_inf, const DataSource &so)
+{
+	eqn_inf.line_num = so.line_num;
+	
+	if(eqn_inf.error) alert_source(eqn_inf.emsg,so);	
+	return eqn_inf;
+}	
+
+
+/// Generates a potential list of events which can be added and removed from the system
+vector <AddRemLocal> Species::find_add_rem_list() const
+{
+	vector <AddRemLocal> add_rem_local;
+	
+	// Works out which global compartments contribute to a population 
+	vector <bool> cp(comp_gl.size(),false);
+	for(auto c = 0u; c < comp_gl.size(); c++){
+		if(comp_gl[c].pop_ref.size() > 0) cp[c] = true;
+	}
+	
+	for(auto c = 0u; c < comp_gl.size(); c++){
+		if(cp[c] == false){
+			for(auto tr : comp_gl[c].tr_leave){
+				vector <unsigned int> tr_list;
+				tr_list.push_back(tr);
+				
+				add_tr_list(tr_list,cp,add_rem_local);
+			}
+		}
+	}
+	
+	if(false){
+		for(const auto &arl : add_rem_local){
+			for(auto tr :arl.tr_list) cout << tra_gl[tr].name << ","; 
+			cout << "ADD REM" << endl; 
+		}
+	}
+	
+	return add_rem_local;
+}
+
+
+/// Add new items to add remove local
+void Species::add_tr_list(const vector <unsigned int> &tr_list, const vector <bool> &cp, vector <AddRemLocal> &add_rem_local) const 
+{
+	auto tr = tr_list[tr_list.size()-1];
+	auto cf = tra_gl[tr].f;
+	
+	if(cf == UNSET || cp[cf] == false){
+		AddRemLocal arl; arl.tr_list = tr_list;
+		add_rem_local.push_back(arl);
+	}
+	else{
+		for(auto tr : comp_gl[cf].tr_leave){
+			auto tr_list_new = tr_list;
+			tr_list_new.push_back(tr);		
+			add_tr_list(tr_list_new,cp,add_rem_local);			
+		}
+	}
+}
+
+
+/// Adds any individuals which are unobserved 
+void Species::add_unobs_Amatrix_ind()
+{
+	
+	for(const auto &ieg : ind_eff_group){
+		const auto &A = ieg.A_matrix;
+		if(A.set){
+			for(auto na : A.ind_list){
+				find_individual(na);
+			}
 		}
 	}
 }

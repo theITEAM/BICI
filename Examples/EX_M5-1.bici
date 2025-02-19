@@ -1,0 +1,50 @@
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+data-dir folder="Examples\EX_M5-1-data-files"
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5
+
+post-sim start=0 end=100
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
+
+species name="Animal" type="individual" trans-tree="off"
+
+# SPECIES MODEL
+
+class name="DS" index="a"
+
+comp name="S" color="#009900" x=-16 y=-7
+comp name="I" color="#ff2222" x=-2 y=-7
+
+trans name="S->I" value="exp(rate:β_v×{I}/N)"
+
+
+class name="Vaccination" index="v"
+
+comp name="Vac" color="#888888" x=-10 y=-2
+comp name="Unvac" color="#aa00aa" x=4 y=-2
+
+
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="DS" file="init-pop-sim-Animal.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="N" constant="202"
+param name="β_v" value="value-beta.csv" prior="uniform(0,1)"
+
+

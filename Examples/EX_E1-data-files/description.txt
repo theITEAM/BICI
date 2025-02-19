@@ -1,0 +1,18 @@
+# Example E1: Individual fixed effect applied to a transition
+
+## Objective
+- This example includes an individual fixed effect applied to the infection transition.
+
+## Data
+- Infection event times.
+
+## Model
+- A single individual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A fixed effect 〈g〉 varies the susceptibilities of individuals based on a covariate.
+- A parameter $ν^g$ governs the strength of the fixed effect.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

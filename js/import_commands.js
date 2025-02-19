@@ -1,58 +1,425 @@
-// Implements an import command
-
 "use strict";
+// Function which implement import commands
+
+/// Imports a data-table 
+function import_data_table_command(cname)
+{
+	let siminf = "inf";
+	switch(cname){
+	case "add-pop-sim": cname = "add-pop"; siminf = "sim"; break;
+	case "remove-pop-sim": cname = "remove-pop"; siminf = "sim"; break;	
+	case "add-ind-sim": cname = "add-ind"; siminf = "sim"; break;
+	case "remove-ind-sim": cname = "remove-ind"; siminf = "sim"; break;
+	case "move-ind-sim": cname = "move-ind"; siminf = "sim"; break;
+	case "init-pop-sim": cname = "init-pop"; siminf = "sim"; break;
+	case "add-pop-post-sim": cname = "add-pop"; siminf = "ppc"; break;
+	case "remove-pop-post-sim": cname = "remove-pop"; siminf = "ppc"; break;	
+	case "add-ind-post-sim": cname = "add-ind"; siminf = "ppc"; break;
+	case "remove-ind-post-sim": cname = "remove-ind"; siminf = "ppc"; break;
+	case "move-ind-post-sim": cname = "move-ind"; siminf = "ppc"; break;
+	}
+	
+	let i = find(convert,"command",cname);
+	if(i == undefined){
+		error("Counld not not import data table:"+cname);
+		return;
+	}
+	
+	let type = convert[i].type;
+	
+	let file = get_tag_value("file"); if(file == "") cannot_find_tag();
+	
+	let tab = load_table(file.te,true,file.sep,file.name);
+	
+	if(typeof tab == 'string'){
+		alert_import(tab);
+	}
+	
+	let cols = get_tag_value("cols");
+	let cols_split = cols.split(",");
+	
+	let p = imp.p;
+	if(p == undefined){
+		alert_import("To load the data file the species must be set");
+	}
+	
+	let sp = model.species[p];
+	
+	let spec;
+	let info = {p:p, siminf:siminf};
+	
+	switch(type){                                    // Modifies specification dependent on data source
+	case "Init. Pop.":
+		{
+			let focal = get_tag_value("focal");
+		
+			if(focal == "") spec = {radio:{value:"File"},radio2:{value:"All"}, focal:{te:""}};
+			else{
+				let cl = find_nocase(sp.cla,"name",focal);
+				if(cl == undefined) alert_import("'"+focal+"' is not a classification name");
+				else focal = sp.cla[cl].name;
+		
+				spec = {radio:{value:"File"},radio2:{value:"Focal"}, focal:{te:focal}};
+			}
+			
+			let type = get_tag_value("type"); if(type == "") type = "fixed";
+			if(option_error("type",type,["fixed","dist"]) == true) return;
+				
+			if(type == "fixed") spec.radio_dist = {value:"Fixed"};
+			else spec.radio_dist = {value:"Dist"};
+		}	
+		break;
+	
+	case "Add Pop.": case "Remove Pop.":
+		break
+		
+	case "Add Ind.":
+		break;
+		
+	case "Remove Ind.":
+		break;
+	
+	case "Move Ind.":
+		{
+			let name = get_tag_value("class"); if(name == "") cannot_find_tag();
+		
+			let cl = find_nocase(sp.cla,"name",name);
+			if(cl == undefined){
+				alert_import("In 'class' the value '"+name+"' is not a classification"); 
+			}
+			
+			spec = {cl_drop:{te:sp.cla[cl].name}};
+		}
+		break;
+		
+	case "Ind. Eff.":
+		{
+			let name = get_tag_value("name"); if(name == "") cannot_find_tag();
+		
+			spec = {drop:{te:name}};
+		}
+		break;
+		
+	case "Ind. Group":
+		{
+			let name = get_tag_value("name"); if(name == "") cannot_find_tag();
+			spec = { gname:name};
+		}
+		break;
+	
+	case "Compartment":
+		{
+			let name = get_tag_value("class");
+			if(name == "") cannot_find_tag();
+			
+			let cl = find_nocase(sp.cla,"name",name);
+			if(cl == undefined){
+				alert_import("In 'class' the value '"+name+"' is not a classification"); 
+			}
+		
+			spec = {cl_drop:{te:sp.cla[cl].name}};
+		}	
+		break;
+		
+	case "Transition": 
+		{
+			let name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
+			name = name.replace(/->/g,"→")
+			
+			let cl_sel = get_cl_from_trans(name,p);
+		
+			if(cl_sel == undefined){
+				alert_import("Error with expression '"+name+"'"); return;
+			}
+
+			let filter = get_tag_value("filter");
+			let filt = get_filt_from_str(filter,p);
+			if(filt == undefined) return;
+
+			let claa_sel = sp.cla[cl_sel];
+		
+			set_get_tra_filt_from_str(claa_sel,filt,name);
+
+			spec = {cl_drop:{te:claa_sel.name}, filter:filt};
+
+			let or = get_tag_value("obsrange").toLowerCase();
+			if(or == "") cannot_find_tag();
+			
+			if(option_error("obsrange",or,["all","specify"]) == true) return;
+			
+			spec.time_start = "";
+			spec.time_end = "";
+			
+			switch(or){
+			case "all": 
+				spec.time_radio = {value:"All"};
+				break;
+				
+			case "specify":
+				spec.time_radio = {value:"Spec"}; 
+				
+				let start = get_tag_value("start");
+				if(start == "") cannot_find_tag();
+				if(isNaN(start)) alert_import("'start' must be a number");
+				spec.time_start = start;
+				
+				let end = get_tag_value("end");
+				if(end == "") cannot_find_tag();
+				if(isNaN(end)) alert_import("'end' must be a number");
+				spec.time_end = end;
+				
+				if(Number(start) >= Number(end)){
+					alert_import("'start' must be before 'end'");
+				}
+				break;
+			
+			default: 
+				alert_import("The value '"+or+"' not recognised"); 
+				break;
+			}
+		}
+		break;
+		
+	case "Diag. Test":
+		{
+			let Se = get_tag_value("Se");
+			if(Se == "") cannot_find_tag();
+			
+			output_error(is_eqn(Se,"Se",{zero_one_range:true}));
+			
+			let Sp = get_tag_value("Sp");
+			if(Sp == "") cannot_find_tag();
+			
+			output_error(is_eqn(Sp,"Sp",{zero_one_range:true}));
+			
+			let pos = get_tag_value("pos");
+			if(pos == "") pos = "1";
+			
+			let neg = get_tag_value("neg");
+			if(neg == "") neg = "0";
+			
+			if(pos == neg){
+				alert_import("'pos' and 'neg' cannot both have the same value");
+			}
+			
+			let comp = get_tag_value("comp");
+			if(comp == "") cannot_find_tag();
+		
+			let spl = comp.split(",");
+			
+			let cl = get_cl_from_comp(spl[0],p);
+			if(cl == undefined){
+				alert_import("Value '"+spl[0]+"' is not a compartment");
+			}
+			
+			let claa = model.species[p].cla[cl];
+			
+			let cb = {name:claa.name, value:[]};
+			
+			for(let c = 0; c < claa.ncomp; c++){
+				let name = claa.comp[c].name;
+				if(find_in(spl,name) != undefined) cb.value[c] = {comp_name_store:name, check:true};
+				else cb.value[c] = {comp_name_store:name, check:false};
+			}
+	
+			let Se_eqn = create_equation(Se,"Se");
+			let Sp_eqn = create_equation(Sp,"Sp");
+			
+			spec = {cl_drop:{te:claa.name}, Se_eqn:Se_eqn, Sp_eqn:Sp_eqn, pos_result:pos, neg_result:neg, check_box:cb};
+		}
+		break;
+		
+	case "Population":
+		{		
+			let filter = get_tag_value("filter");
+			
+			let filt = get_filt_from_str(filter,p);
+			if(filt == undefined) return;
+		
+			spec = {filter:filt};
+				
+			load_obs_model(spec);
+		}
+		break;
+		
+	case "Pop. Trans.":
+		{
+			let name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
+			name = name.replace(/->/g,"→")
+			
+			let cl_sel = get_cl_from_trans(name,p);
+		
+			if(cl_sel == undefined){
+				alert_import("Error with expression '"+name+"'"); return;
+			}
+
+			let filter = get_tag_value("filter");
+			let filt = get_filt_from_str(filter,p);
+			if(filt == undefined) return;
+
+			let claa_sel = sp.cla[cl_sel];
+		
+			set_get_tra_filt_from_str(claa_sel,filt,name);
+
+			spec = {cl_drop:{te:claa_sel.name}, filter:filt};
+
+			load_obs_model(spec);
+		}
+		break;
+		
+	case "Genetic":
+		{
+			let type = get_tag_value("type"); if(type == "") cannot_find_tag();
+			if(option_error("type",type,["matrix","snp"]) == true) return;
+			
+			let snp_root = get_tag_value("root");
+			if(type == "snp"){
+				if(snp_root == "") cannot_find_tag();
+			}
+			
+			let mut_rate = get_tag_value("mut-rate"); if(mut_rate == "") cannot_find_tag();
+			let seq_var = get_tag_value("seq-var"); if(seq_var == "") cannot_find_tag();
+			spec = {type_radio:{value:type}, snp_root:snp_root, mut_rate_eqn:create_equation(mut_rate,"mut_rate"), seq_var_eqn:create_equation(seq_var,"seq_var"), };
+		}
+		break;
+	}
+	
+	start_data_source(type,spec,info);
+	
+	let so = edit_source;
+	
+	if(type == "Genetic"){
+		switch(so.spec.type_radio.value){
+		case "matrix": set_genetic_matrix_columns(tab.ele,so); break;
+		case "snp": set_SNP_columns(tab,so); break;
+		}
+	}
+	
+	// Determines if dates need to be converted to times
+	so.time_format = "float";
+	for(let c = 0; c < so.load_col.length; c++){
+		if(so.load_col[c].heading == "t"){
+			let date = get_tag_value("date");
+				
+			if(date != ""){
+				if(option_error("date",date,["dd/mm/yyyy","dd/mm/yy","dd.mm.yyyy","yyyy-mm-dd","mm/dd/yyyy","mm/dd/yy"]) == true) return;
+				
+				so.time_format = date;
+			}
+		}
+	}
+	
+	so.data_table_use = "not loaded";
+	
+	let col_name = [];
+	for(let c = 0; c < so.load_col.length; c++){
+		col_name.push(so.load_col[c].heading);
+	}
+	
+	if(cols != ""){
+		let spl = cols.split(",");
+
+		if(spl.length != col_name.length){
+			alert_import("'cols' does not have the correct number of entries (expected something in the order '"+stringify(col_name)+"')"); 
+		}
+		
+		for(let i = 0; i < spl.length; i++){
+			for(let j = 0; j < col_name.length; j++){
+				if(spl[i] == col_name[j] && i != j){
+					alert_import("'cols' does not have the correct order (expected something in the order '"+stringify(col_name)+"')"); 
+				}
+			}
+		}
+		
+		col_name = spl;
+	}
+
+	so.table = get_subtable(tab,col_name);	
+	if(so.table.error != "") alert_import("File problem – "+so.table.error);
+
+	convert_date_time(so);
+
+	so.table_loaded = true;
+	so.table.edit = true;
+
+	switch(type){                                    // Adds prior for information for total population
+	case "Init. Pop.":
+		{
+			init_pop_convert_to_graphical(so,true);
+
+			if(so.spec.radio_dist.value == "Dist" && so.spec.radio2.value == "All"){
+				so.pop_dist = unset_prior("pop_prior");
+				
+				let prior = get_tag_value("prior").toLowerCase(); 
+				so.pop_dist = convert_text_to_prior(prior,prior_pos);
+			}
+		}
+		break;
+	} 
+	
+	data_source_check_error("import",so)
+	
+	edit_source.info.imp = true;
+	data_source("Add",edit_source);
+}
+
 
 /// Adds a species to the model
 function species_command(loop)
 {
 	let name = get_tag_value("name");
-	if(name == ""){ cannot_find_tag(); return;}
+	if(name == "") cannot_find_tag();
 	
 	let type = get_tag_value("type").toLowerCase();
-	if(type == ""){ cannot_find_tag(); return;}
+	if(type == "") cannot_find_tag();
 	
 	if(option_error("type",type,["individual","population"]) == true) return;
 
+	let trans_tree = false; 
+	if(type == "individual"){
+		let trans_tree_str = get_tag_value("trans-tree").toLowerCase();
+		if(trans_tree_str != ""){
+			if(trans_tree_str == "on") trans_tree = true;
+			else{
+				if(trans_tree_str != "off"){ alert_import("'trans-tree' must be either 'off' or 'on'"); return;}
+			}
+		}
+	}
+	
 	if(loop == 0){
 		let type_conv = type.substr(0,1).toUpperCase()+type.substr(1);
-	
-		model.add_species(name,type_conv);
-	
-		if(check_for_error() == true) return;	
-		inter.imp.p = model.species.length-1;		
+		output_error(model.add_species(name,type_conv,trans_tree));
+		imp.p = model.species.length-1;		
 	}
 	else{
-		inter.imp.p = find(model.species,"name",name);
-		if(inter.imp.p == undefined){ alert_import("Problem finding species '"+name+"'"); return;}
+		imp.p = find(model.species,"name",name);
+		if(imp.p == undefined) alert_import("Problem finding species '"+name+"'");
 	}
-	inter.imp.cl = undefined;	
 
-	initialise_pages();
+	imp.cl = undefined;	
 }
 
 
 /// Adds a classification to the model
 function classification_command(loop)
 {
-	let p = inter.imp.p;
+	let p = imp.p;
 
 	if(p == undefined){
 		alert_import("A species must be defined before a classification can be added");
-		return;
 	}
 		
 	let sp = model.species[p];
 	
 	let name = get_tag_value("name");
-	if(name == ""){ cannot_find_tag(); return;}
+	if(name == "") cannot_find_tag();
 	
 	let clone = get_tag_value("clone");
-	if(clone != ""){ // Clones a classification from another species
+	if(clone != ""){                                 // Clones a classification from another species
 		if(loop == 0){
 			let p2 = find(model.species,"name",clone);
 			if(p2 == undefined){
 				alert_import("In 'clone' cannot find the species '"+clone+"'");
-				return;
 			}
 			
 			let sp2 = model.species[p2];
@@ -61,34 +428,26 @@ function classification_command(loop)
 			
 			if(cl2 == undefined){
 				alert_import("In clone species '"+clone+"' cannot find the classification '"+name+"'");
-				return;
 			} 
 				
 			model.clone_class(p,p2,cl2)	
-			sp.cla[sp.ncla-1].import_line = inter.imp.line;
+			sp.cla[sp.ncla-1].import_line = imp.line;
 		}
 		else{
-			inter.imp.cl = find(model.species[p].cla,"name",name);
-			if(inter.imp.cl == undefined){ alert_import("Problem finding classification '"+name+"'"); return;}
+			imp.cl = find(model.species[p].cla,"name",name);
+			if(imp.cl == undefined) alert_import("Problem finding classification '"+name+"'");
 		}
 	}
 	else{
 		let index = get_tag_value("index");
-		if(index == ""){ cannot_find_tag(); return;}
+		if(index == "") cannot_find_tag();
 		if(index.length != 1){
 			alert_import("The index '"+index+"' must be just a single character");
-			return;
 		}
 		
 		if(index == "t"){
 			alert_import("The index 't' cannot be used because it is reserved for time variation");
-			return;
 		}	
-		
-		if(index == "a"){
-			alert_import("The index 'a' cannot be used because it is reserved for age variation");
-			return;
-		}
 		
 		if(find_in(alphabet,index) == undefined){
 			alert_import("Index '"+index+"' must be from the lower case alphabet");
@@ -101,7 +460,6 @@ function classification_command(loop)
 			coord = coord.toLowerCase();
 			if(coord != "latlng" && coord != "cartesian"){
 				alert_import("'coord' must be either 'latlng' or 'cartesian'");
-				return;
 			}					
 			op.coord = coord;
 		}
@@ -111,56 +469,49 @@ function classification_command(loop)
 			if(def_map != ""){
 				if(def_map != "load"){
 					alert_import("'map' must be set to 'load'");
-					return;
 				}
 				op.default_map = true;
 			}
 		}
 		
 		if(loop == 0){
-			model.add_classification(p,name,index,op);
+			output_error(model.add_classification(p,name,index,op));
 		
-			sp.cla[sp.ncla-1].import_line = inter.imp.line;
+			sp.cla[sp.ncla-1].import_line = imp.line;
 		
-			if(check_for_error() == true) return;	
-			inter.imp.cl = sp.ncla-1;		
+			imp.cl = sp.ncla-1;		
 		}
 		else{
-			inter.imp.cl = find(model.species[p].cla,"name",name);
-			if(inter.imp.cl == undefined){ alert_import("Problem finding classification '"+name+"'"); return;}
+			imp.cl = find(model.species[p].cla,"name",name);
+			if(imp.cl == undefined) alert_import("Problem finding classification '"+name+"'"); 
 		}
 	}
-	
-	initialise_pages();
 }
 
 
 /// Sets the classification which is being worked on
 function set_command()
 {
-	let p = inter.imp.p;
+	let p = imp.p;
 	let sp = get_tag_value("species");
 	if(sp != ""){
-		inter.imp.p = find(model.species,"name",sp);
-		if(inter.imp.p == undefined){
+		imp.p = find(model.species,"name",sp);
+		if(imp.p == undefined){
 			alert_import("Cannot set the species '"+sp+"' as this does not exist");
-			return;
 		}
 	}
 	
 	let name = get_tag_value("classification");
 	
 	if(name != ""){
-		let p = inter.imp.p;
+		let p = imp.p;
 		if(p == undefined){
 			alert_import("A species must be set before a 'classification' can be set");
-			return;
 		};
 	
-		inter.imp.cl = find(model.species[p].cla,"name",name);
-		if(inter.imp.cl == undefined){
+		imp.cl = find(model.species[p].cla,"name",name);
+		if(imp.cl == undefined){
 			alert_import("Cannot set the classification '"+name+"'");
-			return;
 		}
 	}
 }
@@ -171,29 +522,31 @@ function camera_command()
 {
 	let claa = get_claa(); if(claa == undefined) return;
 
-	let scale = get_tag_value("scale"); if(scale == ""){ cannot_find_tag(); return;}
-	if(isNaN(scale)){ alert_import("'scale' must be a number"); return;}
-	if(scale <= 0){ alert_import("'scale' must be positive"); return;}
+	let scale = get_tag_value("scale"); if(scale == "") cannot_find_tag();
+	if(isNaN(scale)) alert_import("'scale' must be a number"); 
+	if(scale <= 0) alert_import("'scale' must be positive");
+	
+	claa.camera.set = true;
 	
 	claa.camera.scale = scale;
 
 	switch(claa.camera.coord){
 	case "cartesian":
-		let x = get_tag_value("x"); if(x == ""){ cannot_find_tag(); return;}
-		let y = get_tag_value("y"); if(y == ""){ cannot_find_tag(); return;}
+		let x = get_tag_value("x"); if(x == "") cannot_find_tag();
+		let y = get_tag_value("y"); if(y == "") cannot_find_tag();
 		
-		x = Number(x)*import_scale_factor; if(isNaN(x)){ alert_import("'x' must be a number"); return;}
+		x = Number(x)*import_scale_factor; if(isNaN(x)) alert_import("'x' must be a number");
 		
-		y = Number(y)*import_scale_factor; if(isNaN(y)){ alert_import("'y' must be a number"); return;}
+		y = Number(y)*import_scale_factor; if(isNaN(y)) alert_import("'y' must be a number");
 			
 		claa.camera.x = x;
 		claa.camera.y = y;
 		break;
 		
 	case "latlng":
-		let lat = get_tag_value("lat"); if(lat == ""){ cannot_find_tag(); return;}
-		let lng = get_tag_value("lng"); if(lng == ""){ cannot_find_tag(); return;}
-		if(check_latlng(lat,lng) != "success") return;
+		let lat = get_tag_value("lat"); if(lat == "") cannot_find_tag();
+		let lng = get_tag_value("lng"); if(lng == "") cannot_find_tag();
+		check_latlng(lat,lng);
 		
 		let p = transform_latlng(lng,lat);
 		claa.camera.x = p.x;
@@ -202,7 +555,50 @@ function camera_command()
 		
 	default:
 		alert_import("'coord' must be 'cartesian' or 'latlng'"); 
-		return;
+		break;
+	}
+}
+
+
+/// Gets a list of tags from a file 
+function get_tags_list(file)
+{
+	let tags_list=[];
+	let tab = load_table(file.te,true,file.sep,file.name);
+	let N = tab.ncol;
+	
+	let head = tab.heading;
+	let tags_root=[];
+	for(let i = 0; i < imp.tags.length; i++){
+		let ta = copy(imp.tags[i]);
+		if(ta.name == "file") ta.value = "";
+		tags_root.push(ta);
+	}
+
+	for(let r = 0; r < tab.nrow; r++){
+		let row = tab.ele[r];
+		let tags = copy(tags_root);
+		for(let i = 0; i < N; i++){
+			let te = row[i];
+			if(te != "") tags.push({name:head[i],value:te,done:0});
+		}
+		
+		tags_list.push(tags);		
+	}
+	
+	return tags_list;
+}
+	
+
+/// Checks all tags used 
+function check_tags_used(r,tags)
+{
+	for(let i = 0; i < tags.length; i++){
+		let tag = tags[i];
+		if(tag.done == 0){
+			alert_import("The value '"+tag.value+"' for property '"+tag.name+"' is not used (line "+(r+2)+" in file).");
+			return;
+		}			
 	}
 }
 
@@ -210,15 +606,42 @@ function camera_command()
 /// Adds a compartment to the model
 function compartment_command()
 {
-	let claa = get_claa(); if(claa == undefined) return;
-	let p = inter.imp.p;
-	let cl = inter.imp.cl;
+	compartment_command2(imp.tags)
+}
+
+
+/// Adds compartments to the model
+function compartment_all_command()
+{
+	let file = get_tag_value("file"); if(file == "") cannot_find_tag();
+
+	let tags_list = get_tags_list(file);
 	
-	let name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
+	for(let i = 0; i < tags_list.length; i++){
+		let tags = tags_list[i];
+		imp.all_row = "(line "+(i+2)+" in file)";
+		compartment_command2(tags);
+		check_tags_used(i,tags);
+	}
+	
+	for(let m = 0; m < imp.tags.length; m++) imp.tags[m].done = 1; 
+}
+
+	
+/// Adds a compartment to the model
+function compartment_command2(tags)
+{
+	let claa = get_claa(); if(claa == undefined) return;
+	let p = imp.p;
+	let cl = imp.cl;
+	
+	let name = get_tag_val("name",tags); if(name == "") cannot_find_tag();
+	let warn_comp = model.check_comp_name(name,"full");
+	if(warn_comp != undefined) alert_import(warn_comp);
 	
 	let cam = claa.camera;
 	
-	let color = get_tag_value("color"); 
+	let color = get_tag_val("color",tags); 
 	if(color == ""){ 
 		let check_col;
 		switch(name){
@@ -247,7 +670,7 @@ function compartment_command()
 	}
 	
 	let fix = false;
-	let fix_str = get_tag_value("fix").toLowerCase(); 
+	let fix_str = get_tag_val("fix",tags).toLowerCase(); 
 	if(fix_str != ""){
 		if(fix_str == "true") fix = true;
 		else{
@@ -257,71 +680,82 @@ function compartment_command()
 			}
 		}
 	}
+	
+	let infected = false;
+	let infected_str = get_tag_val("infected",tags).toLowerCase(); 
+	if(infected_str != ""){
+		if(infected_str == "true") infected = true;
+		else{
+			if(infected_str == "false") infected = false;
+			else{
+				alert_import("'infected' must be 'true' or 'false'"); 
+			}
+		}
+	
+		let sp = model.species[p];
+		let claname = sp.cla[cl].name;
+		
+		if(sp.infection_cl.te == select_str) sp.infection_cl.te = claname;
+		else{
+			if(sp.infection_cl.te != claname){
+				alert_import("Cannot have 'infected' specified in more than one classification for species '"+sp.name+"'.");
+			}
+		}
+	}
 
 	switch(cam.coord){
 	case "cartesian":
 		{
-			let x = get_tag_value("x");
-			let y = get_tag_value("y");
+			let x = get_tag_val("x",tags);
+			let y = get_tag_val("y",tags);
 			if(x == "" && y == ""){
 				x = "auto"; y = "auto";
 			}
 			else{
-				if(x == ""){ cannot_find_tag(); return;}
-				if(y == ""){ cannot_find_tag(); return;}
+				x = get_tag_val("x",tags); if(x == "") cannot_find_tag();
+				y = get_tag_val("y",tags); if(y == "") cannot_find_tag();
 				
-				x = Number(x)*import_scale_factor; if(isNaN(x)){ alert_import("'x' must be a number"); return;}
-				y = Number(y)*import_scale_factor; if(isNaN(y)){ alert_import("'y' must be a number"); return;}
+				x = Number(x)*import_scale_factor; if(isNaN(x)) alert_import("'x' must be a number");
+				y = Number(y)*import_scale_factor; if(isNaN(y)) alert_import("'y' must be a number");
 			
 				for(let i = 0; i < claa.ncomp; i++){
 					if(claa.comp[i].x == x && claa.comp[i].y == y){		
-						alert_import("Compartments '"+name+"' and '"+claa.comp[i].name+"' cannot have the same position"); return;
+						alert_import("Compartments '"+name+"' and '"+claa.comp[i].name+"' cannot have the same position");
 					}	
 				}
 			}
 			
-			model.add_compartment(name,p,cl,x,y,color,fix,false);
-			claa.comp[claa.ncomp-1].import_line = inter.imp.line;
+			output_error(model.add_compartment(name,p,cl,x,y,color,fix,infected,false));
+			claa.comp[claa.ncomp-1].import_line = imp.line;
 		}
 		break;
 	
 	case "latlng":
 		{
-			let bound_file = get_tag_value("boundary");
+			let bound_file = get_tag_val("boundary",tags);
 			if(bound_file != ""){
 				let claa = get_claa(); if(claa == undefined) return;
 
-				let res = add_individual_compartment_boundary(name,inter.imp.p,inter.imp.cl,bound_file,color);
-				if(res != "success"){
-					if(inter.help.te == undefined) alert_import(res);
-					return;
-				}
+				output_error(add_individual_compartment_boundary(name,imp.p,imp.cl,bound_file,color,infected));
 			}
 			else{
-				let lat = get_tag_value("lat"); if(lat == ""){ cannot_find_tag(); return;}
-				let lng	= get_tag_value("lng"); if(lng == ""){ cannot_find_tag(); return;}
-				if(check_latlng(lat,lng) != "success") return;
+				let lat = get_tag_val("lat",tags); if(lat == "") cannot_find_tag();
+				let lng	= get_tag_val("lng",tags); if(lng == "") cannot_find_tag();
+				
+				check_latlng(lat,lng);
 				
 				let pt = transform_latlng(lng,lat);
-			
-				for(let i = 0; i < claa.ncomp; i++){
-					if(claa.comp[i].x == pt.x && claa.comp[i].y == pt.y){		
-						alert_import("Compartments '"+name+"' and '"+claa.comp[i].name+"' cannot have the same position"); return;
-					}	
-				}
 				
-				model.add_latlng_compartment(name,inter.imp.p,inter.imp.cl,pt.x,pt.y,color,fix);		
+				output_error(model.add_latlng_compartment(name,imp.p,imp.cl,pt.x,pt.y,color,fix,infected));		
 			}
 		}
 		break;
 
 	default: error("Option not recognised 50"); break;
 	}
-
-	if(check_for_error() == true) return;	
 	
 	let markov_branch = false;
-	let markov_branch_str = get_tag_value("branch-prob"); 
+	let markov_branch_str = get_tag_val("branch-prob",tags); 
 	if(markov_branch_str != ""){
 		if(markov_branch_str == "true") markov_branch = true;
 		else{
@@ -341,30 +775,15 @@ function compartment_command()
 function datadir_command()
 {
 	let dir = get_tag_value("folder"); 
-	
-	if(dir == ""){ cannot_find_tag(); return;}
+	if(dir == "") cannot_find_tag();
 
-	if(check_char_allowed(dir,"<>\"|?*") != "success") return;
-	
-	const fs = require('fs');
-	
-	if(!fs.existsSync(dir)){ 
-		alert_import("The directory '"+dir+"' does not exist"); return;
-	}
-	
-	inter.imp.datadir = dir;
-	inter.imp.outputdir = dir+"/Output";
+	check_char_allowed(dir,"<>\"|?*");
 }
 
 
 /// Determines if a file exists or not
 function check_file_exists(file)
 {
-	let fs = require('fs');	
-	if(!fs.existsSync(file)){
-		alert_import("The file '"+file+"' does not exist"); return;
-	}
-	return "success";
 }
 
 
@@ -374,80 +793,91 @@ function check_char_allowed(st,not_allowed)
 	for(let i = 0; i < st.length; i++){
 		let ch = st.substr(i,1);
 		if(find_in(not_allowed,ch) != undefined){
-			alert_import("In '"+st+"' the character '"+ch+"' is not allowed"); return;
+			alert_import("In '"+st+"' the character '"+ch+"' is not allowed");
 		}
 	}
-	
-	return "success";
 }
 
 
 /// Sets a description of the analysis
 function description_command()
 {
-	let te = get_tag_value("text"); if(te == ""){ cannot_find_tag(); return;}
+	let te = get_tag_value("text"); if(te == "") cannot_find_tag();
+	if(typeof te == "object") te = te.te;
+	else te = te.replace(/\|/g,"\n");
 
-	model.description.te = te.replace(/\|/g,"\n");
+	model.description.te = te;
 }
 	
-	
 /// Adds a transition / source / sink to the model
-function transition_command(cname)
+function transition_command()
 {
-	let pos = dist_pos;	if(cname == "source") pos = exp_dist_pos;
+	transition_command2(imp.tags);
+}
 
+
+/// Adds compartments to the model
+function transition_all_command()
+{
+	let file = get_tag_value("file"); if(file == "") cannot_find_tag();
+
+	let tags_list = get_tags_list(file);
+
+	for(let i = 0; i < tags_list.length; i++){
+		let tags = tags_list[i];
+		transition_command2(tags);
+		check_tags_used(i,tags);
+	}
+	
+	for(let m = 0; m < imp.tags.length; m++) imp.tags[m].done = 1; 
+}
+
+
+/// Adds a transition / source / sink to the model
+function transition_command2(tags)
+{
 	let claa = get_claa(); if(claa == undefined) return;
 	let cam = claa.camera;
 
-	let p = inter.imp.p;
-	let cl = inter.imp.cl;
+	let p = imp.p;
+	let cl = imp.cl;
 	
-	let type = get_tag_value("type");
-	if(type == "") type = "exp(rate)";
+	let value = get_tag_val("value",tags); if(value == "") cannot_find_tag();
 	
-	let fr, to;
-	if(cname == "source"){
-		fr = "Source"; 
-		let te = get_tag_value("from"); 
-		if(te != ""){ alert_import("A source transition should not have a 'from' tag"); return;}
-	}
-	else{ 
-		fr = get_tag_value("from");
-		if(fr == ""){ cannot_find_tag(); return;}
-	}
+	let te = get_tag_val("name",tags); if(te == "") cannot_find_tag();
 	
-	if(cname == "sink"){
-		to = "Sink"; 
-		let te = get_tag_value("to"); 
-		if(te != ""){ alert_import("A sink transition should not have a 'to' tag"); return;}
-	}
-	else{ 
-		to = get_tag_value("to"); 
-		if(to == ""){ cannot_find_tag(); return;}
-	}
+	let spl = te.split("->");
+	if(spl.length != 2){ alert_import("Expression '"+te+"' is not understood"); return;}
+
+	let fr = spl[0].trim();
+	if(fr == "+") fr = SOURCE; 
+	
+	let to = spl[1].trim();
+	if(to == "-") to = SINK; 
 	
 	let ci, cf;
 	
-	if(fr == "Source") ci = "Source";
+	if(fr == SOURCE) ci = SOURCE;
 	else{
-		ci = find(claa.comp,"name",fr);
-		if(ci == undefined){ alert_import("Cannot find compartment '"+fr+"'"); return;}
+		ci = hash_find(claa.hash_comp,fr);
+		if(ci == undefined) alert_import("Cannot find compartment '"+fr+"'");
 	}
 	
-	if(to == "Sink") cf = "Sink";
+	if(to == SINK) cf = SINK;
 	else{
-		cf = find(claa.comp,"name",to);
-		if(cf == undefined){ alert_import("Cannot find compartment '"+to+"'"); return;}
+		cf = hash_find(claa.hash_comp,to);
+		if(cf == undefined) alert_import("Cannot find compartment '"+to+"'");
 	}
 	
+	let pos = dist_pos;	if(ci == SOURCE) pos = source_dist_pos;
+
 	for(let tr = 0; tr < claa.ntra; tr++){
 		if(claa.tra[tr].i == ci && claa.tra[tr].f == cf){
-			if(ci == "Source") alert_import("Source to '"+to+"' already exists");
+			if(ci == SOURCE) alert_import("Source to '"+to+"' already exists");
 			else{
-				if(cf == "Sink") alert_import("Sink from '"+fr+"' already exists");
+				if(cf == SINK) alert_import("Sink from '"+fr+"' already exists");
 				else alert_import("Transition from '"+fr+"' to '"+to+"' already exists");
 			}
-			return;
 		}
 	}
 
@@ -456,41 +886,41 @@ function transition_command(cname)
 	switch(cam.coord){
 	case "cartesian": 
 		{
-			if(cname == "source"){ 
-				let x = get_tag_value("x");
-				let y = get_tag_value("y");
+			if(ci == SOURCE){ 
+				let x = get_tag_val("x",tags);
+				let y = get_tag_val("y",tags);
 				if(x == "" && y == ""){
 					x = "auto"; y = "auto";
 				}
 				else{
 					if(x == "" || y == ""){
-						alert_import("The 'x' and 'y' positions must be set for the source"); return;
+						alert_import("The 'x' and 'y' positions must be set for the source");
 					}
 
 					x = Number(x)*import_scale_factor; 
-					if(isNaN(x)){ alert_import("'x' must be a number"); return;}
+					if(isNaN(x)) alert_import("'x' must be a number");
 					y = Number(y)*import_scale_factor; 
-					if(isNaN(y)){ alert_import("'y' must be a number"); return;}
+					if(isNaN(y)) alert_import("'y' must be a number");
 				}
 				
 				midp.push({x:x, y:y});
 			}
 
-			let xmid = get_tag_value("mid-x");
-			let ymid = get_tag_value("mid-y");
+			let xmid = get_tag_val("mid-x",tags);
+			let ymid = get_tag_val("mid-y",tags);
 			if(xmid != ""){
 				var xlist = xmid.split(",");
-				if(ymid == ""){ alert_import("Must set 'mid-x' and 'mid-y' points"); return;}
+				if(ymid == "") alert_import("Must set 'mid-x' and 'mid-y' points"); 
 				var ylist = ymid.split(",");
 				if(xlist.length != ylist.length){
-					alert_import("Must have the same number of 'x-mid' and 'y-mid' points"); return;
+					alert_import("Must have the same number of 'x-mid' and 'y-mid' points");
 				}
 
 				for(let n = 0; n < xlist.length; n++){
 					xlist[n] = Number(xlist[n])*import_scale_factor; 
-					if(isNaN(xlist[n])){ alert_import("'mid-x' must be a number"); return;}
+					if(isNaN(xlist[n])) alert_import("'mid-x' must be a number");
 					ylist[n] = Number(ylist[n])*import_scale_factor; 
-					if(isNaN(ylist[n])){ alert_import("'mid-y' must be a number"); return;}
+					if(isNaN(ylist[n])) alert_import("'mid-y' must be a number");
 				}
 				
 				for(let n = 0; n < xlist.length; n++){
@@ -498,25 +928,25 @@ function transition_command(cname)
 				}
 			}
 			else{
-				if(ymid != ""){ alert_import("Must set 'mid-x' and 'mid-y' points"); return;}
+				if(ymid != "") alert_import("Must set 'mid-x' and 'mid-y' points");
 			}
 
-			if(cname == "sink"){ 
-				let x = get_tag_value("x");
-				let y = get_tag_value("y");
+			if(cf == SINK){ 
+				let x = get_tag_val("x",tags);
+				let y = get_tag_val("y",tags);
 				
 				if(x == "" && y == ""){
 					x = "auto"; y = "auto";
 				}
 				else{
 					if(x == "" || y == ""){
-						alert_import("The 'x' and 'y' positions must be set for the sink"); return;
+						alert_import("The 'x' and 'y' positions must be set for the sink");
 					}
 
 					x = Number(x)*import_scale_factor; 
-					if(isNaN(x)){ alert_import("'x' must be a number"); return;}
+					if(isNaN(x)) alert_import("'x' must be a number");
 					y = Number(y)*import_scale_factor; 
-					if(isNaN(y)){ alert_import("'y' must be a number"); return;}
+					if(isNaN(y)) alert_import("'y' must be a number");
 				}
 				
 				midp.push({x:x, y:y});
@@ -526,42 +956,43 @@ function transition_command(cname)
 
 	case "latlng":
 		{
-			if(cname == "source"){ 
-				let lng = get_tag_value("lng");
-				let lat = get_tag_value("lat");
-				if(check_latlng(lat,lng) != "success") return;
+			if(ci == SOURCE){
+				let lng = get_tag_val("lng",tags);
+				let lat = get_tag_val("lat",tags);
+				check_latlng(lat,lng);
 				
 				let p = transform_latlng(lng,lat);
 				midp.push(p);
 			}
 
-			let lngmid = get_tag_value("mid-lng");
-			let latmid = get_tag_value("mid-lat");
+			let lngmid = get_tag_val("mid-lng",tags);
+			let latmid = get_tag_val("mid-lat",tags);
 			if(lngmid != ""){
 				var lnglist = lngmid.split(",");
 				if(latmid == ""){ 
-					alert_import("Must set 'mid-lat' and 'mid-lng' points"); return;
+					alert_import("Must set 'mid-lat' and 'mid-lng' points");
 				}
 
 				var latlist = latmid.split(",");
 				if(lnglist.length != latlist.length){ 
-					alert_import("Must have the same number of 'lat-mid' and 'lng-mid' points"); return;
+					alert_import("Must have the same number of 'lat-mid' and 'lng-mid' points");
 				}
 
 				for(let n = 0; n < lnglist.length; n++){
-					if(check_latlng(latlist[n],lnglist[n]) != "success") return;
+					check_latlng(latlist[n],lnglist[n]);
+					
 					let p = transform_latlng(lnglist[n],latlist[n]);
 					midp.push(p);
 				}
 			}
 			else{
-				if(latmid != ""){ alert_import("Must set 'mid-lat' and 'mid-lng' points"); return;}
+				if(latmid != "") alert_import("Must set 'mid-lat' and 'mid-lng' points");
 			}
 
-			if(cname == "sink"){
-				let lng = get_tag_value("lng");
-				let lat = get_tag_value("lat");
-				if(check_latlng(lat,lng) != "success") return;
+			if(cf == SINK){ 
+				let lng = get_tag_val("lng",tags);
+				let lat = get_tag_val("lat",tags);
+				check_latlng(lat,lng);
 				
 				let p = transform_latlng(lng,lat);
 				midp.push(p);
@@ -572,112 +1003,72 @@ function transition_command(cname)
 	default: error("Option not recognised 130"); break;
 	}
 
-	type = correct_caps(type,pos);
-
-	if(option_error("type",type,pos) == true) return;
-
-	model.add_transition(p,cl,ci,cf,midp,type);
-
-	if(check_for_error() == true) return;	
+	let trans_def = extract_trans_def(value);
+	if(trans_def == undefined) alert_import("There is a syntax error in value '"+value+"'");
 	
+	option_error("type",trans_def.type,pos);
+
+	if(output_error(model.add_transition(p,cl,ci,cf,midp,trans_def.type,"simple"))) return;
+
 	let traa = claa.tra[claa.ntra-1];
-	traa.import_line = inter.imp.line;
+	traa.import_line = imp.line;
 	
 	traa.bp_set = false;
 	
 	let val = traa.value;
 	
-	switch(type){
-	case "exp(rate)":
-		{
-			let rate = get_tag_value("rate");
-			if(rate != ""){
-				if(import_eqn_value(val.rate_eqn,rate) != "success") return;
-			}
-		}
-		break;
-		
-	case "exp(mean)":
-		{
-			let mean = get_tag_value("mean"); 
-			if(mean != ""){ 
-				if(import_eqn_value(val.mean_eqn,mean) != "success") return;
-			}
-		}
+	switch(trans_def.type){
+	case "exponential":
+		import_eqn_value(val.rate_eqn,trans_def.rate);
 		break;
 		
 	case "gamma":
-		{
-			let mean = get_tag_value("mean"); 
-			if(mean != ""){ 
-				if(import_eqn_value(val.mean_eqn,mean) != "success") return;
-			}
-			
-			let cv = get_tag_value("cv"); 
-			if(cv != ""){ 
-				if(import_eqn_value(val.cv_eqn,cv) != "success") return;
-			}
-		}
+		import_eqn_value(val.mean_eqn,trans_def.mean);
+		import_eqn_value(val.cv_eqn,trans_def.cv);
 		break;
 		
 	case "erlang":
 		{
-			let mean = get_tag_value("mean"); 
-			if(mean != ""){ 
-				if(import_eqn_value(val.mean_eqn,mean) != "success") return;
-			}
+			import_eqn_value(val.mean_eqn,trans_def.mean);
 			
-			let shape = get_tag_value("shape"); 
-			if(shape == ""){ cannot_find_tag(); return;}
-			
+			let shape = trans_def.shape;
 			let num = Number(shape);
 			if(isNaN(shape) || num <= 0 || Math.round(num) != num){
 				alert_import("For an Erlang distribution the shape parameter must be a positive integer");				
-				return;
 			}
 			
-			if(import_eqn_value(val.shape_erlang,shape) != "success") return;
+			import_eqn_value(val.shape_erlang,shape);
 		}
 		break;
 		
 	case "log-normal":
-		{
-			let mean = get_tag_value("mean"); 
-			if(mean != ""){ 
-				if(import_eqn_value(val.mean_eqn,mean) != "success") return;
-			}
-			
-			let cv = get_tag_value("cv"); 
-			if(cv != ""){ 
-				if(import_eqn_value(val.cv_eqn,cv) != "success") return;
-			}
-		}
+		import_eqn_value(val.mean_eqn,trans_def.mean);
+		import_eqn_value(val.cv_eqn,trans_def.cv);
 		break;
 		
 	case "weibull":
-		{
-			let scale = get_tag_value("scale"); 
-			if(scale != ""){ 
-				if(import_eqn_value(val.scale_eqn,scale) != "success") return;
-			}
-			
-			let shape = get_tag_value("shape"); 
-			if(shape != ""){ 
-				if(import_eqn_value(val.shape_eqn,shape) != "success") return;
-			}
-		}
+		import_eqn_value(val.scale_eqn,trans_def.scale);
+		import_eqn_value(val.shape_eqn,trans_def.shape);
 		break;
 
+	case "period":
+		import_eqn_value(val.mean_eqn,trans_def.time);
+		break;
+		
 	default: error("Option not recognised 51"); break;
 	}
 	
-	let bp = get_tag_value("bp");
+	let bp = get_tag_val("bp",tags);
 	if(bp != ""){
 		traa.bp_set = true;
 		import_eqn_value(val.bp_eqn,bp);
+		
+		if(val.bp_eqn.te == "×"){
+			traa.branch_select = false;
+			val.bp_eqn.te = "";
+		}
+		else traa.branch_select = true;
 	}
-	
-	model.update_pline(p,cl);
 }
 
 
@@ -686,17 +1077,45 @@ function label_command()
 {
 	let claa = get_claa(); if(claa == undefined) return;
 	
-	let te = get_tag_value("text"); if(te == ""){ cannot_find_tag(); return;}
-	let tesize = get_tag_value("textsize"); if(tesize == ""){ cannot_find_tag(); return;}
-	tesize = Number(tesize); if(isNaN(tesize)){ alert_import("'textsize' must be a number"); return;}
+	let te = get_tag_value("text"); if(te == "") cannot_find_tag();
+	let size = get_tag_value("text-size");
+	if(size == "") size = size_annotation_default;
+	else{
+		size = Number(size); 
+		if(isNaN(size)) alert_import("'text-size' must be a number");
+	}
 	
-	let x = get_tag_value("x"); if(x == ""){ cannot_find_tag(); return;}
-	let y = get_tag_value("y"); if(y == ""){ cannot_find_tag(); return;}
-	x = Number(x)*import_scale_factor; if(isNaN(x)){ alert_import("'x' must be a number"); return;}
-	y = Number(y)*import_scale_factor; if(isNaN(y)){ alert_import("'y' must be a number"); return;}
-	let color = get_tag_value("color"); if(color == ""){ cannot_find_tag(); return;}
+	let x, y;
+	switch(claa.camera.coord){
+	case "cartesian":
+		{
+			x = get_tag_value("x"); if(x == "") cannot_find_tag();
+			y = get_tag_value("y"); if(y == "") cannot_find_tag();
+			x = Number(x)*import_scale_factor; if(isNaN(x)) alert_import("'x' must be a number");
+			y = Number(y)*import_scale_factor; if(isNaN(y)) alert_import("'y' must be a number");
+		}
+		break;
+		
+	case "latlng":
+		{
+			let lat = get_tag_value("lat"); if(lat == "") cannot_find_tag();
+			let lng = get_tag_value("lng"); if(lng == "") cannot_find_tag();
+			check_latlng(lat,lng);
+		
+			let p = transform_latlng(lng,lat);
+			x = p.x;
+			y = p.y;
+		}
+		break;
+	
+	default:
+		alert_import("'coord' must be 'cartesian' or 'latlng'"); 
+		break;
+	}
+	
+	let color = get_tag_value("color"); if(color == "") color = BLACK;
 
-	claa.annotation.push({type:"text", te:te, tesize:tesize, x:x, y:y, color:color});
+	claa.annotation.push({type:"text", te:te, size:size, x:x, y:y, color:color});
 }
 
 
@@ -705,54 +1124,96 @@ function box_command()
 {
 	let claa = get_claa(); if(claa == undefined) return;
 	
-	let te = get_tag_value("text"); if(te == ""){ cannot_find_tag(); return;}
-	let tesize = get_tag_value("textsize"); if(tesize == ""){ cannot_find_tag(); return;}
-	tesize = Number(tesize); if(isNaN(tesize)){ alert_import("'textsize' must be a number"); return;}
+	let te = get_tag_value("text"); if(te == "") cannot_find_tag();
+	let size = get_tag_value("text-size"); if(size == "") size = size_annotation_default;
+	else{
+		size = Number(size); 
+		if(isNaN(size)) alert_import("'text-size' must be a number");
+	}
 	
-	let comps = get_tag_value("compartments"); if(comps == ""){ cannot_find_tag(); return;}
-	let color = get_tag_value("color"); if(color == ""){ cannot_find_tag(); return;}
+	let comps = get_tag_value("comps"); if(comps == "") cannot_find_tag();
+	let color = get_tag_value("color"); if(color == "") color = BLACK;
 			
 	let list=[];
 	let spl = comps.split(",");
-	if(spl.length == 0){ alert_import("Error 'box' contains no compartments."); return;}
+	if(spl.length == 0) alert_import("Error 'box' contains no compartments.");
 	for(let k = 0; k < spl.length; k++){
 		let c = 0; while(c < claa.ncomp && claa.comp[c].name != spl[k]) c++;
 		if(c == claa.ncomp){ 
-			alert_import("Cannot find compartment '"+spl[k]+"'."); return;
+			alert_import("Cannot find compartment '"+spl[k]+"'.");
 		}
 		list.push(spl[k]);
 	}
 	
-	claa.annotation.push({type:"box", te:te, tesize:tesize, comps:list, color:color});
+	claa.annotation.push({type:"box", te:te, size:size, comps:list, color:color});
 }
 
 
-/// Loads data inito the model
-function data_command()
+/// Adds an annotation map
+function map_command()
 {
-	load_data();
-	//if(inter.help.te != undefined) break;
+	let p = imp.p;
+	if(p == undefined){
+		alert_import("Species needs to be specified before 'map' command");
+	}
+			
+	let cl = imp.cl;
+	if(cl == undefined){
+		alert_import("Classification need to be specified before 'map' command");
+	}
+	
+	let file = get_tag_value("file"); if(file == "") cannot_find_tag();
+	
+	let res = load_annotation_map(file.te);
+	
+	let name = "file"+Math.random();
+	map_store.push({name:name, feature:res.feature, box:res.box});
+				
+	let claa = model.species[p].cla[cl];
+	claa.annotation.push({type:"map", map_ref:name});
 }
-		
-		
+
+	
+/// Sets param_mult
+function param_mult_command()
+{
+	let full_name = get_tag_value("name"); if(full_name == "") cannot_find_tag();
+	
+	let par = get_param_prop(full_name);
+	par.full_name = param_name(par);
+	
+	let f_par = get_param_mult(par);
+	model.param_factor.push({f_param:f_par, param:{name:par.name,dep:copy(par.dep), full_name:par.full_name}});
+
+	param_command2(remove_eq_quote(f_par.full_name),"mult");
+}
+
+
 /// Sets the value for a parameter in the model
 function param_command()
 {
-	let full_name = get_tag_value("name"); if(full_name == ""){ cannot_find_tag(); return;}
-	
+	let full_name = get_tag_value("name"); if(full_name == "") cannot_find_tag();
+	param_command2(full_name);
+}
+
+
+/// Processes param / param-mult command
+function param_command2(full_name,op)
+{
 	let pp = get_param_prop(full_name);
-
-	let par = create_new_param(pp,"normal");
-
-	par.import_line = inter.imp.line;
 	
-	if(par.time_dep == true || par.age_dep == true){
-		let knot_times = get_tag_value("knot-times"); if(knot_times == ""){ cannot_find_tag(); return;}
+	let par = create_new_param(pp,"normal");
+	
+	par.import_line = imp.line;
+
+	if(par.time_dep == true){
+		let knot_times = get_tag_value("knot-times"); if(knot_times == "") cannot_find_tag();
 		let warn = check_knot_times(knot_times);
-		if(warn != ""){ alert_import(warn); return;}
+		if(warn != "") alert_import(warn);
 		
 		change_spline_knot(par,knot_times.split(","));
-	
+		par_set_default(par);
+		
 		let smooth = get_tag_value("smooth").toLowerCase().trim();
 		
 		par.spline.smooth = default_smooth();
@@ -769,24 +1230,34 @@ function param_command()
 			case "log-normal": par.spline.smooth.type = {value:"Log-Normal"}; break;
 			}
 	
-			if(spl.length != 2){ alert_import("There is syntax error in 'smooth'"); return;}
+			if(spl.length != 2) alert_import("There is syntax error in 'smooth'");
 			
-			if(spl[1].substr(spl[1].length-1,1) != ")"){ alert_import("There is syntax error in 'smooth'"); return;}
+			if(spl[1].substr(spl[1].length-1,1) != ")"){
+				alert_import("There is syntax error in 'smooth'");
+			}
+			
 			let val = spl[1].substr(0,spl[1].length-1);
-			if(isNaN(val)){ alert_import("In 'smooth' the value '"+val+"' is not a number"); return;}
-			if(Number(val) <= 0){ alert_import("In 'smooth' the value '"+val+"' is not positive"); return;}
+			if(isNaN(val)) alert_import("In 'smooth' the value '"+val+"' is not a number");
+			if(Number(val) <= 0) alert_import("In 'smooth' the value '"+val+"' is not positive");
 			par.spline.smooth.value = val;
 		}
 	}
+
+	if(par.dep.length > 0){
+		let list = par_find_list(par)
+		par.list = list;
+		par.comb_list = generate_comb_list(list);
+	}
 	
 	let cons = get_tag_value("constant"); 
-	let dist = get_tag_value("dist").toLowerCase();
-	let dist_split = get_tag_value("dist-split").toLowerCase();
+	let dist = get_tag_value("dist");	
+	let dist_split = get_tag_value("dist-split");
 	let value = get_tag_value("value");
 	let reparam = get_tag_value("reparam"); 
-	let prior = get_tag_value("prior").toLowerCase(); 
-	let prior_split = get_tag_value("prior-split").toLowerCase(); 
-	let dist_mat = get_tag_value("distance-matrix").toLowerCase(); 
+	let prior = get_tag_value("prior"); 
+	let prior_split = get_tag_value("prior-split"); 
+	//let dist_mat = get_tag_value("distance-matrix").toLowerCase(); 
+	//let dist_mat = "";
 
 	let param_tag = [];
 	param_tag.push({val:cons, tag:"constant"});
@@ -796,241 +1267,150 @@ function param_command()
 	param_tag.push({val:reparam, tag:"reparam"});
 	param_tag.push({val:prior, tag:"prior"});
 	param_tag.push({val:prior_split, tag:"prior-split"});
-	param_tag.push({val:dist_mat, tag:"distance-matrix"});
+	//param_tag.push({val:dist_mat, tag:"distance-matrix"});
 
 	for(let j = 0; j < param_tag.length; j++){
 		for(let i = j+1; i < param_tag.length; i++){
 			if(param_tag[j].val != "" && param_tag[i].val != ""){
-				alert_import("'"+param_tag[j].tag+"' and '"+param_tag[i].tag+"' cannot both be set"); 
-				return;
+				if(!(param_tag[j].tag == "value" && param_tag[j].tag != "prior") && 
+					 !(param_tag[j].tag == "value" && param_tag[j].tag != "prior_split")){
+					alert_import("'"+param_tag[j].tag+"' and '"+param_tag[i].tag+"' cannot both be set"); 
+				}
 			}
 		}
 	}
 	
 	let j = 0; while(j < param_tag.length && param_tag[j].val == "") j++;
 	
-	if(j == param_tag.length){
-		let te = "One of these possibilities must be set: ";
-		for(let j = 0; j < param_tag.length; j++){
-			if(j != 0) te += ", ";
-			te += "'"+param_tag[j].tag+"'";
-		}
-		alert_import(te); 
-		return;
+	if(par.name == dist_matrix_name){
+		alert_import("The distance matrix '"+dist_matrix_name+"' cannot be set"); 
 	}
-		
-	par.dist_matrix = { check:false}; 
+	
+	//par.dist_matrix = { check:false}; 
+	//if(par.name == dist_matrix_name) par.dist_matrix.check = true;
+
+	par.reparam_eqn = "";
+	par.reparam_eqn_on = false;
+	
+	/*
 	if(dist_mat != ""){
 		if(dist_mat != "true") alert_import("'distance-matrix' must be set to 'true'");
 		par.dist_matrix.check = true;
 	}
+	*/
 	
-	par.auto_value = false;
-	
-	if(value == "auto"){
-		par.auto_value = true;
-		par.set = true;
+	if(par.dep.length == 0){
+		if(value != ""){
+			par.value = value;
+			par.variety = "normal";
+		}
+		
+		if(reparam != ""){
+			par.value = reparam;
+			par.variety = "reparam";
+		}
+		
+		if(cons != ""){
+			par.value = cons;
+			par.variety = "const";
+		}
 	}
 	else{
-		if(par.dep.length == 0){
-			if(value != ""){
-				par.value = value;
-				par.variety = "normal";
-			}
+		if(value != "" || cons != "" || reparam != ""){
+			set_default_value(par);
 			
-			if(reparam != ""){
-				par.value = reparam;
-				par.variety = "reparam";
-			}
-			
-			if(cons != ""){
-				par.value = cons;
-				par.variety = "const";
-			}
-		}
-		else{
-			if(value != "" || cons != "" || reparam != ""){
-				let desc = "In 'value'";
-				let valu = value; 
-				if(valu == ""){
-					if(cons != ""){
-						valu = cons; desc = "In 'constant'";
-						par.variety = "const";		
+			let desc = "In 'value'";
+			let valu = value; 
+			if(valu == ""){
+				if(cons != ""){
+					valu = cons; desc = "In 'constant'";
+					par.variety = "const";		
+				}
+				else{
+					if(reparam != ""){
+						valu = reparam; desc = "In 'reparam'";
+						par.variety = "reparam";		
 					}
-					else{
-						if(reparam != ""){
-							valu = reparam; desc = "In 'reparam'";
-							par.variety = "reparam";		
-						}
-						else error("Problem importing");
+					else error("Problem importing");
+				}
+			}
+		
+			if(reparam != "" && is_file(valu) == false){
+				par.reparam_eqn = reparam;
+				par.reparam_eqn_on = true;
+			}
+			else{		
+				if(is_file(valu) == false){ // Sets all elements to the same
+					let dim = get_dimensions(par.value);
+					let ele_list = get_element_list(par.value,dim);
+		
+					for(let k = 0; k < ele_list.length; k++){
+						set_element(par.value,ele_list[k],valu);
 					}
 				}
+				else{
+					let tab = load_table(valu.te,true,valu.sep,valu.name);
 				
-				let tab = load_table_from_file(valu);
-				if(tab == undefined) return;
-				if(typeof tab == 'string'){ alert_import(tab); return;}
-			
-				let col_name = copy(par.dep);
-				col_name.push("Value");
+					if(tab == undefined) return;
+					if(typeof tab == 'string') alert_import(tab);
 				
-				let subtab = get_subtable(tab,col_name);
-				if(subtab.error != ""){	alert_import(subtab.error); return;}
+					let col_name = copy(par.dep);
+					col_name.push("Value");
+					
+					let subtab = get_subtable(tab,col_name);
+					if(subtab.error != "") alert_import(subtab.error);
 			
-				let ncol = subtab.ncol;
-			
-				for(let r = 0; r < subtab.nrow; r++){
-					let ind = [];
-					for(let i = 0; i < ncol-1; i++){
-						ind[i] = find_in(par.list[i],subtab.ele[r][i]);
-						if(ind[i] == undefined){ 
-							alert_import(desc+" the element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+(r+2)+")");
-							return;
-						}
-					}
-					let ele = subtab.ele[r][ncol-1];
-					let val;
-					
-					switch(par.variety){
-					case "normal": case "const":
-						val = Number(ele);
-					
-						if(isNaN(val)){
-							alert_import(desc+" the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+(r+2)+")");
-							return;
-						}
-						break;
-					
-					case "reparam":
-						if(!isNaN(ele)) val = Number(ele);
-						else{
-							val = ele;
-							if(is_eqn(val,"Table element",{}) == false){
-								alert_import(desc+" the element '"+ele+"' is not a valid equation (column '"+subtab.heading[ncol-1]+"', row "+(r+2)+")");
-								return;
+					let ncol = subtab.ncol;
+				
+					for(let r = 0; r < subtab.nrow; r++){
+						let ind = [];
+						for(let i = 0; i < ncol-1; i++){
+							ind[i] = find_in(par.list[i],subtab.ele[r][i]);
+							if(ind[i] == undefined){
+								alert_import(desc+" the element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+(r+2)+")");
 							}
 						}
-						break;
+						let ele = subtab.ele[r][ncol-1];
+						let val;
 						
-					default: error("option not recognised"); break;
+						switch(par.variety){
+						case "normal": case "const":
+							val = Number(ele);
+						
+							if(isNaN(val)){
+								alert_import(desc+" the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+(r+2)+")");
+							}
+							break;
+						
+						case "reparam":
+							if(!isNaN(ele)) val = Number(ele);
+							else{
+								let conv_res = detect_greek(ele,0);
+								ele = conv_res.te;
+								subtab.ele[r][ncol-1] = ele;
+
+								val = ele;
+								
+								let res = is_eqn(val,"Table element",{});
+								if(res.err == true){
+									alert_import(desc+" the element '"+ele+"' is not a valid equation (column '"+subtab.heading[ncol-1]+"', row "+(r+2)+")");
+								}
+							}
+							break;
+							
+						default: error("option not recognised1"); break;
+						}
+						
+						set_element(par.value,ind,val);
 					}
-					
-					set_element(par.value,ind,val);
 				}
-				par.set = true;
 			}
+			par.set = true;
 		}
 	}
-	
+
 	if(prior != ""){
-		let pri = par.prior;
-			
-		let val;
-		
-		pri.type.te = prior;
-			
-		switch(prior){
-		case "fix":
-			{
-				let mean = get_tag_value("fixed"); if(mean == ""){ cannot_find_tag(); return;}
-				if(!is_number(mean,"fixed")) return;
-				pri.value.mean_eqn.te = mean;
-			}
-			break;
-			
-		case "uniform":
-			{	
-				let min = get_tag_value("min"); if(min == ""){ cannot_find_tag(); return;}
-				if(!is_number(min,"min")) return;
-				pri.value.min_eqn.te = min;
-				
-				let max = get_tag_value("max"); if(max == ""){ cannot_find_tag(); return;}
-				if(!is_number(max,"max")) return;
-				pri.value.max_eqn.te = max;
-				
-				if(Number(min) >= Number(max)){
-					alert_import("'min' must be smaller than 'max'"); 
-					return;
-				}
-			}
-			break;
-			
-		case "normal":
-			{
-				let mean = get_tag_value("mean"); if(mean == ""){ cannot_find_tag(); return;}
-				if(!is_number(mean,"mean")) return;
-				pri.value.mean_eqn.te = mean;
-					
-				let sd = get_tag_value("sd"); if(sd == ""){ cannot_find_tag(); return;}
-				if(!is_positive(sd,"sd")) return;
-				pri.value.sd_eqn.te = sd;
-			}
-			break;
-			
-		case "log-normal":
-			{
-				let mean = get_tag_value("mean"); if(mean == ""){ cannot_find_tag(); return;}
-				if(!is_positive(mean,"mean")) return;
-				pri.value.mean_eqn.te = mean;
-					
-				let cv = get_tag_value("cv"); if(cv == ""){ cannot_find_tag(); return;}
-				if(!is_positive(cv,"cv")) return;
-				pri.value.cv_eqn.te = cv;
-			}
-			break;
-			
-		case "exp":
-			{
-				let mean = get_tag_value("mean"); if(mean == ""){ cannot_find_tag(); return;}
-				if(!is_positive(mean,"mean")) return;
-				pri.value.mean_eqn.te = mean;
-			}
-			break;
-			
-		case "gamma":
-			{
-				let mean = get_tag_value("mean"); if(mean == ""){ cannot_find_tag(); return;}
-				if(!is_positive(mean,"mean")) return;
-				pri.value.mean_eqn.te = mean;
-				
-				let cv = get_tag_value("cv"); if(cv == ""){ cannot_find_tag(); return;}
-				if(!is_positive(cv,"cv")) return;
-				pri.value.cv_eqn.te = cv;
-			}
-			break;
-		
-		case "beta":
-			{
-				let alpha = get_tag_value("alpha"); if(alpha == ""){ cannot_find_tag(); return;}
-				if(!is_positive(alpha,"alpha")) return;
-				pri.value.alpha_eqn.te = alpha;
-				
-				let beta = get_tag_value("beta"); if(beta == ""){ cannot_find_tag(); return;}
-				if(!is_positive(beta,"beta")) return;
-				pri.value.beta_eqn.te = beta;
-			}
-			break;
-			
-		case "bernoulli":
-			{
-				let mean = get_tag_value("mean"); if(mean == ""){ cannot_find_tag(); return;}
-				if(!is_zeroone(mean,"mean")) return;
-				pri.value.mean_eqn.te = mean;
-			}
-			break;
-			
-		case "flat":
-			break;
-		
-		case "dirichlet":
-			let alpha = get_tag_value("alpha"); if(alpha == ""){ cannot_find_tag(); return;}
-			if(!is_positive(alpha,"alpha")) return;
-			pri.value.alpha_eqn.te = alpha;
-			break;
-	
-		default: 
-			error("Prior type '"+prior+"' not recognised");
-			break;
-		}
+		par.prior = convert_text_to_prior(prior,par.pri_pos);
 	}
 	
 	if(prior_split != ""){
@@ -1040,15 +1420,16 @@ function param_command()
 			alert_import("'prior-split' can only be used if the parameter has a dependency.");  
 		}
 	
-		let tab = load_table_from_file(prior_split);
+		let tab = load_table(prior_split.te,true,prior_split.sep,prior_split.name);
+		//let tab = load_table_from_file(prior_split);
 		if(tab == undefined) return;	
-		if(typeof tab == 'string'){ alert_import(tab); return;}
+		if(typeof tab == 'string') alert_import(tab);
 		
 		let col_name = copy(par.dep);
 		col_name.push("Prior");
 		
 		let subtab = get_subtable(tab,col_name);
-		if(subtab.error != ""){ alert_import(subtab.error); return;}
+		if(subtab.error != "") alert_import(subtab.error);
 	
 		let ncol = subtab.ncol;
 		
@@ -1058,14 +1439,12 @@ function param_command()
 				ind[i] = find_in(par.list[i],subtab.ele[r][i]);
 				if(ind[i] == undefined){ 
 					alert_import("The table element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+(r+2)+")");
-					return;
 				}
 			}
 			
-			let pri = convert_text_to_prior(subtab.ele[r][ncol-1],par.pri_pos)
-			if(typeof pri == 'string'){
+			let pri = convert_text_to_prior(subtab.ele[r][ncol-1],par.pri_pos);
+			if(pri.err == true){
 				alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not valid (col '"+subtab.heading[ncol-1]+"', row "+(r+2)+"). "+pri);
-				return;
 			}
 			
 			set_element(par.prior_split,ind,pri);
@@ -1073,110 +1452,13 @@ function param_command()
 	}
 	
 	if(dist != ""){
+		par.prior = convert_text_to_prior(dist,par.pri_pos,true);
+			
 		let pri = par.prior;
 		par.variety = "dist";
 		
-		pri.type.te = dist;
-				
-		if(option_error("type",dist,prior_pos) == true) return;
-		
-		switch(dist){
-		case "fix":
-			{
-				let mean = get_tag_value("value"); if(mean == ""){ cannot_find_tag(); return;}
-				if(!is_eqn(mean,"value",{})) return;
-				pri.value.mean_eqn.te = mean;
-			}
-			break;
-			
-		case "uniform":
-			{	
-				let min = get_tag_value("min"); if(min == ""){ cannot_find_tag(); return;}
-				if(!is_eqn(min,"min",{})) return;
-				pri.value.min_eqn.te = min;
-				
-				let max = get_tag_value("max"); if(max == ""){ cannot_find_tag(); return;}
-				if(!is_eqn(max,"max",{})) return;
-				pri.value.max_eqn.te = max;
-			}
-			break;
-			
-		case "normal":
-			{
-				let mean = get_tag_value("mean"); if(mean == ""){ cannot_find_tag(); return;}
-				if(!is_eqn(mean,"mean",{})) return;
-				pri.value.mean_eqn.te = mean;
-					
-				let sd = get_tag_value("sd"); if(sd == ""){ cannot_find_tag(); return;}
-				if(!is_eqn(sd,"sd",{positive:true})) return;
-				pri.value.sd_eqn.te = sd;
-			}
-			break;
-			
-		case "log-normal":
-			{
-				let mean = get_tag_value("mean"); if(mean == ""){ cannot_find_tag(); return;}
-				if(!is_eqn(mean,"mean",{positive:true})) return;
-				pri.value.mean_eqn.te = mean;
-					
-				let sd = get_tag_value("sd"); if(sd == ""){ cannot_find_tag(); return;}
-				if(!is_eqn(sd,"sd",{positive:true})) return;
-				pri.value.sd_eqn.te = sd;
-			}
-			break;
-			
-		case "exp":
-			{
-				let mean = get_tag_value("mean"); if(mean == ""){ cannot_find_tag(); return;}
-				if(!is_eqn(mean,"mean",{positive:true})) return;
-				pri.value.mean_eqn.te = mean;
-			}
-			break;
-			
-		case "gamma":
-			{
-				let mean = get_tag_value("mean"); if(mean == ""){ cannot_find_tag(); return;}
-				if(!is_eqn(mean,"mean",{positive:true})) return;
-				pri.value.mean_eqn.te = mean;
-				
-				let cv = get_tag_value("cv"); if(cv == ""){ cannot_find_tag(); return;}
-				if(!is_eqn(cv,"cv",{positive:true})) return;
-				pri.value.cv_eqn.te = cv;
-			}
-			break;
-		
-		case "beta":
-			{
-				let alpha = get_tag_value("alpha"); if(alpha == ""){ cannot_find_tag(); return;}
-				if(!is_eqn(alpha,"alpha",{positive:true})) return;
-				pri.value.alpha_eqn.te = alpha;
-				
-				let beta = get_tag_value("beta"); if(beta == ""){ cannot_find_tag(); return;}
-				if(!is_eqn(beta,"beta",{positive:true})) return;
-				pri.value.beta_eqn.te = beta;
-			}
-			break;
-			
-		case "bernoulli":
-			{
-				let mean = get_tag_value("mean"); if(mean == ""){ cannot_find_tag(); return;}
-				if(!is_eqn(mean,"mean",{zero_one_range:true})) return;
-				pri.value.mean_eqn.te = mean;
-			}
-			break;
-			
-		case "flat":
-			break;
-		
-		case "dirichlet":
-			let alpha = get_tag_value("alpha"); if(alpha == ""){ cannot_find_tag(); return;}
-			if(!is_eqn(alpha,"alpha",{positive:true})) return;
-			pri.value.alpha_eqn.te = alpha;
-			break;
-		
-		default: 
-			error("Distribution type '"+dist+"' not recognised");
-			break;
+		if(pri.err == true){
+			alert_import("Error loading prior '"+dist+"'");
 		}
 	}
 	
@@ -1191,16 +1473,17 @@ function param_command()
 			alert_import("'dist-split' can only be used if the parameter has a dependency.");  
 		}
 		
-		let tab = load_table_from_file(dist_split);
+		let tab = load_table(dist_split.te,true,dist_split.sep,dist_split.name);
+		//let tab = load_table_from_file(dist_split);
 		
 		if(tab == undefined) return;	
-		if(typeof tab == 'string'){ alert_import(tab); return;}
+		if(typeof tab == 'string') alert_import(tab);
 		
 		let col_name = copy(par.dep);
 		col_name.push("Dist");
 		
 		let subtab = get_subtable(tab,col_name);
-		if(subtab.error != ""){ alert_import(subtab.error); return;}
+		if(subtab.error != "") alert_import(subtab.error);
 	
 		let ncol = subtab.ncol;
 		
@@ -1210,15 +1493,12 @@ function param_command()
 				ind[i] = find_in(par.list[i],subtab.ele[r][i]);
 				if(ind[i] == undefined){ 
 					alert_import("The table element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+(r+2)+")");
-					return;
 				}
 			}
 			
 			let pri = convert_text_to_prior(subtab.ele[r][ncol-1],par.pri_pos,true);
-			
-			if(typeof pri == 'string'){
+			if(pri.err == true){
 				alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not valid (col '"+subtab.heading[ncol-1]+"', row "+(r+2)+"). "+pri);
-				return;
 			}
 			
 			set_element(par.prior_split,ind,pri);
@@ -1230,7 +1510,6 @@ function param_command()
 	else{
 		if(dist == ""){
 			alert_import("'sim-sample' can only be set if a distribution is set through 'dist'");
-			return;
 		}
 	}
 	if(option_error("sim-sample",sim_sample,["true","false"]) == true) return;
@@ -1244,6 +1523,9 @@ function param_command()
 	
 	par.full_name = param_name(par);
 
+	get_reparam_param_list(par);
+	get_prior_param_list(par);
+	
 	model.param.push(par);
 }
 
@@ -1251,20 +1533,17 @@ function param_command()
 /// Definition for derived quantities
 function derived_command()
 {
-	let full_name = get_tag_value("name"); if(full_name == ""){ cannot_find_tag(); return;}
-	let eqn_name = get_tag_value("eqn"); if(eqn_name == ""){ cannot_find_tag(); return;}
+	let full_name = get_tag_value("name"); if(full_name == "") cannot_find_tag();
+	let eqn_name = get_tag_value("eqn"); if(eqn_name == "") cannot_find_tag();
 	
 	let eqn1 = create_equation(full_name,"derive_param");
-	if(eqn1.warn.length > 0){ alert_import("In 'name': "+eqn1.warn[0].te); return;}
+	if(eqn1.warn.length > 0) alert_import("In 'name': "+eqn1.warn[0].te);
 	if(eqn1.param.length != 1){
-		pr("PP");
-		pr(eqn1);
-		pr(full_name);
-		alert_import("'name' must contain a single paramter"); return;
+		alert_import("'name' must contain a single paramter");
 	}
 
 	let eqn2 = create_equation(eqn_name,"derive_eqn");
-	if(eqn2.warn.length > 0){ alert_import("In 'eqn': "+eqn2.warn[0].te); return;}
+	if(eqn2.warn.length > 0) alert_import("In 'eqn': "+eqn2.warn[0].te);
 	
 	model.derive.push({eqn1:eqn1, eqn2:eqn2});
 }
@@ -1275,27 +1554,31 @@ function simulation_command()
 {
 	let details = model.sim_details;
 	
-	let start = get_tag_value("start"); if(start == ""){ cannot_find_tag(); return;}
-	if(isNaN(start)){ alert_import("'start' must be a number"); return;}
+	let start = get_tag_value("start"); 
 	details.t_start = start;
 	
-	let end = get_tag_value("end"); if(end == ""){ cannot_find_tag(); return;}
-	if(isNaN(end)){ alert_import("'end' must be a number"); return;}
+	let end = get_tag_value("end"); 
 	details.t_end = end;
 	
-	if(Number(details.t_start) >= Number(details.t_end)){
-		alert_import("'start' must before 'end'"); return;
+	if(details.t_start != "" && details.t_end != ""){
+		if(Number(details.t_start) >= Number(details.t_end)){
+			alert_import("'start' must before 'end'");
+		}
 	}
 	
 	let num = get_tag_value("number").toLowerCase();
-	if(num == "") num = 1;
+	if(num == "") num = SIM_NUM_DEFAULT;
 	let numf = Number(num);
 	
 	if(isNaN(num) || numf != Math.floor(numf) || numf <= 0){ 
 		alert_import("'number' must be a positive integer"); 
-		return;
 	}
 	details.number = num;
+	
+	details.seed_on = {value:"No"};
+	details.seed = SEED_DEFAULT;
+	let seed = get_tag_value("seed"); 
+	if(seed != ""){ details.seed = seed; details.seed_on.value = "Yes";}
 	
 	let alg = get_tag_value("algorithm").toLowerCase();
 	if(alg == "") alg = "gillespie";
@@ -1303,14 +1586,19 @@ function simulation_command()
 	if(option_error("algorithm",alg,sim_alg_list) == true) return;
 	details.algorithm.value = alg;		
 	
-	let dt_str = get_tag_value("timestep"); if(dt_str == ""){ cannot_find_tag(); return;}
-	let dt = Number(dt_str);
-	if(isNaN(dt_str) || dt <= 0){
-		alert_import("'timestep' must be a positive number"); return;
+	let dt_str = get_tag_value("timestep");
+	if(dt_str == "") details.timestep = "";
+	else{
+		let dt = Number(dt_str);
+		if(isNaN(dt_str) || dt <= 0){
+			alert_import("'timestep' must be a positive number");
+		}
+		details.timestep = dt;
 	}
-	details.timestep = dt;
 	
-	details.indmax = check_pos_integer("ind-max",10000);
+	details.indmax = check_pos_integer("ind-max",INDMAX_DEFAULT);
+	
+	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
 }
 
 
@@ -1319,58 +1607,202 @@ function inference_command()
 {
 	let details = model.inf_details;
 	
-	let start = get_tag_value("start"); if(start == ""){ cannot_find_tag(); return;}
-	if(isNaN(start)){ alert_import("'start' must be a number"); return;}
+	let start = get_tag_value("start"); 
 	details.t_start = start;
 	
-	let end = get_tag_value("end"); if(end == ""){ cannot_find_tag(); return;}
-	if(isNaN(end)){ alert_import("'end' must be a number"); return;}
+	let end = get_tag_value("end"); 
 	details.t_end = end;
 	
-	if(Number(details.t_start) >= Number(details.t_end)){
-		alert_import("'start' must before 'end'"); return;
+	if(details.t_start != "" && details.t_end != ""){
+		if(Number(details.t_start) >= Number(details.t_end)){
+			alert_import("'start' must before 'end'");
+		}
 	}
 	
+	details.seed_on = {value:"No"};
+	details.seed = SEED_DEFAULT;
+	let seed = get_tag_value("seed"); 
+	if(seed != ""){ details.seed = seed; details.seed_on.value = "Yes";}
+	
 	let alg = get_tag_value("algorithm").toUpperCase();
-	if(alg == "") alg = "DA-MCMC";
+	if(alg == "" || set_default) alg = ALG_DEFAULT;
 	
 	if(option_error("algorithm",alg,inf_alg_list) == true) return;
 	
 	details.algorithm.value = alg;	
 
-	let dt_str = get_tag_value("timestep"); if(dt_str == ""){ cannot_find_tag(); return;}
-	let dt = Number(dt_str);
-	if(isNaN(dt_str) || dt <= 0){
-		alert_import("'timestep' must be a positive number"); return;
+	let dt_str = get_tag_value("timestep");
+	if(dt_str == "") details.timestep = "";
+	else{
+		let dt = Number(dt_str);
+		if(isNaN(dt_str) || dt <= 0){
+			alert_import("'timestep' must be a positive number");
+		}
+		details.timestep = dt;
 	}
-	details.timestep = dt;
 	
-	details.indmax = check_pos_integer("ind-max",10000);
-
+	let nchain = get_tag_value("nchain");
+	if(nchain == "") nchain = "3";
+	if(isNaN(nchain) || Math.floor(nchain) != nchain || Number(nchain) <= 0){
+		alert_import("'nchain' must be a positive integer");
+	}
+	details.nchain = nchain;
+	
+	details.indmax = check_pos_integer("ind-max",INDMAX_DEFAULT);
+	
+	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
+	
 	switch(alg){
 	case "DA-MCMC":
-		details.sample = check_pos_integer("sample",10000);
-		details.thinparam = check_pos_integer("param-thin",10);
-		details.thinstate = check_pos_integer("state-thin",100);
+		details.sample = check_pos_integer("sample",MCMC_SAMPLE_DEFAULT);
+		details.output_param = check_pos_integer("param-output",MCMC_OP_PARAM_DEFAULT);
+		details.output_state = check_pos_integer("state-output",MCMC_OP_STATE_DEFAULT);
+		break;
+	
+	case "PAS-MCMC":
+		details.gen_update = check_pos_integer("gen-update",PAS_GEN_UPDATE_DEFAULT);
+		details.npart = check_pos_integer("npart",PAS_PART_DEFAULT);
+		details.output_param = check_pos_integer("param-output",MCMC_OP_PARAM_DEFAULT);
+		details.output_state = check_pos_integer("state-output",MCMC_OP_STATE_DEFAULT);
 		break;
 		
 	case "ABC":
-		details.abcsample = check_pos_integer("sample",1000);
-		details.accfrac = check_zero_one("acc-frac",0.1);
+		details.abcsample = check_pos_integer("sample",ABC_SAMPLE_DEFAULT);
+		details.accfrac = check_zero_one("acc-frac",ABC_ACFRAC_DEFAULT);zzz
 		break;
 		
 	case "ABC-SMC":
-		details.abcsample = check_pos_integer("sample",1000);
-		details.accfrac = check_zero_one("acc-frac",0.5);
-		details.numgen = check_pos_integer("gen",5);
-		details.kernelsize = check_pos_number("kernel-size",0.5);
+		details.abcsample = check_pos_integer("sample",ABCSMC_SAMPLE_DEFAULT);
+		details.accfrac = check_zero_one("acc-frac",ABCSMC_ACFRAC_DEFAULT);
+		details.numgen = check_pos_integer("gen",ABCSMC_GEN_DEFAULT);
+		details.kernelsize = check_pos_number("kernel-size",ABCSMC_KERNEL_DEFAULT);
 		break;
 		
 	default: break;
-	
 		break;
 	}
 	
+	details.burnin_frac = BURNIN_FRAC_DEFAULT;
+	details.anneal_type = {te:ANNEAL_DEFAULT};
+	details.anneal_rate = ANNEAL_RATE_DEFAULT;
+	details.anneal_power = ANNEAL_POWER_DEFAULT;
+	
+	if(alg == "DA-MCMC"){
+		let burnin_str = get_tag_value("burnin-frac"); 
+		if(burnin_str != ""){
+			let burnin = Number(burnin_str);
+			if(isNaN(burnin) || burnin < 1 || burnin > 90){
+				alert_import("'burnin-frac' must be a number between 1 and 90");
+				return;		
+			}
+			details.burnin_frac = burnin_str;
+		}	
+	
+		let anneal_str = get_tag_value("anneal"); 
+		if(anneal_str != ""){
+			if(option_error("anneal",anneal_str,["none","scan","power-auto","log-auto","power"]) == true) return;
+			
+			details.anneal_type = {te:anneal_str};
+			
+			switch(anneal_str){
+			case "scan":
+				{
+					let rate_str = get_tag_value("rate");
+					if(rate_str != ""){				
+						let rate = Number(rate_str);
+						if(isNaN(rate) || rate <= 0){
+							alert_import("'rate' must be a positive number");
+							return;		
+						}
+					
+						details.anneal_rate = rate_str;
+					}
+				}
+				break;
+				
+			case "power":	
+				{
+					let power_str = get_tag_value("power");
+					if(power_str != ""){
+						//if(power_str == ""){ cannot_find_tag(); return;}
+					
+						let power = Number(power_str);
+						if(isNaN(power) || power <= 0){
+							alert_import("'power' must be a positive number");
+							return;		
+						}
+					
+						details.anneal_power = power_str;
+					}
+				}
+				break;
+				
+			default: break;
+			}
+		}
+	}
+	
+	let ppc = model.ppc_details;
+
+	if(ppc.ppc_t_start == ""){
+		ppc.ppc_t_start = details.t_start;
+		ppc.ppc_t_end = details.t_end;
+	}
+}
+
+
+/// Applies the post-sim command
+function post_sim_command()
+{
+	let details = model.ppc_details;
+	
+	// Copies information from inference
+	let inf_de = model.inf_details;
+	details.timestep = inf_de.timestep;
+	details.t_start = inf_de.t_start;
+	details.t_end = inf_de.t_end;
+	details.inf_t_end = inf_de.t_end;
+	
+	let start = get_tag_value("start"); 
+	if(start != "") details.ppc_t_start = start;
+	else details.ppc_t_start = details.t_start;
+		
+	let end = get_tag_value("end"); 
+	if(end != "") details.ppc_t_end = end;
+	else details.ppc_t_end = details.t_end;
+		
+	if(details.ppc_t_start != "" && details.ppc_t_end != ""){
+		if(Number(details.ppc_t_start) >= Number(details.ppc_t_end)){
+			alert_import("'start' must before 'end'");
+		}
+		if(Number(end) > Number(details.t_end)) details.t_end = end;
+	}
+	
+	let num = get_tag_value("number").toLowerCase();
+	if(num == "") num = PPC_NUM_DEFAULT;
+	let numf = Number(num);
+	if(set_default) num = PPC_NUM_DEFAULT;
+	
+	if(isNaN(num) || numf != Math.floor(numf) || numf <= 0){ 
+		alert_import("'number' must be a positive integer"); 
+	}
+	details.number = num;
+	
+	details.seed_on = {value:"No"};
+	details.seed = SEED_DEFAULT;
+	let seed = get_tag_value("seed"); 
+	if(seed != ""){ details.seed = seed; details.seed_on.value = "Yes";}
+	
+	let alg = "gillespie";
+	
+	if(option_error("algorithm",alg,sim_alg_list) == true) return;
+	details.algorithm.value = alg;	
+
+	let resample = get_tag_value("resample");
+	if(resample != ""){
+		details.resample = resample.split(","); 		
+		details.line = imp.line;	
+	}
 }
 
 
@@ -1379,7 +1811,7 @@ function check_pos_integer(te,def)
 {
 	let value = get_tag_value(te);
 	
-	if(value == "") return def;
+	if(value == "" || set_default) return def;
 	
 	let num = Number(value);
 	if(isNaN(value) || num <= 0 || num != Math.floor(num)){
@@ -1388,12 +1820,13 @@ function check_pos_integer(te,def)
 	return num;
 }
 
+
 /// Check that a number is positive 
 function check_pos_number(te,def)
 {
 	let value = get_tag_value(te);
 	
-	if(value == "") return def;
+	if(value == "" || set_default) return def;
 	
 	let num = Number(value);
 	if(isNaN(value) || num <= 0){
@@ -1408,7 +1841,7 @@ function check_zero_one(te,def)
 {
 	let value = get_tag_value(te);
 	
-	if(value == "") return def;
+	if(value == "" || set_default) return def;
 	
 	let num = Number(value);
 	if(isNaN(value) || num <= 0 || num > 1){
@@ -1421,34 +1854,75 @@ function check_zero_one(te,def)
 /// Loads individual effects into the model
 function ind_effect_command()
 {
-	let p = inter.imp.p;
+	let p = imp.p;
 
 	if(p == undefined){
 		alert_import("A species must be defined before an individual effect can be added");
-		return;
 	}
 		
-	let name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
+	let name = get_tag_value("name"); if(name == "") cannot_find_tag();
+	
 	let spl = name.split(",");
-	let list = []; for(let i = 0; i < spl.length; i++) list.push({name:spl[i]});
+	let ie_list = []; for(let i = 0; i < spl.length; i++) ie_list.push({name:spl[i]});
 	
 	let A = get_tag_value("A"); 
+	let A_sparse = get_tag_value("A-sparse"); 
 	
 	let A_matrix;
 	if(A == ""){
-		A_matrix = {check:false, loaded:false, value:[], ind_list:[]};
+		if(A_sparse == ""){ 
+			A_matrix = {check:false, loaded:false, A_value:[], ind_list:[]};
+		}
+		else{
+			A_matrix = {check:true, loaded:true};
+			
+			let ind_list = get_tag_value("ind-list"); 
+		
+			let tab_ind = load_table(ind_list.te,true,ind_list.sep,ind_list.name);
+			if(tab_ind == undefined) return;
+			
+			let list=[];
+			for(let r = 0; r < tab_ind.nrow; r++){ 
+				list.push(tab_ind.ele[r][0]);
+			}			
+		
+			A_matrix.ind_list = list;
+		
+			let N = list.length;
+			let val=[];
+			for(let r = 0; r < N; r++){
+				val[r]=[];
+				for(let c = 0; c < N; c++) val[r][c] = 0;
+			}
+		
+			let tab = load_table(A_sparse.te,true,A_sparse.sep,A_sparse.name);
+			if(tab == undefined) return;
+		
+			for(let r = 0; r < tab.nrow; r++){
+				let fl = false;
+				let j = Number(tab.ele[r][0]); if(isNaN(j) || j != Math.floor(j)) fl = true;
+				let i = Number(tab.ele[r][1]); if(isNaN(i) || i != Math.floor(i)) fl = true;
+				let value = Number(tab.ele[r][2]); if(isNaN(value)) fl = true;
+				if(fl == true){
+					alert_import("Problem loading table on line "+to_string(r+1)); return;
+				}
+				val[j][i] = value;
+				val[i][j] = value;
+			}
+			A_matrix.A_value = val;
+		}
 	}
 	else{
 		A_matrix = {check:true, loaded:true};
 		
-		let tab = load_table_from_file(A);
+		let tab = load_table(A.te,true,A.sep,A.name);
+		//let tab = load_table_from_file(A);
 		if(tab == undefined) return;
-		if(typeof tab == 'string'){ alert_import(tab); return;}
+		if(typeof tab == 'string') alert_import(tab); 
 
 		A_matrix.ind_list = tab.heading;
 		if(tab.nrow != tab.ncol){
 			alert_import("The file '"+tab.filename+"' must contain an equal number of columns and rows."); 
-			return;
 		}
 		
 		let val = [];
@@ -1457,620 +1931,151 @@ function ind_effect_command()
 			for(let c = 0; c < tab.ncol; c++){
 				let ele = tab.ele[r][c];
 				if(isNaN(ele)){
-					alert_import("In file '"+tab.filename+"' the element '"+ele+"' is not a number (row "+(r+2)+", col "+(c+1)+")");
-					return;
+					alert_import(in_file_text(tab.filename)+"the element '"+ele+"' is not a number (row "+(r+2)+", col "+(c+1)+")");
 				}
 				val[r][c] = Number(ele);
 			}
 		}
-		A_matrix.value = val;
+		A_matrix.A_value = val;
 	}
 	
-	model.species[p].ind_eff_group.push({list:list, A_matrix:A_matrix});
+	// Checks that ind effects do not already exist in the model
+	for(let pp = 0; pp < model.species.length; pp++){
+		let iegroup = model.species[pp].ind_eff_group;
+		for(let k = 0; k < iegroup.length; k++){
+			let list = iegroup[k].ie_list;
+			for(let ii = 0; ii < list.length; ii++){				
+				for(let j = 0; j < ie_list.length; j++){	
+					if(find(list,"name",ie_list[j].name) != undefined){
+						alert_import("Individual effect '"+ie_list[j].name+"' already in the model");
+					}
+				}
+			}
+		}
+	}
+	
+	model.species[p].ind_eff_group.push({ie_list:ie_list, A_matrix:A_matrix});
+}
+
+
+/// Displays text referencing a file/table
+function in_file_text(te)
+{
+	if(te == "inline") return "In table '[[...]]' ";
+	return "In file '"+te+"' ";
 }
 
 
 /// Loads fixed effects into the model
 function fixed_effect_command()
 {
-	let p = inter.imp.p;
+	let p = imp.p;
 
 	if(p == undefined){
 		alert_import("A species must be defined before a fixed effect can be added");
-		return;
 	}
 		
-	let name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
+	let name = get_tag_value("name"); if(name == "") cannot_find_tag();
 
-	let X = get_tag_value("X"); if(X == ""){ cannot_find_tag(); return;}
-	
-	let X_vector = { loaded:true, ind_list:[], value:[]};
+	let X_vector = { loaded:false, ind_list:[], X_value:[]};
+
+	let X = get_tag_value("X"); 
+	if(X != ""){
+		X_vector.loaded = true;		
+		let tab = load_table(X.te,true,X.sep,X.name);		
+		if(tab == undefined) return;
 		
-	let tab = load_table_from_file(X);
-	if(tab == undefined) return;
-	
-	let col_name = ["ID","value"]; 
-	let subtab = get_subtable(tab,col_name);
-	if(subtab.error != ""){	alert_import(subtab.error); return;}
-	
-	for(let r = 0; r < subtab.nrow; r++){
-		X_vector.ind_list.push(subtab.ele[r][0]);
-		let val = tab.ele[r][1];
-		if(isNaN(val)){
-			alert_import("In file '"+tab.filename+"' the element '"+val+"' is not a number (row "+(r+2)+")");
-			return;
+		let col_name = ["ID","value"]; 
+		let subtab = get_subtable(tab,col_name);
+		if(subtab.error != "") alert_import(subtab.error);
+		
+		for(let r = 0; r < subtab.nrow; r++){
+			X_vector.ind_list.push(subtab.ele[r][0]);
+			let val = tab.ele[r][1];
+			if(isNaN(val)){
+				alert_import(in_file_text(tab.filename)+"the element '"+val+"' is not a number (row "+(r+2)+")");
+			}
+			X_vector.X_value.push(val);
 		}
-		X_vector.value.push(val);
 	}
-
+	
 	model.species[p].fix_eff.push({name:name, X_vector:X_vector});
 }
 
 
-/// Imports a data-table 
-function import_data_table_command(cname)
+/// Converts dates to times
+function convert_date_time(so)
 {
-	let siminf = "inf";
-	switch(cname){
-	case "add-ind-sim": cname = "add-ind"; siminf = "sim"; break;
-	case "remove-ind-sim": cname = "remove-ind"; siminf = "sim"; break;
-	case "move-ind-sim": cname = "move-ind"; siminf = "sim"; break;
-	case "init-pop-sim": cname = "init-pop"; siminf = "sim"; break;
-	}
-	
-	let i = find(convert,"command",cname);
-	if(i == undefined){
-		error("Counld not not import data table:"+cname);
-		return;
-	}
-	
-	let type = convert[i].type;
-	
-	let file = get_tag_value("file");
-	let tab; 
-	if(file != ""){
-		tab = load_table_from_file(file);
-		if(tab == undefined) return;
-		if(typeof tab == 'string'){ alert_import(tab); return;}
-	}
-	
-	let cols = get_tag_value("cols");
-	let cols_split = cols.split(",");
-	
-	let p = inter.imp.p;
-	if(p == undefined){
-		alert_import("To load the data file the species must be set"); return;
-	}
-	
-	let sp = model.species[p];
-	
-	let spec;
-	let info = {p:p, siminf:siminf};
-	
-	switch(type){  // Modifies specification dependent on data source
-	case "Init. Pop.":
-		{
-			let focal = get_tag_value("focal");
+	if(so.time_format != "float"){
+		let sep;
+		if(so.time_format.includes("/")) sep = "/";
+		if(so.time_format.includes(".")) sep = ".";
+		if(so.time_format.includes("-")) sep = "-";
+		let temp = so.time_format.split(sep);
 		
-			if(focal == "") spec = {radio:{value:"File"},radio2:{value:"All"}, focal:{te:""}};
-			else{
-				let cl = find_nocase(sp.cla,"name",focal);
-				if(cl == undefined){ alert_import("'"+focal+"' is not a classification name"); return;}
-				else focal = sp.cla[cl].name;
-		
-				spec = {radio:{value:"File"},radio2:{value:"Focal"}, focal:{te:focal}};
-			}
-		}	
-		break;
-		
-	case "Add Ind.":
-		break;
-		
-	case "Remove Ind.":
-		break;
-	
-	case "Move Ind.":
-		{
-			let name = get_tag_value("class");
-			if(name == ""){ cannot_find_tag(); return;}
-		
-			let cl = find_nocase(sp.cla,"name",name);
-			if(cl == undefined){
-				alert_import("In 'class' the value '"+name+"' is not a classification"); 
-				return;
-			}
-			
-			spec = {cl_drop:{te:sp.cla[cl].name}};
-		}
-		break;
-	
-	case "Init. Pop. Prior": 
-		{
-			let ty = get_tag_value("type").toLowerCase();
-	
-			if(option_error("type",ty,["flat","dirichlet"]) == true) return;
-	
-			switch(ty){
-			case "flat": spec = {radio:{value:"Flat"}}; break;
-			case "dirichlet": spec = {radio:{value:"Dirichlet"}}; break;
-			default: error("Op not recognised"); break;
-			}
-		}
-		break;
-	
-	case "Compartment":
-		{
-			let name = get_tag_value("class");
-			if(name == ""){ cannot_find_tag(); return;}
-			
-			let cl = find_nocase(sp.cla,"name",name);
-			if(cl == undefined){
-				alert_import("In 'class' the value '"+name+"' is not a classification"); 
-				return;
-			}
-		
-			spec = {cl_drop:{te:sp.cla[cl].name}};
-		}	
-		break;
-		
-		
-	case "Transition": case "Source": case "Sink":
-		{
-			switch(type){
-			case "Transition":
-				{
-					let from = get_tag_value("from");
-					if(from == ""){ cannot_find_tag(); return;}
-			
-					let cl_fr = get_cl_from_comp(from,p);
-					if(cl_fr == undefined){
-						alert_import("'"+from+"' is not a valid compartment"); 
-						return;
-					}
-				
-					let to = get_tag_value("to");
-					if(to == ""){ cannot_find_tag(); return;}
-			
-					let cl_to = get_cl_from_comp(to,p);
-					if(cl_to == undefined){ 
-						alert_import("'"+to+"' is not a valid compartment"); 
-						return;
-					}
-				
-					if(cl_fr != cl_to){ 
-						alert_import("'"+from+"' and '"+to+"' cannot be in different classifications");
-						return;
-					}
-						
-					spec = {tr_drop:{te:from+"→"+to}};				
-				}
-				break;
-				
-			case "Source":
-				{
-					let to = get_tag_value("to");
-					if(to == ""){ cannot_find_tag(); return;}
-			
-					let cl_to = get_cl_from_comp(to,p);
-					if(cl_to == undefined){ 
-						alert_import("'"+to+"' is not a valid compartment"); 
-						return;
-					}
+		for(let c = 0; c < so.load_col.length; c++){
+			if(so.load_col[c].heading == "t"){
+				let tab = so.table;
+				for(let r = 0; r < tab.nrow; r++){
+					let el = tab.ele[r][c];
+					let val = el.split(sep);
 					
-					spec = {tr_drop:{te:to}};
-				}
-				break;
-				
-			case "Sink":
-				{
-					let from = get_tag_value("from");
-					if(from == ""){ cannot_find_tag(); return;}
-
-					let cl_fr = get_cl_from_comp(from,p);
-					if(cl_fr == undefined){
-						alert_import("'"+from+"' is not a valid compartment"); 
-						return;
-					}
+					let warn = false;
 					
-					spec = {tr_drop:{te:from}};
-				}
-				break;
-			}
-		
-			let or = get_tag_value("obsrange").toLowerCase();
-			if(or == ""){ cannot_find_tag(); return;}
-			
-			if(option_error("obsrange",or,["all","specify","file"]) == true) return;
-			
-			spec.time_start = "";
-			spec.time_end = "";
-			
-			switch(or){
-			case "all": 
-				spec.time_radio = {value:"All"};
-				break;
-				
-			case "specify":
-				spec.time_radio = {value:"Spec"}; 
-				
-				let start = get_tag_value("start");
-				if(start == ""){ cannot_find_tag(); return;}
-				if(isNaN(start)){ alert_import("'start' must be a number"); return;}
-				spec.time_start = start;
-				
-				let end = get_tag_value("end");
-				if(end == ""){ cannot_find_tag(); return;}
-				if(isNaN(end)){ alert_import("'end' must be a number"); return;}
-				spec.time_end = end;
-				
-				if(Number(start) >= Number(end)){
-					alert_import("'start' must be before 'end'"); return;
-				}
-				break;
-				
-			case "file": 
-				spec.time_radio = {value:"File"}; 
-				break;
-			
-			default: 
-				alert_import("The value '"+or+"' not recognised"); 
-				return;
-			}
-		}
-		break;
-		
-	case "Diag. Test":
-		{
-			let Se = get_tag_value("Se");
-			if(Se == ""){ cannot_find_tag(); return;}
-			
-			if(!is_eqn(Se,"Se",{zero_one_range:true})) return;
-			
-			let Sp = get_tag_value("Sp");
-			if(Sp == ""){ cannot_find_tag(); return;}
-			
-			if(!is_eqn(Sp,"Sp",{zero_one_range:true})) return;
-			
-			let pos = get_tag_value("pos");
-			if(pos == "") pos = "1";
-			
-			let neg = get_tag_value("neg");
-			if(neg == "") pos = "0";
-			
-			if(pos == neg){
-				alert_import("'pos' and 'neg' cannot both have the same value");
-			}
-			
-			let comp = get_tag_value("comp");
-			if(comp == ""){ cannot_find_tag(); return;}
-		
-			let spl = comp.split(",");
-			
-			let cl = get_cl_from_comp(spl[0],p);
-			if(cl == undefined){
-				alert_import("Value '"+spl[0]+"' is not a compartment");
-				return;
-			}
-			
-			let claa = model.species[p].cla[cl];
-			
-			let cb = {name:claa.name, value:[]};
-			
-			for(let c = 0; c < claa.ncomp; c++){
-				let name = claa.comp[c].name;
-				if(find_in(spl,name) != undefined) cb.value[c] = {comp_name_store:name, check:true};
-				else cb.value[c] = {comp_name_store:name, check:false};
-			}
-	
-			let Se_eqn = create_equation(Se,"Se");
-			let Sp_eqn = create_equation(Sp,"Sp");
-			
-			spec = {cl_drop:{te:claa.name}, Se_eqn:Se_eqn, Sp_eqn:Sp_eqn, pos_result:pos, neg_result:neg, check_box:cb};
-		}
-		break;
-		
-	case "Population": case "Set Traps":
-		{		
-			let filt = [];
-			for(let cl = 0; cl < sp.ncla; cl++){
-				let claa = sp.cla[cl];
-				filt[cl] = {comp:[], radio:{value:"All"}};
-				for(let c = 0; c < claa.ncomp; c++) filt[cl].comp[c] = false;
-			}
-			
-			let filter = get_tag_value("filter");
-			
-			if(filter != ""){
-				let spl = filter.split(",");
-				for(let j = 0; j < spl.length; j++){
-					let spl2 = spl[j].split(":");
-					if(spl2.length != 2){ 
-						alert_import("In 'filter' error understanding '"+filter+"'"); 
-						return;
-					}
+					if(temp.length != val.length) warn = true;
 					
-					if(spl2[0] == ""){
-						alert_import("In 'filter' the value '"+filter+"' does not specify a classification");
-						return;	
-					}
-					
-					let cl = find_nocase(sp.cla,"name",spl2[0]);
-					if(cl == undefined){ 
-						alert_import("In 'filter' the value '"+spl2[0]+"' is not a classification"); 
-						return;
-					}
-					
-					let claa = sp.cla[cl];
-					
-					if(spl2[1].toLowerCase() == "file"){
-						filt[cl].radio.value = "File";
-					}
-					else{
-						filt[cl].radio.value = "Comp";
-						
-						let spl3 = spl2[1].split("|");
-						for(let k = 0; k < spl3.length; k++){
-							let c = find(claa.comp,"name",spl3[k]);
-							
-							if(spl3[k] == ""){
-								alert_import("In 'filter' the classification '"+spl2[0]+"' is not set");
-								return;
+					let year, month, day;
+					for(let k = 0; k < temp.length; k++){
+						if(isNaN(val[k])) warn = true; 
+						else{
+							if(temp[k].substr(0,1) == "d") day = Number(val[k]);
+							if(temp[k].substr(0,1) == "m") month = Number(val[k]);
+							if(temp[k].substr(0,1) == "y"){
+								year = Number(val[k]);
 							}
-							
-							if(c == undefined){ 
-								alert_import("In 'filter' the value '"+spl3[k]+"' is not a compartment in '"+spl2[0]+"'"); 
-								return;
-							}
-							
-							filt[cl].comp[c] = true;
 						}
 					}
-				}
-			}
-
-			let cla_fi = [];
-			for(let cl = 0; cl < sp.ncla; cl++){
-				let claa = sp.cla[cl];
+					
+					if(warn == true){
+						alert_import("For '"+tab.filename+"': '"+el+"' does not follow format '"+so.time_format+"' (col '"+tab.heading[c]+"', row "+(r+2)+")");
+					}
 				
-				let comp = [];
-				
-				for(let c = 0; c < claa.ncomp; c++){
-					comp[c] = {check: filt[cl].comp[c], comp_name_store:claa.comp[c].name};
+					let time = (new Date(year, month, day)).getTime();
+					let time_beg = (new Date(year, 1, 1)).getTime();
+					let time_end = (new Date(year+1, 1, 1)).getTime();
+					let frac = (time - time_beg)/(time_end-time_beg);
+					
+					tab.ele[r][c] = String((year+frac).toFixed(4));
 				}
-						
-				cla_fi[cl] = {cl_name_store:claa.name, radio:filt[cl].radio, comp:comp};
-			}
-	
-			spec = {filter:{cla:cla_fi}};
-			
-			if(type == "Set Traps"){
-				let prob = get_tag_value("prob");
-				if(prob == ""){ cannot_find_tag(); return;}
-			
-				if(!is_eqn(prob,"prob",{zero_one_range:true})) return;
-				
-				spec.trap_prob_eqn = create_equation(prob,"trap_prob",p,undefined);
-			}
-
-			if(type == "Population"){
-				if(load_obs_model(spec) != "success") return;
 			}
 		}
-		break;
-		
-	case "Pop. Trans.":
-		{
-			let from = get_tag_value("from");
-			if(from == ""){ cannot_find_tag(); return;}
-			let from_spl = from.split(",");
-			
-			let to = get_tag_value("to");
-			if(to == ""){ cannot_find_tag(); return;}
-			let to_spl = to.split(",");
-
-			if(from_spl.length != to_spl.length){
-				alert_import("The 'from' and 'to' must have the same size list");
-				return;
-			}
-			
-			let cl_sel;
-			for(let i = 0; i < from_spl.length; i++){
-				let cl = get_cl_from_comp(from_spl[i],p);
-				if(cl == undefined){
-					alert_import("The value '"+from_spl[i]+"' is not a compartment");
-					return;
-				}
-				if(cl_sel == undefined) cl_sel = cl;
-				else{
-					if(cl != cl_sel){
-						alert_import("In 'from' the value '"+from+"' has compartments from different classifications");
-						return;
-					}
-				}
-			}
-			
-			if(cl_sel == undefined){
-				alert_import("No transitions have been selected");
-				return;
-			}
-					
-			let claa_sel = sp.cla[cl_sel];
-			
-			let tra_fi = [];
-			for(let i = 0; i < claa_sel.ntra; i++){
-				let tra = claa_sel.tra[i];
-				tra_fi[i] = { tra_name_store:tra.name, check:false};
-			}
-			
-			for(let j = 0; j < from_spl.length; j++){
-				let name = from_spl[j]+"→"+to_spl[j];
-				let i = find(claa_sel.tra,"name",name);
-				if(i == undefined){
-					alert_import("The transition '"+name+"' does not exist");
-					return;
-				}
-				
-				tra_fi[i].check = true;
-			}
-		
-			let filt = [];
-			for(let cl = 0; cl < sp.ncla; cl++){
-				if(cl == cl_sel){
-					filt[cl] = {};
-				}
-				else{
-					let claa = sp.cla[cl];
-					filt[cl] = {comp:[], radio:{value:"All"}};
-					for(let c = 0; c < claa.ncomp; c++) filt[cl].comp[c] = false;
-				}
-			}
-		
-			let filter = get_tag_value("filter");
-			if(filter != ""){
-				let spl = filter.split(",");
-				for(let j = 0; j < spl.length; j++){
-					let spl2 = spl[j].split(":");
-					if(spl2.length != 2){ 
-						alert_import("In 'filter' error understanding '"+filter+"'"); 
-						return;
-					}
-					
-					if(spl2[0] == ""){
-						alert_import("In 'filter' the value '"+filter+"' does not specify a classification");
-						return;	
-					}
-					
-					let cl = find(sp.cla,"name",spl2[0]);
-					if(cl == undefined){
-						alert_import("In 'filter' the value '"+spl2[0]+"' is not a classification"); 
-						return;
-					}
-					
-					if(cl == cl_sel){ 
-						alert_import("In 'filter' the value '"+spl2[0]+"' cannot be the same as the transition classification"); 
-						return;
-					}
-					
-					let claa = sp.cla[cl];
-					
-					if(spl2[1].toLowerCase() == "file"){
-						filt[cl].radio.value = "File";
-					}					
-					else{	
-						filt[cl].radio.value = "Comp";
-					
-						let spl3 = spl2[1].split("|");
-						for(let k = 0; k < spl3.length; k++){
-							if(spl3[k] == ""){
-								alert_import("In 'filter' the classification '"+spl2[0]+"' is not set");
-								return;
-							}
-							
-							let c = find(claa.comp,"name",spl3[k]);
-							if(c == undefined){
-								alert_import("In 'filter' the value '"+spl3[k]+"' is not a compartment in '"+spl2[0]+"'"); 
-								return;
-							}
-							
-							filt[cl].comp[c] = true;
-						}
-					}
-				}
-			}
-			
-			let cla_fi = [];
-			for(let cl = 0; cl < sp.ncla; cl++){
-				if(cl == cl_sel){
-					cla_fi[cl] = {};
-				}
-				else{
-					let claa = sp.cla[cl];
-					
-					let comp = [];
-					
-					for(let c = 0; c < claa.ncomp; c++){
-						comp[c] = {check: filt[cl].comp[c], comp_name_store:claa.comp[c].name};
-					}
-							
-					cla_fi[cl] = {cl_name_store:claa.name, radio:filt[cl].radio, comp:comp};
-				}
-			}
-	
-			spec = {cl_drop:{te:claa_sel.name}, filter:{te:claa_sel.name, cla:cla_fi, tra:tra_fi}};
-			
-			if(load_obs_model(spec) != "success") return;
-		}
-		break;
-		
-	case "Genetic":
-		{
-			let root = get_tag_value("root");
-			if(root == ""){ cannot_find_tag(); return;}
-			
-			spec = {root:root};
-		}
-		break;
 	}
-		
-	start_data_source(type,spec,info);
+}
 
-	let so = inter.edit_source;
 
-	switch(type){  // Adds in extra information dependent on data source
-	case "Init. Pop. Prior": 
-		{
-			so.variety = so.spec.radio.value;
-			if(so.variety == "Flat"){
-				data_source("Add");
-				return;
-			}
+/// Sets the columns which need to be loaded SNP data
+function set_SNP_columns(tab,ds)
+{
+	let snp_root = ds.spec.snp_root;
+	let len = snp_root.length;	
+	ds.load_col.pop();
+
+	for(let c = 0; c < tab.ncol; c++){
+		let head = tab.heading[c];
+		if(head.length >= len && head.substr(0,len) == snp_root){
+			ds.load_col.push({heading:head, desc:"SNP data",type:"text"});
 		}
-		break;
 	}
-	//if(type == "Init. Pop. Prior": 
-	
-	so.data_table_use = "not loaded";
-	
-	let col_name = [];
-	for(let c = 0; c < so.load_col.length; c++){
-		col_name.push(so.load_col[c].heading);
-	}
-	
-	if(cols != ""){
-		let spl = cols.split(",");
+}
 
-		if(spl.length != col_name.length){
-			alert_import("'cols' does not have the correct number of entries (expected something in the order '"+stringify(col_name)+"')"); 
-			return;
-		}
-		
-		for(let i = 0; i < spl.length; i++){
-			for(let j = 0; j < col_name.length; j++){
-				if(spl[i] == col_name[j] && i != j){
-					alert_import("'cols' does not have the correct order (expected something in the order '"+stringify(col_name)+"')"); 
-					return;
-				}
-			}
-		}
-		
-		col_name = spl;
-	}
-	
-	so.table = get_subtable(tab,col_name);	
-	if(so.table.error != ""){ alert_import("File problem – "+so.table.error); return;}
 
-	so.table_loaded = true;
-	so.table.edit = true;
-
-	if(data_source_check_error(true) == false){
-		data_source("Add");
-	}
-	else{
-		if(inter.help.te != undefined){
-			close_data_source();
-			alert_import("File problem – "+inter.help.te);
-			return;
-		}
+/// Sets the columns which need to be loaded matrix data
+function set_genetic_matrix_columns(ele,ds)
+{
+	//let obs_col = ds.load_col[ds.load_col.length-1];
+	let c = ds.load_col.length-1;
+	for(let r = 0; r < ele.length; r++){
+		ds.load_col.push({heading:ele[r][c], desc:"Matrix data",type:"positive int"});
 	}
 }
 
@@ -2079,52 +2084,227 @@ function import_data_table_command(cname)
 function load_obs_model(spec)
 {
 	let error = get_tag_value("error");
-	if(error == ""){ cannot_find_tag(); return;}
+	if(error == "") cannot_find_tag();
 			
 	let spl = error.split(":");
-	if(spl.length != 2){ alert_import("Problem with expression '"+error+"'"); return;}
+
+	switch(spl[0].toLowerCase()){
+	case "normal": spec.obs_error_dist = {value:"Normal"}; break;
+	case "poisson": spec.obs_error_dist = {value:"Poisson"}; break;
+	case "neg-binomial": spec.obs_error_dist = {value:"Negative binomial"}; break;
+	default:
+		alert_import("Observation error '"+spl[0]+"' not recognised");
+		break;
+	}
 	
-	if(spl[0].toLowerCase() != "normal"){ alert_import("'"+spl[0]+"' should be 'normal'"); return;}
-	
-	let val = spl[1].trim();
-	
+	spec.p = "0.5";
 	spec.percent = "10";
 	spec.sd = "";
-			
-	if(val.toLowerCase() == "file"){
-		spec.obs_error = {value:"file"};	
+	spec.obs_error = {value:"percent"};	
+	spec.obs_error_p = {value:"p"};	
+
+	switch(spec.obs_error_dist.value){
+	case "Normal":
+		{
+			if(spl.length != 2) alert_import("Problem with expression '"+error+"'");
+	
+			let val = spl[1].trim();
+		
+			if(val.toLowerCase() == "file"){
+				spec.obs_error = {value:"file"};	
+			}
+			else{
+				if(is_percent(val) == true){
+					spec.obs_error = {value:"percent"};
+					spec.percent = val.substr(0,val.length-1);
+					if(isNaN(spec.percent)){
+						alert_import("The expression '"+spec.percent+"' is not a percentage");
+					}
+					
+					if(Number(spec.percent) <= 0){
+						alert_import("The value '"+spec.percent+"%' must be a positive percentage");
+					}
+				}	
+				else{
+					spec.obs_error = {value:"sd"};
+					spec.sd = val;
+					
+					if(isNaN(spec.sd)){
+						alert_import("The expression '"+spec.sd+"' must be a number or a percentage");
+					}
+					
+					if(Number(spec.sd) <= 0){
+						alert_import("The value '"+spec.sd+"' must be positive");
+					}
+				}
+			}
+		}
+		break;
+		
+	case "Poisson":
+		if(spl.length != 1) alert_import("Problem with expression '"+error+"'");
+		break;
+	
+	case "Negative binomial":
+		{
+			if(spl.length != 2) alert_import("Problem with expression '"+error+"'");
+	
+			let val = spl[1].trim();
+		
+			if(val.toLowerCase() == "file"){
+				spec.obs_error_p = {value:"file"};
+			}
+			else{
+				spec.obs_error_p = {value:"p"};
+				spec.p = val;
+					
+				if(isNaN(spec.p)){
+					alert_import("The expression '"+spec.p+"' must be a number");
+				}
+				
+				if(Number(spec.p) <= 0 || Number(spec.p) >= 1){
+					alert_import("The value '"+spec.p+"' must be between zero and one");
+				}
+			}
+		}
+		break;
 	}
-	else{
-		if(is_percent(val) == true){
-			spec.obs_error = {value:"percent"};
-			spec.percent = val.substr(0,val.length-1);
-			if(isNaN(spec.percent)){
-				alert_import("The expression '"+spec.percent+"' is not a percentage");
+}
+
+
+/// Gets a filter from a string
+function get_filt_from_str(filter,p)
+{
+	let filt = load_default_filt(p);
+	
+	if(filter != ""){
+		let sp = model.species[p];
+		
+		let spl = filter.split(",");
+		for(let j = 0; j < spl.length; j++){
+			let spl2 = spl[j].split("=");
+		
+			if(spl2.length != 2){ 
+				alert_import("In 'filter' error understanding '"+filter+"'"); 
 				return;
 			}
 			
-			if(Number(spec.percent) <= 0){
-				alert_import("The value '"+spec.percent+"%' must be a positive percentage");
-				return;
-			}
-		}	
-		else{
-			spec.obs_error = {value:"sd"};
-			spec.sd = val;
-			
-			if(isNaN(spec.sd)){
-				alert_import("The expression '"+spec.sd+"' must be a number or a percentage");
+			if(spl2[0] == ""){
+				alert_import("In 'filter' the value '"+filter+"' does not specify a classification");
 				return;
 			}
 			
-			if(Number(spec.sd) <= 0){
-				alert_import("The value '"+spec.sd+"' must be positive");
+			let cl = find_nocase(sp.cla,"name",spl2[0]);
+			if(cl == undefined){ 
+				alert_import("In 'filter' the value '"+spl2[0]+"' is not a classification"); 
 				return;
+			}
+			let claa = sp.cla[cl];
+			
+			if(spl2[1].includes(":")){                  // Load up an observation model
+				filt.cla[cl].radio.value = "ObsMod";
+				
+				//let spl3 = spl2[1].split("|");
+				let spl3 = split_with_bracket(spl2[1],"|");
+				for(let k = 0; k < spl3.length; k++){
+					let spl4 = spl3[k].split(":");
+				
+					if(spl4[0] == ""){
+						alert_import("In 'filter' there was an error");
+						return;
+					}
+						
+					let c = hash_find(claa.hash_comp,spl4[0]);
+					if(c == undefined){ 
+						alert_import("In 'filter' the value '"+spl3[k]+"' is not a compartment in '"+spl2[0]+"'"); 
+						return;
+					}
+					
+					switch(spl4.length){
+					case 1: filt.cla[cl].comp[c] = true; break;
+					case 2: filt.cla[cl].comp[c].prob_eqn.te = spl4[1]; break;
+					default: alert_import("In 'filter' there was an error"); return;
+					}
+				}
+			}
+			else{
+				if(spl2[1].toLowerCase() == "file"){
+					filt.cla[cl].radio.value = "File";
+				}
+				else{
+					filt.cla[cl].radio.value = "Comp";
+				
+					//let spl3 = spl2[1].split("|");
+					let spl3 = split_with_bracket(spl2[1],"|");
+				
+					for(let k = 0; k < spl3.length; k++){
+						if(spl3[k] == ""){
+							alert_import("In 'filter' the classification '"+spl2[0]+"' is not set");
+							return;
+						}
+						
+						let c = hash_find(claa.hash_comp,spl3[k]);
+						if(c == undefined){ 
+							alert_import("In 'filter' the value '"+spl3[k]+"' is not a compartment in '"+spl2[0]+"'"); 
+							return;
+						}
+						
+						filt.cla[cl].comp[c].check = true;
+					}
+				}
 			}
 		}
 	}
 	
-	return "success";
+	return filt;
+}
+
+
+/// Sets the transition filter from a string (e.g. S->E or S->E:0.5|E->I:x)
+function set_get_tra_filt_from_str(claa_sel,filt,name)
+{
+	filt.te = claa_sel.name;
+
+	let tra_fi = [];
+	for(let i = 0; i < claa_sel.ntra; i++){
+		let tra = claa_sel.tra[i];
+		tra_fi[i] = { tra_name_store:tra.name, check:false, prob_eqn:create_equation("0","trans_prob")};
+	}
+	
+	filt.trans_obs_model = {value: "off"};
+	if(name.includes(":")) filt.trans_obs_model.value = "on";
+	
+	//let spl = name.split("|");
+	let spl = split_with_bracket(name,"|");
+	for(let j = 0; j < spl.length; j++){
+		let spl2 = spl[j].split(":");
+		
+		switch(spl2.length){
+		case 1:
+			{
+				let i = hash_find(claa_sel.hash_tra,spl2[0]);
+				if(i == undefined) alert_import("The transition '"+spl2[0]+"' does not exist");
+				tra_fi[i].prob_eqn = create_equation("1","trans_prob");
+				tra_fi[i].check = true;
+			}
+			break;
+		
+		case 2:
+			{
+				let i = hash_find(claa_sel.hash_tra,spl2[0]);
+				if(i == undefined) alert_import("The transition '"+spl2[0]+"' does not exist");
+				tra_fi[i].prob_eqn = create_equation(spl2[1],"trans_prob");
+				tra_fi[i].check = true;
+			}
+			break;
+		
+		default:
+			alert_import("Expression '"+spl[j]+"' not understood");
+			break;
+		}
+	}
+
+	filt.tra = tra_fi;
 }
 
 
@@ -2132,7 +2312,7 @@ function load_obs_model(spec)
 function sim_param_command()
 {
 	let file = get_tag_value("file");
-	if(file == ""){ cannot_find_tag(); return;}
+	if(file == "") cannot_find_tag();
 	
 	read_param_samples_file(0,file,sim_result);
 }
@@ -2142,12 +2322,22 @@ function sim_param_command()
 function inf_param_command()
 {
 	let file = get_tag_value("file");
-	if(file == ""){ cannot_find_tag(); return;}
+	if(file == "") cannot_find_tag();
 	
 	let chain = get_tag_value("chain");
-	if(chain == ""){ cannot_find_tag(); return;}
+	if(chain == "") cannot_find_tag();
 	
 	read_param_samples_file(chain,file,inf_result);
+}
+
+
+/// Reads in parameter samples into ppc_results
+function post_sim_param_command()
+{
+	let file = get_tag_value("file");
+	if(file == "") cannot_find_tag();
+	
+	read_param_samples_file(0,file,ppc_result);
 }
 
 
@@ -2155,7 +2345,7 @@ function inf_param_command()
 function sim_state_command()
 {
 	let file = get_tag_value("file");
-	if(file == ""){ cannot_find_tag(); return;}
+	if(file == "") cannot_find_tag();
 	
 	read_state_samples_file(0,file,sim_result);
 }
@@ -2165,23 +2355,20 @@ function sim_state_command()
 function inf_state_command()
 {
 	let file = get_tag_value("file");
-	if(file == ""){ cannot_find_tag(); return;}
+	if(file == "") cannot_find_tag();
 	
 	let chain = get_tag_value("chain");
-	if(chain == ""){ cannot_find_tag(); return;}
+	if(chain == "") cannot_find_tag();
 	
 	read_state_samples_file(chain,file,inf_result);
 }
 
 
-/*
-/// Load in constant parameters
-function sim_const_command()
+/// Reads in state samples into sim_results
+function post_sim_state_command()
 {
 	let file = get_tag_value("file");
-	if(file == ""){ cannot_find_tag(); return;}
+	if(file == "") cannot_find_tag();
 	
-	read_constant(file,sim_result);
+	read_state_samples_file(0,file,ppc_result);
 }
-*/
-

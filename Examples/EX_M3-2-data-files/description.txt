@@ -1,0 +1,20 @@
+# Model 3.2: Metapopulation model of the world using geographical points
+
+## Objective
+- Introduces a spatial epidemiological model that uses geographical points (these have a defined longitude and latitude).
+- The 100 largest cities in the world are incorporated into the model.
+
+
+## Model
+- A single population-based species 'People' is created.
+- This contains classifications 'DS', which stands for 'disease status', and 'Location'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$.
+- A transmission rate $β$ determines the rate at which individuals transmit disease within a city.
+- Parameter $λ$ controls the spread of disease between cities.
+- A recovery rate $γ$ determines the rate at which individuals recover.
+- Constant matrix $M_l,l'$ is proportional to the interactions between cities (*e.g.*, this can be obtained from movement data).
+- $N_l$ is the population of city $l$.
+- $P$ is the global population.
+
+## Population
+- This consists of initially susceptible individuals, with city populations taken from census data, with two infected individuals starting in Tokyo.

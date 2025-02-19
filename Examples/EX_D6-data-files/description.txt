@@ -1,0 +1,19 @@
+# Example D6: Time variation in population observation probability
+
+## Objective
+- An example of when the probability of observing individuals changes as a function of time.
+- Here population observations only detect a fraction $f$ of the true population.
+- This, for example, could represent the number of individuals captured during a series of capture campaigns.
+- Because capturing individuals is often seasonally dependent, we apply a trigonometric function $f=a*exp(b*cos(0.06*t)$.
+
+## Data
+- Time series population estimates.
+- Simulated data used $a=0.1$ and $b=0.3$.
+
+## Model
+- A single population-based species 'Animal' is created.
+- This contains a classification 'Area' with a single compartment 'P'.
+- 'P' represents the animal population.
+
+## Population
+- This consists of 1000 individuals.

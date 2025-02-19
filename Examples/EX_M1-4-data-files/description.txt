@@ -1,0 +1,19 @@
+# Model 1.4: SIR model with Erlang distributed infectious period
+
+## Objective
+- Introduce the Erlang distribution.
+- In population-based models, transitions are normally required to be exponentially distributed.
+- The Erlang distribution is a gamma distribution with a specified integer shape parameter.
+- This can be used to more realistically model disease progression within an individual.
+- Note, Erlang transitions must be unbranching.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A recovery duration $m$ determines how long it takes for individuals to recover on average.
+- The shape parameter is fixed to $k=3$.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

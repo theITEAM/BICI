@@ -1,0 +1,21 @@
+# Example E2:  Fixed-effect applied to a population
+
+## Objective
+- Example of adding a fixed effect into a population.
+- In the SI model the population of infected {I} determines how quickly other individual become infected.
+- Individual variation in infectivity can incorporated through an individual fixed effect.
+- The term {I〈f〉} sums over infected individuals, but rather than each individual having a unit contribution it is modified by a fixed effect factor 〈f〉.
+
+## Data
+- Infection times.
+
+## Model
+- A single individual-based species 'Animal' is created.
+- This contains classifications 'DS', which stands for 'disease status', and 'Group'.
+- 'DS' contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- 'Group' contains 24 contact groups.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- Fixed effect parameter $ν^f$ determines the strength of the fixed effect.
+
+## Population
+- Each of the 24 groups consist of 10 individuals, two of which are infected.

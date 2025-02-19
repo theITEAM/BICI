@@ -1,0 +1,21 @@
+# Model 4.2: Predator-prey model
+
+## Objective
+- Introduce a simple model to demonstrate predator-prey dynamics.
+- This uses the well-known Lotka-Volterra equations.
+- The birth rate of prey is proportional to their population.
+- Prey die at a rate proportional to the number of predators.
+- The birth rate of predators is proportional to their population as well as the population of prey (because predators rely on prey for food).
+- Predators die at a constant rate.
+
+## Model
+- A single population-based species 'Animal' is created.
+- This contains a classification 'Population'.
+- Population contains two compartments: $Prey$ and $Pred$.
+- A birth rate $α$ determines how fast prey are born.
+- A mortality rate $β$ determines how fast prey die.
+- A birth rate $δ$ determines how fast predators are born.
+- A mortality rate $γ$ determines how fast predators die.
+
+## Population
+- This initial state starts with 100 predators and 100 prey.

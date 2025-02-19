@@ -1,0 +1,17 @@
+# Example D1: Time variation in transmission rate
+
+## Objective
+- Introduce a model with time variation in the transmission.
+- The transmission rate $β(t)$ is taken to be a piecewise linear spline with knots taken at 6 time points.
+
+## Data
+- Time series estimates of the infected population.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+
+## Population
+- This consists of 1000 initially susceptible individuals and one infected.

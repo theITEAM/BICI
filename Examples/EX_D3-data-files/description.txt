@@ -1,0 +1,17 @@
+# Example D3: Time variation in transmission rate using covariate
+
+## Objective
+- The transmission rate is taken to have a contribution coming from a time-varying covariate.
+- The covariate is exponentiated (to ensure it is positive) and modulates the transmission rate through a strength parameter $Δ$.
+
+## Data
+- Time series population data is used to inform inference.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- The transmission rate is given by $β×exp(Δ×f(t))$, where $f(t)$ is a time-varying covariate.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

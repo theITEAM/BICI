@@ -1,0 +1,419 @@
+
+####################### DESCRIPTION ########################
+
+description text="[[
+# Example D9: Time-varying covariate affecting branching probability (IBM)
+
+## Objective
+- This includes time variation in the branching probability but relating it to a time-varying covariate.
+- In this we use a model with branching 'factors'. These denote the *relative* probability of going downa branch, and so are defined  at between zero and infinity (rather than zero and one for usual probabilities).
+- A a factor $b$ is used to detemine how a constant time-varying covariate $f(t)$ affects branching..
+- Known event times are used to inform inference.
+
+## Model
+- A single individual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains four compartments: susceptible $S$, infected $I$, recovered $R$ and dead $D$. Together they are known as the “SIRD model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- Branching probability $b$ determines the probability of dying.
+- Mean $m^R$ and coefficient of variation $c^R$ specify the log-normally distributed period to recovery.
+- Mean $m^D$ and coefficient of variation $c^D$ specify the gamma distributed period to death.
+
+## Population
+- This consists of 100 initially susceptible individuals and two infected.
+]]"
+
+
+######################### DETAILS ##########################
+
+simulation start=0 end=100 number=1 timestep=0.5
+
+inference start=0 end=100 timestep=0.5 sample=5000 state-output=50 algorithm="DA-MCMC" anneal="none"
+
+post-sim start=0 end=100 number=1
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
+
+species name="People" type="individual" trans-tree="off"
+
+# SPECIES MODEL
+
+class name="DS" index="a" coord="cartesian"
+
+camera x=-1.177 y=-6.452 scale=1
+
+comp name="S" color="#009900" fix="false" x=-16 y=-7
+comp name="I" color="#ff2222" fix="false" x=-4 y=-7
+comp name="R" color="#4444ff" fix="false" x=12 y=-12
+comp name="D" color="#000000" fix="false" x=12 y=-1
+
+trans name="S->I" value="exp(rate:β×{I})"
+trans name="I->R" value="log-normal(mean:m^R, cv:c^R)" bp="1"
+trans name="I->D" value="gamma(mean:m^D, cv:c^D)" bp="exp(b×f(t))"
+
+
+# SIMULATION DATA
+
+init-pop-sim type="fixed" focal="DS" file="[[
+"Compartment","Population"
+"S",100
+"I",2
+"R",0
+"D",0
+]]"
+
+
+# INFERENCE DATA
+
+add-ind file="[[
+"ID","t","DS"
+"Sim-People-Ind-1",0,"S"
+"Sim-People-Ind-2",0,"S"
+"Sim-People-Ind-3",0,"S"
+"Sim-People-Ind-4",0,"S"
+"Sim-People-Ind-5",0,"S"
+"Sim-People-Ind-6",0,"S"
+"Sim-People-Ind-7",0,"S"
+"Sim-People-Ind-8",0,"S"
+"Sim-People-Ind-9",0,"S"
+"Sim-People-Ind-10",0,"S"
+"Sim-People-Ind-11",0,"S"
+"Sim-People-Ind-12",0,"S"
+"Sim-People-Ind-13",0,"S"
+"Sim-People-Ind-14",0,"S"
+"Sim-People-Ind-15",0,"S"
+"Sim-People-Ind-16",0,"S"
+"Sim-People-Ind-17",0,"S"
+"Sim-People-Ind-18",0,"S"
+"Sim-People-Ind-19",0,"S"
+"Sim-People-Ind-20",0,"S"
+"Sim-People-Ind-21",0,"S"
+"Sim-People-Ind-22",0,"S"
+"Sim-People-Ind-23",0,"S"
+"Sim-People-Ind-24",0,"S"
+"Sim-People-Ind-25",0,"S"
+"Sim-People-Ind-26",0,"S"
+"Sim-People-Ind-27",0,"S"
+"Sim-People-Ind-28",0,"S"
+"Sim-People-Ind-29",0,"S"
+"Sim-People-Ind-30",0,"S"
+"Sim-People-Ind-31",0,"S"
+"Sim-People-Ind-32",0,"S"
+"Sim-People-Ind-33",0,"S"
+"Sim-People-Ind-34",0,"S"
+"Sim-People-Ind-35",0,"S"
+"Sim-People-Ind-36",0,"S"
+"Sim-People-Ind-37",0,"S"
+"Sim-People-Ind-38",0,"S"
+"Sim-People-Ind-39",0,"S"
+"Sim-People-Ind-40",0,"S"
+"Sim-People-Ind-41",0,"S"
+"Sim-People-Ind-42",0,"S"
+"Sim-People-Ind-43",0,"S"
+"Sim-People-Ind-44",0,"S"
+"Sim-People-Ind-45",0,"S"
+"Sim-People-Ind-46",0,"S"
+"Sim-People-Ind-47",0,"S"
+"Sim-People-Ind-48",0,"S"
+"Sim-People-Ind-49",0,"S"
+"Sim-People-Ind-50",0,"S"
+"Sim-People-Ind-51",0,"S"
+"Sim-People-Ind-52",0,"S"
+"Sim-People-Ind-53",0,"S"
+"Sim-People-Ind-54",0,"S"
+"Sim-People-Ind-55",0,"S"
+"Sim-People-Ind-56",0,"S"
+"Sim-People-Ind-57",0,"S"
+"Sim-People-Ind-58",0,"S"
+"Sim-People-Ind-59",0,"S"
+"Sim-People-Ind-60",0,"S"
+"Sim-People-Ind-61",0,"S"
+"Sim-People-Ind-62",0,"S"
+"Sim-People-Ind-63",0,"S"
+"Sim-People-Ind-64",0,"S"
+"Sim-People-Ind-65",0,"S"
+"Sim-People-Ind-66",0,"S"
+"Sim-People-Ind-67",0,"S"
+"Sim-People-Ind-68",0,"S"
+"Sim-People-Ind-69",0,"S"
+"Sim-People-Ind-70",0,"S"
+"Sim-People-Ind-71",0,"S"
+"Sim-People-Ind-72",0,"S"
+"Sim-People-Ind-73",0,"S"
+"Sim-People-Ind-74",0,"S"
+"Sim-People-Ind-75",0,"S"
+"Sim-People-Ind-76",0,"S"
+"Sim-People-Ind-77",0,"S"
+"Sim-People-Ind-78",0,"S"
+"Sim-People-Ind-79",0,"S"
+"Sim-People-Ind-80",0,"S"
+"Sim-People-Ind-81",0,"S"
+"Sim-People-Ind-82",0,"S"
+"Sim-People-Ind-83",0,"S"
+"Sim-People-Ind-84",0,"S"
+"Sim-People-Ind-85",0,"S"
+"Sim-People-Ind-86",0,"S"
+"Sim-People-Ind-87",0,"S"
+"Sim-People-Ind-88",0,"S"
+"Sim-People-Ind-89",0,"S"
+"Sim-People-Ind-90",0,"S"
+"Sim-People-Ind-91",0,"S"
+"Sim-People-Ind-92",0,"S"
+"Sim-People-Ind-93",0,"S"
+"Sim-People-Ind-94",0,"S"
+"Sim-People-Ind-95",0,"S"
+"Sim-People-Ind-96",0,"S"
+"Sim-People-Ind-97",0,"S"
+"Sim-People-Ind-98",0,"S"
+"Sim-People-Ind-99",0,"S"
+"Sim-People-Ind-100",0,"S"
+"Sim-People-Ind-101",0,"I"
+"Sim-People-Ind-102",0,"I"
+]]"
+
+trans-data name="S->I" obsrange="all" file="[[
+"ID","t"
+"Sim-People-Ind-1",37.5563
+"Sim-People-Ind-2",35.5667
+"Sim-People-Ind-3",15.2362
+"Sim-People-Ind-4",25.8948
+"Sim-People-Ind-5",16.5475
+"Sim-People-Ind-6",31.7075
+"Sim-People-Ind-7",31.077
+"Sim-People-Ind-8",20.1345
+"Sim-People-Ind-9",48.7293
+"Sim-People-Ind-10",18.9672
+"Sim-People-Ind-11",31.6473
+"Sim-People-Ind-12",32.4154
+"Sim-People-Ind-13",23.8946
+"Sim-People-Ind-14",22.6708
+"Sim-People-Ind-15",38.3772
+"Sim-People-Ind-16",27.2033
+"Sim-People-Ind-17",21.2124
+"Sim-People-Ind-18",33.2752
+"Sim-People-Ind-19",18.1214
+"Sim-People-Ind-20",19.4016
+"Sim-People-Ind-21",19.9344
+"Sim-People-Ind-22",35.7034
+"Sim-People-Ind-23",46.0322
+"Sim-People-Ind-24",52.85
+"Sim-People-Ind-25",14.656
+"Sim-People-Ind-26",30.8144
+"Sim-People-Ind-27",24.527
+"Sim-People-Ind-28",36.8964
+"Sim-People-Ind-29",30.4785
+"Sim-People-Ind-30",4.02529
+"Sim-People-Ind-31",3.593
+"Sim-People-Ind-32",25.7518
+"Sim-People-Ind-33",24.7206
+"Sim-People-Ind-34",17.1354
+"Sim-People-Ind-35",34.8429
+"Sim-People-Ind-36",22.014
+"Sim-People-Ind-38",17.5391
+"Sim-People-Ind-39",23.9136
+"Sim-People-Ind-40",16.227
+"Sim-People-Ind-41",19.5153
+"Sim-People-Ind-42",20.9958
+"Sim-People-Ind-43",41.415
+"Sim-People-Ind-44",13.8513
+"Sim-People-Ind-45",0.0443661
+"Sim-People-Ind-46",15.0195
+"Sim-People-Ind-47",17.7202
+"Sim-People-Ind-48",21.2654
+"Sim-People-Ind-49",16.5778
+"Sim-People-Ind-50",19.991
+"Sim-People-Ind-51",30.182
+"Sim-People-Ind-52",12.7016
+"Sim-People-Ind-53",9.3437
+"Sim-People-Ind-54",43.7311
+"Sim-People-Ind-55",35.7778
+"Sim-People-Ind-56",21.5633
+"Sim-People-Ind-58",17.099
+"Sim-People-Ind-59",16.1768
+"Sim-People-Ind-60",5.97346
+"Sim-People-Ind-61",26.1878
+"Sim-People-Ind-62",18.7558
+"Sim-People-Ind-63",8.2276
+"Sim-People-Ind-64",7.22664
+"Sim-People-Ind-65",26.1384
+"Sim-People-Ind-66",31.4911
+"Sim-People-Ind-67",28.7076
+"Sim-People-Ind-68",23.2417
+"Sim-People-Ind-69",15.5824
+"Sim-People-Ind-70",26.3007
+"Sim-People-Ind-71",10.8737
+"Sim-People-Ind-72",35.782
+"Sim-People-Ind-73",4.51452
+"Sim-People-Ind-74",24.3556
+"Sim-People-Ind-75",20.7463
+"Sim-People-Ind-76",22.5499
+"Sim-People-Ind-77",30.6157
+"Sim-People-Ind-78",35.2036
+"Sim-People-Ind-79",56.9452
+"Sim-People-Ind-80",29.3853
+"Sim-People-Ind-81",26.7583
+"Sim-People-Ind-82",15.0616
+"Sim-People-Ind-83",19.1553
+"Sim-People-Ind-84",20.1609
+"Sim-People-Ind-85",16.1239
+"Sim-People-Ind-86",9.62782
+"Sim-People-Ind-87",39.5656
+"Sim-People-Ind-88",27.71
+"Sim-People-Ind-89",25.5588
+"Sim-People-Ind-90",17.9285
+"Sim-People-Ind-91",16.8601
+"Sim-People-Ind-92",21.282
+"Sim-People-Ind-93",17.1494
+"Sim-People-Ind-94",26.3275
+"Sim-People-Ind-95",19.9228
+"Sim-People-Ind-96",13.3886
+"Sim-People-Ind-97",30.2482
+"Sim-People-Ind-98",13.359
+"Sim-People-Ind-99",17.4986
+"Sim-People-Ind-100",11.4402
+]]"
+
+trans-data name="I->R" obsrange="all" file="[[
+"ID","t"
+"Sim-People-Ind-1",53.0583
+"Sim-People-Ind-2",53.0526
+"Sim-People-Ind-4",56.2708
+"Sim-People-Ind-10",38.2372
+"Sim-People-Ind-11",49.375
+"Sim-People-Ind-12",51.8847
+"Sim-People-Ind-15",56.0703
+"Sim-People-Ind-16",39.6639
+"Sim-People-Ind-20",43.4578
+"Sim-People-Ind-22",57.2715
+"Sim-People-Ind-24",74.507
+"Sim-People-Ind-25",27.6804
+"Sim-People-Ind-27",41.4545
+"Sim-People-Ind-28",52.2888
+"Sim-People-Ind-33",42.0488
+"Sim-People-Ind-39",42.7196
+"Sim-People-Ind-40",30.3182
+"Sim-People-Ind-43",65.6348
+"Sim-People-Ind-44",31.4697
+"Sim-People-Ind-45",16.4328
+"Sim-People-Ind-46",31.7025
+"Sim-People-Ind-48",44.7748
+"Sim-People-Ind-49",39.21
+"Sim-People-Ind-53",24.6123
+"Sim-People-Ind-54",61.8904
+"Sim-People-Ind-55",54.1093
+"Sim-People-Ind-56",61.4264
+"Sim-People-Ind-60",24.4244
+"Sim-People-Ind-61",46.7849
+"Sim-People-Ind-62",44.3977
+"Sim-People-Ind-63",22.7823
+"Sim-People-Ind-64",22.8837
+"Sim-People-Ind-65",52.259
+"Sim-People-Ind-66",52.001
+"Sim-People-Ind-67",45.2682
+"Sim-People-Ind-68",33.4818
+"Sim-People-Ind-69",31.6124
+"Sim-People-Ind-71",34.7449
+"Sim-People-Ind-72",54.3791
+"Sim-People-Ind-74",50.5758
+"Sim-People-Ind-75",37.8638
+"Sim-People-Ind-81",40.9443
+"Sim-People-Ind-85",30.457
+"Sim-People-Ind-87",63.7998
+"Sim-People-Ind-89",48.8566
+"Sim-People-Ind-91",39.1471
+"Sim-People-Ind-94",48.9162
+"Sim-People-Ind-97",49.3442
+"Sim-People-Ind-100",27.3243
+"Sim-People-Ind-101",18.4828
+]]"
+
+trans-data name="I->D" obsrange="all" file="[[
+"ID","t"
+"Sim-People-Ind-3",36.9868
+"Sim-People-Ind-5",40.1741
+"Sim-People-Ind-6",74.1382
+"Sim-People-Ind-7",54.6255
+"Sim-People-Ind-8",33.383
+"Sim-People-Ind-9",64.7391
+"Sim-People-Ind-13",49.2249
+"Sim-People-Ind-14",33.6844
+"Sim-People-Ind-17",52.7211
+"Sim-People-Ind-18",74.2061
+"Sim-People-Ind-19",52.3981
+"Sim-People-Ind-21",39.9153
+"Sim-People-Ind-23",56.528
+"Sim-People-Ind-26",51.7995
+"Sim-People-Ind-29",61.8193
+"Sim-People-Ind-30",38.7171
+"Sim-People-Ind-31",27.8719
+"Sim-People-Ind-32",47.8635
+"Sim-People-Ind-34",45.4426
+"Sim-People-Ind-35",60.6654
+"Sim-People-Ind-36",39.1839
+"Sim-People-Ind-38",57.2062
+"Sim-People-Ind-41",71.2137
+"Sim-People-Ind-42",43.6757
+"Sim-People-Ind-47",69.4555
+"Sim-People-Ind-50",52.7587
+"Sim-People-Ind-51",61.8884
+"Sim-People-Ind-52",34.1515
+"Sim-People-Ind-58",63.9569
+"Sim-People-Ind-59",62.7884
+"Sim-People-Ind-70",53.9189
+"Sim-People-Ind-73",55.4411
+"Sim-People-Ind-76",31.0101
+"Sim-People-Ind-77",64.932
+"Sim-People-Ind-78",48.5088
+"Sim-People-Ind-79",74.8329
+"Sim-People-Ind-82",74.2712
+"Sim-People-Ind-83",46.3836
+"Sim-People-Ind-84",63.2005
+"Sim-People-Ind-86",17.1516
+"Sim-People-Ind-88",58.3975
+"Sim-People-Ind-90",64.4882
+"Sim-People-Ind-92",31.2022
+"Sim-People-Ind-93",60.4982
+"Sim-People-Ind-95",52.8686
+"Sim-People-Ind-96",42.8433
+"Sim-People-Ind-98",66.3142
+"Sim-People-Ind-99",33.584
+"Sim-People-Ind-102",38.5445
+]]"
+
+
+
+######################## PARAMETERS ########################
+
+param name="b" value="1.3" prior="uniform(0,3)"
+param name="c^D" value="0.5" prior="uniform(0,1)"
+param name="c^R" value="0.3" prior="uniform(0,1)"
+param name="m^D" value="30" prior="uniform(0,50)"
+param name="m^R" value="20" prior="uniform(0,50)"
+param name="β" value="0.0015" prior="uniform(0,0.1)"
+param name="f(t)" constant="[[
+"t",Value
+"0","0.233541"
+"5","-0.0138624"
+"10","0.0686768"
+"15","0.362109"
+"20","0.529011"
+"25","0.329856"
+"30","-0.149081"
+"35","-0.566391"
+"40","-0.630586"
+"45","-0.359859"
+"50","-0.0584554"
+"55","-0.0320132"
+"60","-0.304008"
+"65","-0.594248"
+"70","-0.579168"
+"75","-0.194384"
+"80","0.299126"
+"85","0.546673"
+"90","0.41711"
+"95","0.114793"
+"100","-0.0159162"
+]]" knot-times="0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100"
+
+

@@ -1,61 +1,94 @@
 "use strict";
+// Function that define and control the model
 
 class Model
 {
-	start;                         // Set to true when a new model is started 
+	start;                                           // Set to true when a new model is started 
 	
-	description;                   // A description of the analysis
-	filename;                      // The current filename 
-	species = [];                  // Stores information about species
-	param = [];                    // Stores parameter information
-	spline = [];                   // Stores spline information
-	warn = [];                     // Stores model warnings
-	derive = [];                   // Sets derived quantities
+	description;                                     // A description of the analysis
+	filename;                                        // The current filename 
+	species = [];                                    // Stores information about species
+	param = [];                                      // Stores parameter information
+	param_factor = [];                               // Stores factors which multiply parameter (for ppc)
+	spline = [];                                     // Stores spline information
+	warn = [];                                       // Stores model warnings
+	derive = [];                                     // Sets derived quantities
 	
-	sim_details = {};              // Details of simulation
-	inf_details = {};              // Details of inference
+	sim_details = {};                                // Details of simulation
+	inf_details = {};                                // Details of inference
+	ppc_details = {};                                // Details of posterior predictive check
+	
+	sim_res = { siminf:"sim"};                       // Filter used to plot sim results
+	inf_res = { siminf:"inf"};                       // Filter used to plot inf results
+	ppc_res = { siminf:"ppc"};                       // Filter used to plot post-sim results
+	
+	update_model_needed = false;                     // Determines if init parameter is needed
+	warn_view = true;                                // Determines if warning are shown on main page
 	
 	constructor()
 	{
 		this.start = false;
+		this.update_model_needed = true;
 	}
+
 
 	///	Starts a new model
 	start_new(op)
 	{
-		this.description = {te:"Model and analysis description."};
+		this.description = {te:"# Model and analysis description."};
+		this.example = undefined;
 		this.species = [];
 		this.param = [];
+		this.param_factor = [];
 		this.derive = [];   
-		this.sim_details = { t_start:"", t_end:"", timestep:"", indmax:10000, algorithm:{value:"gillespie"}, number:1};    
-		this.inf_details = { t_start:"", t_end:"", timestep:"", abcsample:"1000", sample:"10000", thinparam:"10", thinstate:"50", accfrac:"0.1", accfracsmc:"0.5", numgen:"5", kernelsize:"0.5", indmax:10000, nchain:"3", algorithm:{value:"DA-MCMC"}}; 
 		
+		this.sim_details = { t_start:"", t_end:"", timestep:"", indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, algorithm:{value:"gillespie"}, number:SIM_NUM_DEFAULT, run_local:{value:"Yes"}, seed_on:{value:"No"}, seed:SEED_DEFAULT };    
+		
+		this.inf_details = { t_start:"", t_end:"", timestep:"", abcsample:String(ABC_SAMPLE_DEFAULT), sample:String(MCMC_SAMPLE_DEFAULT), output_param :String(MCMC_OP_PARAM_DEFAULT), output_state:String(MCMC_OP_STATE_DEFAULT), accfrac:String(ABC_ACFRAC_DEFAULT), accfracsmc:String(ABCSMC_ACFRAC_DEFAULT), numgen:String(ABCSMC_GEN_DEFAULT), kernelsize:String(ABCSMC_KERNEL_DEFAULT), indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, nchain:String(MCMC_CHAIN_DEFAULT), algorithm:{value:ALG_DEFAULT}, run_local:{value:"Yes"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, burnin_frac:BURNIN_FRAC_DEFAULT, anneal_type:{te:ANNEAL_DEFAULT}, anneal_rate:ANNEAL_RATE_DEFAULT, anneal_power:ANNEAL_POWER_DEFAULT, npart:String(PAS_PART_DEFAULT), gen_update:String(PAS_GEN_UPDATE_DEFAULT) };
+		
+		this.ppc_details = {  ppc_t_start:"", ppc_t_end:"", t_start:"", t_end:"", algorithm:{value:"gillespie"}, number:PPC_NUM_DEFAULT, run_local:{value:"Yes"}, seed_on:{value:"No"}, seed:SEED_DEFAULT};    
+			
 		this.start = true;
 		this.filename = "";
-		initialise_pages();
-		zero_page_index();
-		
-		if(op != "without results"){
-			sim_result = clear_result();
-			inf_result = clear_result();
-		}
-		
-		initialise_pages();
 	}
 	
 	
 	/// Gets the species number currently being viewed
-	get_p()
+	get_p(op)
 	{
 		let pag = inter.page[inter.pa];
 		let sub = pag.sub[pag.index];
-		if(!(pag.name =="Simulation" && sub.name == "Population") &&
-		  !(pag.name =="Simulation" && sub.name == "Generate Data") &&
-			!(pag.name =="Inference" && sub.name == "Data") &&
-			!(pag.name =="Model" && sub.name == "Compartments")){
-			error("Should not be getting p");
+		
+		if(sub.name == "Results"){
+			if(!sub.sub) return 0;
+			
+			let subsub = sub.sub[sub.index];
+		
+			switch(subsub.name){
+			case "Populations":
+			case "Transitions":
+			case "Individuals":
+				return subsub.index;
+				
+			default:
+				if(op == "no error") return;
+				error("Should not be getting p");
+				return;
+			}
 		}
-		return sub.index;
+		else{
+			if(!(pag.name =="Simulation" && sub.name == "Initial Conditions") &&
+				!(pag.name =="Simulation" && sub.name == "Generate Data") &&
+				!(pag.name =="Inference" && sub.name == "Initial Conditions") &&
+				!(pag.name =="Inference" && sub.name == "Data") &&
+				!(pag.name =="Post. Simulation" && sub.name == "Population Mod.") &&
+				!(pag.name =="Model" && sub.name == "Compartments")){
+				if(op == "no error") return;
+				error("Should not be getting p");
+			}
+			
+			return sub.index;
+		}
 	}
 	
 	
@@ -74,21 +107,46 @@ class Model
 		return pag.sub[pag.index].sub[p].index;
 	}
 
+
+	/// Gets the classification
 	get_cla()
 	{
-		return this.species[this.get_p()].cla[this.get_cl()];
+		let p = this.get_p(); if(p == undefined) return;
+		let cl = this.get_cl(); if(cl == undefined) return;
+		if(p >= this.species.length) return;
+		if(cl >= this.species[p].cla.length) return;
+		return this.species[p].cla[cl];
 	}
+
 
 	///	Returns true if the compartmental model is being viewed 
 	get_show_model()
 	{
-		if(this.warn.length > 0) return false;
+		if(this.show_warning() == true) return false;
 		
-		let tree = inter.page_name.split("->");
-		if(tree[0] == "Model" && tree[1] == "Compartments"){
+		if(tab_name() == "Model" && subtab_name() == "Compartments"){
 			return true;
 		}
 		return false;
+	}
+	
+	
+	/// Updates a sbox region
+	update_sbox(sbox,x,y,dx,dy,mar)
+	{
+		if(mar < 1.5) mar = 1.5;
+		let x1 = x-mar, y1 = y-mar, x2 = x+dx+mar, y2 = y+dy+mar; 
+		if(!sbox.x1){
+			sbox = {on:true, x1:x1, y1:y1, x2:x2, y2:y2};
+		}
+		else{
+			if(x1 < sbox.x1) sbox.x1 = x1;
+			if(x2 > sbox.x2) sbox.x2 = x2;
+			if(y1 < sbox.y1) sbox.y1 = y1;
+			if(y2 > sbox.y2) sbox.y2 = y2;
+		}
+	
+		return sbox;
 	}
 	
 	
@@ -107,10 +165,15 @@ class Model
 			lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, ac:"IntermediateAdd", type:"Nothing", p:p, cl:cl});
 		}
 		
-		let cam = claa.camera;                    // Loads up the camera used to view model
+		let cam = claa.camera;                         // Loads up the camera used to view model
+		
 		let bub = inter.bubble;
 
+		let sbox = {};
+		
 		for(let k = 0; k < claa.ncomp; k++){
+			let sel = false; if(find_in(inter.comp_select.list,k) != undefined) sel = true;
+			
 			let c = claa.comp[k];
 		
 			let ac = "Compartment";
@@ -127,27 +190,42 @@ class Model
 					let w =	c.w*cam.scale;
 					let h =	c.h*cam.scale; 
 					let x = pt.x-w/2, y = pt.y-h/2;
-					lay.add_button({te:claa.comp[k].name, x:x, y:y, dx:w, dy:h, ac:ac, type:"Compartment", col:c.col, p:p, cl:cl, i:k});
+					if(sel){
+						sbox = this.update_sbox(sbox,x,y,w,h,h/2);			
+					}
+					
+					lay.add_button({te:claa.comp[k].name, x:x, y:y, dx:w, dy:h, ac:ac, type:"Compartment", col:c.col, col_dark:dark_colour(c.col), p:p, cl:cl, i:k});
 				}
 				break;
 			
 			case "latlng":
 				{
-					let pt = trans_point(c.x,c.y,cam,lay);
-					let w =	2*latlng_radius*cam.scale*cam.ruler, h = w; 
-					let x = pt.x-w/2, y = pt.y-h/2;
-					lay.add_button({te:claa.comp[k].name, x:x, y:y, dx:w, dy:h, ac:ac, type:"CompLatLng", col:c.col, p:p, cl:cl, i:k});
+					let si = cam.scale*cam.ruler*Math.exp(inter.lnglat_slider.value);
+					if(si > si_limit_circle){
+						let w =	2*latlng_radius*si, h = w; 
+						let pt = trans_point(c.x,c.y,cam,lay);
+						let x = pt.x-w/2, y = pt.y-h/2;
+						if(sel){
+							sbox = this.update_sbox(sbox,x,y,w,h,h/2);			
+						}
+						lay.add_button({te:claa.comp[k].name, x:x, y:y, dx:w, dy:h, ac:ac, type:"CompLatLng", col:c.col, col_dark:dark_colour(c.col), p:p, cl:cl, i:k});
+					}
 				}
 				break;
 				
 			case "boundary":
 				{
-					let box = c.feature.box;
+					let ms = find_map_store(c.map_ref);
+					let box = ms.feature.box;
 				
 					let pmin = trans_point(box.xmin,box.ymin,cam,lay);
 					let pmax = trans_point(box.xmax,box.ymax,cam,lay);
 					
-					lay.add_button({x:pmin.x, y:pmin.y, dx:pmax.x-pmin.x, dy:pmax.y-pmin.y, ac:ac, type:"CompMap", polygon:c.feature.polygon, mask:c.mask, col:c.col, p:p, cl:cl, i:k});
+					if(sel){
+						sbox = this.update_sbox(sbox,pmin.x,pmin.y,pmax.x-pmin.x,pmax.y-pmin.y,0);			
+					}
+						
+					lay.add_button({x:pmin.x, y:pmin.y, dx:pmax.x-pmin.x, dy:pmax.y-pmin.y, ac:ac, type:"CompMap", polygon:ms.feature.polygon, mask:ms.mask, col:c.col, p:p, cl:cl, i:k});
 				}
 				break;
 
@@ -158,9 +236,185 @@ class Model
 		if(mo.type == "Add_Compartment" || mo.type == "Add_Label"){
 			lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, ac:"NothingMode", type:"Nothing"});	
 		}
+		
+		if(sbox.on){
+			inter.comp_select.sbox = sbox;
+		}
 	}
 
 
+	/// Adds a button for selected compartments
+	add_comp_select_buts(lay)
+	{
+		let sbox = inter.comp_select.sbox;
+		let x1 = sbox.x1, y1 = sbox.y1, x2 = sbox.x2, y2 = sbox.y2;
+		lay.add_button({x:x1, y:y1, dx:x2-x1, dy:y2-y1, ac:"Selected", type:"Selected", p:this.get_p(), cl:this.get_cl()});	
+	}
+	
+	
+	/// Adds a button for selected compartments
+	add_comp_select_button_buts(lay)
+	{
+		let cs = inter.comp_select;
+		
+		let sbox = cs.sbox;
+		let x1 = sbox.x1, y1 = sbox.y1, x2 = sbox.x2, y2 = sbox.y2;
+
+		let ddx = 1.1, ddy = ddx*231/218, mar = 0.4;
+			
+		let claa = this.species[cs.p].cla[cs.cl];
+		let no_copy = false;
+		for(let i = 0; i < cs.list.length; i++){
+			let co = claa.comp[cs.list[i]];
+			if(co.type == "boundary") no_copy = true;
+		}
+		
+		if(no_copy == false){
+			lay.add_button({x:x2-ddx-mar, y:y2-ddy-mar, dx:ddx, dy:ddy, ac:"CopyPic", type:"CopyPic"});	
+		}
+		
+		ddx = 1.1, ddy = 1.1;
+		lay.add_button({x:x2-ddx-mar, y:y1+mar, dx:ddx, dy:ddy, ac:"DeleteSel", type:"Delete"});	
+	}
+
+
+	/// Copies the selected compartments 
+	copy_selected(suf)
+	{
+		let p = inter.comp_select.p, cl = inter.comp_select.cl;
+		let clone = model.find_clones(p,cl);	
+		clone.push({p:p, cl:cl});
+		
+		let list = inter.comp_select.list;
+	
+		for(let loop = 0; loop < clone.length; loop++){
+			let clo = clone[loop];
+			let p = clo.p, cl = clo.cl;
+		
+			let claa = this.species[p].cla[cl];	
+		
+			let list_new = [];
+			for(let i = 0; i < list.length; i++){
+				let c = list[i];
+				list_new.push(claa.ncomp);
+				let co = copy(claa.comp[c]);
+				co.fixed = {check: false}
+				co.name += suf;
+				switch(co.type){
+				case "box": 
+					this.set_compartment_size(co); 
+					co.x += 2; co.y += 2; 
+					break;
+				case "latlng":
+					{
+						let d = 2*claa.camera.ruler;
+						co.x += d; co.y += d; 
+					}
+					break;
+				}
+				
+				hash_add(claa.hash_comp,co.name,claa.ncomp);
+			
+				claa.comp.push(co);
+				claa.ncomp++;
+			}
+			
+			let map_c = [];
+			for(let i = 0; i < list.length; i++){
+				map_c[list[i]] = list_new[i];
+			}
+		
+			// Copies any transitions
+			for(let i = 0; i < claa.ntra; i++){
+				let tr = claa.tra[i];
+				
+				let i_in; if(tr.i != UNSET && map_c[tr.i] != undefined) i_in = map_c[tr.i];
+				let f_in; if(tr.f != UNSET && map_c[tr.f] != undefined) f_in = map_c[tr.f];
+				
+				if(i_in != undefined || f_in != undefined){
+					let tr_new = copy(tr);
+					if(i_in != undefined) tr_new.i = i_in;
+					if(f_in != undefined) tr_new.f = f_in;
+					
+					claa.tra.push(tr_new);
+					this.set_transition_name(p,cl,claa.ntra);
+		
+					if(tr_new.i == SOURCE) claa.nsource++;
+					if(tr_new.f == SINK) claa.nsink++;
+					claa.ntra++;
+				}
+			}
+	
+			this.update_pline(p,cl);
+			inter.comp_select.list = list_new;
+		}
+	}
+	
+	
+	/// Deletes selected compartments
+	delete_selected()
+	{
+		let p = inter.comp_select.p, cl = inter.comp_select.cl;
+		let clone = model.find_clones(p,cl);	
+		clone.push({p:p, cl:cl});
+			
+		let list = inter.comp_select.list;
+	
+		let map_c = [];
+		for(let i = 0; i < list.length; i++) map_c[list[i]] = true;
+	
+		for(let loop = 0; loop < clone.length; loop++){
+			let clo = clone[loop];
+			let p = clo.p, cl = clo.cl;
+		
+			let claa = this.species[p].cla[cl];	
+		
+			let i = 0;
+			while(i < claa.ntra){
+				let tr = claa.tra[i];
+				if((tr.i != UNSET && map_c[tr.i] == true) ||
+					 (tr.f != UNSET && map_c[tr.f] == true)){
+				 	if(tr.i == SOURCE) claa.nsource--;
+					if(tr.f == SINK) claa.nsink--;
+					
+					claa.tra.splice(i,1);
+					claa.ntra--;
+				}					 
+				else i++;
+			}
+			hash_redo(claa.hash_tra,claa.tra);
+
+			for(let c = claa.ncomp-1; c >= 0; c--){
+				if(map_c[c] == true){
+					claa.comp.splice(c,1);
+					claa.ncomp--;
+				}
+			}	
+			hash_redo(claa.hash_comp,claa.comp);
+			
+			this.update_pline(p,cl);
+		}
+		
+		clear_comp_select();
+	}
+	
+	
+	/// New added compartment
+	add_compartment_new_buts(lay) 
+	{
+		let p = this.get_p();
+		let cl = this.get_cl();
+		
+		let cam = this.species[p].cla[cl].camera;
+	
+		switch(cam.coord){
+		case "cartesian": lay.add_button({te:"", x:0, y:0, dx:lay.dx-marnew, dy:lay.dy-marnew, type:"Compartment", col:WHITE, col_dark:dark_colour(WHITE)}); break;
+		case "latlng": lay.add_button({te:"", x:0, y:0, dx:lay.dx-marnew, dy:lay.dy-marnew, type:"CompLatLng", col:BLACK, col_dark:DDGREY}); break;
+		default: error("SHoudl not be def"); break;
+		}
+	}
+	
+	
 	/// Adds all the buttons associated with transitions
 	add_transition_buts(lay)
 	{
@@ -198,8 +452,9 @@ class Model
 				if(f == undefined){ midp.push(this.get_mouse_to_desktop()); add_mouse = true;}
 				
 				if(flag == false){
-					this.add_transition(p,cl,mo.i,f,midp,"");
-				
+					let res = this.add_transition(p,cl,mo.i,f,midp,"");
+					output_help(res);
+					
 					trans_temp_add = true;
 				}
 			}
@@ -225,8 +480,9 @@ class Model
 			if(f == undefined){ midp.push(this.get_mouse_to_desktop()); add_mouse = true;}
 			
 			if(flag == false){
-				this.add_transition(p,cl,"Source",f,midp,"");
-					
+				let res = this.add_transition(p,cl,SOURCE,f,midp,"");
+				output_help(res);
+				
 				trans_temp_add = true;
 			}
 		}
@@ -255,15 +511,16 @@ class Model
 			}
 				
 			if(flag == false){
-				this.add_transition(p,cl,i,"Sink",midp,"");
-						
+				let res = this.add_transition(p,cl,i,SINK,midp,"");
+				output_help(res);
+				
 				trans_temp_add = true;
 			}
 		}
 		
 		this.add_transition_buts2(p,cl,inter.mode.type,claa,add_mouse,lay);
 	
-		if(trans_temp_add == true){
+		if(trans_temp_add == true){		
 			claa.tra.pop(); claa.ntra--;
 		}
 	}
@@ -295,23 +552,25 @@ class Model
 			if(mode_type == "Add_Source" || mode_type == "Add_Sink" || mode_type == "No Click") ac = undefined;
 			
 			lay.add_button({x:lay.dx/2 + (tr.box.x-cam.x)*cam.scale - d, y:lay.dy/2 + (tr.box.y-cam.y)*cam.scale-d, dx:tr.box.dx*cam.scale+2*d, dy:tr.box.dy*cam.scale+2*d, ac:ac, type:"Transition", cam:cam, points:points, center:center, tr:tr, p:p, cl:cl, i:k});	
-				
+			
+			//lay.add_button({x:lay.dx/2 + (tr.box.x-cam.x)*cam.scale - d, y:lay.dy/2 + (tr.box.y-cam.y)*cam.scale-d, dx:tr.box.dx*cam.scale+2*d, dy:tr.box.dy*cam.scale+2*d, ac:ac, type:"Transition", cam:cam, points:points, center:center, tr:tr, p:p, cl:cl, i:k});	
+			
 			for(let j = 0; j < points.length; j++){
 				let po = points[j];
 				if(po.index >= 0 && po.index < tr.midp.length){
 					let r = TRANS_POINT_R; 
-					let variety = "Midpoint";
+					let variety = MIDPOINT;
 					let ac = "TransitionPoint";
-					if(tr.i == "Source" && j == 0){ 
+					if(tr.i == SOURCE && j == 0){ 
 						r = 0.7*cam.scale*cam.ruler;
-						variety = "Source"; ac = "Transition";
+						variety = SOURCE; ac = "Transition";
 					}
-					if(tr.f == "Sink" && j == points.length-1){ 
+					if(tr.f == SINK && j == points.length-1){ 
 						r = 0.7*cam.scale*cam.ruler;
-						variety = "Sink"; ac = "Transition";
+						variety = SINK; ac = "Transition";
 					}
 
-					if((variety == "Source" || variety == "Sink") && cam.coord == "latlng") r *= 0.6;
+					if((variety == SOURCE || variety == SINK) && cam.coord == "latlng") r *= 0.6;
 					
 					if(mode_type == "Add_Transition" || mode_type == "Add_Source" || mode_type == "Add_Sink"){
 						if(k < claa.ntra-1) ac = undefined;
@@ -324,71 +583,34 @@ class Model
 									if(po.index == tr.midp.length-1) ac = undefined;
 								}
 							}
-							if(variety == "Source" || variety == "Sink") ac = undefined;
+							if(variety == SOURCE || variety == SINK) ac = undefined;
 						}
 					}
 
-					if(ac != undefined || variety == "Source" || variety == "Sink"){
+					if(ac != undefined || variety == SOURCE	|| variety == SINK){
 						lay.add_button({x:po.x - r, y:po.y - r, dx:2*r, dy:2*r, ac:ac, type:"TransitionPoint", tr:tr, p:p, cl:cl, i:k, index:po.index, variety:variety, center:center, tr:tr, p:p, cl:cl, i:k});
 					}
 				}
 			}
 		}
 	}
-/*
-	/// Sets camera based on the location of compartments, transitions and annotations
-	set_camera(p,cl)
-	{
-		let scw = page_char_wid-menu_width;
-		let sch = page_char_hei;
-		
-		let xmin = LARGE, xmax = -LARGE, ymin = LARGE, ymax = -LARGE;
-		
-		let claa = this.species[p].cla[cl];
-		for(let i = 0; i < claa.ncomp; i++){
-			let co = claa.comp[i];
-			let x = co.x; if(x < xmin) xmin = x; if(x > xmax) xmax = x;
-			let y = co.y; if(y < ymin) ymin = y; if(y > ymax) ymax = y;
-			
-			x = co.x+co.w; if(x < xmin) xmin = x; if(x > xmax) xmax = x;
-		  y = co.y+co.h; if(y < ymin) ymin = y; if(y > ymax) ymax = y;
-		}
-		
-		for(let i = 0; i < claa.ntra; i++){
-			let traa = claa.tra[i];
-			for(let i = 0; i < traa.midp.length; i++){
-				let x = traa.midp[i].x; if(x < xmin) xmin = x; if(x > xmax) xmax = x;
-				let y = traa.midp[i].y; if(y < ymin) ymin = y; if(y > ymax) ymax = y;
-			}
-		}
-	
-		for(let i = 0; i < claa.annotation.length; i++){
-			let an = claa.annotation[i];
-			switch(an.type){
-			case "text":
-		
-				let x = an.x; if(x < xmin) xmin = x; if(x > xmax) xmax = x;
-				let y = an.y; if(y < ymin) ymin = y; if(y > ymax) ymax = y;
-				break;
-			}
-		}
-		
-		let sca = scw/(xmax-xmin);
-		if(0.9*sch/(ymax-ymin) < sca) sca = 0.9*sch/(ymax-ymin);
-		sca *= 0.9;
-		if(sca > 1) sca = 1;
-		
-		claa.camera = {x:(xmin+xmax)/2, y:(ymin+ymax)/2, scale:sca};
-	}
-	*/
-	
-	
-	/// Adds a compartment button
-	add_addcompartment_buts(lay)
-	{
-		inter.mode.l = lay.index;
 
-		lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, type:"AddCompartmentMode"});
+	
+	/// Determines if a source exists in the model
+	source_exist(p)
+	{
+		let sp = this.species[p];
+		
+		for(let cl = 0; cl < sp.cla.length; cl++){
+			let claa = sp.cla[cl];
+			
+			for(let tr = 0; tr < claa.tra.length; tr++){
+				let tra = claa.tra[tr];
+				if(claa.tra[tr].i == SOURCE) return true;
+			}
+		}
+	
+		return false;
 	}
 	
 	
@@ -397,16 +619,16 @@ class Model
 	{
 		let mo = inter.mode;
 		mo.l = lay.index;
-		lay.add_button({te:mo.te, x:0, y:0, dx:lay.dx, dy:lay.dy, si:mo.si, font:mo.fo, type:"Text", col:GREY});
+		lay.add_button({te:mo.te, x:0, y:0, dx:lay.dx, dy:lay.dy, si:mo.si, font:mo.fo, type:"Text", col:mo.col});
 	}
 	
 
-	/// Adda a label annotation to the model
-	add_label(te,p,cl)
+	/// Adds a label annotation to the model
+	add_label(te,size,p,cl)
 	{
 		let mo = inter.mode;
 		let claa = this.species[p].cla[cl];
-		claa.annotation.push({type:"text", te:te, tesize:si_annotation, x:mo.mp.x, y:mo.mp.y, color:BLACK});
+		claa.annotation.push({type:"text", te:te, size:size, x:mo.mp.x, y:mo.mp.y, color:mo.col});
 	}
 
 	
@@ -428,7 +650,6 @@ class Model
 		}
 	
 		return {x:xc, y:yc};	
-	//	return {x:Math.round(xc/grid)*grid, y:Math.round(yc/grid)*grid};
 	}
 
 
@@ -445,17 +666,6 @@ class Model
 		return this.species[this.get_p()].cla[this.get_cl()].camera.coord;
 	}
 	
-	/*
-	/// Gets the coord 
-	get_coord()
-	{
-		let pag = inter.page[inter.pa];
-		let p = pag.sub[pag.index].index;
-		let cl = pag.sub[pag.index].sub[p].index;
-		let cam = this.species[p].cla[cl].camera;
-		return cam.coord;
-	}
-	*/
 	
 	/// Gets the ruler
 	get_ruler()
@@ -482,10 +692,15 @@ class Model
 
 
 	/// In the "add compartment" mode this adds the new compartment
-	place_add_compartment()
+	place_add_compartment(type)
 	{
-		let lay_comp = inter.layer[inter.mode.l];
-					
+		let lay_comp;
+		switch(type){
+		case "Add_Compartment": lay_comp = get_lay("AddCompartment"); break;
+		case "Add_Label": lay_comp = get_lay("AddLabel"); break;
+		default: error("Add op problem"); break;
+		}
+		
 		lay_comp.x = 1000;
 		
 		let l = inter.over.layer;
@@ -502,6 +717,9 @@ class Model
 
 				lay_comp.x = lay_main.x + ip.x-lay_comp.dx/2;
 				lay_comp.y = lay_main.y + ip.y-lay_comp.dy/2; 
+		
+				if(lay_comp.x < lay_main.x || lay_comp.x+lay_comp.dx > lay_main.x+lay_main.dx ||
+					 lay_comp.y < lay_main.y || lay_comp.y+lay_comp.dy > lay_main.y+lay_main.dy) lay_comp.x = 1000;
 			
 				let mo = inter.mode;
 				mo.mp = mp;
@@ -516,12 +734,12 @@ class Model
 
 
 	/// Adds a new species to the model
-	add_species(name,type)
+	add_species(name,type,trans_tree)
 	{
 		let p = find(this.species,"name",name);
+	
 		if(p != undefined){
-			alertp("There is already a species with the name '"+name+"'");
-			return;
+			return err("There is already a species with the name '"+name+"'");
 		}
 		
 		for(let p = 0; p < this.species.length; p++){
@@ -529,84 +747,65 @@ class Model
 			
 			let i = find(sp.cla,"name",name);
 			if(i != undefined){
-				alertp("Cannot have the same name as classification '"+sp.cla[i].name+"' ");
-				return;
+				return err("Cannot have the same name as classification '"+sp.cla[i].name+"' ");
 			}
 			
 			let j = find(sp.cla,"index",name);
 			if(j != undefined){
-				alertp("Cannot have the same name as index for classification '"+sp.cla[j].name+"' ");
-				return;
+				return err("Cannot have the same name as index for classification '"+sp.cla[j].name+"' ");
 			}
 		
 			for(let cl = 0; cl < sp.ncla; cl++){
 				let c = find(sp.cla[cl].comp,"name",name);
 				if(c != undefined){
-					alertp("Cannot have the same name as compartment '"+sp.cla[cl].comp[i].name+"' in classification '"+sp.cla[cl].name+"'");
-					return;
+					return err("Cannot have the same name as compartment '"+sp.cla[cl].comp[i].name+"' in classification '"+sp.cla[cl].name+"'");
 				}
 			}
 		}
 		
-		this.species.push({ name:name, sim_source:[], inf_source:[], gen_source:[], data_type:{te:data_types[0]
-		}, cla:[], ncla:0, fix_eff:[], ind_eff_group:[], type:type});		
-			
+		this.species.push({ name:name, sim_source:[], inf_source:[], ppc_source:[], data_type:{te:data_types[0]
+		}, cla:[], ncla:0, fix_eff:[], ind_eff_group:[], type:type, trans_tree:{check:trans_tree}, infection_cl:{te:select_str}});		
+		//, sim_init_cond:{ type:{value:"Fixed"}, focal:{value:"Focal"}, focal_cl:0}}
+		
 		if(debug == true) this.check_consistent();  
 		
-		return "success";
+		update_param();
+		
+		return success();
 	}
+	
 	
 	/// Adds a new classification to the model
 	add_classification(p,name,index,op)
 	{
 		if(p == undefined){
-			alertp("Cannot add a classification when the species is not set");
-			return;
+			return err("Cannot add a classification when the species is not set");
 		}
-		
+	
 		let cl = find(this.species[p].cla,"name",name);
 		if(cl != undefined){
-			alertp("There is already a classification with the name '"+name+"'");
-			return;
+			return err("There is already a classification with the name '"+name+"'");
 		}
 		
 		if(name == index){
-			alertp("Name and index must be different");
-			return;
+			return err("Name and index must be different");
 		}
 		
-		let coord = op.coord; if(coord == undefined) coord = "cartesian";
-		
+		let coord = op.coord; if(coord == undefined) coord = COORD_DEFAULT;
 	
-		let cam = {x:0, y:0, scale:1, ruler:1, coord:coord};
+		let cam = {x:0, y:0, scale:1, ruler:1, coord:coord, set:false};
 		
-		let dmap = false; if(coord == "latlng" && op.default_map == true){ dmap = "loading"; cam.ruler = 0.05;}
+		let dmap = false; if(coord == "latlng" && op.default_map == true) dmap = "loading"; 
+		if(coord == "latlng") cam.ruler = default_ruler;
 		
-		this.species[p].cla.push({ name:name, index:index, tra:[], ntra:0, comp:[], ncomp:0, annotation:[], default_map:dmap, camera:cam});
+		this.species[p].cla.push({ name:name, index:index, tra:[], ntra:0, hash_tra:[], comp:[], ncomp:0, hash_comp:[], nsource:0, nsink:0, annotation:[], default_map:dmap, camera:cam});
 		this.species[p].ncla++;
 		
 		data_update_add_classification(p);
-		check_data_valid();
 		
 		if(debug == true) this.check_consistent();  
 		
-		return "success";
-	}
-	
-	
-	/// Loads up default map (if neccesary);
-	load_default_map()
-	{
-		for(let p = 0; p < this.species.length; p++){
-			let sp = this.species[p];
-			for(let cl = 0; cl < sp.ncla; cl++){
-				let claa = this.species[p].cla[cl];
-				if(claa.default_map == "loading"){
-					claa.default_map = true;
-					load_map("world",p,cl);
-				}
-			}
-		}
+		return success();
 	}
 	
 
@@ -622,87 +821,80 @@ class Model
 		this.species[p_to].cla[cl] = copy(cla_from);
 		
 		let cla_to = this.species[p_to].cla[cl];
-		cla_to.tra = [];
-		cla_to.ntra = 0;
+		cla_to.tra=[]; cla_to.ntra = 0; cla_to.tra_hash=[];
+		cla_to.nsource = 0; cla_to.nsink = 0;
 	}
 
 
 	/// Adds a new compartment to the model
-	add_compartment(name,p,cl,x,y,col,fix,include_clone)
+	add_compartment(name,p,cl,x,y,col,fix,infected,include_clone)
 	{
 		if(fix == undefined) fix = false;
 		
-		if(this.check_comp_exist(name,p) == true) return;
+		let res = this.check_comp_exist(name,p); if(res.err == true) return res;
 	
-		let claa = this.species[p].cla[cl];
+		let sp = this.species[p];
+		let claa = sp.cla[cl];
 		let comp = claa.comp;
-			
-		comp.push({name:name, type:"box", x:x, y:y, col:col, fixed:{check:fix}, markov_branch:false});
+		
+		if(infected == true) sp.infection_cl.te = claa.name;
+		
+		hash_add(claa.hash_comp,name,claa.ncomp);
+		
+		comp.push({name:name, type:"box", x:x, y:y, col:col, fixed:{check:fix}, infected:{check:infected}, markov_branch:false, all_branches:false});
 		claa.ncomp++;
 			
 		let i = comp.length-1;
+		
 		this.set_compartment_size(comp[i]);
 		
 		this.snap_comp_to_grid(comp[i]);
 		this.determine_branching();
 		
-		data_update_add_compartment(p,cl);
-		
-		if(include_clone == true) this.update_param_index(claa.index); // Updates param
-		
-		check_data_valid();
-
-		if(include_clone == true){  // Adds to clones 
+		if(include_clone == true){                     // Adds to clones 
 			let list = this.find_clones(p,cl);
 		
 			for(let li of list){
-				this.add_compartment(name,li.p,li.cl,x,y,col,fix,false);
+				let res = this.add_compartment(name,li.p,li.cl,x,y,col,fix,infected,false);
+				if(res.err == true) return res;
 			}
 		}
 		
 		if(debug == true) this.check_consistent();  
 		
-		return "success";
+		update_param();
+		
+		return success();
 	}
 	
-		
-	/// Updates parameter if the is a compartmental change in an index
-	update_param_index(index)
-	{
-		for(let th = 0; th < this.param.length; th++){
-			let par = this.param[th];
-		
-			let j = find_in(par.dep,index);
-			if(j != undefined){
-				let par_copy = copy(par);
-				copy_param_info(par,par_copy);
-			}
-		}
-	}
-	
-	
+
 	/// Adds a new compartment to the model
-	add_latlng_compartment(name,p,cl,x,y,col,fix)
+	add_latlng_compartment(name,p,cl,x,y,col,fix,infected)
 	{
 		if(fix == undefined) fix = false;
 	
-		if(this.check_comp_exist(name,p) == true) return;
+		let res = this.check_comp_exist(name,p); if(res.err == true) return res;
 		
-		let claa = this.species[p].cla[cl];
+		let sp = this.species[p];
+		let claa = sp.cla[cl];
 		let comp = claa.comp;
-		comp.push({name:name, type:"latlng", x:x, y:y, col:col, fixed:{check:fix}, markov_branch:false});
+		
+		if(infected == true) sp.infection_cl.te = claa.name;
+		
+		hash_add(claa.hash_comp,name,claa.ncomp);
+		
+		comp.push({name:name, type:"latlng", x:x, y:y, col:col, fixed:{check:fix}, infected:{check:infected}, markov_branch:false, all_branches:false});
 		claa.ncomp++;
 		
 		let i = comp.length-1;
 		
 		this.determine_branching();
 
-		data_update_add_compartment(p,cl);
-		check_data_valid();
-		
 		if(debug == true) this.check_consistent();  
 		
-		return "success";
+		update_param();
+		
+		return success();
 	}
 	
 	
@@ -757,11 +949,11 @@ class Model
 	
 	
 	/// Adds a new map compartment to the model
-	add_map_compartment(name,p,cl,feature,mask,col)
+	add_map_compartment(name,p,cl,feature,mask,col,infected)
 	{
-		if(this.check_comp_exist(name,p) == true) return;
+		let res = this.check_comp_exist(name,p); if(res.err == true) return res;
 		
-		/// Calculates the midpoint of the region as the middle of the mask
+		// Calculates the midpoint of the region as the middle of the mask
 		let claa = this.species[p].cla[cl];
 		let comp = claa.comp;
 		let xav = 0, yav = 0, nav = 0;
@@ -776,9 +968,18 @@ class Model
 		let xmid = box.xmin+((xav/nav)/mask_size)*(box.xmax-box.xmin);
 		let ymid = box.ymin+((yav/nav)/mask_size)*(box.ymax-box.ymin);
 		
-		comp.push({name:name, type:"boundary", xmid:xmid, ymid:ymid, feature:feature, fixed:{check:true}, mask:mask, col:col, markov_branch:false});
+		let map_name = "file"+Math.random();
+		map_store.push({name:map_name, feature:feature, mask:mask});
+		
+		hash_add(claa.hash_comp,name,claa.ncomp);
+		
+		comp.push({name:name, type:"boundary", xmid:xmid, ymid:ymid, map_ref:map_name, col:col, fixed:{check:true}, infected:{check:infected}, markov_branch:false, all_branches:false});
 		claa.ncomp++;
 		this.determine_branching();
+		
+		update_param();
+		
+		return success();
 	}
 
 	
@@ -790,22 +991,22 @@ class Model
 			for(let cl = 0; cl < sp.ncla; cl++){
 				let claa = sp.cla[cl];
 				if(claa.name == name){
-					alertp("Cannot have a classification and compartment both '"+name+"'");
+					return err("Cannot have a classification and compartment both '"+name+"'");
 				}					
 				
 				if(claa.index == name){
-					alertp("Cannot have a classification index and compartment both '"+name+"'");
+					return err("Cannot have a classification index and compartment both '"+name+"'");
 				}		
 				
-				let c = find(claa.comp,"name",name);
+				let c = hash_find(claa.hash_comp,name);
 				if(c != undefined){
-					alertp("There is already a compartment with the name '"+name+"'");
-					return true;
+					return err("There is already a compartment with the name '"+name+"'");
 				}
 			}
 		}
-		return false;
+		return success();
 	}
+	
 	
 	/// Selects a compartment (i.e. generate a bubble)
 	select_button_bubble(lay_name,type,p,cl,i)
@@ -845,39 +1046,60 @@ class Model
 	
 	
 	/// Adds a transition to the model
-	add_transition(p,cl,i,f,midp,ty)
+	add_transition(p,cl,i,f,midp,ty,op)
 	{
-		let claa = this.species[p].cla[cl];
+		let sp = this.species[p];
+		let claa = sp.cla[cl];
 		let tra = claa.tra;
 	
 		if(ty != ""){
-			for(let j = 0; j < tra.length; j++){
-				if(tra[j].i == i && tra[j].f == f){
-					if(i == "Source") alertp("Cannot have two sources into the same compartment");
-					else{
-						if(f == "Sink") alertp("Cannot have two sinks leaving the same compartment");
-						else{
-							alertp("Cannot have two transitions with the same source and destination compartments");
-						}
+			if(i == SOURCE){
+				for(let cl2 = 0; cl2 < cl; cl2++){
+					if(cl2 != cl && sp.cla[cl2].nsource > 0){
+						return err("Cannot have sources in multiple classifications (here sources are in '"+sp.cla[cl].name+"' and '"+sp.cla[cl2].name+"')");
 					}
-					return false;
 				}
 			}
+
+			if(f == SINK){
+				for(let cl2 = 0; cl2 < cl; cl2++){
+					if(cl2 != cl && sp.cla[cl2].nsink > 0){
+						return err("Cannot have sinks in multiple classifications (here sinks are in '"+sp.cla[cl].name+"' and '"+sp.cla[cl2].name+"')");
+					}
+				}
+			}
+
+			let exist_fl = false;
 			
+			let name = this.get_trans_name(claa,i,f);
+			
+			if(hash_find(claa.hash_tra,name) != undefined){
+				if(i == SOURCE){
+					return err("Cannot have two sources into the same compartment");
+				}
+				else{
+					if(f == SINK){
+						return err("Cannot have two sinks leaving the same compartment");
+					}
+					else{
+						return err("Cannot have two transitions with the same source and destination compartments");
+					}
+				}
+			}
+	
 			if(i == f){
-				alertp("The 'from' and 'to' compartments must be different");
-				return false;
+				return err("The 'from' and 'to' compartments must be different");
 			}
 		}
 		
 		let value = {};
 		if(ty != ""){
-			if(i == "Source"){
+			if(i == SOURCE){
 				let sup2 = claa.comp[f].name;
 				value = this.new_trans_equations(sup2,sup2,true,p,cl);
 			}
 			else{	
-				if(f == "Sink"){
+				if(f == SINK){
 					let sup = "("+claa.comp[i].name+"→Sink)";
 					let sup2 = claa.comp[i].name;
 					value = this.new_trans_equations(sup,sup2,true,p,cl);
@@ -889,23 +1111,37 @@ class Model
 				}
 			}
 		}
-
-		tra.push({type:ty, i:i, f:f, pline:[], midp:midp, value:value});	
+		
+		tra.push({type:ty, i:i, f:f, pline:[], branch_select:undefined, midp:midp, value:value});	
 		this.set_transition_name(p,cl,claa.ntra);
+		
+		if(ty != ""){
+			if(i == SOURCE) claa.nsource++;
+			if(f == SINK) claa.nsink++;	
+		}
+		
 		claa.ntra++;
 		
-		if(ty != "") this.determine_branching();
+		if(op != "simple"){
+			if(ty != "") this.determine_branching();
 		
-		this.update_pline(p,cl);  
+			this.update_pline(p,cl);  
 
-		if(ty != ""){
-			data_update_add_transition(p,cl);
-			check_data_valid();
+			if(debug == true) this.check_consistent();  
 		}
+		
+		update_param();
 	
+		return success();
+	}
+	
+	
+	/// Updates the model
+	update_check(p,cl)
+	{
+		this.determine_branching();	
+		this.update_pline(p,cl);  
 		if(debug == true) this.check_consistent();  
-	
-		return true;
 	}
 	
 	
@@ -913,18 +1149,35 @@ class Model
 	new_trans_equations(sup,sup2,flag,p,cl)
 	{
 		let value = {};
-		if(flag == false){
-			value.mean_eqn = create_equation("μ^"+sup2,"trans_mean",p,cl);
-			value.rate_eqn = create_equation("s^"+sup2,"trans_rate",p,cl);
+		if(true){                                     // Turned off default transition nales
+			if(flag == false){
+				value.mean_eqn = create_equation("","trans_mean",p,cl);
+				value.rate_eqn = create_equation("","trans_rate",p,cl);
+			}
+			else{
+				value.mean_eqn = create_equation("","trans_mean",p,cl);
+				value.rate_eqn = create_equation("","trans_rate",p,cl);
+				value.bp_eqn = create_equation("","trans_bp",p,cl);
+				value.shape_eqn = create_equation("","trans_shape",p,cl);
+				value.scale_eqn = create_equation("","trans_scale",p,cl);
+				value.cv_eqn = create_equation("","trans_cv",p,cl);
+				value.shape_erlang = {te:"2"};
+			}
 		}
 		else{
-			value.mean_eqn = create_equation("μ^"+sup,"trans_mean",p,cl);
-			value.rate_eqn = create_equation("r^"+sup,"trans_rate",p,cl);
-			value.bp_eqn = create_equation("b^"+sup,"trans_bp",p,cl);
-			value.shape_eqn = create_equation("k^"+sup2,"trans_shape",p,cl);
-			value.scale_eqn = create_equation("ν^"+sup2,"trans_scale",p,cl);
-			value.cv_eqn = create_equation("cv^"+sup2,"trans_cv",p,cl);
-			value.shape_erlang = {te:"1"};
+			if(flag == false){
+				value.mean_eqn = create_equation("μ^"+sup2,"trans_mean",p,cl);
+				value.rate_eqn = create_equation("s^"+sup2,"trans_rate",p,cl);
+			}
+			else{
+				value.mean_eqn = create_equation("μ^"+sup,"trans_mean",p,cl);
+				value.rate_eqn = create_equation("r^"+sup,"trans_rate",p,cl);
+				value.bp_eqn = create_equation("b^"+sup,"trans_bp",p,cl);
+				value.shape_eqn = create_equation("k^"+sup2,"trans_shape",p,cl);
+				value.scale_eqn = create_equation("ν^"+sup2,"trans_scale",p,cl);
+				value.cv_eqn = create_equation("cv^"+sup2,"trans_cv",p,cl);
+				value.shape_erlang = {te:"1"};
+			}
 		}
 		
 		return value;
@@ -939,29 +1192,31 @@ class Model
 		
 		let par = ob.eqn1.param;
 		if(par.length != 1){ 
-			if(par.length == 0){ alertp("Does not contain a parameter"); return;}
-			if(par.length > 1){	alertp("Should not contain more than one parameter"); return;}
+			if(par.length == 0)	return err("Does not contain a parameter");
+			if(par.length > 1) return err("Should not contain more than one parameter");
 		}
 		
-		let warn = check_derived_param(ob.eqn2,ob.eqn1);
-		if(warn != "success"){ alertp(warn); return;}
+		let res = check_derived_param(ob.eqn2,ob.eqn1);
+		if(res.err == true) return res;
 		
 		let name = par[0].name;
 		let i = find(this.param,"name",name);
-		if(i != undefined && !(mod == "modify" && par[0].full_name == this.derive[ob.val].eqn1.param[0].full_name)){
-			alertp("The parameter '"+name+"' is already used in the model"); 
-			return;
+
+		if(i != undefined && mod != "modify"){
+			return err("The parameter '"+name+"' is already used in the model"); 
 		}
 	
 		if(mod == "modify") this.derive[ob.val] = ob;
 		else this.derive.push(ob);
-		init_param();
-		return "success";
+		
+		update_param();
+		
+		return success();
 	}
 	
 	
 	/// Determines if compartments/transition are branching
-	determine_branching()
+	determine_branching(op)
 	{
 		for(let p = 0; p < this.species.length; p++){
 			let sp = this.species[p];
@@ -969,6 +1224,7 @@ class Model
 				let claa = sp.cla[cl];
 				for(let tr = 0; tr < claa.ntra; tr++){
 					claa.tra[tr].branch = false;
+					claa.tra[tr].all_branches = false;
 				}
 
 				for(let c = 0; c < claa.ncomp; c++){
@@ -976,12 +1232,32 @@ class Model
 					
 					let list=[]; 
 					let flag = false;
+					let all_set = true;
 					for(let tr = 0; tr < claa.ntra; tr++){
 						let trr = claa.tra[tr];
 						if(trr.i == c){
 							list.push(tr);
-							if(trr.type != "exp(rate)" && trr.type != "exp(mean)" && tr.type != "erlang") flag = true;
+										
+							if(trr.type != "exponential" && tr.type != "erlang") flag = true;
+							
+							if(trr.branch_select != true) all_set = false;
 						}
+					}
+					
+					
+					if(op == "set all_branches"){           // Sets the all_branches flag on compartments
+						if(list.length > 1 && all_set == true){
+							co.all_branches = true;
+						}
+					}
+					
+					if(list.length > 1 && all_set == true){
+						claa.tra[list[list.length-1]].branch_select = false;
+					}
+					
+					for(let i = 0; i < list.length; i++){
+						let tra = claa.tra[list[i]];
+						tra.all_branches = co.all_branches;
 					}
 					
 					if(list.length > 1 && flag == false) co.choose_branch = true;
@@ -993,14 +1269,46 @@ class Model
 					else co.branch = false;
 					
 					for(let i = 0; i < list.length; i++){
-						claa.tra[list[i]].branch = co.branch;
+						let tra = claa.tra[list[i]];
+						tra.branch = co.branch;
+					
+						if(list.length > 1 && tra.branch_select == undefined){
+							if(i == 0) tra.branch_select = false;
+							else tra.branch_select = true;
+						}
 					}
 				}					
 			}
 		}
 	}
-	
 
+
+	/// Deletes the branching probability (such that it is defined for another transition)
+	delete_branch_prob(p,cl,i)
+	{
+		let claa = this.species[p].cla[cl];
+		let tra_sel = claa.tra[i];
+		
+		for(let tr = 0; tr < claa.ntra; tr++){
+			let trr = claa.tra[tr];
+			if(trr.i == tra_sel.i) trr.branch_select = true;
+		}
+		
+		tra_sel.branch_select = false;
+		
+		this.determine_branching();
+		this.update_pline(p,cl);
+	}
+	
+	get_trans_name(claa,i,f)
+	{
+		if(i == SOURCE) return "+→"+claa.comp[f].name;
+		else{
+			if(f == SINK) return claa.comp[i].name+"→-";
+			else return claa.comp[i].name+"→"+claa.comp[f].name;
+		}	
+	}
+	
 	/// Sets the name of a transition
 	set_transition_name(p,cl,tr)
 	{
@@ -1008,28 +1316,44 @@ class Model
 		let tra = claa.tra[tr];
 		
 		if(tra.type != ""){
-			let variety = "Normal", name;
-			let i = tra.i, f = tra.f;
-			if(i == "Source"){ variety = "Source"; name = "+→"+claa.comp[f].name;}
+			let name = this.get_trans_name(claa,tra.i,tra.f);
+			
+			let variety = NORMAL;
+			if(tra.i == SOURCE) variety = SOURCE;
 			else{
-				if(f == "Sink"){ variety = "Sink"; name = claa.comp[i].name+"→-";}
-				else name = claa.comp[i].name+"→"+claa.comp[f].name;
+				if(tra.f == SINK) variety = SINK; 
 			}
-			tra.variety = variety; tra.name = name;
+	
+			if(name != tra.name){
+				if(tra.name != undefined && tra.name != "") hash_remove(claa.hash_tra,tra.name);
+				hash_add(claa.hash_tra,name,tr);
+				tra.name = name;
+			}
+			
+			tra.variety = variety; 
 		}
 	}
 
 
-	/// Sets the size of a compartment (depending on the length of the text which defined it)
+	/// Sets the size of a compartment (depending on the height of the text which defined it)
 	set_compartment_size(comp)
 	{
-		comp.h  = compartment_height
+		comp.h = compartment_height;
+
+		cv.font = "30px Times";
+		let name = comp.name;
+		let w = 2;
+		if(name.includes("^")){
+			let spl = name.split("^");
+			w += comp.h*si_comp_text_frac*(cv.measureText(spl[0]).width+cv.measureText(spl[1]).width*si_sup_fac)/30;
+		}
+		else{
+			w += comp.h*si_comp_text_frac*(cv.measureText(name).width/30);
+		}
 		
-		let font = get_font(compartment_height*0.85,"","times");
-		let w = text_width(comp.name,font)+1;
-		if(w < 3) w = 3;
+		if(w < compartment_width_min) w = compartment_width_min;
 		
-		w = (Math.floor(w/grid)+1)*grid;
+		w = (Math.floor(w/grid))*grid;
 		comp.w = w;
 	}
 
@@ -1062,7 +1386,7 @@ class Model
 		}
 		
 		if(message != ""){ 		
-			lay.add_button({te:message, x:0, y:0, dx:lay.dx, dy:lay.dy, type:"Message"});
+			lay.add_button({te:message, x:0, y:0, dx:lay.dx, dy:lay.dy, type:"MessageMenu"});
 			lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, ac:"Nothing", type:"Nothing"});
 			lay.add_button({te:message, x:lay.dx-1.5, y:0.2, dx:1, dy:1, ac:"MessageClose", type:"MessageClose"});
 			return;
@@ -1079,7 +1403,7 @@ class Model
 		
 		let claa; if(cl < n) claa = this.species[p].cla[cl];
 		
-		let gap = 4;
+		let gap = 3.5;
 		let w;		
 		
 		let active;
@@ -1095,10 +1419,13 @@ class Model
 		
 		w = this.add_object_button(lay,"Sink",x,y,"AddSink",{active:active, title:"Add a sink", te:sink_text, back:WHITE}); x += w+gap;
 	
-		x += gap;
+		x += 2;
 		if(cl < n) active = true; else active = false;
 		w = this.add_object_button(lay,"Annotation",x,y,"AddAnnotation",{active:active, p:p, cl:cl, title:"Add an annotation", te:annotation_text, back:WHITE});
 		x += w+gap;
+		
+		
+		w = this.add_object_button(lay,"Import",x,y,"ImportModel",{active:active, p:p, cl:cl, title:"Import", te:import_text, back:WHITE});
 	
 		let ac_in, ac_out;
 	
@@ -1106,6 +1433,11 @@ class Model
 			ac_in = "ZoomIn"; ac_out = "ZoomOut";
 		}
 		
+		if(claa && claa.camera.coord == "latlng"){
+			inter.lnglat_slider.lay = lay.name;
+			lay.add_button({x:lay.dx-11, y:0.45, dx:5, dy:1, info:inter.lnglat_slider, ac:"Slider", type:"Slider"});
+		}
+	
 		lay.add_button({x:lay.dx-5, y:0, dx:1.8, dy:2, ac:ac_in, type:"ZoomIn", p:p, cl:cl});
 
 		lay.add_button({x:lay.dx-3, y:0, dx:1.8, dy:1.8, ac:ac_out, type:"ZoomOut", p:p, cl:cl});
@@ -1125,7 +1457,11 @@ class Model
 	/// Generates the popup bubble which appears on the add compartment button 
 	add_compartment_popup()
 	{
-		let i = get_lay("LowerMenu").search_button_ac("AddCompartment");
+		if(inter.loading_symbol.on == true) return;
+		
+		let lay = get_lay("LowerMenu"); if(lay == undefined) return;
+		
+		let i = lay.search_button_ac("AddCompartment");
 
 		select_bubble("LowerMenu",i,{type:"Popup"});
 		generate_screen();
@@ -1171,8 +1507,15 @@ class Model
 		if(cla.length == 0){ x = 0; yy = y+0.5;}
 		this.add_object_button(lay,"Classification",x,yy,"AddClassification",{active:true, p:p, title:"Add a classification", te:class_text, back:WHITE});
 	}
-
-
+		
+		
+	/// Adds button to view warning
+	add_view_warning_buts(lay)
+	{		
+		lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, ac:"WarningStore", type:"WarningStore"});
+	}
+	
+	
 	/// Adds an add object button (e.g. add compartment) 
 	add_object_button(lay,te,x,y,ac,op)
 	{
@@ -1193,7 +1536,6 @@ class Model
 
 
 	/// Ensures the positions of the midpoint of compartments an on a grid
-	//snap_comp_to_grid(p,cl,i)
 	snap_comp_to_grid(ob)
 	{
 		if(ob.x == "auto") return;
@@ -1252,12 +1594,14 @@ class Model
 		
 		let tr = claa.tra[i];
 
-		tr.pair = false;                        // Finds if a transition is pair with its reverse
+		let midp = tr.midp;
+		
+		tr.pair = false;                              // Finds if a transition is pair with its reverse
 		for(let j = 0; j < claa.ntra; j++){
 			if(j != i){
 				let tr2 = claa.tra[j];
 				if(tr.i == tr2.f && tr.f == tr2.i){
-					if(tr.midp.length == 0 && tr2.midp.length == 0){
+					if(midp.length == 0 && midp.length == 0){
 						tr.pair = true;
 					}
 				}
@@ -1282,17 +1626,17 @@ class Model
 			pair_shift.y = -shift_gap*dx/r;
 		}			
 		
-		if(tr.i != undefined && tr.i != "Source"){
+		if(tr.i != undefined && tr.i != SOURCE){
 			let co = claa.comp[tr.i];
-			
+			//zz
 			let p1 = this.comp_center(co);
 		
 			p1.x += pair_shift.x; p1.y += pair_shift.y;
 			
 			let	p2;
-			if(tr.midp.length > 0) p2 = tr.midp[0];
+			if(midp.length > 0) p2 = midp[0];
 			else{
-				if(tr.f != "Sink" && tr.f != undefined) p2 = this.comp_center(claa.comp[tr.f]);
+				if(tr.f != SINK && tr.f != undefined) p2 = this.comp_center(claa.comp[tr.f]);
 			}
 			
 			if(p2 != undefined){
@@ -1301,11 +1645,11 @@ class Model
 			}
 		}
 		
-		for(let i = 0; i < tr.midp.length; i++){
-			tr.pline.push({x:tr.midp[i].x, y:tr.midp[i].y, index:i});
+		for(let i = 0; i < midp.length; i++){
+			tr.pline.push({x:midp[i].x, y:midp[i].y, index:i});
 		}
-		
-		if(tr.f != undefined && tr.f != "Sink"){
+
+		if(tr.f != undefined && tr.f != SINK){
 			let co = claa.comp[tr.f];
 			
 			let p1 = this.comp_center(co);
@@ -1313,14 +1657,13 @@ class Model
 			p1.x += pair_shift.x; p1.y += pair_shift.y;
 			
 			let p2;
-			if(tr.midp.length > 0) p2 = tr.midp[tr.midp.length-1];
-			else{ if(tr.i != "Source") p2 = this.comp_center(claa.comp[tr.i]);}
+			if(midp.length > 0) p2 = midp[midp.length-1];
+			else{ if(tr.i != SOURCE) p2 = this.comp_center(claa.comp[tr.i]);}
 		
 			let pos = this.intersect_comp_line(co,p1,p2,r_latlng);
-			tr.pline.push({x:pos.x, y:pos.y, index:tr.midp.length});
+			tr.pline.push({x:pos.x, y:pos.y, index:midp.length});
 		}
 		
-
 		let np = tr.pline.length;
 		let l = 0;
 		let dist=[];
@@ -1346,7 +1689,7 @@ class Model
 		tr.l = l;
 		
 		if(l > 0){
-			let wmin = LARGE, wmax = -LARGE; // Finds the potential width for the label
+			let wmin = LARGE, wmax = -LARGE;            // Finds the potential width for the label
 			for(let p = 0; p < np; p++){
 				let dx = tr.pline[p].x - tr.center.x;
 				let dy = tr.pline[p].y - tr.center.y;
@@ -1357,7 +1700,7 @@ class Model
 			tr.center.w = wmax-wmin;
 		}
 		
-		let xmax = -LARGE, xmin = LARGE;   // Finds a box around the transition points
+		let xmax = -LARGE, xmin = LARGE;              // Finds a box around the transition points
 		let ymax = -LARGE, ymin = LARGE;
 			
 		for(let j = 0; j < tr.pline.length; j++){
@@ -1367,40 +1710,43 @@ class Model
 		}
 		tr.box = {x:xmin, y:ymin, dx:xmax-xmin, dy:ymax-ymin};
 		
+		let val = tr.value;
+		
 		let lab="";
 	
-		let val = tr.value;
-
-		switch(tr.type){
-		case "exp(mean)": 
-			if(tr.branch == true) lab = val.bp_eqn.te+"/";
-			else lab = "1/";
-			lab += "("+val.mean_eqn.te+")"; 
-			break;
+		if(tr.branch == true){
+			if(tr.branch_select == true || tr.all_branches == true){
+				let te = val.bp_eqn.te; if(te == "") te = "?";
+				lab += te;
+			}
+			else lab += "*";
 			
-		case "exp(rate)": 
-			if(tr.branch == true) lab = val.bp_eqn.te+"×"; 
-			lab += val.rate_eqn.te; 
+			lab += " | ";
+		}
+	
+		switch(tr.type){
+		case "exponential": 
+			lab += val.rate_eqn.te.trim(); 
 			break;
 			
 		case "gamma": 
-			if(tr.branch == true) lab = val.bp_eqn.te+","; 
-			lab += "Γ("+val.mean_eqn.te+" , "+val.cv_eqn.te+")";
+			lab += "Γ("+val.mean_eqn.te.trim()+" , "+val.cv_eqn.te+")";
 			break;
 			
 		case "erlang": 
-			if(tr.branch == true) lab = val.bp_eqn.te+","; 
-			lab += "EL("+val.mean_eqn.te+" , "+val.shape_erlang.te+")";
+			lab += "EL("+val.mean_eqn.te.trim()+" , "+val.shape_erlang.te.trim()+")";
 			break;
 			
 		case "log-normal":
-			if(tr.branch == true) lab = val.bp_eqn.te+","; 
-			lab += "LN("+val.mean_eqn.te+" , "+val.cv_eqn.te+")"; 
+			lab += "LN("+val.mean_eqn.te.trim()+" , "+val.cv_eqn.te.trim()+")"; 
 			break;
 			
 		case "weibull":
-			if(tr.branch == true) lab = val.bp_eqn.te+","; 
-			lab += "W("+val.scale_eqn.te+" , "+val.shape_eqn.te+")";
+			lab += "W("+val.scale_eqn.te.trim()+" , "+val.shape_eqn.te.trim()+")";
+			break;
+			
+		case "period": 
+			lab += "P("+val.mean_eqn.te.trim()+")"; 
 			break;
 			
 		default: delete tr.label; break;
@@ -1488,6 +1834,9 @@ class Model
 	delete_compartment(p,cl,i,include_clone)
 	{
 		let claa = this.species[p].cla[cl];
+
+		let co = claa.comp[i];
+		if(co == undefined) return;
 		
 		// First removes any transitions connected with compartment
 		for(let	tr = claa.ntra-1; tr >= 0; tr--){
@@ -1496,7 +1845,7 @@ class Model
 		}
 
 		// Removes compartment from any box annotations
-		let name = claa.comp[i].name;
+		let name = co.name;
 		let k = 0;
 		while(k < claa.annotation.length){
 			let an = claa.annotation[k];
@@ -1511,10 +1860,15 @@ class Model
 			if(an.type == "box" && an.comps.length == 0) claa.annotation.splice(k,1);
 			else k++;
 		}
-	
+
+		// Removes any boundary data
+		if(co.map_ref != undefined) delete_map_store(co.map_ref);
+		
 		claa.comp.splice(i,1);
 		claa.ncomp--;
 
+		hash_redo(claa.hash_comp,claa.comp);
+	
 		for(let	tr = 0; tr < claa.ntra; tr++){
 			let traa = claa.tra[tr];
 			if(traa.i > i) traa.i--;
@@ -1525,20 +1879,16 @@ class Model
 
 		this.update_pline(p,cl);
 
-		data_update_delete_compartment(p,cl,i,name);
-		
-		if(include_clone == true) this.update_param_index(claa.index); // Updates param
-		
 		if(include_clone == true){  // Adds to clones 
 			let list = this.find_clones(p,cl);
 		
 			for(let li of list){
 				this.delete_compartment(li.p,li.cl,i,false);
 			}
-			
-			check_data_valid();
 		}
 		
+		update_param();
+
 		if(debug == true) this.check_consistent();  
 	}
 
@@ -1548,17 +1898,37 @@ class Model
 	{
 		let claa = this.species[p].cla[cl];
 		
+		let tr = claa.tra[i];
+		if(tr.i == SOURCE) claa.nsource--;
+		if(tr.f == SINK) claa.nsink--;
+					
 		claa.tra.splice(i,1);
 		claa.ntra--;
+		
+		hash_redo(claa.hash_tra,claa.tra);
+		
 		this.determine_branching();
 		this.update_pline(p,cl); 
 
-		data_update_delete_transition(p,cl,i);
-		check_data_valid();
+		update_param();
 		
 		if(debug == true) this.check_consistent();  
 	}
 
+
+	/// Checks that a compartment name is valid
+	check_comp_name(te,op)
+	{
+		for(let i = 0; i < te.length; i++){
+			let ch = te.substr(i,1);
+		
+			if(compnotallow.includes(ch)){
+				if(op == "full") return "Compartment name '"+te+"' cannot use character '"+ch+"'";
+				else return "Cannot use character '"+ch+"'";
+			}
+		}
+	}
+	
 
 	/// Changes the name of a compartment
 	rename_compartment(p,cl,c,new_name)
@@ -1569,31 +1939,9 @@ class Model
 		let cl_name = claa.name;
 		let old_name = claa.comp[c].name;
 		
-		let eq_list = this.find_equation_list();
-		
-		let len = old_name.length;
-		let dif = new_name.length - old_name.length;
-		
-		for(let i = 0; i < eq_list.length; i++){
-			let eqn = eq_list[i];
-			extract_equation_properties(eqn);
-		
-			let te = eqn.te;
-			for(let j = 0; j < eqn.comp_name_list.length; j++){
-				let ch = eqn.comp_name_list[j];
-			
-				if(ch.cl_name == cl_name && ch.comp_name == old_name){
-					te = te.substr(0,ch.icur)+new_name+te.substr(ch.icur+len);
-					for(let jj = j+1; jj < eqn.comp_name_list.length; jj++){
-						eqn.comp_name_list[jj].icur += dif;
-					}
-				}
-			}
-			eqn.te = te;
-		}
 		clone_camera(p,cl);
 	
-		// this converts all classification on all species
+		// This converts all classification on all species
 		for(let p = 0; p < this.species.length; p++){
 			let sp = this.species[p];
 			for(let cl = 0; cl < sp.ncla; cl++){
@@ -1602,32 +1950,15 @@ class Model
 					for(let c = 0; c < claa.ncomp; c++){
 						let co = claa.comp[c];
 						if(co.name == old_name){
+							hash_remove(claa.hash_comp,old_name);
+							hash_add(claa.hash_comp,new_name,c);
+						
 							co.name = new_name;
 							this.set_compartment_size(co);
 							this.update_pline(p,cl);
 						}
 					}
 				}
-			}
-		}
-
-		// Changes name on param
-		for(let i = 0; i < this.param.length; i++){
-			let par = this.param[i];
-			
-			let flag = false;
-			for(let j = 0; j < par.dep.length; j++){
-				if(par.dep[j] == claa.index){
-					if(c < par.list[j].length){
-						if(par.list[j][c] != old_name) error("Old name not correct");
-						par.list[j][c] = new_name;
-						flag = true;
-					}
-				}
-			}
-			
-			if(flag == true){
-				par.comb_list = generate_comb_list(par.list);
 			}
 		}
 		
@@ -1640,18 +1971,12 @@ class Model
 				}
 			}
 		}
-	
-		data_update_rename_compartment(p,cl,old_name,new_name);
 		
 		this.rename_ob(model,"model","comp_name",old_name,new_name);
 		this.rename_ob(model,"model","comp_name_store",old_name,new_name);
-	
-		if(false) this.check_ob_string_exist(model,"model",old_name);
-			
+		
 		this.update_pline_all();
 
-		check_data_valid();
-		
 		if(debug == true) this.check_consistent();  
 	}
 
@@ -1659,9 +1984,11 @@ class Model
 	/// Rename a classification
 	rename_classification(new_name,p,cl)
 	{
-		let p_name = this.species[p].name;
+		let sp = this.species[p];
+		let p_name = sp.name;
+		let claa = sp.cla[cl]
 		
-		let old_name = this.species[p].cla[cl].name
+		let old_name = claa.name
 		if(new_name == old_name) return;
 
 		let eq_list = this.find_equation_list();
@@ -1676,7 +2003,7 @@ class Model
 			if(eqn.cl_name == old_name) eqn.cl_name = new_name;
 		}
 	
-		// this converts all classification on all species
+		// This converts all classification on all species
 		for(let p = 0; p < this.species.length; p++){
 			let sp = this.species[p];
 			for(let cl = 0; cl < sp.ncla; cl++){
@@ -1686,19 +2013,16 @@ class Model
 			}
 		}
 
-		data_update_rename_classification(p,cl,old_name,new_name);
-		
 		this.rename_ob(model,"model","cl_name",old_name,new_name);
 		this.rename_ob(model,"model","cl_name_store",old_name,new_name);
 		
-		if(false) this.check_ob_string_exist(model,"model",old_name);
+		if(sp.infection_cl.te == old_name) sp.infection_cl.te = new_name;
 		
 		this.update_pline_all();
 		
-		check_data_valid();
-		
 		if(debug == true) this.check_consistent();  
 	}
+	
 	
 	/// Rename a species
 	rename_species(new_name,p)
@@ -1733,13 +2057,19 @@ class Model
 		
 		this.rename_ob(model,"model","p_name",old_name,new_name);
 	
-		if(false) this.check_ob_string_exist(model,"model",old_name);
-		
 		this.update_pline_all();
 		
-		check_data_valid();
-		
 		if(debug == true) this.check_consistent();  
+	}
+	
+	
+	/// Changes a parameter property
+	change_param(th,prop,val)
+	{
+		if(val != this.param[th][prop]){
+			this.param[th][prop] = val;
+			update_param();
+		}
 	}
 	
 	
@@ -1749,17 +2079,17 @@ class Model
 		let claa = this.species[p].cla[cl];
 		
 		let old_name = claa.index;
-		if(new_name == old_name) return "success";
-		
-		claa.index = new_name;
+		if(new_name == old_name) return success();
 		
 		if(include_clone == true){ 
 			for(let i = 0; i < this.param.length; i++){
 				let par = this.param[i];
 				for(let d = 0; d < par.dep.length; d++){
-					if(par.dep[d] == old_name){
-						par.dep[d] = new_name;
-						par.label_info = get_label_info(par);
+					let de = par.dep[d];
+					let de_remove = remove_prime(de)
+					if(de_remove == old_name){
+						par.dep[d] = new_name+de.substr(de_remove.length);
+						par.full_name = param_name(par);
 					}
 				}
 			}
@@ -1781,27 +2111,29 @@ class Model
 					}
 				}
 				eqn.te = te;
+				
+				extract_equation_properties(eqn);
 			}
-		}
-		
-		if(include_clone == true){  // Adds to clones 
+	
 			let list = this.find_clones(p,cl);
 		
 			for(let li of list){
 				this.rename_index(new_name,li.p,li.cl,false);
 			}
 			
-			if(false) this.check_ob_string_exist(model,"model",old_name);
-			
+			claa.index = new_name;
+	
+			if(debug == true) this.check_consistent();  
+		
 			this.update_pline_all();
 		}
 		
-		if(debug == true) this.check_consistent();  
+		return success();
 	}
 
 
 	/// Renames a property within the model
-	rename_ob(ob,root,prop,old_name,new_name)
+	rename_ob(ob,root,prop,old_name,new_name) // zz
 	{
 		if(old_name == "") return;
 		
@@ -1809,13 +2141,18 @@ class Model
 			if(ele == prop){ 
 				if(ob[ele] == old_name) ob[ele] = new_name; 
 			}
-			else{
-				if(ele != "eqn_appear"){ 
-					let ob2 = ob[ele];
+			else{	
+				switch(ele){
+				case "eqn_appear": break;
+				default:
+					{
+						let ob2 = ob[ele];
 					
-					if(typeof ob2 == 'object'){
-						this.rename_ob(ob2,root+"->"+ele,prop,old_name,new_name);
+						if(typeof ob2 == 'object'){
+							this.rename_ob(ob2,root+"->"+ele,prop,old_name,new_name);
+						}
 					}
+					break;
 				}
 			}
 		}
@@ -1825,12 +2162,17 @@ class Model
 	/// Checks if a string exists in an of the properties of an object (diagnostic)
 	check_ob_string_exist(ob,root,name)
 	{
+		return;// TURN OFF IF NOT DEBUGGING
+		
+		if(root == "model") pr("Checking for "+name);
 		if(name == "") return;
 		
 		for(let ele in ob){
 			if(ele != "eqn_appear"){ 
 				let ob2 = ob[ele];
-				if(ob2 == name) error("'"+name+"' found here: "+root);
+				if(ob2 == name){
+					error("'"+name+"' found here: "+root);
+				}
 				
 				if(typeof ob2 == 'object'){
 					this.check_ob_string_exist(ob2,root+"->"+ele,name);
@@ -1898,13 +2240,14 @@ class Model
 					}
 					
 					if(val.mean_eqn != undefined){
-						if(all_param == true || traa.type == "exp(mean)" || traa.type == "gamma" || traa.type == "erlang" || traa.type == "log-normal"){
+						if(all_param == true || traa.type == "gamma" || traa.type == "erlang" || traa.type == "log-normal"){
 							this.add_equation_to_list(eqn_list,val.mean_eqn,eqn_info);
 						}
 					}
 					
 					if(val.rate_eqn != undefined){
-						if(all_param == true || traa.type == "exp(rate)"){
+						//if(all_param == true || traa.type == "exp(rate)"){
+						if(all_param == true || traa.type == "exponential"){
 							this.add_equation_to_list(eqn_list,val.rate_eqn,eqn_info);
 						}
 					}
@@ -1939,15 +2282,13 @@ class Model
 					this.add_equation_to_list(eqn_list,so.spec.Sp_eqn,eqn_info);
 				}
 				
-				if(so.type=="Set Traps"){
-					this.add_equation_to_list(eqn_list,so.spec.trap_prob_eqn,eqn_info);
-				}
-				
 				if(so.type == "Compartment"){
 					let tab = so.table;
 					for(let r = 0; r < tab.nrow; r++){
 						let te = tab.ele[r][2];
-						let spl = te.split("|");
+						//let spl = te.split("|");
+						let spl = split_with_bracket(te,"|");
+						
 						for(let k = 0; k < spl.length; k++){
 							let spl2 = spl[k].split(":");
 							if(spl2.length == 2){
@@ -1966,7 +2307,7 @@ class Model
 			}		
 		}
 		
-		/// Goes through derived parameters
+		// Goes through derived parameters
 		for(let i = 0; i < this.derive.length; i++){
 			let der = this.derive[i];
 			
@@ -1975,70 +2316,10 @@ class Model
 			this.add_equation_to_list(eqn_list,der.eqn1,eqn_info);		
 		}
 		
-		/*
-		/// Goes through reparameterisation
-		for(let th = 0; th < this.param.length; th++){  
-			let par = this.param[th];
-			if(par.variety == "reparam"){		
-				if(par.dep.length == 0){
-					let ele = par.value;
-					if(isNaN(ele)){
-						let eqn = create_equation(ele,par.variety);
-						let eqn_info = {par_name:par.name};
-						this.add_equation_to_list(eqn_list,eqn,eqn_info);		
-					}
-				}
-				else{
-					for(let i = 0; i < par.comb_list.length; i++){
-						let comb = par.comb_list[i];
-						let ele = get_element(par.value,comb.index);
-						if(isNaN(ele)){
-							let eqn = create_equation(ele,par.variety);
-							let eqn_info = {par_name:par.name, index:comb.index};
-							this.add_equation_to_list(eqn_list,eqn,eqn_info);		
-						}
-					}
-				}
-			}
-			
-			if(par.variety == "dist"){
-				if(par.prior_split_check.check == false){
-					let eqn_info = {par_name:par.name};
-					
-					this.add_distribution_eqn(eqn_list,par.prior,eqn_info);	
-				}
-				else{
-					for(let i = 0; i < par.comb_list.length; i++){
-						let comb = par.comb_list[i];
-						let ele = get_element(par.prior_split,comb.index);
-					
-						let eqn_info = {par_name:par.name, index:comb.index};
-					
-						this.add_distribution_eqn(eqn_list,ele,eqn_info);	
-					}
-				}
-			}
-		}
-		*/
-		
 		return eqn_list;
 	}
-			
 	
 	
-	
-	
-	/*
-	/// Adds a distribution equation to equation list
-	add_dist_eqn(eqn_list,eqn,eqn_info)	
-	{
-		if(isNaN(eqn.te)){
-			this.add_equation_to_list(eqn_list,eqn,eqn_info);
-		}			
-	}
-	*/
-
-
 	/// Adds equation to a list and appends information about source 
 	add_equation_to_list(eqn_list,source,eqn_info)
 	{
@@ -2051,11 +2332,7 @@ class Model
 	delete_species(p)
 	{
 		this.species.splice(p,1);
-		
-		if(p == this.species.length && p > 0) change_page({pa:"Model",su:"Compartments",susu:p-1});
-		initialise_pages();
 		reset_info_p();
-		
 		if(debug == true) this.check_consistent();  
 	}
 
@@ -2074,8 +2351,6 @@ class Model
 		sp.cla.splice(cl,1);
 		sp.ncla--;
 	
-		initialise_pages();
-
 		data_update_delete_classification(p,cl,name,comp_list);
 		
 		for(let i = 0; i < this.param.length; i++){
@@ -2088,9 +2363,7 @@ class Model
 			}
 		}
 		
-		check_data_valid();
-		
-		if(debug == true) this.check_consistent();  
+		if(debug == true) this.check_consistent(); 
 	}
 
 
@@ -2099,11 +2372,11 @@ class Model
 	{
 		for(let p = 0; p < model.species.length; p++){
 			let sp = model.species[p];
-			if(sp.ncla != sp.cla.length) pr(sp.ncla+" "+sp.cla.length+" ncla not consistent")
+			if(sp.ncla != sp.cla.length) error(sp.ncla+" "+sp.cla.length+" ncla not consistent")
 			for(let cl = 0; cl < sp.ncla; cl++){
 				let claa = sp.cla[cl];
-				if(claa.ntra != claa.tra.length) pr(claa.ntra+" "+claa.tra.length+" ntra ncla not consistent");
-				if(claa.ncomp != claa.comp.length) pr(claa.ncomp+" "+claa.comp.length+" ncomp ncla not consistent")
+				if(claa.ntra != claa.tra.length) error(claa.ntra+" "+claa.tra.length+" ntra ncla not consistent");
+				if(claa.ncomp != claa.comp.length) error(claa.ncomp+" "+claa.comp.length+" ncomp ncla not consistent")
 			}
 		}
 	}
@@ -2112,7 +2385,7 @@ class Model
 	/// Determines if mouse is over a transition
 	mouse_over_transition(points,lay)                         
 	{		
-		if(inter.mode.type == "Add_Transition") return UNSET;
+		if(inter.mode.type == "Add_Transition") return;
 		
 		let mx = inter.mx-lay.x, my = inter.my - lay.y;
 		let np = points.length;
@@ -2128,47 +2401,14 @@ class Model
 				if(para < TRANS_OVER_RANGE && para > -TRANS_OVER_RANGE) return points[p].index;
 			}
 		}
-
-		return UNSET;
 	}
 
 
-	/// Based on the individual classifications, this generates all the compartments in the system
-	get_glob_comp(p)
-	{
-		let sp = this.species[p];
-		
-		let glob_comp=[];
-		
-		let index=[];	
-		for(let cl = 0; cl < sp.ncla; cl++){
-			if(sp.cla[cl].ncomp == 0) return glob_comp;
-			index[cl] = 0;
-		}
-		
-		do{
-			let co = { cla:[]};
-			
-			for(let cl = 0; cl < sp.ncla; cl++){
-				co.cla[cl] = sp.cla[cl].comp[index[cl]].name;
-			}
-			glob_comp.push(co);
-				
-			let cl = 0; 
-			let flag;
-			do{
-				flag = false;
-				index[cl]++; if(index[cl] >= sp.cla[cl].ncomp){ index[cl] = 0; cl++; flag = true;}
-			}while(flag == true && cl < sp.ncla);
-			if(cl == sp.ncla) break;
-		}while(true);
-			
-		return glob_comp;
-	}
-	
-	
+	/// Adds warning buttons to the screen
 	add_warning_buts(lay)
 	{
+		lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, type:"Rect", val:WHITE});
+		
 		let cx = corner.x;
 		let cy = corner.y;
 	
@@ -2211,17 +2451,23 @@ class Model
 	/// Adds compartments from a table
 	add_file_compartment(p,cl,tab,col)
 	{
+		percent(0);
+		
+		this.remove_repeated(tab,0);
+		
+		clear_classification(p,cl);
+		
 		let claa = this.species[p].cla[cl];	
 		let cam = claa.camera;
 
 		let pos_x=[], pos_y=[];
 	
 		if(tab.ncol <= 2){ // Makes up a set of points on a grid
-			let font = get_font(compartment_height*0.85,"","times");
+			let si = compartment_height*si_comp_text_frac;
 		
 			let w_max = 0;
 			for(let r = 0; r < tab.nrow; r++){
-				let w = text_width(tab.ele[r][0],font)+1;
+				let w = text_width_worker(tab.ele[r][0],si,false)+1;
 				if(w > w_max) w_max = w;
 			}
 			if(w_max < 3) w_max = 3;
@@ -2251,6 +2497,8 @@ class Model
 		}
 		else{
 			for(let r = 0; r < tab.nrow; r++){
+				percent(100*r/tab.nrow);
+				
 				switch(cam.coord){
 				case "cartesian":								
 					pos_x[r] = Number(tab.ele[r][1])*import_scale_factor;
@@ -2276,8 +2524,11 @@ class Model
 			switch(cam.coord){
 			case "cartesian":		
 				{		
-					let c = find(claa.comp,"name",name);
-					if(c == undefined) this.add_compartment(name,p,cl,x,y,col2,true,true);		
+					let c = hash_find(claa.hash_comp,name);
+					if(c == undefined){
+						let res = this.add_compartment(name,p,cl,x,y,col2,true,false,true);		
+						output_help(res);
+					}
 					else{
 						let co = claa.comp[c];
 						co.x = x; co.y = y; co.col = col2;
@@ -2288,8 +2539,11 @@ class Model
 			
 			case "latlng":
 				{
-					let c = find(claa.comp,"name",name);
-					if(c == undefined) this.add_latlng_compartment(name,p,cl,x,y,col2,true);		
+					let c = hash_find(claa.hash_comp,name);
+					if(c == undefined){
+						let res = this.add_latlng_compartment(name,p,cl,x,y,col2,true,false);
+						output_help(res);
+					}
 					else{
 						let co = claa.comp[c];
 						co.x = x; co.y = y; co.col = col2;
@@ -2301,285 +2555,163 @@ class Model
 			}
 		}
 
-		set_camera(p,cl);
-		
 		if(debug == true) this.check_consistent();  
 	}
 	
 	
-	/// Adds compartments from a table
-	add_file_transition(p,cl,tab,type)
+	/// Removes lines with repeated elements on 
+	remove_repeated(tab,col)
+	{
+		let hash = new Hash();
+		let r = 0;
+		while(r < tab.nrow){
+			let val = tab.ele[r][col];
+			if(hash.find(val) != undefined){ tab.ele.splice(r,1); tab.nrow--;}
+			else{ hash.add(val,r); r++;}
+		}
+	}
+	
+	
+	/// Adds transitions from a table
+	add_file_transition(p,cl,tab,so_type)
 	{
 		let claa = this.species[p].cla[cl];	
+		claa.tra=[]; claa.ntra = 0; claa.hash_tra=[] 
+		claa.nsource = 0; claa.nsink = 0;
+		
+		let cam = claa.camera;
+		
+		let equal_flag = false;
 		for(let r = 0; r < tab.nrow; r++){	
-			let i	= find(claa.comp,"name",tab.ele[r][0]);
-			let f	= find(claa.comp,"name",tab.ele[r][1]);
+			if(r%10) percent(100*r/tab.nrow);
+		
+			let i_str = tab.ele[r][0];
+			let i;
+			if(i_str == "+") i = SOURCE;
+			else i = hash_find(claa.hash_comp,i_str);
+				
+			let f_str = tab.ele[r][1];
+			let f;
+			if(f_str == "-") f = SINK;
+			else f = hash_find(claa.hash_comp,f_str);
 			
-			if(i != undefined && f != undefined && i != f){
+			let trans_def = extract_trans_def(tab.ele[r][tab.ncol-1])
+			
+			let pos = dist_pos;	if(i == SOURCE) pos = source_dist_pos;
+
+			option_error("type",trans_def.type,pos);
+			
+			if(i == SOURCE && f == SINK) alert_help("Cannot have '+->-'");
+				
+			if(i == f) equal_flag = true;
+			
+			if(i != undefined && f != undefined && i != f){	
+				let midp=[];
+	
+				if(so_type == "Trans File Pos"){
+					let x_spl = tab.ele[r][2].split(",");
+					let y_spl = tab.ele[r][3].split(",");
+					if(x_spl.length != y_spl.length){
+						alert_help("On line "+(r+1)+" the x and y positions do not have the same number of points");
+					}
+					for(let k = 0; k < x_spl.length; k++){
+						let numx = Number(x_spl[k]);
+						let numy = Number(y_spl[k]);
+						if(isNaN(numx)){
+							alert_help("On line "+(r+1)+" the x positions is not a number");
+						}
+						
+						if(isNaN(numy)){
+							alert_help("On line "+(r+1)+" the y positions is not a number");
+						}
+						
+						let x,y
+						switch(cam.coord){
+						case "cartesian":				
+							midp.push({x:numx*import_scale_factor, y:numy*import_scale_factor});						
+							break;
+						
+						case "latlng":
+							let pt = transform_latlng(numx,numy);
+							midp.push({x:pt.x, y:pt.y});	
+							break;
+						}
+					}
+				}
+				else{
+					if(i == SOURCE){
+						let co = claa.comp[f];
+						switch(cam.coord){
+						case "cartesian":	midp = [{x:co.x,y:co.y+compartment_height+1}]; break;
+						case "latlng": midp = [{x:co.x,y:co.y}]; break;
+						default: error("Option not recognised 95"); break;
+						}
+					}
+					
+					if(f == SINK){
+						let co = claa.comp[i];
+						switch(cam.coord){
+						case "cartesian":	midp = [{x:co.x,y:co.y-compartment_height-1}]; break;
+						case "latlng": midp = [{x:co.x,y:co.y}]; break;
+						default: error("Option not recognised 95"); break;
+						}
+					}
+				}
+				
 				let k = 0; 
 				while(k < claa.tra.length && !(claa.tra[k].i == i && claa.tra[k].f == f)) k++;
 				
 				let value;
 				if(k < claa.tra.length){
 					let traa = claa.tra[k];
-					traa.type = type;
-					traa.midp = [];
+					traa.type = trans_def.type;
+					traa.midp = midp;
 					value = traa.value;
 				}
 				else{
-					this.add_transition(p,cl,i,f,[],type);
+					let res = this.add_transition(p,cl,i,f,midp,trans_def.type,"simple");
+					output_help(res);
+					
 					value = claa.tra[claa.tra.length-1].value;
 				}
+			
+				switch(trans_def.type){
+				case "exponential":
+					value.rate_eqn.te = trans_def.rate;
+					break;
 				
-				switch(type){
-				case "exp(rate)":
-					value.rate_eqn.te = tab.ele[r][2];
-					break;
-					
-				case "exp(mean)": 
-					value.mean_eqn.te = tab.ele[r][2];
-					break;
-					
 				case "erlang": 
-					value.mean_eqn.te = tab.ele[r][2];
-					value.shape_eqn.te = tab.ele[r][3];
+					value.mean_eqn.te = trans_def.mean;
+					value.shape_erlang.te = trans_def.shape;
 					break;
 					
 				case "gamma":
-					value.mean_eqn.te = tab.ele[r][2];
-					value.cv_eqn.te = tab.ele[r][3];
+					value.mean_eqn.te = trans_def.mean;
+					value.cv_eqn.te = trans_def.cv;
 					break;
 					
 				case "log-normal": 
-					value.mean_eqn.te = tab.ele[r][2];
-					value.cv_eqn.te = tab.ele[r][3];
+					value.mean_eqn.te = trans_def.mena;
+					value.cv_eqn.te = trans_def.cv;
 					break;
 					
 				case "weibull": 
-					value.scale_eqn.te = tab.ele[r][2];
-					value.shape_eqn.te = tab.ele[r][3];
+					value.scale_eqn.te = trans_def.scale;
+					value.shape_eqn.te = trans_def.shape;
 					break;
 
+				case "period": 
+					value.mean_eqn.te = trans_def.time;
+					break;
+					
 				default: error("Option not recognised 90"); break;
 				}
 			}
 		}
 		
-		this.determine_branching();
-		this.update_pline(p,cl);   
-			
-		set_camera(p,cl);
-		
-		if(debug == true) this.check_consistent();  
-	}
+		this.update_check(p,cl);
 	
-	
-	/// Adds sources from a table
-	add_file_source(p,cl,tab,type)
-	{
-		let claa = this.species[p].cla[cl];	
-		let cam = claa.camera;
-		
-		let midp_list=[];
-	
-		if(tab.ncol == 2){ 
-			for(let r = 0; r < tab.nrow; r++){	
-				let f	= find(claa.comp,"name",tab.ele[r][0]);
-				if(f != undefined){
-					let co = claa.comp[f];
-					let x, y;
-					switch(cam.coord){
-					case "cartesian":	
-						x = co.x;
-						y = co.y+compartment_height+1;
-						break;
-						
-					case "latlng":
-						x = co.x;
-						y = co.y;
-						break;
-
-					default: error("Option not recognised 91"); break;
-					}
-					midp_list[r] = [{x:x,y:y}];
-				}
-			}
-		}
-		else{
-			for(let r = 0; r < tab.nrow; r++){	
-				let x,y;
-				switch(cam.coord){
-				case "cartesian":								
-					x = Number(tab.ele[r][1])*import_scale_factor;
-					y = Number(tab.ele[r][2])*import_scale_factor;
-				break;
-				
-				case "latlng":
-					let pt = transform_latlng(tab.ele[r][2],tab.ele[r][1]);
-					x = pt.x; y = pt.y; 
-					break;
-
-				default: error("Option not recognised 92"); break;
-				}
-				
-				midp_list[r] = [{x:x,y:y}];
-			}
-		}
-		
-		for(let r = 0; r < tab.nrow; r++){	
-			let f	= find(claa.comp,"name",tab.ele[r][0]);
-			
-			if(f != undefined){
-				let k = 0; 
-				while(k < claa.tra.length && !(claa.tra[k].i == "Source" && claa.tra[k].f == f)) k++;
-				
-				let value;
-				if(k < claa.tra.length){
-					let traa = claa.tra[k];
-					traa.type = type;
-					traa.midp = midp_list[r];
-					value = traa.value;
-				}
-				else{
-					this.add_transition(p,cl,"Source",f,midp_list[r],type);
-					value = claa.tra[claa.tra.length-1].value;
-				}
-				
-				switch(type){
-				case "exp(rate)":
-					value.rate_eqn.te = tab.ele[r][tab.ncol-1];
-					break;
-					
-				case "exp(mean)": 
-					value.mean_eqn.te = tab.ele[r][tab.ncol-1];
-					break;
-
-				default: error("Option not recognised 93"); break;
-				}
-			}
-		}
-		
-		this.determine_branching();
-		this.update_pline(p,cl);   
-			
-		set_camera(p,cl);
-		
-		if(debug == true) this.check_consistent();  
-	}
-	
-	
-	/// Adds sinks from a table
-	add_file_sink(p,cl,tab,type)
-	{
-		let claa = this.species[p].cla[cl];	
-		let cam = claa.camera;
-		
-		let midp_list=[];
-	
-		if(tab.ncol == 2){ 
-			for(let r = 0; r < tab.nrow; r++){	
-				let i	= find(claa.comp,"name",tab.ele[r][0]);
-				if(i != undefined){
-					let co = claa.comp[i];
-					let x, y;
-					
-					switch(cam.coord){
-					case "cartesian":	
-						x = co.x;
-						y = co.y+compartment_height+1;
-						break;
-						
-					case "latlng":
-						x = co.x;
-						y = co.y;
-						break;
-
-					default: error("Option not recognised 95"); break;
-					}
-					midp_list[r] = [{x:x,y:y}];
-				}
-			}
-		}
-		else{
-			for(let r = 0; r < tab.nrow; r++){	
-				let x,y;
-				switch(cam.coord){
-				case "cartesian":								
-					x = Number(tab.ele[r][1])*import_scale_factor;
-					y = Number(tab.ele[r][2])*import_scale_factor;
-				break;
-				
-				case "latlng":
-					let pt = transform_latlng(tab.ele[r][2],tab.ele[r][1]);
-					x = pt.x; y = pt.y; 
-					break;
-
-				default: error("Option not recognised 96"); break;
-				}
-				
-				midp_list[r] = [{x:x,y:y}];
-			}
-		}
-		
-		for(let r = 0; r < tab.nrow; r++){	
-			let i	= find(claa.comp,"name",tab.ele[r][0]);
-			
-			if(i != undefined){
-				let k = 0; 
-				while(k < claa.tra.length && !(claa.tra[k].i == i && claa.tra[k].f == "Sink")) k++;
-				
-				let value;
-				if(k < claa.tra.length){
-					let traa = claa.tra[k];
-					traa.type = type;
-					traa.midp = midp_list[r];
-					value = traa.value;
-				}
-				else{
-					this.add_transition(p,cl,i,"Sink",midp_list[r],type);
-					value = claa.tra[claa.tra.length-1].value;
-				}
-				
-				switch(type){
-				case "exp(rate)":
-					value.rate_eqn.te = tab.ele[r][tab.ncol-1];
-					break;
-					
-				case "exp(mean)": 
-					value.mean_eqn.te = tab.ele[r][tab.ncol-1];
-					break;
-					
-				case "gamma": 
-					value.mean_eqn.te = tab.ele[r][tab.ncol-2];
-					value.cv_eqn.te = tab.ele[r][tab.ncol-1];
-					break;
-					
-				case "erlang": 
-					value.mean_eqn.te = tab.ele[r][tab.ncol-2];
-					value.shape_eqn.te = tab.ele[r][tab.ncol-1];
-					break;
-					
-				case "log-normal": 
-					value.mean_eqn.te = tab.ele[r][tab.ncol-2];
-					value.cv_eqn.te = tab.ele[r][tab.ncol-1];
-					break;
-					
-				case "weibull": 
-					value.scale_eqn.te = tab.ele[r][tab.ncol-2];
-					value.shape_eqn.te = tab.ele[r][tab.ncol-1];
-					break;
-
-				default: error("Option not recognised 98"); break;
-				}
-			}
-		}
-		
-		this.determine_branching();
-		this.update_pline(p,cl);   
-			
-		set_camera(p,cl);
-		
-		if(debug == true) this.check_consistent();  
+		if(equal_flag) alert_help("Warning!","Some transitions are set with the same 'from' and 'to' compartments. These are ignored");
 	}
 
 	
@@ -2590,36 +2722,41 @@ class Model
 		let p = this.get_p();
 		if(this.species[p].ncla == 0) return;
 		let cl = this.get_cl();
-		lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, ac:"ClassificationBack", type:"Nothing", p:p, cl:cl});
+		lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, ac:"ClassificationBack", type:"ClassBack", p:p, cl:cl});
 	}
 	
 	
 	/// Replots the model
-	replot()
-	{
-		if(find(inter.layer,"name","Annotation") == undefined){
-			replot_layer("GraphCompartments");
-			replot_layer("GraphTransitions");
+	replot(sh)
+	{	
+		if(!layer_exist("Annotation")){	
+			if(layer_exist("GraphAnnotations")) replot_layer("GraphAnnotations",sh);
+			if(layer_exist("GraphCompartments")) replot_layer("GraphCompartments",sh);
+			if(layer_exist("GraphTransitions")) replot_layer("GraphTransitions",sh);
 		}			
 		else{
-			replot_layer("Annotation");
-			replot_layer("AnnotationMap");
-			replot_layer("Compartment");
-			replot_layer("Transition");
+			replot_layer("Annotation",sh);
+			replot_layer("AnnotationMap",sh);
+			replot_layer("Compartment",sh);
+			replot_layer("Transition",sh);
+			if(inter.comp_select.sbox && inter.comp_select.list.length > 1){
+				replot_layer("CompSelect",sh);
+				replot_layer("CompSelectButton",sh);
+			}
 		}
 		
 		plot_screen();
 	}
 	
 	
-	/// Gets all the values an index cound take
+	/// Gets all the values an index could take
 	get_index_possibility(def_pos)
 	{
 		let pos = [];
 		for(let i = 0; i < alphabet.length; i++){
 			let ch = alphabet[i];
 			let flag = false;
-			if(ch == "a" || ch == "t") flag = true;
+			if(ch == "t") flag = true;
 			
 			if(ch != def_pos){
 				for(let p = 0; p < this.species.length; p++){
@@ -2639,6 +2776,7 @@ class Model
 		
 		return pos;
 	}
+
 
 	/// Check clones all have the same specifications for compartments
 	check_clones()
@@ -2689,4 +2827,456 @@ class Model
 			}
 		}
 	}
+
+
+	/// Gets all the label info for the parameters
+	get_label_info_all()
+	{
+		for(let th = 0; th < this.param.length; th++) this.get_label_info(this.param[th]);
+	}
+
+
+	/// Gets label information about a parameter
+	get_label_info(par)
+	{	
+		let fo_big = get_font(si_big,undefined,"Times");
+		let fo_sup = get_font(si_sub,undefined,"Times");
+		let fo_sub = get_font(si_sub,"italic","Times");
+
+		let te = par.name;
+		let spl = te.split("^");
+		par.name_raw = spl[0];
+		par.sup = ""; if(spl.length == 2)	par.sup = remove_bracket(spl[1]); 
+		
+		par.name_raw_w = text_width(par.name_raw,fo_big);
+		par.sup_w = text_width(par.sup,fo_sup);
+		
+		let sub = "";
+		for(let j = 0; j < par.dep.length; j++){
+			if(par.dep[j] != "t"){
+				if(sub != "") sub += ",";
+				sub += par.dep[j];
+			}
+		}
+		par.sub = sub;
+		par.sub_w = text_width(par.sub,fo_sub);
+		
+		let w = par.name_raw_w;
+		let w2 = par.sup_w; if(par.sub_w > w2) w2 = par.sub_w;
+		let w_tot = w+w2+0.1;
+		
+		let time = "";
+		if(par.time_dep == true) time = "(t)";
+		
+		let time_pos = w_tot;
+		if(time != ""){
+			w_tot += text_width(time,fo_big);
+		}
+		
+		par.label_info = {name_full:par.name, name:par.name_raw, time_pos:time_pos, time:time, sup:par.sup, sub:par.sub, fo_big:fo_big, fo_sup:fo_sup, fo_sub:fo_sub, dx:w_tot};
+	}
+
+
+	/// Loads up a new model based on information from a webworker
+	load(ans)
+	{
+		let mod = ans.model;
+	
+		for(let ele in mod) this[ele] = mod[ele];
+		
+		this.get_label_info_all();
+		
+		if(ans.map_store) map_store = ans.map_store;
+		
+		initialise_pages();
+		zero_page_index();
+	
+		if(ans.sim_on) model_sim = this.create_ans_model();
+		if(ans.inf_on) model_inf = this.create_ans_model();
+	
+		// Switches page depeding on what model has been loaded
+		if(ans.inf_on == true){
+			if(ans.ppc_on == true){
+				change_page({pa:"Post. Simulation", su:"Results"});
+			}
+			else{
+				change_page({pa:"Inference", su:"Results"});
+			}
+			inter.options = true;	generate_screen();
+		}
+		else{
+			if(ans.sim_on == true){
+				change_page({pa:"Simulation", su:"Results"});
+			}
+			else{
+				change_page({pa:"Model", su:"Compartments"});
+			}
+		}
+	}
+	
+	
+	/// Gets all individuals mentioned in the data
+	get_all_data_individual(p)
+	{
+		let hash = new Hash();
+		
+		let list=[];
+		
+		let inf_source = model.species[p].inf_source;
+		for(let i = 0; i < inf_source.length; i++){
+			let so = inf_source[i];
+			switch(so.type){
+			case "Add Pop.": case "Remove Pop.": 
+			case "Add Ind.": case "Remove Ind.": case "Move Ind.": 
+			case "Compartment":case "Transition": case "Trans. in time range":
+			case "Diag. Test": case "Genetic":
+				{
+					let tab = so.table;
+					for(let r = 0; r < tab.nrow; r++){
+						let name = tab.ele[r][0];
+						if(hash.find(name) == undefined){
+							hash.add(name,list.length);
+							list.push({name:name});
+						}
+					}
+				}
+				break;
+			}
+		}
+		
+		let ind_eff_group = model.species[p].ind_eff_group;
+		
+		for(let i = 0; i < ind_eff_group.length; i++){
+			let A = ind_eff_group[i].A_matrix;
+			if(A.check == true && A.loaded == true){
+				for(let j = 0; j < A.ind_list.length; j++){
+					let name = A.ind_list[j];
+					if(hash.find(name) == undefined){
+						hash.add(name,list.length);
+						list.push({name:name});
+					}
+				}					
+			}
+		}
+	
+		return list;
+	}
+	
+	
+	/// Determines if a warning should be shown
+	show_warning()
+	{
+		if(tab_name() == "Home") return false;
+		
+		if(model.warn.length > 0){
+			if(model.warn_view == true) return true;
+			else return "button";
+		}
+		return false;
+	}
+	
+	
+	/// Checks that a name is not already existing in the model (list stores exceptions)
+	check_name(te,list)
+	{
+		for(let i = 0; i < te.length; i++){
+			let ch = te.substr(i,1);
+		
+			if(compnotallow.includes(ch)){
+				return "Cannot use character '"+ch+"'";
+			}
+		}
+		
+		for(let p = 0; p < this.species.length; p++){
+			let sp = this.species[p];
+			
+			if(sp.name.toLowerCase() == te.toLowerCase()){	
+				let k = 0; 
+				while(k < list.length && !(list[k].p == p && list[k].cl == undefined && list[k].c == undefined)) k++; 
+				if(k == list.length){
+					return "Must have a different name to species '"+sp.name+"'";
+				}
+			}
+			
+			for(let cl = 0; cl < sp.cla.length; cl++){
+				let claa = sp.cla[cl];	
+				
+				if(claa.name.toLowerCase() == te.toLowerCase()){
+					let k = 0; 
+					while(k < list.length && !(list[k].p == p && list[k].cl == cl && list[k].c == undefined)) k++; 
+					if(k == list.length){
+						let st = "Must have a different name to classification '";
+						if(this.species.length > 1) st += sp.name+"→";
+						st += claa.name+"'";
+						return st;
+					}
+				}				
+
+
+				// ZZZZZZZZZZZ
+				for(let c = 0; c < claa.ncomp; c++){
+					let co = claa.comp[c];
+					if(co.name.toLowerCase() == te.toLowerCase()){
+						let k = 0; 
+						while(k < list.length && !(list[k].p == p && list[k].cl == cl && list[k].c == c)) k++; 
+						if(k == list.length){
+							let st = "Must have a different name to compartment '"+co.name+"'";
+							if(list[k].p != p) st += " species '"+sp.name+"'";
+							if(!(list[k].p == p && list[k].cl == cl)) st += " classification '"+claa.name+"'";
+							return st;
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	
+	/// Selects compartments based on a mouse selection
+	select_compartments()
+	{
+		let box = select_box();
+		box.x1 -= menu_width; box.x2 -= menu_width; 
+		
+		let im = inter.mode;
+		let lay = inter.layer[im.l];
+		
+		inter.comp_select={p:im.p, cl:im.cl, list:[]};
+		let cs_list = inter.comp_select.list;
+	
+		let claa = this.species[im.p].cla[im.cl];
+		let cam = claa.camera;  
+				
+		for(let k = 0; k < claa.ncomp; k++){
+			let c = claa.comp[k];
+			let pt;
+			switch(c.type){
+			case "box": pt = trans_point(c.x,c.y,cam,lay); break;
+			case "latlng": pt = trans_point(c.x,c.y,cam,lay); break;
+			case "boundary":
+				{
+					let ms = find_map_store(c.map_ref);
+					let box = ms.feature.box;
+					pt = trans_point((box.xmin+box.xmax)/2,(box.ymin+box.ymax)/2,cam,lay);
+				}
+				break;
+			}
+			
+			let x = pt.x, y = pt.y;
+			if(x > box.x1 && x < box.x2 && y > box.y1 && y < box.y2){
+				cs_list.push(k);
+			}
+		}
+		
+		if(cs_list.length == 1){                      // If only one selected the click on
+			this.select_single();
+		}
+	}
+
+
+	/// Determines if a given suffix is valid
+	allow_suffix(suf)
+	{
+		let cs = inter.comp_select;
+		
+		let hash = new Hash();
+		let claa = model.species[cs.p].cla[cs.cl];
+		for(let i = 0; i < cs.list.length; i++){
+			let co = claa.comp[cs.list[i]];
+			hash.add(co.name+suf,i);
+		}
+		
+		for(let p = 0; p < model.species.length; p++){
+			let sp = model.species[p];
+			for(let cl = 0; cl < sp.ncla; cl++){
+				let claa = sp.cla[cl];
+				for(let c = 0; c < claa.ncomp; c++){
+					if(hash.find(claa.comp[c].name) != undefined){
+						pr(claa.comp[c].name+" not allow");
+						return false;
+					}
+				}
+			}
+		}
+		
+		return true;
+	}
+	
+	
+	/// Selects a single selected compartment
+	select_single()
+	{
+		let cs = inter.comp_select;
+		let cs_list = cs.list;
+	
+		if(cs_list.length != 1){ error("Should only be one"); return;}
+		
+		let lay = get_lay("Compartment");
+		
+		for(let i = 0; i < lay.but.length; i++){
+			let bu = lay.but[i];
+			
+			switch(bu.type){
+			case "Compartment": case "CompLatLng":
+				if(bu.p == cs.p && bu.cl == cs.cl && bu.i == cs_list[0]){
+					inter.over = {layer:lay.index, i:i};
+					button_action(bu,"click");
+					return;
+				}
+				break;
+			}
+		}
+		error("Could not find single");
+	}
+	
+	
+	/// Creates a simplified model used for outputting simulation/inference/PPC
+	create_ans_model()
+	{
+		let fac = 0.85;
+		
+		let model_new = {species:[]};
+		for(let p = 0; p < this.species.length; p++){
+			let sp = this.species[p];
+			model_new.species[p] = {cla:[]};
+			for(let cl = 0; cl < sp.ncla; cl++){
+				let claa = sp.cla[cl];
+				model_new.species[p].cla[cl] = copy(claa);
+				let claa_new = model_new.species[p].cla[cl];
+				claa_new.camera.scale = fac*Number(claa_new.camera.scale);
+			}
+		}
+		return model_new;
+	}
+	
+
+	///	Moves a group of compartments
+	move_group(mgroup,cl,p)
+	{
+		let repl = false;
+		for(let i = 0; i < mgroup.length; i++){
+			let mg = mgroup[i];
+			if(this.move_comp(mg.c,mg.x,mg.y,cl,p) == true){
+				repl = true;
+			}
+		}
+
+		if(repl){
+			inter.mode.moved = true;
+			this.update_pline(p,cl);  
+			let clone = inter.mode.clone;
+			if(clone){
+				for(let k = 0; k < clone.length; k++){
+					let clo = clone[k];
+					this.update_pline(clo.p,clo.cl);  
+				}
+			}
+			
+			if(inter.bubble.lay_name != undefined) generate_screen();
+			else this.replot();
+		}
+	}
+		
+		
+	/// Moves a compartment (with potentiall any sources or sinks also)
+	move_comp(c,x,y,p,cl,op)
+	{
+		let claa = this.species[p].cla[cl];
+		let co = claa.comp[c];
+		let x_old = co.x;
+		let y_old = co.y;
+		co.x = x;
+		co.y = y;
+		
+		if(claa.camera.coord == "cartesian") this.snap_comp_to_grid(co);
+		
+		let shx = co.x-x_old;
+		let shy = co.y-y_old;
+		if(shx != 0 || shy != 0){
+			let mode = inter.mode;
+			
+			if(mode != undefined){			
+				// Creates information which can be used to determine transition entering leaving
+				if(!mode.comp_source_sink){
+					mode.comp_source_sink = {species:[]};
+					for(let p2 = 0; p2 < this.species.length; p2++){
+						let sp2 = this.species[p2];
+						mode.comp_source_sink.species[p2]={cla:[]};
+					}
+				}
+				
+				let css_sp = mode.comp_source_sink.species[p];
+				if(css_sp.cla[cl] == undefined){
+					css_sp.cla[cl] = {comp:[]};
+					let css_cl = css_sp.cla[cl];
+					for(let c = 0; c < claa.ncomp; c++){
+						css_cl.comp[c] = {list:[]};
+					}
+					for(let tr = 0; tr < claa.ntra; tr++){
+						let tra = claa.tra[tr];
+						if(tra.i == SOURCE) css_cl.comp[tra.f].list.push(tr);
+						if(tra.f == SINK) css_cl.comp[tra.i].list.push(tr);
+					}
+				}
+			
+				let list = css_sp.cla[cl].comp[c].list;
+				for(let i = 0; i < list.length; i++){ 
+					let tra = claa.tra[list[i]];
+					for(let k = 0; k < tra.midp.length; k++){
+						tra.midp[k].x += shx;
+						tra.midp[k].y += shy;
+					}
+				}
+		
+				if(mode.clone == undefined){
+					mode.clone = model.find_clones(p,cl);	
+				}
+			
+				if(op != "no clone"){
+					for(let loop = 0; loop < mode.clone.length; loop++){
+						let clo = mode.clone[loop];
+						this.move_comp(c,x,y,clo.p,clo.cl,"no clone");
+					}
+				}
+			}
+			
+			return true;
+		}				
+		return false;
+	}
+	
+
+	/// Ensures that camera stays within the lng range
+	ensure_lng(cam,ww)
+	{
+		if(cam.coord == "latlng"){
+			let no_plot = false;
+			if(ww == undefined){
+				let show = model.get_show_model();
+				if(show) ww = get_lay("Main").dx;
+				else ww = get_lay("GraphCompartments").dx;
+			}
+			else no_plot = true;
+		
+			let max = Math.PI - (ww/2)/cam.scale;
+			let min = -Math.PI+ (ww/2)/cam.scale;
+			
+			let fl = false;
+			if(min > max){
+				cam.x = 0;
+				cam.scale = ww/(2*Math.PI);
+				fl = true;
+			}
+			else{
+				if(cam.x < min){ cam.x = min; fl = true;}
+				if(cam.x > max){ cam.x = max; fl = true;}
+			}
+			
+			if(fl && no_plot == false){
+				this.replot();
+			}
+		}
+	}
 }
+
+

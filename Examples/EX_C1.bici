@@ -1,0 +1,54 @@
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+data-dir folder="Examples\EX_C1-data-files"
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5
+
+post-sim start=0 end=100
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
+
+species name="People" type="individual" trans-tree="off"
+
+# SPECIES MODEL
+
+class name="DS" index="a"
+
+comp name="S" color="#009900" x=-16 y=-7
+comp name="I" color="#ff2222" x=-2 y=-7
+comp name="R" color="#4444ff" x=11 y=-7
+
+trans name="S->I" value="exp(rate:β×{I})"
+trans name="I->R" value="exp(rate:γ)"
+
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
+
+
+# INFERENCE DATA
+
+add-ind file="add-ind.csv"
+
+trans-data name="S->I" obsrange="all" file="trans-data.csv"
+
+trans-data name="I->R" obsrange="all" file="trans-data-2.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="β" value="0.003" prior="uniform(0,0.1)"
+param name="γ" value="0.1" prior="uniform(0,1)"
+
+

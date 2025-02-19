@@ -1,5 +1,5 @@
 "use strict";
-
+// Functions for plotying text/shapes 
 
 /// Changes colour format
 function hex_to_RGB(hex) 
@@ -10,41 +10,6 @@ function hex_to_RGB(hex)
 		g: parseInt(result[2], 16),
 		b: parseInt(result[3], 16)
 	} : null;
-}
-
-
-/// Converts decimal to hexidecimal
-function hex(c) 
-{
-	let hex = (Math.floor(c)).toString(16);
-	return hex.length == 1 ? "0" + hex : hex;
-}
-
-
-/// Returns a darker version of a colour
-function dark_colour(col)
-{ 
-	if(col == BLACK) return BLACK;
-
-	const frac = 0.7;
-	let bigint = parseInt(col.substring(1), 16);	
-	let r = (bigint >> 16) & 255;
-	let g = (bigint >> 8) & 255;
-	let b = bigint & 255;
-	
-	return "#" + hex(frac*r) + hex(frac*g) + hex(frac*b);
-}
-
-
-/// Returns a lighter version of a colour
-function light_colour(col) 
-{ 
-	const frac = 0.13;
-	let bigint = parseInt(col.substring(1), 16);
-	let r = 255-(255-((bigint >> 16) & 255))*frac;
-	let g = 255-(255-((bigint >> 8) & 255))*frac;
-	let b = 255-(255-(bigint & 255))*frac;
-	return "#" + hex(r) + hex(g) + hex(b);
 }
 
 
@@ -62,6 +27,153 @@ function plot_text(te,x,y,font,col,width)
 	cv.textAlign = 'left';
 	cv.fillStyle = col;
 	cv.fillText(te,x,y);
+}
+
+
+/// Print left-aligned text
+function plot_simp_text(te,x,y,font,col)               
+{
+	x = ro_int(x); y = ro_int(y);
+
+	if(te == undefined){ te = "undefined"; error("undefined text");}
+	if(te.length == 0) return;
+
+	cv.font = font;		
+	cv.textAlign = 'left';
+	cv.fillStyle = col;
+	cv.fillText(te,x,y);
+}
+
+/// Vertical text aligned at top
+function plot_simp_vert_text(te,x,y,font,col)   
+{
+	x = ro_int(x); 
+	y = ro_int(y);
+
+	let th = Math.PI/2;
+	
+	cv.font = font;
+	cv.save();
+	cv.translate(x, y);
+	cv.rotate(-th);
+	cv.textAlign = 'left';
+	cv.fillStyle = col;
+	cv.fillText(te, 0, 0);
+	cv.restore();
+}
+
+
+/// Truncates a string to a certain length
+function trunc(te,fo,width)
+{
+	if(width <= 0) return "";
+	
+	let w = text_width(te,fo);
+	let len = Math.round(te.length*w/width);
+	te = te.substr(0,len);
+	while(len > 0 && text_width(te,fo) > width){ len--; te = te.substr(0,len);}
+	
+	return te;
+}
+
+
+/// Creates simple annotation (to allow for superscript)
+function text_sup_anno(tex,si,width,fo_type)
+{
+	if(typeof(tex) == "number") tex = String(tex);
+	if(width == undefined) width = LARGE;
+	if(!fo_type) fo_type = "times";
+	let fo = get_font(si,"",fo_type);
+	let fo_sup = get_font(si_sup_fac*si,"",fo_type);
+	
+	let x = 0;
+	let anno = [];
+	let spl = tex.split("^");
+	let wtrun = text_width("...",fo);
+	
+	let fl = false;
+	
+	let te = spl[0];
+	let w = text_width(te,fo);
+	if(w > width){
+		fl = true;
+		te = trunc(te,fo,width-wtrun);
+		w = text_width(te,fo);
+	}
+	
+	anno.push({te:te, fo:fo, x:x, y:0});
+	x += w;
+	
+	if(fl == false){
+		for(let j = 1; j < spl.length; j++){
+			let te = spl[j];
+			let k = 0;
+			while(k < te.length && !compnotallow.includes(te.substr(k,1))) k++;
+			
+			let te_add = te.substr(0,k);
+			let w = text_width(te_add,fo_sup);
+			if(x+w > width){
+				fl = true;
+				te_add = trunc(te_add,fo_sup,width-wtrun-x);
+				w = text_width(te_add,fo_sup);
+			}
+			
+			anno.push({te:te_add, fo:fo_sup, x:x, y:-si*0.4});
+			x += w;
+		
+			if(fl == true) break; 
+		
+			if(k < te.length){
+				let te_add = te.substr(k);
+			
+				let w = text_width(te_add,fo);
+				if(x+w > width){
+					fl = true;
+					te_add = trunc(te_add,fo,width-wtrun-x);
+					w = text_width(te_add,fo);
+				}
+				
+				anno.push({te:te_add, fo:fo, x:x, y:0});
+				x += w;
+			}
+		}
+	}
+	
+	if(fl){
+		anno.push({te:"...", fo:fo, x:x, y:0});
+		x += wtrun;
+	}
+	
+	return {anno:anno, w:x}
+}
+
+
+/// Plots text from text_sup_anno
+function center_text_tsa(tsa,x,y,col)  
+{
+	plot_text_tsa(tsa,x-tsa.w/2,y,col)  
+}
+
+
+/// Plots text from text_sup_anno
+function plot_text_tsa(tsa,x,y,col)  
+{
+	let anno = tsa.anno;
+	for(let i = 0; i < anno.length; i++){
+		let ann = anno[i];
+		plot_simp_text(ann.te,x+ann.x,y+ann.y,ann.fo,col)  
+	}
+}
+
+
+/// Plots text from text_sup_anno
+function vert_text_tsa(tsa,x,y,si,col)  
+{
+	let anno = tsa.anno;
+	for(let i = 0; i < anno.length; i++){
+		let ann = anno[i];	
+		plot_simp_vert_text(ann.te,x+ann.y,y+tsa.w-ann.x,ann.fo,col);
+	}
 }
 
 
@@ -84,7 +196,7 @@ function right_text(te,x,y,font,col,width)
 }
 
 
-// Center-aligns verticle text
+/// Center-aligns verticle text
 function center_vert_text(te,x,y,font,col,width)   
 {
 	te = restrict_width(te,font,width);
@@ -123,10 +235,32 @@ function vert_text(te,x,y,font,col,width)
 }
 
 
+/// Vertical text aligned at top
+function top_vert_text(te,x,y,font,col,width)   
+{
+	te = restrict_width(te,font,width);
+	
+	x = ro_int(x); 
+	y = ro_int(y+text_width(te,font));
+
+	let th = Math.PI/2;
+	
+	cv.font = font;
+	cv.save();
+	cv.translate(x, y);
+	cv.rotate(-th);
+	cv.textAlign = 'left';
+	cv.fillStyle = col;
+	cv.fillText(te, 0, 0);
+	cv.restore();
+}
+
+
 /// Ensures that text is not beyond a given width
 function restrict_width(te,font,width)
 {
 	if(width){		
+		let te_start = te, width_st = width;
 		cv.font = font;	
 	
 		width *= inter.sca;
@@ -140,7 +274,7 @@ function restrict_width(te,font,width)
 			let rule2 = cv.measureText("Z").width;
 			
 			while(te.length > 0){
-				let ww = cv.measureText(te+"...").width;
+				let ww = cv.measureText(te+"⋯").width;
 				if(ww <= width) break;
 				
 				let num = Math.floor(0.9*(ww-width)/rule2);
@@ -148,8 +282,8 @@ function restrict_width(te,font,width)
 				te = te.substr(0,te.length-num);
 			}
 				
-			if(te == "") error("Space is too small");
-			te += "...";
+			if(te == "") error("Space is too small"+" "+te_start+" "+ width_st +"  "+font+" "+width);
+			te += "⋯";
 		}
 	}	
 	return te;
@@ -175,6 +309,7 @@ function vert_text_right(te,x,y,font,col,width)
 	cv.restore();
 }
 
+
 /// Find the width of text 
 function text_width(te,font)                             
 { 
@@ -189,6 +324,13 @@ function draw_image(pic,x,y,dx,dy)
 	let x2 = ro(x+dx), y2 = ro(y+dy);
 	x = ro(x); y = ro(y); 
 	cv.drawImage(pic,x,y,x2-x,y2-y);
+}
+
+
+/// Draw an image and finds what value dy must have
+function draw_image_sc(pic,x,y,dx)
+{
+	draw_image(pic,x,y,dx,dx*pic.height/pic.width);
 }
 
 
@@ -222,12 +364,14 @@ function draw_plus(x, y, r, col, col2)
 	cv.stroke();
 }	
 
+
 /// Draws a rectangle
 function draw_rect(x, y, dx, dy, col, col2, style)            
 {
+	if(style && inter.printing) style *= print_line_factor;
+	
 	let x1 = ro(x), y1 = ro(y), x2 = ro(x+dx), y2 = ro(y+dy);
-	//let x1 = ro_down(x), y1 = ro_down(y), x2 = ro_up(x+dx), y2 = ro_up(y+dy);
-
+	
 	cv.beginPath();
 	cv.lineWidth = style;
 	cv.fillStyle = col;
@@ -237,11 +381,12 @@ function draw_rect(x, y, dx, dy, col, col2, style)
 	cv.stroke();
 }
 
+
 /// Draws a rectangle
 function draw_rectangle(x, y, dx, dy, col, style)            
 {
-	//let x1 = ro(x), y1 = ro(y), x2 = ro(x+dx), y2 = ro(y+dy);
-	let x1 = ro_down(x), y1 = ro_down(y), x2 = ro_up(x+dx), y2 = ro_up(y+dy);
+	if(style && inter.printing) style *= print_line_factor;
+	let x1 = ro(x), y1 = ro(y), x2 = ro(x+dx), y2 = ro(y+dy);
 
 	cv.beginPath();
 	cv.lineWidth = style;
@@ -252,8 +397,16 @@ function draw_rectangle(x, y, dx, dy, col, style)
 }
 
 
+function plot_pixel(x,y,col)
+{
+	cv.beginPath();
+	cv.rect(ro_down(x),ro_down(y),1,1);
+	cv.fillStyle = col;
+	cv.fill();
+}
+
 /// Draws a filled rectangle
-function fill_rectangle(x, y, dx, dy, col)                   
+function fill_rectangle(x, y, dx, dy, col, col2, style)                   
 {
 	let x1 = ro_down(x), y1 = ro_down(y), x2 = ro_up(x+dx), y2 = ro_up(y+dy);
 
@@ -261,11 +414,19 @@ function fill_rectangle(x, y, dx, dy, col)
 	cv.rect(x1,y1,x2-x1,y2-y1);
 	cv.fillStyle = col;
 	cv.fill();
+	
+	if(col2){
+		if(style && inter.printing) style *= print_line_factor;
+	
+		cv.strokeStyle = col2;
+		cv.lineWidth = style;
+		cv.stroke();
+	}
 }
 
 
 /// Draw rectangle checkbox
-function check_rectangle(x, y, dx, dy, col, style)            
+function check_rectangle(x, y, dx, dy, col, check, style)            
 {
 	let x1 = ro(x), y1 = ro(y), x2 = ro(x+dx), y2 = ro(y+dy);
 
@@ -276,11 +437,13 @@ function check_rectangle(x, y, dx, dy, col, style)
 	cv.strokeStyle = col;
 	cv.stroke();
 	
-	let mar = 2;
-	cv.beginPath();
-	cv.rect(x1+mar,y1+mar,x2-x1-2*mar,y2-y1-2*mar);
-	cv.fillStyle = col;
-	cv.fill();
+	if(check == true){
+		let mar = 2;
+		cv.beginPath();
+		cv.rect(x1+mar,y1+mar,x2-x1-2*mar,y2-y1-2*mar);
+		cv.fillStyle = col;
+		cv.fill();
+	}
 }
 
 
@@ -306,39 +469,33 @@ function ro(val)
 	return Math.round(val*inter.sca)+0.5;
 }
 
+
 /// Rounds a position to a pixel
 function ro_int(val)
 {
 	return Math.round(val*inter.sca);
 }
 
+
+/// Rounds down to the nearest_pixel
 function ro_down(val)
 {
 	return Math.floor(val*inter.sca);
 }
 
+
+/// Rounds up to the nearest_pixel
 function ro_up(val)
 {
 	return Math.floor(val*inter.sca+0.9999999);
 }
 
+
+/// Rounds to the nearest_pixel
 function nearest_pixel(val)
 {
 	return Math.round(val*inter.sca)/inter.sca;
 }
-
-
-/*
-function fill_rectangle_large(x1, y1, x2, y2, col)                    // Draws a filled rectangle
-{
-	x1 = ro_down(x1); y1 = ro_down(y1); x2 = ro_up(x2); y2 = ro_up(y2);
-
-	cv.beginPath();
-	cv.rect(x1,y1,x2,y2);
-	cv.fillStyle = col;
-	cv.fill();
-}
-*/
 
 
 /// Draws a dimming rectangle (used as background for help)
@@ -430,9 +587,23 @@ function draw_minus(x,y,r,col)
 }
 
 
+/// Draws a cross
+function draw_X(x,y,si)
+{
+	x = nearest_pixel(x); y = nearest_pixel(y);
+
+	draw_line(x-si/2,y-si/2,x+si/2,y+si/2,BLACK,MTHICKLINE); 		
+	draw_line(x+si/2,y-si/2,x-si/2,y+si/2,BLACK,MTHICKLINE); 
+	draw_line(x-si/2,y-si/2,x+si/2,y+si/2,RED,THICKLINE); 		
+	draw_line(x+si/2,y-si/2,x-si/2,y+si/2,RED,THICKLINE); 
+}
+
+
 /// Draws a line
 function draw_line(x1, y1, x2, y2, col, style, dash)       
-{// zzq
+{
+	if(style && inter.printing) style *= print_line_factor;
+	
 	x1 = ro(x1); y1 = ro(y1); x2 = ro(x2); y2 = ro(y2);
 
 	cv.lineWidth = style;
@@ -452,6 +623,8 @@ function draw_line(x1, y1, x2, y2, col, style, dash)
 /// Draws a line with no rounding 
 function draw_line_noround(x1, y1, x2, y2, col, style, dash)       
 {
+	if(style && inter.printing) style *= print_line_factor;
+	
 	x1 = x1*inter.sca; y1 = y1*inter.sca; x2 = x2*inter.sca; y2 = y2*inter.sca;
 
 	cv.lineWidth = style;
@@ -495,8 +668,6 @@ function corner_arrow(x1,y1,x2,y2,col,style)
 /// Draws a polygon
 function draw_polygon(polypoint,col,col2,style)             
 {
-	cv.lineWidth = style;
-
 	cv.beginPath();
 	cv.moveTo(ro(polypoint[0].x),ro(polypoint[0].y));
 	for(let i = 1; i < polypoint.length; i++){
@@ -506,22 +677,34 @@ function draw_polygon(polypoint,col,col2,style)
 	cv.closePath();
 	cv.fillStyle = col;
 	cv.fill();
-	cv.strokeStyle = col2;
-	cv.stroke();
+
+	if(style != NOLINE){
+		if(style && inter.printing) style *= print_line_factor;
+	
+		cv.lineWidth = style;
+		cv.strokeStyle = col2;
+		cv.stroke();
+	}
 }
 
 
-// Draws a polygon
+/// Draws a polygon
 function draw_feature(x,y,dx,dy,poly,col,col2,style)             
 {
+	if(dx == 0 || dy == 0) return;
+	if(style && inter.printing) style *= print_line_factor;
+	
 	cv.lineWidth = style;
-
+	let num_max = (dx+dy)*100;
+	
 	for(let p = 0; p < poly.length; p++){
 		let cor = poly[p].cor;
 		
 		cv.beginPath();
-		for(let i = 0; i < cor.length; i++){
-		//for(let i = 0; i < cor.length; i+=100){
+		let imax = cor.length;
+		let step = 1;
+		if(imax > num_max) step = Math.floor(imax/num_max);
+		for(let i = 0; i < imax; i+=step){
 			let xx = ro(x+dx*cor[i][0]);
 			let yy = ro(y+dy*cor[i][1]);
 			if(i == 0) cv.moveTo(xx,yy);
@@ -536,15 +719,17 @@ function draw_feature(x,y,dx,dy,poly,col,col2,style)
 }
 
 
-// Draws a rectangle with rounded corners
+/// Draws a rectangle with rounded corners
 function draw_round_rectangle(x,y,dx,dy,r,col,col2,thick)            
 {
-	if(thick == undefined) thick = 1;
+	if(thick == undefined){
+		thick = 1;
+		if(thick_line) thick = 2;
+	}
+	if(inter.printing) thick *= print_line_factor;
 	
 	cv.lineWidth = thick;	
 	
-	//let x2 = ro_up(x+dx), y2 = ro_up(y+dy);
-	//x = ro_down(x); y = ro_down(y); r = ro(r);
 	let x2 = ro(x+dx), y2 = ro(y+dy);
 	x = ro(x); y = ro(y); r = ro(r);
 	dx = x2-x; dy = y2-y;
@@ -604,7 +789,7 @@ function draw_round_rectangle(x,y,dx,dy,r,col,col2,thick)
 }
 
 
-// Draws the rounded corners around a preexisting rectangle
+/// Draws the rounded corners around a preexisting rectangle
 function draw_inverse_round_rectangle(x,y,dx,dy,r,col)            
 {
 	let x2 = ro(x+dx), y2 = ro(y+dy);
@@ -660,14 +845,14 @@ function draw_inverse_round_rectangle(x,y,dx,dy,r,col)
 }
 
 
-// Draws a rectangle with rounded corners at the bottom
+/// Draws a rectangle with rounded corners at the bottom
 function draw_lower_round_rectangle(x,y,dx,dy,r,col,col2,thick)            
 {
 	if(thick == undefined) thick = 0;
+	if(inter.printing) thick *= print_line_factor;
+	
 	cv.lineWidth = thick;	
 
-	//let x2 = ro_up(x+dx), y2 = ro_up(y+dy);
-	//x = ro_down(x); y = ro_down(y); r = ro(r);
 	let x2 = ro(x+dx), y2 = ro(y+dy);
 	x = ro(x); y = ro(y); r = ro(r);
 	dx = x2-x; dy = y2-y;
@@ -696,7 +881,6 @@ function draw_lower_round_rectangle(x,y,dx,dy,r,col,col2,thick)
 		cv.lineTo(x+r-r*Math.sin(th),y+dy-r+r*Math.cos(th));
 	}
 	cv.lineTo(x,y);
-	//cv.closePath();
 
 	if(col != "no_fill"){
 		cv.fillStyle = col; 
@@ -707,30 +891,12 @@ function draw_lower_round_rectangle(x,y,dx,dy,r,col,col2,thick)
 		cv.strokeStyle = col2;
 		cv.stroke();
 	}
-	
-	
-	/*
-	cv.beginPath(); 
-	cv.moveTo(x,y);
-	cv.lineTo(x+dx,y);
-	
-	if(col){
-		cv.strokeStyle = col;
-		cv.stroke();
-	}
-	*/
-	//cv.moveTo(x,y);
-	
-	
 }
 
 
 /// Draws rounded rectangle used in dropdown buttons
 function draw_round_menu_top(x,y,dx,dy,r,col,col2)          
 {
-	//let x2 = ro_up(x+dx), y2 = ro_up(y+dy);
-	//x = ro_down(x); y = ro_down(y); r = ro(r);
-	
 	let x2 = ro(x+dx), y2 = ro(y+dy);
 	x = ro(x); y = ro(y); r = ro(r);
 	
@@ -804,6 +970,8 @@ function draw_round_menu_bottom(x,y,dx,dy,r,col,col2)
 /// Draws circle
 function circle(x,y,r,col,style)                        
 {
+	if(style && inter.printing) style *= print_line_factor;
+	
 	x = ro(x); y = ro(y); r = ro(r);
 
 	cv.lineWidth = style;
@@ -817,6 +985,8 @@ function circle(x,y,r,col,style)
 /// Draws filled circle
 function fill_circle(x,y,r,col,col2,style)                
 {
+	if(style && inter.printing) style *= print_line_factor;
+	
 	x = ro(x); y = ro(y); r = ro(r);
 	if(r < 0.5) r = 0.5; 
 	
@@ -826,6 +996,116 @@ function fill_circle(x,y,r,col,col2,style)
 	cv.fillStyle = col;
 	cv.fill();
   
+	cv.strokeStyle = col2;
+	cv.stroke();
+}
+
+
+/// Draws filled semicircle
+function fill_semicircle(x,y,r,col,col2,style)                
+{
+	if(style && inter.printing) style *= print_line_factor;
+	
+	x = ro(x); y = ro(y); r = ro(r);
+	if(r < 0.5) r = 0.5; 
+	
+	cv.lineWidth = style;
+	cv.beginPath();
+	cv.arc(x,y,r,-Math.PI/2,Math.PI/2);
+	cv.lineTo(x,y-r);
+	cv.fillStyle = col;
+	cv.fill();
+  
+	cv.strokeStyle = col2;
+	cv.stroke();
+}
+
+
+/// Draws triangle using multiple colours (used for add ind. data)
+function multi_triangle(x,y,dx,dy,list,col,style)                
+{
+	if(style && inter.printing) style *= print_line_factor;
+	
+	let frac_sum = 0;
+	
+	for(let i = 0; i < list.length; i++){
+		let fr1 = frac_sum;
+		let fr2 = frac_sum+list[i].frac;
+		let x1 = ro(x+fr1*dx);
+		let x2 = ro(x+fr2*dx);
+		let y1a = ro(y+(dy/2)*fr1);
+		let y1b = ro(y+dy-(dy/2)*fr1);
+		let y2a = ro(y+(dy/2)*fr2);
+		let y2b = ro(y+dy-(dy/2)*fr2);
+		cv.beginPath();
+		cv.moveTo(x1,y1a);
+		cv.lineTo(x2,y2a);
+		cv.lineTo(x2,y2b);
+		cv.lineTo(x1,y1b);
+		cv.fillStyle = list[i].col;
+		cv.fill();
+		frac_sum = fr2;
+	}
+	
+	{
+		let x1 = ro(x);
+		let x2 = ro(x+dx);
+		let y1 = ro(y);
+		let y2 = ro(y+dy);
+		cv.beginPath();
+		cv.moveTo(x1,y1);
+		cv.lineTo(x2,(y1+y2)/2);
+		cv.lineTo(x1,y2);
+		cv.lineTo(x1,y1);
+		cv.lineWidth = style;	
+		cv.strokeStyle = col;
+		cv.stroke();
+	}
+}
+
+
+/// Draw backward triangle (used for rem ind. data)
+function rem_triangle(x,y,dx,dy,col)                
+{
+	let x1 = ro(x);
+	let x2 = ro(x+dx);
+	let y1 = ro(y);
+	let y2 = ro(y+dy);
+	cv.beginPath();
+	cv.moveTo(x2,y1);
+	cv.lineTo(x1,(y1+y2)/2);
+	cv.lineTo(x2,y2);
+	cv.lineTo(x2,y1);
+	cv.fillStyle = col;
+	cv.fill();
+}
+
+
+/// Draws circle using multiple colours
+function multi_circle(x,y,r,list,col2,style)                
+{
+	if(style && inter.printing) style *= print_line_factor;
+	
+	x = ro(x); y = ro(y); r = ro(r);
+	if(r < 0.5) r = 0.5; 
+
+	let phi_begin = 0.5*Math.PI;
+
+	for(let i = 0; i < list.length; i++){
+		let phi_end = phi_begin + 2*Math.PI*list[i].frac;
+		cv.beginPath();
+		cv.moveTo(x,y);
+		cv.arc(x,y,r,phi_begin,phi_end);
+
+		cv.fillStyle = list[i].col;
+		cv.fill();
+
+		phi_begin = phi_end;
+  }
+
+	cv.beginPath();
+	cv.arc(x,y,r,0,2*Math.PI);
+	cv.lineWidth = style;
 	cv.strokeStyle = col2;
 	cv.stroke();
 }
@@ -883,13 +1163,14 @@ function draw_corners(x,y,dx,dy,r,col,col2)
 function text_convert_annotation(te,si,lh,dx,align,col)      
 {
 	let subsi = 0.7*si;
-
+	
 	if(te == undefined){ error("Text is not defined"); return;}
 		
 	let col_basic = col;
 	
-	/// This allows for links to be added (these have format ['Text','Action'] and must be separated from other words)
-	/// Additionally information can passed through the link using ['Text','Action|Info']
+	// This allows for links to be added (these have format ['Text','Action'] and must be separated from other words)
+	// Additionally information can passed through the link using ['Text','Action|Info']
+	
 	let link=[];
 	for(let i = 0; i < te.length-4; i++){
 		if(te.substr(i,2) == "['"){
@@ -919,7 +1200,9 @@ function text_convert_annotation(te,si,lh,dx,align,col)
 	let x = 0, y = 0.7*lh;
 	
 	let width_first;
-	
+		
+	let ga = 0.1; if(si <= 1) ga = 0.05; if(si <= 0.8) ga = 0.02;
+				
 	let li = 0;
 	let li_width=[];
 	
@@ -947,8 +1230,8 @@ function text_convert_annotation(te,si,lh,dx,align,col)
 				let flag = false;
 				
 				switch(te.substr(k,3)){
-				case "<b>": case "<i>": case "<c>": case "<t>": case "<g>": case "<e>": 
-				case "</b": case "</i": case "</c": case "</t": case "</g": case "</e": 
+				case "<b>": case "<i>": case "<c>": case "<p>": case "<t>": case "<g>": case "<e>": 
+				case "</b": case "</i": case "</c": case "</p": case "</t": case "</g": case "</e": 
 					flag = true;
 					break;				
 				}
@@ -968,12 +1251,14 @@ function text_convert_annotation(te,si,lh,dx,align,col)
 					case "<b>": bo_flag = true; k += 3; break;
 					case "<i>": it_flag = true; k += 3; break;
 					case "<c>": col = BLUE; k += 3; break;
+					case "<p>": col = DPURPLE; k += 3; break;
 					case "<t>": col = DGREEN; k += 3; break;
 					case "<g>": col = DGREY; k += 3; break;
 					case "<e>": eq_flag = true; k += 3; break;
 					case "</b": bo_flag = false; k += 4; break;
 					case "</i": it_flag = false; k += 4; break;
 					case "</c": col = col_basic; k += 4; break;
+					case "</p": col = col_basic; k += 4; break;
 					case "</t": col = col_basic; k += 4; break;
 					case "</g": col = col_basic; k += 4; break;
 					case "</e": eq_flag = false; k += 4; break;
@@ -1000,6 +1285,7 @@ function text_convert_annotation(te,si,lh,dx,align,col)
 				let te = " ";
 						
 				let w = text_width(te,fo);
+				
 				if(x+w < dx) x += w;
 				else{ li_width[li] = x; li++; x = 0; y += lh;}
 			}
@@ -1012,14 +1298,15 @@ function text_convert_annotation(te,si,lh,dx,align,col)
 				if(x+w >= dx){ li_width[li] = x; li++; x = 0; y += lh;}
 			
 				let lin = link[link_num];
-				lin.x = x; lin.y = y; lin.w = w; lin.font = fo; lin.si = si;
+				lin.x = x; lin.y = y; lin.w = w+0.1; lin.font = fo; lin.si = si;
 				x += w;		
 				link_num++;	
 			}
 			else{
 				if(wor.eq_flag == true){
+				
 					let end;
-					if(te.length > 3 && (te.substr(te.length-3,3) == "(t)" || te.substr(te.length-3,3) == "(a)")){
+					if(te.length > 3 && (te.substr(te.length-3,3) == "(t)")){
 						end = te.substr(te.length-3,3);
 						te = te.substr(0,te.length-3);
 					}
@@ -1064,21 +1351,21 @@ function text_convert_annotation(te,si,lh,dx,align,col)
 						sup = sup.substr(0,sup.length-1);
 						end_bracket = true;
 					}
-					
+				
 					let w = text_width(main,fo);
-					
 					let w2 = 0;
 					if(sub != "") w2 = text_width(sub,fo_sub);
 					if(sup != ""){ let ww = text_width(sup,fo_sup); if(ww > w2) w2 = ww;}
-					
-					if(x+w+w2+0.1 >= dx){ li_width[li] = x; li++; x = 0; y += lh;}
+						
+					if(x+w+w2+ga >= dx){ li_width[li] = x; li++; x = 0; y += lh;}
 					
 					word.push({te:main, x:x, y:y, font:fo, col:col});		
-					if(sub != "") word.push({te:sub, x:x+w+0.1, y:y+0.2*si, font:fo_sub, col:wor.col});		
-					if(sup != "") word.push({te:sup, x:x+w+0.1, y:y-0.4*si, font:fo_sup, col:wor.col});
+				
+					if(sub != "") word.push({te:sub, x:x+w+ga, y:y+0.2*si, font:fo_sub, col:wor.col});		
+					if(sup != "") word.push({te:sup, x:x+w+ga, y:y-0.4*si, font:fo_sup, col:wor.col});
 
 					contain_word = true;
-					x += w+w2+0.1;	
+					x += w+w2+ga;	
 
 					if(end_bracket == true){
 						word.push({te:")", x:x, y:y, font:fo, col:col});		
@@ -1114,20 +1401,23 @@ function text_convert_annotation(te,si,lh,dx,align,col)
 	
 	if(x == 0 && y == 0.7*lh){ li++; y += lh;}
 	
-	//if(y == 0.7*lh && x < dx && 
 	if(align == "center"){
 		for(let i = 0; i < word.length; i++){
 			word[i].x += (dx-li_width[word[i].li])/2;
 		}
 	}
 	
-	return { width_first:width_first,  height:y-lh+si*0.4, word:word, link:link};
+	let wmax = x;
+	for(let i = 0; i < li; i++) if(li_width[i] > wmax) wmax = li_width[i];
+	
+	return { width_first:width_first, wmax:wmax, height:y-lh+si*0.4, word:word, link:link};
 }
 
 
 /// Selects white or black depending on the colour of the background
 function white_black(col)
 {
+	
 	let bigint = parseInt(col.substring(1), 16);	
 	let r = (bigint >> 16) & 255;
 	let g = (bigint >> 8) & 255;
@@ -1143,7 +1433,6 @@ function draw_arrow(x,y,x2,y2,size,col)
 {
 	let nx = x2-x, ny = y2-y;
 	let r = Math.sqrt(nx*nx+ny*ny);
-	//if(size > r/5) size = r/5;
 	nx *= size/r; ny *= size/r; 
 	let px = 0.5*ny, py = -0.5*nx;
 
@@ -1157,7 +1446,7 @@ function draw_arrow(x,y,x2,y2,size,col)
 	polypoint.push({x:x, y:y});
 	polypoint.push({x:x+0.8*nx, y:y+0.8*ny});
 	polypoint.push({x:x+nx-px, y:y+ny-py});
-	
+
 	draw_polygon(polypoint,col,col,NOLINE);
 }
 
@@ -1180,6 +1469,7 @@ function plot_loading_symbol(x,y,r)
 }
 
 
+/// Draws arrow on the menu bar
 function draw_menu_arrow_down(x,y,si,col)
 {
 	x = ro(x); y = ro(y); si *= inter.sca;
@@ -1322,12 +1612,12 @@ function label_convert(te,si,wmax)
 				
 				let w_sub = 0, w_sup = 0;
 				if(sub != ""){
-					frag.push({ te:sub, col:col, x:x, y:0.15*si, fo:sub_fo});
+					frag.push({ te:sub, col:col, x:x, y:0.2*si, fo:sub_fo});
 					w_sub = text_width(sub,sub_fo)
 				}
 				
 				if(sup != ""){
-					frag.push({ te:sup, col:col, x:x, y:-0.3*si, fo:sup_fo});
+					frag.push({ te:sup, col:col, x:x, y:-0.45*si, fo:sup_fo});
 					w_sup = text_width(sup,sup_fo)
 				}
 				
@@ -1342,8 +1632,6 @@ function label_convert(te,si,wmax)
 				x += gap;
 			}
 			else{
-				//if(pair == "}") tex = "{"+tex+"}";
-			
 				if(pair == "]"){
 					tex = "["+tex+"]";
 				}
@@ -1374,18 +1662,22 @@ function label_convert(te,si,wmax)
 		let tew = text_width(te,fo);
 		
 		let i;
-		for(i = frag.length-1; i >= 0; i--){
-			let fo =  frag[i].fo;
-			if(frag[i].x < wmax-tew && frag[i].fo != sub_fo && frag[i].fo != sup_fo ) break;
+		for(i = frag.length-1; i > 0; i--){
+			let fo = frag[i].fo;
+			if(frag[i].x < wmax-tew && frag[i].fo != sub_fo && frag[i].fo != sup_fo) break;
 		}
 		
-		if(i < 1) frag.length = 0;
-		else{
-			let x = frag[i].x;
-			frag.length = i;
-			frag.push({te:te, col:BLACK, x:x, y:0, fo:fo});
-		}
+		let tefrag = frag[i].te;
+		let j = tefrag.length;
+		while(j > 0 && frag[i].x + text_width(tefrag,frag[i].fo) > wmax-tew){
+			j--; tefrag = tefrag.substr(0,j);
+		}			
+		frag[i].te = tefrag;
+		frag.length = i+1;
 		
+		let x = frag[i].x;
+		frag.push({te:te, col:BLACK, x:frag[i].x+text_width(frag[i].te,frag[i].fo), y:0, fo:fo});
+
 		w = 0;
 		for(let i = 0; i < frag.length; i++){
 			let x = frag[i].x + text_width(frag[i].te,frag[i].fo);
@@ -1435,7 +1727,6 @@ function plot_angle_equation(te,x,y,nx,ny,si,w,orient,col)
 		cv.translate(xx,yy);
 		cv.rotate(-th);
 		cv.textAlign = 'left';
-		//cv.fillStyle = frag.col;
 		cv.fillStyle = col;
 		cv.fillText(frag.te, 0, 0);
 		cv.restore();
@@ -1446,6 +1737,8 @@ function plot_angle_equation(te,x,y,nx,ny,si,w,orient,col)
 /// Draws a left arrow 
 function draw_left_arrow(x,y,dx,dy,col,col2,style)
 {
+	if(style && inter.printing) style *= print_line_factor;
+	
 	let x1 = ro(x), y1 = ro(y), x2 = ro(x+dx), y2 = ro(y+dy);
 
 	let ym = ro(y+0.5*dy);
@@ -1477,15 +1770,15 @@ function draw_left_arrow(x,y,dx,dy,col,col2,style)
 function plot_paramlabel(x,y,dx,dy,tcol,info)
 {		
 	let xx = x+dx/2-info.dx/2;
-	let yy = y+dy/2+0.3*si_big;
+	let yy = y+dy/2+0.35*si_big;
 	plot_text(info.name,xx,yy,info.fo_big,tcol,dx);
 
 	let xx2 = xx+text_width(info.name,info.fo_big)+0.02;
 	plot_text(info.sup,xx2,yy-0.6,info.fo_sup,tcol,dx);
 	plot_text(info.sub,xx2,yy+0.1,info.fo_sub,tcol,dx);
 
-	if(info.age_time != ""){
-		plot_text(info.age_time,xx+info.age_time_pos,yy,info.fo_big,tcol,dx);
+	if(info.time != ""){
+		plot_text(info.time,xx+info.time_pos,yy,info.fo_big,tcol,dx);
 	}
 }
 		
@@ -1498,16 +1791,24 @@ function plot_param_info(te,si)
 	let name, sub, sup, end;
 	
 	if(te.length >= 3){
-		let pos = te.substr(te.length-3,3);
-		if(pos == "(t)" || pos == "(a)"){ te = te.substr(0,te.length-3); end = pos;}
+		if(te.substr(te.length-1,1) == ")"){
+			let k = te.length-3;
+			while(k > 0 && te.substr(k,2) != "(t") k--;
+			if(k > 0){
+				end = te.substr(k);
+				te = te.substr(0,k);
+			}
+		}
 	}		
-			
+	
 	let spl = te.split("_");
-	if(spl.length == 2) sub = spl[1];
-		
+	if(spl.length == 2) sub = spl[1].replace(/\^/g,"-");
+	
 	let spl3 = spl[0].split("^");
 	if(spl3.length == 2) sup = spl3[1];
 	
+	if(sup) sup = remove_bracket(sup).replace(/\^/g,"-");
+
 	name = spl3[0];
 	
 	let font = get_font(si);
@@ -1515,9 +1816,9 @@ function plot_param_info(te,si)
 	let w = text_width(name,font);
 	frag.push({te:name, x:x, y:0, font:font});
 		
-	if(sub || sup || end){
-		x += w;
+	x += w;
 	
+	if(sub || sup || end){
 		w = 0;
 		if(sub){
 			let fo_sub = get_font(si*0.7,"italic","Times");
@@ -1529,7 +1830,7 @@ function plot_param_info(te,si)
 		if(sup){
 			let fo_sup = get_font(si*0.7,undefined,"Times");
 			let ww = text_width(sup,fo_sup);
-			frag.push({te:sup, x:x, y:-0.3*si, font:fo_sup});
+			frag.push({te:sup, x:x, y:-0.4*si, font:fo_sup});
 			if(ww > w) w = ww;
 		}
 		
@@ -1569,6 +1870,20 @@ function center_param_text(te,x,y,si,col,width)
 }
 
 
+/// Plots right-aligned parameter text
+function right_param_text(te,x,y,si,col,width)
+{
+	let info = plot_param_info(te,si);
+	let sh = info.w; 
+	
+	if(sh > width) sh = width;
+	let xx = x-sh;
+	for(let i = 0; i < info.frag.length; i++){
+		let fr = info.frag[i];
+		if(fr.x < width) plot_text(fr.te,xx+fr.x,y+fr.y,fr.font,col,width-fr.x);
+	}
+}
+
 /// Plots verticle parameter text
 function center_vert_param_text(te,x,y,si,col,width) 
 {
@@ -1585,16 +1900,33 @@ function center_vert_param_text(te,x,y,si,col,width)
 }
 
 
-/// Plots right-aligned parameter text
-function right_param_text(te,x,y,si,col,width)
+/// Plots verticle parameter text 
+function top_vert_param_text(te,x,y,si,col,width) 
 {
 	let info = plot_param_info(te,si);
-	
+
 	let sh = info.w; if(sh > width) sh = width;
 	let yy = y+sh;
 	for(let i = 0; i < info.frag.length; i++){
 		let fr = info.frag[i];
-		if(fr.x < width) vert_text(fr.te,x+fr.y,yy-fr.x,fr.font,col,width-fr.x); 
+		if(fr.x < width){
+			vert_text(fr.te,x+fr.y,yy-fr.x,fr.font,col,width-fr.x);
+		}			
 	}
 }
 
+
+/// Gets colours for scroll bars
+function get_scroll_col(style,ov)
+{
+	let c1 = LLGREY, c2 = GREY, c3 = DGREY;
+	switch(style){
+	case "White": c1 = HELP_BLUE; c2 = LLBLUE; c3 = LBLUE; break;
+	case "Blue": c1 = BACKGROUND; c2 = LLBLUE; c3 = HELP_BLUE; break;
+	case "Bubble": c1 = WHITE; c2 = LLBLUE; c3 = HELP_BLUE; break;
+	case "TextBox": c1 = "none"; c2 = "none"; c3 = DDBLUE; if(ov) c3 = BLUE; break;
+	case "TabSlider":  c1 = "none"; c2 = "none"; c3 = DDBLUE; if(ov) c3 = BLUE; break;	
+	}
+	
+	return { c1:c1, c2:c2, c3:c3};
+}

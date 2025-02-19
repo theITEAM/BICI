@@ -1,0 +1,20 @@
+# Model 2.2: SIRD model with branching probability
+
+## Objective
+- Introduce branching in an individual-based model.
+- Here infected individuals can either recover or die.
+- A branching probability is used to determine if an individual dies.
+- Note, one of the branches had probability '*' because it is derived from others (such that the total adds to one).
+- In this example the transition distributions down the branches are different (one being log-normal and the other gamma distributed).
+
+## Model
+- A single individual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains four compartments: susceptible $S$, infected $I$, recovered $R$ and dead $D$. Together they are known as the “SIRD model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- Branching probability $b$ determines the probability of dying.
+- Mean $m^R$ and coefficient of variation $c^R$ specify the log-normally distributed period to recovery.
+- Mean $m^D$ and coefficient of variation $c^D$ specify the gamma distributed period to death.
+
+## Population
+- This consists of 100 initially susceptible individuals and two infected.

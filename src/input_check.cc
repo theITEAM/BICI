@@ -1,4 +1,4 @@
-///Checks that inputs are correctly specified
+// Checks that inputs are correctly specified
 
 #include <string>
 #include <sstream>
@@ -12,66 +12,59 @@ using namespace std;
 #include "input.hh"
 #include "utils.hh"
 
-
-/// Check for initial pop (more bech get done at end
+/// Check for initial pop (more checks get done at the end)
 void Input::check_initial_pop_error(bool end)
 {
 	for(const auto &sp : model.species){
 		auto name = sp.name;
 		const auto &source = sp.source;
 
-		auto ninitpopprior = 0u, ninitpop = 0u, naddind = 0u;
+		auto ninitpop = 0u, naddind = 0u, naddpop = 0u;
 		for(auto i = 0u; i < source.size(); i++){
 			const auto &so = source[i];
 			
 			switch(so.cname){
-			case INIT_POP_PRIOR: ninitpopprior++; break;
 			case INIT_POP: ninitpop++; break;
 			case ADD_IND: naddind++; break;
+			case ADD_POP: case ADD_POP_SIM: naddpop++; break;
 			default: break;
 			}
 		}
 		
 		switch(model.mode){
 		case SIM:
-			if(ninitpopprior > 0){
-				alert_import("The initial population prior should not be set for species '"+name+"'");
-				return;
-			}
-			
-			/*
-			if(end == true && ninitpop == 0){
-				alert_import("The initial population should be set for species '"+name+"'");
-				return;
-			}
-			*/
-			
-			if(ninitpop > 1){
+			if(ninitpop > 1 && !sp.contains_source){
 				alert_import("Only one initial population should be set for species '"+name+"'");
 				return;
 			}
 			break;
 		
 		case INF:
-			if(ninitpopprior > 1){
-				alert_import("Only one initial population prior should be set for species '"+name+"'");
-				return;
-			}
-			
 			if(ninitpop > 1){
 				alert_import("Only one initial population should be set for species '"+name+"'");
 				return;
 			}
 			
-			if(end == true && ninitpopprior == 0 && ninitpop == 0 && naddind == 0){
-				alert_import("Either 'Init. Pop.', 'Init. Pop. Prior' or 'Add Ind.' must be set for species '"+name+"'");
-				return;
+			if(end == true){
+				switch(sp.type){
+				case POPULATION:
+					if(ninitpop == 0 && naddpop == 0 && !sp.contains_source){
+						alert_import("Either 'Init. Pop.' or 'Add Pop.' must be set for species '"+name+"'");
+						return;
+					}
+					break;
+				
+				case INDIVIDUAL:
+					if(ninitpop == 0 && naddind == 0 && !sp.contains_source){
+						alert_import("Either 'Init. Pop.' or 'Add Ind.' must be set for species '"+name+"'");
+						return;
+					}
+					break;
+				}
 			}
-			
-			if(ninitpopprior == 1 && ninitpop == 1){
-				alert_import("'Init. Pop.' and 'Init. Pop. Prior' cannot both be set for species '"+name+"'");
-				return;
-			}
+			break;
+		
+		case PPC:
 			break;
 			
 		default: alert_import("Should not be default3a"); return;
@@ -96,77 +89,12 @@ void Input::data_source_check_error(const DataSource &ds)
 				}
 			}
 		}
-
-// TO DO
-/*
-		// Checks not adding individual twice
-		if(so.type == "Add Ind." || so.type == "Remove Ind."){ 
-			let list=[];
-			for(let r = 0u; r < tab.nrow; r++) list.push(tab.ele[r][0]);
-			list.sort();
-			for(let r = 0u; r < list.length-1; r++){
-				if(list[r] == list[r+1]){
-					let te; if(so.type == "Add Ind.") te = "added"; else te = "removed";
-					
-					inter.help = {title:"Error with data table", te:"Individual '"+list[r]+"' is "+te+" more than once."};
-					return true;
-				}
-			}
-		}
-		
-		if((so.type == "Transition" || so.type == "Source" || so.type == "Sink") && 
-				so.spec.time_radio.value == "File"){
-			for(let r = 0u; r < tab.nrow; r++){
-				if(Number(tab.ele[r][2]) >= Number(tab.ele[r][3])){				
-					inter.help = {title:"Error with data table", te:"For the observations the 'start' time must be before the 'end' time (row "+(r+2)+")."};
-					return true;
-				}
-			}
-		}
-		
-		if(so.type == "Diag. Test"){
-			for(let r = 0u; r < tab.nrow; r++){
-				let res = tab.ele[r][2];
-				
-				let neg_res = so.spec.neg_result;
-				let pos_res = so.spec.pos_result;
-				
-				if(res != neg_res && res != pos_res){
-					inter.help = {title:"Error with data table", te:"The test result '"+res+"' is neither negative '"+neg_res+"' or positive '"+pos_res+"' (col '"+tab.heading[2]+"', row "+(r+2)+")."};
-					return true;
-				}
-			}
-		}
-		
-		if(so.type == "Set Traps"){
-			let list=[];
-			for(let r = 0u; r < tab.nrow; r++) list.push(tab.ele[r][0]);
-			list.sort();
-			for(let r = 0u; r < list.length-1; r++){
-				if(list[r] == list[r+1]){	
-					inter.help = {title:"Error with data table", te:"In column '"+tab.heading[0]+"' the trapping event '"+list[r]+"' is set more than once."};
-					return true;
-				}
-			}
-		}
-		*/
 	}
-	
-	/*
-	let desc = check_data_source_valid(so);
-	if(so.error == true){
-		if(desc == undefined) desc = so.error_mess;
-		inter.help = {title:"Error with data table", te:desc};
-		return true;
-	}
-	
-	return false;
-	*/
 }
 
 
 /// Checks the value of an element is correct
-string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c) const
+string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c)
 {
 	auto col = ds.load_col[c];
 	
@@ -185,6 +113,27 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 			if(te != "start" && te != "end" && te != "no"){
 				auto num = number(te);
 				if(num == UNSET) return "Must be a number";
+				
+				switch(ds.cname){
+				case TRANS_DATA:	
+					if(ds.time_start != UNSET){
+						if(num <= ds.time_start || num >= ds.time_end){
+							return "Time '"+te+"' must be between the start and end times";
+						}
+					}
+					else{
+						if(num <= model.details.t_start || num >= model.details.t_end){
+							return "Time '"+te+"' must be between the start and end times";
+						}
+					}
+					break;
+				
+				default:
+					if(num < model.details.t_start || num > model.details.t_end){
+						return "Time '"+te+"' must be between the start and end times";
+					}
+					break;
+				}
 			}
 		}
 		break;
@@ -194,6 +143,14 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 			auto num = number(te);
 			if(num == UNSET) return "Must be a number";
 			if(num <= 0) return "Must be positive";
+		}
+		break;
+		
+	case ZERO_ONE_EL:
+		{
+			auto num = number(te);
+			if(num == UNSET) return "Must be a number";
+			if(num <= 0 || num >= 1) return "Must be between zero and one";
 		}
 		break;
 		
@@ -228,6 +185,7 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 	
 	case TEXT_EL:
 		if(te == "") return "Element empty";
+		if(includes(trim(te)," ")) return "Should not include a space";
 		break;
 		
 	case COMP_EL: 
@@ -257,55 +215,44 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 		
 	case COMP_PROB_EL: 
 		{ // This allows 'S', 'E', 'S|E', 'S:0.4|E:0.6' etc...
-			const auto &claa = model.species[ds.p].cla[col.cl];
-		
-			auto spl = split(te,'|');
-		
-			auto syntax_error = false;
-				
-			auto colon_flag = false, normal_flag = false;
-			for(auto i = 0u; i < spl.size(); i++){
-				if(spl[i] == ""){ syntax_error = true; break;}
-				else{
-					auto spl2 = split(spl[i],':');
-					
-					if(spl2[0] == ""){ syntax_error = true; break;}
-					
-					if(find_c(ds.p,col.cl,spl2[0]) == UNSET){
-						return "Compartment '"+spl2[0]+"' not in classification '"+claa.name+"'";
-					}
-					
-					if(spl2.size() == 1){
-						normal_flag = true;
-					}							
-					else{
-						colon_flag = true; 
-						if(spl2[1] == ""){ syntax_error = true; break;}
-						
-						auto valid = check_eqn_valid(spl2[1]);
-						if(valid != SUCCESS) return "Error with equation'"+spl2[1]+"'";
-					}
-					
-					if(spl2.size() > 2){ syntax_error = true; break;}
-				}
-			}
-				
-			if(normal_flag == true && colon_flag == true) syntax_error = true;
-
-			if(syntax_error == true){
-				return "There is a syntax error in table element.";
-			}
-		}
-		break;
-	
-	case MULTI_COMP_EL:
-		{
-			const auto &claa = model.species[ds.p].cla[col.cl];
-			auto spl = split(te,'|');
+			if(te != missing_str){
+				const auto &claa = model.species[ds.p].cla[col.cl];
 			
-			for(auto j = 0u; j < spl.size(); j++){
-				if(find_c(ds.p,col.cl,spl[j]) == UNSET){
-					return "Value '"+spl[j]+"' not in classification '"+claa.name+"'";
+				auto spl = split_with_bracket(te,'|');
+			
+				auto syntax_error = false;
+					
+				auto colon_flag = false, normal_flag = false;
+				for(auto i = 0u; i < spl.size(); i++){
+					if(spl[i] == ""){ syntax_error = true; break;}
+					else{
+						auto spl2 = split(spl[i],':');
+						
+						if(spl2[0] == ""){ syntax_error = true; break;}
+						
+						if(find_c(ds.p,col.cl,spl2[0]) == UNSET){
+							return "Compartment '"+spl2[0]+"' not in classification '"+claa.name+"'";
+						}
+						
+						if(spl2.size() == 1){
+							normal_flag = true;
+						}							
+						else{
+							colon_flag = true; 
+							if(spl2[1] == ""){ syntax_error = true; break;}
+							
+							auto valid = check_eqn_valid(spl2[1]);
+							if(valid != SUCCESS) return "Error with equation'"+spl2[1]+"'";
+						}
+						
+						if(spl2.size() > 2){ syntax_error = true; break;}
+					}
+				}
+					
+				if(normal_flag == true && colon_flag == true) syntax_error = true;
+
+				if(syntax_error == true){
+					return "There is a syntax error in table element.";
 				}
 			}
 		}
@@ -320,6 +267,16 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 			}
 		}
 		break;
+		
+	case PRIOR_DIR_EL:
+		{
+			auto num = number(te);
+			if(num == UNSET){	
+				auto pri = convert_text_to_prior(te,line_num);
+				if(pri.error != "") return pri.error;
+			}	
+		}
+		break;
 	}
 	
 	return "";
@@ -329,13 +286,13 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 /// Determines if an equation is valid
 Result Input::check_eqn_valid(string te) const
 {
-	if(false) cout << te;
-	// TO DO
+	//cout << te << "Check" << endl;
+	// TO DO EQN CHECK
 	return SUCCESS;
 }
 
 
-// Used to order compartments
+/// Used to order compartments
 bool Comp_ord (Compartment co1, Compartment co2)                      
 { return (co1.name < co2.name); };  
 
@@ -343,20 +300,6 @@ bool Comp_ord (Compartment co1, Compartment co2)
 /// Checks compartmental structure (looks for repeated names etc...) 
 void Input::check_comp_structure()
 {
-	// TO DO temporarily turned off
-/*
-	// Order compartments alphabetically
-	for(auto p = 0u; p < model.nspecies; p++){
-		auto &sp = model.species[p];
-		for(auto cl = 0u; cl < sp.ncla; cl++){
-			auto &claa = sp.cla[cl];
-			
-			sort(claa.comp.begin(),claa.comp.end(),Comp_ord);    
-		}
-	}
-*/
-	
-	
 	for(auto p = 0u; p < model.nspecies; p++){
 		const auto &sp = model.species[p];
 		for(auto cl = 0u; cl < sp.ncla; cl++){
@@ -413,6 +356,11 @@ void Input::check_import_correct()
 	for(auto p = 0u; p < model.nspecies; p++){
 		const auto &sp = model.species[p];
 		
+		if(sp.trans_tree == true && sp.infection_cl == UNSET){
+			alert_line("Because 'trans-tree' is set so at least one compartment must be set as 'infected'.",sp.line_num);
+			return;
+		}
+		
 		// Checks that branching probability has not been specified in error 
 		for(auto cl = 0u; cl < sp.ncla; cl++){	
 			const auto &claa = sp.cla[cl];
@@ -424,13 +372,13 @@ void Input::check_import_correct()
 			}
 		}
 		
-		/// Checks that non-Markovian transitions not used for population models
+		// Checks that non-Markovian transitions not used for population models
 		if(sp.type == POPULATION){
 			for(auto cl = 0u; cl < sp.ncla; cl++){
 				const auto &claa = sp.cla[cl];
 				for(const auto &tr : claa.tra){
 					if(tr.type != EXP_RATE && tr.type != ERLANG){
-						alert_line("Because species '"+sp.name+"' has a population-based model this transition must have a type 'exp(rate)', 'exp(mean)' or 'erlang'.",tr.line_num);
+						alert_line("Because species '"+sp.name+"' has a population-based model this transition must have a type 'exponential' or 'erlang'.",tr.line_num);
 						return;
 					}						
 				}
@@ -440,7 +388,7 @@ void Input::check_import_correct()
 }
 
 
-// Fuction used for diagnostic work
+/// Fuction used for diagnostic work
 void Input::temp_check(unsigned int num)
 {	
 	for(auto p = 0u; p < model.nspecies; p++){
@@ -457,229 +405,3 @@ void Input::temp_check(unsigned int num)
 	}
 }
 
-
-/// Checks that the equation is formatted correctly and puts '%' and '$' around parameters
-string Input::basic_equation_check(string te)
-{
-	if(check_brackets_match(te) == false) return te;
-
-	if(check_chnotallowed(te) == true) return te;
-
-	auto two_variable_flag = false;
-	
-	auto i = 0u; 
-	while(i < te.length()){
-		string type, right;
-		while(i < te.length()){
-			if(i < te.length()-4){
-				if(te.substr(i,4) == "exp(" || te.substr(i,4) == "cos(" ||
-					te.substr(i,4) == "sin("|| te.substr(i,4) == "log("){
-					i += 4;
-				}
-			}
-			
-			if(i < te.length()-5 && te.substr(i,5) == "step(") i += 5;			
-			
-			if(i < te.length()-4 && te.substr(i,4) == "pow("){ two_variable_flag = true; i += 4;}			
-			
-			if(i < te.length()-7 && te.substr(i,7) == "thresh("){ two_variable_flag = true; i += 7;}
-			
-			if(i < te.length()-4 && te.substr(i,4) == "max("){ two_variable_flag = true; i += 4;}			
-			
-			if(i < te.length()-4 && te.substr(i,4) == "min("){ two_variable_flag = true; i += 4;}			
-			
-			if(i < te.length()-4 && te.substr(i,4) == "abs(") i += 4;			
-			
-			if(i < te.length()-5 && te.substr(i,5) == "sqrt(") i += 5;			
-			
-			if(te.substr(i,1) == "|" && two_variable_flag == true) i++;
-			
-			if(str_eq(te,i,"Σ")){
-				while(i < te.length() && te.substr(i,1) != " " && te.substr(i,1) != "(") i++;
-			}
-			
-			auto ch = te.substr(i,1);
-			
-			if(ch == "{"){ type = "pop"; right = "}"; break;}
-			if(ch == "["){ type = "ie"; right = "]"; break;}
-			if(ch == "<"){ type = "fe"; right = ">"; break;}
-			if(ch == "}"){
-				alert_import("There should not be a right bracket '}'"); //, cur:icur2+i, len:1});
-				return te;
-			}
-
-			if(ch == "]"){
-				alert_import("There should not be a right bracket ']'");//, cur:icur2+i, len:1});
-				return te;
-			}
-		
-			if(ch == ">"){
-				alert_import("There should not be a right bracket '>'");//, cur:icur2+i, len:1});
-				return te;
-			}
-			
-			if(includes(notparam_list,ch) == false){
-				type = "param"; break;
-			}
-			i++;
-		}
-			
-		if(type != ""){
-			auto ist = i;
-			
-			if(type == "param"){
-				string warn;
-				i = param_end(te,i,warn); 
-				if(i == UNSET){
-					alert_import(warn);
-					return te;
-				}
-				//auto tex = te.substr(ist,i-ist);
-			
-				//auto icur3 = ist;
-				//TO DO
-				//check_parameter(tex,icur3,filter,eqn);
-
-				
-				te = te.substr(0,ist)+"%"+te.substr(ist,i-ist)+"$"+te.substr(i);
-				
-				i += 1;
-			}
-			else{
-				while(i < te.length() && te.substr(i,1) != right) i++;
-				if(i == te.length()){
-					alert_import("There should be a right bracket '"+right+"'");
-					return te;
-				}
-				else{
-					//auto tex = te.substr(ist+1,i-ist-1);
-					//auto icur3 = ist+1;
-
-					if(type == "pop"){
-//TO DO
-					//	check_population(tex,icur3,filter,eqn);
-					}
-
-					if(type == "ie"){
-//TO DO
-					//	check_ie(tex,icur3,filter,eqn); 
-					}
-					
-					if(type == "fe"){
-//TO DO
-					//	check_ie(tex,icur3,filter,eqn); 
-					}
-				}
-			}
-		}
-		i++;
-	}
-
-	return te;
-}
-
-
-/// Determines when a parameter definition ends
-unsigned int Input::param_end(const string &st, unsigned int i, string &warn) const 
-{
-	auto sub_brack = false;
-	auto sup_brack = false;
-	auto type = NORMAL_TEXT;
-	
-	do{
-		auto ch = st.substr(i,1);
-		if(ch == "^"){
-			if(type != NORMAL_TEXT){
-				warn = "Problem understanding parameter definition.";
-				return UNSET;
-			}
-			type = SUP_TEXT;
-		}
-			
-		if(ch == "_"){
-			if(type != NORMAL_TEXT && type != SUP_TEXT){
-				warn = "Problem understanding parameter definition.";
-				return UNSET;
-			}
-			type = SUB_TEXT;
-		}
-	
-		if(ch == "("){
-			if(i > 0 && st.substr(i-1,1) == "^") sup_brack = true;
-			else{
-				if(i > 0 && st.substr(i-1,1) == "_") sub_brack = true;
-				else break;
-			}
-		}
-		
-		if(ch == ")"){
-			if(!(type == SUP_TEXT && sup_brack == true) && !(type == SUB_TEXT && sub_brack == true)) break;
-			sub_brack = false;
-			sup_brack = false;
-		}
-		
-		if(includes(paramend_list,ch)) break;
-		i++;
-	}while(i < st.length());
-	if(i <= st.length() - 3){
-		if(st.substr(i,3) == "(t)" || st.substr(i,3) == "(a)") i += 3;
-	}
-
-	return i;
-}			
-
-
-/// Checks that all brackets match in the equation
-bool Input::check_brackets_match(string te)
-{
-	vector <Bracket> brack_list;
-	for(auto i = 0u; i < te.length(); i++){
-		auto ch = te.substr(i,1);
-		if(ch == "(" || ch == "[" || ch == "{"){
-			Bracket br; br.i = i; br.ch = ch; brack_list.push_back(br);
-		}
-		
-		if(ch == ")" || ch == "]" || ch == "}"){
-			if(brack_list.size() == 0){
-				alert_import("For equation '"+te+"': "+"The bracket '"+ch+"' does not match up.");
-				return false;
-			}
-			
-			auto chlast = brack_list[brack_list.size()-1].ch;
-			if((chlast == "(" && ch == ")") || (chlast == "[" && ch == "]") ||(chlast == "{" && ch == "}")){
-				brack_list.pop_back();
-			}
-			else{
-				alert_import("For equation '"+te+"': "+"The bracket '"+chlast+"' does not match up.");
-				return false;
-			}
-		}		
-	}
-	
-	if(brack_list.size() != 0){
-		auto last = brack_list[brack_list.size()-1];
-		alert_import("For equation '"+te+"': "+"The bracket '"+last.ch+"' does not match up.");
-		return false;
-	}
-	
-	return true;
-}
-
-
-/// Checks that the epression does not include ceratin characters which are not allowed
-bool Input::check_chnotallowed(string te)
-{
-	for(auto i = 0u; i < te.length(); i++){
-		auto num = te.at(i);
-		if(num >= 0){  // This ensures not a unicode character
-			auto ch = te.substr(i,1);
-			
-			if(includes(chnotallowed,ch)){			
-				alert_import("For equation '"+te+"': "+"The character '"+ch+"' is not allowed.");
-				return true;
-			}
-		}
-	}
-	
-	return false;
-}

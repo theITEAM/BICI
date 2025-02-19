@@ -1,0 +1,21 @@
+# Example D5: Time variation in individual transition observation probability
+
+## Objective
+- An example of when the probability of observing individual transitions changes as a function of time.
+- Like D4 but with an IBM and individual-level data.
+- The probability of observing transitions is given the functional form $a+b*cos(0.03t)$.
+- The values $a=0.5$ and $b=0.3$ were used to simulate the data.
+- Parameters $a$ and $b$ can be inferred. 
+
+## Data
+- Partially observed transitions.
+- Periodic compartmental observations every 20 time units.
+
+## Model
+- A single inidividual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

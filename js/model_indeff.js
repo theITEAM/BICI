@@ -1,23 +1,25 @@
 "use strict";
-/// Functions for individual effects
+// Functions for individual effects
 
 /// Display an individual effect group
 function display_ind_eff_group(p,i,x,y,lay,wmax)
 {		
 	let ieg = model.species[p].ind_eff_group[i];
-	let list = ieg.list;
+	let ie_list = ieg.ie_list;
+	
+	ieg.A_matrix.name = get_A_matrix_name(ie_list);
 	
 	lay.add_checkbox(wmax-4,y+0.3,"Ind. Cor.","Ind. Cor.",ieg.A_matrix,WHITE,{title:"Individual correlation", te:corrlation_text});
 	wmax -= 4;
 	
-	if(list.length == 1){	
+	if(ie_list.length == 1){	
 		if(combine_possible(i,p) == true){
-			lay.add_button({te:"Combine", x:wmax-4, y:y+0.3, dx:3.7, dy:1, ac:"CombineIEBubble", type:"CombineIE", p:p, i:i});
-			wmax -= 4.5;
+			lay.add_button({te:"Combine", x:wmax-4.8, y:y+0.2, dx:4.4, dy:1.2, ac:"CombineIEBubble", type:"GreyView", p:p, i:i});
+			wmax -= 5.3;
 		}
 	}
 	else{
-		lay.add_button({te:"Split", x:wmax-4, y:y+0.3, dx:3.7, dy:1, ac:"SplitIE", type:"CombineIE", p:p, i:i});
+		lay.add_button({te:"Split", x:wmax-4, y:y+0.2, dx:3.5, dy:1.2, ac:"SplitIE", type:"GreyView", p:p, i:i});
 		wmax -= 4.5;
 	}
 	
@@ -25,10 +27,10 @@ function display_ind_eff_group(p,i,x,y,lay,wmax)
 	
 	var si = 1.5;
 	
-	if(list.length == 0) error("Should contain IE");
+	if(ie_list.length == 0) error("Should contain IE");
 	
-	if(list.length == 1){
-		let st = list[0].name;
+	if(ie_list.length == 1){
+		let st = ie_list[0].name;
 		let st2 = "["+st+"]";
 		let w = text_width(st2,fo);
 
@@ -36,19 +38,23 @@ function display_ind_eff_group(p,i,x,y,lay,wmax)
 	
 		lay.add_button({te:"~", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
 		
-		let eq = "Ω^"+st+st; 
+		let eq = "Ω^"+st+","+st; 
 		let te = "<e>Shifted LN("+eq;
 		
-		if(ieg.A_matrix.check == true) te += "</e><e>×</e><e>"+ieg.A_matrix.name+"</e>";
+		if(ieg.A_matrix.check == true){
+			te += "</e><e>⊗</e><e>"+ieg.A_matrix.name+"</e>";
+		}
 		te += ")</e>";
 		
 		lay.add_paragraph(te,wmax-x-1.6,x+1.6,y+0.2,BLACK,para_eq_si,para_lh);
 	}
 	else{
 		let st = "", st2 = "";
-		for(let j = 0; j < list.length; j++){
-			if(st += "") st += ", ";
-			st += "["+list[j].name+"]";	st2 += list[j].name;
+		for(let j = 0; j < ie_list.length; j++){
+			if(st != "") st += ", ";
+			st += "["+ie_list[j].name+"]";
+			if(st2 != "") st2 += ",";
+			st2 += ie_list[j].name;
 		}
 		st = "("+st+")";
 		
@@ -67,20 +73,19 @@ function display_ind_eff_group(p,i,x,y,lay,wmax)
 		
 		lay.add_paragraph(te,wmax-x-1.6,x+1.6,y+0.2,BLACK,para_eq_si,para_lh);
 	}
-	
-	ieg.A_matrix.name = get_A_matrix_name(list);
 }
 
 
 /// Returns the name of the A matrix
-function get_A_matrix_name(list)
+function get_A_matrix_name(ie_list)
 {
-	if(list.length == 1) return "A^"+list[0].name;
-	else{
-		let st = "";
-		for(let j = 0; j < list.length; j++) st += list[j].name;
-		return "A^"+st;
+	
+	let st = "";
+	for(let j = 0; j < ie_list.length; j++){
+		if(st != "") st += ",";
+		st += ie_list[j].name;
 	}
+	return "A^"+st;
 }
 
 
@@ -92,7 +97,7 @@ function combine_ie_bubble(cont)
 	
 	let p = inter.bubble.ie_p;
 	let ie = inter.bubble.ie_combine;
-	let name = model.species[p].ind_eff_group[ie].list[0].name;
+	let name = model.species[p].ind_eff_group[ie].ie_list[0].name;
 
 	bubble_addparagraph(cont,"Select individual effect to combine <e>"+name+"</e> with:",0,cont.dx);
 	
@@ -119,15 +124,17 @@ function combineIE_scrollable(lay)
 		if(i != inter.bubble.ie_combine){
 			let te = "";
 	
-			for(let j = 0; j < ieg.list.length; j++){
+			for(let j = 0; j < ieg.ie_list.length; j++){
 				if(te != "") te += ",";
-				te += ieg.list[j].name;
+				te += ieg.ie_list[j].name;
 			}
 		
 			let dx = 1+text_width(te,fo);
-			if(cx+dx+1 >= lay.inner_dx){ cx = 0; cy += dy;}
+			if(cx+dx+0.3 >= lay.inner_dx){ cx = 0; cy += dy;}
 			
 			lay.add_button({te:te, x:cx, y:cy, dx:dx, dy:1.4*si, type:"IEcombine", back_col:BUBBLE_COL, font:fo, i:i, ac:"CombineIE"});
+			
+			cx += dx+0.3;
 		}
 	}
 	
@@ -144,7 +151,7 @@ function combine_possible(isel,psel)
 	for(let i = 0; i < sp.ind_eff_group.length; i++){
 		let ieg = sp.ind_eff_group[i];
 		if(i != isel){
-			if(ieg.list.length > 0) return true;
+			if(ieg.ie_list.length > 0) return true;
 		}
 	}
 	
@@ -152,19 +159,17 @@ function combine_possible(isel,psel)
 }
 
 
-// Adds one individual effect group to another
+/// Adds one individual effect group to another
 function add_ie_to_group(p,i1,i2)
 {
 	let sp = model.species[p];
 	let ieg1 = sp.ind_eff_group[i1];
 	let ieg2 = sp.ind_eff_group[i2];
-	for(let i = 0; i  < ieg1.list.length; i++){
-		ieg2.list.push({name:ieg1.list[i].name});
+	for(let i = 0; i  < ieg1.ie_list.length; i++){
+		ieg2.ie_list.push({name:ieg1.ie_list[i].name});
 	}
 	
 	sp.ind_eff_group.splice(i1,1);
-	
-	init_param();
 }
 
 
@@ -173,50 +178,16 @@ function split_ie(p,i)
 {
 	let sp = model.species[p];
 	let ieg = sp.ind_eff_group[i];
-	for(let j = 0; j < ieg.list.length; j++){
+	for(let j = 0; j < ieg.ie_list.length; j++){
 		sp.ind_eff_group.push(copy(ieg));
 		let ieg2 = sp.ind_eff_group[sp.ind_eff_group.length-1];
-		ieg2.list.length = 0;
-		ieg2.list.push(copy(ieg.list[j]));
+		ieg2.ie_list.length = 0;
+		ieg2.ie_list.push(copy(ieg.ie_list[j]));
 	}
 	
 	sp.ind_eff_group.splice(i,1);
 	
-	init_param();
-}
-
-
-/// The function is called when the A matrix is loaded
-function A_matrix_loaded(tab)
-{
-	if(tab.ncol == 0){ alertp("The data table does not have any columns"); return;}
-	if(tab.nrow == 0){ alertp("The data table does not have any rows"); return;}
-	if(tab.nrow != tab.ncol){ alertp("The data table must be square and have headings which give the IDs of the individuals"); return;}
-	
-	for(let r = 0; r < tab.nrow; r++){
-		for(let c = 0; c < tab.ncol; c++){
-			if(isNaN(tab.ele[r][c])){
-				alertp("The element '"+tab.ele[r][c]+"' is not a number (col "+(c+1)+", row "+(r+2)+")"); 
-				return;
-			}
-		}
-	}
-	
-	let sp = model.species[inter.edit_source.info.p];
-	
-	let Amat = sp.ind_eff_group[inter.edit_source.info.i].A_matrix;
-	Amat.ind_list = tab.heading;
-	Amat.loaded = true;
-	
-	Amat.value = [];
-	for(let r = 0; r < tab.nrow; r++){
-		Amat.value[r] = [];
-		for(let c = 0; c < tab.ncol; c++){
-			Amat.value[r][c] = Number(tab.ele[r][c]);
-		}
-	}
-	
-	close_help();
+	update_param();
 }
 
 
@@ -228,17 +199,21 @@ function create_edit_Amatrix(lay)
 	let cx = corner.x;
 	let cy = corner.y;
 	
-	cy = lay.add_title("Edit A matrix",cx,cy,{te:Amatrix_text});
+	let too_big = false; if(inter.edit_Amatrix.too_big == true) too_big = true;
 	
-	add_layer("CreateEditAmatrixContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{type:lay.op.type});
+	let title = "Edit A matrix";
+	if(too_big) title = "A matrix (too large to edit)";
 	
-	lay.add_corner_button([["Cancel","Grey","CancelAmatrix"],["Done","Grey","DoneAmatrix"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
-	 
-	//let x = 1.2, y = lay.dy-1.6;
-	//let gap = 3.5;
+	cy = lay.add_title(title,cx,cy,{te:Amatrix_text});
 	
-//	let w = model.add_object_button(lay,"Load",x,y,load_ac,{ back:WHITE, active:true, info:{}, title:load_title, te:load_te}); 
-	//x += w+gap;
+	add_layer("CreateEditAmatrixContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{type:lay.op.type, too_big:too_big});
+	
+	if(too_big == true){
+		lay.add_corner_button([["Back","Grey","CancelAmatrix"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
+	}
+	else{
+		lay.add_corner_button([["Cancel","Grey","CancelAmatrix"],["Done","Grey","DoneAmatrix"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
+	}
 }
 
 
@@ -252,16 +227,19 @@ function close_Amatrix_source()
 /// Plots A matrix to allow for values to be editted			
 function add_Amatrix_buts(lay)
 {
-	let sp = model.species[inter.edit_Amatrix.p];
-	let Amat = sp.ind_eff_group[inter.edit_Amatrix.i].A_matrix
+	let edit_A = inter.edit_Amatrix;
+	let ind_list = edit_A.ind_list;
+	
+	let sp = model.species[edit_A.p];
+	let Amat = sp.ind_eff_group[edit_A.i].A_matrix
 	
 	let si_mar = 1;
 	let fo_mar = get_font(si_mar);
 	let fo_table = get_font(si_table);
 
 	let w_max = 0;
-	for(let i = 0; i < Amat.ind_list.length; i++){
-		let w = text_width(Amat.ind_list[i],fo_mar);
+	for(let i = 0; i < ind_list.length; i++){
+		let w = text_width(ind_list[i],fo_mar);
 		if(w > w_max) w_max = w;		
 	}
 	w_max += 1;
@@ -273,41 +251,51 @@ function add_Amatrix_buts(lay)
 	let mar_col = DRED;
 	
 	let cx = 2+w_max+gap;
-	for(let i = 0; i < Amat.ind_list.length; i++){
-		lay.add_button({te: Amat.ind_list[i], x:cx+dx/2-0.6, y:cy, dx:1.2, dy:w_max, type:"VertText", font:fo_mar, col:mar_col});
+	for(let i = 0; i < ind_list.length; i++){
+		lay.add_button({te: ind_list[i], x:cx+dx/2-0.6, y:cy, dx:1.2, dy:w_max, type:"VertText", font:fo_mar, col:mar_col});
 		cx += dx;
 	}
 	cy += w_max+gap;
 	
+	let too_big = edit_A.too_big;
+	
 	cx = 2;
-	lay.add_button({x:cx+w_max+gap-mar, y:cy-mar, dx:dx*Amat.ind_list.length+2*mar, dy:dy_table_param*Amat.ind_list.length+2*mar, type:"Outline", col:BLACK});
+	let out_dx = dx*ind_list.length+2*mar;
+	let out_dy = dy_table_param*ind_list.length+2*mar;
 		
-	for(let j = 0; j < Amat.ind_list.length; j++){
+	if(too_big){ out_dx += 2; out_dy += dy_table_param;}
+	
+	lay.add_button({x:cx+w_max+gap-mar, y:cy-mar, dx:out_dx, dy:out_dy, type:"Outline", col:BLACK});
+	
+	let ele_type = "AmatrixElement";
+	let action = "EditAmatrixElement";
+
+	if(too_big){ ele_type = "TooBigElement"; action = undefined;}
+	
+	for(let j = 0; j < ind_list.length; j++){
 		let cx = 2;
-		lay.add_button({te: Amat.ind_list[j], x:cx, y:cy, dx:w_max, dy:dy_table_param, type:"RightText", si:si_mar, font:fo_mar, col:mar_col});
+		lay.add_button({te: ind_list[j], x:cx, y:cy, dx:w_max, dy:dy_table_param, type:"RightText", si:si_mar, font:fo_mar, col:mar_col});
 	
 		cx += w_max+gap;
 	
-		for(let i = 0; i < Amat.ind_list.length; i++){
-			let val = inter.edit_Amatrix.value[j][i];
-			lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:"AmatrixElement", font:fo_table, i:i, j:j, ac:"EditAmatrixElement"});
+		for(let i = 0; i < ind_list.length; i++){
+			let val = inter.edit_Amatrix.A_value[j][i];
+			lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:ele_type, font:fo_table, i:i, j:j, ac:action});
 			cx += dx;
 		}
-		
+		if(too_big){
+			lay.add_button({te:"...", x:cx, y:cy, dx:2, dy:dy_table_param, type:"Text", si:si_mar, font:fo_mar, col:mar_col});
+		}
 		cy += dy_table_param;
+	}
+	
+	if(too_big == true){
+		let cx = 2+w_max+gap;
+		for(let i = 0; i < ind_list.length; i++){
+			lay.add_button({te:"⋮", x:cx, y:cy, dx:2, dy:dy_table_param, type:"RightText", si:si_mar, font:fo_mar, col:mar_col});
+			cx += dx;
+		}
 	}
 	
 	lay.add_button({x:0, y:cy, dx:0, dy:0.5, type:"Nothing"});	
 }
-
-
-/// Runs when editting of the A matrix is complete
-function done_Amatrix()
-{
-	let ea = inter.edit_Amatrix;
-	
-	model.species[ea.p].ind_eff_group[ea.i].A_matrix.value = ea.value;
-	close_bubble();
-	close_Amatrix_source();
-}
-

@@ -1,4 +1,4 @@
-/// Implements the basic ABC_SMC rejection algorithm
+// Implements the basic ABC_SMC rejection algorithm
 
 #include <iostream>
 #include <fstream>
@@ -26,8 +26,6 @@ ABC_SMC::ABC_SMC(const Model &model, Output &output) : model(model), output(outp
 /// Implements a version of simple ABC rejection algorithm
 void ABC_SMC::run()
 {
-	auto initc_val = model.initc_sample();
-
 	auto prop = intialise_proposal();
 
 	vector <Particle> particle_store;                // Stores the previous generation
@@ -44,6 +42,8 @@ void ABC_SMC::run()
 				if(com_op) progress(s,nsample*G);
 				
 				auto param_val = model.param_sample();
+				auto initc_val = model.initc_sample(param_val);
+
 				state.simulate(param_val,initc_val);
 				auto part = state.generate_particle();
 				part.w = 1;
@@ -54,7 +54,9 @@ void ABC_SMC::run()
 		else{
 			if(g == 1) prior_ref = model.prior_total(particle_store[0].param_val);
 			
-			prop.set_mvn(particle_store,si);
+			cor_matrix.set_mvn_from_particle(particle_store);
+			
+			prop.set_mvn(si,cor_matrix);
 		
 			setup_particle_sampler(particle_store);         // Sets up sampler for particles
 		
@@ -63,17 +65,19 @@ void ABC_SMC::run()
 				
 				ntr++;
 					
-				auto p = particle_sampler();                 // Samples from a particle in last generation
+				auto p = particle_sampler();                  // Samples from a particle in last gen
 				const auto &part = particle_store[p];
 				
 				auto param_prop = prop.sample(part.param_val);// Proposes a new parameter set using MVN kernal
 				
-				if(model.inbounds(param_prop) == true){             // Checks if parameters within bounds
-					state.simulate(param_prop,initc_val);             // Simulates a new state
-																														// Calculates the weight for the sample
+				if(model.inbounds(param_prop) == true){       // Checks if parameters within bounds
+					auto initc_val = model.initc_sample(param_prop);
+
+					state.simulate(param_prop,initc_val);       // Simulates a new state
+																									  	// Calculates the weight for the sample
 					auto w = calculate_particle_weight(param_prop,particle_store,prop); 
 
-					if(state.like.obs > obs_cutoff){                  // Checks if error function less than cutoff
+					if(state.like.obs > obs_cutoff){            // Checks if error function less than cutoff
 						auto part = state.generate_particle();
 						part.w = w;
 						particle.push_back(part);
@@ -90,7 +94,6 @@ void ABC_SMC::run()
 		cout << "Generation " << g << "   Acceptance: " << 100*double(nac)/ntr << "%  ";
 		cout << "Cut-off: " << obs_cutoff << "   # Particle: " <<  particle.size() << endl;
 	}
-	
 	
 	// Outputs the final results by sampling from 
 	setup_particle_sampler(particle_store);    
@@ -120,7 +123,7 @@ Proposal ABC_SMC::intialise_proposal() const
 		}
 	}
 	
-	Proposal pp(PARAM_PROP,vec,model,output,1,1);
+	Proposal pp(PARAM_PROP,vec,model,output,1,burn_info);
 	
 	return pp;
 }
@@ -129,7 +132,7 @@ Proposal ABC_SMC::intialise_proposal() const
 /// Cuts off the samples which do not agree as well
 double ABC_SMC::implement_cutoff_frac(vector <Particle> &particle) const
 {
-	vector <double> obs_prob;                                           // Calculates the cut-off
+	vector <double> obs_prob;                              // Calculates the cut-off
 	for(auto &part : particle){
 		obs_prob.push_back(part.like.obs);
 	}

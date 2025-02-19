@@ -1,15 +1,14 @@
-// Functions qhich calculate statistical quantities
-
 "use strict";
+// Functions which calculate statistical quantities
 
 /// Given a vector of values this returns statistical information
 function get_statistic(vect)
 {
 	let vec = copy(vect);
-	
-	let stat = {};
 
 	let n = vec.length;
+	
+	let stat = {n:n};
 	if(n == 0){
 		stat.mean = "NA";
 		stat.CImin = "NA";
@@ -89,7 +88,7 @@ function get_effective_sample_size(vec)
 }	
 	
 
-/// Returns the gelman rubin statistic
+/// Returns the Gelman-Rubin statistic
 function get_Gelman_Rubin_statistic(cha)
 {
 	let C = cha.length;
@@ -135,3 +134,53 @@ function get_line_stats(line)
 
 	return line_stats;
 }			
+
+
+/// Works out the mean for a series of lines
+function get_line_mean(line)
+{
+	if(line.length == 0) error("Problem with line stat");
+	
+	let T = line[0].length;
+
+	let line_stats = [];
+	
+	let av = [];
+	for(let t = 0; t < T; t++) av[t] = 0;
+	
+	for(let i = 0; i < line.length; i++){
+		let li = line[i];
+		for(let t = 0; t < T; t++) av[t] += li[t].y;
+	}
+	
+	let num = line.length;
+	for(let t = 0; t < T; t++){
+		//line_stats.push({x:line[0][t].x, y:av[t]/num});
+		line_stats.push(av[t]/num);
+	}
+
+	return line_stats;
+}			
+
+
+/// Gets the Pearson correlation coefficient between two sets of measurements
+function get_correlation(vecA,vecB)
+{
+	if(vecA.length != vecB.length){ error("Cannot get correlation"); return 0;}
+	
+	let avA = 0, avA2 = 0, avB = 0, avB2 = 0, avAB = 0;
+	let N = vecA.length;
+	for(let i = 0; i < N; i++){
+		let valA = vecA[i], valB = vecB[i];
+		avA += valA; avA2 += valA*valA;
+		avB += valB; avB2 += valB*valB;
+		avAB += valA*valB;
+	}
+	
+	let varA = avA2/N - (avA/N)*(avA/N);
+	let varB = avB2/N - (avB/N)*(avB/N);
+	
+	if(varA < TINY || varB < TINY) return 0;
+	
+	return (avAB/N - (avA/N)*(avB/N))/Math.sqrt(varA*varB);
+}

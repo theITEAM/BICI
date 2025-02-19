@@ -1,8 +1,13 @@
 "use strict";
+// Functions when the mouse button goes up or down
 
 /// Fires if mouse button is pressed down
 function mouse_down(xx,yy,evt)                                     
 {
+	if(inter.loading_symbol.on) return;
+	
+	if(false){ pr("evt"); pr(evt);}
+
   let d = new Date(); 
 	let over = inter.over;
 	inter.mouse_time_down_prev = inter.mouse_time_down;
@@ -21,13 +26,20 @@ function mouse_down(xx,yy,evt)
 		let bu = inter.layer[l].but[i];
 		
 		switch(evt.which){	
-		case 3:  // Right click
+		case 3:                                        // Right click
 			{	
-				switch(bu.ac){
-				case "ClassificationBack": case "Compartment": case "Transition":
+				switch(bu.ac){	
+				case "Compartment": case "Transition":
 				case "TransitionPoint":
 					{
 						inter.mode={ type:"Drag_Classification", p:bu.p, cl:bu.cl, l:l};
+						set_arrow_icon();
+					}
+					break;
+					
+				case "ClassificationBack":
+					{
+						inter.mode={ type:"Drag_Selector", mx:xx, my:yy,  p:bu.p, cl:bu.cl, l:l};
 						set_arrow_icon();
 					}
 					break;
@@ -35,10 +47,43 @@ function mouse_down(xx,yy,evt)
 			}
 			break;
 			
-			
-		case 1:  // Left button
+		case 1:                                        // Left button
 			{
 				switch(bu.type){
+				case "Letter":
+					inter.mode={ type:"Drag_Letter", index:bu.index};
+					break;
+				
+				case "Timebar":
+					{
+						let lay = get_lay("AnimControls");
+						let anim = inter.graph.animation;
+			
+						let x = inter.mx-bu.x-lay.x;
+						let xnow = bu.dy/2 + (bu.dx-bu.dy)*anim.playframe/anim.playframe_max;
+						if(x >= xnow - bu.dy/2 && x <= xnow + bu.dy/2){
+							inter.mode={ type:"Drag_Timebar", drag:true, bu:bu};
+						}
+					}
+					break;
+					
+					case "Slider":
+					{
+						let info = bu.info;
+						
+						let lay = get_lay(info.lay);
+						let anim = inter.graph.animation;
+			
+						let x = inter.mx-bu.x-lay.x;
+						let fr = (info.value-info.min)/(info.max-info.min);
+						let xnow = slider_dx/2 + (bu.dx-slider_dx)*fr;
+						
+						if(x >= xnow - slider_dx/2 && x <= xnow + slider_dx/2){
+							inter.mode={ type:"Drag_Slider", drag:true, bu:bu};
+						}
+					}
+					break;
+					
 				case "VerticalSlider":
 					inter.mode={ type:"Drag_VerticalSlider", drag:true, scroll_ref:bu.scroll_ref, scale:bu.scale, pn:bu.pn};
 					break;
@@ -50,11 +95,19 @@ function mouse_down(xx,yy,evt)
 				case "TableSlider":
 					inter.mode={ type:"Drag_TableSlider", drag:true, width_store:copy(bu.width), width:bu.width, x_st:inter.mx,  col:bu.col};
 					break;
+					
+				case "TableSlider2":
+					inter.mode={ type:"Drag_TableSlider2", drag:true, width_store:right_menu_width, x_st:inter.mx, col:bu.col};
+					break;
 				
 				case "Compartment": case "CompLatLng": case "LabelText": 
 					if(model.get_show_model() == true && inter.mode.type != "Add_Transition" &&
    					inter.mode.type != "Add_Source" && inter.mode.type != "Add_Sink"){
 						
+						if(bu.type == "Compartment" && evt.ctrlKey){
+							inter.comp_select.list.push(bu.i);
+						}
+				
 						let fix = false;
 						if(bu.type == "Compartment" || bu.type == "CompLatLng"){
 							fix = model.species[bu.p].cla[bu.cl].comp[bu.i].fixed.check;
@@ -67,6 +120,30 @@ function mouse_down(xx,yy,evt)
 					}
 					break;
 					
+				case "Selected":
+					{
+						// Stores positions of selected
+						let cs = inter.comp_select;
+						let claa = model.species[cs.p].cla[cs.cl];
+						
+						let fixed = false;
+						
+						let pos=[];
+						for(let i = 0; i < cs.list.length; i++){
+						
+							let c = cs.list[i];
+							let co = claa.comp[c];
+							if(co.fixed.check == true) fixed = true;
+							
+							pos.push({c:c, x:co.x, y:co.y});
+						}
+						
+						if(pos.length > 0 && fixed == false){
+							inter.mode={ type:"Drag_Selected", drag:true, p:bu.p, cl:bu.cl, i:bu.i, pos:pos, mx:inter.mx, my:inter.my}; 
+						}
+					}
+					break;
+					
 				case "Box":
 					if(inter.mode.type != "Add_Transition" && inter.mode.type != "Add_Source" && inter.mode.type != "Add_Sink"){
 						let claa = model.species[bu.p].cla[bu.cl];
@@ -75,7 +152,7 @@ function mouse_down(xx,yy,evt)
 							
 							let pos=[];
 							for(let i = 0; i < comps.length; i++){
-								let c = find(claa.comp,"name",comps[i]);
+								let c = hash_find(claa.hash_comp,comps[i]);
 								pos.push({c:c, x:claa.comp[c].x, y:claa.comp[c].y});
 							}
 							inter.mode={ type:"Drag_Box", p:bu.p, cl:bu.cl, i:bu.i, pos:pos, mx:inter.mx, my:inter.my}; 
@@ -112,14 +189,16 @@ function mouse_down(xx,yy,evt)
 						set_arrow_icon();
 					}
 					break;
-					
+				
 				case "ClassificationBack":
 					{
+						clear_comp_select();
 						inter.mode={ type:"Drag_Classification", p:bu.p, cl:bu.cl, l:l};
 						set_arrow_icon();
+						generate_screen();
 					}
 					break;
-					
+				
 				case "PositionCursor":
 					{	
 						inter.mode={ type:"Drag_Cursor"};
@@ -172,9 +251,7 @@ function mouse_down(xx,yy,evt)
 						keep_cursor_flag = true;
 					}
 					break;
-				
 			
-
 				case "ExpandIcon": keep_cursor_flag = true; break;
 				
 				case "Select":
@@ -196,10 +273,10 @@ function mouse_down(xx,yy,evt)
 	if(inter.equation.te != undefined) keep_cursor_flag = true;
 
 	if(keep_cursor_flag == false){
-		if(inter.cursor.i != undefined && inter.mode.type != "Drag_Cursor" ){
+		if(inter.cursor.i != undefined && inter.mode.type != "Drag_Cursor"){
 			unfocus_check();			
 			turn_off_cursor();
-			//generate_screen();
+			generate_screen();
 		}
 	}
 }
@@ -208,13 +285,34 @@ function mouse_down(xx,yy,evt)
 /// Fires when mouse button is released
 function mouse_up(xx,yy)                                       
 {
-	switch(inter.mode.type){
+	switch(inter.mode.type){	
+	case "Drag_Letter":
+		mode_off();
+		generate_screen();
+		break;
+
+	case "Drag_Selector":
+		model.select_compartments();
+		mode_off();
+		generate_screen();
+		break;
+		
+	case "Drag_Timebar": 
+		mode_off();
+		break;
+		
+	case "Drag_Slider":
+		inter.graph.press_slider(inter.mode.bu,true);
+		mode_off();
+		generate_screen();
+		break;
+		
 	case "Drag_VerticalSlider": case "Drag_HorizontalSlider": 
 		mode_off();
 		generate_screen();
 		return;
 
-	case "Drag_TableSlider": 
+	case "Drag_TableSlider": case "Drag_TableSlider2": 
 		mode_off();
 		return;
 		
@@ -237,7 +335,7 @@ function mouse_up(xx,yy)
 		break;
 		
 	case "Drag_Classification": case "Drag_Compartment": case "Drag_CompLatLng":
-	case "Drag_LabelText": case "Drag_Box": 
+	case "Drag_LabelText": case "Drag_Box": case "Drag_Selected":
 	case "Drag_TransitionPoint": case "Split_Transition":
 		if(inter.mode.moved == true){ mode_off(); return;}
 		mode_off();
@@ -262,4 +360,3 @@ function mouse_up(xx,yy)
 		mouse_click(xx,yy);
 	}
 }
-

@@ -1,0 +1,21 @@
+# Example B5: Combined population-based data sources in a Covid-19 type of model
+
+## Objective
+- Show how multiple population-based data can be used to inform a Covid-19 model.
+- Using this data it is possible to estimate branching probabilities and the time variation in the transmission rate $β(t)$.
+- However, this sort of data will not estimate transition rates once infected, so informative priors have been used for these.
+
+## Data
+- Population transition data is available for $E→I$ (cases), $I→H$ (hospitalisations) and $H→D$ (hospital deaths).
+- Population data for the combined population in $E$, $I$ and $A$ (survey PCR data).
+- Population data for the combined population in $E$, $I$, $A$ and $R$ (seroprevalence data).
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$, exposed $E$, infected $I$, recovered $R$, asymptomatic $A$, hospitalised $H$ and dead $D$.
+- An external force of infection is controlled by parameter $η$ (in reality this could be time-varying and estimated from raw case data and flight information).
+- The time-varying spline $β(t)$ captures transmission between individuals.
+
+## Population
+- This consists of the UK population which is initially susceptible.

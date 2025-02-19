@@ -1,0 +1,48 @@
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+data-dir folder="Examples\EX_M4-2-data-files"
+
+simulation start=0 end=400 timestep=0.5
+
+inference
+
+post-sim
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
+
+species name="Animal" type="population"
+
+# SPECIES MODEL
+
+class name="Population" index="a"
+
+comp name="Prey" color="#888888" x=-3 y=0
+comp name="Pred" color="#974500" x=-3 y=6
+
+trans name="+->Prey" x=-22 y=0 value="exp(rate:α×{Prey})"
+trans name="Prey->-" x=13 y=0 value="exp(rate:β×{Pred})"
+trans name="+->Pred" x=-22 y=6 value="exp(rate:δ×{Prey}×{Pred})"
+trans name="Pred->-" x=13 y=6 value="exp(rate:γ)"
+
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="Population" file="init-pop-sim-Animal.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="α" value="0.1" prior="uniform(0,1)"
+param name="β" value="0.0004"
+param name="γ" value="0.05"
+param name="δ" value="0.00005"
+
+

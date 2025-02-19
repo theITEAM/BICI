@@ -1,4 +1,5 @@
 "use strict";
+// Functions when the mouse moves
 
 /// Fires when the mouse moves
 function mouse_move(x,y)                                   
@@ -6,9 +7,40 @@ function mouse_move(x,y)
 	let xst = inter.mx, yst = inter.my
 	inter.mx = x; inter.my = y;
 
+	//pr("ty"); pr(inter.mode.type);
 	switch(inter.mode.type){
-	case "Drag_VerticalSlider": case "Drag_HorizontalSlider":
+	case "Drag_Letter":
+		inter.figure[inter.mode.index].x = x-letter_size/2;
+		inter.figure[inter.mode.index].y = y-letter_size/2;
+		replot_layer("Figure");
+		plot_screen();
+		break;
+			
+	case "Drag_Selector":
+		replot_layer("Frame");
+		plot_screen();
+		break;
+		
+	case "Drag_Timebar":
 		{
+			let anim = inter.graph.animation;
+			let st = anim.playframe;
+			inter.graph.press_timebar(inter.mode.bu);
+			
+			if(st != anim.playframe) inter.graph.replot_anim();
+		}
+		break;
+		
+	case "Drag_Slider":
+		{
+			inter.graph.press_slider(inter.mode.bu);	
+			replot_layer(inter.mode.bu.info.lay);
+			plot_screen();
+		}
+		break;
+		
+	case "Drag_VerticalSlider": case "Drag_HorizontalSlider":
+		{	
 			let pos = inter.scroll_position[inter.mode.scroll_ref];
 		
 			let sh = pos.shift;
@@ -40,25 +72,32 @@ function mouse_move(x,y)
 		drag_table_slider(x);
 		break;
 		
+	case "Drag_TableSlider2":
+		drag_rightmenu_slider(x);
+		break;
+		
 	case "Drag_Classification":
 		{
 			let show = model.get_show_model();
 			
 			let cam;
 			if(show == true) cam = model.species[inter.mode.p].cla[inter.mode.cl].camera;
-			else cam = inter.graph.op.species[inter.mode.p].cla[inter.mode.cl].camera;
+			else cam = inter.graph.get_cla(inter.mode.p,inter.mode.cl).camera;
 		
 			let lay = {dx:0, dy:0};
 			let pst = trans_point_rev(xst,yst,cam,lay);
 			let p = trans_point_rev(x,y,cam,lay);
 
+			let sh = {x:x-xst, y:y-yst};
 			cam.x -= p.x-pst.x;
 			cam.y -= p.y-pst.y;
 		
-			if(show == true) clone_camera(inter.mode.p,inter.mode.cl);
-			
 			if(inter.bubble.lay_name != undefined) generate_screen();
-			else model.replot();
+			else model.replot(sh);
+			
+			model.ensure_lng(cam);
+			
+			if(show == true) clone_camera(inter.mode.p,inter.mode.cl);
 		}
 		break;
 		
@@ -83,49 +122,59 @@ function mouse_move(x,y)
 	case "Drag_Timeline":
 		{
 			let mo = inter.mode;
-			let shx = inter.mx-xst 
+			let shx = inter.mx-xst;
 			let la = inter.layer[inter.mode.l];
 			let w = la.dx;
 			let ra = inter.graph.range;
 			let dx = -(ra.xmax-ra.xmin)*shx/w;
 			ra.xmin += dx; ra.xmax += dx;
+			
+			let shy = inter.my-yst;
+			
+			if(shy != 0) scroll_layer("GraphContent",-shy);
 			inter.graph.replot();
 		}
 		break;
 		
-	case "Drag_Box": 
+	case "Drag_Box": case "Drag_Selected":
 		{
 			let mo = inter.mode;
 			let p = mo.p;
 			let cl = mo.cl;
 			let i = mo.i;
+			let pos = mo.pos; 
+			
 			let shx = inter.mx-mo.mx;
 			let shy = inter.my-mo.my;
-			
+		
 			let claa = model.species[p].cla[cl];
 			let cam = claa.camera;
-			
-			let pos = mo.pos; 
-					
-			let co1 = claa.comp[pos[0].c];
-			let cx = co1.x, cy = co1.y;
-	
+			if(cam.coord == "latlng"){
+				let sc = Number(cam.scale);
+				shx /= sc; shy /= sc;
+				
+				// Ensures that does not go out of range
+				let max = -LARGE, min = LARGE;
+				for(let i = 0; i < pos.length; i++){
+					let xx = pos[i].x + shx;
+					if(xx > max) max = xx;
+					if(xx < min) min = xx;
+				}
+				
+				if(max > Math.PI) shx -= max-Math.PI + TINY;
+				if(min < -Math.PI) shx += -Math.PI-min + TINY;
+			}
+		
+			let mgroup=[];	
 			for(let i = 0; i < pos.length; i++){
-				let co = claa.comp[pos[i].c];
-				co.x = pos[i].x + shx;
-				co.y = pos[i].y + shy;
-				model.snap_comp_to_grid(co);
-			}
+				mgroup.push({c:pos[i].c, x:pos[i].x + shx, y:pos[i].y + shy});
+			}				
 			
-			if(cx != co1.x || cy != co1.y){
-				inter.mode.moved = true;
-				model.update_pline(p,cl);  
-				model.replot();
-			}
+			model.move_group(mgroup,cl,p);
 		}
 		break;
-		
-	case "Drag_Compartment": case "Drag_CompLatLng": case "Drag_LabelText":
+	
+	case "Drag_LabelText":
 		{
 			let p = inter.mode.p;
 			let cl = inter.mode.cl;
@@ -136,58 +185,37 @@ function mouse_move(x,y)
 			
 			let mo = inter.mode;
 	
-			let ob = claa.comp[i];
-			
-			if(inter.mode.type == "Drag_LabelText") ob = claa.annotation[i];
-			let cx = ob.x, cy = ob.y;
-			
 			let lay = get_lay("Compartment");
 			let po = trans_point_rev(x-lay.x-mo.shx,y-lay.y-mo.shy,cam,lay);
-			 
+			let ob = claa.annotation[i];
+			let cx = ob.x, cy = ob.y;
 			ob.x = po.x;
 			ob.y = po.y;
-			
 			if(cam.coord == "cartesian") model.snap_comp_to_grid(ob);
 			
-			let list = model.find_clones(p,cl);	
-			
-			/// Clones movement of classification 
-			if(inter.mode.type == "Drag_Compartment" || inter.mode.type == "Drag_CompLatLng"){
-				if(list.length > 0){
-					for(let li of list){
-						let co2 = model.species[li.p].cla[li.cl].comp[i];
-						co2.x = ob.x; co2.y = ob.y;
-					}
-					model.check_clones();
-				}
-			}
-			
-			
 			if(cx != ob.x || cy != ob.y){
-				inter.mode.moved = true;
-				
-				if(inter.mode.type == "Drag_Compartment" || inter.mode.type == "Drag_CompLatLng"){
-					for(let j = 0; j < claa.ntra; j++){
-						if(claa.tra[j].i == i || claa.tra[j].f == i){
-							model.find_trans_pline(p,cl,j);
-						}
-					}
-					
-					if(list.length > 0){
-						for(let li of list){
-							let claa2 = model.species[li.p].cla[li.cl];
-							for(let j = 0; j < claa2.ntra; j++){
-								if(claa2.tra[j].i == i || claa2.tra[j].f == i){
-									model.find_trans_pline(li.p,li.cl,j);
-								}
-							}
-						}
-					}
-				}
-				
-				if(inter.bubble.lay_name != undefined) generate_screen();
-				else model.replot();
+				model.replot();
 			}
+		}
+		break;
+		
+	case "Drag_Compartment": case "Drag_CompLatLng": 
+		{
+			let p = inter.mode.p;
+			let cl = inter.mode.cl;
+			let i = inter.mode.i;
+			
+			let claa = model.species[p].cla[cl];
+			let cam = claa.camera;
+			
+			let mo = inter.mode;
+	
+			let lay = get_lay("Compartment");
+			let po = trans_point_rev(x-lay.x-mo.shx,y-lay.y-mo.shy,cam,lay);
+			
+			let mgroup=[];	
+			mgroup.push({c:i, x:po.x, y:po.y});
+			model.move_group(mgroup,cl,p);
 		}
 		break;
 	
@@ -230,28 +258,28 @@ function mouse_move(x,y)
 		break;
 		
 	default:
-		{
+		{	
 			switch(inter.mode.type){
-			case "Add_Compartment": model.place_add_compartment(); break;
-			case "Add_Label": model.place_add_compartment(); break;
+			case "Add_Compartment": model.place_add_compartment(inter.mode.type); break;
+			case "Add_Label": model.place_add_compartment(inter.mode.type); break;
 			}
 			
 			let over_new = get_button_over(x,y);
 			
 			let replot_flag = false; 
+		
 			if(inter.mode.type == "Add_Transition" || inter.mode.type == "Add_Source" || inter.mode.type == "Add_Sink") replot_flag = true;
 				
 			if(over_new.layer != inter.over.layer || over_new.i != inter.over.i){
 				let l = inter.over.layer;
 				let i = inter.over.i;
-		
 				if(l){
 					let lay = inter.layer[l];
 			
 					if(lay.name == "Transition") replot_flag = true;
 					else lay.plot_button(lay.but[i],false);
 				}
-				
+	
 				l = over_new.layer;
 				i = over_new.i;
 				if(l){
@@ -259,11 +287,11 @@ function mouse_move(x,y)
 					if(lay.name == "Transition") replot_flag = true;
 					else lay.plot_button(lay.but[i],true);
 				}
-				
+			
 				inter.over = over_new;
 				
 				if(replot_flag == true) replot_layer("Transition");
-				 
+				
 				plot_screen();
 			}
 			else{
@@ -288,15 +316,17 @@ function set_arrow_icon()
 
 	if(l != undefined && inter.mode.type != "Add_Compartment"){
 		switch(inter.layer[l].but[inter.over.i].ac){
-			//case "ClassificationBack": arrow_icon = "Grab"; break;
-			case "TableSlider": arrow_icon = "ColShift"; break;
+			case "TableSlider": case "TableSlider2": arrow_icon = "ColShift"; break;
 		}
 		
-		if(inter.mode.type == "Drag_Classification") arrow_icon = "Grab";
+		switch(inter.mode.type){
+		case "Drag_Classification": case "Drag_Timeline": case "Drag_Graph":
+			arrow_icon = "Grab";
+			break;
+		}
 	}
 	
-	/// Sets the cursor (i.e. a hand is used for grabbing)
-
+	// Sets the cursor (i.e. a hand is used for grabbing)
 	if(arrow_icon != inter.arrow_icon){        
 		inter.arrow_icon = arrow_icon;
 		let val = "";
@@ -312,9 +342,7 @@ function set_arrow_icon()
 	
 /// Retuns which button the mouse is over
 function get_button_over(x,y)
-{
-	if(inter.mode.drag == true) return {};
-			
+{		
 	for(let l = inter.layer.length-1; l >= 0; l--){
 		let lay = inter.layer[l];
 		
@@ -331,11 +359,11 @@ function get_button_over(x,y)
 					case "Transition":
 						{
 							let index = model.mouse_over_transition(bu.points,lay);
-							if(index != UNSET) return { layer:l, i:i, index:index};
+							if(index != undefined) return { layer:l, i:i, index:index};
 						}
 						break;
 						
-					case "CompMap":
+					case "CompMap": case "CompMapGraph":
 						{
 							let frx = (x-(sh_x+bu.x))/bu.dx;
 							let fry = (y-(sh_y+bu.y))/bu.dy;

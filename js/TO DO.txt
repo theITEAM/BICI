@@ -1,3 +1,93 @@
+Need to sort out joining
+sort out "to do2"
+
+
+
+B5 joining of proposals
+
+D8 to do
+E6 to do
+E7
+
+
+§
+	if(style && inter.printing) w *= print_line_factor;
+		
+BICI achieves Bayesian inference by means of drawing samples from the posterior distribution using a widely applied technique known as “Markov chain Monte Carlo” (MCMC). Unlike many other statistical techniques (such as maximum likelihood), MCMC does not simply follow a predetermined algorithm and produce a final end r
+
+esult. Instead, it successively generates samples that progressively improve the accuracy with which the posterior is approximated. MCMC is continuously run until sufficient precision. 
+
+Currently working on making farm-based models faster
+- At the moment simulation is slow so working on improving that
+
+
+- Using Mareks disease status
+- cutting off first passage
+- ppc
+- time dependency
+- .
+
+make_comp_name(
+
+(1) // TO DO Need a faster way  -  fast way to reduce multinomial
+(2) // TO DO EQN CHECK
+
+
+- Need to sort out local event changes (to do sections)
+
+
+- FARM model with known infection times not working correctly
+- file saved in temp
+
+
+
+- direct message from software
+- get all examples done
+- finish off MFA
+- PAS
+- when initial "Cannot change pop fixed." error message
+
+
+
+
+
+
+
+
+- Get Marek's individual sampling working
+
+- Get individual sampler sorted
+
+- For transmission trees the rate must be linearly expressed in terms of populations.
+
+- matrix comp plot
+
+
+- siumulation slow when doing inference
+
+
+
+a×η(t)+β×Σ_l' ((1/(1+pow(ubound(d_l,l'|40)/r|α))) {I,l'})
+
+took around 1 min to do
+
+(0) a = a for reparaemterisation
+
+(1) Loading symbol when paraemter spline being viewed
+(2) paraemter loading symbol pausing
+(3) When matrix is too big then do not output results (maximum 
+e.g. let toobig = false; if(num_element(par) > ELEMENT_MAX) toobig = true;
+(4) Get AI working with ||l,l'|| approach
+
+
+
+model.init_param_needed = true;
+
+
+loading dirchlet prior
+start_add_initial_population();
+import_data_table_command(cname);
+ get_prior_from_file(pri)
 Copy simulated parameters
 
 
@@ -10,3 +100,6 @@ menu icon
 sum using prime
 a greek letter must be selected
 
+DONE
+chaging name for species, comp etc...
+- ctl c v to copy values and priors

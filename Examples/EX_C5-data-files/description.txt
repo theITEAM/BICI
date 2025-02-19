@@ -1,0 +1,17 @@
+# Example C5: A partially observed transition
+
+## Objective
+- Shows an inference example where some transitions are partially observed.
+
+## Data
+- Here the data collected assumes that all recovery events are observed, but infections are only observed with a $f=50%$ probability.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A recovery rate $γ$ determines the rate at which individuals recover.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

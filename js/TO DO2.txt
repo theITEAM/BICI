@@ -1,0 +1,45 @@
+WARNINGS DISAPPEAR when changing page
+
+
+
+
+20/12/23 Currently making sure event times are within inference time period...
+e.g. see input_check.cc 185
+
+
+TO DO
+Get everything working in fixed event scenarios
+
+
+Webworker stop
+annotation map being sent to and from BICI
+annealing
+PAS
+emulation method
+voronoi
+draw anim timeline
+branching prob sort out
+parameter vecto
+undo button
+
+center_message(this.op.label,lay);
+let tree = inter.page_name.split("->");
+
+PROBLEMS
+Incorporating inidividual-based variation estimate of q isn't right
+trans through the env beta a little low
+many do not have inference done
+
+plot
+vector on map
+vector on map + time
+matrix on map
+matrix on map + time
+matrix timeplot
+
+
+
+
+
+
+

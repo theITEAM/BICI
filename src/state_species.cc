@@ -7,38 +7,45 @@
 #include <cmath>
 #include <algorithm>
  
-// NOTES
-// markov_eqn list all transitions which are Markovian. Attached to this list are the individuals 
-
 using namespace std;
 
 #include "state_species.hh"
 #include "utils.hh"
 #include "matrix.hh"
 
-
-/// Initialises the model model.param,model.param_vec
-StateSpecies::StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const Species &sp, const Details &details, const	vector <double> &timepoint, const	vector <double> &dtimepoint, const vector <unsigned int> &pop_affect_, Operation mode_) : param_val(param_val), spline_val(spline_val), eqn(eqn), param(param), param_vec(param_vec), sp(sp), details(details), timepoint(timepoint), dtimepoint(dtimepoint) 
+/// Initialises the state species
+StateSpecies::StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const	vector <double> &timepoint, const	vector <double> &dtimepoint, const vector <unsigned int> &pop_affect_, Operation mode_) : source_sampler(sp.markov_eqn,sp.tra_gl,sp.comp_gl,timepoint,dtimepoint,details,sp.init_cond), rate_mean(details), param_val(param_val), spline_val(spline_val), eqn(eqn), param(param), param_vec(param_vec), pop(pop), sp(sp), genetic_data(genetic_data), details(details), timepoint(timepoint), dtimepoint(dtimepoint)
 {
+	timer.resize(STSP_TIMER_MAX,0);
+	
 	pop_affect = pop_affect_;
 	
 	N = sp.markov_eqn.size();
 	T = timepoint.size()-1;
-	ti_sim = 0;
 	
 	mode = mode_;
 	
 	nnode = sp.markov_tree.node.size();
 	
+	type = sp.type;
+	
 	initialise_arrays();
 }
 
 
-/// Initialises all the arrays which will be used
+/// Initialises all arrays
 void StateSpecies::initialise_arrays()
 {
-	nm_trans_ind.resize(sp.nm_trans.size());
-	Li_nm_trans.resize(sp.nm_trans.size());
+	nm_trans_ev_ref.resize(sp.nm_trans.size());
+	for(auto m = 0u; m < sp.nm_trans.size(); m++){
+		nm_trans_ev_ref[m].resize(T);
+	}
+	
+	nm_trans_incomp_ref.resize(sp.nm_trans_incomp.size());
+	for(auto n = 0u; n < sp.nm_trans_incomp.size(); n++){
+		nm_trans_incomp_ref[n].resize(T);
+	}
+	
 	Li_ie.resize(sp.ind_eff_group.size());
 	
 	auto G = sp.tra_gl.size();
@@ -53,21 +60,52 @@ void StateSpecies::initialise_arrays()
 	
 	pop_data_num.resize(sp.pop_data.size());
 	pop_trans_data_num.resize(sp.pop_trans_data.size());
+
+	if(type == INDIVIDUAL){
+		pop_data_cgl.resize(sp.pop_data.size());
+		for(auto i = 0u; i < sp.pop_data.size(); i++){
+			pop_data_cgl[i].resize(sp.comp_gl.size());
+		}
+	}
+	
+	pop_trans_data_tgl.resize(sp.pop_trans_data.size());
+	for(auto i = 0u; i < sp.pop_trans_data.size(); i++){
+		pop_trans_data_tgl[i].resize(sp.tra_gl.size());
+	}
 	
 	obs_eqn_value.resize(sp.obs_eqn.size());
+	
+	auto E = sp.obs_trans_eqn.size();
+	obs_trans_eqn_value.resize(E);
+	obs_trans_eqn_num.resize(E);
+	auto all_time = seq_vec(T);
+	for(auto i = 0u; i < E; i++){
+		obs_trans_eqn_value[i].resize(T,0);
+		obs_trans_eqn_num[i].resize(T,0);
+	}
+ 
+	rate_store_init();
 }
 
 
 /// Initialises species ready for simulation be be performed
-void StateSpecies::simulate_init(const InitCondValue &initc_val)
+void StateSpecies::simulate_init()
 {
 	auto G = sp.tra_gl.size();
 	trans_num.clear(); trans_num.resize(G);
 	tnum_mean_st.clear(); tnum_mean_st.resize(G);
-	
+	ind_sim_c.clear();
 	cpop_st.clear();
 	
-	ie_sampler_init();  // Samples individual effects
+	for(auto m = 0u; m < sp.nm_trans.size(); m++){
+		for(auto ti = 0u; ti < T; ti++) nm_trans_ev_ref[m][ti].clear();
+	}
+	
+	for(auto n = 0u; n < sp.nm_trans_incomp.size(); n++){
+		for(auto ti = 0u; ti < T; ti++) nm_trans_incomp_ref[n][ti].clear();
+	}
+	
+	ie_sampler_init();                            // Samples individual effects
 	
 	markov_eqn_vari.clear();
 	markov_eqn_vari.resize(N);
@@ -89,90 +127,624 @@ void StateSpecies::simulate_init(const InitCondValue &initc_val)
 		me_vari.value = UNSET;
 	}
 	
-	end_nm_event.clear();
 	trig_div.clear();
 	trig_div.resize(T);
 		
 	type = sp.type;
-
-	cpop_init = initc_val.cpop;
 	
 	individual.clear();
 	
+	auto C = sp.comp_gl.size();
+	
+	cpop.clear();
+	cpop.resize(C,0);	
+	
+	ti_sort = UNSET;
+}
+
+
+/// Initialises individuals to be simulated
+void StateSpecies::simulate_individual_init()
+{
+	// Loads observation equations (using in sampling individual initial state
+	calculate_obs_eqn(seq_vec(obs_eqn_value.size()));
+	
+	auto C = sp.comp_gl.size();
+	
+	vector <unsigned int> pop_added(C,0);
+	
+	vector <unsigned int> unallocated;
+	
 	/// Adds any individuals from the data
-	for(const auto &ind : sp.individual){
-		if(ind.ev.size() == 0) emsg("No events");
+	for(auto i = 0u; i < sp.nindividual_obs; i++){
+		const auto &ind = sp.individual[i];
 		
-		auto c_init = UNSET;
+		auto num_trig_data = 0u;
 		
-		auto i = individual.size();
-		for(const auto &ev : ind.ev){
-			auto t = ev.t;
-			if(t == details.t_start){
-				if(ev.type != ENTER_EV) emsg("SHould be enter");
-				c_init = ev.c;
+		auto added_flag = false;
+		
+		if(i < sp.nindividual_in){		
+			for(const auto &ev : ind.ev){
+				auto t = ev.t;
+				
+				if(t > details.t_start){
+					SimTrigEvent trig; trig.i = i; trig.t = t;
+					
+					switch(ev.type){
+					case ENTER_EV:
+						trig.type = ENTER_SIM_EV;
+						added_flag = true;
+						trig.c = ind_sample_init_c(ind); trig.trg = UNSET;
+						break;
+						
+					case LEAVE_EV:
+						trig.type = LEAVE_SIM_EV;
+						trig.c = UNSET; trig.trg = UNSET;
+						break;
+					
+					case MOVE_EV:
+						trig.type = MOVE_SIM_EV;
+						trig.c = ev.move_c; trig.trg = ev.cl;
+						break;
+						
+					default: emsg("event type not recog"); break;
+					}	
+					
+					num_trig_data++;
+					insert_trigger_event(trig);
+				}
 			}
-			else{
-				TrigEvent trig; trig.type = ev.type; trig.i = i; trig.t = t;
-				
-				switch(ev.type){
-				case ENTER_EV:
-					trig.c = ev.c; trig.trg = UNSET;
-					c_init = UNSET;
+			
+			// Adds in event data (used during inference to set up initial state)
+			for(auto m = 0u; m < ind.obs.size(); m++){
+				const auto &ob = ind.obs[m];
+
+				switch(ob.type){
+				case OBS_TRANS_EV: case OBS_SOURCE_EV: case OBS_SINK_EV:
+					{
+						SimTrigEvent trig; 
+						trig.type = DATA_TRANS_SIM_EV;
+						trig.i = i; trig.t = ob.t; trig.c = m; trig.trg = UNSET;
+						num_trig_data++;
+						insert_trigger_event(trig);
+						
+						// Determines if individual is most likely to enter through an observed source
+						if(added_flag == false){
+							for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+								if(sp.tra_gl[tr].variety == SOURCE_TRANS){
+									auto pr = like_trans_prob_obs(tr,ob);
+									if(pr != LI_WRONG){ added_flag = true; break;}
+								}
+							}
+						}						
+					}
 					break;
-					
-				case LEAVE_EV:
-					trig.c = UNSET; trig.trg = UNSET;
-					break;
-				
-				case MOVE_EV:
-					trig.c = ev.c; trig.trg = ev.cl;
-					break;
-					
-				default: emsg("event type not recog"); break;
-				}	
-				insert_trigger_event(trig);
+
+				default: break;
+				}
 			}
 		}
-		add_individual(ind.name,c_init,false);
+		else{
+			added_flag = true;
+		}
+		
+		auto ii = add_individual(OBSERVED_IND,ind.name);
+		
+		individual[ii].num_trig_data = num_trig_data;
+		
+		// Directly adds ENTER_EV at start of simulation
+		if(added_flag == false){                   // If individual not added then add at beginning
+			unsigned int c;
+			if(ind.ev.size() > 0 && ind.ev[0].type == ENTER_EV){
+				if(ind.ev[0].t != details.t_start) emsg("Should be at start");
+				c = ind_sample_init_c(ind);
+				
+				pop_added[c]++;
+			
+				IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
+			
+				add_event(ENTER_EV,ii,UNSET,UNSET,UNSET,c,details.t_start,iif);
+			}
+			else{ 
+				unallocated.push_back(ii);
+			}
+		}
 	}
 	
 	ie_Amatrix_sampler_init();
 	sample_ie_Amatrix();	
 	
+	if(sp.init_cond.type == INIT_POP_NONE){
+		init_cond_val.cnum = pop_added;					
+	}
+		
 	switch(type){
 	case POPULATION:
-		cpop = cpop_init;	
+		{
+			for(auto c = 0u; c < C; c++){
+				cpop[c] = double(init_cond_val.cnum[c]);
+			}
+		}			
 		break;
 
 	case INDIVIDUAL:
 		{
-			cpop.clear();
-			cpop.resize(sp.comp_gl.size(),0);
-		
-			string pre = ""; if(sp.individual.size() > 0) pre = "UO ";
-			auto n = 0;
-			for(auto c = 0u; c < sp.comp_gl.size(); c++){
-				if(cpop_init[c] > 0 && sp.fix_effect.size() > 0){
-					string st = "";
-					for(const auto &fe : sp.fix_effect){
-						if(st != "") st += ","; 
-						st += fe.name;
+			if(sp.init_cond.type != INIT_POP_NONE){
+				string pre = ""; if(sp.nindividual_obs > 0) pre = "UO ";
+				auto n = 0;
+				for(auto c = 0u; c < sp.comp_gl.size(); c++){
+					if(init_cond_val.cnum[c] > 0 && sp.fix_effect.size() > 0){
+						string st = "";
+						for(const auto &fe : sp.fix_effect){
+							if(st != "") st += ","; 
+							st += fe.name;
+						}
+						emsg("Cannot add unspecified individuals for a model with fixed effect(s) '"+st+"'"); 
 					}
-					emsg("Cannot add unspecified individuals for a model with fixed effect(s) '"+st+"'"); 
-				}
+					
+					auto imax = init_cond_val.cnum[c];	
+					for(auto i = 0u; i < imax; i++){	
+						unsigned int ii;
+						if(unallocated.size() > 0){
+							ii = unallocated[0];
+							unallocated.erase(unallocated.begin());
+						}
+						else ii = add_individual(UNOBSERVED_IND);
+						
+						IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
 				
-				for(auto i = 0u; i < cpop_init[c]; i++){
-					auto name = get_new_ind_name(pre,n+1);
-					add_individual(name,c,false);
-					n++;
+						add_event(ENTER_EV,ii,UNSET,UNSET,UNSET,c,details.t_start,iif);
+						
+						n++;
+					}
 				}
 			}
 		}
 		break;
 	}
 	
+	// Works out situation with individuals which do not have a specified starting position
+	if(unallocated.size() > 0){
+		vector <SourceSamp> source_samp;           // Generates a sampler for the source
+		auto sum = 0.0;
+		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+			const auto &tra = sp.tra_gl[tr];
+		
+			if(tra.i == UNSET){
+				const auto &eq = eqn[tra.dist_param[0].eq_ref];
+				auto value = 1;
+				if(eq.pop_ref.size() == 0) value = eq.calculate_no_popnum(0,param_val,spline_val);
+				
+				if(value != 0){
+					SourceSamp ss; ss.tr_gl = tr; ss.prob_sum = sum;
+					source_samp.push_back(ss);
+				}
+			}
+		}
+		
+		switch(sp.init_cond.type){
+		case INIT_POP_NONE: case INIT_POP_DIST:
+			for(auto i : unallocated){
+				const auto &ind = sp.individual[i];
+				auto c = ind_sample_init_c(ind);
+				
+				pop_added[c]++;
+			
+				IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
+			
+				add_event(ENTER_EV,i,UNSET,UNSET,UNSET,c,details.t_start,iif);
+			}
+			break;
+			
+		case INIT_POP_FIXED:
+			if(!sp.contains_source) emsg("Either an initial population distribution is added or the model must contain a source");
+		
+			for(auto i : unallocated){
+				const auto &obs = sp.individual[i].obs;
+				auto tmin = details.t_start;
+				auto tmax = details.t_end; if(obs.size() > 0) tmax = obs[0].t;
+				
+				auto z = ran()*sum;
+				auto j = 0u; 
+				while(j < source_samp.size() && z > source_samp[j].prob_sum) j++;
+				if(j == source_samp.size()) emsg("Could not simulate source");
+				
+				SimTrigEvent trig; 
+				trig.type = SOURCE_SIM_EV;
+				trig.i = i; trig.t = tmin+ran()*(tmax-tmin); trig.c = UNSET; 
+				trig.trg = source_samp[j].tr_gl;
+				individual[i].num_trig_data++;
+				insert_trigger_event(trig);
+			}
+			break;
+		}
+	}
+	
 	for(auto f = 0u; f < sp.fix_effect.size(); f++) set_exp_fe(f);
+	
+	prob_trans_tree = 0;
+	
+	set_all_obs_trans_value();
+}
+
+
+/// Warning message when loading posterior sample
+void StateSpecies::error_load_sample(unsigned int num) const
+{
+	emsg("Problem loading posterior sample "+to_string(num));
+}
+
+
+/// Initialises based on a posterior sample
+void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies &samp_sp)
+{
+	auto t_end = timepoint[ti_end];
+	
+	string warn = "Problem loading posterior sample";
+			
+	switch(sp.type){
+	case INDIVIDUAL:
+		{
+			Hash hash_compgl;
+			for(auto c = 0u; c < sp.comp_gl.size(); c++){
+				//auto hash_vec = hash_compgl.get_vec_string(sp.comp_gl[c].name);
+				//hash_compgl.add(c,hash_vec);
+				hash_compgl.add(c,sp.comp_gl[c].name);
+			}
+			
+			Hash hash_tra;
+			vector <TransRef> trans_ref;
+			for(auto cl = 0u; cl < sp.ncla; cl++){
+				const auto &claa = sp.cla[cl];
+				for(auto tr = 0u; tr < claa.ntra; tr++){
+					TransRef tref; tref.cl = cl; tref.tr = tr;
+					//auto hash_vec = hash_tra.get_vec_string(claa.tra[tr].name);
+					//hash_tra.add(trans_ref.size(),hash_vec);
+					hash_tra.add(trans_ref.size(),claa.tra[tr].name);
+					trans_ref.push_back(tref);
+				}
+			}
+		
+			Hash hash_ind; 
+			for(auto i = 0u; i < sp.nindividual_obs; i++){
+				const auto &ind = sp.individual[i];
+				
+				auto ii = add_individual(OBSERVED_IND,ind.name);
+				//auto hash_vec = hash_ind.get_vec_string(ind.name);
+				//hash_ind.add(ii,hash_vec);
+				hash_ind.add(ii,ind.name);
+			}
+			
+			const auto &ind_tab = samp_sp.ind_tab;
+			
+			// Checks individual effects are correct
+			if(ind_tab.ncol-3 != sp.ind_effect.size()){
+				error_load_sample(1);
+			}
+			
+			if(ind_tab.ncol-3 != sp.ind_effect.size()){
+				error_load_sample(20);
+			}
+			
+			for(auto e = 0u; e < sp.ind_effect.size(); e++){
+				if(ind_tab.heading[e+2] != sp.ind_effect[e].name){
+					error_load_sample(2);
+				}
+			}
+			
+			for(auto r = 0u; r < ind_tab.nrow; r++){
+				const auto &row = ind_tab.ele[r];
+				
+				auto name = row[0];
+				auto hash_vec = hash_compgl.get_vec_string(name);
+				auto i = hash_ind.existing(hash_vec);
+				if(i == UNSET){
+					i = add_individual(OBSERVED_IND,name);
+					hash_ind.add(i,hash_vec);
+				}					
+			
+				auto &ind = individual[i];
+				
+				auto source = false;
+				if(row[1] == "yes") source = true;
+				
+				if(ind_tab.ncol != ind.ie.size()+3) error_load_sample(21);
+				else{
+					for(const auto &ieg : sp.ind_eff_group){
+						if(ieg.ppc_resample == false){
+							for(const auto &li : ieg.list){
+								auto e = li.index;
+								ind.ie[e] = log(number(row[2+e]));
+							}
+						}
+					}
+				}
+				
+				set_exp_ie(ind);
+				
+				auto ev_text = row[row.size()-1];
+									
+				auto col = split(ev_text,' ');		
+			
+				auto c = UNSET;
+				for(auto e = 0u; e < col.size(); e++){
+					auto tspl = split(col[e],':');
+					
+					if(tspl.size() != 2) error_load_sample(3);
+					auto t = number(tspl[1]); if(t == UNSET) error_load_sample(4);
+					
+					if(t <= t_end){
+						if(c == UNSET && source == false){
+							//auto hash_vec = hash_compgl.get_vec_string(tspl[0]);
+							//c = hash_compgl.existing(hash_vec);
+							c = hash_compgl.find(tspl[0]);
+							if(c == UNSET) error_load_sample(5);
+						
+							IndInfFrom inf_from;
+							add_event(ENTER_EV,i,UNSET,UNSET,UNSET,c,t,inf_from);
+						}
+						else{
+							auto tr = tspl[0];
+					
+							tr = replace(tr,"->","→");
+						
+							//auto hash_vec = hash_tra.get_vec_string(tr);
+							//auto trr = hash_tra.existing(hash_vec);
+							auto trr = hash_tra.find(tr);
+							if(trr == UNSET) error_load_sample(8);
+							
+							const auto &tref = trans_ref[trr];
+							
+							auto trg = sp.trg_from_tr[c][tref.cl][tref.tr];
+							if(trg == UNSET) error_load_sample(9);
+						
+							const auto &trgl = sp.tra_gl[trg];
+							if(trgl.i != c) error_load_sample(10);
+							
+							auto ty = M_TRANS_EV;
+							if(trgl.nm_trans_ref != UNSET) ty = NM_TRANS_EV;
+							c = trgl.f;
+							
+							IndInfFrom inf_from;
+							
+							add_event(ty,i,trg,UNSET,UNSET,c,t,inf_from);				
+						}
+					}
+				}		
+			}	
+		
+			// Looks to add any move leave events 
+			// Loads observation equations (using in sampling individual initial state
+			calculate_obs_eqn(seq_vec(obs_eqn_value.size()));
+			
+			// TO DO added individuals under PPC
+
+			/// Adds any individuals from the data
+			for(auto i = 0u; i < sp.nindividual_obs; i++){
+				const auto &ind = sp.individual[i];
+				
+				auto num_trig_data = 0u;
+				
+				//auto added_flag = false;
+				
+				if(1 == 1 && i < sp.nindividual_in){		
+					for(const auto &ev : ind.ev){
+						auto t = ev.t;
+						
+						if(t > t_end){
+							SimTrigEvent trig; trig.i = i; trig.t = t;
+							
+							switch(ev.type){
+							case ENTER_EV:
+								trig.type = ENTER_SIM_EV;
+								//added_flag = true;
+								trig.c = ind_sample_init_c(ind); trig.trg = UNSET;
+								break;
+								
+							case LEAVE_EV:
+								trig.type = LEAVE_SIM_EV;
+								trig.c = UNSET; trig.trg = UNSET;
+								break;
+							
+							case MOVE_EV:
+								trig.type = MOVE_SIM_EV;
+								trig.c = ev.move_c; trig.trg = ev.cl;
+								break;
+								
+							default: emsg("event type not recog"); break;
+							}	
+							
+							num_trig_data++;
+							insert_trigger_event(trig);
+						}
+					}
+					
+					/*
+					/// Adds in event data (used during inference to set up initial state)
+					for(auto m = 0u; m < ind.obs.size(); m++){
+						const auto &ob = ind.obs[m];
+						if(ob.type == OBS_TRANS_EV){
+							SimTrigEvent trig; 
+							trig.type = DATA_TRANS_SIM_EV;
+							trig.i = i; trig.t = ob.t; trig.c = m; trig.trg = UNSET;
+							num_trig_data++;
+							insert_trigger_event(trig);
+							
+							/// Determines if individual is most likely to enter through an observed source
+							if(added_flag == false){
+								for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+									if(sp.tra_gl[tr].variety == SOURCE_TRANS){
+										auto pr = like_trans_prob_obs(ob.obs_eqn_ref[tr]);
+										if(pr != LI_WRONG){ added_flag = true; break;}
+									}
+								}
+							}						
+						}
+					}
+					*/
+				}
+				else{
+					//added_flag = true;
+				}
+				
+				
+					
+				//auto ii = add_individual(OBSERVED_IND,ind.name);
+				//auto hash_vec = hash_ind.get_vec_string(row[0]);
+				//hash_tra.add(ii,hash_vec);
+				//auto ii = i;
+				
+				//individual[ii].num_trig_data = num_trig_data;
+				// TO DO
+				individual[i].num_trig_data = num_trig_data;
+			
+				/*
+				auto ii = add_individual(OBSERVED_IND,ind.name);
+			
+				individual[ii].num_trig_data = num_trig_data;
+				*/
+		
+				
+				/*
+				// Directly adds ENTER_EV at start of simulation
+				// If individual not added then add at beginning
+				if(added_flag == false && individual[ii].ev.size() == 0){
+					unsigned int c;
+					if(ind.ev.size() > 0 && ind.ev[0].type == ENTER_EV){
+						if(ind.ev[0].t < t_end){
+							stringstream ss;
+							ss << "Cannot add individual '" << ind.name << "' at time " << ind.ev[0].t << " prior to posterior simulation start time " << to_string(t_end) << ".";
+							emsg(ss.str());
+						}
+						
+						if(ind.ev[0].t != t_end) emsg("Should be at start");
+						c = ind_sample_init_c(ind);
+						
+						IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
+					
+						add_event(ENTER_EV,ii,UNSET,UNSET,UNSET,c,details.t_start,iif);
+					}
+				}
+				*/
+			}
+		
+			
+			for(auto f = 0u; f < sp.fix_effect.size(); f++) set_exp_fe(f);
+		}
+		
+		ie_Amatrix_sampler_init();
+		sample_ie_Amatrix();	
+		//emsg("do");
+		break;
+	
+	case POPULATION:
+		{
+			const auto &tab = samp_sp.cpop_init_tab;
+			auto C = sp.comp_gl.size();
+			if(tab.nrow != C) error_load_sample(11);
+
+			for(auto c = 0u; c < C; c++){
+				if(tab.ele[c][0] != sp.comp_gl[c].name) error_load_sample(12);
+				cpop[c] = number(tab.ele[c][1]); 
+			}
+			
+			init_cond_val.cnum.resize(C);
+			for(auto c = 0u; c < C; c++) init_cond_val.cnum[c] = (unsigned int)(cpop[c]);
+		}
+		
+		{
+			const auto &tab = samp_sp.trans_num_tab;
+		
+			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+				if(tab.ele[tr][0] != sp.tra_gl[tr].name) error_load_sample(15);
+				
+				auto &tnum = trans_num[tr];
+				
+				auto spl = split(tab.ele[tr][1],',');
+				auto k = 0u;
+				while(k < spl.size() && tnum.size() < ti_end){
+					auto val = spl[k];
+					if(val.substr(0,1) == "Z"){
+						auto num = number(val.substr(1));
+						if(num == UNSET || num != (unsigned int)(num)) error_load_sample(15);
+						for(auto j = 0u; j < num; j++){
+							tnum.push_back(0);
+							if(tnum.size() == ti_end) break;
+						}
+					}
+					else{
+						auto num = number(val);
+						tnum.push_back(num);
+					}
+					k++;
+				}
+			}
+			
+			for(auto ti = 0u; ti < ti_end; ti++){
+				vector <double> tnum(sp.tra_gl.size());
+				for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+					tnum[tr] = trans_num[tr][ti];
+				}
+			
+				cpop_st.push_back(cpop);
+	
+				update_cpop(ti,cpop,tnum);
+			}
+			
+			cpop_st.push_back(cpop);
+		}
+		break;
+	}
+}
+
+
+/// Sets values for tnum_mean
+void StateSpecies::set_tnum_mean(unsigned int ti_end, const vector < vector <double> > &popnum_t)
+{
+	for(auto ti = 0u; ti < ti_end; ti++){
+		auto ddt = timepoint[ti+1] - timepoint[ti];
+	
+		auto tnum_mean = calculate_tnum_mean(ti,popnum_t[ti],cpop_st[ti],param_val,ddt);
+		
+		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+			tnum_mean_st[tr].push_back(tnum_mean[tr]);
+		}
+	}
+}
+
+
+/// Samples the initial state for the individual
+unsigned int StateSpecies::ind_sample_init_c(const IndData &ind) const
+{
+	const auto &ent = sp.enter[ind.enter_ref];
+	
+	if(ent.c_set != UNSET) return ent.c_set;
+	
+	auto c_after = 0u;
+	for(auto cl = 0u; cl < sp.ncla; cl++){
+		const auto &ent_cl = ent.cla[cl];
+		if(ent_cl.c_set != UNSET) c_after += sp.comp_mult[cl]*ent_cl.c_set;
+		else{
+			auto sum = 0u; 
+			vector <double> prob, prob_sum;
+			const auto &claa = sp.cla[cl];
+			const auto &oer = ent_cl.obs_eqn_ref;
+			auto C = claa.ncomp;
+			for(auto c = 0u; c < C; c++){
+				auto pr = obs_eqn_value[oer[c]];
+				sum += pr;
+				prob.push_back(pr); prob_sum.push_back(sum);
+			}
+			
+			auto z = ran()*sum;
+			auto c = 0u; while(c < C && z > prob_sum[c]) c++;
+			if(c == C) emsg("Zero problem");
+			
+			c_after += sp.comp_mult[cl]*c;
+		}
+	}
+	
+	return c_after;
 }
 
 
@@ -182,8 +754,8 @@ string StateSpecies::get_new_ind_name(string pre, unsigned int num) const
 	auto loop = 0u;
 	do{
 		string name;
-		if(loop == 0) name = pre+"Ind. "+tstr(num); 
-		else name = pre+"Ind. "+tstr(num)+"("+alphabet[loop-1]+")";
+		if(loop == 0) name = pre+"Ind."+tstr(num); 
+		else name = pre+"Ind."+tstr(num)+"("+alphabet[loop-1]+")";
 		
 		auto i = 0u; while(i < individual.size() && individual[i].name != name) i++;
 		if(i == individual.size()) return name;
@@ -195,43 +767,6 @@ string StateSpecies::get_new_ind_name(string pre, unsigned int num) const
 }
 
 
-/// Adds an individual to the state
-void StateSpecies::add_individual(string name, unsigned int c, bool from_source)
-{
-	Individual ind;
-	ind.name = name;
-	ind.cinit = c;
-	ind.c = c;
-	ind.cl_ev.resize(sp.ncla);
-	
-	ind.ie = sample_ie();
-	set_exp_ie(ind);
-	
-	if(from_source == true){
-		if(sp.fix_effect.size() > 0) emsg("Cannot have fixed affects with a source");
-	}
-	else{
-		auto i = individual.size();
-		for(auto f = 0u; f < sp.fix_effect.size(); f++){
-			const auto &fe = sp.fix_effect[f];
-			const auto &X = fe.X_vector;
-			
-			if(i >= X.ind_list.size()) emsg("Individual '"+name+"' does not have a design matrix X specified for fixed effect '"+fe.name+"'");
-			
-			if(X.ind_list[i] != name) emsg("Names do not agree");
-			ind.X.push_back(X.value[i]);
-			ind.exp_fe.push_back(UNSET);
-		}
-	}
-	
-	individual.push_back(ind);
-	
-	if(individual.size() > details.individual_max){
-		emsg("Maximum number of "+tstr(details.individual_max)+" individuals reached");
-	}
-}
-
-
 /// Sets up the exponential of the fixed effects
 vector <double> StateSpecies::set_exp_fe(unsigned int f)
 {	
@@ -240,7 +775,9 @@ vector <double> StateSpecies::set_exp_fe(unsigned int f)
 	const auto &par = param[fe.th];
 
 	double pval;
-	if(par.variety == CONST_PARAM) pval = par.value[0].value;
+	if(par.variety == CONST_PARAM){
+		pval = par.value[0].value;
+	}
 	else{
 		auto th2 = par.param_vec_ref[0];
 		if(th2 == UNSET) emsg("Should not be unset1");		
@@ -326,7 +863,7 @@ vector <double> StateSpecies::recalculate_exp_ie(unsigned int ie)
 }
 
 
-/// Recalcualted exp_ie given omega has changed
+/// Restores values for exp_ie
 void StateSpecies::recalculate_exp_ie_restore(unsigned int ie, const vector <double> &store)
 {
 	auto j = 0u;
@@ -357,12 +894,12 @@ void StateSpecies::ie_sampler_init()
 
 
 
-/// 
+/// Initialises sampler for individual effects which use A martrix
 void StateSpecies::ie_Amatrix_sampler_init()
 {
-	for(auto i = 0u; i < sp.ind_eff_group.size(); i++){
-		const auto &ieg = sp.ind_eff_group[i];
-		auto &iegs = ind_eff_group_sampler[i];
+	for(auto ig = 0u; ig < sp.ind_eff_group.size(); ig++){
+		const auto &ieg = sp.ind_eff_group[ig];
+		auto &iegs = ind_eff_group_sampler[ig];
 		
 		const auto &Aieg = ieg.A_matrix;
 		if(Aieg.set == true){
@@ -370,8 +907,9 @@ void StateSpecies::ie_Amatrix_sampler_init()
 			vector <unsigned int> map(I);
 			for(auto i = 0u; i < I; i++){
 				auto name = individual[i].name;
-				auto ii = find_in(Aieg.ind_list,name);
-				if(ii == UNSET) emsg("Cannot find individual '"+name+"' is the Amatrix");
+				//auto ii = find_in(Aieg.ind_list,name);
+				auto ii = Aieg.hash_ind_list.find(name);
+				if(ii == UNSET) emsg("Cannot find individual '"+name+"' in the A matrix");
 				map[i] = ii;
 			}
 			
@@ -383,8 +921,10 @@ void StateSpecies::ie_Amatrix_sampler_init()
 					A[j][i] = Aieg.value[map[j]][map[i]];
 				}
 			}
+			
 			iegs.A_Z = calculate_cholesky(A);
 			auto A_inv = invert_matrix(A);
+			tidy(A_inv);
 			iegs.A_inv = A_inv;
 			iegs.A_inv_diag.resize(I);
 			iegs.A_inv_nonzero.resize(I);
@@ -429,9 +969,9 @@ vector <double> StateSpecies::calculate_omega(unsigned int g)
 		}
 	}
 	
-	//print("Omega",iegs.omega);
+	if(false) print("Omega",iegs.omega);
 	
-	/// Converts correlations to variances
+	// Converts correlations to variances
 	for(auto j = 0u; j < N; j++){
 		for(auto i = 0u; i < N; i++){
 			if(j != i) iegs.omega[j][i] *= sqrt(iegs.omega[i][i]*iegs.omega[j][j]);
@@ -466,7 +1006,7 @@ void StateSpecies::calculate_omega_restore(unsigned int g, const vector <double>
 /// Samples the individual effects 
 vector <double> StateSpecies::sample_ie() const
 {
-	auto N = sp.ind_effect.size(); // The number of individual effects
+	auto N = sp.ind_effect.size();               // The number of individual effects
 	
 	vector <double> vec(N,UNSET);
 	
@@ -493,7 +1033,7 @@ vector <double> StateSpecies::sample_ie() const
 	
 	if(flag == false){
 		for(auto i = 0u; i < N; i++){
-			if(vec[i] == UNSET) emsg("SHould not be unset3");
+			if(vec[i] == UNSET) emsg("Should not be unset3");
 		}
 	}
 	
@@ -510,7 +1050,7 @@ void StateSpecies::sample_ie_Amatrix()
 		
 		const auto &iegs = ind_eff_group_sampler[i];
 		
-		if(ieg.A_matrix.set == true){
+		if(ieg.A_matrix.set == true && !(mode == PPC && ieg.ppc_resample == false)){
 			flag = true;
 			
 			auto N = ieg.list.size();
@@ -560,12 +1100,11 @@ double StateSpecies::get_indfac(const Individual &ind, const MarkovEqn &mar_eqn)
 		cout << eqn[mar_eqn.eqn_ref].te << " ";
 		for(auto ie : mar_eqn.ind_eff_mult) cout << "mult IE " << ie << endl;
 		for(auto fe : mar_eqn.fix_eff_mult) cout << "mult FE " << fe << endl;
-		cout << val << "val\n";
+		cout << val << "val" << endl;
 	}
 	
 	return val;
 }
-
 
 
 /// Updates population-based species
@@ -575,9 +1114,23 @@ void StateSpecies::update_population_based(unsigned int ti, bool stoc, const vec
 	auto ddt = timepoint[ti+1] - t;
 		
 	auto tnum_mean = calculate_tnum_mean(ti,popnum,cpop,param_val,ddt);
-
+	
+	if(false){
+		for(auto val : cpop) cout << val << ","; 
+		cout << "cpop" << endl;
+		
+		for(auto val : param_val) cout << val << ","; 
+		cout << "paramval" << endl;
+		
+		for(auto val : popnum) cout << val << ","; 
+		cout << "popnum" << endl;
+		
+		for(auto val : tnum_mean) cout << val << ","; 
+		cout << " val" << endl;
+	}
+	
 	auto tnum = sample_trans_num(tnum_mean,stoc);
-	//cout << ti << " " << tnum[0] << " " << tnum_mean[0] << " transnum\n";
+	
 	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 		tnum_mean_st[tr].push_back(tnum_mean[tr]);
 		trans_num[tr].push_back(tnum[tr]);
@@ -585,19 +1138,25 @@ void StateSpecies::update_population_based(unsigned int ti, bool stoc, const vec
 	
 	cpop_st.push_back(cpop);
 	
-	update_cpop(cpop,tnum);
+	update_cpop(ti,cpop,tnum);
 }
 
 
 /// Updates the compartmental populations based on transition numbers
-void StateSpecies::update_cpop(vector <double> &cpop, const vector <double> &tnum) const
+void StateSpecies::update_cpop(unsigned int ti, vector <double> &cpop, const vector <double> &tnum) const
 {
 	for(auto i = 0u; i < sp.tra_gl.size(); i++){
 		const auto &tra = sp.tra_gl[i];
 		auto num = tnum[i];
 	
-		if(tra.i != SOURCE) cpop[tra.i] -= num;
-		if(tra.f != SINK) cpop[tra.f] += num;
+		if(tra.i != UNSET) cpop[tra.i] -= num;
+		if(tra.f != UNSET) cpop[tra.f] += num;
+	}
+	
+	if(sp.add_rem_pop_on){
+		for(auto c : sp.add_rem_pop_change[ti]){
+			cpop[c] += sp.add_rem_pop[ti][c];
+		}
 	}
 }
 
@@ -639,15 +1198,14 @@ double StateSpecies::calculate_tnum_mean(unsigned int ti, unsigned int i, const 
 	const auto &eq = eqn[tr.dist_param[0].eq_ref];
 	auto rate = eq.calculate(ti,popnum,param_val,spline_val);
 	
-	if(rate < 0){
-		for(auto val:param_val) cout << val << " val\n";
-		
+	if(rate < 0){	
 		emsg("The transition rate for '"+tr.name+"' has become negative."+check_prior(eq));
 	}
 		
 	auto ci = tr.i;
 	double pop;
-	if(ci == SOURCE){ pop = 1.0/eq.source_tr_gl.size();}  
+	
+	if(ci == UNSET) pop = 1.0;
 	else{ pop = cpop[ci]; if(pop < 0) pop = 0;}
 	
 	return pop*rate*dt;
@@ -683,9 +1241,10 @@ void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t)
 {
 	cpop_st_f.clear();
 	
-	auto cpop = cpop_st[0];
-	//auto popnum = popnum_t[0];
-	
+	auto C = sp.comp_gl.size();
+	vector <double> cpop(C);
+	for(auto c = 0u; c < C; c++) cpop[c] = double(init_cond_val.cnum[c]);	
+		
 	auto N = sp.tra_gl.size();
 				
 	vector <int> num(N);
@@ -699,11 +1258,11 @@ void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t)
 		for(auto tr = 0u; tr < N; tr++){
 			auto tnum_mean_i = tnum_mean_st[tr][ti];
 			auto tnum_mean_f = calculate_tnum_mean(ti,tr,popnum,cpop,param_val,ddt);
-		
+			
 			auto num_i = trans_num[tr][ti];
 
 			unsigned int num_f;	
-			if(sim_prob == 0 || ran() > sim_prob){     // Does a MBP
+			if(sim_prob == 0 || ran() > sim_prob){  // Does a MBP
 				if(tnum_mean_f > tnum_mean_i){
 					num_f = num_i + poisson_sample(tnum_mean_f-tnum_mean_i);
 				}
@@ -714,7 +1273,7 @@ void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t)
 					}
 				}
 			}
-			else{                                      // Does a simulation
+			else{                                   // Does a simulation
 				num_f = poisson_sample(tnum_mean_f);	
 			}
 			
@@ -734,16 +1293,24 @@ void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t)
 				if(n != 0){
 					const auto &tra = sp.tra_gl[tr];
 					auto ci = tra.i;
-					if(ci != SOURCE){
+					if(ci != UNSET){
 						cpop[ci] -= n;
 						for(auto po : sp.comp_gl[ci].pop_ref_simp) popnum_new[po] -= n;
 					}
 					
 					auto cf = tra.f;
-					if(cf != SINK){
+					if(cf != UNSET){
 						cpop[cf] += n;
 						for(auto po : sp.comp_gl[cf].pop_ref_simp) popnum_new[po] += n;
 					}
+				}
+			}
+			
+			if(sp.add_rem_pop_on){
+				for(auto c : sp.add_rem_pop_change[ti]){
+					auto val = sp.add_rem_pop[ti][c];
+					cpop[c] += val;
+					for(auto po : sp.comp_gl[c].pop_ref_simp) popnum_new[po] += val;
 				}
 			}
 		}
@@ -755,7 +1322,7 @@ void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t)
 }
 
 
-/// Performs a MBP
+/// Accepts a MBP
 void StateSpecies::mbp_accept(double &like_ch, const vector < vector <double> > &popnum_t)
 {
 	like_ch -= sum(Li_markov_pop);
@@ -771,4 +1338,130 @@ void StateSpecies::mbp_accept(double &like_ch, const vector < vector <double> > 
 	like_ch += sum(Li_markov_pop);
 }
 
+
+/// Moves a single event to a new time and generates the new event sequence
+unsigned int StateSpecies::move_event(vector <Event> &ev, unsigned int index, double t_new) const 
+{
+	auto flag = false;
+	auto ev_store = ev[index];
+	auto E = ev.size();
+	auto t = ev_store.t;
+	
+	if(t_new > t){
+		while(index+1 < E && ev[index+1].t < t_new){
+			ev[index] = ev[index+1];
+			index++;
+			flag = true;
+		}							
+	}
+	else{
+		while(index > 0 && ev[index-1].t > t_new){
+			ev[index] = ev[index-1];
+			index--;
+			flag = true;
+		}			
+	}
+	
+	auto tr_gl_new = UNSET;
+
+	// If the move event crosses an event in another classification
+	if(flag == true){  
+		ev[index] = ev_store;
+		ev[index].t = t_new;
+		
+		ensure_consistent(ev);
+		tr_gl_new = ev[index].tr_gl;
+	}
+	else{
+		ev[index].t = t_new;
+	}
+
+	return tr_gl_new;
+}
+
+
+/// Gets ti div time from an actual time
+unsigned int StateSpecies::get_ti(double t) const
+{
+	return (unsigned int)(OVER_ONE*(t-details.t_start)/details.dt);
+}
+
+
+/// Used to order events
+bool Event_ord (Event ev1, Event ev2)                      
+{ return (ev1.t < ev2.t); };  
+
+
+/// Makes sure event sequence
+void StateSpecies::make_consistent(vector <Event> &event) const
+{
+	if(sp.multi_trans_cl){	
+		// Sorts events by time 
+		sort(event.begin(),event.end(),Event_ord);    
+		
+		auto c = UNSET;
+		for(auto k = 0u; k < event.size(); k++){	
+			auto &ev = event[k];
+			if(sp.correct_ev(c,ev) == true) emsg("Inconsistent");
+			c = ev.c_after; 
+		}
+	}
+	
+	set_m_ti_origin(event);
+}
+
+
+/// Sets cpop_st for population-based models (based on initial condition and trans_num
+void StateSpecies::set_cpop_st()
+{	
+	if(sp.type != POPULATION) emsg("cpop_st only defined for population-based model");
+		
+	auto C = sp.comp_gl.size();
+	vector <double> cpop(C);
+	
+	switch(sp.init_cond.type){
+	case INIT_POP_FIXED: case INIT_POP_DIST:	
+		for(auto c = 0u; c < C; c++) cpop[c] = double(init_cond_val.cnum[c]);
+		break;
+		
+	case INIT_POP_NONE:
+		for(auto c = 0u; c < C; c++) cpop[c] = 0;
+		break;
+	}
+	
+	auto N = sp.tra_gl.size();
+			
+	for(auto ti = 0u; ti < T; ti++){
+		auto C = sp.comp_gl.size();
+			
+		for(auto c = 0u; c < C; c++) cpop_st[ti] = cpop;
+		
+		for(auto tr = 0u; tr < N; tr++){
+			auto n = trans_num[tr][ti];
+		
+			if(n != 0){
+				const auto &tra = sp.tra_gl[tr];
+				auto ci = tra.i;
+				if(ci != UNSET) cpop[ci] -= n;
+				
+				auto cf = tra.f;
+				if(cf != UNSET) cpop[cf] += n;
+			}
+		}
+		
+		if(sp.add_rem_pop_on){
+			for(auto c : sp.add_rem_pop_change[ti]){
+				cpop[c] += sp.add_rem_pop[ti][c];
+			}
+		}
+	}
+}
+
+
+/// Gets the observation probability on an observation for a transition
+double StateSpecies::get_trans_obs_prob(unsigned int trg, const ObsData &ob) const
+{
+	if(ob.time_vari) return obs_eqn_value[ob.obs_eqn_ref[trg]];
+	else return obs_eqn_value[sp.obs_trans[ob.ref].obs_eqn_ref[trg]];
+}
 

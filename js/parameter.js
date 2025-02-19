@@ -1,13 +1,108 @@
 "use strict";
-/// Give all functions relating to parameters
+// Functions relating to parameters
+
+/// Generates a list of all model parameters
+// Goes through the exisiting list and copies any info on values/priors
+function update_model()
+{
+	model.warn = [];
+	
+	check_data_valid_all("siminf");
+
+	let lists = generate_parameter_list();           // Generates a list of all model parameters
+
+	if(false){ pr("lists"); pr(lists);}
+
+	let ielist = lists.ind_eff_list;       
+  let felist = lists.fix_eff_list;       
+	let par_list = lists.par_list;
+	
+	update_model_ind_eff(ielist);                    // Updates individual effect groupings in model
+	
+	update_model_fix_eff(felist);                    // Updates fixed effects in model 
+	
+	add_param_ppc_factor(par_list);                  // Adds any parameter for ppc factors
+
+	add_ind_eff_param(par_list);                     // Adds individual effect parameters (i.e. variances) to model
+	
+	update_model_param(par_list);                    // Updates the model parameters
+
+	for(let th = 0; th < model.param.length; th++){  // Sets the distance matrix
+		let par = model.param[th];	
+		if(par.name == dist_matrix_name){
+			set_dist(par);                            
+		}
+	}
+	
+	set_generate_pos();
+	
+	if(model.warn.length > 0) err_warning();
+}
+
+
+/// Sets if it is possible to generate data from results (by seeing if the model had been altered)
+function set_generate_pos()
+{
+	let sp = model.species;
+	let sp2 = sim_result.species;
+	
+	for(let p = 0; p < sp.length; p++){
+		sp[p].generate_pos = false;
+	}	
+	
+	if(sp2 && sp2.length == sp.length){
+		for(let p = 0; p < sp.length; p++){
+			let fl = 0;
+			
+			if(sp[p].type != sp2[p].type) fl = 1;
+			
+			if(sp[p].cla.length != sp2[p].cla.length) fl = 2;
+			else{
+				for(let cl = 0; cl < sp[p].cla.length; cl++){
+					let claa = sp[p].cla[cl], claa2 = sp2[p].cla[cl];
+					
+					if(claa.name != claa2.name || claa.index != claa2.index) fl = 3;
+					else{
+						if(claa.comp.length != claa2.comp.length) fl = 4;
+						else{
+							for(let c = 0; c < claa.comp.length; c++){
+								let co = claa.comp[c], co2 = claa2.comp[c];
+								if(co.name != co2.name || co.branch != co2.branch) fl = 5;
+								if(co.infected.check != co2.infected.check) fl = 6;
+							}
+						}
+		
+						if(claa.tra.length != claa2.tra.length) fl = 7;
+						else{
+							for(let tr = 0; tr < claa.tra.length; tr++){
+								let tra = claa.tra[tr], tra2 = claa2.tra[tr];
+								if(tra.i != tra2.i) fl = 8;
+								if(tra.f != tra2.f) fl = 9;
+								if(tra.type != tra2.type) fl = 10;
+								if(tra.bp_set != tra2.bp_set) fl = 11;
+								
+								let br = false; if(tra.branch == true) br = true;
+								let br2 = false; if(tra2.branch == true) br2 = true;
+								if(br != br2)	fl = 12;
+							}				
+						}
+					}
+				}
+			}
+			
+			if(fl == 0) sp[p].generate_pos = true;
+			else sp[p].generate_pos = false;
+		}
+	}		
+}
+
 
 /// Genrates a list of all model parameters
 function generate_parameter_list()
 {
-	//coment("Gather list of parameters");
-	let eq_list = model.find_equation_list();
+	let eq_list = find_equation_list();
 	
-	//comment("eq list");comment(eq_list);
+	if(false){ pr("eq_list"); pr(eq_list);}
 	
 	let list = [];
 	let ind_eff_list = [];
@@ -17,13 +112,16 @@ function generate_parameter_list()
 		let sp = model.species[p];
 		for(let cl = 0; cl < sp.ncla; cl++){
 			let claa = sp.cla[cl];
+			if(claa.ncomp == 0){
+				model.warn.push({mess:"Classification problem", mess2:"Classification '"+claa.name+"' does not contain any compartments", p:p, cl:cl, warn_type:"NoClaComp"});
+			}
 			for(let c = 0; c < claa.ncomp; c++){
 				let co = claa.comp[c];
 				if(co.name == ""){
 					model.warn.push({mess:"Missing compartment name", mess2:"Name has not been specified in classification '"+claa.name+"'", p:p, cl:cl, c:c, warn_type:"MissingComp"});
 				}
 				else{
-					if(co.col == WHITE){
+					if(co.col == "#FFFFFF"){
 						model.warn.push({mess:"Compartment colour not set", mess2:"In compartment '"+co.name+"' classification '"+claa.name+"'", p:p, cl:cl, c:c, warn_type:"MissingColour"});
 					}
 				}
@@ -71,12 +169,20 @@ function generate_parameter_list()
 			mess = "For a disease diagnostic test specificity";
 			break;
 			
-		case "trap_prob":
-			mess = "For a trapping probability";
+		case "mut_rate": 
+			mess = "For a genetic mutation rate";
+			break;
+			
+		case "seq_var": 
+			mess = "For a genetic sequence variation";
 			break;
 			
 		case "comp_prob":
 			mess = "For a compartmental probability";
+			break;
+		
+		case "trans_prob":
+			mess = "For a transition probability";
 			break;
 						
 		case "reparam":
@@ -102,7 +208,8 @@ function generate_parameter_list()
 		}
 		
 		for(let i = 0; i < eqn.fix_eff.length; i++){
-			let par = { name:eqn.fix_eff[i].name, age_dep: false, time_dep: false, dep:[], eqn_appear:[], type: "fixed effect"};
+			//let par = { name:eqn.fix_eff[i].name, time_dep: false, dep:[], eqn_appear:[], type: "fixed effect"};
+			let par = { name:"ν^"+eqn.fix_eff[i].name, time_dep: false, dep:[], eqn_appear:[], type: "fixed effect"};
 			add_par_to_list(par,list,copy(eqn),mess);
 		}
 		
@@ -155,7 +262,7 @@ function generate_parameter_list()
 			fix_eff_list[j].eqn_appear.push(copy(eqn));
 		}
 	}
-	
+
 	return {par_list:list, ind_eff_list:ind_eff_list, fix_eff_list:fix_eff_list};
 }
 
@@ -213,7 +320,7 @@ function add_par_to_list(par,list,eqn,mess)
 	}
 	
 	if(eqn != undefined){
-		list[j].eqn_appear.push(eqn);
+	list[j].eqn_appear.push(eqn);
 	}
 }
 
@@ -224,7 +331,8 @@ function param_eqn_desc(eqn)
 	switch(eqn.type){
 	case "Se": return "as a diagnostic test sensitivity";
 	case "Sp": return "as a diagnostic test specificity";
-	case "trap_prob": return "as a trapping probability";
+	case "mut_rate": return "as a genetic mutation rate";
+	case "seq_var": return "as a genetic sequence variation";
 	case "trans_bp": return "as a branching probability";
 	case "trans_mean": return "in a transition mean";
 	case "trans_rate": return "in a transition rate";
@@ -233,33 +341,8 @@ function param_eqn_desc(eqn)
 	case "trans_cv": return "in a transition coefficient of variation";
 	case "comp_prob": return "in a compartmental probability";
 	case "reparam": return "in a reparametersation";
-	default: error("option not pos"); break;	
+	default: error("option not pos:"+eqn.type); break;	
 	}
-}
-
-
-/// Finds the lists for the dependencies
-function par_find_list(par)
-{
-	let dep = par.dep;
-	let ndep = dep.length;
-	
-	if(ndep == 0) return;
-	if(par.type == "ind_eff") return;
-	
-	var list = [];
-	
-	for(let i = 0; i < ndep; i++){	
-		if(dep[i] == "t" || dep[i] == "a"){
-			list[i]	= par.spline.knot;
-		}
-		else{
-			list[i] = find_comp_from_index(dep[i]);
-			if(list.length == 0) error("Cannot find compartments from index");
-		}
-	}
-	
-	return list;
 }
 
 
@@ -267,6 +350,13 @@ function par_find_list(par)
 function par_find_template(list)
 {
 	let ndep = list.length;
+	
+	let list_len = [];
+	for(let d = 0; d < ndep; d++){
+		let k = 0;
+		while(k < list[d].length && list[d][k] != undefined) k++;
+		list_len[d] = k;
+	}
 	
 	let index = [];
 	for(let i = 0; i < ndep; i++) index[i] = 0;
@@ -293,7 +383,7 @@ function par_find_template(list)
 		do{
 			flag = false;
 			index[i]++; 
-			if(index[i] >= list[i].length){
+			if(index[i] >= list_len[i]){
 				index[i] = 0; 
 				i++; 
 				flag = true;
@@ -333,32 +423,6 @@ function get_element_list(ob,dim,dim_used)
 }
 
 
-/*
-/// Performs an OR opertaion on the needed objects
-function add_needed(needed,add)
-{
-	let dim = get_dimentions(needed);
-	
-	let ndim = dim.length;
-	let index = [];	
-	for(let i = 0; i < ndim; i++) index[i] = 0;
-	
-	let flag;
-	do{
-		if(get_element(add,index) == true){
-			set_element(needed,index,true);
-		}
-		
-		let i = 0; 
-		do{
-			flag = false;
-			index[i]++; if(index[i] >= dim[i]){ index[i] = 0; i++; flag = true;}
-		}while(i < ndim && flag == true);
-	}while(flag == false);
-}
-*/
-
-
 /// Gets the value of the object based on the index
 function get_element(ob,ind)
 {
@@ -391,8 +455,58 @@ function set_element(ob,ind,value)
 }
 
 
-/// Gets the dimentions of the object
-function get_dimentions(ob)
+/// Gets the dimentions
+function get_value_dim(par)
+{
+	let dim = [];
+	if(Array.isArray(par.value) && par.comb_list.length > 0){
+		for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
+	}
+	return dim;
+}
+
+
+/// Gets a description of value to send back to inferface
+function get_value_desc(par)
+{
+	let te;
+	
+	if(Array.isArray(par.value)){
+		if(par.comb_list.length == 0){
+			return no_elements;
+		}
+		
+		let dim = [];
+		for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
+		
+		//let dim = get_list_len(par.list);//  get_dimensions(par.value);
+		switch(dim.length){
+		case 1: te = "Vector("; break;
+		case 2: te = "Matrix("; break;
+		default: te = "Tensor("; break;
+		}
+		
+		let tot = 1; 
+		for(let k = 0; k < dim.length; k++){
+			if(k != 0) te += ",";
+			te += dim[k];
+			tot *= dim[k];
+		}
+		te += ")";
+		
+		if(par.set == true && tot < 10){
+			te = JSON.stringify(par.value);
+			te = te.replace(/\"/g," ")
+			te = te.replace(/null/g,"Unset");
+		}
+	}
+	
+	return te;
+}
+
+
+/// Gets the dimensions of the object
+function get_dimensions(ob)
 {
 	let dim=[];
 	while(typeof(ob) == "object"){
@@ -447,398 +561,15 @@ function find_index_from_comp(p_name,name)
 	let sp = model.species[p];
 	for(let cl = 0; cl < sp.ncla; cl++){
 		let claa = sp.cla[cl];
-		if(find(claa.comp,"name",name) != undefined){
+		if(hash_find(claa.hash_comp,name) != undefined){
 			return claa.index;
 		}
 	}
 	return "";
 }
 	
-
-/// Closes the parameter source 
-function close_param_source()
-{
-	inter.edit_param = {};
-}
-
 	
-/// Allows the user to edit parameter values
-function create_edit_param(lay)
-{
-	lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, type:"Rect", val:WHITE});
-		
-	let cx = corner.x;
-	let cy = corner.y;
-
-	let title = "Edit tensor values";
-	let help = edittensor_text;
-	let doneac = "EditParamDone";
-	
-	let	load_title = "Load tensor values", load_te = load_tensor_text;
-	let load_ac = "LoadTensor";
-	
-	let par = model.param[inter.edit_param.i];
-	
-	switch(lay.op.type){
-	case "Value":
-		title = "Edit constant tensor values";
-		break;
-		
-	case "Reparam":
-		title = "Edit parameter reparameterisation";
-		help = editreparam_text;
-		doneac = "EditReparamDone";
-		load_title = "Load reparameterisation", load_te = load_reparam_text; 
-		load_ac = "LoadReparam";
-		break;
-	
-	case "PriorSplit":
-		title = "Edit priors";
-		help = editpriorsplit_text; 
-		doneac = "EditPriorSplitDone";
-		load_title = "Load priors", load_te = load_priorsplit_text; 
-		load_ac = "LoadPriorSplit";
-		break;
-		
-	case "DistSplit":
-		title = "Edit distributions";
-		help = editdistsplit_text;
-		doneac = "EditDistSplitDone";
-		load_title = "Load distributions", load_te = load_distsplit_text; 
-		load_ac = "LoadDistSplit";
-		break;
-	}
-
-	let dim = par.dep.length;
-	
-	title = convert_tensor_text(title,dim);
-	help = convert_tensor_text(help,dim);
-	load_title = convert_tensor_text(load_title,dim);
-	load_te = convert_tensor_text(load_te,dim);
- 
-	title += " for "+par.full_name;
-	cy = lay.add_title(title,cx,cy,{te:help});
-	
-	//let xx = cx + text_width(te,get_font(1))+0.4;
-	
-	//lay.display_param(xx,cy-0.15,inter.edit_param.label_info);
-	
-	//cy = lay.add_paragraph(te,lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
-	//cy += 0.5;
-	//cy -=1;
-	
-	add_layer("CreateEditParamContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{type:lay.op.type});
-	
-	lay.add_corner_button([["Cancel","Grey","CancelEditParam"],["Done","Grey",doneac]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
-	 
-	let x = 1.2, y = lay.dy-1.6;
-	let gap = 3.5;
-	
-	let w = model.add_object_button(lay,"Load",x,y,load_ac,{ back:WHITE, active:true, info:{}, title:load_title, te:load_te}); 
-	x += w+gap;
-}
-
-
-/// Plots vector/matrix to allow for values to be editted			
-function add_create_edit_param_buts(lay)
-{
-	let i = inter.edit_param.i;
-	//source =
-	
-	let par = model.param[i];
-
-	let action = "EditParamElement";
-	let dx_table_param = 7;
-	
-	let ele_type = "ParamElement";
-	
-	
-	switch(lay.op.type){
-	case "Value":
-		ele_type = "ParamElementConst";
-		break;
-		
-	case "Reparam":
-		ele_type = "ReparamTableElement"; 
-		dx_table_param = 12;
-		break;
-	
-	case "PriorSplit": 
-		ele_type = "PriorSplitElement";
-		action = "EditPriorSplitElement";
-		dx_table_param = 12;
-		break;
-		
-	case "DistSplit":
-		ele_type = "DistSplitElement";
-		action = "EditDistSplitElement";
-		dx_table_param = 12;
-		break;
-		
-	default: error("option not recog"); break;
-	}
-	
-	let value = inter.edit_param.value;
-	//if(
-	
-	//let need = inter.edit_param.need;
-	
-	let list = par.list;
-	
-	let dep = par.dep;
-	
-	let si_mar = 1;
-	let fo_mar = get_font(si_mar);
-	let fo_head = get_font(si_mar,"bold italic","times");
-	let fo_table = get_font(si_table);
-	let mar = 0.4;
-	let gap = 0.7;
-	let cy = 0;//1;
-	let mar_col = DRED;
-	
-	let w_dep = [];
-	for(let i = 0; i < dep.length; i++){
-		let wmax = 0;
-		
-		for(let j = 0; j < list[i].length; j++){
-			let te = list[i][j];
-			let w = text_width(te,fo_mar);
-			if(w > wmax) wmax = w;
-		}
-		w_dep[i] = wmax+1;
-	}
-		
-	if(dep.length == 2){ // matrix
-		let welemax = 0;
-		for(let j = 0; j < list[0].length; j++){
-			for(let i = 0; i < list[1].length; i++){
-				let w = text_width(value[j][i],fo_table);
-				if(w > welemax) welemax  = w;
-			}
-		}
-		welemax++;
-		
-		let dx = w_dep[1];
-		if(welemax > dx) dx = welemax;
-  	
-		let cx = 2;
-		
-		lay.add_button({te:dep[1], x:cx, y:cy, dx:w_dep[0]-0.3, dy:dy_table, type:"RightText", si:si_mar, font:fo_head, col:mar_col});
-		
-		lay.add_button({te:dep[0], x:cx, y:cy+1.1, dx:w_dep[0]-0.3, dy:dy_table, type:"RightText", si:si_mar, font:fo_head, col:mar_col});
-		
-		cx += w_dep[0]+gap;
-			
-		for(let i = 0; i < list[1].length; i++){
-			lay.add_button({te:list[1][i], x:cx, y:cy, dx:dx, dy:dy_table_param, type:"Text", si:si_mar, font:fo_mar, col:mar_col});
-			cx += dx;
-		}
-		cy += dy_table_param+0.4;
-		
-		cx = 2;
-		lay.add_button({x:cx+w_dep[0]+gap-mar, y:cy-mar, dx:dx*list[1].length+2*mar, dy:dy_table_param*list[0].length+2*mar, type:"Outline", col:BLACK});
-		
-		for(let j = 0; j < list[0].length; j++){
-			let cx = 2;
-			lay.add_button({te:list[0][j], x:cx, y:cy, dx:w_dep[0]-0.3, dy:dy_table_param, type:"RightText", si:si_mar, font:fo_mar, col:mar_col});
-			cx += w_dep[0]+gap;
-			
-			for(let i = 0; i < list[1].length; i++){
-				let pindex = [j,i];
-				let val = get_element(value,pindex);
-		
-				lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:ele_type, font:fo_table, i:i, pindex:pindex, ac:action});
-				cx += dx;
-			}
-			cy += dy_table_param;
-		}
-	}
-	else{	
-		let dim = get_dimentions(value);
-		let ele_list = get_element_list(value,dim);
-	
-		let cx = 2;
-		for(let j = 0; j < dep.length; j++){
-			lay.add_button({te:dep[j], x:cx, y:cy, dx:w_dep[j], dy:dy_table_param, type:"Text", si:si_mar, font:fo_head, col:mar_col});
-			cx += w_dep[j];
-		} 
-		cy += dy_table_param;
-			
-		lay.add_button({x:cx+gap-mar, y:cy-mar, dx:dx_table_param+2*mar, dy:ele_list.length*dy_table_param+2*mar, type:"Outline", col:BLACK});
-		
-		for(let k = 0; k < ele_list.length; k++){
-			let cx = 2;
-			for(let j = 0; j < dep.length; j++){
-				lay.add_button({te:list[j][ele_list[k][j]], x:cx, y:cy, dx:w_dep[j], dy:dy_table_param, type:"Text", si:si_mar, font:fo_mar, col:mar_col});
-				cx += w_dep[j];
-			}
-			
-			cx += gap;
-			
-			let pindex = ele_list[k];
-			
-			let val = get_element(value,pindex);
-				
-			//let ac; if(get_element(need,pindex) == true) ac = action;
-				
-			lay.add_button({te:val, x:cx, y:cy, dx:dx_table_param, dy:dy_table_param, type:ele_type, font:fo_table, i:i, pindex:pindex, ac:action});
-			
-			cy += dy_table_param;
-		}
-	}
-	
-	lay.add_button({x:0, y:cy, dx:0, dy:0.5, type:"Nothing"});	
-}
-
-
-/// Loads tensor values
-function load_tensor()
-{
-	let ep = inter.edit_param;
-	let par = model.param[ep.i];
-	let dep = par.dep;
-	let list = par.list;
-	let value = ep.value;
-	//let need = ep.need;
-	let tab = inter.edit_source.table;
-	
-	for(let r = 0; r < tab.nrow; r++){
-		let ind=[];
-		let flag = false;
-		for(let i = 0; i < dep.length; i++){
-			let te = tab.ele[r][i].trim();
-			let k = 0; while(k < list[i].length && te != list[i][k]) k++;
-			if(k < list[i].length) ind[i] = k;
-			else{ flag = true; error("Problem loading");}
-		}
-		
-		if(flag == false){
-			let val = Number(tab.ele[r][dep.length]);
-			//if(get_element(need,ind) == true){
-			set_element(value,ind,val);
-			//}
-		}
-	}
-	
-	close_data_source();
-}
-
-
-/// Loads reparameterised values
-function load_reparam()
-{
-	let ep = inter.edit_param;
-	let par = model.param[ep.i];
-	let dep = par.dep;
-	let list = par.list;
-	let value = ep.value;
-	//let need = ep.need;
-	let tab = inter.edit_source.table;
-	
-	for(let r = 0; r < tab.nrow; r++){
-		let ind=[];
-		let flag = false;
-		for(let i = 0; i < dep.length; i++){
-			let te = tab.ele[r][i].trim();
-			let k = 0; while(k < list[i].length && te != list[i][k]) k++;
-			if(k < list[i].length) ind[i] = k;
-			else{ flag = true; error("Problem loading");}
-		}
-		
-		if(flag == false){
-			let val = tab.ele[r][dep.length];
-			if(!isNaN(val)) val = Number(val);
-			
-			//if(get_element(need,ind) == true){
-			set_element(value,ind,val);
-			//}
-		}
-	}
-	
-	close_data_source();
-}
-
-
-/// Loads prior split values
-function load_priorsplit()
-{
-	let ep = inter.edit_param;
-	let par = model.param[ep.i];
-	
-	let dep = par.dep;
-	let list = par.list;
-	let prior_split = ep.prior_split;
-	let value = ep.value;
-	//let need = ep.need;
-	let tab = inter.edit_source.table;
-	
-	for(let r = 0; r < tab.nrow; r++){
-		let ind=[];
-		let flag = false;
-		for(let i = 0; i < dep.length; i++){
-			let te = tab.ele[r][i].trim();
-			let k = 0; while(k < list[i].length && te != list[i][k]) k++;
-			if(k < list[i].length) ind[i] = k;
-			else{ flag = true; error("Problem loading");}
-		}
-		
-		if(flag == false){
-			//if(get_element(need,ind) == true){
-			let ele = tab.ele[r][dep.length];
-		
-			let pri = convert_text_to_prior(ele,par.pri_pos);
-			if(typeof pri == 'string'){
-				alertp("Problem loading the element '"+ele+"' (col "+(dep.length+1)+", row "+(r+1)+"): "+pri+".");
-				return;
-			}
-			set_element(prior_split,ind,pri);
-			set_element(value,ind,get_prior_string(pri));
-			//}
-		}
-	}
-	
-	close_data_source();
-}
-
-
-/// Generates a list of all model parameters
-/// goes through the exisiting list and copies any info on values/priors
-function init_param()
-{
-	model.warn = [];
-	
-	let lists = generate_parameter_list();   // Generates a list of all model parameters
-
-	let ielist = lists.ind_eff_list;       
-  let felist = lists.fix_eff_list;       
-	let par_list = lists.par_list;
-	
-	update_model_ind_eff(ielist);            // Updates individual effect groupings in model
-	
-	if(model.warn > 0) return;	
-	
-	update_model_fix_eff(felist);            // Updates fixed effects in model 
-	
-	if(model.warn > 0) return;	
-
-	add_ind_eff_param(par_list);             // Adds individual effect parameters (i.e. variances) to model
- 	
-	update_model_param(par_list);            // Updates the model parameters
-	
-	create_spline();                         // Creates splines based on parameters
-
-	if(model.warn > 0) return;	
-
-	for(let th = 0; th < model.param.length; th++){  // Sets the distance matrix
-		let par = model.param[th];	
-		if(par.dist_matrix.check == true){
-			set_dist(par);                            
-		}
-	}
-}
-
-
-// Updates individual effect groups stored in model
+/// Updates individual effect groups stored in model
 function update_model_ind_eff(ielist)
 {
 	for(let p = 0; p < model.species.length; p++){
@@ -846,7 +577,7 @@ function update_model_ind_eff(ielist)
 		
 		for(let i = 0; i < sp.ind_eff_group.length; i++){
 			let ieg = sp.ind_eff_group[i];
-			for(let j = 0; j < ieg.list.length; j++) ieg.list[j].used = false;
+			for(let j = 0; j < ieg.ie_list.length; j++) ieg.ie_list[j].used = false;
 		}
 	
 		for(let k = 0; k < ielist.length; k++){
@@ -856,17 +587,17 @@ function update_model_ind_eff(ielist)
 			if(ie.p_name == sp.name){
 				for(let i = 0; i < sp.ind_eff_group.length; i++){
 					let ieg = sp.ind_eff_group[i];
-					let list = ieg.list;
-					for(let j = 0; j < list.length; j++){
-						if(ie.name == list[j].name){
-							list[j].used = true;
+					let ie_list = ieg.ie_list;
+					for(let j = 0; j < ie_list.length; j++){
+						if(ie.name == ie_list[j].name){
+							ie_list[j].used = true;
 							flag = true;
 						}
 					}
 				}
 			
 				if(flag == false){
-					sp.ind_eff_group.push({p_name:ie.p_name, A_matrix:{check:false, loaded:false, value:[], ind_list:[]}, list:[{name:ie.name}]});
+					sp.ind_eff_group.push({p_name:ie.p_name, A_matrix:{check:false, loaded:false, value:[], ind_list:[]}, ie_list:[{name:ie.name}]});
 				}
 			}
 		}
@@ -875,15 +606,15 @@ function update_model_ind_eff(ielist)
 		let i = 0;
 		while(i < sp.ind_eff_group.length){
 			let ieg = sp.ind_eff_group[i];
-			let list = ieg.list;
+			let ie_list = ieg.ie_list;
 				
 			let j = 0;
-			while(j < list.length){
-				if(list[j].used == false) list.splice(j,1);
+			while(j < ie_list.length){
+				if(ie_list[j].used == false) ie_list.splice(j,1);
 				else j++;
 			}
 			
-			if(list.length == 0) sp.ind_eff_group.splice(i,1);
+			if(ie_list.length == 0) sp.ind_eff_group.splice(i,1);
 			else i++;
 		}
 	}
@@ -893,14 +624,14 @@ function update_model_ind_eff(ielist)
 		let sp = model.species[p];
 	
 		if(sp.type == "Population" && sp.ind_eff_group.length > 0){
-			let name = sp.ind_eff_group[0].list[0].name;
+			let name = sp.ind_eff_group[0].ie_list[0].name;
 			model.warn.push({mess:"Cannot have individual effects", mess2:"A population-based model cannot have individual effects such as '"+name+"'", warn_type:"Equation"});
 		}
 	}
 }
 
 
-// Updates fixed effects stored in model
+/// Updates fixed effects stored in model
 function update_model_fix_eff(felist)
 {
 	for(let p = 0; p < model.species.length; p++){
@@ -912,7 +643,7 @@ function update_model_fix_eff(felist)
 	
 		for(let k = 0; k < felist.length; k++){
 			let fe = felist[k];
-		
+	
 			let flag = false;
 			if(fe.p_name == sp.name){
 				for(let i = 0; i < sp.fix_eff.length; i++){
@@ -941,8 +672,8 @@ function update_model_fix_eff(felist)
 		let sp = model.species[p];
 	
 		if(sp.type == "Population" && sp.fix_eff.length > 0){
-			let name = sp.eqn.fix_eff[0].name;
-			model.warn.push({mess:"Cannot have individual effects", mess2:"A population-based model cannot have fixed effects such as '"+name+"'", warn_type:"Equation"});
+			let name = sp.fix_eff[0].name;
+			model.warn.push({mess:"Cannot have fixed effects", mess2:"A population-based model cannot have fixed effects such as '"+name+"'", warn_type:"Equation"});
 		}
 	}
 }
@@ -956,17 +687,17 @@ function add_ind_eff_param(par_list)
 		
 		for(let i = 0; i < sp.ind_eff_group.length; i++){
 			let ieg = sp.ind_eff_group[i];
-			for(let j = 0; j < ieg.list.length; j++){
-				for(let jj = j; jj < ieg.list.length; jj++){
-					let ie1 = ieg.list[j].name, ie2 = ieg.list[jj].name;
-					let sup = "^"+ie1+ie2;
+			for(let j = 0; j < ieg.ie_list.length; j++){
+				for(let jj = j; jj < ieg.ie_list.length; jj++){
+					let ie1 = ieg.ie_list[j].name, ie2 = ieg.ie_list[jj].name;
+					let sup = "^"+ie1+","+ie2;
 					
 					let par;
 					if(j == jj){
-						par = { name:"Ω"+sup, age_dep: false, time_dep: false, dep:[], eqn_appear:[], type: "variance"};
+						par = { name:"Ω"+sup, time_dep: false, dep:[], eqn_appear:[], type: "variance"};
 					}
 					else{
-						par = { name:"ω"+sup, age_dep: false, time_dep: false, dep:[], eqn_appear:[], type: "correlation"};
+						par = { name:"ω"+sup, time_dep: false, dep:[], eqn_appear:[], type: "correlation"};
 					}
 				
 					add_par_to_list(par,par_list,{p:p, ieg:i, ie1:ie1, ie2:ie2},"Individual effect variance");
@@ -980,13 +711,17 @@ function add_ind_eff_param(par_list)
 /// Updates the model parameters
 function update_model_param(par_list)
 {
+	check_derived_param_all(model.param);
+
+	if(model.warn.length > 0) err_warning();
+	
 	let param_old = model.param;
 				
 	let param=[];
 	for(let i = 0; i < par_list.length; i++){
 		let par = par_list[i];
 		
-		let j;                                 // Determines if parameter already exists
+		let j;                                         // Determines if parameter already exists
 		for(j = 0; j < param_old.length; j++){
 			let par_old = param_old[j];
 			if(par.name == par_old.name){	
@@ -998,16 +733,16 @@ function update_model_param(par_list)
 			}
 		}
 		
-		if(j < param_old.length){              // Copy across information from existing parameter definition
+		if(j < param_old.length){                      // Copies information from existing parameter definition	
 			param.push(copy_param_info(par,param_old[j]));
 			add_dependent_param(param,par_list);
 		}
-		else{                                  // Create new parameter
+		else{                                          // Create new parameter
 			param.push(create_new_param(par,"normal"));
 		}
 	}
 
-	param.sort( function(a, b){              // Alp[habetically sorts parameters
+	param.sort( function(a, b){                      // Alphabetically sorts parameters
 		if(a.dep.length > b.dep.length) return 1; 
 		if(a.dep.length == b.dep.length){
 			if(a.name.toLowerCase() > b.name.toLowerCase()) return 1;
@@ -1015,17 +750,9 @@ function update_model_param(par_list)
 		}
 		return -1;});
 	
-	let branch_list = set_model_branch_list(param);
-	
-	check_derived_param_all(param);
-	
-	if(model.warn > 0) return;
+	if(model.warn.length > 0) err_warning();
 	
 	model.param = param;
-
-	model.branch_list = branch_list;
-
-	branch_auto_calculate();
 }
 
 
@@ -1038,32 +765,20 @@ function add_dependent_param(param,par_list)
 	
 	switch(vari){
 	case "reparam":
-		{
-			if(par.dep.length == 0){
-				add_ele_param(par.value,vari,par_list);
-			}
-			else{
-				for(let i = 0; i < par.comb_list.length; i++){
-					let comb = par.comb_list[i];
-					let ele = get_element(par.value,comb.index);
-					add_ele_param(ele,vari,par_list);
-				}
-			}
+		if(par.dep.length == 0) add_ele_param(par.value,vari,par_list,{par_name:par.name});
+		else{
+			if(par.reparam_eqn_on) add_ele_param(par.reparam_eqn,"reparam_eqn",par_list,{par_name:par.name});
+			else add_to_par_list(par.reparam_param_list,par_list);
 		}
 		break;
 		
 	case "dist":
 		{
-			if(par.prior_split_check.check == false){	
-				add_distribution_eqn(par.prior,vari,par_list);	
+			if(par.dep.length == 0 || par.prior_split_check.check == false){	
+				add_distribution_eqn(par.prior,vari,par_list,{par_name:par.name});	
 			}
 			else{
-				for(let i = 0; i < par.comb_list.length; i++){
-					let comb = par.comb_list[i];
-					let ele = get_element(par.prior_split,comb.index);
-				
-					add_distribution_eqn(ele,vari,par_list);	
-				}
+				add_to_par_list(par.prior_param_list,par_list);
 			}
 		}
 		break;
@@ -1073,76 +788,145 @@ function add_dependent_param(param,par_list)
 }
 
 
+/// Adds parameters defined in reparameterisation or priors
+function add_to_par_list(add_param_list,par_list)
+{
+	for(let i = 0; i < add_param_list.length; i++){
+		let par_add = add_param_list[i]; 
+
+		let j = 0; while(j < par_list.length && par_list[j].name != par_add.name) j++;
+		if(j == par_list.length) par_list.push(par_add);
+		else{
+			for(let k = 0; k < par_add.eqn_appear.length; k++){
+				par_list[j].eqn_appear.push(par_add.eqn_appear[k]);
+			}
+		}
+	}
+}
+		
+
 /// Adds any parameters from a distribution to the list of equations
-function add_distribution_eqn(dist,vari,par_list)
+function add_distribution_eqn(dist,vari,par_list,eqn_info,op)
 {
 	let val = dist.value;
 	
 	switch(dist.type.te){
 	case "fix": 
-		add_ele_param(val.mean_eqn.te,vari,par_list);
+		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,op);
 		break;
 		
 	case "uniform":
-		add_ele_param(val.min_eqn.te,vari,par_list);
-		add_ele_param(val.max_eqn.te,vari,par_list);
+		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,op);
+		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,op);
 		break;
 		
 	case "exp": 
-		add_ele_param(val.mean_eqn.te,vari,par_list);
+		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,op);
 		break;
 		
 	case "normal": 
-		add_ele_param(val.mean_eqn.te,vari,par_list);
-		add_ele_param(val.sd_eqn.te,vari,par_list);
+		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,op);
+		add_ele_param(val.sd_eqn.te,vari,par_list,eqn_info,op);
 		break;
 	
 	case "log-normal": 
-		add_ele_param(val.mean_eqn.te,vari,par_list);
-		add_ele_param(val.cv_eqn.te,vari,par_list);
+		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,op);
+		add_ele_param(val.cv_eqn.te,vari,par_list,eqn_info,op);
 		break;
 		
 	case "gamma":
-		add_ele_param(val.mean_eqn.te,vari,par_list);
-		add_ele_param(val.cv_eqn.te,vari,par_list);
+		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,op);
+		add_ele_param(val.cv_eqn.te,vari,par_list,eqn_info,op);
 		break;
 		
 	case "bernoulli":
-		add_ele_param(val.mean_eqn.te,vari,par_list);
+		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,op);
 		break;
 					
 	case "beta":
-		add_ele_param(val.alpha_eqn.te,vari,par_list);
-		add_ele_param(val.beta_eqn.te,vari,par_list);
+		add_ele_param(val.alpha_eqn.te,vari,par_list,eqn_info,op);
+		add_ele_param(val.beta_eqn.te,vari,par_list,eqn_info,op);
 		break;
 	
-	case "flat":
+	case select_str:
 		break;
 		
-	case "dirichlet":
-		add_ele_param(val.alpha_eqn.te,vari,par_list);
-		break;
-	
 	default: error("not op:"+dist.type.te); break;
 	}
 }
 
 
 /// Adds any parameters from a text element to the parameter list
-function add_ele_param(ele,variety,par_list)
+function add_ele_param(ele,variety,par_list,eqn_info,op)
 {
 	if(isNaN(ele)){
 		let eqn = create_equation(ele,variety);
-	
-		for(let i = 0; i < eqn.param.length; i++){
-			add_par_to_list(eqn.param[i],par_list,{},"Reparameterisation");
+		eqn.eqn_info = eqn_info;
+		
+		if(op == "single eqn_appear"){  // In this case only want one eqn_appear 
+			for(let i = 0; i < eqn.param.length; i++){
+				let par = eqn.param[i];
+				let j = 0; while(j < par_list.length && par_list[j].name != par.name) j++;
+				
+				if(j == par_list.length){
+					add_par_to_list(par,par_list,copy(eqn),"Reparameterisation");
+				}
+			}
+		}
+		else{
+			for(let i = 0; i < eqn.param.length; i++){
+				add_par_to_list(eqn.param[i],par_list,copy(eqn),"Reparameterisation");
+			}
 		}
 	}
 }
 
 
+/// Gets a list of all parameters in a reparameterisation
+function get_reparam_param_list(par) 
+{
+	par.reparam_param_list=[];
+	if(par.variety == "reparam" && par.dep.length > 0 && par.reparam_eqn_on != true){
+		let eqn_info = {par_name:par.name};
+		let par_list = [];
+		let vari = par.variety;
+		
+		for(let i = 0; i < par.comb_list.length; i++){
+			let comb = par.comb_list[i];
+			let ele = get_element(par.value,comb.index);
+			eqn_info.index = comb.index;
+			add_ele_param(ele,vari,par_list,eqn_info,"single eqn_appear");
+		}
+	
+		par.reparam_param_list = par_list;
+	}
+}
+
+
+/// Gets a list of all parameters in prior
+function get_prior_param_list(par) 
+{
+	par.prior_param_list=[];
+	
+	if(par.dep.length > 0 && par.prior_split_check.check == true){
+		let eqn_info = {par_name:par.name};
+		let par_list = [];
+		let vari = par.variety;
+		
+		for(let i = 0; i < par.comb_list.length; i++){
+			let comb = par.comb_list[i];
+			let ele = get_element(par.prior_split,comb.index);
+				
+			add_distribution_eqn(ele,vari,par_list,eqn_info,"single eqn_appear");	
+		}
+
+		par.prior_param_list = par_list;
+	}
+}
+
+
 /// Creates a new parameter
-// par must have the properties: name, dep, type, time_dep, age_dep, (optionally eqn_appear)
+// par must have the properties: name, dep, type, time_dep, (optionally eqn_appear)
 // On top of these new properties are added: 
 // list: shows the potential values for the dependencies
 // comb_list: this is a list giving every possible combination of dependency  
@@ -1152,30 +936,35 @@ function create_new_param(par,variety)
 	if(par.dep == undefined) error("Parameter dependency must be set");
 	if(par.type == undefined) error("Parameter type must be set");
 	if(par.time_dep == undefined) error("Parameter time dependency must be set");
-	if(par.age_dep == undefined) error("Parameter age dependency must be set");
+
+	if(par.type == "param factor") variety = "const"; 
 
 	par.variety = variety;
 	
 	par.pri_pos = set_pri_pos(par.type);
 
-	par.label_info = get_label_info(par);
-
-	let knot = ["start","end"];           // Intialises a spline
+	let knot = ["start","end"];                      // Initialises a spline
 	
 	let on = false;
-	if(par.time_dep == true || par.age_dep == true) on = true;
+	if(par.time_dep == true) on = true;
 	
-	par.spline = { on:on, smooth:default_smooth(), time_dep:par.time_dep, age_dep:par.age_dep, knot:knot}; 
+	par.spline = { on:on, smooth:default_smooth(), time_dep:par.time_dep, knot:knot}; 
 		
 	par.sim_sample = {check:true};
 		 
 	par.prior = unset_prior(par.type);
-
+	
+	par.reparam_eqn_on = false;
+	par.reparam_eqn = "";
+	
 	par_set_default(par);
 
-	par.dist_matrix = false; 
+	//par.dist_matrix = {check:false}; 
 	
 	par.full_name = param_name(par);
+
+	par.reparam_param_list = [];
+	par.prior_param_list = [];
 
 	return par;
 }
@@ -1184,7 +973,7 @@ function create_new_param(par,variety)
 /// The default value for smoothing
 function default_smooth()
 {
-	return {check:false, type:{value:"Log-Normal"}, value:0.1};
+	return {check:false, type:{value:"Log-Normal"}, value:0.5};
 }
 
 
@@ -1207,24 +996,39 @@ function par_set_default(par)
 		let value = copy(temp);
 		let prior_split = copy(temp);
 		
-		let dim = get_dimentions(temp);
-		let ele_list = get_element_list(temp,dim);
-		
-		for(let k = 0; k < ele_list.length; k++){	
-			let	val = 0;
-			let val_eq = create_equation("","reparam");
-			let pr_sp = unset_prior(par.type);
-			
-			set_element(value,ele_list[k],val);
-			set_element(prior_split,ele_list[k],pr_sp);
-		}
-		
 		par.list = list;
 		par.comb_list = comb_list;
 		par.value = value;
 		par.prior_split = prior_split;
 		par.prior_split_check = {check:false};
 		par.set = false;
+	}
+}
+
+
+/// Sets default values for prior
+function set_default_prior_split(par)
+{
+	let prior_split = par.prior_split;
+	let dim = get_dimensions(prior_split);
+	let ele_list = get_element_list(prior_split,dim);
+		
+	for(let k = 0; k < ele_list.length; k++){	
+		let pr_sp = unset_prior(par.type);	
+		set_element(prior_split,ele_list[k],pr_sp);
+	}
+}
+
+
+/// Sets default values for tensor
+function set_default_value(par)
+{
+	let value = par.value;
+	let dim = get_dimensions(value);
+	let ele_list = get_element_list(value,dim);
+		
+	for(let k = 0; k < ele_list.length; k++){	
+		set_element(value,ele_list[k],0);
 	}
 }
 
@@ -1237,128 +1041,127 @@ function copy_param_info(par,old)
 	par.spline = old.spline;
 	par.prior = old.prior;
 	par.sim_sample = old.sim_sample;
-	par.auto_value = old.auto_value;
 	par.label_info = old.label_info;
 	par.set = old.set;
-	par.dist_matrix = old.dist_matrix;
+	//par.dist_matrix = old.dist_matrix;
+	par.import_line = old.import_line;
+	par.reparam_param_list = old.reparam_param_list;
+	par.prior_param_list = old.prior_param_list;
+	par.reparam_eqn_on = old.reparam_eqn_on;
+	par.reparam_eqn = old.reparam_eqn;
 	
 	if(par.dep.length == 0){	
 		par.value = old.value;
 	}
 	else{
 		let list = par_find_list(par);
-		let temp = par_find_template(list);
-		let comb_list = generate_comb_list(list);
+		let list_old = old.list;
 		
-		let map=[];
-		for(let k = 0; k < par.dep.length; k++){
-			map[k]=[];
-			
-			let list_new = list[k];
-			let list_old = old.list[k];
-			let used=[];
-			for(let ij = 0; ij < list_new.length; ij++){
-				let val = list_new[ij];
-				let m = 0; while(m < list_old.length && !(list_old[m] == val && used[m] == undefined)) m++;
-				if(m < list_old.length){ map[k][ij] = m; used[m] = true;}
-			}
-		}
-	
-		let value = copy(temp);
-		let prior_split = copy(temp);
+		// Checks if list is the same as the 
+		let dif = false;
 		
-		let dim = get_dimentions(temp);
-		let ele_list = get_element_list(temp,dim);
-		let prior = copy(old.prior);
-		
-		for(let k = 0; k < ele_list.length; k++){
-			let ind = ele_list[k];
-			
-			let val, val_eqn, pr_sp;
-			
-			let ind_old=[];
-			let ii;
-			for(ii = 0; ii < par.dep.length; ii++){
-				ind_old[ii] = map[ii][ele_list[k][ii]];
-				if(ind_old[ii] == undefined) break;
-			}
-			
-			if(ii == par.dep.length){
-				val = get_element(old.value,ind_old);
-				pr_sp = get_element(old.prior_split,ind_old);
-			}
+		if(!list_old) dif = "unset";
+		else{
+			if(list.length != list_old.length) dif = true;
 			else{
-				val = 0;
-				val_eqn = create_equation("","reparam");
-				pr_sp = unset_prior(par.type);
+				for(let k = 0; k < list.length; k++){
+					let lik = list[k];
+					let lik_old = list_old[k];
+					if(lik.length != lik_old.length){ dif = true; break;}
+					for(let j = 0; j < lik.length; j++){
+						if(lik[j] != lik_old[j]){ dif = true; break;}
+					}
+				}
+			}
+		}
+		
+		if(dif != false){
+			let temp = par_find_template(list);
+			let comb_list = generate_comb_list(list);
+		
+			let value = copy(temp);
+			let prior_split = copy(temp);
+		
+			let prior = copy(old.prior);
+			
+			let old_fl = false;
+			
+			// Attempts to copy across existing values
+			if(dif == true){
+				let map=[];
+				for(let k = 0; k < par.dep.length; k++){
+					map[k]=[];
+					
+					let list_new = list[k];
+					if(k < old.list.length){
+						let list_old = old.list[k];
+						
+						let used=[];
+						for(let ij = 0; ij < list_new.length; ij++){
+							let val = list_new[ij];
+							let m = 0; while(m < list_old.length && !(list_old[m] == val && used[m] == undefined)) m++;
+							if(m < list_old.length){ map[k][ij] = m; used[m] = true;}
+						}
+					}
+				}
+				
+				let dim = get_dimensions(temp);
+				let ele_list = get_element_list(temp,dim);
+				
+				for(let k = 0; k < ele_list.length; k++){
+					let ind = ele_list[k];
+					
+					let val, val_eqn, pr_sp;
+					
+					let ind_old=[];
+					let ii;
+					for(ii = 0; ii < par.dep.length; ii++){
+						ind_old[ii] = map[ii][ele_list[k][ii]];
+						if(ind_old[ii] == undefined) break;
+					}
+					
+					if(ii == par.dep.length){
+						old_fl = true;
+						val = get_element(old.value,ind_old);
+						pr_sp = get_element(old.prior_split,ind_old);
+					}
+					else{
+						val = undefined;
+						val_eqn = create_equation("","reparam");
+						pr_sp = unset_prior(par.type);
+					}
+					
+					set_element(value,ind,val);
+					set_element(prior_split,ele_list[k],pr_sp);
+				}
 			}
 			
-			set_element(value,ind,val);
-			set_element(prior_split,ele_list[k],pr_sp);
+			par.list = list;
+			par.comb_list = comb_list;
+			par.value = value;
+			par.prior_split = prior_split;
+			if(old_fl == false) par.set = false;
 		}
-
-		par.list = list;
-		par.comb_list = comb_list;
-		par.value = value;
-		par.prior_split = prior_split;
+		else{
+			par.list = old.list;
+			par.comb_list = old.comb_list;
+			par.value = old.value;
+			par.prior_split = old.prior_split;
+		}
+		
 		par.prior_split_set = old.prior_split_set;
 		par.prior_split_check = old.prior_split_check;
 	}
-
+	
 	return par;
-}
-
-
-function get_label_info(par)
-{	
-	let fo_big = get_font(si_big,undefined,"Times");
-	let fo_sup = get_font(si_sub,undefined,"Times");
-	let fo_sub = get_font(si_sub,"italic","Times");
-
-	let te = par.name;
-	let spl = te.split("^");
-	par.name_raw = spl[0];
-	par.sup = ""; if(spl.length == 2)	par.sup = remove_bracket(spl[1]); 
-	
-	par.name_raw_w = text_width(par.name_raw,fo_big);
-	par.sup_w = text_width(par.sup,fo_sup);
-	
-	let sub = "";
-	for(let j = 0; j < par.dep.length; j++){
-		if(par.dep[j] != "t" && par.dep[j] != "a"){
-			if(sub != "") sub += ",";
-			sub += par.dep[j];
-		}
-	}
-	par.sub = sub;
-	par.sub_w = text_width(par.sub,fo_sub);
-	
-	let w = par.name_raw_w;
-	let w2 = par.sup_w; if(par.sub_w > w2) w2 = par.sub_w;
-	let w_tot = w+w2+0.1;
-	
-	let age_time = "";
-	if(par.time_dep == true) age_time = "(t)";
-	if(par.age_dep == true) age_time = "(a)";
-	
-	let age_time_pos = w_tot;
-	if(age_time != ""){
-		w_tot += text_width(age_time,fo_big);
-	}
-	
-	return {name_full:par.name, name:par.name_raw, age_time_pos:age_time_pos, age_time:age_time, sup:par.sup, sub:par.sub, fo_big:fo_big, fo_sup:fo_sup, fo_sub:fo_sub, dx:w_tot};
 }
 
 
 /// Finds the possible set of priors for a parameter type
 function set_pri_pos(type)
 {
-	let pri_pos = prior_pos;           
-	switch(type){
-	case "trans_bp": pri_pos = bp_prior_pos; break;
-	case "trap_prob": case "Se": case "Sp": pri_pos = zeroone_prior_pos; break;
-	}
-	
+	let pri_pos = prior_pos;  
+
 	return pri_pos;
 }
 
@@ -1368,24 +1171,35 @@ function generate_comb_list(list)
 {
 	let ndep = list.length;
 	let comb_list = [];
-	if(ndep == 0) return [{combination:[], index:[]}];
+	
+	let list_len = [];
+	for(let d = 0; d < ndep; d++){
+		let k = 0;
+		while(k < list[d].length && list[d][k] != undefined) k++;
+		list_len[d] = k;
+	}
+	
+	if(ndep == 0) return [{index:[]}];
+	
+	for(let d = 0; d < ndep; d++){
+		if(list_len[d] == 0){
+			return comb_list;
+		}
+	}
 	
 	let index=[];
 	for(let d = 0; d < ndep; d++) index[d] = 0;
 
 	let flag;
 	do{
-		let comb = [];
-		for(let d = 0; d < ndep; d++) comb.push(list[d][index[d]]);
-		
-		comb_list.push({combination:comb, index:copy(index)});
+		comb_list.push({index:copy(index)});
 		
 		let i = 0;
 		do{
 			flag = false;
 			
 			index[i]++; 
-			if(index[i] >= list[i].length){
+			if(index[i] >= list_len[i]){
 				index[i] = 0; 
 				i++; 
 				flag = true;
@@ -1396,198 +1210,16 @@ function generate_comb_list(list)
 	return comb_list;
 }
 
-				
-/// Sets up a description of the branching in the model
-function set_model_branch_list(param)
-{
-	// Ensures that one branching prob is set to auto_set
-	let branch_list = model.find_branch_list();
-
-	let gg = copy(branch_list);
-	
-	for(let i = 0; i < branch_list.length; i++){
-		let bl = branch_list[i];
-		
-		let par_list = [];
-		for(let j = 0; j < bl.tra.length; j++){
-			let fl = false;
-			for(let k = 0; k < param.length; k++){
-				let par = param[k];
-			
-				if(par.type == "trans_bp"){
-					for(let m = 0; m < par.eqn_appear.length; m++){
-						let info = par.eqn_appear[m].eqn_info;
-						if(info.p == bl.p && info.cl == bl.cl && info.i == bl.tra[j]){
-							if(fl == true) error("branching parameter appears more than once");
-							
-							par_list.push(k);
-							
-							fl = true;
-						}
-					}
-					if(fl == true) break;
-				}
-			}
-			if(fl == false){ error("Could not get bp"); break;}
-		}
-		
-		let N = par_list.length;
-		if(N != bl.tra.length){
-			error("Could not set branching auto");
-		}
-		else{
-			/// Checks that the dependencies on the different parameters are all the same
-			let dep = param[par_list[0]].dep;
-			let ill = false;
-			
-			for(let j = 1; j < N; j++){
-				if(equal_vec(dep,param[par_list[j]].dep) != true) ill = true;
-			}		
-		
-			if(ill == true){
-				for(let j = 0; j < N; j++){
-					let par = param[par_list[j]];
-					let eqn_info = par.eqn_appear[0].eqn_info;
-					
-					if(j == 0){
-						model.warn.push({mess:"The dependency on the branching probabilties is not the same", mess2:"View parameter '"+par.name+"'", eqn_info:eqn_info, eqn_type:"trans_bp", warn_type:"Equation"});
-					}
-					else{
-							model.warn.push({mess:"", mess2:"View parameter '"+par.name+"'", eqn_info:eqn_info, eqn_type:"trans_bp", warn_type:"Equation"});
-					}
-				}
-			}
-			else{
-				bl.dep = dep;
-			
-				let j = 0; while(j < N && param[par_list[j]].auto_value != true) j++;
-				if(j == N) j = N-1;
-				
-				for(let k = 0; k < N; k++){
-					if(k == j) param[par_list[k]].auto_value = true;
-					else param[par_list[k]].auto_value = false;
-				}
-			}
-			
-			branch_list[i].par_list = par_list;
-		}
-	}
-	
-	return branch_list;
-}
-	
-
-/// Sets the parameter which is automatically calculated during a branching event
-function set_branch_auto(th)
-{
-	let fl = false;
-	
-	let param = model.param;
-	for(let i = 0; i < model.branch_list.length; i++){
-		let par_list = model.branch_list[i].par_list;
-		let j = find_in(par_list,th);
-		if(j != undefined){
-			let N = par_list.length;
-			for(let k = 0; k < N; k++){
-				if(k == j) param[par_list[k]].auto_value = true;
-				else param[par_list[k]].auto_value = false;
-			}
-			fl = true;
-			break;
-		}
-	}
-	
-	if(fl == false) error("Could not change auto branch");
-}
-
-
-/// Automatically calculates branching probability
-function branch_auto_calculate()
-{
-	let param = model.param;
-
-	for(let i = 0; i < model.branch_list.length; i++){
-		let bl = model.branch_list[i];
-		let par_list = bl.par_list;
-		let N = par_list.length;
-		
-		let dep = bl.dep;
-		if(dep != undefined){
-			if(dep.length == 0){
-				let sum = 0;
-				let par_st;
-				let fl = false;
-				for(let j = 0; j < N; j++){
-					let par = param[par_list[j]];
-					if(par.auto_value == true) par_st = par;
-					else{
-						if(isNaN(par.value)) fl = true;
-						else sum += Number(par.value);
-					}
-				}				
-				
-				if(par_st == undefined) error("Problem calculating branching");
-				else{
-					if(fl == false){
-						let val = Number((1-sum).toPrecision(8));
-						if(val > -TINY && val < TINY) val = 0;
-						par_st.value = val;
-					}
-				}
-			}
-			else{
-				let flag = false;   // Makes sure all non-auto values are set
-				let jst;
-				for(let j = 0; j < N; j++){
-					let par = param[par_list[j]];
-					if(par.auto_value == false){
-						if(par.set != true) flag = true;
-					}
-					else jst = j;
-				}
-			
-				if(flag == false){
-					let par = param[par_list[0]];
-					
-					let value = par.value;
-					let dim = get_dimentions(value);
-					let ele_list = get_element_list(value,dim);
-					
-					let par_set = param[par_list[jst]];
-					par_set.set = true;
-					
-					for(let k = 0; k < ele_list.length; k++){
-						let sum = 0;
-						let fl = false;
-						for(let j = 0; j < N; j++){
-							if(j != jst){
-								let par = param[par_list[j]];
-								sum += Number(get_element(par.value,ele_list[k]));
-							}
-						}
-					
-						let val = Number((1-sum).toPrecision(8));
-						if(val > -TINY && val < TINY) val = 0;
-						
-						set_element(par_set.value,ele_list[k],val)
-					}
-				}
-			}
-		}
-	}
-}
-
 
 /// Sets an unspecified prior
 function unset_prior(par_type)
 {
-	var eb = {te:"", type:"prior"};
+	var eb = {te:"", type:"prior", mode:"param only"};
 	var value = {min_eqn:copy(eb), max_eqn:copy(eb), mean_eqn:copy(eb), shape_eqn:copy(eb), cv_eqn:copy(eb), sd_eqn:copy(eb), alpha_eqn:copy(eb), beta_eqn:copy(eb)};
 	
 	let te = select_str;
 	
 	switch(par_type){  // Loads up standard priors for some parameters
-	case "trans_bp": te = "flat"; break;
 	case "correlation": te = "uniform"; value.min_eqn.te = "-0.9"; value.max_eqn.te = "0.9"; break;
 	}	
 				
@@ -1595,61 +1227,30 @@ function unset_prior(par_type)
 }
 
 
-/// Checks that knot times are set correctly 
-function check_knot_times(te)
-{		
-	let spl = te.split(",");
-	for(let j = 0; j < spl.length; j++){
-		let te = spl[j];
-		if(!(te == "start" && j == 0) && !(te == "end" && j == spl.length-1)){
-			if(isNaN(te)){
-				return "In '"+spl+"' the value '"+te+"' must be a number";
-				break;
-			}
-			else{
-				if(j > 0 && !isNaN(spl[j-1]) && Number(te) <= Number(spl[j-1])){
-					return "'"+spl+"' must be time ordered";
-				}
-			}
-		}
-	}
-	
-	return "";
-}
-	
-	
-/// Changes the knots used in a spline
-function change_spline_knot(par,knot)
-{
-	let par_copy = copy(par);
-	par_copy.spline.knot = knot;
-	copy_param_info(par,par_copy);
-}
-
-
-/// CHecks all the derived parameters
+/// Checks all the derived parameters
 function check_derived_param_all(param)
 {
 	for(let i = 0; i < model.derive.length; i++){
 		let eqn1 = model.derive[i].eqn1;
 		let eqn2 = model.derive[i].eqn2;
 		
-		let wa = check_derived_param(eqn2,eqn1,param);
-		if(wa != "success"){
-			model.warn.push({mess:"Error in derived expression", mess2:wa, warn_type:"Equation", eqn_info:{i:i}, eqn_type:eqn2.type});
+		let res = check_derived_param(eqn2,eqn1,param);
+		
+		if(res.err == true){
+			model.warn.push({mess:"Error in derived expression", mess2:res.msg, warn_type:"Equation", eqn_info:{i:i}, eqn_type:eqn2.type});
 		}
 	}	
 }
 
 
-/// Checks that derived equation only contains only parameters from the model 
+/// Checks that derived equation only contains parameters from the model 
 function check_derived_param(eqn,eqn_param,param)
 {
 	if(param == undefined) param = model.param;
 	
 	extract_equation_properties(eqn);
 	
-	if(eqn.warn.length > 0) return eqn.warn[0].te;
+	if(eqn.warn.length > 0) return err(eqn.warn[0].te);
 
 	for(let i = 0; i < eqn.param.length; i++){
 		let par = eqn.param[i];
@@ -1659,14 +1260,19 @@ function check_derived_param(eqn,eqn_param,param)
 		
 		if(j == param.length){
 			if(find(param,"name",par.name) != undefined){
-				return "Parameter '"+par.full_name+"' has a different dependency in the model";
+				return err("Parameter '"+par.full_name+"' has a different dependency in the model");
 			}
-			else return "Parameter '"+par.full_name+"' is not found in the model";
+			else return err("Parameter '"+par.full_name+"' is not found in the model");
+		}
+		else{
+			if(param[j].type == "derive_param"){
+				return err("Derived parameter '<e>"+eqn_param.te+"</e>' cannot depend on on another derived parameter '"+par.full_name+"'.");
+			}
 		}
 	}
 	
 	// Checks that the dependencies for a derived quantity agree with equation
-	if(eqn_param == undefined){ error("should be defined"); return;}
+	if(eqn_param == undefined) return err("Should be defined");
 	
 	extract_equation_properties(eqn_param);
 
@@ -1676,7 +1282,7 @@ function check_derived_param(eqn,eqn_param,param)
 			let par = param[i];
 			if(par.type != "derive_param"){
 				if(par_param.name == param[i].name){
-					return "The model already contains a parameter with name '"+par_param.name+"'";
+					return err("The model already contains a parameter with name '"+par_param.name+"'");
 				}
 			}
 		}
@@ -1684,34 +1290,15 @@ function check_derived_param(eqn,eqn_param,param)
 		let dep = equation_dep(eqn).sort();
 		let dep_param = equation_dep(eqn_param).sort();
 		
-		if(find_in(dep,"a") != undefined){
-			return "Derived quantities cannot have an age dependency";
-		}
-		
 		if(dep.length != dep_param.length){
 			let par = eqn_param.param[0];
 			let par2 = {name:par.name, dep:dep};
 			let full_name = param_name(par2);
-			return "Problem with dependency - Expect '"+full_name+"' not '"+par.full_name+"'.";
+			return err("Problem with dependency - Expect '"+full_name+"' not '"+par.full_name+"'.");
 		}
 	}
 	
-	return "success";
-}
-
-
-/// Returns true if two parameters the same
-function par_same(par1,par2)
-{
-	if(par1.name != par2.name) return false;
-	
-	if(par1.dep.length != par2.dep.length) return false;
-	
-	for(let i = 0; i < par1.dep.length; i++){
-		if(par1.dep[i] != par2.dep[i]) return false;
-	}
-	
-	return true;
+	return success();
 }
 
 
@@ -1725,12 +1312,9 @@ function param_name(par)
 			let dep = par.dep[i];
 			if(dep == "t") name += "(t)";
 			else{
-				if(dep == "a") name += "(a)";
-				else{
-					if(flag == false){ name += "_"; flag = true;}
-					if(i != 0) name += ",";
-					name += dep;
-				}
+				if(flag == false){ name += "_"; flag = true;}
+				if(i != 0) name += ",";
+				name += dep;
 			}
 		}
 	}
@@ -1748,35 +1332,18 @@ function param_name_index(par,index)
 		let flag = false;
 		for(let i = 0; i < par.dep.length; i++){
 			let dep = par.dep[i];
+		
 			let val = par.list[i][index[i]];
-			if(dep == "t") name += "("+val+")";
+			if(dep == "t") name += "(t="+val+")";
 			else{
-				if(dep == "a") name += "("+")";
-				else{
-					if(flag == false){ name += "_"; flag = true;}
-					if(i != 0) name += ",";
-					name += val;
-				}
+				if(flag == false){ name += "_"; flag = true;}
+				if(i != 0) name += ",";
+				name += val;
 			}
 		}
 	}
 	
 	return name;
-}
-
-
-/// Updates prior_split after it has been editted
-function update_prior_split()
-{
-	let bubpr = inter.bubble.prior;
-	let pri = get_element(inter.edit_param.prior_split,bubpr.pindex);
-
-	pri.type = bubpr.type;
-	pri.value = bubpr.value;
-			
-	set_element(inter.edit_param.value,bubpr.pindex,get_prior_string(pri));
-			
-	//init_param();
 }
 
 	
@@ -1823,38 +1390,14 @@ function check_param()
 		if(par.dep.length > 0){
 			let temp = par_find_template(par.list);
 		
-			let dim = get_dimentions(temp);
+			let dim = get_dimensions(temp);
 	
-			if(equal_vec(dim,get_dimentions(par.value)) == false){
+			if(equal_vec(dim,get_dimensions(par.value)) == false){
 				error("Problem with value dimension");
 			}
 		
-			if(equal_vec(dim,get_dimentions(par.prior_split)) == false) error("Problem with prior_split dimension");
+			if(equal_vec(dim,get_dimensions(par.prior_split)) == false) error("Problem with prior_split dimension");
 		}
-	}
-}
-
-
-
-/// Creates splines in the model 
-function create_spline()
-{
-	model.spline = [];
-	
-	for(let th = 0; th < model.param.length; th++){
-		let par = model.param[th];
-
-		if(par.time_dep == true){
-			let list = par_find_list(par);
-			list.pop();
-			let comb_list = generate_comb_list(list);
-			
-			for(let k = 0; k < comb_list.length; k++){
-				comb_list[k].name = get_spline_name(par,comb_list[k].index,list);
-			}
-	
-			model.spline.push({name:par.name+"(t)", th:th, comb_list:comb_list});
-		}			
 	}
 }
 
@@ -1875,19 +1418,6 @@ function get_spline_name(par,ind,list)
 }
 
 
-/*
-/// Determines if the parameter is "dist" giving the distance between compartments
-function is_dist(par)
-{
-	if(par.name.toLowerCase() == "dist" && par.dep.length == 2){
-		let index = remove_prime(par.dep[0]);
-		if(index == remove_prime(par.dep[1])) return true;
-	}
-	return false;
-}
-*/
-
-
 /// If any parameters are called "dist" then put values for the distance matrix into them
 function set_dist(par)
 {
@@ -1897,6 +1427,14 @@ function set_dist(par)
 	
 	let N = claa.comp.length;
 
+	// Works out if we need to calculate the full matrix
+	if(N > MATRIX_COMP_MAX && N*N > MATRIX_PLOT_MAX){
+		if(N*N > ELEMENT_MAX){
+			N = Math.floor(ELE_REDUCE_FAC*Math.sqrt(ELEMENT_MAX));
+		}
+	}
+	if(N > value.length) N = value.length;
+	
 	switch(claa.camera.coord){
 	case "cartesian":
 		{
@@ -1925,11 +1463,17 @@ function set_dist(par)
 			let lat=[], lng=[];
 			
 			for(let i = 0; i < N; i++){
-				let p = transform_latlng_inv(claa.comp[i].x,claa.comp[i].y);
+				let co = claa.comp[i];
+				
+				let x, y;
+				if(co.type == "boundary"){ x = co.xmid; y = co.ymid;}
+				else{ x = co.x; y = co.y;}
+				
+				let p = transform_latlng_inv(x,y);
 				lat.push(p.lat*Math.PI/180);
 				lng.push(p.lng*Math.PI/180);
 			}
-			
+		
 			let r = 6371;
 
 			for(let j = 0; j < N; j++){
@@ -1938,7 +1482,7 @@ function set_dist(par)
 					else{
 						let si = Math.sin(0.5*(lat[j]-lat[i]));
 						let si2 = Math.sin(0.5*(lng[j]-lng[i]))
-						value[j][i] = 2*r*Math.asin(Math.sqrt(si*si + Math.cos(lat[i])*Math.cos(lat[j])*si2*si2));
+						value[j][i] = precision(2*r*Math.asin(Math.sqrt(si*si + Math.cos(lat[i])*Math.cos(lat[j])*si2*si2)),5);
 					}
 					
 					value[i][j] = value[j][i];
@@ -1952,3 +1496,272 @@ function set_dist(par)
 	par.set = true;
 }
 	
+
+/// Finds a list of all the equations in the model
+function find_equation_list(all_param)
+{
+	let eqn_list = [];
+	for(let p = 0; p < model.species.length; p++){
+		let sp = model.species[p];
+		for(let cl = 0; cl < sp.ncla; cl++){
+			let claa = sp.cla[cl];
+			for(let i = 0; i < claa.ntra; i++){
+				let eqn_info = {p:p,cl:cl,i:i};
+				
+				let traa = claa.tra[i];
+			
+				let val = traa.value;
+			
+				if(val.bp_eqn != undefined){
+					if((traa.branch_select == true || traa.all_branches) && (all_param == true || traa.branch == true)){
+						add_equation_to_list(eqn_list,val.bp_eqn,eqn_info);
+					}
+				}
+				
+				if(val.mean_eqn != undefined){
+					if(all_param == true || traa.type == "gamma" || traa.type == "erlang" || traa.type == "log-normal" ||  traa.type == "period"){
+						add_equation_to_list(eqn_list,val.mean_eqn,eqn_info);
+					}
+				}
+				
+				if(val.rate_eqn != undefined){
+					if(all_param == true || traa.type == "exponential"){
+						add_equation_to_list(eqn_list,val.rate_eqn,eqn_info);
+					}
+				}
+				
+				if(val.scale_eqn != undefined){
+					if(all_param == true || traa.type == "weibull"){
+						add_equation_to_list(eqn_list,val.scale_eqn,eqn_info);
+					}
+				}
+				
+				if(val.shape_eqn != undefined){
+					if(all_param == true || traa.type == "weibull"){
+						add_equation_to_list(eqn_list,val.shape_eqn,eqn_info);
+					}
+				}
+					
+				if(val.cv_eqn != undefined){
+					if(all_param == true || traa.type == "gamma" || traa.type == "log-normal"){
+						add_equation_to_list(eqn_list,val.cv_eqn,eqn_info);
+					}
+				}
+			}
+		}
+		
+		// Adds parameters associated with the observation process
+		for(let i = 0; i < sp.inf_source.length; i++){
+			let so = sp.inf_source[i];
+	
+			if(so.error != true){
+				let eqn_info = {p:p, i:i};
+				
+				switch(so.type){
+				case "Diag. Test":
+					add_equation_to_list(eqn_list,so.spec.Se_eqn,eqn_info);
+					add_equation_to_list(eqn_list,so.spec.Sp_eqn,eqn_info);
+					break;
+				
+				case "Population":
+					add_comp_filt_eqn_list(so.spec.filter,eqn_list,i,p,so);
+					break;
+				
+				case "Pop. Trans.": case "Transition":
+					{
+						let filt = so.spec.filter;
+						let cl = find(sp.cla,"name",filt.te);
+						if(cl == undefined){ error("Cannot find classification"); return;}
+						add_trans_filt_eqn_list(filt,eqn_list,i,p,cl);
+						add_comp_filt_eqn_list(filt,eqn_list,i,p,so,cl);
+					}
+					break;
+				
+				case "Add Ind.":
+					{
+						let tab = so.table;
+						for(let r = 0; r < tab.nrow; r++){
+							for(let c = 2; c < tab.ncol; c++){
+								add_eqn_filter(tab.ele[r][c],"comp_prob",p,i,2,r,eqn_list);
+							}
+						}	
+					}
+					break;
+
+				case "Compartment":
+					{
+						let tab = so.table;
+						for(let r = 0; r < tab.nrow; r++){
+							add_eqn_filter(tab.ele[r][2],"comp_prob",p,i,2,r,eqn_list);
+						}	
+					}
+					break;
+					
+				case "Genetic":
+					add_equation_to_list(eqn_list,so.spec.mut_rate_eqn,eqn_info);
+					add_equation_to_list(eqn_list,so.spec.seq_var_eqn,eqn_info);
+					break;
+				}
+			}
+		}		
+	}
+	
+	// Goes through derived parameters
+	for(let i = 0; i < model.derive.length; i++){
+		let der = model.derive[i];
+		
+		let eqn_info = {i:i};
+		
+		add_equation_to_list(eqn_list,der.eqn1,eqn_info);		
+	}
+	
+	return eqn_list;
+}
+
+
+/// Adds any equations from the compartmental filter to the equation list
+function add_comp_filt_eqn_list(filt,eqn_list,i,p,so,cl_sel)
+{
+	let cla = filt.cla;
+	for(let cl = 0; cl < cla.length; cl++){
+		if(cl != cl_sel){
+			switch(cla[cl].radio.value){
+			case "ObsMod":
+				{
+					let comp = cla[cl].comp;
+					for(let c = 0; c < comp.length; c++){
+						let eqn_info2 = {p:p,i:i,cl:cl,c:c};
+						add_equation_to_list(eqn_list,comp[c].prob_eqn,eqn_info2);
+					}
+				}
+				break;
+
+			case "File":
+				{
+					let tab = so.table;
+					let c = find_in(tab.heading,model.species[p].cla[cl].name);
+					if(c == undefined) error("c should not be undef");
+					for(let r = 0; r < tab.nrow; r++){
+						add_eqn_filter(tab.ele[r][c],"comp_prob",p,i,c,r,eqn_list);
+					}
+				}			
+				break;
+			}
+		}
+	}
+}
+
+
+/// Adds any equations from the transition filter to the equation list
+function add_trans_filt_eqn_list(filt,eqn_list,i,p,cl)
+{
+	if(filt.trans_obs_model.value == "on"){
+		for(let tr = 0; tr < filt.tra.length; tr++){
+			let eqn_info2 = {p:p,i:i,cl:cl,tr:tr};
+			if(filt.tra[tr].prob_eqn){
+				add_equation_to_list(eqn_list,filt.tra[tr].prob_eqn,eqn_info2);
+			}
+		}
+	}
+}
+
+
+/// Adds equations based on a filter such as
+function add_eqn_filter(te,type,p,i,c,r,eqn_list)
+{
+	//let spl = te.split("|");
+	let spl = split_with_bracket(te,"|");
+	for(let k = 0; k < spl.length; k++){
+		let spl2 = spl[k].split(":");
+		if(spl2.length == 2){
+			let te2 = spl2[1];
+			
+			if(isNaN(te2)){
+				let eqn_info2 = {p:p,i:i,r:r,c:c};
+				
+				let eqn = create_equation(te2,type,p,undefined);  
+				add_equation_to_list(eqn_list,eqn,eqn_info2);
+			}
+		}
+	}
+}
+
+	
+/// Updates compartment name in parameters
+function param_update_rename_compartment(p,cl,c,old_name,new_name)
+{
+	let index = model.species[p].cla[cl].index;
+	for(let i = 0; i < model.param.length; i++){
+		let par = model.param[i];
+	
+		if(par.list){
+			let flag = false;
+			for(let j = 0; j < par.dep.length; j++){
+				
+				if(index == remove_prime(par.dep[j])){
+					if(c < par.list[j].length){
+						if(par.list[j][c] != old_name) error("Old name not correct");
+						par.list[j][c] = new_name;
+						flag = true;
+					}
+				}
+			}
+			
+			if(flag == true){
+				par.comb_list = generate_comb_list(par.list);
+			}
+		}
+	}
+}
+
+
+/// Adds equation to a list and appends information about source 
+function add_equation_to_list(eqn_list,source,eqn_info)
+{
+	source.eqn_info = eqn_info;
+	eqn_list.push(source);
+}
+
+
+/// Gets the specification for param_mult based on par
+function get_param_mult(par)
+{
+	let dep = copy(par.dep);
+	let name = "f~"+par.name;
+	let full_name = "<e>"+name;
+	if(dep.length > 0){
+		full_name += "_";
+		for(let j = 0; j < dep.length; j++){
+			if(j > 0) full_name += ",";
+			full_name += dep[j];
+		}
+	}
+	
+	if(par.time_dep == false) dep.push("t");
+	full_name += "(t)</e>";
+	return {name:name, full_name:full_name, dep:dep, time_dep:true, type:"param factor"};
+}
+
+
+/// Adds factors into the model
+function add_param_ppc_factor(par_list)
+{
+	if(!model.param_factor) return;
+	for(let j = 0; j < model.param_factor.length; j++){
+		let pf = model.param_factor[j];
+	
+		// Makes sure parameter is in the model
+		let fl = false;
+		for(let th = 0; th < par_list.length; th++){
+			if(pf.param.name == par_list[th].name){
+				if(equal_vec(pf.param.dep,par_list[th].dep)){
+					fl = true; break;
+				}
+			}
+		}
+		
+		if(fl == true){
+			par_list.push(pf.f_param);
+		}
+	}
+}

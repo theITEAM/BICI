@@ -1,32 +1,38 @@
 "use strict";
-// Takes an equation and extract information from the text
+// Functions which take an equation and extract information from the text
 
 /// Extracts parameters from an equation
 function extract_equation_properties(eqn)
 {
-	eqn.param = [];
-	eqn.ind_eff = [];
-	eqn.fix_eff = [];
-	eqn.pop = [];
-	eqn.sum = [];
-	eqn.warn = [];
+	eqn.param = [];                                  // Parameters in the equation
+	eqn.ind_eff = [];                                // Individual effect in the equation
+	eqn.fix_eff = [];                                // Fixed effects in the equation
+	eqn.pop = [];                                    // Populations in the equation
+	eqn.sum = [];                                    // Sums in the equation
+	eqn.warn = [];                                   // Warnings
 	
-	eqn.sp_name_list = [];   // These are used such that names can be changed
+	// These are used such that names can be changed
+	eqn.sp_name_list = [];   
 	eqn.index_name_list = [];
 	eqn.comp_name_list = [];
 
 	let icur = 0;
-	let lin = eqn.te;//.replace(/\n/g," ");
 
+	let conv_res = detect_greek(eqn.te,0);
+	eqn.te = conv_res.te;
+	
+	let lin = eqn.te;
+	
 	let res = check_brackets_match(lin);
-	if(res != "success"){
-		eqn.warn.push({te:res.te, cur:res.i, len:1});
+
+	if(res.err == true){
+		eqn.warn.push({te:res.msg, cur:res.op, len:1});
 		return;
 	}
 		
 	res = check_chnotallowed(lin);
-	if(res != "success"){
-		eqn.warn.push({te:res.te, cur:res.i, len:1});
+	if(res.err == true){
+		eqn.warn.push({te:res.msg, cur:res.op, len:1});
 		return;
 	}
 	
@@ -52,9 +58,11 @@ function extract_equation_properties(eqn)
 			
 			if(i < lin2.length-7 && lin2.substr(i,7) == "thresh("){ two_variable_flag = true; i += 7;}
 			
-			if(i < lin2.length-4 && lin2.substr(i,4) == "max("){ two_variable_flag = true; i += 4;}			
+			if(i < lin2.length-7 && lin2.substr(i,7) == "ubound("){ two_variable_flag = true; i += 7;}
 			
-			if(i < lin2.length-4 && lin2.substr(i,4) == "min("){ two_variable_flag = true; i += 4;}			
+			if(i < lin2.length-4 && lin2.substr(i,4) == "max("){ two_variable_flag = true; i += 4;}
+	
+			if(i < lin2.length-4 && lin2.substr(i,4) == "min("){ two_variable_flag = true; i += 4;}
 			
 			if(i < lin2.length-4 && lin2.substr(i,4) == "abs(") i += 4;			
 			
@@ -64,7 +72,7 @@ function extract_equation_properties(eqn)
 			
 			if(is_sigma(lin2,i)){
 				let ist = i;
-				i = param_end(lin2,i); 
+				i = param_end(lin2,i+1,"("); 
 				
 				if(typeof i == 'string'){
 					eqn.warn.push({te:i.replace("parameter","sum"), cur:icur2+ist, len:1});
@@ -72,7 +80,6 @@ function extract_equation_properties(eqn)
 				}
 				
 				let tex = lin2.substr(ist,i-ist);
-				
 				check_sum(tex,icur2+ist,eqn);
 			}
 			
@@ -114,7 +121,7 @@ function extract_equation_properties(eqn)
 				}
 
 				let tex = lin2.substr(ist,i-ist);
-				
+			
 				if(tex != "t"){
 					let icur3 = icur2+ist;
 				
@@ -144,7 +151,77 @@ function extract_equation_properties(eqn)
 		icur = lin.length+1;
 	}
 	
+	check_sum_bracket(eqn);
+	
 	check_indexes_match(eqn);
+}
+
+
+/// Checks that sums are encaptulated by brackets
+function check_sum_bracket(eqn)
+{
+	let lin = eqn.te;
+	
+	let sigma = "Σ";
+	
+	let i = 0;
+	while(i < lin.length-1){
+		while(i < lin.length-1 && !is_sigma(lin,i)) i++;
+		
+		if(i < lin.length-1){
+			let i_st = i;
+			i += 1;
+			if(lin.substr(i,1) == "^"){
+				while(i < lin.length && lin.substr(i,1) != "_") i++;
+				if(i == lin.length){
+					eqn.warn.push({te:"The sum should contain a dependency '_'", cur:i_st, len:1}); 
+					return;
+				}
+			}
+			
+			if(lin.substr(i,1) != "_"){
+				eqn.warn.push({te:"The sum should be followed by a dependency '_'", cur:i, len:1}); 
+			}
+			else{
+				i++;
+				let ist = i;
+				while(i < lin.length && lin.substr(i,1) != " " && lin.substr(i,1) != "(") i++;
+				while(i < lin.length && lin.substr(i,1) == " ") i++;
+				
+				if(i == lin.length || lin.substr(i,1) != "("){
+					eqn.warn.push({te:"Content in sums must be surrounded by round brackets (...)", cur:i, len:1}); 
+				}
+				
+				// Checks to see if primed indexes appear in brackets
+				let dep = lin.substr(ist,i-ist).split(",");
+				for(let k = 0; k < dep.length; k++){
+					dep[k] = dep[k].trim();
+				}
+				
+				i++;
+				let ibeg = i;
+				let num = 1;
+				
+				while(i < lin.length){
+					if(lin.substr(i,1) == "(") num++;
+					if(lin.substr(i,1) == ")") num--;
+					if(num == 0) break;
+					i++;
+				}					
+				if(i == lin.length){ 
+					eqn.warn.push({te:"The sum bracket does not match up", cur:ibeg, len:1}); 
+				}
+				
+				let inside = lin.substr(ibeg,i-ibeg);
+			
+				for(let k = 0; k < dep.length; k++){
+					if(!inside.includes(dep[k])){
+						eqn.warn.push({te:"The sum does not include the index '"+dep[k]+"'", cur:ibeg-1, len:i-ibeg+2}); 
+					}
+				}
+			}
+		}
+	}
 }
 
 
@@ -168,7 +245,9 @@ function check_indexes_match(eqn)
 			if(is_prime(ind)){
 				let k = find_in(list,ind);
 				if(k == undefined){
-					eqn.warn.push({te:"Primed index '"+ind+"' for parameter '"+par.name+"' should be summed over"});
+					if(eqn.type != "reparam_eqn"){
+						eqn.warn.push({te:"Primed index '"+ind+"' for parameter '"+par.name+"' should be summed over"});
+					}
 				}					
 				else used[k] = true;
 			}
@@ -212,6 +291,35 @@ function check_sum(tex,icur,eqn)
 {
 	let ch = "Σ";
 	let i = ch.length;
+	
+	if(tex.substr(i,1) == "^"){
+		i++;
+		let ist = i;
+		while(i < tex.length && tex.substr(i,1) != "_") i++;
+		if(i == tex.length){
+			eqn.warn.push({te:"The sum should contain a dependency2 '_'", cur:ist, len:1}); 
+			return;
+		}
+		
+		let sup = tex.substr(ist,i-ist);
+		
+		let fl = false;
+		if(sup.length < 4) fl = true;
+		else{
+			if(sup.substr(0,4) != "max:") fl = true;
+			let num = sup.substr(4);
+			if(num == "" || isNaN(num)){
+				eqn.warn.push({te:"Sum superscript number '"+num+"' not recognised.", cur:ist+6, len:sup.length-4}); 
+				return;
+			}
+		}
+		
+		if(fl == true){
+			eqn.warn.push({te:"Sum superscript '"+sup+"' not recognised.", cur:ist+2, len:sup.length}); 
+			return;
+		}
+	}
+			
 	if(tex.substr(i,1) != "_"){
 		eqn.warn.push({te:"The sum should be followed by '_'", cur:icur, len:i});
 	}
@@ -231,6 +339,19 @@ function check_sum(tex,icur,eqn)
 		if(!is_prime(de)){
 			eqn.warn.push({te:"The index '"+de+"' must have a prime if it is summed over", cur:icur+i, len:de.length});
 		}
+		
+		let de_raw = remove_prime(de);
+		let fl = false;
+		for(let p = 0; p < model.species.length; p++){
+			let sp = model.species[p];
+			for(let cl = 0; cl < sp.cla.length; cl++){
+				if(sp.cla[cl].index == de_raw) fl = true;
+			}
+		}
+		if(fl == false){
+			eqn.warn.push({te:"The index '"+de+"' is not in the model", cur:icur+i, len:de.length});
+		}
+		
 		eqn.index_name_list.push({ index_name:remove_prime(de), icur:icur+i});
 		i += de.length+1;
 	}
@@ -238,7 +359,7 @@ function check_sum(tex,icur,eqn)
 
 
 /// Determines when a parameter definition ends
-function param_end(st,i)
+function param_end(st,i,op)
 {
 	let sub_brack = false;
 	let sup_brack = false;
@@ -246,18 +367,20 @@ function param_end(st,i)
 	
 	do{
 		let ch = st.substr(i,1);
-		//if(ch == "," && type != "normal") break;
+		if(ch == op) break;
 		
 		if(ch == "^"){
-			if(type != "normal") return "Problem understanding parameter definition1.";
+			if(type != "normal") return "Problem understanding parameter definition.";
 			type = "sup";
 		}
 			
 		if(ch == "_"){
-			if(type != "normal" && type != "sup") return "Problem understanding parameter definition2.";
+			if(type != "normal" && type != "sup"){
+				return "Problem understanding parameter definition.";
+			}
 			type = "sub";
 		}
-	
+		
 		if(ch == "("){
 			if(i > 0 && st.substr(i-1,1) == "^") sup_brack = true;
 			else{
@@ -276,7 +399,7 @@ function param_end(st,i)
 	}while(i < st.length);
 	
 	if(i <= st.length - 3){
-		if(st.substr(i,3) == "(t)" || st.substr(i,3) == "(a)") i += 3;
+		if(st.substr(i,3) == "(t)") i += 3;
 	}
 
 	return i;
@@ -291,12 +414,11 @@ function check_parameter(te,icur,eqn)
 	let sp; if(p != undefined) sp = model.species[p];
 	let cl; if(eqn.cl_name != undefined) cl = find(sp.cla,"name",eqn.cl_name);
 
-	let time_dep = false, age_dep = false;
+	let time_dep = false;
 	
 	if(te.length > 3){
 		switch(te.substr(te.length-3,3)){
 			case "(t)": time_dep = true; te = te.substr(0,te.length-3); break;
-			case "(a)": age_dep = true; te = te.substr(0,te.length-3); break;
 		}
 	}
 	
@@ -310,7 +432,7 @@ function check_parameter(te,icur,eqn)
 	
 	check_valid_name(name,icur,eqn);
 	
-	/// checks if compartment names in parameter name 
+	// Checks if compartment names in parameter name 
 	if(eqn.type == "trans"){
 		let spl = name.split("^");
 		if(spl.length == 2){
@@ -326,7 +448,7 @@ function check_parameter(te,icur,eqn)
 			let claa = sp.cla[cl];
 	
 			for(let i = 0; i < spl2.length; i++){
-				let c = find(claa.comp,"name",spl2[i]);
+				let c = hash_find(claa.hash_comp,spl2[i]);
 				if(c != undefined){
 					eqn.comp_name_list.push({ p_name:eqn.p_name, cl_name:eqn.cl_name, comp_name:spl2[i], icur:icur2});
 				}
@@ -352,7 +474,7 @@ function check_parameter(te,icur,eqn)
 				let na = dep[i];
 				let index = remove_prime(na);
 			
-				if(eqn.type != "derive_eqn" &&  eqn.type != "derive_param" && eqn.type != "test"){
+				if(eqn.type != "derive_eqn" && eqn.type != "derive_param" && eqn.type != "reparam_eqn" && eqn.type != "test"){
 					if(sp == undefined) error("SHould be defined");
 					let cl2; cl2 = find(sp.cla,"index",index);	
 					if(cl2 == undefined){
@@ -388,9 +510,9 @@ function check_parameter(te,icur,eqn)
 	}
 	
 	if(time_dep == true) dep.push("t");
-	if(age_dep == true) dep.push("a");
 	
-	let par = { name:name, p_name:eqn.p_name, cl_name:eqn.cl_name, dep:dep, type:eqn.type, time_dep:time_dep, age_dep:age_dep};
+	let par = { name:name, p_name:eqn.p_name, cl_name:eqn.cl_name, dep:dep, type:eqn.type, time_dep:time_dep};
+
 	par.full_name = param_name(par);
 	
 	eqn.param.push(par);
@@ -469,54 +591,48 @@ function check_population(te,icur,eqn)
 	}
 	
 	// Removes any individual effects
-	let j = 0; while(j < te.length && te.substr(j,1) != "[") j++;
-	if(j < te.length){
-		let jst = j;
-		while(j < te.length && te.substr(j,1) != "]") j++;
-		if(j == te.length){
-			eqn.warn.push({te:"Individual effect should have a right bracket ']'", cur:icur+jst, len:j-jst});
-		}
-		else{
-			let ie = te.substr(jst+1,j-(jst+1));
-			check_ie(ie,p_name,icur+jst+1,eqn);
-			te = te.substr(0,jst)+te.substr(j+1);
-		}
-	}
-	
-	// Removes any fixed effects
-	j = 0; 
-	while(j < te.length){
-		while(j < te.length && te.substr(j,1) != "〈") j++;
+	do{
+		let j = 0; while(j < te.length && te.substr(j,1) != "[") j++;
 		if(j < te.length){
 			let jst = j;
-			while(j < te.length && te.substr(j,1) != "〉") j++;
+			while(j < te.length && te.substr(j,1) != "]") j++;
 			if(j == te.length){
-				eqn.warn.push({te:"Fixed effect should have a right bracket '〉'", cur:icur+jst, len:j-jst});
-				return;
+				eqn.warn.push({te:"Individual effect should have a right bracket ']'", cur:icur+jst, len:j-jst});
 			}
 			else{
-				let fe = te.substr(jst+1,j-(jst+1));
-				check_fe(fe,p_name,icur+jst+1,eqn);
+				let ie = te.substr(jst+1,j-(jst+1));
+				check_ie(ie,p_name,icur+jst+1,eqn);
 				te = te.substr(0,jst)+te.substr(j+1);
-				j = jst;
+			}
+		}
+		else break;
+	}while(true);
+	
+	// Removes any fixed effects
+	{
+		let j = 0; 
+		while(j < te.length){
+			while(j < te.length && te.substr(j,1) != "〈") j++;
+			if(j < te.length){
+				let jst = j;
+				while(j < te.length && te.substr(j,1) != "〉") j++;
+				if(j == te.length){
+					eqn.warn.push({te:"Fixed effect should have a right bracket '〉'", cur:icur+jst, len:j-jst});
+					return;
+				}
+				else{
+					let fe = te.substr(jst+1,j-(jst+1));
+					check_fe(fe,p_name,icur+jst+1,eqn);
+					te = te.substr(0,jst)+te.substr(j+1);
+					j = jst;
+				}
 			}
 		}
 	}
 	
-	
 	// Checks that the population being set is consistent 
-	
 	let sp = model.species[p];
 	
-	/*
-	let spl_dep = te.split("_");
-	
-	if(spl_dep.length > 2){
-		eqn.warn.push({te:"Contains more than one underscore '_'", cur:icur, len:te.length});
-	}
-	*/
-	
-	//let te_comp = spl_dep[0];
 	let te_comp = te;
 	
 	let cl_ref=[];
@@ -527,12 +643,14 @@ function check_population(te,icur,eqn)
 	let icur3 = icur;
 	if(te_comp != "" && te_comp != "All"){
 		let spl = te_comp.split(",");
+		
 		for(let i = 0; i < spl.length; i++){
 			let tex = spl[i];
 			
 			let index = remove_prime(tex);
 		
-			let cl_sp = find(sp.cla,"index",index);  // Detects if an index
+			let cl_sp = find(sp.cla,"index",index);      // Detects if an index
+			
 			if(cl_sp != undefined){
 				pop.index.push(tex);
 				
@@ -553,23 +671,27 @@ function check_population(te,icur,eqn)
 				for(let k = 0; k < spl2.length; k++){
 					let te2 = spl2[k];
 					let co = find_comp_from_name(te2,p_name);
-
-					if(co.warn != undefined) warn = co.warn;
+					if(co == undefined){
+						warn = "Compartment '"+te2+"' not found";
+						if(index != tex) warn = "Index '"+te2+"' not found";
+					}
 					else{
-						let cl_name = sp.cla[co.cl].name;
-							
-						let comp_name = sp.cla[co.cl].comp[co.c].name;
-						eqn.comp_name_list.push({ p_name:p_name, cl_name:cl_name, comp_name:comp_name, icur:icur4});
-						
-						if(cl_sp == undefined) cl_sp = co.cl;
+						if(co.warn != undefined) warn = co.warn;
 						else{
-							if(cl_sp != co.cl){
-								warn = "The compartments '"+spl2[k-1].trim()+"' and '"+spl2[k].trim()+"' are on different classifications";
+							let cl_name = sp.cla[co.cl].name;
+								
+							let comp_name = sp.cla[co.cl].comp[co.c].name;
+							eqn.comp_name_list.push({ p_name:p_name, cl_name:cl_name, comp_name:comp_name, icur:icur4});
+							
+							if(cl_sp == undefined) cl_sp = co.cl;
+							else{
+								if(cl_sp != co.cl){
+									warn = "The compartments '"+spl2[k-1].trim()+"' and '"+spl2[k].trim()+"' are on different classifications";
+								}
 							}
 						}
 					}
 					icur4 += te2.length+1;
-					//if(warn != undefined) break;
 				}
 				if(warn != undefined){
 					eqn.warn.push({te:warn, cur:icur3, len:tex.length});
@@ -629,19 +751,37 @@ function find_comp_from_name(te,p_name)
 	te = te.trim();
 	if(te == "") return {warn:"Compartment not specfied"};
 	
-	let p = find(model.species,"name",p_name);
-	if(p == undefined) return {warn:"Problem with expression"};
-
-	for(let cl = 0; cl < model.species[p].ncla; cl++){
-		let claa = model.species[p].cla[cl];
-		for(let c = 0; c < claa.ncomp; c++){
-			if(claa.comp[c].name == te){
-				return {p:p, cl:cl, c:c};
+	if(p_name == undefined){
+		for(let p = 0; p < model.species.length; p++){
+			let sp = model.species[p];
+			for(let cl = 0; cl < sp.ncla; cl++){
+				let claa = sp.cla[cl];
+				for(let c = 0; c < claa.ncomp; c++){
+					if(claa.comp[c].name == te){
+						return {p:p, cl:cl, c:c};
+					}
+				}
 			}
 		}
 	}
+	else{
+		let p = find(model.species,"name",p_name);
+		if(p == undefined){
+			return {warn:"Problem with expression"};
+		}
+		
+		for(let cl = 0; cl < model.species[p].ncla; cl++){
+			let claa = model.species[p].cla[cl];
+			for(let c = 0; c < claa.ncomp; c++){
+				if(claa.comp[c].name == te){
+					return {p:p, cl:cl, c:c};
+				}
+			}
+		}
+	}
+	return;
 	
-	return { warn:"Could not find compartment '"+te+"'"};
+	//return { warn:"Could not find compartment '"+te+"'"};
 }
 
 
@@ -659,88 +799,15 @@ function check_valid_name(name,icur,eqn)
 }
 
 
-/*
-/// Checks to see if the filter is correctly specified
-// The filter is ordered by the classifications
-// If unset then there is no restriction on the classification
-function check_filter(filt,icur,eqn)
-{	
-	let p_name = eqn.p_name;
-	let p = find(model.species,"name",p_name);
-	let sp = model.species[p];
-	let cl = find(sp.cla,"name",eqn.cl_name);
-
-	let filter=[];
-	
-	let spl = filt.split(",");
-	let icur3 = icur;
-	let cl_ref=[];
-	for(let i = 0; i < spl.length; i++){
-		let te = spl[i];
-		let warn;
-		let spl2 = te.split("|");
-		let cl_sp;
-	
-		let icur4 = icur3;
-		for(let k = 0; k < spl2.length; k++){
-			let te2 = spl2[k];
-			let co = find_comp_from_name(te2,p_name);
-			if(co.warn != undefined) warn = co.warn;
-			else{
-				let cl_name = sp.cla[co.cl].name;
-					
-				if(filter[co.cl] == undefined){
-					filter[co.cl] = {p_name:p_name, name:cl_name, pos:[]};
-				}
-				filter[co.cl].pos.push(te2.trim());
-				
-				let ii = icur4; while(ii < te.length && te2.substr(ii,1) == " ") ii++;
-			
-				let comp_name = sp.cla[co.cl].comp[co.c].name;
-				eqn.comp_name_list.push({ p_name:p_name, cl_name:cl_name, comp_name:comp_name, icur:ii});
-				
-				if(co.cl == cl){
-					warn = "The compartment '"+spl2[k].trim()+"' is in the same classification as the transition";
-				}
-				else{
-					if(cl_sp == undefined) cl_sp = co.cl;
-					else{
-						if(cl_sp != co.cl){
-							warn = "The compartments '"+spl2[k-1].trim()+"' and '"+spl2[k].trim()+"' are on different classifications";
-						}
-					}
-				}
-			}
-			icur4 += te2.length+1;
-			//if(warn != undefined) break;
-		}
-		if(warn != undefined){
-			eqn.warn.push({te:warn, cur:icur3, len:te.length});
-		}
-
-		if(cl_ref[cl_sp] != undefined){
-			eqn.warn.push({te:"Cannot have multiple compartments in the same classification", cur:cl_ref[cl_sp],len:icur3+te.length-cl_ref[cl_sp]});
-		}
-		cl_ref[cl_sp] = icur3;
-		
-		icur3 += te.length+1;
-	}
-	return filter;
-}
-*/
-
-
 /// Gets the properties of a parameter from the string
 function get_param_prop(st)
 {
 	st = st.trim();
-	let time_dep = false, age_dep = false;
+	let time_dep = false;
 	
 	if(st.length > 3){
 		let end = st.substr(st.length-3,3);
-		if(end == "(t)") time_dep = true;
-		if(end == "(a)") age_dep = true;
-		if(end == "(t)" || end == "(a)") st = st.substr(0,st.length-3);
+		if(end == "(t)"){ time_dep = true; st = st.substr(0,st.length-3);}
 	}
 	
 	let j = 0;
@@ -754,6 +821,7 @@ function get_param_prop(st)
 	while(jj < name.length && name.substr(jj,1) != "^") jj++;
 	if(jj < name.length){
 		sup = name.substr(jj+1);
+		sup = remove_bracket(sup);
 		name_raw = name.substr(0,jj);
 	}
 
@@ -765,13 +833,13 @@ function get_param_prop(st)
 		let jst = j; 
 		while(j < st.length && st.substr(j,1) != "[") j++;
 		sub = st.substr(jst,j-jst);
+		sub = remove_bracket(sub);
 		dep = sub.split(",");
 	}
 					
 	if(time_dep == true) dep.push("t");
-	if(age_dep == true) dep.push("a");
-	
-	return {name:name, name_raw:name_raw, dep:dep, sub:sub, sup:sup, time_dep:time_dep, age_dep:age_dep, type:unset_type};
+
+	return {name:name, name_raw:name_raw, dep:dep, sub:sub, sup:sup, time_dep:time_dep, type:unset_type};
 }
 
 
@@ -795,7 +863,7 @@ function equation_dep(eqn)
 {
 	extract_equation_properties(eqn);
 	
-	let time_fl = false, age_fl = false;
+	let time_fl = false;
 	
 	let dep=[];
 	for(let i = 0; i < eqn.param.length; i++){
@@ -805,11 +873,8 @@ function equation_dep(eqn)
 			if(de == remove_prime(de)){
 				if(de == "t") time_fl = true;
 				else{
-					if(de == "a") age_fl = true;
-					else{
-						if(find_in(dep,de) == undefined){
-							dep.push(de);
-						}
+					if(find_in(dep,de) == undefined){
+						dep.push(de);
 					}
 				}
 			}
@@ -829,7 +894,6 @@ function equation_dep(eqn)
 	if(eqn.te.includes("{") == true) time_fl = true;
 	
 	if(time_fl == true) dep.push("t");
-	if(age_fl == true) dep.push("a");
 
 	return dep;
 }
@@ -844,7 +908,7 @@ function check_brackets_match(te)
 		if(ch == "(" || ch == "[" || ch == "{") brack_list.push({i:i, ch:ch});
 		if(ch == ")" || ch == "]" || ch == "}"){
 			if(brack_list.length == 0){
-				return {te:"The bracket '"+ch+"' does not match up", i:i};
+				return err("The bracket '"+ch+"' does not match up",i);
 			}
 			
 			let chlast = brack_list[brack_list.length-1].ch;
@@ -852,31 +916,29 @@ function check_brackets_match(te)
 				brack_list.pop();
 			}
 			else{
-				return {te:"The bracket '"+chlast+"' does not match up", i:brack_list[brack_list.length-1].i};
+				return err("The bracket '"+chlast+"' does not match up",brack_list[brack_list.length-1].i);
 			}
 		}		
 	}
 	
 	if(brack_list.length != 0){
 		let last = brack_list[brack_list.length-1];
-		return {te:"The bracket '"+last.ch+"' does not match up", i:last.i};
+		return err("The bracket '"+last.ch+"' does not match up",last.i);
 	}
 	
-	return "success";
+	return success();
 }
 
 
-/// Checks that the epression does not include ceratin characters which are not allowed
+/// Checks that the expression does not include ceratin characters which are not allowed
 function check_chnotallowed(te)
 {
 	for(let i = 0; i < te.length; i++){
 		let ch = te.substr(i,1);
 		if(chnotallowed.includes(ch)){
-			return {te:"The character '"+ch+"' is not allowed", i:i};
+			return err("The character '"+ch+"' is not allowed",i);
 		}
 	}
 	
-	return "success";
+	return success();
 }
-
-

@@ -1,4 +1,5 @@
 "use strict";
+// Functions related to pop-up bubbles
 
 /// Adds buttons associated with a speech bubble
 function add_bubble_buts(lay)
@@ -15,9 +16,161 @@ function add_bubble_buts(lay)
 	let cont = {y:0, input_list:[], drop_list:[], lay:lay, bu:bu, bu_lay:bu_lay, end_button:[]};
 	
 	bub.warning = false;
+
+	switch(bu.type){	
+	case "BayesFactor":
+		cont.dx = 9;
+		bubble_addtitle(cont,"Bayes Factor",{te:bayesfactor_text});
+		switch(bub.mode){
+		case "bf":
+			bubble_addparagraph(cont,inter.graph.bf_store.te,0,cont.dx);
+			add_end_button(cont,"Done","Done",{});	
+			break;
+			
+		default:
+			
+			bubble_input(cont,"Value:",{type:"BF_val"});
+			add_end_button(cont,"Calculate","CalculateBF",{});	
+		}
+		break;
+		
+	case "ShowModel":
+		{
+			let ex = bu.mod_but;
+			cont.dx = 14;
+			bubble_addtitle(cont,"Model used",{});
+			let pic = find_pic(ex.pic);
+		
+			bubble_addpicture(cont,pic);
+		
+			let si = 0.9, lh = 1.1, ma = 0.5;  
+			let text_anno = text_convert_annotation("<b>"+ex.mod+": "+ex.te+"</b>",si,lh,cont.dx-2*ma,"center",DDBLUE);
+			let word = text_anno.word;
+			
+			let dy = text_anno.height;
+		
+			cont.lay.add_button({word:word, x:0, y:cont.y, dx:cont.dx, dy:dy, type:"PlotWord"}); 
+			cont.y += dy;
+			
+			add_end_button(cont,"Done","Done",{});	
+		}
+		break;
 	
-	//pr(bu.type+" Bubble type");
-	switch(bu.type){		
+	case "ModType":
+		{
+			let title, te;
+			switch(bu.variety){
+			case "IBM":
+				title = "Individual-based model"; 
+				te = "This example uses an individual-based model (IBM). This means that individuals are explicitly modelled with each having it's own timeline.";
+				break;
+				
+			case "POP":
+				title = "Population-based model"; 
+				te = "This example uses a population-based model (PBM). This means that only the compartmental populations are modelled. Such a model cannot make used of individual-level data or individual-level variation (e.g. through fixed or individual effects).";
+				break;
+				
+			case "IBM/POP": 
+				title = "Combined population and individual-based model"; 
+				te = "This example uses both an individual (IBM) and a population-based model (PBM). This is often useful for modelling different aspects of the model.";
+				break;
+			}
+			cont.dx = 17;
+			bubble_addtitle(cont,title,{});
+			bubble_addbigparagraph(cont,te,0,cont.dx);
+			add_end_button(cont,"Done","Done",{});	
+		}
+		break;
+		
+	case "CopyPic":
+		cont.dx = 8;
+		bubble_addtitle(cont,"Copy",{});
+		bubble_input(cont,"Suffix:",{type:"suffix"});
+		add_end_button(cont,"Done","DoneCopyPic",{});	
+		break;
+		
+	case "CompAlpha": case "MultiCompAlpha":
+		cont.dx = 10;
+		bubble_addtitle(cont,"Edit α",{});
+		bubble_input(cont,"Value:",{type:"alpha_val"});
+		add_end_button(cont,"Done","DoneAlpha",{});	
+		break;
+		
+	case "ProbEqn":
+		cont.dx = 10;
+		bubble_addtitle(cont,"Detection prob.",{});
+		add_end_button(cont,"Done","Done",{});	
+		break;
+		
+	case "CompGraph": case "CompGraph2": case "CompLatLngGraph": case "CompMapGraph": 
+		{
+			cont.dx = 9.3;
+			bubble_addtitle(cont,"Compartment",{});
+			bubble_addparagraph(cont,"<b>Name:</b> "+bu.te,0,cont.dx);
+			if(bu.CImin){	
+				bubble_addparagraph(cont,"<b>Mean:</b> "+precision(bu.value,5),0,cont.dx);
+				bubble_addparagraph(cont,"<b>CI min:</b> "+precision(bu.CImin,5),0,cont.dx);
+				bubble_addparagraph(cont,"<b>CI max:</b> "+precision(bu.CImax,5),0,cont.dx);
+			}
+			else{
+				bubble_addparagraph(cont,"<b>Value:</b> "+precision(bu.value,5),0,cont.dx);
+			}		
+			add_end_button(cont,"Done","Done",{});	
+		}
+		break;
+	
+	case "SliceTime":
+		{
+			cont.dx = 9.3;
+			bubble_addtitle(cont,"Slice Time",{});
+			bubble_input(cont,"Time:",{type:"slice_time"});
+			add_end_button(cont,"Done","DoneSliceTime",{});	
+		}
+		break;
+		
+	case "PopFilt":
+		{
+			cont.dx = 14.3;
+			bubble_addtitle(cont,"Filter",{});
+			
+			let popf = bub.popfilt;
+			let filt = popf.filter;
+			
+			let cl_sel = popf.rpf.species[filt.p].sel_class.cl;
+			
+			if(filt.cl != cl_sel){
+				bubble_addradio(cont,0,"select","Select",bub.popfilt.filter.radio); cont.y -= 1.4;
+				bubble_addradio(cont,5,"single","Single",bub.popfilt.filter.radio);
+			}
+			
+			cont.y += 0.2;
+			bubble_addscrollable(cont,{type:"filterpos", ymax:10});
+		
+			bubble_addcheckbox(cont,0,"Calculate fraction",bub.popfilt.filter.fraction);
+			cont.y += 0.4;
+				 
+			add_end_button(cont,"Delete","RemoveFilter",{num:bu.num, p: bu.filter.p, rpf:bub.popfilt.rpf});	
+			add_end_button(cont,"Done","DoneFilter",{});	
+		}
+		break;
+		
+	case "MatrixEleBut":	
+		{
+			cont.dx = 8.5;
+			bubble_addtitle(cont,"Matrix element",{});
+			if(bu.stat){
+				bubble_addparagraph(cont,"<b>Mean:</b> "+bu.stat.mean,0,cont.dx);
+				bubble_addparagraph(cont,"<b>CI min:</b> "+bu.stat.CImin,0,cont.dx);
+				bubble_addparagraph(cont,"<b>CI max:</b> "+bu.stat.CImax,0,cont.dx);
+				bubble_addparagraph(cont,"<b>ESS:</b> "+bu.stat.ESS,0,cont.dx);
+				bubble_addparagraph(cont,"<b>GR:</b> "+bu.stat.GR,0,cont.dx);
+			}
+			else{
+				bubble_addparagraph(cont,"<b>Value:</b> "+bu.value,0,cont.dx);
+			}
+		}
+		break;
+		
 	case "Link":
 		switch(bu.ac){
 		case "AddConstantTime":
@@ -45,6 +198,7 @@ function add_bubble_buts(lay)
 			switch(bu.ac){
 			case "GraphSettings": inter.graph.settings_dist_bubble(cont); break;
 			case "TraceSettings": inter.graph.settings_trace_bubble(cont); break;
+			case "ScatterSettings": inter.graph.settings_scatter_bubble(cont); break;
 			default: inter.graph.settings_speed_bubble(cont); break;
 			}
 		}
@@ -52,10 +206,6 @@ function add_bubble_buts(lay)
 		
 	case "AddFilter":
 		filter_bubble(bu,cont);
-		break;
-		
-	case "CombineIE":
-		combine_ie_bubble(cont);
 		break;
 		
 	case "x-tick-label":
@@ -85,7 +235,7 @@ function add_bubble_buts(lay)
 		
 	case "Compartment": case "CompMap": case "CompLatLng":
 		{
-			cont.dx = 11;
+			cont.dx = 11.3;
 			
 			bubble_addtitle(cont,"Compartment",{te:compartment_text2});
 			bubble_input(cont,"Name:",{type:"compartment", p:bu.p, cl:bu.cl, i:bu.i});
@@ -99,121 +249,156 @@ function add_bubble_buts(lay)
 				bubble_addcheckbox(cont,-0.1,"Add branching probability",bub.checkbox);
 			}
 			
+			if(co.branch == true){
+				bubble_addcheckbox(cont,-0.1,"Use branching factors",bub.checkbox2);
+			}
+			
 			if(co.type != "boundary"){
 				bubble_addcheckbox(cont,-0.1,"Position fixed",co.fixed);
 			}
 			
+			let sp = model.species[bu.p];
+			if(sp.trans_tree.check == true){
+				if(sp.infection_cl.te == sp.cla[bu.cl].name){
+					bubble_addcheckbox(cont,-0.1,"Infected state",co.infected);
+				}
+			}
+			
+			if(co.type != "boundary"){
+				add_end_button(cont,"Copy","CopyComp",{p:bu.p, cl:bu.cl, i:bu.i});		
+			}
 			add_end_button(cont,"Delete","DeleteComp",{p:bu.p, cl:bu.cl, i:bu.i});		
 			add_end_button(cont,"OK","ChangeComp",{p:bu.p, cl:bu.cl, i:bu.i});		
 		}
 		break;
 	
 	case "Transition": case "TransitionPoint":
-		let tr = bu.tr;
+		{
+			let tr = bu.tr;
 
-		cont.dx = 12;
-		
-		if(tr.i == "Source"){
-			bubble_addtitle(cont,"Source",{te:source_text2});
-		}
-		else{
-			if(tr.f == "Sink"){
-				bubble_addtitle(cont,"Sink",{te:sink_text2});
+			cont.dx = 12;
+			
+			if(tr.i == SOURCE){
+				bubble_addtitle(cont,"Source",{te:source_text2});
 			}
 			else{
-				bubble_addtitle(cont,"Transition",{te:trans_text2});
+				if(tr.f == SINK){
+					bubble_addtitle(cont,"Sink",{te:sink_text2});
+				}
+				else{
+					bubble_addtitle(cont,"Transition",{te:trans_text2});
+				}
 			}
-		}
+			
+			cont.y += 0.1;
 		
-		cont.y += 0.4;
-		
-		let dist = get_dist_pos();
-		if(tr.i == "Source") dist = exp_dist_pos;
-		
-		bubble_addtext(cont,"Distribution:");
-		cont.y -= 1.7;
-		
-		let pos=[]; for(let i = 0; i < dist.length; i++) pos.push({te:dist[i]});
-		
-		bubble_adddropdown(cont,4.6,6.5,inter.bubble.trans_type,pos);
+			if(tr.branch == true){
+				if(tr.branch_select == true || tr.all_branches == true){
+					let si = 1.1;
+					if(tr.all_branches == true){
+						bubble_input(cont,"Branching factor:",{type:"trans_bp", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+					}
+					else{
+						cont.lay.add_button({te:"Hel", x:11, y:cont.y+1.2, dx:si, dy:si, type:"Delete", back_col:BUBBLE_COL,  ac:"DeleteBranchProb", p:bu.p, cl:bu.cl, i:bu.i}); 
+					
+						bubble_input(cont,"Branching probability:",{type:"trans_bp", w:10.8, eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+					}
+				}
+				else{
+					cont.lay.add_button({te:"Branching probability:", x:0, y:cont.y, dx:6, dy:0.8, type:"InputBoxName"});
+					cont.y += 1.3;
+					
+					bubble_addparagraph(cont,"Set by other transitions.",0.5,cont.dx-0.5);
+					
+					cont.y += 0.4;
+				}
+				cont.y += 0.3;
+			}
+			cont.y += 0.3;
+			
+			let dist = get_dist_pos();
+			if(tr.i == SOURCE) dist = source_dist_pos;
+			
+			bubble_addtext(cont,"Distribution:");
+			cont.y -= 1.7;
+			
+			let pos=[]; for(let i = 0; i < dist.length; i++) pos.push({te:dist[i], trans_dist:true});
+			
+			bubble_adddropdown(cont,4.6,7.2,inter.bubble.trans_type,pos);
 
-		cont.y += 0.5;
-		
-		if(tr.branch == true){
-			bubble_input(cont,"Branching probability:",{type:"trans_bp", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-		}
-		
-		let mean_fl = false, rate_fl = false, shape_fl = false;
-		let cv_fl = false, scale_fl = false, shape_erlang_fl = false; 
-		
-		switch(inter.bubble.trans_type.te){
-		case "exp(mean)":
-			mean_fl = true;
-			bubble_input(cont,"Mean:",{type:"trans_mean", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-			if(tr.i == "Source"){ cv_fl = true; shape_fl = true; scale_fl = true; shape_erlang_fl = true;}
-			break;
+			cont.y += 0.5;
 			
-		case "exp(rate)":
-			rate_fl = true;
-			bubble_input(cont,"Rate:",{type:"trans_rate", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-			if(tr.i == "Source"){ cv_fl = true; shape_fl = true; scale_fl = true; shape_erlang_fl = true;}
-			break;
+			let mean_fl = false, rate_fl = false, shape_fl = false;
+			let cv_fl = false, scale_fl = false, shape_erlang_fl = false; 
 			
-		case "gamma":
-			mean_fl = true;
-			bubble_input(cont,"Mean:",{type:"trans_mean", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-			cv_fl = true;
-			bubble_input(cont,"CV:",{type:"trans_cv", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-			break;
-			
-		case "erlang":
-			mean_fl = true;
-			bubble_input(cont,"Mean:",{type:"trans_mean", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-			shape_erlang_fl = true;
-			bubble_input(cont,"Shape:",{type:"trans_shape_erlang", p:bu.p, cl:bu.cl, i:bu.i});
-			break;
-			
-		case "log-normal":
-			mean_fl = true;
-			bubble_input(cont,"Mean:",{type:"trans_mean", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-			cv_fl = true;
-			bubble_input(cont,"CV:",{type:"trans_cv", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-			break;
-			
-		case "weibull":
-			scale_fl = true;
-			bubble_input(cont,"Scale:",{type:"trans_scale", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-			shape_fl = true;
-			bubble_input(cont,"Shape:",{type:"trans_shape", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-			break;
-		}
-	
-		if(mean_fl == false){
-			bubble_input(cont,"",{hidden:true, type:"trans_mean", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-		}
+			switch(inter.bubble.trans_type.te){
+			case "exponential":
+				rate_fl = true;
+				bubble_input(cont,"Rate:",{type:"trans_rate", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+				if(tr.i == SOURCE){ cv_fl = true; shape_fl = true; scale_fl = true; shape_erlang_fl = true;}
+				break;
+				
+			case "gamma":
+				mean_fl = true;
+				bubble_input(cont,"Mean:",{type:"trans_mean", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+				cv_fl = true;
+				bubble_input(cont,"CV:",{type:"trans_cv", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+				break;
+				
+			case "erlang":
+				mean_fl = true;
+				bubble_input(cont,"Mean:",{type:"trans_mean", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+				shape_erlang_fl = true;
+				bubble_input(cont,"Shape:",{type:"trans_shape_erlang", p:bu.p, cl:bu.cl, i:bu.i});
+				break;
+				
+			case "log-normal":
+				mean_fl = true;
+				bubble_input(cont,"Mean:",{type:"trans_mean", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+				cv_fl = true;
+				bubble_input(cont,"CV:",{type:"trans_cv", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+				break;
+				
+			case "weibull":
+				scale_fl = true;
+				bubble_input(cont,"Scale:",{type:"trans_scale", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+				shape_fl = true;
+				bubble_input(cont,"Shape:",{type:"trans_shape", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+				break;
 
-		if(rate_fl == false){
-			bubble_input(cont,"",{hidden:true, type:"trans_rate", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-		}
+			case "period":
+				mean_fl = true;
+				bubble_input(cont,"Time:",{type:"trans_mean", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+				break;
+			}
 		
-		if(cv_fl == false){
-			bubble_input(cont,"",{hidden:true, type:"trans_cv", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});	
+			if(mean_fl == false){
+				bubble_input(cont,"",{hidden:true, type:"trans_mean", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+			}
+
+			if(rate_fl == false){
+				bubble_input(cont,"",{hidden:true, type:"trans_rate", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+			}
+			
+			if(cv_fl == false){
+				bubble_input(cont,"",{hidden:true, type:"trans_cv", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});	
+			}
+			
+			if(shape_fl == false){
+				bubble_input(cont,"",{hidden:true, type:"trans_shape", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+			}
+			
+			if(scale_fl == false){
+				bubble_input(cont,"",{hidden:true, type:"trans_scale", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+			}
+			
+			if(shape_erlang_fl == false){
+				bubble_input(cont,"",{hidden:true, type:"trans_shape_erlang", p:bu.p, cl:bu.cl, i:bu.i});
+			}
+			
+			add_end_button(cont,"Delete","DeleteTrans",{p:bu.p, cl:bu.cl, i:bu.i});			
+			add_end_button(cont,"OK","ChangeTransValue",{p:bu.p, cl:bu.cl, i:bu.i});		
 		}
-		
-		if(shape_fl == false){
-			bubble_input(cont,"",{hidden:true, type:"trans_shape", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-		}
-		
-		if(scale_fl == false){
-			bubble_input(cont,"",{hidden:true, type:"trans_scale", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
-		}
-		
-		if(shape_erlang_fl == false){
-			bubble_input(cont,"",{hidden:true, type:"trans_shape_erlang", p:bu.p, cl:bu.cl, i:bu.i});
-		}
-		
-		add_end_button(cont,"Delete","DeleteTrans",{p:bu.p, cl:bu.cl, i:bu.i});			
-		add_end_button(cont,"OK","ChangeTransValue",{p:bu.p, cl:bu.cl, i:bu.i});		
 		break;
 		
 	case "ClassTab":
@@ -237,7 +422,7 @@ function add_bubble_buts(lay)
 		break;
 		
 	case "AddButton":
-		{			
+		{	
 			switch(bu.ac){
 			case "AddClassification": 
 				switch(bub.mode){
@@ -284,7 +469,6 @@ function add_bubble_buts(lay)
 				
 						bubble_input(cont,"Name:",{type:"add_classification_name",p:bu.op.p, w:10});
 					
-						//cont.y += 0.3;
 						bubble_addparagraph(cont,"Select coordinate system:",0,11);
 						cont.y += 0.2;
 						bubble_addradio(cont,0,"cartesian","Cartesian (x/y)",bub.radio);
@@ -317,12 +501,96 @@ function add_bubble_buts(lay)
 				}
 				break;
 	
+			case "ImportModel":
+				{
+					pr(bub.mode+" mode");
+					switch(bub.mode){
+					case "LoadComps":
+						{
+							cont.dx = 11.5;
+							bubble_addtitle(cont,"Load compartments",{te:loadcomp_text});
+							
+							bubble_addradio(cont,0,"SelectColour","Select colour",bub.radio);
+							bubble_colour(cont);
+							cont.y += 0.3;
+
+							bubble_addradio(cont,0,"FileColour","Load colour from file",bub.radio);
+							
+							cont.y += 0.5;
+							
+							let op = bub.bu.op;
+							if(model.species[op.p].cla[op.cl].camera.coord == "cartesian"){
+								bubble_addcheckbox(cont,0,"Load position data",bub.pos_check);
+							}
+
+							add_end_button(cont,"Back","MenuBack");		
+							add_end_button(cont,"Next","LoadCompartmentNext");		
+						}
+						break;
+						
+					case "LoadCompMaps":
+						{
+							cont.dx = 10.8;
+							bubble_addtitle(cont,"Load comp. map",{te:loadcomp_text});
+							
+							bubble_colour(cont,0);
+							cont.y += 0.5;
+							
+							add_end_button(cont,"Back","MenuBack");		
+							add_end_button(cont,"Next","ImportCompMap2");
+						}			
+						break;
+					
+					
+					case "LoadTrans":
+						{
+							cont.dx = 12;
+							bubble_addtitle(cont,"Load transitions",{te:loadtrans_text});
+								
+							bubble_addparagraph(cont,"Select if position data is included in data file:",0,cont.dx);
+							cont.y += 0.3;
+							
+							bubble_addcheckbox(cont,0,"Load position data",bub.pos_check);
+							
+							add_end_button(cont,"Back","MenuBack");		
+							add_end_button(cont,"Load","ImportTrans2");		
+						}
+						break;
+
+					default:
+						cont.dx = 10;
+						bubble_addtitle(cont,"Import",{te:label_text});
+						bubble_addradio(cont,0,"Compartments","Compartments",inter.bubble.radio); 
+						let claa = model.get_cla();
+						if(claa.camera.coord == "latlng"){
+							bubble_addradio(cont,0,"Comp. Map","Comp. Map",inter.bubble.radio); 
+						}
+						bubble_addradio(cont,0,"Transitions","Transitions",inter.bubble.radio); 
+					
+						add_end_button(cont,"Next","ImportModelNext");	
+					}
+				}
+					
+			/*
+				let sub = [];
+				let active = cont.bu.show_model;
+				sub.push({te:"Compartments", ac:"ImportComp", active:active});
+				let active2 = active; if(active2 == true && cont.bu.coord != "latlng") active2 = false;
+				sub.push({te:"Comp. Map", ac:"ImportCompMap", active:active2});			
+				*/			
+			
+				break;
+			
 			case "AddAnnotation":
-				cont.dx = 10;
+				cont.dx = 12;
 				switch(bub.mode){
 				case "add_label":
 					bubble_addtitle(cont,"Add label",{te:label_text});
 					bubble_input(cont,"Text:",{type:"label"});
+					bubble_input(cont,"Text size:",{type:"label_size"});
+					bubble_colour(cont);
+					cont.y += 0.3;
+			
 					add_end_button(cont,"Add","AddLabelOK");		
 					break;
 				
@@ -349,7 +617,7 @@ function add_bubble_buts(lay)
 					if(model.get_coord() == "latlng"){
 						bubble_addradio(cont,0,"Map","Add map (.geoJSON)",bub.radio);
 					}
-					bubble_addradio(cont,0,"Remove","Edit annotations",bub.radio);
+					//bubble_addradio(cont,0,"Remove","Edit annotations",bub.radio);
 					add_end_button(cont,"Next","AddAnnotationOK");				
 					break;
 				}
@@ -365,29 +633,35 @@ function add_bubble_buts(lay)
 			case "DiagTestData": diagtest_data_bubble(cont,"add"); break;
 			case "PopulationData": population_data_bubble(cont,"add"); break;
 			case "PopTransData": poptrans_data_bubble(cont,"add"); break;
+			case "SeqData": sequence_data_bubble(cont,"add"); break;
+			case "IndEffData": ind_eff_data_bubble(cont,"add"); break;
+			case "IndGroupData": ind_group_data_bubble(cont,"add"); break;
 			case "SetConstant": set_constant_bubble(cont); break;
 			case "SetReparam": set_reparam_bubble(cont); break;
 			case "SetDistribution": set_distribution_bubble(cont); break;
 			case "SetDerived": set_derived_bubble(cont); break;
-			case "SetTrapsData": settraps_data_bubble(cont,"add"); break;
-			default: error("Cannot find source"); break;
+			case "AddParamMult": add_param_mult_bubble(cont); break;
+			default: error("Cannot find source2"); break;
 			}
 		}
 		break;
 	
 	case "GreyView":
-		switch(inter.edit_source.type){
-		case "Init. Pop.": initpop_data_bubble(cont,"view"); break;
-		case "Move Ind.": move_data_bubble(cont,"view"); break;
-		case "Compartment": comp_data_bubble(cont,"view"); break;
-		case "Transition": trans_data_bubble(cont,"view","TransVar"); break;
-		case "Source": trans_data_bubble(cont,"view","SourceVar"); break;
-		case "Sink": trans_data_bubble(cont,"view","SinkVar"); break;
-		case "Diag. Test": diagtest_data_bubble(cont,"view"); break;
-		case "Population": population_data_bubble(cont,"view"); break;
-		case "Pop. Trans.": poptrans_data_bubble(cont,"view"); break;
-		case "Set Traps": settraps_data_bubble(cont,"view"); break;
-		default: error("Cannot find source: "+inter.edit_source.type); break;
+		if(bu.ac == "CombineIEBubble") combine_ie_bubble(cont);
+		else{	
+			switch(edit_source.type){
+			case "Init. Pop.": initpop_data_bubble(cont,"view"); break;
+			case "Move Ind.": move_data_bubble(cont,"view"); break;
+			case "Compartment": comp_data_bubble(cont,"view"); break;
+			case "Transition": trans_data_bubble(cont,"view","TransVar"); break;
+			case "Diag. Test": diagtest_data_bubble(cont,"view"); break;
+			case "Ind. Eff.": ind_eff_data_bubble(cont,"view"); break;
+			case "Ind. Group": ind_group_data_bubble(cont,"view"); break;
+			case "Genetic": sequence_data_bubble(cont,"view"); break;
+			case "Population": population_data_bubble(cont,"view"); break;
+			case "Pop. Trans.": poptrans_data_bubble(cont,"view"); break;
+			default: error("Cannot find source: "+edit_source.type); break;
+			}
 		}
 		break;
 	
@@ -396,20 +670,11 @@ function add_bubble_buts(lay)
 			cont.dx = 9;
 			bubble_addparagraph(cont,"Click here to add a species to the model.",0,8);
 		}
-		else{	
+		else{		
 			cont.dx = 12;
 			bubble_addtitle(cont,"Add species",{te:species_text});
-	
 			bubble_input(cont,"Name:",{type:"add_species_name"});
-			
-			bubble_addtext(cont,"Type:");
-			
-			cont.y -= 1.2;
-			
-			bubble_addradio(cont,2.3,"Individual","Individual-based",bub.radio);
-			bubble_addradio(cont,2.3,"Population","Population-based",bub.radio);
-			cont.y += 0.2;
-			
+			add_species_bubble(cont);
 			add_end_button(cont,"Add","AddSpeciesOK");	
 		}			
 		break;
@@ -422,15 +687,7 @@ function add_bubble_buts(lay)
 		cont.dx = 12;
 		bubble_addtitle(cont,"Species",{te:species_text});
 		bubble_input(cont,"Name:",{type:"species_name",p:bu.val});
-		
-		bubble_addtext(cont,"Type:");
-			
-		cont.y -= 1.2;
-		
-		bubble_addradio(cont,2.3,"Individual","Individual-based",bub.radio);
-		bubble_addradio(cont,2.3,"Population","Population-based",bub.radio);
-		cont.y += 0.2;
-		
+		add_species_bubble(cont);
 		add_end_button(cont,"Delete","DeleteSpecies");
 		add_end_button(cont,"Done","ChangeSpeciesName");		
 		break;
@@ -490,20 +747,27 @@ function add_bubble_buts(lay)
 		break;
 	
 	case "ReparamElement":
-		cont.dx = 10;
+		cont.dx = 15;
 		bubble_addtitle(cont,"Edit equation",{te:editeqnparam_text});	
 		bubble_input(cont,"Equation:",{type:"reparam_eqn", eqn:true});
-		add_end_button(cont,"Done","DoneEquation");	
+		add_end_button(cont,"Done","DoneReparamEquation");	
+		break;
+		
+	case "ReparamEqn":
+		cont.dx = 15;
+		bubble_addtitle(cont,"Edit equation",{te:editeqnparam_text});	
+		bubble_input(cont,"Equation:",{type:"reparam_equation", eqn:true});
+		add_end_button(cont,"Done","DoneReparamEquation");	
 		break;
 		
 	case "ReparamTableElement":
-		cont.dx = 10;
+		cont.dx = 15;
 		bubble_addtitle(cont,"Edit equation",{te:editeqnparam_text});	
 		bubble_input(cont,"Equation:",{type:"element_eqn", eqn:true, pindex:bu.pindex});
 		add_end_button(cont,"Done","Done");	
 		break;
 	
-	case "ParamSimElement":
+	case "ParamSimElement": case "DistSimElement":
 		cont.dx = 10;
 		bubble_addtitle(cont,"Edit value",{te:editsimparam_text});
 		bubble_input(cont,"Value:",{type:"param_val", val:bu.i});
@@ -512,36 +776,44 @@ function add_bubble_buts(lay)
 		
 	case "PriorElement": case "DistElement": 
 	case "PriorSplitElement": case "DistSplitElement":
+	case "CompPrior":
 		{
 			let ac;
-			let ae = false; // determines if allow eqn
+			let ae = false;                              // Determines if allow eqn
 		
 			cont.dx = 8;
-			switch(bu.type){
-			case "PriorElement": case "PriorSplitElement":
-				{
-					ac = "DonePrior";
-					let te = editprior_text;
-					if(model.param[bu.i].pri_pos == bp_prior_pos) te = editpriorbp_text;
-					if(model.param[bu.i].pri_pos == zeroone_prior_pos) te = editpriorzeroone_text;
-			
-					bubble_addtitle(cont,"Edit prior",{te:te});
-					
-					if(bu.type == "PriorSplitElement") ac = "DonePriorSplit";
-				}
-				break;
-				
-			case "DistElement": case "DistSplitElement":
-				ac = "DoneDist";
-				ae = true;
-				bubble_addtitle(cont,"Edit dist.",{title:"Edit Distribution", te:distribution_text});
-				if(bu.type == "DistSplitElement") ac = "DoneDistSplit";
-				break;
-			
-			default: error("Option not recognised 1A"); break;
+			let pp;
+			if(bu.type == "CompPrior"){
+				bubble_addtitle(cont,"Pop. prior",{title:"Population prior", te:editpopprior_text});
+						
+				pp = prior_pos_positive;
+				ac = "DoneCompPrior";
 			}
+			else{
+				switch(bu.type){
+				case "PriorElement": case "PriorSplitElement":
+					{
+						ac = "DonePrior";
+						let te = editprior_text;
+					
+						bubble_addtitle(cont,"Edit prior",{te:te});
+						
+						if(bu.type == "PriorSplitElement") ac = "DonePriorSplit";
+					}
+					break;
+					
+				case "DistElement": case "DistSplitElement":
+					ac = "DoneDist";
+					ae = true;
+					bubble_addtitle(cont,"Edit dist.",{title:"Edit Distribution", te:distribution_text});
+					if(bu.type == "DistSplitElement") ac = "DoneDistSplit";
+					break;
+				
+				default: error("Option not recognised 1A"); break;
+				}
 
-			let pp = model.param[bu.i].pri_pos;
+				pp = model.param[bu.i].pri_pos;
+			}
 			
 			let pos=[]; 
 			for(let i = 0; i < pp.length; i++) pos.push({te:pp[i]});
@@ -652,9 +924,37 @@ function add_bubble_buts(lay)
 	case "SplineKnots":
 		cont.dx = 25;
 		bubble_addtitle(cont,"Spline knots",{te:knot_text});
-		bubble_input(cont,"Knot times:",{type:"knot_times", val:bu.i, eqn:false});
+		
+		bubble_addradio(cont,0,"knot_time","Times",bub.knot_radio); cont.y -= 1.4;
+		bubble_addradio(cont,7,"time_step","Time-step",bub.knot_radio); cont.y -= 1.4;
+		bubble_addradio(cont,14,"load","Load",bub.knot_radio);
+		
+		switch(bub.knot_radio.value){
+		case "knot_time":
+			bubble_input(cont,"Knot times:",{type:"knot_times", val:bu.i, eqn:false});
+			add_end_button(cont,"Done","DoneKnots");	
+			break;
 			
-		add_end_button(cont,"Done","DoneKnots");	
+		case "time_step":
+			{
+				let ww = 7.7, gap = 0.7;
+				bubble_input(cont,"",{hidden:true, type:"knot_times", val:bu.i});
+				bubble_input(cont,"Start time:",{type:"knot_t_start", no_down:true, w:ww, eqn:false});
+				bubble_input(cont,"End time:",{type:"knot_t_end", no_down:true, x:ww+gap, w:ww, eqn:false});
+				bubble_input(cont,"Time-step:",{type:"knot_dt", x:2*(ww+gap), w:ww, eqn:false});
+				add_end_button(cont,"Done","DoneKnots");	
+			}
+			break;
+			
+		case "load":
+			cont.y += 0.2;
+			bubble_addparagraph(cont,"Load from the column of a table",0,cont.dx);
+			cont.y += 0.2;
+			add_end_button(cont,"Upload","UploadKnots",{i:bu.i});	
+			break;
+			
+		default: error("Option not recog"); break;
+		}
 		break;
 		
 	case "Element":
@@ -669,7 +969,7 @@ function add_bubble_buts(lay)
 				add_end_button(cont,"Next","SearchNext");
 			}
 			else{
-				let te = inter.edit_source.table.ele[bu.r][bu.c];
+				let te = edit_source.table.ele[bu.r][bu.c];
 				if(typeof(te) == "object"){
 					cont.dx = 8;
 					bubble_addtitle(cont,"Boundary",{te:boundary_text});
@@ -706,7 +1006,7 @@ function add_bubble_buts(lay)
 				{
 					cont.dx = 10;
 					bubble_addtitle(cont,"Replace",{te:replace_text});
-					let te = "Replaced "+inter.bubble.num+" occurence";
+					let te = "Replaced "+inter.bubble.num+" occurrences";
 					if(inter.bubble.num > 1) te += ".";
 					bubble_addparagraph(cont,te,0,10);
 				}
@@ -767,9 +1067,12 @@ function add_bubble_buts(lay)
 		break;
 
 	case "LabelText":
-		cont.dx = 10;
+		cont.dx = 12;
 		bubble_addtitle(cont,"Label",{te:label_text});
 		bubble_input(cont,"Text:",{type:"label_anno",p:bu.p, cl:bu.cl, i:bu.i});
+		bubble_input(cont,"Text size:",{type:"label_anno_size",p:bu.p, cl:bu.cl, i:bu.i});
+		bubble_colour(cont);	
+		cont.y += 0.2;
 		add_end_button(cont,"Delete","DeleteAnno",{p:bu.p, cl:bu.cl, i:bu.i});		
 		add_end_button(cont,"Done","LabelOK");		
 		break;
@@ -778,7 +1081,9 @@ function add_bubble_buts(lay)
 		cont.dx = 10;
 		bubble_addtitle(cont,"Box",{te:box_text});
 		bubble_input(cont,"Text:",{type:"label_anno", p:bu.p, cl:bu.cl, i:bu.i});
-			
+		bubble_input(cont,"Text size:",{type:"label_anno_size",p:bu.p, cl:bu.cl, i:bu.i});
+		bubble_colour(cont);	
+		cont.y += 0.2;
 		add_end_button(cont,"Delete","DeleteAnno",{p:bu.p, cl:bu.cl, i:bu.i});		
 		add_end_button(cont,"OK","LabelOK",{p:bu.p, cl:bu.cl, i:bu.i});	
 		break;
@@ -808,6 +1113,10 @@ function add_bubble_buts(lay)
 		set_paramselect_bubble(cont,bu.eqn_appear);
 		break;
 	
+	case "PopSlice":
+		pop_slice_bubble();
+		break;
+		
 	default: error(bu.type+": Bubble Not recognised"); break;
 	}
 
@@ -821,6 +1130,32 @@ function add_bubble_buts(lay)
 }
 
 
+/// Displays the species bubble 
+function add_species_bubble(cont)
+{
+	let bub = inter.bubble;
+
+	bubble_addtext(cont,"Type:");
+	cont.y -= 1.4;
+	
+	bubble_addradio(cont,2.3,"Population","Population-based",bub.radio);
+	bubble_addradio(cont,2.3,"Individual","Individual-based",bub.radio);
+	cont.y += 0.2;
+	
+	if(bub.radio.value == "Individual"){
+		bubble_addcheckbox(cont,-0.1,"Calculate transmission tree",bub.checkbox);
+	
+		if(bub.checkbox.check == true && bub.infection_cl != undefined && bub.infection_cl_pos.length > 0){
+			bubble_addtext(cont,"Infection classification:");	
+			cont.y -= 0.4;
+			bubble_adddropdown(cont,1,cont.dx-2,bub.infection_cl,bub.infection_cl_pos);
+			
+			cont.y += 0.4;
+		}
+	}
+}
+
+			
 /// Determines if a bubble is on
 function bubble_on()
 {
@@ -838,6 +1173,7 @@ function selected(bu)
 	}
 	return false;
 }
+
 
 /// Determines if a button is in selected column
 function selected_column(bu)
@@ -905,12 +1241,15 @@ function press_bubble_OK()
 	error("Could not find");
 }
 
+
 /// Selects a bubble based on a layer name and a button property
 function press_button_prop(lay_name,type,info,value,op)
 {
 	close_bubble();
 	generate_screen();
-		
+	
+	if(inter.loading_symbol.on) return;
+	
 	let lay = get_lay(lay_name);
 	if(lay == undefined){
 		error("Could not find layer '"+lay_name+"'");
@@ -940,11 +1279,10 @@ function select_bubble(lay_name,i,op)
 
 	let lay = get_lay(lay_name);
 	let bu = lay.but[i];
-
-
+	
 	scroll_to_view(lay,bu);
 	
-	inter.bubble = { lay_name:lay_name, bu:bu, i:i, show_warning:false, warning:false, op:op, find_focus:true};
+	inter.bubble = { lay_name:lay_name, bu:bu, i:i, show_warning:false, warning:false, op:op, find_focus:true, check_radio_press:false};
 	
 	switch(bu.type){
 	case "Transition": case "TransitionPoint":
@@ -952,7 +1290,8 @@ function select_bubble(lay_name,i,op)
 		inter.bubble.trans_type = {te:bu.tr.type};
 		break;
 	}
-	reset_text_box();
+	
+	if(subtab_name() != "Description") reset_text_box();
 }
 
 
@@ -962,7 +1301,6 @@ function change_bubble_mode(mode)
 	inter.bubble.mode = mode;
 	reset_text_box();
 	inter.bubble.find_focus = true;
-	//	let over_new = get_button_over(x,y);
 }
 
 
@@ -974,8 +1312,8 @@ function close_bubble()
 	}
 
 	turn_off_cursor();
+
 	inter.bubble = {};
-	//generate_screen();
 }
 
 
@@ -984,7 +1322,6 @@ function add_bubble_back_buts(lay)
 {
 	lay.add_button({type:"BubbleBack"});
 	lay.add_button({ac:"Nothing", type:"Nothing"});
-	
 	lay.add_button({dx:1, dy:1, ac:"CloseBubble", type:"CloseBubble"});
 }
 
@@ -996,7 +1333,7 @@ function add_end_button(cont,te,ac,op)
 }
 
 
-///Adds a termination point to a bubble
+/// Adds a termination point to a bubble
 function add_bubble_end(cont)
 {
 	cont.lay.add_button({x:0,y:cont.y, type:"Nothing"});
@@ -1004,9 +1341,11 @@ function add_bubble_end(cont)
 
 
 /// Adds a mini title 
-function bubble_add_minititle(cont,te)
+function bubble_add_minititle(cont,te,xx)
 {
-	cont.lay.add_button({te:te, x:0, y:cont.y, dx:cont.dx, dy:0.8, type:"InputBoxName"});
+	let w = cont.dx;
+	let x = 0; if(xx != undefined){ x = xx; w -= x;}
+	cont.lay.add_button({te:te, x:x, y:cont.y, dx:w, dy:0.8, type:"InputBoxName"});
 	cont.y += 1.4;	
 }
 
@@ -1014,9 +1353,12 @@ function bubble_add_minititle(cont,te)
 /// Adds an input text box to the bubble		
 function bubble_input(cont,te,op)
 {	
-	let x = 0; if(op.x != undefined) x = op.x;
-	let w = cont.dx; if(op.w != undefined) w = op.w;
+	let yst = cont.y;
 	
+	let w = cont.dx;
+	let x = 0; if(op.x != undefined){ x = op.x; w -= x;}
+	if(op.w != undefined) w = op.w;
+	 
 	add_ref(op);
 	
 	if(op.hidden == true){
@@ -1025,22 +1367,18 @@ function bubble_input(cont,te,op)
 	else{
 		if(te != ""){
 			cont.lay.add_button({te:te, x:x, y:cont.y, dx:w, dy:0.8, type:"InputBoxName"});
-			cont.y += 1.2;
+			cont.y += 1.0;
 		}
 		
 		cont.input_list.push({x:x+0.3, y:cont.y, dx:w-0.6, op:op});
 		
-		if(op.no_down == true) cont.y -= 1.4;
-		else cont.y += 1.8;
+		cont.y += 1.8;
 		
-		//let k = cont.input_list.length-1;
 		let sto = inter.textbox_store;
 
 		let warn;
 		let k = find(sto,"ref",op.ref);
 		if(k != undefined) warn = sto[k].warning;
-		//let k = 0; while(k < sto.length && sto[k].ref != op.ref) k++;
-		//if(k < sto.length) warn = sto[k].warning;
 	
 		if(warn == undefined && inter.bubble.error_warning != undefined){
 			warn = inter.bubble.error_warning;
@@ -1051,6 +1389,8 @@ function bubble_input(cont,te,op)
 			cont.y += 0.2;
 		}				
 	}
+	
+	if(op.no_down == true) cont.y = yst;
 }
 
 
@@ -1102,6 +1442,16 @@ function bubble_double_input(cont,te,op,te2,op2)
 }
 
 
+/// Adds a picture to the bubble
+function bubble_addpicture(cont,pic)
+{
+	let dx = cont.dx;
+	let dy = pic.height*dx/pic.width;
+	cont.lay.add_button({pic:pic, x:0, y:cont.y, dx:dx, dy:dy, type:"BubblePic"});
+	cont.y += dy+0.2;
+}
+
+
 /// Adds a title to the bubble
 function bubble_addtitle(cont,te,op)
 {
@@ -1128,15 +1478,16 @@ function bubble_adddropdown(cont,tab,w,source,pos)
 /// Adds a scrollable box for putting content in
 function bubble_addscrollable(cont,op)
 {
-	cont.scrollable_y = cont.y;
+	cont.scrollable_y = cont.y; 
 
-	add_layer("BubbleScrollable",0,0,cont.dx+0.4,0,op);
+	add_layer("BubbleScrollable",0,0,cont.dx,0,op);
 	let lay = get_lay("BubbleScrollable");
 
-	cont.y += lay.dy-0.2;
+	cont.y += lay.dy;
 }
 
 
+/// Adds potentially scrollable region to layer
 function add_bubble_scrollable_buts(lay)
 {
 	let cy;
@@ -1144,30 +1495,32 @@ function add_bubble_scrollable_buts(lay)
 	lay.background = BUBBLE_COL;
 
 	switch(lay.op.type){
+	case "filterpos": cy = filterpos_scrollable(lay); break;
 	case "comp list": cy = diagtest_scrollable(lay); break;
+	case "ind list": cy = individual_scrollable(lay); break;
 	case "pop list": cy = population_scrollable(lay); break;
 	case "poptrans list": cy = poptrans_scrollable(lay); break;
 	case "annotation": cy = annotation_scrollable(lay); break;
 	case "param sel": cy = param_sel_scrollable(lay); break;
+	case "trans param sel": cy = param_sel_scrollable(lay,"trans"); break;
 	case "param details": cy = param_details_scrollable(lay); break;
 	case "combine IE": cy = combineIE_scrollable(lay); break;
 	default: error("Option not recognised 9"); break;
 	}
 
 	let box = get_but_box(lay.but);
-	cy = box.ymax;
 	
+	cy = box.ymax+0.8;
+
 	if(cy > lay.op.ymax){
 		cy = lay.op.ymax;
-		lay.background = WHITE;
+		lay.background = BUBBLE_SCROLL_COL;
 		for(let i = 0; i < lay.but.length; i++){
-			if(lay.but[i].back_col == BUBBLE_COL) lay.but[i].back_col = WHITE;
+			if(lay.but[i].back_col == BUBBLE_COL) lay.but[i].back_col = BUBBLE_SCROLL_COL;
 		}
 	}
 
 	lay.dy = cy;
-
-	//lay.but[0].dy = box.ymax;
 }
 
 
@@ -1184,7 +1537,8 @@ function bubble_addlink(cont,te,ac,op)
 {
 	let si = 0.8;
 	let fo = get_font(si);
-	let w = text_width(te,fo);
+	let w = text_width(te,fo)+0.1;
+	
 	cont.lay.add_button({te:te, x:0.5, y:cont.y, dx:w, si:si, dy:1, font:fo, ac:ac, op:op, type:"BubbleLink"});
 	cont.y += 1.4;
 }
@@ -1195,9 +1549,12 @@ function bubble_addradio(cont,tab,value,te,source,disable)
 {
 	let ac; if(disable != true) ac = "RadioButton";
 	
-	cont.lay.add_button({value:value, x:tab+0.5, y:cont.y, dx:1, dy:1, ac:ac, type:"RadioButton", source:source});
+	let xx = nearest_pixel(tab+0.5), yy = nearest_pixel(cont.y);
 	
-	cont.lay.add_button({te:te, x:tab+1.6, y:cont.y+0.05, dx:cont.dx-(tab+1.6), dy:1, type:"RadioButtonText", source:source, disable:disable, col:BLACK});
+	cont.lay.add_button({value:value, x:xx, y:yy, dx:1.2, dy:1.2, ac:ac, type:"RadioButton", source:source});
+	
+	let w = text_width(te,get_font(si_radio));
+	cont.lay.add_button({te:te, x:xx+1.2, y:yy+0.1, dx:w+0.4, dy:1, type:"RadioButtonText", source:source, disable:disable, col:BLACK});
 
 	cont.y += 1.4;
 }
@@ -1240,6 +1597,13 @@ function bubble_addparagraph(cont,te,x,dx)
 }
 
 
+/// Adds a big paragraph to the bubble
+function bubble_addbigparagraph(cont,te,x,dx)
+{
+	cont.y = cont.lay.add_paragraph(te,dx,x,cont.y,BLACK,bubbig_si,bubbig_lh);
+}
+
+
 /// Adds button to the bubble
 function bubble_addbutton(cont,te,x,y,dx,dy,type,ac,op)
 {	
@@ -1255,7 +1619,7 @@ function bubble_check_error()
 	switch(bub.check){
 	case "checkbox":
 		{
-			let cb = inter.edit_source.spec.check_box.value; 
+			let cb = edit_source.spec.check_box.value; 
 			let i = 0; while(i < cb.length && cb[i].check == false) i++;
 			if(i == cb.length){
 				bub.check_warning = "At least one must be selected";
@@ -1267,12 +1631,66 @@ function bubble_check_error()
 			
 	case "trans_checkbox":
 		{
-			let cb = inter.edit_source.spec.filter.tra; 
-			let i = 0; while(i < cb.length && cb[i].check == false) i++;
-			if(i == cb.length){
-				bub.check_warning = "At least one transition must be selected";
+			let cb = edit_source.spec.filter.tra; 
+			let obs_mod = edit_source.spec.filter.trans_obs_model.value;
+			switch(obs_mod){
+			case "on": 
+				{
+					let i = 0; while(i < cb.length && cb[i].prob_eqn.te == "0") i++;
+					if(i == cb.length){
+						bub.check_warning = "At least one probability must be non-zero";
+						return true;
+					}
+				}
+				break;
+			
+			case "off":
+				{
+					let i = 0; while(i < cb.length && cb[i].check == false) i++;
+					if(i == cb.length){
+						bub.check_warning = "At least one transition must be selected";
+						return true;
+					}
+					
+					
+				}
+				break;
+			}
+			
+			let source_fl = false, sink_fl = false, tra_fl = false;
+			for(let i = 0; i < cb.length; i++){
+				let cbb = cb[i];
+				
+				let fl = false;
+				switch(obs_mod){
+				case "on":{ if(cbb.prob_eqn.te != "0") fl = true;}
+				case "off":{ if(cbb.check == true) fl = true;}
+				}
+				
+				if(fl == true){
+					if(cbb.i == SOURCE) source_fl = true;
+					else{
+						if(cbb.f == SINK) sink_fl = true;
+						else tra_fl = true;
+					}
+				}
+			}
+
+			if(source_fl && tra_fl){
+				bub.check_warning = "Cannot include source and non-source transitions";
 				return true;
-			}				
+			}
+			
+			if(sink_fl && tra_fl){
+				bub.check_warning = "Cannot include sink and non-sink transitions";
+				return true;
+			}
+			
+			if(source_fl && sink_fl){
+				bub.check_warning = "Cannot include source and sink transitions";
+				return true;
+			}
+			
 			delete bub.check_warning;
 		}
 		break;
@@ -1280,7 +1698,7 @@ function bubble_check_error()
 	case "pop_checkbox":
 		{
 			let sp = model.get_sp();
-			let clz = inter.edit_source.spec.filter.cla;
+			let clz = edit_source.spec.filter.cla;
 		
 			for(let cl = 0; cl < clz.length; cl++){
 				if(clz[cl].radio.value == "Comp"){
@@ -1309,11 +1727,11 @@ function bubble_check_error()
 function bubble_colour(cont,tab)
 {
 	let dby = 1.2, gap = 0, mar = 0.;
-	let dbx = (cont.dx-gap*6-2*mar)/7;
-
 	if(tab == undefined) tab = 0;
 	
-	cont.lay.add_button({te:"Colour:", x:tab, y:cont.y, dx:cont.dx, dy:0.8, type:"InputBoxName"});
+	let dbx = (cont.dx-tab+gap*6-2*mar)/7;
+
+	cont.lay.add_button({te:"Colour:", x:tab, y:cont.y, dx:cont.dx-tab, dy:0.8, type:"InputBoxName"});
 	cont.y += 1.0;
 	
 	for(let j = 0; j < 4; j++){
@@ -1325,7 +1743,7 @@ function bubble_colour(cont,tab)
 	cont.y += (dby+gap)*4;
 	
 	let col2 = cont.bu.col;
-	if(cont.bu.type == "Menu"){
+	if(cont.bu.type == "AddButton"){
 		col2 = inter.bubble.radio.col;
 		if(inter.bubble.radio.value != "SelectColour") col2 = BLACK;
 	}
@@ -1350,11 +1768,15 @@ function setup_bubble_back(cont)
 
 	let lay_but = get_lay(inter.bubble.lay_name);
 
-	let bux = bu.x-lay_but.x_shift, buy = bu.y-lay_but.y_shift, budx = bu.dx, budy = bu.dy;
+	let bux = nearest_pixel(bu.x-lay_but.x_shift);
+	let buy = nearest_pixel(bu.y-lay_but.y_shift);
+	let budx = nearest_pixel(bu.dx), budy = nearest_pixel(bu.dy);
 	
-	if(bu.type == "Transition"){ bux = bu.center.x; buy = bu.center.y; budx = 0; budy = 0;}
+	if(bu.type == "Transition"){ 
+		bux = nearest_pixel(bu.center.x); buy = nearest_pixel(bu.center.y);
+		budx = 0; budy = 0;
+	}
 	
-	//pr(bux+budx
 	if(bux+budx < 0 || buy+budy < 0 || bux > bu_lay.dx || buy > bu_lay.dy){
 		inter.bubble.out_of_range = true;
 	}
@@ -1364,18 +1786,22 @@ function setup_bubble_back(cont)
 	if(n > 0){
 		let box = get_but_box(lay.but);
 		
-		let dx = 3.5, dy = 1.2, gap = 0.4;
+		let dy = nearest_pixel(1.2), gap = nearest_pixel(0.4);
 		
-		let xx = box.xmax - n*dx - gap*(n-1);
+		let xx = box.xmax;
 		let yy = cont.y;
 		
-		for(let i = 0; i < n; i++){
+
+		for(let i = n-1; i >= 0; i--){
 			let endb = cont.end_button[i];
-			lay.add_button({te:endb.te, x:xx, y:yy, dx:dx, dy:dy, ac:endb.ac, type:"BubbleEndBut", op:endb.op});
-			xx += dx+gap;
+			let dx = nearest_pixel(3.5);
+			if(endb.te == "Calculate") dx = nearest_pixel(4.5);
+			lay.add_button({te:endb.te, x:xx-dx, y:yy, dx:dx, dy:dy, ac:endb.ac, type:"BubbleEndBut", op:endb.op});
+			if(i == n-1){
+				inter.bubble.final_button = lay.but[lay.but.length-1];
+			}
+			xx -= dx+gap;
 		}
-		
-		inter.bubble.final_button = lay.but[lay.but.length-1];
 	}
 	
 	let back_lay = inter.layer[lay.index-1];
@@ -1390,53 +1816,39 @@ function setup_bubble_back(cont)
 	let bx = bu_lay.x + bux, by = bu_lay.y + buy;
 	let bw = budx, bh = budy;
 	
-	let gapx = 1.5, gapy = 1.6, gap = 1;
-	let marx = 0.6, mary = 0.6;
+	let gapx = nearest_pixel(1.5), gapy = nearest_pixel(1.6), gap = nearest_pixel(1);
+	let marx = nearest_pixel(0.6), mary = nearest_pixel(0.6);
 	
-	let w_right = distance(bux+budx+gap+0.5*lay.dx+marx,buy+0.5*budy,back_lay);
+	let w_right = distance(bu_lay.x+bux+budx+gap+0.5*lay.dx+marx,bu_lay.y+buy+0.5*budy);
 
-	let w_left = distance(bux-gap-0.5*lay.dx-marx,buy+0.5*budy,back_lay);
+	let w_left = distance(bu_lay.x+bux-gap-0.5*lay.dx-marx,bu_lay.y+buy+0.5*budy);
 	
-	let w_top = distance(bux+0.5*budx,buy-gap-0.5*lay.dy-mary,back_lay);
-	let w_bottom = distance(bux+0.5*budx,buy+budy+gap+0.5*lay.dy+mary,back_lay);
+	let w_top = distance(bu_lay.x+bux+0.5*budx,bu_lay.y+buy-gap-0.5*lay.dy-mary);
+	let w_bottom = distance(bu_lay.x+bux+0.5*budx,bu_lay.y+buy+budy+gap+0.5*lay.dy+mary);
 		
 	let overlap_red = 30;
-	if(bux + bw > bu_lay.dx){	
-		w_right += overlap_red;
-		w_top += overlap_red;
-		w_bottom += overlap_red;
-	}
 	
-	/*
-	if(bux < 0){	
-		w_left -= overlap_red;
-		w_top -= overlap_red;
-		w_bottom -= overlap_red;
-	}
+	let bubwid = lay.dx+2*marx;
+	let bubhei = lay.dy+2*mary;
 	
-	if(bux+bw+lay.dx > back_lay.dx) w_right = 0;
-	if(bux-lay.dx < 0) w_left = 0;
-	
-	if(buy+bh+lay.dy > back_lay.dy) w_bottom = 0;
-	if(buy-lay.dy < 0) w_top = 0;
-	let ma = 4;
-	
-	let w_hor = 0; if(w_top < ma || w_bottom < ma) w_hor = -20;
-	let w_vert = 0; //if(w_right < ma || w_left < ma) w_vert = -2000;
+	// Penalises if bubble is outside page
+	if(bu_lay.x+bux + bw + bubwid+gap > page_char_wid) w_right += overlap_red;
+	if(bu_lay.x+bux - bubwid-gap < 0) w_left += overlap_red;
+	if(bu_lay.y+buy + bh + bubhei+gap > page_char_hei) w_bottom += overlap_red;
+	if(bu_lay.y+buy - bubhei-gap < 0) w_top += overlap_red;
 
-	w_right += w_hor; w_left += w_hor;
-	w_top += w_vert; w_bottom += w_vert;
-	*/
-	
+	// Penalises non-right if in menu
+	if(bu_lay.x+bux < menu_width){ w_top += overlap_red; w_bottom += overlap_red;}
+
 	let w = w_right, orient = "right";
 	if(w_left < w){ w = w_left; orient = "left";}
 	if(w_top < w){ w = w_top; orient = "top";}
 	if(w_bottom < w){ w = w_bottom; orient = "bottom";}
 	
 	let pa={}, pb={}, pc={};
-	
-	//pr(bu.type+"ty");
+
 	switch(bu.type){
+	case "BayesFactor":  orient = "top"; break;
 	case "AddSpecies": orient = "right"; break;
 	case "ClassTab": orient = "bottom"; break;
 	case "Settings": orient = "top"; break;
@@ -1539,16 +1951,17 @@ function setup_bubble_back(cont)
 	
 	let back_bu = back_lay.but[0];
 
-	back_bu.tag = {x0:nearest_pixel(pa.x-xref), y0:nearest_pixel(pa.y-yref), x1:nearest_pixel(pb.x-xref), y1:nearest_pixel(pb.y-yref), x2:nearest_pixel(pc.x-xref), y2:nearest_pixel(pc.y-yref)};
+	back_bu.tag = {x0:pa.x-xref, y0:pa.y-yref, x1:pb.x-xref, y1:pb.y-yref, x2:pc.x-xref, y2:pc.y-yref};
 	
-	back_bu.x = nearest_pixel(lay.x - marx - xref);
-	back_bu.y = nearest_pixel(lay.y - mary - yref);
+	back_bu.x = lay.x - marx - xref;
+	back_bu.y = lay.y - mary - yref;
 	
-	back_bu.dx = nearest_pixel(lay.dx+2*marx);
-	back_bu.dy = nearest_pixel(lay.dy+2*mary);
+	back_bu.dx = lay.dx+2*marx;
+	back_bu.dy = lay.dy+2*mary;
 
 	let nothing_bu = back_lay.but[1];	
-	nothing_bu.x = back_bu.x; nothing_bu.y = back_bu.y; nothing_bu.dx = back_bu.dx; nothing_bu.dy = back_bu.dy; 
+	nothing_bu.x = back_bu.x; nothing_bu.y = back_bu.y; 
+	nothing_bu.dx = back_bu.dx; nothing_bu.dy = back_bu.dy; 
 
 	let close_bu = back_lay.but[2];
 	
@@ -1574,33 +1987,11 @@ function setup_bubble_back(cont)
 	}
 }
 
-/*
-/// Selects a given transition equation
-function select_transition_equation(p,cl,i,type)
-{
-	select_bubble_transition(p,cl,i);
-	
-	for(let l = 0; l < inter.layer.length; l++){
-		let lay = inter.layer[l];
-		if(lay.name == "Input"){
-			if(lay.op.source.type == type){
-				let bs = lay.get_text_box_store();
-				start_equation(bs.te,bs.eqn,lay.op.source,0);
-				//equation_done();
-				return;
-			}
-		}
-	}
-	
-	error("Could not select transition equation");
-}
-*/
-
 
 /// Returns the distance to the center of the screen (used for orient)
-function distance(x,y,back)
+function distance(x,y)
 {
-	return Math.sqrt((x-back.dx/2)*(x-back.dx/2) + (y-back.dy/2)*(y-back.dy/2));
+	return Math.sqrt((x-page_char_wid/2)*(x-page_char_wid/2) + (y-page_char_hei/2)*(y-page_char_hei/2));
 }
 
 
@@ -1620,7 +2011,8 @@ function select_bubble_transition(p,cl,i)
 	let mar = 2;
 	let x = bu[j].center.x, y = bu[j].center.y;
 	
-	if(x < mar || x > lay.dx-mar || y < mar || y > lay.dy-mar){  // Recenters camera if outside range
+	// Recenters camera if outside range
+	if(x < mar || x > lay.dx-mar || y < mar || y > lay.dy-mar){  
 		let cam = model.species[p].cla[cl].camera;
 		let tra = model.species[p].cla[cl].tra[i];
 		cam.x = tra.center.x; cam.y = tra.center.y;
@@ -1688,7 +2080,7 @@ function select_reparam_element(par_name,index)
 	
 	activate_button(lay,j); 
 	
-	select_param_element(index);
+	if(index != undefined) select_param_element(index);
 }
 
 
@@ -1718,10 +2110,6 @@ function select_dist_element(par_name,index)
 function goto_param_page()
 {
 	change_page({pa:"Model",su:"Parameters"});
-	if(model.warn.length > 0){
-		model.warn.length = 0; 
-		generate_screen();
-	}
 }
 
 
@@ -1787,7 +2175,9 @@ function select_bubble_compartment(p,cl,i)
 	let x = bu[j].x, y = bu[j].y;
 	
 	let mar = 2;
-	if(x < mar || x > lay.dx-mar || y < mar || y > lay.dy-mar){  // Recenters camera if outside range
+	
+	// Recenters camera if outside range
+	if(x < mar || x > lay.dx-mar || y < mar || y > lay.dy-mar){  
 		let cam = model.species[p].cla[cl].camera;
 		let co = model.species[p].cla[cl].comp[i];
 		

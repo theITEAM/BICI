@@ -1,0 +1,18 @@
+# Example C6: A transition observed over a time window
+
+## Objective
+- Shows an inference example where a transition is only observed over a specified time window.
+
+# Data
+- All recovery events are observed.
+- Infection events are only observed between times $t=5$ and $t=15$.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A recovery rate $γ$ determines the rate at which individuals recover.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

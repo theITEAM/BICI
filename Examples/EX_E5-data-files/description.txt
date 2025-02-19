@@ -1,0 +1,23 @@
+# Example E5: Correlated individual effect applied to a population
+
+## Objective
+- Introduce an individual effect applied to vary the infectiousness of individuals.
+- In the SI model the infected population {I} determines how quickly other individual become infected.
+- The term {I[f]} sums over infected individuals, but rather than each individual having a unit contribution it is modified by an individual effect factor [f] (this factor has a population average of 1 but allows for individual variation).
+- The individual effect is correlated through a relationship matrix.
+
+## Data
+- Known infection times.
+
+## Model
+- A single individual-based species 'Animal' is created.
+- This contains classifications 'DS' and 'Group'.
+- 'DS' contains two compartments: susceptible $S$ and infected $I$.
+- 'Group' contains 60 contact groups.
+- A transmission rate $β$ determines how fast individuals become infected.
+- [f] give individual effects for infectivity.
+- $Ω^f,f$ give the genetic variance in infectivity.
+
+## Population
+- Each contact group consists of 10 individuals, two of which have been randomly infected.
+- The population is made up of 60 sires who each have 10 progeny. These 600 progeny are randomly allocated across the contact groups.

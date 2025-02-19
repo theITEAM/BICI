@@ -1,0 +1,21 @@
+# Example D8: Time-varying covariate affecting branching probability (IBM)
+
+## Objective
+- This example includes time variation in a covariate that affects branching probability.
+- This is implemented using 'branching factors'.
+
+## Data
+- Known event times are used to inform inference.
+
+## Model
+- A single individual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains four compartments: susceptible $S$, infected $I$, recovered $R$ and dead $D$. Together they are known as the “SIRD model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- The *relative* probability of dying is given by $a×exp(b×cos(0.06×t)$.
+- The *relative* probability of recovery is 1.
+- Mean $m^R$ and coefficient of variation $c^R$ specify the log-normally distributed period to recovery.
+- Mean $m^D$ and coefficient of variation $c^D$ specify the gamma distributed period to death.
+
+## Population
+- This consists of 100 initially susceptible individuals and two infected.

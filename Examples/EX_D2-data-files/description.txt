@@ -1,0 +1,16 @@
+# Example D2: Time variation in transmission rate using trigonometric function
+
+## Objective
+- In this example the transmission rate is taken to have a time-varying profile using a cosine curve.
+
+## Data
+- Time series population estimates.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- The transmission rate is taken to be $β(1+Δ×cos(α×t))$.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

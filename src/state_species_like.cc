@@ -1,4 +1,4 @@
-// Calculates the likelihood
+// Calculates different types of likelihood
 
 #include <string>
 #include <sstream>
@@ -14,28 +14,76 @@ using namespace std;
 
 
 /// Markov likelihood for a specific equation
-vector <double> StateSpecies::likelihood_markov(unsigned int e, vector <unsigned int> list, AllTimeStatus as, double &like_ch)
+vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <unsigned int> &list, double &like_ch)
 {
 	auto &me = sp.markov_eqn[e];
 	auto &me_vari = markov_eqn_vari[e];
 	auto &Li_mark = Li_markov[e];
-
-	if(as == ALL_DIV){
-		if(list.size() != 0) emsg("list pr");
-		for(auto ti = 0u; ti < me_vari.div.size(); ti++) list.push_back(ti);
-	}
 	
 	vector <double> store;
+	
+	double va;
+	
 	for(auto ti : list){
 		const auto &div = me_vari.div[ti];
 		
 		auto val = div.value;
+		if(val < 0){
+			if(val > -TINY) val = 0;
+			else emsg("Rate has become negative");
+		}
+		
 		auto Li = -val*div.indfac_int;
 	
-		for(const auto &it : div.ind_trans){
-			Li += log(get_indfac(individual[it.i],me)*(val+LOG_THRESH));			
+		auto si = div.ind_trans.size();
+			
+		if(me.infection_trans){ // If an infection transition then works out specific probability of specific individual
+			const auto &eq = eqn[me.eqn_ref];
+			const auto &lin = eq.linearise;
+			if(!lin.on) emsg("Linearisation should be on");
+			for(const auto &it : div.ind_trans){
+				const auto &ind = individual[it.i];
+				const auto &iif = ind.ev[it.index].ind_inf_from;
+				auto p = iif.p;
+				switch(p){
+				case OUTSIDE_INF:
+					va = eq.calculate_calculation(lin.no_pop_calc,ti,param_val,spline_val);
+					break;
+					
+				case ENTER_INF: 
+					va = UNSET;
+					emsg("SHould not be ENTER_INFb");
+					break;
+					
+				default:
+					va = eq.calculate_calculation(lin.pop_grad_calc[iif.pref],ti,param_val,spline_val);
+					break;
+				}
+				
+				if(me.ind_variation) va *= get_indfac(ind,me);
+				Li += log(va*iif.w);
+			}
 		}
-	
+		else{
+			switch(si){
+			case 0: break;
+			
+			case 1:
+				if(me.ind_variation){
+					Li += log(get_indfac(individual[div.ind_trans[0].i],me)*(val+LOG_THRESH));	
+				}
+				else Li += log(val+LOG_THRESH);	
+				break;
+				
+			default:
+				if(me.ind_variation){
+					for(const auto &it : div.ind_trans) Li += log(get_indfac(individual[it.i],me));
+				}
+				Li += si*log(val+LOG_THRESH);
+				break;
+			}
+		}
+		
 		like_ch += Li-Li_mark[ti];
 		store.push_back(Li_mark[ti]);
 		
@@ -47,7 +95,7 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, vector <unsigned
 
 
 /// Calculate the value of a markov equation
-vector <double> StateSpecies::likelihood_markov_value(unsigned int e, vector <unsigned int> list, AllTimeStatus as, const vector < vector <double> > &popnum_t)
+vector <double> StateSpecies::likelihood_markov_value(unsigned int e, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t)
 {
 	auto &me = sp.markov_eqn[e];
 	auto &me_vari = markov_eqn_vari[e];
@@ -60,19 +108,178 @@ vector <double> StateSpecies::likelihood_markov_value(unsigned int e, vector <un
 		me_vari.div[0].value = value;
 	}		
 	else{
-		if(as == ALL_DIV){
-			if(list.size() != 0) emsg("list pr");
-			for(auto ti = 0u; ti < me_vari.div.size(); ti++) list.push_back(ti);
-		}
+		const auto &eq = eqn[me.eqn_ref];
+		auto &div = me_vari.div;
 		
 		for(auto ti : list){	
-			auto value = eqn[me.eqn_ref].calculate(ti,popnum_t[ti],param_val,spline_val);
-			store.push_back(me_vari.div[ti].value);
-			me_vari.div[ti].value = value;
+			auto value = eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+			store.push_back(div[ti].value);
+			div[ti].value = value;
 		}
 	}
 	
 	return store;
+}
+
+
+/// Calculate the value of a markov equation 
+// This is the case when only the non-population part of the equation changes
+vector <double> StateSpecies::likelihood_markov_value_fast(const vector <unsigned int> &me_list, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const vector <double> &param_store, const vector <SplineValue> &spline_val)
+{
+	auto e_first = me_list[0];
+	auto &me = sp.markov_eqn[e_first];
+	
+	vector <double> store;
+
+	if(me.time_vari == false) emsg("time_vary should be true");
+	
+	const auto &eq = eqn[me.eqn_ref];
+	const auto &calc = eq.linearise.no_pop_calc;
+	
+	if(eq.linearise.no_pop_calc_time_dep){ // Time dependent	
+		for(auto ti : list){	
+			auto d = eq.calculate_calculation(calc,ti,param_val,spline_val) - 
+								 eq.calculate_calculation_spline_store(calc,ti,param_store,spline_val);
+								
+			for(auto e : me_list){		
+				auto &div = markov_eqn_vari[e].div;			
+				auto val = div[ti].value;
+			
+				if(slow_check){
+					auto value = eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+					if(dif(value,val+d)) emsg("markov fast problem");
+				}
+			
+				store.push_back(val);
+				div[ti].value = val+d;
+			}
+		}
+	}
+	else{                                            // Not time dependent
+		auto d = eq.calculate_calculation(calc,UNSET,param_val,spline_val) - 
+								 eq.calculate_calculation_spline_store(calc,UNSET,param_store,spline_val);
+			
+		for(auto ti : list){							
+			for(auto e : me_list){		
+				auto &div = markov_eqn_vari[e].div;			
+				auto val = div[ti].value;
+			
+				if(slow_check){
+					auto value = eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+					if(dif(value,val+d)) emsg("markov fast problem");
+				}
+			
+				store.push_back(val);
+				div[ti].value = val+d;
+			}
+		}
+	}
+	
+	return store;
+}
+
+
+/// Calculate the value of a series of markov equation
+vector <double> StateSpecies::likelihood_markov_value_linear(const vector <unsigned int> &list, const LinearProp &linear_prop, const vector < vector <double> > &popnum_t)
+{
+	timer[LINEAR_TIMER] -= clock();
+	
+	if(list.size() == 0) emsg("list should not be zero");
+	
+	vector <double> store;
+	
+	auto N = linear_prop.me.size();
+	vector <double> val(N);
+	
+	vector <double> no_pop;
+	no_pop.resize(N);
+	
+	vector < vector <double> > pop_grad;
+	pop_grad.resize(N);
+	
+	auto ti_last = UNSET;
+	
+	for(auto k = 0u; k < list.size(); k++){
+		auto ti = list[k];
+		
+		if(k == 0){                            // Calculates the first value (along with gradients)
+			timer[LINEARZERO_TIMER] -= clock();
+	
+			for(auto i = 0u; i < N; i++){
+				auto e = linear_prop.me[i]; 			
+				auto &me = sp.markov_eqn[e];
+
+				const auto &eq = eqn[me.eqn_ref];
+	
+				val[i] = eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+				pop_grad[i] = eq.calculate_popnum_gradient(param_val);
+				
+				if(eq.linearise.no_pop_calc_time_dep){
+					no_pop[i] = eq.calculate_no_pop(ti,param_val,spline_val);
+				}
+			}
+			timer[LINEARZERO_TIMER] += clock();
+		}
+		else{                                    // Subsequent values uses differences in population
+			const auto &popnum = popnum_t[ti];
+			const auto &popnum_last = popnum_t[ti_last];
+			
+			for(const auto &pa : linear_prop.pop_affect){
+				auto po = pa.po;
+				if(popnum[po] != popnum_last[po]){
+					auto dif = rectify(popnum[po]) - rectify(popnum_last[po]);
+					for(auto &gr : pa.pop_grad_ref){
+						val[gr.ref] += dif*pop_grad[gr.ref][gr.index];
+					}
+				}
+			}
+		}
+		
+		for(auto i = 0u; i < N; i++){
+			auto e = linear_prop.me[i]; 
+			auto &me = sp.markov_eqn[e];
+			const auto &eq = eqn[me.eqn_ref];
+			
+			// Accounts for time variation in the non-population part
+			if(eq.linearise.no_pop_calc_time_dep){    
+				val[i] -= no_pop[i];
+				no_pop[i] = eq.calculate_no_pop(ti,param_val,spline_val);
+				val[i] += no_pop[i];
+			}
+			
+			auto &me_vari = markov_eqn_vari[e];
+			store.push_back(me_vari.div[ti].value);
+			me_vari.div[ti].value = val[i];
+			
+			if(slow_check){
+				if(dif(val[i],eq.calculate(ti,popnum_t[ti],param_val,spline_val))){
+					emsg("Not agree"); 
+				}
+			}
+		}
+		
+		ti_last = ti;
+	}
+	
+	timer[LINEAR_TIMER] += clock();
+	
+	return store;
+}
+
+
+/// Restores values 
+void StateSpecies::likelihood_markov_value_linear_restore(const vector <unsigned int> &list, const LinearProp &linear_prop, const vector<double> &store)
+{
+	auto i = 0u;
+	for(auto k = 0u; k < list.size(); k++){
+		auto ti = list[k];
+		
+		for(auto e : linear_prop.me){
+			auto &me_vari = markov_eqn_vari[e];
+			me_vari.div[ti].value = store[i]; i++;
+		}
+	}
+	if(i != store.size()) emsg("Store problem");
 }
 
 
@@ -88,8 +295,9 @@ vector <double> StateSpecies::likelihood_indfac_int()
 	
 	for(auto e = 0u; e < N; e++){
 		auto &div = markov_eqn_vari[e].div;
-		
-		auto val = 0.0; if(sp.markov_eqn[e].source == true) val = T/div.size();
+		const auto &me = sp.markov_eqn[e];
+		auto val = 0.0; 
+		if(me.source == true) val = me.source_tr_gl.size()*dt*T/div.size();
 		for(auto ti = 0u; ti < div.size(); ti++){
 			store.push_back(div[ti].indfac_int);
 			div[ti].indfac_int = val;
@@ -102,13 +310,13 @@ vector <double> StateSpecies::likelihood_indfac_int()
 		auto t = t_start;
 		auto ti = 0u;
 		
-		auto c = ind.cinit;
+		auto c = UNSET;
 		for(auto k = 0u; k <= ind.ev.size(); k++){
 			auto t_ev = t_end; if(k < ind.ev.size()) t_ev = ind.ev[k].t;
 	
 			auto ti_new = (unsigned int)(ALMOST_ONE*(t_ev-t_start)/dt);
 								
-			if(c < CODE){
+			if(c != UNSET){
 				for(auto e : sp.comp_gl[c].me_ref){
 					auto &mev = markov_eqn_vari[e];
 					const auto &me = sp.markov_eqn[e];
@@ -158,7 +366,7 @@ vector <double> StateSpecies::likelihood_ie_change(unsigned int i, unsigned int 
 	const auto &ind = individual[i];
 	const auto &ev = ind.ev;
 	
-	auto c = ind.cinit;
+	auto c = UNSET;
 	auto dLi_sum = 0.0;
 	
 	double va, dLi;
@@ -168,7 +376,7 @@ vector <double> StateSpecies::likelihood_ie_change(unsigned int i, unsigned int 
 
 		auto ti_new = (unsigned int)(ALMOST_ONE*(t_ev-t_start)/dt);
 							
-		if(c < CODE){
+		if(c != UNSET){
 			for(auto e : sp.comp_gl[c].me_ref){
 				const auto &me = sp.markov_eqn[e];
 				
@@ -237,13 +445,12 @@ vector <double> StateSpecies::likelihood_ie_change(unsigned int i, unsigned int 
 			const auto &e = ev[k];
 			
 			if(e.type == M_TRANS_EV){
-				const auto &mef = e.markov_eq_ref;
-				const auto &me = sp.markov_eqn[mef.e];
+				const auto &me = sp.markov_eqn[e.m];
 				
 				for(auto ie_me : me.ind_eff_mult){
 					if(ie_me == ie){
 						dLi = log(factor);
-						Li_markov[mef.e][mef.ti] += dLi;
+						Li_markov[e.m][e.ti] += dLi;
 						like_ch.markov += dLi;
 					}
 				}
@@ -273,14 +480,14 @@ void StateSpecies::likelihood_ie_change_restore(unsigned int i, unsigned int ie,
 	const auto &ind = individual[i];
 	const auto &ev = ind.ev;
 	
-	auto c = ind.cinit;
+	auto c = UNSET;
 	
 	auto j = 0u;
 	for(auto k = 0u; k <= ev.size(); k++){
 		auto t_ev = t_end; if(k < ind.ev.size()) t_ev = ev[k].t;
 		auto ti_new = (unsigned int)(ALMOST_ONE*(t_ev-t_start)/dt);
 						
-		if(c < CODE){
+		if(c != UNSET){
 			for(auto e : sp.comp_gl[c].me_ref){
 				const auto &me = sp.markov_eqn[e];
 				
@@ -320,11 +527,10 @@ void StateSpecies::likelihood_ie_change_restore(unsigned int i, unsigned int ie,
 			const auto &e = ev[k];
 			
 			if(e.type == M_TRANS_EV){
-				const auto &mef = e.markov_eq_ref;
-				const auto &me = sp.markov_eqn[mef.e];
+				const auto &me = sp.markov_eqn[e.m];
 				for(auto ie_me : me.ind_eff_mult){
 					if(ie_me == ie){	
-						Li_markov[mef.e][mef.ti] -= log(factor);
+						Li_markov[e.m][e.ti] -= log(factor);
 					}
 				}
 			}	
@@ -351,25 +557,31 @@ void StateSpecies::update_indfac_int(unsigned int c, double t1, double t2, const
 		auto &mev = markov_eqn_vari[e];
 		const auto &me = sp.markov_eqn[e];
 		auto indfac = sign*get_indfac(ind,me);
-			
+		auto &Li_m = Li_markov[e];
+		
+		vector <double> dLi_store;
+		vector <double> dif_store;
+		vector <double> ti_store;
+		
 		if(mev.time_vari == false){
 			dif = (t2-t1)*indfac;
 			auto &div = mev.div[0];
 			div.indfac_int += dif;
 			dLi = -div.value*dif;
-			Li_markov[e][0] += dLi;
+			ti_store.push_back(0); dif_store.push_back(dif); dLi_store.push_back(dLi);
+			Li_m[0] += dLi;
 			like_ch += dLi;
 		}
 		else{
 			auto ti = (unsigned int)(ALMOST_ONE*(t1-t_start)/dt);
 			auto ti_new = (unsigned int)(ALMOST_ONE*(t2-t_start)/dt);
-	
 			if(ti_new == ti){
 				dif = (t2-t1)*indfac;
 				auto &div = mev.div[ti];
 				div.indfac_int += dif;
 				dLi = -div.value*dif;
-				Li_markov[e][ti] += dLi;
+				ti_store.push_back(ti); dif_store.push_back(dif); dLi_store.push_back(dLi);
+				Li_m[ti] += dLi;
 				like_ch += dLi;
 			}
 			else{
@@ -377,7 +589,8 @@ void StateSpecies::update_indfac_int(unsigned int c, double t1, double t2, const
 				auto &div = mev.div[ti];
 				div.indfac_int += dif;
 				dLi = -div.value*dif;
-				Li_markov[e][ti] += dLi;
+				ti_store.push_back(ti); dif_store.push_back(dif); dLi_store.push_back(dLi);
+				Li_m[ti] += dLi;
 				like_ch += dLi;
 			
 				for(auto j = ti+1; j < ti_new; j++){
@@ -385,7 +598,8 @@ void StateSpecies::update_indfac_int(unsigned int c, double t1, double t2, const
 					auto &div = mev.div[j];
 					div.indfac_int += dif;
 					dLi = -div.value*dif;
-					Li_markov[e][j] += dLi;
+					ti_store.push_back(j); dif_store.push_back(dif); dLi_store.push_back(dLi);
+					Li_m[j] += dLi;
 					like_ch += dLi;
 				}
 				
@@ -393,82 +607,18 @@ void StateSpecies::update_indfac_int(unsigned int c, double t1, double t2, const
 				auto &div2 = mev.div[ti_new];
 				div2.indfac_int += dif;
 				dLi = -div2.value*dif;
-				Li_markov[e][ti_new] += dLi;
+				ti_store.push_back(ti_new); dif_store.push_back(dif); dLi_store.push_back(dLi);
+				Li_m[ti_new] += dLi;
 				like_ch += dLi;
 			}
 		}
+		
+		back.push_back(Back(TI_INDFAC,e,ti_store));
+		back.push_back(Back(DLI_INDFAC,dLi_store));
+		back.push_back(Back(DIF_INDFAC,dif_store));
 	}
 }
 		
-		
-// Removes events from markov eqn for old event sequence 
-void StateSpecies::remove_ind_events_markov_eqn(unsigned int i, double &like_ch)
-{
-	const auto &ind = individual[i];
-	
-	for(auto ee = 0u; ee < ind.ev.size(); ee++){
-		auto &ev = ind.ev[ee];
-		
-		if(ev.type == M_TRANS_EV){
-			auto &mer = ev.markov_eq_ref;
-			auto e = mer.e;
-			auto ti = mer.ti;
-			auto &it = markov_eqn_vari[e].div[ti].ind_trans;
-			auto k = mer.index;
-			if(k != it.size()-1){
-				auto &it_shift = it[it.size()-1];
-				it[k] = it_shift;
-				individual[it_shift.i].ev[it_shift.index].markov_eq_ref.index = k;
-			}
-			it.pop_back();
-		
-			auto &me = sp.markov_eqn[e];
-			auto val = markov_eqn_vari[e].div[ti].value;
-			
-			auto Li = log(get_indfac(ind,me)*(val+LOG_THRESH));
-		
-			Li_markov[e][ti] -= Li;
-			like_ch -= Li;
-		}
-	}
-}
-
-
-// Adds events from markov eqn for old event sequence 
-void StateSpecies::add_ind_events_markov_eqn(unsigned int i, double &like_ch)
-{
-	auto &ind = individual[i];
-	
-	auto t_start = timepoint[0];
-	auto dt = details.dt;
-	
-	for(auto ee = 0u; ee < ind.ev.size(); ee++){
-		auto &ev = ind.ev[ee];
-				
-		if(ev.type == M_TRANS_EV){
-			// Add individual on to ind_trans and sets .markov_eq_ref for event
-			auto e = sp.tra_gl[ev.tr_gl].markov_eqn_ref;
-			auto &mev = markov_eqn_vari[e];
-			
-			auto ti = 0; if(mev.time_vari == true) ti = (unsigned int)((ev.t-t_start)/dt);
-					
-			auto &mer = ev.markov_eq_ref;
-			auto &it = mev.div[ti].ind_trans;	
-			mer.e = e; mer.ti = ti; mer.index = it.size();
-				
-			DivIndRef dir; dir.i = i; dir.index = ee;
-			it.push_back(dir);
-		
-			auto &me = sp.markov_eqn[e];
-			auto val = markov_eqn_vari[e].div[ti].value;
-			
-			auto Li = log(get_indfac(ind,me)*(val+LOG_THRESH));
-			Li_markov[e][ti] += Li;
-			like_ch += Li;
-		}
-	}
-}
-
 
 /// Restores indfac_int
 void StateSpecies::likelihood_indfac_int_restore(const vector <double> &store)
@@ -482,7 +632,8 @@ void StateSpecies::likelihood_indfac_int_restore(const vector <double> &store)
 	}
 }
 
-/// Sets  ind_trans in markov_eqn
+
+/// Sets ind_trans in markov_eqn
 void StateSpecies::likelihood_ind_trans()
 {	
 	for(auto e = 0u; e < N; e++){
@@ -511,92 +662,636 @@ void StateSpecies::likelihood_ind_trans()
 				else ti = (unsigned int)((ev.t-t_start)/dt);
 					
 				DivIndRef dir; dir.i = i; dir.index = k;
-				IndDivRef idr; idr.e = e; idr.ti = ti; idr.index = mev.div[ti].ind_trans.size();
+				ev.m = e; ev.ti = ti; ev.index = mev.div[ti].ind_trans.size();
 					
 				mev.div[ti].ind_trans.push_back(dir);
-				ev.markov_eq_ref = idr;
 			}
-			else ev.markov_eq_ref.e = UNSET;
 		}
 	}
 }
 
 
 /// Calculate the likelihood of non-Markovian transitions
-double StateSpecies::likelihood_nm_trans(unsigned int i, const vector < vector <double> > &popnum_t, double &like_ch)
+vector <double> StateSpecies::likelihood_nm_trans(unsigned int m, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, double &like_ch)
 {
-	auto t_start = details.t_start;
-	auto timestep = details.dt;
+	vector <double> store;
+
+	const auto &nmt = sp.nm_trans[m];
 	
-	const auto &nmt = sp.nm_trans[i];
-	const auto &nmt_ind = nm_trans_ind[i];
+	const auto &ref = nmt.dist_param_eq_ref;
+			
+	vector <double> ref_val(ref.size());
 	
-	// TO DO braching probability
+	NmUpdate update = UPDATE_NO_TIME;
+	for(auto i = 0u; i < ref.size(); i++){
+		const auto &eq = eqn[ref[i]];
+		if(eq.time_vari == true && update == UPDATE_NO_TIME) update = UPDATE_TIME;
+		if(eq.ind_eff == true) update = UPDATE_IND;
+	}
 	
-	auto Li = 0.0;
-	for(const auto &nmti : nmt_ind){
-		const auto &ind = individual[nmti.i];
-		auto &cl_ev = ind.cl_ev[nmti.cl];
-		auto e = nmti.index;
-		auto t_trans = ind.ev[cl_ev[e].index_ev].t;
-		if(t_trans != nmti.t) emsg("Times do not agree");
+	if(update == UPDATE_NO_TIME){
+		for(auto i = 0u; i < ref.size(); i++){
+			ref_val[i] = eqn[ref[i]].calculate_param_only(param_val);
+		}
+	}
+	
+	auto &nm_ref = nm_trans_ev_ref[m];
+	
+	for(auto ti : list){
+		auto &nmt_er = nm_ref[ti];
+	
+		if(nmt_er.size() > 0){	
+			const auto &popnum = popnum_t[ti];
+				
+			if(update == UPDATE_TIME){
+				for(auto i = 0u; i < ref.size(); i++){
+					ref_val[i] = eqn[ref[i]].calculate(ti,popnum,param_val,spline_val);
+				}
+			}
 		
-		double t_from;
-		if(e > 0) t_from = ind.ev[cl_ev[e-1].index_ev].t;
-		else t_from = t_start;
+			for(auto &nmti : nmt_er){
+				auto &ind = individual[nmti.i];
+
+				if(update == UPDATE_IND){
+					for(auto i = 0u; i < ref.size(); i++){
+						ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+					}
+				}
+			
+				auto &ev = ind.ev;
+			
+				auto e_end = nmti.e_end;
+			
+				auto &ev_end = ev[e_end];
+				auto e_begin = ev_end.e_origin;
+				if(e_begin == UNSET) emsg("SHould not be unset");
+			
+				auto t_trans = ev_end.t;
+				auto t_from = ev[e_begin].t;
+			
+				auto dt = t_trans - t_from;
+				if(dt <= 0) emsg("zero time4");
+
+				auto Li_new = nm_trans_like(nmt.type,dt,ref_val);
+				auto Li_old = ev_end.Li;
+				store.push_back(Li_old);
+				like_ch += Li_new-Li_old;
+				ev_end.Li = Li_new; 
+			}
+		}
+	}
+	
+	return store;
+}
+
+
+/// Restores nm_trans likelihood values
+void StateSpecies::likelihood_nm_trans_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> store) 
+{
+	auto k = 0u;
+	auto &nm_ref = nm_trans_ev_ref[m];
+	for(auto ti : list){
+		auto &nmt_er = nm_ref[ti];
+		for(auto &nmti : nmt_er){
+			individual[nmti.i].ev[nmti.e_end].Li = store[k]; k++; 
+		}
+	}		
+	
+	if(k != store.size()) emsg("Wrong size");
+}
+
+
+/// Calculate the likelihood of non-Markovian transitions
+vector <double> StateSpecies::likelihood_nm_trans_bp(unsigned int m, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, double &like_ch)
+{
+	vector <double> store;
+	
+	const auto &nmt = sp.nm_trans[m];
+
+	auto bp_eq = nmt.bp_eq;
+	
+	switch(bp_eq){
+	case UNSET:
+		return store;
+	
+	case BP_FROM_OTHERS:
+		{	
+			auto &nm_ref = nm_trans_ev_ref[m];
+			
+			for(auto ti : list){
+				if(nm_ref[ti].size() > 0){
+					const auto &popnum = popnum_t[ti];
+									
+					for(auto &nmti : nm_ref[ti]){
+						auto &ind = individual[nmti.i];
+						auto prob = 1.0;
+						for(auto e : nmt.bp_other_eq){
+							prob -= eqn[e].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+						}
+						auto &ev = ind.ev[nmti.e_end];
+					
+						auto Li_new = get_log_zero_one(prob);
+						auto Li_old = ev.Li_bp;
+						store.push_back(Li_old);
+						like_ch += Li_new-Li_old;
+						ev.Li_bp = Li_new;
+					}
+				}
+			}
+		}
+		break;
 		
-		auto dt = t_trans - t_from;
-		if(dt <= 0) emsg("zero time");
+	default:
+		{	
+			const auto &eq = eqn[bp_eq];
+			
+			NmUpdate update = UPDATE_NO_TIME;
+			if(nmt.all_branches){
+				for(auto e : nmt.bp_all_eq){
+					const auto &eq = eqn[e];
+					if(eq.time_vari == true && update == UPDATE_NO_TIME) update = UPDATE_TIME;
+					if(eq.ind_eff == true) update = UPDATE_IND;
+				}
+			}
+			else{
+				if(eq.time_vari == true && update == UPDATE_NO_TIME) update = UPDATE_TIME;
+				if(eq.ind_eff == true) update = UPDATE_IND;
+			}
+			
+			auto Li_new = 0.0;
+			if(update == UPDATE_NO_TIME){
+				auto val = eq.calculate_param_only(param_val);
+				if(nmt.all_branches){
+					auto div = 0.0;
+					for(auto e : nmt.bp_all_eq){
+						div += eqn[e].calculate_param_only(param_val);
+					}
+				
+					val /= div;
+				}
+				
+				Li_new = get_log_zero_one(val);
+			}
+			
+			auto &nmt_ref = nm_trans_ev_ref[m];
+			
+			for(auto ti : list){
+				if(nmt_ref[ti].size() > 0){
+					const auto &popnum = popnum_t[ti];
+						
+					if(update == UPDATE_IND){
+						for(auto &nmti : nmt_ref[ti]){
+							auto &ind = individual[nmti.i];
+						
+							auto val = eq.calculate_indfac(ind,ti,popnum,param_val,spline_val);
+							
+							if(nmt.all_branches){
+								auto div = 0.0;
+								for(auto e : nmt.bp_all_eq){
+									div += eqn[e].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+								}
+								val /= div;
+							}
+				
+							auto &ev = ind.ev[nmti.e_end];
+							
+							Li_new = get_log_zero_one(val);
+							auto Li_old = ev.Li_bp;
+							store.push_back(Li_old);
+							like_ch += Li_new-Li_old;
+							ev.Li_bp = Li_new;
+						}
+					}
+					else{
+						if(update == UPDATE_TIME){
+							auto val = eq.calculate(ti,popnum,param_val,spline_val);
+							
+							if(nmt.all_branches){
+								auto div = 0.0;
+								for(auto e : nmt.bp_all_eq){
+									div += eqn[e].calculate(ti,popnum,param_val,spline_val);
+								}
+								val /= div;
+							}
+							
+							Li_new = get_log_zero_one(val);
+						}
+
+						const auto nmti_old = nmt_ref[ti][0];
+						auto Li_old =	individual[nmti_old.i].ev[nmti_old.e_end].Li_bp; 
+						for(const auto &nmti : nmt_ref[ti]){
+							store.push_back(Li_old);
+							
+							individual[nmti.i].ev[nmti.e_end].Li_bp = Li_new;
+						}
+						like_ch += (Li_new-Li_old)*nmt_ref[ti].size();
+					}
+				}
+			}
+		}
+		break;
+	}
+	
+	return store;
+}
+
+
+/// Restores Li_bp
+void StateSpecies::likelihood_nm_trans_bp_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> store)
+{
+	auto k = 0u;
+	auto &nm_ref = nm_trans_ev_ref[m];
+	for(auto ti : list){
+		auto &nmt_er = nm_ref[ti];
+		for(const auto &nmti : nmt_er){
+			individual[nmti.i].ev[nmti.e_end].Li_bp = store[k]; k++; 
+		}
+	}		
+	
+	if(k != store.size()) emsg("Wrong size");
+}
+
+
+/// Calculate the likelihood of non-Markovian incomplete transitions
+vector <double> StateSpecies::likelihood_nm_trans_incomp(unsigned int n, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, double &like_ch)
+{
+	vector <double> store;
+	
+	const auto &nmti = sp.nm_trans_incomp[n];
+	auto B = nmti.nmtrans_ref.size();                 // The number of branches
+	
+	auto b_sel = UNSET;
+	
+	vector < vector <double> > ref_val;
+	ref_val.resize(B);
+	vector <double> bp_val(B);
+	
+	vector <NmUpdate> update(B,UPDATE_NO_TIME);
+	auto update_bp = NO_UPDATE;
+	for(auto b = 0u; b < B; b++){
+		auto &up = update[b];
 		
-		// TO DO make faster by doing a non-time varying version
-		
-		auto ti = (unsigned int)((t_from-t_start)/timestep);
-		const auto &popnum = popnum_t[ti];
+		auto m = nmti.nmtrans_ref[b];
+		const auto &nmt = sp.nm_trans[m];
 		
 		const auto &ref = nmt.dist_param_eq_ref;
+		ref_val[b].resize(ref.size());
+		for(auto i = 0u; i < ref.size(); i++){
+			const auto &eq = eqn[ref[i]];
+			if(eq.time_vari == true && up == UPDATE_NO_TIME) up = UPDATE_TIME;
+			if(eq.ind_eff == true) up = UPDATE_IND;
+		}
+			
+		auto bp_eq = nmt.bp_eq;
+		if(bp_eq == BP_FROM_OTHERS) b_sel = b;
+		else{
+			if(bp_eq != UNSET){
+				if(update_bp == NO_UPDATE) update_bp = UPDATE_NO_TIME;
+			
+				if(nmti.all_branches){
+					for(auto e : nmt.bp_all_eq){
+						const auto &eq = eqn[e];
+						if(eq.time_vari == true && update_bp == UPDATE_NO_TIME) update_bp = UPDATE_TIME;
+						if(eq.ind_eff == true) update_bp = UPDATE_IND;
+					}
+				}
+				else{
+					const auto &eq = eqn[bp_eq];
+					if(eq.time_vari == true && update_bp == UPDATE_NO_TIME) update_bp = UPDATE_TIME;
+					if(eq.ind_eff == true) update_bp = UPDATE_IND;
+				}
+			}
+		}
+	}
+	
+	for(auto b = 0u; b < B; b++){
+		if(update[b] == UPDATE_NO_TIME){
+			auto m = nmti.nmtrans_ref[b];
+			const auto &ref = sp.nm_trans[m].dist_param_eq_ref;
+			for(auto i = 0u; i < ref.size(); i++){
+				ref_val[b][i] = eqn[ref[i]].calculate_param_only(param_val);
+			}
+		}
+	}
+	
+	if(update_bp == UPDATE_NO_TIME){		
+		for(auto b = 0u; b < B; b++){
+			if(b != b_sel){
+				auto m = nmti.nmtrans_ref[b];
+				auto bp_eq = sp.nm_trans[m].bp_eq;
+				bp_val[b] = eqn[bp_eq].calculate_param_only(param_val);
+			}
+		}
 		
-		switch(nmt.type){
-		case EXP_RATE: case EXP_MEAN: emsg("Should not be in NM"); break;
-		case GAMMA:
-			{
-				auto mean = eqn[ref[0]].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto cv = eqn[ref[1]].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				Li += gamma_probability(dt,mean,cv);
+		if(b_sel != UNSET){
+			auto bp = 1.0; for(auto b = 0u; b < B; b++) if(b != b_sel) bp -= bp_val[b];
+			bp_val[b_sel] = bp;
+		}
+		
+		if(nmti.all_branches){
+			auto div = 0.0;
+			for(auto b = 0u; b < B; b++) div += bp_val[b];
+			for(auto b = 0u; b < B; b++) bp_val[b] /= div;
+		}
+	}
+	
+	auto &nm_incomp_ref = nm_trans_incomp_ref[n];
+	
+	for(auto ti : list){
+		auto &nmit_er = nm_incomp_ref[ti];
+	
+		const auto &popnum = popnum_t[ti];
+		
+		for(auto b = 0u; b < B; b++){
+			if(update[b] == UPDATE_TIME){
+				auto m = nmti.nmtrans_ref[b];
+				const auto &ref = sp.nm_trans[m].dist_param_eq_ref;
+				for(auto i = 0u; i < ref.size(); i++){
+					ref_val[b][i] = eqn[ref[i]].calculate(ti,popnum,param_val,spline_val);
+				}
 			}
-			break;
+		}
+		
+		if(update_bp == UPDATE_TIME){	
+			for(auto b = 0u; b < B; b++){
+				if(b != b_sel){
+					auto m = nmti.nmtrans_ref[b];			
+					auto bp_eq = sp.nm_trans[m].bp_eq;
+					bp_val[b] = eqn[bp_eq].calculate(ti,popnum,param_val,spline_val);
+				}
+			}
 			
-		case ERLANG:
-			{
-				auto mean = eqn[ref[0]].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto shape = eqn[ref[1]].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				Li += gamma_probability(dt,mean,sqrt(1.0/shape));
+			if(b_sel != UNSET){
+				auto bp = 1.0; for(auto b = 0u; b < B; b++) if(b != b_sel) bp -= bp_val[b];
+				bp_val[b_sel] = bp;
 			}
-			break;
+			
+			if(nmti.all_branches){
+				auto div = 0.0;
+				for(auto b = 0u; b < B; b++) div += bp_val[b];
+				for(auto b = 0u; b < B; b++) bp_val[b] /= div;
+			}
+		}
+	
+		for(auto i : nmit_er){
+			auto &ind = individual[i];
+			
+			for(auto b = 0u; b < B; b++){
+				if(update[b] == UPDATE_IND){	
+					auto m = nmti.nmtrans_ref[b];
+					const auto &ref = sp.nm_trans[m].dist_param_eq_ref;
+					for(auto i = 0u; i < ref.size(); i++){
+						ref_val[b][i] = eqn[ref[i]].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+					}
+				}
+			}
+			
+			if(update_bp == UPDATE_IND){	
+				for(auto b = 0u; b < B; b++){
+					if(b != b_sel){
+						auto m = nmti.nmtrans_ref[b];			
+						auto bp_eq = sp.nm_trans[m].bp_eq;			
+						bp_val[b] = eqn[bp_eq].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+					}
+				}
+				
+				if(b_sel != UNSET){
+					auto bp = 1.0; for(auto b = 0u; b < B; b++) if(b != b_sel) bp -= bp_val[b];
+					bp_val[b_sel] = bp;
+				}
+				
+				if(nmti.all_branches){
+					auto div = 0.0;
+					for(auto b = 0u; b < B; b++) div += bp_val[b];
+					for(auto b = 0u; b < B; b++) bp_val[b] /= div;
+				}
+			}
+	
+			const auto &ev = ind.ev;
+			const auto &inmtr = ind.incomp_ref[nmti.cl];
+			
+			auto e_begin = inmtr.e_begin;	
+			auto t_from = ev[e_begin].t;
+			auto t_trans = inmtr.t_end;
+			auto dt = t_trans - t_from;
+			if(dt <= 0) emsg("zero time5");
+			
+			auto Li_new = nm_trans_incomp_full_like(nmti.nmtrans_ref,dt,ref_val,bp_val);
+		
+			auto &inmtref = ind.incomp_ref[nmti.cl];
+			if(!inmtref.on) emsg("SHould be on");
+			
+			auto Li_old = inmtref.Li;
+			store.push_back(Li_old);
+			inmtref.Li = Li_new; 			
+			like_ch += Li_new-Li_old;
+		}
+	}
+	
+	return store;
+}
 
-		case LOG_NORMAL:
+
+/// Restores nm_trans incomplete likelihood values
+void StateSpecies::likelihood_nm_trans_incomp_restore(unsigned int n, const vector <unsigned int> &list, const vector <double> store) 
+{
+	const auto &nmti = sp.nm_trans_incomp[n];
+	
+	auto k = 0u;
+	auto &nmi_ref = nm_trans_incomp_ref[n];
+	for(auto ti : list){
+		auto &nmit_er = nmi_ref[ti];
+		for(auto i : nmit_er){
+			individual[i].incomp_ref[nmti.cl].Li = store[k]; k++; 
+		}
+	}		
+	
+	if(k != store.size()) emsg("Wrong size");
+}
+
+
+/// Gets the likelihood for an incomplete transition
+double StateSpecies::nm_trans_incomp_full_like(const vector <unsigned int> &nmtrans_ref, double dt, const vector< vector <double> > &ref_val, const vector <double> &bp_val) const
+{
+	auto B = nmtrans_ref.size();
+	if(B == 1){
+		const auto &nmt = sp.nm_trans[nmtrans_ref[0]];
+		return nm_trans_incomp_like(nmt.type,dt,ref_val[0]);
+	}
+	else{
+		auto p = 0.0;
+		for(auto b = 0u; b < B; b++){
+			auto bp = bp_val[b]; 
+			check_bp(bp);
+			
+			const auto &nmt = sp.nm_trans[nmtrans_ref[b]];
+			
+			p += bp*nm_trans_incomp_like_no_log(nmt.type,dt,ref_val[b]);
+		}
+		
+		return log(p);
+	}
+}
+
+
+/// Gets the likelihood for a transition
+double StateSpecies::nm_trans_incomp_like(TransType type, double dt, const vector <double> &ref_val) const
+{		
+	switch(type){
+	case EXP_RATE: emsg("Should not be in NM"); return 0;
+	case EXP_RATE_NM:	return exp_rate_upper_probability(dt,ref_val[0]); 
+	case GAMMA: return gamma_upper_probability(dt,ref_val[0],ref_val[1]);
+	case ERLANG: return gamma_upper_probability(dt,ref_val[0],sqrt(1.0/ref_val[1])); 
+	case LOG_NORMAL: return lognormal_upper_probability(dt,ref_val[0],ref_val[1]);
+	case WEIBULL:	return weibull_upper_probability(dt,ref_val[0],ref_val[1]);
+	case PERIOD: if(dt < ref_val[0]) return 0; else return -LARGE;
+	}
+	return UNSET;
+}
+
+
+/// Gets the likelihood for a transition (with no log)
+double StateSpecies::nm_trans_incomp_like_no_log(TransType type, double dt, const vector <double> &ref_val) const 
+{		
+	switch(type){
+	case EXP_RATE: emsg("Should not be in NM"); return 0;
+	case EXP_RATE_NM:	return exp_rate_upper_probability_no_log(dt,ref_val[0]); 
+	case GAMMA: return gamma_upper_probability_no_log(dt,ref_val[0],ref_val[1]);
+	case ERLANG: return gamma_upper_probability_no_log(dt,ref_val[0],sqrt(1.0/ref_val[1])); 
+	case LOG_NORMAL: return lognormal_upper_probability_no_log(dt,ref_val[0],ref_val[1]);
+	case WEIBULL:	return weibull_upper_probability_no_log(dt,ref_val[0],ref_val[1]);
+	case PERIOD: return 1; 
+	}
+	return UNSET;
+}
+
+
+/// Works out how nm_trans likelihood changes as a result of ie changing
+vector <NMupdate> StateSpecies::likelihood_ie_nm_trans_change(unsigned int i, unsigned int ie, double factor, const vector < vector <double> > &popnum_t, double &like_ch)
+{
+	vector <NMupdate> nm_update;
+	
+	const auto &ind = individual[i];
+	const auto &event = ind.ev;
+
+	for(auto e = 0u; e < event.size(); e++){
+		const auto &ev = event[e];
+	
+		if(ev.type == NM_TRANS_EV){
+			auto trg = ev.tr_gl;
+			if(sp.tra_ie_affect[ev.tr_gl][ie]){
+				auto t = ind.ev[ev.e_origin].t;
+				auto m = ev.m;
+				auto ti = ev.ti;
+				
+				const auto &nmt = sp.nm_trans[m];
+				const auto &ref = nmt.dist_param_eq_ref;
+			
+				vector <double> ref_val(ref.size());
+				for(auto i = 0u; i < ref.size(); i++){
+					const auto &eq = eqn[ref[i]];
+					ref_val[i] = eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);	
+					if(eq.ind_eff_exist[ie]) ref_val[i] *= factor;
+				}
+				
+				auto Li = nm_trans_like(nmt.type,ev.t-t,ref_val);
+				
+				like_ch += Li-ev.Li;
+				
+				auto Li_bp = 0.0;
+				
+				if(sp.tra_gl[trg].branch){                 // Accounts for branching probability 
+					auto bp_eq = nmt.bp_eq;
+					double bp;
+				
+					if(bp_eq == BP_FROM_OTHERS){
+						bp = 1.0;
+						for(auto e : nmt.bp_other_eq){
+							const auto &eq = eqn[e];
+							auto value = eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+							if(eq.ind_eff_exist[ie]) value *= factor;
+							bp -= value;
+						}
+					}
+					else{	
+						const auto &eq = eqn[bp_eq];
+						bp = eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+						if(eq.ind_eff_exist[ie]) bp *= factor;
+							
+						if(nmt.all_branches){
+							auto div = 0.0;
+							for(auto e: nmt.bp_all_eq){
+								const auto &eq = eqn[e];
+								auto val = eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+								if(eq.ind_eff_exist[ie]) val *= factor;
+								div += val; 
+							}
+							bp /= div;
+						}
+					}
+					
+					Li_bp = get_log_zero_one(bp);
+		
+					like_ch += Li_bp-ev.Li_bp; 
+				}	
+				
+				NMupdate nm; 
+				nm.type = NM_EVENT_STORE; nm.i = i; nm.e = e; //nm.index = index;
+				nm.Li = Li; nm.Li_bp = Li_bp; 
+				nm_update.push_back(nm);
+			}
+		}
+	}
+	
+	for(auto j = 0u; j < ind.incomp_ref.size(); j++){
+		const auto &inmt = ind.incomp_ref[j];
+		if(inmt.on){
+			auto n = inmt.n;
+			auto ti = inmt.ti;
+			
+			const auto &nmt = sp.nm_trans_incomp[n];
+			
+			auto dt = inmt.t_end - event[inmt.e_begin].t; if(dt <= 0) emsg("zero time");
+
+			auto val = get_nm_incomp_val_ie_factor(ie,factor,nmt,ti,ind,popnum_t);
+			
+			auto Li = nm_trans_incomp_full_like(nmt.nmtrans_ref,dt,val.ref_val,val.bp_val);
+		
+			like_ch += Li-inmt.Li; 
+					
+			NMupdate nm; 
+			nm.type = NM_INCOMP_STORE; nm.i = i; nm.e = j; //nm.index = index;
+			nm.Li = Li;
+			nm_update.push_back(nm);	
+		}
+	}
+	
+	return nm_update;
+}
+
+
+/// Updates nm_trans likelihoods if ie proposal is accepted
+void StateSpecies::likelihood_ie_nm_trans_update(const vector <NMupdate> &nm_st)
+{
+	for(const auto &nm : nm_st){
+		switch(nm.type){
+		case NM_EVENT_STORE:
 			{
-				auto mean = eqn[ref[0]].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto cv = eqn[ref[1]].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				Li += lognormal_probability(dt,mean,cv);
+				auto &ev = individual[nm.i].ev[nm.e];
+				ev.Li = nm.Li;
+				ev.Li_bp = nm.Li_bp;
 			}
 			break;
 			
-		case WEIBULL:
+		case NM_INCOMP_STORE:
 			{
-				auto scale = eqn[ref[0]].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto shape = eqn[ref[1]].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				Li += weibull_probability(dt,shape,scale);
+				individual[nm.i].incomp_ref[nm.e].Li = nm.Li;
 			}
 			break;
 		}
 	}
-
-	auto store = Li_nm_trans[i];
-	like_ch = Li - store;
-	Li_nm_trans[i] = Li;
-
-	return store;
 }
+
 
 /// Calculates individual effect group likelihood
 double StateSpecies::likelihood_indeff_group(unsigned int g, double &like_ch)
@@ -637,7 +1332,7 @@ double StateSpecies::likelihood_indeff_group(unsigned int g, double &like_ch)
 		auto I = individual.size();
 		
 		vector < vector <double> > samp;
-		
+	
 		samp.resize(I);
 		for(auto i = 0u; i < I; i++){
 			const auto &ind = individual[i];
@@ -647,6 +1342,19 @@ double StateSpecies::likelihood_indeff_group(unsigned int g, double &like_ch)
 				if(k >= ind.ie.size()) emsg("Out of range10");
 				samp[i][j] = ind.ie[k];
 			}
+		}
+		
+		if(false){
+			for(auto j = 0u; j < I; j++){
+				cout << individual[j].name << ": ";
+				for(const auto &nz : A_inv_nonzero[j]){
+					auto i = nz.i; 
+					auto A_inv = nz.value;
+					cout << individual[i].name << " " << A_inv << ", ";
+				}
+				cout << "j" << endl;
+			}
+			emsg("P");
 		}
 		
 		auto sum = 0.0;
@@ -674,6 +1382,7 @@ double StateSpecies::likelihood_indeff_group(unsigned int g, double &like_ch)
 	return store;
 }
 
+
 /// Calculates the change in Li_ie from a single individual effect changing
 double StateSpecies::likelihood_indeff_change(unsigned int i, unsigned int ie, double value_new, double value_old)
 {
@@ -691,10 +1400,11 @@ double StateSpecies::likelihood_indeff_change(unsigned int i, unsigned int ie, d
 		
 	auto sum = 0.0;
 	
-	if(ieg.A_matrix.set == false){   // Works out the change in Li_ie
+	if(ieg.A_matrix.set == false){                   // Works out the change in Li_ie
+		const auto &ind = individual[i];
 		for(auto k = 0u; k < N; k++){
 			if(k == num) sum += omega_inv[num][num]*(value_new*value_new-value_old*value_old);
-			else sum += 2*omega_inv[num][k]*(value_new-value_old)*individual[i].ie[list[k]];
+			else sum += 2*omega_inv[num][k]*(value_new-value_old)*ind.ie[list[k]];
 		}
 	}
 	else{
@@ -741,6 +1451,7 @@ void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, uns
 	auto &Li = Li_markov_pop[tr];
 	auto &tn = trans_num[tr];
 	auto &tnm = tnum_mean_st[tr];
+	
 	for(auto ti = ti1; ti < ti2; ti++){
 		tnm[ti] = calculate_tnum_mean(ti,tr,popnum_t[ti],cpop_st[ti],param_val,dtimepoint[ti]);
 		like_ch -= Li[ti];
@@ -750,7 +1461,52 @@ void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, uns
 }
 
 
-/// Works out the change in the likelihood
+/// Updates the transition number and corresponding likelihood
+double StateSpecies::Li_update_tn(unsigned int tr, unsigned int ti, int sign)
+{
+	auto &Li = Li_markov_pop[tr][ti];
+	auto &tn = trans_num[tr][ti];
+	auto &tnm = tnum_mean_st[tr][ti];
+	
+	tn += sign;
+	
+	auto Li_new = poisson_probability(tn,tnm);	
+	auto d = Li_new-Li;	
+	Li = Li_new;
+	
+	return d;
+}
+
+
+/// Updates the likelihood from change in c
+double StateSpecies::Li_update_c(unsigned int c, int ma, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popnum_t)
+{
+	auto d = 0.0;
+	for(auto tr : sp.comp_gl[c].tr_leave){
+		auto &Li = Li_markov_pop[tr];
+		auto &tn = trans_num[tr];
+		auto &tnm = tnum_mean_st[tr];
+		for(auto tii = ti; tii < ti_next; tii++){
+			auto c_aft = cpop_st[tii][c];
+			auto c_bef = c_aft - ma;
+			if(c_bef != 0){                              // This is a faster way to calculate
+				tnm[tii] *= cpop_st[tii][c]/c_bef;
+			}
+			else{
+				tnm[tii] = calculate_tnum_mean(tii,tr,popnum_t[tii],cpop_st[tii],param_val,dtimepoint[tii]);
+			}
+			
+			auto Li_new = poisson_probability(tn[tii],tnm[tii]);	
+			d += Li_new-Li[tii];	
+			Li[tii] = Li_new;
+		}
+	}
+	
+	return d;
+}
+
+
+/// Works out the change in the likelihood due to population change
 vector <double> StateSpecies::likelihood_pop_change(unsigned int tr, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, double &like_ch)
 {
 	vector <double> store;
@@ -775,7 +1531,7 @@ vector <double> StateSpecies::likelihood_pop_change(unsigned int tr, const vecto
 }
 
 
-/// Works out the change in the likelihood
+/// Restores likelihood change from population
 void StateSpecies::likelihood_pop_change_restore(unsigned int tr, const vector <unsigned int> &list, const vector <double> &vec)
 {
 	auto j = 0.0;
@@ -788,223 +1544,216 @@ void StateSpecies::likelihood_pop_change_restore(unsigned int tr, const vector <
 }
 
 
-/// Works out the observation probability
-vector <double> StateSpecies::likelihood_observation(double &like_ch)
+/// Calculate the likelihood of the initial condition
+vector <double> StateSpecies::likelihood_init_cond(double &like_ch)
 {
 	vector <double> store;
+
+	store.push_back(Li_init_cond);
+		
+	if(mode == SIM) return store;
 	
-	if(mode == SIM){ Li_obs = 0; return store;}
+	if(sp.init_cond.type != INIT_POP_DIST) return store;
 	
-	const auto &popd = sp.pop_data;
-	const auto &ptransd = sp.pop_trans_data;
+	const auto &ic = sp.init_cond;
+	const auto &icv = init_cond_val;
+	
+	auto foc_cl = ic.focal_cl;
 	
 	auto Li = 0.0;
 	
-	switch(type){
-	case POPULATION:
-		{
-			for(auto i = 0u; i < popd.size(); i++){
-				store.push_back(pop_data_num[i]);
-			}
-			for(auto i = 0u; i < ptransd.size(); i++){
-				store.push_back(pop_trans_data_num[i]);
-			}
-			
-			for(auto i = 0u; i < popd.size(); i++){
-				const auto &pd = popd[i];
-				const auto &filt = pd.filt;
-				
-				auto ti = sp.get_ti(pd.t);
-				if(ti == T) ti--;
-				
-				auto num = 0.0;
-				for(auto c = 0u; c < sp.comp_gl.size(); c++){
-					if(filt[c] == true){
-						num += cpop_st[ti][c];
-					}
-				}
-			
-				pop_data_num[i] = num;
-			}
-			
-			for(auto i = 0u; i < ptransd.size(); i++){
-				pop_trans_data_num[i] = 0;
-			}
-			
-			for(auto ti = 0u; ti < T; ti++){
-				for(auto trg = 0u; trg < sp.tra_gl.size(); trg++){
-					auto num = trans_num[trg][ti];
-					if(num > 0){
-						for(auto ref : sp.pop_trans_ref[ti][trg]){
-							pop_trans_data_num[ref] += num;
-						}
-					}
-				}
+	if(foc_cl == UNSET){
+		if(sp.type == INDIVIDUAL){
+			Li += factorial(icv.N_total_unobs);
+			Li += multinomial_samp_probability(icv.cnum,icv.frac);
+		}
+		else{
+			Li += multinomial_probability(icv.N_total,icv.cnum,icv.frac);
+		}
+	}
+	else{                                            // A focal classification is set
+		const auto &claa = sp.cla[foc_cl];
+		if(sp.type == INDIVIDUAL){
+			for(auto c = 0u; c < claa.ncomp; c++){
+				Li += factorial(icv.N_focal_unobs[c]);
+				Li += multinomial_samp_probability(icv.cnum_reduce[c],icv.frac_comb);
 			}
 		}
-		break;
-	
-	case INDIVIDUAL:
-		{	
-			// Calculates the values for any equations associated with observation (e.g. Se, Sp)
-			
-			for(auto i = 0u; i < obs_eqn_value.size(); i++){
-				obs_eqn_value[i] = eqn[sp.obs_eqn[i]].calculate_param_only(param_val);
-			}
-			
-			for(auto i = 0u; i < popd.size(); i++) pop_data_num[i] = 0;
-			for(auto i = 0u; i < ptransd.size(); i++) pop_trans_data_num[i] = 0;
-			
-			auto t_end = details.t_end;
-			
-			for(auto i = 0u; i < individual.size(); i++){
-				const auto &obs = sp.individual[i].obs;
-				const auto &ind = individual[i];
-				
-				auto c = ind.cinit;
-				auto m = 0u;
-				auto ev = ind.ev;
-				
-				for(auto k = 0u; k <= ev.size(); k++){
-					double t;	
-					if(k < ev.size()) t = ev[k].t; else t = t_end;
-					
-					while(m < obs.size() && obs[m].t < t){
-						const auto &ob = obs[m];
-						
-						switch(ob.type){
-						case OBS_TRANS_EV:  // Checks to see if event agrees with observation
-							{
-							}
-							break;
-							
-						case OBS_COMP_EV:
-							{
-								if(sp.comp_gl[c].cla_comp[ob.cl] != ob.c) Li += LI_WRONG;
-							}
-							break;
-							
-						case OBS_TEST_EV:
-							{
-								Li += like_diag_test(c,ob);
-							}
-							break;
-							
-						case OBS_POP:
-							{
-								if(c < CODE){
-									if(sp.pop_data[ob.ref].filt[c] == true){
-										pop_data_num[ob.ref]++;
-									}
-								}
-							}
-							break;
-						}
-						
-						m++;
-					}
-				
-					if(k < ev.size()){
-						const auto &e = ev[k];
-						auto tr_gl = e.tr_gl;
-						
-						if(e.type == M_TRANS_EV){
-							auto ti = sp.get_ti(e.t);
-						
-							if(sp.trans_not_allow[ti][tr_gl] == true){
-								if(m < obs.size() && obs[m].t == e.t && sp.source[obs[m].so].trans_filt[tr_gl]){}
-								else Li += LI_WRONG;
-							}
-							
-							for(auto ref : sp.pop_trans_ref[ti][tr_gl]){
-								pop_trans_data_num[ref]++;
-							}
-						}
-						c = e.c_after;
-					}	
-				}
+		else{
+			for(auto c = 0u; c < claa.ncomp; c++){
+				Li += multinomial_probability(icv.N_focal[c],icv.cnum_reduce[c],icv.frac_comb);
 			}
 		}
-		break;
 	}
-	
-	for(auto i = 0u; i < pop_data_num.size(); i++){
-		const auto &popd = sp.pop_data[i];
-		Li += normal_probability(pop_data_num[i],popd.value,popd.sd);
-	}
-	
-	for(auto i = 0u; i < pop_trans_data_num.size(); i++){
-		const auto &poptd = sp.pop_trans_data[i];
-		Li += normal_probability(pop_trans_data_num[i],poptd.value,poptd.sd);
-	}
-		
-	like_ch += Li-Li_obs;
-	
-	store.push_back(Li_obs);
-	
-	Li_obs = Li;
+
+	like_ch += Li-Li_init_cond;
+	Li_init_cond = Li;
 
 	return store;
 }
 
 
-/// Resores values
-void StateSpecies::likelihood_observation_restore(const vector <double> &store)
+/// Gets the values for the incomplete nm trans
+NMIncompVal StateSpecies::get_nm_incomp_val(const NMTransIncomp &nmti, unsigned int ti, const Individual &ind, const vector < vector <double> > &popnum_t) const
 {
-	auto j = 0u;
+	const auto &nmtrans_ref = nmti.nmtrans_ref;
 	
-	if(type == POPULATION){
-		const auto &popd = sp.pop_data;
-		const auto &ptransd = sp.pop_trans_data;
+	NMIncompVal value;
+	auto &ref_val = value.ref_val;
+	auto &bp_val = value.bp_val;
 	
-		for(auto i = 0u; i < popd.size(); i++){
-			pop_data_num[i] = store[j]; j++;
+	auto B = nmtrans_ref.size();
+	
+	ref_val.resize(B);
+	bp_val.resize(B,UNSET);
+	
+	auto b_sel = UNSET;
+	for(auto b = 0u; b < B; b++){
+		auto m = nmtrans_ref[b];
+		
+		const auto &ref = sp.nm_trans[m].dist_param_eq_ref;
+		ref_val[b].resize(ref.size());
+		for(auto i = 0u; i < ref.size(); i++){
+			const auto &eq = eqn[ref[i]];
+			if(eq.ind_eff == true) ref_val[b][i] = eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			else{
+				if(eq.time_vari) ref_val[b][i] = eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+				else{
+					ref_val[b][i] = eq.calculate_param_only(param_val);
+				}
+			}
 		}
-		for(auto i = 0u; i < ptransd.size(); i++){
-			pop_trans_data_num[i] = store[j]; j++;
+	
+		auto bp_eq = sp.nm_trans[m].bp_eq;
+		if(bp_eq != UNSET){
+			if(bp_eq == BP_FROM_OTHERS) b_sel = b;
+			else{
+				const auto &eq = eqn[bp_eq];
+				if(eq.ind_eff == true) bp_val[b] = eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+				else{
+					if(eq.time_vari) bp_val[b] = eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+					else bp_val[b] = eq.calculate_param_only(param_val);
+				}
+			}
 		}
 	}
-		
-	Li_obs = store[j]; j++;
+	
+	if(b_sel != UNSET){
+		auto bp = 1.0;
+		for(auto b = 0u; b < B; b++) if(b != b_sel) bp -= bp_val[b];
+		bp_val[b_sel] = bp;
+	}
+	
+	if(nmti.all_branches){
+		auto div = 0.0;
+		for(auto b = 0u; b < B; b++) div += bp_val[b];
+		for(auto b = 0u; b < B; b++) bp_val[b] /= div;
+	}
+	
+	return value;
 }
 
 
-/// Gets the probability of a diagnostic test
-double StateSpecies::like_diag_test(unsigned int c, const ObsData &ob) const
+/// Prints information about incomplete transition
+void StateSpecies::print_incomp_val(string te, NMIncompVal value) const
 {
-	if(c > CODE) return LI_WRONG;
-	else{
-		const auto &om = sp.source[ob.so].obs_model;
-		const auto &cgl = sp.comp_gl[c];
+	cout << te << endl;
+	for(auto rval : value.ref_val){
+		for(auto va : rval) cout << va << ", ";
+	}
+	cout << "trans val" << endl;
+	for(auto va : value.bp_val) cout << va << ", " ;
+	cout << "bp val" << endl;
+	cout << endl;
+}
 		
-		auto cl = om.diag_test_sens.cl;
-		if(om.diag_test_sens.comp[cgl.cla_comp[cl]] == true){ // Truely infected
-			auto Se = obs_eqn_value[ob.Se_obs_eqn];
-			if(ob.test_res == true) return log(Se+LOG_THRESH); 
-			else return log(1-Se+LOG_THRESH);
+
+/// Gets the values for the incomplete nm trans with individual effect changed by a factor
+NMIncompVal StateSpecies::get_nm_incomp_val_ie_factor(unsigned int ie, double factor, const NMTransIncomp &nmti, unsigned int ti, const Individual &ind, const vector < vector <double> > &popnum_t) const
+{
+	const auto & nmtrans_ref = nmti.nmtrans_ref;
+	 
+	NMIncompVal value;
+	auto &ref_val = value.ref_val;
+	auto &bp_val = value.bp_val;
+	
+	auto B = nmtrans_ref.size();
+	ref_val.resize(B);
+	bp_val.resize(B,UNSET);
+	
+	auto b_sel = UNSET;
+	for(auto b = 0u; b < B; b++){
+		auto m = nmtrans_ref[b];
+		
+		const auto &ref = sp.nm_trans[m].dist_param_eq_ref;
+		ref_val[b].resize(ref.size());
+		for(auto i = 0u; i < ref.size(); i++){
+			const auto &eq = eqn[ref[i]];
+			ref_val[b][i] = eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			if(eq.ind_eff_exist[ie]) ref_val[b][i] *= factor;
 		}
-		else{
-			auto Sp = obs_eqn_value[ob.Sp_obs_eqn];
-			if(ob.test_res == false) return log(Sp+LOG_THRESH); 
-			else return log(1-Sp+LOG_THRESH);
+	
+		auto bp_eq = sp.nm_trans[m].bp_eq;
+		if(bp_eq != UNSET){
+			if(bp_eq == BP_FROM_OTHERS) b_sel = b;
+			else{
+				const auto &eq = eqn[bp_eq];
+				bp_val[b] = eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+				if(eq.ind_eff_exist[ie]) bp_val[b] *= factor;
+			}
 		}
 	}
+			
+	if(b_sel != UNSET){
+		auto bp = 1.0;
+		for(auto b = 0u; b < B; b++) if(b != b_sel) bp -= bp_val[b];
+		bp_val[b_sel] = bp;
+	}
+	
+	if(nmti.all_branches){
+		auto div = 0.0;
+		for(auto b = 0u; b < B; b++) div += bp_val[b];
+		for(auto b = 0u; b < B; b++) bp_val[b] /= div;
+	}
+	
+	return value;
 }
 
 
-/// Updates pop_trans and works out the change in observation likelihood
-double StateSpecies::update_pop_trans(double t, unsigned int tr_gl, int sign)
+/// Calculates the likelihood for observed nm events (used for simulation proposals) 
+double StateSpecies::nm_obs_dprob(const Individual &ind) const
 {
-	auto ti = sp.get_ti(t);
-		
-	auto dLi = 0.0; 
-	for(auto ref : sp.pop_trans_ref[ti][tr_gl]){
-		const auto &poptd = sp.pop_trans_data[ref];
+	const auto &event = ind.ev;
 	
-		dLi -= normal_probability(pop_trans_data_num[ref],poptd.value,poptd.sd);
-		pop_trans_data_num[ref] += sign;
-		dLi += normal_probability(pop_trans_data_num[ref],poptd.value,poptd.sd);
+	auto dprob = 0.0;
+	for(const auto &ev : event){	
+		if(!ev.observed && ev.type == NM_TRANS_EV){
+			dprob += ev.Li + ev.Li_bp;
+		}
 	}
 	
-	return dLi;
+	for(const auto &inmtr : ind.incomp_ref){
+		if(inmtr.on) dprob += inmtr.Li;
+	}
+
+	return dprob;
+}
+
+
+/// Calculates the likelihood for observed nm events (used for simulation proposals) 
+double StateSpecies::nm_single_obs_dprob(unsigned int cl, const Individual &ind) const
+{
+	const auto &event = ind.ev;
+	
+	auto dprob = 0.0;
+	for(const auto &ev : event){
+		if(!ev.observed && ev.type == NM_TRANS_EV && ev.cl == cl){
+			dprob += ev.Li + ev.Li_bp;
+		}
+	}
+	
+	const auto &inmtr = ind.incomp_ref[cl]; 
+	if(inmtr.on) dprob += inmtr.Li;//nmtir.Li;
+	
+	return dprob;
 }

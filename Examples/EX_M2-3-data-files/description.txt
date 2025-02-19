@@ -1,0 +1,22 @@
+# Model 2.3: SIRD model with branching factors
+
+## Objective
+- Introduce branching factors in an individual-based model.
+- Here infected individuals can either recover or die.
+- Unlike branching probabilities, branching factors specify the *relative* probability of going down a branch (note, their sum does not need to add to one).
+- They are implemented by clicking on the $I$ compartment and selecting 'Use branching factors'.
+- Branching factors are useful, *e.g.*, for models in which time-varying covariates affect branching probabilities.
+- In this example the transition distributions down the branches are different (one being log-normal and the other gamma distributed).
+
+## Model
+- A single individual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains four compartments: susceptible $S$, infected $I$, recovered $R$ and dead $D$. Together they are known as the “SIRD model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- Branching factors $b^D$ and $b^R$ determine the *relative* probability of dying or recovering.
+- The probability of dying is $b^D$/($b^D$+$b^R$).
+- Mean $m^R$ and coefficient of variation $c^R$ specify the log-normally distributed period to recovery.
+- Mean $m^D$ and coefficient of variation $c^D$ specify the gamma distributed period to death.
+
+## Population
+- This consists of 100 initially susceptible individuals and two infected.

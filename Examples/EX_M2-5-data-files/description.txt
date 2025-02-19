@@ -1,0 +1,19 @@
+# Model 2.5: SIRS model with waning immunity
+
+## Objective
+- Introduce the concept of waning immunity.
+- For many diseases recovery in not permanent. Due to mutations in the pathogen an individual can become reinfected at a later date.
+- This waning immunity is incorporated into the standard SIR model by a backward transition from $R$ to $S$.
+- Such a model can generate multiple epidemics.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$.
+- An external force of infection parameter $η$ provides a small proportion of infections from outside the system.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A recovery duration $m$ (and coefficient of variation $c$) determines how long, on average, it takes for individuals to recover.
+- A waning immunity coefficient $ν$ determines the rate at which individuals become susceptible again.
+
+## Population
+- This consists of 100 initially susceptible individuals and two infected.

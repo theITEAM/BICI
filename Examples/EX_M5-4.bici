@@ -1,0 +1,77 @@
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+data-dir folder="Examples\EX_M5-4-data-files"
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5
+
+post-sim start=0 end=100
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
+
+species name="Animal" type="individual" trans-tree="off"
+
+# SPECIES MODEL
+
+class name="DS" index="a"
+
+comp name="S" color="#009900" x=-24 y=-7
+comp name="I" color="#ff2222" x=-2 y=-7
+
+trans name="S->I" value="exp(rate:β_v×{Pathogen:N,g})"
+
+
+class name="Vaccination" index="v"
+
+comp name="Vac" color="#888888" x=-10 y=-2
+comp name="Unvac" color="#aa00aa" x=4 y=-2
+
+
+
+class name="Group" index="g"
+
+comp-all color="#005500" fix="true" file="comp-Group.csv"
+
+
+
+# SIMULATION INITIAL CONDITIONS
+
+add-ind-sim file="add-ind-sim.csv"
+
+
+
+######## DEFINE MODEL AND DATA FOR SPECIES PATHOGEN ########
+
+species name="Pathogen" type="population"
+
+# SPECIES MODEL
+
+class name="Population" index="b"
+
+comp name="N" color="#888888" x=-3 y=0
+
+trans name="+->N" x=-26 y=0 value="exp(rate:τ×Σ_v'(f_v'×{Animal:I,v'}))"
+trans name="N->-" x=14 y=0 value="exp(rate:λ)"
+
+
+class name="Group" clone="Animal"
+
+
+
+
+######################## PARAMETERS ########################
+
+param name="λ" value="0.01"
+param name="τ" value="0.2"
+param name="f_v" value="value-f.csv" prior-split="prior-f.csv"
+param name="β_v" value="value-beta.csv" prior="uniform(0,1)"
+
+

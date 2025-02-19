@@ -1,0 +1,14 @@
+# Model 1.2: Individual-based SI model
+
+## Objective
+- Introduce the simplest possible individual-based epidemiological model.
+- Under simulation or inference, we see timelines for each of the individuals in the system.
+
+## Model
+- A single individual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

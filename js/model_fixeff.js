@@ -1,5 +1,5 @@
 "use strict";
-/// Functions for fixed effects
+// Functions for fixed effects
 
 /// Display an individual effect 
 function display_fix_eff(p,i,x,y,lay,wmax)
@@ -20,29 +20,8 @@ function display_fix_eff(p,i,x,y,lay,wmax)
 	
 	lay.add_button({te:"∝", x:x, y:y+0.2, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
 
-	let te = "<e>exp(X^r_i</e><e>×</e><e>"+feg.name+")</e>";
-	lay.add_paragraph(te,wmax-x,x+1.6,y+0.2,BLACK,para_eq_si,para_lh);// zzz
-}
-
-
-/// Loads vector X from table
-function inf_eff_load_X()
-{
-	let so = inter.edit_source;
-
-	let i = so.info.i;
-	let X = model.species[so.info.p].fix_eff[i].X_vector;
-	
-	X.loaded = true;
-	X.value = [];
-	X.ind_list = [];
-	let tab = so.table;
-	for(let j = 0; j < tab.nrow; j++){
-		X.ind_list.push(tab.ele[j][0]);
-		X.value.push(Number(tab.ele[j][1]));
-	}
-	
-	close_data_source();
+	let te = "<e>exp(X^"+feg.name+"_i</e><e>×</e><e>ν^"+feg.name+")</e>";
+	lay.add_paragraph(te,wmax-x,x+1.6,y+0.2,BLACK,para_eq_si,para_lh);
 }
 
 
@@ -72,15 +51,19 @@ function close_Xvector_source()
 /// Plots X vector to allow for values to be editted			
 function add_Xvector_buts(lay)
 {
-	let Xvec = model.species[inter.edit_Xvector.p].fix_eff[inter.edit_Xvector.i].X_vector;
+	let edit_X = inter.edit_Xvector;
+	
+	//let Xvec = model.species[inter.edit_Xvector.p].fix_eff[inter.edit_Xvector.i].X_vector;
+	let ind_list = edit_X.ind_list;
+	
 	
 	let si_mar = 1;
 	let fo_mar = get_font(si_mar);
 	let fo_table = get_font(si_table);
 
 	let w_max = 0;
-	for(let i = 0; i < Xvec.ind_list.length; i++){
-		let w = text_width(Xvec.ind_list[i],fo_mar);
+	for(let i = 0; i < ind_list.length; i++){
+		let w = text_width(ind_list[i],fo_mar);
 		if(w > w_max) w_max = w;		
 	}
 	w_max += 1;
@@ -94,38 +77,19 @@ function add_Xvector_buts(lay)
 	let cx = 2+gap;
 	
 	cx = 2;
-	lay.add_button({x:cx+w_max+gap-mar, y:cy-mar, dx:dx+2*mar, dy:dy_table_param*Xvec.ind_list.length+2*mar, type:"Outline", col:BLACK});
+	lay.add_button({x:cx+w_max+gap-mar, y:cy-mar, dx:dx+2*mar, dy:dy_table_param*ind_list.length+2*mar, type:"Outline", col:BLACK});
 		
-	for(let j = 0; j < Xvec.ind_list.length; j++){
+	for(let j = 0; j < ind_list.length; j++){
 		let cx = 2;
-		lay.add_button({te: Xvec.ind_list[j], x:cx, y:cy, dx:w_max, dy:dy_table_param, type:"RightText", si:si_mar, font:fo_mar, col:mar_col});
+		lay.add_button({te: ind_list[j], x:cx, y:cy, dx:w_max, dy:dy_table_param, type:"RightText", si:si_mar, font:fo_mar, col:mar_col});
 	
 		cx += w_max+gap;
 	
-		let val = inter.edit_Xvector.value[j];
+		let val = edit_X.X_value[j];
 		lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:"XvectorElement", font:fo_table, i:j, ac:"EditXvectorElement"});
 	
-	/*
-		for(let i = 0; i < Amat.ind_list.length; i++){
-			
-			lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:"AmatrixElement", font:fo_table, i:i, j:j, ac:"EditAmatrixElement"});
-			cx += dx;
-		}
-		*/
 		cy += dy_table_param;
 	}
 	
 	lay.add_button({x:0, y:cy, dx:0, dy:0.5, type:"Nothing"});	
 }
-
-
-/// Runs when editing of the X vector is complete
-function done_Xvector()
-{
-	let ea = inter.edit_Xvector;
-	model.species[ea.p].fix_eff[ea.i].X_vector.value = ea.value;
-	close_bubble();
-	close_Xvector_source();
-}
-
-

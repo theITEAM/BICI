@@ -1,17 +1,16 @@
-/// Layers describe canvases which are sequentially plotted to generate the final interface
-
 "use strict";
+// Functions related to layers, which describe canvases which are sequentially plotted to generate the final interface
 
 class Layer
 {
-	x;
-	y; 
-	dx; 
-	dy;
-	but = [];
-	name;
-	can;
-	cv;
+	x;                                               // x position of layer
+	y;                                               // y position of layer
+	dx;                                              // dx of layer
+	dy;                                              // dy of layer
+	but = [];                                        // buttons on layer
+	name;                                            // Name of layer
+	can;                                             // Canvas for layer
+	cv;                                              // Used for plotting on canvas
 	
 	constructor(na,x,y,dx,dy,op)	
 	{
@@ -30,17 +29,44 @@ class Layer
 	}
 
 
+	/// Adds a blank screen (used with loading symbol)
+	add_blank_buts()
+	{
+		this.add_button({x:0, y:0, dx:this.dx, dy:this.dy, type:"Rect", val:WHITE});
+	}
+	
+	
+	/// Adds buttons to the main area (this is to the right of the menu bar)
+	add_figure_buts()
+	{
+		if(inter.figure.length == -1){
+			inter.figure.push({te:"A",x:9,y:10});
+			inter.figure.push({te:"B",x:12,y:10});
+			inter.figure.push({te:"C",x:14,y:10});
+			inter.figure.push({te:"D",x:16,y:10});
+			inter.figure.push({te:"E",x:18,y:10});
+			inter.figure.push({te:"F",x:20,y:10});
+			inter.figure.push({te:"G",x:22,y:10});
+			inter.figure.push({te:"H",x:24,y:10});
+			inter.figure.push({te:"I",x:26,y:10});
+		}
+		
+		for(let i = 0; i < inter.figure.length; i++){
+			let fig = inter.figure[i];
+			this.add_button({te:fig.te, x:fig.x, y:fig.y, index:i, dx:letter_size, dy:letter_size, ac:"Letter", type:"Letter"});
+	
+		}
+	}
+	
+	
 	/// Adds buttons to the main area (this is to the right of the menu bar)
 	add_main_buts()
 	{
 		this.add_button({x:0, y:0, dx:this.dx, dy:this.dy, type:"Rect", val:WHITE});
 	
 		let tree = inter.page_name.split("->");
-		
-		if(model.warn.length > 0){
-			model.add_warning_buts(this);
-			return;			
-		}
+	
+		if(inter.loading_symbol.on == true) return;
 		
 		switch(tree[0]){
 		case "Home": add_home_page_buts(this); break;
@@ -50,8 +76,7 @@ class Layer
 				model.add_classback_buts(this);
 				break;
 			case "Parameters":
-				if(model.warn.length > 0) model.add_warning_buts(this); 
-				else add_model_param_buts(this); 
+				add_model_param_buts(this); 
 				break;
 			case "Description": add_description_buts(this); break;
 			}
@@ -59,38 +84,36 @@ class Layer
 		
 		case "Simulation":
 			switch(tree[1]){
-			case "Population": add_data_buts(this,"sim"); break;
+			//case "Population": add_data_buts(this,"sim"); break;
+			//case "Initial Conditions": add_init_cont_buts(this,"sim"); break;
+			case "Initial Conditions": add_data_buts(this,"sim"); break;
 			
 			case "Parameters":
-				if(model.warn.length > 0) model.add_warning_buts(this); 
-				else add_param_value_buts(this); 
+				add_param_value_buts(this); 
 				break;
 				
 			case "Run":
-				if(model.warn.length > 0) model.add_warning_buts(this); 
-				else{
-					if(inter.running_status == false){
-						add_sim_start_buts(this);
-					}
-				}					
+				//if(inter.running_status == false){
+				add_sim_start_buts(this);
+				//}					
 				break;
 					
 			case "Results":
 				switch(tree[2]){
 				case "Populations":
-					add_pop_buts(sim_result,this);
+					add_pop_buts(model.sim_res,this);
 					break;
 				case "Transitions":
-					add_trans_buts(sim_result,this);
+					add_trans_buts(model.sim_res,this);
 					break;
 				case "Individuals":
-					add_individual_buts(sim_result,this);
+					add_individual_buts(model.sim_res,this);
 					break;
-				case "Splines":
-					add_spline_buts(sim_result,this);
-					break;
+				//case "Derived":
+					//add_spline_buts(model.sim_res,this);
+					//break;
 				case "Parameters":
-					add_parameter_buts(sim_result,this);
+					add_parameter_buts(model.sim_res,this);
 					break;
 				}
 				break;
@@ -99,47 +122,81 @@ class Layer
 			}
 			break;
 			
-			
-			
 		case "Inference":
 			switch(tree[1]){
+			case "Initial Conditions": add_data_buts(this,"infic"); break;
 			case "Data": add_data_buts(this,"inf"); break;
 			case "Prior":
-				if(model.warn.length > 0) model.add_warning_buts(this); 
-				else add_param_prior_buts(this); 
+				add_param_prior_buts(this); 
 				break;
 			case "Run":
-				if(model.warn.length > 0) model.add_warning_buts(this); 
-				else add_inf_start_buts(this);	
+				add_inf_start_buts(this);	
 				break;
 	
 			case "Results":
 				switch(tree[2]){
 				case "Populations":
-					add_pop_buts(inf_result,this);
+					add_pop_buts(model.inf_res,this);
 					break;
 				case "Transitions":
-					add_trans_buts(inf_result,this);
+					add_trans_buts(model.inf_res,this);
 					break;
 				case "Individuals":
-					add_individual_buts(inf_result,this);
+					add_individual_buts(model.inf_res,this);
 					break;
-				case "Splines":
-					add_spline_buts(inf_result,this);
-					break;
+				//case "Derived":
+				  //add_spline_buts(model.inf_res,this);
+					//break;
 				case "Parameters":
-					add_parameter_buts(inf_result,this);
+					add_parameter_buts(model.inf_res,this);
 					break;
 				}
 				break;
+			}
+			break;
+		
+		case "Post. Simulation":
+			switch(tree[1]){
+			case "Population Mod.": 
+				add_data_buts(this,"ppc"); 
+				break;
+		
+			case "Parameter Mult.":
+				add_param_mult_buts(this);
+				break;
+				
+			case "Run":
+				//if(inter.running_status == false){
+				add_ppc_start_buts(this);
+				//}		
+				break;
+	
+			case "Results":
+				switch(tree[2]){
+				case "Populations":
+					add_pop_buts(model.ppc_res,this);
+					break;
+				case "Transitions":
+					add_trans_buts(model.ppc_res,this);
+					break;
+				case "Individuals":
+					add_individual_buts(model.ppc_res,this);
+					break;
+				//case "Derived":
+					//add_spline_buts(model.ppc_res,this);
+					//break;
+				case "Parameters":
+					add_parameter_buts(model.ppc_res,this);
+					break;
+				}
 			}
 			break;
 			
 		default: error("Page "+inter.page_name+" not set up"); break;
 		}
 	}
-		
-		
+	
+	
 	/// Adds a button onto a page
 	add_button(bu)      
 	{
@@ -185,10 +242,7 @@ class Layer
 			
 			if(bu.x < x2 && bu.x+bu.dx > x1 && bu.y < y2 && bu.y+bu.dy > y1){
 				if(!(not_plot && find_in(not_plot,bu.type) != undefined)){				
-					let dx_can = this.dx, dy_can = this.dy;
-	
 					let ov = false;
-			
 					if(this.index == inter.over.layer && i == inter.over.i) ov = true;
 					this.plot_button(bu,ov);
 				}
@@ -200,12 +254,12 @@ class Layer
 	/// Adds a title to the layer
 	add_title(te,cx,cy,op)
 	{ 
-		let col = DBLUE, col_line = LBLUE;
+		let col = BLACK, col_line = GREY;
 		if(op == undefined) op = {};
 		if(op.col != undefined) col = op.col;
 		if(op.col_line != undefined) col_line = op.col_line;
 		
-		let text_anno = text_convert_annotation(te,si_title,1.4*si_title,100,"",col);
+		let text_anno = text_convert_annotation("<b>"+te+"</b>",si_title,1.4*si_title,100,"",col);
 		
 		this.add_button({word:text_anno.word, x:cx, y:cy, dx:this.dx-cx*2, dy:1.5, col:col, col_line:col_line, type:"Title"}); 
 		
@@ -224,7 +278,7 @@ class Layer
 		let si = 0.8;
 		let fo = get_font(si,"Bold");
 	
-		this.add_button({te:te, x:cx,dx:this.dx-cx*2, y:cy, dy:si, type:"Text", font:fo, si:si, col:DBLUE, back_col:back_col});
+		this.add_button({te:te, x:cx,dx:this.dx-cx*2, y:cy, dy:si, type:"Text", font:fo, si:si, col:BLACK, back_col:back_col});
 		
 		if(op && op.te){
 			let title = te; if(op.title != undefined) title = op.title;
@@ -237,20 +291,43 @@ class Layer
 	
 	
 	/// Adds a link to the layer
-	add_example_link(te,file,cx,cy)
+	add_example_link(te,file,cx,cy,mod_ty,mod_ty2,variety,mod_but,sel)
 	{ 
 		let font = get_font(0.9);
 		
-		this.add_button({te:te, x:cx, y:cy, dx:text_width(te,font)+1, dy:1, ac:"Example", type:"Example", font:font, file:file});
-		return cy + 1.4;
+		this.add_button({te:te, x:cx, y:cy, dx:text_width(te,font)+1, dy:1, ac:"ExampleModel", type:"Example", sel:sel, font:font, file:file});
+		
+		let xx = cx+text_width(te,font)+0.9;
+
+		if(mod_but){
+			let font2 = get_font(0.9,"bold");
+			let tee = "("+mod_but.mod+")";
+			let dx = text_width(tee,font2)+0.3;
+			this.add_button({te:tee, x:xx, y:cy, dx:dx, dy:1, ac:"ShowModel", type:"ShowModel", mod_but:mod_but, font:font2});
+			xx += dx+0.3;
+		}
+		
+		if(mod_ty){
+			let dy = 0.9;
+			let dx = mod_ty.width*dy/mod_ty.height	 
+			this.add_button({te:te, x:xx, y:cy-0, dx:dx, dy:dy, ac:"ModType", variety:variety, type:"ModType", mod_ty:mod_ty});
+			xx += dx;
+		}
+
+		if(mod_ty2){
+			let dy = 0.9;
+			let dx = mod_ty.width*dy/mod_ty.height	 
+			this.add_button({te:te, x:xx, y:cy-0, dx:dx, dy:dy, ac:"ModType", variety:variety, type:"ModType", mod_ty:mod_ty2});
+			xx += dx;
+		}
+
+		return cy + 1.2;
 	}
 	
 	/// Adds some simple text
 	add_text(te,cx,cy,col,si)
 	{
 		this.add_button({te:te, x:cx, y:cy, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
-		
-		//this.add_paragraph(te,text_width(te,get_font(si)),cx,cy,col,si);
 	}
 	
 	
@@ -265,10 +342,12 @@ class Layer
 	/// Adds a paragraph to the layer
 	add_paragraph(te,dx,cx,cy,col,si,lh,back_col,align)
 	{
+		if(te == undefined) te = "undefined";
+		
 		if(lh == undefined) l = 1.4*si;
 		
 		let text_anno = text_convert_annotation(te,si,lh,dx,align,col);
-	
+		
 		let dy = text_anno.height;
 		
 		if(back_col != undefined) this.add_button({x:cx, y:cy, dx:dx, dy:dy, type:"Rect", val:back_col});
@@ -279,7 +358,14 @@ class Layer
 			let li = text_anno.link[i];
 			let spl = li.ac.split("|");
 			
-			this.add_button({te:li.te, x:cx+li.x, y:cy+li.y-1*li.si, dx:li.w, dy:1.4*li.si, si: li.si, ac:spl[0], info:spl[1], type:"Link", font:li.font});
+			if(spl.length == 2 && spl[1].substr(0,2) == "BB"){
+				let si = 0.8;
+				let font = get_font(si,"bold");
+				this.add_button({te:li.te, x:cx+li.x, y:cy+li.y-1*si, dx:li.w, dy:1.4*si, si:si, ac:spl[0], info:spl[1], type:"LinkBlue", font:font});
+			}
+			else{
+				this.add_button({te:li.te, x:cx+li.x, y:cy+li.y-1*li.si, dx:li.w, dy:1.4*li.si, si: li.si, ac:spl[0], info:spl[1], type:"Link", font:li.font});
+			}
 		}
 		
 		return cy+dy;
@@ -313,6 +399,7 @@ class Layer
 		this.add_button({te:te, x:x+1.6, y:y, dx:text_width(te,get_font(si_radio))+0.4, dy:1, type:"CheckboxButtonText", source:source, col:WHITE});
 	}
 
+
 	/// Adds a check box on a white background
 	add_checkbox(x,y,value,te,source,back_col,op)
 	{
@@ -330,6 +417,8 @@ class Layer
 	/// Adds a radio button on a black background
 	add_radio_white(x,y,value,te,source,op)
 	{
+		let xx = nearest_pixel(x+0.5), yy = nearest_pixel(y);
+	
 		let back_col; 
 		let fo = get_font(si_radio);
 		if(op){
@@ -337,14 +426,16 @@ class Layer
 			if(op.fo != undefined) fo = op.fo;
 		}
 			
-		this.add_button({value:value, x:x+0.5, y:y, dx:1, dy:1, ac:"RadioButton", type:"RadioWhiteButton", source:source, back_col:back_col});
-		this.add_button({te:te, x:x+1.6, y:y, dx:text_width(te,fo)+0.4, dy:1, type:"RadioButtonText", source:source, fo:fo, col:WHITE, back_col:back_col});
+		this.add_button({value:value,  x:xx, y:yy, dx:1.2, dy:1.2, ac:"RadioButton", type:"RadioWhiteButton", source:source, back_col:back_col});
+		this.add_button({te:te, x:xx+1.2, y:yy+0.1, dx:text_width(te,fo)+0.4, dy:1, type:"RadioButtonText", source:source, fo:fo, col:WHITE, back_col:back_col});
 	}
 	
 	
 	/// Adds a radio button on white background
 	add_radio(x,y,value,te,source,op)
 	{
+		let xx = nearest_pixel(x+0.5), yy = nearest_pixel(y);
+	
 		let back_col; 
 		let fo = get_font(si_radio);
 		let ac = "RadioButton"; 
@@ -354,11 +445,12 @@ class Layer
 			if(op.disable == true) ac = undefined;
 		}
 	
-		this.add_button({value:value, x:x+0.5, y:y, dx:1, dy:1, ac:ac, type:"RadioButton", source:source, back_col:back_col});
-		this.add_button({te:te, x:x+1.6, y:y, dx:text_width(te,get_font(si_radio))+0.4, dy:1, type:"RadioButtonText", source:source, col:BLACK, fo:fo, back_col:back_col});
+		this.add_button({value:value, x:xx, y:yy, dx:1.2, dy:1.2, ac:ac, type:"RadioButton", source:source, back_col:back_col});
+		this.add_button({te:te, x:xx+1.2, y:yy+0.1, dx:text_width(te,get_font(si_radio))+0.4, dy:1, type:"RadioButtonText", source:source, col:BLACK, fo:fo, back_col:back_col});
 		
 		return x + text_width(te,get_font(si_radio))+3;
 	}
+
 
 	/// Adds yscroll buttons
 	add_yscroll_buts()
@@ -396,7 +488,6 @@ class Layer
 		pos.frac = frac;
 		pos.scroll_layer = this.index;
 		
-		//if(height != pos.max_create) pos.shift = 0;
 		if(pos.shift < 0) pos.shift = 0;
 		if(pos.shift > pos.max*(1-pos.frac)) pos.shift = pos.max*(1-pos.frac);
 
@@ -404,7 +495,9 @@ class Layer
 		let ysh_disc = ysh;
 
 		if(lay.name == "TextBox"){
-			ysh_disc = Math.round(ysh_disc/textbox_linesi)*textbox_linesi;
+			let fsi = get_font_info().fsi;
+			ysh_disc = Math.round(ysh_disc/fsi)*fsi;
+	
 			pos.discretise = true;
 		}
 		
@@ -493,26 +586,30 @@ class Layer
 	/// Adds corner scroll buttons
 	add_corner_scroll_buts()
 	{
-		let si = this.dx;
-		//this.add_button({x:0, y:0, dx:si, dy:si, type:"Rect", val:LLGREY, style:this.op.style});
+		if(false){
+			let si = this.dx;
+			this.add_button({x:0, y:0, dx:si, dy:si, type:"Rect", val:LLGREY, style:this.op.style});
+		}
 	}
 	
 
 	/// Adds loading symbol buttons
 	add_loadingsymbol_buts()
-	{
+	{	
 		this.add_button({x:this.dx/2-loading_si/2, y:0, dx:loading_si, dy:loading_si, type:"LoadingSymbol"});
 		
-		if(inter.loading_symbol.processing == true) this.add_button({te:"Processing", x:0, y:loading_si, dx:this.dx, dy:1, type:"Stop"});
-		else this.add_button({te:"Stop", x:0, y:loading_si, dx:this.dx, dy:1, type:"Stop", ac:"Stop"});
+		let mess = inter.loading_symbol.message;
+		if(mess != undefined) this.add_button({te:mess, x:0, y:loading_si, dx:this.dx, dy:1, type:"Stop"});
+		
+		//else this.add_button({te:"Stop", x:0, y:loading_si, dx:this.dx, dy:1, type:"Stop", ac:"Stop"});
+		
+		//this.add_button({x:this.dx/2-loading_si/2, y:0, dx:loading_si, dy:loading_si, type:"LoadingSymbol"});
 	}
 	
 	
 	/// Adds buttons for input box
 	add_input_buts()
 	{
-		//this.add_button({x:0, y:0, dx:this.dx, dy:this.dy, type:"Rect", val:BLUE});				
-		
 		this.copy_from_source();
 		
 		let te = this.get_text_from_source();
@@ -559,17 +656,20 @@ class Layer
 		}
 		
 		let i = te.length;
-		this.add_button({te:"", x:cx, y:0, dx:0, dy:lh, type:"Char", col:BLACK, i:i, font:font, si:inputbox_fontsi});				
-			
-		this.add_button({x:cx_click, y:0, dx:box_dx-cx_click, dy:lh, ac:"PositionCursor", type:"Nothing", i:i, eqn:eqn});
+		this.add_button({te:"", x:cx, y:0, dx:0, dy:lh, type:"Char", col:BLACK, i:i, font:font, si:inputbox_fontsi});	
+		let dxx =	box_dx-cx_click; if(dxx < 1) dxx = 1;
+		this.add_button({x:cx_click, y:0, dx:dxx, dy:lh, ac:"PositionCursor", type:"Nothing", i:i, eqn:eqn});
 						
 		this.outline = {style:"round", col:INPUT_OUTLINE_COL, line:NORMLINE, marx:outline_marx, mary:outline_mary}
 	}
 	
+	
+	/// Adds expand buttin to input box
 	add_expand_buts()
 	{
 		this.add_button({x:0, y:0, dx:expand_dx, dy:inputbox_linesi, type:"ExpandIcon", ac:"ExpandIcon"});				
 	}
+
 
 	/// Adds buttons for textbox
 	add_textbox_buts()
@@ -580,18 +680,18 @@ class Layer
 		if(te == undefined) return;
 		
 		let textcol = BLACK;
-		
-		let lh = textbox_linesi;
+	
 		let marx = 0.1;
 		
 		let cx = marx;
 		let cy = 0;
 		let cx_click = 0;
-	
-		let font;
-		if(this.op.source.type == "equation") font = get_font(textbox_fontsi,"","times");
-		else font = get_font(textbox_fontsi);
-			
+
+		let font_inf = get_font_info();
+		let lh = font_inf.lh; 
+		let fsi = font_inf.fsi;
+		let font = font_inf.font;
+		
 		let box_dx = this.inner_dx;
 		let box_dy = this.dy;
 		
@@ -628,10 +728,10 @@ class Layer
 
 					if(cx == marx){
 						let w = text_width(" ",font);
-						this.add_button({te:" ", x:cx, y:cy, dx:w, dy:lh, type:"Char", col:BLACK, i:i, font:font, si:textbox_fontsi });
+						this.add_button({te:" ", x:cx, y:cy, dx:w, dy:lh, type:"Char", col:BLACK, i:i, font:font, si:fsi});
 					}
 					else{
-						this.add_button({te:"", x:cx, y:cy, dx:0, dy:lh, type:"Char", col:BLACK, i:i, font:font, si:textbox_fontsi});				
+						this.add_button({te:"", x:cx, y:cy, dx:0, dy:lh, type:"Char", col:BLACK, i:i, font:font, si:fsi});				
 					}
 				
 					cx = marx; cy += lh; text_nrow++;
@@ -656,7 +756,7 @@ class Layer
 						if(wrap == "word") cx = marx;
 						else{
 							cx = textbox_tab; 
-							this.add_button({x:cx, y:cy, dx:textbox_tab-2*marx, dy:lh, type:"TextboxTab", col:BLACK, i:i, font:font, si:textbox_fontsi });
+							this.add_button({x:cx, y:cy, dx:textbox_tab-2*marx, dy:lh, type:"TextboxTab", col:BLACK, i:i, font:font, si:fsi });
 						}
 			
 						cy += lh; text_nrow++;
@@ -680,7 +780,7 @@ class Layer
 						if(i >= warn.cur && i < warn.cur+len) underline = true;
 					}
 					
-					this.add_button({te:ch, x:cx, y:cy, dx:w, dy:lh, type:"Char", col:textcol, i:i, font:font, si:textbox_fontsi, underline:underline});
+					this.add_button({te:ch, x:cx, y:cy, dx:w, dy:lh, type:"Char", col:textcol, i:i, font:font, si:fsi, underline:underline});
 					
 					if(ch == "}") textcol = textcol_pop_store;
 					if(ch == "]") textcol = textcol_ie_store;
@@ -690,7 +790,7 @@ class Layer
 			}
 
 			if(i == te.length){
-				this.add_button({te:"", x:cx, y:cy, dx:0, dy:lh, type:"Char", col:BLACK, i:i, font:font, si:textbox_fontsi});				
+				this.add_button({te:"", x:cx, y:cy, dx:0, dy:lh, type:"Char", col:BLACK, i:i, font:font, si:fsi});				
 			
 				this.add_button({x:cx_click, y:cy, dx:box_dx-cx_click, dy:lh, ac:"PositionCursor", type:"Nothing", i:i, eqn:eqn});
 				cx = marx; cy += lh; 
@@ -699,7 +799,11 @@ class Layer
 			}
 		}
 		
-
+		{ // This puts a black space at the end of the text box (to sort out problem of scroll bar)
+			cx = 0; cy += lh; 
+			this.add_button({te:"", x:cx, y:cy, dx:0, dy:lh, type:"Char", col:BLACK,  font:font, si:fsi});				
+		}
+		
 		this.text_nrow = text_nrow;
 		this.outline = {style:"round", col:BLACK, line:NORMLINE, marx:outline_marx, mary:outline_mary}
 	}
@@ -709,7 +813,7 @@ class Layer
 	add_textbox(x,y,dx,nrow,source)	
 	{		
 		add_ref(source);
-		add_layer("TextBox",this.x+x,this.y+y,dx,nrow*textbox_linesi,{nrow:nrow, source:source});
+		add_layer("TextBox",this.x+x,this.y+y,dx,nrow*get_font_info().lh,{nrow:nrow, source:source});
 	}
 
 
@@ -719,7 +823,7 @@ class Layer
 		add_ref(source);
 
 		if(source.eqn == true){
-			add_layer("Input",this.x+x,this.y+y,dx-expand_dx,inputbox_linesi,{source:source});
+			add_layer("Input",this.x+x,this.y+y,dx-expand_dx-0.2,inputbox_linesi,{source:source});
 			add_layer("Expand",this.x+x+dx-expand_dx,this.y+y,expand_dx,inputbox_linesi);
 		}
 		else{
@@ -810,6 +914,7 @@ class Layer
 		this.add_button({x:x, y:y, dx:info.dx, dy:1.2*si_big, type:"ParamLabel", info:info, col:BLACK});
 	}
 	
+	
 	/// Add corner buttons
 	add_corner_button(arr,pos,op)
 	{
@@ -863,6 +968,44 @@ class Layer
 	}
 
 
+	/// Checks if we need to add scroll bars
+	need_add_scroll()
+	{
+		switch(this.name){
+		case "TextBox":
+			{
+				let y_scroll_need = false; 
+				if(this.but.length > 4){
+					let k = this.but.length-1;
+					while(k >= 0 && this.but[k].type == "Nothing") k--;
+					let bu = this.but[k];
+					if(bu.y+bu.dy >= this.dy) y_scroll_need = true;
+				}
+				
+				if(this.y_scroll != y_scroll_need) return true;
+			}
+			break;
+			
+		case "Input":
+			{
+				let x_scroll_need = false; 
+				if(this.but.length > 4){
+					let k = this.but.length-1;
+					while(k >= 0 && this.but[k].type == "Nothing") k--;
+					let bu = this.but[k];
+					if(bu.x+bu.dx >= this.dx) x_scroll_need = true;
+				}
+				
+				if(this.x_scroll != x_scroll_need) return true;	
+			}
+			break;
+			
+		default: error("Option not recognised 65"); break;
+		}
+		return false;
+	}
+
+
 	/// Ensures that if the cursor goes out of view the screen is repositioned
 	ensure_cursor_in_view()
 	{
@@ -873,7 +1016,9 @@ class Layer
 		switch(this.name){
 		case "TextBox":
 			{
-				if(this.y_scroll == false) return;
+				if(this.y_scroll == false){
+					return;
+				}
 				
 				let y;
 				
@@ -961,14 +1106,19 @@ class Layer
 		case "Logo": add_logo_buts(this); break;
 		case "Menu": add_menu_buts(this); break;
 		case "Main": this.add_main_buts(); break;
+		case "Figure": this.add_figure_buts(); break;
+		case "ShowWarning": model.add_warning_buts(this); break;
+		case "Blank": this.add_blank_buts(); break;
 		case "EditTable": create_edit_table(this); break;	
 		case "EditInitPop": create_initial_pop(this); break;	
-		case "EditInitPopPrior": create_initial_pop_prior(this); break;	
+		//case "EditInitPopPrior": create_initial_pop_prior(this); break;	
 		case "EditParam": create_edit_param(this); break;	
 		case "EditAmatrix": create_edit_Amatrix(this); break;	
 		case "EditXvector": create_edit_Xvector(this); break;	
 		case "ViewGraph": create_view_graph(this); break;	
 		case "Compartment": model.add_compartment_buts(this); break;
+		case "CompSelect": model.add_comp_select_buts(this); break;
+		case "CompSelectButton": model.add_comp_select_button_buts(this); break;
 		case "Select": add_select_buts(this); break;
 		case "Transition": model.add_transition_buts(this); break;
 		case "Annotation": add_annotation_buts(this); break;
@@ -977,9 +1127,10 @@ class Layer
 		case "Bubble": add_bubble_buts(this); break;
 		case "LowerMenu": model.add_lower_menu_buts(this); break;
 		case "UpperMenu": model.add_upper_menu_buts(this); break;
-		case "AddCompartment": model.add_addcompartment_buts(this); break;
+		case "ViewWarning": model.add_view_warning_buts(this); break;
+		case "AddCompartment": model.add_compartment_new_buts(this); break;
 		case "AddLabel": model.add_addlabel_buts(this); break;
-		case "Examples": add_examples_buts(this); break;
+		case "Examples": add_examples_buts2(this); break;
 		case "Frame": add_frame_buts(this); break;
 		case "Xscroll": this.add_xscroll_buts(); break;
 		case "Yscroll": this.add_yscroll_buts(); break;
@@ -995,12 +1146,12 @@ class Layer
 		case "Expand": this.add_expand_buts(); break;
 		case "DescriptionContent": add_description_content(this); break;
 		case "InitialPopulationContent": add_initial_population_content(this); break;
-		case "InitPopPriorContent": add_init_pop_prior_content(this); break;
 		case "TableContent": add_table_content(this,this.op.table,WHITE,1.7); break;
 		case "WarningContent": model.add_warning_content(this); break;
 		case "ParamValueContent": add_param_value_content(this); break;
 		case "ParamPriorContent": add_param_prior_content(this); break;
 		case "ModelParamContent": add_model_param_content(this); break;
+		case "ParamMultContent": add_param_mult_content(this); break;
 		case "Dropdown": this.add_dropdown_buts(); break;
 		case "DropdownOptions": this.add_dropdownoptions_buts(); break;
 		case "LoadingSymbol": this.add_loadingsymbol_buts(); break;
@@ -1010,15 +1161,18 @@ class Layer
 		case "CreateEditAmatrixContent": add_Amatrix_buts(this); break;
 		case "BubbleScrollable": add_bubble_scrollable_buts(this); break;
 		case "GraphContent": inter.graph.content(this); break;
+		case "GraphWarn": inter.graph.warning(this); break;
 		case "Axes": inter.graph.axes(this); break;
 		case "TimeAxis": inter.graph.time_axis(this); break;
 		case "RightMenu": right_menu_buts(this); break;
+		case "RightMenuSlider": right_menu_slider_buts(this); break;
 		case "RightBotMenu": rightbot_menu_buts(this); break;
 		case "RightMidMenu": rightmid_menu_buts(this); break;
+		case "GraphAnnotations": inter.graph.add_annotation_buts(this); break;
 		case "GraphCompartments": inter.graph.add_compartment_buts(this); break;
 		case "GraphTransitions": inter.graph.add_transition_buts(this); break;
 		case "AnimControls": inter.graph.add_animcontrol_buts(this); break;
-		
+		case "SamplingCheckbox": sampling_checkbox(this); break;
 		default: error("Layer "+this.name+" not recognised"); break;
 		}
 	}
@@ -1077,14 +1231,19 @@ class Layer
 		case "add_classification_name": te = ""; break;
 		case "classification_name": te = model.species[so.p].cla[so.cl].name; break;
 		case "species_name": te = model.species[so.p].name; break;
-		case "init_population": te = String(inter.edit_source.cla[so.cl].comp_init_pop[so.c].pop); break;
-		case "init_per": te = String(inter.edit_source.cla[so.cl].comp_init_pop[so.c].pop_per); break;
-		case "init_globpopulation": te = String(inter.edit_source.glob_comp[so.c].pop);	break;
-		case "element": te = String(inter.edit_source.table.ele[so.r][so.c]);	break;
-		case "element_param": te = String(get_element(inter.edit_param.value,so.pindex)); break;
-		case "element_param_const": te = String(get_element(inter.edit_param.value,so.pindex)); break;
-		case "element_Amatrix": te = String(inter.edit_Amatrix.value[so.j][so.i]); break;
-		case "element_Xvector": te = String(inter.edit_Xvector.value[so.i]); break;
+		case "init_population": te = String(edit_source.cla[so.cl].comp_init_pop[so.c].pop); break;
+		case "init_per": te = String(edit_source.cla[so.cl].comp_init_pop[so.c].pop_per); break;
+		case "init_globpopulation": te = String(edit_source.glob_comp[so.c].pop);	break;
+		case "element": te = String(edit_source.table.ele[so.r][so.c]);	break;
+		case "element_param": case "element_param_const": 
+			{
+				let ele = get_element(inter.edit_param.value,so.pindex);
+				if(ele == undefined) ele = "";
+				te = String(ele);
+			}
+			break;
+		case "element_Amatrix": te = String(inter.edit_Amatrix.A_value[so.j][so.i]); break;
+		case "element_Xvector": te = String(inter.edit_Xvector.X_value[so.i]); break;
 		case "element_eqn":
 			{
 				let st = String(get_element(inter.edit_param.value,so.pindex));
@@ -1096,22 +1255,36 @@ class Layer
 				let st = String(model.param[inter.bubble.th].value);
 				eqn = create_equation(st,"reparam"); 
 			}
-			break;
+			break;		
+		case "reparam_equation": 
+			{
+				let st = String(model.param[inter.bubble.th].reparam_eqn);
+				eqn = create_equation(st,"reparam_eqn"); 
+			}
+			break;		
 		case "find": te = String(inter.bubble.find); break;
 		case "burnin": te = String(inter.bubble.burnin); break;
 		case "replace": te = String(inter.bubble.replace); break;
-		case "time_start": te = inter.edit_source.spec.time_start; break;
-		case "time_end": te = inter.edit_source.spec.time_end; break;
-		case "Se": eqn = inter.edit_source.spec.Se_eqn; break;
-		case "Sp": eqn = inter.edit_source.spec.Sp_eqn; break;
-		case "trap_prob": eqn = inter.edit_source.spec.trap_prob_eqn; break;
-		case "pos_result": te = inter.edit_source.spec.pos_result; break;
-		case "neg_result": te = inter.edit_source.spec.neg_result; break;
-		case "percent": te = inter.edit_source.spec.percent; break;
-		case "sd": te = inter.edit_source.spec.sd; break;
+		case "time_start": te = edit_source.spec.time_start; break;
+		case "time_end": te = edit_source.spec.time_end; break;
+		case "Se": eqn = edit_source.spec.Se_eqn; break;
+		case "Sp": eqn = edit_source.spec.Sp_eqn; break;
+		case "mut_rate": eqn = edit_source.spec.mut_rate_eqn; break;
+		case "seq_var": eqn = edit_source.spec.seq_var_eqn; break;
+		case "snp_root": te = edit_source.spec.snp_root; break;
+		case "num_basep": te = String(edit_source.numbp); break;
+		case "frac_obs": te = String(edit_source.frac_obs); break;
+		case "trap_prob": eqn = edit_source.spec.trap_prob_eqn; break;
+		case "pos_result": te = edit_source.spec.pos_result; break;
+		case "neg_result": te = edit_source.spec.neg_result; break;
+		case "percent": te = edit_source.spec.percent; break;
+		case "sd": te = edit_source.spec.sd; break;
+		case "p": te = edit_source.spec.p; break;
 		case "param_val": te = model.param[so.val].value; break; 
 		case "label": te = inter.bubble.label.te; break;
+		case "label_size": te = String(inter.bubble.label.size); break;
 		case "label_anno": te = model.species[so.p].cla[so.cl].annotation[so.i].te; break;
+		case "label_anno_size": te = String(model.species[so.p].cla[so.cl].annotation[so.i].size); break;
 		case "prior_min": te = inter.bubble.prior.value.min_eqn.te; break;
 		case "prior_max": te = inter.bubble.prior.value.max_eqn.te; break;
 		case "prior_mean": te = inter.bubble.prior.value.mean_eqn.te; break;
@@ -1136,30 +1309,51 @@ class Layer
 		case "sim_t_end": te = String(model.sim_details.t_end); break;
 		case "sim_number": te = String(model.sim_details.number); break;
 		case "sim_timestep": te = String(model.sim_details.timestep); break;
-		
+		case "sim_paramout": te = String(model.sim_details.param_output_max); break;
+		case "sim_seed": te = String(model.sim_details.seed); break;
+		case "sim_indmax": te = String(model.sim_details.indmax); break;
+		case "ppc_t_start": te = String(model.ppc_details.ppc_t_start); break;
+		case "ppc_t_end": te = String(model.ppc_details.ppc_t_end); break;
+		case "ppc_number": te = String(model.ppc_details.number); break;
+		case "ppc_seed": te = String(model.ppc_details.seed); break;
 		case "inf_t_start": te = String(model.inf_details.t_start); break;
 		case "inf_t_end": te = String(model.inf_details.t_end); break;
 		case "inf_timestep": te = String(model.inf_details.timestep); break;
 		case "inf_sample": te = String(model.inf_details.sample); break;
+		case "inf_seed": te = String(model.inf_details.seed); break;
 		case "inf_chain": te = String(model.inf_details.nchain); break;
 		case "inf_abcsample": te = String(model.inf_details.abcsample); break;
-		case "inf_thinparam": te = String(model.inf_details.thinparam); break;
-		case "inf_thinstate": te = String(model.inf_details.thinstate); break;
+		case "inf_output_param ": te = String(model.inf_details.output_param ); break;
+		case "inf_outputstate": te = String(model.inf_details.output_state); break;
 		case "inf_accfrac": te = String(model.inf_details.accfrac); break;
 		case "inf_accfracsmc": te = String(model.inf_details.accfracsmc); break;
 		case "inf_numgen": te = String(model.inf_details.numgen); break;
 		case "inf_kernelsize": te = String(model.inf_details.kernelsize); break;
 		case "inf_indmax": te = String(model.inf_details.indmax); break;
-		case "sim_indmax": te = String(model.sim_details.indmax); break;
-
-		case "knot_times": te = stringify(model.param[so.val].spline.knot); break;
+		case "inf_npart": te = String(model.inf_details.npart); break;
+		case "inf_gen_update": te = String(model.inf_details.gen_update); break;
+		case "anneal_rate": te = String(model.inf_details.anneal_rate); break;
+		case "anneal_power": te = String(model.inf_details.anneal_power); break;
+		case "burnin_frac": te = String(model.inf_details.burnin_frac); break;
+		case "inf_paramout": te = String(model.inf_details.param_output_max); break;
+		case "knot_times": te = inter.bubble.knot_times; break;
+		case "knot_t_start": te = inter.bubble.knot_t_start; break;
+		case "knot_t_end": te =inter.bubble.knot_t_end; break;
+		case "knot_dt": te = inter.bubble.knot_dt; break;
 		case "smooth_value": te = String(model.param[so.i].spline.smooth.value); break;
-		case "min": te = String(inter.bubble.min); break;
-		case "max": te = String(inter.bubble.max); break;
+		case "min": te = precision(inter.bubble.min,5); break;
+		case "max": te = precision(inter.bubble.max,5); break;
 		case "fixed_time": te = inter.bubble.fixed_time; break;
 		case "const_column": te = inter.bubble.const_column; break;
-		case "time_gen": te = String(inter.edit_source.time_gen); break;
-		case "time_step": te = String(inter.edit_source.time_step); break;
+		case "time_gen": te = String(edit_source.time_gen); break;
+		case "time_step": te = String(edit_source.time_step); break;
+		case "alpha_val": te = String(inter.bubble.alpha_val); break;
+		case "BF_val": te = String(inter.bubble.BF_val); break;
+		case "group_name": te = String(edit_source.spec.gname); break;
+		case "slice_time": te = String(inter.bubble.slice_time); break;
+		case "suffix": te = String(inter.bubble.suffix); break;
+		case "wild_card": te = String(inter.bubble.wildcard); break;
+		case "comp_acc": te = String(edit_source.comp_acc); break;
 		default: error("SOURCE PROBLEM: "+so.type); break;
 		}
 

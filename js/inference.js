@@ -1,10 +1,16 @@
 "use strict";
+// Functions related to inference
 
-/// Starts inference
-function start_inference()
+/// Starts inference on a linux cluster
+function inference_cluster()
 {
-	start("inf",1);
-}
+	let nchain = model.inf_details.nchain;
+	
+	let line1 = "module load mpi/openmpi-x86_64";
+	let line2 = "mpirun -n "+nchain+" bici_cluster file=[file.bici]";
+	
+	inter.help = { title:"Run BICI on Linux cluster", te:"To run BICI on a Linux cluster the following steps must be followed:\n• <b>Create BICI file</b> – Click on the 'Start' button below to create and save the initialisation BICI file. Copy this to the cluster where you want BICI to run.\n• <b>Executable</b> – The executable 'bici_cluster' must also be copied from the BICI main folder to the cluster (<i>e.g.</i> this could be in the same directory as the BICI file).\n• <b>Load MPI</b> – MPI will need to be installed on the cluster. Once installed this can be loaded into the terminal using '"+line1+"' ['⟨⟨COPY⟩⟩','CopyText|BB"+line1+"'] \n• <b>Run</b> – BICI is run using '"+line2+"' ['⟨⟨COPY⟩⟩','CopyText|BB"+line2+"'] (where '[file.bici]' is replaced by the name of the BICI file you created).\n• <b>Visualise</b> – Once BICI has run it puts its results into the initialisation file. Copy this back to your local computer and load into the BICI software.", save:"StartCluster"};   
+}			
 
 
 /// Checks if some features have been disabled
@@ -17,7 +23,8 @@ function check_disable()
 			let so = model.species[p].inf_source;
 			for(let j = 0; j < so.length; j++){
 				switch(so[j].type){
-				case "Compartment": case "Transition": case "Source": case "Sink": case "Diag. Test":
+				case "Compartment": case "Transition": 			
+				case "Diag. Test":
 					alertp("Individual-level data cannot be handled by the "+alg+" algorithm");
 					return true;
 				}
@@ -35,67 +42,40 @@ function check_disable()
 		disactivated("Inferences with the ABC-MBP algorithm cannot be performed.");
 		return true;
 	
-	case "PAS-MBP":
-		disactivated("Inferences with the PAS-MBP algorithm cannot be performed.");
-		return true;
+	//case "PAS-MCMC":
+		//disactivated("Inferences with the PAS-MBP algorithm cannot be performed.");
+		//return true;
 	
 	case "Emulation":
 		disactivated("Inferences with the emulation algorithm cannot be performed.");
 		return true;
 	}
 	
-	for(let p = 0; p < model.species.length; p++){
-		let sp = model.species[p]; 
-		for(let cl = 0; cl < sp.ncla; cl++){
-			let claa = sp.cla[cl];
-			for(let tr = 0; tr < claa.tra.length; tr++){
-				let tra = claa.tra[tr];
-				if(tra.variety == "Source"){
-					disactivated("Inferences with source transitions cannot be performed.");
-					return true;
-				}
-				
-				if(tra.variety == "Sink"){
-					disactivated("Inferences with sink transitions cannot be performed.");
-					return true;
-				}
-			
-				if(tra.type == "gamma"){
-					disactivated("Inferences with gamma distributed transitions cannot be performed.");
-					return true;
-				}
-				
-				if(tra.type == "log-normal"){
-					disactivated("Inferences with log-normally distributed transitions cannot be performed.");
-					return true;
-				}
-				
-				if(tra.type == "weibull"){
-					disactivated("Inferences with Weibull distributed transitions cannot be performed.");
-					return true;
-				}
-			}
-		}
-	}
-	
 	return false;
 }
 
 
-/// Checks that the intial start and end times and time-step are all consistent
+/// Checks that the initial start and end times and time-step are all consistent
 function check_time_error()
 {
 	let de;
-	switch(inter.page[inter.pa].name){
+	let pag = inter.page[inter.pa];
+	switch(pag.name){
 	case "Simulation": de = model.sim_details; break;
 	case "Inference": de = model.inf_details; break;
-	default: error("option not recognised"); return;
+	case "Post. Simulation": de = model.ppc_details; break;
+	default: error("option not recognised2"); return;
 	}
 		
 	let t_start = Number(de.t_start);
 	let t_end = Number(de.t_end);
 	let dt = Number(de.timestep);
 
+	if((t_end - t_start)/dt > TI_DIV_MAX){
+		alertp("The number of time divisions must be fewer than "+TI_DIV_MAX);
+		return true;
+	}
+	
 	if(t_start >= t_end){
 		alertp("The start time must be before the end time.");
 		return true;
@@ -107,20 +87,6 @@ function check_time_error()
 		return true;
 	}
 		
-	if(inter.page[inter.pa].name == "Inference"){
-		for(let p = 0; p < model.species.length; p++){
-			let sp = model.species[p];
-			let so = sp.inf_source;
-			let spec = so.spec;
-			
-			switch(so.type){
-			case "Transition":
-				// TO DO
-				break;
-			}
-		}	
-	}
-	
 	return false;
 }
 
@@ -136,10 +102,11 @@ function check_timestep_fit(t,de)
 	return true;
 }
 
+
 /// Sets buttons used to start inference
 function add_inf_start_buts(lay)
 {
-	if(inter.running_status == true) return;
+	//if(inter.running_status == true) return;
 	
 	let cx = corner.x;
 	let cy = corner.y;
@@ -154,9 +121,9 @@ function add_inf_start_buts(lay)
 		
 		let yy = cy-2.5;
 		add_right_input_field(yy,"Start time",{type:"inf_t_start",update:true},lay);
-		add_right_input_field(yy+4,"End time",{type:"inf_t_end",update:true},lay);
+		add_right_input_field(yy+3,"End time",{type:"inf_t_end",update:true},lay);
 
-		cy += 5;
+		cy += 4;
 			
 		cy = lay.add_subtitle("Time-step",cx,cy,WHITE,{te:sim_timestep});
 
@@ -165,16 +132,19 @@ function add_inf_start_buts(lay)
 		yy = cy-2.5;
 		add_right_input_field(yy,"Time-step",{type:"inf_timestep",update:true},lay);
 
-		cy += 2;
+		cy += 1;
 		
 		cy = lay.add_subtitle("Algorithm",cx,cy,WHITE,{te:inf_algorithm});
 
-		cy = lay.add_paragraph("Set the algorithm used to perform inference:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+		//cy = lay.add_paragraph("Set the algorithm used to perform inference:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 			
-		cy += 1;
+		//cy += 0.5;
 		
 		let xx = 3, gap = 0.5;
 		xx = lay.add_radio(xx,cy+0.1,"DA-MCMC","DA-MCMC",model.inf_details.algorithm,{back_col:WHITE});
+		xx += gap;
+	
+		xx = lay.add_radio(xx,cy+0.1,"PAS-MCMC","PAS-MCMC",model.inf_details.algorithm,{back_col:WHITE});
 		xx += gap;
 		
 		xx = lay.add_radio(xx,cy+0.1,"ABC","ABC",model.inf_details.algorithm,{back_col:WHITE});
@@ -186,80 +156,123 @@ function add_inf_start_buts(lay)
 		xx = lay.add_radio(xx,cy+0.1,"PMCMC","PMCMC",model.inf_details.algorithm,{back_col:WHITE});
 		xx += gap;
 		
-		xx = lay.add_radio(xx,cy+0.1,"ABC-MBP","ABC-MBP",model.inf_details.algorithm,{back_col:WHITE});
-		xx += gap;
+		//xx = lay.add_radio(xx,cy+0.1,"ABC-MBP","ABC-MBP",model.inf_details.algorithm,{back_col:WHITE});
+		//xx += gap;
 		
-		xx = lay.add_radio(xx,cy+0.1,"PAS-MBP","PAS-MBP",model.inf_details.algorithm,{back_col:WHITE});
-		xx += gap;
-			
 		//xx = lay.add_radio(xx,cy+0.1,"HMC","HMC",model.inf_details.algorithm,{back_col:WHITE});
 		
 		xx = lay.add_radio(xx,cy+0.1,"Emulation","Emulation",model.inf_details.algorithm,{back_col:WHITE});
 
-		cy += 3;
+		cy += 2.5;
 
 		let gapop = 1;
 			
 		switch(model.inf_details.algorithm.value){
 		case "DA-MCMC":
-			cy = lay.add_subtitle("Samples",cx,cy,WHITE,{te:sample_text});
+			{
+				cy = lay.add_subtitle("Updates",cx,cy,WHITE,{te:sample_text});
 
-			cy = lay.add_paragraph("Set the number of samples:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Set the number of MCMC updates:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 		
-			yy = cy-2.5;
-			add_right_input_field(yy,"Samples",{type:"inf_sample",update:true},lay);
-
+				yy = cy-2.5;
+				add_right_input_field(yy,"Updates",{type:"inf_sample",update:true},lay);
+			}
 			cy += gapop;	
+
+			{			
+				cy = lay.add_subtitle("Chains",cx,cy,WHITE,{te:sample_text});
 			
-			cy = lay.add_subtitle("Chains",cx,cy,WHITE,{te:sample_text});
-			
-			cy = lay.add_paragraph("Set the number of MCMC chains:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Set the number of MCMC chains:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 		
-			yy = cy-2.5;
-			add_right_input_field(yy,"Chains",{type:"inf_chain",update:true},lay);
-
-			cy += gapop;	
+				yy = cy-2.5;
+				add_right_input_field(yy,"Chains",{type:"inf_chain",update:true},lay);
+			}
 			break;
 		
-		case "ABC":
-			cy = lay.add_subtitle("Samples",cx,cy,WHITE,{te:abc_sample_text});
+		case "PAS-MCMC":
+			{
+				cy = lay.add_subtitle("Updates",cx,cy,WHITE,{te:pas_sample_text});
 
-			cy = lay.add_paragraph("Set the number of samples:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Set the number of MCMC updates:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 		
-			yy = cy-2.5;
-			add_right_input_field(yy,"Samples",{type:"inf_abcsample",update:true},lay);
+				yy = cy-2.5;
+				add_right_input_field(yy,"Samples",{type:"inf_sample",update:true},lay);
+			}
+			
+			cy += gapop;	
+			
+			{
+				cy = lay.add_subtitle("Particles",cx,cy,WHITE,{te:particle_text});
+			
+				cy = lay.add_paragraph("Set the number of particles:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+		
+				yy = cy-2.5;
+				add_right_input_field(yy,"Particles",{type:"inf_npart",update:true},lay);
+			}
+			
+			cy += gapop;	
 
+			{
+				cy = lay.add_subtitle("Updates per generation",cx,cy,WHITE,{te:gen_update_text});
+				
+				cy = lay.add_paragraph("Set the number of MCMC updates per generation:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+		
+				yy = cy-2.5;
+				add_right_input_field(yy,"Updates",{type:"inf_gen_update",update:true},lay);
+			}
+			break;
+			
+		case "ABC":
+			{
+				cy = lay.add_subtitle("Samples",cx,cy,WHITE,{te:abc_sample_text});
+
+				cy = lay.add_paragraph("Set the number of samples:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+		
+				yy = cy-2.5;
+				add_right_input_field(yy,"Samples",{type:"inf_abcsample",update:true},lay);
+			}
+			
 			cy += gapop;
 			
-			cy = lay.add_subtitle("Acceptance",cx,cy,WHITE,{te:acceptance_text});
+			{
+				cy = lay.add_subtitle("Acceptance",cx,cy,WHITE,{te:acceptance_text});
 
-			cy = lay.add_paragraph("Set the acceptance fraction:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Set the acceptance fraction:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 		
-			yy = cy-2.5;
-			add_right_input_field(yy,"Fraction",{type:"inf_accfrac",update:true},lay);
+				yy = cy-2.5;
+				add_right_input_field(yy,"Fraction",{type:"inf_accfrac",update:true},lay);
+			}
 			break;
 			
 		case "ABC-SMC":
-			cy = lay.add_subtitle("Samples",cx,cy,WHITE,{te:abc_sample_text});
+			{
+				cy = lay.add_subtitle("Samples",cx,cy,WHITE,{te:abc_sample_text});
 
-			cy = lay.add_paragraph("Set the number of samples:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Set the number of samples:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 		
-			yy = cy-2.5;
-			add_right_input_field(yy,"Samples",{type:"inf_abcsample",update:true},lay);
-
-			cy += gapop;
-
-			cy = lay.add_subtitle("Generations",cx,cy,WHITE,{te:abc_gen_text});
-
-			cy = lay.add_paragraph("Set the number of generations:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
-		
-			yy = cy-2.5;
-			add_right_input_field(yy,"Generations",{type:"inf_numgen",update:true},lay);
+				yy = cy-2.5;
+				add_right_input_field(yy,"Samples",{type:"inf_abcsample",update:true},lay);
+			}
 			
 			cy += gapop;
+
+			{
+				cy = lay.add_subtitle("Generations",cx,cy,WHITE,{te:abc_gen_text});
+
+				cy = lay.add_paragraph("Set the number of generations:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+		
+				yy = cy-2.5;
+				add_right_input_field(yy,"Generations",{type:"inf_numgen",update:true},lay);
+			}
 			break;
 		}
 
+		cy += gapop;	
+		
+		cy = run_local(cx,cy,model.inf_details,lay);
+	
+		cy += gapop;	
+		
 		add_corner_link("> Further options","Options",lay);
 		
 		lay.add_corner_button([["Start","Grey","StartInference"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
@@ -270,28 +283,28 @@ function add_inf_start_buts(lay)
 		
 		cy = lay.add_title(te,cx,cy,{te:further_inf_text});
 		
-		cy += 2;
+		cy += 1;
 		
-		let gap = 2;
+		let gap = 1.6;
 		
 		switch(model.inf_details.algorithm.value){
 		case "DA-MCMC": 
 			{
-				cy = lay.add_subtitle("Parameter thinning",cx,cy,WHITE,{te:param_thin_text});
+				cy = lay.add_subtitle("Output parameter sample number",cx,cy,WHITE,{te:param_sample_text});
 				
-				cy = lay.add_paragraph("Set the parameter thinning factor",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Set the number of parameter samples to be generated.",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 			
 				let yy = cy-2.5;
-				add_right_input_field(yy,"Parameter thinning",{type:"inf_thinparam",update:true},lay);
+				add_right_input_field(yy,"Param. samples output",{type:"inf_output_param ",update:true},lay);
 
 				cy += gap;
 			
-				cy = lay.add_subtitle("State thinning",cx,cy,WHITE,{te:state_thin_text});
+				cy = lay.add_subtitle("Output state sample number",cx,cy,WHITE,{te:state_sample_text});
 				
-				cy = lay.add_paragraph("Set the state thinning factor",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Set the number of state samples to be generated.",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 			
 				yy = cy-2.5;
-				add_right_input_field(yy,"State thinning",{type:"inf_thinstate",update:true},lay);
+				add_right_input_field(yy,"State samples output",{type:"inf_outputstate",update:true},lay);
 				
 				cy += gap;
 			}
@@ -314,7 +327,7 @@ function add_inf_start_buts(lay)
 			
 				yy = cy-2.5;
 				add_right_input_field(yy,"Kernel size",{type:"inf_kernelsize",update:true},lay);
-		
+				
 				cy += gap;
 			}
 			break;
@@ -326,6 +339,68 @@ function add_inf_start_buts(lay)
 	
 		let yy = cy-2.5;
 		add_right_input_field(yy,"Maximum",{type:"inf_indmax",update:true},lay);
+	
+		cy += gap;
+		
+		cy = lay.add_subtitle("Parameter outputs",cx,cy,WHITE,{te:paramoutputmax_text});
+				
+		cy = lay.add_paragraph("Threshold number of tensor elements above which tensor not output.",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+	
+		yy = cy-2.5;
+		add_right_input_field(yy,"Maximum",{type:"inf_paramout",update:true},lay);
+	
+		cy += gap;
+	
+		if(model.inf_details.algorithm.value == "DA-MCMC"){
+			cy = lay.add_subtitle("Burn-in",cx,cy,WHITE,{te:burnin_text});
+			
+			cy = lay.add_paragraph("Annealing used during the burn-in phase",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+			
+			let pos = [{te:"none"},{te:"scan"},{te:"power-auto"},{te:"log-auto"},{te:"power"}];
+			
+			let yy = cy-2.5;
+			add_right_dropdown(yy,"Type",model.inf_details.anneal_type,pos,lay);
+			
+			let type = model.inf_details.anneal_type.te;
+			
+			switch(type){
+			case "scan":
+				{
+					cy += 1.5;
+					
+					cy = lay.add_paragraph("Rate of annealing",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+		
+					let yy = cy-2.5;
+					add_right_input_field(yy,"Rate",{type:"anneal_rate",update:true},lay);
+				}
+				break;
+				
+			case "power":
+				{
+					cy += 1.5;
+					
+					cy = lay.add_paragraph("Power in annealing model",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+		
+					let yy = cy-2.5;
+					add_right_input_field(yy,"Power",{type:"anneal_power",update:true},lay);
+				}
+				break;
+			}
+			
+			if(type != "scan"){
+				cy += 1.5;
+					
+				cy = lay.add_paragraph("Percentage of samples for burn-in",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+	
+				let yy = cy-2.5;
+				add_right_input_field(yy,"Percentage",{type:"burnin_frac",update:true},lay);
+			}
+			
+			cy += gap;
+		}
+		
+		cy = set_seed(cx,cy,"inf_seed",model.inf_details,lay);
+		
 		lay.add_corner_button([["Done","Grey","OptionsDone"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
 }

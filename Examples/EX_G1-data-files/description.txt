@@ -1,0 +1,18 @@
+# Example G1: Matrix of genetic differences
+
+## Objective
+- Genetic observations on the pathogen allow for the transmission tree to be estimated.
+
+## Data
+- Known event times.
+- Genetic observations are taken every 20 time units on all individuals in the system.
+- A matrix of genetic differences between the observations is used to inform inference.
+
+## Model
+- A single individual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

@@ -1,0 +1,61 @@
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+data-dir folder="Examples\EX_E5-data-files"
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5
+
+post-sim start=0 end=100
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
+
+species name="Animal" type="individual" trans-tree="off"
+
+# SPECIES MODEL
+
+class name="DS" index="a"
+
+comp name="S" color="#009900" x=-21 y=-7
+comp name="I" color="#ff2222" x=-2 y=-7
+
+trans name="S->I" value="exp(rate:β×{I,g[f]}/N)"
+
+
+class name="Group" index="g"
+
+comp-all color="#aa00aa" fix="true" file="comp-Group.csv"
+
+
+
+# INDIVIDUAL EFFECTS
+
+ind-effect name="f" ind-list="ind-list-f.csv" A-sparse="A-matrix-f.csv"
+
+# SIMULATION INITIAL CONDITIONS
+
+add-ind-sim file="add-ind-sim.csv"
+
+
+# INFERENCE DATA
+
+add-ind file="add-ind.csv"
+
+trans-data name="S->I" obsrange="all" file="trans-data.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="N" constant="10"
+param name="β" value="0.2" prior="uniform(0,1)"
+param name="Ω^f,f" value="1.5" prior="uniform(0,3)"
+
+

@@ -1,10 +1,11 @@
 "use strict";
+// Functions for initialising the software
 
-/// Intialises the software
+/// Initialises the software
 function initialise_BICI()                                         
 {
 	document.onselectstart = function() { return false; };
-
+	
 	if(debug == true) require('nw.gui').Window.get().showDevTools();
 
 	inter.graph = new Graph();
@@ -21,54 +22,10 @@ function initialise_BICI()
 	
 	change_page({pa:"Home"});
 	
-	if(1 == 0){
-		if(make_file == 1){
-			load_import_test();
-		
-			//model.start_new("without results"); TURN ON TO SEE IF MODEL IS REFERNCED IN RESULTS
-			
-			if(inter.help.title == undefined){
-				//change_page({pa:"Simulation", su:"Population"});
-				//change_page({pa:"Model", su:"Parameters"});
-	
-				//change_page({pa:"Simulation", su:"Parameters"});
-				//change_page({pa:"Model", su:"Compartments"});
-				//change_page({pa:"Inference", su:"ResultsParameters"});
-				change_page({pa:"Inference", su:"Run"});
-				
-			}
-			
-			//if(inter.help.title == undefined && sim_result.sample.length > 0){
-		if(inter.help.title == undefined && (sim_result.sample.length > 0 )){
-				//change_page({pa:"Inference", su:"Data"});
-				//change_page({pa:"Model", su:"Compartments"});
-				//change_page({pa:"Model", su:"Parameters"});
-				//change_page({pa:"Simulation", su:"Run", susu:"Transitions"});
-				//change_page({pa:"Simulation", su:"Results", susu:"Populations"});
-				//change_page({pa:"Simulation", su:"Results", susu:"Splines"});
-				//change_page({pa:"Simulation", su:"Run", susu:"Individuals"});
-				//change_page({pa:"Simulation", su:"Population"});
-					//inter.graph.export_image();
-				//change_page({pa:"Simulation", su:"Generate Data"});
-			}
-			
-			if(inter.help.title == undefined &&  inf_result.sample.length > 0){
-				//	change_page({pa:"Inference", su:"Results", susu:"Individuals"});
-				//change_page({pa:"Inference", su:"Results", susu:"Parameters"});
-				//change_page({pa:"Inference", su:"Results", susu:"Populations"});
-				//change_page({pa:"Inference", su:"Results", susu:"Populations"});
-				//change_page({pa:"Inference", su:"Results", susu:"Transitions"});
-			
-			}
-		}
-		else{
-			//load_example("temp2");
-			load_example("temp");
-			//change_page({pa:"Simulation", su:"Run"});
-		
-			//load_example("SIR");
-			//load_example("marek");
-		}
+	//if(true) start_worker("Load Default","test");
+	if(test_comment){
+		inter.help = {title:"Test comments", index:120};
+		generate_screen();
 	}
 }
 
@@ -80,9 +37,7 @@ function add_listeners()
 	
 	a.addEventListener('contextmenu', function(ev) {
     ev.preventDefault();
-		// Right click
-    //alert('success!');
-    return false;
+		 return false;
 	}, false);
 
 	a.addEventListener('paste', function(evt) {
@@ -127,7 +82,6 @@ function add_listeners()
 	
 	a.addEventListener('mouseup', function(evt) {
 		let mousePos = mouse_position(inter.canvas, evt); 
-		//ctrlkey = evt.ctrlKey;
 		if(evt.altKey) location.reload(true);
 		mouse_up(mousePos.x,mousePos.y);
 	}, false);
@@ -170,7 +124,10 @@ function add_listeners()
 /// Loads all the pictures used in the graphical interface
 function load_pictures()
 {
-	let file_name = ["logo_big","speech","newmod","manual","paper","warn","desc","SIR","SEIR","grid2","transexp","Simple population","SIbd","LV","gridSI","metapopUK","scotland_region","badger","zoomin","zoomout","desc","settings","SIRsex"];
+	let file_name = ["logo_big","speech","newmod","manual","paper","warn","warn_black","desc","zoomin","zoomout","desc","settings","copy_icon",
+	// These are pictures for homepage
+	"IBM","POP","SI","SIR","SIRErlang","SIRgamma","SIRD","SIRD_IBM","SIRD_IBM2","SIR_sex","SIR_sex2","scotland","SIS","SEIR","SIRwaning","world","uk","farm","carry","predprey","grid","dte","group","groupQG","envpathogen","covid","covidage","UK_grid"
+	];
 
 	inter.npicloaded = 0;
 	for(let i = 0; i < file_name.length; i++){

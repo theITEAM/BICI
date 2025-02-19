@@ -1,0 +1,84 @@
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+data-dir folder="Examples\EX_M3-1-data-files"
+
+simulation start=0 end=600 timestep=0.5
+
+inference start=0 end=100 timestep=0.5
+
+post-sim start=0 end=100
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
+
+species name="People" type="population"
+
+# SPECIES MODEL
+
+class name="DS" index="d"
+
+comp name="S" color="#009900" x=-21 y=-7
+comp name="I" color="#ff2222" x=-2 y=-7
+comp name="R" color="#4444ff" x=11 y=-7
+
+trans name="S->I" value="exp(rate:η+β×Σ_l' (M_l,l'×{I,l'}))"
+trans name="I->R" value="exp(rate:γ)"
+
+
+class name="Location" index="l" coord="latlng"
+
+comp name="Clackmannanshire" color="#bbbbbb" fix="true" boundary="Clackmannanshire_boundary.geojson"
+comp name="Dumfries-and-Galloway" color="#bbbbbb" fix="true" boundary="Dumfries-and-Galloway_boundary.geojson"
+comp name="East-Ayrshire" color="#bbbbbb" fix="true" boundary="East-Ayrshire_boundary.geojson"
+comp name="East-Lothian" color="#bbbbbb" fix="true" boundary="East-Lothian_boundary.geojson"
+comp name="East-Renfrewshire" color="#bbbbbb" fix="true" boundary="East-Renfrewshire_boundary.geojson"
+comp name="Na-h-Eileanan-Siar" color="#bbbbbb" fix="true" boundary="Na-h-Eileanan-Siar_boundary.geojson"
+comp name="Falkirk" color="#bbbbbb" fix="true" boundary="Falkirk_boundary.geojson"
+comp name="Highland" color="#bbbbbb" fix="true" boundary="Highland_boundary.geojson"
+comp name="Inverclyde" color="#bbbbbb" fix="true" boundary="Inverclyde_boundary.geojson"
+comp name="Midlothian" color="#bbbbbb" fix="true" boundary="Midlothian_boundary.geojson"
+comp name="Moray" color="#bbbbbb" fix="true" boundary="Moray_boundary.geojson"
+comp name="North-Ayrshire" color="#bbbbbb" fix="true" boundary="North-Ayrshire_boundary.geojson"
+comp name="Orkney-Islands" color="#bbbbbb" fix="true" boundary="Orkney-Islands_boundary.geojson"
+comp name="Scottish-Borders" color="#bbbbbb" fix="true" boundary="Scottish-Borders_boundary.geojson"
+comp name="Shetland-Islands" color="#bbbbbb" fix="true" boundary="Shetland-Islands_boundary.geojson"
+comp name="South-Ayrshire" color="#bbbbbb" fix="true" boundary="South-Ayrshire_boundary.geojson"
+comp name="South-Lanarkshire" color="#bbbbbb" fix="true" boundary="South-Lanarkshire_boundary.geojson"
+comp name="Stirling" color="#bbbbbb" fix="true" boundary="Stirling_boundary.geojson"
+comp name="Aberdeen-City" color="#bbbbbb" fix="true" boundary="Aberdeen-City_boundary.geojson"
+comp name="Aberdeenshire" color="#bbbbbb" fix="true" boundary="Aberdeenshire_boundary.geojson"
+comp name="Argyll-and-Bute" color="#bbbbbb" fix="true" boundary="Argyll-and-Bute_boundary.geojson"
+comp name="City-of-Edinburgh" color="#bbbbbb" fix="true" boundary="City-of-Edinburgh_boundary.geojson"
+comp name="Renfrewshire" color="#bbbbbb" fix="true" boundary="Renfrewshire_boundary.geojson"
+comp name="West-Dunbartonshire" color="#bbbbbb" fix="true" boundary="West-Dunbartonshire_boundary.geojson"
+comp name="West-Lothian" color="#bbbbbb" fix="true" boundary="West-Lothian_boundary.geojson"
+comp name="Angus" color="#bbbbbb" fix="true" boundary="Angus_boundary.geojson"
+comp name="Dundee-City" color="#bbbbbb" fix="true" boundary="Dundee-City_boundary.geojson"
+comp name="East-Dunbartonshire" color="#bbbbbb" fix="true" boundary="East-Dunbartonshire_boundary.geojson"
+comp name="Fife" color="#bbbbbb" fix="true" boundary="Fife_boundary.geojson"
+comp name="Perth-and-Kinross" color="#bbbbbb" fix="true" boundary="Perth-and-Kinross_boundary.geojson"
+comp name="Glasgow-City" color="#bbbbbb" fix="true" boundary="Glasgow-City_boundary.geojson"
+comp name="North-Lanarkshire" color="#bbbbbb" fix="true" boundary="North-Lanarkshire_boundary.geojson"
+
+
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" file="init-pop-sim-People.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="β" value="0.0000001" prior="uniform(0,1)"
+param name="γ" value="0.05" prior="uniform(0,1)"
+param name="η" value="0.00000005" prior="uniform(0,0.1)"
+param name="M_l,l'" constant="constant-M.csv"
+
+

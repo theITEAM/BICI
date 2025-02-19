@@ -1,8 +1,7 @@
 "use strict";
-/// Functions which deal with annotations on the model
+// Functions which deal with annotations on the model
 
-
-/// Adds all the buttons associated with annotation
+/// Adds all buttons associated with annotation
 function add_annotation_buts(lay)
 {
 	let p = model.get_p();
@@ -20,9 +19,10 @@ function add_annotation_buts(lay)
 					let x = lay.dx/2 + (an.x-cam.x)*cam.scale; 
 					let y = lay.dy/2 + (an.y-cam.y)*cam.scale;	
 
-					let si = an.tesize*cam.scale*cam.ruler;
+					let si = si_anno*(an.size/size_annotation_default)*cam.scale*cam.ruler;
 					let fo = get_font(si);
 					let w = text_width(an.te,fo);
+					
 					lay.add_button({te:an.te, x:x-w/2, y:y-0.5*si, dx:w+1, dy:si, p:p, cl:cl, i:k, si:si, font:fo, type:"LabelText", col:an.color, ac:"LabelText"});
 				}
 				break;
@@ -34,7 +34,7 @@ function add_annotation_buts(lay)
 					
 					for(let k = 0; k < an.comps.length; k++){
 						let na = an.comps[k];
-						let c = find(claa.comp,"name",na);
+						let c = hash_find(claa.hash_comp,na);
 						let co = claa.comp[c];
 					
 						switch(co.type){
@@ -70,17 +70,19 @@ function add_annotation_buts(lay)
 					if(xmin == xmax || ymin == ymax) mar *= 2;
 					
 					let xc = xmin - mar;
-					let yc = ymin - 1.5*mar;
+					let yc = ymin - mar;
 					let wc = xmax-xmin+2*mar; 
-					let hc = ymax-ymin+2.5*mar;
+					let hc = ymax-ymin+2*mar;
+					
+					let si = si_anno*(an.size/size_annotation_default)*cam.scale*cam.ruler;
 					
 					let x = lay.dx/2 + (xc-cam.x)*cam.scale; 
-					let y = lay.dy/2 + (yc-cam.y)*cam.scale;	
+					let y = lay.dy/2 + (yc-cam.y)*cam.scale - si;	
 	
 					let w = wc*cam.scale; 
-					let h = hc*cam.scale; 
+					let h = hc*cam.scale+si; 
 				
-					lay.add_button({te:an.te, x:x, y:y, dx:w, dy:h, type:"Box", p:p, cl:cl, i:k, col:an.color, ac:"Box", si:an.tesize*cam.scale*cam.ruler});
+					lay.add_button({te:an.te, x:x, y:y, dx:w, dy:h, type:"Box", p:p, cl:cl, i:k, col:an.color, ac:"Box", si:si});
 				}
 				break;
 			
@@ -101,18 +103,18 @@ function add_annotation_map_buts(lay)
 	if(model.species.length == 0 || cl == model.species[p].ncla) return;
 
 	let claa = model.species[p].cla[cl];
-	
-	//lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, ac:"ClassificationBack", type:"Nothing", p:p, cl:cl});
-		
-	let cam = claa.camera;    
+
+	let cam = claa.camera; 
 
 	for(let k = 0; k < claa.annotation.length; k++){
 		let an = claa.annotation[k];
 		switch(an.type){
 			case "map":
 				{
-					for(let i = 0; i < an.feature.length; i++){
-						let fea = an.feature[i];
+					let feature = find_feature(an.map_ref);
+					
+					for(let i = 0; i < feature.length; i++){
+						let fea = feature[i];
 						let box = fea.box;
 					
 						let p1 = trans_point(box.xmin,box.ymin,cam,lay);
@@ -128,20 +130,39 @@ function add_annotation_map_buts(lay)
 	}
 	
 	// Plots labels in latlng view
-	for(let k = 0; k < claa.ncomp; k++){
-		let c = claa.comp[k];
-		if(c.type == "latlng"){
-			let p = trans_point(c.x,c.y,cam,lay);
-			
-			let te = claa.comp[k].name
-			let si = cam.scale*cam.ruler;
-			let fo = get_font(si);
-			let w = text_width(te,fo);
-				
-			lay.add_button({te:te, x:p.x-w/2, y:p.y+0.5*si, dx:w, dy:si, si:si, font:fo, type:"LatLngLabel", col:BLACK});
+	let si = cam.scale*cam.ruler*Math.exp(inter.lnglat_slider.value);
+
+	let fo = get_font(si);
+	if(si > si_limit_label || claa.ncomp < 100){
+		for(let k = 0; k < claa.ncomp; k++){
+			let c = claa.comp[k];
+			if(c.type == "latlng"){
+				let p = trans_point(c.x,c.y,cam,lay);
+				let te = claa.comp[k].name
+		
+				lay.add_button({te:te, x:p.x, y:p.y+1*si, dx:0, dy:0, si:si, type:"LatLngLabel", col:BLACK});
+			}
 		}
 	}
 }
+
+
+/// Finds a feature from a reference
+function find_feature(name)
+{	
+	let k = find(map_store,"name",name); 
+	if(k == undefined) error("Cannot find feature");
+	return map_store[k].feature;
+}	
+
+
+/// Finds a feature from a reference
+function find_map_store(name)
+{	
+	let k = find(map_store,"name",name); 
+	if(k == undefined) error("Cannot find feature");
+	return map_store[k];
+}	
 
 
 /// Transforms a lng lat position into an x,y position 
@@ -160,6 +181,8 @@ function transform_latlng(lng,lat)
 function transform_latlng_inv(x,y)
 {
 	let lng = x*180/Math.PI;
+	while(lng > 180) lng -= 360;
+	while(lng < -180) lng += 360;
 	
 	let sign = 1;
 	if(y < 0){ sign = -1; y = -y;}
@@ -187,98 +210,97 @@ function trans_point_rev(xx,yy,cam,lay)
 	
 	
 /// Loads up a map into the annotations
-function load_annotation_map(te,p,cl,def)
+function load_annotation_map(te)
 {			
 	let data = JSON.parse(te);
 
 	let feature = get_feature(data);
 	if(feature.length == 0){
-		inter.help = {title:"Error loading file", te:"This map has no features"};
+		alert_help("Error loading file","This map has no features");
 		return;
 	}	
 	let box = get_map_bound_box(feature);
 	
-	let claa = model.species[p].cla[cl];
-	
-	claa.annotation.push({type:"map", feature:feature, box:box});
-	
-	set_camera(p,cl);
+	return {type:"map", feature:feature, box:box}
 }
 
 
 /// Loads up a map into compartments
-function load_compartment_map(te,p,cl,def)
-{
-	if(p == undefined) p = model.get_p();
-	if(cl == undefined) cl = model.get_cl();
-				
+function load_compartment_map(te)
+{	
 	let da = JSON.parse(te);
 
 	let feature = get_feature(da);
 	if(feature.length == 0){
-		inter.help = {title:"Error loading file", te:"This map has no features"};
+		alert_help("Error loading file","This map has no features");
 		return;
 	}	
 		
-	start_data_source("CompMap",{},{p:p, cl:cl});
-
 	let tab = get_feature_table(da,feature);
-	data.table.push(tab);
 	
-	let so = inter.edit_source;
-	so.table_loaded = true;
-	so.p = p; so.cl = cl;
-
-	so.data_table_use = data.table.length-1;
-			
-	transfer_column(0);
+	post({type:"Load Comp Map", tab:tab});
 }
 
 
 /// Adds a compartment map
-function add_compartment_map()
+function add_compartment_map(col,so)
 {
-	let so = inter.edit_source;
 	let p = so.p, cl = so.cl;
-	let claa = model.species[p].cla[cl];
+	clear_classification(p,cl);
+	
+	map_store = [];
 	
 	let tab = so.table;
 	let ele = so.table.ele;
 	for(let r = 0; r < tab.nrow; r++){
 		let fea = tab.ele[r][0];
-		model.add_map_compartment(tab.ele[r][1],p,cl,fea,get_mask(fea),MAP_DEFAULT);
+		let res = model.add_map_compartment(tab.ele[r][1],p,cl,fea,get_mask(fea),col,false);
+		output_help(res);
 	}
+}
+
+
+/// Clears a classification such that it can be reloaded
+function clear_classification(p,cl,op)
+{
+	let claa = model.species[p].cla[cl];
+	claa.comp=[]; claa.ncomp=0; claa.hash_comp=[];
+	claa.tra=[]; claa.ntra = 0; claa.hash_tra=[];
+	claa.nsource = 0; claa.nsink = 0;
 	
-	set_camera(p,cl);
-	close_data_source();
+	if(op == undefined){
+		let list = model.find_clones(p,cl);	
+		for(let j = 0; j < list.length; j++){
+			clear_classification(list.p,list.cl,"no");
+		}
+	}
 }
 
 
 /// Adds an individual compartmental bounardy based on file
-function add_individual_compartment_boundary(name,p,cl,file,color)
+function add_individual_compartment_boundary(name,p,cl,file,color,infected)
 {	
 	let tab = import_geojson(file);
-	
-	if(tab == undefined) return;
+	if(tab == undefined) return err("Error importing");
 	
 	for(let c = 1; c < tab.ncol; c++){
 		for(let r = 0; r < tab.nrow; r++){
 			if(tab.ele[r][c] == name){
 				let fea = tab.ele[r][0];
-				model.add_map_compartment(name,p,cl,fea,get_mask(fea),color);
-				return "success";
+				return model.add_map_compartment(name,p,cl,fea,get_mask(fea),color,infected);
 			}
 		}
 	}
  
-	return "'"+name+"' could not be found in the file '"+file+"'";
+	return err("'"+name+"' could not be found in the file '"+file+"'");
 }
 
-
+	
 /// Gets a mask of the feature so that mouse over works
 function get_mask(fea)
 {
-	let can = document.createElement('canvas');
+	const can = new OffscreenCanvas(mask_size,mask_size);
+	
   let cv = can.getContext('2d');
 	
 	can.width = mask_size;
@@ -336,13 +358,14 @@ function set_camera(p,cl)
 }
 
 
-/// Sets the camera ruler (this is used to detemine text size in map view
+/// Sets the camera ruler (this is used to detemine text size in map view)
 function set_ruler(p,cl)
 {
 	let box = get_model_box(p,cl);
 	
 	let claa = model.species[p].cla[cl];
 	let cam = claa.camera;
+
 	switch(cam.coord){
 	case "cartesian":
 		cam.ruler = 1; 
@@ -350,25 +373,23 @@ function set_ruler(p,cl)
 		
 	case "latlng":
 		{
-			cam.ruler = 1/box.scale; 
+			// This sets default ruller size to 2 unit on final page
+		
+			let num = claa.ncomp; if(num == 0) num = 1;
+			let area_per_comp = (page_char_wid-menu_width)*page_char_hei/num;
 			
+			let dist = 0.1*Math.sqrt(area_per_comp);
+			
+			cam.ruler = dist/box.scale; 
+			
+			/*
+			// This works out the average minimum size to nearest compartment
 			let xmin = LARGE, xmax = -LARGE;
 			let ymin = LARGE, ymax = -LARGE;
 			for(let c = 0; c < claa.ncomp; c++){
-				let co = claa.comp[c];
-	
-				if(co.type == "boundary"){
-					if(co.xmid < xmin) xmin = co.xmid; 
-					if(co.xmid > xmax) xmax = co.xmid; 
-					if(co.ymid < ymin) ymin = co.ymid; 
-					if(co.ymid > ymax) ymax = co.ymid; 
-				}
-				else{
-					if(co.x < xmin) xmin = co.x; 
-					if(co.x > xmax) xmax = co.x;
-					if(co.y < ymin) ymin = co.y; 
-					if(co.y > ymax) ymax = co.y;
-				}
+				let p = comp_pos(claa.comp[c]);
+				if(p.x < xmin) xmin = p.x; if(p.x > xmax) xmax = p.x;
+				if(p.y < ymin) ymin = p.y; if(p.y > ymax) ymax = p.y;
 			}
 			
 			let N = 20;
@@ -377,29 +398,29 @@ function set_ruler(p,cl)
 			
 			for(let c = 0; c < claa.ncomp; c++){
 				let co = claa.comp[c];
-				let x, y;
-				if(co.type == "boundary"){ x = co.xmid, y = co.ymid;}
-				else{ x = co.x; y = co.y;}
+				let p = comp_pos(claa.comp[c]);
 				
-				let i = Math.floor(ALMOST_ONE*N*(x-xmin)/(xmax-xmin+TINY));
-				let j = Math.floor(ALMOST_ONE*N*(y-ymin)/(ymax-ymin+TINY));
+				let i = Math.floor(ALMOST_ONE*N*(p.x-xmin)/(xmax-xmin+TINY));
+				let j = Math.floor(ALMOST_ONE*N*(p.y-ymin)/(ymax-ymin+TINY));
 				grid[j*N+i].push(c);
 			}
 			
 			let av = 0, nav = 0;
 			for(let k = 0; k < N*N; k++){
 				let gr = grid[k];
-				if(gr.length > 2){
+				if(gr.length > 1){
 					for(let i = 0; i < gr.length; i++){
 						let min = LARGE;
-						let coi = claa.comp[gr[i]];
+						let pi = comp_pos(claa.comp[gr[i]]);
+				
 						for(let j = 0; j < gr.length; j++){
 							if(j != i){
-								let coj = claa.comp[gr[j]];
-								let d = (coi.x-coj.x)*(coi.x-coj.x) + (coi.y-coj.y)*(coi.y-coj.y);
+								let pj = comp_pos(claa.comp[gr[j]]);
+								let d = (pi.x-pj.x)*(pi.x-pj.x) + (pi.y-pj.y)*(pi.y-pj.y);
 								if(d < min) min = d;
 							}
 						}
+						//av += Math.sqrt(min); nav++;
 						av += Math.sqrt(min); nav++;
 					}
 				}
@@ -407,10 +428,11 @@ function set_ruler(p,cl)
 			
 			if(nav > 0){
 				av /= nav;
-				let rule = 0.15*av;
+				let rule = 0.1*av;
 				if(rule < cam.ruler) cam.ruler = rule;	
 			}
-			
+			*/
+			/*
 			let dx = xmax-xmin, dy = ymax-ymin;
 			let d = dx; if(dy > d) d = dy;
 			
@@ -418,10 +440,12 @@ function set_ruler(p,cl)
 				if(cam.ruler < 0.05) cam.ruler = 0.05;
 			}
 			else{
-				if(cam.ruler > 0.1*d) cam.ruler = 0.1*d;
+				if(cam.ruler > 0.1*d){
+					cam.ruler = 0.1*d;
+				}
 			}
+			*/
 		}
-	
 		break;
 
 	default: error("Option not recognised 3"); break;
@@ -429,7 +453,15 @@ function set_ruler(p,cl)
 }
 
 
-// Gets a box surrounding the complete model
+/// Gets the position of a compartment
+function comp_pos(co)
+{
+	if(co.type == "boundary") return {x:co.xmid, y:co.ymid};
+	return {x:co.x, y:co.y};
+}
+
+
+/// Gets a box surrounding the complete model
 function get_model_box(p,cl)
 {
 	let claa = model.species[p].cla[cl];
@@ -443,12 +475,15 @@ function get_model_box(p,cl)
 
 		switch(co.type){
 		case "boundary":
-			let box = co.feature.box;
-				
-			if(box.xmin < xmin) xmin = box.xmin; 
-			if(box.xmax > xmax) xmax = box.xmax; 
-			if(box.ymin < ymin) ymin = box.ymin; 
-			if(box.ymax > ymax) ymax = box.ymax; 
+			{
+				let feature = find_feature(co.map_ref);
+				let box = feature.box;
+					
+				if(box.xmin < xmin) xmin = box.xmin; 
+				if(box.xmax > xmax) xmax = box.xmax; 
+				if(box.ymin < ymin) ymin = box.ymin; 
+				if(box.ymax > ymax) ymax = box.ymax; 
+			}
 			break;
 			
 		case "box": case "latlng":
@@ -476,40 +511,58 @@ function get_model_box(p,cl)
 	for(let i = 0; i < claa.annotation.length; i++){
 		let anno = claa.annotation[i];
 
-		if(!(anno.type == "map" && anno.feature.length == 248)){		
+		let ms;
+		if(anno.type == "map"){
+			let i = find(map_store,"name",anno.map_ref);
+			if(i == undefined) error("Cannot find map");
+			ms = map_store[i];
+		}
+
+		if(!(ms && ms.feature.length == 248)){	
 			switch(anno.type){
-			case "label":
+			case "text":
 				if(anno.x < xmin) xmin = anno.x; 
 				if(anno.x > xmax) xmax = anno.x;
 				if(anno.y < ymin) ymin = anno.y; 
 				if(anno.y > ymax) ymax = anno.y;
 				break;
 				
+			case "box":
+				break;
+				
 			case "map":
-				let box = anno.box;
+				let box = ms.box;
 				if(box.xmin < xmin) xmin = box.xmin;
 				if(box.xmax > xmax) xmax = box.xmax;
 				if(box.ymin < ymin) ymin = box.ymin;
 				if(box.ymax > ymax) ymax = box.ymax;
 				break;
 
-			default: error("Option not recognised 5"); break;
+			default: error("Option not recognised 5"+anno.type); break;
 			}		
 		}
 	}
-	
-	let scalex = 0.7*(page_char_wid-menu_width)/(xmax-xmin); 
-	if(cam.coord == "cartesian" && scalex > 1) scalex = 1;
-	
-	let scaley = 0.7*page_char_hei/(ymax-ymin);
-	if(cam.coord == "cartesian" && scaley > 1) scaley = 1;
+
+	let unset = false;
 
 	let scale;
-	if(scalex < scaley) scale = scalex;
-	else scale = scaley;
+	if(xmin == LARGE || xmax == xmin){
+		scale = cam.scale;
+		unset = true;
+	}
+	else{
+		let scalex = 0.7*(page_char_wid-menu_width)/(xmax-xmin); 
+		if(cam.coord == "cartesian" && scalex > 1) scalex = 1;
+		
+		let scaley = 0.7*page_char_hei/(ymax-ymin);
+		if(cam.coord == "cartesian" && scaley > 1) scaley = 1;
+
+		
+		if(scalex < scaley) scale = scalex;
+		else scale = scaley;
+	}
 	
-	let unset = false; if(xmin == LARGE) unset = true;
-	
+		
 	return {unset:unset, xmin:xmin, xmax:xmax, ymin:ymin, ymax:ymax, scale:scale};
 }
 
@@ -561,7 +614,7 @@ function get_feature(data)
 		default: error(geo[j].type+" Type not syported"); break;
 		}
 	
-		/// Transforms lng lat to x y 
+		// Transforms lng lat to x y 
 		for(let i = 0; i < polygon.length; i++){
 			let points = polygon[i].cor;
 			for(let j = 0; j < points.length; j++){
@@ -633,7 +686,7 @@ function get_feature_table(da,feature)
 		}
 	}
 
-	return {filename:data.filename, heading:heading, col_used:[], ele:ele, ncol:heading.length, nrow:nrow, edit:false};
+	return {filename:"file", heading:heading, col_used:[], ele:ele, ncol:heading.length, nrow:nrow, edit:false};
 }
 
 	
@@ -650,7 +703,7 @@ function remove_annotation_init()
 		let an = anno[i];
 		let te;
 		switch(an.type){
-		case "map": te = "Map with "+an.feature.length+" features";	break;
+		case "map": te = "Map with "+find_feature(an.map_ref).length+" features";	break;
 		case "text": te = "Label '"+an.te+"'"; break;
 		case "box": te = "Box with text '"+an.te+"'"; break;
 		default: error("Annotation type not recognised"); break;
@@ -666,7 +719,6 @@ function remove_annotation_init()
 	inter.bubble.rem_annotation = { w:wmax, p:p, cl:cl, list:list};
 	change_bubble_mode("remove");
 }
-
 	
 	
 /// Adds a scrollable list to allow for removal of annotations
@@ -688,10 +740,24 @@ function delete_annotation()
 {
 	let rem = inter.bubble.rem_annotation;
 	let anno = model.species[rem.p].cla[rem.cl].annotation;
-	
+
 	for(let j = anno.length-1; j >= 0; j--){
-		if(rem.list[j].box.check == true) anno.splice(j,1);
+		if(rem.list[j].box.check == true){
+			let ann = anno[j];
+			if(ann.type == "map") delete_map_store(anno[j].map_ref);
+		
+			anno.splice(j,1);
+		}
 	}		
+}
+
+
+/// Deletes an element in map_list
+function delete_map_store(na)
+{
+	let k = find(map_store,"name",na);
+	if(k == undefined) error("cannot delete map store");
+	map_store.splice(k,1);
 }
 
 
@@ -703,9 +769,11 @@ function zoom_factor(p,cl,fac)
 	let cam;
 
 	if(show == true) cam = model.species[p].cla[cl].camera;
-	else cam = inter.graph.op.species[p].cla[cl].camera;
+	else cam = inter.graph.get_cla(p,cl).camera;
 	
 	cam.scale *= fac;
+	
+	model.ensure_lng(cam);
 	
 	if(show == true) clone_camera(p,cl);
 }
@@ -715,14 +783,20 @@ function zoom_factor(p,cl,fac)
 function zoom_double_click(p,cl)
 {
 	let mx = inter.mx, my = inter.my;
-	let lay = get_lay("Main");
+	let lay;
 	
 	let show = model.get_show_model();
 	
 	let cam;
-	if(show == true) cam = model.species[p].cla[cl].camera;
-	else cam = inter.graph.op.species[p].cla[cl].camera;
-	
+	if(show == true){
+		cam = model.species[p].cla[cl].camera;
+		lay = get_lay("Main");
+	}
+	else{
+		cam = inter.graph.get_cla(p,cl).camera;
+		lay = get_lay("GraphCompartments");
+	}
+
 	let x = mx-lay.x, y = my-lay.y;
 	
 	let f = 0.25;
@@ -734,42 +808,6 @@ function zoom_double_click(p,cl)
 	cam.y = rev.y; 
 	
 	zoom_factor(p,cl,1.3);
-}
-
-
-/// Loads map
-function load_map(val,p,cl)                                   
-{	 
-	start_loading_symbol(0);
-	inter.load_map = {p:p, cl:cl};
-	
-	let file = "D:/BICI_nolongerused/Maps/"+val+".json"; // TO DO turn off	
-	//let file = "Maps/"+val+".json";
-
-	//let xmlhttp = new XMLHttpRequest();  
-	xmlhttp.abort();
-	
-	xmlhttp.addEventListener("progress", function(ev) { 
-		inter.loading_symbol.percent = Math.floor(100*ev.loaded/ev.total);
-	});
-	
-	xmlhttp.addEventListener("loadend",function(){
-		stop_loading_symbol();
-		let p = inter.load_map.p;
-		let sp = model.species[p];
-		let cl = inter.load_map.cl;
-	
-		load_annotation_map(xmlhttp.responseText,p,cl);
-		
-		let cam = sp.cla[cl].camera;
-		let po = transform_latlng(0,40);
-		cam.x = po.x;
-		cam.y = po.y;
-		cam.scale = (page_char_wid-menu_width)/(2*Math.PI);
-		generate_screen();
-	});
-	
-	xmlhttp.open("GET",file,true); xmlhttp.send();
 }
 
 
@@ -809,7 +847,7 @@ function add_box()
 		}
 	}
 
-	claa.annotation.push({type:"box", te:"", tesize:si_annotation, comps:comps, color:BLACK});
+	claa.annotation.push({type:"box", te:"", size:size_annotation_default, comps:comps, color:annotation_col_default});
 }
 
 
@@ -830,8 +868,8 @@ function generate_JSON_feature(name,feature)
 				let x = box.xmin + cor[i][j][k][0]*(box.xmax-box.xmin);
 				let y = box.ymin + cor[i][j][k][1]*(box.ymax-box.ymin);
 				let p = transform_latlng_inv(x,y);
-				cor[i][j][k][0] = p.lng;
-				cor[i][j][k][1] = p.lat;
+				cor[i][j][k][0] = Number(precision(p.lng,6));
+				cor[i][j][k][1] = Number(precision(p.lat,6));
 			}
 		}
 	}
@@ -839,4 +877,29 @@ function generate_JSON_feature(name,feature)
 	let fea = { type:"Feature", geometry:{type:"MultiPolygon", coordinates:cor}, properties:{name:name}};
 
 	return fea;
+}
+
+
+/// Loads a map from worker reply
+function load_map(ans)
+{
+	let p = ans.info.p, cl = ans.info.cl; 
+	
+	let name = "file"+Math.random();
+	map_store.push({name:name, feature:ans.feature, box:ans.box});
+	
+	let claa = model.species[p].cla[cl];
+	claa.annotation.push({type:"map", map_ref:name, default_map:ans.info.default_map});
+	
+	set_camera(p,cl);
+	
+	if(ans.info.default_map == true){
+		claa.default_map = true;
+		
+		let cam = claa.camera;
+		let po = transform_latlng(0,40);
+		cam.x = po.x;
+		cam.y = po.y;
+		cam.scale = (page_char_wid-menu_width)/(2*Math.PI);
+	}
 }

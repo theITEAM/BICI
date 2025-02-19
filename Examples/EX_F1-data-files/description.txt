@@ -1,0 +1,21 @@
+# Example F1: Reparameterisation
+
+## Objective
+- Here we introduce a farm-based model with reparameterisation.
+- A matrix of interactions $M_l,l'$ represents transmission of infection between farms.
+- It is reparameterised as a power-law distribution kernel 1/(1+pow($D_l,l'$/$Δ$|$α$)).
+- $D_l,l'$ is a reserved parameter in BICI which gives the distance between locations.
+- A maximum interaction distance is set which is used to significantly speed up the algorithm (because distant interactions of negligible effect are removed).
+
+## Data
+- Event times known.
+
+## Model
+- A single population-based species 'Farm' is created.
+- This contains classifications 'DS', which stands for 'disease status', and 'Location'.
+- DS contains three compartments: susceptible farm $S$, infected farm $I$ and recovered farm $R$.
+- A transmission rate $β$ determines the rate at which infected farms transmit disease to surrounding farms.
+- A recovery rate $γ$ determines how quickly farms recover.
+
+## Population
+- A single individual is added to each farm location. All farms are initially susceptible except for one infected.

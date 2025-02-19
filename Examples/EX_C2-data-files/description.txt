@@ -1,0 +1,18 @@
+# Example C2: Incomplete transition events - recovery only
+
+## Objective
+- Show an inference example where only recovery transition events are known.
+- We see that it is still possible to infer $β$ and $γ$, albeit with more uncertainty.
+
+## Data
+- Recovery times for individuals in an SIR model
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A recovery rate $γ$ determines the rate at which individuals recover.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

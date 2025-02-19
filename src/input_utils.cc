@@ -5,7 +5,6 @@
 #include <iostream>
 #include <fstream>
 #include <cmath>
-//#include <sys/stat.h>
 #include "json.hpp" // This is a JSON parser from https://github.com/nlohmann/json
 
 using namespace std;
@@ -14,7 +13,6 @@ using json = nlohmann::json;
 
 #include "input.hh"
 #include "utils.hh"
-
 
 /// Returns the species number from its name
 unsigned int Input::find_p(string name) const 
@@ -51,37 +49,11 @@ unsigned int Input::find_cl_index(unsigned int p, string index) const
 /// Returns the compartment number from its name
 unsigned int Input::find_c(unsigned int p, unsigned int cl, string name) const 
 {
-	const auto &comp = model.species[p].cla[cl].comp;
-	for(auto c = 0u; c < comp.size(); c++){
-		if(comp[c].name == name) return c;
-	}
-	return UNSET;
+	//const auto &claa = model.species[p].cla[cl];
+	//auto vec = claa.hash_comp.get_vec_string(name);
+	//return claa.hash_comp.existing(vec);
+	return model.species[p].cla[cl].hash_comp.find(name);
 }
-
-
-/// Returns the transition number from its name
-unsigned int Input::find_tr(unsigned int p, unsigned int cl, string name) const 
-{
-	const auto &tra = model.species[p].cla[cl].tra;
-	for(auto tr = 0u; tr < tra.size(); tr++){
-		if(tra[tr].name == name) return tr;
-	}
-	return UNSET;
-}
-
-
-/*
-/// Clones the compatments from one classification to another
-void Input::clone_compartments(unsigned int p_from, unsigned int cl_from, unsigned int p_to, unsigned int cl_to)
-{
-	auto &cla_from = model.species[p_from].cla[cl_from];
-	auto &cla_to = model.species[p_to].cla[cl_to];
-	cla_to.comp = cla_from.comp;
-	cla_to.ncomp = cla_from.ncomp;
-	cla_to.tra.resize(0);
-	cla_to.ntra = 0;
-}
-*/
 
 
 /// Checks that it is OK to access claa
@@ -155,63 +127,55 @@ bool Input::check_comp_exist(string name, unsigned int p)
 /// Loads a table from a file
 Table Input::load_table(const string file)
 {
+	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
+	if(i == files.size()) alert_import("Could not find '"+file+"'");
+	
+	const auto &fs = files[i];
+	
 	Table tab; tab.error = false;
-		
-	char sep = ',';
-	if(file.length() > 4){
-		auto end = file.substr(file.length()-4);
-		if(end == ".txt" || end == ".tsv") sep = '\t';
-	}
 	
-	if(datadir == ""){ alert_import("'datadir' must be first set"); tab.error = true; return tab;}
+	auto sep = fs.sep;
 	
-	auto filefull = datadir+"/"+file;
-	ifstream in(filefull);
-	if(!in){ alert_import("Cannot open the file '"+filefull+"'."); tab.error = true; return tab;}
+	tab.file = fs.name;
 	
-	tab.file = file;
-	
-	string line;
-	
-	do{
-		getline(in,line);
-	}while(line.substr(0,1) == "#");
-		
-	if(com_op == false) cout << "Loaded table '" << file << "'." << endl;
+	auto lines = fs.lines;
 
-	remove_cr(line);
+	auto j = 0u;
+	while(j < lines.size() && lines[j].substr(0,1) == "#") j++;
 
-	tab.heading = split(line,sep);
+	remove_cr(lines[j]);
 	
+	tab.heading = split(lines[j],sep);
+
 	for(auto &val : tab.heading) val = trim(remove_quote(val));
+	j++;
 
 	tab.ncol = tab.heading.size();
-	
-	do{
-		getline(in,line);
-		if(in.eof()) break;
+	while(j < lines.size()){
+		remove_cr(lines[j]);
+		if(lines[j] != ""){
+			auto vec = split(lines[j],sep);
+		
+			if(vec.size() != tab.ncol){
+				alert_import("Rows in the file '"+file+"' do not all share the same number of columns.");
+				tab.error = true; 
+				return tab;
+			}
 
-		remove_cr(line);
-
-		auto vec = split(line,sep);
-	
-		if(vec.size() != tab.ncol){
-			alert_import("Rows in the file '"+file+"' do not all share the same number of columns.");
-			tab.error = true; 
-			return tab;
+			for(auto &val : vec) val = trim(remove_quote(val));
+		
+			tab.ele.push_back(vec);
 		}
-
-		for(auto &val : vec) val = trim(remove_quote(val));
+		j++;
+	}
 	
-		tab.ele.push_back(vec);
-	}while(true);
 	tab.nrow = tab.ele.size();
 	
 	return tab;
 }
 
 
-/// Gets a subtable based on a series of column heading names
+/// Gets a sub-table based on a series of column heading names
 Table Input::get_subtable(const Table &tab, const vector <string> &col_name)
 {
 	Table table;
@@ -221,10 +185,12 @@ Table Input::get_subtable(const Table &tab, const vector <string> &col_name)
 	table.nrow = tab.nrow;
 	table.heading = col_name;
 	table.ele.resize(tab.nrow);
-
+	
 	vector <unsigned int> col;
 	for(auto i = 0u; i < col_name.size(); i++){
-		auto c = find_string_in(tab.heading,col_name[i]);
+		auto cname = col_name[i];
+		
+		auto c = find_string_in(tab.heading,cname);
 		if(c == UNSET){
 			alert_import("Cannot find heading '"+col_name[i]+"' in the file '"+tab.file+"'");
 			table.error = true;
@@ -243,21 +209,73 @@ Table Input::get_subtable(const Table &tab, const vector <string> &col_name)
 }
  
 
-/// Gets the classification from the compartment name
+/// Gets the classification from the compartment name (or if formated using S|E or S:0.5|E:1) 
 unsigned int Input::get_cl_from_comp(string name, unsigned int p) const
 {
 	const auto &sp = model.species[p];
-	for(auto cl = 0u; cl < sp.ncla; cl++){
-		const auto &claa = sp.cla[cl];
-		for(auto c = 0u; c < claa.ncomp; c++){
-			if(claa.comp[c].name == name) return cl;
+
+	auto spl = split_with_bracket(name,'|');
+	
+	if(spl.size() == 1){	
+		auto spl2 = split(name,':');
+		for(auto cl = 0u; cl < sp.ncla; cl++){
+			const auto &claa = sp.cla[cl];
+			for(auto c = 0u; c < claa.ncomp; c++){
+				if(claa.comp[c].name == spl2[0]) return cl;
+			}
 		}
 	}
+	else{
+		auto cl_st = UNSET;
+		for(auto i = 0u; i < spl.size(); i++){
+			auto cl = get_cl_from_comp(spl[i],p);
+			if(cl_st == UNSET) cl_st = cl;
+			else{
+				if(cl_st != cl) return UNSET;
+			}
+		}
+		return cl_st;
+	}
+	
 	return UNSET;
 }
 
 
-/// Finds a value in list of string case-independent
+/// Gets the classification from the trans name (or if formated using S->E|E->I or S->E:0.5|E->I:1) 
+unsigned int Input::get_cl_from_trans(string name, unsigned int p) const
+{
+	const auto &sp = model.species[p];
+	
+	name = replace(name,"->","→");
+
+	auto spl = split_with_bracket(name,'|');
+	
+	if(spl.size() == 1){	
+		auto spl2 = split(name,':');
+		for(auto cl = 0u; cl < sp.ncla; cl++){
+			const auto &claa = sp.cla[cl];
+			for(auto c = 0u; c < claa.ntra; c++){
+				if(claa.tra[c].name == spl2[0]) return cl;
+			}
+		}
+	}
+	else{
+		auto cl_st = UNSET;
+		for(auto i = 0u; i < spl.size(); i++){
+			auto cl = get_cl_from_trans(spl[i],p);
+			if(cl_st == UNSET) cl_st = cl;
+			else{
+				if(cl_st != cl) return UNSET;
+			}
+		}
+		return cl_st;
+	}
+	
+	return UNSET;
+}
+
+
+/// Finds a value in list of strings (case-independent)
 unsigned int Input::find_string_in(const vector <string> &arr, string val) const 
 {
 	auto i = 0u; while(i < arr.size() && toLower(arr[i]) != toLower(val)) i++;
@@ -272,15 +290,8 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 	auto &load_col = ds.load_col;
 
 	// If time range of transition observation is needed then this adds extra columns to data
-	if(cname == TRANS_DATA || cname == SOURCE_DATA || cname == SINK_DATA){
-		if(ds.time_range == FILE_TIME){
-			switch(cname){
-			case TRANS_DATA: cname = TRANS_TIMERANGE_DATA; break;
-			case SOURCE_DATA: cname = SOURCE_TIMERANGE_DATA; break;
-			case SINK_DATA: cname = SINK_TIMERANGE_DATA; break;
-			default: break;
-			}
-		}
+	if(cname == TRANS_DATA){
+		if(ds.time_range == FILE_TIME) cname = TRANS_TIMERANGE_DATA; 
 	}
 	
 	auto i = 0u; while(i < data_template.size() && data_template[i].cname != cname) i++;
@@ -292,8 +303,10 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 	for(auto c = 0u; c < cols.size(); c++){
 		vector <string> spl = split(cols[c],',');
 		
-		auto type = ColumnType(option_error("cols",spl[0],{"ID","t","snp","cl_prob","cl_all","from","to","pop","alpha","start","end","result","filt_obspop","filt_obspoptrans","filt_settraps","setrap_name","comp_name","start_comp","end_comp"},{ ID_COL, T_COL, SNP_COL, CL_PROB_COL, CL_ALL_COL, FROM_COL, TO_COL, POP_COL, ALPHA_COL, START_COL, END_COL, RESULT_COL, FILT_OBSPOP_COL, FILT_OBSPOPTRANS_COL, FILT_SETTRAPS_COL, SETTRAP_NAME_COL,COMP_NAME_COL, START_COMP_COL, END_COMP_COL }));
-	
+		auto type = ColumnType(option_error("cols",spl[0],{"ID","t","tstart","tend","snp","cl_prob","cl_all","cl_all_prob","from","to","init_pop","add_pop","rem_pop","start","end","result","filt_obspop","filt_obspoptrans","comp_name","start_comp","end_comp",},{ ID_COL, T_COL, TSTART_COL, TEND_COL, SNP_COL, CL_PROB_COL, CL_ALL_COL, CL_ALL_PROB_COL, FROM_COL, TO_COL, INIT_POP_COL, ADD_POP_COL, REM_POP_COL, START_COL, END_COL, RESULT_COL, FILT_OBSPOP_COL, FILT_OBSPOPTRANS_COL, COMP_NAME_COL, START_COMP_COL, END_COMP_COL,  }));
+		
+		if(type == SNP_COL && ds.gen_data_type == MATRIX_DATA) type = GENOBS_COL;
+		
 		switch(type){
 			case ID_COL:
 				load_col.push_back(LoadCol("ID","individual ID",TEXT_EL));
@@ -302,9 +315,21 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 			case T_COL:
 				load_col.push_back(LoadCol("t",spl[1],TIME_FLOAT_EL));
 				break;
+				
+			case TSTART_COL:
+				load_col.push_back(LoadCol("Start","measurement start time",TIME_FLOAT_EL));
+				break;
+			
+			case TEND_COL:
+				load_col.push_back(LoadCol("End","measurement end time",TIME_FLOAT_EL));
+				break;
 
 			case SNP_COL:
 				load_col.push_back(LoadCol("SNP",spl[1],TEXT_EL));
+				break;
+				
+			case GENOBS_COL:
+				load_col.push_back(LoadCol("Obs","Observation ID",TEXT_EL));
 				break;
 
 			case CL_PROB_COL:
@@ -320,16 +345,38 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 
 			case CL_ALL_COL:
 				{
-					if(cname == INIT_POP && ds.focal_cl != UNSET){
-						load_col.push_back(LoadCol("Compartment","Comparment",COMP_ALL_EL));
-					}
-					else{
-						auto p = ds.p; if(p == UNSET){ alert_import("p should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ alert_import("p should be defined"); return false;}
 						
-						const auto &sp = model.species[p];
+					const auto &sp = model.species[p];
+					
+					switch(cname){
+					case INIT_POP: 
+						if(ds.focal_cl != UNSET){
+							load_col.push_back(LoadCol("Compartment","comparment",COMP_ALL_EL));
+						}
+						else{
+							for(auto cl = 0u; cl < sp.ncla; cl++){
+								load_col.push_back(LoadCol(sp.cla[cl].name,"'"+sp.cla[cl].name+"'",COMP_EL,cl));
+							}
+						}
+						break;
+						
+					default:
 						for(auto cl = 0u; cl < sp.ncla; cl++){
 							load_col.push_back(LoadCol(sp.cla[cl].name,"'"+sp.cla[cl].name+"' into which individuals are added",COMP_EL,cl));
 						}
+						break;
+					}
+				}
+				break;
+				
+			case CL_ALL_PROB_COL:
+				{
+					auto p = ds.p; if(p == UNSET){ alert_import("p should be defined"); return false;}
+						
+					const auto &sp = model.species[p];
+					for(auto cl = 0u; cl < sp.ncla; cl++){
+						load_col.push_back(LoadCol(sp.cla[cl].name,"'"+sp.cla[cl].name+"' into which individuals are added",COMP_PROB_EL,cl));
 					}
 				}
 				break;
@@ -354,19 +401,40 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 				}
 				break;
 
-			case POP_COL:
-				if(cname == INIT_POP && ds.focal_cl != UNSET){
-					load_col.push_back(LoadCol("Population","the population",POS_FLOAT_PERCENT_EL));
+			case INIT_POP_COL:
+				if(ds.cname != INIT_POP) emsg("Should be init pop");
+			
+				switch(ds.init_pop_type){
+				case INIT_POP_FIXED: 
+					if(ds.focal_cl != UNSET){
+						load_col.push_back(LoadCol("Population","the population",POS_FLOAT_PERCENT_EL));
+					}
+					else{
+						load_col.push_back(LoadCol("Population","the population",POS_ZERO_FLOAT_EL));
+					}
+					break;
+				
+				case INIT_POP_DIST:
+					if(ds.focal_cl != UNSET){
+						load_col.push_back(LoadCol("Distribution","the distribution/α value",PRIOR_DIR_EL));
+					}
+					else{
+						load_col.push_back(LoadCol("Alpha","the alpha value",POS_FLOAT_EL));
+					}
+					break;
+					
+				default: emsg("Def op wrong"); break;
 				}
-				else{
-					load_col.push_back(LoadCol("Population","the population",POS_ZERO_FLOAT_EL));
-				}
-				break;
-
-			case ALPHA_COL:
-				load_col.push_back(LoadCol("Alpha","the alpha value",POS_FLOAT_EL));
 				break;
 		
+			case ADD_POP_COL:
+				load_col.push_back(LoadCol("Population","the population added",POS_FLOAT_EL));
+				break;
+				
+			case REM_POP_COL:
+				load_col.push_back(LoadCol("Population","the population removed",POS_FLOAT_EL));
+				break;
+			
 			case START_COL:
 				load_col.push_back(LoadCol("Start","the observation start time",FLOAT_EL));
 				break;
@@ -381,68 +449,65 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 				
 			case FILT_OBSPOP_COL:
 				{
-					const auto &filt = ds.comp_filt;
-					
 					auto p = ds.p; if(p == UNSET){ alert_import("p should be defined"); return false;}
-
-					const auto &sp = model.species[p];
+					auto &sp = model.species[p];
+					
+					const auto filt = sp.set_comp_filt(ds.filter_str,UNSET,LOWER_BOUND,ds);
 					
 					for(auto cl = 0u; cl < sp.ncla; cl++){
 						if(filt.cla[cl].type == FILE_FILT){
-							load_col.push_back(LoadCol(sp.cla[cl].name,"'"+sp.cla[cl].name+"' which specifies sub-population",MULTI_COMP_EL));
+							load_col.push_back(LoadCol(sp.cla[cl].name,"'"+sp.cla[cl].name+"' which specifies sub-population",COMP_PROB_EL,cl));
 						}
 					}
 				
 					load_col.push_back(LoadCol("Population","the observed population estimates",POS_ZERO_FLOAT_EL));
 					
-					if(ds.obs_model.type == FILE_OBSMOD){
-						load_col.push_back(LoadCol("sd","the standard deviation in population estimates",POS_FLOAT_EL));
+					switch(ds.obs_model.type){
+					case NORMAL_FILE_OBSMOD:
+						load_col.push_back(LoadCol("SD","the standard deviation in population estimates",POS_FLOAT_EL));
+						break;
+						
+					case NEGBIN_FILE_OBSMOD:
+						load_col.push_back(LoadCol("p","the probability p in negative binomial error",ZERO_ONE_EL));
+						break;
+						
+					default: break;
 					}
 				}
 				break;
 				
 			case FILT_OBSPOPTRANS_COL:
-				{	
-					const auto &filt = ds.comp_filt;
-						
+				{		
 					auto p = ds.p; if(p == UNSET){ alert_import("p should be defined"); return false;}
 					auto cl = ds.cl; if(cl == UNSET){ alert_import("cl should be defined"); return false;}
+					auto &sp = model.species[p];
 					
-					const auto &sp = model.species[p];
+					const auto filt = sp.set_comp_filt(ds.filter_str,cl,LOWER_BOUND,ds);
+			
 					for(auto cl2 = 0u; cl2 < sp.ncla; cl2++){
 						if(cl2 != cl){
 							if(filt.cla[cl2].type == FILE_FILT){
-								load_col.push_back(LoadCol(sp.cla[cl2].name,"'"+sp.cla[cl2].name+"' which specifies sub-population",COMP_EL));
+								load_col.push_back(LoadCol(sp.cla[cl2].name,"'"+sp.cla[cl2].name+"' which specifies sub-population",COMP_PROB_EL,cl2));
 							}
 						}
 					}
 					
 					load_col.push_back(LoadCol("Number","the observed number of transitions",POS_ZERO_FLOAT_EL));
 					
-					if(ds.obs_model.type == FILE_OBSMOD){
-						load_col.push_back(LoadCol("sd","the standard deviation in population estimates",POS_FLOAT_EL));
+					switch(ds.obs_model.type){
+					case NORMAL_FILE_OBSMOD:
+						load_col.push_back(LoadCol("SD","the standard deviation in population transition estimates",POS_FLOAT_EL));
+						break;
+						
+					case NEGBIN_FILE_OBSMOD:
+						load_col.push_back(LoadCol("p","the probability p in negative binomial error",ZERO_ONE_EL));
+						break;
+					
+					default: break;
 					}
 				}
 				break;
 			
-			case FILT_SETTRAPS_COL:
-				{
-					const auto &filt = ds.comp_filt;
-					auto p = ds.p; if(p == UNSET){ alert_import("p should be defined"); return false;}
-					
-					const auto &sp = model.species[p];
-					for(auto cl = 0u; cl < sp.ncla; cl++){
-						if(filt.cla[cl].type == FILE_FILT){
-							load_col.push_back(LoadCol(sp.cla[cl].name,"'"+sp.cla[cl].name+"' which specifies sub-population",COMP_EL));
-						}
-					}
-				}
-				break;
-
-			case SETTRAP_NAME_COL:
-				load_col.push_back(LoadCol("Name","the unique name for the trapping event",TEXT_EL));
-				break;
-
 			case COMP_NAME_COL:
 				load_col.push_back(LoadCol("Name","the compartment name",TEXT_EL));
 				break;
@@ -461,9 +526,37 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 }
 
 
+/// Sets the columns which need to be loaded SNP data
+void Input::set_SNP_columns(const Table &tab, DataSource &ds)
+{
+	auto root = ds.SNP_root;
+	auto len = root.length();
+	
+	ds.load_col.pop_back();
+	
+	for(auto c = 0u; c < tab.ncol; c++){
+		auto head = tab.heading[c];
+		if(head.length() >= len && head.substr(0,len) == root){
+			ds.load_col.push_back(LoadCol(head,"SNP value",TEXT_EL));
+		}
+	}
+}
+
+
+/// Sets the columns which need to be loaded in matrix data
+void Input::set_genetic_matrix_columns(const Table &tab, DataSource &ds)
+{
+	auto c = ds.load_col.size()-1;
+	for(auto r = 0u; r < tab.ele.size(); r++){
+		ds.load_col.push_back(LoadCol(tab.ele[r][c],"Matrix data",POS_INT_EL));
+	}
+}
+
+
 /// Loads up the observation model
 void Input::load_obs_model(ObsModel &om)
 {
+	/*
 	auto error = get_tag_value("error"); if(error == ""){ cannot_find_tag(); return;}
 			
 	auto spl = split(error,':');
@@ -507,6 +600,82 @@ void Input::load_obs_model(ObsModel &om)
 			}
 		}
 	}
+	*/
+	
+	auto error = get_tag_value("error"); if(error == ""){ cannot_find_tag(); return;}
+			
+	auto spl = split(error,':');
+
+	auto str = toLower(spl[0]);
+	if(str == "normal"){
+		if(spl.size() != 2) alert_import("Problem with expression '"+error+"'");
+	
+		auto val = trim(spl[1]);
+		
+		if(toLower(val) == "file"){
+			om.type = NORMAL_FILE_OBSMOD;
+		}
+		else{
+			if(is_percent(val) == true){
+				om.type = NORMAL_PERCENT_OBSMOD;
+				om.percent = number(val.substr(0,val.length()-1));
+				if(om.percent == UNSET){
+					alert_import("The expression '"+tstr(om.percent)+"' is not a percentage");
+					return;
+				}
+				
+				if(om.percent <= 0){
+					alert_import("The value '"+tstr(om.percent)+"%' must be a positive percentage");
+					return;
+				}
+			}	
+			else{
+				om.type = NORMAL_SD_OBSMOD;
+				om.sd = number(val);
+				if(om.sd == UNSET){
+					alert_import("The expression '"+val+"' must be a number or a percentage");
+					return;
+				}
+				
+				if(om.sd <= 0){
+					alert_import("The value '"+tstr(om.sd)+"' must be positive");
+					return;
+				}
+			}
+		}
+	}
+	else{
+		if(str == "poisson"){
+			if(spl.size() != 1) alert_import("Problem with expression '"+error+"'");
+			om.type = POISSON_OBSMOD;
+		}
+		else{
+			if(str == "neg-binomial"){
+				if(spl.size() != 2) alert_import("Problem with expression '"+error+"'");
+	
+				auto val = trim(spl[1]);
+			
+				if(toLower(val) == "file"){
+					om.type = NEGBIN_FILE_OBSMOD;
+				}
+				else{
+					om.type = NEGBIN_OBSMOD;
+					om.p = number(val);
+						
+					if(om.p == UNSET){
+						alert_import("The expression '"+val+"' must be a number");
+					}
+					
+					if(om.p <= 0 || om.p >= 1){
+						alert_import("The value '"+val+"' must be between zero and one");
+					}
+				}
+			}
+			else{
+				alert_import("Problem with expression '"+error+"'");
+			}
+		}
+	}
 }
 
 
@@ -530,11 +699,12 @@ CompRef Input::find_comp_from_name(unsigned int p, string te) const
 		const auto &sp = model.species[p];
 		for(auto cl = 0u; cl < sp.ncla; cl++){
 			const auto &claa = sp.cla[cl];
-			for(auto c = 0u; c < claa.ncomp; c++){
-				if(claa.comp[c].name == te){
-					CompRef cr; cr.p = p; cr.cl = cl; cr.c = c; cr.error = "";
-					return cr;
-				}
+			//auto vec = claa.hash_comp.get_vec_string(te);
+			//auto c = claa.hash_comp.existing(vec);
+			auto c = claa.hash_comp.find(te);
+			if(c != UNSET){
+				CompRef cr; cr.p = p; cr.cl = cl; cr.c = c; cr.error = "";
+				return cr;
 			}
 		}
 	}
@@ -548,8 +718,13 @@ CompRef Input::find_comp_from_name(unsigned int p, string te) const
 unsigned int Input::import_geojson(string file)
 {
 	if(check_char_allowed(file,"/<>:\"\\|?*") == false) return UNSET;
+
+	//if(datadir == ""){ alert_import("'datadir' must be first set"); return UNSET;}
 	
-	if(datadir == ""){ alert_import("'datadir' must be first set"); return UNSET;}
+	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
+	if(i == files.size()) alert_import("Could not find '"+file+"'");
+	
+	const auto &fs = files[i];
 	
 	for(auto i = 0u; i < geo_json.size(); i++){
 		if(geo_json[i].file == file) return i;
@@ -557,12 +732,12 @@ unsigned int Input::import_geojson(string file)
 	
 	GeoJSON gj; gj.file = file;
 	
-	file = datadir+"/"+file;
+	stringstream ss;
+	for(const auto &li : fs.lines){
+		ss << li << endl;
+	}
 	
-	ifstream f(file);
-	if(!f) emsg("File '"+file+"' could not be loaded");
-	
-	json data = json::parse(f);
+	json data = json::parse(ss.str());
 	
 	for(const auto &ob : data.items()){
 		if(ob.key() == "features"){
@@ -696,7 +871,6 @@ void Input::set_reparam_element(vector <EquationInfo> &value, const vector <Depe
 }
 
 
-
 /// Sets the text value of an element based on a dependency and an index
 void Input::set_prior_element(vector <Prior> &prior, const vector <Dependency> &dep, const vector <unsigned int> &ind, Prior pri)
 {
@@ -734,6 +908,8 @@ void Input::add_to_list(vector <ParamRef> &list, const ParamRef &pr) const
 /// Creates a dependency from an vector of indices
 unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamProp &pp, const vector <string> &knot_times)
 {
+	dep_alter.clear();
+	
 	for(auto i = 0u; i < pp.dep.size(); i++){
 		auto index = pp.dep[i];
 		
@@ -741,8 +917,8 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 		dep.index = index;
 		dep.index_with_prime = pp.dep_with_prime[i];
 		
-		if(index == "t" || index == "a"){
-			if(!(pp.time_dep == true && index == "t") && !(pp.age_dep == true && index == "a")){
+		if(index == "t"){
+			if(!(pp.time_dep == true && index == "t")){
 				alert_import("Problem with dependency"); 
 				return UNSET;
 			}
@@ -769,6 +945,15 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 			if(flag != true){ alert_import("Cannot find the index '"+index+"'"); return UNSET;}
 		}
 		
+		dep.hash_list.create(dep.list);
+		/*
+		for(auto k = 0u; k < dep.list.size(); k++){
+			auto te = dep.list[k];
+			auto vec = dep.hash_list.get_vec_string(te);
+			dep.hash_list.add(k,vec);
+		}
+		*/
+	
 		dep_alter.push_back(dep);
 	}
 		
@@ -779,4 +964,533 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 	}
 	
 	return mult;
+}
+
+
+/// Handles any error message
+EquationInfo Input::he(EquationInfo eqn_inf)
+{
+	eqn_inf.line_num = line_num;
+	
+	if(eqn_inf.error) alert_import(eqn_inf.emsg);	
+	return eqn_inf;
+}	
+
+
+/// Determines if text string is for a file
+bool Input::is_file(string te) const
+{
+	if(te.length() < 4) return false;
+	
+	if(te.substr(0,3) == "[[$" && te.substr(te.length()-3,3) == "&]]")	return true;
+	
+	auto k = te.length()-1;
+	auto kmin = k-10;
+	while(k > 0 && k > kmin && te.substr(k,1) != ".") k--;
+	if(k == 0 || k == kmin) return false;
+	auto end = toLower(te.substr(k));
+	if(end != ".csv" && end != ".txt" && end != ".tsv" && end != ".geojson") return false;
+
+	return true;
+}
+
+
+/// Based on i and a dependency works out the index
+vector <unsigned int> Input::find_index(unsigned int i, const vector <Dependency> &depend) const
+{ 
+	vector <unsigned int> ind;
+	for(auto d = 0u; d < depend.size(); d++){
+		const auto &dep = depend[d];
+		ind.push_back((i/dep.mult)%dep.list.size());
+	}
+	return ind;
+}
+
+
+/// Takes a transition definition and extracts information from it
+TransDef Input::extract_trans_def(string value) const
+{
+	TransDef tdef; tdef.set = false;
+	
+	value = trim(value);
+	if(value == "") return tdef;
+	auto spl = split(value,'(');
+	if(spl.size() == 0) return tdef; 
+	
+	if(value.substr(value.length()-1,1) != ")") return tdef;
+
+	auto ty = toLower(spl[0]);
+	
+	if(ty == "exp"){
+		tdef.rate = get_prop(value,"rate:","end");
+		if(tdef.rate != ""){ tdef.type = EXP_RATE; tdef.set = true;}
+	}
+	
+	if(ty == "gamma"){
+		tdef.mean = get_prop(value,"mean:","cv:");
+		tdef.cv = get_prop(value,"cv:","end");
+		if(tdef.mean != "" && tdef.cv != ""){ tdef.type = GAMMA; tdef.set = true;}
+	}
+	
+	if(ty == "erlang"){
+		tdef.mean = get_prop(value,"mean:","shape:");
+		tdef.shape = get_prop(value,"shape:","end");
+		if(tdef.mean != "" && tdef.shape != ""){ tdef.type = ERLANG; tdef.set = true;}
+	}
+		
+	if(ty == "log-normal"){
+		tdef.mean = get_prop(value,"mean:","cv:");
+		tdef.cv = get_prop(value,"cv:","end");
+		if(tdef.mean != "" && tdef.cv != ""){ tdef.type = LOG_NORMAL; tdef.set = true;}
+	}
+		
+	if(ty == "weibull"){
+		tdef.scale = get_prop(value,"scale:","shape:");
+		tdef.shape = get_prop(value,"shape:","end");
+		if(tdef.scale != "" && tdef.shape != ""){ tdef.type = WEIBULL; tdef.set = true;}
+	}
+		
+	if(ty == "period"){
+		tdef.time = get_prop(value,"time:","end");
+		if(tdef.time != ""){ tdef.type = PERIOD; tdef.set = true;}
+	}
+	
+	return tdef;
+}
+
+
+/// Tries to get a property from a string
+string Input::get_prop(string value, string prop, string end) const
+{
+	auto i = value.find(prop,0);
+
+	if(i != string::npos){
+		i += prop.length();
+		if(end == "end"){
+			return trim(value.substr(i,value.length()-1-i));
+		}
+		else{
+			auto i2 = value.find(end,0);
+			if(i2 != string::npos){
+				while(i2 > 0 && value.substr(i2,1) != ",") i2--;
+				if(i2 > 0){
+					return trim(value.substr(i,i2-i));
+				}
+			}
+		}
+	}
+	
+	return "";
+}
+
+
+/// Displays text referencing a file/table
+string Input::in_file_text(string te) const 
+{
+	if(te.substr(0,7) == "[[$FILE") return "In table '[[...]]' ";
+	return "In file '"+te+"' ";
+}
+
+
+/// Generates a warning if the sample cannot be read
+void Input::alert_sample(string warn, unsigned int num)
+{
+	alert_import(warn+" "+to_string(num)); 
+}
+
+
+/// Reads a state file from text
+void Input::read_state_sample(const vector <string> &lines, const vector <string> &ind_key)
+{
+	Sample samp;
+	samp.param_value.resize(model.param.size());
+	for(auto th = 0u; th < model.param.size(); th++){
+		samp.param_value[th].resize(model.param[th].value.size(),UNSET);
+	}
+	
+	samp.species.resize(model.species.size());
+	
+	auto mode = MODE_NODE;
+	string warn = "Problem loading inferred state";
+	
+	auto p = UNSET;
+	for(auto i = 0u; i < lines.size(); i++){
+		auto li = lines[i];
+		if(li != ""){
+			if(li.substr(0,1) == "<"){
+				if(li.substr(li.length()-1,1) != ">") alert_sample(warn,1); 
+				li = li.substr(1,li.length()-2);
+			
+				auto spl = split(li,' ');
+			
+				auto va = spl[0];
+				
+				if(va == "<STATE"){
+					auto spl2 = split(spl[1],'>');
+					samp.num = number(spl2[0]);
+				}
+				
+				if(va == "PARAMETERS"){
+					mode = MODE_PARAM; 
+				}
+					
+				if(va == "SPECIES"){
+					if(spl.size() != 2) alert_sample(warn,2);
+					auto sp_name = remove_quote(spl[1]);
+					
+					p = 0; 
+					while(p < model.species.size() && model.species[p].name != sp_name) p++;
+					if(p == model.species.size()) alert_sample(warn,3);
+				}
+				
+				if(va == "INITIAL"){
+					if(p == UNSET) alert_sample(warn,4);
+					if(model.species[p].type == INDIVIDUAL) alert_sample(warn,5);
+					mode = MODE_INITIAL;
+				}
+					
+				if(va == "POPULATION"){
+					if(p == UNSET) alert_sample(warn,4);
+					if(model.species[p].type == INDIVIDUAL) alert_sample(warn,5);
+					mode = MODE_POPCHANGE;
+				}
+					
+				if(va == "TRANSITIONS"){ 
+					if(p == UNSET) alert_sample(warn,6);
+					if(model.species[p].type == INDIVIDUAL) alert_sample(warn,7);
+					mode = MODE_TRANS; 
+				}
+				
+				if(va == "TIMEPOINT"){
+					mode = MODE_TIMEPOINT;
+				}
+					
+				if(va == "INDIVIDUALS"){
+					if(p == UNSET) alert_sample(warn,10);
+					if(model.species[p].type == POPULATION) alert_sample(warn,11);
+					mode = MODE_INDIVIDUAL;
+				}
+					
+				if(va == "DERIVED"){
+					mode = MODE_DERIVE;
+				}
+					
+				if(va == "PHYLOTREE"){
+					mode = MODE_PHYLO;
+				}
+			}
+			else{
+				switch(mode){
+				case MODE_PHYLO:
+					break;
+					
+				case MODE_PARAM: 
+					i = get_param_value(samp.param_value,i,lines,warn);
+					break;
+					
+				case MODE_DERIVE: break;
+				
+				case MODE_INITIAL:
+					{
+						if(p == UNSET) alert_sample(warn,26);
+						auto spl = split(lines[i],',');
+						
+						auto &tab = samp.species[p].cpop_init_tab;
+						if(tab.heading.size() == 0){
+							tab.heading = spl;
+							tab.ncol = spl.size();
+						}
+						else{
+							tab.ele.push_back(spl);
+							tab.nrow++;
+						}
+					}
+					break;
+					
+				case MODE_POPCHANGE:
+					break;
+					
+				case MODE_TRANS:
+					{
+						if(p == UNSET) alert_sample(warn,26);
+						
+						auto &tab = samp.species[p].trans_num_tab;
+						if(tab.heading.size() == 0){
+							tab.heading.push_back("Transitions");
+							tab.heading.push_back("Timeline");
+							tab.ncol = 2;
+						}
+						
+						auto spl = split(lines[i],':');
+						if(spl.size() != 2) alert_sample(warn,27);
+						
+						spl[0] = replace(spl[0],"->","→");
+						tab.ele.push_back(spl);
+						tab.nrow++;
+					}
+					break;
+				
+				case MODE_TIMEPOINT:
+					break;
+					
+				case MODE_INDIVIDUAL:
+					{
+						if(p == UNSET) alert_sample(warn,26);
+						auto spl = split(lines[i],',');
+						
+						auto &ind_tab = samp.species[p].ind_tab;
+						if(spl.size() > 2 && spl[0] == "name" && spl[1] == "source"){
+							ind_tab.heading = spl;
+							ind_tab.ncol = spl.size();
+						}
+						else{
+							auto num = number(spl[0]);
+							if(num == UNSET) alert_sample(warn,26);
+							spl[0] = ind_key[num];
+							ind_tab.ele.push_back(spl);
+							ind_tab.nrow++;
+						}
+					}
+					break;
+					
+				default:
+					alert_sample(warn,40); 
+					return;
+				}
+			}
+		}
+	}
+	
+	if(false){
+		for(auto th = 0u; th < model.param.size(); th++){
+			cout << model.param[th].name << " ";
+			for(auto va : samp.param_value[th]) cout << va << ",";
+			cout << "  value" << endl;
+		}
+	}
+	
+	model.sample.push_back(samp);
+}
+
+
+/// Gets parameter value from line in the file
+unsigned int Input::get_param_value(vector < vector <double> > &param_value, unsigned int i, const vector <string> &lines, string warn)
+{
+	string not_param = "L^markov,L^non-markov,L^ie,L^dist,L^obs,L^init,Prior";
+	auto not_param_list = split(not_param,',');
+	
+	auto spl = comma_split(lines[i]);
+	auto name = remove_quote(replace(spl[0],"->","→"));// remove_quote(spl[0].replace(/->/g,"→"));
+	
+	if(find_in(not_param_list,name) != UNSET){
+		return i;
+	}
+	
+	auto th = 0u;
+	while(th < model.param.size() && model.param[th].name != name) th++;
+	if(th == model.param.size()) alert_sample(warn,13);
+
+	const auto &par = model.param[th];
+
+	switch(spl.size()){
+	case 1:           // Set parameter value with dependency
+		{
+			i++;
+			auto title = comma_split(lines[i]);
+		
+			if(title.size() != par.dep.size()+1) alert_sample(warn,14);
+			
+			for(auto k = 0u; k < par.dep.size(); k++){
+				if(title[k] != par.dep[k].index_with_prime) alert_sample(warn,15);
+			}
+			if(title[par.dep.size()] != "Value") alert_sample(warn,16);
+				
+			for(auto j = 0u; j < par.N; j++){
+				i++;
+				auto li = comma_split(lines[i]);
+				for(auto k = 0u; k < par.dep.size(); k++){
+					const auto &dp = par.dep[k];
+					auto m = (unsigned int)(j/dp.mult)%dp.list.size();
+					if(li[k] != dp.list[m]) alert_sample(warn,17);
+				}
+				auto value = number(li[par.dep.size()]);
+				if(value == UNSET) alert_sample(warn,19);
+				param_value[th][j] = value;
+			}
+		}
+		break;
+		
+	case 2:    // Directly set parameter value (univariate)
+		{
+			auto value = number(spl[1]);
+			if(value == UNSET) alert_sample(warn,19);
+			param_value[th][0] = value;
+		}
+		break;
+		
+	default: alert_sample(warn,20); return i;
+	}
+	
+	return i;
+}
+
+
+/// Loads parameter values from a file 
+void Input::load_param_value(const ParamProp &pp, string valu, Param &par, string desc)
+{
+	auto tab = load_table(valu); if(tab.error == true) return;
+
+	auto col_name = pp.dep_with_prime;
+
+	col_name.push_back("Value");
+	
+	auto subtab = get_subtable(tab,col_name); if(subtab.error == true) return;
+	
+	auto ncol = subtab.ncol;
+	
+	auto ndep = pp.dep.size();
+	
+	for(auto r = 0u; r < subtab.nrow; r++){
+		vector <unsigned int> ind(ndep);
+		for(auto i = 0u; i < ndep; i++){
+			//const auto &hash_list = par.dep[i].hash_list;			
+			//auto vec = hash_list.get_vec_string(subtab.ele[r][i]);
+			//ind[i] = hash_list.existing(vec);
+			ind[i] = par.dep[i].hash_list.find(subtab.ele[r][i]);
+	
+			//ind[i] = find_in(par.dep[i].list,subtab.ele[r][i]);
+			if(ind[i] == UNSET){ 
+				alert_import(desc+" the element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
+				return;
+			}
+		}
+		
+		auto ele = subtab.ele[r][ncol-1];
+
+		double val = number(ele);
+	
+		switch(par.variety){
+		case CONST_PARAM:
+			if(val == UNSET){
+				alert_import(desc+" the element '"+ele+"' is not a number1 (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
+				return;
+			}
+			set_element(par.value,par.dep,ind,ele);
+			break;
+		
+		case REPARAM_PARAM:
+			if(val == UNSET){
+				if(check_eqn_valid(ele) != SUCCESS){
+					alert_import(desc+" the element '"+ele+"' is not a valid equation (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
+					return;
+				}
+			}
+			set_reparam_element(par.value,par.dep,ind,he(add_equation_info(ele,REPARAM)));
+			break;
+			
+		default: alert_import("Should not be default3"); return;
+		}
+	}
+	
+	// Sets any unspecified to zero
+	for(auto i = 0u; i < par.N; i++){
+		if(par.value[i].te == ""){
+			switch(par.variety){
+			case CONST_PARAM: par.value[i].te = "0"; break;
+			case REPARAM_PARAM: par.value[i] = add_equation_info("0",REPARAM); break;
+			default: break;
+			}
+		}
+	}
+	
+	if(false){
+		for(auto i = 0u; i < par.N; i++){
+			cout << i << " " << par.value[i].te << " val" << endl;
+		}
+	}
+}
+
+	
+/// Sets spline based on knot-times and smooth specification
+void Input::set_spline(string knot_times_str, string smooth, vector <string> &knot_times, bool use_inf_time, Param &par)
+{
+	par.spline_info.on = true;
+
+	vector <double> times;
+	
+	knot_times = split(knot_times_str,',');
+	for(auto j = 0u; j < knot_times.size(); j++){
+		double num;
+		
+		auto te = knot_times[j];
+		if(te == "start"){
+			if(j != 0){ alert_import("In 'knot_times' 'start' should only occur at the start of the knot definition"); return;}
+			
+			num = model.details.t_start;
+		}
+		else{
+			if(te == "end"){
+				if(j != knot_times.size()-1){ alert_import("In 'knot_times' 'end' should only occur at the end of the knot definition"); return;}
+				num = model.details.t_end;
+				if(model.mode == PPC && use_inf_time) num = model.details.inf_t_end;
+			}
+			else{
+				num = number(te);
+				if(num == UNSET){
+					alert_import("In 'knot_times' the value '"+te+"' must be a number"); return;
+				}
+				else{
+					if(num < model.details.t_start || num > model.details.t_end){
+						alert_import("In 'knot_times' the value '"+te+"' must be before the start time and after the end time"); return;
+					}
+				}
+			}
+		}
+		
+		if(j > 0 && num < times[times.size()-1]){
+			alert_import("'knot_times' must be time ordered"); return;
+		}
+		
+		times.push_back(num);
+	}
+			
+	par.spline_info.knot_times = times;
+	
+	if(smooth == ""){
+		par.spline_info.smooth = false;
+	}
+	else{
+		par.spline_info.smooth = true;
+		
+		auto spl = split(smooth,'(');
+		
+		auto type = SmoothType(option_error("smooth",spl[0],{"normal","log-normal"},{ NORMAL_SMOOTH, LOG_NORMAL_SMOOTH }));
+		par.spline_info.smooth_type = type;
+
+		if(spl.size() != 2){ alert_import("There is syntax error in 'smooth'"); return;}
+		
+		if(spl[1].substr(spl[1].length()-1,1) != ")"){ alert_import("There is syntax error in 'smooth'"); return;}
+		
+		auto val_str = spl[1].substr(0,spl[1].length()-1);
+		auto val = number(val_str);
+		if(val == UNSET){ alert_import("In 'smooth' the value '"+val_str+"' is not a number"); return;}
+		if(val <= 0){ alert_import("In 'smooth' the value '"+val_str+"' is not positive"); return;}
+		par.spline_info.smooth_value = val;
+	}
+}
+
+
+/// Gets the seed value from the input file
+unsigned int Input::get_seed()
+{
+	auto seed_str = get_tag_value("seed");
+	if(seed_str != ""){
+		auto num = number(seed_str);
+		if(num == UNSET){ terminate = true; alert_import("Seed '"+seed_str+"' must be a number"); return UNSET;}
+		if(num != int(num)){ terminate = true; alert_import("Seed '"+seed_str+"' must be an integer"); return UNSET;}
+		if(num < 0 || num > SEED_MAX){ terminate = true; alert_import("Seed '"+seed_str+"' must be in the range 0-"+to_string(SEED_MAX)); return UNSET;}
+		
+		return num;
+	}
+	return UNSET;
 }

@@ -1,0 +1,19 @@
+# Example F3: Derived quantities
+
+## Objective
+- Derived quantities are functionally dependent on model parameters or populations, but are not themselves within the model.
+- In this example the basic reproduction number $R_0$ is calculated.
+
+## Data
+- Known event times.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A recovery rate $γ$ determines the rate at which individuals recover.
+- $R_0$ is derived by equation $Nβ/γ$, where $N$ is the number of individuals.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

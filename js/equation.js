@@ -1,4 +1,5 @@
 "use strict";
+// Function which incorporate equations into the model
 
 // Different equation modes determine what properties the equation can have.
 // These are now automatically generated when an equation is created
@@ -27,7 +28,7 @@ function add_equation_buts(lay)
 	
 	let martop = 2.9, marbot = 2.8;
 	let ytop = 5-martop;
-	let dy = martop+marbot+11.9;
+	let dy = martop+marbot+11.4;
 	
 	let warn = inter.equation.warning;
 
@@ -72,7 +73,10 @@ function add_toolbar(te,ytop,lay)
 		case "Add tensor": shift = 4.7; break;
 		case "Add sum": shift = 2.7; break;
 		case "Add population": shift = 2.7; break;
-		case "Add individual effect": shift = 6.7; break;
+		case "Add individual effect": shift = 4.7; break;
+		case "Add fixed effect": shift = 4.7; break;
+		case "Add time": shift = 2.7; break;
+		case "Add distance": shift = 2.7; break;
 		default: error("Option not recognised 30"); break;
 	}
 	
@@ -96,12 +100,12 @@ function add_toolbar(te,ytop,lay)
 		
 	case "Add parameter":
 		{
-			let bdx = 1, bdy = 1.8;
+			let bdx = 1.59, bdy = 1.8;
 			
 			let x = 0.8, y = ytop+2.6;
 			for(let i = 0; i < greek.length; i++){
 				lay.add_button({te:greek[i], x:x, y:y, dx:bdx, dy:bdy, ac:"Letter_But", type:"Letter_But", col:BLACK, colov:DDGREY});
-				x += bdx+0.16;
+				x += bdx+0.2;
 			}		
 			
 			ac = "AddParameterDone";	
@@ -110,12 +114,12 @@ function add_toolbar(te,ytop,lay)
 	
 	case "Add tensor":
 		{
-			let bdx = 1, bdy = 1.8;
+			let bdx = 1.59, bdy = 1.8;
 			
 			let x = 0.8, y = ytop+2.6;
 			for(let i = 0; i < greek_capital.length; i++){
 				lay.add_button({te:greek_capital[i], x:x, y:y, dx:bdx, dy:bdy, ac:"Letter_But", type:"Letter_But", col:BLACK, colov:DDGREY});
-				x += bdx+0.16;
+				x += bdx+0.2;
 			}		
 		
 			ac = "AddTensorDone";	
@@ -133,19 +137,39 @@ function add_toolbar(te,ytop,lay)
 	case "Add individual effect":
 		{
 			let x = 0.5, y = ytop+2.6;
-			let bdx = 2.0, bdy = 1.8;
-			let half = Math.floor(0.5+alphabet.length/2);
-			for(let i = 0; i < half; i++){
+			let bdx = 1.47, bdy = 1.8;
+			for(let i = 0; i < alphabet.length; i++){
 				lay.add_button({te:alphabet[i], x:x, y:y, dx:bdx, dy:bdy, ac:"Letter_But", type:"Letter_But", col:BLACK, colov:DDGREY});
 				x += bdx+0.2;
 			}			
-			x = 0.5; y += 2.0;
-			for(let i = half; i < alphabet.length; i++){
-				lay.add_button({te:alphabet[i], x:x, y:y, dx:bdx, dy:bdy, ac:"Letter_But", type:"Letter_But", col:BLACK, colov:DDGREY});
-				x += bdx+0.2;
-			}
+			
 			ac = "AddIndEffectDone";	
 		}
+		break;
+		
+	case "Add fixed effect":
+		{
+			let x = 0.5, y = ytop+2.6;
+			let bdx = 1.47, bdy = 1.8;
+			for(let i = 0; i < alphabet.length; i++){
+				lay.add_button({te:alphabet[i], x:x, y:y, dx:bdx, dy:bdy, ac:"Letter_But", type:"Letter_But", col:BLACK, colov:DDGREY});
+				x += bdx+0.2;
+			}			
+			
+			ac = "AddFixEffectDone";	
+		}
+		break;
+		
+		case "Add time":
+		{
+			let x = 1, y = ytop+2.6;
+			lay.add_paragraph("Adds the time variable to the equation.",lay.dx,x,y,WHITE,para_si,para_lh);
+			ac = "AddTimeDone";	
+		}
+		break;
+		
+	case "Add distance":
+		ac = "AddDistanceDone";	
 		break;
 
 	default: error("Option not recognised 31"); break;
@@ -194,9 +218,7 @@ function add_quantity_content_buts(lay)
 				
 			lay.add_radio_white(marleft,y,"None","None",eqn.dep_radio);
 			lay.add_radio_white(marleft+5,y,"Time","Time",eqn.dep_radio);
-			if(eqn.mode == "all"){
-				lay.add_radio_white(marleft+10,y,"Age","Age",eqn.dep_radio);
-			}
+			
 			y += 1.6;
 			
 			switch(eqn.mode){
@@ -262,7 +284,6 @@ function add_quantity_content_buts(lay)
 			
 			lay.add_radio_white(marleft,y,"None","None",eqn.dep_radio);
 			lay.add_radio_white(marleft+5,y,"Time","Time",eqn.dep_radio);
-			lay.add_radio_white(marleft+10,y,"Age","Age",eqn.dep_radio);
 			y += 1.6;
 			
 			let ml = 4;
@@ -376,6 +397,35 @@ function add_quantity_content_buts(lay)
 		}
 		break;
 
+	case "Add individual effect": break;
+	case "Add fixed effect": break;
+	case "Add time": break;
+	case "Add distance":
+		{
+			
+			let marleft = 7;
+			
+			let p = eqn.origin.p;
+			let sp = model.species[p];
+			let ncla = sp.cla.length;
+			lay.add_button({te:"CLASSIFICATION:", x:x, y:y+0.1, dx: marleft, dy:dy, type:"Text", col:WHITE, si:0.8, font:get_font(0.8)});
+					
+			x = marleft;
+						
+			for(let cl = 0; cl < ncla; cl++){
+				let name = sp.cla[cl].name;
+		
+				let w = 1.6+text_width(name,get_font(si_radio))+1;
+				if(x+w > lay.inner_dx){ x = marleft; y += 1.4;}
+		
+				lay.add_radio_white(x,y,name,name,eqn.cla_radio);
+				x += w;
+			}
+			
+			y += 1.6;
+		}
+		break;
+
 	default: error("Option not recognised 32"); break;
 	}
 	
@@ -387,32 +437,28 @@ function add_quantity_content_buts(lay)
 /// Adds buttons for the equation editor
 function equation_calulator(lay,cx,cy,width,source,warn,mode)
 {
-	let nrow = 4;
+	let nrow = 3;
 
 	source.warn = warn;
 	lay.add_textbox(cx+0.5,cy,width-1,nrow,source);
 	
-	cy += nrow*textbox_linesi+0.8;
+	cy += nrow*equation_linesi+0.8;
 	
 	if(warn != undefined){
 		cy = lay.add_paragraph(warn.te,warn.dx,1.5,cy-0.4,LRED,warn_si,warn_lh);
 		cy += 0.1;
 	}
 
-	let dx = 2.2, dy=1.5, gap = 0.5;
-	let dx2 = 1.38, gap2 = gap;
-	let dx3 = 2.02, gap3 = gap;
+	let dx = 2.7, dy=1.5, gap = 0.5;
+	let dx2 = 1.52, gap2 = 0.5;
+	let dx3 = 1.52, gap3 = 0.5;
 	
 	let x = cx+0.2;
 	for(let i = 0; i < functi.length; i++){
-		lay.add_button({te:functi[i], x:x, y:cy, dx:dx, dy:dy, ac:"Calculator_But", type:"Calculator_But", col:GREY, colov:LGREY});
-		x += dx+gap;
+		let ddx = 2.95; if(functi_dx[i] != "def") ddx = functi_dx[i];
+		lay.add_button({te:functi[i], x:x, y:cy, dx:ddx, dy:dy, ac:"Calculator_But", type:"Calculator_But", col:GREY, colov:LGREY});
+		x += ddx+gap;
 	}			
-	
-	for(let i = 0; i < opbut.length; i++){
-		lay.add_button({te:opbut[i], x:x, y:cy, dx:dx2, dy:dy, ac:"Calculator_But", type:"Calculator_But", col:DGREY, colov:GREY});
-		x += dx2+gap2;
-	}
 	
 	cy += dy+0.4;
 		
@@ -422,8 +468,11 @@ function equation_calulator(lay,cx,cy,width,source,warn,mode)
 		x += dx3+gap3;
 	}
 
+	for(let i = 0; i < opbut.length; i++){
+		lay.add_button({te:opbut[i], x:x, y:cy, dx:dx2, dy:dy, ac:"Calculator_But", type:"Calculator_But", col:DGREY, colov:GREY});
+		x += dx2+gap2;
+	}
 	cy += dy+0.4;
-	
 	
 	cy += 0.2;
 	x = cx+0.2;
@@ -457,7 +506,9 @@ function equation_calulator(lay,cx,cy,width,source,warn,mode)
 		param_fl = true; 
 		break;
 	
-	default: error("option prob 100"+eqn.mode); break;
+	default:
+		error("option prob 100"+eqn.mode); 
+		break;
 	}
 	
 	let ac = "AddToolbar";	
@@ -480,9 +531,27 @@ function equation_calulator(lay,cx,cy,width,source,warn,mode)
 		x += w+gap4;
 	}
 	
+	if(param_fl == true){
+		let te = "t", w = text_width(te,font)+pad;
+		lay.add_button({te:te, te2:"Add time", x:x, y:cy, dx:w, dy:dy, ac:ac, type:"Toolbar_But"});
+		x += w+gap4;
+	}
+	
+	if(param_fl == true){
+		let te = "D", w = text_width(te,font)+pad;
+		lay.add_button({te:te, te2:"Add distance", x:x, y:cy, dx:w, dy:dy, ac:ac, type:"Toolbar_But"});
+		x += w+gap4;
+	}
+	
 	if(indeff_fl == true){
 		let te = "Ind. Effect", w = text_width(te,font)+pad;
 		lay.add_button({te:te, te2:"Add individual effect", x:x, y:cy, dx:w, dy:dy, ac:ac, type:"Toolbar_But"});
+		x += w+gap4;
+	}
+	
+	if(indeff_fl == true){
+		let te = "Fixed Effect", w = text_width(te,font)+pad;
+		lay.add_button({te:te, te2:"Add fixed effect", x:x, y:cy, dx:w, dy:dy, ac:ac, type:"Toolbar_But"});
 		x += w+gap4;
 	}
 	
@@ -616,8 +685,19 @@ function initialise_toolbar(type)
 			}
 		}
 		break;
+		
+	case "Add individual effect": break;
+	case "Add fixed effect": break;
+	case "Add time": break;
+	case "Add distance": 
+		{
+			let p = eqn.origin.p;	
+			let sp = model.species[p];
+			eqn.cla_radio = {value:sp.cla[0].name};
+		}
+		break;
 
-	default: error("Option not recognised 33"); break;
+	default: error("Option not recognised 33"+type); break;
 	}
 }
 
@@ -692,10 +772,8 @@ function equation_add_parameter()
 	
 	if(dep != "") paste += "_"+dep;
 		
-	
 	switch(inter.equation.dep_radio.value){
 	case "Time": paste += "(t)"; break;
-	case "Age": paste += "(a)"; break;
 	case "None": break;
 	default: error("Option not recognised 35"); break;
 	}
@@ -751,7 +829,6 @@ function equation_add_tensor()
 		
 	switch(inter.equation.dep_radio.value){
 	case "Time": paste += "(t)"; break;
-	case "Age": paste += "(a)"; break;
 	default: error("Option not recognised 36"); break;
 	}
 
@@ -861,18 +938,15 @@ function equation_add_population()
 		case "Index":
 			if(paste != start) paste += ",";
 			paste += tree.index_radio.value;
-			//if(dep != "") dep += ",";
-			//dep += tree.index_radio.value;
 			break;
 
 		default: error("Option not recognised 37"); break;
 		}
 	}
 	if(paste == start) paste += "All";
-	//if(dep != "") paste += "_"+dep;
 	
 	paste += "}";
-	cursor_paste_with_space(paste);
+	cursor_paste(paste);
 	delete inter.equation.toolbar;
 }
 
@@ -894,6 +968,71 @@ function equation_add_indeffect()
 	}
 		
 	let paste = "["+eqn.letter+"]";
+	cursor_paste(paste);
+	delete inter.equation.toolbar;
+}
+
+
+/// Add fixed effect to an equation
+function equation_add_fixeffect()
+{
+	let eqn = inter.equation;
+	eqn.toolbar_warning = "";
+	
+	if(eqn.letter == undefined){
+		eqn.toolbar_warning = "A letter must be selected";
+		return;
+	}
+	
+	if(inter.cursor.i == undefined){
+		eqn.toolbar_warning = "The cursor location must be selected"; 
+		return;
+	}
+	
+	let paste = "<"+eqn.letter+">";
+	//cursor_paste_with_space(paste);
+	cursor_paste(paste);
+	delete inter.equation.toolbar;
+}
+
+
+/// Add time to an equation
+function equation_add_time()
+{
+	let eqn = inter.equation;
+	eqn.toolbar_warning = "";
+
+	if(inter.cursor.i == undefined){
+		eqn.toolbar_warning = "The cursor location must be selected"; 
+		return;
+	}
+	
+	let paste = "t";
+	cursor_paste_with_space(paste);
+	delete inter.equation.toolbar;
+}
+
+
+/// Add distance to an equation
+function equation_add_distance()
+{
+	let eqn = inter.equation;
+	eqn.toolbar_warning = "";
+
+	if(inter.cursor.i == undefined){
+		eqn.toolbar_warning = "The cursor location must be selected"; 
+		return;
+	}
+	
+	let val = eqn.cla_radio.value;
+	let p = eqn.origin.p;
+	let sp = model.species[p];
+	let cl = 0; while(cl < sp.cla.length && sp.cla[cl].name != val) cl++;
+	if(cl == sp.cla.length) error("Could not find index");
+	let index = sp.cla[cl].index;
+	
+	let paste = "D_"+index+","+index+"′";
+	
 	cursor_paste_with_space(paste);
 	delete inter.equation.toolbar;
 }
@@ -912,6 +1051,20 @@ function equation_done()
 	
 	eqn.te = te;
 	extract_equation_properties(eqn);
+
+	// Looks for warnings associated with calculating equations for simulating data
+	if(eqn.warn.length == 0 && subtab_name() == "Generate Data"){  
+		switch(eqn.type){
+		case "trans_prob": case "comp_prob":
+			{
+				let eq_calc = setup_eqn(te);
+				if(eq_calc.err){ 
+					eqn.warn.push({te:eq_calc.msg, cur:0, len:0});
+				}
+			}
+			break;
+		}
+	}
 	
 	if(eqn.warn.length > 0){
 		inter.equation.warning = eqn.warn[0];
@@ -920,25 +1073,34 @@ function equation_done()
 	
 	turn_off_cursor();
 	
-	let ref = inter.equation.origin.ref;
-		
-	let i = 0; while(i < inter.textbox_store.length && inter.textbox_store[i].ref != ref) i++;
-	if(i == inter.textbox_store.length) error("Could not find");
-	else{
-		let tbs = inter.textbox_store[i];
-		
-		tbs.te = te;
-		tbs.eqn = eqn;
-		
-		let origin = inter.equation.origin;
-		if(origin.p != undefined && origin.cl != undefined) model.update_pline(origin.p,origin.cl);    
+	let orig = inter.equation.origin;
+	let ref = orig.ref;
 	
+	if(ref == "ProbEqn"){
+		if(te != orig.te_store) update_param();
 		inter.equation = {};
 		inter.textbox_store.pop();
+		inter.bubble.check_warning = undefined;
+	}
+	else{
+		let i = 0; while(i < inter.textbox_store.length && inter.textbox_store[i].ref != ref) i++;
+		if(i == inter.textbox_store.length) error("Could not find");
+		else{
+			let tbs = inter.textbox_store[i];
+			
+			tbs.te = te;
+			tbs.eqn = eqn;
+			
+			let origin = inter.equation.origin;
+			if(origin.p != undefined && origin.cl != undefined) model.update_pline(origin.p,origin.cl);    
 		
-		bubble_check_error();
-		
-		press_bubble_OK();
+			inter.equation = {};
+			inter.textbox_store.pop();
+			
+			bubble_check_error();
+			
+			press_bubble_OK();
+		}
 	}
 }
 
@@ -946,6 +1108,8 @@ function equation_done()
 /// Creates a new equation with a text string and a type. p and cl are available for transitions
 function create_equation(te,type,p,cl)
 {
+	te = te.replace(/\*/g,"×");
+	
 	let i = find(eqn_types,"name",type);
 	if(i == undefined){
 		error("Equation type not found: "+type); 
@@ -960,4 +1124,76 @@ function create_equation(te,type,p,cl)
 	extract_equation_properties(eqn);
 	
 	return eqn;
+}
+
+
+/// Checks if a string is an equation with a single parameter or a number
+function is_eqn(te,tag,op)
+{
+	let eqn = create_equation(te,"test");
+	
+	if(eqn.warn.length > 0) return err("For '"+tag+"' — "+eqn.warn[0].te); 
+	
+	if(eqn.mode == "param_only"){
+		if(eqn.ind_eff.length > 0){
+			return err("'"+tag+"' cannot contain individual effects"); 
+		}
+		
+		if(eqn.param.length > 1){
+			return err("'"+tag+"' can only be constant or contain one parameter"); 
+		}
+	}
+	
+	if(eqn.param.length == 0){
+		if(op.positive == true){
+			if(Number(te) <= 0){
+				return err("'"+tag+"' must be a positive number"); 
+			}
+		}
+		
+		if(op.zero_positive == true){
+			if(Number(te) < 0){
+				return err("'"+tag+"' must be a non-negative number"); 
+			}
+		}
+		
+		if(op.zero_one_range == true){
+			if(Number(te) < 0 || Number(te) > 1){
+				return err("'"+tag+"' must be in the range 0 - 1"); 
+			}
+		}
+	}
+	
+	return success();
+}
+
+
+/// Renames compartment in equations
+function equation_rename_compartment(p,cl,old_name,new_name)
+{
+	let sp = model.species[p];
+	let cl_name = sp.cla[cl].name;
+		
+	let eq_list = model.find_equation_list();
+	
+	let len = old_name.length;
+	let dif = new_name.length - old_name.length;
+	
+	for(let i = 0; i < eq_list.length; i++){
+		let eqn = eq_list[i];
+		extract_equation_properties(eqn);
+	
+		let te = eqn.te;
+		for(let j = 0; j < eqn.comp_name_list.length; j++){
+			let ch = eqn.comp_name_list[j];
+		
+			if(ch.cl_name == cl_name && ch.comp_name == old_name){
+				te = te.substr(0,ch.icur)+new_name+te.substr(ch.icur+len);
+				for(let jj = j+1; jj < eqn.comp_name_list.length; jj++){
+					eqn.comp_name_list[jj].icur += dif;
+				}
+			}
+		}
+		eqn.te = te;
+	}	
 }

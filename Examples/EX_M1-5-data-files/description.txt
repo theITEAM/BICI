@@ -1,0 +1,19 @@
+# Model 1.5: SIR model with gamma distributed infectious period
+
+## Objective
+- Introduce non-Markovian (NM) transitions.
+- In individual-based models there is greater flexibility to specify the probability distribution over which transitions occur.
+- This example uses a gamma distributed infectious period with a mean and coefficient of variation (which is a dimensionless number that specifies the standard deviation divided by the mean).
+- Other possibilities include: Erlang, log-normal, Weibull, and fixed period.
+- NM transitions can be used to more realistically model disease progression within an individual.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A recovery duration $m$ determines how long it takes for individuals to recover on average.
+- A coefficient of variation parameter $c$ determines the variation about the mean $m$ .
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

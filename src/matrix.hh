@@ -25,4 +25,5 @@ vector < vector <double> > transpose(const vector < vector <double> > &M);
 double dot_prod(const vector <double> &vec1, const vector <double> &vec2);
 double sparsity(const vector < vector <double> > &a);
 vector <double> sample_mvn(const vector < vector <double> > &Z);
+void tidy(vector < vector <double> > &M);
 #endif

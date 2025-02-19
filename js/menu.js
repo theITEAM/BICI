@@ -1,4 +1,5 @@
 "use strict";
+// Functions which generate the menu
 
 /// Initialises all the pages and scrollbars
 function initialise_pages()                                     
@@ -38,50 +39,33 @@ function initialise_pages()
 	{
 		let sub = page[page.length-1].sub;
 	
-		sub.push({name:"Population", sub:[]});
-		
-		{
-			let subsub = sub[sub.length-1].sub;
-		
-			if(model.species.length > 1){
-				for(let p = 0; p < model.species.length; p++){
-					subsub.push({name:model.species[p].name, sub:[]});
-				}
-			}
-		}
+		//sub.push({name:"Population", sub:[]});
+		//add_species_options(sub,model.species);
+		sub.push({name:"Initial Conditions", sub:[]});
+		add_species_options(sub,model.species);
 		
 		sub.push({name:"Parameters", sub:[]});
 		sub.push({name:"Run", sub:[]});
 		
-		if(sim_result.on == true){
+		if(model.sim_res.on == true){
 			sub.push({name:"Results", sub:[]});
 		
 			let subsub = sub[sub.length-1].sub;
-			subsub.push({name:"Populations"});
-			subsub.push({name:"Transitions"});
+			subsub.push({name:"Populations", sub:[]});
+			add_species_options(subsub,model.sim_res.species_name);
 			
-			if(sim_result.species){
-				if(find(sim_result.species,"type","Individual") != undefined){
-					subsub.push({name:"Individuals"});
-				}
+			subsub.push({name:"Transitions", sub:[]});
+			add_species_options(subsub,model.sim_res.species_name);
+			
+			if(model.sim_res.ind_flag == true){
+				subsub.push({name:"Individuals", sub:[]});
+				add_species_options(subsub,model.sim_res.species_name);
 			}
-			
-			if(sim_result.spline.length > 0) subsub.push({name:"Splines"});
 			
 			subsub.push({name:"Parameters"});
 			
 			sub.push({name:"Generate Data", sub:[]});
-			
-			{
-				let subsub = sub[sub.length-1].sub;
-			
-				if(sim_result.species.length > 1){
-					for(let p = 0; p < sim_result.species.length; p++){
-						subsub.push({name:sim_result.species[p].name, sub:[]});
-					}
-				}
-			}
-		
+			add_species_options(sub,model.sim_res.species_name);
 		}
 	}
 	
@@ -90,39 +74,53 @@ function initialise_pages()
 	{
 		let sub = page[page.length-1].sub;
 	
+		//sub.push({name:"Initial Conditions", sub:[]});
+		//add_species_options(sub,model.species);
+		
 		sub.push({name:"Data", sub:[]});
-		
-		{
-			let subsub = sub[sub.length-1].sub;
-		
-			if( model.species.length > 1){
-				for(let p = 0; p < model.species.length; p++){
-					subsub.push({name:model.species[p].name, sub:[]});
-				}
-			}
-		}
+		add_species_options(sub,model.species);
 		
 		sub.push({name:"Prior", sub:[]});
 		
 		sub.push({name:"Run", sub:[]});
 		
-		if(inf_result.on == true){
+		if(model.inf_res.on == true){
 			sub.push({name:"Results", sub:[]});
 		
 			let subsub = sub[sub.length-1].sub;
 			subsub.push({name:"Parameters"});
+	
+			subsub.push({name:"Populations", sub:[]});
+			add_species_options(subsub,model.inf_res.species_name);
+		
+			subsub.push({name:"Transitions", sub:[]});
+			add_species_options(subsub,model.inf_res.species_name);
+			
+			if(model.inf_res.ind_flag == true){
+				subsub.push({name:"Individuals", sub:[]});
+				add_species_options(subsub,model.inf_res.species_name);
+			}
+		}
+	}
+	
+	if(model.inf_res.on == true){
+		page.push({name:"Post. Simulation", sub:[]});
+		
+		let sub = page[page.length-1].sub;
+		sub.push({name:"Population Mod.", sub:[]});
+		
+		sub.push({name:"Parameter Mult.", sub:[]});
+		
+		sub.push({name:"Run", sub:[]});
+
+		if(model.ppc_res.on == true){
+			sub.push({name:"Results", sub:[]});
+		
+			let subsub = sub[sub.length-1].sub;
 			subsub.push({name:"Populations"});
 			subsub.push({name:"Transitions"});
-			
-			if(inf_result.species){
-				if(find(inf_result.species,"type","Individual") != undefined){
-					subsub.push({name:"Individuals"});
-				}
-			}
-			
-			if(inf_result.spline){
-				if(inf_result.spline.length > 0) subsub.push({name:"Splines"});
-			}
+			if(model.ppc_res.ind_flag == true) subsub.push({name:"Individuals"});
+			subsub.push({name:"Parameters"});
 		}
 	}
 	
@@ -132,6 +130,20 @@ function initialise_pages()
 }
 
 
+/// Adds species options onto the menu
+function add_species_options(sub,list)
+{
+	let subsub = sub[sub.length-1].sub;
+		
+	if(list.length > 1){
+		for(let p = 0; p < list.length; p++){
+			let te = list[p]; if(list[p].name) te = list[p].name;
+			subsub.push({name:te, sub:[]});
+		}
+	}
+}
+		
+		
 /// Sets the indexes for the pages
 function set_page_index(page)
 {
@@ -212,7 +224,10 @@ function add_logo_buts(lay)
 {
 	let mar = 0.05*lay.dx;
 	let ddx = lay.dx-2*mar;
-	lay.add_button({x:mar, y:0, dx:ddx, dy:(370/927)*ddx, type:"Logo"});
+	
+	let ac; if(debug == true && testing == true) ac="LoadInference"; 
+	
+	lay.add_button({x:mar, y:0, dx:ddx, dy:(370/927)*ddx, ac:ac, type:"Logo"});
 }
 
 
@@ -223,11 +238,13 @@ function add_menu_buts(lay)
 	
 	let ddy = nearest_pixel(1.7);
 	let dby = nearest_pixel(0.15);
-	let dby2 = nearest_pixel(1.5);
+	let dby2 = nearest_pixel(1.4);
 	let dysub = nearest_pixel(1.6);
 	let dysubsub = nearest_pixel(1.3);
 	let xsub = nearest_pixel(0.5);
-	let xsubsub = nearest_pixel(1.0);
+	let xsubsub = nearest_pixel(1);
+	//let xsubsubsub = nearest_pixel(1.6);
+	let xsubsubsub = nearest_pixel(1);
 	
 	let y = 0;
 
@@ -235,7 +252,7 @@ function add_menu_buts(lay)
 		let pag = inter.page[p];
 
 		let ac;
-		if(p == 0 || model.start) ac = "Tab";
+		if((p == 0 || model.start) && p != inter.pa) ac = "Tab";
 	
 		lay.add_button({te:pag.name, x:0, y:y, dx:dx, dy:ddy, ac:ac, type:"Tab", val:p}); 
 		y += ddy; 
@@ -246,8 +263,9 @@ function add_menu_buts(lay)
 				let sub = pag.sub[s];
 			
 				let xx = 0.7;
-				
-				lay.add_button({te:sub.name, x:xsub, y:y, dx:dx-xsub, dy:dysub, ac:"PageSub", type:"PageSub", val:s});
+			
+				let acsub; if(s != pag.index) acsub = "PageSub";
+				lay.add_button({te:sub.name, x:xsub, y:y, dx:dx-xsub, dy:dysub, ac:acsub, type:"PageSub", val:s});
 				y += dysub;
 				
 				if(s == inter.page[inter.pa].index && sub.sub.length > 0){
@@ -259,15 +277,26 @@ function add_menu_buts(lay)
 							lay.add_button({te:"Add species", x:xx, y:y, dx:dx-xx, dy:dysubsub, ac:"AddSpecies", type:"AddSpecies", val:s});
 						}
 						else{
-							lay.add_button({te:subsub.name, x:xsubsub, y:y, dx:dx-xsubsub, dy:dysubsub, ac:"PageSubSub", type:"PageSubSub", val:ss});
+							let acsubsub = "PageSubSub";
+				
+							lay.add_button({p:ss, te:subsub.name, x:xsubsub, y:y, dx:dx-xsubsub, dy:dysubsub, ac:acsubsub, type:"PageSubSub", val:ss});
 						}
+						
 						y += dysubsub;
+						
+						if(sub.name != "Compartments" && subsub.sub && ss == sub.index && subsub.sub.length > 1){
+							for(let sss = 0; sss < subsub.sub.length; sss++){
+								let subsubsub = subsub.sub[sss];
+								lay.add_button({p:sss, te:subsubsub.name, x:xsubsubsub, y:y, dx:dx-xsubsubsub, dy:dysubsub, ac:"PageSubSubSub", type:"PageSubSubSub", val:sss});
+								y += dysubsub;
+							}
+						}
 					}
+						
 					y += nearest_pixel(0.5);
 				}
 				y += dby;
 			}
-			y += nearest_pixel(1);
 		}
 		y += dby2;
 	}
@@ -281,7 +310,6 @@ function add_submenu(submenu,dx,y,shift)
 		
 	for(let i = 0; i < submenu.length; i++){
 		let ii = i; if(shift) ii += shift;
-		//this.add_button({x:xx, y:y, dx:dx-xx, dy:inter.menu_submenu_size, type:"PageSubBack"});
 		this.add_button({te:submenu[i], x:xx, y:y, dx:dx-xx, dy:inter.menu_submenu_size, ac:"PageSub", type:"PageSub", val:ii});
 		y += inter.menu_submenu_size;
 	}
@@ -307,21 +335,10 @@ function add_subsubmenu(submenu,y,dx)
 function add_frame_buts(lay) 
 {
 	let op = lay.op;
-	/*
-	lay.add_button({x:0, y:0, dx:op.x, dy:lay.dy, type:"Rect", col:BACKGROUND});
-	lay.add_button({x:op.x, y:0, dx:op.dx, dy:op.y, type:"Rect", col:BACKGROUND});
-	lay.add_button({x:op.x+op.dx, y:0, dx:lay.dx-(op.x+op.dx), dy:lay.dy, type:"Rect", col:BACKGROUND});
-	lay.add_button({x:op.x, y:op.y+op.dy, dx:op.dx, dy:lay.dy-(op.y+op.dy), type:"Rect", col:BACKGROUND});
-	*/
+	
 	lay.add_button({x:op.x, y:op.y, dx:op.dx, dy:op.dy, type:"Corners"});
 	
-	//lay.add_button({te:"File", x:op.x+op.dx-5, y:op.y, dx:3, dy:1.3, ac:"File", type:"File"});		
-	
-	//lay.add_button({x:op.x+op.dx-3, y:op.y+0.6, dx:1.8, dy:1.8, ac:"Menu", type:"Menu"});	
-	
 	let x = op.x+op.dx-4, y = op.y+1;
-	let tree = inter.page_name.split("->");
-	//if(tree[0] == "Model" && tree[1] == "Compartments"){ x = op.x+op.dx-3; y = op.y+0.6;}
 		
 	let show_model = model.get_show_model();
 	if(show_model == true){
@@ -338,174 +355,114 @@ function add_frame_buts(lay)
 function drop_menu(cont,lay)
 {
 	let bub = inter.bubble;
-	switch(bub.mode){
-	case "LoadComps":
-		{
-			cont.dx = 10;
-			bubble_addtitle(cont,"Load compartments",{te:loadcomp_text});
-			
-			if(bub.bu.coord == "cartesian"){
-				bubble_addcheckbox(cont,0,"Load position data",bub.pos_check);
-			}
-			cont.y += 0.3;
-
-			bubble_addradio(cont,0,"SelectColour","Select colour",bub.radio);
-			bubble_colour(cont,2);
-			cont.y += 0.3;
-
-			bubble_addradio(cont,0,"FileColour","Load colour from file",bub.radio);
-			
-			add_end_button(cont,"Back","MenuBack");		
-			add_end_button(cont,"Next","LoadCompartmentNext");		
-		}
-		break;
-	
-	case "LoadTrans":
-		{
-			cont.dx = 12;
-			bubble_addtitle(cont,"Load transitions",{te:loadtrans_text});
-				
-			bubble_addparagraph(cont,"Select distribution for the loaded transitions:",0,cont.dx);
-			cont.y += 0.3;
-			bubble_addtext(cont,"Distribution:",1);
-			cont.y -= 1.7;
-
-			let dist = get_dist_pos();
-			let pos=[]; for(let i = 0; i < dist.length; i++) pos.push({te:dist[i]});
-
-			bubble_adddropdown(cont,5.6,6.5,inter.bubble.trans_type,pos);
-			cont.y += 0.4;
-			
-			add_end_button(cont,"Back","MenuBack");		
-			add_end_button(cont,"Load","ImportTrans2");		
-		}
-		break;
-	
-	case "LoadSource":
-		{
-			cont.dx = 11;
-			bubble_addtitle(cont,"Load sources",{te:loadsource_text});
-				
-			bubble_addcheckbox(cont,0,"Load position data",bub.pos_check);
-			
-			bubble_addparagraph(cont,"Select distribution for the loaded sources:",0,cont.dx);
-			cont.y += 0.5;
-			bubble_addtext(cont,"Distribution:",0);
-			cont.y -= 1.7;
-
-			let dist = exp_dist_pos;
-			let pos=[]; for(let i = 0; i < dist.length; i++) pos.push({te:dist[i]});
-			
-			bubble_adddropdown(cont,4.6,6.5,inter.bubble.trans_type,pos);
-			cont.y += 0.6;
-			
-			add_end_button(cont,"Back","MenuBack");		
-			add_end_button(cont,"Load","ImportSource2");		
-		}
-		break;
 		
-	case "LoadSink":
+	let dx = 6.5, dy = 1.2;
+	cont.dx = dx;
+	
+	let active_mod = true; if(model.start == false) active_mod = false;	
+		
+	let menu = [];
+	{
+		let sub = [];
+		sub.push({te:"Load", ac:"Load"});
+		let active; if(inter.file_store.filename == "") active = false;
+		sub.push({te:"Save", ac:"Save", active:active});
+		sub.push({te:"Save As...", ac:"SaveAs", active:active_mod});
+		
 		{
-			cont.dx = 11;
-			bubble_addtitle(cont,"Load sinks",{te:loadsink_text});
-				
-			bubble_addcheckbox(cont,0,"Load position data",bub.pos_check);
-			
-			bubble_addparagraph(cont,"Select distribution for the loaded sinks:",0,cont.dx);
-			cont.y += 0.3;
-			bubble_addtext(cont,"Distribution:",0);
-			cont.y -= 1.7;
-
-			let dist = get_dist_pos();
-			let pos=[]; for(let i = 0; i < dist.length; i++) pos.push({te:dist[i]});
-
-			bubble_adddropdown(cont,4.6,6.5,inter.bubble.trans_type,pos);
-			cont.y += 0.6;
-			
-			add_end_button(cont,"Back","MenuBack");		
-			add_end_button(cont,"Load","ImportSink2");		
+			let ac; if(model.sim_res.on) ac = "SaveSim";
+			sub.push({te:"Save Simulation", ac:ac});
 		}
-		break;
+		
+		{
+			let ac; if(model.inf_res.on) ac = "SaveInf";
+			sub.push({te:"Save Inference", ac:ac});
+		}
+		
+		{
+			let ac; if(model.ppc_res.on) ac = "SavePPC";
+			sub.push({te:"Save Post. Sim.", ac:ac});
+		}
 
-	default:
-		{				
-			let dx = 6.5, dy = 1.2;
-			cont.dx = dx;
-			
-			let menu = [];
-			{
-				let sub = [];
-				sub.push({te:"Load", ac:"Load"});
-				let active; if(model.filename == "") active = false;
-				sub.push({te:"Save", ac:"Save", active:active});
-				sub.push({te:"Save As...", ac:"SaveAs"});
-				
-				let active2 = true; 
-				if(inter.page[inter.pa].name != "Simulation" && inter.page[inter.pa].name != "Inference"){
-					active2 = false;
-				}
-				
-				sub.push({te:"View Code", ac:"ViewCode", active:active2});
-				
-				menu.push({te:"File",sub:sub, help:file_text});
-			}
-			{
-				let sub = [];
-				sub.push({te:"Script", ac:"ImportScript"});
-				let active = cont.bu.show_model;
-				sub.push({te:"Compartments", ac:"ImportComp", active:active});
-				let active2 = active; if(active2 == true && cont.bu.coord != "latlng") active2 = false;
-				sub.push({te:"Comp. Map", ac:"ImportCompMap", active:active2});			
-							
-				sub.push({te:"Transitions", ac:"ImportTrans", active:active});
-				sub.push({te:"Sources", ac:"ImportSource", active:active});
-				sub.push({te:"Sinks", ac:"ImportSink", active:active});
-				menu.push({te:"Import",sub:sub, help:import_text});
-			}
-			{
-				let sub = [];
-				let active = false; 
-				
-				sub.push({te:"Script", ac:"ExportScript", active:true});
-				
-				if(inter.graph.type) active = true;
-				if(model.get_show_model()) active = true;
-				
-				sub.push({te:"Print", ac:"PrintGraph", active:active});
-				sub.push({te:"Image (.png)", ac:"ExportGraph", active:active});
-				
-				let ac = "ExportTable";
-				active = false;
-				if(find(inter.layer,"name","TableContent")) active = true;
-				
-				if(inter.graph.type == "Matrix"){
-					active = true;
-					ac = "ExportMatrixTable";
-				}
-				
-				sub.push({te:"Table (.csv)", ac:ac, active:active});
-				
-				menu.push({te:"Export",sub:sub, help:export_text});
-			}
-			
-			cont.y -= 0.4;
-			for(let i = 0; i < menu.length; i++){
-				let te = menu[i].te;
-				lay.add_button({te:te, x:0, y:cont.y, dx:dx, dy:dy, type:"MiniMenu"});
+		{
+			sub.push({te:"View Code", ac:"ViewCode", active:active_mod});
+		}
+		
+		menu.push({te:"File",sub:sub, help:file_text});
+	}
+	
+	/*
+	{
+		let sub = [];
+		let active = cont.bu.show_model;
+		sub.push({te:"Compartments", ac:"ImportComp", active:active});
+		let active2 = active; if(active2 == true && cont.bu.coord != "latlng") active2 = false;
+		sub.push({te:"Comp. Map", ac:"ImportCompMap", active:active2});			
+					
+		sub.push({te:"Transitions", ac:"ImportTrans", active:active});
+		menu.push({te:"Import",sub:sub, help:import_text});
+	}
+	*/
+	{
+		let sub = [];
+		let active = false; 
+		
+		{
+			sub.push({te:"Script", ac:"ExportScript", active:active_mod});
+		}
+		
+		if(inter.graph.type) active = true;
+		if(model.get_show_model()) active = true;
+		
+		sub.push({te:"Print", ac:"PrintGraph", active:active});
+		sub.push({te:"Image (.png)", ac:"ExportGraph", active:active});
+		
+		let ac = "ExportTable";
 
-				let w = text_width(te,get_font(0.8));
-				cont.lay.add_help_button(w+0.4,cont.y+1.7,{title:te, te:menu[i].help, back_col:BUBBLE_COL});
-					
-				cont.y += 1.6;
-				for(let j = 0; j < menu[i].sub.length; j++){
-					let sub = menu[i].sub[j];
-					let ac; if(sub.active != false) ac = sub.ac;
-					lay.add_button({te:sub.te, x:0, y:cont.y, dx:dx, dy:dy, ac:ac, type:"MenuBut"});
-					
-					cont.y += 1.2;
-				}
+		active = false;
+		for(let l = 0; l < inter.layer.length; l++){
+			switch(inter.layer[l].name){
+			case "TableContent": 
+			case "CreateEditXvectorContent":
+			case "CreateEditTableContent":
+			case "CreateEditParamContent":
+			case "CreateEditAmatrixContent":
+				active = true;
+				ac = "ExportTableContent"
+				break;
 			}
 		}
-		break;
+	
+		if(inter.graph.type == "Matrix"){
+			active = true;
+			ac = "ExportMatrixTable";
+		}
+		
+		sub.push({te:"Table (.csv)", ac:ac, active:active});
+		
+		active = false;
+		if(subtab_name() == "Results") active = true;
+		sub.push({te:"Params (.csv)", ac:"OutputParams", active:active});
+		sub.push({te:"States (.txt)", ac:"OutputStates", active:active});
+		
+		menu.push({te:"Export",sub:sub, help:export_text});
+	}
+	
+	cont.y -= 0.4;
+	for(let i = 0; i < menu.length; i++){
+		let te = menu[i].te;
+		lay.add_button({te:te, x:0, y:cont.y, dx:dx, dy:dy, type:"MiniMenu"});
+
+		let w = text_width(te,get_font(0.8));
+		cont.lay.add_help_button(w+0.4,cont.y+1.7,{title:te, te:menu[i].help, back_col:BUBBLE_COL});
+			
+		cont.y += 1.6;
+		for(let j = 0; j < menu[i].sub.length; j++){
+			let sub = menu[i].sub[j];
+			let ac; if(sub.active != false) ac = sub.ac;
+			lay.add_button({te:sub.te, x:0, y:cont.y, dx:dx, dy:dy, ac:ac, type:"MenuBut"});
+			
+			cont.y += 1.2;
+		}
 	}
 }

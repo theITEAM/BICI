@@ -1,8 +1,14 @@
 "use strict";
+// Functions related to the Javascript interface
 
 /// Change the page being viewed
 function change_page(page_new)  
 {
+	if(model && model.description && model.description.edit == true){
+		alert_help("Close editing","Please finish editing the model description.");
+		return;
+	}
+	
 	let pa_new = page_new.pa;
 	if(pa_new != undefined){
 		if(isNaN(pa_new)){
@@ -18,6 +24,11 @@ function change_page(page_new)
 			su_new = find(inter.page[inter.pa].sub,"name",su_new);
 			if(su_new == undefined){ alertp("Problem changing page2"); return;}
 		}
+	
+		if(false){
+			let max = inter.page[inter.pa].sub.length;
+			if(su_new >= max) su_new = max-1;
+		}
 		
 		inter.page[inter.pa].index = su_new;
 	}
@@ -31,6 +42,11 @@ function change_page(page_new)
 			if(susu_new == undefined){ alertp("Problem changing page3"); return;}
 		}
 		
+		if(false){
+			let max = pag.sub[pag.index].sub.length;
+			if(susu_new >= max) susu_new = max-1;
+		}
+		
 		pag.sub[pag.index].index = susu_new;
 	}
 	
@@ -38,7 +54,13 @@ function change_page(page_new)
 	if(sususu_new != undefined){
 		let pag = inter.page[inter.pa];
 		let p = pag.sub[pag.index].index;
-		pag.sub[pag.index].sub[p].index = sususu_new;
+		let susu = pag.sub[pag.index].sub[p];
+		if(false){
+			let max = susu.sub.length;
+			if(sususu_new >= max){ sususu_new = max-1; pr("trunc");}
+		}
+		
+		susu.index = sususu_new;
 	}
 	
 	let pag = inter.page[inter.pa];
@@ -53,11 +75,9 @@ function change_page(page_new)
 	}
 
 	inter.page_name = na;
-	
-	model.warn.length = 0;
-	
+
 	inter.options = false;
-	
+	clear_comp_select();
 	close_help();
 	close_bubble();
 	close_data_source();
@@ -65,17 +85,14 @@ function change_page(page_new)
 	close_Amatrix_source();
 	close_Xvector_source();
 	close_view_graph();
-	
+	close_view_ind();
 	mode_off();
-	
+	close_description();
+	if(make_fig) inter.figure=[];
+		
 	if(inter.popup_timeout != undefined) clearInterval(inter.popup_timeout);
 	
 	let tree = na.split("->");
-	if((tree[0] == "Model" && tree[1] == "Parameters") ||
-		 (tree[0] == "Simulation" && tree[1] == "Parameters") ||
-		 (tree[0] == "Inference" && tree[1] == "Prior")){
-		init_param();
-	}
 	
 	generate_screen();
 	
@@ -99,6 +116,13 @@ function change_page(page_new)
 }
 
 
+/// Clears any selected compartments
+function clear_comp_select()
+{
+	inter.comp_select={list:[]};
+}
+
+
 /// Closes a dropdown menu if it is on
 function close_dropdown()
 {
@@ -109,11 +133,49 @@ function close_dropdown()
 }
 
 
+/// Closes the parameter source 
+function close_param_source()
+{
+	inter.edit_param = {};
+}
+
+
 /// Fires when a key is pressed
 function key_press(e)
 {
-	//error(e.keyCode+" code");
+	if(false) error(e.keyCode+" code");
+	
 	let code = e.keyCode;	
+	
+	if(make_fig){
+		switch(code){
+		case 8: // Deletes later letter
+			if(inter.figure.length > 0){ inter.figure.pop(); generate_screen();}
+			break;
+			
+		case 36:
+			saving_dialogue("",".png","Export figure");
+			break;
+		}
+		
+		if(code >= 65 && code < 75){
+			let letter = String.fromCharCode(code);
+			inter.figure.push({te:letter, x:inter.mx-letter_size/2, y:inter.my-letter_size/2});
+			generate_screen();
+		}
+	}
+	
+	if(test_comment){
+		if(code == 38){ 
+			inter.help.index--; 
+			if(inter.help.index < 0) inter.help.index = 0;
+		}
+		if(code == 40){ 
+			inter.help.index++; 
+			if(inter.help.index >= all_comments_name.length) inter.help.index = all_comments_name.length-1;
+		}
+		generate_screen();
+	}		
 
 	if(code == 16 || code == 17) return;
 	
@@ -122,7 +184,12 @@ function key_press(e)
 	let cur = inter.cursor;
 	if(code != 38 && code != 40) cur.xstore = undefined;
 
+	if(cur.i != undefined && cur.l >= inter.layer.length){
+		cur.i = undefined; cur.l = undefined;
+	}
+
 	let i = cur.i;
+
 	if(i != undefined){	
 		if(code == 9){                                // Tab key
 			let lay_name = inter.bubble.lay_name;
@@ -153,27 +220,29 @@ function key_press(e)
 					
 						copy_back_to_source();
 						
-					
 						if(bub.bu.type == "DistSplitElement" || bub.bu.type == "PriorSplitElement") update_prior_split();
-					
+				
 						close_bubble();
-						generate_screen();		
-						
+					
+						generate_screen(false);	
+
 						let lay = get_lay(lay_name);
-			
-						for(let i = i_now+1; i < lay.but.length; i++){
-							let bu = lay.but[i];
-							
-							if(bu.ac != undefined){
-								if(bu.type == "ParamSimElement" || bu.type == "PriorElement" ||
-									bu.type == "DistElement" || bu.ac == "EditDerive" ||
-									bu.type == "ParamElement" || bu.type == "ReparamElement" ||
-									bu.type == "ParamElementConst" || 
-									bu.type == "PriorSplitElement" || 
-									bu.type == "DistSplitElement" || 
-									bu.type == "CompPop"){
-									activate_button(lay,i);
-									return;
+					
+						if(lay != undefined){
+							for(let i = i_now+1; i < lay.but.length; i++){
+								let bu = lay.but[i];
+								
+								if(bu.ac != undefined){
+									if(bu.type == "ParamSimElement" || bu.type == "DistSimElement" ||  bu.type == "PriorElement" ||
+										bu.type == "DistElement" || bu.ac == "EditDerive" ||
+										bu.type == "ParamElement" || bu.type == "ReparamElement" ||
+										bu.type == "ParamElementConst" || 
+										bu.type == "PriorSplitElement" || 
+										bu.type == "DistSplitElement" || 
+										bu.type == "CompPop"){
+										activate_button(lay,i);
+										return;
+									}
 								}
 							}
 						}
@@ -196,19 +265,19 @@ function key_press(e)
 			}
 			
 			switch(code){
-			case 37:                             // Left arrow
+			case 37:                                     // Left arrow
 				if(i > 0) i--; 
 				break;
 		
-			case 39:                             // Right arrow
+			case 39:                                     // Right arrow
 				if(i < st.length) i++;
 				break;
 
-			case 38:                             // Up arro
+			case 38:                                     // Up arrow
 				i = text_lay.arrow_up_down(i,"up");
 				break;
 
-			case 40:                             // Down arrow
+			case 40:                                     // Down arrow
 				i = text_lay.arrow_up_down(i,"down");
 				break;
 			}
@@ -224,7 +293,7 @@ function key_press(e)
 			let remember = { on:true, i:cur.i, select_pos:cur.select_pos};
 
 			switch(code){
-			case 8:                              // Backspace
+			case 8:                                      // Backspace
 				if(cur.select_pos != undefined){ st = remove_selection(st); i = cur.i;}
 				else{
 					if(i > 0){
@@ -234,7 +303,7 @@ function key_press(e)
 				}
 				break;
 
-			case 46:                             // Delete
+			case 46:                                     // Delete
 				if(cur.select_pos != undefined){ st = remove_selection(st); i = cur.i;}
 				else{
 					if(i < st.length){
@@ -243,10 +312,17 @@ function key_press(e)
 				}
 				break;
 
-			case 13:                             // Enter
+			case 13:                                     // Enter
 				if(text_lay.name == "TextBox"){
-					st = st.substr(0,i)+"\n"+st.substr(i);
-					i++;
+					if(inter.equation.te != undefined){
+						equation_done();
+						generate_screen();
+						return;
+					}
+					else{
+						st = st.substr(0,i)+"\n"+st.substr(i);
+						i++;
+					}
 				}
 				else{
 					unfocus_check();		
@@ -257,8 +333,9 @@ function key_press(e)
 						let sto = inter.textbox_store;
 					}
 				
-					if(inter.bubble.final_button != undefined && flag == false){
-						button_action(inter.bubble.final_button,"enter");  
+					let fin_but = inter.bubble.final_button;
+					if(fin_but != undefined && fin_but.ac != undefined && flag == false){	
+						button_action(fin_but,"enter");  
 						return;
 					}
 					else{
@@ -271,7 +348,18 @@ function key_press(e)
 			if(e.key.length == 1 && e.ctrlKey == false){
 				st = remove_selection(st); i = cur.i;
 				let key = e.key;
-				if(key == "*") key = "×";
+				if(key == "*"){
+					let fl = false;
+					if(text_lay){
+						switch(text_lay.op.source.type){
+						case "find": case "replace": case "description":
+							fl = true; 
+							break;				
+						}
+					}
+					
+					if(fl == false) key = "×";
+				}
 				if(key == "<") key = "〈";
 				if(key == ">") key = "〉";
 				st = st.substr(0,i)+key+st.substr(i);
@@ -298,14 +386,19 @@ function key_press(e)
 			}
 			
 			text_lay.put_text_in_source(st,remember);
+			
 			cur.i = i; if(cur.select_pos == i) cur.select_pos = undefined;
 
 			if(inter.equation.warning != undefined){
 				delete inter.equation.warning.cur;
 			}
 
-			reset_cursor();
-			
+			let lay = inter.layer[cur.l];
+			lay.initialise_buttons();
+			lay.plot_buttons();	
+			if(lay.need_add_scroll()) generate_screen();
+			plot_screen();
+		
 			inter.layer[cur.l].ensure_cursor_in_view();
 		}
 	}
@@ -341,110 +434,27 @@ function create_edit_table(lay)
 	let cx = corner.x;
 	let cy = corner.y;
 	
-	let so = inter.edit_source;
+	let so = edit_source;
 		
 	let tab_source = data.table[so.data_table_use];
 	let tab_dest = so.table
 
 	let title = so.type, help;
+	
+	if(so.title) title = so.title;
+	if(so.help) help = so.help;
+		
 	switch(title){
 	case "Init. Pop.": 
-		title = "Initial population"; 
-		help = load_initpop_text;
+		if(so.spec.radio_dist.value == "Dist"){
+			title = "Initial population distribution";
+			help = load_initpopdist_text;
+		}
 		break;
-		
-	case "Init. Pop. Prior":
-		title = "Initial population prior";
-		help = load_initpopprior_text;
-		break;
-		
-	case "Add Ind.": 
-		title = "Add individuals"; 
-		help = load_add_ind_text;
-		break;
-		
-	case "Remove Ind.":
-		title = "Remove individuals";
-		help = load_rem_ind_text;
-		break;
-		
-	case "Move Ind.": 
-		title = "Move individuals"; 
-		help = load_move_ind_text;
-		break;
-	
-	case "Comp File":
-		title = "Load compartments"; 
-		help = load_comp_text;
-		break;
-		
-	case "Comp File Colour":
-		title = "Load compartments"; 
-		help = load_compcol_text;
-		break;
-		
-	case "Comp File Pos": 
-		title = "Load compartments"; 
-		help = load_comppos_text;
-		break;
-		
-	case "Comp File Pos Colour":
-		title = "Load compartments"; 
-		help = load_compposcol_text;
-		break;
-		
-	case "CompMap":
-		title = "Compartment map"; 
-		help = load_compmap_text;
-		break;
-		
+
 	case "LoadTensor":
 		title = convert_tensor_text("Load tensor values",so.load_col.length-1); 
 		help = convert_tensor_text(load_tensor_text2,so.load_col.length-1);
-		break;
-			
-	case "LoadReparam":
-		title = "Load reparameterisation";
-		help = load_reparam_text2;
-		break;
-		
-	case "LoadPriorSplit": 
-		title = "Load priors"; 
-		help = load_priorsplit_text2;
-		break;
-		
-	case "LoadDistSplit": 
-		title = "Load distributions"; 
-		help = load_distsplit_text2;
-		break;
-	
-	case "Population":
-		title = "Load population data"; 
-		help = load_population_text;
-		break;
-	
-	case "Pop. Trans.":
-		title = "Load population transition data"; 
-		help = load_poptrans_text;
-		break;
-		
-	case "Fixed Effect":
-		title = "Load covariate vector for fixed effect"; 
-		help = fixed_eff_text;
-		break;
-	
-	case "Compartment":
-		title = "Load compartmental data"; 
-		help = load_compartment_text;
-		break;
-		
-	case "Transition":
-		title = "Load transition data"; 
-		help = load_compartment_text;
-		break;
-		
-	default:
-		//error("Option error:"+title);
 		break;
 	}
 	
@@ -479,12 +489,14 @@ function create_edit_table(lay)
 			te = "Edit this table (optional) and click 'Done' to complete."; 
 
 			switch(so.type){
+			case "KnotTimes": ac = "AddKnotTimes"; break;
 			case "CompMap": ac = "AddCompMap"; break;
 			case "LoadTensor": ac = "LoadTensorDone"; break;
 			case "LoadPriorSplit": ac = "LoadPriorSplitDone"; break;
 			case "LoadDistSplit": ac = "LoadDistSplitDone"; break;
 			case "LoadReparam": ac = "LoadReparamDone"; break;	
 			case "Fixed Effect": ac = "LoadXvector2"; break;
+			case "Init. Pop.": ac = "InitPopAdd"; break;
 			default:
 				if(so.info.load_file) ac = "AddFile" + so.info.load_file; 
 				else{		
@@ -497,7 +509,6 @@ function create_edit_table(lay)
 	}
 	else{
 		let col = so.load_col[tab_dest.ncol];
-		//te = "Select column '<b>"+col.heading.toLowerCase()+"</b>' for "+col.desc+":";
 		te = "Select column '<b>"+col.heading+"</b>' for "+col.desc+":";
 		
 		let teri, teri2;
@@ -558,7 +569,6 @@ function convert_tensor_text(te,dim)
 		te = te.replace(/tensor/g,"vector"); 
 		te = te.replace(/Tensor/g,"Vector"); 
 		te = te.replace(/columns with headings given by the indices/g,"a column with heading given by the index"); 
-		//indices of the tensor
 		break;
 	case 2: 
 		te = te.replace(/tensor/g,"matrix"); 
@@ -572,15 +582,18 @@ function convert_tensor_text(te,dim)
 /// Displays the creation of a new data table					
 function add_create_edit_table_buts(lay)
 {
-	let tab_source = data.table[inter.edit_source.data_table_use];
-	let tab_dest = inter.edit_source.table
+	let tab_source = data.table[edit_source.data_table_use];
+	
+	let tab_dest = edit_source.table;
+
+	lay.op.table = edit_source.table;
 
 	let x = 0;
 	
 	x = draw_data_table(lay,x,0,tab_dest,{name:"Data table", edit:tab_dest.edit});
 	x += 1;
 	
-	if(tab_dest.ncol < inter.edit_source.load_col.length){
+	if(tab_dest.ncol < edit_source.load_col.length){
 		lay.add_button({x:x, y:1.3, dx:2, dy:1.3, type:"LeftArrow", col:BLACK});
 		x += 2;
 		
@@ -622,19 +635,33 @@ function draw_data_table(lay,x,y,tab,op)
 		}
 		
 		if(flag == false){
-			let wmax = 0;
+			let wmax = 4;
 			let head = tab.heading[c];
 			let w = text_width(head,fo_head);
 			if(w > wmax) wmax = w;
 			
-			for(let r = 0; r < tab.nrow; r++){
-				let te = get_table_ele_text(tab,r,c); 
-				let w = text_width(te,fo);
-				if(w > wmax) wmax = w;
+			// Works out if a compartment or index
+			let comp_col = false;
+			for(let p = 0; p < model.species.length; p++){
+				let sp = model.species[p];
+				for(let cl = 0; cl < sp.ncla; cl++){
+					let claa = sp.cla[cl];
+					if(head == claa.name || remove_prime(head) == claa.index) comp_col = true;
+				}
 			}
+			
+			let lenmax = 0, longest="";
+			for(let r = 0; r < tab.nrow; r++){
+				let te = get_table_ele_text(tab,r,c);
+				let l = te.length;
+				if(l > lenmax){ lenmax = l; longest = te;}
+			}
+			
+			w = text_width(longest,fo); if(w > 10) w = 10;
+			if(w > wmax) wmax = w;
+			if(wmax < 5) wmax = 5;
+	
 			wmax += pad;
-			if(wmax < 4) wmax = 4;
-			if(c == tab.ncol-1 && cx+wmax < x+wmin) wmax = x+wmin-cx;
 			
 			let cy = y+mar;
 
@@ -642,7 +669,7 @@ function draw_data_table(lay,x,y,tab,op)
 				lay.add_button({te:head, x:cx, y:cy, dx:wmax, dy:dy_table, type:"Element", c:c, ac:"EditTableHead", font:get_font(si_table,"bold")}); cy += dy_table;
 				for(let r = 0; r < tab.nrow; r++){
 					let te = get_table_ele_text(tab,r,c); 
-					lay.add_button({te:te, x:cx, y:cy, dx:wmax, dy:dy_table, type:"Element", c:c, r:r, ac:"EditTableElement", font:get_font(si_table)}); cy += dy_table;
+					lay.add_button({te:te, x:cx, y:cy, dx:wmax, comp_col:comp_col, dy:dy_table, type:"Element", c:c, r:r, ac:"EditTableElement", font:get_font(si_table)}); cy += dy_table;
 				}
 			}
 			else{
@@ -694,28 +721,167 @@ function get_table_ele_text(tab,r,c)
 }
 
 
+/// Converts from a text string to a filter
+function find_filt(find)
+{
+	let filt = [];
+	let spl = find.split("*");
+	for(let i = 0; i < spl.length; i++){
+		let len_after = 0;
+		for(let j = i; j < spl.length; j++){
+			len_after += spl[j].length;
+		}
+		filt.push({len:spl[i].length, te:spl[i], len_after:len_after});
+	}
+	
+	return filt;
+}
+
+
+/// Works out if a string agees with a filter
+function filt_agree(st,filt)
+{
+	st = String(st);
+	if(filt.length == 1){
+		if(st.toLowerCase() == filt[0].te.toLowerCase()) return true;
+		return false;
+	}
+	return filt_agree2(st,0,filt,0);
+}
+
+function filt_agree2(st,i,filt,num)
+{
+	let fi = filt[num];
+	if(i > st.length-fi.len_after) return false;
+	
+	let jmin, jmax;
+	if(num == 0){ jmin = 0; jmax = 1;}
+	else{
+		if(num == filt.length-1){ jmin = st.length-fi.len; jmax = jmin+1;}
+		else{
+			jmin = i; jmax = st.length-fi.len_after;
+		}
+	}
+
+	for(let j = jmin; j < jmax; j++){
+		if(st.substr(j,fi.len).toLowerCase() == fi.te.toLowerCase()){
+			if(num == filt.length-1) return true;
+			else{
+				if(filt_agree2(st,j+fi.len,filt,num+1) == true) return true;
+			}
+		}
+	}
+	return false;
+}
+
+
 /// Performs a search 
 function done_search()
 {
 	let c = inter.bubble.bu.c;
-	let tab = inter.edit_source.table;
+	let tab = edit_source.table;
 	
 	let find = inter.bubble.find;
 	
+	let filt = find_filt(find);
+
 	let row_find = [];
 	for(let r = 0; r < tab.nrow; r++){
-		if(tab.ele[r][c].toLowerCase() == find.toLowerCase()){
+		if(filt_agree(tab.ele[r][c],filt)){
 			row_find.push(r);
 		}
 	}
 	
-	if(row_find.length > 0){
-		select_table_elelent(row_find[0],c);
+	if(row_find.length == 0){
+		alert_help("Search problem","No search results were found");
 	}
-	inter.bubble.row_find = row_find;
-	inter.bubble.search_select = 0;
+	else{
+		if(row_find.length > 0){
+			select_table_elelent(row_find[0],c);
+		}
+		inter.bubble.row_find = row_find;
+		inter.bubble.search_select = 0;
+		
+		change_bubble_mode("SearchResult");
+	}
+}
+
+
+/// Works out if a string agees with a filter and replaces
+function filt_replace(st,filt,replace)
+{
+	st = String(st);
+	if(filt.length == 1){
+		if(st.toLowerCase() == filt[0].te.toLowerCase()) return replace[0];
+		return st;
+	}
 	
-	change_bubble_mode("SearchResult");
+	let res = filt_replace2(st,0,filt,0,replace);
+	if(res == false) return st;
+	return res;
+}
+
+
+/// Works out if a string agees with a filter and replaces
+function filt_replace2(st,i,filt,num,replace)
+{
+	let fi = filt[num];
+	if(i > st.length-fi.len_after) return false;
+	
+	let jmin, jmax;
+	if(num == 0){ jmin = 0; jmax = 1;}
+	else{
+		if(num == filt.length-1){ jmin = st.length-fi.len; jmax = jmin+1;}
+		else{
+			jmin = i; jmax = st.length-fi.len_after;
+		}
+	}
+
+	for(let j = jmin; j < jmax; j++){
+		if(st.substr(j,fi.len).toLowerCase() == fi.te.toLowerCase()){
+			if(num == filt.length-1){
+				let te = ""; if(jmin > i) te += st.substr(i,jmin-i);
+				return te+replace[num];
+			}
+			else{
+				let res = filt_replace2(st,j+fi.len,filt,num+1,replace);
+				if(res != false){
+					let te = ""; if(jmin > i) te += st.substr(i,jmin-i);
+					return te+replace[num]+res;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+
+/// Performs a replace 
+function done_replace()
+{
+	let c = inter.bubble.bu.c;
+	let tab = edit_source.table;
+	let num = 0;
+	
+	let filt = find_filt(inter.bubble.find);
+	let replace = inter.bubble.replace.split("*");
+	if(filt.length != replace.length){
+		alert_help("Wildcard error", "The number of wildcards '*' must match between 'find' and 'replace'.");
+	}
+	else{
+		for(let r = 0; r < tab.nrow; r++){
+			let te = String(tab.ele[r][c]);
+			let te_new = filt_replace(te,filt,replace);
+			
+			if(te != te_new){
+				tab.ele[r][c] = te_new;
+				num++;
+			}
+		}
+		
+		inter.bubble.num = num;
+		change_bubble_mode("ReplaceResult");
+	}
 }
 
 
@@ -723,14 +889,16 @@ function done_search()
 function done_delete_rows()
 {
 	let c = inter.bubble.bu.c;
-	let tab = inter.edit_source.table;
+	let tab = edit_source.table;
 	
 	let find = inter.bubble.find;
 	
+	let filt = find_filt(find);
+
 	let num = 0;
 	let r = 0;
 	while(r < tab.nrow){
-		if(tab.ele[r][c].toLowerCase() == find.toLowerCase()){
+		if(filt_agree(tab.ele[r][c],filt)){
 			tab.ele.splice(r,1);
 			tab.nrow--;
 			num++;
@@ -751,7 +919,7 @@ function done_delete_rows()
 function done_delete_row()
 {
 	let r = inter.bubble.bu.r;
-	let tab = inter.edit_source.table;
+	let tab = edit_source.table;
 	
 	tab.ele.splice(r,1);
 	tab.nrow--;
@@ -762,20 +930,28 @@ function done_delete_row()
 /// Goes back on a search result
 function search_back()
 {
-	let bub = inter.bubble;
+	let bub = copy(inter.bubble);
 	bub.search_select--;
 	if(bub.search_select < 0) bub.search_select = bub.row_find.length-1;
 	select_table_elelent(bub.row_find[bub.search_select],inter.bubble.bu.c);
+	inter.bubble.mode = bub.mode;
+	inter.bubble.search_select = bub.search_select;
+	inter.bubble.row_find = bub.row_find;
 }
 
 
 /// Goes next on a search result
 function search_next()
 {
-	let bub = inter.bubble;
+	let bub = copy(inter.bubble);
+
 	bub.search_select++;
-	if(bub.search_select ==  bub.row_find.length) bub.search_select = 0;
+	if(bub.search_select == bub.row_find.length) bub.search_select = 0;
+
 	select_table_elelent(bub.row_find[bub.search_select],inter.bubble.bu.c);
+	inter.bubble.mode = bub.mode;
+	inter.bubble.search_select = bub.search_select;
+	inter.bubble.row_find = bub.row_find;
 }
 
 
@@ -802,12 +978,11 @@ function sort_number(a,b,sign)
 }
 
 
-
 /// Performs an orderinf of a column 
 function done_order()
 {
 	let c = inter.bubble.bu.c;
-	let tab = inter.edit_source.table;
+	let tab = edit_source.table;
 	
 	let list=[];
 	for(let r = 0; r < tab.nrow; r++){
@@ -872,7 +1047,8 @@ function select_param_element(index)
 	let but = lay.but;
 	
 	let i = 0; 
-	while(i < but.length && (!(but[i].ac == "EditParamElement" || but[i].ac == "EditDistSplitElement") || equal_vec(but[i].pindex,index) == false)) i++;
+	while(i < but.length && (!(but[i].ac == "EditParamElement" 
+	   || but[i].ac == "EditDistSplitElement") || equal_vec(but[i].pindex,index) == false)) i++;
 	if(i == but.length){ error("Button not found"); return;}
 
 	activate_button(lay,i);
@@ -905,34 +1081,38 @@ function shift_button_in_view(l,i)
 
 
 /// Transfers a column from a loaded data table to a data source 
-function transfer_column(c)
+function transfer_column(c,all_snp_flag)
 {
-	let so = inter.edit_source;
+	let so = edit_source;
 
 	let tab_source = data.table[so.data_table_use];
 	let tab_dest = so.table;
 	
-	tab_dest.filename = tab_source.filename;
+	let replace_space = false;
+	if(so.load_col[tab_dest.ncol].type == "comptext") replace_space = true;
 	
+	tab_dest.filename = tab_source.filename;
 	for(let r = 0; r < tab_source.nrow; r++){
 		if(tab_dest.nrow == 0) tab_dest.ele[r]=[];
-		tab_dest.ele[r].push(tab_source.ele[r][c]);
+		
+		let te = tab_source.ele[r][c];
+		if(replace_space) te = te.replace(/ /g,"-");
+		tab_dest.ele[r].push(te);
 	}
-	
+
 	tab_dest.heading.push(so.load_col[tab_dest.ncol].heading);
+	
 	tab_dest.col_used.push(c);
 	tab_dest.ncol++; 
 	tab_dest.nrow = tab_source.nrow;
 
-	if(so.type == "Genetic" && tab_dest.ncol == 3){
-		let head = tab_source.heading[c];
-		let i = 0; while(i < head.length && isNaN(head.substr(i,1))) i++;
-		let root = head.substr(0,i);
+	if(so.type == "Genetic" && tab_dest.ncol == 3 && all_snp_flag != false){
+		let snp_root = so.spec.snp_root;
 
 		let list_extra = [];
 		for(let c = 0; c < tab_source.ncol; c++){
 			if(find_in(tab_dest.col_used,c) == undefined){
-				if(tab_source.heading[c].substr(0,root.length) == root){
+				if(tab_source.heading[c].substr(0,snp_root.length) == snp_root){
 					for(let r = 0; r < tab_source.nrow; r++){
 						tab_dest.ele[r].push(tab_source.ele[r][c]);
 					}
@@ -954,7 +1134,7 @@ function transfer_column(c)
 /// Transfers a column back				
 function transfer_column_back()
 {
-	let so = inter.edit_source;
+	let so = edit_source;
 	let tab_dest = so.table;
 
 	if(tab_dest.list_extra != undefined){  // For genetic data removes extra columns
@@ -979,7 +1159,7 @@ function transfer_column_back()
 /// Adds a constant column to the table
 function add_constant_column(val)
 {
-	let so = inter.edit_source;
+	let so = edit_source;
 		
 	let tab_source = data.table[so.data_table_use];
 	tab_source.heading.push("Constant");
@@ -1009,14 +1189,6 @@ function add_table_content(lay,table,back_col,dy)
 	let head = table.heading;
 	let ncol = head.length;
 	
-	/*
-	if(outline != undefined){
-		let sum = 0;
-		for(let c = 0; c < ncol; c++) sum += head[c].width;
-		lay.add_button({x:mar, y:0.5, dx:sum, dy:(table.content.length+1)*dy, type:"Outline", back_col:WHITE, col:WHITE}); 
-	}
-	*/
-	
 	for(let c = 0; c < ncol; c++){
 		let w = table.width[c];
 		let fo = get_font(si,"bold");
@@ -1043,17 +1215,17 @@ function add_table_content(lay,table,back_col,dy)
 				break;
 
 			case "Edit":
-				lay.add_button({te:ele.te, x:cx, y:cy+0.1, dx:w, dy:1.1, type:"GreyEdit", back_col:back_col, info:ele.info, ac:ele.ac}); 
+				lay.add_button({te:ele.te, x:cx, y:cy+0.1, dx:w, dy:1.2, type:"GreyEdit", back_col:back_col, info:ele.info, ac:ele.ac}); 
 				break;
 				
 			case "View":
-				lay.add_button({te:ele.te, x:cx, y:cy+0.1, dx:w-0.5, dy:1.1, type:"GreyView", back_col:back_col, info:ele.info, ac:ele.ac}); 
+				lay.add_button({te:ele.te, x:cx, y:cy+0.1, dx:w-0.5, dy:1.2, type:"GreyView", back_col:back_col, info:ele.info, ac:ele.ac}); 
 				break;
 				
 			case "Delete":
 				{
 					let si = 1.3;
-					lay.add_button({te:ele.te, x:cx+w-si/2, y:cy, dx:si, dy:si, type:"Delete", back_col:back_col, source:ele.source, i:ele.i, ac:ele.ac}); 
+					lay.add_button({te:ele.te, x:cx+w-si/2, y:cy, dx:si, dy:si, type:"Delete", back_col:back_col, error:ele.error, siminf:ele.siminf, source:ele.source, p:ele.p, i:ele.i, ac:ele.ac}); 
 				}
 				break;
 			
@@ -1070,7 +1242,10 @@ function add_table_content(lay,table,back_col,dy)
 						lay.add_button({te:ele.te, x:cx, y:cy, dx:w, dy:1.3, type:"ParamText", back_col:back_col, si:si, font:fo, col:col});
 					}
 					else{
-						lay.add_button({te:ele.te, x:cx, y:cy, dx:w, dy:1.3, type:"Text", back_col:back_col, si:si, font:fo, col:col});
+						let comp_col;
+						if(head[c].name == "Details") comp_col = true; 
+							
+						lay.add_button({te:ele.te, comp_col:comp_col, x:cx, y:cy, dx:w, dy:1.3, type:"Text", back_col:back_col, si:si, font:fo, col:col});
 					}
 				}					
 				break;	
@@ -1084,40 +1259,18 @@ function add_table_content(lay,table,back_col,dy)
 	cx = mar+table.width[0];
 	for(let c = 1; c < ncol; c++){
 		let d = 0.4;
-		if(head[c-1].name != "" && head[c].name != ""){
+		
+		if(head[c-1].name != "" && head[c].name != "" && head[c-1].name != "Spec." && head[c].name != "Spec."){
 			lay.add_button({x:cx-d, y:0, dx:d, dy:cy, col:c, width:table.width, type:"TableSlider", ac:"TableSlider"});
 		}
 		cx += table.width[c];		
 	}
+	
+	
 }	
 
 
-/// Given a classification name return species
-function get_p_cl_from_claname(name)
-{
-	for(let p = 0; p < model.species.length; p++){
-		let sp = model.species[p];
-		for(let cl = 0; cl < sp.ncla; cl++){
-			if(sp.cla[cl].name == name) return {p:p, cl:cl};
-		}
-	}
-}
-
-/*
-/// Gets p and cl from classification name
-function get_p_cl_from_name(te)
-{
-	for(let p = 0; p < model.species.length; p++){
-		let sp = model.species[p];
-		for(let cl = 0; cl < sp.ncla; cl++){
-			if(sp.cla[cl].name == te) return {p:p, cl:cl};
-		}
-	}
-}
-*/
-
-
-/// Drags the tableslide (assuming a mouse move even)
+/// Drags the tableslider (assuming a mouse move even)
 function drag_table_slider(x)
 {
 	let wmin = 2;
@@ -1133,6 +1286,19 @@ function drag_table_slider(x)
 	
 	inter.mode.width[c-1] = w1;
 	inter.mode.width[c] = w2;
+	generate_screen();
+}
+
+
+/// Drags the right menu slider 
+function drag_rightmenu_slider(x)
+{
+	let mod = inter.mode;
+	
+	right_menu_width = mod.width_store-(x-mod.x_st);
+	if(right_menu_width < 7) right_menu_width = 7;
+	if(right_menu_width > 30) right_menu_width = 30;
+	
 	generate_screen();
 }
 
@@ -1164,25 +1330,6 @@ function mode_off()
 }
 
 
-/// Prints to the console
-function pr(te)
-{ 
-	console.log(te);
-}
-
-/// Prints to the console
-function comment(te)
-{ 
-	console.log(te);
-}
-
-/// Prints a text error to the console
-function error(te)
-{
-	console.log("ERROR: "+te);
-}
-
-
 /// Prints a text error to the screen
 function alertp(te)
 {
@@ -1193,21 +1340,13 @@ function alertp(te)
 }
 
 
-/// Copies an object
-function copy(inp){ 
-	return JSON.parse(JSON.stringify(inp));
-}
-
-
-/// Finds a value in list of objects
-function find(arr,prop,val)
+/// If the result of a function throws an error then outputs to help
+function output_help(res)
 {
-	let i = 0; while(i < arr.length && arr[i][prop] != val) i++;
-	if(i == arr.length){
-		//error("Cannot find array value. prop:"+prop+" val:"+val+"  arr:"+arr);
-		return;
+	if(res.err == true){
+		inter.help = { title:"Sorry an error occured!", te:res.msg};
+		generate_screen();
 	}
-	return i;
 }
 
 
@@ -1221,73 +1360,6 @@ function count(arr,prop,val)
 	return num;
 }
 
-
-/// Finds a value in list of objects (irrespective of case)
-function find_nocase(arr,prop,val)
-{
-	let i = 0; while(i < arr.length && arr[i][prop].toLowerCase() != val.toLowerCase()) i++;
-	if(i == arr.length){
-		//error("Cannot find array value. prop:"+prop+" val:"+val+"  arr:"+arr);
-		return;
-	}
-	return i;
-}
-
-
-/// Finds a value in list of objects
-function find_in(arr,val)
-{
-	let i = 0; while(i < arr.length && arr[i] != val) i++;
-	if(i == arr.length)	return;
-	return i;
-}
-
-
-/// Finds a value in list of string case-independent
-function find_string_in(arr,val)
-{
-	let i = 0; while(i < arr.length && arr[i].toLowerCase() != val.toLowerCase()) i++;
-	if(i == arr.length)	return;
-	return i;
-}
-
-
-/// When typing this convert \alpha to greek alpha
-function detect_greek(te,curi)
-{
-	let i = 0;
-	while(i < te.length){
-		while(i < te.length && te.substr(i,1) != "\\") i++;
-	
-		if(i < te.length){
-			i++;
-			for(let j = 0; j < greek_latex.length; j++){
-				let wo = greek_latex[j][0];
-				let len = wo.length;
-				if(i <= te.length-len){
-					if(te.substr(i,len) == wo){
-						te = te.substr(0,i-1)+greek_latex[j][1]+te.substr(i+len);
-						if(curi > i) curi -= len;
-					}
-				}
-			}
-		}
-	}
-	
-	return {te:te,curi:curi};
-}
-
-
-/*
-/// Finds a value in list of objects assuming lower case
-function find_lc(arr,prop,val)
-{
-	let i = 0; 
-	while(i < arr.length && arr[i][prop].toLowerCase() != val.toLowerCase()) i++;
-	if(i == arr.length) return;
-	return i;
-}
-*/
 
 /// Gets the possibilities from an array with a given property
 function get_pos(ar,ob)
@@ -1320,14 +1392,16 @@ function get_w_drop(pos)
 /// Views a warning
 function view_warning(i)
 {
-	let warn = copy(model.warn[i]);
-	model.warn.length = 0;
+	let warn = model.warn[i];
 	
-	let info = warn.eqn_info;
-			
-	//error(warn.warn_type+" warn type"); error(warn);
+	model.warn_view = false;
 
 	switch(warn.warn_type){
+	case "TransTreeInf":
+		change_page({pa:"Model", su:"Compartments", susu:warn.p});
+		press_button_prop("Menu","PageSubSub",["val"],warn.p);	
+		break;
+	
 	case "ModelClass":
 		change_page({pa:"Model", su:"Compartments", susu:warn.p, sususu:warn.cl});
 		break;
@@ -1345,10 +1419,22 @@ function view_warning(i)
 		press_button_prop("TableContent","GreyEdit",["info","i"],warn.i);	
 		break;
 		
+	case "NoClaComp":
+		change_page({pa:"Model", su:"Compartments", susu:warn.p, sususu:warn.cl});
+		break;
+	
 	case "MissingComp": case "MissingColour":
 		select_bubble_compartment(warn.p,warn.cl,warn.c);
 		break;
 	
+	case "TransMistake":
+		select_bubble_transition(warn.p,warn.cl,warn.i);
+		break;
+		
+	case "MissingParamMultValue":
+		change_page({pa:"Post. Simulation", su:"Parameter Mult."});
+		break;
+		
 	case "MissingSimValue":
 		change_page({pa:"Simulation", su:"Parameters"});
 		press_button_prop("ParamValueContent","ParamSimElement",["name"],warn.name);
@@ -1371,8 +1457,7 @@ function view_warning(i)
 		
 	case "reparam":
 		change_page({pa:"Model", su:"Parameters"});
-		press_button_prop("ModelParamContent","DistElement",["name"],warn.name);
-		error("Need to do");
+		press_button_prop("ModelParamContent","ReparamElement",["name"],warn.name);
 		break;
 	
 	case "SimPopulationProb":
@@ -1404,36 +1489,40 @@ function view_warning(i)
 		break;
 	
 	case "Equation":
-		switch(warn.eqn_type){
-		case "comp_prob":
-			select_bubble_data_element(info.p,info.i,info.r,info.c);
-			break;
-		
-		case "reparam":
-			select_reparam_element(info.par_name, info.index);
-			break;
-		
-		case "trap_prob":	case "Se": case "Sp":
-			select_bubble_data_spec(info.p,info.i);
-			break;
-		
-		case "trans_mean": case "trans_rate":
-		case "trans_scale": case "trans_shape":
-		case "trans_cv":
-			select_bubble_transition(info.p,info.cl,info.i);;
-			break;
-		
-		case "trans_bp": 
-			select_bubble_transition(info.p,info.cl,info.i);
-			break;
+		{
+			let info = warn.eqn_info;
+	
+			switch(warn.eqn_type){
+			case "comp_prob":
+				select_bubble_data_element(info.p,info.i,info.r,info.c);
+				break;
 			
-		case "derive_param": case "derive_eqn":
-			select_bubble_derived(info.i);
-			break;
-		
-		default: 
-			error("This equation type is not recognised:"+warn.eqn_type);
-			break;
+			case "reparam":
+				select_reparam_element(info.par_name, info.index);
+				break;
+			
+			case "Se": case "Sp":
+				select_bubble_data_spec(info.p,info.i);
+				break;
+			
+			case "trans_mean": case "trans_rate":
+			case "trans_scale": case "trans_shape":
+			case "trans_cv":
+				select_bubble_transition(info.p,info.cl,info.i);;
+				break;
+			
+			case "trans_bp": 
+				select_bubble_transition(info.p,info.cl,info.i);
+				break;
+				
+			case "derive_param": case "derive_eqn":
+				select_bubble_derived(info.i);
+				break;
+			
+			default: 
+				error("This equation type is not recognised:"+warn.eqn_type);
+				break;
+			}
 		}
 		break;
 	
@@ -1449,13 +1538,22 @@ function view_warning(i)
 		if(warn.siminf == "sim") change_page({pa:"Simulation", su:"Population", susu:warn.p});
 		else change_page({pa:"Inference", su:"Data", susu:warn.p});
 		break;
+		
+	case "KnotProblem":
+		change_page({pa:"Model", su:"Parameters"});
+		break;
+		
+	case "ParamValueProblem":
+		switch(warn.par.variety){
+		case "normal": change_page({pa:"Simulation", su:"Parameters"}); break;
+		default: change_page({pa:"Model", su:"Parameters"}); break;
+		}
+		break;
 			
 	default:
 		error("This warning type is not recognised:"+warn.warn_type);
 		break;
 	}
-	
-	model.warn.length = 0;
 }
 
 
@@ -1472,6 +1570,15 @@ function get_drop_width(wmin,pos)
 	if(w < wmin) w = wmin;
 	
 	return w;
+}
+
+
+/// Removes a filter
+function remove_filter(p,i,rpf)
+{
+	rpf.species[p].filter.splice(i,1);
+	inter.graph.init = undefined;
+	close_bubble();
 }
 
 
@@ -1499,33 +1606,23 @@ function clone_class_init(p_sel)
 }
 
 
-/// Makes sure the camera is up-to-date for any clones
-function clone_camera(p,cl)
-{
-	let list = model.find_clones(p,cl);	
-	if(list.length > 0){
-		let cam = model.species[p].cla[cl].camera;
-	
-		for(let li of list){
-			let cam2 = model.species[li.p].cla[li.cl].camera;
-			cam2.x = cam.x; cam2.y = cam.y; cam2.scale = cam.scale; cam2.ruler = cam.ruler;
-		}
-		model.check_clones();
-	}
-}
-
-
 /// Displays a message at the center of the screen
 function center_message(te,lay)
 {
 	let dx = 40;
 	
 	let si = para_si;
-	lay.add_button({te:te, x:page_char_wid/2-lay.x-dx/2+menu_width/2, y:page_char_hei/2-lay.y, dx:dx, dy:si, type:"CenterText", font:get_font(si)}); 
+	
+	let y = page_char_hei/2-lay.y;
+	let spl = te.split("\n");
+	for(let j = 0; j < spl.length; j++){			
+		lay.add_button({te:spl[j], x:page_char_wid/2-lay.x-dx/2+menu_width/2, y:y, dx:dx, dy:si, type:"CenterText", font:get_font(si)}); 
+		y += 1.5;
+	}
 }
 
 
-// Gets the main tab page name
+/// Gets the main tab page name
 function tab_name()
 {
 	let tree = inter.page_name.split("->");
@@ -1536,6 +1633,7 @@ function tab_name()
 /// Gets the sub tab  name
 function subtab_name()
 {
+	if(!inter.page_name) return "";
 	let tree = inter.page_name.split("->");
 	return tree[1];
 }
@@ -1546,27 +1644,6 @@ function subsubtab_name()
 {
 	let tree = inter.page_name.split("->");
 	return tree[2];
-}
-
-
-/// Removes quotation marks from a string
-function remove_quote(te)
-{
-	if(te.substr(0,1) == "\"" && te.substr(te.length-1,1) == "\""){
-		te = te.substr(1,te.length-2);
-	}
-	return te;
-}
-
-
-/// Removes <e> </e> equation quotes
-function remove_eq_quote(te)
-{
-	if(typeof te == "string"){
-		if(te.length >= 3 && te.substr(0,3) == "<e>") te = te.substr(3);
-		if(te.length >= 4 && te.substr(te.length-4,4) == "</e>") te = te.substr(0,te.length-4);
-	}
-	return te;
 }
 
 
@@ -1582,19 +1659,255 @@ function add_quote(te)
 }
 
 
-/// Calculates if two numbers is different (subject to numerical noise) 
-function dif(a,b)
-{
-	let dif = a-b; if(dif < 0) dif = -dif;
-	if(dif > TINY) return true;
-	return false;
-}
-
-
 /// A message showing that a feature is currently not avaiable
 function disactivated(te)
 {
 	if(te == undefined) te = ""; else te += " ";
 	te += "This feature is currently under development, but unfortunately is unavailable yet.";
-	inter.help = {title:"Feature not available", te:te};
+	
+	alert_help("Feature not available",te);
+}
+
+
+/// Starts the worker doing a job
+function start_worker(type,info)
+{
+	if(false) pr("start work: "+type+" "+info);
+	
+	start_loading_symbol(0,type);
+	generate_screen();
+	
+	inter.worker_mess.next = {type:type, info:info};
+	
+	if(subtab_name() != "Results") inter.worker_mess.next.model = model;
+
+	setTimeout(worker_mess_process,10);
+}
+
+
+/// Processes any web worker messages 
+function worker_mess_process()
+{
+	let wm = inter.worker_mess;
+	if(wm.next && wm.active == false){
+		wm.active = true;
+		worker.postMessage(wm.next);
+		delete wm.next;
+	}
+}
+
+
+/// For some scroll bars make sure they go to the top
+function scroll_to_top()
+{
+	let list = ["CreateEditTableContent"];
+	for(let i = 0; i < inter.scroll_position.length; i++){
+		let sp = inter.scroll_position[i];
+	
+		let j = 0; while(j < list.length && !sp.page.includes(list[j])) j++;
+		if(j < list.length) sp.shift = 0;
+	}
+}
+
+
+/// Stops the current message
+function stop_worker()
+{
+	stop_loading_symbol();
+	inter.worker_mess.active = "stop";
+}
+
+
+/// Determines a match between the two textstore objects
+function find_match(ts,ts2)
+{
+	if(ts.length != ts2.length) return;
+	let match = [];
+	let flag = [];
+	for(let i = 0; i < ts.length; i++){
+		let type = ts[i].source.type;
+		for(let j = 0; j < ts2.length; j++){
+			if(flag[j] != true){
+				if(ts2[j].source.type == type){
+					flag[j] = true;
+					match[i] = j;
+					break;
+				}
+			}
+		}
+		if(match[i] == undefined) return;
+	}
+	return match;
+}
+
+
+/// Pastes content at the cursor location
+function cursor_paste(paste)
+{
+	if(paste.length > 7 && paste.substr(0,7) == "OBJECT-"){
+		if(bubble_on()){
+			let bub_sum = get_bubble_summary();
+			let bub_sum2 = JSON.parse(paste.substr(7));
+
+			let match = find_match(bub_sum.ts,bub_sum2.ts);
+			
+			if(bub_sum.type != bub_sum2.type || 
+				bub_sum.drop.length != bub_sum2.drop.length || 
+				bub_sum.check.length != bub_sum2.check.length || 
+				bub_sum.radio.length != bub_sum2.radio.length || 
+				match == undefined){
+				alert_help("Error pasting", "The copied object cannot be placed into this element.");
+				generate_screen();
+			}
+			else{
+				for(let i = 0; i < match.length; i++){
+					inter.textbox_store[i].te = bub_sum2.ts[match[i]].te;
+				}
+				
+				let lay = get_lay("Bubble");
+				for(let i = 0; i < bub_sum.check.length; i++){
+					let ch = bub_sum.check[i];
+					lay.but[ch.i].source.check = ch.check;
+				}
+				
+				for(let i = 0; i < bub_sum.radio.length; i++){
+					let ra = bub_sum.radio[i];
+					lay.but[ra.i].source.value = ra.value;
+				}
+				
+				for(let i = 0; i < bub_sum.drop.length; i++){
+					inter.layer[bub_sum.drop[i].l].op.source.te = bub_sum2.drop[i].te;
+				}
+				
+				button_action(inter.bubble.final_button,"enter");  
+			}
+		}
+	}
+	else{
+		paste = paste.replace(/</g,"〈");
+		paste = paste.replace(/>/g,"〉");
+		if(subtab_name() != "Description") paste = paste.replace(/\*/g,"×");
+				
+		let cur = inter.cursor;
+		if(cur.i == undefined) return;
+
+		let i = 0; 
+		while(i < paste.length){
+			let ch = paste.charCodeAt(i);
+			if(ch == 13){
+				if(inter.layer[cur.l].name == "TextBox"){
+					paste = paste.substr(0,i)+"\n"+paste.substr(i+1);
+				}
+			}
+			else{
+				if(ch >= 0 && ch < 32){
+					paste = paste.substr(0,i)+paste.substr(i+1);
+					i--;
+				}
+			}
+			i++;
+		}
+
+		let text_lay = inter.layer[cur.l];
+		
+		let te = text_lay.get_text_from_source();
+
+		let remember = { on:true, i:cur.i, select_pos:cur.select_pos};
+
+		te = remove_selection(te);
+		
+		te = te.substr(0,cur.i)+paste+te.substr(cur.i);
+		text_lay.put_text_in_source(te,remember);
+		cur.i += paste.length; 
+		reset_cursor();
+	}
+}
+
+
+/// Gets a summary of all the properties of a bubble (so it can be copied)
+function get_bubble_summary()
+{
+	let bu = inter.bubble.bu;
+	
+	let sum = {type:bu.type, ts:inter.textbox_store, check:[], drop:[], radio:[]};
+	
+	let lay = get_lay("Bubble");
+	for(let j = 0; j < lay.but.length; j++){
+		let bu = lay.but[j];
+		switch(bu.type){
+		case "CheckboxButton":
+			sum.check.push({ i:j, check:bu.source.check});
+			break;
+			
+		case "RadioButton":
+			sum.radio.push({ i:j, value:bu.source.value});
+			break;	
+		}
+	}
+	
+	for(let l = lay.index+1; l < inter.layer.length; l++){
+		let la = inter.layer[l];
+		if(la.name == "Dropdown"){
+			sum.drop.push({l:l, te:la.op.source.te});
+		}
+	}
+	
+	return sum;
+}
+
+
+/// Copies selected text to clipboard
+function cursor_copy(cut)
+{
+	let te = get_selected_text();
+	if(te.length == 0){
+		if(bubble_on()){	
+			let bub_sum = get_bubble_summary();
+			
+			te = "OBJECT-"+JSON.stringify(bub_sum);
+		}
+	}
+	else{
+		if(cut == true){
+			let cur = inter.cursor;
+			if(cur.l != undefined){
+				let text_lay = inter.layer[cur.l];
+			
+				let st = text_lay.get_text_from_source();
+
+				if(cur.select_pos != undefined){
+					let remember = { on:true, i:cur.i, select_pos:cur.select_pos};
+					
+					st = remove_selection(st);
+					text_lay.put_text_in_source(st,remember);
+					reset_cursor();
+				}
+			}
+		}
+	
+		let i = 0;
+		while(i < te.length){
+			if(te.substr(i,1) == "\n") te = te.substr(0,i)+"\n"+te.substr(i+1);
+			i++;
+		}
+	}
+	
+	navigator.clipboard.writeText(te);
+}
+
+
+/// Specifies a selection box for selecting compartments
+function select_box()
+{
+	let x1 = inter.mode.mx, y1 = inter.mode.my;
+	let x2 = inter.mx, y2 = inter.my;
+	if(x1 > x2){ let xx = x1; x1 = x2; x2 = xx;}
+	if(y1 > y2){ let yy = y1; y1 = y2; y2 = yy;}
+
+	let box = {x1:x1,y1:y1,x2:x2,y2:y2};
+	if((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1) > 0.5){ 
+		box.on = true;
+	}
+	
+	return box;
 }

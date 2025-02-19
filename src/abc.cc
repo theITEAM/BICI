@@ -21,22 +21,21 @@ ABC::ABC(const Model &model, Output &output) : model(model), output(output), sta
 /// Implements a version of simple ABC rejection algorithm
 void ABC::run()
 {
-	auto initc_val = model.initc_sample();
-	
 	vector <Particle> particle;
 	
 	for(auto s = 0u; s < nsample/acc_frac; s++){
 		if(com_op) progress(s,nsample/acc_frac);
-		else if(s%100 == 0) cout << s << " s\n";
+		else if(s%100 == 0) cout << s << " s" << endl;
 		
 		auto param_val = model.param_sample();
-		
+		auto initc_val = model.initc_sample(param_val);
+	
 		state.simulate(param_val,initc_val);
 	
 		particle.push_back(state.generate_particle());
 	}
 	
-	vector <double> obs_prob;                                           // Calculates the cut-off
+	vector <double> obs_prob;                                // Calculates the cut-off
 	for(auto &part : particle){
 		obs_prob.push_back(part.like.obs);
 	}

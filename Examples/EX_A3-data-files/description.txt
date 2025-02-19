@@ -1,0 +1,22 @@
+# Example A3: Uncertain initial conditions (with focal classification)
+
+## Objective
+- Introduce specification of uncertainty in the initial population when there is more than one classification.
+- The initial population is given on the 'Simulation→Initial Conditions' page.
+- Here disease status is a specified 'focal' classification.
+- Distributions for the initial populations in focal compartments are set (in this case chosen to be uniform distributions).
+- For the other classification ('Sex') a Dirichlet distribution is used to sample the *fraction* of individuals in each compartment.
+- 100 simulations are performed to see stochastic variation.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS', which stands for 'disease status', and a classification 'Sex'.
+- 'DS' contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- 'Sex' contains the compartments $M$ and $F$ for male and female.
+- A transmission rate $β_s$ determines the rate at which individuals with sex $s$ become infected.
+- A recovery rate $γ_s$ determines the rate at which individuals recover with sex $s$.
+- $N$ is the total number of individuals (this model assumes frequency dependent transmission).
+
+## Population
+- This consists of S initially uniformly sampled between 9000 and 11000, I uniformly sampled between 0 and 100 and R uniformly sampled between 0 and 100.
+- There is a 30/70 split between males and females, as determined from the Dirichlet distribution.

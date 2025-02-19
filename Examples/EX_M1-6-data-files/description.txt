@@ -1,0 +1,16 @@
+# Model 1.6: The SEIR model
+
+## Objective
+- Introduce a model with a so-called 'exposed' compartment.
+- This new compartment allows for a period of time after an individual becomes infected but before they are infectious.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains four compartments: susceptible $S$, infected $I$, exposed $E$ and recovered $R$. Together they are known as the “SEIR model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A latent duration $m^L$ (with coefficient of variation $c^L$) determines how long, on average, individuals remain in the exposed state.
+-  An infectious duration $m^I$ (with coefficient of variation $c^I$) determines how long, on average, individuals can pass on their infection to others.
+
+## Population
+- This consists of 100 initially susceptible individuals and two infected.

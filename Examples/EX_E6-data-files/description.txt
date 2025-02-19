@@ -1,0 +1,22 @@
+# Example E6: Fixed effect applied to a branching probability
+
+## Objective
+- Individual variation is incorporated into branching through a fixed effect.
+- Branching factors are used.
+
+## Data
+- Periodic compartmental observations.
+
+## Model
+- A single individual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains four compartments: susceptible $S$, infected $I$, recovered $R$ and dead $D$. Together they are known as the “SIRD model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- The *relative* probability of dying is given by b〈g〉.
+- The *relative* probability of recovering is given by 1.
+- Mean $m^R$ and coefficient of variation $c^R$ specify the log-normally distributed period to recovery.
+- Mean $m^D$ and coefficient of variation $c^D$ specify the gamma distributed period to death.
+- The strength of the fixed effect is determined through parameter $ν^g$.
+
+## Population
+- This consists of 100 initially susceptible individuals of which two are infected.

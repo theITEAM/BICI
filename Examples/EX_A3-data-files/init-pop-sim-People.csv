@@ -1,0 +1,6 @@
+"Compartment","Distribution"
+"S","uniform(9000,11000)"
+"I","uniform(0,100)"
+"R","uniform(0,100)"
+"M",3
+"F",7

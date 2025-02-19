@@ -1,0 +1,19 @@
+# Model 3.1: Metapopulation model of Scotland using regions
+
+## Objective
+- Introduce a spatial epidemiological model that uses regions (these are bounded areas on a map).
+- Here Scotland is divided into 32 local authorities.
+- A constant matrix of interactions is derived from census commuting data.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains classifications 'DS', which stands for 'disease status', and 'Location'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- “Location” contains 32 regions.
+- A transmission rate $β$ determines the rate at which individuals transmit disease.
+- A constant matrix of interactions $M_l,l'$ is proportional to the contact rate between individuals in the same and different regions (this can be estimated from census commuting data).
+- A recovery rate $γ$ determines the rate at which individuals recover.
+- An external force of infection $η$ is used to initiate an epidemic.
+
+## Population
+- This consists of initially susceptible individuals, with regional populations taken from census data.

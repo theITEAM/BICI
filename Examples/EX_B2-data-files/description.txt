@@ -1,0 +1,17 @@
+# Example B2: Time-series population transition observations for PBM
+
+## Objective
+- Inference is done using time-series population transition data.
+
+## Data
+- On the 'Inference→Data' page, population transition data is added.
+- This gives time-series estimates for the number infection transitions at periodic intervals time timestep $Δt=7$.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

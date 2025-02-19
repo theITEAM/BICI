@@ -10,15 +10,13 @@ using namespace std;
 #include "state.hh"
 #include "output.hh"
 
-class Simulate                                             // Simulates from the model
+class Simulate                             // Simulates from the model
 {
 	public:
 		Simulate(const Model &model, Output &output);
 		void run();
 		
 	private:
-		//vector <double> paramval;
-		
 		const Model &model;
 		Output &output;
 		

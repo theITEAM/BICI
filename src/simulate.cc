@@ -1,4 +1,5 @@
 // Implements a modified Gillespie algorithm to simulate from the model
+// A timestep is used over which populations are assumed constant
 
 #include <iostream>
 #include <fstream>
@@ -18,24 +19,25 @@ Simulate::Simulate(const Model &model, Output &output) : model(model), output(ou
 }
 
 
-/// Performs a simulation
+/// Performs simulation
 void Simulate::run()
 {
 	auto smax = model.details.number;
 	for(auto s = 0u; s < smax; s++){
+		if(smax > 1) cout << "Simulation " << s << endl;
 		if(com_op) progress(s,smax);
 		
-		auto initc_val = model.initc_sample();
 		auto param_val = model.param_sample();
-		
-		output.print_param(param_val);
-		
-		output.print_initc(initc_val);
-		
+		auto initc_val = model.initc_sample(param_val);
+	
 		state.simulate(param_val,initc_val);
+
+		state.check("Check state");
 	
 		output.param_sample(s,state);
 		
 		output.state_sample(s,state);
+		
+		if(false) state.output_waifw("waifw.txt");
 	}
 }

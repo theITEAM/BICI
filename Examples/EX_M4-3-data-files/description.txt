@@ -1,0 +1,14 @@
+# Model 4.3: A spatial diffusion model 
+
+## Objective
+- Introduce a model in which a landscape is divided into a grid of cells.
+- Individuals move across this landscape by randomly hopping from one grid cell to a neighbouring grid cell. 
+
+## Model
+- A single individual-based species 'Animal' is created.
+- This contains a classification 'Location'.
+- 'Location' contains a 20x20 grid of cells represented by compartments.
+- A hopping rate $ω$ determines the rate at which individuals move between cells.
+
+## Population
+- This consists of 100 individuals initially in cell G10-10.

@@ -1,0 +1,19 @@
+# Example D7: Time variation in branching probability (PBM)
+
+## Objective
+- This includes time variation in the branching probability.
+- A spline $b(t)$ is used to represent the probability of dying.
+
+## Data
+- Time series population measurements.
+
+## Model
+- A single individual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains four compartments: susceptible $S$, infected $I$, recovered $R$ and dead $D$. Together they are known as the “SIRD model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- Branching probability $b(t)$ determines the probability of dying.
+- Parameter $γ$ specifies the recovery/death rate.
+
+## Population
+- This consists of 1000 initially susceptible individuals and two infected.

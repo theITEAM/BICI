@@ -1,0 +1,16 @@
+# Model 2.1: SIRD model with branching
+
+## Objective
+- Introduce branching in a population-based model.
+- Here infected individuals can either recover or die.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains four compartments: susceptible $S$, infected $I$, recovered $R$ and dead $D$. Together they are known as the “SIRD model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A recovery rate $γ$ determines the probability per unit time an infected individual recovers.
+- A mortality rate $κ$ determines the probability per unit time an infected individual dies.
+
+## Population
+- This consists of 100 initially susceptible individuals and two infected.

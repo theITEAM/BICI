@@ -1,4 +1,5 @@
-// This provides information about one species within the model
+// This provides information about a single species within the model
+// All properties of Species are fixed during simulation or inference
 
 #include <string>
 #include <sstream>
@@ -14,11 +15,17 @@ using namespace std;
 #include "matrix.hh"
 
 
-/// Initialises the model model.param,model.param_vec
-Species::Species(const vector <double> &timepoint, const Details &details) : timepoint(timepoint), details(details){};
+/// Initialises the model
+Species::Species(unsigned int p, const vector <double> &timepoint, const Details &details) : timepoint(timepoint), details(details)
+{
+	p_species = p;
+	obs_trans_exist = false;
+	add_rem_pop_on = false;
+	pop_trans_data_exist = false;
+};
 
 
-/// Creates a node tree used to sample Markovian events
+/// Creates a node tree used to sample Markovian events (used during simulation)
 void Species::create_markov_tree()
 {
 	for(auto i = 0u; i < markov_eqn.size(); i++){
@@ -61,7 +68,8 @@ void Species::create_markov_tree()
 	}
 }
 
-/// Updates the global compartment based on a classification compartment being set to a given value
+
+/// Updates the global compartment based on a classification and comp being set to a given value
 unsigned int Species::update_c_comp(unsigned int c, unsigned int cl, unsigned int c_comp) const
 {
 	int cco = comp_gl[c].cla_comp[cl];
@@ -70,49 +78,553 @@ unsigned int Species::update_c_comp(unsigned int c, unsigned int cl, unsigned in
 	return (unsigned int) cnew;
 }
 
-	
-/// Prints out observation events 
-void Species::print_obs_data(string name, const vector <ObsData> &obs) const 
-{
-	cout << name << endl;
-	cout << "Observations:" << endl;
-	for(auto &ob : obs){
-		cout << ob.t << " ";
-		switch(ob.type){
-		case OBS_TRANS_EV: 
-			cout << "OBS_TRANS_EV " << cla[ob.cl].tra[ob.tr].name;
-			break;
-			
-		case OBS_COMP_EV:
-			cout << "OBS_COMP_EV " << cla[ob.cl].comp[ob.c].name;
-			break;
-			
-		case OBS_TEST_EV:
-			{
-				cout << "OBS_TEST_EV res=";
-				if(ob.test_res == true) cout << "+ve"; else cout << "-ve";
-				const auto &ds = source[ob.so];
-				cout << "  Se=" << ds.obs_model.Se.te << "  Sp=" << ds.obs_model.Sp.te;
-			}
-			break;
-			
-		case OBS_POP:
-			{
-				cout << "OBS_POP " << ob.ref;
-			}
-			break;
-			
-		default: emsg("event data not right:"+ob.type); break;
-		}
-		cout << "   ";
-	}
-	cout << endl << endl;
-}
 
-
-/// Gets ti div time from an actual time
+/// Gets ti (the division time) from an actual time
 unsigned int Species::get_ti(double t) const
 {
-	return (unsigned int)(OVER_ONE*(t- details.t_start)/details.dt);
+	return (unsigned int)(OVER_ONE*(t-details.t_start)/details.dt);
 }
 
+
+/// Potentially corrects enew based on current compartment
+bool Species::correct_ev(unsigned int c, Event &enew) const
+{
+	switch(enew.type){
+	case ENTER_EV: 
+		c = enew.c_after;
+		break;
+	
+	case LEAVE_EV:
+		c = UNSET;
+		enew.c_after = c;
+		break;
+
+	case MOVE_EV: 
+		{
+			auto cl = enew.cl, c_comp = enew.move_c;
+			c = update_c_comp(c,cl,c_comp);
+			enew.c_after = c;
+		}
+		break;
+		
+		
+	case NM_TRANS_EV:
+	case M_TRANS_EV:
+		{
+			const auto &trg = tra_gl[enew.tr_gl];
+			if(trg.i != c){                               // Ensures that sequence is consistent
+				if(c == UNSET){
+					emsg("Not consistent4");
+					return true;
+				}
+				
+				auto tr_new = trg.transform[c];
+				if(tr_new == UNSET){
+					return true; 
+				}
+				
+				enew.tr_gl = tr_new;
+				auto c_after = tra_gl[tr_new].f;
+				enew.c_after = c_after;
+				c = c_after;
+			}
+			else c = trg.f;
+		}
+		break;
+	}
+	
+	return false;
+}
+
+
+/// Creates a "fake" individual a the end of the list 
+// (used when dealing with unobserved individuals)
+void Species::create_ind_noobs()
+{
+	nindividual_obs = individual.size();
+	if(type == INDIVIDUAL){
+		IndData ind;
+		ind.name = "No observation";
+		ind.enter_ref = UNSET;
+		individual.push_back(ind);
+	}
+}
+
+
+/// Determines if the population is fixed
+bool Species::is_pop_num_fixed() const
+{
+	auto fl = true;                                   // Sets if the total pop number is fixed
+	if(init_cond.type == INIT_POP_DIST){	
+		if(init_cond.focal_cl == UNSET){
+			if(init_cond.pop_prior.type != FIX_PR) fl = false;
+		}
+		else{
+			const auto &claa = cla[init_cond.focal_cl];
+			for(auto c = 0u; c < claa.comp.size(); c++){
+				if(init_cond.comp_prior[c].type != FIX_PR) fl = false;
+			}
+		}
+	}
+	
+	return fl;
+}
+
+
+/// Sets up nm_flag and cgl_incomp_nmtrans
+void Species::nm_trans_incomp_info()
+{
+	nm_flag = false;
+	for(auto &tr : tra_gl){
+		switch(tr.type){
+			case EXP_RATE_NM: case GAMMA: case ERLANG: case LOG_NORMAL: 
+			case WEIBULL: case PERIOD:
+				nm_flag = true;
+				break;
+			default: break;
+		}
+	}
+	
+	cgl_incomp_nmtrans_cl.resize(comp_gl.size());
+	
+	for(auto c = 0u; c < comp_gl.size(); c++){
+		cgl_incomp_nmtrans_cl[c].resize(ncla);
+		
+		const auto &cgl = comp_gl[c];
+		for(auto cl = 0u; cl < ncla; cl++){
+			if(cgl.tra_leave_group[cl].markov == false){
+				cgl_incomp_nmtrans_cl[c][cl] = true;
+			}
+		}			
+	}
+}
+
+
+/// Gets nm transition number from event 
+unsigned int Species::get_tra_m(const TransGlobal &tra, const Event &ev_orig) const
+{
+	if(tra.i != ev_orig.c_after){ // accounts for intermediate transition
+		auto trg = tra.transform[ev_orig.c_after];
+		if(trg == UNSET) emsg("trg unset");
+		return tra_gl[trg].nm_trans_ref;
+	}
+	return tra.nm_trans_ref;
+}
+	
+	
+/// Finds a name for a sequence of events
+string Species::tr_swap_name(unsigned int cl, const vector <TrSwap> &tswa) const 
+{
+	const auto &claa = cla[cl];
+	
+	stringstream ss;
+	for(auto k = 0u; k < tswa.size(); k++){
+		const auto &tsw = tswa[k];
+		switch(tsw.type){
+		case ENTER_SW: ss << "Enter->" << claa.comp[tsw.trc].name; break;
+		case LEAVE_SW: ss << claa.comp[tsw.trc].name << "->Leave"; break;
+		case SOURCE_SW:	ss << "+->" << claa.tra[tsw.trc].name; break;
+		case SINK_SW: ss << claa.tra[tsw.trc].name << "->-"; break;
+		case TRANS_SW: ss << claa.tra[tsw.trc].name; break;
+		case MOVE_SW: ss << "MOVE"; break;
+		}
+		ss << " ... ";
+	}
+	
+	return ss.str();
+}
+
+
+/// Converts information about a potential local individual swap of events to a hash vec
+vector <unsigned int> Species::get_vec_tr_swap(unsigned int c, const vector <TrSwap> &start) const
+{
+	vector <unsigned int> vec;
+	vec.push_back(c);
+	for(const auto &trs : start){
+		vec.push_back(trs.type);
+		vec.push_back(trs.trc);
+	}
+	
+	return vec;
+}
+
+
+/// Converts information about a potential local individual swap of events to a hash vec
+vector <unsigned int> Species::get_vec_tr_swap_mid(unsigned int st, unsigned int num, const vector <EventCl> &timeline) const
+{
+	vector <unsigned int> vec;
+	vec.push_back(timeline[st].c_bef);
+	
+	for(auto j = st; j < st+num; j++){
+		const auto &trs =	timeline[j].trs;
+		vec.push_back(trs.type);
+		vec.push_back(trs.trc);
+	}
+	
+	return vec;
+}
+
+
+/// Calculates non-Markovian rate
+vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector <double> > &popnum_t, const vector <Equation> &eqn, vector < vector <double> > &bp_store) const
+{
+	vector < vector <double> > nm_rate;
+	
+	auto M = nm_trans.size();
+	nm_rate.resize(M);
+	for(auto m = 0u; m < M; m++){
+		nm_rate[m].resize(T);
+		
+		const auto &nmt = nm_trans[m];
+	
+		if(nmt.precalc_nm_rate || calc_bp){		
+			// Calculates branching probabilities
+			vector <double> bp(T,1);
+			
+			auto bp_eq = nmt.bp_eq;
+			if(bp_eq != UNSET){
+				if(bp_eq == BP_FROM_OTHERS){
+					auto time_vari = false;
+					for(auto e : nmt.bp_other_eq){
+						if(eqn[e].time_vari) time_vari = true;
+					}
+							
+					if(time_vari){
+						for(auto ti = 0u; ti < T; ti++){
+							const auto &popnum = popnum_t[ti];
+							auto bp_f = 1.0;
+							for(auto e : nmt.bp_other_eq){
+								bp_f -= eqn[e].calculate(ti,popnum,param_val,spline_val);
+							}
+							check_bp(bp_f);
+							bp[ti] = bp_f;
+						}
+					}
+					else{
+						auto bp_f = 1.0;
+						for(auto e : nmt.bp_other_eq){
+							bp_f -= eqn[e].calculate_param_only(param_val);
+						}
+						check_bp(bp_f);
+						for(auto ti = 0u; ti < T; ti++) bp[ti] = bp_f;
+					}
+				}
+				else{
+					auto update = UPDATE_NO_TIME;
+					if(nmt.all_branches){
+						for(auto e : nmt.bp_all_eq) if(eqn[e].time_vari) update = UPDATE_TIME;
+					}
+					else{
+						if(eqn[bp_eq].time_vari) update = UPDATE_TIME;
+					}
+					
+					const auto &eq = eqn[bp_eq];
+					if(update == UPDATE_TIME){
+						for(auto ti = 0u; ti < T; ti++){
+							const auto &popnum = popnum_t[ti];
+							auto bp_f = eq.calculate(ti,popnum,param_val,spline_val);
+							if(nmt.all_branches){
+								auto div = 0.0;
+								for(auto e : nmt.bp_all_eq){
+									div += eqn[e].calculate(ti,popnum,param_val,spline_val);
+								}
+								bp_f /= div;
+							}
+							check_bp(bp_f);
+							bp[ti] = bp_f;
+						}
+					}
+					else{
+						auto bp_f = eq.calculate_param_only(param_val);
+						if(nmt.all_branches){
+							auto div = 0.0;
+							for(auto e : nmt.bp_all_eq){
+								div += eqn[e].calculate_param_only(param_val);
+							}
+							bp_f /= div;
+						}
+						check_bp(bp_f);
+						for(auto ti = 0u; ti < T; ti++) bp[ti] = bp_f;
+					}
+				}
+			}
+			if(calc_bp) bp_store.push_back(bp);
+			
+			switch(nmt.type){
+			case EXP_RATE: emsg("Should not be here"); break;
+
+			case GAMMA: case ERLANG: case LOG_NORMAL: case PERIOD: 
+				{
+					const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
+					if(eq.time_vari){
+						for(auto ti = 0u; ti < T; ti++){	
+							nm_rate[m][ti] = bp[ti]/eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+						}
+					}
+					else{
+						auto val = 1.0/eq.calculate_param_only(param_val); 
+						for(auto ti = 0u; ti < T; ti++){
+							nm_rate[m][ti] = bp[ti]*val;
+						}
+					}
+				}
+				break;
+
+			case EXP_RATE_NM:
+				{
+					const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
+					if(eq.time_vari){
+						for(auto ti = 0u; ti < T; ti++){	
+							nm_rate[m][ti] = bp[ti]*eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+						}		
+					}
+					else{
+						auto val = eq.calculate_param_only(param_val); 
+						for(auto ti = 0u; ti < T; ti++){
+							nm_rate[m][ti] = bp[ti]*val;
+						}
+					}
+				}
+				break;
+			
+			case WEIBULL:
+				{
+					// The gamma function correction to mean is relatively small so here it is ignored
+					const auto &eq = eqn[nmt.dist_param_eq_ref[0]];	
+					if(eq.time_vari){
+						for(auto ti = 0u; ti < T; ti++){	
+							nm_rate[m][ti] = bp[ti]/eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+						}
+					}
+					else{
+						auto val = 1.0/eq.calculate_param_only(param_val); 
+						for(auto ti = 0u; ti < T; ti++){
+							nm_rate[m][ti] = bp[ti]*val;
+						}
+					}
+					
+					if(false){ // This more complicate version didn't perform much better
+						const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
+						const auto &eq_sh = eqn[nmt.dist_param_eq_ref[1]];
+					
+						if(eq.time_vari || eq_sh.time_vari){
+							for(auto ti = 0u; ti < T; ti++){
+								nm_rate[m][ti] = 1.0/eq.calculate_no_popnum(ti,param_val,spline_val);
+							}
+						}
+						else{
+							auto val = 1.0/(eq.calculate_param_only(param_val)); 
+							
+							for(auto ti = 0u; ti < T; ti++) nm_rate[m][ti] = val;
+						}
+					}
+				}
+				break;
+				
+			default: emsg("op not here"); break;
+			}
+		}
+		else{
+			for(auto ti = 0u; ti < T; ti++) nm_rate[m][ti] = UNSET;
+		}
+	}
+	
+	return nm_rate;
+}
+
+
+/// Determines if individual samplers are needed (i.e. if all transitions are known)
+void Species::set_ind_samp_needed(const vector <Equation> &eqn)
+{
+	// Determines if transition is not observed at any point over the entire time period
+	vector <bool> tra_not_obs(tra_gl.size(),false);
+	for(auto trg = 0u; trg < tra_gl.size(); trg++){
+		auto not_obs = false;
+		for(auto ti = 0u; ti < T; ti++){
+			auto fl = false;
+			for(auto ter : obs_trans_eqn_ref[trg][ti]){
+				const auto &ot = obs_trans[ter];
+				if(ot.is_one[trg] && ot.single_trans){ fl = true; break;}
+			}
+			
+			if(fl == false){ not_obs = true; break;}
+		}
+		tra_not_obs[trg] = not_obs;
+	}
+	
+	if(false){
+		for(auto trg = 0u; trg < tra_gl.size(); trg++){
+			cout << tra_gl[trg].name << " " << tra_not_obs[trg] << " not obs" << endl;
+		}
+		emsg("done");
+	}
+
+	// This stores if there is a link between a classification compartment and trans
+	vector < vector < vector <bool> > > comp_tra_link; // [cl][c][tr]
+	comp_tra_link.resize(ncla);
+	for(auto cl = 0u; cl < ncla; cl++){
+		const auto &claa = cla[cl];
+		comp_tra_link[cl].resize(claa.ncomp);
+		for(auto c = 0u; c < claa.ncomp; c++){
+			comp_tra_link[cl][c].resize(claa.ntra,false);
+		}
+	}
+
+	for(auto trg = 0u; trg < tra_gl.size(); trg++){
+		const auto &tra = tra_gl[trg];
+		auto cl = tra.cl;
+		
+		auto c = cla[cl].tra[tra.tr].i;
+		if(c != UNSET){
+			comp_tra_link[cl][c][tra.tr] = true;
+			
+			for(auto k = 0u; k < tr_after[trg].size(); k++){
+				auto trg_aft = tr_after[trg][k];
+				const auto &tra_aft = tra_gl[trg_aft];
+				comp_tra_link[cl][c][tra_aft.tr] = true;
+			}
+		}
+	}		
+	
+	if(false){
+		for(auto cl = 0u; cl < ncla; cl++){
+			const auto &claa = cla[cl];
+			for(auto c = 0u; c < claa.ncomp; c++){
+				for(auto tr = 0u; tr < claa.ntra; tr++){
+					cout << claa.comp[c].name << " " << claa.tra[tr].name << " " 
+							<< comp_tra_link[cl][c][tr] << endl;
+				}
+			}
+		}
+		emsg("done");
+	}
+	
+	// Makes a list of global not obseved transitions stratified by cl
+	vector < vector <unsigned int> > trg_not_obs_cl; 
+	trg_not_obs_cl.resize(ncla);
+	for(auto trg = 0u; trg < tra_gl.size(); trg++){
+		const auto &tra = tra_gl[trg];
+		if(tra_not_obs[trg]) trg_not_obs_cl[tra.cl].push_back(trg);
+	}
+
+	if(false){
+		for(auto cl = 0u; cl < ncla; cl++){
+			for(auto trg : trg_not_obs_cl[cl]) cout << cl << " "<< tra_gl[trg].name << endl;
+		}
+		emsg("done");
+	}
+	
+	for(auto i = 0u; i < individual.size(); i++){
+		auto &ind = individual[i];
+		if(i < nindividual_in){	
+			ind.sample_needed.resize(ncla,true);
+				
+			auto e = ind.enter_ref;
+
+			auto num_pos = 0u;
+
+			if(e != UNSET){
+				const auto &ent = enter[e];
+				
+				vector <bool> cgl_pos(comp_gl.size(),false);
+				if(ent.c_set != UNSET){ cgl_pos[ent.c_set] = true; num_pos++;}
+				else{
+					vector < vector <bool> > c_pos;
+					c_pos.resize(ncla);
+					for(auto cl = 0u; cl < ncla; cl++){
+						const auto &claa = cla[cl];
+						c_pos[cl].resize(claa.ncomp,false);
+						const auto &ent_cl = ent.cla[cl];
+						if(ent_cl.c_set != UNSET) c_pos[cl][ent_cl.c_set] = true;
+						else{
+							for(auto c = 0u; c < claa.ncomp; c++){
+								if(!eqn[ent_cl.eqn[c].eq_ref].is_zero()) c_pos[cl][c] = true;
+							}
+						}
+					}
+					
+					for(auto c = 0u; c < comp_gl.size(); c++){
+						const auto &cla_comp = comp_gl[c].cla_comp;
+						auto cl = 0u; while(cl < ncla && c_pos[cl][cla_comp[cl]] == true) cl++;
+						
+						if(cl == ncla){
+							cgl_pos[c] = true;
+							num_pos++;
+						}
+					}
+				}
+
+				for(auto cl = 0u; cl < ncla; cl++){
+					// First determines if initial state is set within classification
+	
+					const auto &claa = cla[cl];
+					vector <bool> non_zero(claa.ncomp,false);
+					
+					for(auto c = 0u; c < comp_gl.size(); c++){
+						const auto &cgl = comp_gl[c];
+						if(cgl_pos[c]) non_zero[cgl.cla_comp[cl]] = true;
+					}
+					
+					auto unobs = false;
+					for(auto c = 0u; c < claa.ncomp; c++){
+						if(non_zero[c]){
+							for(auto trg : trg_not_obs_cl[cl]){
+								const auto &tra = tra_gl[trg];
+								if(comp_tra_link[cl][c][tra.tr]){ unobs = true; break;}
+							}
+						}
+						if(unobs == true) break;
+					}
+								
+					if(unobs == false) ind.sample_needed[cl] = false;
+				}
+			}
+			
+			ind.simulation_needed = false;
+			for(auto need : ind.sample_needed){
+				if(need) ind.simulation_needed = true;
+			}
+		
+			// If uncertainty in initial condition
+			if(num_pos > 1) ind.simulation_needed = true; 
+			
+			ind.move_needed = ind.simulation_needed;
+			if(contains_source) ind.move_needed = true;
+		}
+		else{
+			ind.sample_needed.resize(ncla,false);
+			ind.simulation_needed = false;
+			ind.move_needed = false;
+		}
+	}
+}
+
+
+/// Calcualtes the probability of an individual entering a given state
+double Species::calc_enter_prob(unsigned int c, unsigned int entref, const vector <double> &obs_eqn_value) const
+{
+	if(c == UNSET) return 0;
+	const auto &ent = enter[entref];
+	if(ent.c_set != UNSET){
+		if(c == ent.c_set) return 1;
+		return 0;
+	}
+	else{
+		const auto &cla_comp = comp_gl[c].cla_comp;
+		
+		auto prob = 1.0;
+		for(auto cl = 0u; cl < ncla; cl++){
+			const auto &ent_cl = ent.cla[cl];
+			auto cc = cla_comp[cl];
+			if(ent_cl.c_set){
+				if(cc != ent_cl.c_set) return 0;
+			}
+			else{
+				auto val = obs_eqn_value[ent_cl.obs_eqn_ref[cc]];
+				if(val < 0) emsg("Initial compartment observational likelihood has become negative"); 
+				prob *= val;
+			}
+		}
+		return prob;
+	}
+}

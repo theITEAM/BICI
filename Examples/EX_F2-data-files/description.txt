@@ -1,0 +1,24 @@
+# Example F2: Parameter distribution
+
+## Objective
+- In some instances, it is useful for a parameter to be sampled from a distribution.
+- An example is a random effect in a mixed model.
+- This is illustrated here with a disease transmission experiment.
+- The rate of transmission in different groups is modulated by a group-specific factor $G_g$.
+- The elements in parameter vector $G_g$ are assumed to be drawn from a normal distribution with mean zero and standard deviation $σ^G$.
+
+## Data
+- Known transition times.
+
+## Model
+- A single individual-based species 'Animal' is created.
+- This contains classifications 'DS', which stands for 'disease status', 'Vaccination' and 'Group'.
+- 'DS' contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- 'Vaccination' contains two compartments: 'Vac' and 'Unvac' that represent vaccinated and unvaccinated individuals.
+- 'Group' contains 24 contact groups.
+- A transmission rate $β_v$ determines the susceptibility of individuals with vaccination status $v$ become infected.
+- A factor $f_v$ determines the relative infectiousness of individuals with vaccination status $v$
+
+## Population
+- Each group consists of 10 individuals, half of which are infected.
+- The vaccination status of the infected and susceptibility individuals is permuted to create blocks of 4 which are replicated 6 times (to make 24 groups in total).

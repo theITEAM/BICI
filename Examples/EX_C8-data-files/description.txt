@@ -1,0 +1,18 @@
+# Example C8: Uncertain  compartmental observations
+
+## Objective
+- This example allows for uncertainty in compartmental observation.
+- Here fixed probabilities are used, but the observation model can also include parameters that can be estimated during inference.
+
+## Data
+- Periodic uncertain compartmental observations are made every 20 time units.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A recovery rate $γ$ determines the rate at which individuals recover.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

@@ -1,0 +1,19 @@
+# Model 2.6: SIR model with demographic stratification
+
+## Objective
+- Introduces an example of stratification into the SIR epidemiological model.
+- Here the population is divided into males and females.
+
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status' and a classification 'Sex'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- A transmission rate $β_s$ determines the rate at which individuals with sex $s$ become infected.
+- A recovery rate $γ_s$ determines the rate at which individuals recover with sex $s$.
+- $N$ is the total number of individuals (this model assumes frequency dependent transmission).
+- Classification 'Sex' contains the compartments $M$ and $F$ for male and female.
+
+## Population
+- This consists of 10000 initially susceptible individuals and 2 infected.
+- There is a 50/50 split between males and females.

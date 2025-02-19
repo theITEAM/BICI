@@ -1,0 +1,65 @@
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+data-dir folder="Examples\EX_M3-4-data-files"
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5
+
+post-sim start=0 end=100
+
+
+########## DEFINE MODEL AND DATA FOR SPECIES FARM ##########
+
+species name="Farm" type="individual" trans-tree="off"
+
+# SPECIES MODEL
+
+class name="DS" index="d"
+
+comp name="S" color="#009900" x=0 y=-7
+comp name="I" color="#ff2222" x=17 y=-7
+comp name="R" color="#4444ff" x=30 y=-7
+
+trans name="S->I" value="exp(rate:βΣ_l' (M_l,l'×{I,l'}))"
+trans name="I->R" value="gamma(mean:m, cv:c)"
+
+
+class name="Location" index="l"
+
+comp-all color="#000099" fix="true" file="comp-Location.csv"
+
+
+
+# SIMULATION INITIAL CONDITIONS
+
+add-ind-sim file="add-ind-sim.csv"
+
+
+# INFERENCE DATA
+
+add-ind file="add-ind.csv"
+
+trans-data name="I->R" obsrange="all" file="trans-data.csv"
+
+trans-data name="S->I" obsrange="all" file="trans-data-2.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="c" value="0.3" prior="fix(0.3)"
+param name="d^max" constant="30"
+param name="m" value="8" prior="fix(8)"
+param name="α" value="2.5" prior="uniform(1,4)"
+param name="β" value="2" prior="uniform(0,5)"
+param name="Δ" value="5" prior="uniform(0,20)"
+param name="M_l,l'" reparam="step(d^max-D_l,l')/(1+pow(D_l,l'/Δ|α))"
+
+

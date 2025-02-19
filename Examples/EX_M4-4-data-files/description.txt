@@ -1,0 +1,19 @@
+# Model M4.4: A species presence/absence distribution model
+
+## Objective
+- Introduce a simple presence/absence model for an invasive plant species.
+- A map of the UK is split into a grid of 25km squares.
+- A covariate is used that affects the probability the species will invade a given square (*e.g.* it could represent some environmental variable such as altitude or mean temperature).
+
+## Model
+- A single individual-based species 'Plant' is created.
+- This contains classifications 'Presence' and 'Location'.
+- 'Presence' contains two compartments: 'No' and 'Yes'.
+- 'Location' contains compartments representing the grid cells (559 in total).
+- Each grid cell contains a single individual that represents the cell's status.
+- A transmission rate $β$ determines the rate at which cells start growing the plant.
+- A fixed effect 〈g〉 is used to add a covariate affecting plant spread.
+- A spatial power-law transmission kernel is used to model the geographic spread of the plant.
+
+## Population
+- Initially, a single grid cell is set to contain the invasive plant species.

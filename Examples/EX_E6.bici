@@ -1,0 +1,63 @@
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+data-dir folder="Examples\EX_E6-data-files"
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5
+
+post-sim start=0 end=100
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
+
+species name="People" type="individual" trans-tree="off"
+
+# SPECIES MODEL
+
+class name="DS" index="a"
+
+comp name="S" color="#009900" x=-16 y=-7
+comp name="I" color="#ff2222" x=-4 y=-7
+comp name="R" color="#4444ff" x=11 y=-12
+comp name="D" color="#000000" x=11 y=-2
+
+trans name="S->I" value="exp(rate:β×{I})"
+trans name="I->R" value="log-normal(mean:m^R, cv:c^R)" bp=1
+trans name="I->D" value="gamma(mean:m^D, cv:c^D)" bp="b×〈g〉"
+
+
+# FIXED EFFECTS
+
+fixed-effect name="g" X="X-vector-g.csv"
+
+# SIMULATION INITIAL CONDITIONS
+
+add-ind-sim file="add-ind-sim.csv"
+
+
+# INFERENCE DATA
+
+add-ind file="add-ind.csv"
+
+comp-data class="DS" file="comp-data-DS.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="b" value="0.3" prior="uniform(0,1)"
+param name="c^D" value="0.5" prior="uniform(0,1)"
+param name="c^R" value="0.3" prior="uniform(0,1)"
+param name="m^D" value="20" prior="uniform(0,30)"
+param name="m^R" value="10" prior="uniform(0,30)"
+param name="β" value="0.002" prior="uniform(0,0.1)"
+param name="ν^g" value="0.8" prior="uniform(-2,2)"
+
+

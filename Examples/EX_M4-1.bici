@@ -1,0 +1,44 @@
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+data-dir folder="Examples\EX_M4-1-data-files"
+
+simulation start=0 end=100 timestep=0.5
+
+inference
+
+post-sim
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
+
+species name="Animal" type="individual" trans-tree="off"
+
+# SPECIES MODEL
+
+class name="Population" index="a"
+
+comp name="N" color="#888888" x=-3 y=0
+
+trans name="+->N" x=-20 y=0 value="exp(rate:α×{N}×(1-{N}/κ))"
+trans name="N->-" x=9 y=0 value="exp(rate:μ)"
+
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="Population" file="init-pop-sim-Animal.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="α" value="0.2" prior="uniform(0,1)"
+param name="κ" value="200" prior="uniform(0,1000)"
+param name="μ" value="0.05" prior="uniform(0,1)"
+
+
