@@ -4,10 +4,10 @@
 
 BICI can be downloaded and run on your computer (no installation required):
 
-* **Windows:** [BICI_v0.1_windows.zip](https://github.com/theITEAM/BICI/releases/download/v0.1/BICI_v0.1_windows.zip). Once unzipped SIRE is run by clicking on the “BICI.exe” icon.
+* **Windows:** [BICI_v0.1_windows.zip](https://github.com/theITEAM/BICI/releases/download/v0.1/BICI_v0.1_windows.zip). Once unzipped, it is run by clicking on the “BICI.exe” icon.
 
 * **Mac:** 
-*BICI_v0.1_Mac.zip* (Currently unavailable). BICI is run by clicking on the “BICI.app” icon.
+*BICI_v0.1_Mac.zip* (Currently unavailable). Once unzipped, it is run by clicking on the “BICI.app” icon.
 
 ## Introduction
 
@@ -23,25 +23,26 @@ For inference BICI takes in a variety of individual and/or population-level data
 This multipurpose software allows for sophisticated Bayesian analysis of data using an easy point and click interface.
 The current version contains the following features:
 
-* **Arbitrary compartmental models.** The interface allows for easy model specification and can accommodate multiple classifications (e.g. disease status as well as location and sex of individuals). Furthermore multiple species (e.g. predetor-prey models, or environmental accumulation of pathogen).
+* **Arbitrary compartmental models** – The interface allows for easy model specification and can accommodate multiple classifications (e.g. disease status as well as location and sex of individuals). Furthermore multiple species (e.g. predetor-prey models, or environmental accumulation of pathogen).
 
-* **Markovian and Non-Markovian transitions.** This allows for more realistic models (e.g. disease recovery can be modeled using a more adaptable gamma distribution instead of assuming an exponential distribution).
+* **Markovian and non-Markovian transitions** – This allows for more realistic models (e.g. disease recovery can be modeled using a more adaptable gamma distribution instead of assuming an exponential distribution).
 
 * **Multiple species** This allows for multiple interacting species, e.g. predetor-prey models or pathogen accumulation model.
 
-* **Inidivudual and population-based** Allows for mixing population and individual-based species together within the same model.
+* **Inidivudual and population-based** – Allows for mixing population and individual-based species together within the same model.
 
-* **Individual variation** Allows for individual variation (on top of compartmental stratification) by incorporating individual covariates, or individual effects (e.g. for quantitative genetics models).
+* **Individual variation** – Allows for individual variation (on top of compartmental stratification) by incorporating individual covariates, or individual effects (e.g. for quantitative genetics models).
 
-* **Parallel** An optional parallel implementation can be use to tackle big problems (e.g. on a Linux cluster).
+* **Variation in time** – The software allows for the the possibility of model parameters to varying in time according to linear spline functions. 
 
-* **Simulation.** The initial conditions can be set and the dynamic variation in the model can be graphically represented in a variety of ways.
+* **Parallel** – An optional parallel implementation can be use to tackle big problems (e.g. on a Linux cluster).
 
-* **Inference.** BICI can take a variety of different data types (e.g. state data, population estimates, event times or even uncertain data such as disease diagnostic test results) and infer model parameters as well as underlying model dynamics.
+* **Simulation** – The initial conditions can be set and the dynamic variation in the model can be graphically represented in a variety of ways.
 
-* **Posterior Simulation.** Future prediction, scenario analysis, counterfactual analysis and posterior predictive check. .
+* **Inference** – BICI can take a variety of different data types (e.g. state data, population estimates, event times or even uncertain data such as disease diagnostic test results) and infer model parameters as well as underlying model dynamics.
 
-* **Variation in time.** The software allows for the the possibility of model parameters to varying in time according to linear spline functions. 
+* **Posterior Simulation** – Future prediction, scenario analysis, counterfactual analysis and posterior predictive check.
+
 
 ## Documentation
 
