@@ -18,10 +18,15 @@ Output::Output(unsigned int _chain, const Model &model, const Input &input, Mpi 
 	chain = _chain;
 	
 	timer.resize(OUTTIMER_MAX); for(auto &ti : timer) ti = 0;
-		
-	outputdir = input.outputdir;
 	
-	ensure_directory(outputdir);                      // Creates the output directory
+	diagdir = "";	sampledir = "";	
+	if(input.datadir != ""){
+		diagdir = input.datadir+"/Dignostics";
+		ensure_directory(diagdir);                  // Creates the diagnostics directory
+		
+		sampledir = input.datadir+"/Sample";
+		ensure_directory(sampledir);                // Creates the Samples directory
+	}
 	
 	if(op()){
 		lines_raw = input.lines_raw;
@@ -106,7 +111,8 @@ void Output::check_open(ofstream &fout, string file) const
 /// Outputs a summary of the model and data to a file
 void Output::summary(const Model &model) const
 {
-	auto file = outputdir+"/model.txt";
+	if(diagdir == "") return;
+	auto file = diagdir+"/model.txt";
 	ofstream fout(file);
 	check_open(fout,file);
 
@@ -587,7 +593,8 @@ void Output::summary(const Model &model) const
 /// Outputs a summary of proprosals
 void Output::prop_summary(string te) const
 {
-	auto file = outputdir+"/proposal.txt";
+	if(diagdir == "") return;
+	auto file = diagdir+"/proposal.txt";
 	ofstream fout(file);
 	check_open(fout,file);
 	fout << te;
@@ -881,7 +888,8 @@ string Output::transtype_text(TransType type) const
 /// Outputs a summary of the data to a file
 void Output::data_summary(const Model &model) const
 {
-	auto file = outputdir+"/data.txt";
+	if(diagdir == "") return;
+	auto file = diagdir+"/data.txt";
 	ofstream fout(file);
 	check_open(fout,file);
 	
@@ -1639,30 +1647,30 @@ void Output::generate_files()
 	}
 	*/
 	
-	auto dir = outputdir+"/Sample";
-
-	ensure_directory(dir);
-
+	string param_out_file, state_out_file;
+	
 	string ch = "1"; if(chain != UNSET) ch = tstr(chain);
 	
-	string add; if(chain != UNSET) add = "_"+tstr(chain);
+	if(sampledir != ""){
+		
+		string add; if(chain != UNSET) add = "_"+tstr(chain);
 	
-	auto param_out_file = "param"+add+".csv";
+		param_out_file = "param"+add+".csv";
 
-	auto state_out_file = "state"+add+".csv";
+		state_out_file = "state"+add+".csv";
 	
-	ofstream pout(dir+"/"+param_out_file);
-	check_open(pout,param_out_file);
-	pout << param_out.str();
+		ofstream pout(sampledir+"/"+param_out_file);
+		check_open(pout,param_out_file);
+		pout << param_out.str();
 	
-	ofstream sout(dir+"/"+state_out_file);
-	check_open(sout,state_out_file);
-	sout << state_out_str;
+		ofstream sout(sampledir+"/"+state_out_file);
+		check_open(sout,state_out_file);
+		sout << state_out_str;
 	
-	param_out_file = "Sample/"+param_out_file;
-	state_out_file = "Sample/"+state_out_file;
-	
-	if(true){ // Embeds output into file
+		param_out_file = "Sample/"+param_out_file;
+		state_out_file = "Sample/"+state_out_file;
+	}
+	else{  // Embeds output into file
 		param_out_file = "[["+endli+param_out.str()+"]]";
 		state_out_file = "[["+endli+state_out_str+"]]";
 	}

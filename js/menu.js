@@ -39,8 +39,6 @@ function initialise_pages()
 	{
 		let sub = page[page.length-1].sub;
 	
-		//sub.push({name:"Population", sub:[]});
-		//add_species_options(sub,model.species);
 		sub.push({name:"Initial Conditions", sub:[]});
 		add_species_options(sub,model.species);
 		
@@ -74,9 +72,6 @@ function initialise_pages()
 	{
 		let sub = page[page.length-1].sub;
 	
-		//sub.push({name:"Initial Conditions", sub:[]});
-		//add_species_options(sub,model.species);
-		
 		sub.push({name:"Data", sub:[]});
 		add_species_options(sub,model.species);
 		
@@ -203,16 +198,34 @@ function set_page_index(page)
 
 
 /// Sets all the page indexes to zero
-function zero_page_index()
+function zero_page_index(not_zero_page)
 {
 	let page = inter.page;
-	for(let p = 0; p < page.length; p++){
-		let pag = page[p];
-		pag.index = 0;
-		for(let s = 0; s < pag.sub.length; s++){
-			pag.sub[s].index = 0;
-			for(let ss = 0; ss < pag.sub[s].sub.length; ss++){
-				pag.sub[s].sub[ss].index = 0;
+	if(not_zero_page == true){ // Just sets defined and makes sure in range
+		for(let p = 0; p < page.length; p++){
+			let pag = page[p];
+			if(pag.index == undefined || pag.index >= pag.sub.length) pag.index = 0;
+			for(let s = 0; s < pag.sub.length; s++){
+				let pag_sub = pag.sub[s];
+				if(pag_sub.index == undefined || pag_sub.index >= pag_sub.sub.length) pag_sub.index = 0;
+				for(let ss = 0; ss < pag_sub.sub.length; ss++){
+					let pag_sub_sub = pag.sub[s].sub[ss];
+					if(pag_sub_sub.index == undefined || pag_sub_sub.index >= pag_sub_sub.sub.length){ 		
+						pag_sub_sub.index = 0;
+					}
+				}
+			}
+		}
+	}
+	else{
+		for(let p = 0; p < page.length; p++){
+			let pag = page[p];
+			pag.index = 0;
+			for(let s = 0; s < pag.sub.length; s++){
+				pag.sub[s].index = 0;
+				for(let ss = 0; ss < pag.sub[s].sub.length; ss++){
+					pag.sub[s].sub[ss].index = 0;
+				}
 			}
 		}
 	}
@@ -225,7 +238,7 @@ function add_logo_buts(lay)
 	let mar = 0.05*lay.dx;
 	let ddx = lay.dx-2*mar;
 	
-	let ac; if(debug == true && testing == true) ac="LoadInference"; 
+	let ac; //if(debug == true && testing == true) ac="LoadInference"; 
 	
 	lay.add_button({x:mar, y:0, dx:ddx, dy:(370/927)*ddx, ac:ac, type:"Logo"});
 }
@@ -238,14 +251,19 @@ function add_menu_buts(lay)
 	
 	let ddy = nearest_pixel(1.7);
 	let dby = nearest_pixel(0.15);
-	let dby2 = nearest_pixel(1.4);
+	let dby2 = nearest_pixel(1.2);
 	let dysub = nearest_pixel(1.6);
 	let dysubsub = nearest_pixel(1.3);
 	let xsub = nearest_pixel(0.5);
 	let xsubsub = nearest_pixel(1);
-	//let xsubsubsub = nearest_pixel(1.6);
 	let xsubsubsub = nearest_pixel(1);
 	
+	let tree = inter.page_name.split("->");
+	if(tab_name() == "Simulation" && subtab_name() == "Reults" &&
+  	model.sim_res.on && model.inf_res.on){
+		dysubsub = nearest_pixel(1);
+	}
+		
 	let y = 0;
 
 	for(let p = 0; p < inter.page.length; p++){

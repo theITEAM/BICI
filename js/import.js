@@ -17,9 +17,6 @@
 	data-dir
 	derived / der
 	description /desc
-	do-inf / do-inference
-	do-post-sim / do-posterior-simulation
-	do-sim / do-simulation
 	fixed-effect
 	genetic-data
 	ind-effect
@@ -62,7 +59,7 @@
 let imp = {};                                      // Stores information as import is done
 
 /// Import a script to define (or partially define) model and data 
-function import_file(te)                                
+function import_file(te,clear_results)                                
 {		
 	import_te = te;
 	
@@ -83,11 +80,10 @@ function import_file(te)
 	imp = { lines:lines, script:pro.formatted, previous_loaded_table:[], warn:false}; 
 
 	model = new Model();	 
-	sim_result = {};    
-	inf_result = {};    
-	ppc_result = {};    
 	model.start_new();
 	
+	init_result(pro,clear_results);
+
 	percent(10);
 		
 	for(let loop = 0; loop < 4; loop++){ 
@@ -130,9 +126,9 @@ function import_file(te)
 			
 			model.update_pline_all();
 		
-			if(sim_result.on) results_add_model(sim_result,model.sim_details,"sim");
-			if(inf_result.on) results_add_model(inf_result,model.inf_details,"inf");
-			if(ppc_result.on) results_add_model(ppc_result,model.ppc_details,"ppc");
+			if(sim_result.load) results_add_model(sim_result,model.sim_details,"sim");
+			if(inf_result.load) results_add_model(inf_result,model.inf_details,"inf");
+			if(ppc_result.load) results_add_model(ppc_result,model.ppc_details,"ppc");
 			
 			percent(85);
 		}
@@ -159,10 +155,6 @@ function import_file(te)
 			case "posterior-simulation": cname = "post-sim"; break;
 			}
 
-			if(cname == "sim-param") sim_result.on = true;
-			if(cname == "inf-param") inf_result.on = true;
-			if(cname == "post-sim-param") ppc_result.on = true;
-			
 			let process = true;
 			switch(loop){
 			case 0: // In the first pass create species, classifications, compartments and loads data directory
@@ -227,9 +219,9 @@ function import_file(te)
 		}
 	}
 	
-	if(sim_result.on) results_finalise(sim_result);
-	if(inf_result.on) results_finalise(inf_result);
-	if(ppc_result.on) results_finalise(ppc_result);
+	if(sim_result.load) results_finalise(sim_result);
+	if(inf_result.load) results_finalise(inf_result);
+	if(ppc_result.load) results_finalise(ppc_result);
 	
 	percent(90);
 	
@@ -248,15 +240,57 @@ function import_file(te)
 	if(input.type == "Load Example") model.example = input.info;
 
 	let ans = { model:strip_heavy(model), info:in2, map_store:map_store};
-	if(sim_result.on) ans.sim_on = true;
-	if(inf_result.on) ans.inf_on = true;
-	if(ppc_result.on) ans.ppc_on = true;
+	if(sim_result.load) ans.sim_load = true;
+	if(inf_result.load) ans.inf_load = true;
+	if(ppc_result.load) ans.ppc_load = true;
 	
 	import_post_mess(ans);
 	
 	map_store = [];
 }
 
+
+/// Initialises results based on what information is loaded in file
+function init_result(pro,clear_results)
+{
+	if(clear_results){
+		sim_result = {siminf:"sim"};                  // Stores results from simulation
+		inf_result = {siminf:"inf"};                  // Stores results from inference
+		ppc_result = {siminf:"ppc"};
+	}
+	
+	sim_result.load = false;
+	inf_result.load = false;
+	ppc_result.load = false;
+
+	for(let m = 0; m < pro.processed.length; m++){
+		let line = pro.processed[m];
+		let cname = line.type;
+		
+		switch(cname){
+		case "sim-param": case "sim-state": turn_result_on(sim_result,"sim"); break;
+		case "inf-param": case "inf-state": turn_result_on(inf_result,"inf"); break;
+		case "post-sim-param": case "post-sim-state": turn_result_on(ppc_result,"ppc"); break;
+		default: break;
+		}
+	}
+}
+	
+	
+/// Turns a result on
+function turn_result_on(result,siminf)
+{
+	if(result.load == false){
+		for(let ele in result){
+			delete result[ele];
+		}
+	
+		result.siminf = siminf;
+		result.load = true;
+		result.on = true;
+	}		
+}
+	
 	
 /// Adds add_ind, move_ind and remove_ind results to PPC
 function ppc_add_ind()
@@ -343,9 +377,6 @@ function process_command(cname,tags,loop)
 	case "inf-state": inf_state_command(); break;
 	case "post-sim-param": post_sim_param_command(); break;
 	case "post-sim-state": post_sim_state_command(); break;
-	case "do-sim": case "do-simulation": break;
-	case "do-inf": case "do-inference": break;
-	case "do-post-sim": case "do-posterior-simulation": break;
 	
 	default: 
 		if(find_in(data_command_list,cname) != undefined){

@@ -4,8 +4,8 @@
 // 53754 lines of code (16/11/24)
 // 50018 lines of code (18/11/24)
 
-//let ver="windows";         // Determines platform
-let ver="linux";
+let ver="windows";         // Determines platform
+//let ver="linux";
 //let ver="mac";
 
 let try_on = true;
@@ -13,8 +13,9 @@ let testing = true;
 let thick_line = false;
 let big_eqn = false;
 
-const make_file = true;                           // Determines if makes file or runs
-const debug = true;                               // Determines if debugger used
+let make_file = true;                           // Determines if makes file or runs
+if(ver == "windows") make_file = false;
+const debug = false;//true;                               // Determines if debugger used
 const graph_dia = false;                          // Used to diagnose problems with graphs
 const load_map_fast = false;                      // If loads up world map from local computer
 const test_comment = false;                       // Used when checking help comments are correct 
@@ -23,7 +24,7 @@ const set_default = false;                        // Used to set default when lo
 
 const check_clone_on = true;                      // Turn on to check if cloning is working
 
-const command_list = ["species","classification","class","set","camera","compartment","comp","comp-all","transition","trans","trans-all","data-dir","description","desc","label","box","parameter","param","derived","der","init-pop","add-pop","remove-pop","add-ind","remove-ind","move-ind","init-pop-sim","add-pop-sim","remove-pop-sim","add-ind-sim", "remove-ind-sim","move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim","comp-data","trans-data","test-data","pop-data","pop-trans-data","ind-effect-data","ind-group-data","genetic-data","simulation","sim","inference","inf","post-sim","posterior-simulation","ind-effect","fixed-effect","sim-param","sim-state","inf-param","inf-state","post-sim-param","post-sim-state","map","post-sim","post-simulation","do-sim","do-simulation","do-inf","do-inference",,"do-post-sim","do-posterior-simulation","param-mult"];
+const command_list = ["species","classification","class","set","camera","compartment","comp","comp-all","transition","trans","trans-all","data-dir","description","desc","label","box","parameter","param","derived","der","init-pop","add-pop","remove-pop","add-ind","remove-ind","move-ind","init-pop-sim","add-pop-sim","remove-pop-sim","add-ind-sim", "remove-ind-sim","move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim","comp-data","trans-data","test-data","pop-data","pop-trans-data","ind-effect-data","ind-group-data","genetic-data","simulation","sim","inference","inf","post-sim","posterior-simulation","ind-effect","fixed-effect","sim-param","sim-state","inf-param","inf-state","post-sim-param","post-sim-state","map","post-sim","post-simulation","param-mult"];
 
 // Lists all commands which need to load files
 const data_command_list = ["init-pop", "add-pop", "remove-pop", "add-ind", "remove-ind", "move-ind", "init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data","param-mult"];
@@ -292,7 +293,8 @@ const INPUT_OUTLINE_COL = LBLUE;
 
 const TI_DIV_MAX = 10000;                          // Maximum number of time divisions
 const DISPLAY_FILE_LEN_MAX = 100;
-const KEY_LINE_MAX = 50;                           // Maximum number of key lines on a graph    
+const KEY_LINE_MAX = 100;                          // Maximum number of key lines on a graph    
+const GRAPH_LINE_MAX = 1000;                       // Maximum number of lines on graph    
 const IND_PLOT_MAX = 20000;                        // Manimum number of individuals plotted
 const MATRIX_PLOT_MAX = 40000;                     // The maximim number of nodes plotted
 const MATRIX_COMP_MAX = 200;                       // The maximum comparments for MatrixAnim

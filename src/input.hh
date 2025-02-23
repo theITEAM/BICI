@@ -74,14 +74,16 @@ DataTemplate(GENETIC_DATA,{"ID","t,the time the genetic measurement is taken","s
 class Input                                // Stores information about the model
 {
 	public:
-		string outputdir;                      // The output directory 
+		string datadir;                        // The data directory 
 		vector <string> lines_raw;             // Stores the raw text lines of the input file
 		
-		Input(Model &model, string file, unsigned int chain);
+		Input(Model &model, string file, unsigned int chain, unsigned int nchain_, unsigned int seed);
 	
 	private:
 		unsigned int p_current, cl_current;    // Stores the current species and classification 
-	
+		
+		unsigned int nchain;                   // The number of chains
+		
 		bool terminate;                        // Set if algorithm terminated early
 		
 		string input_file;                     // The input file
@@ -130,7 +132,6 @@ class Input                                // Stores information about the model
 		void create_param_vector();
 		void create_pop_ref();
 		void simplify_equations();
-		void set_outputdir(string file);
 		
 		// In 'input_commands.cc' 
 		void species_command(unsigned int loop);
@@ -153,9 +154,6 @@ class Input                                // Stores information about the model
 		void param_command();
 		void load_reparam_eqn(string te, Param &par);
 		void derived_command();
-		void do_sim_command();
-		void do_inf_command();
-		void do_post_sim_command();
 		void simulation_command();
 		void inference_command();
 		void post_sim_command();

@@ -4,12 +4,11 @@
 /// Fires if mouse button is pressed down
 function mouse_down(xx,yy,evt)                                     
 {
-	if(inter.loading_symbol.on) return;
-	
 	if(false){ pr("evt"); pr(evt);}
 
   let d = new Date(); 
 	let over = inter.over;
+	
 	inter.mouse_time_down_prev = inter.mouse_time_down;
 	inter.mouse_down_over_prev = inter.mouse_down_over; 
 	

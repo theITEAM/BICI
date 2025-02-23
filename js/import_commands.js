@@ -1668,7 +1668,7 @@ function inference_command()
 		
 	case "ABC":
 		details.abcsample = check_pos_integer("sample",ABC_SAMPLE_DEFAULT);
-		details.accfrac = check_zero_one("acc-frac",ABC_ACFRAC_DEFAULT);zzz
+		details.accfrac = check_zero_one("acc-frac",ABC_ACFRAC_DEFAULT);
 		break;
 		
 	case "ABC-SMC":
@@ -1885,7 +1885,9 @@ function ind_effect_command()
 			for(let r = 0; r < tab_ind.nrow; r++){ 
 				list.push(tab_ind.ele[r][0]);
 			}			
-		
+		for(let r = 0; r < list.length; r++){ 
+		//pr(list[r]+"ind");
+		}
 			A_matrix.ind_list = list;
 		
 			let N = list.length;
@@ -2318,14 +2320,22 @@ function sim_param_command()
 }
 
 
+/// Gets the chain value (increments for plotting)
+function get_chain_value()
+{
+	let chain = get_tag_value("chain");
+	if(chain == "") chain = "0";
+	return String(Number(chain)+1);
+}
+
+
 /// Reads in parameter samples into inf_results
 function inf_param_command()
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
 	
-	let chain = get_tag_value("chain");
-	if(chain == "") cannot_find_tag();
+	let chain = get_chain_value();
 	
 	read_param_samples_file(chain,file,inf_result);
 }
@@ -2357,8 +2367,7 @@ function inf_state_command()
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
 	
-	let chain = get_tag_value("chain");
-	if(chain == "") cannot_find_tag();
+	let chain = get_chain_value();
 	
 	read_state_samples_file(chain,file,inf_result);
 }

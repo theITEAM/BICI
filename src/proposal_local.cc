@@ -37,7 +37,7 @@ void Sampler2D::init(unsigned int _N, unsigned int _N2)
 		num[i].resize(N2,100);  
 		num_sum[i].resize(N2); 
 	}
-
+	
 	setup();
 }
 
@@ -62,10 +62,12 @@ void Sampler2D::setup()
 /// Samples from 2D sampler
 Samp Sampler2D::sample(double &dprob) const
 {
-	auto z = ran()*S;
+	auto ra = ran();
+	auto z = ra*S;
+
 	auto i = 0u; while(i < N && z > marg_sum[i]) i++;
 	if(i == N) emsg("Cannot sample i1");
-
+	
 	if(i > 0) z -= marg_sum[i-1];
 	
 	const auto &ns = num_sum[i]; 
@@ -106,7 +108,7 @@ void Sampler2D::print() const
 }
 
 
-/// Updates teh 2D sampler
+/// Updates the 2D sampler
 void Sampler2D::update(unsigned int i, unsigned int j, int sign)
 {
 	num[i][j] += sign;
@@ -116,6 +118,7 @@ void Sampler2D::update(unsigned int i, unsigned int j, int sign)
 	
 	for(auto ii = i; ii < N; ii++) marg_sum[ii] += sign;
 	S += sign;
+	if(S < 0) emsg("GG");
 }
 
 
@@ -589,6 +592,7 @@ void Proposal::pop_single_local(State &state)
 	auto &cnum = ssp.init_cond_val.cnum;
 	auto N = sp.tra_gl.size();
 	
+	// This is a sampler for adding new events
 	auto &tr_samp = loc_samp.tr_samp;
 		
 	if(burn_info.on){ // Updates the sampler
@@ -614,7 +618,7 @@ void Proposal::pop_single_local(State &state)
 	tr_sel.init(N,T);
 	tr_sel.num = tn;
 	tr_sel.setup();
-		
+
 	for(auto loop = 0u; loop < LOOP_IC_LOCAL; loop++){
 		if(sp.init_cond.type == INIT_POP_DIST && ran() < 0.5){  // Changes IC and add/rem event
 			if(ran() < 0.5){                               // Add event with initical condition change
@@ -636,7 +640,7 @@ void Proposal::pop_single_local(State &state)
 					local_change.push_back(lc);
 						
 					auto like_ch = state.calculate_local_change(p_prop,local_change,1);
-					//cout << state.species[
+					
 					auto al = calculate_al(like_ch,dprob);
 					
 					ntr++;
@@ -690,6 +694,7 @@ void Proposal::pop_single_local(State &state)
 		else{                                           // Just add/rem event
 			if(ran() < 0.5){ // Add event 
 				if(pl) cout << "add" << endl;
+				
 				auto dprob = 0.0;
 				auto samp = tr_samp.sample(dprob);
 				auto tr = samp.i;
@@ -725,7 +730,7 @@ void Proposal::pop_single_local(State &state)
 				
 					auto tr = samp.i;	
 					auto ti = samp.j;
-				
+					
 					dprob += log((tr_samp.num[tr][ti])/(tr_samp.S));
 					
 					vector <LocalChange> local_change;
@@ -749,7 +754,7 @@ void Proposal::pop_single_local(State &state)
 				}
 			}
 		}
-		
+			
 		if(pl) state.check("Proposal local");
 	}
 	

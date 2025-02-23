@@ -13,9 +13,9 @@ using namespace std;
 #include "utils.hh"
 
 /// Initialises the model 
-Model::Model()
+Model::Model(Operation mode_)
 {
-	mode = MODE_UNSET;  
+	mode = mode_;  
 	nspecies = 0;
 };
 

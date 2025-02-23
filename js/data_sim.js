@@ -31,7 +31,6 @@ function obs_model_sample(mean,so)
 		break;
 	
 	case "Poisson":
-	pr(mean+" mean");
 		return poisson_sample(mean);
 		
 	case "Negative binomial":
@@ -446,9 +445,7 @@ function simulate_data(so)
 						sum += posg[c]*popc[c];
 					}
 				
-				
 					let result = obs_model_sample(sum,so);
-					pr(t+" "+sum+" "+result+" sum");
 					row.push(precision(result,5));
 					ele.push(row);
 				}

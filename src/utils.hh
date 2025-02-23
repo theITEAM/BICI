@@ -5,10 +5,14 @@
 
 using namespace std;
 
+extern bool com_op;                            // Set to true for command line output
+
 #include "struct.hh"
 #include "equation.hh"
 
 void emsg(const string &msg);
+void display_error(const string &msg);
+void display_warning(const string &msg);
 string trim(string te);
 string remove_prime(string te);
 string remove_quote(string te);
@@ -77,6 +81,7 @@ ParamProp get_param_prop(string st);
 unsigned int add_to_vec(vector <unsigned int> &vec, unsigned int val);
 unsigned int add_to_vec(vector <ParamRef> &vec, unsigned int th, unsigned int index);
 void print(string name, const vector <double> &vec);
+void print_diag(string te);
 void print(string name, const vector <unsigned int> &vec);
 void printsm(string name, const vector <double> &vec);
 void print(string name, const vector < vector <double> > &vec);
@@ -127,7 +132,7 @@ double multinomial_samp_probability(const vector <unsigned int> &x, const vector
 unsigned int get_event_before(unsigned int e, const vector <Event> &ev);
 unsigned int get_event_after(unsigned int e, const vector <Event> &ev);
 double get_log_zero_one(double val);
-void set_seed(const int chain, const Details &details);
+void set_seed(const int chain, const Details &details, unsigned int seed_tag);
 void check_bp(double &bp);
 double nm_trans_like(TransType type, double dt, const vector <double> &ref_val);
 vector <string> comma_split(string te);
@@ -136,6 +141,7 @@ vector <unsigned int> true_list(const vector <bool> &vec);
 vector <unsigned int> false_list(const vector <bool> &vec);
 vector <unsigned int> combine(const vector <unsigned int> &vec1, const vector <unsigned int> &vec2);	
 bool begin_str(string st, string st2);
+bool end_str(string st, string st2);
 	
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);

@@ -1,0 +1,82 @@
+
+####################### DESCRIPTION ########################
+
+description text="[[
+# Example B6: Time-series population obesrvations for IBM
+
+## Objective
+- Introduce population-based data incorporated into an IBMs.
+
+## Data
+- On the 'Inference→Data' page population data is added.
+- This gives time-series estimates for the number of individuals in the infected $I$ compartment.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.
+]]"
+
+
+######################### DETAILS ##########################
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5 nchain=3
+
+post-sim start=0 end=100
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
+
+species name="People" type="individual" trans-tree="off"
+
+# SPECIES MODEL
+
+class name="DS" index="a"
+
+camera x=-9 y=-7 scale=1
+
+comp name="S" color="#009900" x=-16 y=-7
+comp name="I" color="#ff2222" x=-2 y=-7
+
+trans name="S->I" value="exp(rate:β×{I})"
+
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="DS" file="[[
+"Compartment","Population"
+"S",100
+"I",1
+]]"
+
+
+# INFERENCE DATA
+
+init-pop type="fixed" file="[[
+"DS","Population"
+"S",100
+"I",1
+]]"
+
+pop-data filter="DS=I" error="normal:5%" file="[[
+"t","Population"
+20,18
+40,75
+60,89
+80,100
+100,101
+]]"
+
+
+
+######################## PARAMETERS ########################
+
+param name="β" value="0.001" prior="uniform(0,0.01)"
+
+

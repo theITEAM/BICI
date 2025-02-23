@@ -146,9 +146,11 @@ function add_bubble_buts(lay)
 			cont.y += 0.2;
 			bubble_addscrollable(cont,{type:"filterpos", ymax:10});
 		
-			bubble_addcheckbox(cont,0,"Calculate fraction",bub.popfilt.filter.fraction);
-			cont.y += 0.4;
-				 
+			if(subsubtab_name() == "Populations"){		
+				bubble_addcheckbox(cont,0,"Calculate fraction",bub.popfilt.filter.fraction);
+				cont.y += 0.4;
+			}
+			
 			add_end_button(cont,"Delete","RemoveFilter",{num:bu.num, p: bu.filter.p, rpf:bub.popfilt.rpf});	
 			add_end_button(cont,"Done","DoneFilter",{});	
 		}

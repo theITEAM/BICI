@@ -59,11 +59,11 @@ function load_fi(file,file_type,heading,format,op)
 		break;
 	
 	case "BICI_file": 
-		import_file(te); 
+		import_file(te,true); 
 		break;
 		
 	case "Import file": 
-		import_file(te); 
+		import_file(te,true); 
 		break;
 	
 	case "A matrix":
@@ -250,7 +250,7 @@ function load_table(te,head,sep,filename)
 function read_param_samples_file(chain,file,result)
 {
 	let te= file.te;
-	
+
 	let warn = "Problem loading file '"+file.name+"'";
 	if(file.name == "inline") warn = "Problem loading parameter sample";
 	
@@ -262,8 +262,8 @@ function read_param_samples_file(chain,file,result)
 function read_param_samples(chain,te,result,warn)
 {
 	let lines = te.split('\n');
-
-	let spl = comma_split(lines[0]);
+	
+	let spl = comma_split(lines[0].trim());
 	
 	if(spl[0] != "State"){ alert_param_sample(warn,-1); return;}
 
@@ -286,7 +286,7 @@ function read_param_samples(chain,te,result,warn)
 			}
 			else{
 				let pp = get_param_prop(name);
-				
+			
 				let th = find(result.param,"name",pp.name);
 			
 				if(th == undefined && begin(name,"N^")){

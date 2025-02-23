@@ -4,8 +4,9 @@
 /// Generates all the layers on the screen
 function generate_screen(update)
 {		
-	if(update != false && model.update_model_needed == true){
+	if(update != false && model.update_model_needed == true && inter.page_name){
 		let na = inter.page_name;
+	
 		let tree = na.split("->");
 		if((tree[0] == "Model" && tree[1] == "Parameters") ||
 			(tree[0] == "Simulation" && tree[1] == "Parameters") ||
@@ -29,9 +30,11 @@ function generate_screen(update)
 	if(height < 538*factor) height = 538*factor; 
 	if(width < 917*factor) width = 917*factor;
 	
-	inter.canvas.width = width;
-  inter.canvas.height = height;
-
+	if(inter.canvas){
+		inter.canvas.width = width;
+		inter.canvas.height = height;
+	}
+	
 	let ratio = page_char_wid/page_char_hei;
 	let wid_show = Math.round(height*ratio);
 	let hei_show = height;
@@ -532,7 +535,7 @@ function add_screen_buts(lay)
 
 	let ya = 1.5;
 	let yb = 5;
-	let yc = y2-2;
+	let yc = y2-0.5;
 
 	let show_model = model.get_show_model();
 	
@@ -737,7 +740,9 @@ function add_screen_buts(lay)
 
 	if(inter.loading_symbol.on){
 		let six = 4.7, siy = 3.7;
-		add_layer("LoadingSymbol",(x2+x3)/2-six/2,(y1+y2)/2-siy/2,six,siy,{});
+		add_layer("LoadingSymbol",(x2+x3)/2-six/2,(y1+y2)/2-siy/2,six,siy+8,{});
+		
+		add_layer("Logo",x1,ya,x2-x1,yb-ya,{});
 	}
 	else{
 		if(inter.bubble.i != undefined && showbubble == false){
@@ -814,8 +819,8 @@ function start_loading_symbol(per,type)
 		inter.loading_symbol = {on:true, offset:0, interval:interval, percent:per, type:type};
 		
 		switch(type){
-		case "Start": inter.loading_symbol.message = "Creating..."; break;
-		case "Spawn": inter.loading_symbol.message = "Initialising..."; break;
+		case "Start": loading_symbol_message("Creating..."); break;
+		case "Spawn": loading_symbol_message("Initialising..."); break;
 		}
 		
 		generate_screen();
@@ -827,7 +832,6 @@ function start_loading_symbol(per,type)
 function loading_symbol_message(te)
 {
 	inter.loading_symbol.message = te;
-	generate_screen();
 }	
 
 
@@ -973,6 +977,9 @@ function replot_loading_symbol()
 		lay.plot_button(lay.but[0]);	
 		cv = inter.canvas_cv;
 		cv.drawImage(lay.can,Math.round(lay.x*inter.sca),Math.round(lay.y*inter.sca));
+		
+		lay.plot_button(lay.but[1]);	
+		cv.drawImage(lay.can,Math.round(lay.x*inter.sca),Math.round(lay.y*inter.sca));	
 	}
 }
 
@@ -1394,6 +1401,17 @@ function check_param_or_number(te,type)
 }
 
 
+/// Checks that a string is a non-negative integer
+function check_integer(te)
+{
+	let num = Number(te);
+	if(isNaN(num) || num < 0 || num != Math.floor(num)){
+		return "Must be an integer";
+	}
+	return "";
+}
+
+
 /// Checks that a string is a positive integer
 function check_posinteger(te)
 {
@@ -1598,7 +1616,7 @@ function check_error_textbox2(tbs)
 				break;
 				
 			case "sim_seed": case "inf_seed": case "ppc_seed":
-				warn = check_posinteger(te);
+				warn = check_integer(te);
 				if(warn == ""){ if(Number(te) > seed_max) warn = "Between 0-"+seed_max;}
 				break;
 				

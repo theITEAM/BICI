@@ -50,7 +50,7 @@ MCMC::MCMC(const Model &model, Output &output) : model(model), output(output), s
 /// Runs MCMC
 void MCMC::run()
 {
-	print("Run...");
+	print_diag("Run...");
 	
 	update.init();
 	
@@ -60,11 +60,11 @@ void MCMC::run()
 	
 	auto like_obs_max = -LARGE;
 	
-	print("Finding initial state");
+	print("Finding initial state...");
 
 	auto loop_max = 10u;
 	for(auto loop = 0u; loop < loop_max; loop++){ 
-		print(to_string(loop)+" Initial state");
+		print_diag(to_string(loop)+" Initial state");
 		
 		auto param_val = model.param_sample();
 		auto initc_val = model.initc_sample(param_val);
@@ -74,21 +74,21 @@ void MCMC::run()
 			output.print_param(param_val);
 		}
 		
-		print("simulate");
+		print_diag("simulate");
 		
 		state.simulate(param_val,initc_val);
 	
-		print("simulate done");
+		print_diag("simulate done");
 	
 		state.check("First check");
 	
-		print("Checked");
+		print_diag("Checked");
 		
 		state.resample_ind();    // Resamples individual such that fixed events become correct
 
 		state.check("Resample check");
 	
-		print("resampled");
+		print_diag("resampled");
 		
 		burn_info.add_L(state.like); 
 		
@@ -105,12 +105,12 @@ void MCMC::run()
 	
 	state.check("before");
 	
-	print("Starting sampling");
+	print_diag("Starting sampling");
 
 	long time_start = clock();
 
 	auto op_step = get_op_step(nsample);
-	
+
 	for(auto s = 0u; s < nsample; s++){
 		if(s%100 == 0 && com_op) progress(s,nsample);		
 		else{

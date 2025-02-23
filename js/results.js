@@ -8,9 +8,6 @@ function results_finalise(result)
 	average_rescale(result);
 	
 	delete result.hash_tl;
-	
-	//pr("fin");	
-	//pr(result);
 }
 
 
@@ -505,7 +502,7 @@ function add_tl(vec,ref,result,op)
 
 
 /// Gets a value from a timeline at a given time point
-function get_val_tl(ti,ref,result)
+function get_val_tl(ti,ref,result,op)
 {
 	let tl = result.tl_store[ref];
 	let v = tl.v, n = tl.n;
@@ -517,7 +514,11 @@ function get_val_tl(ti,ref,result)
 		i++;
 	}
 	if(i == v.length) error("Problem with get val ti");
-	return v[i];
+	
+	let va = v[i];
+	if(op){ if(op == "positive" && va < 0) va = 0;}
+	
+	return va;
 }
 
 
@@ -549,8 +550,6 @@ function get_timeline(vec,result)
 		let tl = tl_store[j];
 		if(!equal_vec(tl.v,v)){ 
 			j = undefined; pr("ERROR vec not equal1");
-			pr(tl.v);
-			pr(v);
 		}
 		if(!equal_vec(tl.n,n)){ j = undefined; pr("ERROR vec not equal2");}
 	}
@@ -858,7 +857,7 @@ function initialise_plot_filters(result,source)
 		let cla_red = [];
 		for(let cl = 0; cl < sp.ncla; cl++){
 			let claa = sp.cla[cl];
-			cla_red[cl] = { name:claa.name};///zzz
+			cla_red[cl] = { name:claa.name};
 			if(claa.ncomp > COMP_FILTER_MAX) cla_red[cl].comp_too_large = true;
 			else{ cla_red[cl].comp = claa.comp; cla_red[cl].ncomp = claa.ncomp;} 
 			
@@ -1551,6 +1550,9 @@ function get_times(knot,details)
 	let t_end = details.t_end;
 	if(details.inf_t_end != undefined) t_end = details.inf_t_end;
 	
+	if(details.ppc_t_start != undefined) t_start = details.ppc_t_start;
+	if(details.ppc_t_end != undefined) t_end = details.ppc_t_end;
+
 	let times = [];
 	for(let k = 0; k < knot.length; k++){
 		let t;

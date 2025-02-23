@@ -70,7 +70,7 @@ function create_edit_param(lay)
 		lay.add_corner_button([["Back","Grey","CancelEditParam"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
 	else{
-		lay.add_corner_button([["Cancel","Grey","CancelEditParam"],["Done","Grey",doneac]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
+		lay.add_corner_button([["Cancel","Grey","CancelEditParam"],["Update","Grey",doneac]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
 	
 	let x = 1.2, y = lay.dy-1.6;

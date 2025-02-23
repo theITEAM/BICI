@@ -1418,6 +1418,12 @@ void Input::set_spline(string knot_times_str, string smooth, vector <string> &kn
 
 	vector <double> times;
 	
+	auto t_start = model.details.t_start;
+	if(model.mode == PPC && !use_inf_time) t_start = model.details.ppc_t_start; 
+	
+	auto t_end = model.details.t_end;
+	if(model.mode == PPC && use_inf_time) t_end = model.details.inf_t_end;
+		
 	knot_times = split(knot_times_str,',');
 	for(auto j = 0u; j < knot_times.size(); j++){
 		double num;
@@ -1425,14 +1431,12 @@ void Input::set_spline(string knot_times_str, string smooth, vector <string> &kn
 		auto te = knot_times[j];
 		if(te == "start"){
 			if(j != 0){ alert_import("In 'knot_times' 'start' should only occur at the start of the knot definition"); return;}
-			
-			num = model.details.t_start;
+			num = t_start;
 		}
 		else{
 			if(te == "end"){
 				if(j != knot_times.size()-1){ alert_import("In 'knot_times' 'end' should only occur at the end of the knot definition"); return;}
-				num = model.details.t_end;
-				if(model.mode == PPC && use_inf_time) num = model.details.inf_t_end;
+				num = t_end;
 			}
 			else{
 				num = number(te);
@@ -1440,8 +1444,8 @@ void Input::set_spline(string knot_times_str, string smooth, vector <string> &kn
 					alert_import("In 'knot_times' the value '"+te+"' must be a number"); return;
 				}
 				else{
-					if(num < model.details.t_start || num > model.details.t_end){
-						alert_import("In 'knot_times' the value '"+te+"' must be before the start time and after the end time"); return;
+					if(num < t_start || num > t_end){
+						alert_import("In 'knot_times' the value '"+te+"' must be after the start time and before the end time"); return;
 					}
 				}
 			}

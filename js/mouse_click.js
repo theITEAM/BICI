@@ -10,7 +10,11 @@ function mouse_click(x,y)
 	let i = inter.over.i;
 	
 	if(l != undefined){
-		button_action(inter.layer[l].but[i],"click");
+		let but = inter.layer[l].but[i];
+	
+		if(inter.loading_symbol.on && but.ac != "Stop") return;
+	
+		button_action(but,"click");
 	}
 	else{
 		close_dropdown();
@@ -1659,8 +1663,16 @@ function button_action(bu,action_type)
 				alertp("The start time must be before the end time.");
 			}
 			else{
-				if(check_time_error() == false){		
-					start_worker("Start",{save_type:"sim", map_store:map_store, ver:ver});
+				if(check_time_error() == false){	
+					switch(model.sim_details.run_local.value){
+					case "Yes":
+						start_worker("Start",{save_type:"sim", map_store:map_store, ver:ver});
+						break;
+						
+					case "No":
+						run_cluster("sim");
+						break;
+					}
 				}
 			}
 		}
@@ -1671,7 +1683,7 @@ function button_action(bu,action_type)
 			copy_back_to_source();
 		
 			let de = model.ppc_details;
-				
+			
 			if(Number(de.ppc_t_start) >= Number(de.ppc_t_end)){
 				alertp("The start time must be before the end time.");
 			}
@@ -1685,8 +1697,16 @@ function button_action(bu,action_type)
 					}
 					else{
 						if(check_time_error() == false){	
-pr("START");						
-							start_worker("StartPPC",{save_type:"ppc", map_store:map_store, ver:ver});
+		
+							switch(model.ppc_details.run_local.value){
+							case "Yes":
+								start_worker("StartPPC",{save_type:"ppc", map_store:map_store, ver:ver});
+								break;
+								
+							case "No":
+								run_cluster("ppc");
+								break;
+							}
 						}
 					}
 				}
@@ -1717,7 +1737,7 @@ pr("START");
 						break;
 					
 					case "No":
-						inference_cluster();
+						run_cluster("inf");
 						break;
 					}
 				}
@@ -1726,7 +1746,7 @@ pr("START");
 		break;
 		
 	case "StartCluster":
-		start_worker("StartCluster",{save_type:"inf", map_store:map_store, ver:ver});			
+		start_worker("StartCluster",{save_type:inter.help.siminf, map_store:map_store, ver:ver});		
 		break;
 
 	case "CopyText":

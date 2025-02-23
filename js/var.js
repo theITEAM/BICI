@@ -27,7 +27,7 @@ let inter=                                         // Dynamic variables related 
 	
 	pa:0,                                            // Page number
 	page:[],                                         // Stores the page being viewed
-	page_name:undefined,                             // A string which represents the page name
+	page_name:"",                                    // A string which represents the page name
 		
 	help:{},                                         // Stores information about help
 
@@ -99,7 +99,7 @@ let map_store = [];
 
 let data = new Data();
 
-let edit_source;                                   // Allow for a data source to be editted
+let edit_source={};                                   // Allow for a data source to be editted
 
 let cv;                                            // Used for plotting to working  anvas       
 

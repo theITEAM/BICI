@@ -269,22 +269,7 @@ worker.onmessage = function (e) {
 			break;
 		
 		case "Load Example":
-			{
-				model.load(ans);
-				//change_page({pa:"Model", su:"Compartments"});
-				//change_page({pa:"Model", su:"Description"}); 
-				//change_page({pa:"Model", su:"Parameters"}); 
-				//change_page({pa:"Simulation", su:"Parameters"});
-				//change_page({pa:"Simulation", su:"Population"});
-				//change_page({pa:"Simulation", su:"Individual"});
-				//change_page({pa:"Inference", su:"Data"});
-				//change_page({pa:"Simulation", su:"Parameters"});
-				//change_page({pa:"Inference", su:"Prior"});
-				//change_page({pa:"Model"});
-				//change_page({pa:"Inference", su:"Run"});
-				//change_page({pa:"Simulation", su:"Run"});
-				//pr("model"); pr(model);
-			}
+			model.load(ans);
 			break;
 		
 		case "Load File":
@@ -310,7 +295,7 @@ worker.onmessage = function (e) {
 			break;
 		
 		case "Spawn Output":
-			model.load(ans);	
+			model.load(ans,true);	
 			break;
 		
 		case "Import output": case "Import output2": case "Load Default": 
@@ -368,6 +353,7 @@ worker.onmessage = function (e) {
 			{	
 				model.warn = ans.warn;
 				model.species = ans.species;
+				close_help();
 				generate_screen();
 			}
 			break;
@@ -420,7 +406,7 @@ worker.onmessage = function (e) {
 			break;
 			
 		default:
-			pr("Option not recognisted");
+			pr("Option not recognisted: "+ans.type);
 			break;
 		}
 	}

@@ -180,7 +180,8 @@ class StateSpecies                         // Stores information about the state
 		void check_markov_eqn(unsigned int ti, const vector <double> &popnum) const;
 		void check_markov_tree_rate() const;
 		void check_event() const;
-		void check_erlang() const ;
+		void check_erlang() const;
+		void check_trans_num_neg() const;
 		string check_prior(const Equation &eq) const;
 		
 		const vector <double> &param_val;      // Quantities reference from state

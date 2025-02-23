@@ -221,17 +221,28 @@ function add_help_content_buts(lay)
 			let para = te.split("\n");
 
 			for(let j = 0; j < para.length; j++){
-				if(para[j].substr(0,2) == "• "){
+				let fir = para[j].substr(0,2);
+				switch(fir){
+				case "• ":
 					lay.add_paragraph("•",dx,cx+0.5,cy,WHITE,para_si,para_lh);
 					cy = lay.add_paragraph(para[j].substr(2),dx-1.4,cx+1.4,cy,WHITE,para_si,para_lh);
-				}
-				else{
-					if(para[j].substr(0,2) == "* "){
-						cy = lay.add_paragraph(para[j].substr(2),dx-2.4,cx+2.4,cy,WHITE,para_si,para_lh);
-					}
-					else{
-						cy = lay.add_paragraph(para[j],dx,cx,cy,WHITE,para_si,para_lh);
-					}
+					break;
+					
+				case "* ":
+					cy = lay.add_paragraph(para[j].substr(2),dx-2.4,cx+2.4,cy,WHITE,para_si,para_lh);
+					break;
+					
+				case ">>":
+					cy = lay.add_paragraph(para[j].substr(2),dx-1.4,cx+1.4,cy,WHITE,para_si,para_lh);
+					break;
+					
+				case "]>":
+					cy = lay.add_paragraph(para[j].substr(2),dx-2.4,cx+2.4,cy,WHITE,para_si,para_lh);
+					break;
+					
+				default:
+					cy = lay.add_paragraph(para[j],dx,cx,cy,WHITE,para_si,para_lh);
+					break;
 				}
 				cy += 0.5;
 			}

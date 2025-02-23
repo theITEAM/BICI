@@ -8,7 +8,7 @@
 using namespace std;
 
 // This is set if compilation is done on windows
-//#define WINDOWS
+#define WINDOWS
 
 //#define USE_MPI                                      // Sets if code can run in parallel
 
@@ -18,6 +18,7 @@ const bool check_lin = true;                         // Checks linearisation of 
 const bool adapt_prop_prob = false;//true;           // Determines if proposals prob adapted
 const bool check_swap = false;                       // Used to check if new swap is working
 const bool use_ind_key = true;                       // Determines if indindividual key
+const bool print_diag_on = false;                    // Prints diagnostic statements to terminal
 
 const bool linearise_speedup = true;                 // Linearisation speed-up of likelihood
 // This speeds up by taking account of linear population terms when calculation div values
@@ -31,18 +32,10 @@ const bool linearise_speedup3 = true;                 // Linearisation speed-up 
 const bool removeparamvec_speedup = true;            // Removes zeros from paramter vector
 const bool simplify_eqn = true;                      // Simplifies equations (to speed up)
 
-#ifdef WINDOWS
-const bool com_op = true;                            // Set to true for command line output
-const bool print_on = false;                          // Determines if diagnostics printed
-#else
-const bool com_op = false; 
-const bool print_on = true;                          // Determines if diagnostics printed
-#endif
-
 /************************** Enumerated values ******************************/
 
 // Information from tags when BICI is run
-enum TagType { CHAIN, NCHAIN, OP, SAMP_TYPE, TAG_UNSET };
+enum TagType { CHAIN, NCHAIN, OP, SAMP_TYPE, SEED, TAG_UNSET };
 
 
 // Different types of algorithm for simulation / inference
@@ -85,7 +78,7 @@ enum Operation { SIM, INF, PPC, MODE_UNSET };
 enum PriorPos { UNIFORM_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, FLAT_PR, DIRICHLET_PR };
  
 // Different possible command types
-enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, MAP, DO_SIM, DO_INF, DO_POST_SIM, PARAM_MULT,
+enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, MAP, PARAM_MULT,
 // These are not commands but varient used when loading data
 TRANS_TIMERANGE_DATA,
 EMPTY };

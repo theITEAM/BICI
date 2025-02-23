@@ -101,7 +101,15 @@ function get_Gelman_Rubin_statistic(cha)
 	if(N == 0){ error =("no data"); return;}
 		
 	let mu=[], vari=[];
-				
+	
+	{ // Checks to see if values along chain are all equal
+		for(let ch = 0; ch < C; ch++){ 
+			let val_basic = cha[ch][0];
+			let i = 0; while(i < N && cha[ch][i] == val_basic) i++;
+			if(i == N) return "-";
+		}
+	}
+	
 	let muav = 0.0;
 	for(let ch = 0; ch < C; ch++){ 
 		let valav = 0.0; for(let i = 0; i < N; i++) valav += cha[ch][i]/N;
@@ -110,9 +118,11 @@ function get_Gelman_Rubin_statistic(cha)
 		vari[ch] = varr;
 		muav += mu[ch]/C;
 	}
+	
 	let W = 0.0; for(let ch = 0; ch < C; ch++) W += vari[ch]/C;
+	
 	let B = 0.0; for(let ch = 0; ch < C; ch++) B += (mu[ch]-muav)*(mu[ch]-muav)*N/(C-1);
-	return Math.sqrt(((1-1.0/N)*W + B/N)/W);
+	return Math.sqrt(((1-1.0/N)*W + B/N)/W).toPrecision(pre);
 }
 
 

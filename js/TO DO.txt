@@ -1,3 +1,8 @@
+- T=0 not shown on density maps right
+- B8 post sim crashes
+- C4 ppc 20-200 time 
+
+
 Need to sort out joining
 sort out "to do2"
 

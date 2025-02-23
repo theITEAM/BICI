@@ -286,7 +286,7 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 /// Determines if an equation is valid
 Result Input::check_eqn_valid(string te) const
 {
-	//cout << te << "Check" << endl;
+	if(false) cout << te << "Check" << endl;
 	// TO DO EQN CHECK
 	return SUCCESS;
 }

@@ -20,19 +20,21 @@ function create_initial_pop(lay)
 		help = initpopdist_text;
 	}
 	
+	let bute = "Done";
 	if(so.info.i != undefined){
 		ac = "PlaceSourceBack";
 		title = "Edit initial population";
 		if(so.spec.radio_dist.value == "Dist"){
 			title = "Edit initial population distribution";	
 		}
+		bute = "Update";
 	}
 			
 	cy = lay.add_title(title,cx,cy,{te:help});
 
 	add_layer("InitialPopulationContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{});
 
-	lay.add_corner_button([["Cancel","Grey","CancelEditSource"],["Done","Grey",ac]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
+	lay.add_corner_button([["Cancel","Grey","CancelEditSource"],[bute,"Grey",ac]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 }
 
 

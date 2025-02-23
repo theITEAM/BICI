@@ -166,9 +166,7 @@ class Layer
 				break;
 				
 			case "Run":
-				//if(inter.running_status == false){
 				add_ppc_start_buts(this);
-				//}		
 				break;
 	
 			case "Results":
@@ -598,12 +596,16 @@ class Layer
 	{	
 		this.add_button({x:this.dx/2-loading_si/2, y:0, dx:loading_si, dy:loading_si, type:"LoadingSymbol"});
 		
-		let mess = inter.loading_symbol.message;
-		if(mess != undefined) this.add_button({te:mess, x:0, y:loading_si, dx:this.dx, dy:1, type:"Stop"});
-		
-		//else this.add_button({te:"Stop", x:0, y:loading_si, dx:this.dx, dy:1, type:"Stop", ac:"Stop"});
-		
-		//this.add_button({x:this.dx/2-loading_si/2, y:0, dx:loading_si, dy:loading_si, type:"LoadingSymbol"});
+		this.add_button({x:0, y:loading_si, dx:this.dx, dy:1, type:"LoadMessage"});
+
+		switch(inter.loading_symbol.type){
+		case "Start":
+			{
+				let si = 3;
+				this.add_button({te:"Stop", x:this.dx/2-si/2, y:loading_si+5, dx:si, dy:si, ac:"Stop", type:"Stop"});
+			}
+			break;
+		}
 	}
 	
 	

@@ -236,7 +236,7 @@ function additional_filt(y,rpf,lay)
 			
 		default: error("Option prob"); break;
 		}
-		if(rpf3.fraction.check) te = "Frac. "+te;
+		if(rpf3.fraction.check && subsubtab_name() == "Populations") te = "Frac. "+te;
 		
 		y = add_population_filter(rpf3.name,y,te,rpf,rpf3,i,lay);
 	}

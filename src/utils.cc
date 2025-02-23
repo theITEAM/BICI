@@ -32,9 +32,9 @@
 #include <math.h>
 #include <algorithm>
 #include <boost/math/special_functions/gamma.hpp>
-//#ifdef USE_MPI
+#ifdef USE_MPI
 #include "mpi.h"
-//#endif
+#endif
 
 using namespace std;
 
@@ -42,6 +42,9 @@ using namespace std;
 #include "utils.hh"
 
 default_random_engine generator;
+std::uniform_real_distribution<> dist(0,1);
+std::random_device rd; 
+std::mt19937 gen(rd());
 
 vector <double> log_sum;
 vector <double> log_integer;
@@ -51,6 +54,16 @@ void emsg(const string &msg)
 {
 	if(false) throw(std::runtime_error(msg));
 	
+	display_error(msg);
+	if(false) raise(SIGABRT);
+	
+	exit (EXIT_FAILURE);
+}
+
+
+/// Displays an error message
+void display_error(const string &msg)
+{
 	if(com_op == true){
 		cout << "<<ERROR>>" << endl <<  msg << endl << "<<END>>" << endl;
 	}
@@ -61,13 +74,23 @@ void emsg(const string &msg)
 		cout << msg;
 		if(msg.length() > 0 && msg.substr(msg.length()-1,1) != ".") cout << ".";
 		cout << endl;
-		
-		if(false){
-			raise(SIGABRT);
-		}
 	}
-	
-	exit (EXIT_FAILURE);
+}
+
+
+/// Display a warning message
+void display_warning(const string &msg)
+{
+	if(com_op == true){
+	}
+	else{
+		cout << "\033[35m";
+		cout << "WARNING: ";
+		cout << "\033[0m";
+		cout << msg;
+		if(msg.length() > 0 && msg.substr(msg.length()-1,1) != ".") cout << ".";
+		cout << endl;
+	}
 }
 
 
@@ -279,10 +302,14 @@ unsigned int integer(string st)
 
 
 /// Sets the seed for the random number generator
-void set_seed(const int chain, const Details &details)
+void set_seed(const int chain, const Details &details, unsigned int seed_tag)
 {
 	auto seed = details.seed;
 	if(seed == UNSET) seed = SEED_DEFAULT;
+
+	// Seed from tag loading BICI overides seed from file
+	if(seed_tag != UNSET) seed = seed_tag;
+	
 	seed += 10000*chain;
 
 	generator.seed(seed);
@@ -293,14 +320,13 @@ void set_seed(const int chain, const Details &details)
 /// Draws a random number between 0 and 1
 double ran()
 {
-	return double(0.999999999*rand())/RAND_MAX;
-	
-	/*
-	if(false){
-		std::uniform_real_distribution<> dist(0.0000000001,0.999999999);
-		return dist(mt);
-	}
-	*/
+	double val;
+	do{
+		//val = double(rand())/RAND_MAX;
+		val = dist(gen);
+	}while(val == 0 || val == 1);
+
+	return val;
 }
 
 
@@ -2145,17 +2171,24 @@ void print_like(const Like &like)
 }
 
 
-/// Prints a diagnostic statement to terminal
+/// Prints a statement to terminal
 void print(string te)
 {
-	if(print_on && op()) cout << te << endl;
+	if(!com_op && op()) cout << te << endl;
+}
+
+
+/// Prints a diagnostic statement to terminal
+void print_diag(string te)
+{
+	if(print_diag_on && !com_op && op()) cout << te << endl;
 }
 
 
 /// Prints a diagnostic statement to terminal
 void print(double num, string te)
 {
-	if(print_on && op()) cout << num << " " << te << endl;
+	if(!com_op && op()) cout << num << " " << te << endl;
 }
 
 
@@ -2221,5 +2254,15 @@ bool begin_str(string st, string st2)
 	auto tr = trim(st);
 	if(st.length() < st2.length()) return false;
 	if(st.substr(0,st2.length()) == st2) return true;
+	return false;
+}
+
+
+/// Determines if a string ends with another string
+bool end_str(string st, string st2)
+{
+	auto tr = trim(st);
+	if(st.length() < st2.length()) return false;
+	if(st.substr(st.length()-st2.length(),st2.length()) == st2) return true;
 	return false;
 }

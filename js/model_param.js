@@ -49,7 +49,7 @@ function add_param_mult_buts(lay)
 		active = false;
 	}
 	
-	cy += 0.5;
+	//cy += 0.5;
 
 	add_layer("ParamMultContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{});	
 	
@@ -63,7 +63,7 @@ function add_param_mult_buts(lay)
 /// The content within the param mult info
 function add_param_mult_content(lay)
 {
-	let y = 0;
+	let y = 0.5;
 	let mar = 2;
 	let dy = 4;
 	let col_round = LLLBLUE, col_text = DDBLUE;
@@ -100,7 +100,7 @@ function add_param_mult_content(lay)
 		}
 	}
 	
-	if(y == 0){
+	if(y == 0.5){
 		let si = 1;
 		let col = BLACK;
 		lay.add_button({te:"There are currently no parameter factors added to the model.", x:0.5, y:0, dx:lay.dx-5, dy:1.3, type:"Text", si:si, font:get_font(si), col:col}); 
@@ -281,9 +281,10 @@ function add_model_param_content(lay)
 						lay.add_radio(x+8.6,y,"Normal","Normal",spl.smooth.type);
 						
 						let si = 0.9, fo = get_font(si,"","times");
-						lay.add_button({te:"Value =", x:x+16.6, y:y+0.03, dy:si, si:si, font:fo, type:"Text", col:BLACK});
+						let sh = 0.15;
+						lay.add_button({te:"Value =", x:x+16.6, y:y+0.03+sh, dy:si, si:si, font:fo, type:"Text", col:BLACK});
 					
-						lay.add_button({te:spl.smooth.value, x:x+19.4, y:y, dx:8, dy:1.2, type:"SmoothValue", font: get_font(0.9), ac:"EditSplineKnots", i:i});
+						lay.add_button({te:spl.smooth.value, x:x+19.4, y:y+sh, dx:8, dy:1.2, type:"SmoothValue", font: get_font(0.9), ac:"EditSplineKnots", i:i});
 						y += dy;
 					}
 				}

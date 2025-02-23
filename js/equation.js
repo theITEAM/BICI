@@ -308,8 +308,14 @@ function add_quantity_content_buts(lay)
 			let cl_view = eqn.origin.cl;
 			
 			let marleft = 6;
-			
 			let ml = 4;
+			
+			lay.add_button({te:"DIST MAX:", x:0, y:y, dx: ml+1, dy:dy, type:"Text", col:WHITE, si:0.8, font:get_font(0.8)});
+			
+			lay.add_radio_white(ml,y,"No","No",eqn.dist_radio);
+			lay.add_radio_white(ml+5,y,"Yes","Yes",eqn.dist_radio);
+		
+			y += 1.9;
 			
 			lay.add_button({te:"INDICES:", x:0, y:y, dx: marleft, dy:dy, type:"Text", col:WHITE, si:0.8, font:get_font(0.8)});
 			let gap = 3.4;
@@ -556,7 +562,7 @@ function equation_calulator(lay,cx,cy,width,source,warn,mode)
 	}
 	
 	if(sum_fl == true){
-		let te = "Sum", w = text_width(te,font)+pad;
+		let te = "Sum", w = text_width(te,font)+pad;	
 		lay.add_button({te:te, te2:"Add sum", x:x, y:cy, dx:w, dy:dy, ac:ac, type:"Toolbar_But"});
 		x += w+gap4;
 	}
@@ -646,6 +652,8 @@ function initialise_toolbar(type)
 	case "Add sum":
 		{
 			eqn.num_radio = { value:1};
+			eqn.dist_radio = { value:"No"};
+
 			let pos = [];
 			for(let p = 0; p < model.species.length; p++){
 				let sp = model.species[p];
@@ -857,7 +865,9 @@ function equation_add_sum()
 		}
 	}
 	
-	let paste = "Σ"+eqn.letter;
+	let paste = "Σ";
+	if(eqn.dist_radio.value == "Yes") paste += "^max:";
+	paste += eqn.letter;
 	
 	let dep = "";
 	for(let i = 0; i < eqn.num_radio.value; i++){

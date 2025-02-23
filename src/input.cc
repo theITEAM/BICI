@@ -13,15 +13,17 @@ using namespace std;
 #include "utils.hh"
 
 /// Initialises the model 
-Input::Input(Model &model, string file, unsigned int chain) : model(model)
+Input::Input(Model &model, string file, unsigned int chain, unsigned int nchain_, unsigned int seed) : model(model)
 {
+	datadir = "";
+	
 	//generate_data();
+	
+	nchain = nchain_;
 	
 	terminate = false;
 	
 	input_file = file;
-	
-	set_outputdir(file);
 	
 	ifstream fin(file);
 	if(!fin) emsg("File '"+file+"' could not be loaded");
@@ -55,8 +57,8 @@ Input::Input(Model &model, string file, unsigned int chain) : model(model)
 	// (4) Adds inidividuals to the system
 	// (5) Everything else
 
-	for(auto loop = 0u; loop < 6; loop++){ 
-		print(loop,"loop");
+	for(auto loop = 1u; loop < 6; loop++){ 
+		print_diag("loop="+to_string(loop));
 		
 		// Keeps track of the current species and classification 
 		p_current = UNSET; cl_current = UNSET; 
@@ -72,14 +74,6 @@ Input::Input(Model &model, string file, unsigned int chain) : model(model)
 			
 			auto process = true;
 			switch(loop){
-			case 0:  // The initial pass determines if simulation or inference is being performed
-				switch(cname){
-				case DO_SIM: case DO_INF: case DO_POST_SIM: case DATA_DIR:
-					break;
-				default: process = false; break;
-				}
-				break;
-				
 			case 1:  // Gets simulation or inference details
 				switch(cname){
 				case SIMULATION: 
@@ -93,7 +87,9 @@ Input::Input(Model &model, string file, unsigned int chain) : model(model)
 				case POST_SIM:
 					if(model.mode != PPC) process = false; 
 					break;
-					
+				
+				case DATA_DIR: break;
+				
 				default: process = false; break;
 				}
 				break;
@@ -135,7 +131,7 @@ Input::Input(Model &model, string file, unsigned int chain) : model(model)
 				
 			case 5:   // In the last pass everything else
 				switch(cname){
-				case DO_SIM: case DO_INF: case DO_POST_SIM: case DATA_DIR: 
+				case DATA_DIR: 
 				case SIMULATION: case INFERENCE: case POST_SIM:
 				case PARAM: case DERIVED: 
 				case ADD_POP: case ADD_POP_SIM: case ADD_POP_POST_SIM:
@@ -186,13 +182,6 @@ Input::Input(Model &model, string file, unsigned int chain) : model(model)
 		line_num = UNSET;
 		
 		switch(loop){
-		case 0:
-			if(model.mode == MODE_UNSET){
-				alert_import("Either 'do-simulation' or 'do-inference' must be set"); 
-				return;
-			}
-			break;
-
 		case 1: calculate_timepoint(); break;
 		case 2: check_comp_structure(); break; 		
 		}
@@ -202,7 +191,7 @@ Input::Input(Model &model, string file, unsigned int chain) : model(model)
 	
 	auto inf = false; if(model.mode == INF) inf = true;
 	
-	print("loaded");
+	print_diag("loaded");
 	
 	set_contains_source();             // Sets flag to determine if source
 	
@@ -212,37 +201,37 @@ Input::Input(Model &model, string file, unsigned int chain) : model(model)
 	
 	progress(20,100);
 	
-	print("loaded1");
+	print_diag("loaded1");
 	
 	determine_branching();             // Determines which transitions branch from compartments
 	
-	print("loaded2");
+	print_diag("loaded2");
 	
 	bp_create_unset();                 // Substitutes "*" with the expression form branching prob
 	
-	print("loaded3");
+	print_diag("loaded3");
 	
 	markov_bp_convert();               // If all branches are rates then removes branching
 
-	print("loaded4");
+	print_diag("loaded4");
 	progress(30,100);
 	
 	//population_bp_rate_combine();      // Combines branching probabilities with rates in population model
 	
-	print("loaded5");
+	print_diag("loaded5");
 	
 	check_initial_pop_error(true);     // Determines if initial population is specified correctly
 
-	print("loaded6");
+	print_diag("loaded6");
 	
 	check_import_correct();            // Checks import has been successfully acheived
 
-	print("loaded7");
+	print_diag("loaded7");
 	progress(40,100);
 	
 	global_comp_trans_init();          // Creates global compartments and transitions
 	
-	print("loaded8");
+	print_diag("loaded8");
 
 	for(auto &sp : model.species){	
 		sp.initialise_data();            // Extracts data structures from data sources
@@ -252,7 +241,7 @@ Input::Input(Model &model, string file, unsigned int chain) : model(model)
 	
 	progress(50,100);
 	
-	print("loaded9");
+	print_diag("loaded9");
 	
 	model.set_hash_all_ind();           // Sets a hash table for all individuals
 	
@@ -260,7 +249,7 @@ Input::Input(Model &model, string file, unsigned int chain) : model(model)
 		
 	source_rate_divide();              // Divides equations for source rates
 	
-	print("h1");
+	print_diag("h1");
 
 	progress(60,100);
 	
@@ -268,98 +257,98 @@ Input::Input(Model &model, string file, unsigned int chain) : model(model)
 	
 	progress(70,100);
 	
-	print("h1a");
+	print_diag("h1a");
 	
 	simplify_equations();              // Simplifies equations as much as possible
 
 	progress(80,100);
 	
-	print("h1b");
+	print_diag("h1b");
 		
 	for(auto &sp : model.species){     // Classifies observed transitons as trans, source, or sink
 		sp.set_ob_trans_ev(model.eqn);
 	}
 
-	print("h1c");
+	print_diag("h1c");
 	
 	for(auto &eqn : model.eqn){        // Sets up reference (pop_ref, param_ref) in equations
 		eqn.setup_references();
 	}	
 	
-	print("h1d");
+	print_diag("h1d");
 	map_ind_effect();                  // Maps individual effects with groups
 
 	set_param_use();                   // Sets which parameters are used in the model
 	
-	print("h1e");
+	print_diag("h1e");
 	
 	set_param_parent_child();          // Sets parent child relationships for parameters
 	
-	print("h1f");
+	print_diag("h1f");
 	
 	//exp_nm_convert();                  // If doesn't contain a population then EXP_RATE -> EXP_RATE_NM
 	
-	print("h1g");
+	print_diag("h1g");
 	
 	setup_obs_trans();                 // Sets up obs_trans
 	
-	print("h1h");
+	print_diag("h1h");
 	
 	setup_obs_trans_is_one();          // Sets up obs_trans is_one
 	
-	print("h1i");
+	print_diag("h1i");
 	
 	create_nm_trans();                 // Creates a list of possible non-Markovian transitions
 
-	print("h2");
+	print_diag("h2");
 	
 	source_equation_comp();            // Attaches compartments to source equations
 
-	print("h3");
+	print_diag("h3");
 	
 	create_markov_eqn();               // Works out which equations are Markovian
 	
-	print("h4");
+	print_diag("h4");
 	
 	create_markov_comp_gl();           // Works out which markov_eqn applied to a compartment 
 	
-	print("h5");
+	print_diag("h5");
 	
 	create_markov_eqn_pop_ref();       // Works out which populations affect which markov eqns (and vice versa)
 	
-	print("h6");
+	print_diag("h6");
 
 	create_pop_ref();                  // Create reference to pop in comp_gl
 	
-	print("h8");
+	print_diag("h8");
 	
 	create_param_vector();             // Creates an overall parameter vector
 	
-	print("h9");
+	print_diag("h9");
 	
 	create_spline();                   // Creates any splines in the model
 
-	print("h10");
+	print_diag("h10");
 	
 	ind_fix_eff_group_trans_ref();     // References markov eqns and nm_trans ind_eff_group and fix_effect
 	
-	print("h11");
+	print_diag("h11");
 	
 	ind_fix_eff_pop_ref();             // References populations in ind_effect and fix_effect
 	
 	if(inf) create_trg_from_tr();      // Works out a convertion from tr to trg
 	
-	print("h12");
+	print_diag("h12");
 	
 	set_tra_ie_fe_affect();            // Sets which ie affect transitions
 	
 	set_tr_leave_markov();             // Sets Markov transitions leaving compartment    
 	
-	print("h13");
+	print_diag("h13");
 	
 	set_multi_trans_cl();              // Sets if transitions in multiple classification
 	
-	print("h14");
+	print_diag("h14");
 		
 	set_tr_connected();                // Determines if global transitions are connected
 	
@@ -377,23 +366,21 @@ Input::Input(Model &model, string file, unsigned int chain) : model(model)
 	
 	//set_pop_speedup();                 // Sets speedup for update_ind when population is changed
  	
-	print("h15");
+	print_diag("h15");
 	
 	progress(90,100);
 	
-	if(true){
-		for(auto &eq : model.eqn){
-			eq.calculate_linearise();      // Tries to linearise equations in terms of populations
-		}
+	for(auto &eq : model.eqn){
+		eq.calculate_linearise();        // Tries to linearise equations in terms of populations
 	}
 	
 	if(inf) param_affect_likelihood(); // Works out how changes to parameters affect likelihoods
 	
-	print("h16");
+	print_diag("h16");
 	
 	check_param_used();                // Checks all defined parameters used in the model (and vice versa)
 	
-	print("h18");
+	print_diag("h18");
 	
 	for(auto &sp : model.species){
 		sp.create_markov_tree();         // Creates sampler used to sample Markov events
@@ -402,11 +389,11 @@ Input::Input(Model &model, string file, unsigned int chain) : model(model)
 		for(const auto &wa : sp.warn) alert_line(wa.te,wa.line_num);    
 	}
 	
-	print("h19");
+	print_diag("h19");
 	
 	if(inf) create_island();                   // Works out how interconnected compartments are
 	
-	print("h20");
+	print_diag("h20");
 	
 	setup_trans_infection();                   // Sets up information about infection down transitions (for trans-tree)
 	
@@ -454,21 +441,14 @@ Input::Input(Model &model, string file, unsigned int chain) : model(model)
 	
 	output_error_messages(err_mess);
 	
-	set_seed(chain,model.details);             // Sets the psuedo random nunber generator see
+	set_seed(chain,model.details,seed);       // Sets the psuedo random nunber generator 
 	
 	progress(100,100);
 	
 	if(com_op) cout << "<RUNNING>" << endl;
 	
 	progress(0,100);
-	print("Finish");
-	
-	/*
-	for(auto me : model.species[0].markov_eqn){
-		cout <<  model.eqn[me.eqn_ref].te << " eq\n";
-	}
-	emsg("do");
-	*/
+	print_diag("Finish");
 }
 
 
@@ -751,9 +731,6 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 	if(type == "map") com = MAP;
 	if(type == "post-sim" || type == "post-simulation" ) com = POST_SIM;
 	
-	if(type == "do-sim" || type == "do-simulation") com = DO_SIM;
-	if(type == "do-inf" || type == "do-inference" ) com = DO_INF;
-	if(type == "do-post-sim" || type == "do-posterior-simulation" ) com = DO_POST_SIM;
 	if(type == "param-mult") com = PARAM_MULT;
 	
 	if(com == EMPTY){ alert_import("Command '"+type+"' not recognised."); return syntax_error();}
@@ -895,7 +872,7 @@ bool Input::fatal_error() const
 void Input::output_error_messages(string te) const 
 {
 	for(const auto &em : error_mess){
-		if(em.line_num < lines.size()){ 	
+		if(!com_op && em.line_num < lines.size()){ 	
 			cout << "\033[32m";
 			cout <<  "Line " << em.line_num+1 << ": ";
 			cout << "\033[0m";
@@ -903,20 +880,9 @@ void Input::output_error_messages(string te) const
 		}
 
 		switch(em.type){
-		case ERROR_FATAL: 
-			cout << "\033[31m";
-			cout << "ERROR: ";
-			cout << "\033[0m";
-			break;
-			
-		case ERROR_WARNING:
-			cout << "\033[35m";
-			cout << "WARNING: ";
-			cout << "\033[0m";
-			break;
+		case ERROR_FATAL: display_error(em.error);	break;
+		case ERROR_WARNING: display_warning(em.error); break;
 		}
-		
-		cout << em.error << endl;
 		cout << endl;
 	}
 	
@@ -1004,11 +970,7 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 		break;
 		
 	case MAP: map_command(); break;
-	
-	case DO_SIM: do_sim_command(); break;
-	case DO_INF: do_inf_command(); break;
-	case DO_POST_SIM: do_post_sim_command(); break;
-	
+		
 	default: alert_import("Command not recognised"); return;
 	}
 	
@@ -1431,13 +1393,4 @@ void Input::simplify_equations()
 			}
 		}
 	}while(flag_global == true);
-}
-
-
-/// Sets the default output directory 
-void Input::set_outputdir(string file)
-{
-	auto i = file.length()-1;
-	while(i > 0 && file.substr(i,1) != ".") i--;
-	outputdir = file.substr(0,i)+"_output";
 }

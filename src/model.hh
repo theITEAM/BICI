@@ -50,9 +50,10 @@ class Model                                // Stores information about the model
 		vector <Sample> sample;                // Stores inferred state (used 
 		
 		Operation mode;                        // SIM for simulation, INF for inference, PPC for post sim
+		
 		Details details;                       // Details for simulation/inference
 		
-		Model();
+		Model(Operation mode_);
 		void add_eq_ref(EquationInfo &eqi, double t = UNSET);
 		string find_eq_dif(const EquationInfo &eqi) const;
 		vector <double> param_sample() const;

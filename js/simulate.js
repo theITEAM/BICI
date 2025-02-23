@@ -7,7 +7,7 @@ const spawn = require('child_process').spawn;
 function start_spawn(file_list)
 {
 	let file = "Execute/init.bici"; if(ver == "mac") file = "init.bici";
-	let dir = "Execute/init-data-files";
+	let dir;
 	
 	create_files(file_list,file,dir,"spawn");
 }
@@ -16,13 +16,15 @@ function start_spawn(file_list)
 /// Saves all the files needed for analysis
 function create_files(file_list,file,dir,type)
 {
-	const fs = require('fs');  // Creates the data directory
-	if (dir != undefined && !fs.existsSync(dir)) {
-		fs.mkdir(dir, function(err) {
-			if(err) { 
-				alertp("There was a problem creating the directoy '"+dir+"'");
-			}
-		});
+	if(dir != undefined){
+		const fs = require('fs');  // Creates the data directory
+		if (dir != undefined && !fs.existsSync(dir)) {
+			fs.mkdir(dir, function(err) {
+				if(err) { 
+					alertp("There was a problem creating the directoy '"+dir+"'");
+				}
+			});
+		}
 	}
 	
 	inter.saving = { num:0, num_to_do:file_list.length, type:type}
@@ -37,7 +39,7 @@ function create_files(file_list,file,dir,type)
 			write_file_async(finfo.data,dir+"/"+finfo.file);
 		}
 	}
-	
+
 	generate_screen();
 }
 
@@ -45,20 +47,18 @@ function create_files(file_list,file,dir,type)
 /// Saving files has finished
 function saving_done()
 {
-	let seed = get_seed(inter.save_type);
-
 	if(make_file){
 		stop_loading_symbol();
 		generate_screen();
 		return;
 	}
+	
 	switch(inter.saving.type){
 	case "spawn":
-		start(inter.siminf);
+		start(inter.save_type);
 		break;
 	default: break;
 	}
-	//start(inter.siminf);
 }
 
 
@@ -76,14 +76,15 @@ function start(siminf)
 		nchain = model.inf_details.nchain;
 	}
 
+
 	for(let ch = 0; ch < nchain; ch++){
-		startspawn(ch,siminf);
+		startspawn(ch,nchain,siminf);
 	}
 }
 
 
 /// Gets the value for the seed
-function get_seed(siminf)
+function get_seed_not_set(siminf)
 {
 	let details;
 	switch(siminf){
@@ -91,29 +92,35 @@ function get_seed(siminf)
 	case "inf": details = model.inf_details; break;
 	case "ppc": details = model.ppc_details; break;
 	}
-	if(details.seed_on.value == "Yes") return Number(details.seed);
-	
-	return Math.floor(Math.random()*seed_max); 
+
+	if(details.seed_on.value != "Yes") return Math.floor(Math.random()*seed_max); 
 }
 
 
 /// Starts execution of C++ code
-function startspawn(ch,siminf)                                    
+function startspawn(ch,nchain,siminf)                                    
 {		
-	let seed = get_seed(siminf);
-	
+	let seed_not_set = get_seed_not_set(siminf);
 
-	
 	inter.chain[ch] = { done:false, siminf:siminf, term:false, prog:0, leftover:"", lines:[]};
-	
+
+	let do_com = siminf; if(do_com == "ppc") do_com="post-sim";
+
 	//inter.child[ch] = spawn('Execute/bici.exe',["-chain=0"])
-	inter.child[ch] = spawn('bici.exe',["-chain="+ch,"-seed="+seed]);
-		
+
+	if(seed_not_set != undefined){
+		inter.child[ch] = spawn('bici_core.exe',["default.bici",do_com,"-chain="+ch,"-nchain="+nchain,"-seed="+seed_not_set]);
+	}
+	else{
+		inter.child[ch] = spawn('bici_core.exe',["default.bici",do_com,"-chain="+ch,"-nchain="+nchain
+		]);
+	}		
+
 	//switch(ver){
 	//case "windows": inter.child[ch] = spawn('Execute/bici.exe',["Execute/init.bici",num]); break;
 	//case "mac": inter.child[ch] = spawn('Execute/bici.out',["/tmp/init.bici",num]); break;
 	//}
-	
+
 	funct(inter.child[ch],ch);
 }
 
@@ -122,8 +129,6 @@ function startspawn(ch,siminf)
 function funct(chi,ch)                             // Gathers output of C++ file
 {
 	chi.stdout.on('data', function (data) {
-		//pr(data+" data");
-		
 		let cha = inter.chain[ch];
 		let st = cha.leftover + data;
 		
@@ -132,12 +137,12 @@ function funct(chi,ch)                             // Gathers output of C++ file
 		
 		for(let li = 0; li < lines.length-1; li++){
 			let line = lines[li];
-	
-			if(line.length > 9 && line.substr(0,9) == "<RUNNING>"){
+			
+			if(begin(line,"<RUNNING>")){
 				loading_symbol_message("Running...");
 			}
-	 
-			if(line.length > 10 && line.substr(0,10) == "<PROGRESS>"){
+	
+			if(begin(line,"<PROGRESS>")){
 				cha.prog = Number(line.substr(10));
 				let progmin = LARGE;
 				for(let ch2 = 0; ch2 < inter.chain.length; ch2++){
@@ -145,59 +150,58 @@ function funct(chi,ch)                             // Gathers output of C++ file
 				}
 				if(progmin > 0) set_loading_percent(progmin);
 			}
-			
+		  	
 			cha.lines.push(line);
 		}
 	});
 
 	chi.stderr.on('data', function (data) {
-		//pr("error");
-		alertp("There was a problem running the code: "+endl+data); 
+		//alertp("There was a problem running the code: "+endl+data); 
 		terminate(); 
 	});
 
 	chi.on('close', function (code) {
-		//pr("close");
-		let cha = inter.chain[ch];
-		cha.done = true;
-		
-		// Extracts the file from the output
-		let lines = cha.lines;
-		for(let c = 0; c < lines.length; c++){ lines[c] = lines[c].replace(/\r/g, "");}
-		
-		let i = 0;
-		while(i < lines.length && lines[i] != "<<ERROR>>" && lines[i] != "<<OUTPUT FILE>>") i++;
-	
-		if(i == lines.length){
-			alertp("There was a problem running the code.");
-			terminate(); 
-		}
-		else{
-			let li = lines[i];
+		if(inter.running_status == true){
+			let cha = inter.chain[ch];
+			cha.done = true;
 			
-			i++;
-			let content="";
-			while(i < lines.length && lines[i] != "<<END>>"){
-				content += lines[i]+endl;
+			// Extracts the file from the output
+			let lines = cha.lines;
+			for(let c = 0; c < lines.length; c++){ lines[c] = lines[c].replace(/\r/g, "");}
+			
+			let i = 0;
+			while(i < lines.length && lines[i] != "<<ERROR>>" && lines[i] != "<<OUTPUT FILE>>") i++;
+		
+			if(i == lines.length){
+				alertp("There was a problem running the code.");
+				terminate(); 
+			}
+			else{
+				let li = lines[i];
+				
 				i++;
+				let content="";
+				while(i < lines.length && lines[i] != "<<END>>"){
+					content += lines[i]+endl;
+					i++;
+				}
+			
+				switch(li){
+				case "<<OUTPUT FILE>>": 
+					cha.content = content;
+					break;
+					
+				case "<<ERROR>>":
+					terminate(content.trim());
+					return;
+				} 
 			}
 		
-			switch(li){
-			case "<<OUTPUT FILE>>": 
-				cha.content = content;
-				break;
-				
-			case "<<ERROR>>":
-				setTimeout(function(){ alertp("The following error was generated which cause BICI to terminate:\n'ERROR: "+content.trim()+"'");}, 10);
-				terminate();
-				break;
-			} 
-		}
-	
-		let j = 0; 
-		while(j < inter.chain.length && inter.chain[j].done == true && inter.chain[j].term == false) j++;
-		if(j == inter.chain.length){
-			setTimeout(function(){ process_all_chains()}, 10);
+			let j = 0; 
+			while(j < inter.chain.length && inter.chain[j].done == true && inter.chain[j].term == false) j++;
+			if(j == inter.chain.length){
+				setTimeout(function(){ process_all_chains()}, 10);
+			}
 		}
 	});
 }	
@@ -206,6 +210,8 @@ function funct(chi,ch)                             // Gathers output of C++ file
 /// Processes information from all chains
 function process_all_chains()
 {
+	inter.running_status = false;
+	
 	let content = inter.chain[0].content;
 	for(let ch = 1; ch < inter.chain.length; ch++){
 		content += endl+inter.chain[ch].content;
@@ -217,101 +223,9 @@ function process_all_chains()
 	start_worker("Spawn Output",{content:content});	
 }
 
-/*
-/// Processes a single chain	
-function process_chain(ch)
-{
-	let siminf = inter.chain[ch].siminf;
-	
-	let result;
-	switch(siminf){
-	case "sim": result = sim_result; break;
-	case "inf": result = inf_result; break;
-	case "ppc": result = ppc_result; break;
-	}
-	
-	process_info(ch,result);
-	
-	ch++;
-	
-	set_loading_percent(100*ch/inter.chain.length);
-	
-	replot_loading_symbol();
-	
-	if(ch < inter.chain.length){ setTimeout(function(){ process_chain(ch)}, 10);}
-	else{		
-		inter.running_status = false;
-		stop_loading_symbol();
-
-		initialise_plot_filters(result);
-		initialise_pages();
-	
-		let newpage = "Simulation"; if(siminf == "inf") newpage = "Inference";
-		change_page({pa:newpage, su:"Results"});
-	}
-}
-
-
-/// Processes the output from the c++ code
-function process_info(ch,result)
-{
-	let lines = inter.chain[ch].lines;
-	
-	for(let c = 0; c < lines.length; c++){ lines[c] = lines[c].replace(/\r/g, "");}
-
-	// Checks for any errors  
-	let c = 0; 
-	while(c < lines.length){
-		
-		inter.loading_symbol.percent = Math.floor(100*c/lines.length);
-	
-		let line = lines[c];
-	
-		if(line == "<<PARAMS>>" || line == "<<STATES>>" || line == "<<ERROR>>"){
-			c++;
-			let content="";
-			while(c < lines.length && lines[c] != "<<END>>"){
-				content += lines[c]+endl;
-				c++;
-			}
-		
-			if(c == lines.length){
-				alertp("There was a problem running the code."); 
-				terminate(); 
-				return;
-			}
-			
-			switch(line){
-			case "<<PARAMS>>":
-				{
-					let warn = "Problem trasfering data";
-					
-					read_param_samples(ch+1,content,result,warn);
-				}
-				break;
-			
-			case "<<STATES>>":
-				read_state_samples(ch+1,content,result);
-				break;
-				
-			case "<<ERROR>>":
-				{
-					alertp("The following error was found:"+endl+content);
-					terminate(); 
-					return;
-				}
-				break;
-			}
-		}
-	
-		c++;
-	}
-}
-*/
-
 
 /// Terminates the code
-function terminate()
+function terminate(te)
 {
 	if(inter.running_status == false) return;
 	
@@ -322,9 +236,14 @@ function terminate()
 		inter.child[ch].kill();
 	}
 	
+				
 	inter.running_status = false;
-	stop_loading_symbol();
-	generate_screen();
+	
+	if(te){
+		inter.help = { title:"Error running core code", te:"The following error was generated which caused BICI to terminate:\n'ERROR: "+te+"'"};
+	}
+	
+	setTimeout(function(){ stop_loading_symbol(); generate_screen();}, 10);
 }
 
 

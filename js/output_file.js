@@ -3,8 +3,8 @@
 
 /// Creates an output file
 // save_type has the values:
-// sim - In one file with do-sim
-// inf - In one file with do-inf
+// sim - In one file 
+// inf - In one file
 // save - In one file
 // export - References data files
 function create_output_file(save_type,map_store)
@@ -47,9 +47,6 @@ function create_output_file(save_type,map_store)
 	te += create_output_derived();
 	
 	te += endl;
-	
-	if(save_type == "sim") te += "do-sim"+endl;
-	if(save_type == "inf") te += "do-inf"+endl;
 		
 	if(model.warn.length > 0) err_warning();
 	
@@ -1190,8 +1187,8 @@ function create_output_siminf(save_type)
 		
 		if(details.timestep != "") te += " timestep="+details.timestep; 
 		
-		if(details.seed_on.value == "Yes") te += " seed="+details.seed;
-			
+		if(details.seed_on.value == "Yes") te += " seed="+Number(details.seed);
+		 
 		if(details.indmax != INDMAX_DEFAULT){
 			te += " ind-max="+details.indmax;
 		}
@@ -1275,6 +1272,9 @@ function create_output_siminf(save_type)
 		switch(details.algorithm.value){
 		case "DA-MCMC":
 			{	
+				let nchain = Number(details.nchain);
+				te += " nchain="+nchain;
+				
 				let type = details.anneal_type.te;
 				
 				if(type != ANNEAL_DEFAULT){
@@ -2259,7 +2259,7 @@ function create_ppc_file()
 	let te = inf_result.import_te;
 	let file_list=[];
 	
-	te = remove_command(te,"post-sim,posterior-simulation,do-sim,do-inf,do-post-sim,do-posterior-simulation,add-pop-post-sim,remove-pop-post-sim,add-ind-post-sim,remove-ind-post-sim,move-ind-post-sim,param-mult,# MODIFICATION DATA");
+	te = remove_command(te,"post-sim,posterior-simulation,add-pop-post-sim,remove-pop-post-sim,add-ind-post-sim,remove-ind-post-sim,move-ind-post-sim,param-mult,# MODIFICATION DATA");
 	te += endl+get_ppc_command("ppc")+endl+endl;
 
 	te += mini_banner("MODIFICATION DATA");
@@ -2286,9 +2286,7 @@ function create_ppc_file()
 		}
 		te += endl;
 	}
-	
-	te += "do-post-sim"+endl;
-	 
+ 
 	te = tidy_code(te);
 	
 	if(model.warn.length > 0) err_warning();

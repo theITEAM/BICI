@@ -44,7 +44,18 @@ Layer.prototype.plot_button = function (bu,ov)
 				let val = bu.value;
 				if(val != undefined){
 					let si_num = si/2; 
-					center_text(val,x+dx/2,y+dy/2+0.6*si,get_font(si_num,"","times"),BLACK);
+					let wmax = dx*0.9;
+					do{
+						let fo = get_font(si_num,"","times")
+						let w = text_width(val,fo);
+						if(w > wmax){
+							si_num *= 0.95*wmax/w;
+						}
+						else{
+							center_text(val,x+dx/2,y+dy/2+0.6*si,fo,BLACK);
+							break;
+						}
+					}while(si_num > 0.2);
 				}
 			}
 		}
@@ -494,12 +505,25 @@ Layer.prototype.plot_button = function (bu,ov)
 		plot_param_text(te,x,y+dy/2+0.35*bu.si,bu.si,bu.col,dx-0.2);
 		break;
 	
+	case "LoadMessage":
+		{
+			if(inter.loading_symbol) te = inter.loading_symbol.message;
+			if(te){
+				fill_rectangle(x,y,dx,dy,WHITE);
+				let col = BLACK; if(ov) col = GREY;
+				let si = 0.7;
+				center_text(te,x+dx/2,y+dy/2+0.4*si,get_font(si),col);     
+			}
+		}
+		break;
+		
 	case "Stop":
 		{
 			fill_rectangle(x,y,dx,dy,WHITE);
-			let col = BLACK; if(ov) col = GREY;
-			let si = 0.7;
-			center_text(bu.te,x+dx/2,y+dy/2+0.4*si,get_font(si),col);     
+			if(!ov) cv.globalAlpha = 0.3;
+			let mar = 0.1;
+			draw_image(find_pic("stop"),x+mar,y+mar,dx-2*mar,dy-2*mar);
+			cv.globalAlpha = 1;     
 		}
 		break;
 		
@@ -1627,11 +1651,11 @@ Layer.prototype.plot_button = function (bu,ov)
 			let fo = get_font(si_radio); if(bu.fo != undefined) fo = bu.fo;
 		
 			if(bu.source.param == true){
-				plot_param_text(te,x+0.2,y+dy/2+0.37*si_radio,si_radio,bu.col,dx+5);
+				plot_param_text(te,x+0.2,y+dy/2+0.4*si_radio,si_radio,bu.col,dx+5);
 			}
 			else{
 				let tsa = text_sup_anno(te,si_radio,dx+5,"arial");
-				plot_text_tsa(tsa,x+0.2,y+dy/2+0.37*si_radio,bu.col);
+				plot_text_tsa(tsa,x+0.2,y+dy/2+0.4*si_radio,bu.col);
 			}
 		}
 		break;

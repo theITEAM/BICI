@@ -22,6 +22,9 @@ void StateSpecies::check(unsigned int ti, const vector < vector <double> > &popn
 		check_markov_eqn(ti,popnum);
 		check_markov_tree_rate();
 	}
+	else{
+		check_trans_num_neg(); 
+	}
 	check_erlang();
 }
 
@@ -330,6 +333,17 @@ void StateSpecies::check_erlang() const
 		const auto &co = sp.comp_gl[c];
 		if(co.erlang_hidden){
 			if(init_cond_val.cnum[c] != 0) emsg("Erlang must have zero initial state for internal compartments");
+		}
+	}
+}
+
+
+/// Checks if the transition number is negative
+void StateSpecies::check_trans_num_neg() const
+{
+	for(auto tr = 0u; tr < trans_num.size(); tr++){
+		for(auto ti = 0u; ti < trans_num[tr].size(); ti++){
+			if(trans_num[tr][ti] < 0) emsg("Negative trans num");
 		}
 	}
 }

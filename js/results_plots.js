@@ -41,6 +41,7 @@ function graph_pop_calculate(result,rpf,burn,p)
 {
 	// Sets classification
 	let rpf2 = rpf.species[p];
+	
 	let cl = rpf2.sel_class.cl;
 	let filter = rpf2.filter;
 
@@ -293,9 +294,9 @@ function graph_pop_calculate(result,rpf,burn,p)
 								if(fraction){
 									let pop_denom = 0;
 									for(let ij = 0; ij < c_list_denom.length; ij++){			
-										get_val_tl(ti,sa.cpop_tl[c_list_denom[ij]],result,pos_op);
+										pop_denom += get_val_tl(ti,sa.cpop_tl[c_list_denom[ij]],result,pos_op);
 									}
-									
+						
 									if(pop_denom == 0) pop = 1;
 									else pop /= pop_denom;
 								}
@@ -306,7 +307,10 @@ function graph_pop_calculate(result,rpf,burn,p)
 					}
 					let show_mean = rpf.dist_settings.show_mean.check;
 					if(vec.length > 0){
-						distribution_add_data_line(vec,claa.comp[c].name,col,data,key,rpf,show_mean);
+						let int_req, max = LARGE; 
+						if(!fraction) int_req = "integer";
+						else max = 1;
+						distribution_add_data_line(vec,claa.comp[c].name,col,data,key,rpf,show_mean,0,max,int_req);
 					}
 				}
 				else{
@@ -350,9 +354,15 @@ function graph_pop_calculate(result,rpf,burn,p)
 				
 					switch(view){
 					case "Graph": case "Graph (all)": case "Graph (split)": case "Graph (lines)":
+					
 						for(let j = 0; j < line.length; j++){
 							data.push({point:line[j], col:claa.comp[c].col, view:view, type:"Line"});
+							
+							if(view == "Graph (lines)" && data.length > GRAPH_LINE_MAX){
+								line_max = true; break;
+							}
 						}
+						
 						key.push({type:"Line", te:claa.comp[c].name, col:col, c:c});
 						break;
 						
@@ -379,7 +389,7 @@ function graph_pop_calculate(result,rpf,burn,p)
 			if(key.length > KEY_LINE_MAX){ line_max = true; break;}
 		}
 	}
-	
+			
 	switch(view){
 	case "Graph": case "Graph (all)": case "Graph (split)": 
 	case "Graph (lines)": case "Graph (CI)": case "Data":
@@ -2690,7 +2700,10 @@ function create_view_graph_calculate(name,sel_view,so)
 		
 	let par = model.param[i];
 	
-	post(define_parameter_plot("view_graph",par,par.value,undefined,undefined,sel_view,so.sim_details,so));
+	let det = so.sim_details;
+	if(par.type == "param factor") det = so.ppc_details;
+	
+	post(define_parameter_plot("view_graph",par,par.value,undefined,undefined,sel_view,det,so));
 }
 
 
@@ -3671,7 +3684,7 @@ function get_param_stats(th,index,result,rpf,burn)
 				}
 			}
 			
-			GR = get_Gelman_Rubin_statistic(cha).toPrecision(pre);
+			GR = get_Gelman_Rubin_statistic(cha);
 		}
 	}
 	
@@ -3689,6 +3702,7 @@ function no_graph_msg(msg)
 /// Sets up a distribution plot
 function setup_distribution(result,rpf,burn)
 {	
+//pr("setup dis");
 	let val = rpf.sel_paramview.radio.value;
 	let th = rpf.sel_paramview.list[val].th;
 	let ind = rpf.sel_paramview.list[val].index;
@@ -3754,7 +3768,9 @@ function setup_distribution(result,rpf,burn)
 		let show_mean = rpf.dist_settings.show_mean.check;
 		if(line.length > 1) show_mean = false;
 
-		distribution_add_data_line(vec,line[li].name,col,data,key,rpf,show_mean);
+		let clip = get_prior_clip(par);
+		
+		distribution_add_data_line(vec,line[li].name,col,data,key,rpf,show_mean,clip.min,clip.max);
 		if(key.length > KEY_LINE_MAX){ line_max = true; break;}
 	}
 
@@ -3915,15 +3931,52 @@ function setup_distribution(result,rpf,burn)
 }
 
 
-/// Adds a distribution line on a distribution plot
-function distribution_add_data_line(vec,name,col,data,key,rpf,show_mean)
+/// Gets clipped edges based on a parameter prior
+function get_prior_clip(par)
 {
+	let clip_min, clip_max;
+		
+	if(par.variety != "reparam" && par.variety != "likelihood" && par.kind != "const" && par.prior){
+		let pri;
+		if(par.dep.length > 0 && par.prior_split_set == true) pri = get_element(par.prior_split,ind);
+		else pri = par.prior;
+		
+		switch(pri.type.te){
+		case "uniform": 
+			return {min:Number(pri.value.min_eqn.te), max: Number(pri.value.max_eqn.te)};
+			
+		case "gamma": case "log-normal":
+			return {min:0, max: LARGE};
+		
+		case "beta":
+			return {min:0, max: 1};
+		}
+	}
+	return {min:undefined, max:undefined};
+}
+
+	
+/// Adds a distribution line on a distribution plot
+function distribution_add_data_line(vec,name,col,data,key,rpf,show_mean,clip_min,clip_max,op)
+{
+	// Makes sure values are within the range
+	if(clip_min != undefined){
+		for(let i = 0; i < vec.length; i++){
+			if(vec[i] < clip_min) vec[i] = clip_min;
+		}
+	}
+	
+	if(clip_max != undefined){
+		for(let i = 0; i < vec.length; i++){
+			if(vec[i] > clip_max) vec[i] = clip_max;
+		}
+	}
+	
 	let stat = get_statistic(vec);
 	let range = get_range(vec);
 	if(range.min == range.max){
 		data.push({te:"Constant", col:col, thick:1, x:range.min, type:"VertLine2"});
 		return;
-		//range.min -= 0.5; range.max += 0.5;
 	}
 	
 	let point = [];
@@ -3936,7 +3989,15 @@ function distribution_add_data_line(vec,name,col,data,key,rpf,show_mean)
 			let bin = [];
 			for(let b = 0; b < nbin; b++) bin[b] = 0;
 		
-			let dx = (range.max-range.min)/nbin;
+			let mi = range.min;
+			let ma = range.max;
+			let dx = (ma-mi)/nbin;
+			if(op == "integer"){
+				dx = Math.round(dx);
+				if(dx == 0) dx = 1;
+				ma = mi+dx*nbin;
+			}
+			
 			let num = (1.0/vec.length)/dx;
 			
 			for(let i = 0; i < vec.length; i++){
@@ -3957,21 +4018,36 @@ function distribution_add_data_line(vec,name,col,data,key,rpf,show_mean)
 			let h = rpf.dist_settings.sel_h.te;
 		
 			let d = range.max-range.min;
-			range.min -= d*h;
-			range.max += d*h;
-			
 			let ma = range.max, mi = range.min;
-			let dd = ma-mi;
+		
+			mi -= d*h;
+			ma += d*h;
 			
+			if(op == "integer"){
+				mi = Math.floor(mi);
+				ma = 1+Math.floor(ma);
+			}
+			
+			if(clip_min != undefined && mi < clip_min) mi = clip_min;
+			if(clip_max != undefined && ma > clip_max) ma = clip_max;
+		
 			let nbin = Math.floor(5/h); 
 			if(nbin < 100) nbin = 100; if(nbin > 500) nbin = 500;
+			
+			if(op == "integer"){ // nbin must be some multiple
+				let step = Math.floor((ma-mi)/nbin);
+				if(step <= 1) nbin = ma-mi;
+				else ma = mi*step;
+			}
+			
+			let dd = ma-mi;	
 			
 			let db = dd/nbin;
 			
 			let hb = Math.floor(1+d*h/db);
 			
 			let bin=[];
-			for(let b = 0; b < nbin; b++) bin[b] = 0;
+			for(let b = 0; b <= nbin; b++) bin[b] = 0;
 			
 			for(let i = 0; i < vec.length; i++){
 				let bf = nbin*(vec[i]-mi)/dd;
@@ -3980,7 +4056,7 @@ function distribution_add_data_line(vec,name,col,data,key,rpf,show_mean)
 				let bmi = bmid-hb, bma = bmid+hb;
 			
 				for(let b = bmi; b <= bma; b++){
-					let bsh = b+0.5;
+					let bsh = b;//+0.5;
 					
 					let d;
 					if(bsh < bf) d = 1-(bf-bsh)/hb;
@@ -3988,19 +4064,23 @@ function distribution_add_data_line(vec,name,col,data,key,rpf,show_mean)
 					if(d > 0){
 						let bb = b;
 						if(bb < 0) bb = -bb; 
-						if(bb >= nbin) bb = nbin-1 -(bb-(nbin-1));
-						bin[bb] += d;
+						if(bb > nbin) bb = nbin -(bb-(nbin));
+						if(bb >= 0 && bb <= nbin){
+							bin[bb] += d;
+							if(bb == 0 && clip_min != undefined) bin[bb] += d;
+							if(bb == nbin && clip_max != undefined) bin[bb] += d;
+						}
 					}		
 				}
 			}
 			
-			let sum = 0.0; for(let b = 0; b < nbin; b++) sum += bin[b];
+			let sum = 0.0; for(let b = 0; b <= nbin; b++) sum += bin[b];
 			
-			for(let b = 0; b < nbin; b++) bin[b] /= (db*sum);
+			for(let b = 0; b <= nbin; b++) bin[b] /= (db*sum);
 			
 			point.push({x:mi, y:0});
-			for(let b = 0; b < nbin; b++){
-				point.push({x:mi+((b+0.5)/nbin)*dd, y:bin[b]});
+			for(let b = 0; b <= nbin; b++){
+				point.push({x:mi+(b/nbin)*dd, y:bin[b]});
 			}
 			point.push({x:ma, y:0});
 		}

@@ -2164,6 +2164,11 @@ class Graph
 					break;		
 				}
 				
+				if(Math.floor(value) != value){ 	
+					if(value < 1) value = value.toFixed(4);
+					else value = precision(value,4)
+				}
+				
 				switch(c.type){
 				case "box":
 					{

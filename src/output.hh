@@ -18,7 +18,8 @@ using namespace std;
 class Output                               // Stores information about the data
 {
 	public:
-		string outputdir;
+		string diagdir;                        // The diagnostics directory (within Data if available)
+		string sampledir;                      // The samples directory (within Data if available)
 		
 		unsigned int chain;                    // Stores the chain number
 		

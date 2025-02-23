@@ -12,7 +12,6 @@ using namespace std;
 #include "input.hh"
 #include "utils.hh"
 
-
 /// Imports a data-table 
 void Input::import_data_table_command(Command cname)
 {
@@ -433,7 +432,7 @@ void Input::param_mult_command()
 	
 	vector <string> knot_times;
 	set_spline(knot_times_str,"",knot_times,false,par);
-			
+	
 	par.dep = par_orig.dep;
 
 	if(par_orig.time_dep == false){
@@ -860,7 +859,7 @@ void Input::transition_command2(vector <Tag> &tags)
 /// Sets the data directory
 void Input::datadir_command()
 {
-	auto datadir = get_tag_value("folder"); if(datadir == ""){ cannot_find_tag(); return;}
+	datadir = get_tag_value("folder"); if(datadir == ""){ cannot_find_tag(); return;}
 
 	if(check_char_allowed(datadir,"<>\"|?*") == false) return;
 
@@ -1325,30 +1324,6 @@ void Input::derived_command()
 }
 
 
-/// Do simulation command
-void Input::do_sim_command()
-{
-	if(model.mode != MODE_UNSET){ alert_import("Cannot set multiple 'do-simulation', 'do-inference' or 'do-post-sim'"); return;}
-	model.mode = SIM;
-}
-
-
-/// Do inference command
-void Input::do_inf_command()
-{
-	if(model.mode != MODE_UNSET){ alert_import("Cannot set multiple 'do-simulation', 'do-inference' or 'do-post-sim'"); return;}
-	model.mode = INF;
-}
-
-
-/// Do posterior simulation command
-void Input::do_post_sim_command()
-{
-	if(model.mode != MODE_UNSET){ alert_import("Cannot set multiple 'do-simulation', 'do-inference' or 'do-post-sim'"); return;}
-	model.mode = PPC;
-}
-
-
 /// Applies the simulation command
 void Input::simulation_command()
 {
@@ -1451,6 +1426,8 @@ void Input::inference_command()
 		return;
 	}
 	
+	get_tag_value("nchain"); // nchain is not needed
+	
 	model.details.dt = dt;
 	model.details.sample = MCMC_SAMPLE_DEFAULT;
 	model.details.output_param = MCMC_OP_PARAM_DEFAULT;
@@ -1468,6 +1445,15 @@ void Input::inference_command()
 			details.output_param /= num_core();
 			details.output_state /= num_core();
 		}
+		else{
+			if(nchain != UNSET){
+				details.output_param /= nchain;
+				details.output_state /= nchain;
+			}
+		}
+		
+		if(details.output_param < 1) details.output_param = 1;
+		if(details.output_state < 1) details.output_state = 1;
 		break;
 		
 	case ABC_ALG:

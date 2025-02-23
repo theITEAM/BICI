@@ -1396,6 +1396,7 @@ function view_warning(i)
 	
 	model.warn_view = false;
 
+	//pr(warn.warn_type+" warn");
 	switch(warn.warn_type){
 	case "TransTreeInf":
 		change_page({pa:"Model", su:"Compartments", susu:warn.p});
@@ -1415,7 +1416,15 @@ function view_warning(i)
 		break;
 		
 	case "Init_pop": 
-		change_page({pa:warn.pa, su:"Population", susu:warn.p});
+		switch(inter.page[warn.pa].name){
+		case "Simulation":
+			change_page({pa:"Simulation", su:"Initial Conditions", susu:warn.p}); 
+			break;
+		case "Inference": 
+			change_page({pa:"Inference", su:"Data", susu:warn.p});
+			break;
+		}
+		
 		press_button_prop("TableContent","GreyEdit",["info","i"],warn.i);	
 		break;
 		
@@ -1461,7 +1470,7 @@ function view_warning(i)
 		break;
 	
 	case "SimPopulationProb":
-		change_page({pa:"Simulation", su:"Population", susu:warn.p});
+		change_page({pa:"Simulation", su:"Initial Conditions", susu:warn.p});
 		break;
 
 	case "SourceProb": 
@@ -1535,7 +1544,7 @@ function view_warning(i)
 		break;
 		
 	case "DataProblem": 
-		if(warn.siminf == "sim") change_page({pa:"Simulation", su:"Population", susu:warn.p});
+		if(warn.siminf == "sim") change_page({pa:"Simulation", su:"Initial Conditions", susu:warn.p});
 		else change_page({pa:"Inference", su:"Data", susu:warn.p});
 		break;
 		
@@ -1543,13 +1552,18 @@ function view_warning(i)
 		change_page({pa:"Model", su:"Parameters"});
 		break;
 		
-	case "ParamValueProblem":
-		switch(warn.par.variety){
-		case "normal": change_page({pa:"Simulation", su:"Parameters"}); break;
-		default: change_page({pa:"Model", su:"Parameters"}); break;
+	case "ParamValueProblem": case "KnotTimeProblem":
+		if(warn.par.type == "param factor"){
+			change_page({pa:"Post. Simulation", su:"Parameter Mult."});
+		}
+		else{				
+			switch(warn.par.variety){
+			case "normal": change_page({pa:"Simulation", su:"Parameters"}); break;
+			default: change_page({pa:"Model", su:"Parameters"}); break;
+			}
 		}
 		break;
-			
+	
 	default:
 		error("This warning type is not recognised:"+warn.warn_type);
 		break;

@@ -2878,8 +2878,11 @@ class Model
 
 
 	/// Loads up a new model based on information from a webworker
-	load(ans)
+	load(ans,not_zero_page)
 	{
+		let exa_store;
+		if(model.example && not_zero_page) exa_store = model.example;
+		
 		let mod = ans.model;
 	
 		for(let ele in mod) this[ele] = mod[ele];
@@ -2889,14 +2892,14 @@ class Model
 		if(ans.map_store) map_store = ans.map_store;
 		
 		initialise_pages();
-		zero_page_index();
+		zero_page_index(not_zero_page);
 	
-		if(ans.sim_on) model_sim = this.create_ans_model();
-		if(ans.inf_on) model_inf = this.create_ans_model();
+		if(ans.sim_load) model_sim = this.create_ans_model();
+		if(ans.inf_load) model_inf = this.create_ans_model();
 	
 		// Switches page depeding on what model has been loaded
-		if(ans.inf_on == true){
-			if(ans.ppc_on == true){
+		if(ans.inf_load == true){
+			if(ans.ppc_load == true){
 				change_page({pa:"Post. Simulation", su:"Results"});
 			}
 			else{
@@ -2905,13 +2908,15 @@ class Model
 			inter.options = true;	generate_screen();
 		}
 		else{
-			if(ans.sim_on == true){
+			if(ans.sim_load == true){
 				change_page({pa:"Simulation", su:"Results"});
 			}
 			else{
 				change_page({pa:"Model", su:"Compartments"});
 			}
 		}
+		
+		if(exa_store) model.example = exa_store;
 	}
 	
 	
@@ -3278,5 +3283,3 @@ class Model
 		}
 	}
 }
-
-

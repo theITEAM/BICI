@@ -59,7 +59,12 @@ onmessage = function(e)
 	if(false){ pr("Worker start"); prr(e.data);}
 
 	if(try_on){
-		try { process(e);}catch(e) { pr("ERROR:"); pr(e); post(e);}
+		try {
+			process(e);
+		}catch(e){
+			//pr("ERROR:"); pr(e); 
+			post(e);
+		}
 	}
 	else{
 		process(e);
@@ -242,13 +247,13 @@ function process(e)
 		break;
 
 	case "Spawn Output":
-		import_file(info.content);
+		import_file(info.content,false);
 		break;
 
 	case "Load Default": 
 		{
 			let te = load_file_http("D:/AI temp/test.bici");
-			import_file(te);
+			import_file(te,true);
 		}
 		break;
 		
@@ -256,7 +261,7 @@ function process(e)
 	case "Load Example": 
 		{
 			let te = load_file_http("../Examples/"+info+".bici");
-			import_file(te);
+			import_file(te,true);
 		}
 		break;
 		
@@ -495,7 +500,7 @@ function process(e)
 	case "Graph pop":
 		{
 			let res = info;
-			
+		
 			switch(res.siminf){
 			case "sim": graph_pop_calculate(sim_result,res.plot_filter,res.burnin,res.p); break;
 			case "inf": graph_pop_calculate(inf_result,res.plot_filter,res.burnin,res.p); break;
@@ -567,14 +572,14 @@ function process(e)
 		{
 			let te = load_file_http("M:/Github/theITEAM/BICI/Execute/init.bici");
 			percent(2)
-			import_file(te);
+			import_file(te,true);
 		}
 		break;
 
 	case "Import output2":
 		{
 			let te = load_file_http("D:/Execute/init.bici");
-			import_file(te);
+			import_file(te,true);
 		}
 		break;
 		

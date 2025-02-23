@@ -436,8 +436,10 @@ void Update::add_parameter_prop(const vector <unsigned int> &vec)
 
 /// Outputs diagnostics about the proposals
 void Update::diagnostics(long total_time, const State &state) const
-{                        
-	auto file = output.outputdir+"/diagnostics.txt";
+{                    
+	if(output.diagdir == "") return;
+	
+	auto file = output.diagdir+"/diagnostics.txt";
 	ofstream fout(file);
 	output.check_open(fout,file);
 

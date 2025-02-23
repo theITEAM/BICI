@@ -265,11 +265,10 @@ void Input::create_equations()
 		for(auto &eq : der.eq) model.add_eq_ref(eq);
 	}
 
-//double tim = -clock();
 	for(auto &sp : model.species){                       // Transitions
 		auto lo = 0u;
 		for(auto &tr_gl : sp.tra_gl){ 
-			if(lo%1000 == 0) cout << lo << " / " << sp.tra_gl.size() << endl;
+			//if(lo%1000 == 0) cout << lo << " / " << sp.tra_gl.size() << endl;
 			lo++;
 			if(tr_gl.branch == true && tr_gl.bp_set == BP_SET) model.add_eq_ref(tr_gl.bp);
 			for(auto &dp : tr_gl.dist_param) model.add_eq_ref(dp);
@@ -1207,7 +1206,7 @@ void Input::create_spline()
 				spl.index = j;
 				spl.constant = false;
 				spl.info = par.spline_info;
-				
+		
 				vector <unsigned int> param_ref;
 			
 				if(par.variety == CONST_PARAM) spl.constant = true;
@@ -1230,29 +1229,36 @@ void Input::create_spline()
 				
 				auto i = 0u;                             // Indexes times
 				for(auto ti = 0u; ti < ntp-1; ti++){
-					auto tmid = (tp[ti]+tp[ti+1])/2;
-					while(i+1 < times.size() && times[i+1] < tmid) i++;
-					if(i+1 >= times.size()){ // This extends spline for PPC
+					if(tp[ti] < times[0]){ // Extends parameter factors to start time
+						spl.const_val.push_back(1);
 						if(model.mode != PPC) emsg("Should be PPC");
-						
-						if(spl.constant == false){
-							SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = param_ref[i]; sd.f = 1;	
-							spl.div.push_back(sd);
-						}
-						else{
-							spl.const_val.push_back(par.value[j*ntimes+i].value);
-						}
+						if(!begin_str(spl.name,"f~")) emsg("Should be a parameter factor");
 					}
 					else{
-						auto f = (times[i+1]-tmid)/(times[i+1]-times[i]);
-						if(spl.constant == false){
-							SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = param_ref[i+1]; sd.f = f;	
-							spl.div.push_back(sd);
+						auto tmid = (tp[ti]+tp[ti+1])/2;
+						while(i+1 < times.size() && times[i+1] < tmid) i++;
+						if(i+1 >= times.size()){ // This extends spline for PPC
+							if(model.mode != PPC) emsg("Should be PPC");
+							
+							if(spl.constant == false){
+								SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = param_ref[i]; sd.f = 1;	
+								spl.div.push_back(sd);
+							}
+							else{
+								spl.const_val.push_back(par.value[j*ntimes+i].value);
+							}
 						}
 						else{
-							auto val1 = par.value[j*ntimes+i].value;
-							auto val2 = par.value[j*ntimes+i+1].value;
-							spl.const_val.push_back(val1*f+val2*(1-f));
+							auto f = (times[i+1]-tmid)/(times[i+1]-times[i]);
+							if(spl.constant == false){
+								SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = param_ref[i+1]; sd.f = f;	
+								spl.div.push_back(sd);
+							}
+							else{
+								auto val1 = par.value[j*ntimes+i].value;
+								auto val2 = par.value[j*ntimes+i+1].value;
+								spl.const_val.push_back(val1*f+val2*(1-f));
+							}
 						}
 					}
 				}

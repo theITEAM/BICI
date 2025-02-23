@@ -2,14 +2,26 @@
 // Functions related to inference
 
 /// Starts inference on a linux cluster
-function inference_cluster()
+function run_cluster(siminf)
 {
 	let nchain = model.inf_details.nchain;
 	
 	let line1 = "module load mpi/openmpi-x86_64";
-	let line2 = "mpirun -n "+nchain+" bici_cluster file=[file.bici]";
 	
-	inter.help = { title:"Run BICI on Linux cluster", te:"To run BICI on a Linux cluster the following steps must be followed:\n• <b>Create BICI file</b> – Click on the 'Start' button below to create and save the initialisation BICI file. Copy this to the cluster where you want BICI to run.\n• <b>Executable</b> – The executable 'bici_cluster' must also be copied from the BICI main folder to the cluster (<i>e.g.</i> this could be in the same directory as the BICI file).\n• <b>Load MPI</b> – MPI will need to be installed on the cluster. Once installed this can be loaded into the terminal using '"+line1+"' ['⟨⟨COPY⟩⟩','CopyText|BB"+line1+"'] \n• <b>Run</b> – BICI is run using '"+line2+"' ['⟨⟨COPY⟩⟩','CopyText|BB"+line2+"'] (where '[file.bici]' is replaced by the name of the BICI file you created).\n• <b>Visualise</b> – Once BICI has run it puts its results into the initialisation file. Copy this back to your local computer and load into the BICI software.", save:"StartCluster"};   
+	let line2;
+	switch(siminf){
+	case "sim": line2 = "bici_cluster [file.bici] sim"; break;
+	case "inf": line2 = "mpirun -n "+nchain+" bici_cluster [file.bici] inf"; break;
+	case "ppc": line2 = "bici_cluster [file.bici] post-sim"; break;
+	}
+	
+	let te = "To run BICI on a Linux cluster the following steps must be followed:\n• <b>Create BICI file</b> – Click on the 'Save' button below to create and save the initialisation BICI file. Copy this to the cluster where you want BICI to run.\n• <b>Executable</b> – The executable 'bici_cluster' must also be copied from the BICI main folder to the cluster (<i>e.g.</i> this could be in the same directory as the BICI file).\n";
+	if(siminf == "inf"){
+		te += "• <b>Load MPI</b> – MPI will need to be installed on the cluster. Once installed this can be loaded into the terminal using:\n]>'<b>"+line1+"</b>' ['⟨⟨COPY⟩⟩','CopyText|BB"+line1+"'] \n";
+	}
+	te += "• <b>Run</b> – BICI is run using:\n]><b>'"+line2+"</b>' ['⟨⟨COPY⟩⟩','CopyText|BB"+line2+"']\n>>(where '[file.bici]' is replaced by the name of the BICI file you created).\n• <b>Visualise</b> – Once BICI has run it puts its results into the script file. Copy this back to your local computer and load into the BICI interface.";
+	
+	inter.help = { title:"Run BICI on Linux cluster", te:te, siminf:siminf, save:"StartCluster"};   
 }			
 
 
@@ -57,7 +69,7 @@ function check_disable()
 
 /// Checks that the initial start and end times and time-step are all consistent
 function check_time_error()
-{
+{	
 	let de;
 	let pag = inter.page[inter.pa];
 	switch(pag.name){
@@ -69,6 +81,10 @@ function check_time_error()
 		
 	let t_start = Number(de.t_start);
 	let t_end = Number(de.t_end);
+	
+	if(de.ppc_t_start) t_start = Number(de.ppc_t_start);
+	if(de.ppc_t_end) t_end = Number(de.ppc_t_end);
+	
 	let dt = Number(de.timestep);
 
 	if((t_end - t_start)/dt > TI_DIV_MAX){
@@ -86,8 +102,50 @@ function check_time_error()
 		alertp("The timestep must fit exactly as an integer quantity between the start and end times.");
 		return true;
 	}
-		
+	
+	// Check spline times
+	for(let th = 0; th < model.param.length; th++){
+		let par = model.param[th];
+		if(par.spline.on){
+			let gtimes = get_times(par.spline.knot,de);
+			
+			if(gtimes.err){
+				return add_knot_warning(gtimes.msg,par);
+			}
+			
+			let times = gtimes.times;
+			
+			if(times[0] != t_start){
+				return add_knot_warning("The knot start time must be 'start' instead of '"+times[0]+"'.",par);
+			}
+			
+			if(times[times.length-1] != t_end){
+				return add_knot_warning("The knot end time must be 'end' instead of '"+times[times.length-1]+"'.",par);
+			}
+			
+			for(let i = 1; i < times.length-1; i++){
+				if(times[i] < t_start || times[i] > t_end){
+					return add_knot_warning("The knot time '"+times[i]+"' is outside the time range.",par);
+				}
+			}
+			
+			for(let i = 0; i < times.length-1; i++){
+				if(times[i] > times[i+1]){
+					return add_knot_warning("The knots must be time ordered.",par);
+				}
+			}				
+		}
+	}
+	
 	return false;
+}
+
+
+/// Warning for knot timings
+function add_knot_warning(te,par)
+{
+	add_warning({mess:"Problem with knot times", mess2:"For parameter '"+par.full_name+"': "+te, par:par, warn_type:"KnotTimeProblem"});
+	return true;
 }
 
 
