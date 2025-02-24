@@ -156,8 +156,7 @@ function funct(chi,ch)                             // Gathers output of C++ file
 	});
 
 	chi.stderr.on('data', function (data) {
-		//alertp("There was a problem running the code: "+endl+data); 
-		terminate(); 
+		terminate("The BICI core code terminated unexpectedly"); 
 	});
 
 	chi.on('close', function (code) {
@@ -173,8 +172,7 @@ function funct(chi,ch)                             // Gathers output of C++ file
 			while(i < lines.length && lines[i] != "<<ERROR>>" && lines[i] != "<<OUTPUT FILE>>") i++;
 		
 			if(i == lines.length){
-				alertp("There was a problem running the code.");
-				terminate(); 
+				terminate("There was a problem running the code."); 
 			}
 			else{
 				let li = lines[i];

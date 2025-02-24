@@ -4,7 +4,7 @@
 
 BICI can be downloaded and run on your computer (no installation required):
 
-* **Windows:** [BICI_v0.1_windows.zip](https://github.com/theITEAM/BICI/releases/download/v0.1/BICI_v0.1_windows.zip). Once unzipped, it is run by clicking on the “BICI.exe” icon.
+* **Windows:** [BICI_v0.2_windows.zip](https://github.com/theITEAM/BICI/releases/download/v0.2/BICI_v0.2_windows.zip). Once unzipped, it is run by clicking on the “BICI.exe” icon.
 
 * **Mac:** 
 *BICI_v0.1_Mac.zip* (Currently unavailable). Once unzipped, it is run by clicking on the “BICI.app” icon.
