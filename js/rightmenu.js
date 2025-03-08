@@ -5,24 +5,13 @@
 function right_menu_buts(lay)
 {	
 	if(inter.graph.init != true && inter.graph.init != "no data") return;
-		
+
+	let dygap = 0.2;
+	
 	let type = lay.op.type;
 
-	let rpf;
+	let rpf; if(type != "GraphView") rpf = get_inf_res().plot_filter;
 
-	if(type != "GraphView"){	
-		rpf = get_inf_res().plot_filter;
-		/*
-		switch(tab_name()){
-		case "Simulation": res = model.sim_res; break;
-		case "Inference": res = model.inf_res; break;
-		case "Post. Simulation": res = model.ppc_res; break;
-		default: error("Problem tree"); break;
-		}
-		rpf = res.plot_filter;
-		*/
-	}
-	
 	let y = 0.1;
 
 	if(inter.graph.init == "no data"){
@@ -40,7 +29,7 @@ function right_menu_buts(lay)
 					y = add_slice_time("Time",rpf,y,lay);
 				}
 				
-				y += 1;		
+				y += dygap;		
 			}
 			
 			if(rpf.sel_view.te == "Data"){		
@@ -58,7 +47,7 @@ function right_menu_buts(lay)
 		{
 			if(rpf.pos_trans_view.length > 1){
 				y = add_filter("View",y,rpf.sel_trans_view,rpf.pos_trans_view,lay);
-				y += 1;	
+				y += dygap;	
 			}
 			
 			if(rpf.sel_trans_view.te == "Data"){		
@@ -80,12 +69,12 @@ function right_menu_buts(lay)
 		{
 			if(rpf.pos_indview.length > 1 && inter.graph.ind_sel == undefined){
 				y = add_filter("View",y,rpf.sel_indview,rpf.pos_indview,lay);
-				y += 1;	
+				y += dygap;	
 			}
 			
 			if(inter.graph.ind_sel){
 				y = add_filter("View",y,rpf.sel_ind_sel_view,rpf.pos_ind_sel_view,lay);
-				y += 1;	
+				y += dygap;	
 			}
 			
 			y = stand_filt(y,rpf,lay);		
@@ -113,7 +102,7 @@ function right_menu_buts(lay)
 		{
 			if(rpf.pos_spline.length > 1){
 				y = add_filter("Quantity",y,rpf.sel_spline,rpf.pos_spline,lay);
-				y += 2;		
+				y += dygap;		
 			}
 			
 			y = chain_sample_filt(y,rpf,lay);
@@ -125,7 +114,7 @@ function right_menu_buts(lay)
 			if(rpf.sel_paramview == undefined) return;
 			
 			y = add_filter("View",y,rpf.sel_paramview,rpf.pos_paramview,lay);
-			y += 2;				
+			y += dygap;				
 						
 			switch(rpf.sel_paramview.te){
 			case "Scatter": case "Correlation": break;
@@ -133,7 +122,7 @@ function right_menu_buts(lay)
 				{			
 					if(rpf.pos_paramviewtype.length > 1){
 						y = add_filter("Graph",y,rpf.sel_paramviewtype,rpf.pos_paramviewtype,lay);
-						y += 2;
+						y += dygap;
 					}
 				
 					if(rpf.sel_paramviewtype.te == "Distribution"){
@@ -149,6 +138,15 @@ function right_menu_buts(lay)
 				}
 				break;
 			}
+		}
+		break;
+	
+	case "Generations":
+		{
+			if(rpf.sel_genview == undefined) return;
+			
+			y = add_filter("View",y,rpf.sel_genview,rpf.pos_genview,lay);
+			y += dygap;		
 		}
 		break;
 	
@@ -335,24 +333,24 @@ function rightbot_menu_buts(lay)
 			
 			switch(ke.type){
 			case "Line": 
-				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:1.3, dash:ke.dash, thick:ke.thick, col:ke.col, type:"Key"}); 
+				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:dy, dash:ke.dash, thick:ke.thick, col:ke.col, type:"Key"}); 
 				break;
 			
 			case "Rect": 
-				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:1.3, col:ke.col, type:"KeyRect"}); 
+				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:dy, col:ke.col, type:"KeyRect"}); 
 				break;
 			
 			case "ErrBar":
-				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:1.3, col:ke.col, type:"KeyErrBar"}); 
+				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:dy, col:ke.col, type:"KeyErrBar"}); 
 				break;
 			
 			case "Cross":
-				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:1.3, col:ke.col, type:"KeyCross"}); 
+				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:dy, col:ke.col, type:"KeyCross"}); 
 				break;
 				
 			case "AddObs": case "RemObs": case "MoveObs": case "TransObs": 
 			case "CompObs": case "DiagObs": case "GeneticObs": 
-				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:1.3, col:ke.col, type:"KeySymb", symb:ke.type});
+				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:dy, col:ke.col, type:"KeySymb", symb:ke.type});
 				break;
 			}
 			y += dy; 
@@ -377,34 +375,48 @@ function rightmid_menu_buts(lay)
 	let rpf = get_inf_res().plot_filter;
 	
 	if(rpf){
-		if(subsubtab_name() == "Parameters"){
-			let selpv = rpf.sel_paramview;
-			let title = ""; 
-			
-			switch(selpv.te){
-			case "Correlation":
-				param_check_box(rpf.param_check,lay);
-				break;
+		switch(subsubtab_name()){
+		case "Parameters":
+			{
+				let selpv = rpf.sel_paramview;
+				let title = ""; 
 				
-			case "Scatter":
-				tot_param_list("",rpf.xaxis_radio,lay);
-				break;
-			
-			default:
-				switch(rpf.sel_paramviewtype.te){
-				case "Graph (split)": param_list(title,selpv.radio_split,selpv.list_split,lay); break;
-				default: param_list(title,selpv.radio,selpv.list,lay); break;
+				switch(selpv.te){
+				case "Correlation":
+					param_check_box(rpf.param_check,lay);
+					break;
+					
+				case "Scatter":
+					tot_param_list("",rpf.xaxis_radio,lay);
+					break;
+				
+				default:
+					switch(rpf.sel_paramviewtype.te){
+					case "Graph (split)": param_list(title,selpv.radio_split,selpv.list_split,lay); break;
+					default: param_list(title,selpv.radio,selpv.list,lay); break;
+					}
+					break;
 				}
-				break;
 			}
-		}
-		
-		if(subsubtab_name() == "Individuals"){
-			let p = model.get_p();
+			break;
 			
-			let seliev = rpf.sel_ie_view[p];
-		
-			param_list("",seliev.radio,seliev.list,lay);
+		case "Generations":
+			{
+				let selpv = rpf.sel_genview;
+				let title = ""; 
+				param_list(title,selpv.radio,selpv.list,lay);
+			}
+			break;
+			
+		case "Individuals":
+			{
+				let p = model.get_p();
+				
+				let seliev = rpf.sel_ie_view[p];
+			
+				param_list("",seliev.radio,seliev.list,lay);
+			}
+			break;
 		}
 	}
 }

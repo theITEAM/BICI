@@ -34,7 +34,7 @@ void Species::initialise_data()
 		case POP_TRANS_DATA: popu_trans_data(so); break;
 		case GENETIC_DATA: genetic_data(so); break;
 		default:
-			emsg("data type not added:"); break;
+			emsg_input("data type not added:"); break;
 		}
 	}
 
@@ -132,7 +132,7 @@ void Species::init_pop_data(const DataSource &so)
 						}
 					}
 					
-					if(n > num) emsg("Should not be larger");
+					if(n > num) emsg_input("Should not be larger");
 					if(n < num){
 						sort(frac_list.begin(),frac_list.end(),Fraction_ord);
 						for(auto k = 0u; k < num-n; k++){
@@ -345,7 +345,7 @@ void Species::init_pop_data(const DataSource &so)
 		}
 		break;
 		
-	default: emsg("de f prob"); break;
+	default: emsg_input("de f prob"); break;
 	}
 }
 		
@@ -475,7 +475,7 @@ void Species::add_pop_data(const DataSource &so, int sign)
 		
 		auto ti = get_ti(t); if(ti == T) ti--;
 		
-		if(ncla+2 != tab.ncol) emsg("Columns not right1");
+		if(ncla+2 != tab.ncol) emsg_input("Columns not right1");
 		
 		auto name = t_str;
 		
@@ -502,7 +502,7 @@ void Species::add_pop_data(const DataSource &so, int sign)
 			for(auto va : add_rem_pop[ti]) cout << va << ",";
 			cout << " add rem" << endl;
 		}
-		emsg("don");
+		emsg_input("don");
 	}
 }
 
@@ -536,7 +536,7 @@ void Species::add_ind_data(const DataSource &so)
 		double t = number(t_str);
 		if(t_str == "start") t = details.t_start;
 		
-		if(ncla+2 != tab.ncol) emsg("Columns not right2");
+		if(ncla+2 != tab.ncol) emsg_input("Columns not right2");
 		
 		auto name = t_str;
 		vector <string> val;
@@ -618,7 +618,7 @@ void Species::remove_ind_data(const DataSource &so)
 		double t = number(t_str);
 		if(t_str == "start") t = details.t_start;
 		
-		if(tab.ncol != 2) emsg("Columns not right3");
+		if(tab.ncol != 2) emsg_input("Columns not right3");
 		
 		EventData ev; 
 		ev.type = LEAVE_EV;
@@ -642,7 +642,7 @@ void Species::move_ind_data(const DataSource &so)
 		double t = number(t_str);
 		if(t_str == "start") t = details.t_start;
 		
-		if(tab.ncol != 3) emsg("Columns not right4");
+		if(tab.ncol != 3) emsg_input("Columns not right4");
 		
 		auto cl = so.cl;
 		auto val = tab.ele[j][2];
@@ -719,7 +719,7 @@ void Species::genetic_data(const DataSource &so)
 	
 	string ems;
 	auto prob_str = find_comp_prob_str(infection_cl,str,LOWER_BOUND,ems);
-	if(ems != "") emsg("SHould not be error");
+	if(ems != "") emsg_input("SHould not be error");
 		
 	auto p_eqn = create_eqn_vector(prob_str,COMP_PROB,so);
 	
@@ -864,7 +864,7 @@ ObsModelVariety Species::set_obs_mod_type(const ObsModel &om) const
 	case POISSON_OBSMOD: return POISSON_OBS;
 	case NEGBIN_OBSMOD: case NEGBIN_FILE_OBSMOD: return NEGBIN_OBS;
 	}
-	emsg("Option not recognised");
+	emsg_input("Option not recognised");
 	return NORMAL_OBS;
 }
 
@@ -1010,15 +1010,15 @@ void Species::set_ob_trans_ev(const vector <Equation> &eqn)
 		}
 
 		if(source_fl && trans_fl){
-			emsg("Transition data '"+ot.name+"' cannot include source and non-source transitions");
+			emsg_input("Transition data '"+ot.name+"' cannot include source and non-source transitions");
 		}
 
 		if(sink_fl && trans_fl){
-			emsg("Transition data '"+ot.name+"' cannot include sink and non-sink transitions");
+			emsg_input("Transition data '"+ot.name+"' cannot include sink and non-sink transitions");
 		}
 
 		if(source_fl && sink_fl){
-			emsg("Transition data '"+ot.name+"' cannot include source and sink transitions");
+			emsg_input("Transition data '"+ot.name+"' cannot include source and sink transitions");
 		}
 
 		ot.type = OBS_TRANS_EV;
@@ -1136,7 +1136,7 @@ unsigned int Species::find_individual(string name, bool create)
 	if(i == UNSET && create){
 		i = individual.size();
 		if(i >= details.individual_max){
-			emsg("The number of individuals exceeds the limit of "+to_string(details.individual_max)+".");
+			emsg_input("The number of individuals exceeds the limit of "+to_string(details.individual_max)+".");
 		}
 		
 		hash_ind.add(i,vec);
@@ -1196,7 +1196,7 @@ vector <string> Species::global_convert(const Filter &filt) const
 		string te="";
 		for(auto cl = 0u; cl < ncla; cl++){
 			auto &fcl = filt.cla[cl];
-			if(fcl.type != COMP_FILT) emsg("SHould be COMP_FILT");
+			if(fcl.type != COMP_FILT) emsg_input("SHould be COMP_FILT");
 			if(te != "") te += "*";
 		
 			const auto cc = cgl.cla_comp[cl];
@@ -1454,7 +1454,7 @@ string Species::add_bound(string te, BoundType bound) const
 	switch(bound){
 	case LOWER_BOUND: ss << "max(" << te << "|" << LOW_BOUND << ")"; break;
 	case LOWER_UPPER_BOUND: ss << "min(max(" << te << "|" << LOW_BOUND << ")|" << UP_BOUND<< ")"; break;
-	default: emsg("Bound not reconginsed"); break;
+	default: emsg_input("Bound not reconginsed"); break;
 	}
 	return ss.str();
 }

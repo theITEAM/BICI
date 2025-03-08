@@ -300,9 +300,13 @@ struct Details {                   // Stores details about simulation/inference/
 	AnnealType anneal_type;          // The type of annealing performed
 	double anneal_power;             // The power (if power annealing is used)
 	double anneal_rate;              // The rate of annealing (if used)
+	unsigned int gen_update;         // Number of updates per generation (PAS-MCMC)
 	string ppc_resample;             // String determining which parameters must be resampled    
 	unsigned int param_output_max;   // The maximum size of tensor which can be output
 	unsigned int seed;               // Seed used to initialise RNG
+	unsigned int nchain;             // The number of chains / particles
+	unsigned int num_per_core;       // The number of samples / chains / particles per core
+	bool diagnostics_on;             // Determines if MCMC diagnostics printed
 };
 
 struct FilterCla {                 // Used to filter a classification
@@ -1031,10 +1035,10 @@ struct ParticleSpecies {           // Store the species state is a particle
 	InitCondValue init_cond_val;     // The initial state
 	vector < vector <double> > trans_num; // Transition numbers (for population-based)
 	vector <Individual> individual;  // Individuals (for individual-based)
+	unsigned int nindividual;        // The number of individuals (used for trace plots)
 };
 
-struct TransTreeStats              // Stores statistics about transmission tree
-{
+struct TransTreeStats {            // Stores statistics about transmission tree
 	TransTreeStats(){ N_origin = UNSET; N_inf = UNSET; N_mut_tree = UNSET; N_mut_origin = UNSET; N_unobs = UNSET; t_root = UNSET;}
 	
 	unsigned int N_origin;           // The number of origins of infection entering
@@ -1211,18 +1215,22 @@ struct Particle {                  // Stores information from state
 	vector <InfNode> inf_node;       // The infection nodes
 	
 	double w;                        // Particle weight (used in ABC-SMC)
+	
+	unsigned int s;                  // The sample number
+	unsigned int chain;              // The chain number
 };
 
 struct CorMatrix {                 // Information about the parameter correlations    
 	unsigned int N;                  // The number of parameters
 	unsigned int n;                  // Number of samples added to av and av2
 	unsigned int n_start;            // The start of samp
+	//unsigned int range;              // Defines rage over which correlation is calculated
 	vector <double> av;              // The sum of parameter values 
 	vector < vector <double> > av2;  // The sum of param*param 
 	vector < vector <double> > samp; // Stores historic parameter values
 
 	void init(unsigned int N);
-	void add_sample(const vector <double> &param_value, bool all=false);
+	void add_sample(const vector <double> &param_value, unsigned int range);
 	vector < vector <double> > calculate_cor_matrix() const;
 	void set_mvn_from_particle(vector <Particle> &particle);
 	vector < vector <double> > find_covar(const vector <unsigned int> &param_list) const;
@@ -1256,8 +1264,10 @@ struct BurnInfo {                  // Information about burnin phase
 	
 	unsigned prop_join_step;         // How often to check if proposals should be jointed 
 	
-	void add_L(const Like &like);
+	void add_L(double L);
 	void setup(unsigned int s, unsigned int &nburnin,  unsigned int &nsample, const Details &details);
+	void pas_setup(unsigned int s, unsigned int g, unsigned int gen_update, double phi_);
+	void set_phi();
 };
 
 struct Fraction {                  // Used to store a fraction (used in initial state)
@@ -1545,4 +1555,20 @@ struct BICITag {                   // Gets a tag when running bici
 	bool processed;                  // Determines if the tag has been processed
 };
 
+struct PartReorder {               // Used for reorder particles based on likelihood
+	double L;                        // Likelihood
+	unsigned int i;                  // Particle number
+};
+
+struct Diagnostic {                // Stores diagnostic information about chain
+	unsigned int ch;                 // Chain number
+	string te;                       // Text
+};
+
+struct Stat {                      // Statistics
+	double mean;                     // The mean
+	double sd;                       // The standard deviation            
+	double CImin;                    // Credible interval
+	double CImax;
+};
 #endif

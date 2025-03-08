@@ -49,6 +49,7 @@ class State                                // Stores information about the state
 		vector <BackPop> back_pop;             // Stores population info
 		
 		State(const Model &model);
+		void init();
 		void simulate(const vector <double> &param_value, const vector <InitCondValue> &initc_val);
 		void post_sim(const vector <double> &param_value, const Sample &samp);
 		void simulate_iterate(unsigned int ti_start, unsigned int ti_end);
@@ -67,7 +68,7 @@ class State                                // Stores information about the state
 		void restore(const vector <AffectLike> &affect_like);
 		void likelihood_from_scratch();
 		void resample_ind();
-		Particle generate_particle() const;
+		Particle generate_particle(unsigned int s, unsigned int chain, bool store_state) const;
 		void set_particle(const Particle &part);
 		vector <double> prior_init_cond(double &like_ch);
 		void update_individual_sampler();

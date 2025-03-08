@@ -782,7 +782,8 @@ void StateSpecies::set_event_observed()
 			
 			if(numi != numob) i_sel = i;
 		}
-		if(num != num_obs){
+		
+		if(num != num_obs && false){
 			cout << num << " / " << num_obs << "NUM OBS" << " Ind:" << sp.individual[i_sel].name << endl;
 		}
 	}

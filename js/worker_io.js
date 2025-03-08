@@ -269,139 +269,147 @@ function read_param_samples(chain,te,result,warn)
 
 	let J = spl.length;
 
+	let hash_ref = result.hash_ref;
+		
 	let ref = [];
 	ref.push({});
 	for(let i = 1; i < J; i++){
 		let name = remove_quote(spl[i]).replace(/->/g,"→");
 		name = name.replace(/\|/g,",");
 	
-		if(find_in(like_name,name) != undefined){
-			ref.push({th:result.param.length, index:[]});
-			result.param.push({name:name, full_name:name, dep:[], time_dep:false, kind:"variable", variety: "likelihood", selop:"like"});
-		}
-		else{
-			if(find_in(trans_tree_name,name) != undefined){
-				ref.push({th:result.param.length, index:[]});
-				result.param.push({name:name, full_name:name, dep:[], time_dep:false, kind:"variable", variety: "trans_tree", selop:"tree"});
+		let ref_add = hash_ref.find(name)
+		if(ref_add == undefined){
+			if(find_in(like_name,name) != undefined){
+				let th = result.param.length;
+				ref_add = {th:th, index:[]};
+				
+				result.param.push({name:name, full_name:name, dep:[], time_dep:false, kind:"variable", variety: "likelihood", selop:"like"});
+				
 			}
 			else{
-				let pp = get_param_prop(name);
-			
-				let th = find(result.param,"name",pp.name);
-			
-				if(th == undefined && begin(name,"N^")){
-					for(let p = 0; p < result.species.length; p++){
-						if(name == "N^"+result.species[p].name){
-							th = result.param.length;
-						
-							let par = {name:pp.name, full_name:"<e>"+pp.name+"</e>", dep:[], time_dep:false, kind:"variable", selop:"ic"};
-		
-							result.param.push(par);
-							break;
-						}			
-						
-						if(name == "N^"+result.species[p].name || name == "N^"+result.species[p].name+"-total"){
-							th = result.param.length;
-						
-							let par = {name:pp.name, full_name:"<e>"+pp.name+"</e>", dep:[], time_dep:false, kind:"variable", selop:"indpop"};
-		
-							result.param.push(par);
-							break;
-						}			
-					}
+				if(find_in(trans_tree_name,name) != undefined){
+					let th = result.param.length;
+					ref_add = {th:th, index:[]};
+					result.param.push({name:name, full_name:name, dep:[], time_dep:false, kind:"variable", variety: "trans_tree", selop:"tree"});
 				}
-								
-				if(th == undefined){
-					// Adds parameters for initial condition and factor parameters
-					let name = pp.name;
-					let fl = false;
-					let time_dep = false;
-					if(name == "N^init") fl = true;
-					if(name == "f^init") fl = true;
+				else{
+					let pp = get_param_prop(name);
 				
-					if(fl == true){
-						th = result.param.length;
-					
-						let dep = copy(pp.dep);
-						
-						let imax = dep.length; if(time_dep) imax--;
-						for(let i = 0; i < imax; i++){
-							let val = dep[i]; 
-					
-							dep[i] = "";
-							for(let p = 0; p < result.species.length; p++){
-								let sp = result.species[p];
-								for(let cl = 0; cl < sp.ncla; cl++){
-									let claa = sp.cla[cl];
-									for(let c = 0; c < claa.comp.length; c++){
-										let co = claa.comp[c];
-										if(val == co.name) dep[i] = claa.index;
-									}
-								}									
-							}
-							if(dep[i] == "") alert_param_sample(warn,-40); 
-						}
-						
-						if(time_dep) dep[imax] = "t";
-					
-						let full = pp.name+"_";
-						for(let i = 0; i < imax; i++){
-							if(i != 0) full += ",";
-							full += dep[i];
-						}
-						if(time_dep) full += "(t)";
-						
-						let par = {name:pp.name, full_name:"<e>"+full+"</e>", dep:dep, time_dep:time_dep, kind:"variable"};
+					let th = find(result.param,"name",pp.name);
+				
+					if(th == undefined && begin(name,"N^")){
+						for(let p = 0; p < result.species.length; p++){
+							if(name == "N^"+result.species[p].name){
+								th = result.param.length;
+								let par = {name:pp.name, full_name:"<e>"+pp.name+"</e>", dep:[], time_dep:false, kind:"variable", selop:"ic"};
 			
-						if(false){                             // Turned off because no time variables added 
-							if(time_dep){
-								let knot;
+								result.param.push(par);
+								break;
+							}			
+							
+							if(name == "N^"+result.species[p].name || name == "N^"+result.species[p].name+"-total"){
+								th = result.param.length;
+								let par = {name:pp.name, full_name:"<e>"+pp.name+"</e>", dep:[], time_dep:false, kind:"variable", selop:"indpop"};
+			
+								result.param.push(par);
+								break;
+							}			
+						}
+					}
+									
+					if(th == undefined){
+						// Adds parameters for initial condition and factor parameters
+						let name = pp.name;
+						let fl = false;
+						let time_dep = false;
+						if(name == "N^init") fl = true;
+						if(name == "f^init") fl = true;
+					
+						if(fl == true){
+							th = result.param.length;
+						
+							let dep = copy(pp.dep);
+							
+							let imax = dep.length; if(time_dep) imax--;
+							for(let i = 0; i < imax; i++){
+								let val = dep[i]; 
+						
+								dep[i] = "";
 								for(let p = 0; p < result.species.length; p++){
-									let ppc_so = result.species[p].ppc_source;
-									for(let k = 0; k < ppc_so.length; k++){
-										let ppcs = ppc_so[k];
-										if(ppcs.type == "Parameter Mult."){
-											let na = "f~"+ppcs.spec.full_name;
-											if(!(na.length > 3 && na.substr(na.length-3,3) == "(t)")) na += "(t)";
-											if(na == full){
-												knot = ppcs.spec.knot_times.split(",");
-												break;
+									let sp = result.species[p];
+									for(let cl = 0; cl < sp.ncla; cl++){
+										let claa = sp.cla[cl];
+										for(let c = 0; c < claa.comp.length; c++){
+											let co = claa.comp[c];
+											if(val == co.name) dep[i] = claa.index;
+										}
+									}									
+								}
+								if(dep[i] == "") alert_param_sample(warn,-40); 
+							}
+							
+							if(time_dep) dep[imax] = "t";
+						
+							let full = pp.name+"_";
+							for(let i = 0; i < imax; i++){
+								if(i != 0) full += ",";
+								full += dep[i];
+							}
+							if(time_dep) full += "(t)";
+							
+							let par = {name:pp.name, full_name:"<e>"+full+"</e>", dep:dep, time_dep:time_dep, kind:"variable"};
+				
+							if(false){                             // Turned off because no time variables added 
+								if(time_dep){
+									let knot;
+									for(let p = 0; p < result.species.length; p++){
+										let ppc_so = result.species[p].ppc_source;
+										for(let k = 0; k < ppc_so.length; k++){
+											let ppcs = ppc_so[k];
+											if(ppcs.type == "Parameter Mult."){
+												let na = "f~"+ppcs.spec.full_name;
+												if(!(na.length > 3 && na.substr(na.length-3,3) == "(t)")) na += "(t)";
+												if(na == full){
+													knot = ppcs.spec.knot_times.split(",");
+													break;
+												}
 											}
 										}
 									}
+								
+									if(knot == undefined) alert_param_sample(warn,-5); 
+									par.spline = {on:true, smooth:{check:false}, time_dep:true, knot:knot};
 								}
-							
-								if(knot == undefined) alert_param_sample(warn,-5); 
-								par.spline = {on:true, smooth:{check:false}, time_dep:true, knot:knot};
 							}
+						
+							par.list = par_find_list(par);
+							par.comb_list = generate_comb_list(par.list);
+							result.param.push(par);
 						}
-					
-						par.list = par_find_list(par);
-						par.comb_list = generate_comb_list(par.list);
-		
-						result.param.push(par);
 					}
+				
+					if(th == undefined){
+						alert_param_sample(warn,-2);
+						return;
+					}
+					
+					let par = result.param[th];
+					if(pp.dep.length != par.dep.length){ alert_param_sample(warn,-3); return;}
+					
+					let ind = [];
+					for(let j = 0; j < par.dep.length; j++){
+						ind[j] = find_in(par.list[j],pp.dep[j]);	
+						if(ind[j] == undefined){ alert_param_sample(warn,41); return;}
+					}
+					
+					if(par.output == false){ alert_param_sample(warn,5); return;}
+					
+					ref_add = {th:th, index:ind};
 				}
-			
-				if(th == undefined){
-					alert_param_sample(warn,-2);
-					return;
-				}
-				
-				let par = result.param[th];
-				if(pp.dep.length != par.dep.length){ alert_param_sample(warn,-3); return;}
-				
-				let ind = [];
-				for(let j = 0; j < par.dep.length; j++){
-					ind[j] = find_in(par.list[j],pp.dep[j]);	
-					if(ind[j] == undefined){ alert_param_sample(warn,41); return;}
-				}
-				
-				if(par.output == false){ alert_param_sample(warn,5); return;}
-				
-				ref.push({th:th, index:ind});
 			}
+			hash_ref.add(name,ref_add);
 		}
+		ref.push(ref_add);
 	}
 
 	let temp = [];
@@ -431,20 +439,53 @@ function read_param_samples(chain,te,result,warn)
 		
 			if(spl.length != J){ alert_param_sample(warn,-4); return;}
 			let param = copy(temp);
-			for(let i = 1; i < J; i++){
-				let num = Number(spl[i]); if(isNaN(num)){ alert_param_sample(warn,-5); return;}
+	
+			let sa;
+			
+			if(chain == "gen-plot"){
+				let par_mean = copy(temp);
+				let par_CImin = copy(temp);
+				let par_CImax = copy(temp);
 				
-				let th = ref[i].th;
-				if(ref[i].index.length == 0) param[th] = num;
-				else set_element(param[th],ref[i].index,num);
-			}
+				for(let i = 1; i < J; i++){
+					let div = spl[i].split("|");
+					if(div.length != 3){ alert_param_sample(warn,-5); return;}
+					
+					let mean = Number(div[0]); if(isNaN(mean)){ alert_param_sample(warn,-5); return;}
+					let CImin = Number(div[1]); if(isNaN(CImin)){ alert_param_sample(warn,-5); return;}
+					let CImax = Number(div[2]); if(isNaN(CImax)){ alert_param_sample(warn,-5); return;}
+					
+					let th = ref[i].th;
+					if(ref[i].index.length == 0){
+						par_mean[th] = mean;
+						par_CImin[th] = CImin;
+						par_CImax[th] = CImax;
+					}
+					else{
+						set_element(par_mean[th],ref[i].index,mean);
+						set_element(par_CImin[th],ref[i].index,CImin);
+						set_element(par_CImax[th],ref[i].index,CImax);
+					}
+				}
 
-			let sa = { chain:chain, num:Number(spl[0]), param:param};
+				sa = { num:Number(spl[0]), mean:par_mean, CImin:par_CImin, CImax:par_CImax};
+				result.generation.push(sa);
+			}
+			else{
+				for(let i = 1; i < J; i++){
+					let num = Number(spl[i]); if(isNaN(num)){ alert_param_sample(warn,-5); return;}
+					
+					let th = ref[i].th;
+					if(ref[i].index.length == 0) param[th] = num;
+					else set_element(param[th],ref[i].index,num);
+				}
+
+				sa = { chain:chain, num:Number(spl[0]), param:param};
+				result.par_sample.push(sa);
+			}
 			
 			result.param_memory += obj_memory(sa);
-			if(result.param_memory > mem_param_sample_max*bytes_in_GB) out_of_param_memory(result);
-			
-			result.par_sample.push(sa);
+			if(result.param_memory > mem_param_sample_max*bytes_in_GB) out_of_param_memory(result);	
 		}
 	}
 	
@@ -1141,6 +1182,9 @@ function load_file_http(file,type)
 	if(begin(file,root)) file = "..\\"+file;
 	
 	const xhr = new XMLHttpRequest();
+	
+	if(ver=="windows") file = file.replace(/\//g,"\\");
+	
   xhr.open("GET",file,false); // synchronous request
 	xhr.send();
 	

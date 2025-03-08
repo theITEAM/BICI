@@ -93,9 +93,7 @@ class Layer
 				break;
 				
 			case "Run":
-				//if(inter.running_status == false){
-				add_sim_start_buts(this);
-				//}					
+				add_sim_start_buts(this);			
 				break;
 					
 			case "Results":
@@ -109,9 +107,7 @@ class Layer
 				case "Individuals":
 					add_individual_buts(model.sim_res,this);
 					break;
-				//case "Derived":
-					//add_spline_buts(model.sim_res,this);
-					//break;
+					
 				case "Parameters":
 					add_parameter_buts(model.sim_res,this);
 					break;
@@ -144,11 +140,17 @@ class Layer
 				case "Individuals":
 					add_individual_buts(model.inf_res,this);
 					break;
-				//case "Derived":
-				  //add_spline_buts(model.inf_res,this);
-					//break;
+			
 				case "Parameters":
 					add_parameter_buts(model.inf_res,this);
+					break;
+					
+				case "Generations":
+					add_generation_buts(model.inf_res,this);
+					break;
+					
+				case "Diagnostics":
+					add_diagnostic_buts(model.inf_res,this);
 					break;
 				}
 				break;
@@ -1108,6 +1110,7 @@ class Layer
 		case "Logo": add_logo_buts(this); break;
 		case "Menu": add_menu_buts(this); break;
 		case "Main": this.add_main_buts(); break;
+		case "Diagnostics": diagnostics_buts(this); break;
 		case "Figure": this.add_figure_buts(); break;
 		case "ShowWarning": model.add_warning_buts(this); break;
 		case "Blank": this.add_blank_buts(); break;
@@ -1325,7 +1328,7 @@ class Layer
 		case "inf_seed": te = String(model.inf_details.seed); break;
 		case "inf_chain": te = String(model.inf_details.nchain); break;
 		case "inf_abcsample": te = String(model.inf_details.abcsample); break;
-		case "inf_output_param ": te = String(model.inf_details.output_param ); break;
+		case "inf_output_param ": te = String(model.inf_details.output_param); break;
 		case "inf_outputstate": te = String(model.inf_details.output_state); break;
 		case "inf_accfrac": te = String(model.inf_details.accfrac); break;
 		case "inf_accfracsmc": te = String(model.inf_details.accfracsmc); break;
@@ -1334,6 +1337,8 @@ class Layer
 		case "inf_indmax": te = String(model.inf_details.indmax); break;
 		case "inf_npart": te = String(model.inf_details.npart); break;
 		case "inf_gen_update": te = String(model.inf_details.gen_update); break;
+		case "inf_cha_per_core": te = String(model.inf_details.cha_per_core); break;
+		case "inf_part_per_core": te = String(model.inf_details.part_per_core); break;
 		case "anneal_rate": te = String(model.inf_details.anneal_rate); break;
 		case "anneal_power": te = String(model.inf_details.anneal_power); break;
 		case "burnin_frac": te = String(model.inf_details.burnin_frac); break;

@@ -11,10 +11,12 @@ using namespace std;
 #include "post_sim.hh"
 #include "state.hh"
 #include "utils.hh"
+#include "mpi.hh"
 
 /// Initilaises the simulation
-PostSim::PostSim(const Model &model, Output &output) : model(model), output(output), state(model)
+PostSim::PostSim(const Model &model, Output &output, Mpi &mpi) : model(model), output(output), mpi(mpi), state(model)
 {	
+	state.init();
 }
 
 
@@ -23,14 +25,14 @@ void PostSim::run()
 {
 	const auto &details = model.details;
 
-	auto smax = details.number;
-
 	if(model.sample.size()==0) emsg("Sample number should not be zero");
 	
+	auto smax = details.num_per_core;
+
 	for(auto s = 0u; s < smax; s++){
-		if(smax > 1) cout << "Simulation " << s+1 << endl;
-		if(com_op) progress(s,smax);
-	
+		output.percentage(s,smax);
+		progress(s,smax);
+		
 		const auto &samp = model.sample[(unsigned int)(model.sample.size()*ran())];
 
 		auto param_val = model.post_param(samp);
@@ -41,8 +43,14 @@ void PostSim::run()
 		
 		state.check("Check state");
 	
-		output.param_sample(s,state);
+		output.param_sample(s,0,state);// TO DO
 		
-		output.state_sample(s,state);
+		output.state_sample(s,0,state);// TO DO
 	}
+	
+#ifdef USE_MPI
+	mpi.barrier();
+#endif
+	
+	output.percentage(smax,smax);
 }

@@ -13,12 +13,13 @@ using namespace std;
 class PostSim                              // Simulates from the model
 {
 	public:
-		PostSim(const Model &model, Output &output);
+		PostSim(const Model &model, Output &output, Mpi &mpi);
 		void run();
 		
 	private:
 		const Model &model;
 		Output &output;
+		Mpi &mpi;
 		
 		State state;
 };

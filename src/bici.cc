@@ -8,18 +8,19 @@
 
 // Load mpi: module load mpi/openmpi-x86_64
 // mpirun -n 3 ./bici file.bici sim
+// mpirun -n 3 ./bici Execute/init.bici sim
+// mpirun -n 1 ./bici Execute/init.bici inf
 
 // ssh cpooley@azog.bioss.ac.uk
 
 // Different commands
 // -ch=0 / -chain=0                           Runs the zeroth chain
-// -nch=3 / -nchain=3                         Runs multiple chains 
 // -samp=0                                    Sets how sampling is done (for diagnostic purposes)
 // -seed=100                                  This overides seed set in bici file 
 
 // When running in parallel then load mpi using: module load mpi/openmpi-x86_64
 
-// Test: valgrind --leak-check=yes -s ./bici
+// Test: valgrind --leak-check=yes -s ./bici Execute/init.bici inf
 
 // Compiling for windows: .\make.bat from the directory D:\C_complier_BICI2.0\bin
 
@@ -64,7 +65,7 @@ int main(int argc, char** argv)
 #ifdef USE_MPI                            // This is for the parallel version of the code 
   MPI_Init(&argc,&argv);                 
 #endif
-	
+
 	init_log_sum();
 	
 	//test_distribution(); return 0; 
@@ -72,8 +73,7 @@ int main(int argc, char** argv)
 	//generate_data();  return 0; 
 	//if(argc > 2){ simulate_trans_exp(); return 0;}
 	
-	auto chain = 0;
-	auto nchain = 1;
+	auto core_spec = UNSET;
 	auto seed = UNSET;
 	auto mode = MODE_UNSET;
 	string file="";
@@ -86,8 +86,7 @@ int main(int argc, char** argv)
 	
 	for(const auto &tag : tags){
 		switch(tag.type){
-		case CHAIN: chain = tag.value; break;  
-		case NCHAIN: nchain = tag.value; break; 
+		case CHAIN: core_spec = tag.value; break;  
 		case SEED: seed = tag.value; break;  
 		case OP: file = tag.te; break;
 		case SAMP_TYPE:
@@ -98,7 +97,7 @@ int main(int argc, char** argv)
 			case 3: model.samp_type = SIM_CL_SAMP; break;
 			}
 			break;
-		case TAG_UNSET: emsg("Tag must be set"); break; 
+		case TAG_UNSET: emsg_input("Tag must be set"); break; 
 		}
 	}
 	
@@ -112,40 +111,32 @@ int main(int argc, char** argv)
 		}
 	}
 	
-	Mpi mpi(model);                         // Sets up mpi
+	Mpi mpi(core_spec,model);               // Sets up mpi
 
-#ifdef USE_MPI
-	chain = mpi.core;
-#endif
-	
-	Input input(model,file,chain,nchain,seed);     // Imports information from input file into model
+	Input input(model,file,seed,mpi);       // Imports information from input file into model
 
-	Output output(chain,model,input,mpi);   // Sets up the class for model outputs
+	Output output(model,input,mpi);         // Sets up the class for model outputs
 
 	if(op()){
 		output.summary(model);                // Outputs a text file sumarising the model
 
 		output.data_summary(model);           // Outputs a text file sumarising the data
 	}
-	
+
 	switch(model.mode){
 	case SIM:                               // Simulates from the model
 		{
-			Simulate simu(model,output);
+			Simulate simu(model,output,mpi);
 			simu.run();
 		}
 		break;
 		
 	case INF:                               // Performs inference on the model
 		{
-			//if(model.details.algorithm == DA_MCMC){
-			//model.details.algorithm = MFA_ALG;
-			//}
-
 			switch(model.details.algorithm){
 			case PAS_MCMC:	
 				{
-					PAS pas(model,mpi,output);
+					PAS pas(model,output,mpi);
 					pas.run();
 				}
 				break;
@@ -159,27 +150,27 @@ int main(int argc, char** argv)
 				
 			case DA_MCMC:
 				{
-					MCMC mcmc(model,output);
+					MCMC mcmc(model,output,mpi);
 					mcmc.run();
 				}
 				break;
 				
 			case ABC_ALG:
 				{
-					ABC abc(model,output);
+					ABC abc(model,output,mpi);
 					abc.run();
 				}
 				break;
 				
 			case ABC_SMC_ALG:
 				{
-					ABC_SMC abcsmc(model,output);
+					ABC_SMC abcsmc(model,output,mpi);
 					abcsmc.run();
 				}
 				break;
 				
 			default: 
-				emsg("This algorithm has not been implemented yet");
+				emsg_input("This algorithm has not been implemented yet");
 				return 0;
 			}
 		}
@@ -187,20 +178,18 @@ int main(int argc, char** argv)
 	
 	case PPC:                               // Simulates from the posterior
 		{
-			PostSim post_simu(model,output);
+			PostSim post_simu(model,output,mpi);
 			post_simu.run();
 		}
 		break;
 		
 	case MODE_UNSET:
-		emsg("The mode is unset");
+		emsg_input("The mode is unset");
 		break;
 	}
 	
-	output.generate_files();
+	output.end(file);
 	
-	output.updated_file(file);
-
 #ifdef USE_MPI
 	MPI_Finalize();
 #endif
@@ -231,12 +220,12 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 			}
 			
 			if(mode_new == MODE_UNSET && file_new == ""){
-				emsg("Tag '"+te+"' is not recognised");
+				emsg_input("Tag '"+te+"' is not recognised");
 			}
 			else{	
 				if(mode_new != MODE_UNSET){
 					if(mode != MODE_UNSET){
-						emsg("Cannot set multiple 'sim', 'inf' or 'post-sim'");
+						emsg_input("Cannot set multiple 'sim', 'inf' or 'post-sim'");
 					}
 					else{
 						mode = mode_new;
@@ -245,7 +234,7 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 				
 				if(file_new != ""){
 					if(file != ""){
-						emsg("Cannot define multiple '.bici' files");
+						emsg_input("Cannot define multiple '.bici' files");
 					}
 					else{
 						file = file_new;
@@ -258,12 +247,7 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 		
 			auto spl = split(te.substr(1),'=');
 	
-			if(spl.size() != 2) emsg("Tag '"+te+"' is not recognised");
-			
-			if(spl[0] == "nch" || spl[0] == "nchain"){
-				tag.type = NCHAIN;
-				tag.value = number(spl[1]);
-			}
+			if(spl.size() != 2) emsg_input("Tag '"+te+"' is not recognised");
 			
 			if(spl[0] == "ch" || spl[0] == "chain"){
 				tag.type = CHAIN;
@@ -286,7 +270,7 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 			}
 
 			if(tag.type == TAG_UNSET){
-				emsg("Tag '"+te+"' is not recognised");
+				emsg_input("Tag '"+te+"' is not recognised");
 			}
 		
 			tags.push_back(tag);
@@ -294,15 +278,15 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 	}
 	
 	if(mode == MODE_UNSET){
-		emsg("Either 'sim', 'inf' or 'post-sim' must be specified to tell BICI what to do.");
+		emsg_input("Either 'sim', 'inf' or 'post-sim' must be specified to tell BICI what to do.");
 	}
 	
 	if(file == ""){
-		emsg("A '.bici' file must be specified.");
+		emsg_input("A '.bici' file must be specified.");
 	}
 	
 	if(file == "default.bici"){
-		file = "Execute/init.bici";
+		file = default_file;
 		com_op = true;
 	}
 	

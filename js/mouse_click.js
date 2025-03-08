@@ -1670,7 +1670,7 @@ function button_action(bu,action_type)
 						break;
 						
 					case "No":
-						run_cluster("sim");
+						run_cluster();
 						break;
 					}
 				}
@@ -1697,14 +1697,13 @@ function button_action(bu,action_type)
 					}
 					else{
 						if(check_time_error() == false){	
-		
 							switch(model.ppc_details.run_local.value){
 							case "Yes":
 								start_worker("StartPPC",{save_type:"ppc", map_store:map_store, ver:ver});
 								break;
 								
 							case "No":
-								run_cluster("ppc");
+								run_cluster();
 								break;
 							}
 						}
@@ -1726,10 +1725,13 @@ function button_action(bu,action_type)
 				copy_back_to_source();
 				
 				if(check_time_error() == false){
-					switch(model.inf_details.run_local.value){
+					let det = model.inf_details;
+				
+					switch(det.run_local.value){
 					case "Yes":
-						if(model.inf_details.algorithm.value == "PAS-MCMC"){
-							alert_help("Problem starting...","The PAS-MCMC algorithm cannot be run on the local machine (because it requires communication between cores).");
+						if(det.algorithm.value == "PAS-MCMC" && 
+						   Number(det.npart) != Number(det.part_per_core)){ 
+							alert_help("Problem starting...","The PAS-MCMC algorithm can only be run on a single core on the local machine.\nThis can be achieved by setting 'Particle per core' (under 'Further options') to the number of particles '"+det.npart+"'.");
 						}
 						else{
 							start_worker("Start",{save_type:"inf", map_store:map_store, ver:ver});
@@ -1737,7 +1739,7 @@ function button_action(bu,action_type)
 						break;
 					
 					case "No":
-						run_cluster("inf");
+						run_cluster();
 						break;
 					}
 				}
@@ -1750,7 +1752,12 @@ function button_action(bu,action_type)
 		break;
 
 	case "CopyText":
-		navigator.clipboard.writeText(bu.info.substr(2));
+		{
+			let te = bu.info.substr(2);
+			inter.copied = te;
+			navigator.clipboard.writeText(te);
+			run_cluster();
+		}
 		break;
 
 	case "BayesFactor":

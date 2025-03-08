@@ -2,26 +2,57 @@
 // Functions related to inference
 
 /// Starts inference on a linux cluster
-function run_cluster(siminf)
+function run_cluster()
 {
-	let nchain = model.inf_details.nchain;
+	let siminf;
+	switch(tab_name()){
+	case "Simulation": siminf = "sim"; break;
+	case "Inference": siminf = "inf"; break;
+	case "Post. Simulation": siminf = "ppc"; break;
+	}
+	
+	let ncore;
+	if(siminf == "inf"){
+		switch(model.inf_details.algorithm.value){
+		case "DA-MCMC":
+			ncore = Number(model.inf_details.nchain)/Number(model.inf_details.cha_per_core);
+			break;
+		case "PAS-MCMC":
+			ncore = Number(model.inf_details.npart)/Number(model.inf_details.part_per_core);
+			break;
+		default: break;
+		}
+	}
 	
 	let line1 = "module load mpi/openmpi-x86_64";
 	
-	let line2;
+	let line2="";
+	if(ncore != 1){
+		line2 += "mpirun -n ";
+		if(ncore != undefined) line2 += ncore+" "; else line2 += "[cores] ";
+	}		
+	line2 += "./bici-para ";
+	if(true) line2 += "[file.bici]";
+	else line2 += "Execute/init.bici";
+
 	switch(siminf){
-	case "sim": line2 = "bici_cluster [file.bici] sim"; break;
-	case "inf": line2 = "mpirun -n "+nchain+" bici_cluster [file.bici] inf"; break;
-	case "ppc": line2 = "bici_cluster [file.bici] post-sim"; break;
+	case "sim": line2 += " sim"; break;
+	case "inf": line2 += " inf"; break;
+	case "ppc": line2 += " post-sim"; break;
 	}
 	
-	let te = "To run BICI on a Linux cluster the following steps must be followed:\n• <b>Create BICI file</b> – Click on the 'Save' button below to create and save the initialisation BICI file. Copy this to the cluster where you want BICI to run.\n• <b>Executable</b> – The executable 'bici_cluster' must also be copied from the BICI main folder to the cluster (<i>e.g.</i> this could be in the same directory as the BICI file).\n";
-	if(siminf == "inf"){
-		te += "• <b>Load MPI</b> – MPI will need to be installed on the cluster. Once installed this can be loaded into the terminal using:\n]>'<b>"+line1+"</b>' ['⟨⟨COPY⟩⟩','CopyText|BB"+line1+"'] \n";
-	}
-	te += "• <b>Run</b> – BICI is run using:\n]><b>'"+line2+"</b>' ['⟨⟨COPY⟩⟩','CopyText|BB"+line2+"']\n>>(where '[file.bici]' is replaced by the name of the BICI file you created).\n• <b>Visualise</b> – Once BICI has run it puts its results into the script file. Copy this back to your local computer and load into the BICI interface.";
+	let te = "To run BICI on a Linux cluster the following steps must be followed:\n• <b>Create BICI file</b> – Click on the 'Save' button below to create and save the initialisation BICI file. Copy this to the cluster where you want BICI to run.\n• <b>Executable</b> – The executable 'bici-para' must also be copied from the BICI main folder to the cluster (<i>e.g.</i> this could be in the same directory as the BICI file).\n";
 	
-	inter.help = { title:"Run BICI on Linux cluster", te:te, siminf:siminf, save:"StartCluster"};   
+	let butte = "'⟨⟨COPY⟩⟩'"; if(line1 == inter.copied) butte = "'⟨⟨COPIED⟩⟩'";
+	te += "• <b>Load MPI</b> – MPI will need to be installed on the cluster. Once installed , it can be loaded using:\n]>'<b>"+line1+"</b>' ["+butte+",'CopyText|BB"+line1+"'] \n";
+
+	butte = "'⟨⟨COPY⟩⟩'"; if(line2 == inter.copied) butte = "'⟨⟨COPIED⟩⟩'";
+	te += "• <b>Run</b> – BICI is run using:\n]><b>'"+line2+"</b>' ["+butte+",'CopyText|BB"+line2+"']\n>>(where ";
+	if(ncore == undefined) te += "'[core]' is the number of CPU cores and ";
+	te += "'[file.bici]' is replaced by the name of the BICI file you created).\n• <b>Visualise</b> – Once BICI has run it puts its results into the script file. Copy this back to your local computer and load into the interface.";
+	
+	inter.help = { title:"Run BICI on Linux cluster", te:te, siminf:siminf, save:"StartCluster"};  
+	inter.copied = undefined;	
 }			
 
 
@@ -343,10 +374,12 @@ function add_inf_start_buts(lay)
 		
 		cy += 1;
 		
-		let gap = 1.6;
+		let gap = 1.8;
+		if(alg =="DA-MCMC") gap = 0.9;
+		if(alg =="PAS-MCMC") gap = 1.4;
 		
-		switch(model.inf_details.algorithm.value){
-		case "DA-MCMC": 
+		switch(alg){
+		case "DA-MCMC": case "PAS-MCMC": 
 			{
 				cy = lay.add_subtitle("Output parameter sample number",cx,cy,WHITE,{te:param_sample_text});
 				
@@ -363,6 +396,26 @@ function add_inf_start_buts(lay)
 			
 				yy = cy-2.5;
 				add_right_input_field(yy,"State samples output",{type:"inf_outputstate",update:true},lay);
+				
+				cy += gap;
+				
+				if(alg == "DA-MCMC"){
+					cy = lay.add_subtitle("Chains per core",cx,cy,WHITE,{te:chain_per_core_text});
+				
+					cy = lay.add_paragraph("Set the number of chains to be run on each CPU core.",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+			
+					yy = cy-2.5;
+					add_right_input_field(yy,"Chains per core",{type:"inf_cha_per_core",update:true},lay);
+				}
+				
+				if(alg == "PAS-MCMC"){
+					cy = lay.add_subtitle("Particles per core",cx,cy,WHITE,{te:part_per_core_text});
+				
+					cy = lay.add_paragraph("Set the number of particles to be run on each CPU core.",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+			
+					yy = cy-2.5;
+					add_right_input_field(yy,"Particles per core",{type:"inf_part_per_core",update:true},lay);
+				}
 				
 				cy += gap;
 			}
@@ -409,52 +462,68 @@ function add_inf_start_buts(lay)
 	
 		cy += gap;
 	
-		if(model.inf_details.algorithm.value == "DA-MCMC"){
-			cy = lay.add_subtitle("Burn-in",cx,cy,WHITE,{te:burnin_text});
-			
-			cy = lay.add_paragraph("Annealing used during the burn-in phase",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
-			
-			let pos = [{te:"none"},{te:"scan"},{te:"power-auto"},{te:"log-auto"},{te:"power"}];
-			
-			let yy = cy-2.5;
-			add_right_dropdown(yy,"Type",model.inf_details.anneal_type,pos,lay);
-			
-			let type = model.inf_details.anneal_type.te;
-			
-			switch(type){
-			case "scan":
-				{
-					cy += 1.5;
-					
-					cy = lay.add_paragraph("Rate of annealing",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
-		
-					let yy = cy-2.5;
-					add_right_input_field(yy,"Rate",{type:"anneal_rate",update:true},lay);
-				}
-				break;
+		switch(alg){
+		case "DA-MCMC":
+			{
+				cy = lay.add_subtitle("Burn-in",cx,cy,WHITE,{te:burnin_text});
 				
-			case "power":
-				{
-					cy += 1.5;
+				cy = lay.add_paragraph("Annealing used during the burn-in phase",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				
+				let pos = [{te:"none"},{te:"scan"},{te:"power-auto"},{te:"log-auto"},{te:"power"}];
+				
+				let yy = cy-2.5;
+				add_right_dropdown(yy,"Type",model.inf_details.anneal_type,pos,lay);
+				
+				let type = model.inf_details.anneal_type.te;
+				
+				switch(type){
+				case "scan":
+					{
+						//cy += 1.5;
+						
+						//cy = lay.add_paragraph("Rate of annealing",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+			
+						let yy = cy-2.5;
+						add_right_input_field(yy,"Rate",{type:"anneal_rate",update:true},lay,9);
+					}
+					break;
 					
-					cy = lay.add_paragraph("Power in annealing model",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				case "power":
+					{
+						//cy += 1.5;
+						
+						//cy = lay.add_paragraph("Power in annealing model",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+			
+						let yy = cy-2.5;
+						add_right_input_field(yy,"Power",{type:"anneal_power",update:true},lay,9);
+					}
+					break;
+				}
+				
+				if(type != "scan"){
+					cy += 1.5;
+						
+					cy = lay.add_paragraph("Percentage of samples for burn-in",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 		
 					let yy = cy-2.5;
-					add_right_input_field(yy,"Power",{type:"anneal_power",update:true},lay);
+					add_right_input_field(yy,"Percentage",{type:"burnin_frac",update:true},lay);
 				}
-				break;
+				
+				cy += gap;
 			}
+			break;
 			
-			if(type != "scan"){
-				cy += 1.5;
-					
+		case "PAS-MCMC":
+			{
+				cy = lay.add_subtitle("Burn-in",cx,cy,WHITE,{te:burnin_text});
+				
 				cy = lay.add_paragraph("Percentage of samples for burn-in",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 	
 				let yy = cy-2.5;
 				add_right_input_field(yy,"Percentage",{type:"burnin_frac",update:true},lay);
-			}
-			
-			cy += gap;
+				cy += gap;
+			}	
+			break;
 		}
 		
 		cy = set_seed(cx,cy,"inf_seed",model.inf_details,lay);

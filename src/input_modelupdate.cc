@@ -87,7 +87,7 @@ void Input::add_compartment(string name, unsigned int p, unsigned int cl, double
 	if(erlang_source != ""){
 		co.erlang_hidden = true;
 		auto cc = 0u; while(cc < claa.comp.size() && claa.comp[cc].name != erlang_source) cc++;
-		if(cc == claa.comp.size()) emsg("Erlang source problem");
+		if(cc == claa.comp.size()) emsg_input("Erlang source problem");
 		co.erlang_c_start = cc;
 	}	
 	co.erlang_source = erlang_source;
@@ -251,12 +251,12 @@ void Input::create_equations()
 				for(auto &eqi : par.value){
 					eqi.value = number(eqi.te);
 					if(eqi.value == UNSET){
-						emsg("Value not set");
+						emsg_input("Value not set");
 					}
 				}
 				break;
 				
-			case UNSET_PARAM: emsg("Should not be unset7"); break;
+			case UNSET_PARAM: emsg_input("Should not be unset7"); break;
 			}
 		}
 	}
@@ -519,9 +519,9 @@ void Input::create_markov_eqn()
 		for(auto &tr : sp.tra_gl){
 			tr.markov_eqn_ref = UNSET;
 			if(tr.type == EXP_RATE){
-				auto e = tr.dist_param[0].eq_ref; if(e == UNSET) emsg("Prob1");
+				auto e = tr.dist_param[0].eq_ref; if(e == UNSET) emsg_input("Prob1");
 				const auto &eq = model.eqn[e];
-				auto mef = eq.markov_eqn_ref; if(mef == UNSET) emsg("Prob2");
+				auto mef = eq.markov_eqn_ref; if(mef == UNSET) emsg_input("Prob2");
 				tr.markov_eqn_ref = mef;
 			}
 		}
@@ -551,7 +551,7 @@ void Input::create_markov_eqn_pop_ref()
 				
 				for(auto e = 0u; e < sp.markov_eqn.size(); e++){
 					auto eq = sp.markov_eqn[e].eqn_ref;
-					if(eq == UNSET) emsg("Problem with ME");
+					if(eq == UNSET) emsg_input("Problem with ME");
 				
 					for(auto k : model.eqn[eq].pop_ref){
 						PopMarkovEqnRef mer; mer.p = p; mer.e = e;
@@ -733,7 +733,7 @@ void Input::global_comp_trans_init()
 							auto te_ch = tr.bp.te;
 							auto res = swap_index(te_ch,dep_conv); 
 							if(res.warn != ""){ alert_equation(tr_gl.bp,res.warn); return;}
-							if(te_ch != tr_gl.bp.te) emsg("Swap not agree");
+							if(te_ch != tr_gl.bp.te) emsg_input("Swap not agree");
 						}
 						
 						for(auto i = 0u; i < tr_gl.dist_param.size(); i++){
@@ -744,13 +744,13 @@ void Input::global_comp_trans_init()
 								auto te_ch = tr.dist_param[i].te;
 								auto res = swap_index(te_ch,dep_conv); 	
 								if(res.warn != ""){ alert_equation(tr_gl.dist_param[i],res.warn); return;}
-								if(te_ch != tr_gl.dist_param[i].te) emsg("Swap not agree");
+								if(te_ch != tr_gl.dist_param[i].te) emsg_input("Swap not agree");
 							}
 						}
 
 						if(ii != UNSET){
 							auto &ti = sp.comp_gl[ii].tra_leave_group[cl];
-							if(ti.branch != tr.branch) emsg("Branch does not agree");
+							if(ti.branch != tr.branch) emsg_input("Branch does not agree");
 					
 							ti.tr_list.push_back(sp.tra_gl.size());
 						}
@@ -954,7 +954,7 @@ void Input::set_tr_connected()
 				cout << "trans before" << endl;
 			}				
 		}
-		emsg("done");
+		emsg_input("done");
 	}
 }
 	
@@ -974,7 +974,7 @@ void Input::set_precalc_nm_rate()
 				const auto &eq = model.eqn[nmt.dist_param_eq_ref[0]];
 				for(auto pr : eq.pop_ref){
 					if(model.pop[pr].sp_p == p){ 
-						emsg("Non-Markovian transition cannot depend on a population in the same species");
+						emsg_input("Non-Markovian transition cannot depend on a population in the same species");
 					}
 				}
 			}
@@ -987,7 +987,7 @@ void Input::set_precalc_nm_rate()
 						
 						for(auto pr : eq.pop_ref){
 							if(model.pop[pr].sp_p == p){ 
-								emsg("Non-Markovian transition cannot depend on a population in the same species");
+								emsg_input("Non-Markovian transition cannot depend on a population in the same species");
 							}
 						}
 						
@@ -1027,7 +1027,7 @@ void Input::check_markov_or_nm() const
 			if(tr.nm_trans_ref != UNSET) num++;
 			if(tr.markov_eqn_ref != UNSET) num++;
 
-			if(num != 1) emsg("Transition should be markovian or nm");
+			if(num != 1) emsg_input("Transition should be markovian or nm");
 		}
 	}
 }
@@ -1045,7 +1045,7 @@ void Input::check_nm_pop() const
 					const auto &eq = model.eqn[dp.eq_ref];
 					for(auto &pop : eq.pop_ref){
 						const auto &po = model.pop[pop];
-						if(po.sp_p == p) emsg("Non-Markovian parameter cannot depend on population from the same species.");
+						if(po.sp_p == p) emsg_input("Non-Markovian parameter cannot depend on population from the same species.");
 					}
 				}
 				
@@ -1053,7 +1053,7 @@ void Input::check_nm_pop() const
 					const auto &eq = model.eqn[tr.bp.eq_ref];
 					for(auto &pop : eq.pop_ref){
 						const auto &po = model.pop[pop];
-						if(po.sp_p == p) emsg("Branching probability cannot depend on population from the same species.");
+						if(po.sp_p == p) emsg_input("Branching probability cannot depend on population from the same species.");
 					}
 				}
 			}
@@ -1185,7 +1185,7 @@ void Input::create_spline()
 		
 		if(par.time_dep == true){
 			auto &sinfo = par.spline_info;
-			if(sinfo.on != true) emsg("Problem loading spline");
+			if(sinfo.on != true) emsg_input("Problem loading spline");
 			
 			const auto &times = sinfo.knot_times;
 			auto ntimes = times.size();
@@ -1219,7 +1219,7 @@ void Input::create_spline()
 							if(pv.th == th && pv.index == j*ntimes + i) break;
 							k++;
 						}
-						if(k == model.param_vec.size()) emsg("Could not find");
+						if(k == model.param_vec.size()) emsg_input("Could not find");
 						
 						param_ref.push_back(k);
 					}
@@ -1231,14 +1231,14 @@ void Input::create_spline()
 				for(auto ti = 0u; ti < ntp-1; ti++){
 					if(tp[ti] < times[0]){ // Extends parameter factors to start time
 						spl.const_val.push_back(1);
-						if(model.mode != PPC) emsg("Should be PPC");
-						if(!begin_str(spl.name,"f~")) emsg("Should be a parameter factor");
+						if(model.mode != PPC) emsg_input("Should be PPC");
+						if(!begin_str(spl.name,"f~")) emsg_input("Should be a parameter factor");
 					}
 					else{
 						auto tmid = (tp[ti]+tp[ti+1])/2;
 						while(i+1 < times.size() && times[i+1] < tmid) i++;
 						if(i+1 >= times.size()){ // This extends spline for PPC
-							if(model.mode != PPC) emsg("Should be PPC");
+							if(model.mode != PPC) emsg_input("Should be PPC");
 							
 							if(spl.constant == false){
 								SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = param_ref[i]; sd.f = 1;	
@@ -1276,10 +1276,10 @@ void Input::create_spline()
 				if(it.type == SPLINE){
 					auto th = it.num, index = it.index;
 					auto ntimes = model.param[th].spline_info.knot_times.size();
-					if(index%ntimes != 0) emsg("Should be zero1");
+					if(index%ntimes != 0) emsg_input("Should be zero1");
 					index /= ntimes;
 					auto i = 0u; while(i < spl.size() && !(spl[i].th == th && spl[i].index == index)) i++;
-					if(i == spl.size()) emsg("Spline could not be found");
+					if(i == spl.size()) emsg_input("Spline could not be found");
 					it.num = i; it.index = UNSET;
 				}
 			}
@@ -1288,10 +1288,10 @@ void Input::create_spline()
 		if(eq.ans.type == SPLINE){
 			auto th = eq.ans.num, index = eq.ans.index;
 			auto ntimes = model.param[th].spline_info.knot_times.size();
-			if(index%ntimes != 0) emsg("Should be zero");
+			if(index%ntimes != 0) emsg_input("Should be zero");
 			index /= ntimes;
 			auto i = 0u; while(i < spl.size() && !(spl[i].th == th && spl[i].index == index)) i++;
-			if(i == spl.size()) emsg("Spline could not be found");
+			if(i == spl.size()) emsg_input("Spline could not be found");
 			eq.ans.num = i; eq.ans.index = UNSET;
 		}
 	}
@@ -1312,7 +1312,7 @@ void Input::create_spline()
 				cout << d << " " << model.param_vec[di.th1].name << " " <<  model.param_vec[di.th2].name << " " << di.f << " div"<< endl;
 			}
 		}
-		emsg("Done");
+		emsg_input("Done");
 	}
 }
 
@@ -1372,7 +1372,7 @@ void Input::create_nm_trans()
 				
 				// Finds how individual factor alter the rate (used in individual sampling)
 				switch(type){
-				case EXP_RATE: emsg("Should not be here"); break;
+				case EXP_RATE: emsg_input("Should not be here"); break;
 				
 				case GAMMA: case ERLANG: case LOG_NORMAL: case PERIOD: case WEIBULL:
 					{
@@ -1438,7 +1438,7 @@ void Input::create_nm_trans()
 						const auto &tra = sp.tra_gl[tr];
 						if(tra.all_branches) nmtrin.all_branches = true;
 						auto m = tra.nm_trans_ref;	
-						if(m == UNSET) emsg("nm_trans_ref should be set");
+						if(m == UNSET) emsg_input("nm_trans_ref should be set");
 						nmtrin.nmtrans_ref.push_back(m);
 					}
 		
@@ -1460,7 +1460,7 @@ void Input::create_nm_trans()
 		}
 		
 		for(const auto &nmt : sp.nm_trans){
-			if(nmt.trans_incomp_ref == UNSET) emsg("trans_incomp_ref not set");
+			if(nmt.trans_incomp_ref == UNSET) emsg_input("trans_incomp_ref not set");
 		}
 	}
 	
@@ -1479,7 +1479,7 @@ void Input::create_nm_trans()
 			}
 		}
 		
-		emsg("done");
+		emsg_input("done");
 	}
 }
 
@@ -1622,7 +1622,7 @@ void Input::ind_fix_eff_group_trans_ref()
 				}					
 			}
 		}
-		emsg("J");
+		emsg_input("J");
 	}
 }
 
@@ -1660,11 +1660,11 @@ void Input::create_markov_comp_gl()
 					for(const auto &tgl :  co.tra_leave_group[cl].tr_list){
 						const auto &tr = sp.tra_gl[tgl];
 						if(tr.type == EXP_RATE){
-							if(tr.markov_eqn_ref == UNSET) emsg("Should not be unset4");
+							if(tr.markov_eqn_ref == UNSET) emsg_input("Should not be unset4");
 							co.me_ref.push_back(tr.markov_eqn_ref);
 						}
 						else{
-							if(tr.markov_eqn_ref != UNSET) emsg("Should not be set3");
+							if(tr.markov_eqn_ref != UNSET) emsg_input("Should not be set3");
 						}
 					}
 				}
@@ -1707,7 +1707,7 @@ void Input::create_island()
 							j = 0; while(j < co.size() && co[j].c != c1) j++;
 							if(j < co.size()) break;
 						}
-						if(isl1 == island.size()) emsg("Cannot find island1");
+						if(isl1 == island.size()) emsg_input("Cannot find island1");
 							
 						IslandTrans itr;
 						itr.tr = tr;
@@ -1721,7 +1721,7 @@ void Input::create_island()
 								j = 0; while(j < co.size() && co[j].c != c2) j++;
 								if(j < co.size()) break;
 							}
-							if(isl2 == island.size()) emsg("Cannot find island2");
+							if(isl2 == island.size()) emsg_input("Cannot find island2");
 						}
 						
 						if(isl1 != isl2){
@@ -1743,7 +1743,7 @@ void Input::create_island()
 							// Sets cf which gives the final
 							auto f = tra.f;
 							auto j = 0u; while(j < isl.comp.size() && isl.comp[j].c != f) j++;
-							if(j == isl.comp.size()) emsg("problem");
+							if(j == isl.comp.size()) emsg_input("problem");
 							le.cf = j;
 							
 							// Given a global compartment c  works put the me which should be used
@@ -1760,7 +1760,7 @@ void Input::create_island()
 									if(me == UNSET){
 										switch(trg.type){
 										case EXP_RATE:
-											emsg("Should not be unset5");
+											emsg_input("Should not be unset5");
 											break;
 										default:
 											nm_flag = true;
@@ -1781,7 +1781,7 @@ void Input::create_island()
 							
 							if(nm_flag == false){
 								for(auto c = 0u; c < sp.comp_gl.size(); c++){
-									if(me_ref[c] == UNSET) emsg("me ref prob");
+									if(me_ref[c] == UNSET) emsg_input("me ref prob");
 								}							
 								
 								// Accounts for time variation  
@@ -1840,7 +1840,7 @@ void Input::create_island()
 						cout << endl;
 						cout << endl;
 					}
-					emsg("Islands");
+					emsg_input("Islands");
 				}
 				
 				claa.island = island;
@@ -1869,7 +1869,7 @@ void Input::param_affect_likelihood()
 		
 			auto s = 0u;
 			while(s < model.spline.size() && !(th == model.spline[s].th && ind/nknot == model.spline[s].index)) s++;
-			if(s == model.spline.size()) emsg("Cannot find spline");
+			if(s == model.spline.size()) emsg_input("Cannot find spline");
 		
 			const auto &spl = model.spline[s];
 			
@@ -2010,8 +2010,8 @@ void Input::param_affect_likelihood()
 					const auto &fe = sp.fix_effect[f];
 					
 					const auto &par = model.param[fe.th];
-					if(par.name != "ν^"+fe.name) emsg("names do not match");
-					if(par.N != 1) emsg("Should be univariate");
+					if(par.name != "ν^"+fe.name) emsg_input("names do not match");
+					if(par.N != 1) emsg_input("Should be univariate");
 					auto k = par.param_vec_ref[0];
 					
 					if(k != UNSET){				
@@ -2042,10 +2042,10 @@ void Input::param_affect_likelihood()
 			for(auto f : pop.fix_eff_mult){		
 				const auto &fe = sp.fix_effect[f];
 				const auto &par = model.param[fe.th];
-				if(par.name != "ν^"+fe.name) emsg("names do not match");
-				if(par.N != 1) emsg("Should be univariate");
+				if(par.name != "ν^"+fe.name) emsg_input("names do not match");
+				if(par.N != 1) emsg_input("Should be univariate");
 				auto k = par.param_vec_ref[0];
-				if(k == UNSET) emsg("Problem with fix_eff_mult");
+				if(k == UNSET) emsg_input("Problem with fix_eff_mult");
 				
 				AffectLike al; 	
 				al.type = EXP_FE_AFFECT; al.num = p; al.num2 = f;
@@ -2128,7 +2128,7 @@ void Input::param_affect_likelihood()
 						auto &par = model.param[ieg.omega[j][i]];
 						if(par.variety != CONST_PARAM){
 							auto k = par.param_vec_ref[0];
-							if(k == UNSET) emsg("Should not be unset6");
+							if(k == UNSET) emsg_input("Should not be unset6");
 							
 							AffectLike al; 	
 							al.type = OMEGA_AFFECT; al.num = p; al.num2 = g;
@@ -2219,7 +2219,7 @@ void Input::param_affect_likelihood()
 					case OBS_COMP_EV:
 						for(auto c = 0u; c < ob.c_obs_prob_eqn.size(); c++){
 							auto eq = ob.c_obs_prob_eqn[c].eq_ref;
-							if(eq == UNSET) emsg("Equation is not set");
+							if(eq == UNSET) emsg_input("Equation is not set");
 							add_to_map(eq,i,map,spline_map);
 						}
 						break;
@@ -2244,7 +2244,7 @@ void Input::param_affect_likelihood()
 					}
 					cout << endl;
 				}
-				emsg("done");
+				emsg_input("done");
 			}
 			
 			add_map_list(map,p,LIKE_OBS_IND_AFFECT);
@@ -2308,7 +2308,7 @@ void Input::param_affect_likelihood()
 			for(auto &pref : eqn.param_ref){
 				const auto &par = model.param[pref.th];
 				auto k = par.param_vec_ref[pref.index];
-				if(k == UNSET) emsg("Parameter prob");
+				if(k == UNSET) emsg_input("Parameter prob");
 				
 				{
 					AffectLike al; 	
@@ -2329,7 +2329,7 @@ void Input::param_affect_likelihood()
 			for(auto &pref : eqn.param_ref){
 				const auto &par = model.param[pref.th];
 				auto k = par.param_vec_ref[pref.index];
-				if(k == UNSET) emsg("Parameter prob");
+				if(k == UNSET) emsg_input("Parameter prob");
 				
 				{
 					AffectLike al; 	
@@ -2396,8 +2396,8 @@ void Input::add_nm_trans_affect(unsigned int p, unsigned int i, unsigned int eq,
 		const auto &fe = sp.fix_effect[f];
 	
 		const auto &par = model.param[fe.th];
-		if(par.name != "ν^"+fe.name) emsg("names do not match");
-		if(par.N != 1) emsg("Should be univariate");
+		if(par.name != "ν^"+fe.name) emsg_input("names do not match");
+		if(par.N != 1) emsg_input("Should be univariate");
 		auto k = par.param_vec_ref[0];
 	
 		if(k != UNSET){				
@@ -2426,14 +2426,14 @@ void Input::add_obs_trans_eqn(unsigned int p, unsigned int e, const vector < vec
 	for(auto &pref : eqn.param_ref){
 		const auto &par = model.param[pref.th];
 		auto k = par.param_vec_ref[pref.index];
-		if(k == UNSET) emsg("Parameter prob");
+		if(k == UNSET) emsg_input("Parameter prob");
 		
 		if(spline_map[k].size() > 0){                // There is a spline in the equation	
-			if(!par.spline_info.on) emsg("Should be spline");
+			if(!par.spline_info.on) emsg_input("Should be spline");
 			auto nknot = par.spline_info.knot_times.size();
 			
 			for(auto j = 0u; j < nknot; j++){
-				if(k+j >= spline_map.size()) emsg("Prob0");
+				if(k+j >= spline_map.size()) emsg_input("Prob0");
 				
 				{
 					AffectLike al; 
@@ -2459,30 +2459,30 @@ void Input::add_to_map(unsigned int eq, unsigned int i, vector < vector <bool> >
 	for(auto &pref : eqn.param_ref){
 		const auto &par = model.param[pref.th];
 		auto k = par.param_vec_ref[pref.index];
-		if(k == UNSET) emsg("Parameter prob");
+		if(k == UNSET) emsg_input("Parameter prob");
 		
 		if(spline_map[k].size() > 0){                // There is a spline in the equation
 			auto ti = eqn.ti_fix;
-			if(ti == UNSET) emsg("Time should be fixed");
+			if(ti == UNSET) emsg_input("Time should be fixed");
 			
-			if(!par.spline_info.on) emsg("SHould be spline");
+			if(!par.spline_info.on) emsg_input("SHould be spline");
 			auto nknot = par.spline_info.knot_times.size();
 			
 			for(auto j = 0u; j < nknot; j++){
-				if(k+j >= spline_map.size()) emsg("Prob0");
+				if(k+j >= spline_map.size()) emsg_input("Prob0");
 				if(ti >= spline_map[k+j].size()){
-					emsg("Prob-1");
+					emsg_input("Prob-1");
 				}
 				if(spline_map[k+j][ti] == true){
-					if(k+j >= map.size()) emsg("Prob1");
-					if(i >= map[k+j].size()) emsg("Prob2");
+					if(k+j >= map.size()) emsg_input("Prob1");
+					if(i >= map[k+j].size()) emsg_input("Prob2");
 					map[k+j][i] = true;
 				}
 			}
 		}
 		else{
-			if(k >= map.size()) emsg("Prob3");
-			if(i >= map[k].size()) emsg("Prob4");
+			if(k >= map.size()) emsg_input("Prob3");
+			if(i >= map[k].size()) emsg_input("Prob4");
 			map[k][i] = true;
 		}
 	}
@@ -2692,7 +2692,7 @@ void Input::bp_create_unset()
 						break;
 					
 					default:
-						emsg("Branching probabilities should be set");
+						emsg_input("Branching probabilities should be set");
 						break;
 					}
 				}
@@ -2908,7 +2908,7 @@ void Input::add_genetic_data()
 										if(ch == "T") ogd.snp.push_back(T_CH);
 										else{
 											if(ch == "G") ogd.snp.push_back(G_CH);
-											else emsg("SNP character '"+ch+"' not recognised");
+											else emsg_input("SNP character '"+ch+"' not recognised");
 										}
 									}
 								}
@@ -2977,7 +2977,7 @@ void Input::add_genetic_data()
 						}
 						cout << endl;
 					}
-					emsg("Genetic difference");
+					emsg_input("Genetic difference");
 				}
 			}
 		}
@@ -3264,7 +3264,7 @@ void Input::set_joint_param_event()
 				cout << " transitions" << endl;
 			}
 		}
-		emsg("done");
+		emsg_input("done");
 	}
 }
 
@@ -3385,9 +3385,9 @@ void Input::set_local_ind_init()
 							auto cf = tr_swap_leave[ci][j];
 						
 							if(cf != C && cf != ci){
-								if(ci >= tr_swap_ref.size()) emsg("prob");
+								if(ci >= tr_swap_ref.size()) emsg_input("prob");
 								if(cf >= tr_swap_ref[ci].size()){
-									emsg("prob2here");
+									emsg_input("prob2here");
 								}
 								
 								auto ref = tr_swap_ref[ci][cf];
@@ -3540,7 +3540,7 @@ void Input::set_local_ind_init()
 				cout << claa.swap.size() << " " << claa.swap_rep.size() << " " << C << " swap" << endl;
 			}
 		}
-		emsg("gg");
+		emsg_input("gg");
 	}
 	
 	if(false){
@@ -3553,7 +3553,7 @@ void Input::set_local_ind_init()
 				}
 			}
 		}
-		emsg("done");
+		emsg_input("done");
 	}
 	
 	if(false){
@@ -3566,7 +3566,7 @@ void Input::set_local_ind_init()
 				}					
 			}
 		}
-		emsg("done");
+		emsg_input("done");
 	}
 }
 
@@ -3596,7 +3596,7 @@ void Input::print_tr_swap(unsigned int cl, const vector < vector <unsigned int> 
 			}
 		}
 	}
-	//emsg("done print_tr_swap");
+	//emsg_input("done print_tr_swap");
 }
 
 
@@ -3805,7 +3805,7 @@ void Input::set_ppc_resample()
 			}
 		}
 		
-		if(fl == false) emsg("In 'resample' the value '"+name+"' is not within the model"); 
+		if(fl == false) emsg_input("In 'resample' the value '"+name+"' is not within the model"); 
 	}
 
 	if(false){
@@ -3820,7 +3820,7 @@ void Input::set_ppc_resample()
 			}
 		}
 		
-		emsg("Resample");
+		emsg_input("Resample");
 	}
 }
 
@@ -3899,7 +3899,7 @@ void Input::set_sink_exist()
 			for(auto cl = 0u; cl < sp.ncla; cl++){
 				cout << cl << " " << sp.sink_exist[cl] << "sink exist" << endl;
 			}
-			emsg("done");
+			emsg_input("done");
 		}
 	}
 }
@@ -3914,7 +3914,7 @@ void Input::set_eqn_ind_eff_exist()
 		case TRANS_NM_RATE: case TRANS_SHAPE: case TRANS_SCALE: case TRANS_CV:
 			{
 				auto p = eqn.sp_p;
-				if(p == UNSET) emsg("Species is unset"); 
+				if(p == UNSET) emsg_input("Species is unset"); 
 				
 				const auto &sp = model.species[p];
 				
@@ -3979,15 +3979,15 @@ void Input::set_param_use()
 		for(auto &ca : eq.calc){
 			for(auto &it : ca.item){
 				if(it.type == PARAMETER){
-					if(it.num >= model.param.size()) emsg("Out of range1");
-					if(it.index >= model.param[it.num].N) emsg("Out of range2");
+					if(it.num >= model.param.size()) emsg_input("Out of range1");
+					if(it.index >= model.param[it.num].N) emsg_input("Out of range2");
 					model.param[it.num].use[it.index] = true;
 				}
 			}
 		}
 	
 		if(eq.ans.type == PARAMETER){
-			if(eq.ans.num == UNSET) emsg("done");
+			if(eq.ans.num == UNSET) emsg_input("done");
 			model.param[eq.ans.num].use[eq.ans.index] = true;
 		}
 	}
@@ -4015,6 +4015,6 @@ void Input::set_param_use()
 			for(auto i = 0u; i < imax; i++) cout << par.use[i] << " ";
 			cout << endl;
 		}
-		emsg("Shows parameters used");
+		emsg_input("Shows parameters used");
 	}
 }

@@ -13,37 +13,40 @@ using namespace std;
 #include "utils.hh"
 
 /// Initialises the model 
-Input::Input(Model &model, string file, unsigned int chain, unsigned int nchain_, unsigned int seed) : model(model)
+Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(model), mpi(mpi)
 {
 	datadir = "";
-	
-	//generate_data();
-	
-	nchain = nchain_;
-	
+
 	terminate = false;
 	
 	input_file = file;
 	
-	ifstream fin(file);
-	if(!fin) emsg("File '"+file+"' could not be loaded");
-	
 	progress(0,100);
+
+	if(op()){
+		ifstream fin(file);
+		if(!fin) emsg_input("File '"+file+"' could not be loaded");
 	
-	do{
-		string line;
-		getline(fin,line);
+		do{
+			string line;
+			getline(fin,line);
 		
-		if(fin.eof()) break;
+			if(fin.eof()) break;
+			
+			remove_cr(line);
 		
-		remove_cr(line);
+			lines_raw.push_back(line);
+			
+			line = add_escape_char(line);
+		
+			lines.push_back(line);
+		}while(true);
+	}
 	
-		lines_raw.push_back(line);
-		
-		line = add_escape_char(line);
-	
-		lines.push_back(line);
-	}while(true);
+#ifdef USE_MPI 
+	mpi.bcast(lines);
+	mpi.bcast(lines_raw);
+#endif
 
 	auto command_line = extract_command_line(lines); // Converts from text lines to command lines
 
@@ -59,7 +62,7 @@ Input::Input(Model &model, string file, unsigned int chain, unsigned int nchain_
 
 	for(auto loop = 1u; loop < 6; loop++){ 
 		print_diag("loop="+to_string(loop));
-		
+
 		// Keeps track of the current species and classification 
 		p_current = UNSET; cl_current = UNSET; 
 	
@@ -181,6 +184,8 @@ Input::Input(Model &model, string file, unsigned int chain, unsigned int nchain_
 		}
 		line_num = UNSET;
 		
+		//output_error_messages(err_mess);
+			
 		switch(loop){
 		case 1: calculate_timepoint(); break;
 		case 2: check_comp_structure(); break; 		
@@ -336,7 +341,9 @@ Input::Input(Model &model, string file, unsigned int chain, unsigned int nchain_
 	
 	ind_fix_eff_pop_ref();             // References populations in ind_effect and fix_effect
 	
-	if(inf) create_trg_from_tr();      // Works out a convertion from tr to trg
+	if(model.mode == INF || model.mode == PPC){
+		create_trg_from_tr();      // Works out a convertion from tr to trg
+	}
 	
 	print_diag("h12");
 	
@@ -430,7 +437,7 @@ Input::Input(Model &model, string file, unsigned int chain, unsigned int nchain_
 	}
 	
 	if(model.mode == PPC && model.sample.size() == 0){
-		alert_import("Samples must be specified for 'post-sim' to be run.");
+		alert_import("Posterior samples (from the commands 'inf-param' and 'inf-state') must be specified for 'post-sim' to be run.");
 	}		
 
 	if(model.mode == PPC) set_ppc_resample();
@@ -441,7 +448,7 @@ Input::Input(Model &model, string file, unsigned int chain, unsigned int nchain_
 	
 	output_error_messages(err_mess);
 	
-	set_seed(chain,model.details,seed);       // Sets the psuedo random nunber generator 
+	set_seed(mpi.core,model.details,seed);     // Sets the psuedo random nunber generator 
 	
 	progress(100,100);
 	
@@ -513,6 +520,10 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 			}
 		}
 	}
+	
+	convert_folder(data_dir);
+	data_dir = "Execute/test-data-files";
+	//te_raw = replace(te_raw,"%","");
 
 	for(auto j = 0u; j < command_line.size(); j++){
 		const auto &cl = command_line[j];
@@ -531,7 +542,7 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 							
 						auto full_name = data_dir+"/"+file; 
 						ifstream fin(full_name);
-						if(!fin) emsg("File '"+full_name+"' could not be loaded");
+						if(!fin) emsg_input("File '"+full_name+"' could not be loaded");
 						
 						vector <string> lines;
 						
@@ -610,6 +621,24 @@ string Input::add_escape_char(string te)
 	}
 	
 	return te;
+}
+
+
+/// Converts folder to linux format
+void Input::convert_folder(string &data_dir) const
+{
+	if(begin_str(data_dir,"M:/Github")){
+		data_dir = "/nfs/home/cpooley/Github"+data_dir.substr(9);
+	}
+	
+/*
+#ifdef WINDOWS
+#else
+
+	
+	//data_dir = replace(data_dir,"\\","/");
+#endif
+*/
 }
 
 
@@ -725,9 +754,11 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 	if(type == "sim-param") com = SIM_PARAM;
 	if(type == "sim-state") com = SIM_STATE;
 	if(type == "inf-param") com = INF_PARAM;
+	if(type == "inf-generation") com = INF_GEN;
 	if(type == "inf-state") com = INF_STATE;
 	if(type == "post-sim-param") com = POST_SIM_PARAM;
 	if(type == "post-sim-state") com = POST_SIM_STATE;
+	if(type == "inf-diagnostics") com = INF_DIAGNOSTICS;
 	if(type == "map") com = MAP;
 	if(type == "post-sim" || type == "post-simulation" ) com = POST_SIM;
 	
@@ -809,9 +840,11 @@ void Input::alert_import(string st)
 	em.type = ERROR_FATAL;
 	
 	error_mess.push_back(em);	
-	output_error_messages("All mess");  // TURN OFF
+	//output_error_messages("All mess");  // TURN OFF
 	 
-	if(fatal_error() == true && error_mess.size() >= ERR_MSG_MAX) output_error_messages("Total error limit exceeded");
+	if(fatal_error() == true && error_mess.size() >= ERR_MSG_MAX){
+		output_error_messages("Total error limit exceeded");
+	}
 }
 
 
@@ -871,24 +904,26 @@ bool Input::fatal_error() const
 /// Outputs all the error messages
 void Input::output_error_messages(string te) const 
 {
-	for(const auto &em : error_mess){
-		if(!com_op && em.line_num < lines.size()){ 	
-			cout << "\033[32m";
-			cout <<  "Line " << em.line_num+1 << ": ";
-			cout << "\033[0m";
-			cout << lines[em.line_num] << endl;
-		}
+	if(op()){
+		for(const auto &em : error_mess){
+			if(!com_op && em.line_num < lines.size()){ 	
+				cout << "\033[32m";
+				cout <<  "Line " << em.line_num+1 << ": ";
+				cout << "\033[0m";
+				cout << lines[em.line_num] << endl;
+			}
 
-		switch(em.type){
-		case ERROR_FATAL: display_error(em.error);	break;
-		case ERROR_WARNING: display_warning(em.error); break;
+			switch(em.type){
+			case ERROR_FATAL: display_error(em.error);	break;
+			case ERROR_WARNING: display_warning(em.error); break;
+			}
+			cout << endl;
 		}
-		cout << endl;
 	}
 	
 	if(fatal_error() == true){
-		cout << te << endl;
-		exit (EXIT_FAILURE);
+		if(op()) cout << te << endl;
+		end_code();
 	}
 }
 
@@ -963,6 +998,8 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 	case SIM_PARAM: case SIM_STATE: dummy_file_command(); break;
 	case POST_SIM_PARAM: case POST_SIM_STATE: dummy_file_command(); break;
 	case INF_PARAM: dummy_file_command(); break;
+	case INF_DIAGNOSTICS: dummy_file_command(); break;
+	case INF_GEN: dummy_file_command(); break;
 	
 	case INF_STATE: 
 		if(model.mode == PPC) inf_state_command();
@@ -1162,7 +1199,7 @@ void Input::map_ind_effect()
 void Input::check_param_used()
 {
 	for(const auto &par : model.param){
-		if(par.used == false){
+		if(par.used == false && model.mode != PPC){
 			alert_line("Parameter '"+par.full_name+"' is not used in the model",par.line_num);
 		}
 	}
@@ -1188,15 +1225,15 @@ void Input::create_param_vector()
 		for(auto &ca : eq.calc){
 			for(auto &it : ca.item){
 				if(it.type == PARAMETER){
-					if(it.num >= model.param.size()) emsg("Out of range1");
-					if(it.index >= model.param[it.num].N) emsg("Out of range2");
+					if(it.num >= model.param.size()) emsg_input("Out of range1");
+					if(it.index >= model.param[it.num].N) emsg_input("Out of range2");
 					eqn_used[it.num][it.index] = true;
 				}
 			}
 		}
 	
 		if(eq.ans.type == PARAMETER){
-			if(eq.ans.num == UNSET) emsg("done");
+			if(eq.ans.num == UNSET) emsg_input("done");
 			eqn_used[eq.ans.num][eq.ans.index] = true;
 		}
 	}
@@ -1224,7 +1261,7 @@ void Input::create_param_vector()
 			for(auto i = 0u; i < imax; i++) cout << eqn_used[th][i] << " ";
 			cout << endl;
 		}
-		emsg("Shows parameters used");
+		emsg_input("Shows parameters used");
 	}
 	*/
 	
@@ -1313,8 +1350,8 @@ void Input::create_param_vector()
 		for(auto &ca : eq.calc){
 			for(auto &it : ca.item){
 				if(it.type == PARAMETER){
-					if(it.num >= model.param.size()) emsg("Out of range1");
-					if(it.index >= model.param[it.num].param_vec_ref.size()) emsg("Out of range2");
+					if(it.num >= model.param.size()) emsg_input("Out of range1");
+					if(it.index >= model.param[it.num].param_vec_ref.size()) emsg_input("Out of range2");
 					it.num = model.param[it.num].param_vec_ref[it.index];
 					it.index = UNSET;
 				}
@@ -1335,7 +1372,7 @@ void Input::create_param_vector()
 			cout << model.param_vec[i].name << " vec" << endl;
 		}
 		
-		emsg("param vec");
+		emsg_input("param vec");
 	}
 }
 

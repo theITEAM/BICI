@@ -8,7 +8,9 @@
 using namespace std;
 
 // This is set if compilation is done on windows
-#define WINDOWS
+//#define WINDOWS
+//const string default_file = "/tmp/init.bici";   // This is used for Mac
+const string default_file = "Execute/init.bici"; // This is used for windows / linux
 
 //#define USE_MPI                                      // Sets if code can run in parallel
 
@@ -35,7 +37,7 @@ const bool simplify_eqn = true;                      // Simplifies equations (to
 /************************** Enumerated values ******************************/
 
 // Information from tags when BICI is run
-enum TagType { CHAIN, NCHAIN, OP, SAMP_TYPE, SEED, TAG_UNSET };
+enum TagType { CHAIN, OP, SAMP_TYPE, SEED, TAG_UNSET };
 
 
 // Different types of algorithm for simulation / inference
@@ -78,7 +80,7 @@ enum Operation { SIM, INF, PPC, MODE_UNSET };
 enum PriorPos { UNIFORM_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, FLAT_PR, DIRICHLET_PR };
  
 // Different possible command types
-enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, MAP, PARAM_MULT,
+enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT,
 // These are not commands but varient used when loading data
 TRANS_TIMERANGE_DATA,
 EMPTY };
@@ -245,6 +247,8 @@ const auto TIME_VAR = 99999991u;                  // Indicates time variable t (
 const auto OUTSIDE_INF = 99999992u;               // Stands for outside infection
 const auto ENTER_INF = 99999993u;                 // Stands for entering infection
 const auto BP_FROM_OTHERS = 99999994u;            // Branch probability is calculated from others
+const auto GEN_PLOT = 99999995u;                  // Used for a generation plot
+
 const auto SIM_TRY_MAX = 10000u;                  // Maximum tries simulating nm trans
 const auto IC_NUM_OPTIMUM = 100u;                 // Optimum number of events for IC local range
 const auto ADDREM_NUM_OPTIMUM = 5u;               // The optimum number for add/rem local
@@ -305,6 +309,9 @@ const auto BURNIN_FRAC_DEFAULT = 20.0;            // The default percentage burn
 const auto MCMC_SAMPLE_DEFAULT = 5000u;           // The default number of MCMC samples
 const auto MCMC_OP_PARAM_DEFAULT = 1000u;         // The default number of output parameters
 const auto MCMC_OP_STATE_DEFAULT = 200u;          // The default number of output states  
+const auto MCMC_CHAIN_PER_CORE_DEFAULT = 1u;      // The default chains per core
+const auto PAS_PART_PER_CORE_DEFAULT = 1u;        // The default particles per core
+
 const auto ABC_SAMPLE_DEFAULT = 1000u;            // The default number of ABC samples
 const auto ABC_ACFRAC_DEFAULT = 0.1;              // The default acceptance fraction for ABC
 const auto ABCSMC_ACFRAC_DEFAULT = 0.5;           // The default acceptance fraction for ABCSMC
@@ -318,9 +325,11 @@ const auto PROP_MBPII_W = 0.5;                    // The weight given to MBPII
 const auto PROP_MBPIC_W = 0.5;                    // The weight give to MBP IC 
 const auto POP_SI_LIM = 0.5;                      // Minimum proposal size when changing integer populations
 
-# define M_PI  3.14159265358979323846             // Value for pi
+# define MM_PI  3.14159265358979323846             // Value for pi
 
 const unsigned int NEXT_IND_EVENT_DIV = 100;      // Number of divisions next_event divided into
+
+const double PERCENT_STEP = 2.5;                  // Percentage per dot in running bar
 
 const vector <unsigned int> factori = {1,1,2,6,24};// Fatorial N! for first 5 numbers
 

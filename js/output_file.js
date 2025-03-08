@@ -16,7 +16,7 @@ function create_output_file(save_type,map_store)
 	
 	percent(0);
 
-	if(ver == "mac") dir = "/tmp/"+dir;
+	//if(ver == "mac") dir = "/tmp/"+dir;
 	
 	update_model();
 
@@ -54,7 +54,7 @@ function create_output_file(save_type,map_store)
 	
 	//check_comp_structure();
 
-	if(ver == "mac") filename = "/tmp/"+filename;
+	//if(ver == "mac") filename = "/tmp/"+filename;
 	
 	percent(80);
 
@@ -1224,8 +1224,12 @@ function create_output_siminf(save_type)
 		if(details.t_end != "") te += " end="+details.t_end;
 		if(details.timestep != "") te += " timestep="+details.timestep; 
 		
-		switch(details.algorithm.value){
-		case "DA-MCMC":
+		if(details.seed_on.value == "Yes") te += " seed="+Number(details.seed);
+		
+		let alg = details.algorithm.value;
+		
+		switch(alg){
+		case "DA-MCMC": case "PAS-MCMC":
 			{
 				let num_samp = Number(details.sample);
 				if(num_samp != MCMC_SAMPLE_DEFAULT){
@@ -1240,6 +1244,32 @@ function create_output_siminf(save_type)
 				let num_state = Number(details.output_state);
 				if(num_state != MCMC_OP_STATE_DEFAULT){
 					te += " state-output="+num_state;
+				}
+				
+				if(alg == "DA-MCMC"){
+					let cha_per_core = Number(details.cha_per_core);
+					if(cha_per_core != MCMC_CHAIN_PER_CORE_DEFAULT){
+						te += " chain-per-core="+cha_per_core;
+					}
+					
+					if(Number(details.nchain)%cha_per_core != 0){
+						add_warning({mess:"Error with chain number", mess2:"The number of chains '"+details.nchain+"' must be a multiple of the number of chains per core '"+cha_per_core+"'", warn_type:"InfFurtherDetails"});
+					}
+				}
+				
+				if(alg == "PAS-MCMC"){
+					let part_per_core = Number(details.part_per_core);
+					if(part_per_core != PAS_PART_PER_CORE_DEFAULT){
+						te += " part-per-core="+part_per_core;
+					}
+					
+					if(Number(details.npart)%part_per_core != 0){
+						add_warning({mess:"Error with particle number", mess2:"The number of particles '"+details.npart+"' must be a multiple of the number of particles per core '"+part_per_core+"'", warn_type:"InfFurtherDetails"});
+					}
+				}
+				
+				if(debug){
+					te += ' diagnostics="on"';
 				}
 			}
 			break;
@@ -1301,6 +1331,9 @@ function create_output_siminf(save_type)
 		case "PAS-MCMC":
 			te += " npart="+details.npart;
 			te += ' gen-update=' +details.gen_update;
+			if(Number(details.burnin_frac) != BURNIN_FRAC_DEFAULT){
+				te += ' burnin-frac="' +details.burnin_frac+'"';
+			}
 			break;
 		}
 		
@@ -1348,6 +1381,8 @@ function get_ppc_command(save_type)
 			te += " number="+details.number;
 		}
 	}
+	
+	if(details.seed_on.value == "Yes") te += " seed="+Number(details.seed);
 	
 	let cbl = details.check_box_list;
 
@@ -2044,7 +2079,7 @@ function output_table_simp_file(file,head,row,file_list)
 }
 							
 
-/// Checks the models is correctly specified
+/// Checks the model is correctly specified
 function output_check(save_type)
 {
 	// Checks to make sure initial population is set correctly
@@ -2106,6 +2141,9 @@ function output_check(save_type)
 			if(ninitpop > 0 && sp.fix_eff.length > 0){
 				add_warning({mess:"Cannot add individuals with fixed effect", mess2:"The individuals from 'Init. Pop.' cannot be added because of individual fixed effects in the model", warn_type:"InfPopulationProb", p:p});
 			}
+			break;
+
+		case "ppc":
 			break;
 
 		default: error("Option not recognised 126"); break;
@@ -2257,9 +2295,12 @@ function tidy_code(te)
 function create_ppc_file()
 {
 	let te = inf_result.import_te;
+	pr("import");
+	pr(te);
+	
 	let file_list=[];
 	
-	te = remove_command(te,"post-sim,posterior-simulation,add-pop-post-sim,remove-pop-post-sim,add-ind-post-sim,remove-ind-post-sim,move-ind-post-sim,param-mult,# MODIFICATION DATA");
+	te = remove_command(te,"post-sim,posterior-simulation,add-pop-post-sim,remove-pop-post-sim,add-ind-post-sim,remove-ind-post-sim,move-ind-post-sim,param-mult,inf-diagnostic,inf-generation,# MODIFICATION DATA");
 	te += endl+get_ppc_command("ppc")+endl+endl;
 
 	te += mini_banner("MODIFICATION DATA");
@@ -2293,5 +2334,5 @@ function create_ppc_file()
 	
 	write_file_store(te,"bicifile",file_list,"bicifile");
 
-	post({type:"Start", save_type:"ppc", file_list:file_list, param:strip_heavy(model.param), species:strip_heavy(model.species)});
+	post({save_type:"ppc", file_list:file_list, param:strip_heavy(model.param), species:strip_heavy(model.species)});
 }

@@ -95,6 +95,13 @@ function initialise_pages()
 				subsub.push({name:"Individuals", sub:[]});
 				add_species_options(subsub,model.inf_res.species_name);
 			}
+			
+			let alg = model.inf_res.plot_filter.details.algorithm.value;
+			if(alg == "PAS-MCMC" || alg == "ABC-SMC") subsub.push({name:"Generations"});
+	
+			if(model.inf_res.plot_filter.diagnostics_on){
+				subsub.push({name:"Diagnostics"});
+			}	
 		}
 	}
 	
@@ -238,7 +245,7 @@ function add_logo_buts(lay)
 	let mar = 0.05*lay.dx;
 	let ddx = lay.dx-2*mar;
 	
-	let ac; //if(debug == true && testing == true) ac="LoadInference"; 
+	let ac; if(debug == true && testing == true) ac = "LoadInference"; 
 	
 	lay.add_button({x:mar, y:0, dx:ddx, dy:(370/927)*ddx, ac:ac, type:"Logo"});
 }

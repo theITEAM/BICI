@@ -34,7 +34,18 @@ function add_examples_buts2(lay)
 	
 	let ex_mod=[];
 	
-	if(1 == 1){
+	if(true){
+		if(false){
+			ex_mod.push({te:"M) Science Review",help:"Illustrates some simple examples for the Science Review."});
+			ex_mod.push({mod:"SR1", te:"SIR model (IBM)",file:"EX_SR1",mod_type:"IBM", pic:"SIR"});
+			
+			ex_mod.push({mod:"SR1", te:"SIR model (IBM)",file:"EX_B1",mod_type:"IBM", pic:"SIR"});
+			
+			ex_mod.push({mod:"SR2", te:"COVID-19 model",file:"EX_SR2",mod_type:"POP", pic:"covid"});
+		
+			ex_mod.push({mod:"SR3", te:"Metapopulation model using geographical regions",file:"EX_SR3",mod_type:"POP", pic:"scotland"});
+		}
+		
 		ex_mod.push({te:"M1) Simple epidemiological models",help:"This section gives some examples of simple epidemiological models, illustrating both individual and population-based approaches."+mod_mess});
 		
 		ex_mod.push({mod:"M1.1", te:"SI population-based model (PBM)",file:"EX_M1-1",mod_type:"POP", pic:"SI"});

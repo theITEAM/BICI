@@ -1641,29 +1641,26 @@ function inference_command()
 		details.timestep = dt;
 	}
 	
-	let nchain = get_tag_value("nchain");
-	if(nchain == "") nchain = "3";
-	if(isNaN(nchain) || Math.floor(nchain) != nchain || Number(nchain) <= 0){
-		alert_import("'nchain' must be a positive integer");
-	}
-	details.nchain = nchain;
-	
 	details.indmax = check_pos_integer("ind-max",INDMAX_DEFAULT);
 	
 	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
 	
 	switch(alg){
 	case "DA-MCMC":
+		details.nchain = check_pos_integer("nchain",MCMC_CHAIN_DEFAULT);
 		details.sample = check_pos_integer("sample",MCMC_SAMPLE_DEFAULT);
 		details.output_param = check_pos_integer("param-output",MCMC_OP_PARAM_DEFAULT);
 		details.output_state = check_pos_integer("state-output",MCMC_OP_STATE_DEFAULT);
+		details.cha_per_core = check_pos_integer("chain-per-core",MCMC_CHAIN_PER_CORE_DEFAULT);
 		break;
 	
 	case "PAS-MCMC":
-		details.gen_update = check_pos_integer("gen-update",PAS_GEN_UPDATE_DEFAULT);
 		details.npart = check_pos_integer("npart",PAS_PART_DEFAULT);
+		details.gen_update = check_pos_integer("gen-update",PAS_GEN_UPDATE_DEFAULT);
+		details.sample = check_pos_integer("sample",MCMC_SAMPLE_DEFAULT);
 		details.output_param = check_pos_integer("param-output",MCMC_OP_PARAM_DEFAULT);
 		details.output_state = check_pos_integer("state-output",MCMC_OP_STATE_DEFAULT);
+		details.part_per_core = check_pos_integer("part-per-core",PAS_PART_PER_CORE_DEFAULT);
 		break;
 		
 	case "ABC":
@@ -1687,7 +1684,7 @@ function inference_command()
 	details.anneal_rate = ANNEAL_RATE_DEFAULT;
 	details.anneal_power = ANNEAL_POWER_DEFAULT;
 	
-	if(alg == "DA-MCMC"){
+	if(alg == "DA-MCMC" || alg == "PAS-MCMC"){
 		let burnin_str = get_tag_value("burnin-frac"); 
 		if(burnin_str != ""){
 			let burnin = Number(burnin_str);
@@ -1697,7 +1694,9 @@ function inference_command()
 			}
 			details.burnin_frac = burnin_str;
 		}	
+	}
 	
+	if(alg == "DA-MCMC"){
 		let anneal_str = get_tag_value("anneal"); 
 		if(anneal_str != ""){
 			if(option_error("anneal",anneal_str,["none","scan","power-auto","log-auto","power"]) == true) return;
@@ -1748,6 +1747,8 @@ function inference_command()
 		ppc.ppc_t_start = details.t_start;
 		ppc.ppc_t_end = details.t_end;
 	}
+	
+	get_tag_value("diagnostics");
 }
 
 
@@ -2336,8 +2337,31 @@ function inf_param_command()
 	if(file == "") cannot_find_tag();
 	
 	let chain = get_chain_value();
-	
+
 	read_param_samples_file(chain,file,inf_result);
+}
+
+
+/// Reads in parameter samples into inf_results
+function inf_generation_command()
+{
+	let file = get_tag_value("file");
+	if(file == "") cannot_find_tag();
+	
+	read_param_samples_file("gen-plot",file,inf_result);
+}
+
+
+/// Reads in diagnostics into inf_results
+function inf_diagnostics_command()
+{
+	let file = get_tag_value("file");
+	if(file == "") cannot_find_tag();
+	
+	let chain = get_chain_value();
+	//pr(chain
+	inf_result.diagnostics[chain] = file.te;
+	inf_result.diagnostics_on = true;
 }
 
 

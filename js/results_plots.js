@@ -998,6 +998,42 @@ function add_individual_buts(res,lay)
 }
 
 
+/// Displays diagnostic information
+function add_diagnostic_buts(res,lay)
+{
+	if(inter.graph.init == "loading") return;
+	
+	let cx = corner.x;
+	let cy = corner.y;
+
+	cy = lay.add_title("Diagnostics",cx,cy,{te:diagnostic_text});
+	
+	let rpf = res.plot_filter;
+	lay.add_dropdown(10,cy-2,6,10,rpf.sel_diag_chain,rpf.pos_diag_chain);
+
+	let x1 = lay.x+cx;
+	let x2 = lay.x+lay.dx-cx;
+	let y1 = lay.y+cy+0.5;
+	let y2 = lay.y+lay.dy-1;
+
+	add_layer("Diagnostics",x1,y1,x2-x1,y2-y1,{te:res.plot_filter.diagnostics[rpf.sel_diag_chain.i+1]});
+}
+
+
+/// Page giving diagnistics information
+function diagnostics_buts(lay)
+{	
+	let te = lay.op.te;
+	let lines = te.split("\n");
+	
+	let cx = 0, cy = 0;
+	let mar = 1;
+	for(let i = 0; i < lines.length; i++){
+		cy = lay.add_paragraph(lines[i],lay.dx-4*mar,cx,cy,BLACK,para_si,para_lh);
+	}
+}
+
+
 /// Calculates quantities needed for the graph
 function graph_ind_calculate(result,rpf,burn,p)
 {
@@ -3120,8 +3156,10 @@ function add_parameter_buts(res,lay)
 			}
 					
 			if(res.siminf == "inf"){
-				if(rpf.details.algorithm.value == "DA-MCMC") pvt.push({te:"Trace"});
-				else pvt.push({te:"Samples"});
+				switch(rpf.details.algorithm.value){
+				case "DA-MCMC": case "PAS-MCMC": pvt.push({te:"Trace"}); break;
+				default: pvt.push({te:"Samples"}); break;
+				}
 			}
 			
 			pvt.push({te:"Distribution"});	
@@ -3138,6 +3176,40 @@ function add_parameter_buts(res,lay)
 		}
 
 		start_worker("Graph param",res_worker(res));
+		return;
+	}
+	
+	let x = cx, y = cy;
+	let w = graph_width-right_menu_width;
+	let h = 29;
+	
+	inter.graph.create(x,y,w,h,lay);
+}
+
+
+/// Adds buttons for the generations page
+function add_generation_buts(res,lay)
+{
+	if(inter.graph.init == "loading") return;
+	
+	let cx = corner.x;
+	let cy = corner.y;
+	
+	cy = lay.add_title("Generations",cx,cy,{te:generations_text});
+	cy += 1;
+	
+	let rpf = res.plot_filter;
+	let pview = rpf.sel_genview;
+
+	if(pview == undefined){
+		center_message("No parameters are in the model.",lay);
+		return;
+	}
+	
+	if(inter.graph.init != true){
+		inter.graph.init = "loading"; 
+		
+		start_worker("Graph generation",res_worker(res));
 		return;
 	}
 	
@@ -3375,23 +3447,23 @@ function graph_param_calculate(result,rpf,burn)
 					
 					if(vte == "Trace"){
 						data.push({te:"Burn-in", col:BLACK, thick:1, x:burn, type:"VertLine"});
+					}
+					
+					if(rpf.sim_val.check == true){
+						let end = result.par_sample[result.par_sample.length-1].num;
 						
-						if(rpf.sim_val.check == true){
-							let end = result.par_sample[result.par_sample.length-1].num;
+						if(par.value){
+							let va = get_element(par.value,ind);
 							
-							if(par.value){
-								let va = get_element(par.value,ind);
+							if(va != undefined && !isNaN(va)){
+								let val = Number(va);	
+							
+								let point = [];
+								point.push({x:0, y:val}); point.push({x:end, y:val});
 								
-								if(va != undefined && !isNaN(va)){
-									let val = Number(va);	
+								data.push({point:point, col:SIM_VALUE_COL, type:"Line", thick:SIM_VALUE_THICK, dash:SIM_VALUE_DASH});
 								
-									let point = [];
-									point.push({x:0, y:val}); point.push({x:end, y:val});
-									
-									data.push({point:point, col:SIM_VALUE_COL, type:"Line", thick:SIM_VALUE_THICK, dash:SIM_VALUE_DASH});
-									
-									key.push({type:"Line", te:"Sim. Val.", dash:SIM_VALUE_DASH, thick:SIM_VALUE_THICK, col:SIM_VALUE_COL});
-								}
+								key.push({type:"Line", te:"Sim. Val.", dash:SIM_VALUE_DASH, thick:SIM_VALUE_THICK, col:SIM_VALUE_COL});
 							}
 						}
 					}
@@ -3457,6 +3529,89 @@ function graph_param_calculate(result,rpf,burn)
 	}
 	
 	throw({type:"Error", te:"Cannot find graph2"});
+}
+
+
+/// Initialises generation plots
+function graph_generation_calculate(result,rpf,burn)
+{	
+	let data = [];
+	
+	let pview = rpf.sel_genview;
+	
+	if(graph_dia) pr("GRAPH DIA  graph_generation_calculate: pview:"+pview.te);
+	
+	if(pview.param == "too big"){
+		post(no_graph_msg("This quantity is too large to output.\nThe threshold number of tensor elements can be altered under 'Further options'."));
+		return;
+	}
+	
+	let val = pview.radio.value;
+	let th = pview.list[val].th;
+	let ind = pview.list[val].index;
+				
+	let par = result.param[th];
+				
+	let name = param_name_index(result.param[th],ind);
+					
+	let key = [];
+		
+	let pmean=[], pCImin=[], pCImax=[];
+	for(let g = 0; g < result.generation.length; g++){
+		let gen = result.generation[g];
+	
+		pmean.push({x:g+0.5, y:get_element(gen.mean[th],ind)});
+		pCImin.push({x:g+0.5, y:get_element(gen.CImin[th],ind)});
+		pCImax.push({x:g+0.5, y:get_element(gen.CImax[th],ind)});
+	}
+										
+	data.push({point:pmean, col:GENRATION_COL, type:"Line"});
+	data.push({point:pCImin, col:GENRATION_CI_COL, type:"Line", dash:GENRATION_DASH});
+	data.push({point:pCImax, col:GENRATION_CI_COL, type:"Line", dash:GENRATION_DASH});			
+	key.push({type:"Line", te:"Mean", thick:GENRATION_THICK, col:GENRATION_COL});
+	key.push({type:"Line", te:"95% CI", thick:GENRATION_THICK, dash:GENRATION_DASH, col:GENRATION_CI_COL});
+	
+	let sample = result.par_sample;
+	if(par.type == "derive_param" && par.time_dep) sample = result.sample;
+	
+	let vec = [];
+	for(let i = 0; i < sample.length; i++){
+		let samp = sample[i];
+		if(samp.num >= burn){
+			let val;
+			if(par.kind == "const") val = get_element(par.value,ind)
+			else val = get_element(samp.param[th],ind);
+			vec.push(val);
+		}
+	}
+	
+	let end = result.generation[result.generation.length-1].num+1;
+		
+	if(vec.length > 0){
+		let stat = get_statistic(vec);
+	
+		data.push({type:"ErrorBar", x:end, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
+		key.push({type:"ErrBar", te:"Posterior", thick:GENRATION_THICK, col:BLACK});
+	}
+	
+	if(rpf.sim_val.check == true){
+		if(par.value){
+			let va = get_element(par.value,ind);
+			
+			if(va != undefined && !isNaN(va)){
+				let val = Number(va);	
+			
+				let point = [];
+				point.push({x:0, y:val}); point.push({x:end, y:val});
+				
+				data.push({point:point, col:SIM_VALUE_COL, type:"Line", thick:SIM_VALUE_THICK, dash:SIM_VALUE_DASH});
+				
+				key.push({type:"Line", te:"Sim. Val.", dash:SIM_VALUE_DASH, thick:SIM_VALUE_THICK, col:SIM_VALUE_COL});
+			}
+		}
+	}
+	
+	post({type:"Graph define", variety:"Samples", view:"Graph", data:data, op:{x_label:"Generations", y_label:name, y_param:true, key:key}});
 }
 
 
@@ -3702,7 +3857,6 @@ function no_graph_msg(msg)
 /// Sets up a distribution plot
 function setup_distribution(result,rpf,burn)
 {	
-//pr("setup dis");
 	let val = rpf.sel_paramview.radio.value;
 	let th = rpf.sel_paramview.list[val].th;
 	let ind = rpf.sel_paramview.list[val].index;

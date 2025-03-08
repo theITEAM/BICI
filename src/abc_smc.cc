@@ -11,15 +11,16 @@ using namespace std;
 
 #include "abc_smc.hh"
 #include "utils.hh"
+#include "matrix.hh"
 
-
-ABC_SMC::ABC_SMC(const Model &model, Output &output) : model(model), output(output), state(model)
+ABC_SMC::ABC_SMC(const Model &model, Output &output, Mpi &mpi) : model(model), output(output), mpi(mpi), state(model)
 {	
 	const auto &de = model.details;
 	nsample = de.sample;
 	acc_frac = de.accfrac;
 	G = de.numgen;
 	si = de.kernelsize;
+	state.init();
 }
  
 
@@ -32,20 +33,28 @@ void ABC_SMC::run()
 	
 	double obs_cutoff = -LARGE; 
 
+	auto smax = model.details.num_per_core;
 	for(auto g = 0u; g < G; g++){
 		vector <Particle> particle;
 		
 		auto ntr = 0u, nac = 0u;
 		
+		output.percent_done = 0;
+		
+		auto last = false; if(g == G-1) last = true;
+			
 		if(g == 0){
-			for(auto s = 0u; s < nsample; s++){
-				if(com_op) progress(s,nsample*G);
+			for(auto s = 0u; s < smax; s++){
+				output.percentage(s,smax*G);
+				progress(s,smax*G);
 				
 				auto param_val = model.param_sample();
 				auto initc_val = model.initc_sample(param_val);
 
 				state.simulate(param_val,initc_val);
-				auto part = state.generate_particle();
+				
+				output.param_sample(g,GEN_PLOT,state);
+				auto part = state.generate_particle(UNSET,0,last);
 				part.w = 1;
 				particle.push_back(part);
 				ntr++; nac++;
@@ -60,8 +69,10 @@ void ABC_SMC::run()
 		
 			setup_particle_sampler(particle_store);         // Sets up sampler for particles
 		
+			auto s = 0u;
 			do{
-				if(com_op) progress(g*nsample+particle.size(),nsample*G);
+				output.percentage(s,smax);
+				progress(smax*g+s,smax*G);
 				
 				ntr++;
 					
@@ -77,32 +88,40 @@ void ABC_SMC::run()
 																									  	// Calculates the weight for the sample
 					auto w = calculate_particle_weight(param_prop,particle_store,prop); 
 
-					if(state.like.obs > obs_cutoff){            // Checks if error function less than cutoff
-						auto part = state.generate_particle();
+					if(state.like.obs > obs_cutoff){            // Checks if error function less than cutoff		
+						output.param_sample(g,GEN_PLOT,state);
+						auto part = state.generate_particle(UNSET,0,last);
 						part.w = w;
 						particle.push_back(part);
 						nac++;
+						s++;
 					}
 				}
-			}while(particle.size() < nsample);
+			}while(s < smax);
 		}
+		output.percentage(smax,smax);
 		
-		obs_cutoff = implement_cutoff_frac(particle); 
-
+		if(!last) obs_cutoff = implement_cutoff_frac(particle); 
+		
 		particle_store = particle;
 		
-		cout << "Generation " << g << "   Acceptance: " << 100*double(nac)/ntr << "%  ";
-		cout << "Cut-off: " << obs_cutoff << "   # Particle: " <<  particle.size() << endl;
+#ifdef USE_MPI 
+		mpi.share_particle(particle_store);
+#endif
+		
+		if(op()){
+			cout << "Generation " << g << "   Acceptance: " << 100*double(nac)/ntr << "%  ";
+			cout << "Cut-off: " << obs_cutoff << "   # Particle: " <<  particle_store.size() << endl << endl;
+		}
 	}
-	
-	// Outputs the final results by sampling from 
+
 	setup_particle_sampler(particle_store);    
-	for(auto s = 0u; s < nsample; s++){
+	for(auto s = 0u; s < smax; s++){
 		auto p = particle_sampler();   
 		const auto &part = particle_store[p];
-		
-		output.param_sample(s,part);
-		output.state_sample(s,part);
+	
+		output.param_sample(part);
+		output.state_sample(part);
 	}
 }
 	
@@ -136,10 +155,18 @@ double ABC_SMC::implement_cutoff_frac(vector <Particle> &particle) const
 	for(auto &part : particle){
 		obs_prob.push_back(part.like.obs);
 	}
-	
+
+#ifdef USE_MPI 
+	obs_prob = mpi.gather(obs_prob);
+#endif
+
 	sort(obs_prob.begin(),obs_prob.end());
 	
 	auto cutoff = obs_prob[(obs_prob.size()-1)*(1-acc_frac)];
+
+#ifdef USE_MPI 
+	mpi.bcast(cutoff);
+#endif
 
 	auto p = 0u;
 	while(p < particle.size()){

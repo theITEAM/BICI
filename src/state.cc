@@ -17,6 +17,12 @@ using namespace std;
 /// Initialises the model 
 State::State(const Model &model) : model(model)
 {
+}
+
+
+/// Initialises state;
+void State::init()
+{
 	T = model.ntimepoint-1;
 	
 	timer.resize(TIMER_MAX,0);
@@ -55,7 +61,7 @@ State::State(const Model &model) : model(model)
 void State::simulate(const vector <double> &param_value, const vector <InitCondValue> &initc_val) 
 {
 	param_val = param_value;
-	
+
 	spline_init(); 
 
 	for(auto p = 0u; p < nspecies; p++){
@@ -78,7 +84,7 @@ void State::simulate(const vector <double> &param_value, const vector <InitCondV
 		auto &ssp = species[p];
 		ssp.check(0,popnum_t);
 	}
-	
+
 	simulate_iterate(0,T);
 }
 
@@ -1119,9 +1125,10 @@ void State::resample_ind()
 
  
 /// Generates a particle from the state
-Particle State::generate_particle() const
+Particle State::generate_particle(unsigned int s, unsigned int chain, bool store_state) const
 {
 	Particle part;
+	part.s = s; part.chain = chain;
 	part.param_val = param_val;
 	part.like = like;
 	part.dir_out = derive_calculate();
@@ -1130,9 +1137,13 @@ Particle State::generate_particle() const
 		const auto &ssp = species[p];
 		ParticleSpecies part_sp;
 		part_sp.init_cond_val = ssp.init_cond_val;
-		part_sp.trans_num = ssp.trans_num;
-		part_sp.individual = ssp.individual;
-	
+		
+		if(store_state){
+			part_sp.trans_num = ssp.trans_num;
+			part_sp.individual = ssp.individual;
+		}
+		part_sp.nindividual = ssp.individual.size();
+		
 		part.species.push_back(part_sp);
 	}
 		
@@ -1337,12 +1348,11 @@ void CorMatrix::init(unsigned int N_)
 
 
 /// Adds a sample
-void CorMatrix::add_sample(const vector <double> &param_value, bool all)
+void CorMatrix::add_sample(const vector <double> &param_value, unsigned int range)
 {
 	samp.push_back(param_value);
 	n++;
 
-	
 	for(auto i = 0u; i < N; i++){
 		auto vali = param_value[i];
 		av[i] += vali;
@@ -1352,19 +1362,17 @@ void CorMatrix::add_sample(const vector <double> &param_value, bool all)
 		}
 	}
 
-	if(all != true){
-		while(n_start < n/3){
-			const auto &samp_val = samp[n_start];
-			for(auto i = 0u; i < N; i++){
-				auto vali = samp_val[i];
-				av[i] -= vali;
-				for(auto j = i; j < N; j++){
-					auto valj = samp_val[j];
-					av2[i][j] -= vali*valj;
-				}
+	while(n-n_start > range){
+		const auto &samp_val = samp[n_start];
+		for(auto i = 0u; i < N; i++){
+			auto vali = samp_val[i];
+			av[i] -= vali;
+			for(auto j = i; j < N; j++){
+				auto valj = samp_val[j];
+				av2[i][j] -= vali*valj;
 			}
-			n_start++;
 		}
+		n_start++;
 	}
 }
 
@@ -1399,10 +1407,8 @@ void CorMatrix::set_mvn_from_particle(vector <Particle> &particle)
 {
 	init(particle[0].param_val.size());
 	for(const auto &part : particle){
-		add_sample(part.param_val,true);
+		add_sample(part.param_val,LARGE);
 	}
-	
-	
 }
 
 

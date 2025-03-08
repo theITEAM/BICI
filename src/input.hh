@@ -7,6 +7,7 @@ using namespace std;
 
 #include "model.hh"
 #include "hash.hh"
+#include "mpi.hh"
 
 struct TransDef {                          // Transition reference
 	TransType type;
@@ -77,12 +78,10 @@ class Input                                // Stores information about the model
 		string datadir;                        // The data directory 
 		vector <string> lines_raw;             // Stores the raw text lines of the input file
 		
-		Input(Model &model, string file, unsigned int chain, unsigned int nchain_, unsigned int seed);
+		Input(Model &model, string file, unsigned int seed, Mpi &mpi);
 	
 	private:
 		unsigned int p_current, cl_current;    // Stores the current species and classification 
-		
-		unsigned int nchain;                   // The number of chains
 		
 		bool terminate;                        // Set if algorithm terminated early
 		
@@ -105,10 +104,12 @@ class Input                                // Stores information about the model
 		Hash hash_eqn;                         // Stores a hash take for equations
 	
 		Model &model;                          // References model such that it can be updated
+		Mpi &mpi;                              // Stores information about mpi
 		
 		vector <CommandLine> extract_command_line(vector <string> lines);
 		void load_data_files(vector <CommandLine> &command_line);
 		string add_escape_char(string te);
+		void convert_folder(string &data_dir) const;
 		CommandLine get_command_tags(string trr, unsigned int line_num);
 		CommandLine syntax_error() const;
 		void alert(string st);
@@ -277,6 +278,7 @@ class Input                                // Stores information about the model
 		void load_param_value(const ParamProp &pp, string valu, Param &par, string desc);
 		void set_spline(string knot_times_str, string smooth, vector <string> &knot_times, bool use_inf_time, Param &par);
 		unsigned int get_seed();
+		//unsigned int get_tag_integer(string tag, unsigned int def=UNSET);
 		
 		// In 'input_check.cc'
 		void check_initial_pop_error(bool end);
@@ -286,7 +288,7 @@ class Input                                // Stores information about the model
 		void check_comp_structure();
 		void check_import_correct();
 		void temp_check(unsigned int num);
-		unsigned int check_pos_integer(string val, unsigned int def);
+		unsigned int check_pos_integer(string val, unsigned int def=UNSET);
 		double check_pos_number(string te, unsigned int def);
 		double check_zero_one(string te, double def);
 };

@@ -41,7 +41,10 @@ void Input::import_data_table_command(Command cname)
 	auto cols = get_tag_value("cols");
 	
 	auto p = p_current;
-	if(p == UNSET){ alert_import("To load the data file the species must be set"); return;}
+	if(p == UNSET){ 
+		alert_import("To load the data file the species must be set"); 
+		return;
+	}
 	
 	DataSource ds;
 	ds.line_num = line_num;
@@ -59,7 +62,10 @@ void Input::import_data_table_command(Command cname)
 		
 			if(focal != ""){
 				ds.focal_cl = find_cl(p,focal); 
-				if(ds.focal_cl == UNSET){ alert_import("The focal classification '"+focal+"' not recognised"); return;}
+				if(ds.focal_cl == UNSET){
+					alert_import("The focal classification '"+focal+"' not recognised");
+					return;
+				}
 			}
 			
 			auto type = get_tag_value("type");
@@ -89,7 +95,10 @@ void Input::import_data_table_command(Command cname)
 			auto name = get_tag_value("class"); if(name == ""){ cannot_find_tag(); return;}
 			
 			ds.cl = find_cl(p,name);
-			if(ds.cl == UNSET){ alert_import("In 'class' the value '"+name+"' is not a classification"); return;}
+			if(ds.cl == UNSET){ 
+				alert_import("In 'class' the value '"+name+"' is not a classification");
+				return;
+			}
 		}
 		break;
 	
@@ -99,7 +108,10 @@ void Input::import_data_table_command(Command cname)
 			
 			ds.cl = find_cl(p,name);
 		
-			if(ds.cl == UNSET){ alert_import("In 'class' the value '"+name+"' is not a classification"); return;}
+			if(ds.cl == UNSET){
+				alert_import("In 'class' the value '"+name+"' is not a classification");
+				return;
+			}
 		}	
 		break;
 	
@@ -117,7 +129,10 @@ void Input::import_data_table_command(Command cname)
 			auto neg = get_tag_value("neg");
 			if(neg == "") pos = "0";
 			
-			if(pos == neg){ alert_import("'pos' and 'neg' cannot both have the same value"); return;}
+			if(pos == neg){ 
+				alert_import("'pos' and 'neg' cannot both have the same value"); 
+				return;
+			}
 				
 			om.diag_pos = pos; om.diag_neg = neg;
 				
@@ -126,7 +141,10 @@ void Input::import_data_table_command(Command cname)
 			auto spl = split(comp,',');
 			
 			auto cl = get_cl_from_comp(spl[0],p);
-			if(cl == UNSET){ alert_import("Value '"+spl[0]+"' is not a compartment5"); return;}
+			if(cl == UNSET){ 
+				alert_import("Value '"+spl[0]+"' is not a compartment5");
+				return;
+			}
 			
 			om.diag_test_sens.cl = cl;
 			ds.cl = cl;
@@ -160,7 +178,8 @@ void Input::import_data_table_command(Command cname)
 			auto cl_sel = get_cl_from_trans(name,p);
 		
 			if(cl_sel == UNSET){
-				alert_import("Error with expression '"+name+"'"); return;
+				alert_import("Error with expression '"+name+"'");
+				return;
 			}
 		
 			ds.cl = cl_sel;
@@ -177,13 +196,22 @@ void Input::import_data_table_command(Command cname)
 			case SPEC_TIME:
 				auto start = get_tag_value("start"); if(start == ""){ cannot_find_tag(); return;} 
 				ds.time_start = number(start);
-				if(ds.time_start == UNSET){ alert_import("'start' must be a number"); return;}
+				if(ds.time_start == UNSET){ 
+					alert_import("'start' must be a number"); 
+					return;
+				}
 				
 				auto end = get_tag_value("end"); if(end == ""){ cannot_find_tag(); return;} 
 				ds.time_end = number(end);
-				if(ds.time_end == UNSET){ alert_import("'end' must be a number"); return;}
+				if(ds.time_end == UNSET){ 
+					alert_import("'end' must be a number"); 
+					return;
+				}
 				
-				if(ds.time_start >= ds.time_end){ alert_import("'start' must be before 'end'"); return;}
+				if(ds.time_start >= ds.time_end){
+					alert_import("'start' must be before 'end'"); 
+					return;
+				}
 				break;
 			}
 		}
@@ -312,7 +340,10 @@ void Input::species_command(unsigned int loop)
 		if(trans_tree_str != ""){
 			if(trans_tree_str == "on") trans_tree = true;
 			else{
-				if(trans_tree_str != "off"){ alert_import("'trans-tree' must be either 'off' or 'on'"); return;}
+				if(trans_tree_str != "off"){ 
+					alert_import("'trans-tree' must be either 'off' or 'on'");
+					return;
+				}
 			}
 		}
 	}
@@ -323,10 +354,14 @@ void Input::species_command(unsigned int loop)
 	}
 	else{
 		p_current = find_p(name);
-		if(p_current == UNSET){ alert_import("Problem finding species '"+name+"'"); return;}
+		if(p_current == UNSET){
+			alert_import("Problem finding species '"+name+"'"); 
+			return;
+		}
 	}
 	cl_current = UNSET;
 }
+
 
 
 /// Adds a classification to the model
@@ -334,7 +369,10 @@ void Input::classification_command(unsigned int loop)
 {
 	auto p = p_current;
 
-	if(p == UNSET){ alert_import("A species must be defined before a classification can be added"); return;}
+	if(p == UNSET){ 
+		alert_import("A species must be defined before a classification can be added"); 
+		return;
+	}
 		
 	auto &sp = model.species[p];
 	
@@ -362,17 +400,29 @@ void Input::classification_command(unsigned int loop)
 		}
 		else{
 			cl_current = find_cl(p,name);
-			if(cl_current == UNSET){ alert_import("Problem finding classification '"+name+"'"); return;}
+			if(cl_current == UNSET){
+				alert_import("Problem finding classification '"+name+"'"); 
+				return;
+			}
 		}
 	}
 	else{
 		auto index = get_tag_value("index");
 		if(index == ""){ cannot_find_tag(); return;}
-		if(index.length() != 1){ alert_import("The index '"+index+"' must be just a single character"); return;}
+		if(index.length() != 1){ 
+			alert_import("The index '"+index+"' must be just a single character"); 
+			return;
+		}
 		
-		if(index == "t"){ alert_import("The index 't' cannot be used because it is reserved for time variation"); return;}
+		if(index == "t"){ 
+			alert_import("The index 't' cannot be used because it is reserved for time variation"); 
+			return;
+		}
 		
-		if(find_in(alphabet,index) == UNSET){ alert_import("Index '"+index+"' must be from the lower case alphabet"); return;}
+		if(find_in(alphabet,index) == UNSET){ 
+			alert_import("Index '"+index+"' must be from the lower case alphabet"); 
+			return;
+		}
 		
 		auto coord = toLower(get_tag_value("coord"));
 		
@@ -385,7 +435,10 @@ void Input::classification_command(unsigned int loop)
 		if(coord == "latlng"){
 			auto def_map = get_tag_value("map");
 			if(def_map != ""){
-				if(def_map != "load"){ alert_import("'map' must be set to 'load'"); return;}
+				if(def_map != "load"){ 
+					alert_import("'map' must be set to 'load'");
+					return;
+				}
 			}
 		}
 		
@@ -395,7 +448,10 @@ void Input::classification_command(unsigned int loop)
 		}
 		else{
 			cl_current = find_cl(p,name);
-			if(cl_current == UNSET){ alert_import("Problem finding classification '"+name+"'"); return;}
+			if(cl_current == UNSET){ 
+				alert_import("Problem finding classification '"+name+"'"); 
+				return;
+			}
 		}
 	}
 }
@@ -469,15 +525,24 @@ void Input::set_command()
 	auto sp = get_tag_value("species");
 	if(sp != ""){
 		p_current = find_p(sp);
-		if(p_current == UNSET){ alert_import("Cannot set the species '"+sp+"' as this does not exist"); return;}
+		if(p_current == UNSET){
+			alert_import("Cannot set the species '"+sp+"' as this does not exist"); 
+			return;
+		}
 	}
 	
 	auto name = get_tag_value("classification");
 	if(name != ""){
-		if(p == UNSET){ alert_import("A species must be set before a 'classification' can be set"); return;}
+		if(p == UNSET){
+			alert_import("A species must be set before a 'classification' can be set"); 
+			return;
+		}
 	
 		cl_current = find_cl(p,name);
-		if(cl_current == UNSET){ alert_import("Cannot set the classification '"+name+"'"); return;}
+		if(cl_current == UNSET){
+			alert_import("Cannot set the classification '"+name+"'"); 
+			return;
+		}
 	}
 }
 
@@ -600,12 +665,20 @@ void Input::compartment_command2(vector <Tag> &tags)
 		{
 			auto x_str = get_tag_val("x",tags);
 			if(x_str != ""){
-				x = number(x_str); if(x == UNSET){ alert_import("'x' must be a number"); return;}
+				x = number(x_str); 
+				if(x == UNSET){
+					alert_import("'x' must be a number"); 
+					return;
+				}
 			}
 			
 			auto y_str = get_tag_val("y",tags);
 			if(y_str != ""){
-				y = number(y_str); if(y == UNSET){ alert_import("'y' must be a number"); return;}
+				y = number(y_str);
+				if(y == UNSET){ 
+					alert_import("'y' must be a number"); 
+					return;
+				}
 			}
 			
 			if(x != UNSET && y != UNSET){
@@ -633,13 +706,19 @@ void Input::compartment_command2(vector <Tag> &tags)
 				auto lat_str = get_tag_val("lat",tags);
 				if(lat_str != ""){
 					lat = number(lat_str);
-					if(lat == UNSET){ alert_import("'lat' must be a number"); return;}
+					if(lat == UNSET){ 
+						alert_import("'lat' must be a number"); 
+						return;
+					}
 				}
 				
 				auto lng_str = get_tag_val("lng",tags);
 				if(lng_str != ""){
 					lng = number(lng_str);
-					if(lng == UNSET){ alert_import("'lng' must be a number"); return;}
+					if(lng == UNSET){
+						alert_import("'lng' must be a number"); 
+						return;
+					}
 				}
 			
 				if(lat != UNSET && lng != UNSET){
@@ -716,11 +795,17 @@ void Input::transition_command2(vector <Tag> &tags)
 	
 	auto te = get_tag_val("name",tags); if(te == "") cannot_find_tag();
 	
-	if(te.length() < 2){ alert_import("Expression '"+te+"' is not understood"); return;}
+	if(te.length() < 2){ 
+		alert_import("Expression '"+te+"' is not understood"); 
+		return;
+	}
 	
 	auto i = 0u; while(i < te.length()-1 && te.substr(i,2) != "->") i++;
 	
-	if(i == te.length()-1){ alert_import("Expression '"+te+"' is not understood"); return;}
+	if(i == te.length()-1){ 
+		alert_import("Expression '"+te+"' is not understood"); 
+		return;
+	}
 	
 	string fr = trim(te.substr(0,i));
 	if(fr == "+") fr = "Source";
@@ -732,7 +817,8 @@ void Input::transition_command2(vector <Tag> &tags)
 	
 	auto trans_def = extract_trans_def(value_str);
 	if(trans_def.set == false){ 
-		alert_import("There is a syntax error in value '"+value_str+"'"); return;
+		alert_import("There is a syntax error in value '"+value_str+"'");
+		return;
 	}
 	
 	unsigned int ci, cf;
@@ -740,21 +826,36 @@ void Input::transition_command2(vector <Tag> &tags)
 	if(fr == "Source") ci = UNSET;
 	else{
 		ci = find_c(p,cl,fr);
-		if(ci == UNSET){ alert_import("Cannot find compartment '"+fr+"'"); return;}
+		if(ci == UNSET){ 
+			alert_import("Cannot find compartment '"+fr+"'"); 
+			return;
+		}
 	}
 	
 	if(to == "Sink") cf = UNSET;
 	else{
 		cf = find_c(p,cl,to);
-		if(cf == UNSET){ alert_import("Cannot find compartment '"+to+"'"); return;}
+		if(cf == UNSET){
+			alert_import("Cannot find compartment '"+to+"'"); 
+			return;
+		}
 	}
 
 	for(auto tr = 0u; tr < claa.ntra; tr++){
 		if(claa.tra[tr].i == ci && claa.tra[tr].f == cf){
-			if(ci == UNSET){ alert_import("Source to '"+to+"' already exists"); return;}
+			if(ci == UNSET){ 
+				alert_import("Source to '"+to+"' already exists"); 
+				return;
+			}
 			else{
-				if(cf == UNSET){ alert_import("Sink from '"+fr+"' already exists"); return;}
-				else{ alert_import("Transition from '"+fr+"' to '"+to+"' already exists"); return;}
+				if(cf == UNSET){
+					alert_import("Sink from '"+fr+"' already exists"); 
+					return;
+				}
+				else{
+					alert_import("Transition from '"+fr+"' to '"+to+"' already exists");
+					return;
+				}
 			}
 		}
 	}
@@ -860,6 +961,8 @@ void Input::transition_command2(vector <Tag> &tags)
 void Input::datadir_command()
 {
 	datadir = get_tag_value("folder"); if(datadir == ""){ cannot_find_tag(); return;}
+	
+	convert_folder(datadir);
 
 	if(check_char_allowed(datadir,"<>\"|?*") == false) return;
 
@@ -897,7 +1000,10 @@ void Input::box_command()
 	auto te = get_tag_value("text");
 	auto tesize = get_tag_value("textsize"); 
 	if(tesize != ""){ 
-		if(number(tesize) == UNSET){ alert_import("'textsize' must be a number"); return;}
+		if(number(tesize) == UNSET){ 
+			alert_import("'textsize' must be a number"); 
+			return;
+		}
 	}
 	
 	auto comps = get_tag_value("comps"); if(comps == ""){ cannot_find_tag(); return;}
@@ -993,8 +1099,10 @@ void Input::param_command()
 	
 	par.auto_value = false;
 	
-	if(par.name == dist_matrix_name) alert_import("The distance matrix '"+par.full_name+"' must not be set");
-
+	if(par.name == dist_matrix_name){
+		alert_import("The distance matrix '"+par.full_name+"' must not be set");
+	}
+	
 	if(value == "auto"){
 		par.auto_value = true;
 		for(auto &val : par.value) val.te = "auto";
@@ -1032,7 +1140,10 @@ void Input::param_command()
 							valu = reparam; desc = "In 'reparam'";
 							par.variety = REPARAM_PARAM;		
 						}
-						else{ alert_import("Problem importing"); return;}
+						else{ 
+							alert_import("Problem importing"); 
+							return;
+						}
 					}
 				}
 				
@@ -1099,7 +1210,8 @@ void Input::param_command()
 		par.variety = PRIOR_PARAM;
 		
 		if(par.dep.size() == 0){
-			alert_import("'prior-split' can only be used if the parameter has a dependency.");  
+			alert_import("'prior-split' can only be used if the parameter has a dependency."); 
+			return;
 		}
 	
 		auto tab = load_table(prior_split);
@@ -1203,18 +1315,23 @@ void Input::param_command()
 	else{
 		if(sim_sample == "true") par.sim_sample = true;
 		else{
-			alert_import("'sim-sample' must be either 'true' or 'false'."); return;
+			alert_import("'sim-sample' must be either 'true' or 'false'."); 
+			return;
 		}
 	}
 	
 	for(const auto &par2 : model.param){
 		if(par2.name == par.name){
-			alert_import("Parameter already defined"); return;
+			alert_import("Parameter already defined"); 
+			return;
 		}
 	}
 	
 	if(par.variety == UNSET_PARAM){
-		if(false){ alert_import("Parameter variety for '"+par.name+"' is unset"); return;}
+		if(false){ 
+			alert_import("Parameter variety for '"+par.name+"' is unset");
+			return;
+		}
 	}
 	else{
 		model.param.push_back(par);
@@ -1238,7 +1355,10 @@ void Input::load_reparam_eqn(string te, Param &par)
 	}
 	
 	auto swap_temp = swap_template(eqn_raw.te,dep_conv);
-	if(swap_temp.warn != ""){ alert_import(swap_temp.warn); return;}
+	if(swap_temp.warn != ""){ 
+		alert_import(swap_temp.warn); 
+		return;
+	}
 		
 	for(auto i = 0u; i < par.N; i++){
 		for(auto d = 0u; d < depend.size(); d++){
@@ -1252,10 +1372,14 @@ void Input::load_reparam_eqn(string te, Param &par)
 		if(check_swap){
 			auto te_st = eqn.te;
 			auto res = swap_index(eqn.te,dep_conv);
-			if(res.warn != ""){ alert_import(res.warn); return;}
+			if(res.warn != ""){
+				alert_import(res.warn); 
+				return;
+			}
+			
 			if(eqn.te != te_st){
 				cout << eqn.te << " " << te_st << " compare" << endl; 
-				emsg("Swap index dif res");
+				emsg_input("Swap index dif res");
 			}
 		}
 		
@@ -1295,7 +1419,10 @@ void Input::derived_command()
 	}
 	
 	auto swap_temp = swap_template(der_eqn_raw.te,dep_conv);
-	if(swap_temp.warn != ""){ alert_import(swap_temp.warn); return;}
+	if(swap_temp.warn != ""){ 
+		alert_import(swap_temp.warn); 
+		return;
+	}
 	
 	for(auto i = 0u; i < mult; i++){
 		for(auto d = 0u; d < depend.size(); d++){
@@ -1310,10 +1437,14 @@ void Input::derived_command()
 		if(check_swap){
 			auto te_ch = der_eqn_raw.te;
 			auto res = swap_index(te_ch,dep_conv);
-			if(res.warn != ""){ alert_import(res.warn); return;}
+			if(res.warn != ""){ 
+				alert_import(res.warn); 
+				return;
+			}
+			
 			if(te_ch != der_eqn.te){
 				cout << der_eqn.te << " " << te_ch << " compare" << endl; 
-				emsg("Swap index dif res");
+				emsg_input("Swap index dif res");
 			}
 		}
 		
@@ -1333,28 +1464,40 @@ void Input::simulation_command()
 	if(start == ""){ terminate = true; cannot_find_tag(); return;}
 	
 	auto start_num = number(start);
-	if(start_num == UNSET){ terminate = true; alert_import("'start' must be a number"); return;}
+	if(start_num == UNSET){
+		terminate = true; 
+		alert_import("'start' must be a number"); 
+		return;
+	}
+	
 	details.t_start = start_num;
 	
 	auto end = get_tag_value("end");
 	if(end == ""){ terminate = true; cannot_find_tag(); return;}
 
 	auto end_num = number(end);
-	if(end_num == UNSET){ terminate = true; alert_import("'end' must be a number"); return;}
+	if(end_num == UNSET){
+		terminate = true; 
+		alert_import("'end' must be a number");
+		return;
+	}
+	
 	details.t_end = end_num;
 	
 	if(details.t_start >= details.t_end){
+		terminate = true;
 		alert_import("'start' must before 'end'");
-	}
-
-	auto num_str = get_tag_value("number");
-	double num = SIM_NUM_DEFAULT;
-	if(num_str != "") num = number(num_str);
-	if(num == UNSET || num != int(num) || num <= 0){ 
-		alert_import("'number' must be a positive integer"); 
 		return;
 	}
-	details.number = (unsigned int)num;
+
+	details.number = check_pos_integer("number",SIM_NUM_DEFAULT);
+
+	if(details.number%mpi.ncore != 0 && model.mode == SIM){
+		alert_import("'number' must be a multiple of the number of cores");
+	}		 
+	details.num_per_core = details.number/mpi.ncore;
+
+	details.nchain = 1;
 	
 	details.seed = get_seed();
 	
@@ -1380,6 +1523,7 @@ void Input::simulation_command()
 	details.anneal_type = ANNEAL_NONE;
 	details.anneal_rate = UNSET;
 	details.anneal_power = UNSET;
+	details.diagnostics_on = false;
 }
 
 
@@ -1392,7 +1536,11 @@ void Input::inference_command()
 	if(start == ""){ terminate = true; cannot_find_tag(); return;}
 	
 	auto start_num = number(start);
-	if(start_num == UNSET){ terminate = true; alert_import("'start' must be a number"); return;}
+	if(start_num == UNSET){ 
+		terminate = true; 
+		alert_import("'start' must be a number"); 
+		return;
+	}
 	
 	details.t_start = start_num;
 	
@@ -1400,12 +1548,18 @@ void Input::inference_command()
 	if(end == ""){ terminate = true; cannot_find_tag(); return;}
 	
 	auto end_num = number(end);
-	if(end_num == UNSET){ terminate = true; alert_import("'end' must be a number"); return;}
+	if(end_num == UNSET){ 
+		terminate = true; 
+		alert_import("'end' must be a number"); 
+		return;
+	}
 	
 	details.t_end = end_num;
 	
 	if(details.t_start >= details.t_end){
+		terminate = true;
 		alert_import("'start' must before 'end'");
+		return;
 	}
 	
 	details.seed = get_seed();
@@ -1422,43 +1576,45 @@ void Input::inference_command()
 
 	auto dt = number(dt_str);
 	if(dt == UNSET || dt <= 0){
-		terminate = true; alert_import("'timestep' must be a positive number");
+		terminate = true; 
+		alert_import("'timestep' must be a positive number");
 		return;
 	}
 	
-	get_tag_value("nchain"); // nchain is not needed
+	details.dt = dt;
+	details.sample = MCMC_SAMPLE_DEFAULT;
+	details.output_param = MCMC_OP_PARAM_DEFAULT;
+	details.output_state = MCMC_OP_STATE_DEFAULT;
 	
-	model.details.dt = dt;
-	model.details.sample = MCMC_SAMPLE_DEFAULT;
-	model.details.output_param = MCMC_OP_PARAM_DEFAULT;
-	model.details.output_state = MCMC_OP_STATE_DEFAULT;
-
+	details.nchain = 1;
+	details.gen_update = UNSET;
+	
 	details.individual_max = check_pos_integer("ind-max",INDMAX_DEFAULT);
 	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
 
-	switch(details.algorithm){
+	auto algo = details.algorithm;
+	
+	switch(algo){
 	case DA_MCMC:
 		details.sample = check_pos_integer("sample",MCMC_SAMPLE_DEFAULT);
-		details.output_param = check_pos_integer("param-output",MCMC_OP_PARAM_DEFAULT);
-		details.output_state = check_pos_integer("state-output",MCMC_OP_STATE_DEFAULT);
-		if(num_core() != 1){
-			details.output_param /= num_core();
-			details.output_state /= num_core();
+		details.nchain = check_pos_integer("nchain");
+		if(details.nchain%mpi.ncore != 0 && model.mode == INF){
+			alert_import("'nchain' must be a multiple of the number of cores");
 		}
-		else{
-			if(nchain != UNSET){
-				details.output_param /= nchain;
-				details.output_state /= nchain;
-			}
-		}
-		
-		if(details.output_param < 1) details.output_param = 1;
-		if(details.output_state < 1) details.output_state = 1;
+		details.num_per_core = check_pos_integer("chain-per-core",MCMC_CHAIN_PER_CORE_DEFAULT);
 		break;
 		
 	case ABC_ALG:
-		details.sample = check_pos_integer("sample",ABC_SAMPLE_DEFAULT);
-		details.accfrac = check_zero_one("acc-frac",ABC_ACFRAC_DEFAULT);
+		{
+			details.sample = check_pos_integer("sample",ABC_SAMPLE_DEFAULT);
+			details.accfrac = check_zero_one("acc-frac",ABC_ACFRAC_DEFAULT);
+			auto num = (unsigned int)(details.sample/details.accfrac);
+			
+			if(num%mpi.ncore != 0 && model.mode == INF){
+				alert_import("'sample' divide by 'acc-frac' must be a multiple of the number of cores"); 
+			}			
+			details.num_per_core = num/mpi.ncore;
+		}
 		break;
 		
 	case ABC_SMC_ALG:
@@ -1466,9 +1622,48 @@ void Input::inference_command()
 		details.accfrac = check_zero_one("acc-frac",ABCSMC_ACFRAC_DEFAULT);
 		details.numgen = check_pos_integer("gen",ABCSMC_GEN_DEFAULT);
 		details.kernelsize = check_pos_number("kernel-size",ABCSMC_KERNEL_DEFAULT);
+		
+		if(details.sample%mpi.ncore != 0 && model.mode == INF){
+			alert_import("'sample' must be a multiple of the number of cores");
+		}	
+		details.num_per_core = details.sample/mpi.ncore;
+		break;
+	
+	case PAS_MCMC:
+		details.sample = check_pos_integer("sample",MCMC_SAMPLE_DEFAULT);
+		details.nchain = check_pos_integer("npart");
+		details.gen_update = check_pos_integer("gen-update");
+		if(details.nchain%mpi.ncore != 0 && model.mode == INF){
+			alert_import("'npart' must be a multiple of the number of cores");
+		}
+		details.num_per_core = check_pos_integer("part-per-core",PAS_PART_PER_CORE_DEFAULT);
 		break;
 		
 	default: break;
+	}
+	
+	details.diagnostics_on = false;
+	if(algo == DA_MCMC || algo == PAS_MCMC){
+		details.output_param = check_pos_integer("param-output",MCMC_OP_PARAM_DEFAULT);
+		details.output_state = check_pos_integer("state-output",MCMC_OP_STATE_DEFAULT);
+		details.output_param /= details.nchain;
+		details.output_state /= details.nchain;	
+		if(details.output_param < 1) details.output_param = 1;
+		if(details.output_state < 1) details.output_state = 1;	
+		
+		auto ncore = details.nchain/details.num_per_core;
+		if(ncore != mpi.ncore && model.mode == INF && mpi.core_spec_on == false){
+			emsg_input("The number of cores is '"+tstr(mpi.ncore)+"' and should be '"+tstr(ncore)+"'");
+		}
+	
+		auto diag = get_tag_value("diagnostics");
+		
+		if(diag != ""){
+			if(diag == "on") details.diagnostics_on = true;
+			else{
+				if(diag != "off") emsg_input("'diagnostics' must be 'off' or 'on'");
+			}
+		}
 	}
 	
 	model.details.stochastic = true;
@@ -1478,7 +1673,7 @@ void Input::inference_command()
 	details.anneal_rate = ANNEAL_RATE_DEFAULT;
 	details.anneal_power = ANNEAL_POWER_DEFAULT;
 	
-	if(details.algorithm == DA_MCMC){
+	if(algo == DA_MCMC || algo == PAS_MCMC){
 		auto burnin_str = get_tag_value("burnin-frac"); 
 		
 		if(burnin_str != ""){
@@ -1493,7 +1688,9 @@ void Input::inference_command()
 		else{
 			details.burnin_frac = BURNIN_FRAC_DEFAULT;
 		}
+	}
 	
+	if(algo == DA_MCMC){
 		auto anneal_str = get_tag_value("anneal"); 
 		if(anneal_str != ""){
 			details.anneal_type = AnnealType(option_error("anneal",anneal_str,{"none","scan","power-auto","log-auto","power"},{ ANNEAL_NONE, ANNEAL_SCAN, ANNEAL_POWERAUTO, ANNEAL_LOGAUTO, ANNEAL_POWER}));
@@ -1505,9 +1702,7 @@ void Input::inference_command()
 					if(rate_str != ""){ 
 						auto rate = number(rate_str);
 						if(rate == UNSET || rate <= 0){
-							terminate = true;
 							alert_import("'rate' must be a positive number");
-							return;		
 						}
 					
 						details.anneal_rate = rate;
@@ -1521,9 +1716,7 @@ void Input::inference_command()
 					if(power_str != ""){ 
 						auto power = number(power_str);
 						if(power == UNSET || power <= 0){
-							terminate = true;
 							alert_import("'power' must be a positive number");
-							return;		
 						}
 					
 						details.anneal_power = power;
@@ -1547,37 +1740,48 @@ void Input::post_sim_command()
 	if(start == ""){ terminate = true; cannot_find_tag(); return;}
 	
 	auto start_num = number(start);
-	if(start_num == UNSET){ terminate = true; alert_import("'start' must be a number"); return;}
+	if(start_num == UNSET){
+		terminate = true; 
+		alert_import("'start' must be a number"); 
+		return;
+	}
+	
 	details.ppc_t_start = start_num;
 	
 	auto end = get_tag_value("end"); 
 	if(end == ""){ terminate = true; cannot_find_tag(); return;}
 	
 	auto end_num = number(end);
-	if(end_num == UNSET){ terminate = true; alert_import("'end' must be a number"); return;}
+	if(end_num == UNSET){ 
+		terminate = true; 
+		alert_import("'end' must be a number"); 
+		return;
+	}
+	
 	details.ppc_t_end = end_num;
 	details.inf_t_end = details.t_end;
 	if(end_num > details.t_end) details.t_end = end_num;
 	
 	if(details.t_start >= details.t_end){
+		terminate = true;
 		alert_import("'start' must before 'end'");
-	}
-
-	auto num_str = get_tag_value("number");
-	double num = PPC_NUM_DEFAULT;
-	if(num_str != "") num = number(num_str);
-	if(num == UNSET || num != int(num) || num <= 0){ 
-		alert_import("'number' must be a positive integer"); 
 		return;
 	}
+
+	details.number = check_pos_integer("number",PPC_NUM_DEFAULT);
 	
+	if(details.number%mpi.ncore != 0 && model.mode == PPC){
+		alert_import("'number' must be a multiple of the number of cores");
+	}		 
+	details.num_per_core = details.number/mpi.ncore;
+
 	details.individual_max = check_pos_integer("ind-max",INDMAX_DEFAULT);
 	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
 	
 	details.seed = get_seed();
-
-	details.number = (unsigned int) num;
+	
 	details.ppc_resample = get_tag_value("resample");
+	details.diagnostics_on = false;
 }
 
 
@@ -1586,7 +1790,7 @@ unsigned int Input::check_pos_integer(string te, unsigned int def)
 {
 	auto value = get_tag_value(te);
 	
-	if(value == "") return def;
+	if(value == "" && def != UNSET) return def;
 	
 	auto num = number(value);
 	if(num == UNSET || num <= 0 || num != (int)num){
@@ -1630,7 +1834,11 @@ double Input::check_zero_one(string te, double def)
 void Input::ind_effect_command()
 {
 	auto p = p_current;
-	if(p == UNSET){ alert_import("To add individual effects the species must be set"); return;}
+	if(p == UNSET){ 
+		terminate = true;
+		alert_import("To add individual effects the species must be set");
+		return;
+	}
 	
 	auto name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
 	auto spl = split(name,',');
@@ -1674,8 +1882,10 @@ void Input::ind_effect_command()
 				auto i = integer(tab.ele[r][1]);
 				auto value = number(tab.ele[r][2]);
 				if(j == UNSET || i == UNSET || value == UNSET){
-					alert_import("Problem loading table on line "+to_string(r+1)); return;
+					alert_import("Problem loading table on line "+to_string(r+1));
+					return;
 				}
+				
 				val[j][i] = value;
 				val[i][j] = value;
 			}
@@ -1737,7 +1947,11 @@ void Input::ind_effect_command()
 void Input::fixed_effect_command()
 {
 	auto p = p_current;
-	if(p == UNSET){ alert_import("To add individual effects the species must be set"); return;}
+	if(p == UNSET){
+		terminate = true;
+		alert_import("To add individual effects the species must be set"); 
+		return;
+	}
 	
 	auto name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
 
@@ -1800,7 +2014,10 @@ void Input::inf_state_command()
 	auto chain = get_tag_value("chain"); 
 	
 	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
-	if(i == files.size()) alert_import("Could not find '"+file+"'");
+	if(i == files.size()){
+		alert_import("Could not find '"+file+"'");
+		return;
+	}
 
 	const auto &flines = files[i].lines;
 
@@ -1809,19 +2026,19 @@ void Input::inf_state_command()
 	// Reads in individual key
 	vector <string> ind_key;
 	{
-		auto warn = "Problem loading state file";
+		string warn = "Problem loading state file";
 		
 		while(li < flines.size() && trim(flines[li]) != "{") li++;
-		if(li == flines.size()) alert_import(warn);
-		while(li < lines.size() && !begin_str(flines[li],"timepoint")) li++;
-		if(li == flines.size()) alert_import(warn);
+		if(li == flines.size()) alert_import(warn+"1");
+		while(li < flines.size() && !begin_str(flines[li],"timepoint")) li++;
+		if(li == flines.size()) alert_import(warn+"2");
 		li++;
 		while(li < flines.size()){
 			auto line = trim(flines[li]);
 			if(line == "}") break;
 			if(line != ""){
 				auto spl = split(flines[li],':');
-				if(spl.size() != 2) alert_import(warn);
+				if(spl.size() != 2) alert_import(warn+"3");
 				auto num = number(spl[0]);
 				auto name = spl[1];
 				if(num >= ind_key.size()) ind_key.resize(num+1);
@@ -1830,8 +2047,8 @@ void Input::inf_state_command()
 			li++;
 		}
 		
-		while(li < lines.size() && !begin_str(flines[li],"<<")) li++;
-		if(li == flines.size()) alert_import(warn);
+		while(li < flines.size() && !begin_str(flines[li],"<<")) li++;
+		if(li == flines.size()) alert_import(warn+"4");
 	}
 	
 	vector <string> lines; 

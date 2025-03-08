@@ -1265,8 +1265,6 @@ function add_table_content(lay,table,back_col,dy)
 		}
 		cx += table.width[c];		
 	}
-	
-	
 }	
 
 
@@ -1396,7 +1394,7 @@ function view_warning(i)
 	
 	model.warn_view = false;
 
-	//pr(warn.warn_type+" warn");
+	pr(warn.warn_type+" warn");
 	switch(warn.warn_type){
 	case "TransTreeInf":
 		change_page({pa:"Model", su:"Compartments", susu:warn.p});
@@ -1413,6 +1411,11 @@ function view_warning(i)
 		
 	case "InfDetails":
 		change_page({pa:"Inference", su:"Run"});
+		break;
+		
+	case "InfFurtherDetails":
+		change_page({pa:"Inference", su:"Run"});
+		inter.options = true;
 		break;
 		
 	case "Init_pop": 

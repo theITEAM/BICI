@@ -6,6 +6,7 @@
 #include <fstream>
 #include <cmath>
 #include <sys/stat.h>
+#include <algorithm> 
  
 using namespace std;
 
@@ -13,15 +14,13 @@ using namespace std;
 #include "utils.hh"
 
 /// Initialises the output 
-Output::Output(unsigned int _chain, const Model &model, const Input &input, Mpi &mpi) : model(model), mpi(mpi)
+Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model), mpi(mpi)
 {
-	chain = _chain;
-	
 	timer.resize(OUTTIMER_MAX); for(auto &ti : timer) ti = 0;
 	
 	diagdir = "";	sampledir = "";	
 	if(input.datadir != ""){
-		diagdir = input.datadir+"/Dignostics";
+		diagdir = input.datadir+"/Diagnostic";
 		ensure_directory(diagdir);                  // Creates the diagnostics directory
 		
 		sampledir = input.datadir+"/Sample";
@@ -55,6 +54,14 @@ Output::Output(unsigned int _chain, const Model &model, const Input &input, Mpi 
 				flag = true;
 			}
 			
+			if(command == "inf-diagnostics"){
+				flag = true;
+			}
+			
+			if(command == "inf-generation"){
+				flag = true;
+			}
+			
 			if(flag == true){
 				if(st.length() >= 3 && st.substr(st.length()-3,3) == "\"[["){
 					auto j = i+1;
@@ -78,7 +85,9 @@ Output::Output(unsigned int _chain, const Model &model, const Input &input, Mpi 
 		lines_raw.push_back("");
 	}
 	
-	trace_init();
+	//trace_init();
+	
+	percent_done = UNSET;
 };
 
 
@@ -1104,14 +1113,16 @@ void Output::print_initc(const vector <InitCondValue> &initc) const
 
 
 /// Outputs a parameter sample 
-void Output::trace_init()
+string Output::trace_init() const 
 {
-	param_out << "State"; 
+	stringstream ss;
+	
+	ss << "State"; 
 	for(auto th = 0u; th < model.param_vec.size(); th++){
 		const auto &par = model.param_vec[th];	
 		
 		if(model.param[par.th].trace_output == true){
-			param_out << ",\"" << replace(par.name,"→","->") << "\"";
+			ss << ",\"" << replace(par.name,"→","->") << "\"";
 		}
 	}
 
@@ -1119,76 +1130,83 @@ void Output::trace_init()
 		const auto &der = model.derive[i];
 		if(der.time_dep == false){
 			if(der.dep.size() == 0){
-				param_out << ",\"" << der.name << "\"";
+				ss << ",\"" << der.name << "\"";
 			}
 			else{
 				for(auto j = 0u; j < der.eq.size(); j++){
-					param_out << ",\"" << der.name << "_";
+					ss << ",\"" << der.name << "_";
 					for(auto k = 0u; k < der.dep.size(); k++){
 						const auto &dp = der.dep[k];
 						auto m = (unsigned int)(j/dp.mult)%dp.list.size();
-						if(k != 0) param_out << ",";
-						param_out << dp.list[m];
+						if(k != 0) ss << ",";
+						ss << dp.list[m];
 					}
-					param_out << "\"";
+					ss << "\"";
 				}
 			}
 		}
 	}
 	
 	if(model.trans_tree){
-		param_out << ",N^origin,N^infected,N^mut-tree,N^mut-origin,N^unobs,t^root";
+		ss << ",N^origin,N^infected,N^mut-tree,N^mut-origin,N^unobs,t^root";
 	}
 	
 	for(const auto &sp : model.species){
-		if(sp.type == INDIVIDUAL) param_out << ",N^" << sp.name << "-total";;
+		if(sp.type == INDIVIDUAL) ss << ",N^" << sp.name << "-total";;
 	}
 	
-	ic_output_head();
+	ss << ic_output_head();
 	
-	param_out << ",L^markov,L^non-markov,L^ie,L^dist,L^obs,L^genetic-proc,L^genetic-obs,L^init,Prior";
+	ss << ",L^markov,L^non-markov,L^ie,L^dist,L^obs,L^genetic-proc,L^genetic-obs,L^init,Prior";
 
-	param_out << endl;
+	ss << endl;
+	
+	return ss.str();
 }
 
 
 /// Outputs the parameter file columns for initial conditions
-void Output::ic_output_head() 
+string Output::ic_output_head() const 
 {
+	stringstream ss;
+	
 	for(const auto &sp : model.species){
 		const auto &ic = sp.init_cond;
 		if(ic.type == INIT_POP_DIST){
 			if(ic.focal_cl == UNSET){
-				param_out << ",N^" << sp.name;
+				ss << ",N^" << sp.name;
 				for(auto c = 0u; c < sp.comp_gl.size(); c++){
 					const auto &co = sp.comp_gl[c];
-					if(co.erlang_hidden == false) param_out << ",f^init_(" << co.name << ")";
+					if(co.erlang_hidden == false) ss << ",f^init_(" << co.name << ")";
 				}
 			}
 			else{
 				const auto &claa = sp.cla[ic.focal_cl];
 				for(auto c = 0u; c < claa.comp.size(); c++){
 					const auto co = claa.comp[c];
-					if(!co.erlang_hidden) param_out << ",N^init_(" << co.name << ")";
+					if(!co.erlang_hidden) ss << ",N^init_(" << co.name << ")";
 				}
 				for(auto cl = 0u; cl < sp.ncla; cl++){
 					if(cl != ic.focal_cl){
 						const auto &claa = sp.cla[cl];
 						for(auto c = 0u; c < claa.comp.size(); c++){
 							const auto co = claa.comp[c];
-							if(!co.erlang_hidden) param_out << ",f^init_(" << co.name << ")";
+							if(!co.erlang_hidden) ss << ",f^init_(" << co.name << ")";
 						}
 					}
 				}
 			}
 		}
 	}
+	
+	return ss.str();
 }
 	
 	
 /// Outputs the initial conditions
-void Output::ic_output(const Particle &part) 
+string Output::ic_output(const Particle &part) const
 {
+	stringstream ss;
 	for(auto p = 0u; p < model.species.size(); p++){
 		const auto &sp = model.species[p];
 		const auto &ic = sp.init_cond;
@@ -1196,30 +1214,32 @@ void Output::ic_output(const Particle &part)
 		
 		if(ic.type == INIT_POP_DIST){
 			if(ic.focal_cl == UNSET){
-				param_out << "," << icv.N_total;
+				ss << "," << icv.N_total;
 				for(auto c = 0u; c < sp.comp_gl.size(); c++){
 					const auto &co = sp.comp_gl[c];
-					if(!co.erlang_hidden) param_out << "," << icv.frac[c];
+					if(!co.erlang_hidden) ss << "," << icv.frac[c];
 				}
 			}
 			else{
 				const auto &claa = sp.cla[ic.focal_cl];
 				for(auto c = 0u; c < claa.comp.size(); c++){
 					const auto &co = claa.comp[c];
-					if(!co.erlang_hidden) param_out << "," << icv.N_focal[c];
+					if(!co.erlang_hidden) ss << "," << icv.N_focal[c];
 				}
 				for(auto cl = 0u; cl < sp.ncla; cl++){
 					if(cl != ic.focal_cl){
 						const auto &claa = sp.cla[cl];
 						for(auto c = 0u; c < claa.comp.size(); c++){
 							const auto &co = claa.comp[c];
-							if(!co.erlang_hidden) param_out << "," << icv.frac_focal[cl][c];
+							if(!co.erlang_hidden) ss << "," << icv.frac_focal[cl][c];
 						}
 					}
 				}
 			}
 		}
 	}
+
+	return ss.str();
 }
 
 
@@ -1234,7 +1254,9 @@ void Output::set_output_burnin(double burnin_frac)
 		if(spl[0] == "inference"){
 			auto k = 0u; while(k < st.length()-12 && st.substr(k,12) != " burnin-frac") k++;
 			if(k < st.length()-12) st = st.substr(0,k);
-			st += " burnin-frac=" + to_str(burnin_frac);
+			if(burnin_frac != BURNIN_FRAC_DEFAULT){
+				st += " burnin-frac=" + to_str(burnin_frac);
+			}
 			lines_raw[j] = st;
 			return;
 		}
@@ -1251,26 +1273,32 @@ string Output::to_str(double num) const
 }
 
 
-/// Outputs a parameter sample 
-void Output::param_sample(unsigned int s, const State &state)
+/// Outputs a parameter sample
+void Output::param_sample(unsigned int s, unsigned int chain, const State &state)
 {
 	timer[PARAM_OUTPUT] -= clock();
-	
-	auto part = state.generate_particle();
-	param_sample(s,part);
-	
+	auto part = state.generate_particle(s,chain,false);
+	param_store.push_back(part);
 	timer[PARAM_OUTPUT] += clock();
 }
 
+/// Outputs a parameter sample 
+void Output::param_sample(const Particle &part)
+{
+	timer[PARAM_OUTPUT] -= clock();
+	param_store.push_back(part);
+	timer[PARAM_OUTPUT] += clock();
+}
 
 /// Outputs a parameter sample 
-void Output::param_sample(unsigned int s, const Particle &part)
+string Output::param_output(const Particle &part) const
 {
-	param_out << s;
+	stringstream ss;
+	ss << part.s;
 	for(auto th = 0u; th < model.param_vec.size(); th++){
 		const auto &par = model.param_vec[th];
 		if(model.param[par.th].trace_output == true){
-			param_out << "," << part.param_val[th];
+			ss << "," << part.param_val[th];
 		}
 	}
 		
@@ -1281,11 +1309,11 @@ void Output::param_sample(unsigned int s, const Particle &part)
 			const auto &out = dir_out[i];
 			
 			if(der.dep.size() == 0){
-				param_out << "," << out.value_str[0];
+				ss << "," << out.value_str[0];
 			}
 			else{
 				for(auto j = 0u; j < der.eq.size(); j++){
-					param_out << "," << out.value_str[j];
+					ss << "," << out.value_str[j];
 				}
 			}
 		}
@@ -1293,42 +1321,53 @@ void Output::param_sample(unsigned int s, const Particle &part)
 
 	if(model.trans_tree){ 
 		const auto &tts = part.trans_tree_stats;
-		param_out << "," << tts.N_origin << "," << tts.N_inf << "," << tts.N_mut_tree << "," << tts.N_mut_origin << "," << tts.N_unobs << "," << tts.t_root;
+		ss << "," << tts.N_origin << "," << tts.N_inf << "," << tts.N_mut_tree << "," << tts.N_mut_origin << "," << tts.N_unobs << "," << tts.t_root;
 	}
 	
 	for(auto p = 0u; p < model.species.size(); p++){
 		if(model.species[p].type == INDIVIDUAL){
-			param_out << "," << part.species[p].individual.size();
+			ss << "," << part.species[p].nindividual;
 		}
 	}
 	
-	ic_output(part);
+	ss << ic_output(part);
 	
 	const auto &like = part.like;
 	
 	if(std::isnan(like.init_cond)) emsg("pp");
-	param_out << "," << like.markov << "," << like.nm_trans << "," << like.ie << "," << like.dist << "," << like.obs << "," << like.genetic_process << "," << like.genetic_obs << "," << like.init_cond << "," << like.prior+like.spline_prior+like.init_cond_prior;
+	ss << "," << like.markov << "," << like.nm_trans << "," << like.ie << "," << like.dist << "," << like.obs << "," << like.genetic_process << "," << like.genetic_obs << "," << like.init_cond << "," << like.prior+like.spline_prior+like.init_cond_prior;
 	
-	param_out << endl;
+	ss << endl;
+	return ss.str();
 }
 
 
 /// Outputs a state sample
-void Output::state_sample(unsigned int s, const State &state)
+void Output::state_sample(unsigned int s, unsigned int chain, const State &state)
 {
 	timer[STATE_OUTPUT] -= clock();
-	state_sample(s,state.generate_particle());
+	auto part = state.generate_particle(s,chain,true);
+	state_store.push_back(part);
+	timer[STATE_OUTPUT] += clock();
+}
+
+
+/// Outputs a state sample
+void Output::state_sample(const Particle &part)
+{
+	timer[STATE_OUTPUT] -= clock();
+	state_store.push_back(part);
 	timer[STATE_OUTPUT] += clock();
 }
 
 	
 /// Outputs a state sample
-void Output::state_sample(unsigned int s, const Particle &part)
+string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash &hash_ind) const
 {
 	auto value = param_value_from_vec(part.param_val); 
 	
 	stringstream ss;
-	ss << "<<STATE " << s << ">>" << endl << endl;
+	ss << "<<STATE " << part.s << ">>" << endl << endl;
 	
 	ss << "<PARAMETERS>" << endl;
 	
@@ -1395,28 +1434,7 @@ void Output::state_sample(unsigned int s, const Particle &part)
 					}
 					ss << endl;
 				}
-				
-				/*
-				auto flag = false;
-				for(auto i = 0u; i < sp.tra_gl.size(); i++){
-					if(flag == true) ss << ","; 
-					flag = true;
-					ss << replace(sp.tra_gl[i].name,"→","->");
-				}
 				ss << endl;
-					
-				for(auto ti = 0u; ti < T; ti++){
-					auto flag = false;
-				
-					for(auto j = 0u; j < ssp.trans_num.size(); j++){
-						if(flag == true) ss << ",";
-						flag = true;
-						ss << ssp.trans_num[j][ti];
-					}
-					ss << endl;
-				}
-				ss << endl;
-				*/
 			}
 			break;
 			
@@ -1615,87 +1633,24 @@ void Output::state_sample(unsigned int s, const Particle &part)
 		ss << endl;
 	}
 	
-	state_out << ss.str();
+	return ss.str();
 }
 
 
 /// Generates the final output files
-void Output::generate_files()
+string Output::generate_state_head(const vector <string> &ind_key) const
 {
-	string state_out_str = "";
-	if(use_ind_key){
-		stringstream ss;
+	stringstream ss;
+	
+	if(use_ind_key){	
 		ss << "{" << endl;
 		ss << "  timepoint " << model.details.t_start << ":" <<  model.details.dt << ":" << model.details.t_end << endl;
 		for(auto i = 0u; i < ind_key.size(); i++){
 			ss << "  " << i << ":" << ind_key[i] << endl;
 		}
 		ss << "}" << endl << endl;
-		state_out_str += ss.str();
 	}
-	state_out_str += state_out.str();
-	
-	/*
-	if(com_op == true){
-		cout << "<<PARAMS>>" << endl;
-		cout << param_out.str();
-		cout << "<<END>>" << endl;
-		
-		cout << "<<STATES>>" << endl;
-		cout << state_out_str;
-		cout << "<<END>>" << endl;
-	}
-	*/
-	
-	string param_out_file, state_out_file;
-	
-	string ch = "1"; if(chain != UNSET) ch = tstr(chain);
-	
-	if(sampledir != ""){
-		
-		string add; if(chain != UNSET) add = "_"+tstr(chain);
-	
-		param_out_file = "param"+add+".csv";
-
-		state_out_file = "state"+add+".csv";
-	
-		ofstream pout(sampledir+"/"+param_out_file);
-		check_open(pout,param_out_file);
-		pout << param_out.str();
-	
-		ofstream sout(sampledir+"/"+state_out_file);
-		check_open(sout,state_out_file);
-		sout << state_out_str;
-	
-		param_out_file = "Sample/"+param_out_file;
-		state_out_file = "Sample/"+state_out_file;
-	}
-	else{  // Embeds output into file
-		param_out_file = "[["+endli+param_out.str()+"]]";
-		state_out_file = "[["+endli+state_out_str+"]]";
-	}
-	
-	switch(model.mode){
-	case SIM:
-		lines_raw.push_back("sim-param file=\""+param_out_file+"\"");
-		lines_raw.push_back("");
-		lines_raw.push_back("sim-state file=\""+state_out_file+"\"");
-		break;
-	
-	case INF:
-		lines_raw.push_back("inf-param chain="+ch+" file=\""+param_out_file+"\"");
-		lines_raw.push_back("");
-		lines_raw.push_back("inf-state chain="+ch+" file=\""+state_out_file+"\"");
-		break;
-		
-	case PPC:
-		lines_raw.push_back("post-sim-param file=\""+param_out_file+"\"");
-		lines_raw.push_back("");
-		lines_raw.push_back("post-sim-state file=\""+state_out_file+"\"");
-		break;
-		
-	default: emsg("Should not be default12"); break;
-	}
+	return ss.str();
 }
 
 
@@ -1792,39 +1747,15 @@ string Output::output_param(const vector < vector <double> > &value, const Parti
 }
 
 
-/// Outputs an updated version of the input file
-void Output::updated_file(string file)
+/// Gets the particles for a given chain
+vector <Particle> Output::get_part_chain(unsigned int chain, const vector <Particle> &part) const
 {
-	if(com_op == true){
-		cout << "<<OUTPUT FILE>>" << endl;
-		if(chain == 0){
-			for(auto li : lines_raw){
-				cout << li << endl;
-			}
-		}
-		else{ // For other chains just shows the output
-			auto i = 0u; 
-			while(i < lines_raw.size() && lines_raw[i] != "# OUTPUT") i++;
-			while(i < lines_raw.size()){
-				cout << lines_raw[i] << endl;
-				i++;
-			}
-		}
-		cout << "<<END>>" << endl;
-		return;
+	vector <Particle> part_ch;
+	for(const auto &pa : part){
+		if(pa.chain == chain) part_ch.push_back(pa);
 	}
 	
-#ifdef USE_MPI	
-	mpi.transfer_lines_raw(lines_raw);
-#endif
-	
-	if(op()){
-		ofstream fout(file);
-	
-		for(auto li : lines_raw){
-			fout << li << endl;
-		}
-	}	
+	return part_ch;
 }
 
 
@@ -1905,5 +1836,345 @@ void Output::print_individuals(unsigned int N, unsigned int p, const State &stat
 		ssp.print_event("Ev",ssp.individual[i]);
 		state.print_ev_data("Event Data",ind.ev,p);
 		cout << print_obs_data(p,ind.obs);
+	}
+}
+
+
+/// Prints percentage done
+void Output::percentage(unsigned int val, unsigned int val2)
+{	
+	if(!com_op && op()){
+		if(percent_done == UNSET){
+			//cout << "Running: ";
+			percent_done = 0;
+		}
+		
+		auto per = 100*double(val)/val2;
+		while(percent_done <= per){
+			if(int(percent_done)%10 == 0){
+				cout << "" << percent_done << "%";
+				if(percent_done == 100){ cout << endl; return;}
+			}
+			cout << "."; 
+			cout.flush();
+			percent_done += PERCENT_STEP;
+		}			
+	}
+}
+
+
+/// Sets diagnostics
+void Output::set_diagnostics(unsigned int ch, string diag)
+{
+	Diagnostic di; di.ch = ch; di.te = diag;
+	diagnostic_store.push_back(di);
+}
+
+
+/// Generates the final outputs
+void Output::end(string file) const
+{
+	if(com_op == true){
+		cout << "<<OUTPUT FILE>>" << endl;
+		if(mpi.core == 0){
+			for(auto li : lines_raw){
+				cout << li << endl;
+			}
+		}
+	}
+	
+	ofstream fout;
+	
+	if(com_op == false && op()){
+		fout.open(file);
+
+		for(auto li : lines_raw){
+			fout << li << endl;
+		}
+	}
+	
+	auto nchain = model.details.nchain;
+	
+	for(auto ch = 0u; ch < nchain; ch++){
+		auto part = get_part_chain(ch,param_store);
+		
+#ifdef USE_MPI	
+		mpi.transfer_particle(part);
+#endif
+		
+		if(op() && part.size() > 0){
+			number_part(part);
+			
+			string param_out;
+			
+			param_out += trace_init();
+			for(const auto &pa : part) param_out += param_output(pa);
+			
+			string param_out_file;
+		
+			if(sampledir != ""){
+				string add; if(nchain > 1) add = "_"+tstr(ch);
+		
+				param_out_file = "param"+add+".csv";
+
+				ofstream pout(sampledir+"/"+param_out_file);
+				check_open(pout,param_out_file);
+				pout << param_out;
+
+				param_out_file = "Sample/"+param_out_file;
+			}
+			else{  // Embeds output into file
+				param_out_file = "[["+endli+param_out+"]]";
+			}
+		
+			stringstream ss;
+			switch(model.mode){
+			case SIM:
+				ss << "sim-param file=\"" << param_out_file << "\"" << endl;
+				break;
+		
+			case INF:
+				ss << "inf-param chain=" << ch << " file=\""+param_out_file+"\"" << endl;
+				break;
+			
+			case PPC:
+				ss << "post-sim-param file=\"" << param_out_file << "\"" <<  endl;
+				break;
+			
+			default: emsg("Should not be default12"); break;
+			}
+			ss << endl;
+			
+			if(com_op == true) cout << ss.str();
+			else fout << ss.str();
+		}
+	}
+	
+	for(auto ch = 0u; ch < model.details.nchain; ch++){
+		auto part = get_part_chain(ch,state_store);
+		
+#ifdef USE_MPI	
+		mpi.transfer_particle(part);
+#endif
+	
+		if(op() && part.size() > 0){
+			number_part(part);
+			
+			string state_out;
+		
+			vector <string> ind_key;
+			Hash hash_ind;
+			for(const auto &pa : part) state_out += state_output(pa,ind_key,hash_ind);
+			
+			auto state_head = generate_state_head(ind_key);
+			
+			string state_out_file;
+		
+			if(sampledir != ""){
+				string add; if(nchain > 1) add = "_"+tstr(ch);
+		
+				state_out_file = "state"+add+".txt";
+
+				ofstream pout(sampledir+"/"+state_out_file);
+				check_open(pout,state_out_file);
+				pout << state_head << state_out;
+
+				state_out_file = "Sample/"+state_out_file;
+			}
+			else{  // Embeds output into file
+				state_out_file = "[["+endli+state_head+state_out+"]]";
+			}
+		
+			stringstream ss;
+			switch(model.mode){
+			case SIM:
+				ss << "sim-state file=\"" << state_out_file << "\"" << endl;
+				break;
+		
+			case INF:
+				ss << "inf-state chain=" << ch << " file=\""+state_out_file+"\"" << endl;
+				break;
+			
+			case PPC:
+				ss << "post-sim-state file=\"" << state_out_file << "\"" <<  endl;
+				break;
+			
+			default: emsg("Should not be default12"); break;
+			}
+			ss << endl;
+			
+			if(com_op == true) cout << ss.str();
+			else fout << ss.str();
+		}
+	}
+	
+	auto alg = model.details.algorithm;
+	if(alg == PAS_MCMC || alg == ABC_SMC_ALG){
+		auto part = get_part_chain(GEN_PLOT,param_store);
+		
+#ifdef USE_MPI	
+		mpi.transfer_particle(part);
+#endif
+		
+		if(op() && part.size() > 0){
+			string param_out;
+			
+			string content;
+			for(const auto &pa : part) content += param_output(pa);
+			param_out += generation_average(trace_init(),content);
+		
+			string param_out_file;
+		
+			if(sampledir != ""){
+				param_out_file = "generation.csv";
+
+				ofstream pout(sampledir+"/"+param_out_file);
+				check_open(pout,param_out_file);
+				pout << param_out;
+
+				param_out_file = "Sample/"+param_out_file;
+			}
+			else{  // Embeds output into file
+				param_out_file = "[["+endli+param_out+"]]";
+			}
+		
+			stringstream ss;
+			ss << "inf-generation file=\""+param_out_file+"\"" << endl;
+			ss << endl;
+			
+			if(com_op == true) cout << ss.str();
+			else fout << ss.str();
+		}
+	}
+	
+	if(model.details.diagnostics_on){
+		auto diagnostic = diagnostic_store;
+	
+#ifdef USE_MPI	
+		mpi.transfer_diagnostic(diagnostic);
+#endif
+
+		if(op() && diagnostic.size() > 0){
+			for(const auto &di :  diagnostic){
+				string diag_out_file;
+			
+				if(sampledir != ""){
+					diag_out_file = "diagnostic_"+tstr(di.ch)+".txt";
+
+					ofstream pout(sampledir+"/"+diag_out_file);
+					check_open(pout,diag_out_file);
+					pout << di.te;
+
+					diag_out_file = "Diagnostic/"+diag_out_file;
+				}
+				else{  // Embeds output into file
+					diag_out_file = "[["+endli+di.te+"]]";
+				}
+				
+				stringstream ss;
+				ss << "inf-diagnostics chain=" << di.ch << " file=\""+diag_out_file+"\"" << endl;
+				ss << endl;
+				
+				if(com_op == true) cout << ss.str();
+				else fout << ss.str();
+			}
+		}
+	}
+
+	if(com_op == true) cout << "<<END>>" << endl;
+}
+
+
+/// Gets statistics from a vector
+Stat Output::get_statistic(vector <double> &vec) const 
+{
+	auto n = vec.size();
+	if(n == 0) emsg("Zero vector size");
+	
+	Stat stat;
+	
+	auto sum = 0.0, sum2 = 0.0;
+	for(auto i = 0u; i < vec.size(); i++) {
+		sum += vec[i];
+		sum2 += vec[i]*vec[i];
+	}
+	sum /= n;
+	sum2 /= n;
+
+	stat.mean = sum;
+
+	sort(vec.begin(),vec.end());
+
+	if(n >= 2) {
+		auto i = floor_int((n-1)*0.025);
+		auto f = (n-1)*0.025 - i;
+		stat.CImin = vec[i]*(1-f) + vec[i+1]*f;
+
+		i = floor_int((n-1)*0.975);
+		f = (n-1)*0.975 - i;
+		stat.CImax = vec[i]*(1-f) + vec[i+1]*f;
+	} 
+	else{
+		stat.CImin = vec[0];
+		stat.CImax = vec[0];
+	}
+
+	return stat;
+}
+
+
+/// Takes an average for each generation
+string Output::generation_average(string head, string content) const
+{
+	auto head_col = split(head,',');
+	auto ncol = head_col.size()-1;
+	
+	Hash hash_col;
+	
+	vector <string> g_st;
+	vector < vector < vector <double> > > vec;
+	auto lines = split(content,'\n');
+	for(auto i = 0u; i < lines.size(); i++){
+		auto col_val = split(lines[i],',');
+		
+		if(col_val.size() == ncol+1){
+			auto g = col_val[0];
+			auto j = hash_col.find(g);
+			if(j == UNSET){
+				j = vec.size();
+				hash_col.add(j,g);
+				vector < vector <double> > vec_add;
+				vec_add.resize(ncol);
+				vec.push_back(vec_add);
+				g_st.push_back(g);
+			}
+		
+			for(auto k = 0u; k < ncol; k++){
+				auto va = number(col_val[1+k]);
+				vec[j][k].push_back(va);
+			}
+		}
+	}		
+	
+	stringstream ss;
+	ss << head;
+	for(auto j = 0u; j < vec.size(); j++){
+		ss << g_st[j];
+		for(auto k = 0u; k < ncol; k++){
+			auto stat = get_statistic(vec[j][k]);
+			ss << "," << stat.mean << "|" << stat.CImin << "|" << stat.CImax;
+		}	
+		ss << endl;
+	}
+	return ss.str();
+}
+
+
+/// Numbers particles (if they are unset)
+void Output::number_part(vector <Particle> &part) const
+{
+	auto num = 1;
+	for(auto &pa : part){
+		if(pa.s == UNSET){ pa.s = num; num++;}
 	}
 }

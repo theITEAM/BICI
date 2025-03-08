@@ -23,8 +23,11 @@
 	ind-effect-data
 	ind-group-data
 	inference / inf
+	inf-diagnostics
+	inf-generation
 	inf-param
 	inf-state
+	inf-diagnostics
 	init-pop
 	init-pop-sim
 	label
@@ -182,6 +185,8 @@ function import_file(te,clear_results)
 				case "sim-param": case "sim-state":
 				case "inf-param": case "inf-state": 
 				case "post-sim-param": case "post-sim-state": 
+				case "inf-generation":
+				case "inf-diagnostics":
 					process = false; break;
 				}
 				break
@@ -192,6 +197,8 @@ function import_file(te,clear_results)
 				case "sim-param": case "sim-state":
 				case "inf-param": case "inf-state": 
 				case "post-sim-param": case "post-sim-state": 
+				case "inf-generation":
+				case "inf-diagnostics":
 					process = true; 
 					break;
 				}
@@ -377,6 +384,8 @@ function process_command(cname,tags,loop)
 	case "inf-state": inf_state_command(); break;
 	case "post-sim-param": post_sim_param_command(); break;
 	case "post-sim-state": post_sim_state_command(); break;
+	case "inf-diagnostics": inf_diagnostics_command(); break;
+	case "inf-generation": inf_generation_command(); break;
 	
 	default: 
 		if(find_in(data_command_list,cname) != undefined){

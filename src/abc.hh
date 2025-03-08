@@ -1,5 +1,5 @@
 #ifndef BICI__ABC_HH
-#define BEEP__ABC_HH
+#define BICI__ABC_HH
 
 #include "struct.hh"
 #include "model.hh"
@@ -10,7 +10,7 @@
 class ABC
 {
 	public:
-		ABC(const Model &model, Output &output);
+		ABC(const Model &model, Output &output, Mpi &mpi);
 		void run();
 	
 	private:
@@ -20,6 +20,7 @@ class ABC
 		
 		const Model &model;
 		Output &output;
+		Mpi &mpi;
 		
 		State state;
 };

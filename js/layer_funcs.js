@@ -181,7 +181,7 @@ function add_layer(na,x,y,dx,dy,op)
 		else{
 			if(box.xmax > lay.dx+TINY){
 				switch(na){
-				case "RightMidMenu": case	"RightMenu": case "RightBotMenu": break;
+				case "RightMidMenu": case "RightMenu": case "RightBotMenu": break;
 				default:
 					lay.x_scroll = true;
 					lay.inner_dy -= wid;
@@ -653,12 +653,14 @@ function add_screen_buts(lay)
 		switch(tree[1]){
 		case "Results": 
 			switch(tree[2]){
-			case "Populations": case "Transitions": case "Individuals": case "Derived": case "Parameters":
+			case "Populations": case "Transitions": case "Individuals": case "Derived":
+			case "Parameters": case "Generations": 
 				right_menu = tree[2];
 				
 				let rpf = get_inf_res().plot_filter;
-					
-				if(tree[2] == "Parameters"){
+				
+				switch(tree[2]){
+				case "Parameters": 
 					if(rpf.sel_paramview){
 						switch(rpf.sel_paramview.te){
 						case "Scatter": right_mid = "split"; break;
@@ -673,10 +675,17 @@ function add_screen_buts(lay)
 							break;
 						}
 					}
-				}
+					break;
+					
+				case "Generations":
+					if(rpf.sel_genview){
+						right_mid = "with key";
+					}
+					break;
 				
-				if(tree[2] == "Individuals"){
+				case "Individuals":
 					if(rpf.sel_indview.te == "Ind. Eff.") right_mid = "with key";
+					break;
 				}
 				break;
 			}
@@ -686,7 +695,7 @@ function add_screen_buts(lay)
 	}
 	
 	if(inter.view_graph.value != undefined) right_menu = "GraphView";
-	
+
 	if(right_menu != "" && !inter.loading_symbol.on){	
 		let xr = x3-right_menu_width;
 		let yr = y1 + right_menu_top;
@@ -708,7 +717,7 @@ function add_screen_buts(lay)
 			case "with key":
 				add_layer("RightMidMenu",xr,yr2,x3-xr-0.5,0.63*hh,{});
 				
-				add_layer("RightBotMenu",xr,yr2+0.65*hh,x3-xr-0.5,0.35*hh,{});
+				add_layer("RightBotMenu",xr,yr2+0.65*hh,x3-xr-0.5,0.32*hh,{});
 				break;
 				
 			case "split":
@@ -823,7 +832,7 @@ function start_loading_symbol(per,type)
 		case "Spawn": loading_symbol_message("Initialising..."); break;
 		}
 		
-		generate_screen();
+		//generate_screen();
 	}
 }
 
@@ -1284,6 +1293,8 @@ function copy_back_to_source2(tbs)
 	case "inf_chain": model.inf_details.nchain = te; break;
 	case "inf_npart": model.inf_details.npart = te; break;
 	case "inf_gen_update": model.inf_details.gen_update = te; break;
+	case "inf_cha_per_core": model.inf_details.cha_per_core = te; break;
+	case "inf_part_per_core": model.inf_details.part_per_core = te; break;
 	case "anneal_rate": model.inf_details.anneal_rate = te; break;
 	case "anneal_power": model.inf_details.anneal_power = te; break;
 	case "burnin_frac": model.inf_details.burnin_frac = te; break;
@@ -1554,10 +1565,19 @@ function check_error_textbox2(tbs)
 				break;
 				
 			case "inf_npart":
-				warn = check_posinteger(te);
+				{
+					let num = Number(te);
+					if(isNaN(num) || num <= 1 || num != Math.floor(num)){
+						warn = "Must be ≥ 2";
+					}
+				}
 				break;
 				
 			case "inf_gen_update":
+				warn = check_posinteger(te);
+				break;
+				
+			case "inf_cha_per_core": case "inf_part_per_core":
 				warn = check_posinteger(te);
 				break;
 			

@@ -446,6 +446,9 @@ void Proposal::update_sampler(const CorMatrix &cor_matrix)
 	
 	timer[UPDATESAMP_TIMER] -= clock();
 	M = cor_matrix.find_covar(param_list);
+	
+	//print_matrix("M",M);
+	
 	Z = calculate_cholesky(M);
 	
 	timer[UPDATESAMP_TIMER] += clock();
@@ -753,7 +756,7 @@ void Proposal::MH(State &state)
 		nac++;
 			
 		state.add_like(like_ch);
-		update_si(0.01); if(si > 3) si = 3;
+		update_si(0.01);
 		state.remove_store_spline(affect_spline);
 	}
 	else{ 
@@ -762,7 +765,7 @@ void Proposal::MH(State &state)
 		state.restore(affect_like);
 		state.restore_spline(affect_spline);
 		
-		update_si(-0.005);
+		update_si(-0.005); if(si > 3) si *= 0.75;
 	}
 
 	if(pl) state.check("ev");

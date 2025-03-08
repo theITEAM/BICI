@@ -6,9 +6,11 @@ const spawn = require('child_process').spawn;
 /// Starts creation of files for spawning
 function start_spawn(file_list)
 {
-	let file = "Execute/init.bici"; if(ver == "mac") file = "init.bici";
+	//if(ver == "mac") filename = "/tmp/"+filename;
+
+	let file = "Execute/init.bici"; if(ver == "mac") file = "/tmp/init.bici";
 	let dir;
-	
+
 	create_files(file_list,file,dir,"spawn");
 }
 
@@ -64,9 +66,9 @@ function saving_done()
 
 /// Starts a simulation or inference 
 function start(siminf)
-{			
+{		
 	start_loading_symbol(0,"Spawn");
-	
+
 	inter.running_status = true;
 
 	inter.chain = [];
@@ -75,8 +77,7 @@ function start(siminf)
 	if(inter.save_type == "inf" && model.inf_details.algorithm.value =="DA-MCMC"){
 		nchain = model.inf_details.nchain;
 	}
-
-
+	
 	for(let ch = 0; ch < nchain; ch++){
 		startspawn(ch,nchain,siminf);
 	}
@@ -99,28 +100,24 @@ function get_seed_not_set(siminf)
 
 /// Starts execution of C++ code
 function startspawn(ch,nchain,siminf)                                    
-{		
+{	
+
 	let seed_not_set = get_seed_not_set(siminf);
 
 	inter.chain[ch] = { done:false, siminf:siminf, term:false, prog:0, leftover:"", lines:[]};
 
 	let do_com = siminf; if(do_com == "ppc") do_com="post-sim";
 
-	//inter.child[ch] = spawn('Execute/bici.exe',["-chain=0"])
-
+	let file = "bici-core.exe";
+	if(ver == "mac") file = "./bici-core";
+	
 	if(seed_not_set != undefined){
-		inter.child[ch] = spawn('bici_core.exe',["default.bici",do_com,"-chain="+ch,"-nchain="+nchain,"-seed="+seed_not_set]);
+		inter.child[ch] = spawn(file,["default.bici",do_com,"-chain="+ch,"-seed="+seed_not_set]);
 	}
 	else{
-		inter.child[ch] = spawn('bici_core.exe',["default.bici",do_com,"-chain="+ch,"-nchain="+nchain
-		]);
+		inter.child[ch] = spawn(file,["default.bici",do_com,"-chain="+ch]);
 	}		
-
-	//switch(ver){
-	//case "windows": inter.child[ch] = spawn('Execute/bici.exe',["Execute/init.bici",num]); break;
-	//case "mac": inter.child[ch] = spawn('Execute/bici.out',["/tmp/init.bici",num]); break;
-	//}
-
+			
 	funct(inter.child[ch],ch);
 }
 
@@ -131,7 +128,7 @@ function funct(chi,ch)                             // Gathers output of C++ file
 	chi.stdout.on('data', function (data) {
 		let cha = inter.chain[ch];
 		let st = cha.leftover + data;
-		
+
 		let lines = st.split('\n');
 		cha.leftover = lines[lines.length-1];
 		
@@ -140,6 +137,10 @@ function funct(chi,ch)                             // Gathers output of C++ file
 			
 			if(begin(line,"<RUNNING>")){
 				loading_symbol_message("Running...");
+			}
+			
+			if(begin(line,"<ANNEALING>")){
+				loading_symbol_message("Annealing...");
 			}
 	
 			if(begin(line,"<PROGRESS>")){
@@ -406,17 +407,18 @@ function add_ppc_start_buts(lay)
 		
 		cy += 2;
 	
-		cy = run_local(cx,cy,model.inf_details,lay);
+		cy = run_local(cx,cy,model.ppc_details,lay);
 	
-		
-		if(model.ppc_details.check_box_list.length > 0){
-			cy += 2;
-			cy = lay.add_subtitle("Resampling",cx,cy,WHITE,{te:ppc_num_text});
-			cy = lay.add_paragraph("Select which parameter or individual effects get resampled:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
-			
-			cy += 0.5;
-			
-			add_layer("SamplingCheckbox",lay.x+cx,lay.y+cy,lay.dx-2*cx-20,lay.dy-cy-3.5,{});
+		if(model.ppc_details.check_box_list){
+			if(model.ppc_details.check_box_list.length > 0){
+				cy += 2;
+				cy = lay.add_subtitle("Resampling",cx,cy,WHITE,{te:ppc_num_text});
+				cy = lay.add_paragraph("Select which parameter or individual effects get resampled:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				
+				cy += 0.5;
+				
+				add_layer("SamplingCheckbox",lay.x+cx,lay.y+cy,lay.dx-2*cx-20,lay.dy-cy-3.5,{});
+			}
 		}
 		
 		lay.add_corner_button([["Start","Grey","StartPPC"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
@@ -448,10 +450,11 @@ function sampling_checkbox(lay)
 
 
 /// Adds a text input field on the right hand menu
-function add_right_input_field(yy,te,op,lay)
+function add_right_input_field(yy,te,op,lay,shift)
 {
 	let dx = 8;
 	let xx = lay.inner_dx-dx-3;
+	if(shift) xx -= shift;
 	add_input_field(xx,yy,dx,te,op,lay);
 }
 
@@ -520,7 +523,6 @@ function get_param_cat(filt_list,filt_type)
 	param_cat.push({name:"Fixed effects", sim_te:fixed_eff_text, inf_te:fixed_eff_text, list:[]});
 	
 	for(let i = 0; i < param.length; i++){
-		//pr(param[i].type+" type");
 		if(find_in(filt_list,param[i].type) == undefined && 
 		!(filt_type == "only normal" && param[i].variety != "normal") &&
 		!(filt_type == "for sim" && param[i].variety == "const") &&

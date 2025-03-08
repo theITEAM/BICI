@@ -8,14 +8,14 @@ let ver="windows";         // Determines platform
 //let ver="linux";
 //let ver="mac";
 
+let make_file = false;                            // Determines if makes file or runs
+
 let try_on = true;
+const debug = false;//true;                               // Determines if debugger used
+
 let testing = true;
 let thick_line = false;
 let big_eqn = false;
-
-let make_file = true;                           // Determines if makes file or runs
-if(ver == "windows") make_file = false;
-const debug = false;//true;                               // Determines if debugger used
 const graph_dia = false;                          // Used to diagnose problems with graphs
 const load_map_fast = false;                      // If loads up world map from local computer
 const test_comment = false;                       // Used when checking help comments are correct 
@@ -24,7 +24,7 @@ const set_default = false;                        // Used to set default when lo
 
 const check_clone_on = true;                      // Turn on to check if cloning is working
 
-const command_list = ["species","classification","class","set","camera","compartment","comp","comp-all","transition","trans","trans-all","data-dir","description","desc","label","box","parameter","param","derived","der","init-pop","add-pop","remove-pop","add-ind","remove-ind","move-ind","init-pop-sim","add-pop-sim","remove-pop-sim","add-ind-sim", "remove-ind-sim","move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim","comp-data","trans-data","test-data","pop-data","pop-trans-data","ind-effect-data","ind-group-data","genetic-data","simulation","sim","inference","inf","post-sim","posterior-simulation","ind-effect","fixed-effect","sim-param","sim-state","inf-param","inf-state","post-sim-param","post-sim-state","map","post-sim","post-simulation","param-mult"];
+const command_list = ["species","classification","class","set","camera","compartment","comp","comp-all","transition","trans","trans-all","data-dir","description","desc","label","box","parameter","param","derived","der","init-pop","add-pop","remove-pop","add-ind","remove-ind","move-ind","init-pop-sim","add-pop-sim","remove-pop-sim","add-ind-sim", "remove-ind-sim","move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim","comp-data","trans-data","test-data","pop-data","pop-trans-data","ind-effect-data","ind-group-data","genetic-data","simulation","sim","inference","inf","post-sim","posterior-simulation","ind-effect","fixed-effect","sim-param","sim-state","inf-param","inf-generation","inf-state","post-sim-param","post-sim-state","inf-diagnostics","map","post-sim","post-simulation","param-mult"];
 
 // Lists all commands which need to load files
 const data_command_list = ["init-pop", "add-pop", "remove-pop", "add-ind", "remove-ind", "move-ind", "init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data","param-mult"];
@@ -324,6 +324,10 @@ const SIM_VALUE_DASH = 2;                          // Dash value used when displ
 const SIM_VALUE_COL = BLACK;                       // The colour of the sim value line
 const SIM_VALUE_THICK = 1;                         // The thickness of the sim value line
 const SPLIT_SIZE = 0.5;                            // Size of mouse movement needed to split transition
+const GENRATION_COL = BLUE;                        // Used for generation plot
+const GENRATION_CI_COL = LBLUE;                    // Used for generation plot
+const GENRATION_THICK = 1;                         // The thickness of the sim value line
+const GENRATION_DASH = 3;                          // Dash value used when displaying gen CIs 
 const TRANS_POINT_R = 0.35;                        // The size of transitions points
 const COLOUR_KEY_DIV = 100;                        // The numb er
 const COMP_FILTER_MAX = 1000;                      // The maximum number of compartments for a filter
@@ -393,11 +397,14 @@ const PARAM_OUTPUT_MAX_DEFAULT = 1000;             // The default maximum number
 const INDMAX_DEFAULT = 20000;                      // The default maximum number of individuals
 const BURNIN_FRAC_DEFAULT = 20;                    // The default percentage burnin
 const MCMC_SAMPLE_DEFAULT = 5000;                  // The default number of MCMC samples
-const MCMC_OP_PARAM_DEFAULT = 1000;                 // The default number of output parameters
+const MCMC_OP_PARAM_DEFAULT = 1000;                // The default number of output parameters
 const MCMC_OP_STATE_DEFAULT = 200;                 // The default number of output states  
 const MCMC_CHAIN_DEFAULT = 3;                      // The default number of MCMC chains
-const PAS_PART_DEFAULT = 3;                        // The default number of PAS particles
+const MCMC_CHAIN_PER_CORE_DEFAULT = 1;             // The default chains per core
+const PAS_PART_DEFAULT = 10;                       // The default number of PAS particles
 const PAS_GEN_UPDATE_DEFAULT = 100;                // The default updates per generation for   
+const PAS_PART_PER_CORE_DEFAULT = 1;               // The default particles per core
+
 const ABC_SAMPLE_DEFAULT = 1000;                    // The default number of ABC samples
 const ABC_ACFRAC_DEFAULT = 0.1;                    // The default acceptance fraction for ABC
 const ABCSMC_SAMPLE_DEFAULT = 1000;                 // The default number of ABCSMC samples

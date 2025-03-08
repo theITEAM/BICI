@@ -13,12 +13,13 @@ using namespace std;
 class Simulate                             // Simulates from the model
 {
 	public:
-		Simulate(const Model &model, Output &output);
+		Simulate(const Model &model, Output &output, Mpi &mpi);
 		void run();
 		
 	private:
 		const Model &model;
 		Output &output;
+		Mpi &mpi;
 		
 		State state;
 };

@@ -32,14 +32,15 @@
 #include <math.h>
 #include <algorithm>
 #include <boost/math/special_functions/gamma.hpp>
-#ifdef USE_MPI
-#include "mpi.h"
-#endif
 
 using namespace std;
 
 #include "const.hh"
 #include "utils.hh"
+
+#ifdef USE_MPI
+#include "mpi.h"
+#endif
 
 default_random_engine generator;
 std::uniform_real_distribution<> dist(0,1);
@@ -57,7 +58,37 @@ void emsg(const string &msg)
 	display_error(msg);
 	if(false) raise(SIGABRT);
 	
+#ifdef USE_MPI
+	//MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+  MPI_Finalize();
 	exit (EXIT_FAILURE);
+#else
+	exit (EXIT_FAILURE);
+#endif
+}
+
+
+/// Displays an error message (this only exits when all 
+void emsg_input(const string &msg)
+{
+	if(false) throw(std::runtime_error(msg));
+	if(op()) display_error(msg);
+	if(false) raise(SIGABRT);
+	
+	end_code();
+}
+
+
+/// Ends the code
+void end_code()
+{
+	#ifdef USE_MPI
+	MPI_Barrier(MPI_COMM_WORLD);  
+  MPI_Finalize();
+	exit (EXIT_SUCCESS);
+#else
+	exit (EXIT_SUCCESS);
+#endif
 }
 
 
@@ -302,7 +333,7 @@ unsigned int integer(string st)
 
 
 /// Sets the seed for the random number generator
-void set_seed(const int chain, const Details &details, unsigned int seed_tag)
+void set_seed(const int core, const Details &details, unsigned int seed_tag)
 {
 	auto seed = details.seed;
 	if(seed == UNSET) seed = SEED_DEFAULT;
@@ -310,7 +341,7 @@ void set_seed(const int chain, const Details &details, unsigned int seed_tag)
 	// Seed from tag loading BICI overides seed from file
 	if(seed_tag != UNSET) seed = seed_tag;
 	
-	seed += 10000*chain;
+	seed += 10000*core;
 
 	generator.seed(seed);
 	srand(seed);
@@ -322,8 +353,8 @@ double ran()
 {
 	double val;
 	do{
-		//val = double(rand())/RAND_MAX;
-		val = dist(gen);
+		val = double(rand())/RAND_MAX;
+		//val = dist(gen);
 	}while(val == 0 || val == 1);
 
 	return val;
@@ -351,7 +382,7 @@ double normal_probability(const double x, const double mean, const double sd)
 {
 	auto var = sd*sd;
   if(var < TINY) return -LARGE;
-  return -0.5*log(2*M_PI*var) - (x-mean)*(x-mean)/(2*var);
+  return -0.5*log(2*MM_PI*var) - (x-mean)*(x-mean)/(2*var);
 }
 
 
@@ -379,7 +410,7 @@ double lognormal_probability(const double x, const double mean, const double cv)
 	auto mu = log(mean)-var/2;
 	
 	auto logx = log(x);
-	return  -0.5*log(2*M_PI*var*x*x) - (logx-mu)*(logx-mu)/(2*var);
+	return  -0.5*log(2*MM_PI*var*x*x) - (logx-mu)*(logx-mu)/(2*var);
 }
 
 
@@ -1473,6 +1504,13 @@ unsigned int max(const vector <unsigned int> &val)
 int round_int(double val)
 {
 	return int(val+LARGE_INT+0.5)-LARGE_INT;
+}
+
+
+/// Rounds a number down to the nearest integer 
+int floor_int(double val)
+{
+	return int(val+LARGE_INT)-LARGE_INT;
 }
 
 

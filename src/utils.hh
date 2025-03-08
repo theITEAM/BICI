@@ -11,6 +11,8 @@ extern bool com_op;                            // Set to true for command line o
 #include "equation.hh"
 
 void emsg(const string &msg);
+void emsg_input(const string &msg);
+void end_code();
 void display_error(const string &msg);
 void display_warning(const string &msg);
 string trim(string te);
@@ -109,6 +111,7 @@ double max(const vector <double> &val);
 unsigned int max(const vector <unsigned int> &val);
 unsigned int min(const vector <unsigned int> &val);
 int round_int(double val);
+int floor_int(double val);
 vector <int> round_int(const vector <double> &val);
 string cpu_percent(long time, long total_time);
 string tstr(double value);
@@ -132,7 +135,7 @@ double multinomial_samp_probability(const vector <unsigned int> &x, const vector
 unsigned int get_event_before(unsigned int e, const vector <Event> &ev);
 unsigned int get_event_after(unsigned int e, const vector <Event> &ev);
 double get_log_zero_one(double val);
-void set_seed(const int chain, const Details &details, unsigned int seed_tag);
+void set_seed(const int core, const Details &details, unsigned int seed_tag);
 void check_bp(double &bp);
 double nm_trans_like(TransType type, double dt, const vector <double> &ref_val);
 vector <string> comma_split(string te);

@@ -47,7 +47,7 @@ class Model                                // Stores information about the model
 	
 		bool trans_tree;                       // Set if trans_tree exists in the model
 		
-		vector <Sample> sample;                // Stores inferred state (used 
+		vector <Sample> sample;                // Stores inferred state (used for PPC)
 		
 		Operation mode;                        // SIM for simulation, INF for inference, PPC for post sim
 		

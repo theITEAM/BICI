@@ -1,7 +1,8 @@
 "use strict";
 // Functions which receive reply from the worker
 
-worker.onmessage = function (e) {
+worker.onmessage = function (e) 
+{
 	let ans = e.data;
 	
 	//pr("Worker ans"); pr(ans);
@@ -15,7 +16,7 @@ worker.onmessage = function (e) {
 	if(false){ pr("Worker reply: "+ans.type); pr("ans"); pr(ans);}
 
 	if(inter.worker_mess.active != "stop"){
-		if(ans.type != "Start") stop_loading_symbol();
+		if(ans.type != "Start" && ans.type != "StartPPC") stop_loading_symbol();
 		
 		switch(ans.type){
 		case "Create SIRE":
@@ -341,11 +342,13 @@ worker.onmessage = function (e) {
 			model_updated(ans);
 			break;
 			
-		case "Start":
+		case "Start": case "StartPPC":
 			{
 				model_updated(ans);
 				inter.save_type = ans.save_type;
-				if(check_memory(ans)) start_spawn(ans.file_list);
+				if(check_memory(ans)){
+					start_spawn(ans.file_list);
+				}
 			}
 			break;
 			

@@ -222,10 +222,15 @@ function process(e)
 			post({ p:so.info.p, cl:so.info.cl, species:strip_heavy(model.species), warning:so.warning});
 		}
 		break;
-		
+								
 	case "View Code": case "Export BICI": case "Start": case "Save BICI": 
-	case "StartCluster":
 		create_output_file(info.save_type,info.map_store);
+		break;
+		
+	case "StartCluster":
+	pr(info.save_type+" type");
+		if(info.save_type == "ppc") create_ppc_file();
+		else create_output_file(info.save_type,info.map_store);
 		break;
 		
 	case"Save Sim": case"Save Inf": case"Save PPC":
@@ -546,6 +551,10 @@ function process(e)
 			default: error("Problem sim inf"); break;
 			}
 		}
+		break;
+		
+	case "Graph generation":
+		graph_generation_calculate(inf_result,info.plot_filter,info.burnin); 
 		break;
 		
 	case "Graph param":

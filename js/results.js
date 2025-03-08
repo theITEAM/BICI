@@ -16,7 +16,12 @@ function results_add_model(result,details,siminf)
 {
 	result.sample = [];
 	result.par_sample = [];
+	result.hash_ref = new Hash(); 
+	let alg = details.algorithm.value;
+	if(alg == "PAS-MCMC" || alg == "ABC-SMC") result.generation = [];
 	result.plot_average = false;
+	result.diagnostics = [];
+	result.diagnostics_on = false;
 	
 	result.state_memory = 0;               // Keeps track of state memory
 	result.param_memory = 0;               // Keeps track of parameter memory
@@ -54,6 +59,7 @@ function delete_results(result)
 	delete result.par_sample;
 	delete result.tl_store;
 	delete result.hash_tl;
+	delete result.hash_ref;
 	result.on = false;
 }
 
@@ -200,7 +206,8 @@ function comma_split(te)
 /// Calculate the burn-in time
 function calculate_burnin(result,source)
 {
-	if(source.plot_filter.details.algorithm.value != "DA-MCMC"){ source.burnin = 0; return;}
+	let alg = source.plot_filter.details.algorithm.value;
+	if(alg != "DA-MCMC" && alg != "PAS-MCMC"){ source.burnin = 0; return;}
 	
 	// Parameter burnin
 	let cha = result.chains;
@@ -736,6 +743,8 @@ function initialise_plot_filters(result,source)
 	rpf.plot_average = result.plot_average;
 	rpf.siminf = result.siminf;
 	rpf.details = result.details;
+	rpf.diagnostics_on = result.diagnostics_on;
+	rpf.diagnostics = result.diagnostics;
 	
 	// Initialises distribution plots
 	let pos_bin = [];
@@ -763,6 +772,13 @@ function initialise_plot_filters(result,source)
 	}	
 	rpf.sel_chain = copy(rpf.pos_chain[0]);	
 
+	// Possibilities for viewing diagnostic information
+	rpf.pos_diag_chain = [];
+	for(let i = 0; i < result.chains.length; i++){
+		rpf.pos_diag_chain.push({te:"Chain "+result.chains[i], i:i});
+	}
+	rpf.sel_diag_chain = copy(rpf.pos_diag_chain[0]);	
+
 	// Possibilities for chain distribution 
 	rpf.pos_distchain = [];
 	rpf.pos_distchain.push({te:"Combine", i:"Combine"});
@@ -775,10 +791,15 @@ function initialise_plot_filters(result,source)
 	rpf.sel_distchain = copy(rpf.pos_distchain[0]);	
 	
 	// Possibilies for parameter view
-	rpf.pos_paramview = get_pos_paramview(result);
-	
+	let pres = get_pos_paramview(result);
+	rpf.pos_paramview = pres.ppv;
 	if(rpf.pos_paramview.length > 0){
 		rpf.sel_paramview = copy(rpf.pos_paramview[0]);
+	}
+	
+	rpf.pos_genview = pres.pgv;
+	if(rpf.pos_genview.length > 0){
+		rpf.sel_genview = copy(rpf.pos_genview[0]);
 	}
 	
 	// Possiblities for parameter checkbox
@@ -1213,7 +1234,7 @@ function get_pos_paramview(result)
 	let total_param_list = [];
 	
 	let pos_paramview = [];
-	
+	let pos_genview = [];
 	{                                               // Univariate parameters
 		let list = [];
 		
@@ -1229,7 +1250,9 @@ function get_pos_paramview(result)
 		}
 		
 		if(list.length > 0){
-			pos_paramview.push({te:"Univariate", param:true, radio:{value:0, param:true}, list:list});	
+			let add = {te:"Univariate", param:true, radio:{value:0, param:true}, list:list};
+			pos_paramview.push(add);
+			pos_genview.push(add);
 		}
 	}
 	
@@ -1264,6 +1287,7 @@ function get_pos_paramview(result)
 			let ppv = {te:remove_eq_quote(par.full_name), param:para, radio:{value:0, param:true}, list:list, radio_split:{value:0, param:true}, list_split:list_split};
 			
 			pos_paramview.push(ppv);
+			pos_genview.push(ppv);
 		}
 	}
 
@@ -1287,24 +1311,32 @@ function get_pos_paramview(result)
 	}
 	
 	if(list_trans.length > 0){
-		pos_paramview.push({te:"Trans. Tree", param:true, radio:{value:0, param:true},  list:list_trans});	
+		let ob = {te:"Trans. Tree", param:true, radio:{value:0, param:true},  list:list_trans};
+		pos_paramview.push(ob);	
+		pos_genview.push(ob);	
 	}
 	
 	if(result.siminf == "inf" || result.siminf == "ppc"){
 		if(list_like.length > 0){
-			pos_paramview.push({te:"Likelihoods", param:true, radio:{value:0, param:true},  list:list_like});	
+			let ob = {te:"Likelihoods", param:true, radio:{value:0, param:true},  list:list_like};
+			pos_paramview.push(ob);	
+			pos_genview.push(ob);	
 		}
 	
 		if(list_ic.length > 0){
-			pos_paramview.push({te:"Init. Pop.", param:true, radio:{value:0, param:true}, list:list_ic});	
+			let ob = {te:"Init. Pop.", param:true, radio:{value:0, param:true}, list:list_ic};
+			pos_paramview.push(ob);
+			pos_genview.push(ob);
 		}
 	
 		if(list_indpop.length > 0){
-			pos_paramview.push({te:"Ind. Pop.", param:true, radio:{value:0, param:true}, list:list_indpop});	
+			let ob = {te:"Ind. Pop.", param:true, radio:{value:0, param:true}, list:list_indpop};
+			pos_paramview.push(ob);	
+			pos_genview.push(ob);	
 		}
 	}
 
-	return pos_paramview;
+	return {ppv:pos_paramview, pgv:pos_genview};
 }
 
 

@@ -101,8 +101,9 @@ function save_bici(filename)
 		if(k == 0) error("Cannot find '.'");
 		else dir = filename.substr(0,k)+"-data-files";
 		
-		let root = "M:\\Github\\theITEAM\\BICI\\";
-		if(begin(dir,root)) dir = dir.substr(root.length);  
+		//let root = "M:\\Github\\theITEAM\\BICI\\";
+		//if(begin(dir,root)) dir = dir.substr(root.length);  
+		dir = dir.replace(/\\/g,"/");
 		
 		let te = file_list[file_list.length-1].data;
 		let na= 'data-dir folder="."';
@@ -110,6 +111,7 @@ function save_bici(filename)
 		if(i == -1) error("cannot find 'data-dir'");
 		else{
 			i += na.length-2;
+			
 			file_list[file_list.length-1].data = te.substr(0,i)+dir+te.substr(i+1);
 		}
 	}

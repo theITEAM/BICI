@@ -2592,17 +2592,17 @@ double Equation::find_dist(unsigned int c, unsigned int cc, const vector <Compar
 		
 	case LATLNG:
 		{
-			auto lat = comp[c].lat*M_PI/180.0;
-			auto lng = comp[c].lng*M_PI/180.0;
+			auto lat = comp[c].lat*MM_PI/180.0;
+			auto lng = comp[c].lng*MM_PI/180.0;
 
-			auto lat2 = comp[cc].lat*M_PI/180.0;
-			auto lng2 = comp[cc].lng*M_PI/180.0;
+			auto lat2 = comp[cc].lat*MM_PI/180.0;
+			auto lng2 = comp[cc].lng*MM_PI/180.0;
 
 			auto r = 6371.0;
 
 			auto dlng = lng2-lng;
-			if(dlng > M_PI) dlng -= 2*M_PI;
-			if(dlng < -M_PI) dlng += 2*M_PI;
+			if(dlng > MM_PI) dlng -= 2*MM_PI;
+			if(dlng < -MM_PI) dlng += 2*MM_PI;
 	
 			auto si = sin(0.5*(lat2-lat));
 			auto si2 = sin(0.5*dlng);

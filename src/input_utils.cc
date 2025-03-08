@@ -402,7 +402,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 				break;
 
 			case INIT_POP_COL:
-				if(ds.cname != INIT_POP) emsg("Should be init pop");
+				if(ds.cname != INIT_POP) emsg_input("Should be init pop");
 			
 				switch(ds.init_pop_type){
 				case INIT_POP_FIXED: 
@@ -423,7 +423,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 					}
 					break;
 					
-				default: emsg("Def op wrong"); break;
+				default: emsg_input("Def op wrong"); break;
 				}
 				break;
 		
@@ -853,7 +853,7 @@ void Input::set_element(vector <EquationInfo> &value, const vector <Dependency> 
 	auto sum = 0u;
 	for(auto i = 0u; i < dep.size(); i++) sum += dep[i].mult*ind[i];
 	
-	if(sum >= value.size()) emsg("Problem setting element");
+	if(sum >= value.size()) emsg_input("Problem setting element");
  
 	value[sum].te = te; 
 }
@@ -865,7 +865,7 @@ void Input::set_reparam_element(vector <EquationInfo> &value, const vector <Depe
 	auto sum = 0u;
 	for(auto i = 0u; i < dep.size(); i++) sum += dep[i].mult*ind[i];
 	
-	if(sum >= value.size()) emsg("Problem setting element");
+	if(sum >= value.size()) emsg_input("Problem setting element");
  
 	value[sum] = val; 
 }
@@ -877,7 +877,7 @@ void Input::set_prior_element(vector <Prior> &prior, const vector <Dependency> &
 	auto sum = 0u;
 	for(auto i = 0u; i < dep.size(); i++) sum += dep[i].mult*ind[i];
 	
-	if(sum >= prior.size()) emsg("Problem setting element");
+	if(sum >= prior.size()) emsg_input("Problem setting element");
  
 	prior[sum] = pri; 
 }
@@ -1498,3 +1498,22 @@ unsigned int Input::get_seed()
 	}
 	return UNSET;
 }
+
+
+/*
+/// Gets an integer	
+unsigned int Input::get_tag_integer(string tag, unsigned int def)
+{
+	auto str = get_tag_value(tag);
+	if(str == ""){
+		if(def != UNSET) return def;
+		else alert_import("'"+tag+"' must be set");
+	}
+	auto num = number(str);
+	if(num == UNSET || num != int(num) || num <= 0){ 
+		alert_import("'"+tag+"' must be a positive integer"); 
+	}
+	
+	return (unsigned int) num;
+}
+*/
