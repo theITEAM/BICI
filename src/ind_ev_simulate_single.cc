@@ -128,7 +128,12 @@ vector <Event> IndEvSampler::simulate_single_events(unsigned int i, unsigned int
 						}
 						break;
 					
-					case LEAVE_EV: case ENTER_EV:
+					case LEAVE_EV: 
+						c = UNSET;
+						break;
+						
+					case ENTER_EV:
+						emsg("Should not enter");
 						break;
 
 					case MOVE_EV:
@@ -217,11 +222,13 @@ vector <Event> IndEvSampler::simulate_single_events(unsigned int i, unsigned int
 		}
 	}
 
+	if(events_near_div(ev_new,details)) illegal = true;
+	
 	return ev_new;
 }
 
 
-/// Samples a new set of events based on observation probability
+/// Simulates a new set of events based on observation probability
 double IndEvSampler::simulate_single_events_prob(unsigned int i, unsigned int cl, const vector <Event> &ev, const vector <TrigEventRef> &trig_event) const
 {
 	double probif = 0.0;
@@ -333,7 +340,7 @@ double IndEvSampler::simulate_single_events_prob(unsigned int i, unsigned int cl
 		}while(true);
 		if(c == UNSET) break;
 	}
-	
+
 	return probif;
 }
 

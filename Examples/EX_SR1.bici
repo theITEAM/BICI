@@ -21,9 +21,9 @@ description text="[[
 
 ######################### DETAILS ##########################
 
-simulation start=0 end=100 timestep=0.5
+simulation start=0 end=100 timestep=0.5 seed=0
 
-inference start=0 end=100 timestep=0.5 sample=1000 nchain=3
+inference start=0 end=100 timestep=0.5 seed=0 sample=1000 nchain=3
 
 post-sim start=0 end=100
 
@@ -474,7 +474,7 @@ comp-data class="DS" file="[[
 "Sim-People-Ind-101",25,"R:0.75|S:0.125|I:0.125"
 ]]"
 
-trans-data name="I->R:0.5" obsrange="all" file="[[
+trans-data name="I->R:p" obsrange="all" file="[[
 "ID","t"
 "Sim-People-Ind-3",18.3096
 "Sim-People-Ind-5",45.8361
@@ -1044,6 +1044,7 @@ test-data Se="0.5" Sp="0.99" pos="+" neg="-" comp="I" file="[[
 
 ######################## PARAMETERS ########################
 
+param name="p" prior="uniform(0,1)"
 param name="β" value="0.003" prior="uniform(0,0.01)"
 param name="γ" value="0.1" prior="uniform(0,0.5)"
 

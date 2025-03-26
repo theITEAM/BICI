@@ -597,7 +597,7 @@ function update_model_ind_eff(ielist)
 				}
 			
 				if(flag == false){
-					sp.ind_eff_group.push({p_name:ie.p_name, A_matrix:{check:false, loaded:false, value:[], ind_list:[]}, ie_list:[{name:ie.name}]});
+					sp.ind_eff_group.push({p_name:ie.p_name, A_matrix:{check:false, loaded:false, value:[], ind_list:[], pedigree:false, sire_list:[], dam_list:[]}, ie_list:[{name:ie.name}]});
 				}
 			}
 		}

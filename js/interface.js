@@ -497,6 +497,7 @@ function create_edit_table(lay)
 			case "LoadReparam": ac = "LoadReparamDone"; break;	
 			case "Fixed Effect": ac = "LoadXvector2"; break;
 			case "Init. Pop.": ac = "InitPopAdd"; break;
+			case "APed": ac = "APedAdd"; break;
 			default:
 				if(so.info.load_file) ac = "AddFile" + so.info.load_file; 
 				else{		

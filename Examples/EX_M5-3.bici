@@ -6,7 +6,7 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-data-dir folder="C:\Users\cpooley\Desktop\BICI_release\BICI_v0.1_windows\Examples\EX_M5-3-data-files"
+data-dir folder="Examples\EX_M5-3-data-files"
 
 simulation start=0 end=100 timestep=0.5
 

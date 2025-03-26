@@ -51,7 +51,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	auto command_line = extract_command_line(lines); // Converts from text lines to command lines
 
 	load_data_files(command_line);
-	
+
 	// Import happens in three stages:
 	// (0) Determines if simulation, inference or post_sim
 	// (1) Simulation or inference details
@@ -432,6 +432,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	set_cgl_tr_source_sink();                  // Sets trg reference from compartments
 	
+	set_omega_fl();                            // Sets a flag if param in in omega
+	
 	if(model.trans_tree){
 		set_inf_cause();                         // Reference to see the population which causes infection 
 	}
@@ -522,7 +524,8 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 	}
 	
 	convert_folder(data_dir);
-	data_dir = "Execute/test-data-files";
+	
+	//data_dir = "Execute/test-data-files";
 	//te_raw = replace(te_raw,"%","");
 
 	for(auto j = 0u; j < command_line.size(); j++){
@@ -532,7 +535,9 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 			const auto &tag = cl.tags[k];
 			
 			auto na = tag.name;
-			if(na == "value" || na == "prior-split" || na == "dist-split" || na == "A" || na == "X" || na == "file"){
+			if(na == "value" || na == "boundary" || na == "constant" || na == "reparam" || na == "prior-split" || na == "dist-split" || 
+				na == "A" || na == "A-sparse" || na == "pedigree" || na == "X" || na == "file" || na == "text" || na == "ind-list"){
+				
 				auto file = tag.value;
 				
 				if(is_file(file)){
@@ -830,7 +835,7 @@ void Input::alert(string st)
 
  
 /// Error message for imported file 
-void Input::alert_import(string st)                               
+void Input::alert_import(string st, bool fatal)   
 {
 	if(st.length() > 0 && st.substr(st.length()-1,1) != ".") st += ".";
 	
@@ -842,6 +847,10 @@ void Input::alert_import(string st)
 	error_mess.push_back(em);	
 	//output_error_messages("All mess");  // TURN OFF
 	 
+	if(fatal){
+		output_error_messages("");
+	}
+	
 	if(fatal_error() == true && error_mess.size() >= ERR_MSG_MAX){
 		output_error_messages("Total error limit exceeded");
 	}
@@ -905,6 +914,7 @@ bool Input::fatal_error() const
 void Input::output_error_messages(string te) const 
 {
 	if(op()){
+		//cout << "OUTPUT ERROR\n";
 		for(const auto &em : error_mess){
 			if(!com_op && em.line_num < lines.size()){ 	
 				cout << "\033[32m";

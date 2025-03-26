@@ -2614,6 +2614,8 @@ void Input::setup_obs_trans_is_one()
 void Input::setup_obs_trans()
 {
 	for(auto &sp : model.species){
+		sp.last_obs_trans_ti = UNSET;
+		
 		sp.obs_trans_eqn_ref.resize(sp.tra_gl.size());
 		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 			sp.obs_trans_eqn_ref[tr].resize(sp.T);
@@ -2629,6 +2631,13 @@ void Input::setup_obs_trans()
 					auto index = add_to_vec(sp.obs_trans_eqn,eq);
 					for(auto ti = ot.ti_min; ti < ot.ti_max; ti++){
 						sp.obs_trans_eqn_ref[tr][ti].push_back(index);
+					}
+					
+					if(sp.last_obs_trans_ti == UNSET) sp.last_obs_trans_ti = ot.ti_max;
+					else{
+						if(ot.ti_max > sp.last_obs_trans_ti){
+							sp.last_obs_trans_ti = ot.ti_max;
+						}
 					}
 				}
 			}
@@ -3155,7 +3164,7 @@ void Input::create_cl_trig_ev_ref()
 				const auto &ev = sp.individual[i].ev;
 				for(auto m = 0u; m < ev.size(); m++){
 					const auto &eve = ev[m];
-					switch(eve.type){	
+					switch(eve.type){			
 					case MOVE_EV:
 						{
 							TrigEventRef ste; 
@@ -3392,19 +3401,19 @@ void Input::set_local_ind_init()
 								
 								auto ref = tr_swap_ref[ci][cf];
 								if(ref != UNSET){
-									const auto &tsw_if = tr_swap_list[ref];
-									for(auto k = 0u; k < tsw_if.size(); k++){
-										const auto &tsw_if_k = tsw_if[k];
-										if(tsw_if_k.size() < IND_LOCAL_TRANS_MAX){
+									for(auto k = 0u; k < tr_swap_list[ref].size(); k++){
+										auto num_ev = tr_swap_list[ref][k].size();		
+										if(num_ev < IND_LOCAL_TRANS_MAX){	
 											for(auto cg : tr_swap_leave_dir[cf]){
 												auto ref_dir = tr_swap_ref_dir[cf][cg];
+												
 												if(ref_dir != UNSET){
 													const auto &tsw_fg = tr_swap_list_dir[ref_dir];
 													for(auto j = 0u; j < tsw_fg.size(); j++){
 														const auto &tsw_fg_j = tsw_fg[j];
 														
-														if(tsw_if_k.size() + tsw_fg_j.size() <= IND_LOCAL_TRANS_MAX){
-															auto vec = tsw_if_k;
+														if(num_ev + tsw_fg_j.size() <= IND_LOCAL_TRANS_MAX){
+															auto vec = tr_swap_list[ref][k];//tsw_if_k;
 															for(const auto &tsw : tsw_fg_j) vec.push_back(tsw);
 															
 															bool end = false;
@@ -3492,6 +3501,7 @@ void Input::set_local_ind_init()
 										sw.name = name;
 										sw.c = ci;
 										sw.start = tsw_if_k;
+								
 										sw.swap = swap;
 										
 										for(auto kk = 0u; kk < swap.size(); kk++){
@@ -4016,5 +4026,36 @@ void Input::set_param_use()
 			cout << endl;
 		}
 		emsg_input("Shows parameters used");
+	}
+}
+
+
+/// Sets a flag if param is in omega
+void Input::set_omega_fl()
+{
+	for(auto &pv : model.param_vec) pv.omega_fl = false;
+	
+	for(auto p = 0u; p < model.species.size(); p++){
+		const auto &sp = model.species[p];
+		for(auto g = 0u; g < sp.ind_eff_group.size(); g++){
+			const auto &ieg = sp.ind_eff_group[g];
+			auto N = ieg.list.size();
+			for(auto j = 0u; j < N; j++){
+				for(auto i = 0u; i < N; i++){
+					auto &par = model.param[ieg.omega[j][i]];
+					if(par.variety != CONST_PARAM){
+						auto th = par.param_vec_ref[0]; if(th == UNSET) emsg("Should not be unset2");
+						model.param_vec[th].omega_fl = true;
+					}
+				}
+			}
+		}
+	}
+	
+	if(false){
+		for(auto &pv : model.param_vec){
+			cout << pv.name << " " << pv.omega_fl << endl;
+		}
+		emsg("done");
 	}
 }

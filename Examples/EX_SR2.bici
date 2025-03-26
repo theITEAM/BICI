@@ -1,0 +1,382 @@
+
+####################### DESCRIPTION ########################
+
+description text="[[
+# Example B5: Combined population-based data sources in a Covid-19 type of model
+
+## Objective
+- Show how multiple population-based data can be used to inform a Covid-19 model.
+- Using this data it is possible to estimate branching probabilities and the time variation in the transmission rate $β(t)$.
+- However, this sort of data will not estimate transition rates once infected, so informative priors have been used for these.
+
+## Data
+- Population transition data is available for $E→I$ (cases), $I→H$ (hospitalisations) and $H→D$ (hospital deaths).
+- Population data for the combined population in $E$, $I$ and $A$ (survey PCR data).
+- Population data for the combined population in $E$, $I$, $A$ and $R$ (seroprevalence data).
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$, exposed $E$, infected $I$, recovered $R$, asymptomatic $A$, hospitalised $H$ and dead $D$.
+- An external force of infection is controlled by parameter $η$ (in reality this could be time-varying and estimated from raw case data and flight information).
+- The time-varying spline $β(t)$ captures transmission between individuals.
+
+## Population
+- This consists of the UK population which is initially susceptible.
+]]"
+
+
+######################### DETAILS ##########################
+
+simulation start=0 end=588 timestep=0.5
+
+inference start=0 end=588 timestep=0.5 nchain=3
+
+post-sim start=0 end=588
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
+
+species name="People" type="population"
+
+# SPECIES MODEL
+
+class name="DS" index="d"
+
+camera x=-0.5 y=1 scale=0.66818
+
+comp name="S" color="#009900" x=-28 y=1
+comp name="E" color="#ff9900" branch-prob="true" x=-7 y=1
+comp name="I" color="#ff2222" x=5 y=5
+comp name="A" color="#ff44ff" x=5 y=-3
+comp name="H" color="#888888" branch-prob="true" x=16 y=5
+comp name="D" color="#000000" x=27 y=5
+comp name="R" color="#4444ff" x=16 y=-3
+
+trans name="S->E" value="exp(rate:(η+β(t)({I}+f^A×{A}))/N)"
+trans name="E->I" value="exp(rate:r^E)" bp="b^I"
+trans name="E->A" value="exp(rate:r^A)" bp="*"
+trans name="I->H" value="exp(rate:r^I)"
+trans name="H->D" value="exp(rate:r^H)" bp="b^D"
+trans name="A->R" value="exp(rate:r^A)"
+trans name="H->R" value="exp(rate:r^H)" bp="*"
+
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="DS" file="[[
+"Compartment","Population"
+"S",68000000
+"E",0
+"I",0
+"A",0
+"H",0
+"D",0
+"R",0
+]]"
+
+
+# INFERENCE DATA
+
+init-pop type="fixed" file="[[
+"DS","Population"
+"S",68000000
+"E",0
+"I",0
+"A",0
+"H",0
+"D",0
+"R",0
+]]"
+
+pop-trans-data name="E->I" error="normal:10%" file="[[
+"Start","End","Number"
+0,14,1
+14,28,29
+28,42,306
+42,56,2508
+56,70,20141
+70,84,158777
+84,98,683763
+98,112,560624
+112,126,324551
+126,140,185865
+140,154,105514
+154,168,58917
+168,182,33270
+182,196,18750
+196,210,10377
+210,224,5849
+224,238,3150
+238,252,1756
+252,266,950
+266,280,972
+280,294,3834
+294,308,16890
+308,322,49117
+322,336,35327
+336,350,19051
+350,364,10532
+364,378,8427
+378,392,19327
+392,406,48843
+406,420,122666
+420,434,300847
+434,448,520350
+448,462,309853
+462,476,150531
+476,490,72835
+490,504,35377
+504,518,17151
+518,532,8189
+532,546,3909
+546,560,1837
+560,574,857
+574,588,396
+]]"
+
+pop-trans-data name="I->H" error="normal:10%" file="[[
+"Start","End","Number"
+0,14,0
+14,28,15
+28,42,193
+42,56,1537
+56,70,12456
+70,84,99129
+84,98,533559
+98,112,638999
+112,126,383574
+126,140,220150
+140,154,126121
+154,168,70442
+168,182,39875
+182,196,22339
+196,210,12433
+210,224,6966
+224,238,3842
+238,252,2067
+252,266,1172
+266,280,844
+280,294,2657
+294,308,11694
+308,322,41023
+322,336,41542
+336,350,22966
+350,364,12671
+364,378,8275
+378,392,15123
+392,406,38502
+406,420,96873
+420,434,239120
+434,448,481142
+448,462,379428
+462,476,188372
+476,490,91896
+490,504,44349
+504,518,21555
+518,532,10365
+532,546,4932
+546,560,2320
+560,574,1105
+574,588,502
+]]"
+
+pop-trans-data name="H->D" error="normal:10%" file="[[
+"Start","End","Number"
+0,14,0
+14,28,1
+28,42,19
+42,56,194
+56,70,1461
+70,84,11723
+84,98,77511
+98,112,171283
+112,126,149990
+126,140,99578
+140,154,60593
+154,168,34902
+168,182,19918
+182,196,11224
+196,210,6349
+210,224,3523
+224,238,1993
+238,252,1122
+252,266,632
+266,280,314
+280,294,461
+294,308,1718
+308,322,6778
+322,336,11904
+336,350,9685
+350,364,5997
+364,378,3615
+378,392,3511
+392,406,7051
+406,420,17420
+420,434,43325
+434,448,98897
+448,462,127074
+462,476,88875
+476,490,49482
+490,504,25711
+504,518,12731
+518,532,6379
+532,546,3042
+546,560,1499
+560,574,719
+574,588,367
+]]"
+
+pop-data filter="DS=E|I|A" error="normal:10%" file="[[
+"t","Population"
+14,15
+28,121
+42,1237
+56,9636
+70,77094
+84,598336
+98,1438502
+112,864783
+126,501423
+140,285731
+154,161641
+168,91057
+182,50981
+196,28459
+210,16051
+224,8840
+238,4783
+252,2734
+266,1443
+280,2695
+294,12047
+308,54630
+322,95279
+336,52580
+350,29353
+364,15981
+378,20038
+392,51869
+406,130603
+420,324524
+434,783991
+448,896880
+462,446635
+476,218129
+490,105398
+504,50960
+518,24547
+532,11677
+546,5527
+560,2658
+574,1170
+588,531
+]]"
+
+pop-data filter="DS=E|I|A|R" error="normal:10%" file="[[
+"t","Population"
+14,16
+28,161
+42,1700
+56,14263
+70,114367
+84,894136
+98,3162549
+112,4482091
+126,5363630
+140,5896745
+154,6205968
+168,6383314
+182,6482831
+196,6539018
+210,6570543
+224,6588019
+238,6597513
+252,6602771
+266,6605690
+280,6609633
+294,6626221
+308,6700164
+322,6852871
+336,6934911
+350,6987959
+364,7018514
+378,7050341
+392,7125413
+406,7310684
+420,7772898
+434,8891936
+448,10356793
+462,11087338
+476,11505480
+490,11722976
+504,11832033
+518,11885503
+532,11911616
+546,11923991
+560,11929901
+574,11932655
+588,11933848
+]]"
+
+
+
+######################## PARAMETERS ########################
+
+param name="b^D" value="0.3" prior="uniform(0,1)"
+param name="b^I" value="0.3" prior="uniform(0,1)"
+param name="f^A" constant="0.5"
+param name="N" constant="68000000"
+param name="r^A" value="0.25" prior="gamma(0.25,0.1)"
+param name="r^E" value="0.25" prior="gamma(0.25,0.1)"
+param name="r^H" value="0.1" prior="gamma(0.1,0.1)"
+param name="r^I" value="0.25" prior="gamma(0.25,0.1)"
+param name="η" constant="0.1"
+param name="β(t)" value="[[
+"t",Value
+"start","1"
+"14","1"
+"28","1"
+"42","1"
+"56","1"
+"70","1"
+"84","1"
+"98","0.3"
+"112","0.3"
+"126","0.3"
+"140","0.3"
+"154","0.3"
+"168","0.3"
+"182","0.3"
+"196","0.3"
+"210","0.3"
+"224","0.3"
+"238","0.3"
+"252","0.3"
+"266","0.3"
+"280","0.9"
+"294","0.9"
+"308","0.9"
+"322","0.3"
+"336","0.3"
+"350","0.3"
+"364","0.3"
+"378","0.7"
+"392","0.7"
+"406","0.7"
+"420","0.7"
+"434","0.7"
+"448","0.3"
+"462","0.3"
+"476","0.3"
+"490","0.3"
+"504","0.3"
+"518","0.3"
+"532","0.3"
+"546","0.3"
+"560","0.3"
+"574","0.3"
+"end","0.3"
+]]" prior="uniform(0,2)" knot-times="start,14,28,42,56,70,84,98,112,126,140,154,168,182,196,210,224,238,252,266,280,294,308,322,336,350,364,378,392,406,420,434,448,462,476,490,504,518,532,546,560,574,end" smooth="log-normal(0.5)"
+
+

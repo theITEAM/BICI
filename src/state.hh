@@ -1,5 +1,4 @@
-#ifndef BICI__STATE_HH
-#define BICI__STATE_HH
+#pragma once
 
 #include <vector>
 
@@ -46,6 +45,8 @@ class State                                // Stores information about the state
 		vector <long> restore_timer;           // Stores timers for parameter restore
 		vector <long> timer;                   // General purpose timers
 		
+		double dif_thresh;                     // Threshold for difference
+		
 		vector <BackPop> back_pop;             // Stores population info
 		
 		State(const Model &model);
@@ -67,7 +68,7 @@ class State                                // Stores information about the state
 		Like update_param(const vector <AffectLike> &affect_like, const vector <double> &param_store);
 		void restore(const vector <AffectLike> &affect_like);
 		void likelihood_from_scratch();
-		void resample_ind();
+		void resample_ind(bool do_pl = false);
 		Particle generate_particle(unsigned int s, unsigned int chain, bool store_state) const;
 		void set_particle(const Particle &part);
 		vector <double> prior_init_cond(double &like_ch);
@@ -176,6 +177,8 @@ class State                                // Stores information about the state
 		void check(string ref);
 		void scan_variable(string name, double min, double max);
 		void print_ev_data(string te, const vector <EventData> &event_data, unsigned int p) const;
+		void check_popnum_t(string ref);
+		void check_popnum_t2(string ref);
 	
 	private:
 		void check_dependent_param(string ref);
@@ -183,7 +186,6 @@ class State                                // Stores information about the state
 		void check_markov_trans(unsigned int p, string ref);
 		void check_nm_trans(unsigned int p, string ref);
 		void check_prior(string ref);
-		void check_popnum_t(string ref);
 		void check_like(string ref);
 		void check_spline(string ref);
 		void check_ie(unsigned int p, string ref);
@@ -199,8 +201,12 @@ class State                                // Stores information about the state
 		void check_genetic_value(string ref);
 		void check_popnum_ind(string ref);
 		void check_add_move_rem(string ref);
+		void check_event_boundary(string ref);
+		void check_effect_out_of_range();
+		void output_dump() const;
+		void get_closest_to_boundary();
 		
 	private:
 		const Model &model;
 };
-#endif
+

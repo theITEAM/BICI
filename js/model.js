@@ -3161,7 +3161,7 @@ class Model
 		let repl = false;
 		for(let i = 0; i < mgroup.length; i++){
 			let mg = mgroup[i];
-			if(this.move_comp(mg.c,mg.x,mg.y,cl,p) == true){
+			if(this.move_comp(mg.c,mg.x,mg.y,p,cl) == true){
 				repl = true;
 			}
 		}
@@ -3186,6 +3186,7 @@ class Model
 	/// Moves a compartment (with potentiall any sources or sinks also)
 	move_comp(c,x,y,p,cl,op)
 	{
+		pr(p+" "+cl+" p cl");
 		let claa = this.species[p].cla[cl];
 		let co = claa.comp[c];
 		let x_old = co.x;

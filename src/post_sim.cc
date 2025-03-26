@@ -37,7 +37,7 @@ void PostSim::run()
 
 		auto param_val = model.post_param(samp);
 		
-		if(false) output.print_param(param_val);
+		if(false) model.print_param(param_val);
 
 		state.post_sim(param_val,samp);
 		

@@ -11,7 +11,7 @@ let ver="windows";         // Determines platform
 let make_file = false;                            // Determines if makes file or runs
 
 let try_on = true;
-const debug = false;//true;                               // Determines if debugger used
+const debug = true;                               // Determines if debugger used
 
 let testing = true;
 let thick_line = false;
@@ -261,6 +261,10 @@ const data_template = [
 // Loads the A matrix into and individual effect group
 {type:"LoadAmatrix", title:"Load relationship matrix", cols:["A"]},
 
+// Loads the pedigree into and individual effect group
+{type:"APed", title:"Pedigree", cols:["ID","sire","dam"]},
+
+
 // Load compartment map
 {type:"KnotTimes", title:"Load spline knot times", cols:["t,the knot times"]},
 ];
@@ -361,7 +365,8 @@ const opbut = ["_","^","+","-","\u00d7","\u2215","(",")","Σ","'"];
 
 const numbut = ["0","1","2","3","4","5","6","7","8","9","."];
 
-const char_not_allowed = [":",",",".","!","[","]","{","}","〈","〉","|","*","_","×","-","+","<",">"]; 
+//const char_not_allowed = [":",",",".","!","[","]","{","}","〈","〉","|","*","_","×","-","+","<",">"]; 
+const char_not_allowed = [":",",",".","!","[","]","{","}","〈","〉","|","*","_","×","<",">"]; 
 
 const greek = ["\u03B1","\u03B2","\u03B3","\u03B4","\u03B5","\u03B6","\u03B7","\u03B8","\u03B9",
 "\u03Ba","\u03Bb","\u03Bc","\u03Bd","\u03Be","\u03Bf","\u03C0","\u03C1","\u03C3","\u03C4","\u03C5","\u03C6","\u03C7","\u03C8","\u03C9"];
@@ -402,7 +407,7 @@ const MCMC_OP_STATE_DEFAULT = 200;                 // The default number of outp
 const MCMC_CHAIN_DEFAULT = 3;                      // The default number of MCMC chains
 const MCMC_CHAIN_PER_CORE_DEFAULT = 1;             // The default chains per core
 const PAS_PART_DEFAULT = 10;                       // The default number of PAS particles
-const PAS_GEN_UPDATE_DEFAULT = 100;                // The default updates per generation for   
+const PAS_GEN_UPDATE_DEFAULT = 1;                  // The default updates per generation percent  
 const PAS_PART_PER_CORE_DEFAULT = 1;               // The default particles per core
 
 const ABC_SAMPLE_DEFAULT = 1000;                    // The default number of ABC samples

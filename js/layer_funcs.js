@@ -1574,7 +1574,7 @@ function check_error_textbox2(tbs)
 				break;
 				
 			case "inf_gen_update":
-				warn = check_posinteger(te);
+				warn = check_percent(te);
 				break;
 				
 			case "inf_cha_per_core": case "inf_part_per_core":

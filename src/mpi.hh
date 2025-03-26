@@ -1,5 +1,4 @@
-#ifndef BICI__MPI_HH
-#define BICI__MPI_HH
+#pragma once
 
 #include "struct.hh"
 #ifdef USE_MPI
@@ -70,4 +69,4 @@ private:
 	
 	const Model &model;
 };
-#endif
+

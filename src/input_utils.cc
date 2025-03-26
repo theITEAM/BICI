@@ -127,12 +127,18 @@ bool Input::check_comp_exist(string name, unsigned int p)
 /// Loads a table from a file
 Table Input::load_table(const string file)
 {
+	Table tab; tab.error = false;
+	
 	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
-	if(i == files.size()) alert_import("Could not find '"+file+"'");
+	
+	if(i == files.size()){
+		alert_import("Could not find '"+file+"'");
+		tab.error = true; 
+		return tab;
+	}
 	
 	const auto &fs = files[i];
 	
-	Table tab; tab.error = false;
 	
 	auto sep = fs.sep;
 	

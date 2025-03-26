@@ -14,7 +14,7 @@ using namespace std;
 #include "matrix.hh"
 
 /// Initialises the state species
-StateSpecies::StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const	vector <double> &timepoint, const	vector <double> &dtimepoint, const vector <unsigned int> &pop_affect_, Operation mode_) : source_sampler(sp.markov_eqn,sp.tra_gl,sp.comp_gl,timepoint,dtimepoint,details,sp.init_cond), rate_mean(details), param_val(param_val), spline_val(spline_val), eqn(eqn), param(param), param_vec(param_vec), pop(pop), sp(sp), genetic_data(genetic_data), details(details), timepoint(timepoint), dtimepoint(dtimepoint)
+StateSpecies::StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const	vector <double> &timepoint, const	vector <double> &dtimepoint, const vector <unsigned int> &pop_affect_, Operation mode_, const double &dif_thresh) : source_sampler(sp.markov_eqn,sp.tra_gl,sp.comp_gl,timepoint,dtimepoint,details,sp.init_cond), rate_mean(details), param_val(param_val), spline_val(spline_val), eqn(eqn), param(param), param_vec(param_vec), pop(pop), sp(sp), genetic_data(genetic_data), details(details), timepoint(timepoint), dtimepoint(dtimepoint), dif_thresh(dif_thresh)
 {
 	timer.resize(STSP_TIMER_MAX,0);
 	
@@ -787,6 +787,7 @@ vector <double> StateSpecies::set_exp_fe(unsigned int f)
 	vector <double> store;
 
 	auto sum = 0.0;
+	auto num = 0u;
 	for(auto &ind : individual){
 		store.push_back(ind.exp_fe[f]);
 		
@@ -795,10 +796,13 @@ vector <double> StateSpecies::set_exp_fe(unsigned int f)
 			auto val = exp(X*pval);
 			ind.exp_fe[f] = val;
 			sum += val;
+			num++;
 		}
 	}
 	
-	auto fac = individual.size()/sum;
+	if(sum == 0) emsg("Fixed effect problem");
+	
+	auto fac = num/sum;
 
 	for(auto &ind : individual){
 		auto X = ind.X[f];
@@ -837,7 +841,9 @@ vector <double> StateSpecies::set_exp_ie(Individual &ind) const
 		const auto &ie = indeff[i];
 		auto var = iegs[ie.index].omega[ie.num][ie.num];
 		store.push_back(ind.exp_ie[i]);
+		
 		ind.exp_ie[i] = exp(ind.ie[i]-0.5*var);
+		//check_ie_out_of_range(i,ind);
 	}
 	
 	return store;
@@ -852,9 +858,9 @@ vector <double> StateSpecies::recalculate_exp_ie(unsigned int ie)
 	auto j = ind_eff.num;
 	const auto &iegs = ind_eff_group_sampler[g];
 	auto var = iegs.omega[j][j];
-	
+		
 	vector <double> store;
-	for(auto &ind : individual){
+	for(auto &ind : individual){	
 		store.push_back(ind.exp_ie[ie]);
 		ind.exp_ie[ie] = exp(ind.ie[ie]-0.5*var);
 	}
@@ -881,6 +887,7 @@ void StateSpecies::ie_sampler_init()
 	
 	for(auto i = 0u; i < sp.ind_eff_group.size(); i++){
 		const auto &ieg = sp.ind_eff_group[i];
+		
 		auto &iegs = ind_eff_group_sampler[i];
 		auto N = ieg.list.size();
 		iegs.omega.resize(N); iegs.omega_Z.resize(N); iegs.omega_inv.resize(N);
@@ -922,9 +929,14 @@ void StateSpecies::ie_Amatrix_sampler_init()
 				}
 			}
 			
-			iegs.A_Z = calculate_cholesky(A);
+			auto illegal = false;
+			iegs.A_Z = calculate_cholesky(A,illegal);
+			if(illegal) emsg("Cholesky decomposition of A matrix not possible");
+			
 			auto A_inv = invert_matrix(A);
 			tidy(A_inv);
+			print_matrix("Ainv final",A_inv);
+					
 			iegs.A_inv = A_inv;
 			iegs.A_inv_diag.resize(I);
 			iegs.A_inv_nonzero.resize(I);
@@ -946,39 +958,23 @@ void StateSpecies::ie_Amatrix_sampler_init()
 vector <double> StateSpecies::calculate_omega(unsigned int g)
 {
 	auto &iegs = ind_eff_group_sampler[g];
-	const auto &ieg = sp.ind_eff_group[g];
-	auto N = ieg.list.size();
+	auto N = iegs.omega.size();
 	
 	vector <double> store;
 	for(auto j = 0u; j < N; j++){
-		for(auto i = 0u; i < N; i++){
+		for(auto i = 0u; i < N; i++){	
 			store.push_back(iegs.omega[j][i]);
 			store.push_back(iegs.omega_Z[j][i]);
 			store.push_back(iegs.omega_inv[j][i]);
 		}
 	}
 	
-	for(auto j = 0u; j < N; j++){
-		for(auto i = 0u; i < N; i++){
-			auto &par = param[ieg.omega[j][i]];
-			if(par.variety == CONST_PARAM) iegs.omega[j][i] = par.value[0].value;
-			else{
-				auto th2 = par.param_vec_ref[0]; if(th2 == UNSET) emsg("Should not be unset2");
-				iegs.omega[j][i] = param_val[th2];
-			}
-		}
-	}
+	iegs.omega = sp.calculate_omega_basic(g,param_val,param);
 	
-	if(false) print("Omega",iegs.omega);
+	auto illegal = false;
+	iegs.omega_Z = calculate_cholesky(iegs.omega,illegal);
+	if(illegal) emsg("Cholesky should not be illegal");
 	
-	// Converts correlations to variances
-	for(auto j = 0u; j < N; j++){
-		for(auto i = 0u; i < N; i++){
-			if(j != i) iegs.omega[j][i] *= sqrt(iegs.omega[i][i]*iegs.omega[j][j]);
-		}
-	}
-	
-	iegs.omega_Z = calculate_cholesky(iegs.omega);
 	iegs.omega_inv = invert_matrix(iegs.omega);
 	
 	return store;
@@ -1464,4 +1460,44 @@ double StateSpecies::get_trans_obs_prob(unsigned int trg, const ObsData &ob) con
 	if(ob.time_vari) return obs_eqn_value[ob.obs_eqn_ref[trg]];
 	else return obs_eqn_value[sp.obs_trans[ob.ref].obs_eqn_ref[trg]];
 }
+
+
+/// Compares a covariance matrix with one from individual effects
+void StateSpecies::compare_covar(string te, const vector < vector <double> > &omega, unsigned int g) const
+{
+	const auto &ieg = sp.ind_eff_group[g];
+	
+	auto N = ieg.list.size();
+	vector <double> av;
+	vector < vector <double> > av2;
+	av.resize(N); av2.resize(N);
+	for(auto j = 0u; j < N; j++){	
+		av2[j].resize(N,0);
+	}
+	
+	for(const auto &ind : individual){
+		for(auto i = 0u; i < N; i++){
+			av[i] += ind.ie[ieg.list[i].index];
+			for(auto j = 0u; j < N; j++){
+				av2[i][j] += ind.ie[ieg.list[i].index]*ind.ie[ieg.list[j].index];
+			}
+		}
+	}
+	
+	auto T = individual.size();
+	
+	vector < vector <double> > M;
+	M.resize(N);
+	for(auto j = 0u; j < N; j++){
+		M[j].resize(N);
+		for(auto i = 0u; i < N; i++){
+			M[j][i] = av2[j][i]/T - (av[j]/T)*(av[i]/T);
+		}
+	}
+	
+	cout << te << endl;
+	print_matrix("omega",omega);
+	print_matrix("omega ind",M);
+}
+
 

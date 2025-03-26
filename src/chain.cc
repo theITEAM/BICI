@@ -53,8 +53,10 @@ void Chain::init()
 		
 		if(false){
 			output.print_initc(initc_val);
-			output.print_param(param_val);
+			model.print_param(param_val);
 		}
+		//output.print_param(param_val);
+	
 		
 		print_diag("simulate");
 		
@@ -66,7 +68,8 @@ void Chain::init()
 	
 		print_diag("Checked");
 		
-		state.resample_ind();    // Resamples individual such that fixed events become correct
+		auto pl = false; //if(loop == 1) pl = true;
+		state.resample_ind(pl);    // Resamples individual such that fixed events become correct
 
 		state.check("Resample check");
 	
@@ -80,9 +83,10 @@ void Chain::init()
 			part = state.generate_particle(UNSET,UNSET,true);
 		}
 	
-		state.check("after resample");
+		//state.check("after resample");
 	}
-
+	if(Lmax == -LARGE) emsg("Could not find initial state");
+	
 	state.set_particle(part);
 	
 	state.check("before");
@@ -96,6 +100,8 @@ void Chain::burn_update(unsigned int s)
 	burn_info.setup(s,nburnin,nsample,model.details);
 	
 	if(burn_info.on){
+		state.dif_thresh = DIF_THRESH_BURNIN;
+		
 		cor_matrix.add_sample(state.param_val,cor_matrix.n/3);
 	
 		if(s%10 == 0){
@@ -106,6 +112,9 @@ void Chain::burn_update(unsigned int s)
 		//if(s != 0 && s%burn_info.prop_join_step == 0) update.check_join_proposal();
 
 		if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
+	}
+	else{
+		state.dif_thresh = DIF_THRESH;
 	}
 }
 
@@ -408,11 +417,13 @@ void Chain::update(unsigned int s)
 	state.sample = s;
  
 	auto pl = false;
+	//pl = true;
+	//if(core() == 14 && s >=2080) pl = true;
 	
 	for(auto &pro : proposal){ 
 		if(pro.on){
-			if(pl) cout << pro.name << " " <<  state.sample << " proposal" << endl;
-			
+			if(pl) cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
+				
 			if(true){
 				pro.update(state);
 			}
@@ -430,10 +441,13 @@ void Chain::update(unsigned int s)
 				}
 			}
 		
-			if(pl) state.check(" After prop check");
+			//if(pl) state.check(" After prop check");
+			if(pl) state.check_popnum_t2("hhh");
 		}
 	}
 	
+	//if(testing == true && s%10 == 0) state.check("turn off check");
+
 	if(testing == true && s%CHECK_THIN == CHECK_THIN-1) state.check("end");
 }
 
@@ -473,13 +487,24 @@ void Chain::update_init()
 			for(auto j = 0u; j < ieg.list.size(); j++){
 				auto &par = model.param[ieg.omega[j][j]];
 				if(par.variety != CONST_PARAM){
+					auto ie = ieg.list[j].index;
+					
 					vector <unsigned int> vec;
 					vec.push_back(par.param_vec_ref[0]);
 					vec.push_back(p);
-					vec.push_back(ieg.list[j].index);
+					vec.push_back(ie);
 					
 					Proposal pp(IE_VAR_PROP,vec,model,output,1,burn_info);
 					proposal.push_back(pp);
+
+					// Adds proposals for joint ie, variance and cv
+					auto list = sp.get_cv_list(ie,model.param,model.eqn);
+					if(list.size() > 0){
+						for(auto th : list) vec.push_back(th);
+										
+						Proposal pp(IE_VAR_CV_PROP,vec,model,output,1,burn_info);
+						proposal.push_back(pp);
+					}
 				}
 			}
 			
@@ -621,7 +646,7 @@ void Chain::update_init()
 		}
 	}
 	
-	if(true){
+	if(true){ // Event changes 
 		for(auto p = 0u; p < model.nspecies; p++){
 			auto &sp = model.species[p];
 			auto st = model.samp_type;
@@ -824,7 +849,7 @@ string Chain::diagnostics(unsigned int total_time, unsigned int anneal_time) con
 	
 	if(anneal_time != UNSET){
 		ss << "Annealing percentage = " 
-			<< cpu_percent(anneal_time,(anneal_time+total_time)) << endl << endl;
+			 << cpu_percent(anneal_time,(anneal_time+total_time)) << endl << endl;
 	}
 	
 	{	
@@ -1089,5 +1114,11 @@ void Chain::join_proposal(unsigned int th1, unsigned int th2)
 	}
 }
 
+
+/// Check correlation matrix is specified correctly
+void Chain::check_cor_matrix() const
+{
+	cor_matrix.check();
+}
 
 

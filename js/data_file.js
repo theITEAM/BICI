@@ -1408,9 +1408,12 @@ function ind_group_data_bubble(cont,type)
 		bubble_addradio(cont,13,"Load","Load",bub.ind_group_radio);
 	}
 	
+	cont.y += 0.2;
+	
 	switch(bub.ind_group_radio.value){
 	case "Specify":
-		bubble_add_minititle(cont,"Individuals in group:"); cont.y += 0.2;
+		cont.y += 0.2;
+		bubble_add_minititle(cont,"Individuals in group:"); 
 		
 		bubble_addscrollable(cont,{type:"ind list", p:spec.p, name_list:inter.bubble.name_list, ymax:bubblescroll_dymax}); 
 			

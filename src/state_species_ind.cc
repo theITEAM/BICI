@@ -32,9 +32,12 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 		double dt;
 		auto R = 0.0; if(nnode > 0) R = markov_tree_rate[nnode-1];
 	
-		if(R > -TINY && R < TINY) dt = LARGE;
+		//if(R > -TINY && R < TINY) dt = LARGE;
+		if(R > -SMALL && R < TINY) dt = LARGE;
 		else{
-			if(R < 0) emsg("Negative rate");
+			if(R < 0){
+				emsg("Negative rate");
+			}
 			auto ra = ran(); if(ra == 0) ra = TINY;
 			dt = -log(ra)/R;
 		}
@@ -168,7 +171,9 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 					j = 0u; while(j < it.size() && z > sum_st[j]) j++;
 					if(j == it.size()) emsg("erro select");
 					
-					if(dif(sum,me_vari.indfac_sum)) emsg("SHould be the same");
+					if(dif(sum,me_vari.indfac_sum,dif_thresh)){
+						emsg("SHould be the same");
+					}
 				}
 			
 				const auto &itr = me_vari.ind_tra[j];
@@ -412,7 +417,7 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 				sum_store.push_back(sum);
 			}
 			
-			if(!tlg.all_branches && dif(sum,1)){
+			if(!tlg.all_branches && dif(sum,1,dif_thresh)){
 				const auto &trg = sp.tra_gl[tref[0]];
 				const auto &tr = sp.cla[trg.cl].tra[trg.tr];
 				const auto &co = sp.cla[trg.cl].comp[tr.i];
@@ -921,6 +926,25 @@ void StateSpecies::add_event(EventType type, unsigned int i, unsigned int tr_gl,
 	auto &ind = individual[i];
 	auto &ev = ind.ev;
 	
+	// If event is near to division boundary then shifts
+	switch(type){
+	case NM_TRANS_EV: case M_TRANS_EV:
+		if(event_near_div(t,details)){
+			auto dtrange = NEAR_DIV_THRESH*details.dt;
+			t -= 2*dtrange;
+			if(ev.size() > 0 && t < ev[0].t){
+				t += 4*dtrange;
+			}
+			
+			if(event_near_div(t,details)){
+				emsg("still out of range");
+			}
+		}
+		break;
+		
+	default: break;
+	}
+		
 	auto e = get_event(type,i,tr_gl,move_c,cl,c_after,t,inf_from);
 	
 	ev.push_back(e);

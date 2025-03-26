@@ -63,6 +63,7 @@ void MCMC::run()
 	long time_start = clock();
 
 	for(auto s = 0u; s < nsample; s++){
+		//if(mpi.core == 0) cout << s << " samp" << endl;
 		output.percentage(s,nsample);
 		progress(s,nsample);
 	

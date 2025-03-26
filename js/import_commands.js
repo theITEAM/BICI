@@ -1648,7 +1648,7 @@ function inference_command()
 	switch(alg){
 	case "DA-MCMC":
 		details.nchain = check_pos_integer("nchain",MCMC_CHAIN_DEFAULT);
-		details.sample = check_pos_integer("sample",MCMC_SAMPLE_DEFAULT);
+		details.sample = check_pos_integer("update",MCMC_SAMPLE_DEFAULT);
 		details.output_param = check_pos_integer("param-output",MCMC_OP_PARAM_DEFAULT);
 		details.output_state = check_pos_integer("state-output",MCMC_OP_STATE_DEFAULT);
 		details.cha_per_core = check_pos_integer("chain-per-core",MCMC_CHAIN_PER_CORE_DEFAULT);
@@ -1656,8 +1656,9 @@ function inference_command()
 	
 	case "PAS-MCMC":
 		details.npart = check_pos_integer("npart",PAS_PART_DEFAULT);
-		details.gen_update = check_pos_integer("gen-update",PAS_GEN_UPDATE_DEFAULT);
-		details.sample = check_pos_integer("sample",MCMC_SAMPLE_DEFAULT);
+		details.gen_update = check_percent("gen-percent",PAS_GEN_UPDATE_DEFAULT);
+		if(details.gen_update == 0) alert_import("'gen-percent' cannot be 0");
+		details.sample = check_pos_integer("update",MCMC_SAMPLE_DEFAULT);
 		details.output_param = check_pos_integer("param-output",MCMC_OP_PARAM_DEFAULT);
 		details.output_state = check_pos_integer("state-output",MCMC_OP_STATE_DEFAULT);
 		details.part_per_core = check_pos_integer("part-per-core",PAS_PART_PER_CORE_DEFAULT);
@@ -1685,11 +1686,11 @@ function inference_command()
 	details.anneal_power = ANNEAL_POWER_DEFAULT;
 	
 	if(alg == "DA-MCMC" || alg == "PAS-MCMC"){
-		let burnin_str = get_tag_value("burnin-frac"); 
+		let burnin_str = get_tag_value("burnin-percent"); 
 		if(burnin_str != ""){
 			let burnin = Number(burnin_str);
 			if(isNaN(burnin) || burnin < 1 || burnin > 90){
-				alert_import("'burnin-frac' must be a number between 1 and 90");
+				alert_import("'burnin-percent' must be a number between 1 and 90");
 				return;		
 			}
 			details.burnin_frac = burnin_str;
@@ -1822,6 +1823,20 @@ function check_pos_integer(te,def)
 }
 
 
+/// Check that a number is a percentage
+function check_percent(te,def)
+{
+	let value = get_tag_value(te);
+	
+	if(value == "" || set_default) return def;
+	
+	let num = Number(value);
+	if(isNaN(value) || num < 0 || num > 100){
+		alert_import("'"+te+"' must be between 0 and 100");
+	}
+	return num;
+}
+
 /// Check that a number is positive 
 function check_pos_number(te,def)
 {
@@ -1830,8 +1845,8 @@ function check_pos_number(te,def)
 	if(value == "" || set_default) return def;
 	
 	let num = Number(value);
-	if(isNaN(value) || num <= 0){
-		alert_import("'"+te+"' must be a positive number");
+	if(isNaN(value) || num <= 0 || num >= 100){
+		alert_import("'"+te+"' must be between 0 and 100, exclusive");
 	}
 	return num;
 }
@@ -1868,14 +1883,43 @@ function ind_effect_command()
 	
 	let A = get_tag_value("A"); 
 	let A_sparse = get_tag_value("A-sparse"); 
+	let pedigree = get_tag_value("pedigree"); 
 	
-	let A_matrix;
-	if(A == ""){
-		if(A_sparse == ""){ 
-			A_matrix = {check:false, loaded:false, A_value:[], ind_list:[]};
+	let num = 0;
+	if(A != "") num++;
+	if(A_sparse != "") num++;
+	if(pedigree != "") num++;
+	
+	if(num > 1){
+		alert_import("Cannot specify more than one of 'A', 'A-sparse' and 'pedigree'."); return;
+	}
+	
+	let A_matrix = {check:false, loaded:false, A_value:[], ind_list:[], pedigree:false, sire_list:[], dam_list:[]};
+	
+	if(num == 1){
+		if(pedigree != ""){
+			A_matrix = {check:true, loaded:true, A_value:[], ind_list:[], pedigree:true, sire_list:[], dam_list:[]};
+	
+			let tab_ped = load_table(pedigree.te,true,pedigree.sep,pedigree.name);
+				
+			if(tab_ped.ncol != 3){
+				alert_import("'pedigree' file should have 3 columns"); return;
+			}
+				
+			if(tab_ped.heading[0] != "ID" || tab_ped.heading[1] != "sire" || 
+					tab_ped.heading[2] != "dam"){
+				alert_import("'pedigree' file should have columns with headings 'ID', 'sire' and 'dam'"); return;
+			}
+			
+			for(let r = 0; r < tab_ped.nrow; r++){
+				A_matrix.ind_list.push(tab_ped.ele[r][0]);
+				A_matrix.sire_list.push(tab_ped.ele[r][1]);
+				A_matrix.dam_list.push(tab_ped.ele[r][2]);
+			}					
 		}
-		else{
-			A_matrix = {check:true, loaded:true};
+		
+		if(A_sparse != ""){
+			A_matrix = {check:true, loaded:true, pedigree:false, sire_list:[], dam_list:[]};
 			
 			let ind_list = get_tag_value("ind-list"); 
 		
@@ -1886,9 +1930,7 @@ function ind_effect_command()
 			for(let r = 0; r < tab_ind.nrow; r++){ 
 				list.push(tab_ind.ele[r][0]);
 			}			
-		for(let r = 0; r < list.length; r++){ 
-		//pr(list[r]+"ind");
-		}
+		
 			A_matrix.ind_list = list;
 		
 			let N = list.length;
@@ -1914,32 +1956,33 @@ function ind_effect_command()
 			}
 			A_matrix.A_value = val;
 		}
-	}
-	else{
-		A_matrix = {check:true, loaded:true};
-		
-		let tab = load_table(A.te,true,A.sep,A.name);
-		//let tab = load_table_from_file(A);
-		if(tab == undefined) return;
-		if(typeof tab == 'string') alert_import(tab); 
+	
+		if(A != ""){
+			A_matrix = {check:true, loaded:true, pedigree:false, sire_list:[], dam_list:[]};
+			
+			let tab = load_table(A.te,true,A.sep,A.name);
+			//let tab = load_table_from_file(A);
+			if(tab == undefined) return;
+			if(typeof tab == 'string') alert_import(tab); 
 
-		A_matrix.ind_list = tab.heading;
-		if(tab.nrow != tab.ncol){
-			alert_import("The file '"+tab.filename+"' must contain an equal number of columns and rows."); 
-		}
-		
-		let val = [];
-		for(let r = 0; r < tab.nrow; r++){
-			val[r] = [];
-			for(let c = 0; c < tab.ncol; c++){
-				let ele = tab.ele[r][c];
-				if(isNaN(ele)){
-					alert_import(in_file_text(tab.filename)+"the element '"+ele+"' is not a number (row "+(r+2)+", col "+(c+1)+")");
-				}
-				val[r][c] = Number(ele);
+			A_matrix.ind_list = tab.heading;
+			if(tab.nrow != tab.ncol){
+				alert_import("The file '"+tab.filename+"' must contain an equal number of columns and rows."); 
 			}
+			
+			let val = [];
+			for(let r = 0; r < tab.nrow; r++){
+				val[r] = [];
+				for(let c = 0; c < tab.ncol; c++){
+					let ele = tab.ele[r][c];
+					if(isNaN(ele)){
+						alert_import(in_file_text(tab.filename)+"the element '"+ele+"' is not a number (row "+(r+2)+", col "+(c+1)+")");
+					}
+					val[r][c] = Number(ele);
+				}
+			}
+			A_matrix.A_value = val;
 		}
-		A_matrix.A_value = val;
 	}
 	
 	// Checks that ind effects do not already exist in the model

@@ -662,6 +662,14 @@ function set_loadcol()
 				load_col.push({heading:"ID", desc:"individual ID",type:"text"});
 				break;
 
+			case "sire":
+				load_col.push({heading:"sire", desc:"sire ID",type:"text"});
+				break;
+				
+			case "dam":
+				load_col.push({heading:"dam", desc:"dam ID",type:"text"});
+				break;
+
 			case "t":
 				load_col.push({heading:"t", desc:spl[1], type:"time_float"});
 				break;
@@ -1386,6 +1394,11 @@ function add_source_description(so)
 		num = so.table.nrow;
 		break;
 		
+	case "APed":
+		num = so.table.nrow;
+		break;
+	
+	
 	default: error(so.type+" DESC NOT ADDED"); break;
 	}
 	

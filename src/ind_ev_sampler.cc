@@ -31,7 +31,7 @@ IndEvSampler::IndEvSampler(vector <MarkovEqnVariation> &markov_eqn_vari, const v
 	
 	ind_variation = sp.ind_variation;
 }
-	
+
 	
 /// Determines if the sampler is needed
 bool IndEvSampler::needed(unsigned int i, unsigned int cl)
@@ -70,6 +70,18 @@ bool IndEvSampler::needed(unsigned int i, unsigned int cl)
 	nobs = obs.size();
 	if(nobs > 0) ti_end	= 1+get_ti_lower(obs[nobs-1].t); 
 	else ti_end = ti_start;
+	
+	if(sp.obs_trans_exist){ // If transitions are observed, extend to cover region
+		auto ti_tobs = sp.last_obs_trans_ti;
+		if(ti_tobs != UNSET && ti_tobs > ti_end){
+			ti_end = ti_tobs;
+			const auto &e_last = ind.ev[ind.ev.size()-1];
+			if(e_last.c_after == UNSET){
+				auto ti_leave = 1+get_ti_lower(e_last.t); 
+				if(ti_end > ti_leave) ti_end = ti_leave;
+			}
+		}
+	}
 	
 	// Works out how c changes over time within the sampler
 	
@@ -205,7 +217,24 @@ void IndEvSampler::generate_ind_obs_timeline()
 				}
 				
 				iop[c] = (1-sum)*iop_next[c];
-				for(auto l = 0u; l < lmax; l++) iop[c] += num[l]*iop_next[co.leave[l].cf];
+				
+				for(auto l = 0u; l < lmax; l++){
+					const auto &le = co.leave[l];
+				
+					auto val = num[l]*iop_next[le.cf];
+					
+					if(sp.obs_trans_exist){  // Accounts for observation probability
+						auto tr_gl = sp.trg_from_tr[c][cl_store][le.tr];		
+						for(auto m : sp.obs_trans_eqn_ref[tr_gl][tii]){
+							auto va = obs_trans_eqn_value[m][tii];
+							if(va == LI_WRONG){ val = 0; break;}
+							
+							val *= exp(va);
+						}
+					}
+				
+					iop[c] += val;
+				}
 			}
 		}
 			
@@ -337,7 +366,7 @@ void IndEvSampler::generate_ind_obs_timeline()
 
 	if(false){
 		cout << ti_start << " " << ti_end << " time range" << endl;
-		for(auto ti = ti_start; ti < ti_end; ti++){
+		for(auto ti = ti_start; ti <= ti_end; ti++){
 			cout << ti << " " << c_timeline[ti] << "  obs prob " << endl;
 			
 			for(auto c = 0u; c < C; c++){ 
@@ -367,6 +396,7 @@ void IndEvSampler::generate_ind_obs_timeline()
 	
 		if(isl == 1) emsg("Pp");
 	}
+	//emsg("do");
 }
 
 
@@ -486,12 +516,14 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 							if(ti < ti_end) num[l] = ddt*rate_store[tii][cisland][l];
 							else num[l] = ddt*calculate_rate(ind,le,ctime,ti);
 							
+							/*
 							if(sp.obs_trans_exist){  // Accounts for observation probability
 								auto tr_gl = sp.trg_from_tr[c][cl_store][le.tr];		
 								for(auto m : sp.obs_trans_eqn_ref[tr_gl][ti]){
 									num[l] *= exp(obs_trans_eqn_value[m][ti]);
 								}
 							}
+							*/
 		
 							sum += num[l];
 						
@@ -665,6 +697,8 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 		illegal = true;
 		return ev_new;
 	}
+	
+	if(events_near_div(ev_new,details)) illegal = true;
 	
 	return ev_new;
 }
@@ -840,12 +874,14 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 								num[l] = ddt*calculate_rate(ind,le,ctime,ti);
 							}
 							
+							/*
 							if(sp.obs_trans_exist){  // Accounts for observation probability
 								auto tr_gl = sp.trg_from_tr[c][cl_store][le.tr];		
 								for(auto m : sp.obs_trans_eqn_ref[tr_gl][ti]){
 									num[l] *= exp(obs_trans_eqn_value[m][ti]);
 								}
 							}
+							*/
 					
 							sum += num[l];
 					

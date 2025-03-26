@@ -1,5 +1,4 @@
-#ifndef BICI__INPUT_HH
-#define BICI__INPUT_HH
+#pragma once
 
 #include <string>
 
@@ -113,7 +112,7 @@ class Input                                // Stores information about the model
 		CommandLine get_command_tags(string trr, unsigned int line_num);
 		CommandLine syntax_error() const;
 		void alert(string st);
-		void alert_import(string st);  
+		void alert_import(string st, bool fatal=false);  
 		void alert_line(string st, unsigned int line);  
 		void alert_equation(const EquationInfo &eqi, const string &warn);
 		void alert_warning(string st);  
@@ -236,6 +235,7 @@ class Input                                // Stores information about the model
 		void set_eqn_ind_eff_exist();
 		void set_param_parent_child();
 		void set_param_use();
+		void set_omega_fl();
 	
 		// In 'input_utils.cc'
 		unsigned int find_p(string name) const;
@@ -292,4 +292,4 @@ class Input                                // Stores information about the model
 		double check_pos_number(string te, unsigned int def);
 		double check_zero_one(string te, double def);
 };
-#endif
+

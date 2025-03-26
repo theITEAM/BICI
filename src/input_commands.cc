@@ -11,6 +11,7 @@ using namespace std;
 
 #include "input.hh"
 #include "utils.hh"
+#include "matrix.hh"
 
 /// Imports a data-table 
 void Input::import_data_table_command(Command cname)
@@ -1596,7 +1597,7 @@ void Input::inference_command()
 	
 	switch(algo){
 	case DA_MCMC:
-		details.sample = check_pos_integer("sample",MCMC_SAMPLE_DEFAULT);
+		details.sample = check_pos_integer("update",MCMC_SAMPLE_DEFAULT);
 		details.nchain = check_pos_integer("nchain");
 		if(details.nchain%mpi.ncore != 0 && model.mode == INF){
 			alert_import("'nchain' must be a multiple of the number of cores");
@@ -1630,9 +1631,12 @@ void Input::inference_command()
 		break;
 	
 	case PAS_MCMC:
-		details.sample = check_pos_integer("sample",MCMC_SAMPLE_DEFAULT);
+		details.sample = check_pos_integer("update",MCMC_SAMPLE_DEFAULT);
 		details.nchain = check_pos_integer("npart");
-		details.gen_update = check_pos_integer("gen-update");
+		if(details.nchain <= 1){
+			alert_import("'npart' must be 2 or above");
+		}
+		
 		if(details.nchain%mpi.ncore != 0 && model.mode == INF){
 			alert_import("'npart' must be a multiple of the number of cores");
 		}
@@ -1674,13 +1678,13 @@ void Input::inference_command()
 	details.anneal_power = ANNEAL_POWER_DEFAULT;
 	
 	if(algo == DA_MCMC || algo == PAS_MCMC){
-		auto burnin_str = get_tag_value("burnin-frac"); 
+		auto burnin_str = get_tag_value("burnin-percent"); 
 		
 		if(burnin_str != ""){
 			auto burnin = number(burnin_str);
 			if(burnin == UNSET || burnin < 1 || burnin > 90){
 				terminate = true;
-				alert_import("'burnin-frac' must be a number between 1 and 90");
+				alert_import("'burnin-percent' must be a number between 1 and 90");
 				return;		
 			}
 			details.burnin_frac = burnin;
@@ -1688,6 +1692,27 @@ void Input::inference_command()
 		else{
 			details.burnin_frac = BURNIN_FRAC_DEFAULT;
 		}
+	}
+	
+	if(algo == PAS_MCMC){
+		auto genper_str = get_tag_value("gen-percent"); 
+		
+		auto genper = PAS_GEN_UPDATE_DEFAULT;
+		if(genper_str != ""){
+			genper = number(genper_str);
+			if(genper == UNSET || genper <= 0 || genper >= 100){
+				terminate = true;
+				alert_import("'gen-percent' must be a number between 0 and 100, exclusive");
+				return;		
+			}
+		}	
+		
+		auto update = (unsigned int)(genper*details.sample/100.0);
+		if(update < 10){
+			update = 10;
+			alert_warning("'gen-percent' set to "+tstr(update*100/details.sample)+"% because the value "+tstr(genper)+"% was too small.");
+		}
+		details.gen_update = update;
 	}
 	
 	if(algo == DA_MCMC){
@@ -1850,11 +1875,108 @@ void Input::ind_effect_command()
 	
 	auto A = get_tag_value("A"); 
 	auto A_sparse = get_tag_value("A-sparse"); 
-
+	auto pedigree = get_tag_value("pedigree");
+	
+	auto num = 0u;
+	if(A != "") num++;
+	if(A_sparse != "") num++;
+	if(pedigree != "") num++;
+	if(num > 1){
+		alert_import("Cannot specify more than one of 'A', 'A-sparse' and 'pedigree'."); 
+		return;
+	}
+	
 	Amatrix A_matrix;
-	if(A == ""){
-		if(A_sparse == "") A_matrix.set = false;
-		else{
+	A_matrix.set = false;
+	
+	if(num == 1){
+		if(pedigree != ""){
+			auto tab_ped = load_table(pedigree);
+				
+			if(tab_ped.ncol != 3){
+				alert_import("'pedigree' file should have 3 columns"); return;
+			}
+				
+			if(tab_ped.heading[0] != "ID" || tab_ped.heading[1] != "sire" || 
+					tab_ped.heading[2] != "dam"){
+				alert_import("'pedigree' file should have columns with headings 'ID', 'sire' and 'dam'"); return;
+			}
+			
+			for(auto r = 0u; r < tab_ped.nrow; r++){
+				A_matrix.ind_list.push_back(tab_ped.ele[r][0]);
+			}
+			
+			A_matrix.hash_ind_list.create(A_matrix.ind_list);
+			
+			auto N = A_matrix.ind_list.size();
+		
+			vector < vector <double> > Ainv;    	// Creates an inverse
+			Ainv.resize(N);
+			for(auto r = 0u; r < N; r++) Ainv[r].resize(N,0);
+			for(auto r = 0u; r < N; r++) Ainv[r][r] = 1;
+			
+			for(auto r = 0u; r < tab_ped.nrow; r++){
+				vector <unsigned int> par;
+				
+				auto te = tab_ped.ele[r][1];
+				if(te != "."){
+					auto i = A_matrix.hash_ind_list.find(te);
+					if(i == UNSET){
+						alert_import("Sire '"+te+"' cannot be found in individual list");
+					}
+					else par.push_back(i);
+				}					
+				
+				te = tab_ped.ele[r][2];
+				if(te != "."){
+					auto i = A_matrix.hash_ind_list.find(te);
+					if(i == UNSET){
+						alert_import("Dam '"+te+"' cannot be found in individual list");
+					}
+					else par.push_back(i);
+				}			
+
+				switch(par.size()){
+				case 0: break;   // Both parents unknown
+				case 1:          // One parent known
+					{
+						auto p = par[0];
+						Ainv[p][p] += 1.0/3;
+						Ainv[r][r] += 1.0/3;
+						Ainv[p][r] -= 2.0/3;
+						Ainv[r][p] -= 2.0/3;
+					}
+					break;
+					
+				case 2:          // Both parents known
+					{
+						auto par1 = par[0];
+						auto par2 = par[1];
+						
+						Ainv[par1][par1] += 1.0/2;
+						Ainv[par2][par2] += 1.0/2;
+						Ainv[r][r] += 1.0;
+						Ainv[par1][par2] += 1.0/2;
+						Ainv[par2][par1] += 1.0/2;
+						Ainv[par1][r] -= 1.0;
+						Ainv[r][par1] -= 1.0;
+						Ainv[par2][r] -= 1.0;
+						Ainv[r][par2] -= 1.0;
+					}
+					break;
+					
+				default: emsg("Not right"); break;
+				}				
+			}
+		
+			auto A = invert_matrix(Ainv);
+			
+			tidy(A);
+		
+			A_matrix.value = A;
+		}
+		
+		if(A_sparse != ""){
 			A_matrix.set = true;
 			
 			auto ind_list = get_tag_value("ind-list"); 
@@ -1890,35 +2012,37 @@ void Input::ind_effect_command()
 				val[i][j] = value;
 			}
 			A_matrix.value = val;
+			A_matrix.hash_ind_list.create(A_matrix.ind_list);
 		}
-	}
-	else{
-		A_matrix.set = true;
-		auto tab = load_table(A);
-		if(tab.error == true) return;
 	
-		A_matrix.ind_list = tab.heading;
-		if(tab.nrow != tab.ncol){
-			alert_import("The file '"+tab.file+"' must contain an equal number of columns and rows."); 
-			return;
-		}
+		if(A != ""){
+			A_matrix.set = true;
+			auto tab = load_table(A);
+			if(tab.error == true) return;
 		
-		vector < vector <double> > val;
-		val.resize(tab.nrow);
-		for(auto r = 0u; r < tab.nrow; r++){
-			val[r].resize(tab.ncol);
-			for(auto c = 0u; c < tab.ncol; c++){
-				auto ele = number(tab.ele[r][c]);
-				if(ele == UNSET){
-					alert_import(in_file_text(tab.file)+ "the element '"+tstr(ele)+"' is not a number2 (row "+tstr(r+2)+", col "+tstr(c+1)+")");
-					return;
-				}
-				val[r][c] = ele;
+			A_matrix.ind_list = tab.heading;
+			if(tab.nrow != tab.ncol){
+				alert_import("The file '"+tab.file+"' must contain an equal number of columns and rows."); 
+				return;
 			}
+			
+			vector < vector <double> > val;
+			val.resize(tab.nrow);
+			for(auto r = 0u; r < tab.nrow; r++){
+				val[r].resize(tab.ncol);
+				for(auto c = 0u; c < tab.ncol; c++){
+					auto ele = number(tab.ele[r][c]);
+					if(ele == UNSET){
+						alert_import(in_file_text(tab.file)+ "the element '"+tstr(ele)+"' is not a number2 (row "+tstr(r+2)+", col "+tstr(c+1)+")");
+						return;
+					}
+					val[r][c] = ele;
+				}
+			}
+			A_matrix.value = val;
+			A_matrix.hash_ind_list.create(A_matrix.ind_list);
 		}
-		A_matrix.value = val;
 	}
-	A_matrix.hash_ind_list.create(A_matrix.ind_list);
 	
 	// Checks that ind effects do not already exist
 	for(const auto &sp : model.species){

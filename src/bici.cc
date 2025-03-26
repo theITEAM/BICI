@@ -20,7 +20,8 @@
 
 // When running in parallel then load mpi using: module load mpi/openmpi-x86_64
 
-// Test: valgrind --leak-check=yes -s ./bici Execute/init.bici inf
+// Test: valgrind --leak-check=yes -s ./bici-para Execute/init.bici inf
+// Test: valgrind --leak-check=yes -s ./bici-para Execute/FB2.bici inf
 
 // Compiling for windows: .\make.bat from the directory D:\C_complier_BICI2.0\bin
 

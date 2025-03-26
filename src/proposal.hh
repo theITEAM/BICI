@@ -1,5 +1,4 @@
-#ifndef BICI__PARAMPROP_HH
-#define BICI__PARAMPROP_HH
+#pragma once
 
 #include <vector>
 
@@ -48,6 +47,7 @@ class Proposal                             // Implements a proposal
 		
 		vector < vector <double> > M_inv;      // The covariance matrix
 		
+		bool omega_check;                      // Set if omega needs to be checked
 		double prop_weight;                    // The weight given to certain proposals
 		
 		double prop_prob;                      // The probability of performing proposal update
@@ -106,6 +106,7 @@ class Proposal                             // Implements a proposal
 		void MH_ie(State &state);
 		void MH_ie_var(State &state);
 		void MH_ie_covar(State &state);
+		void MH_ie_var_cv(State &state);
 		
 		// MBP_PROP
 		void mbp(State &state);
@@ -126,6 +127,7 @@ class Proposal                             // Implements a proposal
 		void enforce_add_trans(unsigned int i, const ObsData &ob, State &state);
 		bool try_move_obs_trans_event(unsigned int i, unsigned int e, double t, const ObsData &ob, const vector <Event> &ev, State &state);
 		void basic_ind_update(unsigned int i, vector <Event> &ev_new, State &state);
+		void set_omega_check();
 	
 	private:
 		const Model &model;
@@ -143,4 +145,4 @@ class Proposal                             // Implements a proposal
 		void pop_ic(State &state);
 		void pop_ic_swap(State &state);
 };
-#endif
+

@@ -1554,9 +1554,11 @@ Layer.prototype.plot_button = function (bu,ov)
 		
 			let y1 = nearest_pixel(y+pady);
 			let y2 = nearest_pixel(y+pady+((dy-2*pady)/2));
+			let w = Math.floor(inter.sca/5);
+			if(w < 1) w = 1;
 			for(let i = 0; i < 3; i++){
 				let yy = y1+(y2-y1)*i;
-				draw_line(x+padx,yy,x+dx-padx,yy,col,thick);
+				draw_line(x+padx,yy,x+dx-padx,yy,col,w);
 			}				
 		}
 		break;

@@ -1,5 +1,4 @@
-#ifndef BICI__SIMULATE_HH
-#define BICI__SIMULATE_HH
+#pragma once
 
 #include <vector>
 
@@ -23,4 +22,4 @@ class Simulate                             // Simulates from the model
 		
 		State state;
 };
-#endif
+

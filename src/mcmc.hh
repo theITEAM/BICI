@@ -1,5 +1,4 @@
-#ifndef BICI__MCMC_HH
-#define BICI__MCMC_HH
+#pragma once
 
 #include <vector>
 
@@ -39,4 +38,4 @@ class MCMC                                 // Implements an MCMC chain
 		Output &output;
 		Mpi &mpi;
 };
-#endif
+

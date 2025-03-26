@@ -23,7 +23,7 @@ function create_edit_param(lay)
 	
 	switch(lay.op.type){
 	case "Value":
-		title = "Edit constant tensor values";
+		title = "Edit tensor values";
 		break;
 		
 	case "Reparam":
@@ -171,7 +171,8 @@ function add_create_edit_param_buts(lay)
 		
 		let dx = w_dep[1];
 		if(welemax > dx) dx = welemax;
-  	
+  	if(dx < 5) dx = 5;
+		
 		let cx = 2;
 		
 		lay.add_button({te:dep[1], x:cx, y:cy, dx:w_dep[0]-0.3, dy:dy_table, type:"RightText", si:si_mar, font:fo_head, col:mar_col});

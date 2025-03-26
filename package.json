@@ -5,6 +5,8 @@
     "toolbar": true,
     "width": 1019,
     "height": 582,
-	"resizable": true
+	"resizable": true,
+	"min_width": 1000,
+	"min_height": 580
   }
 }

@@ -179,19 +179,51 @@ function add_model_param_content(lay)
 				
 				let ieg = sp.ind_eff_group[i];
 				if(ieg.A_matrix.check == true){
-					let si = 0.9;
-					let te = "Load <e>"+ieg.A_matrix.name+"</e> matrix", dx = 8; 
-					if(ieg.A_matrix.loaded == true){ te = "Reload <e>"+ieg.A_matrix.name+"</e> matrix"; dx = 8;}
-						
-					let text_anno = text_convert_annotation(te,si,si,100,"",BLACK);
-
-					let xload = 4;
-					let dxload = text_anno.wmax+0.5;
 					
-					lay.add_button({word:text_anno.word, x:xload, y:y+0.1, dx:dxload, dy:1.1, type:"LinkPara", ac:"LoadAMarix", p:p, i:i});
+					let si = 0.9;
+					
+					let te_mat = "Load <e>"+ieg.A_matrix.name+"</e> matrix"; 
+				
+					let te_ped = "Load <e>"+ieg.A_matrix.name+"</e> pedigree"; 
+				
+					if(ieg.A_matrix.loaded == true){ 
+						if(ieg.A_matrix.pedigree == true){
+							te_ped = "Reload <e>"+ieg.A_matrix.name+"</e> pedigree"; 
+						}
+						else{
+							te_mat = "Reload <e>"+ieg.A_matrix.name+"</e> matrix";
+						}
+					}
+					
+					let xload = 4;
+					if(te_mat != ""){
+						let text_anno = text_convert_annotation(te_mat,si,si,100,"",BLACK);
+
+						let dxload = text_anno.wmax+0.5;
+					
+						lay.add_button({word:text_anno.word, x:xload, y:y+0.1, dx:dxload, dy:1.1, type:"LinkPara", ac:"LoadAMarix", p:p, i:i});
+						xload += dxload+0.3;
 		
-					if(ieg.A_matrix.loaded == true){
-						lay.add_button({te:"Edit", x:xload+dxload+0.3, y:y-0.2, dx:3.75, dy:1.2, ac:"EditAmatrix", type:"GreyView", p:p, i:i});
+						if(ieg.A_matrix.loaded == true && ieg.A_matrix.pedigree == false){
+							lay.add_button({te:"Edit", x:xload, y:y-0.05, dx:3.75, dy:1.2, ac:"EditAmatrix", type:"GreyView", p:p, i:i});
+							xload += 3.75;
+						}
+						xload += 3;
+					}
+					
+					if(te_ped != ""){
+						let text_anno = text_convert_annotation(te_ped,si,si,100,"",BLACK);
+
+						let dxload = text_anno.wmax+0.5;
+					
+						lay.add_button({word:text_anno.word, x:xload, y:y+0.1, dx:dxload, dy:1.1, type:"LinkPara", ac:"LoadAPed", p:p, i:i});
+						xload += dxload+0.3;
+		
+						if(ieg.A_matrix.loaded == true && ieg.A_matrix.pedigree == true){
+							lay.add_button({te:"Edit", x:xload, y:y-0.05, dx:3.75, dy:1.2, ac:"EditAPed", type:"GreyView", p:p, i:i});
+							xload += 3.75;
+						}
+						xload += 3;
 					}
 					
 					y += dy;
@@ -817,3 +849,34 @@ function param_details_scrollable(lay)
 	
 	return cy;
 }
+
+
+/// Allows for pedigree to be editted
+function edit_A_pedigree(Amat,p,i)
+{
+	start_data_source("APed",{},{p:p,i:i});
+	
+	let so = edit_source;
+	so.table_loaded = true;
+	so.data_table_use = UNSET;
+
+	let tab = so.table;
+	
+	for(let r = 0; r < Amat.ind_list.length; r++){
+		let row = [];
+		row[0] = Amat.ind_list[r];
+		row[1] = Amat.sire_list[r];
+		row[2] = Amat.dam_list[r];
+		tab.ele.push(row);
+	}
+	tab.nrow = tab.ele.length;
+	tab.ncol = 3;
+	tab.edit = true;
+	for(let j = 0; j < so.load_col.length; j++){
+		tab.col_used.push(j);
+		tab.heading.push(so.load_col[j].heading);
+	}
+	
+	generate_screen();
+}
+

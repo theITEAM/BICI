@@ -73,7 +73,7 @@ void StateSpecies::check_markov_eqn_ref() const
 			}
 		}
 		
-		if(dif(markov_eqn_vari[e].indfac_sum,sum)){
+		if(dif(markov_eqn_vari[e].indfac_sum,sum,dif_thresh)){
 			emsg("Problem with ie_sum");
 		}
 	}
@@ -97,7 +97,7 @@ void StateSpecies::check_cpop() const
 	}
 	
 	for(auto c = 0u; c < N; c++){
-		if(dif(cpop[c],cpop_check[c])){
+		if(dif(cpop[c],cpop_check[c],dif_thresh)){
 			cout << c << " " << cpop[c] << " "<< cpop_check[c] <<" dif" << endl;
 			emsg("cpop wrong");
 		}
@@ -115,7 +115,9 @@ void StateSpecies::check_markov_eqn(unsigned int ti, const vector <double> &popn
 		
 		auto value = eqn[me.eqn_ref].calculate(ti,popnum,param_val,spline_val);	
 	
-		if(dif(value,me_vari.value)) emsg("value problem");
+		if(dif(value,me_vari.value,dif_thresh)){
+			emsg("value problem");
+		}
 		
 		auto sum = 0.0; 	
 		if(me.source == true) sum = me.source_tr_gl.size();
@@ -129,7 +131,7 @@ void StateSpecies::check_markov_eqn(unsigned int ti, const vector <double> &popn
 			}
 		}
 		
-		if(dif(me_vari.indfac_sum,sum)) emsg("indfac_sum problem");
+		if(dif(me_vari.indfac_sum,sum,dif_thresh)) emsg("indfac_sum problem");
 	}
 };
 
@@ -154,7 +156,7 @@ void StateSpecies::check_markov_tree_rate() const
 	}
 	
 	for(auto i = 0u; i < markov_tree_rate.size(); i++){
-		if(dif(markov_tree_rate_check[i],markov_tree_rate[i])){
+		if(dif(markov_tree_rate_check[i],markov_tree_rate[i],dif_thresh)){
 			emsg("markov tree problem");
 		}
 	}		

@@ -38,6 +38,8 @@ void Species::initialise_data()
 		}
 	}
 
+	if(type == INDIVIDUAL) jiggle_data();
+	
 	nindividual_in = individual.size();
  
 	add_unobs_Amatrix_ind();
@@ -943,15 +945,6 @@ void Species::trans_data(const DataSource &so)
 			return;
 		}
 		
-		{                                               // Moves if on a division boundary
-			auto t_start = details.t_start, dt = details.dt;
-			auto t_bound = t_start+(unsigned int)(((t+TINY)-t_start)/dt)*dt;
-			if(!dif(t,t_bound)){
-				if(t > t_start+dt) t -= 0.0001*dt;
-				else t += 0.0001*dt;
-			}
-		}
-		
 		ObsData ob; 
 		ob.so = so.index;
 		ob.ref = obs_trans.size();
@@ -1657,6 +1650,120 @@ void Species::add_unobs_Amatrix_ind()
 		if(A.set){
 			for(auto na : A.ind_list){
 				find_individual(na);
+			}
+		}
+	}
+}
+
+
+/// Makes tiny shifts in time ensure that transition times are not equal
+void Species::jiggle_data()
+{
+	auto range = NEAR_DIV_THRESH*details.dt*2;
+		
+	Hash hash_t;
+	
+	// Adds times to hash time when NOT a transition event
+	for(auto &ind : individual){	
+		for(const auto &ev : ind.ev){
+			auto vec = hash_t.get_vec_double(ev.t);
+			hash_t.add(0,vec);
+		}
+		
+		for(const auto &ob : ind.obs){
+			switch(ob.type){
+			case OBS_SOURCE_EV: case OBS_SINK_EV: case OBS_TRANS_EV: break;
+			default:
+				{
+					auto vec = hash_t.get_vec_double(ob.t);
+					hash_t.add(0,vec);
+				}
+				break;
+			}
+		}
+	}
+	
+	for(auto &ind : individual){	
+		double tmin = UNSET, tmax = UNSET;
+		for(const auto &ev : ind.ev){
+			switch(ev.type){
+			case ENTER_EV:
+				if(tmin != UNSET){
+					emsg("Cannot set entry time twice for individual '"+ind.name+"'");
+				}				
+				tmin = ev.t;
+				break;
+				
+			case LEAVE_EV:
+				if(tmax != UNSET){
+					emsg("Cannot set leave time twice for individual '"+ind.name+"'");
+				}				
+				tmax = ev.t;
+				break;
+			case MOVE_EV: break;
+			default: emsg("Should not have diferent type"); break;
+			}
+		}
+			
+		if(tmin == UNSET) tmin = details.t_start;
+		if(tmax == UNSET) tmax = details.t_end;
+	
+		// Makes sure move events are in time range
+		for(const auto &ev : ind.ev){
+			switch(ev.type){
+			case MOVE_EV:
+				if(ev.t <= tmin || ev.t >= tmax){
+					emsg("The move event at time '"+tstr(ev.t)+" for '"+ind.name+"' is not within the time range.");
+				}
+				break;
+			
+				if(tmax != UNSET){
+					emsg("Cannot set leave time twice for individual '"+ind.name+"'");
+				}				
+				tmax = ev.t;
+				break;
+				
+			default: break;
+			}
+		}
+		
+		for(auto &ob : ind.obs){
+			if(ob.t < tmin || ob.t > tmax){
+				emsg("Observation at time "+tstr(ob.t)+" on individual '"+ind.name+"' is out of range");
+			}
+			
+			switch(ob.type){
+			case OBS_SOURCE_EV: case OBS_SINK_EV: case OBS_TRANS_EV: 
+				{
+					double t;
+					const auto loopmax = 1000;
+					auto loop = 0u;
+					do{
+						t = ob.t + loop*range;
+						if(!event_near_div(t,details) && t >= tmin && t <= tmax &&
+   						hash_t.existing(hash_t.get_vec_double(t)) == UNSET){
+							break;
+						}
+						
+						t = ob.t - loop*range;
+						if(!event_near_div(t,details) && t >= tmin && t <= tmax &&
+   						hash_t.existing(hash_t.get_vec_double(t)) == UNSET){
+							break;
+						}
+						loop++;
+					}while(loop < loopmax);
+					
+					if(loop == loopmax){
+						emsg("Could not deal with transition event time '"+tstr(t)+"' on individual '"+ind.name+"'");
+					}
+					
+					ob.t = t;
+					auto vec = hash_t.get_vec_double(t);
+					hash_t.add(0,vec);
+				}
+				break;
+				
+			default: break;
 			}
 		}
 	}

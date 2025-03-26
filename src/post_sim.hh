@@ -1,5 +1,4 @@
-#ifndef BICI__POST_SIM_HH
-#define BICI__POST_SIM_HH
+#pragma once
 
 #include <vector>
 
@@ -23,4 +22,4 @@ class PostSim                              // Simulates from the model
 		
 		State state;
 };
-#endif
+

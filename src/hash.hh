@@ -1,5 +1,4 @@
-#ifndef BICI__HASH_HH
-#define BICI__HASH_HH
+#pragma once
 
 #include <vector>
 
@@ -24,6 +23,7 @@ public:
 	void add(unsigned int num, const string &te);
 	vector <unsigned int> get_vec_eqn(const string &te, unsigned int type, unsigned int p, unsigned int cl, bool infection_trans, unsigned int ti, const string &c_te) const;
 	vector <unsigned int> get_vec_string(const string &te) const;
+	vector <unsigned int> get_vec_double(const double val) const;
 	void create(const vector <string> &v);
 	
 private:
@@ -33,4 +33,4 @@ private:
 	
 	unsigned int get_model_hash_number(const vector <unsigned int> &vec) const;
 };
-#endif
+

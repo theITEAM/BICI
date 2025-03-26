@@ -628,3 +628,81 @@ double Species::calc_enter_prob(unsigned int c, unsigned int entref, const vecto
 		return prob;
 	}
 }
+
+
+/// Gets parameters cv's which correspond individual effect in mean (used for IE_VAR_CV_PROP)
+vector <unsigned int> Species::get_cv_list(unsigned int ie, const vector <Param> &param, const vector <Equation> &eqn) const
+{
+	auto fl = true;
+	
+	const auto &ind_eff = ind_effect[ie]; 
+	
+	vector <unsigned int> list; 	
+	if(ind_eff.markov_eqn_ref.size() > 0) fl = false;
+	else{
+		for(auto ref : ind_eff.nm_trans_ref){
+			const auto &nmt = nm_trans[ref];
+			
+			switch(nmt.type){
+			case GAMMA: case LOG_NORMAL:
+				{
+					const auto &mean_eqn = eqn[nmt.dist_param_eq_ref[0]];
+					const auto &cv_eqn = eqn[nmt.dist_param_eq_ref[1]];
+					if(find_in(mean_eqn.ind_eff_mult,ie) == UNSET) fl = false;
+					if(find_in(cv_eqn.ind_eff_mult,ie) != UNSET) fl = false;
+					if(cv_eqn.param_ref.size() != 1) fl = false;
+					else{
+						const auto &pr = cv_eqn.param_ref[0];
+						const auto &par = param[pr.th];
+						if(par.variety == CONST_PARAM) fl = false;
+						else{
+							auto th = par.param_vec_ref[pr.index];	
+							if(th == UNSET) fl = false;
+							else add_to_vec(list,th);
+						}
+					}
+				}
+				break;
+				
+			default: fl = false; break;
+			}
+		}			
+	}
+	
+	if(fl == false) list.resize(0);
+	return list;
+}
+
+
+/// Calculate the actual omega matrix
+vector < vector <double> > Species::calculate_omega_basic(unsigned int g, const vector <double> &param_val, const vector <Param> &param) const
+{
+	const auto &ieg = ind_eff_group[g];
+	auto N = ieg.list.size();
+	
+	vector < vector <double> > omega;
+	
+	omega.resize(N);
+	for(auto j = 0u; j < N; j++){
+		omega[j].resize(N);
+		for(auto i = 0u; i < N; i++){
+			auto &par = param[ieg.omega[j][i]];
+			if(par.variety == CONST_PARAM) omega[j][i] = par.value[0].value;
+			else{
+				auto th2 = par.param_vec_ref[0]; if(th2 == UNSET) emsg("Should not be unset2");
+				omega[j][i] = param_val[th2];
+			}
+		}
+	}
+	
+	if(false) print("Omega",omega);
+	
+	// Converts correlations to variances
+	for(auto j = 0u; j < N; j++){
+		for(auto i = 0u; i < N; i++){
+			if(j != i) omega[j][i] *= sqrt(omega[i][i]*omega[j][j]);
+		}
+	}
+	
+	return omega;
+}	

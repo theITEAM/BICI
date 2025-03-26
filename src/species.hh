@@ -1,5 +1,4 @@
-#ifndef BICI__SPECIES_HH
-#define BICI__SPECIES_HH
+#pragma once
 
 #include <vector>
 
@@ -87,6 +86,8 @@ class Species   	                         // Stores details of a species
 		// References observation transitions [trgl][ti][#]
 		vector < vector < vector <unsigned int> > > obs_trans_eqn_ref;
 		
+		unsigned int last_obs_trans_ti;        // Last ti point for obs_trans
+		
 		vector <unsigned int> obs_trans_eqn;   // Lists all equations used in obs_trans 
 
 		vector <ObsTrans> obs_trans;           // Any observations on transitions
@@ -151,6 +152,8 @@ class Species   	                         // Stores details of a species
 		vector < vector <double> > get_focal_init_cond(const InitCondValue &icv) const;
 		void set_ind_samp_needed(const vector <Equation> &eqn);
 		double calc_enter_prob(unsigned int c, unsigned int entref, const vector <double> &obs_eqn_value) const;
+		vector <unsigned int> get_cv_list(unsigned int ie, const vector <Param> &param, const vector <Equation> &eqn) const;
+		vector < vector <double> > calculate_omega_basic(unsigned int g, const vector <double> &param_val, const vector <Param> &param) const;
 		
 	// In 'species_data.cc':
 	public: 
@@ -164,6 +167,7 @@ class Species   	                         // Stores details of a species
 		vector <AddRemLocal> find_add_rem_list() const;
 		void add_tr_list(const vector <unsigned int> &tr_list, const vector <bool> &cp, vector <AddRemLocal> &add_rem_local) const;
 		void add_unobs_Amatrix_ind();
+		void jiggle_data();
 		bool is_pop_num_fixed() const;
 		void nm_trans_incomp_info();
 		unsigned int get_tra_m(const TransGlobal &tra, const Event &ev_orig) const;
@@ -207,4 +211,4 @@ class Species   	                         // Stores details of a species
 	const vector <double> &timepoint;
 	const Details &details;
 };
-#endif
+

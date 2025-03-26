@@ -1,7 +1,6 @@
 /// Stores constant values used and enumerated types
 
-#ifndef BICI__CONST_HH
-#define BICI__CONST_HH
+#pragma once
 
 #include <string>
 
@@ -12,7 +11,7 @@ using namespace std;
 //const string default_file = "/tmp/init.bici";   // This is used for Mac
 const string default_file = "Execute/init.bici"; // This is used for windows / linux
 
-//#define USE_MPI                                      // Sets if code can run in parallel
+#define USE_MPI                                      // Sets if code can run in parallel
 
 const bool testing = true;                           // Set to true for additional testing
 const bool slow_check = false;                       // Additional checks which are slow
@@ -136,7 +135,7 @@ enum ObsType { OBS_SOURCE_EV, OBS_TRANS_EV, OBS_SINK_EV, OBS_COMP_EV, OBS_TEST_E
 enum AffectType { SPLINE_PRIOR_AFFECT, PRIOR_AFFECT, DIST_AFFECT, SPLINE_AFFECT, EXP_FE_AFFECT, DIV_VALUE_AFFECT, DIV_VALUE_FAST_AFFECT, DIV_VALUE_LINEAR_AFFECT, MARKOV_LIKE_AFFECT, POP_AFFECT, NM_TRANS_AFFECT, NM_TRANS_BP_AFFECT, NM_TRANS_INCOMP_AFFECT, OMEGA_AFFECT, EXP_IE_AFFECT, LIKE_IE_AFFECT, INDFAC_INT_AFFECT, MARKOV_POP_AFFECT, LIKE_OBS_IND_AFFECT, LIKE_OBS_POP_AFFECT, LIKE_OBS_POP_TRANS_AFFECT, OBS_EQN_AFFECT, LIKE_UNOBS_TRANS_AFFECT, POP_DATA_CGL_TGL_AFFECT, LIKE_INIT_COND_AFFECT, PRIOR_INIT_COND_AFFECT, LIKE_GENETIC_PROCESS_AFFECT, GENETIC_VALUE_AFFECT, LIKE_GENETIC_OBS_AFFECT, IIF_W_AFFECT, POPNUM_IND_W_AFFECT, AFFECT_MAX };
 
 // Different proposal types
-enum PropType { PARAM_PROP, IND_EVENT_TIME_PROP, IND_OBS_SAMP_PROP, IND_OBS_RESIM_PROP, IND_OBS_RESIM_SINGLE_PROP, IND_UNOBS_RESIM_PROP, IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, TRANS_TREE_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP };
+enum PropType { PARAM_PROP, IND_EVENT_TIME_PROP, IND_OBS_SAMP_PROP, IND_OBS_RESIM_PROP, IND_OBS_RESIM_SINGLE_PROP, IND_UNOBS_RESIM_PROP, IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, IE_VAR_CV_PROP, TRANS_TREE_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP };
 
 // Different types of annealing stratregy
 enum AnnealType { ANNEAL_NONE, ANNEAL_SCAN, ANNEAL_POWERAUTO, ANNEAL_LOGAUTO, ANNEAL_POWER };
@@ -236,6 +235,13 @@ enum BoundType { LOWER_BOUND, LOWER_UPPER_BOUND };
 // Sets how markov equation is recalculated
 enum RecalcMarkovType { RECALC, USE_POP_DIF, USE_POP_DIF_TIME};
 
+// Sets diffent distribution for displaying text
+enum DistText { NORM_TE, LOGNORM_TE, WEIBULL_TE, GAMMA_TE, BETA_TE, NEGBINO_TE,BERN_TE, EXP_RATE_TE, EXP_MEAN_TE, POIS_TE, PERIOD_TE};
+
+// Different quantities
+enum DistQuant { SD_QU, CV_QU, MEAN_QU, NORM_MEAN_QU, SHAPE_QU, SCALE_QU, ALPHA_QU, BETA_QU, P_QU, BERNP_QU, RATE_QU, EXP_MEAN_QU, POIS_QU, TIME_QU};
+
+
 /************************** Numeric constants ******************************/
 
 const auto ERR_MSG_MAX = 10u;                     // The maximum number of error messages
@@ -271,7 +277,15 @@ const auto LI_WRONG = -100.0;                     // Likelihood penalty for wron
 const auto GEN_OBS_WRONG = -1000.0;               // Likelihood penalty genetic obs not made
 const auto LOCAL_SMOOTH = 0.1;                    // Smoothing of transitions rate in local props
 
-const double TINY = 0.00000001;                   // Used to represent a tiny number
+const double TINY = 0.000000001;                   // Used to represent a tiny number
+const double VTINY = 0.00000000000001;            // Used to represent a tiny number
+const double NEAR_DIV_THRESH = 0.00000001;      // Threshold for near a div
+const double EFFECT_MAX = 10000000;               // Sets maximum value for effect
+const double EFFECT_MIN = 0.0000001;              // Sets minimum value for effect
+const double DIF_THRESH = 0.00001;                // The threshold for a difference
+const double DIF_THRESH_BURNIN = 0.1;             // The threshold during burnin
+const unsigned int RANGE_MIN = 50;                // Minimum number to calc M
+
 const double TWO_TINY = 2*TINY;                   // Used to represent a tiny number
 const double SMALL = 0.00001;                     // Used to represent a small number
 const double LARGE = 1000000000;                  // Used to represent a big number
@@ -281,7 +295,7 @@ const int LARGE_INT = 1000000000;                 // Used to represent a big int
 const double INFY = 1000000001;                   // Used to represent infinity
 const double UNDEF = 1000000002;                  // Used to represent undefined
 const double ALMOST_ONE = 0.9999999999999;        // Almost one   
-const double OVER_ONE = 1.000000000001;
+const double OVER_ONE = 1.0000000000001;          // Just over one
 const double LOG_THRESH = 0.00001;                // The threshold below which logs not calculated
 const double PROB_MOD = 0.001;                    // Avoids zero probability in local event props
 const double LOW_BOUND = 0;                       // The lower bound for observation probability
@@ -294,8 +308,29 @@ const unsigned int TRUNC_MAX = 40;                // Truncates strings longer th
 
 const auto PHI_LIM = 1.0;                         // The final inverse temperature
 
-const auto CHECK_THIN = 200u;                     // Determines how often MCMC is checked
-
+const auto CHECK_THIN = 20u;                      // Determines how often MCMC is checked
+const auto SD_MIN = TINY;                         // The minimum value for sd
+const auto SD_MAX = LARGE;                        // The maximum value for sd
+const auto CV_MIN = 0.01;                         // The minimum value for cv
+const auto CV_MAX = 10.0;                         // The maximum value for cv
+const auto MEAN_MIN = VTINY;                      // The minimum for dist mean
+const auto MEAN_MAX = LARGE;                      // The maximim for dist mean
+const auto NORM_MEAN_MIN = -LARGE;                // The minimum for normal mean
+const auto NORM_MEAN_MAX = LARGE;                 // The maximum for normal mean
+const auto SCALE_MIN = TINY;                      // The minimum for dist scale
+const auto SCALE_MAX = LARGE;                     // The minimum for dist scale
+const auto SHAPE_MIN = 0.1;                       // The minimum for dist shape
+const auto SHAPE_MAX = 100.0;                     // The maximum for dist shape
+const auto ALPBETA_MIN = 0.01;                    // The minumum for alpha or beta
+const auto ALPBETA_MAX = 100;                     // The minumum for alpha or beta
+const auto LAM_MIN = 0;                           // The minimum value for poisson
+const auto LAM_MAX = LARGE;                       // The maximum value for poisson
+const auto EXP_MEAN_MIN = TINY;                   // Minimum mean for exponential
+const auto TIME_MIN = TINY;                       // The minimum time
+const auto RATE_MIN = TINY;                       // The minimum rate
+const auto P_MIN = TINY;                          // The minimum probability
+const auto P_MAX = 1-TINY;                        // The maximum probability
+ 
 const unsigned int SIM_NUM_DEFAULT = 1;           // The default simulation number
 const unsigned int PPC_NUM_DEFAULT = 200;         // The default number of ppc simulations
 const auto ALG_DEFAULT = DA_MCMC;                 // Default inference algorithm
@@ -311,6 +346,7 @@ const auto MCMC_OP_PARAM_DEFAULT = 1000u;         // The default number of outpu
 const auto MCMC_OP_STATE_DEFAULT = 200u;          // The default number of output states  
 const auto MCMC_CHAIN_PER_CORE_DEFAULT = 1u;      // The default chains per core
 const auto PAS_PART_PER_CORE_DEFAULT = 1u;        // The default particles per core
+const auto PAS_GEN_UPDATE_DEFAULT = 1.0;          // The default updates per generation percent  
 
 const auto ABC_SAMPLE_DEFAULT = 1000u;            // The default number of ABC samples
 const auto ABC_ACFRAC_DEFAULT = 0.1;              // The default acceptance fraction for ABC
@@ -382,5 +418,3 @@ EqnInfo(DIST,PARAM_ONLY,false),
 EqnInfo(DERIVE_EQN,DERIVE_MODE,false),
 EqnInfo(REPARAM_EQN,ALL,false)
 };
-
-#endif

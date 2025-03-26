@@ -170,6 +170,10 @@ function add_bubble_buts(lay)
 			else{
 				bubble_addparagraph(cont,"<b>Value:</b> "+bu.value,0,cont.dx);
 			}
+			cont.y += 0.2;
+			bubble_addparagraph(cont,"<b>x:</b> <e>"+bu.labels.xlab[bu.i]+"</e>",0,cont.dx);
+			cont.y += 0.2;
+			bubble_addparagraph(cont,"<b>y:</b> <e>"+bu.labels.ylab[bu.j]+"</e>",0,cont.dx);
 		}
 		break;
 		

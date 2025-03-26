@@ -43,6 +43,7 @@ PAS::PAS(const Model &model, Output &output, Mpi &mpi) : model(model), output(ou
 	// Aim for 100 parameter samples per generation
 	step_gen_param = (gen_update*de.nchain)/100;
 	if(step_gen_param > gen_update) step_gen_param = gen_update;
+	if(step_gen_param == 0) step_gen_param = 1;
 	
 	for(auto &ch : chain) ch.state.init();
 }
@@ -55,9 +56,14 @@ void PAS::run()
 	
 	if(op()) cout << "Annealing..." << endl;
 	
+	for(auto &ch : chain) ch.state.dif_thresh = DIF_THRESH_BURNIN;
+		
 	for(auto &ch : chain) ch.init();
 
 	auto time_anneal_start = clock();
+
+	auto step_Lobs = gen_update/10;
+	if(step_Lobs == 0) step_Lobs = 1;
 
 	if(com_op) cout << "<ANNEALING>" << endl;
 	
@@ -66,11 +72,20 @@ void PAS::run()
 		progress(phi,1);
 			
 		if(op()) cout << "Generation " << g << ":  φ=" << phi << endl;
- 
+
+		for(auto &ch : chain){ ch.Lobs_av = 0; ch.nLobs_av = 0;}
+	 
 		for(auto s = 0u; s < gen_update; s++) {   // Updates mcmc
 			for(auto &ch : chain){
 				ch.pas_burn_update(s,g,gen_update,phi);
 				ch.update(s);
+			}
+			
+			if(s%step_Lobs == step_Lobs-1){
+				for(auto &ch : chain){
+					ch.Lobs_av += ch.like_total_obs(); 
+					ch.nLobs_av++;
+				}
 			}
 			
 			if(s%step_gen_param == step_gen_param-1){ // Stores samples for generation plot
@@ -93,6 +108,8 @@ void PAS::run()
 	long time_start = clock();
 
 	for(auto s = 0u; s < nsample; s++){
+		//if(mpi.core == 14) cout << s << " samp" << endl;
+	
 		output.percentage(s,nsample);
 		progress(s,nsample);
 	
@@ -145,7 +162,10 @@ bool PartRO_ord (PartReorder p1,PartReorder p2)
 void PAS::bootstrap()
 {
 	vector <double> L_store;
-	for(const auto &ch : chain) L_store.push_back(ch.like_total_obs());
+	
+	for(const auto &ch : chain){
+		L_store.push_back(ch.Lobs_av/ch.nLobs_av);
+	}
 	
 #ifdef USE_MPI 
 	auto L_store_tot = mpi.gather(L_store);
@@ -163,11 +183,17 @@ void PAS::bootstrap()
 		for(auto i = 0u; i < Ntot; i++){ part_ro[i].i = i; part_ro[i].L = L_store_tot[i];}
 		
 		sort(part_ro.begin(),part_ro.end(),PartRO_ord);  // Sorts EFs
-			
-		auto L_range = part_ro[int(0.75*Ntot)].L - part_ro[int(0.5*Ntot)].L;
+		
+		auto i1 = int(0.5*Ntot);
+		auto i2 = int(0.75*Ntot);
+		if(i1 == i2){
+			if(i1 > 0) i1--;
+			else i2++;
+		}
+		auto L_range = part_ro[i2].L - part_ro[i1].L;
 	
 		if(L_range == 0) L_range = 1;
-		
+	
 	  auto dphi = quench_factor/L_range;   // Sets the increase in inverse temperature
 		
 		if(phi+dphi > phi_final) dphi = phi_final-phi;  // Limits phi to phifinal

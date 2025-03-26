@@ -25,12 +25,18 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 	double va;
 	
 	for(auto ti : list){
-		const auto &div = me_vari.div[ti];
+		auto &div = me_vari.div[ti];
 		
 		auto val = div.value;
 		if(val < 0){
-			if(val > -TINY) val = 0;
-			else emsg("Rate has become negative");
+			if(val > -SMALL){
+				div.value = 0;
+				val = 0;
+			}
+			else{
+				cout << val << " val\n";
+				emsg("Rate has become negative");
+			}
 		}
 		
 		auto Li = -val*div.indfac_int;
@@ -147,7 +153,7 @@ vector <double> StateSpecies::likelihood_markov_value_fast(const vector <unsigne
 			
 				if(slow_check){
 					auto value = eq.calculate(ti,popnum_t[ti],param_val,spline_val);
-					if(dif(value,val+d)) emsg("markov fast problem");
+					if(dif(value,val+d,dif_thresh)) emsg("markov fast problem");
 				}
 			
 				store.push_back(val);
@@ -166,7 +172,7 @@ vector <double> StateSpecies::likelihood_markov_value_fast(const vector <unsigne
 			
 				if(slow_check){
 					auto value = eq.calculate(ti,popnum_t[ti],param_val,spline_val);
-					if(dif(value,val+d)) emsg("markov fast problem");
+					if(dif(value,val+d,dif_thresh)) emsg("markov fast problem");
 				}
 			
 				store.push_back(val);
@@ -252,7 +258,7 @@ vector <double> StateSpecies::likelihood_markov_value_linear(const vector <unsig
 			me_vari.div[ti].value = val[i];
 			
 			if(slow_check){
-				if(dif(val[i],eq.calculate(ti,popnum_t[ti],param_val,spline_val))){
+				if(dif(val[i],eq.calculate(ti,popnum_t[ti],param_val,spline_val),dif_thresh)){
 					emsg("Not agree"); 
 				}
 			}

@@ -141,8 +141,7 @@ vector <LocalIndChange> StateSpecies::local_ind_change(unsigned int i, unsigned 
 					
 					if(si != UNSET){
 						const auto &sw = claa.swap[si];
-						
-						if(!(no_enter == true && sw.start[0].type == ENTER_SW)){
+						if(!(no_enter == true && sw.start.size() > 0 && sw.start[0].type == ENTER_SW)){
 							LocalIndChange lic;
 							lic.i = i;
 							lic.cl = cl;
@@ -404,16 +403,15 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 					enew.c_after = c_after;
 					enew.t = t;
 					
-					if(tr_gl != UNSET){
-						rate_mean.update_prob_try_Rint(t_new,t,tr_gl,cl,c_new,prob_try,Rint,ind,MULT_MOD);
-						//rate_mean.update_prob_try_Rint_R(t_new,t,cl,c_new,prob_try,Rint,ind,MULT_MOD);
-						//auto ti_ev = get_ti(t);
-						//rate_mean.update_prob_try_event(ti_ev,tr_gl,cl,c_new,prob_try,ind,MULT_MOD);
-						t_new = t;
-					}
+					rate_mean.update_prob_try_Rint(t_new,t,tr_gl,cl,c_new,prob_try,Rint,ind,MULT_MOD);
+					t_new = t;
 					
 					ev_new.push_back(enew);
 					c_new = c_after;
+				}
+				else{
+					rate_mean.update_prob_try_Rint(t_new,tmax,UNSET,cl,c_new,prob_try,Rint,ind,MULT_MOD);
+					t_new = tmax;
 				}
 				k++; if(k < K) t_event_new = time_list[k]; else t_event_new = LARGE;
 			}
@@ -422,33 +420,34 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 		case OLD_EVENT_LOC:                   // Removes old event
 			{
 				const auto &eve = event[e];
+				auto t = eve.t;
+				auto tr_gl = UNSET;
+				
 				if(r < R && rem[r] == e){
 					if(eve.observed) return 0;
-					auto tr_gl = eve.tr_gl;
-					if(tr_gl != UNSET){				
-						auto t = eve.t;
-						rate_mean.update_prob_try_Rint(t_old,t,tr_gl,cl,c_old,prob_try,Rint,ind,DIV_MOD);
-						
-						//rate_mean.update_prob_try_Rint_R(t_old,t,cl,c_old,prob_try,Rint,ind,DIV_MOD);
-						
-						//auto ti_ev = get_ti(t);
-						//rate_mean.update_prob_try_event(ti_ev,tr_gl,cl,c_old,prob_try,ind,DIV_MOD);
-						
-						t_old = t;
-					}
+					tr_gl = eve.tr_gl;
 					r++;
 				}
 				else{
 					auto ev_add = eve;
 					
 					if(sp.correct_ev(c_new,ev_add) == true) emsg("Inconsistent");
+
+					if(c_new != UNSET && t > t_new){
+						rate_mean.update_prob_try_Rint(t_new,t,UNSET,cl,c_new,prob_try,Rint,ind,MULT_MOD);
+						t_new = t;
+					}
 					
 					ev_new.push_back(ev_add);
 					c_new = ev_add.c_after; 
 				}
 				
-				c_old = eve.c_after;
+				if(c_old != UNSET && t > t_old){
+					rate_mean.update_prob_try_Rint(t_old,t,tr_gl,cl,c_old,prob_try,Rint,ind,DIV_MOD);
+					t_old = t;
+				}
 				
+				c_old = eve.c_after;
 				e++; if(e < E) t_event_old = event[e].t; else t_event_old = LARGE;
 			}
 			break;
@@ -515,14 +514,14 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 	}while(true);
 	
 	// Accounts for the final part of the integral
-	if(t_old != tmax){
+	if(t_old != tmax && c_old != UNSET){ 
 		rate_mean.update_prob_try_Rint(t_old,tmax,UNSET,cl,c_old,prob_try,Rint,ind,DIV_MOD);
 	}
-		
-	if(t_new != tmax){
-		rate_mean.update_prob_try_Rint(t_new,tmax,UNSET,cl,c_new,prob_try,Rint,ind,MULT_MOD);
-	}
 	
+	if(t_new != tmax && c_new != UNSET){
+		rate_mean.update_prob_try_Rint(t_new,tmax,UNSET,cl,c_new,prob_try,Rint,ind,MULT_MOD);		
+	}
+
 	prob_try *= exp(Rint);
 	
 	// Adds remaining events
@@ -953,7 +952,7 @@ void RatePosteriorMean::update_prob_try_Rint(double t1, double t2, unsigned int 
 	
 	case NM_CALCALL_UP: 
 		{
-			//emsg("to do2");
+			emsg("to do2");
 			/*
 			auto sum = 0.0;
 			for(auto m : compr.list){
@@ -1073,8 +1072,11 @@ void StateSpecies::swap_check_rev_prob_try(double prob_try, double timefac, cons
 	auto prob_try_rev = create_local_change(timefac_rev,add[k_sel],ev_new,enew,nind_obs,ev_store,LOCAL_REVERSE);
 
 	if(prob_try_rev != 0){
-		if(dif(prob_try,1.0/prob_try_rev)) emsg("prob_try dif");
-		if(dif(timefac,1.0/timefac_rev)){
+		if(dif(prob_try,1.0/prob_try_rev,dif_thresh)){
+			emsg("prob_try dif");
+		}
+		
+		if(dif(timefac,1.0/timefac_rev,dif_thresh)){
 			cout << "Change:" << endl;
 			print_local_ind_change(lich);
 		

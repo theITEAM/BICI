@@ -1,5 +1,4 @@
-#ifndef BICI__SOURCESAMPLER_HH
-#define BICI__SOURCESAMPLER_HH
+#pragma once
 
 #include <vector>
 
@@ -43,4 +42,4 @@ class SourceSampler {
 		const Details &details;
 		const InitCond &init_cond;
 };
-#endif
+

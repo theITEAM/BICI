@@ -82,6 +82,7 @@ function right_menu_buts(lay)
 			if(rpf.siminf == "inf" || rpf.siminf == "ppc"){ // Individual group filter
 				let p = model.get_p();
 				let rpf2 = rpf.species[p];
+				
 				if(rpf2.pos_indgroup.length > 1){
 					y = add_filter("Ind. Group",y,rpf2.sel_indgroup,rpf2.pos_indgroup,lay);
 				}

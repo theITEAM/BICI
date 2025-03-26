@@ -270,9 +270,9 @@ function button_action(bu,action_type)
 		
 	case "TimelineGrab":
 		if(double_click == true){
-			let mx = inter.mx;
+			let mx = inter.mx, my = inter.my;
 			let lay = get_lay("GraphContent");
-			inter.graph.zoom_timeline_factor(1.3,(mx-lay.x)/lay.dx);
+			inter.graph.zoom_timeline_factor(1.3,(mx-lay.x)/lay.dx,(my-lay.y)/lay.dy);
 		}			
 		break;
 		
@@ -1542,6 +1542,21 @@ function button_action(bu,action_type)
 	
 	case "LoadAMarix":
 		start_data_source("LoadAmatrix",{},{p:bu.p,i:bu.i});
+		file_add_datatable(); 
+		break;
+		
+	case "APedAdd":
+		start_worker("Add A pedigree",{edit_source:edit_source});
+		close_data_source();
+		break;
+		
+	case "EditAPed":
+		start_worker("EditAPed",{p:bu.p, i:bu.i});
+		break;
+		
+		
+	case "LoadAPed":
+		start_data_source("APed",{},{p:bu.p,i:bu.i});
 		file_add_datatable(); 
 		break;
 	

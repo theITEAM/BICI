@@ -247,10 +247,10 @@ vector <unsigned int>  StateSpecies::update_ind(unsigned int i, vector <Event> &
 		
 		if(!identical){
 			if(t == t_old){                               // Removes old event
-				const auto &eve_old = ev_old[e_old];
+				auto &eve_old = ev_old[e_old];
 				
 				remove_old.push_back(e_old);
-				remove_event(eve_old,ind,like_ch); 
+				remove_event(eve_old,ind,like_ch,i,ev_old); 
 	
 				c_old = eve_old.c_after; e_old++;
 
@@ -306,7 +306,7 @@ vector <unsigned int>  StateSpecies::update_ind(unsigned int i, vector <Event> &
 			}
 		}
 	}while(true);
-	
+
 	// Updates the initial condition (if neccesary)
 	if(c_enter_old != c_enter_new){
 		switch(sp.init_cond.type){
@@ -394,7 +394,7 @@ void StateSpecies::set_m_ti_origin(vector <Event> &ev_new) const
 	
 
 /// Removes event from old event sequence 
-void StateSpecies::remove_event(const Event &ev, const Individual &ind, Like &like_ch)
+void StateSpecies::remove_event(Event &ev, const Individual &ind, Like &like_ch, unsigned int i, vector <Event> &event_old)
 {
 	switch(ev.type){
 	case NM_TRANS_EV:
@@ -404,12 +404,24 @@ void StateSpecies::remove_event(const Event &ev, const Individual &ind, Like &li
 			like_ch.nm_trans -= ev.Li + ev.Li_bp;
 		
 			auto nmt_ind = ev.index;
-	
+			
 			if(nmt_ind+1 < nmter.size()){
 				const auto &eref = nmter[nmter.size()-1];
-				nmter[nmt_ind] = eref;
-			
-				individual[eref.i].ev[eref.e_end].index = nmt_ind;
+				nmter[nmt_ind] = eref;	
+				
+				auto ii = eref.i;
+				if(ii != i){
+					individual[ii].ev[eref.e_end].index = nmt_ind;
+				}
+				else{
+					auto index = eref.e_end;
+					if(event_old[index].t > ev.t){	
+						event_old[index].index = nmt_ind;
+					}
+					else{
+						individual[ii].ev[index].index = nmt_ind;
+					}
+				}
 			}
 			nmter.pop_back();	
 		}
@@ -424,11 +436,25 @@ void StateSpecies::remove_event(const Event &ev, const Individual &ind, Like &li
 			auto &it = markov_eqn_vari[e].div[ti].ind_trans;
 			auto k = ev.index;
 		
-			if(k >= it.size()) emsg(" out of range");
+			if(k >= it.size()) emsg(" out of range a");
+			
 			if(k != it.size()-1){
 				auto &it_shift = it[it.size()-1];
 				it[k] = it_shift;
-				individual[it_shift.i].ev[it_shift.index].index = k;
+				auto ii = it_shift.i;
+	
+				if(ii != i){
+					individual[ii].ev[it_shift.index].index = k;
+				}
+				else{
+					auto index = it_shift.index;
+					if(event_old[index].t > ev.t){	
+						event_old[index].index = k;
+					}
+					else{
+						individual[ii].ev[index].index = k;
+					}
+				}
 			}
 			it.pop_back();
 		
@@ -485,8 +511,9 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee,  const vector 
 			auto t = ev_orig.t;		
 			auto ti = ev.ti;
 			auto m = ev.m;
-			auto dt = ev.t - t; if(dt <= 0) emsg("zero time1");
-
+			auto dt = ev.t - t; 
+			if(dt <= 0) emsg("zero time1");
+			
 			const auto &tra = sp.tra_gl[ev.tr_gl];	
 			const auto &nmt = sp.nm_trans[m];
 			const auto &ref = nmt.dist_param_eq_ref;
@@ -636,7 +663,7 @@ void StateSpecies::remove_all_event_ref(const vector <unsigned int> &ind_list)
 					auto &it = markov_eqn_vari[e].div[ti].ind_trans;
 					auto k = ev.index;
 				
-					if(k >= it.size()) emsg(" out of range");
+					if(k >= it.size()) emsg(" out of range b");
 					if(k != it.size()-1){
 						auto &it_shift = it[it.size()-1];
 						it[k] = it_shift;
@@ -762,6 +789,10 @@ void StateSpecies::set_e_origin(Event &ev, unsigned int e, const vector <Event> 
 /// Sets incomp_ref
 void StateSpecies::set_incomp_ref(unsigned int i, const vector < vector <double> > &popnum_t, double &like_ch)
 { 
+	if(std::isnan(like_ch)){
+		emsg("Incomplete not a num before");
+	}
+	
 	auto &ind = individual[i];
 	auto &inmtr = ind.incomp_ref;
 	
@@ -837,7 +868,10 @@ void StateSpecies::set_incomp_ref(unsigned int i, const vector < vector <double>
 				incomp_turn_off(inm);
 			}
 		}
-	}			
+	}		
+	if(std::isnan(like_ch)){
+		emsg("Incomplete not a num");
+	}
 }
 
 
@@ -1178,7 +1212,7 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 			
 				if(false){
 					auto val_ch = eq.calculate(tii,popnum_t[tii],param_val,spline_val);
-					if(dif(value,val_ch)){
+					if(dif(value,val_ch,dif_thresh)){
 						emsg("problem with value");
 					}
 				}

@@ -285,7 +285,7 @@ function add_inf_start_buts(lay)
 				cy = lay.add_paragraph("Set the number of MCMC updates:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 		
 				yy = cy-2.5;
-				add_right_input_field(yy,"Samples",{type:"inf_sample",update:true},lay);
+				add_right_input_field(yy,"Updates",{type:"inf_sample",update:true},lay);
 			}
 			
 			cy += gapop;	
@@ -304,10 +304,10 @@ function add_inf_start_buts(lay)
 			{
 				cy = lay.add_subtitle("Updates per generation",cx,cy,WHITE,{te:gen_update_text});
 				
-				cy = lay.add_paragraph("Set the number of MCMC updates per generation:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Set the number of updates per generation as a percentage of MCMC updates:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 		
 				yy = cy-2.5;
-				add_right_input_field(yy,"Updates",{type:"inf_gen_update",update:true},lay);
+				add_right_input_field(yy,"Percentage",{type:"inf_gen_update",update:true},lay);
 			}
 			break;
 			
@@ -383,7 +383,7 @@ function add_inf_start_buts(lay)
 			{
 				cy = lay.add_subtitle("Output parameter sample number",cx,cy,WHITE,{te:param_sample_text});
 				
-				cy = lay.add_paragraph("Set the number of parameter samples to be generated.",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Set the number of parameter samples to be generated:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 			
 				let yy = cy-2.5;
 				add_right_input_field(yy,"Param. samples output",{type:"inf_output_param ",update:true},lay);
@@ -392,7 +392,7 @@ function add_inf_start_buts(lay)
 			
 				cy = lay.add_subtitle("Output state sample number",cx,cy,WHITE,{te:state_sample_text});
 				
-				cy = lay.add_paragraph("Set the number of state samples to be generated.",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Set the number of state samples to be generated:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 			
 				yy = cy-2.5;
 				add_right_input_field(yy,"State samples output",{type:"inf_outputstate",update:true},lay);
@@ -402,7 +402,7 @@ function add_inf_start_buts(lay)
 				if(alg == "DA-MCMC"){
 					cy = lay.add_subtitle("Chains per core",cx,cy,WHITE,{te:chain_per_core_text});
 				
-					cy = lay.add_paragraph("Set the number of chains to be run on each CPU core.",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+					cy = lay.add_paragraph("Set the number of chains to be run on each CPU core:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 			
 					yy = cy-2.5;
 					add_right_input_field(yy,"Chains per core",{type:"inf_cha_per_core",update:true},lay);
@@ -411,7 +411,7 @@ function add_inf_start_buts(lay)
 				if(alg == "PAS-MCMC"){
 					cy = lay.add_subtitle("Particles per core",cx,cy,WHITE,{te:part_per_core_text});
 				
-					cy = lay.add_paragraph("Set the number of particles to be run on each CPU core.",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+					cy = lay.add_paragraph("Set the number of particles to be run on each CPU core:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 			
 					yy = cy-2.5;
 					add_right_input_field(yy,"Particles per core",{type:"inf_part_per_core",update:true},lay);
@@ -434,7 +434,7 @@ function add_inf_start_buts(lay)
 	
 				cy = lay.add_subtitle("Kernel",cx,cy,WHITE,{te:kernel_text});
 			
-				cy = lay.add_paragraph("Set size of proposal kernel relative to posterior:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Set size of proposal kernel relative to the posterior:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 			
 				yy = cy-2.5;
 				add_right_input_field(yy,"Kernel size",{type:"inf_kernelsize",update:true},lay);
@@ -446,7 +446,7 @@ function add_inf_start_buts(lay)
 		
 		cy = lay.add_subtitle("Individual maximum",cx,cy,WHITE,{te:indmax_text});
 				
-		cy = lay.add_paragraph("Maximum number of individuals (for individual-based models)",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+		cy = lay.add_paragraph("Maximum number of individuals (for individual-based models):",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 	
 		let yy = cy-2.5;
 		add_right_input_field(yy,"Maximum",{type:"inf_indmax",update:true},lay);
@@ -455,7 +455,7 @@ function add_inf_start_buts(lay)
 		
 		cy = lay.add_subtitle("Parameter outputs",cx,cy,WHITE,{te:paramoutputmax_text});
 				
-		cy = lay.add_paragraph("Threshold number of tensor elements above which tensor not output.",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+		cy = lay.add_paragraph("Threshold number of tensor elements above which tensor not output:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 	
 		yy = cy-2.5;
 		add_right_input_field(yy,"Maximum",{type:"inf_paramout",update:true},lay);
@@ -467,7 +467,7 @@ function add_inf_start_buts(lay)
 			{
 				cy = lay.add_subtitle("Burn-in",cx,cy,WHITE,{te:burnin_text});
 				
-				cy = lay.add_paragraph("Annealing used during the burn-in phase",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Annealing used during the burn-in phase:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 				
 				let pos = [{te:"none"},{te:"scan"},{te:"power-auto"},{te:"log-auto"},{te:"power"}];
 				
@@ -503,7 +503,7 @@ function add_inf_start_buts(lay)
 				if(type != "scan"){
 					cy += 1.5;
 						
-					cy = lay.add_paragraph("Percentage of samples for burn-in",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+					cy = lay.add_paragraph("Set the number of updates for burn-in as a percentage of MCMC updates:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 		
 					let yy = cy-2.5;
 					add_right_input_field(yy,"Percentage",{type:"burnin_frac",update:true},lay);
@@ -517,7 +517,7 @@ function add_inf_start_buts(lay)
 			{
 				cy = lay.add_subtitle("Burn-in",cx,cy,WHITE,{te:burnin_text});
 				
-				cy = lay.add_paragraph("Percentage of samples for burn-in",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Set the number of updates for burn-in as a percentage of MCMC updates:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 	
 				let yy = cy-2.5;
 				add_right_input_field(yy,"Percentage",{type:"burnin_frac",update:true},lay);

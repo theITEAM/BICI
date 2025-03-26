@@ -61,7 +61,7 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 			const auto &po = model.pop[k];
 			
 			if(ma != 0){
-				auto num = ma; 
+				double num = ma; 
 				for(auto ie : po.ind_eff_mult) num *= ind.exp_ie[ie];
 				for(auto fe : po.fix_eff_mult) num *= ind.exp_fe[fe];
 				

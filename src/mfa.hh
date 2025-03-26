@@ -1,5 +1,4 @@
-#ifndef BICI__MFA_HH
-#define BICI__MFA_HH
+#pragma once
 
 #include <vector>
 
@@ -51,4 +50,4 @@ class MFA                                  // Implements a MFA chain
 		
 		State state;
 };
-#endif
+

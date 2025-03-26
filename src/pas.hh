@@ -1,5 +1,4 @@
-#ifndef BICI__PAS_HH
-#define BICI__PAS_HH
+#pragma once
 
 #include <vector>
 
@@ -48,4 +47,4 @@ class PAS                                 // Implements PAS algorithm
 		Output &output;
 		Mpi &mpi;
 };
-#endif
+

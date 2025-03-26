@@ -11,6 +11,7 @@ using namespace std;
 
 #include "model.hh"
 #include "utils.hh"
+#include "matrix.hh"
 
 /// Initialises the model 
 Model::Model(Operation mode_)
@@ -101,30 +102,37 @@ vector <double> Model::param_sample() const
 {
 	vector <double> param_val(nparam_vec,0);
 	
-	for(auto th = 0u; th < nparam_vec; th++){
-		const auto &pv = param_vec[th];
-		
-		const auto &par = param[pv.th];
-		switch(par.variety){
-		case CONST_PARAM:
-			param_val[th] = par.value[pv.index].value;
-			break;
+	auto loop = 0u, loopmax = 100u;
+	do{
+		for(auto th = 0u; th < nparam_vec; th++){
+			const auto &pv = param_vec[th];
 			
-		case REPARAM_PARAM: 
-			{
-				auto eq_ref = par.value[pv.index].eq_ref;
-				if(eq_ref == UNSET) emsg("eq_ref should be set");
-				param_val[th] = eqn[eq_ref].calculate_param_only(param_val);
+			const auto &par = param[pv.th];
+			switch(par.variety){
+			case CONST_PARAM:
+				param_val[th] = par.value[pv.index].value;
+				break;
+				
+			case REPARAM_PARAM: 
+				{
+					auto eq_ref = par.value[pv.index].eq_ref;
+					if(eq_ref == UNSET) emsg("eq_ref should be set");
+					param_val[th] = eqn[eq_ref].calculate_param_only(param_val);
+				}
+				break;
+				
+			case DIST_PARAM: case PRIOR_PARAM:
+				param_val[th] = prior_sample(pv.prior,param_val);
+				break;
+				
+			case UNSET_PARAM: emsg("error param"); break;
 			}
-			break;
-			
-		case DIST_PARAM: case PRIOR_PARAM:
-			param_val[th] = prior_sample(pv.prior,param_val);
-			break;
-			
-		case UNSET_PARAM: emsg("error param"); break;
 		}
-	}
+	
+		if(!ie_cholesky_error(param_val)) break;
+		loop++;
+	}while(loop < loopmax);
+	if(loop == loopmax) emsg("Could not sample parameters due to Cholesky error");
 	
 	return param_val;
 }
@@ -307,6 +315,7 @@ double Model::recalculate_spline_prior(unsigned int s, vector <double> &spline_p
 	spline_prior[s] = Li;
 	
 	return store;
+	
 }
 	
 
@@ -494,30 +503,34 @@ void Model::order_affect(vector <AffectLike> &vec) const
 			al.order_num = 1; 
 			break;
 			
-		case SPLINE_AFFECT: case EXP_FE_AFFECT: case POP_AFFECT: case EXP_IE_AFFECT:
+		case SPLINE_AFFECT: case EXP_FE_AFFECT: case EXP_IE_AFFECT:
 			al.order_num = 2; 
 			break;
-		
-		case INDFAC_INT_AFFECT: 
+			
+		case POP_AFFECT: 
 			al.order_num = 3; 
+			break;
+			
+		case INDFAC_INT_AFFECT: 
+			al.order_num = 4; 
 			break;
 		
 		case DIV_VALUE_AFFECT: case DIV_VALUE_FAST_AFFECT: case DIV_VALUE_LINEAR_AFFECT: 
 		case POP_DATA_CGL_TGL_AFFECT:
-			al.order_num = 4; 
+			al.order_num = 5; 
 			break;
 			
 		case OBS_EQN_AFFECT: //case OBS_TRANS_EQN_AFFECT:
 		case IIF_W_AFFECT:
 		case POPNUM_IND_W_AFFECT:
-			al.order_num = 5; 
+			al.order_num = 6; 
 			break;
 			
 		case MARKOV_LIKE_AFFECT: case NM_TRANS_AFFECT:  case NM_TRANS_BP_AFFECT: case NM_TRANS_INCOMP_AFFECT: case LIKE_IE_AFFECT: 
 		case MARKOV_POP_AFFECT: case LIKE_OBS_IND_AFFECT: case LIKE_OBS_POP_AFFECT: 
 		case LIKE_OBS_POP_TRANS_AFFECT: case LIKE_UNOBS_TRANS_AFFECT:
 		case LIKE_GENETIC_PROCESS_AFFECT: case LIKE_GENETIC_OBS_AFFECT:
-			al.order_num = 6; 
+			al.order_num = 7; 
 			break;
 			
 		case AFFECT_MAX: break;
@@ -1253,3 +1266,34 @@ void Model::set_hash_all_ind()
 		}
 	}
 }
+
+
+/// Checks that the cholesky matrices can all be specified
+bool Model::ie_cholesky_error(const vector <double> &param_val) const
+{
+	for(auto p = 0u; p < species.size(); p++){
+		const auto &sp = species[p];
+		for(auto g = 0u; g < sp.ind_eff_group.size(); g++){
+			auto omega = sp.calculate_omega_basic(g,param_val,param);
+			auto illegal = false;
+			calculate_cholesky(omega,illegal);
+			if(illegal) return true;
+		}
+	}
+
+	return false;
+}
+
+
+/// Prints a set of parameters
+void Model::print_param(const vector <double> &vec) const
+{
+	if(com_op == true) return;
+	
+	cout << "Parameters:" << endl;
+	for(auto th = 0u; th < param_vec.size(); th++){
+		cout << param_vec[th].name << " "<< vec[th] << endl;
+	}
+	cout << endl;
+}
+

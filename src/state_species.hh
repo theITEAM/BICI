@@ -1,5 +1,4 @@
-#ifndef BICI__STATE_SPECIES_HH
-#define BICI__STATE_SPECIES_HH
+#pragma once
 
 #include <vector>
 
@@ -82,7 +81,7 @@ class StateSpecies                         // Stores information about the state
 		
 		vector <long> timer;                   // General purpose timers
 		
-		StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const	vector <double> &timepoint, const	vector <double> &dtimepoint,  const vector <unsigned int> &pop_affect, Operation mode);
+		StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const	vector <double> &timepoint, const	vector <double> &dtimepoint,  const vector <unsigned int> &pop_affect, Operation mode, const double &dif_thresh);
 	
 		void simulate_init();
 		void simulate_individual_init();
@@ -102,6 +101,7 @@ class StateSpecies                         // Stores information about the state
 		void make_consistent(vector <Event> &event) const;
 		void set_cpop_st();
 		double get_trans_obs_prob(unsigned int trg, const ObsData &ob) const;
+		void compare_covar(string te, const vector < vector <double> > &omega, unsigned int g) const;
 		unsigned int get_ti(double t) const;
 		double get_indfac(const Individual &ind, const  MarkovEqn &mar_eqn) const;
 		void update_ind_basic(const vector < vector <Event> > &ev_new);
@@ -195,6 +195,7 @@ class StateSpecies                         // Stores information about the state
 		const Details &details;
 		const vector <double> &timepoint;
 		const vector <double> &dtimepoint;
+		const double &dif_thresh;
 		
 		vector <unsigned int> pop_affect;
 		Operation mode;                        // SIM for simulation and INF for inference	
@@ -267,7 +268,7 @@ class StateSpecies                         // Stores information about the state
 		vector <unsigned int> update_ind(unsigned int i, vector <Event> &event_new, const vector < vector <double> > &popnum_t, vector <PopUpdate> &pop_update, Like &like_ch);	
 		void add_event_ref(unsigned int i, unsigned int ee,  const vector < vector <double> > &popnum_t, Like &like_ch);
 		void set_m_ti_origin(vector <Event> &ev_new) const;
-		void remove_event(const Event &ev, const Individual &ind, Like &like_ch);
+		void remove_event(Event &ev, const Individual &ind, Like &like_ch, unsigned int i, vector <Event> &event_old);
 		void remove_all_event_ref(const vector <unsigned int> &ind_list);
 		void add_all_event_ref(const vector <unsigned int> &ind_list, const vector < vector <Event> > &ev_new);
 		void remove_all_nmincomp_ref(const vector <unsigned int> &ind_list);
@@ -293,4 +294,3 @@ class StateSpecies                         // Stores information about the state
 		bool tr_swap_same(const vector <TrSwap> &tr_swap, const vector <TrSwap> &tr_swap2) const;
 };
 
-#endif

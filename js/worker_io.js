@@ -121,6 +121,26 @@ function inf_eff_load_X(so)
 }
 
 
+/// The function is called when the A pedigree is loaded
+function add_A_pedigree(tab,p,i)
+{
+	let sp = model.species[p];
+	let Amat = sp.ind_eff_group[i].A_matrix;
+
+	Amat.pedigree = true;
+	Amat.loaded = true;
+	Amat.ind_list = [];
+	Amat.sire_list = [];
+	Amat.dam_list = [];
+	
+	for(let r = 0; r < tab.nrow; r++){
+		Amat.ind_list[r] = tab.ele[r][0];
+		Amat.sire_list[r] = tab.ele[r][1];
+		Amat.dam_list[r] = tab.ele[r][2];
+	}
+}
+
+
 /// The function is called when the A matrix is loaded
 function A_matrix_loaded(tab,p,i)
 {
@@ -145,6 +165,7 @@ function A_matrix_loaded(tab,p,i)
 	let Amat = sp.ind_eff_group[i].A_matrix;
 	Amat.ind_list = tab.heading;
 	Amat.loaded = true;
+	Amat.pedigree = false;
 	
 	Amat.A_value = [];
 	for(let r = 0; r < tab.nrow; r++){
@@ -154,6 +175,7 @@ function A_matrix_loaded(tab,p,i)
 		}
 	}
 }
+				
 
 
 /// Loads a table from text
@@ -1186,15 +1208,32 @@ function load_file_http(file,type)
 	if(ver=="windows") file = file.replace(/\//g,"\\");
 	
   xhr.open("GET",file,false); // synchronous request
-	xhr.send();
 	
-	if(xhr.responseText == ""){
-		if(type == "import") alert_import("The file '"+file+"' does not exist or is empty.");
+	let fl = false;
+	
+	try{
+		xhr.send();
+	}catch(e){
+		fl = true;
+	}
+	
+	if(xhr.responseText == "") fl = true;
+
+	if(fl == true && type != "import"){
 		alertp("The file '"+file+"' does not exist or is empty.");
 	}
 	
 	return xhr.responseText;
 }
+
+
+/// Strips file from path
+function filename(te)
+{
+	let spl = te.split("\\");
+	return spl[spl.length-1];
+}
+
 
 
 /// Works out the width of text in a table

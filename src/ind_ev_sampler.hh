@@ -1,5 +1,4 @@
-#ifndef BICI__IND_EVENT_SAMPLER_HH
-#define BICI__IND_EVENT_SAMPLER_HH
+#pragma once
 
 #include <vector>
 
@@ -105,4 +104,4 @@ class IndEvSampler                         // Stores information about an indivi
 	double find_tnext_single(unsigned int m, const vector <TrigEventRef> &trig_event, unsigned int f, const vector <FutureNMEvent> &future_nm, unsigned int e, const vector <Event> &ev) const;
 	void get_trans_rate_single(unsigned int c, unsigned int cl, unsigned int ti, const Individual &ind, vector <double> &trans_rate, double &R) const;
 };
-#endif
+

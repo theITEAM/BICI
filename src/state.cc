@@ -17,6 +17,7 @@ using namespace std;
 /// Initialises the model 
 State::State(const Model &model) : model(model)
 {
+	dif_thresh = DIF_THRESH;
 }
 
 
@@ -48,7 +49,7 @@ void State::init()
 			if(model.pop[po].sp_p == p) pop_affect.push_back(po);
 		}
 		
-		StateSpecies ss(param_val,spline_val,model.eqn,model.param,model.param_vec,model.pop,model.species[p],model.genetic_data,model.details,model.timepoint,dtimepoint,pop_affect,model.mode);
+		StateSpecies ss(param_val,spline_val,model.eqn,model.param,model.param_vec,model.pop,model.species[p],model.genetic_data,model.details,model.timepoint,dtimepoint,pop_affect,model.mode,dif_thresh);
 		species.push_back(ss);
 	}
 	
@@ -70,7 +71,7 @@ void State::simulate(const vector <double> &param_value, const vector <InitCondV
 		ssp.simulate_init();
 		ssp.simulate_individual_init();
 	}
-	
+		
 	popnum_t[0] = model.calculate_popnum(species);  
 
 	for(auto p = 0u; p < nspecies; p++){
@@ -132,12 +133,12 @@ void State::post_sim(const vector <double> &param_value, const Sample &samp)
 /// Once a simulation is setup this iterates equations
 void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end) 
 {
-	auto op_step = get_op_step(ti_end-ti_start);
+	//auto op_step = get_op_step(ti_end-ti_start);
 	
 	for(auto ti = ti_start; ti < ti_end; ti++){	
-		if(model.mode == SIM && model.details.number == 1 && ti%op_step == 0){
-			print_cpop(ti);
-		}
+		//if(model.mode == SIM && model.details.number == 1 && ti%op_step == 0){
+		//print_cpop(ti);
+		//}
 
 		//if(true && ti%op_step == 0) print_cpop(ti);
 	
@@ -1061,13 +1062,13 @@ void State::likelihood_from_scratch()
 
 
 /// Resamples individual using the observation sampler (this gets fixed events correct)
-void State::resample_ind()
+void State::resample_ind(bool do_pl)
 {
-	//print("Start resample...");
+	print_diag("Start resample...");
 	
 	auto popnum_t = model.calculate_popnum_t(species);
 	
-	auto pl = false;
+	auto pl = false; if(do_pl) pl = true;
 
 	if(pl) check(" before resample");
 			
@@ -1083,6 +1084,12 @@ void State::resample_ind()
 			for(auto i = 0u; i < sp.nindividual_in; i++){
 				for(auto cl = 0u; cl < sp.ncla; cl++){
 					if(ind_ev_samp.needed(i,cl) == true){
+						if(pl){
+							cout << endl << endl << endl << endl;
+							cout << ssp.individual[i].name << endl;
+							cout << "Before:" << endl; ssp.print_event(ssp.individual[i].ev);
+						}
+						
 						ind_ev_samp.generate_ind_obs_timeline();
 						auto loop_max = 1u;
 						for(auto loop = 0u; loop < loop_max; loop++){
@@ -1107,7 +1114,7 @@ void State::resample_ind()
 										cout << endl;
 										cout << "After:" << endl; ssp.print_event(ssp.individual[i].ev);
 									}
-								
+							
 									add_like(like_ch);
 									gen_change_update(gc); 	
 									break;
@@ -1116,7 +1123,7 @@ void State::resample_ind()
 						}
 					}
 					
-					if(pl) check("  resample");
+					//if(pl) check("  resample");
 				}
 			}
 		}
@@ -1350,14 +1357,22 @@ void CorMatrix::init(unsigned int N_)
 /// Adds a sample
 void CorMatrix::add_sample(const vector <double> &param_value, unsigned int range)
 {
-	samp.push_back(param_value);
+	if(range < RANGE_MIN) range = RANGE_MIN;
+		
+	auto paramv = param_value;
+	
+	// Shifting ensure that values are not constant
+	auto sh = (ran()-0.5)*TINY;
+	for(auto &val : paramv) val += sh;
+	
+	samp.push_back(paramv);
 	n++;
 
 	for(auto i = 0u; i < N; i++){
-		auto vali = param_value[i];
+		auto vali = paramv[i];
 		av[i] += vali;
 		for(auto j = i; j < N; j++){
-			auto valj = param_value[j];
+			auto valj = paramv[j];
 			av2[i][j] += vali*valj;
 		}
 	}
@@ -1377,10 +1392,40 @@ void CorMatrix::add_sample(const vector <double> &param_value, unsigned int rang
 }
 
 
+/// Checks that correlation matrix is up-to-date
+void CorMatrix::check() const
+{
+	//cout << "check state\n";
+	vector <double> ave(N,0);
+	vector < vector <double> > ave2;
+	ave2.resize(N);
+	for(auto j = 0u; j < N; j++) ave2[j].resize(N,0);
+	
+	for(auto i = n_start; i < n; i++){
+		for(auto j = 0u; j < N; j++){
+			ave[j] += samp[i][j];
+			for(auto k = j; k < N; k++){
+				ave2[j][k] += samp[i][j]*samp[i][k];
+			}
+		}
+	}
+	
+	for(auto j = 0u; j < N; j++){
+		if(dif(ave[j],av[j],DIF_THRESH)) emsg("Different in av");
+		for(auto k = j; k < N; k++){
+			if(dif(ave2[j][k],av2[j][k],DIF_THRESH)){
+				cout << n_start << " " << n << " " << ave2[j][k] << " " << av2[j][k] << " av2\n";
+				emsg("Different in av2");
+			}
+		}	
+	}
+}
+
+
 /// Calculates the correlation matrix
 vector < vector <double> > CorMatrix::calculate_cor_matrix() const
 {
-	auto nn = n -  n_start;
+	auto nn = n-n_start;
 	
 	vector <double> mu(N);
 	for(auto i = 0u; i < N; i++) mu[i] = av[i]/nn;
@@ -1443,3 +1488,5 @@ unsigned int CorMatrix::get_n()
 {
 	return n-n_start;
 }
+
+

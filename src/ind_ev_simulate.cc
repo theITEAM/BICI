@@ -166,6 +166,8 @@ vector <Event> IndEvSampler::simulate_events(unsigned int i, const Event &e_init
 		}
 	}
 
+	if(events_near_div(ev_new,details)) illegal = true;
+
 	return ev_new;
 }
 
@@ -275,7 +277,7 @@ void IndEvSampler::add_future_nm_event(unsigned int c, unsigned int cl, double t
 		{
 			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
 			auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
-			ts = t+gamma_sample(mean,cv);
+			ts = t+gamma_sample(mean,cv);	
 		}
 		break;
 	

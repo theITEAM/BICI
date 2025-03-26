@@ -89,6 +89,21 @@ function process(e)
 	}
 		
 	switch(input.type){
+	case "Add A pedigree":
+		{
+			let so = info.edit_source;
+			add_A_pedigree(so.table,so.info.p,so.info.i);
+			update_mod = true;
+		}
+		break;
+		
+	case "EditAPed":
+		{
+			let p = info.p, i = info.i;
+			post({Amat:model.species[p].ind_eff_group[i].A_matrix, p:p, i:i});
+		}
+		break;
+		
 	case "Output States": case "Output Params":
 		{
 			let result = get_result(input.info.name);

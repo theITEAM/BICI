@@ -1,5 +1,4 @@
-#ifndef BICI__OUTPUT_HH
-#define BICI__OUTPUT_HH
+#pragma once
 
 #include <string>
 #include <sstream>
@@ -32,7 +31,6 @@ class Output                               // Stores information about the data
 		string print_affect_like(const AffectLike &al) const;
 		void data_summary(const Model &model) const;
 		void ensure_directory(const string &path) const;
-		void print_param(const vector <double> &vec) const;
 		void print_initc(const vector <InitCondValue> &initc) const;
 		//void updated_file(string file);
 		void constants(string file);
@@ -73,4 +71,4 @@ class Output                               // Stores information about the data
 		const Model &model;	
 		Mpi &mpi;	
 };
-#endif
+

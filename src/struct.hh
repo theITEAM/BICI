@@ -1,7 +1,6 @@
 /// Stores commonly used data structures
 
-#ifndef BICI__STRUCT_HH
-#define BICI__STRUCT_HH
+#pragma once
 
 #include <vector>
 
@@ -251,6 +250,7 @@ struct ParamVecEle                 // Stores information about an element in par
 	ParamVariety variety;            // The parameter variety (copied from param)
 	bool ppc_resample;               // Sets if parameter gets resampled for ppc
 	bool prop_pos;                   // Set if it is possible to do a proposal on this parameter
+	bool omega_fl;                   // Detemines if in omega
 	vector <AffectLike> affect_like; // Determines how parameter affects likelihoods
 };
 
@@ -848,7 +848,7 @@ struct MarkovEqnVariation {        // Stores variation in Markov equations for a
 	double indfac_sum;               // The sum of the potential individual effect acting on equation
 	
 	// Used in inference
-	vector <MarkovEqnDiv> div;       // Infornation for each time division
+	vector <MarkovEqnDiv> div;       // Information for each time division
 };
 
 struct EventData {                 // Stores individual data
@@ -1231,6 +1231,7 @@ struct CorMatrix {                 // Information about the parameter correlatio
 
 	void init(unsigned int N);
 	void add_sample(const vector <double> &param_value, unsigned int range);
+	void check() const;
 	vector < vector <double> > calculate_cor_matrix() const;
 	void set_mvn_from_particle(vector <Particle> &particle);
 	vector < vector <double> > find_covar(const vector <unsigned int> &param_list) const;
@@ -1571,4 +1572,3 @@ struct Stat {                      // Statistics
 	double CImin;                    // Credible interval
 	double CImax;
 };
-#endif

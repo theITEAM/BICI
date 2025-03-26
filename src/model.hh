@@ -1,5 +1,4 @@
-#ifndef BICI__MODEL_HH
-#define BICI__MODEL_HH
+#pragma once
 
 #include <vector>
 
@@ -87,7 +86,9 @@ class Model                                // Stores information about the model
 		void add_like_obs_affect(unsigned int p, vector <AffectLike> &affect_like) const;
 		AllInd find_all_ind(string name) const;
 		void set_hash_all_ind();
-		
+		bool ie_cholesky_error(const vector <double> &param_val) const;
+		void print_param(const vector <double> &vec) const;
+	
 	private:
 		Hash hash_eqn;                         // Stores a hash take for equations
 		
@@ -98,4 +99,4 @@ class Model                                // Stores information about the model
 		double prior_sample(const Prior &pri, const vector <double> &param_val) const;
 		long get_hash_number(const EquationInfo &eqi);
 };
-#endif
+

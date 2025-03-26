@@ -94,6 +94,8 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 /// Create a directory if it doesn't already exist
 void Output::ensure_directory(const string &path) const 
 {
+	if(!op()) return;
+	
 	struct stat st;
 	if (stat(path.c_str(), &st) == -1){  	            // Directory not found
 
@@ -602,6 +604,17 @@ void Output::summary(const Model &model) const
 /// Outputs a summary of proprosals
 void Output::prop_summary(string te) const
 {
+	if(!op()) return;
+		
+	if(false){ // TURN OFF
+		auto file = "proposal.txt";
+		ofstream fout(file);
+		check_open(fout,file);
+		fout << te;
+		cout << "TURN OFF" << endl;
+		return;
+	}
+
 	if(diagdir == "") return;
 	auto file = diagdir+"/proposal.txt";
 	ofstream fout(file);
@@ -821,7 +834,10 @@ string Output::print_affect_like(const AffectLike &al) const
 		break;
 		
 	case POPNUM_IND_W_AFFECT:
-		ss << "AFFECT popnum ind w" << endl;
+		{
+			const auto &pop = model.pop[al.num];
+			ss << "AFFECT popnum ind w " << pop.name << endl;
+		}
 		break;
 		
 	case AFFECT_MAX: break;
@@ -897,7 +913,8 @@ string Output::transtype_text(TransType type) const
 /// Outputs a summary of the data to a file
 void Output::data_summary(const Model &model) const
 {
-	if(diagdir == "") return;
+	if(!op() || diagdir == "") return;
+
 	auto file = diagdir+"/data.txt";
 	ofstream fout(file);
 	check_open(fout,file);
@@ -1032,19 +1049,6 @@ void Output::data_summary(const Model &model) const
 			fout << model.eqn[eq].te_raw << endl;
 		}
 	}
-}
-
-
-/// Prints a set of parameters
-void Output::print_param(const vector <double> &vec) const
-{
-	if(com_op == true) return;
-	
-	cout << "Parameters:" << endl;
-	for(auto th = 0u; th < model.param_vec.size(); th++){
-		cout << model.param_vec[th].name << " "<< vec[th] << endl;
-	}
-	cout << endl;
 }
 
 
@@ -1252,10 +1256,10 @@ void Output::set_output_burnin(double burnin_frac)
 		auto st = lines_raw[j];
 		auto spl = split(st,' ');
 		if(spl[0] == "inference"){
-			auto k = 0u; while(k < st.length()-12 && st.substr(k,12) != " burnin-frac") k++;
-			if(k < st.length()-12) st = st.substr(0,k);
+			auto k = 0u; while(k < st.length()-15 && st.substr(k,15) != " burnin-percent") k++;
+			if(k < st.length()-15) st = st.substr(0,k);
 			if(burnin_frac != BURNIN_FRAC_DEFAULT){
-				st += " burnin-frac=" + to_str(burnin_frac);
+				st += " burnin-percent=" + to_str(burnin_frac);
 			}
 			lines_raw[j] = st;
 			return;
@@ -2058,10 +2062,10 @@ void Output::end(string file) const
 			for(const auto &di :  diagnostic){
 				string diag_out_file;
 			
-				if(sampledir != ""){
+				if(diagdir != ""){
 					diag_out_file = "diagnostic_"+tstr(di.ch)+".txt";
 
-					ofstream pout(sampledir+"/"+diag_out_file);
+					ofstream pout(diagdir+"/"+diag_out_file);
 					check_open(pout,diag_out_file);
 					pout << di.te;
 

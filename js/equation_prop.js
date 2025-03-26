@@ -722,7 +722,12 @@ function check_ie(te,p_name_filter,icur,eqn)
 	}
 	else{
 		if(eqn.ind_eff[i].p_name_filter != p_name_filter){
-			eqn.warn.push({te:"Species filters for individual effect "+te+" do not match up"});
+			if(eqn.ind_eff[i].p_name_filter == "" || p_name_filter == ""){
+				eqn.warn.push({te:"Individual effect "+te+" cannot act is a population as well as directly"});
+			}
+			else{
+				eqn.warn.push({te:"Species filters for individual effect "+te+" do not match up"});
+			}
 		}
 	}
 }

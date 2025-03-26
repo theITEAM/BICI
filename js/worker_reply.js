@@ -18,7 +18,11 @@ worker.onmessage = function (e)
 	if(inter.worker_mess.active != "stop"){
 		if(ans.type != "Start" && ans.type != "StartPPC") stop_loading_symbol();
 		
-		switch(ans.type){
+		switch(ans.type){		
+		case "EditAPed":
+			edit_A_pedigree(ans.Amat,ans.p,ans.i);
+			break;
+		
 		case "Create SIRE":
 			write_file_async(ans.te,"../ZSIRE2.1/file.sire","export");
 			write_file_async(ans.dt,"../ZSIRE2.1/table.csv","export");

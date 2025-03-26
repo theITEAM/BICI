@@ -6,8 +6,6 @@ const spawn = require('child_process').spawn;
 /// Starts creation of files for spawning
 function start_spawn(file_list)
 {
-	//if(ver == "mac") filename = "/tmp/"+filename;
-
 	let file = "Execute/init.bici"; if(ver == "mac") file = "/tmp/init.bici";
 	let dir;
 

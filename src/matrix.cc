@@ -12,10 +12,12 @@ using namespace std;
 #include "matrix.hh"
 #include "utils.hh"
 
+
 /// Inverts a matrix
-vector < vector <double> > invert_matrix(vector <vector <double> > M) 
+vector < vector <double> > invert_matrix(const vector <vector <double> > &Mst) 
 {
-	int nvar = M.size();
+	int nvar = Mst.size();
+	auto M = Mst;
 
 	vector <vector <double> > inv_M;
 
@@ -50,33 +52,41 @@ vector < vector <double> > invert_matrix(vector <vector <double> > M)
 				auto &inv_Mjj = inv_M[jj];
 
 				for(auto i = 0; i < nvar; i++) inv_Mjj[i] -= r * inv_Mii[i];
+				M[jj][ii] = 0;
 			}
 		}
 	}
 
 	if(false){ // checks inverse
 		cout << "Check matrix" << endl;
+		auto inv_MT = transpose(inv_M);
+		
 		for(auto j = 0; j < nvar; j++){
-			for(auto i = 0; i < nvar; i++){
+			for(auto i = 0; i < nvar; i++){	
+				const auto &Mj = Mst[j];
+				const auto &MTi = inv_MT[i];
+				
 				double sum = 0;
-				for(auto ii = 0; ii < nvar; ii++) sum += M[j][ii] * inv_M[ii][i];
-
+				for(auto ii = 0; ii < nvar; ii++) sum += Mj[ii]*MTi[ii];
 				if(i != j){
 					if(sum < -TINY || sum > TINY) emsg("Matrix1");
 				}
 				else{
-					if(sum < 1 - TINY || sum > 1 + TINY) emsg("Matrix2");
+					if(sum < 1 - TINY || sum > 1 + TINY){
+						emsg("Matrix2");
+					}
 				}
 			}
-			cout << endl;
 		}
+		cout << "Checked" << endl;
 	}
-
+	
 	return inv_M;
 }
 
 
 /// Inverts a sparse matrix
+// This is not used because ordinary method is reasonably fast when sparse
 vector < vector <double> > invert_matrix_sparse(vector <vector <double> > M)
 {
 	int nvar = M.size();
@@ -103,7 +113,7 @@ vector < vector <double> > invert_matrix_sparse(vector <vector <double> > M)
 		}
 	}
 	
-	if(false){
+	if(true){
 		check_sparse("M",M,M_ele,M_map); check_sparse("M_inv",inv_M,inv_M_ele,inv_M_map);
 	}
 	
@@ -135,7 +145,7 @@ vector < vector <double> > invert_matrix_sparse(vector <vector <double> > M)
 		}
 	}
 
-	if(false){
+	if(true){
 		check_sparse("M",M,M_ele,M_map); check_sparse("M_inv",inv_M,inv_M_ele,inv_M_map);
 	}
 	
@@ -156,29 +166,30 @@ vector < vector <double> > invert_matrix_sparse(vector <vector <double> > M)
 		}
 	}
 	
-	cout << sparsity(inv_M) << "invM" << endl;
-	emsg("L");
+	//cout << sparsity(inv_M) << "invM" << endl;
+	//emsg("L");
 	//check_sparse("M_inv",inv_M,inv_M_ele,inv_M_map);
 
-	if(false){ // checks inverse
+	if(true){ // checks inverse
 		auto M_st = M;
 		cout << "Check matrix" << endl;
 		for(auto j = 0; j < nvar; j++){
 			for(auto i = 0; i < nvar; i++){
 				double sum = 0;
-				for(auto ii = 0; ii < nvar; ii++)
-					sum += M_st[j][ii] * inv_M[ii][i];
+				for(auto ii = 0; ii < nvar; ii++) sum += M_st[j][ii]*inv_M[ii][i];
 
 				if(i != j){
-					if(sum < -TINY || sum > TINY)
+					if(sum < -TINY || sum > TINY){
 						emsg("Matrix3");
+					}
 				} else {
-					if(sum < 1 - TINY || sum > 1 + TINY)
+					if(sum < 1 - TINY || sum > 1 + TINY){
 						emsg("Matrix4");
+					}
 				}
 			}
 		}
-		emsg("do");
+		//emsg("do");
 	}
 
 	return inv_M;
@@ -337,8 +348,7 @@ vector <double> matrix_mult(const vector < vector <double> > &M, const vector <d
 	const auto NX = M[0].size();
 	vector <double> result(NY);
 
-	if(vec.size() != NX)
-		emsg("Matrix7");
+	if(vec.size() != NX) emsg("Matrix7");
 
 	for(auto j = 0u; j < NY; j++){
 		auto sum = 0.0;
@@ -394,8 +404,10 @@ vector < vector <double> > matrix_mult(const vector < vector <double> > &M1, con
 }
 
 /// Calculates the cholesky decomposition of a matrix
-vector < vector <double> > calculate_cholesky(const vector < vector <double> > &M) 
+vector < vector <double> > calculate_cholesky(const vector < vector <double> > &M, bool &illegal) 
 {
+	illegal = false;
+	
 	vector < vector <double> > CM;
 	auto nvar = M.size();
 
@@ -410,7 +422,8 @@ vector < vector <double> > calculate_cholesky(const vector < vector <double> > &
 			if(i == j){
 				auto val = M[i][i] - sum;
 				if(val < -TINY){
-					CM[0][0] = UNSET;
+					illegal = true;
+					//CM[0][0] = UNSET;
 					return CM;
 				} 
 				else{
@@ -421,10 +434,11 @@ vector < vector <double> > calculate_cholesky(const vector < vector <double> > &
 			else{
 				auto denom = CM[j][j];
 				if(denom == 0){
-					CM[0][0] = UNSET;
+					illegal = true;
+					//CM[0][0] = UNSET;
 					return CM;
 				}
-				CM[i][j] = ((1.0 / denom) * (M[i][j] - sum));
+				CM[i][j] = ((1.0/denom) * (M[i][j] - sum));
 			}
 		}
 	}
@@ -648,3 +662,17 @@ void tidy(vector < vector <double> > &M)
 		}
 	}
 }
+
+
+/// Creates a two by two matrix
+vector < vector <double> > create_two_by_two(const vector < vector <double> > &M, unsigned int i, unsigned int j)
+{
+	vector < vector <double> > A;
+	A.resize(2);
+	A[0].resize(2); A[0][0] = M[i][i]; A[0][1] = M[i][j];
+	A[1].resize(2); A[1][0] = M[j][i]; A[1][1] = M[j][j];
+	
+	return A;
+}
+
+

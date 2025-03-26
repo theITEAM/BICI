@@ -60,8 +60,11 @@ void emsg(const string &msg)
 	
 #ifdef USE_MPI
 	//MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-  MPI_Finalize();
+	int num;
+	MPI_Comm_rank(MPI_COMM_WORLD,&num);
+	cout << "Error from core: " << num << endl;	
 	exit (EXIT_FAILURE);
+	//MPI_Finalize();
 #else
 	exit (EXIT_FAILURE);
 #endif
@@ -364,7 +367,9 @@ double ran()
 /// Draws a normally distributed number with mean mu and standard deviation sd
 double normal_sample(const double mean, const double sd) 
 {
-	if(sd < 0) emsg("Normal distribution cannot have negative SD");
+	check_thresh(NORM_TE,SD_QU,sd);
+	check_thresh(NORM_TE,NORM_MEAN_QU,mean);
+
 	normal_distribution<double> distribution(mean, sd);
 	return distribution(generator);
 }
@@ -380,8 +385,8 @@ int normal_int_sample(double si)
 /// The log of the probability from the normal distribution
 double normal_probability(const double x, const double mean, const double sd)
 {
+	if(sd < SD_MIN) return LI_WRONG;
 	auto var = sd*sd;
-  if(var < TINY) return -LARGE;
   return -0.5*log(2*MM_PI*var) - (x-mean)*(x-mean)/(2*var);
 }
 
@@ -389,22 +394,23 @@ double normal_probability(const double x, const double mean, const double sd)
 /// Draws a log-normally distributed number with mean mu and standard deviation sd
 double lognormal_sample(const double mean, const double cv) 
 {
-	if(cv < 0) emsg("Lognormal cannot have negative CV");
-	if(mean < TINY) emsg("Lognormal must have positive mean");
-	
+	check_thresh(LOGNORM_TE,CV_QU,cv);
+	check_thresh(LOGNORM_TE,MEAN_QU,mean);
+
 	auto var = log(1+cv*cv);                // Works out variables on log scale
 	auto mu = log(mean)-var/2;
 	
 	normal_distribution<double> distribution(mu, sqrt(var));
-	
-	return exp(distribution(generator));
+	auto val = exp(distribution(generator));
+	if(val < TINY) return TINY;
+	return val;
 }
 
 
 /// Probability of log-normally distribution
 double lognormal_probability(const double x, const double mean, const double cv) 
 {
-	if(mean < TINY || cv < 0 || x < TINY) return -LARGE;
+	if(mean < MEAN_MIN || cv < CV_MIN || cv > CV_MAX || x < TINY) return LI_WRONG;
 	
 	auto var = log(1+cv*cv);                // Works out variables on log scale
 	auto mu = log(mean)-var/2;
@@ -417,11 +423,14 @@ double lognormal_probability(const double x, const double mean, const double cv)
 /// The lognormal probability of being xmin or above
 double lognormal_upper_probability(const double xmin, const double mean, const double cv)
 {
+	check_thresh(LOGNORM_TE,CV_QU,cv);
+	check_thresh(LOGNORM_TE,MEAN_QU,mean);
+
 	auto var = log(1+cv*cv);                // Works out variables on log scale
 	auto mu = log(mean)-var/2;
 	
 	auto val = 1-0.5*erfc(-(log(xmin)-mu)/(sqrt(2*var)));
-	if(val < TINY) val = TINY;
+	if(std::isnan(val) || val < TINY) return LI_WRONG;
 	return log(val);
 }
 
@@ -429,11 +438,14 @@ double lognormal_upper_probability(const double xmin, const double mean, const d
 /// The lognormal probability of being xmin or above (with no log taken)
 double lognormal_upper_probability_no_log(const double xmin, const double mean, const double cv)
 {
+	check_thresh(LOGNORM_TE,CV_QU,cv);
+	check_thresh(LOGNORM_TE,MEAN_QU,mean);
+
 	auto var = log(1+cv*cv);                // Works out variables on log scale
 	auto mu = log(mean)-var/2;
 	
 	auto val = 1-0.5*erfc(-(log(xmin)-mu)/(sqrt(2*var)));
-	if(val < TINY) val = TINY;
+	if(std::isnan(val) || val < TINY) return TINY;
 	return val;
 }
 
@@ -441,18 +453,21 @@ double lognormal_upper_probability_no_log(const double xmin, const double mean, 
 /// Draws a Weibull distributed number with shape and scale parameters
 double weibull_sample(const double scale, const double shape) 
 {
-	if(scale <= TINY) emsg("Weibull must have posivie scale");
-	if(shape <= TINY) emsg("Weibull must have positive shape");
-	
+	check_thresh(WEIBULL_TE,SCALE_QU,scale);
+	check_thresh(WEIBULL_TE,SHAPE_QU,shape);
+
 	weibull_distribution<double> distribution(shape, scale);
-	return distribution(generator);
+	auto val = distribution(generator);
+	if(val < TINY) return TINY;
+	return val;
 }
 
 
 /// Probability of weibull sample
 double weibull_probability(const double x, const double scale, const double shape) 
 {
-	if(shape < TINY || scale < TINY) return -LARGE;
+	if(shape < SHAPE_MIN || shape > SHAPE_MAX || 
+	scale < SCALE_MIN || scale > SCALE_MAX) return LI_WRONG;
 	
 	return log(shape/scale)+(shape-1)*log(x/scale) - pow(x/scale,shape);
 }
@@ -461,37 +476,51 @@ double weibull_probability(const double x, const double scale, const double shap
 /// Probability of weibull sample beign xmin or above
 double weibull_upper_probability(const double xmin, const double scale, const double shape) 
 {
-	
-	return -pow((xmin/scale),shape);
+	check_thresh(WEIBULL_TE,SCALE_QU,scale);
+	check_thresh(WEIBULL_TE,SHAPE_QU,shape);
+
+	auto val = -pow((xmin/scale),shape);
+	if(std::isnan(val) || val < LI_WRONG) return LI_WRONG;
+	return val;
 }
 
 
 /// Probability of weibull sample beign xmin or above (with no log taken)
 double weibull_upper_probability_no_log(const double xmin, const double scale, const double shape) 
 {
-	
-	return exp(-pow((xmin/scale),shape));
+	check_thresh(WEIBULL_TE,SCALE_QU,scale);
+	check_thresh(WEIBULL_TE,SHAPE_QU,shape);
+
+	auto val = exp(-pow((xmin/scale),shape));
+	if(std::isnan(val) || val < TINY) return TINY;
+	return val;
 }
 
 
 /// Draws a sample from the gamma distribution x^(a-1)*exp(-b*x)
 double gamma_sample(const double mean, const double cv)
 {
-	if(mean < TINY) emsg("Gamma mean must be positive");
-	if(cv < TINY) emsg("Gamma CV must be positive");
+	check_thresh(GAMMA_TE,CV_QU,cv);
+	check_thresh(GAMMA_TE,MEAN_QU,mean);
+
 	gamma_distribution<double> distribution(1.0/(cv*cv),mean*cv*cv);
-	return distribution(generator);
+	auto val = distribution(generator);
+	if(val < TINY) return TINY;
+	return val;
+	
+	//return distribution(generator);
 }
 
 
 /// The log of the probability from the gamma distribution
 double gamma_probability(const double x, const double mean, const double cv)
 {
-	if(mean < TINY || cv < TINY) return -LARGE;
+	if(x < MEAN_MIN || mean < MEAN_MIN || cv < CV_MIN || cv > CV_MAX){
+		return LI_WRONG;
+	}
 	
 	auto shape = 1.0/(cv*cv);
 	auto b = shape/mean;
-  if(x <= 0 || shape <= 0 || b <= 0) return -LARGE;
   return (shape-1)*log(x) - b*x + shape*log(b) - lgamma(shape);
 }
 
@@ -499,27 +528,37 @@ double gamma_probability(const double x, const double mean, const double cv)
 /// The gamma probability of being x or above
 double gamma_upper_probability(const double xmin, const double mean, const double cv)
 {
+	check_thresh(GAMMA_TE,CV_QU,cv);
+	check_thresh(GAMMA_TE,MEAN_QU,mean);
+
 	auto shape = 1.0/(cv*cv);
 	auto theta = mean/shape;
-	return log(boost::math::gamma_q(shape,xmin/theta));
+	auto value = boost::math::gamma_q(shape,xmin/theta);	
+	if(std::isnan(value) || value < TINY) return LI_WRONG;
+	return log(value);
 }
 
 
 /// The gamma probability of being x or above (with no log taken)
 double gamma_upper_probability_no_log(const double xmin, const double mean, const double cv)
 {
+	check_thresh(GAMMA_TE,CV_QU,cv);
+	check_thresh(GAMMA_TE,MEAN_QU,mean);
+
 	auto shape = 1.0/(cv*cv);
 	auto theta = mean/shape;
-	return boost::math::gamma_q(shape,xmin/theta);
+	auto val = boost::math::gamma_q(shape,xmin/theta);
+	if(std::isnan(val) || val < TINY) return TINY;
+	return val;
 }
 
 
 /// Draws a sample from the beta distribution x^(a-1)*(1-x)^(b-1)
 double beta_sample(const double alpha, const double beta)
 {
-	if(alpha < TINY) emsg("For the Beta distribution alpha must be positive");
-	if(beta < TINY) emsg("For the Beta distribution beta must be positive");
-	
+	check_thresh(BETA_TE,ALPHA_QU,alpha);
+	check_thresh(BETA_TE,BETA_QU,beta);
+
 	gamma_distribution<double> distributionX(alpha,1), distributionY(beta,1);
 	auto x = distributionX(generator);
 	auto y = distributionY(generator);
@@ -531,8 +570,9 @@ double beta_sample(const double alpha, const double beta)
 /// The log of the probability from the beta distribution
 double beta_probability(const double x, const double alpha, const double beta)
 {
-	if(x < TINY || x > 1-TINY) return -LARGE;
-	if(alpha < TINY || beta < TINY) return -LARGE;
+	if(x < TINY || x > 1-TINY) return LI_WRONG;
+	if(alpha < ALPBETA_MIN || beta < ALPBETA_MIN ||
+	   alpha > ALPBETA_MAX || beta > ALPBETA_MAX) return LI_WRONG;
 	
   return (alpha-1)*log(x) + (beta-1)*log(1-x) + lgamma(alpha+beta) - lgamma(alpha) - lgamma(beta);
 }
@@ -541,8 +581,8 @@ double beta_probability(const double x, const double alpha, const double beta)
 /// Generates a sample from the Poisson distribution
 unsigned int poisson_sample(const double lam)
 {
-	if(lam > LARGE) emsg("For the Poisson distribution the mean is too large");
-	if(lam < 0) emsg("Poisson mean cannot be negative");
+	check_thresh(POIS_TE,POIS_QU,lam);
+	
   poisson_distribution<int> distribution(lam);
 	return distribution(generator);
 }
@@ -551,14 +591,14 @@ unsigned int poisson_sample(const double lam)
 /// The log probability of the poisson distribution
 double poisson_probability(const int i, const double lam)
 {
-	if(lam < 0) return -LARGE;
+	if(lam < LAM_MIN || lam > LAM_MAX) return LI_WRONG;
 	
   if(lam == 0){
     if(i == 0) return 0;
-    else return -LARGE;
+    else return LI_WRONG;
   }
   else{
-    if(i < 0) return -LARGE;
+    if(i < 0) return LI_WRONG;
     else{
 			return i*log(lam)-lam - lgamma(i+1);
 		}
@@ -569,6 +609,9 @@ double poisson_probability(const int i, const double lam)
 /// The log probability of the negative binomial distribution
 double neg_binomial_probability(const int k, const double mean, const double p)
 {	
+	check_thresh(NEGBINO_TE,MEAN_QU,mean);
+	check_thresh(NEGBINO_TE,P_QU,p);
+	
 	auto r = round_int(mean*p/(1-p));
 	if(r < 1) r = 1;
 	return choose(k+r-1,k) + k*log(1-p) + r*log(p);
@@ -578,9 +621,8 @@ double neg_binomial_probability(const int k, const double mean, const double p)
 /// Generates a sample from the Bernoulli distribution
 unsigned int bernoulli_sample(const double p)
 {
-	if(p < 0) emsg("Bernoulli mean cannot be smaller than zero");
-	if(p > 1) emsg("Bernoulli mean cannot be larger than one");
-		
+	check_thresh(BERN_TE,BERNP_QU,p);
+	
 	if(ran() < p) return 1;
 	return 0;
 }
@@ -589,13 +631,12 @@ unsigned int bernoulli_sample(const double p)
 /// The probability of a Bernoulli sample
 double bernoulli_probability(unsigned int x, const double p)
 {
-	
 	if(x == 0){
-		if(p > 1-TINY) return -LARGE;
+		if(p > 1-TINY) return LI_WRONG;
 		return log(1-p);
 	}
 	
-	if(p < TINY) return -LARGE;
+	if(p < TINY) return LI_WRONG;
 	return log(p);
 }
 
@@ -603,15 +644,18 @@ double bernoulli_probability(unsigned int x, const double p)
 /// Samples from the exponential distribution with specified rate
 double exp_rate_sample(const double rate)
 {
-	if(rate < TINY) emsg("Exponential rate must be positive");
-	return -log(ran())/rate;
+	check_thresh(EXP_RATE_TE,RATE_QU,rate);
+	
+	auto val = -log(ran())/rate;
+	if(val < TINY) return TINY;
+	return val;
 }
 
 
 /// Probability of exponential distribution
 double exp_rate_probability(const double x, const double rate)
 {
-	if(rate < TINY) return -LARGE;
+	if(rate < RATE_MIN) return LI_WRONG;
 	 
 	return log(rate) - rate*x;
 }
@@ -627,14 +671,18 @@ double exp_rate_upper_probability(const double xmin, const double rate)
 /// Probability of exponential distribution above xmin (with no log taken)
 double exp_rate_upper_probability_no_log(const double xmin, const double rate)
 {
-	return exp(-rate*xmin);
+	auto val = exp(-rate*xmin);
+	if(std::isnan(val) || val < TINY) return TINY;
+	return val;
 }
 
 
 /// Samples from the exponential distribution with specified mean
 double exp_mean_sample(const double mean)
 {
-	if(mean < 0) emsg("The exponential must be positive");
+	check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean);
+	
+	//if(mean < 0) emsg("The exponential must be positive");
 	return -log(ran())*mean;
 }
 
@@ -642,7 +690,7 @@ double exp_mean_sample(const double mean)
 /// Probability of exponential distribution
 double exp_mean_probability(const double x, const double mean)
 {
-	if(x < 0 || mean < TINY) return -LARGE;
+	if(x < 0 || mean < EXP_MEAN_MIN) return LI_WRONG;
 	return -log(mean) - x/mean;
 }
 
@@ -650,6 +698,8 @@ double exp_mean_probability(const double x, const double mean)
 /// Probability of exponential distribution above xmin
 double exp_mean_upper_probability(const double xmin, const double mean)
 {
+	check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean);
+	
 	return -xmin/mean;
 }
 
@@ -657,14 +707,19 @@ double exp_mean_upper_probability(const double xmin, const double mean)
 /// Probability of exponential distribution above xmin (with no log taken)
 double exp_mean_upper_probability_no_log(const double xmin, const double mean)
 {
-	return exp(-xmin/mean);
+	check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean);
+	auto val = exp(-xmin/mean);
+	if(std::isnan(val) || val < TINY) return TINY;
+	return val;
 }
 
 
 /// Draws a sample from the gamma distribution x^(a-1)*exp(-x)
 double gamma_alpha_sample(const double alpha)
 {
-	if(alpha < TINY) emsg("Alpha must be positive");
+	check_thresh(GAMMA_TE,ALPHA_QU,alpha);
+	
+	//if(alpha < TINY) emsg("Alpha must be positive");
 	gamma_distribution<double> distribution(alpha,1);
 	return distribution(generator);
 }
@@ -673,7 +728,7 @@ double gamma_alpha_sample(const double alpha)
 /// Draws a sample from the gamma distribution x^(a-1)*exp(-x)
 double gamma_alpha_probability(const double x, const double alpha)
 {
-  if(x <= 0 || alpha < TINY) return -LARGE;
+  if(x <= 0 || alpha < ALPBETA_MIN || alpha > ALPBETA_MAX) return LI_WRONG;
   return (alpha-1)*log(x) - x - lgamma(alpha);
 }
 
@@ -699,17 +754,19 @@ unsigned int binomial_sample(double p, unsigned int n)
 /// A sample from the binomial distribution
 double binomial_probability(unsigned int num, double p, unsigned int n)
 {	
+	if(p < 0 || p > 1) return LI_WRONG;
+
 	if(p == 0){
 		if(num == 0) return 0;
-		else return -LARGE;
+		else return LI_WRONG;
 	}
 	else{
 		if(p == 1){
 			if(num == n) return 0;
-			else return -LARGE;
+			else return LI_WRONG;
 		}
 		else{
-			if(num > n || p < 0 || p > 1) emsg("Problem");
+			if(num > n) emsg("Problem");
 
 			return lgamma(n+1) - lgamma(num+1) - lgamma(n-num+1) + num*log(p) + (n-num)*log(1-p);
 		}
@@ -720,7 +777,7 @@ double binomial_probability(unsigned int num, double p, unsigned int n)
 /// Probability of period sample
 double period_sample(const double time) 
 {
-	if(time < TINY) emsg("Period should be positive");
+	check_thresh(PERIOD_TE,TIME_QU,time);
 	return time;
 }
 
@@ -728,7 +785,7 @@ double period_sample(const double time)
 /// Probability of period sample (Uses a very sharp spike prior)
 double period_probability(const double x, const double time) 
 {
-	if(time < TINY) return -LARGE;
+	if(time < TIME_MIN) return LI_WRONG;
 	auto dd = x - time;
 	if(dd > 0) return -dd*LARGE;
 	else return dd*LARGE;
@@ -739,7 +796,7 @@ double period_probability(const double x, const double time)
 double period_upper_probability(const double x, const double time) 
 {
 	if(x < time) return 0; 
-	return -LARGE;
+	return LI_WRONG;
 }
 
 
@@ -1176,18 +1233,20 @@ void print(string name, const Table &tab)
 
 
 /// Calculates if two numbers is different (subject to numerical noise) 
-bool dif(double a, double b)
+bool dif2(double a, double b, double thresh)
 {
-	if(std::isnan(a)) return true;
-	if(std::isnan(b)) return true;
+	if(std::isnan(a)){ cout << " is nan\n"; return true;}
+	if(std::isnan(b)){ cout << "is nan\n"; return true;}
 	
 	auto dif = a-b; if(dif < 0) dif = -dif;
-
-	if(dif > 0.00001){
+	cout << dif << " dif\n";
+	
+	if(dif > thresh){
 		if(a < 0) a = -a;
 		if(b < 0) b = -b;
 		
 		auto frac = dif/(a+b);
+		cout << frac << " " <<  0.00000001<< "comp\n";
 		if(frac > 0.00000001) return true;
 	}
 	return false;
@@ -1195,35 +1254,23 @@ bool dif(double a, double b)
 
 
 /// Calculates if two numbers is different (subject to numerical noise) 
-bool dif(const vector <double> &a, const vector <double> &b)
+bool dif(double a, double b, double thresh)
 {
-	if(a.size() != b.size()) return true;
-	for(auto j = 0u; j < a.size(); j++){
-		if(dif(a[j],b[j])) return true;
-	}
-	return false;
-}
-
-
-/// returns which is different
-unsigned int which_dif(const vector <double> &a, const vector <double> &b)
-{
-	if(a.size() != b.size()) return true;
-	for(auto j = 0u; j < a.size(); j++){
-		if(dif(a[j],b[j])) return j;
-	}
-	return UNSET;
-}
-
-
-/// Calculates if two numbers is different (subject to numerical noise) 
-bool dif(const vector < vector <double> > &a, const vector < vector <double> > &b)
-{
-	if(a.size() != b.size()) return true;
-	for(auto j = 0u; j < a.size(); j++){
-		if(a[j].size() != b[j].size()) return true;
-		for(auto i = 0u; i < a[j].size(); i++){
-			if(dif(a[j][i],b[j][i])) return true;
+	if(std::isnan(a)) return true;
+	if(std::isnan(b)) return true;
+	
+	auto dif = a-b; if(dif < 0) dif = -dif;
+	
+	if(dif > thresh){
+		if(a < 0) a = -a;
+		if(b < 0) b = -b;
+		
+		auto frac = dif/(a+b);
+		if(dif == DIF_THRESH){
+			if(frac > 0.00000001) return true;
+		}
+		else{
+			if(frac > 0.00001) return true;
 		}
 	}
 	return false;
@@ -1231,7 +1278,43 @@ bool dif(const vector < vector <double> > &a, const vector < vector <double> > &
 
 
 /// Calculates if two numbers is different (subject to numerical noise) 
-vector <unsigned int> which_dif(const vector < vector <double> > &a, const vector < vector <double> > &b)
+bool dif(const vector <double> &a, const vector <double> &b, double thresh)
+{
+	if(a.size() != b.size()) return true;
+	for(auto j = 0u; j < a.size(); j++){
+		if(dif(a[j],b[j],thresh)) return true;
+	}
+	return false;
+}
+
+
+/// returns which is different
+unsigned int which_dif(const vector <double> &a, const vector <double> &b, double thresh)
+{
+	if(a.size() != b.size()) return true;
+	for(auto j = 0u; j < a.size(); j++){
+		if(dif(a[j],b[j],thresh)) return j;
+	}
+	return UNSET;
+}
+
+
+/// Calculates if two numbers is different (subject to numerical noise) 
+bool dif(const vector < vector <double> > &a, const vector < vector <double> > &b, double thresh)
+{
+	if(a.size() != b.size()) return true;
+	for(auto j = 0u; j < a.size(); j++){
+		if(a[j].size() != b[j].size()) return true;
+		for(auto i = 0u; i < a[j].size(); i++){
+			if(dif(a[j][i],b[j][i],thresh)) return true;
+		}
+	}
+	return false;
+}
+
+
+/// Calculates if two numbers is different (subject to numerical noise) 
+vector <unsigned int> which_dif(const vector < vector <double> > &a, const vector < vector <double> > &b, double thresh)
 {
 	vector <unsigned int> vec;
 	
@@ -1239,7 +1322,7 @@ vector <unsigned int> which_dif(const vector < vector <double> > &a, const vecto
 	for(auto j = 0u; j < a.size(); j++){
 		if(a[j].size() != b[j].size()) return vec;
 		for(auto i = 0u; i < a[j].size(); i++){
-			if(dif(a[j][i],b[j][i])){
+			if(dif(a[j][i],b[j][i],thresh)){
 				vec.push_back(j); vec.push_back(i); 
 				return vec;
 			}
@@ -1250,7 +1333,7 @@ vector <unsigned int> which_dif(const vector < vector <double> > &a, const vecto
 
 
 /// Calculates if two unsigned ints are different 
-bool dif(unsigned int a, unsigned int b)
+bool difi(unsigned int a, unsigned int b)
 {
 	if(a != b) return true;
 	return false;
@@ -1258,24 +1341,24 @@ bool dif(unsigned int a, unsigned int b)
 
 
 /// Calculates if two vectors are different 
-bool dif(const vector <unsigned int> &a, const vector <unsigned int> &b)
+bool difi(const vector <unsigned int> &a, const vector <unsigned int> &b)
 {
 	if(a.size() != b.size()) return true;
 	for(auto j = 0u; j < a.size(); j++){
-		if(dif(a[j],b[j])) return true;
+		if(difi(a[j],b[j])) return true;
 	}
 	return false;
 }
 
 
 /// Calculates if two numbers is different 
-bool dif(const vector < vector <unsigned int> > &a, const vector < vector <unsigned int> > &b)
+bool difi(const vector < vector <unsigned int> > &a, const vector < vector <unsigned int> > &b)
 {
 	if(a.size() != b.size()) return true;
 	for(auto j = 0u; j < a.size(); j++){
 		if(a[j].size() != b[j].size()) return true;
 		for(auto i = 0u; i < a[j].size(); i++){
-			if(dif(a[j][i],b[j][i])) return true;
+			if(difi(a[j][i],b[j][i])) return true;
 		}
 	}
 	return false;
@@ -1564,6 +1647,19 @@ bool op()
 }
 
 
+/// Determines the core number
+unsigned int core()
+{
+#ifdef USE_MPI
+	int num;
+	MPI_Comm_rank(MPI_COMM_WORLD,&num); 
+	return (unsigned int) num;
+#else		
+	return 0;
+#endif
+}
+
+
 /// Determines  number of cores running on
 unsigned int num_core()
 {
@@ -1840,7 +1936,7 @@ vector <unsigned int>  multinomial_sample(unsigned int N_total, const vector <do
 			sum += frac[i];
 			frac_sum[i] = sum;
 		}
-		if(dif(sum,1)) emsg("sum not one");
+		if(dif(sum,1,DIF_THRESH)) emsg("sum not one");
 		
 		for(auto j = 0u; j < N_total; j++){
 			auto z = ran(); 
@@ -2216,10 +2312,23 @@ void print(string te)
 }
 
 
+/// Gets the core
+unsigned int get_core()
+{
+#ifdef USE_MPI
+	int num;
+	MPI_Comm_rank(MPI_COMM_WORLD,&num);
+	return num;
+#endif
+	return 0;
+}
+
+
 /// Prints a diagnostic statement to terminal
 void print_diag(string te)
 {
 	if(print_diag_on && !com_op && op()) cout << te << endl;
+	//cout << te << endl;
 }
 
 
@@ -2304,3 +2413,157 @@ bool end_str(string st, string st2)
 	if(st.substr(st.length()-st2.length(),st2.length()) == st2) return true;
 	return false;
 }
+
+
+/// Checks if value is within thresholds
+void check_thresh(DistText dist, DistQuant dq, double val)
+{
+	double min_th = UNSET, max_th = UNSET;
+	
+	switch(dq){
+	case MEAN_QU: 
+		if(val < MEAN_MIN) min_th = MEAN_MIN;
+		if(val > MEAN_MAX) max_th = MEAN_MAX; 
+		break;
+		
+	case NORM_MEAN_QU: 
+		if(val < NORM_MEAN_MIN) min_th = NORM_MEAN_MIN;
+		if(val > NORM_MEAN_MAX) max_th = NORM_MEAN_MAX; 
+		break;
+	
+	case SD_QU: 
+		if(val < SD_MIN) min_th = SD_MIN;
+		if(val > SD_MAX) max_th = SD_MAX; 
+		break;
+	
+	case CV_QU: 
+		if(val < CV_MIN) min_th = CV_MIN;
+		if(val > CV_MAX) max_th = CV_MAX; 
+		break;
+		
+	case SHAPE_QU: 
+		if(val < SHAPE_MIN) min_th = SHAPE_MIN;
+		if(val > SHAPE_MAX) max_th = SHAPE_MAX; 
+		break;
+		
+	case SCALE_QU: 
+		if(val < SCALE_MIN) min_th = SCALE_MIN;
+		if(val > SCALE_MAX) max_th = SCALE_MAX; 
+		break;
+	
+	case ALPHA_QU: case BETA_QU:
+		if(val < ALPBETA_MIN) min_th = ALPBETA_MIN;
+		if(val > ALPBETA_MAX) max_th = ALPBETA_MAX; 
+		break;
+		
+	case P_QU: 
+		if(val < P_MIN) min_th = P_MIN;
+		if(val > P_MAX) max_th = P_MAX; 
+		break;
+		
+	case BERNP_QU: 
+		if(val < 0) min_th = 0;
+		if(val > 1) max_th = 1; 
+		break;
+	
+	case RATE_QU: 
+		if(val < RATE_MIN) min_th = RATE_MIN;
+		break;
+		
+	case EXP_MEAN_QU: 
+		if(val < EXP_MEAN_MIN) min_th = EXP_MEAN_MIN;
+		break;
+		
+	case TIME_QU: 
+		if(val < TIME_MIN) min_th = TIME_MIN;
+		break;
+		
+	case POIS_QU: 
+		if(val < LAM_MIN) min_th = LAM_MIN;
+		if(val > LAM_MAX) max_th = LAM_MAX; 
+		break;
+	}
+
+	string dist_te;
+	if(min_th != UNSET || max_th != UNSET){
+		switch(dist){
+		case LOGNORM_TE: dist_te = "Log-normal"; break;
+		case NORM_TE: dist_te = "Normal"; break;
+		case WEIBULL_TE: dist_te = "Weibull"; break;
+		case GAMMA_TE: dist_te = "Gamma"; break;
+		case BETA_TE: dist_te = "Beta"; break;
+		case NEGBINO_TE: dist_te = "Negitive-binomial"; break;
+		case BERN_TE: dist_te = "Bernoulli"; break;
+		case EXP_RATE_TE: dist_te = "Exponenial"; break;
+		case EXP_MEAN_TE: dist_te = "Exponenial"; break;
+		case POIS_TE: dist_te = "Poisson"; break;
+		case PERIOD_TE: dist_te = "Period"; break;
+		}
+		
+		string quant;
+		switch(dq){
+		case MEAN_QU: quant = "mean"; break;
+		case NORM_MEAN_QU: quant = "mean"; break;
+		case SD_QU: quant = "standard deviation"; break;
+		case CV_QU: quant = "coefficient of variation"; break;
+		case SHAPE_QU: quant = "shape"; break;
+		case SCALE_QU: quant = "scale"; break;
+		case ALPHA_QU: quant = "alpha"; break;
+		case BETA_QU: quant = "beta"; break;
+		case P_QU: quant = "probability"; break;
+		case BERNP_QU: quant = "probability"; break;
+		case RATE_QU: quant = "rate"; break;
+		case EXP_MEAN_QU: quant = "mean"; break;
+		case POIS_QU: quant = "mean"; break;
+		case TIME_QU: quant = "time"; break;
+		}		
+		
+		if(min_th != UNSET){
+			emsg(dist_te+" "+quant+" has value "+tstr(val)+" which should not be below threshold "+tstr(min_th));
+		}
+		
+		if(max_th != UNSET){
+			emsg(dist_te+" "+quant+" has value "+tstr(val)+" which should not be above threshold "+tstr(max_th));
+		}
+	}
+}
+
+
+/// Determines if events are near to a boundary 
+bool events_near_div(const vector <Event> &event, const Details &details)
+{
+	auto t_start = details.t_start, dt = details.dt;
+	for(const auto &ev : event){
+		switch(ev.type){
+		case NM_TRANS_EV: case M_TRANS_EV:
+			{
+				auto f = (ev.t-t_start)/dt;
+				auto d = f-(unsigned int)(f+0.5);
+				
+				if(d < NEAR_DIV_THRESH && d > -NEAR_DIV_THRESH){ 
+					return true;
+				}
+			}
+			break;
+			
+		default: break;
+		}
+	}
+	return false;
+}
+
+
+/// Determines if a single event is near to a boundary
+bool event_near_div(double t, const Details &details)
+{
+	auto t_start = details.t_start, dt = details.dt;
+	auto f = (t-t_start)/dt;
+	auto d = f-(unsigned int)(f+0.5);
+	
+	if(d < NEAR_DIV_THRESH && d > -NEAR_DIV_THRESH){ 
+		return true;
+	}
+
+	return false;
+}
+

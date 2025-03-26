@@ -133,7 +133,8 @@ class Graph
 			this.set_matrix_colour(); 
 			break;
 			
-		case "Stat table plot": break;
+		case "Stat table plot":
+			break;
 		
 		case "CompMatrix plot": 
 			this.comp_matrix_init(); 
@@ -191,7 +192,6 @@ class Graph
 				
 			case "Bar":
 				if(da.x-0.5 < xmin) xmin = da.x-0.5; if(da.x+0.5 > xmax) xmax = da.x+0.5;
-				//if(0 < ymin) ymin = 0; 
 				if(da.y < ymin) ymin = da.y;
 				if(da.y > ymax) ymax = da.y;
 				break;
@@ -1027,6 +1027,8 @@ class Graph
 				let da = this.data[0];
 				let fr = this.animation.playframe;
 				
+				let labels = {ylab:da.ylab, xlab:da.xlab};
+				
 				for(let j = 0; j < da.ylab.length; j++){
 					let fracj = j/da.ylab.length;
 					for(let i = 0; i < da.xlab.length; i++){	
@@ -1051,7 +1053,7 @@ class Graph
 							te = da.mat[j][i];
 						}							
 						
-						lay.add_button({te:precision(te), x:fraci*lay.dx+marx, y:(1-fracj)*lay.dy-dy+mary, dx:dx-2*marx, dy:dy-2*mary, value:value, stat:stat, col:col, type:"MatrixEleBut", ac:"MatrixEleBut"});
+						lay.add_button({te:precision(te), x:fraci*lay.dx+marx, y:(1-fracj)*lay.dy-dy+mary, dx:dx-2*marx, dy:dy-2*mary, value:value, i:i, j:j, labels:labels, stat:stat, col:col, type:"MatrixEleBut", ac:"MatrixEleBut"});
 					}
 				}
 			}
@@ -1116,7 +1118,7 @@ class Graph
 		let bar = 1;
 		let yte = y+dy/2-0.3;
 		
-		right_text(info,x+dx-0.2,yte,get_font(0.8),BLACK); 
+		right_text(info,x+dx-0.2,yte,get_font(0.8),BLACK,0.6*dx); 
 		
 		let ra = this.range;
 				
@@ -1943,17 +1945,36 @@ class Graph
 	
 	
 	/// Zooms into the timeline
-	zoom_timeline_factor(fac,f)
+	zoom_timeline_factor(fac,fx,fy)
 	{
-		if(f == undefined) f = 0.5;
+		if(fx == undefined) fx = 0.5;
+		if(fy == undefined) fy = 0.5;
+			
 		let ra = this.range;
-		let mean = ra.xmax*f+ra.xmin*(1-f);
+		let mean = ra.xmax*fx+ra.xmin*(1-fx);
 		
 		ra.xmin = mean - (mean-ra.xmin)/fac;
 		ra.xmax = mean + (ra.xmax-mean)/fac;
+		
 		this.set_ind_time();
 		
 		this.barh *= fac;
+	
+		let fr_bef = fy;
+		let lay_bef = get_lay("Yscroll");
+		if(lay_bef){
+			let spos = inter.scroll_position[lay_bef.scroll_ref];
+			fr_bef = (spos.shift + fy*lay_bef.inner_dy)/spos.max;
+		}
+	
+		generate_screen();
+		
+		let lay = get_lay("Yscroll");
+		if(lay){
+			let spos = inter.scroll_position[lay.scroll_ref];	
+			let shift_new = fr_bef*spos.max - fy*lay.inner_dy
+			change_scroll(shift_new,lay.but[0],"page_set");
+		}
 	}
 	
 	
@@ -2622,7 +2643,9 @@ class Graph
 				let da = this.data[0];
 				if(da.type != "Matrix" && da.type != "Correlation") error("Data not right"); 
 				
-				let x_param = this.op.x_param;
+				//let x_param = this.op.x_param;
+				let x_param = da.x_param;
+				
 				let lab_info = this.get_axis_label_info(da.xlab,"x",w-mar.right-mar.left,mar,x_param);
 	
 				let x_label = lab_info.label;
@@ -2631,7 +2654,9 @@ class Graph
 				if(x_label_vert == true) mar.bottom = 2.5+lab_info.wimax;
 				else mar.bottom = 3.5;
 				
-				let y_param = this.op.y_param;
+				//let y_param = this.op.y_param;
+				let y_param = da.y_param;
+						
 				lab_info = this.get_axis_label_info(da.ylab,"y",h-mar.top-mar.bottom,mar,y_param);
 				let y_label = lab_info.label;
 				let y_label_hor = lab_info.turn;
@@ -2692,14 +2717,14 @@ class Graph
 		
 			if(wi > wimax) wimax = wi;
 		}
-		
+	
 		let turn = false;
 		let d_label = room/lab.length;
 		
 		if(d_label < wimax){
 			turn = true;
 			
-			let frac = 1;                               // Ensures font size fits in gap
+			let frac = 0.9;                               // Ensures font size fits in gap
 			if(d_label*frac < si){ wimax *= d_label*frac/si; si = d_label*frac;}
 			
 			if(wimax > 7){                              // Ensures axes are not too big
@@ -2724,6 +2749,9 @@ class Graph
 	{
 		// Shifts scrollbars to the origin in tables (if necessary)	
 		inter.export_image = true;
+		if(subsubtab_name() == "Individuals" && this.variety == "Individual"){	
+			inter.export_image = false;
+		}
 		
 		inter.printing = true;
 		generate_screen();

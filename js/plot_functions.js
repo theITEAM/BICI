@@ -542,7 +542,7 @@ function draw_gradient_line(x1, y1, x2, y2, f1, f2)
 function set_dash_type(dash)                                    
 {	
 	let scale = inter.sca/10;
-	let sm = 3*scale, md = 9*scale, bi = 14*scale;
+	let sm = 2*scale, md = 9*scale, bi = 14*scale;
 	
 	switch(dash%10){
 	case 0: cv.setLineDash([]); break;

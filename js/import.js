@@ -334,6 +334,8 @@ function load_default_map()
 					if(load_map_fast) mfi = "D:/BICI_nolongerused/Maps/World.json";
 				
 					let te = load_file_http(mfi,"import");
+					if(te == "") alert_import("The file '"+filename(mfi)+"' does not exist or is empty.");
+						 
 					map = load_annotation_map(te);
 				}
 			
@@ -847,14 +849,15 @@ function load_data_files(pro)
 
 	for(let j = 0; j < pro.processed.length; j++){
 		let cl = pro.processed[j];
-			
+		
 		for(let k = 0; k < cl.tags.length; k++){
 			let tag = cl.tags[k];
 			
 			let file = tag.value;
 			if(typeof file == 'string'){
 				switch(tag.name){
-				case "value": case "boundary": case "constant": case "reparam": case "prior-split": case "dist-split": case "A": case "A-sparse": case "X": case "file": case "text": case "ind-list":
+				case "value": case "boundary": case "constant": case "reparam": case "prior-split": case "dist-split": 
+				case "A": case "A-sparse": case "pedigree": case "X": case "file": case "text": case "ind-list":
 					{
 						if(is_file(file)){
 							let k = 0; while(k < previous_loaded.length && file != previous_loaded[k]) k++;
@@ -869,7 +872,8 @@ function load_data_files(pro)
 								let full_name = pro.data_dir+"/"+file;
 							
 								let te = load_file_http(full_name,"import");
-						
+								if(te == "") alert_import("The file '"+filename(file)+"' does not exist or is empty.",cl.line);
+						 
 								let sep = "comma"; if(file.substr(file.length-4,4) == ".tsv") sep = "tab";
 								tag.value = {name:file, full_name:full_name, sep:sep, te:te};
 								previous_loaded.push(tag.value);

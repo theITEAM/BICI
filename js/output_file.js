@@ -16,8 +16,6 @@ function create_output_file(save_type,map_store)
 	
 	percent(0);
 
-	//if(ver == "mac") dir = "/tmp/"+dir;
-	
 	update_model();
 
 	percent(30);
@@ -54,8 +52,6 @@ function create_output_file(save_type,map_store)
 	
 	//check_comp_structure();
 
-	//if(ver == "mac") filename = "/tmp/"+filename;
-	
 	percent(80);
 
 	if(input.type == "View Code"){
@@ -157,10 +153,12 @@ function create_output_species(p,file_list,save_type,map_store,one_file)
 	te += 'species name="'+sp.name+'" type="'+ty+'"';
 
 	if(ty == "individual"){
-		te += ' trans-tree="';
-		if(sp.trans_tree.check == true) te += 'on';
-		else te += 'off';
-		te += '"';
+		if(sp.trans_tree.check == true){
+			te += ' trans-tree="';
+			if(sp.trans_tree.check == true) te += 'on';
+			else te += 'off';
+			te += '"';
+		}
 	}
 	
 	te += endl+endl;
@@ -292,13 +290,12 @@ function create_output_compartments(p,file_list,map_store,one_file)
 				store.push(labs);
 			}
 			
-			te += output_command_list("comp",claa.name,store,file_list,one_file);
-		
-			te += endl;	
+			if(store.length > 0){
+				te += output_command_list("comp",claa.name,store,file_list,one_file);
+				te += endl;	
+			}
 		}
-	
-		
-	
+
 		let store=[];
 		for(let j = 0; j < claa.ntra; j++){
 			let labs=[];
@@ -463,56 +460,60 @@ function create_output_compartments(p,file_list,map_store,one_file)
 			
 			store.push(labs);
 		}
-			
-		te += output_command_list("trans",claa.name,store,file_list,one_file);
 		
-		te += endl;
+		if(store.length > 0){
+			te += output_command_list("trans",claa.name,store,file_list,one_file);
 		
-		for(let i = 0; i < claa.annotation.length; i++){
-			let anno = claa.annotation[i];
-			switch(anno.type){
-			case "box":
-				te += 'box text="'+anno.te+'" comps="';
-				for(let k = 0; k < anno.comps.length; k++){
-					if(k != 0) te += ",";
-					te += anno.comps[k];
-				}						
-				te += '"'
-				if(anno.color != annotation_col_default) te += ' color="'+anno.color+'"';
-				if(anno.size != size_annotation_default) te += ' text-size='+anno.size;
-				te += endl;
-				break;
-				
-			case "text":
-				te += 'label text="'+anno.te+'" '+output_coords(anno.x,anno.y,cam);
-				if(anno.color != annotation_col_default) te += ' color="'+anno.color+'"';
-				if(anno.size != size_annotation_default) te += ' text-size='+anno.size;
-				te += endl;
-				break;
-				
-			case "map":
-				if(anno.default_map != true){
-					let file = get_unique_file("map",file_list,'.geojson');
-					let k = find(map_store,"name",anno.map_ref);
-					if(k == undefined) error("map undefined");
-					else{
-						let map_da = { crs:{},features:[],type:"FeatureCollection"};
-						for(let j = 0; j < map_store[k].feature.length; j++){
-							map_da.features.push(generate_JSON_feature("Feature"+k,map_store[k].feature[j]));
-						}
-					
-						write_file_store(JSON.stringify(map_da)+"\n",file,file_list);
-						if(one_file) file = get_one_file(file_list);
-						te += 'map file="' +file+'"' + endl;
-					}
-				}
-				break;
-				
-			default:
-				break;
-			}
+			te += endl;
 		}
-		te += endl;
+		
+		if(claa.annotation.length > 0){
+			for(let i = 0; i < claa.annotation.length; i++){
+				let anno = claa.annotation[i];
+				switch(anno.type){
+				case "box":
+					te += 'box text="'+anno.te+'" comps="';
+					for(let k = 0; k < anno.comps.length; k++){
+						if(k != 0) te += ",";
+						te += anno.comps[k];
+					}						
+					te += '"'
+					if(anno.color != annotation_col_default) te += ' color="'+anno.color+'"';
+					if(anno.size != size_annotation_default) te += ' text-size='+anno.size;
+					te += endl;
+					break;
+					
+				case "text":
+					te += 'label text="'+anno.te+'" '+output_coords(anno.x,anno.y,cam);
+					if(anno.color != annotation_col_default) te += ' color="'+anno.color+'"';
+					if(anno.size != size_annotation_default) te += ' text-size='+anno.size;
+					te += endl;
+					break;
+					
+				case "map":
+					if(anno.default_map != true){
+						let file = get_unique_file("map",file_list,'.geojson');
+						let k = find(map_store,"name",anno.map_ref);
+						if(k == undefined) error("map undefined");
+						else{
+							let map_da = { crs:{},features:[],type:"FeatureCollection"};
+							for(let j = 0; j < map_store[k].feature.length; j++){
+								map_da.features.push(generate_JSON_feature("Feature"+k,map_store[k].feature[j]));
+							}
+						
+							write_file_store(JSON.stringify(map_da)+"\n",file,file_list);
+							if(one_file) file = get_one_file(file_list);
+							te += 'map file="' +file+'"' + endl;
+						}
+					}
+					break;
+					
+				default:
+					break;
+				}
+			}
+			te += endl;
+		}
 	}
 
 	return te;
@@ -1049,52 +1050,69 @@ function create_output_ind_eff(p,file_list,one_file)
 				add_warning({mess:"Error in individual effects", mess2:"The A matrix for individual effects '"+name+"' must be loaded", warn_type:"A matrix"});
 			}
 			else{
-				let file = get_unique_file("A-matrix-"+name,file_list,'.csv');
-				
-				if(true){                                   // Sparse representation
-					let file_ind = get_unique_file("ind-list-"+name,file_list,'.csv');
-				
-					let data_ind = 'Individual'+endl;
-					for(let c = 0; c < mat.ind_list.length; c++){ 
-						data_ind += '"'+mat.ind_list[c]+'"'+endl;
-					}
-				
-					write_file_store(data_ind,file_ind,file_list);
-					if(one_file) file_ind = get_one_file(file_list);
-					te += ' ind-list="'+file_ind+'"';
+				if(mat.pedigree == true){
+					let file = get_unique_file("pedigree-"+name,file_list,'.csv');
 					
-					let data = 'j,i,value'+endl;
-					for(let r = 0; r <  mat.ind_list.length; r++){
-						for(let c = 0; c <= r; c++){
-							let val = mat.A_value[r][c];
-							
-							if(val != 0) data += r+","+c+","+val+endl;
-						}
+					let data = 'ID,sire,dam'+endl;
+					
+					for(let c = 0; c < mat.ind_list.length; c++){ 
+						data += '"'+mat.ind_list[c]+'"'+",";
+						data += '"'+mat.sire_list[c]+'"'+",";
+						data += '"'+mat.dam_list[c]+'"'+endl;
 					}
-		
+						
 					write_file_store(data,file,file_list);
 					if(one_file) file = get_one_file(file_list);
-					te += ' A-sparse="'+file+'"';
+					te += ' pedigree="'+file+'"';
 				}
-				else{	
-					let data = '';
-					for(let c = 0; c < mat.ind_list.length; c++){ 
-						if(c != 0) data += ',';
-						data += '"'+mat.ind_list[c]+'"';
+				else{
+					let file = get_unique_file("A-matrix-"+name,file_list,'.csv');
+					
+					if(true){                                   // Sparse representation
+						let file_ind = get_unique_file("ind-list-"+name,file_list,'.csv');
+					
+						let data_ind = 'Individual'+endl;
+						for(let c = 0; c < mat.ind_list.length; c++){ 
+							data_ind += '"'+mat.ind_list[c]+'"'+endl;
+						}
+					
+						write_file_store(data_ind,file_ind,file_list);
+						if(one_file) file_ind = get_one_file(file_list);
+						te += ' ind-list="'+file_ind+'"';
+						
+						let data = 'j,i,value'+endl;
+						for(let r = 0; r <  mat.ind_list.length; r++){
+							for(let c = 0; c <= r; c++){
+								let val = mat.A_value[r][c];
+								
+								if(val != 0) data += r+","+c+","+val+endl;
+							}
+						}
+			
+						write_file_store(data,file,file_list);
+						if(one_file) file = get_one_file(file_list);
+						te += ' A-sparse="'+file+'"';
 					}
-					data += endl;
-
-					for(let r = 0; r <  mat.ind_list.length; r++){
+					else{	
+						let data = '';
 						for(let c = 0; c < mat.ind_list.length; c++){ 
 							if(c != 0) data += ',';
-							data += mat.A_value[r][c];
+							data += '"'+mat.ind_list[c]+'"';
 						}
 						data += endl;
+
+						for(let r = 0; r <  mat.ind_list.length; r++){
+							for(let c = 0; c < mat.ind_list.length; c++){ 
+								if(c != 0) data += ',';
+								data += mat.A_value[r][c];
+							}
+							data += endl;
+						}
+			
+						write_file_store(data,file,file_list);
+						if(one_file) file = get_one_file(file_list);
+						te += ' A="'+file+'"';
 					}
-		
-					write_file_store(data,file,file_list);
-					if(one_file) file = get_one_file(file_list);
-					te += ' A="'+file+'"';
 				}
 			}
 		}		
@@ -1233,7 +1251,7 @@ function create_output_siminf(save_type)
 			{
 				let num_samp = Number(details.sample);
 				if(num_samp != MCMC_SAMPLE_DEFAULT){
-					te += " sample="+num_samp;
+					te += " update="+num_samp;
 				}
 				
 				let num_param = Number(details.output_param);
@@ -1321,7 +1339,7 @@ function create_output_siminf(save_type)
 					
 					if(type != "scan"){
 						if(Number(details.burnin_frac) != BURNIN_FRAC_DEFAULT){
-							te += ' burnin-frac="' +details.burnin_frac+'"';
+							te += ' burnin-percent="' +details.burnin_frac+'"';
 						}
 					}
 				}
@@ -1330,9 +1348,9 @@ function create_output_siminf(save_type)
 				
 		case "PAS-MCMC":
 			te += " npart="+details.npart;
-			te += ' gen-update=' +details.gen_update;
+			te += ' gen-percent=' +details.gen_update;
 			if(Number(details.burnin_frac) != BURNIN_FRAC_DEFAULT){
-				te += ' burnin-frac="' +details.burnin_frac+'"';
+				te += ' burnin-percent="' +details.burnin_frac+'"';
 			}
 			break;
 		}

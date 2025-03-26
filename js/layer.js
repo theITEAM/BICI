@@ -396,7 +396,12 @@ class Layer
 	add_checkbox_white(x,y,value,te,source)
 	{
 		this.add_button({value:value, x:x+0.5, y:y, dx:1, dy:1, ac:"CheckboxButton", type:"CheckboxWhiteButton", source:source});
-		this.add_button({te:te, x:x+1.6, y:y, dx:text_width(te,get_font(si_radio))+0.4, dy:1, type:"CheckboxButtonText", source:source, col:WHITE});
+		
+		let dx; 
+		if(source.param) dx = plot_param_info(te,si_radio).w+0.4;
+		else dx = text_width(te,get_font(si_radio))+0.4;
+		
+		this.add_button({te:te, x:x+1.6, y:y, dx:dx, dy:1, type:"CheckboxButtonText", source:source, col:WHITE});
 	}
 
 
@@ -404,7 +409,11 @@ class Layer
 	add_checkbox(x,y,value,te,source,back_col,op)
 	{
 		this.add_button({value:value, x:x+0.5, y:y, dx:1, dy:1, ac:"CheckboxButton", type:"CheckboxButton", source:source});
-		let dx = text_width(te,get_font(si_radio))+0.4;
+		
+		let dx; 
+		if(source.param) dx = plot_param_info(te,si_radio).w+0.4;
+		else dx = text_width(te,get_font(si_radio))+0.4;
+		
 		this.add_button({te:te, x:x+1.6, y:y, dx:dx, dy:1, type:"CheckboxButtonText", source:source, col:BLACK, back_col:back_col});
 		
 		if(op != undefined && op.title != undefined){
@@ -427,7 +436,12 @@ class Layer
 		}
 			
 		this.add_button({value:value,  x:xx, y:yy, dx:1.2, dy:1.2, ac:"RadioButton", type:"RadioWhiteButton", source:source, back_col:back_col});
-		this.add_button({te:te, x:xx+1.2, y:yy+0.1, dx:text_width(te,fo)+0.4, dy:1, type:"RadioButtonText", source:source, fo:fo, col:WHITE, back_col:back_col});
+		
+		let dx; 
+		if(source.param) dx = plot_param_info(te,si_radio).w+0.4;
+		else dx = text_width(te,fo)+0.4;
+		
+		this.add_button({te:te, x:xx+1.2, y:yy+0.1, dx:dx, dy:1, type:"RadioButtonText", source:source, fo:fo, col:WHITE, back_col:back_col});
 	}
 	
 	
@@ -446,7 +460,12 @@ class Layer
 		}
 	
 		this.add_button({value:value, x:xx, y:yy, dx:1.2, dy:1.2, ac:ac, type:"RadioButton", source:source, back_col:back_col});
-		this.add_button({te:te, x:xx+1.2, y:yy+0.1, dx:text_width(te,get_font(si_radio))+0.4, dy:1, type:"RadioButtonText", source:source, col:BLACK, fo:fo, back_col:back_col});
+		
+		let dx; 
+		if(source.param) dx = plot_param_info(te,si_radio).w+0.4;
+		else dx = text_width(te,fo)+0.4;
+		
+		this.add_button({te:te, x:xx+1.2, y:yy+0.1, dx:dx, dy:1, type:"RadioButtonText", source:source, col:BLACK, fo:fo, back_col:back_col});
 		
 		return x + text_width(te,get_font(si_radio))+3;
 	}

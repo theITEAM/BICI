@@ -30,7 +30,7 @@ void MFA::run()
 	
 	auto param_val = model.param_sample();
 	
-	output.print_param(param_val);
+	model.print_param(param_val);
 	
 	auto Li = state.like_integrate(param_val);
 	

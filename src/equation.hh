@@ -1,5 +1,4 @@
-#ifndef BICI__EQUATION_HH
-#define BICI__EQUATION_HH
+#pragma once
 
 #include <vector>
 
@@ -18,13 +17,6 @@ struct EqItem {                            // An individual operation in a calcu
 	unsigned int index;
 	double constant; 
 };
-
-/*
-struct CalcItemRef {                       // References an idem on a calculation
-	unsigned int i;                          // Calculation number
-	unsigned int j;                          // Index
-};
-*/
 
 struct Calculation                         // Stores a calculation (made up of operations)
 {
@@ -196,4 +188,4 @@ class Equation                             // Stores information about the model
 		double calculate_no_pop(unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
 		InfSourceSampler setup_source_sampler(unsigned int ti, const vector <double> &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
 };
-#endif
+

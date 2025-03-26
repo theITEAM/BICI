@@ -91,7 +91,7 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 				
 				if(testing){
 					auto prob = prob_infection_source(ev,p);
-					if(dif(prob,probif)){
+					if(dif(prob,probif,dif_thresh)){
 						emsg("Source sampler problem");
 					}
 				}

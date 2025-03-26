@@ -130,9 +130,18 @@ void Sampler2D::check()
 	auto S_store = S;
 	
 	setup();
-	if(dif(num_sum_store,num_sum)) emsg("problem with num sum");
-	if(dif(marg_sum_store,marg_sum)) emsg("problem with marg sum");
-	if(dif(S_store,S)) emsg("S");
+	
+	if(dif(num_sum_store,num_sum,DIF_THRESH)){
+		emsg("problem with num sum");
+	}
+	
+	if(dif(marg_sum_store,marg_sum,DIF_THRESH)){
+		emsg("problem with marg sum");
+	}
+	
+	if(dif(S_store,S,DIF_THRESH)){
+		emsg("S");
+	}
 }
 
 
@@ -188,8 +197,14 @@ void Sampler::check()
 	auto S_store = S;
 	
 	setup();
-	if(dif(num_sum_store,num_sum)) emsg("problem with num sum");
-	if(dif(S_store,S)) emsg("S");
+
+	if(dif(num_sum_store,num_sum,DIF_THRESH)){
+		emsg("problem with num sum");
+	}
+	
+	if(dif(S_store,S,DIF_THRESH)){
+		emsg("S");
+	}
 }
 
 
@@ -365,7 +380,7 @@ void Proposal::pop_move_local(State &state)
 		state.check("hh");
 		for(auto tr = 0u; tr < N; tr++){
 			for(auto ti = 0u; ti < win; ti++){
-				if(dif(samp.num[tr][ti],tn[tr][tmin+ti])) emsg("dif prob");
+				if(dif(samp.num[tr][ti],tn[tr][tmin+ti],DIF_THRESH)) emsg("dif prob");
 			}
 		}
 	}
@@ -472,7 +487,9 @@ void Proposal::pop_ic_local(State &state)
 	
 	if(false){
 		for(auto tr = 0u; tr < N; tr++){
-			for(auto ti = 0u; ti < win; ti++) if(dif(samp.num[tr][ti],tn[tr][ti])) emsg("Wrong");
+			for(auto ti = 0u; ti < win; ti++){
+				if(dif(samp.num[tr][ti],tn[tr][ti],DIF_THRESH)) emsg("Wrong");
+			}
 		}
 		state.check("hh");
 		samp.check();
@@ -571,7 +588,9 @@ void Proposal::pop_end_local(State &state)
 	
 	if(false){
 		for(auto tr = 0u; tr < N; tr++){
-			for(auto ti = 0u; ti < win; ti++) if(dif(samp.num[tr][ti],tn[tr][ti+ti_shift])) emsg("Wrong");
+			for(auto ti = 0u; ti < win; ti++){
+				if(dif(samp.num[tr][ti],tn[tr][ti+ti_shift],DIF_THRESH)) emsg("Wrong");
+			}
 		}
 		state.check("hh");
 		samp.check();
@@ -759,7 +778,7 @@ void Proposal::pop_single_local(State &state)
 	}
 	
 	if(false){
-		if(dif(tr_sel.num,tn)) emsg("Not agree");
+		if(dif(tr_sel.num,tn,DIF_THRESH)) emsg("Not agree");
 	
 		state.check("hh");
 		tr_sel.check();
@@ -846,7 +865,7 @@ void Proposal::pop_ic(State &state)
 	
 	if(false){
 		for(auto c = 0u; c < N; c++){
-			if(dif(samp.num[c],double(cnum[c]))) emsg("Not agree");
+			if(dif(samp.num[c],double(cnum[c]),DIF_THRESH)) emsg("Not agree");
 		}
 
 		state.check("hh");
@@ -911,7 +930,7 @@ void Proposal::pop_ic_swap(State &state)
 	
 	if(false){
 		for(auto c = 0u; c < N; c++){
-			if(dif(samp.num[c],double(cnum[c]))) emsg("Not agree");
+			if(dif(samp.num[c],double(cnum[c]),DIF_THRESH)) emsg("Not agree");
 		}
 
 		state.check("hh");

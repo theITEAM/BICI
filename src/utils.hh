@@ -1,7 +1,6 @@
 /// General purpose utility functions for all classes to use
 
-#ifndef BICI__UTILS_HH
-#define BICI__UTILS_HH
+#pragma once
 
 using namespace std;
 
@@ -83,20 +82,22 @@ ParamProp get_param_prop(string st);
 unsigned int add_to_vec(vector <unsigned int> &vec, unsigned int val);
 unsigned int add_to_vec(vector <ParamRef> &vec, unsigned int th, unsigned int index);
 void print(string name, const vector <double> &vec);
+unsigned int get_core();
 void print_diag(string te);
 void print(string name, const vector <unsigned int> &vec);
 void printsm(string name, const vector <double> &vec);
 void print(string name, const vector < vector <double> > &vec);
 void print(string name, const vector < vector <unsigned int> > &mat);
 void print(string name, const Table &tab);
-bool dif(double a, double b);
-bool dif(const vector <double> &a, const vector <double> &b);
-unsigned int which_dif(const vector <double> &a, const vector <double> &b);
-bool dif(const vector < vector <double> > &a, const vector < vector <double> > &b);
-vector <unsigned int> which_dif(const vector < vector <double> > &a, const vector < vector <double> > &b);
-bool dif(unsigned int a, unsigned int b);
-bool dif(const vector <unsigned int> &a, const vector <unsigned int> &b);
-bool dif(const vector < vector <unsigned int> > &a, const vector < vector <unsigned int> > &b);
+
+bool dif(double a, double b, double thresh);
+bool dif(const vector <double> &a, const vector <double> &b, double thresh);
+unsigned int which_dif(const vector <double> &a, const vector <double> &b, double thresh);
+bool dif(const vector < vector <double> > &a, const vector < vector <double> > &b, double thresh);
+vector <unsigned int> which_dif(const vector < vector <double> > &a, const vector < vector <double> > &b, double thresh);
+bool difi(unsigned int a, unsigned int b);
+bool difi(const vector <unsigned int> &a, const vector <unsigned int> &b);
+bool difi(const vector < vector <unsigned int> > &a, const vector < vector <unsigned int> > &b);
 string replace(string st, string st1, string st2);
 void remove_cr(string &st);
 bool is_percent(string val);
@@ -116,6 +117,7 @@ vector <int> round_int(const vector <double> &val);
 string cpu_percent(long time, long total_time);
 string tstr(double value);
 void progress(double val, double val2);
+unsigned int core();
 unsigned int num_core();
 bool op();
 vector <unsigned int> seq_vec(unsigned int N);
@@ -145,7 +147,10 @@ vector <unsigned int> false_list(const vector <bool> &vec);
 vector <unsigned int> combine(const vector <unsigned int> &vec1, const vector <unsigned int> &vec2);	
 bool begin_str(string st, string st2);
 bool end_str(string st, string st2);
-	
+void check_thresh(DistText dist, DistQuant dq, double val);
+bool events_near_div(const vector <Event> &ev, const Details &details);
+bool event_near_div(double t, const Details &details);
+		
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);
 string basic_equation_check(string &te);
@@ -168,4 +173,3 @@ void test_distribution();
 void generate_data();
 void simulate_trans_exp();
 void test_incomplete_distribution();
-#endif

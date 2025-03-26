@@ -1,5 +1,4 @@
-#ifndef BICI__ABC_SMC_HH
-#define BICI__ABC_SMC_HH
+#pragma once
 
 #include "struct.hh"
 #include "model.hh"
@@ -43,4 +42,4 @@ class ABC_SMC
 		
 		State state;
 };
-#endif
+

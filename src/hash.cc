@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <cmath>
+#include <iomanip>    
  
 using namespace std;
 
@@ -20,6 +21,7 @@ Hash::Hash()
 		hash_code[h] = (unsigned int)(ran()*HASH_MAX);
 	}
 };	
+	
 	
 /// Determines if the state is already in the hash table
 unsigned int Hash::find(string te) const 
@@ -81,6 +83,17 @@ vector <unsigned int> Hash::get_vec_string(const string &te) const
 	}
 	
 	return vec;
+}
+
+
+/// COnverts from a text string to a list of integers
+vector <unsigned int> Hash::get_vec_double(const double val) const
+{
+	stringstream ss;
+	ss << fixed << std::setprecision(16);
+	ss << val;
+	
+	return get_vec_string(ss.str());
 }
 
 
