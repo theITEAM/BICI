@@ -4,12 +4,13 @@
 /// Generates content for the right bar
 function right_menu_buts(lay)
 {	
-	if(inter.graph.init != true && inter.graph.init != "no data") return;
+	let type = lay.op.type;
+
+	if(type != "Diagnostics" && inter.graph.init != true && inter.graph.init != "no data") return;
 
 	let dygap = 0.2;
 	
-	let type = lay.op.type;
-
+	
 	let rpf; if(type != "GraphView") rpf = get_inf_res().plot_filter;
 
 	let y = 0.1;
@@ -18,7 +19,7 @@ function right_menu_buts(lay)
 		y = stand_filt(y,rpf,lay);
 		return;
 	}
-	
+
 	switch(type){
 	case "Populations":
 		{
@@ -70,6 +71,13 @@ function right_menu_buts(lay)
 			if(rpf.pos_indview.length > 1 && inter.graph.ind_sel == undefined){
 				y = add_filter("View",y,rpf.sel_indview,rpf.pos_indview,lay);
 				y += dygap;	
+				
+				if(rpf.sel_indview.te == "Ind. Eff."){
+					if(rpf.pos_indeffview.length > 1){
+						y = add_filter("Graph",y,rpf.sel_indeffview,rpf.pos_indeffview,lay);
+						y += dygap;
+					}
+				}
 			}
 			
 			if(inter.graph.ind_sel){
@@ -120,7 +128,7 @@ function right_menu_buts(lay)
 			switch(rpf.sel_paramview.te){
 			case "Scatter": case "Correlation": break;
 			default:
-				{			
+				if(rpf.pos_paramviewtype){
 					if(rpf.pos_paramviewtype.length > 1){
 						y = add_filter("Graph",y,rpf.sel_paramviewtype,rpf.pos_paramviewtype,lay);
 						y += dygap;
@@ -159,6 +167,41 @@ function right_menu_buts(lay)
 			}
 		}
 		break;
+		
+	case "Diagnostics":
+		{
+			y = add_filter("View",y,rpf.sel_diag_view,rpf.pos_diag_view,lay);
+			
+			let sdv = rpf.sel_diag_view;
+			
+			switch(sdv.te){
+			case "Trans. (exp.)":
+				y = stand_filt(y,rpf,lay,"trans");
+				y = additional_filt(y,rpf,lay);
+				if(rpf.pos_timestep.length > 1){
+					y = add_filter("Time-step",y,rpf.sel_timestep,rpf.pos_timestep,lay);
+				}
+				break;
+				
+			case "Trans. (dist.)":
+				y = stand_filt(y,rpf,lay,"trans");	
+				y = additional_filt(y,rpf,lay);
+				break;
+				
+			case "Trans. (bias)": case "Trans. (p-val.)":
+				y = add_filter("Graph",y,rpf.sel_bias_view,rpf.pos_bias_view,lay);		
+				y = stand_filt(y,rpf,lay,"trans");	
+				y = additional_filt(y,rpf,lay);
+				break;
+			
+			case "Proposals":
+				if(rpf.pos_diag_chain.length > 1){
+					y = add_filter("Chain",y,rpf.sel_diag_chain,rpf.pos_diag_chain,lay);	
+				}
+				break;
+			}
+		}
+		break;
 	}
 }
 
@@ -169,11 +212,12 @@ function stand_filt(y,rpf,lay,op)
 	let p = model.get_p();
 	
 	let rpf2 = rpf.species[p];
+	
 	if(rpf2.pos_class.length > 1){
 		y = add_filter("Classification",y,rpf2.sel_class,rpf2.pos_class,lay);
 	}
 	
-	if(!(rpf.plot_average && (op == "pop" || op == "trans"))){
+	if(!(rpf.plot_average && (op == "pop" || op == "trans")) && op != "trans-diag"){
 		y = chain_sample_filt(y,rpf,lay);
 	}
 	
@@ -211,33 +255,60 @@ function additional_filt(y,rpf,lay)
 	
 	let rpf2 = rpf.species[p];
 	
+	
 	for(let i = 0; i < rpf2.filter.length; i++){
-		let rpf3 = rpf2.filter[i];
 		let te = "";
 
-		switch(rpf3.radio.value){
-		case "select":
-			let num = 0;
-			for(let c = 0; c < rpf3.comp_name.length; c++){
-				if(rpf3.comp_filt[c].check == true){
-					if(te != "") te += ",";
-					te += rpf3.comp_name[c];
-					num++;
+		if(apply_filter(rpf2,i,subsubtab_name())){
+			let rpf3 = rpf2.filter[i];
+				
+			switch(rpf3.type){
+			case "trans_filt":
+				{
+					let num = 0;
+					for(let k = 0; k < rpf3.tra_name.length; k++){
+						if(rpf3.tra_filt[k].check == true){
+							if(te != "") te += ",";
+							te += rpf3.tra_name[k];
+							num++;
+						}
+					}
+					if(num == rpf3.tra_name.length) te = "All";
+					if(num == 0) te = "None";
 				}
+				break;
+				
+			case "pop_filt":
+				{
+					switch(rpf3.radio.value){
+					case "select":
+						let num = 0;
+						for(let c = 0; c < rpf3.comp_name.length; c++){
+							if(rpf3.comp_filt[c].check == true){
+								if(te != "") te += ",";
+								te += rpf3.comp_name[c];
+								num++;
+							}
+						}
+						if(num == rpf3.comp_name.length) te = "All";
+						if(num == 0) te = "None";
+						break;
+						
+					case "single":
+						te = rpf3.radio_sel.value;
+						break;
+					
+					default: error("Option prob"); break;
+					}
+					if(rpf3.fraction.check) te = "Frac. "+te;
+				}
+				break;
+				
+			default: error("Filt type not recognised"); break;
 			}
-			if(num == rpf3.comp_name.length) te = "All";
-			if(num == 0) te = "None";
-			break;
 			
-		case "single":
-			te = rpf3.radio_sel.value;
-			break;
-			
-		default: error("Option prob"); break;
+			y = add_population_filter(rpf3.name,y,te,rpf,rpf3,i,lay);
 		}
-		if(rpf3.fraction.check && subsubtab_name() == "Populations") te = "Frac. "+te;
-		
-		y = add_population_filter(rpf3.name,y,te,rpf,rpf3,i,lay);
 	}
 	
 	lay.add_button({te:"Add filter", x:0.1, y:y, dx:4.5, dy:1.0, type:"AddFilter", ac:"AddFilter", rpf:rpf});
@@ -374,9 +445,23 @@ function rightbot_menu_buts(lay)
 function rightmid_menu_buts(lay)
 {
 	let rpf = get_inf_res().plot_filter;
-	
+
 	if(rpf){
 		switch(subsubtab_name()){
+		case "Diagnostics":
+			{
+				let seldv = rpf.sel_diag_view;
+				let p = model.get_p();
+				let rpf2 = rpf.species[p];
+				let cl = rpf2.sel_class.cl;
+				let sel = rpf2.cla[cl].sel;
+	
+				switch(seldv.te){
+				case "Trans. (dist.)": param_list("",sel.radio,sel.list,lay); break;
+				}
+			}
+			break;
+		
 		case "Parameters":
 			{
 				let selpv = rpf.sel_paramview;
@@ -413,7 +498,12 @@ function rightmid_menu_buts(lay)
 			{
 				let p = model.get_p();
 				
-				let seliev = rpf.sel_ie_view[p];
+				let seliev;
+				switch(rpf.sel_indeffview.te){
+				case "Scatter": seliev = rpf.sel_ie_data_view[p]; break;
+				case "Distribution": seliev = rpf.sel_ie_view[p]; break;
+				default: error("Default option problem"); break;
+				}
 			
 				param_list("",seliev.radio,seliev.list,lay);
 			}
@@ -434,10 +524,14 @@ function param_list(title,rad,list,lay)
 		cy += 1.3;
 	}
 	
-	for(let i = 0; i < list.length; i++){
+	let too_big = false;
+	let imax = list.length; if(imax > PARAM_LIST_MAX){ imax = PARAM_LIST_MAX; too_big = true;}
+	for(let i = 0; i < imax; i++){
+		let li = list[i];
 		lay.add_radio(0,cy,i,list[i].name,rad,{});
 		cy += 1.3;	
 	}
+	if(too_big){ lay.add_text("... too many",2,cy+0.4,BLACK,0.8); cy += 1.3;}	
 }
 	
 	
@@ -453,16 +547,22 @@ function param_check_box(param_check,lay)
 			cy += 1.3;
 
 			if(pc.checkb.check && pc.list){
-				if(pc.all_checkb){
+				let too_big = false;
+				let kmax = pc.list.length;
+				if(kmax > PARAM_LIST_MAX){ kmax = PARAM_LIST_MAX; too_big = true;}
+				
+				if(pc.all_checkb && !too_big){
 					lay.add_checkbox(0.5,cy,"All","All",pc.all_checkb,WHITE,{});
 					cy += 1.3;	
 				}
-				
-				for(let k = 0; k < pc.list.length; k++){
+
+				for(let k = 0; k < kmax; k++){
 					let pcl = pc.list[k];
 					lay.add_checkbox(0.5,cy,pcl.name,pcl.name,pcl.checkb,WHITE,{});
 					cy += 1.3;	
 				}				
+				if(too_big){ lay.add_text("... too many",2.5,cy+0.4,BLACK,0.8); cy += 1.3;}	
+			
 				cy += 0.2;
 			}
 		}
@@ -486,11 +586,16 @@ function tot_param_list(title,param_radio,lay)
 		lay.add_radio(0,cy,i,prpl.name,param_radio.radio,{});
 		cy += 1.3;	
 		if(param_radio.radio.value == i && prpl.list){
-			for(let j = 0; j < prpl.list.length; j++){
+			let too_big = false;
+			let jmax = prpl.list.length;
+			if(jmax > PARAM_LIST_MAX){ jmax = PARAM_LIST_MAX; too_big = true;}
+			for(let j = 0; j < jmax; j++){
 				let prpll = prpl.list[j];
 				lay.add_radio(0.5,cy,j,prpll.name,prpl.radio,{});
 				cy += 1.3;	
 			}
+			if(too_big){ lay.add_text("... too many",2.5,cy+0.4,BLACK,0.8); cy += 1.3;}	
+			
 			cy += 0.2;	
 		}
 	}

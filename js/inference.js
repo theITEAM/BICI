@@ -43,13 +43,15 @@ function run_cluster()
 	
 	let te = "To run BICI on a Linux cluster the following steps must be followed:\n• <b>Create BICI file</b> – Click on the 'Save' button below to create and save the initialisation BICI file. Copy this to the cluster where you want BICI to run.\n• <b>Executable</b> – The executable 'bici-para' must also be copied from the BICI main folder to the cluster (<i>e.g.</i> this could be in the same directory as the BICI file).\n";
 	
-	let butte = "'⟨⟨COPY⟩⟩'"; if(line1 == inter.copied) butte = "'⟨⟨COPIED⟩⟩'";
-	te += "• <b>Load MPI</b> – MPI will need to be installed on the cluster. Once installed , it can be loaded using:\n]>'<b>"+line1+"</b>' ["+butte+",'CopyText|BB"+line1+"'] \n";
+	//te += "• <b>Load MPI</b> – MPI will need to be installed on the cluster. Once installed , it can be loaded using:\n]>'<b>"+line1+"</b>' ["+butte+",'CopyText|BB"+line1+"'] \n";
 
-	butte = "'⟨⟨COPY⟩⟩'"; if(line2 == inter.copied) butte = "'⟨⟨COPIED⟩⟩'";
+	let butte = "'⟨⟨COPY⟩⟩'"; if(line2 == inter.copied) butte = "'⟨⟨COPIED⟩⟩'";
 	te += "• <b>Run</b> – BICI is run using:\n]><b>'"+line2+"</b>' ["+butte+",'CopyText|BB"+line2+"']\n>>(where ";
 	if(ncore == undefined) te += "'[core]' is the number of CPU cores and ";
-	te += "'[file.bici]' is replaced by the name of the BICI file you created).\n• <b>Visualise</b> – Once BICI has run it puts its results into the script file. Copy this back to your local computer and load into the interface.";
+	te += "'[file.bici]' is replaced by the name of the BICI file you created). ";
+
+	butte = "'⟨⟨COPY⟩⟩'"; if(line1 == inter.copied) butte = "'⟨⟨COPIED⟩⟩'";
+	te += "Note, if the error “mpirun: command not found...” is encountered, MPI can be loaded with the terminal command:\n]>'<b>"+line1+"</b>' ["+butte+",'CopyText|BB"+line1+"']\n• <b>Visualise</b> – Once BICI has run it puts its results into the script file. Copy this back to your local computer and load into the interface.";
 	
 	inter.help = { title:"Run BICI on Linux cluster", te:te, siminf:siminf, save:"StartCluster"};  
 	inter.copied = undefined;	
@@ -130,7 +132,7 @@ function check_time_error()
 	
 	let num = (t_end-t_start)/dt;
 	if(dif(num,Math.round(num))){
-		alertp("The timestep must fit exactly as an integer quantity between the start and end times.");
+		alertp("The difference between the start '"+t_start+"' and end '"+t_end+"' times is not a multiple of the time-step '"+dt+"'.");
 		return true;
 	}
 	
@@ -157,6 +159,14 @@ function check_time_error()
 			for(let i = 1; i < times.length-1; i++){
 				if(times[i] < t_start || times[i] > t_end){
 					return add_knot_warning("The knot time '"+times[i]+"' is outside the time range.",par);
+				}
+				
+				if(times[i] == t_start){
+					return add_knot_warning("The start knot time '"+times[i]+"' is set twice.",par);
+				}
+				
+				if(times[i] == t_end){
+					return add_knot_warning("The end knot time '"+times[i]+"' is set twice.",par);
 				}
 			}
 			
@@ -210,7 +220,7 @@ function add_inf_start_buts(lay)
 		
 		let yy = cy-2.5;
 		add_right_input_field(yy,"Start time",{type:"inf_t_start",update:true},lay);
-		add_right_input_field(yy+3,"End time",{type:"inf_t_end",update:true},lay);
+		add_right_input_field(yy+3.5,"End time",{type:"inf_t_end",update:true},lay);
 
 		cy += 4;
 			

@@ -1,4 +1,51 @@
-TO DO
+prob1: parameter a not being estimated correctly
+
+Write to Aiden
+Write to margo
+
+
+TO DO §
+X(7) Checks on data tables
+X(13) Check error messages when changing BICI file
+(4) Look at doing posterior simulation from all examples
+(1) Go through all the examples and check they are working... look at diagnostic information
+
+(2) Look at diagnostics for kernels
+(5) Update manual
+
+X(3) Get period working - move multiple events 
+
+
+x(6) Error for poptrans data
+
+X(8) joining proposals
+(9) example giving age variation using period
+
+LATER
+NEW Adding a categorical fixed effect 
+
+(11) Capture recapture example
+X(12) Not alive comp measurement
+
+X(14) add grid view
+X(15) empty parameter
+(20) Get a version 0.4 on github
+
+Changes made for v0.4:
+- New diagnostic information which can be found on the "Diagnostics" menu item when inference is performed: (1) This shows expected number of transition from model vs actual number, (2) Distributions are probed looking at the uniformness of the cumulative probability distributions for evidence of biased transitions (see Max Lau paper), (3) MCMC diagnostic information.
+- Updates to the manual to help improve the explanations.
+- Incorporation of "period" transitions, which allow for a transition event after a certain time period. E.g. this can be used to implement age progression within individuals.
+- THe possiblity for parameter "factors" has been added to the model. This provides a good way for adding in categorical fixed effect into models.
+- Several new proposals have to added (moving mutiple linked events, moving all events for the same individual, leave/sink proposals.
+- Corrections made to add/rem individual proposals (such that they work when some individuals are observed in the system).
+- Significant improvements have been made on error messages in both the visual interface and direct from BICI script. These will help user to understand mistakes in the model
+- Added example M4.5 to illustrate "period" transition
+- Improvements in how loading is displayed in both interface ("Initialising..", "Running..." messages with percentages) and on the terminal.
+- Lots of bug finding. 
+
+There have been some minor changes to the syntax for BICI-script, so you might find that ".bici" files which previous loaded up now give error messages. The current manual contains all the BICI command. If you have difficulities let me know and I can help!
+
+
 
 (4) comp data seems to be shifted to the left
 (5) move multiple events 

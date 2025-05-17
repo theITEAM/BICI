@@ -620,7 +620,7 @@ class Layer
 		this.add_button({x:0, y:loading_si, dx:this.dx, dy:1, type:"LoadMessage"});
 
 		switch(inter.loading_symbol.type){
-		case "Start":
+		case "Start": case "StartPPC":
 			{
 				let si = 3;
 				this.add_button({te:"Stop", x:this.dx/2-si/2, y:loading_si+5, dx:si, dy:si, ac:"Stop", type:"Stop"});
@@ -1146,6 +1146,7 @@ class Layer
 		case "Select": add_select_buts(this); break;
 		case "Transition": model.add_transition_buts(this); break;
 		case "Annotation": add_annotation_buts(this); break;
+		case "PointLabel": add_pointlabel_buts(this); break;
 		case "AnnotationMap": add_annotation_map_buts(this); break;
 		case "BubbleBack": add_bubble_back_buts(this); break;
 		case "Bubble": add_bubble_buts(this); break;
@@ -1154,7 +1155,7 @@ class Layer
 		case "ViewWarning": model.add_view_warning_buts(this); break;
 		case "AddCompartment": model.add_compartment_new_buts(this); break;
 		case "AddLabel": model.add_addlabel_buts(this); break;
-		case "Examples": add_examples_buts2(this); break;
+		case "Examples": add_examples_buts(this); break;
 		case "Frame": add_frame_buts(this); break;
 		case "Xscroll": this.add_xscroll_buts(); break;
 		case "Yscroll": this.add_yscroll_buts(); break;
@@ -1222,7 +1223,7 @@ class Layer
 		case "description": te = model.description.te; break;
 		case "compartment": te = model.species[so.p].cla[so.cl].comp[so.i].name; break;
 		
-		case "trans_mean":
+		case "trans_mean": case "trans_period":
 			eqn = model.species[so.p].cla[so.cl].tra[so.i].value.mean_eqn; 
 			break;
 		
@@ -1259,7 +1260,8 @@ class Layer
 		case "init_per": te = String(edit_source.cla[so.cl].comp_init_pop[so.c].pop_per); break;
 		case "init_globpopulation": te = String(edit_source.glob_comp[so.c].pop);	break;
 		case "element": te = String(edit_source.table.ele[so.r][so.c]);	break;
-		case "element_param": case "element_param_const": 
+		case "element_param": case "element_param_const":
+		case "element_factor_const": case "element_weight_const":
 			{
 				let ele = get_element(inter.edit_param.value,so.pindex);
 				if(ele == undefined) ele = "";
@@ -1317,6 +1319,7 @@ class Layer
 		case "prior_cv": te = inter.bubble.prior.value.cv_eqn.te; break;
 		case "prior_alpha": te = inter.bubble.prior.value.alpha_eqn.te; break;
 		case "prior_beta": te = inter.bubble.prior.value.beta_eqn.te; break;
+		case "prior_sigma": te = inter.bubble.prior.value.sigma_eqn.te; break;
 		case "prior_dist_min": eqn = inter.bubble.prior.value.min_eqn; break;
 		case "prior_dist_max": eqn = inter.bubble.prior.value.max_eqn; break;
 		case "prior_dist_mean": eqn = inter.bubble.prior.value.mean_eqn; break;
@@ -1380,7 +1383,7 @@ class Layer
 		case "suffix": te = String(inter.bubble.suffix); break;
 		case "wild_card": te = String(inter.bubble.wildcard); break;
 		case "comp_acc": te = String(edit_source.comp_acc); break;
-		default: error("SOURCE PROBLEM: "+so.type); break;
+		default: error("SOURCE PROBLEM2: "+so.type); break;
 		}
 
 		if(eqn != undefined){

@@ -9,6 +9,16 @@ function change_page(page_new)
 		return;
 	}
 	
+	if(inter.edit_source == "editted"){
+		alert_help("Data source changed","Click 'Update' to revise data source otherwise 'Cancel'.");
+		return;
+	}
+	
+	if(inter.edit_source == "adding"){
+		alert_help("Add data source","Click 'Done' to add data source otherwise 'Cancel'.");
+		return;
+	}
+	
 	let pa_new = page_new.pa;
 	if(pa_new != undefined){
 		if(isNaN(pa_new)){
@@ -57,7 +67,7 @@ function change_page(page_new)
 		let susu = pag.sub[pag.index].sub[p];
 		if(false){
 			let max = susu.sub.length;
-			if(sususu_new >= max){ sususu_new = max-1; pr("trunc");}
+			if(sususu_new >= max) sususu_new = max-1;
 		}
 		
 		susu.index = sususu_new;
@@ -86,11 +96,12 @@ function change_page(page_new)
 	close_Xvector_source();
 	close_view_graph();
 	close_view_ind();
+	inter.edit_source = false;
 	mode_off();
 	close_description();
 	if(make_fig) inter.figure=[];
 		
-	if(inter.popup_timeout != undefined) clearInterval(inter.popup_timeout);
+	if(inter.popup_timeout != undefined) clearTimeout(inter.popup_timeout);
 	
 	let tree = na.split("->");
 	
@@ -112,6 +123,16 @@ function change_page(page_new)
 				}
 			}
 		}
+	}
+}
+
+
+/// Updates edit_source property
+function update_edit_source(bu)
+{
+	if(bu.type == "BubbleEndBut"){
+		if(inter.edit_source == true) inter.edit_source = "editted";
+		if(inter.edit_source == "add") inter.edit_source = "adding";
 	}
 }
 
@@ -158,7 +179,7 @@ function key_press(e)
 			break;
 		}
 		
-		if(code >= 65 && code < 75){
+		if(code >= 65 && code < 76){
 			let letter = String.fromCharCode(code);
 			inter.figure.push({te:letter, x:inter.mx-letter_size/2, y:inter.my-letter_size/2});
 			generate_screen();
@@ -179,7 +200,10 @@ function key_press(e)
 
 	if(code == 16 || code == 17) return;
 	
-	if(code == 27) location.reload(true); // Escape key
+	if(code == 27){ // Escape key
+		console.clear();
+		location.reload(true);
+	}
 	
 	let cur = inter.cursor;
 	if(code != 38 && code != 40) cur.xstore = undefined;
@@ -237,6 +261,8 @@ function key_press(e)
 										bu.type == "DistElement" || bu.ac == "EditDerive" ||
 										bu.type == "ParamElement" || bu.type == "ReparamElement" ||
 										bu.type == "ParamElementConst" || 
+										bu.type == "ParamFactorConst" || 
+										bu.type == "ParamWeightConst" || 
 										bu.type == "PriorSplitElement" || 
 										bu.type == "DistSplitElement" || 
 										bu.type == "CompPop"){
@@ -340,6 +366,7 @@ function key_press(e)
 					}
 					else{
 						turn_off_cursor();
+						generate_screen();
 					}
 				}
 				break;
@@ -352,7 +379,8 @@ function key_press(e)
 					let fl = false;
 					if(text_lay){
 						switch(text_lay.op.source.type){
-						case "find": case "replace": case "description":
+						case "find": case "replace": case "description": case "element_factor_const":
+						case "element_weight_const":
 							fl = true; 
 							break;				
 						}
@@ -667,7 +695,7 @@ function draw_data_table(lay,x,y,tab,op)
 			let cy = y+mar;
 
 			if(op.edit == true){
-				lay.add_button({te:head, x:cx, y:cy, dx:wmax, dy:dy_table, type:"Element", c:c, ac:"EditTableHead", font:get_font(si_table,"bold")}); cy += dy_table;
+				lay.add_button({te:head, x:cx, y:cy, dx:wmax, dy:dy_table, type:"Element", c:c, ac:"EditTableHead", head:true, font:get_font(si_table,"bold")}); cy += dy_table;
 				for(let r = 0; r < tab.nrow; r++){
 					let te = get_table_ele_text(tab,r,c); 
 					lay.add_button({te:te, x:cx, y:cy, dx:wmax, comp_col:comp_col, dy:dy_table, type:"Element", c:c, r:r, ac:"EditTableElement", font:get_font(si_table)}); cy += dy_table;
@@ -1182,6 +1210,7 @@ function add_table_content(lay,table,back_col,dy)
 	let col = BLACK;
 	if(back_col != WHITE) col = WHITE;
 	
+	
 	if(typeof table == 'string'){
 		lay.add_button({te:table, x:cx, y:cy, dx:lay.dx-5, dy:1.3, type:"Text", si:si, font:get_font(si), col:col}); 
 		return;
@@ -1266,6 +1295,7 @@ function add_table_content(lay,table,back_col,dy)
 		}
 		cx += table.width[c];		
 	}
+	
 }	
 
 
@@ -1395,7 +1425,7 @@ function view_warning(i)
 	
 	model.warn_view = false;
 
-	pr(warn.warn_type+" warn");
+	//error(warn.warn_type+" warn");
 	switch(warn.warn_type){
 	case "TransTreeInf":
 		change_page({pa:"Model", su:"Compartments", susu:warn.p});
@@ -1440,6 +1470,10 @@ function view_warning(i)
 		select_bubble_compartment(warn.p,warn.cl,warn.c);
 		break;
 	
+	case "MissingBox": 
+		select_bubble_box(warn.p,warn.cl,warn.k);
+		break;
+		
 	case "TransMistake":
 		select_bubble_transition(warn.p,warn.cl,warn.i);
 		break;
@@ -1453,7 +1487,7 @@ function view_warning(i)
 		press_button_prop("ParamValueContent","ParamSimElement",["name"],warn.name);
 		break;
 		
-	case "MissingPriorValue":
+	case "MissingPriorValue": case "ErrorPriorValue":
 		change_page({pa:"Inference", su:"Prior"});
 		press_button_prop("ParamPriorContent","PriorElement",["name"],warn.name);
 		break;
@@ -1640,6 +1674,22 @@ function center_message(te,lay)
 }
 
 
+/// Displays a message at the center of a box
+function center_message_box(x,y,dx,dy,te,lay)
+{
+	let si = para_si;
+	let ddy = 1.5;
+	
+	let spl = te.split("\n");
+	y += dy/2 - 2 - (spl.length-1)*ddy/2;
+	
+	for(let j = 0; j < spl.length; j++){			
+		lay.add_button({te:spl[j], x:x, y:y, dx:dx, dy:si, type:"CenterText", font:get_font(si)}); 
+		y += 1.5;
+	}
+}
+
+
 /// Gets the main tab page name
 function tab_name()
 {
@@ -1690,7 +1740,7 @@ function disactivated(te)
 /// Starts the worker doing a job
 function start_worker(type,info)
 {
-	if(false) pr("start work: "+type+" "+info);
+	if(false) error("start work: "+type+" "+info);
 	
 	start_loading_symbol(0,type);
 	generate_screen();

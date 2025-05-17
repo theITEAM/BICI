@@ -43,6 +43,11 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		name += "IND_OBS_SWITCH_ENTER_SOURCE_PROP";	
 		break;
 		
+	case IND_OBS_SWITCH_LEAVE_SINK_PROP:
+		p_prop = vec[0];
+		name += "IND_OBS_SWITCH_LEAVE_SINK_PROP";	
+		break;
+		
 	case CORRECT_OBS_TRANS_PROP: 
 		p_prop = vec[0];
 		all_events_correct = false;
@@ -144,7 +149,23 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		
 		initialise_ind_variable();              // Initialises sampling variables for individual proposals
 		break;
+		
+	case IND_MULTI_EVENT_PROP:                 // Individual multi event time proposals
+		name += "IND_MULTI_EVENT_PROP";	
+		if(vec.size() != 1) emsg("error vec num");
+		p_prop = vec[0];
+		
+		initialise_ind_variable();              // Initialises sampling variables for individual proposals
+		break;
 	
+	case IND_EVENT_ALL_PROP:                 // Individual event time proposals for all events
+		name += "IND_EVENT_ALL_PROP";	
+		if(vec.size() != 1) emsg("error vec num");
+		p_prop = vec[0];
+		
+		initialise_ind_time_sampler();         // Initialises sampling variables for individuals
+		break;
+		
 	case IND_LOCAL_PROP:                      // Individual event time proposals
 		name += "IND_LOCAL_PROP";	
 		if(vec.size() != 2) emsg("error vec num");
@@ -302,36 +323,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 }
 
 
-/// Looks at population changes under and mbp and how they might affect other species
-void Proposal::mbp_population_affect()
-{
-	for(auto po = 0u; po < model.pop.size(); po++){
-		const auto &pop = model.pop[po];
-		
-		for(auto &pmr : pop.markov_eqn_ref){
-			auto p = pmr.p, e = pmr.e;
-
-			AffectLike al; al.map.resize(model.ntimepoint-1,true);
-			
-			al.type = DIV_VALUE_AFFECT; al.num = p; al.num2 = e;
-			param_vec_add_affect(affect_like,al);		
-	
-			al.type = MARKOV_LIKE_AFFECT;
-			param_vec_add_affect(affect_like,al);
-		}
-	
-		for(auto &tre : pop.trans_ref){
-			auto p = tre.p, tr = tre.tr;
-			if(p != p_prop){
-				AffectLike al; al.map.resize(model.ntimepoint-1,true);
-				al.type = MARKOV_POP_AFFECT; al.num = p; al.num2 = tr;
-				param_vec_add_affect(affect_like,al);
-			}
-		}
-	}
-}
-
-
 /// Initialises basic sampling variables
 void Proposal::initialise_variables()
 {
@@ -346,198 +337,6 @@ void Proposal::initialise_variables()
 	ntr = 0; nac = 0; si = 1;
 	M.resize(N);
 	for(auto j = 0u; j < N; j++) M[j].resize(N,UNSET);
-}
-
-	
-// Gets how other parameter and priors are affect by change
-void Proposal::get_dependency()
-{
-	vector <unsigned int> map(model.param_vec.size(),0);
-	
-	vector <unsigned int> list;
-	for(auto i = 0u; i < N; i++){
-		auto j = param_list[i];
-		list.push_back(j);
-		map[j] = 1;
-	}
-	
-	for(auto i = 0u; i < list.size(); i++){
-		auto j = list[i]; 
-		
-		const auto &pv = model.param_vec[j];
-		const auto &par = model.param[pv.th];
-		for(const auto &ch : par.child[pv.index]){
-			const auto &par_child = model.param[ch.th];
-			
-			if(par_child.variety == REPARAM_PARAM){
-				auto k = par_child.param_vec_ref[ch.index];
-				if(k != UNSET){
-					if(map[k] == 0){ map[k] = 2; list.push_back(k);}
-				}
-			}
-		}
-	}
-	
-	// Adds all parameters which are dependent
-	for(auto i = 0u; i < model.param_vec.size(); i++){
-		if(map[i] == 2) dependent.push_back(i);
-	}
-	
-	if(false){
-		cout << name << ":";
-		for(auto th : dependent) cout << model.param_vec[th].name <<","; 
-		cout << endl;
-		emsg("done");
-	}
-}
-
-
-// Gets how the likelihood is altered under the change
-void Proposal::get_affect_like()
-{
-	auto vec = param_list;
-	for(auto th : dependent) vec.push_back(th);
-	
-	for(auto i = 0u; i < vec.size(); i++){
-		auto th = vec[i];
-		for(const auto &al : model.param_vec[th].affect_like){
-			param_vec_add_affect(affect_like,al);
-		}
-	}
-	
-	switch(type){
-	case IE_COVAR_PROP:
-		{
-			const auto &ieg = model.species[p_prop].ind_eff_group[ind_eff_group_ref.ieg];
-			for(const auto &li : ieg.list){
-				model.add_ie_affect(p_prop,li.index,affect_like);
-			}
-			
-			//model.add_ie_affect(p_prop,ieg.list[ind_eff_group_ref.i].index,affect_like);
-			//model.add_ie_affect(p_prop,ieg.list[ind_eff_group_ref.j].index,affect_like);
-		}
-		break;
-		
-	case PAR_EVENT_FORWARD_PROP: case PAR_EVENT_FORWARD_SQ_PROP: 
-	case PAR_EVENT_BACKWARD_SQ_PROP: 
-		model.joint_affect_like(type,tr_change,p_prop,affect_like);
-		break;
-	default: break;
-	}
-
-	model.add_iif_w_affect(affect_like);
-		
-	model.add_popnum_ind_w_affect(affect_like);
-	
-	if(linearise_speedup2 && type == PARAM_PROP){
-		model.affect_linearise_speedup2(affect_like,param_list,dependent);
-	}
-	
-	if(linearise_speedup){
-		model.affect_linearise_speedup(affect_like);
-	}
-	
-	model.order_affect(affect_like);
-}
-
-
-/// Sets up the MVN sampling distribution from particle samples
-void Proposal::set_mvn(double si_, const CorMatrix &cor_matrix)
-{
-	update_sampler(cor_matrix);	
-
-	M_inv = invert_matrix(M);
-	si = si_;
-}
-
-
-/// Initialise sampler
-void Proposal::update_sampler(const CorMatrix &cor_matrix)
-{
-	if(!on || param_list.size() == 0) return;
-	
-	timer[UPDATESAMP_TIMER] -= clock();
-	M = cor_matrix.find_covar(param_list);
-auto Mst = M;
-
-	auto loop = 0u, loopmax = 1000u;
-	do{
-		auto illegal = false;
-		Z = calculate_cholesky(M,illegal);
-		if(!illegal) break;
-		
-		for(auto i = 0u; i < M.size(); i++){
-			M[i][i] *= 1.1;
-		}
-		loop++;
-	}while(loop < loopmax);
-	if(loop == loopmax){
-		cout << name << "  proposal\n";
-		
-		{
-			cout << "check\n";
-			cor_matrix.check();
-			
-			ofstream fout("pout.txt");
-			auto th = param_list[0];
-			
-			auto av = 0.0, av2 = 0.0, nav = 0.0;
-			for(auto i = 0u; i < cor_matrix.n; i++){
-				auto val = cor_matrix.samp[i][th];
-				fout << i << " " << cor_matrix.n_start << " " << val << "\n";
-				if(i >= cor_matrix.n_start){
-					av += val; av2 += val; nav++;
-				}				
-			}
-			cout << av/nav << " " << (av2/nav) - (av/nav)*(av/nav) << " av\n";
-		
-		}
-		
-		print_matrix("A",M);
-		print_matrix("B",Mst);
-		emsg("Cholesky problem");
-	}
-	
-	timer[UPDATESAMP_TIMER] += clock();
-}
-
-
-/// Samples from the covariance matrix
-vector <double> Proposal::sample(vector <double> param_val)
-{
-	timer[SAMPLE_TIMER] -= clock();
-
-	auto vec = sample_mvn(Z);
-
-	for(auto i = 0u; i < N; i++){
-		param_val[param_list[i]] += si*vec[i];
-	}	
-		
-	for(auto j : dependent){
-		const auto &pv = model.param_vec[j];
-		auto ref = model.param[pv.th].value[pv.index].eq_ref;
-		if(ref == UNSET) emsg("Reparam is not set");	
-		param_val[j] = model.eqn[ref].calculate_param_only(param_val);
-	}
-	
-	timer[SAMPLE_TIMER] += clock();
-	
-	return param_val;
-}
-
-
-/// Returns the MVN probability (or something proportional to it
-double Proposal::mvn_probability(const vector <double> &param1, const vector <double> &param2) const
-{
-	double sum = 0;
-	for(auto v1 = 0u; v1 < N; v1++){
-		for(auto v2 = 0u; v2 < N; v2++){
-			double val1 = param1[param_list[v1]] - param2[param_list[v1]];
-			double val2 = param1[param_list[v2]] - param2[param_list[v2]];
-			sum += (val1/si)*M_inv[v1][v2]*(val2/si);
-		}
-	}	
-	return -0.5*sum;
 }
 
 
@@ -609,8 +408,24 @@ string Proposal::print_info() const
 		}
 		break;
 		
+	case IND_MULTI_EVENT_PROP:
+		{
+			ss << "INDIVIDUAL multi event time sampler for species " << model.species[p_prop].name << endl;
+		}
+		break;
+		
+	case IND_EVENT_ALL_PROP:
+		{
+			ss << "INDIVIDUAL all event time sampler for species " << model.species[p_prop].name << endl;
+		}
+		break;
+		
 	case IND_OBS_SWITCH_ENTER_SOURCE_PROP:
 		ss << "INDIVIDUAL correct switch enter/source propsal for species " << model.species[p_prop].name << endl;
+		break;
+		
+	case IND_OBS_SWITCH_LEAVE_SINK_PROP:
+		ss << "INDIVIDUAL correct switch leave/sink propsal for species " << model.species[p_prop].name << endl;
 		break;
 	
 	case CORRECT_OBS_TRANS_PROP:
@@ -712,7 +527,6 @@ string Proposal::print_info() const
 			ss << "LOCAL sampler move events for " << model.species[p_prop].name << endl;
 		}
 		break;
-		
 		
 	case POP_IC_LOCAL_PROP:
 		{
@@ -840,7 +654,7 @@ void Proposal::mbp(State &state)
 	switch(type){
 	case MBP_PROP: 
 		state.param_val = sample(state.param_val); 
-		
+
 		if(model.inbounds(state.param_val) == false){
 			state.param_val = param_store; 
 			update_si(-0.005);
@@ -883,16 +697,15 @@ void Proposal::mbp(State &state)
 	auto cpop_st_st = ssp.cpop_st;
 	
 	state.update_spline(affect_spline);
-	
+
 	ssp.mbp(sim_prob,state.popnum_t);
-	
+
 	auto like_ch = state.update_param(affect_like,param_store);
 	
 	auto al = calculate_al(like_ch,0);
 	
 	if(pl) cout << al << " al" << endl; 
 	
-		
 	if(ran() < al){
 		if(pl) cout << "accept" << endl;
 		nac++;
@@ -936,188 +749,13 @@ void Proposal::mbp(State &state)
 }
 
 
-/// Proposes a new initial condition
-ICResult Proposal::propose_init_cond(InitCondValue &icv, const State &state)
-{
-	vector < vector <double> > num;
-	
-	const	auto &sp = model.species[p_prop];
-
-	const auto &ic = sp.init_cond;
-	
-	auto foc_cl = ic.focal_cl;
-	
-	if(foc_cl == UNSET){		
-		switch(type){
-		case MBP_IC_POPTOTAL_PROP:
-			{	
-				auto dN_total = normal_int_sample(si);
-				if(-dN_total > int(icv.N_total)) return IC_FAIL;
-				
-				icv.N_total += dN_total;
-		
-				if(prior_probability(icv.N_total,ic.pop_prior,state.param_val,model.eqn) == -LARGE){
-					return IC_FAIL;
-				}
-		
-				if(dN_total > 0){
-					auto dcnum = multinomial_sample(dN_total,icv.frac);
-					for(auto c = 0u; c < sp.comp_gl.size(); c++) icv.cnum[c] += dcnum[c];
-				}
-				else{
-					if(dN_total < 0){
-						multinomial_reduce(-dN_total,icv.cnum,icv.frac);
-					}
-				}
-			}
-			break;
-			
-		case MBP_IC_RESAMP_PROP: // Resamples initial 
-			icv.cnum = multinomial_resample(icv.cnum,icv.frac,si);
-			break;
-			
-		default: emsg("prop prob"); break;
-		}
-	}
-	else{
-		switch(type){
-		case MBP_IC_POP_PROP:
-			{	
-				auto cpr = c_prop;
-				
-				auto dN_focal = normal_int_sample(si);
-			
-				if(-dN_focal > int(icv.N_focal[cpr])) return IC_FAIL;
-				
-				icv.N_focal[cpr] += dN_focal;
-		
-				if(prior_probability(icv.N_focal[cpr],ic.comp_prior[cpr],state.param_val,model.eqn) == -LARGE){
-					return IC_FAIL;
-				}
-			
-				if(dN_focal == 0) return IC_ZERO;
-				
-				if(dN_focal > 0){
-					auto dcnum_reduce = multinomial_sample(dN_focal,icv.frac_comb);
-					for(auto c = 0u; c < ic.N_reduce; c++) icv.cnum_reduce[cpr][c] += dcnum_reduce[c];
-				}
-				else{
-					if(dN_focal < 0){
-						multinomial_reduce(-dN_focal,icv.cnum_reduce[cpr],icv.frac_comb);
-					}
-				}
-				
-				model.combine_cnum_reduce(p_prop,icv);
-			}
-			break;
-			
-			
-		case MBP_IC_RESAMP_PROP: // Resamples initial 
-			{
-				auto foc_cl = ic.focal_cl;
-				const auto &claa = sp.cla[foc_cl]; 
-				
-				for(auto c = 0u; c < claa.ncomp; c++){
-					icv.cnum_reduce[c] = multinomial_resample(icv.cnum_reduce[c],icv.frac_comb,si);
-				}
-				model.combine_cnum_reduce(p_prop,icv);
-			}
-			break;
-			
-		default: emsg("prop prob"); break;
-		}
-	}
-	
-	return IC_SUCCESS;
-}
-
-
-/// Resamples from a multinomial distribution
-vector <unsigned int> Proposal::multinomial_resample(const vector <unsigned int> &x, const vector <double> &frac, double prob) const
-{
-	auto N = frac.size();
-	auto x_new = x;
-	
-	if(false){ // Direct way
-		vector <unsigned int> list;
-		for(auto i = 0u; i < N; i++){
-			for(auto j = 0u; j < x[i]; j++) list.push_back(i);
-		}
-		
-		auto sum = 0.0;
-		vector <double> frac_sum(N);
-		for(auto i = 0u; i < N; i++){
-			sum += frac[i];	
-			frac_sum[i] = sum;
-		}
-		if(dif(sum,1,DIF_THRESH)) emsg("sum prob");
-		
-		for(auto k = 0u; k < list.size(); k++){
-			if(ran() < prob){
-				auto z = ran();
-				auto i = 0u; while(i < N && z > frac_sum[i]) i++;
-				if(i == N) emsg("Samp prob");
-				
-				x_new[list[k]]--;
-				x_new[i]++;
-			}
-		}
-	}
-	else{  // Faster way
-		auto total = 0u;
-		for(auto i = 0u; i < N; i++){
-			auto n = binomial_sample(prob,x[i]);
-			x_new[i] -= n;
-			total += n;
-		}
-		
-		auto x_resamp = multinomial_sample(total,frac);
-		
-		for(auto i = 0u; i < N; i++){
-			x_new[i] += x_resamp[i];
-		}	
-		
-		auto totaft = 0u;	for(auto i = 0u; i < N; i++) totaft += x_new[i];
-	}
-	
-	return x_new;
-}
-
-
-/// Reduces the multinomial distribution by a certain number of individuals
-void Proposal::multinomial_reduce(unsigned int dN, vector <unsigned int> &x, const vector <double> &frac) const
-{
-	auto N = frac.size();
-	if(true){
-		vector <unsigned int> list;
-		for(auto i = 0u; i < N; i++){
-			for(auto j = 0u; j < x[i]; j++) list.push_back(i);
-		}
-	
-		auto nlist = list.size();
-		for(auto j = 0u; j < dN; j++){
-			if(nlist == 0) emsg("problem reduce");
-			auto k = (unsigned int)(ran()*nlist);
-			x[list[k]]--;
-			if(k < nlist-1) list[k] = list[nlist-1];
-			list.pop_back();
-			nlist--;
-		}
-	}
-	else{ // TO DO Need a faster way 	
-	}
-}
-
-
 /// Performs a Metropolis-Hastings proposal update for an individual event time
-void Proposal::MH_ind(State &state)
+void Proposal::MH_event(State &state)
 {
 	if(skip_proposal(0.5)) return;
 
 	auto pl = false;
 
-	//if(state.sample >= 2099 && core() == 14) pl = true;
-			
 	auto &sp = model.species[p_prop];
 	auto &ssp = state.species[p_prop];
 	
@@ -1140,7 +778,7 @@ void Proposal::MH_ind(State &state)
 				if(ev.observed == false){
 					switch(ev.type){
 					case NM_TRANS_EV: case M_TRANS_EV:
-						if(!(sp.period_exist && sp.comp_period[ev.c_after][ev.cl])){							
+						if(!(sp.period_exist && ev.c_after != UNSET && sp.comp_period[ev.c_after][ev.cl])){							
 							auto t = ev.t;
 					
 							auto tmin = t_start; 
@@ -1164,17 +802,7 @@ void Proposal::MH_ind(State &state)
 							auto &samp = ind_sampler[tr_gl];
 							
 							auto t_new = t + normal_sample(0,samp.si);
-
-	/*
-if(pl){				
-	auto t_start = model.details.t_start, dt = model.details.dt;
-	auto f = (t_new-t_start)/dt;
-	auto d = f-(unsigned int)(f+0.5);
-cout << t_new-2.5 << " " << f << " " << d << " dif\n";
-cout << event_near_div(t_new,model.details) << "near\n";
-}
-*/
-
+							
 							samp.ntr++;
 							if(t_new <= tmin || t_new >= tmax || event_near_div(t_new,model.details)){
 								samp.nfa++;
@@ -1229,12 +857,8 @@ cout << event_near_div(t_new,model.details) << "near\n";
 										update_ind_samp_si(tr_gl,-0.005);
 									}
 
-									//if(pl) state.check("ind prop");
-									/*
-									if(pl){
-										state.check_simp("ind prop");
-									}
-									*/
+									if(pl) state.check("ind prop");
+	
 									if(pl){
 										state.check_popnum_t2("Pnum");
 									}
@@ -1244,6 +868,255 @@ cout << event_near_div(t_new,model.details) << "near\n";
 						break;
 						
 					default: break;
+					}
+				}
+			}
+		}
+	}
+	if(pl) cout << " done" << endl;
+}
+
+
+/// Performs a Metropolis-Hastings proposal update for multiple individual event times
+void Proposal::MH_multi_event(State &state)
+{
+	if(skip_proposal(0.5)) return;
+
+	auto pl = false;
+
+	auto &sp = model.species[p_prop];
+	auto &ssp = state.species[p_prop];
+	
+	for(auto i = 0u; i < ssp.individual.size(); i++){	
+		if(i >= sp.nindividual_obs || sp.individual[i].move_needed){
+			auto &ind = ssp.individual[i];
+		
+			auto loop_max = ind.ev.size();
+			for(auto loop = 0u; loop < loop_max; loop++){
+				auto &event = ind.ev;
+				auto E = event.size();
+			
+				// Samples to root event
+				auto e = (unsigned int)(ran()*E);
+				if(e == E) emsg("event not in range");
+				
+				auto lm = ssp.get_ev_link_listmove(e,event,ind,state.popnum_t);
+				if(lm.list.size() > 1){
+					auto trange = ssp.ev_link_trange(lm,event);
+					
+					auto tr_gl = event[lm.list[0]].tr_gl;
+				
+					auto &samp = ind_sampler[tr_gl];
+					
+					vector <EventMove> evmo;
+					
+					auto ill = false;
+					
+					auto dt = normal_sample(0,samp.si);
+					if(dt >= trange.tmax || dt < trange.tmin) ill = true;
+					else{
+						// Reorders events 
+						for(auto e = 0u; e < E; e++){
+							auto tnew = event[e].t;
+							if(lm.move[e]){
+								tnew += dt;
+								if(event_near_div(tnew,model.details)) ill = true;
+							}
+							
+							EventMove em;
+							em.t = tnew;
+							em.e = e;
+							em.move = lm.move[e];
+							evmo.push_back(em);
+						}
+					}
+					
+					vector <Event> ev_new;
+					unsigned int tr_gl_new;
+					if(!ill){
+						vector <bool> move_new;
+						for(auto e = 0u; e < E; e++){
+							const auto &evm = evmo[e];
+							auto ev = event[evm.e];
+							ev.t = evm.t;
+							ev_new.push_back(ev);
+							move_new.push_back(evm.move);
+						}
+					
+						ssp.ensure_consistent(ev_new);
+					
+						if(pl){
+							cout << endl << endl;
+							cout << ind.name << endl;
+							cout << "event old:" << endl; ssp.print_event(ind.ev);
+							cout << "event new:" << endl; ssp.print_event(ev_new);
+						}
+						
+						auto e_new = 0u; while(e_new < E && move_new[e_new] == false) e_new++;
+						if(e_new == E) emsg("Should not be E");
+						
+						auto lm_new = ssp.get_ev_link_listmove(e_new,ev_new,ind,state.popnum_t);
+						
+						if(lm.list.size() != lm_new.list.size())  ill = true;
+						else{
+							if(!equal_vec(lm_new.move,move_new)) ill = true;
+							else{
+								tr_gl_new = event[lm_new.list[0]].tr_gl;
+							}
+						}
+					}
+					
+					samp.ntr++;
+					if(ill){
+						samp.nfa++;
+						update_ind_samp_si(tr_gl,-0.005);
+					}
+					else{		
+						auto gc = state.update_tree(p_prop,i,ev_new);
+						if(gc.type == GENCHA_FAIL){
+							samp.nfa++;
+							update_ind_samp_si(tr_gl,-0.005);
+						}
+						else{
+							auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+						
+							auto dprob = 0.0;
+							if(tr_gl_new != tr_gl){  // Accounts for differeces in time sampler
+								const auto &samp_new = ind_sampler[tr_gl_new];
+								dprob = normal_probability(dt,0,samp_new.si) - normal_probability(dt,0,samp.si); 
+							}
+							
+							gc.update_like_ch(like_ch,dprob);
+							
+							auto al = calculate_al(like_ch,dprob);
+					
+							if(pl) cout << i << " " <<  al << " " << e << " al" << endl;
+						
+							if(ran() < al){
+								if(pl) cout << " accept" << endl;
+								samp.nac++;
+								state.add_like(like_ch);
+								state.gen_change_update(gc); 
+								if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+								
+								update_ind_samp_si(tr_gl,0.005);
+							}
+							else{ 
+								if(pl) cout << "reject" << endl;
+								state.restore_back();
+								update_ind_samp_si(tr_gl,-0.005);
+							}
+
+							if(pl) state.check("ind multi event");
+						}
+					}
+				}
+			}
+		}
+	}
+	if(pl) cout << " done" << endl;
+}
+	
+
+/// Performs a Metropolis-Hastings proposal update for all individual event times
+void Proposal::MH_event_all(State &state)
+{
+	if(skip_proposal(0.5)) return;
+
+	auto pl = false;
+
+	auto &sp = model.species[p_prop];
+	auto &ssp = state.species[p_prop];
+	
+	auto t_start = model.details.t_start;
+	auto t_end = model.details.t_end;
+
+	for(auto i = 0u; i < sp.nindividual_obs; i++){	
+		if(sp.individual[i].move_needed){
+			auto &ind = ssp.individual[i];
+		
+			auto &event = ind.ev;
+			auto E = event.size();
+			
+			auto emin = 0u; auto emax = E;
+			
+			auto tmin = t_start;
+			auto tmax = t_end;
+			
+			if(event[0].type == ENTER_EV){ emin = 1; tmin = event[0].t;}
+			if(event[E-1].type == LEAVE_EV){ emax = E-1; tmax = event[E-1].t;}
+			
+			auto ill = false;
+			for(auto e = emin; e < emax; e++){
+				if(event[e].observed) ill = true;
+			}
+			
+			if(ill == false){
+				auto &samp = ind_sampler[i];
+				auto dt = normal_sample(0,samp.si);
+				
+				if(dt > 0){
+					if(event[emax-1].t+dt > tmax) ill = true;
+				}
+				else{
+					if(event[emin].t+dt < tmin) ill = true;
+				}
+			
+				samp.ntr++;
+				if(ill){
+					samp.nfa++;
+					update_ind_samp_si(i,-0.005);
+				}
+				else{
+					auto ev_new = event;
+					for(auto e = emin; e < emax; e++){
+						ev_new[e].t += dt;
+					}
+					
+					if(!events_near_div(ev_new,model.details)){
+						if(pl){
+							cout << endl << endl;
+							cout << ind.name << endl;
+							cout << "event old:" << endl; ssp.print_event(ind.ev);
+							cout << "event new:" << endl; ssp.print_event(ev_new);
+						}
+						
+						auto gc = state.update_tree(p_prop,i,ev_new);
+						if(gc.type == GENCHA_FAIL){
+							samp.nfa++;
+							update_ind_samp_si(i,-0.005);
+						}
+						else{
+							auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+						
+							auto dprob = 0.0;
+							gc.update_like_ch(like_ch,dprob);
+							
+							auto al = calculate_al(like_ch,dprob);
+					
+							if(pl) cout << i << " " <<  al << " al" << endl;
+						
+							if(ran() < al){
+								if(pl) cout << " accept" << endl;
+								samp.nac++;
+								state.add_like(like_ch);
+								state.gen_change_update(gc); 
+								if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+								
+								update_ind_samp_si(i,0.005);
+							}
+							else{ 
+								if(pl) cout << "reject" << endl;
+								state.restore_back();
+								update_ind_samp_si(i,-0.005);
+							}
+
+							if(pl) state.check("ind event all prop");
+
+							if(pl){
+								state.check_popnum_t2("Pnum");
+							}
+						}
 					}
 				}
 			}
@@ -1430,32 +1303,6 @@ void Proposal::MH_ind_local(State &state)
 	}
 }
 
-
-/// Adds possibilities for local changes from add to the total list
-void Proposal::add_li_cha(unsigned int i, const vector <LocalIndChange> &add, vector <LocalIndChange> &licha, vector < vector <unsigned int> > &lc_ref) const
-{
-	for(auto ad : add){
-		ad.ref = lc_ref[i].size();
-		lc_ref[i].push_back(licha.size());
-		licha.push_back(ad);
-	}
-}
-
-
-/// Removes possibilities for local changes for individual i
-void Proposal::remove_li_cha(unsigned int i, vector <LocalIndChange> &licha, vector < vector <unsigned int> > &lc_ref) const
-{
-	for(auto j : lc_ref[i]){
-		if(j+1 < licha.size()){
-			auto &lc = licha[j];
-			lc = licha[licha.size()-1];
-			lc_ref[lc.i][lc.ref] = j;
-		}
-		licha.pop_back();
-	}
-	lc_ref[i].clear();
-}
-
 	
 /// Performs a transmission tree proposal
 void Proposal::trans_tree(State &state)
@@ -1523,9 +1370,11 @@ void Proposal::sample_ind_obs(State &state)
 		if(sp.individual[i].simulation_needed){
 			for(auto cl = 0u; cl < sp.ncla; cl++){
 				if(sp.individual[i].sample_needed[cl] || ssp.all_events_correct(i,cl) == false){
+					
 					if(pl) cout << endl << endl << i << "update    cl=" << cl << endl;
 			
 					if(ind_ev_samp.needed(i,cl) == true){
+						
 						ntr++;
 						ind_ev_samp.generate_ind_obs_timeline();
 						
@@ -1623,7 +1472,7 @@ void Proposal::resimulate_ind_obs(State &state)
 			auto probif = 0.0, probfi = 0.0;
 			
 			auto e_init = ind_ev_samp.resample_init_event(i,probif);
-		
+	
 			if(pl){
 				cout << endl << endl << ind.name << "ind" << endl; 
 				cout << "older: "; ssp.print_event(ind.ev); 
@@ -1655,8 +1504,12 @@ void Proposal::resimulate_ind_obs(State &state)
 				}
 				else{
 					if(pl){
-						cout << endl << endl << ind.name << "ind" << endl; 
+						cout << endl << endl << ind.name << "ind " << endl; 
 						cout << "old: "; ssp.print_event(ind.ev);
+						for(auto i = 0u; i < ind.ev.size(); i++){
+							cout << ind.ev[i].t - int(ind.ev[i].t) << ",";
+						}
+						cout << " dif old " << endl;
 					}
 					
 					probfi += ssp.nm_obs_dprob(ind);
@@ -1886,7 +1739,7 @@ void Proposal::resimulate_ind_unobs(State &state)
 /// Add and removes indiviual from the system
 void Proposal::add_rem_ind(State &state)
 {
-	auto pl = false;//true;
+	auto pl = false;
 	
 	const auto &sp = model.species[p_prop];
 	auto &ssp = state.species[p_prop];
@@ -1897,8 +1750,15 @@ void Proposal::add_rem_ind(State &state)
 	
 	vector <Event> ev_empty;
 	
-	ListMap unobs(sp.nindividual_obs,ssp.individual.size());
-	if(testing) unobs.check(ssp.individual.size()-sp.nindividual_obs);
+	auto nobs = sp.nindividual_obs;
+	
+	// We need to keep track of the total number of source transition and observed number of source transitions
+	
+	auto Nso_obs = ssp.source_num(0,nobs);
+	auto Nso_unobs = ssp.source_num(nobs,ssp.individual.size());
+	
+	ListMap unobs(nobs,ssp.individual.size());
+	if(testing) unobs.check(ssp.individual.size()-nobs);
 
 	vector <TrigEventRef> ste;
 
@@ -1907,7 +1767,9 @@ void Proposal::add_rem_ind(State &state)
 		state.back_init();
 		
 		int dN = normal_int_sample(si);
-		
+	
+		auto Nso_unobs_new = Nso_unobs;
+	
 		if(dN != 0){
 			ntr++;
 			
@@ -1948,11 +1810,21 @@ void Proposal::add_rem_ind(State &state)
 					auto li_ch = state.update_ind(p_prop,i,ev_new,UP_MULTI);
 					probif += ssp.nm_obs_dprob(ssp.individual[i]);
 					
+					if(ssp.source_ind(i)) Nso_unobs_new++;
+					
 					add_on_like(li_ch,like_ch);
 				}
 				
-				auto probfi =	-factorial(nunobs+dN) + factorial(nunobs) - factorial(dN);
-			
+				auto probfi = -factorial(nunobs+dN) + factorial(nunobs);
+					
+				// ADDITION
+				// This assumes likelihood has a factor Nso_total!/Nso_unobs! implicitly included 
+				// This was found to be neccesary, e.g. for a simple model with a source and some observed individuals
+				if(Nso_unobs_new != Nso_unobs){
+					probfi -= factorial(Nso_obs + Nso_unobs_new) - factorial(Nso_obs + Nso_unobs);
+					probfi += factorial(Nso_unobs_new) - factorial(Nso_unobs); 	
+				}
+				
 				auto al = calculate_al(like_ch,probfi-probif);
 				
 				if(pl) cout << al << "al add" << endl;
@@ -1964,6 +1836,8 @@ void Proposal::add_rem_ind(State &state)
 					for(auto i : i_store){
 						unobs.add(i);
 					}
+					
+					Nso_unobs = Nso_unobs_new;
 					
 					update_si(0.005); if(si > ADD_REM_IND_MAX) si = ADD_REM_IND_MAX;
 				}
@@ -1985,10 +1859,10 @@ void Proposal::add_rem_ind(State &state)
 				else{
 					vector < vector <Event> > event_store;
 					vector <unsigned int> i_store;
-				
-					auto probif =	-factorial(nunobs) + factorial(nunobs-dN) + factorial(dN);
-				
+
 					Like like_ch;
+				
+					auto probif = -factorial(nunobs) + factorial(nunobs-dN);
 				
 					auto probfi = 0.0;
 					for(auto k = 0; k < dN; k++){
@@ -1996,6 +1870,8 @@ void Proposal::add_rem_ind(State &state)
 						auto i = unobs.list[m];
 						unobs.remove(i);
 						nunobs--;
+						
+						if(ssp.source_ind(i)) Nso_unobs_new--;
 						
 						auto ev_store = ssp.individual[i].ev;
 						i_store.push_back(i);
@@ -2019,6 +1895,14 @@ void Proposal::add_rem_ind(State &state)
 						event_store.push_back(ev_store);			
 					}		
 					
+					// ADDITION
+					// This assumes likelihood has a factor Nso_total!/Nso_unobs! implicitly included 
+					// This was found to be neccesary, e.g. for a simple model with a source and some observed individuals
+					if(Nso_obs != 0 && Nso_unobs_new != Nso_unobs){
+						probif += factorial(Nso_obs + Nso_unobs_new) - factorial(Nso_obs + Nso_unobs);
+						probif -= factorial(Nso_unobs_new) - factorial(Nso_unobs); 
+					}
+				
 					auto al = calculate_al(like_ch,probfi-probif);
 					
 					if(pl) cout << al << "al remove" << endl;
@@ -2033,6 +1917,9 @@ void Proposal::add_rem_ind(State &state)
 							unobs.remove_hole(i);
 							ssp.remove_individual(i,inf_node);
 						}
+						
+						Nso_unobs = Nso_unobs_new;
+					
 						update_si(0.005); if(si > ADD_REM_IND_MAX) si = ADD_REM_IND_MAX;
 					}
 					else{
@@ -2049,7 +1936,9 @@ void Proposal::add_rem_ind(State &state)
 		if(pl) state.check(" Add rem prop");
 	}
 	
-	if(testing) unobs.check(ssp.individual.size()-sp.nindividual_obs);
+	if(Nso_unobs != ssp.source_num(nobs,ssp.individual.size())) emsg("Source number problem");
+	
+	if(testing) unobs.check(ssp.individual.size()-nobs);
 }
 
 
@@ -2068,9 +1957,17 @@ void Proposal::add_rem_tt_ind(State &state)
 	
 	vector <Event> ev_empty;
 	vector <TrigEventRef> ste;
-	 
+	
+	auto nobs = sp.nindividual_obs;
+	
+	auto Nso_obs = ssp.source_num(0,nobs);
+	auto Nso_unobs = ssp.source_num(nobs,ssp.individual.size());
+	
 	for(auto loop = 0u; loop < 6; loop++){
 		ntr++;
+	
+		auto Nso_unobs_new = Nso_unobs;
+	
 		if(ran() < 0.5){                               // Add individual	
 			auto probif = 0.0;
 			auto i = ssp.add_individual(UNOBSERVED_IND);
@@ -2092,9 +1989,19 @@ void Proposal::add_rem_tt_ind(State &state)
 			else{	
 				auto li_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
 				probif += ssp.nm_obs_dprob(ssp.individual[i]);
+				if(ssp.source_ind(i)) Nso_unobs_new++;
 			
-				auto probfi = log(1.0/(ssp.individual.size()-sp.nindividual_obs));
-			
+				auto nunobs = ssp.individual.size()-nobs;
+				auto probfi = -log(nunobs);
+					
+				// ADDITION
+				// This assumes likelihood has a factor Nso_total!/Nso_unobs! implicitly included 
+				// This was found to be neccesary, e.g. for a simple model with a source and some observed individuals
+				if(Nso_obs != 0 && Nso_unobs_new != Nso_unobs){
+					probfi -= factorial(Nso_obs + Nso_unobs_new) - factorial(Nso_obs + Nso_unobs);
+					probfi += factorial(Nso_unobs_new) - factorial(Nso_unobs); 	
+				}
+				
 				auto dprob = probfi-probif;
 				gc.update_like_ch(li_ch,dprob);
 	
@@ -2108,6 +2015,7 @@ void Proposal::add_rem_tt_ind(State &state)
 					state.gen_change_update(gc); 	
 					if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 					
+					Nso_unobs = Nso_unobs_new;
 					update_si(0.005);
 				}
 				else{
@@ -2122,7 +2030,8 @@ void Proposal::add_rem_tt_ind(State &state)
 			if(nunobs == 0) nfa++;
 			else{
 				auto i = sp.nindividual_obs + (unsigned int)(ran()*nunobs);
-				
+				if(ssp.source_ind(i)) Nso_unobs_new--;
+						
 				auto fl = false;                           // Checks to see for onward transmission
 				for(const auto &ev : ssp.individual[i].ev){
 					if(ev.inf_node_ref != UNSET){
@@ -2132,6 +2041,14 @@ void Proposal::add_rem_tt_ind(State &state)
 				
 				if(fl == false){
 					auto probif = log(1.0/nunobs);
+					
+					// ADDITION
+					// This assumes likelihood has a factor Nso_total!/Nso_unobs! implicitly included 
+					// This was found to be neccesary, e.g. for a simple model with a source and some observed individuals
+					if(Nso_unobs_new != Nso_unobs){
+						probif += factorial(Nso_obs + Nso_unobs_new) - factorial(Nso_obs + Nso_unobs);
+						probif -= factorial(Nso_unobs_new) - factorial(Nso_unobs); 
+					}
 					
 					auto probfi = 0.0;
 						
@@ -2165,6 +2082,7 @@ void Proposal::add_rem_tt_ind(State &state)
 							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 												
 							ssp.remove_individual(i,inf_node);
+							Nso_unobs = Nso_unobs_new;
 							update_si(0.005);
 						}
 						else{
@@ -2177,81 +2095,8 @@ void Proposal::add_rem_tt_ind(State &state)
 		}
 		if(pl) state.check(" Add rem prop");
 	}
-}
-
-
-/// Sets up a list and map
-ListMap::ListMap(unsigned int min_, unsigned int max_)
-{
-	min = min_;
-	map.resize(min,UNSET);
-	for(auto i = min_; i < max_; i++){
-		map.push_back(list.size());
-		list.push_back(i);
-	}
-}
-
-
-/// Adds an element
-void ListMap::add(unsigned int i)
-{
-	map.push_back(list.size());
-	list.push_back(i);
-}
-
-
-/// Removes an element (but leaves a hole)
-void ListMap::remove(unsigned int i)
-{
-	auto m = map[i];
-	map[i] = UNSET;
-	if(m < list.size()-1){
-		list[m] = list[list.size()-1];
-		map[list[m]] = m;
-	}
-	list.pop_back();
-}
-
-
-/// Puts an element back in hole
-void ListMap::add_hole(unsigned int i)
-{
-	map[i] = list.size();
-	list.push_back(i);
-}
-
-
-/// Removes a hole
-void ListMap::remove_hole(unsigned int i)
-{
-	if(map[i] != UNSET) emsg("not hole");
-	if(i < map.size()-1){
-		map[i] = map[map.size()-1];
-		list[map[i]] = i;
-	}
-	map.pop_back();
-}
-
-
-/// Checks that every thing is correct
-void ListMap::check(unsigned int num)
-{
-	if(list.size() != num) emsg("unobs prob");
-
-	for(auto j = 0u; j < list.size(); j++){
-		if(map[list[j]] != j){
-			emsg("inconstent1");
-		}
-	}			
-		
-	for(auto i = 0u; i < list.size(); i++){
-		if(i < min){
-			if(map[i] != UNSET) emsg("should be unset");
-		}
-		else{
-			if(list[map[i]] != i) emsg("inconstent2");
-		}
-	}
+	
+	if(Nso_unobs != ssp.source_num(nobs,ssp.individual.size())) emsg("Source number problem");
 }
 
 
@@ -2576,119 +2421,6 @@ void Proposal::MH_ie_covar(State &state)
 }
 
 
-/*
-/// Performs a Metropolis-Hastings joint proposal update for individual effects and a variance
-void Proposal::MH_ie_covar(State &state)
-{
-	auto pl = false;
-	
-	auto param_store = state.param_val;
-
-	state.param_val = sample(state.param_val);
-	
-	if(model.inbounds(state.param_val) == false || 		
-		 model.ie_cholesky_error(state.param_val)){ 
-		state.param_val = param_store; 
-		update_si(-0.005);
-		return;
-	}
-	
-	auto g = ind_eff_group_ref.ieg;
-	auto th = param_list[0];
-	
-	auto &ssp = state.species[p_prop];
-	const auto &iegs = ssp.ind_eff_group_sampler[g];
-	
-	const auto &sp = model.species[p_prop];
-	const auto &ieg = sp.ind_eff_group[g];
-
-	auto fac = state.param_val[th]/param_store[th]; 
-		
-	auto omega_bef = iegs.omega;
-	auto omega_aft = omega_bef;
-
-	auto pi = ind_eff_group_ref.i;
-	auto pj = ind_eff_group_ref.j;
-		
-	vector <unsigned int> index;
-	{		
-		omega_aft[pi][pj] *= fac;
-		omega_aft[pj][pi] *= fac;
-		
-		index.push_back(ieg.list[pi].index);
-		index.push_back(ieg.list[pj].index);
-	}
-	
-	auto illegal = false;
-	auto Z_omega_aft = calculate_cholesky(omega_aft,illegal);
-	if(illegal){
-		state.param_val = param_store; 
-		update_si(-0.005);
-		return;
-	}
-	
-	ssp.compare_covar("BEFORE",omega_bef,g);
-
-	auto om_bef = create_two_by_two(omega_bef,pi,pj);
-	auto illegal_bef = false;
-	auto Z_om_bef = calculate_cholesky(om_bef,illegal_bef);
-	if(illegal_bef) emsg("Cholesky should not be illegal");
-	
-	auto om_aft = create_two_by_two(omega_aft,pi,pj);
-	auto illegal_aft = false;
-	auto Z_om_aft =  calculate_cholesky(om_aft,illegal_aft);
-	if(illegal_aft) emsg("Cholesky should not be illegal");
-	
-	auto inv_Z_om_bef = invert_matrix(Z_om_bef);
-	
-	auto M = matrix_mult(Z_om_aft,inv_Z_om_bef);
-	
-	auto E = index.size();
-	
-	vector <double> vec(E), vec_new(E);
-	vector < vector <double> > store;
-	for(auto i = 0u; i < ssp.individual.size(); i++){
-		auto &ie = ssp.individual[i].ie;
-		
-		for(auto e = 0u; e < E; e++) vec[e] = ie[index[e]];
-		store.push_back(vec);
-		
-		vec_new = matrix_mult(M,vec);
-		for(auto e = 0u; e < E; e++) ie[index[e]] = vec_new[e];
-	}
-	
-	ssp.compare_covar("AFTER",omega_aft,g);
-
-	state.update_spline(affect_spline);
-	auto like_ch = state.update_param(affect_like,param_store);
-
-	auto al = calculate_al(like_ch,-like_ch.ie);
-	
-	if(pl) cout << al << " al" << endl;
-	ntr++;
-	if(ran() < al){ 
-		if(pl) cout << "ac" << endl;
-		nac++;
-		state.add_like(like_ch);
-		update_si(0.01);
-		state.remove_store_spline(affect_spline);
-	}
-	else{ 
-		state.param_val = param_store;
-		state.restore(affect_like);
-		state.restore_spline(affect_spline);
-		
-		for(auto i = 0u; i < ssp.individual.size(); i++){
-			auto &ie = ssp.individual[i].ie;
-			for(auto e = 0u; e < E; e++) ie[index[e]] = store[i][e];
-		}
-		update_si(-0.005);
-	}
-	if(pl) state.check("uuu");
-}
-*/
-
-
 /// Proposals which jointly changes parameter and events
 void Proposal::param_event_joint(Direction dir, State &state)
 {
@@ -2960,58 +2692,6 @@ double Proposal::calculate_al(const Like &like_ch, double dprob) const
 }
 
 
-/// Initialises sampling variables for individual proposals
-void Proposal::initialise_ind_variable()
-{
-	const auto &sp = model.species[p_prop];
-
-	ind_sampler.resize(sp.tra_gl.size());
-	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
-		auto &is = ind_sampler[tr];
-		is.si = 1;
-		is.ntr = 0;
-		is.nac = 0;
-		is.nfa = 0;
-	}
-}
-
-
-/// Initialises sampling variables for swap proposals
-void Proposal::initialise_swap_variable()
-{
-	const auto &claa = model.species[p_prop].cla[cl_prop];
-
-	swap_info.resize(claa.swap_rep.size());
-	for(auto j = 0u; j < claa.swap_rep.size(); j++){
-		auto &si = swap_info[j];
-		si.ntr = 0; si.ntr2 = 0;
-		si.nac = 0;
-		si.nfa = 0;
-		si.nzero = 0;
-		si.nfilt = 0;
-	}
-}
-
-
-/// Updates the size of the proposal (if in burnin phase)
-void Proposal::update_si(double fac)
-{
-	if(burn_info.on){
-		auto f = 1+fac*burn_info.fac;
-		if(f < 0.5) f = 0.5; 
-		if(f > 10) f = 10;
-		si *= f;
-	}
-}
-
-
-/// Updates the size of individual sampler (if in burnin phase)
-void Proposal::update_ind_samp_si(unsigned int tr_gl, double fac)
-{
-	if(burn_info.on) ind_sampler[tr_gl].si *= 1+fac*burn_info.fac;
-}
-
-
 /// Provides diagnostic information about the proposals
 string Proposal::diagnostics(long total_time) const
 {
@@ -3176,11 +2856,12 @@ string Proposal::diagnostics(long total_time) const
 		}
 		break;
 	
-	case IND_EVENT_TIME_PROP:
+	case IND_EVENT_TIME_PROP: case IND_MULTI_EVENT_PROP:
 		{
 			const auto &sp = model.species[p_prop];
 			
-			ss << "Individual event proposals " << name;
+			if(type == IND_EVENT_TIME_PROP) ss << "Individual event proposals ";
+			else ss << "Individual multi-event proposals ";
 			ss << endl;
 			
 			vector < vector < vector <double> > > ac_list,  fa_list, si_list;
@@ -3189,18 +2870,20 @@ string Proposal::diagnostics(long total_time) const
 				const auto &claa = sp.cla[cl];
 				ac_list[cl].resize(claa.ntra); fa_list[cl].resize(claa.ntra); si_list[cl].resize(claa.ntra);
 			}
-			
+		
 			auto ntr_tot = 0u;
 			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 				const auto &tra = sp.tra_gl[tr];
 				const auto &samp = ind_sampler[tr];
-				ac_list[tra.cl][tra.tr].push_back((unsigned int) (100.0*samp.nac/(samp.ntr+TINY)));
-				fa_list[tra.cl][tra.tr].push_back((unsigned int) (100.0*samp.nfa/(samp.ntr+TINY)));
-				si_list[tra.cl][tra.tr].push_back(samp.si);
+				if(samp.ntr > 0){
+					ac_list[tra.cl][tra.tr].push_back((unsigned int) (100.0*samp.nac/(samp.ntr+TINY)));
+					fa_list[tra.cl][tra.tr].push_back((unsigned int) (100.0*samp.nfa/(samp.ntr+TINY)));
+					si_list[tra.cl][tra.tr].push_back(samp.si);
+				}
 				
 				ntr_tot += samp.ntr;
 			}
-			
+		
 			if(ntr_tot == 0) ss << "No proposals" << endl;
 			else{
 				for(auto cl = 0u; cl < sp.ncla; cl++){
@@ -3208,13 +2891,44 @@ string Proposal::diagnostics(long total_time) const
 					for(auto tr = 0u; tr < claa.ntra; tr++){
 						const auto &tra = claa.tra[tr];
 						
-						ss << tra.name << "   ";
-						ss << " Acceptance: " << min(ac_list[cl][tr]) << " - " << max(ac_list[cl][tr]) << "%   ";
-						ss << " Fail: " << min(fa_list[cl][tr]) << " - " << max(fa_list[cl][tr]) << "%   ";
-						ss << "Size:" << min(si_list[cl][tr]) << " - " << max(si_list[cl][tr]) ;
-						ss << endl;
+						if(ac_list[cl][tr].size() > 0){
+							ss << replace_arrow(tra.name) << "   ";
+							ss << " Acceptance: " << min(ac_list[cl][tr]) << " - " << max(ac_list[cl][tr]) << "%   ";
+							ss << " Fail: " << min(fa_list[cl][tr]) << " - " << max(fa_list[cl][tr]) << "%   ";
+							ss << "Size:" << min(si_list[cl][tr]) << " - " << max(si_list[cl][tr]) ;
+							ss << endl;
+						}
 					}
 				}
+			}
+		}
+		break;
+		
+	case IND_EVENT_ALL_PROP: 
+		{
+			const auto &sp = model.species[p_prop];
+			
+			ss << "Individual all event proposals" << endl;
+			
+			vector <double> ac_list,  fa_list, si_list;
+		
+			auto ntot = 0u;
+			for(auto i = 0u; i < sp.nindividual_obs; i++){
+				const auto &samp = ind_sampler[i];
+				if(samp.ntr > 0){
+					ac_list.push_back((unsigned int) (100.0*samp.nac/(samp.ntr+TINY)));
+					fa_list.push_back((unsigned int) (100.0*samp.nfa/(samp.ntr+TINY)));
+					si_list.push_back(samp.si);
+				}
+				ntot += samp.ntr;
+			}
+		
+			if(ntot == 0) ss << "No proposals" << endl;
+			else{
+				ss << " Acceptance: " << int(mean(ac_list)) << " (" << min(ac_list) << " - " << max(ac_list) << ")    ";
+				ss << " Fail: " << int(mean(fa_list)) << " (" << min(fa_list) << " - " << max(fa_list) << ")   ";
+				ss << "Size:" << mean(si_list) << " (" << min(si_list) << " - " << max(si_list) << ")";
+				ss << endl;
 			}
 		}
 		break;
@@ -3250,6 +2964,13 @@ string Proposal::diagnostics(long total_time) const
 		else ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%";
 		ss << endl;
 		break;
+
+	case IND_OBS_SWITCH_LEAVE_SINK_PROP:
+		ss << "Switch leave sink prop" << endl;
+		if(ntr == 0) ss << "No proposals";
+		else ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%";
+		ss << endl;
+		break;
 		
 	case CORRECT_OBS_TRANS_PROP:
 		ss << "Correct obs trans prop" << endl;
@@ -3261,7 +2982,7 @@ string Proposal::diagnostics(long total_time) const
 			ss << "Individual local proposals for " << claa.name << ":" << endl;
 			for(auto j = 0u; j < claa.swap_rep.size(); j++){
 				const auto &si = swap_info[j];
-				ss <<  claa.swap_rep[j].name << " ";
+				ss << replace_arrow(claa.swap_rep[j].name) << " ";
 				if(si.ntr == 0) ss << "No proposals";
 				else{
 					ss << " Acceptance: " << (unsigned int) (100.0*si.nac/(si.ntr2+TINY)) << "%  ";
@@ -3440,33 +3161,11 @@ string Proposal::diagnostics(long total_time) const
 }
 
 
-/// Separate list of changes to splines from other changes
-void Proposal::calculate_affect_spline()
-{
-	auto i = 0u;
-	while(i < affect_like.size()){
-		if(affect_like[i].type == SPLINE_AFFECT){
-			affect_spline.push_back(affect_like[i]);
-			affect_like.erase(affect_like.begin()+i);
-		}
-		else i++;
-	}
-}
-
-
-/// Deterines probability proposal won't be performed (assuming no prob adaptation)
-bool Proposal::skip_proposal(double val) const 
-{
-	if(!adapt_prop_prob && ran() < val) return true;
-	return false;
-}
-
-
 /// Switchs betweeen an enter and source event
 void Proposal::switch_enter_source(State &state)
 {
 	auto pl = false;
-	
+
 	const auto &sp = model.species[p_prop];
 	auto &ssp = state.species[p_prop];
 
@@ -3488,15 +3187,23 @@ void Proposal::switch_enter_source(State &state)
 			if(ev.size() > 1){
 				if(ev[1].t < tmax) tmax = ev[1].t; 
 			}
+			
 			if(indd.obs.size() > 0){
-				if(indd.obs[0].t < tmax) tmax = indd.obs[0].t;
+				const auto &ob = indd.obs[0];
+				auto tma = ob.t;
+				if(indd.obs[0].not_alive){ // If there are not alive observation account for
+					auto trange = ssp.source_time_range(indd);
+					tma = trange.tmax;
+				}
+				
+				if(tma < tmax) tmax = tma;
 			}
 		
 			Event e_new;
 			
 			double dprob = UNSET;
 			switch(e_init.type){
-			case ENTER_EV:  // Swiches from enter to source
+			case ENTER_EV:  // Switches from enter to source
 				{
 					auto c = e_init.c_after;
 					auto tr = sp.cgl_tr_source[c];
@@ -3504,10 +3211,13 @@ void Proposal::switch_enter_source(State &state)
 						const auto &tra = sp.tra_gl[tr];
 						
 						auto t = t_start + ran()*(tmax-t_start);
+						
 						dprob = log(tmax-t_start);
-	
+
 						IndInfFrom inf_from;
 						e_new = ssp.get_event(M_TRANS_EV,i,tr,UNSET,UNSET,tra.f,t,inf_from);
+						
+						if(event_near_div(t,model.details)) dprob = UNSET;
 					}
 				}
 				break;
@@ -3533,33 +3243,151 @@ void Proposal::switch_enter_source(State &state)
 				auto ev_new = ev;
 				ev_new[0] = e_new;
 				
-				auto gc = state.update_tree(p_prop,i,ev_new);
-				if(gc.type == GENCHA_FAIL){
-					nfa++;
+				if(pl){
+					cout << endl << endl;
+					cout << ind.name << endl;
+					cout << "event old:" << endl; ssp.print_event(ind.ev);
+					cout << "event new:" << endl; ssp.print_event(ev_new);
 				}
-				else{
-					auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-				
-					gc.update_like_ch(like_ch,dprob);
-					
-					auto al = calculate_al(like_ch,dprob);
 			
-					if(pl) cout << i << " " <<  al << " al" << endl;
+				if(!events_near_div(ev_new,model.details)){
+					auto gc = state.update_tree(p_prop,i,ev_new);
+					if(gc.type == GENCHA_FAIL){
+						nfa++;
+					}
+					else{
+						auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+					
+						gc.update_like_ch(like_ch,dprob);
+						
+						auto al = calculate_al(like_ch,dprob);
 				
-					if(ran() < al){
-						if(pl) cout << " accept" << endl;
-						nac++;
-						state.add_like(like_ch);
-						state.gen_change_update(gc); 
-						if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
-					}
-					else{ 
-						if(pl) cout << "reject" << endl;
-						state.restore_back();
-					}
+						if(pl) print_like(like_ch);
+				
+						if(pl) cout << i << " " <<  al << " al" << endl;
+					
+						if(ran() < al){
+							if(pl) cout << " accept" << endl;
+							nac++;
+							state.add_like(like_ch);
+							state.gen_change_update(gc); 
+							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+						}
+						else{ 
+							if(pl) cout << "reject" << endl;
+							state.restore_back();
+						}
 
-					if(pl) state.check("ind prop");
+						if(pl) state.check("ind prop");
+					}
 				}
+			}
+		}
+	}
+}
+
+
+/// Switchs betweeen an leave and sink event
+void Proposal::switch_leave_sink(State &state)
+{
+	auto pl = false;
+	
+	const auto &sp = model.species[p_prop];
+	auto &ssp = state.species[p_prop];
+
+	const auto &det = sp.details;
+	auto t_start = det.t_start;
+	auto t_end = det.t_end;
+	const auto tlim = t_end-0.05*(t_end-t_start);
+	
+	for(auto i = 0u; i < sp.nindividual_obs; i++){
+		const auto &indd = sp.individual[i];
+		const auto &ind = ssp.individual[i];
+		const auto &ev = ind.ev;
+	
+		// Get the maximum time over which a swap could be done
+		auto tmin = tlim;
+		if(indd.tmax > tmin) tmin = indd.tmax;
+		
+		vector <Event> ev_new;
+		
+		double dprob = UNSET;
+		
+		const auto &e_last = ev[ev.size()-1];
+		auto c = e_last.c_after;
+		if(c == UNSET){                 // Switches from sink to leave
+			if(!e_last.observed && e_last.t > tlim){		
+				auto tt = ev[ev.size()-2].t;
+				if(tt > tmin) tmin = tt;
+		
+				dprob = -log(t_end-tmin);
+			
+				ev_new = ev;
+				ev_new.pop_back();
+			}
+		}
+		else{                            // Switches from leave to sink
+			ev_new = ev;
+			
+			IndInfFrom inf_from;
+			
+			auto tr_gl = sp.cgl_tr_sink[c];
+			if(tr_gl != UNSET){
+				auto tt = e_last.t;
+				if(tt > tmin) tmin = tt;
+			
+				if(tmin < t_end){
+					const auto &tra = sp.tra_gl[tr_gl];
+				
+					auto type = M_TRANS_EV;
+					if(tra.type != EXP_RATE) type = NM_TRANS_EV;
+					
+					auto t = tmin + ran()*(t_end-tmin);
+					
+					dprob = log(t_end-tmin);
+
+					auto e_new = ssp.get_event(type,i,tr_gl,UNSET,UNSET,tra.f,t,inf_from);
+					ev_new.push_back(e_new);
+				}
+			}
+		}
+		
+		if(dprob != UNSET && !events_near_div(ev_new,model.details)){
+			if(pl){
+				cout << endl << endl;
+				cout << ind.name << endl;
+				cout << "event old:" << endl; ssp.print_event(ind.ev);
+				cout << "event new:" << endl; ssp.print_event(ev_new);
+			}
+								
+			ntr++;
+			
+			auto gc = state.update_tree(p_prop,i,ev_new);
+			if(gc.type == GENCHA_FAIL){
+				nfa++;
+			}
+			else{
+				auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+			
+				gc.update_like_ch(like_ch,dprob);
+				
+				auto al = calculate_al(like_ch,dprob);
+		
+				if(pl) cout << i << " " <<  al << " al" << endl;
+			
+				if(ran() < al){
+					if(pl) cout << " accept" << endl;
+					nac++;
+					state.add_like(like_ch);
+					state.gen_change_update(gc); 
+					if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+				}
+				else{ 
+					if(pl) cout << "reject" << endl;
+					state.restore_back();
+				}
+
+				if(pl) state.check("switch leave sink");
 			}
 		}
 	}
@@ -3728,16 +3556,6 @@ void Proposal::basic_ind_update(unsigned int i, vector <Event> &ev_new, State &s
 }
 
 
-/// Determines if omega needs to be checked over proposal
-void Proposal::set_omega_check()
-{
-	omega_check = false;
-	
-	for(auto th : param_list){
-		if(model.param_vec[th].omega_fl) omega_check = true;
-	}
-}
-
 /// Updates the system based on the proposal type
 void Proposal::update(State &state)
 {
@@ -3755,8 +3573,11 @@ void Proposal::update(State &state)
 	case PAR_EVENT_FORWARD_PROP: param_event_joint(FORWARD,state); break;
 	case PAR_EVENT_FORWARD_SQ_PROP: param_event_joint(FORWARD_SQ,state); break;
 	case PAR_EVENT_BACKWARD_SQ_PROP: param_event_joint(BACKWARD_SQ,state); break;
-	case IND_EVENT_TIME_PROP: MH_ind(state); break;
+	case IND_EVENT_TIME_PROP: MH_event(state); break;
+	case IND_MULTI_EVENT_PROP: MH_multi_event(state); break;
+	case IND_EVENT_ALL_PROP: MH_event_all(state); break;
 	case IND_OBS_SWITCH_ENTER_SOURCE_PROP: switch_enter_source(state); break;
+	case IND_OBS_SWITCH_LEAVE_SINK_PROP: switch_leave_sink(state); break;
 	case CORRECT_OBS_TRANS_PROP: correct_obs_trans_events(state); break;
 	case IND_LOCAL_PROP: MH_ind_local(state); break;
 	case IND_OBS_SAMP_PROP: sample_ind_obs(state); break;

@@ -14,9 +14,8 @@ let inter=                                         // Dynamic variables related 
 	
 	over:{},                                         // Stores the button the mouse is over
 											                  	
-	density_slider:{update:"density",lay:"AnimControls", min:-2, max:2, value:0},      // Information about density slider
+	density_slider:{update:"density",lay:"AnimControls", min:-3, max:3, value:0},      // Information about density slider
 	compmatrix_slider:{update:"compmatrix",lay:"AnimControls", min:-1, max:1, value:0},// Slider used for matrix
-	lnglat_slider:{update:"scale",lay:"LowerMenu", min:-2,max:2, value:0},             // Slider used for lnglat point scale
 	
 	mx:undefined,                                    // Position of the mouse
 	my:undefined,
@@ -35,6 +34,8 @@ let inter=                                         // Dynamic variables related 
 	
 	cursor:{},                                       // Stores information about the cursor
 
+	interval_store:[],                               // Stores any setInterval
+	
 	sca:undefined,                                   // Scaling factor from window units to pixels
 
 	scroll_position:[],                              // Stores the position of scroll bars
@@ -54,6 +55,8 @@ let inter=                                         // Dynamic variables related 
 	tick:[],                                         // Stores potential tick marks
 	
 	printing:false,                                  // Determines if printing
+	
+	xi_sq:{},                                        // Stores xi-sq distribution
 	
 	loading_symbol:{},                               // Stores information about loading symbol
 	

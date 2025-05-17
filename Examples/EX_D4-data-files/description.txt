@@ -3,6 +3,7 @@
 ## Objective
 - In this example there is some time variation in observing population transitions.
 - The probability is taken to have the functional form $a+b*cos(0.06*t)$.
+- To simulate the data a=0.6 and b=0.3 were used. These values can be inferred from the data.
 
 ## Data
 - Partially observed population transition data

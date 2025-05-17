@@ -12,7 +12,7 @@
 - 'Vaccination' contains two compartments: 'Vac' and 'Unvac', which represent vaccinated and unvaccinated individuals.
 - 'Group' contains 24 contact groups.
 - A transmission rate $β_v$ determines the susceptibility of individuals with vaccination status $v$.
-- A factor $f_v$ determines the relative infectiousness of individuals with vaccination status $v$.
+- A factor $f_v$ determines the relative infectiousness of individuals with vaccination status $v$. A factor is, by construction, is designed to have an average of one.
 
 ## Population
 - Each group consists of 10 individuals, half of which are initially infected.

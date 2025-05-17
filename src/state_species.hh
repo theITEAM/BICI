@@ -85,6 +85,8 @@ class StateSpecies                         // Stores information about the state
 	
 		void simulate_init();
 		void simulate_individual_init();
+		void add_ind_source(unsigned int i, const vector <SourceSamp> &source_samp);
+		TRange source_time_range(const IndData &ind) const;
 		void error_load_sample(unsigned int num) const;
 		void simulate_sample_init(unsigned int ti, const SampleSpecies &samp_sp);
 		void set_tnum_mean(unsigned int ti_end, const vector < vector <double> > &popnum_t);
@@ -102,6 +104,12 @@ class StateSpecies                         // Stores information about the state
 		void set_cpop_st();
 		double get_trans_obs_prob(unsigned int trg, const ObsData &ob) const;
 		void compare_covar(string te, const vector < vector <double> > &omega, unsigned int g) const;
+		ListMove get_ev_link_listmove(unsigned int e, const vector <Event> &event, const Individual &ind, const vector < vector <double> > &popnum_t) const;
+		TRange ev_link_trange(const ListMove &lm, const vector <Event> &event) const;
+		bool ev_link(const Event &ev, const Individual &ind, const vector < vector <double> > &popnum_t) const;
+		bool source_ind(unsigned int i) const;
+		unsigned int source_num(unsigned int min, unsigned int max) const;
+		
 		unsigned int get_ti(double t) const;
 		double get_indfac(const Individual &ind, const  MarkovEqn &mar_eqn) const;
 		void update_ind_basic(const vector < vector <Event> > &ev_new);
@@ -216,6 +224,7 @@ class StateSpecies                         // Stores information about the state
 		vector <double> likelihood_markov_value_fast(const vector <unsigned int> &me_list, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const vector <double> &param_store, const vector <SplineValue> &spline_val);
 		vector <double> likelihood_markov_value_linear(const vector <unsigned int> &list, const LinearProp &linear_prop, const vector < vector <double> > &popnum_t);
 		void likelihood_markov_value_linear_restore(const vector <unsigned int> &list, const LinearProp &linear_prop, const vector<double> &store);
+		MeanSD get_mean_sd(TransType type, const vector <double> &ref_val) const;
 		vector <NMupdate> likelihood_ie_nm_trans_change(unsigned int i, unsigned int ie, double factor, const vector < vector <double> > &popnum_t, double &like_ch);
 		void likelihood_ie_nm_trans_update(const vector <NMupdate> &nm_st);
 		double likelihood_indeff_group(unsigned int g, double &like_ch);
@@ -235,6 +244,11 @@ class StateSpecies                         // Stores information about the state
 		NMIncompVal get_nm_incomp_val_ie_factor(unsigned int ie, double factor, const NMTransIncomp &nmti, unsigned int ti, const Individual &ind, const vector < vector <double> > &popnum_t) const;
 		double nm_obs_dprob(const Individual &ind) const;
 		double nm_single_obs_dprob(unsigned int cl, const Individual &ind) const;
+		
+		double sum_markov_prob(double t1, double t2, unsigned int c, unsigned int tr_gl, unsigned int i, vector < vector <double> > &en) const;
+		void calc_trans_diag(ParticleSpecies &ps, const vector < vector <double> > &popnum_t) const;
+		void add_nm_prob(unsigned tr_gl_or, double t1, ParticleSpecies &ps, const vector < vector <double> > &popnum_t, const Individual &ind) const;
+		void add_nm_cpd(unsigned tr_gl_or, double t1, double t2, ParticleSpecies &ps, const vector < vector <double> > &popnum_t, const Individual &ind) const;
 	
 	// In 'state_species_like_obs.cc'
 	public:

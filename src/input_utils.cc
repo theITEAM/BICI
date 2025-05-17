@@ -60,12 +60,12 @@ unsigned int Input::find_c(unsigned int p, unsigned int cl, string name) const
 bool Input::check_claa_error()
 {
 	if(p_current == UNSET){
-		alert_import("Population needs to be specified before "+cline_store.command_name);
+		alert_import("A species needs to be specified before the '"+cline_store.command_name+"' command can be added",true);
 		return true;
 	}
 			
 	if(cl_current == UNSET){
-		alert_import("Classification need to be specified before "+cline_store.command_name);
+		alert_import("A classification need to be specified before the '"+cline_store.command_name+"' command can be added",true);
 		return true;
 	}
 	
@@ -76,6 +76,14 @@ bool Input::check_claa_error()
 /// Gets the classification object based on store values for p and cl
 Classification& Input::get_claa()
 {
+	if(p_current == UNSET){
+		alert_import("A species needs to be specified before the '"+cline_store.command_name+"' command can be added",true);
+	}
+	
+	if(cl_current == UNSET){
+		alert_import("A classification needs to be specified before the '"+cline_store.command_name+"' command can be added",true);
+	}
+	
 	return model.species[p_current].cla[cl_current];
 }
 
@@ -124,6 +132,14 @@ bool Input::check_comp_exist(string name, unsigned int p)
 }
 
 
+/// Displays text referencing a file/table
+string Input::in_file_text(string te) const 
+{
+	if(te.substr(0,7) == "[[$FILE") return "In table '[[...]]'";
+	return "In file '"+te+"'";
+}
+
+
 /// Loads a table from a file
 Table Input::load_table(const string file)
 {
@@ -138,8 +154,7 @@ Table Input::load_table(const string file)
 	}
 	
 	const auto &fs = files[i];
-	
-	
+
 	auto sep = fs.sep;
 	
 	tab.file = fs.name;
@@ -147,7 +162,7 @@ Table Input::load_table(const string file)
 	auto lines = fs.lines;
 
 	auto j = 0u;
-	while(j < lines.size() && lines[j].substr(0,1) == "#") j++;
+	while(j < lines.size() && (begin_str(trim(lines[j]),"#") || trim(lines[j]) == "")) j++;
 
 	remove_cr(lines[j]);
 	
@@ -161,9 +176,9 @@ Table Input::load_table(const string file)
 		remove_cr(lines[j]);
 		if(lines[j] != ""){
 			auto vec = split(lines[j],sep);
-		
+	
 			if(vec.size() != tab.ncol){
-				alert_import("Rows in the file '"+file+"' do not all share the same number of columns.");
+				alert_import(in_file_text(file)+" there are "+tstr(tab.ncol)+" headings but line "+tstr(j+1)+" ("+trunc(lines[j],30)+") contains "+tstr(vec.size())+" columns.");
 				tab.error = true; 
 				return tab;
 			}
@@ -198,7 +213,7 @@ Table Input::get_subtable(const Table &tab, const vector <string> &col_name)
 		
 		auto c = find_string_in(tab.heading,cname);
 		if(c == UNSET){
-			alert_import("Cannot find heading '"+col_name[i]+"' in the file '"+tab.file+"'");
+			alert_import(in_file_text(tab.file)+" cannot find heading '"+cname+"'");
 			table.error = true;
 			return table;
 		}
@@ -310,6 +325,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 		vector <string> spl = split(cols[c],',');
 		
 		auto type = ColumnType(option_error("cols",spl[0],{"ID","t","tstart","tend","snp","cl_prob","cl_all","cl_all_prob","from","to","init_pop","add_pop","rem_pop","start","end","result","filt_obspop","filt_obspoptrans","comp_name","start_comp","end_comp",},{ ID_COL, T_COL, TSTART_COL, TEND_COL, SNP_COL, CL_PROB_COL, CL_ALL_COL, CL_ALL_PROB_COL, FROM_COL, TO_COL, INIT_POP_COL, ADD_POP_COL, REM_POP_COL, START_COL, END_COL, RESULT_COL, FILT_OBSPOP_COL, FILT_OBSPOPTRANS_COL, COMP_NAME_COL, START_COMP_COL, END_COMP_COL,  }));
+		if(type == UNSET) return false;
 		
 		if(type == SNP_COL && ds.gen_data_type == MATRIX_DATA) type = GENOBS_COL;
 		
@@ -345,7 +361,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 					
 					auto name = model.species[p].cla[cl].name; 
 						
-					load_col.push_back(LoadCol(name,"the classification in '"+name+"'",COMP_PROB_EL,cl));
+					load_col.push_back(LoadCol(name,"the classification in '"+name+"'",COMP_PROB_NA_EL,cl));
 				}
 				break;
 
@@ -562,59 +578,13 @@ void Input::set_genetic_matrix_columns(const Table &tab, DataSource &ds)
 /// Loads up the observation model
 void Input::load_obs_model(ObsModel &om)
 {
-	/*
-	auto error = get_tag_value("error"); if(error == ""){ cannot_find_tag(); return;}
-			
-	auto spl = split(error,':');
-	if(spl.size() != 2){ alert_import("Problem with expression '"+error+"'"); return;}
-	
-	if(toLower(spl[0]) != "normal"){ alert_import("'"+spl[0]+"' should be 'normal'"); return;}
-	
-	auto val = trim(spl[1]);
-	
-	om.percent = 10;
-	om.sd = UNSET;
-			
-	if(toLower(val) == "file"){
-		om.type = FILE_OBSMOD;
-	}
-	else{
-		if(is_percent(val) == true){
-			om.type = PERCENT_OBSMOD;
-			om.percent = number(val.substr(0,val.length()-1));
-			if(om.percent == UNSET){
-				alert_import("The expression '"+tstr(om.percent)+"' is not a percentage");
-				return;
-			}
-			
-			if(om.percent <= 0){
-				alert_import("The value '"+tstr(om.percent)+"%' must be a positive percentage");
-				return;
-			}
-		}	
-		else{
-			om.type = SD_OBSMOD;
-			om.sd = number(val);
-			if(om.sd == UNSET){
-				alert_import("The expression '"+val+"' must be a number or a percentage");
-				return;
-			}
-			
-			if(om.sd <= 0){
-				alert_import("The value '"+tstr(om.sd)+"' must be positive");
-				return;
-			}
-		}
-	}
-	*/
-	
 	auto error = get_tag_value("error"); if(error == ""){ cannot_find_tag(); return;}
 			
 	auto spl = split(error,':');
 
 	auto str = toLower(spl[0]);
 	if(str == "normal"){
-		if(spl.size() != 2) alert_import("Problem with expression '"+error+"'");
+		if(spl.size() != 2) alert_import("For 'error' problem with expression '"+error+"'");
 	
 		auto val = trim(spl[1]);
 		
@@ -626,12 +596,12 @@ void Input::load_obs_model(ObsModel &om)
 				om.type = NORMAL_PERCENT_OBSMOD;
 				om.percent = number(val.substr(0,val.length()-1));
 				if(om.percent == UNSET){
-					alert_import("The expression '"+tstr(om.percent)+"' is not a percentage");
+					alert_import("For 'error' the expression '"+tstr(om.percent)+"' is not a percentage");
 					return;
 				}
 				
 				if(om.percent <= 0){
-					alert_import("The value '"+tstr(om.percent)+"%' must be a positive percentage");
+					alert_import("For 'error' the value '"+tstr(om.percent)+"%' must be a positive percentage");
 					return;
 				}
 			}	
@@ -639,12 +609,12 @@ void Input::load_obs_model(ObsModel &om)
 				om.type = NORMAL_SD_OBSMOD;
 				om.sd = number(val);
 				if(om.sd == UNSET){
-					alert_import("The expression '"+val+"' must be a number or a percentage");
+					alert_import("For 'error' the expression '"+val+"' must be a number or a percentage");
 					return;
 				}
 				
 				if(om.sd <= 0){
-					alert_import("The value '"+tstr(om.sd)+"' must be positive");
+					alert_import("For 'error' the value '"+tstr(om.sd)+"' must be positive");
 					return;
 				}
 			}
@@ -652,12 +622,12 @@ void Input::load_obs_model(ObsModel &om)
 	}
 	else{
 		if(str == "poisson"){
-			if(spl.size() != 1) alert_import("Problem with expression '"+error+"'");
+			if(spl.size() != 1) alert_import("For 'error' problem with expression '"+error+"'");
 			om.type = POISSON_OBSMOD;
 		}
 		else{
 			if(str == "neg-binomial"){
-				if(spl.size() != 2) alert_import("Problem with expression '"+error+"'");
+				if(spl.size() != 2) alert_import("For 'error' problem with expression '"+error+"'");
 	
 				auto val = trim(spl[1]);
 			
@@ -669,16 +639,16 @@ void Input::load_obs_model(ObsModel &om)
 					om.p = number(val);
 						
 					if(om.p == UNSET){
-						alert_import("The expression '"+val+"' must be a number");
+						alert_import("For 'error' the expression '"+val+"' must be a number");
 					}
 					
 					if(om.p <= 0 || om.p >= 1){
-						alert_import("The value '"+val+"' must be between zero and one");
+						alert_import("For 'error' the value '"+val+"' must be between zero and one");
 					}
 				}
 			}
 			else{
-				alert_import("Problem with expression '"+error+"'");
+				alert_import("For 'error' the observation error '"+str+"' not recognised. It must be chosen from the following options: 'normal', 'poisson' or 'neg-binomial'.");
 			}
 		}
 	}
@@ -728,7 +698,7 @@ unsigned int Input::import_geojson(string file)
 	//if(datadir == ""){ alert_import("'datadir' must be first set"); return UNSET;}
 	
 	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
-	if(i == files.size()) alert_import("Could not find '"+file+"'");
+	if(i == files.size()) alert_import("Could not find '"+file+"'",true);
 	
 	const auto &fs = files[i];
 	
@@ -761,7 +731,7 @@ unsigned int Input::import_geojson(string file)
 					}
 				}
 				
-				if(name.size() == 0){ alert_import("Problem loading '"+file+"'"); return UNSET;}
+				if(name.size() == 0){ alert_import("Problem loading '"+file+"'",true); return UNSET;}
 					
 				for(const auto &ob3 : val2.items()){
 					if(ob3.key() == "geometry"){
@@ -789,7 +759,7 @@ unsigned int Input::import_geojson(string file)
 											for(const auto &ob6 : ob5){
 												Polygon poly;
 												for(const auto &ob7 : ob6){
-													if(ob7.size() != 2){ alert_import("Problem loading '"+file+"'"); return UNSET;}
+													if(ob7.size() != 2){ alert_import("Problem loading '"+file+"'",true); return UNSET;}
 													LatLng po; po.lng = ob7[0]; po.lat = ob7[1];
 													poly.point.push_back(po);
 												}
@@ -801,7 +771,7 @@ unsigned int Input::import_geojson(string file)
 											{
 												Polygon poly;
 												for(const auto &ob6 : ob5){
-													if(ob6.size() != 2){ alert_import("Problem loading '"+file+"'"); return UNSET;}
+													if(ob6.size() != 2){ alert_import("Problem loading '"+file+"'",true); return UNSET;}
 													LatLng po; po.lat = ob6[0]; po.lng = ob6[1];
 													poly.point.push_back(po);
 												}
@@ -847,7 +817,7 @@ LatLng Input::boundary_mean_latlng(unsigned int i, string name)
 		}
 	}
 	
-	alert_import("Problem finding '"+name+"' in '"+geo_json[i].file+"'");
+	alert_import("Problem finding '"+name+"' in '"+geo_json[i].file+"'",true);
 	LatLng po; po.lat = UNSET; po.lng = UNSET;			
 	return po;
 }
@@ -977,7 +947,6 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 EquationInfo Input::he(EquationInfo eqn_inf)
 {
 	eqn_inf.line_num = line_num;
-	
 	if(eqn_inf.error) alert_import(eqn_inf.emsg);	
 	return eqn_inf;
 }	
@@ -1090,14 +1059,6 @@ string Input::get_prop(string value, string prop, string end) const
 }
 
 
-/// Displays text referencing a file/table
-string Input::in_file_text(string te) const 
-{
-	if(te.substr(0,7) == "[[$FILE") return "In table '[[...]]' ";
-	return "In file '"+te+"' ";
-}
-
-
 /// Generates a warning if the sample cannot be read
 void Input::alert_sample(string warn, unsigned int num)
 {
@@ -1184,6 +1145,10 @@ void Input::read_state_sample(const vector <string> &lines, const vector <string
 				if(va == "PHYLOTREE"){
 					mode = MODE_PHYLO;
 				}
+				
+				if(va == "TRANSDISTPROB"){
+					mode = MODE_TRANSDISTPROB;
+				}
 			}
 			else{
 				switch(mode){
@@ -1195,6 +1160,8 @@ void Input::read_state_sample(const vector <string> &lines, const vector <string
 					break;
 					
 				case MODE_DERIVE: break;
+				
+				case MODE_TRANSDISTPROB: break;
 				
 				case MODE_INITIAL:
 					{
@@ -1359,12 +1326,8 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 	for(auto r = 0u; r < subtab.nrow; r++){
 		vector <unsigned int> ind(ndep);
 		for(auto i = 0u; i < ndep; i++){
-			//const auto &hash_list = par.dep[i].hash_list;			
-			//auto vec = hash_list.get_vec_string(subtab.ele[r][i]);
-			//ind[i] = hash_list.existing(vec);
 			ind[i] = par.dep[i].hash_list.find(subtab.ele[r][i]);
 	
-			//ind[i] = find_in(par.dep[i].list,subtab.ele[r][i]);
 			if(ind[i] == UNSET){ 
 				alert_import(desc+" the element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
 				return;
@@ -1374,12 +1337,15 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 		auto ele = subtab.ele[r][ncol-1];
 
 		double val = number(ele);
-	
 		switch(par.variety){
 		case CONST_PARAM:
 			if(val == UNSET){
-				alert_import(desc+" the element '"+ele+"' is not a number1 (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
-				return;
+				if(par.cat_factor && ele == "*"){
+				}
+				else{
+					alert_import(desc+" the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
+					return;
+				}
 			}
 			set_element(par.value,par.dep,ind,ele);
 			break;
@@ -1409,10 +1375,99 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 		}
 	}
 	
+	if(par.cat_factor){
+		auto num = 0u, numi = 0u;
+		auto sum = 0.0;
+		auto wsum = 0.0, wi = 0.0;
+		for(auto i = 0u; i < par.N; i++){
+			auto te = par.value[i].te;
+			auto w = par.weight[i];
+			
+			if(te == "*"){
+				num++; numi = i; wi = w;
+			}
+			else{
+				auto val = number(te);
+				if(val < 0) alert_import(desc+" the value '"+tstr(val)+"' must be positive for a factor.");
+				sum += w*val;
+			}
+			wsum += w;
+		}
+		
+		if(num > 1){
+			alert_import(desc+" this shouldn't contain more than one element with value '*'");
+		}
+		
+		if(num == 1){
+			auto val_new = (wsum-sum)/wi;
+			if(val_new < 0){
+				alert_import(desc+" the calculated value for '*' is '"+tstr(val_new)+"' which must be positive");
+			}
+			
+			par.value[numi].te = tstr(val_new);
+		}
+		
+		if(num == 0){
+			auto mean = sum/wsum;
+			if(dif(mean,1,DIF_THRESH)){
+				if(!par.cat_factor_weight_on){ 	
+					alert_import(desc+" the mean of elements is "+tstr(mean)+" and it should be 1");
+				}
+				else{
+					alert_import(desc+" the weighted mean of elements is "+tstr(mean)+" and it should be 1");
+				}
+			}
+		}
+	}
+		
 	if(false){
 		for(auto i = 0u; i < par.N; i++){
 			cout << i << " " << par.value[i].te << " val" << endl;
 		}
+	}
+}
+
+
+/// Loads parameter weight from a file 
+void Input::load_weight_value(const ParamProp &pp, string valu, Param &par, string desc)
+{
+	auto tab = load_table(valu); if(tab.error == true) return;
+
+	auto col_name = pp.dep_with_prime;
+
+	col_name.push_back("Value");
+	
+	auto subtab = get_subtable(tab,col_name); if(subtab.error == true) return;
+	
+	auto ncol = subtab.ncol;
+	
+	auto ndep = pp.dep.size();
+	
+	for(auto r = 0u; r < subtab.nrow; r++){
+		vector <unsigned int> ind(ndep);
+		for(auto i = 0u; i < ndep; i++){
+			ind[i] = par.dep[i].hash_list.find(subtab.ele[r][i]);
+	
+			if(ind[i] == UNSET){ 
+				alert_import(desc+" the element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
+				return;
+			}
+		}
+		
+		auto ele = subtab.ele[r][ncol-1];
+
+		double val = number(ele);
+	
+		if(val == UNSET){
+			alert_import(desc+" the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
+			return;
+		}
+		
+		auto sum = 0u;
+		for(auto i = 0u; i < par.dep.size(); i++) sum += par.dep[i].mult*ind[i];
+		if(sum >= par.N) emsg_input("Problem setting element");
+ 
+		par.weight[sum] = val;
 	}
 }
 
@@ -1436,22 +1491,30 @@ void Input::set_spline(string knot_times_str, string smooth, vector <string> &kn
 		
 		auto te = knot_times[j];
 		if(te == "start"){
-			if(j != 0){ alert_import("In 'knot_times' 'start' should only occur at the start of the knot definition"); return;}
+			if(j != 0){ alert_import("For 'knot_times' the value 'start' should only occur at the start of the knot definition"); return;}
 			num = t_start;
 		}
 		else{
 			if(te == "end"){
-				if(j != knot_times.size()-1){ alert_import("In 'knot_times' 'end' should only occur at the end of the knot definition"); return;}
+				if(j != knot_times.size()-1){ alert_import("For 'knot_times' the value 'end' should only occur at the end of the knot definition"); return;}
 				num = t_end;
 			}
 			else{
 				num = number(te);
 				if(num == UNSET){
-					alert_import("In 'knot_times' the value '"+te+"' must be a number"); return;
+					alert_import("For 'knot_times' the value '"+te+"' must be a number"); return;
 				}
 				else{
 					if(num < t_start || num > t_end){
-						alert_import("In 'knot_times' the value '"+te+"' must be after the start time and before the end time"); return;
+						alert_import("For 'knot_times' the value '"+te+"' must be after the start time and before the end time"); return;
+					}
+					
+					if(num == t_start && j != 0){
+						alert_import("For 'knot_times' the end time is set twice"); return;
+					}
+					
+					if(num == t_end && j+1 != knot_times.size()){
+						alert_import("For 'knot_times' the end time is set twice"); return;
 					}
 				}
 			}
@@ -1475,6 +1538,8 @@ void Input::set_spline(string knot_times_str, string smooth, vector <string> &kn
 		auto spl = split(smooth,'(');
 		
 		auto type = SmoothType(option_error("smooth",spl[0],{"normal","log-normal"},{ NORMAL_SMOOTH, LOG_NORMAL_SMOOTH }));
+		if(type == UNSET) return;
+			
 		par.spline_info.smooth_type = type;
 
 		if(spl.size() != 2){ alert_import("There is syntax error in 'smooth'"); return;}
@@ -1483,8 +1548,8 @@ void Input::set_spline(string knot_times_str, string smooth, vector <string> &kn
 		
 		auto val_str = spl[1].substr(0,spl[1].length()-1);
 		auto val = number(val_str);
-		if(val == UNSET){ alert_import("In 'smooth' the value '"+val_str+"' is not a number"); return;}
-		if(val <= 0){ alert_import("In 'smooth' the value '"+val_str+"' is not positive"); return;}
+		if(val == UNSET){ alert_import("For 'smooth' the value '"+val_str+"' is not a number"); return;}
+		if(val <= 0){ alert_import("For 'smooth' the value '"+val_str+"' is not positive"); return;}
 		par.spline_info.smooth_value = val;
 	}
 }
@@ -1506,20 +1571,122 @@ unsigned int Input::get_seed()
 }
 
 
-/*
-/// Gets an integer	
-unsigned int Input::get_tag_integer(string tag, unsigned int def)
+/// Checks the timestep fits between the start and end times
+void Input::check_dt(const Details &details)
 {
-	auto str = get_tag_value(tag);
-	if(str == ""){
-		if(def != UNSET) return def;
-		else alert_import("'"+tag+"' must be set");
+	auto num = (details.t_end-details.t_start)/details.dt;
+	if(dif(num,double(round_int(num)),DIF_THRESH)){
+		alert_import("The difference between the start '"+tstr(details.t_start)+"' and end '"+tstr(details.t_end)+"' times is not a multiple of the time-step '"+tstr(details.dt)+"'.");
 	}
-	auto num = number(str);
-	if(num == UNSET || num != int(num) || num <= 0){ 
-		alert_import("'"+tag+"' must be a positive integer"); 
+}
+
+
+/// Adds an extra parameter to model categorical factor
+void Input::add_param_cat_factor(Param &par)
+{
+	Param par_basic = par;
+	
+	string pre = "basic";
+	par_basic.full_name = pre+par_basic.full_name;  
+	par_basic.name = pre+par_basic.name;  
+	par_basic.trace_output = false;
+
+	auto N = par_basic.N;
+	auto sigma = number(par_basic.prior[0].dist_param[0].te);
+	
+	const auto &weight = par.weight;
+	
+	auto wsum = 0.0;
+	for(auto i = 0u; i < N; i++) wsum += weight[i];
+	
+	for(auto i = 0u; i < N; i++){
+		auto &pri = par_basic.prior[i];
+		pri.type = DIRICHLET_PR;
+		pri.dist_param[0].te = tstr((((N-1)/(sigma*sigma))-1)*(weight[i]/wsum));
 	}
 	
-	return (unsigned int) num;
+	const auto &depend = par.dep;
+	par.variety = REPARAM_PARAM;
+	
+	string denom = "";
+
+	auto name = par_basic.name;
+	for(auto i = 0u; i < par.N; i++){
+		if(i != 0) denom += "+";
+		denom += name+"_";
+		for(auto d = 0u; d < depend.size(); d++){
+			const auto &dep = depend[d];
+			if(d != 0) denom += ",";
+			denom += dep.list[(i/dep.mult)%dep.list.size()];
+		}
+	}
+	
+	for(auto i = 0u; i < par.N; i++){
+		stringstream ss;
+		ss << (wsum/weight[i]) << "*";
+		//ss << "%" << name << "_";
+			ss << name << "_";
+		for(auto d = 0u; d < depend.size(); d++){
+			const auto &dep = depend[d];
+			if(d != 0) ss << ",";
+			ss << dep.list[(i/dep.mult)%dep.list.size()];
+		}
+		ss << "/(" << denom << ")";
+		par.value[i] = he(add_equation_info(ss.str(),REPARAM));
+	}
+	
+	model.param.push_back(par_basic);
 }
-*/
+
+
+/// Loads up a reparameterisation
+void Input::load_reparam_eqn(string te, Param &par)
+{
+	const auto &depend = par.dep;
+	
+	auto eqn_raw = he(add_equation_info(te,REPARAM_EQN));
+		
+	vector <DepConv> dep_conv;
+	for(auto d = 0u; d < depend.size(); d++){
+		const auto &dep = depend[d];
+		DepConv dc; 
+		dc.before = dep.index_with_prime;
+		dep_conv.push_back(dc);
+	}
+	
+	auto swap_temp = swap_template(eqn_raw.te,dep_conv);
+	if(swap_temp.warn != ""){ 
+		alert_import(swap_temp.warn); 
+		return;
+	}
+		
+	for(auto i = 0u; i < par.N; i++){
+		for(auto d = 0u; d < depend.size(); d++){
+			const auto &dep = depend[d];
+			dep_conv[d].after = dep.list[(i/dep.mult)%dep.list.size()];
+		}
+		
+		auto eqn = eqn_raw;
+		eqn.te = swap_index_temp(dep_conv,swap_temp);
+		
+		if(check_swap){
+			auto te_st = eqn.te;
+			auto res = swap_index(eqn.te,dep_conv);
+			if(res.warn != ""){
+				alert_import(res.warn); 
+				return;
+			}
+			
+			if(eqn.te != te_st){
+				cout << eqn.te << " " << te_st << " compare" << endl; 
+				emsg_input("Swap index dif res");
+			}
+		}
+		
+		eqn.type = REPARAM;
+		
+		auto ind = find_index(i,depend);
+		set_reparam_element(par.value,par.dep,ind,eqn);
+	}	
+}
+

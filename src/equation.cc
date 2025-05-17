@@ -33,8 +33,6 @@ using namespace std;
 /// Initialises the equation 
 Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsigned int c, bool inf_trans, unsigned int tif, unsigned int li_num, vector <SpeciesSimp> &species, vector <Param> &param, vector <Spline> &spline, vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, const vector <double> &timepoint) : species(species), param(param), spline(spline), param_vec(param_vec), pop(pop), hash_pop(hash_pop), timepoint(timepoint)
 {
-	//timer.resize(20,0);
-	
 	plfl = false;  // Set to true to print operations to terminal (used for diagnostics)
 	
 	if(plfl) cout << endl << tex << "  start equation" << endl;
@@ -44,15 +42,17 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsi
 	type = ty; sp_p = p; sp_cl = cl; sp_c = c; ti_fix = tif, line_num = li_num; warn = "";
 	infection_trans = inf_trans;
 	markov_eqn_ref = UNSET;
+	ans.type = NUMERIC; ans.num = UNSET;
 	
 	tex = trim(tex); if(tex == ""){ warn = "There is no equation"; return;}
 
 	te = tex;
-	te_init = tex;
-	te_raw = tex; if(ti_fix != UNSET) te_raw += "(t="+to_string(timepoint[ti_fix])+")";
+	te_init = te;
+	te_raw = te;
 	te_raw = replace(te_raw,"%","");
 	te_raw = replace(te_raw,"$","");
-	
+	//if(ti_fix != UNSET) te_raw += "(t="+to_string(timepoint[ti_fix])+")";
+
 	//te = basic_equation_check(te);
 	if(warn != "") return;
 
@@ -63,14 +63,18 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsi
 	
 	auto op = extract_operations();                  // Extracts the operations in the 	expression
 	
-  if(plfl == true) print_operations(op);
-
-	if(warn != "") return;  
-
+	check_repeated_operator(op);                     // Checks for repeated operators e.g. "**"
+	
+	if(warn != "") return; 
+	
+	replace_minus(op);                               // Replaces minums sign with (-1)*
+	
 	if(plfl) print_operations(op);
 
 	create_calculation(op);                          // Works out the sequence of calculation to generate result
 
+	if(warn != "") return; 
+	
 	if(plfl == true) print_calculation();
 
 	if(simplify_eqn == true) simplify();             // Simplifies by combining constants
@@ -99,8 +103,8 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsi
 	set_time_vari();
 	
 	// Truncates strings to save memory
-	if(te.length() > 20) te = te.substr(0,20)+"...";
-	if(te_raw.length() > 20) te_raw = te_raw.substr(0,20)+"...";
+	te = trunc(te);
+	te_raw = trunc(te_raw);
 }
 
 
@@ -148,7 +152,7 @@ void Equation::check()
 // 'I'  all infectious individuls
 // 'I,M' all infectious individuals
 // 'E|I,M' alld infectous or exposed individuals
-vector <unsigned int> Equation::get_all_comp(unsigned int p, string st)
+vector <unsigned int> Equation::get_all_comp(unsigned int p, string te)
 {
 	vector <unsigned int> state;
 	
@@ -161,7 +165,7 @@ vector <unsigned int> Equation::get_all_comp(unsigned int p, string st)
 	vector < vector <unsigned int> > list_all;
 	list_all.resize(ncla);
 
-	auto vec = split(st,',');
+	auto vec = split(te,',');
 	for(auto k = 0u; k < vec.size(); k++){
 		auto st = trim(vec[k]);
 		if(st != ""){
@@ -173,11 +177,15 @@ vector <unsigned int> Equation::get_all_comp(unsigned int p, string st)
 				auto name = vec2[j];
 				
 				auto cref = find_comp_from_name(p,name);
-				if(cref.error != ""){ warn = cref.error; return state;}
+				if(cref.error != ""){ 
+					warn = "In population '{"+te+"}': "+cref.error; 
+					return state;
+				}
+				
 				if(cl == UNSET) cl = cref.cl;
 				else{
 					if(cl != cref.cl){ 
-						warn = "In population '"+st+"' cannt mix up compartments from different classifications"; 
+						warn = "In population '{"+te+"}' cannot mix up compartments from different classifications"; 
 						return state;
 					}
 				}
@@ -193,7 +201,7 @@ vector <unsigned int> Equation::get_all_comp(unsigned int p, string st)
 			}
 	
 			if(filt_set[cl] == true){
-				warn = "Cannot put a filter on classification '"+sp.cla[cl].name+"' more than once"; 
+				warn = "In population '{"+te+"}' cannot put a filter on classification '"+sp.cla[cl].name+"' more than once"; 
 				return state;
 			}
 			
@@ -227,89 +235,8 @@ vector <unsigned int> Equation::get_all_comp(unsigned int p, string st)
 }
 
 
-/*
-vector <unsigned int> Equation::get_all_comp(unsigned int p, string st)
-{
-	vector <unsigned int> state;
-	
-	const auto &sp = species[p]; 
-
-	auto ncla = sp.cla.size();
-	
-	vector <bool> filt_set(ncla,false);
-	
-	vector < vector <bool> > filt;
-	filt.resize(ncla);
-	for(auto cl = 0u; cl < ncla; cl++){
-		const auto &claa = sp.cla[cl];
-		filt[cl].resize(claa.comp.size(),true);
-	}
-
-	vector < vector <unsigned int> > list_all;
-	list_all.resize(ncla);
-
-	auto vec = split(st,',');
-	for(auto k = 0u; k < vec.size(); k++){
-		auto st = trim(vec[k]);
-		if(st != ""){
-			auto vec2 = split(st,'|');
-			
-			vector <unsigned int> list;
-			auto cl = UNSET;
-			for(auto j = 0u; j < vec2.size(); j++){
-				auto name = vec2[j];
-				
-				auto cref = find_comp_from_name(p,name);
-				if(cref.error != ""){ warn = cref.error; return state;}
-				if(cl == UNSET) cl = cref.cl;
-				else{
-					if(cl != cref.cl){ 
-						warn = "In population '"+st+"' cannt mix up compartments from different classifications"; 
-						return state;
-					}
-				}
-				
-				list.push_back(cref.c);
-			
-				// Look for potential Erlang hidden compartments
-				for(auto c = 0u; c < sp.cla[cl].ncomp; c++){
-					if(sp.cla[cl].comp[c].erlang_source == name){
-						list.push_back(c);
-					}
-				}
-			}
-	
-			if(filt_set[cl] == true){
-				warn = "Cannot put a filter on classification '"+sp.cla[cl].name+"' more than once"; 
-				return state;
-			}
-			
-			filt_set[cl] = true;
-			for(auto c = 0u; c < sp.cla[cl].ncomp; c++) filt[cl][c] = false;
-			for(auto c : list) filt[cl][c] = true;		
-			
-			list_all[cl] = list;
-		}
-	}
-	
-	for(auto cl = 0u; cl < ncla; cl++){
-		if(filt_set[cl] == false) list_all[cl] = seq_vec(sp.cla[cl].ncomp);
-	}
-	
-	vector <unsigned int> state_ch;
-	for(auto c = 0u; c < sp.comp_gl.size(); c++){
-		const auto &co = sp.comp_gl[c];
-		
-		auto cl = 0u; while(cl < ncla && filt[cl][co.cla_comp[cl]] == true) cl++;
-		if(cl == ncla) state.push_back(c);
-	}
-	
-  return state;
-}
-*/
-
 /// Prints all the operations for a calculation
-void Equation::print_operations(vector <EqItem> op) const
+void Equation::print_operations(const vector <EqItem> &op) const
 {
 	cout << "List of operations:" << endl;
   for(auto i = 0u; i < op.size(); i++){
@@ -861,6 +788,8 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 							auto &sp = species[sp_p2];
 							auto ie = 0u; while(ie < sp.ind_effect.size() && sp.ind_effect[ie].name != ie_name) ie++;
 							if(ie == sp.ind_effect.size()){
+								if(ie_name  == ""){ warn = "Individual effect in population '[]' must contain text"; return p;}
+									
 								IndEffect ind_eff; 
 								ind_eff.name = ie_name; ind_eff.index = UNSET; ind_eff.num = UNSET; 
 								ind_eff.line_num = line_num;
@@ -873,15 +802,13 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 							
 							auto fe_name = extra.substr(kst+1,k-(kst+1));
 	
+							if(fe_name  == ""){ warn = "Fixed effect in population '<>' must contain text"; return p;}
+							
 							auto &sp = species[sp_p2];
 							auto fe = 0u; 
 							while(fe < sp.fix_effect.size() && sp.fix_effect[fe].name != fe_name) fe++;
 							if(fe == sp.fix_effect.size()){
-								emsg("SHould this be here?");
-								FixedEffect fix_eff; 
-								fix_eff.name = fe_name;
-								fix_eff.line_num = line_num;
-								sp.fix_effect.push_back(fix_eff);
+								warn = "Fixed effect '<"+fe_name+">' unspecified. This is specified through the 'fixed-effect' command"; return p;
 							}
 							po.fix_eff_mult.push_back(fe);
 						}
@@ -928,11 +855,16 @@ unsigned int Equation::get_ie(unsigned int i, unsigned int &raend)
 		auto ist = i;
 		while(i < te.length() && te.substr(i,1) != "]") i++;
 		if(i == te.length()){ warn = "The '[' bracket does not match up"; return ie;}
+		
 
 		if(sp_p == UNSET){ warn = "An individual effect can only be set if there is a species"; return ie;}
 
 		auto name = te.substr(ist,i-ist);
-
+		if(name == ""){
+			warn = "Individual effect '[]' must contain text";
+			return ie;
+		}
+		
 		auto &sp = species[sp_p];
 		ie = 0; while(ie < sp.ind_effect.size() && name != sp.ind_effect[ie].name) ie++;
 		
@@ -966,10 +898,15 @@ unsigned int Equation::get_fe(unsigned int i, unsigned int &raend)
 
 		auto name = te.substr(ist,i-ist);
 
+		if(name == ""){
+			warn = "Fixed effect '<"+name+">' must contain text";
+			return fe;
+		}
+		
 		const auto &fix_eff = species[sp_p].fix_effect;
 
 		fe = 0; while(fe < fix_eff.size() && name != fix_eff[fe].name) fe++;
-		if(fe == fix_eff.size()){ warn = "Fixed effect '"+name+"' is not specified"; return fe;}
+		if(fe == fix_eff.size()){ warn = "Fixed effect '<"+name+">' is not specified"; return fe;}
 		
 		i++;
 		raend = i;
@@ -1044,14 +981,7 @@ vector <EqItem> Equation::extract_operations()
       case '*': item.type = MULTIPLY; op.push_back(item); break;
       case '/': item.type = DIVIDE; op.push_back(item); break;
 			case '+': item.type = ADD; op.push_back(item); break;
-      case '-': 
-				item.type = ADD; op.push_back(item); 
-				{
-					EqItem item2; item2.type = NUMERIC; item2.constant = -1;
-					op.push_back(item2);
-				}					
-				item.type = MULTIPLY; op.push_back(item); 
-				break;
+      case '-': item.type = TAKE; op.push_back(item);	break;
 			case ' ': break;
 
       default:
@@ -1222,16 +1152,6 @@ vector <EqItem> Equation::extract_operations()
 									}
 								}
 								
-								/* // ZZZ
-								auto ii = 0u; 
-								while(ii < param_ref.size() && !(param_ref[ii].th == pref.th && param_ref[ii].index == pref.index)) ii++;
-				
-								if(ii == param_ref.size()){
-									ParamRef parref; parref.th = pref.th; parref.index = pref.index; 
-									param_ref.push_back(parref);
-								}
-								*/
-								
 								par.used = true;
 							}
 						}
@@ -1269,9 +1189,10 @@ vector <EqItem> Equation::extract_operations()
           }
         }
 				
-				if(doneflag == false){
-					cout << "Problem with expression. The character '"+ch+"' was not expected." << endl;
-				}
+				//if(doneflag == false){
+				//cout << "Problem with expression. The character '"+ch+"' was not expected." << endl;
+				//}
+				
         if(doneflag == false){ warn = "Problem with expression. The character '"+ch+"' was not expected."; return op;}
         break;
     }
@@ -1286,7 +1207,6 @@ vector <EqItem> Equation::extract_operations()
       op.insert(op.begin()+i+1,item);
     }
     else i++;
-		
   }
 
 	return op;
@@ -1416,7 +1336,30 @@ void Equation::create_calculation(vector <EqItem> &op)
     if(plfl == true) print_operations(op);
   }while(flag == true && op.size() > 1);
 
-	if(op.size() != 1){ warn = "Problem with expression. Calculation cannot be performed."; return;}
+ 	string wa = "";
+		
+	if(op.size() != 1){
+		vector <EqItemType> oper;
+		for(const auto &val : op){
+			switch(val.type){
+			case ADD: case TAKE: case MULTIPLY: case DIVIDE:
+				oper.push_back(val.type);
+				break;
+			default: break;
+			}
+		}
+	
+		if(oper.size() == 1){
+			wa = "There is potentially a stray "+op_name(oper[0])+" in the expression. ";
+		}
+	}
+
+	if(wa != ""){
+		warn = "Problem with expression. ";
+		if(wa != "error") warn += wa;	
+		warn += "Calculation cannot be performed.";
+		return;
+	}
 
 	ans = op[0];
 }
@@ -2652,4 +2595,67 @@ double Equation::get_distance(const ParamProp &pp)
 	
 	warn = "Compartment '"+dep1+"' is not recognised in distance matrix.";
 	return UNSET;
+}
+
+
+/// Provides a name for an operator
+string Equation::op_name(EqItemType type) const 
+{
+	switch(type){
+	case ADD: return "addition '+'";
+	case TAKE: return "subtraction '-'";
+	case MULTIPLY: return "multiplication '×'";
+	case DIVIDE: return "division '/'"; 
+	default: break;
+	}
+	return "";
+}
+
+
+/// Checks for any repeated operators in expression
+void Equation::check_repeated_operator(const vector <EqItem> &op)
+{
+	if(op.size() == 1){
+		switch(op[0].type){
+		case ADD: case TAKE: case MULTIPLY: case DIVIDE:
+			warn = "Expression cannot be simply "+op_name(op[0].type)+".";
+			return;
+		default: break;
+		}
+	}
+	
+	if(op.size() > 0){
+		for(auto i = 0u; i < op.size()-1; i++){
+			switch(op[i].type){
+			case ADD: case TAKE: case MULTIPLY: case DIVIDE:
+				switch(op[i+1].type){
+				case ADD: case TAKE: case MULTIPLY: case DIVIDE:
+					warn = "Problem with the expression. Cannot have operators "+op_name(op[i].type)+" and "+op_name(op[i+1].type)+" next to each other";
+					
+					break;
+				default: break;
+				}
+			default: break;
+			}
+		}
+	}
+}
+
+
+/// Replaces minus sign with plus one multiply
+void Equation::replace_minus(vector <EqItem> &op)
+{
+	auto i = 0u;
+	while(i < op.size()){
+		if(op[i].type == TAKE){
+			op[i].type = ADD;
+			
+			EqItem item2; item2.type = NUMERIC; item2.constant = -1;
+			op.insert(op.begin()+i+1,item2);
+	
+			EqItem item3; item3.type = MULTIPLY;
+			op.insert(op.begin()+i+2,item3);
+		}
+		else i++;
+	}
 }

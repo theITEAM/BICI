@@ -33,6 +33,9 @@ function add_model_param_buts(lay)
 	
 	w = model.add_object_button(lay,"Derived",x,y,"SetDerived",{ back:WHITE, active:active, info:{}, title:"Derived", te:derived_text}); 
 	x += w+gap;
+	
+	w = model.add_object_button(lay,"Factor",x,y,"SetFactor",{ back:WHITE, active:active, info:{}, title:"Facto", te:factor_text}); 
+	x += w+gap;
 }
 
 
@@ -347,15 +350,38 @@ function add_model_param_content(lay)
 					else{
 						if(add_view_button(par,w-4,y,i,lay,model)) w -= 4.5;
 						
-						if(add_distance_button(par,w-6.5,y,lay)) w -= 6;
-					
 						display_constant(i,x,y,lay,w);
 					}
 					
-					if(par.name != dist_matrix_name){
+					if(!par.dist_mat){
 						lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamConst"});
 					}
 					
+					y += dy;
+				}
+			}
+			y += 1;
+		}
+	}
+	
+	{ // Factors
+		let num = 0;
+		for(let i = 0; i < model.param.length; i++){
+			let par = model.param[i];
+			if(par.factor) num++;
+		}
+				
+		if(num > 0){
+			lay.add_button({te:"Factors", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5, col:col_round, col2:col_text, type:"CurvedOutline"});
+			y += 1.4;
+		
+			for(let i = 0; i < model.param.length; i++){
+				let par = model.param[i];
+				if(par.factor){
+					let w = wright;
+					display_factor(i,x,y,lay,w);
+	
+					lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamFactor"});				
 					y += dy;
 				}
 			}
@@ -448,14 +474,14 @@ function add_model_param_content(lay)
 /// Bubble which allows user to select a constant parameter
 function set_constant_bubble(cont)
 {	
-	if(check_param_free() == true){
+	if(check_param_free("const") == true){
 		cont.dx = 20;
 		bubble_addtitle(cont,"Set constant");
 
 		bubble_addparagraph(cont,"Select parameter which is going to be set as a constant:",0,cont.dx);
 		cont.y += 0.2;
 	
-		bubble_addscrollable(cont,{type:"param sel", ymax:10, ac:"AddConstParam"}); 
+		bubble_addscrollable(cont,{type:"const param sel", ymax:10, ac:"AddConstParam"}); 
 		
 		add_bubble_end(cont);
 	}
@@ -464,6 +490,29 @@ function set_constant_bubble(cont)
 		bubble_addtitle(cont,"Set constant");
 
 		bubble_addparagraph(cont,"There are currently no free parameters to set.",0,cont.dx); 
+	}
+}
+
+
+/// Bubble which allows user to select a constant parameter
+function set_factor_bubble(cont)
+{	
+	if(check_param_free("fac") == true){
+		cont.dx = 20;
+		bubble_addtitle(cont,"Set factor");
+
+		bubble_addparagraph(cont,"Select parameter which is going to be set as a factor:",0,cont.dx);
+		cont.y += 0.2;
+	
+		bubble_addscrollable(cont,{type:"fac param sel", ymax:10, ac:"AddFactorParam"}); 
+		
+		add_bubble_end(cont);
+	}
+	else{
+		cont.dx = 10;
+		bubble_addtitle(cont,"Set factor");
+
+		bubble_addparagraph(cont,"There are currently no parameters to set as factors.",0,cont.dx); 
 	}
 }
 
@@ -482,14 +531,14 @@ function set_reparam_bubble(cont)
 		return;
 	}
 	
-	if(check_param_free() == true){
+	if(check_param_free("reparam") == true){
 		cont.dx = 20;
 		bubble_addtitle(cont,"Set reparameterisation");
 
 		bubble_addparagraph(cont,"Select parameter which is going to be reparameterised:",0,cont.dx);
 		cont.y += 0.2;
 	
-		bubble_addscrollable(cont,{type:"param sel", ymax:10, ac:"AddReparamParam"});
+		bubble_addscrollable(cont,{type:"reparam param sel", ymax:10, ac:"AddReparamParam"});
 		add_bubble_end(cont);	
 	}
 	else{
@@ -513,12 +562,12 @@ function set_reparam_bubble2(cont)
 /// Bubble which allows user to select a parameter for distribution
 function set_distribution_bubble(cont)
 {
-	if(check_param_free("tensor only") == true){
+	if(check_param_free("dist") == true){
 		cont.dx = 18;
 		bubble_addtitle(cont,"Set distribution");
 		bubble_addparagraph(cont,"Select parameter to be sampled from a distribution:",0,cont.dx); cont.y += 0.2;
 		
-		bubble_addscrollable(cont,{type:"param sel", ymax:10, ac:"AddDistParam"}); 
+		bubble_addscrollable(cont,{type:"dist param sel", ymax:10, ac:"AddDistParam"}); 
 		
 		add_bubble_end(cont);
 		//cont.y += 0.3;
@@ -612,14 +661,47 @@ function check_param_free(op)
 {
 	for(let i = 0; i < model.param.length; i++){
 		let par = model.param[i];
-		if(par.variety == "normal"){
-			if(op == "tensor only"){
-				if(par.dep.length != 0) return true;
-			}
-			else return true;
-		}			
+		if(param_pos(par,op)) return true;
 	}
 	return false;
+}
+
+
+/// Determines if possible to select parameter
+function param_pos(par,op)
+{
+	if(par.type == "derive_param") return false;
+		 
+	switch(op){
+	case "const":
+		if(par.variety != "normal") return false;
+		break;
+		
+	case "reparam":
+		if(par.variety != "normal") return false;
+		if(par.factor) return false;
+		break;
+		
+	case "dist":
+		if(par.variety != "normal") return false;
+		if(par.factor) return false;
+		if(par.dep.length == 0) return false;
+		break;
+	
+	case "fac":
+		if(par.factor) return false;
+		if(par.time_dep) return false;
+		if(par.variety != "normal" && par.variety != "const") return false;
+		if(par.dep.length == 0) return false;
+		break;
+		
+	case "trans":
+		if(par.variety != "normal") return false;
+		if(par.type != "trans_rate") return false;
+		break;
+	}
+
+	return true;
 }
 
 
@@ -633,10 +715,7 @@ function param_sel_scrollable(lay,op)
 	for(let i = 0; i < model.param.length; i++){
 		let par = model.param[i];
 
-		if(par.variety == "normal"
-			&& !(lay.op.ac == "AddDistParam" && par.dep.length == 0) 
-			&& par.type != "derive_param" && !(op == "trans" && par.type != "trans_rate")
-			){	
+		if(param_pos(par,op)){	
 			let info = par.label_info;
 			if(cx+info.dx+1 >= lay.inner_dx){ cx = 0; cy += dy;}
 		
@@ -725,7 +804,6 @@ function set_paramselect_bubble(cont,eqn_appear)
 	if(te != undefined){
 		cont.y += 0.2;
 		if(fl == false){
-			
 			bubble_addbutton(cont,"View",cont.dx-3.6,cont.y-0.2,3.5,1.2,"GreyView","SelectParam",{par:par});
 		}
 		
@@ -758,6 +836,9 @@ function param_details_scrollable(lay)
 	let store = [];
 	
 	let eq_app = lay.op.eqn_appear;
+	
+	let too_big = false;
+	
 	for(let i = 0; i < eq_app.length; i++){
 		let eq = eq_app[i];
 
@@ -838,12 +919,16 @@ function param_details_scrollable(lay)
 		}
 		
 		if(find_in(store,te) == undefined){
-			lay.add_button({te:"View", x:dx-3.6, y:cy-0.2, dx:3.5, dy:1.2, ac:ac, type:"GreyView", eqn_info:eq.eqn_info});
+			lay.add_button({te:"View", x:dx-3.8, y:cy-0.2, dx:3.5, dy:1.2, ac:ac, type:"GreyView", eqn_info:eq.eqn_info});
 			cy = lay.add_paragraph("<b>"+te+"</b>",dx-4,cx,cy,BLACK,warn_si,warn_lh);
 		
 			cy += 0.5;
 		
 			store.push(te);
+			if(store.length > 10){
+				cy = lay.add_paragraph("+ more",dx-4,cx+0.3,cy-0.3,BLACK,warn_si,warn_lh);
+				break;
+			}
 		}
 	}
 	

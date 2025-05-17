@@ -1102,8 +1102,11 @@ function equation_done()
 			tbs.eqn = eqn;
 			
 			let origin = inter.equation.origin;
-			if(origin.p != undefined && origin.cl != undefined) model.update_pline(origin.p,origin.cl);    
-		
+			if(origin.p != undefined && origin.cl != undefined){
+				let claa = model.species[origin.p].cla[origin.cl];
+				model.update_pline(claa);    
+			}
+			
 			inter.equation = {};
 			inter.textbox_store.pop();
 			
@@ -1118,7 +1121,7 @@ function equation_done()
 /// Creates a new equation with a text string and a type. p and cl are available for transitions
 function create_equation(te,type,p,cl)
 {
-	te = te.replace(/\*/g,"×");
+	te = char_replace(te);
 	
 	let i = find(eqn_types,"name",type);
 	if(i == undefined){

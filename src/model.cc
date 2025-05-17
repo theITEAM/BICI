@@ -40,7 +40,10 @@ void Model::add_eq_ref(EquationInfo &eqi, double t)
 	auto e = hash_eqn.existing(vec);
 	if(e != UNSET){
 		eqi.eq_ref = e;
-		if(eqi.te != eqn[e].te_init) emsg("wrong");
+		if(eqi.te != eqn[e].te_init){
+			cout << eqi.te << "| " << eqn[e].te_init <<" init" << endl;
+			emsg("wrong");
+		}
 	}
 	else{
 		eqi.eq_ref = eqn.size();	
@@ -488,7 +491,7 @@ void Model::create_species_simp()
 
 
 /// Used to order affects
-bool AL_ord(AffectLike al1, AffectLike al2)                      
+bool AL_ord(const AffectLike &al1, const AffectLike &al2)                      
 { return (al1.order_num < al2.order_num); };  
 
 
@@ -659,10 +662,11 @@ void Model::affect_linearise_speedup(vector <AffectLike> &vec) const
 				const auto &meq = species[vec[j].num].markov_eqn[vec[j].num2];
 				
 				auto eq = eqn[meq.eqn_ref];
+				if(eq.linearise.on == false){ flag = true; break;}
+				
 				if(eq.pop_ref.size() == 0) flag = true;
 				if(vec[j].num != vec[imin].num) flag = true;
 				if(vec[j].num2 != vec[imin].num2) flag = true;
-				if(eq.linearise.on == false) flag = true;
 				if(eq.linearise.pop_grad_calc_time_dep == true) flag = true;
 				if(!equal_vec(vec[j].list,vec[imin].list)) flag = true;
 			}
@@ -1197,17 +1201,15 @@ double Model::prior_sample(const Prior &pri, const vector <double> &param_val) c
 		}
 		break;
 		
-	case FLAT_PR:
-		{
-			return gamma_alpha_sample(1);
-		}
-		break;
-		
 	case DIRICHLET_PR:
 		{
 			auto alpha = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
 			return gamma_alpha_sample(alpha);
 		}
+		break;
+		
+	case MDIR_PR:	
+		emsg("SHould not sample from MDIR");
 		break;
 	}
 	

@@ -1,6 +1,7 @@
 /// Information and routines for transferring data between cores using MPI
 
 #include <sstream>
+#include <iostream>
 
 using namespace std;
 
@@ -215,10 +216,12 @@ void Mpi::pack(const Particle &pa)
 				pack_item(ir.index);
 				pack_item(ir.Li);
 			}
-			
-			pack_item(ind.num_trig_data);
+
 			pack_item(ind.init_c_set);
 		}
+
+		pack_item(sp_val.exp_num);
+		pack_item(sp_val.cum_prob_dist);
 	}
 	
 	pack_num(pa.dir_out.size());
@@ -362,12 +365,14 @@ void Mpi::unpack(Particle &pa)
 				ind.incomp_ref.push_back(ir);
 			}
 			
-			unpack_item(ind.num_trig_data);
 			unpack_item(ind.init_c_set);
 			
 			sp_val.individual.push_back(ind);
 		}
 		
+		unpack_item(sp_val.exp_num);
+		unpack_item(sp_val.cum_prob_dist);
+
 		pa.species.push_back(sp_val);
 	}
 	

@@ -1,12 +1,15 @@
 
+###################### DATA DIRECTORY ######################
+
+data-dir folder="Examples\EX_M5-3-data-files"
+
+
 ####################### DESCRIPTION ########################
 
 description text="description.txt"
 
 
 ######################### DETAILS ##########################
-
-data-dir folder="Examples\EX_M5-3-data-files"
 
 simulation start=0 end=100 timestep=0.5
 
@@ -17,23 +20,20 @@ post-sim start=0 end=100
 
 ######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
 
-species name="Animal" type="individual" trans-tree="off"
+species name="Animal" type="individual"
 
 # SPECIES MODEL
 
 class name="DS" index="a"
 
-comp name="S" color="#009900" x=-30 y=-7
-comp name="I" color="#ff2222" x=-2 y=-7
+comp name="S" color="#009900" x=-10 y=0
+comp name="I" color="#ff2222" x=10 y=0
 
 trans name="S->I" value="exp(rate:β[ga][ge]×{I,g[fa][fe]}/N)"
-
 
 class name="Group" index="g"
 
 comp-all color="#aa00aa" fix="true" file="comp-Group.csv"
-
-
 
 # INDIVIDUAL EFFECTS
 
@@ -49,12 +49,20 @@ add-ind-sim file="add-ind-sim.csv"
 ######################## PARAMETERS ########################
 
 param name="N" constant="10"
+
 param name="β" value="0.5" prior="uniform(0,1)"
-param name="Ω^fa,fa" value="2" prior="uniform(0,3)"
+
+param name="Ω^fa,fa" value="2" prior="uniform(0.01,3)"
+
 param name="ω^fa,ga" value="0.3" prior="uniform(-0.9,0.9)"
-param name="Ω^fe,fe" value="1" prior="uniform(0,3)"
+
+param name="Ω^fe,fe" value="1" prior="uniform(0.01,3)"
+
 param name="ω^fe,ge" value="0.4" prior="uniform(-0.9,0.9)"
-param name="Ω^ga,ga" value="1" prior="uniform(0,3)"
-param name="Ω^ge,ge" value="1" prior="uniform(0,3)"
+
+param name="Ω^ga,ga" value="1" prior="uniform(0.01,3)"
+
+param name="Ω^ge,ge" value="1" prior="uniform(0.01,3)"
+
 
 

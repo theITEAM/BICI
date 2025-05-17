@@ -3,28 +3,33 @@
 
 // 53754 lines of code (16/11/24)
 // 50018 lines of code (18/11/24)
+// 59127 lines of code (16/15/25)
 
 let ver="windows";         // Determines platform
 //let ver="linux";
 //let ver="mac";
 
+const try_on = true;                              // Deterimines if try/catch is on (true)   
+const create_example = false;                     // Set if creating example (false)
+const turn_off_random_seed = false;               // Used in testing (false)
+const debug = false;                              // Determines if debugger used (false)
+const testing = false;                            // Used logo to load up results (false)
+
 let make_file = false;                            // Determines if makes file or runs
-
-let try_on = true;
-const debug = true;                               // Determines if debugger used
-
-let testing = true;
-let thick_line = false;
+let thick_line = false;                           // Used for making figures
 let big_eqn = false;
 const graph_dia = false;                          // Used to diagnose problems with graphs
 const load_map_fast = false;                      // If loads up world map from local computer
 const test_comment = false;                       // Used when checking help comments are correct 
 const make_fig = false;                           // Sets editor to make figures for manual
+// Here the leters A-H are pressed to add letters to the screen.
+// "Home" is used to print the page
+
 const set_default = false;                        // Used to set default when loading (turn off)
 
 const check_clone_on = true;                      // Turn on to check if cloning is working
 
-const command_list = ["species","classification","class","set","camera","compartment","comp","comp-all","transition","trans","trans-all","data-dir","description","desc","label","box","parameter","param","derived","der","init-pop","add-pop","remove-pop","add-ind","remove-ind","move-ind","init-pop-sim","add-pop-sim","remove-pop-sim","add-ind-sim", "remove-ind-sim","move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim","comp-data","trans-data","test-data","pop-data","pop-trans-data","ind-effect-data","ind-group-data","genetic-data","simulation","sim","inference","inf","post-sim","posterior-simulation","ind-effect","fixed-effect","sim-param","sim-state","inf-param","inf-generation","inf-state","post-sim-param","post-sim-state","inf-diagnostics","map","post-sim","post-simulation","param-mult"];
+const command_list = ["species","classification","class","set","view","compartment","comp","comp-all","transition","trans","trans-all","data-dir","description","desc","label","box","parameter","param","derived","der","init-pop","add-pop","remove-pop","add-ind","remove-ind","move-ind","init-pop-sim","add-pop-sim","remove-pop-sim","add-ind-sim", "remove-ind-sim","move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim","comp-data","trans-data","test-data","pop-data","pop-trans-data","ind-effect-data","ind-group-data","genetic-data","simulation","sim","inference","inf","post-sim","posterior-simulation","ind-effect","fixed-effect","sim-param","sim-state","inf-param","inf-generation","inf-state","trans-diag","post-sim-param","post-sim-state","inf-diagnostics","map","post-sim","post-simulation","param-mult"];
 
 // Lists all commands which need to load files
 const data_command_list = ["init-pop", "add-pop", "remove-pop", "add-ind", "remove-ind", "move-ind", "init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data","param-mult"];
@@ -159,22 +164,30 @@ const print_line_factor = 3;                       // Increase in line thickness
 const sim_param_not_needed = ["Se","Sp","mut_rate","seq_var","trans_prob","comp_prob","derive_param"];
 const inf_param_not_needed = ["derive_param"];
 
-const dist_pos = ["exponential","gamma","erlang","log-normal","weibull"];
-//const dist_pos = ["exponential","gamma","erlang","log-normal","weibull","period"];
+//const dist_pos = ["exponential","gamma","erlang","log-normal","weibull"];
+const dist_pos = ["exponential","gamma","erlang","log-normal","weibull","period"];
 
 const exp_dist_pos = ["exponential","erlang"];
 const source_dist_pos = ["exponential"];
 const prior_pos = ["uniform","exp","normal","gamma","log-normal","beta","bernoulli","fix"];
+const prior_factor_pos = ["mdir"];
 const prior_pos_positive = ["uniform","exp","gamma","log-normal","fix"];
 //const prior_zero_one = ["uniform","beta","fix"];
 
 //const data_types = ["System", "Individual", "Population", "Additional"];
 const data_types = ["Init. Cond.", "Individual", "Population", "Additional"];
 
-let chnotallowed = "\"£!$%&=;@~#\\?";
-let notparam_list = "+-*×/0123456789.{<>〈〉}()|\n\r Σ′";// Sets not a parameter character
-let paramend_list = "+-*×/|.{<>〈〉}[]$\n\r Σ";	       // Sets characters which end parameter
-let compnotallow = "\"*×_ {<>〈〉}[]()=Σ′";           // Character not allowed in comp names
+
+
+//const char_not_allowed = [":",",",".","!","[","]","{","}","〈","〉","|","*","_","×","-","+","<",">"]; 
+//const char_not_allowed = [":",",",".","!","[","]","{","}","〈","〉","|","*","_","×","<",">"]; 
+
+let chnotallowed = "\"£!$%&=;@~#\\?→";
+let notparam_list = "+-*×/0123456789.{<>〈〉}()|\n\r Σ′→";// Sets not a parameter character
+let paramend_list = "+-*×/|.{<>〈〉}[]$\n\r Σ";	          // Sets characters which end parameter
+let name_notallow = "|\"*×_ {<>〈〉}[]()=Σ′→";           // Character not allowed in species, class or comp names
+let name_ch_max = 40;                                 // The maximum number of characters allowed for strings
+let invalid_name = ["Compartment","Population","Alpha","Distribution","file"];
 
 const convert = [
 		{command:"add-pop", type:"Add Pop."},
@@ -327,6 +340,9 @@ const TRANS_OVER_RANGE = 0.5;                      // The width around which a t
 const SIM_VALUE_DASH = 2;                          // Dash value used when displaying sim values 
 const SIM_VALUE_COL = BLACK;                       // The colour of the sim value line
 const SIM_VALUE_THICK = 1;                         // The thickness of the sim value line
+const TRANS_EXP_DASH = 2;                          // Dash for expected transitions
+const TRANS_EXP_THICK = 2;                         // Thickness for expected transitions
+
 const SPLIT_SIZE = 0.5;                            // Size of mouse movement needed to split transition
 const GENRATION_COL = BLUE;                        // Used for generation plot
 const GENRATION_CI_COL = LBLUE;                    // Used for generation plot
@@ -339,6 +355,7 @@ const TRANS_FILTER_MAX = 1000;                     // The maximum number of tran
 
 const endl = '\n';                                 // End line character
 const missing_str = ".";                           // Denotes missing in data file
+const not_alive_str = "!";                         // Denotes individul not alive
 const set_str = "Please set";                      // String prompt to set
 const select_str = "Please Select";                // String prompt to select         
 const select_drop_str = "Select";                  // String prompt to set dropdown
@@ -365,13 +382,10 @@ const opbut = ["_","^","+","-","\u00d7","\u2215","(",")","Σ","'"];
 
 const numbut = ["0","1","2","3","4","5","6","7","8","9","."];
 
-//const char_not_allowed = [":",",",".","!","[","]","{","}","〈","〉","|","*","_","×","-","+","<",">"]; 
-const char_not_allowed = [":",",",".","!","[","]","{","}","〈","〉","|","*","_","×","<",">"]; 
-
 const greek = ["\u03B1","\u03B2","\u03B3","\u03B4","\u03B5","\u03B6","\u03B7","\u03B8","\u03B9",
 "\u03Ba","\u03Bb","\u03Bc","\u03Bd","\u03Be","\u03Bf","\u03C0","\u03C1","\u03C3","\u03C4","\u03C5","\u03C6","\u03C7","\u03C8","\u03C9"];
-["Α","Β","Γ","Δ","Ε","Ζ","Η","Θ","Ι","Κ","Λ","Μ","Ν","Ξ","Ο","Π","Ρ","Σ","Τ","Υ","Φ","Χ","Ψ","Ω"];
-const greek_latex = [["alpha","α"],["beta","β"],["gamma","γ"],["Gamma","Γ"],["delta","δ"],["Delta","Δ"],["epsilon","ε"],["zeta","ζ"],["eta","η"],["Eta","Η"],["theta","θ"],["Theta","Θ"],["Iota","ι"],["kappa","κ"],["lambda","λ"],["Lambda","Λ"],["mu","μ"],["nu","ν"],["xi","ξ"],["Xi","Ξ"],["omicron","ο"],["pi","π"],["Pi","Π"],["rho","ρ"],["sigma","σ"],["Sigma","Σ"],["tau","τ"],["upsilon","τ"],["phi","φ"],["Phi","Φ"],["chi","χ"],["psi","ψ"],["Psi","Ψ"],["omega","ω"],["Omega","Ω"],["sum","Σ"]];
+
+const greek_latex = [["alpha","α"],["beta","β"],["gamma","γ"],["Gamma","Γ"],["delta","δ"],["Delta","Δ"],["epsilon","ε"],["zeta","ζ"],["eta","η"],["Eta","Η"],["theta","θ"],["Theta","Θ"],["iota","ι"],["kappa","κ"],["lambda","λ"],["Lambda","Λ"],["mu","μ"],["nu","ν"],["xi","ξ"],["Xi","Ξ"],["omicron","ο"],["pi","π"],["Pi","Π"],["rho","ρ"],["sigma","σ"],["Sigma","Σ"],["tau","τ"],["upsilon","υ"],["phi","φ"],["Phi","Φ"],["chi","χ"],["psi","ψ"],["Psi","Ψ"],["omega","ω"],["Omega","Ω"],["sum","Σ"]];
 
 const greek_capital = ["A","B","Γ","Δ","E","Z","H","Θ","I","K","Λ","M","N","Ξ","O","Π","P","Σ","T","Y","Φ","X","Ψ","Ω"];
 
@@ -385,10 +399,15 @@ const trans_tree_name = ["N^origin","N^infected","N^mut-tree","N^mut-origin","N^
 
 const UNSET = 99999999;                            // Deotes unset
 const LARGE = 10000000;                            // Denote a large quantity
+const VLARGE = 100000000000;                       // Denote a very large quantity
 const TINY = 0.000000001;                          // Denotes a tiny quantity
+const VTINY = 0.00000000000001;                    // A very tiny number
 const ALMOST_ONE = 0.9999999;                      // Denotes almost one
 const ELEMENT_MAX = 1000;                          // The maximum number of elements which can be displayed
+const PARAM_LIST_MAX = 1000;                       // The maximum number of parameters on list
 const HASH_MAX = 10000;                            // The value used for the hash tables
+const H_BIN = 10;                                  // Used for distributions in cumulative prob
+
 const SIM_NUM_DEFAULT = 1;                         // The default simulation number
 const PPC_NUM_DEFAULT = 200;                       // The default number of ppc simulation
 const ANNEAL_DEFAULT = "none";                     // Default annealing type
@@ -424,4 +443,32 @@ const annotation_col_default = BLACK;              // Default colour for labels
 
 // Different line thicknesses
 const NOLINE = 0, THINLINE = 0.5, NORMLINE = 1, MEDIUMLINE = 1.5, THICKLINE = 2, MTHICKLINE = 3, VTHICKLINE = 4;
+
+const SD_MIN = TINY;                         // The minimum value for sd
+const SD_MAX = LARGE;                        // The maximum value for sd
+const CV_MIN = 0.01;                         // The minimum value for cv
+const CV_MAX = 10.0;                         // The maximum value for cv
+const MEAN_MIN = VTINY;                      // The minimum for dist mean
+const MEAN_MAX = LARGE;                      // The maximim for dist mean
+const NORM_MEAN_MIN = -LARGE;                // The minimum for normal mean
+const NORM_MEAN_MAX = LARGE;                 // The maximum for normal mean
+const SCALE_MIN = TINY;                      // The minimum for dist scale
+const SCALE_MAX = LARGE;                     // The minimum for dist scale
+const SHAPE_MIN = 0.1;                       // The minimum for dist shape
+const SHAPE_MAX = 100.0;                     // The maximum for dist shape
+const ALPBETA_MIN = 0.01;                    // The minumum for alpha or beta
+const ALPBETA_MAX = 100;                     // The minumum for alpha or beta
+const LAM_MIN = 0;                           // The minimum value for poisson
+const LAM_MAX = LARGE;                       // The maximum value for poisson
+const EXP_MEAN_MIN = TINY;                   // Minimum mean for exponential
+const TIME_MIN = TINY;                       // The minimum time
+const RATE_MIN = TINY;                       // The minimum rate
+const P_MIN = TINY;                          // The minimum probability
+const P_MAX = 1-TINY;                        // The maximum probability
+ 
+// Sets diffent distribution for displaying text
+const NORM_TE=0, LOGNORM_TE=1, WEIBULL_TE=2, GAMMA_TE=3, BETA_TE=4, NEGBINO_TE=5, BERN_TE=6, EXP_RATE_TE=7, EXP_MEAN_TE=8, POIS_TE=9, PERIOD_TE=10;
+
+// Different quantities
+const SD_QU=0, CV_QU=1, MEAN_QU=2, NORM_MEAN_QU=3, SHAPE_QU=4, SCALE_QU=5, ALPHA_QU=6, BETA_QU=7, P_QU=8, BERNP_QU=9, RATE_QU=10, EXP_MEAN_QU=11, POIS_QU=12, TIME_QU=13;
 

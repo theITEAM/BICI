@@ -1,4 +1,9 @@
 
+###################### DATA DIRECTORY ######################
+
+data-dir folder="Examples\EX_D7-data-files"
+
+
 ####################### DESCRIPTION ########################
 
 description text="description.txt"
@@ -6,11 +11,9 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-data-dir folder="Examples\EX_D7-data-files"
-
 simulation start=0 end=100 timestep=0.5
 
-inference start=0 end=100 timestep=0.5
+inference start=0 end=100 timestep=0.5 nchain=3
 
 post-sim start=0 end=100
 
@@ -23,15 +26,14 @@ species name="People" type="population"
 
 class name="DS" index="a"
 
-comp name="S" color="#009900" x=-16 y=-7
-comp name="I" color="#ff2222" branch-prob="true" x=-4 y=-7
-comp name="R" color="#4444ff" x=11 y=-12
-comp name="D" color="#000000" x=11 y=-2
+comp name="S" color="#009900" x=-13 y=0
+comp name="I" color="#ff2222" branch-prob="true" x=0 y=0
+comp name="R" color="#4444ff" x=13 y=5
+comp name="D" color="#000000" x=13 y=-5
 
 trans name="S->I" value="exp(rate:β×{I})"
 trans name="I->R" value="exp(rate:γ)" bp="*"
 trans name="I->D" value="exp(rate:γ)" bp="b(t)"
-
 
 # SIMULATION INITIAL CONDITIONS
 
@@ -49,7 +51,10 @@ pop-data filter="DS=file" error="poisson" file="pop-data.csv"
 ######################## PARAMETERS ########################
 
 param name="β" value="0.0004" prior="uniform(0,0.1)"
+
 param name="γ" value="0.1" prior="uniform(0,1)"
+
 param name="b(t)" value="value-b.csv" prior="uniform(0,1)" knot-times="start,20,40,60,80,end" smooth="log-normal(0.5)"
+
 
 

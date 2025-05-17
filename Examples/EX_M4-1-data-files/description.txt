@@ -8,7 +8,7 @@
 
 ## Model
 - A single population-based species 'Animal' is created.
-- This contains a classification 'Population'.
+- This contains a classification 'Alive'.
 - Population contains a compartment $N$, which represents the number of individuals.
 - A birth rate $α$ determines how fast individuals are born.
 - A mortality rate $μ$ determines how fast individuals die.

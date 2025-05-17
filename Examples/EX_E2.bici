@@ -1,4 +1,9 @@
 
+###################### DATA DIRECTORY ######################
+
+data-dir folder="Examples\EX_E2-data-files"
+
+
 ####################### DESCRIPTION ########################
 
 description text="description.txt"
@@ -6,34 +11,29 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-data-dir folder="Examples\EX_E2-data-files"
-
 simulation start=0 end=100 timestep=0.5
 
-inference start=0 end=100 timestep=0.5
+inference start=0 end=100 timestep=0.5 nchain=3
 
 post-sim start=0 end=100
 
 
 ######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
 
-species name="Animal" type="individual" trans-tree="off"
+species name="Animal" type="individual"
 
 # SPECIES MODEL
 
 class name="DS" index="a"
 
-comp name="S" color="#009900" x=-19 y=-7
-comp name="I" color="#ff2222" x=-2 y=-7
+comp name="S" color="#009900" x=-10 y=0
+comp name="I" color="#ff2222" x=10 y=0
 
 trans name="S->I" value="exp(rate:β×{I,g〈f〉}/N)"
-
 
 class name="Group" index="g"
 
 comp-all color="#005500" fix="true" file="comp-Group.csv"
-
-
 
 # FIXED EFFECTS
 
@@ -55,7 +55,10 @@ trans-data name="S->I" obsrange="all" file="trans-data.csv"
 ######################## PARAMETERS ########################
 
 param name="N" constant="10"
+
 param name="β" value="0.1" prior="uniform(0,1)"
-param name="ν^f" value="1" prior="uniform(-2,2)"
+
+param name="μ^f" value="1" prior="uniform(-2,2)"
+
 
 

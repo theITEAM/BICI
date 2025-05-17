@@ -5,7 +5,7 @@ worker.onmessage = function (e)
 {
 	let ans = e.data;
 	
-	//pr("Worker ans"); pr(ans);
+	//prr("Worker ans"); prr(ans);
 	
 	if(ans.type == "Percent"){
 		let mem = performance.memory;
@@ -13,7 +13,7 @@ worker.onmessage = function (e)
 		return;
 	}
 
-	if(false){ pr("Worker reply: "+ans.type); pr("ans"); pr(ans);}
+	if(false){ prr("Worker reply: "+ans.type); prr("ans"); prr(ans);}
 
 	if(inter.worker_mess.active != "stop"){
 		if(ans.type != "Start" && ans.type != "StartPPC") stop_loading_symbol();
@@ -223,15 +223,24 @@ worker.onmessage = function (e)
 			}
 			break;
 			
-		case "Edit Param": case "Edit Reparam":
+		case "Edit Param": case "Edit Reparam": case "Edit Weight":
 			inter.edit_param = ans.info;
 			generate_screen();
 			break;
 			
 		case "Set Param": case "Set Reparam":
+			inter.edit_source = false;
+			close_bubble();
+			close_param_source();
+			
 			model.param[ans.i].value_desc = ans.value_desc;
 			model.param[ans.i].set = true;
 			if(ans.type == "Set Reparam") update_param();
+			generate_screen();
+			break;
+			
+		case "Set Weight": 
+			model.param[ans.i].weight_desc = ans.weight_desc;
 			generate_screen();
 			break;
 			
@@ -358,6 +367,7 @@ worker.onmessage = function (e)
 			
 		case "Model warning":
 			{	
+				if(ans.full_warn) model.warn_view = true;
 				model.warn = ans.warn;
 				model.species = ans.species;
 				close_help();
@@ -413,7 +423,7 @@ worker.onmessage = function (e)
 			break;
 			
 		default:
-			pr("Option not recognisted: "+ans.type);
+			error("Option not recognisted: "+ans.type);
 			break;
 		}
 	}

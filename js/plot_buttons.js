@@ -32,6 +32,8 @@ Layer.prototype.plot_button = function (bu,ov)
 		case "CompGraph2": 
 		{
 			let col = bu.col; if(ov) col = shift_colour(col);
+			let te_col = white_black(col);
+			
 			if(dx*inter.sca < 1) plot_pixel(x,y,col);
 			else{
 				clear_rectangle(x,y,dx,dy);
@@ -39,7 +41,7 @@ Layer.prototype.plot_button = function (bu,ov)
 				let si = dy*si_cogr_text_frac;
 
 				let tsa = text_sup_anno(te,si,dx);
-				center_text_tsa(tsa,x+dx/2,y+dy/2+0.1*si,BLACK);
+				center_text_tsa(tsa,x+dx/2,y+dy/2+0.1*si,te_col);
 				
 				let val = bu.value;
 				if(val != undefined){
@@ -52,7 +54,7 @@ Layer.prototype.plot_button = function (bu,ov)
 							si_num *= 0.95*wmax/w;
 						}
 						else{
-							center_text(val,x+dx/2,y+dy/2+0.6*si,fo,BLACK);
+							center_text(val,x+dx/2,y+dy/2+0.6*si,fo,te_col);
 							break;
 						}
 					}while(si_num > 0.2);
@@ -63,7 +65,7 @@ Layer.prototype.plot_button = function (bu,ov)
 		
 	case "CompLatLngGraph": case "CompLatLngGraph2":
 		{
-			let col = bu.col;
+			let col = bu.col;	if(ov) col = shift_colour(col);
 			if(dx*inter.sca < 1) plot_pixel(x,y,col);
 			else{
 				fill_circle(x+dx/2,y+dy/2,dx/2,col,bu.col_dark,NORMLINE);
@@ -75,7 +77,7 @@ Layer.prototype.plot_button = function (bu,ov)
 						while(si_num > 0.2 && text_width(val,get_font(si_num,"","times")) > dx){
 							si_num *= 0.7;
 						}
-						center_text(val,x+dx/2,y+dy/2+0.3*si_num,get_font(si_num,"","times"),LBLUE);
+						center_text(val,x+dx/2,y+dy/2+0.3*si_num,get_font(si_num,"","times"),white_black(col));
 					}
 				}
 			}
@@ -145,12 +147,12 @@ Layer.prototype.plot_button = function (bu,ov)
 			let frac = anim.playframe/anim.playframe_max;
 			let xx = x+dy/2+frac*(dx-dy);
 		
-			if(ov) fill_circle(xx,y+dy/2,r2,LRED,LRED);
-		
 			fill_rectangle(x+dy/2,y+dy/2-0.15,dx-dy,0.3,LLGREY);
 			
 			fill_rectangle(x+dy/2,y+dy/2-0.15,xx-(x+dy/2),0.3,RED);
 			
+			if(ov) fill_circle(xx,y+dy/2,r2,LRED,LRED);
+		
 			fill_circle(xx,y+dy/2,r,RED,RED);
 		}
 		break;
@@ -342,8 +344,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			else{
 				if(ov) col = GREY;
 			}
-			
-			plot_text(te,x+0.4,y+dy/2+0.4*si,font,col);	
+			plot_text(te,x+0.4,y+dy/2+0.4*si,font,col,dx-1);	
 		}
 		break;
 		
@@ -542,8 +543,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			else clear_rectangle(x,y,dx,dy);
 			
 			let text_anno = bu.text_anno;
-			//let text_anno = text_convert_annotation(te,para_si,para_lh,LARGE,undefined,BLACK);
-		
+			
 			let word = text_anno.word;
 			for(let i = 0; i < word.length; i++){
 				let wo = word[i];
@@ -641,7 +641,9 @@ Layer.prototype.plot_button = function (bu,ov)
 		}
 		break;
 		
-	case "Element": case "ParamElement": case "ParamElementConst": case "ParamElementEq": 
+	case "Element":
+	case "ParamElement": case "ParamElementConst": case "ParamElementEq": 
+	case "ParamFactorConst": case "ParamWeightConst":
 	case "PriorSplitElement": case "DistSplitElement":
 	case "ParamSimElement": case "DistSimElement": 
 	case "ReparamElement": case "ReparamTableElement": 
@@ -671,12 +673,17 @@ Layer.prototype.plot_button = function (bu,ov)
 				colte = GREY;			
 				if(bu.type == "ParamSimElement" && bu.source != model) colte = BLACK;
 			}
-			
-			let tsa = text_sup_anno(te,si_table,dx-0.5);
-			plot_text_tsa(tsa,x+0.3,y+0.7*dy,colte);
+		
+			if(bu.head){
+				plot_text(te,x+0.3,y+0.7*dy,bu.font,colte); 
+			}
+			else{
+				let tsa = text_sup_anno(te,si_table,dx-0.5);
+				plot_text_tsa(tsa,x+0.3,y+0.7*dy,colte);
+			}
 		}
 		break;
-	
+		
 	case "TooBigElement": case "No element":	
 		plot_text(te,x+0.3,y+0.7*dy,bu.font,BLACK,dx-0.5);
 		break;
@@ -899,7 +906,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			
 	case "CenterText":
 		fill_rectangle(x,y,dx,dy,WHITE);
-		center_text(te,x+dx/2,y+0.8*dy,bu.font,BLACK);
+		center_text(te,x+dx/2,y+0.8*dy,bu.font,BLACK,dx-1);
 		break;
 		
 	case "LeftText":
@@ -1383,7 +1390,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			
 			let len = 0;
 			
-			let liw = MEDIUMLINE;//NORMLINE;
+			let liw = MEDIUMLINE;
 			if(big_eqn){ liw = THICKLINE; si *= 1.5;}
 			
 			for(let i = 0; i < bu.points.length - 1; i++){
@@ -1503,6 +1510,43 @@ Layer.prototype.plot_button = function (bu,ov)
 		}
 		break;
 		
+		case "Grid":
+			plot_grid(bu.p,bu.cl,dx,dy)
+			break;
+			
+		case "GridIcon":
+		{
+			clear_rectangle(x,y,dx,dy);
+			
+			let thick = NORMLINE;
+			if(!bu.ac){
+				cv.globalAlpha = 0.3;
+			}
+			else{
+				let grid = model.species[bu.p].cla[bu.cl].camera.grid;
+			
+				if(grid=="on"){				
+					if(ov) thick = MEDIUMLINE;
+				}
+				else{
+					cv.globalAlpha = 0.3;
+					if(ov) cv.globalAlpha = 0.6;
+				}
+			}
+			
+			let d = 0.3;
+			let kmax = 3;
+			for(let k = 0; k <= kmax; k++){
+				let xx = x+d+k*(dx-2*d)/kmax;
+				draw_line(xx,y+d,xx,y+dy-d,BLACK,thick);
+				
+				let yy = y+d+k*(dy-2*d)/kmax;
+				draw_line(x+d,yy,x+dx-d,yy,BLACK,thick);
+			}
+			cv.globalAlpha = 1;	
+		}
+		break;
+		
 	case "ZoomIn":
 		clear_rectangle(x,y,dx,dy);
 		if(ov || ac == undefined) cv.globalAlpha = 0.3;
@@ -1554,7 +1598,12 @@ Layer.prototype.plot_button = function (bu,ov)
 		
 			let y1 = nearest_pixel(y+pady);
 			let y2 = nearest_pixel(y+pady+((dy-2*pady)/2));
-			let w = Math.floor(inter.sca/5);
+			
+			let sca = inter.sca;
+			if(inter.printing) sca /= print_scale_factor;
+			
+			let w = Math.floor(sca/5);
+		
 			if(w < 1) w = 1;
 			for(let i = 0; i < 3; i++){
 				let yy = y1+(y2-y1)*i;
@@ -1936,7 +1985,7 @@ Layer.prototype.plot_button = function (bu,ov)
 		
 		let per = inter.loading_symbol.percent;
 	
-		if(per){
+		if(per != undefined){
 			center_text(per,x+dx/2+0.02,y+dy/2+0.26,get_font(0.8,"bold"),BLACK);
 		}
 		plot_loading_symbol(x+dx/2,y+dy/2,1);
@@ -2089,10 +2138,11 @@ Layer.prototype.plot_button = function (bu,ov)
 		
 	case "MatrixEleBut":
 		{
-			fill_rectangle(x,y,dx,dy,bu.col);
+			let col = bu.col;
+			fill_rectangle(x,y,dx,dy,col);
 			if(dx > 3){
 				let si = 1.0; let fo = get_font(si,"bold");
-				center_text(te,x+dx/2,y+dy/2+0.3*si,fo,BLACK,dx-0.0);
+				center_text(te,x+dx/2,y+dy/2+0.3*si,fo,white_black(col),dx-0.0);
 			}
 			
 			let mar = 0.1;	

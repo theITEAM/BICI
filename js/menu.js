@@ -100,7 +100,8 @@ function initialise_pages()
 			if(alg == "PAS-MCMC" || alg == "ABC-SMC") subsub.push({name:"Generations"});
 	
 			if(model.inf_res.plot_filter.diagnostics_on){
-				subsub.push({name:"Diagnostics"});
+				subsub.push({name:"Diagnostics", sub:[]});
+				add_species_options(subsub,model.inf_res.species_name);
 			}	
 		}
 	}
@@ -110,6 +111,7 @@ function initialise_pages()
 		
 		let sub = page[page.length-1].sub;
 		sub.push({name:"Population Mod.", sub:[]});
+		add_species_options(sub,model.species);
 		
 		sub.push({name:"Parameter Mult.", sub:[]});
 		
@@ -119,9 +121,18 @@ function initialise_pages()
 			sub.push({name:"Results", sub:[]});
 		
 			let subsub = sub[sub.length-1].sub;
-			subsub.push({name:"Populations"});
-			subsub.push({name:"Transitions"});
-			if(model.ppc_res.ind_flag == true) subsub.push({name:"Individuals"});
+			subsub.push({name:"Populations", sub:[]});
+			add_species_options(subsub,model.ppc_res.species_name);
+			
+			subsub.push({name:"Transitions", sub:[]});
+			add_species_options(subsub,model.ppc_res.species_name);
+			
+			
+			if(model.ppc_res.ind_flag == true){
+				subsub.push({name:"Individuals", sub:[]});
+				add_species_options(subsub,model.inf_res.species_name);
+			}
+			
 			subsub.push({name:"Parameters"});
 		}
 	}

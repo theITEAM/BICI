@@ -37,18 +37,38 @@ function results_add_model(result,details,siminf)
 	result.details = copy(details);
 	
 	result.species = copy(model.species);
+
+	/*
+	for(let p = 0; p < result.species.length; p++){
+		result.species[p].ppc_source=[];
+	}
+	*/
 	
 	average_init(result);
 
 	global_comp_trans_init(result.species);
 	
 	result.param = copy(model.param);
+	
+	set_par_output(result.param);
 
 	create_param_const(result,siminf);            // Creates constant values for non-variable parameters 
 
 	set_genetic_data(result);
 	
 	if(siminf == "inf") set_ppc_checkbox(model);
+}
+
+
+/// Sets whether a parameter is output or not
+function set_par_output(param)
+{
+	for(let th = 0; th < param.length; th++){
+		let par = param[th];
+		par.output = false;
+		if(par.variety == "const") par.output = true;
+		if(par.type == "derive_param") par.output = true;
+	}
 }
 
 
@@ -141,29 +161,14 @@ function create_param_const(result,siminf)
 			else result.param.splice(th,1);
 		}
 	}
-	
-	for(let th = 0; th < result.param.length; th++){
-		let par = result.param[th];
-		
-		par.kind = "variable";
-	
-		if(par.variety == "const" || siminf == "sim"){ 
-			if(!(par.variety == "dist" && par.sim_sample.check == true) 
-				&& par.type != "derive_param"
-				&& par.variety != "reparam"
-				){
-				par.kind = "const";
-			}
-		}
-	}		
 }
 
 
 /// Sends an error that the sample could not be loaded
 function alert_sample(warn,code)
 {
-	pr(warn+" CODE: "+code);
-	alert_import(warn+" CODE: "+code);
+	if(isNaN(code)) alert_import(warn+" ERROR: "+code);
+	else alert_import(warn+" CODE: "+code);
 }
 
 
@@ -287,7 +292,8 @@ function get_param_value(i,source,lines,result,warn,mode)
 				let val = spl_row[ndep];
 				
 				if(der_time_var){
-					val = split_spline(val);
+					if(mode == "derive") val = split_compact(val);
+					else val = split_spline(val);
 				}
 				else{
 					if(isNaN(val)) alert_sample(warn,100);
@@ -305,7 +311,8 @@ function get_param_value(i,source,lines,result,warn,mode)
 		value = spl[1];
 		
 		if(der_time_var){
-			value = split_spline(value);
+			if(mode == "derive") value = split_compact(value);
+			else value = split_spline(value);
 		}
 		else{
 			value = Number(value);
@@ -349,6 +356,38 @@ function split_spline(val)
 		val[k] = Number(val[k]);
 	}
 	return val;		
+}
+
+
+/// Splits text "1|3*2|.." into a numeric vector (used for d
+function split_compact(val)
+{
+	val = val.split("|");
+	let num=[];
+	for(let k = 0; k < val.length; k++){
+		let spl = val[k].split("*");
+		let nu = Number(spl[0]);
+		if(isNaN(nu)) alert_sample(warn,101);
+	
+		switch(spl.length){
+		case 1:
+			num.push(nu);
+			break;
+		
+		case 2:
+			{
+				let times = Number(spl[1]);
+				if(isNaN(times)) alert_sample(warn,101);
+				for(let i = 0; i < times; i++) num.push(nu);
+			}
+			break;
+			
+		default:
+			if(isNaN(times)) alert_sample(warn,101);
+			break;
+		}
+	}
+	return num;		
 }
 
 
@@ -504,7 +543,7 @@ function add_tl(vec,ref,result,op)
 		if(op){ if(op == "positive" && va < 0) va = 0;}
 		for(let k = 0; k < num; k++){ vec[j] += va; j++;}
 	}
-	if(j != vec.length) pr("vec not right length");
+	if(j != vec.length) error("vec not right length");
 }
 
 
@@ -556,9 +595,9 @@ function get_timeline(vec,result)
 	if(j != undefined){
 		let tl = tl_store[j];
 		if(!equal_vec(tl.v,v)){ 
-			j = undefined; pr("ERROR vec not equal1");
+			j = undefined; error("ERROR vec not equal1");
 		}
-		if(!equal_vec(tl.n,n)){ j = undefined; pr("ERROR vec not equal2");}
+		if(!equal_vec(tl.n,n)){ j = undefined; error("ERROR vec not equal2");}
 	}
 	
 	if(j == undefined){
@@ -733,8 +772,8 @@ function plot_variety(view)
 }
 
 
-/// Initialises filters used to plot the results
-function initialise_plot_filters(result,source)
+/// Initialise plot filters
+function initialise_plot_filters_setup(result,source)
 {
 	source.on = true;
 	source.plot_filter = {};
@@ -746,6 +785,48 @@ function initialise_plot_filters(result,source)
 	rpf.diagnostics_on = result.diagnostics_on;
 	rpf.diagnostics = result.diagnostics;
 	
+	rpf.species = [];
+	for(let p = 0; p < result.species.length; p++){
+		let sp = result.species[p];
+		
+		let pos_class = [];
+		for(let cl = 0; cl < sp.ncla; cl++){
+			pos_class.push({te:sp.cla[cl].name, siminf:rpf.siminf, p:p, cl:cl, check_filter:true});
+		}
+
+		let cla_red = [];
+		for(let cl = 0; cl < sp.ncla; cl++){
+			let claa = sp.cla[cl];
+			
+			cla_red[cl] = { name:claa.name, index:claa.index};
+			if(claa.ncomp > COMP_FILTER_MAX) cla_red[cl].comp_too_large = true;
+			else{ cla_red[cl].comp = claa.comp; cla_red[cl].ncomp = claa.ncomp;} 
+			
+			if(claa.ntra > TRANS_FILTER_MAX) cla_red[cl].tra_too_large = true;
+			else{ cla_red[cl].tra = claa.tra; cla_red[cl].ntra = claa.ntra;} 
+
+			let list=[];
+			for(let tr = 0; tr < claa.tra.length; tr++){
+				list.push({name: claa.tra[tr].name});
+			}
+			cla_red[cl].sel = {radio:{value:0, param:false}, list:list};
+		}
+		
+		rpf.species[p] = { sel_class:copy(pos_class[0]), pos_class:pos_class, cla:cla_red, ncla:sp.ncla, name:sp.name, type:sp.type, trans_tree:sp.trans_tree, filter:[]};
+		
+		switch(rpf.siminf){
+		case "sim": rpf.species[p].gen_source=[]; break;
+		case "inf": rpf.species[p].ppc_source=[]; break;
+		}
+	}
+}
+
+
+/// Initialises filters used to plot the results
+function initialise_plot_filters(result,source)
+{
+	let rpf = source.plot_filter;
+
 	// Initialises distribution plots
 	let pos_bin = [];
 	pos_bin.push({te:10}); pos_bin.push({te:20}); pos_bin.push({te:50}); 
@@ -808,7 +889,18 @@ function initialise_plot_filters(result,source)
 	// Sets up radio button for axes 
 	rpf.xaxis_radio = get_tot_param_radio(result);
 	rpf.yaxis_radio = get_tot_param_radio(result);
-	if(rpf.yaxis_radio.param_list.length > 0 && rpf.yaxis_radio.radio.value+1 < rpf.yaxis_radio.param_list.length) rpf.yaxis_radio.radio.value++;
+	
+	// Ensures initial two variables are not the same
+	if(rpf.yaxis_radio.param_list.length > 0){
+		if(rpf.yaxis_radio.radio.value+1 < rpf.yaxis_radio.param_list.length) rpf.yaxis_radio.radio.value++;
+		else{
+			let rad = rpf.yaxis_radio.param_list[rpf.yaxis_radio.radio.value];
+			
+			if(rad.list && rad.list.length > 0 && rad.radio.value+1 < rad.list.length){
+				rad.radio.value++;
+			}
+		}
+	}
 	
 	// Possibilies for individual view
 	rpf.pos_indview = [];
@@ -833,25 +925,48 @@ function initialise_plot_filters(result,source)
 		}
 	}
 	
-	if(rpf.siminf == "inf" || rpf.siminf == "ppc"){
+	{
 		rpf.sel_ie_view = [];
+		rpf.sel_ie_data_view = [];
 		
-		let fl = false;
+		let dist_fl = false;
+		let so_fl = false;
+			
 		for(let p = 0; p < result.species.length; p++){
-			let list = [];
+			let list_ie = [];
+			let list_data = [];
 			let sp = result.species[p];
-			for(let k = 0; k < sp.inf_source.length; k++){
-				let so = sp.inf_source[k];
-				
-				if(so.type == "Ind. Eff."){
-					list.push({name:so.spec.drop.te});
-					fl = true;
+			
+			if(sp.type == "Individual"){
+				for(let j = 0; j < sp.ind_effect.length; j++){
+					list_ie.push({name:"["+sp.ind_effect[j]+"]"});
+					dist_fl = true;
 				}
 			}
-			rpf.sel_ie_view.push({ radio: {value: 0}, list:list});
+			
+			if(rpf.siminf == "inf" || rpf.siminf == "ppc"){
+				for(let k = 0; k < sp.inf_source.length; k++){
+					let so = sp.inf_source[k];
+					if(so.type == "Ind. Eff."){
+						list_data.push({name:"["+so.spec.drop.te+"]"});
+						so_fl = true;
+					}
+				}
+			}
+			
+			rpf.sel_ie_view.push({ radio:{value: 0}, list:list_ie});
+			rpf.sel_ie_data_view.push({ radio:{value: 0}, list:list_data});
 		}
 		
-		if(fl == true) rpf.pos_indview.push({te:"Ind. Eff."});
+		if(dist_fl == true || so_fl == true){
+			rpf.pos_indview.push({te:"Ind. Eff."});
+			
+			// Possibilities for viewing individual effects
+			rpf.pos_indeffview=[];
+			if(so_fl) rpf.pos_indeffview.push({te:"Scatter"});
+			if(dist_fl) rpf.pos_indeffview.push({te:"Distribution"});
+			rpf.sel_indeffview = copy(rpf.pos_indeffview[0]);
+		}
 	}
 					
 	rpf.pos_indview.push({te:"Table"});
@@ -865,6 +980,7 @@ function initialise_plot_filters(result,source)
 		rpf.sel_timestep = copy(rpf.pos_timestep[0]);
 	}
 	
+	/*
 	// Possibilities for classification
 	rpf.species = [];
 	for(let p = 0; p < result.species.length; p++){
@@ -878,16 +994,29 @@ function initialise_plot_filters(result,source)
 		let cla_red = [];
 		for(let cl = 0; cl < sp.ncla; cl++){
 			let claa = sp.cla[cl];
-			cla_red[cl] = { name:claa.name};
+			
+			cla_red[cl] = { name:claa.name, index:claa.index};
 			if(claa.ncomp > COMP_FILTER_MAX) cla_red[cl].comp_too_large = true;
 			else{ cla_red[cl].comp = claa.comp; cla_red[cl].ncomp = claa.ncomp;} 
 			
 			if(claa.ntra > TRANS_FILTER_MAX) cla_red[cl].tra_too_large = true;
 			else{ cla_red[cl].tra = claa.tra; cla_red[cl].ntra = claa.ntra;} 
+
+			let list=[];
+			for(let tr = 0; tr < claa.tra.length; tr++){
+				list.push({name: claa.tra[tr].name});
+			}
+			cla_red[cl].sel = {radio:{value:0, param:false}, list:list};
 		}
 		
-		rpf.species[p] = { sel_class:copy(pos_class[0]), pos_class:pos_class, cla:cla_red, ncla:sp.ncla, name:sp.name, type:sp.type, gen_source:[], filter:[]};
+		rpf.species[p] = { sel_class:copy(pos_class[0]), pos_class:pos_class, cla:cla_red, ncla:sp.ncla, name:sp.name, type:sp.type, 	trans_tree:sp.trans_tree, filter:[]};
+		
+		switch(rpf.siminf){
+		case "sim": rpf.species[p].gen_source=[]; break;
+		case "inf": rpf.species[p].ppc_source=[]; break;
+		}
 	}
+	*/
 	
 	// Possibilities for sample
 	let pos_sample = [];
@@ -1004,6 +1133,25 @@ function initialise_plot_filters(result,source)
 	rpf.sel_view = copy(pos_view[0]);
 	rpf.pos_view = pos_view;
 	
+	// Possibilities for viewing disgnostics
+	let pos_diag_view = [];
+	pos_diag_view.push({te:"Trans. (exp.)"});	
+	
+	pos_diag_view.push({te:"Trans. (dist.)"});	
+	
+	pos_diag_view.push({te:"Trans. (bias)"});
+	pos_diag_view.push({te:"Trans. (p-val.)"});
+	if(result.prop_diag_on) pos_diag_view.push({te:"Proposals"});
+	rpf.pos_diag_view = pos_diag_view;
+	rpf.sel_diag_view = copy(pos_diag_view[0]);
+
+	let pos_bias_view = [];
+	pos_bias_view.push({te:"Histogram"});	
+	//pos_bias_view.push({te:"Compartment"});	
+
+	rpf.pos_bias_view = pos_bias_view;
+	rpf.sel_bias_view = copy(pos_bias_view[0]);
+
 	// Possibilities for viewing individual 
 	
 	let pos_ind_sel_view=[];
@@ -1108,12 +1256,13 @@ function get_par_pos_view(par,so)
 		}
 		
 		let title = "Time variation in "+name;
-		
+	
 		switch(par.dep.length){
 		case 2:
 			{
 				let index = remove_prime(par.dep[0]);
 				let pcl = find_p_cl_index(so,index);
+				
 				if(pcl != undefined){
 					pos_view.push({te:"Compartment", title:title, type:"Timevary", p:pcl.p, cl:pcl.cl});
 					pos_view.push({te:"Density", title:title, type:"Timevary", p:pcl.p, cl:pcl.cl});
@@ -1220,6 +1369,7 @@ function change_remove_filter(pos)
 /// Gets a list of all possible parameter views
 function get_pos_paramview(result)
 {
+	/*
 	// Determines which parameters to output
 	for(let th = 0; th < result.param.length; th++){
 		let par = result.param[th];
@@ -1230,6 +1380,7 @@ function get_pos_paramview(result)
 			if(N > result.details.param_output_max) par.output = false;
 		}
 	}	
+	*/
 	
 	let total_param_list = [];
 	
@@ -1243,7 +1394,7 @@ function get_pos_paramview(result)
 
 			if(par.output == true && par.dep.length == 0 && par.selop == undefined){
 				list.push({th:th, index:[], name:param_name_index(par,[])});
-				if(par.kind != "const"){
+				if(par.variety != "const"){
 					total_param_list.push({th:th, index:[], name:param_name_index(par,[])});
 				}
 			}
@@ -1258,10 +1409,12 @@ function get_pos_paramview(result)
 	
 	for(let th = 0; th < result.param.length; th++){
 		let par = result.param[th];
-		if(par.dep.length > 0 && par.type != "param factor"){
+	
+		if(par.dep.length > 0 && par.type != "param factor" && !par.dist_mat){
 			let list = [];
 			let list_split = [];
 			let para = true;
+		
 			if(par.output == true){
 				for(let j = 0; j < par.comb_list.length; j++){	
 					let ind = par.comb_list[j].index;
@@ -1277,7 +1430,7 @@ function get_pos_paramview(result)
 						}
 					}
 					
-					if(par.kind != "const" && par.type != "derive_param"){
+					if(par.variety != "const"){
 						total_param_list.push({th:th, index:ind, name:param_name_index(par,ind)});
 					}
 				}
@@ -1484,12 +1637,17 @@ function filter_bubble(bu,cont)
 	let rpf2 = rpf.species[p];
 	let cl = rpf2.sel_class.cl;
 	
-	for(let i = 0; i < rpf2.filter.length; i++) filt[rpf2.filter[i].cl] = "not";
-	
+	for(let i = 0; i < rpf2.filter.length; i++){
+		if(apply_filter(rpf2,i,subsubtab_name())){
+			filt[rpf2.filter[i].cl] = "not";
+		}
+	}
+		
 	let sp = rpf.species[p];
 	
 	let pos=[];
 	for(let cl2 = 0; cl2 < sp.ncla; cl2++){
+		
 		if(filt[cl2] != "not") pos.push({te:sp.cla[cl2].name, cl:cl2});	
 	}
 	
@@ -1542,7 +1700,10 @@ function add_pop_filter(rpf,cl)
 		tra_name.push(claa.tra[j].name);
 	}
 	
-	let filter = {name:sp.cla[cl].name, p:p, cl:cl, fraction:{check:false, update_fraction:true, p:p, cl:cl}, all_check:{check:true}, radio_sel:{value:comp_name[0], noupdate:true}, comp_name:comp_name, comp_filt:comp_filt, tra_filt:tra_filt, tra_name:tra_name, single:{}, radio:{value:"select", noupdate:true}};
+	let type = "pop_filt";
+	if(subsubtab_name() == "Transitions" && sp.sel_class.cl == cl) type = "trans_filt";
+
+	let filter = {type:type, name:sp.cla[cl].name, p:p, cl:cl, fraction:{check:false, update_fraction:true, p:p, cl:cl}, all_check:{check:true}, radio_sel:{value:comp_name[0], noupdate:true}, comp_name:comp_name, comp_filt:comp_filt, tra_filt:tra_filt, tra_name:tra_name, single:{}, radio:{value:"select", noupdate:true}};
 	
 	rpf2.filter.push(filter);
 
@@ -1650,7 +1811,7 @@ function filterpos_scrollable(lay)
 			cy = add_checkbox_list(lay,claa.comp,"name",filt.comp_filt,cy,dx); 
 			break;
 
-		case "Transitions": 
+		case "Transitions": case "Diagnostics":
 			cy = add_checkbox_list(lay,claa.tra,"name",filt.tra_filt,cy,dx); 
 			break;
 		default: error("tree op not recognised"); break;

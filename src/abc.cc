@@ -24,10 +24,11 @@ void ABC::run()
 {
 	vector <Particle> particle;
 	
+	percentage_start(RUN_PER);
+	
 	auto smax = model.details.num_per_core;
 	for(auto s = 0u; s < smax; s++){
-		output.percentage(s,smax);
-		progress(s,nsample/acc_frac);
+		percentage(s,smax);
 		
 		auto param_val = model.param_sample();
 		auto initc_val = model.initc_sample(param_val);
@@ -36,7 +37,6 @@ void ABC::run()
 	
 		particle.push_back(state.generate_particle(UNSET,0,true));
 	}
-	output.percentage(smax,smax);
 	
 	vector <double> obs_prob;                                // Calculates the cut-off
 	for(auto &part : particle){
@@ -55,11 +55,13 @@ void ABC::run()
 	mpi.bcast(cutoff);
 #endif
 
-	for(auto &part : particle){
+	for(const auto &part : particle){
 		if(part.like.obs >= cutoff){
 			output.param_sample(part);
 			output.state_sample(part);
 		}
 	}
+	
+	percentage_end();
 }
 	

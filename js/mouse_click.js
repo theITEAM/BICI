@@ -69,6 +69,8 @@ function button_action(bu,action_type)
 	if(ac != "Dropdown") close_dropdown();
 
 	//turn_off_cursor();
+
+	update_edit_source(bu);
 	
 	pr(ac+" ac");
 
@@ -374,19 +376,20 @@ function button_action(bu,action_type)
 			
 			let te = inter.rename_compartment;
 			let bu = inter.bubble.bu;
-			let co = model.species[bu.p].cla[bu.cl].comp[bu.i];
+			let claa = model.species[bu.p].cla[bu.cl];
+			let co = claa.comp[bu.i];
 		
 			
 			if(co.choose_branch == true){
 				co.markov_branch = inter.bubble.checkbox.check;
 				model.determine_branching();
-				model.update_pline(bu.p,bu.cl);
+				model.update_pline(claa);
 			}
 			
 			if(co.branch == true){
 				co.all_branches = inter.bubble.checkbox2.check;
 				model.determine_branching();
-				model.update_pline(bu.p,bu.cl);
+				model.update_pline(claa);
 			}
 			
 			if(co.name == te) close_bubble();
@@ -418,7 +421,7 @@ function button_action(bu,action_type)
 		}
 		break;
 		
-	case "ClassificationBack":
+	case "ClassificationBack": case "ClassGraphBack":
 		if(double_click == true) zoom_double_click(bu.p,bu.cl);
 		break;
 		
@@ -521,7 +524,7 @@ function button_action(bu,action_type)
 			let p = pag.sub[pag.index].index;
 		
 			let bub = inter.bubble;
-			
+		
 			start_worker("Add Cla",{p:p, name:bub.classification_name, index:bub.drop.te, op:{coord:bub.radio.value, default_map:bub.checkbox.check}});
 		}
 		break;
@@ -649,11 +652,12 @@ function button_action(bu,action_type)
 		
 	case "ChangeTransValue":
 		if(bubble_check_error() == false){	
-			model.species[bu.op.p].cla[bu.op.cl].tra[bu.op.i].type = inter.bubble.trans_type.te;
+			let claa = model.species[bu.op.p].cla[bu.op.cl];
+			claa.tra[bu.op.i].type = inter.bubble.trans_type.te;
 			update_param();
 			copy_back_to_source();
 			model.determine_branching();
-			model.update_pline(bu.op.p,bu.op.cl);    
+			model.update_pline(claa);    
 			close_bubble();
 		}
 		break;
@@ -814,6 +818,7 @@ function button_action(bu,action_type)
 		break;
 
 	case "CancelEditSource":
+		inter.edit_source = false;
 		close_bubble();
 		close_data_source();
 		break;
@@ -863,6 +868,7 @@ function button_action(bu,action_type)
 		break;
 	
 	case "AddDataSource":
+		inter.edit_source = false;
 		start_worker("Data Source",{type:"Add", edit_source:edit_source});
 		break;
 		
@@ -871,8 +877,8 @@ function button_action(bu,action_type)
 		break;
 		
 	case "EditSource":
+		inter.edit_source = true;
 		scroll_to_top();
-	
 		start_worker("Data Source",{type:"Edit", info:bu.info});
 		break;
 		
@@ -886,7 +892,7 @@ function button_action(bu,action_type)
 			switch(bu.info.siminf){
 			case "sim": edit_source = sp.sim_source[info.i]; break;
 			case "inf": edit_source = sp.inf_source[info.i]; break;
-			case "ppc": edit_source = sp.ppc_source[info.i]; break;
+			case "ppc": edit_source = model.inf_res.plot_filter.species[p].ppc_source[info.i]; break;
 			case "gen": edit_source = model.sim_res.plot_filter.species[p].gen_source[info.i]; break;
 			}
 			edit_source.info_store = info;
@@ -896,6 +902,7 @@ function button_action(bu,action_type)
 		break;
 		
 	case "PlaceSourceBack":
+		inter.edit_source = false;
 		start_worker("Data Source",{type:"Replace", edit_source:edit_source, info:edit_source.info_store});
 		break;
 		
@@ -988,7 +995,8 @@ function button_action(bu,action_type)
 		select_bubble_over();
 		break;
 	
-	case "EditParamElement": 
+	case "EditParamElement":  
+		inter.edit_source = true;
 		select_bubble_over();
 		break;
 	
@@ -1349,6 +1357,7 @@ function button_action(bu,action_type)
 		break;
 	
 	case "CancelEditParam":
+		inter.edit_source = false;
 		close_bubble();
 		close_param_source();
 		break;
@@ -1366,8 +1375,16 @@ function button_action(bu,action_type)
 	case "EditParamDone":
 		if(edit_param_check_error() == false){
 			let ep = inter.edit_param;
-			
 			start_worker("Set Param",{i:ep.i, value:ep.value});
+		}
+		break;
+		
+	case "EditWeightDone":
+		if(edit_param_check_error() == false){
+			inter.edit_source = false;
+			let ep = inter.edit_param;
+			
+			start_worker("Set Weight",{i:ep.i, value:ep.value});
 			
 			close_bubble();
 			close_param_source();
@@ -1385,8 +1402,6 @@ function button_action(bu,action_type)
 		if(edit_param_check_error() == false){
 			let ep = inter.edit_param;
 			start_worker("Set Reparam",{i:ep.i, value:ep.value});
-			close_bubble();
-			close_param_source();
 		}
 		break;
 		
@@ -1445,6 +1460,13 @@ function button_action(bu,action_type)
 		}
 		break;
 		
+	case "AddFactorParam":
+		{
+			model.param[bu.i].factor = true;
+			close_bubble();
+		}
+		break;
+		
 	case "AddReparamParam":
 		{
 			let par = model.param[bu.i];
@@ -1490,6 +1512,10 @@ function button_action(bu,action_type)
 		inter.help = {title: "Delete constant", te: "Are you sure you want to delete this constant definition?", i:bu.i, ok:"DeleteParamDistConfirm"};
 		break;
 		
+	case "DeleteParamFactor":
+		inter.help = {title: "Delete factor", te: "Are you sure you want to stop this parameter from becoming a factor", i:bu.i, ok:"DeleteParamFactorConfirm"};
+		break;
+		
 	case "DeleteParamMult":
 		inter.help = {title: "Delete multiplier", te: "Are you sure you want to delete this parameter multiplier?", i:bu.i, ok:"DeleteParamMultConfirm"};
 		break;
@@ -1506,6 +1532,14 @@ function button_action(bu,action_type)
 		{
 			let he = inter.help;
 			start_worker("DeleteParamDist",{ i:he.i});
+			close_help();
+		}
+		break;
+		
+	case "DeleteParamFactorConfirm":
+		{
+			let he = inter.help;
+			start_worker("DeleteParamFactor",{ i:he.i});
 			close_help();
 		}
 		break;
@@ -1528,6 +1562,10 @@ function button_action(bu,action_type)
 		}
 		break;
 		
+	case "SetFactor":
+		select_bubble_over();
+		break;
+			
 	case "AddDerived":
 		if(bubble_check_error() == false){
 			copy_back_to_source();
@@ -1566,6 +1604,14 @@ function button_action(bu,action_type)
 		
 	case "EditSimValue":
 		edit_sim_value(bu.i,inter.layer[inter.over.layer].name,inter.over.i,bu.source);
+		break;
+		
+	case "EditWeightValue":
+		{
+			let th = bu.i;
+			let par = bu.source.param[th];
+			start_worker("Edit Weight",{type:"Value", source:bu.source, label_info:par.label_info, i:th});
+		}
 		break;
 		
 	case "EditPriorSplitValue":
@@ -1699,29 +1745,37 @@ function button_action(bu,action_type)
 		
 			let de = model.ppc_details;
 			
+			let ill = false;
 			if(Number(de.ppc_t_start) >= Number(de.ppc_t_end)){
-				alertp("The start time must be before the end time.");
+				alertp("The start time '"+de.ppc_t_start+"' must be before the end time '"+de.ppc_t_end+"'.");
+				ill = true;
 			}
-			else{
-				if(Number(de.ppc_t_start) < Number(de.t_start)){
-					alertp("The start time cannot be before the inference start time");
-				}
-				else{
-					if(Number(de.ppc_t_start) > Number(de.inf_t_end)){
-						alertp("The start time cannot be after the inference end time");
-					}
-					else{
-						if(check_time_error() == false){	
-							switch(model.ppc_details.run_local.value){
-							case "Yes":
-								start_worker("StartPPC",{save_type:"ppc", map_store:map_store, ver:ver});
-								break;
-								
-							case "No":
-								run_cluster();
-								break;
-							}
-						}
+			
+			if(Number(de.ppc_t_start) < Number(de.t_start)){
+				alertp("The start time '"+de.ppc_t_start+"' cannot be before the inference start time '"+de.t_start+"'");
+				ill = true;
+			}
+			
+			if(Number(de.ppc_t_start) > Number(de.inf_t_end)){
+				alertp("The start time '"+de.ppc_t_start+"' cannot be after the inference end time '"+de.inf_t_end+"'");
+				ill = true;	
+			}
+			
+			if(Number(de.ppc_t_end) < Number(de.inf_t_end)){
+				alertp("The end time '"+de.ppc_t_end+"' cannot be before the inference end time '"+de.inf_t_end+"'");
+				ill = true;	
+			}
+				
+			if(ill == false){
+				if(check_time_error() == false){	
+					switch(model.ppc_details.run_local.value){
+					case "Yes":
+						start_worker("StartPPC",{save_type:"ppc", map_store:map_store, ver:ver});
+						break;
+						
+					case "No":
+						run_cluster();
+						break;
 					}
 				}
 			}
@@ -2255,6 +2309,14 @@ function button_action(bu,action_type)
 		
 	case "OutputParams":
 		start_worker("Output Params",{name:tab_name()});	
+		break;
+		
+	case "GridIcon":
+		{
+			let cam = model.species[bu.p].cla[bu.cl].camera;
+			if(cam.grid == "off") cam.grid = "on"; 
+			else cam.grid = "off"; 
+		}
 		break;
 		
 	default:

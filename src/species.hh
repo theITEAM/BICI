@@ -64,6 +64,8 @@ class Species   	                         // Stores details of a species
 	
 		bool contains_source;                  // Set to true if a source transition exists
 		
+		bool contains_sink;                    // Set to true if a sink transition exists
+		
 		vector <unsigned int> cgl_tr_source;   // Gives the transition entering  
 		
 		vector <unsigned int> cgl_tr_sink;     // Gives the transition leaving 
@@ -178,6 +180,7 @@ class Species   	                         // Stores details of a species
 		void set_ob_trans_ev(const vector <Equation> &eqn);
 
  	private:
+		void set_ind_tmin_tmax();
 		void init_pop_data(const DataSource &so);
 		vector < vector <double> > pop_get_percentage(const DataSource &so);
 		void add_pop_data(const DataSource &so, int sign);

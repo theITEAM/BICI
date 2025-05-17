@@ -274,7 +274,7 @@ function add_help_content_buts(lay)
 				
 				let text_anno = text_convert_annotation(script[j].te,para_si,para_lh,LARGE,undefined,BLACK);
 			
-				lay.add_button({text_anno:text_anno, x:cx+tab, y:cy, dx:text_anno.wmax, dy:para_lh, back_col:back_col, type:"Script Line"}); 
+				lay.add_button({text_anno:text_anno, x:cx+tab, y:cy, dx:text_anno.wmax+0.6, dy:para_lh, back_col:back_col, type:"Script Line"}); 
 			
 				cy += para_lh;
 			}

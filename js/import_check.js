@@ -4,8 +4,8 @@
 /// imports an equation value
 function import_eqn_value(eqn,te,op)
 {
-	te = te.replace(/\*/g,"×");
-	
+	te = char_replace(te);
+ 
 	eqn.te = te;
 	extract_equation_properties(eqn);
 	if(eqn.warn.length > 0){
@@ -16,16 +16,15 @@ function import_eqn_value(eqn,te,op)
 
 /// Check for initial pop
 function check_initial_pop_error(end)
-{
+{ 
 	for(let p = 0; p < model.species.length; p++){
-		let sp = model.species[p];
+		for(let loop = 0; loop < 2; loop++){
+			let sp = model.species[p];
 		
-		for(let loop = 0; loop < 3; loop++){
 			let source, type;
 			switch(loop){
 			case 0: source = sp.sim_source; type = "sim"; break;
 			case 1: source = sp.inf_source; type = "inf"; break;
-			case 2: source = sp.ppc_source; type = "ppc"; break;
 			}
 			
 			let ninitpop = 0;
@@ -87,7 +86,7 @@ function check_param_complete()
 	for(let th = 0; th < model.param.length; th++){
 		let par = model.param[th];
 		if(flag[th] != true && !is_in_obsmodel(par) && par.type != "derive_param"){
-			if(par.name != dist_matrix_name){
+			if(!par.dist_mat){
 				alert_noline("Parameter "+par.full_name+" is not specified as a 'param'");
 			}
 		}

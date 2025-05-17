@@ -34,7 +34,6 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 				val = 0;
 			}
 			else{
-				cout << val << " val\n";
 				emsg("Rate has become negative");
 			}
 		}
@@ -1172,6 +1171,33 @@ double StateSpecies::nm_trans_incomp_like_no_log(TransType type, double dt, cons
 }
 
 
+/// Gets the likelihood for a transition (with no log)
+MeanSD StateSpecies::get_mean_sd(TransType type, const vector <double> &ref_val) const 
+{		
+	MeanSD msd;
+	
+	switch(type){
+	case EXP_RATE: emsg("Should not be in NM"); break;
+	case EXP_RATE_NM:	msd.mean = 1.0/ref_val[0]; msd.sd = sqrt(msd.mean); break; 
+	case LOG_NORMAL: case GAMMA: msd.mean = ref_val[0]; msd.sd = ref_val[1]*msd.mean; break;
+	case ERLANG: msd.mean = ref_val[0]; msd.sd = sqrt(1.0/ref_val[1])*msd.mean; break;
+	case PERIOD: msd.mean = ref_val[0]; msd.sd = TINY; break;
+	case WEIBULL:
+		{
+			auto lam = ref_val[0];
+			auto k = ref_val[1];
+			auto gam1 = tgamma(1+(1/k));
+			auto gam2 = tgamma(1+(2/k));
+			msd.mean = lam*gam1; 
+			msd.sd = lam*sqrt(gam2-gam1*gam1);
+		}
+		break;	
+	}
+	
+	return msd;
+}
+
+
 /// Works out how nm_trans likelihood changes as a result of ie changing
 vector <NMupdate> StateSpecies::likelihood_ie_nm_trans_change(unsigned int i, unsigned int ie, double factor, const vector < vector <double> > &popnum_t, double &like_ch)
 {
@@ -1677,7 +1703,7 @@ void StateSpecies::print_incomp_val(string te, NMIncompVal value) const
 /// Gets the values for the incomplete nm trans with individual effect changed by a factor
 NMIncompVal StateSpecies::get_nm_incomp_val_ie_factor(unsigned int ie, double factor, const NMTransIncomp &nmti, unsigned int ti, const Individual &ind, const vector < vector <double> > &popnum_t) const
 {
-	const auto & nmtrans_ref = nmti.nmtrans_ref;
+	const auto &nmtrans_ref = nmti.nmtrans_ref;
 	 
 	NMIncompVal value;
 	auto &ref_val = value.ref_val;
@@ -1763,3 +1789,374 @@ double StateSpecies::nm_single_obs_dprob(unsigned int cl, const Individual &ind)
 	
 	return dprob;
 }
+
+
+/// Used to sum up probability of an event
+double StateSpecies::sum_markov_prob(double t1, double t2, unsigned int c, unsigned int tr_gl, unsigned int i, vector < vector <double> > &en) const
+{
+	if(c == UNSET) emsg("unset");
+	
+	auto tr_gl_cor = sp.tra_gl[tr_gl].transform[c];
+	
+	const auto &tra_cor = sp.tra_gl[tr_gl_cor];
+	
+	auto &entr = en[tr_gl_cor];
+	
+	if(tra_cor.type != EXP_RATE) emsg("Should be exp_rate");
+	
+	auto e = tra_cor.markov_eqn_ref;
+	
+	const auto &me = sp.markov_eqn[e];
+	const auto &mev = markov_eqn_vari[e];
+	
+	auto sum = 0.0;
+
+	auto ti1 = get_ti(t1);
+	auto ti2 = get_ti(t2);
+	if(ti2 == entr.size()) ti2--;
+	
+	auto dt = details.dt;
+	auto t_start = details.t_start;
+	
+	auto fac = 1.0;
+	if(me.ind_variation){
+		const auto &ind = individual[i];
+		for(auto ie : me.ind_eff_mult) fac *= ind.exp_ie[ie];
+		for(auto fe : me.fix_eff_mult) fac *= ind.exp_fe[fe];
+	}
+	
+	for(auto ti = ti1; ti <= ti2; ti++){
+		auto dtt = dt;
+		if(ti == ti1) dtt = t_start+(ti+1)*dt - t1;
+		else{
+			if(ti == ti2) dtt = t2 - (t_start+ti*dt);
+		}
+
+		auto tii = ti; if(!mev.time_vari) tii = 0;
+		auto val = fac*mev.div[tii].value*dtt;
+		if(ti >= entr.size()) emsg("Prob");
+
+		entr[ti] += val;
+		sum -= val;
+	}
+ 
+	return sum;
+}
+
+
+/// Calculates the estimated and actual number of transitions in each division for each global transition
+void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <double> > &popnum_t) const
+{
+	auto T = timepoint.size()-1;
+		
+	auto &cpd = ps.cum_prob_dist;
+	auto &en = ps.exp_num;
+	auto t_end = details.t_end;
+	auto dt = details.dt;
+	
+	cpd.resize(sp.tra_gl.size());
+	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++) cpd[tr].resize(H_BIN,0);
+	
+	switch(type){
+	case POPULATION:
+		en = tnum_mean_st;
+		
+		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+			auto &tn = trans_num[tr];
+			auto &tnm = tnum_mean_st[tr];
+			for(auto ti = 0u; ti < T; ti++){
+				auto n = tn[ti];
+				auto lam = tnm[ti];
+				auto pr = 1-(ran()*exp(poisson_probability(n,lam)) + poisson_upper_probability_no_log(n,lam));
+				
+				auto b = (unsigned int)(ALMOST_ONE*pr*H_BIN);
+				if(b >= H_BIN) emsg("hbin range4");
+							
+				cpd[tr][b]++;
+			}
+		}
+		break;
+		
+	case INDIVIDUAL:
+		{
+			en.resize(sp.tra_gl.size());
+			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+				en[tr].resize(T,0);
+			}
+			
+			auto ncla = sp.ncla;
+
+			// Accounts for sources
+			for(auto m = 0u; m < sp.markov_eqn.size(); m++){
+				const auto &me = sp.markov_eqn[m];
+				if(me.source){
+					for(auto ti = 0u; ti < T; ti++){
+						const auto &mev = markov_eqn_vari[m];
+						auto tii = ti; if(mev.time_vari == false) tii = 0;
+						auto val = mev.div[tii].value*dt;
+						for(auto tr : me.source_tr_gl){
+							en[tr][ti] += val;
+						}
+					}
+				}
+			}
+
+			for(auto i = 0u; i < individual.size(); i++){
+				vector <unsigned int> origin(ncla,0);
+				
+				vector <double> cum_pr;
+				
+				const auto &ind = individual[i];
+				
+				const auto &eve = ind.ev;
+				for(auto e = 0u; e < eve.size(); e++){
+					const auto &ev = eve[e];
+					
+					switch(ev.type){
+					case NM_TRANS_EV:
+						{
+							auto cl = ev.cl;
+							auto tr_gl = ev.tr_gl;
+							if(ev.e_origin != origin[cl]) emsg("e_origin wrong");
+						
+							const auto &ev_or = eve[ev.e_origin];
+							auto tr_gl_cor = sp.tra_gl[tr_gl].transform[ev_or.c_after];
+							
+							add_nm_prob(tr_gl_cor,ev_or.t,ps,popnum_t,ind);
+							add_nm_cpd(tr_gl_cor,ev_or.t,ev.t,ps,popnum_t,ind);
+							
+							origin[cl] = e;
+						}
+						break;
+						
+					case M_TRANS_EV:
+						{
+							auto cl = ev.cl;
+							auto tr_gl = ev.tr_gl;
+							
+							auto sum = 0.0;
+							for(auto ee = origin[cl]; ee < e; ee++){
+								sum += sum_markov_prob(eve[ee].t,eve[ee+1].t,eve[ee].c_after,tr_gl,i,en);
+							}
+							
+							auto pr = exp(sum);
+							auto b = (unsigned int)(ALMOST_ONE*pr*H_BIN);
+							if(b >= H_BIN) emsg("hbin range2");
+							
+							cpd[tr_gl][b]++;
+							
+							origin[cl] = e;
+						}
+						break;
+			
+					default: break;
+					}
+				}
+				
+				if(eve.size() > 0){
+					// Works out when there is no event
+					for(auto cl = 0u; cl < ncla; cl++){
+						auto e_st = origin[cl];
+						const auto &ev_or = eve[e_st];
+						auto c = ev_or.c_after;
+						if(c != UNSET){
+							const auto &cgl = sp.comp_gl[c];
+							
+							const CompGlTransGroup &tlg = cgl.tra_leave_group[cl];
+							if(tlg.markov){
+								for(auto tr_gl : tlg.tr_list){
+									auto sum = 0.0;
+									for(auto ee = e_st; ee < eve.size(); ee++){
+										double tnext;
+										if(ee < eve.size()-1) tnext = eve[ee+1].t;
+										else tnext = t_end;
+										
+										sum += sum_markov_prob(eve[ee].t,tnext,eve[ee].c_after,tr_gl,i,en);
+									}
+									
+									auto pr = ran()*exp(sum);
+									auto b = (unsigned int)(ALMOST_ONE*pr*H_BIN);
+									if(b >= H_BIN) emsg("hbin range3");
+									
+									cpd[tr_gl][b]++;
+								}
+							}	
+							else{
+								const auto &tr_list = tlg.tr_list;
+								
+								auto B = tr_list.size();
+								auto t1 = ev_or.t;
+								
+								if(B == 1){
+									add_nm_prob(tlg.tr_list[0],t1,ps,popnum_t,ind);
+									add_nm_cpd(tlg.tr_list[0],t1,UNSET,ps,popnum_t,ind);
+								}
+								else{
+									auto ti = get_ti(t1);
+			
+									auto sum = 0.0;
+									vector <double> sum_store;
+									
+									auto sum2 = 0.0;
+									vector <double> sum_store2;
+									
+									vector <double> pr_st(B);
+									
+									for(auto b = 0u; b < B; b++){
+										const auto &tra = sp.tra_gl[tr_list[b]];
+			
+									
+										auto m = tra.nm_trans_ref;
+										const auto &nmt = sp.nm_trans[m];
+										const auto &ref = nmt.dist_param_eq_ref;
+
+										vector <double> ref_val(ref.size());
+										for(auto i = 0u; i < ref.size(); i++){
+											ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+										}
+			
+										auto bp = eqn[tra.bp.eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+										pr_st[b] = nm_trans_incomp_like_no_log(nmt.type,t_end-t1,ref_val);
+											
+										sum += bp;
+										sum_store.push_back(sum);
+										
+										sum2 += bp*pr_st[b];
+										sum_store2.push_back(sum2);
+									}
+				
+									// For future predition of transions rate the branch is randomly selected 
+									{
+										auto z = sum*ran();
+										auto k = 0u; while(k < B && z > sum_store[k]) k++;
+										if(k == B) emsg("Should not be B");	
+										add_nm_prob(tlg.tr_list[k],t1,ps,popnum_t,ind);								
+									}
+									
+									// For updating cumulative probability distribution, the branch must be 
+									// selected according to bp multiplied probability of being branch
+									{
+										auto z = sum2*ran();
+										auto k = 0u; while(k < B && z > sum_store2[k]) k++;
+										if(k == B) emsg("Should not be B");		
+										
+										auto pr = ran()*pr_st[k];
+										auto b = (unsigned int)(ALMOST_ONE*pr*H_BIN);
+										if(b >= H_BIN) emsg("hbin range1");
+			
+										cpd[tlg.tr_list[k]][b]++;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		break;
+	}
+}
+
+
+/// Adds probabilities for a non-Markovian transition
+void StateSpecies::add_nm_prob(unsigned tr_gl_or, double t1, ParticleSpecies &ps, const vector < vector <double> > &popnum_t, const Individual &ind) const
+{						
+	auto &en = ps.exp_num;
+	auto t_end = details.t_end;
+	
+	auto m = sp.tra_gl[tr_gl_or].nm_trans_ref;
+	const auto &nmt = sp.nm_trans[m];
+	const auto &ref = nmt.dist_param_eq_ref;
+
+	auto ti = get_ti(t1);
+	
+	vector <double> ref_val(ref.size());
+	for(auto i = 0u; i < ref.size(); i++){
+		ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+	}
+
+	if(nmt.type == PERIOD){
+		auto t = t1 + ref_val[0];
+		if(t < t_end){
+			auto tii = get_ti(t);
+			en[tr_gl_or][tii] += 1;
+		}
+		return;
+	}
+
+	auto msd = get_mean_sd(nmt.type,ref_val);
+	auto tmin = t1 + msd.mean - 3*msd.sd; 
+	if(tmin < t1) tmin = t1;
+	if(tmin > t_end) tmin = t_end;
+	auto tmax = t1 + msd.mean + 4*msd.sd;
+	if(tmax > t_end) tmax = t_end;
+	//tmin = t1; tmax = t_end;
+	auto ti_min = get_ti(tmin);
+	auto ti_max = get_ti(tmax);
+	if(ti_min < ti+1) ti_min = ti+1;
+	if(ti_max > T) ti_max = T;
+
+	auto step = (unsigned int)(ti_max-ti_min)/20;
+	if(step == 0) step = 1;
+	//step = 1;
+	
+	// Does the first fraction of a division
+	auto prob = 1.0;
+	auto tot = 0.0;
+	bool first = true;
+	while(ti < ti_max){
+		unsigned int tii;
+		
+		if(first){ tii = ti+1; first = false;}
+		else{
+			if(ti < ti_min) tii = ti_min;
+			else{
+				tii = ti + step; if(tii > ti_max) tii = ti_max;
+			}
+		}
+		
+		auto pr = nm_trans_incomp_like_no_log(nmt.type,timepoint[tii]-t1,ref_val);
+		auto num = (prob-pr)/(tii-ti);
+	
+		while(ti < tii){
+			tot += num;
+			en[tr_gl_or][ti] += num;
+			ti++;
+		}
+		
+		prob = pr;
+	}
+}
+
+
+/// Adds to cumulative probability distribution
+void StateSpecies::add_nm_cpd(unsigned tr_gl_or, double t1, double t2, ParticleSpecies &ps, const vector < vector <double> > &popnum_t, const Individual &ind) const
+{	
+	auto &cpd = ps.cum_prob_dist;
+	auto t_end = details.t_end;
+	
+	auto m = sp.tra_gl[tr_gl_or].nm_trans_ref;
+	const auto &nmt = sp.nm_trans[m];
+	const auto &ref = nmt.dist_param_eq_ref;
+
+	auto ti = get_ti(t1);
+
+	vector <double> ref_val(ref.size());
+	for(auto i = 0u; i < ref.size(); i++){
+		ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+	}
+	
+	double pr;
+	if(t2 != UNSET){
+		pr = nm_trans_incomp_like_no_log(nmt.type,t2-t1,ref_val);
+	}
+	else{
+		pr = ran()*nm_trans_incomp_like_no_log(nmt.type,t_end-t1,ref_val);
+	}
+	
+	auto b = (unsigned int)(ALMOST_ONE*pr*H_BIN);
+	if(b >= H_BIN) emsg("hbin range1");
+	
+	cpd[tr_gl_or][b]++;
+}
+

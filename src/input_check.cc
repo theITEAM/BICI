@@ -84,11 +84,28 @@ void Input::data_source_check_error(const DataSource &ds)
 			for(auto r = 0u; r < tab.nrow; r++){
 				auto result = check_element(ds,r,c);
 				if(result != ""){
-					alert_import("In data file '"+tab.file+"' (col '"+tab.heading[c]+"', row "+tstr(r+2)+") the following error is found: "+result);
+					string te = in_file_text(tab.file);
+					te += " the element '"+tab.ele[r][c]+"' (col '"+tab.heading[c]+"', row "+tstr(r+2)+") has the following error: "+result;
+					alert_import(te);
 					return;
 				}
 			}
 		}
+	}
+	
+	switch(ds.cname){
+	case POP_TRANS_DATA:
+		for(auto r = 0u; r < tab.nrow; r++){
+			auto sta_str = tab.ele[r][0], end_str = tab.ele[r][1];
+			auto sta = number(sta_str), end = number(end_str);
+			if(sta >= end){
+				alert_import(in_file_text(tab.file)+" on row "+tstr(r+2)+", the start time '"+sta_str+"' must be less than the end time '"+end_str+"'.");
+				return;
+			}
+		}
+		break;
+		
+	default: break;
 	}
 }
 
@@ -104,7 +121,7 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 	case FLOAT_EL:
 		{
 			auto num = number(te);
-			if(num == UNSET) return "Must be a number";
+			if(num == UNSET) return "The value '"+te+"' must be a number";
 		}
 		break;
 		
@@ -112,7 +129,7 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 		{
 			if(te != "start" && te != "end" && te != "no"){
 				auto num = number(te);
-				if(num == UNSET) return "Must be a number";
+				if(num == UNSET) return "The value '"+te+"' must be a number";
 				
 				switch(ds.cname){
 				case TRANS_DATA:	
@@ -141,33 +158,33 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 	case POS_FLOAT_EL:
 		{
 			auto num = number(te);
-			if(num == UNSET) return "Must be a number";
-			if(num <= 0) return "Must be positive";
+			if(num == UNSET) return "The value '"+te+"' must be a number";
+			if(num <= 0) return "The value '"+te+"' must be positive";
 		}
 		break;
 		
 	case ZERO_ONE_EL:
 		{
 			auto num = number(te);
-			if(num == UNSET) return "Must be a number";
-			if(num <= 0 || num >= 1) return "Must be between zero and one";
+			if(num == UNSET) return "The value '"+te+"' must be a number";
+			if(num <= 0 || num >= 1) return "The value '"+te+"' must be between zero and one";
 		}
 		break;
 		
 	case POS_ZERO_FLOAT_EL:
 		{
 			auto num = number(te);
-			if(num == UNSET) return "Must be a number";
-			if(num < 0) return "Must be positive or zero";
+			if(num == UNSET) return "The value '"+te+"' must be a number";
+			if(num < 0) return "The value '"+te+"' must be positive or zero";
 		}
 		break;
 		
 	case POS_INT_EL:
 		{
 			auto num = number(te);
-			if(num == UNSET) return "The Must be a number";
-			if(num != int(num)) return "Must be an integer";	
-			if(num < 0) return "Must be non-negative";
+			if(num == UNSET) return "The value '"+te+"' must be a number";
+			if(num != int(num)) return "The value '"+te+"' must be an integer";	
+			if(num < 0) return "The value '"+te+"' must be non-negative";
 		}
 		break;
 
@@ -178,14 +195,14 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 			}
 			
 			auto num = number(te);
-			if(num == UNSET) return "Must be a number";
-			if(num < 0) return "Must be non-negative";
+			if(num == UNSET) return "The value '"+te+"' must be a number";
+			if(num < 0) return "The value '"+te+"' must be non-negative";
 		}
 		break;
 	
 	case TEXT_EL:
 		if(te == "") return "Element empty";
-		if(includes(trim(te)," ")) return "Should not include a space";
+		if(includes(trim(te)," ")) return "The value '"+te+"' should not include a space";
 		break;
 		
 	case COMP_EL: 
@@ -213,9 +230,9 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 		}
 		break;
 		
-	case COMP_PROB_EL: 
+	case COMP_PROB_EL: case COMP_PROB_NA_EL: 
 		{ // This allows 'S', 'E', 'S|E', 'S:0.4|E:0.6' etc...
-			if(te != missing_str){
+			if(te != missing_str && !(col.type == COMP_PROB_NA_EL && te == not_alive_str)){
 				const auto &claa = model.species[ds.p].cla[col.cl];
 			
 				auto spl = split_with_bracket(te,'|');
@@ -242,7 +259,8 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 							if(spl2[1] == ""){ syntax_error = true; break;}
 							
 							auto valid = check_eqn_valid(spl2[1]);
-							if(valid != SUCCESS) return "Error with equation'"+spl2[1]+"'";
+							if(valid != SUCCESS) return "Error with equation '"+spl2[1]+"'";
+							
 						}
 						
 						if(spl2.size() > 2){ syntax_error = true; break;}
@@ -252,7 +270,7 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 				if(normal_flag == true && colon_flag == true) syntax_error = true;
 
 				if(syntax_error == true){
-					return "There is a syntax error in table element.";
+					return "There is a syntax error in table element with value '"+te+"'.";
 				}
 			}
 		}
@@ -263,7 +281,7 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 			auto pos = ds.obs_model.diag_pos;
 			auto neg = ds.obs_model.diag_neg;
 			if(te != pos && te != neg){
-				return "Value '"+te+"' is neither '"+pos+"' or '"+neg+"'";
+				return "The value '"+te+"' is neither '"+pos+"' or '"+neg+"'";
 			}
 		}
 		break;
@@ -272,7 +290,7 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 		{
 			auto num = number(te);
 			if(num == UNSET){	
-				auto pri = convert_text_to_prior(te,line_num);
+				auto pri = convert_text_to_prior(te,line_num,false);
 				if(pri.error != "") return pri.error;
 			}	
 		}
@@ -284,10 +302,9 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 
 
 /// Determines if an equation is valid
-Result Input::check_eqn_valid(string te) const
+Result Input::check_eqn_valid(string te) const 
 {
 	if(false) cout << te << "Check" << endl;
-	// TO DO EQN CHECK
 	return SUCCESS;
 }
 
@@ -403,5 +420,91 @@ void Input::temp_check(unsigned int num)
 			}
 		}
 	}
+}
+
+
+/// Checks if reparameterised equations involve time
+void Input::check_reparam_time()
+{
+	for(auto th = 0u; th < model.param.size(); th++){
+		auto &par = model.param[th];
+		if(par.variety == REPARAM_PARAM){
+			for(auto k = 0u; k < par.value.size(); k++){
+				const auto &eqi = par.value[k];	
+				const auto &eq = model.eqn[eqi.eq_ref]; 
+				if(eq.time_vari){
+					if(eq.pop_ref.size() > 0){
+						alert_import("The reparamerised parameter '"+par.full_name+"' element '"+eqi.te_raw+"' should not contain populations.");
+					}
+					else{
+						alert_import("The reparamerised parameter '"+par.full_name+"' element '"+eqi.te_raw+"' should not contain contain time variation.");
+					}
+				}
+			}
+		}
+	}
+}
+
+
+/// Checks the name is valid
+bool Input::check_name_input(string name, string te) 
+{
+	if(name.length() > name_ch_max){
+		alert_import(te+" '"+name+"' cannot be more than "+tstr(name_ch_max)+" characters");
+	}
+	
+	vector <string> invalid_name = {"Compartment","Population","Alpha","Distribution","file"};
+	
+	for(auto i = 0u; i < invalid_name.size(); i++){
+		if(toLower(name) == toLower(invalid_name[i])){
+			alert_import(te+" cannot use reserved word '"+name+"'"); 
+		}
+	}
+	
+	for(auto i = 0u; i < name.length(); i++){
+		auto ch = name.substr(i,1);
+		if(includes(name_notallow,ch)){
+			alert_import(te+" '"+name+"' cannot use character '"+ch+"'");
+			return true;
+		}
+		
+		if(str_eq(name,i,sigma)){
+			alert_import(te+" '"+name+"' cannot use character '"+sigma+"'");
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+
+/// Determines if a valid colour 
+bool Input::is_Color(string color) const
+{
+	string allow = "0123456789abcdefABCDEF";
+	color = trim(color);
+	if(color.substr(0,1) == "#"){
+		if(color.length() != 7) return false;
+		for(auto i = 1u; i < 7; i++){
+			auto ch = color.substr(i,1);
+			if(!includes(allow,ch)) return false;
+		}
+	}
+	else{
+		if(color.substr(0,4) != "rgb(") return false;
+		if(color.substr(color.length()-1,1) != ")") return false;
+		
+		auto cont = color.substr(4,color.length()-5);
+		auto spl = split(cont,',');
+		if(spl.size() != 3) return false;
+		for(auto i = 0u; i < 3; i++){
+			auto num = number(spl[i]);
+			if(num == UNSET) return false;
+			if(num != (int)(num)) return false;
+			if(num < 0 || num > 255) return false;
+		}
+	}
+	
+	return true;
 }
 

@@ -15,7 +15,7 @@
 - 'DS' contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
 - 'Group' contains 24 contact groups.
 - A transmission rate $β$ determines the rate at which individuals become infected.
-- Fixed effect parameter $ν^f$ determines the strength of the fixed effect.
+- Fixed effect parameter $μ^f$ determines the strength of the fixed effect.
 
 ## Population
 - Each of the 24 groups consist of 10 individuals, two of which are infected.

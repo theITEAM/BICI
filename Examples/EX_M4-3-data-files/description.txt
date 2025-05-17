@@ -1,8 +1,8 @@
-# Model 4.3: A spatial diffusion model 
+# Model 4.3: A spatial diffusion model
 
 ## Objective
 - Introduce a model in which a landscape is divided into a grid of cells.
-- Individuals move across this landscape by randomly hopping from one grid cell to a neighbouring grid cell. 
+- Individuals move across this landscape by randomly hopping from one grid cell to a neighbouring grid cell.
 
 ## Model
 - A single individual-based species 'Animal' is created.

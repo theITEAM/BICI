@@ -51,11 +51,39 @@ void Species::initialise_data()
 	set_default_enter();
 	
 	set_add_rem_pop_change();
+	
+	set_ind_tmin_tmax();
 }
 
 
+/// Sets the timerange over which measurements are made on individuals
+void Species::set_ind_tmin_tmax()
+{
+	for(auto &ind : individual){
+		auto tmin = LARGE;
+		auto tmax = -LARGE;
+		for(const auto &ev : ind.ev){
+			auto t = ev.t;
+			if(t < tmin) tmin = t;
+			if(t > tmax) tmax = t;
+		}
+			
+		for(const auto &ob : ind.obs){
+			if(!(ob.type == OBS_COMP_EV && ob.not_alive)){
+				auto t = ob.t;
+				if(t < tmin) tmin = t;
+				if(t > tmax) tmax = t;
+			}
+		}
+		 
+		ind.tmin = tmin; ind.tmax = tmax;
+	}
+}
+
+
+
 /// Used to order genetic data
-bool Fraction_ord (Fraction frac1, Fraction frac2)                      
+bool Fraction_ord (const Fraction &frac1, const Fraction &frac2)                      
 { return (frac1.fr > frac2.fr); };  
 
 
@@ -222,7 +250,7 @@ void Species::init_pop_data(const DataSource &so)
 			for(auto c = 0u; c < claa.ncomp; c++){
 				const auto &co = claa.comp[c];
 				if(co.erlang_hidden == true){
-					init_cond.comp_prior[c] = convert_text_to_prior("fix(0)",UNSET);
+					init_cond.comp_prior[c] = convert_text_to_prior("fix(0)",UNSET,false);
 					prior_set[c] = true;
 				}
 			}
@@ -251,7 +279,7 @@ void Species::init_pop_data(const DataSource &so)
 					for(auto c = 0u; c < cla[cl].ncomp; c++){
 						if(cla[cl].comp[c].name == name){
 							if(cl == foc_cl){
-								auto pri = convert_text_to_prior(val,so.line_num);
+								auto pri = convert_text_to_prior(val,so.line_num,false);
 								if(pri.error != "") alert_source(pri.error,so,1,r);
 								else{
 									init_cond.comp_prior[c] = pri;
@@ -683,12 +711,15 @@ void Species::comp_data(const DataSource &so)
 		auto comp = tab.ele[j][2];
 		if(comp != missing_str){
 			auto c_exact = find_c(cl,comp);
-			
+
 			ObsData ob; 
 			ob.so = so.index;
 			ob.type = OBS_COMP_EV;
 			ob.c_exact = c_exact;
+			ob.not_alive = false;
 			if(c_exact == UNSET){
+				if(comp == not_alive_str) ob.not_alive = true;
+				
 				string emsg;
 				auto prob_str = find_comp_prob_str(cl,comp,LOWER_BOUND,emsg);
 				if(emsg != ""){ alert_source(emsg,so,2,j); return;}
@@ -741,6 +772,7 @@ void Species::genetic_data(const DataSource &so)
 			ob.so = so.index;
 			ob.type = OBS_COMP_EV;
 			ob.c_exact = UNSET;
+			ob.not_alive = false;
 			ob.c_obs_prob_eqn = p_eqn;
 			ob.cl = infection_cl;
 			ob.t = t;
@@ -772,6 +804,7 @@ void Species::test_data(const DataSource &so)
 		ob.so = so.index;
 		ob.cl = so.cl;
 		ob.t = t;
+		ob.not_alive = false;
 		ob.time_vari = false;
 		ob.Se_eqn = he(add_equation_info(so.obs_model.Se_str,SE),so);
 		ob.Sp_eqn = he(add_equation_info(so.obs_model.Sp_str,SP),so);
@@ -952,6 +985,7 @@ void Species::trans_data(const DataSource &so)
 		ob.cl = so.cl;
 		ob.t = t;
 		ob.time_vari = false;
+		ob.not_alive = false;
 		
 		ind.obs.push_back(ob);
 	}		
@@ -1224,22 +1258,22 @@ vector <string> Species::trans_global_convert(unsigned int cl, const vector <str
 
 
 /// Used to order events
-bool EventData_ord (EventData ev1, EventData ev2)                      
+bool EventData_ord (const EventData &ev1, const EventData &ev2)                      
 { return (ev1.t < ev2.t); };  
 
 
 /// Used to order observations
-bool ObsData_ord (ObsData ob1, ObsData ob2)                      
+bool ObsData_ord (const ObsData &ob1, const ObsData &ob2)                      
 { return (ob1.t < ob2.t); };  
 
 
 /// Used to order population data times
-bool PopData_ord (PopData pd1, PopData pd2)                      
+bool PopData_ord (const PopData &pd1, const PopData &pd2)                      
 { return (pd1.t < pd2.t); }; 
 
 
 /// Used to order poptrans data times
-bool PopTransData_ord (PopTransData pd1, PopTransData pd2)                      
+bool PopTransData_ord (const PopTransData &pd1, const PopTransData &pd2)                      
 { return (pd1.tmin < pd2.tmin); }; 
 
 
@@ -1351,7 +1385,11 @@ vector <string> Species::find_comp_prob_str(unsigned int cl, string te, BoundTyp
 	for(auto c = 0u; c < fil.size(); c++){
 		fil[c] = "0";
 	}	
-		
+	
+	if(te == not_alive_str){
+		return fil;
+	}
+	
 	if(te == "."){
 		te = "";
 		const auto &claa = cla[cl];

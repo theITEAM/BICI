@@ -7,11 +7,11 @@
 // Run: ./bici 
 
 // Load mpi: module load mpi/openmpi-x86_64
-// mpirun -n 3 ./bici file.bici sim
-// mpirun -n 3 ./bici Execute/init.bici sim
-// mpirun -n 1 ./bici Execute/init.bici inf
+// mpirun -n 1 ./bici-para file.bici sim
+// mpirun -n 1 ./bici-para Execute/init.bici sim
+// mpirun -n 3 ./bici-para Execute/init.bici inf
 
-// ssh cpooley@azog.bioss.ac.uk
+// ssh cpooley@gaia.bioss.ac.uk    azog.bioss.ac.uk
 
 // Different commands
 // -ch=0 / -chain=0                           Runs the zeroth chain
@@ -20,13 +20,14 @@
 
 // When running in parallel then load mpi using: module load mpi/openmpi-x86_64
 
+// Test: valgrind --leak-check=yes -s ./bici-para Execute/init.bici sim
 // Test: valgrind --leak-check=yes -s ./bici-para Execute/init.bici inf
-// Test: valgrind --leak-check=yes -s ./bici-para Execute/FB2.bici inf
 
 // Compiling for windows: .\make.bat from the directory D:\C_complier_BICI2.0\bin
 
 // 45541 lines of code (15/11/24)
-// 51000 lines of code (18/12/25)
+// 51000 lines of code (18/12/24)
+// 56000 lines of code (16/05/25)
 
 #include <iostream>
 #include <sstream>
@@ -290,6 +291,7 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 		file = default_file;
 		com_op = true;
 	}
+	//com_op = true;
 	
 	return tags;
 }

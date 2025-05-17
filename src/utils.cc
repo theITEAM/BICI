@@ -50,6 +50,8 @@ std::mt19937 gen(rd());
 vector <double> log_sum;
 vector <double> log_integer;
 
+double percent_done;
+
 /// Displays an error message
 void emsg(const string &msg)
 {
@@ -71,7 +73,7 @@ void emsg(const string &msg)
 }
 
 
-/// Displays an error message (this only exits when all 
+/// Displays an error message (this only exits when all core reach it)
 void emsg_input(const string &msg)
 {
 	if(false) throw(std::runtime_error(msg));
@@ -102,10 +104,10 @@ void display_error(const string &msg)
 		cout << "<<ERROR>>" << endl <<  msg << endl << "<<END>>" << endl;
 	}
 	else{
-		cout << "\033[31m" << "ERROR:" << endl;
+		cout << endl << "\033[31m" << "ERROR:" << endl;
 		cout << "\033[0m";
 		
-		cout << msg;
+		cout << add_escape_char(msg);
 		if(msg.length() > 0 && msg.substr(msg.length()-1,1) != ".") cout << ".";
 		cout << endl;
 	}
@@ -121,7 +123,7 @@ void display_warning(const string &msg)
 		cout << "\033[35m";
 		cout << "WARNING: ";
 		cout << "\033[0m";
-		cout << msg;
+		cout << add_escape_char(msg);
 		if(msg.length() > 0 && msg.substr(msg.length()-1,1) != ".") cout << ".";
 		cout << endl;
 	}
@@ -317,7 +319,7 @@ double number(string st)
 	if(allow_string(st,"-0123456789.e") == false) return UNSET;
 	
 	double val = atof(st.c_str());
-	if(val == 0 && trim(st) != "0" && trim(st).substr(0,3) != "0.0") return UNSET;
+	if(val == 0 && trim(st) != "0" && trim(st).substr(0,3) != "0.0" && trim(st).substr(0,3) != "0.") return UNSET;
 	return val;
 }
 
@@ -367,8 +369,8 @@ double ran()
 /// Draws a normally distributed number with mean mu and standard deviation sd
 double normal_sample(const double mean, const double sd) 
 {
-	check_thresh(NORM_TE,SD_QU,sd);
-	check_thresh(NORM_TE,NORM_MEAN_QU,mean);
+	check_thresh(NORM_TE,SD_QU,sd,true);
+	check_thresh(NORM_TE,NORM_MEAN_QU,mean,true);
 
 	normal_distribution<double> distribution(mean, sd);
 	return distribution(generator);
@@ -394,8 +396,8 @@ double normal_probability(const double x, const double mean, const double sd)
 /// Draws a log-normally distributed number with mean mu and standard deviation sd
 double lognormal_sample(const double mean, const double cv) 
 {
-	check_thresh(LOGNORM_TE,CV_QU,cv);
-	check_thresh(LOGNORM_TE,MEAN_QU,mean);
+	check_thresh(LOGNORM_TE,CV_QU,cv,true);
+	check_thresh(LOGNORM_TE,MEAN_QU,mean,true);
 
 	auto var = log(1+cv*cv);                // Works out variables on log scale
 	auto mu = log(mean)-var/2;
@@ -423,8 +425,8 @@ double lognormal_probability(const double x, const double mean, const double cv)
 /// The lognormal probability of being xmin or above
 double lognormal_upper_probability(const double xmin, const double mean, const double cv)
 {
-	check_thresh(LOGNORM_TE,CV_QU,cv);
-	check_thresh(LOGNORM_TE,MEAN_QU,mean);
+	check_thresh(LOGNORM_TE,CV_QU,cv,true);
+	check_thresh(LOGNORM_TE,MEAN_QU,mean,true);
 
 	auto var = log(1+cv*cv);                // Works out variables on log scale
 	auto mu = log(mean)-var/2;
@@ -438,8 +440,8 @@ double lognormal_upper_probability(const double xmin, const double mean, const d
 /// The lognormal probability of being xmin or above (with no log taken)
 double lognormal_upper_probability_no_log(const double xmin, const double mean, const double cv)
 {
-	check_thresh(LOGNORM_TE,CV_QU,cv);
-	check_thresh(LOGNORM_TE,MEAN_QU,mean);
+	check_thresh(LOGNORM_TE,CV_QU,cv,true);
+	check_thresh(LOGNORM_TE,MEAN_QU,mean,true);
 
 	auto var = log(1+cv*cv);                // Works out variables on log scale
 	auto mu = log(mean)-var/2;
@@ -453,8 +455,8 @@ double lognormal_upper_probability_no_log(const double xmin, const double mean, 
 /// Draws a Weibull distributed number with shape and scale parameters
 double weibull_sample(const double scale, const double shape) 
 {
-	check_thresh(WEIBULL_TE,SCALE_QU,scale);
-	check_thresh(WEIBULL_TE,SHAPE_QU,shape);
+	check_thresh(WEIBULL_TE,SCALE_QU,scale,true);
+	check_thresh(WEIBULL_TE,SHAPE_QU,shape,true);
 
 	weibull_distribution<double> distribution(shape, scale);
 	auto val = distribution(generator);
@@ -476,8 +478,8 @@ double weibull_probability(const double x, const double scale, const double shap
 /// Probability of weibull sample beign xmin or above
 double weibull_upper_probability(const double xmin, const double scale, const double shape) 
 {
-	check_thresh(WEIBULL_TE,SCALE_QU,scale);
-	check_thresh(WEIBULL_TE,SHAPE_QU,shape);
+	check_thresh(WEIBULL_TE,SCALE_QU,scale,true);
+	check_thresh(WEIBULL_TE,SHAPE_QU,shape,true);
 
 	auto val = -pow((xmin/scale),shape);
 	if(std::isnan(val) || val < LI_WRONG) return LI_WRONG;
@@ -488,8 +490,8 @@ double weibull_upper_probability(const double xmin, const double scale, const do
 /// Probability of weibull sample beign xmin or above (with no log taken)
 double weibull_upper_probability_no_log(const double xmin, const double scale, const double shape) 
 {
-	check_thresh(WEIBULL_TE,SCALE_QU,scale);
-	check_thresh(WEIBULL_TE,SHAPE_QU,shape);
+	check_thresh(WEIBULL_TE,SCALE_QU,scale,true);
+	check_thresh(WEIBULL_TE,SHAPE_QU,shape,true);
 
 	auto val = exp(-pow((xmin/scale),shape));
 	if(std::isnan(val) || val < TINY) return TINY;
@@ -500,8 +502,8 @@ double weibull_upper_probability_no_log(const double xmin, const double scale, c
 /// Draws a sample from the gamma distribution x^(a-1)*exp(-b*x)
 double gamma_sample(const double mean, const double cv)
 {
-	check_thresh(GAMMA_TE,CV_QU,cv);
-	check_thresh(GAMMA_TE,MEAN_QU,mean);
+	check_thresh(GAMMA_TE,CV_QU,cv,true);
+	check_thresh(GAMMA_TE,MEAN_QU,mean,true);
 
 	gamma_distribution<double> distribution(1.0/(cv*cv),mean*cv*cv);
 	auto val = distribution(generator);
@@ -528,8 +530,8 @@ double gamma_probability(const double x, const double mean, const double cv)
 /// The gamma probability of being x or above
 double gamma_upper_probability(const double xmin, const double mean, const double cv)
 {
-	check_thresh(GAMMA_TE,CV_QU,cv);
-	check_thresh(GAMMA_TE,MEAN_QU,mean);
+	check_thresh(GAMMA_TE,CV_QU,cv,true);
+	check_thresh(GAMMA_TE,MEAN_QU,mean,true);
 
 	auto shape = 1.0/(cv*cv);
 	auto theta = mean/shape;
@@ -542,8 +544,8 @@ double gamma_upper_probability(const double xmin, const double mean, const doubl
 /// The gamma probability of being x or above (with no log taken)
 double gamma_upper_probability_no_log(const double xmin, const double mean, const double cv)
 {
-	check_thresh(GAMMA_TE,CV_QU,cv);
-	check_thresh(GAMMA_TE,MEAN_QU,mean);
+	check_thresh(GAMMA_TE,CV_QU,cv,true);
+	check_thresh(GAMMA_TE,MEAN_QU,mean,true);
 
 	auto shape = 1.0/(cv*cv);
 	auto theta = mean/shape;
@@ -556,8 +558,8 @@ double gamma_upper_probability_no_log(const double xmin, const double mean, cons
 /// Draws a sample from the beta distribution x^(a-1)*(1-x)^(b-1)
 double beta_sample(const double alpha, const double beta)
 {
-	check_thresh(BETA_TE,ALPHA_QU,alpha);
-	check_thresh(BETA_TE,BETA_QU,beta);
+	check_thresh(BETA_TE,ALPHA_QU,alpha,true);
+	check_thresh(BETA_TE,BETA_QU,beta,true);
 
 	gamma_distribution<double> distributionX(alpha,1), distributionY(beta,1);
 	auto x = distributionX(generator);
@@ -581,7 +583,7 @@ double beta_probability(const double x, const double alpha, const double beta)
 /// Generates a sample from the Poisson distribution
 unsigned int poisson_sample(const double lam)
 {
-	check_thresh(POIS_TE,POIS_QU,lam);
+	check_thresh(POIS_TE,POIS_QU,lam,true);
 	
   poisson_distribution<int> distribution(lam);
 	return distribution(generator);
@@ -606,11 +608,18 @@ double poisson_probability(const int i, const double lam)
 }
 
 
+/// The probability for above imin
+double poisson_upper_probability_no_log(const int imin, const double lam)
+{
+	return 1-boost::math::gamma_q(imin+1,lam);
+}
+
+
 /// The log probability of the negative binomial distribution
 double neg_binomial_probability(const int k, const double mean, const double p)
 {	
-	check_thresh(NEGBINO_TE,MEAN_QU,mean);
-	check_thresh(NEGBINO_TE,P_QU,p);
+	check_thresh(NEGBINO_TE,MEAN_QU,mean,true);
+	check_thresh(NEGBINO_TE,P_QU,p,true);
 	
 	auto r = round_int(mean*p/(1-p));
 	if(r < 1) r = 1;
@@ -621,7 +630,7 @@ double neg_binomial_probability(const int k, const double mean, const double p)
 /// Generates a sample from the Bernoulli distribution
 unsigned int bernoulli_sample(const double p)
 {
-	check_thresh(BERN_TE,BERNP_QU,p);
+	check_thresh(BERN_TE,BERNP_QU,p,true);
 	
 	if(ran() < p) return 1;
 	return 0;
@@ -644,7 +653,7 @@ double bernoulli_probability(unsigned int x, const double p)
 /// Samples from the exponential distribution with specified rate
 double exp_rate_sample(const double rate)
 {
-	check_thresh(EXP_RATE_TE,RATE_QU,rate);
+	check_thresh(EXP_RATE_TE,RATE_QU,rate,true);
 	
 	auto val = -log(ran())/rate;
 	if(val < TINY) return TINY;
@@ -680,9 +689,8 @@ double exp_rate_upper_probability_no_log(const double xmin, const double rate)
 /// Samples from the exponential distribution with specified mean
 double exp_mean_sample(const double mean)
 {
-	check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean);
+	check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean,true);
 	
-	//if(mean < 0) emsg("The exponential must be positive");
 	return -log(ran())*mean;
 }
 
@@ -698,7 +706,7 @@ double exp_mean_probability(const double x, const double mean)
 /// Probability of exponential distribution above xmin
 double exp_mean_upper_probability(const double xmin, const double mean)
 {
-	check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean);
+	check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean,true);
 	
 	return -xmin/mean;
 }
@@ -707,7 +715,7 @@ double exp_mean_upper_probability(const double xmin, const double mean)
 /// Probability of exponential distribution above xmin (with no log taken)
 double exp_mean_upper_probability_no_log(const double xmin, const double mean)
 {
-	check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean);
+	check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean,true);
 	auto val = exp(-xmin/mean);
 	if(std::isnan(val) || val < TINY) return TINY;
 	return val;
@@ -717,7 +725,7 @@ double exp_mean_upper_probability_no_log(const double xmin, const double mean)
 /// Draws a sample from the gamma distribution x^(a-1)*exp(-x)
 double gamma_alpha_sample(const double alpha)
 {
-	check_thresh(GAMMA_TE,ALPHA_QU,alpha);
+	check_thresh(GAMMA_TE,ALPHA_QU,alpha,true);
 	
 	//if(alpha < TINY) emsg("Alpha must be positive");
 	gamma_distribution<double> distribution(alpha,1);
@@ -738,6 +746,7 @@ unsigned int binomial_sample(double p, unsigned int n)
 {
 	if(n == 0) return 0;
 	
+	if(n > LARGE) emsg("Binomual cannot sample from negative"); 
 	if(p < -TINY) emsg("For the binomial distribution the probability must be postive");
 	if(p > OVER_ONE){
 		emsg("For the binomial distribution the probability must be one or less");
@@ -777,7 +786,7 @@ double binomial_probability(unsigned int num, double p, unsigned int n)
 /// Probability of period sample
 double period_sample(const double time) 
 {
-	check_thresh(PERIOD_TE,TIME_QU,time);
+	check_thresh(PERIOD_TE,TIME_QU,time,true);
 	return time;
 }
 
@@ -824,6 +833,19 @@ bool equal_vec(const vector <string> &vec1, const vector <string> &vec2)
 
 /// Compares two strings to see if they are equal
 bool equal_vec(const vector <unsigned int> &vec1, const vector <unsigned int> &vec2)
+{
+	if(vec1.size() != vec2.size()) return false;
+	
+	for(auto i = 0u; i < vec1.size(); i++){
+		if(vec1[i] != vec2[i]) return false;
+	}
+	
+	return true;
+}
+
+
+/// Compares two boolean vector to see if they are equal
+bool equal_vec(const vector <bool> &vec1, const vector <bool> &vec2)
 {
 	if(vec1.size() != vec2.size()) return false;
 	
@@ -950,7 +972,7 @@ SwapResult swap_index(string &te, const vector <DepConv> &dep_conv)
 				if(di.result == FAIL){
 					res.warn = "An error occured";
 					if(type == "pop"){
-						res.warn = "Population {} has an error";
+						res.warn = "Population '"+te.substr(istore,di.iend-istore)+"' has an error";
 					}
 					if(type == "param"){
 						res.warn = "Parameter '"+te.substr(istore+1,i-istore-2)+"' has a misspecified dependency.";
@@ -1010,14 +1032,14 @@ SwapResult swap_template(string te, const vector <DepConv> &dep_conv)
 					i++;
 				}
 			}
-		
+
 			if(type != ""){
 				auto di = get_dep_info(te,i,"$}[<(");
 
 				if(di.result == FAIL){
 					res.warn = "An error occured";
 					if(type == "pop"){
-						res.warn = "Population {} has an error";
+						res.warn = "Population '"+te.substr(istore,di.iend-istore)+"' has an error";
 					}
 					if(type == "param"){
 						res.warn = "Parameter '"+te.substr(istore+1,i-istore-2)+"' has a misspecified dependency.";
@@ -1235,18 +1257,16 @@ void print(string name, const Table &tab)
 /// Calculates if two numbers is different (subject to numerical noise) 
 bool dif2(double a, double b, double thresh)
 {
-	if(std::isnan(a)){ cout << " is nan\n"; return true;}
-	if(std::isnan(b)){ cout << "is nan\n"; return true;}
+	if(std::isnan(a)){ return true;}
+	if(std::isnan(b)){ return true;}
 	
 	auto dif = a-b; if(dif < 0) dif = -dif;
-	cout << dif << " dif\n";
 	
 	if(dif > thresh){
 		if(a < 0) a = -a;
 		if(b < 0) b = -b;
 		
 		auto frac = dif/(a+b);
-		cout << frac << " " <<  0.00000001<< "comp\n";
 		if(frac > 0.00000001) return true;
 	}
 	return false;
@@ -1540,6 +1560,15 @@ double sum_mult(const vector < vector <double> > &M1, const vector < vector <uns
 }
 
 
+/// Finds the mean value for an array
+double mean(const vector <double> &val)
+{
+	auto sum = 0.0;
+	for(auto v : val) sum += v;
+	return sum/val.size();
+}
+
+
 /// Finds the minimum value for an array
 double min(const vector <double> &val)
 {
@@ -1623,16 +1652,6 @@ string tstr(double value)
 }
 
 
-/// Outputs progess (when doing command line output)
-void progress(double val, double val2)
-{
-	if(com_op && op()){
-		cout << "<PROGRESS>" << (unsigned int)(100*(val+1)/val2) << endl;
-		cout.flush();
-	}
-}
-
-
 /// Determines if output
 bool op()
 {
@@ -1692,17 +1711,17 @@ vector <bool> true_vec(unsigned int N)
 
 
 /// Converts a text string to a prior specification
-Prior convert_text_to_prior(string te, unsigned int line_num)
+Prior convert_text_to_prior(string te, unsigned int line_num, bool dist)
 {
 	Prior pri;
 	
 	te = trim(te);
 	
 	auto spl = split(te,'(');
-	if(spl.size() != 2){ pri.error = true; return pri;}
+	if(spl.size() != 2){ pri.error = "Syntax error"; return pri;}
 	
-	if(spl[1].size() == 0){ pri.error = "Prior has a syntax error"; return pri;}
-	if(spl[1].substr(spl[1].length()-1,1) != ")"){ pri.error = "Prior has a syntax error"; return pri;}
+	if(spl[1].size() == 0){ pri.error = "Syntax error"; return pri;}
+	if(spl[1].substr(spl[1].length()-1,1) != ")"){ pri.error = "Syntax error"; return pri;}
 	
 	auto type = toLower(spl[0]);
 	if(type == "dir") type = "dirichlet";
@@ -1717,8 +1736,8 @@ Prior convert_text_to_prior(string te, unsigned int line_num)
 	if(type == "beta"){ pri.type = BETA_PR; fl = true;}
 	if(type == "bernoulli"){ pri.type = BERNOULLI_PR; fl = true;}
 	if(type == "fix"){ pri.type = FIX_PR; fl = true;}
-	if(type == "flat"){ pri.type = FLAT_PR; fl = true;}
 	if(type == "dirichlet"){ pri.type = DIRICHLET_PR; fl = true;}
+	if(type == "mdir"){ pri.type = MDIR_PR; fl = true;}
 	
 	if(fl == false){
 		pri.error = "Distribution '"+type+"' not recognised"; return pri;
@@ -1731,63 +1750,231 @@ Prior convert_text_to_prior(string te, unsigned int line_num)
 	case FIX_PR:
 		{
 			if(spl2.size() != 1){ pri.error = "Expected one value in the brackets"; return pri;}
+			
+			if(!dist){
+				if(number(spl2[0]) == UNSET) pri.error = "The value '"+spl2[0]+"' must be a number";
+			}
 		}
 		break;
 	
 	case UNIFORM_PR:
 		{
 			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
+			
+			if(!dist){
+				if(number(spl2[0]) == UNSET){
+					pri.error = "The value '"+spl2[0]+"' must be a number"; return pri;
+				}
+				if(number(spl2[1]) == UNSET){ 
+					pri.error = "The value '"+spl2[1]+"' must be a number"; return pri;
+				}
+				if(number(spl2[0]) >= number(spl2[1])){  
+					pri.error = "Minimum must be smaller than maximum";return pri;
+				}
+			}
 		}
 		break;
 	
 	case EXP_PR:
 		{
 			if(spl2.size() != 1){ pri.error = "Expected one value in the brackets"; return pri;}
+			
+			auto mean = number(spl2[0]);
+			
+			if(!dist){
+				if(mean == UNSET){
+					pri.error = "The value '"+spl2[0]+"' must be a number"; return pri;
+				}
+				
+				if(mean <= 0){
+					pri.error = "Mean must be positive"; return pri;
+				}
+			}
+			
+			pri.error = check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean,false); 		
+			if(pri.error != "") return pri;
 		}
 		break;
 		
 	case NORMAL_PR:
 		{
 			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
+			
+			auto mean = number(spl2[0]);
+			auto sd = number(spl2[1]);
+	
+			if(!dist){
+				if(mean == UNSET){
+					pri.error = "The value '"+spl2[0]+"' must be a number"; return pri;
+				}
+				if(sd == UNSET){
+					pri.error = "The value '"+spl2[1]+"' must be a number"; return pri;
+				}
+			
+				if(sd <= 0){
+					pri.error = "Standard deviation must be positive"; return pri;
+				}
+			}
+			
+			pri.error = check_thresh(NORM_TE,SD_QU,sd,false); 		
+			if(pri.error != "") return pri;
+			
+			pri.error = check_thresh(NORM_TE,NORM_MEAN_QU,mean,false); 		
+			if(pri.error != "") return pri;
 		}
 		break;
 		
 	case GAMMA_PR:
 		{
 			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
+			
+			auto mean = number(spl2[0]);
+			auto cv = number(spl2[1]);
+	
+			if(!dist){
+				if(mean == UNSET){
+					pri.error = "The value '"+spl2[0]+"' must be a number"; return pri;
+				}
+				if(cv == UNSET){
+					pri.error = "The value '"+spl2[1]+"' must be a number"; return pri;
+				}
+			
+				if(mean <= 0){
+					pri.error = "Mean must be positive"; return pri;
+				}
+				
+				if(cv <= 0){
+					pri.error = "Standard deviation must be positive"; return pri;
+				}
+			}
+			
+			pri.error = check_thresh(GAMMA_TE,CV_QU,cv,false); 		
+			if(pri.error != "") return pri;
+			
+			pri.error = check_thresh(GAMMA_TE,MEAN_QU,mean,false); 		
+			if(pri.error != "") return pri;
 		}
 		break;
 		
 	case LOG_NORMAL_PR:
 		{
 			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
+			
+			auto mean = number(spl2[0]);
+			auto cv = number(spl2[1]);
+	
+			if(!dist){
+				if(mean == UNSET){
+					pri.error = "The value '"+spl2[0]+"' must be a number"; return pri;
+				}
+				if(cv == UNSET){
+					pri.error = "The value '"+spl2[1]+"' must be a number"; return pri;
+				}
+			
+				if(mean <= 0){
+					pri.error = "Mean must be positive"; return pri;
+				}
+				
+				if(cv <= 0){
+					pri.error = "Standard deviation must be positive"; return pri;
+				}
+			}
+			
+			pri.error = check_thresh(LOGNORM_TE,CV_QU,cv,false); 		
+			if(pri.error != "") return pri;
+			
+			pri.error = check_thresh(LOGNORM_TE,MEAN_QU,mean,false); 		
+			if(pri.error != "") return pri;
 		}
 		break;
 		
 	case BETA_PR:
 		{
 			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
+			
+			auto alpha = number(spl2[0]);
+			auto beta = number(spl2[1]);
+	
+			if(!dist){
+				if(alpha == UNSET){
+					pri.error = "The value '"+spl2[0]+"' must be a number"; return pri;
+				}
+				if(beta == UNSET){
+					pri.error = "The value '"+spl2[1]+"' must be a number"; return pri;
+				}
+			
+				if(alpha <= 0){
+					pri.error = "Alpha must be positive"; return pri;
+				}
+			
+				if(beta <= 0){
+					pri.error = "Beta must be positive"; return pri;
+				}
+			}
+			
+			pri.error = check_thresh(BETA_TE,BETA_QU,beta,false); 		
+			if(pri.error != "") return pri;
+			
+			pri.error = check_thresh(BETA_TE,ALPHA_QU,alpha,false); 		
+			if(pri.error != "") return pri;
 		}
 		break;
 
 	case BERNOULLI_PR:
 		{
 			if(spl2.size() != 1){ pri.error = "Expected one value in the brackets"; return pri;}
+			
+			auto mean = number(spl2[0]);
+		
+			if(!dist){
+				if(mean == UNSET){
+					pri.error = "The value '"+spl2[0]+"' must be a number"; return pri;
+				}
+			
+				if(mean < 0 || mean > 1){
+					pri.error = "Mean must be between zero and one"; return pri;
+				}
+			}
+			
+			pri.error = check_thresh(BERN_TE,BERNP_QU,mean,false); 		
+			if(pri.error != "") return pri;
 		}
 		break;
-		
-	case FLAT_PR:
-		break;
-		
+	
 	case DIRICHLET_PR:
 		{
 			if(spl2.size() != 1){ pri.error = "Expected one value in the brackets"; return pri;}
+			
+			auto alpha = number(spl2[0]);
+		
+			if(!dist){
+				if(alpha == UNSET){
+					pri.error = "The value '"+spl2[0]+"' must be a number"; return pri;
+				}
+				
+				if(alpha <= 0){
+					pri.error = "Alpha must be positive"; return pri;
+				}
+			}
+		}
+		break;
+		
+	case MDIR_PR:
+		{
+			if(spl2.size() != 1){ pri.error = "Expected one value in the brackets"; return pri;}
+			
+			if(number(spl2[0]) == UNSET) pri.error = "The value '"+spl2[0]+"' must be a number";
 		}
 		break;
 	}
 
 	for(auto i = 0u; i < spl2.size(); i++){
-		pri.dist_param.push_back(add_equation_info(spl2[i],DIST,line_num));
+		auto ei = add_equation_info(spl2[i],DIST,line_num);
+		if(ei.error){
+			pri.error = ei.emsg;
+			return pri;
+		}
+		pri.dist_param.push_back(ei);
 	}
 	
 	return pri;
@@ -1822,11 +2009,11 @@ string get_prior_string(Prior prior)
 	case BERNOULLI_PR:
 		return "bernoulli("+prior.dist_param[0].te_raw+")";
 	
-	case FLAT_PR:
-		return "flat";
-	
 	case DIRICHLET_PR:
 		return "dir("+prior.dist_param[0].te_raw+")";
+		
+	case MDIR_PR:
+		return "mdir("+prior.dist_param[0].te_raw+")";	
 	}
 	
 	return "Problem with prior";
@@ -1918,7 +2105,7 @@ double dirichlet_probability(const vector <double> &frac, const vector <double> 
 
 
 /// Used to order fractions
-bool Frac_ord (FracSort fs1, FracSort fs2)                      
+bool Frac_ord (const FracSort &fs1, const FracSort &fs2)                      
 { return (fs1.frac > fs2.frac); };  
 
 
@@ -2187,19 +2374,16 @@ double prior_probability(double x, const Prior &pri, const vector <double> &para
 		}
 		break;
 		
-	case FLAT_PR:
-		{
-			if(x <= 0) return -LARGE;
-			return gamma_alpha_probability(x,1);
-		}
-		break;
-		
 	case DIRICHLET_PR:
 		{
 			auto alpha = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
 			if(x <= 0 || alpha <= 0) return -LARGE; 
 			return gamma_alpha_probability(x,alpha);
 		}
+		break;
+		
+	case MDIR_PR:
+		emsg("Should not be mdir");
 		break;
 	}
 	
@@ -2285,6 +2469,7 @@ double calc_al(const Like &like_ch, double dprob, const BurnInfo &burn_info)
 					+ burn_info.genetic_obs*like_ch.genetic_obs 
 					+ dprob); 
 }
+
 
 /// Prints likelihood to the terminal
 void print_like(const Like &like)
@@ -2416,8 +2601,11 @@ bool end_str(string st, string st2)
 
 
 /// Checks if value is within thresholds
-void check_thresh(DistText dist, DistQuant dq, double val)
+string check_thresh(DistText dist, DistQuant dq, double val, bool err)
 {
+	string te;
+	if(val == UNSET) return te;
+	
 	double min_th = UNSET, max_th = UNSET;
 	
 	switch(dq){
@@ -2494,11 +2682,11 @@ void check_thresh(DistText dist, DistQuant dq, double val)
 		case BETA_TE: dist_te = "Beta"; break;
 		case NEGBINO_TE: dist_te = "Negitive-binomial"; break;
 		case BERN_TE: dist_te = "Bernoulli"; break;
-		case EXP_RATE_TE: dist_te = "Exponenial"; break;
-		case EXP_MEAN_TE: dist_te = "Exponenial"; break;
+		case EXP_RATE_TE: dist_te = "Exponential"; break;
+		case EXP_MEAN_TE: dist_te = "Exponential"; break;
 		case POIS_TE: dist_te = "Poisson"; break;
 		case PERIOD_TE: dist_te = "Period"; break;
-		}
+		} 
 		
 		string quant;
 		switch(dq){
@@ -2519,13 +2707,16 @@ void check_thresh(DistText dist, DistQuant dq, double val)
 		}		
 		
 		if(min_th != UNSET){
-			emsg(dist_te+" "+quant+" has value "+tstr(val)+" which should not be below threshold "+tstr(min_th));
+			te = dist_te+" "+quant+" has value '"+tstr(val)+"' which should not be below threshold '"+tstr(min_th)+"'";
 		}
 		
 		if(max_th != UNSET){
-			emsg(dist_te+" "+quant+" has value "+tstr(val)+" which should not be above threshold "+tstr(max_th));
+			te = dist_te+" "+quant+" has value '"+tstr(val)+"' which should not be above threshold '"+tstr(max_th)+"'";
 		}
 	}
+	
+	if(err && te != "") emsg(te);
+	return te;
 }
 
 
@@ -2565,5 +2756,158 @@ bool event_near_div(double t, const Details &details)
 	}
 
 	return false;
+}
+
+
+/// Truncates a text string to a certain length
+string trunc(string te, unsigned int len)
+{
+	if(te.length() < len) return te;
+	return te.substr(0,len)+"...";
+}
+
+
+/// Returns a list of escape characters
+vector< vector <string> > get_escape_char()
+{
+	vector< vector <string> > escape_char;
+	
+	escape_char.push_back({"\\alpha","α"});
+	escape_char.push_back({"\\beta","β"});
+	escape_char.push_back({"\\gamma","γ"});
+	escape_char.push_back({"\\Gamma","Γ"});
+	escape_char.push_back({"\\delta","δ"});
+	escape_char.push_back({"\\Delta","Δ"});
+	escape_char.push_back({"\\epsilon","ε"});
+	escape_char.push_back({"\\zeta","ζ"});
+	escape_char.push_back({"\\eta","η"});
+	escape_char.push_back({"\\Eta","Η"});
+	escape_char.push_back({"\\theta","θ"});
+	escape_char.push_back({"\\Theta","Θ"});
+	escape_char.push_back({"\\iota","ι"});
+	escape_char.push_back({"\\kappa","κ"});
+	escape_char.push_back({"\\lambda","λ"});
+	escape_char.push_back({"\\Lambda","Λ"});
+	escape_char.push_back({"\\mu","μ"});
+	escape_char.push_back({"\\nu","ν"});
+	escape_char.push_back({"\\xi","ξ"});
+	escape_char.push_back({"\\Xi","Ξ"});
+	escape_char.push_back({"\\omicron","ο"});
+	escape_char.push_back({"\\pi","π"});
+	escape_char.push_back({"\\Pi","Π"});
+	escape_char.push_back({"\\rho","ρ"});
+	escape_char.push_back({"\\sigma","σ"});
+	escape_char.push_back({"\\Sigma","Σ"});
+	escape_char.push_back({"\\tau","τ"});
+	escape_char.push_back({"\\upsilon","υ"});
+	escape_char.push_back({"\\phi","φ"});
+	escape_char.push_back({"\\Phi","Φ"});
+	escape_char.push_back({"\\chi","χ"});
+	escape_char.push_back({"\\psi","ψ"});
+	escape_char.push_back({"\\Psi","Ψ"});
+	escape_char.push_back({"\\omega","ω"});	
+	escape_char.push_back({"\\Omega","Ω"});	
+	escape_char.push_back({"\\sum","Σ"});		
+	
+	return escape_char;
+}
+
+
+/// Replaces greek letters with escape characters
+string add_escape_char(string te)
+{
+	auto escape_char = get_escape_char();
+
+	for(auto i = 0u; i < escape_char.size(); i++){
+		auto st1 = escape_char[i][0];
+		auto st2 = escape_char[i][1];
+		if(includes(te,st2)){
+			te = replace(te,st2,st1);
+		}
+	
+		te = replace(te,"×","*");
+		te = replace(te,"→","->");
+	}
+	
+	return te;
+}
+
+
+/// Replaces right arrow
+string replace_arrow(string te)
+{
+	return replace(te,"→","->");
+}
+
+
+/// Resets the percentage
+void percentage_start(PercentType type, unsigned int gen)
+{
+	if(!op()) return;
+	
+	if(com_op){
+		switch(type){
+		case LOAD_PER: cout << "<CREATING>" << endl; break;
+		case INIT_PER: cout << "<INIT>" << endl; break;
+		case RUN_PER: cout << "<RUNNING>"  << endl; break;
+		case RUN_GEN_PER: cout << "<RUNGEN>" << gen << endl; break;
+		case ANNEAL_PER: cout << "<ANNEALING>" << endl; break;
+		case OUTPUT_PER: cout << "<OUTPUTTING>" << endl; break;
+		}
+	}
+	else{
+		switch(type){
+		case LOAD_PER: cout << "Loading..." << endl; break;
+		case INIT_PER: cout << "Initialising..." << endl; break;
+		case RUN_PER: cout << "Running..." << endl; break;
+		case RUN_GEN_PER: cout << "Generation " << gen << "..." << endl; break;
+		case ANNEAL_PER: cout << "Annealing..." << endl; break;
+		case OUTPUT_PER: cout << "Outputing..." << endl; break;
+		}
+	}
+	
+	percent_done = UNSET;
+	percentage(0,1);
+}
+
+
+/// Ends the percentage
+void percentage_end()
+{
+	percentage(1,1);
+}
+
+
+/// Prints percentage done
+void percentage(double val, double val2)
+{		
+	if(!op()) return;
+	
+	if(!com_op && percent_done != LARGE){		
+		if(percent_done == UNSET) percent_done = 0;
+		
+		auto per = 100*val/val2;
+		while(percent_done <= per){
+			if(int(percent_done)%10 == 0){
+				cout << "" << percent_done << "%";
+				if(percent_done == 100){ 
+					percent_done = LARGE;
+					cout << endl; cout.flush(); 
+					return;
+				}
+			}
+			cout << "."; 
+			cout.flush();
+			percent_done += PERCENT_STEP;
+		}			
+	}
+	else{
+		auto per = (unsigned int)(100*val/val2);
+		if(percent_done == UNSET || percent_done < per){
+			cout << "<PROGRESS>" << per << endl;
+			cout.flush();
+			percent_done = per;
+		}
+	}
 }
 

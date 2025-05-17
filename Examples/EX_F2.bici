@@ -1,4 +1,9 @@
 
+###################### DATA DIRECTORY ######################
+
+data-dir folder="Examples\EX_F2-data-files"
+
+
 ####################### DESCRIPTION ########################
 
 description text="description.txt"
@@ -6,41 +11,34 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-data-dir folder="Examples\EX_F2-data-files"
-
 simulation start=0 end=100 timestep=0.5
 
-inference start=0 end=100 timestep=0.5
+inference start=0 end=100 timestep=0.5 nchain=3
 
 post-sim start=0 end=100
 
 
 ######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
 
-species name="Animal" type="individual" trans-tree="off"
+species name="Animal" type="individual"
 
 # SPECIES MODEL
 
 class name="DS" index="a"
 
-comp name="S" color="#009900" x=-24 y=-7
-comp name="I" color="#ff2222" x=-2 y=-7
+comp name="S" color="#009900" x=-10 y=0
+comp name="I" color="#ff2222" x=10 y=0
 
 trans name="S->I" value="exp(rate:β_v×exp(G_g)×{I,g}/N)"
 
-
 class name="Vaccination" index="v"
 
-comp name="Vac" color="#888888" x=-10 y=-2
-comp name="Unvac" color="#aa00aa" x=4 y=-2
-
-
+comp name="Vac" color="#888888" x=-10 y=0
+comp name="Unvac" color="#aa00aa" x=10 y=0
 
 class name="Group" index="g"
 
 comp-all color="#005500" fix="true" file="comp-Group.csv"
-
-
 
 # SIMULATION INITIAL CONDITIONS
 
@@ -58,8 +56,12 @@ trans-data name="S->I" obsrange="all" file="trans-data.csv"
 ######################## PARAMETERS ########################
 
 param name="N" constant="10"
+
 param name="σ^G" value="0.5" prior="uniform(0,2)"
+
 param name="G_g" dist="normal(0,σ^G)"
+
 param name="β_v" value="value-beta.csv" prior="uniform(0,1)"
+
 
 

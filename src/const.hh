@@ -8,6 +8,7 @@ using namespace std;
 
 // This is set if compilation is done on windows
 //#define WINDOWS
+
 //const string default_file = "/tmp/init.bici";   // This is used for Mac
 const string default_file = "Execute/init.bici"; // This is used for windows / linux
 
@@ -20,6 +21,7 @@ const bool adapt_prop_prob = false;//true;           // Determines if proposals 
 const bool check_swap = false;                       // Used to check if new swap is working
 const bool use_ind_key = true;                       // Determines if indindividual key
 const bool print_diag_on = false;                    // Prints diagnostic statements to terminal
+const bool cum_diag = true;                          // Cumulative probability diagnostic
 
 const bool linearise_speedup = true;                 // Linearisation speed-up of likelihood
 // This speeds up by taking account of linear population terms when calculation div values
@@ -76,10 +78,11 @@ enum TransVariety { NORMAL, SOURCE_TRANS, SINK_TRANS };
 enum Operation { SIM, INF, PPC, MODE_UNSET };
 
 // Different prior possibilities
-enum PriorPos { UNIFORM_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, FLAT_PR, DIRICHLET_PR };
+enum PriorPos { UNIFORM_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, DIRICHLET_PR, MDIR_PR };
  
 // Different possible command types
-enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT,
+enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG,
+
 // These are not commands but varient used when loading data
 TRANS_TIMERANGE_DATA,
 EMPTY };
@@ -105,7 +108,7 @@ enum Result { SUCCESS, FAIL };
 enum ColumnType { ID_COL, T_COL, TSTART_COL, TEND_COL, SNP_COL, GENOBS_COL, CL_PROB_COL, CL_ALL_COL, CL_ALL_PROB_COL, FROM_COL, TO_COL, INIT_POP_COL, ADD_POP_COL, REM_POP_COL, START_COL, END_COL, RESULT_COL, FILT_OBSPOP_COL, FILT_OBSPOPTRANS_COL, COMP_NAME_COL, START_COMP_COL, END_COMP_COL };
 
 // Different types of element in a table (this helps to spot errors in data tables)
-enum ElementType { TEXT_EL, TIME_FLOAT_EL, FLOAT_EL, COMP_PROB_EL, COMP_EL, POS_FLOAT_PERCENT_EL, POS_INT_EL, POS_FLOAT_EL, ZERO_ONE_EL, POS_ZERO_FLOAT_EL, COMP_SOURCE_SINK_EL, COMP_ALL_EL, DIAG_TEST_EL, PRIOR_DIR_EL };
+enum ElementType { TEXT_EL, TIME_FLOAT_EL, FLOAT_EL, COMP_PROB_EL, COMP_PROB_NA_EL, COMP_EL, POS_FLOAT_PERCENT_EL, POS_INT_EL, POS_FLOAT_EL, ZERO_ONE_EL, POS_ZERO_FLOAT_EL, COMP_SOURCE_SINK_EL, COMP_ALL_EL, DIAG_TEST_EL, PRIOR_DIR_EL };
 
 // Different types of warning
 enum ErrorType { ERROR_FATAL, ERROR_WARNING };
@@ -135,7 +138,7 @@ enum ObsType { OBS_SOURCE_EV, OBS_TRANS_EV, OBS_SINK_EV, OBS_COMP_EV, OBS_TEST_E
 enum AffectType { SPLINE_PRIOR_AFFECT, PRIOR_AFFECT, DIST_AFFECT, SPLINE_AFFECT, EXP_FE_AFFECT, DIV_VALUE_AFFECT, DIV_VALUE_FAST_AFFECT, DIV_VALUE_LINEAR_AFFECT, MARKOV_LIKE_AFFECT, POP_AFFECT, NM_TRANS_AFFECT, NM_TRANS_BP_AFFECT, NM_TRANS_INCOMP_AFFECT, OMEGA_AFFECT, EXP_IE_AFFECT, LIKE_IE_AFFECT, INDFAC_INT_AFFECT, MARKOV_POP_AFFECT, LIKE_OBS_IND_AFFECT, LIKE_OBS_POP_AFFECT, LIKE_OBS_POP_TRANS_AFFECT, OBS_EQN_AFFECT, LIKE_UNOBS_TRANS_AFFECT, POP_DATA_CGL_TGL_AFFECT, LIKE_INIT_COND_AFFECT, PRIOR_INIT_COND_AFFECT, LIKE_GENETIC_PROCESS_AFFECT, GENETIC_VALUE_AFFECT, LIKE_GENETIC_OBS_AFFECT, IIF_W_AFFECT, POPNUM_IND_W_AFFECT, AFFECT_MAX };
 
 // Different proposal types
-enum PropType { PARAM_PROP, IND_EVENT_TIME_PROP, IND_OBS_SAMP_PROP, IND_OBS_RESIM_PROP, IND_OBS_RESIM_SINGLE_PROP, IND_UNOBS_RESIM_PROP, IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, IE_VAR_CV_PROP, TRANS_TREE_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP };
+enum PropType { PARAM_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT_PROP, IND_EVENT_ALL_PROP, IND_OBS_SAMP_PROP, IND_OBS_RESIM_PROP, IND_OBS_RESIM_SINGLE_PROP, IND_UNOBS_RESIM_PROP, IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, IE_VAR_CV_PROP, TRANS_TREE_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP, IND_OBS_SWITCH_LEAVE_SINK_PROP };
 
 // Different types of annealing stratregy
 enum AnnealType { ANNEAL_NONE, ANNEAL_SCAN, ANNEAL_POWERAUTO, ANNEAL_LOGAUTO, ANNEAL_POWER };
@@ -224,7 +227,7 @@ enum GenDataType { SNP_DATA, MATRIX_DATA };
 enum GenBranchUpdate { OBS_GEN_UPDATE, SINGLE_BRANCH, TWO_BRANCH1, TWO_BRANCH2, TWO_BRANCH3, ORIGIN_GEN_UPDATE, GEN_UPDATE_MAX };
    
 // Different modes when reading in state samples (for PPC)
-enum InfStateMode { MODE_NODE, MODE_PARAM, MODE_PHYLO, MODE_DERIVE, MODE_INITIAL, MODE_POPCHANGE, MODE_TIMEPOINT, MODE_TRANS, MODE_INDIVIDUAL };
+enum InfStateMode { MODE_NODE, MODE_PARAM, MODE_PHYLO, MODE_DERIVE, MODE_INITIAL, MODE_POPCHANGE, MODE_TIMEPOINT, MODE_TRANS, MODE_INDIVIDUAL, MODE_TRANSDISTPROB };
 
 // Sets direction of local event proposals
 enum LocalDir { LOCAL_FORWARD, LOCAL_REVERSE };
@@ -241,19 +244,25 @@ enum DistText { NORM_TE, LOGNORM_TE, WEIBULL_TE, GAMMA_TE, BETA_TE, NEGBINO_TE,B
 // Different quantities
 enum DistQuant { SD_QU, CV_QU, MEAN_QU, NORM_MEAN_QU, SHAPE_QU, SCALE_QU, ALPHA_QU, BETA_QU, P_QU, BERNP_QU, RATE_QU, EXP_MEAN_QU, POIS_QU, TIME_QU};
 
+// Different percentage measures
+enum PercentType { LOAD_PER, INIT_PER, RUN_PER, RUN_GEN_PER, ANNEAL_PER, OUTPUT_PER};
 
 /************************** Numeric constants ******************************/
 
-const auto ERR_MSG_MAX = 10u;                     // The maximum number of error messages
+const auto ERR_MSG_MAX = 5u;                     // The maximum number of error messages
 
 const auto CODE = 99999989u;                      // Value above which is a non-numeric number
 const auto UNSET = 99999990u;                     // Indicates an unset number
+const auto UNSET_WILD = 99999980.0;               // Indicates an unset wildcard "*"
 const auto UNSET_F = 99999990.0;                  // Floating point unset
 const auto TIME_VAR = 99999991u;                  // Indicates time variable t (used in eqnations)
 const auto OUTSIDE_INF = 99999992u;               // Stands for outside infection
 const auto ENTER_INF = 99999993u;                 // Stands for entering infection
 const auto BP_FROM_OTHERS = 99999994u;            // Branch probability is calculated from others
 const auto GEN_PLOT = 99999995u;                  // Used for a generation plot
+
+const auto LINK_CV_THRESH = 0.3;                  // CV threshold for linking for multi-event
+const auto LINK_WEIBULL_SHAPE = 3.7;              // Shape thresh for linking for multi-event
 
 const auto SIM_TRY_MAX = 10000u;                  // Maximum tries simulating nm trans
 const auto IC_NUM_OPTIMUM = 100u;                 // Optimum number of events for IC local range
@@ -285,6 +294,8 @@ const double EFFECT_MIN = 0.0000001;              // Sets minimum value for effe
 const double DIF_THRESH = 0.00001;                // The threshold for a difference
 const double DIF_THRESH_BURNIN = 0.1;             // The threshold during burnin
 const unsigned int RANGE_MIN = 50;                // Minimum number to calc M
+
+const unsigned int H_BIN = 10;                    // Used for distributions in cumulative prob
 
 const double TWO_TINY = 2*TINY;                   // Used to represent a tiny number
 const double SMALL = 0.00001;                     // Used to represent a small number
@@ -361,9 +372,9 @@ const auto PROP_MBPII_W = 0.5;                    // The weight given to MBPII
 const auto PROP_MBPIC_W = 0.5;                    // The weight give to MBP IC 
 const auto POP_SI_LIM = 0.5;                      // Minimum proposal size when changing integer populations
 
-# define MM_PI  3.14159265358979323846             // Value for pi
-
 const unsigned int NEXT_IND_EVENT_DIV = 100;      // Number of divisions next_event divided into
+
+# define MM_PI  3.14159265358979323846             // Value for pi
 
 const double PERCENT_STEP = 2.5;                  // Percentage per dot in running bar
 
@@ -373,10 +384,13 @@ const vector <unsigned int> factori = {1,1,2,6,24};// Fatorial N! for first 5 nu
 
 const vector <string> alphabet = {"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"};
 
-const string chnotallowed = "\"!%$&=;@~#\\?";     // Character not allowed in equations
-const string notparam_list = "+-*×/0123456789.{<>〈〉}() %$′";   // Sets not a parameter character
+
+const string chnotallowed = "\"!%$&=;@~#\\?→";     // Character not allowed in equations
+const string notparam_list = "+-*×/0123456789.{<>〈〉}() %$′→";   // Sets not a parameter character
 const string paramend_list = "+-*×/|.{<>〈〉}[] %$"; // Sets characters which end parameter
-const string compnotallow = "\"*×_ {<>〈〉}[]()=′";  // Character not allowed in comp names
+const string name_notallow = "|\"*×_ {<>〈〉}[]()=′→";// Character not allowed in names
+const string fe_char = "μ";                       // Character used for fixed effect parameter
+const auto name_ch_max = 40;                      // Maximum number of characters allowed
 const string endli = "\n";
 const string dist_matrix_name = "D";              // The name of a distance matrix
 
@@ -385,10 +399,11 @@ const string sigma = "Σ";
 
 const string unobserved_str = "Unobserved";       // Name for unobserved 
 
-const string missing_str = ".";                      // Determines a missing quantity
+const string missing_str = ".";                   // Determines a missing quantity
+const string not_alive_str = "!";                 // Denotes individul not alive
 
 const string err_mess = "Please correct these errors and rerun.";
-
+const string err_mess_sing = "Please correct this error and rerun.";
 
 /************************** Object constants ******************************/
 

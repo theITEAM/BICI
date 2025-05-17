@@ -9,7 +9,6 @@
 	add-pop-post-sim
 	add-pop-sim
 	box
-	camera
 	classification / class
 	compartment / comp
 	compartment-all / comp-all
@@ -55,8 +54,10 @@
 	sim-state
 	test-data
 	trans-data
+	trans-diag
 	transition / trans
 	transition-all / trans-all
+	view
 	*/
 	
 let imp = {};                                      // Stores information as import is done
@@ -65,10 +66,10 @@ let imp = {};                                      // Stores information as impo
 function import_file(te,clear_results)                                
 {		
 	import_te = te;
-	
+
 	percent(5);
 			
-	te = add_escape_char(te);
+	te = remove_escape_char(te);
 	
 	let	lines = te.split('\n');
 	
@@ -88,7 +89,7 @@ function import_file(te,clear_results)
 	init_result(pro,clear_results);
 
 	percent(10);
-		
+
 	for(let loop = 0; loop < 4; loop++){ 
 		// Import happens in four stages:
 		// (0) Load species and classification information
@@ -132,6 +133,10 @@ function import_file(te,clear_results)
 			if(sim_result.load) results_add_model(sim_result,model.sim_details,"sim");
 			if(inf_result.load) results_add_model(inf_result,model.inf_details,"inf");
 			if(ppc_result.load) results_add_model(ppc_result,model.ppc_details,"ppc");
+		
+			if(inf_result.load) inf_result.diagnostics_on = true;
+			
+			initialise_filters_setup();
 			
 			percent(85);
 		}
@@ -143,7 +148,7 @@ function import_file(te,clear_results)
 			imp.typest = line.type;
 		
 			let cname = line.type;
-			//pr(loop+" "+cname+" loop command");
+			//error(loop+" "+cname+" loop command");
 			switch(cname){                               // Accounts for shortened versions of commands
 			case "comp": cname = "compartment"; break;
 			case "comp-all": cname = "compartment-all"; break;
@@ -162,7 +167,7 @@ function import_file(te,clear_results)
 			switch(loop){
 			case 0: // In the first pass create species, classifications, compartments and loads data directory
 				switch(cname){
-				case "species": case "classification": case "camera": 
+				case "species": case "classification": case "view": 
 				case "compartment": case "compartment-all": 
 				case "data-dir": break;
 				default: process = false; break;
@@ -172,7 +177,7 @@ function import_file(te,clear_results)
 			case 1: // The next pass does loads the parameters 
 				process = false; 
 				switch(cname){
-				case "species": case "classification": case "camera": case "param": case "derived": 
+				case "species": case "classification": case "view": case "param": case "derived": 
 					process = true; 
 					break;
 				}
@@ -187,6 +192,9 @@ function import_file(te,clear_results)
 				case "post-sim-param": case "post-sim-state": 
 				case "inf-generation":
 				case "inf-diagnostics":
+				case "trans-diag": 
+				case "add-ind-post-sim": case "remove-ind-post-sim": case "move-ind-post-sim":
+				case "add-pop-post-sim": case "remove-pop-post-sim":
 					process = false; break;
 				}
 				break
@@ -199,6 +207,9 @@ function import_file(te,clear_results)
 				case "post-sim-param": case "post-sim-state": 
 				case "inf-generation":
 				case "inf-diagnostics":
+				case "trans-diag":
+				case "add-ind-post-sim": case "remove-ind-post-sim": case "move-ind-post-sim":
+				case "add-pop-post-sim": case "remove-pop-post-sim":
 					process = true; 
 					break;
 				}
@@ -225,7 +236,7 @@ function import_file(te,clear_results)
 			if(imp.warn == true) return;
 		}
 	}
-	
+
 	if(sim_result.load) results_finalise(sim_result);
 	if(inf_result.load) results_finalise(inf_result);
 	if(ppc_result.load) results_finalise(ppc_result);
@@ -304,14 +315,15 @@ function ppc_add_ind()
 {
 	for(let p = 0; p < model.species.length; p++){
 		let sp = model.species[p];
+		let sp_ppc = model.inf_res.plot_filter.species[p];
 		for(let j = 0; j < sp.inf_source.length; j++){
 			let so = sp.inf_source[j];
 			switch(so.type){
 			case "Add Ind.": case "Remove Ind.": case "Move Ind.":
 				{
 					let so_new = copy(so);
-					so_new.check_info.i = sp.ppc_source.length;
-					sp.ppc_source.push(so_new);
+					so_new.check_info.i = sp_ppc.ppc_source.length;
+					sp_ppc.ppc_source.push(so_new);
 				}
 				break;
 			}
@@ -362,7 +374,7 @@ function process_command(cname,tags,loop)
 	case "species": species_command(loop); break;
 	case "classification": classification_command(loop); break;
 	case "set": set_command(); break;
-	case "camera": camera_command(); break;
+	case "view": camera_command(); break;
 	case "compartment": compartment_command(); break;
 	case "compartment-all": compartment_all_command(); break;
 	case "transition": transition_command(); break;
@@ -388,7 +400,8 @@ function process_command(cname,tags,loop)
 	case "post-sim-state": post_sim_state_command(); break;
 	case "inf-diagnostics": inf_diagnostics_command(); break;
 	case "inf-generation": inf_generation_command(); break;
-	
+	case "trans-diag": trans_diag_command(); break;
+		
 	default: 
 		if(find_in(data_command_list,cname) != undefined){
 			import_data_table_command(cname);
@@ -414,7 +427,7 @@ function import_geojson(file)
 	
 	let feature = get_feature(da);
 	if(feature.length == 0){
-		return "There are no features in the file '"+file+"'";
+		return in_file_text(file)+" there are no features";
 	}	
 		
 	let tab = get_feature_table(da,feature);
@@ -457,25 +470,22 @@ function import_table(te)
 
 
 /// Checks if lat and lng are correctly specified
-function check_latlng(lat,lng)
+function check_latlng(lat,lat_tag,lng,lng_tag)
 {
 	if(lng == "" || lat == ""){
-		alert_import("The 'lat' and 'lng' must be set");
+		alert_import("'"+lat_tag+"' and '"+lng_tag+"' must both be set");
 	}
-	if(isNaN(lat)){
-		alert_import("'lat' must be a number");
-	}
-
-	if(isNaN(lng)){
-		alert_import("'lng' must be a number");
-	}
+	
+	is_number(lat,lat_tag);
+	
+	is_number(lng,lng_tag);
 
 	if(lat > 90 || lat < -90){
-		alert_import("'lat' must be in the range -90 to 90");
+		alert_import("For '"+lat_tag+"' the value '"+lat+"' must be in the range -90 to 90");
 	}
 	
 	if(lng > 180 || lng < -180){
-		alert_import("'lng' must be in the range -180 to 180");
+		alert_import("For '"+lng_tag+"' the value '"+lng+"' must be in the range -180 to 180");
 	}
 }
 
@@ -545,8 +555,43 @@ function get_command_tags(trr)
 	}
 	
 	let num = (frag.length-1)/3;
+	let numi = Math.floor(num);
 
-	if(num != Math.floor(num)){ alert_import("Syntax error"); return;}
+	for(let n = 0; n < num; n++){
+		let ii = 1+n*3;
+
+		if(frag[ii].text == "="){
+			alert_import("An equal sign '=' is misplaced.");
+			return syntax_error();
+		}
+			
+		if(ii+2 >= frag.length){
+			if(ii+1 < frag.length && frag[ii+1].text == "="){
+				alert_import("The property '"+frag[ii].text+"' is unset");
+			}
+			else{
+				alert_import("The text '"+frag[ii].text+"' cannot be understood");
+			}
+			return syntax_error();
+		}
+		
+		if(frag[ii+1].text != "="){
+			alert_import("The property '"+frag[ii].text+"' is missing an equals sign");
+			return syntax_error();
+		}
+		
+		if(ii+2 < frag.length && frag[ii+2].text == "="){
+			alert_import("The property '"+frag[ii].text+"' cannot be followed by '=='");
+			return syntax_error();
+		}
+		
+		if(ii+3 < frag.lengh && frag[ii+3].text == "="){
+			alert_import("The property '"+frag[ii].text+"' is unset");
+			return syntax_error();
+		}
+	}
+	
+	if(num != numi){ alert_import("Syntax error"); return;}
 	let tags=[];
 
 	for(let n = 0; n < num; n++){
@@ -664,7 +709,7 @@ function output_help(res)
 /// Transfers alertp messages to window
 function alertp(te)
 {
-	if(false){ pr("throw"); pr({type:"AlertP", te:te});}
+	if(false){ error("throw"); error({type:"AlertP", te:te});}
 	throw({type:"AlertP", te:te});
 }
 
@@ -714,7 +759,10 @@ function option_error(na,te,pos,line)
 	
 	let st = "'"+na+"' has a value '"+te+"' but should be chosen from one of the following options: ";
 	for(let i = 0; i < pos.length; i++){
-		if(i != 0) st += ", ";
+		if(i != 0){
+			if(i+1 == pos.length) st += " or ";
+			else st += ", ";
+		}
 		st += "'"+pos[i]+"'";
 	}
 	
@@ -728,12 +776,12 @@ function get_claa()
 {
 	let p = imp.p;
 	if(p == undefined){
-		alert_import("Species needs to be specified before "+imp.cname);
+		alert_import("A species needs to be specified before the '"+imp.cname+"' command can be added");
 	}
 			
 	let cl = imp.cl;
 	if(cl == undefined){
-		alert_import("Classification needs to be specified before "+imp.cname);
+		alert_import("A classification needs to be specified before the '"+imp.cname+"' command can be added");
 	}
 	return model.species[p].cla[cl];
 }		
@@ -752,6 +800,7 @@ function process_lines(lines)
 		imp.line = j;
 		
 		let trr = lines[j].trim();
+		if(trr.length > 6 && trr.substr(0,6) == "camera") trr = "view"+trr.substr(6);	
 	
 		let flag = false;                              // Ignores line if empty or commented out
 		if(trr.length == 0) flag = true;
@@ -857,7 +906,8 @@ function load_data_files(pro)
 			if(typeof file == 'string'){
 				switch(tag.name){
 				case "value": case "boundary": case "constant": case "reparam": case "prior-split": case "dist-split": 
-				case "A": case "A-sparse": case "pedigree": case "X": case "file": case "text": case "ind-list":
+				case "A": case "A-sparse": case "pedigree": case "X": case "file": 
+				case "text": case "ind-list": case"factor-weight":
 					{
 						if(is_file(file)){
 							let k = 0; while(k < previous_loaded.length && file != previous_loaded[k]) k++;
@@ -899,33 +949,6 @@ function setup_camera()
 			else set_ruler(p,cl);
 		}
 	}
-}
-
-
-/// Adds text escape characters
-function add_escape_char(te)
-{
-	let escape_char = [];
-	for(let i = 0; i < greek_latex.length; i++){
-		escape_char.push(["\\"+greek_latex[i][0],greek_latex[i][1]]);
-	}
-	escape_char.push(["\\sum","Σ"]);
-	
-	let i = 0;
-
-	while(i < te.length){
-		if(te.substr(i,1) == "\\"){
-			let j = 0; 
-			while(j < escape_char.length && te.substr(i,escape_char[j][0].length) != escape_char[j][0]) j++;
-			if(j < escape_char.length){
-				te = te.substr(0,i)+escape_char[j][1]+te.substr(i+escape_char[j][0].length);
-			}
-			else i++;
-		}
-		else i++;
-	}
-	
-	return te;
 }
 
 
@@ -991,9 +1014,9 @@ function get_cl_from_trans(name,p)
 
 
 /// Determines if a valid colour 
-function is_Color(color)//zz
+function is_Color(color)
 {
-	let allow = "0123456789abcdefABCDEF"
+	let allow = "0123456789abcdefABCDEF";
 	color = color.trim();
 	if(color.substr(0,1) == "#"){
 		if(color.length != 7) return false;
@@ -1325,7 +1348,7 @@ function check_import_correct()
 /// Checks if a string is a number
 function is_number(num,tag)
 {
-	if(isNaN(num)) alert_import("'"+tag+"' must be a number"); 
+	if(isNaN(num)) alert_import("For '"+tag+"' the value '"+num+"' must be a number"); 
 }
 
 
@@ -1334,7 +1357,17 @@ function is_positive(num,tag)
 {
 	let val = Number(num);
 	if(isNaN(num) || val <= 0){
-		alert_import("'"+tag+"' must be a positive number"); 
+		alert_import("For '"+tag+"' the value '"+num+"' must be a positive number"); 
+	}
+}
+
+
+/// Checks if a string is a positive integet
+function is_pos_int(num,tag)
+{
+	let val = Number(num);
+	if(isNaN(num) || val != Math.floor(val) || val <= 0){
+		alert_import("For '"+tag+"' the value '"+num+"' must be a positive integer"); 
 	}
 }
 
@@ -1344,7 +1377,7 @@ function is_zeroone(num,tag)
 {
 	let val = Number(num);
 	if(isNaN(num) || val < 0 || val > 1){
-		alert_import("'"+tag+"' must be between 0 and 1"); 
+		alert_import("For '"+tag+"' the value '"+num+"' must be between 0 and 1"); 
 	}
 }
 

@@ -49,7 +49,7 @@ class Graph
 	define(variety,type,data,op)    
 	{
 		if(graph_dia){		
-			pr("GRAPH DIA: variety:"+variety+" type:"+type+" data:"); pr(data); pr("op:"); pr(op);
+			error("GRAPH DIA: variety:"+variety+" type:"+type+" data:"); error(data); error("op:"); error(op);
 		}
 		
 		this.extra_flag = false;
@@ -83,7 +83,7 @@ class Graph
 	/// Initialises the axes
 	initialise_axes()
 	{
-		if(graph_dia) pr("GRAPH DIA: initialise axes: "+ plot_variety(this.type));
+		if(graph_dia) error("GRAPH DIA: initialise axes: "+ plot_variety(this.type));
 	
 		this.colour_key = undefined;
 		
@@ -286,6 +286,16 @@ class Graph
 			}
 		}
 		
+			
+		switch(this.variety){
+		case "Histogram": case "HistoAnim":                   // On histogram place zero on one end
+			if(!(ymin <= 0 && ymax >= 0)){
+				if(ymin > 0) ymin = 0;
+				else ymax = 0;
+			}
+			break;
+		}
+		
 		if(ymax < ymin+TINY) ymax = ymin;
 		
 		if(ymin == ymax){                              // Ensures thay ymin and ymax are not the same
@@ -297,13 +307,19 @@ class Graph
 		}
 		else{
 			if(this.variety != "Scatter"){
-				if(ymin > 0 && ymax > 0 && ymin < 0.8*ymax) ymin = 0; // Puts lower bound at zero
+				// Puts lower bound at zero
+				if(ymin > 0 && ymax > 0 && ymin < 0.8*ymax) ymin = 0; 
 			}
 		}
 	
 		if(this.op.yaxis == false) ymin = 0;
 		
 		if(this.type == "HistoAnim"){ xmin = 0; xmax = this.data.length;}
+		
+		switch(this.variety){
+		case "TransBias": ymin = -1; ymax = 1; break;
+		//case "TransP": ymin = 0; break;
+		}
 		
 		this.range = {xmin:xmin, ymin:ymin, xmax:xmax, ymax:ymax};
 	}
@@ -723,15 +739,23 @@ class Graph
 		let anim = this.animation;
 		
 		anim.playframe = 0;
+		anim.playing = false;
+		
+		let k = 0;
+		while(k < this.data.length && this.data[k].type == "VertLine") k++;
+		if(k == this.data.length){ error("Could not find data"); return;}
+				
+		let da = this.data[k];
 		
 		switch(this.variety){
-		case "MatrixAnim": anim.playframe_max = this.data[0].mat[0][0].length-1; break;
-		case "CompMatrixAnim": anim.playframe_max = this.data[0].value[0][0].length-1; break;
-		case "Population": anim.playframe_max = this.data[0].y_vec.length-1; break;
-		default: anim.playframe_max = this.data[0].point.length-1; break;
+		case "MatrixAnim": anim.playframe_max = da.mat[0][0].length-1; break;
+		case "CompMatrixAnim": anim.playframe_max = da.value[0][0].length-1; break;
+		case "Population":	
+			if(da.y_vec) anim.playframe_max = da.y_vec.length-1;
+			else anim.playframe_max = da.point.length-1;
+			break;
+		default: anim.playframe_max = da.point.length-1; break;
 		}
-	
-		anim.playing = false;
 	}
 	
 	
@@ -795,7 +819,8 @@ class Graph
 			let dxmin = Math.floor(sx-sr);
 			let dxmax = Math.floor(1+sx+sr);
 			
-			let sy = (po[k].y-ymin)/rule;
+			//let sy = (po[k].y-ymin)/rule;
+			let sy = (ymax-po[k].y)/rule;
 			let dymin = Math.floor(sy-sr);
 			let dymax = Math.floor(1+sy+sr);
 			
@@ -817,8 +842,8 @@ class Graph
 				}
 			}
 		}
-	
-		this.density_info = { x:xmin, y:ymin, dx:dx, dy:dy, mat:mat, DX:DX, DY:DY};
+
+		this.density_info = { x:xmin, y:ymax, dx:dx, dy:dy, mat:mat, DX:DX, DY:DY};
 	}
 	
 	
@@ -857,7 +882,7 @@ class Graph
 	}
 	
 	
-	/// Activates when the timebar is pressed
+	/// Activates when the slider is pressed
 	press_slider(bu,update)
 	{
 		let info = bu.info;
@@ -876,7 +901,7 @@ class Graph
 			switch(bu.info.update){
 			case "density": inter.graph.density_init(); break;
 			case "compmatrix": this.comp_matrix_init(); break;
-			case "scale": break;
+			case "scale": model.update_pline(this.get_cla(bu.p,bu.cl)); break;
 			default: error("update not recognised"); break;
 			}
 		}
@@ -945,7 +970,7 @@ class Graph
 	/// Plots the content of the graph
 	content(lay)
 	{
-		if(graph_dia) pr("GRAPH DIA content: "+this.variety);
+		if(graph_dia) error("GRAPH DIA content: "+this.variety);
 		
 		let vari = plot_variety(this.type);
 		
@@ -1025,6 +1050,7 @@ class Graph
 		case "Matrix": case "MatrixAnim":
 			{
 				let da = this.data[0];
+			
 				let fr = this.animation.playframe;
 				
 				let labels = {ylab:da.ylab, xlab:da.xlab};
@@ -1041,19 +1067,23 @@ class Graph
 						
 						let stat; if(da.mat_stat) stat = da.mat_stat[j][i];
 					
-						let col, value, te;
+						let col, value, CImin, CImax, te;
 						if(this.variety == "MatrixAnim"){
 							col = da.mat_col[j][i][fr];
-							value = da.mat[j][i][fr];
+							value = precision(da.mat[j][i][fr]);
+							if(da.CImin) CImin = precision(da.CImin[j][i][fr]);
+							if(da.CImax) CImax = precision(da.CImax[j][i][fr]);
 							te = da.mat[j][i][fr];
 						}
 						else{
 							col = da.mat_col[j][i];
-							value = da.mat[j][i];
+							value = precision(da.mat[j][i]);
+							if(da.CImin) CImin = precision(da.CImin[j][i]);
+							if(da.CImax) CImax = precision(da.CImax[j][i]);
 							te = da.mat[j][i];
 						}							
 						
-						lay.add_button({te:precision(te), x:fraci*lay.dx+marx, y:(1-fracj)*lay.dy-dy+mary, dx:dx-2*marx, dy:dy-2*mary, value:value, i:i, j:j, labels:labels, stat:stat, col:col, type:"MatrixEleBut", ac:"MatrixEleBut"});
+						lay.add_button({te:precision(te), x:fraci*lay.dx+marx, y:(1-fracj)*lay.dy-dy+mary, dx:dx-2*marx, dy:dy-2*mary, value:value, CImin:CImin, CImax:CImax, i:i, j:j, labels:labels, stat:stat, col:col, type:"MatrixEleBut", ac:"MatrixEleBut"});
 					}
 				}
 			}
@@ -1071,8 +1101,8 @@ class Graph
 	draw_content_button(x,y,dx,dy)
 	{
 		if(graph_dia){
-			pr("GRAPH DIA draw content button: data:");
-			pr(this.data);
+			error("GRAPH DIA draw content button: data:");
+			error(this.data);
 		}
 		
 		fill_rectangle(x,y,dx,dy,WHITE); 
@@ -1116,9 +1146,10 @@ class Graph
 	draw_ind_timeline_button(x,y,dx,dy,name,info,col_timeline,obs)
 	{
 		let bar = 1;
-		let yte = y+dy/2-0.3;
+		let si = dy/3.5;
+		let yte = y+dy/2-0.15*dy;
 		
-		right_text(info,x+dx-0.2,yte,get_font(0.8),BLACK,0.6*dx); 
+		right_text(info,x+dx-0.2,yte,get_font(si),BLACK,0.6*dx); 
 		
 		let ra = this.range;
 				
@@ -1127,7 +1158,7 @@ class Graph
 			center_text("Unobserved",x+dx/2,y+0.87*dy,get_font(0.8),BLACK,dx);
 		}
 		else{	
-		let y1 = ro_down(y+dy/2), y2 = ro_down(y+dy);
+			let y1 = ro_down(y+dy/2), y2 = ro_down(y+dy);
 		
 			let pos = [];
 			for(let i = 0; i < col_timeline.length; i++){
@@ -1150,48 +1181,53 @@ class Graph
 			for(let i = 0; i < obs.length; i++){
 				let ob = obs[i];
 				let xx = x+dx*((ob.t-ra.xmin)/(ra.xmax-ra.xmin));
-		
+	
 				switch(ob.type){
 				case "AddObs":
 					{
 						let siw = 0.5, sih = 0.7;
-						multi_triangle(xx,yy-sih/2,siw,sih,ob.col_list,BLACK,NORMLINE);
-						multi_triangle(xx,yy-sih/2,siw,sih,ob.col_list,BLACK,NORMLINE);
+						multi_triangle(xx,yy-sih/2,siw,sih,ob.col_list,black_not_list(ob.col_list),NORMLINE);
 					}
 					break;
 				
 				case "RemObs":
 					{
 						let siw = 0.5, sih = 0.7;
-						rem_triangle(xx-sih,yy-sih/2,siw,sih,BLACK);
+						rem_triangle(xx-siw,yy-sih/2,siw,sih,BLACK);
 					}
 					break;
 				
 				case "MoveObs":
 					if(ob.col_list.length == 1){
-						fill_semicircle(xx,yy,r,ob.col_list[0].col,BLACK,NORMLINE); 
+						fill_semicircle(xx,yy,r,ob.col_list[0].col,black_not_list(ob.col_list),NORMLINE); 
 					}
 					break;
 					
 				case "TransObs":
 					if(ob.col.length == 2){
-						fill_rectangle(xx-si2/2,yy-si2/2,si2/2,si2,ob.col[0],NORMLINE); 
-						fill_rectangle(xx,yy-si2/2,si2/2,si2,ob.col[1],NORMLINE); 
+						draw_trans_obs(xx-si2/2,yy-si2/2,si2,si2,ob.col[0],ob.col[1]);
 					}
 					else{
 						draw_line(xx,yy-si2/2,xx,yy+si2/2,BLACK,NORMLINE);
+						draw_rectangle(xx-si2/2,yy-si2/2,si2,si2,BLACK,NORMLINE); 
 					}
-					
-					draw_rectangle(xx-si2/2,yy-si2/2,si2,si2,BLACK,NORMLINE); 
 					break;
 					
 				case "CompObs":
-					if(ob.col_list.length == 1) fill_circle(xx,yy,r,ob.col_list[0].col,BLACK,NORMLINE); 
-					else multi_circle(xx,yy,r,ob.col_list,BLACK,NORMLINE); 
+					if(ob.col_list.length == 1){
+						let co = ob.col_list[0].col;
+						if(co == "notalive"){
+							fill_circle_cross(xx,yy,r,WHITE,BLACK,NORMLINE); 
+						}
+						else{
+							fill_circle(xx,yy,r,co,black_not_list(ob.col_list),NORMLINE);
+						}
+					}						
+					else multi_circle(xx,yy,r,ob.col_list,black_not_list(ob.col_list),NORMLINE); 
 					break;
 				
 				case "DiagObs":
-					if(ob.res == true) draw_rect(xx-si/2,yy-si/2,si,si,BLACK,BLACK,NORMLINE); 
+					if(ob.res == true) draw_rect(xx-si/2,yy-si/2,si,si,DDGREY,BLACK,NORMLINE); 
 					else draw_rect(xx-si/2,yy-si/2,si,si,WHITE,BLACK,NORMLINE);  
 					break;
 				
@@ -1761,11 +1797,10 @@ class Graph
 	draw_xtick_label(x,y,dx,dy,mar,x_lab,x_vert,x_param,si,ov)
 	{
 		fill_rectangle(x,y,dx-1,dy,WHITE); 
-	
+
 		let ra = this.range;
 		
 		let col = BLACK; if(ov) col = DGREY;
-		
 		if(x_lab){
 			let wid = (dx-mar.left-mar.right)/x_lab.length;
 			
@@ -1778,11 +1813,11 @@ class Graph
 				}	
 				else{
 					if(x_vert == true){
-						let tsa = text_sup_anno(x_lab[i].name,si,dy-0.2);
+						let tsa = text_sup_anno(x_lab[i].name,si,dy,"arial");
 						vert_text_tsa(tsa,xx+0.3*si,y+0.2,si,col);
 					}
 					else{
-						let tsa = text_sup_anno(x_lab[i].name,si,wid);
+						let tsa = text_sup_anno(x_lab[i].name,si,wid,"arial");
 						center_text_tsa(tsa,xx,y+0.6,col);
 					}
 				}
@@ -1853,7 +1888,7 @@ class Graph
 	axes(lay)
 	{
 		let mar = lay.op.mar;
-		if(graph_dia){ pr("GRAPH_DIA: axes: op:"); pr(lay.op); pr(this.op);}
+		if(graph_dia){ error("GRAPH_DIA: axes: op:"); error(lay.op); error(this.op);}
 		
 		lay.add_button({x:mar.left, y:lay.dy-mar.bottom, dx:lay.dx-mar.left, dy:0, type:"x-axis"});
 		
@@ -2059,8 +2094,8 @@ class Graph
 							let fea = ms.feature[i];
 							let box = fea.box;
 						
-							let p1 = trans_point(box.xmin,box.ymin,cam,lay);
-							let p2 = trans_point(box.xmax,box.ymax,cam,lay);
+							let p1 = trans_point(box.xmin,box.ymax,cam,lay);
+							let p2 = trans_point(box.xmax,box.ymin,cam,lay);
 							
 							lay.add_button({x:p1.x, y:p1.y, dx:p2.x-p1.x, dy:p2.y-p1.y, type:"Feature", polygon:fea.polygon});
 						}
@@ -2076,7 +2111,7 @@ class Graph
 	/// Adds all the compartment buttons
 	add_compartment_buts(lay) 
 	{
-		if(graph_dia) pr("GRAPH DIA: add_compartment_buts");
+		if(graph_dia) error("GRAPH DIA: add_compartment_buts");
 		
 		let vari = this.variety;
 		
@@ -2088,7 +2123,7 @@ class Graph
 		let p = this.op.p;
 		let cl = this.op.cl;
 	
-		lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, p:p, cl:cl, ac:"ClassificationBack", type:"Nothing"});
+		lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, p:p, cl:cl, ac:"ClassGraphBack", type:"Nothing"});
 	
 		let claa = this.get_cla(p,cl);  	
 		let cam = claa.camera;
@@ -2125,7 +2160,7 @@ class Graph
 				}
 			}
 			di.col_k = col_k;
-			
+
 			lay.add_button({x:pt.x, y:pt.y, dx:di.dx*cam.scale, dy:di.dy*cam.scale, type:"DensityBut"});
 		}
 		else{
@@ -2185,17 +2220,18 @@ class Graph
 					break;		
 				}
 				
-				if(Math.floor(value) != value){ 	
-					if(value < 1) value = value.toFixed(4);
-					else value = precision(value,4)
+				if(!isNaN(value)){
+					if(Math.floor(value) != value){ 	
+						value = precision(value,4)
+					}
 				}
 				
 				switch(c.type){
 				case "box":
 					{
 						let pt = trans_point(c.x,c.y,cam,lay);
-						let w =	c.w*cam.scale;
-						let h =	c.h*cam.scale; 
+						let w =	c.w*cam.scale*Math.exp(cam.slider.value);
+						let h =	c.h*cam.scale*Math.exp(cam.slider.value); 
 						let x = pt.x-w/2, y = pt.y-h/2;
 					
 						lay.add_button({te:name, x:x, y:y, dx:w, dy:h, ac:ac, type:co_graph, value:value, CImin:CImin, CImax:CImax, col:col, col_dark:dark_colour(col), p:p, cl:cl, i:k, show:true});
@@ -2204,7 +2240,7 @@ class Graph
 				
 				case "latlng":
 					{
-						let si = cam.scale*cam.ruler*Math.exp(inter.lnglat_slider.value);
+						let si = cam.scale*cam.ruler*Math.exp(cam.slider.value);
 						if(si > si_limit_circle){
 							let pt = trans_point(c.x,c.y,cam,lay);
 							let w =	2*latlng_radius*si, h = w; 
@@ -2219,8 +2255,8 @@ class Graph
 						let ms = find_map_store(c.map_ref);
 						let box = ms.feature.box;
 			
-						let pmin = trans_point(box.xmin,box.ymin,cam,lay);
-						let pmax = trans_point(box.xmax,box.ymax,cam,lay);
+						let pmin = trans_point(box.xmin,box.ymax,cam,lay);
+						let pmax = trans_point(box.xmax,box.ymin,cam,lay);
 						
 						lay.add_button({te:name, value:value, CImin:CImin, CImax:CImax, x:pmin.x, y:pmin.y, dx:pmax.x-pmin.x, dy:pmax.y-pmin.y, ac:ac, type:co_map, polygon:ms.feature.polygon, mask:ms.mask, col:col, p:p, cl:cl, i:k});
 					}
@@ -2303,7 +2339,7 @@ class Graph
 	{
 		let xz = lay.dx-6, yz = lay.dy-2;
 
-		let xslid = 2.4;
+		let xslid = xz-6;
 	
 		switch(this.variety){
 		case "CompMatrix": case "CompVector":
@@ -2322,16 +2358,6 @@ class Graph
 				lay.add_button({x:lay.dx/2+dx-play_r, y:lay.dy-2*play_r, dx:2*play_r, dy:2*play_r, type:"PlayForward", ac:"PlayForward"});
 				
 				lay.add_button({x:2.4, y:yz+0.2, dx:1.4, dy:1.4, ac:"Settings", type:"Settings"});
-				/*
-				let timepoint = this.op.timepoint;
-				let anim = inter.graph.animation;
-				if(timepoint && anim.playing == false){
-					let si = 0.9;
-					lay.add_button({te:"t="+timepoint[anim.playframe], x:xz-5, y:2.5, dx:4, dy:si, type:"CenterText", font:get_font(si)}); 
-				}
-				*/
-				
-				xslid = 5.4;
 			}
 			break;
 		}
@@ -2349,10 +2375,10 @@ class Graph
 			{
 				let op = this.op;
 				let claa = this.get_cla(op.p,op.cl);
-				if(claa.camera.coord == "latlng"){
-					inter.lnglat_slider.lay = lay.name;
-					lay.add_button({x:xslid, y:yz+0.5, dx:5, dy:1, info:inter.lnglat_slider, ac:"Slider", type:"Slider"});
-				}
+				let cam = claa.camera;
+			
+				cam.slider.lay = lay.name;
+				lay.add_button({x:xslid, y:yz+0.5, dx:5, dy:1, info:cam.slider, p:op.p, cl:op.cl, ac:"Slider", type:"Slider"});
 			}
 		}
 		
@@ -2479,7 +2505,7 @@ class Graph
 	create(x,y,w,h,lay) 
 	{
 		let vari = plot_variety(this.type);
-		if(graph_dia) pr("GRAPH DIA: createL  vari:"+vari);
+		if(graph_dia) error("GRAPH DIA: createL  vari:"+vari);
 		
 		let hei = 4;
 	
@@ -2679,13 +2705,12 @@ class Graph
 		case "Stat table plot":
 			{
 				let da = this.data[0];
-			
 				add_layer("TableContent",lay.x+x,lay.y+y,w,h,{table:da.table});
 			}
 			break;
 			
 		case "No graph plot":
-			center_message(this.op.label,lay);
+			center_message_box(x,y,w,h,this.op.label,lay);
 			break;
 			
 		default: error("Variety not recognised:"+vari); break;
@@ -2740,7 +2765,7 @@ class Graph
 	no_graph(x,y,w,h,lay,te) 
 	{
 		if(te == undefined) te = "No data";
-		center_message(te,lay);
+		center_message_box(x,y,w,h,te,lay);
 	}
 	
 	
@@ -2776,7 +2801,8 @@ class Graph
 					
 			switch(name){
 			case "GraphContent": case "Axes": case "TimeAxis": case "RightBotMenu": case "TableContent":
-			case "AnnotationMap": case "Annotation": case "Compartment": case "Transition":	
+			case "AnnotationMap": case "Annotation": case "PointLabel": 
+			case "Compartment": case "Transition":	
 			case "GraphAnnotations": case "GraphCompartments":
 			case "GraphTransitions":
 				{
@@ -2867,8 +2893,7 @@ class Graph
 		if(val < point[0].x) return 0;
 		if(val > point[point.length-1].x) return 0;
 	
-		let i = 0; while(i < point.length-1 && point[i+1].x < val) i++;
-		
+		let i = 0; while(i < point.length-1 && point[i+1].x <= val) i++;
 		let f = (val-point[i].x)/(point[i+1].x-point[i].x);
 	
 		return point[i].y*(1-f) + point[i+1].y*f;

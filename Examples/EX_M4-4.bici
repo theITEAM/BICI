@@ -1,4 +1,9 @@
 
+###################### DATA DIRECTORY ######################
+
+data-dir folder="Examples\EX_M4-4-data-files"
+
+
 ####################### DESCRIPTION ########################
 
 description text="description.txt"
@@ -6,34 +11,31 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-data-dir folder="Examples\EX_M4-4-data-files"
-
 simulation start=0 end=100 timestep=0.5
 
-inference start=0 end=100 timestep=0.5
+inference start=0 end=100 timestep=0.5 nchain=3
 
 post-sim start=0 end=100
 
 
 ######### DEFINE MODEL AND DATA FOR SPECIES PLANT ##########
 
-species name="Plant" type="individual" trans-tree="off"
+species name="Plant" type="individual"
 
 # SPECIES MODEL
 
 class name="Presence" index="a"
 
-comp name="No" color="#009900" x=-27 y=-7
-comp name="Yes" color="#ff2222" x=5 y=-7
+comp name="No" color="#009900" x=-15 y=0
+comp name="Yes" color="#ff2222" x=14 y=0
 
 trans name="No->Yes" value="exp(rate:β×〈g〉×Σ^max:100_l' ({Yes,l'}/(1+pow(D_l,l'/r|3))))"
 
-
 class name="Location" index="l" coord="latlng"
 
+view lat=54.929 lng=-2.6875 scale=90.314
+
 comp-all color="#000099" fix="true" file="comp-Location.csv"
-
-
 
 # FIXED EFFECTS
 
@@ -44,18 +46,15 @@ fixed-effect name="g" X="X-vector-g.csv"
 add-ind-sim file="add-ind-sim.csv"
 
 
-# INFERENCE DATA
-
-add-ind file="add-ind.csv"
-
-comp-data class="Presence" file="comp-data-Presence.csv"
-
-
 
 ######################## PARAMETERS ########################
 
-param name="r" value="25"
-param name="β" value="0.03"
-param name="ν^g" value="0.4"
+param name="r" value="25" prior="uniform(0,100)"
+
+param name="β" value="0.03" prior="uniform(0,0.1)"
+
+param name="μ^g" value="0.4" prior="uniform(-1,1)"
+
+
 
 

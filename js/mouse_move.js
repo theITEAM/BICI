@@ -7,7 +7,7 @@ function mouse_move(x,y)
 	let xst = inter.mx, yst = inter.my
 	inter.mx = x; inter.my = y;
 
-	//pr("ty"); pr(inter.mode.type);
+	//prr("ty"); prr(inter.mode.type);
 	switch(inter.mode.type){
 	case "Drag_Letter":
 		inter.figure[inter.mode.index].x = x-letter_size/2;
@@ -145,7 +145,7 @@ function mouse_move(x,y)
 			let pos = mo.pos; 
 			
 			let shx = inter.mx-mo.mx;
-			let shy = inter.my-mo.my;
+			let shy = -(inter.my-mo.my);
 		
 			let claa = model.species[p].cla[cl];
 			let cam = claa.camera;
@@ -227,8 +227,9 @@ function mouse_move(x,y)
 			let pos = model.species[mo.p].cla[mo.cl].tra[mo.i].midp[mo.index];
 			
 			if(pos.x != mp.x || pos.y != mp.y){
-				model.species[mo.p].cla[mo.cl].tra[mo.i].midp[mo.index] = mp;
-				model.find_trans_pline(mo.p,mo.cl,mo.i);   
+				let claa = model.species[mo.p].cla[mo.cl];
+				claa.tra[mo.i].midp[mo.index] = mp;
+				model.find_trans_pline(claa,mo.i);   
 			
 				if(inter.bubble.lay_name != undefined){
 					generate_screen();
@@ -366,7 +367,7 @@ function get_button_over(x,y)
 					case "CompMap": case "CompMapGraph":
 						{
 							let frx = (x-(sh_x+bu.x))/bu.dx;
-							let fry = (y-(sh_y+bu.y))/bu.dy;
+							let fry = 1-(y-(sh_y+bu.y))/bu.dy;
 							if(mouse_over_comp_map(frx,fry,bu.mask) == true){
 								return { layer:l, i:i};
 							}

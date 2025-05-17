@@ -13,6 +13,13 @@ function create_edit_param(lay)
 	let help = edittensor_text;
 	let doneac = "EditParamDone";
 	
+	if(inter.edit_param.type == "weight"){
+		title = "Edit tensor weights";
+		help = edittensorweight_text;
+		doneac = "EditWeightDone";
+	}
+	
+	
 	let	load_title = "Load tensor values", load_te = load_tensor_text;
 	let load_ac = "LoadTensor";
 	
@@ -62,11 +69,12 @@ function create_edit_param(lay)
 	
 	if(too_big) title = title.substr(5,1).toUpperCase()+title.substr(6)+" (too large to edit)";
 	
-	cy = lay.add_title(title,cx,cy,{te:help});
-		
+	if(par.dist_mat) cy = lay.add_title("Distance matrix",cx,cy,{te:dist_mat_text});
+	else cy = lay.add_title(title,cx,cy,{te:help});
+	
 	add_layer("CreateEditParamContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{type:lay.op.type});
 	
-	if(too_big == true){
+	if(too_big == true || par.dist_mat){
 		lay.add_corner_button([["Back","Grey","CancelEditParam"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
 	else{
@@ -76,7 +84,7 @@ function create_edit_param(lay)
 	let x = 1.2, y = lay.dy-1.6;
 	let gap = 3.5;
 	
-	if(par.name != dist_matrix_name){
+	if(!par.dist_mat){
 		let w = model.add_object_button(lay,"Load",x,y,load_ac,{ back:WHITE, active:true, info:{}, title:load_title, te:load_te}); 
 		x += w+gap;
 	}
@@ -92,13 +100,19 @@ function add_create_edit_param_buts(lay)
 	let par = model.param[i];
 
 	let action = "EditParamElement";
+		
 	let dx_table_param = 7;
 	
 	let ele_type = "ParamElement";
 	
 	switch(lay.op.type){
+	case "weight":
+		ele_type = "ParamWeightConst";
+		break;
+		
 	case "Value":
 		ele_type = "ParamElementConst";
+		if(par.factor) ele_type = "ParamFactorConst";
 		break;
 		
 	case "Reparam":
@@ -118,10 +132,10 @@ function add_create_edit_param_buts(lay)
 		dx_table_param = 12;
 		break;
 		
-	default: error("option not recog"); break;
+	default: error(lay.op.type); error("option not recog"); break;
 	}
 	
-	if(eparam.too_big == true){ ele_type = "TooBigElement"; action = undefined;}
+	if(eparam.too_big == true || par.dist_mat){ ele_type = "TooBigElement"; action = undefined;}
 	
 	let value = eparam.value;
 	
@@ -390,7 +404,7 @@ function load_priorsplit(ep,source,dist)
 		
 			let pri = convert_text_to_prior(ele,par.pri_pos,dist);
 			if(pri.err == true){
-				alertp("Problem loading the element '"+ele+"' (col "+(dep.length+1)+", row "+(r+1)+"): "+pri.msg+".");
+				alertp("Problem loading the element '"+ele+"' (col "+(dep.length+1)+", row "+(r+1)+"): "+pri.msg+" .");
 			}
 			
 			set_element(prior_split,ind,pri);
@@ -435,7 +449,7 @@ function par_find_list(par)
 	}
 	
 	// In the case of the distance matrix truncates if too large
-	if(par.name == dist_matrix_name){
+	if(par.dist_mat){
 		let list_max = Math.floor(Math.sqrt(ELEMENT_MAX))+1;
 		
 		for(let k = list_max; k < list[0].length; k++){
@@ -456,7 +470,7 @@ function check_knot_times(te)
 		let te = spl[j].trim();
 		if(!(te == "start" && j == 0) && !(te == "end" && j == spl.length-1)){
 			if(isNaN(te)){
-				return "In '"+spl+"' the value '"+te+"' must be a number";
+				return "For '"+spl+"' the value '"+te+"' must be a number";
 				break;
 			}
 			else{
@@ -495,14 +509,18 @@ function check_param_valid(type)
 	for(let i = 0; i < model.param.length; i++){
 		let par = model.param[i];
 		if(par.variety == "reparam"){
-			if(par.dep.length == 0 || par.reparam_eqn_on){
+			if(par.dep.length == 0){
 				if(!isNaN(par.value)){
 					add_warning({mess:"Reparameterisation error", mess2:"The reparameterisation of '"+par.full_name+"' does not contain any parameters", warn_type:"reparam", siminf:type, name:par.name});
 				}
 			}
 			else{
-				if(par.reparam_param_list.length == 0){
-					add_warning({mess:"Reparameterisation error", mess2:"The reparameterisation of '"+par.full_name+"' does not contain any parameters", warn_type:"reparam", siminf:type, name:par.name});
+				if(par.reparam_eqn_on){
+				}
+				else{
+					if(par.reparam_param_list.length == 0){
+						add_warning({mess:"Reparameterisation error", mess2:"The reparameterisation of '"+par.full_name+"' does not contain any parameters", warn_type:"reparam", siminf:type, name:par.name});
+					}
 				}
 			}
 		}

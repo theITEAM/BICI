@@ -32,11 +32,10 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 		double dt;
 		auto R = 0.0; if(nnode > 0) R = markov_tree_rate[nnode-1];
 	
-		//if(R > -TINY && R < TINY) dt = LARGE;
 		if(R > -SMALL && R < TINY) dt = LARGE;
 		else{
-			if(R < 0){
-				emsg("Negative rate");
+			if(R < 0){		
+				emsg("Negative rate2");
 			}
 			auto ra = ran(); if(ra == 0) ra = TINY;
 			dt = -log(ra)/R;
@@ -49,11 +48,9 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 			tf = trig.t;
 			auto i = trig.i;
 			
-			auto &ind = individual[i];
 			switch(trig.type){
 			case ENTER_SIM_EV:
 				{
-					ind.num_trig_data--;
 					IndInfFrom iif;
 					if(sp.comp_gl[trig.c].infected == true) iif.p = ENTER_INF;
 					add_event(ENTER_EV,i,UNSET,UNSET,UNSET,trig.c,t,iif);	
@@ -62,12 +59,10 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 				break;
 				
 			case LEAVE_SIM_EV:
-				ind.num_trig_data--;
 				update_ind_remove(i,tf);
 				break;
 			
 			case MOVE_EV:
-				ind.num_trig_data--;
 				update_ind_move(i,tf,trig.c,trig.trg,popnum_t); 
 				break;
 				
@@ -84,8 +79,6 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 				
 			case DATA_TRANS_SIM_EV:
 				{
-					ind.num_trig_data--;
-			
 					auto ty = trig.type;
 					vector <SimTrigEvent> trig_vec;
 					trig_vec.push_back(trig);
@@ -213,8 +206,9 @@ bool StateSpecies::allow_event(double t, const IndTransRef &itr) const
 
 	// Don't allow event if sink and still trigger events
 	const auto &tr = sp.tra_gl[trg];
-	if(mode == INF && tr.variety == SINK_TRANS && individual[itr.i].num_trig_data != 0){
-		prob_ac = 0; 
+	
+	if(mode == INF && tr.variety == SINK_TRANS && itr.i < sp.individual.size() && t < sp.individual[itr.i].tmax){
+		return false;
 	}
 	
 	if(ran() < prob_ac) return true;
@@ -496,7 +490,7 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 			{
 				auto time = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
 				auto ts = t_begin+period_sample(time);
-		
+	
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
 			}
 			break;
@@ -663,8 +657,12 @@ void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vecto
 		auto &me = sp.markov_eqn[e];
 		auto &me_vari = markov_eqn_vari[e];
 		
-		auto value = eqn[me.eqn_ref].calculate(ti,popnum,param_val,spline_val);
-	
+		const auto &eq = eqn[me.eqn_ref]; 
+		auto value = eq.calculate(ti,popnum,param_val,spline_val);
+		if(value < -TINY){
+			emsg("The rate '"+eq.te_raw+"' has become negative");
+		}
+
 		if(me_vari.value != value){
 			update_markov_tree_rate(e,(value-me_vari.value)*me_vari.indfac_sum);
 			me_vari.value = value;
@@ -674,7 +672,7 @@ void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vecto
 
 
 /// Used to order trigger events
-bool Sim_Trig_ord(SimTrigEvent ev1, SimTrigEvent ev2)                      
+bool Sim_Trig_ord(const SimTrigEvent &ev1, const SimTrigEvent &ev2)                      
 { 
 	if(ev1.t == ev2.t){
 		if(ev1.i == ev2.i) return ev1.i < ev2.i;
@@ -992,6 +990,7 @@ unsigned int StateSpecies::add_individual(IndType ind_type, string name)
 	ind.type = ind_type;
 	ind.name = name;
 	ind.ie = sample_ie();
+	
 	set_exp_ie(ind);
 	
 	auto i = individual.size();

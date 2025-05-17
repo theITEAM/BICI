@@ -55,7 +55,7 @@ function create_output_file(save_type,map_store)
 	percent(80);
 
 	if(input.type == "View Code"){
-		te = add_escape_char(te);	
+		te = remove_escape_char(te);	
 		let	lines = te.split('\n');
 		
 		let pro = process_lines(lines);
@@ -74,12 +74,24 @@ function create_output_file(save_type,map_store)
 /// If there are error then display
 function err_warning()
 {
-	if(input.type == "Import output" && model.warn.length > 0){
-		let wa = model.warn[0];
-		alert_import(wa.mess+": "+wa.mess2);
+	if(model.warn.length > 0){
+		if(input.type == "Load Example" || input.type == "Import output"){
+			let wa = model.warn[0];
+			alert_import(wa.mess+": "+wa.mess2);
+			return;
+		}
 	}
 	
-	throw({type:"Model warning", command_type:input.type, species:strip_heavy(model.species), warn:model.warn});
+	let full_warn = false;
+	
+	switch(input.type){
+	case "View Code": case "Export BICI": case "Start": case "Save BICI": 
+	case "StartCluster": case "StartPPC":
+		full_warn = true;
+		break;
+	}
+	
+	throw({type:"Model warning", command_type:input.type, species:strip_heavy(model.species), warn:model.warn, full_warn:full_warn});
 }
 
 
@@ -110,7 +122,14 @@ function mini_banner(name)
 /// Generates details
 function create_output_details(save_type,file_list,one_file)
 {
-	let te = banner("DESCRIPTION");
+	let te = banner("DATA DIRECTORY");
+	
+	if(save_type == "export"){
+		te += 'data-dir folder="."'+endl;
+		te += endl;
+	}
+	
+	te += banner("DESCRIPTION");
 		
 	let desc = model.description.te;
 	let j = desc.length-1;
@@ -129,11 +148,6 @@ function create_output_details(save_type,file_list,one_file)
 	te += endl;
 	
 	te += banner("DETAILS");
-	
-	if(save_type == "export"){
-		te += 'data-dir folder="."'+endl;
-		te += endl;
-	}
 	
 	te += create_output_siminf(save_type);
 
@@ -226,10 +240,19 @@ function create_output_compartments(p,file_list,map_store,one_file)
 			
 			te += endl+endl;
 		
-			if(one_file){
-				te += 'camera '+output_coords(cam.x,cam.y,cam);
-		
-				te += ' scale='+precision(cam.scale)+endl+endl;
+			if(one_file || cam.coord == "latlng"){
+				te += 'view '+output_coords(cam.x,cam.y,cam);
+				
+				if(cam.grid == "on"){
+					if(!create_example) te += ' grid="on"'; 
+				}
+				
+				if(cam.slider.value != 0){
+					te += ' comp-scale='+Math.exp(cam.slider.value).toPrecision(2);
+				}
+				
+				te += ' scale='+precision(cam.scale);
+				te += endl+endl;
 			}
 			
 			let store=[];
@@ -374,7 +397,7 @@ function create_output_compartments(p,file_list,map_store,one_file)
 			case "weibull":
 				{
 					let sc = esc(tr.value.scale_eqn.te); if(sc == "") err_fl = "scale";
-					let sh = esc(tr.value.shape_erlang.te); if(sh == "") err_fl = "shape";
+					let sh = esc(tr.value.shape_eqn.te); if(sh == "") err_fl = "shape";
 					te = "weibull(scale:"+sc+", shape:"+sh+")";
 					nm_flag = true;
 				}
@@ -720,7 +743,7 @@ function output_param(par,save_type,file_list,one_file)
 		let te2 = "";
 		let display = false;
 		
-		if(par.name == dist_matrix_name){
+		if(par.dist_mat){
 			display = true;
 		}
 		else{
@@ -765,39 +788,12 @@ function output_param(par,save_type,file_list,one_file)
 						}
 						
 						if(file != undefined){
-							let data = '';
-							for(let d = 0; d < par.dep.length; d++){	
-								data += '"'+par.dep[d]+'",';
-							}
-							data += 'Value' + endl;
-						
-							let list = par.list;
-						
-							for(let i = 0; i < par.comb_list.length; i++){
-								let comb = par.comb_list[i];
-								let el = get_element(par.value,comb.index);
-								if(el == undefined){
-									let me = "A value for parameter "+par.full_name+" is undefined (";
-									for(let j = 0; j < par.dep.length; j++){
-										if(j != 0) me += ",";
-										me += list[j][comb.index[j]];
-									}
-									me += ").";
-									
-									add_warning({mess:"Parameter value is undefined", mess2:me, warn_type:"ParamValueProblem", par:par});
-									return;
-								}
-								
-								if(el != 0){	
-									for(let d = 0; d < par.dep.length; d++){
-										data += '"'+list[d][comb.index[d]]+'",';
-									}
-									data += '"'+el+'"'+endl;
-								}
+							let err = check_param_value("Set Param",par,par.value);
+							if(err){
+								add_warning({mess:"Problem with "+par.full_name+" value", mess2:err, warn_type:"MissingSimValue", name:par.name});
 							}
 						
-							write_file_store(data,file,file_list);
-							if(one_file) file = get_one_file(file_list);
+							file = output_value_table(par,par.value,file,file_list,one_file);
 							te2 += '"'+file+'"';
 						}
 						else{
@@ -854,8 +850,18 @@ function output_param(par,save_type,file_list,one_file)
 				}
 			}
 		}
+		
+		if(par.factor){
+			te1 += ' factor="true"';
 			
-		if(par.name != dist_matrix_name){
+			if(par.factor_weight_on.check == true){
+				let file = get_unique_file("weight-"+par.name,file_list,'.csv');
+				file = output_value_table(par,par.factor_weight,file,file_list,one_file);
+				te1 += ' factor-weight="'+file+'"';
+			}
+		}
+				
+		if(!par.dist_mat){
 			te += te1+te2+endl;
 		}
 		
@@ -865,10 +871,52 @@ function output_param(par,save_type,file_list,one_file)
 			}
 		}
 	}
+	te += endl;
 	
 	return te;
 }
 	
+	
+/// Outputs the value of a table
+function output_value_table(par,value,file,file_list,one_file)
+{													
+	let data = '';
+	for(let d = 0; d < par.dep.length; d++){	
+		data += '"'+par.dep[d]+'",';
+	}
+	data += 'Value' + endl;
+
+	let list = par.list;
+
+	for(let i = 0; i < par.comb_list.length; i++){
+		let comb = par.comb_list[i];
+		let el = get_element(value,comb.index);
+		if(el == undefined){
+			let me = "A value for parameter "+par.full_name+" is undefined (";
+			for(let j = 0; j < par.dep.length; j++){
+				if(j != 0) me += ",";
+				me += list[j][comb.index[j]];
+			}
+			me += ").";
+			
+			add_warning({mess:"Parameter value is undefined", mess2:me, warn_type:"ParamValueProblem", par:par});
+			return;
+		}
+		
+		if(el != 0){	
+			for(let d = 0; d < par.dep.length; d++){
+				data += '"'+list[d][comb.index[d]]+'",';
+			}
+			data += '"'+el+'"'+endl;
+		}
+	}
+
+	write_file_store(data,file,file_list);
+	if(one_file) file = get_one_file(file_list);
+	
+	return file;
+}
+
 
 /// Adds text associated with adding a distribution
 function output_add_prior_distribution(save_type,par,variety,file_list,one_file)
@@ -881,7 +929,7 @@ function output_add_prior_distribution(save_type,par,variety,file_list,one_file)
 	case "prior": key = "prior"; break;
 	}
 		
-	if(par.dep.length > 0 && par.prior_split_check.check == true){  /// Prior split up
+	if(par.dep.length > 0 && par.prior_split_check.check == true && !par.factor){  /// Prior split up
 		let warn_type;
 		switch(variety){
 		case "dist": key = "distribution"; warn_type = "MissingDistValue"; break;
@@ -961,7 +1009,17 @@ function get_prior_output(save_type,pri,variety,par)
 		return "";
 	}
 	
-	return '"'+get_prior_string(pri)+'"';
+	let st = get_prior_string(pri);
+	if(save_type == "inf" && par){	
+		let dist = true; if(variety == "prior") dist = false;
+		let pri = convert_text_to_prior(st,par.pri_pos,dist);
+		
+		if(pri.err == true){
+			add_warning({mess:"Error for "+variety, mess2:"The "+variety+" for parameter "+par.full_name+" has an error: "+pri.msg, warn_type:"ErrorPriorValue", name:par.name});
+		}
+	}
+	
+	return '"'+st+'"';
 }
 
 
@@ -1286,9 +1344,9 @@ function create_output_siminf(save_type)
 					}
 				}
 				
-				if(debug){
-					te += ' diagnostics="on"';
-				}
+				//if(debug){
+					//te += ' diagnostics="on"';
+				//}
 			}
 			break;
 		
@@ -1336,11 +1394,11 @@ function create_output_siminf(save_type)
 						te += ' power="' +details.anneal_rate+'"';
 						break;
 					}
-					
-					if(type != "scan"){
-						if(Number(details.burnin_frac) != BURNIN_FRAC_DEFAULT){
-							te += ' burnin-percent="' +details.burnin_frac+'"';
-						}
+				}
+				
+				if(type != "scan"){
+					if(Number(details.burnin_frac) != BURNIN_FRAC_DEFAULT){
+						te += ' burnin-percent="' +details.burnin_frac+'"';
 					}
 				}
 			}
@@ -1427,11 +1485,16 @@ function get_ppc_command(save_type)
 /// Adds information about simulation and inference
 function create_output_sim_inf_source(p,sim_or_inf,file_list,one_file)
 {
+	let te = "";
+	
 	let sp = model.species[p];
+	if(sim_or_inf == "ppc"){
+		if(!model.inf_res.plot_filter) return te;
+		sp = model.inf_res.plot_filter.species[p];
+		if(!sp) return te;
+	}
 	
 	let source, pa;
-		
-	let te = "";
 	
 	switch(sim_or_inf){
 	case "sim": pa = "Simulation"; source = sp.sim_source; te += mini_banner("SIMULATION INITIAL CONDITIONS"); break;
@@ -2101,8 +2164,22 @@ function output_table_simp_file(file,head,row,file_list)
 function output_check(save_type)
 {
 	// Checks to make sure initial population is set correctly
-	for(let p = 0; p < model.species.length; p++){
-		let sp = model.species[p];
+	let spec;
+	if(save_type == "ppc"){
+		let pf = model.inf_res.plot_filter;
+		if(pf){
+			spec = pf.species;
+		}
+	}
+	else{
+		spec = model.species;
+	}
+	
+	if(!spec) return;
+	
+	for(let p = 0; p < spec.length; p++){
+		let sp = spec[p];
+		
 		let source, pa;
 		
 		switch(save_type){
@@ -2313,15 +2390,11 @@ function tidy_code(te)
 function create_ppc_file()
 {
 	let te = inf_result.import_te;
-	pr("import");
-	pr(te);
 	
 	let file_list=[];
 	
 	te = remove_command(te,"post-sim,posterior-simulation,add-pop-post-sim,remove-pop-post-sim,add-ind-post-sim,remove-ind-post-sim,move-ind-post-sim,param-mult,inf-diagnostic,inf-generation,# MODIFICATION DATA");
 	te += endl+get_ppc_command("ppc")+endl+endl;
-
-	te += mini_banner("MODIFICATION DATA");
 
 	for(let p = 0; p < inf_result.species.length; p++){
 		let sp = inf_result.species[p];
@@ -2336,7 +2409,7 @@ function create_ppc_file()
 	}
 	
 	if(pfac_list.length > 0){
-		te += mini_banner("PARAMETER FACTORS");
+		te += mini_banner("PARAMETER MULTIPLIERS");
 		for(let k = 0; k < pfac_list.length; k++){
 			let par = model.param[pfac_list[k]];
 			if(par.type == "param factor"){

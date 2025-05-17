@@ -20,7 +20,7 @@ function display_fix_eff(p,i,x,y,lay,wmax)
 	
 	lay.add_button({te:"∝", x:x, y:y+0.2, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
 
-	let te = "<e>exp(X^"+feg.name+"_i</e><e>×</e><e>ν^"+feg.name+")</e>";
+	let te = "<e>exp(X^"+feg.name+"_i</e><e>×</e><e>"+fe_char+"^"+feg.name+")</e>";
 	lay.add_paragraph(te,wmax-x,x+1.6,y+0.2,BLACK,para_eq_si,para_lh);
 }
 

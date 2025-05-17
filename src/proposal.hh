@@ -14,12 +14,7 @@ class Proposal                             // Implements a proposal
 	public:
 		Proposal(PropType type_, vector <unsigned int> vec, const Model &model, const Output &output, double w, const BurnInfo &burn_info);
 		void initialise_variables();
-		void get_dependency();
-		void get_affect_like();
-		void set_mvn(double si_, const CorMatrix &cor_matrix);
-		double mvn_probability(const vector <double> &param1, const vector <double> &param2) const;
-		void update_sampler(const CorMatrix &cor_matrix);
-		vector <double> sample(vector <double> param_val);
+		
 		string print_info() const;
 		void MH(State &state);
 		
@@ -78,15 +73,10 @@ class Proposal                             // Implements a proposal
 			
 		bool all_events_correct;               // Flag determining if all obs events correct
 	
-		void initialise_ind_variable();
-		void initialise_swap_variable();
-		
-		vector <unsigned int> multinomial_resample(const vector <unsigned int> &x, const vector <double> &frac, double prob) const;
-		void multinomial_reduce(unsigned int dN, vector <unsigned int> &x, const vector <double> &frac) const;
-		void MH_ind(State &state);
+		void MH_event(State &state);
+		void MH_multi_event(State &state);
+		void MH_event_all(State &state);
 		void MH_ind_local(State &state);
-		void add_li_cha(unsigned int i, const vector <LocalIndChange> &add, vector <LocalIndChange> &licha, vector < vector <unsigned int> > &lc_ref) const;
-		void remove_li_cha(unsigned int i, vector <LocalIndChange> &licha, vector < vector <unsigned int> > &lc_ref) const;
 		void sample_ind_obs(State &state);
 		void trans_tree(State &state);
 		void trans_tree_swap_inf(State &state);
@@ -95,7 +85,6 @@ class Proposal                             // Implements a proposal
 		void resimulate_ind_obs(State &state);
 		void resimulate_single_ind_obs(State &state);
 		void resimulate_ind_unobs(State &state);
-		void calculate_affect_spline();
 		
 		// IE_PROP
 		unsigned int ie_prop;                 // The individual effect being changed
@@ -110,30 +99,51 @@ class Proposal                             // Implements a proposal
 		
 		// MBP_PROP
 		void mbp(State &state);
-		ICResult propose_init_cond(InitCondValue &icv, const State &state);
 		void param_event_joint(Direction dir, State &state);
 		void init_cond_frac(State &state);
 		double calculate_al(const Like &like_ch, double prop_prob) const;
-		void mbp_population_affect();
-		void update_si(double fac);
-		void update_ind_samp_si(unsigned int tr_gl, double fac);
 		string diagnostics(long total_time) const;
 		void update(State &state);
-		bool skip_proposal(double val) const;
 		void switch_enter_source(State &state);
+		void switch_leave_sink(State &state);
 		void correct_obs_trans_events(State &state);
 		void enforce_add_source(unsigned int i, double t, State &state);
 		void enforce_add_sink(unsigned int i, double t, State &state);
 		void enforce_add_trans(unsigned int i, const ObsData &ob, State &state);
 		bool try_move_obs_trans_event(unsigned int i, unsigned int e, double t, const ObsData &ob, const vector <Event> &ev, State &state);
 		void basic_ind_update(unsigned int i, vector <Event> &ev_new, State &state);
-		void set_omega_check();
 	
 	private:
 		const Model &model;
 		const Output &output;
 		const BurnInfo &burn_info;
 	
+	// Used in proposal_utils.cc
+	public:
+		void update_sampler(const CorMatrix &cor_matrix);
+		void calculate_affect_spline();
+		void mbp_population_affect();
+		void set_mvn(double si_, const CorMatrix &cor_matrix);
+		vector <double> sample(vector <double> param_val);
+		double mvn_probability(const vector <double> &param1, const vector <double> &param2) const;
+		
+	private:
+		void get_dependency();
+		void get_affect_like();
+		ICResult propose_init_cond(InitCondValue &icv, const State &state);
+		vector <unsigned int> multinomial_resample(const vector <unsigned int> &x, const vector <double> &frac, double prob) const;
+		void multinomial_reduce(unsigned int dN, vector <unsigned int> &x, const vector <double> &frac) const;
+		void add_li_cha(unsigned int i, const vector <LocalIndChange> &add, vector <LocalIndChange> &licha, vector < vector <unsigned int> > &lc_ref) const;
+		void remove_li_cha(unsigned int i, vector <LocalIndChange> &licha, vector < vector <unsigned int> > &lc_ref) const;
+		void initialise_ind_variable();
+		void initialise_ind_time_sampler();
+		void initialise_swap_variable();
+		void update_si(double fac);
+		void update_ind_samp_si(unsigned int tr_gl, double fac);
+		bool skip_proposal(double val) const;
+		void set_omega_check();
+	
+	// Used in proposal_local.cc
 	private:
 		unsigned get_win() const;
 		void update_win(unsigned int num, unsigned int num_opt);

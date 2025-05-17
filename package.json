@@ -1,12 +1,13 @@
 {
-  "name": "BIP",
+  "name": "BICI",
   "main": "index.html",
+	"chromium-args": "--disable-pinch",
    "window": {
     "toolbar": true,
     "width": 1019,
     "height": 582,
 	"resizable": true,
-	"min_width": 1000,
-	"min_height": 580
-  }
+	"min_width": 1019,
+	"min_height": 582
+	}
 }

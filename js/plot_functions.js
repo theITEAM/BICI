@@ -108,7 +108,7 @@ function text_sup_anno(tex,si,width,fo_type)
 		for(let j = 1; j < spl.length; j++){
 			let te = spl[j];
 			let k = 0;
-			while(k < te.length && !compnotallow.includes(te.substr(k,1))) k++;
+			while(k < te.length && !name_notallow.includes(te.substr(k,1))) k++;
 			
 			let te_add = te.substr(0,k);
 			let w = text_width(te_add,fo_sup);
@@ -209,6 +209,25 @@ function center_vert_text(te,x,y,font,col,width)
 	cv.translate(x, y);
 	cv.rotate(-th);
 	cv.textAlign = 'center';
+	cv.fillStyle = col;
+	cv.fillText(te, 0, 0);
+	cv.restore();
+}
+
+
+/// Plots verticle text
+function plot_vert_text_rev(te,x,y,font,col,width)   
+{
+	te = restrict_width(te,font,width);
+	x = ro_int(x); y = ro_int(y);
+
+	let th = -Math.PI/2;
+	
+	cv.font = font;
+	cv.save();
+	cv.translate(x, y);
+	cv.rotate(-th);
+	cv.textAlign = 'right';
 	cv.fillStyle = col;
 	cv.fillText(te, 0, 0);
 	cv.restore();
@@ -422,6 +441,34 @@ function fill_rectangle(x, y, dx, dy, col, col2, style)
 		cv.lineWidth = style;
 		cv.stroke();
 	}
+}
+
+
+/// Draws a transition observation
+function draw_trans_obs(x, y, dx, dy, col, col2)
+{                 
+	let x1 = ro_down(x), y1 = ro_down(y), x2 = ro_up(x+dx), y2 = ro_up(y+dy);
+
+	let xmid = Math.floor((x1+x2)/2);
+	
+	cv.beginPath();
+	cv.rect(x1,y1,xmid-x1,y2-y1);
+	cv.fillStyle = col;
+	cv.fill();
+	
+	cv.beginPath();
+	cv.rect(xmid,y1,x2-xmid,y2-y1);
+	cv.fillStyle = col2;
+	cv.fill();
+	
+	let style = NORMLINE;
+	if(inter.printing) style *= print_line_factor;
+	
+	cv.beginPath();
+	cv.rect(x1,y1,x2-x1,y2-y1);
+	cv.strokeStyle = BLACK;
+	cv.lineWidth = style;
+	cv.stroke();
 }
 
 
@@ -703,10 +750,11 @@ function draw_feature(x,y,dx,dy,poly,col,col2,style)
 		cv.beginPath();
 		let imax = cor.length;
 		let step = 1;
+		
 		if(imax > num_max) step = Math.floor(imax/num_max);
 		for(let i = 0; i < imax; i+=step){
 			let xx = ro(x+dx*cor[i][0]);
-			let yy = ro(y+dy*cor[i][1]);
+			let yy = ro(y+dy*(1-cor[i][1]));
 			if(i == 0) cv.moveTo(xx,yy);
 			else cv.lineTo(xx,yy);
 		}
@@ -997,6 +1045,37 @@ function fill_circle(x,y,r,col,col2,style)
 	cv.fill();
   
 	cv.strokeStyle = col2;
+	cv.stroke();
+}
+
+
+/// Draws filled circle with cross
+function fill_circle_cross(x,y,r,col,col2,style)                
+{
+	if(style && inter.printing) style *= print_line_factor;
+	
+	x = ro(x); y = ro(y); r = ro(r);
+	if(r < 0.5) r = 0.5; 
+	
+	cv.lineWidth = style;
+	cv.beginPath();
+	cv.arc(x,y,r,0,2*Math.PI);
+	cv.fillStyle = col;
+	cv.fill();
+  
+	cv.strokeStyle = col2;
+	cv.stroke();
+	
+	let d = r/Math.sqrt(2);
+
+	cv.beginPath();
+	cv.moveTo(x-d,y-d);
+	cv.lineTo(x+d,y+d);
+	cv.stroke();
+	
+	cv.beginPath();
+	cv.moveTo(x-d,y+d);
+	cv.lineTo(x+d,y-d);
 	cv.stroke();
 }
 
@@ -1428,6 +1507,16 @@ function white_black(col)
 }
 
 
+/// Selects black if not on lise, otherwise dark grey
+function black_not_list(list)
+{
+	for(let i = 0; i < list.length; i++){
+		if(list[i].col == BLACK) return DDGREY;
+	}
+	return BLACK;
+}
+
+	
 /// Draws an arrow
 function draw_arrow(x,y,x2,y2,size,col)                   
 {
@@ -1502,13 +1591,14 @@ function label_convert(te,si,wmax)
 	let i = 0;
 	while(i < te.length){
 		let i_store = i;
-	
+
 		let type;
 		do{
 			let ch = te.substr(i,1);
 			if(ch == "{"){ type = "pop"; break;}
 			if(ch == "["){ type = "ie"; break;}
 			if(ch == "〈"){ type = "fe"; break;}
+			if(ch == "Σ"){ type = "sum"; break;}
 			if(!notparam_list.includes(ch)){ type = "param"; break;}				
 			i++;
 		}while(i < te.length);

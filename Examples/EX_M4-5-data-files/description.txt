@@ -1,0 +1,18 @@
+# Model 4.5: Logistic growth model with age dependent mortality
+
+## Objective
+- This uses a logistic growth model for a wildlife population.
+- Age is stratified into 4 different groups: 0-1, 1-4, 4-10, 10+.
+- Mortality is depedent
+
+## Model
+- A single population-based species 'Animal' is created.
+- This contains classifications 'Alive' and 'Age'.
+- 'Alive' contains a compartment $N$, which represents the number of individuals.
+- 'Age' contains compartemnts $A0$, $A1$, $A4$, $A10+$.
+- A birth rate $α$ determines how fast individuals are born into the first age category.
+- A mortality rate $μ_a$ determines how fast individuals die in age category $a$.
+- Finite resources limit the size of the population through a carrying capacity $κ$.
+
+## Population
+- This initial state starts with just a single individual in $A0$.

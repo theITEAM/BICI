@@ -4,7 +4,7 @@
 /// Prints to the console
 function pr(te)
 { 
-	if(te == undefined){ pr("UNDEFINED"); return;}
+	if(te == undefined){ prr("UNDEFINED"); return;}
 	console.log(copy(te));
 }
 
@@ -26,7 +26,8 @@ function comment(te)
 /// Prints a text error to the console
 function error(te)
 {
-	console.log("ERROR: "+te);
+	prr("ERROR:");
+	console.log(te);
 }
 
 
@@ -126,6 +127,14 @@ function get_font(fac,te,type)
 }
 
 
+/// Rounds to nearest number, e.g. converts 0.199900009999 to 0.2
+function round_small(val)
+{
+	//return Math.round(val*10000000000)/10000000000;
+	return Number(val.toPrecision(6));
+}
+
+
 /// Returns true if two parameters the same
 function par_same(par1,par2)
 {
@@ -203,7 +212,7 @@ function light_colour(col,frac)
 
 
 /// If dark, makes light, and vice-versa
-function shift_colour(col)
+function shift_colour(col,fr)
 { 
 	let bigint = parseInt(col.substring(1), 16);	
 	let r = (bigint >> 16) & 255;
@@ -211,13 +220,13 @@ function shift_colour(col)
 	let b = bigint & 255;
 	
 	if(r+g+b < 150){
-		const frac = 0.8;
+		let frac = 0.8; if(fr != undefined) frac = fr;
 		r = 255-(255-r)*frac;
 		g = 255-(255-g)*frac;
 		b = 255-(255-b)*frac;
 	}
 	else{
-		const frac = 0.8;
+		let frac = 0.8; if(fr != undefined) frac = fr;
 		r *= frac;
 		g *= frac;
 		b *= frac;
@@ -241,6 +250,8 @@ function get_glob_comp(p)
 	let sp = model.species[p];
 	
 	let glob_comp=[];
+	
+	if(sp.ncla == 0) return glob_comp;
 	
 	let index=[];	
 	for(let cl = 0; cl < sp.ncla; cl++){
@@ -295,7 +306,7 @@ function precision(x,digit)
 	if(digit_min < 1) digit_min = 1;
 
 	if(digit < digit_min) digit = digit_min;
-
+	
 	let val = Number(x).toPrecision(digit);
 	for(let j = digit-1; j >= digit_min; j--){
 		let val2 = x.toPrecision(j);
@@ -381,7 +392,7 @@ function check_poisson()
 	}	
 	av /= max; av2 /= max;
 	
-	pr(m+" "+av+" "+(av2-av*av)+" Check Poisson");
+	prr(m+" "+av+" "+(av2-av*av)+" Check Poisson");
 }
 
 			
@@ -414,8 +425,8 @@ function neg_binommial_sample(mean,p)
 function copy_strip(source,dest)
 {
 	if(typeof source != 'object'){
-		pr("SHOULD BE OBJECT");
-		pr(source);
+		error("SHOULD BE OBJECT");
+		prr(source);
 	}
 	
 	let is_arr = Array.isArray(source);
@@ -428,6 +439,11 @@ function copy_strip(source,dest)
 		let cont = false;
 		
 		switch(ele){
+		case "factor_weight":
+			dest.weight_desc = get_weight_desc(source);
+			//dest.dim = get_value_dim(source);
+			break;
+			
 		case "value": 
 			if(source.ind_list == undefined){
 				dest.value_desc = get_value_desc(source);
@@ -690,9 +706,9 @@ function check_hash_same(store1,store2)
 				
 				if(vec2 != undefined){
 					if(vec2.length > 0){
-						pr("vecs");
-						pr(vec1);
-						pr(vec2);
+						prr("vecs");
+						prr(vec1);
+						prr(vec2);
 						error("Hash defined wrong2");
 					}
 				}
@@ -719,7 +735,7 @@ function check_hash_same(store1,store2)
 /// Checks that the hash tables for comp and tra are correctly specified
 function check_hash_comp_tra()
 {
-	pr("CHECK HASH");
+	prr("CHECK HASH");
 	for(let p = 0; p < model.species.length; p++){
 		let sp = model.species[p];
 		for(let cl = 0; cl < sp.cla.length; cl++){
@@ -787,8 +803,8 @@ function obj_memory(obj)
 				if (objClass === "Object" || objClass === "Array") {
 					for (var key in obj) {
 						if (!obj.hasOwnProperty(key)) continue;
-						//pr("insde");
-						//pr(obj[key]);
+						//prr("insde");
+						//prr(obj[key]);
 						bytes += obj_memory(obj[key]);
 					}
 				} else bytes += obj.toString().length * 2;
@@ -797,3 +813,132 @@ function obj_memory(obj)
 	}
   return bytes;
 }
+
+
+/// Truncates a text string to a certain length
+function trunc(te,len)
+{
+	if(te.length < len) return te;
+	return te.substr(0,len)+"...";
+}
+
+
+/// Determines if a string begins with another string
+function begin_str(st,st2)
+{
+	let tr = st.trim();
+	if(st.length < st2.length) return false;
+	if(st.substr(0,st2.length) == st2) return true;
+	return false;
+}
+
+
+/// Checks if a name is invalid
+function check_invalid_name(name)
+{
+	for(let i = 0; i < invalid_name.length; i++){
+		if(name.toLowerCase() == invalid_name[i].toLowerCase()) return true;
+	}
+	return false;
+}
+
+	
+/// Checks the name is valid
+function check_name_warn(name,te) 
+{
+	if(check_invalid_name(name)){
+		return te+" cannot use reserved word '"+name+"'";
+	}
+	
+	for(let i = 0; i < name.length; i++){
+		let ch = name.substr(i,1);
+		if(name_notallow.includes(ch)){
+			return te+" '"+name+"' cannot use character '"+ch+"'";
+		}
+	}
+	
+	return "";
+}
+
+
+/// Checks the name is valid
+function check_name_input(name,te) 
+{
+	let warn = check_name_warn(name,te);
+	if(warn != "") alert_import(warn);
+}
+
+
+/// Replaces charceters in a string
+function char_replace(te)
+{
+	te = te.replace(/\*/g,"×");
+	te = te.replace(/</g,"〈");
+	return te.replace(/>/g,"〉");
+}
+
+
+/// Remove text escape characters
+function remove_escape_char(te)
+{
+	let escape_char = [];
+	for(let i = 0; i < greek_latex.length; i++){
+		escape_char.push(["\\"+greek_latex[i][0],greek_latex[i][1]]);
+	}
+	escape_char.push(["\\sum","Σ"]);
+	
+	let i = 0;
+
+	while(i < te.length){
+		if(te.substr(i,1) == "\\"){
+			let j = 0; 
+			while(j < escape_char.length && te.substr(i,escape_char[j][0].length) != escape_char[j][0]) j++;
+			if(j < escape_char.length){
+				te = te.substr(0,i)+escape_char[j][1]+te.substr(i+escape_char[j][0].length);
+			}
+			else i++;
+		}
+		else i++;
+	}
+	
+	return te;
+}
+
+
+/// Replaces greek letters with escape characters
+function add_escape_char(te)
+{
+	for(let i = 0; i < greek_latex.length; i++){
+		let st1 = "\\"+greek_latex[i][0];
+		let st2 = greek_latex[i][1];
+		let regex = new RegExp(st2,"g"); 
+		te = te.replace(regex,st1);
+	}
+	
+	te = te.replace("×","*");
+	te = te.replace("→","->");
+	
+	return te;
+}
+
+
+/// Determines if a filter should be applied (there are differences between population and transition plots
+function apply_filter(rpf2,i,name)
+{
+	let rpf3 = rpf2.filter[i];
+	
+	let ty;
+	switch(name){
+	case "Transitions": ty = "trans"; break;
+	case "Populations": case "Individuals":  ty = "pop"; break;
+	default: error("Name not recognised"+name); break;
+	}
+	
+	if(ty == "pop" && rpf3.type == "trans_filt") return false;
+
+	if(ty == "trans" && rpf3.type == "pop_filt" && rpf2.sel_class.cl == rpf3.cl) return false;
+	return true;
+}
+
+
+

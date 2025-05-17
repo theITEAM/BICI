@@ -18,7 +18,9 @@ function data_source_check_error(out_type,so)
 		if(so.load_col){
 			for(let c = 0; c < so.load_col.length; c++){
 				switch(so.load_col[c].type){
-				case "compartment": case "comp_all": case "compartment_prob": case "comp_source_sink": case "comptext":
+				case "compartment": case "comp_all": 
+				case "compartment_prob": case "compartment_prob_na":
+				case "comp_source_sink": case "comptext":
 					for(let r = 0; r < tab.nrow; r++){	
 						tab.ele[r][c] = make_comp_name(tab.ele[r][c]);
 					}
@@ -29,12 +31,24 @@ function data_source_check_error(out_type,so)
 	
 		for(let c = 0; c < tab.ncol; c++){
 			for(let r = 0; r < tab.nrow; r++){
-				let warn = check_element(tab.ele[r][c],c,so);		
+				let warn = check_element(tab.ele[r][c],c,so);			
 				if(warn != "") data_error(warn,out_type,so,{r:r,c:c});
 			}
 		}
 	}
 
+	
+	switch(so.type){
+	case "Pop. Trans.":
+		for(let r = 0; r < tab.nrow; r++){
+			let sta_str = tab.ele[r][0], end_str = tab.ele[r][1];
+			let sta = Number(sta_str), end = Number(end_str);
+			if(sta >= end){
+				data_error("The start time '"+sta_str+"' must be less than the end time '"+end_str+"'.",out_type,so,{r:r});
+			}
+		}	
+		break;
+	}
 
 	// Checks for repeated elements
 	switch(so.type){
@@ -466,7 +480,7 @@ function check_data_time(out_type)
 								else{
 									let t = Number(te);
 									if(t < t_start || t > t_end){
-										data_error("Time out of range","warn",so,{minor:true, c:c, r:r, num:130});
+										data_error("The time '"+t+"' must be between the start and end times","warn",so,{minor:true, c:c, r:r, num:130});
 										break;
 									}		
 								}
@@ -489,7 +503,7 @@ function check_element(te,c,so)
 	case "float":
 		{
 			let num = Number(te);
-			if(isNaN(num)) return "'"+te+"' should be a number";
+			if(isNaN(num)) return "The value '"+te+"' must be a number";
 		}
 		break;
 		
@@ -497,7 +511,7 @@ function check_element(te,c,so)
 		{
 			if(te != "start" && te != "end"){
 				let num = Number(te);
-				if(isNaN(num)) return "'"+te+"' is not a number";
+				if(isNaN(num)) return "The value '"+te+"' must be a number";
 			}
 		}
 		break;
@@ -506,7 +520,7 @@ function check_element(te,c,so)
 		{
 			if(te != "start" && te != "end" && te != "no"){
 				let num = Number(te);
-				if(isNaN(num)) return "'"+te+"' should be a number";
+				if(isNaN(num)) return "The value '"+te+"' must be a number";
 			}
 		}
 		break;
@@ -514,42 +528,42 @@ function check_element(te,c,so)
 	case "pos_float":
 		{
 			let num = Number(te);
-			if(isNaN(num)) return "'"+te+"' should be a number";
-			if(num <= 0) return "Must be positive";
+			if(isNaN(num)) return "The value '"+te+"' must be a number";
+			if(num <= 0) return "The value '"+te+"' must be positive";
 		}
 		break;
 		
 	case "pos_zero_float":
 		{
 			let num = Number(te);
-			if(isNaN(num)) return "'"+te+"' should be a number";
-			if(num < 0) return "Must be positive or zero";
+			if(isNaN(num)) return "The value '"+te+"' must be a number";
+			if(num < 0) return "The value '"+te+"' must be positive or zero";
 		}
 		break;
 
 	case "zero_one_float":
 		{
 			let num = Number(te);
-			if(isNaN(num)) return "'"+te+"' should be a number";
-			if(num <= 0 || num >= 1) return "Must be between zero and one";
+			if(isNaN(num)) return "The value '"+te+"' must be a number";
+			if(num <= 0 || num >= 1) return "The value '"+te+"' must be between zero and one";
 		}
 		break;
 		
 	case "positive int":
 		{
 			let num = Number(te);
-			if(isNaN(num)) return "The must be a number";
-			if(num != Math.round(num)) return "Must be an integer";	
-			if(num < 0) return "Must be non-negative";
+			if(isNaN(num)) return "The value '"+te+"' must be a number";
+			if(num != Math.round(num)) return "The value '"+te+"' must be an integer";	
+			if(num < 0) return "The value '"+te+"' must be non-negative";
 		}
 		break;
 		
 	case "positive nonzero int":
 		{
 			let num = Number(te);
-			if(isNaN(num)) return "The must be a number";
-			if(num != Math.round(num)) return "Must be an integer";	
-			if(num <= 0) return "Must be positive";
+			if(isNaN(num)) return "The value '"+te+"' must be a number";
+			if(num != Math.round(num)) return "The value '"+te+"' must be an integer";	
+			if(num <= 0) return "The value '"+te+"' must be positive";
 		}
 		break;
 
@@ -560,8 +574,8 @@ function check_element(te,c,so)
 			}
 			
 			let num = Number(te);
-			if(isNaN(num)) return "'"+te+"' should be a number";
-			if(num < 0) return "Must be non-negative";
+			if(isNaN(num)) return "The value '"+te+"' must be a number";
+			if(num < 0) return "The value '"+te+"' must be non-negative";
 		}
 		break;
 	
@@ -569,7 +583,7 @@ function check_element(te,c,so)
 		if(te == ""){
 			return "Element empty";
 		}
-		if(te.trim().includes(" ")){ return "Should not include a space";}
+		if(te.trim().includes(" ")){ return "The value '"+te+"' should not include a space";}
 		if(col.cl != undefined) error("SHOULD BE 'compartment'");
 		break;
 	
@@ -581,7 +595,7 @@ function check_element(te,c,so)
 		
 	case "knot":
 		if(find_in(col.knot,te) == undefined){
-			return "'"+te+"' is not a knot time";
+			return "The value '"+te+"' is not a knot time";
 		}
 		break;
 		
@@ -589,7 +603,7 @@ function check_element(te,c,so)
 		{  // This allows 'S', 'E' etc...
 			let claa = model.species[col.p].cla[col.cl];
 			if(hash_find(claa.hash_comp,te) == undefined){
-				return "Compartment '"+te+"' not in classification '"+claa.name+"'";
+				return "Compartment '"+te+"' is not in classification '"+claa.name+"'";
 			}
 		}
 		break;
@@ -607,15 +621,17 @@ function check_element(te,c,so)
 			te = te.trim();
 			if(te != "+" && te != "-"){
 				if(hash_find(claa.hash_comp,te) == undefined){
-					return "Compartment '"+te+"' not in classification '"+claa.name+"'";
+					return "Compartment '"+te+"' is not in classification '"+claa.name+"'";
 				}
 			}
 		}
 		break;
 		
-	case "compartment_prob": 
-		{ // This allows 'S', 'E', 'S|E', 'S:0.4|E:0.6' etc...
-			if(te != missing_str){
+	case "compartment_prob": case "compartment_prob_na": 
+		{ 
+			// This allows 'S', 'E', 'S|E', 'S:0.4|E:0.6' etc...
+			// "compartment_prob_na" also allow '!' for "not alive"
+			if(te != missing_str && !(col.type == "compartment_prob_na" && te == not_alive_str)){
 				let claa = model.species[col.p].cla[col.cl];
 				let hash_comp = claa.hash_comp;
 			
@@ -632,7 +648,7 @@ function check_element(te,c,so)
 						if(spl2[0] == ""){ syntax_error = true; break;}
 						
 						if(hash_find(hash_comp,spl2[0]) == undefined){
-							return "Compartment '"+spl2[0]+"' not in classification2 '"+claa.name+"'";
+							return "Compartment '"+spl2[0]+"' is not in classification '"+claa.name+"'";
 						}
 						
 						if(spl2.length == 1){
@@ -644,7 +660,7 @@ function check_element(te,c,so)
 							
 							let valid = check_eqn_valid(spl2[1]);
 							if(valid.err == true){
-								return "Error with equation'"+spl2[1]+"': "+valid.msg;
+								return "Error with equation '"+spl2[1]+"': "+valid.msg;
 							}
 						}
 						
@@ -655,7 +671,7 @@ function check_element(te,c,so)
 				if(normal_flag == true && colon_flag == true) syntax_error = true;
 
 				if(syntax_error == true){
-					return "There is a syntax error in table element.";
+					return "There is a syntax error in table element with value '"+te+"'.";
 				}
 			}
 		}
@@ -663,12 +679,12 @@ function check_element(te,c,so)
 		
 	case "diag test":
 		if(te != col.pos_res && te != col.neg_res && te != "NA"){
-			return "Value '"+te+"' is neither '"+col.pos_res+"' or '"+col.neg_res+"'";
+			return "The value '"+te+"' is neither '"+col.pos_res+"' or '"+col.neg_res+"'";
 		}
 		break;
 	
 	case "colour":
-		if(isColor(te) == false) return "Value '"+te+"' is not a colour";
+		if(isColor(te) == false) return "The value '"+te+"' is not a colour";
 		break;
 		
 	case "trans_value":
@@ -690,16 +706,16 @@ function check_element(te,c,so)
 	case "lng":
 		{
 			let num = Number(te);
-			if(isNaN(num)) return "'"+te+"' should be a number";
-			if(num < -180 || num > 180) return "Must be in range -180 - 180";
+			if(isNaN(num)) return "The value '"+te+"' must be a number";
+			if(num < -180 || num > 180) return "The value '"+te+"' must be in the range -180 - 180";
 		}
 		break;
 		
 	case "lat":
 		{
 			let num = Number(te);
-			if(isNaN(num)) return "'"+te+"' should be a number";
-			if(num < -90 || num > 90) return "Must be in range -90 - 90";
+			if(isNaN(num)) return "The value '"+te+"' must be a number";
+			if(num < -90 || num > 90) return "The value '"+te+"' must be in the range -90 - 90";
 		}
 		break;
 		
@@ -764,8 +780,8 @@ function add_warning(wa)
 /// Output a data error warning
 function data_error(warn,out_type,so,op)
 {
-	if(false){ pr("ERR"); pr(so);}
-	
+	if(false){ error("ERR"); error(so);}
+
 	if(so.error == true) return;
 	
 	let minor_warn = false;
@@ -773,17 +789,26 @@ function data_error(warn,out_type,so,op)
 	if(op != undefined && op.minor) minor_warn = true;
 	else so.error = true;
 	
-	let de = so.type;
-	if(so.desc != undefined) de += " "+so.desc;
+	if(out_type == "warn"){
+		let de = so.type;
+		if(so.desc != undefined) de += " "+so.desc;
 	
-	if(de.length > 20) de = de.substr(0,20)+"...";
+		if(de.length > 20) de = de.substr(0,20)+"...";
 	
-	warn = "For '"+de+"': "+warn;
+		warn = "For '"+de+"': "+warn;
+	}
+	else{
+		if(so.table != undefined){
+			warn = in_file_text(so.table.filename)+": "+warn;
+		}
+	}
 	
 	if(warn.substr(warn.length-1,1) == ".") warn = warn.substr(0,warn.length-1);	
 	if(op != undefined && op.r != undefined){
 		let tab = so.table;
-		warn += " (col '"+tab.heading[op.c]+"', row "+(op.r+2)+").";
+		warn += " (";
+		if(op.c) warn += "col '"+tab.heading[op.c]+"', ";
+		warn += "row "+(op.r+2)+").";
 	}
 			
 	switch(out_type){
@@ -822,23 +847,37 @@ function check_data_valid_all(type)
 	let list = [];
 	if(type == "sim" || type == "siminf") list.push("sim");
 	if(type == "inf" || type == "siminf") list.push("inf");
+	if(type == "ppc" || type == "siminf") list.push("ppc");
 
 	for(let loop = 0; loop < list.length; loop++){
-		for(let p = 0; p < model.species.length; p++){
-			let sp = model.species[p];
+		let siminf = list[loop];
+		
+		let spec;
+		if(siminf == "ppc"){
+			let pf = model.inf_res.plot_filter;
+			if(pf) spec = pf.species;
+		}
+		else{
+			spec = model.species;
+		}
+		
+		if(spec){
+			for(let p = 0; p < spec.length; p++){
+				let sp = spec[p];
+		
+				let source;
+				switch(siminf){
+				case "sim": source = sp.sim_source; break;
+				case "inf": source = sp.inf_source; break;
+				case "ppc": source = sp.ppc_source; break;
+				}
 
-			let source;
-			switch(list[loop]){
-			case "sim": source = sp.sim_source; break;
-			case "inf": source = sp.inf_source; break;
-			case "ppc": source = sp.ppc_source; break;
-			}
-
-			for(let i = 0; i < source.length; i++){
-				let so = source[i];
-				so.check_info = {siminf:list[loop], p:p, i:i}; 
-				data_source_check_error("warn",so);
-				if(so.error != true) add_source_description(so);
+				for(let i = 0; i < source.length; i++){
+					let so = source[i];
+					so.check_info = {siminf:list[loop], p:p, i:i}; 
+					data_source_check_error("warn",so);
+					if(so.error != true) add_source_description(so);
+				}
 			}
 		}
 	}

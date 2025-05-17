@@ -38,12 +38,12 @@ function add_param_prior_content(lay)
 			
 				let w = wright2;
 				
-				if(par.dep.length > 0){
+				if(par.dep.length > 0 && !par.factor){
 					w -= 4.5;
 					lay.add_checkbox(w,y+0.4,"Split","Split",par.prior_split_check,WHITE);
 				}
 				
-				if(par.dep.length == 0 || par.prior_split_check.check == false){
+				if(par.dep.length == 0 || par.prior_split_check.check == false || par.factor){
 					display_distribution(i,x,y,lay,true,true,w);
 				}
 				else{
@@ -116,12 +116,12 @@ function get_prior_string(prior)
 	case "bernoulli":
 		return "bernoulli("+prior.value.mean_eqn.te+")";
 	
-	case "flat":
-		return "flat";
-	
 	case "dirichlet":
 		return "dir("+prior.value.alpha_eqn.te+")";
 		
+	case "mdir":
+		return "mdir("+prior.value.sigma_eqn.te+")";
+	
 	default: error("Option not recognised 105"); break;
 	}
 }
@@ -226,12 +226,12 @@ function get_prior_split_tensor(par)
 function convert_text_to_prior(te,pri_pos,dist)
 {
 	let pri = unset_prior();
-	
+
 	let spl = te.trim().split("(");
-	if(spl.length != 2) return err("Prior has a syntax error");
+	if(spl.length != 2) return err("Syntax error");
 	
-	if(spl[1].length == 0) return err("Prior has a syntax error");
-	if(spl[1].substr(spl[1].length-1,1) != ")") return err("Prior has a syntax error");
+	if(spl[1].length == 0) return err("Syntax error");
+	if(spl[1].substr(spl[1].length-1,1) != ")") return err("Syntax syntax error");
 	
 	let type = spl[0].toLowerCase();
 	if(type == "dir") type = "dirichlet";
@@ -241,10 +241,10 @@ function convert_text_to_prior(te,pri_pos,dist)
 
 	if(find_in(pri_pos,type) == undefined){
 		if(find_in(prior_pos,type) == undefined){
-			return err("'"+type+"' is not a valid prior type");
+			return err("'"+type+"' is not a valid type");
 		}
 		else{
-			return err("The prior type '"+type+"' cannot be used for this parameter");
+			return err("The type '"+type+"' cannot be used for this parameter");
 		}
 	}
 	
@@ -253,19 +253,21 @@ function convert_text_to_prior(te,pri_pos,dist)
 		
 	pri.type.te = type;
 	
+	let er;
+	
 	switch(type){
 	case "fix":
-	{
-		if(spl2.length != 1) return err("Expected one value in the brackets");
+		{
+			if(spl2.length != 1) return err("Expected one value in the brackets");
 			if(dist == true){
 				if(!is_eqn(spl2[0],"value",{})){
 					return err("'"+spl2[0]+"' is not valid");
 				}
 			}
 			else{
-				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' is not a number");
-				//if(Number(spl2[0]) <= 0) return err("Value must be positive");
+				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' must be a number");
 			}
+			
 			pri.value.mean_eqn.te = spl2[0];
 		}
 		break;
@@ -285,6 +287,7 @@ function convert_text_to_prior(te,pri_pos,dist)
 				if(isNaN(spl2[1])) return err("'"+spl2[1]+"' is not a number");
 				if(Number(spl2[0]) >= Number(spl2[1])) return err("Minimum must be smaller than maximum");
 			}
+			
 			pri.value.min_eqn.te = spl2[0];
 			pri.value.max_eqn.te = spl2[1];
 		}
@@ -300,6 +303,9 @@ function convert_text_to_prior(te,pri_pos,dist)
 				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' is not a number");
 				if(Number(spl2[0]) <= 0) return err("Mean must be positive");
 			}
+			
+			er = check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,spl2[0]); if(er) return er;
+			
 			pri.value.mean_eqn.te = spl2[0];
 		}
 		break;
@@ -316,7 +322,10 @@ function convert_text_to_prior(te,pri_pos,dist)
 				if(isNaN(spl2[1])) return err("'"+spl2[1]+"' is not a number");
 				if(Number(spl2[1]) <= 0) return err("Standard deviation must be positive");
 			}
-			
+		
+			er = check_thresh(NORM_TE,SD_QU,spl2[1]); if(er) return er;
+			er = check_thresh(NORM_TE,NORM_MEAN_QU,spl2[0]); if(er) return er;
+
 			pri.value.mean_eqn.te = spl2[0];
 			pri.value.sd_eqn.te = spl2[1];
 		}
@@ -336,6 +345,9 @@ function convert_text_to_prior(te,pri_pos,dist)
 				if(Number(spl2[1]) <= 0) return err("CV must be positive");
 			}
 			
+			er = check_thresh(GAMMA_TE,CV_QU,spl2[1]); if(er) return er;
+			er = check_thresh(GAMMA_TE,MEAN_QU,spl2[0]); if(er) return er;
+
 			pri.value.mean_eqn.te = spl2[0];
 			pri.value.cv_eqn.te = spl2[1];
 		}
@@ -354,6 +366,10 @@ function convert_text_to_prior(te,pri_pos,dist)
 				if(Number(spl2[0]) <= 0) return err("Mean must be positive");
 				if(Number(spl2[1]) <= 0) return err("CV must be positive");
 			}
+			
+			er = check_thresh(LOGNORM_TE,CV_QU,spl2[1]); if(er) return er;
+			er = check_thresh(LOGNORM_TE,MEAN_QU,spl2[0]); if(er) return er;
+
 			pri.value.mean_eqn.te = spl2[0];
 			pri.value.cv_eqn.te = spl2[1];
 		}
@@ -373,6 +389,9 @@ function convert_text_to_prior(te,pri_pos,dist)
 				if(Number(spl2[1]) <= 0) return err("Beta must be positive");
 			}
 			
+			er = check_thresh(BETA_TE,BETA_QU,spl2[1]); if(er) return er;
+			er = check_thresh(BETA_TE,ALPHA_QU,spl2[0]); if(er) return er;
+
 			pri.value.alpha_eqn.te = spl2[0];
 			pri.value.beta_eqn.te = spl2[1];
 		}
@@ -391,11 +410,10 @@ function convert_text_to_prior(te,pri_pos,dist)
 				if(Number(spl2[0]) < 0 || Number(spl2[0]) > 1) return err("Mean must be between 0 and 1");
 			}
 			
+			er = check_thresh(BERN_TE,BERNP_QU,spl2[0]); if(er) return er;
+		
 			pri.value.mean_eqn.te = spl2[0];
 		}
-		break;
-		
-	case "flat":
 		break;
 		
 	case "dirichlet":
@@ -406,14 +424,27 @@ function convert_text_to_prior(te,pri_pos,dist)
 			}
 			else{
 				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' is not a number");
-				if(Number(spl2[0]) > 0) return err("Alpha must be positive");
+				if(Number(spl2[0]) <= 0) return err("Alpha must be positive");
 			}
 			
 			pri.value.alpha_eqn.te = spl2[0];
 		}
 		break;
 	
-	default: error("Option problem"); return err("Unknown problem");
+	case "mdir":
+		if(spl2.length != 1) return err("Expected one value in the brackets");
+			if(dist == true){
+				return err("mdir should not be applied to a distribution");
+			}
+			else{
+				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' is not a number");
+				if(Number(spl2[0]) <= 0) return err("Sigma must be positive");
+			}
+			
+			pri.value.sigma_eqn.te = spl2[0];
+		break;
+		
+	default:  err("Distribution '"+type+"' not recognised");
 	}
 
 	return pri;
@@ -493,3 +524,121 @@ function set_warning(te,type_arr)
 	
 	error("Could not set warning");
 }
+
+
+/// Checks if values are within thresholds
+function check_thresh(dist,dq,val)
+{
+	if(isNaN(val)) return;
+	val = Number(val);
+	
+	let min_th, max_th;
+	
+	switch(dq){
+	case MEAN_QU: 
+		if(val < MEAN_MIN) min_th = MEAN_MIN;
+		if(val > MEAN_MAX) max_th = MEAN_MAX; 
+		break;
+		
+	case NORM_MEAN_QU: 
+		if(val < NORM_MEAN_MIN) min_th = NORM_MEAN_MIN;
+		if(val > NORM_MEAN_MAX) max_th = NORM_MEAN_MAX; 
+		break;
+	
+	case SD_QU: 
+		if(val < SD_MIN) min_th = SD_MIN;
+		if(val > SD_MAX) max_th = SD_MAX; 
+		break;
+	
+	case CV_QU: 
+		if(val < CV_MIN) min_th = CV_MIN;
+		if(val > CV_MAX) max_th = CV_MAX; 
+		break;
+		
+	case SHAPE_QU: 
+		if(val < SHAPE_MIN) min_th = SHAPE_MIN;
+		if(val > SHAPE_MAX) max_th = SHAPE_MAX; 
+		break;
+		
+	case SCALE_QU: 
+		if(val < SCALE_MIN) min_th = SCALE_MIN;
+		if(val > SCALE_MAX) max_th = SCALE_MAX; 
+		break;
+	
+	case ALPHA_QU: case BETA_QU:
+		if(val < ALPBETA_MIN) min_th = ALPBETA_MIN;
+		if(val > ALPBETA_MAX) max_th = ALPBETA_MAX; 
+		break;
+		
+	case P_QU: 
+		if(val < P_MIN) min_th = P_MIN;
+		if(val > P_MAX) max_th = P_MAX; 
+		break;
+		
+	case BERNP_QU: 
+		if(val < 0) min_th = 0;
+		if(val > 1) max_th = 1; 
+		break;
+	
+	case RATE_QU: 
+		if(val < RATE_MIN) min_th = RATE_MIN;
+		break;
+		
+	case EXP_MEAN_QU: 
+		if(val < EXP_MEAN_MIN) min_th = EXP_MEAN_MIN;
+		break;
+		
+	case TIME_QU: 
+		if(val < TIME_MIN) min_th = TIME_MIN;
+		break;
+		
+	case POIS_QU: 
+		if(val < LAM_MIN) min_th = LAM_MIN;
+		if(val > LAM_MAX) max_th = LAM_MAX; 
+		break;
+	}
+
+	let dist_te;
+	if(min_th != undefined || max_th != undefined){
+		switch(dist){
+		case LOGNORM_TE: dist_te = "Log-normal"; break;
+		case NORM_TE: dist_te = "Normal"; break;
+		case WEIBULL_TE: dist_te = "Weibull"; break;
+		case GAMMA_TE: dist_te = "Gamma"; break;
+		case BETA_TE: dist_te = "Beta"; break;
+		case NEGBINO_TE: dist_te = "Negitive-binomial"; break;
+		case BERN_TE: dist_te = "Bernoulli"; break;
+		case EXP_RATE_TE: dist_te = "Exponential"; break;
+		case EXP_MEAN_TE: dist_te = "Exponential"; break;
+		case POIS_TE: dist_te = "Poisson"; break;
+		case PERIOD_TE: dist_te = "Period"; break;
+		}
+		
+		let quant;
+		switch(dq){
+		case MEAN_QU: quant = "mean"; break;
+		case NORM_MEAN_QU: quant = "mean"; break;
+		case SD_QU: quant = "standard deviation"; break;
+		case CV_QU: quant = "coefficient of variation"; break;
+		case SHAPE_QU: quant = "shape"; break;
+		case SCALE_QU: quant = "scale"; break;
+		case ALPHA_QU: quant = "alpha"; break;
+		case BETA_QU: quant = "beta"; break;
+		case P_QU: quant = "probability"; break;
+		case BERNP_QU: quant = "probability"; break;
+		case RATE_QU: quant = "rate"; break;
+		case EXP_MEAN_QU: quant = "mean"; break;
+		case POIS_QU: quant = "mean"; break;
+		case TIME_QU: quant = "time"; break;
+		}		
+		
+		if(min_th != UNSET){
+			return err(dist_te+" "+quant+" has value '"+val+"' which should not be below threshold '"+min_th+"'");
+		}
+		
+		if(max_th != UNSET){
+			return err(dist_te+" "+quant+" has value '"+val+"' which should not be above threshold '"+max_th+"'");
+		}
+	}
+}
+

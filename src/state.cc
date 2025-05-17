@@ -164,7 +164,7 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 	}
 
 	if(model.mode == INF) ensure_all_ind_event();
-	
+
 	if(false){
 		cout << "PRINT" << endl;	
 		for(auto p = 0u; p < nspecies; p++){
@@ -184,7 +184,7 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 		if(prob_sum != 0) cout << "Probability trans tree = " << prob_sum << endl;
 		//emsg("do");
 	}
-		
+
 	likelihood_from_scratch();
 }
 
@@ -206,8 +206,10 @@ void State::ensure_all_ind_event()
 					const auto &indd = sp.individual[i];
 					
 					if(indd.obs.size() == 0) emsg("Should be non-zero");
+					auto trange = ssp.source_time_range(indd);
+					
 					auto f = 0.9;
-					auto t = (1-f)*sp.details.t_start+f*indd.obs[0].t;
+					auto t = (1-f)*trange.tmin+f*trange.tmax;
 					
 					auto c = (unsigned int)(ran()*sp.comp_gl.size());
 					IndInfFrom inf_from;
@@ -238,11 +240,12 @@ vector <DeriveOutput> State::derive_calculate() const
 				val_str = tstr(val);
 			}
 			else{
+				vector <double> value;
 				for(auto ti = 0u; ti < T; ti++){	
-					if(ti != 0) val_str += "|";
 					auto val = eqn.calculate(ti,popnum_t[ti],param_val,spline_val);
-					val_str += tstr(val);
+					value.push_back(val);
 				}
+				val_str = compact_vector(value);
 			}
 			op.value_str.push_back(val_str);
 		}
@@ -251,6 +254,29 @@ vector <DeriveOutput> State::derive_calculate() const
 	}
 	
 	return output;
+}
+
+
+/// Compactifies a vector into a string
+string State::compact_vector(const vector <double> &value) const
+{
+	string st;
+	auto nt = 0u;
+	auto i = 0u;
+	while(i < value.size()){
+		auto val = value[i];
+		auto ist = i;
+		while(i+1 < value.size() && value[i+1] == val) i++;
+		i++;
+		
+		if(ist != 0) st += "|";
+		st += tstr(val);
+		auto num = i-ist;
+		if(num > 1) st += "*"+tstr(num);
+		nt += num;
+	}
+	
+	return st;
 }
 
 
@@ -943,7 +969,7 @@ void State::restore(const vector <AffectLike> &affect_like)
 			}
 			break;
 			
-		case MARKOV_LIKE_AFFECT: // Updates the Markov liklihood
+		case MARKOV_LIKE_AFFECT:     // Updates the Markov liklihood
 			{
 				auto p = alike.num, e = alike.num2;
 				for(auto k = 0u; k < li.size(); k++) species[p].Li_markov[e][li[k]] = vec[k];	
@@ -1057,7 +1083,6 @@ void State::likelihood_from_scratch()
 	}
 	
 	calculate_likelihood();
-	//emsg("G"); 
 }
 
 
@@ -1068,7 +1093,8 @@ void State::resample_ind(bool do_pl)
 	
 	auto popnum_t = model.calculate_popnum_t(species);
 	
-	auto pl = false; if(do_pl) pl = true;
+	auto pl = false; 
+	if(do_pl) pl = true;
 
 	if(pl) check(" before resample");
 			
@@ -1117,17 +1143,16 @@ void State::resample_ind(bool do_pl)
 							
 									add_like(like_ch);
 									gen_change_update(gc); 	
+									if(sp.trans_tree) update_popnum_ind(p,i);
 									break;
 								}
 							}
 						}
 					}
-					
-					//if(pl) check("  resample");
 				}
 			}
 		}
-	}		
+	}	
 }
 
  
@@ -1148,6 +1173,7 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 		if(store_state){
 			part_sp.trans_num = ssp.trans_num;
 			part_sp.individual = ssp.individual;
+			if(cum_diag && model.mode == INF) ssp.calc_trans_diag(part_sp,popnum_t);
 		}
 		part_sp.nindividual = ssp.individual.size();
 		
@@ -1186,7 +1212,7 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 		tts.N_inf = gv.inf_node.size();
 		tts.N_unobs = gv.nobs_not_infected;
 	}
-	
+
 	return part;
 }
 
@@ -1395,7 +1421,6 @@ void CorMatrix::add_sample(const vector <double> &param_value, unsigned int rang
 /// Checks that correlation matrix is up-to-date
 void CorMatrix::check() const
 {
-	//cout << "check state\n";
 	vector <double> ave(N,0);
 	vector < vector <double> > ave2;
 	ave2.resize(N);
@@ -1414,7 +1439,6 @@ void CorMatrix::check() const
 		if(dif(ave[j],av[j],DIF_THRESH)) emsg("Different in av");
 		for(auto k = j; k < N; k++){
 			if(dif(ave2[j][k],av2[j][k],DIF_THRESH)){
-				cout << n_start << " " << n << " " << ave2[j][k] << " " << av2[j][k] << " av2\n";
 				emsg("Different in av2");
 			}
 		}	

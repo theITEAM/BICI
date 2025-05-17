@@ -1,4 +1,9 @@
 
+###################### DATA DIRECTORY ######################
+
+data-dir folder="Examples\EX_M3-1-data-files"
+
+
 ####################### DESCRIPTION ########################
 
 description text="description.txt"
@@ -6,11 +11,9 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-data-dir folder="Examples\EX_M3-1-data-files"
-
 simulation start=0 end=600 timestep=0.5
 
-inference start=0 end=100 timestep=0.5
+inference start=0 end=100 timestep=0.5 nchain=3
 
 post-sim start=0 end=100
 
@@ -23,15 +26,16 @@ species name="People" type="population"
 
 class name="DS" index="d"
 
-comp name="S" color="#009900" x=-21 y=-7
-comp name="I" color="#ff2222" x=-2 y=-7
-comp name="R" color="#4444ff" x=11 y=-7
+comp name="S" color="#009900" x=-19 y=0
+comp name="I" color="#ff2222" x=3 y=0
+comp name="R" color="#4444ff" x=19 y=0
 
-trans name="S->I" value="exp(rate:η+β×Σ_l' (M_l,l'×{I,l'}))"
+trans name="S->I" value="exp(rate:(η/N)+(β/N)×Σ_l' (M_l,l'×{I,l'}))"
 trans name="I->R" value="exp(rate:γ)"
 
-
 class name="Location" index="l" coord="latlng"
+
+view lat=56.857 lng=-4.4214 scale=202.71
 
 comp name="Clackmannanshire" color="#bbbbbb" fix="true" boundary="Clackmannanshire_boundary.geojson"
 comp name="Dumfries-and-Galloway" color="#bbbbbb" fix="true" boundary="Dumfries-and-Galloway_boundary.geojson"
@@ -66,8 +70,6 @@ comp name="Perth-and-Kinross" color="#bbbbbb" fix="true" boundary="Perth-and-Kin
 comp name="Glasgow-City" color="#bbbbbb" fix="true" boundary="Glasgow-City_boundary.geojson"
 comp name="North-Lanarkshire" color="#bbbbbb" fix="true" boundary="North-Lanarkshire_boundary.geojson"
 
-
-
 # SIMULATION INITIAL CONDITIONS
 
 init-pop-sim type="fixed" file="init-pop-sim-People.csv"
@@ -76,9 +78,15 @@ init-pop-sim type="fixed" file="init-pop-sim-People.csv"
 
 ######################## PARAMETERS ########################
 
-param name="β" value="0.0000001" prior="uniform(0,1)"
+param name="N" constant="5436406"
+
+param name="β" value="0.5" prior="uniform(0,1)"
+
 param name="γ" value="0.05" prior="uniform(0,1)"
-param name="η" value="0.00000005" prior="uniform(0,0.1)"
+
+param name="η" constant="0.3"
+
 param name="M_l,l'" constant="constant-M.csv"
+
 
 

@@ -65,7 +65,7 @@ function simulate_data(so)
 		
 	let head = [];
 	let ele = [];
-	
+
 	switch(so.type){
 	case "Genetic":
 		switch(spec.type_radio.value){
@@ -218,6 +218,8 @@ function simulate_data(so)
 			else acc = Number(so.comp_acc);
 				
 			let times = get_timepoints(t_start,t_end,so);
+			if(typeof times == 'string'){ alert_help("Problem with times",times); return;}
+	
 			head.push("ID");
 			head.push("t");
 			let cl_drop = spec.cl_drop;
@@ -238,17 +240,22 @@ function simulate_data(so)
 							e++;
 						}
 					
-						if(c != SOURCE && c != SINK && c != OUT){
-							let row = [];
-							
-							row.push(ind.name);
-							row.push(t);
+						let te;
+					
+						let row = [];	
+						row.push(ind.name);
+						row.push(t);
+						
+						if(c == SOURCE || c == SINK || c == OUT){
+							te = "!";
+						}
+						else{
 							let cgl = sp.comp_gl[c];
 						
 							let comp = sp.cla[cl_sel].comp;
 							let ci = cgl.cla_comp[cl_sel];
 						
-							let te;
+							
 							if(exact){
 								te = comp[ci].name;
 							}
@@ -277,9 +284,9 @@ function simulate_data(so)
 									}
 								}
 							}
-							row.push(te);
-							ele.push(row);
 						}
+						row.push(te);
+						ele.push(row);
 					}
 				}
 			}
@@ -290,8 +297,21 @@ function simulate_data(so)
 		{
 			let tmin = t_start, tmax = t_end;
 			if(spec.time_radio.value == "Spec"){
+				
 				tmin = Number(spec.time_start);
 				tmax = Number(spec.time_end);
+	
+				if(tmin < t_start){ 
+					alert_help("The start time '"+tmin+"' cannot be before the simulation start time '"+t_start+"'"); return;
+				}
+				
+				if(tmax > t_end){ 
+					alert_help("The end time '"+tmax+"' cannot be after the simulation end time '"+t_end+"'"); return;
+				}
+				
+				if(tmin >= tmax){
+					alert_help("The start time '"+tmin+"' must be before the end time '"+tmax+"'"); return;
+				}					
 			}
 			
 			let cl_drop = spec.cl_drop;
@@ -330,7 +350,8 @@ function simulate_data(so)
 	case "Diag. Test":
 		{
 			let times = get_timepoints(t_start,t_end,so);
-			
+			if(typeof times == 'string'){ alert_help("Problem with times",times); return;}
+	
 			let cl_drop = spec.cl_drop;
 			let cl_sel = find(sp.cla,"name",cl_drop.te);
 			
@@ -383,6 +404,8 @@ function simulate_data(so)
 	case "Population":
 		{
 			let times = get_timepoints(t_start,t_end,so);
+		
+			if(typeof times == 'string'){ alert_help("Problem with times",times); return;}
 
 			let filt = copy(spec.filter);
 	
@@ -401,7 +424,10 @@ function simulate_data(so)
 					let t = times[k];
 					
 					let posg = get_comp_prob(t,filt,sp);
-				
+					for(let c = 0; c < sp.comp_gl.length; c++){
+						if(posg[c] < 0){ alert_help("Problem with observation model","The observation model has become negative"); return;}
+					}
+					
 					let popc = [];
 					
 					switch(sp.type){
@@ -456,7 +482,8 @@ function simulate_data(so)
 	case "Pop. Trans.":
 		{
 			let times = get_timepoints(t_start,t_end,so);
-			
+			if(typeof times == 'string'){ alert_help("Problem with times",times); return;}
+	
 			if(times[0] != t_start) times.splice(0,0,t_start);
 			if(times[times.length-1] != t_end) times.push(t_end);
 		
@@ -896,16 +923,25 @@ function get_timepoints(t_start,t_end,so)
 
 	switch(so.time_radio.value){
 	case "Periodic":
-		let dt = Number(val);
-		for(let t = t_start+dt; t <= t_end; t += dt){
-			times.push(t);
+		{
+			if(isNaN(val)) return "The value '"+val+"' must be a number";
+			let dt = Number(val);
+			if(dt <= 0) return "The value '"+val+"' must be positive";
+			for(let t = t_start+dt; t <= t_end; t += dt){
+				times.push(t);
+			}
 		}			
 		break;
 	
 	case "Specified": 
 		let spl = val.split(",");
 		for(let k = 0; k < spl.length; k++){
-			times.push(Number(spl[k]));
+			if(isNaN(spl[k])) return "The value '"+spl[k]+"' must be a number";
+			let num = Number(spl[k]);
+			if(num < t_start || num > t_end){
+				return "The value '"+spl[k]+"' must be between the start '"+t_start+"' and end '"+t_end+"' times";
+			}
+			times.push(num);
 		}
 		break;
 	}
@@ -1008,6 +1044,7 @@ function simulate_genetic_snp(t_start,t_end,ele,head,so)
 	for(let i = 0; i < N; i++) head.push(so.spec.snp_root+(i+1));
 	
 	let times = get_timepoints(t_start,t_end,so);
+	if(typeof times == 'string'){ alert_help("Problem with times",times); return;}
 	
 	let ref_seq = [];
 	for(let j = 0; j < N; j++){
@@ -1146,6 +1183,7 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 	let f = so.frac_obs;
 
 	let times = get_timepoints(t_start,t_end,so);
+	if(typeof times == 'string'){ alert_help("Problem with times",times); return;}
 	
 	let samp = result.sample[0];
 	

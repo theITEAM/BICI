@@ -101,9 +101,18 @@ function save_bici(filename)
 		if(k == 0) error("Cannot find '.'");
 		else dir = filename.substr(0,k)+"-data-files";
 		
-		//let root = "M:\\Github\\theITEAM\\BICI\\";
-		//if(begin(dir,root)) dir = dir.substr(root.length);  
-		dir = dir.replace(/\\/g,"/");
+		if(create_example){
+			let root = "M:\\Github\\theITEAM\\BICI\\";
+			let root2 = "C:\\Users\\cpooley\\Desktop\\BICI_release\\";
+			if(begin(dir,root) || begin(dir,root2)){
+				let i = 0; while(i < dir.length-7 && dir.substr(i,7) != "Example") i++;
+				if(i == dir.length-7) error("Could not find directory");
+				else dir = dir.substr(i);  
+			}
+		}
+		else{
+			dir = dir.replace(/\\/g,"/");
+		}
 		
 		let te = file_list[file_list.length-1].data;
 		let na= 'data-dir folder="."';
@@ -183,6 +192,8 @@ function export_table(filename)
 		te += endl;
 	}
 
+	te = add_escape_char(te);
+
 	write_file_async(te,filename,"export");
 }
 
@@ -202,6 +213,7 @@ function export_table_content(filename)
 	
 	let te = "";
 
+pr(inter.layer[l].name+" "+name);
 	switch(inter.layer[l].name){
 	case "TableContent":
 		export_table(filename);
@@ -235,11 +247,10 @@ function export_table_content(filename)
 		
 	case "CreateEditXvectorContent":
 		{
-			let Xvec = model.species[inter.edit_Xvector.p].fix_eff[inter.edit_Xvector.i].X_vector;
-			
+			let Xvec = inter.edit_Xvector;
 			te += "Individual,Value"+endl;
 			for(let j = 0; j < Xvec.ind_list.length; j++){
-				te += '"'+Xvec.ind_list[j]+'",'+inter.edit_Xvector.X_value[j]+endl;
+				te += '"'+Xvec.ind_list[j]+'",'+Xvec.X_value[j]+endl;
 			}
 		}
 		break;
@@ -271,6 +282,23 @@ function export_table_content(filename)
 		break;
 	
 	case "CreateEditAmatrixContent":
+		{
+			let A = inter.edit_Amatrix;
+			pr(A);
+			for(let i = 0; i < A.ind_list.length; i++){
+				if(i != 0) te += ",";
+				te += A.ind_list[i];
+			}
+			te += endl;
+			
+			for(let j = 0; j < A.ind_list.length; j++){
+				for(let i = 0; i < A.ind_list.length; i++){
+					if(i != 0) te += ",";
+					te += A.A_value[j][i];
+				}
+				te += endl;
+			}
+		}
 		break;
 		
 	default: 
@@ -278,6 +306,8 @@ function export_table_content(filename)
 		break;
 	}
 
+	te = add_escape_char(te);
+	
 	write_file_async(te,filename,"export");
 }
 
@@ -310,7 +340,7 @@ function write_file_async(te,filename,op)
 
 	fs.writeFile(filename, te, function (err) {
 		 if (err) {
-			 alertp("There was an error attempting to save your data.");
+			 setTimeout(function(){ alertp("There was an error attempting to save your data.");}, 10);
 			 return;
 		 }
 		 else{

@@ -69,19 +69,13 @@ function add_init_cont_buts(lay,siminf)
 	cy = lay.add_title(title,cx,cy,{te:te});
 	
 	let mar = 0.5, mar2 = 1;
-	//let cx = mar;
-	//let cy = 0.2;
-
+	
 	let dy = 1.3;
 	let si = dy*si_comp_text_frac;
 	let fo = get_font(si,"","times");
 	let si_sup = si*0.6;
 	
-	pr("sp");
-	pr(sp);
-	
 	let ic = sp.sim_init_cond;
-	pr(ic);
 	
 	cy = lay.add_paragraph(":",lay.dx-4*mar,cx,cy,BLACK,para_si,para_lh);
 	
@@ -89,7 +83,7 @@ function add_init_cont_buts(lay,siminf)
 			
 	//bubble_addradio(cont,0,"Fixed","Fixed",spec.radio_dist,disable);
 	//bubble_addradio(cont,0,"Dist","Distribution",spec.radio_dist,disable);
-		return;
+	return;
 		
 	switch(ic.type.value){
 	case "Fixed":
@@ -102,12 +96,7 @@ function add_init_cont_buts(lay,siminf)
 				cy = lay.add_paragraph("Set the populations in each of the compartments:",lay.dx-4*mar,cx,cy,BLACK,para_si,para_lh);
 			
 				let cl = ic.focal_cl;
-				pr("cl");
-				pr(cl);
-				
-				//let te = edit_source.spec.focal.te;
-				//let cl = find(sp.cla,"name",te);
-				
+			
 				let claa = sp.cla[cl];
 				
 				lay.add_button({te:claa.name, x:mar, y:cy+0.06, dy:dy, type:"SubTitle", col:BLACK}); 
@@ -369,6 +358,7 @@ function add_data_buts(lay,siminf)
 	
 	let sp = model.species[p];
 	if(siminf == "gen") sp = model.sim_res.plot_filter.species[p];
+	if(siminf == "ppc") sp = model.inf_res.plot_filter.species[p];
 	
 	let title, te;
 	switch(siminf){
@@ -448,7 +438,7 @@ function add_data_buts(lay,siminf)
 	
 	let w;
 
-	if(inter.data_type == undefined) inter.data_type = {te:data_types[1]};
+	if(inter.data_type == undefined) inter.data_type = {te:data_types[0]};
 	let pos = []; for(let i = 0; i < data_types.length; i++) pos.push({te:data_types[i]});
 
 	let data_ty;
@@ -483,26 +473,6 @@ function add_data_buts(lay,siminf)
 				w = model.add_object_button(lay,"Init. Pop.",x,y,"AddInitialPopulation",{back:WHITE, active:active, info:info, title:"Initial population", te:init_pop_text, siminf:siminf}); x += w+gap;
 			}
 			
-			/*
-			{
-				w = model.add_object_button(lay,"Add Pop.",x,y,"AddPop",{back:WHITE, active:active, info:info, title:"Add Population", te:add_ind_text, siminf:siminf}); x += w+gap;
-			
-				w = model.add_object_button(lay,"Remove Pop.",x,y,"RemPop",{back:WHITE, active:active, info:info, title:"Remove Population", te:add_ind_text, siminf:siminf}); x += w+gap;
-			}
-			
-			{
-				active = true;
-				if(sp.type != "Individual") active = false;
-				x += 3;
-
-				w = model.add_object_button(lay,"Add Ind.",x,y,"AddIndividuals",{back:WHITE, active:active, info:info, title:"Add Individuals", te:add_ind_text, siminf:siminf}); x += w+gap;
-				
-				w = model.add_object_button(lay,"Remove Ind.",x,y,"RemIndividuals",{back:WHITE, active:active, info:info, title:"Remove Individuals", te:rem_ind_text, siminf:siminf}); x += w+gap;
-				
-				w = model.add_object_button(lay,"Move Ind.",x,y,"MoveIndividuals",{back:WHITE, active:active, info:info, title:"Move Individuals", te:move_ind_text, siminf:siminf}); x += w+gap;
-			}
-			*/
-		
 			switch(sp.type){
 			case "Population":
 				w = model.add_object_button(lay,"Add Pop.",x,y,"AddPop",{back:WHITE, active:active, info:info, title:"Add Population", te:add_ind_text, siminf:siminf}); x += w+gap;
@@ -565,7 +535,8 @@ function update_data_update_source_error(siminf,warn)
 {
 	for(let p = 0; p < model.species; p++){
 		let sp = model.species[p];
-
+		if(siminf == "ppc") sp = model.inf_res.plot_filter.species[p];
+		
 		let source;
 		switch(siminf){
 		case "sim": source = sp.sim_source; break;
@@ -641,7 +612,7 @@ function set_loadcol()
 	
 	let i = find(data_template,"type",type);
 
-	if(i == undefined){ pr(type+"tye"); error("Cannot find data template"); return;}
+	if(i == undefined){ error("Cannot find data template"); return;}
 
 	let temp = copy(data_template[i]);
 
@@ -706,7 +677,7 @@ function set_loadcol()
 						let cl = find_nocase(sp.cla,"name",cl_drop.te);
 						if(cl == undefined){ error("cl should be defined"); return;}
 						
-						load_col.push({heading:cl_drop.te, desc:"the classification in '"+cl_drop.te+"'",type:"compartment_prob", p:p, cl:cl});
+						load_col.push({heading:cl_drop.te, desc:"the classification in '"+cl_drop.te+"'",type:"compartment_prob_na", p:p, cl:cl});
 					}
 				}
 				break;
@@ -1065,6 +1036,7 @@ function data_source(type,edit_source,info)
 
 	let sp = model.species[p];
 	if(info.siminf == "gen") sp = model.sim_res.plot_filter.species[p];
+	if(info.siminf == "ppc") sp = model.inf_res.plot_filter.species[p];
 	
 	let so;
 	switch(type){
@@ -1190,7 +1162,8 @@ function data_source_reply(ans)
 	switch(ans.siminf){
 	case "sim": model.species[ans.p].sim_source = ans.sim_source; break;
 	case "inf": model.species[ans.p].inf_source = ans.inf_source; break;
-	case "ppc": model.species[ans.p].ppc_source = ans.ppc_source; break;
+	//case "ppc": model.species[ans.p].ppc_source = ans.ppc_source; break;
+	case "ppc": model.inf_res.plot_filter.species[ans.p].ppc_source = ans.ppc_source; break;
 	case "gen": model.sim_res.plot_filter.species[ans.p].gen_source = ans.gen_source; break;
 	}
 }
@@ -1502,7 +1475,6 @@ function remove_repeated(tab)
 {
 	let c = 0;
 	for(let j = 0; j < tab.nrow; j++){
-		pr(j+"j");
 		let i = j+1; while(i < tab.nrow && tab.ele[i][c] != tab.ele[j][c]) i++;
 		if(i < tab.nrow){
 			tab.ele.splice(j,1); j--;
@@ -1568,7 +1540,89 @@ function load_default_filt(p)
 /// Checks that paramater is correctly specified
 function edit_param_check_error(error_mess_only)
 {
+	
 	return false;
+}
+
+
+
+/// CHecks to see if factor is correctly specified
+function check_param_value(type,par,value)
+{
+	for(let i = 0; i < par.comb_list.length; i++){
+		let comb = par.comb_list[i];
+		let el = get_element(value,comb.index);
+		
+		if(el == undefined){
+			return "This contains unset elements";
+		}
+	}
+	
+	switch(type){
+	case "Set Param":
+		if(par.factor){
+			let weight;
+			if(par.factor_weight_on.check == true) weight = par.factor_weight;
+			let num = 0;
+			let numi;
+			let sum = 0;
+			let wsum = 0, wi;
+			for(let i = 0; i < par.comb_list.length; i++){
+				let comb = par.comb_list[i];
+				let el = get_element(value,comb.index);
+				let val = Number(el);
+				if(val < 0) return "The value '"+el+"' must be positive for a factor.";
+					
+				let w = 1;
+				if(weight) w = Number(get_element(weight,comb.index));
+					
+				if(el == "*"){ num++; numi = i; wi = w;}
+				else{
+					sum += w*Number(el);
+				}
+				wsum += w;
+			}
+			
+			if(num > 1){
+				return "Parameter factors shouldn't contain more than one element with value '*'";
+			}
+			
+			if(num == 1){
+				let val_new = (wsum-sum)/wi;
+				if(val_new < 0){
+					return "The calculated value for '*' is '"+val_new+"' which must be positive";
+				}
+				
+				let comb = par.comb_list[numi];
+				set_element(value,comb.index,round_small(val_new));
+			}
+			
+			if(num == 0){
+				let mean = round_small(sum/wsum);
+				if(dif(mean,1)){
+					if(!weight){ 	
+						return "The mean of elements is "+mean+" and it should be 1";
+					}
+					else{
+						return "The weighted mean of elements is "+mean+" and it should be 1";
+					}
+				}
+			}
+		}
+		break;
+		
+	case "Set Weight":
+		{
+			for(let i = 0; i < par.comb_list.length; i++){
+				let comb = par.comb_list[i];
+				let el = get_element(value,comb.index);
+				if(isNaN(el)) return "The value '"+el+"' must be a number for a weight.";
+				let val = Number(el);
+				if(val <= 0) return "The value '"+el+"' must be positive for a weight.";
+			}
+		}
+		break;
+	}
 }
 
 

@@ -93,6 +93,8 @@ function initpop_data(bu)
 /// Sets up after click
 function initpop_data2()
 {
+	inter.edit_source = "add";
+	
 	let spec = edit_source.spec;
 	
 	let sp = model.get_sp(); 
@@ -347,6 +349,16 @@ function get_glob_comp_name(gc)
 }
 
 
+/// Creates an error message if there is an error
+function pop_val_error(te,r,c,tab,imp)
+{
+	te = in_file_text(tab.filename)+" "+te;
+	te += " (col '"+tab.heading[c]+"', row "+(r+2)+")";
+	if(imp) alert_import(te); 
+	else alert_help("Prior problem",te);
+}
+
+
 /// Converts from table to graphical interface 
 function init_pop_convert_to_graphical(so,imp)
 {
@@ -365,6 +377,7 @@ function init_pop_convert_to_graphical(so,imp)
 	switch(so.spec.radio2.value){
 	case "Focal":
 		{	
+			let co = 1;
 			for(let r = 0; r < tab.nrow; r++){
 				let name = tab.ele[r][0];
 				let val = tab.ele[r][1];
@@ -378,9 +391,41 @@ function init_pop_convert_to_graphical(so,imp)
 							{
 								let cip = so.cla[cl].comp_init_pop[c]
 								if(cip.comp_name_store == name){
-									if(so.spec.focal.te == claa.name) cip.pop = Number(val);
+									if(so.spec.focal.te == claa.name){
+										if(isNaN(val)){
+											pop_val_error("the value '"+val+"' must be a number",r,co,tab,imp);
+										}
+										else{
+											if(Number(val) < 0){
+												pop_val_error("the value '"+val+"' must be positive or zero",r,co,tab,imp);	
+											}
+										}
+										cip.pop = Number(val);
+									}
 									else{
-										if(is_percent(val) == true) val = Number(val.substr(0,val.length-1));
+										if(is_percent(val) == true){
+											val = val.substr(0,val.length-1);
+											if(isNaN(val)){
+												pop_val_error("the value '"+val+"' must be a percentage",r,co,tab,imp);
+											}
+											else{
+												val = Number(val);
+												if(val < 0 || val > 100){
+													pop_val_error("the value '"+val+"' must be between 0 and 100",r,co,tab,imp);
+												}
+											}
+										}
+										else{
+											if(isNaN(val)){
+												pop_val_error("the value '"+val+"' must be a number",r,co,tab,imp);
+											}
+											else{
+												if(Number(val) < 0){
+													pop_val_error("the value '"+val+"' must be positive or zero",r,co,tab,imp);	
+												}
+											}
+										}
+									
 										cip.pop_per = Number(val);
 									}
 									flag = true;
@@ -402,6 +447,14 @@ function init_pop_convert_to_graphical(so,imp)
 										cip.dist = pri;
 									}
 									else{
+										if(isNaN(val)){
+											pop_val_error("the value '"+val+"' must be a number",r,co,tab,imp);
+										}
+										else{
+											if(Number(val) <= 0){
+												pop_val_error("the value '"+val+"' must be positive",r,co,tab,imp);	
+											}
+										}
 										cip.alpha = Number(val);
 									}
 									flag = true;
@@ -412,13 +465,17 @@ function init_pop_convert_to_graphical(so,imp)
 					}
 				}
 				
-				if(flag == false){ alert_help("Could not find"); return;}
+				if(flag == false){
+					pop_val_error("the compartment '"+name+"' is not specified",r,0,tab,imp);			
+					return;
+				}
 			}
 		}
 		break;
 		
 	case "All":	
 		{
+			let co = sp.cla.length;
 			let gc = so.glob_comp;
 			
 			for(let r = 0; r < tab.nrow; r++){
@@ -428,13 +485,48 @@ function init_pop_convert_to_graphical(so,imp)
 					let cl = 0; while(cl < sp.cla.length && gc[c_gl].cla[cl] == row[cl]) cl++;
 					if(cl == sp.cla.length){
 						switch(so.spec.radio_dist.value){
-						case "Fixed": gc[c_gl].pop = Number(row[cl]); break;
-						case "Dist": gc[c_gl].alpha = Number(row[cl]); break;
+						case "Fixed":
+							{
+								let val = row[cl];
+								if(isNaN(val)){
+									pop_val_error("the value '"+val+"' must be a number",r,co,tab,imp);
+								}
+								else{
+									if(Number(val) < 0){
+										pop_val_error("the value '"+val+"' must be positive or zero",r,co,tab,imp);	
+									}
+								}
+								gc[c_gl].pop = Number(val);
+							}
+							break;
+							
+						case "Dist":
+							{
+								let val = row[cl];
+								if(isNaN(val)){
+									pop_val_error("the value '"+val+"' must be a number",r,co,tab,imp);
+								}
+								else{
+									if(Number(val) <= 0){
+										pop_val_error("the value '"+val+"' must be positive",r,co,tab,imp);	
+									}
+								}
+								gc[c_gl].alpha = Number(val);
+							}
+							break;
 						}
 						break;
 					}
 				}
-				if(c_gl == gc.length){ alert_help("Could not find"); return;}
+				if(c_gl == gc.length){ 
+					for(let cl = 0; cl < sp.cla.length; cl++){
+						let claa = sp.cla[cl];
+						if(find(claa.comp,"name",row[cl]) == undefined){
+							pop_val_error("the compartment '"+row[cl]+"' is not specified in classification '"+claa.name+"'",r,cl,tab,imp); 
+							return;
+						}
+					}	
+				}
 			}
 		}
 		break;
@@ -552,8 +644,8 @@ function add_timepoint_options(cont)
 
 	let name;
 	switch(so.time_radio.value){
-	case "Periodic": name = "Time-step"; break;
-	case "Specified": name = "Times (comma separated)"; break;
+	case "Periodic": name = "Time-step:"; break;
+	case "Specified": name = "Times (comma separated):"; break;
 	}
 	
 	bubble_input(cont,name,{x:1, w:cont.dx-1, type:"time_gen"});
@@ -1278,7 +1370,17 @@ function sequence_data_bubble(cont,type)
 	
 	let eqn_on = true;
 	if(sim_options()) eqn_on = false;
-			
+		
+	let info = edit_source.info
+	if(sim_options() && info.siminf == "gen"){
+		let sp = model.sim_res.plot_filter.species[info.p];
+		if(sp.trans_tree.check == false){
+			bubble_addparagraph(cont,"The species must have the transmission tree turned on to generate genetic data",0,cont.dx);
+			add_end_button(cont,"Close","CloseBubble");
+			return;
+		}
+	}
+	
 	let bub = inter.bubble;
 	bubble_add_minititle(cont,"Data type:");
 	cont.y -= 0.3;
@@ -1311,7 +1413,7 @@ function sequence_data_bubble(cont,type)
 }
 
 
-/// Determines if simulation options should appead in bubble
+/// Determines if simulation options should appended in bubble
 function sim_options()
 {
 	if(edit_source.info.siminf == "gen" && edit_source.edit_spec != true) return true;

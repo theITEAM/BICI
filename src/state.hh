@@ -80,6 +80,7 @@ class State                                // Stores information about the state
 		void init_cor_matrix(); 
 	
 	private:
+		string compact_vector(const vector <double> &value) const;
 		void spline_init();
 		void print_cpop(unsigned int ti) const;	
 		
@@ -158,7 +159,7 @@ class State                                // Stores information about the state
 		 
 	// In state_local.cc
 	public:
-		Like calculate_local_change(unsigned int p, vector <LocalChange> &local_change, int dir);
+		Like calculate_local_change(unsigned int p, vector <LocalChange> &local_change, int dir, bool &ill);
 	
 	private:
 		void initialise_local_map(); 
@@ -173,6 +174,7 @@ class State                                // Stores information about the state
 	
 	// In state_check.cc
 	public:
+		void check_trans_num(string ref);
 		void check_simp(string ref);
 		void check(string ref);
 		void scan_variable(string name, double min, double max);

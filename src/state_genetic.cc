@@ -13,12 +13,12 @@ using namespace std;
 #include "utils.hh"
 
 /// Used to time order infection nodes
-bool InfNode_ord (InfNode in1, InfNode in2)                      
+bool InfNode_ord (const InfNode &in1, const InfNode &in2)                      
 { return (in1.t_start < in2.t_start); };  
 
 
 /// Used to time order infection events
-bool InfEv_ord (InfEvent ev1, InfEvent ev2)                      
+bool InfEv_ord (const InfEvent &ev1, const InfEvent &ev2)                      
 { return (ev1.t < ev2.t); };  
 
 
@@ -1081,7 +1081,7 @@ double State::likelihood_genetic_obs(const vector < vector <unsigned int> > &gen
 
 
 /// Used to order global events
-bool GlobalEvent_ord (GlobalEvent ge1, GlobalEvent ge2)                      
+bool GlobalEvent_ord(const GlobalEvent &ge1, const GlobalEvent &ge2)                      
 { return (ge1.t < ge2.t); };  
 
 

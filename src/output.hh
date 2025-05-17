@@ -20,8 +20,6 @@ class Output                               // Stores information about the data
 		string diagdir;                        // The diagnostics directory (within Data if available)
 		string sampledir;                      // The samples directory (within Data if available)
 		
-		double percent_done;                   // Percentage done
-		
 		vector <long> timer;                   // General purpose timers
 		
 		Output(const Model &model, const Input &input, Mpi &mpi);
@@ -50,7 +48,6 @@ class Output                               // Stores information about the data
 		vector <Particle> get_part_chain(unsigned int chain, const vector <Particle> &part) const;
 		string print_obs_data(unsigned int p, const vector <ObsData> &obs) const;
 		void print_individuals(unsigned int N, unsigned int p, const State &state) const;
-		void percentage(unsigned int val, unsigned int val2);
 	
 	private:
 		vector < vector <double> > param_value_from_vec(const vector <double> &param_val) const;
@@ -59,6 +56,9 @@ class Output                               // Stores information about the data
 		vector < vector <double> > param_value_from_value() const;
 		string transtype_text(TransType type) const;
 		void number_part(vector <Particle> &part) const;
+		string trans_diag_output(const vector <TransDiagSpecies> &trans_diag) const;
+		vector <TransDiagSpecies> trans_diag_init() const;
+		void trans_diag_add(vector <TransDiagSpecies> &trans_diag, const vector <Particle> &part) const;
 		Stat get_statistic(vector <double> &vec) const;
 		string generation_average(string head, string content) const;
 		

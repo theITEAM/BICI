@@ -23,6 +23,15 @@ function new_model()
 }
 
 
+/// Sets up filters 
+function initialise_filters_setup()
+{
+	if(sim_result.on == true) initialise_plot_filters_setup(sim_result,model.sim_res);
+	if(inf_result.on == true) initialise_plot_filters_setup(inf_result,model.inf_res);
+	if(ppc_result.on == true) initialise_plot_filters_setup(ppc_result,model.ppc_res);
+}
+
+
 /// Initialises filters for output plots 
 function initialise_filters()
 {
@@ -186,8 +195,10 @@ function load_table(te,head,sep,filename)
 	te.replace(/\r/g,"");
 	let lines = te.split("\n");
 	
-	while(lines.length > 0 && lines[0].length > 0 && lines[0].substr(0,1) == "#") lines.splice(0,1);
-
+	while(lines.length > 0 && (begin_str(lines[0].trim(),"#") || lines[0].trim() == "")){
+		lines.splice(0,1);
+	}
+	
 	let ele = [];
 	for(let r = 0; r < lines.length; r++){
 		let st = lines[r];
@@ -228,6 +239,11 @@ function load_table(te,head,sep,filename)
 
 			default: error("Option not recognised 62"); break;
 			}
+		
+			if(head == true && ele.length > 0 && ele[0].length != li.length){
+				return in_file_text(file_simp)+" there are "+ele[0].length+" headings but line "+(r+1)+" ("+trunc(st,30)+") contains "+li.length+" columns.";
+			}
+
 			ele.push(li);
 		}
 	}
@@ -246,12 +262,14 @@ function load_table(te,head,sep,filename)
 		}
 	}
 	
-	if(ele.length == 0) return in_file_text(file_simp)+"no content was found";
+	if(ele.length == 0) return in_file_text(file_simp)+" no content was found";
 		
 	let ncol = ele[0].length;
 	
 	for(let r = 0; r < ele.length; r++){
-		if(ele[r].length != ncol) return in_file_text(file_simp)+"not all the columns have the same size (e.g. row "+(r+1)+" has "+ele[r].length+" columns).";
+		if(ele[r].length != ncol){
+			return in_file_text(file_simp)+" not all the columns have the same size (e.g. row "+(r+1)+" has "+ele[r].length+" columns).";
+		}
 	}
 	
 	let heading=[];
@@ -292,7 +310,7 @@ function read_param_samples(chain,te,result,warn)
 	let J = spl.length;
 
 	let hash_ref = result.hash_ref;
-		
+	
 	let ref = [];
 	ref.push({});
 	for(let i = 1; i < J; i++){
@@ -305,25 +323,25 @@ function read_param_samples(chain,te,result,warn)
 				let th = result.param.length;
 				ref_add = {th:th, index:[]};
 				
-				result.param.push({name:name, full_name:name, dep:[], time_dep:false, kind:"variable", variety: "likelihood", selop:"like"});
+				result.param.push({name:name, full_name:name, dep:[], time_dep:false, variety: "likelihood", selop:"like"});
 				
 			}
 			else{
 				if(find_in(trans_tree_name,name) != undefined){
 					let th = result.param.length;
 					ref_add = {th:th, index:[]};
-					result.param.push({name:name, full_name:name, dep:[], time_dep:false, kind:"variable", variety: "trans_tree", selop:"tree"});
+					result.param.push({name:name, full_name:name, dep:[], time_dep:false, variety: "trans_tree", selop:"tree"});
 				}
 				else{
 					let pp = get_param_prop(name);
-				
+			
 					let th = find(result.param,"name",pp.name);
-				
+			
 					if(th == undefined && begin(name,"N^")){
 						for(let p = 0; p < result.species.length; p++){
 							if(name == "N^"+result.species[p].name){
 								th = result.param.length;
-								let par = {name:pp.name, full_name:"<e>"+pp.name+"</e>", dep:[], time_dep:false, kind:"variable", selop:"ic"};
+								let par = {name:pp.name, full_name:"<e>"+pp.name+"</e>", dep:[], time_dep:false, selop:"ic"};
 			
 								result.param.push(par);
 								break;
@@ -331,7 +349,7 @@ function read_param_samples(chain,te,result,warn)
 							
 							if(name == "N^"+result.species[p].name || name == "N^"+result.species[p].name+"-total"){
 								th = result.param.length;
-								let par = {name:pp.name, full_name:"<e>"+pp.name+"</e>", dep:[], time_dep:false, kind:"variable", selop:"indpop"};
+								let par = {name:pp.name, full_name:"<e>"+pp.name+"</e>", dep:[], time_dep:false, selop:"indpop"};
 			
 								result.param.push(par);
 								break;
@@ -379,8 +397,9 @@ function read_param_samples(chain,te,result,warn)
 							}
 							if(time_dep) full += "(t)";
 							
-							let par = {name:pp.name, full_name:"<e>"+full+"</e>", dep:dep, time_dep:time_dep, kind:"variable"};
+							let par = {name:pp.name, full_name:"<e>"+full+"</e>", dep:dep, time_dep:time_dep};
 				
+							/*
 							if(false){                             // Turned off because no time variables added 
 								if(time_dep){
 									let knot;
@@ -403,6 +422,7 @@ function read_param_samples(chain,te,result,warn)
 									par.spline = {on:true, smooth:{check:false}, time_dep:true, knot:knot};
 								}
 							}
+							*/
 						
 							par.list = par_find_list(par);
 							par.comb_list = generate_comb_list(par.list);
@@ -424,7 +444,7 @@ function read_param_samples(chain,te,result,warn)
 						if(ind[j] == undefined){ alert_param_sample(warn,41); return;}
 					}
 					
-					if(par.output == false){ alert_param_sample(warn,5); return;}
+					//if(par.output == false){ alert_param_sample(warn,5); return;}
 					
 					ref_add = {th:th, index:ind};
 				}
@@ -432,6 +452,10 @@ function read_param_samples(chain,te,result,warn)
 			hash_ref.add(name,ref_add);
 		}
 		ref.push(ref_add);
+	}
+
+	for(let i = 1; i < ref.length; i++){
+		result.param[ref[i].th].output = true;
 	}
 
 	let temp = [];
@@ -442,13 +466,21 @@ function read_param_samples(chain,te,result,warn)
 		let value; 
 		if(par.output == false) value = "No output";
 		else{
-			if(par.dep.length == 0){
-				value = "unset";
+			if(par.variety == "const"){
+				value = "const";
 			}
 			else{
-				if(par.kind != "const"){
-					let list = par_find_list(par);
-					value = par_find_template(list);
+				if(par.dep.length == 0){
+					value = "unset";
+				}
+				else{
+					if(par.type == "derive_param" && par.time_dep) value = "derived";
+					else{
+						if(par.output){
+							let list = par_find_list(par);
+							value = par_find_template(list);
+						}
+					}
 				}
 			}
 		}
@@ -499,10 +531,13 @@ function read_param_samples(chain,te,result,warn)
 					
 					let th = ref[i].th;
 					if(ref[i].index.length == 0) param[th] = num;
-					else set_element(param[th],ref[i].index,num);
+					else{
+						set_element(param[th],ref[i].index,num);
+					}
 				}
-
+			
 				sa = { chain:chain, num:Number(spl[0]), param:param};
+				
 				result.par_sample.push(sa);
 			}
 			
@@ -510,6 +545,19 @@ function read_param_samples(chain,te,result,warn)
 			if(result.param_memory > mem_param_sample_max*bytes_in_GB) out_of_param_memory(result);	
 		}
 	}
+	
+	// Checks no values for distance matrix or reparameterisation equations
+	for(let th = 0; th < result.param.length; th++){
+		let par = result.param[th];
+		
+		if(par.dist_mat || (par.variety == "reparam" && par.reparam_eqn_on)){
+			if(par.comb_list.length != 0) error("Param error");
+			if(par.value.length != 0) error("Param error");
+			if(par.prior_split.length != 0) error("Param error");
+		}
+	}
+	
+	//prr("res"); prr(result);
 	
 	result.on = true;
 }
@@ -659,6 +707,10 @@ function read_state_sample(te,chain,result,warning)
 					}
 					break;
 					
+				case "TRANSDISTPROB":
+					mode = "transdiag"; 
+					break;
+					
 				case "PARAMETERS":
 					mode = "param"; 
 					break;
@@ -670,7 +722,10 @@ function read_state_sample(te,chain,result,warning)
 						let sp_name = remove_quote(spl[1]);
 						
 						p = find(result.species,"name",sp_name);
-						if(p == undefined) alert_sample(warn,3);
+						if(p == undefined){
+							alert_sample(warn,"Species name '"+sp_name+"' not found");
+						}
+						
 						let sp = result.species[p];
 						
 						switch(sp.type){
@@ -679,11 +734,19 @@ function read_state_sample(te,chain,result,warning)
 							break;
 							
 						case "Individual": 
-							sample.species[p] = {type:"Individual", individual:[], cpop_init:[]}; break;
+							sample.species[p] = {type:"Individual", individual:[], cpop_init:[]};
+							break;
 							
 						default: error("PROBLEM"); break;
 						}
 					
+						if(true){
+							sample.species[p].trans_hbin = [];
+							for(let tr = 0; tr < sp.tra_gl.length; tr++){
+								sample.species[p].trans_hbin[tr] = [];
+							}
+						}
+						
 						let dpop=[];
 						for(let c = 0; c < sp.comp_gl.length; c++){
 							dpop[c]=[];
@@ -820,6 +883,35 @@ function read_state_sample(te,chain,result,warning)
 						}
 					}
 					break;
+				
+				case "transdiag":
+					{
+						let sp = result.species[p];
+							
+						let ssp = sample.species[p];
+						
+						let spl = lines[i].split(":");
+						if(spl.length != 2) alert_sample(warn,131);
+							
+						let name = spl[0].replace(/->/g,"→");
+						if(!name.includes("_erlang")){
+							let trg = hash_tragl[p].find(name);
+							if(trg == undefined){
+								alert_sample(warn,132);
+							}
+					
+							let vec=[];
+							let spl2 = spl[1].split("|");
+							if(spl2.length != H_BIN) alert_sample(warn,133);
+							
+							let hbin = ssp.trans_hbin[trg];
+							for(let b = 0; b < H_BIN; b++){
+								if(isNaN(spl2[b])) alert_sample(warn,134);
+								hbin[b] = Number(spl2[b]);
+							}
+						}
+					}
+					break;
 					
 				case "trans":
 					{
@@ -827,12 +919,12 @@ function read_state_sample(te,chain,result,warning)
 						let ssp = sample.species[p];
 						
 						let spl = lines[i].split(":");
-						if(spl.length != 2) alert_sample(warn,27);
+						if(spl.length != 2) alert_sample(warn,135);
 							
 						let name = spl[0].replace(/->/g,"→");
 						if(!name.includes("_erlang")){
 							let trg = hash_tragl[p].find(name);
-							if(trg == undefined) alert_sample(warn,27);
+							if(trg == undefined) alert_sample(warn,127);
 					
 							let vec=[];
 							let spl2 = spl[1].split(",");
@@ -848,7 +940,9 @@ function read_state_sample(te,chain,result,warning)
 								}
 							}
 							
-							if(vec.length != timepoint.length-1) alert_sample(warn,27);
+							if(vec.length != timepoint.length-1){
+								alert_sample(warn,128);
+							}
 							
 							ssp.transnum_tl[trg] = get_timeline(vec,result);
 						}
@@ -983,15 +1077,6 @@ function read_state_sample(te,chain,result,warning)
 	generate_transnum_from_ind(result,sample);
 
 	generate_cpop_from_transnum(result,sample);
-	
-	for(let th = 0; th < result.param.length; th++){
-		let par = result.param[th];
-		if(par.kind == "variable" && sample.param[th] == undefined){
-			if(!(par.type == "derive_param" && par.time_dep == true) && !(par.variety == "likelihood")){
-				sample.param[th] = "Not output";
-			}
-		}
-	}		
 
 	update_average(result,sample);
 	
@@ -1002,6 +1087,77 @@ function read_state_sample(te,chain,result,warning)
 
 	result.sample.push(sample);
 	if(result.on != true) result.on = true;
+}
+
+
+/// Reads in  information about transition diagnostics
+function read_trans_diag(file,result)
+{
+	create_compartment_hash(result);
+	
+	let warning = "Problem loading file '"+file.name+"'";
+	if(file.name == "inline") warning = "Problem loading state sample";
+	
+	let line = file.te.split("\n");
+	
+	let T = result.timepoint.length-1;
+					
+	let p = 0;
+	
+	for(let i = 0; i < line.length; i++){
+		let li = line[i];
+		
+		if(li != ""){
+			let warn = warning+": Line "+(i+1)+"   "+li;
+	
+			if(li.substr(0,1) == "<"){
+				if(li.substr(li.length-1,1) != ">") alert_sample(warn,100);
+				li = li.substr(1,li.length-2);
+			
+				let spl = li.split(" ");
+			
+				switch(spl[0]){
+				case "SPECIES":
+					{
+						if(spl.length != 2) alert_sample(warn,2);
+						let sp_name = remove_quote(spl[1]);
+						
+						p = find(result.species,"name",sp_name);
+						if(p == undefined) alert_sample(warn,3);
+					}						
+					break;
+				
+				default :
+					alert_sample(warn,100);
+					break;
+				}
+			}
+			else{
+				let spl = li.split(":");
+				if(spl.length != 2) alert_sample(warn,129);
+					
+				let name = spl[0].replace(/->/g,"→");
+				if(!name.includes("_erlang")){
+					let trg = hash_tragl[p].find(name);
+					if(trg == undefined) alert_sample(warn,130);
+					
+					let spl2 = spl[1].split(",");
+					if(spl2.length != T) alert_sample(warn,28);
+					let exp_num=[];
+					for(let ti = 0; ti < T; ti++){
+						if(isNaN(spl2[ti])) alert_sample(warn,28);
+						exp_num[ti] = Number(spl2[ti]);
+					}
+					
+					if(!result.species[p].exp_num) result.species[p].exp_num = [];
+					result.species[p].exp_num[trg] = exp_num;					
+				}
+			}				
+		}
+	}
+	
+	//prr("res");
+	//prr(result);
 }
 
 
@@ -1180,7 +1336,7 @@ function get_subtable(tab,col_name)
 	for(let i = 0; i < col_name.length; i++){
 		let c = find_string_in(tab.heading,col_name[i]);
 		if(c == undefined){
-			return {error:"Cannot find heading '"+col_name[i]+"' in the file '"+tab.filename+"'"};
+			return {error:in_file_text(tab.filename)+" cannot find heading '"+col_name[i]+"'"};
 		}
 		col.push(c);
 	}
@@ -1282,7 +1438,7 @@ function reduce_size(info,par)
 function get_result(name)
 {
 	switch(name){
-	case "Simulation": return sim_res;
+	case "Simulation": return sim_result;
 	case "Inference": return inf_result;
 	case "Post. Simulation": return ppc_result;
 	}
@@ -1325,10 +1481,12 @@ function extract_text_samples(siminf,type,result)
 							te += endl;
 							
 							for(let i = 1; i < spl.length; i++){
-								te += spl[i];
-								if(nchain > 1) te += ","+(ch+1);
-								te += endl;
-							}			
+								if(spl[i] != ""){
+									te += spl[i];
+									if(nchain > 1) te += ","+(ch+1);
+									te += endl;
+								}
+							}								
 						}
 						break;
 					}
@@ -1338,6 +1496,8 @@ function extract_text_samples(siminf,type,result)
 	}
 	
 	if(te == "") alert_help("Export problem","There was a problem exporting this data");
+	
+	te = add_escape_char(te);
 	
 	return te;
 }

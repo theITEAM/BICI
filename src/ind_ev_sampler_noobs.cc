@@ -33,8 +33,7 @@ Event IndEvSampler::resample_init_event(unsigned int i, double &probif) const
 				auto k = 0u; while(k < sampler.size() && z > sampler[k].prob_sum) k++;
 				
 				probif += log(sampler[k].prob);
-				
-				e_init.tr_gl = k;
+				e_init.tr_gl = k;		
 				e_init.c_after = sp.tra_gl[k].f; 
 			}
 			break;
@@ -187,14 +186,16 @@ vector <InitStateProb> IndEvSampler::source_sampler(unsigned int i, const Event 
 				auto tii = ti; if(mev.time_vari == false) tii = 0;
 				prob = mev.div[tii].value;
 				if(prob < 0) emsg("rate is negative");
+				if(prob == 0) prob = TINY;
 				prob_sum += prob;
+				
 			}
 			
 			InitStateProb isp; isp.prob = prob; isp.prob_sum = prob_sum;
 			init_state.push_back(isp);
 		}		
 	}
-
+	
 	for(auto &isp : init_state){
 		isp.prob /= prob_sum; isp.prob_sum /= prob_sum;
 	}

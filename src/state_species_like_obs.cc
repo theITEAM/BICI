@@ -371,23 +371,29 @@ double StateSpecies::like_trans_prob_obs(unsigned int tr, const ObsData &ob) con
 /// Gets the observation likelihood of a compartmental observation
 double StateSpecies::like_comp_obs(unsigned int c, const ObsData &ob) const
 {
-	if(c == UNSET) return LI_WRONG;
-	else{
-		auto c_exact = ob.c_exact;
-		if(c_exact != UNSET){
-			if(sp.comp_gl[c].cla_comp[ob.cl] != c_exact) return LI_WRONG;
-		}
-		else{
-			auto val = obs_eqn_value[ob.obs_eqn_ref[sp.comp_gl[c].cla_comp[ob.cl]]];
-			if(val != 1){
-				if(val == 0) return LI_WRONG;
-				else{
-					if(val < 0) emsg("Compartment observational likelihood has become negative"); 
-					return log(val);
-				}						
-			}
-		}
+	if(ob.not_alive){ 
+		if(c != UNSET) return LI_WRONG;
 		return 0;
+	}
+	else{
+		if(c == UNSET) return LI_WRONG;
+		else{
+			auto c_exact = ob.c_exact;
+			if(c_exact != UNSET){
+				if(sp.comp_gl[c].cla_comp[ob.cl] != c_exact) return LI_WRONG;
+			}
+			else{
+				auto val = obs_eqn_value[ob.obs_eqn_ref[sp.comp_gl[c].cla_comp[ob.cl]]];
+				if(val != 1){
+					if(val == 0) return LI_WRONG;
+					else{
+						if(val < 0) emsg("Compartment observational likelihood has become negative"); 
+						return log(val);
+					}						
+				}
+			}
+			return 0;
+		}
 	}
 }
 

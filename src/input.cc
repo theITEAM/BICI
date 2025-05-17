@@ -4,7 +4,7 @@
 #include <sstream>
 #include <iostream>
 #include <fstream>
-#include <cmath>
+#include <cmath> 
  
 using namespace std;
 
@@ -21,14 +21,17 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	input_file = file;
 	
-	progress(0,100);
-
+	percentage_start(LOAD_PER);
+	
+	percentage(0,100);
+	
 	if(op()){
 		ifstream fin(file);
-		if(!fin) emsg_input("File '"+file+"' could not be loaded");
+		if(!fin) emsg("File '"+file+"' could not be loaded");
 	
 		do{
 			string line;
+
 			getline(fin,line);
 		
 			if(fin.eof()) break;
@@ -37,7 +40,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 		
 			lines_raw.push_back(line);
 			
-			line = add_escape_char(line);
+			line = remove_escape_char(line);
 		
 			lines.push_back(line);
 		}while(true);
@@ -183,8 +186,6 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 			}
 		}
 		line_num = UNSET;
-		
-		//output_error_messages(err_mess);
 			
 		switch(loop){
 		case 1: calculate_timepoint(); break;
@@ -192,19 +193,21 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 		}
 	}
 	
-	progress(10,100);
+	output_error_messages(err_mess);
+	
+	percentage(10,100);
 	
 	auto inf = false; if(model.mode == INF) inf = true;
 	
 	print_diag("loaded");
 	
-	set_contains_source();             // Sets flag to determine if source
+	set_contains_source_sink();        // Sets flag to determine if source or sink
 	
 	set_trans_tree();                  // Sets if there is a transition tree
 	
 	create_population_erlang();        // If a population-based model convert erlang to rate
 	
-	progress(20,100);
+	percentage(20,100);
 	
 	print_diag("loaded1");
 	
@@ -219,7 +222,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	markov_bp_convert();               // If all branches are rates then removes branching
 
 	print_diag("loaded4");
-	progress(30,100);
+	percentage(30,100);
 	
 	//population_bp_rate_combine();      // Combines branching probabilities with rates in population model
 	
@@ -232,7 +235,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	check_import_correct();            // Checks import has been successfully acheived
 
 	print_diag("loaded7");
-	progress(40,100);
+	percentage(40,100);
 	
 	global_comp_trans_init();          // Creates global compartments and transitions
 	
@@ -244,8 +247,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 		for(const auto &wa : sp.warn) alert_line(wa.te,wa.line_num);    
 	}
 	
-	progress(50,100);
-	
+	percentage(50,100);
+
 	print_diag("loaded9");
 	
 	model.set_hash_all_ind();           // Sets a hash table for all individuals
@@ -256,17 +259,17 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	print_diag("h1");
 
-	progress(60,100);
+	percentage(60,100);
 	
 	create_equations();                // Creates equation calculations
 	
-	progress(70,100);
+	percentage(70,100);
 	
 	print_diag("h1a");
 	
 	simplify_equations();              // Simplifies equations as much as possible
 
-	progress(80,100);
+	percentage(80,100);
 	
 	print_diag("h1b");
 		
@@ -279,6 +282,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	for(auto &eqn : model.eqn){        // Sets up reference (pop_ref, param_ref) in equations
 		eqn.setup_references();
 	}	
+	
+	check_reparam_time();              // Checks if reparameterised equations involve time
 	
 	print_diag("h1d");
 	map_ind_effect();                  // Maps individual effects with groups
@@ -375,7 +380,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
  	
 	print_diag("h15");
 	
-	progress(90,100);
+	percentage(90,100);
 	
 	for(auto &eq : model.eqn){
 		eq.calculate_linearise();        // Tries to linearise equations in terms of populations
@@ -445,18 +450,15 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	if(model.mode == PPC) set_ppc_resample();
 		
 	check_markov_or_nm();                      // Checks that transition are either markovian or non-markovian
-	
-	check_nm_pop();                            // Checks no population in species for nm trans
-	
-	output_error_messages(err_mess);
+		
+	check_nm_pop();                            // Checks no population in species for nm trans	
 	
 	set_seed(mpi.core,model.details,seed);     // Sets the psuedo random nunber generator 
 	
-	progress(100,100);
+	percentage(100,100);
 	
-	if(com_op) cout << "<RUNNING>" << endl;
-	
-	progress(0,100);
+	output_error_messages(err_mess,true);
+
 	print_diag("Finish");
 }
 
@@ -525,9 +527,6 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 	
 	convert_folder(data_dir);
 	
-	//data_dir = "Execute/test-data-files";
-	//te_raw = replace(te_raw,"%","");
-
 	for(auto j = 0u; j < command_line.size(); j++){
 		const auto &cl = command_line[j];
 			
@@ -535,9 +534,9 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 			const auto &tag = cl.tags[k];
 			
 			auto na = tag.name;
-			if(na == "value" || na == "boundary" || na == "constant" || na == "reparam" || na == "prior-split" || na == "dist-split" || 
-				na == "A" || na == "A-sparse" || na == "pedigree" || na == "X" || na == "file" || na == "text" || na == "ind-list"){
 				
+			if(na == "value" || na == "boundary" || na == "constant" || na == "reparam" || na == "prior-split" || na == "dist-split" || 
+				na == "A" || na == "A-sparse" || na == "pedigree" || na == "X" || na == "file" || na == "text" || na == "ind-list" || na == "factor-weight"){
 				auto file = tag.value;
 				
 				if(is_file(file)){
@@ -574,42 +573,16 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 
 
 /// Adds text escape characters
-string Input::add_escape_char(string te)
+string Input::remove_escape_char(string te)
 {
-	vector< vector <string> > escape_char;
-	
-	escape_char.push_back({"\\alpha","α"});
-	escape_char.push_back({"\\beta","β"});
-	escape_char.push_back({"\\gamma","γ"});
-	escape_char.push_back({"\\delta","δ"});
-	escape_char.push_back({"\\epsilon","ε"});
-	escape_char.push_back({"\\zeta","ζ"});
-	escape_char.push_back({"\\eta","η"});
-	escape_char.push_back({"\\theta","θ"});
-	escape_char.push_back({"\\iota","ι"});
-	escape_char.push_back({"\\kappa","κ"});
-	escape_char.push_back({"\\lambda","λ"});
-	escape_char.push_back({"\\mu","μ"});
-	escape_char.push_back({"\\nu","ν"});
-	escape_char.push_back({"\\xi","ξ"});
-	escape_char.push_back({"\\pi","π"});
-	escape_char.push_back({"\\rho","ρ"});
-	escape_char.push_back({"\\sigma","σ"});
-	escape_char.push_back({"\\tau","τ"});
-	escape_char.push_back({"\\upsilon","υ"});
-	escape_char.push_back({"\\phi","φ"});
-	escape_char.push_back({"\\chi","χ"});
-	escape_char.push_back({"\\psi","ψ"});
-	escape_char.push_back({"\\omega","ω"});	
-	escape_char.push_back({"\\sum","Σ"});		
-	
+	auto escape_char = get_escape_char();
+
 	te = replace(te,"〈","<");
 	te = replace(te,"〉",">");
 	
 	auto i = 0u;
 	while(i < te.length()){
 		string sq = "′";
-		
 		if(te.substr(i,sq.length()) == sq){   // Converts prime to single quote
 			te = te.substr(0,i)+"'"+te.substr(i+sq.length());
 		}
@@ -715,7 +688,7 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 	if(type == "species") com = SPECIES;
 	if(type == "classification" || type == "class") com = CLASS;
 	if(type == "set") com = SET;
-	if(type == "camera") com = CAMERA;
+	if(type == "camera" || type == "view") com = CAMERA;
 	if(type == "compartment" || type == "comp") com = COMP;
 	if(type == "compartment-all" || type == "comp-all") com = COMP_ALL;
 	if(type == "transition" || type == "trans") com = TRANS;
@@ -769,11 +742,48 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 	
 	if(type == "param-mult") com = PARAM_MULT;
 	
+	if(type == "trans-diag") com = TRANS_DIAG;
+	
 	if(com == EMPTY){ alert_import("Command '"+type+"' not recognised."); return syntax_error();}
 	
 	auto num = double(frag.size()-1)/3;
+	auto numi = (unsigned int)(num);
 
-	if(num != int(num)){ alert_import("Syntax error"); return syntax_error();}
+	for(auto n = 0u; n < num; n++){
+		auto ii = 1+n*3;
+
+		if(frag[ii].text == "="){
+			alert_import("An equal sign '=' is misplaced.");
+			return syntax_error();
+		}
+			
+		if(ii+2 >= frag.size()){
+			if(ii+1 < frag.size() && frag[ii+1].text == "="){
+				alert_import("The property '"+frag[ii].text+"' is unset");
+			}
+			else{
+				alert_import("The text '"+frag[ii].text+"' cannot be understood");
+			}
+			return syntax_error();
+		}
+		
+		if(frag[ii+1].text != "="){
+			alert_import("The property '"+frag[ii].text+"' is missing an equals sign");
+			return syntax_error();
+		}
+		
+		if(ii+2 < frag.size() && frag[ii+2].text == "="){
+			alert_import("The property '"+frag[ii].text+"' cannot be followed by '=='");
+			return syntax_error();
+		}
+		
+		if(ii+3 < frag.size() && frag[ii+3].text == "="){
+			alert_import("The property '"+frag[ii].text+"' is unset");
+			return syntax_error();
+		}
+	}
+
+	if(num != numi){ alert_import("Syntax error"); return syntax_error();}
 	
 	vector <Tag> tags;
 
@@ -820,35 +830,41 @@ CommandLine Input::syntax_error() const
 /// Error message for imported file 
 void Input::alert(string st)                               
 {
-	if(st.length() > 0 && st.substr(st.length()-1,1) != ".") st += ".";
+	add_error_mess(UNSET,st,ERROR_FATAL);
 	
-	ErrorMess em;
-	em.line_num = UNSET;
-	em.error = st;
-	em.type = ERROR_FATAL;
-	
-	error_mess.push_back(em);	
 	if(fatal_error() == true && error_mess.size() >= ERR_MSG_MAX){
 		output_error_messages("Total error limit exceeded");
 	}
+}
+
+
+/// Adds a new error message to the list
+void Input::add_error_mess(unsigned int line_num, string st, ErrorType type)
+{
+	if(st.length() > 0 && st.substr(st.length()-1,1) != ".") st += ".";
+	ErrorMess em;
+	em.line_num = line_num;
+	em.error = st;
+	em.type = type;
+	
+	// Makes sure message is not repeated
+	auto i = 0u; 
+	while(i < error_mess.size() && !(error_mess[i].type == type && 
+	  (error_mess[i].error == st || (error_mess[i].line_num == line_num && line_num != UNSET)))){
+		i++;
+	}
+	
+	if(i == error_mess.size()) error_mess.push_back(em);	
 }
 
  
 /// Error message for imported file 
 void Input::alert_import(string st, bool fatal)   
 {
-	if(st.length() > 0 && st.substr(st.length()-1,1) != ".") st += ".";
+	add_error_mess(line_num,st,ERROR_FATAL);
 	
-	ErrorMess em;
-	em.line_num = line_num;
-	em.error = st;
-	em.type = ERROR_FATAL;
-	
-	error_mess.push_back(em);	
-	//output_error_messages("All mess");  // TURN OFF
-	 
 	if(fatal){
-		output_error_messages("");
+		output_error_messages(err_mess); 
 	}
 	
 	if(fatal_error() == true && error_mess.size() >= ERR_MSG_MAX){
@@ -863,14 +879,8 @@ void Input::alert_line(string st, unsigned int line)
 	if(st.length() > 0 && st.substr(st.length()-1,1) != ".") st += ".";
 	
 	auto i = 0u; while(i < error_mess.size() && error_mess[i].line_num != line) i++;
-
 	if(i == error_mess.size() || line == UNSET){
-		ErrorMess em;
-		em.line_num = line;
-		em.error = st;
-		em.type = ERROR_FATAL;
-	
-		error_mess.push_back(em);	
+		add_error_mess(line,st,ERROR_FATAL);
 	}
 
 	if(fatal_error() == true && error_mess.size() >= ERR_MSG_MAX){
@@ -889,14 +899,7 @@ void Input::alert_equation(const EquationInfo &eqi, const string &warn)
 /// Error message for imported file (for specific line)
 void Input::alert_warning(string st)                               
 {
-	if(st.length() > 0 && st.substr(st.length()-1,1) != ".") st += ".";
-	
-	ErrorMess em;
-	em.line_num = line_num;
-	em.error = st;
-	em.type = ERROR_WARNING;
-	
-	error_mess.push_back(em);	
+	add_error_mess(line_num,st,ERROR_WARNING);
 }
 
 
@@ -911,16 +914,16 @@ bool Input::fatal_error() const
 
 
 /// Outputs all the error messages
-void Input::output_error_messages(string te) const 
+void Input::output_error_messages(string te, bool end) const 
 {
-	if(op()){
-		//cout << "OUTPUT ERROR\n";
+	if(op() && (fatal_error() || end)){
+		if(!com_op && error_mess.size() > 0) cout << endl;
 		for(const auto &em : error_mess){
 			if(!com_op && em.line_num < lines.size()){ 	
 				cout << "\033[32m";
 				cout <<  "Line " << em.line_num+1 << ": ";
 				cout << "\033[0m";
-				cout << lines[em.line_num] << endl;
+				cout << add_escape_char(lines[em.line_num]) << endl;
 			}
 
 			switch(em.type){
@@ -932,7 +935,10 @@ void Input::output_error_messages(string te) const
 	}
 	
 	if(fatal_error() == true){
-		if(op()) cout << te << endl;
+		if(op()){
+			if(te == err_mess && error_mess.size() == 1) te = err_mess_sing;
+			cout << te << endl << endl;
+		}
 		end_code();
 	}
 }
@@ -943,6 +949,8 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 {
 	cline_store = cline;
 	all_row = UNSET;
+	
+	auto nem = error_mess.size();
 	
 	auto cname = cline.command;
 	
@@ -1018,13 +1026,26 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 		
 	case MAP: map_command(); break;
 		
+	case TRANS_DIAG: 
+		dummy_file_command();
+		break;
+		
 	default: alert_import("Command not recognised"); return;
 	}
 	
-	const auto &tags = cline_store.tags;
-	for(auto n = 0u; n < tags.size(); n++){
-		if(tags[n].done != 1){ 
-			alert_warning("Tag '"+tags[n].name+"' not used"); return;
+	
+	// Checks if all tags are used
+	auto error = false;
+	for(auto e = nem; e <  error_mess.size(); e++){
+		if(error_mess[e].type == ERROR_FATAL) error = true;
+	}
+
+	if(error == false){
+		const auto &tags = cline_store.tags;
+		for(auto n = 0u; n < tags.size(); n++){
+			if(tags[n].done != 1){ 
+				alert_warning("Tag '"+tags[n].name+"' not used"); return;
+			}
 		}
 	}
 }
@@ -1055,12 +1076,12 @@ string Input::get_tag_val(string st, vector <Tag> &tags)
 
 
 /// Error massage if a tag cannot be found
-void Input::cannot_find_tag()                                   
+void Input::cannot_find_tag(bool fatal)                                   
 {
 	string te = "Cannot find the '"+tag_find+"' tag for '"+cline_store.command_name+"'";
 	if(all_row != UNSET) te += "( line "+to_string(all_row+2)+" in file)";
 	
-	alert_import(te);
+	alert_import(te,fatal);
 }
 
 
@@ -1076,7 +1097,10 @@ unsigned int Input::option_error(string na, string te, const vector <string> &po
 	
 	auto st = "'"+na+"' has a value '"+te+"' but should be chosen from one of the following options: ";
 	for(auto i = 0u; i < pos.size(); i++){
-		if(i != 0) st += ", ";
+		if(i != 0){
+			if(i+1 == pos.size()) st += " or ";
+			else st += ", ";
+		}
 		st += "'"+pos[i]+"'";
 	}
 	
@@ -1086,22 +1110,28 @@ unsigned int Input::option_error(string na, string te, const vector <string> &po
 
 
 /// Checks if lat and lng are correctly specified
-bool Input::check_latlng_error(double lat, double lng)
+bool Input::check_latlng_error(double lat, double lng, bool fatal)
 {
-	if(lat > 90 || lat < -90){ alert_import("'lat' must be in the range -90 to 90"); return true;}
+	if(lat > 90 || lat < -90){ 
+		alert_import("For 'lat' the value '"+tstr(lat)+"' must be in the range -90 to 90",fatal); 
+		return true;
+	}
 	
-	if(lng > 180 || lng < -180){ alert_import("'lng' must be in the range -180 to 180"); return true;}
+	if(lng > 180 || lng < -180){ 
+		alert_import("For 'lng' the value '"+tstr(lng)+"' must be in the range -180 to 180",fatal); 
+		return true;
+	}
 
 	return false;
 }
 
 
 /// Checks if a string is a number
-bool Input::is_number(string num, string tag)
+bool Input::is_number(string num, string tag, bool fatal)
 {
 	auto x = number(num);
 	if(x == UNSET){
-		alert_import("'"+tag+"' must be a number"); 
+		alert_import("For '"+tag+"' the value '"+num+"' must be a number",fatal); 
 		return false;
 	}
 	return true;
@@ -1109,11 +1139,11 @@ bool Input::is_number(string num, string tag)
 
 
 /// Checks if a string is a positive number
-bool Input::is_positive(string num, string tag)
+bool Input::is_positive(string num, string tag, bool fatal)
 {
 	auto val = number(num);
 	if(val == UNSET || val <= 0){
-		alert_import("'"+tag+"' must be a positive number"); 
+		alert_import("For '"+tag+"' the value '"+num+"' must be a positive number",fatal); 
 		return false;
 	}
 	return true;
@@ -1125,7 +1155,7 @@ bool Input::is_zeroone(string num, string tag)
 {
 	auto val = number(num);
 	if(val == UNSET || val < 0 || val > 1){
-		alert_import("'"+tag+"' must be between 0 and 1"); 
+		alert_import("For '"+tag+"' thel value '"+num+"' must be between 0 and 1"); 
 		return false;
 	}
 	return true;
@@ -1209,8 +1239,10 @@ void Input::map_ind_effect()
 void Input::check_param_used()
 {
 	for(const auto &par : model.param){
-		if(par.used == false && model.mode != PPC){
-			alert_line("Parameter '"+par.full_name+"' is not used in the model",par.line_num);
+		if(par.used == false){
+			if(model.mode != PPC){
+				alert_line("Parameter '"+par.full_name+"' is not used in the model",par.line_num);
+			}
 		}
 	}
 }

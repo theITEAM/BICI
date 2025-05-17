@@ -11,93 +11,103 @@ function data_update_rename_classification(p,cl,old_name,new_name)
 		switch(loop){
 		case 0: source = model.species[p].sim_source; break;
 		case 1: source = model.species[p].inf_source; break;
-		case 2: source = model.species[p].ppc_source; break;
+		case 2:
+			{		
+				let pf = model.inf_res.plot_filter;
+				if(pf){
+					let sp = pf.species[p];
+					if(sp) source = sp.ppc_source;
+				}
+			}
+			break;
 		}
 
-		for(let i = 0; i < source.length; i++){
-			let so = source[i];
-			if(so.error != true){
-				let tab = so.table;
-				for(let c = 0; c < so.load_col.length; c++){
-					let lc = so.load_col[c];
-					let ty = lc.type;
-					if((ty == "compartment" || ty == "compartment_prob") && lc.heading == old_name){
-						lc.heading = new_name;
-						if(tab && tab.ncol > c) tab.heading[c] = new_name;
-					}
-				}			
-				
-				switch(so.type){
-				case "Init. Pop.":
-					{
-						if(so.spec.focal.te == old_name) so.spec.focal.te = new_name;
-												
-						switch(so.spec.radio.value){
-						case "Graphical":		
-							switch(so.spec.radio2.value){
-							case "Focal": break;
-							case "All":	break;
-							}
-							break;
-
-						case "File":
-							switch(so.spec.radio2.value){
-							case "Focal":	
-								break;
-
-							case "All":
-								if(tab.heading[cl] == old_name) tab.heading[cl] = new_name;
-								break;
-							}
-							break;
+		if(source){
+			for(let i = 0; i < source.length; i++){
+				let so = source[i];
+				if(so.error != true){
+					let tab = so.table;
+					for(let c = 0; c < so.load_col.length; c++){
+						let lc = so.load_col[c];
+						let ty = lc.type;
+						if((ty == "compartment" || ty == "compartment_prob") && lc.heading == old_name){
+							lc.heading = new_name;
+							if(tab && tab.ncol > c) tab.heading[c] = new_name;
 						}
-					}
-					break;
-
-				case "Add Pop.": case "Remove Pop.":
-					if(tab.heading[cl+1] == old_name) tab.heading[cl+1] = new_name;
-					break;
-				
-				case "Add Ind.":
-					if(tab.heading[cl+2] == old_name) tab.heading[cl+2] = new_name;
-					break;
-
-				case "Move Ind.":
-					if(so.spec.cl_drop.te == old_name) so.spec.cl_drop.te = new_name;
-					break;
-
-				case "Compartment":
-					if(so.spec.cl_drop.te == old_name){
-						so.spec.cl_drop.te = new_name;
-						if(tab.heading[2] == old_name) tab.heading[2] = new_name;
-					}
-					break;
-
-				case "Diag. Test":
-					{
-						let cb = so.spec.check_box;
-						if(cb.name == old_name) cb.name = new_name;
-						if(so.spec.cl_drop.te == old_name) so.spec.cl_drop.te = new_name;
-					}
-					break;
-
-				case "Transition":
-					if(so.spec.cl_drop.te == old_name) so.spec.cl_drop.te = new_name;
-					if(so.spec.filter.te ==  old_name) so.spec.filter.te = new_name;
-					break;
+					}			
 					
-				case "Population":
-					{
-					}
-					break;
+					switch(so.type){
+					case "Init. Pop.":
+						{
+							if(so.spec.focal.te == old_name) so.spec.focal.te = new_name;
+													
+							switch(so.spec.radio.value){
+							case "Graphical":		
+								switch(so.spec.radio2.value){
+								case "Focal": break;
+								case "All":	break;
+								}
+								break;
 
-				case "Pop. Trans.":
-					{
+							case "File":
+								switch(so.spec.radio2.value){
+								case "Focal":	
+									break;
+
+								case "All":
+									if(tab.heading[cl] == old_name) tab.heading[cl] = new_name;
+									break;
+								}
+								break;
+							}
+						}
+						break;
+
+					case "Add Pop.": case "Remove Pop.":
+						if(tab.heading[cl+1] == old_name) tab.heading[cl+1] = new_name;
+						break;
+					
+					case "Add Ind.":
+						if(tab.heading[cl+2] == old_name) tab.heading[cl+2] = new_name;
+						break;
+
+					case "Move Ind.":
 						if(so.spec.cl_drop.te == old_name) so.spec.cl_drop.te = new_name;
-						if(so.spec.filter.te == old_name) so.spec.filter.te = new_name;
-					}
-					break;
-				}	
+						break;
+
+					case "Compartment":
+						if(so.spec.cl_drop.te == old_name){
+							so.spec.cl_drop.te = new_name;
+							if(tab.heading[2] == old_name) tab.heading[2] = new_name;
+						}
+						break;
+
+					case "Diag. Test":
+						{
+							let cb = so.spec.check_box;
+							if(cb.name == old_name) cb.name = new_name;
+							if(so.spec.cl_drop.te == old_name) so.spec.cl_drop.te = new_name;
+						}
+						break;
+
+					case "Transition":
+						if(so.spec.cl_drop.te == old_name) so.spec.cl_drop.te = new_name;
+						if(so.spec.filter.te ==  old_name) so.spec.filter.te = new_name;
+						break;
+						
+					case "Population":
+						{
+						}
+						break;
+
+					case "Pop. Trans.":
+						{
+							if(so.spec.cl_drop.te == old_name) so.spec.cl_drop.te = new_name;
+							if(so.spec.filter.te == old_name) so.spec.filter.te = new_name;
+						}
+						break;
+					}	
+				}
 			}
 		}
 	}
@@ -107,16 +117,16 @@ function data_update_rename_classification(p,cl,old_name,new_name)
 /// Updates data based on a classification being added 
 function data_update_add_classification(p)
 {
-	let sp = model.species[p];
-	let cl = sp.ncla-1;
-	let claa = sp.cla[cl];
-
-	for(let loop = 0; loop < 3; loop++){
+	for(let loop = 0; loop < 2; loop++){
+		let sp = model.species[p];
+	
+		let cl = sp.ncla-1;
+		let claa = sp.cla[cl];
+		
 		let source;
 		switch(loop){
 		case 0: source = sp.sim_source; break;
 		case 1: source = sp.inf_source; break;
-		case 2: source = sp.ppc_source; break;
 		}
 
 		for(let i = 0; i < source.length; i++){
@@ -166,14 +176,13 @@ function data_update_add_classification(p)
 /// Updates data based on a classification changing name
 function data_update_delete_classification(p,cl,name,comp_list)
 {
-	let sp = model.species[p];
-	
-	for(let loop = 0; loop < 3; loop++){
+	for(let loop = 0; loop < 2; loop++){
+		let sp = model.species[p];
+		
 		let source;
 		switch(loop){
 		case 0: source = sp.sim_source; break;
 		case 1: source = sp.inf_source; break;
-		case 2: source = sp.ppc_source; break;
 		}
 
 		for(let i = 0; i < source.length; i++){
@@ -297,14 +306,16 @@ function data_update_delete_classification(p,cl,name,comp_list)
 function data_update_rename_compartment(p,cl,old_name,new_name)
 {
 	let sp = model.species[p];
-	let claa = sp.cla[cl];
+	
+	for(let loop = 0; loop < 2; loop++){
+		let sp = model.species[p];
+	
+		let claa = sp.cla[cl];
 
-	for(let loop = 0; loop < 3; loop++){
 		let source;
 		switch(loop){
 		case 0: source = sp.sim_source; break;
 		case 1: source = sp.inf_source; break;
-		case 2: source = sp.ppc_source; break;
 		}
 
 		for(let i = 0; i < source.length; i++){
@@ -445,14 +456,23 @@ function reset_info_p()
 {
 	for(let p = 0; p < model.species.length; p++){
 		let sp = model.species[p];
+	
 		for(let i = 0; i < sp.sim_source.length; i++){
 			sp.sim_source[i].info.p = p;
 		}
+		
 		for(let i = 0; i < sp.inf_source.length; i++){
 			sp.inf_source[i].info.p = p;
 		}
-		for(let i = 0; i < sp.ppc_source.length; i++){
-			sp.ppc_source[i].info.p = p;
+	}
+	
+	let pf = model.inf_res.plot_filter;
+	if(pf){
+		for(let p = 0; p < pf.species.length; p++){
+			let sp = pf.species[p];
+			for(let i = 0; i < sp.ppc_source.length; i++){
+				sp.ppc_source[i].info.p = p;
+			}
 		}
 	}
 }

@@ -117,7 +117,8 @@ void SourceSampler::update(unsigned int nind_obs, vector <Individual> &individua
 			auto fac = me.source_tr_gl.size();
 			for(auto ti = 0u; ti < T; ti++){
 				auto tii = ti; if(mev.time_vari == false) tii = 0;
-				rate[ti][i] = rate[ti][i]*memory + fac*mev.div[tii].value;
+				auto val = mev.div[tii].value+TINY;
+				rate[ti][i] = rate[ti][i]*memory + fac*val;
 			}
 		}
 		

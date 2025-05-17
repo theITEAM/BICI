@@ -178,8 +178,8 @@ function extract_operations(te)
 /// Prints all the operation for a eqn
 function print_operations(op)
 {
-	pr("List of operations:");
-	pr(op);
+	error("List of operations:");
+	error(op);
 	
 	let st="";
   for(let i = 0; i < op.length; i++){
@@ -210,7 +210,7 @@ function print_operations(op)
 		}
     st += " ";
   }
-	pr(st);
+	error(st);
 }
 
 
@@ -326,8 +326,8 @@ function create_eqn(op)
 /// Prints steps used for a eqn
 function print_eqn(eqn)  
 {
-	pr("For equation '"+eqn.te+"' eqn:");
-	if(eqn.err == true){ pr("Could not evaluate equation: "+eqn.msg); return;}
+	error("For equation '"+eqn.te+"' eqn:");
+	if(eqn.err == true){ error("Could not evaluate equation: "+eqn.msg); return;}
 
 	let calc = eqn.calc;
   for(let i = 0; i < calc.length; i++){
@@ -360,7 +360,7 @@ function print_eqn(eqn)
 			case REG: st += "R"+it.num; break;
 			case NUMERIC: st += it.constant; break;
 			case TIME: st += "time"; break;
-			default: pr("Eq problem2"); break;
+			default: error("Eq problem2"); break;
 			}
 			
 			if(j != ca.item.length -1){
@@ -391,7 +391,7 @@ function print_eqn(eqn)
 			
     st += " > ";
 
-		pr(st+"R"+ca.reg_store);
+		error(st+"R"+ca.reg_store);
   }
 
 	let an="";
@@ -399,10 +399,10 @@ function print_eqn(eqn)
     case REG: an += "R"+ans.num; break;
 		case NUMERIC: an += ans.constant; break;
 		case TIME: an += "time"; break;
-		default: pr("Eq problem3: "+ans.type); break;
+		default: error("Eq problem3: "+ans.type); break;
   }
-  pr(an+" Answer");
-	pr("");
+  error(an+" Answer");
+	error("");
 }
 
 

@@ -16,6 +16,8 @@ using namespace std;
 /// Adds a new species to the model
 void Input::add_species(string name, SpeciesType type, bool trans_tree)
 {
+	check_name_input(name,"Species name");
+	
 	auto p = find_p(name);
 	if(p != UNSET){ alert_import("There is already a species with the name '"+name+"'"); return;}
 	
@@ -49,6 +51,8 @@ void Input::add_species(string name, SpeciesType type, bool trans_tree)
 /// Adds a new classification to the model
 void Input::add_classification(unsigned int p, string name, string index, Coord coord)
 {
+	check_name_input(name,"Classification name");
+
 	if(p == UNSET){ 
 		alert_import("Cannot add a classification when the species is not set"); 
 		return;
@@ -234,7 +238,6 @@ void Input::create_equations()
 					auto &pri = par.prior[i];
 					for(auto &eqi : pri.dist_param){
 						model.add_eq_ref(eqi);
-						//add_parent_child(eqi,i,th); zzz
 					}
 				}
 				break;
@@ -242,8 +245,7 @@ void Input::create_equations()
 			case REPARAM_PARAM:
 				for(auto i = 0u; i < par.N; i++){
 					auto &eqi = par.value[i];	
-					model.add_eq_ref(eqi);	
-					//add_parent_child(eqi,i,th); zzz
+					model.add_eq_ref(eqi);
 				}
 				break;
 				
@@ -428,7 +430,7 @@ void Input::create_equations()
 			
 			if(sp.fix_effect.size() > 0){
 				const auto &fe = sp.fix_effect[0];
-				alert_line("A population-based model cannot have fixed effects such as '["+fe.name+"]'",fe.line_num); 
+				alert_line("A population-based model cannot have fixed effects such as '<"+fe.name+">'",fe.line_num); 
 			}
 		}
 	}
@@ -974,7 +976,7 @@ void Input::set_precalc_nm_rate()
 				const auto &eq = model.eqn[nmt.dist_param_eq_ref[0]];
 				for(auto pr : eq.pop_ref){
 					if(model.pop[pr].sp_p == p){ 
-						emsg_input("Non-Markovian transition cannot depend on a population in the same species");
+						alert_import("Non-Markovian transition cannot depend on a population in the same species");
 					}
 				}
 			}
@@ -987,7 +989,7 @@ void Input::set_precalc_nm_rate()
 						
 						for(auto pr : eq.pop_ref){
 							if(model.pop[pr].sp_p == p){ 
-								emsg_input("Non-Markovian transition cannot depend on a population in the same species");
+								alert_import("Non-Markovian transition cannot depend on a population in the same species");
 							}
 						}
 						
@@ -1034,7 +1036,7 @@ void Input::check_markov_or_nm() const
 
 
 /// Checks no population in species for nm trans (otherwise simulation proposals not correct)
-void Input::check_nm_pop() const
+void Input::check_nm_pop()
 {
 	for(auto p = 0u; p < model.species.size(); p++){
 		const auto &sp = model.species[p];
@@ -1045,7 +1047,9 @@ void Input::check_nm_pop() const
 					const auto &eq = model.eqn[dp.eq_ref];
 					for(auto &pop : eq.pop_ref){
 						const auto &po = model.pop[pop];
-						if(po.sp_p == p) emsg_input("Non-Markovian parameter cannot depend on population from the same species.");
+						if(po.sp_p == p){
+							alert_import("Non-Markovian parameter cannot depend on population from the same species.");
+						}
 					}
 				}
 				
@@ -1053,7 +1057,9 @@ void Input::check_nm_pop() const
 					const auto &eq = model.eqn[tr.bp.eq_ref];
 					for(auto &pop : eq.pop_ref){
 						const auto &po = model.pop[pop];
-						if(po.sp_p == p) emsg_input("Branching probability cannot depend on population from the same species.");
+						if(po.sp_p == p){
+							alert_import("Branching probability cannot depend on population from the same species.");
+						}
 					}
 				}
 			}
@@ -1921,7 +1927,7 @@ void Input::param_affect_likelihood()
 					
 								al.type = DIV_VALUE_AFFECT; al.num = p; al.num2 = i;
 								param_vec_add_affect(model.param_vec[k].affect_like,al);
-							//zzz
+							
 								al.type = MARKOV_LIKE_AFFECT;
 								param_vec_add_affect(model.param_vec[k].affect_like,al);
 							}
@@ -2010,7 +2016,7 @@ void Input::param_affect_likelihood()
 					const auto &fe = sp.fix_effect[f];
 					
 					const auto &par = model.param[fe.th];
-					if(par.name != "ν^"+fe.name) emsg_input("names do not match");
+					if(par.name != fe_char+"^"+fe.name) emsg_input("names do not match");
 					if(par.N != 1) emsg_input("Should be univariate");
 					auto k = par.param_vec_ref[0];
 					
@@ -2042,7 +2048,7 @@ void Input::param_affect_likelihood()
 			for(auto f : pop.fix_eff_mult){		
 				const auto &fe = sp.fix_effect[f];
 				const auto &par = model.param[fe.th];
-				if(par.name != "ν^"+fe.name) emsg_input("names do not match");
+				if(par.name != fe_char+"^"+fe.name) emsg_input("names do not match");
 				if(par.N != 1) emsg_input("Should be univariate");
 				auto k = par.param_vec_ref[0];
 				if(k == UNSET) emsg_input("Problem with fix_eff_mult");
@@ -2396,7 +2402,7 @@ void Input::add_nm_trans_affect(unsigned int p, unsigned int i, unsigned int eq,
 		const auto &fe = sp.fix_effect[f];
 	
 		const auto &par = model.param[fe.th];
-		if(par.name != "ν^"+fe.name) emsg_input("names do not match");
+		if(par.name != fe_char+"^"+fe.name) emsg_input("names do not match");
 		if(par.N != 1) emsg_input("Should be univariate");
 		auto k = par.param_vec_ref[0];
 	
@@ -2852,12 +2858,12 @@ void Input::set_trans_tree()
 
 
 /// Used to order genetic data
-bool ObsGeneticData_ord (ObsGeneticData in1, ObsGeneticData in2)                      
+bool ObsGeneticData_ord (const ObsGeneticData &in1, const ObsGeneticData &in2)
 { return (in1.t < in2.t); };  
 
 
 /// Used to order individual genetic observations 
-bool ObsGenRef_ord (ObsGenRef ogr1, ObsGenRef ogr2)                      
+bool ObsGenRef_ord (const ObsGenRef &ogr1, const ObsGenRef &ogr2)                      
 { return (ogr1.t < ogr2.t); };  
 
 
@@ -2917,7 +2923,9 @@ void Input::add_genetic_data()
 										if(ch == "T") ogd.snp.push_back(T_CH);
 										else{
 											if(ch == "G") ogd.snp.push_back(G_CH);
-											else emsg_input("SNP character '"+ch+"' not recognised");
+											else{
+												alert_import("SNP character '"+ch+"' not recognised");
+											}
 										}
 									}
 								}
@@ -3025,19 +3033,20 @@ void Input::add_genetic_data()
 		}
 		mean /= (nobs*nobs);
 		gd.obs_scale = 10.0/(mean*mean);
-		cout << gd.obs_scale << " obs scal" << endl;
 	}
 }
 
 
 /// Determines if source transition exists in model
-void Input::set_contains_source()
+void Input::set_contains_source_sink()
 {
 	for(auto &sp : model.species){
 		sp.contains_source = false;
+		sp.contains_sink = false;
 		for(const auto &claa : sp.cla){
 			for(const auto &tr : claa.tra){
 				if(tr.variety == SOURCE_TRANS) sp.contains_source = true;
+				if(tr.variety == SINK_TRANS) sp.contains_sink = true;
 			}
 		}
 	}
@@ -3045,7 +3054,7 @@ void Input::set_contains_source()
 
 
 /// Used to order trigger events
-bool TrigEvRef_ord(TrigEventRef st1, TrigEventRef st2)                      
+bool TrigEvRef_ord(const TrigEventRef &st1, const TrigEventRef &st2)                      
 { return (st1.t < st2.t); };  
 
 
@@ -3357,24 +3366,26 @@ void Input::set_local_ind_init()
 				
 				for(auto tr = 0u; tr < claa.ntra; tr++){
 					const auto &tra = claa.tra[tr];
-					if(tra.i == UNSET){
-						vector <TrSwap> vec;
-						TrSwap tsw; tsw.type = SOURCE_SW; tsw.trc = tr;
-						vec.push_back(tsw);
-						add_tr_swap(C,tra.f,vec,tr_swap_leave,tr_swap_ref,tr_swap_list);
-					}
-					else{
-						if(tra.f == UNSET){
+					if(tra.type != PERIOD){
+						if(tra.i == UNSET){
 							vector <TrSwap> vec;
-							TrSwap tsw; tsw.type = SINK_SW; tsw.trc = tr;
+							TrSwap tsw; tsw.type = SOURCE_SW; tsw.trc = tr;
 							vec.push_back(tsw);
-							add_tr_swap(tra.i,C,vec,tr_swap_leave,tr_swap_ref,tr_swap_list);
+							add_tr_swap(C,tra.f,vec,tr_swap_leave,tr_swap_ref,tr_swap_list);
 						}
 						else{
-							vector <TrSwap> vec;
-							TrSwap tsw; tsw.type = TRANS_SW; tsw.trc = tr;
-							vec.push_back(tsw);
-							add_tr_swap(tra.i,tra.f,vec,tr_swap_leave,tr_swap_ref,tr_swap_list);
+							if(tra.f == UNSET){
+								vector <TrSwap> vec;
+								TrSwap tsw; tsw.type = SINK_SW; tsw.trc = tr;
+								vec.push_back(tsw);
+								add_tr_swap(tra.i,C,vec,tr_swap_leave,tr_swap_ref,tr_swap_list);
+							}
+							else{
+								vector <TrSwap> vec;
+								TrSwap tsw; tsw.type = TRANS_SW; tsw.trc = tr;
+								vec.push_back(tsw);
+								add_tr_swap(tra.i,tra.f,vec,tr_swap_leave,tr_swap_ref,tr_swap_list);
+							}
 						}
 					}
 				}
@@ -3815,7 +3826,7 @@ void Input::set_ppc_resample()
 			}
 		}
 		
-		if(fl == false) emsg_input("In 'resample' the value '"+name+"' is not within the model"); 
+		if(fl == false) emsg_input("For 'resample' the value '"+name+"' is not within the model"); 
 	}
 
 	if(false){

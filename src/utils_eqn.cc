@@ -41,6 +41,61 @@ EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p, unsig
 }
 
 
+/// Checks that a string is a valid name for a parameter / fe or ie
+string check_valid_name(string name, string type)
+{
+	auto escape_char = get_escape_char();
+	
+	if(name == "") return "The "+type+" name is not set";	
+
+	if(type == "parameter"){
+		if(end_str(name,"(t)")) name = name.substr(0,name.length()-3);
+		
+		auto spl = split(name,'_');
+		if(spl.size() > 1) name = spl[0];
+	}
+	
+	if(type == "population"){
+		auto spl = split(name,'<');
+		if(spl.size() > 1) name = spl[0];
+		
+		auto spl2 = split(name,'[');
+		if(spl2.size() > 1) name = spl2[0];
+	}
+
+	auto j = 0u;
+	while(j < name.length()){
+		auto done = false;
+		
+		// Checks to see if greek character
+		if(j+1 < name.length()){
+			for(auto k = 0u; k < escape_char.size(); k++){
+				auto st = escape_char[k][1];
+				auto len = st.length();
+				if(name.substr(j,len) == st){
+					if(st == "Σ"){
+						return "In "+type+" name '"+name+"' the character '\\Sigma' is not expected";
+					}
+					done = true;
+					j += len;
+					break;
+				}
+			}
+		}
+		
+		if(done == false){
+			auto ch = name.substr(j,1);
+			if(includes(chnotallowed,ch) || includes(name_notallow,ch)){
+				if(ch == "_") ch = "underscore";
+				return "In "+type+" name '"+name+"' the character '"+ch+"' is not expected";
+			}
+			j++;
+		}
+	}
+	return "";
+}
+
+
 /// Checks that the equation is formatted correctly and puts '%' and '$' around parameters
 string basic_equation_check(string &te)
 {
@@ -119,7 +174,10 @@ string basic_equation_check(string &te)
 				if(emg != "") return emg;
 				
 				if(i != ist){
-					te = te.substr(0,ist)+"%"+te.substr(ist,i-ist)+"$"+te.substr(i);
+					auto name = te.substr(ist,i-ist);
+					emg = check_valid_name(name,"parameter"); if(emg != "") return emg;
+					
+					te = te.substr(0,ist)+"%"+name+"$"+te.substr(i);
 				}
 				
 				i += 1;
@@ -130,19 +188,17 @@ string basic_equation_check(string &te)
 					return "There should be a right bracket '"+right+"'";
 				}
 				else{
+					auto tex = te.substr(ist+1,i-ist-1);
 					if(type == "pop"){
-						// TO DO
-						// check_population(tex,icur3,filter,eqn);
+						emg = check_valid_name(tex,"population"); if(emg != "") return emg;
 					}
 
 					if(type == "ie"){
-						// TO DO
-						// check_ie(tex,icur3,filter,eqn); 
+						emg = check_valid_name(tex,"individual effect"); if(emg != "") return emg;
 					}
 					
 					if(type == "fe"){
-						// TO DO
-						// check_ie(tex,icur3,filter,eqn); 
+						emg = check_valid_name(tex,"fixed effect"); if(emg != "") return emg;
 					}
 				}
 			}
@@ -197,7 +253,7 @@ string check_chnotallowed(string te)
 			auto ch = te.substr(i,1);
 			
 			if(includes(chnotallowed,ch)){			
-				return "For equation '"+te+"': "+"The character '"+ch+"' is not allowed2.";
+				return "For equation '"+te+"': "+"The character '"+ch+"' is not allowed.";
 			}
 		}
 	}
@@ -212,6 +268,9 @@ unsigned int param_end(const string &st, unsigned int i, string &emg)
 	auto sub_brack = false;
 	auto sup_brack = false;
 	auto type = NORMAL_TEXT;
+	
+	auto ist = i;
+	auto ch_first = st.substr(i,1);
 	
 	do{
 		auto ch = st.substr(i,1);
@@ -248,6 +307,17 @@ unsigned int param_end(const string &st, unsigned int i, string &emg)
 		if(includes(paramend_list,ch) || str_eq(st,i,sigma)) break;
 		i++;
 	}while(i < st.length());
+	
+	if(ch_first == "^"){
+		emg = "Superscript '"+st.substr(ist,i-ist)+"' doesn't have a parameter associated with it.";
+		return i;
+	}
+	
+	if(ch_first == "_"){
+		emg = "Subscript '"+st.substr(ist,i-ist)+"' doesn't have a parameter associated with it.";
+		return i;
+	}
+	
 	if(i <= st.length() - 3){
 		if(st.substr(i,3) == "(t)") i += 3;
 	}

@@ -4,11 +4,11 @@
 /// Fires if mouse button is pressed down
 function mouse_down(xx,yy,evt)                                     
 {
-	if(false){ pr("evt"); pr(evt);}
+	if(false){ prr("evt"); prr(evt);}
 
   let d = new Date(); 
 	let over = inter.over;
-	
+
 	inter.mouse_time_down_prev = inter.mouse_time_down;
 	inter.mouse_down_over_prev = inter.mouse_down_over; 
 	
@@ -18,7 +18,7 @@ function mouse_down(xx,yy,evt)
 
 	let l = over.layer;
 	let i = over.i;
-		
+	
 	let keep_cursor_flag = false;
 	
 	if(l != undefined){
@@ -40,6 +40,15 @@ function mouse_down(xx,yy,evt)
 					{
 						inter.mode={ type:"Drag_Selector", mx:xx, my:yy,  p:bu.p, cl:bu.cl, l:l};
 						set_arrow_icon();
+					}
+					break;
+					
+				case "ClassGraphBack":
+					{
+						clear_comp_select();
+						inter.mode={ type:"Drag_Classification", p:bu.p, cl:bu.cl, l:l};
+						set_arrow_icon();
+						generate_screen();
 					}
 					break;
 				}
@@ -189,7 +198,7 @@ function mouse_down(xx,yy,evt)
 					}
 					break;
 				
-				case "ClassificationBack":
+				case "ClassificationBack": case "ClassGraphBack":
 					{
 						clear_comp_select();
 						inter.mode={ type:"Drag_Classification", p:bu.p, cl:bu.cl, l:l};
@@ -275,7 +284,14 @@ function mouse_down(xx,yy,evt)
 		if(inter.cursor.i != undefined && inter.mode.type != "Drag_Cursor"){
 			unfocus_check();			
 			turn_off_cursor();
-			generate_screen();
+			
+			// If button not active then replot screen
+			let fl = false;
+			if(l != undefined){
+				let bu = inter.layer[l].but[i];
+				if(bu.ac != undefined) fl = true;
+			}	
+			if(fl == false) generate_screen();
 		}
 	}
 }

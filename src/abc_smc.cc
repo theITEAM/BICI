@@ -26,27 +26,28 @@ ABC_SMC::ABC_SMC(const Model &model, Output &output, Mpi &mpi) : model(model), o
 
 /// Implements a version of simple ABC rejection algorithm
 void ABC_SMC::run()
-{
+{		
 	auto prop = intialise_proposal();
 
 	vector <Particle> particle_store;                // Stores the previous generation
 	
 	double obs_cutoff = -LARGE; 
 
+	if(op() && !com_op) cout << endl;
+	
 	auto smax = model.details.num_per_core;
 	for(auto g = 0u; g < G; g++){
 		vector <Particle> particle;
 		
 		auto ntr = 0u, nac = 0u;
 		
-		output.percent_done = 0;
-		
 		auto last = false; if(g == G-1) last = true;
-			
+	
+		percentage_start(RUN_GEN_PER,g+1);
+
 		if(g == 0){
 			for(auto s = 0u; s < smax; s++){
-				output.percentage(s,smax*G);
-				progress(s,smax*G);
+				percentage(s,smax);
 				
 				auto param_val = model.param_sample();
 				auto initc_val = model.initc_sample(param_val);
@@ -71,8 +72,7 @@ void ABC_SMC::run()
 		
 			auto s = 0u;
 			do{
-				output.percentage(s,smax);
-				progress(smax*g+s,smax*G);
+				percentage(s,smax);
 				
 				ntr++;
 					
@@ -99,7 +99,6 @@ void ABC_SMC::run()
 				}
 			}while(s < smax);
 		}
-		output.percentage(smax,smax);
 		
 		if(!last) obs_cutoff = implement_cutoff_frac(particle); 
 		
@@ -108,12 +107,15 @@ void ABC_SMC::run()
 #ifdef USE_MPI 
 		mpi.share_particle(particle_store);
 #endif
-		
-		if(op()){
-			cout << "Generation " << g << "   Acceptance: " << 100*double(nac)/ntr << "%  ";
+			
+		percentage_end();
+	
+		if(op() && !com_op){
+			cout << "  Acceptance: " << 100*double(nac)/ntr << "%  ";
 			cout << "Cut-off: " << obs_cutoff << "   # Particle: " <<  particle_store.size() << endl << endl;
 		}
 	}
+
 
 	setup_particle_sampler(particle_store);    
 	for(auto s = 0u; s < smax; s++){

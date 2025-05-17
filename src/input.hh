@@ -107,11 +107,12 @@ class Input                                // Stores information about the model
 		
 		vector <CommandLine> extract_command_line(vector <string> lines);
 		void load_data_files(vector <CommandLine> &command_line);
-		string add_escape_char(string te);
+		string remove_escape_char(string te);
 		void convert_folder(string &data_dir) const;
 		CommandLine get_command_tags(string trr, unsigned int line_num);
 		CommandLine syntax_error() const;
 		void alert(string st);
+		void add_error_mess(unsigned int line_num, string st, ErrorType type);
 		void alert_import(string st, bool fatal=false);  
 		void alert_line(string st, unsigned int line);  
 		void alert_equation(const EquationInfo &eqi, const string &warn);
@@ -120,12 +121,12 @@ class Input                                // Stores information about the model
 		void process_command(const CommandLine &cline, unsigned int loop);
 		string get_tag_value(string st);
 		string get_tag_val(string st, vector <Tag> &tags);
-		void cannot_find_tag();
+		void cannot_find_tag(bool fatal=false);
 		unsigned int option_error(string na, string te, const vector <string> &pos, const vector <unsigned int> &conv);
-		bool check_latlng_error(double lat, double lng);
-		void output_error_messages(string te) const;
-		bool is_number(string num, string tag);
-		bool is_positive(string num, string tag);
+		bool check_latlng_error(double lat, double lng, bool fatal=false);
+		void output_error_messages(string te, bool end=false) const;
+		bool is_number(string num, string tag, bool fatal=false);
+		bool is_positive(string num, string tag, bool fatal=false);
 		bool is_zeroone(string num, string tag);
 		void map_ind_effect();
 		void check_param_used();
@@ -152,7 +153,6 @@ class Input                                // Stores information about the model
 		void label_command();
 		void box_command();
 		void param_command();
-		void load_reparam_eqn(string te, Param &par);
 		void derived_command();
 		void simulation_command();
 		void inference_command();
@@ -183,7 +183,7 @@ class Input                                // Stores information about the model
 		void set_tr_connected();
 		void set_precalc_nm_rate();
 		void check_markov_or_nm() const;
-		void check_nm_pop() const;
+		void check_nm_pop();
 		void create_population_erlang();
 		void source_equation_comp();
 		void calculate_timepoint();	
@@ -212,7 +212,7 @@ class Input                                // Stores information about the model
 		void set_trans_tree();
 		void set_hash_all_ind();
 		void add_genetic_data();
-		void set_contains_source();
+		void set_contains_source_sink();
 		void create_trig_ev_ref();
 		bool trig_ev_exist(TrigEventType type, double t, const vector <TrigEventRef> &trig_event) const;
 		void create_cl_trig_ev_ref();
@@ -276,9 +276,12 @@ class Input                                // Stores information about the model
 		void read_state_sample(const vector <string> &lines, const vector <string> &ind_key);
 		unsigned int get_param_value(vector < vector <double> > &param_value, unsigned int i, const vector <string> &lines, string warn);
 		void load_param_value(const ParamProp &pp, string valu, Param &par, string desc);
+		void load_weight_value(const ParamProp &pp, string valu, Param &par, string desc);
 		void set_spline(string knot_times_str, string smooth, vector <string> &knot_times, bool use_inf_time, Param &par);
 		unsigned int get_seed();
-		//unsigned int get_tag_integer(string tag, unsigned int def=UNSET);
+		void check_dt(const Details &details);
+		void add_param_cat_factor(Param &par);
+		void load_reparam_eqn(string te, Param &par);
 		
 		// In 'input_check.cc'
 		void check_initial_pop_error(bool end);
@@ -288,6 +291,10 @@ class Input                                // Stores information about the model
 		void check_comp_structure();
 		void check_import_correct();
 		void temp_check(unsigned int num);
+		void check_reparam_time();
+		bool check_name_input(string name, string te);
+		bool is_Color(string color) const;
+		
 		unsigned int check_pos_integer(string val, unsigned int def=UNSET);
 		double check_pos_number(string te, unsigned int def);
 		double check_zero_one(string te, double def);

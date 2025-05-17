@@ -15,30 +15,44 @@ function get_statistic(vect)
 		stat.CImax = "NA";
 	} 
 	else{
-		let sum = 0, sum2 = 0;
+		let min = LARGE, max = -LARGE;
 		for(let i = 0; i < vec.length; i++) {
-			sum += vec[i];
-			sum2 += vec[i]*vec[i];
+			let val = vec[i];
+			if(val < min) min = val;
+			if(val > max) max = val;
 		}
-		sum /= n;
-		sum2 /= n;
+		
+		if(min == max){
+			stat.mean = min;
+			stat.CImin = min;
+			stat.CImax = min;
+		}
+		else{		
+			let sum = 0, sum2 = 0;
+			for(let i = 0; i < vec.length; i++) {
+				sum += vec[i];
+				sum2 += vec[i]*vec[i];
+			}
+			sum /= n;
+			sum2 /= n;
 
-		stat.mean = sum;
+			stat.mean = sum;
 
-		vec.sort(function(a, b){return a - b});
+			vec.sort(function(a, b){return a - b});
 
-		if(n >= 2) {
-			let i = Math.floor((n-1)*0.025);
-			let f = (n-1)*0.025 - i;
-			stat.CImin = vec[i]*(1-f) + vec[i+1]*f;
+			if(n >= 2) {
+				let i = Math.floor((n-1)*0.025);
+				let f = (n-1)*0.025 - i;
+				stat.CImin = vec[i]*(1-f) + vec[i+1]*f;
 
-			i = Math.floor((n-1)*0.975);
-			f = (n-1)*0.975 - i;
-			stat.CImax = vec[i]*(1-f) + vec[i+1]*f;
-		} 
-		else{
-			stat.CImin = vec[0];
-			stat.CImax = vec[0];
+				i = Math.floor((n-1)*0.975);
+				f = (n-1)*0.975 - i;
+				stat.CImax = vec[i]*(1-f) + vec[i+1]*f;
+			} 
+			else{
+				stat.CImin = vec[0];
+				stat.CImax = vec[0];
+			}
 		}
 	}
 
@@ -49,7 +63,7 @@ function get_statistic(vect)
 /// Gets the minimum and maximum of a list
 function get_range(vec)
 {
-	let min = LARGE, max = -LARGE;
+	let min = VLARGE, max = -VLARGE;
 	for(let i = 0; i < vec.length; i++){
 		let val = vec[i];
 		if(val < min) min = val;
@@ -63,16 +77,21 @@ function get_range(vec)
 /// Calculate the effective sample size for a list of numbers
 function get_effective_sample_size(vec)
 {
-	let av = 0.0, av2 = 0.0;
 	let N = vec.length;
+	
+	let min = LARGE, max = -LARGE;
+	for(let i = 0; i < N; i++) {
+		let val = vec[i];
+		if(val < min) min = val;
+		if(val > max) max = val;
+	}
+	if(min == max || N < 2) return "-";
+		
+	let av = 0.0, av2 = 0.0;
 	for(let s = 0; s < N; s++){
 		let val = vec[s]; av += val; av2 += val*val;
 	}
-	
 	let num = av2/N - (av/N)*(av/N);
-	
-	if(num < TINY*TINY || N < 2) return "-";
-	
 	let mean = av/N, sd = Math.sqrt(num);
 	
 	for(let s = 0; s < N; s++) vec[s] = (vec[s]-mean)/sd;
@@ -193,4 +212,39 @@ function get_correlation(vecA,vecB)
 	if(varA < TINY || varB < TINY) return 0;
 	
 	return (avAB/N - (avA/N)*(avB/N))/Math.sqrt(varA*varB);
+}
+
+
+/// Calculates the xi sq distribution - used for testing for in trans (p-val)
+function calc_xi_sq()
+{
+	let dx = 0.1;
+	let k = H_BIN-1;
+	
+	let prob=[];
+	let imax = 10*k/dx;
+	let sum = 0;
+	for(let i = 0; i < imax; i++){
+		let x = i*dx;
+		prob[i] = Math.exp((k/2-1)*Math.log(x)-x/2);	
+		sum += prob[i];
+	}
+	
+	let prob_above=[];
+	let sum2 = 0;
+	for(let i = imax-1; i >= 0; i--){
+		prob_above[i] = sum2;
+		sum2 += prob[i]/sum;
+	}
+	
+	return { prob_above:prob_above, dx:dx};
+}
+
+
+/// Gets the p-value from xis
+function xi_sq_p_value(xis)
+{
+	let i = Math.floor(xis/xi_sq.dx);
+	if(i >= xi_sq.prob_above.length) return TINY;
+	return xi_sq.prob_above[i];
 }

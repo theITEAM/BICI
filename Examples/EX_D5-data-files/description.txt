@@ -5,7 +5,7 @@
 - Like D4 but with an IBM and individual-level data.
 - The probability of observing transitions is given the functional form $a+b*cos(0.03t)$.
 - The values $a=0.5$ and $b=0.3$ were used to simulate the data.
-- Parameters $a$ and $b$ can be inferred. 
+- Parameters $a$ and $b$ can be inferred.
 
 ## Data
 - Partially observed transitions.

@@ -23,11 +23,12 @@ Simulate::Simulate(const Model &model, Output &output, Mpi &mpi) : model(model),
 /// Performs simulation
 void Simulate::run()
 {
+	percentage_start(RUN_PER);
+	
 	auto smax = model.details.num_per_core;
 	for(auto s = 0u; s < smax; s++){
-		output.percentage(s,smax);
-		progress(s,smax);
-		
+		percentage(s,smax);
+	
 		auto param_val = model.param_sample();
 		auto initc_val = model.initc_sample(param_val);
 
@@ -45,5 +46,5 @@ void Simulate::run()
 	mpi.barrier();
 #endif
 	
-	output.percentage(smax,smax);
+	percentage_end();
 }

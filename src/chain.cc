@@ -34,8 +34,8 @@ Chain::Chain(unsigned int nburnin_, unsigned int nsample_, const Model &model, O
 
 
 /// Initialises chain
-void Chain::init()
-{	
+void Chain::init(unsigned int ch, unsigned int ch_max)
+{
 	update_init();
 
 	auto Lmax = -LARGE;
@@ -44,9 +44,11 @@ void Chain::init()
 
 	Particle part;
 
-	auto loop_max = 10u;
+	auto loop_max = 3u;
 	for(auto loop = 0u; loop < loop_max; loop++){ 
 		print_diag(to_string(loop)+" Initial state");
+		
+		percentage(loop+ch*loop_max,loop_max*ch_max);
 		
 		auto param_val = model.param_sample();
 		auto initc_val = model.initc_sample(param_val);
@@ -109,7 +111,7 @@ void Chain::burn_update(unsigned int s)
 			for(auto &pro : proposal) pro.update_sampler(cor_matrix);
 		}
 		
-		//if(s != 0 && s%burn_info.prop_join_step == 0) update.check_join_proposal();
+		if(s != 0 && s%burn_info.prop_join_step == 0) check_join_proposal();
 
 		if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
 	}
@@ -132,7 +134,7 @@ void Chain::pas_burn_update(unsigned int s, unsigned int g, unsigned int gen_upd
 		for(auto &pro : proposal) pro.update_sampler(cor_matrix);
 	}
 	
-	//if(s != 0 && s%burn_info.prop_join_step == 0) update.check_join_proposal();
+	if(s != 0 && s%burn_info.prop_join_step == 0) check_join_proposal();
 
 	if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
 }
@@ -415,10 +417,8 @@ double Chain::like_total_obs() const
 void Chain::update(unsigned int s)
 {
 	state.sample = s;
- 
+
 	auto pl = false;
-	//pl = true;
-	//if(core() == 14 && s >=2080) pl = true;
 	
 	for(auto &pro : proposal){ 
 		if(pro.on){
@@ -429,10 +429,14 @@ void Chain::update(unsigned int s)
 			}
 			else{
 				switch(pro.type){
-				case PAR_EVENT_FORWARD_PROP:
-				case PAR_EVENT_FORWARD_SQ_PROP:
-				case PAR_EVENT_BACKWARD_SQ_PROP:
-				//case IND_ADD_REM_PROP:
+				//case IND_EVENT_TIME_PROP:
+				//case IND_LOCAL_PROP:
+				//case PAR_EVENT_FORWARD_PROP:
+				//case PAR_EVENT_FORWARD_SQ_PROP:
+				//case PAR_EVENT_BACKWARD_SQ_PROP:
+				case IND_ADD_REM_PROP:
+				//case IND_OBS_SWITCH_LEAVE_SINK_PROP:
+				//case IND_OBS_SWITCH_ENTER_SOURCE_PROP:
 					pro.update(state);
 					break;
 			
@@ -441,7 +445,7 @@ void Chain::update(unsigned int s)
 				}
 			}
 		
-			//if(pl) state.check(" After prop check");
+			if(pl) state.check(" After prop check");
 			if(pl) state.check_popnum_t2("hhh");
 		}
 	}
@@ -659,6 +663,18 @@ void Chain::update_init()
 					proposal.push_back(pp); 
 				}
 				
+				{				
+					Proposal pp(IND_MULTI_EVENT_PROP,vec,model,output,1,burn_info);
+					//if(st == LOCAL_SAMP || st == ALL_SAMP) proposal.push_back(pp); 
+					proposal.push_back(pp); 
+				}
+				
+				{				
+					Proposal pp(IND_EVENT_ALL_PROP,vec,model,output,1,burn_info);
+					//if(st == LOCAL_SAMP || st == ALL_SAMP) proposal.push_back(pp); 
+					proposal.push_back(pp); 
+				}
+				
 				for(auto cl = 0u; cl < sp.ncla; cl++){
 					if(sp.cla[cl].swap_rep.size() > 0){
 						vector <unsigned int> vec2; vec2.push_back(p); vec2.push_back(cl);
@@ -696,6 +712,11 @@ void Chain::update_init()
 				
 				if(sp.contains_source && sp.init_cond.type != INIT_POP_FIXED){
 					Proposal pp(IND_OBS_SWITCH_ENTER_SOURCE_PROP,vec,model,output,1,burn_info);
+					proposal.push_back(pp);
+				}
+				
+				if(sp.contains_sink){
+					Proposal pp(IND_OBS_SWITCH_LEAVE_SINK_PROP,vec,model,output,1,burn_info);
 					proposal.push_back(pp);
 				}
 			}
@@ -810,7 +831,7 @@ void Chain::add_parameter_prop(const vector <unsigned int> &vec)
 {
 	Proposal pp(PARAM_PROP,vec,model,output,1,burn_info);
 	proposal.push_back(pp);
-	
+
 	/// Looks at adding MBPs
 	vector <unsigned int> list;
 	for(const auto &al : pp.affect_like){
@@ -995,7 +1016,7 @@ string Chain::diagnostics(unsigned int total_time, unsigned int anneal_time) con
 
 
 /// Used to order proposal speeds
-bool PS_ord (PropSpeed ps1, PropSpeed ps2)                      
+bool PS_ord (const PropSpeed &ps1, const PropSpeed &ps2)                      
 { return (ps1.time_per_prop < ps2.time_per_prop); };  
 
 
@@ -1048,24 +1069,123 @@ void Chain::set_proposal_prob()
 /// Checks if new proposals are added which join parameters
 void Chain::check_join_proposal()
 {
+	auto pl = false;
+	
 	auto M = cor_matrix.calculate_cor_matrix();
 
-	print_matrix("mat",M);
-
+	if(pl) print_matrix("mat",M);
+	
 	auto f = exp(-(cor_matrix.get_n()/400.0));
 	auto thresh = f + (1-f)*PROP_JOIN_COR_MIN;
 
+	// Works out all multivariate proposals
+	vector < vector <unsigned int> > par_list;
+	for(auto i = 0u; i < model.nparam_vec; i++){
+		if(model.param_vec[i].prop_pos){
+			vector <unsigned int> list;
+			list.push_back(i);
+			par_list.push_back(list);
+		}
+	}
+	
 	auto N = M.size();
 	for(auto j = 0u; j < N; j++){
-		for(auto i = j+1; i < N; i++){
-			if(M[j][i] > thresh || M[j][i] < -thresh){
-				join_proposal(i,j);
+		if(model.param_vec[j].prop_pos){
+			for(auto i = j+1; i < N; i++){
+				if(model.param_vec[i].prop_pos){
+					if(M[j][i] > thresh || M[j][i] < -thresh){
+						auto lj = find_which_list(j,par_list);
+						auto li = find_which_list(i,par_list);
+						if(lj != li){
+							for(auto va : par_list[lj]){
+								par_list[li].push_back(va);
+							}
+							
+							if(lj+1 != par_list.size()){
+								par_list[lj] = par_list[par_list.size()-1];
+							}
+							par_list.pop_back();
+						}
+					}
+				}
 			}
+		}
+	}
+	
+	// Switches off all multinomial proposals
+	vector <bool> on_st;
+	for(auto &prop : proposal){	
+		on_st.push_back(prop.on);
+		if(prop.param_list.size() > 1 && (prop.type == PARAM_PROP || prop.type == MBP_PROP)){
+			prop.on = false;
+		}
+	}
+	
+	// Switch on those which are is list
+	vector <unsigned int> add;
+	for(auto j = 0u; j < par_list.size(); j++){
+		auto fl = false;
+		for(auto i = 0u; i < proposal.size(); i++){
+			auto &prop = proposal[i];
+			if(prop.type == PARAM_PROP || prop.type == MBP_PROP){
+				if(equal_vec(prop.param_list,par_list[j])){
+					fl = true;
+					prop.on = true;
+					if(on_st[i] == false){
+						cout << "RE TURN ON: " << prop.name << endl;
+						prop.update_sampler(cor_matrix);
+						prop.calculate_affect_spline(); 
+					}
+				}
+			}
+		}
+		
+		if(fl == false){
+			add.push_back(j);
+		}
+	}
+	
+	for(auto i = 0u; i < proposal.size(); i++){
+		auto &prop = proposal[i];
+		if(on_st[i] && prop.on == false){
+			cout << "REMOVE: " << prop.name << endl;
+		}
+	}
+	
+	// Adds any new proposals
+	auto pr_st = proposal.size();
+	for(auto j : add) add_parameter_prop(par_list[j]);
+	
+	for(auto j = pr_st; j < proposal.size(); j++){
+		auto &prop = proposal[j];
+		cout << "JOIN ADD: " << prop.name << endl;
+		prop.update_sampler(cor_matrix);
+		prop.calculate_affect_spline(); 
+	}
+	
+	if(pl){
+		cout << "after" << endl;
+		for(auto &prop : proposal){	
+			cout << prop.name << " " << prop.on << endl;
 		}
 	}
 }
 
 
+/// Finds which list a parameter is on
+unsigned int Chain::find_which_list(unsigned int j, const vector < vector <unsigned int> > &par_list) const 
+{
+	for(auto k = 0u; k < par_list.size(); k++){
+		for(auto i = 0u; i < par_list[k].size(); i++){
+			if(par_list[k][i] == j) return k;
+		}
+	}
+	emsg("Cannot find on list");
+	
+	return UNSET;
+}
+
+/*
 /// Joins proposals parameters th1 and th2
 void Chain::join_proposal(unsigned int th1, unsigned int th2) 
 {
@@ -1113,6 +1233,7 @@ void Chain::join_proposal(unsigned int th1, unsigned int th2)
 		prop.calculate_affect_spline(); 
 	}
 }
+*/
 
 
 /// Check correlation matrix is specified correctly

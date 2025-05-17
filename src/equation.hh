@@ -121,10 +121,10 @@ class Equation                             // Stores information about the model
 		
 	private:
 		vector <unsigned int> getallcomp(string st);
-		void print_operations(vector <EqItem> op) const;
+		void print_operations(const vector <EqItem> &op) const;
 		
 		vector <string> find_list_from_index(string ind, double dist_max) const;
-		vector <unsigned int> get_all_comp(unsigned int p, string st);
+		vector <unsigned int> get_all_comp(unsigned int p, string te);
 		double get_float(unsigned int i, unsigned int &raend) const;
 		ParamRef get_param_name(unsigned int i, double &dist, unsigned int &raend);
 		unsigned int get_pop(unsigned int i, unsigned int &raend);
@@ -154,6 +154,9 @@ class Equation                             // Stores information about the model
 		void set_time_vari();
 		double find_dist(unsigned int c, unsigned int cc, const vector <Compartment> &comp, Coord coord) const;
 		double get_distance(const ParamProp &pp);
+		string op_name(EqItemType type) const;
+		void check_repeated_operator(const vector <EqItem> &op);
+		void replace_minus(vector <EqItem> &op);
 				
 		vector <SpeciesSimp> &species;       // References the species from the model
 		unsigned int nspecies;

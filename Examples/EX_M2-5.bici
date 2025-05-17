@@ -1,4 +1,9 @@
 
+###################### DATA DIRECTORY ######################
+
+data-dir folder="Examples\EX_M2-5-data-files"
+
+
 ####################### DESCRIPTION ########################
 
 description text="description.txt"
@@ -6,31 +11,28 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-data-dir folder="Examples\EX_M2-5-data-files"
-
 simulation start=0 end=400 timestep=0.5
 
-inference start=0 end=100 timestep=0.5
+inference start=0 end=100 timestep=0.5 nchain=3
 
 post-sim start=0 end=100
 
 
 ######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
 
-species name="People" type="individual" trans-tree="off"
+species name="People" type="individual"
 
 # SPECIES MODEL
 
 class name="DS" index="a"
 
-comp name="S" color="#009900" x=-16 y=-7
-comp name="I" color="#ff2222" x=-2 y=-7
-comp name="R" color="#4444ff" x=11 y=-7
+comp name="S" color="#009900" x=-15 y=0
+comp name="I" color="#ff2222" x=0 y=0
+comp name="R" color="#4444ff" x=15 y=0
 
 trans name="S->I" value="exp(rate:η+β×{I})"
 trans name="I->R" value="gamma(mean:m, cv:c)"
-trans name="R->S" value="exp(rate:ν)" mid-x="11,-16" mid-y="-2,-2"
-
+trans name="R->S" value="exp(rate:ν)" mid-x="15,-15" mid-y="-4,-4"
 
 # SIMULATION INITIAL CONDITIONS
 
@@ -40,10 +42,15 @@ init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
 
 ######################## PARAMETERS ########################
 
-param name="c" value="0.3" prior="uniform(0,1)"
+param name="c" value="0.3" prior="uniform(0.01,1)"
+
 param name="m" value="15" prior="uniform(0,100)"
-param name="β" value="0.003" prior="uniform(0,0.1)"
-param name="η" value="0.00005" prior="uniform(0,0.01)"
+
+param name="β" value="0.003" prior="uniform(0,0.01)"
+
+param name="η" constant="0.00005"
+
 param name="ν" value="0.01" prior="uniform(0,0.1)"
+
 
 

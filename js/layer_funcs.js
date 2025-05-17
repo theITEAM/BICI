@@ -94,10 +94,10 @@ function within_layer(name)
 /// Prints the names of all the layers (for diagnostic purposes)
 function print_layer()
 {
-	pr("");
-	pr("LAYER NAMES:");
+	error("");
+	error("LAYER NAMES:");
 	for(let l = 0; l < inter.layer.length; l++){
-		pr(l+": "+inter.layer[l].name);
+		error(l+": "+inter.layer[l].name);
 	}
 }
 
@@ -152,7 +152,7 @@ function add_layer(na,x,y,dx,dy,op)
 		if(tab_name() == "Model" && subtab_name() == "Compartments") na = "NoScroll";
 		break;
 	
-	case "Annotation": case "AnnotationMap":
+	case "Annotation": case "AnnotationMap": case "PointLabel":
 	case "GraphCompartments": case "GraphTransitions": case "GraphAnnotations":
 		na = "NoScroll";
 		break;
@@ -478,10 +478,10 @@ function turn_off_cursor()
 /// Turns off the regular interval uded to initiate a cursor flash
 function turn_off_cursor_flash()
 {
-	if(inter.cursor.interval != undefined){
-		clearInterval(inter.cursor.interval);
-		inter.cursor.interval = undefined;
+	for(let i = 0; i < inter.interval_store.length; i++){
+		clearInterval(inter.interval_store[i]);
 	}
+	inter.interval_store=[];
 }
 
 
@@ -492,7 +492,7 @@ function start_cursor_flash()
 	
 	turn_off_cursor_flash();
 
-	inter.cursor.interval = setInterval(
+	inter.interval_store.push(setInterval(
 		function (){ 
 			let cur = inter.cursor;
 			
@@ -507,7 +507,7 @@ function start_cursor_flash()
 					}
 				}
 			}
-		}, 500);
+		}, 500));
 }
 
 
@@ -588,6 +588,9 @@ function add_screen_buts(lay)
 				let claa = model.get_cla(); if(claa) model.ensure_lng(claa.camera,x3-x2);
 				add_layer("AnnotationMap",x2,y1,x3-x2,y2-y1,{});
 				add_layer("Annotation",x2,y1,x3-x2,y2-y1,{});
+				if(claa && claa.camera.coord == "latlng"){
+					add_layer("PointLabel",x2,y1,x3-x2,y2-y1,{});
+				}
 				add_layer("Compartment",x2,y1,x3-x2,y2-y1,{});
 				add_layer("Transition",x2,y1,x3-x2,y2-y1,{});
 				if(inter.comp_select.sbox && inter.comp_select.list.length > 1){
@@ -604,14 +607,16 @@ function add_screen_buts(lay)
 			case "Add_Compartment":
 				{
 					let w, h;
-					let scale = model.get_scale();
+					let scale = model.get_scale()*Math.exp(model.get_cam().slider.value);
 					let coord = model.get_coord();
 					let ruler = model.get_ruler();
+					
 					switch(coord){
 					case "cartesian": w = 4*grid*scale+marnew; h = compartment_height*scale+marnew; break;
 					case "latlng": w = 2*latlng_radius*scale*ruler+marnew; if(w < 0.4) w = 0.4; h = w; break;
 					default: error("Option not recognised 67"); break;
 					}
+					
 					add_layer("AddCompartment",1000,10,w,h,{coord:coord});
 				}
 				break;
@@ -654,12 +659,18 @@ function add_screen_buts(lay)
 		case "Results": 
 			switch(tree[2]){
 			case "Populations": case "Transitions": case "Individuals": case "Derived":
-			case "Parameters": case "Generations": 
+			case "Parameters": case "Generations": case "Diagnostics":
 				right_menu = tree[2];
 				
 				let rpf = get_inf_res().plot_filter;
 				
 				switch(tree[2]){
+				case "Diagnostics":
+					switch(rpf.sel_diag_view.te){
+					case "Trans. (dist.)": right_mid = "with key"; break;
+					}
+					break;
+					
 				case "Parameters": 
 					if(rpf.sel_paramview){
 						switch(rpf.sel_paramview.te){
@@ -703,6 +714,7 @@ function add_screen_buts(lay)
 		add_layer("RightMenuSlider",xr-right_menu_slider,yr,right_menu_slider,y2-yr-1,{});
 		
 		let l = inter.layer.length;
+		
 		add_layer("RightMenu",xr,yr,x3-xr,y2-yr,{type:right_menu});
 		
 		let box = get_but_box(inter.layer[l].but);
@@ -828,11 +840,9 @@ function start_loading_symbol(per,type)
 		inter.loading_symbol = {on:true, offset:0, interval:interval, percent:per, type:type};
 		
 		switch(type){
-		case "Start": loading_symbol_message("Creating..."); break;
+		case "Start": case "StartPPC": loading_symbol_message("Creating..."); break;
 		case "Spawn": loading_symbol_message("Initialising..."); break;
 		}
-		
-		//generate_screen();
 	}
 }
 
@@ -1003,13 +1013,16 @@ function replot_layer(name,sh)
 
 	if(sh != undefined){
 		let but = lay.but;
-		
+
 		let shx = sh.x, shy = sh.y;
 		for(let k = 0; k < but.length; k++){
 			let bu = but[k];
-			if(bu.type != "CenterText"){
+			switch(bu.type){
+			case "Nothing": case "CenterText": case "ClassBack": break;
+			default:
 				bu.x += shx;
 				bu.y += shy;
+				break;
 			}
 		}
 		
@@ -1164,9 +1177,18 @@ function copy_back_to_source2(tbs)
 		}
 		break;
 		
-	case "element_param_const": 
+	case "element_param_const": case "element_weight_const": 
 		{
 			let val = Number(te);
+			set_element(inter.edit_param.value,so.pindex,val);
+		}
+		break;
+	
+	case "element_factor_const": 
+		{
+			let val;
+			if(te == "*") val = te;
+			else val = Number(te);
 			set_element(inter.edit_param.value,so.pindex,val);
 		}
 		break;
@@ -1184,39 +1206,60 @@ function copy_back_to_source2(tbs)
 	case "sd": edit_source.spec.sd = te; break;	
 	case "p": edit_source.spec.p = te; break;
 
-	case "trans_mean": 
-		update(model.species[so.p].cla[so.cl].tra[so.i].value.mean_eqn,te);
-		model.find_trans_pline(so.p,so.cl,so.i);
+	case "trans_mean": case "trans_period": 
+		{
+			let claa = model.species[so.p].cla[so.cl];
+			update(claa.tra[so.i].value.mean_eqn,te);
+			model.find_trans_pline(claa,so.i);
+		}
 		break;
 		
 	case "trans_rate":
-		update(model.species[so.p].cla[so.cl].tra[so.i].value.rate_eqn,te);
-		model.find_trans_pline(so.p,so.cl,so.i);
+		{
+			let claa = model.species[so.p].cla[so.cl];
+			update(claa.tra[so.i].value.rate_eqn,te);
+			model.find_trans_pline(claa,so.i);
+		}
 		break;			
 		
 	case "trans_shape": 
-		update(model.species[so.p].cla[so.cl].tra[so.i].value.shape_eqn,te); 
-		model.find_trans_pline(so.p,so.cl,so.i);
+		{
+			let claa = model.species[so.p].cla[so.cl];
+			update(claa.tra[so.i].value.shape_eqn,te); 
+			model.find_trans_pline(claa,so.i);
+		}
 		break;	
 		
 	case "trans_scale": 
-		update(model.species[so.p].cla[so.cl].tra[so.i].value.scale_eqn,te);
-		model.find_trans_pline(so.p,so.cl,so.i);
+		{
+			let claa = model.species[so.p].cla[so.cl];
+			update(claa.tra[so.i].value.scale_eqn,te);
+			model.find_trans_pline(claa,so.i);
+		}
 		break;
 		
 	case "trans_cv": 
-		update(model.species[so.p].cla[so.cl].tra[so.i].value.cv_eqn,te); 
-		model.find_trans_pline(so.p,so.cl,so.i);
+		{
+			let claa = model.species[so.p].cla[so.cl];
+			update(claa.tra[so.i].value.cv_eqn,te); 
+			model.find_trans_pline(claa,so.i);
+		}
 		break;
 		
 	case "trans_bp": 
-		update(model.species[so.p].cla[so.cl].tra[so.i].value.bp_eqn,te); 
-		model.find_trans_pline(so.p,so.cl,so.i);
+		{
+			let claa = model.species[so.p].cla[so.cl];
+			update(claa.tra[so.i].value.bp_eqn,te); 
+			model.find_trans_pline(claa,so.i);
+		}
 		break;
 
 	case "trans_shape_erlang":
-		update(model.species[so.p].cla[so.cl].tra[so.i].value.shape_erlang,te); 
-		model.find_trans_pline(so.p,so.cl,so.i);
+		{
+			let claa = model.species[so.p].cla[so.cl];
+			update(claa.tra[so.i].value.shape_erlang,te); 
+			model.find_trans_pline(claa,so.i);
+		}
 		break;
 
 	case "Se": update(edit_source.spec.Se_eqn,te); break;
@@ -1256,6 +1299,10 @@ function copy_back_to_source2(tbs)
 	case "prior_beta": case "prior_dist_beta":
 		inter.bubble.prior.value.beta_eqn.te = te; 
 		break;
+	case "prior_sigma": 
+		inter.bubble.prior.value.sigma_eqn.te = te;
+		break;
+
 	case "derive_eqn1": inter.bubble.derived.eqn1.te = te; break;
 	case "derive_eqn2": inter.bubble.derived.eqn2.te = te; break;
 	case "derive_eqn": 
@@ -1355,13 +1402,40 @@ function check_posnumber(te)
 }
 
 
+/// Checks formatting for times
+function check_times(te)
+{
+	let spl = te.split(",");
+	for(let i = 0; i < spl.length; i++){
+		let st = spl[i];
+		if(isNaN(st)){
+			if(spl.length == 1) return "Must be a number";
+			else return "'"+st+"' must be a number";
+		}
+	}
+	return "";
+}
+
+
 /// Checks that a string is a number between zero and one
 function check_zeroone(te)
 {
 	let num = Number(te);
 	if(isNaN(num)) return "Must be a number";
 	else{
-		if(num < 0 || num > 1) return "Must be between 0 and 1 inclusive";
+		if(num < 0 || num > 1) return "Must be between 0 and 1, inclusive";
+	}
+	return "";
+}
+
+
+/// Checks that a string is a number between zero and one exclussive
+function check_zeroone_excl(te)
+{
+	let num = Number(te);
+	if(isNaN(num)) return "Must be a number";
+	else{
+		if(num <= 0 || num >= 1) return "Must be between 0 and 1, exclusive";
 	}
 	return "";
 }
@@ -1439,13 +1513,10 @@ function check_error_textbox()
 {
 	let sto = inter.textbox_store;
 	
-	let flag = false;
-
 	for(let i = 0; i < sto.length; i++){
-		if(check_error_textbox2(sto[i]) == true) flag = true;
+		if(check_error_textbox2(sto[i]) == true) return true;
 	}
-	
-	return flag;
+	return false;
 }
 	
 	
@@ -1483,6 +1554,7 @@ function check_error_textbox2(tbs)
 						let warn_name = model.check_name(te,pos);
 						if(warn_name != undefined) warn = warn_name;		
 					}
+					char_lim = name_ch_max;
 				}
 				break;
 				
@@ -1490,7 +1562,7 @@ function check_error_textbox2(tbs)
 				{
 					let warn_name = model.check_name(te,[]);
 					if(warn_name != undefined) warn = warn_name;		
-					char_lim = 20;
+					char_lim = name_ch_max;
 				}
 				break;
 				
@@ -1500,8 +1572,8 @@ function check_error_textbox2(tbs)
 					list.push({p:source.p,cl:source.cl});
 			
 					let warn_name = model.check_name(te,list);
-					if(warn_name != undefined) warn = warn_name;		
-					char_lim = 20;
+					if(warn_name != undefined) warn = warn_name;				
+					char_lim = name_ch_max;
 				}
 				break;
 				
@@ -1509,6 +1581,16 @@ function check_error_textbox2(tbs)
 				{
 					let warn_name = model.check_name(te,[{p:tbs.source.p}]);
 					if(warn_name != undefined) warn = warn_name;		
+					char_lim = name_ch_max;
+				}
+				break;
+				
+				
+			case "add_species_name":
+				{
+					let warn_name = model.check_name(te,[]);
+					if(warn_name != undefined) warn = warn_name;		
+					char_lim = name_ch_max;
 				}
 				break;
 			
@@ -1671,7 +1753,7 @@ function check_error_textbox2(tbs)
 				break;
 				
 			case "p": 
-				warn = check_zeroone(te);
+				warn = check_zeroone_excl(te);
 				break;
 				
 			case "label_anno": case "label":
@@ -1701,11 +1783,33 @@ function check_error_textbox2(tbs)
 				}
 				break;
 				
+			case "element_factor_const": 
+				{
+					if(te != "*"){
+						let num = Number(te);
+						if(isNaN(num)) warn = "Must be a number";
+						if(num < 0) warn = "Must be non-negative";
+					}
+				}
+				break;
+				
+			case "element_weight_const": 
+				{
+					let num = Number(te);
+					if(isNaN(num)) warn = "Must be a number";
+					if(num <= 0) warn = "Must be positive";
+				}
+				break;
+				
 			case "element_Amatrix":
 				{	
 					let num = Number(te);
 					if(isNaN(num)) warn = "Must be a number";
 				}
+				break;
+				
+			case "trans_period":
+				warn = check_posnumber(te);
 				break;
 				
 			case "trans_rate":
@@ -1733,7 +1837,9 @@ function check_error_textbox2(tbs)
 			case "prior_alpha": warn = check_posnumber(te); break;
 
 			case "prior_beta": warn = check_posnumber(te); break;
-						
+	
+			case "prior_sigma": warn = check_posnumber(te); break;
+				
 			case "prior_shape": case "prior_sd": case "prior_cv": 
 				warn = check_posnumber(te);
 				break;
@@ -1765,9 +1871,6 @@ function check_error_textbox2(tbs)
 				
 			case "smooth_value":
 				warn = check_posnumber(te);
-				break;
-		
-			case "add_species_name":
 				break;
 				
 			case "derive_eqn":
@@ -1806,6 +1909,7 @@ function check_error_textbox2(tbs)
 				break;
 			
 			case "time_gen":
+				warn = check_times(te);	
 				break;
 			
 			case "comp_acc":
@@ -1899,7 +2003,6 @@ function check_error_textbox2(tbs)
 	}
 	
 	tbs.warning = warn;
-	
 	if(warn != "") return true;
 	return false;
 }

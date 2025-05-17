@@ -46,7 +46,7 @@ function graph_pop_calculate(result,rpf,burn,p)
 	let filter = rpf2.filter;
 
 	// Incorprates filters
-	let popfilt = get_popfilt(filter);
+	let popfilt = get_popfilt(rpf2,"Populations");
 	
 	// Sets the chain
 	let chsel = rpf.sel_chain.te;
@@ -138,7 +138,8 @@ function graph_pop_calculate(result,rpf,burn,p)
 					line_post.push(point);
 				}
 			}
-			add_line(view,line_post,BLUE,"Posterior",data,key);
+		
+			add_line(view,line_post,BLUE,posterior_name(result),data,key);
 		}
 		
 		{                                              // Data
@@ -244,7 +245,7 @@ function graph_pop_calculate(result,rpf,burn,p)
 		let pos_op;
 		if(fraction){
 			pos_op = "positive";
-			let popfilt_denom = get_popfilt(filter,"denom");
+			let popfilt_denom = get_popfilt(rpf2,"Populations","denom");
 		
 			let op; if(fraction_cl) op = "all";
 		
@@ -304,7 +305,10 @@ function graph_pop_calculate(result,rpf,burn,p)
 								vec.push(pop);
 							}
 						}
+
+						//key.push({type:"Line", te:claa.comp[c].name, col:col, c:c});
 					}
+					
 					let show_mean = rpf.dist_settings.show_mean.check;
 					if(vec.length > 0){
 						let int_req, max = LARGE; 
@@ -408,6 +412,18 @@ function graph_pop_calculate(result,rpf,burn,p)
 	}
 }
 
+	
+/// Gets name which is posterior under inference
+function posterior_name(result)
+{
+	switch(result.siminf){
+	case "sim": return "Simulation";
+	case "inf": return "Posterior";
+	case "ppc": return "Post. Sim.";
+	default: return "Unset";
+	}
+}
+			
 
 /// Gets ti from time t 
 function get_ti(t,tp)
@@ -450,32 +466,35 @@ function fraction_in_cl(cl,filter)
 
 
 /// Gets population filter
-function get_popfilt(filter,op)
+function get_popfilt(rpf2,name,op)
 {
 	let popfilt = [];
-	for(let i = 0; i < filter.length; i++){
-		let rpf3 = filter[i];
-		
-		let vec = [];
+	
+	for(let i = 0; i < rpf2.filter.length; i++){
+		if(apply_filter(rpf2,i,name)){
+			let rpf3 = rpf2.filter[i];
+			
+			let vec = [];
 
-		if(op == "denom" && rpf3.fraction.check){
-			for(let j = 0; j < rpf3.comp_filt.length; j++) vec.push(true);
-		}
-		else{
-			if(rpf3.radio.value == "single"){
-				for(let c = 0; c < rpf3.comp_name.length; c++){
-					if(rpf3.comp_name[c] == rpf3.radio_sel.value) vec.push(true);
-					else vec.push(false);
-				}
+			if(op == "denom" && rpf3.fraction.check){
+				for(let j = 0; j < rpf3.comp_filt.length; j++) vec.push(true);
 			}
 			else{
-				for(let j = 0; j < rpf3.comp_filt.length; j++){
-					if(rpf3.comp_filt[j].check == true) vec.push(true);
-					else vec.push(false);
+				if(rpf3.radio.value == "single"){
+					for(let c = 0; c < rpf3.comp_name.length; c++){
+						if(rpf3.comp_name[c] == rpf3.radio_sel.value) vec.push(true);
+						else vec.push(false);
+					}
+				}
+				else{
+					for(let j = 0; j < rpf3.comp_filt.length; j++){
+						if(rpf3.comp_filt[j].check == true) vec.push(true);
+						else vec.push(false);
+					}
 				}
 			}
+			popfilt[rpf3.cl] = vec;
 		}
-		popfilt[rpf3.cl] = vec;
 	}
 	return popfilt;
 }
@@ -589,7 +608,7 @@ function graph_trans_calculate(result,rpf,burn,p)
 	let cl = rpf2.sel_class.cl;
 
 	// Incorprates filters
-	let popfilt = get_popfilt(rpf2.filter);
+	let popfilt = get_popfilt(rpf2,"Transitions");
 
 	// Sets the chain
 	let chsel = rpf.sel_chain.te;
@@ -618,7 +637,6 @@ function graph_trans_calculate(result,rpf,burn,p)
 	let data = [];
 
 	let key = [];
-
 	
 	let line_max = false;
 	
@@ -702,7 +720,7 @@ function graph_trans_calculate(result,rpf,burn,p)
 					line_post.push(point);
 				}
 			}
-			add_line(view,line_post,BLUE,"Posterior",data,key);
+			add_line(view,line_post,BLUE,posterior_name(result),data,key);
 			
 			for(let t = 0; t < T; t++) line_mean[t] /= nline_mean;
 		}
@@ -810,24 +828,11 @@ function graph_trans_calculate(result,rpf,burn,p)
 		// Potentially only shows some lines
 		let line_filt;
 		for(let i = 0; i < rpf2.filter.length; i++){
-			if(rpf2.filter[i].cl == cl){ line_filt = rpf2.filter[i].tra_filt; break;}
+			let rpf3 = rpf2.filter[i];
+			if(rpf3.type == "trans_filt" && rpf3.cl == cl){ line_filt = rpf3.tra_filt; break;}
 		}
 		
-		// Gets colours for the lines
-		let col_line = [];
-		for(let j = 0; j < claa.ntra; j++){ 
-			let tr = claa.tra[j];
-			let col_pos;
-			if(tr.i == SOURCE || tr.f == SINK) col_pos = BLACK;
-			else col_pos = claa.comp[tr.i].col;
-			
-			if(find_in(col_line,col_pos) == undefined) col_line.push(col_pos);
-			else{
-				let k = 0; while(k < auto_color.length && find_in(col_line, auto_color[k]) != undefined) k++;
-				if(k < auto_color.length) col_line.push(auto_color[k]);
-				else col_line.push(auto_color[Math.floor(Math.random()*auto_color.length)]);
-			}
-		}
+		let col_line = get_col_trans(claa);
 		
 		let stepp = get_percent_step(claa.ntra);
 		for(let j = 0; j < claa.ntra; j++){
@@ -901,6 +906,370 @@ function graph_trans_calculate(result,rpf,burn,p)
 	
 	post({type:"Graph define", variety:"Transition", view:view, data:data, op:{ def_xrange:time_range(result.details), x_label:"Time", y_label:"Transition rate", key:key, line_max:line_max}});
 }
+ 
+
+/// Gets colours for transitions
+function get_col_trans(claa)
+{
+	let col_line = [];
+	for(let j = 0; j < claa.ntra; j++){ 
+		let tr = claa.tra[j];
+		let col_pos;
+		if(tr.i == SOURCE || tr.f == SINK) col_pos = BLACK;
+		else col_pos = claa.comp[tr.i].col;
+		
+		if(find_in(col_line,col_pos) == undefined) col_line.push(col_pos);
+		else{
+			let k = 0; while(k < auto_color.length && find_in(col_line, auto_color[k]) != undefined) k++;
+			if(k < auto_color.length) col_line.push(auto_color[k]);
+			else col_line.push(auto_color[Math.floor(Math.random()*auto_color.length)]);
+		}
+	}
+	
+	return col_line;
+}
+		
+		
+/// Time variation in excess events
+function graph_trans_expect_calculate(result,rpf,burn,p,type)
+{
+	// Sets classification
+	let rpf2 = rpf.species[p];
+	let cl = rpf2.sel_class.cl;
+
+	// Incorprates filters
+	let popfilt = get_popfilt(rpf2,"Transitions");
+
+	// Sets the chain
+	let chsel = rpf.sel_chain.te;
+	
+	let sample = result.sample;
+	
+	// Sets samples
+	let imin = 0, imax = result.sample.length;
+	let isel = get_isel(rpf); if(isel != "All"){ imin = isel; imax = isel+1; burn = 0;}
+
+	let view = "Graph (CI)";
+	
+	if(result.plot_average || ((view == "Compartment" || view == "Density") && isel == "All" && chsel == "All")){
+		imin = 0; imax = 1;
+		isel = "All";
+		sample = result.average;
+	}		
+	
+	let sp = result.species[p];
+	let claa = sp.cla[cl];
+	
+	if(!sp.tr_tra_gl_ref) set_tr_tra_gl_ref(sp);
+
+	let step = rpf.sel_timestep.i;
+
+	let data = [];
+
+	let key = [];
+	
+	let line_max = false;
+	
+	let timepoint = result.timepoint;
+	
+	let T = timepoint.length-1;
+						
+	// Potentially only shows some lines
+	let line_filt;
+	for(let i = 0; i < rpf2.filter.length; i++){
+		if(rpf2.filter[i].cl == cl){ line_filt = rpf2.filter[i].tra_filt; break;}
+	}
+	
+	let col_line = get_col_trans(claa);
+	
+	let stepp = get_percent_step(claa.ntra);
+	for(let j = 0; j < claa.ntra; j++){
+		output_percent(stepp,j,claa.ntra);
+			
+		if(line_filt == undefined || line_filt[j].check == true){
+			let tr = claa.tra[j];
+			
+			let col = col_line[j];
+		
+			let line = [];
+		
+			let ttgr = sp.tr_tra_gl_ref[cl][j];
+			
+			// Makes a list of a transitions to be included
+			let tr_list=[];
+			for(let ij = 0; ij < ttgr.length; ij++){
+				let k = ttgr[ij];
+				let tr = sp.tra_gl[k];
+		
+				let cc = tr.i; if(cc == SOURCE) cc = tr.f;
+					
+				let co = sp.comp_gl[cc];
+					
+				let cl2 = 0; 
+				while(cl2 < sp.ncla && (popfilt[cl2] == undefined || popfilt[cl2][co.cla_comp[cl2]] == true)) cl2++;
+			
+				if(cl2 == sp.ncla) tr_list.push(k);
+			}
+			
+			for(let i = imin; i < imax; i++){
+				let samp = sample[i];
+				if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
+					let sa = samp.species[p];
+					
+					let point = [];
+					
+					let y=[];
+					for(let t = 0; t < T; t++) y[t] = 0;
+					
+					for(let ij = 0; ij < tr_list.length; ij++){
+						add_tl(y,sa.transnum_tl[tr_list[ij]],result);
+					}
+						
+					for(let t = 0; t < T; t += step){
+						let step_max = t + step; if(step_max > T) step_max = T;
+					
+						let dt = timepoint[step_max] - timepoint[t];
+						
+						let num = 0;
+						for(let tt = t; tt < step_max; tt++) num += y[tt]
+						
+						if(T <= step){
+							point.push({x:timepoint[t], y:num/dt});
+							point.push({x:timepoint[t] + dt, y:num/dt});
+						}
+						else{
+							point.push({x:timepoint[t] + dt/2, y:num/dt});
+						}	
+					}							
+				
+					line.push(point);
+				}
+			}
+		
+			add_line(view,line,col,tr.name,data,key);
+			
+			// Adds in line for expected transition number
+			let point=[];
+			for(let t = 0; t < T; t += step){
+				let step_max = t + step; if(step_max > T) step_max = T;
+					
+				let dt = timepoint[step_max] - timepoint[t];
+						
+				let num = 0;
+				for(let ij = 0; ij < tr_list.length; ij++){
+					let exp_num = sp.exp_num[tr_list[ij]];
+					for(let tt = t; tt < step_max; tt++) num += exp_num[tt];
+				}
+		
+				if(T <= step){
+					point.push({x:timepoint[t], y:num/dt});
+					point.push({x:timepoint[t] + dt, y:num/dt});
+				}
+				else{
+					point.push({x:timepoint[t] + dt/2, y:num/dt});
+				}	
+			}				
+				
+			let col_sh = shift_colour(col,0.6);
+			data.push({point:point, col:col_sh, view:view, type:"Line", dash:TRANS_EXP_DASH, thick:TRANS_EXP_THICK});
+			
+		}
+	}
+	
+	key.push({type:"Line", te:"Expected", col:BLACK, dash:TRANS_EXP_DASH, thick:TRANS_EXP_THICK});
+	
+	post({type:"Graph define", variety:"Transition", view:view, data:data, op:{ def_xrange:time_range(result.details), x_label:"Time", y_label:"Transition rate", key:key, line_max:line_max}});
+}
+
+
+/// Calculates quantities needed for the graph
+function graph_trans_hbin_calculate(result,rpf,burn,p,type)
+{
+	// Sets classification
+	let rpf2 = rpf.species[p];
+	let cl = rpf2.sel_class.cl;
+
+	let popfilt = get_popfilt(rpf2,"Transitions");
+	
+	let data = [];
+
+	let key = [];
+	
+	let sp = result.species[p];
+	let claa = sp.cla[cl];
+	
+	let sample = result.sample;
+	
+	// Sets the chain
+	let chsel = rpf.sel_chain.te;
+
+	// Sets samples
+	let imin = 0, imax = sample.length;
+	let isel = get_isel(rpf); if(isel != "All"){ imin = isel; imax = isel+1; burn = 0;}
+
+	if(!sp.tr_tra_gl_ref) set_tr_tra_gl_ref(sp);
+
+	switch(type){
+	case "Distribution":
+		{
+			let sel = rpf2.cla[cl].sel;	
+			let j = sel.radio.value;
+				
+			let ttgr = sp.tr_tra_gl_ref[cl][j];
+					
+			// Makes a list of a transitions to be included
+			let tr_list=[];
+			for(let ij = 0; ij < ttgr.length; ij++){
+				let k = ttgr[ij];
+				let tr = sp.tra_gl[k];
+		
+				let cc = tr.i; if(cc == SOURCE) cc = tr.f;
+					
+				let co = sp.comp_gl[cc];
+					
+				let cl2 = 0; 
+				while(cl2 < sp.ncla && (popfilt[cl2] == undefined || popfilt[cl2][co.cla_comp[cl2]] == true)) cl2++;
+			
+				if(cl2 == sp.ncla) tr_list.push(k);
+			}
+			
+		
+			let hbin=[];
+			for(let b = 0; b < H_BIN; b++) hbin[b]=[];
+				
+			for(let i = imin; i < imax; i++){
+				let samp = sample[i];
+				if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
+					let sa = samp.species[p];
+					for(let j = 0; j < tr_list.length; j++){
+						let hbin2 = sa.trans_hbin[tr_list[j]];
+						for(let b = 0; b < H_BIN; b++) hbin[b].push(hbin2[b]);
+					}
+				}
+			}
+		
+			for(let b = 0; b < H_BIN; b++){
+				let name = (b/H_BIN)+"-"+((b+1)/H_BIN);
+				let stat = get_statistic(hbin[b]);
+				data.push({type:"Bar", name:name, x:b+0.5, y:stat.mean, thick:bar_thick, col:GREY});
+				data.push({type:"ErrorBar", x:b+0.5, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
+			}
+			
+			post({type:"Graph define", variety:"Histogram", view:"Histogram", data:data, op:{x_label:"Probability distribution", x_param:false, y_label:"Frequency"}});
+		}
+		break;
+	
+	case "Histogram":
+		{
+			let sel = rpf2.cla[cl].sel;	
+			let j = sel.radio.value;
+				
+			// Potentially only shows some lines
+			let line_filt;
+			for(let i = 0; i < rpf2.filter.length; i++){
+				if(rpf2.filter[i].cl == cl){ line_filt = rpf2.filter[i].tra_filt; break;}
+			}
+		
+			let col_line = get_col_trans(claa);
+			
+			let view = rpf.sel_diag_view.te;
+			
+			for(let j = 0; j < claa.ntra; j++){	
+				if(line_filt == undefined || line_filt[j].check == true){		
+					let ttgr = sp.tr_tra_gl_ref[cl][j];
+							
+					// Makes a list of a transitions to be included
+					let tr_list=[];
+					for(let ij = 0; ij < ttgr.length; ij++){
+						let k = ttgr[ij];
+						let tr = sp.tra_gl[k];
+				
+						let cc = tr.i; if(cc == SOURCE) cc = tr.f;
+							
+						let co = sp.comp_gl[cc];
+							
+						let cl2 = 0; 
+						while(cl2 < sp.ncla && (popfilt[cl2] == undefined || popfilt[cl2][co.cla_comp[cl2]] == true)) cl2++;
+					
+						if(cl2 == sp.ncla) tr_list.push(k);
+					}
+					
+					let vec = [];					
+					for(let i = imin; i < imax; i++){
+						let samp = sample[i];
+						if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
+							let sa = samp.species[p];
+							for(let j = 0; j < tr_list.length; j++){
+								let hbin = sa.trans_hbin[tr_list[j]];
+								
+								let sum = 0, nav = 0;
+								
+								switch(view){
+								case "Trans. (bias)": 
+									for(let b = 0; b < H_BIN; b++){
+										sum += (2*(b+0.5)/H_BIN - 1)*hbin[b];
+										nav += hbin[b];
+									}
+									if(nav != 0) sum /= nav;
+									break;
+								
+								case "Trans. (p-val.)": 
+									{
+										for(let b = 0; b < H_BIN; b++) nav += hbin[b];
+									
+										if(nav != 0){
+											let E = nav/H_BIN;
+											let xis = 0;
+											for(let b = 0; b < H_BIN; b++){
+												xis += (hbin[b]-E)*(hbin[b]-E)/E;
+											}
+					
+											sum = -Math.log(xi_sq_p_value(xis));
+										}
+									}
+									break;
+								}
+								
+								vec.push(sum);
+							}
+						}
+					}
+				
+					let stat = get_statistic(vec);
+				
+					data.push({type:"Bar", name:claa.tra[j].name, x:j+0.5, y:stat.mean, thick:bar_thick, col:col_line[j]});
+					data.push({type:"ErrorBar", x:j+0.5, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
+				}
+			}
+			
+			let y_label;
+			switch(view){
+			case "Trans. (bias)": 
+				y_label = "Excess transitions";
+				break;
+				
+			case "Trans. (p-val.)":
+				{		
+					y_label = "-log(p-value)";
+					
+					let point=[];
+					point.push({x:0, y:-Math.log(0.05)});
+					point.push({x:claa.ntra, y:-Math.log(0.05)});
+			
+					data.push({point:point, col:BLACK, type:"Line", thick:SIM_VALUE_THICK, dash:SIM_VALUE_DASH});
+				}
+				break;
+			}
+				
+			post({type:"Graph define", variety:"Histogram", view:"Histogram", data:data, op:{x_label:"Transition", x_param:false, y_label:y_label}});
+		}
+		break;
+	
+	default:
+		error("Type not found");
+		break;
+	}
+}
 	
 	
 /// Adds a line to the graph
@@ -956,7 +1325,7 @@ function add_individual_buts(res,lay)
 	
 	// Sets species
 	let rpf = res.plot_filter;	
-	let p = model.get_p();//res.p;
+	let p = model.get_p();
 	
 	if(rpf.species[p].type == "Population"){
 		inter.graph.no_graph(cx,cy,graph_width-right_menu_width,29,lay,"No individual data for a population model.");
@@ -973,6 +1342,7 @@ function add_individual_buts(res,lay)
 	}
 	
 	switch(plot_variety(inter.graph.type)){
+	case "Line plot": inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); break;
 	case "Stat table plot": inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); break;
 	case "Scatter plot": 
 		{
@@ -1006,17 +1376,54 @@ function add_diagnostic_buts(res,lay)
 	let cx = corner.x;
 	let cy = corner.y;
 
-	cy = lay.add_title("Diagnostics",cx,cy,{te:diagnostic_text});
+	let w = graph_width-right_menu_width;
 	
 	let rpf = res.plot_filter;
-	lay.add_dropdown(10,cy-2,6,10,rpf.sel_diag_chain,rpf.pos_diag_chain);
+	
+	let view = rpf.sel_diag_view.te;
 
-	let x1 = lay.x+cx;
-	let x2 = lay.x+lay.dx-cx;
-	let y1 = lay.y+cy+0.5;
-	let y2 = lay.y+lay.dy-1;
+	switch(view){
+	case "Proposals":
+		cy = lay.add_title("Diagnostics",cx,cy,{te:diagnostic_text});
+		break;
+		
+	case "Trans. (exp.)": 
+		cy = lay.add_title("Transition rate vs expected from model",cx,cy,{te:trans_exp_text});
+		break;
+		
+	case "Trans. (dist.)": 
+		cy = lay.add_title("Cumulative probability distribution for transitions",cx,cy,{te:trans_dist_text});
+		break;
+		
+	case "Trans. (bias)": 
+		cy = lay.add_title("Cumulative probability distribution bias for transitions",cx,cy,{te:trans_bias_text});
+		break;
+		
+	case "Trans. (p-val.)": 
+		cy = lay.add_title("Cumulative probability distribution p-value for transitions",cx,cy,{te:trans_pval_text});
+		break;
+	}
+	
+	if(view == "Proposals"){
+		let x1 = lay.x+cx;
+		let x2 = lay.x+lay.dx-cx;
+		let y1 = lay.y+cy+0.5;
+		let y2 = lay.y+lay.dy-1;
 
-	add_layer("Diagnostics",x1,y1,x2-x1,y2-y1,{te:res.plot_filter.diagnostics[rpf.sel_diag_chain.i+1]});
+		add_layer("Diagnostics",x1,y1,w-0.5,y2-y1,{te:res.plot_filter.diagnostics[rpf.sel_diag_chain.i+1]});
+		return;
+	}
+	if(inter.graph.init == "loading") return;
+	
+	cy += 1;
+
+	if(inter.graph.init != true){
+		inter.graph.init = "loading"; 
+		start_worker("Graph "+view,res_worker(res));
+		return;
+	}
+	
+	inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); 
 }
 
 
@@ -1051,6 +1458,7 @@ function graph_ind_calculate(result,rpf,burn,p)
 	let isel = get_isel(rpf); if(isel != "All"){ imin = isel; imax = isel+1; burn = 0;}
 	
 	let sp = result.species[p];
+	
 	let claa = sp.cla[cl];
 
 	let tp = result.timepoint;
@@ -1129,13 +1537,95 @@ function graph_ind_calculate(result,rpf,burn,p)
 		}
 	}
 	
-	let source;
 	switch(result.siminf){
-	case "sim": source = sp.sim_source; break;
-	case "inf": source = sp.inf_source; break;
-	case "ppc": source = sp.ppc_source; break;
+	case "sim": 
+		add_source_obs(sp.sim_source,claa,hash,result,ind_list);
+		break;
+	case "inf": 
+		add_source_obs(sp.inf_source,claa,hash,result,ind_list);
+		break;
+	case "ppc": 
+		add_source_obs(sp.inf_source,claa,hash,result,ind_list);
+		add_source_obs(model.inf_res.plot_filter.species[p].ppc_source,claa,hash,result,ind_list);
+		break;
 	}
 	
+	// Genetic data could be places in any species
+	if(result.siminf == "inf" || result.siminf == "ppc"){     
+		for(let p2 = 0; p2 < result.species.length; p2++){
+			let sp2 = result.species[p2];
+		
+			for(let i = 0; i < sp2.inf_source.length; i++){
+				let so = sp2.inf_source[i];
+
+				if(so.type == "Genetic"){
+					let tab = so.table;
+					
+					for(let r = 0; r < tab.nrow; r++){
+						let j = hash.find(tab.ele[r][0]);
+						if(j != undefined){
+							let tstr = get_time(tab.ele[r][1],result);
+							let t = Number(tstr);	
+							ind_list[j].obs.push({type:"GeneticObs", t:t, tstr:tstr, i:i});
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	percent(20);
+	
+	// Gets statistics about individual effects
+	for(let i = 0; i < ind_list.length; i++){
+		if(i%100 == 0) percent(20+60*i/ind_list.length);
+			
+		let comb_ind = ind_list[i];
+		
+		let ie_vec = [], log_ie_vec = [];
+		let nie = sp.ind_effect.length;
+		for(let e = 0; e < nie; e++){ ie_vec[e] = []; log_ie_vec[e] = [];}
+		
+		let kmax = comb_ind.sa_ref.length;
+		for(let k = 0; k < kmax; k++){
+			let sr = comb_ind.sa_ref[k];
+			let ind = result.sample[sr.sample].species[p].individual[sr.i];
+			if(ind.ie.length != nie) error("ie not the right size");
+			for(let e = 0; e < nie; e++){
+				ie_vec[e].push(ind.ie[e]);
+				log_ie_vec[e].push(Math.log(ind.ie[e]));
+			}
+		}
+		
+		comb_ind.ie_stat = []; 
+		comb_ind.log_ie_stat = [];
+		for(let e = 0; e < nie; e++){
+			comb_ind.ie_stat[e] = get_statistic(ie_vec[e]);
+			comb_ind.log_ie_stat[e] = get_statistic(log_ie_vec[e]);
+		}
+	}
+	
+	percent(80);
+	
+	// Goes through all individuals from all samples
+	switch(rpf.sel_indview.te){
+	case "Timeline": add_timelines(ind_list,tmin,tmax,p,cl,result,data,key,ind_max); break
+	case "Ind. Eff.":
+		switch(rpf.sel_indeffview.te){
+		case "Scatter": add_ind_eff_scatter(ind_list,p,result,rpf,data,key,ind_max); break;
+		case "Distribution": add_ind_eff_distribution(ind_list,p,result,rpf,data,key,ind_max); break;
+		default: error("Option sel ind eff view not here");
+		}
+		break
+	case "Table": add_individual_table(ind_list,p,result,data,ind_max); break;
+	default: error("Option not here: "+rpf.sel_indview.te); break;
+	}
+}
+
+
+/// Adds symbols from observed data
+function add_source_obs(source,claa,hash,result,ind_list)
+{
 	// Puts observed data on the time line
 	for(let i = 0; i < source.length; i++){
 		let so = source[i];
@@ -1286,62 +1776,6 @@ function graph_ind_calculate(result,rpf,burn,p)
 			break;
 		}
 	}
-	
-	// Genetic data could be places in any species
-	if(result.siminf == "inf" || result.siminf == "ppc"){     
-		for(let p2 = 0; p2 < result.species.length; p2++){
-			let sp2 = result.species[p2];
-		
-			for(let i = 0; i < sp2.inf_source.length; i++){
-				let so = sp2.inf_source[i];
-
-				if(so.type == "Genetic"){
-					let tab = so.table;
-					
-					for(let r = 0; r < tab.nrow; r++){
-						let j = hash.find(tab.ele[r][0]);
-						if(j != undefined){
-							let tstr = get_time(tab.ele[r][1],result);
-							let t = Number(tstr);	
-							ind_list[j].obs.push({type:"GeneticObs", t:t, tstr:tstr, i:i});
-						}
-					}
-				}
-			}
-		}
-	}
-	
-	percent(20);
-	
-	// Gets statistics about individual effects
-	for(let i = 0; i < ind_list.length; i++){
-		let comb_ind = ind_list[i];
-		
-		let ie_vec = [];
-		let nie = sp.ind_effect.length;
-		for(let e = 0; e < nie; e++) ie_vec[e] = [];
-		
-		let kmax = comb_ind.sa_ref.length;
-		for(let k = 0; k < kmax; k++){
-			let sr = comb_ind.sa_ref[k];
-			let ind = result.sample[sr.sample].species[p].individual[sr.i];
-			if(ind.ie.length != nie) error("ie not the right size");
-			for(let e = 0; e < nie; e++) ie_vec[e].push(Math.log(ind.ie[e]));
-		}
-		
-		comb_ind.ie_stat = [];
-		for(let e = 0; e < nie; e++){
-			comb_ind.ie_stat[e] = get_statistic(ie_vec[e]);
-		}
-	}
-	
-	// Goes through all individuals from all samples
-	switch(rpf.sel_indview.te){
-	case "Timeline": add_timelines(ind_list,tmin,tmax,p,cl,result,data,key,ind_max); break
-	case "Ind. Eff.": add_ind_eff_scatter(ind_list,p,result,rpf,data,key,ind_max); break
-	case "Table": add_individual_table(ind_list,p,result,data,ind_max); break;
-	default: error("Option not here: "+rpf.sel_indview.te); break;
-	}
 }
 
 
@@ -1374,7 +1808,7 @@ function graph_ind_sing_calculate(ind_sel,result,rpf,burn,p)
 
 	let line_max = false;
 	
-	let popfilt = get_popfilt(rpf2.filter);
+	let popfilt = get_popfilt(rpf2,"Populations");
 	
 	// Constructs a filter for 
 	let g_filt = [];
@@ -1516,29 +1950,34 @@ function find_obs_colour(claa,st)
 		list.push({col:WHITE, frac:1});
 	}
 	else{
-		let spl = split_with_bracket(st,"|");
-		for(let i = 0; i < spl.length; i++){
-			let spl2 = spl[i].split(":");
-			
-			let c = hash_find(claa.hash_comp,spl2[0]);	
-			if(c == undefined){ error("Cannot find obs compartment"); return;}
-
-			let frac = 1; 
-			if(spl2.length == 2){
-				if(isNaN(spl2[1])) flag = true;
-				else frac = Number(spl2[1]);
-			}
-			frac_sum += frac;
-
-			list.push({col:claa.comp[c].col, frac:frac});
-		}
-
-		if(flag == false){
-			for(let i = 0; i < list.length; i++) list[i].frac /= frac_sum;
+		if(st == "!"){ 
+			list.push({col:"notalive", frac:1});
 		}
 		else{
-			for(let i = 0; i < list.length; i++) list[i].frac = 1/list.length;	
-		}	
+			let spl = split_with_bracket(st,"|");
+			for(let i = 0; i < spl.length; i++){
+				let spl2 = spl[i].split(":");
+				
+				let c = hash_find(claa.hash_comp,spl2[0]);	
+				if(c == undefined){ error("Cannot find obs compartment"); return;}
+
+				let frac = 1; 
+				if(spl2.length == 2){
+					if(isNaN(spl2[1])) flag = true;
+					else frac = Number(spl2[1]);
+				}
+				frac_sum += frac;
+
+				list.push({col:claa.comp[c].col, frac:frac});
+			}
+
+			if(flag == false){
+				for(let i = 0; i < list.length; i++) list[i].frac /= frac_sum;
+			}
+			else{
+				for(let i = 0; i < list.length; i++) list[i].frac = 1/list.length;	
+			}	
+		}
 	}
 	
 	return list;
@@ -1561,18 +2000,22 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 	
 	add_table_column("ID",vec,table);
 	
+	percent(85);
+	
 	let nie = sp.ind_effect.length;
 	for(let e = 0; e < nie; e++){	
 		let flag = false;
 		
 		{
-			let name = "⟨"+sp.ind_effect[e]+"⟩";
-			if(result.sample.length == 1) name = sp.ind_effect[e];
+			let name = "["+sp.ind_effect[e]+"]";
 			
 			let vec=[];
 			for(let i = 0; i < ind_list.length; i++){
 				let stat = ind_list[i].ie_stat[e];
-				let te = Math.exp(stat.mean).toPrecision(pre);
+				let te = stat.mean.toPrecision(pre);
+				if(stat.CImin != stat.mean || stat.CImax != stat.mean){
+					te += " ("+stat.CImin.toPrecision(pre)+" — "+stat.CImax.toPrecision(pre)+")";
+				}
 				vec.push(te);
 			}
 			
@@ -1580,10 +2023,10 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 		}
 		
 		{
-			let name = "log("+sp.ind_effect[e]+")";
+			let name = "log(["+sp.ind_effect[e]+"])";
 			let vec=[];
 			for(let i = 0; i < ind_list.length; i++){
-				let stat = ind_list[i].ie_stat[e];
+				let stat = ind_list[i].log_ie_stat[e];
 				let te = stat.mean.toPrecision(pre);
 				if(stat.CImin != stat.mean || stat.CImax != stat.mean){
 					te += " ("+stat.CImin.toPrecision(pre)+" — "+stat.CImax.toPrecision(pre)+")";
@@ -1604,6 +2047,8 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 			}
 		}
 	}	
+	
+	percent(90);
 	
 	let fe_lookup = create_fe_lookup(sp);
 	
@@ -1629,6 +2074,8 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 			if(find_in(list,obs[k].i) == undefined) list.push(obs[k].i);
 		}
 	}
+	
+	percent(95);
 	
 	let mat=[];
 	for(let j = 0; j < list.length; j++){
@@ -1665,10 +2112,12 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 	let wid = 0;
 	for(let i = 0; i < twid.length; i++) wid += twid[i];
 	
-	let wid_max = graph_width-right_menu_width-2;
+	let wid_max = graph_width-right_menu_width-3;
 	if(wid < wid_max) twid[twid.length-1] += wid_max-wid;
 	
 	data.push({type:"Table", table:table});
+	
+	percent(100);
 	
 	post({type:"Graph define", variety:"Stat Table", view:"Stat Table", data:data, op:{ind_max:ind_max}});
 }
@@ -1710,10 +2159,10 @@ function text_width_para(te)
 }
 	
 	
-/// Adds individual timelines
+/// Adds scatter plot showing true vs estimated individual effect
 function add_ind_eff_scatter(ind_list,p,result,rpf,data,key,ind_max)
 {		
-	let seliev = rpf.sel_ie_view[p];
+	let seliev = rpf.sel_ie_data_view[p];
 	
 	if(seliev.list.length == 0){
 		post(no_graph_msg("No individual effects"));
@@ -1722,14 +2171,14 @@ function add_ind_eff_scatter(ind_list,p,result,rpf,data,key,ind_max)
 	
 	if(seliev.radio.value >= seliev.list.length) seliev.radio.value = 0;
 	
-	let ie = seliev.list[seliev.radio.value].name;
+	let name = seliev.list[seliev.radio.value].name;
+	
+	let ie = name.substr(1,name.length-2);
 	
 	let ind_effect = result.species[p].ind_effect;
 	
 	let e = find_in(ind_effect,ie);
 	if(e == undefined) alertp("Problem getting ie");
-		
-	let name = seliev.list[seliev.radio.value].name;
 	
 	let namex = "True log("+name+")";
 					
@@ -1738,10 +2187,12 @@ function add_ind_eff_scatter(ind_list,p,result,rpf,data,key,ind_max)
 	let vecA=[], vecB=[];
 	let point=[];
 	for(let i = 0; i < ind_list.length; i++){
-		if(ind_list[i][name] != undefined){
-			let val = Math.log(Number(ind_list[i][name]));
+		if(i%100 == 0) percent(80+20*i/ind_list.length);
+		
+		if(ind_list[i][ie] != undefined){
+			let val = Math.log(Number(ind_list[i][ie]));
 			if(!isNaN(val)){
-				let stat = ind_list[i].ie_stat[e];
+				let stat = ind_list[i].log_ie_stat[e];
 	
 				vecA.push(val); vecB.push(stat.mean);
 				
@@ -1753,13 +2204,51 @@ function add_ind_eff_scatter(ind_list,p,result,rpf,data,key,ind_max)
 			}
 		}	
 	}
-	
+
 	data.push({point:point, type:"Points", col:BLUE});
-		
+	
+	percent(100);
+	
 	let cor = get_correlation(vecA,vecB);
 	let title = "Prediction accuracy = "+cor.toPrecision(pre);
 	
 	post({type:"Graph define", variety:"Scatter", view:"Scatter", data:data, op:{x_label:namex, x_param:true, y_label:namey, y_param:true, key:[], title:title, ind_max:ind_max}});		
+}
+
+
+/// Shows distribution in individual effect
+function add_ind_eff_distribution(ind_list,p,result,rpf,data,key,ind_max)
+{	
+	let seliev = rpf.sel_ie_view[p];
+	
+	if(seliev.list.length == 0){
+		post(no_graph_msg("No individual effects"));
+		return;
+	}
+	
+	if(seliev.radio.value >= seliev.list.length) seliev.radio.value = 0;
+	
+	let name = seliev.list[seliev.radio.value].name;
+	
+	let ie = name.substr(1,name.length-2);
+	
+	let ind_effect = result.species[p].ind_effect;
+	
+	let e = find_in(ind_effect,ie);
+	if(e == undefined) alertp("Problem getting ie");
+		
+	let vec=[];
+	for(let i = 0; i < ind_list.length; i++){
+		vec.push(ind_list[i].log_ie_stat[e].mean);
+	}
+	
+	percent(90);
+		
+	distribution_add_data_line(vec,posterior_name(result),BLUE,data,key,rpf,true);
+		
+	percent(100);
+	
+	post({type:"Graph define", variety:"Distribution", view:"Graph", data:data, op:{x_label:"log("+name+")", x_param:true, y_label:"Probability", param:true, key:key, line_max:false, yaxis:false}});
 }
 
 
@@ -1834,6 +2323,8 @@ function add_timelines(ind_list,tmin,tmax,p,cl,result,data,key,ind_max)
 	let fe_lookup = create_fe_lookup(sp);
 
 	for(let i = 0; i < ind_list.length; i++){
+		if(i%100 == 0) percent(80+20*i/ind_list.length);
+		
 		let comb_ind = ind_list[i];
 		
 		// Gets information about transitions			
@@ -1915,10 +2406,10 @@ function add_timelines(ind_list,tmin,tmax,p,cl,result,data,key,ind_max)
 		
 		for(let e = 0; e < comb_ind.ie_stat.length; e++){
 			if(e != 0) info += "   ";
-			let name = sp.ind_effect[e];
+			let name = "["+sp.ind_effect[e]+"]";
 			if(nsamp == 1) info += name;
 			else info += "⟨"+name+"⟩";
-			info += "= "+Math.exp(comb_ind.ie_stat[e].mean).toPrecision(pre);
+			info += "= "+comb_ind.ie_stat[e].mean.toPrecision(pre);
 			
 			if(comb_ind[name] != undefined){
 				info += " (True ="+Number(comb_ind[name]).toPrecision(pre)+")";
@@ -1938,6 +2429,8 @@ function add_timelines(ind_list,tmin,tmax,p,cl,result,data,key,ind_max)
 		
 		data.push({type:"Individual", name:comb_ind.name, info:info, tmin:tmin, tmax:tmax, col_timeline:col_timeline, obs:comb_ind.obs});	
 	}
+
+	percent(100);
 
 	post({type:"Graph define", variety:"Individual", view:"Individual", data:data, op:{ def_xrange:time_range(result.details), x_label:"Time", key:key, ind_max:ind_max}});
 }
@@ -2047,7 +2540,7 @@ function add_trans_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 		}
 	}
 	
-	if(false){ pr("Ind list"); pr(ind_list); pr(ind_ref);}
+	if(false){ prr("Ind list"); prr(ind_list); prr(ind_ref);}
 	
 	// Works out where individual become infected from
 	for(let k = 0; k < ind_list.length; k++){
@@ -2228,7 +2721,7 @@ function add_phylo_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 		if(sampl.num >= burn && !(chsel != "All" && sampl.chain != chsel)){	
 			let inf_node = copy(sampl.inf_node);
 			
-			if(false){ pr("ind_nod"); pr(inf_node);}
+			if(false){ prr("ind_nod"); prr(inf_node);}
 			
 			let nmax = inf_node.length;
 			if(nmax > NODE_PLOT_MAX){ no_graph_msg("Too many nodes to plot"); return;}
@@ -2328,11 +2821,11 @@ function add_phylo_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 					}				
 
 					if(false){
-						pr("");
-						pr("ADD BRANCH");
-						pr(String(code_tot));
-						pr(obs_list)
-						pr(ob);
+						prr("");
+						prr("ADD BRANCH");
+						prr(String(code_tot));
+						prr(obs_list)
+						prr(ob);
 					}
 					
 					hash_bra.add_phylo_br(String(code_tot),ob);
@@ -2347,11 +2840,11 @@ function add_phylo_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 	let pnode = [];
 	
 	if(false){
-		pr("freq");
-		pr(freq_ori);
-		pr("HASH");
-		pr(hash_ori);
-		pr(hash_bra);
+		prr("freq");
+		prr(freq_ori);
+		prr("HASH");
+		prr(hash_ori);
+		prr(hash_bra);
 	}
 	
 	for(let i = 0; i < freq_ori.arr.length; i++){
@@ -2785,8 +3278,8 @@ function construct_spline_timevariation(par,value,details)
 function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rpf) 
 {
 	let view = sel_view.te;
-		
-	if(graph_dia) pr("GRAPH DIA: define_param_plot: "+sel_view.type+",  "+view);
+
+	if(graph_dia) prr("GRAPH DIA: define_param_plot: "+sel_view.type+",  "+view);
 
 	let data = [];
 	let key = [];
@@ -2875,8 +3368,8 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 							if(key.length > KEY_LINE_MAX){ line_max = true; break;}
 						}
 						
-						// Adds in siumation values
-						if(rpf && rpf.sim_val.check == true && (rpf.siminf == "inf") && par.type != "derive_param"){	
+						// Adds in simuation values
+						if(par.variety != "const" && rpf && rpf.sim_val.check == true && rpf.siminf != "sim" && par.type != "derive_param"){	
 							let res = construct_spline_timevariation(par,par.value,so.details);
 						
 							if(!res.err){ 
@@ -2912,8 +3405,19 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 						return no_graph_msg("Matrix too large");
 					}
 					
-					data.push({type:"Matrix", xlab:vecx, ylab:vecy, mat:value});
-			
+					let val = value;
+					if(!CImin){
+						let res = construct_spline_timevariation(par,par.value,details);
+						if(!res.err) val = res.value;
+					}
+					
+					if(so.siminf == "sim" || par.variety == "const"){
+						data.push({type:"Matrix", xlab:vecx, ylab:vecy, mat:val});
+					}
+					else{
+						data.push({type:"Matrix", xlab:vecx, ylab:vecy, mat:val, CImin:CImin, CImax:CImax});
+					}
+					
 					return {type:"Graph define", variety:"MatrixAnim", view:"MatrixAnim", data:data, op:{x_label:par.dep[1], x_param:false, y_label:par.dep[0], y_param:false, italic:true}};
 				}
 				break;
@@ -3245,7 +3749,7 @@ function graph_param_calculate(result,rpf,burn)
 	
 	let pview = rpf.sel_paramview;
 	
-	if(graph_dia) pr("GRAPH DIA  graph_param_calculate: pview:"+pview.te);
+	if(graph_dia) prr("GRAPH DIA  graph_param_calculate: pview:"+pview.te);
 	
 	if(pview.param == "too big"){
 		post(no_graph_msg("This quantity is too large to output.\nThe threshold number of tensor elements can be altered under 'Further options'."));
@@ -3253,7 +3757,7 @@ function graph_param_calculate(result,rpf,burn)
 	}
 
 	let pviewtype = rpf.sel_paramviewtype;
-	
+
 	switch(pview.te){
 	case "Scatter":
 		{
@@ -3263,13 +3767,15 @@ function graph_param_calculate(result,rpf,burn)
 			
 			let thx = sp.list[valx].th;
 			let indx = sp.list[valx].index;
-			let namex = param_name_index(result.param[thx],indx);
-		
+			let parx = result.param[thx];
+			let namex = param_name_index(parx,indx);
+			
 			let valy = get_radio_param(rpf.yaxis_radio);
 			
 			let thy = sp.list[valy].th;
 			let indy = sp.list[valy].index;
-			let namey = param_name_index(result.param[thy],indy);
+			let pary = result.param[thy];
+			let namey = param_name_index(pary,indy);
 			
 			let chmin = 0, chmax = result.chains.length;
 			if(rpf.sel_chain.te != "All"){
@@ -3286,8 +3792,8 @@ function graph_param_calculate(result,rpf,burn)
 				for(let i = 0; i < result.par_sample.length; i++){
 					let samp = result.par_sample[i];
 					if(samp.num >= burn && samp.chain == cha){
-						let valx = get_element(samp.param[thx],indx);
-						let valy = get_element(samp.param[thy],indy);
+						let valx = get_param_val(indx,samp.param[thx],parx);
+						let valy = get_param_val(indy,samp.param[thy],pary);
 						point.push({x:valx, y:valy});
 						if(point.length > POINT_PLOT_MAX){ point_max = true; break;};
 					}
@@ -3298,7 +3804,7 @@ function graph_param_calculate(result,rpf,burn)
 		
 			if(rpf.sim_val.check == true){
 				let parx = result.param[thx];
-				if(parx.value){
+				if(parx.value && parx.value.length > 0){
 					let vax = get_element(parx.value,indx);
 					if(vax != undefined && !isNaN(vax)){ 
 						let valx = Number(vax);	
@@ -3307,7 +3813,7 @@ function graph_param_calculate(result,rpf,burn)
 				}
 				
 				let pary = result.param[thy];
-				if(pary.value){
+				if(pary.value && pary.value.length > 0){
 					let vay = get_element(pary.value,indy);
 					
 					if(vay != undefined && !isNaN(vay)){
@@ -3374,6 +3880,7 @@ function graph_param_calculate(result,rpf,burn)
 			}
 			
 			let vte = rpf.sel_paramviewtype.te;
+		
 			switch(vte){
 			case "Trace": case "Samples":
 				{
@@ -3414,10 +3921,7 @@ function graph_param_calculate(result,rpf,burn)
 								for(let i = imin; i <= iburn; i++){
 									let samp = sample[i];
 									if(samp.chain == cha){
-										let val;
-										if(par.kind == "const") val = get_element(par.value,ind)
-										else val = get_element(samp.param[th],ind);
-										point.push({x:samp.num, y:val});
+										point.push({x:samp.num, y:get_param_val(ind,samp.param[th],par)});
 									}
 								}
 						
@@ -3430,10 +3934,7 @@ function graph_param_calculate(result,rpf,burn)
 						for(let i = iburn; i < sample.length; i++){
 							let samp = sample[i];
 							if(samp.chain == cha){
-								let val;
-								if(par.kind == "const") val = get_element(par.value,ind)
-								else val = get_element(samp.param[th],ind);
-								point.push({x:samp.num, y:val});
+								point.push({x:samp.num, y:get_param_val(ind,samp.param[th],par)});
 							}
 						}
 						
@@ -3452,7 +3953,7 @@ function graph_param_calculate(result,rpf,burn)
 					if(rpf.sim_val.check == true){
 						let end = result.par_sample[result.par_sample.length-1].num;
 						
-						if(par.value){
+						if(par.variety != "const" && par.value && par.value.length > 0){
 							let va = get_element(par.value,ind);
 							
 							if(va != undefined && !isNaN(va)){
@@ -3539,7 +4040,7 @@ function graph_generation_calculate(result,rpf,burn)
 	
 	let pview = rpf.sel_genview;
 	
-	if(graph_dia) pr("GRAPH DIA  graph_generation_calculate: pview:"+pview.te);
+	if(graph_dia) prr("GRAPH DIA  graph_generation_calculate: pview:"+pview.te);
 	
 	if(pview.param == "too big"){
 		post(no_graph_msg("This quantity is too large to output.\nThe threshold number of tensor elements can be altered under 'Further options'."));
@@ -3578,10 +4079,7 @@ function graph_generation_calculate(result,rpf,burn)
 	for(let i = 0; i < sample.length; i++){
 		let samp = sample[i];
 		if(samp.num >= burn){
-			let val;
-			if(par.kind == "const") val = get_element(par.value,ind)
-			else val = get_element(samp.param[th],ind);
-			vec.push(val);
+			vec.push(get_param_val(ind,samp.param[th],par));
 		}
 	}
 	
@@ -3591,11 +4089,11 @@ function graph_generation_calculate(result,rpf,burn)
 		let stat = get_statistic(vec);
 	
 		data.push({type:"ErrorBar", x:end, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
-		key.push({type:"ErrBar", te:"Posterior", thick:GENRATION_THICK, col:BLACK});
+		key.push({type:"ErrBar", te:posterior_name(result), thick:GENRATION_THICK, col:BLACK});
 	}
 	
 	if(rpf.sim_val.check == true){
-		if(par.value){
+		if(par.variety != "const" && par.value){
 			let va = get_element(par.value,ind);
 			
 			if(va != undefined && !isNaN(va)){
@@ -3622,7 +4120,7 @@ function multivariate_param_plot(result,rpf,burn)
 
 	let pviewtype = rpf.sel_paramviewtype;
 	
-	if(graph_dia) pr("GRAPH DIA: multivariate");
+	if(graph_dia) prr("GRAPH DIA: multivariate");
 	
 	let li = pview.list[0];
 		
@@ -3633,70 +4131,62 @@ function multivariate_param_plot(result,rpf,burn)
 
 	let value, CImin, CImax;
 
-	if(par.kind == "const"){	
-		value = par.value;
-		if(pviewtype.type == "Timevary"){ 
-			let res = construct_spline_timevariation(par,value,result.details);
-			if(res.err){ post(no_graph_msg(res.msg)); return;}
-			value = res.value;
+	let samp_val_list = []
+
+	if(par.type == "derive_param" && par.time_dep){
+		for(let s = 0; s < result.sample.length; s++){
+			let samp = result.sample[s];
+			if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
+				let samp_val = samp.param[li.th];	
+				samp_val_list.push(samp_val);
+			}
 		}
 	}
 	else{
-		let samp_val_list = []
-	
-		if(par.type == "derive_param" && par.time_dep){
-			for(let s = 0; s < result.sample.length; s++){
-				let samp = result.sample[s];
-				if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
-					let samp_val = samp.param[li.th];	
-					samp_val_list.push(samp_val);
-				}
-			}
-		}
-		else{
-			for(let s = 0; s < result.par_sample.length; s++){
-				let samp = result.par_sample[s];
-				if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
-					let samp_val = samp.param[li.th];
-
-					if(pviewtype.type == "Timevary"){ 
-						let res = construct_spline_timevariation(par,samp_val,result.details);
-						
-						if(res.err){ post(no_graph_msg(res.msg)); return;}
-						samp_val = res.value; 
-					}
-					
-					samp_val_list.push(samp_val);
-				}
-			}
-		}
-		
-		let nsamp = samp_val_list.length;
-		if(nsamp == 0){
-			throw({type:"Error", te:"Cannot find graph1"});
-		}
-		
-		let sam = samp_val_list[0];
-		value = copy(sam);
-		CImin = copy(sam);
-		CImax = copy(sam);
-		
-		let dim = get_dimensions(sam);
-		let list = get_element_list(sam,dim);
-		for(let i = 0; i < list.length; i++){
-			let index = list[i];
-		
-			let vec = []; 
-			for(let s = 0; s < nsamp; s++){
-				vec.push(get_element(samp_val_list[s],index));
-			}
+		for(let s = 0; s < result.par_sample.length; s++){
+			let samp = result.par_sample[s];
+			if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
+				let samp_val = samp.param[li.th];
+				if(samp_val == "const") samp_val = result.param[li.th].value;
 			
-			let stat = get_statistic(vec);
-			set_element(value,index,stat.mean);
-			set_element(CImin,index,stat.CImin);
-			set_element(CImax,index,stat.CImax);
+				if(pviewtype.type == "Timevary"){ 
+					let res = construct_spline_timevariation(par,samp_val,result.details);
+					
+					if(res.err){ post(no_graph_msg(res.msg)); return;}
+					samp_val = res.value; 
+				}
+				
+				samp_val_list.push(samp_val);
+			}
 		}
 	}
+	
+	let nsamp = samp_val_list.length;
+	if(nsamp == 0){
+		throw({type:"Error", te:"Cannot find graph1"});
+	}
+	
+	let sam = samp_val_list[0];
+	value = copy(sam);
+	CImin = copy(sam);
+	CImax = copy(sam);
+	
+	let dim = get_dimensions(sam);
+	let list = get_element_list(sam,dim);
+	for(let i = 0; i < list.length; i++){
+		let index = list[i];
+	
+		let vec = []; 
+		for(let s = 0; s < nsamp; s++){
+			vec.push(get_element(samp_val_list[s],index));
+		}
+		
+		let stat = get_statistic(vec);
+		set_element(value,index,stat.mean);
+		set_element(CImin,index,stat.CImin);
+		set_element(CImax,index,stat.CImax);
+	}
+	//}
 
 	post(define_parameter_plot("param_calc",par,value,CImin,CImax,pviewtype,result.details,result,rpf));
 }
@@ -3731,7 +4221,8 @@ function get_correlation_matrix(list_plot,result,rpf,burn)
 			let samp = result.par_sample[i];
 			if(samp.num >= burn && samp.chain == cha){
 				for(let j = 0; j < N; j++){
-					trace[j].push(get_element(samp.param[list[j].th],list[j].index));
+					let th = list[j].th;
+					trace[j].push(get_param_val(list[j].index,samp.param[th],result.param[th]));
 				}
 			}
 		}
@@ -3789,64 +4280,67 @@ function get_param_stats(th,index,result,rpf,burn)
 			
 	let name = param_name_index(par,index);
 
-	if(par.kind == "const"){	
-		if(index == undefined) mean = par.value;
-		else mean = get_element(par.value,index);
+	let vec = []; 
+	
+	if(par.type == "derive_param" && par.time_dep){
+		for(let s = 0; s < result.sample.length; s++){
+			let samp = result.sample[s];
+			if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
+				vec.push(get_param_val(index,samp.param[th],par));
+			}
+		}
 	}
 	else{
-		let vec = []; 
+		for(let s = 0; s < result.par_sample.length; s++){
+			let samp = result.par_sample[s];
 		
-		if(par.type == "derive_param" && par.time_dep){
-			for(let s = 0; s < result.sample.length; s++){
-				let samp = result.sample[s];
-				if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
-					vec.push(get_element(samp.param[th],index));
-				}
+			if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
+				if(index == undefined) vec.push(samp.param[th]);
+				else vec.push(get_param_val(index,samp.param[th],par));
 			}
-		}
-		else{
-			for(let s = 0; s < result.par_sample.length; s++){
-				let samp = result.par_sample[s];
-			
-				if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
-					if(index == undefined) vec.push(samp.param[th]);
-					else vec.push(get_element(samp.param[th],index));
-				}
-			}
-		}
-
-		let stat = get_statistic(vec);
-	
-		mean = stat.mean.toPrecision(pre); 
-		if(stat.CImin != stat.mean) CImin = stat.CImin.toPrecision(pre);
-		if(stat.CImax != stat.mean) CImax = stat.CImax.toPrecision(pre);
-		
-		ESS = get_effective_sample_size(vec);
-		
-		if(result.chains.length > 1 && chsel == "All"){
-			let cha = []; 
-			for(let c = 0; c < result.chains.length; c++) cha[c] = [];
-			
-			for(let s = 0; s < result.par_sample.length; s++){
-				let samp = result.par_sample[s];
-		
-				if(samp.num >= burn){
-					let ch = find_in(result.chains,samp.chain);
-					if(ch == undefined) error("Cannot find chain");
-				
-					if(index == undefined) cha[ch].push(samp.param[th]);
-					else cha[ch].push(get_element(samp.param[th],index));
-				}
-			}
-			
-			GR = get_Gelman_Rubin_statistic(cha);
 		}
 	}
+
+	let stat = get_statistic(vec);
+
+	mean = stat.mean.toPrecision(pre); 
+	if(stat.CImin != stat.mean) CImin = stat.CImin.toPrecision(pre);
+	if(stat.CImax != stat.mean) CImax = stat.CImax.toPrecision(pre);
+	
+	ESS = get_effective_sample_size(vec);
+	
+	if(result.chains.length > 1 && chsel == "All"){
+		let cha = []; 
+		for(let c = 0; c < result.chains.length; c++) cha[c] = [];
+		
+		for(let s = 0; s < result.par_sample.length; s++){
+			let samp = result.par_sample[s];
+	
+			if(samp.num >= burn){
+				let ch = find_in(result.chains,samp.chain);
+				if(ch == undefined) error("Cannot find chain");
+			
+				if(index == undefined) cha[ch].push(samp.param[th]);
+				else cha[ch].push(get_param_val(index,samp.param[th],par));
+			}
+		}
+		
+		GR = get_Gelman_Rubin_statistic(cha);
+	}
+	//}
 	
 	return { name:name, mean:mean, CImin:CImin, CImax:CImax, ESS:ESS, GR:GR};
 }
 
 
+/// Gets a parameter value
+function get_param_val(index,spar,par)
+{
+	if(par.variety == "const") return get_element(par.value,index);
+	return get_element(spar,index);
+}
+			
+			
 /// Displays no graph with a message
 function no_graph_msg(msg)
 {
@@ -3865,10 +4359,6 @@ function setup_distribution(result,rpf,burn)
 	let data = [];
 	
 	let par = result.param[th];
-	if(par.kind == "const"){
-		post(no_graph_msg("This parameter is constant"));
-		return;
-	}
 		
 	let name = par.name;
 	
@@ -3876,7 +4366,7 @@ function setup_distribution(result,rpf,burn)
 	switch(rpf.sel_distchain.te){
 	case "Combine":
 		{
-			line.push({ name:"Posterior", filt:"All"});
+			line.push({ name:posterior_name(result), filt:"All"});
 		}
 		break;
 	
@@ -3914,7 +4404,7 @@ function setup_distribution(result,rpf,burn)
 			let samp = sample[i];
 			if(samp.num >= burn){
 				if(line[li].filt == "All" || line[li].filt == samp.chain){
-					vec.push(get_element(samp.param[th],ind));
+					vec.push(get_param_val(ind,samp.param[th],par));
 				}
 			}
 		}
@@ -3929,7 +4419,7 @@ function setup_distribution(result,rpf,burn)
 	}
 
 	// Puts on simulation value
-	if(rpf.sim_val.check == true && par.value){
+	if(par.variety != "const" && rpf.siminf != "sim" && rpf.sim_val.check == true && par.value && par.value.length > 0){
 		let val = Number(get_element(par.value,ind));	
 		if(!isNaN(val)){
 			data.push({te:"Simulation value", col:BLACK, thick:1, x:val, type:"VertDashLine"});
@@ -3937,7 +4427,7 @@ function setup_distribution(result,rpf,burn)
 	}
 	
 	// Draws the prior
-	if(rpf.dist_settings.show_prior.check == true && par.variety != "reparam" && par.variety != "likelihood" && par.kind != "const" && par.prior){
+	if(result.siminf != "sim" && rpf.dist_settings.show_prior.check == true && par.variety != "reparam" && par.variety != "likelihood" && par.prior && par.type != "derive_param"){
 		let N = 200;                                   // The number of points
 		
 		let pri;
@@ -4070,6 +4560,9 @@ function setup_distribution(result,rpf,burn)
 			
 		case "fix":
 			break;
+		
+		case "mdir":
+			break;
 			
 		default: error("prior type not recognised: "+pri.type.te); break; 
 		}
@@ -4090,7 +4583,7 @@ function get_prior_clip(par)
 {
 	let clip_min, clip_max;
 		
-	if(par.variety != "reparam" && par.variety != "likelihood" && par.kind != "const" && par.prior){
+	if(par.variety != "reparam" && par.variety != "likelihood" && par.prior){
 		let pri;
 		if(par.dep.length > 0 && par.prior_split_set == true) pri = get_element(par.prior_split,ind);
 		else pri = par.prior;
@@ -4109,7 +4602,7 @@ function get_prior_clip(par)
 	return {min:undefined, max:undefined};
 }
 
-	
+
 /// Adds a distribution line on a distribution plot
 function distribution_add_data_line(vec,name,col,data,key,rpf,show_mean,clip_min,clip_max,op)
 {
@@ -4128,8 +4621,10 @@ function distribution_add_data_line(vec,name,col,data,key,rpf,show_mean,clip_min
 	
 	let stat = get_statistic(vec);
 	let range = get_range(vec);
+
 	if(range.min == range.max){
 		data.push({te:"Constant", col:col, thick:1, x:range.min, type:"VertLine2"});
+		key.push({type:"Line", te:name, col:col});
 		return;
 	}
 	

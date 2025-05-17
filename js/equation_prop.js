@@ -10,6 +10,7 @@ function extract_equation_properties(eqn)
 	eqn.pop = [];                                    // Populations in the equation
 	eqn.sum = [];                                    // Sums in the equation
 	eqn.warn = [];                                   // Warnings
+	eqn.time_vari = false;                           // Time variation
 	
 	// These are used such that names can be changed
 	eqn.sp_name_list = [];   
@@ -73,12 +74,12 @@ function extract_equation_properties(eqn)
 			if(is_sigma(lin2,i)){
 				let ist = i;
 				i = param_end(lin2,i+1,"("); 
-				
+			
 				if(typeof i == 'string'){
 					eqn.warn.push({te:i.replace("parameter","sum"), cur:icur2+ist, len:1});
 					return;
 				}
-				
+			
 				let tex = lin2.substr(ist,i-ist);
 				check_sum(tex,icur2+ist,eqn);
 			}
@@ -122,7 +123,8 @@ function extract_equation_properties(eqn)
 
 				let tex = lin2.substr(ist,i-ist);
 			
-				if(tex != "t"){
+				if(tex == "t") eqn.time_vari = true;
+				else{
 					let icur3 = icur2+ist;
 				
 					check_parameter(tex,icur3,eqn);
@@ -151,6 +153,23 @@ function extract_equation_properties(eqn)
 		icur = lin.length+1;
 	}
 	
+	if(eqn.pop.length > 0) eqn.time_vari = true;
+
+	for(let i = 0; i < eqn.param.length; i++){
+		if(eqn.param[i].time_dep == true) eqn.time_vari = true;
+	}
+
+	if(eqn.type == "reparam"){
+		if(eqn.time_vari == true){
+			if(eqn.pop.length > 0){
+				eqn.warn.push({te:"Reparameterisation should not depend on population."});
+			}
+			else{
+				eqn.warn.push({te:"Reparameterisation should not depend on time."});
+			}
+		}
+	}
+
 	check_sum_bracket(eqn);
 	
 	check_indexes_match(eqn);
@@ -362,8 +381,11 @@ function check_sum(tex,icur,eqn)
 function param_end(st,i,op)
 {
 	let sub_brack = false;
-	let sup_brack = false;
+	let sup_brack =  false;
 	let type = "normal";
+	
+	let ist = i;
+	let ch_first = st.substr(i,1);
 	
 	do{
 		let ch = st.substr(i,1);
@@ -398,6 +420,14 @@ function param_end(st,i,op)
 		i++;
 	}while(i < st.length);
 	
+	if(ch_first == "^" && op != "("){
+		return "Superscript '"+st.substr(ist+1,i-ist-1)+"' doesn't have a parameter associated with it.";
+	}
+	
+	if(ch_first == "_" && op != "("){
+		return "Subscript '"+st.substr(ist+1,i-ist-1)+"' doesn't have a parameter associated with it.";
+	}
+	
 	if(i <= st.length - 3){
 		if(st.substr(i,3) == "(t)") i += 3;
 	}
@@ -429,8 +459,8 @@ function check_parameter(te,icur,eqn)
 	}
 	
 	let name = spl[0];
-	
-	check_valid_name(name,icur,eqn);
+
+	check_valid_name(name,icur,eqn,"parameter");
 	
 	// Checks if compartment names in parameter name 
 	if(eqn.type == "trans"){
@@ -601,6 +631,11 @@ function check_population(te,icur,eqn)
 			}
 			else{
 				let ie = te.substr(jst+1,j-(jst+1));
+				
+				if(ie == ""){
+					eqn.warn.push({te:"Individual effect in population '[]' must contain text", cur:icur+jst, len:j-jst});
+				}
+				
 				check_ie(ie,p_name,icur+jst+1,eqn);
 				te = te.substr(0,jst)+te.substr(j+1);
 			}
@@ -714,7 +749,11 @@ function check_population(te,icur,eqn)
 /// Checks that individual effect is correctly defined			
 function check_ie(te,p_name_filter,icur,eqn) 
 {
-	check_valid_name(te,icur,eqn);
+	if(te == ""){
+		eqn.warn.push({te:"Individual effect '[]' must contain text"});
+	}
+	
+	check_valid_name(te,icur,eqn,"individual effect");
 	
 	let i = find(eqn.ind_eff,"name",te);
 	if(i == undefined){
@@ -736,8 +775,12 @@ function check_ie(te,p_name_filter,icur,eqn)
 /// Checks that individual effect is correctly defined			
 function check_fe(te,p_name_filter,icur,eqn) 
 {
-	check_valid_name(te,icur,eqn);
+	check_valid_name(te,icur,eqn,"fixed effect");
 	
+	if(te == ""){
+		eqn.warn.push({te:"Fixed effect '〈〉' must contain text"});
+	}
+		
 	let i = find(eqn.fix_eff,"name",te);
 	if(i == undefined){
 		eqn.fix_eff.push({name:te, p_name_filter:p_name_filter});
@@ -790,15 +833,20 @@ function find_comp_from_name(te,p_name)
 }
 
 
-/// Checks that a string is a valid name for a parameter
-function check_valid_name(name,icur,eqn)
+/// Checks that a string is a valid name for a parameter / ie or fe
+function check_valid_name(name,icur,eqn,type)
 {
+	if(name == ""){
+		eqn.warn.push({te:"The "+type+" name is not set", cur:icur, len:1});	
+	}
+	
 	for(let j = 0; j < name.length; j++){
 		let ch = name.substr(j,1);
-		let k = 0; while(k < char_not_allowed.length && ch != char_not_allowed[k]) k++;
-		if(k < char_not_allowed.length){
+		if(chnotallowed.includes(ch) || name_notallow.includes(ch)){
+			//let k = 0; while(k < char_not_allowed.length && ch != char_not_allowed[k]) k++;
+			//if(k < char_not_allowed.length){
 			if(ch == "_") ch = "underscore";
-			eqn.warn.push({te:"In '"+name+"' the character '"+ch+"' is not expected", cur:icur+j, len:1});
+			eqn.warn.push({te:"In "+type+" name '"+name+"' the character '"+ch+"' is not expected", cur:icur+j, len:1});
 		}
 	}
 }

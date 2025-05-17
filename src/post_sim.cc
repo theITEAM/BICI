@@ -23,6 +23,8 @@ PostSim::PostSim(const Model &model, Output &output, Mpi &mpi) : model(model), o
 /// Performs a simulation
 void PostSim::run()
 {
+	percentage_start(RUN_PER);
+	
 	const auto &details = model.details;
 
 	if(model.sample.size()==0) emsg("Sample number should not be zero");
@@ -30,8 +32,7 @@ void PostSim::run()
 	auto smax = details.num_per_core;
 
 	for(auto s = 0u; s < smax; s++){
-		output.percentage(s,smax);
-		progress(s,smax);
+		percentage(s,smax);
 		
 		const auto &samp = model.sample[(unsigned int)(model.sample.size()*ran())];
 
@@ -43,14 +44,13 @@ void PostSim::run()
 		
 		state.check("Check state");
 	
-		output.param_sample(s,0,state);// TO DO
-		
-		output.state_sample(s,0,state);// TO DO
+		output.param_sample(s,0,state);
+		output.state_sample(s,0,state);
 	}
 	
 #ifdef USE_MPI
 	mpi.barrier();
 #endif
 	
-	output.percentage(smax,smax);
+	percentage_end();
 }

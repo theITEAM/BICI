@@ -817,7 +817,7 @@ void StateSpecies::set_incomp_ref(unsigned int i, const vector < vector <double>
 	
 	// Finds a list of classification which need incomplete likelihoods
 	auto c_last = ev[el].c_after;
-		
+	
 	if(c_last == UNSET){
 		t_end = ev[el].t;
 		el--; 
@@ -847,8 +847,11 @@ void StateSpecies::set_incomp_ref(unsigned int i, const vector < vector <double>
 			
 			auto ti = get_ti(t);
 	
-			auto dt = t_end - t; if(dt <= 0) emsg("zero time2");
-		
+			auto dt = t_end - t; 
+			if(dt <= 0){
+				emsg("zero time2");
+			}
+			
 			if(!(inm.on && inm.n == n && inm.ti == ti && inm.dt == dt && inm.e_begin == e && inm.t_end == t_end)){
 				if(inm.on){ 
 					like_ch -= inm.Li;
@@ -909,7 +912,7 @@ void StateSpecies::adjust_incomp_ref(vector <IncompNMTransRef> &inmtr, const vec
 		
 			auto t = eve.t;
 			
-			auto dt = t_end - t; if(dt <= 0) emsg("zero time2");
+			auto dt = t_end - t; if(dt <= 0) emsg("zero time3");
 		
 			inm.dt = dt;
 			inm.e_begin = e;

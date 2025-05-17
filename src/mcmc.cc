@@ -52,35 +52,37 @@ MCMC::MCMC(const Model &model, Output &output, Mpi &mpi) : model(model), output(
 /// Runs MCMC
 void MCMC::run()
 {
-	print_diag("Run...");
+	percentage_start(INIT_PER);
+	for(auto ch = 0u; ch < chain.size(); ch++){
+		chain[ch].init(ch,chain.size());
+	}
+	percentage_end();
 	
-	output.percentage(0,nsample);
+	percentage_start(RUN_PER);
 	
-	for(auto &ch : chain) ch.init();
-
-	print_diag("Starting sampling");
-
 	long time_start = clock();
 
 	for(auto s = 0u; s < nsample; s++){
 		//if(mpi.core == 0) cout << s << " samp" << endl;
-		output.percentage(s,nsample);
-		progress(s,nsample);
-	
+		percentage(s,nsample);
+		
 		for(auto &ch : chain){
 			ch.burn_update(s);
 			ch.update(s);
 		}		
+		
 		sample_op(s);
 	}
-	output.percentage(nsample,nsample);
 	
 	output.set_output_burnin(double(100.0*nburnin)/nsample);
 	
+	auto time_total = (clock()-time_start)/num_per_core;
 	for(auto ch = 0u; ch < num_per_core; ch++){
-		auto diag = chain[ch].diagnostics(clock()-time_start);
+		auto diag = chain[ch].diagnostics(time_total);
 		output.set_diagnostics(mpi.core*num_per_core+ch,diag);
 	}
+	
+	percentage_end();
 }
 
 

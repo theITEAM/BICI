@@ -29,6 +29,8 @@ importScripts("statistics.js");
 importScripts("data_sim.js");
 importScripts("create_sire.js");
 		
+let xi_sq =	calc_xi_sq();
+
 let model;                                        // Stores the model
 
 let sim_result = {siminf:"sim"};                  // Stores results from simulation
@@ -56,13 +58,13 @@ let run_chain = [];
 
 onmessage = function(e) 
 {
-	if(false){ pr("Worker start"); prr(e.data);}
+	if(false){ prr("Worker start"); prr(e.data);}
 
 	if(try_on){
 		try {
 			process(e);
 		}catch(e){
-			//pr("ERROR:"); pr(e); 
+			//error(e); 
 			post(e);
 		}
 	}
@@ -84,10 +86,10 @@ function process(e)
 
 	if(model && input.model){
 		copy_strip(input.model,model);
-		
 		if(model.warn.length > 0) update_mod = true;
 	}
-		
+	
+	//prr(input.type+" type");
 	switch(input.type){
 	case "Add A pedigree":
 		{
@@ -120,7 +122,7 @@ function process(e)
 			else type = "param";
 			
 			let te = extract_text_samples(siminf,type,result);
-			
+	
 			let file_list=[];
 			write_file_store(te,"bicifile",file_list,"bicifile");
 			post({file_list:file_list});
@@ -134,13 +136,19 @@ function process(e)
 	case "DeleteParamDist":
 		{
 			let par = model.param[info.i];
-			par.variety = "normal";
-			
-			if(par.dep.length != 0){
+			if(par.variety != "const" && par.dep.length != 0){
 				let list = par_find_list(par);
 				par.value = par_find_template(list);
 			}
-			
+			par.variety = "normal";
+			update_mod = true;
+		}
+		break;
+	
+	case "DeleteParamFactor":
+		{
+			let par = model.param[info.i];
+			par.factor = false;
 			update_mod = true;
 		}
 		break;
@@ -243,7 +251,6 @@ function process(e)
 		break;
 		
 	case "StartCluster":
-	pr(info.save_type+" type");
 		if(info.save_type == "ppc") create_ppc_file();
 		else create_output_file(info.save_type,info.map_store);
 		break;
@@ -435,15 +442,31 @@ function process(e)
 		}
 		break;
 		
-	case "Edit Param": case "Edit Reparam":
+	case "Edit Param": case "Edit Reparam": 
+		{
+			let par = model.param[info.i];
+		
+			info.value = par.value;	
+			info.list = par.list;
+			if(par.dist_mat){
+				set_dist(info,par);
+			}
+			else{
+				if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
+			}
+			
+			post({ info:info});
+		}
+		break;
+		
+	case "Edit Weight":
 		{
 			let par = model.param[info.i];
 			
-			info.value = par.value;	
+			info.value = par.factor_weight;	
 			info.list = par.list;
-				
 			if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
-		
+			info.type = "weight";
 			post({ info:info});
 		}
 		break;
@@ -452,11 +475,26 @@ function process(e)
 		{
 			let i = info.i;
 			let par = model.param[i];
+			let err = check_param_value(input.type,par,info.value);
+			if(typeof err == 'string') alert_help("Problem updating",err);
+			
 			par.value = info.value;
 			par.set = true;
 			get_reparam_param_list(par);
 			
 			post({ i:i, value_desc:get_value_desc(par)});
+		}
+		break;
+		
+	case "Set Weight": 
+		{
+			let i = info.i;
+			let par = model.param[i];
+			let err = check_param_value(input.type,par,info.value);
+			if(typeof err == 'string') alert_help("Problem updating",err);
+			
+			par.factor_weight = info.value;
+			post({ i:i, weight_desc:get_weight_desc(par)});
 		}
 		break;
 		
@@ -542,6 +580,21 @@ function process(e)
 		}
 		break;
 		
+	case "Graph Trans. (dist.)": 
+		graph_trans_hbin_calculate(inf_result,info.plot_filter,info.burnin,info.p,"Distribution"); 
+		break;
+	
+	case "Graph Trans. (exp.)":
+		graph_trans_expect_calculate(inf_result,info.plot_filter,info.burnin,info.p,input.type); 
+		break;
+	
+	case "Graph Trans. (bias)": case "Graph Trans. (p-val.)":
+		{
+			let rpf = info.plot_filter;
+			graph_trans_hbin_calculate(inf_result,rpf,info.burnin,info.p,rpf.sel_bias_view.te);
+		}
+		break;
+		
 	case "Graph ind":
 		{
 			let res = info;
@@ -594,7 +647,9 @@ function process(e)
 	
 	case "Import output":
 		{
-			let te = load_file_http("M:/Github/theITEAM/BICI/Execute/init.bici");
+			let fi = "M:/Github/theITEAM/BICI/Execute/init.bici";
+			if(ver =="windows") fi = "C:/Users/cpooley/Desktop/BICI_release/BICI_v0.3_windows/Execute/init.bici";
+			let te = load_file_http(fi);
 			percent(2)
 			import_file(te,true);
 		}
@@ -660,25 +715,37 @@ function create_invalid_message(mess)
 {
 	if(model && model.species){
 		let list = [];
-		for(let p = 0; p < model.species.length; p++){
-			let sp = model.species[p];
-			for(let loop = 0; loop < 3; loop++){
-				let source, type;
-				switch(loop){
-				case 0: source = sp.sim_source; type = "Population"; break;
-				case 1: source = sp.inf_source; type = "Data"; break;
-				case 2: source = sp.ppc_source; type = "Population Mod."; break;
-				}
-				
-				for(let j = source.length-1; j >= 0; j--){
-					let so = source[j];
-					if(so.error == true){
-						list.push("• <b>"+type+"</b> - "+so.type+": "+so.desc);
-						source.splice(j,1);
+		
+		for(let loop = 0; loop < 3; loop++){
+			let spec;
+			if(loop == 2){
+				let pf = model.inf_res.plot_filter;
+				if(pf) spec = pf.species;
+			}
+			else spec = model.species;
+			
+			if(spec){
+				for(let p = 0; p < spec.length; p++){	
+					let sp = spec[p];
+	
+					let source, type;
+					switch(loop){
+					case 0: source = sp.sim_source; type = "Population"; break;
+					case 1: source = sp.inf_source; type = "Data"; break;
+					case 2: source = sp.ppc_source; type = "Population Mod."; break;
+					}
+					
+					for(let j = source.length-1; j >= 0; j--){
+						let so = source[j];
+						if(so.error == true){
+							list.push("• <b>"+type+"</b> - "+so.type+": "+so.desc);
+							source.splice(j,1);
+						}
 					}
 				}
 			}
 		}
+		
 		if(list.length > 0){
 			let te = "Due to changes in the model these data sources have been removed:\n";
 			for(let j = 0; j < list.length; j++){

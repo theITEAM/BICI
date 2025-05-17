@@ -9,15 +9,19 @@ function add_annotation_buts(lay)
 	if(model.species.length == 0 || cl == model.species[p].ncla) return;
 	let claa = model.species[p].cla[cl];
 	
-	let cam = claa.camera;    
-
+	let cam = claa.camera;   
+	
+	if(cam.grid == "on"){
+		lay.add_button({x:0, y:0, dx:lay.dx, dy:lay.dy, p:p, cl:cl, type:"Grid"});
+	}
+	
 	for(let k = 0; k < claa.annotation.length; k++){
 		let an = claa.annotation[k];
 		switch(an.type){
 			case "text":
 				{
 					let x = lay.dx/2 + (an.x-cam.x)*cam.scale; 
-					let y = lay.dy/2 + (an.y-cam.y)*cam.scale;	
+					let y = lay.dy/2 - (an.y-cam.y)*cam.scale;	
 
 					let si = si_anno*(an.size/size_annotation_default)*cam.scale*cam.ruler;
 					let fo = get_font(si);
@@ -70,14 +74,14 @@ function add_annotation_buts(lay)
 					if(xmin == xmax || ymin == ymax) mar *= 2;
 					
 					let xc = xmin - mar;
-					let yc = ymin - mar;
+					let yc = ymax + mar;
 					let wc = xmax-xmin+2*mar; 
 					let hc = ymax-ymin+2*mar;
 					
 					let si = si_anno*(an.size/size_annotation_default)*cam.scale*cam.ruler;
 					
 					let x = lay.dx/2 + (xc-cam.x)*cam.scale; 
-					let y = lay.dy/2 + (yc-cam.y)*cam.scale - si;	
+					let y = lay.dy/2 - (yc-cam.y)*cam.scale - si;	
 	
 					let w = wc*cam.scale; 
 					let h = hc*cam.scale+si; 
@@ -93,7 +97,32 @@ function add_annotation_buts(lay)
 	}
 }
 
+/// Adds point labels in latlng view
+function add_pointlabel_buts(lay)
+{
+	let p = model.get_p();
+	let cl = model.get_cl();
+	if(model.species.length == 0 || cl == model.species[p].ncla) return;
+	let claa = model.species[p].cla[cl];
+	let cam = claa.camera;   
+	
+	let si = cam.scale*cam.ruler*Math.exp(cam.slider.value);
 
+	let fo = get_font(si);
+	if(si > si_limit_label || claa.ncomp < 100){
+		for(let k = 0; k < claa.ncomp; k++){
+			let c = claa.comp[k];
+			if(c.type == "latlng"){
+				let p = trans_point(c.x,c.y,cam,lay);
+				let te = claa.comp[k].name
+		
+				lay.add_button({te:te, x:p.x, y:p.y+1*si, dx:0, dy:0, si:si, type:"LatLngLabel", col:BLACK});
+			}
+		}
+	}
+}
+
+	
 /// Adds all the buttons associated with annotation maps
 function add_annotation_map_buts(lay)
 {
@@ -117,31 +146,15 @@ function add_annotation_map_buts(lay)
 						let fea = feature[i];
 						let box = fea.box;
 					
-						let p1 = trans_point(box.xmin,box.ymin,cam,lay);
-						let p2 = trans_point(box.xmax,box.ymax,cam,lay);
-						
+						let p1 = trans_point(box.xmin,box.ymax,cam,lay);
+						let p2 = trans_point(box.xmax,box.ymin,cam,lay);
+					
 						lay.add_button({x:p1.x, y:p1.y, dx:p2.x-p1.x, dy:p2.y-p1.y, type:"Feature", polygon:fea.polygon});
 					}
 				}
 				break;
 
 			default: break;
-		}
-	}
-	
-	// Plots labels in latlng view
-	let si = cam.scale*cam.ruler*Math.exp(inter.lnglat_slider.value);
-
-	let fo = get_font(si);
-	if(si > si_limit_label || claa.ncomp < 100){
-		for(let k = 0; k < claa.ncomp; k++){
-			let c = claa.comp[k];
-			if(c.type == "latlng"){
-				let p = trans_point(c.x,c.y,cam,lay);
-				let te = claa.comp[k].name
-		
-				lay.add_button({te:te, x:p.x, y:p.y+1*si, dx:0, dy:0, si:si, type:"LatLngLabel", col:BLACK});
-			}
 		}
 	}
 }
@@ -171,7 +184,7 @@ function transform_latlng(lng,lat)
 	let x = lng*Math.PI/180;
 	let sign = 1;
 	let phi_p = lat*Math.PI/180; if(phi_p < 0){ phi_p = -phi_p; sign = -1;}
-	let y = -sign*Math.log(Math.tan(0.5*phi_p + 0.25*Math.PI));
+	let y = sign*Math.log(Math.tan(0.5*phi_p + 0.25*Math.PI));
 	
 	return {x:x, y:y};
 }
@@ -186,10 +199,10 @@ function transform_latlng_inv(x,y)
 	
 	let sign = 1;
 	if(y < 0){ sign = -1; y = -y;}
-
+	
 	let phi_p = (Math.atan(Math.exp(y)) - 0.25*Math.PI)/0.5;
 	
-	let lat = -sign*phi_p*180/Math.PI;
+	let lat = sign*phi_p*180/Math.PI;
 	
 	return {lng:lng, lat:lat};
 }
@@ -198,14 +211,14 @@ function transform_latlng_inv(x,y)
 /// Transforms a point based on camera
 function trans_point(x,y,cam,lay)
 {
-	return {x:lay.dx/2 + (x-cam.x)*cam.scale, y:lay.dy/2 + (y-cam.y)*cam.scale};
+	return {x:lay.dx/2 + (x-cam.x)*cam.scale, y:lay.dy/2 - (y-cam.y)*cam.scale};
 }
 
 
 /// Does the reverse function (i.e. gets position in model based on mouse location
 function trans_point_rev(xx,yy,cam,lay)
 {
-	return {x:cam.x + (xx - lay.dx/2)/cam.scale, y:cam.y + (yy - lay.dy/2)/cam.scale};
+	return {x:cam.x + (xx - lay.dx/2)/cam.scale, y:cam.y - (yy - lay.dy/2)/cam.scale};
 }
 	
 	
@@ -292,7 +305,7 @@ function add_individual_compartment_boundary(name,p,cl,file,color,infected)
 		}
 	}
  
-	return err("'"+name+"' could not be found in the file '"+file+"'");
+	return err(in_file_text(file)+", '"+name+"' could not be found");
 }
 
 	
@@ -347,7 +360,12 @@ function mouse_over_comp_map(frx,fry,mask)
 function set_camera(p,cl)
 {
 	let claa = model.species[p].cla[cl];
+	
 	let cam = claa.camera;
+
+	if(create_example){
+		cam.grid = "on"; if(cam.coord == "cartesian") return;
+	}
 	
 	let box = get_model_box(p,cl); if(box.unset) return;
 	
@@ -557,7 +575,6 @@ function get_model_box(p,cl)
 		let scaley = 0.7*page_char_hei/(ymax-ymin);
 		if(cam.coord == "cartesian" && scaley > 1) scaley = 1;
 
-		
 		if(scalex < scaley) scale = scalex;
 		else scale = scaley;
 	}
@@ -902,4 +919,148 @@ function load_map(ans)
 		cam.y = po.y;
 		cam.scale = (page_char_wid-menu_width)/(2*Math.PI);
 	}
+}
+
+
+/// Gets the number of steps
+function get_step(v1,v2)
+{
+	let ideal = 20;
+	let dif = v2-v1;
+
+	let step = 1; 
+	while(dif/step > ideal){
+		if(dif/(2*step) < ideal){ step *= 2; break;} 
+		if(dif/(5*step) < ideal){ step *= 5; break;} 
+		step *= 10;
+	}
+	return step;
+}
+
+
+/// Gets equally spaced division between two values
+function get_div(v1,v2,step)
+{
+	let list=[];
+	for(let i = Math.floor(v1/step)+1; i <= Math.floor(v2/step); i++){
+		list.push(step*i);
+	}
+	return list;
+}
+
+
+/// Determines if the circle is used for the origin
+function circle_origin(divx,divy)
+{
+	if(divx[0] <= 0 && divx[divx.length-1] > 0){
+		if(divy[0] <= 0 && divy[divy.length-1] > 0) return true;
+	}
+	return false;
+}
+
+
+/// Gets the position of the origin
+function get_origin(div)
+{
+	let i = 0;
+	if(div[0] <= 0 && div[div.length-1] > 0){
+		while(i < div.length && div[i] < 0) i++;
+	}
+	else{
+		if(div[0] <= 0) i = div.length-2;
+	}
+	return i;
+}
+
+			
+/// Plots the grid behind the model
+function plot_grid(p,cl,dx,dy)
+{
+	let claa = model.species[p].cla[cl];
+	
+	let cam = claa.camera;
+	
+	let lay = get_lay("AnnotationMap");
+	
+	let col = LLBLUE;
+	let col_text = LBLUE;
+	
+	let xst=[], yst=[];
+	let divx, divy;
+	
+	switch(cam.coord){
+	case "cartesian":
+		{	
+			let p1 = trans_point_rev(0,dy,cam,lay);
+			let p2 = trans_point_rev(dx,0,cam,lay);
+			
+			let step = get_step(p1.x,p2.x);
+			
+			divx = get_div(p1.x,p2.x,step);
+			divy = get_div(p1.y,p2.y,step);
+			
+			for(let i = 0; i < divx.length; i++){
+				let tp = trans_point(divx[i],0,cam,lay);
+				xst.push(tp.x);
+			}
+			
+			for(let i = 0; i < divy.length; i++){
+				let tp = trans_point(0,divy[i],cam,lay);
+				yst.push(tp.y);
+			}
+		}
+		break;
+	
+	case "latlng":
+		{	
+			let p1 = trans_point_rev(0,dy,cam,lay);
+			let p2 = trans_point_rev(dx,0,cam,lay);
+			
+			let pg1 = transform_latlng_inv(p1.x,p1.y,cam,lay);
+			let pg2 = transform_latlng_inv(p2.x,p2.y,cam,lay);
+			
+			let step = get_step(pg1.lng,pg2.lng);
+			
+			divx = get_div(pg1.lng,pg2.lng,step);
+			divy = get_div(pg1.lat,pg2.lat,step);
+		
+			for(let i = 0; i < divx.length; i++){
+				let tp = transform_latlng(divx[i],0);
+				let p = trans_point(tp.x,tp.y,cam,lay);
+				xst.push(p.x);
+			}
+			
+			for(let i = 0; i < divy.length; i++){
+				let tp = transform_latlng(0,divy[i]);
+				let p = trans_point(tp.x,tp.y,cam,lay);
+				yst.push(p.y);
+			}
+		}
+		break;
+	}
+	
+	let xi = get_origin(divx);
+	let xmid = 0.95*xst[xi]+0.05*xst[xi+1];
+	
+	let yi = get_origin(divy);
+	let ymid = 0.95*yst[yi]+0.05*yst[yi+1];
+	
+	let ori = circle_origin(divx,divy);
+	
+	let fo = get_font(0.9);
+	for(let i = 0; i < divx.length; i++){
+		let xx = xst[i];
+		draw_line(xx,0,xx,dy,col,NORMLINE);
+		if(!(divx[i]==0 && ori) && !(i == xi && !ori)){
+			plot_vert_text_rev(divx[i],xx+0.2,ymid,fo,col_text);  
+		}			
+	}
+	
+	for(let i = 0; i < divy.length; i++){
+		let yy = yst[i];
+		draw_line(0,yy,dx,yy,col,NORMLINE);
+		if(!(divy[i]==0 && ori)) plot_text(divy[i],xmid,yy-0.2,fo,col_text); 
+	}
+	
+	if(ori) fill_circle(xmid+0.3,ymid-0.3,0.3,col,col_text,NORMLINE);
 }

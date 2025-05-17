@@ -1,4 +1,9 @@
 
+###################### DATA DIRECTORY ######################
+
+data-dir folder="Examples\EX_B2-data-files"
+
+
 ####################### DESCRIPTION ########################
 
 description text="description.txt"
@@ -6,11 +11,9 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-data-dir folder="Examples\EX_B2-data-files"
-
 simulation start=0 end=100 timestep=0.5
 
-inference start=0 end=100 timestep=0.5
+inference start=0 end=100 timestep=0.5 nchain=3
 
 post-sim start=0 end=100
 
@@ -23,11 +26,10 @@ species name="People" type="population"
 
 class name="DS" index="a"
 
-comp name="S" color="#009900" x=-16 y=-7
-comp name="I" color="#ff2222" x=-2 y=-7
+comp name="S" color="#009900" x=-10 y=0
+comp name="I" color="#ff2222" x=10 y=0
 
 trans name="S->I" value="exp(rate:β×{I})"
-
 
 # SIMULATION INITIAL CONDITIONS
 
@@ -45,5 +47,6 @@ pop-trans-data name="S->I" error="normal:10%" file="pop-trans-data.csv"
 ######################## PARAMETERS ########################
 
 param name="β" value="0.001" prior="uniform(0,0.1)"
+
 
 

@@ -34,7 +34,7 @@ void MFA::run()
 	
 	auto Li = state.like_integrate(param_val);
 	
-	cout << Li << "\n";
+	cout << Li << endl;
 	emsg("don");
 	
 	/*

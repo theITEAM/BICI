@@ -1,4 +1,9 @@
 
+###################### DATA DIRECTORY ######################
+
+data-dir folder="Examples\EX_D2-data-files"
+
+
 ####################### DESCRIPTION ########################
 
 description text="description.txt"
@@ -6,13 +11,11 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-data-dir folder="Examples\EX_D2-data-files"
-
 simulation start=0 end=150 timestep=0.5
 
-inference start=0 end=150 timestep=0.5
+inference start=0 end=150 timestep=0.5 nchain=3
 
-post-sim start=0 end=100
+post-sim start=0 end=150
 
 
 ######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
@@ -23,11 +26,10 @@ species name="People" type="population"
 
 class name="DS" index="a"
 
-comp name="S" color="#009900" x=-25 y=-7
-comp name="I" color="#ff2222" x=1 y=-7
+comp name="S" color="#009900" x=-10 y=0
+comp name="I" color="#ff2222" x=10 y=0
 
 trans name="S->I" value="exp(rate:β(1+Δ×cos(α×t))×{I}/N)"
-
 
 # SIMULATION INITIAL CONDITIONS
 
@@ -45,8 +47,12 @@ pop-data filter="DS=file" error="normal:10%" file="pop-data.csv"
 ######################## PARAMETERS ########################
 
 param name="N" constant="1001"
+
 param name="α" value="0.06" prior="uniform(0,0.2)"
+
 param name="β" value="0.09" prior="uniform(0,1)"
+
 param name="Δ" value="0.7" prior="uniform(0,1)"
+
 
 

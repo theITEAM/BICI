@@ -1,4 +1,4 @@
-# Example B1: Time-series population obesrvations for PBM
+# Example B1: Time-series population observations for PBM
 
 ## Objective
 - Inference is done using time-series population data.

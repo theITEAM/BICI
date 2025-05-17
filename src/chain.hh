@@ -14,7 +14,7 @@ using namespace std;
 class Chain {
 public:
 	Chain(unsigned int nburnin_, unsigned int nsample_, const Model &model, Output &output);
-	void init();
+	void init(unsigned int ch, unsigned int ch_max);
 	void burn_update(unsigned int s);
 	void update(unsigned int s);
 	string diagnostics(unsigned int time, unsigned int anneal_time=UNSET) const;
@@ -40,7 +40,8 @@ private:
 	void add_parameter_prop(const vector <unsigned int> &vec);
 	void set_proposal_prob();
 	void check_join_proposal();
-	void join_proposal(unsigned int th1, unsigned int th2);
+	unsigned int find_which_list(unsigned int j, const vector < vector <unsigned int> > &par_list) const;
+	//void join_proposal(unsigned int th1, unsigned int th2);
 
 	const Model &model;
 	Output &output;

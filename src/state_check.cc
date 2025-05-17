@@ -12,6 +12,25 @@ using namespace std;
 #include "state.hh"
 #include "utils.hh"
 
+/// Checks for any transition numbers becoming negative
+void State::check_trans_num(string ref)
+{
+	for(auto p = 0u; p < model.species.size(); p++){	
+		const auto &sp = model.species[p]; 
+		auto &ssp = species[p];
+		if(sp.type == POPULATION){
+			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+				for(auto ti = 0u; ti < T; ti++){
+					if(ssp.trans_num[tr][ti] < 0) emsg("trans_num has become negative"+ref);
+					//if(trans_num_st[tr][ti] < 0) emsg("trans_num has become negative"+ref);
+				}
+			}
+		}
+	}
+}
+
+
+/// Performs a simple check
 void State::check_simp(string ref)
 {
 	for(auto p = 0u; p < model.species.size(); p++){	
@@ -102,6 +121,8 @@ void State::check(string ref)
 	if(testing == false) return;
 	
 	timer[CHECK_TIMER] -= clock();
+
+	check_trans_num(ref);
 
 	check_event_boundary(ref);
 
@@ -521,8 +542,6 @@ void State::check_markov_trans(unsigned int p, string ref)
 			}
 			
 			if(dif(ssp.Li_markov[e][ti],Li_markov_store[ti],dif_thresh)){
-				cout << ssp.Li_markov[e][ti] << " "<< Li_markov_store[ti] << "compare\n";
-				cout << ssp.Li_markov[e][ti] - Li_markov_store[ti] <<" dif\n";
 				emsg("Li_markov error"+ref);
 			}
 		}
@@ -639,7 +658,8 @@ void State::check_like(string ref)
 	}
 	
 	if(dif(like.obs,like_st.obs,dif_thresh)){
-		emsg("like obs");
+		cout << like.obs << " " << like_st.obs << " like" << endl;
+		emsg("like obs "+ref);
 	}
 	
 	if(dif(like.markov,like_st.markov,dif_thresh)){
@@ -1792,6 +1812,7 @@ void State::check_popnum_ind(string ref)
 	for(auto ti = 0u; ti < T; ti++){
 		for(auto po = 0u; po < model.pop.size(); po++){
 			if(popnum_ind[ti][po].size() != popnum_ind_store[ti][po].size()){
+				cout << " " << popnum_ind[ti][po].size() << " " <<  popnum_ind_store[ti][po].size() << "Kk\n";
 				emsg("popnum_ind size wrong:"+ref);
 			}
 			
@@ -1977,8 +1998,8 @@ void State::check_event_boundary(string ref)
 			const auto &ssp = species[p];
 			for(const auto &ind : ssp.individual){
 				if(events_near_div(ind.ev,model.details)){
-					cout << ind.name <<":\n";
-					for(auto ev:ind.ev) cout << ev.t << " t\n"; 
+					cout << ind.name <<":" << endl;
+					for(auto ev  : ind.ev) cout << ev.t << " t" << endl; 
 					emsg("Event near a boundary"+ref);
 				}
 			}
@@ -2019,7 +2040,7 @@ void State::check_effect_out_of_range()
 				
 						stringstream ss;
 						ss << "Fixed effect '〈" << fe_name << "〉' has a value '" << val << "' which is out of the maximum allowable range " << EFFECT_MIN << "-" << EFFECT_MAX << ". ";
-						ss << "Please restrict the " << ty << " for the fixed effect parameter ν^" << fe_name;
+						ss << "Please restrict the " << ty << " for the fixed effect parameter " << fe_char << "^" << fe_name;
 								
 						emsg(ss.str()); 
 					}

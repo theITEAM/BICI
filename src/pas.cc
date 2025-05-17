@@ -52,26 +52,26 @@ PAS::PAS(const Model &model, Output &output, Mpi &mpi) : model(model), output(ou
 /// Runs PAS algorithm
 void PAS::run()
 {
-	//output.percentage(0,nsample);
-	
-	if(op()) cout << "Annealing..." << endl;
-	
 	for(auto &ch : chain) ch.state.dif_thresh = DIF_THRESH_BURNIN;
 		
-	for(auto &ch : chain) ch.init();
-
+	percentage_start(INIT_PER);	
+	for(auto ch = 0u; ch < chain.size(); ch++){
+		chain[ch].init(ch,chain.size());
+	}
+	percentage_end();
+	
+	percentage_start(ANNEAL_PER);	
+	
 	auto time_anneal_start = clock();
 
 	auto step_Lobs = gen_update/10;
 	if(step_Lobs == 0) step_Lobs = 1;
 
-	if(com_op) cout << "<ANNEALING>" << endl;
-	
 	auto g = 0;
 	do{
-		progress(phi,1);
+		percentage(phi,1);
 			
-		if(op()) cout << "Generation " << g << ":  φ=" << phi << endl;
+		//if(op()) cout << "Generation " << g << ":  \phi=" << phi << endl;
 
 		for(auto &ch : chain){ ch.Lobs_av = 0; ch.nLobs_av = 0;}
 	 
@@ -98,20 +98,17 @@ void PAS::run()
 		bootstrap();
 		g++;
 	}while(true);
-	
+	percentage_end();
+		
 	auto time_anneal_end = clock();
 	
 	// Running phase
-	if(op()) cout << "Running..." << endl;
-	if(com_op) cout << "<RUNNING>" << endl;
+	percentage_start(RUN_PER);	
 	
 	long time_start = clock();
 
 	for(auto s = 0u; s < nsample; s++){
-		//if(mpi.core == 14) cout << s << " samp" << endl;
-	
-		output.percentage(s,nsample);
-		progress(s,nsample);
+		percentage(s,nsample);
 	
 		for(auto &ch : chain){
 			ch.burn_update(s);
@@ -119,7 +116,6 @@ void PAS::run()
 		}		
 		sample_op(s);
 	}
-	output.percentage(nsample,nsample);
 	
 	output.set_output_burnin(double(100.0*nburnin)/nsample);
 	
@@ -127,6 +123,8 @@ void PAS::run()
 		auto diag = chain[ch].diagnostics(clock()-time_start,time_anneal_end-time_anneal_start);
 		output.set_diagnostics(mpi.core*num_per_core+ch,diag);
 	}
+	
+	percentage_end();
 }
 
 
@@ -154,7 +152,7 @@ void PAS::sample_op(unsigned int s)
 
 
 // Used to order particles by EF
-bool PartRO_ord (PartReorder p1,PartReorder p2)                      
+bool PartRO_ord (const PartReorder &p1, const PartReorder &p2)                      
 { return (p1.L < p2.L); };  
 
 

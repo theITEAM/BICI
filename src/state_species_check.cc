@@ -289,13 +289,13 @@ void StateSpecies::print_event(const vector <Event> &event) const
 /// Checks the prior
 string StateSpecies::check_prior(const Equation &eq) const
 {
-	string type = "prior"; if(mode == SIM) type = "parameter value";
+	string type = "prior is"; if(mode == SIM) type = "parameter values are";
 	
 	if(eq.param_ref.size() == 1){
 		const auto &pr = eq.param_ref[0];
-		return " Please check the "+type+" for "+param[pr.th].full_name+" is correctly specified.";
+		return " Please check the "+type+" correctly set for "+param[pr.th].full_name;
 	}		
-	return " Please check the "+type+" is correctly specified.";
+	return " Please check the "+type+" correctly set.";
 }
 
 

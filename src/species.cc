@@ -146,6 +146,8 @@ void Species::create_ind_noobs()
 		IndData ind;
 		ind.name = "No observation";
 		ind.enter_ref = UNSET;
+		ind.tmin = -LARGE;
+		ind.tmax = -LARGE;
 		individual.push_back(ind);
 	}
 }

@@ -70,7 +70,6 @@ class Hash
 		let nu = 0;
 		for(let i = 0; i < vec.length; i++){
 			if(vec[i] >= this.num.length){
-				pr(vec[i]+" "+this.num.length+" pp");
 				error("Out of range hash");
 			}
 			nu = nu ^ this.num[vec[i]]; 
@@ -247,17 +246,17 @@ class Hash
 	/// Prints the possible values for splitting
 	print_pos()
 	{
-		pr(this.list.length+" len");
+		error(this.list.length+" len");
 		for(let i = 0; i < this.list.length; i++){
 			let st = this.store[this.list[i]];
 			for(let j = 0; j < st.length; j++){
 				let stt = st[j];
-				pr("SPLIT");
-				pr(stt);
+				error("SPLIT");
+				error(stt);
 				for(let k = 0; k < stt.pos.length; k++){
 					let po = stt.pos[k];
-					pr("pos");
-					pr(po);
+					error("pos");
+					error(po);
 				}
 			}
 		}

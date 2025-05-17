@@ -22,6 +22,29 @@ using namespace std;
 void test_distribution()
 {
 	{
+		for(auto shape = 1.0; shape < 5; shape += 0.1){
+			auto gam1 = exp(lgamma(1+2.0/shape));
+			auto gam2 = exp(lgamma(1+1.0/shape));
+			
+			auto cv = sqrt(gam1 - gam2*gam2)/gam2;
+			cout << shape << " "<< cv << " " << 1/sqrt(shape) << " hh" << endl;
+		}
+	
+		return;
+	}
+	
+	{
+		auto lam = 10;
+		
+		auto sum = 0.0;
+		for(auto i = 0u; i < 100; i++){
+			sum += exp(poisson_probability(i,lam));
+			cout << 1-sum << " " << poisson_upper_probability_no_log(i,lam) << "comp" << endl;
+		}
+	}
+	return;
+		
+	{
 		auto m = 10.0, p = 0.5;
 		auto sum = 0.0;
 		for(auto k = 0u; k < 100; k++){

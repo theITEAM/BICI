@@ -746,7 +746,7 @@ void StateSpecies::update_rate_mean(const vector < vector <double> > &popnum_t)
 	
 	auto dt = details.dt;
 	
-	// Generates a smoothed version of rates (this helps the proposals
+	// Generates a smoothed version of rates (this helps the proposals)
 	for(auto tr = 0u; tr < rate_mean.tra_rate.size(); tr++){
 		auto &trate = rate_mean.tra_rate[tr];
 			
@@ -911,6 +911,7 @@ double RatePosteriorMean::get_value(const vector <double> &vec, double v) const
 void RatePosteriorMean::update_prob_try_Rint(double t1, double t2, unsigned int tr_gl, unsigned int cl, unsigned int c, double &prob_try, double &Rint, const Individual &ind, Modify mod) const
 {	
 	const auto &compr = compR[compR_ref[cl][c]];
+	if(compr.update == NM_CALCALL_UP) return;
 	
 	auto v1 = ALMOST_ONE*(t1-t_start)/dt;
 	auto v2 = ALMOST_ONE*(t2-t_start)/dt;
@@ -951,31 +952,7 @@ void RatePosteriorMean::update_prob_try_Rint(double t1, double t2, unsigned int 
 		break;
 	
 	case NM_CALCALL_UP: 
-		{
-			emsg("to do2");
-			/*
-			auto sum = 0.0;
-			for(auto m : compr.list){
-				const auto &trate = tra_rate[m];
-				auto ra = trate.value[ti];
-				if(trate.ind_variation){
-					for(const auto &ifr : trate.ind_fac_rate){
-						switch(ifr.type){
-						case IND_EFF_MULT: ra *= ind.exp_ie[ifr.e]; break;
-						case IND_EFF_DIV: ra /= ind.exp_ie[ifr.e]; break;
-						case FIX_EFF_MULT: ra *= ind.exp_fe[ifr.e]; break;
-						case FIX_EFF_DIV: ra /= ind.exp_fe[ifr.e]; break;
-						}
-					}
-				}
-				
-				auto bp = trate.bp[ti];
-				sum += bp*exp(-ra*dt/bp);
-			}
-			if(mod == MULT_MOD) prob_try *= (sum+TINY);
-			else prob_try /= (sum+TINY);
-			*/
-		}
+		emsg("Should not be here");
 		break;
 		
 	case NO_UP: break;
@@ -1000,36 +977,6 @@ void RatePosteriorMean::update_prob_try_Rint(double t1, double t2, unsigned int 
 		
 		if(mod == MULT_MOD) prob_try *= (rate+TINY);
 		else prob_try /= (rate+TINY);
-			
-		/*
-		switch(compr.update){
-		case SINGLE_BRANCH_UP: case SINGLE_CALCALL_UP:
-			if(mod == MULT_MOD) prob_try *= (rate+TINY); 
-			else prob_try /= (rate+TINY); 
-			break;
-		
-		case MARKOV_COMPR_UP:
-			if(mod == MULT_MOD) prob_try *= (rate+TINY);
-			else prob_try /= (rate+TINY);
-			break;
-			
-		case MARKOV_CALCALL_UP:
-			{
-				if(mod == MULT_MOD) prob_try *= (rate+TINY); 
-				else prob_try /= (rate+TINY); 
-			}
-			break;
-		
-		case NM_CALCALL_UP:
-			{
-				if(mod == MULT_MOD) prob_try *= (rate+TINY);
-				else prob_try /= (rate+TINY);
-			}
-			break;
-			
-		case NO_UP: break;
-		}
-		*/
 	}
 }
 

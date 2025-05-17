@@ -126,7 +126,7 @@ function load_pictures()
 {
 	let file_name = ["logo_big","speech","newmod","manual","paper","warn","warn_black","desc","zoomin","zoomout","desc","settings","copy_icon",
 	// These are pictures for homepage
-	"IBM","POP","SI","SIR","SIRErlang","SIRgamma","SIRD","SIRD_IBM","SIRD_IBM2","SIR_sex","SIR_sex2","scotland","SIS","SEIR","SIRwaning","world","uk","farm","carry","predprey","grid","dte","group","groupQG","envpathogen","covid","covidage","UK_grid","stop"
+	"IBM","POP","SI","SIR","SIRErlang","SIRgamma","SIRD","SIRD_IBM","SIRD_IBM2","SIR_sex","SIR_sex2","scotland","SIS","SEIR","SIRwaning","world","uk","farm","carry","carryage","predprey","grid","dte","group","groupQG","envpathogen","covid","covidage","UK_grid","stop"
 	];
 
 	inter.npicloaded = 0;

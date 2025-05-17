@@ -92,7 +92,9 @@ function get_seed_not_set(siminf)
 	case "ppc": details = model.ppc_details; break;
 	}
 
-	if(details.seed_on.value != "Yes") return Math.floor(Math.random()*seed_max); 
+	if(!turn_off_random_seed){
+		if(details.seed_on.value != "Yes") return Math.floor(Math.random()*seed_max); 
+	}
 }
 
 
@@ -133,24 +135,53 @@ function funct(chi,ch)                             // Gathers output of C++ file
 		for(let li = 0; li < lines.length-1; li++){
 			let line = lines[li];
 			
-			if(begin(line,"<RUNNING>")){
-				loading_symbol_message("Running...");
+			let fl = false;
+			if(line.length > 1 && line.substr(0,1) == "<"){
+				if(begin(line,"<CREATING>")){
+					loading_symbol_message("Creating...");
+					fl = true;
+				}
+				
+				if(begin(line,"<INIT>")){
+					loading_symbol_message("Initialising...");
+					fl = true;
+				}
+				
+				if(begin(line,"<RUNNING>")){
+					loading_symbol_message("Running...");
+					fl = true;
+				}
+				
+				if(begin(line,"<RUNGEN>")){
+					let gen = Number(line.substr(8));
+					loading_symbol_message("Generation "+gen);
+					fl = true;
+				}
+				
+				if(begin(line,"<ANNEALING>")){
+					loading_symbol_message("Annealing...");
+					fl = true;
+				}
+		
+				if(begin(line,"<PROGRESS>")){
+					cha.prog = Number(line.substr(10));
+					let progmin = LARGE;
+					for(let ch2 = 0; ch2 < inter.chain.length; ch2++){
+						if(inter.chain[ch2].prog < progmin) progmin = inter.chain[ch2].prog;
+					}
+					set_loading_percent(progmin);
+					fl = true;
+				}
+					
+				if(begin(line,"<OUTPUTTING>")){
+					loading_symbol_message("Outputting...");
+					fl = true;
+				}
 			}
 			
-			if(begin(line,"<ANNEALING>")){
-				loading_symbol_message("Annealing...");
+			if(fl == false){
+				cha.lines.push(line);
 			}
-	
-			if(begin(line,"<PROGRESS>")){
-				cha.prog = Number(line.substr(10));
-				let progmin = LARGE;
-				for(let ch2 = 0; ch2 < inter.chain.length; ch2++){
-					if(inter.chain[ch2].prog < progmin) progmin = inter.chain[ch2].prog;
-				}
-				if(progmin > 0) set_loading_percent(progmin);
-			}
-		  	
-			cha.lines.push(line);
 		}
 	});
 
@@ -207,14 +238,14 @@ function funct(chi,ch)                             // Gathers output of C++ file
 /// Processes information from all chains
 function process_all_chains()
 {
+	loading_symbol_message("Processing...");
+	
 	inter.running_status = false;
 	
 	let content = inter.chain[0].content;
 	for(let ch = 1; ch < inter.chain.length; ch++){
 		content += endl+inter.chain[ch].content;
 	}
-	
-	loading_symbol_message("Processing...");
 	 
 	set_loading_percent(1);
 	start_worker("Spawn Output",{content:content});	
@@ -263,7 +294,7 @@ function add_sim_start_buts(lay)
 		
 			let yy = cy-2.5;
 			add_right_input_field(yy,"Start time",{type:"sim_t_start",update:true},lay);
-			add_right_input_field(yy+3,"End time",{type:"sim_t_end",update:true},lay);
+			add_right_input_field(yy+3.5,"End time",{type:"sim_t_end",update:true},lay);
 		}
 		
 		cy += 5;
@@ -665,7 +696,7 @@ function display_constant(i,x,y,lay,w,allow_edit,source)
 	else{
 		if(par.set == false) te = "Unset ";
 		
-		if(par.name == dist_matrix_name) te = "Distance "; 
+		if(par.dist_mat) te = "Distance "; 
 		te += par.value_desc;
 	}
 	
@@ -674,6 +705,31 @@ function display_constant(i,x,y,lay,w,allow_edit,source)
 	let ac; if(allow_edit != false) ac = "EditSimValue";
 	
 	lay.add_button({te:te, x:x+1.6, y:y+0., dx:w-x-1.6, dy:1.6, type:"ParamSimElement", source:source, font:fo, ac:ac, i:i, name:par.name, label_info:par.label_info});
+}
+
+
+/// Displays a row allowing a variable factor to be set
+function display_factor(i,x,y,lay,w,allow_edit,source)
+{
+	if(source == undefined) source = model;
+
+	let par = model.param[i];
+	
+	lay.display_param(x-par.label_info.dx-0.7,y-0.1,par.label_info);
+
+	if(par.factor_weight_on.check){
+		let te = par.weight_desc;
+	
+		let si = 1.0, fo_la = get_font(si,"","times");			
+		lay.add_button({te:"Weight =", x:x+1.8, y:y+0.3, dy:si, si:si, font:fo_la, type:"Text", col:BLACK});
+		
+		let fo = get_font(1.1,"","times");
+		
+		let ac = "EditWeightValue";
+		lay.add_button({te:te, x:x+5.9, y:y+0., dx:w-x-9.6, dy:1.6, type:"ParamSimElement", source:source, font:fo, ac:ac, i:i, name:par.name, label_info:par.label_info});
+	}
+	
+	lay.add_checkbox(w-4,y+0.3,"Weight","Weight",par.factor_weight_on,WHITE,{title:"Factor weight", te:factor_weight_text});
 }
 
 
@@ -762,30 +818,13 @@ function add_view_button(par,x,y,i,lay,source)
 {
 	if(par.set == false) return false;
 		
-	if(par.variety == "normal" || par.variety == "const"){
+	if(!par.dist_mat && (par.variety == "normal" || par.variety == "const")){
 		let pos_view = get_par_pos_view(par,source);
 		if(pos_view.length > 0){
 			lay.add_button({te:"View", source:source, x:x, y:y+0.2, dx:3.5, dy:1.2, ac:"ViewParam", type:"GreyView", i:i, pos_view:pos_view});
 			return true;
 		}
 	}
-	
-	return false;
-}
-
-
-/// Adds a distance checkbox for a matrix
-function add_distance_button(par,x,y,lay)
-{
-	/*
-	if(par.dep.length == 2){
-		let index = remove_prime(par.dep[0]);
-		if(index == remove_prime(par.dep[1])){
-			lay.add_checkbox(x+0.5,y+0.3,par,"Distance",par.dist_matrix,WHITE,{title:"Distance matrix", te:distmat_text});	
-			return true;
-		}
-	}
-	*/
 	
 	return false;
 }

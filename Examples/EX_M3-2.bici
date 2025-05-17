@@ -1,4 +1,9 @@
 
+###################### DATA DIRECTORY ######################
+
+data-dir folder="Examples\EX_M3-2-data-files"
+
+
 ####################### DESCRIPTION ########################
 
 description text="description.txt"
@@ -6,11 +11,9 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-data-dir folder="Examples\EX_M3-2-data-files"
-
 simulation start=0 end=800 timestep=0.5
 
-inference start=0 end=100 timestep=0.5
+inference start=0 end=100 timestep=0.5 nchain=3
 
 post-sim start=0 end=100
 
@@ -23,18 +26,18 @@ species name="People" type="population"
 
 class name="DS" index="d"
 
-comp name="S" color="#009900" x=-23 y=-7
-comp name="I" color="#ff2222" x=3 y=-7
-comp name="R" color="#4444ff" x=14 y=-7
+comp name="S" color="#009900" x=-19 y=0
+comp name="I" color="#ff2222" x=5 y=0
+comp name="R" color="#4444ff" x=19 y=0
 
 trans name="S->I" value="exp(rate:β({I,l}/N_l)+(λ/P)Σ_l' (M_l,l'×{I,l'}))"
 trans name="I->R" value="exp(rate:γ)"
 
-
 class name="Location" map="load" index="l" coord="latlng"
 
-comp-all color="#000099" fix="true" file="comp-Location.csv"
+view lat=41.883 lng=0 scale=8.3568
 
+comp-all color="#000099" fix="true" file="comp-Location.csv"
 
 
 # SIMULATION INITIAL CONDITIONS
@@ -46,10 +49,16 @@ init-pop-sim type="fixed" file="init-pop-sim-People.csv"
 ######################## PARAMETERS ########################
 
 param name="P" constant="8000000000"
+
 param name="β" value="0.15" prior="uniform(0,1)"
+
 param name="γ" value="0.05" prior="uniform(0,1)"
-param name="λ" value="0.0001"
+
+param name="λ" value="0.0001" prior="uniform(0,0.001)"
+
 param name="N_l" constant="constant-N.csv"
+
 param name="M_l,l'" constant="constant-M.csv"
+
 
 

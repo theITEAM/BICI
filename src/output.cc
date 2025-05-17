@@ -55,11 +55,15 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 			}
 			
 			if(command == "inf-diagnostics"){
-				flag = true;
+				if(model.mode != PPC) flag = true;
 			}
 			
 			if(command == "inf-generation"){
 				flag = true;
+			}
+			
+			if(command == "trans-diag"){
+				if(model.mode != PPC) flag = true;
 			}
 			
 			if(flag == true){
@@ -84,10 +88,6 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 		lines_raw.push_back("# OUTPUT");
 		lines_raw.push_back("");
 	}
-	
-	//trace_init();
-	
-	percent_done = UNSET;
 };
 
 
@@ -1121,15 +1121,31 @@ string Output::trace_init() const
 {
 	stringstream ss;
 	
-	ss << "State"; 
-	for(auto th = 0u; th < model.param_vec.size(); th++){
-		const auto &par = model.param_vec[th];	
+	ss << "State";
+	for(auto th = 0u; th < model.param.size(); th++){
+		const auto &par = model.param[th];
 		
-		if(model.param[par.th].trace_output == true){
-			ss << ",\"" << replace(par.name,"→","->") << "\"";
+		if(par.trace_output){
+			auto pn = replace_arrow(par.name);
+			
+			if(par.dep.size() == 0){		
+				ss << ",\"" << pn << "\"";
+			}
+			else{
+				for(auto j = 0u; j < par.N; j++){
+					ss << ",\"" << pn << "_";
+					for(auto k = 0u; k < par.dep.size(); k++){
+						const auto &dp = par.dep[k];
+						auto m = (unsigned int)(j/dp.mult)%dp.list.size();
+						if(k != 0) ss << ",";
+						ss << dp.list[m];
+					}
+					ss << "\"";
+				}
+			}
 		}
 	}
-
+	
 	for(auto i = 0u; i < model.derive.size(); i++){
 		const auto &der = model.derive[i];
 		if(der.time_dep == false){
@@ -1286,6 +1302,7 @@ void Output::param_sample(unsigned int s, unsigned int chain, const State &state
 	timer[PARAM_OUTPUT] += clock();
 }
 
+
 /// Outputs a parameter sample 
 void Output::param_sample(const Particle &part)
 {
@@ -1296,13 +1313,18 @@ void Output::param_sample(const Particle &part)
 
 /// Outputs a parameter sample 
 string Output::param_output(const Particle &part) const
-{
+{	
 	stringstream ss;
 	ss << part.s;
-	for(auto th = 0u; th < model.param_vec.size(); th++){
-		const auto &par = model.param_vec[th];
-		if(model.param[par.th].trace_output == true){
-			ss << "," << part.param_val[th];
+
+	auto value = param_value_from_vec(part.param_val); 
+	
+	for(auto th = 0u; th < model.param.size(); th++){
+		const auto &par = model.param[th];
+		if(par.trace_output){
+			for(auto j = 0u; j < par.N; j++){
+				ss << "," << value[th][j];
+			}
 		}
 	}
 		
@@ -1418,7 +1440,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 				ss << "<TRANSITIONS>" << endl;
 				// A compressed format
 				for(auto i = 0u; i < sp.tra_gl.size(); i++){
-					ss << replace(sp.tra_gl[i].name,"→","->") << ":";
+					ss << replace_arrow(sp.tra_gl[i].name) << ":";
 					
 					auto flag = false;
 					auto ti = 0u;
@@ -1526,10 +1548,10 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 							case M_TRANS_EV: case NM_TRANS_EV: 
 								{
 									const auto &trg = sp.tra_gl[ev.tr_gl];
-									if(trg.i == UNSET) ss <<  replace(trg.name,"→","->");
+									if(trg.i == UNSET) ss << replace_arrow(trg.name);
 									else{
 										const auto &tr = sp.cla[trg.cl].tra[trg.tr];
-										ss << replace(tr.name,"→","->");
+										ss << replace_arrow(tr.name);
 									}
 									
 									const auto &iif = ev.ind_inf_from;
@@ -1562,6 +1584,20 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 		default:
 			emsg("op error");
 			break;
+		}
+		
+		if(cum_diag && model.mode == INF){
+			ss << "<TRANSDISTPROB>" << endl;
+				
+			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+				ss << replace_arrow(sp.tra_gl[tr].name) << ":";
+				for(auto i = 0u; i < H_BIN; i++){
+					if(i != 0) ss << "|";
+					ss << ssp.cum_prob_dist[tr][i];
+				}
+				ss << endl;
+			}
+			ss << endl;
 		}
 	}
 	
@@ -1666,7 +1702,7 @@ vector < vector <double> > Output::param_value_from_vec(const vector <double> &p
 	value.resize(model.param.size());
 	for(auto th = 0u; th < model.param.size(); th++){
 		const auto &par = model.param[th];
-		if(par.variety != CONST_PARAM || par.factor){
+		if(par.trace_output){
 			value[th].resize(par.N,UNSET);
 		}
 	}
@@ -1675,7 +1711,31 @@ vector < vector <double> > Output::param_value_from_vec(const vector <double> &p
 	
 	for(auto i = 0u; i < model.param_vec.size(); i++){
 		const auto &mpv = model.param_vec[i];
-		value[mpv.th][mpv.index] = param_val[i]; 
+		auto th = mpv.th;
+		if(model.param[th].trace_output){
+			value[mpv.th][mpv.index] = param_val[i]; 
+		}
+	}
+	
+	// Fills in any unset values
+	for(auto th = 0u; th < model.param.size(); th++){
+		const auto &par = model.param[th];
+		if(par.trace_output){
+			for(auto j = 0u; j < par.N; j++){
+				if(value[th][j] == UNSET){
+					auto val = par.value[j].value;
+					if(val != UNSET){
+						value[th][j] = val;
+					}
+					else{
+						auto eq = par.value[j].eq_ref;
+						if(eq != UNSET){			
+							value[th][j] = model.eqn[eq].calculate_param_only(param_val);
+						}
+					}
+				}
+			}
+		}
 	}
 	
 	return value;
@@ -1708,8 +1768,8 @@ string Output::output_param(const vector < vector <double> > &value, const Parti
 	for(auto th = 0u; th < model.param.size(); th++){
 		const auto &par = model.param[th];
 		
-		if(par.variety != CONST_PARAM && par.trace_output == true){
-			ss << "\"" << replace(par.name,"→","->") << "\"";
+		if(par.trace_output){
+			ss << "\"" << replace_arrow(par.name) << "\"";
 			if(par.dep.size() == 0){
 				ss << "," << value[th][0] << endl;
 			}
@@ -1844,29 +1904,6 @@ void Output::print_individuals(unsigned int N, unsigned int p, const State &stat
 }
 
 
-/// Prints percentage done
-void Output::percentage(unsigned int val, unsigned int val2)
-{	
-	if(!com_op && op()){
-		if(percent_done == UNSET){
-			//cout << "Running: ";
-			percent_done = 0;
-		}
-		
-		auto per = 100*double(val)/val2;
-		while(percent_done <= per){
-			if(int(percent_done)%10 == 0){
-				cout << "" << percent_done << "%";
-				if(percent_done == 100){ cout << endl; return;}
-			}
-			cout << "."; 
-			cout.flush();
-			percent_done += PERCENT_STEP;
-		}			
-	}
-}
-
-
 /// Sets diagnostics
 void Output::set_diagnostics(unsigned int ch, string diag)
 {
@@ -1878,6 +1915,10 @@ void Output::set_diagnostics(unsigned int ch, string diag)
 /// Generates the final outputs
 void Output::end(string file) const
 {
+	percentage_start(OUTPUT_PER);
+		
+	if(com_op) cout << "<OUTPUTTING>" << endl;
+	
 	if(com_op == true){
 		cout << "<<OUTPUT FILE>>" << endl;
 		if(mpi.core == 0){
@@ -1900,6 +1941,8 @@ void Output::end(string file) const
 	auto nchain = model.details.nchain;
 	
 	for(auto ch = 0u; ch < nchain; ch++){
+		percentage(ch,4*nchain);
+		
 		auto part = get_part_chain(ch,param_store);
 		
 #ifdef USE_MPI	
@@ -1954,7 +1997,13 @@ void Output::end(string file) const
 		}
 	}
 	
+	auto trans_diag = trans_diag_init(); 
+	
+	auto trans_diag_on = false; if(model.mode == INF) trans_diag_on = true;
+	
 	for(auto ch = 0u; ch < model.details.nchain; ch++){
+		percentage(3*ch+nchain,4*nchain);
+
 		auto part = get_part_chain(ch,state_store);
 		
 #ifdef USE_MPI	
@@ -1963,6 +2012,8 @@ void Output::end(string file) const
 	
 		if(op() && part.size() > 0){
 			number_part(part);
+			
+			if(trans_diag_on) trans_diag_add(trans_diag,part); 
 			
 			string state_out;
 		
@@ -2010,6 +2061,32 @@ void Output::end(string file) const
 			if(com_op == true) cout << ss.str();
 			else fout << ss.str();
 		}
+	}
+	
+	if(op() && trans_diag_on){
+		auto trans_diag_out = trans_diag_output(trans_diag);
+		
+		string trans_diag_out_file;
+		
+		if(sampledir != ""){
+			trans_diag_out_file = "trans_diag.txt";
+
+			ofstream pout(sampledir+"/"+trans_diag_out_file);
+			check_open(pout,trans_diag_out_file);
+			pout << trans_diag_out;
+
+			trans_diag_out_file = "Sample/"+trans_diag_out_file;
+		}
+		else{  // Embeds output into file
+			trans_diag_out_file = "[["+endli+trans_diag_out+"]]";
+		}
+	
+		stringstream ss;
+		ss << "trans-diag file=\"" << trans_diag_out_file << "\"" << endl;
+		ss << endl;
+		
+		if(com_op == true) cout << ss.str();
+		else fout << ss.str();
 	}
 	
 	auto alg = model.details.algorithm;
@@ -2084,9 +2161,84 @@ void Output::end(string file) const
 			}
 		}
 	}
+	
+	percentage_end();
 
 	if(com_op == true) cout << "<<END>>" << endl;
 }
+
+
+/// Outputs results for trans_diag
+string Output::trans_diag_output(const vector <TransDiagSpecies> &trans_diag) const
+{
+	stringstream ss;
+	
+	auto T = model.ntimepoint-1;
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];
+		if(sp.tra_gl.size() > 0){
+			if(model.nspecies > 1) ss << "<SPECIES \"" << sp.name << "\">" << endl;
+			const auto &exp_num = trans_diag[p].exp_num;
+			auto n = trans_diag[p].n;
+			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+				ss << replace_arrow(sp.tra_gl[tr].name)  << ":";
+				for(auto ti = 0u; ti < T; ti++){
+					if(ti != 0) ss << ",";
+					ss << exp_num[tr][ti]/n;
+				}
+				ss << endl;
+			}
+		}
+	}
+	
+	return ss.str();
+}
+
+
+/// Initialises structure for trans_diag observations
+vector <TransDiagSpecies> Output::trans_diag_init() const
+{
+	auto T = model.ntimepoint-1;
+
+	vector <TransDiagSpecies> trans_diag;
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];
+		
+		TransDiagSpecies tdsp;
+		tdsp.n = 0;
+		tdsp.exp_num.resize(sp.tra_gl.size());
+		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+			tdsp.exp_num[tr].resize(T,0);
+		}
+		
+		trans_diag.push_back(tdsp);
+	}
+	
+	return trans_diag;
+}
+
+
+/// Adds results from particle onto h_bin
+void Output::trans_diag_add(vector <TransDiagSpecies> &trans_diag, const vector <Particle> &part) const
+{
+	auto T = model.ntimepoint-1;
+
+	for(const auto &pa : part){
+		for(auto p = 0u; p < model.nspecies; p++){
+			const auto &sp = model.species[p];
+		
+			const auto &exp_num = pa.species[p].exp_num; 
+			auto &exp_num_add = trans_diag[p].exp_num;
+					
+			trans_diag[p].n++;
+			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+				for(auto ti = 0u; ti < T; ti++){
+					exp_num_add[tr][ti] += exp_num[tr][ti];
+				}
+			}
+		}
+	}
+}	
 
 
 /// Gets statistics from a vector

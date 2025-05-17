@@ -396,7 +396,6 @@ void IndEvSampler::generate_ind_obs_timeline()
 	
 		if(isl == 1) emsg("Pp");
 	}
-	//emsg("do");
 }
 
 

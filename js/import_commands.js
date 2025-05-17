@@ -5,6 +5,7 @@
 function import_data_table_command(cname)
 {
 	let siminf = "inf";
+
 	switch(cname){
 	case "add-pop-sim": cname = "add-pop"; siminf = "sim"; break;
 	case "remove-pop-sim": cname = "remove-pop"; siminf = "sim"; break;	
@@ -56,7 +57,7 @@ function import_data_table_command(cname)
 			if(focal == "") spec = {radio:{value:"File"},radio2:{value:"All"}, focal:{te:""}};
 			else{
 				let cl = find_nocase(sp.cla,"name",focal);
-				if(cl == undefined) alert_import("'"+focal+"' is not a classification name");
+				if(cl == undefined) alert_import("The focal classification '"+focal+"' is not recognised");
 				else focal = sp.cla[cl].name;
 		
 				spec = {radio:{value:"File"},radio2:{value:"Focal"}, focal:{te:focal}};
@@ -85,7 +86,7 @@ function import_data_table_command(cname)
 		
 			let cl = find_nocase(sp.cla,"name",name);
 			if(cl == undefined){
-				alert_import("In 'class' the value '"+name+"' is not a classification"); 
+				alert_import("For 'class' the value '"+name+"' is not a classification"); 
 			}
 			
 			spec = {cl_drop:{te:sp.cla[cl].name}};
@@ -114,7 +115,7 @@ function import_data_table_command(cname)
 			
 			let cl = find_nocase(sp.cla,"name",name);
 			if(cl == undefined){
-				alert_import("In 'class' the value '"+name+"' is not a classification"); 
+				alert_import("For 'class' the value '"+name+"' is not a classification"); 
 			}
 		
 			spec = {cl_drop:{te:sp.cla[cl].name}};
@@ -129,7 +130,7 @@ function import_data_table_command(cname)
 			let cl_sel = get_cl_from_trans(name,p);
 		
 			if(cl_sel == undefined){
-				alert_import("Error with expression '"+name+"'"); return;
+				alert_import("For 'name' the value '"+name+"' is not recognised"); return; 
 			}
 
 			let filter = get_tag_value("filter");
@@ -160,16 +161,16 @@ function import_data_table_command(cname)
 				
 				let start = get_tag_value("start");
 				if(start == "") cannot_find_tag();
-				if(isNaN(start)) alert_import("'start' must be a number");
+				is_number(start,"start");
 				spec.time_start = start;
 				
 				let end = get_tag_value("end");
 				if(end == "") cannot_find_tag();
-				if(isNaN(end)) alert_import("'end' must be a number");
+				is_number(end,"end");
 				spec.time_end = end;
 				
 				if(Number(start) >= Number(end)){
-					alert_import("'start' must be before 'end'");
+					alert_import("The start time '"+start+"' must be before the end time '"+end+"'");
 				}
 				break;
 			
@@ -250,7 +251,7 @@ function import_data_table_command(cname)
 			let cl_sel = get_cl_from_trans(name,p);
 		
 			if(cl_sel == undefined){
-				alert_import("Error with expression '"+name+"'"); return;
+				alert_import("For 'name' the value '"+name+"' is not recognised"); return;
 			}
 
 			let filter = get_tag_value("filter");
@@ -351,7 +352,12 @@ function import_data_table_command(cname)
 				so.pop_dist = unset_prior("pop_prior");
 				
 				let prior = get_tag_value("prior").toLowerCase(); 
-				so.pop_dist = convert_text_to_prior(prior,prior_pos);
+				let pri = convert_text_to_prior(prior,prior_pos);
+				if(pri.err == true){
+					alert_import("For 'prior' error with expression '"+prior+"': "+pri.msg);
+					return;
+				}
+				so.pop_dist = pri;
 			}
 		}
 		break;
@@ -369,6 +375,8 @@ function species_command(loop)
 {
 	let name = get_tag_value("name");
 	if(name == "") cannot_find_tag();
+	
+	check_name_input(name,"Species name");
 	
 	let type = get_tag_value("type").toLowerCase();
 	if(type == "") cannot_find_tag();
@@ -406,7 +414,7 @@ function classification_command(loop)
 	let p = imp.p;
 
 	if(p == undefined){
-		alert_import("A species must be defined before a classification can be added");
+		alert_import("A species must be defined before a classification can be added",);
 	}
 		
 	let sp = model.species[p];
@@ -414,12 +422,14 @@ function classification_command(loop)
 	let name = get_tag_value("name");
 	if(name == "") cannot_find_tag();
 	
+	check_name_input(name,"Classification name");
+	
 	let clone = get_tag_value("clone");
 	if(clone != ""){                                 // Clones a classification from another species
 		if(loop == 0){
 			let p2 = find(model.species,"name",clone);
 			if(p2 == undefined){
-				alert_import("In 'clone' cannot find the species '"+clone+"'");
+				alert_import("For 'clone' cannot find the species '"+clone+"'");
 			}
 			
 			let sp2 = model.species[p2];
@@ -450,7 +460,7 @@ function classification_command(loop)
 		}	
 		
 		if(find_in(alphabet,index) == undefined){
-			alert_import("Index '"+index+"' must be from the lower case alphabet");
+			alert_import("Index '"+index+"' must be from the lowercase alphabet");
 		}
 		
 		let op = {};
@@ -475,6 +485,9 @@ function classification_command(loop)
 		}
 		
 		if(loop == 0){
+			let warn_name = model.check_name(name,[]);
+			if(warn_name) output_error(err(warn_name));
+				
 			output_error(model.add_classification(p,name,index,op));
 		
 			sp.cla[sp.ncla-1].import_line = imp.line;
@@ -522,9 +535,26 @@ function camera_command()
 {
 	let claa = get_claa(); if(claa == undefined) return;
 
+	let grid = get_tag_value("grid").toLowerCase(); 
+	if(grid == "") grid = "off";
+	if(option_error("grid",grid,["off","on"]) == true) return;
+	
+	if(create_example) grid = "on";
+	
+	claa.camera.grid = grid;
+	
+	let sc = get_tag_value("comp-scale"); 
+	if(sc == "") sc = "1";
+	is_positive(sc,"comp-scale");
+	sc = Number(sc);
+	if(sc < 0.1 || sc > 10) alert_import("For 'comp-scale' the value '"+sc+"' must be between 0.1 and 10"); 
+	claa.camera.slider.value = Math.log(sc);
+		
+	if(option_error("grid",grid,["off","on"]) == true) return;
+	claa.camera.grid = grid;
+	
 	let scale = get_tag_value("scale"); if(scale == "") cannot_find_tag();
-	if(isNaN(scale)) alert_import("'scale' must be a number"); 
-	if(scale <= 0) alert_import("'scale' must be positive");
+	is_positive(scale,"scale");
 	
 	claa.camera.set = true;
 	
@@ -535,10 +565,14 @@ function camera_command()
 		let x = get_tag_value("x"); if(x == "") cannot_find_tag();
 		let y = get_tag_value("y"); if(y == "") cannot_find_tag();
 		
-		x = Number(x)*import_scale_factor; if(isNaN(x)) alert_import("'x' must be a number");
+		is_number(x,"x");
+		x = Number(x)*import_scale_factor; 
 		
-		y = Number(y)*import_scale_factor; if(isNaN(y)) alert_import("'y' must be a number");
-			
+		is_number(y,"y");
+		y = Number(y)*import_scale_factor; 
+		
+		if(create_example){ x = 0; y = 0;}
+		
 		claa.camera.x = x;
 		claa.camera.y = y;
 		break;
@@ -546,7 +580,7 @@ function camera_command()
 	case "latlng":
 		let lat = get_tag_value("lat"); if(lat == "") cannot_find_tag();
 		let lng = get_tag_value("lng"); if(lng == "") cannot_find_tag();
-		check_latlng(lat,lng);
+		check_latlng(lat,"lat",lng,"lng");
 		
 		let p = transform_latlng(lng,lat);
 		claa.camera.x = p.x;
@@ -712,11 +746,14 @@ function compartment_command2(tags)
 				x = "auto"; y = "auto";
 			}
 			else{
-				x = get_tag_val("x",tags); if(x == "") cannot_find_tag();
-				y = get_tag_val("y",tags); if(y == "") cannot_find_tag();
+				x = get_tag_val("x",tags); if(x == ""){ cannot_find_tag(true); return;}
+				y = get_tag_val("y",tags); if(y == ""){ cannot_find_tag(true); return;}
 				
-				x = Number(x)*import_scale_factor; if(isNaN(x)) alert_import("'x' must be a number");
-				y = Number(y)*import_scale_factor; if(isNaN(y)) alert_import("'y' must be a number");
+				is_number(x,"x");
+				x = Number(x)*import_scale_factor; 
+				
+				is_number(y,"y");
+				y = Number(y)*import_scale_factor; 
 			
 				for(let i = 0; i < claa.ncomp; i++){
 					if(claa.comp[i].x == x && claa.comp[i].y == y){		
@@ -742,7 +779,7 @@ function compartment_command2(tags)
 				let lat = get_tag_val("lat",tags); if(lat == "") cannot_find_tag();
 				let lng	= get_tag_val("lng",tags); if(lng == "") cannot_find_tag();
 				
-				check_latlng(lat,lng);
+				check_latlng(lat,"lat",lng,"lng");
 				
 				let pt = transform_latlng(lng,lat);
 				
@@ -847,7 +884,7 @@ function transition_command2(tags)
 	let te = get_tag_val("name",tags); if(te == "") cannot_find_tag();
 	
 	let spl = te.split("->");
-	if(spl.length != 2){ alert_import("Expression '"+te+"' is not understood"); return;}
+	if(spl.length != 2){ alert_import("Transition name '"+te+"' is not understood. Expected format: 'Initial compartment'->'final compartment'."); return;}
 
 	let fr = spl[0].trim();
 	if(fr == "+") fr = SOURCE; 
@@ -860,13 +897,13 @@ function transition_command2(tags)
 	if(fr == SOURCE) ci = SOURCE;
 	else{
 		ci = hash_find(claa.hash_comp,fr);
-		if(ci == undefined) alert_import("Cannot find compartment '"+fr+"'");
+		if(ci == undefined) alert_import("In transition '"+te+"' cannot find compartment '"+fr+"'");
 	}
 	
 	if(to == SINK) cf = SINK;
 	else{
 		cf = hash_find(claa.hash_comp,to);
-		if(cf == undefined) alert_import("Cannot find compartment '"+to+"'");
+		if(cf == undefined) alert_import("In transition '"+te+"' annot find compartment '"+to+"'");
 	}
 	
 	let pos = dist_pos;	if(ci == SOURCE) pos = source_dist_pos;
@@ -897,10 +934,11 @@ function transition_command2(tags)
 						alert_import("The 'x' and 'y' positions must be set for the source");
 					}
 
+					is_number(x,"x");
 					x = Number(x)*import_scale_factor; 
-					if(isNaN(x)) alert_import("'x' must be a number");
+					
+					is_number(y,"y");
 					y = Number(y)*import_scale_factor; 
-					if(isNaN(y)) alert_import("'y' must be a number");
 				}
 				
 				midp.push({x:x, y:y});
@@ -917,10 +955,11 @@ function transition_command2(tags)
 				}
 
 				for(let n = 0; n < xlist.length; n++){
+					is_number(xlist[n],"mid-x");
 					xlist[n] = Number(xlist[n])*import_scale_factor; 
-					if(isNaN(xlist[n])) alert_import("'mid-x' must be a number");
+					
+					is_number(ylist[n],"mid-y");
 					ylist[n] = Number(ylist[n])*import_scale_factor; 
-					if(isNaN(ylist[n])) alert_import("'mid-y' must be a number");
 				}
 				
 				for(let n = 0; n < xlist.length; n++){
@@ -943,10 +982,11 @@ function transition_command2(tags)
 						alert_import("The 'x' and 'y' positions must be set for the sink");
 					}
 
+					is_number(x,"x");
 					x = Number(x)*import_scale_factor; 
-					if(isNaN(x)) alert_import("'x' must be a number");
+				
+					is_number(y,"y");
 					y = Number(y)*import_scale_factor; 
-					if(isNaN(y)) alert_import("'y' must be a number");
 				}
 				
 				midp.push({x:x, y:y});
@@ -959,7 +999,7 @@ function transition_command2(tags)
 			if(ci == SOURCE){
 				let lng = get_tag_val("lng",tags);
 				let lat = get_tag_val("lat",tags);
-				check_latlng(lat,lng);
+				check_latlng(lat,"lat",lng,"lng");
 				
 				let p = transform_latlng(lng,lat);
 				midp.push(p);
@@ -979,7 +1019,7 @@ function transition_command2(tags)
 				}
 
 				for(let n = 0; n < lnglist.length; n++){
-					check_latlng(latlist[n],lnglist[n]);
+					check_latlng(latlist[n],"lat-mid",lnglist[n],"lng-mid");
 					
 					let p = transform_latlng(lnglist[n],latlist[n]);
 					midp.push(p);
@@ -992,8 +1032,8 @@ function transition_command2(tags)
 			if(cf == SINK){ 
 				let lng = get_tag_val("lng",tags);
 				let lat = get_tag_val("lat",tags);
-				check_latlng(lat,lng);
-				
+				check_latlng(lat,"lat",lng,"lng");
+				 
 				let p = transform_latlng(lng,lat);
 				midp.push(p);
 			}
@@ -1004,7 +1044,9 @@ function transition_command2(tags)
 	}
 
 	let trans_def = extract_trans_def(value);
-	if(trans_def == undefined) alert_import("There is a syntax error in value '"+value+"'");
+	if(trans_def == undefined){
+		alert_import("In the expression '"+value+"' the transition distribution is incorrectly specified. Expected format: 'exp(rate:...)', 'gamma(mean:...,cv:...)', 'erlang(mean:...,shape:)', 'log-normal(mean:...,cv:...)', 'weibull(scale:...,shape:...)' or 'period(time:...)'.");
+	}
 	
 	option_error("type",trans_def.type,pos);
 
@@ -1034,7 +1076,7 @@ function transition_command2(tags)
 			let shape = trans_def.shape;
 			let num = Number(shape);
 			if(isNaN(shape) || num <= 0 || Math.round(num) != num){
-				alert_import("For an Erlang distribution the shape parameter must be a positive integer");				
+				alert_import("For an Erlang distribution the shape parameter '"+shape+"' must be a positive integer");				
 			}
 			
 			import_eqn_value(val.shape_erlang,shape);
@@ -1052,7 +1094,14 @@ function transition_command2(tags)
 		break;
 
 	case "period":
-		import_eqn_value(val.mean_eqn,trans_def.time);
+		{
+			let period = Number(trans_def.time);
+			if(isNaN(trans_def.time) || period <= 0){
+				alert_import("The period must be a positive number");				
+			}
+		
+			import_eqn_value(val.mean_eqn,trans_def.time);
+		}
 		break;
 		
 	default: error("Option not recognised 51"); break;
@@ -1081,8 +1130,8 @@ function label_command()
 	let size = get_tag_value("text-size");
 	if(size == "") size = size_annotation_default;
 	else{
+		is_number(size,"text-size");
 		size = Number(size); 
-		if(isNaN(size)) alert_import("'text-size' must be a number");
 	}
 	
 	let x, y;
@@ -1091,8 +1140,12 @@ function label_command()
 		{
 			x = get_tag_value("x"); if(x == "") cannot_find_tag();
 			y = get_tag_value("y"); if(y == "") cannot_find_tag();
-			x = Number(x)*import_scale_factor; if(isNaN(x)) alert_import("'x' must be a number");
-			y = Number(y)*import_scale_factor; if(isNaN(y)) alert_import("'y' must be a number");
+			
+			is_number(x,"x");
+			x = Number(x)*import_scale_factor; 
+			
+			is_number(y,"y");
+			y = Number(y)*import_scale_factor;
 		}
 		break;
 		
@@ -1100,7 +1153,7 @@ function label_command()
 		{
 			let lat = get_tag_value("lat"); if(lat == "") cannot_find_tag();
 			let lng = get_tag_value("lng"); if(lng == "") cannot_find_tag();
-			check_latlng(lat,lng);
+			check_latlng(lat,"lat",lng,"lng");
 		
 			let p = transform_latlng(lng,lat);
 			x = p.x;
@@ -1127,8 +1180,8 @@ function box_command()
 	let te = get_tag_value("text"); if(te == "") cannot_find_tag();
 	let size = get_tag_value("text-size"); if(size == "") size = size_annotation_default;
 	else{
+		is_number(size,"text-size");
 		size = Number(size); 
-		if(isNaN(size)) alert_import("'text-size' must be a number");
 	}
 	
 	let comps = get_tag_value("comps"); if(comps == "") cannot_find_tag();
@@ -1152,17 +1205,11 @@ function box_command()
 /// Adds an annotation map
 function map_command()
 {
+	get_claa();
 	let p = imp.p;
-	if(p == undefined){
-		alert_import("Species needs to be specified before 'map' command");
-	}
-			
 	let cl = imp.cl;
-	if(cl == undefined){
-		alert_import("Classification need to be specified before 'map' command");
-	}
 	
-	let file = get_tag_value("file"); if(file == "") cannot_find_tag();
+	let file = get_tag_value("file"); if(filev == "") cannot_find_tag();
 	
 	let res = load_annotation_map(file.te);
 	
@@ -1237,8 +1284,8 @@ function param_command2(full_name,op)
 			}
 			
 			let val = spl[1].substr(0,spl[1].length-1);
-			if(isNaN(val)) alert_import("In 'smooth' the value '"+val+"' is not a number");
-			if(Number(val) <= 0) alert_import("In 'smooth' the value '"+val+"' is not positive");
+			if(isNaN(val)) alert_import("For 'smooth' the value '"+val+"' is not a number");
+			if(Number(val) <= 0) alert_import("For 'smooth' the value '"+val+"' is not positive");
 			par.spline.smooth.value = val;
 		}
 	}
@@ -1249,6 +1296,60 @@ function param_command2(full_name,op)
 		par.comb_list = generate_comb_list(list);
 	}
 	
+	par.factor = false;
+	let fact = get_tag_value("factor");
+	if(fact != ""){
+		if(option_error("factor",fact,["true","false"]) == true) return;
+		if(fact == "true"){
+			par.factor = true;
+			par.pri_pos = prior_factor_pos;
+		}
+	}
+	
+	par.factor_weight_on = {check:false};
+	let fw = get_tag_value("factor-weight");
+	if(fw != ""){
+		if(par.factor == false){
+			alert_import("'factor-weight' can only be set if 'factor' is set to 'true'"); 
+		}
+	
+		par.factor_weight_on = {check:true};
+		
+		par.factor_weight = copy(par.value);
+		set_default_factor_weight(par);
+		
+		let tab = load_table(fw.te,true,fw.sep,fw.name);
+			
+		if(tab == undefined) return;
+		if(typeof tab == 'string') alert_import(tab);
+	
+		let col_name = copy(par.dep);
+		col_name.push("Value");
+		
+		let subtab = get_subtable(tab,col_name);
+		if(subtab.error != "") alert_import(subtab.error);
+
+		let ncol = subtab.ncol;
+	
+		for(let r = 0; r < subtab.nrow; r++){
+			let ind = [];
+			for(let i = 0; i < ncol-1; i++){
+				ind[i] = find_in(par.list[i],subtab.ele[r][i]);
+				if(ind[i] == undefined){
+					alert_import("For 'factor-weight' the element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+(r+2)+")");
+				}
+			}
+			let ele = subtab.ele[r][ncol-1];
+			let val = Number(ele);
+			
+			if(isNaN(val)){
+				alert_import("For 'factor-weight' the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+(r+2)+")");
+			}
+				
+			set_element(par.factor_weight,ind,val);
+		}	
+	}
+	
 	let cons = get_tag_value("constant"); 
 	let dist = get_tag_value("dist");	
 	let dist_split = get_tag_value("dist-split");
@@ -1256,6 +1357,7 @@ function param_command2(full_name,op)
 	let reparam = get_tag_value("reparam"); 
 	let prior = get_tag_value("prior"); 
 	let prior_split = get_tag_value("prior-split"); 
+	
 	//let dist_mat = get_tag_value("distance-matrix").toLowerCase(); 
 	//let dist_mat = "";
 
@@ -1282,22 +1384,12 @@ function param_command2(full_name,op)
 	
 	let j = 0; while(j < param_tag.length && param_tag[j].val == "") j++;
 	
-	if(par.name == dist_matrix_name){
+	if(par.dist_mat){
 		alert_import("The distance matrix '"+dist_matrix_name+"' cannot be set"); 
 	}
 	
-	//par.dist_matrix = { check:false}; 
-	//if(par.name == dist_matrix_name) par.dist_matrix.check = true;
-
 	par.reparam_eqn = "";
 	par.reparam_eqn_on = false;
-	
-	/*
-	if(dist_mat != ""){
-		if(dist_mat != "true") alert_import("'distance-matrix' must be set to 'true'");
-		par.dist_matrix.check = true;
-	}
-	*/
 	
 	if(par.dep.length == 0){
 		if(value != ""){
@@ -1319,16 +1411,16 @@ function param_command2(full_name,op)
 		if(value != "" || cons != "" || reparam != ""){
 			set_default_value(par);
 			
-			let desc = "In 'value'";
+			let desc = "For 'value'";
 			let valu = value; 
 			if(valu == ""){
 				if(cons != ""){
-					valu = cons; desc = "In 'constant'";
+					valu = cons; desc = "For 'constant'";
 					par.variety = "const";		
 				}
 				else{
 					if(reparam != ""){
-						valu = reparam; desc = "In 'reparam'";
+						valu = reparam; desc = "For 'reparam'";
 						par.variety = "reparam";		
 					}
 					else error("Problem importing");
@@ -1375,10 +1467,15 @@ function param_command2(full_name,op)
 						
 						switch(par.variety){
 						case "normal": case "const":
-							val = Number(ele);
+							if(par.factor && ele == "*"){
+								val = ele;
+							}
+							else{
+								val = Number(ele);
 						
-							if(isNaN(val)){
-								alert_import(desc+" the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+(r+2)+")");
+								if(isNaN(val)){
+									alert_import(desc+" the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+(r+2)+")");
+								}
 							}
 							break;
 						
@@ -1400,17 +1497,25 @@ function param_command2(full_name,op)
 							
 						default: error("option not recognised1"); break;
 						}
-						
+								
 						set_element(par.value,ind,val);
 					}
 				}
+				
+				let err = check_param_value("Set Param",par,par.value);
+				if(typeof err == 'string') alert_import(desc+": "+err);
 			}
 			par.set = true;
 		}
 	}
 
 	if(prior != ""){
-		par.prior = convert_text_to_prior(prior,par.pri_pos);
+		let pri = convert_text_to_prior(prior,par.pri_pos);
+		if(pri.err == true){
+			alert_import("For 'prior' error with expression '"+prior+"': "+pri.msg);
+			return;
+		}
+		par.prior = pri;
 	}
 	
 	if(prior_split != ""){
@@ -1421,7 +1526,6 @@ function param_command2(full_name,op)
 		}
 	
 		let tab = load_table(prior_split.te,true,prior_split.sep,prior_split.name);
-		//let tab = load_table_from_file(prior_split);
 		if(tab == undefined) return;	
 		if(typeof tab == 'string') alert_import(tab);
 		
@@ -1444,7 +1548,7 @@ function param_command2(full_name,op)
 			
 			let pri = convert_text_to_prior(subtab.ele[r][ncol-1],par.pri_pos);
 			if(pri.err == true){
-				alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not valid (col '"+subtab.heading[ncol-1]+"', row "+(r+2)+"). "+pri);
+				alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not a valid prior specification (col '"+subtab.heading[ncol-1]+"', row "+(r+2)+"). "+pri);
 			}
 			
 			set_element(par.prior_split,ind,pri);
@@ -1452,14 +1556,13 @@ function param_command2(full_name,op)
 	}
 	
 	if(dist != ""){
-		par.prior = convert_text_to_prior(dist,par.pri_pos,true);
-			
-		let pri = par.prior;
-		par.variety = "dist";
-		
+		let pri = convert_text_to_prior(dist,par.pri_pos,true);
 		if(pri.err == true){
-			alert_import("Error loading prior '"+dist+"'");
+			alert_import("For 'dist' error with expression '"+dist+"': "+pri.msg);
+			return;
 		}
+		par.prior = pri;
+		par.variety = "dist";
 	}
 	
 			
@@ -1498,7 +1601,7 @@ function param_command2(full_name,op)
 			
 			let pri = convert_text_to_prior(subtab.ele[r][ncol-1],par.pri_pos,true);
 			if(pri.err == true){
-				alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not valid (col '"+subtab.heading[ncol-1]+"', row "+(r+2)+"). "+pri);
+				alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not a valid distribution specification (col '"+subtab.heading[ncol-1]+"', row "+(r+2)+"). "+pri);
 			}
 			
 			set_element(par.prior_split,ind,pri);
@@ -1524,6 +1627,7 @@ function param_command2(full_name,op)
 	par.full_name = param_name(par);
 
 	get_reparam_param_list(par);
+	
 	get_prior_param_list(par);
 	
 	model.param.push(par);
@@ -1537,9 +1641,14 @@ function derived_command()
 	let eqn_name = get_tag_value("eqn"); if(eqn_name == "") cannot_find_tag();
 	
 	let eqn1 = create_equation(full_name,"derive_param");
-	if(eqn1.warn.length > 0) alert_import("In 'name': "+eqn1.warn[0].te);
+	if(eqn1.warn.length > 0) alert_import("For 'name': "+eqn1.warn[0].te);
 	if(eqn1.param.length != 1){
 		alert_import("'name' must contain a single paramter");
+	}
+	else{
+		let name = eqn1.param[0].name;
+		if(name == "D") alert_import("Name 'D' is reserved for the distance matrix");
+		if(name == "t") alert_import("Name 't' is reserved for time");
 	}
 
 	let eqn2 = create_equation(eqn_name,"derive_eqn");
@@ -1554,26 +1663,24 @@ function simulation_command()
 {
 	let details = model.sim_details;
 	
-	let start = get_tag_value("start"); 
+	let start = get_tag_value("start");
+	if(start != "") is_number(start,"start");
 	details.t_start = start;
 	
 	let end = get_tag_value("end"); 
+	if(end != "") is_number(end,"end");
 	details.t_end = end;
 	
 	if(details.t_start != "" && details.t_end != ""){
 		if(Number(details.t_start) >= Number(details.t_end)){
-			alert_import("'start' must before 'end'");
+			alert_import("The start time '"+start+"' must be before the end time '"+end+"'");
 		}
 	}
 	
 	let num = get_tag_value("number").toLowerCase();
 	if(num == "") num = SIM_NUM_DEFAULT;
-	let numf = Number(num);
-	
-	if(isNaN(num) || numf != Math.floor(numf) || numf <= 0){ 
-		alert_import("'number' must be a positive integer"); 
-	}
-	details.number = num;
+	is_pos_int(num,"number")
+	details.number = Number(num);
 	
 	details.seed_on = {value:"No"};
 	details.seed = SEED_DEFAULT;
@@ -1591,7 +1698,7 @@ function simulation_command()
 	else{
 		let dt = Number(dt_str);
 		if(isNaN(dt_str) || dt <= 0){
-			alert_import("'timestep' must be a positive number");
+			alert_import("For 'timestep' the value '"+dt_str+"' must be a positive number");
 		}
 		details.timestep = dt;
 	}
@@ -1608,14 +1715,16 @@ function inference_command()
 	let details = model.inf_details;
 	
 	let start = get_tag_value("start"); 
+	if(start != "") is_number(start,"start");
 	details.t_start = start;
 	
 	let end = get_tag_value("end"); 
+	if(end != "") is_number(end,"end");
 	details.t_end = end;
 	
 	if(details.t_start != "" && details.t_end != ""){
 		if(Number(details.t_start) >= Number(details.t_end)){
-			alert_import("'start' must before 'end'");
+			alert_import("The start time '"+start+"' must be before the end time '"+end+"'");
 		}
 	}
 	
@@ -1634,11 +1743,8 @@ function inference_command()
 	let dt_str = get_tag_value("timestep");
 	if(dt_str == "") details.timestep = "";
 	else{
-		let dt = Number(dt_str);
-		if(isNaN(dt_str) || dt <= 0){
-			alert_import("'timestep' must be a positive number");
-		}
-		details.timestep = dt;
+		is_positive(dt_str,"timestep");
+		details.timestep = Number(dt_str);
 	}
 	
 	details.indmax = check_pos_integer("ind-max",INDMAX_DEFAULT);
@@ -1690,7 +1796,7 @@ function inference_command()
 		if(burnin_str != ""){
 			let burnin = Number(burnin_str);
 			if(isNaN(burnin) || burnin < 1 || burnin > 90){
-				alert_import("'burnin-percent' must be a number between 1 and 90");
+				alert_import("For 'burnin-percent' the value '"+burnin_str+"' must be a number between 1 and 90");
 				return;		
 			}
 			details.burnin_frac = burnin_str;
@@ -1708,13 +1814,8 @@ function inference_command()
 			case "scan":
 				{
 					let rate_str = get_tag_value("rate");
-					if(rate_str != ""){				
-						let rate = Number(rate_str);
-						if(isNaN(rate) || rate <= 0){
-							alert_import("'rate' must be a positive number");
-							return;		
-						}
-					
+					if(rate_str != ""){		
+						is_positive(rate_str,"rate");
 						details.anneal_rate = rate_str;
 					}
 				}
@@ -1724,14 +1825,7 @@ function inference_command()
 				{
 					let power_str = get_tag_value("power");
 					if(power_str != ""){
-						//if(power_str == ""){ cannot_find_tag(); return;}
-					
-						let power = Number(power_str);
-						if(isNaN(power) || power <= 0){
-							alert_import("'power' must be a positive number");
-							return;		
-						}
-					
+						is_positive(power_str,"power");
 						details.anneal_power = power_str;
 					}
 				}
@@ -1749,7 +1843,10 @@ function inference_command()
 		ppc.ppc_t_end = details.t_end;
 	}
 	
-	get_tag_value("diagnostics");
+	let diag = get_tag_value("diagnostics").toLowerCase();
+	if(diag != ""){
+		if(option_error("diagnostics",diag,["on","off"]) == true) return;
+	}
 }
 
 
@@ -1775,19 +1872,16 @@ function post_sim_command()
 		
 	if(details.ppc_t_start != "" && details.ppc_t_end != ""){
 		if(Number(details.ppc_t_start) >= Number(details.ppc_t_end)){
-			alert_import("'start' must before 'end'");
+			alert_import("The start time '"+start+"' must be before the end time '"+end+"'");
 		}
 		if(Number(end) > Number(details.t_end)) details.t_end = end;
 	}
 	
 	let num = get_tag_value("number").toLowerCase();
 	if(num == "") num = PPC_NUM_DEFAULT;
-	let numf = Number(num);
 	if(set_default) num = PPC_NUM_DEFAULT;
 	
-	if(isNaN(num) || numf != Math.floor(numf) || numf <= 0){ 
-		alert_import("'number' must be a positive integer"); 
-	}
+	is_pos_int(num,"number");
 	details.number = num;
 	
 	details.seed_on = {value:"No"};
@@ -1817,7 +1911,7 @@ function check_pos_integer(te,def)
 	
 	let num = Number(value);
 	if(isNaN(value) || num <= 0 || num != Math.floor(num)){
-		alert_import("'"+te+"' must be a positive integer");
+		alert_import("For '"+te+"' the value '"+value+"' must be a positive integer");
 	}
 	return num;
 }
@@ -1832,7 +1926,7 @@ function check_percent(te,def)
 	
 	let num = Number(value);
 	if(isNaN(value) || num < 0 || num > 100){
-		alert_import("'"+te+"' must be between 0 and 100");
+		alert_import("For '"+te+"' the value '"+value+"' must be between 0 and 100");
 	}
 	return num;
 }
@@ -1846,7 +1940,7 @@ function check_pos_number(te,def)
 	
 	let num = Number(value);
 	if(isNaN(value) || num <= 0 || num >= 100){
-		alert_import("'"+te+"' must be between 0 and 100, exclusive");
+		alert_import("For '"+te+"' the value '"+value+"' must be between 0 and 100, exclusive");
 	}
 	return num;
 }
@@ -1861,7 +1955,7 @@ function check_zero_one(te,def)
 	
 	let num = Number(value);
 	if(isNaN(value) || num <= 0 || num > 1){
-		alert_import("'"+te+"' must be between zero and one");
+		alert_import("For '"+te+"' the value '"+value+"' must be between zero and one");
 	}
 	return num;
 }
@@ -1976,7 +2070,7 @@ function ind_effect_command()
 				for(let c = 0; c < tab.ncol; c++){
 					let ele = tab.ele[r][c];
 					if(isNaN(ele)){
-						alert_import(in_file_text(tab.filename)+"the element '"+ele+"' is not a number (row "+(r+2)+", col "+(c+1)+")");
+						alert_import(in_file_text(tab.filename)+" the element '"+ele+"' is not a number (row "+(r+2)+", col "+(c+1)+")");
 					}
 					val[r][c] = Number(ele);
 				}
@@ -2007,8 +2101,8 @@ function ind_effect_command()
 /// Displays text referencing a file/table
 function in_file_text(te)
 {
-	if(te == "inline") return "In table '[[...]]' ";
-	return "In file '"+te+"' ";
+	if(te == "inline") return "In table '[[...]]'";
+	return "In file '"+te+"'";
 }
 
 
@@ -2039,7 +2133,7 @@ function fixed_effect_command()
 			X_vector.ind_list.push(subtab.ele[r][0]);
 			let val = tab.ele[r][1];
 			if(isNaN(val)){
-				alert_import(in_file_text(tab.filename)+"the element '"+val+"' is not a number (row "+(r+2)+")");
+				alert_import(in_file_text(tab.filename)+" the element '"+val+"' is not a number (row "+(r+2)+")");
 			}
 			X_vector.X_value.push(val);
 		}
@@ -2139,7 +2233,7 @@ function load_obs_model(spec)
 	case "poisson": spec.obs_error_dist = {value:"Poisson"}; break;
 	case "neg-binomial": spec.obs_error_dist = {value:"Negative binomial"}; break;
 	default:
-		alert_import("Observation error '"+spl[0]+"' not recognised");
+		alert_import("For 'error' the observation error '"+spl[0]+"' not recognised. It must be chosen from the following options: 'normal', 'poisson' or 'neg-binomial'.");
 		break;
 	}
 	
@@ -2152,7 +2246,7 @@ function load_obs_model(spec)
 	switch(spec.obs_error_dist.value){
 	case "Normal":
 		{
-			if(spl.length != 2) alert_import("Problem with expression '"+error+"'");
+			if(spl.length != 2) alert_import("For 'error' problem with expression '"+error+"'");
 	
 			let val = spl[1].trim();
 		
@@ -2164,11 +2258,11 @@ function load_obs_model(spec)
 					spec.obs_error = {value:"percent"};
 					spec.percent = val.substr(0,val.length-1);
 					if(isNaN(spec.percent)){
-						alert_import("The expression '"+spec.percent+"' is not a percentage");
+						alert_import("For 'error' the expression '"+spec.percent+"' is not a percentage");
 					}
 					
 					if(Number(spec.percent) <= 0){
-						alert_import("The value '"+spec.percent+"%' must be a positive percentage");
+						alert_import("For 'error' the value '"+spec.percent+"%' must be a positive percentage");
 					}
 				}	
 				else{
@@ -2176,11 +2270,11 @@ function load_obs_model(spec)
 					spec.sd = val;
 					
 					if(isNaN(spec.sd)){
-						alert_import("The expression '"+spec.sd+"' must be a number or a percentage");
+						alert_import("For 'error' the expression '"+spec.sd+"' must be a number or a percentage");
 					}
 					
 					if(Number(spec.sd) <= 0){
-						alert_import("The value '"+spec.sd+"' must be positive");
+						alert_import("For 'error' the value '"+spec.sd+"' must be positive");
 					}
 				}
 			}
@@ -2188,12 +2282,12 @@ function load_obs_model(spec)
 		break;
 		
 	case "Poisson":
-		if(spl.length != 1) alert_import("Problem with expression '"+error+"'");
+		if(spl.length != 1) alert_import("For 'error' problem with expression '"+error+"'");
 		break;
 	
 	case "Negative binomial":
 		{
-			if(spl.length != 2) alert_import("Problem with expression '"+error+"'");
+			if(spl.length != 2) alert_import("For 'error' problem with expression '"+error+"'");
 	
 			let val = spl[1].trim();
 		
@@ -2205,11 +2299,11 @@ function load_obs_model(spec)
 				spec.p = val;
 					
 				if(isNaN(spec.p)){
-					alert_import("The expression '"+spec.p+"' must be a number");
+					alert_import("For 'error' the expression '"+spec.p+"' must be a number");
 				}
 				
 				if(Number(spec.p) <= 0 || Number(spec.p) >= 1){
-					alert_import("The value '"+spec.p+"' must be between zero and one");
+					alert_import("For 'error' the value '"+spec.p+"' must be between zero and one");
 				}
 			}
 		}
@@ -2231,18 +2325,18 @@ function get_filt_from_str(filter,p)
 			let spl2 = spl[j].split("=");
 		
 			if(spl2.length != 2){ 
-				alert_import("In 'filter' error understanding '"+filter+"'"); 
+				alert_import("For 'filter' error understanding '"+filter+"'"); 
 				return;
 			}
 			
 			if(spl2[0] == ""){
-				alert_import("In 'filter' the value '"+filter+"' does not specify a classification");
+				alert_import("For 'filter' the value '"+filter+"' does not specify a classification");
 				return;
 			}
 			
 			let cl = find_nocase(sp.cla,"name",spl2[0]);
 			if(cl == undefined){ 
-				alert_import("In 'filter' the value '"+spl2[0]+"' is not a classification"); 
+				alert_import("For 'filter' the value '"+spl2[0]+"' is not a classification"); 
 				return;
 			}
 			let claa = sp.cla[cl];
@@ -2262,7 +2356,7 @@ function get_filt_from_str(filter,p)
 						
 					let c = hash_find(claa.hash_comp,spl4[0]);
 					if(c == undefined){ 
-						alert_import("In 'filter' the value '"+spl3[k]+"' is not a compartment in '"+spl2[0]+"'"); 
+						alert_import("For 'filter' the value '"+spl3[k]+"' is not a compartment in '"+spl2[0]+"'"); 
 						return;
 					}
 					
@@ -2285,7 +2379,7 @@ function get_filt_from_str(filter,p)
 				
 					for(let k = 0; k < spl3.length; k++){
 						if(spl3[k] == ""){
-							alert_import("In 'filter' the classification '"+spl2[0]+"' is not set");
+							alert_import("For 'filter' the classification '"+spl2[0]+"' is not set");
 							return;
 						}
 						
@@ -2402,9 +2496,9 @@ function inf_diagnostics_command()
 	if(file == "") cannot_find_tag();
 	
 	let chain = get_chain_value();
-	//pr(chain
+	
 	inf_result.diagnostics[chain] = file.te;
-	inf_result.diagnostics_on = true;
+	inf_result.prop_diag_on = true;
 }
 
 
@@ -2447,4 +2541,14 @@ function post_sim_state_command()
 	if(file == "") cannot_find_tag();
 	
 	read_state_samples_file(0,file,ppc_result);
+}
+
+
+/// Reads in transition diagnostic information
+function trans_diag_command()
+{
+	let file = get_tag_value("file");
+	if(file == "") cannot_find_tag();
+	
+	read_trans_diag(file,inf_result);
 }

@@ -37,6 +37,7 @@ function add_bubble_buts(lay)
 	case "ShowModel":
 		{
 			let ex = bu.mod_but;
+			
 			cont.dx = 14;
 			bubble_addtitle(cont,"Model used",{});
 			let pic = find_pic(ex.pic);
@@ -147,8 +148,9 @@ function add_bubble_buts(lay)
 			bubble_addscrollable(cont,{type:"filterpos", ymax:10});
 		
 			if(subsubtab_name() == "Populations"){		
+				cont.y += 0.3;
 				bubble_addcheckbox(cont,0,"Calculate fraction",bub.popfilt.filter.fraction);
-				cont.y += 0.4;
+				cont.y += 0.1;
 			}
 			
 			add_end_button(cont,"Delete","RemoveFilter",{num:bu.num, p: bu.filter.p, rpf:bub.popfilt.rpf});	
@@ -168,7 +170,14 @@ function add_bubble_buts(lay)
 				bubble_addparagraph(cont,"<b>GR:</b> "+bu.stat.GR,0,cont.dx);
 			}
 			else{
-				bubble_addparagraph(cont,"<b>Value:</b> "+bu.value,0,cont.dx);
+				if(bu.CImin){
+					bubble_addparagraph(cont,"<b>Mean:</b> "+bu.value,0,cont.dx);
+					bubble_addparagraph(cont,"<b>CI min:</b> "+bu.CImin,0,cont.dx);
+					bubble_addparagraph(cont,"<b>CI max:</b> "+bu.CImax,0,cont.dx);
+				}
+				else{
+					bubble_addparagraph(cont,"<b>Value:</b> "+bu.value,0,cont.dx);
+				}
 			}
 			cont.y += 0.2;
 			bubble_addparagraph(cont,"<b>x:</b> <e>"+bu.labels.xlab[bu.i]+"</e>",0,cont.dx);
@@ -249,8 +258,26 @@ function add_bubble_buts(lay)
 			bubble_colour(cont);
 			cont.y += 0.3;
 			
-			let co = model.species[bu.p].cla[bu.cl].comp[bu.i];
+			let claa = model.species[bu.p].cla[bu.cl];
 		
+			let co = claa.comp[bu.i];
+	
+			if(claa.camera.grid == "on" && (co.type == "box" || co.type == "latlng")){
+				cont.lay.add_button({te:"Coordinates:", x:0, y:cont.y, dx:cont.dx, dy:0.8, type:"InputBoxName"});
+			
+				let te;	
+				if(co.type == "box"){
+					te = "x: "+co.x+",  y: "+co.y;
+				}
+				else{
+					let p = transform_latlng_inv(co.x,co.y,claa.camera,lay);
+					te = "latitude: "+p.lat.toPrecision(5)+",  longitude: "+p.lng.toPrecision(5);
+				}
+				let tab = 5;
+				bubble_addparagraph(cont,te,tab,cont.dx-tab);
+				cont.y += 0.3;
+			}
+			
 			if(co.choose_branch == true){
 				bubble_addcheckbox(cont,-0.1,"Add branching probability",bub.checkbox);
 			}
@@ -374,7 +401,7 @@ function add_bubble_buts(lay)
 
 			case "period":
 				mean_fl = true;
-				bubble_input(cont,"Time:",{type:"trans_mean", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+				bubble_input(cont,"Time:",{type:"trans_period", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
 				break;
 			}
 		
@@ -509,7 +536,6 @@ function add_bubble_buts(lay)
 	
 			case "ImportModel":
 				{
-					pr(bub.mode+" mode");
 					switch(bub.mode){
 					case "LoadComps":
 						{
@@ -643,6 +669,7 @@ function add_bubble_buts(lay)
 			case "IndEffData": ind_eff_data_bubble(cont,"add"); break;
 			case "IndGroupData": ind_group_data_bubble(cont,"add"); break;
 			case "SetConstant": set_constant_bubble(cont); break;
+			case "SetFactor": set_factor_bubble(cont); break;
 			case "SetReparam": set_reparam_bubble(cont); break;
 			case "SetDistribution": set_distribution_bubble(cont); break;
 			case "SetDerived": set_derived_bubble(cont); break;
@@ -735,6 +762,20 @@ function add_bubble_buts(lay)
 		cont.dx = 10;
 		bubble_addtitle(cont,"Edit constant",{te:editconstparam_text});
 		bubble_input(cont,"Value:",{type:"element_param_const", pindex:bu.pindex});
+		add_end_button(cont,"Done","Done");	
+		break;
+		
+	case "ParamFactorConst":
+		cont.dx = 10;
+		bubble_addtitle(cont,"Edit factor",{te:editfactor_text});
+		bubble_input(cont,"Value:",{type:"element_factor_const", pindex:bu.pindex});
+		add_end_button(cont,"Done","Done");	
+		break;
+		
+	case "ParamWeightConst":
+		cont.dx = 10;
+		bubble_addtitle(cont,"Edit weight",{te:editweight_text});
+		bubble_input(cont,"Value:",{type:"element_weight_const", pindex:bu.pindex});
 		add_end_button(cont,"Done","Done");	
 		break;
 		
@@ -887,6 +928,11 @@ function add_bubble_buts(lay)
 				alpha_fl = true; 
 				break;
 			
+			case "mdir":
+				bubble_input(cont,"Sigma:",{type:str+"sigma", val:bu.i, eqn:ae});
+				alpha_fl = true; 
+				break;
+				
 			case "flat":
 				break;
 				
@@ -1507,7 +1553,10 @@ function add_bubble_scrollable_buts(lay)
 	case "pop list": cy = population_scrollable(lay); break;
 	case "poptrans list": cy = poptrans_scrollable(lay); break;
 	case "annotation": cy = annotation_scrollable(lay); break;
-	case "param sel": cy = param_sel_scrollable(lay); break;
+	case "const param sel": cy = param_sel_scrollable(lay,"const"); break;
+	case "reparam param sel": cy = param_sel_scrollable(lay,"reparam"); break;
+	case "dist param sel": cy = param_sel_scrollable(lay,"dist"); break;
+	case "fac param sel": cy = param_sel_scrollable(lay,"fac"); break;
 	case "trans param sel": cy = param_sel_scrollable(lay,"trans"); break;
 	case "param details": cy = param_details_scrollable(lay); break;
 	case "combine IE": cy = combineIE_scrollable(lay); break;
@@ -1657,8 +1706,6 @@ function bubble_check_error()
 						bub.check_warning = "At least one transition must be selected";
 						return true;
 					}
-					
-					
 				}
 				break;
 			}
@@ -1761,6 +1808,14 @@ function bubble_colour(cont,tab)
 			cont.y -= 0.1;
 		}
 	}
+}
+
+
+/// Shifts the bubble to ensure it is within view
+function shift_bubble(dx,dy,lay,pa,pb,pc)
+{
+	lay.x += dx; pa.x += dx; pb.x += dx; pc.x += dx;
+	lay.y += dy; pa.y += dy; pb.y += dy; pc.y += dy;
 }
 
 
@@ -1953,6 +2008,13 @@ function setup_bubble_back(cont)
 	default: error("Option not recognised 12"); break;
 	}
 	
+	let mar_l = 1.5, mar_r = 0.5;
+	let mar_u = 1.3, mar_d = 1.3;
+	if(lay.x-mar_l < menu_width) shift_bubble(menu_width-(lay.x-mar_l),0,lay,pa,pb,pc);
+	if(lay.x+lay.dx+mar_r > page_char_wid) shift_bubble(page_char_wid-(lay.x+lay.dx+mar_r),0,lay,pa,pb,pc);
+	if(lay.y-mar_u < 0) shift_bubble(0,-(lay.y-mar_u),lay,pa,pb,pc);
+	if(lay.y+lay.dy+mar_d > page_char_hei) shift_bubble(0,page_char_hei-(lay.y+lay.dy+mar_d),lay,pa,pb,pc);
+
 	let xref = back_lay.x, yref = back_lay.y;
 	
 	let back_bu = back_lay.but[0];
@@ -2176,6 +2238,37 @@ function select_bubble_compartment(p,cl,i)
 	
 	let j = 0;
 	while(j < bu.length && !((bu[j].type == "Compartment" || bu[j].type == "CompLatLng") && bu[j].i == i)) j++;
+	if(j == bu.length){ error("Problem selecting"); return;}
+	
+	let x = bu[j].x, y = bu[j].y;
+	
+	let mar = 2;
+	
+	// Recenters camera if outside range
+	if(x < mar || x > lay.dx-mar || y < mar || y > lay.dy-mar){  
+		let cam = model.species[p].cla[cl].camera;
+		let co = model.species[p].cla[cl].comp[i];
+		
+		cam.x = co.x; cam.y = co.y;
+	}
+	
+	select_bubble(lay_name,j);
+	generate_screen();
+}
+
+
+/// Selects a given transition in the model
+function select_bubble_box(p,cl,i)
+{
+	change_page({pa:"Model",su:"Compartments",susu:p,sususu:cl});
+	
+	let lay_name = "Annotation";
+	let lay = get_lay(lay_name);
+	
+	let bu = lay.but;
+
+	let j = 0;
+	while(j < bu.length && !(bu[j].type == "Box" && bu[j].i == i)) j++;
 	if(j == bu.length){ error("Problem selecting"); return;}
 	
 	let x = bu[j].x, y = bu[j].y;

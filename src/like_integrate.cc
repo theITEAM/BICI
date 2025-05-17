@@ -23,7 +23,7 @@ double State::like_integrate(const vector <double> &param_value)
 		const auto &sp = model.species[p];
 		
 		auto N = sp.individual.size();
-		cout << N << "N\n";
+		cout << N << endl;
 		for(auto i = 0u; i < N; i++){
 			
 		}

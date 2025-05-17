@@ -33,10 +33,28 @@ bool LocalChange_ord (LocalChange lc1, LocalChange lc2)
 
 
 /// Calculates the likelihood change associated with a local change 
-Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_change, int dir)
+Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_change, int dir, bool &ill)
 {
+	Like like_ch;
+	
 	const auto &sp = model.species[p];
 	auto &ssp = species[p];
+	
+	// Makes sure change is legal
+	ill = false;
+	for(const auto &lc : local_change){
+		switch(lc.type){
+		case REMOVE_EVENT:
+			if(dir == 1){ if(ssp.trans_num[lc.tr][lc.ti] == 0){ ill = true; return like_ch;}}
+			break;
+
+		case ADD_EVENT:
+			if(dir == -1){ if(ssp.trans_num[lc.tr][lc.ti] == 0){ ill = true; return like_ch;}}
+			break;
+		
+		default: break;
+		}
+	}
 	
 	if(false){
 		for(auto &lc : local_change){
@@ -67,8 +85,6 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 			}
 		}
 	}
-	
-	Like like_ch;
 	
 	if(local_change.size() == 0) emsg("No change");
 	

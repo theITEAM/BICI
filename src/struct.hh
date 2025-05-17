@@ -415,7 +415,7 @@ struct Param {                     // Stores a model parameter
 	bool sim_sample;                 // Set to true if value sampled from the distribution (simulation)
 	ParamVariety variety;            // Determines the variety of parameter	
 	unsigned int N;                  // The number of elements in the parameter
-	bool trace_output;               // Determines if parameter is output (if not too big)
+	bool trace_output;               // Determines if parameter is output (if not too big and not constant)
 	vector <EquationInfo> value;     // Different values (if parameter has dependency)
 	vector <bool> use;               // Determines if specific parameter is used	
 	vector <Prior> prior;            // Different priors for different elements of the parameter
@@ -426,12 +426,17 @@ struct Param {                     // Stores a model parameter
 	bool factor;                     // Set if parameter is a param_mult
 	unsigned int param_mult;         // If the parameter is multiplied by a factor this is th
 	bool used;                       // Determines if param used in model
+	bool not_set;                    // Detemines if not set
+
+	bool cat_factor;                 // Set if parameter is a categorical factor
+	bool cat_factor_weight_on;       // Determines if there is a weight factor
+	vector <double> weight;          // Different weights given to categories
 };
 
 struct CompGlTransGroup {          // Information about transitions from a compartment (in a cl)
 	bool branch;                     // Whether branching happens
 	bool all_branches;               // Determines if all branches are specified
-	bool markov;                     // Set is all transitions leaving are rates
+	bool markov;                     // Set if all transitions leaving are rates
 	vector <unsigned int> tr_list;   // References global transitions leaving compartment group
 };
 
@@ -770,7 +775,6 @@ struct Individual {                // Stores information about an individual
 	vector <double> exp_fe;          // Expoential of individual fixed effect values e^(X*fe)
 	vector <PopnumIndRef> popnum_ind_ref; // References popnum_ind (for transtree)
 	vector <IncompNMTransRef> incomp_ref; // Stores incomplete transitions [cl]
-	unsigned int num_trig_data;      // The number of data trig event still remaining (simulation, used to ensure individual stays alive)
 	bool init_c_set;                 // Determines if the individual compartment set
 	
 	// Only used during simulation
@@ -869,6 +873,7 @@ struct ObsData {
 	unsigned int c_exact;            // The value of c (if known precisely)
 	vector <EquationInfo> c_obs_prob_eqn; // Equation giving the probability of being in compartment
 	vector <bool> eqn_zero;          // Set to true if the equation is zero
+	bool not_alive;                  // Set to true if compartmental observation is not alive
 	vector <unsigned int> obs_eqn_ref;// References the observation equation
 	unsigned int cl;                 // The classification
 	EquationInfo Se_eqn;             // Stores the Se observation equation
@@ -906,6 +911,8 @@ struct IndData {                   // Stores data on individuals
 	bool move_needed;                // Determines if individual move events
 	unsigned int enter_ref;          // References enter compartment probability
 	bool init_c_set;                 // Determines if the init individual compartment set
+	double tmin;                     // The minimum time for data
+	double tmax;                     // The maximim time for data
 };
 
 struct WarnData {                  // Stores warning messages
@@ -1031,11 +1038,18 @@ struct PopTransData {              // Stores information about a population tran
 	bool time_vari;                  // Determines if time varying
 };
 
+struct TransDiagSpecies {          // Stores expected number of transitions based on model
+	vector < vector <double> > exp_num;// [tgl][ti]
+	unsigned int n;                  // The number which have been added
+};
+
 struct ParticleSpecies {           // Store the species state is a particle     
 	InitCondValue init_cond_val;     // The initial state
 	vector < vector <double> > trans_num; // Transition numbers (for population-based)
 	vector <Individual> individual;  // Individuals (for individual-based)
 	unsigned int nindividual;        // The number of individuals (used for trace plots)
+	vector < vector <double> > exp_num;// Expected number of transitions [trg][ti]
+	vector < vector <unsigned int> > cum_prob_dist;// Cumulative probability distribution [trg][b]
 };
 
 struct TransTreeStats {            // Stores statistics about transmission tree
@@ -1572,3 +1586,25 @@ struct Stat {                      // Statistics
 	double CImin;                    // Credible interval
 	double CImax;
 };
+
+struct MeanSD {                    // Stores the mean and stadard deviation for a distribution
+	double mean;
+	double sd;
+};
+
+struct TRange {                    // Stores a time range
+	double tmin;
+	double tmax;
+};
+
+struct ListMove {                  // Stores a list and a corresponding move
+	vector <unsigned int> list;
+	vector <bool> move;
+};
+
+struct EventMove {                 // Used for reordering event for multi-event proposal
+	double t;
+	unsigned int e;
+	bool move;
+};	
+
