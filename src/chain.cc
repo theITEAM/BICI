@@ -1132,7 +1132,7 @@ void Chain::check_join_proposal()
 					fl = true;
 					prop.on = true;
 					if(on_st[i] == false){
-						cout << "RE TURN ON: " << prop.name << endl;
+						if(pl) cout << "RE TURN ON: " << prop.name << endl;
 						prop.update_sampler(cor_matrix);
 						prop.calculate_affect_spline(); 
 					}
