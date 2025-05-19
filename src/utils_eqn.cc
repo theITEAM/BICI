@@ -190,7 +190,7 @@ string basic_equation_check(string &te)
 				else{
 					auto tex = te.substr(ist+1,i-ist-1);
 					if(type == "pop"){
-						emg = check_valid_name(tex,"population"); if(emg != "") return emg;
+						//emg = check_valid_name(tex,"population"); if(emg != "") return emg;
 					}
 
 					if(type == "ie"){
