@@ -1798,7 +1798,7 @@ double StateSpecies::sum_markov_prob(double t1, double t2, unsigned int c, unsig
 	if(c != UNSET){
 		tr_gl_cor = sp.tra_gl[tr_gl].transform[c];
 	}
-	
+
 	const auto &tra_cor = sp.tra_gl[tr_gl_cor];
 	
 	auto &entr = en[tr_gl_cor];

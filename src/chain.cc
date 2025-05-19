@@ -1148,7 +1148,7 @@ void Chain::check_join_proposal()
 	for(auto i = 0u; i < proposal.size(); i++){
 		auto &prop = proposal[i];
 		if(on_st[i] && prop.on == false){
-			cout << "REMOVE: " << prop.name << endl;
+			if(pl) cout << "REMOVE: " << prop.name << endl;
 		}
 	}
 	
@@ -1158,7 +1158,7 @@ void Chain::check_join_proposal()
 	
 	for(auto j = pr_st; j < proposal.size(); j++){
 		auto &prop = proposal[j];
-		cout << "JOIN ADD: " << prop.name << endl;
+		if(pl) cout << "JOIN ADD: " << prop.name << endl;
 		prop.update_sampler(cor_matrix);
 		prop.calculate_affect_spline(); 
 	}
