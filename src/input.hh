@@ -108,7 +108,6 @@ class Input                                // Stores information about the model
 		vector <CommandLine> extract_command_line(vector <string> lines);
 		void load_data_files(vector <CommandLine> &command_line);
 		string remove_escape_char(string te);
-		void convert_folder(string &data_dir) const;
 		CommandLine get_command_tags(string trr, unsigned int line_num);
 		CommandLine syntax_error() const;
 		void alert(string st);
@@ -282,6 +281,7 @@ class Input                                // Stores information about the model
 		void check_dt(const Details &details);
 		void add_param_cat_factor(Param &par);
 		void load_reparam_eqn(string te, Param &par);
+		string get_data_dir(string data_dir);
 		
 		// In 'input_check.cc'
 		void check_initial_pop_error(bool end);

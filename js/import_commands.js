@@ -539,8 +539,6 @@ function camera_command()
 	if(grid == "") grid = "off";
 	if(option_error("grid",grid,["off","on"]) == true) return;
 	
-	if(create_example) grid = "on";
-	
 	claa.camera.grid = grid;
 	
 	let sc = get_tag_value("comp-scale"); 
@@ -570,8 +568,6 @@ function camera_command()
 		
 		is_number(y,"y");
 		y = Number(y)*import_scale_factor; 
-		
-		if(create_example){ x = 0; y = 0;}
 		
 		claa.camera.x = x;
 		claa.camera.y = y;

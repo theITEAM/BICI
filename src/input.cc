@@ -520,12 +520,10 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 		if(command_line[j].command == DATA_DIR){
 			for(auto k = 0u; k < command_line[j].tags.size(); k++){
 				const auto &tag = command_line[j].tags[k];
-				if(tag.name == "folder") data_dir = tag.value;
+				if(tag.name == "folder") data_dir = get_data_dir(tag.value);
 			}
 		}
 	}
-	
-	convert_folder(data_dir);
 	
 	for(auto j = 0u; j < command_line.size(); j++){
 		const auto &cl = command_line[j];
@@ -599,24 +597,6 @@ string Input::remove_escape_char(string te)
 	}
 	
 	return te;
-}
-
-
-/// Converts folder to linux format
-void Input::convert_folder(string &data_dir) const
-{
-	if(begin_str(data_dir,"M:/Github")){
-		data_dir = "/nfs/home/cpooley/Github"+data_dir.substr(9);
-	}
-	
-/*
-#ifdef WINDOWS
-#else
-
-	
-	//data_dir = replace(data_dir,"\\","/");
-#endif
-*/
 }
 
 

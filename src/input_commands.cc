@@ -1010,8 +1010,8 @@ void Input::datadir_command()
 {
 	datadir = get_tag_value("folder"); if(datadir == ""){ cannot_find_tag(); return;}
 	
-	convert_folder(datadir);
-
+	datadir = get_data_dir(datadir);
+	
 	if(check_char_allowed(datadir,"<>\"|?*") == false) return;
 
 	struct stat st;

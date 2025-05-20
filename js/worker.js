@@ -274,22 +274,15 @@ function process(e)
 		break;
 
 	case "Spawn Output":
-		import_file(info.content,false);
+		import_file(info.content,"Execute/init.bici",false);
 		break;
 
 	case "Load Default": 
-		{
-			let te = load_file_http("D:/AI temp/test.bici");
-			import_file(te,true);
-		}
+		load_bici("D:/AI temp/test.bici")
 		break;
 		
-		
 	case "Load Example": 
-		{
-			let te = load_file_http("../Examples/"+info+".bici");
-			import_file(te,true);
-		}
+		load_bici("../Examples/"+info+".bici");
 		break;
 		
 	case "Copy simulated":
@@ -648,18 +641,16 @@ function process(e)
 	case "Import output":
 		{
 			let fi = "M:/Github/theITEAM/BICI/Execute/init.bici";
-			if(ver =="windows") fi = "C:/Users/cpooley/Desktop/BICI_release/BICI_v0.3_windows/Execute/init.bici";
-			let te = load_file_http(fi);
+			if(ver =="windows" && !win_linux){
+				fi = "C:/Users/cpooley/Desktop/BICI_release/BICI_v0.3_windows/Execute/init.bici";
+			}
 			percent(2)
-			import_file(te,true);
+			load_bici(fi);
 		}
 		break;
 
 	case "Import output2":
-		{
-			let te = load_file_http("D:/Execute/init.bici");
-			import_file(te,true);
-		}
+		load_bici("D:/Execute/init.bici");
 		break;
 		
 	case "Combine IE":

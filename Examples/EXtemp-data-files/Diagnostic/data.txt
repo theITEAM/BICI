@@ -1,0 +1,10 @@
+SPECIES: People
+ENTER:
+
+Population filter:
+Population data:
+
+Pop Trans filter:
+Pop Trans data:
+
+Observation equation:

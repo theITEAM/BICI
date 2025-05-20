@@ -1,7 +1,12 @@
-prob1: parameter a not being estimated correctly
+- prob1: parameter a not being estimated correctly
+- Mac post-sim not working
+- Add exp(mean:)
+- Relative path for data_dir
+
+
 
 Write to Aiden
-Write to margo
+
 
 
 TO DO §

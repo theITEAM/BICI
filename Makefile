@@ -3,8 +3,8 @@
 #CXX = mpicxx
 CXX = mpic++
 #CXXFLAGS = -O3 -std=c++11  -fmax-errors=3 -g -Wall -Wextra 
-#CXXFLAGS = -O3 -std=c++14  -fmax-errors=3 -g  -Wall
-CXXFLAGS = -O3 -std=c++14  -fmax-errors=3 -Wall
+CXXFLAGS = -O3 -std=c++14  -fmax-errors=3 -g  -Wall
+#CXXFLAGS = -O3 -std=c++14  -fmax-errors=3 -Wall
 #CXXFLAGS = -O3 -std=c++11  -fmax-errors=3 -Wall -Wextra 
 
 #CXX = mpicxx
@@ -33,7 +33,7 @@ bici-para: $(OBJECTS)
 	cp bici-para ..
 
 clean:
-	rm *.o bici-para *.d
+	rm src/*.o bici-para 
 
 -include $(OBJECTS:.o=.d)
 

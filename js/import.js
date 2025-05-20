@@ -63,8 +63,9 @@
 let imp = {};                                      // Stores information as import is done
 
 /// Import a script to define (or partially define) model and data 
-function import_file(te,clear_results)                                
+function import_file(te,file,clear_results)                                
 {		
+pr(file+" fii");
 	import_te = te;
 
 	percent(5);
@@ -76,7 +77,7 @@ function import_file(te,clear_results)
 	imp.script = [];
 	for(let j = 0; j < lines.length; j++) imp.script.push({line:j, te:lines[j]});
 	
-	let pro = process_lines(lines);
+	let pro = process_lines(lines,file);
 	
 	load_data_files(pro);
 
@@ -788,7 +789,7 @@ function get_claa()
 
 
 /// Processes the lines to extract file information and formats commands
-function process_lines(lines)
+function process_lines(lines,file)
 {
 	let formatted=[];
 	let processed=[];
@@ -874,7 +875,14 @@ function process_lines(lines)
 		}
 		
 		if(command_line != undefined){
-			if(command_line.type == "data-dir") data_dir = command_line.tags[0].value;
+			if(command_line.type == "data-dir"){
+				data_dir = command_line.tags[0].value;
+				if(!data_dir.includes(":") && file != ""){ // This is a relative path					
+					let root = find_root(file);
+					data_dir = root+data_dir;
+					data_dir = data_dir.replace(/\\/g,"/");
+				}
+			}
 		}
 		
 		formatted.push({line:imp.line, te:trr});
@@ -920,7 +928,7 @@ function load_data_files(pro)
 
 								if(pro.data_dir == undefined) alert_import("The 'data-dir' command must be set");
 								let full_name = pro.data_dir+"/"+file;
-							
+								
 								let te = load_file_http(full_name,"import");
 								if(te == "") alert_import("The file '"+filename(file)+"' does not exist or is empty.",cl.line);
 						 

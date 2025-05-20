@@ -58,7 +58,7 @@ function create_output_file(save_type,map_store)
 		te = remove_escape_char(te);	
 		let	lines = te.split('\n');
 		
-		let pro = process_lines(lines);
+		let pro = process_lines(lines,"");
 		
 		post({formatted:pro.formatted,  param:strip_heavy(model.param), species:strip_heavy(model.species)});
 	}
@@ -122,9 +122,10 @@ function mini_banner(name)
 /// Generates details
 function create_output_details(save_type,file_list,one_file)
 {
-	let te = banner("DATA DIRECTORY");
-	
+	let te = "";
+
 	if(save_type == "export"){
+		te += banner("DATA DIRECTORY");
 		te += 'data-dir folder="."'+endl;
 		te += endl;
 	}
@@ -244,7 +245,7 @@ function create_output_compartments(p,file_list,map_store,one_file)
 				te += 'view '+output_coords(cam.x,cam.y,cam);
 				
 				if(cam.grid == "on"){
-					if(!create_example) te += ' grid="on"'; 
+					te += ' grid="on"'; 
 				}
 				
 				if(cam.slider.value != 0){

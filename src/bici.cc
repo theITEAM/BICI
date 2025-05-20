@@ -13,6 +13,8 @@
 
 // ssh cpooley@gaia.bioss.ac.uk    azog.bioss.ac.uk
 
+// git clone https://github.com/theITEAM/BICI.git
+
 // Different commands
 // -ch=0 / -chain=0                           Runs the zeroth chain
 // -samp=0                                    Sets how sampling is done (for diagnostic purposes)
@@ -22,6 +24,7 @@
 
 // Test: valgrind --leak-check=yes -s ./bici-para Execute/init.bici sim
 // Test: valgrind --leak-check=yes -s ./bici-para Execute/init.bici inf
+// Test:  valgrind --leak-check=yes -s  ./bici-para simple_model.bici inf
 
 // Compiling for windows: .\make.bat from the directory D:\C_complier_BICI2.0\bin
 

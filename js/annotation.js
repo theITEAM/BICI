@@ -363,10 +363,6 @@ function set_camera(p,cl)
 	
 	let cam = claa.camera;
 
-	if(create_example){
-		cam.grid = "on"; if(cam.coord == "cartesian") return;
-	}
-	
 	let box = get_model_box(p,cl); if(box.unset) return;
 	
 	cam.x = 0.5*(box.xmin+box.xmax); cam.y = 0.5*(box.ymin+box.ymax);

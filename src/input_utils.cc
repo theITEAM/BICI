@@ -1690,3 +1690,12 @@ void Input::load_reparam_eqn(string te, Param &par)
 	}	
 }
 
+
+/// Gets the data directory
+string Input::get_data_dir(string data_dir)
+{
+	if(!includes(data_dir,":")){
+		data_dir = find_root(input_file)+data_dir;
+	}
+	return data_dir;
+}

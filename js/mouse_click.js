@@ -1798,7 +1798,7 @@ function button_action(bu,action_type)
 				
 					switch(det.run_local.value){
 					case "Yes":
-						if(det.algorithm.value == "PAS-MCMC" && 
+						if(!win_linux && det.algorithm.value == "PAS-MCMC" && 
 						   Number(det.npart) != Number(det.part_per_core)){ 
 							alert_help("Problem starting...","The PAS-MCMC algorithm can only be run on a single core on the local machine.\nThis can be achieved by setting 'Particle per core' (under 'Further options') to the number of particles '"+det.npart+"'.");
 						}

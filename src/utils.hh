@@ -159,6 +159,7 @@ string replace_arrow(string te);
 void percentage(double val, double val2);
 void percentage_start(PercentType type, unsigned int gen=UNSET);
 void percentage_end();	
+string find_root(string file);
 	
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);

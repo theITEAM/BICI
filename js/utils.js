@@ -941,4 +941,21 @@ function apply_filter(rpf2,i,name)
 }
 
 
+/// Finds the root for a file name
+function find_root(file)
+{
+	let i = file.length-1; 
+	while(i >= 0 && file.substr(i,1) != "\\" && file.substr(i,1) != "/") i--;
+
+	return file.substr(0,i+1);
+}
+
+
+/// Finds the local file for a file name
+function find_file(file)
+{
+	let i = file.length-1; 
+	while(i >= 0 && file.substr(i,1) != "\\" && file.substr(i,1) != "/") i--;
+	return file.substr(i+1);
+}
 

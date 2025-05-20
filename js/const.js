@@ -10,10 +10,12 @@ let ver="windows";         // Determines platform
 //let ver="mac";
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
-const create_example = false;                     // Set if creating example (false)
 const turn_off_random_seed = false;               // Used in testing (false)
-const debug = false;                              // Determines if debugger used (false)
-const testing = false;                            // Used logo to load up results (false)
+let debug = false;                                // Determines if debugger used (false)
+let testing = false;                              // Used logo to load up results (false)
+
+let win_linux = true;                             // When working on win running linux 
+if(win_linux){ testing = true; debug = true;}
 
 let make_file = false;                            // Determines if makes file or runs
 let thick_line = false;                           // Used for making figures

@@ -64,7 +64,16 @@ function saving_done()
 
 /// Starts a simulation or inference 
 function start(siminf)
-{		
+{
+	if(win_linux){
+		setTimeout(function(){ 
+			stop_loading_symbol();
+			alert_help("Model saved!"); 
+			generate_screen();
+		}, 10);
+		return;
+	}
+	
 	start_loading_symbol(0,"Spawn");
 
 	inter.running_status = true;
@@ -101,7 +110,6 @@ function get_seed_not_set(siminf)
 /// Starts execution of C++ code
 function startspawn(ch,nchain,siminf)                                    
 {	
-
 	let seed_not_set = get_seed_not_set(siminf);
 
 	inter.chain[ch] = { done:false, siminf:siminf, term:false, prog:0, leftover:"", lines:[]};

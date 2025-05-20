@@ -358,6 +358,7 @@ worker.onmessage = function (e)
 		case "Start": case "StartPPC":
 			{
 				model_updated(ans);
+		
 				inter.save_type = ans.save_type;
 				if(check_memory(ans)){
 					start_spawn(ans.file_list);

@@ -67,12 +67,12 @@ function load_fi(file,file_type,heading,format,op)
 		load_compartment_map(te);
 		break;
 	
-	case "BICI_file": 
-		import_file(te,true); 
+	case "BICI_file":
+		import_file(te,op.path,true); 
 		break;
 		
 	case "Import file": 
-		import_file(te,true); 
+		import_file(te,op.path,true); 
 		break;
 	
 	case "A matrix":
@@ -190,6 +190,7 @@ function A_matrix_loaded(tab,p,i)
 /// Loads a table from text
 function load_table(te,head,sep,filename)
 {
+	pr(filename+" file");
 	let file_simp = cut_path(filename);
 	
 	te.replace(/\r/g,"");
@@ -1453,7 +1454,7 @@ function extract_text_samples(siminf,type,result)
 	let nchain = 1; if(result.chains) nchain = result.chains.length;
 	
 	let lines = result.import_te.split("\n");
-	let pro = process_lines(lines);
+	let pro = process_lines(lines,"");
 	
 	let te="";
 	for(let i = 0; i < pro.processed.length; i++){
@@ -1500,4 +1501,12 @@ function extract_text_samples(siminf,type,result)
 	te = add_escape_char(te);
 	
 	return te;
+}
+
+
+/// Loads up a bici file
+function load_bici(file)
+{
+	let te = load_file_http(file);
+	import_file(te,file,true);
 }

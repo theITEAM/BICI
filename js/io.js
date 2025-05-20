@@ -26,10 +26,12 @@ function load_file()
 {
 	let value = ById("fileToLoad").value;	
 	let fileToLoad = ById("fileToLoad").files[0];
+
 	if(!fileToLoad){ alertp("Could not load this file."); return;}
 	
 	data.filename = fileToLoad.name;
-	
+	//data.path = fileToLoad.path;
+	//pr(filename+" fi name");
 	ById("fileToLoad").value="";
 	
 	let op ={ file:fileToLoad, type:inter.file_type};
@@ -46,6 +48,8 @@ function load_file()
 		op.p = inter.p_cl_store.p;
 		op.cl = inter.p_cl_store.cl;
 	}
+	
+	op.path = fileToLoad.path;
 	
 	start_worker("Load File",op);
 }
@@ -97,22 +101,14 @@ function save_bici(filename)
 	
 	let dir;
 	if(filename != undefined && file_list.length > 1 && inter.file_store.save_type == "export"){
-		let k = filename.length-1; while(k > 0 && filename.substr(k,1) != ".") k--;
-		if(k == 0) error("Cannot find '.'");
-		else dir = filename.substr(0,k)+"-data-files";
+		let root = find_root(filename);
+		let file_local = find_file(filename);
 		
-		if(create_example){
-			let root = "M:\\Github\\theITEAM\\BICI\\";
-			let root2 = "C:\\Users\\cpooley\\Desktop\\BICI_release\\";
-			if(begin(dir,root) || begin(dir,root2)){
-				let i = 0; while(i < dir.length-7 && dir.substr(i,7) != "Example") i++;
-				if(i == dir.length-7) error("Could not find directory");
-				else dir = dir.substr(i);  
-			}
-		}
-		else{
-			dir = dir.replace(/\\/g,"/");
-		}
+		let k = file_local.length-1; while(k > 0 && file_local.substr(k,1) != ".") k--;
+		if(k == 0) error("Cannot find '.'");
+		else dir = file_local.substr(0,k)+"-data-files";
+	
+		dir = dir.replace(/\\/g,"/");
 		
 		let te = file_list[file_list.length-1].data;
 		let na= 'data-dir folder="."';
@@ -123,6 +119,9 @@ function save_bici(filename)
 			
 			file_list[file_list.length-1].data = te.substr(0,i)+dir+te.substr(i+1);
 		}
+		
+		root = root.replace(/\\/g,"/");
+		dir = root+dir;
 	}
 	
 	inter.file_store.filename = filename;
