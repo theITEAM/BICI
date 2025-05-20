@@ -30,8 +30,7 @@ function load_file()
 	if(!fileToLoad){ alertp("Could not load this file."); return;}
 	
 	data.filename = fileToLoad.name;
-	//data.path = fileToLoad.path;
-	//pr(filename+" fi name");
+
 	ById("fileToLoad").value="";
 	
 	let op ={ file:fileToLoad, type:inter.file_type};
@@ -212,7 +211,6 @@ function export_table_content(filename)
 	
 	let te = "";
 
-pr(inter.layer[l].name+" "+name);
 	switch(inter.layer[l].name){
 	case "TableContent":
 		export_table(filename);
@@ -283,7 +281,6 @@ pr(inter.layer[l].name+" "+name);
 	case "CreateEditAmatrixContent":
 		{
 			let A = inter.edit_Amatrix;
-			pr(A);
 			for(let i = 0; i < A.ind_list.length; i++){
 				if(i != 0) te += ",";
 				te += A.ind_list[i];

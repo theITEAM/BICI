@@ -532,8 +532,12 @@ function extract_trans_def(value)
 	switch(spl[0].toLowerCase()){
 	case "exp":
 		{
-			rate = get_prop(value,"rate:","end");
-			if(rate != undefined) type = "exponential";
+			let rate_temp = get_prop(value,"rate:","end");
+			if(rate_temp != undefined){ type = "exp(rate)"; rate = rate_temp;}
+			else{
+				let mean_temp = get_prop(value,"mean:","end");
+				if(mean_temp != undefined){ type = "exp(mean)"; mean = mean_temp;}
+			}
 		}
 		break;
 		

@@ -10,6 +10,7 @@ function generate_screen(update)
 		let tree = na.split("->");
 		if((tree[0] == "Model" && tree[1] == "Parameters") ||
 			(tree[0] == "Simulation" && tree[1] == "Parameters") ||
+			(tree[0] == "Simulation" && tree[1] == "Initial Conditions") ||
 			(tree[0] == "Inference" && tree[1] == "Prior") ||
 			(tree[0] == "Inference" && tree[1] == "Data") ||
 			(tree[0] == "Post. Simulation" && tree[1] == "Parameter Mult.") ||

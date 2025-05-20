@@ -1009,6 +1009,7 @@ double IndEvSampler::get_indfac(const Individual &ind, const MarkovEqn &mar_eqn)
 	auto val = 1.0;
 	for(auto ie : mar_eqn.ind_eff_mult) val *= ind.exp_ie[ie];
 	for(auto fe : mar_eqn.fix_eff_mult) val *= ind.exp_fe[fe];
+	if(!mar_eqn.rate) val = 1/val;
 	
 	return val;
 }
@@ -1087,7 +1088,7 @@ double IndEvSampler::calculate_nm_rate(const Individual &ind, unsigned int m, in
 	}
 	
 	switch(nmt.type){
-	case EXP_RATE: emsg("Should not be here"); break;
+	case EXP_RATE: case EXP_MEAN: emsg("Should not be here"); break;
 
 	case GAMMA: case ERLANG: case LOG_NORMAL: case PERIOD: 
 		{
@@ -1100,6 +1101,13 @@ double IndEvSampler::calculate_nm_rate(const Individual &ind, unsigned int m, in
 		{
 			const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
 			return bp*eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+		}
+		break;
+		
+	case EXP_MEAN_NM:
+		{
+			const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
+			return bp/eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
 		}
 		break;
 	

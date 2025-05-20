@@ -166,11 +166,9 @@ const print_line_factor = 3;                       // Increase in line thickness
 const sim_param_not_needed = ["Se","Sp","mut_rate","seq_var","trans_prob","comp_prob","derive_param"];
 const inf_param_not_needed = ["derive_param"];
 
-//const dist_pos = ["exponential","gamma","erlang","log-normal","weibull"];
-const dist_pos = ["exponential","gamma","erlang","log-normal","weibull","period"];
-
-const exp_dist_pos = ["exponential","erlang"];
-const source_dist_pos = ["exponential"];
+const dist_pos = ["exp(rate)","exp(mean)","gamma","erlang","log-normal","weibull","period"];
+const exp_dist_pos = ["exp(rate)","exp(mean)","erlang"];
+const source_dist_pos = ["exp(rate)","exp(mean)"];
 const prior_pos = ["uniform","exp","normal","gamma","log-normal","beta","bernoulli","fix"];
 const prior_factor_pos = ["mdir"];
 const prior_pos_positive = ["uniform","exp","gamma","log-normal","fix"];

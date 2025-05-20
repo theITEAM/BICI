@@ -183,7 +183,7 @@ void Input::determine_branching() const
 					const auto &trr = claa.tra[tr];
 					if(trr.i == c){
 						list.push_back(tr);
-						if(trr.type != EXP_RATE) flag = true;
+						if(trr.type != EXP_RATE && trr.type != EXP_MEAN) flag = true;
 					}
 				}
 				
@@ -484,7 +484,8 @@ void Input::create_markov_eqn()
 	for(auto e = 0u; e < model.eqn.size(); e++){
 		auto &eqn = model.eqn[e];
 	
-		if(eqn.type == TRANS_RATE || eqn.type == SOURCE_RATE){
+		switch(eqn.type){
+		case TRANS_RATE: case TRANS_MEAN: case SOURCE_RATE: case SOURCE_MEAN:
 			if(eqn.sp_p == UNSET) alert_import("Equation problem"); 
 			else{
 				auto &sp = model.species[eqn.sp_p];
@@ -493,13 +494,13 @@ void Input::create_markov_eqn()
 				
 				MarkovEqn me; 
 				me.eqn_ref = e; 
-			
+				me.rate = true;	if(eqn.type == TRANS_MEAN || eqn.type == SOURCE_MEAN) me.rate = false;
 				me.time_vari = eqn.time_vari;
 				me.infection_trans = eqn.infection_trans;
 				
 				const auto &eq = model.eqn[e];	
 				me.source = false; 
-				if(eq.type == SOURCE_RATE){
+				if(eq.type == SOURCE_RATE || eq.type == SOURCE_MEAN){
 					me.source = true;	
 					me.source_tr_gl = eq.source_tr_gl;
 				}
@@ -511,6 +512,9 @@ void Input::create_markov_eqn()
 		
 				sp.markov_eqn.push_back(me);
 			}
+			break;
+			
+		default: break;
 		}
 	}
 	
@@ -520,7 +524,7 @@ void Input::create_markov_eqn()
 		
 		for(auto &tr : sp.tra_gl){
 			tr.markov_eqn_ref = UNSET;
-			if(tr.type == EXP_RATE){
+			if(tr.type == EXP_RATE || tr.type == EXP_MEAN){
 				auto e = tr.dist_param[0].eq_ref; if(e == UNSET) emsg_input("Prob1");
 				const auto &eq = model.eqn[e];
 				auto mef = eq.markov_eqn_ref; if(mef == UNSET) emsg_input("Prob2");
@@ -693,6 +697,8 @@ void Input::global_comp_trans_init()
 						tr_gl.f = ff;
 						tr_gl.erlang_hidden = tr.erlang_hidden;
 						tr_gl.type = tr.type;
+						tr_gl.ev_type = M_TRANS_EV;
+						if(tr.type != EXP_RATE && tr.type != EXP_MEAN) tr_gl.ev_type = NM_TRANS_EV;
 						tr_gl.variety = tr.variety;
 						tr_gl.branch = tr.branch;
 						tr_gl.all_branches = tr.all_branches;
@@ -769,7 +775,7 @@ void Input::global_comp_trans_init()
 				tlg.markov = true;
 				if(tlg.branch == true) tlg.markov = false;
 				for(auto tr : tlg.tr_list){
-					if(sp.tra_gl[tr].type != EXP_RATE) tlg.markov = false;
+					if(sp.tra_gl[tr].type != EXP_RATE && sp.tra_gl[tr].type != EXP_MEAN) tlg.markov = false;
 				}
 			}
 		}
@@ -1042,7 +1048,7 @@ void Input::check_nm_pop()
 		const auto &sp = model.species[p];
 	
 		for(const auto &tr : sp.tra_gl){
-			if(tr.type != EXP_RATE){
+			if(tr.type != EXP_RATE && tr.type != EXP_MEAN){
 				for(const auto &dp : tr.dist_param){
 					const auto &eq = model.eqn[dp.eq_ref];
 					for(auto &pop : eq.pop_ref){
@@ -1068,7 +1074,7 @@ void Input::check_nm_pop()
 }
 
 
-/// Divides an Erland distribution into multiple compartments
+/// Divides an Erlang distribution into multiple compartments
 void Input::create_population_erlang()
 {
 	for(auto p = 0u; p < model.nspecies; p++){
@@ -1142,9 +1148,9 @@ void Input::source_equation_comp()
 		const auto &sp = model.species[p];
 		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 			const auto &tra = sp.tra_gl[tr];
-			if(tra.type == EXP_RATE){
+			if(tra.type == EXP_RATE || tra.type == EXP_MEAN){
 				auto &eq = model.eqn[tra.dist_param[0].eq_ref];
-				if(eq.type == SOURCE_RATE){
+				if(eq.type == SOURCE_RATE || eq.type == SOURCE_MEAN){
 					eq.source_tr_gl.push_back(tr);
 				}
 			}
@@ -1336,7 +1342,7 @@ void Input::create_nm_trans()
 		
 			auto type = trg.type;
 		
-			if(type == EXP_RATE){
+			if(type == EXP_RATE || type == EXP_MEAN){
 				trg.nm_trans_ref = UNSET;
 			}
 			else{	
@@ -1378,9 +1384,10 @@ void Input::create_nm_trans()
 				
 				// Finds how individual factor alter the rate (used in individual sampling)
 				switch(type){
-				case EXP_RATE: emsg_input("Should not be here"); break;
+				case EXP_RATE: case EXP_MEAN: emsg_input("Should not be here"); break;
 				
 				case GAMMA: case ERLANG: case LOG_NORMAL: case PERIOD: case WEIBULL:
+				case EXP_MEAN_NM:
 					{
 						const auto &eq = model.eqn[nmtra.dist_param_eq_ref[0]];
 						
@@ -1665,7 +1672,7 @@ void Input::create_markov_comp_gl()
 				for(auto cl = 0u; cl < sp.ncla; cl++){
 					for(const auto &tgl :  co.tra_leave_group[cl].tr_list){
 						const auto &tr = sp.tra_gl[tgl];
-						if(tr.type == EXP_RATE){
+						if(tr.type == EXP_RATE || tr.type == EXP_MEAN){
 							if(tr.markov_eqn_ref == UNSET) emsg_input("Should not be unset4");
 							co.me_ref.push_back(tr.markov_eqn_ref);
 						}
@@ -1765,7 +1772,7 @@ void Input::create_island()
 									auto me = trg.markov_eqn_ref;
 									if(me == UNSET){
 										switch(trg.type){
-										case EXP_RATE:
+										case EXP_RATE: case EXP_MEAN:
 											emsg_input("Should not be unset5");
 											break;
 										default:
@@ -2581,7 +2588,11 @@ void Input::source_rate_divide() const
 							auto fac = 1.0/val.tr_gl.size();
 							for(auto j : val.tr_gl){
 								auto &trg  = sp.tra_gl[j];
-								trg.dist_param[0].te = to_string(fac)+"*("+val.rate+")";
+								switch(trg.type){
+								case EXP_RATE: trg.dist_param[0].te = to_string(fac)+"*("+val.rate+")"; break;
+								case EXP_MEAN: trg.dist_param[0].te = "("+val.rate+")/"+to_string(fac); break;
+								default: emsg("Source not exponential"); break;
+								}
 							}
 						}
 					}
@@ -2783,7 +2794,7 @@ void Input::markov_bp_convert()
 				for(auto tr = 0u; tr < claa.ntra; tr++){
 					const auto &tra = claa.tra[tr];
 					if(tra.i == c && tra.branch == true){
-						if(tra.type != EXP_RATE) flag = true;	
+						if(tra.type != EXP_RATE && tra.type != EXP_MEAN) flag = true;	
 						if(tra.bp_set != BP_SET) flag = true;
 						else{
 							auto st = tra.bp.te;
@@ -2808,7 +2819,13 @@ void Input::markov_bp_convert()
 							tra.bp_set = BP_UNSET;
 							auto bp_te = tra.bp.te;
 							if(tra.all_branches) bp_te = "("+tra.bp.te+")/("+div+")";
-							tra.dist_param[0].te = "("+bp_te+")*("+tra.dist_param[0].te+")";
+							
+							if(tra.type == EXP_RATE){
+								tra.dist_param[0].te = "("+bp_te+")*("+tra.dist_param[0].te+")";
+							}
+							else{
+								tra.dist_param[0].te = "("+tra.dist_param[0].te+")/("+bp_te+")";
+							}
 							tra.bp.te = "";
 						}
 						auto &co = claa.comp[c];
@@ -2821,6 +2838,11 @@ void Input::markov_bp_convert()
 							if(tra.type == EXP_RATE){
 								tra.type = EXP_RATE_NM;
 								tra.dist_param[0].type = TRANS_NM_RATE;
+							}
+							
+							if(tra.type == EXP_MEAN){
+								tra.type = EXP_MEAN_NM;
+								tra.dist_param[0].type = TRANS_NM_MEAN;
 							}
 						}					
 					}
@@ -2838,7 +2860,9 @@ void Input::setup_trans_infection()
 		for(auto &tra : sp.tra_gl){
 			auto &inf = tra.infection;
 			if(inf.type == TRANS_INFECTION){
-				if(tra.type != EXP_RATE) alert_line("This infection transition must be Markovian.",tra.line_num);
+				if(tra.type != EXP_RATE && tra.type != EXP_MEAN){
+					alert_line("This infection transition must be Markovian.",tra.line_num);
+				}
 				const auto &eqn = model.eqn[tra.dist_param[0].eq_ref];
 				if(eqn.linearise.on != true) alert_line("For transmission trees the rate must be linearly expressed in terms of populations.",tra.line_num);
 			}
@@ -3207,7 +3231,7 @@ void Input::set_joint_param_event()
 		const auto &sp = model.species[p];
 		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 			const auto &tra = sp.tra_gl[tr];
-			if(tra.type != EXP_RATE){
+			if(tra.type != EXP_RATE && tra.type != EXP_MEAN){
 				const auto &eq = model.eqn[tra.dist_param[0].eq_ref];
 				
 				for(const auto &pref : eq.param_ref){
@@ -3926,13 +3950,13 @@ void Input::set_sink_exist()
 }
 
 
-/// Sets if ind_eff exist in equations (used for 
+/// Sets if ind_eff exist in equations 
 void Input::set_eqn_ind_eff_exist()
 {
 	for(auto &eqn : model.eqn){
 		switch(eqn.type){
-		case BP: case SOURCE_RATE: case TRANS_MEAN: case TRANS_RATE: 
-		case TRANS_NM_RATE: case TRANS_SHAPE: case TRANS_SCALE: case TRANS_CV:
+		case BP: case SOURCE_RATE: case SOURCE_MEAN: case TRANS_RATE: case TRANS_MEAN: 
+		case TRANS_NM_RATE: case TRANS_NM_MEAN: case TRANS_SHAPE: case TRANS_SCALE: case TRANS_CV:
 			{
 				auto p = eqn.sp_p;
 				if(p == UNSET) emsg_input("Species is unset"); 

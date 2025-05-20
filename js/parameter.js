@@ -672,7 +672,7 @@ function update_model_ind_eff(ielist)
 	
 		if(sp.type == "Population" && sp.ind_eff_group.length > 0){
 			let name = sp.ind_eff_group[0].ie_list[0].name;
-			model.warn.push({mess:"Cannot have individual effects", mess2:"A population-based model cannot have individual effects such as '["+name+"]']", warn_type:"Equation"});
+			model.warn.push({mess:"Cannot have individual effects", mess2:"A population-based model cannot have individual effects such as '["+name+"]'", warn_type:"Equation"});
 		}
 	}
 }
@@ -1683,13 +1683,13 @@ function find_equation_list(all_param)
 				}
 				
 				if(val.mean_eqn != undefined){
-					if(all_param == true || traa.type == "gamma" || traa.type == "erlang" || traa.type == "log-normal" ||  traa.type == "period"){
+					if(all_param == true || traa.type == "exp(mean)" || traa.type == "gamma" || traa.type == "erlang" || traa.type == "log-normal" ||  traa.type == "period"){
 						add_equation_to_list(eqn_list,val.mean_eqn,eqn_info);
 					}
 				}
 				
 				if(val.rate_eqn != undefined){
-					if(all_param == true || traa.type == "exponential"){
+					if(all_param == true || traa.type == "exp(rate)"){
 						add_equation_to_list(eqn_list,val.rate_eqn,eqn_info);
 					}
 				}

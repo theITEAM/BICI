@@ -563,12 +563,18 @@ void StateSpecies::rate_store_init()
 		trate.bp_on = false;
 		const auto &mar_eqn = sp.markov_eqn[i];
 		for(auto ie : mar_eqn.ind_eff_mult){
-			IndFacRate ifr; ifr.type = IND_EFF_MULT; ifr.e = ie;
+			IndFacRate ifr;
+			if(mar_eqn.rate) ifr.type = IND_EFF_MULT; 
+			else ifr.type = IND_EFF_DIV; 
+			ifr.e = ie;
 			trate.ind_fac_rate.push_back(ifr);
 		}
 		
 		for(auto ie : mar_eqn.fix_eff_mult){
-			IndFacRate ifr; ifr.type = FIX_EFF_MULT; ifr.e = ie;
+			IndFacRate ifr; 
+			if(mar_eqn.rate) ifr.type = FIX_EFF_MULT; 
+			else ifr.type = FIX_EFF_DIV; 
+			ifr.e = ie;
 			trate.ind_fac_rate.push_back(ifr);
 		}
 		trate.value.resize(T);
@@ -818,75 +824,6 @@ void StateSpecies::update_rate_mean(const vector < vector <double> > &popnum_t)
 		}
 	}
 }
-
-
-/*
-/// Updates prob_try based on a transition
-void RatePosteriorMean::update_prob_try_event(unsigned int ti, unsigned int tr_gl, unsigned int cl, unsigned int c, double &prob_try, const Individual &ind, Modify mod) const
-{
-	const auto &compr = compR[compR_ref[cl][c]];
-	
-	const auto &trate = tra_rate[tramean_ref[tr_gl]];
-	auto rate = trate.value[ti];
-
-	if(trate.ind_variation){
-		for(const auto &ifr : trate.ind_fac_rate){
-			switch(ifr.type){
-			case IND_EFF_MULT: rate *= ind.exp_ie[ifr.e]; break;
-			case IND_EFF_DIV: rate /= ind.exp_ie[ifr.e]; break;
-			case FIX_EFF_MULT: rate *= ind.exp_fe[ifr.e]; break;
-			case FIX_EFF_DIV: rate /= ind.exp_fe[ifr.e]; break;
-			}
-		}
-	}
-	
-	switch(compr.update){
-	case SINGLE_BRANCH_UP: case SINGLE_CALCALL_UP:
-		if(mod == MULT_MOD) prob_try *= (rate+TINY); 
-		else prob_try /= (rate+TINY); 
-		break;
-	
-	case MARKOV_COMPR_UP:
-		if(mod == MULT_MOD) prob_try *= (rate+TINY);
-		else prob_try /= (rate+TINY);
-		break;
-		
-	case MARKOV_CALCALL_UP:
-		{
-			auto R = 0.0;
-			for(auto m : compr.list){
-				const auto &trate = tra_rate[m];
-				auto rate = trate.value[ti];
-				
-				if(trate.ind_variation){
-					for(const auto &ifr : trate.ind_fac_rate){
-						switch(ifr.type){
-						case IND_EFF_MULT: rate *= ind.exp_ie[ifr.e]; break;
-						case IND_EFF_DIV: rate /= ind.exp_ie[ifr.e]; break;
-						case FIX_EFF_MULT: rate *= ind.exp_fe[ifr.e]; break;
-						case FIX_EFF_DIV: rate /= ind.exp_fe[ifr.e]; break;
-						}
-					}
-				}
-				
-				R += rate;
-			}
-			if(mod == MULT_MOD) prob_try *= (rate+TINY); 
-			else prob_try /= (rate+TINY); 
-		}
-		break;
-	
-	case NM_CALCALL_UP:
-		{
-			if(mod == MULT_MOD) prob_try *= (rate+TINY);
-			else prob_try /= (rate+TINY);
-		}
-		break;
-		
-	case NO_UP: break;
-	}
-}
-*/
 
 
 // Cnstructor

@@ -898,8 +898,10 @@ string Output::print_affect_like(const AffectLike &al) const
 string Output::transtype_text(TransType type) const 
 {
 	switch(type){
-	case EXP_RATE: return "Exponential"; 
-	case EXP_RATE_NM: return "Exponential NM"; 
+	case EXP_RATE: return "Exp(rate)"; 
+	case EXP_MEAN: return "Exp(mean)"; 
+	case EXP_RATE_NM: return "Exp(rate) NM"; 
+	case EXP_MEAN_NM: return "Exp(mean) NM"; 
 	case GAMMA: return "Gamma";
 	case ERLANG: return "Erlang"; 
 	case LOG_NORMAL: return "Log-normal"; 

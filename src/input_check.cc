@@ -394,8 +394,8 @@ void Input::check_import_correct()
 			for(auto cl = 0u; cl < sp.ncla; cl++){
 				const auto &claa = sp.cla[cl];
 				for(const auto &tr : claa.tra){
-					if(tr.type != EXP_RATE && tr.type != ERLANG){
-						alert_line("Because species '"+sp.name+"' has a population-based model this transition must have a type 'exponential' or 'erlang'.",tr.line_num);
+					if(tr.type != EXP_RATE && tr.type != EXP_MEAN && tr.type != ERLANG){
+						alert_line("Because species '"+sp.name+"' has a population-based model this transition must have a type 'exp(rate)', 'exp(mean)' or 'erlang'.",tr.line_num);
 						return;
 					}						
 				}

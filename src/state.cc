@@ -133,13 +133,7 @@ void State::post_sim(const vector <double> &param_value, const Sample &samp)
 /// Once a simulation is setup this iterates equations
 void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end) 
 {
-	//auto op_step = get_op_step(ti_end-ti_start);
-	
 	for(auto ti = ti_start; ti < ti_end; ti++){	
-		//if(model.mode == SIM && model.details.number == 1 && ti%op_step == 0){
-		//print_cpop(ti);
-		//}
-
 		//if(true && ti%op_step == 0) print_cpop(ti);
 	
 		auto &pop = popnum_t[ti];

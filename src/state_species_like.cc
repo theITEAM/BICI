@@ -109,6 +109,8 @@ vector <double> StateSpecies::likelihood_markov_value(unsigned int e, const vect
 
 	if(me.time_vari == false){
 		auto value = eqn[me.eqn_ref].calculate_param_only(param_val);
+		if(!me.rate) value = 1.0/value;
+		
 		store.push_back(me_vari.div[0].value);
 		me_vari.div[0].value = value;
 	}		
@@ -116,10 +118,19 @@ vector <double> StateSpecies::likelihood_markov_value(unsigned int e, const vect
 		const auto &eq = eqn[me.eqn_ref];
 		auto &div = me_vari.div;
 		
-		for(auto ti : list){	
-			auto value = eq.calculate(ti,popnum_t[ti],param_val,spline_val);
-			store.push_back(div[ti].value);
-			div[ti].value = value;
+		if(me.rate){
+			for(auto ti : list){	
+				auto value = eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+				store.push_back(div[ti].value);
+				div[ti].value = value;
+			}
+		}
+		else{
+			for(auto ti : list){	
+				auto value = 1.0/eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+				store.push_back(div[ti].value);
+				div[ti].value = value;
+			}
 		}
 	}
 	
@@ -390,7 +401,11 @@ vector <double> StateSpecies::likelihood_ie_change(unsigned int i, unsigned int 
 						auto &mev = markov_eqn_vari[e];
 						auto &div = mev.div;
 					
-						auto indfac = (factor-1)*get_indfac(ind,me);
+						double indfac;
+						if(me.rate) indfac = (factor-1)*get_indfac(ind,me);
+						else indfac = (1.0/factor-1)*get_indfac(ind,me);
+						
+						//auto indfac = (factor-1)*get_indfac(ind,me);
 					
 						auto &Li_mark = Li_markov[e];
 					
@@ -454,7 +469,8 @@ vector <double> StateSpecies::likelihood_ie_change(unsigned int i, unsigned int 
 				
 				for(auto ie_me : me.ind_eff_mult){
 					if(ie_me == ie){
-						dLi = log(factor);
+						if(me.rate) dLi = log(factor);
+						else dLi = -log(factor);
 						Li_markov[e.m][e.ti] += dLi;
 						like_ch.markov += dLi;
 					}
@@ -535,7 +551,8 @@ void StateSpecies::likelihood_ie_change_restore(unsigned int i, unsigned int ie,
 				const auto &me = sp.markov_eqn[e.m];
 				for(auto ie_me : me.ind_eff_mult){
 					if(ie_me == ie){	
-						Li_markov[e.m][e.ti] -= log(factor);
+						if(me.rate) Li_markov[e.m][e.ti] -= log(factor);
+						else Li_markov[e.m][e.ti] += log(factor);
 					}
 				}
 			}	
@@ -1143,8 +1160,9 @@ double StateSpecies::nm_trans_incomp_full_like(const vector <unsigned int> &nmtr
 double StateSpecies::nm_trans_incomp_like(TransType type, double dt, const vector <double> &ref_val) const
 {		
 	switch(type){
-	case EXP_RATE: emsg("Should not be in NM"); return 0;
+	case EXP_RATE: case EXP_MEAN: emsg("Should not be in NM"); return 0;
 	case EXP_RATE_NM:	return exp_rate_upper_probability(dt,ref_val[0]); 
+	case EXP_MEAN_NM:	return exp_mean_upper_probability(dt,ref_val[0]); 
 	case GAMMA: return gamma_upper_probability(dt,ref_val[0],ref_val[1]);
 	case ERLANG: return gamma_upper_probability(dt,ref_val[0],sqrt(1.0/ref_val[1])); 
 	case LOG_NORMAL: return lognormal_upper_probability(dt,ref_val[0],ref_val[1]);
@@ -1159,8 +1177,9 @@ double StateSpecies::nm_trans_incomp_like(TransType type, double dt, const vecto
 double StateSpecies::nm_trans_incomp_like_no_log(TransType type, double dt, const vector <double> &ref_val) const 
 {		
 	switch(type){
-	case EXP_RATE: emsg("Should not be in NM"); return 0;
+	case EXP_RATE: case EXP_MEAN: emsg("Should not be in NM"); return 0;
 	case EXP_RATE_NM:	return exp_rate_upper_probability_no_log(dt,ref_val[0]); 
+	case EXP_MEAN_NM:	return exp_mean_upper_probability_no_log(dt,ref_val[0]); 
 	case GAMMA: return gamma_upper_probability_no_log(dt,ref_val[0],ref_val[1]);
 	case ERLANG: return gamma_upper_probability_no_log(dt,ref_val[0],sqrt(1.0/ref_val[1])); 
 	case LOG_NORMAL: return lognormal_upper_probability_no_log(dt,ref_val[0],ref_val[1]);
@@ -1177,8 +1196,9 @@ MeanSD StateSpecies::get_mean_sd(TransType type, const vector <double> &ref_val)
 	MeanSD msd;
 	
 	switch(type){
-	case EXP_RATE: emsg("Should not be in NM"); break;
+	case EXP_RATE: case EXP_MEAN: emsg("Should not be in NM"); break;
 	case EXP_RATE_NM:	msd.mean = 1.0/ref_val[0]; msd.sd = sqrt(msd.mean); break; 
+	case EXP_MEAN_NM:	msd.mean = ref_val[0]; msd.sd = sqrt(msd.mean); break; 
 	case LOG_NORMAL: case GAMMA: msd.mean = ref_val[0]; msd.sd = ref_val[1]*msd.mean; break;
 	case ERLANG: msd.mean = ref_val[0]; msd.sd = sqrt(1.0/ref_val[1])*msd.mean; break;
 	case PERIOD: msd.mean = ref_val[0]; msd.sd = TINY; break;
@@ -1803,7 +1823,7 @@ double StateSpecies::sum_markov_prob(double t1, double t2, unsigned int c, unsig
 	
 	auto &entr = en[tr_gl_cor];
 	
-	if(tra_cor.type != EXP_RATE) emsg("Should be exp_rate");
+	if(tra_cor.ev_type != M_TRANS_EV) emsg("Should be exp_rate");
 	
 	auto e = tra_cor.markov_eqn_ref;
 	

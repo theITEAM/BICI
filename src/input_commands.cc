@@ -943,11 +943,27 @@ void Input::transition_command2(vector <Tag> &tags)
 		}
 		break;
 		
+	case EXP_MEAN:
+		{	
+			auto eqtype = TRANS_MEAN; if(tra.variety == SOURCE_TRANS) eqtype = SOURCE_MEAN;
+			
+			tra.dist_param.push_back(he(add_equation_info(trans_def.mean,eqtype,p,cl)));
+		}
+		break;
+		
 	case EXP_RATE_NM:
 		{	
 			auto eqtype = TRANS_NM_RATE; 
 			
 			tra.dist_param.push_back(he(add_equation_info(trans_def.rate,eqtype,p,cl)));
+		}
+		break;
+		
+	case EXP_MEAN_NM:
+		{	
+			auto eqtype = TRANS_NM_MEAN; 
+			
+			tra.dist_param.push_back(he(add_equation_info(trans_def.mean,eqtype,p,cl)));
 		}
 		break;
 	
@@ -961,6 +977,7 @@ void Input::transition_command2(vector <Tag> &tags)
 	case ERLANG:
 		{
 			tra.dist_param.push_back(he(add_equation_info(trans_def.mean,TRANS_MEAN,p,cl)));
+			
 			
 			auto num = number(trans_def.shape);
 			

@@ -769,9 +769,28 @@ function check_ie(te,p_name_filter,icur,eqn)
 			}
 		}
 	}
+
+	if(eqn_source(eqn)){
+		eqn.warn.push({te:"Source cannot contain an individual effect"});
+	}	
 }
 
 
+/// Determines if equation refers to a source
+function eqn_source(eqn)
+{
+	let type = eqn.type;
+	if(type == "trans_mean" || type == "trans_rate"){
+		let ei = eqn.eqn_info;
+		if(ei != undefined){
+			let tra = model.species[ei.p].cla[ei.cl].tra[ei.i];
+			if(tra.i == SOURCE) return true;
+		}
+	}	
+	return false;
+}
+
+	
 /// Checks that individual effect is correctly defined			
 function check_fe(te,p_name_filter,icur,eqn) 
 {
@@ -790,6 +809,10 @@ function check_fe(te,p_name_filter,icur,eqn)
 			eqn.warn.push({te:"Species filters for fixed effect "+te+" do not match up"});
 		}
 	}
+	
+	if(eqn_source(eqn)){
+		eqn.warn.push({te:"Source cannot contain a fixed effect"});
+	}	
 }
 
 

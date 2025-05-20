@@ -550,7 +550,7 @@ bool Model::div_value_fast_possible(const AffectLike &al) const
 	if(al.type == DIV_VALUE_AFFECT){
 		const auto &meq = species[al.num].markov_eqn[al.num2];
 		auto eq = eqn[meq.eqn_ref];
-		if(eq.linearise.on && eq.time_vari == true && eq.pop_ref.size() > 0) return true;
+		if(eq.linearise.on && eq.time_vari == true && eq.pop_ref.size() > 0 && meq.rate) return true;
 	}
 	return false;
 }
@@ -660,6 +660,7 @@ void Model::affect_linearise_speedup(vector <AffectLike> &vec) const
 			
 			for(auto j = imin; j < imax; j++){
 				const auto &meq = species[vec[j].num].markov_eqn[vec[j].num2];
+				if(!meq.rate) flag = true;
 				
 				auto eq = eqn[meq.eqn_ref];
 				if(eq.linearise.on == false){ flag = true; break;}

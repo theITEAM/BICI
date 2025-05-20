@@ -52,8 +52,7 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsi
 	te_raw = replace(te_raw,"%","");
 	te_raw = replace(te_raw,"$","");
 	//if(ti_fix != UNSET) te_raw += "(t="+to_string(timepoint[ti_fix])+")";
-
-	//te = basic_equation_check(te);
+	
 	if(warn != "") return;
 
 	unravel_sum(); 

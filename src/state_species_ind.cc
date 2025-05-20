@@ -226,7 +226,8 @@ void StateSpecies::add_data_event(unsigned int i, double t, const vector <SimTri
 	auto sum = 0.0;
 	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 		const auto &trg = sp.tra_gl[tr];
-		if(trg.i == c && trg.type == EXP_RATE){ 
+	
+		if(trg.i == c && trg.ev_type == M_TRANS_EV){ 
 			auto prob = 0.0;
 		
 			auto flag = false;
@@ -273,7 +274,16 @@ void StateSpecies::activate_initial_state(double t, const vector < vector <doubl
 		auto &me_vari = markov_eqn_vari[i];
 		
 		const auto &eq = eqn[me.eqn_ref]; 
-		auto value = eq.calculate(0,popnum,param_val,spline_val);
+		
+		double value;
+		if(me.rate){
+			value = eq.calculate(0,popnum,param_val,spline_val);
+		}
+		else{
+			auto mean = eq.calculate(0,popnum,param_val,spline_val);
+			value = 1/mean;
+		}
+		
 		auto indfac_sum = 0;
 		if(me.source == true) indfac_sum = me.source_tr_gl.size();
 		
@@ -313,7 +323,7 @@ void StateSpecies::update_ind_c(unsigned int i, double t, unsigned int cl_trans,
 			if(tlg.markov){                               // If markov rates leaving a compartment
 				for(auto tgl : tref){
 					const auto &tr = sp.tra_gl[tgl];
-					if(tr.type != EXP_RATE) emsg("Should be exponential"); 
+					if(tr.ev_type != M_TRANS_EV) emsg("Should be exponential"); 
 					if(tr.i != c) emsg("Problem with selected");
 			
 					add_markov_transition(i,tgl);
@@ -435,12 +445,20 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 		const auto &dp = tr.dist_param;		
 					
 		switch(tr.type){	
-		case EXP_RATE:  emsg("SHould not be rate2"); break;
+		case EXP_RATE: case EXP_MEAN: emsg("SHould not be rate2"); break;
 		
 		case EXP_RATE_NM: 	
 			{
 				auto rate = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
 				auto ts = t_begin+exp_rate_sample(rate);
+				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
+			}
+			break;
+			
+		case EXP_MEAN_NM: 	
+			{
+				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+				auto ts = t_begin+exp_mean_sample(mean);
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
 			}
 			break;
@@ -658,9 +676,20 @@ void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vecto
 		auto &me_vari = markov_eqn_vari[e];
 		
 		const auto &eq = eqn[me.eqn_ref]; 
-		auto value = eq.calculate(ti,popnum,param_val,spline_val);
-		if(value < -TINY){
-			emsg("The rate '"+eq.te_raw+"' has become negative");
+		double value;
+		if(me.rate){		
+			value = eq.calculate(ti,popnum,param_val,spline_val);
+			if(value < -TINY){
+				emsg("The rate '"+eq.te_raw+"' has become negative");
+			}
+		}
+		else{
+			auto mean = eq.calculate(ti,popnum,param_val,spline_val);
+			if(mean <= 0){
+				if(mean < 0) emsg("The mean '"+eq.te_raw+"' has become negative");
+				if(mean == 0) emsg("The mean '"+eq.te_raw+"' has become zero");
+			}
+			value = 1.0/mean;
 		}
 
 		if(me_vari.value != value){

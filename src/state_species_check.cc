@@ -113,8 +113,15 @@ void StateSpecies::check_markov_eqn(unsigned int ti, const vector <double> &popn
 		
 		const auto &me_vari = markov_eqn_vari[e];
 		
-		auto value = eqn[me.eqn_ref].calculate(ti,popnum,param_val,spline_val);	
-	
+		double value;
+		if(me.rate){
+			value = eqn[me.eqn_ref].calculate(ti,popnum,param_val,spline_val);	
+		}
+		else{
+			auto mean = eqn[me.eqn_ref].calculate(ti,popnum,param_val,spline_val);
+			value = 1.0/mean;
+		}
+		
 		if(dif(value,me_vari.value,dif_thresh)){
 			emsg("value problem");
 		}

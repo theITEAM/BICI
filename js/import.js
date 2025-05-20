@@ -65,7 +65,6 @@ let imp = {};                                      // Stores information as impo
 /// Import a script to define (or partially define) model and data 
 function import_file(te,file,clear_results)                                
 {		
-pr(file+" fii");
 	import_te = te;
 
 	percent(5);
@@ -1341,8 +1340,7 @@ function check_import_correct()
 				let claa = sp.cla[cl];
 				for(let i = 0; i < claa.ntra; i++){
 					let tr = claa.tra[i];
-					//if(tr.type != "exp(rate)" && tr.type != "exp(mean)" && tr.type != "erlang"){
-					if(tr.type != "exponential" && tr.type != "erlang"){
+					if(tr.type != "exp(rate)" && tr.type != "exp(mean)" && tr.type != "erlang"){
 						imp.line = tr.import_line;
 						alert_import("Because species '"+sp.name+"' has a population-based model this transition must have a type 'exponential' or 'erlang'.");
 					}						

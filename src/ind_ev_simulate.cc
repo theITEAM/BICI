@@ -264,12 +264,19 @@ void IndEvSampler::add_future_nm_event(unsigned int c, unsigned int cl, double t
 	double ts;
 	
 	switch(tra.type){	
-	case EXP_RATE: ts = UNSET; emsg("SHould not be rate2"); break;
+	case EXP_RATE: case EXP_MEAN: ts = UNSET; emsg("SHould not be rate2"); break;
 	
 	case EXP_RATE_NM: 	
 		{
 			auto rate = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
 			ts = t+exp_rate_sample(rate);
+		}
+		break;
+		
+	case EXP_MEAN_NM: 	
+		{
+			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			ts = t+exp_mean_sample(mean);
 		}
 		break;
 

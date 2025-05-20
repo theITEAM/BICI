@@ -365,9 +365,15 @@ function add_bubble_buts(lay)
 			let cv_fl = false, scale_fl = false, shape_erlang_fl = false; 
 			
 			switch(inter.bubble.trans_type.te){
-			case "exponential":
+			case "exp(rate)":
 				rate_fl = true;
 				bubble_input(cont,"Rate:",{type:"trans_rate", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
+				if(tr.i == SOURCE){ cv_fl = true; shape_fl = true; scale_fl = true; shape_erlang_fl = true;}
+				break;
+				
+			case "exp(mean)":
+				mean_fl = true;
+				bubble_input(cont,"Mean:",{type:"trans_mean", eqn:true, p:bu.p, cl:bu.cl, i:bu.i});
 				if(tr.i == SOURCE){ cv_fl = true; shape_fl = true; scale_fl = true; shape_erlang_fl = true;}
 				break;
 				

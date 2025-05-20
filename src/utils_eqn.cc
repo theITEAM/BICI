@@ -34,7 +34,7 @@ EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p, unsig
 	info.line_num = UNSET;
 
 	info.error = false;
-	info.emsg = basic_equation_check(info.te);
+	info.emsg = basic_equation_check(info.te,_type);
 	if(info.emsg != "") info.error = true;
 		
 	return info;
@@ -85,7 +85,7 @@ string check_valid_name(string name, string type)
 		
 		if(done == false){
 			auto ch = name.substr(j,1);
-			if(includes(chnotallowed,ch) || includes(name_notallow,ch)){
+			if(includes(chnotallowed,ch) || (type != "parameter" && includes(name_notallow,ch))){
 				if(ch == "_") ch = "underscore";
 				return "In "+type+" name '"+name+"' the character '"+ch+"' is not expected";
 			}
@@ -97,7 +97,7 @@ string check_valid_name(string name, string type)
 
 
 /// Checks that the equation is formatted correctly and puts '%' and '$' around parameters
-string basic_equation_check(string &te)
+string basic_equation_check(string &te, EqnType eqn_type)
 {
 	auto emg = check_brackets_match(te); if(emg != "") return emg;
 
@@ -190,15 +190,31 @@ string basic_equation_check(string &te)
 				else{
 					auto tex = te.substr(ist+1,i-ist-1);
 					if(type == "pop"){
-						//emg = check_valid_name(tex,"population"); if(emg != "") return emg;
+						emg = check_valid_name(tex,"population"); if(emg != "") return emg;
 					}
 
 					if(type == "ie"){
 						emg = check_valid_name(tex,"individual effect"); if(emg != "") return emg;
+						
+						if(eqn_type == SOURCE_RATE){
+							return "Source rate '"+te+"' should not contain individual effects";
+						}
+						
+						if(eqn_type == SOURCE_MEAN){
+							return "Source mean '"+te+"' should not contain individual effects";
+						}
 					}
 					
 					if(type == "fe"){
 						emg = check_valid_name(tex,"fixed effect"); if(emg != "") return emg;
+						
+						if(eqn_type == SOURCE_RATE){
+							return "Source rate '"+te+"' should not contain fixed effects";
+						}
+						
+						if(eqn_type == SOURCE_MEAN){
+							return "Source mean '"+te+"' should not contain fixed effects";
+						}
 					}
 				}
 			}

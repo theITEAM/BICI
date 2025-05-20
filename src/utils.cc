@@ -2289,8 +2289,9 @@ void check_bp(double &bp)
 double nm_trans_like(TransType type, double dt, const vector <double> &ref_val)  
 {		
 	switch(type){
-	case EXP_RATE: emsg("Should not be in NM"); return 0;
+	case EXP_RATE: case EXP_MEAN: emsg("Should not be in NM"); return 0;
 	case EXP_RATE_NM:	return exp_rate_probability(dt,ref_val[0]); 
+	case EXP_MEAN_NM:	return exp_mean_probability(dt,ref_val[0]); 
 	case GAMMA: return gamma_probability(dt,ref_val[0],ref_val[1]);
 	case ERLANG: return gamma_probability(dt,ref_val[0],sqrt(1.0/ref_val[1])); 
 	case LOG_NORMAL: return lognormal_probability(dt,ref_val[0],ref_val[1]);

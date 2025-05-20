@@ -2220,7 +2220,7 @@ void Proposal::MH_ie(State &state)
 /// Performs a Metropolis-Hastings joint proposal update for individual effects and a variance
 void Proposal::MH_ie_var(State &state)
 {
-	auto pl = false;//true;
+	auto pl = false;
 	
 	auto param_store = state.param_val;
 	
@@ -3338,10 +3338,8 @@ void Proposal::switch_leave_sink(State &state)
 			
 				if(tmin < t_end){
 					const auto &tra = sp.tra_gl[tr_gl];
-				
-					auto type = M_TRANS_EV;
-					if(tra.type != EXP_RATE) type = NM_TRANS_EV;
-					
+
+					auto type = tra.ev_type; 
 					auto t = tmin + ran()*(t_end-tmin);
 					
 					dprob = log(t_end-tmin);
@@ -3453,8 +3451,8 @@ void Proposal::enforce_add_sink(unsigned int i, double t, State &state)
 		auto tr = sp.cgl_tr_sink[c];
 		if(tr != UNSET){
 			const auto &tra = sp.tra_gl[tr];
-			auto type = M_TRANS_EV; if(tra.type != EXP_RATE) type = NM_TRANS_EV;
-	
+			auto type = tra.ev_type;
+		
 			IndInfFrom inf_from;
 			auto e = ssp.get_event(type,i,tr,UNSET,UNSET,tra.f,t,inf_from);
 			

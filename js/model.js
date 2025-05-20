@@ -1251,7 +1251,7 @@ class Model
 						if(trr.i == c){
 							list.push(tr);
 										
-							if(trr.type != "exponential" && tr.type != "erlang") flag = true;
+							if(trr.type != "exp(rate)" && trr.type != "exp(mean)" && tr.type != "erlang") flag = true;
 							
 							if(trr.branch_select != true) all_set = false;
 						}
@@ -1742,8 +1742,12 @@ class Model
 		}
 	
 		switch(tr.type){
-		case "exponential": 
+		case "exp(rate)": 
 			lab += val.rate_eqn.te.trim(); 
+			break;
+			
+		case "exp(mean)": 
+			lab += val.mean_eqn.te.trim(); 
 			break;
 			
 		case "gamma": 
@@ -2261,14 +2265,13 @@ class Model
 					}
 					
 					if(val.mean_eqn != undefined){
-						if(all_param == true || traa.type == "gamma" || traa.type == "erlang" || traa.type == "log-normal"){
+						if(all_param == true || traa.type == "exp(mean)" || traa.type == "gamma" || traa.type == "erlang" || traa.type == "log-normal"){
 							this.add_equation_to_list(eqn_list,val.mean_eqn,eqn_info);
 						}
 					}
 					
 					if(val.rate_eqn != undefined){
-						//if(all_param == true || traa.type == "exp(rate)"){
-						if(all_param == true || traa.type == "exponential"){
+						if(all_param == true || traa.type == "exp(rate)"){
 							this.add_equation_to_list(eqn_list,val.rate_eqn,eqn_info);
 						}
 					}
@@ -2697,8 +2700,12 @@ class Model
 				}
 			
 				switch(trans_def.type){
-				case "exponential":
+				case "exp(rate)":
 					value.rate_eqn.te = trans_def.rate;
+					break;
+					
+				case "exp(mean)":
+					value.mean_eqn.te = trans_def.mean;
 					break;
 				
 				case "erlang": 

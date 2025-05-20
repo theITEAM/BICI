@@ -190,7 +190,6 @@ function A_matrix_loaded(tab,p,i)
 /// Loads a table from text
 function load_table(te,head,sep,filename)
 {
-	pr(filename+" file");
 	let file_simp = cut_path(filename);
 	
 	te.replace(/\r/g,"");

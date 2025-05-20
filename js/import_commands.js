@@ -1056,8 +1056,12 @@ function transition_command2(tags)
 	let val = traa.value;
 	
 	switch(trans_def.type){
-	case "exponential":
+	case "exp(rate)":
 		import_eqn_value(val.rate_eqn,trans_def.rate);
+		break;
+		
+	case "exp(mean)":
+		import_eqn_value(val.mean_eqn,trans_def.mean);
 		break;
 		
 	case "gamma":

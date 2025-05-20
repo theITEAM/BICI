@@ -1812,7 +1812,6 @@ void State::check_popnum_ind(string ref)
 	for(auto ti = 0u; ti < T; ti++){
 		for(auto po = 0u; po < model.pop.size(); po++){
 			if(popnum_ind[ti][po].size() != popnum_ind_store[ti][po].size()){
-				cout << " " << popnum_ind[ti][po].size() << " " <<  popnum_ind_store[ti][po].size() << "Kk\n";
 				emsg("popnum_ind size wrong:"+ref);
 			}
 			

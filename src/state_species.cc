@@ -1131,6 +1131,8 @@ double StateSpecies::get_indfac(const Individual &ind, const MarkovEqn &mar_eqn)
 	for(auto ie : mar_eqn.ind_eff_mult) val *= ind.exp_ie[ie];
 	for(auto fe : mar_eqn.fix_eff_mult) val *= ind.exp_fe[fe];
 	
+	if(!mar_eqn.rate) val = 1.0/val;
+		
 	if(false){
 		cout << ind.name << "   ";
 		cout << eqn[mar_eqn.eqn_ref].te << " ";
@@ -1229,15 +1231,39 @@ vector <double> StateSpecies::calculate_tnum_mean(unsigned int ti, const vector 
 double StateSpecies::calculate_tnum_mean(unsigned int ti, unsigned int i, const vector <double> &popnum, const vector <double> &cpop, const vector <double> &param_val, double dt) const
 {
 	const auto &tr = sp.tra_gl[i];
-	if(tr.type != EXP_RATE) emsg("Should be exponential");
+	if(tr.ev_type != M_TRANS_EV) emsg("Should be exponential");
 	
 	const auto &eq = eqn[tr.dist_param[0].eq_ref];
-	auto rate = eq.calculate(ti,popnum,param_val,spline_val);
-	
-	if(rate < 0){	
-		emsg("The transition rate for '"+tr.name+"' through equation '"+eq.te_raw+"' has become negative."+check_prior(eq));
-	}
+	double rate;
+
+	switch(tr.type){
+	case EXP_RATE: 
+		{
+			rate = eq.calculate(ti,popnum,param_val,spline_val);
+			if(rate < 0){	
+				emsg("The transition rate for '"+tr.name+"' through equation '"+eq.te_raw+"' has become negative."+check_prior(eq));
+			}
+		}
+		break;
 		
+	case EXP_MEAN: 
+		{
+			auto mean = eq.calculate(ti,popnum,param_val,spline_val);
+			if(mean <= 0){	
+				if(mean < 0){	
+					emsg("The transition mean for '"+tr.name+"' through equation '"+eq.te_raw+"' has become negative."+check_prior(eq));
+				}
+				else{
+					emsg("The transition mean for '"+tr.name+"' through equation '"+eq.te_raw+"' has become zero."+check_prior(eq));
+				}
+			}
+			rate = 1/mean;
+		}
+		break;
+		
+	default: rate = 0; emsg("SHould not be here"); break;
+	}
+	
 	auto ci = tr.i;
 	double pop;
 	
@@ -1685,8 +1711,8 @@ bool StateSpecies::ev_link(const Event &ev, const Individual &ind, const vector 
 	auto ti = ev.ti;
 
 	switch(tra.type){
-	case EXP_RATE: emsg("SHould not be"); return false;
-	case EXP_RATE_NM: return false;
+	case EXP_RATE: case EXP_MEAN: emsg("SHould not be"); return false;
+	case EXP_RATE_NM: case EXP_MEAN_NM: return false;
 	case GAMMA: case LOG_NORMAL:
 		{
 			auto cv = eqn[ref[1]].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);

@@ -362,10 +362,17 @@ function create_output_compartments(p,file_list,map_store,one_file)
 			
 			let te;
 			switch(tra_type){
-			case "exponential": 
+			case "exp(rate)": 
 				{
 					let rate = esc(tr.value.rate_eqn.te); if(rate == "") err_fl = "rate";
 					te = "exp(rate:"+rate+")";
+				}
+				break;
+				
+			case "exp(mean)": 
+				{
+					let mean = esc(tr.value.mean_eqn.te); if(mean == "") err_fl = "mean";
+					te = "exp(mean:"+mean+")";
 				}
 				break;
 				

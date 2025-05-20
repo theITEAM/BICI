@@ -997,8 +997,16 @@ TransDef Input::extract_trans_def(string value) const
 	auto ty = toLower(spl[0]);
 	
 	if(ty == "exp"){
-		tdef.rate = get_prop(value,"rate:","end");
-		if(tdef.rate != ""){ tdef.type = EXP_RATE; tdef.set = true;}
+		auto rate_temp = get_prop(value,"rate:","end");
+		if(rate_temp != ""){
+			tdef.rate = rate_temp; tdef.type = EXP_RATE; tdef.set = true;
+		}
+		else{
+			auto mean_temp = get_prop(value,"mean:","end");
+			if(mean_temp != ""){
+				tdef.mean = mean_temp; tdef.type = EXP_MEAN; tdef.set = true;
+			}
+		}
 	}
 	
 	if(ty == "gamma"){

@@ -164,7 +164,7 @@ string find_root(string file);
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);
 string check_valid_name(string name, string type);
-string basic_equation_check(string &te);
+string basic_equation_check(string &te, EqnType eqn_type);
 string check_brackets_match(string te);
 string check_chnotallowed(string te);
 unsigned int param_end(const string &st, unsigned int i, string &emsg);

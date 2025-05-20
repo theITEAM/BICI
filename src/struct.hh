@@ -517,6 +517,7 @@ struct TransGlobal {               // A global transition (combines all classifi
 	TransInfection infection;        // Under trans-tree provides informatransition is associates with infection
 	bool erlang_hidden;              // Determines if hidden Erlang transitions
 	TransType type;                  // The type of the transition
+	EventType ev_type;               // NM_TRANS_EV or M_TRANS_EV
 	TransVariety variety;            // Determines if normal, source or sink
 	bool branch;                     // Determines if this is one of multiple branches leaving a compartment
 	bool all_branches;               // Determines if all branches are specified
@@ -835,6 +836,7 @@ struct MarkovEqn {                 // Stores information about the Markov equati
 	unsigned int eqn_ref;            // The equation number
 	bool time_vari;                  // Determines if equation has time variation
 	bool source;                     // Set to true if equation is for a source
+	bool rate;                       // Set if rate, unset it mean
 	vector <unsigned> source_tr_gl;  // Global transition for source (if applicable)
 	bool ind_variation;              // Set to true if there is individual variation
 	bool infection_trans;            // Determines if relates to an infection transition (used for trans tree likelihood)
