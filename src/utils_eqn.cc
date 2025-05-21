@@ -85,7 +85,7 @@ string check_valid_name(string name, string type)
 		
 		if(done == false){
 			auto ch = name.substr(j,1);
-			if(includes(chnotallowed,ch) || (type != "parameter" && includes(name_notallow,ch))){
+			if(includes(chnotallowed,ch) || (type != "population" && includes(name_notallow,ch))){
 				if(ch == "_") ch = "underscore";
 				return "In "+type+" name '"+name+"' the character '"+ch+"' is not expected";
 			}
