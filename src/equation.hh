@@ -170,6 +170,7 @@ class Equation                             // Stores information about the model
 	// In equation_linearise.cc
 	public:
 		void calculate_linearise();
+		void print_linear_final() const;
 		void setup_param_ref();
 		void calculate_pop_ref();
 		LinearCalculation convert_to_linear_calculation(const EqItem &it, EqItemType op, const vector <LinearCalculation> &lin_calc) const;

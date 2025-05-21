@@ -26,6 +26,10 @@ class Model                                // Stores information about the model
 		
 		unsigned int nparam_vec;               // The total number of parameter
 		
+		vector <unsigned int> param_vec_prop;  // Vector of param_vec elements which undergo proposals
+		
+		unsigned int nparam_vec_prop;          // Total number of parameters under proposal
+		
 		vector <Population> pop;               // Stores information about populations of interest
 		
 		Hash hash_pop;                         // Hash table for populations

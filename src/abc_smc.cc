@@ -13,7 +13,7 @@ using namespace std;
 #include "utils.hh"
 #include "matrix.hh"
 
-ABC_SMC::ABC_SMC(const Model &model, Output &output, Mpi &mpi) : model(model), output(output), mpi(mpi), state(model)
+ABC_SMC::ABC_SMC(const Model &model, Output &output, Mpi &mpi) : cor_matrix(model), model(model), output(output), mpi(mpi), state(model)
 {	
 	const auto &de = model.details;
 	nsample = de.sample;

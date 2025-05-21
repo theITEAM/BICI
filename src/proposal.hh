@@ -8,6 +8,7 @@ using namespace std;
 #include "model.hh"
 #include "state.hh"
 #include "output.hh"
+#include "cor_matrix.hh"
 
 class Proposal                             // Implements a proposal
 {

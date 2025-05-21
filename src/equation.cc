@@ -104,6 +104,8 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsi
 	// Truncates strings to save memory
 	te = trunc(te);
 	te_raw = trunc(te_raw);
+	
+	//print_calculation();
 }
 
 

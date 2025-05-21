@@ -1255,6 +1255,7 @@ void State::check_linearise() const
 				cout << ti << "ti" << endl;
 				cout << eq.te << endl;
 				cout << val << " " << val2 << "val" << endl;
+				eq.print_linear_final();
 				emsg("Equation different");
 			}
 		}

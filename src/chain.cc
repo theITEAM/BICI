@@ -14,7 +14,7 @@ using namespace std;
 #include "utils.hh"
 #include "matrix.hh"
 
-Chain::Chain(unsigned int nburnin_, unsigned int nsample_, const Model &model, Output &output) : state(model), model(model), output(output)
+Chain::Chain(unsigned int nburnin_, unsigned int nsample_, const Model &model, Output &output) : state(model), cor_matrix(model), model(model),  output(output)
 {
 	nburnin = nburnin_;
 	nsample = nsample_;
@@ -37,7 +37,7 @@ Chain::Chain(unsigned int nburnin_, unsigned int nsample_, const Model &model, O
 void Chain::init(unsigned int ch, unsigned int ch_max)
 {
 	update_init();
-
+	
 	auto Lmax = -LARGE;
 	
 	print_diag("Finding initial state...");
@@ -459,7 +459,7 @@ void Chain::update(unsigned int s)
 /// Initialises proposal distributions
 void Chain::update_init()
 {	
-	cor_matrix.init(model.nparam_vec);
+	cor_matrix.init();
 
 	for(auto i = 0u; i < model.nparam_vec; i++){     // Univariate distributions
 		if(model.param_vec[i].prop_pos){
@@ -1080,33 +1080,31 @@ void Chain::check_join_proposal()
 
 	// Works out all multivariate proposals
 	vector < vector <unsigned int> > par_list;
-	for(auto i = 0u; i < model.nparam_vec; i++){
-		if(model.param_vec[i].prop_pos){
-			vector <unsigned int> list;
-			list.push_back(i);
-			par_list.push_back(list);
-		}
+	for(auto i = 0u; i < model.nparam_vec_prop; i++){	
+		auto th = model.param_vec_prop[i];
+		vector <unsigned int> list;
+		list.push_back(th);
+		par_list.push_back(list);
 	}
 	
 	auto N = M.size();
 	for(auto j = 0u; j < N; j++){
-		if(model.param_vec[j].prop_pos){
-			for(auto i = j+1; i < N; i++){
-				if(model.param_vec[i].prop_pos){
-					if(M[j][i] > thresh || M[j][i] < -thresh){
-						auto lj = find_which_list(j,par_list);
-						auto li = find_which_list(i,par_list);
-						if(lj != li){
-							for(auto va : par_list[lj]){
-								par_list[li].push_back(va);
-							}
-							
-							if(lj+1 != par_list.size()){
-								par_list[lj] = par_list[par_list.size()-1];
-							}
-							par_list.pop_back();
-						}
+		for(auto i = j+1; i < N; i++){
+			if(M[j][i] > thresh || M[j][i] < -thresh){
+				auto th_j = model.param_vec_prop[j];
+				auto th_i = model.param_vec_prop[i];
+				
+				auto lj = find_which_list(th_j,par_list);
+				auto li = find_which_list(th_i,par_list);
+				if(lj != li){
+					for(auto va : par_list[lj]){
+						par_list[li].push_back(va);
 					}
+							
+					if(lj+1 != par_list.size()){
+						par_list[lj] = par_list[par_list.size()-1];
+					}
+					par_list.pop_back();
 				}
 			}
 		}

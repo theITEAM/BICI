@@ -22,8 +22,8 @@ void Equation::calculate_linearise()
 
 	auto ncalc = calc.size();
 
-	if(false) print_calculation();
-
+	auto pl = false;
+	
 	vector <LinearCalculation> lin_calc;
 	for(auto i = 0u; i < ncalc; i++){
 		const auto &ca = calc[i];
@@ -38,7 +38,9 @@ void Equation::calculate_linearise()
 				if(j == 0) lin = lin_it;
 				else{
 					calc_add(lin.no_pop_calc.calc,lin_it.no_pop_calc.calc);
-					
+					if(pl){
+						print_calc("calcfin",lin.no_pop_calc.calc);
+					}
 					for(auto k = 0u; k < lin_it.pop_calc.size(); k++){
 						const auto &pc = lin_it.pop_calc[k];
 						auto po = pc.po;
@@ -128,20 +130,21 @@ void Equation::calculate_linearise()
 		default: emsg("Eq problem10"); break;
 		}
 		
-		if(false){
+		if(pl){
 			cout << endl;
 			print_linear_calc("LIN FINAL "+to_string(i),lin);
-			//emsg("fin");
 			cout << endl;
 		}
 		
 		lin_calc.push_back(lin);
 	}
 
-	if(false){
+	//if(true){
+	if(pl){
 		for(const auto &lin : lin_calc){
 			print_linear_calc("LIN FINAL ",lin);
 		}
+		emsg("do");
 	}
 
 	auto lc_final = convert_to_linear_calculation(ans,ADD,lin_calc);
@@ -149,18 +152,7 @@ void Equation::calculate_linearise()
 	linearise.no_pop_calc = lc_final.no_pop_calc.calc;
 	linearise.no_pop_calc_time_dep = calc_time_dep(linearise.no_pop_calc);
 	
-	if(false){
-		cout << te << " te" << endl;
-		print_calculation();
-		cout << endl << endl;
-	
-		cout << endl << endl << te << ":" << endl;
-		print_calc("No pop dep",linearise.no_pop_calc);
-
-		for(auto k = 0u; k < linearise.pop_grad_calc.size(); k++){
-			print_calc(pop[pop_ref[k]].name,linearise.pop_grad_calc[k]);	
-		}
-	}
+	if(false) print_linear_final();
 	
 	auto Npop = pop_ref.size();
 	if(Npop != lc_final.pop_calc.size()){
@@ -200,6 +192,22 @@ void Equation::calculate_linearise()
 	}
 }
 
+
+/// Prints the calculation and the linear final version (for diagnostics)
+void Equation::print_linear_final() const
+{
+	cout << te << " te" << endl;
+	print_calculation();
+	cout << endl << endl;
+
+	cout << endl << endl << te << ":" << endl;
+	print_calc("No pop dep",linearise.no_pop_calc);
+
+	for(auto k = 0u; k < linearise.pop_grad_calc.size(); k++){
+		print_calc(pop[pop_ref[k]].name,linearise.pop_grad_calc[k]);	
+	}
+}
+	
 
 /// Converts from a item to a linear calculation
 LinearCalculation Equation::convert_to_linear_calculation(const EqItem &it, EqItemType op, const vector <LinearCalculation> &lin_calc) const
@@ -375,6 +383,10 @@ void Equation::calc_add(vector <Calculation> &calc, const vector <Calculation> &
 	}
 	
 	if(calc2.size() == 0) return;
+	
+	if(calc.size() == 0){
+		calc = calc2; return;
+	}
 	
 	if(true){ // Extra code to make more efficient
 		if(calc2.size() == 1 && calc.size() >= 1){

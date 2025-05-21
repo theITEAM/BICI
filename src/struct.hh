@@ -252,7 +252,9 @@ struct ParamVecEle                 // Stores information about an element in par
 	bool prop_pos;                   // Set if it is possible to do a proposal on this parameter
 	bool omega_fl;                   // Detemines if in omega
 	vector <AffectLike> affect_like; // Determines how parameter affects likelihoods
+	unsigned int ref;                // Reference param_vec_prop
 };
+
 
 struct ErrorMess {                 // Stores error messages when importing 
 	unsigned int line_num;           // The number of the line in the input file
@@ -1234,24 +1236,6 @@ struct Particle {                  // Stores information from state
 	
 	unsigned int s;                  // The sample number
 	unsigned int chain;              // The chain number
-};
-
-struct CorMatrix {                 // Information about the parameter correlations    
-	unsigned int N;                  // The number of parameters
-	unsigned int n;                  // Number of samples added to av and av2
-	unsigned int n_start;            // The start of samp
-	//unsigned int range;              // Defines rage over which correlation is calculated
-	vector <double> av;              // The sum of parameter values 
-	vector < vector <double> > av2;  // The sum of param*param 
-	vector < vector <double> > samp; // Stores historic parameter values
-
-	void init(unsigned int N);
-	void add_sample(const vector <double> &param_value, unsigned int range);
-	void check() const;
-	vector < vector <double> > calculate_cor_matrix() const;
-	void set_mvn_from_particle(vector <Particle> &particle);
-	vector < vector <double> > find_covar(const vector <unsigned int> &param_list) const;
-	unsigned int get_n();
 };
 
 struct BurnInfo {                  // Information about burnin phase                       

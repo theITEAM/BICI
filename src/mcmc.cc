@@ -53,6 +53,7 @@ MCMC::MCMC(const Model &model, Output &output, Mpi &mpi) : model(model), output(
 void MCMC::run()
 {
 	percentage_start(INIT_PER);
+
 	for(auto ch = 0u; ch < chain.size(); ch++){
 		chain[ch].init(ch,chain.size());
 	}

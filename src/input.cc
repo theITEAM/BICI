@@ -1353,6 +1353,7 @@ void Input::create_param_vector()
 					pr.prior = par.prior[j];
 					pr.variety = par.variety;
 					pr.ppc_resample = false;
+					pr.ref = UNSET;
 				
 					pr.prop_pos = false;
 					if(pr.variety == PRIOR_PARAM || pr.variety == DIST_PARAM){
@@ -1386,6 +1387,17 @@ void Input::create_param_vector()
 		}
 	}
 	model.nparam_vec = model.param_vec.size();
+	
+	// Creates a vector of parameters which can undergoe proposals
+	
+	for(auto th = 0u; th < model.nparam_vec; th++){
+		auto &par = model.param_vec[th];
+		if(par.prop_pos){
+			par.ref = model.param_vec_prop.size();
+			model.param_vec_prop.push_back(th);
+		}			
+	}
+	model.nparam_vec_prop = model.param_vec_prop.size();
 	
 	if(false){
 		auto imax = model.nparam_vec;
