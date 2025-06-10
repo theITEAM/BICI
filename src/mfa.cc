@@ -112,7 +112,7 @@ void MFA::run()
 			
 			for(auto &pro : proposal){
 				if(pro.param_list.size() > 0){
-					pro.add_sample(state.param_val);
+					pro.add_sample(state.get_param_val_prop();
 					if(s%10 == 0) pro.update_sampler();
 				}
 			}

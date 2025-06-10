@@ -29,7 +29,7 @@ class name="DS" index="a"
 comp name="S" color="#009900" x=-10 y=0
 comp name="I" color="#ff2222" x=10 y=0
 
-trans name="S->I" value="exp(rate:β×{I,g〈f〉}/N)"
+trans name="S->I" value="exp(rate:β×{I,g;〈f〉}/N)"
 
 class name="Group" index="g"
 

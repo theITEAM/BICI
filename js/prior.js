@@ -131,33 +131,33 @@ function get_prior_string(prior)
 function get_prior_split_desc(par)
 {
 	let te;
+	
+	let dim = [];
+	for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
+	
+	switch(dim.length){
+	case 1: te = "Vector("; break;
+	case 2: te = "Matrix("; break;
+	default: te = "Tensor("; break;
+	}
+		
+	let tot = 1; 
+	for(let k = 0; k < dim.length; k++){
+		if(k != 0) te += ",";
+		te += dim[k];
+		tot *= dim[k];
+	}
+	te += ")";
+		
 	if(par.prior_split != undefined){
-		if(par.comb_list.length == 0){
-			return no_elements;
-		}
-		
-		let dim = get_dimensions(par.prior_split);
-		switch(dim.length){
-		case 1: te = "Vector("; break;
-		case 2: te = "Matrix("; break;
-		default: te = "Tensor("; break;
-		}
-		
-		let tot = 1; 
-		for(let k = 0; k < dim.length; k++){
-			if(k != 0) te += ",";
-			te += dim[k];
-			tot *= dim[k];
-		}
-		te += ")";
-		
-		if(par.prior_split_set == true && tot < 10){
-			let tensor = get_prior_split_tensor(par)
+		if(tot < 10){
+			let tensor = get_prior_split_tensor(par.prior_split)
 			te = JSON.stringify(tensor);
 			te = te.replace(/\"/g," ");
 			te = te.replace(/null/g,"Unset");
 		}
 	}
+	else te = "Unset "+te;
 	
 	return te;
 }
@@ -180,8 +180,6 @@ function display_distribution_split(i,x,y,lay,allow_eqn,allow_edit,variety,w)
 	
 	let te="";
 	
-	if(par.prior_split_set != true) te += "Unset ";
-	
 	te += par.prior_split_desc;
 	
 	let fo = get_font(1.1,"","times");
@@ -201,20 +199,20 @@ function display_distribution_split(i,x,y,lay,allow_eqn,allow_edit,variety,w)
 
 
 /// Creates a text tensor from prior_split
-function get_prior_split_tensor(par)
+function get_prior_split_tensor(pri)
 {
-	let pri = par.prior_split;
-
 	let tensor = copy(pri);
-		
+	
 	let dim = get_dimensions(tensor);
 	let ele_list = get_element_list(tensor,dim);
 	
 	for(let k = 0; k < ele_list.length; k++){
 		let pindex = ele_list[k];
-			
-		let te = get_prior_string(get_element(pri,pindex)); 
-			
+		let pri = get_element(tensor,pindex);
+		
+		let te;
+		if(pri == undefined) te = select_str
+		else te = get_prior_string(pri); 
 		set_element(tensor,pindex,te);
 	}
 	
@@ -227,11 +225,13 @@ function convert_text_to_prior(te,pri_pos,dist)
 {
 	let pri = unset_prior();
 
-	let spl = te.trim().split("(");
-	if(spl.length != 2) return err("Syntax error");
+	let start = "In '"+te+"' ";
 	
-	if(spl[1].length == 0) return err("Syntax error");
-	if(spl[1].substr(spl[1].length-1,1) != ")") return err("Syntax syntax error");
+	let spl = te.trim().split("(");
+	if(spl.length != 2) return err(start+"there is a syntax error");
+	
+	if(spl[1].length == 0) return err(start+"there is a syntax error");
+	if(spl[1].substr(spl[1].length-1,1) != ")") return err(start+"there is a syntax error");
 	
 	let type = spl[0].toLowerCase();
 	if(type == "dir") type = "dirichlet";
@@ -240,11 +240,11 @@ function convert_text_to_prior(te,pri_pos,dist)
 	if(!pri_pos) error("prior pos is not set!");
 
 	if(find_in(pri_pos,type) == undefined){
-		if(find_in(prior_pos,type) == undefined){
-			return err("'"+type+"' is not a valid type");
+		if(find_in(prior_pos,type) == undefined && find_in(prior_factor_pos,type) == undefined ){
+			return err(start+"the distribution '"+type+"' is not recognised");
 		}
 		else{
-			return err("The type '"+type+"' cannot be used for this parameter");
+			return err(start+"the prior specification '"+type+"' cannot be used for this parameter");
 		}
 	}
 	
@@ -254,18 +254,19 @@ function convert_text_to_prior(te,pri_pos,dist)
 	pri.type.te = type;
 	
 	let er;
-	
+
 	switch(type){
 	case "fix":
 		{
-			if(spl2.length != 1) return err("Expected one value in the brackets");
+			let wa = ". The fixed prior should have the format 'fix(value)'";
+			if(spl2.length != 1) return err(start+"expected one value in the brackets"+wa);
 			if(dist == true){
 				if(!is_eqn(spl2[0],"value",{})){
-					return err("'"+spl2[0]+"' is not valid");
+					return err(start+"'"+spl2[0]+"' is not valid"+wa);
 				}
 			}
 			else{
-				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' must be a number");
+				if(isNaN(spl2[0])) return err(start+"'"+spl2[0]+"' must be a number"+wa);
 			}
 			
 			pri.value.mean_eqn.te = spl2[0];
@@ -274,18 +275,20 @@ function convert_text_to_prior(te,pri_pos,dist)
 		
 	case "uniform":
 		{
-			if(spl2.length != 2) return err("Expected two values in the brackets");
+			let wa = ". The uniform prior should have the format 'uniform(min,max)'";
+			
+			if(spl2.length != 2) return err(start+"expected two values in the brackets"+wa);
 			if(dist == true){
-				if(!is_eqn(spl2[0],"min",{})) return err("'"+spl2[0]+"' is not valid");
-				if(!is_eqn(spl2[1],"max",{})) return err("'"+spl2[1]+"' is not valid");
+				if(!is_eqn(spl2[0],"min",{})) return err(start+"'"+spl2[0]+"' is not valid"+wa);
+				if(!is_eqn(spl2[1],"max",{})) return err(start+"'"+spl2[1]+"' is not valid"+wa);
 				if(!isNaN(spl2[0]) && !isNaN(spl2[1]) && Number(spl2[0]) >= Number(spl2[1])){
-					return err("Minimum must be smaller than maximum");
+					return err(start+"minimum must be smaller than maximum"+wa);
 				}
 			}
 			else{
-				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' is not a number");
-				if(isNaN(spl2[1])) return err("'"+spl2[1]+"' is not a number");
-				if(Number(spl2[0]) >= Number(spl2[1])) return err("Minimum must be smaller than maximum");
+				if(isNaN(spl2[0])) return err(start+"'"+spl2[0]+"' is not a number"+wa);
+				if(isNaN(spl2[1])) return err(start+"'"+spl2[1]+"' is not a number"+wa);
+				if(Number(spl2[0]) >= Number(spl2[1])) return err(start+"minimum must be smaller than maximum"+wa);
 			}
 			
 			pri.value.min_eqn.te = spl2[0];
@@ -295,13 +298,15 @@ function convert_text_to_prior(te,pri_pos,dist)
 	
 	case "exp":
 		{
-			if(spl2.length != 1) return err("Expected one value in the brackets");
+			let wa = ". The exponential prior should have the format 'exp(mean)'";
+			
+			if(spl2.length != 1) return err(start+"expected one value in the brackets"+wa);
 			if(dist == true){
-				if(!is_eqn(spl2[0],"mean",{positive:true})) return err("'"+spl2[0]+"' is not valid");
+				if(!is_eqn(spl2[0],"mean",{positive:true})) return err(start+"'"+spl2[0]+"' is not valid"+wa);
 			}
 			else{
-				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' is not a number");
-				if(Number(spl2[0]) <= 0) return err("Mean must be positive");
+				if(isNaN(spl2[0])) return err(start+"'"+spl2[0]+"' is not a number"+wa);
+				if(Number(spl2[0]) <= 0) return err(start+"mean must be positive"+wa);
 			}
 			
 			er = check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,spl2[0]); if(er) return er;
@@ -312,15 +317,17 @@ function convert_text_to_prior(te,pri_pos,dist)
 		
 	case "normal":
 		{
+			let wa = ". The normal prior should have the format 'normal(mean,sd)'";
+			
 			if(spl2.length != 2) return err("Expected two values in the brackets");
 			if(dist == true){
-				if(!is_eqn(spl2[0],"mean",{})) return err("'"+spl2[0]+"' is not valid");
-				if(!is_eqn(spl2[1],"sd",{positive:true})) return err("'"+spl2[1]+"' is not valid");
+				if(!is_eqn(spl2[0],"mean",{})) return err(start+"'"+spl2[0]+"' is not valid"+wa);
+				if(!is_eqn(spl2[1],"sd",{positive:true})) return err(start+"'"+spl2[1]+"' is not valid"+wa);
 			}
 			else{
-				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' is not a number");
-				if(isNaN(spl2[1])) return err("'"+spl2[1]+"' is not a number");
-				if(Number(spl2[1]) <= 0) return err("Standard deviation must be positive");
+				if(isNaN(spl2[0])) return err(start+"'"+spl2[0]+"' is not a number"+wa);
+				if(isNaN(spl2[1])) return err(start+"'"+spl2[1]+"' is not a number"+wa);
+				if(Number(spl2[1]) <= 0) return err(start+"standard deviation must be positive"+wa);
 			}
 		
 			er = check_thresh(NORM_TE,SD_QU,spl2[1]); if(er) return er;
@@ -333,16 +340,18 @@ function convert_text_to_prior(te,pri_pos,dist)
 		
 	case "gamma":
 		{
-			if(spl2.length != 2) return err("Expected two values in the brackets");
+			let wa = ". The gamma prior should have the format 'gamma(mean,cv)'";
+			
+			if(spl2.length != 2) return err(start+"expected two values in the brackets"+wa);
 			if(dist == true){
-				if(!is_eqn(spl2[0],"mean",{positive:true})) return err("'"+spl2[0]+"' is not valid");
-				if(!is_eqn(spl2[1],"cv",{positive:true})) return err("'"+spl2[1]+"' is not valid");
+				if(!is_eqn(spl2[0],"mean",{positive:true})) return err(start+"'"+spl2[0]+"' is not valid"+wa);
+				if(!is_eqn(spl2[1],"cv",{positive:true})) return err(start+"'"+spl2[1]+"' is not valid"+wa);
 			}
 			else{
-				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' is not a number");
-				if(isNaN(spl2[1])) return err("'"+spl2[1]+"' is not a number");
-				if(Number(spl2[0]) <= 0) return err("Mean must be positive");
-				if(Number(spl2[1]) <= 0) return err("CV must be positive");
+				if(isNaN(spl2[0])) return err(start+"'"+spl2[0]+"' is not a number"+wa);
+				if(isNaN(spl2[1])) return err(start+"'"+spl2[1]+"' is not a number"+wa);
+				if(Number(spl2[0]) <= 0) return err(start+"mean must be positive"+wa);
+				if(Number(spl2[1]) <= 0) return err(start+"cv must be positive"+wa);
 			}
 			
 			er = check_thresh(GAMMA_TE,CV_QU,spl2[1]); if(er) return er;
@@ -355,16 +364,18 @@ function convert_text_to_prior(te,pri_pos,dist)
 		
 	case "log-normal":
 		{
-			if(spl2.length != 2) return err("Expected two values in the brackets");
+			let wa = ". The log-normal prior should have the format 'log-normal(mean,cv)'";
+			
+			if(spl2.length != 2) return err(start+"expected two values in the brackets"+wa);
 			if(dist == true){
-				if(!is_eqn(spl2[0],"mean",{})) return err("'"+spl2[0]+"' is not valid");
-				if(!is_eqn(spl2[1],"cv",{positive:true})) return err("'"+spl2[1]+"' is not valid");
+				if(!is_eqn(spl2[0],"mean",{})) return err(start+"'"+spl2[0]+"' is not valid"+wa);
+				if(!is_eqn(spl2[1],"cv",{positive:true})) return err(start+"'"+spl2[1]+"' is not valid"+wa);
 			}
 			else{
-				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' is not a number");
-				if(isNaN(spl2[1])) return err("'"+spl2[1]+"' is not a number");
-				if(Number(spl2[0]) <= 0) return err("Mean must be positive");
-				if(Number(spl2[1]) <= 0) return err("CV must be positive");
+				if(isNaN(spl2[0])) return err(start+"'"+spl2[0]+"' is not a number"+wa);
+				if(isNaN(spl2[1])) return err(start+"'"+spl2[1]+"' is not a number"+wa);
+				if(Number(spl2[0]) <= 0) return err(start+"mean must be positive"+wa);
+				if(Number(spl2[1]) <= 0) return err(start+"cv must be positive"+wa);
 			}
 			
 			er = check_thresh(LOGNORM_TE,CV_QU,spl2[1]); if(er) return er;
@@ -377,16 +388,18 @@ function convert_text_to_prior(te,pri_pos,dist)
 		
 	case "beta":
 		{
-			if(spl2.length != 2) return err("Expected two values in the brackets");
+			let wa = ". The beta prior should have the format 'beta(alpha,beta)'";
+			
+			if(spl2.length != 2) return err(start+"expected two values in the brackets"+wa);
 			if(dist == true){
-				if(!is_eqn(spl2[0],"alpha",{})) return err("'"+spl2[0]+"' is not valid");
-				if(!is_eqn(spl2[1],"beta",{positive:true})) return err("'"+spl2[1]+"' is not valid");
+				if(!is_eqn(spl2[0],"alpha",{})) return err(start+"'"+spl2[0]+"' is not valid"+wa);
+				if(!is_eqn(spl2[1],"beta",{positive:true})) return err(start+"'"+spl2[1]+"' is not valid"+wa);
 			}
 			else{
-				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' is not a number");
-				if(isNaN(spl2[1])) return err("'"+spl2[1]+"' is not a number");
-				if(Number(spl2[0]) <= 0) return err("Alpha must be positive");
-				if(Number(spl2[1]) <= 0) return err("Beta must be positive");
+				if(isNaN(spl2[0])) return err(start+"'"+spl2[0]+"' is not a number"+wa);
+				if(isNaN(spl2[1])) return err(start+"'"+spl2[1]+"' is not a number"+wa);
+				if(Number(spl2[0]) <= 0) return err(start+"alpha value must be positive"+wa);
+				if(Number(spl2[1]) <= 0) return err(start+"beta must be positive"+wa);
 			}
 			
 			er = check_thresh(BETA_TE,BETA_QU,spl2[1]); if(er) return er;
@@ -399,15 +412,17 @@ function convert_text_to_prior(te,pri_pos,dist)
 
 	case "bernoulli":
 		{
-			if(spl2.length != 1) return err("Expected one value in the brackets");
+			let wa = ". The Bernoulli prior should have the format 'bern(mean)'";
+			
+			if(spl2.length != 1) return err(start+"expected one value in the brackets"+wa);
 			if(dist == true){
 				if(!is_eqn(spl2[0],"mean",{zero_one_range:true})){
-					return err("'"+spl2[0]+"' is not valid");
+					return err(start+"'"+spl2[0]+"' is not valid"+wa);
 				}
 			}
 			else{
-				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' is not a number");
-				if(Number(spl2[0]) < 0 || Number(spl2[0]) > 1) return err("Mean must be between 0 and 1");
+				if(isNaN(spl2[0])) return err(start+"'"+spl2[0]+"' is not a number"+wa);
+				if(Number(spl2[0]) < 0 || Number(spl2[0]) > 1) return err(start+"mean must be between 0 and 1"+wa);
 			}
 			
 			er = check_thresh(BERN_TE,BERNP_QU,spl2[0]); if(er) return er;
@@ -418,13 +433,15 @@ function convert_text_to_prior(te,pri_pos,dist)
 		
 	case "dirichlet":
 		{
-			if(spl2.length != 1) return err("Expected one value in the brackets");
+			let wa = ". The Dirichlet prior should have the format 'dir(alpha)'";
+			
+			if(spl2.length != 1) return err(start+"expected one value in the brackets"+wa);
 			if(dist == true){
-				if(!is_eqn(spl2[0],"alpha",{positive:true})) return err("'"+spl2[0]+"' is not valid");
+				if(!is_eqn(spl2[0],"alpha",{positive:true})) return err(start+"'"+spl2[0]+"' is not valid"+wa);
 			}
 			else{
-				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' is not a number");
-				if(Number(spl2[0]) <= 0) return err("Alpha must be positive");
+				if(isNaN(spl2[0])) return err(start+"'"+spl2[0]+"' is not a number"+wa);
+				if(Number(spl2[0]) <= 0) return err(start+"alpha must be positive"+wa);
 			}
 			
 			pri.value.alpha_eqn.te = spl2[0];
@@ -432,19 +449,23 @@ function convert_text_to_prior(te,pri_pos,dist)
 		break;
 	
 	case "mdir":
-		if(spl2.length != 1) return err("Expected one value in the brackets");
+		{
+			let wa = ". The modified Dirichlet prior should have the format 'mdir(sigma)'";
+			
+			if(spl2.length != 1) return err(start+"expected one value in the brackets"+wa);
 			if(dist == true){
-				return err("mdir should not be applied to a distribution");
+				return err(start+"mdir should not be applied to a distribution");
 			}
 			else{
-				if(isNaN(spl2[0])) return err("'"+spl2[0]+"' is not a number");
-				if(Number(spl2[0]) <= 0) return err("Sigma must be positive");
+				if(isNaN(spl2[0])) return err(start+"'"+spl2[0]+"' is not a number"+wa);
+				if(Number(spl2[0]) <= 0) return err(start+"sigma must be positive"+wa);
 			}
 			
 			pri.value.sigma_eqn.te = spl2[0];
+		}
 		break;
 		
-	default:  err("Distribution '"+type+"' not recognised");
+	default: err(start+"distribution '"+type+"' not recognised");
 	}
 
 	return pri;

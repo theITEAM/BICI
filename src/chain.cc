@@ -104,7 +104,7 @@ void Chain::burn_update(unsigned int s)
 	if(burn_info.on){
 		state.dif_thresh = DIF_THRESH_BURNIN;
 		
-		cor_matrix.add_sample(state.param_val,cor_matrix.n/3);
+		cor_matrix.add_sample(state.get_param_val_prop(),cor_matrix.n/3);
 	
 		if(s%10 == 0){
 			state.update_individual_sampler();
@@ -127,7 +127,7 @@ void Chain::pas_burn_update(unsigned int s, unsigned int g, unsigned int gen_upd
 	burn_info.pas_setup(s,g,gen_update,phi);
 	burn_info.add_L(like_total_obs()); 
 	
-	cor_matrix.add_sample(state.param_val,gen_update);
+	cor_matrix.add_sample(state.get_param_val_prop(),gen_update);
 
 	if(s%10 == 0){
 		state.update_individual_sampler();
@@ -494,7 +494,7 @@ void Chain::update_init()
 					auto ie = ieg.list[j].index;
 					
 					vector <unsigned int> vec;
-					vec.push_back(par.param_vec_ref[0]);
+					vec.push_back(par.get_param_vec(0));
 					vec.push_back(p);
 					vec.push_back(ie);
 					
@@ -518,7 +518,7 @@ void Chain::update_init()
 						auto &par = model.param[ieg.omega[j][k]];
 						if(par.variety != CONST_PARAM){
 							vector <unsigned int> vec;
-							vec.push_back(par.param_vec_ref[0]);
+							vec.push_back(par.get_param_vec(0));
 							vec.push_back(p);
 							vec.push_back(i);
 							vec.push_back(j);
@@ -810,7 +810,7 @@ void Chain::update_init()
 					
 	for(auto i = 0u; i < 100; i++){
 		auto param_val = model.param_sample();
-		cor_matrix.add_sample(param_val,LARGE);
+		cor_matrix.add_sample(model.get_param_val_prop(param_val),LARGE);
 	}
 	
 	for(auto &pro : proposal) pro.update_sampler(cor_matrix);
@@ -863,148 +863,221 @@ void Chain::add_parameter_prop(const vector <unsigned int> &vec)
 }
 
 
+/// Used to order affects
+bool prop_time_ord(const PropTime &pt1, const PropTime &pt2)                      
+{ return (pt1.time > pt2.time); };  
+
+
+/// Generates a banner
+string Chain::banner(string te) const 
+{
+	stringstream ss;
+	
+	auto len = 70;
+	auto num = (len-te.length())/2-1;
+	
+	for(auto i = 0u; i < num; i++) ss << "*";
+	ss << " " << te << " ";
+	for(auto i = 0u; i < len-num-te.length(); i++) ss << "*";
+	
+	return ss.str();
+}
+
+
 /// Outputs diagnostics about the proposals
 string Chain::diagnostics(unsigned int total_time, unsigned int anneal_time) const
 {                    
 	stringstream ss;
 	
-	if(anneal_time != UNSET){
-		ss << "Annealing percentage = " 
-			 << cpu_percent(anneal_time,(anneal_time+total_time)) << endl << endl;
-	}
-	
 	{	
-		ss << "MCMC PROPOSAL DIAGNOSTICS" << endl << endl;
-
-		auto sum_samp = 0.0, sum_prop = 0.0, sum_update = 0.0, sum_mh = 0.0;
-		auto sum_trans_tree = 0.0, sum_trans_tree_swap_inf = 0.0;
-		auto sum_trans_tree_mut = 0.0, sum_trans_tree_mut_local = 0.0;
-		auto sum_init_ind_local = 0.0, sum_ind_local = 0.0;
-		auto sum_temp1 = 0.0, sum_temp2 = 0.0, sum_temp3 = 0.0, sum_temp4 = 0.0, sum_temp5 = 0.0;
-		auto p_sel = UNSET;
+		auto sum_param_prop = 0.0, sum_event_prop = 0.0;
+		auto sum_joint_prop = 0.0, sum_tree_prop = 0.0;
+		auto sum_prop = 0.0;
+		
 		for(auto &pro : proposal){
-			sum_prop += pro.timer[PROP_TIMER];
-			sum_samp += pro.timer[SAMPLE_TIMER];
-			sum_update += pro.timer[UPDATESAMP_TIMER];
-			sum_mh += pro.timer[MH_TIMER];
-			sum_init_ind_local += pro.timer[INIT_IND_LOCAL_TIMER];
-			sum_ind_local += pro.timer[IND_LOCAL_TIMER];
-			sum_trans_tree += pro.timer[TRANS_TREE_TIMER];
-			sum_trans_tree_swap_inf += pro.timer[TRANS_TREE_SWAP_INF_TIMER];
-			sum_trans_tree_mut += pro.timer[TRANS_TREE_MUT_TIMER];
-			sum_trans_tree_mut_local += pro.timer[TRANS_TREE_MUT_LOCAL_TIMER];
-			sum_temp1 += pro.timer[TEMP1_TIMER];
-			sum_temp2 += pro.timer[TEMP2_TIMER];
-			sum_temp3 += pro.timer[TEMP3_TIMER];
-			sum_temp4 += pro.timer[TEMP4_TIMER];
-			sum_temp5 += pro.timer[TEMP5_TIMER];
+			auto t = pro.timer[PROP_TIMER];
+			sum_prop += t;
 			
-			auto p = pro.p_prop;
-			if(p != UNSET && p != p_sel && model.species.size() > 1){
-				ss << "<< For species: " << model.species[p].name << " >>" << endl;
-				p_sel = p;
+			switch(pro.type){
+			case PARAM_PROP:
+			case INIT_COND_FRAC_PROP: case IE_PROP: case IE_VAR_PROP:
+			case IE_COVAR_PROP: case IE_VAR_CV_PROP:
+				sum_param_prop += t;
+				break;
+			
+			case IND_EVENT_TIME_PROP: case IND_MULTI_EVENT_PROP: case IND_EVENT_ALL_PROP:
+			case IND_OBS_SAMP_PROP: case IND_OBS_RESIM_PROP: case IND_OBS_RESIM_SINGLE_PROP:
+			case IND_UNOBS_RESIM_PROP: case IND_ADD_REM_PROP: case IND_ADD_REM_TT_PROP:
+			case POP_ADD_REM_LOCAL_PROP: case POP_MOVE_LOCAL_PROP: case POP_IC_LOCAL_PROP:
+			case POP_END_LOCAL_PROP: case POP_SINGLE_LOCAL_PROP: case POP_IC_PROP:
+			case POP_IC_SWAP_PROP:
+			case IND_LOCAL_PROP: case CORRECT_OBS_TRANS_PROP:
+			case IND_OBS_SWITCH_ENTER_SOURCE_PROP: case IND_OBS_SWITCH_LEAVE_SINK_PROP:
+			case MBPII_PROP:  case MBP_IC_POP_PROP:
+			case MBP_IC_POPTOTAL_PROP: case MBP_IC_RESAMP_PROP:
+				sum_event_prop += t;
+				break;
+				
+			case MBP_PROP: 
+			case PAR_EVENT_FORWARD_PROP: case PAR_EVENT_FORWARD_SQ_PROP:
+			case PAR_EVENT_BACKWARD_SQ_PROP:
+			 sum_joint_prop += t;
+				break;
+			
+			case TRANS_TREE_PROP: case TRANS_TREE_SWAP_INF_PROP: case TRANS_TREE_MUT_PROP:
+			case TRANS_TREE_MUT_LOCAL_PROP:
+				sum_tree_prop += t;
+				break;
 			}
-			
-			ss << pro.diagnostics(total_time);
-			
-			ss << endl;
 		}
-		ss << "Overall: proposal - " << cpu_percent(sum_prop,total_time) << "  ";
-		ss << "sample - " << cpu_percent(sum_samp,total_time) 
-				 << "  update - " << cpu_percent(sum_update,total_time)
-				 << "  mh - " << cpu_percent(sum_mh,total_time)
-				 << "  init ind local - " << cpu_percent(sum_init_ind_local,total_time)
-				 << "  ind local after filt - " << cpu_percent(sum_ind_local,total_time)
-				 << "  trans-tree - " << cpu_percent(sum_trans_tree,total_time)
-				 << "  trans-tree-mut - " << cpu_percent(sum_trans_tree_mut,total_time)
-				 << "  trans-tree-mut-local - " << cpu_percent(sum_trans_tree_mut_local,total_time)
-				 << "  temp1 - " << cpu_percent(sum_temp1,total_time)
-				 << "  temp2 - " << cpu_percent(sum_temp2,total_time)
-				 << "  temp3 - " << cpu_percent(sum_temp3,total_time)
-				 << "  temp4 - " << cpu_percent(sum_temp4,total_time)
-				 << "  temp5 - " << cpu_percent(sum_temp5,total_time)
-				 << endl;
-		ss << endl;	
+		
+		
+		ss << banner("PROPOSALS TYPES") << endl;
+		ss << "Shows how run-time CPU time is distributed into different proposal types:" << endl << endl;
+			
+		if(sum_param_prop != 0){
+			ss << "Parameters - " << cpu_percent(sum_param_prop,total_time) << endl;
+		}
+		
+		if(sum_event_prop != 0){
+			ss << "Events - " << cpu_percent(sum_event_prop,total_time);
+
+			ss << " (ind update:" << cpu_percent(state.timer[IND_TIMER],total_time) << " on which " << cpu_percent(state.timer[IND_POP_UPDATE_TIMER],total_time) << " is from population)" <<  endl;
+
+		}
+		
+		if(sum_joint_prop != 0){
+			ss << "Joint event/parameter - " << cpu_percent(sum_joint_prop,total_time) << endl;
+		}
+
+		if(sum_tree_prop != 0){
+			ss << "Transmission tree - " << cpu_percent(sum_tree_prop,total_time) << endl;
+		}
+		
+		auto other = total_time-sum_prop;
+		ss << "Non-proposal - " << cpu_percent(other,total_time);
+		ss << " (samplers: " << cpu_percent(state.timer[UPDATE_SAMPLER_TIMER],total_time);
+    ss << ", o/p params: " << cpu_percent(output.timer[PARAM_OUTPUT],total_time);
+		ss << ", o/p state: " << cpu_percent(output.timer[STATE_OUTPUT],total_time);
+		ss << ", checking: " << cpu_percent(state.timer[CHECK_TIMER],total_time);
+		ss << ")" << endl;
+		
+		if(anneal_time != UNSET){
+			ss << "Annealing percentage - " 
+				<< cpu_percent(anneal_time,(anneal_time+total_time)) << endl << endl;
+		}
+
+	  ss << endl;
+
+		ss <<  "Total CPU time: " << total_time/CLOCKS_PER_SEC << " seconds" << endl;
+	
+		ss << endl << endl;
 	}
 	
 	{
-		ss << "UPDATE AND RESTORE DIAGNOSTICS" << endl << endl;
+		ss << banner("PARAMETER UPDATE") << endl;
+		ss << "Determines which parts of parameter update use most CPU" << endl << endl;
+		
 		auto sum_update = 0.0, sum_restore = 0.0;
 		for(auto i = 0u; i < AFFECT_MAX; i++){	
-			switch(i){
-			case SPLINE_PRIOR_AFFECT: ss << "Spline prior"; break; 
-			case PRIOR_AFFECT: ss << "Prior"; break; 
-			case DIST_AFFECT: ss << "Distribution"; break; 
-			case SPLINE_AFFECT: ss << "Spline"; break;  
-			case EXP_FE_AFFECT: ss << "Exp FE"; break; 
-			case DIV_VALUE_AFFECT: ss << "Div value"; break; 
-			case DIV_VALUE_FAST_AFFECT: ss << "Div value fast"; break; 
-			case DIV_VALUE_LINEAR_AFFECT: ss << "Div value linear"; break; 
-			case MARKOV_LIKE_AFFECT: ss << "Markov like"; break; 
-			case POP_AFFECT: ss << "Population"; break; 
-			case NM_TRANS_AFFECT: ss << "NM trans"; break; 
-			case NM_TRANS_BP_AFFECT: ss << "NM trans bp"; break; 
-			case NM_TRANS_INCOMP_AFFECT: ss << "NM trans incomp"; break; 
-			case OMEGA_AFFECT: ss << "Omega"; break; 
-			case EXP_IE_AFFECT: ss << "Exp IE"; break; 
-			case LIKE_IE_AFFECT: ss << "Like IE"; break; 
-			case INDFAC_INT_AFFECT: ss << "Individual factor"; break; 
-			case MARKOV_POP_AFFECT: ss << "Markov Pop"; break; 
-			case OBS_EQN_AFFECT: ss << "Obs Eqn"; break; 
-			case LIKE_OBS_IND_AFFECT: ss << "Like Obs Ind"; break; 
-			case LIKE_OBS_POP_AFFECT: ss << "Like Obs Pop"; break; 
-			case LIKE_OBS_POP_TRANS_AFFECT: ss << "Like Obs Pop Trans"; break; 
-			case LIKE_UNOBS_TRANS_AFFECT: ss << "Like unobs trans"; break;
-			case POP_DATA_CGL_TGL_AFFECT: ss << "Pop data cgl tgl"; break;
-			case LIKE_INIT_COND_AFFECT: ss << "Like init cond"; break;
-			case PRIOR_INIT_COND_AFFECT: ss << "prior init cond"; break;
-			case LIKE_GENETIC_PROCESS_AFFECT: ss << "Like genetic process"; break; 
-			case GENETIC_VALUE_AFFECT: ss << "Genetic value"; break; 
-			case LIKE_GENETIC_OBS_AFFECT: ss << "Like genetic obs"; break; 
+			auto update_num = cpu_percent(state.update_timer[i],total_time);
+			auto restore_num = cpu_percent(state.restore_timer[i],total_time);
+			
+			if(!(update_num == "0%" && restore_num == "0%")){
+				switch(i){
+				case SPLINE_PRIOR_AFFECT: ss << "Spline prior"; break; 
+				case PRIOR_AFFECT: ss << "Prior"; break; 
+				case DIST_AFFECT: ss << "Distribution"; break; 
+				case SPLINE_AFFECT: ss << "Spline"; break;  
+				case EXP_FE_AFFECT: ss << "Exp FE"; break; 
+				case DIV_VALUE_AFFECT: ss << "Div value"; break; 
+				case DIV_VALUE_FAST_AFFECT: ss << "Div value fast"; break; 
+				case DIV_VALUE_LINEAR_AFFECT: ss << "Div value linear"; break; 
+				case MARKOV_LIKE_AFFECT: ss << "Markov like"; break; 
+				case POP_AFFECT: ss << "Population"; break; 
+				case NM_TRANS_AFFECT: ss << "NM trans"; break; 
+				case NM_TRANS_BP_AFFECT: ss << "NM trans bp"; break; 
+				case NM_TRANS_INCOMP_AFFECT: ss << "NM trans incomp"; break; 
+				case OMEGA_AFFECT: ss << "Omega"; break; 
+				case EXP_IE_AFFECT: ss << "Exp IE"; break; 
+				case LIKE_IE_AFFECT: ss << "Like IE"; break; 
+				case INDFAC_INT_AFFECT: ss << "Individual factor"; break; 
+				case MARKOV_POP_AFFECT: ss << "Markov Pop"; break; 
+				case OBS_EQN_AFFECT: ss << "Obs Eqn"; break; 
+				case LIKE_OBS_IND_AFFECT: ss << "Like Obs Ind"; break; 
+				case LIKE_OBS_POP_AFFECT: ss << "Like Obs Pop"; break; 
+				case LIKE_OBS_POP_TRANS_AFFECT: ss << "Like Obs Pop Trans"; break; 
+				case LIKE_UNOBS_TRANS_AFFECT: ss << "Like unobs trans"; break;
+				case POP_DATA_CGL_TGL_AFFECT: ss << "Pop data cgl tgl"; break;
+				case LIKE_INIT_COND_AFFECT: ss << "Like init cond"; break;
+				case PRIOR_INIT_COND_AFFECT: ss << "prior init cond"; break;
+				case LIKE_GENETIC_PROCESS_AFFECT: ss << "Like genetic process"; break; 
+				case GENETIC_VALUE_AFFECT: ss << "Genetic value"; break; 
+				case LIKE_GENETIC_OBS_AFFECT: ss << "Like genetic obs"; break; 
+				}
+				ss << "  ";
+				ss << "update - " << update_num << "     ";
+		
+				ss << "restore - " << restore_num << endl;
 			}
-			ss << "  ";
-			ss << "update - " << cpu_percent(state.update_timer[i],total_time) << "  ";
-	
-			ss << "restore - " << cpu_percent(state.restore_timer[i],total_time) << endl;
 			
 			sum_update += state.update_timer[i];
 			sum_restore += state.restore_timer[i];
 		}
-		ss << "Overall: update - " << cpu_percent(sum_update ,total_time) << "  ";
-		ss << "restore - " << cpu_percent(sum_restore,total_time) << endl;
-			
-		ss << endl;
+		
+		ss << endl << endl;
 	}
+	
+	{
+		vector <PropTime> prop_time;
+		for(auto i = 0u; i < proposal.size(); i++){
+			PropTime pt; pt.i = i; pt.time = proposal[i].timer[PROP_TIMER];
+			prop_time.push_back(pt); 
+		}
+		
+		sort(prop_time.begin(),prop_time.end(),prop_time_ord);
+		
+		ss << banner("MCMC PROPOSAL DIAGNOSTICS") << endl;
+		ss << "Diagnostics for different proposals (ordered by CPU time):";
+		ss << endl << endl;
+		
+		for(const auto &pt : prop_time){
+			const auto &pro = proposal[pt.i];
+			ss << pro.diagnostics(total_time);
+			ss << endl;
+		}
+	}
+	
+	
 
+	/*
 	for(const auto &ssp : state.species){
+		ss << "Markov " << cpu_percent(ssp.timer[MARKOV_TIMER],total_time) << endl;
 		ss << "Linear " << cpu_percent(ssp.timer[LINEAR_TIMER],total_time) << endl;
 		ss << "Linear zero " << cpu_percent(ssp.timer[LINEARZERO_TIMER],total_time) << endl;
+		ss << "Linear nopop " << cpu_percent(ssp.timer[LINEARNOPOP_TIMER],total_time) << endl;
 		ss << "Splinechange " << cpu_percent(ssp.timer[SPLINECHANGE_TIMER],total_time) << endl;
 		ss << "Splinechangegrad " << cpu_percent(ssp.timer[SPLINECHANGEGRAD_TIMER],total_time) << endl;
 	}
+	*/
 	
-	ss << "Output param " << cpu_percent(output.timer[PARAM_OUTPUT],total_time) << endl;
-	ss << "Output state " << cpu_percent(output.timer[STATE_OUTPUT],total_time) << endl;
 	
+	/*
 	ss <<  "Gen dif CPU  time: " << cpu_percent(state.timer[GEN_DIF_TIMER],total_time) << endl;
 	ss <<  "trans tree like CPU  time: " << cpu_percent(state.timer[TRANS_TREE_LIKE_TIMER],total_time) << endl;
 	ss <<  "genetic proc like CPU  time: " << cpu_percent(state.timer[GENETIC_PROC_LIKE_TIMER],total_time) << endl;
 	ss <<  "genetic obs like CPU  time: " << cpu_percent(state.timer[GENETIC_OBS_LIKE_TIMER],total_time) << endl;
 	
-	ss <<  "ind update: " << cpu_percent(state.timer[IND_TIMER],total_time) << endl;
-	
-	ss <<  "ind pop update: " << cpu_percent(state.timer[IND_POP_UPDATE_TIMER],total_time) << endl;
+
 	
 	ss <<  "Update sampler: " << cpu_percent(state.timer[UPDATE_SAMPLER_TIMER],total_time) << endl;
 
 	ss <<  "Restore ind: " << cpu_percent(state.timer[RESTORE_TIMER],total_time) << endl;
 	ss << endl;
+	*/
 	
-	ss <<  "Check CPU  time: " << cpu_percent(state.timer[CHECK_TIMER],total_time) << endl;
 	ss << endl;
 
-	ss <<  "Total CPU  time: " << total_time/CLOCKS_PER_SEC << " seconds" << endl;
-	
 	if(false){
 		for(const auto &ssp : state.species){
 			ss << ssp.source_sampler.print();

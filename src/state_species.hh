@@ -123,6 +123,7 @@ class StateSpecies                         // Stores information about the state
 		vector <double> markov_tree_rate;      // Rates going up Markov tree
 	
 		void initialise_arrays();
+		void reset_arrays();
 		vector <double> sample_ie() const;
 		void sample_ie_Amatrix();
 		void ie_Amatrix_sampler_init();

@@ -11,7 +11,7 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-simulation start=0 end=400 timestep=0.5
+simulation start=0 end=400 timestep=0.25
 
 inference start=0 end=400 timestep=0.5 nchain=3
 

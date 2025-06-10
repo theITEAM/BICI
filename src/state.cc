@@ -697,12 +697,12 @@ Like State::update_param(const vector <AffectLike> &affect_like, const vector <d
 			{
 				auto p = alike.num, e = alike.num2;
 				change_add(species[p].likelihood_markov_value(e,alike.list,popnum_t));
-			}
+			} 
 			break;
 			
 		case DIV_VALUE_FAST_AFFECT:   // Updates div.value on Markov transition
 			{
-				auto p = alike.num;//, e = alike.num2;
+				auto p = alike.num;
 				change_add(species[p].likelihood_markov_value_fast(alike.me_list,alike.list,popnum_t,param_store,spline_val));
 			}
 			break;
@@ -1155,7 +1155,7 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 {
 	Particle part;
 	part.s = s; part.chain = chain;
-	part.param_val = param_val;
+	part.param_val_prop = model.get_param_val_prop(param_val);
 	part.like = like;
 	part.dir_out = derive_calculate();
 	
@@ -1211,10 +1211,10 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 }
 
 
-/// Generates a particle from the state
-void State::set_particle(const Particle &part)
+/// Generates a state from a particle 
+void State::set_particle(const Particle &part, bool calc_like)
 {
-	param_val = part.param_val;
+	param_val = model.get_param_val(part.param_val_prop);
 	like = part.like;
 	
 	spline_init();
@@ -1233,7 +1233,8 @@ void State::set_particle(const Particle &part)
 		genetic_value.inf_node = part.inf_node;
 	}
 	
-	likelihood_from_scratch();
+	if(calc_like) likelihood_from_scratch();
+	else popnum_t = model.calculate_popnum_t(species);
 }
 
 
@@ -1333,8 +1334,6 @@ void State::back_init()
 /// Restores the state to the orignal
 void State::restore_back()
 {
-	timer[RESTORE_TIMER] -= clock();
-	
 	for(auto &ssp : species) ssp.restore_back();
 	
 	for(const auto &bp : back_pop){
@@ -1348,8 +1347,6 @@ void State::restore_back()
 			break;
 		}
 	}
-	
-	timer[RESTORE_TIMER] += clock();
 }
 
 
@@ -1359,3 +1356,63 @@ unsigned int State::get_ti(double t) const
 	return (unsigned int)(OVER_ONE*(t-model.details.t_start)/model.details.dt);
 }
 
+
+/// Gets param_val_prop from a full parameter vector (i.e. removes reparam)
+vector <double> State::get_param_val_prop() const
+{
+	return model.get_param_val_prop(param_val);
+}
+
+
+/// Gets the estimated rate for a 
+double State::get_trans_rate_est(unsigned int p, unsigned int tr, unsigned int ti) const
+{
+	const auto &tra = model.species[p].tra_gl[tr];
+	const auto &eq = model.eqn[tra.dist_param[0].eq_ref];
+		
+	switch(tra.type){
+	case EXP_RATE: case EXP_RATE_NM:
+		return eq.calculate(ti,popnum_t[ti],param_val,spline_val); 
+			
+	case EXP_MEAN: case EXP_MEAN_NM: case GAMMA: case ERLANG: case LOG_NORMAL: 
+	case PERIOD: case WEIBULL:
+		return 1.0/(TINY+eq.calculate(ti,popnum_t[ti],param_val,spline_val)); 
+	}
+	return UNSET;
+}
+	
+			
+/// Gets transition rates  
+vector < vector <double> > State::get_population_rates(unsigned int p) const
+{
+	const auto &sp = model.species[p];
+	
+	vector < vector <double> > rate;
+	rate.resize(sp.tra_gl.size());
+	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+		rate[tr].resize(T);
+		
+		const auto &tra = sp.tra_gl[tr];
+		const auto &eq = model.eqn[tra.dist_param[0].eq_ref];
+		if(sp.type == INDIVIDUAL && eq.pop_ref.size() == 0){
+			for(auto ti = 0u; ti < T; ti++){		
+				rate[tr][ti] = 0;
+			}
+		}
+		else{
+			if(eq.time_vari){
+				for(auto ti = 0u; ti < T; ti++){		
+					rate[tr][ti] = get_trans_rate_est(p,tr,ti);
+				}
+			}
+			else{
+				auto va = get_trans_rate_est(p,tr,0);
+				for(auto ti = 0u; ti < T; ti++){		
+					rate[tr][ti] = va;
+				}
+			}
+		}
+	}
+	
+	return rate;
+}

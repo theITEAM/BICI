@@ -919,12 +919,12 @@ function load_map(ans)
 
 
 /// Gets the number of steps
-function get_step(v1,v2)
+function get_step(v1,v2,min)
 {
 	let ideal = 20;
 	let dif = v2-v1;
 
-	let step = 1; 
+	let step = min; 
 	while(dif/step > ideal){
 		if(dif/(2*step) < ideal){ step *= 2; break;} 
 		if(dif/(5*step) < ideal){ step *= 5; break;} 
@@ -939,7 +939,7 @@ function get_div(v1,v2,step)
 {
 	let list=[];
 	for(let i = Math.floor(v1/step)+1; i <= Math.floor(v2/step); i++){
-		list.push(step*i);
+		list.push(round_small(step*i));
 	}
 	return list;
 }
@@ -978,7 +978,7 @@ function plot_grid(p,cl,dx,dy)
 	
 	let lay = get_lay("AnnotationMap");
 	
-	let col = LLBLUE;
+	let col = MLLBLUE;
 	let col_text = LBLUE;
 	
 	let xst=[], yst=[];
@@ -990,7 +990,7 @@ function plot_grid(p,cl,dx,dy)
 			let p1 = trans_point_rev(0,dy,cam,lay);
 			let p2 = trans_point_rev(dx,0,cam,lay);
 			
-			let step = get_step(p1.x,p2.x);
+			let step = get_step(p1.x,p2.x,1);
 			
 			divx = get_div(p1.x,p2.x,step);
 			divy = get_div(p1.y,p2.y,step);
@@ -1015,7 +1015,7 @@ function plot_grid(p,cl,dx,dy)
 			let pg1 = transform_latlng_inv(p1.x,p1.y,cam,lay);
 			let pg2 = transform_latlng_inv(p2.x,p2.y,cam,lay);
 			
-			let step = get_step(pg1.lng,pg2.lng);
+			let step = get_step(pg1.lng,pg2.lng,0.1);
 			
 			divx = get_div(pg1.lng,pg2.lng,step);
 			divy = get_div(pg1.lat,pg2.lat,step);

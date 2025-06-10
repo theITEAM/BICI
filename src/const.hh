@@ -27,7 +27,7 @@ const bool linearise_speedup = true;                 // Linearisation speed-up o
 // This speeds up by taking account of linear population terms when calculation div values
 
 const bool linearise_speedup2 = true;                // Linearisation speed-up likelihood
-// This speeds up by considering changes to non-population terms when calculating div values
+// This speeds up by considering changes to non-population terms when calculating div 
 
 const bool linearise_speedup3 = true;                 // Linearisation speed-up of likelihood
 // This speeds up update_ind by updating value based on changes in population (good for sums)
@@ -78,10 +78,10 @@ enum TransVariety { NORMAL, SOURCE_TRANS, SINK_TRANS };
 enum Operation { SIM, INF, PPC, MODE_UNSET };
 
 // Different prior possibilities
-enum PriorPos { UNIFORM_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, DIRICHLET_PR, MDIR_PR };
+enum PriorPos { UNIFORM_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, DIRICHLET_PR, MDIR_PR, UNSET_PR };
  
 // Different possible command types
-enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG,
+enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, INF_PARAM_STATS, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, WARNING,
 
 // These are not commands but varient used when loading data
 TRANS_TIMERANGE_DATA,
@@ -144,16 +144,16 @@ enum PropType { PARAM_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT_PROP, IND_EVENT
 enum AnnealType { ANNEAL_NONE, ANNEAL_SCAN, ANNEAL_POWERAUTO, ANNEAL_LOGAUTO, ANNEAL_POWER };
 
 // Different state timers
-enum Timer { CHECK_TIMER, GEN_DIF_TIMER, TRANS_TREE_LIKE_TIMER, GENETIC_PROC_LIKE_TIMER, GENETIC_OBS_LIKE_TIMER, RESTORE_TIMER, IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, TIMER_MAX };
+enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER, TIMER_MAX };
 
 // Different output timers
 enum OutTimer { PARAM_OUTPUT, STATE_OUTPUT, OUTTIMER_MAX };
 
 // Different proposal timers
-enum PropTimer { PROP_TIMER, SAMPLE_TIMER, ADDSAMP_TIMER, UPDATESAMP_TIMER, MH_TIMER, TRANS_TREE_TIMER, TRANS_TREE_SWAP_INF_TIMER, TRANS_TREE_MUT_TIMER, TRANS_TREE_MUT_LOCAL_TIMER, TEMP1_TIMER, TEMP2_TIMER, TEMP3_TIMER, TEMP4_TIMER, TEMP5_TIMER, INIT_IND_LOCAL_TIMER, IND_LOCAL_TIMER, PROPTIMER_MAX };
+enum PropTimer { PROP_TIMER, PROPTIMER_MAX };
 
 // Different state species timers
-enum StateSpeciesTimer { LINEAR_TIMER, LINEARZERO_TIMER, SPLINECHANGE_TIMER, SPLINECHANGEGRAD_TIMER, STSP_TIMER_MAX };
+enum StateSpeciesTimer { STSP_TIMER_MAX };
 
 // INIT_POP_FIXED means init pop has been specified in the data file
 // INIT_POP_DIST means a distribution has been specified in the data file
@@ -265,7 +265,11 @@ const auto LINK_CV_THRESH = 0.3;                  // CV threshold for linking fo
 const auto LINK_WEIBULL_SHAPE = 3.7;              // Shape thresh for linking for multi-event
 
 const auto SIM_TRY_MAX = 10000u;                  // Maximum tries simulating nm trans
+const auto TFORM_MAX = 100000u;                   // Maximum number for tform lookup table
+const auto CGC_MAX = 100000u;                     // Maximum number for comp_global_convert
+const auto EQ_POP_REF = 20u;                      // Store reference for population in eq
 const auto IC_NUM_OPTIMUM = 100u;                 // Optimum number of events for IC local range
+const auto RATE_RECOMMEND = 0.25;                 // Sets recommented wait (for warning)
 const auto ADDREM_NUM_OPTIMUM = 5u;               // The optimum number for add/rem local
 const auto WIN_UPDATE_ADAPT = 0.99;               // Rate of adaptation for win (local proposals)
 const auto END_LOCAL_ADAPT = 0.99;                // Controls the rate of adaptation for end local
@@ -285,10 +289,13 @@ const auto IND_LOCAL_TRANS_MAX = 2u;              // Max number of transition lo
 const auto LI_WRONG = -100.0;                     // Likelihood penalty for wrong observation
 const auto GEN_OBS_WRONG = -1000.0;               // Likelihood penalty genetic obs not made
 const auto LOCAL_SMOOTH = 0.1;                    // Smoothing of transitions rate in local props
+const auto PROP_SIM_NAC_INIT = 10;                // Initial value for nac for ind sim prob 
+const auto PROP_SIM_PROB_FADE = 0.98;             // Used for time fading of sim prob
+const auto PROP_SIM_PROB_MIN = 0.05;              // Minimum probability for ind sim proposal
 
-const double TINY = 0.000000001;                   // Used to represent a tiny number
+const double TINY = 0.000000001;                  // Used to represent a tiny number
 const double VTINY = 0.00000000000001;            // Used to represent a tiny number
-const double NEAR_DIV_THRESH = 0.00000001;      // Threshold for near a div
+const double NEAR_DIV_THRESH = 0.00000001;        // Threshold for near a div
 const double EFFECT_MAX = 10000000;               // Sets maximum value for effect
 const double EFFECT_MIN = 0.0000001;              // Sets minimum value for effect
 const double DIF_THRESH = 0.00001;                // The threshold for a difference
@@ -319,7 +326,7 @@ const unsigned int TRUNC_MAX = 40;                // Truncates strings longer th
 
 const auto PHI_LIM = 1.0;                         // The final inverse temperature
 
-const auto CHECK_THIN = 20u;                      // Determines how often MCMC is checked
+const auto CHECK_THIN = 100u;                      // Determines how often MCMC is checked
 const auto SD_MIN = TINY;                         // The minimum value for sd
 const auto SD_MAX = LARGE;                        // The maximum value for sd
 const auto CV_MIN = 0.01;                         // The minimum value for cv
@@ -385,10 +392,10 @@ const vector <unsigned int> factori = {1,1,2,6,24};// Fatorial N! for first 5 nu
 const vector <string> alphabet = {"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"};
 
 
-const string chnotallowed = "\"!%$&=;@~#\\?→";     // Character not allowed in equations
-const string notparam_list = "+-*×/0123456789.{<>〈〉}() %$′→";   // Sets not a parameter character
-const string paramend_list = "+-*×/|.{<>〈〉}[] %$"; // Sets characters which end parameter
-const string name_notallow = "|\"*×_ {<>〈〉}[]()=′→";// Character not allowed in names
+const string chnotallowed = "\"$&=~#\\→";     // Character not allowed in equations
+const string notparam_list = "+-*×/0123456789.{}<>〈〉() $′→;";   // Sets not a parameter character
+const string paramend_list = "+-*×/|.{<>〈〉}[] $"; // Sets characters which end parameter
+const string name_notallow = "|\"*×_ {<>〈〉}[]()=~′→;$&#\\";// Character not allowed in names
 const string fe_char = "μ";                       // Character used for fixed effect parameter
 const auto name_ch_max = 40;                      // Maximum number of characters allowed
 const string endli = "\n";

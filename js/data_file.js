@@ -466,7 +466,8 @@ function init_pop_convert_to_graphical(so,imp)
 				}
 				
 				if(flag == false){
-					pop_val_error("the compartment '"+name+"' is not specified",r,0,tab,imp);			
+					if(name == "") pop_val_error("the compartment is unspecified",r,0,tab,imp);	
+					else pop_val_error("the compartment '"+name+"' is not specified",r,0,tab,imp);			
 					return;
 				}
 			}

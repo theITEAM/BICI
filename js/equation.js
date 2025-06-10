@@ -446,7 +446,7 @@ function equation_calulator(lay,cx,cy,width,source,warn,mode)
 	let nrow = 3;
 
 	source.warn = warn;
-	lay.add_textbox(cx+0.5,cy,width-1,nrow,source);
+	lay.add_textbox(cx+0.5,cy,width-1,nrow,source,"eqn");
 	
 	cy += nrow*equation_linesi+0.8;
 	
@@ -461,7 +461,7 @@ function equation_calulator(lay,cx,cy,width,source,warn,mode)
 	
 	let x = cx+0.2;
 	for(let i = 0; i < functi.length; i++){
-		let ddx = 2.95; if(functi_dx[i] != "def") ddx = functi_dx[i];
+		let ddx = 2.58; if(functi_dx[i] != "def") ddx = functi_dx[i];
 		lay.add_button({te:functi[i], x:x, y:cy, dx:ddx, dy:dy, ac:"Calculator_But", type:"Calculator_But", col:GREY, colov:LGREY});
 		x += ddx+gap;
 	}			

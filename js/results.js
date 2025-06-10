@@ -38,12 +38,6 @@ function results_add_model(result,details,siminf)
 	
 	result.species = copy(model.species);
 
-	/*
-	for(let p = 0; p < result.species.length; p++){
-		result.species[p].ppc_source=[];
-	}
-	*/
-	
 	average_init(result);
 
 	global_comp_trans_init(result.species);
@@ -227,7 +221,7 @@ function calculate_burnin(result,source)
 	}
 	
 	let max = 0; for(let ch = 0; ch < cha.length; ch++) if(samp_max[ch] > max) max = samp_max[ch];
-	source.samp_max = max;
+	source.samp_max = max+1;
 	source.burnin = Math.floor(source.burnin_factor*source.samp_max);
 }
 
@@ -259,9 +253,9 @@ function get_param_value(i,source,lines,result,warn,mode)
 			let list = par_find_list(par);
 				
 			value = par_find_template(list);
-			let comb_list = generate_comb_list(list);
+			let co_list = generate_co_list(list);
 			par.list = list;
-			par.comb_list = comb_list;
+			//par.co_list = co_list;
 		
 			i++;
 			let spl_head = comma_split(lines[i]);
@@ -279,7 +273,7 @@ function get_param_value(i,source,lines,result,warn,mode)
 			if(spl_head[ndep] != "Value") alert_sample(warn,16); 
 				
 			i++;
-			for(let j = 0; j < comb_list.length; j++){
+			for(let j = 0; j < co_list.length; j++){
 				let spl_row = lines[i].split(",");
 			
 				if(spl_row.length != ndep+1) alert_sample(warn,17);
@@ -332,12 +326,13 @@ function get_param_value(i,source,lines,result,warn,mode)
 		let list = par_find_list(par);
 		
 		par.list = list;
-		par.comb_list = generate_comb_list(list);
+		//par.co_list = generate_co_list(list);
 	}
 	
-	if(par.comb_list){
-		for(let j = 0; j < par.comb_list.length; j++){
-			if(get_element(value,par.comb_list[j].index) == undefined) alert_sample(warn,101);
+	if(par.list != undefined){
+		let co_list = generate_co_list(par.list);
+		for(let j = 0; j < co_list.length; j++){
+			if(get_element(value,co_list[j].index) == undefined) alert_sample(warn,101);
 		}
 	}
 			
@@ -1233,7 +1228,7 @@ function get_stratify_data(filt)
 		}
 	}
 	
-	let comb = generate_comb_list(list);
+	let comb = generate_co_list(list);
 
 	return { cl_list:cl_list, comb:comb, list:list};
 }
@@ -1416,8 +1411,9 @@ function get_pos_paramview(result)
 			let para = true;
 		
 			if(par.output == true){
-				for(let j = 0; j < par.comb_list.length; j++){	
-					let ind = par.comb_list[j].index;
+				let co_list = generate_co_list(par.list);
+				for(let j = 0; j < co_list.length; j++){	
+					let ind = co_list[j].index;
 					
 					let name = param_name_index(par,ind);
 					list.push({th:th, index:ind, name:name});

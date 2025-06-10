@@ -18,7 +18,13 @@ class Model                                // Stores information about the model
 		unsigned int nspecies;                 // The number of species
 		
 		vector <SpeciesSimp> species_simp;     // A simplifies version passed to equation
-			
+		
+		//vector <double> cons;                  // Vector of constants
+		
+		//vector <ParamRef> param_ref;           
+		
+		vector <Prior> prior;                  // Vector of priors
+		
 		vector <Param> param;                  // Stores all the parameters in the model
 			
 		vector <ParamVecEle> param_vec;        // A vector of parameter references 
@@ -27,7 +33,6 @@ class Model                                // Stores information about the model
 		unsigned int nparam_vec;               // The total number of parameter
 		
 		vector <unsigned int> param_vec_prop;  // Vector of param_vec elements which undergo proposals
-		
 		unsigned int nparam_vec_prop;          // Total number of parameters under proposal
 		
 		vector <Population> pop;               // Stores information about populations of interest
@@ -57,7 +62,7 @@ class Model                                // Stores information about the model
 		Details details;                       // Details for simulation/inference
 		
 		Model(Operation mode_);
-		void add_eq_ref(EquationInfo &eqi, double t = UNSET);
+		void add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double t = UNSET);
 		string find_eq_dif(const EquationInfo &eqi) const;
 		vector <double> param_sample() const;
 		vector <double> post_param(const Sample &samp) const;
@@ -92,9 +97,11 @@ class Model                                // Stores information about the model
 		void set_hash_all_ind();
 		bool ie_cholesky_error(const vector <double> &param_val) const;
 		void print_param(const vector <double> &vec) const;
+		vector <double> get_param_val_prop(const vector <double> &param_val) const;
+		vector <double> get_param_val(const vector <double> &param_val_prop) const;
 	
 	private:
-		Hash hash_eqn;                         // Stores a hash take for equations
+		//Hash hash_eqn;                         // Stores a hash take for equations
 		
 		Hash hash_all_ind;                     // Stores individuals in a hash table
 		

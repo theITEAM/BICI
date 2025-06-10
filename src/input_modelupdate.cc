@@ -16,7 +16,7 @@ using namespace std;
 /// Adds a new species to the model
 void Input::add_species(string name, SpeciesType type, bool trans_tree)
 {
-	check_name_input(name,"Species name");
+	check_name_input(name,"Species name",true);
 	
 	auto p = find_p(name);
 	if(p != UNSET){ alert_import("There is already a species with the name '"+name+"'"); return;}
@@ -51,7 +51,7 @@ void Input::add_species(string name, SpeciesType type, bool trans_tree)
 /// Adds a new classification to the model
 void Input::add_classification(unsigned int p, string name, string index, Coord coord)
 {
-	check_name_input(name,"Classification name");
+	check_name_input(name,"Classification name",true);
 
 	if(p == UNSET){ 
 		alert_import("Cannot add a classification when the species is not set"); 
@@ -219,61 +219,30 @@ void Input::clone_class(unsigned int p_to, unsigned int p_from, unsigned int cl_
 
 
 /// Creates equations based on EquationInfo specifications
-void Input::create_equations()
+void Input::create_equations(unsigned int per_start, unsigned int per_end)
 {
 	model.create_species_simp();
 
-	for(auto th = 0u; th < model.param.size(); th++){
-		auto &par = model.param[th];
+	Hash hash_eqn;
 	
-		if(par.auto_value == true){
-			for(auto &eqi : par.value){
-				eqi.value = UNSET;
-			}
-		}
-		else{
-			switch(par.variety){
-			case DIST_PARAM: case PRIOR_PARAM:
-				for(auto i = 0u; i < par.N; i++){
-					auto &pri = par.prior[i];
-					for(auto &eqi : pri.dist_param){
-						model.add_eq_ref(eqi);
-					}
-				}
-				break;
-			
-			case REPARAM_PARAM:
-				for(auto i = 0u; i < par.N; i++){
-					auto &eqi = par.value[i];	
-					model.add_eq_ref(eqi);
-				}
-				break;
-				
-			case CONST_PARAM: 
-				for(auto &eqi : par.value){
-					eqi.value = number(eqi.te);
-					if(eqi.value == UNSET){
-						emsg_input("Value not set");
-					}
-				}
-				break;
-				
-			case UNSET_PARAM: emsg_input("Should not be unset7"); break;
-			}
-		}
-	}
-
 	for(auto &der : model.derive){                       // Derived quantities
-		for(auto &eq : der.eq) model.add_eq_ref(eq);
+		for(auto &eq : der.eq) model.add_eq_ref(eq,hash_eqn);
 	}
 
-	for(auto &sp : model.species){                       // Transitions
-		auto lo = 0u;
-		for(auto &tr_gl : sp.tra_gl){ 
-			//if(lo%1000 == 0) cout << lo << " / " << sp.tra_gl.size() << endl;
-			lo++;
-			if(tr_gl.branch == true && tr_gl.bp_set == BP_SET) model.add_eq_ref(tr_gl.bp);
-			for(auto &dp : tr_gl.dist_param) model.add_eq_ref(dp);
+	auto dper = double(per_end-per_start)/model.species.size();
+	for(auto p = 0u; p < model.species.size(); p++){    // Transitions
+		auto &sp = model.species[p];  
+		
+		auto per_st = per_start+dper*p;
+		auto fr = dper/sp.tra_gl.size();
+		for(auto i = 0u; i < sp.tra_gl.size(); i++){
+			auto &tr_gl = sp.tra_gl[i];
+				
+			if(i%100 == 0) percentage(per_st+fr*i,100);
+			if(tr_gl.branch == true && tr_gl.bp_set == BP_SET) model.add_eq_ref(tr_gl.bp,hash_eqn);
+			for(auto &dp : tr_gl.dist_param){
+				model.add_eq_ref(dp,hash_eqn);
+			}
 		}
 	}
 	
@@ -282,13 +251,13 @@ void Input::create_equations()
 		if(ic.type == INIT_POP_DIST){
 			if(ic.focal_cl == UNSET){
 				for(auto &eqi : ic.pop_prior.dist_param){
-					model.add_eq_ref(eqi);
+					model.add_eq_ref(eqi,hash_eqn);
 				}	
 			}
 			else{
 				for(auto c = 0u; c < sp.cla[ic.focal_cl].ncomp; c++){
 					for(auto &eqi : ic.comp_prior[c].dist_param){
-						model.add_eq_ref(eqi);
+						model.add_eq_ref(eqi,hash_eqn);
 					}	
 				}
 			}  
@@ -299,7 +268,7 @@ void Input::create_equations()
 		for(auto &pf : sp.pop_filter){                     // Population filter   
 			pf.time_vari = false;
 			for(auto &cpe : pf.comp_prob_eqn){		
-				model.add_eq_ref(cpe);
+				model.add_eq_ref(cpe,hash_eqn);
 				const auto &eq = model.eqn[cpe.eq_ref];
 				if(eq.time_vari == true) pf.time_vari = true;
 			}
@@ -314,7 +283,7 @@ void Input::create_equations()
 			auto &pf = sp.pop_filter[pd.ref];
 			pd.time_vari = pf.time_vari;
 			if(pd.time_vari){
-				for(auto &cpe : pf.comp_prob_eqn) model.add_eq_ref(cpe,pd.t);
+				for(auto &cpe : pf.comp_prob_eqn) model.add_eq_ref(cpe,hash_eqn,pd.t);
 				pd.comp_obs_mod_ref = sp.obs_eqn_add_vec(pf.comp_prob_eqn);
 			}
 		}
@@ -322,7 +291,7 @@ void Input::create_equations()
 		for(auto &ptf : sp.pop_trans_filter){              // Population transition filter   
 			ptf.time_vari = false;
 			for(auto &tpe : ptf.trans_prob_eqn){		
-				model.add_eq_ref(tpe);
+				model.add_eq_ref(tpe,hash_eqn);
 				const auto &eq = model.eqn[tpe.eq_ref];
 				if(eq.time_vari == true) ptf.time_vari = true;
 			}
@@ -338,7 +307,7 @@ void Input::create_equations()
 			ptd.time_vari = ptf.time_vari;
 			if(ptd.time_vari){
 				for(auto &tpe : ptf.trans_prob_eqn){		
-					model.add_eq_ref(tpe,0.5*(ptd.tmin+ptd.tmax));
+					model.add_eq_ref(tpe,hash_eqn,0.5*(ptd.tmin+ptd.tmax));
 				}
 				ptd.trans_obs_mod_ref = sp.obs_eqn_add_vec(ptf.trans_prob_eqn);
 			}
@@ -349,7 +318,7 @@ void Input::create_equations()
 				for(auto cl = 0u; cl < sp.ncla; cl++){
 					auto &ecp_cl = ecp.cla[cl];
 					if(ecp_cl.c_set == UNSET){
-						for(auto &cop : ecp_cl.eqn) model.add_eq_ref(cop,ecp.time);					
+						for(auto &cop : ecp_cl.eqn) model.add_eq_ref(cop,hash_eqn,ecp.time);					
 						ecp_cl.obs_eqn_ref = sp.obs_eqn_add_vec(ecp_cl.eqn);
 					}
 				}
@@ -360,7 +329,7 @@ void Input::create_equations()
 		for(auto &ot : sp.obs_trans){                      // Observed transition data 
 			ot.time_vari = false;
 			for(auto &tpe : ot.tra_prob_eqn){
-				model.add_eq_ref(tpe);
+				model.add_eq_ref(tpe,hash_eqn);
 				
 				const auto &eq = model.eqn[tpe.eq_ref];
 				if(eq.time_vari == true) ot.time_vari = true;
@@ -383,7 +352,7 @@ void Input::create_equations()
 							if(ob.time_vari == true){
 								auto tra_prob_eqn = ot.tra_prob_eqn;
 								for(auto &tpe : tra_prob_eqn){
-									model.add_eq_ref(tpe,ob.t);
+									model.add_eq_ref(tpe,hash_eqn,ob.t);
 								}
 								
 								ob.obs_eqn_ref = sp.obs_eqn_add_vec(tra_prob_eqn);
@@ -395,7 +364,7 @@ void Input::create_equations()
 				case OBS_COMP_EV:                              // Ind. Compartment
 					if(ob.c_exact == UNSET){
 						for(auto &cop : ob.c_obs_prob_eqn){
-							model.add_eq_ref(cop,ob.t);
+							model.add_eq_ref(cop,hash_eqn,ob.t);
 						}
 				
 						ob.obs_eqn_ref = sp.obs_eqn_add_vec(ob.c_obs_prob_eqn);
@@ -404,10 +373,10 @@ void Input::create_equations()
 					break;
 					
 				case OBS_TEST_EV:                              // Ind. test
-					model.add_eq_ref(ob.Se_eqn,ob.t);
+					model.add_eq_ref(ob.Se_eqn,hash_eqn,ob.t);
 					ob.Se_obs_eqn_ref = add_to_vec(sp.obs_eqn,ob.Se_eqn.eq_ref);
 					
-					model.add_eq_ref(ob.Sp_eqn,ob.t);
+					model.add_eq_ref(ob.Sp_eqn,hash_eqn,ob.t);
 					ob.Sp_obs_eqn_ref = add_to_vec(sp.obs_eqn,ob.Sp_eqn.eq_ref);
 					break;
 				}
@@ -416,8 +385,8 @@ void Input::create_equations()
 	}
 
 	if(model.genetic_data.on){                  // Genetic data
-		model.add_eq_ref(model.genetic_data.mut_rate);
-		model.add_eq_ref(model.genetic_data.seq_var);
+		model.add_eq_ref(model.genetic_data.mut_rate,hash_eqn);
+		model.add_eq_ref(model.genetic_data.seq_var,hash_eqn);
 	}
 
 	for(auto p = 0u; p < model.species.size(); p++){
@@ -435,12 +404,95 @@ void Input::create_equations()
 		}
 	}
 	
+	// Adds in any parameter reparameterisation 
+	// This is done at the end so it is only aplied to any "used" parameter  
+	bool flag;
+	do{
+		flag = false;
+		auto num = 0u;
+		for(auto th = 0u; th < model.param.size(); th++){
+			auto &par = model.param[th];
+		
+			if(par.variety != CONST_PARAM){
+				switch(par.variety){
+				case DIST_PARAM: case PRIOR_PARAM:
+					for(auto &ele : par.element){
+						auto &pri = model.prior[ele.prior_ref];
+						for(auto &eqi : pri.dist_param){
+							if(eqi.eq_ref == UNSET){
+								flag = true;
+								num++;
+								model.add_eq_ref(eqi,hash_eqn);
+							}
+						}
+					}
+					break;
+				
+				case REPARAM_PARAM:
+					if(par.reparam_eqn != ""){   // Reparameterisation set by equation
+						add_reparam_eqn(par,hash_eqn); 
+						flag = true;
+					}
+					else{                        // Reparametersisation set individually
+						for(auto &ele : par.element){
+							auto &eqi = ele.value;	
+							if(eqi.eq_ref == UNSET){
+								flag = true;
+								num++;
+								model.add_eq_ref(eqi,hash_eqn);
+							}
+						}
+					}
+					break;
+					
+				case CONST_PARAM: emsg_input("Should not be const"); break;
+					
+				case UNSET_PARAM: emsg_input("Should not be unset7"); break;
+				}
+			}
+		}
+	}while(flag == true);
+	
 	for(auto eq : model.eqn){
 		if(eq.warn != ""){
 			stringstream ss; ss << endl << "For equation '" << eq.te_raw << "':" << endl << " " << eq.warn;;
 			alert_line(ss.str(),eq.line_num);
 		}
 	}
+}
+
+
+/// Tries to linearise equations in terms of populations
+void Input::linearise_eqn(unsigned int per_start, unsigned int per_end)
+{
+	auto fl = false;
+	if(model.mode != INF){
+		fl = true;
+		for(const auto &sp : model.species){
+			if(sp.trans_tree) fl = false;
+		}
+	}
+
+	if(fl == true) return;
+	
+	auto dper = double(per_end-per_start)/model.species.size();
+	
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];
+		
+		auto per_st = per_start+dper*p;
+		auto fr = dper/sp.tra_gl.size();
+		for(auto e = 0u; e < sp.markov_eqn.size(); e++){
+			const auto &me = sp.markov_eqn[e];
+		
+			if(e%100 == 0) percentage(per_st+fr*e,100);
+			model.eqn[me.eqn_ref].calculate_linearise();    
+		}			
+	}
+	
+	//for(auto &eq : model.eqn){
+	//eq.calculate_linearise();        // Tries to linearise equations in terms of populations
+	//}
 }
 
 
@@ -458,7 +510,7 @@ vector <bool> Input::set_eqn_zero(const vector <EquationInfo> &eq_info)
 
 
 /// Adds a parent child relationship if there is a reparameterisation or distribution
-void Input::add_parent_child(const EquationInfo eqi, unsigned int i, unsigned int th)
+void Input::add_parent_child(const EquationInfo eqi, unsigned int i, unsigned int th, Hash &hash)
 {
 	ParamRef parref; parref.th = th; parref.index = i;
 					
@@ -468,11 +520,21 @@ void Input::add_parent_child(const EquationInfo eqi, unsigned int i, unsigned in
 	if(ref != UNSET){
 		const auto &eq = model.eqn[ref];
 
-		if(eq.param_ref.size() > 0){								
-			for(auto pr : eq.param_ref){
-				add_to_list(par.parent[i],pr);
-				add_to_list(model.param[pr.th].child[pr.index],parref);
+		for(auto pr : eq.param_ref){
+			vector <unsigned int> vec;
+			vec.push_back(th); vec.push_back(i);
+			vec.push_back(pr.th); vec.push_back(pr.index);
+		
+			auto p = hash.existing(vec);
+			if(p == UNSET){
+				hash.add(0,vec);
+		
+				par.add_parent(i,pr);
+				model.param[pr.th].add_child(pr.index,parref);
 			}
+			
+			//add_to_list(par.parent[i],pr);
+			//add_to_list(model.param[pr.th].child[pr.index],parref);
 		}
 	}
 }
@@ -655,7 +717,8 @@ void Input::global_comp_trans_init()
 				vector <SwapResult> dist_swap_temp;
 				for(auto k = 0u; k < tr.dist_param.size(); k++){
 					auto swap_temp = swap_template(tr.dist_param[k].te,dep_conv);
-					if(swap_temp.warn != ""){ alert_equation(tr.dist_param[k],swap_temp.warn); return;}
+					if(swap_temp.warn != ""){ alert_equation(tr.dist_param[k],swap_temp.warn); return;
+					}
 					dist_swap_temp.push_back(swap_temp);
 				}
 				
@@ -719,7 +782,6 @@ void Input::global_comp_trans_init()
 						tr_gl.bp = tr.bp;
 						tr_gl.bp_set = tr.bp_set;
 						tr_gl.dist_param = tr.dist_param;
-						tr_gl.transform.resize(sp.comp_gl.size(),UNSET);
 						tr_gl.line_num = tr.line_num;
 						
 						auto kk = 0u;
@@ -798,45 +860,71 @@ void Input::global_comp_trans_init()
 		}
 	}
 	
-	// Calculates "transform" 
+	// Calculates "tform" 
 	// This allows for transtions o be changed based on a transition in another cl
 	// Either the initial of final compartment can be used for the transformation
+	// If memory requirement is too high, this is not used
 	for(auto &sp : model.species){
-		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
-			auto &t1 = sp.tra_gl[tr];
-			for(auto tr2 = tr; tr2 < sp.tra_gl.size(); tr2++){
-				auto &t2 = sp.tra_gl[tr2];
-				if(t1.cl == t2.cl && t1.tr == t2.tr){
-					if(t2.i != UNSET) t1.transform[t2.i] = tr2;
-					if(t2.f != UNSET) t1.transform[t2.f] = tr2;
-					if(t1.i != UNSET) t2.transform[t1.i] = tr;
-					if(t1.f != UNSET) t2.transform[t1.f] = tr;
+		sp.tform_set = false;
+		if(sp.type == INDIVIDUAL){
+			if(1 == 0 && sp.tra_gl.size()*sp.comp_gl.size() < TFORM_MAX){ // TURN OFF
+				sp.tform_set = true;
+				
+				for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+					sp.tra_gl[tr].tform.resize(sp.comp_gl.size(),UNSET);
 				}
-			}
-		}
-		
-		if(false){
-			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
-				auto &t1 = sp.tra_gl[tr];
-				cout << t1.name << ":" << endl;
-				for(auto c = 0u; c < sp.comp_gl.size(); c++){
-					if(t1.transform[c] != UNSET){
-						auto &t2 = sp.tra_gl[t1.transform[c]];
-						cout << t2.name << ",";
+				
+				for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+					auto &t1 = sp.tra_gl[tr];
+					for(auto tr2 = tr; tr2 < sp.tra_gl.size(); tr2++){
+						auto &t2 = sp.tra_gl[tr2];
+						if(t1.cl == t2.cl && t1.tr == t2.tr){
+							if(t2.i != UNSET) t1.tform[t2.i] = tr2;
+							if(t2.f != UNSET) t1.tform[t2.f] = tr2;
+							if(t1.i != UNSET) t2.tform[t1.i] = tr;
+							if(t1.f != UNSET) t2.tform[t1.f] = tr;
+						}
 					}
 				}
-				cout << endl;
-			}
-		}
-		
-		if(false){
-			for(auto c = 0u; c < sp.comp_gl.size(); c++){
-				const auto &cgl = sp.comp_gl[c];
-				cout << cgl.name << " name" << endl;
-				for(auto tr : cgl.tr_leave){
-					cout << sp.tra_gl[tr].name << ",";
+				
+				if(false){
+					for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+						auto &t1 = sp.tra_gl[tr];
+						cout << t1.name << ":" << endl;
+						for(auto c = 0u; c < sp.comp_gl.size(); c++){
+							if(t1.tform[c] != UNSET){
+								auto &t2 = sp.tra_gl[t1.tform[c]];
+								cout << t2.name << ",";
+							}
+						}
+						cout << endl;
+					}
 				}
-				cout << "trr" << endl;
+				
+				if(false){
+					for(auto c = 0u; c < sp.comp_gl.size(); c++){
+						const auto &cgl = sp.comp_gl[c];
+						cout << cgl.name << " name" << endl;
+						for(auto tr : cgl.tr_leave){
+							cout << sp.tra_gl[tr].name << ",";
+						}
+						cout << "trr" << endl;
+					}
+				}
+			}
+			else{
+				sp.tr_shift.resize(sp.ncla);
+				for(auto cl = 0u; cl < sp.ncla; cl++){
+					sp.tr_shift[cl].resize(sp.ncla);
+					auto mult = 1u;
+					for(auto cl2 = 0u; cl2 < sp.ncla; cl2++){
+						if(cl2 == cl) sp.tr_shift[cl][cl2] = UNSET;
+						else{
+							sp.tr_shift[cl][cl2] = mult;
+							mult *= sp.cla[cl2].ncomp;
+						}
+					}
+				}
 			}
 		}
 	}
@@ -1257,7 +1345,7 @@ void Input::create_spline()
 								spl.div.push_back(sd);
 							}
 							else{
-								spl.const_val.push_back(par.value[j*ntimes+i].value);
+								spl.const_val.push_back(par.get_value(j*ntimes+i));
 							}
 						}
 						else{
@@ -1267,8 +1355,8 @@ void Input::create_spline()
 								spl.div.push_back(sd);
 							}
 							else{
-								auto val1 = par.value[j*ntimes+i].value;
-								auto val2 = par.value[j*ntimes+i+1].value;
+								auto val1 = par.get_value(j*ntimes+i);
+								auto val2 = par.get_value(j*ntimes+i+1);
 								spl.const_val.push_back(val1*f+val2*(1-f));
 							}
 						}
@@ -1286,25 +1374,29 @@ void Input::create_spline()
 		for(auto &ca : eq.calc){
 			for(auto &it : ca.item){
 				if(it.type == SPLINE){
-					auto th = it.num, index = it.index;
+					const auto &pr = eq.param_ref[it.num];
+					auto th = pr.th, index = pr.index;
 					auto ntimes = model.param[th].spline_info.knot_times.size();
 					if(index%ntimes != 0) emsg_input("Should be zero1");
 					index /= ntimes;
 					auto i = 0u; while(i < spl.size() && !(spl[i].th == th && spl[i].index == index)) i++;
 					if(i == spl.size()) emsg_input("Spline could not be found");
-					it.num = i; it.index = UNSET;
+					it.type = SPLINEREF;
+					it.num = i;
 				}
 			}
 		}
 	
 		if(eq.ans.type == SPLINE){
-			auto th = eq.ans.num, index = eq.ans.index;
+			const auto &pr = eq.param_ref[eq.ans.num];
+			auto th = pr.th, index = pr.index;
 			auto ntimes = model.param[th].spline_info.knot_times.size();
 			if(index%ntimes != 0) emsg_input("Should be zero");
 			index /= ntimes;
 			auto i = 0u; while(i < spl.size() && !(spl[i].th == th && spl[i].index == index)) i++;
 			if(i == spl.size()) emsg_input("Spline could not be found");
-			eq.ans.num = i; eq.ans.index = UNSET;
+			eq.ans.type = SPLINEREF;
+			eq.ans.num = i; 
 		}
 	}
 	
@@ -1873,6 +1965,7 @@ void Input::param_affect_likelihood()
 	spline_map.resize(model.param_vec.size());
 	for(auto k = 0u; k < model.param_vec.size(); k++){
 		const auto &pv = model.param_vec[k];
+		
 		auto th = pv.th, ind = pv.index;
 	
 		const auto &par = model.param[th];
@@ -1894,7 +1987,7 @@ void Input::param_affect_likelihood()
 			spline_map[k] = map;
 			AffectLike al; al.type = SPLINE_AFFECT; al.num = s; al.num2 = UNSET; al.map = map;
 			param_vec_add_affect(model.param_vec[k].affect_like,al);		
-		}						
+		}		
 	}
 
 	/// The effect of parameters on Markov equations
@@ -1912,31 +2005,33 @@ void Input::param_affect_likelihood()
 						auto th = pref.th, ind = pref.index;
 						auto &par = model.param[th];
 					
-						auto k = par.param_vec_ref[ind];	
-						if(k != UNSET){
-							if(par.spline_info.on == true){	
-								auto nknot = par.spline_info.knot_times.size();
+						if(par.variety != CONST_PARAM){
+							auto k = par.get_param_vec(ind);	
+							if(k != UNSET){
+								if(par.spline_info.on == true){	
+									auto nknot = par.spline_info.knot_times.size();
+									
+									for(auto t = 0u; t < nknot; t++){ // Goes down the spline
+										k = par.get_param_vec(ind+t);
+										AffectLike al; al.map = spline_map[k];
+										al.type = DIV_VALUE_AFFECT; al.num = p; al.num2 = i;
+										param_vec_add_affect(model.param_vec[k].affect_like,al);		
 								
-								for(auto t = 0u; t < nknot; t++){ // Goes down the spline
-									k = par.param_vec_ref[ind+t];
-									AffectLike al; al.map = spline_map[k];
+										al.type = MARKOV_LIKE_AFFECT;
+										param_vec_add_affect(model.param_vec[k].affect_like,al);
+									}
+								}
+								else{
+									AffectLike al; 
+									if(me.time_vari == true) al.map.resize(T,true);
+									else al.map.resize(1,true);
+						
 									al.type = DIV_VALUE_AFFECT; al.num = p; al.num2 = i;
-									param_vec_add_affect(model.param_vec[k].affect_like,al);		
-							
+									param_vec_add_affect(model.param_vec[k].affect_like,al);
+								
 									al.type = MARKOV_LIKE_AFFECT;
 									param_vec_add_affect(model.param_vec[k].affect_like,al);
 								}
-							}
-							else{
-								AffectLike al; 
-								if(me.time_vari == true) al.map.resize(T,true);
-								else al.map.resize(1,true);
-					
-								al.type = DIV_VALUE_AFFECT; al.num = p; al.num2 = i;
-								param_vec_add_affect(model.param_vec[k].affect_like,al);
-							
-								al.type = MARKOV_LIKE_AFFECT;
-								param_vec_add_affect(model.param_vec[k].affect_like,al);
 							}
 						}
 					}
@@ -1953,22 +2048,24 @@ void Input::param_affect_likelihood()
 						auto th = pref.th, ind = pref.index;
 					
 						auto &par = model.param[th];
-						auto k = par.param_vec_ref[ind];	
-						if(k != UNSET){
-							if(par.spline_info.on == true){
-								auto nknot = par.spline_info.knot_times.size();
-							
-								for(auto t = 0u; t < nknot; t++){ // Goes down the spline
-									k = par.param_vec_ref[ind+t];
-									AffectLike al; al.map = spline_map[k];
-									al.type = MARKOV_POP_AFFECT; al.num = p; al.num2 = tr; 
+						if(par.variety != CONST_PARAM){
+							auto k = par.get_param_vec(ind);	
+							if(k != UNSET){
+								if(par.spline_info.on == true){
+									auto nknot = par.spline_info.knot_times.size();
+								
+									for(auto t = 0u; t < nknot; t++){ // Goes down the spline
+										k = par.get_param_vec(ind+t);
+										AffectLike al; al.map = spline_map[k];
+										al.type = MARKOV_POP_AFFECT; al.num = p; al.num2 = tr; 
+										param_vec_add_affect(model.param_vec[k].affect_like,al);
+									}
+								}
+								else{
+									AffectLike al; al.map.resize(T,true);
+									al.type = MARKOV_POP_AFFECT; al.num = p; al.num2 = tr;
 									param_vec_add_affect(model.param_vec[k].affect_like,al);
 								}
-							}
-							else{
-								AffectLike al; al.map.resize(T,true);
-								al.type = MARKOV_POP_AFFECT; al.num = p; al.num2 = tr;
-								param_vec_add_affect(model.param_vec[k].affect_like,al);
 							}
 						}
 					}
@@ -1988,8 +2085,8 @@ void Input::param_affect_likelihood()
 			
 			param_vec_add_affect(model.param_vec[th].affect_like,al);
 			
-			for(const auto &pref : par.parent[pv.index]){
-				const auto th_par = model.param[pref.th].param_vec_ref[pref.index];				
+			for(const auto &pref : par.get_parent(pv.index)){
+				const auto th_par = model.param[pref.th].get_param_vec(pref.index);				
 				if(th_par != UNSET){
 					param_vec_add_affect(model.param_vec[th_par].affect_like,al);
 				}
@@ -2025,20 +2122,23 @@ void Input::param_affect_likelihood()
 					const auto &par = model.param[fe.th];
 					if(par.name != fe_char+"^"+fe.name) emsg_input("names do not match");
 					if(par.N != 1) emsg_input("Should be univariate");
-					auto k = par.param_vec_ref[0];
 					
-					if(k != UNSET){				
-						AffectLike al; 	
-						al.type = EXP_FE_AFFECT; al.num = p; al.num2 = f;
-						param_vec_add_affect(model.param_vec[k].affect_like,al);		
+					if(par.variety != CONST_PARAM){
+						auto k = par.get_param_vec(0);
 						
-						al.type = INDFAC_INT_AFFECT; al.num = p; al.num2 = UNSET;
-						param_vec_add_affect(model.param_vec[k].affect_like,al);		
-						
-						al.type = MARKOV_LIKE_AFFECT; al.num = p; al.num2 = i;
-						if(me.time_vari == true) al.map.resize(T,true);
-						else al.map.resize(1,true);
-						param_vec_add_affect(model.param_vec[k].affect_like,al);		
+						if(k != UNSET){				
+							AffectLike al; 	
+							al.type = EXP_FE_AFFECT; al.num = p; al.num2 = f;
+							param_vec_add_affect(model.param_vec[k].affect_like,al);		
+							
+							al.type = INDFAC_INT_AFFECT; al.num = p; al.num2 = UNSET;
+							param_vec_add_affect(model.param_vec[k].affect_like,al);		
+							
+							al.type = MARKOV_LIKE_AFFECT; al.num = p; al.num2 = i;
+							if(me.time_vari == true) al.map.resize(T,true);
+							else al.map.resize(1,true);
+							param_vec_add_affect(model.param_vec[k].affect_like,al);		
+						}
 					}
 				}
 			}
@@ -2057,14 +2157,17 @@ void Input::param_affect_likelihood()
 				const auto &par = model.param[fe.th];
 				if(par.name != fe_char+"^"+fe.name) emsg_input("names do not match");
 				if(par.N != 1) emsg_input("Should be univariate");
-				auto k = par.param_vec_ref[0];
-				if(k == UNSET) emsg_input("Problem with fix_eff_mult");
 				
-				AffectLike al; 	
-				al.type = EXP_FE_AFFECT; al.num = p; al.num2 = f;
-				param_vec_add_affect(model.param_vec[k].affect_like,al);		
-				
-				model.add_pop_affect(po,model.param_vec[k].affect_like);
+				if(par.variety != CONST_PARAM){
+					auto k = par.get_param_vec(0);
+					if(k == UNSET) emsg_input("Problem with fix_eff_mult");
+					
+					AffectLike al; 	
+					al.type = EXP_FE_AFFECT; al.num = p; al.num2 = f;
+					param_vec_add_affect(model.param_vec[k].affect_like,al);		
+					
+					model.add_pop_affect(po,model.param_vec[k].affect_like);
+				}
 			}
 		}
 	}
@@ -2140,7 +2243,7 @@ void Input::param_affect_likelihood()
 					for(auto i = 0u; i < N; i++){
 						auto &par = model.param[ieg.omega[j][i]];
 						if(par.variety != CONST_PARAM){
-							auto k = par.param_vec_ref[0];
+							auto k = par.get_param_vec(0);
 							if(k == UNSET) emsg_input("Should not be unset6");
 							
 							AffectLike al; 	
@@ -2320,19 +2423,21 @@ void Input::param_affect_likelihood()
 			const auto &eqn = model.eqn[gen_data.mut_rate.eq_ref];
 			for(auto &pref : eqn.param_ref){
 				const auto &par = model.param[pref.th];
-				auto k = par.param_vec_ref[pref.index];
-				if(k == UNSET) emsg_input("Parameter prob");
-				
-				{
-					AffectLike al; 	
-					al.type = GENETIC_VALUE_AFFECT; al.num = UNSET; al.num2 = UNSET;
-					param_vec_add_affect(model.param_vec[k].affect_like,al);	
-				}
-				
-				{
-					AffectLike al; 	
-					al.type = LIKE_GENETIC_PROCESS_AFFECT; al.num = UNSET; al.num2 = UNSET;
-					param_vec_add_affect(model.param_vec[k].affect_like,al);	
+				if(par.variety != CONST_PARAM){
+					auto k = par.get_param_vec(pref.index);
+					if(k == UNSET) emsg_input("Parameter prob");
+					
+					{
+						AffectLike al; 	
+						al.type = GENETIC_VALUE_AFFECT; al.num = UNSET; al.num2 = UNSET;
+						param_vec_add_affect(model.param_vec[k].affect_like,al);	
+					}
+					
+					{
+						AffectLike al; 	
+						al.type = LIKE_GENETIC_PROCESS_AFFECT; al.num = UNSET; al.num2 = UNSET;
+						param_vec_add_affect(model.param_vec[k].affect_like,al);	
+					}
 				}
 			}
 		}
@@ -2341,19 +2446,21 @@ void Input::param_affect_likelihood()
 			const auto &eqn = model.eqn[gen_data.seq_var.eq_ref];
 			for(auto &pref : eqn.param_ref){
 				const auto &par = model.param[pref.th];
-				auto k = par.param_vec_ref[pref.index];
-				if(k == UNSET) emsg_input("Parameter prob");
-				
-				{
-					AffectLike al; 	
-					al.type = GENETIC_VALUE_AFFECT; al.num = UNSET; al.num2 = UNSET;
-					param_vec_add_affect(model.param_vec[k].affect_like,al);	
-				}
-				
-				{
-					AffectLike al; 	
-					al.type = LIKE_GENETIC_PROCESS_AFFECT; al.num = UNSET; al.num2 = UNSET;
-					param_vec_add_affect(model.param_vec[k].affect_like,al);	
+				if(par.variety != CONST_PARAM){
+					auto k = par.get_param_vec(pref.index);
+					if(k == UNSET) emsg_input("Parameter prob");
+					
+					{
+						AffectLike al; 	
+						al.type = GENETIC_VALUE_AFFECT; al.num = UNSET; al.num2 = UNSET;
+						param_vec_add_affect(model.param_vec[k].affect_like,al);	
+					}
+					
+					{
+						AffectLike al; 	
+						al.type = LIKE_GENETIC_PROCESS_AFFECT; al.num = UNSET; al.num2 = UNSET;
+						param_vec_add_affect(model.param_vec[k].affect_like,al);	
+					}
 				}
 			}
 		}
@@ -2382,22 +2489,24 @@ void Input::add_nm_trans_affect(unsigned int p, unsigned int i, unsigned int eq,
 		auto th = pref.th, ind = pref.index;
 
 		auto &par = model.param[th];
-		auto k = par.param_vec_ref[ind];	
-		if(k != UNSET){
-			if(par.spline_info.on == true){	
-				auto nknot = par.spline_info.knot_times.size();
-				
-				for(auto t = 0u; t < nknot; t++){ // Goes down the spline
-					k = par.param_vec_ref[ind+t];
+		if(par.variety != CONST_PARAM){
+			auto k = par.get_param_vec(ind);	
+			if(k != UNSET){
+				if(par.spline_info.on == true){	
+					auto nknot = par.spline_info.knot_times.size();
+					
+					for(auto t = 0u; t < nknot; t++){ // Goes down the spline
+						k = par.get_param_vec(ind+t);
+						AffectLike al; al.type = type; al.num = p; al.num2 = i;
+						al.map = spline_map[k];
+						param_vec_add_affect(model.param_vec[k].affect_like,al);		
+					}
+				}
+				else{
 					AffectLike al; al.type = type; al.num = p; al.num2 = i;
-					al.map = spline_map[k];
+					al.map.resize(T,true);
 					param_vec_add_affect(model.param_vec[k].affect_like,al);		
 				}
-			}
-			else{
-				AffectLike al; al.type = type; al.num = p; al.num2 = i;
-				al.map.resize(T,true);
-				param_vec_add_affect(model.param_vec[k].affect_like,al);		
 			}
 		}
 	}
@@ -2409,18 +2518,22 @@ void Input::add_nm_trans_affect(unsigned int p, unsigned int i, unsigned int eq,
 		const auto &fe = sp.fix_effect[f];
 	
 		const auto &par = model.param[fe.th];
+		
 		if(par.name != fe_char+"^"+fe.name) emsg_input("names do not match");
 		if(par.N != 1) emsg_input("Should be univariate");
-		auto k = par.param_vec_ref[0];
-	
-		if(k != UNSET){				
-			AffectLike al; 	
-			al.type = EXP_FE_AFFECT; al.num = p; al.num2 = f;
-			param_vec_add_affect(model.param_vec[k].affect_like,al);		
 		
-			al.type = type; al.num = p; al.num2 = i;
-			al.map.resize(T,true);
-			param_vec_add_affect(model.param_vec[k].affect_like,al);		
+		if(par.variety != CONST_PARAM){
+			auto k = par.get_param_vec(0);
+		
+			if(k != UNSET){				
+				AffectLike al; 	
+				al.type = EXP_FE_AFFECT; al.num = p; al.num2 = f;
+				param_vec_add_affect(model.param_vec[k].affect_like,al);		
+			
+				al.type = type; al.num = p; al.num2 = i;
+				al.map.resize(T,true);
+				param_vec_add_affect(model.param_vec[k].affect_like,al);		
+			}
 		}
 	}
 }
@@ -2438,30 +2551,32 @@ void Input::add_obs_trans_eqn(unsigned int p, unsigned int e, const vector < vec
 
 	for(auto &pref : eqn.param_ref){
 		const auto &par = model.param[pref.th];
-		auto k = par.param_vec_ref[pref.index];
-		if(k == UNSET) emsg_input("Parameter prob");
-		
-		if(spline_map[k].size() > 0){                // There is a spline in the equation	
-			if(!par.spline_info.on) emsg_input("Should be spline");
-			auto nknot = par.spline_info.knot_times.size();
+		if(par.variety != CONST_PARAM){	
+			auto k = par.get_param_vec(pref.index);
+			if(k == UNSET) emsg_input("Parameter prob");
 			
-			for(auto j = 0u; j < nknot; j++){
-				if(k+j >= spline_map.size()) emsg_input("Prob0");
+			if(spline_map[k].size() > 0){                // There is a spline in the equation	
+				if(!par.spline_info.on) emsg_input("Should be spline");
+				auto nknot = par.spline_info.knot_times.size();
 				
-				{
-					AffectLike al; 
-					al.type = LIKE_UNOBS_TRANS_AFFECT; al.num = p; al.num2 = e; al.map = spline_map[k+j];
-					param_vec_add_affect(model.param_vec[k+j].affect_like,al);
+				for(auto j = 0u; j < nknot; j++){
+					if(k+j >= spline_map.size()) emsg_input("Prob0");
+					
+					{
+						AffectLike al; 
+						al.type = LIKE_UNOBS_TRANS_AFFECT; al.num = p; al.num2 = e; al.map = spline_map[k+j];
+						param_vec_add_affect(model.param_vec[k+j].affect_like,al);
+					}
 				}
 			}
-		}
-		else{
-			{
-				AffectLike al; al.type =  LIKE_UNOBS_TRANS_AFFECT; al.num = p; al.num2 = e; al.map = map_all;
-				param_vec_add_affect(model.param_vec[k].affect_like,al);
+			else{
+				{
+					AffectLike al; al.type =  LIKE_UNOBS_TRANS_AFFECT; al.num = p; al.num2 = e; al.map = map_all;
+					param_vec_add_affect(model.param_vec[k].affect_like,al);
+				}
 			}
-		}
-	}		
+		}		
+	}
 }
 		
 		
@@ -2471,32 +2586,34 @@ void Input::add_to_map(unsigned int eq, unsigned int i, vector < vector <bool> >
 	const auto &eqn = model.eqn[eq];
 	for(auto &pref : eqn.param_ref){
 		const auto &par = model.param[pref.th];
-		auto k = par.param_vec_ref[pref.index];
-		if(k == UNSET) emsg_input("Parameter prob");
-		
-		if(spline_map[k].size() > 0){                // There is a spline in the equation
-			auto ti = eqn.ti_fix;
-			if(ti == UNSET) emsg_input("Time should be fixed");
+		if(par.variety != CONST_PARAM){
+			auto k = par.get_param_vec(pref.index);
+			if(k == UNSET) emsg_input("Parameter prob");
 			
-			if(!par.spline_info.on) emsg_input("SHould be spline");
-			auto nknot = par.spline_info.knot_times.size();
-			
-			for(auto j = 0u; j < nknot; j++){
-				if(k+j >= spline_map.size()) emsg_input("Prob0");
-				if(ti >= spline_map[k+j].size()){
-					emsg_input("Prob-1");
-				}
-				if(spline_map[k+j][ti] == true){
-					if(k+j >= map.size()) emsg_input("Prob1");
-					if(i >= map[k+j].size()) emsg_input("Prob2");
-					map[k+j][i] = true;
+			if(spline_map[k].size() > 0){                // There is a spline in the equation
+				auto ti = eqn.ti_fix;
+				if(ti == UNSET) emsg_input("Time should be fixed");
+				
+				if(!par.spline_info.on) emsg_input("SHould be spline");
+				auto nknot = par.spline_info.knot_times.size();
+				
+				for(auto j = 0u; j < nknot; j++){
+					if(k+j >= spline_map.size()) emsg_input("Prob0");
+					if(ti >= spline_map[k+j].size()){
+						emsg_input("Prob-1");
+					}
+					if(spline_map[k+j][ti] == true){
+						if(k+j >= map.size()) emsg_input("Prob1");
+						if(i >= map[k+j].size()) emsg_input("Prob2");
+						map[k+j][i] = true;
+					}
 				}
 			}
-		}
-		else{
-			if(k >= map.size()) emsg_input("Prob3");
-			if(i >= map[k].size()) emsg_input("Prob4");
-			map[k][i] = true;
+			else{
+				if(k >= map.size()) emsg_input("Prob3");
+				if(i >= map[k].size()) emsg_input("Prob4");
+				map[k][i] = true;
+			}
 		}
 	}
 }
@@ -2864,7 +2981,9 @@ void Input::setup_trans_infection()
 					alert_line("This infection transition must be Markovian.",tra.line_num);
 				}
 				const auto &eqn = model.eqn[tra.dist_param[0].eq_ref];
-				if(eqn.linearise.on != true) alert_line("For transmission trees the rate must be linearly expressed in terms of populations.",tra.line_num);
+				if(eqn.linearise.on != true){
+					alert_line("For transmission trees the rate must be linearly expressed in terms of populations.",tra.line_num);
+				}
 			}
 		}
 	}
@@ -3235,16 +3354,20 @@ void Input::set_joint_param_event()
 				const auto &eq = model.eqn[tra.dist_param[0].eq_ref];
 				
 				for(const auto &pref : eq.param_ref){
-					auto th = model.param[pref.th].param_vec_ref[pref.index];  
+					const auto &par = model.param[pref.th];
 					
-					if(eq.param_linear(th)){	
-						auto &pji = par_joint_info[th];
+					if(par.variety != CONST_PARAM){
+						auto th = par.get_param_vec(pref.index);  
 						
-						if(pji.p == UNSET) pji.p = p;
-						else{
-							if(pji.p != p) pji.possible = false;
+						if(eq.param_linear(th)){	
+							auto &pji = par_joint_info[th];
+							
+							if(pji.p == UNSET) pji.p = p;
+							else{
+								if(pji.p != p) pji.possible = false;
+							}
+							pji.tr_list.push_back(tr);
 						}
-						pji.tr_list.push_back(tr);
 					}
 				}
 			}
@@ -3686,19 +3809,27 @@ bool Input::add_tr_swap(unsigned int ci, unsigned int cf, const vector <TrSwap> 
 void Input::set_comp_global_convert()
 {
 	for(auto &sp : model.species){
-		auto &cgc = sp.comp_global_convert;
-		cgc.resize(sp.comp_gl.size());
-		for(auto cgl = 0u; cgl < sp.comp_gl.size(); cgl++){
-			cgc[cgl].resize(sp.ncla);
-			for(auto cl = 0u; cl < sp.ncla; cl++){
-				auto cold = sp.comp_gl[cgl].cla_comp[cl];				
-				const auto &claa = sp.cla[cl];
-				cgc[cgl][cl].resize(claa.comp.size());
-				for(auto c = 0u; c < claa.comp.size(); c++){
-					cgc[cgl][cl][c] = cgl + (c-cold)*sp.comp_mult[cl];
+		auto num = 0u;
+		for(auto cl = 0u; cl < sp.ncla; cl++) num += sp.cla[cl].ncomp;
+		
+		sp.comp_global_convert_set = false;
+		if(1 == 0 && sp.comp_gl.size()*num < CGC_MAX){ // TURN ON
+			sp.comp_global_convert_set = true;
+			
+			auto &cgc = sp.comp_global_convert;
+			cgc.resize(sp.comp_gl.size());
+			for(auto cgl = 0u; cgl < sp.comp_gl.size(); cgl++){
+				cgc[cgl].resize(sp.ncla);
+				for(auto cl = 0u; cl < sp.ncla; cl++){
+					auto cold = sp.comp_gl[cgl].cla_comp[cl];				
+					const auto &claa = sp.cla[cl];
+					cgc[cgl][cl].resize(claa.comp.size());
+					for(auto c = 0u; c < claa.comp.size(); c++){
+						cgc[cgl][cl][c] = cgl + (c-cold)*sp.comp_mult[cl];
+					}
 				}
-			}
-		}			
+			}			
+		}
 	}			
 }
 
@@ -3978,15 +4109,21 @@ void Input::set_eqn_ind_eff_exist()
 /// Sets parent child relationships for parameters
 void Input::set_param_parent_child()
 {
+	Hash hash;
+	
 	for(auto th = 0u; th < model.param.size(); th++){
 		const auto &par = model.param[th];
 		switch(par.variety){
 		case DIST_PARAM: case PRIOR_PARAM:
 			for(auto i = 0u; i < par.N; i++){
-				if(par.use[i]){
-					const auto &pri = par.prior[i];
-					for(const auto &eqi : pri.dist_param){
-						add_parent_child(eqi,i,th);
+				auto ref = par.element_ref[i];
+				if(ref != UNSET){
+					const auto &ele = par.element[ref];
+					if(ele.used){
+						const auto &pri = model.prior[ele.prior_ref];
+						for(const auto &eqi : pri.dist_param){
+							add_parent_child(eqi,i,th,hash);
+						}
 					}
 				}
 			}
@@ -3994,9 +4131,13 @@ void Input::set_param_parent_child()
 			
 		case REPARAM_PARAM:
 			for(auto i = 0u; i < par.N; i++){
-				if(par.use[i]){
-					const auto &eqi = par.value[i];	
-					add_parent_child(eqi,i,th); 
+				auto ref = par.element_ref[i];
+				if(ref != UNSET){
+					const auto &ele = par.element[ref];
+					if(ele.used){
+						const auto &eqi = ele.value;	
+						add_parent_child(eqi,i,th,hash); 
+					}
 				}
 			}
 			break;
@@ -4008,6 +4149,7 @@ void Input::set_param_parent_child()
 
 
 /// Sets which parameters are used in equations
+// This writes over previously used, because of potnetial equation simplification
 void Input::set_param_use()
 {
 	auto N = model.param.size();
@@ -4017,23 +4159,25 @@ void Input::set_param_use()
 	//eqn_used.resize(N);
 	for(auto th = 0u; th < N; th++){
 		auto &par = model.param[th];
-		par.use.resize(par.N,false);
+		for(auto &ele : par.element) ele.used = false;
 	}
 	
 	for(auto &eq : model.eqn){
 		for(auto &ca : eq.calc){
 			for(auto &it : ca.item){
 				if(it.type == PARAMETER){
-					if(it.num >= model.param.size()) emsg_input("Out of range1");
-					if(it.index >= model.param[it.num].N) emsg_input("Out of range2");
-					model.param[it.num].use[it.index] = true;
+					const auto &pr = eq.param_ref[it.num]; 
+					if(pr.th >= model.param.size()) emsg_input("Out of range1");
+					if(pr.index >= model.param[pr.th].N) emsg_input("Out of range2");
+					model.param[pr.th].set_used(pr.index);
 				}
 			}
 		}
 	
 		if(eq.ans.type == PARAMETER){
 			if(eq.ans.num == UNSET) emsg_input("done");
-			model.param[eq.ans.num].use[eq.ans.index] = true;
+			const auto &pr = eq.param_ref[eq.ans.num]; 
+			model.param[pr.th].set_used(pr.index);
 		}
 	}
 	
@@ -4042,13 +4186,13 @@ void Input::set_param_use()
 			auto N = ieg.list.size(); 
 			for(auto j = 0u; j < N; j++){
 				for(auto i = 0u; i < N; i++){
-					model.param[ieg.omega[j][i]].use[0] = true;
+					model.param[ieg.omega[j][i]].set_used(0);
 				}
 			}
 		}
 		
 		for(const auto &fe : sp.fix_effect){
-			model.param[fe.th].use[0] = true;
+			model.param[fe.th].set_used(0);
 		}
 	}
 	
@@ -4056,8 +4200,8 @@ void Input::set_param_use()
 		for(auto th = 0u; th < N; th++){
 			const auto &par = model.param[th];
 			cout << par.name << endl;
-			auto imax = par.use.size(); if(imax > 100) imax = 100;
-			for(auto i = 0u; i < imax; i++) cout << par.use[i] << " ";
+			auto imax = par.element.size(); if(imax > 100) imax = 100;
+			for(auto i = 0u; i < imax; i++) cout << par.element[i].used << " ";
 			cout << endl;
 		}
 		emsg_input("Shows parameters used");
@@ -4079,7 +4223,7 @@ void Input::set_omega_fl()
 				for(auto i = 0u; i < N; i++){
 					auto &par = model.param[ieg.omega[j][i]];
 					if(par.variety != CONST_PARAM){
-						auto th = par.param_vec_ref[0]; if(th == UNSET) emsg("Should not be unset2");
+						auto th = par.get_param_vec(0); if(th == UNSET) emsg("Should not be unset2");
 						model.param_vec[th].omega_fl = true;
 					}
 				}

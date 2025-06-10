@@ -83,6 +83,16 @@ function check_param_complete()
 		}
 	}
 	
+	for(let p = 0; p < model.species.length; p++){
+		let sp = model.species[p];
+		for(let i = 0; i < sp.fix_eff.length; i++){
+			let fe = sp.fix_eff[i];
+			if(fe.defined != true){
+				alert_noline("Fixed effect 〈"+fe.name+"〉 is unspecified. It must be defined through the 'fixed-effect' command.");
+			}
+		}
+	}
+	
 	for(let th = 0; th < model.param.length; th++){
 		let par = model.param[th];
 		if(flag[th] != true && !is_in_obsmodel(par) && par.type != "derive_param"){
@@ -114,3 +124,27 @@ function is_file(te)
 
 	return true;
 }
+
+
+/// Calls when cannot find a compartment in 
+function cannot_find_trans_comp(te,p,cl,co)
+{
+	let st = "In transition '"+te+"' cannot find compartment '"+co+"'";
+	
+	let sp = model.species[p];
+	
+	if(sp.ncla > 1) st += " in classification '"+sp.cla[cl].name+"'";
+	st += ".";
+	
+	for(let cl2 = 0; cl2 < sp.ncla; cl2++){
+		if(cl2 != cl){
+			let c = hash_find(sp.cla[cl2].hash_comp,co);
+			if(c != undefined){
+				st += " Perhaps this transition should be placed in classification '"+sp.cla[cl2].name+"'?";
+			}
+		}
+	}
+	
+	alert_import(st);
+}
+			

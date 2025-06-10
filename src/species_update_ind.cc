@@ -95,6 +95,7 @@ vector <unsigned int>  StateSpecies::update_ind(unsigned int i, vector <Event> &
 		auto t_next = t_old; if(t_new < t_next) t_next = t_new;
 		
 		auto ti_next = (unsigned int)(ALMOST_ONE+((t_next-t_start)/dt));
+		if(ti_next > T) ti_next = T;
 	
 		while(k < popd.size() && popd[k].t <= t_next){   // Accounts for population data
 			if(c_new != c_old) dLi_obs += update_pop_data(k,c_old,c_new);
@@ -354,7 +355,8 @@ void StateSpecies::set_m_ti_origin(vector <Event> &ev_new) const
 			
 			case NM_TRANS_EV:
 				{
-					const auto &tra = sp.tra_gl[ev.tr_gl];
+					auto tr = ev.tr_gl;
+					const auto &tra = sp.tra_gl[tr];
 					
 					auto cl = tra.cl;
 					ev.e_origin = e_vec[cl];
@@ -364,9 +366,9 @@ void StateSpecies::set_m_ti_origin(vector <Event> &ev_new) const
 					e_vec[cl] = e;
 					
 					if(tra.i != ev_orig.c_after){             // Accounts for intermediate transition
-						auto trg = tra.transform[ev_orig.c_after];
-						if(trg == UNSET) emsg("trg unset");
-						ev.m = sp.tra_gl[trg].nm_trans_ref;
+						tr = sp.tr_trans(tr,ev_orig.c_after);
+						if(tr == UNSET) emsg("trg unset");
+						ev.m = sp.tra_gl[tr].nm_trans_ref;
 					}
 					else ev.m = tra.nm_trans_ref;
 					
@@ -781,8 +783,7 @@ void StateSpecies::set_e_origin(Event &ev, unsigned int e, const vector <Event> 
 	const auto &ev_orig = event[e_bef];
 	ev.ti = get_ti(ev_orig.t);
 	
-	const auto &tra = sp.tra_gl[ev.tr_gl];
-	ev.m = sp.get_tra_m(tra,ev_orig);
+	ev.m = sp.get_tra_m(ev.tr_gl,ev_orig);
 }
 
 
@@ -1145,43 +1146,22 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 		
 	case USE_POP_DIF:         // If population gradient not time dependant
 		for(const auto &po_ch : pop_change){
-			auto po = po_ch.po;
-			auto pr = find_in(eq.pop_ref,po);
+			auto pr = lin.get_pop_ref(po_ch.po);
 			if(pr == UNSET) emsg("Could not find pop_ref");
 			auto va = eq.calculate_calculation_notime(lin.pop_grad_calc[pr],param_val);
-			
 			diff += va*po_ch.num;
-			/*
-				// This is not needed at populations are always positive for IBM
-				// Checks there is no problem with rectification
-				auto num = po_ch.num;
-				auto fl = false;
-				if(num > 0){
-					for(auto tii = ti; tii < ti_next; tii++){
-						if(popnum_t[tii][po] < num) fl = true;
-					}
-				}
-				else{
-					for(auto tii = ti; tii < ti_next; tii++){
-						if(popnum_t[tii][po] < 0) fl = true;
-					}
-				}
-				
-				if(fl == true){ type = USE_POP_DIF_TIME; break;}
-				diff += va*num;
-			*/
 		}
 		break;
 	
 	case USE_POP_DIF_TIME:         // If population gradient time dependant
 		// Makes a list of populations
 		for(auto k = 0u; k < pop_change.size(); k++){
-			auto pr = find_in(eq.pop_ref,pop_change[k].po);
+			auto pr = lin.get_pop_ref(pop_change[k].po);
 			pr_store.push_back(pr);
 		}
 		break;
 	}
-	
+
 	vector <double> dLi_store, value_store;
 	double value;
 	for(auto tii = ti; tii < ti_next; tii++){
@@ -1205,12 +1185,6 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 					const auto &po_ch = pop_change[k];
 					auto va = eq.calculate_calculation(lin.pop_grad_calc[pr_store[k]],tii,param_val,spline_val);
 					value += va*po_ch.num;
-					/*
-					auto po = po_ch.po;
-					auto pop_aft = popnum_t[tii][po];
-					auto pop_bef = pop_aft-po_ch.num;		
-					value += va*(rectify(pop_aft)-rectify(pop_bef));
-					*/
 				}
 			
 				if(false){

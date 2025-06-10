@@ -486,7 +486,6 @@ void Input::param_mult_command()
 	par.used = true;
 	par.param_mult = UNSET;
 	par.factor = true;
-	par.auto_value = false;
 	par.line_num = line_num;
 	par.cat_factor = false;
 	par.cat_factor_weight_on = false;
@@ -511,10 +510,8 @@ void Input::param_mult_command()
 		
 	auto mult = get_dependency(par.dep,pp,knot_times); if(mult == UNSET) return; 
 	
-	par.value.resize(mult);
-	par.prior.resize(mult);
-	par.parent.resize(mult);
-	par.child.resize(mult);
+	par.element_ref.resize(mult,UNSET);
+	
 	par.N = mult;
 	par.trace_output = false;
 	
@@ -853,8 +850,9 @@ void Input::transition_command2(vector <Tag> &tags)
 	if(to == "-") to = "Sink";
 	
 	auto value_str = get_tag_val("value",tags); if(value_str == ""){ cannot_find_tag(); return;}
-	
+
 	auto trans_def = extract_trans_def(value_str);
+
 	if(trans_def.set == false){ 
 		alert_import("In the expression '"+value_str+"' the transition distribution is incorrectly specified. Expected format: 'exp(rate:...)', 'gamma(mean:...,cv:...)', 'erlang(mean:...,shape:)', 'log-normal(mean:...,cv:...)', 'weibull(scale:...,shape:...)' or 'period(time:...)'.");
 		return;
@@ -865,17 +863,14 @@ void Input::transition_command2(vector <Tag> &tags)
 	if(fr == "Source") ci = UNSET;
 	else{
 		ci = find_c(p,cl,fr);
-		if(ci == UNSET){ 
-			alert_import("In transition '"+te+"' cannot find compartment '"+fr+"'"); 
-			return;
-		}
+		if(ci == UNSET){ cannot_find_trans_comp(te,p,cl,fr); return;}
 	}
 	
 	if(to == "Sink") cf = UNSET;
 	else{
 		cf = find_c(p,cl,to);
 		if(cf == UNSET){
-			alert_import("In transition '"+te+"' cannot find compartment '"+to+"'"); 
+			cannot_find_trans_comp(te,p,cl,to);
 			return;
 		}
 	}
@@ -1131,7 +1126,6 @@ void Input::param_command()
 	pt.val = reparam; pt.tag = "reparam"; param_tag.push_back(pt);
 	pt.val = prior; pt.tag = "prior"; param_tag.push_back(pt);
 	pt.val = prior_split; pt.tag = "prior-split"; param_tag.push_back(pt);
-	//pt.val = dist_mat; pt.tag = "distance-matrix"; param_tag.push_back(pt);
 	
 	for(auto j = 0u; j < param_tag.size(); j++){
 		for(auto i = j+1; i < param_tag.size(); i++){
@@ -1150,10 +1144,7 @@ void Input::param_command()
 	
 	auto mult = get_dependency(par.dep,pp,knot_times); if(mult == UNSET) return; 
 	
-	par.value.resize(mult);
-	par.prior.resize(mult);
-	par.parent.resize(mult);
-	par.child.resize(mult);
+	par.element_ref.resize(mult,UNSET);
 	
 	par.N = mult;
 	
@@ -1188,132 +1179,108 @@ void Input::param_command()
 					alert_import("'factor' can only take the values 'true' or 'false'");
 				}
 			}
+		}
+	}
+	
+	if(par.cat_factor){
+		//for(auto i = 0u; i < mult; i++) par.add_element(i);
+		par.weight.resize(par.N,1);
 		
-			if(par.cat_factor){
-				par.weight.resize(mult,1);
-				
-				auto weight = get_tag_value("factor-weight"); 
-				if(weight != ""){
-					par.cat_factor_weight_on = true;
-					if(is_file(weight) == false){
-						alert_import("'factor-weight' must be a data table");
-					}		
-					else{
-						load_weight_value(pp,weight,par,"In 'file'");
-					}
-				}
+		auto weight = get_tag_value("factor-weight"); 
+		if(weight != ""){
+			par.cat_factor_weight_on = true;
+			if(is_file(weight) == false){
+				alert_import("'factor-weight' must be a data table");
+			}		
+			else{
+				load_weight_value(pp,weight,par,"In 'file'");
 			}
 		}
 	}
 	
 	// Sets default value to zero
-	for(auto i = 0u; i < mult; i++) par.value[i].te = "0";
+	//for(auto i = 0u; i < mult; i++) par.value[i].te = "0";
 	
 	par.trace_output = true;
 	if(cons != "" || mult > model.details.param_output_max) par.trace_output = false;
-	par.auto_value = false;
-	
+
 	if(par.name == dist_matrix_name){
 		alert_import("The distance matrix '"+par.full_name+"' must not be set");
 	}
 	
 	auto pre = "Parameter '"+par.full_name+"': ";
 	
-	if(value == "auto"){
-		par.auto_value = true;
-		for(auto &val : par.value) val.te = "auto";
-		par.variety = CONST_PARAM;
+	if(value == "auto") emsg("auto no longer supported");
+		
+	if(pp.dep.size() == 0){
+		if(value != ""){
+			auto val = number(value);
+			if(val == UNSET){
+				alert_import(pre+"The value '"+value+"' must be a number"); 
+			}
+			
+			par.variety = CONST_PARAM;
+			par.set_cons(0,val);
+		}
+		
+		if(reparam != ""){
+			par.variety = REPARAM_PARAM;
+			par.reparam_eqn = reparam;
+			//par.set_value_eqn(0,reparam);
+		}
+		
+		if(cons != ""){
+			auto val = number(cons);
+			if(val == UNSET){
+				alert_import(pre+"The constant '"+cons+"' must be a number"); 
+			}
+			
+			par.variety = CONST_PARAM;
+			par.set_cons(0,val);
+		}
 	}
 	else{
-		if(pp.dep.size() == 0){
-			if(value != ""){
-				auto val = number(value);
-				if(val == UNSET){
-					alert_import(pre+"The value '"+value+"' must be a number"); 
-				}
-				
-				par.value[0].te = value;
-				par.variety = CONST_PARAM;
-			}
+		if(value != "" || cons != "" || reparam != ""){
+			par.variety = CONST_PARAM;		
 			
-			if(reparam != ""){
-				par.value[0] = he(add_equation_info(reparam,REPARAM));
-				par.variety = REPARAM_PARAM;
-			}
-			
-			if(cons != ""){
-				auto val = number(cons);
-				if(val == UNSET){
-					alert_import(pre+"The constant '"+cons+"' must be a number"); 
-				}
-				
-				par.value[0].te = cons;
-				par.variety = CONST_PARAM;
-			}
-		}
-		else{
-			if(value != "" || cons != "" || reparam != ""){
-				par.variety = CONST_PARAM;		
-				
-				string desc = pre+"For 'value'";
-				auto valu = value; 
-				if(valu == ""){
-					if(cons != ""){
-						valu = cons; desc = pre+"For 'const'";
-					}
-					else{
-						if(reparam != ""){
-							valu = reparam; desc = pre+"For 'reparam'";
-							par.variety = REPARAM_PARAM;		
-						}
-						else{ 
-							alert_import("Problem importing"); 
-							return;
-						}
-					}
-				}
-				
-				if(reparam != "" && is_file(valu) == false){
-					load_reparam_eqn(reparam,par);
+			string desc = pre+"For 'value'";
+			auto valu = value; 
+			if(valu == ""){
+				if(cons != ""){
+					valu = cons; desc = pre+"For 'const'";
 				}
 				else{
-					if(is_file(valu) == false){
-						double val = number(valu);
-						
-						switch(par.variety){
-						case CONST_PARAM:
-							if(val == UNSET){
-								alert_import(desc+" '"+valu+"' is not a number");
-								return;
-							}
-							
-							for(auto k = 0u; k < mult; k++){
-								par.value[k].te = valu;
-							}
-							break;
-						
-						case REPARAM_PARAM:
-							{
-								if(val == UNSET){
-									if(check_eqn_valid(valu) != SUCCESS){
-										alert_import(desc+" '"+value+"' is not a valid equation.");
-										return;
-									}
-								}
-								
-								auto ei = he(add_equation_info(valu,REPARAM));
-								for(auto k = 0u; k < mult; k++){
-									par.value[k] = ei;
-								}
-							}
-							break;
-							
-						default: alert_import("Should not be default3"); return;
-						}
+					if(reparam != ""){
+						valu = reparam; desc = pre+"For 'reparam'";
+						par.variety = REPARAM_PARAM;		
 					}
-					else{
-						load_param_value(pp,valu,par,desc);
+					else{ 
+						alert_import("Problem importing"); 
+						return;
 					}
+				}
+			}
+			
+			if(reparam != "" && is_file(valu) == false){
+				par.reparam_eqn = reparam;
+				//load_reparam_eqn(reparam,par);
+			}
+			else{
+				if(is_file(valu) == false){
+					double val = number(valu);
+					
+					if(par.variety != CONST_PARAM) emsg("Should be const");
+				
+					if(val == UNSET){
+						alert_import(desc+" '"+valu+"' is not a number");
+						return;
+					}
+						
+					auto ref = par.add_cons(val);
+					for(auto k = 0u; k < mult; k++) par.element_ref[k] = ref;
+				}
+				else{
+					load_param_value(pp,valu,par,desc);
 				}
 			}
 		}
@@ -1340,11 +1307,15 @@ void Input::param_command()
 				return;
 			}
 		}
-			
-		for(auto i = 0u; i < mult; i++) par.prior[i] = pri;
+		
+		auto ref = model.prior.size();
+		par.default_prior_ref = ref;
+		model.prior.push_back(pri);
+		for(auto i = 0u; i < mult; i++) par.set_prior(i,ref);
 	}
 	
 	if(prior_split != ""){
+		//par.prior.resize(mult);
 		par.variety = PRIOR_PARAM;
 		
 		if(par.dep.size() == 0){
@@ -1365,12 +1336,7 @@ void Input::param_command()
 		for(auto r = 0u; r < subtab.nrow; r++){
 			vector <unsigned int> ind(ncol-1);
 			for(auto i = 0u; i < ncol-1; i++){
-				//const auto &hash_list = par.dep[i].hash_list;			
-				//auto vec = hash_list.get_vec_string(subtab.ele[r][i]);
-				//ind[i] = hash_list.existing(vec);
 				ind[i] = par.dep[i].hash_list.find(subtab.ele[r][i]);
-	
-				//ind[i] = find_in(par.dep[i].list,subtab.ele[r][i]);
 				if(ind[i] == UNSET){ 
 					alert_import("The table element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
 					return;
@@ -1384,7 +1350,7 @@ void Input::param_command()
 				return;
 			}
 			
-			set_prior_element(par.prior,par.dep,ind,pri);
+			set_prior_element(par,ind,pri);
 		}
 	}
 	
@@ -1396,8 +1362,9 @@ void Input::param_command()
 			alert_import("For 'dist' error with expression '"+dist+"': "+pri.error);
 			return;
 		}
-			
-		for(auto i = 0u; i < mult; i++) par.prior[i] = pri;
+		
+		par.default_prior_ref = model.prior.size();
+		model.prior.push_back(pri);
 	}
 
 	if(dist_split != ""){
@@ -1436,10 +1403,10 @@ void Input::param_command()
 				return;
 			}
 			
-			set_prior_element(par.prior,par.dep,ind,pri);
+			set_prior_element(par,ind,pri);
 		}
 	}
-	
+			
 	auto sim_sample = toLower(get_tag_value("sim-sample")); 
 	if(sim_sample == "") sim_sample = "true";
 	else{
@@ -1489,6 +1456,10 @@ void Input::param_command()
 		}
 		
 		model.param.push_back(par);
+	}
+	
+	if(par.variety == REPARAM_PARAM){
+		for(const auto &ele : par.element) he(ele.value);
 	}
 }
 
@@ -1945,10 +1916,14 @@ void Input::ind_effect_command()
 	}
 	
 	auto name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
+	
 	auto spl = split(name,',');
 	vector <IEname> list; 
 	for(auto i = 0u; i < spl.size(); i++){
-		IEname na; na.name = spl[i]; na.index = UNSET;
+		auto nam = spl[i];
+		check_name_input(nam,"Individual effect name",true);
+	
+		IEname na; na.name = nam; na.index = UNSET;
 		list.push_back(na);
 	}
 	
@@ -2158,6 +2133,8 @@ void Input::fixed_effect_command()
 	
 	auto name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
 
+	check_name_input(name,"Individual fixed effect name",true);
+
 	auto X = get_tag_value("X"); if(X == ""){ cannot_find_tag(); return;}
 	
 	Xvector X_vector;
@@ -2267,6 +2244,12 @@ void Input::inf_state_command()
 	}
 
 	if(lines.size() > 0) read_state_sample(lines,ind_key);
+}
+
+/// Warning command
+void Input::warning_command()
+{
+	auto text = get_tag_value("text"); 
 }
 
 

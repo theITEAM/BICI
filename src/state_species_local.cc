@@ -338,7 +338,7 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 						
 							if(event[e].type != ENTER_EV) emsg("Should be enter here");
 							auto c_old = event[e].c_after;
-							c_after = sp.comp_global_convert[c_old][cl][trs.trc];
+							c_after = sp.get_comp_global_convert(c_old,cl,trs.trc);
 							
 							auto entref = indd.enter_ref;
 							if(entref != UNSET){
@@ -359,7 +359,7 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 							auto c_old = event[e].c_after;
 							auto tr = trs.trc;
 							auto cnew = claa.tra[tr].f;
-							c_after = sp.comp_global_convert[c_old][cl][cnew];
+							c_after = sp.get_comp_global_convert(c_old,cl,cnew);
 							tr_gl = sp.trg_from_tr[c_after][cl][tr];
 						}
 						break;

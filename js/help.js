@@ -272,7 +272,8 @@ function add_help_content_buts(lay)
 				
 				let back_col; if(script[j].line == inter.help.line){ back_col = LLBLUE; inter.help.liney = cy;}
 				
-				let text_anno = text_convert_annotation(script[j].te,para_si,para_lh,LARGE,undefined,BLACK);
+				let tee = script[j].te;
+				let text_anno = text_convert_annotation(tee,para_si,para_lh,LARGE,undefined,BLACK);
 			
 				lay.add_button({text_anno:text_anno, x:cx+tab, y:cy, dx:text_anno.wmax+0.6, dy:para_lh, back_col:back_col, type:"Script Line"}); 
 			
@@ -313,10 +314,7 @@ function alert_help(title,te)
 {	
 	if(te == undefined){ te = title; title = "Sorry an error occurred...";}
 
-	if(te.length > 0 && te.substr(te.length-1,1) != "."){
-		let ch = te.substr(te.length-1,1);
-		if(ch != "." && ch != "\n") te += ".";
-	}
+	te = add_full_stop(te);
 	
 	while(te.length > 0 && te.substr(te.length-1,1) == "\n"){
 		te = te.substr(0,te.length-1);

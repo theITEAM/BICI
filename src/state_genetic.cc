@@ -831,8 +831,6 @@ void State::sample_genetic_value()
 /// Calculates the difference in genetic sequences
 vector < vector <unsigned int> > State::calculate_gen_dif()
 {
-	timer[GEN_DIF_TIMER] -= clock();
-	
 	const auto &gen_data = model.genetic_data;
 
 	vector < vector <unsigned int> > gen_dif;
@@ -885,8 +883,6 @@ vector < vector <unsigned int> > State::calculate_gen_dif()
 			}
 		}
 	}
-	
-	timer[GEN_DIF_TIMER] += clock();
 	
 	return gen_dif;
 }
@@ -1021,8 +1017,6 @@ double State::likelihood_genetic_process()
 	
 	if(model.mode == SIM  || !gen_data.on) return 0;
 	
-	timer[GENETIC_PROC_LIKE_TIMER] -= clock();
-	
 	auto Li = 0.0;
 
 	auto mut_rate = genetic_value.mut_rate;
@@ -1042,8 +1036,6 @@ double State::likelihood_genetic_process()
 		Li += poisson_probability(io.mut_num,seq_var+mut_rate*(in.t_start-model.details.t_start));
 	}
 	
-	timer[GENETIC_PROC_LIKE_TIMER] += clock();
-	
 	return Li;
 }
 
@@ -1055,8 +1047,6 @@ double State::likelihood_genetic_obs(const vector < vector <unsigned int> > &gen
 	
 	if(model.mode == SIM  || !gen_data.on) return 0;
 	
-	timer[GENETIC_OBS_LIKE_TIMER] -= clock();
-		
 	auto N = gen_data.obs.size();
 	
 	const auto &gen_dif = gen_data.gen_dif;
@@ -1073,8 +1063,6 @@ double State::likelihood_genetic_obs(const vector < vector <unsigned int> > &gen
 	Li *= gen_data.obs_scale;
 	
 	Li += genetic_value.nobs_not_infected*GEN_OBS_WRONG;
-	
-	timer[GENETIC_OBS_LIKE_TIMER] += clock();
 	
 	return Li;
 }

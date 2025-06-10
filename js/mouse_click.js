@@ -1385,9 +1385,7 @@ function button_action(bu,action_type)
 			let ep = inter.edit_param;
 			
 			start_worker("Set Weight",{i:ep.i, value:ep.value});
-			
 			close_bubble();
-			close_param_source();
 		}
 		break;
 		
@@ -1462,7 +1460,9 @@ function button_action(bu,action_type)
 		
 	case "AddFactorParam":
 		{
-			model.param[bu.i].factor = true;
+			let par = model.param[bu.i];
+			par.factor = true;
+			par.pri_pos = prior_factor_pos;
 			close_bubble();
 		}
 		break;
@@ -1671,12 +1671,13 @@ function button_action(bu,action_type)
 		break;
 	
 	case "EditPriorSplitElement": case "EditDistSplitElement": 
-		select_bubble_over();
-	
-		let prior = get_element(inter.edit_param.prior_split,bu.pindex);
-		inter.bubble.prior = copy(prior);
-		inter.bubble.prior.i = bu.i;
-		inter.bubble.prior.pindex = bu.pindex;
+		{
+			select_bubble_over();
+			let prior = get_element(inter.edit_param.prior_split,bu.pindex);
+			inter.bubble.prior = copy(prior);
+			inter.bubble.prior.i = bu.i;
+			inter.bubble.prior.pindex = bu.pindex;
+		}
 		break;
 		
 	case "DonePriorSplit": case "DoneDistSplit":
@@ -2129,6 +2130,10 @@ function button_action(bu,action_type)
 		select_bubble_over();
 		break;
 		
+	case "HistogramSettings":
+		select_bubble_over();
+		break;
+		
 	case "BurninOK":
 		if(bubble_check_error() == false){			
 			copy_back_to_source();
@@ -2140,7 +2145,7 @@ function button_action(bu,action_type)
 		}
 		break;
 	
-	case "ScatterOK": case "DistributionPlotOK":
+	case "ScatterOK": case "DistributionPlotOK": case "HistogramOK":
 		if(bubble_check_error() == false){			
 			copy_back_to_source();
 			close_bubble();

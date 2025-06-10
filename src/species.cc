@@ -111,20 +111,17 @@ bool Species::correct_ev(unsigned int c, Event &enew) const
 	case NM_TRANS_EV:
 	case M_TRANS_EV:
 		{
-			const auto &trg = tra_gl[enew.tr_gl];
+			auto tr = enew.tr_gl;
+			const auto &trg = tra_gl[tr];
 			if(trg.i != c){                               // Ensures that sequence is consistent
 				if(c == UNSET){
 					emsg("Not consistent4");
 					return true;
 				}
-				
-				auto tr_new = trg.transform[c];
-				if(tr_new == UNSET){
-					return true; 
-				}
-				
-				enew.tr_gl = tr_new;
-				auto c_after = tra_gl[tr_new].f;
+		
+				tr = tr_trans(tr,c); if(tr == UNSET) return true;
+				enew.tr_gl = tr;
+				auto c_after = tra_gl[tr].f;
 				enew.c_after = c_after;
 				c = c_after;
 			}
@@ -203,10 +200,11 @@ void Species::nm_trans_incomp_info()
 
 
 /// Gets nm transition number from event 
-unsigned int Species::get_tra_m(const TransGlobal &tra, const Event &ev_orig) const
+unsigned int Species::get_tra_m(unsigned int tr, const Event &ev_orig) const
 {
+	const auto &tra = tra_gl[tr];
 	if(tra.i != ev_orig.c_after){ // accounts for intermediate transition
-		auto trg = tra.transform[ev_orig.c_after];
+		auto trg = tr_trans(tr,ev_orig.c_after);
 		if(trg == UNSET) emsg("trg unset");
 		return tra_gl[trg].nm_trans_ref;
 	}
@@ -658,7 +656,7 @@ vector <unsigned int> Species::get_cv_list(unsigned int ie, const vector <Param>
 						const auto &par = param[pr.th];
 						if(par.variety == CONST_PARAM) fl = false;
 						else{
-							auto th = par.param_vec_ref[pr.index];	
+							auto th = par.get_param_vec(pr.index);	
 							if(th == UNSET) fl = false;
 							else add_to_vec(list,th);
 						}
@@ -689,9 +687,9 @@ vector < vector <double> > Species::calculate_omega_basic(unsigned int g, const 
 		omega[j].resize(N);
 		for(auto i = 0u; i < N; i++){
 			auto &par = param[ieg.omega[j][i]];
-			if(par.variety == CONST_PARAM) omega[j][i] = par.value[0].value;
+			if(par.variety == CONST_PARAM) omega[j][i] = par.get_value(0);
 			else{
-				auto th2 = par.param_vec_ref[0]; if(th2 == UNSET) emsg("Should not be unset2");
+				auto th2 = par.get_param_vec(0); if(th2 == UNSET) emsg("Should not be unset2");
 				omega[j][i] = param_val[th2];
 			}
 		}
@@ -708,3 +706,39 @@ vector < vector <double> > Species::calculate_omega_basic(unsigned int g, const 
 	
 	return omega;
 }	
+
+
+/// Shifts a global transition such that fits with a given c
+unsigned int Species::tr_trans(unsigned int trg, unsigned int c) const
+{
+	if(tform_set) return tra_gl[trg].tform[c];
+	
+	const auto &tra = tra_gl[trg];
+	auto cl_tra = tra.cl;
+	const auto &co = comp_gl[c];
+	const auto &coi = comp_gl[tra.i];
+	
+	for(auto cl = 0u; cl < ncla; cl++){
+		int dif = co.cla_comp[cl]-coi.cla_comp[cl];
+		if(dif != 0){
+			if(cl == cl_tra) emsg("Should not differ in cl");
+			trg += tr_shift[cl_tra][cl]*dif;
+		}
+	}
+	if(tra_gl[trg].i != c) emsg("could not do tform");
+	
+	return trg;
+}
+
+
+/// Convert from a global compartment to another based on classification cl being in c
+unsigned int Species::get_comp_global_convert(unsigned int cgl, unsigned int cl, unsigned int c) const
+{
+	if(comp_global_convert_set) return comp_global_convert[cgl][cl][c];
+	
+	const auto &co = comp_gl[cgl]; 
+	cgl += ((int)c-co.cla_comp[cl])*comp_mult[cl];
+	if(comp_gl[cgl].cla_comp[cl] != c) emsg("Wrong c");
+	
+	return cgl;
+}

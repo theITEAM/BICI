@@ -837,7 +837,7 @@ void StateSpecies::update_ind_trans(double t, const IndTransRef &itr, const vect
 	
 	// Updates the individual compartment based on transition
 	if(ind_sim_c[i] != sp.tra_gl[tr_gl].i){ // Case when intermediate event has occured
-		tr_gl = sp.tra_gl[tr_gl].transform[ind_sim_c[i]];
+		tr_gl = sp.tr_trans(tr_gl,ind_sim_c[i]);
 	}
 	
 	const auto &tr = sp.tra_gl[tr_gl];	

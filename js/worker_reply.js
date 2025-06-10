@@ -12,6 +12,11 @@ worker.onmessage = function (e)
 		set_loading_percent(ans.info);
 		return;
 	}
+	
+	if(ans.type == "LoadMess"){
+		loading_symbol_message(ans.info);
+		return;
+	}
 
 	if(false){ prr("Worker reply: "+ans.type); prr("ans"); prr(ans);}
 
@@ -241,6 +246,7 @@ worker.onmessage = function (e)
 			
 		case "Set Weight": 
 			model.param[ans.i].weight_desc = ans.weight_desc;
+			close_param_source();
 			generate_screen();
 			break;
 			
@@ -400,9 +406,7 @@ worker.onmessage = function (e)
 			
 		case "Alert Import":
 			inter.help = { title:ans.title, te:ans.te, st:ans.st, line:ans.line, scroll_to_line:ans.scroll_to_line, script:ans.script};
-			
 			add_script_width(inter.help.script);
-		
 			generate_screen();
 			break;
 			

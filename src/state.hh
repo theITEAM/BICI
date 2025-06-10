@@ -70,13 +70,16 @@ class State                                // Stores information about the state
 		void likelihood_from_scratch();
 		void resample_ind(bool do_pl = false);
 		Particle generate_particle(unsigned int s, unsigned int chain, bool store_state) const;
-		void set_particle(const Particle &part);
+		void set_particle(const Particle &part, bool calc_like=true);
 		vector <double> prior_init_cond(double &like_ch);
 		void update_individual_sampler();
 		void update_popnum_t_init(unsigned int p, vector <unsigned int> cnum_i, vector <unsigned int> cnum_f);
 		void back_init();
 		void restore_back();
 		unsigned int get_ti(double t) const;
+		vector <double> get_param_val_prop() const;
+		double get_trans_rate_est(unsigned int p, unsigned int tr, unsigned int ti) const;
+		vector < vector <double> > get_population_rates(unsigned int p) const;
 		void init_cor_matrix(); 
 	
 	private:

@@ -11,9 +11,9 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-simulation start=0 end=100 timestep=0.5
+simulation start=0 end=100 timestep=0.25
 
-inference start=0 end=100 timestep=0.5 update=1000 nchain=1
+inference start=0 end=100 timestep=0.25 nchain=3
 
 post-sim start=0 end=100
 
@@ -29,7 +29,7 @@ class name="DS" index="a"
 comp name="S" color="#009900" x=-10 y=0
 comp name="I" color="#ff2222" x=10 y=0
 
-trans name="S->I" value="exp(rate:β×{I,g[f]}/N)"
+trans name="S->I" value="exp(rate:β×{I,g;[f]}/N)"
 
 class name="Group" index="g"
 

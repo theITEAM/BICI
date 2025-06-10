@@ -25,7 +25,7 @@ public:
 	vector <unsigned int> get_vec_string(const string &te) const;
 	vector <unsigned int> get_vec_double(const double val) const;
 	void create(const vector <string> &v);
-	
+
 private:
 	vector <long> hash_code;                 // Stores codes used to make number
 

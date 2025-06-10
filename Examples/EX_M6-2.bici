@@ -26,7 +26,7 @@ species name="People" type="population"
 
 class name="DS" index="d"
 
-comp name="S" color="#009900" x=-32 y=0
+comp name="S" color="#009900" x=-35 y=0
 comp name="E" color="#ff9900" branch-prob="true" x=-6 y=0
 comp name="I" color="#ff2222" x=3 y=5
 comp name="A" color="#ff44ff" x=3 y=-5

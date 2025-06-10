@@ -173,17 +173,55 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		
 		initialise_swap_variable();             // Initialises sampling variables for swap proposals
 		break;
+	
+	case IND_OBS_RESIM_PROP:  
+		{
+			name += "IND_OBS_RESIM_PROP"; 
+			if(vec.size() != 1) emsg("error vec num");
+			p_prop = vec[0];
+			ntr = 0; nac = 0; nfa = 0;
+			
+			auto N = model.species[p_prop].nindividual_in;
+			ind_sim_prob.resize(N);
+			for(auto &va : ind_sim_prob){
+				va.ntr = PROP_SIM_NAC_INIT; va.nac = PROP_SIM_NAC_INIT; va.prob = 1;
+				va.done = false;
+			}
+		}
+		break;
 		
 	case IND_OBS_SAMP_PROP:                   // Individual proposals
-	case IND_OBS_RESIM_PROP:  
-	case IND_OBS_RESIM_SINGLE_PROP:  	
+	case IND_OBS_RESIM_SINGLE_PROP:  
+		{
+			switch(type){
+			case IND_OBS_SAMP_PROP: name += "IND_OBS_SAMP_PROP"; break;
+			case IND_OBS_RESIM_SINGLE_PROP: name += "IND_OBS_RESIM_SINGLE_PROP"; break;
+			default: emsg("op prob"); break;
+			}
+			
+			if(vec.size() != 1) emsg("error vec num");
+			p_prop = vec[0];
+			ntr = 0; nac = 0; nfa = 0;
+			
+			const auto &sp = model.species[p_prop];
+			auto N = sp.nindividual_in;
+			auto K = sp.ncla;
+			ind_sim_prob_cl.resize(N);
+			for(auto i = 0u; i < N; i++){
+				ind_sim_prob_cl[i].resize(K);
+				for(auto cl = 0u; cl < K; cl++){
+					auto &va = ind_sim_prob_cl[i][cl];
+					va.ntr = PROP_SIM_NAC_INIT; va.nac = PROP_SIM_NAC_INIT; va.prob = 1;
+					va.done = false;
+				}
+			}
+		}
+		break;
+		
 	case IND_UNOBS_RESIM_PROP:         
 	case IND_ADD_REM_PROP:    
 	case IND_ADD_REM_TT_PROP:  	
 		switch(type){
-		case IND_OBS_SAMP_PROP: name += "IND_OBS_SAMP_PROP"; break;
-		case IND_OBS_RESIM_PROP: name += "IND_OBS_RESIM_PROP"; break;
-		case IND_OBS_RESIM_SINGLE_PROP: name += "IND_OBS_RESIM_SINGLE_PROP"; break;
 		case IND_UNOBS_RESIM_PROP: name += "IND_UNOBS_RESIM_PROP"; break;
 		case IND_ADD_REM_PROP: name += "IND_ADD_REM_PROP"; break;
 		case IND_ADD_REM_TT_PROP: name += "IND_ADD_REM_TT_PROP"; break;
@@ -580,7 +618,6 @@ void Proposal::MH(State &state)
 {
 	auto pl = false;
 	
-	timer[MH_TIMER] -= clock();
 	auto param_store = state.param_val;
 	
 	state.param_val = sample(state.param_val);
@@ -602,7 +639,6 @@ void Proposal::MH(State &state)
 		(omega_check && model.ie_cholesky_error(state.param_val))){ 
 		state.param_val = param_store; 
 		update_si(-0.005);
-		timer[MH_TIMER] += clock();
 		return;
 	}
 
@@ -631,8 +667,6 @@ void Proposal::MH(State &state)
 	}
 
 	if(pl) state.check("ev");
-
-	timer[MH_TIMER] += clock();
 }
 
 
@@ -1144,7 +1178,6 @@ void Proposal::MH_ind_local(State &state)
 	lc_ref.resize(individual.size());
 
 	// Adds all possible local changes
-	timer[INIT_IND_LOCAL_TIMER] -= clock();
 	for(auto i = 0u; i < individual.size(); i++){
 		auto add = ssp.local_ind_change(i,cl);
 		add_li_cha(i,add,licha,lc_ref);
@@ -1157,8 +1190,6 @@ void Proposal::MH_ind_local(State &state)
 		
 	const vector <Event> empty_event;           
 
-	timer[INIT_IND_LOCAL_TIMER] += clock();
-	
 	if(licha.size() > 0){
 		auto loopmax = (unsigned int)(licha.size());
 		if(loopmax > individual.size()) loopmax= individual.size();
@@ -1206,7 +1237,6 @@ void Proposal::MH_ind_local(State &state)
 					si.nfilt++;
 				}
 				else{
-					timer[IND_LOCAL_TIMER] -= clock();
 					si.ntr2++;
 					
 					auto ev_store = ssp.individual[lich.i].ev;
@@ -1263,9 +1293,7 @@ void Proposal::MH_ind_local(State &state)
 							
 							if(pl) state.check("ind prop");
 						}
-					}
-					
-					timer[IND_LOCAL_TIMER] += clock();
+					}		
 				}
 			}
 		}		
@@ -1309,9 +1337,7 @@ void Proposal::trans_tree(State &state)
 {
 	if(skip_proposal(0.9)) return;
 	
-	timer[TRANS_TREE_TIMER] -= clock();
 	state.trans_tree_proposal(burn_info,nac,ntr);
-	timer[TRANS_TREE_TIMER] += clock();
 }
 
 
@@ -1320,9 +1346,7 @@ void Proposal::trans_tree_swap_inf(State &state)
 {
 	if(skip_proposal(0.9)) return;
 	
-	timer[TRANS_TREE_SWAP_INF_TIMER] -= clock();
 	state.trans_tree_swap_inf_proposal(burn_info,nfa,nac,ntr);
-	timer[TRANS_TREE_SWAP_INF_TIMER] += clock();
 }
 
 
@@ -1331,9 +1355,7 @@ void Proposal::trans_tree_mut(State &state)
 {
 	if(skip_proposal(0.9)) return;
 	
-	timer[TRANS_TREE_MUT_TIMER] -= clock();
 	state.trans_tree_mut_proposal(burn_info,nac,ntr,si);
-	timer[TRANS_TREE_MUT_TIMER] += clock();
 }
 
 
@@ -1342,19 +1364,18 @@ void Proposal::trans_tree_mut_local(State &state)
 {
 	if(skip_proposal(0.9)) return;
 	
-	timer[TRANS_TREE_MUT_LOCAL_TIMER] -= clock();
 	state.trans_tree_mut_local_proposal(burn_info,gen_mut_info);
-	timer[TRANS_TREE_MUT_LOCAL_TIMER] += clock();
 }
 
 
 /// Performs a sampling proposal update for an observed individual 
 void Proposal::sample_ind_obs(State &state)
 {
-	if(skip_proposal(0.9)) return;
+	if(skip_proposal(0.8)) return;
 	
 	auto pl = false;
-	
+	auto burn = burn_info.on;
+
 	if(pl) state.check("before");
 	
 	auto &sp = model.species[p_prop];
@@ -1370,78 +1391,80 @@ void Proposal::sample_ind_obs(State &state)
 		if(sp.individual[i].simulation_needed){
 			for(auto cl = 0u; cl < sp.ncla; cl++){
 				if(sp.individual[i].sample_needed[cl] || ssp.all_events_correct(i,cl) == false){
-					
 					if(pl) cout << endl << endl << i << "update    cl=" << cl << endl;
 			
 					if(ind_ev_samp.needed(i,cl) == true){
-						
-						ntr++;
-						ind_ev_samp.generate_ind_obs_timeline();
-						
-						auto probif = 0.0;
+						auto &isp = ind_sim_prob_cl[i][cl];
 					
-						auto ev_new = ind_ev_samp.sample_events(probif);
+						if(ran() < isp.prob){
+							ntr++; if(burn) isp.ntr++;
+							ind_ev_samp.generate_ind_obs_timeline();
+							
+							auto probif = 0.0;
 						
-						if(pl){	
-							cout << i << " " << ind.name << "  individual" << endl;
-							cout << "old: "; ssp.print_event(ind.ev);
-							cout << "new: "; ssp.print_event(ev_new);
-							cout << ind_ev_samp.illegal << "illegal" << endl;
-							if(ind_ev_samp.illegal) emsg("stop");
-						}
+							auto ev_new = ind_ev_samp.sample_events(probif);
 							
-						if(ind_ev_samp.illegal == true) nfa++;
-						else{
-							if(testing == true){ // Diagnostic
-								auto prob = ind_ev_samp.sample_events_prob(ev_new);
-								if(dif(probif,prob,DIF_THRESH)){
-									emsg("sampler different here");
-								}
+							if(pl){	
+								cout << i << " " << ind.name << "  individual" << endl;
+								cout << "old: "; ssp.print_event(ind.ev);
+								cout << "new: "; ssp.print_event(ev_new);
+								cout << ind_ev_samp.illegal << "illegal" << endl;
+								if(ind_ev_samp.illegal) emsg("stop");
 							}
-							
-							auto ev_store = ind.ev;
-							
-							auto gc = state.update_tree(p_prop,i,ev_new);
-							
-							if(gc.type == GENCHA_FAIL) nfa++;
+								
+							if(ind_ev_samp.illegal == true) nfa++;
 							else{
-								auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-							
-								if(pl){
-									cout << "modi: "; ssp.print_event(ev_new);
+								if(testing == true){ // Diagnostic
+									auto prob = ind_ev_samp.sample_events_prob(ev_new);
+									if(dif(probif,prob,DIF_THRESH)){
+										emsg("sampler different here");
+									}
 								}
 								
-								ind_ev_samp.generate_ind_obs_timeline();
-								auto probfi = ind_ev_samp.sample_events_prob(ev_store);
+								auto ev_store = ind.ev;
 								
-								auto dprob = probfi-probif;
-							
-								gc.update_like_ch(like_ch,dprob);
+								auto gc = state.update_tree(p_prop,i,ev_new);
 								
-								auto al = calculate_al(like_ch,dprob);
-							
-								if(pl){
-									cout << al << " " << dprob <<  "al" << endl;	
-									print_like(like_ch);
+								if(gc.type == GENCHA_FAIL) nfa++;
+								else{
+									auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+								
+									if(pl){
+										cout << "modi: "; ssp.print_event(ev_new);
+									}
+									
+									ind_ev_samp.generate_ind_obs_timeline();
+									auto probfi = ind_ev_samp.sample_events_prob(ev_store);
+									
+									auto dprob = probfi-probif;
+								
+									gc.update_like_ch(like_ch,dprob);
+									
+									auto al = calculate_al(like_ch,dprob);
+								
+									if(pl){
+										cout << al << " " << dprob <<  "al" << endl;	
+										print_like(like_ch);
+									}
+								
+									if(ran() < al){
+										if(pl) cout << "ac ind" << endl;
+										nac++; if(burn){ if(event_dif(ev_store,ind.ev)) isp.nac++;}
+										state.add_like(like_ch);
+										state.gen_change_update(gc); 	
+										if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+									}
+									else{ 
+										if(pl) cout << "reject" << endl;
+										state.restore_back();
+									}
 								}
-							
-								if(ran() < al){
-									if(pl) cout << "ac ind" << endl;
-									nac++;
-									state.add_like(like_ch);
-									state.gen_change_update(gc); 	
-									if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
-								}
-								else{ 
-									if(pl) cout << "reject" << endl;
-									state.restore_back();
-								}
+								
+								if(pl) state.check(" indupdate");
 							}
-							
-							if(pl) state.check(" indupdate");
+							if(burn) ind_obs_prob_update(isp);
 						}
 					}
-					if(i == 69) pl = false;
 				}
 			}
 		}
@@ -1452,10 +1475,11 @@ void Proposal::sample_ind_obs(State &state)
 /// Performs a resimulation proposal update for an observed individual 
 void Proposal::resimulate_ind_obs(State &state)
 {
-	if(skip_proposal(0.5)) return;
+	//if(skip_proposal(0.5)) return;
 	 
 	auto pl = false;
-	
+	auto burn = burn_info.on;
+
 	auto &sp = model.species[p_prop];
 	auto &ssp = state.species[p_prop];
 	
@@ -1467,84 +1491,89 @@ void Proposal::resimulate_ind_obs(State &state)
 		const auto &indd = sp.individual[i];
 		
 		if(indd.simulation_needed){
-			auto &ind = ssp.individual[i];
-			
-			auto probif = 0.0, probfi = 0.0;
-			
-			auto e_init = ind_ev_samp.resample_init_event(i,probif);
-	
-			if(pl){
-				cout << endl << endl << ind.name << "ind" << endl; 
-				cout << "older: "; ssp.print_event(ind.ev); 
-			}
-					
-			auto ev_new = ind_ev_samp.simulate_events(i,e_init,probif,indd.trig_ev_ref);
-	
-			if(pl){
-				cout << "new: "; ssp.print_event(ind.ev); 	
-				if(ind_ev_samp.illegal) emsg("do");
-			}
-			ntr++;
-			if(ind_ev_samp.illegal){
-				nfa++;
-			}
-			else{
-				if(testing == true){ // Diagnostic
-					auto prob = ind_ev_samp.resample_init_event_prob(i,e_init) + ind_ev_samp.simulate_events_prob(i,ev_new,indd.trig_ev_ref);
-					if(dif(probif,prob,DIF_THRESH)){
-						emsg("sampler different3");
-					}
+			auto &isp = ind_sim_prob[i];
+			if(ran() < isp.prob){
+				auto &ind = ssp.individual[i];
+				
+				auto probif = 0.0, probfi = 0.0;
+				
+				auto e_init = ind_ev_samp.resample_init_event(i,probif);
+		
+				if(pl){
+					cout << endl << endl << ind.name << "ind" << endl; 
+					cout << "older: "; ssp.print_event(ind.ev); 
 				}
-				
-				auto ev_store = ind.ev;	
-				
-				auto gc = state.update_tree(p_prop,i,ev_new);
-				if(gc.type == GENCHA_FAIL){
+						
+				auto ev_new = ind_ev_samp.simulate_events(i,e_init,probif,indd.trig_ev_ref);
+		
+				if(pl){
+					cout << "new: "; ssp.print_event(ind.ev); 	
+					if(ind_ev_samp.illegal) emsg("do");
+				}
+				ntr++; if(burn) isp.ntr++;
+				if(ind_ev_samp.illegal){
 					nfa++;
 				}
 				else{
-					if(pl){
-						cout << endl << endl << ind.name << "ind " << endl; 
-						cout << "old: "; ssp.print_event(ind.ev);
-						for(auto i = 0u; i < ind.ev.size(); i++){
-							cout << ind.ev[i].t - int(ind.ev[i].t) << ",";
+					if(testing == true){ // Diagnostic
+						auto prob = ind_ev_samp.resample_init_event_prob(i,e_init) + ind_ev_samp.simulate_events_prob(i,ev_new,indd.trig_ev_ref);
+						if(dif(probif,prob,DIF_THRESH)){
+							emsg("sampler different3");
 						}
-						cout << " dif old " << endl;
 					}
 					
-					probfi += ssp.nm_obs_dprob(ind);
-					auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-					probif += ssp.nm_obs_dprob(ind);
+					auto ev_store = ind.ev;	
 					
-					if(pl){
-						cout << "new: "; ssp.print_event(ind.ev);
+					auto gc = state.update_tree(p_prop,i,ev_new);
+					if(gc.type == GENCHA_FAIL){
+						nfa++;
 					}
-					
-					probfi += ind_ev_samp.resample_init_event_prob(i,ev_store[0]) + 
-					          ind_ev_samp.simulate_events_prob(i,ev_store,indd.trig_ev_ref);
-			
-					auto dprob = probfi-probif;
-					
-					gc.update_like_ch(like_ch,dprob);
-					if(pl) print_like(like_ch);
-					
-					auto al = calculate_al(like_ch,dprob);
+					else{
+						if(pl){
+							cout << endl << endl << ind.name << "ind " << endl; 
+							cout << "old: "; ssp.print_event(ind.ev);
+							for(auto i = 0u; i < ind.ev.size(); i++){
+								cout << ind.ev[i].t - int(ind.ev[i].t) << ",";
+							}
+							cout << " dif old " << endl;
+						}
+						
+						probfi += ssp.nm_obs_dprob(ind);
+						auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+						probif += ssp.nm_obs_dprob(ind);
+						
+						if(pl){
+							cout << "new: "; ssp.print_event(ind.ev);
+						}
+						
+						probfi += ind_ev_samp.resample_init_event_prob(i,ev_store[0]) + 
+											ind_ev_samp.simulate_events_prob(i,ev_store,indd.trig_ev_ref);
+				
+						auto dprob = probfi-probif;
+						
+						gc.update_like_ch(like_ch,dprob);
+						if(pl) print_like(like_ch);
+						
+						auto al = calculate_al(like_ch,dprob);
 
-					if(pl) cout << al << " al try ind" << endl;
-					if(ran() < al){ 
-						if(pl) cout << "ac ind" << endl;
-						nac++;
-						state.add_like(like_ch);
-						state.gen_change_update(gc); 	
-						if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+						if(pl) cout << al << " al try ind" << endl;
+						if(ran() < al){ 
+							if(pl) cout << "ac ind" << endl;
+							nac++; if(burn){ if(event_dif(ev_store,ind.ev)) isp.nac++;}
+							state.add_like(like_ch);
+							state.gen_change_update(gc); 	
+							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+						}
+						else{ 
+							if(pl) cout << "rej ind" << endl;
+							state.restore_back();
+						}
 					}
-					else{ 
-						if(pl) cout << "rej ind" << endl;
-						state.restore_back();
-					}
+					
+					if(pl) state.check(" After ind prop");
 				}
 				
-				if(pl) state.check(" After ind prop");
+				if(burn) ind_obs_prob_update(isp);
 			}
 		}
 	}
@@ -1557,6 +1586,7 @@ void Proposal::resimulate_single_ind_obs(State &state)
 	if(skip_proposal(0.5)) return;
 	
 	auto pl = false;
+	auto burn = burn_info.on;
 
 	auto &sp = model.species[p_prop];
 	auto &ssp = state.species[p_prop];
@@ -1569,76 +1599,81 @@ void Proposal::resimulate_single_ind_obs(State &state)
 		const auto &indd = sp.individual[i];
 		for(auto cl = 0u; cl < sp.ncla; cl++){
 			if((indd.sample_needed[cl] || ssp.all_events_correct(i,cl) == false) && !sp.sink_exist[cl]){		
-				auto &ind = ssp.individual[i];
-				
-				const auto &trig = indd.cl_trig_ev_ref[cl];
-				
-				auto probif = 0.0, probfi = 0.0;
-	
-				if(pl){
-					cout << endl << " " << endl << ind.name << "ind" << endl; 
-					cout << "older: "; ssp.print_event(ind.ev);
-					cout << cl << " cl" << endl;
-				}
-						
-				auto ev_new = ind_ev_samp.simulate_single_events(i,cl,probif,trig);
+				auto &isp = ind_sim_prob_cl[i][cl];
+				if(ran() < isp.prob){
+					auto &ind = ssp.individual[i];
+					
+					const auto &trig = indd.cl_trig_ev_ref[cl];
+					
+					auto probif = 0.0, probfi = 0.0;
 		
-				if(pl){
-					cout << "newer: "; ssp.print_event(ev_new);
-				}
-				
-				ntr++;
-				if(ind_ev_samp.illegal){
-					nfa++;
-				}
-				else{
-					if(testing == true){ // Diagnostic
-						auto prob = ind_ev_samp.simulate_single_events_prob(i,cl,ev_new,trig);
-						if(dif(probif,prob,DIF_THRESH)){
-							cout <<  probif << " " << prob << " prob" << endl;
-							emsg("sampler different4");
-						}
+					if(pl){
+						cout << endl << " " << endl << ind.name << "ind" << endl; 
+						cout << "older: "; ssp.print_event(ind.ev);
+						cout << cl << " cl" << endl;
+					}
+							
+					auto ev_new = ind_ev_samp.simulate_single_events(i,cl,probif,trig);
+			
+					if(pl){
+						cout << "newer: "; ssp.print_event(ev_new);
 					}
 					
-					auto ev_store = ind.ev;	
-					
-					auto gc = state.update_tree(p_prop,i,ev_new);
-					if(gc.type == GENCHA_FAIL){
+					ntr++; if(burn) isp.ntr++;
+					if(ind_ev_samp.illegal){
 						nfa++;
 					}
 					else{
-						if(pl){
-							cout << endl << " " << endl << ind.name << "ind" << endl; 
-							cout << "old: "; ssp.print_event(ind.ev);
-							cout << "new: "; ssp.print_event(ev_new);
+						if(testing == true){ // Diagnostic
+							auto prob = ind_ev_samp.simulate_single_events_prob(i,cl,ev_new,trig);
+							if(dif(probif,prob,DIF_THRESH)){
+								cout <<  probif << " " << prob << " prob" << endl;
+								emsg("sampler different4");
+							}
 						}
 						
-						probfi += ssp.nm_single_obs_dprob(cl,ind);
-						auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-						probif += ssp.nm_single_obs_dprob(cl,ind);
+						auto ev_store = ind.ev;	
 						
-						probfi += ind_ev_samp.simulate_single_events_prob(i,cl,ev_store,trig);
-				
-						auto dprob = probfi-probif;
-						
-						gc.update_like_ch(like_ch,dprob);
-									
-						auto al = calculate_al(like_ch,dprob);
-					
-						if(pl) cout << al << " al try ind" << endl;
-						if(ran() < al){
-							if(pl) cout << "ac ind" << endl;
-							nac++;
-							state.add_like(like_ch);
-							state.gen_change_update(gc); 	
-							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+						auto gc = state.update_tree(p_prop,i,ev_new);
+						if(gc.type == GENCHA_FAIL){
+							nfa++;
 						}
 						else{
-							state.restore_back();
+							if(pl){
+								cout << endl << " " << endl << ind.name << "ind" << endl; 
+								cout << "old: "; ssp.print_event(ind.ev);
+								cout << "new: "; ssp.print_event(ev_new);
+							}
+							
+							probfi += ssp.nm_single_obs_dprob(cl,ind);
+							auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+							probif += ssp.nm_single_obs_dprob(cl,ind);
+							
+							probfi += ind_ev_samp.simulate_single_events_prob(i,cl,ev_store,trig);
+					
+							auto dprob = probfi-probif;
+							
+							gc.update_like_ch(like_ch,dprob);
+										
+							auto al = calculate_al(like_ch,dprob);
+						
+							if(pl) cout << al << " al try ind" << endl;
+							if(ran() < al){
+								if(pl) cout << "ac ind" << endl;
+								nac++; if(burn){ if(event_dif(ev_store,ind.ev)) isp.nac++;}
+								state.add_like(like_ch);
+								state.gen_change_update(gc); 	
+								if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+							}
+							else{
+								state.restore_back();
+							}
 						}
+						
+						if(pl) state.check(" After ind prop");
 					}
 					
-					if(pl) state.check(" After ind prop");
+					if(burn) ind_obs_prob_update(isp);
 				}
 			}
 		}
@@ -2910,7 +2945,7 @@ string Proposal::diagnostics(long total_time) const
 			
 			ss << "Individual all event proposals" << endl;
 			
-			vector <double> ac_list,  fa_list, si_list;
+			vector <double> ac_list, fa_list, si_list;
 		
 			auto ntot = 0u;
 			for(auto i = 0u; i < sp.nindividual_obs; i++){
@@ -2933,27 +2968,69 @@ string Proposal::diagnostics(long total_time) const
 		}
 		break;
 	
-	case IND_OBS_SAMP_PROP:
 	case IND_OBS_RESIM_PROP:
+		{
+			ss << "Individual resimulation proposals (for observed)";
+		
+			ss << ":" << endl;	
+					
+			if(ntr == 0) ss << "No proposals";
+			else{
+				ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%    ";
+				ss << " Fail: " << (unsigned int) (100.0*nfa/(ntr+TINY)) << "%    ";
+				
+				vector <double> prob_list;
+				for(const auto &isp : ind_sim_prob){
+					if(isp.done) prob_list.push_back(isp.prob);
+					else prob_list.push_back(0);
+				}
+				
+				ss << " Prob: " << tstr(mean(prob_list),3) << " (" << tstr(min(prob_list),3) << " - " << tstr(max(prob_list),3) << ")  ";
+			}
+			ss << endl;
+		}
+		break;
+		
+	case IND_OBS_SAMP_PROP:
 	case IND_OBS_RESIM_SINGLE_PROP:
-	case IND_UNOBS_RESIM_PROP:
 		{
 			ss << "Individual ";
 			switch(type){
 			case IND_OBS_SAMP_PROP: ss << "sampler proposals (for observed)"; break;
-			case IND_OBS_RESIM_PROP: ss << "resimulation proposals (for observed)"; break;
 			case IND_OBS_RESIM_SINGLE_PROP: ss << "resimulation single cl proposals (for observed)"; break;
-			case IND_UNOBS_RESIM_PROP: ss <<  "resimulation proposals (for unobserved)"; break;
 			default: emsg("def op"); break;
 			}
-			
+		
+			ss << ":" << endl;	
+			if(ntr == 0) ss << "No proposals";
+			else{
+				ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%    ";
+				ss << " Fail: " << (unsigned int) (100.0*nfa/(ntr+TINY)) << "%    ";
+				
+				const auto &sp = model.species[p_prop];
+				for(auto cl = 0u; cl < sp.ncla; cl++){
+					vector <double> prob_list;
+					for(const auto &isp : ind_sim_prob_cl){
+						if(isp[cl].done) prob_list.push_back(isp[cl].prob);
+						else prob_list.push_back(0);
+					}			
+					ss << " " << sp.cla[cl].name << " prob: " << tstr(mean(prob_list),3) << " (" << tstr(min(prob_list),3) << " - " << tstr(max(prob_list),3) << ")  ";
+				}
+			}
+			ss << endl;
+		}			
+		break;
+		
+	case IND_UNOBS_RESIM_PROP:
+		{
+			ss << "Individual resimulation proposals (for unobserved)"; 
+	
 			ss << ":" << endl;	
 			if(ntr == 0) ss << "No proposals";
 			else{
 				ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%    ";
 				ss << " Fail: " << (unsigned int) (100.0*nfa/(ntr+TINY)) << "%    ";
 			}
-				
 			ss << endl;
 		}
 		break;
@@ -3151,11 +3228,8 @@ string Proposal::diagnostics(long total_time) const
 		break;
 	}
 	
-	ss << "CPU time: " << cpu_percent(timer[PROP_TIMER],total_time)
-		 << "  Sample: " << cpu_percent(timer[SAMPLE_TIMER],total_time)
-		 << "  Add samp: " << cpu_percent(timer[ADDSAMP_TIMER],total_time)
-		 << "  Update: " << cpu_percent(timer[UPDATESAMP_TIMER],total_time)
-		 << "  Prob: " << prop_prob << endl;
+	ss << "CPU time: " << cpu_percent(timer[PROP_TIMER],total_time) << endl;
+	//	 << "  Prob: " << prop_prob << endl;
 	
 	return ss.str();
 }

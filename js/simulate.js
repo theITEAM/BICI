@@ -702,8 +702,6 @@ function display_constant(i,x,y,lay,w,allow_edit,source)
 		if(allow_edit == false && isNaN(te)) te = "Auto calculate"; 
 	}
 	else{
-		if(par.set == false) te = "Unset ";
-		
 		if(par.dist_mat) te = "Distance "; 
 		te += par.value_desc;
 	}
@@ -762,7 +760,6 @@ function display_reparam(i,x,y,lay,w)
 		 type = "ReparamEqn";
 		}
 		else{
-			if(par.set == false) te = "Unset ";
 			te += par.value_desc;
 		}
 	}
@@ -947,16 +944,16 @@ function check_memory(ans)
 			}
 		}
 		
-		run_mem += T_st[p]*C_st[p]*4;   // transform in TransGlobal
+		//run_mem += T_st[p]*C_st[p]*4;   // transform in TransGlobal
 	
 		if(type == "inf"){
-			run_mem += C_st[p]*T_st[p]*4; // trg_from_tr
-			run_mem += C_st[p]*C_st[p]*4; // comp_global_convert
+			//run_mem += C_st[p]*T_st[p]*4; // trg_from_tr
+			//run_mem += C_st[p]*C_st[p]*4; // comp_global_convert
 			
 			let tm = C_st[p]*C_st[p]*8; // tr_swap (temporarily) 
 			if(tm > temp_mem) temp_mem = tm;
 				
-			run_mem += C_st[p]*C_st[p]*4; // comp_global_convert
+			//run_mem += C_st[p]*C_st[p]*4; // comp_global_convert
 
 			tm = T_st[p]*T_st[p];   // tr_connected (only temporary)
 			if(tm > temp_mem) temp_mem = tm;

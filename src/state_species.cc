@@ -30,33 +30,43 @@ StateSpecies::StateSpecies(const vector <double> &param_val, const vector <Splin
 	type = sp.type;
 	
 	initialise_arrays();
+	reset_arrays();
 }
 
 
 /// Initialises all arrays
 void StateSpecies::initialise_arrays()
-{
-	nm_trans_ev_ref.resize(sp.nm_trans.size());
-	for(auto m = 0u; m < sp.nm_trans.size(); m++){
-		nm_trans_ev_ref[m].resize(T);
-	}
+{	
+	auto G = sp.tra_gl.size();
+
+	if(sp.type == POPULATION){
+		trans_num.resize(G);
+		tnum_mean_st.resize(G);
+		trans_num_f.resize(G);
+		tnum_mean_st_f.resize(G);
+		for(auto tr = 0u; tr < G; tr++){
+			trans_num[tr].resize(T);
+			tnum_mean_st[tr].resize(T);
+			trans_num_f[tr].resize(T);
+			tnum_mean_st_f[tr].resize(T);
+		}
+	}		
 	
-	nm_trans_incomp_ref.resize(sp.nm_trans_incomp.size());
-	for(auto n = 0u; n < sp.nm_trans_incomp.size(); n++){
-		nm_trans_incomp_ref[n].resize(T);
+	if(sp.type == INDIVIDUAL){
+		nm_trans_ev_ref.resize(sp.nm_trans.size());
+		for(auto m = 0u; m < sp.nm_trans.size(); m++){
+			nm_trans_ev_ref[m].resize(T);
+		}
+		
+		nm_trans_incomp_ref.resize(sp.nm_trans_incomp.size());
+		for(auto n = 0u; n < sp.nm_trans_incomp.size(); n++){
+			nm_trans_incomp_ref[n].resize(T);
+		}
 	}
 	
 	Li_ie.resize(sp.ind_eff_group.size());
 	
-	auto G = sp.tra_gl.size();
 	Li_markov_pop.resize(G);
-		
-	trans_num_f.resize(G);
-	tnum_mean_st_f.resize(G);
-	for(auto tr = 0u; tr < G; tr++){
-		trans_num_f[tr].resize(T);
-		tnum_mean_st_f[tr].resize(T);
-	}
 	
 	pop_data_num.resize(sp.pop_data.size());
 	pop_trans_data_num.resize(sp.pop_trans_data.size());
@@ -88,8 +98,8 @@ void StateSpecies::initialise_arrays()
 }
 
 
-/// Initialises species ready for simulation be be performed
-void StateSpecies::simulate_init()
+/// Resets arrays
+void StateSpecies::reset_arrays()
 {
 	auto G = sp.tra_gl.size();
 	trans_num.clear(); trans_num.resize(G);
@@ -104,8 +114,6 @@ void StateSpecies::simulate_init()
 	for(auto n = 0u; n < sp.nm_trans_incomp.size(); n++){
 		for(auto ti = 0u; ti < T; ti++) nm_trans_incomp_ref[n][ti].clear();
 	}
-	
-	ie_sampler_init();                            // Samples individual effects
 	
 	markov_eqn_vari.clear();
 	markov_eqn_vari.resize(N);
@@ -140,6 +148,15 @@ void StateSpecies::simulate_init()
 	cpop.resize(C,0);	
 	
 	ti_sort = UNSET;
+}
+
+
+/// Initialises species ready for simulation be be performed
+void StateSpecies::simulate_init()
+{
+	reset_arrays();
+	
+	ie_sampler_init();                            // Samples individual effects
 }
 
 
@@ -816,10 +833,10 @@ vector <double> StateSpecies::set_exp_fe(unsigned int f)
 
 	double pval;
 	if(par.variety == CONST_PARAM){
-		pval = par.value[0].value;
+		pval = par.get_value(0);
 	}
 	else{
-		auto th2 = par.param_vec_ref[0];
+		auto th2 = par.get_param_vec(0);
 		if(th2 == UNSET) emsg("Should not be unset1");		
 		pval = param_val[th2];
 	}
@@ -954,7 +971,6 @@ void StateSpecies::ie_Amatrix_sampler_init()
 			vector <unsigned int> map(I);
 			for(auto i = 0u; i < I; i++){
 				auto name = individual[i].name;
-				//auto ii = find_in(Aieg.ind_list,name);
 				auto ii = Aieg.hash_ind_list.find(name);
 				if(ii == UNSET) emsg("Cannot find individual '"+name+"' in the A matrix");
 				map[i] = ii;
@@ -1473,7 +1489,7 @@ void StateSpecies::make_consistent(vector <Event> &event) const
 }
 
 
-/// Sets cpop_st for population-based models (based on initial condition and trans_num
+/// Sets cpop_st for population-based models (based on initial condition and trans_num)
 void StateSpecies::set_cpop_st()
 {	
 	if(sp.type != POPULATION) emsg("cpop_st only defined for population-based model");
@@ -1493,6 +1509,7 @@ void StateSpecies::set_cpop_st()
 	
 	auto N = sp.tra_gl.size();
 			
+	cpop_st.resize(T);
 	for(auto ti = 0u; ti < T; ti++){
 		auto C = sp.comp_gl.size();
 			

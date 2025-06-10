@@ -47,7 +47,7 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsi
 	tex = trim(tex); if(tex == ""){ warn = "There is no equation"; return;}
 
 	te = tex;
-	te_init = te;
+	//te_init = te;
 	te_raw = te;
 	te_raw = replace(te_raw,"%","");
 	te_raw = replace(te_raw,"$","");
@@ -76,7 +76,7 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsi
 	
 	if(plfl == true) print_calculation();
 
-	if(simplify_eqn == true) simplify();             // Simplifies by combining constants
+	if(simplify_eqn == true) simplify();         // Simplifies by combining constants
 
 	if(warn != "") return;  
 
@@ -102,9 +102,8 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsi
 	set_time_vari();
 	
 	// Truncates strings to save memory
-	te = trunc(te);
-	te_raw = trunc(te_raw);
-	
+	te.clear();//trunc(te);
+	te_raw = trunc(te_raw,5);
 	//print_calculation();
 }
 
@@ -155,6 +154,7 @@ void Equation::check()
 // 'E|I,M' alld infectous or exposed individuals
 vector <unsigned int> Equation::get_all_comp(unsigned int p, string te)
 {
+	if(toLower(trim(te)) == "all") te = "";
 	vector <unsigned int> state;
 	
 	const auto &sp = species[p]; 
@@ -245,8 +245,20 @@ void Equation::print_operations(const vector <EqItem> &op) const
       case LEFTBRACKET: cout << "("; break;
       case RIGHTBRACKET: cout << ")"; break;
 			case FUNCDIVIDE: cout << "|"; break;
-      case PARAMETER: cout << param[op[i].num].name << op[i].index; break;
-			case SPLINE: cout << "Spline " << param[op[i].num].name << op[i].index; break;
+      case PARAMETER: 
+				{
+					const auto &pr = param_ref[op[i].num];
+					cout << param[pr.th].name << pr.index;
+				}
+				break;
+			case PARAMVEC: emsg("SHould not be param vec"); break;
+			case SPLINE:
+				{
+					const auto &pr = param_ref[op[i].num];
+					cout << "Spline " << param[pr.th].name << pr.index;
+				}
+				break;
+			case SPLINEREF: emsg("spline ref should not"); break;
 			case IE: cout << species[sp_p].ind_effect[op[i].num].name; break;
 			case ONE: cout << "1"; break;
 			case FE: cout << species[sp_p].fix_effect[op[i].num].name; break;
@@ -263,12 +275,13 @@ void Equation::print_operations(const vector <EqItem> &op) const
 			case MINFUNC: cout << "min"; break; 
 			case ABSFUNC: cout << "abs"; break;
 			case SQRTFUNC: cout << "sqrt"; break;
-      case ADD: cout << "+"; break;
+      case SIGFUNC: cout << "sigmoid"; break;
+			case ADD: cout << "+"; break;
       case TAKE: cout << "-"; break;
       case MULTIPLY: cout << "*"; break;
 			case DIVIDE: cout << "/"; break;
       case REG: cout << "R" << op[i].num; break;
-      case NUMERIC: cout << "numeric" << op[i].constant; break;
+      case NUMERIC: cout << "numeric" <<1/ cons[op[i].num]; break;
 			case TIME: cout << "time"; break;
 			case NOOP: cout << "No operation"; break;
 		}
@@ -276,8 +289,8 @@ void Equation::print_operations(const vector <EqItem> &op) const
   }
   cout << endl;
 }
- 
- 
+
+	
 /// Prints steps used for a calculation
 void Equation::print_calculation() const   
 {
@@ -290,22 +303,28 @@ void Equation::print_calculation() const
 
   switch(ans.type){
     case PARAMETER:
-			if(ans.index == UNSET) cout << param_vec[ans.num].name; 
-			else cout << param[ans.num].name << ans.index; 
+			{
+				const auto &pr = param_ref[ans.num];
+				cout << param[pr.th].name << pr.index;
+			}
 			break;
+		
+		case PARAMVEC: cout << param_vec[ans.num].name; break;
 		case SPLINE:
-			if(ans.index == UNSET) cout << "Spline " << spline[ans.num].name; 
-			else{
-				auto par = param[ans.num]; 
-				cout << "Spline " << get_param_name_with_dep(par,par.dep,ans.index);
-			}	
+			{
+				const auto &pr = param_ref[ans.num];
+				auto par = param[pr.th]; 
+				cout << "Spline " << get_param_name_with_dep(par,par.dep,pr.index);
+			}
 			break;
+		
+		case SPLINEREF: cout << "Spline " << spline[ans.num].name; break;
     case POPNUM: cout << pop[ans.num].name; break;
 		case IE: cout << "[" << species[sp_p].ind_effect[ans.num].name << "]"; break;
     case ONE: cout << "1"; break;
 		case FE: cout << "<" << species[sp_p].fix_effect[ans.num].name << ">"; break;
     case REG: cout <<  "R" << ans.num; break;
-    case NUMERIC: cout << ans.constant; break;
+    case NUMERIC: cout << cons[ans.num]; break;
 		case TIME: cout << "time"; break;
 		default: emsg("Eq problem3"); break;
   }
@@ -335,6 +354,7 @@ void Equation::print_ca(const Calculation &ca) const
 	case MINFUNC: cout << "min("; break; 
 	case ABSFUNC: cout << "abs("; break;
 	case SQRTFUNC: cout << "sqrt("; break;
+	case SIGFUNC: cout << "sigmoid("; break;
 	case ADD: break;
 	case TAKE: break;
 	case MULTIPLY: break;
@@ -346,26 +366,35 @@ void Equation::print_ca(const Calculation &ca) const
 		const auto &it = ca.item[j];
 		switch(it.type){
 		case PARAMETER: 
-			if(it.index == UNSET) cout << param_vec[it.num].name; 
-			else cout << param[it.num].name << it.index; 
+			{
+				const auto &pr = param_ref[it.num];
+				cout << param[pr.th].name << pr.index;
+			}
 			break;
+		case PARAMVEC: cout << param_vec[it.num].name; break;
+		
 		case SPLINE: 
-			if(it.index == UNSET) cout << "Spline " << spline[it.num].name; 
-			else{
-				auto par = param[it.num]; 
-				cout << "Spline " << get_param_name_with_dep(par,par.dep,it.index);
-			}					
+			{
+				const auto &pr = param_ref[it.num];
+				auto par = param[pr.th]; 
+				cout << "Spline " << get_param_name_with_dep(par,par.dep,pr.index);
+			}
 			break;
+			
+		case SPLINEREF: cout << "Spline " << spline[it.num].name; break;
 		case POPNUM: cout << "'" << pop[it.num].name << "'"; break;
 		case IE: cout << species[sp_p].ind_effect[it.num].name; break;
 		case ONE: cout << "1"; break;
 		case FE: cout << species[sp_p].fix_effect[it.num].name; break;
 		case REG: cout << "R" << it.num; break;
 		case NUMERIC: 
-			if(it.constant == INFY) cout << "INFY";
-			else{
-				if(it.constant == UNDEF) cout << "UNDEF";
-				else cout << it.constant; 
+			{
+				auto val = cons[it.num];
+				if(val == INFY) cout << "INFY";
+				else{
+					if(val == UNDEF) cout << "UNDEF";
+					else cout << val; 
+				}
 			}
 			break;
 		case TIME: cout << "time"; break;
@@ -392,6 +421,7 @@ void Equation::print_ca(const Calculation &ca) const
 	switch(ca.op){
 	case EXPFUNC: case SINFUNC: case COSFUNC: case LOGFUNC: case STEPFUNC: case POWERFUNC: 
 	case THRESHFUNC: case UBOUNDFUNC: case MAXFUNC: case MINFUNC: case ABSFUNC: case SQRTFUNC:
+	case SIGFUNC:
 		cout << ")"; 
 		break;
 	default: break;
@@ -650,7 +680,7 @@ double Equation::get_float(unsigned int i, unsigned int &raend) const
 /// Tries to get a parameter name from a string
 ParamRef Equation::get_param_name(unsigned int i, double &dist, unsigned int &raend)
 {
-	ParamRef pref; pref.found = false;
+	ParamRef pref; 
 	
 	if(te.substr(i,1) == "%"){
 		auto ist = i;
@@ -659,7 +689,7 @@ ParamRef Equation::get_param_name(unsigned int i, double &dist, unsigned int &ra
 		if(i == te.length()){ warn = "Could not find right bracket '$'"; return pref;}
 		
 		auto content = trim(te.substr(ist+1,i-ist-1));
-		
+	
 		if(content == "t"){
 			pref.th = TIME_VAR;
 		}
@@ -716,7 +746,7 @@ ParamRef Equation::get_param_name(unsigned int i, double &dist, unsigned int &ra
 				pref.th = th; pref.index = ind;
 			}
 		}
-		pref.found = true; 
+	
 		raend = i+1;
 	}
 	
@@ -762,20 +792,33 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 			p = pop.size();
 			hash_pop.add(pop.size(),vec);
 			
+			string start = "In population {"+cont+"}: ";
+	
 			Population po;
 			po.name = name;
 			
-			auto k = 0u; while(k < cont.length() && cont.substr(k,1) != "[" && cont.substr(k,1) != "<") k++;
+			auto spl = split(cont,';');
 			
-			if(k < cont.length()){
-				auto extra = cont.substr(k);
+			if(spl.size() > 2){
+				warn = start+"More than one ';' unexpected"; return p;
+			}
 			
-				cont = cont.substr(0,k);	
-				k = 0;
+			if(spl.size() == 2){
+				auto extra = spl[1];
+			
+				cont = spl[0];	
+				
+				auto fl = false;
+				
+				auto k = 0u;
 				while(k < extra.length()){
-					while(k < extra.length() && extra.substr(k,1) != "[" && extra.substr(k,1) != "<") k++;
-					if(k < extra.length()){
-						auto ch = extra.substr(k,1);
+					while(k < extra.length() && extra.substr(k,1) == " ") k++;
+					if(k == extra.length()) break;
+					
+					auto ch = extra.substr(k,1);
+					if(ch == "[" || ch == "<"){
+						fl = true;
+						
 						auto kst = k;
 						
 						while(k < extra.length() && extra.substr(k,1) != "]" && extra.substr(k,1) != ">") k++;
@@ -809,14 +852,38 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 							auto fe = 0u; 
 							while(fe < sp.fix_effect.size() && sp.fix_effect[fe].name != fe_name) fe++;
 							if(fe == sp.fix_effect.size()){
-								warn = "Fixed effect '<"+fe_name+">' unspecified. This is specified through the 'fixed-effect' command"; return p;
+								warn = "Fixed effect '<"+fe_name+">' unspecified. This must be specified through the 'fixed-effect' command"; return p;
 							}
 							po.fix_eff_mult.push_back(fe);
 						}
 					}
+					else{
+						if(ch != "×" && ch != "*"){
+							warn = start+"Character '"+ch+"' is unexpected"; return p;
+						}
+					}
+					k++;
+				}
+				
+				if(fl == false){
+					warn = start+"Expected content after ';'"; return p;
 				}
 			}
-		
+	
+			// Checks that population individual/fixed effects are divided correctly
+			for(auto k = 0u; k < cont.length(); k++){
+				auto ch = cont.substr(k,1);
+				if(ch == "<"){
+					warn = start+"Population fixed effects must be placed after ';' divider";
+					return p;
+				}
+				
+				if(ch == "["){
+					warn = start+"Population individual effects must be placed after ';' divider";
+					return p;
+				}
+			}
+	
 			auto state = get_all_comp(sp_p2,cont);
 		
 			vector <unsigned int> vec;
@@ -922,7 +989,9 @@ bool Equation::quant(const vector <EqItem> &op, int i) const
 {
   if(i < 0 || i >= (int)op.size()) return false;
   switch(op[i].type){
-	case PARAMETER: case SPLINE: case POPNUM: case IE: case FE: case REG: case NUMERIC: case TIME: return true;
+	case PARAMETER: case PARAMVEC: case SPLINE: case SPLINEREF:
+	case POPNUM: case IE: case FE: case REG: case NUMERIC: case TIME: 
+		return true;
   default: return false;
 	}
 }
@@ -934,7 +1003,8 @@ bool Equation::is_func(const vector <EqItem> &op, int i) const
   if(i < 0 || i >= (int)op.size()) return false;
   switch(op[i].type){
 	case EXPFUNC: case SINFUNC: case COSFUNC: case LOGFUNC: case POWERFUNC: 
-	case THRESHFUNC: case UBOUNDFUNC: case STEPFUNC: case MAXFUNC: case MINFUNC: case ABSFUNC: case SQRTFUNC:
+	case THRESHFUNC: case UBOUNDFUNC: case STEPFUNC: case MAXFUNC: case MINFUNC:
+	case ABSFUNC: case SQRTFUNC: case SIGFUNC:
 		return true;
 	default: return false;
 	}
@@ -1060,13 +1130,19 @@ vector <EqItem> Equation::extract_operations()
           i += 3;
         }
 				
+				if(te.substr(i,4) == "sig(" && doneflag == false){
+					item.type = SIGFUNC; op.push_back(item); 
+          doneflag = true;
+          i += 2;
+        }
+				
         if(doneflag == false){
 					unsigned int raend;
           auto num = get_float(i,raend);
           if(num != UNSET){
 						i = raend-1; 
 						item.type = NUMERIC; 
-						item.constant = num;
+						item.num = add_cons(num);
 						op.push_back(item); 
             doneflag = true;
           }
@@ -1079,16 +1155,18 @@ vector <EqItem> Equation::extract_operations()
 				
           auto pref = get_param_name(i,dist,raend); if(warn != "") return op;
 				
-          if(pref.found == true){
+          if(pref.th != UNSET || dist != UNSET){
             i = raend-1;
 						
 						if(dist != UNSET){
-							item.type = NUMERIC; item.constant = dist; op.push_back(item); 
+							item.type = NUMERIC; item.num = add_cons(dist); op.push_back(item); 
 						}
 						else{
 							if(pref.th == TIME_VAR){
 								if(ti_fix != UNSET){
-									item.type = NUMERIC; item.constant = timepoint[ti_fix]; op.push_back(item); 
+									item.type = NUMERIC; 
+									item.num = add_cons(timepoint[ti_fix]); 
+									op.push_back(item); 
 								}
 								else{
 									item.type = TIME; op.push_back(item); 
@@ -1109,18 +1187,18 @@ vector <EqItem> Equation::extract_operations()
 									if(item.type == PARAMETER && param[pref.th].variety == CONST_PARAM){
 										item.type = NUMERIC; 
 										const auto &par = param[pref.th];
-										item.constant = par.value[pref.index].value;
+										item.num = add_cons(par.cons[par.element_ref[pref.index]]);
 										op.push_back(item); 
 										done = true;
 									}
 								}
-									
+								
 								if(done == false){
-									if(item.type == PARAMETER && param[pref.th].variety == REPARAM_PARAM){
-										auto num = number(param[pref.th].value[pref.index].te);
+									if(item.type == PARAMETER && par.variety == REPARAM_PARAM && par.exist(pref.index)){
+										auto num = number(par.get_value_te(pref.index));
 										if(num != UNSET){
 											item.type = NUMERIC; 
-											item.constant = num;
+											item.num = add_cons(num);
 											op.push_back(item); 
 											done = true;
 										}
@@ -1128,9 +1206,10 @@ vector <EqItem> Equation::extract_operations()
 								}
 								
 								if(done == false){
-									item.num = pref.th; 
-									item.index = pref.index; 
+									item.num = add_param_ref(pref);
 									op.push_back(item); 
+									
+									par.add_element(pref.index);
 									
 									// Adds in factor to equation
 									if(par.param_mult != UNSET){
@@ -1138,16 +1217,18 @@ vector <EqItem> Equation::extract_operations()
 											EqItem item2; item2.type = MULTIPLY; op.push_back(item2); 
 										}
 										item.type = SPLINE; 
-										item.num = par.param_mult;
+										auto &pr = param_ref[item.num];
+										pr.th = par.param_mult;
+										
 										if(par.time_dep){
 											const auto &dep = par.dep;
-											item.index /= dep[dep.size()-1].list.size();
+											pr.index /= dep[dep.size()-1].list.size();
 										}
 										
 										const auto &par_mult = param[par.param_mult];
 										const auto &dep = par_mult.dep;
 										
-										item.index *= dep[dep.size()-1].list.size();
+										pr.index *= dep[dep.size()-1].list.size();
 										
 										op.push_back(item); 
 									}
@@ -1194,7 +1275,10 @@ vector <EqItem> Equation::extract_operations()
 				//cout << "Problem with expression. The character '"+ch+"' was not expected." << endl;
 				//}
 				
-        if(doneflag == false){ warn = "Problem with expression. The character '"+ch+"' was not expected."; return op;}
+        if(doneflag == false){ 
+					warn = "Problem with expression. The character '"+ch+"' was not expected."; 
+					return op;
+				}
         break;
     }
 		i++;
@@ -1273,7 +1357,8 @@ void Equation::create_calculation(vector <EqItem> &op)
 				}
 				break;
 				
-			case PARAMETER: case SPLINE: case POPNUM: // Removes brackets around a quantity
+			// Removes brackets around a quantity
+			case PARAMETER: case PARAMVEC: case SPLINE: case SPLINEREF: case POPNUM: 
 			case IE: case FE: case REG: case NUMERIC: case TIME: 
 				if(optype(op,i-1,LEFTBRACKET) && optype(op,i+1,RIGHTBRACKET) && !is_func(op,i-2)){
 					i--;
@@ -1288,7 +1373,7 @@ void Equation::create_calculation(vector <EqItem> &op)
 			
 			case FUNCDIVIDE: break;
 			
-			case EXPFUNC: case LOGFUNC: case SINFUNC: case COSFUNC: case STEPFUNC: case ABSFUNC: case SQRTFUNC: // Univariate
+			case EXPFUNC: case LOGFUNC: case SINFUNC: case COSFUNC: case STEPFUNC: case ABSFUNC: case SQRTFUNC: case SIGFUNC: // Univariate
 				if(optype(op,i+1,LEFTBRACKET) && quant(op,i+2) == true && optype(op,i+3,RIGHTBRACKET)){		
 					Calculation cal;
 					cal.item.push_back(op[i+2]);
@@ -1383,18 +1468,18 @@ double Equation::calculate_param_only(const vector <double> &param_val) const
 			const auto &it = item[j];
 			
 			switch(it.type){
-				case PARAMETER:
+				case PARAMETER: emsg("SHould not be param"); break;
+				case PARAMVEC:
 					num[j] = param_val[it.num]; 
-					if(it.index != UNSET) emsg("SHould be unset1"); 
 					if(num[j] == UNSET) emsg("Param must be set");
 					break;
-				case SPLINE: emsg("Should not be here1"); break;
+				case SPLINE: case SPLINEREF: emsg("Should not be here1"); break;
 				case IE: emsg("Should not include ind effect"); break;
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: emsg("Should not include population"); break;
 				case REG: num[j] = regcalc[it.num]; break;
-				case NUMERIC: num[j] = it.constant; break;
+				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: emsg("Should not include time1"); break;
 				default: emsg("Equation error"); break;
 			}
@@ -1404,14 +1489,13 @@ double Equation::calculate_param_only(const vector <double> &param_val) const
   }
 
   switch(ans.type){
-    case PARAMETER: 
-			if(ans.index != UNSET) emsg("Should be unset2"); 
-			if(param_val[ans.num] == UNSET) emsg("Param must be set");
-			return param_val[ans.num];
+    case PARAMETER: emsg("Should not be parameter1"); return UNSET;
+		case PARAMVEC: return param_val[ans.num];
     case SPLINE: emsg("SHould not be here2"); return UNSET;
+		case SPLINEREF: emsg("SHould not be here2"); return UNSET;
     case POPNUM: emsg("SHould not be here3"); return UNSET;
     case REG: return regcalc[ans.num];
-    case NUMERIC: return ans.constant;
+    case NUMERIC: return cons[ans.num];
 		case IE: emsg("Should not include ind effect"); return UNSET;
 		case ONE: return 1; 		
 		case FE: emsg("Should not include fixed effect"); return UNSET;
@@ -1438,22 +1522,19 @@ double Equation::calculate_param_only_ti_fix(const vector <double> &param_val, c
 			const auto &it = item[j];
 			
 			switch(it.type){
-				case PARAMETER:
-					num[j] = param_val[it.num]; 
-					if(it.index != UNSET) emsg("SHould be unset1"); 
-					if(num[j] == UNSET) emsg("Param must be set");
-					break;
-				case SPLINE:
+				case PARAMETER: emsg("SHould not be parameter2"); break;
+				case PARAMVEC: num[j] = param_val[it.num]; break;
+				case SPLINE: emsg("SHould not be spline"); break;
+				case SPLINEREF:
 					if(ti_fix == UNSET) emsg("Should not be here4");
 					num[j] = spline_val[it.num].val[ti_fix];
-					if(it.index != UNSET) emsg("SHould be unset4"); 
 					break;
 				case IE: emsg("Should not include ind effect"); break;
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: emsg("Should not include population"); break;
 				case REG: num[j] = regcalc[it.num]; break;
-				case NUMERIC: num[j] = it.constant; break;
+				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: emsg("Should not include time3"); break;
 				default: emsg("Equation error"); break;
 			}
@@ -1463,16 +1544,15 @@ double Equation::calculate_param_only_ti_fix(const vector <double> &param_val, c
   }
 
   switch(ans.type){
-    case PARAMETER: 
-			if(ans.index != UNSET) emsg("Should be unset2"); 
-			if(param_val[ans.num] == UNSET) emsg("Param must be set");
-			return param_val[ans.num];
-    case SPLINE: 
+    case PARAMETER: emsg("Should not be parameter3"); return UNSET;
+		case PARAMVEC: return param_val[ans.num];
+    case SPLINE: emsg("Should not be spline"); return UNSET;
+		case SPLINEREF:
 			if(ti_fix == UNSET) emsg("Should not be here5");
 			return spline_val[ans.num].val[ti_fix];
     case POPNUM: emsg("SHould not be here6"); return UNSET;
     case REG: return regcalc[ans.num];
-    case NUMERIC: return ans.constant;
+    case NUMERIC: return cons[ans.num];
 		case IE: emsg("Should not include ind effect"); return UNSET;
 		case ONE: return 1; 		
 		case FE: emsg("Should not include fixed effect"); return UNSET;
@@ -1500,20 +1580,16 @@ double Equation::calculate_no_popnum(unsigned int ti, const vector <double> &par
 			const auto &it = item[j];
 			
 			switch(it.type){
-				case PARAMETER:
-					num[j] = param_val[it.num]; 
-					if(it.index != UNSET) emsg("SHould be unset3"); 
-					break;
-				case SPLINE:
-					num[j] = spline_val[it.num].val[ti];
-					if(it.index != UNSET) emsg("SHould be unset4"); 
-					break;
+				case PARAMETER: emsg("SHould not be parameter4"); break;
+				case PARAMVEC: num[j] = param_val[it.num]; break;
+				case SPLINE: emsg("SHould not be spline"); break;
+				case SPLINEREF: num[j] = spline_val[it.num].val[ti]; break;
 				case IE: emsg("Should not include ind effect"); break;
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: emsg("Should not include popnum"); break;
 				case REG: num[j] = regcalc[it.num]; break;
-				case NUMERIC: num[j] = it.constant; break;
+				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: num[j] = timepoint[ti]; break;
 				default: emsg("Equation error"); break;
 			}
@@ -1523,15 +1599,13 @@ double Equation::calculate_no_popnum(unsigned int ti, const vector <double> &par
   }
 
   switch(ans.type){
-    case PARAMETER:
-			if(ans.index != UNSET) emsg("Should be unset5"); 
-			return param_val[ans.num];
-    case SPLINE: 
-			if(ans.index != UNSET) emsg("SHould be unset6"); 
-			return spline_val[ans.num].val[ti];
+    case PARAMETER: emsg("SHould not be parameter5"); return UNSET;
+		case PARAMVEC: return param_val[ans.num];
+    case SPLINE: emsg("SHould not be spline"); return UNSET;
+		case SPLINEREF: return spline_val[ans.num].val[ti];
     case POPNUM: emsg("Should not include popnum"); return UNSET;
     case REG: return regcalc[ans.num];
-    case NUMERIC: return ans.constant;
+    case NUMERIC: return cons[ans.num];
 		case IE: emsg("Should not include ind effect"); return UNSET;
 		case ONE: return 1; 		
 		case FE: emsg("Should not include fixed effect"); return UNSET;
@@ -1558,20 +1632,16 @@ double Equation::calculate(unsigned int ti, const vector <double> &popnum, const
 			const auto &it = item[j];
 			
 			switch(it.type){
-				case PARAMETER:
-					num[j] = param_val[it.num]; 
-					if(it.index != UNSET) emsg("SHould be unset3"); 
-					break;
-				case SPLINE:
-					num[j] = spline_val[it.num].val[ti];
-					if(it.index != UNSET) emsg("SHould be unset4"); 
-					break;
+				case PARAMETER: emsg("SHould not be parameter6"); break;
+				case PARAMVEC: num[j] = param_val[it.num]; break;
+				case SPLINE: emsg("Should not be spline"); break;
+				case SPLINEREF:	num[j] = spline_val[it.num].val[ti]; break;
 				case IE: emsg("Should not include ind effect"); break;
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: num[j] = rectify(popnum[it.num]); break;
 				case REG: num[j] = regcalc[it.num]; break;
-				case NUMERIC: num[j] = it.constant; break;
+				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: num[j] = timepoint[ti]; break;
 				default: emsg("Equation error"); break;
 			}
@@ -1581,15 +1651,13 @@ double Equation::calculate(unsigned int ti, const vector <double> &popnum, const
   }
 
   switch(ans.type){
-    case PARAMETER:
-			if(ans.index != UNSET) emsg("Should be unset5"); 
-			return param_val[ans.num];
-    case SPLINE: 
-			if(ans.index != UNSET) emsg("SHould be unset6"); 
-			return spline_val[ans.num].val[ti];
+    case PARAMETER: emsg("Should not be parameter7"); return UNSET;
+		case PARAMVEC: return param_val[ans.num];
+    case SPLINE: emsg("Should not be spline"); return UNSET;
+		case SPLINEREF: return spline_val[ans.num].val[ti];
     case POPNUM: return rectify(popnum[ans.num]);
     case REG: return regcalc[ans.num];
-    case NUMERIC: return ans.constant;
+    case NUMERIC: return cons[ans.num];
 		case IE: emsg("Should not include ind effect"); return UNSET;
 		case ONE: return 1; 		
 		case FE: emsg("Should not include fixed effect"); return UNSET;
@@ -1692,6 +1760,10 @@ double Equation::calculate_operation(EqItemType op, vector <double> &num) const
 		if(N != 1) emsg("For SQRTFUNC should be 1");
 		if(num[0] < 0) emsg("For equation '"+te_raw+"' the quantity inside the square root became negative."); 
 		return sqrt(num[0]);
+		
+	case SIGFUNC:
+		if(N != 1) emsg("For SIGFUNCT should be 1");
+		return 1/(1+exp(-num[0]));
 		
 	case NOOP: 
 		return 0;
@@ -1814,8 +1886,6 @@ CompRef Equation::find_comp_from_name(unsigned int p, string te) const
 		for(auto cl = 0u; cl < sp.cla.size(); cl++){
 			const auto &claa = sp.cla[cl];
 
-			//auto vec = claa.hash_comp.get_vec_string(te);
-			//auto c = claa.hash_comp.existing(vec);
 			auto c = claa.hash_comp.find(te);
 			if(c != UNSET){
 				CompRef cr; cr.p = p; cr.cl = cl; cr.c = c; cr.error = "";
@@ -1824,7 +1894,10 @@ CompRef Equation::find_comp_from_name(unsigned int p, string te) const
 		}
 	}
 	
-	CompRef cr; cr.p = UNSET; cr.cl = UNSET; cr.c = UNSET; cr.error = "Compartment '"+te+"' not specfied";
+	
+	CompRef cr; cr.p = UNSET; cr.cl = UNSET; cr.c = UNSET;
+	if(te == "") cr.error = "No compartment specfied";
+	else cr.error = "Compartment '"+te+"' not specfied";
 	return cr;
 }
 
@@ -1881,9 +1954,13 @@ void Equation::simplify()
 		// Converts a negative TAKE constant to an ADD
 		for(auto i = 0u; i < calc.size(); i++){
 			auto &ca = calc[i];
-			if(ca.op == TAKE && ca.item[1].type == NUMERIC){
-				ca.op = ADD; ca.item[1].constant *= -1;
-				flag = true;
+			if(ca.op == TAKE){
+				auto &it = ca.item[1];
+				if(it.type == NUMERIC){
+					ca.op = ADD; 
+					it.num = add_cons(cons[it.num]);
+					flag = true;
+				}
 			}
 		}
 		
@@ -1928,11 +2005,10 @@ void Equation::simplify()
 					flag = true;
 					EqItem rep; rep.type = NUMERIC; 
 					switch(ca.op){
-					case ADD: rep.constant = 0; break;
-					case MULTIPLY: rep.constant = 1; break;
+					case ADD: rep.num = add_cons(0); break;
+					case MULTIPLY: rep.num = add_cons(1); break;
 					default: emsg("prob"); break;
 					}
-					rep.index = UNSET; rep.num = UNSET;
 					replace_reg(ca.reg_store,rep);
 					calc.erase(calc.begin()+i);
 						
@@ -1970,7 +2046,7 @@ void Equation::simplify()
 							auto jj = j+1;
 							while(jj < ca.item.size()){
 								if(ca.item[jj].type == NUMERIC){
-									ca.item[j].constant = mult_const(ca.item[j],ca.item[jj]);
+									ca.item[j].num = mult_const(ca.item[j],ca.item[jj]);
 									ca.item.erase(ca.item.begin()+jj);
 									flag = true;
 								}
@@ -1983,7 +2059,7 @@ void Equation::simplify()
 						// Removes anything with one
 						auto j = 0u;
 						while(j < ca.item.size()){
-							if(ca.item[j].type == NUMERIC && ca.item[j].constant == 1){
+							if(ca.item[j].type == NUMERIC && cons[ca.item[j].num] == 1){
 								ca.item.erase(ca.item.begin()+j);
 								flag = true;
 							}
@@ -1993,7 +2069,7 @@ void Equation::simplify()
 					
 					// If contains zero then entire sum is zero
 					auto j = 0u;
-					while(j < ca.item.size() && !(ca.item[j].type == NUMERIC && ca.item[j].constant == 0)) j++;
+					while(j < ca.item.size() && !(ca.item[j].type == NUMERIC && cons[ca.item[j].num] == 0)) j++;
 					if(j < ca.item.size()) rep_con = 0;
 					else{
 						if(ca.item.size() == 0) rep_con = 1;
@@ -2012,7 +2088,7 @@ void Equation::simplify()
 						auto jj = j+1;
 						while(jj < ca.item.size()){
 							if(ca.item[jj].type == NUMERIC){
-								ca.item[j].constant = add_const(ca.item[j],ca.item[jj]);
+								ca.item[j].num = add_const(ca.item[j],ca.item[jj]);
 								ca.item.erase(ca.item.begin()+jj);
 							}
 							else jj++;
@@ -2022,7 +2098,7 @@ void Equation::simplify()
 					// Removes anything with zero
 					j = 0;
 					while(j < ca.item.size()){
-						if(ca.item[j].type == NUMERIC && ca.item[j].constant == 0){
+						if(ca.item[j].type == NUMERIC && cons[ca.item[j].num] == 0){
 							ca.item.erase(ca.item.begin()+j);
 						}
 						else j++;
@@ -2039,8 +2115,8 @@ void Equation::simplify()
 			case DIVIDE:
 				{
 					double con1 = UNSET, con2 = UNSET;
-					if(ca.item[0].type == NUMERIC) con1 = ca.item[0].constant;
-					if(ca.item[1].type == NUMERIC) con2 = ca.item[1].constant;
+					if(ca.item[0].type == NUMERIC) con1 = cons[ca.item[0].num];
+					if(ca.item[1].type == NUMERIC) con2 = cons[ca.item[1].num];
 				
 					if(con2 == 0){
 						warn = "Equation contains a division by zero";
@@ -2067,7 +2143,7 @@ void Equation::simplify()
 				
 			case EXPFUNC:
 				if(ca.item[0].type == NUMERIC){
-					auto con = ca.item[0].constant;
+					auto con = cons[ca.item[0].num];
 					if(con == INFY) rep_con = INFY;
 					else{
 						if(con == UNDEF) rep_con = UNDEF;
@@ -2078,7 +2154,7 @@ void Equation::simplify()
 			
 			case SINFUNC:
 				if(ca.item[0].type == NUMERIC){
-					auto con = ca.item[0].constant;
+					auto con = cons[ca.item[0].num];
 					if(con == INFY) rep_con = UNDEF;
 					else{
 						if(con == UNDEF) rep_con = UNDEF;
@@ -2089,7 +2165,7 @@ void Equation::simplify()
 				
 			case COSFUNC:
 				if(ca.item[0].type == NUMERIC){
-					auto con = ca.item[0].constant;
+					auto con = cons[ca.item[0].num];
 					if(con == INFY) rep_con = UNDEF;
 					else{
 						if(con == UNDEF) rep_con = UNDEF;
@@ -2100,7 +2176,7 @@ void Equation::simplify()
 			
 			case LOGFUNC:
 				if(ca.item[0].type == NUMERIC){
-					auto con = ca.item[0].constant;
+					auto con = cons[ca.item[0].num];
 					if(con <= 0){
 						warn = "Equation contains the logarithm of a non-positive";
 					}
@@ -2117,8 +2193,8 @@ void Equation::simplify()
 			case POWERFUNC:
 				{
 					double con1 = UNSET, con2 = UNSET;
-					if(ca.item[0].type == NUMERIC) con1 = ca.item[0].constant;
-					if(ca.item[1].type == NUMERIC) con2 = ca.item[1].constant;
+					if(ca.item[0].type == NUMERIC) con1 = cons[ca.item[0].num];
+					if(ca.item[1].type == NUMERIC) con2 = cons[ca.item[1].num];
 				
 					if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
 					else{
@@ -2140,7 +2216,7 @@ void Equation::simplify()
 		
 			case THRESHFUNC:
 				if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
-					auto con1 = ca.item[0].constant, con2 = ca.item[1].constant;
+					auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
 					if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
 					else{
 						if(con1 < con2) rep_con = 0;
@@ -2151,7 +2227,7 @@ void Equation::simplify()
 				
 			case UBOUNDFUNC:
 				if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
-					auto con1 = ca.item[0].constant, con2 = ca.item[1].constant;
+					auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
 					if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
 					else{
 						if(con1 > con2) rep_con = INFY;
@@ -2162,7 +2238,7 @@ void Equation::simplify()
 			
 			case STEPFUNC:
 				if(ca.item[0].type == NUMERIC){
-					auto con = ca.item[0].constant;
+					auto con = cons[ca.item[0].num];
 					if(con == UNDEF) rep_con = UNDEF;
 					else{
 						if(con > 0) rep_con = 1; else rep_con = 0;
@@ -2172,7 +2248,7 @@ void Equation::simplify()
 				
 			case MAXFUNC:
 				if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
-					auto con1 = ca.item[0].constant, con2 = ca.item[1].constant;
+					auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
 					if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
 					else{
 						if(con1 > con2) rep_con = con1;
@@ -2183,7 +2259,7 @@ void Equation::simplify()
 				
 			case MINFUNC:
 				if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
-					auto con1 = ca.item[0].constant, con2 = ca.item[1].constant;
+					auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
 					if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
 					else{
 						if(con1 < con2) rep_con = con1;
@@ -2194,7 +2270,7 @@ void Equation::simplify()
 				
 			case ABSFUNC:
 				if(ca.item[0].type == NUMERIC){
-					auto con = ca.item[0].constant;
+					auto con = cons[ca.item[0].num];
 					if(con == UNDEF) rep_con = UNDEF;
 					else{
 						if(con < 0) rep_con = -con;
@@ -2205,7 +2281,7 @@ void Equation::simplify()
 			
 			case SQRTFUNC:
 				if(ca.item[0].type == NUMERIC){
-					auto con = ca.item[0].constant;
+					auto con = cons[ca.item[0].num];
 					if(con < 0){
 						warn = "Equation contains the square root of a non-positive";
 					}
@@ -2218,6 +2294,18 @@ void Equation::simplify()
 					}
 				}
 				break;
+				
+			case SIGFUNC:
+				if(ca.item[0].type == NUMERIC){
+					auto con = cons[ca.item[0].num];
+					
+					if(con == UNDEF) rep_con = UNDEF;
+					else{
+						if(con == INFY) rep_con = 1;
+						else rep_con = 1/(1+exp(-con));
+					}
+				}
+				break;
 
 			default: emsg("Should be simplification"); break;
 			}
@@ -2227,7 +2315,7 @@ void Equation::simplify()
 				if(rep.type != NOOP && rep_con != UNSET) emsg("Cannot be both here");
 				
 				if(rep_con != UNSET){
-					rep.type = NUMERIC; rep.constant = rep_con; rep.index = UNSET; rep.num = UNSET;
+					rep.type = NUMERIC; rep.num = add_cons(rep_con);
 				}
 				
 				replace_reg(ca.reg_store,rep);
@@ -2246,15 +2334,15 @@ void Equation::simplify()
 		for(auto j = 0u; j < ca.item.size(); j++){
 			const auto &it = ca.item[j];
 			if(it.type == NUMERIC){
-				if(it.constant == UNDEF) warn = "The equation contains an undefined quantity";
-				if(it.constant == INFY) warn = "The equation contains an infinite quantity";
+				if(cons[it.num] == UNDEF) warn = "The equation contains an undefined quantity";
+				if(cons[it.num] == INFY) warn = "The equation contains an infinite quantity";
 			}
 		}
 	}
 	
 	if(ans.type == NUMERIC){
-		if(ans.constant == UNDEF) warn = "The equation contains an undefined quantity";
-		if(ans.constant == INFY) warn = "The equation contains an infinite quantity";
+		if(cons[ans.num] == UNDEF) warn = "The equation contains an undefined quantity";
+		if(cons[ans.num] == INFY) warn = "The equation contains an infinite quantity";
 	}
 	
 	if(false) print_calculation();
@@ -2343,34 +2431,45 @@ void Equation::remove_unused()
 
  
 /// Adds constant values
-double Equation::add_const(EqItem item1, EqItem item2) const
+unsigned int Equation::add_const(EqItem item1, EqItem item2)
 {
-	auto val1 = item1.constant, val2 = item2.constant;
-	if(val1 == UNDEF || val2 == UNDEF) return UNDEF; 
-
-	if(val1 == INFY || val2 == INFY) return INFY;
-	return val1+val2;
+	auto val1 = cons[item1.num], val2 = cons[item2.num];
+	
+	double num;
+	if(val1 == UNDEF || val2 == UNDEF) num = UNDEF; 
+	else{
+		if(val1 == INFY || val2 == INFY) num = INFY;
+		else num = val1+val2;
+	}
+	
+	return add_cons(num);
 }
 
 
 /// Multiplies constant values
-double Equation::mult_const(EqItem item1, EqItem item2) const
+unsigned int Equation::mult_const(EqItem item1, EqItem item2)
 {
-	auto val1 = item1.constant, val2 = item2.constant;
+	auto val1 = cons[item1.num], val2 = cons[item2.num];
 
-	if(val1 == UNDEF || val2 == UNDEF) return UNDEF; 
-	if(val1 == INFY){
-		if(val2 == 0) return UNDEF;
-		return INFY;
-	}
+	double num;
+	if(val1 == UNDEF || val2 == UNDEF) num = UNDEF;
 	else{
-		if(val2 == INFY){
-			if(val1 == 0) return UNDEF;
-			return INFY;
+		if(val1 == INFY){
+			if(val2 == 0) num = UNDEF;
+			else num = INFY;
+		}
+		else{
+			if(val2 == INFY){
+				if(val1 == 0) num = UNDEF;
+				else num = INFY;
+			}
+			else{
+				num = val1*val2;
+			}
 		}
 	}
 	
-	return val1*val2;
+	return add_cons(num);
 }
 
 
@@ -2391,7 +2490,7 @@ void Equation::calculate_pop_ref()
 /// Determines if the equation is zero
 bool Equation::is_zero() const
 {
-	if(calc.size() == 0 && ans.type == NUMERIC && ans.constant == 0) return true;
+	if(calc.size() == 0 && ans.type == NUMERIC && cons[ans.num] == 0) return true;
 	return false;
 }
 
@@ -2399,7 +2498,7 @@ bool Equation::is_zero() const
 /// Determines if the equation is one
 bool Equation::is_one() const
 {
-	if(calc.size() == 0 && ans.type == NUMERIC && ans.constant == 1) return true;
+	if(calc.size() == 0 && ans.type == NUMERIC && cons[ans.num] == 1) return true;
 	return false;
 }
 
@@ -2433,11 +2532,11 @@ double Equation::indfac(const Individual &ind) const
 }
 
 
-/// Determines if equation in linear in a given parameter
+/// Determines if equation is linear in a given parameter
 bool Equation::param_linear(unsigned int th) const
 {
 	switch(ans.type){
-	case PARAMETER:
+	case PARAMETER: case PARAMVEC:
 		if(ans.num == th) return true;
 		break;
 		
@@ -2449,21 +2548,21 @@ bool Equation::param_linear(unsigned int th) const
 			switch(last.op){
 			case MULTIPLY:
 				for(const auto &it : last.item){
-					if(it.type == PARAMETER && it.num == th) return true;
+					if(it.type == PARAMVEC && it.num == th) return true;
 				}
 				break;
 				
 			case ADD:
 				if(last.item.size() == 1){
 					const auto &it = last.item[0];
-					if(it.type == PARAMETER && it.num == th) return true;
+					if(it.type == PARAMVEC && it.num == th) return true;
 				}
 				break;
 			
 			case DIVIDE:
 				{
 					const auto &it = last.item[0];
-					if(it.type == PARAMETER && it.num == th) return true;
+					if(it.type == PARAMVEC && it.num == th) return true;
 				}
 				break;
 			
@@ -2479,15 +2578,18 @@ bool Equation::param_linear(unsigned int th) const
 }
 	
 
-/// Sets any references to parameters used in equations
-void Equation::setup_param_ref()
+/// Removes any unused parameter references (based on simplifications)
+void Equation::remove_unused_param_ref()
 {
+	auto N = param_ref.size();
+	vector <bool> on(N,false);
+	
 	for(auto i = 0u; i < calc.size(); i++){
 		const auto &ca = calc[i];
 		for(const auto &it : ca.item){
 			switch(it.type){
-			case PARAMETER: case SPLINE:
-				add_to_vec(param_ref,it.num,it.index);
+			case PARAMETER: case PARAMVEC: case SPLINE: case SPLINEREF:
+				on[it.num] = true;
 				break;
 			default: break;
 			}
@@ -2495,9 +2597,45 @@ void Equation::setup_param_ref()
 	}
 	
 	switch(ans.type){
-	case PARAMETER: case SPLINE:
-		add_to_vec(param_ref,ans.num,ans.index); 
-		break;
+	case PARAMETER: case PARAMVEC: case SPLINE: case SPLINEREF:
+		on[ans.num] = true;
+	break;
+		default: break;
+	}
+	
+	auto j = 0u; while(j < N && on[j]) j++;
+	if(j == N) return;
+	
+	// Removes parameters which are not used
+	vector <unsigned int> map;
+	auto param_ref_old = param_ref;
+	param_ref.clear();
+	for(auto i = 0u; i < N; i++){
+		if(on[i]){
+			map.push_back(param_ref.size());
+			param_ref.push_back(param_ref_old[i]);
+		}
+		else{
+			map.push_back(UNSET);
+		}
+	}
+	
+	for(auto i = 0u; i < calc.size(); i++){
+		auto &ca = calc[i];
+		for(auto &it : ca.item){
+			switch(it.type){
+			case PARAMETER: case PARAMVEC: case SPLINE: case SPLINEREF:
+				it.num = map[it.num];
+				break;
+			default: break;
+			}
+		}
+	}
+	
+	switch(ans.type){
+	case PARAMETER: case PARAMVEC: case SPLINE: case SPLINEREF:
+		ans.num = map[ans.num];
+	break;
 		default: break;
 	}
 }
@@ -2506,11 +2644,11 @@ void Equation::setup_param_ref()
 /// Sets up references (pop_ref, param_ref) in equations
 void Equation::setup_references()
 {
-	setup_param_ref();
+	remove_unused_param_ref();
 	calculate_pop_ref();       
 	if(infection_trans) setup_comp_pref_convert();
 	set_time_vari();
-	
+
 	if(false){
 		print_calculation();
 		cout << param_ref.size() << " " << pop_ref.size() << " param pop" << endl;
@@ -2651,7 +2789,7 @@ void Equation::replace_minus(vector <EqItem> &op)
 		if(op[i].type == TAKE){
 			op[i].type = ADD;
 			
-			EqItem item2; item2.type = NUMERIC; item2.constant = -1;
+			EqItem item2; item2.type = NUMERIC; item2.num = add_cons(-1);
 			op.insert(op.begin()+i+1,item2);
 	
 			EqItem item3; item3.type = MULTIPLY;
@@ -2659,4 +2797,45 @@ void Equation::replace_minus(vector <EqItem> &op)
 		}
 		else i++;
 	}
+}
+
+
+/// Adds a constant to the list
+unsigned int Equation::add_cons(double val)
+{
+	auto num = cons.size();
+	if(num < 10){ // Looks through exisiting constants
+		auto i = 0u; while(i < num && cons[i] != val) i++;
+		if(i < cons.size()) return i;
+	}
+
+	cons.push_back(val);
+	return num;
+}
+
+
+/// Adds a parameter reference
+unsigned int Equation::add_param_ref(const ParamRef &pref)
+{
+	auto num = param_ref.size();
+	param_ref.push_back(pref);
+	return num;
+}
+
+
+/// Gets a number to represent an equation
+double Equation::get_calc_hash_num(const vector <Calculation> &calc) const
+{
+	auto val = 0.0;
+	for(const auto &ca : calc){
+		for(const auto &it : ca.item){
+			val += MM_PI*it.type;
+			if(it.type == NUMERIC) val += cons[it.num];
+			else val += 0.3*it.num;
+		}
+		val += 0.1*ca.op + ca.reg_store;
+		val *= MM_PI/3;
+	}
+	
+	return val;
 }

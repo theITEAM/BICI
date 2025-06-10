@@ -440,25 +440,26 @@ function copy_strip(source,dest)
 		
 		switch(ele){
 		case "factor_weight":
-			dest.weight_desc = get_weight_desc(source);
+			//dest.weight_desc = get_weight_desc(source);
 			//dest.dim = get_value_dim(source);
 			break;
 			
 		case "value": 
 			if(source.ind_list == undefined){
-				dest.value_desc = get_value_desc(source);
-				dest.dim = get_value_dim(source);
+				//dest.value_desc = get_value_desc(source);
+				//dest.dim = get_value_dim(source);
 			}
 			
 			if(!Array.isArray(source.value)) dest.value = source.value;
 			break;
 			
 		case "prior_split": 
-			dest.prior_split_desc = get_prior_split_desc(source);
+			//dest.prior_split_desc = get_prior_split_desc(source);
 			break;
 			
 		case "table": case "A_value": case "X_value": case "ind_list":
-		case "list": case "comb_list": case "reparam_param_list": case "prior_param_list":
+		case "list": case "reparam_param_list": case "prior_param_list":
+		//case "co_list":
 			break;
 		
 		case "param": case "species": 
@@ -848,8 +849,12 @@ function check_invalid_name(name)
 
 	
 /// Checks the name is valid
-function check_name_warn(name,te) 
+function check_name_warn(name,te,sup_not_allow) 
 {
+	if(name.length > name_ch_max){
+		return te+" '"+name+"' cannot be more than "+name_ch_max+" characters";
+	}
+	
 	if(check_invalid_name(name)){
 		return te+" cannot use reserved word '"+name+"'";
 	}
@@ -857,7 +862,13 @@ function check_name_warn(name,te)
 	for(let i = 0; i < name.length; i++){
 		let ch = name.substr(i,1);
 		if(name_notallow.includes(ch)){
-			return te+" '"+name+"' cannot use character '"+ch+"'";
+			return te+" '"+name+"' cannot use the character '"+ch+"'";
+		}
+		
+		if(sup_not_allow){
+			if(ch == "^"){
+				return te+" '"+name+"' cannot contain the superscript character '"+ch+"'";
+			}
 		}
 	}
 	
@@ -866,9 +877,9 @@ function check_name_warn(name,te)
 
 
 /// Checks the name is valid
-function check_name_input(name,te) 
+function check_name_input(name,te,sup_not_allow) 
 {
-	let warn = check_name_warn(name,te);
+	let warn = check_name_warn(name,te,sup_not_allow);
 	if(warn != "") alert_import(warn);
 }
 
@@ -963,3 +974,13 @@ function find_file(file)
 	return file.substr(i+1);
 }
 
+
+/// Adds a fullstop at the end of a line
+function add_full_stop(te)
+{
+	if(te.length > 0){
+		let ch = te.substr(te.length-1,1);
+		if(ch != "." && ch != "?" && ch != "!" && ch != "\n") te += ".";
+	}
+	return te;
+}

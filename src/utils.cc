@@ -98,25 +98,27 @@ void end_code()
 
 
 /// Displays an error message
-void display_error(const string &msg)
+void display_error(string msg)
 {
+	add_full_stop(msg);
+	
 	if(com_op == true){
 		cout << "<<ERROR>>" << endl <<  msg << endl << "<<END>>" << endl;
 	}
 	else{
 		cout << endl << "\033[31m" << "ERROR:" << endl;
 		cout << "\033[0m";
-		
 		cout << add_escape_char(msg);
-		if(msg.length() > 0 && msg.substr(msg.length()-1,1) != ".") cout << ".";
 		cout << endl;
 	}
 }
 
 
 /// Display a warning message
-void display_warning(const string &msg)
+void display_warning(string msg)
 {
+	add_full_stop(msg);
+	
 	if(com_op == true){
 	}
 	else{
@@ -124,7 +126,6 @@ void display_warning(const string &msg)
 		cout << "WARNING: ";
 		cout << "\033[0m";
 		cout << add_escape_char(msg);
-		if(msg.length() > 0 && msg.substr(msg.length()-1,1) != ".") cout << ".";
 		cout << endl;
 	}
 }
@@ -167,7 +168,7 @@ string remove_quote(string te)
 
 
 /// Split up a string at a specified delimiter
-vector<string> split(const string &s, char delimiter)
+vector<string> split(const string &s, char delimiter, bool notrim)
 {                              
   vector<string> splits;                       
  
@@ -183,7 +184,10 @@ vector<string> split(const string &s, char delimiter)
 		}
 	}
 	splits.push_back(s.substr(j,s.length()-j));
-	for(auto &spl : splits) spl = trim(spl);
+	
+	if(notrim != true){
+		for(auto &spl : splits) spl = trim(spl);
+	}
 	
 	return splits;                                           
 }
@@ -899,7 +903,7 @@ DepInfo get_dep_info(const string &te, unsigned int i, const string &not_allowed
 	auto ist = i;
 	if(te.substr(i,1) == "("){	
 		while(i < te.length() && te.substr(i,1) != ")") i++;
-		if(i == te.length()){ di.result = FAIL; return di;}
+		if(i == te.length()) di.result = FAIL;
 
 		dep = te.substr(ist+1,i-(ist+1));
 	}
@@ -909,14 +913,15 @@ DepInfo get_dep_info(const string &te, unsigned int i, const string &not_allowed
 	}
 
 	if(dep != ""){
-		auto spl = split(dep,',');
+		auto spl = split(dep,',',true);
 
 		for(auto &de : spl){
-			di.ipos.push_back(ist);
+			auto sh = 0u; while(sh < de.length() && de.substr(sh,1) == " ") sh++; 
+			di.ipos.push_back(ist+sh);
 			ist += de.length() + 1;
-			
+	
 			de = trim(de);
-			if(de == ""){ di.result = FAIL; return di;}
+			if(de == "") di.result = FAIL; 
 		}
 
 		di.spl = spl;
@@ -967,12 +972,12 @@ SwapResult swap_index(string &te, const vector <DepConv> &dep_conv)
 		
 			if(type != ""){
 				auto ist = i;
-				auto di = get_dep_info(te,i,"$}[<(");
-
+				auto di = get_dep_info(te,i,"$}[<(;");
+			
 				if(di.result == FAIL){
 					res.warn = "An error occured";
 					if(type == "pop"){
-						res.warn = "Population '"+te.substr(istore,di.iend-istore)+"' has an error";
+						res.warn = "Population '{"+te.substr(ist,di.iend-ist)+"}' has an error";
 					}
 					if(type == "param"){
 						res.warn = "Parameter '"+te.substr(istore+1,i-istore-2)+"' has a misspecified dependency.";
@@ -1034,12 +1039,13 @@ SwapResult swap_template(string te, const vector <DepConv> &dep_conv)
 			}
 
 			if(type != ""){
-				auto di = get_dep_info(te,i,"$}[<(");
+				auto ist = i;
+				auto di = get_dep_info(te,i,"$}[<(;");
 
 				if(di.result == FAIL){
 					res.warn = "An error occured";
 					if(type == "pop"){
-						res.warn = "Population '"+te.substr(istore,di.iend-istore)+"' has an error";
+						res.warn = "Population '{"+te.substr(ist,di.iend-ist)+"}' has an error";
 					}
 					if(type == "param"){
 						res.warn = "Parameter '"+te.substr(istore+1,i-istore-2)+"' has a misspecified dependency.";
@@ -1080,7 +1086,7 @@ SwapResult swap_template(string te, const vector <DepConv> &dep_conv)
 		for(auto swt : res.swap_temp){
 			cout << swt.te << " " << swt.num << endl;
 		}
-		emsg("Split");
+		//emsg("Split");
 	}
 	
 	return res;
@@ -1645,9 +1651,11 @@ string cpu_percent(long time, long total_time)
 
 
 /// Converts a value to a string
-string tstr(double value)
+string tstr(double value, unsigned int dig)
 {
-	stringstream ss; ss << value; 
+	stringstream ss; 
+	if(dig != UNSET) ss << setprecision(dig); 
+	ss << value; 
 	return ss.str();
 }
 
@@ -1966,6 +1974,8 @@ Prior convert_text_to_prior(string te, unsigned int line_num, bool dist)
 			if(number(spl2[0]) == UNSET) pri.error = "The value '"+spl2[0]+"' must be a number";
 		}
 		break;
+		
+	case UNSET_PR: emsg("SHould not be unset"); break;
 	}
 
 	for(auto i = 0u; i < spl2.size(); i++){
@@ -2014,6 +2024,10 @@ string get_prior_string(Prior prior)
 		
 	case MDIR_PR:
 		return "mdir("+prior.dist_param[0].te_raw+")";	
+		
+	case UNSET_PR: 
+		emsg("SHould not be unset"); 
+		return "";
 	}
 	
 	return "Problem with prior";
@@ -2385,6 +2399,10 @@ double prior_probability(double x, const Prior &pri, const vector <double> &para
 		
 	case MDIR_PR:
 		emsg("Should not be mdir");
+		break;
+		
+	case UNSET_PR:
+		emsg("SHould not be unset"); 
 		break;
 	}
 	
@@ -2922,3 +2940,21 @@ string find_root(string file)
 	return file.substr(0,i+1);
 }
 
+
+/// Waits indefinately
+void wait()
+{
+	cout << "waiting" << endl; 
+	while(true){};
+}
+
+
+
+/// Adds a fullstop at the end of a line
+void add_full_stop(string &te)
+{
+	if(te.length() > 0){
+		auto ch = te.substr(te.length()-1,1);
+		if(ch != "." && ch != "?" && ch != "!" && ch != "\n") te += ".";
+	}
+}

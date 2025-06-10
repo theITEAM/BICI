@@ -70,6 +70,10 @@ class Proposal                             // Implements a proposal
 		
 		vector <IndSampler> ind_sampler;       // Information about the individual samplers
 		
+		vector <IndSimProb> ind_sim_prob;      // Probability of proposing ind sim prop [i]
+		
+		vector < vector <IndSimProb> > ind_sim_prob_cl;// Probability of proposing ind simp prop [i][cl]
+		
 		vector <bool> tr_change;               // Store transition change under par/event joint prop
 			
 		bool all_events_correct;               // Flag determining if all obs events correct
@@ -126,7 +130,7 @@ class Proposal                             // Implements a proposal
 		void mbp_population_affect();
 		void set_mvn(double si_, const CorMatrix &cor_matrix);
 		vector <double> sample(vector <double> param_val);
-		double mvn_probability(const vector <double> &param1, const vector <double> &param2) const;
+		double mvn_probability(const vector <double> &param_prop1, const vector <double> &param_prop2) const;
 		
 	private:
 		void get_dependency();
@@ -143,6 +147,8 @@ class Proposal                             // Implements a proposal
 		void update_ind_samp_si(unsigned int tr_gl, double fac);
 		bool skip_proposal(double val) const;
 		void set_omega_check();
+		bool event_dif(const vector <Event> &ev1, const vector <Event> &ev2) const;
+		void ind_obs_prob_update(IndSimProb &isp) const;
 	
 	// Used in proposal_local.cc
 	private:

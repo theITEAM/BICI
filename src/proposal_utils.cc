@@ -61,11 +61,11 @@ void Proposal::get_dependency()
 		
 		const auto &pv = model.param_vec[j];
 		const auto &par = model.param[pv.th];
-		for(const auto &ch : par.child[pv.index]){
+		for(const auto &ch : par.get_child(pv.index)){
 			const auto &par_child = model.param[ch.th];
 			
 			if(par_child.variety == REPARAM_PARAM){
-				auto k = par_child.param_vec_ref[ch.index];
+				auto k = par_child.get_param_vec(ch.index);
 				if(k != UNSET){
 					if(map[k] == 0){ map[k] = 2; list.push_back(k);}
 				}
@@ -107,9 +107,6 @@ void Proposal::get_affect_like()
 			for(const auto &li : ieg.list){
 				model.add_ie_affect(p_prop,li.index,affect_like);
 			}
-			
-			//model.add_ie_affect(p_prop,ieg.list[ind_eff_group_ref.i].index,affect_like);
-			//model.add_ie_affect(p_prop,ieg.list[ind_eff_group_ref.j].index,affect_like);
 		}
 		break;
 		
@@ -123,10 +120,12 @@ void Proposal::get_affect_like()
 	model.add_iif_w_affect(affect_like);
 		
 	model.add_popnum_ind_w_affect(affect_like);
-	
+
 	if(linearise_speedup2 && type == PARAM_PROP){
 		model.affect_linearise_speedup2(affect_like,param_list,dependent);
 	}
+	
+	model.order_affect(affect_like);
 	
 	if(linearise_speedup){
 		model.affect_linearise_speedup(affect_like);
@@ -134,6 +133,7 @@ void Proposal::get_affect_like()
 	
 	model.order_affect(affect_like);
 }
+
 
 /// Sets up the MVN sampling distribution from particle samples
 void Proposal::set_mvn(double si_, const CorMatrix &cor_matrix)
@@ -150,7 +150,6 @@ void Proposal::update_sampler(const CorMatrix &cor_matrix)
 {
 	if(!on || param_list.size() == 0) return;
 	
-	timer[UPDATESAMP_TIMER] -= clock();
 	M = cor_matrix.find_covar(param_list);
 	auto Mst = M;
 
@@ -192,15 +191,11 @@ void Proposal::update_sampler(const CorMatrix &cor_matrix)
 		*/
 		emsg("Cholesky problem");
 	}
-	
-	timer[UPDATESAMP_TIMER] += clock();
 }
 
 /// Samples from the covariance matrix
 vector <double> Proposal::sample(vector <double> param_val)
 {
-	timer[SAMPLE_TIMER] -= clock();
-
 	auto vec = sample_mvn(Z);
 
 	for(auto i = 0u; i < N; i++){
@@ -209,25 +204,29 @@ vector <double> Proposal::sample(vector <double> param_val)
 		
 	for(auto j : dependent){
 		const auto &pv = model.param_vec[j];
-		auto ref = model.param[pv.th].value[pv.index].eq_ref;
+		auto ref = model.param[pv.th].get_eq_ref(pv.index);
 		if(ref == UNSET) emsg("Reparam is not set");	
 		param_val[j] = model.eqn[ref].calculate_param_only(param_val);
 	}
-	
-	timer[SAMPLE_TIMER] += clock();
 	
 	return param_val;
 }
 
 
 /// Returns the MVN probability (or something proportional to it
-double Proposal::mvn_probability(const vector <double> &param1, const vector <double> &param2) const
+double Proposal::mvn_probability(const vector <double> &param_prop1, const vector <double> &param_prop2) const
 {
+	vector <unsigned int> list;
+	for(auto th : param_list) list.push_back(model.param_vec[th].ref);
+
+	//for(auto i = 0u; i < param_list.size(); i++) cout << param_list[i] << " " << list[i] << " comp" << endl;
+	//emsg("J");
+
 	double sum = 0;
 	for(auto v1 = 0u; v1 < N; v1++){
 		for(auto v2 = 0u; v2 < N; v2++){
-			double val1 = param1[param_list[v1]] - param2[param_list[v1]];
-			double val2 = param1[param_list[v2]] - param2[param_list[v2]];
+			double val1 = param_prop1[list[v1]] - param_prop2[list[v1]];
+			double val2 = param_prop1[list[v2]] - param_prop2[list[v2]];
 			sum += (val1/si)*M_inv[v1][v2]*(val2/si);
 		}
 	}	
@@ -612,3 +611,31 @@ void Proposal::set_omega_check()
 		if(model.param_vec[th].omega_fl) omega_check = true;
 	}
 }
+
+
+/// Determines if two sampled sequences are different
+bool Proposal::event_dif(const vector <Event> &ev1, const vector <Event> &ev2) const
+{
+	if(ev1.size() != ev2.size()) return true;
+	
+	for(auto i = 0u; i < ev1.size(); i++){
+		if(ev1[i].c_after != ev2[i].c_after) return true;
+		if(ev1[i].t != ev2[i].t) return true;
+	}
+	
+	return false;
+}
+
+
+/// Update probability of doing proposal
+void Proposal::ind_obs_prob_update(IndSimProb &isp) const
+{
+	isp.ntr *= PROP_SIM_PROB_FADE;
+	isp.nac *= PROP_SIM_PROB_FADE;
+	auto pr = 2*isp.nac/isp.ntr;	
+	if(pr > 1) pr = 1; 
+	if(pr < 0.05) pr = 0.05;
+	isp.prob = pr;
+	isp.done = true;
+}
+

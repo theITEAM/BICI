@@ -896,8 +896,9 @@ function output_value_table(par,value,file,file_list,one_file)
 
 	let list = par.list;
 
-	for(let i = 0; i < par.comb_list.length; i++){
-		let comb = par.comb_list[i];
+	let co_list = generate_co_list(par.list);
+	for(let i = 0; i < co_list.length; i++){
+		let comb = co_list[i];
 		let el = get_element(value,comb.index);
 		if(el == undefined){
 			let me = "A value for parameter "+par.full_name+" is undefined (";
@@ -958,7 +959,12 @@ function output_add_prior_distribution(save_type,par,variety,file_list,one_file)
 			case "prior": st += ' prior-split'; col = 'Prior'; break;
 			default: error("option prob"); break;
 			}
-								
+						
+			if(par.prior_split == undefined){
+				add_warning({mess:"Missing "+key, mess2:"The "+key+" for "+par.full_name+" must be set.", warn_type:"MissingPriorSplitValue", name:par.name});
+				return "";
+			}
+				
 			let data = '';
 			for(let d = 0; d < par.dep.length; d++){
 				data += '"'+par.dep[d]+'",';
@@ -966,8 +972,9 @@ function output_add_prior_distribution(save_type,par,variety,file_list,one_file)
 			data += col+endl;
 			
 			let list = par.list;
-			for(let i = 0; i < par.comb_list.length; i++){
-				let comb = par.comb_list[i];
+			let co_list = generate_co_list(list);
+			for(let i = 0; i < co_list.length; i++){
+				let comb = co_list[i];
 				for(let d = 0; d < par.dep.length; d++){
 					data += '"'+list[d][comb.index[d]]+'",';
 				}
@@ -989,7 +996,7 @@ function output_add_prior_distribution(save_type,par,variety,file_list,one_file)
 	}
 	else{
 		let pri = par.prior;
-	
+		
 		let prior_string = get_prior_output(save_type,par.prior,variety,par);
 		if(prior_string == "") return "";
 	

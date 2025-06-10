@@ -13,7 +13,7 @@ public:
 	unsigned int n;                  // Number of samples added to av and av2
 
 	void init();
-	void add_sample(const vector <double> &param_value, unsigned int range);
+	void add_sample(vector <double> param_val_prop, unsigned int range);
 	void check() const;
 	vector < vector <double> > calculate_cor_matrix() const;
 	void set_mvn_from_particle(vector <Particle> &particle);

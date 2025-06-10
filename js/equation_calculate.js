@@ -1,7 +1,7 @@
 "use strict";
 // Functions which evaluate equations
 
-const LEFTBRACKET=0, RIGHTBRACKET=1, FUNCDIVIDE=2, ADD=3, TAKE=4, MULTIPLY=5, DIVIDE=6, REG=7, TIME=11,   NUMERIC=15, EXPFUNC=16, SINFUNC=17, COSFUNC=18, LOGFUNC=19, POWERFUNC=20, THRESHFUNC=21, UBOUNDFUNC=22, STEPFUNC=23, MAXFUNC=24, MINFUNC=25, ABSFUNC=26, SQRTFUNC=27;
+const LEFTBRACKET=0, RIGHTBRACKET=1, FUNCDIVIDE=2, ADD=3, TAKE=4, MULTIPLY=5, DIVIDE=6, REG=7, TIME=11, NUMERIC=15, EXPFUNC=16, SINFUNC=17, COSFUNC=18, LOGFUNC=19, POWERFUNC=20, THRESHFUNC=21, UBOUNDFUNC=22, STEPFUNC=23, MAXFUNC=24, MINFUNC=25, ABSFUNC=26, SQRTFUNC=27, SIGFUNC=28;
 
 /// Calculates an equation based on a text string
 function equation_calculate(te,t)
@@ -134,6 +134,12 @@ function extract_operations(te)
           i += 3;
         }
 				
+				if(te.substr(i,4) == "sig(" && doneflag == false){
+					op.push({type:SIGFUNC}); 
+          doneflag = true;
+          i += 2;
+        }
+				
         if(doneflag == false){
 			    let res = get_float(i,te);
           if(res != undefined){
@@ -200,6 +206,7 @@ function print_operations(op)
 			case MINFUNC: st += "min"; break; 
 			case ABSFUNC: st += "abs"; break;
 			case SQRTFUNC: st += "sqrt"; break;
+			case SIGFUNC: st += "sig"; break;
       case ADD: st += "+"; break;
       case TAKE: st += "-"; break;
       case MULTIPLY: st += "*"; break;
@@ -278,7 +285,8 @@ function create_eqn(op)
 				
 			case FUNCDIVIDE: break;
 			
-			case EXPFUNC: case LOGFUNC: case SINFUNC: case COSFUNC: case STEPFUNC: case ABSFUNC: case SQRTFUNC: // Univariate
+			case EXPFUNC: case LOGFUNC: case SINFUNC: case COSFUNC: case STEPFUNC: case ABSFUNC: 
+			case SQRTFUNC: case SIGFUNC: // Univariate
 				if(optype(op,i+1,LEFTBRACKET) && quant(op,i+2) == true && optype(op,i+3,RIGHTBRACKET)){		
 					let cal = {op:op[i].type, reg_store:nreg, item:[]} ;
 					cal.item.push(copy(op[i+2]));
@@ -347,6 +355,7 @@ function print_eqn(eqn)
 		case MINFUNC: st += "min("; break; 
 		case ABSFUNC: st += "abs("; break;
 		case SQRTFUNC: st += "sqrt("; break;
+		case SIGFUNC: st += "sig("; break;
 		case ADD: break;
 		case TAKE: break;
 		case MULTIPLY: break;
@@ -464,7 +473,7 @@ function is_func(op,i)
   switch(op[i].type){
 	case EXPFUNC: case SINFUNC: case COSFUNC: case LOGFUNC: case POWERFUNC: 
 	case THRESHFUNC: case UBOUNDFUNC: 
-	case STEPFUNC: case MAXFUNC: case MINFUNC: case ABSFUNC: case SQRTFUNC:
+	case STEPFUNC: case MAXFUNC: case MINFUNC: case ABSFUNC: case SQRTFUNC: case SIGFUNC:
 		return true;
 	default: return false;
 	}
@@ -588,6 +597,10 @@ function calculate_operation(op,num)
 		if(N != 1) error("For SQRTFUNC should be 1");
 		if(num[0] < 0) alert_help("Equation error","Cannot have a negative quantity in a sqaure root");
 		return Math.sqrt(num[0]);
+		
+	case SIGFUNC:
+		if(N != 1) error("For SIGFUNC should be 1");
+		return 1/(1+Math.exp(-num[0]));
 		
 	default: alert_help("Equation error","Code 2"); break;
 	}

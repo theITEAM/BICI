@@ -32,6 +32,8 @@ public:
 	void bcast(vector <string> &vec);
 	void barrier() const;
 	void mess(string te) const;
+	void sum(vector < vector <double> > &array);
+	void sum(double &val);
 	
 private:
 	vector<double> buffer;                                       // Stores packed up information to be sent between cores

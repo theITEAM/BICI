@@ -661,7 +661,7 @@ function get_stratify(filt,sp)
 		}
 	}
 	
-	let comb = generate_comb_list(list);
+	let comb = generate_co_list(list);
 	return { cl_list:cl_list, comb:comb, list:list};
 }
 

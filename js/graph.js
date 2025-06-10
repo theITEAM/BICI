@@ -1905,6 +1905,12 @@ class Graph
 		
 			lay.add_button({x:0, y:yl, dx:lay.dx, dy:dy, mar:mar, x_lab:x_lab, x_vert:x_vert, x_param:x_param, x_si:lay.op.x_si, type:"x-tick-label"});
 			yl += 1;
+					
+			if(this.variety == "Histogram"){
+				let xz = lay.dx-4, yz = lay.dy-1.7;
+		
+				lay.add_button({x:mar.left-2, y:yz, dx:1.4, dy:1.4, ac:"HistogramSettings", type:"Settings"});
+			}
 		}
 		else{
 			lay.add_button({x:mar.left, y:yl, dx:lay.dx-mar.left-mar.right, dy:tick_si, type:"x-tick"});
@@ -2455,6 +2461,20 @@ class Graph
 		bubble_addcheckbox(cont,0,"Show simulated values",ds);
 		
 		add_end_button(cont,"OK","BurninOK",{});	
+	}	
+	
+	
+	/// Setting for the histogram plots
+	settings_histogram_bubble(cont)
+	{
+		cont.dx = 10;
+		bubble_addtitle(cont,"Settings",{});
+		
+		let ds = get_inf_res().plot_filter.sim_val;
+		
+		bubble_addcheckbox(cont,0,"Show simulated values",ds);
+		
+		add_end_button(cont,"OK","HistogramOK",{});	
 	}	
 		
 		

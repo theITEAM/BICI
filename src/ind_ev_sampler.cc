@@ -271,7 +271,7 @@ void IndEvSampler::generate_ind_obs_timeline()
 						{
 							double val;
 							for(auto c = 0u; c < C; c++){
-								auto cgl = sp.comp_global_convert[ctime][cl_store][comp[c].c];
+								auto cgl = sp.get_comp_global_convert(ctime,cl_store,comp[c].c);
 								auto trg = sp.cgl_tr_sink[cgl];
 								if(trg == UNSET) val = OBS_COMP_MIN;
 								else{

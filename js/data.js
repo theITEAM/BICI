@@ -1549,8 +1549,9 @@ function edit_param_check_error(error_mess_only)
 /// CHecks to see if factor is correctly specified
 function check_param_value(type,par,value)
 {
-	for(let i = 0; i < par.comb_list.length; i++){
-		let comb = par.comb_list[i];
+	let co_list = generate_co_list(par.list);
+	for(let i = 0; i < co_list.length; i++){
+		let comb = co_list[i];
 		let el = get_element(value,comb.index);
 		
 		if(el == undefined){
@@ -1567,8 +1568,8 @@ function check_param_value(type,par,value)
 			let numi;
 			let sum = 0;
 			let wsum = 0, wi;
-			for(let i = 0; i < par.comb_list.length; i++){
-				let comb = par.comb_list[i];
+			for(let i = 0; i < co_list.length; i++){
+				let comb = co_list[i];
 				let el = get_element(value,comb.index);
 				let val = Number(el);
 				if(val < 0) return "The value '"+el+"' must be positive for a factor.";
@@ -1590,10 +1591,10 @@ function check_param_value(type,par,value)
 			if(num == 1){
 				let val_new = (wsum-sum)/wi;
 				if(val_new < 0){
-					return "The calculated value for '*' is '"+val_new+"' which must be positive";
+					return "The calculated value for '*' is '"+round_small(val_new)+"' which must be positive";
 				}
 				
-				let comb = par.comb_list[numi];
+				let comb = co_list[numi];
 				set_element(value,comb.index,round_small(val_new));
 			}
 			
@@ -1613,8 +1614,8 @@ function check_param_value(type,par,value)
 		
 	case "Set Weight":
 		{
-			for(let i = 0; i < par.comb_list.length; i++){
-				let comb = par.comb_list[i];
+			for(let i = 0; i < co_list.length; i++){
+				let comb = co_list[i];
 				let el = get_element(value,comb.index);
 				if(isNaN(el)) return "The value '"+el+"' must be a number for a weight.";
 				let val = Number(el);

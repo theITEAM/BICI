@@ -24,8 +24,10 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 	
 	double va;
 	
+	auto &mvdiv = me_vari.div;
+	
 	for(auto ti : list){
-		auto &div = me_vari.div[ti];
+		auto &div = mvdiv[ti];
 		
 		auto val = div.value;
 		if(val < 0){
@@ -77,7 +79,9 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 				if(me.ind_variation){
 					Li += log(get_indfac(individual[div.ind_trans[0].i],me)*(val+LOG_THRESH));	
 				}
-				else Li += log(val+LOG_THRESH);	
+				else{
+					Li += log(val+LOG_THRESH);	
+				}
 				break;
 				
 			default:
@@ -155,8 +159,7 @@ vector <double> StateSpecies::likelihood_markov_value_fast(const vector <unsigne
 	if(eq.linearise.no_pop_calc_time_dep){ // Time dependent	
 		for(auto ti : list){	
 			auto d = eq.calculate_calculation(calc,ti,param_val,spline_val) - 
-								 eq.calculate_calculation_spline_store(calc,ti,param_store,spline_val);
-								
+								 eq.calculate_calculation_spline_store(calc,ti,param_store,spline_val);	
 			for(auto e : me_list){		
 				auto &div = markov_eqn_vari[e].div;			
 				auto val = div[ti].value;
@@ -198,13 +201,13 @@ vector <double> StateSpecies::likelihood_markov_value_fast(const vector <unsigne
 /// Calculate the value of a series of markov equation
 vector <double> StateSpecies::likelihood_markov_value_linear(const vector <unsigned int> &list, const LinearProp &linear_prop, const vector < vector <double> > &popnum_t)
 {
-	timer[LINEAR_TIMER] -= clock();
-	
 	if(list.size() == 0) emsg("list should not be zero");
 	
 	vector <double> store;
 	
 	auto N = linear_prop.me.size();
+	auto T = list.size();
+	
 	vector <double> val(N);
 	
 	vector <double> no_pop;
@@ -212,19 +215,41 @@ vector <double> StateSpecies::likelihood_markov_value_linear(const vector <unsig
 	
 	vector < vector <double> > pop_grad;
 	pop_grad.resize(N);
-	
+
 	auto ti_last = UNSET;
 	
-	for(auto k = 0u; k < list.size(); k++){
+	// Calculates time variation in non-population part
+	//timer[LINEARNOPOP_TIMER] -= clock();
+	
+	const auto &mnp = linear_prop.me_no_pop;
+	
+	vector < vector <double> > no_pop_dif;
+	no_pop_dif.resize(mnp.size());
+	for(auto i = 0u; i < mnp.size(); i++){
+		auto &ve = no_pop_dif[i];
+		ve.resize(T);
+		
+		const auto &me = sp.markov_eqn[mnp[i]];
+		const auto &eq = eqn[me.eqn_ref];
+		auto val = eq.calculate_no_pop(list[0],param_val,spline_val);
+		ve[0] = 0; 
+		for(auto k = 1u; k < T; k++){
+			auto val_new = eq.calculate_no_pop(list[k],param_val,spline_val);
+			ve[k] = val_new-val;
+			val = val_new;
+		}
+	}
+	//timer[LINEARNOPOP_TIMER] += clock();
+	
+	for(auto k = 0u; k < T; k++){
 		auto ti = list[k];
 		
 		if(k == 0){                            // Calculates the first value (along with gradients)
-			timer[LINEARZERO_TIMER] -= clock();
+			//timer[LINEARZERO_TIMER] -= clock();
 	
 			for(auto i = 0u; i < N; i++){
 				auto e = linear_prop.me[i]; 			
-				auto &me = sp.markov_eqn[e];
-
+				const auto &me = sp.markov_eqn[e];
 				const auto &eq = eqn[me.eqn_ref];
 	
 				val[i] = eq.calculate(ti,popnum_t[ti],param_val,spline_val);
@@ -234,7 +259,7 @@ vector <double> StateSpecies::likelihood_markov_value_linear(const vector <unsig
 					no_pop[i] = eq.calculate_no_pop(ti,param_val,spline_val);
 				}
 			}
-			timer[LINEARZERO_TIMER] += clock();
+			//timer[LINEARZERO_TIMER] += clock();
 		}
 		else{                                    // Subsequent values uses differences in population
 			const auto &popnum = popnum_t[ti];
@@ -257,11 +282,8 @@ vector <double> StateSpecies::likelihood_markov_value_linear(const vector <unsig
 			const auto &eq = eqn[me.eqn_ref];
 			
 			// Accounts for time variation in the non-population part
-			if(eq.linearise.no_pop_calc_time_dep){    
-				val[i] -= no_pop[i];
-				no_pop[i] = eq.calculate_no_pop(ti,param_val,spline_val);
-				val[i] += no_pop[i];
-			}
+			auto m = linear_prop.no_pop_ref[i];
+			if(m != UNSET) val[i] += no_pop_dif[m][k];
 			
 			auto &me_vari = markov_eqn_vari[e];
 			store.push_back(me_vari.div[ti].value);
@@ -276,8 +298,6 @@ vector <double> StateSpecies::likelihood_markov_value_linear(const vector <unsig
 		
 		ti_last = ti;
 	}
-	
-	timer[LINEAR_TIMER] += clock();
 	
 	return store;
 }
@@ -308,7 +328,7 @@ vector <double> StateSpecies::likelihood_indfac_int()
 	auto t_start = timepoint[0];
 	auto t_end = timepoint[T];
 	auto dt = details.dt;
-	
+
 	for(auto e = 0u; e < N; e++){
 		auto &div = markov_eqn_vari[e].div;
 		const auto &me = sp.markov_eqn[e];
@@ -1816,7 +1836,9 @@ double StateSpecies::sum_markov_prob(double t1, double t2, unsigned int c, unsig
 {
 	auto tr_gl_cor = tr_gl;
 	if(c != UNSET){
-		tr_gl_cor = sp.tra_gl[tr_gl].transform[c];
+		if(sp.tra_gl[tr_gl_cor].i != c){
+			tr_gl_cor = sp.tr_trans(tr_gl,c);
+		}
 	}
 
 	const auto &tra_cor = sp.tra_gl[tr_gl_cor];
@@ -1941,10 +1963,12 @@ void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <d
 							if(ev.e_origin != origin[cl]) emsg("e_origin wrong");
 						
 							const auto &ev_or = eve[ev.e_origin];
-							auto tr_gl_cor = sp.tra_gl[tr_gl].transform[ev_or.c_after];
+							if(sp.tra_gl[tr_gl].i != ev_or.c_after){
+								tr_gl = sp.tr_trans(tr_gl,ev_or.c_after);
+							}
 							
-							add_nm_prob(tr_gl_cor,ev_or.t,ps,popnum_t,ind);
-							add_nm_cpd(tr_gl_cor,ev_or.t,ev.t,ps,popnum_t,ind);
+							add_nm_prob(tr_gl,ev_or.t,ps,popnum_t,ind);
+							add_nm_cpd(tr_gl,ev_or.t,ev.t,ps,popnum_t,ind);
 							
 							origin[cl] = e;
 						}

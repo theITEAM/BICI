@@ -13,7 +13,7 @@ function add_description_buts(lay)
 		yy += 2;
 		let nline = Math.round((lay.dy-yy-5.5)/get_font_info().lh);
 		
-		lay.add_textbox(cx,yy+0.5,lay.dx-2*cx,nline,{type:"description", wrap:"word"});
+		lay.add_textbox(cx,yy+0.5,lay.dx-2*cx,nline,{type:"description", wrap:"word"},"desc");
 		
 		lay.add_corner_button([["Cancel","Grey","CancelEditDescription"],["Done","Grey","DoneEditDescription"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}

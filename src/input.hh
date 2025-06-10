@@ -113,7 +113,7 @@ class Input                                // Stores information about the model
 		void alert(string st);
 		void add_error_mess(unsigned int line_num, string st, ErrorType type);
 		void alert_import(string st, bool fatal=false);  
-		void alert_line(string st, unsigned int line);  
+		void alert_line(string st, unsigned int line, bool fatal = false);  
 		void alert_equation(const EquationInfo &eqi, const string &warn);
 		void alert_warning(string st);  
 		bool fatal_error() const;
@@ -131,7 +131,7 @@ class Input                                // Stores information about the model
 		void check_param_used();
 		void create_param_vector();
 		void create_pop_ref();
-		void simplify_equations();
+		void further_simplify_equations(unsigned int per_start, unsigned int per_end);
 		
 		// In 'input_commands.cc' 
 		void species_command(unsigned int loop);
@@ -161,6 +161,7 @@ class Input                                // Stores information about the model
 		void import_data_table_command(Command cname);
 		void map_command();
 		void inf_state_command();
+		void warning_command();
 		void dummy_file_command();
 		
 		// In 'input_modelupdate.cc'
@@ -170,10 +171,11 @@ class Input                                // Stores information about the model
 		void add_transition(unsigned int p, unsigned int cl, unsigned int i,unsigned int f, TransType type);
 		void determine_branching() const;
 		void add_obs_model_eqn(Species &sp);
-		void create_equations();
+		void create_equations(unsigned int per_start, unsigned int per_end);
+		void linearise_eqn(unsigned int per_start, unsigned int per_end);
 		void add_eq_ref(EquationInfo &eqi);	
 		vector <bool> set_eqn_zero(const vector <EquationInfo> &eq_info);
-		void add_parent_child(const EquationInfo eqi, unsigned int i, unsigned int th);
+		void add_parent_child(const EquationInfo eqi, unsigned int i, unsigned int th, Hash &hash);
 		void create_markov_eqn();
 		void create_markov_eqn_pop_ref();
 		void global_comp_trans_init();
@@ -258,9 +260,10 @@ class Input                                // Stores information about the model
 		CompRef find_comp_from_name(unsigned int p, string te) const;
 		unsigned int import_geojson(string file);
 		LatLng boundary_mean_latlng(unsigned int i, string name);
-		void set_element(vector <EquationInfo> &value, const vector <Dependency> &dep, const vector <unsigned int> &ind, string te);
-		void set_reparam_element(vector <EquationInfo> &value, const vector <Dependency> &dep, const vector <unsigned int> &ind, const EquationInfo &val);
-		void set_prior_element(vector <Prior> &prior, const vector <Dependency> &dep, const vector <unsigned int> &ind, Prior pri);
+		void set_const(Param &par, const vector <unsigned int> &ind, double val);
+		void set_element(Param &par, const vector <unsigned int> &ind, string te);
+		void set_reparam_element(Param &par, const vector <unsigned int> &ind, const EquationInfo &val);
+		void set_prior_element(Param &par, const vector <unsigned int> &ind, Prior pri);
 		void clone_class(unsigned int p_to, unsigned int p_from, unsigned int cl_from);
 		void print_table(const Table &tab) const;
 		void add_to_list(vector <ParamRef> &list, const ParamRef &pr) const;
@@ -280,8 +283,10 @@ class Input                                // Stores information about the model
 		unsigned int get_seed();
 		void check_dt(const Details &details);
 		void add_param_cat_factor(Param &par);
-		void load_reparam_eqn(string te, Param &par);
+		//void load_reparam_eqn(string te, Param &par);
+		void add_reparam_eqn(Param &par, Hash &hash_eqn);
 		string get_data_dir(string data_dir);
+		//unsigned int add_cons(double val);
 		
 		// In 'input_check.cc'
 		void check_initial_pop_error(bool end);
@@ -292,8 +297,17 @@ class Input                                // Stores information about the model
 		void check_import_correct();
 		void temp_check(unsigned int num);
 		void check_reparam_time();
-		bool check_name_input(string name, string te);
+		bool check_name_input(string name, string te, bool sup_not_allow = false);
 		bool is_Color(string color) const;
+		void cannot_find_trans_comp(string te, unsigned int p, unsigned int cl, string co);
+		void param_eqn_mem() const;
+		void eqn_mem_usage(string name, const vector <unsigned int> &vec) const;
+		void param_vec_mem_usage() const;
+		void param_mem_usage(string name, const vector <unsigned int> &vec) const;
+		void comp_global_mem_usage() const;
+		void trans_global_mem_usage() const;
+		void species_mem_usage() const;
+		unsigned int sizeof_eqninfo(const EquationInfo &ei) const;
 		
 		unsigned int check_pos_integer(string val, unsigned int def=UNSET);
 		double check_pos_number(string te, unsigned int def);

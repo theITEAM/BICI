@@ -142,7 +142,7 @@ void Mpi::share_particle(vector <Particle> &part)
 /// Packs up a particle
 void Mpi::pack(const Particle &pa)
 {
-	pack_item(pa.param_val);
+	pack_item(pa.param_val_prop);
 	
 	// Species
 	pack_num(pa.species.size());
@@ -287,7 +287,7 @@ void Mpi::pack(const Particle &pa)
 /// Packs up a particle
 void Mpi::unpack(Particle &pa)
 {
-	unpack_item(pa.param_val);
+	unpack_item(pa.param_val_prop);
 
 	auto S = unpack_num();
 	for(auto sp = 0u; sp < S; sp++){
@@ -688,4 +688,52 @@ void Mpi::mess(string te) const
 	MPI_Barrier(MPI_COMM_WORLD);  
 	if(core == 0) cout << te << endl;
 }
+
+
+/// Sums up a double value over all cores  
+void Mpi::sum(double &val)
+{
+	vector <double> valtot;
+	valtot.resize(ncore);
+
+	MPI_Gather(&val,1,MPI_DOUBLE,&valtot[0],1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	
+	auto sum = 0.0;
+	if(core == 0){
+		for(auto val : valtot) sum += val;
+		val = sum;
+	}
+}
+
+
+/// Sums up arrays over multiple cores
+void Mpi::sum(vector < vector <double> > &array)
+{
+	auto Y = array.size();
+	auto X = 0u; if(Y > 0) X = array[0].size();
+	vector <double> vectrans;
+	vector <double> vectot(Y*X*ncore);
+
+	for(auto j = 0u; j < Y; j++){
+		for(auto i = 0u; i < X; i++) vectrans.push_back(array[j][i]);
+	}
+	
+	MPI_Gather(&vectrans[0],vectrans.size(),MPI_DOUBLE,&vectot[0],vectrans.size(),MPI_DOUBLE,0,MPI_COMM_WORLD);
+	
+	if(core == 0){
+		auto shift = Y*X;
+		for(auto j = 0u; j < Y; j++){
+			for(auto i = 0u; i < X; i++){
+				auto start = j*X+i;
+				
+				auto sum = 0.0;
+				for(auto k = 0u; k < ncore; k++){
+					sum += vectot[start+k*shift];
+				}
+				array[j][i] = sum;
+			}
+		}
+	}
+}
+
 #endif

@@ -10,8 +10,10 @@
 // mpirun -n 1 ./bici-para file.bici sim
 // mpirun -n 1 ./bici-para Execute/init.bici sim
 // mpirun -n 3 ./bici-para Execute/init.bici inf
+// mpirun -n 3 ./bici-para Grant/RealData_1000_DA_5000 inf
+// mpirun -n 3 ./bici-para Grant/RealData_2000_DA_5000 inf
 
-// ssh cpooley@gaia.bioss.ac.uk    azog.bioss.ac.uk
+// ssh gaia.bioss.ac.uk    azog.bioss.ac.uk
 
 // git clone https://github.com/theITEAM/BICI.git
 
@@ -67,6 +69,8 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file);
 
 int main(int argc, char** argv)
 {	
+	auto total_time = clock();
+	
 #ifdef USE_MPI                            // This is for the parallel version of the code 
   MPI_Init(&argc,&argv);                 
 #endif
@@ -193,7 +197,11 @@ int main(int argc, char** argv)
 		break;
 	}
 	
-	output.end(file);
+	auto total_cpu = (clock()-total_time)/CLOCKS_PER_SEC;
+	
+	output.end(file,total_cpu);
+	
+	if(op() && !com_op) output.final_time(total_cpu);
 	
 #ifdef USE_MPI
 	MPI_Finalize();

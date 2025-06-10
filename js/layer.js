@@ -618,12 +618,15 @@ class Layer
 		this.add_button({x:this.dx/2-loading_si/2, y:0, dx:loading_si, dy:loading_si, type:"LoadingSymbol"});
 		
 		this.add_button({x:0, y:loading_si, dx:this.dx, dy:1, type:"LoadMessage"});
-
-		switch(inter.loading_symbol.type){
-		case "Start": case "StartPPC":
+	
+		let ls = inter.loading_symbol;
+		switch(ls.type){
+		case "Start": case "StartPPC": case "Load File":
 			{
-				let si = 3;
-				this.add_button({te:"Stop", x:this.dx/2-si/2, y:loading_si+5, dx:si, dy:si, ac:"Stop", type:"Stop"});
+				if(ls.message != "Processing..."){				
+					let si = 3;
+					this.add_button({te:"Stop", x:this.dx/2-si/2, y:loading_si+5, dx:si, dy:si, ac:"Stop", type:"Stop"});
+				}
 			}
 			break;
 		}
@@ -670,7 +673,8 @@ class Layer
 			if(ch == "{"){ textcol_pop_store = textcol; textcol = BLUE;}
 			if(ch == "["){ textcol_ie_store = textcol;  textcol = DGREEN;}
 			if(ch == "〈"){ textcol_fe_store = textcol; textcol = RED;}
-			this.add_button({te:ch, x:cx, y:0, dx:w, dy:lh, type:"Char", col:textcol, i:i, font:font, si:inputbox_fontsi});
+			let teco = textcol; if(ch == ";") teco = BLACK;
+			this.add_button({te:ch, x:cx, y:0, dx:w, dy:lh, type:"Char", col:teco, i:i, font:font, si:inputbox_fontsi});
 			if(ch == "}") textcol = textcol_pop_store;
 			if(ch == "]") textcol = textcol_ie_store;
 			if(ch == "〉") textcol = textcol_fe_store;
@@ -699,6 +703,8 @@ class Layer
 	{
 		this.copy_from_source();
 		
+		let eqn_edit = false; if(this.op.type == "eqn") eqn_edit = true;
+		
 		let te = this.get_text_from_source();
 		if(te == undefined) return;
 		
@@ -726,7 +732,7 @@ class Layer
 		let textcol_pop_store = BLACK;
 		let textcol_ie_store = BLACK;
 		let textcol_fe_store = BLACK;
-
+		
 		let text_nrow = 1;
 
 		let list=[];
@@ -738,6 +744,33 @@ class Layer
 		}
 	
 		let eqn = this.op.source.eqn;
+	
+		// Works out background to show brackets matching up
+		let char_curs_back = [];
+		if(eqn_edit){
+			let ro_bra=[];
+			for(let i = 0; i < te.length; i++){
+				let ii;
+				switch(te.substr(i,1)){
+				case "(": ro_bra.push(i); break;
+				case ")": if(ro_bra.length > 0){ ii = ro_bra[ro_bra.length-1]; ro_bra.pop();} break;
+				}
+				if(ii != undefined){
+					if(!char_curs_back[i]) char_curs_back[i] = [];
+					char_curs_back[i].push(i+1);
+					if(!(i > 0 && te.substr(i-1,1) == ")")) char_curs_back[i].push(i);
+					char_curs_back[i].push(ii+1);
+					if(!(i < te.length-1 && te.substr(i+1,1) == "(")) char_curs_back[i].push(ii);
+					
+					if(!char_curs_back[ii]) char_curs_back[ii] = [];
+					char_curs_back[ii].push(i+1);
+					if(!(i > 0 && te.substr(i-1,1) == ")")) char_curs_back[ii].push(i);					
+					char_curs_back[ii].push(ii+1);
+					if(!(i < te.length-1 && te.substr(i+1,1) == "(")) char_curs_back[ii].push(ii);
+				}
+			}
+		}
+		
 		for(let i = 0; i <= te.length; i++){
 			let char_begin_cx = cx, char_begin_cy = cy;
 			
@@ -793,17 +826,51 @@ class Layer
 					this.add_button({x:cx_click, y:cy, dx:(cx+w/2)-cx_click, dy:lh, ac:"PositionCursor", type:"Nothing", i:i, eqn:eqn});
 					cx_click = (cx+w/2);
 
-					if(ch == "{"){ textcol_pop_store = textcol; textcol = BLUE;}
-					if(ch == "["){ textcol_ie_store = textcol; textcol = DGREEN;}
-					if(ch == "〈"){ textcol_fe_store = textcol; textcol = RED;}
-					
+					if(textcol == SUM_COL){
+						if(ch == "(") textcol = BLACK;
+					}
+					else{
+						switch(ch){
+						case "{": textcol_pop_store = textcol; textcol = POP_COL; break;
+						case "[": textcol_ie_store = textcol; textcol = IE_COL; break;
+						case "〈": textcol_fe_store = textcol; textcol = FE_COL; break;
+						case "Σ": textcol = SUM_COL; break;
+						
+						case "+": case "-": case "*": case "×": case "/":
+						case "0": case "1": case "2": case "3": case "4": 
+						case "5": case "6": case "7": case "8": case "9":
+						case ".": case "(": case ")": case "→":
+							if(eqn_edit) textcol = BLACK;
+							break;
+							
+						case "|":
+							if(eqn_edit && textcol == PARAM_COL) textcol = BLACK;
+							break;
+							
+						default:
+							if(eqn_edit && textcol == BLACK) textcol = PARAM_COL;
+							break;
+						}
+					}
+						
 					let underline = false;
 					if(warn != undefined){
 						let len = warn.len; if(len == 0) len = 1;
 						if(i >= warn.cur && i < warn.cur+len) underline = true;
 					}
 					
-					this.add_button({te:ch, x:cx, y:cy, dx:w, dy:lh, type:"Char", col:textcol, i:i, font:font, si:fsi, underline:underline});
+					let ch_cu_back=[];
+					if(char_curs_back[i] != undefined) ch_cu_back = char_curs_back[i];
+					
+					
+					let teco = textcol; if(ch == ";") teco = BLACK;
+					if(eqn_edit && ch == "(" || ch == ")"){
+						let font_bra = get_font(equation_brasi);
+						this.add_button({te:ch, x:cx, y:cy, dx:w, dy:lh, type:"Char", col:teco, i:i, font:font_bra, si:fsi, underline:underline, ch_cu_back:ch_cu_back});
+					}
+					else{
+						this.add_button({te:ch, x:cx, y:cy, dx:w, dy:lh, type:"Char", col:teco, i:i, font:font, si:fsi, underline:underline, ch_cu_back:ch_cu_back});
+					}
 					
 					if(ch == "}") textcol = textcol_pop_store;
 					if(ch == "]") textcol = textcol_ie_store;
@@ -833,10 +900,10 @@ class Layer
 
 
 	/// Adds textbox
-	add_textbox(x,y,dx,nrow,source)	
+	add_textbox(x,y,dx,nrow,source,type)	
 	{		
 		add_ref(source);
-		add_layer("TextBox",this.x+x,this.y+y,dx,nrow*get_font_info().lh,{nrow:nrow, source:source});
+		add_layer("TextBox",this.x+x,this.y+y,dx,nrow*get_font_info().lh,{nrow:nrow, source:source, type:type});
 	}
 
 

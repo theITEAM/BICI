@@ -71,11 +71,9 @@ void State::check_simp(string ref)
 							emsg("e_bef not right");
 						}
 						
-						const auto &tra = sp.tra_gl[ev.tr_gl];
-						
 						const auto &ev_orig = ind.ev[e_bef];
 	
-						if(ev.m != sp.get_tra_m(tra,ev_orig)){
+						if(ev.m != sp.get_tra_m(ev.tr_gl,ev_orig)){
 							emsg("NMarkov equation not correct2"+ref);
 						}
 						
@@ -186,7 +184,7 @@ void State::check_dependent_param(string ref)
 	for(auto th = 0u; th < model.param_vec.size(); th++){	
 		const auto &pv = model.param_vec[th];
 		if(pv.variety == REPARAM_PARAM){
-			auto re = model.param[pv.th].value[pv.index].eq_ref;
+			auto re = model.param[pv.th].get_eq_ref(pv.index);
 			if(re == UNSET) emsg("Reparam is not set");	
 			auto value = model.eqn[re].calculate_param_only(param_val);
 		
@@ -219,12 +217,9 @@ void State::check_ref(unsigned int p, string refst)
 				}
 				
 				const auto &ev_orig = ind.ev[ev.e_origin];
-				const auto &tra = sp.tra_gl[ev.tr_gl];
-				auto m = sp.get_tra_m(tra,ev_orig);
+				auto m = sp.get_tra_m(ev.tr_gl,ev_orig);
 	
-				if(m != ev.m){
-					emsg("m is not right");
-				}
+				if(m != ev.m) emsg("m is not right");
 				
 				auto t = ind.ev[ev.e_origin].t;		
 				auto ti = sp.get_ti(t);
@@ -242,11 +237,12 @@ void State::check_ref(unsigned int p, string refst)
 			
 				auto ti = sp.get_ti(t);
 		
-				const auto &tra = sp.tra_gl[ev.tr_gl];
+				auto tr = ev.tr_gl;
+				const auto &tra = sp.tra_gl[tr];
 				auto m = tra.nm_trans_ref;
 				
 				if(tra.i != ev_orig.c_after){               // Accounts for intermdiate transition
-					m = sp.tra_gl[tra.transform[ev_orig.c_after]].nm_trans_ref;
+					m = sp.tra_gl[sp.tr_trans(tr,ev_orig.c_after)].nm_trans_ref;
 				}
 
 				if(nmt_ind == UNSET) emsg("index should be set");
@@ -457,15 +453,12 @@ void State::check_markov_trans(unsigned int p, string ref)
 			
 			case NM_TRANS_EV:
 				{
-					const auto &tra = sp.tra_gl[ev.tr_gl];
 					auto e_bef = get_event_before(e,ind.ev);
-					if(ev.e_origin != e_bef){
-						emsg("e_bef not right");
-					}
+					if(ev.e_origin != e_bef) emsg("e_bef not right");
 					
 					const auto &ev_orig = ind.ev[e_bef];
 	
-					if(ev.m != sp.get_tra_m(tra,ev_orig)){
+					if(ev.m != sp.get_tra_m(ev.tr_gl,ev_orig)){
 						emsg("NMarkov equation not correct"+ref);
 					}
 				}

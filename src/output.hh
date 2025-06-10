@@ -35,7 +35,7 @@ class Output                               // Stores information about the data
 		string to_str(double num) const;
 		void param_sample(unsigned int s, unsigned int chain, const State &state);
 		void param_sample(const Particle &part);
-		string param_output(const Particle &part) const;
+		string param_output(const Particle &part, const vector < vector <double> > &value) const;
 		void state_sample(unsigned int s, unsigned int chain, const State &state);
 		void state_sample(const Particle &part);
 		string state_output(const Particle &part,	vector <string> &ind_key, Hash &hash_ind) const;
@@ -44,19 +44,29 @@ class Output                               // Stores information about the data
 		string ic_output(const Particle &part) const;
 		void set_output_burnin(double burnin_frac);
 		void set_diagnostics(unsigned int ch, string diag);
-		void end(string file) const;
+		void end(string file, unsigned int total_cpu) const;
 		vector <Particle> get_part_chain(unsigned int chain, const vector <Particle> &part) const;
 		string print_obs_data(unsigned int p, const vector <ObsData> &obs) const;
 		void print_individuals(unsigned int N, unsigned int p, const State &state) const;
+		void final_time(long total_cpu) const;
 	
 	private:
-		vector < vector <double> > param_value_from_vec(const vector <double> &param_val) const;
+		vector < vector <double> > param_value_from_vec(const vector <double> &param_val_prop) const;
 		string generate_state_head(const vector <string> &ind_key) const;
 		string output_param(const vector < vector <double> > &value, const Particle &part) const;
 		vector < vector <double> > param_value_from_value() const;
 		string transtype_text(TransType type) const;
 		void number_part(vector <Particle> &part) const;
-		string trans_diag_output(const vector <TransDiagSpecies> &trans_diag) const;
+		void output_trace(unsigned int ch, const vector <Particle> &part, vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout) const;
+		string get_effective_sample_size(vector <double> vec) const;
+		string get_Gelman_Rubin_statistic(const vector < vector <double> > &cha) const;
+		string param_stat(unsigned int th, unsigned int i, const vector < vector < vector < vector <double> > > > &param_samp) const;
+		void output_param_statistics(const vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout) const;
+		void output_state(unsigned int ch, const vector <Particle> &part, ofstream &fout) const;
+		void output_trans_diag(const vector <TransDiagSpecies> &trans_diag, ofstream &fout) const;
+		void output_rate_warning(unsigned int total_cpu, unsigned int per_start, unsigned int per_end, ofstream &fout) const;
+		void output_generation(const vector <Particle> &part, ofstream &fout) const;
+		void output_diagnostic(const vector <Diagnostic> &diagnostic, ofstream &fout) const;
 		vector <TransDiagSpecies> trans_diag_init() const;
 		void trans_diag_add(vector <TransDiagSpecies> &trans_diag, const vector <Particle> &part) const;
 		Stat get_statistic(vector <double> &vec) const;

@@ -41,11 +41,56 @@ function initialise_filters()
 }
 
 
+//function 
+
 /// Loads up a file
 function load_fi(file,file_type,heading,format,op)
 {
-	var fileReader = new FileReaderSync();
-	let te = fileReader.readAsText(file, "UTF-8");
+	//var fileReader = new FileReader();
+	
+	fileReader.readAsText(file);
+	
+	let per_st = 0;
+	
+	fileReader.onprogress = function(currentFile) {
+		if(currentFile.lengthComputable) {
+			let per = parseInt(((currentFile.loaded / currentFile.total) * 100), 10);
+			if(per >= 1 && per != per_st){
+				per_st = per;
+				percent(per)
+			}
+		}
+	}
+
+	fileReader.onload = function(){
+		if(try_on){
+			try {
+				load_fi2(fileReader.result,file,file_type,heading,format,op);
+			}catch(e){
+				post(e);
+			}
+		}
+		else{
+			load_fi2(fileReader.result,file,file_type,heading,format,op);
+		}
+
+		//load_fi2(fileReader.result,file,file_type,heading,format,op);
+  };
+
+
+	fileReader.onerror = function(){
+		post({type:"AlertP", te:"Error reading the file. Please try again."});
+  };
+}
+
+
+
+/// Fires after loading had been completed
+function load_fi2(te,file,file_type,heading,format,op)
+{
+	loading_mess("Processing...");
+	
+	//let te = fileReader.readAsText(file,"UTF-8");
 
 	te = te.replace(/\r/g, "");
 
@@ -425,7 +470,7 @@ function read_param_samples(chain,te,result,warn)
 							*/
 						
 							par.list = par_find_list(par);
-							par.comb_list = generate_comb_list(par.list);
+							//par.co_list = generate_co_list(par.list);
 							result.param.push(par);
 						}
 					}
@@ -551,7 +596,7 @@ function read_param_samples(chain,te,result,warn)
 		let par = result.param[th];
 		
 		if(par.dist_mat || (par.variety == "reparam" && par.reparam_eqn_on)){
-			if(par.comb_list.length != 0) error("Param error");
+			//if(par.co_list.length != 0) error("Param error");
 			if(par.value.length != 0) error("Param error");
 			if(par.prior_split.length != 0) error("Param error");
 		}
@@ -1419,12 +1464,12 @@ function reduce_size(info,par)
 	}
 
 	let temp = par_find_template(list_shrink);
-	let comb_list = generate_comb_list(list_shrink);
+	let co_list = generate_co_list(list_shrink);
 	
 	let value = info.value;
 	
-	for(let i = 0; i < comb_list.length; i++){
-		let ind = comb_list[i].index;
+	for(let i = 0; i < co_list.length; i++){
+		let ind = co_list[i].index;
 		set_element(temp,ind,get_element(value,ind));
 	}
 			
@@ -1507,5 +1552,7 @@ function extract_text_samples(siminf,type,result)
 function load_bici(file)
 {
 	let te = load_file_http(file);
+	loading_mess("Processing...");
 	import_file(te,file,true);
+	
 }

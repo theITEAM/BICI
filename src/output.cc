@@ -7,11 +7,13 @@
 #include <cmath>
 #include <sys/stat.h>
 #include <algorithm> 
+#include <iomanip>
  
 using namespace std;
 
 #include "output.hh"
 #include "utils.hh"
+//#include "state.hh"
 
 /// Initialises the output 
 Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model), mpi(mpi)
@@ -46,9 +48,11 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 				flag = true;
 			}
 			
-			if(command == "inf-param" || command == "inf-state"){
+			if(command == "inf-param" || command == "inf-param-stats" || command == "inf-state"){
 				if(model.mode != PPC) flag = true;
 			}
+			
+			if(command == "warning") flag = true;
 			
 			if(command == "post-sim-param" || command == "post-sim-state"){
 				flag = true;
@@ -485,8 +489,6 @@ void Output::summary(const Model &model) const
 		
 		fout << "  ";
 		fout << "time_dep: "; if(par.time_dep == true) fout << "true"; else fout << "false";
-		fout << "  ";
-		fout << "auto: "; if(par.auto_value == true) fout << "true"; else fout << "false";
 		fout << endl;
 
 		for(const auto &dep : par.dep){
@@ -512,10 +514,12 @@ void Output::summary(const Model &model) const
 
 		switch(model.mode){
 		case SIM:
+			/*
 			if(par.value.size() > 0){
 				auto st = stringify(par.value,par.dep);
 				fout << "  value: " << st;
 			}
+			
 			
 			fout << " parent: [";
 			for(auto i = 0u; i < par.parent.size(); i++){
@@ -538,6 +542,7 @@ void Output::summary(const Model &model) const
 				}
 			}			
 			fout << "]  ";
+			*/
 			break;
 
 		case INF: case PPC:
@@ -773,7 +778,6 @@ string Output::print_affect_like(const AffectLike &al) const
 		
 	case DIV_VALUE_FAST_AFFECT:
 		{
-			ss << "AFFECT Div Value Fast" << endl;
 			auto eq = model.species[al.num].markov_eqn[al.num2].eqn_ref;
 			ss << "AFFECT Div Value Fast" << model.eqn[eq].te_raw << endl;
 		}
@@ -788,7 +792,7 @@ string Output::print_affect_like(const AffectLike &al) const
 					auto eq = model.species[al.num].markov_eqn[k].eqn_ref;
 					str += model.eqn[eq].te_raw +", ";
 				}
-				ss << trunc(str);
+				ss << trunc(str,1000);
 			}
 			ss << endl;
 		}
@@ -1314,13 +1318,11 @@ void Output::param_sample(const Particle &part)
 }
 
 /// Outputs a parameter sample 
-string Output::param_output(const Particle &part) const
+string Output::param_output(const Particle &part, const vector < vector <double> > &value) const
 {	
 	stringstream ss;
 	ss << part.s;
 
-	auto value = param_value_from_vec(part.param_val); 
-	
 	for(auto th = 0u; th < model.param.size(); th++){
 		const auto &par = model.param[th];
 		if(par.trace_output){
@@ -1392,7 +1394,7 @@ void Output::state_sample(const Particle &part)
 /// Outputs a state sample
 string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash &hash_ind) const
 {
-	auto value = param_value_from_vec(part.param_val); 
+	auto value = param_value_from_vec(part.param_val_prop); 
 	
 	stringstream ss;
 	ss << "<<STATE " << part.s << ">>" << endl << endl;
@@ -1697,8 +1699,10 @@ string Output::generate_state_head(const vector <string> &ind_key) const
 
 
 /// Generates values from parameter vector
-vector < vector <double> > Output::param_value_from_vec(const vector <double> &param_val) const 
+vector < vector <double> > Output::param_value_from_vec(const vector <double> &param_val_prop) const 
 {
+	auto param_val = model.get_param_val(param_val_prop);
+	
 	vector < vector <double> > value;
 	
 	value.resize(model.param.size());
@@ -1724,13 +1728,13 @@ vector < vector <double> > Output::param_value_from_vec(const vector <double> &p
 		const auto &par = model.param[th];
 		if(par.trace_output){
 			for(auto j = 0u; j < par.N; j++){
-				if(value[th][j] == UNSET){
-					auto val = par.value[j].value;
+				if(value[th][j] == UNSET){	
+					auto val = par.get_value(j);
 					if(val != UNSET){
 						value[th][j] = val;
 					}
 					else{
-						auto eq = par.value[j].eq_ref;
+						auto eq = par.get_eq_ref(j);
 						if(eq != UNSET){			
 							value[th][j] = model.eqn[eq].calculate_param_only(param_val);
 						}
@@ -1754,7 +1758,7 @@ vector < vector <double> > Output::param_value_from_value() const
 		const auto &par = model.param[th];
 		if(par.variety == CONST_PARAM){
 			value[th].resize(par.N);
-			for(auto i = 0u; i < par.N; i++) value[th][i] = par.value[i].value;
+			for(auto i = 0u; i < par.N; i++) value[th][i] = par.get_value(i);
 		}
 	}
 
@@ -1915,7 +1919,7 @@ void Output::set_diagnostics(unsigned int ch, string diag)
 
 
 /// Generates the final outputs
-void Output::end(string file) const
+void Output::end(string file, unsigned int total_cpu) const
 {
 	percentage_start(OUTPUT_PER);
 		
@@ -1942,8 +1946,12 @@ void Output::end(string file) const
 	
 	auto nchain = model.details.nchain;
 	
+	vector < vector < vector < vector <double> > > > param_samp;
+	param_samp.resize(nchain);
+	
 	for(auto ch = 0u; ch < nchain; ch++){
-		percentage(ch,4*nchain);
+		auto frac = double(ch)/nchain;
+		percentage(frac*25,100);
 		
 		auto part = get_part_chain(ch,param_store);
 		
@@ -1953,58 +1961,19 @@ void Output::end(string file) const
 		
 		if(op() && part.size() > 0){
 			number_part(part);
-			
-			string param_out;
-			
-			param_out += trace_init();
-			for(const auto &pa : part) param_out += param_output(pa);
-			
-			string param_out_file;
-		
-			if(sampledir != ""){
-				string add; if(nchain > 1) add = "_"+tstr(ch);
-		
-				param_out_file = "param"+add+".csv";
-
-				ofstream pout(sampledir+"/"+param_out_file);
-				check_open(pout,param_out_file);
-				pout << param_out;
-
-				param_out_file = "Sample/"+param_out_file;
-			}
-			else{  // Embeds output into file
-				param_out_file = "[["+endli+param_out+"]]";
-			}
-		
-			stringstream ss;
-			switch(model.mode){
-			case SIM:
-				ss << "sim-param file=\"" << param_out_file << "\"" << endl;
-				break;
-		
-			case INF:
-				ss << "inf-param chain=" << ch << " file=\""+param_out_file+"\"" << endl;
-				break;
-			
-			case PPC:
-				ss << "post-sim-param file=\"" << param_out_file << "\"" <<  endl;
-				break;
-			
-			default: emsg("Should not be default12"); break;
-			}
-			ss << endl;
-			
-			if(com_op == true) cout << ss.str();
-			else fout << ss.str();
+			output_trace(ch,part,param_samp,fout);
 		}
 	}
+	
+	if(op() && model.mode == INF) output_param_statistics(param_samp,fout);
 	
 	auto trans_diag = trans_diag_init(); 
 	
 	auto trans_diag_on = false; if(model.mode == INF) trans_diag_on = true;
 	
 	for(auto ch = 0u; ch < model.details.nchain; ch++){
-		percentage(3*ch+nchain,4*nchain);
+		auto frac = double(ch)/nchain;
+		percentage(25+frac*25,100);
 
 		auto part = get_part_chain(ch,state_store);
 		
@@ -2014,81 +1983,13 @@ void Output::end(string file) const
 	
 		if(op() && part.size() > 0){
 			number_part(part);
-			
 			if(trans_diag_on) trans_diag_add(trans_diag,part); 
-			
-			string state_out;
-		
-			vector <string> ind_key;
-			Hash hash_ind;
-			for(const auto &pa : part) state_out += state_output(pa,ind_key,hash_ind);
-			
-			auto state_head = generate_state_head(ind_key);
-			
-			string state_out_file;
-		
-			if(sampledir != ""){
-				string add; if(nchain > 1) add = "_"+tstr(ch);
-		
-				state_out_file = "state"+add+".txt";
-
-				ofstream pout(sampledir+"/"+state_out_file);
-				check_open(pout,state_out_file);
-				pout << state_head << state_out;
-
-				state_out_file = "Sample/"+state_out_file;
-			}
-			else{  // Embeds output into file
-				state_out_file = "[["+endli+state_head+state_out+"]]";
-			}
-		
-			stringstream ss;
-			switch(model.mode){
-			case SIM:
-				ss << "sim-state file=\"" << state_out_file << "\"" << endl;
-				break;
-		
-			case INF:
-				ss << "inf-state chain=" << ch << " file=\""+state_out_file+"\"" << endl;
-				break;
-			
-			case PPC:
-				ss << "post-sim-state file=\"" << state_out_file << "\"" <<  endl;
-				break;
-			
-			default: emsg("Should not be default12"); break;
-			}
-			ss << endl;
-			
-			if(com_op == true) cout << ss.str();
-			else fout << ss.str();
+			output_state(ch,part,fout);
 		}
 	}
 	
 	if(op() && trans_diag_on){
-		auto trans_diag_out = trans_diag_output(trans_diag);
-		
-		string trans_diag_out_file;
-		
-		if(sampledir != ""){
-			trans_diag_out_file = "trans_diag.txt";
-
-			ofstream pout(sampledir+"/"+trans_diag_out_file);
-			check_open(pout,trans_diag_out_file);
-			pout << trans_diag_out;
-
-			trans_diag_out_file = "Sample/"+trans_diag_out_file;
-		}
-		else{  // Embeds output into file
-			trans_diag_out_file = "[["+endli+trans_diag_out+"]]";
-		}
-	
-		stringstream ss;
-		ss << "trans-diag file=\"" << trans_diag_out_file << "\"" << endl;
-		ss << endl;
-		
-		if(com_op == true) cout << ss.str();
-		else fout << ss.str();
+		output_trans_diag(trans_diag,fout);
 	}
 	
 	auto alg = model.details.algorithm;
@@ -2100,33 +2001,7 @@ void Output::end(string file) const
 #endif
 		
 		if(op() && part.size() > 0){
-			string param_out;
-			
-			string content;
-			for(const auto &pa : part) content += param_output(pa);
-			param_out += generation_average(trace_init(),content);
-		
-			string param_out_file;
-		
-			if(sampledir != ""){
-				param_out_file = "generation.csv";
-
-				ofstream pout(sampledir+"/"+param_out_file);
-				check_open(pout,param_out_file);
-				pout << param_out;
-
-				param_out_file = "Sample/"+param_out_file;
-			}
-			else{  // Embeds output into file
-				param_out_file = "[["+endli+param_out+"]]";
-			}
-		
-			stringstream ss;
-			ss << "inf-generation file=\""+param_out_file+"\"" << endl;
-			ss << endl;
-			
-			if(com_op == true) cout << ss.str();
-			else fout << ss.str();
+			output_generation(part,fout);
 		}
 	}
 	
@@ -2138,65 +2013,562 @@ void Output::end(string file) const
 #endif
 
 		if(op() && diagnostic.size() > 0){
-			for(const auto &di :  diagnostic){
-				string diag_out_file;
-			
-				if(diagdir != ""){
-					diag_out_file = "diagnostic_"+tstr(di.ch)+".txt";
-
-					ofstream pout(diagdir+"/"+diag_out_file);
-					check_open(pout,diag_out_file);
-					pout << di.te;
-
-					diag_out_file = "Diagnostic/"+diag_out_file;
-				}
-				else{  // Embeds output into file
-					diag_out_file = "[["+endli+di.te+"]]";
-				}
-				
-				stringstream ss;
-				ss << "inf-diagnostics chain=" << di.ch << " file=\""+diag_out_file+"\"" << endl;
-				ss << endl;
-				
-				if(com_op == true) cout << ss.str();
-				else fout << ss.str();
-			}
+			output_diagnostic(diagnostic,fout);
 		}
 	}
-	
-	percentage_end();
+			
+	output_rate_warning(total_cpu,50,100,fout);
 
 	if(com_op == true) cout << "<<END>>" << endl;
 }
 
 
-/// Outputs results for trans_diag
-string Output::trans_diag_output(const vector <TransDiagSpecies> &trans_diag) const
+/// Outputs trace 
+void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout) const
 {
+	auto nchain = model.details.nchain;
+	
+	auto burn = 0u;
+	const auto &de = model.details;
+	switch(de.algorithm){
+	case DA_MCMC: case PAS_MCMC: burn = double(de.sample*de.burnin_frac)/100; break;
+	default: break;
+	}
+
+	string param_out;
+	
+	param_out += trace_init();
+	for(const auto &pa : part){
+		auto value = param_value_from_vec(pa.param_val_prop);
+		if(model.mode == INF && pa.s >= burn){
+			param_samp[ch].push_back(value);				
+		}
+		param_out += param_output(pa,value);
+	}
+	
+	string param_out_file;
+
+	if(sampledir != ""){
+		string add; if(nchain > 1) add = "_"+tstr(ch);
+
+		param_out_file = "param"+add+".csv";
+
+		ofstream pout(sampledir+"/"+param_out_file);
+		check_open(pout,param_out_file);
+		pout << param_out;
+
+		param_out_file = "Sample/"+param_out_file;
+	}
+	else{  // Embeds output into file
+		param_out_file = "[["+endli+param_out+"]]";
+	}
+
 	stringstream ss;
+	switch(model.mode){
+	case SIM:
+		ss << "sim-param file=\"" << param_out_file << "\"" << endl;
+		break;
+
+	case INF:
+		ss << "inf-param chain=" << ch << " file=\""+param_out_file+"\"" << endl;
+		break;
+	
+	case PPC:
+		ss << "post-sim-param file=\"" << param_out_file << "\"" <<  endl;
+		break;
+	
+	default: emsg("Should not be default12"); break;
+	}
+	ss << endl;
+	
+	if(com_op == true) cout << ss.str();
+	else fout << ss.str();
+}
+
+
+/// Calculate the effective sample size for a list of numbers
+string Output::get_effective_sample_size(vector <double> vec) const
+{
+	auto N = vec.size();
+	
+	double min = LARGE, max = -LARGE;
+	for(auto i = 0u; i < N; i++) {
+		auto val = vec[i];
+		if(val < min) min = val;
+		if(val > max) max = val;
+	}
+	if(min == max || N < 2) return "NA";
+		
+	auto av = 0.0, av2 = 0.0;
+	for(auto s = 0u; s < N; s++){
+		auto val = vec[s]; av += val; av2 += val*val;
+	}
+	auto num = av2/N - (av/N)*(av/N); if(num < 0) num = 0;
+	auto mean = av/N, sd = sqrt(num);
+	
+	for(auto s = 0u; s < N; s++) vec[s] = (vec[s]-mean)/sd;
+	
+	auto sum = 1.0;
+	for(auto d = 1u; d < N/2; d++){
+		auto a = 0.0; for(auto s = 0u; s < N-d; s++) a += vec[s]*vec[s+d]; 
+		auto cor = a/(N-d); if(cor < 0) break;
+		sum += 0.5*cor;			
+	}
+	
+	return tstr((unsigned int)(N/sum));
+}	
+
+
+/// Returns the Gelman-Rubin statistic
+string Output::get_Gelman_Rubin_statistic(const vector < vector <double> > &cha) const
+{
+	auto C = cha.size();
+	if(C == 0) emsg("no chain");
+	if(C == 1) return "NA";
+	
+	auto N = cha[0].size();
+	if(N == 0) emsg("no data");
+		
+	vector <double> mu(C), vari(C);
+	
+	{ // Checks to see if values along chain are all equal
+		for(auto ch = 0u; ch < C; ch++){ 
+			auto val_basic = cha[ch][0];
+			auto i = 0u; while(i < N && cha[ch][i] == val_basic) i++;
+			if(i == N) return "NA";
+		}
+	}
+	
+	auto muav = 0.0;
+	for(auto ch = 0u; ch < C; ch++){ 
+		auto valav = 0.0; for(auto i = 0u; i < N; i++) valav += cha[ch][i]/N;
+		auto varr = 0.0; for(auto i = 0u; i < N; i++) varr += (cha[ch][i]-valav)*(cha[ch][i]-valav)/(N-1);
+		mu[ch] = valav;
+		vari[ch] = varr;
+		muav += mu[ch]/C;
+	}
+	
+	auto W = 0.0; for(auto ch = 0u; ch < C; ch++) W += vari[ch]/C;
+	
+	auto B = 0.0; for(auto ch = 0u; ch < C; ch++) B += (mu[ch]-muav)*(mu[ch]-muav)*N/(C-1);
+	
+	return tstr(sqrt(((1-1.0/N)*W + B/N)/W));
+}
+
+
+/// Generates parameter statistics
+string Output::param_stat(unsigned int th, unsigned int i, const vector < vector < vector < vector <double> > > > &param_samp) const
+{
+	auto nchain = param_samp.size();
+	
+	vector <double> vec;
+	vector < vector <double> > cha;
+	cha.resize(nchain);
+	
+	for(auto ch = 0u; ch < nchain; ch++){
+		const auto &psch = param_samp[ch];
+		for(auto s = 0u; s < psch.size(); s++){
+			auto val = psch[s][th][i];
+			vec.push_back(val);
+			cha[ch].push_back(val);
+		}
+	}
+	
+	auto ESS = get_effective_sample_size(vec);
+	auto GR = get_Gelman_Rubin_statistic(cha);
+	
+	auto stat = get_statistic(vec);
+	
+	stringstream ss;
+	ss << "," << stat.mean << "," << stat.sd << "," << stat.CImin << "," << stat.CImax << "," << ESS << "," << GR;
+
+	return ss.str();
+}
+
+
+/// Outputs a table of parameter statistics
+void Output::output_param_statistics(const vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout) const
+{
+	stringstream sss;
+	
+	sss << "name,mean,sd,CI min,CI max,ESS,GR" << endl;
+	
+	for(auto th = 0u; th < model.param.size(); th++){
+		const auto &par = model.param[th];
+		
+		if(par.trace_output){
+			auto pn = add_escape_char(par.name);
+			
+			if(par.dep.size() == 0){	
+				sss << "\"" << pn << "\"" << param_stat(th,0,param_samp) << endl;
+			}
+			else{
+				for(auto j = 0u; j < par.N; j++){
+					sss << "\"" << pn << "_";
+					for(auto k = 0u; k < par.dep.size(); k++){
+						const auto &dp = par.dep[k];
+						auto m = (unsigned int)(j/dp.mult)%dp.list.size();
+						if(k != 0) sss << ",";
+						sss << dp.list[m];
+					}
+					sss << "\"";
+					sss << param_stat(th,j,param_samp) << endl;
+				}
+			}
+		}
+	}
+	
+	auto stat_table = sss.str();
+
+	string stat_out_file;
+	
+	if(sampledir != ""){
+		stat_out_file = "inf-param-stats.csv";
+
+		ofstream pout(sampledir+"/"+stat_out_file);
+		check_open(pout,stat_out_file);
+		pout << stat_table;
+
+		stat_out_file = "Sample/"+stat_out_file;
+	}
+	else{  // Embeds output into file
+		stat_out_file = "[["+endli+stat_table+"]]";
+	}
+	
+	stringstream ss;
+	ss << "inf-param-stats file=\""+stat_out_file+"\"" << endl;
+	ss << endl;
+	
+	if(com_op == true) cout << ss.str();
+	else fout << ss.str();
+}
+	
+
+/// Outputs state samples
+void Output::output_state(unsigned int ch, const vector <Particle> &part, ofstream &fout) const
+{
+	auto nchain = model.details.nchain;
+	
+	string state_out;
+
+	vector <string> ind_key;
+	Hash hash_ind;
+	for(const auto &pa : part) state_out += state_output(pa,ind_key,hash_ind);
+	
+	auto state_head = generate_state_head(ind_key);
+	
+	string state_out_file;
+
+	if(sampledir != ""){
+		string add; if(nchain > 1) add = "_"+tstr(ch);
+
+		state_out_file = "state"+add+".txt";
+
+		ofstream pout(sampledir+"/"+state_out_file);
+		check_open(pout,state_out_file);
+		pout << state_head << state_out;
+
+		state_out_file = "Sample/"+state_out_file;
+	}
+	else{  // Embeds output into file
+		state_out_file = "[["+endli+state_head+state_out+"]]";
+	}
+
+	stringstream ss;
+	switch(model.mode){
+	case SIM:
+		ss << "sim-state file=\"" << state_out_file << "\"" << endl;
+		break;
+
+	case INF:
+		ss << "inf-state chain=" << ch << " file=\""+state_out_file+"\"" << endl;
+		break;
+	
+	case PPC:
+		ss << "post-sim-state file=\"" << state_out_file << "\"" <<  endl;
+		break;
+	
+	default: emsg("Should not be default12"); break;
+	}
+	ss << endl;
+	
+	if(com_op == true) cout << ss.str();
+	else fout << ss.str();
+}
+
+	
+/// Outputs results for trans_diag
+void Output::output_trans_diag(const vector <TransDiagSpecies> &trans_diag, ofstream &fout) const
+{
+	stringstream sstd;
 	
 	auto T = model.ntimepoint-1;
 	for(auto p = 0u; p < model.nspecies; p++){
 		const auto &sp = model.species[p];
 		if(sp.tra_gl.size() > 0){
-			if(model.nspecies > 1) ss << "<SPECIES \"" << sp.name << "\">" << endl;
+			if(model.nspecies > 1) sstd << "<SPECIES \"" << sp.name << "\">" << endl;
 			const auto &exp_num = trans_diag[p].exp_num;
 			auto n = trans_diag[p].n;
 			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
-				ss << replace_arrow(sp.tra_gl[tr].name)  << ":";
+				sstd << replace_arrow(sp.tra_gl[tr].name)  << ":";
 				for(auto ti = 0u; ti < T; ti++){
-					if(ti != 0) ss << ",";
-					ss << exp_num[tr][ti]/n;
+					if(ti != 0) sstd << ",";
+					sstd << exp_num[tr][ti]/n;
 				}
-				ss << endl;
+				sstd << endl;
 			}
 		}
 	}
 	
-	return ss.str();
+	auto trans_diag_out = sstd.str();
+	string trans_diag_out_file;
+	
+	if(sampledir != ""){
+		trans_diag_out_file = "trans_diag.txt";
+
+		ofstream pout(sampledir+"/"+trans_diag_out_file);
+		check_open(pout,trans_diag_out_file);
+		pout << trans_diag_out;
+
+		trans_diag_out_file = "Sample/"+trans_diag_out_file;
+	}
+	else{  // Embeds output into file
+		trans_diag_out_file = "[["+endli+trans_diag_out+"]]";
+	}
+
+	stringstream ss;
+	ss << "trans-diag file=\"" << trans_diag_out_file << "\"" << endl;
+	ss << endl;
+	
+	if(com_op == true) cout << ss.str();
+	else fout << ss.str();
 }
 
 
+/// Works out if time step is too small
+void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start, unsigned int per_end, ofstream &fout) const 
+{
+	State state(model);
+	state.init();
+	
+	vector < vector < vector <double> > > rate_sum;
+	double nrate_sum = 0;
+	
+	auto T = state.T;
+	auto dt = model.details.dt;
+	
+	rate_sum.resize(model.nspecies); 
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];	
+		rate_sum[p].resize(sp.tra_gl.size()); 
+		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+			rate_sum[p][tr].resize(T,0); 
+		}
+	}
+	
+	// Randomly selects around 10 state samples on which estimate are made
+	auto samp_tot = state_store.size()*mpi.ncore;
+	auto step = samp_tot/10;
+	if(step == 0) step = 1;
+	
+	auto rmax = 0.0;
+	for(auto k = 0u; k < state_store.size(); k += step){
+		auto frac = double(k)/state_store.size();
+		percentage(per_start+frac*(per_end-per_start),100);
+		
+		const auto &pa = state_store[k];
+	
+		state.set_particle(pa,false);
+		for(auto p = 0u; p < model.nspecies; p++){
+			const auto &sp = model.species[p];
+			auto rate = state.get_population_rates(p);
+			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+				for(auto ti = 0u; ti < T; ti++){
+					rate_sum[p][tr][ti] += rate[tr][ti];
+				}
+			}
+		}
+		nrate_sum++;
+	}
+	
+
+#ifdef USE_MPI	
+	for(auto p = 0u; p < model.nspecies; p++){
+		mpi.sum(rate_sum[p]);
+	}
+	mpi.sum(nrate_sum);
+#endif
+
+	percentage_end();
+
+	if(op()){
+		auto rate_thresh = RATE_RECOMMEND/dt;
+		
+		string err_msg = "";
+		for(auto p = 0u; p < model.nspecies; p++){		
+			const auto &sp = model.species[p];
+	
+			auto K = sp.ncla;
+		
+			vector < vector < vector <unsigned int> > > tra_good, tra_bad;
+			tra_good.resize(K); tra_bad.resize(K); 
+			for(auto cl = 0u; cl < K; cl++){
+				const auto &claa = sp.cla[cl];
+				tra_good[cl].resize(claa.ntra); tra_bad[cl].resize(claa.ntra); 
+			}
+
+			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+				const auto &tra = sp.tra_gl[tr];
+				
+				auto fl = false;
+				if(tra.i == UNSET){ // Source transition
+					
+				}
+				else{
+					for(auto ti = 0u; ti < T; ti++){
+						auto val = rate_sum[p][tr][ti]/nrate_sum;
+						if(val > rmax) rmax = val;
+						if(val > rate_thresh) fl = true;
+					}
+				}
+				if(fl == false) tra_good[tra.cl][tra.tr].push_back(tr);
+				else tra_bad[tra.cl][tra.tr].push_back(tr);
+			}
+			
+			string err = "";
+			for(auto cl = 0u; cl < K; cl++){
+				const auto &claa = sp.cla[cl];
+				for(auto tr = 0u; tr < claa.ntra; tr++){
+					const auto &tbad = tra_bad[cl][tr];
+					const auto &tgood = tra_good[cl][tr];
+					if(tbad.size() > 0){
+						if(err != "") err += ", ";
+						err += claa.tra[tr].name;
+						if(tgood.size() != 0){
+							string filt = "";
+							for(auto k = 0u; k < tbad.size(); k++){
+								const auto &trg = sp.tra_gl[tbad[k]];
+								auto c = trg.i; if(c == UNSET) c = trg.f;
+								const auto &co = sp.comp_gl[c];
+								
+								string pst = "";
+								for(auto cl2 = 0u; cl2 < K; cl2++){
+									if(cl2 != cl){
+										if(pst != "") pst += "|";
+										pst += sp.cla[cl2].comp[co.cla_comp[cl2]].name;
+									}
+								}
+								if(filt != "") filt += ", ";
+								filt += pst;
+							}
+							filt = trunc(filt,40);
+							err += " (for "+filt+")";
+						}
+					}
+				}
+			}
+			
+			if(err != ""){
+				if(model.nspecies > 1) err_msg += "For species '"+sp.name+"': ";
+				err_msg += err+". ";
+			}
+		}
+	
+		if(err_msg != ""){
+			err_msg = "High transition rates mean that there is a potential for a finite time step disretisation error. It is recommended that this model is run with a time step below '"+tstr(RATE_RECOMMEND/rmax,2)+"'. The following transitions are affected: "+err_msg;
+		}
+		else{
+			if(total_cpu >= 100 && rmax != 0 && rmax < 0.1*rate_thresh){
+				auto tmax = model.details.t_end-model.details.t_start;
+				auto dt = RATE_RECOMMEND/rmax;
+				if(dt > tmax/10) dt = tmax/10;
+				
+				err_msg = "This is being run with a relatively small time step. Analysis suggests it could be reliably run up to a time step '"+tstr(dt,2)+"'.";
+			}
+		}
+		
+		if(err_msg != ""){
+			err_msg = trunc(trim(err_msg),300);
+			auto line = "warning text=\""+err_msg+"\""+endli;
+			if(com_op == true){
+				cout << line;
+			}
+			else{
+				cout << endl;
+				display_warning(err_msg);
+				cout << endl;
+				fout << line;
+			}
+		}
+	}
+}
+
+
+/// Outputs information about generations (for PAS-MBP and ABC-SMC)
+void Output::output_generation(const vector <Particle> &part, ofstream &fout) const
+{
+	string param_out;
+			
+	string content;
+	for(const auto &pa : part){
+		auto value = param_value_from_vec(pa.param_val_prop);
+		content += param_output(pa,value);
+	}
+	param_out += generation_average(trace_init(),content);
+
+	string param_out_file;
+
+	if(sampledir != ""){
+		param_out_file = "generation.csv";
+
+		ofstream pout(sampledir+"/"+param_out_file);
+		check_open(pout,param_out_file);
+		pout << param_out;
+
+		param_out_file = "Sample/"+param_out_file;
+	}
+	else{  // Embeds output into file
+		param_out_file = "[["+endli+param_out+"]]";
+	}
+
+	stringstream ss;
+	ss << "inf-generation file=\""+param_out_file+"\"" << endl;
+	ss << endl;
+	
+	if(com_op == true) cout << ss.str();
+	else fout << ss.str();
+}
+
+
+/// Outputs diagnostic information
+void Output::output_diagnostic(const vector <Diagnostic> &diagnostic, ofstream &fout) const
+{
+	for(const auto &di :  diagnostic){
+		string diag_out_file;
+	
+		if(diagdir != ""){
+			diag_out_file = "diagnostic_"+tstr(di.ch)+".txt";
+
+			ofstream pout(diagdir+"/"+diag_out_file);
+			check_open(pout,diag_out_file);
+			pout << di.te;
+
+			diag_out_file = "Diagnostic/"+diag_out_file;
+		}
+		else{  // Embeds output into file
+			diag_out_file = "[["+endli+di.te+"]]";
+		}
+		
+		stringstream ss;
+		ss << "inf-diagnostics chain=" << di.ch << " file=\""+diag_out_file+"\"" << endl;
+		ss << endl;
+		
+		if(com_op == true) cout << ss.str();
+		else fout << ss.str();
+	}
+}
+
+			
 /// Initialises structure for trans_diag observations
 vector <TransDiagSpecies> Output::trans_diag_init() const
 {
@@ -2260,7 +2632,9 @@ Stat Output::get_statistic(vector <double> &vec) const
 	sum2 /= n;
 
 	stat.mean = sum;
-
+	auto var = sum2 - sum*sum; if(var < 0) var = 0;
+	stat.sd = sqrt(var);
+	
 	sort(vec.begin(),vec.end());
 
 	if(n >= 2) {
@@ -2335,4 +2709,34 @@ void Output::number_part(vector <Particle> &part) const
 	for(auto &pa : part){
 		if(pa.s == UNSET){ pa.s = num; num++;}
 	}
+}
+
+
+/// Outputs the final cpu time
+void Output::final_time(long sec) const 
+{
+	cout << endl << "Total CPU time: ";
+	
+	if(sec < 60){
+		cout << sec << " seconds" << endl;
+		return;
+	}
+	
+	cout << std::fixed;
+  cout << setprecision(1);
+		
+	auto min = sec/60.0;
+	if(min < 60){
+		cout << min << " minutes" << endl;
+		return;
+	}
+	
+	auto hour = min/60.0;
+	if(hour < 24){
+		cout << hour << " hours" << endl;
+		return;
+	}
+	
+	auto day = hour/24.0;
+	cout << day << " days" << endl;
 }

@@ -52,9 +52,9 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 #endif
 
 	auto command_line = extract_command_line(lines); // Converts from text lines to command lines
-
+	
 	load_data_files(command_line);
-
+		
 	// Import happens in three stages:
 	// (0) Determines if simulation, inference or post_sim
 	// (1) Simulation or inference details
@@ -62,7 +62,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	// (3) Load parameter information
 	// (4) Adds inidividuals to the system
 	// (5) Everything else
-
+	
 	for(auto loop = 1u; loop < 6; loop++){ 
 		print_diag("loop="+to_string(loop));
 
@@ -195,7 +195,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	output_error_messages(err_mess);
 	
-	percentage(10,100);
+	percentage(5,100);
 	
 	auto inf = false; if(model.mode == INF) inf = true;
 	
@@ -207,7 +207,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	create_population_erlang();        // If a population-based model convert erlang to rate
 	
-	percentage(20,100);
+	percentage(10,100);
 	
 	print_diag("loaded1");
 	
@@ -222,7 +222,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	markov_bp_convert();               // If all branches are rates then removes branching
 
 	print_diag("loaded4");
-	percentage(30,100);
+	percentage(15,100);
 	
 	//population_bp_rate_combine();      // Combines branching probabilities with rates in population model
 	
@@ -235,8 +235,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	check_import_correct();            // Checks import has been successfully acheived
 
 	print_diag("loaded7");
-	percentage(40,100);
-	
+	percentage(20,100);
+
 	global_comp_trans_init();          // Creates global compartments and transitions
 	
 	print_diag("loaded8");
@@ -247,8 +247,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 		for(const auto &wa : sp.warn) alert_line(wa.te,wa.line_num);    
 	}
 	
-	percentage(50,100);
-
+	percentage(25,100);
+	
 	print_diag("loaded9");
 	
 	model.set_hash_all_ind();           // Sets a hash table for all individuals
@@ -259,17 +259,17 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	print_diag("h1");
 
+	percentage(30,100);
+
+	create_equations(30,60);           // Creates equation calculations
+
 	percentage(60,100);
-	
-	create_equations();                // Creates equation calculations
-	
-	percentage(70,100);
 	
 	print_diag("h1a");
 	
-	simplify_equations();              // Simplifies equations as much as possible
+	further_simplify_equations(60,70); // Simplifies equations as much as possible
 
-	percentage(80,100);
+	percentage(70,100);
 	
 	print_diag("h1b");
 		
@@ -380,17 +380,19 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
  	
 	print_diag("h15");
 	
-	percentage(90,100);
+	percentage(75,100);
 	
-	for(auto &eq : model.eqn){
-		eq.calculate_linearise();        // Tries to linearise equations in terms of populations
-	}
+	linearise_eqn(75,85);               // Tries to linearise equations in terms of pops
+	
+	percentage(85,100);
 	
 	if(inf) param_affect_likelihood(); // Works out how changes to parameters affect likelihoods
 	
 	print_diag("h16");
 	
 	check_param_used();                // Checks all defined parameters used in the model (and vice versa)
+	
+	percentage(90,100);
 	
 	print_diag("h18");
 	
@@ -400,6 +402,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 		sp.init_pop_data_ref();          // Initialises reference from global compartment to obs         
 		for(const auto &wa : sp.warn) alert_line(wa.te,wa.line_num);    
 	}
+	
+	percentage(95,100);
 	
 	print_diag("h19");
 	
@@ -460,6 +464,9 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	output_error_messages(err_mess,true);
 
 	print_diag("Finish");
+	
+	//if(true) param_eqn_mem();
+	//wait();
 }
 
 
@@ -712,6 +719,7 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 	if(type == "sim-param") com = SIM_PARAM;
 	if(type == "sim-state") com = SIM_STATE;
 	if(type == "inf-param") com = INF_PARAM;
+	if(type == "inf-param-stats") com = INF_PARAM_STATS;
 	if(type == "inf-generation") com = INF_GEN;
 	if(type == "inf-state") com = INF_STATE;
 	if(type == "post-sim-param") com = POST_SIM_PARAM;
@@ -724,6 +732,8 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 	
 	if(type == "trans-diag") com = TRANS_DIAG;
 	
+	if(type == "warning") com = WARNING;
+		
 	if(com == EMPTY){ alert_import("Command '"+type+"' not recognised."); return syntax_error();}
 	
 	auto num = double(frag.size()-1)/3;
@@ -821,7 +831,8 @@ void Input::alert(string st)
 /// Adds a new error message to the list
 void Input::add_error_mess(unsigned int line_num, string st, ErrorType type)
 {
-	if(st.length() > 0 && st.substr(st.length()-1,1) != ".") st += ".";
+	add_full_stop(st);
+	
 	ErrorMess em;
 	em.line_num = line_num;
 	em.error = st;
@@ -854,9 +865,9 @@ void Input::alert_import(string st, bool fatal)
 
 
 /// Error message for imported file (for specific line)
-void Input::alert_line(string st, unsigned int line)                               
+void Input::alert_line(string st, unsigned int line, bool fatal)                         
 {
-	if(st.length() > 0 && st.substr(st.length()-1,1) != ".") st += ".";
+	add_full_stop(st);
 	
 	auto i = 0u; while(i < error_mess.size() && error_mess[i].line_num != line) i++;
 	if(i == error_mess.size() || line == UNSET){
@@ -866,13 +877,17 @@ void Input::alert_line(string st, unsigned int line)
 	if(fatal_error() == true && error_mess.size() >= ERR_MSG_MAX){
 		output_error_messages("Total error limit exceeded");
 	}
+	
+	if(fatal){
+		output_error_messages(err_mess); 
+	}
 }
 
 
 /// Alerts that an equation is incorectly specified
 void Input::alert_equation(const EquationInfo &eqi, const string &warn)
 {
-	alert_line("For equation '"+eqi.te_raw+"': "+warn,eqi.line_num); 
+	alert_line("For equation '"+eqi.te_raw+"': "+warn,eqi.line_num,true); 
 }
 
 
@@ -995,7 +1010,8 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 	
 	case SIM_PARAM: case SIM_STATE: dummy_file_command(); break;
 	case POST_SIM_PARAM: case POST_SIM_STATE: dummy_file_command(); break;
-	case INF_PARAM: dummy_file_command(); break;
+	case INF_PARAM: case INF_PARAM_STATS: dummy_file_command(); break;
+	case WARNING: warning_command(); break;
 	case INF_DIAGNOSTICS: dummy_file_command(); break;
 	case INF_GEN: dummy_file_command(); break;
 	
@@ -1232,71 +1248,18 @@ void Input::check_param_used()
 void Input::create_param_vector()
 {
 	auto N = model.param.size();
-	
-	// This has been moved to "use" in parameter
-	/*
-	// Finds which parameters are actually used in the equations
-	vector < vector <bool> > eqn_used;
-	eqn_used.resize(N);
-	for(auto th = 0u; th < N; th++){
-		const auto &par = model.param[th];
-		eqn_used[th].resize(par.N,false);
-	}
-	
-	for(auto &eq : model.eqn){
-		for(auto &ca : eq.calc){
-			for(auto &it : ca.item){
-				if(it.type == PARAMETER){
-					if(it.num >= model.param.size()) emsg_input("Out of range1");
-					if(it.index >= model.param[it.num].N) emsg_input("Out of range2");
-					eqn_used[it.num][it.index] = true;
-				}
-			}
-		}
-	
-		if(eq.ans.type == PARAMETER){
-			if(eq.ans.num == UNSET) emsg_input("done");
-			eqn_used[eq.ans.num][eq.ans.index] = true;
-		}
-	}
-	
-	for(const auto &sp : model.species){
-		for(const auto &ieg : sp.ind_eff_group){
-			auto N = ieg.list.size(); 
-			for(auto j = 0u; j < N; j++){
-				for(auto i = 0u; i < N; i++){
-					eqn_used[ieg.omega[j][i]][0] = true;
-				}
-			}
-		}
-		
-		for(const auto &fe : sp.fix_effect){
-			eqn_used[fe.th][0] = true;
-		}
-	}
-	
-	if(false){
-		for(auto th = 0u; th < N; th++){
-			const auto &par = model.param[th];
-			cout << par.name << endl;
-			auto imax = eqn_used[th].size(); if(imax > 100) imax = 100;
-			for(auto i = 0u; i < imax; i++) cout << eqn_used[th][i] << " ";
-			cout << endl;
-		}
-		emsg_input("Shows parameters used");
-	}
-	*/
-	
+
 	vector < vector <unsigned int> > needed;
 	
 	needed.resize(N);
 
 	for(auto th = 0u; th < N; th++){		
 		const auto &par = model.param[th];
-		for(auto i = 0u; i < par.parent.size(); i++){
-			for(auto j = 0u; j < par.parent[i].size(); j++){
-				auto th2 = par.parent[i][j].th;
-			
+		
+		for(const auto &ele : par.element){
+			for(const auto &pa : ele.parent){
+				auto th2 = pa.th;
+				
 				if(th2 == th){
 					alert_import("In parameter '"+par.name+"' error with one element dependent on another element");
 					return;
@@ -1337,32 +1300,38 @@ void Input::create_param_vector()
 		auto th = list[i];
 		auto &par = model.param[th];
 		
-		par.param_vec_ref.resize(par.N,UNSET);
-		
 		if(par.variety != CONST_PARAM || par.factor){	
 			for(auto j = 0u; j < par.N; j++){
-				if(removeparamvec_speedup == false || 
-				   //eqn_used[th][j] == true || par.spline_info.on == true){
-				   par.use[j] == true || par.spline_info.on == true){
-					par.param_vec_ref[j] = model.param_vec.size();
+				auto ref = par.element_ref[j];
+				if(ref != UNSET){
+					auto &ele = par.element[ref];
 					
-					ParamVecEle pr; 
-					pr.name = get_param_name_with_dep(par,par.dep,j);
-					pr.th = th; 
-					pr.index = j;
-					pr.prior = par.prior[j];
-					pr.variety = par.variety;
-					pr.ppc_resample = false;
-					pr.ref = UNSET;
-				
-					pr.prop_pos = false;
-					if(pr.variety == PRIOR_PARAM || pr.variety == DIST_PARAM){
-						if(pr.prior.type != FIX_PR){
-							pr.prop_pos = true;
+					if(removeparamvec_speedup == false || ele.used == true || par.spline_info.on == true){
+						ele.param_vec_ref = model.param_vec.size();
+					
+						ParamVecEle pr; 
+						pr.name = get_param_name_with_dep(par,par.dep,j);
+						pr.th = th; 
+						pr.index = j;
+						if(par.variety == PRIOR_PARAM || par.variety == DIST_PARAM){
+							pr.prior_ref = ele.prior_ref;
 						}
+						else{
+							pr.prior_ref = UNSET;
+						}
+						pr.variety = par.variety;
+						pr.ppc_resample = false;
+						pr.ref = UNSET;
+				
+						pr.prop_pos = false;
+						if(pr.variety == PRIOR_PARAM || pr.variety == DIST_PARAM){
+							if(model.prior[pr.prior_ref].type != FIX_PR){
+								pr.prop_pos = true;
+							}
+						}
+						
+						model.param_vec.push_back(pr);
 					}
-					
-					model.param_vec.push_back(pr);
 				}
 			}		 
 		}
@@ -1373,21 +1342,25 @@ void Input::create_param_vector()
 		for(auto &ca : eq.calc){
 			for(auto &it : ca.item){
 				if(it.type == PARAMETER){
-					if(it.num >= model.param.size()) emsg_input("Out of range1");
-					if(it.index >= model.param[it.num].param_vec_ref.size()) emsg_input("Out of range2");
-					it.num = model.param[it.num].param_vec_ref[it.index];
-					it.index = UNSET;
+					if(it.num >= eq.param_ref.size()) emsg_input("Out of range0");
+					const auto &pr = eq.param_ref[it.num];
+					const auto &par = model.param[pr.th];
+					it.type = PARAMVEC;
+					it.num = par.get_param_vec(pr.index); 
+					if(it.num == UNSET) emsg("pvec element unset");
 				}
 			}
 		}
 	
 		if(eq.ans.type == PARAMETER){
-			eq.ans.num = model.param[eq.ans.num].param_vec_ref[eq.ans.index];
-			eq.ans.index = UNSET;
+			const auto &pr = eq.param_ref[eq.ans.num];
+			const auto &par = model.param[pr.th];
+			eq.ans.type = PARAMVEC;
+			eq.ans.num = par.get_param_vec(pr.index);
 		}
 	}
 	model.nparam_vec = model.param_vec.size();
-	
+
 	// Creates a vector of parameters which can undergoe proposals
 	
 	for(auto th = 0u; th < model.nparam_vec; th++){
@@ -1398,7 +1371,7 @@ void Input::create_param_vector()
 		}			
 	}
 	model.nparam_vec_prop = model.param_vec_prop.size();
-	
+
 	if(false){
 		auto imax = model.nparam_vec;
 		if(imax > 100) imax = 100;
@@ -1425,31 +1398,37 @@ void Input::create_pop_ref()
 	}
 }
 
-
+	
 /// Simplifies equations as much as possible
-void Input::simplify_equations()
+void Input::further_simplify_equations(unsigned int per_start, unsigned int per_end)
 {
 	if(simplify_eqn == false) return; 
+	
+	auto first = true;
 	
 	bool flag_global;
 	do{
 		flag_global = false;
 			
 		// If a reparameterised parameter is used and it is constant than substitutes 
-		for(auto &eq : model.eqn){
+		for(auto e = 0u; e < model.eqn.size(); e++){
+			if(first) percentage(per_start+double((per_end-per_start))*e/model.eqn.size(),100);
+			auto &eq = model.eqn[e];
+		
 			auto flag = false;
 			for(auto &ca : eq.calc){
 				for(auto &it : ca.item){
 					if(it.type == PARAMETER){
+						const auto &pr = eq.param_ref[it.num];
 						
-						const auto &par = model.param[it.num];
+						const auto &par = model.param[pr.th];
 						if(par.variety == REPARAM_PARAM){
-							const auto &eqn = model.eqn[par.value[it.index].eq_ref];
+							const auto &eqn = model.eqn[par.get_eq_ref(pr.index)];
 							
 							if(eqn.calc.size() == 0){
 								if(eqn.ans.type == NUMERIC){
 									it.type = NUMERIC;
-									it.constant = eqn.ans.constant;
+									it.num = eq.add_cons(eqn.cons[eqn.ans.num]);
 									flag = true;
 								}
 							}
@@ -1463,5 +1442,6 @@ void Input::simplify_equations()
 				flag_global = true;
 			}
 		}
+		first = false;
 	}while(flag_global == true);
 }

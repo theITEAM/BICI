@@ -101,7 +101,7 @@ vector <Event> IndEvSampler::simulate_events(unsigned int i, const Event &e_init
 				auto trg = fnm.trg;
 				const auto &tra = sp.tra_gl[trg];
 			
-				if(tra.i != c) trg = tra.transform[c];
+				if(tra.i != c) trg = sp.tr_trans(trg,c);
 				
 				const auto &tra2 = sp.tra_gl[trg];
 				if(tra2.i != c) emsg("Shoudl be c");

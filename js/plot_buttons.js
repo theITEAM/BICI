@@ -747,9 +747,16 @@ Layer.prototype.plot_button = function (bu,ov)
 					}
 				}
 				
-				if(back == true) fill_rectangle(x,y,dx,dy,LLBLUE); 
+				if(back == true) fill_rectangle(x,y,dx,dy,LLBLUE,LLBLUE); 
 				
-				if(bu.underline == true) fill_rectangle(x,y,dx,dy,LLRED);
+				if(sel == undefined){
+					let ch_cu_back = bu.ch_cu_back;
+					if(ch_cu_back != undefined && find_in(ch_cu_back,curi) != undefined){
+						fill_rectangle(x,y,dx,dy,LGREY,LGREY); 
+					}
+				}
+				
+				if(bu.underline == true) fill_rectangle(x,y,dx,dy,LLRED,LLRED);
 			
 				if(curi == i){
 					if(inter.cursor.on == 1){
@@ -944,7 +951,10 @@ Layer.prototype.plot_button = function (bu,ov)
 		break;
 	
 	case "EquationBack":
-		draw_round_rectangle(x,y,dx,dy,1.5,GREY_BACK,"#000000");  
+		{
+			let mar = 0.1;
+			draw_round_rectangle(x+mar,y+mar,dx-2*mar,dy-2*mar,1.5,GREY_BACK,"#000000");  
+		}
 		break;
 	
 	case "EquationAddBack":

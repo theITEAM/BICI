@@ -37,10 +37,16 @@ class Species   	                         // Stores details of a species
 
 		vector <TransGlobal> tra_gl;           // Global transitions  
 		
+		bool tform_set;                        // Determines if tform is set  
+		
+		vector < vector <int> >	tr_shift;      // If tform not set this is used  
+		
 		vector < vector < vector <unsigned int> > >  trg_from_tr; // Converts from tr to trg [cgl][cl][tr]
 		
 		// Convert from a global compartment to another based on classification cl being in c
 		vector < vector < vector <unsigned int> > > comp_global_convert; // [cgl][cl][c]
+	
+		bool comp_global_convert_set;
 	
 		vector < vector <bool> > tra_ie_affect;// Set if an ie affects a transition
 		
@@ -156,6 +162,8 @@ class Species   	                         // Stores details of a species
 		double calc_enter_prob(unsigned int c, unsigned int entref, const vector <double> &obs_eqn_value) const;
 		vector <unsigned int> get_cv_list(unsigned int ie, const vector <Param> &param, const vector <Equation> &eqn) const;
 		vector < vector <double> > calculate_omega_basic(unsigned int g, const vector <double> &param_val, const vector <Param> &param) const;
+		unsigned int tr_trans(unsigned int trg, unsigned int c) const;
+		unsigned int get_comp_global_convert(unsigned int cgl, unsigned int cl, unsigned int c) const;
 		
 	// In 'species_data.cc':
 	public: 
@@ -172,7 +180,7 @@ class Species   	                         // Stores details of a species
 		void jiggle_data();
 		bool is_pop_num_fixed() const;
 		void nm_trans_incomp_info();
-		unsigned int get_tra_m(const TransGlobal &tra, const Event &ev_orig) const;
+		unsigned int get_tra_m(unsigned int tr, const Event &ev_orig) const;
 		string tr_swap_name(unsigned int cl, const vector <TrSwap> &tswa) const;
 		vector <unsigned int> get_vec_tr_swap(unsigned int c, const vector <TrSwap> &start) const;
 		vector <unsigned int> get_vec_tr_swap_mid(unsigned int st, unsigned int num, const vector <EventCl> &timeline) const;

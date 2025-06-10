@@ -112,14 +112,16 @@ vector <Event> IndEvSampler::simulate_single_events(unsigned int i, unsigned int
 					switch(eve.type){
 					case M_TRANS_EV: case NM_TRANS_EV:
 						{
-							const auto &tra = sp.tra_gl[eve.tr_gl];	
+							auto trg = eve.tr_gl;
+							const auto &tra = sp.tra_gl[trg];	
 					
 							if(tra.i != c){
-								eve.tr_gl = tra.transform[c];
-								if(eve.tr_gl == UNSET){ illegal = true; return ev_new;}					
+								trg = sp.tr_trans(trg,c);
+								if(trg == UNSET){ illegal = true; return ev_new;}	
+								eve.tr_gl = trg;								
 							}							
 							
-							const auto &tra2 = sp.tra_gl[eve.tr_gl];		
+							const auto &tra2 = sp.tra_gl[trg];		
 							
 							if(tra2.i != c) emsg("SHould be c other");
 					
@@ -156,8 +158,9 @@ vector <Event> IndEvSampler::simulate_single_events(unsigned int i, unsigned int
 					auto trg = fnm.trg;
 					const auto &tra = sp.tra_gl[trg];
 				
-					if(tra.i != c) trg = tra.transform[c];
-			
+					if(tra.i != c){
+						trg = sp.tr_trans(trg,c);
+					}			
 					const auto &tra2 = sp.tra_gl[trg];
 				
 					if(tra2.i != c) emsg("Shoudl be c future");

@@ -11,9 +11,9 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-simulation start=0 end=100 timestep=0.5
+simulation start=0 end=100 timestep=0.1
 
-inference start=0 end=100 timestep=0.5 nchain=3
+inference start=0 end=100 timestep=0.1 nchain=3
 
 post-sim start=0 end=100
 
@@ -56,11 +56,11 @@ trans-data name="I->R" obsrange="all" file="trans-data-2.csv"
 
 param name="c" value="0.3" prior="uniform(0,1)"
 
-param name="m" value="8" prior="uniform(0,20)"
+param name="m" value="12" prior="uniform(0,20)"
 
 param name="α" value="2.5" prior="uniform(1,5)"
 
-param name="β" value="3" prior="uniform(1,5)"
+param name="β" value="1.8" prior="uniform(1,5)"
 
 param name="Δ" value="5" prior="uniform(3,7)"
 

@@ -3034,12 +3034,12 @@ function graph_spline_calculate(result,rpf,burn)
 	
 	let par = result.param[spline.th];
 
-	let col_list = get_col_list(par.dep,result,spline.comb_list.length);
+	let col_list = get_col_list(par.dep,result,spline.co_list.length);
 	
 	let line_ref = [];
 	
-	for(let i = 0; i < spline.comb_list.length; i++){  // There is potential for filtering
-		line_ref.push({index:spline.comb_list[i].index, col:col_list[i], name:spline.comb_list[i].name});
+	for(let i = 0; i < spline.co_list.length; i++){  // There is potential for filtering
+		line_ref.push({index:spline.co_list[i].index, col:col_list[i], name:spline.co_list[i].name});
 	}
 	
 	let line_max = false;
@@ -3308,13 +3308,13 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 					if(list[list.length-1].length != ntimes) error("Should be same length");
 					list.pop();
 					
-					let comb_list = generate_comb_list(list);
+					let co_list = generate_co_list(list);
 				
-					let col_list = get_col_list(par.dep,so,comb_list.length);
+					let col_list = get_col_list(par.dep,so,co_list.length);
 
 					let sim_flag = false;
 				
-					let imin = 0, imax = comb_list.length;
+					let imin = 0, imax = co_list.length;
 					if(view == "Graph (split)" && rpf){
 						imin = rpf.sel_paramview.radio_split.value; imax = imin+1;
 					}
@@ -3325,7 +3325,7 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 						let line = [];
 						let point = [];
 						
-						let index = comb_list[i].index;
+						let index = co_list[i].index;
 						
 						let vec_val = get_element(value,index);
 						let type = "Line";
@@ -3489,19 +3489,40 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 					}
 					
 					let col_list = get_col_list(par.dep,so,vec.length);
-
+					
+					let sim_val_on = false;
+					if(par.variety != "const" && rpf && rpf.siminf != "sim" && rpf.sim_val.check == true && 
+						par.value && par.value.length > 0){
+						sim_val_on = true;
+					}
+					
 					for(let i = 0; i < vec.length; i++){
 						let ind = [i]; 
 						
 						data.push({type:"Bar", name:par.list[0][i], x:i+0.5, y:value[i], thick:bar_thick, col:col_list[i]});
+						
 						if(CImin != undefined){
 							data.push({type:"ErrorBar", x:i+0.5, ymin:CImin[i], y:value[i], ymax:CImax[i], col:BLACK});
 						}
+						
+						if(sim_val_on){
+							let val = Number(get_element(par.value,ind));	
+							
+							let point = [];
+							let mar = 0.1;
+							point.push({x:i+mar, y:val}); point.push({x:i+1-mar, y:val});
+								
+							data.push({point:point, col:SIM_VALUE_COL, type:"Line", thick:SIM_VALUE_THICK, dash:SIM_VALUE_DASH});
+						}
+					}
+					
+					if(sim_val_on){
+						key.push({type:"Line", te:"Sim. Val.", dash:SIM_VALUE_DASH, thick:SIM_VALUE_THICK, col:SIM_VALUE_COL});
 					}
 					
 					let claa = get_cla_from_index(so,par.dep[0]);
 				
-					return {type:"Graph define", variety:"Histogram", view:"Histogram", data:data, op:{x_label:claa.name, x_param:false, y_label:"Value"}};
+					return {type:"Graph define", variety:"Histogram", view:"Histogram", data:data, op:{x_label:claa.name, x_param:false, y_label:"Value", key:key}};
 				}
 				break;
 				
@@ -4293,10 +4314,11 @@ function get_param_stats(th,index,result,rpf,burn)
 	else{
 		for(let s = 0; s < result.par_sample.length; s++){
 			let samp = result.par_sample[s];
-		
 			if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
-				if(index == undefined) vec.push(samp.param[th]);
-				else vec.push(get_param_val(index,samp.param[th],par));
+				let samp_val;
+				if(index == undefined) samp_val = samp.param[th];
+				else samp_val = get_param_val(index,samp.param[th],par);
+				vec.push(Number(samp_val));
 			}
 		}
 	}
@@ -4306,7 +4328,7 @@ function get_param_stats(th,index,result,rpf,burn)
 	mean = stat.mean.toPrecision(pre); 
 	if(stat.CImin != stat.mean) CImin = stat.CImin.toPrecision(pre);
 	if(stat.CImax != stat.mean) CImax = stat.CImax.toPrecision(pre);
-	
+
 	ESS = get_effective_sample_size(vec);
 	
 	if(result.chains.length > 1 && chsel == "All"){
@@ -4327,7 +4349,6 @@ function get_param_stats(th,index,result,rpf,burn)
 		
 		GR = get_Gelman_Rubin_statistic(cha);
 	}
-	//}
 	
 	return { name:name, mean:mean, CImin:CImin, CImax:CImax, ESS:ESS, GR:GR};
 }
@@ -4412,7 +4433,7 @@ function setup_distribution(result,rpf,burn)
 		let show_mean = rpf.dist_settings.show_mean.check;
 		if(line.length > 1) show_mean = false;
 
-		let clip = get_prior_clip(par);
+		let clip = get_prior_clip(par,ind);
 		
 		distribution_add_data_line(vec,line[li].name,col,data,key,rpf,show_mean,clip.min,clip.max);
 		if(key.length > KEY_LINE_MAX){ line_max = true; break;}
@@ -4579,7 +4600,7 @@ function setup_distribution(result,rpf,burn)
 
 
 /// Gets clipped edges based on a parameter prior
-function get_prior_clip(par)
+function get_prior_clip(par,ind)
 {
 	let clip_min, clip_max;
 		

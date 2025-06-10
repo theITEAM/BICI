@@ -166,7 +166,7 @@ function add_examples_buts(lay)
 	
 	ex_mod.push({te:"E) Individual-based variation",help:"These examples look at how individual-based variation can be incorporated into the model"+mod_mess, gap:gap});
 	ex_mod.push({te:"E1: Individual fixed effect applied to a transition", mod:"M1.2", link:true, mod_type:"IBM"}); 
-	ex_mod.push({te:"E2: Fixed-effect applied to a population", link:true, mod_type:"IBM"}); 
+	ex_mod.push({te:"E2: Individual fixed effect applied to a population", link:true, mod_type:"IBM"}); 
 	ex_mod.push({te:"E3: Individual effect applied to a transition", mod:"M1.2", link:true, mod_type:"IBM"}); 
 	ex_mod.push({te:"E4: Correlated individual effect applied to a transition", mod:"M1.2", link:true, mod_type:"IBM"});
 	ex_mod.push({te:"E5: Correlated individual effect applied to a population", mod:"M5.3", link:true, mod_type:"IBM"});

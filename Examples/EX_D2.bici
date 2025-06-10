@@ -13,7 +13,7 @@ description text="description.txt"
 
 simulation start=0 end=150 timestep=0.5
 
-inference start=0 end=150 timestep=0.5 nchain=3
+inference start=0 end=150 timestep=0.5 nchain=3 anneal="power" power="0.01"
 
 post-sim start=0 end=150
 
@@ -40,7 +40,7 @@ init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
 
 init-pop type="fixed" file="init-pop-People.csv"
 
-pop-data filter="DS=file" error="normal:10%" file="pop-data.csv"
+pop-data filter="DS=file" error="poisson" file="pop-data.csv"
 
 
 

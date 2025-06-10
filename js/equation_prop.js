@@ -620,48 +620,96 @@ function check_population(te,icur,eqn)
 		}
 	}
 	
-	// Removes any individual effects
-	do{
-		let j = 0; while(j < te.length && te.substr(j,1) != "[") j++;
-		if(j < te.length){
-			let jst = j;
-			while(j < te.length && te.substr(j,1) != "]") j++;
-			if(j == te.length){
-				eqn.warn.push({te:"Individual effect should have a right bracket ']'", cur:icur+jst, len:j-jst});
-			}
-			else{
-				let ie = te.substr(jst+1,j-(jst+1));
-				
-				if(ie == ""){
-					eqn.warn.push({te:"Individual effect in population '[]' must contain text", cur:icur+jst, len:j-jst});
-				}
-				
-				check_ie(ie,p_name,icur+jst+1,eqn);
-				te = te.substr(0,jst)+te.substr(j+1);
-			}
-		}
-		else break;
-	}while(true);
+	let spl = te.split(";");
+
+	let start = "In population {"+te+"}: ";
 	
-	// Removes any fixed effects
-	{
-		let j = 0; 
-		while(j < te.length){
-			while(j < te.length && te.substr(j,1) != "〈") j++;
+	if(spl.length > 2){
+		eqn.warn.push({te:start+"More than one ';' unexpected", cur:icur, len:te.length});
+		return;
+	}
+	
+	let test = te;
+	
+	if(spl.length == 2){
+		let icur2 = icur+spl[0].length+1;
+		te = spl[1];
+	
+		let fl = false;
+		
+		// Removes any individual effects
+		do{
+			let j = 0; while(j < te.length && te.substr(j,1) != "[") j++;
 			if(j < te.length){
+				fl = true;
 				let jst = j;
-				while(j < te.length && te.substr(j,1) != "〉") j++;
+				while(j < te.length && te.substr(j,1) != "]") j++;
 				if(j == te.length){
-					eqn.warn.push({te:"Fixed effect should have a right bracket '〉'", cur:icur+jst, len:j-jst});
-					return;
+					eqn.warn.push({te:start+"Individual effect should have a right bracket ']'", cur:icur2+jst, len:j-jst});
 				}
 				else{
-					let fe = te.substr(jst+1,j-(jst+1));
-					check_fe(fe,p_name,icur+jst+1,eqn);
+					let ie = te.substr(jst+1,j-(jst+1));
+					
+					if(ie == ""){
+						eqn.warn.push({te:start+"Individual effect '[]' must contain text", cur:icur2+jst, len:j-jst+1});
+					}
+					
+					check_ie(ie,p_name,icur2+jst+1,eqn);
 					te = te.substr(0,jst)+te.substr(j+1);
-					j = jst;
 				}
 			}
+			else break;
+		}while(true);
+		
+		// Removes any fixed effects
+		{
+			let j = 0; 
+			while(j < te.length){
+				while(j < te.length && te.substr(j,1) != "〈") j++;
+				if(j < te.length){
+					fl = true;
+					let jst = j;
+					while(j < te.length && te.substr(j,1) != "〉") j++;
+					if(j == te.length){
+						eqn.warn.push({te:start+"Fixed effect should have a right bracket '〉'", cur:icur2+jst, len:j-jst});
+						return;
+					}
+					else{
+						let fe = te.substr(jst+1,j-(jst+1));
+						check_fe(fe,p_name,icur2+jst+1,eqn);
+						te = te.substr(0,jst)+te.substr(j+1);
+						j = jst;
+					}
+				}
+			}
+		}
+		
+		for(let k = 0; k < te.length; k++){
+			let ch = te.substr(k,1);
+			if(ch != "×" && ch != "*" && ch != " "){
+				eqn.warn.push({te:start+"Did not expect character '"+ch+"' after ';'", cur:icur2, len:spl[1].length});
+				return;
+			}
+		}				
+	
+		if(fl == false){
+			eqn.warn.push({te:start+"Expected content after ';'", cur:icur2, len:spl[1].length});
+				return;
+		}
+		te = spl[0];
+	}
+	
+	// Checks that population individual/fixed effects are divided correctly
+	for(let k = 0; k < te.length; k++){
+		let ch = te.substr(k,1);
+		if(ch == "〈"){
+			eqn.warn.push({te:start+"Fixed effects must be placed after ';' divider", cur:icur, len:test.length});
+			return;
+		}
+		
+		if(ch == "["){
+			eqn.warn.push({te:start+"Individual effects must be placed after ';' divider", cur:icur, len:test.length});
+			return;
 		}
 	}
 	
@@ -676,11 +724,11 @@ function check_population(te,icur,eqn)
 	
 	// Goes through compartment names
 	let icur3 = icur;
-	if(te_comp != "" && te_comp != "All"){
+	if(te_comp != "" && te_comp.trim().toLowerCase() != "all"){
 		let spl = te_comp.split(",");
 		
 		for(let i = 0; i < spl.length; i++){
-			let tex = spl[i];
+			let tex = spl[i].trim();
 			
 			let index = remove_prime(tex);
 		
@@ -692,7 +740,7 @@ function check_population(te,icur,eqn)
 				eqn.index_name_list.push({ index_name:index, icur:icur3});
 			
 				if(cl_ref[cl_sp] != undefined){
-					eqn.warn.push({te:"Cannot have multiple compartments in the same classification", cur:cl_ref[cl_sp],len:icur3+te.length-cl_ref[cl_sp]});
+					eqn.warn.push({te:start+"Cannot have multiple compartments in the same classification", cur:cl_ref[cl_sp],len:icur3+te.length-cl_ref[cl_sp]});
 				}
 				cl_ref[cl_sp] = icur3;
 			}
@@ -729,11 +777,11 @@ function check_population(te,icur,eqn)
 					icur4 += te2.length+1;
 				}
 				if(warn != undefined){
-					eqn.warn.push({te:warn, cur:icur3, len:tex.length});
+					eqn.warn.push({te:start+warn, cur:icur3, len:tex.length});
 				}
 				
 				if(cl_ref[cl_sp] != undefined){
-					eqn.warn.push({te:"Cannot have multiple compartments in the same classification", cur:cl_ref[cl_sp],len:icur3+te.length-cl_ref[cl_sp]});
+					eqn.warn.push({te:start+"Cannot have multiple compartments in the same classification", cur:cl_ref[cl_sp],len:icur3+te.length-cl_ref[cl_sp]});
 				}
 				cl_ref[cl_sp] = icur3;
 			}
@@ -866,10 +914,14 @@ function check_valid_name(name,icur,eqn,type)
 	for(let j = 0; j < name.length; j++){
 		let ch = name.substr(j,1);
 		if(chnotallowed.includes(ch) || name_notallow.includes(ch)){
-			//let k = 0; while(k < char_not_allowed.length && ch != char_not_allowed[k]) k++;
-			//if(k < char_not_allowed.length){
 			if(ch == "_") ch = "underscore";
 			eqn.warn.push({te:"In "+type+" name '"+name+"' the character '"+ch+"' is not expected", cur:icur+j, len:1});
+		}
+		
+		if(ch == "^"){
+			if(type == "individual effect" || type == "fixed effect"){ 
+				eqn.warn.push({te:"In "+type+" name '"+name+"' the superscript character '"+ch+"' is not allowed", cur:icur+j, len:1});
+			}
 		}
 	}
 }

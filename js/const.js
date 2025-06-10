@@ -13,15 +13,15 @@ const try_on = true;                              // Deterimines if try/catch is
 const turn_off_random_seed = false;               // Used in testing (false)
 let debug = false;                                // Determines if debugger used (false)
 let testing = false;                              // Used logo to load up results (false)
+let load_map_fast = false;                        // If loads up world map from local computer
 
-let win_linux = true;                             // When working on win running linux 
-if(win_linux){ testing = true; debug = true;}
+let win_linux = false;//true;                             // When working on win running linux 
+if(win_linux){ testing = true; debug = true; load_map_fast = true;}
 
 let make_file = false;                            // Determines if makes file or runs
 let thick_line = false;                           // Used for making figures
 let big_eqn = false;
 const graph_dia = false;                          // Used to diagnose problems with graphs
-const load_map_fast = false;                      // If loads up world map from local computer
 const test_comment = false;                       // Used when checking help comments are correct 
 const make_fig = false;                           // Sets editor to make figures for manual
 // Here the leters A-H are pressed to add letters to the screen.
@@ -31,7 +31,76 @@ const set_default = false;                        // Used to set default when lo
 
 const check_clone_on = true;                      // Turn on to check if cloning is working
 
-const command_list = ["species","classification","class","set","view","compartment","comp","comp-all","transition","trans","trans-all","data-dir","description","desc","label","box","parameter","param","derived","der","init-pop","add-pop","remove-pop","add-ind","remove-ind","move-ind","init-pop-sim","add-pop-sim","remove-pop-sim","add-ind-sim", "remove-ind-sim","move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim","comp-data","trans-data","test-data","pop-data","pop-trans-data","ind-effect-data","ind-group-data","genetic-data","simulation","sim","inference","inf","post-sim","posterior-simulation","ind-effect","fixed-effect","sim-param","sim-state","inf-param","inf-generation","inf-state","trans-diag","post-sim-param","post-sim-state","inf-diagnostics","map","post-sim","post-simulation","param-mult"];
+const command_list = [
+{na:"species",ti:0},
+{na:"classification",ti:0},
+{na:"class",ti:0},
+{na:"set",ti:0},
+{na:"view",ti:0},
+{na:"compartment",ti:0.01},
+{na:"comp",ti:0.01},
+{na:"comp-all",ti:0.1},
+{na:"transition",ti:0.01},
+{na:"trans",ti:0.01},
+{na:"trans-all",ti:0.1},
+{na:"data-dir",ti:0},
+{na:"description",ti:0},
+{na:"desc",ti:0},
+{na:"label",ti:0},
+{na:"box",ti:0},
+{na:"parameter",ti:1},
+{na:"param",ti:1},
+{na:"derived",ti:0},
+{na:"der",ti:0},
+{na:"init-pop",ti:0},
+{na:"add-pop",ti:0},
+{na:"remove-pop",ti:0},
+{na:"add-ind",ti:0},
+{na:"remove-ind",ti:0},
+{na:"move-ind",ti:0},
+{na:"init-pop-sim",ti:0},
+{na:"add-pop-sim",ti:0},
+{na:"remove-pop-sim",ti:0},
+{na:"add-ind-sim",ti:0},
+{na: "remove-ind-sim",ti:0},
+{na:"move-ind-sim",ti:0},
+{na:"add-pop-post-sim",ti:0},
+{na:"remove-pop-post-sim",ti:0},
+{na:"add-ind-post-sim",ti:0},
+{na:"remove-ind-post-sim",ti:0},
+{na:"move-ind-post-sim",ti:0},
+{na:"comp-data",ti:0},
+{na:"trans-data",ti:0},
+{na:"test-data",ti:0},
+{na:"pop-data",ti:0},
+{na:"pop-trans-data",ti:0},
+{na:"ind-effect-data",ti:0},
+{na:"ind-group-data",ti:0},
+{na:"genetic-data",ti:0},
+{na:"simulation",ti:0},
+{na:"sim",ti:0},
+{na:"inference",ti:0},
+{na:"inf",ti:0},
+{na:"post-sim",ti:0},
+{na:"posterior-simulation",ti:0},
+{na:"ind-effect",ti:0},
+{na:"fixed-effect",ti:0},
+{na:"sim-param",ti:0.5},
+{na:"sim-state",ti:1},
+{na:"inf-param",ti:5},
+{na:"inf-param-stats",ti:1},
+{na:"inf-generation",ti:1},
+{na:"inf-state",ti:10},
+{na:"trans-diag",ti:1},
+{na:"post-sim-param",ti:5},
+{na:"post-sim-state",ti:10},
+{na:"inf-diagnostics",ti:0.1},
+{na:"map",ti:5},
+{na:"post-sim",ti:0},
+{na:"post-simulation",ti:0},
+{na:"param-mult",ti:0},
+{na:"warning",ti:0}
+];
 
 // Lists all commands which need to load files
 const data_command_list = ["init-pop", "add-pop", "remove-pop", "add-ind", "remove-ind", "move-ind", "init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data","param-mult"];
@@ -125,6 +194,7 @@ const outline_mary = 0.1;                          // Outline y margin for input
 const inputbox_fontsi = 1.1;                       // Font size for input box
 const inputbox_linesi = 1.28;                      // The line size for input box
 const equation_fontsi = 1.9;                       // Font size for equation editor
+const equation_brasi = 2.1;                        // Font size for bracket
 const equation_linesi = 2.4;                       // Line size for equation editor
 const textbox_fontsi = 1.1;                        // Font size for text box
 const textbox_linesi = 1.4;                        // The line size for text box
@@ -172,21 +242,14 @@ const source_dist_pos = ["exp(rate)","exp(mean)"];
 const prior_pos = ["uniform","exp","normal","gamma","log-normal","beta","bernoulli","fix"];
 const prior_factor_pos = ["mdir"];
 const prior_pos_positive = ["uniform","exp","gamma","log-normal","fix"];
-//const prior_zero_one = ["uniform","beta","fix"];
 
-//const data_types = ["System", "Individual", "Population", "Additional"];
 const data_types = ["Init. Cond.", "Individual", "Population", "Additional"];
 
-
-
-//const char_not_allowed = [":",",",".","!","[","]","{","}","〈","〉","|","*","_","×","-","+","<",">"]; 
-//const char_not_allowed = [":",",",".","!","[","]","{","}","〈","〉","|","*","_","×","<",">"]; 
-
-let chnotallowed = "\"£!$%&=;@~#\\?→";
-let notparam_list = "+-*×/0123456789.{<>〈〉}()|\n\r Σ′→";// Sets not a parameter character
-let paramend_list = "+-*×/|.{<>〈〉}[]$\n\r Σ";	          // Sets characters which end parameter
-let name_notallow = "|\"*×_ {<>〈〉}[]()=Σ′→";           // Character not allowed in species, class or comp names
-let name_ch_max = 40;                                 // The maximum number of characters allowed for strings
+let chnotallowed = "\"$&=~#\\→";
+let notparam_list = "+-*×/0123456789.{}<>〈〉()|\n\r Σ′→;";// Sets not a parameter character
+let paramend_list = "+-*×/|.{}<>〈〉[]$\n\r Σ";	            // Sets characters which end parameter
+let name_notallow = "|\"*×_ {}<>〈〉[]()=Σ′→;$&#\\";       // Character not allowed in species, class or comp names
+let name_ch_max = 40;                                   // The maximum number of characters allowed for strings
 let invalid_name = ["Compartment","Population","Alpha","Distribution","file"];
 
 const convert = [
@@ -285,14 +348,15 @@ const data_template = [
 // Colours
 
 const BLACK = "#000000", GREEN = "#22ff22", RED = "#ff2222", BLUE = "#4444ff", PURPLE = "#ff44ff";
-const WHITE = "#ffffff", GREY = "#bbbbbb", CYAN = "#00bbbb"; 
-const LGREEN = "#aaffaa", LRED = "#ffaaaa", LBLUE = "#aaaaff", LPURPLE = "#ffaaff", LGREY = "#dddddd", LCYAN = "#00ffff";
-const DGREEN = "#009900", DRED = "#990000", DBLUE = "#000099", DPURPLE = "#aa00aa", DGREY = "#888888", DCYAN = "#009999";
-const DDGREEN = "#005500", DDRED = "#550000", DDBLUE = "#000055", DDPURPLE = "#550055", DDGREY = "#444444", DDCYAN = "#005555";
+const WHITE = "#ffffff", GREY = "#bbbbbb", CYAN = "#00bbbb", YELLOW = "#dddd00"; 
+const LGREEN = "#aaffaa", LRED = "#ffaaaa", LBLUE = "#aaaaff", LPURPLE = "#ffaaff", LGREY = "#dddddd", LCYAN = "#00ffff", LYELLOW = "#ffff00";
+const DGREEN = "#00bb00", DRED = "#bb0000", DBLUE = "#0000bb", DPURPLE = "#bb00bb", DGREY = "#888888", DCYAN = "#00bbbb", DYELLOW = "#bbbb00";
+const DDGREEN = "#009900", DDRED = "#990000", DDBLUE = "#000099", DDPURPLE = "#990099", DDGREY = "#444444", DDCYAN = "#009999", DDYELLOW = "#999900";
 const LLGREEN = "#ddffdd", LLRED = "#ffdddd", LLBLUE = "#ddddff", LLPURPLE = "#ffddff", LLGREY = "#eeeeee", LLCYAN = "#99ffff";
 const LLLBLUE = "#eeeeff";
+const MLLBLUE = "#bbbbff";
 const LLLGREY = "#eeeeee";
-const ORANGE = "#ff9900", DORANGE = "#cc6600", LORANGE = "#ffcc55",  DDORANGE = "#441100", LLORANGE = "#ffee99";
+const ORANGE = "#ff9900", DORANGE = "#dd6600", LORANGE = "#ffcc55",  DDORANGE = "#882200", LLORANGE = "#ffee99";
 const BROWN = "#cb6a00", LBROWN = "#edbb99", DBROWN = "#974500", DDBROWN = "#431200";
 const LLGREY_CODE = 99999;
 
@@ -307,6 +371,11 @@ const BUBBLE_COL = LLLBLUE, BUBBLE_SURROUND = LBLUE, BUBBLE_TEXT_COL = BLACK;
 const EDIT_MARGIN_COL = BLACK;
 const BUBBLE_SCROLL_COL = BUBBLE_COL;
 const INPUT_OUTLINE_COL = LBLUE;
+const POP_COL = BLUE;
+const IE_COL = DGREEN;
+const FE_COL = DORANGE;
+const PARAM_COL = DRED;
+const SUM_COL = DPURPLE;
 
 const TI_DIV_MAX = 10000;                          // Maximum number of time divisions
 const DISPLAY_FILE_LEN_MAX = 100;
@@ -319,6 +388,7 @@ const HISTO_PLOT_MAX = 100;                         // Maximum number of bars in
 const POINT_PLOT_MAX = 1000;                       // Maximum number of points in scatter
 const PARAM_STAT_MAX = 1000;                       // Maximum number of parameter statistics
 const NODE_PLOT_MAX = 1000;                        // Maximum number nodes is phylogenetic tree
+const SCRIPT_LINE_MAX = 1000;                      // The maximum number of script lines to show
 
 const ELE_REDUCE_FAC = 0.7;                        // Factor reduction when too many elements
 
@@ -365,7 +435,7 @@ const data_invalid = "Data source is invalid";     // Invalid data source messag
 const dist_matrix_name = "D";                      // The name of a distance matrix
 
 // List of colours used for compartments
-const collist = [LGREEN,LRED,LBLUE,LPURPLE,LORANGE,LBROWN,LGREY,GREEN,RED,BLUE,PURPLE,ORANGE,BROWN,GREY,DGREEN,DRED,DBLUE,DPURPLE,DORANGE,DBROWN,DGREY,DDGREEN,DDRED,DDBLUE,DDPURPLE,DDORANGE,DDBROWN,BLACK];
+const collist = [LGREEN,LRED,LBLUE,LPURPLE,LORANGE,LYELLOW,LBROWN,LGREY,GREEN,RED,BLUE,PURPLE,ORANGE,YELLOW,BROWN,GREY,DGREEN,DRED,DBLUE,DPURPLE,DORANGE,DYELLOW,DBROWN,DGREY,DDGREEN,DDRED,DDBLUE,DDPURPLE,DDORANGE,DDYELLOW,DDBROWN,BLACK];
 
 // List of colours used for lines
 const auto_color = [BLUE,RED,GREEN,DRED,PURPLE,ORANGE,BROWN,GREY,GREEN,DRED,DBLUE,DPURPLE,DORANGE,DBROWN,DGREY,LGREEN,LRED,LBLUE,LPURPLE,LORANGE,LBROWN,LGREY,DDGREEN,DDRED,DDBLUE,DDPURPLE,DDORANGE,DDBROWN,BLACK];
@@ -375,8 +445,8 @@ const OK_butcol = "#444499", OK_butcol2 = "#333399";
 const OK_butcol3 = "#6666cc", OK_butcol4 = "#6666cc";
 
 
-const functi = ["exp","cos","sin","log","pow","max","min","abs","sqrt","step","thresh","ubound"];
-const functi_dx = ["def","def","def","def","def","def","def","def",2.8,2.8,3.4,3.7];
+const functi = ["exp","cos","sin","log","pow","max","min","abs","sqrt","step","sig","thresh","ubound"];
+const functi_dx = ["def","def","def","def","def","def","def","def",2.8,2.8,"def",3.4,3.7];
 
 const opbut = ["_","^","+","-","\u00d7","\u2215","(",")","Σ","'"];
 
@@ -440,6 +510,7 @@ const COMP_NOISY_MAX = 10;                         // When simulating noisy comp
 const si_anno = 1.4;
 const size_annotation_default = 10;                // Default size of annotation text
 const annotation_col_default = BLACK;              // Default colour for labels
+const import_frac_pro = 0.5;
 
 // Different line thicknesses
 const NOLINE = 0, THINLINE = 0.5, NORMLINE = 1, MEDIUMLINE = 1.5, THICKLINE = 2, MTHICKLINE = 3, VTHICKLINE = 4;

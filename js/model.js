@@ -1948,8 +1948,8 @@ class Model
 			let ch = te.substr(i,1);
 		
 			if(name_notallow.includes(ch)){
-				if(op == "full") return "Compartment name '"+te+"' cannot use character '"+ch+"'";
-				else return "Cannot use character '"+ch+"'";
+				if(op == "full") return "Compartment name '"+te+"' cannot use the character '"+ch+"'";
+				else return "Cannot use the character '"+ch+"'";
 			}
 		}
 	}
@@ -2914,7 +2914,7 @@ class Model
 		if(model.example && not_zero_page) exa_store = model.example;
 		
 		let mod = ans.model;
-	
+		
 		for(let ele in mod) this[ele] = mod[ele];
 		
 		this.get_label_info_all();
@@ -2947,6 +2947,12 @@ class Model
 		}
 		
 		if(exa_store) model.example = exa_store;
+		
+		let wa = mod.warning;
+		if(wa && wa.show == false){
+			alert_help("Run time warning",wa.te);
+			wa.show = true;
+		}
 	}
 	
 	
@@ -3020,7 +3026,7 @@ class Model
 			let ch = te.substr(i,1);
 		
 			if(name_notallow.includes(ch)){
-				return "Cannot use character '"+ch+"'";
+				return "Cannot use the character '"+ch+"'";
 			}
 		}
 		

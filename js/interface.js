@@ -1362,7 +1362,7 @@ function mode_off()
 /// Prints a text error to the screen
 function alertp(te)
 {
-	if(te.length > 0 && te.substr(te.length-1,1) != ".") te += ".";
+	te = add_full_stop(te);
 	
 	inter.help = { title:"Sorry an error occured!", te:te};
 	generate_screen();
@@ -1743,6 +1743,7 @@ function start_worker(type,info)
 	if(false) error("start work: "+type+" "+info);
 	
 	start_loading_symbol(0,type);
+	
 	generate_screen();
 	
 	inter.worker_mess.next = {type:type, info:info};
@@ -1782,7 +1783,8 @@ function scroll_to_top()
 function stop_worker()
 {
 	stop_loading_symbol();
-	inter.worker_mess.active = "stop";
+	worker.postMessage({type:"Stop Load"});
+	inter.worker_mess.active = false;
 }
 
 

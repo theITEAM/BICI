@@ -27,9 +27,26 @@ function update_model()
 	
 	update_model_param(par_list);                    // Updates the model parameters
 	
-	set_generate_pos();
+	set_generate_pos();                              // Sets if possible to generate results
+	
+	update_desc();                                   // Updates descriptions of parameter
 	
 	if(model.warn.length > 0) err_warning();
+}
+
+
+/// Updates descriptions of parameter
+function update_desc()
+{
+	for(let i = 0; i < model.param.length; i++){
+		let par = model.param[i];
+		if(par.dep.length > 0){
+			par.value_desc = get_value_desc(par);
+			par.weight_desc = get_weight_desc(par);
+			par.prior_split_desc = get_prior_split_desc(par);
+			par.dim = get_value_dim(par);
+		}
+	}
 }
 
 
@@ -469,7 +486,7 @@ function set_element(ob,ind,value)
 function get_value_dim(par)
 {
 	let dim = [];
-	if(Array.isArray(par.value) && par.comb_list.length > 0){
+	if(Array.isArray(par.value)){
 		for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
 	}
 	return dim;
@@ -481,34 +498,31 @@ function get_value_desc(par)
 {
 	let te;
 	
-	if(Array.isArray(par.value)){
-		if(par.list.length == 0){
-			return no_elements;
-		}
+	let dim = [];
+	for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
 		
-		let dim = [];
-		for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
+	switch(dim.length){
+	case 1: te = "Vector("; break;
+	case 2: te = "Matrix("; break;
+	default: te = "Tensor("; break;
+	}
 		
-		switch(dim.length){
-		case 1: te = "Vector("; break;
-		case 2: te = "Matrix("; break;
-		default: te = "Tensor("; break;
-		}
-		
-		let tot = 1; 
-		for(let k = 0; k < dim.length; k++){
-			if(k != 0) te += ",";
-			te += dim[k];
-			tot *= dim[k];
-		}
-		te += ")";
-		
-		if(par.set == true && tot < 10){
+	let tot = 1; 
+	for(let k = 0; k < dim.length; k++){
+		if(k != 0) te += ",";
+		te += dim[k];
+		tot *= dim[k];
+	}
+	te += ")";
+	
+	if(par.value != undefined){
+		if(tot < 10){
 			te = JSON.stringify(par.value);
 			te = te.replace(/\"/g," ")
 			te = te.replace(/null/g,"Unset");
 		}
 	}
+	else te = "Unset "+te;
 	
 	return te;
 }
@@ -519,34 +533,31 @@ function get_weight_desc(par)
 {
 	let te;
 	
-	if(par.list && Array.isArray(par.factor_weight)){
-		if(par.list.length == 0){
-			return no_elements;
-		}
+	let dim = [];
+	for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
 		
-		let dim = [];
-		for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
-		
-		switch(dim.length){
-		case 1: te = "Vector("; break;
-		case 2: te = "Matrix("; break;
-		default: te = "Tensor("; break;
-		}
-		
-		let tot = 1; 
-		for(let k = 0; k < dim.length; k++){
-			if(k != 0) te += ",";
-			te += dim[k];
-			tot *= dim[k];
-		}
-		te += ")";
-		
+	switch(dim.length){
+	case 1: te = "Vector("; break;
+	case 2: te = "Matrix("; break;
+	default: te = "Tensor("; break;
+	}
+	
+	let tot = 1; 
+	for(let k = 0; k < dim.length; k++){
+		if(k != 0) te += ",";
+		te += dim[k];
+		tot *= dim[k];
+	}
+	te += ")";
+	
+	if(par.factor_weight != undefined){
 		if(tot < 10){
 			te = JSON.stringify(par.factor_weight);
 			te = te.replace(/\"/g," ")
 			te = te.replace(/null/g,"Unset");
 		}
 	}
+	else te = "Unset " + te;
 	
 	return te;
 }
@@ -957,8 +968,9 @@ function get_reparam_param_list(par)
 		let par_list = [];
 		let vari = par.variety;
 		
-		for(let i = 0; i < par.comb_list.length; i++){
-			let comb = par.comb_list[i];
+		let co_list = generate_co_list(par.list);
+		for(let i = 0; i < co_list.length; i++){
+			let comb = co_list[i];
 			let ele = get_element(par.value,comb.index);
 			eqn_info.index = comb.index;
 			add_ele_param(ele,vari,par_list,eqn_info,par.reparam_warn,"single eqn_appear");
@@ -979,8 +991,9 @@ function get_prior_param_list(par)
 		let par_list = [];
 		let vari = par.variety;
 		
-		for(let i = 0; i < par.comb_list.length; i++){
-			let comb = par.comb_list[i];
+		let co_list = generate_co_list(par.list);
+		for(let i = 0; i < co_list.length; i++){
+			let comb = co_list[i];
 			let ele = get_element(par.prior_split,comb.index);
 				
 			add_distribution_eqn(ele,vari,par_list,eqn_info,par.prior_warn,"single eqn_appear");	
@@ -995,7 +1008,6 @@ function get_prior_param_list(par)
 // par must have the properties: name, dep, type, time_dep, (optionally eqn_appear)
 // On top of these new properties are added: 
 // list: shows the potential values for the dependencies
-// comb_list: this is a list giving every possible combination of dependency  
 function create_new_param(par,variety)
 {
 	if(par.name == undefined) error("Parameter name must be set");
@@ -1026,22 +1038,6 @@ function create_new_param(par,variety)
 
 	par.full_name = param_name(par);
 
-	par.reparam_param_list = [];
-	par.reparam_warn = [];
-	par.prior_param_list = [];
-	par.prior_warn = [];
-	par.factor = false;
-	par.factor_weight_on = {check:false};
-	
-	// Initialises weights of 1
-	let wei = copy(par.value);
-	let dim = get_dimensions(wei);
-	let ele_list = get_element_list(wei,dim);
-	for(let k = 0; k < ele_list.length; k++){	
-		set_element(wei,ele_list[k],1);
-	}
-	par.factor_weight = wei;
-
 	return par;
 }
 
@@ -1061,8 +1057,9 @@ function par_set_default(par)
 	if(par.dep.length == 0){
 		par.value = set_str;
 		if(par.list){
-			delete par.list; delete par.comb_list;
+			delete par.list;
 			delete par.prior_split; delete par.prior_split_set; delete par.prior_split_check;
+			delete par.factor_weight;
 			delete par.set;
 		}
 	}
@@ -1071,20 +1068,18 @@ function par_set_default(par)
 		
 		if(par.variety == "reparam" && par.reparam_eqn_on){ reparam_eqn_set_default(par); return;}
 		
-		let list = par_find_list(par);
-		let temp = par_find_template(list);
-		let comb_list = generate_comb_list(list);
-		
-		let value = copy(temp);
-		let prior_split = copy(temp);
-		
-		par.list = list;
-		par.comb_list = comb_list;
-		par.value = value;
-		par.prior_split = prior_split;
+		par.list = par_find_list(par);
 		par.prior_split_check = {check:false};
 		par.set = false;
 	}
+	
+	par.reparam_param_list = [];
+	par.reparam_warn = [];
+	par.prior_param_list = [];
+	par.prior_warn = [];
+	par.factor = false;
+	par.factor_weight_on = {check:false};
+
 }
 
 
@@ -1092,7 +1087,7 @@ function par_set_default(par)
 function dist_set_default(par)
 {
 	par.list = par_find_list(par);
-	par.comb_list = [];
+	//par.co_list = [];
 	par.value = [];
 	par.prior_split = [];
 	par.prior_split_check = {check:false};
@@ -1107,27 +1102,13 @@ function dist_set_default(par)
 function reparam_eqn_set_default(par)
 {
 	par.list = par_find_list(par);
-	par.comb_list = [];
+	//par.co_list = [];
 	par.value = [];
 	par.prior_split = [];
 	par.prior_split_check = {check:false};
 	par.variety = "reparam";	
 	par.set = true;		
 	par.set = false;
-}
-
-
-/// Sets default values for prior
-function set_default_prior_split(par)
-{
-	let prior_split = par.prior_split;
-	let dim = get_dimensions(prior_split);
-	let ele_list = get_element_list(prior_split,dim);
-		
-	for(let k = 0; k < ele_list.length; k++){	
-		let pr_sp = unset_prior(par.type);	
-		set_element(prior_split,ele_list[k],pr_sp);
-	}
 }
 
 
@@ -1149,6 +1130,8 @@ function set_default_value(par)
 /// Sets default values for tensor
 function set_default_factor_weight(par)
 {
+	par.factor_weight = param_blank(par);
+		
 	let value = par.factor_weight;
 	let dim = get_dimensions(value);
 	let ele_list = get_element_list(value,dim);
@@ -1195,101 +1178,109 @@ function copy_param_info(par,old)
 		// Checks if list is the same as the 
 		let dif = false;
 		
-		if(!list_old) dif = "unset";
-		else{
-			if(list.length != list_old.length) dif = true;
+		let val_set = false; if(old.value != undefined) val_set = true;
+		let pri_set = false; if(old.prior_split != undefined) pri_set = true;
+		let wei_set = false; if(old.factor_weight != undefined) wei_set = true;
+		
+		if(val_set || pri_set || wei_set){
+			if(!list_old) dif = "unset";
 			else{
-				for(let k = 0; k < list.length; k++){
-					let lik = list[k];
-					let lik_old = list_old[k];
-					if(lik.length != lik_old.length){ dif = true; break;}
-					for(let j = 0; j < lik.length; j++){
-						if(lik[j] != lik_old[j]){ dif = true; break;}
-					}
-				}
-			}
-		}
-		
-		if(dif != false){
-			let temp = par_find_template(list);
-			let comb_list = generate_comb_list(list);
-		
-			let value = copy(temp);
-			let prior_split = copy(temp);
-			let weight = copy(temp);
-		
-			let prior = copy(old.prior);
-			
-			let old_fl = false;
-			
-			// Attempts to copy across existing values
-			if(dif == true){
-				let map=[];
-				for(let k = 0; k < par.dep.length; k++){
-					map[k]=[];
-					
-					let list_new = list[k];
-					if(k < old.list.length){
-						let list_old = old.list[k];
-						
-						let used=[];
-						for(let ij = 0; ij < list_new.length; ij++){
-							let val = list_new[ij];
-							let m = 0; while(m < list_old.length && !(list_old[m] == val && used[m] == undefined)) m++;
-							if(m < list_old.length){ map[k][ij] = m; used[m] = true;}
+				if(list.length != list_old.length) dif = true;
+				else{
+					for(let k = 0; k < list.length; k++){
+						let lik = list[k];
+						let lik_old = list_old[k];
+						if(lik.length != lik_old.length){ dif = true; break;}
+						for(let j = 0; j < lik.length; j++){
+							if(lik[j] != lik_old[j]){ dif = true; break;}
 						}
 					}
 				}
-				
-				let dim = get_dimensions(temp);
-				let ele_list = get_element_list(temp,dim);
-				
-				for(let k = 0; k < ele_list.length; k++){
-					let ind = ele_list[k];
-					
-					let val, val_eqn, pr_sp, wei;
-					
-					let ind_old=[];
-					let ii;
-					for(ii = 0; ii < par.dep.length; ii++){
-						ind_old[ii] = map[ii][ele_list[k][ii]];
-						if(ind_old[ii] == undefined) break;
-					}
-					
-					if(ii == par.dep.length){
-						old_fl = true;
-						val = get_element(old.value,ind_old);
-						pr_sp = get_element(old.prior_split,ind_old);
-						wei = get_element(old.factor_weight,ind_old);
-					}
-					else{
-						val = undefined;
-						val_eqn = create_equation("","reparam");
-						pr_sp = unset_prior(par.type);
-						wei = 1;
-					}
-					
-					set_element(value,ind,val);
-					set_element(prior_split,ele_list[k],pr_sp);
-					set_element(weight,ele_list[k],wei);
-				}
 			}
+		
+			if(dif != false){
+				let temp = par_find_template(list);
+				let co_list = generate_co_list(list);
 			
-			par.list = list;
-			par.comb_list = comb_list;
-			par.value = value;
-			par.prior_split = prior_split;
-			par.factor_weight = weight;
-			if(old_fl == false) par.set = false;
+				let value; if(val_set) value = copy(temp);
+				let prior_split; if(pri_set) prior_split = copy(temp);
+				let weight; if(wei_set) weight = copy(temp);
+			
+				//let prior = copy(old.prior);
+				
+				let old_fl = false;
+				
+				// Attempts to copy across existing values
+				if(dif == true){
+					let map=[];
+					for(let k = 0; k < par.dep.length; k++){
+						map[k]=[];
+						
+						let list_new = list[k];
+						if(k < old.list.length){
+							let list_old = old.list[k];
+							
+							let used=[];
+							for(let ij = 0; ij < list_new.length; ij++){
+								let val = list_new[ij];
+								let m = 0; while(m < list_old.length && !(list_old[m] == val && used[m] == undefined)) m++;
+								if(m < list_old.length){ map[k][ij] = m; used[m] = true;}
+							}
+						}
+					}
+					
+					let dim = get_dimensions(temp);
+					let ele_list = get_element_list(temp,dim);
+					
+					for(let k = 0; k < ele_list.length; k++){
+						let ind = ele_list[k];
+						
+						let val, pr_sp, wei;
+						
+						let ind_old=[];
+						let ii;
+						for(ii = 0; ii < par.dep.length; ii++){
+							ind_old[ii] = map[ii][ele_list[k][ii]];
+							if(ind_old[ii] == undefined) break;
+						}
+						
+						if(ii == par.dep.length){
+							old_fl = true;
+							if(val_set) val = get_element(old.value,ind_old);
+							if(pri_set) pr_sp = get_element(old.prior_split,ind_old);
+							if(wei_set) wei = get_element(old.factor_weight,ind_old);
+						}
+						else{
+							if(val_set) val = undefined;
+							if(pri_set) pr_sp = unset_prior(par.type);
+							if(wei_set) wei = 1;
+						}
+						
+						if(val_set) set_element(value,ind,val);
+						if(pri_set) set_element(prior_split,ele_list[k],pr_sp);
+						if(wei_set) set_element(weight,ele_list[k],wei);
+					}
+				}
+				
+				par.list = list;
+				//par.co_list = co_list;
+				if(val_set) par.value = value;
+				if(pri_set) par.prior_split = prior_split;
+				if(wei_set) par.factor_weight = weight;
+				if(old_fl == false) par.set = false;
+			}
+			else{
+				par.list = old.list;
+				//par.co_list = old.co_list;
+				if(val_set) par.value = old.value;
+				if(pri_set) par.prior_split = old.prior_split;
+				if(wei_set) par.factor_weight = old.factor_weight;
+			}
 		}
 		else{
 			par.list = old.list;
-			par.comb_list = old.comb_list;
-			par.value = old.value;
-			par.prior_split = old.prior_split;
-			par.factor_weight = old.factor_weight;
 		}
-		
+			
 		par.prior_split_set = old.prior_split_set;
 		par.prior_split_check = old.prior_split_check;
 	}
@@ -1309,10 +1300,10 @@ function set_pri_pos(type,factor)
 
 
 /// Given a list of dependencies this provides a list of cominations going through each
-function generate_comb_list(list)
+function generate_co_list(list)
 {
 	let ndep = list.length;
-	let comb_list = [];
+	let co_list = [];
 	
 	let list_len = [];
 	for(let d = 0; d < ndep; d++){
@@ -1325,7 +1316,7 @@ function generate_comb_list(list)
 	
 	for(let d = 0; d < ndep; d++){
 		if(list_len[d] == 0){
-			return comb_list;
+			return co_list;
 		}
 	}
 	
@@ -1334,21 +1325,7 @@ function generate_comb_list(list)
 
 	let flag;
 	do{
-		comb_list.push({index:copy(index)});
-		
-		/*
-		let i = 0;
-		do{
-			flag = false;
-			
-			index[i]++; 
-			if(index[i] >= list_len[i]){
-				index[i] = 0; 
-				i++; 
-				flag = true;
-			}
-		}while(i < ndep && flag == true);
-		*/
+		co_list.push({index:copy(index)});
 		
 		let i = ndep-1;
 		do{
@@ -1363,7 +1340,7 @@ function generate_comb_list(list)
 		}while(i >= 0 && flag == true);
 	}while(flag == false);
 	
-	return comb_list;
+	return co_list;
 }
 
 
@@ -1533,14 +1510,15 @@ function check_param()
 		
 		if(par.dep.length > 0){
 			if(equal_ob(par.list,par_find_list(par)) == false) error("List not correct");
-			if(equal_ob(par.comb_list,generate_comb_list(par.list)) == false) error("Comb list not correct");
+			//if(equal_ob(par.co_list,generate_co_list(par.list)) == false) error("Co list not correct");
 		}
 		
 		if(par.dep.length == 0){
 			if(par.list != undefined){ error("List should not be specified");}
-			if(par.comb_list != undefined) error("comb_list should not be specified");
+			//if(par.co_list != undefined) error("co_list should not be specified");
 			if(par.prior_split != undefined) error("prior_split should not be specified");
 			if(par.prior_split_check != undefined) error("prior_split_check should not be specified");
+			if(par.factor_weight != undefined) error("factor_weight should not be specified");
 			if(par.set != undefined) error("Set should not be specified");
 		}
 		
@@ -1614,7 +1592,7 @@ function set_dist(info,par)
 					if(i == j) value[j][i] = 0;
 					else{
 						let dx = px[i]-px[j], dy = py[i]-py[j];
-						value[j][i] = Math.sqrt(dx*dx + dy*dy);
+						value[j][i] =  precision(Math.sqrt(dx*dx + dy*dy),5);
 					}
 					
 					value[i][j] = value[j][i];
@@ -1859,21 +1837,23 @@ function param_update_rename_compartment(p,cl,c,old_name,new_name)
 		let par = model.param[i];
 	
 		if(par.list){
-			let flag = false;
+			//let flag = false;
 			for(let j = 0; j < par.dep.length; j++){
 				
 				if(index == remove_prime(par.dep[j])){
 					if(c < par.list[j].length){
 						if(par.list[j][c] != old_name) error("Old name not correct");
 						par.list[j][c] = new_name;
-						flag = true;
+						//flag = true;
 					}
 				}
 			}
 			
+			/*
 			if(flag == true){
-				par.comb_list = generate_comb_list(par.list);
+				par.co_list = generate_co_list(par.list);
 			}
+			*/
 		}
 	}
 }
@@ -1928,4 +1908,12 @@ function add_param_ppc_factor(par_list)
 			par_list.push(pf.f_param);
 		}
 	}
+}
+
+
+/// Sets up a blank parameter specification (
+function param_blank(par)
+{
+	let temp = par_find_template(par.list);
+	return temp;
 }

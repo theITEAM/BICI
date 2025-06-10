@@ -41,6 +41,7 @@ private:
 	void set_proposal_prob();
 	void check_join_proposal();
 	unsigned int find_which_list(unsigned int j, const vector < vector <unsigned int> > &par_list) const;
+	string banner(string te) const;
 	//void join_proposal(unsigned int th1, unsigned int th2);
 
 	const Model &model;

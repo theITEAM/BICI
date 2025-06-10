@@ -1,4 +1,4 @@
-# Example E6: Fixed effect applied to a branching probability
+﻿# Example E6: Fixed effect applied to a branching probability
 
 ## Objective
 - Individual variation is incorporated into branching through a fixed effect.
@@ -16,7 +16,7 @@
 - The *relative* probability of recovering is given by 1.
 - Mean $m^R$ and coefficient of variation $c^R$ specify the log-normally distributed period to recovery.
 - Mean $m^D$ and coefficient of variation $c^D$ specify the gamma distributed period to death.
-- The strength of the fixed effect is determined through parameter $ν^g$.
+- The strength of the fixed effect is determined through parameter $μ^g$.
 
 ## Population
 - This consists of 100 initially susceptible individuals of which two are infected.

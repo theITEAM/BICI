@@ -1199,7 +1199,6 @@ void Species::X_vector_order()
 			xvec_new.ind_list.push_back(name);
 			
 			auto j = xvec_old.hash_ind_list.find(name);
-			//auto j = find_in(xvec_old.ind_list,name,i);
 			if(j == UNSET) xvec_new.value.push_back(UNSET);
 			else xvec_new.value.push_back(xvec_old.value[j]);			
 		}

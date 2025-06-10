@@ -680,7 +680,7 @@ function add_screen_buts(lay)
 						default:
 							if(rpf.sel_paramviewtype){
 								let pl = rpf.sel_paramviewtype.te;
-								if(pl == "Trace" || pl =="Samples" || pl == "Distribution" || pl == "Graph (split)"){
+								if(pl == "Trace" || pl =="Samples" || pl == "Distribution" || pl == "Graph (split)" || pl == "Histogram"){
 									right_mid = "with key";
 								}
 							}
@@ -839,11 +839,12 @@ function start_loading_symbol(per,type)
 	if(!inter.loading_symbol.on){
 		let interval = setInterval(function(){ inter.loading_symbol.offset++; replot_loading_symbol();},110);
 		inter.loading_symbol = {on:true, offset:0, interval:interval, percent:per, type:type};
+	}
 		
 		switch(type){
-		case "Start": case "StartPPC": loading_symbol_message("Creating..."); break;
-		case "Spawn": loading_symbol_message("Initialising..."); break;
-		}
+	case "Start": case "StartPPC": loading_symbol_message("Creating..."); break;
+	case "Spawn": loading_symbol_message("Initialising..."); break;
+	case "Load File": case "Load Example": loading_symbol_message("Loading..."); break;
 	}
 }
 
@@ -852,6 +853,7 @@ function start_loading_symbol(per,type)
 function loading_symbol_message(te)
 {
 	inter.loading_symbol.message = te;
+	generate_screen();
 }	
 
 
@@ -1859,7 +1861,7 @@ function check_error_textbox2(tbs)
 					
 			case "knot_times":
 				warn = check_knot_times(te);
-				char_lim = 1000;
+				char_lim = 100000;
 				break;
 				
 			case "knot_t_start": case "knot_t_end":

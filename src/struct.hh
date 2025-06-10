@@ -9,9 +9,8 @@ using namespace std;
 #include "const.hh"
 #include "hash.hh"
 
-struct ParamRef                    // Used to reference parameter
-{
-	bool found;                      // Determines if parameter has been found
+struct ParamRef {                  // Used to reference parameter
+	ParamRef(){ th = UNSET; index = UNSET;}
 	unsigned int th;                 // The number of the parameter
 	unsigned int index;              // The index where to find 
 };
@@ -28,6 +27,8 @@ struct PopAffect {                 // Lists all populations which affect DIV_VAL
 
 struct LinearProp {                // Store information about DIV_VALUE_LINEAR_AFFECT proposal
 	vector <unsigned int> me;        // Markov eqn ref
+	vector <unsigned int> me_no_pop; // Which no_pop calculations need to be done
+	vector <unsigned int> no_pop_ref;// References no_pop which needs to be updated
 	vector <PopAffect> pop_affect;   // References populations which affect
 };
 
@@ -35,7 +36,7 @@ struct AffectLike {                // Determines how a parameter affects likelih
 	AffectType type;                 // The type of likelihood being affected
 	unsigned int num;                // The reference number
 	unsigned int num2;               // Another reference number
-	vector <unsigned int> me_list;   // Stores a lise of Markov equantions (used in DIV_VALUE_FAST_AFFECT)
+	vector <unsigned int> me_list;   // Stores a list of Markov equantions (used in DIV_VALUE_FAST_AFFECT)
 	vector <bool> map;               // Maps all time elements which are affected
 	vector <unsigned int> list;      // Lists all map which is true
 	unsigned int order_num;          // Used to order terms by list priority
@@ -235,7 +236,7 @@ struct Dependency {                // A dependency in the model
 };
 
 struct Prior {                     // Defines a parameter prior
-	Prior(){ error = "";}
+	Prior(){ error = ""; type = UNSET_PR;}
 	PriorPos type;                   // The type of prior
 	vector <EquationInfo> dist_param;// A list of equations to specify prior distribution parameters
 	string error;                    // Stores error message if declared incorrectly
@@ -246,7 +247,7 @@ struct ParamVecEle                 // Stores information about an element in par
 	string name;                     // The name of the parameter
 	unsigned int th;                 // The number of the parameter
 	unsigned int index;              // The index where to find 
-	Prior prior;                     // The prior distribution (copied from param)
+	unsigned int prior_ref;          // References the prior
 	ParamVariety variety;            // The parameter variety (copied from param)
 	bool ppc_resample;               // Sets if parameter gets resampled for ppc
 	bool prop_pos;                   // Set if it is possible to do a proposal on this parameter
@@ -407,23 +408,38 @@ struct Compartment {               // Information about a compartment
 	vector <unsigned int> tr_enter;  // Transitions entering this compartment
 };
 
+struct ParamElement {              // Stores information about a parameter element
+	ParamElement(){ param_vec_ref = UNSET;}
+
+	EquationInfo value;
+	bool used;                       // Determines if specific parameter is used	
+	unsigned int prior_ref;          // References prior
+	vector <ParamRef> parent;        // Parameters dependent on
+	vector <ParamRef> child;         // Parameters on which dependent
+	unsigned int param_vec_ref;      // References the value on param_vec_ref
+};
+
 struct Param {                     // Stores a model parameter
 	string full_name;                // The full name (as defined in the input file)
 	string name;                     // The name after removing dependencies
 	vector <Dependency> dep;         // Dependency for parameter
 	bool time_dep;                   // Time dependency
 	SplineInfo spline_info;          // Stores information about spline (if used)
-	bool auto_value;                 // Detemines if value is automatically calculated (e.g. for branching probabilities)
 	bool sim_sample;                 // Set to true if value sampled from the distribution (simulation)
 	ParamVariety variety;            // Determines the variety of parameter	
 	unsigned int N;                  // The number of elements in the parameter
 	bool trace_output;               // Determines if parameter is output (if not too big and not constant)
-	vector <EquationInfo> value;     // Different values (if parameter has dependency)
-	vector <bool> use;               // Determines if specific parameter is used	
-	vector <Prior> prior;            // Different priors for different elements of the parameter
-	vector < vector <ParamRef> > parent;// Parameters which parameter is dependent on
-	vector < vector <ParamRef> > child; // Parameters which parameter is dependent on
-	vector <unsigned int> param_vec_ref;// References the value on param_vec_ref
+	
+	unsigned int default_prior_ref;  // Default prior reference
+		
+	vector <unsigned int> element_ref; // This references a given element
+	vector <ParamElement> element;   // This stores information about elements in parameter
+	
+	vector <double> weight;          // Different weights given to categories for factor
+
+	vector <double> cons;            // Stores constant values
+	string reparam_eqn;              // Used to store reparameterisation eqn
+	
 	unsigned int line_num;           // The line num in input file when parameter is defined
 	bool factor;                     // Set if parameter is a param_mult
 	unsigned int param_mult;         // If the parameter is multiplied by a factor this is th
@@ -432,7 +448,27 @@ struct Param {                     // Stores a model parameter
 
 	bool cat_factor;                 // Set if parameter is a categorical factor
 	bool cat_factor_weight_on;       // Determines if there is a weight factor
-	vector <double> weight;          // Different weights given to categories
+	
+	unsigned int get_param_vec(unsigned int i) const; 
+	const vector <ParamRef>& get_child(unsigned int i) const;
+	const vector <ParamRef>& get_parent(unsigned int i) const;
+	unsigned int get_eq_ref(unsigned int i) const;
+	void all_elements();
+	void add_element(unsigned int i); 
+	void set_prior(unsigned int i, unsigned int prior_ref);
+	void add_parent(unsigned int i, const ParamRef &pr);
+	void add_child(unsigned int i, const ParamRef &pr);
+	double get_value(unsigned int i) const;
+	void set_used(unsigned int i);
+	void set_value_te(unsigned int i, string te);
+	string get_value_te(unsigned int i) const;
+	void set_value_eqn(unsigned int i, const EquationInfo &val);
+	//void set_weight(unsigned int i, double w);
+	//double get_weight(unsigned int i);
+	unsigned int get_prior_ref(unsigned int i) const;
+	bool exist(unsigned int i) const;
+	unsigned int add_cons(double val);
+	void set_cons(unsigned int i, double val);
 };
 
 struct CompGlTransGroup {          // Information about transitions from a compartment (in a cl)
@@ -511,7 +547,7 @@ struct InfSourceSampler {          // Used to sample the source of infection (fo
 };
 
 struct TransGlobal {               // A global transition (combines all classifications)
-	string name;                     // The name of the classification
+	string name;                     // The name of the transition
 	unsigned int cl;                 // The classification
 	unsigned int tr;                 // The transition number in the classifciation
 	unsigned int i;                  // The initial compartment (set to UNSET for source)
@@ -529,7 +565,7 @@ struct TransGlobal {               // A global transition (combines all classifi
 	vector <EquationInfo> dist_param;// References a list of equations to specify transition distribution parameters
 	unsigned int nm_trans_ref;       // References nm_trans (if non-Markovian)
 	unsigned int markov_eqn_ref;     // References Markovian equation (if Markovian)
-	vector <unsigned int> transform; // Transforms transition based on a shift in c
+	vector <unsigned int> tform;     // Transforms transition based on a shift in c
 	bool time_vari;                  // Determines if time varying
 	unsigned int line_num;           // Stores the import line (for diagnostic error messages)
 };
@@ -994,6 +1030,13 @@ struct IndRef {                    // An individual reference
 	unsigned int i;                  // Individual number
 };
 
+struct IndSimProb {                // User to workout if simulation proposal should be done
+	double ntr;                      // Number of proposals tried (with time fading)
+	double nac;                      // Number of proposals accepted (with time fading)
+	double prob;                     // Probability of trying 
+	bool done; 
+};
+
 struct IndSampler {                // Used as an individual sampler
 	unsigned int ntr;                // Number of tries
 	unsigned int nac;                // Number accepted
@@ -1223,7 +1266,7 @@ struct GeneticDataValue {          // Stores state values for genetic data
 };
 
 struct Particle {                  // Stores information from state
-	vector <double> param_val;       // The parameter value
+	vector <double> param_val_prop;  // The parameter value (without const or reparameterisation)
 	vector <ParticleSpecies> species;// Species state data
 	
 	vector <DeriveOutput> dir_out;   // Derived outputs
@@ -1235,6 +1278,7 @@ struct Particle {                  // Stores information from state
 	double w;                        // Particle weight (used in ABC-SMC)
 	
 	unsigned int s;                  // The sample number
+	
 	unsigned int chain;              // The chain number
 };
 
@@ -1593,4 +1637,9 @@ struct EventMove {                 // Used for reordering event for multi-event 
 	unsigned int e;
 	bool move;
 };	
+
+struct PropTime {                  // Used for orthering proposal times
+	unsigned int i;
+	long time;
+};
 

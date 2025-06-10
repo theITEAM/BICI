@@ -26,6 +26,12 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 	
 	auto &ind = ssp.individual[i];
 	
+	if(false){
+		cout << " change" << endl;	
+		ssp.print_event(ind.ev);
+		ssp.print_event(ev_ne);
+	}
+	
 	// Deals with event changes
 	Like like_ch;
 	
@@ -90,9 +96,15 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 			pop_map[k] = UNSET;
 		}		
 		pop_list.clear();
+
+		if(false){
+			cout << ti << " " << ti_next << " pop chang" << endl;
+			for(auto pc : pop_change) cout << pc.po << " " << pc.num << "pc" << endl; 
+		}
 		
 		update_pop_change(ti,ti_next,pop_change,like_ch.markov);
 	}
+	
 	timer[IND_POP_UPDATE_TIMER] += clock();
 	
 	// Adds in new events
@@ -109,6 +121,7 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 /// Updates the likelihoods based on a set of population changes 
 void State::update_pop_change(unsigned int ti, unsigned int ti_next, const vector <PopChange> &pop_change, double &like_ch)
 {
+	// This is the part which is slow for spatial models
 	// Updates markov_eqn as a result of populations change in size
 	for(const auto &mef : markov_eqn_list){
 		auto pp = mef.p, ee = mef.e;
@@ -116,8 +129,8 @@ void State::update_pop_change(unsigned int ti, unsigned int ti_next, const vecto
 		markov_eqn_map[pp][ee] = false;
 	}
 	markov_eqn_list.clear();
-			
-	/// Updates transitions in population species as a result of population change in size
+				
+	// Updates transitions in population species as a result of population change in size
 	for(const auto &mtf : trans_list){
 		auto pp = mtf.p, tr = mtf.tr;
 		if(model.species[pp].type != POPULATION) emsg("must be ind");

@@ -62,7 +62,10 @@ void ABC_SMC::run()
 			}
 		}
 		else{
-			if(g == 1) prior_ref = model.prior_total(particle_store[0].param_val);
+			if(g == 1){
+				auto param_val = model.get_param_val(particle_store[0].param_val_prop);
+				prior_ref = model.prior_total(param_val);
+			}
 			
 			cor_matrix.set_mvn_from_particle(particle_store);
 			
@@ -79,7 +82,8 @@ void ABC_SMC::run()
 				auto p = particle_sampler();                  // Samples from a particle in last gen
 				const auto &part = particle_store[p];
 				
-				auto param_prop = prop.sample(part.param_val);// Proposes a new parameter set using MVN kernal
+				auto param_val = model.get_param_val(part.param_val_prop);
+				auto param_prop = prop.sample(param_val);     // Proposes a new parameter set using MVN kernal
 				
 				if(model.inbounds(param_prop) == true){       // Checks if parameters within bounds
 					auto initc_val = model.initc_sample(param_prop);
@@ -135,13 +139,7 @@ Proposal ABC_SMC::intialise_proposal() const
 	
 	// Sets the vect to all the non-derived and non-fixed variables
 	for(auto i = 0u; i < model.nparam_vec; i++){ // Univariate distributions
-		const auto &pv = model.param_vec[i];
-		const auto &par = model.param[pv.th];
-		if(par.variety == PRIOR_PARAM || par.variety == DIST_PARAM){
-			if(par.prior[pv.index].type != FIX_PR){
-				vec.push_back(i);
-			}
-		}
+		if(model.param_vec[i].prop_pos) vec.push_back(i);
 	}
 	
 	Proposal pp(PARAM_PROP,vec,model,output,1,burn_info);
@@ -183,9 +181,11 @@ double ABC_SMC::implement_cutoff_frac(vector <Particle> &particle) const
 /// Calculates the weights for the different particles
 double ABC_SMC::calculate_particle_weight(const vector <double> &param_prop, const vector <Particle> &particle, const Proposal &prop) const 
 {	
+	auto param_prop_prop = model.get_param_val_prop(param_prop);
+	
 	auto sum = 0.0;
 	for(const auto &part : particle){	
-		sum += part.w*exp(prop.mvn_probability(param_prop,part.param_val));
+		sum += part.w*exp(prop.mvn_probability(param_prop_prop,part.param_val_prop));
 	}
 
 	return exp(model.prior_total(param_prop) - prior_ref)/sum;

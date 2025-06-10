@@ -1,7 +1,51 @@
+generate_co_list(list)
+
+- Tried to reduce the memory footprint as much as possible (to help with large spatial models). This has involved a lot of changes, so may have introduced errors... I've done a fair amount of testing to try to mitigate this.
+
+- For proposals on observed individuals (simulation and sampling-based) a new adaptive scheme has been adopted. This preferentially sampled individuals which are successfully changed under the proposal (this avoid lots of wasteful proposals in the spatial farm model when only a few farms are infected)
+
+- Some improvements to the equation editor in the interface (different colours used to represent different elements in the equation, as well as indicating matching brackets).
+
+- Parameter diagnostic information provide in the output file using the command 'inf-param-stats' (this is useful for users which don't use the interface)
+
+- Perform additional checks on bici script (e.g. stopping '^' is individual effect name) and tried to improve error messages.
+
+- Made some improvments in the the speed of initialisation (especially for large spacial model).
+
+- Added in sigmoidal function (this is useful when you want to map from a continuous number to something bounded from zero to one (e.g. for a probability)
+
+- Some improvements to manual: Section 2.1.11 and section 2.1.12 added as well revisions to Section 7. The prior section 4.2 has been revised to emphasise the importance of carefully choosing the prior.
+
+- Changed the syntax used for population with fixed or individual effects. Now a ";" is used, e.g. "{I;<g>}". 
+
+- Tried to improve error messages (I've systematically been through script trying to break them in many different ways).
+
+- One of the difficulties in set up a run is to know what the time step should be. I've now added some diagnostics which outputs a run-time warning if either the time step is too large (discretisation error) or too small (computationally inefficient). This doesn't stop executiong of the code, it's just a useful guide. Section 3.3.1 has been added to the manual
+
+- Corrected slowing of interface when many knots in spline
+ 
+ - Improvements to parameter proposals for parameters in equations which are linearly eqpressible in terms of popuations (speeding up by combining calculation of non-population part) 
+
+- Some yellow colours have been added to the potential compartmental colour pallette.
+
+- Update MCMC diagnostic text information to be more informative
+
+- Improvements to loading symbol in interface (to make it more smooth... this is tricky because difficult to know how long things will take a priori)
+
+
+
+
+- output percent
+- \omega^ia,ta
+
+
+
+
+
 - prob1: parameter a not being estimated correctly
 - Mac post-sim not working
-- Add exp(mean:)
-- Relative path for data_dir
+
+
 
 
 

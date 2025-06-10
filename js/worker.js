@@ -56,6 +56,8 @@ let child=[];
 
 let run_chain = [];
 
+let fileReader = new FileReader();
+
 onmessage = function(e) 
 {
 	if(false){ prr("Worker start"); prr(e.data);}
@@ -78,8 +80,15 @@ onmessage = function(e)
 function process(e)
 {
 	percent(1)
-
+	
 	input = e.data;
+	
+	if(input.type == "Stop Load"){
+		fileReader.abort();
+		return;
+	}
+
+
 	let info = input.info;
 
 	let update_mod = false;
@@ -407,10 +416,22 @@ function process(e)
 		{
 			let par = model.param[info.i];
 		
-			if(par.prior_split_set != true) set_default_prior_split(par);
+			if(par.prior_split == undefined){
+				let prior_split = par_find_template(par.list);
+				let dim = get_dimensions(prior_split);
+				let ele_list = get_element_list(prior_split,dim);
+		
+				for(let k = 0; k < ele_list.length; k++){	
+					let pr_sp = unset_prior(par.type);	
+					set_element(prior_split,ele_list[k],pr_sp);
+				}
+				
+				info.prior_split = prior_split;
+			}
+			else info.prior_split = par.prior_split;
 			
-			info.prior_split = par.prior_split;
-			info.value = get_prior_split_tensor(par);
+			info.value = get_prior_split_tensor(info.prior_split);
+			
 			info.list = par.list;
 			
 			if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
@@ -440,6 +461,8 @@ function process(e)
 			let par = model.param[info.i];
 		
 			info.value = par.value;	
+			if(info.value == undefined) info.value = param_blank(par);
+			
 			info.list = par.list;
 			if(par.dist_mat){
 				set_dist(info,par);
@@ -457,6 +480,8 @@ function process(e)
 			let par = model.param[info.i];
 			
 			info.value = par.factor_weight;	
+			if(info.value == undefined) info.value = param_blank(par);
+			
 			info.list = par.list;
 			if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
 			info.type = "weight";
@@ -763,4 +788,11 @@ function post(mess)
 function percent(per)
 {
 	post({ type:"Percent", info:per});
+}
+
+
+/// Outputs percentage complete
+function loading_mess(te)
+{
+	post({ type:"LoadMess", info:te});
 }

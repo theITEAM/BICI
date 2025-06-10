@@ -33,27 +33,22 @@ void CorMatrix::init()
 
 
 /// Adds a sample
-void CorMatrix::add_sample(const vector <double> &param_value, unsigned int range)
+void CorMatrix::add_sample(vector <double> param_val_prop, unsigned int range)
 {
 	if(range < RANGE_MIN) range = RANGE_MIN;
 	
-	vector <double> paramv(N);
-	for(auto i = 0u; i < N; i++){
-		paramv[i] = param_value[model.param_vec_prop[i]];
-	}
-	
 	// Shifting ensure that values are not constant
 	auto sh = (ran()-0.5)*TINY;
-	for(auto &val : paramv) val += sh;
+	for(auto &val : param_val_prop) val += sh;
 	
-	samp.push_back(paramv);
+	samp.push_back(param_val_prop);
 	n++;
 
 	for(auto i = 0u; i < N; i++){
-		auto vali = paramv[i];
+		auto vali = param_val_prop[i];
 		av[i] += vali;
 		for(auto j = i; j < N; j++){
-			auto valj = paramv[j];
+			auto valj = param_val_prop[j];
 			av2[i][j] += vali*valj;
 		}
 	}
@@ -131,7 +126,7 @@ void CorMatrix::set_mvn_from_particle(vector <Particle> &particle)
 {
 	init();
 	for(const auto &part : particle){
-		add_sample(part.param_val,LARGE);
+		add_sample(part.param_val_prop,LARGE);
 	}
 }
 

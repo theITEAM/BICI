@@ -310,8 +310,10 @@ string StateSpecies::check_prior(const Equation &eq) const
 void StateSpecies::set_ind_sim_c(unsigned int ti)
 {
 	auto t = timepoint[ti];
-		
-	for(auto i = 0u; i < individual.size(); i++){
+
+	auto imax = individual.size();
+	if(ind_sim_c.size() != imax) ind_sim_c.resize(imax);
+	for(auto i = 0u; i < imax; i++){
 		const auto &ind = individual[i];
 		
 		auto c = UNSET;

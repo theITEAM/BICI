@@ -46,7 +46,7 @@ string check_valid_name(string name, string type)
 {
 	auto escape_char = get_escape_char();
 	
-	if(name == "") return "The "+type+" name is not set";	
+	if(name == "" && type != "population") return "The "+type+" name is not set";	
 
 	if(type == "parameter"){
 		if(end_str(name,"(t)")) name = name.substr(0,name.length()-3);

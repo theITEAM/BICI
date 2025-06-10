@@ -12,12 +12,12 @@ extern bool com_op;                            // Set to true for command line o
 void emsg(const string &msg);
 void emsg_input(const string &msg);
 void end_code();
-void display_error(const string &msg);
-void display_warning(const string &msg);
+void display_error(string msg);
+void display_warning(string msg);
 string trim(string te);
 string remove_prime(string te);
 string remove_quote(string te);
-vector <string> split(const string &s, char delimiter);
+vector <string> split(const string &s, char delimiter, bool notrim = false);
 vector <string> split_with_bracket(const string &s, char delimiter);
 
 string toLower(string st);
@@ -118,7 +118,7 @@ int round_int(double val);
 int floor_int(double val);
 vector <int> round_int(const vector <double> &val);
 string cpu_percent(long time, long total_time);
-string tstr(double value);
+string tstr(double value, unsigned int dig=UNSET);
 unsigned int core();
 unsigned int num_core();
 bool op();
@@ -160,6 +160,8 @@ void percentage(double val, double val2);
 void percentage_start(PercentType type, unsigned int gen=UNSET);
 void percentage_end();	
 string find_root(string file);
+void wait();
+void add_full_stop(string &te);
 	
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);

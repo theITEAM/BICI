@@ -57,7 +57,7 @@ trans-data name="S->I" filter="Sex=M" obsrange="all" file="trans-data-2.csv"
 
 param name="N" constant="101"
 
-param name="β_s" value="value-beta.csv" prior="uniform(0,1)"
+param name="β_s" value="value-beta.csv" prior="uniform(0,2)"
 
 param name="γ_s" value="value-gamma.csv" prior="uniform(0,1)"
 

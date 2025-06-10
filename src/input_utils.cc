@@ -675,8 +675,6 @@ CompRef Input::find_comp_from_name(unsigned int p, string te) const
 		const auto &sp = model.species[p];
 		for(auto cl = 0u; cl < sp.ncla; cl++){
 			const auto &claa = sp.cla[cl];
-			//auto vec = claa.hash_comp.get_vec_string(te);
-			//auto c = claa.hash_comp.existing(vec);
 			auto c = claa.hash_comp.find(te);
 			if(c != UNSET){
 				CompRef cr; cr.p = p; cr.cl = cl; cr.c = c; cr.error = "";
@@ -685,7 +683,9 @@ CompRef Input::find_comp_from_name(unsigned int p, string te) const
 		}
 	}
 	
-	CompRef cr; cr.p = UNSET; cr.cl = UNSET; cr.c = UNSET; cr.error = "Compartment '"+te+"' not specfied";
+	CompRef cr; cr.p = UNSET; cr.cl = UNSET; cr.c = UNSET; 
+	if(te == "") cr.error = "No compartment specfied";
+	else cr.error = "Compartment '"+te+"' not specfied";
 	return cr;
 }
 
@@ -823,39 +823,56 @@ LatLng Input::boundary_mean_latlng(unsigned int i, string name)
 }
 
 
-/// Sets the text value of an element based on a dependency and an index
-void Input::set_element(vector <EquationInfo> &value, const vector <Dependency> &dep, const vector <unsigned int> &ind, string te)
+/// Sets the value of a constant based on a dependency and an index
+void Input::set_const(Param &par, const vector <unsigned int> &ind, double val)
 {
+	const auto &dep = par.dep;
+	
 	auto sum = 0u;
 	for(auto i = 0u; i < dep.size(); i++) sum += dep[i].mult*ind[i];
-	
-	if(sum >= value.size()) emsg_input("Problem setting element");
+	if(sum >= par.N) emsg_input("Problem setting element");
  
-	value[sum].te = te; 
+	par.set_cons(sum,val);
+}
+			
+			
+/// Sets the text value of an element based on a dependency and an index
+void Input::set_element(Param &par, const vector <unsigned int> &ind, string te)
+{
+	const auto &dep = par.dep;
+	
+	auto sum = 0u;
+	for(auto i = 0u; i < dep.size(); i++) sum += dep[i].mult*ind[i];
+	if(sum >= par.N) emsg_input("Problem setting element");
+ 
+	par.set_value_te(sum,te);
 }
 
 
 /// Sets the text value of an element based on a dependency and an index
-void Input::set_reparam_element(vector <EquationInfo> &value, const vector <Dependency> &dep, const vector <unsigned int> &ind, const EquationInfo &val)
+void Input::set_reparam_element(Param &par, const vector <unsigned int> &ind, const EquationInfo &val)
 {
+	const auto &dep = par.dep;
+	
 	auto sum = 0u;
 	for(auto i = 0u; i < dep.size(); i++) sum += dep[i].mult*ind[i];
-	
-	if(sum >= value.size()) emsg_input("Problem setting element");
+	if(sum >= par.N) emsg_input("Problem setting element");
  
-	value[sum] = val; 
+	par.set_value_eqn(sum,val);
 }
 
 
 /// Sets the text value of an element based on a dependency and an index
-void Input::set_prior_element(vector <Prior> &prior, const vector <Dependency> &dep, const vector <unsigned int> &ind, Prior pri)
+void Input::set_prior_element(Param &par, const vector <unsigned int> &ind, Prior pri)
 {
+	const auto &dep = par.dep;
+	
 	auto sum = 0u;
 	for(auto i = 0u; i < dep.size(); i++) sum += dep[i].mult*ind[i];
-	
-	if(sum >= prior.size()) emsg_input("Problem setting element");
- 
-	prior[sum] = pri; 
+	if(sum >= par.N) emsg_input("Problem setting element");
+
+	par.set_prior(sum,model.prior.size());
+	model.prior.push_back(pri);
 }
 
 
@@ -1079,9 +1096,11 @@ void Input::read_state_sample(const vector <string> &lines, const vector <string
 {
 	Sample samp;
 	samp.param_value.resize(model.param.size());
+	/*
 	for(auto th = 0u; th < model.param.size(); th++){
 		samp.param_value[th].resize(model.param[th].value.size(),UNSET);
 	}
+	*/
 	
 	samp.species.resize(model.species.size());
 	
@@ -1273,6 +1292,8 @@ unsigned int Input::get_param_value(vector < vector <double> > &param_value, uns
 
 	const auto &par = model.param[th];
 
+	param_value[th].resize(par.N,UNSET);
+
 	switch(spl.size()){
 	case 1:           // Set parameter value with dependency
 		{
@@ -1355,7 +1376,8 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 					return;
 				}
 			}
-			set_element(par.value,par.dep,ind,ele);
+						
+			set_const(par,ind,val);
 			break;
 		
 		case REPARAM_PARAM:
@@ -1365,22 +1387,33 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 					return;
 				}
 			}
-			set_reparam_element(par.value,par.dep,ind,he(add_equation_info(ele,REPARAM)));
+			set_reparam_element(par,ind,he(add_equation_info(ele,REPARAM)));
 			break;
 			
 		default: alert_import("Should not be default3"); return;
 		}
 	}
 	
-	// Sets any unspecified to zero
-	for(auto i = 0u; i < par.N; i++){
-		if(par.value[i].te == ""){
-			switch(par.variety){
-			case CONST_PARAM: par.value[i].te = "0"; break;
-			case REPARAM_PARAM: par.value[i] = add_equation_info("0",REPARAM); break;
-			default: break;
+	// Sets default values for any missing
+	switch(par.variety){
+	case CONST_PARAM:
+		{
+			auto ref = par.add_cons(0);
+			for(auto i = 0u; i < par.N; i++){
+				if(par.element_ref[i] == UNSET) par.element_ref[i] = ref;
 			}
 		}
+		break;
+		
+	case REPARAM_PARAM:
+		{
+			for(auto i = 0u; i < par.N; i++){
+				if(par.element_ref[i] == UNSET) par.set_value_te(i,"0"); 
+			}
+		}
+		break;
+		
+	default: alert_import("Should not be default3"); return;
 	}
 	
 	if(par.cat_factor){
@@ -1388,15 +1421,19 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 		auto sum = 0.0;
 		auto wsum = 0.0, wi = 0.0;
 		for(auto i = 0u; i < par.N; i++){
-			auto te = par.value[i].te;
+			auto ref = par.element_ref[i];
+			if(ref == UNSET) emsg("ref should not be unset"); 
+		
+			auto val = par.cons[ref];
 			auto w = par.weight[i];
 			
-			if(te == "*"){
+			if(val == UNSET){
 				num++; numi = i; wi = w;
 			}
 			else{
-				auto val = number(te);
-				if(val < 0) alert_import(desc+" the value '"+tstr(val)+"' must be positive for a factor.");
+				if(val < 0){
+					alert_import(desc+" the value '"+tstr(val)+"' must be positive for a factor.");
+				}
 				sum += w*val;
 			}
 			wsum += w;
@@ -1412,7 +1449,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 				alert_import(desc+" the calculated value for '*' is '"+tstr(val_new)+"' which must be positive");
 			}
 			
-			par.value[numi].te = tstr(val_new);
+			par.set_cons(numi,val_new);
 		}
 		
 		if(num == 0){
@@ -1426,11 +1463,22 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 				}
 			}
 		}
+		
+		if(false){
+			for(auto i = 0u; i < par.N; i++){
+				auto ref = par.element_ref[i];
+				cout << par.cons[ref] << "  param fact" << endl;
+			}
+		}
 	}
 		
 	if(false){
 		for(auto i = 0u; i < par.N; i++){
-			cout << i << " " << par.value[i].te << " val" << endl;
+			auto ref = par.element_ref[i];
+			if(ref == UNSET) emsg("ref should not be unset"); 
+			
+			auto &ele = par.element[ref];
+			cout << i << " " << ele.value.te << " val" << endl;
 		}
 	}
 }
@@ -1450,6 +1498,8 @@ void Input::load_weight_value(const ParamProp &pp, string valu, Param &par, stri
 	auto ncol = subtab.ncol;
 	
 	auto ndep = pp.dep.size();
+	
+	par.weight.resize(par.N,1);
 	
 	for(auto r = 0u; r < subtab.nrow; r++){
 		vector <unsigned int> ind(ndep);
@@ -1476,6 +1526,7 @@ void Input::load_weight_value(const ParamProp &pp, string valu, Param &par, stri
 		if(sum >= par.N) emsg_input("Problem setting element");
  
 		par.weight[sum] = val;
+		//par.set_weight(sum,val);
 	}
 }
 
@@ -1600,17 +1651,21 @@ void Input::add_param_cat_factor(Param &par)
 	par_basic.trace_output = false;
 
 	auto N = par_basic.N;
-	auto sigma = number(par_basic.prior[0].dist_param[0].te);
+	const auto &pri = model.prior[par_basic.get_prior_ref(0)];
 	
-	const auto &weight = par.weight;
+	auto sigma = number(pri.dist_param[0].te);
+	
+	//const auto &weight = par.weight;
 	
 	auto wsum = 0.0;
-	for(auto i = 0u; i < N; i++) wsum += weight[i];
+	for(auto i = 0u; i < N; i++) wsum += par.weight[i];
 	
 	for(auto i = 0u; i < N; i++){
-		auto &pri = par_basic.prior[i];
+		auto pri = model.prior[par_basic.get_prior_ref(i)];
 		pri.type = DIRICHLET_PR;
-		pri.dist_param[0].te = tstr((((N-1)/(sigma*sigma))-1)*(weight[i]/wsum));
+		pri.dist_param[0].te = tstr((((N-1)/(sigma*sigma))-1)*(par.weight[i]/wsum));
+		par_basic.set_prior(i,model.prior.size());
+		model.prior.push_back(pri);
 	}
 	
 	const auto &depend = par.dep;
@@ -1631,7 +1686,7 @@ void Input::add_param_cat_factor(Param &par)
 	
 	for(auto i = 0u; i < par.N; i++){
 		stringstream ss;
-		ss << (wsum/weight[i]) << "*";
+		ss << (wsum/par.weight[i]) << "*";
 		//ss << "%" << name << "_";
 			ss << name << "_";
 		for(auto d = 0u; d < depend.size(); d++){
@@ -1640,7 +1695,7 @@ void Input::add_param_cat_factor(Param &par)
 			ss << dep.list[(i/dep.mult)%dep.list.size()];
 		}
 		ss << "/(" << denom << ")";
-		par.value[i] = he(add_equation_info(ss.str(),REPARAM));
+		par.set_value_eqn(i,he(add_equation_info(ss.str(),REPARAM)));
 	}
 	
 	model.param.push_back(par_basic);
@@ -1648,9 +1703,11 @@ void Input::add_param_cat_factor(Param &par)
 
 
 /// Loads up a reparameterisation
-void Input::load_reparam_eqn(string te, Param &par)
+void Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 {
 	const auto &depend = par.dep;
+	auto te = par.reparam_eqn;
+	par.reparam_eqn = "";
 	
 	auto eqn_raw = he(add_equation_info(te,REPARAM_EQN));
 		
@@ -1669,33 +1726,39 @@ void Input::load_reparam_eqn(string te, Param &par)
 	}
 		
 	for(auto i = 0u; i < par.N; i++){
-		for(auto d = 0u; d < depend.size(); d++){
-			const auto &dep = depend[d];
-			dep_conv[d].after = dep.list[(i/dep.mult)%dep.list.size()];
-		}
-		
-		auto eqn = eqn_raw;
-		eqn.te = swap_index_temp(dep_conv,swap_temp);
-		
-		if(check_swap){
-			auto te_st = eqn.te;
-			auto res = swap_index(eqn.te,dep_conv);
-			if(res.warn != ""){
-				alert_import(res.warn); 
-				return;
+		auto ref = par.element_ref[i];
+		if(ref != UNSET){
+			//auto &ele = par.element[ref];
+			
+			for(auto d = 0u; d < depend.size(); d++){
+				const auto &dep = depend[d];
+				dep_conv[d].after = dep.list[(i/dep.mult)%dep.list.size()];
 			}
 			
-			if(eqn.te != te_st){
-				cout << eqn.te << " " << te_st << " compare" << endl; 
-				emsg_input("Swap index dif res");
+			auto eqn = eqn_raw;
+			eqn.te = swap_index_temp(dep_conv,swap_temp);
+			
+			if(check_swap){
+				auto te_st = eqn.te;
+				auto res = swap_index(eqn.te,dep_conv);
+				if(res.warn != ""){
+					alert_import(res.warn); 
+					return;
+				}
+				
+				if(eqn.te != te_st){
+					cout << eqn.te << " " << te_st << " compare" << endl; 
+					emsg_input("Swap index dif res");
+				}
 			}
+			
+			eqn.type = REPARAM;
+			
+			model.add_eq_ref(eqn,hash_eqn);
+			
+			par.element[ref].value = eqn;
 		}
-		
-		eqn.type = REPARAM;
-		
-		auto ind = find_index(i,depend);
-		set_reparam_element(par.value,par.dep,ind,eqn);
-	}	
+	}
 }
 
 
@@ -1707,3 +1770,4 @@ string Input::get_data_dir(string data_dir)
 	}
 	return data_dir;
 }
+				

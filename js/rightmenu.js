@@ -393,7 +393,7 @@ function rightbot_menu_buts(lay)
 	}
 	
 	let key = inter.graph.op.key;
-
+	
 	if(key != undefined && inter.graph.init == true){
 		let dy = 1.2;
 

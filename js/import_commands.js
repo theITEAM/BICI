@@ -376,7 +376,7 @@ function species_command(loop)
 	let name = get_tag_value("name");
 	if(name == "") cannot_find_tag();
 	
-	check_name_input(name,"Species name");
+	check_name_input(name,"Species name",true);
 	
 	let type = get_tag_value("type").toLowerCase();
 	if(type == "") cannot_find_tag();
@@ -422,7 +422,7 @@ function classification_command(loop)
 	let name = get_tag_value("name");
 	if(name == "") cannot_find_tag();
 	
-	check_name_input(name,"Classification name");
+	check_name_input(name,"Classification name",true);
 	
 	let clone = get_tag_value("clone");
 	if(clone != ""){                                 // Clones a classification from another species
@@ -587,6 +587,15 @@ function camera_command()
 		alert_import("'coord' must be 'cartesian' or 'latlng'"); 
 		break;
 	}
+}
+
+
+/// Sets a camera in a classification
+function warning_command()
+{
+	let warn = get_tag_value("text"); if(warn == "") cannot_find_tag();
+	
+	model.warning = {show:false, te:warn};
 }
 
 
@@ -893,13 +902,13 @@ function transition_command2(tags)
 	if(fr == SOURCE) ci = SOURCE;
 	else{
 		ci = hash_find(claa.hash_comp,fr);
-		if(ci == undefined) alert_import("In transition '"+te+"' cannot find compartment '"+fr+"'");
+		if(ci == undefined) cannot_find_trans_comp(te,p,cl,fr);
 	}
 	
 	if(to == SINK) cf = SINK;
 	else{
 		cf = hash_find(claa.hash_comp,to);
-		if(cf == undefined) alert_import("In transition '"+te+"' annot find compartment '"+to+"'");
+		if(cf == undefined) cannot_find_trans_comp(te,p,cl,to);
 	}
 	
 	let pos = dist_pos;	if(ci == SOURCE) pos = source_dist_pos;
@@ -1222,7 +1231,7 @@ function map_command()
 
 	
 /// Sets param_mult
-function param_mult_command()
+function param_mult_command(per_start,per_end)
 {
 	let full_name = get_tag_value("name"); if(full_name == "") cannot_find_tag();
 	
@@ -1232,25 +1241,25 @@ function param_mult_command()
 	let f_par = get_param_mult(par);
 	model.param_factor.push({f_param:f_par, param:{name:par.name,dep:copy(par.dep), full_name:par.full_name}});
 
-	param_command2(remove_eq_quote(f_par.full_name),"mult");
+	param_command2(remove_eq_quote(f_par.full_name),per_start,per_end,"mult");
 }
 
 
 /// Sets the value for a parameter in the model
-function param_command()
+function param_command(per_start,per_end)
 {
 	let full_name = get_tag_value("name"); if(full_name == "") cannot_find_tag();
-	param_command2(full_name);
+	param_command2(full_name,per_start,per_end);
 }
 
 
 /// Processes param / param-mult command
-function param_command2(full_name,op)
+function param_command2(full_name,per_start,per_end,op)
 {
 	let pp = get_param_prop(full_name);
-	
+
 	let par = create_new_param(pp,"normal");
-	
+
 	par.import_line = imp.line;
 
 	if(par.time_dep == true){
@@ -1291,9 +1300,7 @@ function param_command2(full_name,op)
 	}
 
 	if(par.dep.length > 0){
-		let list = par_find_list(par)
-		par.list = list;
-		par.comb_list = generate_comb_list(list);
+		par.list = par_find_list(par);
 	}
 	
 	par.factor = false;
@@ -1315,7 +1322,6 @@ function param_command2(full_name,op)
 	
 		par.factor_weight_on = {check:true};
 		
-		par.factor_weight = copy(par.value);
 		set_default_factor_weight(par);
 		
 		let tab = load_table(fw.te,true,fw.sep,fw.name);
@@ -1390,7 +1396,7 @@ function param_command2(full_name,op)
 	
 	par.reparam_eqn = "";
 	par.reparam_eqn_on = false;
-	
+
 	if(par.dep.length == 0){
 		if(value != ""){
 			par.value = value;
@@ -1432,15 +1438,22 @@ function param_command2(full_name,op)
 				par.reparam_eqn_on = true;
 			}
 			else{		
-				if(is_file(valu) == false){ // Sets all elements to the same
-					let dim = get_dimensions(par.value);
-					let ele_list = get_element_list(par.value,dim);
+				par.value = param_blank(par);
+			
+				let dim = get_dimensions(par.value);
+				let ele_list = get_element_list(par.value,dim);
 		
+				if(is_file(valu) == false){ // Sets all elements to the same	
 					for(let k = 0; k < ele_list.length; k++){
 						set_element(par.value,ele_list[k],valu);
 					}
 				}
 				else{
+					// Sets a default value of zero
+					for(let k = 0; k < ele_list.length; k++){
+						set_element(par.value,ele_list[k],"0");
+					}
+					
 					let tab = load_table(valu.te,true,valu.sep,valu.name);
 				
 					if(tab == undefined) return;
@@ -1521,6 +1534,7 @@ function param_command2(full_name,op)
 	if(prior_split != ""){
 		par.prior_split_check = {check:true};
 		par.prior_split_set = true;
+		par.prior_split = param_blank(par);
 		if(par.dep.length == 0){
 			alert_import("'prior-split' can only be used if the parameter has a dependency.");  
 		}
@@ -1973,7 +1987,12 @@ function ind_effect_command()
 	let name = get_tag_value("name"); if(name == "") cannot_find_tag();
 	
 	let spl = name.split(",");
-	let ie_list = []; for(let i = 0; i < spl.length; i++) ie_list.push({name:spl[i]});
+	let ie_list = []; 
+	for(let i = 0; i < spl.length; i++){
+		let nam = spl[i];
+		check_name_input(nam,"Individual effect name",true);
+		ie_list.push({name:nam});
+	}
 	
 	let A = get_tag_value("A"); 
 	let A_sparse = get_tag_value("A-sparse"); 
@@ -2116,6 +2135,7 @@ function fixed_effect_command()
 	}
 		
 	let name = get_tag_value("name"); if(name == "") cannot_find_tag();
+	check_name_input(name,"Individual fixed effect",true);
 
 	let X_vector = { loaded:false, ind_list:[], X_value:[]};
 
@@ -2139,7 +2159,7 @@ function fixed_effect_command()
 		}
 	}
 	
-	model.species[p].fix_eff.push({name:name, X_vector:X_vector});
+	model.species[p].fix_eff.push({name:name, X_vector:X_vector, defined:true});
 }
 
 

@@ -64,14 +64,23 @@ function plot_simp_vert_text(te,x,y,font,col)
 
 
 /// Truncates a string to a certain length
-function trunc(te,fo,width)
+function trunc_fo(te,fo,width)
 {
 	if(width <= 0) return "";
 	
 	let w = text_width(te,fo);
-	let len = Math.round(te.length*w/width);
-	te = te.substr(0,len);
-	while(len > 0 && text_width(te,fo) > width){ len--; te = te.substr(0,len);}
+	if(w <= width) return te;
+	
+	let len = Math.round(1.2*te.length*width/w);
+	if(len < te.length) te = te.substr(0,len);
+	w = text_width(te,fo);
+	if(w <= width) return te;
+	
+	let dw = w-width;
+	let le = te.length;
+	let i = 1;
+	while(i < le && text_width(te.substr(le-i,i)) < dw) i++;
+	te = te.substr(0,le-i);
 	
 	return te;
 }
@@ -92,12 +101,12 @@ function text_sup_anno(tex,si,width,fo_type)
 	let wtrun = text_width("...",fo);
 	
 	let fl = false;
-	
+
 	let te = spl[0];
 	let w = text_width(te,fo);
 	if(w > width){
 		fl = true;
-		te = trunc(te,fo,width-wtrun);
+		te = trunc_fo(te,fo,width-wtrun);
 		w = text_width(te,fo);
 	}
 	
@@ -114,7 +123,7 @@ function text_sup_anno(tex,si,width,fo_type)
 			let w = text_width(te_add,fo_sup);
 			if(x+w > width){
 				fl = true;
-				te_add = trunc(te_add,fo_sup,width-wtrun-x);
+				te_add = trunc_fo(te_add,fo_sup,width-wtrun-x);
 				w = text_width(te_add,fo_sup);
 			}
 			
@@ -129,7 +138,7 @@ function text_sup_anno(tex,si,width,fo_type)
 				let w = text_width(te_add,fo);
 				if(x+w > width){
 					fl = true;
-					te_add = trunc(te_add,fo,width-wtrun-x);
+					te_add = trunc_fo(te_add,fo,width-wtrun-x);
 					w = text_width(te_add,fo);
 				}
 				
@@ -1578,6 +1587,7 @@ function label_convert(te,si,wmax)
 {
 	let fo_big = get_font(1.4*si,"","Times");
 	let fo = get_font(si,"","Times");
+	let bra_fo = get_font(1.2*si,"","Times");
 	let sub_fo = get_font(0.6*si,"italic","Times");
 	let sup_fo = get_font(0.6*si,"","Times");
 	
@@ -1599,139 +1609,150 @@ function label_convert(te,si,wmax)
 			if(ch == "["){ type = "ie"; break;}
 			if(ch == "〈"){ type = "fe"; break;}
 			if(ch == "Σ"){ type = "sum"; break;}
+			if(ch == "(" || ch == ")"){ type = "bra"; break;}
 			if(!notparam_list.includes(ch)){ type = "param"; break;}				
 			i++;
 		}while(i < te.length);
 
 		if(i_store != i){
 			let tex = te.substr(i_store,i-i_store).replace(/ /g,"");
-
-			frag.push({ te:tex, col:BLACK, x:x, y:0*si, fo:fo});
-			x += text_width(tex,fo)+gap;  
+			if(tex != ""){
+				frag.push({ te:tex, col:BLACK, x:x, y:0*si, fo:fo});
+				x += text_width(tex,fo)+gap;  
+			}
 		}
 		
 		if(i < te.length){
-			let pair, col;
-			
-			let i_store = i;
-			let tex;
-			
-			if(type == "param"){
-				i = param_end(te,i);
-				if(typeof i == 'string'){ prob_flag = true; break;}
-				
-				tex = te.substr(i_store,i-i_store);	
-				if(i < te.length && te.substr(i,1) == "$") i++;
+			if(type == "bra"){
+				let tex = te.substr(i,1);
+				frag.push({ te:tex, col:BLACK, x:x, y:0*si, fo:bra_fo});
+				x += text_width(tex,bra_fo)+gap;  
+				i++;
 			}
 			else{
-				switch(te.substr(i,1)){
-				case "{": pair = "}"; col = BLUE; break;
-				case "[": pair = "]"; col = DGREEN; break;
-				case "〈": pair = "〉"; col = DRED; break;
-				case "Σ": pair = "("; col = BLACK; break;
-				default: alertp("No pair"); break;
-				}	
+				let pair, col;
 				
-				while(i < te.length && te.substr(i,1) != pair) i++;
-			
-				if(i < te.length) i++;
-	
-				if(pair == "("){
-					let num = 1;
-					for(let j = i; j < te.length; j++){
-						if(te.substr(j,1) == "(") num++;
-						if(te.substr(j,1) == ")"){
-							num--;
-							if(num == 0){
-								te = te.substr(0,j)+te.substr(j+1);
-								break;
+				let i_store = i;
+				let tex;
+				
+				if(type == "param"){
+					i = param_end(te,i);
+					if(typeof i == 'string'){ prob_flag = true; break;}
+					
+					tex = te.substr(i_store,i-i_store);	
+					if(i < te.length && te.substr(i,1) == "$") i++;
+				}
+				else{
+					switch(te.substr(i,1)){
+					case "{": pair = "}"; col = BLUE; break;
+					case "[": pair = "]"; col = DGREEN; break;
+					case "〈": pair = "〉"; col = DRED; break;
+					case "Σ": pair = "("; col = BLACK; break;
+					default: alertp("No pair"); break;
+					}	
+					
+					while(i < te.length && te.substr(i,1) != pair) i++;
+				
+					if(i < te.length) i++;
+		
+					if(pair == "("){
+						let num = 1;
+						for(let j = i; j < te.length; j++){
+							if(te.substr(j,1) == "(") num++;
+							if(te.substr(j,1) == ")"){
+								num--;
+								if(num == 0){
+									break;
+								}
 							}
 						}
 					}
+					
+					tex = te.substr(i_store+1,i-i_store-2);
 				}
 				
-				tex = te.substr(i_store+1,i-i_store-2);
-			}
-			
-			if(type == "param" || pair == "}" || pair == "("){
-				let sub = "", sup = "", time = "";
-			
-				if(tex.length > 3){
-					let end = tex.substr(tex.length-3,3);
-					if(end == "(t)" || end == "(a)"){
-						time = end;
-						tex = tex.substr(0,tex.length-3);
-					}
-				}
+				if(type == "param" || pair == "}" || pair == "("){
+					let sub = "", sup = "", time = "";
 				
-				let k = 0; while(k < tex.length && tex.substr(k,1) != "^" && tex.substr(k,1) != "_") k++;
-				let main = tex.substr(0,k);
-				if(pair == "}"){
-					if(main == "") main = "All";
-					main = "{"+main+"}";
-				}
-			
-				if(pair == "("){
-					main = "Σ"+main;
-				}
-				
-				for(let loop = 0; loop < 2; loop++){
-					if(k < tex.length){
-						let k_store = k;
-						k++; 
-						while(k < tex.length && tex.substr(k,1) != "^" && tex.substr(k,1) != "_" ) k++;
-						let st = tex.substr(k_store+1,k-(k_store+1));
-						switch(tex.substr(k_store,1)){
-							case "^": sup = st; break;
-							case "_": sub = st; break;
-							default: error("Option not recognised 103"); break;
+					if(tex.length > 3){
+						let end = tex.substr(tex.length-3,3);
+						if(end == "(t)" || end == "(a)"){
+							time = end;
+							tex = tex.substr(0,tex.length-3);
 						}
 					}
-				}			
-				
-				sup = remove_bracket(sup);
-				sub = remove_bracket(sub);
-
-				let ysh = 0;
-				let fo_main = fo; 
-				if(main == "Σ" && pair == "("){ fo_main = fo_big; ysh = 0.2;}
-
-				frag.push({ te:main, col:col, x:x, y:ysh*si, fo:fo_main});
-				x += text_width(main,fo_main);  
-				if(sub != "" || sup != "") x += gap/2;
-				
-				let w_sub = 0, w_sup = 0;
-				if(sub != ""){
-					frag.push({ te:sub, col:col, x:x, y:0.2*si, fo:sub_fo});
-					w_sub = text_width(sub,sub_fo)
-				}
-				
-				if(sup != ""){
-					frag.push({ te:sup, col:col, x:x, y:-0.45*si, fo:sup_fo});
-					w_sup = text_width(sup,sup_fo)
-				}
-				
-				if(w_sub > w_sup) x += w_sub; 
-				else x += w_sup;
-
-				if(time != ""){
-					frag.push({ te:time, col:col, x:x, y:0*si, fo:fo});
-					x += text_width(time,fo);
-				}
-
-				x += gap;
-			}
-			else{
-				if(pair == "]"){
-					tex = "["+tex+"]";
-				}
-				
-				if(pair == "〉"){
-					tex = "〈"+tex+"〉";
-				}
 					
-				frag.push({ te:tex, col:col, x:x, y:0*si, fo:fo});
-				x += text_width(tex,fo)+gap;  
+					let k = 0; while(k < tex.length && tex.substr(k,1) != "^" && tex.substr(k,1) != "_") k++;
+					let main = tex.substr(0,k);
+					if(pair == "}"){
+						if(main == "") main = "All";
+						main = "{"+main+"}";
+					}
+				
+					if(pair == "("){
+						main = "Σ"+main;
+					}
+					
+					for(let loop = 0; loop < 2; loop++){
+						if(k < tex.length){
+							let k_store = k;
+							k++; 
+							while(k < tex.length && tex.substr(k,1) != "^" && tex.substr(k,1) != "_" ) k++;
+							let st = tex.substr(k_store+1,k-(k_store+1));
+							switch(tex.substr(k_store,1)){
+								case "^": sup = st; break;
+								case "_": sub = st; break;
+								default: error("Option not recognised 103"); break;
+							}
+						}
+					}			
+					
+					sup = remove_bracket(sup);
+					sub = remove_bracket(sub);
+
+					let ysh = 0;
+					let fo_main = fo; 
+					if(main == "Σ" && pair == "("){ fo_main = fo_big; ysh = 0.2;}
+
+					frag.push({ te:main, col:col, x:x, y:ysh*si, fo:fo_main});
+					x += text_width(main,fo_main);  
+					if(sub != "" || sup != "") x += gap/2;
+					
+					let w_sub = 0, w_sup = 0;
+					if(sub != ""){
+						frag.push({ te:sub, col:col, x:x, y:0.2*si, fo:sub_fo});
+						w_sub = text_width(sub,sub_fo)
+					}
+					
+					if(sup != ""){
+						frag.push({ te:sup, col:col, x:x, y:-0.45*si, fo:sup_fo});
+						w_sup = text_width(sup,sup_fo)
+					}
+					
+					if(w_sub > w_sup) x += w_sub; 
+					else x += w_sup;
+
+					if(time != ""){
+						frag.push({ te:time, col:col, x:x, y:0*si, fo:fo});
+						x += text_width(time,fo);
+					}
+
+					x += gap;
+					
+					if(pair == "(") i--;
+				}
+				else{
+					if(pair == "]"){
+						tex = "["+tex+"]";
+					}
+					
+					if(pair == "〉"){
+						tex = "〈"+tex+"〉";
+					}
+						
+					frag.push({ te:tex, col:col, x:x, y:0*si, fo:fo});
+					x += text_width(tex,fo)+gap;  
+				}
 			}
 		}
 	}

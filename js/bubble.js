@@ -214,6 +214,7 @@ function add_bubble_buts(lay)
 			case "GraphSettings": inter.graph.settings_dist_bubble(cont); break;
 			case "TraceSettings": inter.graph.settings_trace_bubble(cont); break;
 			case "ScatterSettings": inter.graph.settings_scatter_bubble(cont); break;
+			case "HistogramSettings": inter.graph.settings_histogram_bubble(cont); break;
 			default: inter.graph.settings_speed_bubble(cont); break;
 			}
 		}
@@ -1788,14 +1789,14 @@ function bubble_colour(cont,tab)
 	let dby = 1.2, gap = 0, mar = 0.;
 	if(tab == undefined) tab = 0;
 	
-	let dbx = (cont.dx-tab+gap*6-2*mar)/7;
+	let dbx = (cont.dx-tab+gap*6-2*mar)/8;
 
 	cont.lay.add_button({te:"Colour:", x:tab, y:cont.y, dx:cont.dx-tab, dy:0.8, type:"InputBoxName"});
 	cont.y += 1.0;
 	
 	for(let j = 0; j < 4; j++){
-		for(let i = 0; i < 7; i++){
-			cont.lay.add_button({x:tab+mar+(dbx+gap)*i, y:cont.y+(dby+gap)*j, dx:dbx, dy:dby, ac:"ColourSelect", type:"ColourSelect", col:collist[j*7+i], sel_bu:cont.bu});
+		for(let i = 0; i < 8; i++){
+			cont.lay.add_button({x:tab+mar+(dbx+gap)*i, y:cont.y+(dby+gap)*j, dx:dbx, dy:dby, ac:"ColourSelect", type:"ColourSelect", col:collist[j*8+i], sel_bu:cont.bu});
 		}
 	}
 	
