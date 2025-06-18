@@ -223,28 +223,36 @@ vector <DeriveOutput> State::derive_calculate() const
 {
 	vector <DeriveOutput> output;
 	
+	vector < vector < vector <double> > > der_value; 
+	
 	for(const auto &der : model.derive){
 		DeriveOutput op;
+		vector < vector <double> > d_value;
 		for(auto i = 0u; i < der.eq.size(); i++){
 			auto &eqn = model.eqn[der.eq[i].eq_ref];
 			
+			vector <double> value;
+			
 			string val_str;
 			if(der.time_dep == false){
-				auto val = eqn.calculate_param_only(param_val);
+				auto val = eqn.calculate_derive(UNSET,popnum_t,param_val,spline_val,der_value);
 				val_str = tstr(val);
+				value.push_back(val);
 			}
 			else{
-				vector <double> value;
 				for(auto ti = 0u; ti < T; ti++){	
-					auto val = eqn.calculate(ti,popnum_t[ti],param_val,spline_val);
+					auto val = eqn.calculate_derive(ti,popnum_t,param_val,spline_val,der_value);
 					value.push_back(val);
 				}
 				val_str = compact_vector(value);
 			}
+			d_value.push_back(value);
+			
 			op.value_str.push_back(val_str);
 		}
 		
 		output.push_back(op);
+		der_value.push_back(d_value);
 	}
 	
 	return output;

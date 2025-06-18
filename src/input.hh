@@ -116,6 +116,7 @@ class Input                                // Stores information about the model
 		void alert_line(string st, unsigned int line, bool fatal = false);  
 		void alert_equation(const EquationInfo &eqi, const string &warn);
 		void alert_warning(string st);  
+		void alert_warning_line(string st, unsigned int line);
 		bool fatal_error() const;
 		void process_command(const CommandLine &cline, unsigned int loop);
 		string get_tag_value(string st);
@@ -188,6 +189,7 @@ class Input                                // Stores information about the model
 		void create_population_erlang();
 		void source_equation_comp();
 		void calculate_timepoint();	
+		unsigned int get_spline_i(const ParamRef &pr);
 		void create_spline();
 		bool is_dist(const Param &par) const;
 		void create_nm_trans();
@@ -312,5 +314,7 @@ class Input                                // Stores information about the model
 		unsigned int check_pos_integer(string val, unsigned int def=UNSET);
 		double check_pos_number(string te, unsigned int def);
 		double check_zero_one(string te, double def);
+		void check_memory_too_large();
+		void check_derived_order();
 };
 

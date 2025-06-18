@@ -27,6 +27,8 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 		
 		sampledir = input.datadir+"/Sample";
 		ensure_directory(sampledir);                // Creates the Samples directory
+	
+		if(op()) start_progess_file(diagdir+"/progress.txt");
 	}
 	
 	if(op()){
@@ -63,7 +65,7 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 			}
 			
 			if(command == "inf-generation"){
-				flag = true;
+				if(model.mode != PPC) flag = true;
 			}
 			
 			if(command == "trans-diag"){
@@ -1965,7 +1967,7 @@ void Output::end(string file, unsigned int total_cpu) const
 		}
 	}
 	
-	if(op() && model.mode == INF) output_param_statistics(param_samp,fout);
+	if(op() && model.mode == INF && com_op == false) output_param_statistics(param_samp,fout);
 	
 	auto trans_diag = trans_diag_init(); 
 	
@@ -2112,7 +2114,7 @@ string Output::get_effective_sample_size(vector <double> vec) const
 	for(auto d = 1u; d < N/2; d++){
 		auto a = 0.0; for(auto s = 0u; s < N-d; s++) a += vec[s]*vec[s+d]; 
 		auto cor = a/(N-d); if(cor < 0) break;
-		sum += 0.5*cor;			
+		sum += 2*cor;			
 	}
 	
 	return tstr((unsigned int)(N/sum));
@@ -2123,11 +2125,11 @@ string Output::get_effective_sample_size(vector <double> vec) const
 string Output::get_Gelman_Rubin_statistic(const vector < vector <double> > &cha) const
 {
 	auto C = cha.size();
-	if(C == 0) emsg("no chain");
+	if(C == 0) return "no chain";
 	if(C == 1) return "NA";
 	
 	auto N = cha[0].size();
-	if(N == 0) emsg("no data");
+	if(N == 0) return "no data";
 		
 	vector <double> mu(C), vari(C);
 	
@@ -2739,4 +2741,21 @@ void Output::final_time(long sec) const
 	
 	auto day = hour/24.0;
 	cout << day << " days" << endl;
+}
+
+
+/// Outputs the memory usage
+void Output::final_memory_usage() const 
+{
+	auto mem = memory_usage();
+
+#ifdef USE_MPI	
+	mpi.sum(mem);
+#endif
+	
+	if(op()){
+		auto per = (unsigned int)(100*mem/total_memory());
+		cout << "Total memory consumption: " << mem_print(mem);
+		cout << " (" << per << "% of computer)" << endl;
+	}
 }

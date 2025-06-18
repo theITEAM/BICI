@@ -49,6 +49,7 @@ class Output                               // Stores information about the data
 		string print_obs_data(unsigned int p, const vector <ObsData> &obs) const;
 		void print_individuals(unsigned int N, unsigned int p, const State &state) const;
 		void final_time(long total_cpu) const;
+		void final_memory_usage() const;
 	
 	private:
 		vector < vector <double> > param_value_from_vec(const vector <double> &param_val_prop) const;

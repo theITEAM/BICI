@@ -7,7 +7,7 @@ using namespace std;
 #include "struct.hh"
 #include "const.hh"
 
-enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAMETER, PARAMVEC, SPLINE, SPLINEREF, POPNUM, TIME, IE, ONE, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, NOOP};
+enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAMETER, PARAMVEC, SPLINE, SPLINEREF, POPNUM, TIME, IE, ONE, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, TINT, POPNUM_TIME, DERIVE, SPLINE_TIME, SPLINEREF_TIME, NOOP};
 
 struct EqItem {                            // An individual operation in a calculation
 	EqItem(){ num = UNSET;}
@@ -33,6 +33,13 @@ struct PopCalculation                      // Used to describe a population calc
 	unsigned int po;                         // The population which multiplies calculation 
 };
 
+struct TimeRef                             // For time integrals allows for time index
+{
+	// For integral num and ti can store the bounds
+	unsigned int num;                        // The number of quantity (e.g. spline)
+	unsigned int ti;                         // The time step
+};
+	
 struct LinearCalculation                   // Stores a linear calculation
 {
 	PopCalculation no_pop_calc;              // Calculates non-population part
@@ -69,7 +76,11 @@ class Equation                             // Stores information about the model
 	
 		vector <ParamRef> param_ref;           // Stores the parameters used in the equation
 		
+		vector <DeriveRef> derive_ref;         // Stores derived used in the equation
+		
 		vector <double> cons;                  // Stores any constant values
+		
+		vector <TimeRef> time_ref;             // Used for time integrals
 		
 		vector <unsigned int> pop_ref;         // Stores the populations used in the equation
 		
@@ -110,11 +121,12 @@ class Equation                             // Stores information about the model
 		
 		Linearise linearise;                   // Used for accelerated likelihood calculation
 		
-		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsigned int c, bool inf_trans, unsigned int tif, unsigned int li_num, vector <SpeciesSimp> &species, vector <Param> &param, vector <Spline> &spline, vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, const vector <double> &timepoint);
+		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsigned int c, bool inf_trans, unsigned int tif, unsigned int li_num, vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, vector <Spline> &spline, vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, const vector <double> &timepoint);
 		double calculate_param_only(const vector <double> &param_val) const;
 		double calculate_param_only_ti_fix(const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
 		double calculate_no_popnum(unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const; 
 		double calculate(unsigned int ti, const vector <double> &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
+		double calculate_derive(unsigned int ti, const vector < vector <double> > &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector < vector <double> > > &derive_val) const;
 		void print_calculation() const;
 		void print_ca(const Calculation &ca) const;
 		
@@ -138,6 +150,7 @@ class Equation                             // Stores information about the model
 		vector <unsigned int> get_all_comp(unsigned int p, string te);
 		double get_float(unsigned int i, unsigned int &raend) const;
 		ParamRef get_param_name(unsigned int i, double &dist, unsigned int &raend);
+		DeriveRef get_derive_name(unsigned int i, unsigned int &raend);
 		unsigned int get_pop(unsigned int i, unsigned int &raend);
 		unsigned int get_ie(unsigned int i, unsigned int &raend);
 		unsigned int get_fe(unsigned int i, unsigned int &raend);
@@ -151,6 +164,8 @@ class Equation                             // Stores information about the model
 		double calculate_operation(EqItemType op, vector <double> &num) const;
 		
 		vector <EqItem> extract_operations();
+		unsigned int get_integral_bound(string st);
+		unsigned int extract_integral(const string &te, unsigned int i, vector <EqItem> &op);
 		void combine_populations(vector <EqItem> &op) const;
 		void create_calculation(vector <EqItem> &op);
 		void extract_ind_eff();
@@ -167,12 +182,14 @@ class Equation                             // Stores information about the model
 		double get_distance(const ParamProp &pp);
 		string op_name(EqItemType type) const;
 		void check_repeated_operator(const vector <EqItem> &op);
+		void time_integral(vector <EqItem> &op);
 		void replace_minus(vector <EqItem> &op);
 		unsigned int add_param_ref(const ParamRef &pref);
 				
 		vector <SpeciesSimp> &species;       // References the species from the model
 		unsigned int nspecies;
 		vector <Param> &param;               // References the parameters from the model
+		const vector <Derive> &derive;       // Reference derived quantities in the model
 		vector <Spline> &spline;             // References splines from the model
 		vector <ParamVecEle> &param_vec;     // References the param_vec from the model
 		vector <Population> &pop;            // References the populations from the model

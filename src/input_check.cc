@@ -290,7 +290,7 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 		{
 			auto num = number(te);
 			if(num == UNSET){	
-				auto pri = convert_text_to_prior(te,line_num,false);
+				auto pri = convert_text_to_prior(te,line_num,"",false);
 				if(pri.error != "") return pri.error;
 			}	
 		}
@@ -849,12 +849,70 @@ void Input::species_mem_usage() const
 	cout << "pop_data_ref:" << int(100*pop_data_ref/sum) << ",";
 	cout << "pop_trans_ref:" << int(100*pop_trans_ref/sum) << ",";
 	cout << endl;
+}
+
+
+/// Checks if too much memory is being used
+void Input::check_memory_too_large()
+{
+	auto mem = memory_usage();
 	
-	/*
-		// These not calculated
-		vector <IndData> individual;           // Stores data on individuals
-		vector <ParEventJointProp> par_event_joint;// Information about joint parameter event proposal		
-		Hash hash_ind;                         // Stores individuals in a hash table
-		Hash hash_enter;                       // Stores enter in a hash table
-	*/
+#ifdef USE_MPI	
+	mpi.sum(mem);
+#endif
+
+	auto f_mem = 0.0, f_free = 1.0;
+	
+	if(op()){
+		f_mem = mem/total_memory();
+		f_free = memory_available()/mem;
+	}
+
+#ifdef USE_MPI	
+	mpi.bcast(f_mem);
+	mpi.bcast(f_free);
+#endif
+	
+	auto fl = false;
+	if(f_mem > MEM_FRAC_MAX){
+		fl = true;
+		alert_import("Out of memory error. BICI currently requires '"+mem_print(mem)+"' and this computer only has '"+mem_print(mem*MEM_FRAC_MAX/f_mem)+"' available");
+	}
+	else{
+		if(f_free < MEM_FREE_MIN){
+			fl = true;
+			alert_import("Out of memory error. This computer potentially has enough memory but other processes need to be terminated. BICI currently requires '"+mem_print(mem)+"' and this computer has '"+mem_print(mem*MEM_FRAC_MAX/f_mem)+"' available");
+		}
+	}
+	
+	if(fl) output_error_messages(err_mess,true);
+}
+
+
+/// Checks to see if derived quantities do not use derived quanties yet to be calculated  
+void Input::check_derived_order()
+{
+	for(auto d = 0u; d < model.derive.size(); d++){
+		const auto &der = model.derive[d];
+		
+		for(const auto &ei : der.eq){
+			const auto &eqn = model.eqn[ei.eq_ref]; 
+			for(const auto &ca : eqn.calc){
+				for(const auto &it : ca.item){
+					if(it.type == DERIVE){
+						const auto &dr = eqn.derive_ref[it.num];
+						if(dr.i == d){
+							alert_line("Derived quantity '"+der.full_name+"' cannot depend on itself",der.line_num);
+							return;
+						}
+						if(dr.i > d){
+							auto &der2 = model.derive[dr.i];
+							alert_line("Derived quantity '"+der.full_name+"' cannot depend on derived quantity '"+der2.full_name+"' which is defined later.",der.line_num);
+							return;
+						}
+					}
+				}
+			}
+		}			
+	} 
 }

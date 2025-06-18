@@ -21,6 +21,8 @@ using namespace std;
 /// Checks that a distribution is being generated correctly
 void test_distribution()
 {
+	string warn;
+	
 	{
 		for(auto shape = 1.0; shape < 5; shape += 0.1){
 			auto gam1 = exp(lgamma(1+2.0/shape));
@@ -77,7 +79,7 @@ void test_distribution()
 		auto av = 0.0, av2 = 0.0;
 		auto loopmax = 1000000u;
 		for(auto loop = 0u; loop < loopmax; loop++){
-			auto x = gamma_sample(m,cv);
+			auto x = gamma_sample(m,cv,warn);
 			av += x;
 			av2 += x*x;
 		}
@@ -103,7 +105,7 @@ void test_distribution()
 	case 0: // Tests the normal distribution
 		{
 			for(auto i = 0u; i < imax; i++){
-				auto val = normal_sample(meansamp,sdsamp);
+				auto val = normal_sample(meansamp,sdsamp,warn);
 				sum += val; sum2 += val*val;
 			}
 
@@ -123,7 +125,7 @@ void test_distribution()
 	case 1: // Tests the gamma distribution
 		{
 			for(auto i = 0u; i < imax; i++){
-				auto val = gamma_sample(meansamp,cvsamp);
+				auto val = gamma_sample(meansamp,cvsamp,warn);
 				sum += val; sum2 += val*val;
 			}
 
@@ -149,7 +151,7 @@ void test_distribution()
 	case 2: // Tests the log-normal distribution
 		{
 			for(auto i = 0u; i < imax; i++){
-				auto val = lognormal_sample(meansamp,cvsamp);
+				auto val = lognormal_sample(meansamp,cvsamp,warn);
 				sum += val; sum2 += val*val;
 			}
 
@@ -175,7 +177,7 @@ void test_distribution()
 	case 3: // Tests the Weibull distribution
 		{
 			for(auto i = 0u; i < imax; i++){
-				auto val = weibull_sample(scalesamp,shapesamp);
+				auto val = weibull_sample(scalesamp,shapesamp,warn);
 				sum += val; sum2 += val*val;
 			}
 
@@ -201,7 +203,7 @@ void test_distribution()
 	case 4: // Tests the Poisson distribution
 		{
 			for(auto i = 0u; i < imax; i++){
-				auto val = poisson_sample(lamsamp);
+				auto val = poisson_sample(lamsamp,warn);
 				sum += val; sum2 += val*val;
 			}
 
@@ -225,7 +227,7 @@ void test_distribution()
 	case 5: // Tests the bernoulli distribution
 		{
 			for(auto i = 0u; i < imax; i++){
-				auto val = bernoulli_sample(zsamp);
+				auto val = bernoulli_sample(zsamp,warn);
 				sum += val; sum2 += val*val;
 			}
 
@@ -249,12 +251,12 @@ void test_distribution()
 	case 6: // Tests the beta distribution
 		{
 			for(auto i = 0u; i < imax; i++){
-				auto val = beta_sample(alphasamp,betasamp);
+				auto val = beta_sample(alphasamp,betasamp,warn);
 				sum += val; sum2 += val*val;
 			}
 
 			for(auto x = dx; x < 1-dx; x+=dx){
-				auto val = exp(beta_probability(x,alphasamp,betasamp));
+				auto val = exp(beta_probability(x,alphasamp,betasamp,warn));
 				dsum += val*x; dsum2 += val*x*x; ds += val;
 			}
 	
@@ -349,9 +351,10 @@ void generate_data()
 	{
 		ofstream fout("Examples/individual_data.csv");
 	
+		string warn;
 		fout << "ID,X,DS,Sex" << endl;
 		for(auto i = 0u; i < 500; i++){
-			fout << "Ind-" << i << "," << 10+normal_sample(0,1) << ","; 
+			fout << "Ind-" << i << "," << 10+normal_sample(0,1,warn) << ","; 
 			if(i < 2) fout << "I"; else fout << "S";
 			fout << ",";
 			if(ran() < 0.5) fout << "M"; else fout << "F";
@@ -441,10 +444,12 @@ void simulate_trans_exp()
 	}
 	
 	{
+		string warn;
+		
 		ofstream fout("Examples/X.csv");
 		fout << "Ind,Value" << endl;
 		for(auto i = 0u; i < n; i++){
-			fout << name[i] << "," << normal_sample(0,1) << endl;
+			fout << name[i] << "," << normal_sample(0,1,warn) << endl;
 		}
 	}
 }
@@ -578,28 +583,30 @@ void test_incomplete_distribution()
 	vector <double> store;
 	auto shape = 2.2, scale = 1.5, rate = 0.5;
 	
+	string warn;
+	
 	vector <double> tim_store;
 	for(auto type = 0u; type < 15; type++){
 		auto cl_store = clock();
 		for(auto loop = 0u; loop < 10000000; loop++){
 			switch(type){
-			case 0: store.push_back(lognormal_sample(mean,cv)); break;
+			case 0: store.push_back(lognormal_sample(mean,cv,warn)); break;
 			case 1: store.push_back(lognormal_probability(3,mean,cv)); break;
 			case 2: store.push_back(lognormal_upper_probability(3,mean,cv)); break;
 			
-			case 3: store.push_back(weibull_sample(scale,shape)); break;
+			case 3: store.push_back(weibull_sample(scale,shape,warn)); break;
 			case 4: store.push_back(weibull_probability(3,scale,shape)); break;
 			case 5: store.push_back(weibull_upper_probability(3,scale,shape)); break;
 			
-			case 6: store.push_back(gamma_sample(mean,cv)); break;
+			case 6: store.push_back(gamma_sample(mean,cv,warn)); break;
 			case 7: store.push_back(gamma_probability(3,mean,cv)); break;
 			case 8: store.push_back(gamma_upper_probability(3,mean,cv)); break;
 			
-			case 9: store.push_back(exp_rate_sample(rate)); break;
+			case 9: store.push_back(exp_rate_sample(rate,warn)); break;
 			case 10: store.push_back(exp_rate_probability(3,rate)); break;
 			case 11: store.push_back(exp_rate_upper_probability(3,rate)); break;
 			
-			case 12: store.push_back(exp_mean_sample(mean)); break;
+			case 12: store.push_back(exp_mean_sample(mean,warn)); break;
 			case 13: store.push_back(exp_mean_probability(3,mean)); break;
 			case 14: store.push_back(exp_mean_upper_probability(3,mean)); break;
 			}

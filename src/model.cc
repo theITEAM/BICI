@@ -51,7 +51,9 @@ void Model::add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double t)
 		eqi.eq_ref = eqn.size();	
 		
 		hash_eqn.add(eqi.eq_ref,vec);
-		Equation eq(eqi.te,eqi.type,eqi.p,eqi.cl,eqi.c,eqi.infection_trans,ti,eqi.line_num,species_simp,param,spline,param_vec,pop,hash_pop,timepoint);
+		Equation eq(eqi.te,eqi.type,eqi.p,eqi.cl,eqi.c,eqi.infection_trans,ti,eqi.line_num,species_simp,param,derive,spline,param_vec,pop,hash_pop,timepoint);
+		
+		if(false && eq.warn != ""){ cout << eq.warn << endl; emsg("warning");}
 		
 		eqn.push_back(eq);
 	}
@@ -622,7 +624,9 @@ void Model::affect_linearise_speedup2(vector <AffectLike> &vec, const vector <un
 							break;
 						
 						case PARAMETER: case SPLINE: emsg("SHould not be"); break;
-						
+						case SPLINE_TIME: case SPLINEREF_TIME:
+							emsg("SHould not be spline time");
+							break;
 						default: break;
 						}
 					}
@@ -1220,21 +1224,24 @@ void Model::combine_cnum_reduce(unsigned p, InitCondValue &inc) const
 /// Samples from the prior
 double Model::prior_sample(const Prior &pri, const vector <double> &param_val) const
 {				
+	double val=UNSET;
+	string warn;
+	
 	switch(pri.type){
 	case UNIFORM_PR:
 		{	
 			auto min = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
 			auto max = eqn[pri.dist_param[1].eq_ref].calculate_param_only(param_val);
 		
-			if(min > max) emsg("Ordering of uniform prior is wrong");
-			return min+ran()*(max-min);
+			if(min >= max) emsg("For the prior '"+pri.name+"' the minumum value '"+tstr(min)+"' is larger than the maximum value '"+tstr(max)+"'.");
+			val = min+ran()*(max-min);
 		}
 		break;
 		
 	case EXP_PR:
 		{	
 			auto mean = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
-			return exp_mean_sample(mean);
+			val = exp_mean_sample(mean,warn);
 		}
 		break;
 	
@@ -1242,7 +1249,7 @@ double Model::prior_sample(const Prior &pri, const vector <double> &param_val) c
 		{	
 			auto mean = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
 			auto sd = eqn[pri.dist_param[1].eq_ref].calculate_param_only(param_val);
-			return normal_sample(mean,sd);
+			val = normal_sample(mean,sd,warn);
 		}
 		break;
 		
@@ -1250,7 +1257,7 @@ double Model::prior_sample(const Prior &pri, const vector <double> &param_val) c
 		{	
 			auto mean = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
 			auto cv = eqn[pri.dist_param[1].eq_ref].calculate_param_only(param_val);
-			return gamma_sample(mean,cv);
+			val = gamma_sample(mean,cv,warn);
 		}
 		break;
 	
@@ -1258,7 +1265,7 @@ double Model::prior_sample(const Prior &pri, const vector <double> &param_val) c
 		{	
 			auto mean = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
 			auto cv = eqn[pri.dist_param[1].eq_ref].calculate_param_only(param_val);
-			return lognormal_sample(mean,cv);
+			val = lognormal_sample(mean,cv,warn);
 		}
 		break;
 		
@@ -1266,41 +1273,46 @@ double Model::prior_sample(const Prior &pri, const vector <double> &param_val) c
 		{	
 			auto alpha = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
 			auto beta = eqn[pri.dist_param[1].eq_ref].calculate_param_only(param_val);
-			return beta_sample(alpha,beta);
+			val = beta_sample(alpha,beta,warn);
 		}
 		break;
 	
 	case BERNOULLI_PR:
 		{	
 			auto z = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
-			return bernoulli_sample(z);
+			val = bernoulli_sample(z,warn);
 		}
 		break;
 		
 	case FIX_PR:
 		{
-			auto val = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
-			return val;
+			val = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
 		}
 		break;
 		
 	case DIRICHLET_PR:
 		{
 			auto alpha = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
-			return gamma_alpha_sample(alpha);
+			val = gamma_alpha_sample(alpha,warn);
 		}
 		break;
 		
 	case MDIR_PR:	
+		val = UNSET;
 		emsg("SHould not sample from MDIR");
 		break;
 	
 	case UNSET_PR:
+		val = UNSET;
 		emsg("Prior should be set");
 		break;
 	}
 	
-	return UNSET;
+	if(val == UNSET){
+		emsg("For prior '"+pri.name+"' the follow error occurred: "+warn+". This prior is for '"+pri.in+"'. Prior distribution quantities (means, sds etc...) have threshold limits to ensure numerical accuracy. Consider changing the values or restricting the priors on model parameter which determine this distribution"); 
+	}
+	
+	return val;
 }
 
 

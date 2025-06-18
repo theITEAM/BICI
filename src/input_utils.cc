@@ -757,7 +757,7 @@ unsigned int Input::import_geojson(string file)
 										switch(type){
 										case MULTI_POLYGON:
 											for(const auto &ob6 : ob5){
-												Polygon poly;
+												Pgon poly;
 												for(const auto &ob7 : ob6){
 													if(ob7.size() != 2){ alert_import("Problem loading '"+file+"'",true); return UNSET;}
 													LatLng po; po.lng = ob7[0]; po.lat = ob7[1];
@@ -769,7 +769,7 @@ unsigned int Input::import_geojson(string file)
 										
 										case POLYGON:
 											{
-												Polygon poly;
+												Pgon poly;
 												for(const auto &ob6 : ob5){
 													if(ob6.size() != 2){ alert_import("Problem loading '"+file+"'",true); return UNSET;}
 													LatLng po; po.lat = ob6[0]; po.lng = ob6[1];

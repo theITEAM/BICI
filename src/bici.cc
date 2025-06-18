@@ -10,10 +10,13 @@
 // mpirun -n 1 ./bici-para file.bici sim
 // mpirun -n 1 ./bici-para Execute/init.bici sim
 // mpirun -n 3 ./bici-para Execute/init.bici inf
+// mpirun -n 10 ./bici-para Execute/init.bici inf
 // mpirun -n 3 ./bici-para Grant/RealData_1000_DA_5000 inf
 // mpirun -n 3 ./bici-para Grant/RealData_2000_DA_5000 inf
+// mpirun -n 16 ./bici-para Jamie/scen-5-1.bici inf
 
-// ssh gaia.bioss.ac.uk    azog.bioss.ac.uk
+// ssh gaia.bioss.ac.uk   
+// tar -xzf foo.tgz
 
 // git clone https://github.com/theITEAM/BICI.git
 
@@ -202,6 +205,8 @@ int main(int argc, char** argv)
 	output.end(file,total_cpu);
 	
 	if(op() && !com_op) output.final_time(total_cpu);
+	
+	if(!com_op) output.final_memory_usage();
 	
 #ifdef USE_MPI
 	MPI_Finalize();

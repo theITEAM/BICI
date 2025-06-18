@@ -742,3 +742,12 @@ unsigned int Species::get_comp_global_convert(unsigned int cgl, unsigned int cl,
 	
 	return cgl;
 }
+
+
+/// Outputs a sampling error message
+void Species::sampling_error(unsigned int trg, string warn) const
+{
+	const auto &tra = tra_gl[trg];
+	emsg("Sampling error for transition '"+cla[tra.cl].tra[tra.tr].name+"': "+warn+". Transition distribution quantities (means, sds etc...) have threshold limits to ensure numerical accuracy. Consider changing the values or restricting the priors on model parameter which determine this transition."); 
+}
+

@@ -8,6 +8,8 @@ using namespace std;
 
 // This is set if compilation is done on windows
 //#define WINDOWS
+#define LINUX
+//#define MAC
 
 //const string default_file = "/tmp/init.bici";   // This is used for Mac
 const string default_file = "Execute/init.bici"; // This is used for windows / linux
@@ -264,6 +266,8 @@ const auto GEN_PLOT = 99999995u;                  // Used for a generation plot
 const auto LINK_CV_THRESH = 0.3;                  // CV threshold for linking for multi-event
 const auto LINK_WEIBULL_SHAPE = 3.7;              // Shape thresh for linking for multi-event
 
+const auto MEM_FRAC_MAX = 0.8;                    // Maximum fraction of memory usable
+const auto MEM_FREE_MIN = 0.1;                    // Minimum fraction of memory available
 const auto SIM_TRY_MAX = 10000u;                  // Maximum tries simulating nm trans
 const auto TFORM_MAX = 100000u;                   // Maximum number for tform lookup table
 const auto CGC_MAX = 100000u;                     // Maximum number for comp_global_convert
@@ -401,8 +405,9 @@ const auto name_ch_max = 40;                      // Maximum number of character
 const string endli = "\n";
 const string dist_matrix_name = "D";              // The name of a distance matrix
 
-// Checking for Σ is done differtly in c++ because it uses two characters
+// Checking for Σ and ∫ is done differently in c++ because it uses two characters
 const string sigma = "Σ";  
+const string tint = "∫";  
 
 const string unobserved_str = "Unobserved";       // Name for unobserved 
 

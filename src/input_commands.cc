@@ -77,7 +77,7 @@ void Input::import_data_table_command(Command cname)
 			if(ds.init_pop_type == INIT_POP_DIST){
 				if(ds.focal_cl == UNSET){
 					auto prior = get_tag_value("prior"); 
-					auto pri = convert_text_to_prior(prior,line_num,false);
+					auto pri = convert_text_to_prior(prior,line_num,"Total population",false);
 					if(pri.error != ""){
 						alert_import("For 'prior' error with expression '"+prior+"': "+pri.error);
 						return;
@@ -1106,6 +1106,24 @@ void Input::param_command()
 
 	auto mode = model.mode;
 
+	auto sim_sample = toLower(get_tag_value("sim-sample")); 
+	if(sim_sample == "") sim_sample = "true";
+	else{
+		if(dist == "" && dist_split == ""){
+			alert_import("'sim-sample' can only be set if a distribution is set through 'dist'");
+			return;
+		}
+	}
+	
+	if(sim_sample == "false") par.sim_sample = false;
+	else{
+		if(sim_sample == "true") par.sim_sample = true;
+		else{
+			alert_import("'sim-sample' must be either 'true' or 'false'."); 
+			return;
+		}
+	}
+	
 	switch(mode){
 	case INF: case PPC:
 		value = "";
@@ -1113,6 +1131,7 @@ void Input::param_command()
 		
 	case SIM: 
 		prior = ""; prior_split = "";
+		if(par.sim_sample == false){ dist = ""; dist_split = "";}
 		break;
 	default: break;
 	}
@@ -1120,9 +1139,9 @@ void Input::param_command()
 	vector <ParamTag> param_tag;
 	ParamTag pt; 
 	pt.val = cons; pt.tag = "constant"; param_tag.push_back(pt);
+	pt.val = value; pt.tag = "value"; param_tag.push_back(pt);
 	pt.val = dist; pt.tag = "dist"; param_tag.push_back(pt);
 	pt.val = dist_split; pt.tag = "dist-split"; param_tag.push_back(pt);
-	pt.val = value; pt.tag = "value"; param_tag.push_back(pt);
 	pt.val = reparam; pt.tag = "reparam"; param_tag.push_back(pt);
 	pt.val = prior; pt.tag = "prior"; param_tag.push_back(pt);
 	pt.val = prior_split; pt.tag = "prior-split"; param_tag.push_back(pt);
@@ -1289,7 +1308,7 @@ void Input::param_command()
 	if(prior != ""){
 		par.variety = PRIOR_PARAM;
 		
-		auto pri = convert_text_to_prior(prior,line_num,false);
+		auto pri = convert_text_to_prior(prior,line_num,par.full_name,false);
 		if(pri.error != ""){
 			alert_import("For 'prior' error with expression '"+prior+"': "+pri.error);
 			return;
@@ -1343,7 +1362,7 @@ void Input::param_command()
 				}
 			}
 			
-			auto pri = convert_text_to_prior(subtab.ele[r][ncol-1],line_num,false);
+			auto pri = convert_text_to_prior(subtab.ele[r][ncol-1],line_num,par.full_name,false);
 			
 			if(pri.error != ""){
 				alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not a valid prior specification: "+pri.error+" (col '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+").");
@@ -1357,7 +1376,7 @@ void Input::param_command()
 	if(dist != ""){
 		par.variety = DIST_PARAM;
 		
-		auto pri = convert_text_to_prior(dist,line_num,true);
+		auto pri = convert_text_to_prior(dist,line_num,par.full_name,true);
 		if(pri.error != ""){
 			alert_import("For 'dist' error with expression '"+dist+"': "+pri.error);
 			return;
@@ -1396,7 +1415,7 @@ void Input::param_command()
 				}
 			}
 			
-			auto pri = convert_text_to_prior(subtab.ele[r][ncol-1],line_num,true);
+			auto pri = convert_text_to_prior(subtab.ele[r][ncol-1],line_num,par.full_name,true);
 			
 			if(pri.error != ""){
 				alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not a valid distribution specification: "+pri.error+" (col '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+").");
@@ -1404,24 +1423,6 @@ void Input::param_command()
 			}
 			
 			set_prior_element(par,ind,pri);
-		}
-	}
-			
-	auto sim_sample = toLower(get_tag_value("sim-sample")); 
-	if(sim_sample == "") sim_sample = "true";
-	else{
-		if(dist == ""){
-			alert_import("'sim-sample' can only be set if a distribution is set through 'dist'");
-			return;
-		}
-	}
-	
-	if(sim_sample == "false") par.sim_sample = false;
-	else{
-		if(sim_sample == "true") par.sim_sample = true;
-		else{
-			alert_import("'sim-sample' must be either 'true' or 'false'."); 
-			return;
 		}
 	}
 	
@@ -1478,6 +1479,8 @@ void Input::derived_command()
 	
 	Derive der;
 	der.name = pp.name;
+	der.line_num = line_num;
+	der.full_name = full_name;
 	der.time_dep = pp.time_dep;
 
 	auto mult = get_dependency(der.dep,pp,vector <string> ()); if(mult == UNSET) return; 

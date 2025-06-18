@@ -455,7 +455,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 	
 	for(auto eq : model.eqn){
 		if(eq.warn != ""){
-			stringstream ss; ss << endl << "For equation '" << eq.te_raw << "':" << endl << " " << eq.warn;;
+			stringstream ss; ss << endl << "For equation '" << eq.te_raw << "':" << endl << " " << eq.warn;
 			alert_line(ss.str(),eq.line_num);
 		}
 	}
@@ -1274,6 +1274,22 @@ void Input::calculate_timepoint()
 }
 
 
+/// Used for converting splines to paramvec
+unsigned int Input::get_spline_i(const ParamRef &pr)
+{					
+	const auto &spl = model.spline;		
+	
+	auto th = pr.th, index = pr.index;
+	auto ntimes = model.param[th].spline_info.knot_times.size();
+	if(index%ntimes != 0) emsg_input("Should be zero1");
+	index /= ntimes;
+	auto i = 0u; while(i < spl.size() && !(spl[i].th == th && spl[i].index == index)) i++;
+	if(i == spl.size()) emsg_input("Spline could not be found");
+	
+	return i;
+}
+
+					
 /// Creates splices for the relevant parameters
 void Input::create_spline()
 {
@@ -1368,35 +1384,36 @@ void Input::create_spline()
 		}			
 	}
 	
-	// Converts equations such that the spline is referenced
-	const auto &spl = model.spline;			
+	// Converts equations such that the spline is referenced	
 	for(auto &eq : model.eqn){
 		for(auto &ca : eq.calc){
 			for(auto &it : ca.item){
 				if(it.type == SPLINE){
 					const auto &pr = eq.param_ref[it.num];
-					auto th = pr.th, index = pr.index;
-					auto ntimes = model.param[th].spline_info.knot_times.size();
-					if(index%ntimes != 0) emsg_input("Should be zero1");
-					index /= ntimes;
-					auto i = 0u; while(i < spl.size() && !(spl[i].th == th && spl[i].index == index)) i++;
-					if(i == spl.size()) emsg_input("Spline could not be found");
 					it.type = SPLINEREF;
-					it.num = i;
+					it.num = get_spline_i(pr);
+				}
+				
+				if(it.type == SPLINE_TIME){
+					auto &tr = eq.time_ref[it.num];
+					const auto &pr = eq.param_ref[tr.num];
+					it.type = SPLINEREF_TIME;
+					tr.num = get_spline_i(pr);
 				}
 			}
 		}
 	
 		if(eq.ans.type == SPLINE){
 			const auto &pr = eq.param_ref[eq.ans.num];
-			auto th = pr.th, index = pr.index;
-			auto ntimes = model.param[th].spline_info.knot_times.size();
-			if(index%ntimes != 0) emsg_input("Should be zero");
-			index /= ntimes;
-			auto i = 0u; while(i < spl.size() && !(spl[i].th == th && spl[i].index == index)) i++;
-			if(i == spl.size()) emsg_input("Spline could not be found");
 			eq.ans.type = SPLINEREF;
-			eq.ans.num = i; 
+			eq.ans.num = get_spline_i(pr);
+		}
+		
+		if(eq.ans.type == SPLINE_TIME){
+			auto &tr = eq.time_ref[eq.ans.num];
+			const auto &pr = eq.param_ref[tr.num];
+			eq.ans.type = SPLINEREF_TIME;
+			tr.num = get_spline_i(pr); 
 		}
 	}
 	

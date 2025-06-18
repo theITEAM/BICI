@@ -262,6 +262,7 @@ void IndEvSampler::add_future_nm_event(unsigned int c, unsigned int cl, double t
 	const auto &dp = tra.dist_param;
 	
 	double ts;
+	string warn;
 	
 	switch(tra.type){	
 	case EXP_RATE: case EXP_MEAN: ts = UNSET; emsg("SHould not be rate2"); break;
@@ -269,14 +270,14 @@ void IndEvSampler::add_future_nm_event(unsigned int c, unsigned int cl, double t
 	case EXP_RATE_NM: 	
 		{
 			auto rate = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
-			ts = t+exp_rate_sample(rate);
+			ts = t+exp_rate_sample(rate,warn);
 		}
 		break;
 		
 	case EXP_MEAN_NM: 	
 		{
 			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
-			ts = t+exp_mean_sample(mean);
+			ts = t+exp_mean_sample(mean,warn);
 		}
 		break;
 
@@ -284,7 +285,7 @@ void IndEvSampler::add_future_nm_event(unsigned int c, unsigned int cl, double t
 		{
 			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
 			auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
-			ts = t+gamma_sample(mean,cv);	
+			ts = t+gamma_sample(mean,cv,warn);	
 		}
 		break;
 	
@@ -293,7 +294,7 @@ void IndEvSampler::add_future_nm_event(unsigned int c, unsigned int cl, double t
 			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
 			auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
 			auto cv = sqrt(1.0/shape);
-			ts = t+gamma_sample(mean,cv);
+			ts = t+gamma_sample(mean,cv,warn);
 		}
 		break;
 
@@ -301,7 +302,7 @@ void IndEvSampler::add_future_nm_event(unsigned int c, unsigned int cl, double t
 		{
 			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
 			auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
-			ts = t + lognormal_sample(mean,cv);
+			ts = t + lognormal_sample(mean,cv,warn);
 		}
 		break;
 		
@@ -309,20 +310,22 @@ void IndEvSampler::add_future_nm_event(unsigned int c, unsigned int cl, double t
 		{
 			auto scale = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
 			auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
-			ts = t+weibull_sample(scale,shape);
+			ts = t+weibull_sample(scale,shape,warn);
 		}
 		break;
 		
 	case PERIOD:
 		{
 			auto time = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
-			ts = t+period_sample(time);
+			ts = t+period_sample(time,warn);
 		}
 		break;
 		
 	default: ts = UNSET; emsg("Option should not be here"); break;
 	}	
 
+	if(warn != "") sp.sampling_error(tr,warn);
+	
 	if(ts < tmax){
 		FutureNMEvent fnme; fnme.t = ts; fnme.trg = tr;
 		

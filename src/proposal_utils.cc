@@ -249,7 +249,10 @@ ICResult Proposal::propose_init_cond(InitCondValue &icv, const State &state)
 		switch(type){
 		case MBP_IC_POPTOTAL_PROP:
 			{	
-				auto dN_total = normal_int_sample(si);
+				string warn;
+				auto dN_total = normal_int_sample(si,warn);
+				if(dN_total == UNSET) emsg("MCMC proposal problem: "+warn);
+		
 				if(-dN_total > int(icv.N_total)) return IC_FAIL;
 				
 				icv.N_total += dN_total;
@@ -283,8 +286,10 @@ ICResult Proposal::propose_init_cond(InitCondValue &icv, const State &state)
 			{	
 				auto cpr = c_prop;
 				
-				auto dN_focal = normal_int_sample(si);
-			
+				string warn;
+				auto dN_focal = normal_int_sample(si,warn);
+				if(dN_focal == UNSET) emsg("MCMC proposal problem: "+warn);
+		
 				if(-dN_focal > int(icv.N_focal[cpr])) return IC_FAIL;
 				
 				icv.N_focal[cpr] += dN_focal;
@@ -361,9 +366,12 @@ vector <unsigned int> Proposal::multinomial_resample(const vector <unsigned int>
 		}
 	}
 	else{  // Faster way
+		string warn;
+		
 		auto total = 0u;
 		for(auto i = 0u; i < N; i++){
-			auto n = binomial_sample(prob,x[i]);
+			auto n = binomial_sample(prob,x[i],warn);
+			if(n == UNSET) emsg("Problem sampling from bionomial distribution: "+warn);
 			x_new[i] -= n;
 			total += n;
 		}

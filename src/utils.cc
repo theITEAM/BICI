@@ -38,6 +38,17 @@ using namespace std;
 #include "const.hh"
 #include "utils.hh"
 
+
+#ifdef WINDOWS
+#include "windows.h"
+#include "psapi.h"
+#endif
+
+#ifdef LINUX
+#include "sys/types.h"
+#include "sys/sysinfo.h"
+#endif
+
 #ifdef USE_MPI
 #include "mpi.h"
 #endif
@@ -52,10 +63,15 @@ vector <double> log_integer;
 
 double percent_done;
 
+ofstream progress;
+bool progress_on = false;
+
 /// Displays an error message
 void emsg(const string &msg)
 {
 	if(false) throw(std::runtime_error(msg));
+	
+	cout << endl;
 	
 	display_error(msg);
 	if(false) raise(SIGABRT);
@@ -371,10 +387,10 @@ double ran()
 
 
 /// Draws a normally distributed number with mean mu and standard deviation sd
-double normal_sample(const double mean, const double sd) 
+double normal_sample(const double mean, const double sd, string &warn) 
 {
-	check_thresh(NORM_TE,SD_QU,sd,true);
-	check_thresh(NORM_TE,NORM_MEAN_QU,mean,true);
+	if(check_thresh(NORM_TE,SD_QU,sd,warn)) return UNSET;
+	if(check_thresh(NORM_TE,NORM_MEAN_QU,mean,warn)) return UNSET;
 
 	normal_distribution<double> distribution(mean, sd);
 	return distribution(generator);
@@ -382,9 +398,11 @@ double normal_sample(const double mean, const double sd)
 
 
 /// Returns an integer samping distribution with a normal envelope
-int normal_int_sample(double si)
+int normal_int_sample(double si, string &warn)
 {
-	return int(normal_sample(0,si)+0.5+LARGE_INT)-LARGE_INT;
+	auto val = normal_sample(0,si,warn);
+	if(val == UNSET) return UNSET;
+	return int(val+0.5+LARGE_INT)-LARGE_INT;
 }
 
 
@@ -398,10 +416,10 @@ double normal_probability(const double x, const double mean, const double sd)
 
 
 /// Draws a log-normally distributed number with mean mu and standard deviation sd
-double lognormal_sample(const double mean, const double cv) 
+double lognormal_sample(const double mean, const double cv, string &warn) 
 {
-	check_thresh(LOGNORM_TE,CV_QU,cv,true);
-	check_thresh(LOGNORM_TE,MEAN_QU,mean,true);
+	if(check_thresh(LOGNORM_TE,CV_QU,cv,warn)) return UNSET;
+	if(check_thresh(LOGNORM_TE,MEAN_QU,mean,warn)) return UNSET;
 
 	auto var = log(1+cv*cv);                // Works out variables on log scale
 	auto mu = log(mean)-var/2;
@@ -429,9 +447,8 @@ double lognormal_probability(const double x, const double mean, const double cv)
 /// The lognormal probability of being xmin or above
 double lognormal_upper_probability(const double xmin, const double mean, const double cv)
 {
-	check_thresh(LOGNORM_TE,CV_QU,cv,true);
-	check_thresh(LOGNORM_TE,MEAN_QU,mean,true);
-
+	if(mean < MEAN_MIN || cv < CV_MIN || cv > CV_MAX || xmin < TINY) return LI_WRONG;
+	
 	auto var = log(1+cv*cv);                // Works out variables on log scale
 	auto mu = log(mean)-var/2;
 	
@@ -444,9 +461,8 @@ double lognormal_upper_probability(const double xmin, const double mean, const d
 /// The lognormal probability of being xmin or above (with no log taken)
 double lognormal_upper_probability_no_log(const double xmin, const double mean, const double cv)
 {
-	check_thresh(LOGNORM_TE,CV_QU,cv,true);
-	check_thresh(LOGNORM_TE,MEAN_QU,mean,true);
-
+	if(mean < MEAN_MIN || mean > MEAN_MAX || cv < CV_MIN || cv > CV_MAX) return TINY;
+	
 	auto var = log(1+cv*cv);                // Works out variables on log scale
 	auto mu = log(mean)-var/2;
 	
@@ -457,10 +473,10 @@ double lognormal_upper_probability_no_log(const double xmin, const double mean, 
 
 
 /// Draws a Weibull distributed number with shape and scale parameters
-double weibull_sample(const double scale, const double shape) 
+double weibull_sample(const double scale, const double shape, string &warn) 
 {
-	check_thresh(WEIBULL_TE,SCALE_QU,scale,true);
-	check_thresh(WEIBULL_TE,SHAPE_QU,shape,true);
+	if(check_thresh(WEIBULL_TE,SCALE_QU,scale,warn)) return UNSET;
+	if(check_thresh(WEIBULL_TE,SHAPE_QU,shape,warn)) return UNSET;
 
 	weibull_distribution<double> distribution(shape, scale);
 	auto val = distribution(generator);
@@ -482,9 +498,8 @@ double weibull_probability(const double x, const double scale, const double shap
 /// Probability of weibull sample beign xmin or above
 double weibull_upper_probability(const double xmin, const double scale, const double shape) 
 {
-	check_thresh(WEIBULL_TE,SCALE_QU,scale,true);
-	check_thresh(WEIBULL_TE,SHAPE_QU,shape,true);
-
+	if(scale < SCALE_MIN || scale > SCALE_MAX || shape < SHAPE_MIN || shape > SHAPE_MAX) return  LI_WRONG;
+	
 	auto val = -pow((xmin/scale),shape);
 	if(std::isnan(val) || val < LI_WRONG) return LI_WRONG;
 	return val;
@@ -494,9 +509,8 @@ double weibull_upper_probability(const double xmin, const double scale, const do
 /// Probability of weibull sample beign xmin or above (with no log taken)
 double weibull_upper_probability_no_log(const double xmin, const double scale, const double shape) 
 {
-	check_thresh(WEIBULL_TE,SCALE_QU,scale,true);
-	check_thresh(WEIBULL_TE,SHAPE_QU,shape,true);
-
+	if(scale < SCALE_MIN || scale > SCALE_MAX || shape < SHAPE_MIN || shape > SHAPE_MAX) return TINY;
+	
 	auto val = exp(-pow((xmin/scale),shape));
 	if(std::isnan(val) || val < TINY) return TINY;
 	return val;
@@ -504,17 +518,15 @@ double weibull_upper_probability_no_log(const double xmin, const double scale, c
 
 
 /// Draws a sample from the gamma distribution x^(a-1)*exp(-b*x)
-double gamma_sample(const double mean, const double cv)
+double gamma_sample(const double mean, const double cv, string &warn)
 {
-	check_thresh(GAMMA_TE,CV_QU,cv,true);
-	check_thresh(GAMMA_TE,MEAN_QU,mean,true);
+	if(check_thresh(GAMMA_TE,CV_QU,cv,warn)) return UNSET;
+	if(check_thresh(GAMMA_TE,MEAN_QU,mean,warn)) return UNSET;
 
 	gamma_distribution<double> distribution(1.0/(cv*cv),mean*cv*cv);
 	auto val = distribution(generator);
 	if(val < TINY) return TINY;
 	return val;
-	
-	//return distribution(generator);
 }
 
 
@@ -534,9 +546,8 @@ double gamma_probability(const double x, const double mean, const double cv)
 /// The gamma probability of being x or above
 double gamma_upper_probability(const double xmin, const double mean, const double cv)
 {
-	check_thresh(GAMMA_TE,CV_QU,cv,true);
-	check_thresh(GAMMA_TE,MEAN_QU,mean,true);
-
+	if(xmin < MEAN_MIN || mean < MEAN_MIN || cv < CV_MIN || cv > CV_MAX) return LI_WRONG;
+	
 	auto shape = 1.0/(cv*cv);
 	auto theta = mean/shape;
 	auto value = boost::math::gamma_q(shape,xmin/theta);	
@@ -548,9 +559,8 @@ double gamma_upper_probability(const double xmin, const double mean, const doubl
 /// The gamma probability of being x or above (with no log taken)
 double gamma_upper_probability_no_log(const double xmin, const double mean, const double cv)
 {
-	check_thresh(GAMMA_TE,CV_QU,cv,true);
-	check_thresh(GAMMA_TE,MEAN_QU,mean,true);
-
+	if(xmin < MEAN_MIN || mean < MEAN_MIN || cv < CV_MIN || cv > CV_MAX) return TINY;
+	
 	auto shape = 1.0/(cv*cv);
 	auto theta = mean/shape;
 	auto val = boost::math::gamma_q(shape,xmin/theta);
@@ -560,10 +570,10 @@ double gamma_upper_probability_no_log(const double xmin, const double mean, cons
 
 
 /// Draws a sample from the beta distribution x^(a-1)*(1-x)^(b-1)
-double beta_sample(const double alpha, const double beta)
+double beta_sample(const double alpha, const double beta, string &warn)
 {
-	check_thresh(BETA_TE,ALPHA_QU,alpha,true);
-	check_thresh(BETA_TE,BETA_QU,beta,true);
+	if(check_thresh(BETA_TE,ALPHA_QU,alpha,warn)) return UNSET;
+	if(check_thresh(BETA_TE,BETA_QU,beta,warn)) return UNSET;
 
 	gamma_distribution<double> distributionX(alpha,1), distributionY(beta,1);
 	auto x = distributionX(generator);
@@ -585,9 +595,9 @@ double beta_probability(const double x, const double alpha, const double beta)
 
 
 /// Generates a sample from the Poisson distribution
-unsigned int poisson_sample(const double lam)
+unsigned int poisson_sample(const double lam, string &warn)
 {
-	check_thresh(POIS_TE,POIS_QU,lam,true);
+	if(check_thresh(POIS_TE,POIS_QU,lam,warn)) return UNSET;
 	
   poisson_distribution<int> distribution(lam);
 	return distribution(generator);
@@ -622,8 +632,7 @@ double poisson_upper_probability_no_log(const int imin, const double lam)
 /// The log probability of the negative binomial distribution
 double neg_binomial_probability(const int k, const double mean, const double p)
 {	
-	check_thresh(NEGBINO_TE,MEAN_QU,mean,true);
-	check_thresh(NEGBINO_TE,P_QU,p,true);
+	if(mean < MEAN_MIN || mean > MEAN_MAX || p < P_MIN || p > P_MAX) return LI_WRONG;
 	
 	auto r = round_int(mean*p/(1-p));
 	if(r < 1) r = 1;
@@ -632,9 +641,9 @@ double neg_binomial_probability(const int k, const double mean, const double p)
 
 
 /// Generates a sample from the Bernoulli distribution
-unsigned int bernoulli_sample(const double p)
+unsigned int bernoulli_sample(const double p, string &warn)
 {
-	check_thresh(BERN_TE,BERNP_QU,p,true);
+	if(check_thresh(BERN_TE,BERNP_QU,p,warn)) return UNSET;
 	
 	if(ran() < p) return 1;
 	return 0;
@@ -655,9 +664,9 @@ double bernoulli_probability(unsigned int x, const double p)
 
 
 /// Samples from the exponential distribution with specified rate
-double exp_rate_sample(const double rate)
+double exp_rate_sample(const double rate, string &warn)
 {
-	check_thresh(EXP_RATE_TE,RATE_QU,rate,true);
+	if(check_thresh(EXP_RATE_TE,RATE_QU,rate,warn)) return UNSET;
 	
 	auto val = -log(ran())/rate;
 	if(val < TINY) return TINY;
@@ -691,9 +700,9 @@ double exp_rate_upper_probability_no_log(const double xmin, const double rate)
 
 
 /// Samples from the exponential distribution with specified mean
-double exp_mean_sample(const double mean)
+double exp_mean_sample(const double mean, string &warn)
 {
-	check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean,true);
+	if(check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean,warn)) return UNSET;
 	
 	return -log(ran())*mean;
 }
@@ -710,7 +719,7 @@ double exp_mean_probability(const double x, const double mean)
 /// Probability of exponential distribution above xmin
 double exp_mean_upper_probability(const double xmin, const double mean)
 {
-	check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean,true);
+	if(xmin < 0 || mean < EXP_MEAN_MIN) return LI_WRONG;
 	
 	return -xmin/mean;
 }
@@ -719,7 +728,8 @@ double exp_mean_upper_probability(const double xmin, const double mean)
 /// Probability of exponential distribution above xmin (with no log taken)
 double exp_mean_upper_probability_no_log(const double xmin, const double mean)
 {
-	check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean,true);
+	if(xmin < 0 || mean < EXP_MEAN_MIN) return TINY;
+	
 	auto val = exp(-xmin/mean);
 	if(std::isnan(val) || val < TINY) return TINY;
 	return val;
@@ -727,9 +737,9 @@ double exp_mean_upper_probability_no_log(const double xmin, const double mean)
 
 
 /// Draws a sample from the gamma distribution x^(a-1)*exp(-x)
-double gamma_alpha_sample(const double alpha)
+double gamma_alpha_sample(const double alpha, string &warn)
 {
-	check_thresh(GAMMA_TE,ALPHA_QU,alpha,true);
+	if(check_thresh(GAMMA_TE,ALPHA_QU,alpha,warn)) return UNSET;
 	
 	//if(alpha < TINY) emsg("Alpha must be positive");
 	gamma_distribution<double> distribution(alpha,1);
@@ -746,14 +756,15 @@ double gamma_alpha_probability(const double x, const double alpha)
 
 
 /// A sample from the binomial distribution
-unsigned int binomial_sample(double p, unsigned int n)
+unsigned int binomial_sample(double p, unsigned int n, string &warn)
 {
 	if(n == 0) return 0;
 	
-	if(n > LARGE) emsg("Binomual cannot sample from negative"); 
-	if(p < -TINY) emsg("For the binomial distribution the probability must be postive");
+	if(n > LARGE){ warn = "Binomual cannot sample from negative"; return UNSET;} 
+	if(p < -TINY){ warn = "For the binomial distribution the probability must be postive"; return UNSET;}
 	if(p > OVER_ONE){
-		emsg("For the binomial distribution the probability must be one or less");
+		warn = "For the binomial distribution the probability must be one or less";
+		return UNSET;
 	}
 	
 	if(p < TINY) return 0;
@@ -788,9 +799,9 @@ double binomial_probability(unsigned int num, double p, unsigned int n)
 
 
 /// Probability of period sample
-double period_sample(const double time) 
+double period_sample(const double time, string &warn) 
 {
-	check_thresh(PERIOD_TE,TIME_QU,time,true);
+	if(check_thresh(PERIOD_TE,TIME_QU,time,warn)) return UNSET;
 	return time;
 }
 
@@ -1719,11 +1730,12 @@ vector <bool> true_vec(unsigned int N)
 
 
 /// Converts a text string to a prior specification
-Prior convert_text_to_prior(string te, unsigned int line_num, bool dist)
+Prior convert_text_to_prior(string te, unsigned int line_num, string in, bool dist)
 {
 	Prior pri;
-	
 	te = trim(te);
+	pri.name = te;
+	pri.in = in;
 	
 	auto spl = split(te,'(');
 	if(spl.size() != 2){ pri.error = "Syntax error"; return pri;}
@@ -1799,8 +1811,7 @@ Prior convert_text_to_prior(string te, unsigned int line_num, bool dist)
 				}
 			}
 			
-			pri.error = check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean,false); 		
-			if(pri.error != "") return pri;
+			if(mean != UNSET && check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean,pri.error)) return pri; 		
 		}
 		break;
 		
@@ -1824,11 +1835,8 @@ Prior convert_text_to_prior(string te, unsigned int line_num, bool dist)
 				}
 			}
 			
-			pri.error = check_thresh(NORM_TE,SD_QU,sd,false); 		
-			if(pri.error != "") return pri;
-			
-			pri.error = check_thresh(NORM_TE,NORM_MEAN_QU,mean,false); 		
-			if(pri.error != "") return pri;
+			if(sd != UNSET && check_thresh(NORM_TE,SD_QU,sd,pri.error)) return pri;		
+			if(mean != UNSET && check_thresh(NORM_TE,NORM_MEAN_QU,mean,pri.error)) return pri; 		
 		}
 		break;
 		
@@ -1856,11 +1864,8 @@ Prior convert_text_to_prior(string te, unsigned int line_num, bool dist)
 				}
 			}
 			
-			pri.error = check_thresh(GAMMA_TE,CV_QU,cv,false); 		
-			if(pri.error != "") return pri;
-			
-			pri.error = check_thresh(GAMMA_TE,MEAN_QU,mean,false); 		
-			if(pri.error != "") return pri;
+			if(cv != UNSET && check_thresh(GAMMA_TE,CV_QU,cv,pri.error)) return pri; 		
+			if(mean != UNSET && check_thresh(GAMMA_TE,MEAN_QU,mean,pri.error)) return pri; 		
 		}
 		break;
 		
@@ -1888,11 +1893,8 @@ Prior convert_text_to_prior(string te, unsigned int line_num, bool dist)
 				}
 			}
 			
-			pri.error = check_thresh(LOGNORM_TE,CV_QU,cv,false); 		
-			if(pri.error != "") return pri;
-			
-			pri.error = check_thresh(LOGNORM_TE,MEAN_QU,mean,false); 		
-			if(pri.error != "") return pri;
+			if(cv != UNSET && check_thresh(LOGNORM_TE,CV_QU,cv,pri.error)) return pri; 			
+			if(mean != UNSET && check_thresh(LOGNORM_TE,MEAN_QU,mean,pri.error)); 		
 		}
 		break;
 		
@@ -1920,11 +1922,8 @@ Prior convert_text_to_prior(string te, unsigned int line_num, bool dist)
 				}
 			}
 			
-			pri.error = check_thresh(BETA_TE,BETA_QU,beta,false); 		
-			if(pri.error != "") return pri;
-			
-			pri.error = check_thresh(BETA_TE,ALPHA_QU,alpha,false); 		
-			if(pri.error != "") return pri;
+			if(beta != UNSET && check_thresh(BETA_TE,BETA_QU,beta,pri.error)) return pri; 		
+			if(alpha != UNSET && check_thresh(BETA_TE,ALPHA_QU,alpha,pri.error)) return pri; 		
 		}
 		break;
 
@@ -1944,8 +1943,7 @@ Prior convert_text_to_prior(string te, unsigned int line_num, bool dist)
 				}
 			}
 			
-			pri.error = check_thresh(BERN_TE,BERNP_QU,mean,false); 		
-			if(pri.error != "") return pri;
+			if(mean != UNSET && check_thresh(BERN_TE,BERNP_QU,mean,pri.error)) return pri; 		
 		}
 		break;
 	
@@ -2084,13 +2082,17 @@ vector <double> dirichlet_sample(const vector <double> &alpha)
 {
 	auto N = alpha.size();
 	
+	string warn;
+	
 	vector <double> vec(N);
 	auto sum = 0.0;
 	for(auto i = 0u; i < N; i++){
 		auto al = alpha[i];
 		if(al == ALPHA_ZERO) vec[i] = 0;
 		else{
-			vec[i] = gamma_alpha_sample(al);
+			auto val = gamma_alpha_sample(al,warn);
+			if(val == UNSET) emsg("Dirichlet distribution sampling error: "+warn); 
+			vec[i] = val;
 			sum += vec[i];
 		}
 	}
@@ -2130,6 +2132,8 @@ vector <unsigned int>  multinomial_sample(unsigned int N_total, const vector <do
 	
 	vector <unsigned int> x(N,0);
 	
+	string warn;
+	
 	if(false){ // Direct way
 		vector <double> frac_sum(N);
 		auto sum = 0.0;
@@ -2160,7 +2164,10 @@ vector <unsigned int>  multinomial_sample(unsigned int N_total, const vector <do
 		for(auto k = 0u; k < N-1; k++){
 			auto i = frac_sort[k].i;
 			auto n = 0.0;
-			if(r > 0) n = binomial_sample(ALMOST_ONE*frac[i]/r,S);
+			if(r > 0){
+				n = binomial_sample(ALMOST_ONE*frac[i]/r,S,warn);
+				if(n == UNSET) emsg("Problem with multinomial sampling: "+warn);
+			}
 			x[i] = n;
 			S -= n;
 			r -= frac[i];
@@ -2620,10 +2627,9 @@ bool end_str(string st, string st2)
 
 
 /// Checks if value is within thresholds
-string check_thresh(DistText dist, DistQuant dq, double val, bool err)
+bool check_thresh(DistText dist, DistQuant dq, double val, string &err)
 {
-	string te;
-	if(val == UNSET) return te;
+	if(val == UNSET){ err = "Value is unset"; return true;}
 	
 	double min_th = UNSET, max_th = UNSET;
 	
@@ -2726,16 +2732,16 @@ string check_thresh(DistText dist, DistQuant dq, double val, bool err)
 		}		
 		
 		if(min_th != UNSET){
-			te = dist_te+" "+quant+" has value '"+tstr(val)+"' which should not be below threshold '"+tstr(min_th)+"'";
+			err = dist_te+" "+quant+" has the value '"+tstr(val)+"' which should not be below the threshold '"+tstr(min_th)+"'";
 		}
 		
 		if(max_th != UNSET){
-			te = dist_te+" "+quant+" has value '"+tstr(val)+"' which should not be above threshold '"+tstr(max_th)+"'";
+			err = dist_te+" "+quant+" has the value '"+tstr(val)+"' which should not be above the threshold '"+tstr(max_th)+"'";
 		}
 	}
 	
-	if(err && te != "") emsg(te);
-	return te;
+	if(err != "") return true;
+	return false;
 }
 
 
@@ -2827,6 +2833,7 @@ vector< vector <string> > get_escape_char()
 	escape_char.push_back({"\\omega","ω"});	
 	escape_char.push_back({"\\Omega","Ω"});	
 	escape_char.push_back({"\\sum","Σ"});		
+	escape_char.push_back({"\\int","∫"});		
 	
 	return escape_char;
 }
@@ -2859,6 +2866,14 @@ string replace_arrow(string te)
 }
 
 
+/// Initialises a file for outputting progress
+void start_progess_file(string file)
+{
+	progress_on = true;
+	progress.open(file);	
+}
+
+
 /// Resets the percentage
 void percentage_start(PercentType type, unsigned int gen)
 {
@@ -2875,13 +2890,20 @@ void percentage_start(PercentType type, unsigned int gen)
 		}
 	}
 	else{
+		string te;
 		switch(type){
-		case LOAD_PER: cout << "Loading..." << endl; break;
-		case INIT_PER: cout << "Initialising..." << endl; break;
-		case RUN_PER: cout << "Running..." << endl; break;
-		case RUN_GEN_PER: cout << "Generation " << gen << "..." << endl; break;
-		case ANNEAL_PER: cout << "Annealing..." << endl; break;
-		case OUTPUT_PER: cout << "Outputing..." << endl; break;
+		case LOAD_PER: te = "Loading..."; break;
+		case INIT_PER: te = "Initialising..."; break;
+		case RUN_PER: te = "Running..."; break;
+		case RUN_GEN_PER: te = "Generation "+tstr(gen)+"..."; break;
+		case ANNEAL_PER: te = "Annealing..."; break;
+		case OUTPUT_PER: te = "Outputting..."; break;
+		}
+		cout << te << endl;
+		cout.flush();
+		if(progress_on){ 
+			progress << te << endl;
+			progress.flush();
 		}
 	}
 	
@@ -2908,7 +2930,13 @@ void percentage(double val, double val2)
 		auto per = 100*val/val2;
 		while(percent_done <= per){
 			if(int(percent_done)%10 == 0){
-				cout << "" << percent_done << "%";
+				cout << percent_done << "%";
+				
+				if(progress_on){ 
+					progress << percent_done << "%" << endl; 
+					progress.flush();
+				}
+					
 				if(percent_done == 100){ 
 					percent_done = LARGE;
 					cout << endl; cout.flush(); 
@@ -2955,6 +2983,115 @@ void add_full_stop(string &te)
 {
 	if(te.length() > 0){
 		auto ch = te.substr(te.length()-1,1);
-		if(ch != "." && ch != "?" && ch != "!" && ch != "\n") te += ".";
+		if(ch != "." && ch != "?" && ch != "!" && ch != endli) te += ".";
 	}
 }
+
+
+/// This read in a line to get information about memory usage
+int parseLine(char* line)
+{
+	int i = strlen(line);
+	const char* p = line;
+	while (*p <'0' || *p > '9') p++;
+	line[i-3] = '\0';
+	i = atoi(p);
+	return i;
+}
+
+
+/// Gets the memory being used by the process 
+double memory_usage()
+{
+#ifdef WINDOWS
+	PROCESS_MEMORY_COUNTERS_EX pmc;
+	GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+	SIZE_T virtualMemUsedByMe = pmc.PrivateUsage;
+	return virtualMemUsedByMe/1024.0;
+#endif
+
+#ifdef LINUX
+	FILE* file = fopen("/proc/self/status", "r");
+	int result = -1;
+	char line[128];
+
+	while (fgets(line, 128, file) != NULL){	
+		if(strncmp(line, "VmSize:", 7) == 0){
+			result = parseLine(line);
+			break;
+		}
+	}
+	fclose(file);
+	return result;
+#endif
+}
+
+
+/// Returns total computer memory
+double total_memory()
+{
+#ifdef WINDOWS
+	MEMORYSTATUSEX memInfo;
+	memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+	GlobalMemoryStatusEx(&memInfo);
+	DWORDLONG totalVirtualMem = memInfo.ullTotalPageFile;
+	return totalVirtualMem/1024.0;
+#endif
+
+#ifdef LINUX
+	struct sysinfo memInfo;	
+	sysinfo (&memInfo);
+	long long totalVirtualMem = memInfo.totalram;
+	totalVirtualMem += memInfo.totalswap;
+	totalVirtualMem *= memInfo.mem_unit;
+	totalVirtualMem /= 1024.0; // Convert to K
+	return totalVirtualMem;
+#endif
+}
+
+
+/// The memory available 
+double memory_available()
+{
+#ifdef WINDOWS
+	MEMORYSTATUSEX memInfo;
+	memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+	GlobalMemoryStatusEx(&memInfo);
+	DWORDLONG availVirtualMem = memInfo.ullAvailPageFile;
+	return availVirtualMem/1024.0;
+#endif
+
+#ifdef LINUX
+	struct sysinfo memInfo;	
+	sysinfo (&memInfo);
+	return memInfo.freeram/1024.0;
+#endif
+}
+
+
+/// Outputs memory as a string
+string mem_print(double mem)
+{
+	stringstream ss;
+	ss << std::fixed;
+  ss << setprecision(1);
+
+	if(mem < 1024){   // Result
+		ss << (unsigned int) mem << "K";
+	}
+	else{
+		mem /= 1024;
+		if(mem < 1024){ 
+			if(mem < 10) ss << mem << "MB";
+			else ss << (unsigned int) mem << "MB";
+		}
+		else{
+			mem /= 1024;
+			if(mem < 10) ss << mem << "GB";
+			else ss << (unsigned int) mem << "GB";
+		}
+	}
+	
+	return ss.str();
+}
+

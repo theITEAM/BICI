@@ -15,6 +15,13 @@ struct ParamRef {                  // Used to reference parameter
 	unsigned int index;              // The index where to find 
 };
 
+struct DeriveRef {                 // Used to reference derived quantities
+	DeriveRef(){ i = UNSET; index = UNSET; ti = UNSET;}
+	unsigned int i;                  // The number of the parameter
+	unsigned int index;              // The index where to find 
+	unsigned int ti;                 // The time step
+};
+
 struct GradRef {                   // References population gradient
 	unsigned int ref;                // References a Markov equation
 	unsigned index;                  // References a population in Markov equation
@@ -77,13 +84,6 @@ struct PopChange {                 // Stores the change in population
 	unsigned int po;                 // The population
 	double num;                      // The change
 };
-
-/*
-struct PopChangeSpeedup {          // Used for speeding up population change in update_ind
-	bool on;                         // Determines if the speedup is on
-	
-};
-*/
 
 struct Population {                // Stores a population (used in an equation)
 	string name;                     // The name of the population
@@ -237,8 +237,10 @@ struct Dependency {                // A dependency in the model
 
 struct Prior {                     // Defines a parameter prior
 	Prior(){ error = ""; type = UNSET_PR;}
+	string name;                     // Stores text name
 	PriorPos type;                   // The type of prior
 	vector <EquationInfo> dist_param;// A list of equations to specify prior distribution parameters
+	string in;                       // Descript of what prior is in (e.g. name of parameter)
 	string error;                    // Stores error message if declared incorrectly
 };
 
@@ -268,13 +270,13 @@ struct LatLng {                    // Denote a point with latitude and longitude
 	double lng;                      // Longitude
 };
 
-struct Polygon {                   // Denotes a polygon for a boundary
+struct Pgon {                      // Denotes a polygon for a boundary
 	vector <LatLng> point;           // Points on boundary
 };
 
 struct Boundary {
 	vector <string> name;            // Potential names for boundary (taken from "properties"
-	vector <Polygon> polygon;        // Boundary made up of polygons
+	vector <Pgon> polygon;           // Boundary made up of polygons
 };
 
 struct GeoJSON {                   // Stores geoJSON information
@@ -984,9 +986,11 @@ struct ParamTag {                  // Used to check tags on parameters specified
 
 struct Derive {                    // Stores derived parameters
 	string name;                     // The name of the derived quantity
+	string full_name;                // Full name including dependency        
 	bool time_dep;                   // Time dependency
 	vector <Dependency> dep;         // Dependency for derived quantity (excluding time)
 	vector <EquationInfo> eq;        // The equations for each quantity
+	unsigned int line_num;           // Stores the line number the equation comes from
 };
 
 struct DeriveOutput {              // Calculates any derived outputs

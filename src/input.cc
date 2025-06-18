@@ -193,6 +193,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 		}
 	}
 	
+	check_memory_too_large();
+	
 	output_error_messages(err_mess);
 	
 	percentage(5,100);
@@ -253,6 +255,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	model.set_hash_all_ind();           // Sets a hash table for all individuals
 	
+	check_memory_too_large();
+	
 	add_genetic_data();                // Adds genetic data (potentially multi-species)
 		
 	source_rate_divide();              // Divides equations for source rates
@@ -262,6 +266,12 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	percentage(30,100);
 
 	create_equations(30,60);           // Creates equation calculations
+
+	output_error_messages(err_mess);
+
+	check_derived_order();             // Checks to see if derived quantities do not use derived quanties yet to be calculated  
+
+	check_memory_too_large();          // Checks if the memory requirement is too large
 
 	percentage(60,100);
 	
@@ -326,6 +336,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	create_markov_eqn_pop_ref();       // Works out which populations affect which markov eqns (and vice versa)
 	
+	check_memory_too_large();
+	
 	print_diag("h6");
 
 	create_pop_ref();                  // Create reference to pop in comp_gl
@@ -333,6 +345,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	print_diag("h8");
 	
 	create_param_vector();             // Creates an overall parameter vector
+	
+	check_memory_too_large();
 	
 	print_diag("h9");
 	
@@ -384,9 +398,13 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	linearise_eqn(75,85);               // Tries to linearise equations in terms of pops
 	
+	check_memory_too_large();
+	
 	percentage(85,100);
 	
 	if(inf) param_affect_likelihood(); // Works out how changes to parameters affect likelihoods
+	
+	check_memory_too_large();
 	
 	print_diag("h16");
 	
@@ -464,6 +482,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	output_error_messages(err_mess,true);
 
 	print_diag("Finish");
+	
+	check_memory_too_large();
 	
 	//if(true) param_eqn_mem();
 	//wait();
@@ -647,8 +667,8 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 		if(trr.substr(i,1) == "=") after_eq = true;
 		
 		auto te = trr.substr(ist,i-ist);
-		while(te.substr(0,1) == "\n") te = te.substr(1);
-		while(te.substr(te.length()-1,1) == "\n") te = te.substr(0,te.length()-1);
+		while(te.substr(0,1) == endli) te = te.substr(1);
+		while(te.substr(te.length()-1,1) == endli) te = te.substr(0,te.length()-1);
 
 		te = trim(te); if(quote == 0) te = toLower(te);
 
@@ -891,10 +911,17 @@ void Input::alert_equation(const EquationInfo &eqi, const string &warn)
 }
 
 
-/// Error message for imported file (for specific line)
+/// Error message for imported file
 void Input::alert_warning(string st)                               
 {
 	add_error_mess(line_num,st,ERROR_WARNING);
+}
+
+
+/// Error message for imported file (for specific line)
+void Input::alert_warning_line(string st, unsigned int line)                               
+{
+	add_error_mess(line,st,ERROR_WARNING);
 }
 
 
@@ -1237,7 +1264,7 @@ void Input::check_param_used()
 	for(const auto &par : model.param){
 		if(par.used == false){
 			if(model.mode != PPC){
-				alert_line("Parameter '"+par.full_name+"' is not used in the model",par.line_num);
+				alert_warning_line("Parameter '"+par.full_name+"' is not used in the model",par.line_num);
 			}
 		}
 	}

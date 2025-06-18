@@ -76,6 +76,10 @@ string check_valid_name(string name, string type)
 					if(st == "Σ"){
 						return "In "+type+" name '"+name+"' the character '\\Sigma' is not expected";
 					}
+					if(st == "∫"){
+						return "In "+type+" name '"+name+"' the character '\\int' is not expected";
+					}
+					
 					done = true;
 					j += len;
 					break;
@@ -138,7 +142,17 @@ string basic_equation_check(string &te, EqnType eqn_type)
 				if(te.substr(i,1) == "|" && two_variable_flag == true) i++;
 				
 				if(str_eq(te,i,"Σ")){
-					while(i < te.length() && te.substr(i,1) != " " && te.substr(i,1) != "(") i++;
+					while(i < te.length() && te.substr(i,1) != "(") i++;
+					if(i == te.length()){
+						return "There should not be a left bracket '(' after the sum";
+					}
+				}
+				
+				if(str_eq(te,i,"∫")){
+					while(i < te.length() && te.substr(i,1) != "(") i++;
+					if(i == te.length()){
+						return "There should not be a left bracket '(' after the integral";
+					}
 				}
 				
 				auto ch = te.substr(i,1);

@@ -250,7 +250,7 @@ void Species::init_pop_data(const DataSource &so)
 			for(auto c = 0u; c < claa.ncomp; c++){
 				const auto &co = claa.comp[c];
 				if(co.erlang_hidden == true){
-					init_cond.comp_prior[c] = convert_text_to_prior("fix(0)",UNSET,false);
+					init_cond.comp_prior[c] = convert_text_to_prior("fix(0)",UNSET,"Erlang",false);
 					prior_set[c] = true;
 				}
 			}
@@ -279,7 +279,7 @@ void Species::init_pop_data(const DataSource &so)
 					for(auto c = 0u; c < cla[cl].ncomp; c++){
 						if(cla[cl].comp[c].name == name){
 							if(cl == foc_cl){
-								auto pri = convert_text_to_prior(val,so.line_num,false);
+								auto pri = convert_text_to_prior(val,so.line_num,"Population for "+name,false);
 								if(pri.error != "") alert_source(pri.error,so,1,r);
 								else{
 									init_cond.comp_prior[c] = pri;

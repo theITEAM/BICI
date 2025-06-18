@@ -640,7 +640,8 @@ vector <double> sample_mvn(const vector < vector <double> > &Z)
 	auto N = Z.size();
 	vector <double> vec(N);
 	
-	for(auto i = 0u; i < N; i++) vec[i] = normal_sample(0,1);
+	string warn;
+	for(auto i = 0u; i < N; i++) vec[i] = normal_sample(0,1,warn);
 	
 	vector <double> vec2(N);
 	for(auto j = 0u; j < N; j++){

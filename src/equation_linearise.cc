@@ -238,6 +238,18 @@ LinearCalculation Equation::convert_to_linear_calculation(const EqItem &it, EqIt
 				lin.pop_calc.push_back(pop_c);
 			}
 			break;
+			
+		case POPNUM_TIME:
+			emsg("Should not be popnum_time");
+			break;
+		
+		case SPLINE_TIME:
+			emsg("Should not be spline_time");
+			break;
+			
+		case SPLINEREF_TIME:
+			emsg("Should not be splineref_time");
+			break;
 		
 		case PARAMVEC: case SPLINEREF: case NUMERIC: case TIME: 
 			{
@@ -537,6 +549,7 @@ void Equation::single_param_func(Calculation ca, LinearCalculation &lin, const v
 		break;
 		
 	case POPNUM: return;
+	case POPNUM_TIME: emsg("Eq Lin should not be popnum_time"); break;
 	case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
 	default: emsg("Eq problem2"); break;
 	}
@@ -595,6 +608,7 @@ void Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 			}
 			break;
 		case POPNUM: return;
+		case POPNUM_TIME:  emsg("Eq Lin should not be popnum_time"); break;
 		case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
 		default: emsg("Eq problem2"); break;
 		}
@@ -620,11 +634,13 @@ void Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 			}
 			break;
 		case POPNUM: return;
+		case POPNUM_TIME: emsg("Eq Lin should not be popnum_time"); break;
 		case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
 		default: emsg("Eq problem2"); break;
 		}
 		break;
 	case POPNUM: return;
+	case POPNUM_TIME: emsg("Eq Lin should not be popnum_time"); break;
 	case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
 	default: emsg("Eq problem2"); break;
 	}
@@ -671,6 +687,7 @@ bool Equation::calc_time_dep(const vector <Calculation> &calc) const
 					break;
 				case SPLINE: case SPLINEREF: case TIME: return true;
 				case POPNUM: emsg("Should not have a population"); break;
+				case POPNUM_TIME: emsg("Should not have a popnum_time"); break;
 				default: emsg("Equation error"); break;
 			}
 		}
@@ -708,6 +725,7 @@ double Equation::calculate_calculation(const vector <Calculation> &calc, unsigne
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: emsg("Should not have a population"); break;
+				case POPNUM_TIME: emsg("Should not have a popnum_time"); break;
 				case REG: num[j] = regcalc[it.num]; break;
 				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: num[j] = timepoint[ti]; break;
@@ -755,6 +773,7 @@ double Equation::calculate_calculation_spline_store(const vector <Calculation> &
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: emsg("Should not have a population"); break;
+				case POPNUM_TIME: emsg("Should not have a popnumn_time"); break;
 				case REG: num[j] = regcalc[it.num]; break;
 				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: num[j] = timepoint[ti]; break;
@@ -797,6 +816,7 @@ double Equation::calculate_calculation_notime(const vector <Calculation> &calc, 
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: emsg("Should not have a population"); break;
+				case POPNUM_TIME: emsg("Should not have a popnum_time"); break;
 				case REG: num[j] = regcalc[it.num]; break;
 				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: emsg("Should not have time"); break;

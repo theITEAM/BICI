@@ -203,7 +203,6 @@ void IndEvSampler::generate_ind_obs_timeline()
 					const auto &le = co.leave[l];
 				
 					rate = calculate_rate(ind,le,ctime,tii);
-			
 					rs[l]	= rate;
 					rate *= dt;
 					num[l] = rate;
@@ -217,7 +216,6 @@ void IndEvSampler::generate_ind_obs_timeline()
 				}
 				
 				iop[c] = (1-sum)*iop_next[c];
-				
 				for(auto l = 0u; l < lmax; l++){
 					const auto &le = co.leave[l];
 				
@@ -232,7 +230,7 @@ void IndEvSampler::generate_ind_obs_timeline()
 							val *= exp(va);
 						}
 					}
-				
+			
 					iop[c] += val;
 				}
 			}
@@ -360,7 +358,9 @@ void IndEvSampler::generate_ind_obs_timeline()
 			auto sum = 0.0; 
 			for(auto c = 0u; c < C; c++) sum += iop[c];
 			if(sum == 0) emsg("No observation probability");
-			for(auto c = 0u; c < C; c++) iop[c] /= sum;
+			for(auto c = 0u; c < C; c++){
+				iop[c] /= sum;
+			}			
 		}
 	}
 
@@ -777,7 +777,7 @@ vector <InitStateProb> IndEvSampler::init_state_sampler_obs(unsigned int i, unsi
 double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 {
 	auto pif = 1.0;
-	
+			
 	const auto &ind = individual[i_store];
 	
 	const auto &claa = sp.cla[cl_store];
@@ -805,7 +805,7 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 			pif *= sampler[j].prob;
 		}
 	}
-	
+
 	auto cisland = claa.comp[ci].island_ref.c;
 	
 	auto &obs = sp.individual[i_store].obs;
@@ -889,7 +889,7 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 						}
 					}
 				
-					if(sum_op > 0){     // If any non-zero transitions leaving comprtment
+					if(sum_op > 0){     // If any non-zero transitions leaving compartment
 						// Due to finite discretisation time, this ensure algorithm is stable
 						if(sum > IND_SAMP_THRESH){
 							auto f = IND_SAMP_THRESH/sum;
@@ -914,6 +914,7 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 							pif *= num_op[l]/sum_op;
 							
 							pif *= 1.0/(tt-t);
+								
 							c = trg.f; 
 							ci = claa.tra[tr].f;
 							cisland = claa.comp[ci].island_ref.c;
@@ -924,7 +925,7 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 							tt = e.t;
 						}
 						else{
-							pif *= stay_op/total;
+							pif *= stay_op/total;	
 						}
 					}
 				}
@@ -1036,6 +1037,7 @@ double IndEvSampler::calculate_rate(const Individual &ind, const IslandTrans &le
 		}
 		else{
 			auto rate = nm_rate[m][tii];
+			if(rate < TINY) rate = TINY;
 			if(ind_variation == true){
 				//for(const auto &ifr : sp.nm_trans[m].ind_fac_rate){
 				for(const auto &ifr : nm_trans[m].ind_fac_rate){
@@ -1054,6 +1056,7 @@ double IndEvSampler::calculate_rate(const Individual &ind, const IslandTrans &le
 		const auto &mer = le.markov_eqn_ref[tii][ctime];
 
 		auto rate = markov_eqn_vari[mer.e].div[mer.ti].value;
+		if(rate < TINY) rate = TINY;
 		if(ind_variation == true) rate *= get_indfac(ind,sp.markov_eqn[mer.e]);
 		return rate;
 	}

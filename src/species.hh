@@ -164,6 +164,7 @@ class Species   	                         // Stores details of a species
 		vector < vector <double> > calculate_omega_basic(unsigned int g, const vector <double> &param_val, const vector <Param> &param) const;
 		unsigned int tr_trans(unsigned int trg, unsigned int c) const;
 		unsigned int get_comp_global_convert(unsigned int cgl, unsigned int cl, unsigned int c) const;
+		void sampling_error(unsigned int trg, string warn) const;
 		
 	// In 'species_data.cc':
 	public: 

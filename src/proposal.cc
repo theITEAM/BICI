@@ -835,7 +835,11 @@ void Proposal::MH_event(State &state)
 							auto tr_gl = ev.tr_gl;
 							auto &samp = ind_sampler[tr_gl];
 							
-							auto t_new = t + normal_sample(0,samp.si);
+							string warn;
+							auto dt = normal_sample(0,samp.si,warn);
+							if(dt == UNSET) emsg("Problem with MCMC proposal: "+warn);
+							
+							auto t_new = t + dt;
 							
 							samp.ntr++;
 							if(t_new <= tmin || t_new >= tmax || event_near_div(t_new,model.details)){
@@ -946,7 +950,10 @@ void Proposal::MH_multi_event(State &state)
 					
 					auto ill = false;
 					
-					auto dt = normal_sample(0,samp.si);
+					string warn;
+					auto dt = normal_sample(0,samp.si,warn);
+					if(dt == UNSET) emsg("Problem with MCMC proposal: "+warn);
+							
 					if(dt >= trange.tmax || dt < trange.tmin) ill = true;
 					else{
 						// Reorders events 
@@ -1087,7 +1094,10 @@ void Proposal::MH_event_all(State &state)
 			
 			if(ill == false){
 				auto &samp = ind_sampler[i];
-				auto dt = normal_sample(0,samp.si);
+				
+				string warn;
+				auto dt = normal_sample(0,samp.si,warn);
+				if(dt == UNSET) emsg("Problem with MCMC proposal: "+warn);
 				
 				if(dt > 0){
 					if(event[emax-1].t+dt > tmax) ill = true;
@@ -1374,6 +1384,7 @@ void Proposal::sample_ind_obs(State &state)
 	if(skip_proposal(0.8)) return;
 	
 	auto pl = false;
+	
 	auto burn = burn_info.on;
 
 	if(pl) state.check("before");
@@ -1416,9 +1427,7 @@ void Proposal::sample_ind_obs(State &state)
 							else{
 								if(testing == true){ // Diagnostic
 									auto prob = ind_ev_samp.sample_events_prob(ev_new);
-									if(dif(probif,prob,DIF_THRESH)){
-										emsg("sampler different here");
-									}
+									if(dif(probif,prob,DIF_THRESH)) emsg("sampler different here");
 								}
 								
 								auto ev_store = ind.ev;
@@ -1801,8 +1810,10 @@ void Proposal::add_rem_ind(State &state)
 		auto nunobs = unobs.list.size();
 		state.back_init();
 		
-		int dN = normal_int_sample(si);
-	
+		string warn;
+		int dN = normal_int_sample(si,warn);
+		if(dN == UNSET) emsg("MCMC proposal problem: "+warn);
+			
 		auto Nso_unobs_new = Nso_unobs;
 	
 		if(dN != 0){
@@ -2183,7 +2194,12 @@ void Proposal::MH_ie(State &state)
 		if(pl) cout << "Individual: " << ind.name << endl;
 		
 		auto value_st = ind.ie[ie_prop];
-		auto value_prop = value_st + normal_sample(0,sd*si);
+		
+		string warn;
+		auto d = normal_sample(0,sd*si,warn);
+		if(d == UNSET) emsg("Problem with MCMC proposal: "+warn);
+		
+		auto value_prop = value_st + d;
 		
 		auto exp_old = ind.exp_ie[ie_prop];
 		auto exp_prop = exp(value_prop-0.5*var);

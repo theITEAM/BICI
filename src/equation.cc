@@ -31,7 +31,7 @@ using namespace std;
     
 		
 /// Initialises the equation 
-Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsigned int c, bool inf_trans, unsigned int tif, unsigned int li_num, vector <SpeciesSimp> &species, vector <Param> &param, vector <Spline> &spline, vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, const vector <double> &timepoint) : species(species), param(param), spline(spline), param_vec(param_vec), pop(pop), hash_pop(hash_pop), timepoint(timepoint)
+Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsigned int c, bool inf_trans, unsigned int tif, unsigned int li_num, vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, vector <Spline> &spline, vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, const vector <double> &timepoint) : species(species), param(param), derive(derive), spline(spline), param_vec(param_vec), pop(pop), hash_pop(hash_pop), timepoint(timepoint)
 {
 	plfl = false;  // Set to true to print operations to terminal (used for diagnostics)
 	
@@ -62,20 +62,26 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsi
 	
 	auto op = extract_operations();                  // Extracts the operations in the 	expression
 	
+	if(warn != "") return; 
+	
 	check_repeated_operator(op);                     // Checks for repeated operators e.g. "**"
 	
 	if(warn != "") return; 
 	
 	replace_minus(op);                               // Replaces minums sign with (-1)*
-	
+		
 	if(plfl) print_operations(op);
 
+	time_integral(op);                               // Incorporates time integral
+	
+	if(warn != "") return; 
+	
 	create_calculation(op);                          // Works out the sequence of calculation to generate result
 
 	if(warn != "") return; 
 	
 	if(plfl == true) print_calculation();
-
+	
 	if(simplify_eqn == true) simplify();         // Simplifies by combining constants
 
 	if(warn != "") return;  
@@ -103,8 +109,8 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsi
 	
 	// Truncates strings to save memory
 	te.clear();//trunc(te);
-	te_raw = trunc(te_raw,5);
-	//print_calculation();
+	if(type == REPARAM || type == REPARAM_EQN) te_raw = trunc(te_raw,5);
+	else te_raw = trunc(te_raw,20);
 }
 
 
@@ -242,27 +248,57 @@ void Equation::print_operations(const vector <EqItem> &op) const
 	cout << "List of operations:" << endl;
   for(auto i = 0u; i < op.size(); i++){
     switch(op[i].type){
+			case TINT: cout << "∫dt"; break;
       case LEFTBRACKET: cout << "("; break;
       case RIGHTBRACKET: cout << ")"; break;
 			case FUNCDIVIDE: cout << "|"; break;
+			
       case PARAMETER: 
 				{
 					const auto &pr = param_ref[op[i].num];
 					cout << param[pr.th].name << pr.index;
 				}
 				break;
-			case PARAMVEC: emsg("SHould not be param vec"); break;
+				
+			case PARAMVEC:
+				emsg("SHould not be param vec"); 
+				break;
+				
 			case SPLINE:
 				{
 					const auto &pr = param_ref[op[i].num];
 					cout << "Spline " << param[pr.th].name << pr.index;
 				}
 				break;
+				
+			case SPLINE_TIME:
+				{
+					const auto &tr = time_ref[op[i].num];
+					const auto &pr = param_ref[tr.num];
+					cout << "Spline " << param[pr.th].name << pr.index << "(ti=" << tr.ti << ")";
+				}
+				break;
+				
+			case DERIVE: 
+				{
+					const auto &dr = derive_ref[op[i].num];
+					cout << "Derive(" << derive[dr.i].name << dr.index << ")";
+					if(dr.ti != UNSET) cout << "(ti=" << dr.ti << ")";
+				}
+				break;
+				
 			case SPLINEREF: emsg("spline ref should not"); break;
+			case SPLINEREF_TIME: emsg("splineref_time should not"); break;
 			case IE: cout << species[sp_p].ind_effect[op[i].num].name; break;
 			case ONE: cout << "1"; break;
 			case FE: cout << species[sp_p].fix_effect[op[i].num].name; break;
       case POPNUM: cout << pop[op[i].num].name; break;
+			case POPNUM_TIME:
+				{
+					const auto &tr = time_ref[op[i].num];
+					cout << pop[tr.num].name << "(ti=" << tr.ti << ")";
+				}
+				break;
       case EXPFUNC: cout << "exp"; break;
       case SINFUNC: cout << "sin"; break;
       case COSFUNC: cout << "cos"; break;
@@ -281,7 +317,7 @@ void Equation::print_operations(const vector <EqItem> &op) const
       case MULTIPLY: cout << "*"; break;
 			case DIVIDE: cout << "/"; break;
       case REG: cout << "R" << op[i].num; break;
-      case NUMERIC: cout << "numeric" <<1/ cons[op[i].num]; break;
+      case NUMERIC: cout << "numeric" << cons[op[i].num]; break;
 			case TIME: cout << "time"; break;
 			case NOOP: cout << "No operation"; break;
 		}
@@ -309,7 +345,10 @@ void Equation::print_calculation() const
 			}
 			break;
 		
-		case PARAMVEC: cout << param_vec[ans.num].name; break;
+		case PARAMVEC: 
+			cout << param_vec[ans.num].name; 
+			break;
+			
 		case SPLINE:
 			{
 				const auto &pr = param_ref[ans.num];
@@ -317,16 +356,53 @@ void Equation::print_calculation() const
 				cout << "Spline " << get_param_name_with_dep(par,par.dep,pr.index);
 			}
 			break;
+			
+		case SPLINE_TIME:
+			{
+				const auto &tr = time_ref[ans.num];
+				const auto &pr = param_ref[tr.num];
+				auto par = param[pr.th]; 
+				cout << "Spline " << get_param_name_with_dep(par,par.dep,pr.index) << "(ti=" << tr.ti << ")";
+			}
+			break;
 		
-		case SPLINEREF: cout << "Spline " << spline[ans.num].name; break;
-    case POPNUM: cout << pop[ans.num].name; break;
+		case SPLINEREF:
+			cout << "Spline " << spline[ans.num].name; 
+			break;
+			
+    case SPLINEREF_TIME:
+			{
+				const auto &tr = time_ref[ans.num];
+				cout << "Spline " << spline[tr.num].name << "(ti=" << tr.ti << ")";
+			}
+			break;
+		
+		case DERIVE: 
+			{
+				const auto &dr = derive_ref[ans.num];
+				cout << "Derive(" << derive[dr.i].name << dr.index << ")";
+				if(dr.ti != UNSET) cout << "(ti=" << dr.ti << ")";
+			}
+			break;
+			
+    case POPNUM: 
+			cout << pop[ans.num].name; 
+			break;
+			
+		case POPNUM_TIME:
+			{
+				const auto &tr = time_ref[ans.num];
+				cout << pop[tr.num].name << "(ti=" << tr.ti << ")";
+			}
+			break;
+			
 		case IE: cout << "[" << species[sp_p].ind_effect[ans.num].name << "]"; break;
     case ONE: cout << "1"; break;
 		case FE: cout << "<" << species[sp_p].fix_effect[ans.num].name << ">"; break;
     case REG: cout <<  "R" << ans.num; break;
     case NUMERIC: cout << cons[ans.num]; break;
 		case TIME: cout << "time"; break;
-		default: emsg("Eq problem3"); break;
+		default: emsg("Eq problem3 "+ans.type); break;
   }
   cout <<  " Answer" << endl << endl;
 	
@@ -371,7 +447,10 @@ void Equation::print_ca(const Calculation &ca) const
 				cout << param[pr.th].name << pr.index;
 			}
 			break;
-		case PARAMVEC: cout << param_vec[it.num].name; break;
+			
+		case PARAMVEC: 
+			cout << param_vec[it.num].name;
+			break;
 		
 		case SPLINE: 
 			{
@@ -381,8 +460,45 @@ void Equation::print_ca(const Calculation &ca) const
 			}
 			break;
 			
-		case SPLINEREF: cout << "Spline " << spline[it.num].name; break;
-		case POPNUM: cout << "'" << pop[it.num].name << "'"; break;
+		case SPLINE_TIME: 
+			{
+				const auto &tr = time_ref[it.num];
+				const auto &pr = param_ref[tr.num];
+				auto par = param[pr.th]; 
+				cout << "Spline " << get_param_name_with_dep(par,par.dep,pr.index) << "(ti=" << tr.ti << ")'";
+			}
+			break;
+			
+		case SPLINEREF:
+			cout << "Spline " << spline[it.num].name; 
+			break;
+		
+		case SPLINEREF_TIME:
+			{
+				const auto &tr = time_ref[it.num];
+				cout << "Spline " << spline[tr.num].name << "(ti=" << tr.ti << ")'";
+			}
+			break;
+			
+		case DERIVE: 
+			{
+				const auto &dr = derive_ref[it.num];
+				cout << "Derive(" << derive[dr.i].name << dr.index << ")";
+				if(dr.ti != UNSET) cout << "(ti=" << dr.ti << ")";
+			}
+			break;
+				
+		case POPNUM: 
+			cout << "'" << pop[it.num].name << "'";
+			break;
+			
+		case POPNUM_TIME:
+			{
+				const auto &tr = time_ref[it.num];
+				cout << "'" << pop[tr.num].name << "(ti=" << tr.ti << ")'";
+			}
+			break;
+			
 		case IE: cout << species[sp_p].ind_effect[it.num].name; break;
 		case ONE: cout << "1"; break;
 		case FE: cout << species[sp_p].fix_effect[it.num].name; break;
@@ -735,8 +851,7 @@ ParamRef Equation::get_param_name(unsigned int i, double &dist, unsigned int &ra
 						//auto j = hash_list.existing(vec);
 						auto j = par.dep[de].hash_list.find(remove_prime(pp.dep[de]));
 						if(j == UNSET){
-							warn = "'"+content+"' does not agree with the definition '"+par.full_name+"'."; 
-							emsg("PPP ");
+							warn = "'"+content+"' does not agree with the definition '"+par.full_name+"'.";
 							return pref;
 						}
 						ind += j*par.dep[de].mult;
@@ -751,6 +866,64 @@ ParamRef Equation::get_param_name(unsigned int i, double &dist, unsigned int &ra
 	}
 	
   return pref;
+}
+
+
+/// Tries to get a parameter name from a string
+DeriveRef Equation::get_derive_name(unsigned int i, unsigned int &raend)
+{
+	DeriveRef dref; 
+	
+	if(te.substr(i,1) == "%"){
+		auto ist = i;
+		while(i < te.length() && te.substr(i,1) != "$") i++;
+	
+		if(i == te.length()){ warn = "Could not find right bracket '$'"; return dref;}
+		
+		auto content = trim(te.substr(ist+1,i-ist-1));
+	
+		auto pp = get_param_prop(content);
+		
+		auto name = pp.name;
+	
+		auto d = 0u; while(d < derive.size() && derive[d].name != name) d++;	
+		if(d < derive.size()){
+			const auto &der = derive[d];
+		
+			if(pp.time_dep != der.time_dep){ 
+				warn = "The time dependency in the equation does not agree with the definition for parameter '"+der.name+"'."; 
+				return dref;
+			}
+			
+			auto dep = pp.dep;
+			if(dep.size() > 0 && dep[dep.size()-1] == "t") dep.pop_back();
+			
+			if(dep.size() != der.dep.size()){
+				warn = "The dependency in the equation does not agree with the definition for parameter '"+der.name+"'."; 
+				return dref;
+			}
+			
+			if(pp.prime == true){
+				warn = "\""+content+"\" should not have a prime (perhaps a sum is missing?)."; 
+				return dref;
+			}
+			
+			auto ind = 0u;
+			for(auto de = 0u; de < der.dep.size(); de++){
+				auto j = der.dep[de].hash_list.find(remove_prime(pp.dep[de]));
+				if(j == UNSET){
+					warn = "'"+content+"' does not agree with the definition '"+der.name+"'."; 
+					return dref;
+				}
+				ind += j*der.dep[de].mult;
+			}
+			dref.i = d; dref.index = ind;
+		}
+	
+		raend = i+1;
+	}
+	
+  return dref;
 }
 
 
@@ -808,8 +981,6 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 			
 				cont = spl[0];	
 				
-				auto fl = false;
-				
 				auto k = 0u;
 				while(k < extra.length()){
 					while(k < extra.length() && extra.substr(k,1) == " ") k++;
@@ -817,8 +988,6 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 					
 					auto ch = extra.substr(k,1);
 					if(ch == "[" || ch == "<"){
-						fl = true;
-						
 						auto kst = k;
 						
 						while(k < extra.length() && extra.substr(k,1) != "]" && extra.substr(k,1) != ">") k++;
@@ -863,10 +1032,6 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 						}
 					}
 					k++;
-				}
-				
-				if(fl == false){
-					warn = start+"Expected content after ';'"; return p;
 				}
 			}
 	
@@ -989,8 +1154,10 @@ bool Equation::quant(const vector <EqItem> &op, int i) const
 {
   if(i < 0 || i >= (int)op.size()) return false;
   switch(op[i].type){
-	case PARAMETER: case PARAMVEC: case SPLINE: case SPLINEREF:
-	case POPNUM: case IE: case FE: case REG: case NUMERIC: case TIME: 
+	case PARAMETER: case PARAMVEC:
+	case SPLINE: case SPLINE_TIME: case SPLINEREF: case SPLINEREF_TIME:
+	case DERIVE:
+	case POPNUM: case POPNUM_TIME: case IE: case FE: case REG: case NUMERIC: case TIME: 
 		return true;
   default: return false;
 	}
@@ -1041,247 +1208,275 @@ vector <EqItem> Equation::extract_operations()
 	
 	auto i = 0u;
   while(i < te.length()){ 
-		auto ch = te.substr(i,1);
-		char cha = te.at(i);
-		
-		EqItem item;
-		switch(cha){
-      case '(': item.type = LEFTBRACKET; op.push_back(item); break;
-      case ')': item.type = RIGHTBRACKET; op.push_back(item); break;
-      case '|': item.type = FUNCDIVIDE; op.push_back(item); break;
-      case '*': item.type = MULTIPLY; op.push_back(item); break;
-      case '/': item.type = DIVIDE; op.push_back(item); break;
-			case '+': item.type = ADD; op.push_back(item); break;
-      case '-': item.type = TAKE; op.push_back(item);	break;
-			case ' ': break;
-
-      default:
-				auto doneflag = false;
-				
-        if(te.substr(i,4) == "exp(" && doneflag == false){
-					item.type = EXPFUNC; op.push_back(item); 
-          doneflag = true;
-          i += 2;
-        }
-
-        if(te.substr(i,4) == "sin(" && doneflag == false){
-					item.type = SINFUNC; op.push_back(item); 
-          doneflag = true;
-          i += 2;
-        }
-
-        if(te.substr(i,4) == "cos(" && doneflag == false){
-					item.type = COSFUNC; op.push_back(item); 
-          doneflag = true;
-          i += 2;
-        }
-
-        if(te.substr(i,4) == "log(" && doneflag == false){
-					item.type = LOGFUNC; op.push_back(item); 
-          doneflag = true;
-          i += 2;
-        }
-
-        if(te.substr(i,5) == "step(" && doneflag == false){
-					item.type = STEPFUNC; op.push_back(item); 
-					doneflag = true;
-          i += 3;
-        }
-
-				if(te.substr(i,4) == "pow(" && doneflag == false){
-					item.type = POWERFUNC; op.push_back(item); 
-          doneflag = true;
-          i += 2;
-        }
-				
-				if(te.substr(i,7) == "thresh(" && doneflag == false){
-					item.type = THRESHFUNC; op.push_back(item); 
-          doneflag = true;
-          i += 5;
-        }
-				
-				if(te.substr(i,7) == "ubound(" && doneflag == false){
-					item.type = UBOUNDFUNC; op.push_back(item); 
-          doneflag = true;
-          i += 5;
-        }
-				
-				if(te.substr(i,4) == "max(" && doneflag == false){
-					item.type = MAXFUNC; op.push_back(item); 
-          doneflag = true;
-          i += 2;
-        }
-				
-				if(te.substr(i,4) == "min(" && doneflag == false){
-					item.type = MINFUNC; op.push_back(item); 
-          doneflag = true;
-          i += 2;
-        }
-				
-				if(te.substr(i,4) == "abs(" && doneflag == false){
-					item.type = ABSFUNC; op.push_back(item); 
-          doneflag = true;
-          i += 2;
-        }
-				
-				if(te.substr(i,5) == "sqrt(" && doneflag == false){
-					item.type = SQRTFUNC; op.push_back(item); 
-          doneflag = true;
-          i += 3;
-        }
-				
-				if(te.substr(i,4) == "sig(" && doneflag == false){
-					item.type = SIGFUNC; op.push_back(item); 
-          doneflag = true;
-          i += 2;
-        }
-				
-        if(doneflag == false){
-					unsigned int raend;
-          auto num = get_float(i,raend);
-          if(num != UNSET){
-						i = raend-1; 
-						item.type = NUMERIC; 
-						item.num = add_cons(num);
-						op.push_back(item); 
-            doneflag = true;
-          }
-        }
+		if(str_eq(te,i,tint)){
+			i = extract_integral(te,i,op);
+			if(warn != "") return op;
+		}
+		else{
+			auto ch = te.substr(i,1);
+			char cha = te.at(i);
 			
-        if(doneflag == false){
-					unsigned int raend;
+			EqItem item;
+			switch(cha){
+				case '(': item.type = LEFTBRACKET; op.push_back(item); break;
+				case ')': item.type = RIGHTBRACKET; op.push_back(item); break;
+				case '|': item.type = FUNCDIVIDE; op.push_back(item); break;
+				case '*': item.type = MULTIPLY; op.push_back(item); break;
+				case '/': item.type = DIVIDE; op.push_back(item); break;
+				case '+': item.type = ADD; op.push_back(item); break;
+				case '-': item.type = TAKE; op.push_back(item);	break;
+				case ' ': break;
+
+				default:
+					auto doneflag = false;
 					
-					double dist = UNSET;
-				
-          auto pref = get_param_name(i,dist,raend); if(warn != "") return op;
-				
-          if(pref.th != UNSET || dist != UNSET){
-            i = raend-1;
-						
-						if(dist != UNSET){
-							item.type = NUMERIC; item.num = add_cons(dist); op.push_back(item); 
+					if(te.substr(i,4) == "exp(" && doneflag == false){
+						item.type = EXPFUNC; op.push_back(item); 
+						doneflag = true;
+						i += 2;
+					}
+
+					if(te.substr(i,4) == "sin(" && doneflag == false){
+						item.type = SINFUNC; op.push_back(item); 
+						doneflag = true;
+						i += 2;
+					}
+
+					if(te.substr(i,4) == "cos(" && doneflag == false){
+						item.type = COSFUNC; op.push_back(item); 
+						doneflag = true;
+						i += 2;
+					}
+
+					if(te.substr(i,4) == "log(" && doneflag == false){
+						item.type = LOGFUNC; op.push_back(item); 
+						doneflag = true;
+						i += 2;
+					}
+
+					if(te.substr(i,5) == "step(" && doneflag == false){
+						item.type = STEPFUNC; op.push_back(item); 
+						doneflag = true;
+						i += 3;
+					}
+
+					if(te.substr(i,4) == "pow(" && doneflag == false){
+						item.type = POWERFUNC; op.push_back(item); 
+						doneflag = true;
+						i += 2;
+					}
+					
+					if(te.substr(i,7) == "thresh(" && doneflag == false){
+						item.type = THRESHFUNC; op.push_back(item); 
+						doneflag = true;
+						i += 5;
+					}
+					
+					if(te.substr(i,7) == "ubound(" && doneflag == false){
+						item.type = UBOUNDFUNC; op.push_back(item); 
+						doneflag = true;
+						i += 5;
+					}
+					
+					if(te.substr(i,4) == "max(" && doneflag == false){
+						item.type = MAXFUNC; op.push_back(item); 
+						doneflag = true;
+						i += 2;
+					}
+					
+					if(te.substr(i,4) == "min(" && doneflag == false){
+						item.type = MINFUNC; op.push_back(item); 
+						doneflag = true;
+						i += 2;
+					}
+					
+					if(te.substr(i,4) == "abs(" && doneflag == false){
+						item.type = ABSFUNC; op.push_back(item); 
+						doneflag = true;
+						i += 2;
+					}
+					
+					if(te.substr(i,5) == "sqrt(" && doneflag == false){
+						item.type = SQRTFUNC; op.push_back(item); 
+						doneflag = true;
+						i += 3;
+					}
+					
+					if(te.substr(i,4) == "sig(" && doneflag == false){
+						item.type = SIGFUNC; op.push_back(item); 
+						doneflag = true;
+						i += 2;
+					}
+					
+					if(doneflag == false){
+						unsigned int raend;
+						auto num = get_float(i,raend);
+						if(num != UNSET){
+							i = raend-1; 
+							item.type = NUMERIC; 
+							item.num = add_cons(num);
+							op.push_back(item); 
+							doneflag = true;
 						}
-						else{
-							if(pref.th == TIME_VAR){
-								if(ti_fix != UNSET){
-									item.type = NUMERIC; 
-									item.num = add_cons(timepoint[ti_fix]); 
-									op.push_back(item); 
-								}
-								else{
-									item.type = TIME; op.push_back(item); 
-								}
+					}
+
+					// Looks for derived parameters
+					if(doneflag == false){
+						unsigned int raend;
+						
+						auto dref = get_derive_name(i,raend); if(warn != "") return op;
+					
+						if(dref.i != UNSET){
+							if(type != DERIVE_EQN){
+								warn = "Derived quantity '"+derive[dref.i].full_name+"' cannot be in a non-derived equation."; 
+							}
+							
+							i = raend-1;
+							
+							item.type = DERIVE;
+							item.num = derive_ref.size();
+							op.push_back(item);
+							
+							derive_ref.push_back(dref);
+							doneflag = true;
+						}
+					}
+				
+					// Looks for parameters
+					if(doneflag == false){
+						unsigned int raend;
+						
+						double dist = UNSET;
+					
+						auto pref = get_param_name(i,dist,raend); if(warn != "") return op;
+					
+						if(pref.th != UNSET || dist != UNSET){
+							i = raend-1;
+							
+							if(dist != UNSET){
+								item.type = NUMERIC; item.num = add_cons(dist); op.push_back(item); 
 							}
 							else{
-								auto &par = param[pref.th];
-								
-								if(par.time_dep == true){
-									if(par.spline_info.on != true) emsg("Spline should be on");
-									item.type = SPLINE;
-								}							
-								else item.type = PARAMETER; 
-								
-								auto done = false;
-								
-								if(done == false){ 
-									if(item.type == PARAMETER && param[pref.th].variety == CONST_PARAM){
+								if(pref.th == TIME_VAR){
+									if(ti_fix != UNSET){
 										item.type = NUMERIC; 
-										const auto &par = param[pref.th];
-										item.num = add_cons(par.cons[par.element_ref[pref.index]]);
+										item.num = add_cons(timepoint[ti_fix]); 
 										op.push_back(item); 
-										done = true;
+									}
+									else{
+										item.type = TIME; op.push_back(item); 
 									}
 								}
-								
-								if(done == false){
-									if(item.type == PARAMETER && par.variety == REPARAM_PARAM && par.exist(pref.index)){
-										auto num = number(par.get_value_te(pref.index));
-										if(num != UNSET){
+								else{
+									auto &par = param[pref.th];
+									
+									if(par.time_dep == true){
+										if(par.spline_info.on != true) emsg("Spline should be on");
+										item.type = SPLINE;
+									}							
+									else item.type = PARAMETER; 
+									
+									auto done = false;
+									
+									if(done == false){ 
+										if(item.type == PARAMETER && param[pref.th].variety == CONST_PARAM){
 											item.type = NUMERIC; 
-											item.num = add_cons(num);
+											const auto &par = param[pref.th];
+											item.num = add_cons(par.cons[par.element_ref[pref.index]]);
 											op.push_back(item); 
 											done = true;
 										}
 									}
-								}
-								
-								if(done == false){
-									item.num = add_param_ref(pref);
-									op.push_back(item); 
 									
-									par.add_element(pref.index);
-									
-									// Adds in factor to equation
-									if(par.param_mult != UNSET){
-										{
-											EqItem item2; item2.type = MULTIPLY; op.push_back(item2); 
+									if(done == false){
+										if(item.type == PARAMETER && par.variety == REPARAM_PARAM && par.exist(pref.index)){
+											auto num = number(par.get_value_te(pref.index));
+											if(num != UNSET){
+												item.type = NUMERIC; 
+												item.num = add_cons(num);
+												op.push_back(item); 
+												done = true;
+											}
 										}
-										item.type = SPLINE; 
-										auto &pr = param_ref[item.num];
-										pr.th = par.param_mult;
-										
-										if(par.time_dep){
-											const auto &dep = par.dep;
-											pr.index /= dep[dep.size()-1].list.size();
-										}
-										
-										const auto &par_mult = param[par.param_mult];
-										const auto &dep = par_mult.dep;
-										
-										pr.index *= dep[dep.size()-1].list.size();
-										
-										op.push_back(item); 
 									}
+									
+									if(done == false){
+										item.num = add_param_ref(pref);
+										op.push_back(item); 
+										
+										par.add_element(pref.index);
+										
+										// Adds in factor to equation
+										if(par.param_mult != UNSET){
+											{
+												EqItem item2; item2.type = MULTIPLY; op.push_back(item2); 
+											}
+											item.type = SPLINE; 
+											auto &pr = param_ref[item.num];
+											pr.th = par.param_mult;
+											
+											if(par.time_dep){
+												const auto &dep = par.dep;
+												pr.index /= dep[dep.size()-1].list.size();
+											}
+											
+											const auto &par_mult = param[par.param_mult];
+											const auto &dep = par_mult.dep;
+											
+											pr.index *= dep[dep.size()-1].list.size();
+											
+											op.push_back(item); 
+										}
+									}
+									
+									par.used = true;
 								}
-								
-								par.used = true;
 							}
+							doneflag = true;
 						}
-					  doneflag = true;
-          }
-        }
+					}
 
-			  if(doneflag == false){
-					unsigned int raend;
-          auto numi = get_pop(i,raend); if(warn != "") return op;
-          if(numi != UNSET){
-            i = raend-1;
-						item.type = POPNUM; item.num = numi; op.push_back(item); 
-						doneflag = true;
-          }
-        }
-			
-				if(doneflag == false){
-					unsigned int raend;
-          auto ie = get_ie(i,raend); if(warn != "") return op;
-          if(ie != UNSET){
-            i = raend-1;
-						item.type = IE; item.num = ie; op.push_back(item); 
-						doneflag = true;
-          }
-        }
+					// Looks for populations
+					if(doneflag == false){
+						unsigned int raend;
+						auto numi = get_pop(i,raend); if(warn != "") return op;
+						if(numi != UNSET){
+							i = raend-1;
+							item.type = POPNUM; item.num = numi; op.push_back(item); 
+							doneflag = true;
+						}
+					}
+				
+					// Looks for individual effects
+					if(doneflag == false){
+						unsigned int raend;
+						auto ie = get_ie(i,raend); if(warn != "") return op;
+						if(ie != UNSET){
+							i = raend-1;
+							item.type = IE; item.num = ie; op.push_back(item); 
+							doneflag = true;
+						}
+					}
 
-				if(doneflag == false){
-					unsigned int raend;
-          auto fe = get_fe(i,raend); if(warn != "") return op;
-          if(fe != UNSET){
-						i = raend-1;
-            item.type = FE; item.num = fe; op.push_back(item); 
-						doneflag = true;
-          }
-        }
+					// Looks for fixed effects
+					if(doneflag == false){
+						unsigned int raend;
+						auto fe = get_fe(i,raend); if(warn != "") return op;
+						if(fe != UNSET){
+							i = raend-1;
+							item.type = FE; item.num = fe; op.push_back(item); 
+							doneflag = true;
+						}
+					}
 				
-				//if(doneflag == false){
-				//cout << "Problem with expression. The character '"+ch+"' was not expected." << endl;
-				//}
-				
-        if(doneflag == false){ 
-					warn = "Problem with expression. The character '"+ch+"' was not expected."; 
-					return op;
-				}
-        break;
-    }
-		i++;
+					if(doneflag == false){ 
+						warn = "Problem with expression. The character '"+ch+"' is not expected."; 
+						return op;
+					}
+					break;
+			}
+			i++;
+		}
   }
 
   i = 0;                                            // Adds in unspecified multiply signs
@@ -1298,6 +1493,99 @@ vector <EqItem> Equation::extract_operations()
 }
 
 
+/// Gets an integral bound
+unsigned int Equation::get_integral_bound(string st)
+{
+	auto t = number(st);
+	if(t == UNSET){ 
+		warn = "Problem with expression. Integral bound '"+st+"' is not a number.";
+		return UNSET;
+	}
+
+	if(t < timepoint[0] || t > timepoint[timepoint.size()-1]){
+		warn = "Problem with expression. Integral bound '"+st+"' is not within the system time period.";
+		return UNSET;
+	}		
+	
+	auto dt = timepoint[1]-timepoint[0];
+	double ti_f = OVER_ONE*(t-timepoint[0])/dt;
+	auto ti = round_int(ti_f);
+	
+	if(dif(ti_f,ti,DIF_THRESH)){
+		warn = "Problem with expression. Integral bound '"+st+"' is not at on a time-step.";
+		return UNSET;
+	}
+	
+	return ti;
+}
+
+
+/// Extracts information about an integral 
+unsigned int Equation::extract_integral(const string &te, unsigned int i, vector <EqItem> &op)
+{
+	i += tint.length();
+	auto ist = i;
+	while(i < te.length() && te.substr(i,1) != "(") i++;
+	if(i == te.length()){
+		warn = "Problem with expression. There must be a right bracket '(' after the integral."; 
+		return i;
+	}
+	
+	auto cont = trim(te.substr(ist,i-ist));
+	
+	if(!end_str(cont,"dt")){
+		warn = "Problem with expression. An integral must always be followed by 'dt'."; 
+		return i;
+	}
+	
+	cont = trim(cont.substr(0,cont.length()-2));
+	
+	EqItem item;
+	item.type = TINT;
+	
+	if(cont.length() != 0){
+		auto fl = false;
+		if(cont.substr(0,1) != "[" || cont.substr(cont.length()-1,1) != "]") fl = true;
+		else{
+			auto spl = split(cont.substr(1,cont.length()-2),',');
+			if(spl.size() != 2) fl = true;
+			else{
+				auto sup = spl[1];
+				auto sub = spl[0];
+				auto ti_max = get_integral_bound(sup);
+				auto ti_min = get_integral_bound(sub);
+				
+				if(ti_max == UNSET || ti_min == UNSET) return i;
+				if(ti_min == ti_max){
+					warn = "Problem with expression. The integral bounds cannot have the same value '"+sub+"'.";
+					return i;					
+				}
+				else{
+					if(ti_min > ti_max){
+						warn = "Problem with expression. Integral bound '"+sub+"' must be less than '"+sup+"'.";
+						return i;					
+					}
+					else{
+						item.num = time_ref.size();
+						TimeRef tr; tr.num = ti_min; tr.ti = ti_max;
+						time_ref.push_back(tr);
+					}
+				}
+			}
+		}
+		
+		if(fl == true){
+			warn = "Problem with expression. Integral bounds should be set using the format '∫[min,max] dt (...)'."; 
+			return i;
+		}
+	}
+	
+	op.push_back(item); 
+
+	return i;
+}
+
+
 /// Works out the sequence of calculations to generate result
 void Equation::create_calculation(vector <EqItem> &op)
 {
@@ -1309,6 +1597,8 @@ void Equation::create_calculation(vector <EqItem> &op)
 		
     for(auto i = 0; i < int(op.size())-1; i++){
       switch(op[i].type){
+			case TINT: emsg("Integral should not be here"); break;
+			
 			case LEFTBRACKET: case RIGHTBRACKET:
 				break;
 				
@@ -1358,7 +1648,10 @@ void Equation::create_calculation(vector <EqItem> &op)
 				break;
 				
 			// Removes brackets around a quantity
-			case PARAMETER: case PARAMVEC: case SPLINE: case SPLINEREF: case POPNUM: 
+			case PARAMETER: case PARAMVEC:
+			case SPLINE: case SPLINE_TIME: case SPLINEREF: case SPLINEREF_TIME:
+			case DERIVE:
+			case POPNUM: case POPNUM_TIME:
 			case IE: case FE: case REG: case NUMERIC: case TIME: 
 				if(optype(op,i-1,LEFTBRACKET) && optype(op,i+1,RIGHTBRACKET) && !is_func(op,i-2)){
 					i--;
@@ -1423,7 +1716,7 @@ void Equation::create_calculation(vector <EqItem> &op)
   }while(flag == true && op.size() > 1);
 
  	string wa = "";
-		
+
 	if(op.size() != 1){
 		vector <EqItemType> oper;
 		for(const auto &val : op){
@@ -1437,6 +1730,9 @@ void Equation::create_calculation(vector <EqItem> &op)
 	
 		if(oper.size() == 1){
 			wa = "There is potentially a stray "+op_name(oper[0])+" in the expression. ";
+		}
+		else{
+			wa = "The equation syntax is incorrect. ";
 		}
 	}
 
@@ -1474,10 +1770,13 @@ double Equation::calculate_param_only(const vector <double> &param_val) const
 					if(num[j] == UNSET) emsg("Param must be set");
 					break;
 				case SPLINE: case SPLINEREF: emsg("Should not be here1"); break;
+				case SPLINE_TIME: case SPLINEREF_TIME: emsg("Should not be here1"); break;
+				case DERIVE: emsg("Should not be here1"); break;
 				case IE: emsg("Should not include ind effect"); break;
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: emsg("Should not include population"); break;
+				case POPNUM_TIME: emsg("Should not include population time"); break;
 				case REG: num[j] = regcalc[it.num]; break;
 				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: emsg("Should not include time1"); break;
@@ -1492,8 +1791,12 @@ double Equation::calculate_param_only(const vector <double> &param_val) const
     case PARAMETER: emsg("Should not be parameter1"); return UNSET;
 		case PARAMVEC: return param_val[ans.num];
     case SPLINE: emsg("SHould not be here2"); return UNSET;
+		case SPLINE_TIME: emsg("SHould not be here2"); return UNSET;
 		case SPLINEREF: emsg("SHould not be here2"); return UNSET;
-    case POPNUM: emsg("SHould not be here3"); return UNSET;
+    case SPLINEREF_TIME: emsg("SHould not be here2"); return UNSET;
+		case DERIVE: emsg("SHould not be here2"); return UNSET;
+    case POPNUM: emsg("SHould not be popnum"); return UNSET;
+    case POPNUM_TIME: emsg("SHould not be popnum_time"); return UNSET;
     case REG: return regcalc[ans.num];
     case NUMERIC: return cons[ans.num];
 		case IE: emsg("Should not include ind effect"); return UNSET;
@@ -1525,14 +1828,18 @@ double Equation::calculate_param_only_ti_fix(const vector <double> &param_val, c
 				case PARAMETER: emsg("SHould not be parameter2"); break;
 				case PARAMVEC: num[j] = param_val[it.num]; break;
 				case SPLINE: emsg("SHould not be spline"); break;
+				case SPLINE_TIME: emsg("SHould not be spline"); break;
 				case SPLINEREF:
 					if(ti_fix == UNSET) emsg("Should not be here4");
 					num[j] = spline_val[it.num].val[ti_fix];
 					break;
+				case SPLINEREF_TIME: emsg("SHould not be spline"); break;
+				case DERIVE: emsg("SHould not be derive"); return UNSET;
 				case IE: emsg("Should not include ind effect"); break;
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: emsg("Should not include population"); break;
+				case POPNUM_TIME: emsg("Should not include population time"); break;
 				case REG: num[j] = regcalc[it.num]; break;
 				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: emsg("Should not include time3"); break;
@@ -1547,10 +1854,14 @@ double Equation::calculate_param_only_ti_fix(const vector <double> &param_val, c
     case PARAMETER: emsg("Should not be parameter3"); return UNSET;
 		case PARAMVEC: return param_val[ans.num];
     case SPLINE: emsg("Should not be spline"); return UNSET;
+		case SPLINE_TIME: emsg("Should not be spline time"); return UNSET;
 		case SPLINEREF:
 			if(ti_fix == UNSET) emsg("Should not be here5");
 			return spline_val[ans.num].val[ti_fix];
-    case POPNUM: emsg("SHould not be here6"); return UNSET;
+    case SPLINEREF_TIME: emsg("Should not be splineref time"); return UNSET;
+		case DERIVE: emsg("Should not be derive"); return UNSET;
+		case POPNUM: emsg("SHould not be here6"); return UNSET;
+    case POPNUM_TIME: emsg("SHould not be here6"); return UNSET;
     case REG: return regcalc[ans.num];
     case NUMERIC: return cons[ans.num];
 		case IE: emsg("Should not include ind effect"); return UNSET;
@@ -1583,11 +1894,15 @@ double Equation::calculate_no_popnum(unsigned int ti, const vector <double> &par
 				case PARAMETER: emsg("SHould not be parameter4"); break;
 				case PARAMVEC: num[j] = param_val[it.num]; break;
 				case SPLINE: emsg("SHould not be spline"); break;
+				case SPLINE_TIME: emsg("SHould not be spline time"); break;
 				case SPLINEREF: num[j] = spline_val[it.num].val[ti]; break;
+				case SPLINEREF_TIME: emsg("SHould not be splineref time"); break;
+				case DERIVE: emsg("SHould not be derive"); break;
 				case IE: emsg("Should not include ind effect"); break;
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: emsg("Should not include popnum"); break;
+				case POPNUM_TIME: emsg("Should not include popnum_time"); break;
 				case REG: num[j] = regcalc[it.num]; break;
 				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: num[j] = timepoint[ti]; break;
@@ -1602,8 +1917,12 @@ double Equation::calculate_no_popnum(unsigned int ti, const vector <double> &par
     case PARAMETER: emsg("SHould not be parameter5"); return UNSET;
 		case PARAMVEC: return param_val[ans.num];
     case SPLINE: emsg("SHould not be spline"); return UNSET;
+		case SPLINE_TIME: emsg("SHould not be spline time"); return UNSET;
 		case SPLINEREF: return spline_val[ans.num].val[ti];
-    case POPNUM: emsg("Should not include popnum"); return UNSET;
+		case SPLINEREF_TIME: emsg("SHould not be splineref time"); return UNSET;
+		case DERIVE: emsg("SHould not be derive"); return UNSET;
+		case POPNUM: emsg("Should not include popnum"); return UNSET;
+    case POPNUM_TIME: emsg("Should not include popnum_time"); return UNSET;
     case REG: return regcalc[ans.num];
     case NUMERIC: return cons[ans.num];
 		case IE: emsg("Should not include ind effect"); return UNSET;
@@ -1635,11 +1954,15 @@ double Equation::calculate(unsigned int ti, const vector <double> &popnum, const
 				case PARAMETER: emsg("SHould not be parameter6"); break;
 				case PARAMVEC: num[j] = param_val[it.num]; break;
 				case SPLINE: emsg("Should not be spline"); break;
+				case SPLINE_TIME: emsg("Should not be spline time"); break;
 				case SPLINEREF:	num[j] = spline_val[it.num].val[ti]; break;
+				case SPLINEREF_TIME: emsg("Should not be splineref time"); break;
+				case DERIVE: emsg("Should not be derive"); break;
 				case IE: emsg("Should not include ind effect"); break;
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: num[j] = rectify(popnum[it.num]); break;
+				case POPNUM_TIME: emsg("Should not be popnum_time"); break;
 				case REG: num[j] = regcalc[it.num]; break;
 				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: num[j] = timepoint[ti]; break;
@@ -1654,9 +1977,148 @@ double Equation::calculate(unsigned int ti, const vector <double> &popnum, const
     case PARAMETER: emsg("Should not be parameter7"); return UNSET;
 		case PARAMVEC: return param_val[ans.num];
     case SPLINE: emsg("Should not be spline"); return UNSET;
+		case SPLINE_TIME: emsg("Should not be spline time"); return UNSET;
 		case SPLINEREF: return spline_val[ans.num].val[ti];
-    case POPNUM: return rectify(popnum[ans.num]);
-    case REG: return regcalc[ans.num];
+    case SPLINEREF_TIME: emsg("Should not be spline time"); return UNSET;
+		case DERIVE: emsg("Should not be derive"); return UNSET;
+		case POPNUM: return rectify(popnum[ans.num]);
+    case POPNUM_TIME: emsg("Should not be popnum_time"); return UNSET;
+		case REG: return regcalc[ans.num];
+    case NUMERIC: return cons[ans.num];
+		case IE: emsg("Should not include ind effect"); return UNSET;
+		case ONE: return 1; 		
+		case FE: emsg("Should not include fixed effect"); return UNSET;
+		case TIME: return timepoint[ti];
+		default: emsg("Equation error"); return UNSET;
+  }
+}
+
+
+/// Calculates kderived equations
+double Equation::calculate_derive(unsigned int ti, const vector < vector <double> > &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector < vector <double> > > &derive_val) const 
+{
+ 	vector <double> regcalc(nreg);
+
+  for(auto i = 0u; i < calc.size(); i++){
+		const auto &ca = calc[i];
+		
+		const auto &item = ca.item;
+		const auto N = item.size();
+		
+		vector <double> num(N);
+		
+		for(auto j = 0u; j < N; j++){
+			const auto &it = item[j];
+			
+			switch(it.type){
+				case PARAMETER: emsg("SHould not be parameter6"); break;
+				case PARAMVEC: num[j] = param_val[it.num]; break;
+				case SPLINE: emsg("Should not be spline"); break;
+				case SPLINE_TIME: emsg("Should not be spline time"); break;
+				
+				case SPLINEREF:
+					{
+						if(ti == UNSET) emsg("ti should be set");
+						num[j] = spline_val[it.num].val[ti]; 
+					}
+					break;
+					
+				case SPLINEREF_TIME:
+					{
+						const auto &tr = time_ref[it.num];
+						num[j] = spline_val[tr.num].val[tr.ti]; 
+					}
+					break;
+					
+				case DERIVE:
+					{
+						const auto &dr = derive_ref[it.num];
+						const auto &dv = derive_val[dr.i][dr.index];
+						if(dv.size() == 1) num[j] = dv[0];  // Not time dependent
+						else{
+							if(dr.ti != UNSET) num[j] = dv[dr.ti];
+							else{
+								if(ti != UNSET) num[j] = dv[ti];
+								else emsg("Derive problem");
+							}
+						}
+					}
+					break;
+					
+				case IE: emsg("Should not include ind effect"); break;
+				case ONE: num[j] = 1; break;
+				case FE: emsg("Should not include fixed effect"); break;
+				
+				case POPNUM:
+					{
+						if(ti == UNSET) emsg("ti should be set");
+						num[j] = rectify(popnum[ti][it.num]); 
+					}
+					break;
+				
+				case POPNUM_TIME: 
+					{
+						const auto &tr = time_ref[it.num];
+						num[j] = rectify(popnum[tr.ti][tr.num]);
+					}
+					break;
+					
+				case REG: num[j] = regcalc[it.num]; break;
+				case NUMERIC: num[j] = cons[it.num]; break;
+				case TIME: num[j] = timepoint[ti]; break;
+				default: emsg("Equation error"); break;
+			}
+		}
+
+    regcalc[ca.reg_store] = calculate_operation(ca.op,num);
+  }
+
+  switch(ans.type){
+    case PARAMETER: emsg("Should not be parameter7"); return UNSET;
+		case PARAMVEC: return param_val[ans.num];
+    case SPLINE: emsg("Should not be spline"); return UNSET;
+		case SPLINE_TIME: emsg("Should not be spline time"); return UNSET;
+		
+		case SPLINEREF:
+			{
+				if(ti == UNSET) emsg("ti should be set");
+				return spline_val[ans.num].val[ti];
+			}
+			
+    case SPLINEREF_TIME:
+			{		
+				const auto &tr = time_ref[ans.num];
+				return spline_val[tr.num].val[tr.ti];
+			}
+			
+		case DERIVE:
+			{
+				const auto &dr = derive_ref[ans.num];
+				const auto &dv = derive_val[dr.i][dr.index];
+				if(dv.size() == 1) return dv[0];  // Not time dependent
+				else{
+					if(dr.ti != UNSET) return dv[dr.ti];
+					else{
+						if(ti != UNSET) return dv[ti];
+					}
+				}
+				emsg("Derive problem");
+				return UNSET;
+			}
+		
+    case POPNUM:
+			{
+				if(ti == UNSET) emsg("ti should be set");
+				return rectify(popnum[ti][ans.num]);
+			}
+			
+    case POPNUM_TIME:
+			{
+				const auto &tr = time_ref[ans.num];
+				return rectify(popnum[tr.ti][tr.num]);
+			}
+			
+		case REG: return regcalc[ans.num];
     case NUMERIC: return cons[ans.num];
 		case IE: emsg("Should not include ind effect"); return UNSET;
 		case ONE: return 1; 		
@@ -2588,8 +3050,15 @@ void Equation::remove_unused_param_ref()
 		const auto &ca = calc[i];
 		for(const auto &it : ca.item){
 			switch(it.type){
-			case PARAMETER: case PARAMVEC: case SPLINE: case SPLINEREF:
+			case PARAMETER: case PARAMVEC:
+			case SPLINE: case SPLINEREF: 
 				on[it.num] = true;
+				break;
+			case SPLINE_TIME: case SPLINEREF_TIME:
+				{	
+					const auto &tr = time_ref[it.num];
+					on[tr.num] = true;
+				}
 				break;
 			default: break;
 			}
@@ -2597,9 +3066,15 @@ void Equation::remove_unused_param_ref()
 	}
 	
 	switch(ans.type){
-	case PARAMETER: case PARAMVEC: case SPLINE: case SPLINEREF:
+	case PARAMETER: case PARAMVEC: 
+	case SPLINE: case SPLINE_TIME: 
 		on[ans.num] = true;
-	break;
+		break;
+	case SPLINEREF: case SPLINEREF_TIME:
+		{	
+			const auto &tr = time_ref[ans.num];
+			on[tr.num] = true;
+		}
 		default: break;
 	}
 	
@@ -2624,8 +3099,15 @@ void Equation::remove_unused_param_ref()
 		auto &ca = calc[i];
 		for(auto &it : ca.item){
 			switch(it.type){
-			case PARAMETER: case PARAMVEC: case SPLINE: case SPLINEREF:
+			case PARAMETER: case PARAMVEC:
+			case SPLINE: case SPLINE_TIME:
 				it.num = map[it.num];
+				break;
+			case SPLINEREF: case SPLINEREF_TIME:
+				{
+					auto &tr = time_ref[it.num];
+					tr.num = map[tr.num];
+				}
 				break;
 			default: break;
 			}
@@ -2633,9 +3115,15 @@ void Equation::remove_unused_param_ref()
 	}
 	
 	switch(ans.type){
-	case PARAMETER: case PARAMVEC: case SPLINE: case SPLINEREF:
+	case PARAMETER: case PARAMVEC:
+	case SPLINE: case SPLINE_TIME: 
 		ans.num = map[ans.num];
-	break;
+		break;
+	case SPLINEREF: case SPLINEREF_TIME:
+		{
+			auto &tr = time_ref[ans.num];
+			tr.num = map[tr.num];
+		}
 		default: break;
 	}
 }
@@ -2754,6 +3242,13 @@ string Equation::op_name(EqItemType type) const
 /// Checks for any repeated operators in expression
 void Equation::check_repeated_operator(const vector <EqItem> &op)
 {
+	// Cannot be empty
+	if(op.size() == 0){
+		warn = "Expression is empty.";
+		return;
+	}
+	
+	// Cannot have just an operator
 	if(op.size() == 1){
 		switch(op[0].type){
 		case ADD: case TAKE: case MULTIPLY: case DIVIDE:
@@ -2763,21 +3258,208 @@ void Equation::check_repeated_operator(const vector <EqItem> &op)
 		}
 	}
 	
+	// Cannot have "(*..." or "(/..." or "*..." or "/..."
+	// Cannot have "...+-*/)" or "...+-*/" 
+	for(auto i = 0u; i < op.size(); i++){
+		auto ty = op[i].type;
+		switch(ty){
+		case ADD: case TAKE: case MULTIPLY: case DIVIDE:
+			if(i+1 == op.size()){
+				warn = "Problem with the expression. Cannot have operator "+op_name(ty)+" at the end";
+				return;
+			}
+			else{
+				if(op[i+1].type == RIGHTBRACKET){
+					warn = "Problem with the expression. Cannot have operator "+op_name(ty)+" next to right bracket ')'";
+					break;
+				}
+			}
+			
+			if(i == 0){
+				if(ty == MULTIPLY || ty == DIVIDE){
+					warn = "Problem with the expression. Cannot have operator "+op_name(ty)+" at the start";
+					return;
+				}
+			}
+			else{
+				if(op[i-1].type == LEFTBRACKET && (ty == MULTIPLY || ty == DIVIDE)){
+					warn = "Problem with the expression. Cannot have operator "+op_name(ty)+" after left bracket '('";
+					return;
+				}
+			}
+			break;
+		
+		default: break;
+		}
+	}
+	
 	if(op.size() > 0){
+		// Cannot have operators next to  each other
 		for(auto i = 0u; i < op.size()-1; i++){
 			switch(op[i].type){
 			case ADD: case TAKE: case MULTIPLY: case DIVIDE:
 				switch(op[i+1].type){
 				case ADD: case TAKE: case MULTIPLY: case DIVIDE:
 					warn = "Problem with the expression. Cannot have operators "+op_name(op[i].type)+" and "+op_name(op[i+1].type)+" next to each other";
-					
-					break;
+					return;
 				default: break;
 				}
 			default: break;
 			}
 		}
+	
+		// Cannot have empty brackets
+		for(auto i = 0u; i < op.size()-1; i++){
+			if(op[i].type == LEFTBRACKET && op[i+1].type == RIGHTBRACKET){
+				warn = "Problem with the expression. Cannot have brackets '()' with no content.";
+				return;
+			}
+		}			
 	}
+}
+
+
+/// Replaces time integral with fill expression
+void Equation::time_integral(vector <EqItem> &op)
+{
+	auto i = 0u; 
+	while(i < op.size()){
+		while(i < op.size() && op[i].type != TINT) i++;
+		
+		if(i < op.size()){
+			// Gets time range
+			auto dt = timepoint[1]-timepoint[0];
+			auto ti_min = 0u;
+			auto ti_max = timepoint.size()-1;
+			
+			if(op[i].num != UNSET){
+				const auto &tr = time_ref[op[i].num];
+				ti_min = tr.num;
+				ti_max = tr.ti;
+			}
+			
+			// Works out content of integral
+			auto ist = i+1;
+			
+			auto j = ist;
+			if(!(j < op.size() && op[j].type == LEFTBRACKET)){
+				warn = "Problem with the expression. A time integral must be followed by a left bracket '('.";
+				return;
+			}
+			
+			auto num = 0u;
+			while(j < op.size()){
+				auto ty = op[j].type;
+				if(ty == LEFTBRACKET) num++;
+				if(ty == RIGHTBRACKET){
+					num--;
+					if(num == 0) break;
+				}
+				if(ty == TINT){
+					warn = "Problem with the expression. Cannot have nested integrals.";
+					return;
+				}
+				j++;
+			}
+			
+			if(j == op.size()){
+				warn = "Problem with the expression. Content in time integral must be enclosed by round brackets '(...)'.";
+				return;
+			}
+			
+			if(ist+1 == j){
+				warn = "Problem with the expression. The time integral does not contain any content.";
+				return;
+			}
+			
+			// Integrates over content
+			vector <EqItem> ins;
+			{
+				EqItem it; it.type = NUMERIC; it.num = add_cons(dt); 
+				ins.push_back(it);
+			}
+			
+			{
+				EqItem it; it.type = MULTIPLY;
+				ins.push_back(it);
+			}
+			
+			{
+				EqItem it; it.type = LEFTBRACKET;
+				ins.push_back(it);
+			}
+			
+			for(auto ti = ti_min; ti < ti_max; ti++){
+				if(ti > ti_min){
+					EqItem it; it.type = ADD;
+					ins.push_back(it);
+				}
+					
+				for(auto k = ist+1; k < j; k++){
+					auto it = op[k];
+					switch(it.type){
+					case POPNUM:
+						{
+							TimeRef tr; 
+							tr.num = it.num;
+							tr.ti = ti;
+							
+							it.type = POPNUM_TIME;
+							it.num = time_ref.size();
+							time_ref.push_back(tr);
+						}
+						break;
+				
+					case SPLINE:
+						{
+							TimeRef tr; 
+							tr.num = it.num;
+							tr.ti = ti;
+							
+							it.type = SPLINE_TIME;
+							it.num = time_ref.size();
+							time_ref.push_back(tr);
+						}
+						break;
+					
+					case DERIVE:
+						{
+							auto dr = derive_ref[it.num];
+							dr.ti = ti;
+							it.num = derive_ref.size();
+							derive_ref.push_back(dr);
+						}
+						break;
+						
+					case TIME:
+						{
+							auto t = (timepoint[ti]+timepoint[ti+1])/2;
+							it.type = NUMERIC;
+							it.num = add_cons(t);
+						}
+						break;
+					
+					default:
+						break;
+					}
+					
+					ins.push_back(it);
+				}
+			}
+			
+			{
+				EqItem it; it.type = RIGHTBRACKET;
+				ins.push_back(it);
+			}
+		
+			op.erase(op.begin()+i,op.begin()+j+1);
+			op.insert(op.begin()+i,ins.begin(),ins.end());
+			
+			if(type != DERIVE_EQN){
+				warn = "Time integrals can only appear in derived equations.";
+			}
+		}
+	}	
 }
 
 

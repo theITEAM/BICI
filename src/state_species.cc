@@ -1097,6 +1097,7 @@ vector <double> StateSpecies::sample_ie() const
 void StateSpecies::sample_ie_Amatrix()
 {
 	auto flag = false;
+	string warn;
 	for(auto i = 0u; i < sp.ind_eff_group.size(); i++){
 		const auto &ieg = sp.ind_eff_group[i];
 		
@@ -1110,7 +1111,7 @@ void StateSpecies::sample_ie_Amatrix()
 			auto M = N*I;
 			
 			vector <double> vec(M);
-			for(auto i = 0u; i < M; i++) vec[i] = normal_sample(0,1);
+			for(auto i = 0u; i < M; i++) vec[i] = normal_sample(0,1,warn);
 			
 			for(auto j = 0u; j < M; j++){
 				auto j_A = (unsigned int)(j/N);
@@ -1221,8 +1222,13 @@ vector <double> StateSpecies::sample_trans_num(const vector <double> &tnum_mean,
 	auto N = tnum_mean.size();
 	vector <double> tnum(N);
 	
+	string warn;
 	for(auto tr = 0u; tr < N; tr++){
-		if(stochastic == true) tnum[tr] = poisson_sample(tnum_mean[tr]);	
+		if(stochastic == true){
+			auto val = poisson_sample(tnum_mean[tr],warn);	
+			if(val == UNSET) sp.sampling_error(tr,warn);
+			tnum[tr] = val;
+		}
 		else tnum[tr] = tnum_mean[tr];
 	}
 	
@@ -1324,7 +1330,9 @@ void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t)
 	for(auto c = 0u; c < C; c++) cpop[c] = double(init_cond_val.cnum[c]);	
 		
 	auto N = sp.tra_gl.size();
-				
+	
+	string warn;
+	
 	vector <int> num(N);
 	for(auto ti = 0u; ti < T; ti++){
 		const auto &popnum = popnum_t[ti];
@@ -1342,17 +1350,21 @@ void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t)
 			unsigned int num_f;	
 			if(sim_prob == 0 || ran() > sim_prob){  // Does a MBP
 				if(tnum_mean_f > tnum_mean_i){
-					num_f = num_i + poisson_sample(tnum_mean_f-tnum_mean_i);
+					auto val = poisson_sample(tnum_mean_f-tnum_mean_i,warn);
+					if(val == UNSET) sp.sampling_error(tr,warn);
+					num_f = num_i + val;
 				}
 				else{
 					if(tnum_mean_i == tnum_mean_f) num_f = num_i;
 					else{
-						num_f = binomial_sample(tnum_mean_f/tnum_mean_i,num_i);
+						num_f = binomial_sample(tnum_mean_f/tnum_mean_i,num_i,warn);
+						if(num_f == UNSET) sp.sampling_error(tr,warn);
 					}
 				}
 			}
 			else{                                   // Does a simulation
-				num_f = poisson_sample(tnum_mean_f);	
+				num_f = poisson_sample(tnum_mean_f,warn);	
+				if(num_f == UNSET) sp.sampling_error(tr,warn);
 			}
 		
 			num[tr] = num_f;

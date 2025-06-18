@@ -781,6 +781,8 @@ void State::sample_genetic_value()
 	
 	auto &inf_node = genetic_value.inf_node;
 	
+	string warn;
+	
 	// Samples mutation events down the timelines for ind_nodes
 	for(auto k = 0u; k < inf_node.size(); k++){
 		auto &in = inf_node[k];
@@ -789,14 +791,18 @@ void State::sample_genetic_value()
 		for(auto e = 0u; e < in.inf_ev.size(); e++){
 			auto &ev = in.inf_ev[e];
 			
-			ev.mut_num = poisson_sample(mut_rate*(ev.t-t));
+			auto val = poisson_sample(mut_rate*(ev.t-t),warn);
+			if(val == UNSET) emsg("Problem sampling from a Poisson distribution: "+warn);
+			ev.mut_num = val;
 			t = ev.t;
 		}
 	}
 	
 	for(auto &io : genetic_value.inf_origin){
 		auto &in = inf_node[io.node];
-		io.mut_num = poisson_sample(seq_var+mut_rate*(in.t_start-model.details.t_start));
+		auto val = poisson_sample(seq_var+mut_rate*(in.t_start-model.details.t_start),warn);
+		if(val == UNSET) emsg("Problem sampling from a Poisson distribution: "+warn);
+		io.mut_num = val;
 	}
 	
 	// Calculates the genetic difference between different observed sequences
@@ -1737,7 +1743,10 @@ void State::trans_tree_mut_proposal(const BurnInfo &burn_info, unsigned int &nac
 		for(auto e = 0u; e < in.inf_ev.size(); e++){
 			auto &iev = in.inf_ev[e];
 	
-			int dn = normal_int_sample(si); 
+			string warn;
+			int dn = normal_int_sample(si,warn); 
+			if(dn == UNSET) emsg("MCMC proposal problem: "+warn);
+		
 			if(dn != 0){
 				int num = iev.mut_num;
 				auto num_new = num + dn;
@@ -1807,7 +1816,10 @@ void State::trans_tree_mut_proposal(const BurnInfo &burn_info, unsigned int &nac
 	for(auto &io : genetic_value.inf_origin){ 
 		const auto &in = inf_node[io.node];
 		
-		int dn = normal_int_sample(si);
+		string warn;
+		int dn = normal_int_sample(si,warn);
+		if(dn == UNSET) emsg("MCMC proposal problem: "+warn);
+		
 		if(dn != 0){
 			int num = io.mut_num;
 			auto num_new = num + dn;
@@ -1906,8 +1918,10 @@ void State::trans_tree_mut_local_proposal(const BurnInfo &burn_info, vector <Gen
 				auto &in = inf_node[n];
 
 				for(auto e = 0u; e < in.inf_ev.size(); e++){
-					int dn = normal_int_sample(gmi.si);
-				
+					string warn;
+					int dn = normal_int_sample(gmi.si,warn);
+					if(dn == UNSET) emsg("MCMC proposal problem: "+warn);
+		
 					if(dn != 0){
 						auto &ev = in.inf_ev[e];
 					
@@ -2178,7 +2192,10 @@ void State::trans_tree_mut_local_proposal(const BurnInfo &burn_info, vector <Gen
 			for(auto &io : genetic_value.inf_origin){
 				auto &in = inf_node[io.node];
 				
-				int dn = normal_int_sample(gmi.si);
+				string warn;
+				int dn = normal_int_sample(gmi.si,warn);
+				if(dn == UNSET) emsg("MCMC tree proposal problem: "+warn);
+		
 				if(dn != 0 && in.inf_ev.size() > 0){
 					auto &ev = in.inf_ev[0];
 					
@@ -3019,6 +3036,8 @@ void State::change_add_node(double t, const NodeRef &nr_add, GenChange &gc) cons
 	const auto &inf_node = genetic_value.inf_node;
 	auto mut_rate = genetic_value.mut_rate;
 	
+	string warn;
+	
 	if(nr_add.node != OUTSIDE_INF && nr_add.node != ENTER_INF){
 		const auto &in_add = inf_node[nr_add.node];
 		const auto &inf_ev_add = in_add.inf_ev;
@@ -3029,7 +3048,9 @@ void State::change_add_node(double t, const NodeRef &nr_add, GenChange &gc) cons
 		auto t2 = t;
 		
 		if(j_add == inf_ev_add.size()){                // Adds at the end
-			gc.mut_num = poisson_sample(mut_rate*(t2-t1));
+			auto val = poisson_sample(mut_rate*(t2-t1),warn);
+			if(val == UNSET) emsg("Problem sampling from a Poisson distribition: "+warn);
+			gc.mut_num = val;
 			auto prob = poisson_probability(gc.mut_num,mut_rate*(t2-t1));
 			gc.dlike_genetic_process += prob;
 			gc.probif += prob;
@@ -3039,7 +3060,9 @@ void State::change_add_node(double t, const NodeRef &nr_add, GenChange &gc) cons
 			auto frac = (t2-t1)/(t3-t1);
 			auto num = inf_ev_add[j_add].mut_num;
 			
-			gc.mut_num = binomial_sample(frac,num);
+			auto val = binomial_sample(frac,num,warn);
+			if(val == UNSET) emsg("Problem sampling from a Poisson distribition: "+warn);
+			gc.mut_num = val;
 		
 			gc.dlike_genetic_process += poisson_probability(gc.mut_num,mut_rate*(t2-t1)) 
 																+ poisson_probability(num-gc.mut_num,mut_rate*(t3-t2))
@@ -3051,7 +3074,9 @@ void State::change_add_node(double t, const NodeRef &nr_add, GenChange &gc) cons
 		auto seq_var = genetic_value.seq_var;
 		
 		auto lam = seq_var+mut_rate*(t-model.details.t_start);
-		gc.mut_num = poisson_sample(lam);
+		auto val = poisson_sample(lam,warn);
+		if(val == UNSET) emsg("Problem sampling from a Poisson distribition: "+warn);
+		gc.mut_num = val;
 		auto prob = poisson_probability(gc.mut_num,lam);
 		gc.dlike_genetic_process += prob;
 		gc.probif += prob;
@@ -3315,6 +3340,8 @@ void State::gen_change_update(const GenChange &gc)
 	in.t_start = na.t_start;
 	in.t_rec = na.t_rec;
 	
+	string warn;
+	
 	// Adds observations
 	if(na.obs_add_begin.size() > 0 || na.obs_add_end.size() > 0){
 		auto &inf_ev = in.inf_ev;
@@ -3334,8 +3361,9 @@ void State::gen_change_update(const GenChange &gc)
 			double t_last;
 			if(inf_ev.size() == 0) t_last = in.t_start; else t_last = inf_ev[inf_ev.size()-1].t;
 
-			auto num = poisson_sample(genetic_value.mut_rate*(obs.t-t_last));
-
+			auto num = poisson_sample(genetic_value.mut_rate*(obs.t-t_last),warn);
+			if(num == UNSET) emsg("Problem sampling from a Poisson distribition: "+warn);
+				
 			InfEvent iev; iev.t = obs.t; iev.type = GENETIC_OBS; iev.index = m; iev.mut_num = num;
 			inf_ev.push_back(iev);
 			

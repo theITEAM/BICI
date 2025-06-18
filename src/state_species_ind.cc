@@ -443,14 +443,16 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 		const auto &tr = sp.tra_gl[tgl];
 
 		const auto &dp = tr.dist_param;		
-					
+			
+		string warn;
+		
 		switch(tr.type){	
 		case EXP_RATE: case EXP_MEAN: emsg("SHould not be rate2"); break;
 		
 		case EXP_RATE_NM: 	
 			{
 				auto rate = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto ts = t_begin+exp_rate_sample(rate);
+				auto ts = t_begin+exp_rate_sample(rate,warn);
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
 			}
 			break;
@@ -458,7 +460,7 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 		case EXP_MEAN_NM: 	
 			{
 				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto ts = t_begin+exp_mean_sample(mean);
+				auto ts = t_begin+exp_mean_sample(mean,warn);
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
 			}
 			break;
@@ -468,7 +470,7 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
 				auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
 			
-				auto ts = t_begin+gamma_sample(mean,cv);
+				auto ts = t_begin+gamma_sample(mean,cv,warn);
 				
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
 			}
@@ -478,7 +480,7 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 			{
 				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
 				auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto ts = t_begin+gamma_sample(mean,sqrt(1.0/shape));
+				auto ts = t_begin+gamma_sample(mean,sqrt(1.0/shape),warn);
 					
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
 			}
@@ -488,7 +490,7 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 			{
 				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
 				auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto ts = t_begin+lognormal_sample(mean,cv);
+				auto ts = t_begin+lognormal_sample(mean,cv,warn);
 
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
 			}
@@ -498,7 +500,7 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 			{
 				auto scale = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
 				auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto ts = t_begin+weibull_sample(scale,shape);
+				auto ts = t_begin+weibull_sample(scale,shape,warn);
 		
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
 			}
@@ -507,13 +509,15 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 		case PERIOD:
 			{
 				auto time = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto ts = t_begin+period_sample(time);
+				auto ts = t_begin+period_sample(time,warn);
 	
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
 			}
 			break;
 		}	
 	
+		if(warn != "") sp.sampling_error(tgl,warn);
+		
 		loop++; 
 		if(loop > SIM_TRY_MAX){
 			stringstream ss; 
@@ -680,14 +684,15 @@ void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vecto
 		if(me.rate){		
 			value = eq.calculate(ti,popnum,param_val,spline_val);
 			if(value < -TINY){
-				emsg("The rate '"+eq.te_raw+"' has become negative");
+				
+				emsg("The transition rate determined by equation '"+eq.te_raw+"' has become negative");
 			}
 		}
 		else{
 			auto mean = eq.calculate(ti,popnum,param_val,spline_val);
 			if(mean <= 0){
-				if(mean < 0) emsg("The mean '"+eq.te_raw+"' has become negative");
-				if(mean == 0) emsg("The mean '"+eq.te_raw+"' has become zero");
+				if(mean < 0) emsg("The transition mean determined by equation '"+eq.te_raw+"' has become negative");
+				if(mean == 0) emsg("The transition mean determined by equation '"+eq.te_raw+"' has become zero");
 			}
 			value = 1.0/mean;
 		}
