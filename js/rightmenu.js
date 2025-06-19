@@ -104,6 +104,9 @@ function right_menu_buts(lay)
 			if(inter.graph.ind_sel){
 				y = additional_filt(y,rpf,lay);
 			}
+			else{
+				y = additional_filt(y,rpf,lay);
+			}
 		}
 		break;
 		
@@ -252,14 +255,14 @@ function chain_sample_filt(y,rpf,lay)
 function additional_filt(y,rpf,lay)
 {
 	let p = model.get_p();
+	let name = subsubtab_name();
 	
 	let rpf2 = rpf.species[p];
-	
 	
 	for(let i = 0; i < rpf2.filter.length; i++){
 		let te = "";
 
-		if(apply_filter(rpf2,i,subsubtab_name())){
+		if(apply_filter(rpf2,i,name)){
 			let rpf3 = rpf2.filter[i];
 				
 			switch(rpf3.type){
@@ -311,7 +314,16 @@ function additional_filt(y,rpf,lay)
 		}
 	}
 	
-	lay.add_button({te:"Add filter", x:0.1, y:y, dx:4.5, dy:1.0, type:"AddFilter", ac:"AddFilter", rpf:rpf});
+	
+	let te = "Add filter";
+
+	let si = 0.8;
+	let font = get_font(si);
+	let w = text_width(te,font);
+	lay.add_button({te:te, x:0.1, y:y, dx:w+1.2, dy:1.0, type:"AddFilter", ac:"AddFilter", rpf:rpf});
+		
+	lay.add_help_button(w+1.5,y+1.4,{title:"Filter", te:filter_text, back_col:WHITE});
+		
 	y += 1.5;
 	
 	return y;

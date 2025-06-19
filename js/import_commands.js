@@ -594,6 +594,7 @@ function camera_command()
 function warning_command()
 {
 	let warn = get_tag_value("text"); if(warn == "") cannot_find_tag();
+	if(typeof warn == "object") warn = warn.te;
 	
 	model.warning = {show:false, te:warn};
 }
@@ -1369,9 +1370,9 @@ function param_command2(full_name,per_start,per_end,op)
 
 	let param_tag = [];
 	param_tag.push({val:cons, tag:"constant"});
+	param_tag.push({val:value, tag:"value"});
 	param_tag.push({val:dist, tag:"dist"});
 	param_tag.push({val:dist_split, tag:"dist-split"});
-	param_tag.push({val:value, tag:"value"});
 	param_tag.push({val:reparam, tag:"reparam"});
 	param_tag.push({val:prior, tag:"prior"});
 	param_tag.push({val:prior_split, tag:"prior-split"});
@@ -1379,10 +1380,12 @@ function param_command2(full_name,per_start,per_end,op)
 
 	for(let j = 0; j < param_tag.length; j++){
 		for(let i = j+1; i < param_tag.length; i++){
-			if(param_tag[j].val != "" && param_tag[i].val != ""){
-				if(!(param_tag[j].tag == "value" && param_tag[j].tag != "prior") && 
-					 !(param_tag[j].tag == "value" && param_tag[j].tag != "prior_split")){
-					alert_import("'"+param_tag[j].tag+"' and '"+param_tag[i].tag+"' cannot both be set"); 
+			let ptvj = param_tag[j];
+			let ptvi = param_tag[i];
+			if(ptvj.val != "" && ptvi.val != ""){
+				if(!(ptvj.tag == "value" && (ptvi.tag == "prior" || ptvi.tag == "prior-split" ||
+   				ptvi.tag == "dist" || ptvi.tag == "dist-split"))){
+					alert_import("'"+ptvj.tag+"' and '"+ptvi.tag+"' cannot both be set"); 
 				}
 			}
 		}
@@ -1584,6 +1587,7 @@ function param_command2(full_name,per_start,per_end,op)
 		par.prior_split_check = {check:true};
 		par.variety = "dist";
 		par.prior_split_set = true;
+		par.prior_split = param_blank(par);
 		
 		par.prior_split_check = {check:true};
 		if(par.dep.length == 0){
@@ -1625,17 +1629,15 @@ function param_command2(full_name,per_start,per_end,op)
 	let sim_sample = get_tag_value("sim-sample").toLowerCase(); 
 	if(sim_sample == "") sim_sample = "true";
 	else{
-		if(dist == ""){
+		if(dist == "" && dist_split == ""){
 			alert_import("'sim-sample' can only be set if a distribution is set through 'dist'");
 		}
 	}
 	if(option_error("sim-sample",sim_sample,["true","false"]) == true) return;
 	
-	if(dist != ""){
-		switch(sim_sample){
-		case "false": par.sim_sample = {check:false}; break;
-		case "true": par.sim_sample = {check:true}; break;
-		}
+	switch(sim_sample){
+	case "false": par.sim_sample = {check:false}; break;
+	case "true": par.sim_sample = {check:true}; break;
 	}
 	
 	par.full_name = param_name(par);
@@ -1668,7 +1670,7 @@ function derived_command()
 	let eqn2 = create_equation(eqn_name,"derive_eqn");
 	if(eqn2.warn.length > 0) alert_import("In 'eqn': "+eqn2.warn[0].te);
 	
-	model.derive.push({eqn1:eqn1, eqn2:eqn2});
+	model.derive.push({eqn1:eqn1, eqn2:eqn2, line:imp.line});
 }
 
 

@@ -853,7 +853,6 @@ function start_loading_symbol(per,type)
 function loading_symbol_message(te)
 {
 	inter.loading_symbol.message = te;
-	generate_screen();
 }	
 
 

@@ -116,6 +116,7 @@ const eqn_types = [
 {name:"seq_var", mode:"param only", obs_model:true},
 {name:"comp_prob",mode:"param only", obs_model:true},
 {name:"trans_prob",mode:"param only", obs_model:true},
+{name:"sim_comp_prob",mode:"param only"},
 {name:"trans_bp", mode:"param with dep"},
 {name:"trans_mean", mode:"all"},
 {name:"trans_rate", mode:"all"},
@@ -205,9 +206,10 @@ const example_space = 1;                           // Used for examples spacing 
 const bubblescroll_dymax = 16;                     // The maximum size of slider in bubbles
 const warn_si = 0.8, warn_lh = 0.9;                // Size and line height for warnings
 const bub_si = 0.8, bub_lh = 0.9;                  // Size and line height for bubble paragraphs
-const bubbig_si = 0.9, bubbig_lh = 1.2;              // Size and line height for big bubble paragraphs
+const bubbig_si = 0.9, bubbig_lh = 1.2;            // Size and line height for big bubble paragraphs
 const para_si = 1, para_lh = 1.4;                  // Size and line height for paragraphs
 const para_eq_si = 1.2;                            // Size of equation in paragraph
+const table_lh = 1.4;                              // The line height used for tables 
 const dropdown_height = 1.4;                       // The height for a dropdown menu
 const dropdown_opheight = 1.2;                     // The height for different options in a dropdown menu
 const dropdown_dymax = 17;                         // The maximum size for the dropdown menu 
@@ -246,9 +248,9 @@ const prior_pos_positive = ["uniform","exp","gamma","log-normal","fix"];
 const data_types = ["Init. Cond.", "Individual", "Population", "Additional"];
 
 let chnotallowed = "\"$&=~#\\→";
-let notparam_list = "+-*×/0123456789.{}<>〈〉()|\n\r Σ′→;";// Sets not a parameter character
-let paramend_list = "+-*×/|.{}<>〈〉[]$\n\r Σ";	            // Sets characters which end parameter
-let name_notallow = "|\"*×_ {}<>〈〉[]()=Σ′→;$&#\\";       // Character not allowed in species, class or comp names
+let notparam_list = "+-*×/0123456789.{}<>〈〉()|\n\r Σ∫′→;";// Sets not a parameter character
+let paramend_list = "+-*×/|.{}<>〈〉[]$\n\r Σ∫";	            // Sets characters which end parameter
+let name_notallow = "|\"*×_ {}<>〈〉[]()=Σ∫′→;$&#\\";       // Character not allowed in species, class or comp names
 let name_ch_max = 40;                                   // The maximum number of characters allowed for strings
 let invalid_name = ["Compartment","Population","Alpha","Distribution","file"];
 
@@ -448,14 +450,14 @@ const OK_butcol3 = "#6666cc", OK_butcol4 = "#6666cc";
 const functi = ["exp","cos","sin","log","pow","max","min","abs","sqrt","step","sig","thresh","ubound"];
 const functi_dx = ["def","def","def","def","def","def","def","def",2.8,2.8,"def",3.4,3.7];
 
-const opbut = ["_","^","+","-","\u00d7","\u2215","(",")","Σ","'"];
+const opbut = ["_","^","+","-","\u00d7","\u2215","(",")","Σ","∫","'"];
 
 const numbut = ["0","1","2","3","4","5","6","7","8","9","."];
 
 const greek = ["\u03B1","\u03B2","\u03B3","\u03B4","\u03B5","\u03B6","\u03B7","\u03B8","\u03B9",
 "\u03Ba","\u03Bb","\u03Bc","\u03Bd","\u03Be","\u03Bf","\u03C0","\u03C1","\u03C3","\u03C4","\u03C5","\u03C6","\u03C7","\u03C8","\u03C9"];
 
-const greek_latex = [["alpha","α"],["beta","β"],["gamma","γ"],["Gamma","Γ"],["delta","δ"],["Delta","Δ"],["epsilon","ε"],["zeta","ζ"],["eta","η"],["Eta","Η"],["theta","θ"],["Theta","Θ"],["iota","ι"],["kappa","κ"],["lambda","λ"],["Lambda","Λ"],["mu","μ"],["nu","ν"],["xi","ξ"],["Xi","Ξ"],["omicron","ο"],["pi","π"],["Pi","Π"],["rho","ρ"],["sigma","σ"],["Sigma","Σ"],["tau","τ"],["upsilon","υ"],["phi","φ"],["Phi","Φ"],["chi","χ"],["psi","ψ"],["Psi","Ψ"],["omega","ω"],["Omega","Ω"],["sum","Σ"]];
+const greek_latex = [["alpha","α"],["beta","β"],["gamma","γ"],["Gamma","Γ"],["delta","δ"],["Delta","Δ"],["epsilon","ε"],["zeta","ζ"],["eta","η"],["Eta","Η"],["theta","θ"],["Theta","Θ"],["iota","ι"],["kappa","κ"],["lambda","λ"],["Lambda","Λ"],["mu","μ"],["nu","ν"],["xi","ξ"],["Xi","Ξ"],["omicron","ο"],["pi","π"],["Pi","Π"],["rho","ρ"],["sigma","σ"],["Sigma","Σ"],["tau","τ"],["upsilon","υ"],["phi","φ"],["Phi","Φ"],["chi","χ"],["psi","ψ"],["Psi","Ψ"],["omega","ω"],["Omega","Ω"],["sum","Σ"],["int","∫"]];
 
 const greek_capital = ["A","B","Γ","Δ","E","Z","H","Θ","I","K","Λ","M","N","Ξ","O","Π","P","Σ","T","Y","Φ","X","Ψ","Ω"];
 

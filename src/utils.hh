@@ -28,6 +28,7 @@ unsigned int find_in(const vector <string> &vec, const string val);
 unsigned int find_in(const vector <string> &vec, const string val, unsigned int guess);
 unsigned int find_in(string st1, string st2);
 unsigned int find_in(const vector <bool> &vec, const bool val);
+unsigned int find_in(const vector <Warn> &vec, const unsigned int val);
 unsigned int integer(string st);
 double number(string st);
 double ran();

@@ -143,7 +143,7 @@ function par_same(par1,par2)
 	if(par1.dep.length != par2.dep.length) return false;
 	
 	for(let i = 0; i < par1.dep.length; i++){
-		if(par1.dep[i] != par2.dep[i]) return false;
+		if(remove_prime(par1.dep[i]) != remove_prime(par2.dep[i])) return false;
 	}
 	
 	return true;
@@ -586,7 +586,8 @@ function get_prop(value,prop,end)
 		i += prop.length;
 		if(end == "end"){
 			let val = value.substr(i,value.length-1-i).trim();
-			return val;
+			val = char_replace(val);
+			return remove_escape_char(val);
 		}
 		else{
 			let i2 = value.indexOf(end);
@@ -594,7 +595,8 @@ function get_prop(value,prop,end)
 				while(i2 > 0 && value.substr(i2,1) != ",") i2--;
 				if(i2 > 0){
 					let val = value.substr(i,i2-i).trim();
-					return val;
+					val = char_replace(val);
+					return remove_escape_char(val);
 				}
 			}
 		}
@@ -876,6 +878,15 @@ function check_name_warn(name,te,sup_not_allow)
 }
 
 
+/// Checks an individual name is valid
+function check_ind_name_warn(name) 
+{
+	if(name.trim().includes(" ")){
+		return "Individual name '"+name+"' should not include a space. Names in BICI are not allowed spaces.";
+	}
+}
+
+
 /// Checks the name is valid
 function check_name_input(name,te,sup_not_allow) 
 {
@@ -901,6 +912,7 @@ function remove_escape_char(te)
 		escape_char.push(["\\"+greek_latex[i][0],greek_latex[i][1]]);
 	}
 	escape_char.push(["\\sum","Σ"]);
+	escape_char.push(["\\int","∫"]);
 	
 	let i = 0;
 

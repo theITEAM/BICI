@@ -745,6 +745,7 @@ function display_derive(j,x,y,lay,edit,w)
 	let right_mar2 = lay.dx-8;
 	let set_dx = 0.8;
 
+	/*
 	let par;
 	if(der.eqn1.param.length == 1){
 		let param = der.eqn1.param[0];
@@ -752,10 +753,16 @@ function display_derive(j,x,y,lay,edit,w)
 		let i = 0; while(i < model.param.length && par_same(param,model.param[i]) == false) i++;
 		if(i < model.param.length) par = model.param[i];
 	}
-
+	*/
+	let par;
+	if(der.eqn1.param.length == 1){
+		par = der.eqn1.param[0];
+		model.get_label_info(par);
+	}
+	
 	let ac_lab; if(edit == true) ac_lab = "EditDerive";
 
-	lay.add_button({te_eqn1:der.eqn1.te, te_eqn2:der.eqn2.te,  par:par, val:j, x:2, y:y-0.05, x_eq:x, dx:w-2, dy:1.7, si:1.4, type:"Derive", col:BLUE, ac:ac_lab});
+	lay.add_button({te_eqn1:der.eqn1.te, te_eqn2:der.eqn2.te, val:j, x:2, y:y-0.05, x_eq:x, dx:w-2, dy:1.7, si:1.4, par:par, type:"Derive", col:BLUE, ac:ac_lab});
 }
 
 

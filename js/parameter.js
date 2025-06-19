@@ -6,7 +6,7 @@
 function update_model()
 {
 	model.warn = [];
-	
+
 	check_data_valid_all("siminf");
 
 	let lists = generate_parameter_list();           // Generates a list of all model parameters
@@ -24,9 +24,9 @@ function update_model()
 	add_param_ppc_factor(par_list);                  // Adds any parameter for ppc factors
 
 	add_ind_eff_param(par_list);                     // Adds individual effect parameters (i.e. variances) to model
-	
+
 	update_model_param(par_list);                    // Updates the model parameters
-	
+
 	set_generate_pos();                              // Sets if possible to generate results
 	
 	update_desc();                                   // Updates descriptions of parameter
@@ -198,7 +198,7 @@ function generate_parameter_list()
 			mess = "For a genetic sequence variation";
 			break;
 			
-		case "comp_prob":
+		case "comp_prob": case "sim_comp_prob":
 			mess = "For a compartmental probability";
 			break;
 		
@@ -282,7 +282,7 @@ function generate_parameter_list()
 			fix_eff_list[j].eqn_appear.push(copy(eqn));
 		}
 	}
-
+	
 	return {par_list:list, ind_eff_list:ind_eff_list, fix_eff_list:fix_eff_list};
 }
 
@@ -359,7 +359,7 @@ function param_eqn_desc(eqn)
 	case "trans_shape": return "in a transition shape";
 	case "trans_scale": return "in a transition scale";
 	case "trans_cv": return "in a transition coefficient of variation";
-	case "comp_prob": return "in a compartmental probability";
+	case "comp_prob": case "sim_comp_prob": return "in a compartmental probability";
 	case "reparam": return "in a reparametersation";
 	default: error("option not pos:"+eqn.type); break;	
 	}
@@ -769,7 +769,7 @@ function add_ind_eff_param(par_list)
 /// Updates the model parameters
 function update_model_param(par_list)
 {
-	check_derived_param_all(model.param);
+	//check_derived_param_all(model.param);
 
 	if(model.warn.length > 0) err_warning();
 	
@@ -811,6 +811,8 @@ function update_model_param(par_list)
 	if(model.warn.length > 0) err_warning();
 	
 	model.param = param;
+	
+	check_derived_param_all(model.param);
 }
 
 
@@ -1173,9 +1175,10 @@ function copy_param_info(par,old)
 	}
 	else{
 		let list = par_find_list(par);
+	
 		let list_old = old.list;
 		
-		// Checks if list is the same as the 
+		// Checks if list is the same as the old version
 		let dif = false;
 		
 		let val_set = false; if(old.value != undefined) val_set = true;
@@ -1263,7 +1266,6 @@ function copy_param_info(par,old)
 				}
 				
 				par.list = list;
-				//par.co_list = co_list;
 				if(val_set) par.value = value;
 				if(pri_set) par.prior_split = prior_split;
 				if(wei_set) par.factor_weight = weight;
@@ -1271,14 +1273,13 @@ function copy_param_info(par,old)
 			}
 			else{
 				par.list = old.list;
-				//par.co_list = old.co_list;
 				if(val_set) par.value = old.value;
 				if(pri_set) par.prior_split = old.prior_split;
 				if(wei_set) par.factor_weight = old.factor_weight;
 			}
 		}
 		else{
-			par.list = old.list;
+			par.list = list;
 		}
 			
 		par.prior_split_set = old.prior_split_set;
@@ -1365,13 +1366,14 @@ function unset_prior(par_type)
 function check_derived_param_all(param)
 {
 	for(let i = 0; i < model.derive.length; i++){
-		let eqn1 = model.derive[i].eqn1;
-		let eqn2 = model.derive[i].eqn2;
+		let der = model.derive[i];
+		let eqn1 = der.eqn1;
+		let eqn2 = der.eqn2;
 		
 		let res = check_derived_param(eqn2,eqn1,param);
 		
 		if(res.err == true){
-			model.warn.push({mess:"Error in derived expression", mess2:res.msg, warn_type:"Equation", eqn_info:{i:i}, eqn_type:eqn2.type});
+			model.warn.push({mess:"Error in derived expression", mess2:res.msg, warn_type:"Equation", eqn_info:{i:i}, eqn_type:eqn2.type, line:der.line});
 		}
 	}	
 }
@@ -1393,16 +1395,20 @@ function check_derived_param(eqn,eqn_param,param)
 		while(j < param.length && par_same(par,param[j]) == false) j++;
 		
 		if(j == param.length){
-			if(find(param,"name",par.name) != undefined){
-				return err("Parameter '"+par.full_name+"' has a different dependency in the model");
+			let k = find(param,"name",par.name);
+			if(k != undefined){
+				let par_exist = param[k];
+				return err("Parameter '"+par.full_name+"' should have the dependency '"+par_exist.full_name+"' from the model");
 			}
 			else return err("Parameter '"+par.full_name+"' is not found in the model");
 		}
+		/*
 		else{
 			if(param[j].type == "derive_param"){
-				return err("Derived parameter '<e>"+eqn_param.te+"</e>' cannot depend on on another derived parameter '"+par.full_name+"'.");
+				return err("Derived parameter '<e>"+eqn_param.te+"</e>' cannot depend on another derived parameter '"+par.full_name+"'.");
 			}
 		}
+		*/
 	}
 	
 	// Checks that the dependencies for a derived quantity agree with equation
@@ -1420,15 +1426,32 @@ function check_derived_param(eqn,eqn_param,param)
 				}
 			}
 		}
-	
-		let dep = equation_dep(eqn).sort();
-		let dep_param = equation_dep(eqn_param).sort();
+
+		let dep = copy(eqn.dep);
+		dep = dep.sort();
 		
+		let dep_param = copy(eqn_param.dep);
+		dep_param = dep_param.sort();
+		
+		let par = eqn_param.param[0];
+		let par2 = {name:par.name, dep:dep};
+		let full_name = param_name(par2);
+			
 		if(dep.length != dep_param.length){
-			let par = eqn_param.param[0];
-			let par2 = {name:par.name, dep:dep};
-			let full_name = param_name(par2);
 			return err("Problem with dependency - Expected '"+full_name+"' not '"+par.full_name+"'.");
+		}
+		else{
+			for(let i = 0; i < dep.length; i++){
+				if(remove_prime(dep[i]) != remove_prime(dep_param[i])){
+					return err("Problem with dependency - Expected '"+full_name+"' not '"+par.full_name+"'.");
+				}
+			}
+			
+			for(let i = 0; i < dep.length; i++){
+				if(dep[i] != dep_param[i]){
+					return err("Problem with dependency - Primes do not match up. Expected '"+full_name+"' not '"+par.full_name+"'.");
+				}
+			}
 		}
 	}
 	
@@ -1691,6 +1714,29 @@ function find_equation_list(all_param)
 				}
 			}
 		}
+		
+		// Adds parameters associated with simulation
+		for(let i = 0; i < sp.sim_source.length; i++){
+			let so = sp.sim_source[i];
+	
+			if(so.error != true){
+				let eqn_info = {p:p, i:i};
+				
+				switch(so.type){
+				case "Add Ind.":
+					{
+						let tab = so.table;
+						for(let r = 0; r < tab.nrow; r++){
+							for(let c = 2; c < tab.ncol; c++){
+								add_eqn_filter(tab.ele[r][c],"sim_comp_prob",p,i,2,r,eqn_list);
+							}
+						}	
+					}
+					break;
+				}
+			}
+		}		
+		
 		
 		// Adds parameters associated with the observation process
 		for(let i = 0; i < sp.inf_source.length; i++){

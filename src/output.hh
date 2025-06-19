@@ -61,11 +61,12 @@ class Output                               // Stores information about the data
 		void output_trace(unsigned int ch, const vector <Particle> &part, vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout) const;
 		string get_effective_sample_size(vector <double> vec) const;
 		string get_Gelman_Rubin_statistic(const vector < vector <double> > &cha) const;
-		string param_stat(unsigned int th, unsigned int i, const vector < vector < vector < vector <double> > > > &param_samp) const;
-		void output_param_statistics(const vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout) const;
+		string param_stat(unsigned int th, unsigned int i, const vector < vector < vector < vector <double> > > > &param_samp, vector <Warn> &ESS_warn, vector <Warn> &GR_warn) const;
+		void output_param_statistics(const vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout, vector <string> &final_warning) const;
 		void output_state(unsigned int ch, const vector <Particle> &part, ofstream &fout) const;
 		void output_trans_diag(const vector <TransDiagSpecies> &trans_diag, ofstream &fout) const;
-		void output_rate_warning(unsigned int total_cpu, unsigned int per_start, unsigned int per_end, ofstream &fout) const;
+		void add_warning(string err_msg, ofstream &fout) const;
+		void output_rate_warning(unsigned int total_cpu, unsigned int per_start, unsigned int per_end, vector <string> &final_warning) const;
 		void output_generation(const vector <Particle> &part, ofstream &fout) const;
 		void output_diagnostic(const vector <Diagnostic> &diagnostic, ofstream &fout) const;
 		vector <TransDiagSpecies> trans_diag_init() const;

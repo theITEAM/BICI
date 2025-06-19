@@ -1,6 +1,7 @@
 "use strict";
 // Function related to editing parameters
 
+
 /// Allows the user to edit parameter values
 function create_edit_param(lay)
 {
@@ -64,7 +65,16 @@ function create_edit_param(lay)
 	help = convert_tensor_text(help,dim);
 	load_title = convert_tensor_text(load_title,dim);
 	load_te = convert_tensor_text(load_te,dim);
- 
+
+	if(dim > 0){
+		switch(lay.op.type){
+		case "Value":	load_te += tab_par("Value",par); break;
+		case "Reparam": load_te += tab_par("Equation",par); break;
+		case "PriorSplit": load_te += tab_par("Prior",par); break;
+		case "DistSplit": load_te += tab_par("Distribution",par); break;
+		}
+	}
+	
 	title += " for "+par.full_name;
 	
 	if(too_big) title = title.substr(5,1).toUpperCase()+title.substr(6)+" (too large to edit)";

@@ -1967,7 +1967,11 @@ void Output::end(string file, unsigned int total_cpu) const
 		}
 	}
 	
-	if(op() && model.mode == INF && com_op == false) output_param_statistics(param_samp,fout);
+	vector <string> final_warning;
+	
+	if(op() && model.mode == INF && com_op == false){
+		output_param_statistics(param_samp,fout,final_warning);
+	}
 	
 	auto trans_diag = trans_diag_init(); 
 	
@@ -2019,8 +2023,12 @@ void Output::end(string file, unsigned int total_cpu) const
 		}
 	}
 			
-	output_rate_warning(total_cpu,50,100,fout);
+	output_rate_warning(total_cpu,50,100,final_warning);
 
+	if(op()){
+		for(auto te : final_warning) add_warning(te,fout);
+	}
+	
 	if(com_op == true) cout << "<<END>>" << endl;
 }
 
@@ -2159,7 +2167,7 @@ string Output::get_Gelman_Rubin_statistic(const vector < vector <double> > &cha)
 
 
 /// Generates parameter statistics
-string Output::param_stat(unsigned int th, unsigned int i, const vector < vector < vector < vector <double> > > > &param_samp) const
+string Output::param_stat(unsigned int th, unsigned int i, const vector < vector < vector < vector <double> > > > &param_samp, vector <Warn> &ESS_warn, vector <Warn> &GR_warn) const
 {
 	auto nchain = param_samp.size();
 	
@@ -2179,6 +2187,22 @@ string Output::param_stat(unsigned int th, unsigned int i, const vector < vector
 	auto ESS = get_effective_sample_size(vec);
 	auto GR = get_Gelman_Rubin_statistic(cha);
 	
+	auto ESS_num = number(ESS);
+	if(ESS_num != UNSET && ESS_num < ESS_THRESH){
+		if(find_in(ESS_warn,th) == UNSET){
+			Warn wa; wa.th = th; wa.num = ESS_num;
+			ESS_warn.push_back(wa);
+		}
+	}			
+	
+	auto GR_num = number(GR);
+	if(GR_num != UNSET && GR_num > GR_THRESH){
+		if(find_in(GR_warn,th) == UNSET){
+			Warn wa; wa.th = th; wa.num = GR_num;
+			GR_warn.push_back(wa);
+		}
+	}			
+	
 	auto stat = get_statistic(vec);
 	
 	stringstream ss;
@@ -2189,11 +2213,13 @@ string Output::param_stat(unsigned int th, unsigned int i, const vector < vector
 
 
 /// Outputs a table of parameter statistics
-void Output::output_param_statistics(const vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout) const
+void Output::output_param_statistics(const vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout, vector <string> &final_warning) const
 {
 	stringstream sss;
 	
 	sss << "name,mean,sd,CI min,CI max,ESS,GR" << endl;
+	
+	vector <Warn> ESS_warn, GR_warn;
 	
 	for(auto th = 0u; th < model.param.size(); th++){
 		const auto &par = model.param[th];
@@ -2202,7 +2228,7 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 			auto pn = add_escape_char(par.name);
 			
 			if(par.dep.size() == 0){	
-				sss << "\"" << pn << "\"" << param_stat(th,0,param_samp) << endl;
+				sss << "\"" << pn << "\"" << param_stat(th,0,param_samp,ESS_warn,GR_warn) << endl;
 			}
 			else{
 				for(auto j = 0u; j < par.N; j++){
@@ -2214,7 +2240,7 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 						sss << dp.list[m];
 					}
 					sss << "\"";
-					sss << param_stat(th,j,param_samp) << endl;
+					sss << param_stat(th,j,param_samp,ESS_warn,GR_warn) << endl;
 				}
 			}
 		}
@@ -2243,6 +2269,50 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 	
 	if(com_op == true) cout << ss.str();
 	else fout << ss.str();
+	
+	if(ESS_warn.size() > 0 || GR_warn.size() > 0){
+		stringstream ss;
+		
+		ss << "MCMC diagnostics suggests it has not been run for long enough. ";
+		if(ESS_warn.size() > 0){
+			auto ESS_min = LARGE;
+			for(const auto &wa : ESS_warn){ if(wa.num < ESS_min) ESS_min = wa.num;}
+			
+			auto sa = (unsigned int)(1.1*model.details.sample*double(ESS_THRESH)/ESS_min);
+			ss << "An estimated " << sa << " updates are required. ";
+		}
+		
+		ss << endl;
+		
+		if(ESS_warn.size() > 0){
+			string pte;
+			for(const auto &wa : ESS_warn){
+				if(pte != "") pte += ", ";
+				pte += model.param[wa.th].full_name;
+			}
+			
+			ss << endl;
+			if(ESS_warn.size() == 1) ss << "Parameter";
+			else ss << "Parameters";
+			ss << " below the " << ESS_THRESH << " ESS threshold: " << pte << ".";
+		}
+		
+		if(GR_warn.size() > 0){
+			string pte;
+			for(const auto &wa : GR_warn){
+				if(pte != "") pte += ", ";
+				pte += model.param[wa.th].full_name;
+			}
+			
+			ss << endl;
+			if(GR_warn.size() == 1) ss << "Parameter";
+			else ss << "Parameters";
+		
+			ss << " above the " << GR_THRESH << " GR threshold: " << pte << ".";
+		}
+		
+		final_warning.push_back(ss.str());
+	}
 }
 	
 
@@ -2347,8 +2417,27 @@ void Output::output_trans_diag(const vector <TransDiagSpecies> &trans_diag, ofst
 }
 
 
+/// Adds an output warning
+void Output::add_warning(string err_msg, ofstream &fout) const
+{
+	auto line = "warning text=\"[["+endli;
+	line += err_msg+endli;
+	line += "]]\""+endli;
+	
+	if(com_op == true){
+		cout << line;
+	}
+	else{
+		cout << endl;
+		display_warning(err_msg);
+		cout << endl;
+		fout << line;
+	}
+}
+
+			
 /// Works out if time step is too small
-void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start, unsigned int per_end, ofstream &fout) const 
+void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start, unsigned int per_end, vector <string> &final_warning) const 
 {
 	State state(model);
 	state.init();
@@ -2491,15 +2580,9 @@ void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start,
 		
 		if(err_msg != ""){
 			err_msg = trunc(trim(err_msg),300);
-			auto line = "warning text=\""+err_msg+"\""+endli;
-			if(com_op == true){
-				cout << line;
-			}
-			else{
-				cout << endl;
-				display_warning(err_msg);
-				cout << endl;
-				fout << line;
+			
+			if(final_warning.size()== 0){		
+				final_warning.push_back(err_msg);
 			}
 		}
 	}

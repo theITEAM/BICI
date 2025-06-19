@@ -612,47 +612,38 @@ function add_param_value_content(lay)
 				let par = param[i];
 			
 				if(par.variety != "const" && par.variety != "reparam"){
-					switch(par.type){
-					case "Se": case "Sp":// case "trap_prob": 
-					case "mut_rate": case "seq_var":
-					case "comp_prob": case "trans_prob": case "derive_param":
-						break;
+					if(!find_in(sim_param_not_needed,par.type)){
+						let w = wright2;
 					
-					default:
-						{
-							let w = wright2;
-						
-							if(par.value_desc == no_elements){
-								display_no_element(par,x,y,lay,w);
+						if(par.value_desc == no_elements){
+							display_no_element(par,x,y,lay,w);
+						}
+						else{
+							if(add_view_button(par,w-4,y,i,lay,model)) w -= 4.5;
+							
+							if(par.variety == "dist"){
+								w -= 4.5;
+								lay.add_checkbox(w,y+0.4,"Sample","Sample",par.sim_sample,WHITE);
 							}
-							else{
-								if(add_view_button(par,w-4,y,i,lay,model)) w -= 4.5;
-								
-								if(par.variety == "dist"){
-									w -= 4.5;
-									lay.add_checkbox(w,y+0.4,"Sample","Sample",par.sim_sample,WHITE);
-								}
-								
-								if(par.variety == "dist" && par.sim_sample.check == true){
-									if(par.dep.length == 0 || par.prior_split_check.check == false){
-										display_distribution(i,x,y,lay,true,false,w);
-									}
-									else{
-										if(par.prior_split_desc == no_elements){
-											display_no_element(par,x,y,lay,w);
-										}
-										else{
-											display_distribution_split(i,x,y,lay,true,false,"dist",w);
-										}
-									}
+							
+							if(par.variety == "dist" && par.sim_sample.check == true){
+								if(par.dep.length == 0 || par.prior_split_check.check == false){
+									display_distribution(i,x,y,lay,true,false,w);
 								}
 								else{
-									display_constant(i,x,y,lay,w);
+									if(par.prior_split_desc == no_elements){
+										display_no_element(par,x,y,lay,w);
+									}
+									else{
+										display_distribution_split(i,x,y,lay,true,false,"dist",w);
+									}
 								}
 							}
-							y += dy;
+							else{
+								display_constant(i,x,y,lay,w);
+							}
 						}
-						break;
+						y += dy;
 					}
 				}
 			}

@@ -322,6 +322,15 @@ unsigned int find_in(const vector <bool> &vec, const bool val)
 }
 
 
+/// Finds the index of a value in a vector
+unsigned int find_in(const vector <Warn> &vec, const unsigned int val)
+{
+	for(auto i = 0u; i < vec.size(); i++){
+		if(vec[i].th == val) return i;
+	}
+	return UNSET;
+}
+
 /// Checks a string has a certain set of characters
 bool allow_string(const string st, const string ok_char)
 {
@@ -2930,7 +2939,9 @@ void percentage(double val, double val2)
 		auto per = 100*val/val2;
 		while(percent_done <= per){
 			if(int(percent_done)%10 == 0){
-				cout << percent_done << "%";
+				printf("%d%%",(unsigned int)(percent_done));
+				fflush(stdout); 
+				//cout << percent_done << "%";
 				
 				if(progress_on){ 
 					progress << percent_done << "%" << endl; 
@@ -2943,7 +2954,9 @@ void percentage(double val, double val2)
 					return;
 				}
 			}
-			cout << "."; 
+			printf(".");
+			fflush(stdout); 
+			//cout << "."; 
 			cout.flush();
 			percent_done += PERCENT_STEP;
 		}			

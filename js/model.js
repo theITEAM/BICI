@@ -1213,6 +1213,7 @@ class Model
 		if(res.err == true) return res;
 		
 		let name = par[0].name;
+
 		let i = find(this.param,"name",name);
 
 		if(i != undefined && mod != "modify"){
@@ -1223,7 +1224,7 @@ class Model
 		else this.derive.push(ob);
 		
 		update_param();
-		
+	
 		return success();
 	}
 	

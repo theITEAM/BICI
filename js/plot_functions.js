@@ -1608,7 +1608,7 @@ function label_convert(te,si,wmax)
 			if(ch == "{"){ type = "pop"; break;}
 			if(ch == "["){ type = "ie"; break;}
 			if(ch == "〈"){ type = "fe"; break;}
-			if(ch == "Σ"){ type = "sum"; break;}
+			if(ch == "Σ" || ch == "∫"){ type = "sum"; break;}
 			if(ch == "(" || ch == ")"){ type = "bra"; break;}
 			if(!notparam_list.includes(ch)){ type = "param"; break;}				
 			i++;
@@ -1630,7 +1630,7 @@ function label_convert(te,si,wmax)
 				i++;
 			}
 			else{
-				let pair, col;
+				let pair, col, fch;
 				
 				let i_store = i;
 				let tex;
@@ -1643,11 +1643,13 @@ function label_convert(te,si,wmax)
 					if(i < te.length && te.substr(i,1) == "$") i++;
 				}
 				else{
-					switch(te.substr(i,1)){
+					fch = te.substr(i,1);
+					
+					switch(fch){
 					case "{": pair = "}"; col = BLUE; break;
 					case "[": pair = "]"; col = DGREEN; break;
 					case "〈": pair = "〉"; col = DRED; break;
-					case "Σ": pair = "("; col = BLACK; break;
+					case "Σ": case "∫": pair = "("; col = BLACK; break;
 					default: alertp("No pair"); break;
 					}	
 					
@@ -1670,6 +1672,7 @@ function label_convert(te,si,wmax)
 					
 					tex = te.substr(i_store+1,i-i_store-2);
 				}
+				tex = tex.trim();
 				
 				if(type == "param" || pair == "}" || pair == "("){
 					let sub = "", sup = "", time = "";
@@ -1682,6 +1685,27 @@ function label_convert(te,si,wmax)
 						}
 					}
 					
+					if(fch == "∫"){
+						if(tex.length > 2){
+							let end = tex.substr(tex.length-2,2);
+							if(end == "dt"){
+								time = end;
+								tex = tex.substr(0,tex.length-2).trim();
+							}
+							
+							if(tex.length > 2){
+								if(tex.substr(0,1) == "[" && tex.substr(tex.length-1,1) == "]"){
+									let spl = tex.substr(1,tex.length-2).split(",");
+									if(spl.length == 2){
+										sub = spl[0];
+										sup = spl[1];
+										tex = "";
+									}
+								}
+							}
+						}
+					}
+						
 					let k = 0; while(k < tex.length && tex.substr(k,1) != "^" && tex.substr(k,1) != "_") k++;
 					let main = tex.substr(0,k);
 					if(pair == "}"){
@@ -1690,7 +1714,7 @@ function label_convert(te,si,wmax)
 					}
 				
 					if(pair == "("){
-						main = "Σ"+main;
+						main = fch+main;
 					}
 					
 					for(let loop = 0; loop < 2; loop++){
@@ -1705,23 +1729,25 @@ function label_convert(te,si,wmax)
 								default: error("Option not recognised 103"); break;
 							}
 						}
-					}			
+					}						
 					
 					sup = remove_bracket(sup);
 					sub = remove_bracket(sub);
 
 					let ysh = 0;
 					let fo_main = fo; 
-					if(main == "Σ" && pair == "("){ fo_main = fo_big; ysh = 0.2;}
+					if((main == "Σ" || main == "∫") && pair == "("){ fo_main = fo_big; ysh = 0.2;}
 
 					frag.push({ te:main, col:col, x:x, y:ysh*si, fo:fo_main});
 					x += text_width(main,fo_main);  
 					if(sub != "" || sup != "") x += gap/2;
 					
+					let sf = sub_fo; if(fch == "∫") sf = sup_fo;
+					
 					let w_sub = 0, w_sup = 0;
 					if(sub != ""){
-						frag.push({ te:sub, col:col, x:x, y:0.2*si, fo:sub_fo});
-						w_sub = text_width(sub,sub_fo)
+						frag.push({ te:sub, col:col, x:x, y:0.2*si, fo:sf});
+						w_sub = text_width(sub,sf)
 					}
 					
 					if(sup != ""){

@@ -339,6 +339,25 @@ class Layer
 	}
 	
 	
+	/// Adds a table to 
+	add_table(te,x,dx,cy)
+	{
+		let tab=[];
+		let spl = te.split("&");
+		let nrow = spl.length, ncol = 0;
+		for(let j = 0; j < spl.length; j++){
+			let spl2 = spl[j].split("|");
+			if(spl2.length > ncol) ncol = spl2.length;
+			tab.push(spl2);
+		}
+		
+		let dy = table_lh*nrow;
+		this.add_button({x:x, y:cy, dx:dx, dy:dy, tab:tab, ncol:ncol, nrow:nrow, type:"Table"}); 
+		
+		return cy+dy;
+	}
+	
+	
 	/// Adds a paragraph to the layer
 	add_paragraph(te,dx,cx,cy,col,si,lh,back_col,align)
 	{
@@ -834,7 +853,7 @@ class Layer
 						case "{": textcol_pop_store = textcol; textcol = POP_COL; break;
 						case "[": textcol_ie_store = textcol; textcol = IE_COL; break;
 						case "〈": textcol_fe_store = textcol; textcol = FE_COL; break;
-						case "Σ": textcol = SUM_COL; break;
+						case "Σ": case "∫": textcol = SUM_COL; break;
 						
 						case "+": case "-": case "*": case "×": case "/":
 						case "0": case "1": case "2": case "3": case "4": 
@@ -864,9 +883,11 @@ class Layer
 					
 					
 					let teco = textcol; if(ch == ";") teco = BLACK;
-					if(eqn_edit && ch == "(" || ch == ")"){
+					if(eqn_edit && ch == "(" || ch == ")" || ch == "∫" || ch == "Σ"){
+						let sh = 0; if(ch == "∫" || ch == "Σ") sh = 0.1;
+						
 						let font_bra = get_font(equation_brasi);
-						this.add_button({te:ch, x:cx, y:cy, dx:w, dy:lh, type:"Char", col:teco, i:i, font:font_bra, si:fsi, underline:underline, ch_cu_back:ch_cu_back});
+						this.add_button({te:ch, x:cx, y:cy, dx:w, dy:lh, type:"Char", col:teco, i:i, font:font_bra, si:equation_brasi, sh:sh, underline:underline, ch_cu_back:ch_cu_back});
 					}
 					else{
 						this.add_button({te:ch, x:cx, y:cy, dx:w, dy:lh, type:"Char", col:teco, i:i, font:font, si:fsi, underline:underline, ch_cu_back:ch_cu_back});

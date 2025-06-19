@@ -9,6 +9,11 @@ using namespace std;
 #include "const.hh"
 #include "hash.hh"
 
+struct Warn {                      // Stores warning information from ESS and GR
+	unsigned int th;                 // The parameter affected
+	double num;                      // The number 
+};
+
 struct ParamRef {                  // Used to reference parameter
 	ParamRef(){ th = UNSET; index = UNSET;}
 	unsigned int th;                 // The number of the parameter

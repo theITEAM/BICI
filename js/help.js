@@ -199,6 +199,7 @@ function add_help_content_buts(lay)
 		{
 			let dx = lay.inner_dx-2*cx;
 			let te = inter.help.te;
+		
 			if(test_comment) te = all_comments[inter.help.index];
 
 			if(type == "warning"){
@@ -219,30 +220,36 @@ function add_help_content_buts(lay)
 			}
 			
 			let para = te.split("\n");
-
 			for(let j = 0; j < para.length; j++){
-				let fir = para[j].substr(0,2);
-				switch(fir){
-				case "• ":
-					lay.add_paragraph("•",dx,cx+0.5,cy,WHITE,para_si,para_lh);
-					cy = lay.add_paragraph(para[j].substr(2),dx-1.4,cx+1.4,cy,WHITE,para_si,para_lh);
-					break;
-					
-				case "* ":
-					cy = lay.add_paragraph(para[j].substr(2),dx-2.4,cx+2.4,cy,WHITE,para_si,para_lh);
-					break;
-					
-				case ">>":
-					cy = lay.add_paragraph(para[j].substr(2),dx-1.4,cx+1.4,cy,WHITE,para_si,para_lh);
-					break;
-					
-				case "]>":
-					cy = lay.add_paragraph(para[j].substr(2),dx-2.4,cx+2.4,cy,WHITE,para_si,para_lh);
-					break;
-					
-				default:
-					cy = lay.add_paragraph(para[j],dx,cx,cy,WHITE,para_si,para_lh);
-					break;
+				let pa = para[j];
+			
+				if(begin(pa,"<table>")){
+					cy = lay.add_table(pa.substr(7),1,dx-2,cy);
+				}
+				else{
+					let fir = pa.substr(0,2);
+					switch(fir){
+					case "• ":
+						lay.add_paragraph("•",dx,cx+0.5,cy,WHITE,para_si,para_lh);
+						cy = lay.add_paragraph(pa.substr(2),dx-1.4,cx+1.4,cy,WHITE,para_si,para_lh);
+						break;
+						
+					case "* ":
+						cy = lay.add_paragraph(pa.substr(2),dx-2.4,cx+2.4,cy,WHITE,para_si,para_lh);
+						break;
+						
+					case ">>":
+						cy = lay.add_paragraph(pa.substr(2),dx-1.4,cx+1.4,cy,WHITE,para_si,para_lh);
+						break;
+						
+					case "]>":
+						cy = lay.add_paragraph(pa.substr(2),dx-2.4,cx+2.4,cy,WHITE,para_si,para_lh);
+						break;
+						
+					default:
+						cy = lay.add_paragraph(pa,dx,cx,cy,WHITE,para_si,para_lh);
+						break;
+					}
 				}
 				cy += 0.5;
 			}
@@ -304,7 +311,7 @@ function add_help_content_buts(lay)
 	}
 	
 	if(cy > lay.op.ymax) cy = lay.op.ymax;
-
+	
 	lay.dy = cy;
 }
 

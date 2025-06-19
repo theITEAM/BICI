@@ -1323,6 +1323,7 @@ function add_individual_buts(res,lay)
 	
 	cy = lay.add_title("Individuals",cx,cy,{te:ind_plot_text});
 	
+
 	// Sets species
 	let rpf = res.plot_filter;	
 	let p = model.get_p();
@@ -1449,7 +1450,7 @@ function graph_ind_calculate(result,rpf,burn,p)
 	// Sets classification
 	let rpf2 = rpf.species[p];
 	let cl = rpf2.sel_class.cl;
-
+	
 	// Sets the chain
 	let chsel = rpf.sel_chain.te;
 	
@@ -1516,6 +1517,54 @@ function graph_ind_calculate(result,rpf,burn,p)
 				}
 			}
 		}
+	}
+
+	let popfilt = get_popfilt(rpf2,"Populations");
+		
+	/// Filters individuals based on a population filter
+	if(popfilt && popfilt.length > 0){
+		let g_filt = get_g_filt(popfilt,sp);
+		
+		let ind_list_new=[];
+		
+		for(let k = 0; k < ind_list.length; k++){
+			let ind_li = ind_list[k];
+			
+			let fl = false;
+			for(let j = 0; j < ind_li.sa_ref.length; j++){
+				let sr = ind_li.sa_ref[j];
+				
+				let ind = result.sample[sr.sample].species[p].individual[sr.i];
+				
+				let c = ind.cinit;
+				if(g_filt[c] == true){ fl = true; break;}
+				
+				let eve = ind.ev;
+						
+				for(let e = 0; e < eve.length; e++){
+					let ev = eve[e];
+						
+					switch(ev.type){
+					case EV_TRANS: c = sp.tra_gl[ev.trg].f; break;
+					case EV_ENTER: c = ev.c; break;	
+					case EV_LEAVE: c = OUT; break;		
+					case EV_MOVE: c = ev.cf; break;
+					default: error("option not recognised"); break;
+					}
+					
+					if(c != OUT && g_filt[c] == true){ fl = true; break;}
+				}
+			
+				if(fl == true) break;
+			}
+			
+			if(fl == true) ind_list_new.push(ind_li);
+		}
+		
+		ind_list = ind_list_new;
+		
+		// Redos hash for reduced list
+		hash = new Hash(); for(let j = 0; j < ind_list.length; j++) hash.add(ind_list[j].name,j);
 	}
 
 	percent(10);
@@ -1779,6 +1828,23 @@ function add_source_obs(source,claa,hash,result,ind_list)
 }
 
 
+/// Gets a global compartment filter from a population filter
+function get_g_filt(popfilt,sp)
+{
+	let g_filt = [];
+	for(let c = 0; c < sp.comp_gl.length; c++){	
+		let cgl = sp.comp_gl[c];
+			
+		let cl = 0; 
+		while(cl < sp.ncla && (popfilt[cl] == undefined || popfilt[cl][cgl.cla_comp[cl]] == true)) cl++;
+		if(cl == sp.ncla) g_filt[c] = true;
+		else g_filt[c] = false;
+	}
+	
+	return g_filt;
+}
+
+
 /// Calculates quantities needed for the graph
 function graph_ind_sing_calculate(ind_sel,result,rpf,burn,p)
 {
@@ -1810,16 +1876,8 @@ function graph_ind_sing_calculate(ind_sel,result,rpf,burn,p)
 	
 	let popfilt = get_popfilt(rpf2,"Populations");
 	
-	// Constructs a filter for 
-	let g_filt = [];
-	for(let c = 0; c < sp.comp_gl.length; c++){	
-		let cgl = sp.comp_gl[c];
-			
-		let cl = 0; 
-		while(cl < sp.ncla && (popfilt[cl] == undefined || popfilt[cl][cgl.cla_comp[cl]] == true)) cl++;
-		if(cl == sp.ncla) g_filt[c] = true;
-		else g_filt[c] = false;
-	}
+	// Constructs a global filter 
+	let g_filt = get_g_filt(popfilt,sp);
 	
 	// Gets the individual number
 	let i_store = [];

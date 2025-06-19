@@ -9,6 +9,8 @@ function extract_equation_properties(eqn)
 	eqn.fix_eff = [];                                // Fixed effects in the equation
 	eqn.pop = [];                                    // Populations in the equation
 	eqn.sum = [];                                    // Sums in the equation
+	eqn.tint = [];                                   // Time integral in the equation
+	eqn.dep = [];                                    // Dependencies for the equation
 	eqn.warn = [];                                   // Warnings
 	eqn.time_vari = false;                           // Time variation
 	
@@ -16,13 +18,22 @@ function extract_equation_properties(eqn)
 	eqn.sp_name_list = [];   
 	eqn.index_name_list = [];
 	eqn.comp_name_list = [];
-
+	
+	let lin = eqn.te;
+	
+	// Checks equation for repeated operators
+	{
+		let res = check_repeated_operator(lin);
+		if(res.err == true){
+			eqn.warn.push({te:res.msg, cur:res.op, len:1});
+			return;
+		}
+	}
+	
 	let icur = 0;
 
 	let conv_res = detect_greek(eqn.te,0);
 	eqn.te = conv_res.te;
-	
-	let lin = eqn.te;
 	
 	let res = check_brackets_match(lin);
 
@@ -81,7 +92,21 @@ function extract_equation_properties(eqn)
 				}
 			
 				let tex = lin2.substr(ist,i-ist);
-				check_sum(tex,icur2+ist,eqn);
+				check_sum(tex,icur2+ist,lin2,i,eqn);
+			}
+			
+			if(is_tint(lin2,i)){
+				let ist = i;
+				
+				while(i < lin2.length && lin2.substr(i,1) != "(") i++;
+				
+				if(i == lin2.length){
+					eqn.warn.push({te:"There should be a left bracket '(' after the integral.", cur:icur2+i, len:1});
+					return;
+				}
+			
+				let tex = lin2.substr(ist,i-ist);
+				check_tint(tex,icur2+ist,lin2,i,eqn);
 			}
 			
 			let ch = lin2.substr(i,1);
@@ -123,7 +148,12 @@ function extract_equation_properties(eqn)
 
 				let tex = lin2.substr(ist,i-ist);
 			
-				if(tex == "t") eqn.time_vari = true;
+				if(tex == "t"){
+					eqn.time_vari = true;
+					
+					let dep=[]; dep.push("t");
+					add_eqn_dep(eqn,dep,ist);
+				}
 				else{
 					let icur3 = icur2+ist;
 				
@@ -264,7 +294,7 @@ function check_indexes_match(eqn)
 			if(is_prime(ind)){
 				let k = find_in(list,ind);
 				if(k == undefined){
-					if(eqn.type != "reparam_eqn"){
+					if(eqn.type != "reparam_eqn" && eqn.type != "derive_param" && eqn.type != "derive_eqn"){
 						eqn.warn.push({te:"Primed index '"+ind+"' for parameter '"+par.name+"' should be summed over"});
 					}
 				}					
@@ -305,8 +335,36 @@ function is_sigma(st,i)
 }
 
 
+/// Determines if sigma is at a particular point in a string
+function is_tint(st,i)
+{
+	let ch = "∫";
+	let len = ch.length;
+  if(i <= st.length-len && st.substr(i,len) == ch) return true;
+	return false;
+}
+
+
+/// Detemines where the end of bracketed content is
+function end_bra(i_bra,lin)
+{
+	let k = i_bra;
+	let num = 0;
+	while(k < lin.length){
+		let ch = lin.substr(k,1);
+		if(ch == "(") num++;
+		if(ch == ")"){
+			num--;
+			if(num == 0) break;
+		}
+		k++;
+	}
+	return k;
+}
+
+
 /// Determines if a sum is defined correctly
-function check_sum(tex,icur,eqn)
+function check_sum(tex,icur,lin,i_bra,eqn)
 {
 	let ch = "Σ";
 	let i = ch.length;
@@ -316,7 +374,7 @@ function check_sum(tex,icur,eqn)
 		let ist = i;
 		while(i < tex.length && tex.substr(i,1) != "_") i++;
 		if(i == tex.length){
-			eqn.warn.push({te:"The sum should contain a dependency2 '_'", cur:ist, len:1}); 
+			eqn.warn.push({te:"The sum should contain a dependency '_'", cur:ist, len:1}); 
 			return;
 		}
 		
@@ -350,9 +408,19 @@ function check_sum(tex,icur,eqn)
 	}
 	
 	let dep = dep_str.split(",");
+	for(let k = 0; k < dep.length; k++){
+		dep[k] = dep[k].trim();
+	}
 	
-	eqn.sum.push({dep:dep});
+	/// Works out where then end of the sum is
+	let k = end_bra(i_bra,lin);	
+	if(k == lin.length){
+		eqn.warn.push({te:"The sum bracket does not match up", cur:i_bra, len:1});
+		return;
+	}
 	
+	eqn.sum.push({dep:dep, start:i_bra, end:k});
+		
 	for(let j = 0; j < dep.length; j++){
 		let de = dep[j];
 		if(!is_prime(de)){
@@ -367,6 +435,7 @@ function check_sum(tex,icur,eqn)
 				if(sp.cla[cl].index == de_raw) fl = true;
 			}
 		}
+	
 		if(fl == false){
 			eqn.warn.push({te:"The index '"+de+"' is not in the model", cur:icur+i, len:de.length});
 		}
@@ -374,6 +443,77 @@ function check_sum(tex,icur,eqn)
 		eqn.index_name_list.push({ index_name:remove_prime(de), icur:icur+i});
 		i += de.length+1;
 	}
+}
+
+
+/// Determines if a sum is defined correctly
+function check_tint(tex,icur,lin,i_bra,eqn)
+{
+	if(eqn.type != "derive_eqn"){
+		eqn.warn.push({te:"TIme integrals can only be used for derived quantities", cur:i_bra, len:1});
+		return;
+	}
+	
+	let k = end_bra(i_bra,lin);	
+	if(k == lin.length){
+		eqn.warn.push({te:"The integral bracket does not match up", cur:i_bra, len:1});
+		return;
+	}
+	
+	let ch = "∫";
+	let i = ch.length;
+
+	let warn;
+	let mi, ma;
+	
+	tex = tex.substr(i).trim();
+	if(tex.length < 2) warn = "'dt' should be after the integral.";
+	else{
+		if(tex.substr(tex.length-2,2) != "dt") warn = "'dt' should be after the integral.";
+		else{
+			tex = tex.substr(0,tex.length-2).trim();
+			if(tex != ""){
+				if(tex.substr(0,1) != "[" || tex.substr(tex.length-1,1) != "]"){
+					warn = "Integral bounds should have the format '∫[min,max]dt(...)'.";
+				}
+				else{
+					tex = tex.substr(1,tex.length-2);
+					let spl = tex.split(",");
+					if(spl.length != 2){
+						warn = "Integral bounds should have the format '∫[min,max]dt(...)'.";
+					}
+					else{
+						mi = spl[0]; ma = spl[1];
+						if(isNaN(mi)) warn = "Bound '"+mi+"' is not a number.";
+						if(isNaN(ma)) warn = "Bound '"+ma+"' is not a number.";
+						mi = Number(mi); ma = Number(ma);
+						if(mi == ma) warn = "Integral cannot have equal bounds '"+mi+"'.";
+						if(mi > ma) warn = "Integral bound '"+mi+"' must be smaller than '"+ma+"'.";
+					}
+				}
+			}
+		}
+	}
+	
+	if(warn != undefined){
+		eqn.warn.push({te:warn, cur:icur, len:i_bra-icur}); 
+		return;
+	}
+
+	for(let i = i_bra; i < k; i++){
+		if(lin.substr(i,1) == "∫"){
+			eqn.warn.push({te:"Cannot have nested integrals", cur:i, len:1}); 
+			return;
+		}
+	}
+	
+	let cont = lin.substr(i_bra+1,k-i_bra-1);
+	if(cont.trim() == ""){
+		eqn.warn.push({te:"No content in integral", cur:i_bra, len:k-i_bra+1}); 
+		return;
+	}
+	
+	eqn.tint.push({start:i_bra, end:k, min:mi, max:ma});
 }
 
 
@@ -416,7 +556,7 @@ function param_end(st,i,op)
 			sub_brack = false; sup_brack = false;
 		}
 		
-		if(paramend_list.includes(ch)) break;
+		if(paramend_list.includes(ch) && !(op == "(" && ch == " ")) break;
 		i++;
 	}while(i < st.length);
 	
@@ -541,11 +681,44 @@ function check_parameter(te,icur,eqn)
 	
 	if(time_dep == true) dep.push("t");
 	
+	add_eqn_dep(eqn,dep,icur);
+	
 	let par = { name:name, p_name:eqn.p_name, cl_name:eqn.cl_name, dep:dep, type:eqn.type, time_dep:time_dep};
 
 	par.full_name = param_name(par);
 	
 	eqn.param.push(par);
+}
+
+
+/// Adds a dependency to the equation
+function add_eqn_dep(eqn,dep,icur)
+{
+	for(let k = 0; k < dep.length; k++){
+		let de = dep[k];
+		
+		if(find_in(eqn.dep,de) == undefined){
+			// Checks to see if on a sum 
+			let fl = false;
+			for(let j = 0; j < eqn.sum.length; j++){
+				let su = eqn.sum[j];
+				if(icur >= su.start && icur < su.end){
+					if(find_in(su.dep,de) != undefined){ fl = true; break;}
+				}
+			}
+			
+			if(de == "t"){
+				for(let j = 0; j < eqn.tint.length; j++){
+					let tint = eqn.tint[j];
+					if(icur >= tint.start && icur < tint.end){
+						fl = true; break;
+					}
+				}
+			}
+			
+			if(fl == false) eqn.dep.push(de);
+		}
+	}
 }
 
 
@@ -692,10 +865,6 @@ function check_population(te,icur,eqn)
 			}
 		}				
 	
-		if(fl == false){
-			eqn.warn.push({te:start+"Expected content after ';'", cur:icur2, len:spl[1].length});
-				return;
-		}
 		te = spl[0];
 	}
 	
@@ -720,6 +889,8 @@ function check_population(te,icur,eqn)
 	
 	let cl_ref=[];
 
+	let dep = [];
+	
 	let pop = {index:[]};
 	
 	// Goes through compartment names
@@ -736,6 +907,7 @@ function check_population(te,icur,eqn)
 			
 			if(cl_sp != undefined){
 				pop.index.push(tex);
+				dep.push(tex);
 				
 				eqn.index_name_list.push({ index_name:index, icur:icur3});
 			
@@ -789,6 +961,9 @@ function check_population(te,icur,eqn)
 			icur3 += te_comp.length+1;
 		}
 	}
+	
+	dep.push("t");
+	add_eqn_dep(eqn,dep,icur);
 	
 	eqn.pop.push(pop);
 }
@@ -983,47 +1158,6 @@ function string_dep(dep)
 	}
 	
 	return te;
-}
-
-
-/// Returns the overall equation dependency
-function equation_dep(eqn)
-{
-	extract_equation_properties(eqn);
-	
-	let time_fl = false;
-	
-	let dep=[];
-	for(let i = 0; i < eqn.param.length; i++){
-		let par = eqn.param[i];
-		for(let j = 0; j < par.dep.length; j++){
-			let de = par.dep[j];
-			if(de == remove_prime(de)){
-				if(de == "t") time_fl = true;
-				else{
-					if(find_in(dep,de) == undefined){
-						dep.push(de);
-					}
-				}
-			}
-		}
-	}
-	
-	for(let i = 0; i < eqn.pop.length; i++){
-		let po = eqn.pop[i];
-		for(let j = 0; j < po.index.length; j++){
-			let de = po.index[j];
-			if(find_in(dep,de) == undefined){
-				dep.push(de);
-			}
-		}
-	}
-	
-	if(eqn.te.includes("{") == true) time_fl = true;
-	
-	if(time_fl == true) dep.push("t");
-
-	return dep;
 }
 
 

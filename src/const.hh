@@ -266,6 +266,9 @@ const auto GEN_PLOT = 99999995u;                  // Used for a generation plot
 const auto LINK_CV_THRESH = 0.3;                  // CV threshold for linking for multi-event
 const auto LINK_WEIBULL_SHAPE = 3.7;              // Shape thresh for linking for multi-event
 
+const auto ESS_THRESH = 200;                      // Threshold for ESS statistic
+const auto GR_THRESH = 1.01;                      // Threshold for GR statistic
+
 const auto MEM_FRAC_MAX = 0.8;                    // Maximum fraction of memory usable
 const auto MEM_FREE_MIN = 0.1;                    // Minimum fraction of memory available
 const auto SIM_TRY_MAX = 10000u;                  // Maximum tries simulating nm trans

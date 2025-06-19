@@ -678,7 +678,8 @@ function button_action(bu,action_type)
 					}
 				}
 				
-				if(paste == "Σ"){ paste += "_()"; shift = 2;}
+				if(paste == "Σ"){ paste += "_()"; shift = 1;}
+				if(paste == "∫"){ paste += "dt()"; shift = 1;}
 		
 				cursor_paste(paste);
 				
@@ -705,7 +706,7 @@ function button_action(bu,action_type)
 		}
 	
 		let bso = bu.source;
-		
+	
 		if(bso.check == false){
 			bso.check = true;
 		}

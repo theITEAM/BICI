@@ -14,6 +14,7 @@ function data_source_check_error(out_type,so)
 	let tab = so.table;
 	
 	if(tab != undefined){                            // Checks that elements are correctly specified
+		/* // This was turned off becase it lead to error e.g. "E | I"
 		// If a compartment then corrects name (e.g. space -> "-") 
 		if(so.load_col){
 			for(let c = 0; c < so.load_col.length; c++){
@@ -28,6 +29,7 @@ function data_source_check_error(out_type,so)
 				}
 			}
 		}
+		*/
 	
 		for(let c = 0; c < tab.ncol; c++){
 			for(let r = 0; r < tab.nrow; r++){
@@ -87,8 +89,8 @@ function data_source_check_error(out_type,so)
 		
 			if(repeat != ""){
 				let te; if(so.type == "Add Ind.") te = "added"; else te = "removed";
-					
-				data_error("The following individuals are '"+list[r]+"' more than once:"+repeat,out_type,so);
+				
+				data_error("The following individuals are "+te+" more than once:"+repeat,out_type,so);
 			}
 		}
 		break;
@@ -482,7 +484,12 @@ function check_data_time(out_type)
 									if(t < t_start || t > t_end){
 										data_error("The time '"+t+"' must be between the start and end times","warn",so,{minor:true, c:c, r:r, num:130});
 										break;
-									}		
+									}	
+
+									if(so.type == "Add Ind." && t == t_end){
+										data_error("When adding individuals the time '"+t+"' must be before the end time","warn",so,{minor:true, c:c, r:r, num:130});
+										break;
+									}
 								}
 							}
 						}
@@ -583,7 +590,7 @@ function check_element(te,c,so)
 		if(te == ""){
 			return "Element empty";
 		}
-		if(te.trim().includes(" ")){ return "The value '"+te+"' should not include a space";}
+		if(te.trim().includes(" ")){ return "The value '"+te+"' should not include a space. Names in BICI are not allowed spaces.";}
 		if(col.cl != undefined) error("SHOULD BE 'compartment'");
 		break;
 	
@@ -640,6 +647,7 @@ function check_element(te,c,so)
 				let syntax_error = false;
 					
 				let colon_flag = false, normal_flag = false;
+				let list=[];
 				for(let i = 0; i < spl.length; i++){
 					if(spl[i] == ""){ syntax_error = true; break;}
 					else{
@@ -647,9 +655,15 @@ function check_element(te,c,so)
 						
 						if(spl2[0] == ""){ syntax_error = true; break;}
 						
-						if(hash_find(hash_comp,spl2[0]) == undefined){
-							return "Compartment '"+spl2[0]+"' is not in classification '"+claa.name+"'";
+						let k = hash_find(hash_comp,spl2[0]);
+						if(k == undefined){
+							return "In table element '"+te+"', compartment '"+spl2[0]+"' is not in classification '"+claa.name+"'";
 						}
+						if(find_in(list,k)){
+							return "In table element '"+te+"', compartment '"+spl2[0]+"' is repeated.";
+						}
+						
+						list.push(k);
 						
 						if(spl2.length == 1){
 							normal_flag = true;
@@ -660,7 +674,7 @@ function check_element(te,c,so)
 							
 							let valid = check_eqn_valid(spl2[1]);
 							if(valid.err == true){
-								return "Error with equation '"+spl2[1]+"': "+valid.msg;
+								return "In table element '"+te+"', error with equation '"+spl2[1]+"': "+valid.msg;
 							}
 						}
 						
@@ -668,8 +682,10 @@ function check_element(te,c,so)
 					}
 				}
 					
-				if(normal_flag == true && colon_flag == true) syntax_error = true;
-
+				if(normal_flag == true && colon_flag == true){
+					return "In table element '"+te+"', either all compartments should use a probability or all not (they cannot be mixed). For example, 'S:0.5|I:0.5' uses probabilites and 'S|I' does not.";
+				}
+				
 				if(syntax_error == true){
 					return "There is a syntax error in table element with value '"+te+"'.";
 				}

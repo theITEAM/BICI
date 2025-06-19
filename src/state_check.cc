@@ -832,7 +832,6 @@ void State::check_cpop_st(string ref)
 		switch(sp.type){
 		case INDIVIDUAL:
 			{
-				
 				auto C = sp.comp_gl.size();
 				
 				vector <double> cpop(C,0); 

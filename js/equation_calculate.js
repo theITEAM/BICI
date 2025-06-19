@@ -20,6 +20,9 @@ function setup_eqn(te)
 {
 	te = te.replace(/×/g,"*");                      // Converts × to *
 
+	let res = check_repeated_operator(te);
+	if(res.err == true) return res;
+			
 	te = minus_sign_adjust(te)
 
 	let eqn;
@@ -157,10 +160,10 @@ function extract_operations(te)
 				}
 				
 				if(doneflag == false){
-					return "Problem with equation '"+te+"'. The character '"+ch+"' was not expected.";
+					return "Problem with equation '"+te+"'. The character '"+ch+"' is not expected.";
 				}
         if(doneflag == false){
-					return "Problem with equation '"+te+"'. The character '"+ch+"' was not expected.";
+					return "Problem with equation '"+te+"'. The character '"+ch+"' is not expected.";
 				}					
         break;
     }
@@ -645,3 +648,112 @@ function calculate(eqn,t)
 		default: alert_help("Equation error","Code 4"); return UNSET;
   }
 }
+
+
+/// Provides a name for an operator
+function op_name(type)
+{
+	switch(type){
+	case ADD: return "addition '+'";
+	case TAKE: return "subtraction '-'";
+	case MULTIPLY: return "multiplication '×'";
+	case DIVIDE: return "division '/'"; 
+	default: break;
+	}
+	return "";
+}
+
+
+/// Checks for any repeated operators in expression
+function check_repeated_operator(te)
+{
+	let op=[];
+	
+	for(let i = 0; i < te.length; i++){
+		let ch = te.substr(i,1);
+		if(ch != " "){
+			switch(ch){
+			case "(": op.push({type:LEFTBRACKET, i:i}); break;
+			case ")": op.push({type:RIGHTBRACKET, i:i}); break;
+			case "×": case "*": op.push({type:MULTIPLY, i:i}); break;
+			case "/": op.push({type:DIVIDE, i:i}); break;
+			case "+": op.push({type:ADD, i:i}); break;
+			case "-": op.push({type:TAKE, i:i}); break;
+			default: op.push({type:"non", i:i}); break;
+			}
+		}
+	}
+	
+	// Cannot be empty
+	if(op.length == 0){
+		return err("Expression is empty.",0);
+	}
+	
+	// This allows for "*" used in branching probabilities
+	if(op.length == 1 && op[0].type == MULTIPLY) return success();
+	
+	// Cannot have just an operator
+	if(op.length == 1){
+		switch(op[0].type){
+		case ADD: case TAKE: case MULTIPLY: case DIVIDE:
+			return err("Expression cannot be simply "+op_name(op[0].type)+".",0);
+		default: break;
+		}
+	}
+	
+	// Cannot have "(*..." or "(/..." or "*..." or "/..."
+	// Cannot have "...+-*/)" or "...+-*/" 
+	for(let i = 0; i < op.length; i++){
+		let ty = op[i].type;
+		switch(ty){
+		case ADD: case TAKE: case MULTIPLY: case DIVIDE:
+			if(i+1 == op.length){
+				return err("Cannot have operator "+op_name(ty)+" at the end",i);
+			}
+			else{
+				if(op[i+1].type == RIGHTBRACKET){
+					return err("Cannot have operator "+op_name(ty)+" next to right bracket ')'",i);
+				}
+			}
+			
+			if(i == 0){
+				if(ty == MULTIPLY || ty == DIVIDE){
+					return err("Cannot have operator "+op_name(ty)+" at the start",0);
+				}
+			}
+			else{
+				if(op[i-1].type == LEFTBRACKET && (ty == MULTIPLY || ty == DIVIDE)){
+					return err("Cannot have operator "+op_name(ty)+" after left bracket '('",i);
+				}
+			}
+			break;
+		
+		default: break;
+		}
+	}
+	
+	if(op.length > 0){
+		// Cannot have operators next to  each other
+		for(let i = 0; i < op.length-1; i++){
+			switch(op[i].type){
+			case ADD: case TAKE: case MULTIPLY: case DIVIDE:
+				switch(op[i+1].type){
+				case ADD: case TAKE: case MULTIPLY: case DIVIDE:
+					return err("Cannot have operators "+op_name(op[i].type)+" and "+op_name(op[i+1].type)+" next to each other",i+1);
+				default: break;
+				}
+			default: break;
+			}
+		}
+	
+		// Cannot have empty brackets
+		for(let i = 0; i < op.length-1; i++){
+			if(op[i].type == LEFTBRACKET && op[i+1].type == RIGHTBRACKET){
+				return err("Cannot have brackets '()' with no content.",i+1);
+			}
+		}			
+	}
+	
+	return success();
+}
+

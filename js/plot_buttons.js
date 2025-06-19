@@ -768,7 +768,8 @@ Layer.prototype.plot_button = function (bu,ov)
 			let ymid = y+dy/2;
 
 			if(ymid > 0 && ymid < this.dy){
-				plot_text(te,x+textbox_space/2,ymid+bu.si*0.35,bu.font,bu.col);
+				let yy = ymid+bu.si*0.35; if(bu.sh) yy += bu.sh;
+				plot_text(te,x+textbox_space/2,yy,bu.font,bu.col);
 			}
 		}
 		break;
@@ -1466,6 +1467,39 @@ Layer.prototype.plot_button = function (bu,ov)
 			
 			si = 1.4;
 			plot_equation(bu.te_eqn2,bu.x_eq+1.6,y+dy/2+0.3*si,si,x+dx-(bu.x_eq+1.6),tcol);
+		}
+		break;
+		
+	case "Table":
+		{
+			let tab = bu.tab;
+			let col = BLACK;//WHITE;
+			
+			//fill_rectangle(x,y,dx,dy,DBLUE); 
+			fill_rectangle(x,y,dx,dy,LLBLUE); 
+			
+			for(let i = 0; i <= bu.ncol; i++){
+				let xx = x+i*dx/bu.ncol;
+				draw_line(xx,y,xx,y+dy,col,NORMLINE);
+			}
+			
+			for(let i = 0; i <= bu.nrow; i++){
+				let yy = y+i*dy/bu.nrow;
+				draw_line(x,yy,x+dx,yy,col,NORMLINE);
+			}
+			
+			let fo_bold = get_font(1,"bold");
+			let fo_norm = get_font(1);
+			
+			let w = dx/bu.ncol;
+			for(let j = 0; j < bu.nrow; j++){
+				let fo = fo_norm; if(j == 0) fo = fo_bold;
+				for(let i = 0; i < bu.ncol; i++){
+					let xx = x+i*w;
+					let yy = y+j*dy/bu.nrow;
+					plot_text(tab[j][i],xx+0.5,yy+1.1,fo,col,w-1); 
+				}
+			}
 		}
 		break;
 		

@@ -100,7 +100,7 @@ function get_effective_sample_size(vec)
 	for(let d = 1; d < N/2; d++){
 		let a = 0.0; for(let s = 0; s < N-d; s++) a += vec[s]*vec[s+d]; 
 		let cor = a/(N-d); if(cor < 0) break;
-		sum += 0.5*cor;			
+		sum += 2*cor;			
 	}
 	
 	return Math.floor(N/sum);

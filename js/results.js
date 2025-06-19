@@ -267,7 +267,9 @@ function get_param_value(i,source,lines,result,warn,mode)
 			if(spl_head.length != ndep+1) alert_sample(warn,14);
 			
 			for(let d = 0; d < ndep; d++){
-				if(dep[d] != spl_head[d]) alert_sample(warn,15); 
+				if(remove_prime(dep[d]) != remove_prime(spl_head[d])){
+					alert_sample(warn,15); 
+				}
 			}
 
 			if(spl_head[ndep] != "Value") alert_sample(warn,16); 
@@ -1649,14 +1651,14 @@ function filter_bubble(bu,cont)
 	
 	if(pos.length == 0){
 		cont.dx = 9;
-		bubble_addtitle(cont,"Add Filter",{});
+		bubble_addtitle(cont,"Add Filter",{te:filter_text});
 	
 		bubble_addparagraph(cont,"There are no potential classifications which can be filtered.",0,cont.dx);
 		add_end_button(cont,"OK","CloseBubble",{});	
 	}
 	else{
 		cont.dx = 7;
-		bubble_addtitle(cont,"Add Filter",{});
+		bubble_addtitle(cont,"Add Filter",{te:filter_text});
 	
 		for(let i = 0; i < pos.length; i++){
 			cont.lay.add_button({te:pos[i].te, x:0, y:cont.y, dx:cont.dx, dy:dropdown_height, rpf:rpf, cl:pos[i].cl, ac:"AddFilter2", type:"PopFilt"});

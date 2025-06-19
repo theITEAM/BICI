@@ -131,13 +131,40 @@ function add_bubble_buts(lay)
 		
 	case "PopFilt":
 		{
-			cont.dx = 14.3;
-			bubble_addtitle(cont,"Filter",{});
-			
+			let name = subsubtab_name();
 			let popf = bub.popfilt;
 			let filt = popf.filter;
-			
 			let cl_sel = popf.rpf.species[filt.p].sel_class.cl;
+			
+			let te;
+			switch(name){
+			case "Populations":
+				if(filt.cl == cl_sel) te = filter_pop_incl_text;
+				else te = filter_pop_notincl_text;
+				break;
+				
+			case "Transitions":
+				if(filt.cl == cl_sel) te = filter_trans_incl_text;
+				else te = filter_trans_notincl_text;
+				break;
+				
+			case "Individuals":
+				{
+					let ind_sel = inter.graph.ind_sel;
+					if(ind_sel != undefined){
+						if(filt.cl == cl_sel) te = filter_ind_sel_incl_text;
+						else te = filter_ind_sel_notincl_text;
+					}
+					else{
+						if(filt.cl == cl_sel) te = filter_ind_incl_text;
+						else te = filter_ind_notincl_text;
+					}
+				}
+				break;
+			}
+				
+			cont.dx = 14.3;
+			bubble_addtitle(cont,"Filter",{te:te});
 			
 			if(filt.cl != cl_sel){
 				bubble_addradio(cont,0,"select","Select",bub.popfilt.filter.radio); cont.y -= 1.4;
@@ -147,7 +174,7 @@ function add_bubble_buts(lay)
 			cont.y += 0.2;
 			bubble_addscrollable(cont,{type:"filterpos", ymax:10});
 		
-			if(subsubtab_name() == "Populations"){		
+			if(name == "Populations"){		
 				cont.y += 0.3;
 				bubble_addcheckbox(cont,0,"Calculate fraction",bub.popfilt.filter.fraction);
 				cont.y += 0.1;

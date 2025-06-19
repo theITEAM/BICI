@@ -1,36 +1,50 @@
-generate_co_list(list)
+- prob1 adding individual and initial disitrubution
+- prob2 same
 
-- Tried to reduce the memory footprint as much as possible (to help with large spatial models). This has involved a lot of changes, so may have introduced errors... I've done a fair amount of testing to try to mitigate this.
 
-- For proposals on observed individuals (simulation and sampling-based) a new adaptive scheme has been adopted. This preferentially sampled individuals which are successfully changed under the proposal (this avoid lots of wasteful proposals in the spatial farm model when only a few farms are infected)
 
-- Some improvements to the equation editor in the interface (different colours used to represent different elements in the equation, as well as indicating matching brackets).
 
-- Parameter diagnostic information provide in the output file using the command 'inf-param-stats' (this is useful for users which don't use the interface)
 
-- Perform additional checks on bici script (e.g. stopping '^' is individual effect name) and tried to improve error messages.
 
-- Made some improvments in the the speed of initialisation (especially for large spacial model).
 
-- Added in sigmoidal function (this is useful when you want to map from a continuous number to something bounded from zero to one (e.g. for a probability)
 
-- Some improvements to manual: Section 2.1.11 and section 2.1.12 added as well revisions to Section 7. The prior section 4.2 has been revised to emphasise the importance of carefully choosing the prior.
+JAMIE:
+- Progress bar. So as far as I can see this is just an Eddie issue. I quite like the horizontal progress bars, because it doesn't cause the terminal to scroll so much. So what I've done is add a progress file (located in the "Diagnostic" directory. This does use vertical updating. Perhaps you could check to see if that works with Eddie?
 
-- Changed the syntax used for population with fixed or individual effects. Now a ";" is used, e.g. "{I;<g>}". 
+- As an alternative I've now replaced cout with printf(..) and fflush(stdout). Perhaps this has sorted out the problem with the progress bar?
 
-- Tried to improve error messages (I've systematically been through script trying to break them in many different ways).
+- I've tried to improve the error messages regarding limitations to certain parameters (for example CV should not below 0.01 for numerical reasons). I've also added section 4.2.4 to the manual.
 
-- One of the difficulties in set up a run is to know what the time step should be. I've now added some diagnostics which outputs a run-time warning if either the time step is too large (discretisation error) or too small (computationally inefficient). This doesn't stop executiong of the code, it's just a useful guide. Section 3.3.1 has been added to the manual
+- Now I've removed the error which is generated for {I;}
 
-- Corrected slowing of interface when many knots in spline
- 
- - Improvements to parameter proposals for parameters in equations which are linearly eqpressible in terms of popuations (speeding up by combining calculation of non-population part) 
+- I've corrected the "sampler problem" error. It was indeed down to finite precision, but a tricky one to track down.
 
-- Some yellow colours have been added to the potential compartmental colour pallette.
 
-- Update MCMC diagnostic text information to be more informative
+GRANT:
+- Memory usage. So as I mentioned, there is nothing in C++ itself which gets this, but having investigated there are some platform dependent methods to get this info (the code isn't pretty, but it does the job). So now an estimate for memory is printed and also if its likely to run out of memory a warning message is given.
 
-- Improvements to loading symbol in interface (to make it more smooth... this is tricky because difficult to know how long things will take a priori)
+- Code has been added to allow for time integrals to be done on derived quantities. They have the format “\int dt (…)”, where the content goes in the round brackets.  For example, the expression “\int dt ({I})” is mathematically represented by ∫{I}dt. By default, time is integrated over the entire system period, but limits can be placed (e.g. “\int[10,50] dt ({I})” becomes ∫_10^50{I}dt. Time integration can be used to estimate the relative contribution to different routes of transmission. For example, if the force of infection is given by β{I}+ϕ the derived quantity “\int dt (\phi) / \int dt (\beta{I}+\phi)” (mathematically (∫ϕdt)⁄(∫(β{I}+ϕ)dt)) gives the relative contribution of external infections).
+
+- I've added information which helps users to load up data table for parameter values (and prior/reparameterisation etc). There have been examples put in software [?] help files as well as lots of examples of input files I've now put in the manual (also section 2.2.9 has been added).
+
+ME:
+- I've corrected a mistake in how effective sample sizes are calculated. Values will now be lower than they were previously. 
+
+- Add filters for individuals (these filters are based on whether individuals at some point visit a specified set of compartments). Also some filter help has been added through the interface help symbols[?])
+
+- Allow for the possibility of derived parameters to depend on parameters which themselves are derived. 
+
+- I've done some general error checking for derived / reparameterised / distributions... I spotted a few mistakes.
+
+- Add a warning on ESS/GR. If this warning is set then don't show timestep warning (because this isn't very reliable for an unmixed system
+
+- Updates to the manual related to above.
+
+
+
+
+
+
 
 
 

@@ -566,6 +566,11 @@ void Species::add_ind_data(const DataSource &so)
 		double t = number(t_str);
 		if(t_str == "start") t = details.t_start;
 		
+		if(t < details.t_start || t >= details.t_end){
+			 alert_source("The time '"+t_str+"' must be between the start and end times",so,1,j); 
+			 return;
+		}
+		
 		if(ncla+2 != tab.ncol) emsg_input("Columns not right2");
 		
 		auto name = t_str;
@@ -587,8 +592,6 @@ void Species::add_ind_data(const DataSource &so)
 			for(auto cl = 0u; cl < ncla; cl++){
 				const auto &claa = cla[cl];
 
-				//auto vec = claa.hash_comp.get_vec_string(val[cl]);
-				//auto c = claa.hash_comp.existing(vec);
 				auto c = claa.hash_comp.find(val[cl]);
 				if(c == UNSET){ c_set = UNSET; break;}
 				c_set += comp_mult[cl]*c;
@@ -604,8 +607,6 @@ void Species::add_ind_data(const DataSource &so)
 
 					auto &ent_cl = ep.cla[cl];
 					
-					//auto vec = claa.hash_comp.get_vec_string(val[cl]);
-					//auto c = claa.hash_comp.existing(vec);
 					auto c = claa.hash_comp.find(val[cl]);
 					
 					ent_cl.c_set = c;

@@ -30,6 +30,8 @@ function create_output_file(save_type,map_store)
 	
 	check_param_valid(save_type);
 	
+	check_integral_bounds(save_type);
+	
 	percent(45);
 	
 	for(let p = 0; p < model.species.length; p++){
@@ -77,7 +79,9 @@ function err_warning()
 	if(model.warn.length > 0){
 		if(input.type == "Load Example" || input.type == "Import output"){
 			let wa = model.warn[0];
-			alert_import(wa.mess+": "+wa.mess2);
+			let msg = wa.mess+": "+wa.mess2;
+			if(wa.line) alert_line(msg,wa.line)
+			else alert_import(msjg);
 			return;
 		}
 	}
@@ -91,7 +95,9 @@ function err_warning()
 		break;
 	}
 	
-	throw({type:"Model warning", command_type:input.type, species:strip_heavy(model.species), warn:model.warn, full_warn:full_warn});
+	let wa = {type:"Model warning", command_type:input.type, species:strip_heavy(model.species), warn:model.warn, full_warn:full_warn};
+	if(try_on == false) prr(wa);
+	else throw(wa);
 }
 
 
@@ -868,6 +874,11 @@ function output_param(par,save_type,file_list,one_file)
 				te1 += ' factor-weight="'+file+'"';
 			}
 		}
+		
+		
+		if(par.sim_sample && par.sim_sample.check == false){
+			te1 += ' sim-sample="false"';
+		}
 				
 		if(!par.dist_mat){
 			te += te1+te2+endl;
@@ -1087,7 +1098,7 @@ function create_output_derived()
 		
 		if(der.eqn1.param.length != 1) error("problem with derived");
 		else{
-			let name = remove_eq_quote(get_full_parameter_name(der.eqn1.param[0].name));
+			let name = remove_eq_quote(der.eqn1.param[0].full_name);	
 			te += 'derived name="'+name+'" eqn="'+der.eqn2.te+'"'+endl;
 		}
 	}
@@ -2401,14 +2412,14 @@ function tidy_code(te)
 }
 
  
-/// Creates a file to start a posterior predictive check
+/// Creates a file to start a posterior simulation
 function create_ppc_file()
 {
 	let te = inf_result.import_te;
 	
 	let file_list=[];
 	
-	te = remove_command(te,"post-sim,posterior-simulation,add-pop-post-sim,remove-pop-post-sim,add-ind-post-sim,remove-ind-post-sim,move-ind-post-sim,param-mult,inf-diagnostic,inf-generation,# MODIFICATION DATA");
+	te = remove_command(te,"post-sim,posterior-simulation,add-pop-post-sim,remove-pop-post-sim,add-ind-post-sim,remove-ind-post-sim,move-ind-post-sim,param-mult,# MODIFICATION DATA");
 	te += endl+get_ppc_command("ppc")+endl+endl;
 
 	for(let p = 0; p < inf_result.species.length; p++){

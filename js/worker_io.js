@@ -204,6 +204,11 @@ function A_matrix_loaded(tab,p,i)
 		alertp("The data table must be square and have headings which give the IDs of the individuals"); 
 		return;
 	}
+
+	for(let c = 0; c < tab.heading.length; c++){
+		let warn = check_ind_name_warn(tab.heading[c]);
+		if(warn != undefined) alertp(warn); 	
+	}
 	
 	for(let r = 0; r < tab.nrow; r++){
 		for(let c = 0; c < tab.ncol; c++){

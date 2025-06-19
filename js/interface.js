@@ -200,7 +200,7 @@ function key_press(e)
 
 	if(code == 16 || code == 17) return;
 	
-	if(code == 27){ // Escape key
+	if(code == 27 && win_linux){ // Escape key
 		console.clear();
 		location.reload(true);
 	}
@@ -686,7 +686,7 @@ function draw_data_table(lay,x,y,tab,op)
 				if(l > lenmax){ lenmax = l; longest = te;}
 			}
 			
-			w = text_width(longest,fo); if(w > 10) w = 10;
+			w = 1.1*text_width(longest,fo)+1; if(w > 10) w = 10;
 			if(w > wmax) wmax = w;
 			if(wmax < 5) wmax = 5;
 	
@@ -1136,24 +1136,50 @@ function transfer_column(c,all_snp_flag)
 	tab_dest.nrow = tab_source.nrow;
 
 	if(so.type == "Genetic" && tab_dest.ncol == 3 && all_snp_flag != false){
-		let snp_root = so.spec.snp_root;
-
 		let list_extra = [];
-		for(let c = 0; c < tab_source.ncol; c++){
-			if(find_in(tab_dest.col_used,c) == undefined){
-				if(tab_source.heading[c].substr(0,snp_root.length) == snp_root){
-					for(let r = 0; r < tab_source.nrow; r++){
-						tab_dest.ele[r].push(tab_source.ele[r][c]);
-					}
-	
-					let head = "SNP"+(list_extra.length+2);
-					tab_dest.heading.push(head);
-					list_extra.push(c);
-					tab_dest.ncol++;
+		switch(so.spec.type_radio.value){
+		case "snp":
+			{
+				let snp_root = so.spec.snp_root;
 
-					so.load_col.push({heading:head, desc:"SNP column",type: "text"});
+				for(let c = 0; c < tab_source.ncol; c++){
+					if(find_in(tab_dest.col_used,c) == undefined){
+						if(tab_source.heading[c].substr(0,snp_root.length) == snp_root){
+							for(let r = 0; r < tab_source.nrow; r++){
+								tab_dest.ele[r].push(tab_source.ele[r][c]);
+							}
+			
+							let head = "SNP"+(list_extra.length+2);
+							tab_dest.heading.push(head);
+							list_extra.push(c);
+							tab_dest.ncol++;
+
+							so.load_col.push({heading:head, desc:"SNP column",type: "text"});
+						}
+					}
 				}
 			}
+			break;
+			
+		case "matrix":
+			{	
+				for(let r = 0; r < tab_dest.ele.length; r++){
+					let val = tab_dest.ele[r][2];
+					let c = find_in(tab_source.heading,val);
+					if(c != undefined){
+						for(let r = 0; r < tab_source.nrow; r++){
+							tab_dest.ele[r].push(tab_source.ele[r][c]);
+						}
+							
+						tab_dest.heading.push(val);
+						list_extra.push(c);
+						tab_dest.ncol++;
+
+						so.load_col.push({heading:val, desc:"SNP column",type: "text"});
+					}
+				}
+			}
+			break;
 		}
 		tab_dest.list_extra = list_extra;
 	}
@@ -1540,7 +1566,7 @@ function view_warning(i)
 			let info = warn.eqn_info;
 	
 			switch(warn.eqn_type){
-			case "comp_prob":
+			case "comp_prob": case "sim_comp_prob":
 				select_bubble_data_element(info.p,info.i,info.r,info.c);
 				break;
 			
@@ -1584,6 +1610,10 @@ function view_warning(i)
 	case "DataProblem": 
 		if(warn.siminf == "sim") change_page({pa:"Simulation", su:"Initial Conditions", susu:warn.p});
 		else change_page({pa:"Inference", su:"Data", susu:warn.p});
+		break;
+	
+	case "DeriveProblem":
+		select_bubble_derived(warn.i);
 		break;
 		
 	case "KnotProblem":

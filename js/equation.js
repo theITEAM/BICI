@@ -456,8 +456,8 @@ function equation_calulator(lay,cx,cy,width,source,warn,mode)
 	}
 
 	let dx = 2.7, dy=1.5, gap = 0.5;
-	let dx2 = 1.52, gap2 = 0.5;
-	let dx3 = 1.52, gap3 = 0.5;
+	let dx2 = 1.43, gap2 = 0.5;
+	let dx3 = dx2, gap3 = 0.5;
 	
 	let x = cx+0.2;
 	for(let i = 0; i < functi.length; i++){
@@ -1209,4 +1209,36 @@ function equation_rename_compartment(p,cl,old_name,new_name)
 		}
 		eqn.te = te;
 	}	
+}
+
+
+/// CHecks the integrals are in bounds
+function check_integral_bounds(out_type)
+{
+	if(out_type != "sim" && out_type != "inf") return;
+
+	let details;
+	switch(out_type){
+	case "sim": details = model.sim_details; break;
+	case "inf": details = model.inf_details; break;
+	}
+		
+	let t_start = Number(details.t_start);
+	let t_end = Number(details.t_end);
+	
+	for(let i = 0; i < model.derive.length; i++){
+		let eq = model.derive[i].eqn2;
+		for(let k = 0; k < eq.tint.length; k++){
+			let tint = eq.tint[k];
+			let t = tint.min;
+			if(t != undefined && (t < t_start || t > t_end)){
+				add_warning({mess:"Derived equation error", mess2:"The integral bound '"+t+"' is not within the system duration", i:i, warn_type:"DeriveProblem"});
+			}
+			
+			t = tint.max;
+			if(t != undefined && (t < t_start || t > t_end)){
+				add_warning({mess:"Derived equation error", mess2:"The integral bound '"+t+"' is not within the system duration", i:i, warn_type:"DeriveProblem"});
+			}
+		}
+	}
 }

@@ -37,7 +37,7 @@ The current version contains the following features:
 
 The following files can be downloaded:
 
-* **Windows:** [BICI_v0.5_windows.zip](https://github.com/theITEAM/BICI/releases/download/v0.51/BICI_v0.5_windows.zip). Once unzipped BICI is run by clicking on the “BICI.exe” icon (if the error message “Windows protected your PC” appears, click on “More info” and “Run”).
+* **Windows:** [BICI_v0.52_windows.zip](https://github.com/theITEAM/BICI/releases/download/v0.52/BICI_v0.52_windows.zip). Once unzipped BICI is run by clicking on the “BICI.exe” icon (if the error message “Windows protected your PC” appears, click on “More info” and “Run”).
 
 * **Mac:** 
 [BICI_v0.4_mac.zip](https://github.com/theITEAM/BICI/releases/download/v0.4/BICI_v0.4_mac.zip).
@@ -45,7 +45,7 @@ The following files can be downloaded:
 
 ## Documentation
 
-The following manual can be downloaded [here](BICI_Manual_v0.4.pdf)
+The following manual can be downloaded [here](BICI_Manual_v0.52.pdf)
 
 ## Build
 
