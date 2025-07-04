@@ -336,7 +336,7 @@ void State::check_ref(unsigned int p, string refst)
 		for(auto i = 0u; i < ssp.individual.size(); i++){
 			auto &ind = ssp.individual[i];
 			auto inmtr_store = ind.incomp_ref;
-			double temp;
+			auto temp = 0.0;
 			ssp.set_incomp_ref(i,popnum_t,temp);
 			
 			for(auto cl = 0u; cl < sp.ncla; cl++){
@@ -835,7 +835,7 @@ void State::check_cpop_st(string ref)
 				auto C = sp.comp_gl.size();
 				
 				vector <double> cpop(C,0); 
-			
+
 				switch(sp.init_cond.type){
 				case INIT_POP_FIXED: case INIT_POP_DIST:
 					{		

@@ -199,10 +199,13 @@ function create_edit_Amatrix(lay)
 	let cx = corner.x;
 	let cy = corner.y;
 	
-	let too_big = false; if(inter.edit_Amatrix.too_big == true) too_big = true;
+	let Amat = inter.edit_Amatrix;
 	
+	let too_big = false; if(Amat.too_big == true) too_big = true;
 	let title = "Edit A matrix";
-	if(too_big) title = "A matrix (too large to edit)";
+	if(Amat.type == "Ainv") title = "Edit inverse A matrix";
+	
+	if(too_big) title += " (too large to edit)";
 	
 	cy = lay.add_title(title,cx,cy,{te:Amatrix_text});
 	
@@ -247,7 +250,20 @@ function add_Amatrix_buts(lay)
 	let mar = 0.4;
 	let gap = 0.7;
 	let cy = 0;
-	let dx = 4;
+	let dx = 3;
+	
+	// Finds the longest element
+	let str = "";
+	for(let j = 0; j < ind_list.length; j++){
+		for(let i = 0; i < ind_list.length; i++){
+			let st = String(inter.edit_Amatrix.A_value[j][i]);
+			if(st.length > str.length) str = st;
+		}
+	}
+	let w_ele = 1.2*text_width(str,fo_table);
+	if(w_ele > dx) dx = w_ele;
+	if(dx > 8) dx = 8;
+	
 	let mar_col = DRED;
 	
 	let cx = 2+w_max+gap;

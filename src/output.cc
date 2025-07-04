@@ -2025,6 +2025,11 @@ void Output::end(string file, unsigned int total_cpu) const
 			
 	output_rate_warning(total_cpu,50,100,final_warning);
 
+	for(const auto &der : model.derive){
+		auto st = der.func.warn; 
+		if(der.func.on && st != "") final_warning.push_back(st);
+	}
+	
 	if(op()){
 		for(auto te : final_warning) add_warning(te,fout);
 	}
@@ -2422,7 +2427,7 @@ void Output::add_warning(string err_msg, ofstream &fout) const
 {
 	auto line = "warning text=\"[["+endli;
 	line += err_msg+endli;
-	line += "]]\""+endli;
+	line += "]]\""+endli+endli;
 	
 	if(com_op == true){
 		cout << line;

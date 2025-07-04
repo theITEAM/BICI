@@ -677,3 +677,51 @@ vector < vector <double> > create_two_by_two(const vector < vector <double> > &M
 }
 
 
+/// Determines the largest eigenvalue and vector from a matrix
+double largest_eigenvalue(const vector < vector <double> > &M, vector <double> &vec)
+{
+	auto N = M.size();
+	
+	auto ev = 0.0;
+
+	vector <double> vec2(N);
+	
+	auto loop = 0u;
+	do{
+		for(auto i = 0u; i < N; i++){
+			auto sum = 0.0; for(auto ii = 0u; ii < N; ii++) sum += M[i][ii]*vec[ii];
+			vec2[i] = sum;
+		}
+		
+		auto sum = 0.0; for(auto i = 0u; i < N; i++) sum += vec2[i];
+		auto ev_new = sum;
+		
+		for(auto i = 0u; i < N; i++) vec2[i] /= sum;
+	
+		if(loop%10 == 0){
+			auto lim = 100*VTINY;
+			if(loop > 100) lim *= 10;
+			if(loop > 1000) lim *= 10;
+			if(ev_new-ev > -lim && ev_new-ev < lim){
+				unsigned int k;
+				for(k = 0; k < N; k++){
+					auto dif = vec2[k] - vec[k];
+					if(dif > lim || dif < -lim) break;
+				}
+				if(k == N) break;
+			}
+		}
+		
+		vec = vec2;	
+		ev = ev_new;
+
+		loop++;
+		if(loop > 10000){
+			print_matrix("M",M);
+			emsg("Eigen-vector convergence problem");
+		}
+	}while(1 == 1);
+
+	return ev;
+}
+

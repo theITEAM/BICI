@@ -364,7 +364,7 @@ function split_compact(val)
 	for(let k = 0; k < val.length; k++){
 		let spl = val[k].split("*");
 		let nu = Number(spl[0]);
-		if(isNaN(nu)) alert_sample(warn,101);
+		if(isNaN(nu)) alert_sample("There was a problem loading",101);
 	
 		switch(spl.length){
 		case 1:

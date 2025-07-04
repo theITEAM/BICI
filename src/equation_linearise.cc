@@ -20,13 +20,13 @@ void Equation::calculate_linearise()
 {
 	if(linearise.on == true) return;
 
-	auto ncalc = calc.size();
+	auto C = calcu.size();
 
 	auto pl = false;
 	
 	vector <LinearCalculation> lin_calc;
-	for(auto i = 0u; i < ncalc; i++){
-		const auto &ca = calc[i];
+	for(auto i = 0u; i < C; i++){
+		const auto &ca = calcu[i];
 		
 		if(ca.item.size() == 0) emsg("zero item problem");
 		
@@ -146,7 +146,8 @@ void Equation::calculate_linearise()
 		emsg("lin final");
 	}
 
-	auto lc_final = convert_to_linear_calculation(ans,ADD,lin_calc);
+	//auto lc_final = convert_to_linear_calculation(ans,ADD,lin_calc);
+	auto lc_final = lin_calc[lin_calc.size()-1];
 	
 	linearise.no_pop_calc = lc_final.no_pop_calc.calc;
 	linearise.no_pop_calc_time_dep = calc_time_dep(linearise.no_pop_calc);
@@ -228,7 +229,7 @@ LinearCalculation Equation::convert_to_linear_calculation(const EqItem &it, EqIt
 			
 		case POPNUM: 
 			{
-				Calculation ca; ca.op = op; ca.reg_store = 0;
+				Calculation ca; ca.op = op;
 				EqItem it2; it2.type = NUMERIC; it2.num = add_cons(1);
 				ca.item.push_back(it2);
 				
@@ -238,22 +239,10 @@ LinearCalculation Equation::convert_to_linear_calculation(const EqItem &it, EqIt
 				lin.pop_calc.push_back(pop_c);
 			}
 			break;
-			
-		case POPNUM_TIME:
-			emsg("Should not be popnum_time");
-			break;
-		
-		case SPLINE_TIME:
-			emsg("Should not be spline_time");
-			break;
-			
-		case SPLINEREF_TIME:
-			emsg("Should not be splineref_time");
-			break;
 		
 		case PARAMVEC: case SPLINEREF: case NUMERIC: case TIME: 
 			{
-				Calculation ca; ca.op = op; ca.item.push_back(it); ca.reg_store = 0;
+				Calculation ca; ca.op = op; ca.item.push_back(it);
 				lin.no_pop_calc.calc.push_back(ca);
 			}
 			break;
@@ -303,7 +292,7 @@ void Equation::calc_mult(vector <Calculation> &calc, const vector <Calculation> 
 						if(ca.item.size() == 1 && ca.item[0].type == NUMERIC){
 							auto con = cons[ca.item[0].num];
 							calc = calc2;
-							Calculation ca; ca.op = MULTIPLY; ca.reg_store = calc.size();
+							Calculation ca; ca.op = MULTIPLY; 
 							EqItem it1; it1.type = REG; it1.num = calc.size()-1;
 							EqItem it2; it2.type = NUMERIC; it2.num = add_cons(con);
 							ca.item.push_back(it1);
@@ -341,7 +330,7 @@ void Equation::calc_mult(vector <Calculation> &calc, const vector <Calculation> 
 						if(ca2.item.size() == 1 && ca2.item[0].type == NUMERIC){
 							auto con = cons[ca2.item[0].num];
 								
-							Calculation ca; ca.op = MULTIPLY; ca.reg_store = calc.size();
+							Calculation ca; ca.op = MULTIPLY;
 							EqItem it1; it1.type = REG; it1.num = calc.size()-1;
 							EqItem it2; it2.type = NUMERIC; it2.num = add_cons(con);
 							ca.item.push_back(it1);
@@ -362,7 +351,7 @@ void Equation::calc_mult(vector <Calculation> &calc, const vector <Calculation> 
 		for(auto &it : calc[i].item){
 			if(it.type == REG) it.num += num;
 		}
-		calc[i].reg_store += num;
+		//calc[i].reg_store += num;
 	}
 
 	for(auto i = 0u; i < num; i++){
@@ -375,7 +364,7 @@ void Equation::calc_mult(vector <Calculation> &calc, const vector <Calculation> 
 		ca_last.item.push_back(it);
 	}
 	else{
-		Calculation ca; ca.op = MULTIPLY; ca.reg_store = calc.size();
+		Calculation ca; ca.op = MULTIPLY; 
 		EqItem it1; it1.type = REG; it1.num = num-1;
 		EqItem it2; it2.type = REG; it2.num = calc.size()-1;
 		ca.item.push_back(it1);
@@ -431,7 +420,7 @@ void Equation::calc_add(vector <Calculation> &calc, const vector <Calculation> &
 		for(auto &it : calc[i].item){
 			if(it.type == REG) it.num += num;
 		}
-		calc[i].reg_store += num;
+		//calc[i].reg_store += num;
 	}
 
 	for(auto i = 0u; i < num; i++){
@@ -444,7 +433,7 @@ void Equation::calc_add(vector <Calculation> &calc, const vector <Calculation> &
 		ca_last.item.push_back(it);
 	}
 	else{
-		Calculation ca; ca.op = ADD; ca.reg_store = calc.size();
+		Calculation ca; ca.op = ADD;
 		EqItem it1; it1.type = REG; it1.num = num-1;
 		EqItem it2; it2.type = REG; it2.num = calc.size()-1;
 		ca.item.push_back(it1);
@@ -486,12 +475,12 @@ void Equation::calc_div(vector <Calculation> &calc, const vector <Calculation> &
 		for(auto &it : ca.item){
 			if(it.type == REG) it.num += num;
 		}
-		ca.reg_store += num;
+		//ca.reg_store += num;
 		
 		calc.push_back(ca);
 	}
 	
-	Calculation ca; ca.op = DIVIDE; ca.reg_store = calc.size();
+	Calculation ca; ca.op = DIVIDE;
 	EqItem it1; it1.type = REG; it1.num = num-1;
 	EqItem it2; it2.type = REG; it2.num = calc.size()-1;
 	ca.item.push_back(it1);
@@ -519,7 +508,10 @@ void Equation::print_linear_calc(string te, const LinearCalculation &lin) const
 void Equation::print_calc(string st, const vector <Calculation> &calc) const
 {
 	cout << st << ": "; 
-	for(const auto &ca : calc){ print_ca(ca); cout << ",  ";}
+	for(auto i = 0u; i < calc.size(); i++){
+		print_ca(i,calc[i]); 
+		cout << ",  ";
+	}
 	cout << endl;
 }
 
@@ -535,7 +527,6 @@ void Equation::single_param_func(Calculation ca, LinearCalculation &lin, const v
 			lin = lin_calc[it.num];
 			if(lin.pop_calc.size() > 0) return;
 			auto &cal = lin.no_pop_calc.calc;
-			ca.reg_store = cal.size();
 			ca.item[0].num = cal.size()-1;
 			cal.push_back(ca);
 		
@@ -544,12 +535,10 @@ void Equation::single_param_func(Calculation ca, LinearCalculation &lin, const v
 		break;
 		
 	case PARAMVEC: case SPLINEREF: case NUMERIC: case TIME: 
-		ca.reg_store = 0;
 		lin.no_pop_calc.calc.push_back(ca);
 		break;
 		
 	case POPNUM: return;
-	case POPNUM_TIME: emsg("Eq Lin should not be popnum_time"); break;
 	case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
 	default: emsg("Eq problem2"); break;
 	}
@@ -582,13 +571,12 @@ void Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 					for(auto &it : ca_add.item){
 						if(it.type == REG) it.num += num;
 					}
-					ca_add.reg_store += num;
+					//ca_add.reg_store += num;
 					calc.push_back(ca_add);
 				}
 				
 				it1.num = num-1; 
 				it2.num = calc.size()-1;
-				ca.reg_store = calc.size();
 				calc.push_back(ca);
 				if(false){
 					print_linear_calc("calc",lin); 
@@ -603,12 +591,10 @@ void Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 				if(lin.pop_calc.size() > 0) return;
 				auto &cal = lin.no_pop_calc.calc;
 				it1.num = cal.size()-1;
-				ca.reg_store = cal.size();
 				cal.push_back(ca);
 			}
 			break;
 		case POPNUM: return;
-		case POPNUM_TIME:  emsg("Eq Lin should not be popnum_time"); break;
 		case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
 		default: emsg("Eq problem2"); break;
 		}
@@ -622,25 +608,21 @@ void Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 				if(lin.pop_calc.size() > 0) return;
 				auto &cal = lin.no_pop_calc.calc;
 				it2.num = cal.size()-1;
-				ca.reg_store = cal.size();
 				cal.push_back(ca);
 			}
 			break;
 			
 		case PARAMVEC: case SPLINEREF: case NUMERIC: case TIME:
 			{		
-				ca.reg_store = 0;
 				lin.no_pop_calc.calc.push_back(ca);
 			}
 			break;
 		case POPNUM: return;
-		case POPNUM_TIME: emsg("Eq Lin should not be popnum_time"); break;
 		case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
 		default: emsg("Eq problem2"); break;
 		}
 		break;
 	case POPNUM: return;
-	case POPNUM_TIME: emsg("Eq Lin should not be popnum_time"); break;
 	case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
 	default: emsg("Eq problem2"); break;
 	}
@@ -687,7 +669,6 @@ bool Equation::calc_time_dep(const vector <Calculation> &calc) const
 					break;
 				case SPLINE: case SPLINEREF: case TIME: return true;
 				case POPNUM: emsg("Should not have a population"); break;
-				case POPNUM_TIME: emsg("Should not have a popnum_time"); break;
 				default: emsg("Equation error"); break;
 			}
 		}
@@ -725,7 +706,6 @@ double Equation::calculate_calculation(const vector <Calculation> &calc, unsigne
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: emsg("Should not have a population"); break;
-				case POPNUM_TIME: emsg("Should not have a popnum_time"); break;
 				case REG: num[j] = regcalc[it.num]; break;
 				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: num[j] = timepoint[ti]; break;
@@ -733,11 +713,12 @@ double Equation::calculate_calculation(const vector <Calculation> &calc, unsigne
 			}
 		}
 
-    regcalc[ca.reg_store] = calculate_operation(ca.op,num);
+    regcalc[i] = calculate_operation(ca.op,num);
   }
 	
 	return regcalc[imax-1];
 }
+
 
 /// Calculates based on calc (using spline store if that is set)
 double Equation::calculate_calculation_spline_store(const vector <Calculation> &calc, unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const 
@@ -773,7 +754,6 @@ double Equation::calculate_calculation_spline_store(const vector <Calculation> &
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: emsg("Should not have a population"); break;
-				case POPNUM_TIME: emsg("Should not have a popnumn_time"); break;
 				case REG: num[j] = regcalc[it.num]; break;
 				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: num[j] = timepoint[ti]; break;
@@ -781,7 +761,7 @@ double Equation::calculate_calculation_spline_store(const vector <Calculation> &
 			}
 		}
 
-    regcalc[ca.reg_store] = calculate_operation(ca.op,num);
+    regcalc[i] = calculate_operation(ca.op,num);
   }
 	
 	return regcalc[imax-1];
@@ -816,7 +796,6 @@ double Equation::calculate_calculation_notime(const vector <Calculation> &calc, 
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
 				case POPNUM: emsg("Should not have a population"); break;
-				case POPNUM_TIME: emsg("Should not have a popnum_time"); break;
 				case REG: num[j] = regcalc[it.num]; break;
 				case NUMERIC: num[j] = cons[it.num]; break;
 				case TIME: emsg("Should not have time"); break;
@@ -824,7 +803,7 @@ double Equation::calculate_calculation_notime(const vector <Calculation> &calc, 
 			}
 		}
 
-    regcalc[ca.reg_store] = calculate_operation(ca.op,num);
+    regcalc[i] = calculate_operation(ca.op,num);
   }
 	
 	return regcalc[imax-1];
@@ -857,7 +836,6 @@ bool Equation::equal_calc(const vector <Calculation> &calc1, const vector <doubl
 		const auto &ca1 = calc1[i]; 
 		const auto &ca2 = calc2[i];
 		if(ca1.op != ca2.op) return false;
-		if(ca1.reg_store != ca2.reg_store) return false;
 		if(ca1.item.size() != ca2.item.size()) return false;
 		for(auto j = 0u; j < ca1.item.size(); j++){
 			const auto &it1 = ca1.item[j];
@@ -950,6 +928,7 @@ unsigned int Linearise::get_pop_ref(unsigned int po) const
 	for(const auto &pr : pop_ref_from_po[po%EQ_POP_REF]){
 		if(pr.po == po) return pr.i;
 	}
+
 	return UNSET;
 }
 

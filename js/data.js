@@ -1540,7 +1540,6 @@ function load_default_filt(p)
 /// Checks that paramater is correctly specified
 function edit_param_check_error(error_mess_only)
 {
-	
 	return false;
 }
 

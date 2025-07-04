@@ -347,7 +347,7 @@ double number(string st)
 {
 	if(allow_string(st,"-0123456789.e") == false) return UNSET;
 	
-	double val = atof(st.c_str());
+	double val = atof(st.c_str());// zz
 	if(val == 0 && trim(st) != "0" && trim(st).substr(0,3) != "0.0" && trim(st).substr(0,3) != "0.") return UNSET;
 	return val;
 }
@@ -916,14 +916,14 @@ bool includes(string st, string ch)
 /// Gets the dependency from an initial point on the string
 DepInfo get_dep_info(const string &te, unsigned int i, const string &not_allowed)
 {
-	DepInfo di; di.result = SUCCESS;
+	DepInfo di; di.warn = "";
 
 	string dep;
 
 	auto ist = i;
 	if(te.substr(i,1) == "("){	
 		while(i < te.length() && te.substr(i,1) != ")") i++;
-		if(i == te.length()) di.result = FAIL;
+		if(i == te.length()) di.warn = "Brackets do not match";
 
 		dep = te.substr(ist+1,i-(ist+1));
 	}
@@ -941,7 +941,13 @@ DepInfo get_dep_info(const string &te, unsigned int i, const string &not_allowed
 			ist += de.length() + 1;
 	
 			de = trim(de);
-			if(de == "") di.result = FAIL; 
+			if(de == "") di.warn = "Dependency is not set"; 
+		}
+		
+		for(auto d = 0u; d < spl.size(); d++){
+			for(auto dd = d+1; dd < spl.size(); dd++){
+				if(spl[d] == spl[dd]) di.warn = "Cannot have repeated index '"+spl[d]+"'"; 
+			}
 		}
 
 		di.spl = spl;
@@ -994,14 +1000,15 @@ SwapResult swap_index(string &te, const vector <DepConv> &dep_conv)
 				auto ist = i;
 				auto di = get_dep_info(te,i,"$}[<(;");
 			
-				if(di.result == FAIL){
-					res.warn = "An error occured";
+				if(di.warn != ""){
+					res.warn = "An error occured: ";
 					if(type == "pop"){
-						res.warn = "Population '{"+te.substr(ist,di.iend-ist)+"}' has an error";
+						res.warn = "Population '{"+te.substr(ist,di.iend-ist)+"}' has an error: ";
 					}
 					if(type == "param"){
-						res.warn = "Parameter '"+te.substr(istore+1,i-istore-2)+"' has a misspecified dependency.";
+						res.warn = "Parameter '"+te.substr(istore+1,i-istore-2)+"' has a misspecified dependencyL ";
 					}
+					res.warn += di.warn;
 					return res;
 				}
 		
@@ -1027,49 +1034,73 @@ SwapResult swap_index(string &te, const vector <DepConv> &dep_conv)
 }
 
 
+/// Determines 
+bool in_text(const string &te, unsigned int i, string te2)
+{
+	if(i+te2.length() > te.length()) return false;
+	if(te.substr(i,te2.length()) == te2) return true;
+	return false;
+}
+
+
 /// Constructs a swap template
 SwapResult swap_template(string te, const vector <DepConv> &dep_conv)
 {
 	SwapResult res; res.warn = ""; res.done.resize(dep_conv.size(),false);
-
+	
 	auto icopy = 0u;
 	
 	auto i = 0u;
 	while(i < te.length()){
-		while(i < te.length() && te.substr(i,1) != "%" && te.substr(i,1) != "{") i++;
+		while(i < te.length() && te.substr(i,1) != "%" && te.substr(i,1) != "{" && !in_text(te,i,"Σ")) i++;
 		if(i < te.length()){
 			auto istore = i; 
 
 			string type = "";
-			if(te.substr(i,1) == "{"){  // Changes in a population
-				type = "pop";
-				i++;
-				auto ist = i;
-				while(i < te.length() && te.substr(i,1) != ":" &&  te.substr(i,1) != "}") i++;
-				if(i < te.length() && te.substr(i,1) == ":") i++;
-				else i = ist;
-			}
-			else{                               // Changes in a parameter
-				while(i < te.length() && te.substr(i,1) != "_" && te.substr(i,1) != "$") i++;
-		
-				if(i < te.length() && te.substr(i,1) == "_"){
-					type = "param";
+			if(in_text(te,i,"Σ")){  // Changes in a sum max
+				while(i < te.length() && te.substr(i,1) != "[" && te.substr(i,1) != "(") i++;
+				if(i < te.length() && te.substr(i,1) == "["){
+					type = "sum";
 					i++;
 				}
 			}
-
+			else{
+				if(te.substr(i,1) == "{"){  // Changes in a population
+					type = "pop";
+					i++;
+					auto ist = i;
+					while(i < te.length() && te.substr(i,1) != ":" &&  te.substr(i,1) != "}") i++;
+					if(i < te.length() && te.substr(i,1) == ":") i++;
+					else i = ist;
+				}
+				else{                               // Changes in a parameter
+					while(i < te.length() && te.substr(i,1) != "_" && te.substr(i,1) != "$") i++;
+			
+					if(i < te.length() && te.substr(i,1) == "_"){
+						type = "param";
+						i++;
+					}
+				}
+			}
+			
 			if(type != ""){
+				auto end = "$}[<(;"; if(type == "sum") end = ",";
+				
 				auto ist = i;
-				auto di = get_dep_info(te,i,"$}[<(;");
+				auto di = get_dep_info(te,i,end);
 
-				if(di.result == FAIL){
-					res.warn = "An error occured";
+				if(di.warn != ""){
+					res.warn = "An error occured: ";
 					if(type == "pop"){
-						res.warn = "Population '{"+te.substr(ist,di.iend-ist)+"}' has an error";
+						res.warn = "Population '{"+te.substr(ist,di.iend-ist)+"}' has an error: ";
 					}
 					if(type == "param"){
-						res.warn = "Parameter '"+te.substr(istore+1,i-istore-2)+"' has a misspecified dependency.";
+						res.warn = "Parameter '"+te.substr(istore+1,i-istore-2)+"' has a misspecified dependency: ";
 					}
+					if(type == "sum"){
+						res.warn = "Sum '"+te.substr(istore+1,i-istore-2)+"' has a misspecified dependency: ";
+					}
+					res.warn += di.warn;
 					return res;
 				}
 		
@@ -1903,7 +1934,7 @@ Prior convert_text_to_prior(string te, unsigned int line_num, string in, bool di
 			}
 			
 			if(cv != UNSET && check_thresh(LOGNORM_TE,CV_QU,cv,pri.error)) return pri; 			
-			if(mean != UNSET && check_thresh(LOGNORM_TE,MEAN_QU,mean,pri.error)); 		
+			if(mean != UNSET && check_thresh(LOGNORM_TE,MEAN_QU,mean,pri.error)) return pri; 		
 		}
 		break;
 		
@@ -2831,7 +2862,7 @@ vector< vector <string> > get_escape_char()
 	escape_char.push_back({"\\Pi","Π"});
 	escape_char.push_back({"\\rho","ρ"});
 	escape_char.push_back({"\\sigma","σ"});
-	escape_char.push_back({"\\Sigma","Σ"});
+	//escape_char.push_back({"\\Sigma","Σ"});
 	escape_char.push_back({"\\tau","τ"});
 	escape_char.push_back({"\\upsilon","υ"});
 	escape_char.push_back({"\\phi","φ"});
@@ -2936,6 +2967,25 @@ void percentage(double val, double val2)
 	if(!com_op && percent_done != LARGE){		
 		if(percent_done == UNSET) percent_done = 0;
 		
+		/*
+		// Draw progress bar like "Progress 0%...10%...20%..."
+		auto per = 100*val/val2;
+		while(percent_done <= per){
+			if(int(percent_done)%10 == 0){
+				cout << "" << percent_done << "%";
+				if(percent_done == 100){ 
+					percent_done = LARGE;
+					cout << endl; cout.flush(); 
+					return;
+				}
+			}
+			cout << "."; 
+			cout.flush();
+			percent_done += PERCENT_STEP;
+		}	
+		*/
+
+		// Write progress values line-by-line to work around mpi's broken flush
 		auto per = 100*val/val2;
 		while(percent_done <= per){
 			if(int(percent_done)%10 == 0){
@@ -2959,7 +3009,7 @@ void percentage(double val, double val2)
 			//cout << "."; 
 			cout.flush();
 			percent_done += PERCENT_STEP;
-		}			
+		}		
 	}
 	else{
 		auto per = (unsigned int)(100*val/val2);
@@ -3108,3 +3158,20 @@ string mem_print(double mem)
 	return ss.str();
 }
 
+
+/// Clips the exponential for individual effects (to ensure does go too large or small)
+double exp_clip(double val)
+{
+	if(val < CLIP_MIN) val = CLIP_MIN;
+	if(val > CLIP_MAX) val = CLIP_MAX;
+	
+	return exp(val);
+}
+
+
+/// Ensures the a value doesn't go below the threshold
+double clip(double val, double thresh)
+{
+	if(val < thresh) return thresh;
+	return val;
+}

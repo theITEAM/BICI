@@ -83,6 +83,7 @@ class State                                // Stores information about the state
 		void init_cor_matrix(); 
 	
 	private:
+		vector <double> calculate_df(const DerFunc &df) const;
 		string compact_vector(const vector <double> &value) const;
 		void spline_init();
 		void print_cpop(unsigned int ti) const;	
@@ -123,6 +124,7 @@ class State                                // Stores information about the state
 		void calculate_dif_rev(unsigned int n, int e_start, unsigned int num, vector <unsigned int> &dif, unsigned int &root) const;
 		void find_all_obs(unsigned int node, vector <unsigned int> &obs_list) const;
 		vector < vector <Poss> > calculate_pop_ind() const;
+		vector < vector < vector <Poss> > > calculate_pop_ind_total() const;
 		double likelihood_genetic_process(); 
 		double likelihood_genetic_obs(const vector < vector <unsigned int> > &gen_val);
 		void trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, unsigned int &ntr);

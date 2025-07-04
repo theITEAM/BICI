@@ -641,7 +641,7 @@ function draw_data_table(lay,x,y,tab,op)
 	let x_start = x;
 	let si_num = 0.8;
 	let fo_num = get_font(si_num);
-	let wnum = text_width(String(tab.nrow-1),fo_num);
+	let wnum = text_width(String(tab.nrow),fo_num);
 	x += wnum+0.6;
 	
 	let wmin = 0;
@@ -907,7 +907,6 @@ function done_replace()
 				num++;
 			}
 		}
-		
 		inter.bubble.num = num;
 		change_bubble_mode("ReplaceResult");
 	}

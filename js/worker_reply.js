@@ -306,7 +306,7 @@ worker.onmessage = function (e)
 				generate_screen();
 				break;
 				
-			case "A matrix": 
+			case "A matrix": case "Ainv matrix": 
 				model.species = ans.species;
 				close_help();
 				generate_screen();

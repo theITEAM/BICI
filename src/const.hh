@@ -3,18 +3,28 @@
 #pragma once
 
 #include <string>
+#include <cmath>
 
 using namespace std;
 
 // This is set if compilation is done on windows
-//#define WINDOWS
-#define LINUX
-//#define MAC
+#ifdef _WIN64
+  #define WINDOWS
+#elif __linux
+  #define LINUX
+#elif __APPLE__
+  #define MAC
+#else
+#   error "Unknown compiler"
+#endif
 
-//const string default_file = "/tmp/init.bici";   // This is used for Mac
-const string default_file = "Execute/init.bici"; // This is used for windows / linux
+#ifdef MAC
+const string default_file = "/tmp/init.bici";        // This is used for Mac
+#else
+const string default_file = "Execute/init.bici";     // This is used for windows / linux
+#endif
 
-#define USE_MPI                                      // Sets if code can run in parallel
+#define USE_MPI                                    // Sets if code can run in parallel
 
 const bool testing = true;                           // Set to true for additional testing
 const bool slow_check = false;                       // Additional checks which are slow
@@ -199,7 +209,7 @@ enum BpType { BP_UNSET, BP_SET, BP_DERIVED };
 enum Direction { FORWARD, FORWARD_SQ, BACKWARD_SQ };
  
 // Different ways to restore state after an individual change
-enum BackType { REMOVE_LI_MARKOV, ADD_LI_MARKOV, POP_DATA_NUM, LI_OBS_POP, POP_DATA_CGL, POP_TRANS_DATA_NUM, LI_OBS_POP_TRANS, LI_OBS_IND, TI_INDFAC, DLI_INDFAC, DIF_INDFAC, LI_MARKOV, OBS_TRANS_EQN_NUM, VALUE_MARKOV };
+enum BackType { REMOVE_LI_MARKOV, ADD_LI_MARKOV, POP_DATA_NUM, LI_OBS_POP, POP_DATA_CGL, POP_TRANS_DATA_NUM, LI_OBS_POP_TRANS, LI_OBS_IND, TI_INDFAC, DLI_INDFAC, DIF_INDFAC, LI_MARKOV, OBS_TRANS_EQN_NUM, VALUE_MARKOV, IND_COND_VAL };
 
 // Different ways restore population after an individual change
 enum BackPopType { POP_NUM_T };
@@ -249,12 +259,19 @@ enum DistQuant { SD_QU, CV_QU, MEAN_QU, NORM_MEAN_QU, SHAPE_QU, SCALE_QU, ALPHA_
 // Different percentage measures
 enum PercentType { LOAD_PER, INIT_PER, RUN_PER, RUN_GEN_PER, ANNEAL_PER, OUTPUT_PER};
 
+// Different types of derived function
+enum DerFuncType { RN, RNE, RNC, GT, GTE, GTC, DF_UNSET};
+ 
 /************************** Numeric constants ******************************/
 
 const auto ERR_MSG_MAX = 5u;                     // The maximum number of error messages
 
 const auto CODE = 99999989u;                      // Value above which is a non-numeric number
 const auto UNSET = 99999990u;                     // Indicates an unset number
+const auto USINT_MAX = 4294967295u;               // Largest number of unsigned int
+const auto UNSET_LIST = USINT_MAX-1;              // Used in operator lists 
+const auto CUT_LIST = USINT_MAX-2;                // Used to represent cut out of list
+const auto OP_MAX = USINT_MAX-10;                 // Maximum number of operators
 const auto UNSET_WILD = 99999980.0;               // Indicates an unset wildcard "*"
 const auto UNSET_F = 99999990.0;                  // Floating point unset
 const auto TIME_VAR = 99999991u;                  // Indicates time variable t (used in eqnations)
@@ -305,6 +322,8 @@ const double VTINY = 0.00000000000001;            // Used to represent a tiny nu
 const double NEAR_DIV_THRESH = 0.00000001;        // Threshold for near a div
 const double EFFECT_MAX = 10000000;               // Sets maximum value for effect
 const double EFFECT_MIN = 0.0000001;              // Sets minimum value for effect
+const double CLIP_MIN = 0.99*log(EFFECT_MIN);     // Clips minimum 
+const double CLIP_MAX = 0.99*log(EFFECT_MAX);     // Clips maximum 
 const double DIF_THRESH = 0.00001;                // The threshold for a difference
 const double DIF_THRESH_BURNIN = 0.1;             // The threshold during burnin
 const unsigned int RANGE_MIN = 50;                // Minimum number to calc M
@@ -362,6 +381,7 @@ const auto ALG_DEFAULT = DA_MCMC;                 // Default inference algorithm
 const unsigned int SEED_DEFAULT = 0;              // The default seed
 const double ANNEAL_POWER_DEFAULT = 4;            // Default annealing power
 const double ANNEAL_RATE_DEFAULT = 0.01;          // Rate at which annealing is done
+const unsigned int TI_DIV_MAX = 10000;            // Maximum number of time divisions
 
 const unsigned int PARAM_OUTPUT_MAX_DEFAULT = 1000;// The default maximum number of tensor elements to be output
 const auto INDMAX_DEFAULT = 20000u;               // The default maximum number of individuals
@@ -407,6 +427,12 @@ const string fe_char = "μ";                       // Character used for fixed e
 const auto name_ch_max = 40;                      // Maximum number of characters allowed
 const string endli = "\n";
 const string dist_matrix_name = "D";              // The name of a distance matrix
+const string RN_name = "RN";                      // The name of rep. number function
+const string RNE_name = "RNE";                    // The effective rep number function
+const string RNC_name = "RNC";                    // The computational rep number function
+const string GT_name = "GT";                      // The basic generation time
+const string GTE_name = "GTE";                    // The effective generation time function
+const string GTC_name = "GTC";                    // The computational generation time function
 
 // Checking for Σ and ∫ is done differently in c++ because it uses two characters
 const string sigma = "Σ";  

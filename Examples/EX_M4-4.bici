@@ -29,7 +29,7 @@ class name="Presence" index="a"
 comp name="No" color="#009900" x=-15 y=0
 comp name="Yes" color="#ff2222" x=14 y=0
 
-trans name="No->Yes" value="exp(rate:β×〈g〉×Σ^max:100_l' ({Yes,l'}/(1+pow(D_l,l'/r|3))))"
+trans name="No->Yes" value="exp(rate:β×〈g〉×Σ_l'[l,100] ({Yes,l'}/(1+pow(D_l,l'/r|3))))"
 
 class name="Location" index="l" coord="latlng"
 

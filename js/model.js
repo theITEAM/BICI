@@ -41,6 +41,7 @@ class Model
 		this.param = [];
 		this.param_factor = [];
 		this.derive = [];   
+		this.run_warning = [];
 		
 		this.sim_details = { t_start:"", t_end:"", timestep:"", indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, algorithm:{value:"gillespie"}, number:SIM_NUM_DEFAULT, run_local:{value:"Yes"}, seed_on:{value:"No"}, seed:SEED_DEFAULT };    
 		
@@ -2949,10 +2950,20 @@ class Model
 		
 		if(exa_store) model.example = exa_store;
 		
-		let wa = mod.warning;
-		if(wa && wa.show == false){
-			alert_help("Run time warning",wa.te);
-			wa.show = true;
+		let wa = mod.run_warning;
+		if(wa.length > 0 && mod.run_warning_show == false){
+			if(wa.length == 1){
+				alert_help("Run time warning",wa[0]);
+			}
+			else{
+				let te="";
+				for(let i = 0; i < wa.length; i++){
+					te += "• "+wa[i]+endl;
+				}
+				alert_help("Run time warnings",te);
+			}
+		
+			mod.run_warning_show = true;
 		}
 	}
 	

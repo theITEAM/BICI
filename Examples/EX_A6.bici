@@ -11,7 +11,7 @@ description text="description.txt"
 
 ######################### DETAILS ##########################
 
-simulation start=0 end=200 timestep=0.5
+simulation start=0 end=100 number=100 timestep=0.5
 
 inference start=0 end=100 timestep=0.5 nchain=3
 
@@ -29,26 +29,19 @@ class name="DS" index="a"
 comp name="S" color="#009900" x=-10 y=0
 comp name="I" color="#ff2222" x=10 y=0
 
-trans name="S->I" value="exp(rate:β×{I,b})"
-
-class name="Tank" index="b"
-
-comp name="T1" color="#974500" x=-10 y=0
-comp name="T2" color="#888888" x=10 y=0
+trans name="S->I" value="exp(rate:β×{I})"
 
 # SIMULATION INITIAL CONDITIONS
 
+init-pop-sim type="dist" prior="fix(1000)" file="init-pop-sim-People.csv"
+
 add-ind-sim file="add-ind-sim.csv"
-
-move-ind-sim class="Tank" file="move-ind-sim.csv"
-
-remove-ind-sim file="remove-ind-sim.csv"
 
 
 
 ######################## PARAMETERS ########################
 
-param name="β" value="0.001" prior="uniform(0,0.01)"
+param name="β" value="0.0001" prior="uniform(0,0.001)"
 
 
 

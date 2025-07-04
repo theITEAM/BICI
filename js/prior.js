@@ -233,7 +233,7 @@ function convert_text_to_prior(te,pri_pos,dist)
 	if(spl[1].length == 0) return err(start+"there is a syntax error");
 	if(spl[1].substr(spl[1].length-1,1) != ")") return err(start+"there is a syntax error");
 	
-	let type = spl[0].toLowerCase();
+	let type = spl[0].trim().toLowerCase();
 	if(type == "dir") type = "dirichlet";
 	if(type == "bern") type = "bernoulli";
 	

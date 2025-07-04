@@ -111,13 +111,15 @@ function add_examples_buts(lay)
 	
 	let gap = 0.3;
 	
-	ex_mod.push({te:"A) Simulation features",help:"These examples look at various simulation features."+mod_mess, gap:gap});
+	ex_mod.push({te:"A) Simulation features and initial conditions",help:"These examples look at various simulation features and ways to implement initial conditions."+mod_mess, gap:gap});
 	ex_mod.push({te:"A1: Multiple simulations", mod:"M1.1", link:true, mod_type:"POP"});
-	ex_mod.push({te:"A2: Uncertain initial conditions — single classification", mod:"M1.1", link:true, mod_type:"POP"});
-	ex_mod.push({te:"A3: Uncertain initial conditions — multiple classifications — focal selected", mod:"M2.6", link:true, mod_type:"POP"});
-	ex_mod.push({te:"A4: Uncertain initial conditions — multiple classifications — total population selected", mod:"M2.6",link:true, mod_type:"POP"});
-	ex_mod.push({te:"A5: Add / remove individuals from PBM", mod:"M2.6", link:true, mod_type:"POP"});
-	ex_mod.push({te:"A6: Add / move / remove individuals from IBM",link:true, mod_type:"IBM"});
+	ex_mod.push({te:"A2: Uncertain initial conditions for PBM — single classification", mod:"M1.1", link:true, mod_type:"POP"});
+	ex_mod.push({te:"A3: Uncertain initial conditions for PBM — multiple classifications — focal selected", mod:"M2.6", link:true, mod_type:"POP"});
+	ex_mod.push({te:"A4: Uncertain initial conditions for PBM — multiple classifications — total population selected", mod:"M2.6",link:true, mod_type:"POP"});
+	ex_mod.push({te:"A5: Uncertain initial conditions for IBM using individual state", mod:"M1.2",link:true, mod_type:"IBM"});
+	ex_mod.push({te:"A6: Uncertain initial conditions for IBM using population distribution", mod:"M1.2",link:true, mod_type:"IBM"});
+	ex_mod.push({te:"A7: Add / remove individuals from PBM", mod:"M2.6", link:true, mod_type:"POP"});
+	ex_mod.push({te:"A8: Add / move / remove individuals from IBM",link:true, mod_type:"IBM"});
 	
 	
 	ex_mod.push({te:"B) Population-level data types",help:"These examples look at different types of population data."+mod_mess, gap:gap});

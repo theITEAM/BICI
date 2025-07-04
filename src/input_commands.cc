@@ -1227,6 +1227,15 @@ void Input::param_command()
 		alert_import("The distance matrix '"+par.full_name+"' must not be set");
 	}
 	
+	auto name = par.name;
+	if(name == RN_name || name == RNE_name || name == RNC_name){
+		alert_import("The reproduction function '"+name+"' must not be set");
+	}
+	
+	if(name == GT_name || name == GTE_name || name == GTC_name){
+		alert_import("The generation time '"+name+"' must not be set");
+	}
+	
 	auto pre = "Parameter '"+par.full_name+"': ";
 	
 	if(value == "auto") emsg("auto no longer supported");
@@ -1482,54 +1491,70 @@ void Input::derived_command()
 	der.line_num = line_num;
 	der.full_name = full_name;
 	der.time_dep = pp.time_dep;
+	der.func.on = false;
+	
+	auto te = trim(eqn_name);
 
-	auto mult = get_dependency(der.dep,pp,vector <string> ()); if(mult == UNSET) return; 
+	auto df_type = DF_UNSET;
+	if(begin_str(te,RN_name+"(")) df_type = RN;
+	if(begin_str(te,RNE_name+"(")) df_type = RNE;
+	if(begin_str(te,RNC_name+"(")) df_type = RNC;
+	if(begin_str(te,GT_name+"(")) df_type = GT;
+	if(begin_str(te,GTE_name+"(")) df_type = GTE;
+	if(begin_str(te,GTC_name+"(")) df_type = GTC;
 	
-	const auto &depend = der.dep;
-	
-	auto der_eqn_raw = he(add_equation_info(eqn_name,DERIVE_EQN));
-	
-	vector <DepConv> dep_conv;
-	for(auto d = 0u; d < depend.size(); d++){
-		const auto &dep = depend[d];
-		DepConv dc; 
-		dc.before = dep.index_with_prime;
-		dep_conv.push_back(dc);
+	if(df_type != DF_UNSET){
+		setup_der_func(df_type,eqn_name,der.func);
 	}
-	
-	auto swap_temp = swap_template(der_eqn_raw.te,dep_conv);
-	if(swap_temp.warn != ""){ 
-		alert_import(swap_temp.warn); 
-		return;
-	}
-	
-	for(auto i = 0u; i < mult; i++){
+	else{			
+		auto mult = get_dependency(der.dep,pp,vector <string> ()); if(mult == UNSET) return; 
+		
+		const auto &depend = der.dep;
+		
+		auto der_eqn_raw = he(add_equation_info(eqn_name,DERIVE_EQN));
+		
+		vector <DepConv> dep_conv;
 		for(auto d = 0u; d < depend.size(); d++){
 			const auto &dep = depend[d];
-			dep_conv[d].after = dep.list[(i/dep.mult)%dep.list.size()];
+			DepConv dc; 
+			dc.before = dep.index_with_prime;
+			dep_conv.push_back(dc);
 		}
 		
-		auto der_eqn = der_eqn_raw;
+		auto swap_temp = swap_template(der_eqn_raw.te,dep_conv);
+		if(swap_temp.warn != ""){ 
+			alert_import(swap_temp.warn); 
+			return;
+		}
 		
-		der_eqn.te = swap_index_temp(dep_conv,swap_temp);
-		
-		if(check_swap){
-			auto te_ch = der_eqn_raw.te;
-			auto res = swap_index(te_ch,dep_conv);
-			if(res.warn != ""){ 
-				alert_import(res.warn); 
-				return;
+		for(auto i = 0u; i < mult; i++){
+			for(auto d = 0u; d < depend.size(); d++){
+				const auto &dep = depend[d];
+				dep_conv[d].after = dep.list[(i/dep.mult)%dep.list.size()];
 			}
 			
-			if(te_ch != der_eqn.te){
-				cout << der_eqn.te << " " << te_ch << " compare" << endl; 
-				emsg_input("Swap index dif res");
+			auto der_eqn = der_eqn_raw;
+			
+			der_eqn.te = swap_index_temp(dep_conv,swap_temp);
+			
+			if(check_swap){
+				auto te_ch = der_eqn_raw.te;
+				auto res = swap_index(te_ch,dep_conv);
+				if(res.warn != ""){ 
+					alert_import(res.warn); 
+					return;
+				}
+				
+				if(te_ch != der_eqn.te){
+					cout << der_eqn.te << " " << te_ch << " compare" << endl; 
+					emsg_input("Swap index dif res");
+				}
 			}
-		}
-		
-		der.eq.push_back(der_eqn);
-	}	
-						
+			
+			der.eq.push_back(der_eqn);
+		}	
+	}
+									
 	model.derive.push_back(der);
 }
 
@@ -1797,6 +1822,8 @@ void Input::inference_command()
 			}
 		}
 	}
+	
+	check_dt(details);
 }
 
 
@@ -1859,6 +1886,8 @@ void Input::post_sim_command()
 	
 	details.ppc_resample = get_tag_value("resample");
 	details.diagnostics_on = false;
+	
+	check_dt(details);
 }
 
 
@@ -1932,6 +1961,7 @@ void Input::ind_effect_command()
 	
 	auto A = get_tag_value("A"); 
 	auto A_sparse = get_tag_value("A-sparse"); 
+	auto A_inv = get_tag_value("Ainv"); 
 	auto pedigree = get_tag_value("pedigree");
 	
 	auto num = 0u;

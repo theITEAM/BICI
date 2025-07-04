@@ -82,15 +82,22 @@ function extract_equation_properties(eqn)
 			
 			if(lin2.substr(i,1) == "|" && two_variable_flag == true) i++;
 			
+			i = der_func_check(i,lin2,RN_name,eqn);
+			i = der_func_check(i,lin2,RNE_name,eqn);
+			i = der_func_check(i,lin2,RNC_name,eqn);
+			i = der_func_check(i,lin2,GT_name,eqn);
+			i = der_func_check(i,lin2,GTE_name,eqn);
+			i = der_func_check(i,lin2,GTC_name,eqn);
+			
 			if(is_sigma(lin2,i)){
 				let ist = i;
-				i = param_end(lin2,i+1,"("); 
+				while(i < lin2.length && lin2.substr(i,1) != "(") i++;
 			
-				if(typeof i == 'string'){
-					eqn.warn.push({te:i.replace("parameter","sum"), cur:icur2+ist, len:1});
+				if(i == lin2.length){
+					eqn.warn.push({te:"There should be a left bracket '(' after the sum.", cur:icur2+i, len:1});
 					return;
 				}
-			
+		
 				let tex = lin2.substr(ist,i-ist);
 				check_sum(tex,icur2+ist,lin2,i,eqn);
 			}
@@ -206,6 +213,95 @@ function extract_equation_properties(eqn)
 }
 
 
+/// Checks for derived function
+function der_func_check(i,lin2,name,eqn)
+{
+	let RTt = name+"(";
+	let ist = i;
+	if(i < lin2.length-RTt.length && lin2.substr(i,RTt.length) == RTt){
+		let before = lin2.substr(0,i).trim();
+		if(before != ""){
+			eqn.warn.push({te:"The function '"+name+"' must be on its own line. Unexpected '"+before+"' at the beginning of the line.", cur:0, len:i});
+		}
+		
+		i += RTt.length;
+		let ibra = i;
+		while(i < lin2.length && lin2.substr(i,1) != ")") i++;
+		if(i == lin2.length){
+			eqn.warn.push({te:"There should be a right bracket ')' after '"+name+"('.", cur:ist, len:name.length});
+			return;
+		}
+		
+		let after = lin2.substr(i+1).trim();
+		if(after != ""){
+			eqn.warn.push({te:"Unexpected '"+after+"' at end of line.", cur:i+1, len:lin2.length-i-1});
+		}
+		
+		let dep=[]; dep.push("t");
+		add_eqn_dep(eqn,dep,ist);
+		
+		if(eqn.type != "derive_eqn"){
+			eqn.warn.push({te:"'"+name+"' can only be used for a derived expression.", cur:ist, len:name.length});
+		}
+		
+		if(model.species.length > 1){
+			eqn.warn.push({te:"'"+name+"' can only be used for a model with a single species.", cur:ist, len:name.length});
+		}
+		
+		let cont = lin2.substr(ibra,i-ibra);
+
+		// Check that compartments exist
+		let spl = cont.split(",");
+		
+		let sp = model.species[0];
+		
+		if(name == "RNC" || name == "GTC"){
+			if(sp.type == "Population"){
+				eqn.warn.push({te:"'"+name+"' can only be used for an individual-based model.", cur:ist, len:name.length});
+			}
+		}
+		
+		// Checks compartments exist
+		let cl_sel;
+		for(let k = 0; k < spl.length; k++){
+			let na = spl[k].trim();
+	
+			if(na == ""){
+				eqn.warn.push({te:"There is a missing compartment name.", cur:ibra, len:i-ibra});
+			}
+			
+			let fl = false;
+			for(let cl = 0; cl < sp.cla.length; cl++){
+				let claa = sp.cla[cl];
+				for(let c = 0; c < claa.comp.length; c++){
+					if(claa.comp[c].name == na){
+						if(cl_sel != undefined && cl_sel != cl){
+							eqn.warn.push({te:"Not all the compartments are from the same classification.", cur:ibra, len:i-ibra});
+						}
+						
+						let tr = 0; while(tr < claa.ntra && claa.tra[tr].i != c) tr++;
+						if(tr == claa.ntra){
+							eqn.warn.push({te:"'"+name+"' cannot be calculated because no transition leaving compartment '"+na+"'.", cur:ibra, len:i-ibra});
+						}
+					
+						cl_sel = cl;
+						fl = true;
+						break;
+					}
+				}
+				if(fl == true) break;
+			}
+			
+			if(fl == false){
+				eqn.warn.push({te:"Could not find compartment '"+na+"'.", cur:ibra, len:i-ibra});
+			}
+		}
+	}			
+	
+	return i;
+}
+			
+
 /// Checks that sums are encaptulated by brackets
 function check_sum_bracket(eqn)
 {
@@ -221,11 +317,8 @@ function check_sum_bracket(eqn)
 			let i_st = i;
 			i += 1;
 			if(lin.substr(i,1) == "^"){
-				while(i < lin.length && lin.substr(i,1) != "_") i++;
-				if(i == lin.length){
-					eqn.warn.push({te:"The sum should contain a dependency '_'", cur:i_st, len:1}); 
-					return;
-				}
+				eqn.warn.push({te:"The sum should not contain a superscript '^'", cur:i_st, len:1}); 
+				return;
 			}
 			
 			if(lin.substr(i,1) != "_"){
@@ -234,17 +327,33 @@ function check_sum_bracket(eqn)
 			else{
 				i++;
 				let ist = i;
-				while(i < lin.length && lin.substr(i,1) != " " && lin.substr(i,1) != "(") i++;
-				while(i < lin.length && lin.substr(i,1) == " ") i++;
+				while(i < lin.length && lin.substr(i,1) != "(") i++;
+				//while(i < lin.length && lin.substr(i,1) != " " && lin.substr(i,1) != "(") i++;
+				//while(i < lin.length && lin.substr(i,1) == " ") i++;
 				
 				if(i == lin.length || lin.substr(i,1) != "("){
 					eqn.warn.push({te:"Content in sums must be surrounded by round brackets (...)", cur:i, len:1}); 
 				}
 				
+				let ik = ist;
+				while(ik < i && lin.substr(ik,1) != "[") ik++;
+			
 				// Checks to see if primed indexes appear in brackets
-				let dep = lin.substr(ist,i-ist).split(",");
-				for(let k = 0; k < dep.length; k++){
-					dep[k] = dep[k].trim();
+				let dep;
+				if(ik < i){  // The sum is distance limited
+					dep = lin.substr(ist,ik-ist).split(",");
+					for(let k = 0; k < dep.length; k++){
+						dep[k] = dep[k].trim();
+					}
+					if(dep.length > 1){
+						eqn.warn.push({te:"Only one index can be used if the sum is being distance limited", cur:ist, len:i-ist}); 
+					}
+				}
+				else{	       // The sum is not distance					
+					dep = lin.substr(ist,i-ist).split(",");
+					for(let k = 0; k < dep.length; k++){
+						dep[k] = dep[k].trim();
+					}
 				}
 				
 				i++;
@@ -263,11 +372,13 @@ function check_sum_bracket(eqn)
 				
 				let inside = lin.substr(ibeg,i-ibeg);
 			
+				/*
 				for(let k = 0; k < dep.length; k++){
 					if(!inside.includes(dep[k])){
 						eqn.warn.push({te:"The sum does not include the index '"+dep[k]+"'", cur:ibeg-1, len:i-ibeg+2}); 
 					}
 				}
+				*/
 			}
 		}
 	}
@@ -314,12 +425,6 @@ function check_indexes_match(eqn)
 				}					
 				else used[k] = true;
 			}
-		}
-	}
-	
-	for(let i = 0; i < list.length; i++){
-		if(used[i] == false){
-			eqn.warn.push({te:"Index sum '"+list[i]+"' does not appear in either parameters or populations"});
 		}
 	}
 }
@@ -370,41 +475,27 @@ function check_sum(tex,icur,lin,i_bra,eqn)
 	let i = ch.length;
 	
 	if(tex.substr(i,1) == "^"){
-		i++;
-		let ist = i;
-		while(i < tex.length && tex.substr(i,1) != "_") i++;
-		if(i == tex.length){
-			eqn.warn.push({te:"The sum should contain a dependency '_'", cur:ist, len:1}); 
-			return;
-		}
-		
-		let sup = tex.substr(ist,i-ist);
-		
-		let fl = false;
-		if(sup.length < 4) fl = true;
-		else{
-			if(sup.substr(0,4) != "max:") fl = true;
-			let num = sup.substr(4);
-			if(num == "" || isNaN(num)){
-				eqn.warn.push({te:"Sum superscript number '"+num+"' not recognised.", cur:ist+6, len:sup.length-4}); 
-				return;
-			}
-		}
-		
-		if(fl == true){
-			eqn.warn.push({te:"Sum superscript '"+sup+"' not recognised.", cur:ist+2, len:sup.length}); 
-			return;
-		}
+		eqn.warn.push({te:"The sum '"+tex+"' cannot contain a superscript '^'", cur:i, len:1}); 
 	}
 			
 	if(tex.substr(i,1) != "_"){
-		eqn.warn.push({te:"The sum should be followed by '_'", cur:icur, len:i});
+		eqn.warn.push({te:"The sum '"+ch+"' should be followed by '_'", cur:icur, len:i});
 	}
 	i++;
 	
-	let dep_str = tex.substr(i);
+	let ik = i; while(ik < tex.length && tex.substr(ik,1) != "[") ik++;
+	
+	let dep_str, dist;
+	if(ik < tex.length){
+		dep_str = tex.substr(i,ik-i); 
+		dist = tex.substr(ik).trim();
+	}
+	else{
+		dep_str = tex.substr(i);
+	}
+	
 	if(dep_str == ""){
-		eqn.warn.push({te:"The sum must have a dependency", cur:icur+i-1, len:1});
+		eqn.warn.push({te:"The sum '"+tex+"' must have a dependency", cur:icur+i-1, len:1});
 	}
 	
 	let dep = dep_str.split(",");
@@ -412,6 +503,57 @@ function check_sum(tex,icur,lin,i_bra,eqn)
 		dep[k] = dep[k].trim();
 	}
 	
+	for(let d = 0; d < dep.length; d++){
+		for(let dd = d+1; dd < dep.length; dd++){
+			if(dep[d] == dep[dd]){
+				eqn.warn.push({te:"Cannot have repeated index '"+dep[d]+"'", cur:icur+i, len:dep_str.length});
+				return;
+			}
+		} 
+	}
+	
+	
+	if(dist != undefined){     // Checks that format of [l,30] is correct
+		if(dep.length != 1){
+			eqn.warn.push({te:"Because the sum '"+tex+"' is limited by distance, it can only have one index.", cur:icur+i, len:ik-i});
+			return;
+		}
+		
+		if(dist.substr(dist.length-1,1) != "]"){
+			eqn.warn.push({te:"The expression '"+dist+"' should have the format '[index,dist]'.", cur:icur+ik, len:tex.length-ik});
+			return;
+		}
+
+		let spl = dist.substr(1,dist.length-2).split(",");
+	
+		for(let j = 0; j < spl.length; j++) spl[j] = spl[j].trim();	
+
+		if(spl.length != 2){
+			eqn.warn.push({te:"The expression '"+dist+"' should have the format '[index,dist]'.", cur:icur+ik, len:tex.length-ik});
+			return;
+		}
+		
+		if(dep[0] == spl[0]){
+			eqn.warn.push({te:"In the sum '"+tex+"', the index and that inside the square brackets [...] cannot be the same.", cur:icur, len:tex.length});
+			return;
+		}
+		
+		if(remove_prime(dep[0]) != remove_prime(spl[0])){
+			eqn.warn.push({te:"In the sum '"+tex+"', the values '"+dep[0]+"' and '"+spl[0]+"' do not correspond to the same index.", cur:icur, len:tex.length});
+			return;
+		}
+		
+		if(isNaN(spl[1]) || Number(spl[1]) < 0){
+			eqn.warn.push({te:"In the sum '"+tex+"', the distance '"+spl[1]+"' must be a positive number.", cur:icur+ik, len:tex.length-ik});
+			return;
+		}
+		
+		// Adds dependency to list
+		let de=[]; de.push(spl[0]);	
+		add_eqn_dep(eqn,de,icur);
+	}
+	
+		
 	/// Works out where then end of the sum is
 	let k = end_bra(i_bra,lin);	
 	if(k == lin.length){
@@ -419,13 +561,22 @@ function check_sum(tex,icur,lin,i_bra,eqn)
 		return;
 	}
 	
+	// Checks that index is not on surrounding sum
+	for(let k = 0; k < eqn.sum.length; k++){
+		let su = eqn.sum[k];
+		if(su.start < i_bra && su.end > i_bra){
+			for(let d = 0; d < dep.length; d++){
+				if(find_in(su.dep,dep[d]) != undefined){
+					eqn.warn.push({te:"The index '"+dep[d]+"' is already being used in a surrounding sum. Perhaps a prime is required?", cur:icur+i, len:dep[d].length});
+				}
+			}
+		}
+	}
+	
 	eqn.sum.push({dep:dep, start:i_bra, end:k});
 		
 	for(let j = 0; j < dep.length; j++){
 		let de = dep[j];
-		if(!is_prime(de)){
-			eqn.warn.push({te:"The index '"+de+"' must have a prime if it is summed over", cur:icur+i, len:de.length});
-		}
 		
 		let de_raw = remove_prime(de);
 		let fl = false;
@@ -467,9 +618,13 @@ function check_tint(tex,icur,lin,i_bra,eqn)
 	let mi, ma;
 	
 	tex = tex.substr(i).trim();
-	if(tex.length < 2) warn = "'dt' should be after the integral.";
+
+	if(tex.length < 2) warn = "'dt' should be after the integral sign.";
 	else{
-		if(tex.substr(tex.length-2,2) != "dt") warn = "'dt' should be after the integral.";
+		if(tex.substr(tex.length-2,2) != "dt"){
+			if(tex.substr(tex.length-1,1) == "]") warn = "'dt' should be after the integral bounds '∫[min,max]dt'.";
+			else warn = "'dt' should be after the integral sign.";
+		}
 		else{
 			tex = tex.substr(0,tex.length-2).trim();
 			if(tex != ""){
@@ -827,7 +982,7 @@ function check_population(te,icur,eqn)
 						eqn.warn.push({te:start+"Individual effect '[]' must contain text", cur:icur2+jst, len:j-jst+1});
 					}
 					
-					check_ie(ie,p_name,icur2+jst+1,eqn);
+					check_ie(ie,p_name,icur2+jst+1,eqn,true);
 					te = te.substr(0,jst)+te.substr(j+1);
 				}
 			}
@@ -849,7 +1004,7 @@ function check_population(te,icur,eqn)
 					}
 					else{
 						let fe = te.substr(jst+1,j-(jst+1));
-						check_fe(fe,p_name,icur2+jst+1,eqn);
+						check_fe(fe,p_name,icur2+jst+1,eqn,true);
 						te = te.substr(0,jst)+te.substr(j+1);
 						j = jst;
 					}
@@ -970,12 +1125,16 @@ function check_population(te,icur,eqn)
 
 
 /// Checks that individual effect is correctly defined			
-function check_ie(te,p_name_filter,icur,eqn) 
+function check_ie(te,p_name_filter,icur,eqn,in_pop) 
 {
 	if(te == ""){
 		eqn.warn.push({te:"Individual effect '[]' must contain text"});
 	}
 	
+	if(eqn.type == "derive_eqn" && in_pop != true){
+		eqn.warn.push({te:"Derived equations cannot contain individual effects (except in populations)"});
+	}
+		
 	check_valid_name(te,icur,eqn,"individual effect");
 	
 	let i = find(eqn.ind_eff,"name",te);
@@ -1015,12 +1174,16 @@ function eqn_source(eqn)
 
 	
 /// Checks that individual effect is correctly defined			
-function check_fe(te,p_name_filter,icur,eqn) 
+function check_fe(te,p_name_filter,icur,eqn,in_pop) 
 {
 	check_valid_name(te,icur,eqn,"fixed effect");
 	
 	if(te == ""){
 		eqn.warn.push({te:"Fixed effect '〈〉' must contain text"});
+	}
+	
+	if(eqn.type == "derive_eqn" && in_pop != true){
+		eqn.warn.push({te:"Derived equations cannot contain fixed effects (except in populations)"});
 	}
 		
 	let i = find(eqn.fix_eff,"name",te);

@@ -974,48 +974,6 @@ void State::find_all_obs(unsigned int node, vector <unsigned int> &obs_list) con
 }	
 
 
-/// Calculates the individuals which are associated with a population
-vector < vector <Poss> > State::calculate_pop_ind() const 
-{
-	vector < vector <Poss> > pop_ind;
-	
-	auto p = 0u; while(p < nspecies && model.species[p].trans_tree == false) p++;
-	if(p == nspecies) return pop_ind;
-	
-	pop_ind.resize(model.pop.size());
-	
-	for(auto p = 0u; p < nspecies; p++){
-		const auto &ssp = species[p];
-		if(ssp.type == INDIVIDUAL){
-			const auto &sp = model.species[p];
-			for(auto i = 0u; i < ssp.individual.size(); i++){
-				const auto &ind = ssp.individual[i];
-				
-				auto c = ssp.ind_sim_c[i];
-				if(c != UNSET){
-					for(const auto &pr : sp.comp_gl[c].pop_ref){
-						const auto &po = model.pop[pr.po];	
-						if(po.term[pr.index].c != c) emsg("Problem");
-					
-						auto num = 1.0; 
-						if(po.ind_variation){
-							for(auto ie : po.ind_eff_mult) num *= ind.exp_ie[ie];
-							for(auto fe : po.fix_eff_mult) num *= ind.exp_fe[fe];
-						}
-				
-						Poss poss; poss.i = i; poss.weight = po.term[pr.index].w*num;
-						
-						pop_ind[pr.po].push_back(poss);
-					}
-				}
-			}
-		}
-	}
-	
-	return pop_ind;
-}
-
-
 /// Calculate the genetic process likelihood
 double State::likelihood_genetic_process()
 {

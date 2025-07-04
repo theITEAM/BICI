@@ -33,6 +33,8 @@ let xi_sq =	calc_xi_sq();
 
 let model;                                        // Stores the model
 
+let model_store;                                  // Stores model in case loading fails
+
 let sim_result = {siminf:"sim"};                  // Stores results from simulation
 let inf_result = {siminf:"inf"};                  // Stores results from inference
 let ppc_result = {siminf:"ppc"};                  // Stores results from ppc
@@ -66,7 +68,7 @@ onmessage = function(e)
 		try {
 			process(e);
 		}catch(e){
-			//error(e); 
+			restore_model();
 			post(e);
 		}
 	}
@@ -92,6 +94,8 @@ function process(e)
 	let info = input.info;
 
 	let update_mod = false;
+
+	model_store = undefined;
 
 	if(model && input.model){
 		copy_strip(input.model,model);
@@ -363,6 +367,7 @@ function process(e)
 	case "Edit A matrix":
 		{
 			let ieg = model.species[info.p].ind_eff_group[info.i];	
+			
 			let ind_list = ieg.A_matrix.ind_list;
 			let A_value = ieg.A_matrix.A_value;
 			
@@ -379,6 +384,7 @@ function process(e)
 					}
 				}
 				
+				info.type = ieg.A_matrix.type;
 				info.A_value = A_value_shrink;
 				info.ind_list = ind_list_shrink;
 				info.too_big = true;

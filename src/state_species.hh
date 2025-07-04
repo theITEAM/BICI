@@ -84,6 +84,7 @@ class StateSpecies                         // Stores information about the state
 		StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const	vector <double> &timepoint, const	vector <double> &dtimepoint,  const vector <unsigned int> &pop_affect, Operation mode, const double &dif_thresh);
 	
 		void simulate_init();
+		unsigned int get_cinit_to_use(vector <unsigned int> &cinit_to_use) const;
 		void simulate_individual_init();
 		void add_ind_source(unsigned int i, const vector <SourceSamp> &source_samp);
 		TRange source_time_range(const IndData &ind) const;
@@ -102,6 +103,7 @@ class StateSpecies                         // Stores information about the state
 		unsigned int move_event(vector <Event> &ev, unsigned int index, double t_new) const;
 		void make_consistent(vector <Event> &event) const;
 		void set_cpop_st();
+		vector < vector <double> > ibm_cpop_st() const;
 		double get_trans_obs_prob(unsigned int trg, const ObsData &ob) const;
 		void compare_covar(string te, const vector < vector <double> > &omega, unsigned int g) const;
 		ListMove get_ev_link_listmove(unsigned int e, const vector <Event> &event, const Individual &ind, const vector < vector <double> > &popnum_t) const;
@@ -109,6 +111,7 @@ class StateSpecies                         // Stores information about the state
 		bool ev_link(const Event &ev, const Individual &ind, const vector < vector <double> > &popnum_t) const;
 		bool source_ind(unsigned int i) const;
 		unsigned int source_num(unsigned int min, unsigned int max) const;
+		vector < vector <InfPeriod> > get_inf_period(const vector <unsigned int> &ref) const;
 		
 		unsigned int get_ti(double t) const;
 		double get_indfac(const Individual &ind, const  MarkovEqn &mar_eqn) const;
@@ -131,6 +134,7 @@ class StateSpecies                         // Stores information about the state
 		double calculate_tnum_mean(unsigned int ti, unsigned int tr, const vector <double> &popnum, const vector <double> &cpop, const vector <double> &param_val, double dt) const;
 		vector <double> sample_trans_num(const vector <double> &tnum_mean, bool stochastic) const;
 		void update_cpop(unsigned int ti, vector <double> &cpop, const vector <double> &tnum) const;
+		bool enter_flat_dist(const IndData &ind) const;
 		unsigned int ind_sample_init_c(const IndData &ind) const;
 		
 	// In 'state_species_ind.cc'
@@ -296,6 +300,7 @@ class StateSpecies                         // Stores information about the state
 		void incomp_turn_off(IncompNMTransRef &inm);
 		
 		void likelihood_init_cond_change(unsigned int c_enter_old, unsigned int c_enter_new, Like &like_ch);
+		void init_cond_change_back(unsigned int c_enter_old, unsigned int c_enter_new);
 		void recalc_markov_value(unsigned int ee, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popnum_t, const vector <PopChange> &pop_change, double &like_ch);
 		void restore_back();
 		

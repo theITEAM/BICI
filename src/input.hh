@@ -130,6 +130,7 @@ class Input                                // Stores information about the model
 		bool is_zeroone(string num, string tag);
 		void map_ind_effect();
 		void check_param_used();
+		void calc_conv_param_vec(vector <Calculation> &calcu, const vector <ParamRef> &param_ref);
 		void create_param_vector();
 		void create_pop_ref();
 		void further_simplify_equations(unsigned int per_start, unsigned int per_end);
@@ -239,6 +240,8 @@ class Input                                // Stores information about the model
 		void set_param_parent_child();
 		void set_param_use();
 		void set_omega_fl();
+		void setup_der_func(DerFuncType df_type, string te, DerFunc &df);
+		void setup_der_func_eqn();
 	
 		// In 'input_utils.cc'
 		unsigned int find_p(string name) const;

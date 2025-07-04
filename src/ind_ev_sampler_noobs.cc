@@ -82,7 +82,7 @@ unsigned int IndEvSampler::init_comp_sampler(unsigned int i, double &probif) con
 		const auto &ent_cl = ent.cla[cl];
 		if(ent_cl.c_set != UNSET) c_after += sp.comp_mult[cl]*ent_cl.c_set;
 		else{
-			auto sum = 0u; 
+			auto sum = 0.0; 
 			vector <double> prob, prob_sum;
 			const auto &claa = sp.cla[cl];
 			const auto &oer = ent_cl.obs_eqn_ref;
@@ -121,7 +121,7 @@ double IndEvSampler::init_comp_sampler_prob(unsigned int c_after, unsigned int i
 	for(auto cl = 0u; cl < sp.ncla; cl++){
 		const auto &ent_cl = ent.cla[cl];
 		if(ent_cl.c_set == UNSET){
-			auto sum = 0u; 
+			auto sum = 0.0; 
 			const auto &claa = sp.cla[cl];
 			const auto &oer = ent_cl.obs_eqn_ref;
 			auto C = claa.ncomp;

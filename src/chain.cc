@@ -70,7 +70,7 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 	
 		print_diag("Checked");
 		
-		auto pl = false; //if(loop == 1) pl = true;
+		auto pl = false;
 		state.resample_ind(pl);    // Resamples individual such that fixed events become correct
 
 		state.check("Resample check");
@@ -954,7 +954,7 @@ string Chain::diagnostics(unsigned int total_time, unsigned int anneal_time) con
 			ss << "Transmission tree - " << cpu_percent(sum_tree_prop,total_time) << endl;
 		}
 		
-		auto other = total_time-sum_prop;
+		auto other = double(total_time)-double(sum_prop);
 		ss << "Non-proposal - " << cpu_percent(other,total_time);
 		ss << " (samplers: " << cpu_percent(state.timer[UPDATE_SAMPLER_TIMER],total_time);
     ss << ", o/p params: " << cpu_percent(output.timer[PARAM_OUTPUT],total_time);
@@ -964,7 +964,7 @@ string Chain::diagnostics(unsigned int total_time, unsigned int anneal_time) con
 		
 		if(anneal_time != UNSET){
 			ss << "Annealing percentage - " 
-				<< cpu_percent(anneal_time,(anneal_time+total_time)) << endl << endl;
+				<< cpu_percent(anneal_time,total_time) << endl << endl;
 		}
 
 	  ss << endl;

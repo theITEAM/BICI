@@ -18,6 +18,19 @@ function add_bubble_buts(lay)
 	bub.warning = false;
 
 	switch(bu.type){	
+	case "LinkPara":
+		switch(bu.ac){
+		case "LoadAMatrix":
+			cont.dx = 9;
+			bubble_addtitle(cont,"Load options",{te:load_options_text});
+			bubble_addradio(cont,0,"A","A matrix",bub.type_radio);
+			bubble_addradio(cont,0,"Ainv","Inverse of A matrix",bub.type_radio);
+			bubble_addradio(cont,0,"pedigree","Pedigree",bub.type_radio); 
+			add_end_button(cont,"Done","LoadAMatrix2",{p:bu.p,i:bu.i});	
+			break;
+		}
+		break;
+		
 	case "BayesFactor":
 		cont.dx = 9;
 		bubble_addtitle(cont,"Bayes Factor",{te:bayesfactor_text});

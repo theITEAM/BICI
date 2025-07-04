@@ -1733,7 +1733,24 @@ function label_convert(te,si,wmax)
 					
 					sup = remove_bracket(sup);
 					sub = remove_bracket(sub);
-
+					
+					if(type == "sum"){
+						let spl = sub.split("[");
+						if(spl.length == 2){
+							
+							let dist = spl[1].trim();
+							if(dist.length > 0){
+								dist = dist.substr(0,dist.length-1);
+								let spl2 = dist.split(",");
+								
+								if(spl2.length == 2){
+									sub = spl[0].trim();
+									sup = "d("+sub+","+spl2[0]+")<"+spl2[1];
+								}
+							}
+						}
+					}
+					
 					let ysh = 0;
 					let fo_main = fo; 
 					if((main == "Σ" || main == "∫") && pair == "("){ fo_main = fo_big; ysh = 0.2;}

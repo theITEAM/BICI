@@ -183,6 +183,7 @@ void State::update_ie_population(unsigned int p, unsigned int i, unsigned int ie
 		auto t_ev = t_end; if(k < ind.ev.size()) t_ev = ev[k].t;
 
 		auto ti_next = (unsigned int)(ALMOST_ONE+(t_ev-t_start)/dt);
+		if(ti_next > T) ti_next = T;
 							
 		if(c != UNSET){
 			vector <PopChange> pop_change;

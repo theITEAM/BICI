@@ -26,4 +26,5 @@ double sparsity(const vector < vector <double> > &a);
 vector <double> sample_mvn(const vector < vector <double> > &Z);
 void tidy(vector < vector <double> > &M);
 vector < vector <double> > create_two_by_two(const vector < vector <double> > &M, unsigned int i, unsigned int j);
+double largest_eigenvalue(const vector < vector <double> > &M, vector <double> &vec);
 

@@ -746,7 +746,6 @@ void Proposal::mbp(State &state)
 		
 		switch(type){
 		case MBP_IC_POP_PROP: case MBP_IC_POPTOTAL_PROP: case MBP_IC_RESAMP_PROP:
-			//state.likelihood_init_cond(p_prop,like_ch.init_cond); CHA
 			ssp.likelihood_init_cond(like_ch.init_cond);
 			break;
 		default: break;
@@ -837,7 +836,7 @@ void Proposal::MH_event(State &state)
 							
 							string warn;
 							auto dt = normal_sample(0,samp.si,warn);
-							if(dt == UNSET) emsg("Problem with MCMC proposal: "+warn);
+							if(dt == UNSET) emsg("Problem with MCMC proposal2: "+warn);
 							
 							auto t_new = t + dt;
 							
@@ -952,8 +951,8 @@ void Proposal::MH_multi_event(State &state)
 					
 					string warn;
 					auto dt = normal_sample(0,samp.si,warn);
-					if(dt == UNSET) emsg("Problem with MCMC proposal: "+warn);
-							
+					if(dt == UNSET) emsg("Problem with MCMC proposal3: "+warn);
+					
 					if(dt >= trange.tmax || dt < trange.tmin) ill = true;
 					else{
 						// Reorders events 
@@ -1097,13 +1096,13 @@ void Proposal::MH_event_all(State &state)
 				
 				string warn;
 				auto dt = normal_sample(0,samp.si,warn);
-				if(dt == UNSET) emsg("Problem with MCMC proposal: "+warn);
+				if(dt == UNSET) emsg("Problem with MCMC proposal4: "+warn);
 				
 				if(dt > 0){
 					if(event[emax-1].t+dt > tmax) ill = true;
 				}
 				else{
-					if(event[emin].t+dt < tmin) ill = true;
+					if(emin < E && event[emin].t+dt < tmin) ill = true;
 				}
 			
 				samp.ntr++;
@@ -1170,25 +1169,27 @@ void Proposal::MH_event_all(State &state)
 }
 
 
-/// Performs Metropolis-Hastings local updates for individuals 
+/// Performs Metropolis-Hastings local updates for observed individuals in system
 void Proposal::MH_ind_local(State &state)
 {
 	auto pl = false;     
 			
 	auto &sp = model.species[p_prop];
+	auto N = sp.nindividual_in;
+
 	auto cl = cl_prop;
 		
 	auto &ssp = state.species[p_prop];
 		
-	const auto &individual = ssp.individual;
+	//const auto &individual = ssp.individual;
 		
 	vector <LocalIndChange> licha;
 	
 	vector < vector <unsigned int> > lc_ref;
-	lc_ref.resize(individual.size());
+	lc_ref.resize(N);
 
 	// Adds all possible local changes
-	for(auto i = 0u; i < individual.size(); i++){
+	for(auto i = 0u; i < N; i++){
 		auto add = ssp.local_ind_change(i,cl);
 		add_li_cha(i,add,licha,lc_ref);
 	}
@@ -1202,7 +1203,7 @@ void Proposal::MH_ind_local(State &state)
 
 	if(licha.size() > 0){
 		auto loopmax = (unsigned int)(licha.size());
-		if(loopmax > individual.size()) loopmax= individual.size();
+		if(loopmax > N) loopmax = N;
 		if(loopmax == 0) loopmax = 1;
 
 		Event enew;
@@ -1315,7 +1316,7 @@ void Proposal::MH_ind_local(State &state)
 			if(lc_ref[lic.i][lic.ref] != j) emsg("Problem with reference"); 
 		}
 		
-		for(auto i = 0u; i < individual.size(); i++){
+		for(auto i = 0u; i < N; i++){
 			for(auto j : lc_ref[i]){
 				if(licha[j].i != i) emsg("Problem with reference i");
 			}
@@ -1324,16 +1325,16 @@ void Proposal::MH_ind_local(State &state)
 		auto lc_ref_st = lc_ref;
 		auto licha_st = licha;
 	
-		for(auto i = 0u; i < individual.size(); i++) lc_ref[i].clear();
+		for(auto i = 0u; i < N; i++) lc_ref[i].clear();
 		licha.clear();
 		
-		for(auto i = 0u; i < individual.size(); i++){	
+		for(auto i = 0u; i < N; i++){	
 			auto add = ssp.local_ind_change(i,cl);
 			add_li_cha(i,add,licha,lc_ref);
 		}
 		
 		if(licha.size() != licha_st.size()) emsg("licha prob");
-		for(auto i = 0u; i < individual.size(); i++){
+		for(auto i = 0u; i < N; i++){
 			if(lc_ref[i].size() != lc_ref_st[i].size()) emsg("lc_ref problem");
 		}
 		
@@ -2196,13 +2197,14 @@ void Proposal::MH_ie(State &state)
 		auto value_st = ind.ie[ie_prop];
 		
 		string warn;
-		auto d = normal_sample(0,sd*si,warn);
-		if(d == UNSET) emsg("Problem with MCMC proposal: "+warn);
-		
+		auto sd_samp = clip(sd*si,SD_MIN);
+		auto d = normal_sample(0,sd_samp,warn);
+		if(d == UNSET) emsg("Problem with MCMC proposal1: "+warn);
+	
 		auto value_prop = value_st + d;
 		
 		auto exp_old = ind.exp_ie[ie_prop];
-		auto exp_prop = exp(value_prop-0.5*var);
+		auto exp_prop = exp_clip(value_prop-0.5*var);
 		
 		auto factor = exp_prop/exp_old;
 		
@@ -2244,7 +2246,7 @@ void Proposal::MH_ie(State &state)
 		
 			if(inde.pop_ref.size() > 0) state.popnum_ind_recalc_w(p_prop,i);
 			
-			update_si(0.005);
+			update_si(0.0005);
 		}
 		else{ 
 			if(pl) cout << "rej ind" << endl;
@@ -2261,7 +2263,7 @@ void Proposal::MH_ie(State &state)
 				state.update_ie_trans_tree(p_prop,i,ie_prop,exp_old/exp_prop,like_ch.markov);
 			}
 
-			update_si(-0.01);
+			update_si(-0.001);
 		}
 		if(pl) state.check("ind prop");
 	}
@@ -2697,13 +2699,12 @@ void Proposal::init_cond_frac(State &state)
 	auto C = sp.comp_gl.size();
 	
 	auto foc_cl = ic.focal_cl;
-	
+
 	if(foc_cl == UNSET){
 		auto alp = ic.alpha;
 		for(auto c = 0u; c < C; c++){
 			if(alp[c] != ALPHA_ZERO) alp[c] += icv.cnum[c];
 		}
-		
 		icv.frac = dirichlet_sample(alp);
 	}
 	else{

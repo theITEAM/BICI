@@ -21,7 +21,7 @@ public:
 	unsigned int existing(const vector <unsigned int> &vec) const;
 	void add(unsigned int num, const vector <unsigned int> &vec);
 	void add(unsigned int num, const string &te);
-	vector <unsigned int> get_vec_eqn(const string &te, unsigned int type, unsigned int p, unsigned int cl, bool infection_trans, unsigned int ti, const string &c_te) const;
+	vector <unsigned int> get_vec_eqn(const string &te, unsigned int type, unsigned int p, unsigned int cl, bool infection_trans, unsigned int ti) const;
 	vector <unsigned int> get_vec_string(const string &te) const;
 	vector <unsigned int> get_vec_double(const double val) const;
 	void create(const vector <string> &v);

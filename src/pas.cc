@@ -105,8 +105,6 @@ void PAS::run()
 	// Running phase
 	percentage_start(RUN_PER);	
 	
-	long time_start = clock();
-
 	for(auto s = 0u; s < nsample; s++){
 		percentage(s,nsample);
 	
@@ -120,7 +118,7 @@ void PAS::run()
 	output.set_output_burnin(double(100.0*nburnin)/nsample);
 	
 	for(auto ch = 0u; ch < num_per_core; ch++){
-		auto diag = chain[ch].diagnostics(clock()-time_start,time_anneal_end-time_anneal_start);
+		auto diag = chain[ch].diagnostics(clock()-time_anneal_start,time_anneal_end-time_anneal_start);
 		output.set_diagnostics(mpi.core*num_per_core+ch,diag);
 	}
 	

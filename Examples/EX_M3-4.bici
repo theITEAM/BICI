@@ -30,7 +30,7 @@ comp name="S" color="#009900" x=-16 y=0
 comp name="I" color="#ff2222" x=0 y=0
 comp name="R" color="#4444ff" x=16 y=0
 
-trans name="S->I" value="exp(rate:βΣ^max:30_l' (M_l,l'×{I,l'}))"
+trans name="S->I" value="exp(rate:βΣ_l'[l,30] (M_l,l'×{I,l'}))"
 trans name="I->R" value="gamma(mean:m, cv:c)"
 
 class name="Location" index="l"

@@ -573,6 +573,8 @@ void Proposal::update_si(double fac)
 		if(f < 0.5) f = 0.5; 
 		if(f > 10) f = 10;
 		si *= f;
+		if(si < 0.001) si = 0.001;
+		if(si > 1000) si = 1000;
 	}
 }
 

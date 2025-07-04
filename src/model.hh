@@ -63,7 +63,7 @@ class Model                                // Stores information about the model
 		
 		Model(Operation mode_);
 		void add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double t = UNSET);
-		string find_eq_dif(const EquationInfo &eqi) const;
+		//string find_eq_dif(const EquationInfo &eqi) const;
 		vector <double> param_sample() const;
 		vector <double> post_param(const Sample &samp) const;
 		vector <double> prior_prob(const vector <double> &param_val) const;

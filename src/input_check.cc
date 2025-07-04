@@ -643,7 +643,7 @@ void Input::eqn_mem_usage(string name, const vector <unsigned int> &vec) const
 		uni += 17;
 		tex += strsize*3+eqn.te.length() + eqn.te_raw.length() + eqn.warn.length();
 		timer += vecsize + 2*eqn.timer.size();
-		calc += vecsize; for(const auto &ca : eqn.calc) calc += 2 + vecsize + 2*ca.item.size();
+		calc += vecsize; for(const auto &ca : eqn.calcu) calc += 2 + vecsize + 2*ca.item.size();
 		cons += vecsize+2*eqn.cons.size();
 		param_ref += vecsize+3*eqn.param_ref.size();
 		pop_ref += vecsize+eqn.pop_ref.size();
@@ -897,7 +897,7 @@ void Input::check_derived_order()
 		
 		for(const auto &ei : der.eq){
 			const auto &eqn = model.eqn[ei.eq_ref]; 
-			for(const auto &ca : eqn.calc){
+			for(const auto &ca : eqn.calcu){
 				for(const auto &it : ca.item){
 					if(it.type == DERIVE){
 						const auto &dr = eqn.derive_ref[it.num];

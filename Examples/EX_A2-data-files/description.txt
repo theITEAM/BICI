@@ -1,7 +1,7 @@
-# Example A2: Uncertain initial conditions (single classification)
+# Example A2: Uncertain initial conditions for PBM (single classification)
 
 ## Objective
-- Introduce uncertainty in the initial population.
+- Introduce uncertainty in the initial population for a population-based model.
 - This considers the case of a model with just a single classification.
 - On the 'Simulation→Population' page the initial population is set as a distribution (rather than fixed).
 

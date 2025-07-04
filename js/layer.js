@@ -883,7 +883,7 @@ class Layer
 					
 					
 					let teco = textcol; if(ch == ";") teco = BLACK;
-					if(eqn_edit && ch == "(" || ch == ")" || ch == "∫" || ch == "Σ"){
+					if(eqn_edit && (ch == "(" || ch == ")" || ch == "∫" || ch == "Σ")){
 						let sh = 0; if(ch == "∫" || ch == "Σ") sh = 0.1;
 						
 						let font_bra = get_font(equation_brasi);

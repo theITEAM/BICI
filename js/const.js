@@ -5,6 +5,7 @@
 // 50018 lines of code (18/11/24)
 // 59127 lines of code (16/15/25)
 
+
 let ver="windows";         // Determines platform
 //let ver="linux";
 //let ver="mac";
@@ -339,6 +340,9 @@ const data_template = [
 // Loads the A matrix into and individual effect group
 {type:"LoadAmatrix", title:"Load relationship matrix", cols:["A"]},
 
+// Loads the Ainv matrix into and individual effect group
+{type:"LoadAinvmatrix", title:"Load relationship matrix", cols:["A"]},
+
 // Loads the pedigree into and individual effect group
 {type:"APed", title:"Pedigree", cols:["ID","sire","dam"]},
 
@@ -435,6 +439,12 @@ const unset_type = "unset_type";                   // Denotes unset type
 const no_elements = "No elements";                 // Message if no elements in array
 const data_invalid = "Data source is invalid";     // Invalid data source message
 const dist_matrix_name = "D";                      // The name of a distance matrix
+const RN_name = "RN";                              // The basic reproduction number function
+const RNE_name = "RNE";                            // The effective reproduction number function
+const RNC_name = "RNC";                            // The computational reproduction number function
+const GT_name = "GT";                              // The basic generation time
+const GTE_name = "GTE";                            // The effective generation time function
+const GTC_name = "GTC";                            // The computational generation time function
 
 // List of colours used for compartments
 const collist = [LGREEN,LRED,LBLUE,LPURPLE,LORANGE,LYELLOW,LBROWN,LGREY,GREEN,RED,BLUE,PURPLE,ORANGE,YELLOW,BROWN,GREY,DGREEN,DRED,DBLUE,DPURPLE,DORANGE,DYELLOW,DBROWN,DGREY,DDGREEN,DDRED,DDBLUE,DDPURPLE,DDORANGE,DDYELLOW,DDBROWN,BLACK];
@@ -457,7 +467,8 @@ const numbut = ["0","1","2","3","4","5","6","7","8","9","."];
 const greek = ["\u03B1","\u03B2","\u03B3","\u03B4","\u03B5","\u03B6","\u03B7","\u03B8","\u03B9",
 "\u03Ba","\u03Bb","\u03Bc","\u03Bd","\u03Be","\u03Bf","\u03C0","\u03C1","\u03C3","\u03C4","\u03C5","\u03C6","\u03C7","\u03C8","\u03C9"];
 
-const greek_latex = [["alpha","α"],["beta","β"],["gamma","γ"],["Gamma","Γ"],["delta","δ"],["Delta","Δ"],["epsilon","ε"],["zeta","ζ"],["eta","η"],["Eta","Η"],["theta","θ"],["Theta","Θ"],["iota","ι"],["kappa","κ"],["lambda","λ"],["Lambda","Λ"],["mu","μ"],["nu","ν"],["xi","ξ"],["Xi","Ξ"],["omicron","ο"],["pi","π"],["Pi","Π"],["rho","ρ"],["sigma","σ"],["Sigma","Σ"],["tau","τ"],["upsilon","υ"],["phi","φ"],["Phi","Φ"],["chi","χ"],["psi","ψ"],["Psi","Ψ"],["omega","ω"],["Omega","Ω"],["sum","Σ"],["int","∫"]];
+const greek_latex = [["alpha","α"],["beta","β"],["gamma","γ"],["Gamma","Γ"],["delta","δ"],["Delta","Δ"],["epsilon","ε"],["zeta","ζ"],["eta","η"],["Eta","Η"],["theta","θ"],["Theta","Θ"],["iota","ι"],["kappa","κ"],["lambda","λ"],["Lambda","Λ"],["mu","μ"],["nu","ν"],["xi","ξ"],["Xi","Ξ"],["omicron","ο"],["pi","π"],["Pi","Π"],["rho","ρ"],["sigma","σ"],["tau","τ"],["upsilon","υ"],["phi","φ"],["Phi","Φ"],["chi","χ"],["psi","ψ"],["Psi","Ψ"],["omega","ω"],["Omega","Ω"],["sum","Σ"],["int","∫"]];
+//["Sigma","Σ"],
 
 const greek_capital = ["A","B","Γ","Δ","E","Z","H","Θ","I","K","Λ","M","N","Ξ","O","Π","P","Σ","T","Y","Φ","X","Ψ","Ω"];
 

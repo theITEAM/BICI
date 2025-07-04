@@ -188,8 +188,6 @@ vector <unsigned int>  StateSpecies::update_ind(unsigned int i, vector <Event> &
 			switch(eve_old.type){
 			case M_TRANS_EV:
 				if(eve_new.type == M_TRANS_EV && eve_old.m == eve_new.m){
-//				&& 
-	//				!(eve_old.observed && eve_old.tr_gl != eve_new.tr_gl)){
 					identical = true;
 					eve_new.index = eve_old.index;
 					if(e_old != e_new){
@@ -200,8 +198,6 @@ vector <unsigned int>  StateSpecies::update_ind(unsigned int i, vector <Event> &
 				
 			case NM_TRANS_EV:	
 				if(eve_new.type == NM_TRANS_EV && eve_old.m == eve_new.m){
-				//&&
-					//!(eve_old.observed && eve_old.tr_gl != eve_new.tr_gl)){
 					if(ev_old[eve_old.e_origin].t == ev_new[eve_new.e_origin].t){
 						identical = true;
 						
@@ -998,7 +994,7 @@ void StateSpecies::incomp_turn_off(IncompNMTransRef &inm)
 
 /// Updates init_cond_val based on an individuals enter state changing
 void StateSpecies::likelihood_init_cond_change(unsigned int c_enter_old, unsigned int c_enter_new, Like &like_ch)
-{
+{	
 	const auto &ic = sp.init_cond;
 	
 	auto &icv = init_cond_val;
@@ -1009,7 +1005,7 @@ void StateSpecies::likelihood_init_cond_change(unsigned int c_enter_old, unsigne
 		int dN = 0;
 		auto dLi_init_cond = 0.0;
 		
-		if(c_enter_old != UNSET){ 
+		if(c_enter_old != UNSET){ 	
 			icv.cnum[c_enter_old]--; 	
 			if(sp.type != INDIVIDUAL){
 				dLi_init_cond += log_int(icv.cnum[c_enter_old]+1);	
@@ -1033,19 +1029,25 @@ void StateSpecies::likelihood_init_cond_change(unsigned int c_enter_old, unsigne
 		
 		if(dN != 0){
 			if(sp.type == INDIVIDUAL){
-				icv.N_total_unobs += dN;
+				if(dN == 1) dLi_init_cond += log_int(icv.N_total_unobs+1);
+				else dLi_init_cond -= log_int(icv.N_total_unobs);
+				icv.N_total_unobs += dN;			
 			}
-
-			if(dN == 1) dLi_init_cond += log_int(icv.N_total+1);
-			else dLi_init_cond -= log_int(icv.N_total);
+			else{
+				if(dN == 1) dLi_init_cond += log_int(icv.N_total+1);
+				else dLi_init_cond -= log_int(icv.N_total);
+			}
 			
 			auto dprior = -prior_probability(icv.N_total,ic.pop_prior,param_val,eqn);
+			
 			icv.N_total += dN;
 			dprior += prior_probability(icv.N_total,ic.pop_prior,param_val,eqn);
 		
 			like_ch.init_cond_prior += dprior;
 		}
 		
+		back.push_back(Back(IND_COND_VAL,c_enter_old,c_enter_new,dLi_init_cond));
+	
 		Li_init_cond += dLi_init_cond;
 		like_ch.init_cond += dLi_init_cond;
 	}
@@ -1106,8 +1108,71 @@ void StateSpecies::likelihood_init_cond_change(unsigned int c_enter_old, unsigne
 			dN++;
 		}
 	
+		back.push_back(Back(IND_COND_VAL,c_enter_old,c_enter_new,dLi_init_cond));
+	
 		Li_init_cond += dLi_init_cond;
 		like_ch.init_cond += dLi_init_cond;
+	}	
+}
+
+
+/// Used for going back to the previous state
+void StateSpecies::init_cond_change_back(unsigned int c_enter_old, unsigned int c_enter_new)
+{		
+	const auto &ic = sp.init_cond;
+	auto &icv = init_cond_val;
+	auto foc_cl = ic.focal_cl;
+	
+	if(foc_cl == UNSET){
+		int dN = 0;	
+		if(c_enter_old != UNSET){ 
+			icv.cnum[c_enter_old]--; 	
+			dN--;
+		}
+		
+		if(c_enter_new != UNSET){ 
+			icv.cnum[c_enter_new]++; 
+			dN++;
+		}
+		
+		if(dN != 0){
+			if(sp.type == INDIVIDUAL){
+				icv.N_total_unobs += dN;
+			}
+			icv.N_total += dN;
+		}
+	}
+	else{
+		int dN = 0;
+		
+		if(c_enter_old != UNSET){ 
+			const auto &crr = ic.comp_reduce_ref[c_enter_old];
+			auto c = crr.c;
+			auto cred = crr.cred;
+			
+			icv.N_focal[c]--;
+			icv.cnum_reduce[c][cred]--;
+			icv.cnum[c_enter_old]--;
+			
+			if(sp.type == INDIVIDUAL){
+				icv.N_focal_unobs[c]--;
+			}
+	
+			dN--;
+		}
+		
+		if(c_enter_new != UNSET){ 
+			const auto &crr = ic.comp_reduce_ref[c_enter_new];
+			auto c = crr.c;
+			auto cred = crr.cred;
+				
+			icv.N_focal[c]++;
+			icv.cnum_reduce[c][cred]++;
+			icv.cnum[c_enter_new]++;
+			if(sp.type == INDIVIDUAL) icv.N_focal_unobs[c]++;
+			
+			dN++;
+		}
 	}
 }
 
@@ -1147,9 +1212,10 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 	case USE_POP_DIF:         // If population gradient not time dependant
 		for(const auto &po_ch : pop_change){
 			auto pr = lin.get_pop_ref(po_ch.po);
-			if(pr == UNSET) emsg("Could not find pop_ref");
-			auto va = eq.calculate_calculation_notime(lin.pop_grad_calc[pr],param_val);
-			diff += va*po_ch.num;
+			if(pr != UNSET){
+				auto va = eq.calculate_calculation_notime(lin.pop_grad_calc[pr],param_val);
+				diff += va*po_ch.num;
+			}
 		}
 		break;
 	
@@ -1182,9 +1248,12 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 			{
 				value = val_old;
 				for(auto k = 0u; k < pop_change.size(); k++){
-					const auto &po_ch = pop_change[k];
-					auto va = eq.calculate_calculation(lin.pop_grad_calc[pr_store[k]],tii,param_val,spline_val);
-					value += va*po_ch.num;
+					auto pr = pr_store[k];
+					if(pr != UNSET){
+						const auto &po_ch = pop_change[k];
+						auto va = eq.calculate_calculation(lin.pop_grad_calc[pr],tii,param_val,spline_val);
+						value += va*po_ch.num;
+					}
 				}
 			
 				if(false){
@@ -1430,6 +1499,11 @@ void StateSpecies::restore_back()
 				break;
 			
 			case VALUE_MARKOV: break;
+		
+			case IND_COND_VAL:
+				Li_init_cond -= ba.value;
+				init_cond_change_back(ba.index,ba.i); 
+				break;
 			}
 		}
 	}

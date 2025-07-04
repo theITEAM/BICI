@@ -18,7 +18,7 @@ The current version contains the following features:
 
 * **Multiple species** This allows for multiple interacting species, e.g. predetor-prey models or pathogen accumulation model.
 
-* **Inidivudual and population-based** Allows for mixing population and individual-based species together within the same model.
+* **Indivudual and population-based** Allows for mixing population and individual-based species together within the same model.
 
 * **Individual variation** Allows for individual variation (on top of compartmental stratification) by incorporating individual covariates, or individual effects (e.g. for quantitative genetics models).
 
@@ -37,15 +37,15 @@ The current version contains the following features:
 
 The following files can be downloaded:
 
-* **Windows:** [BICI_v0.52_windows.zip](https://github.com/theITEAM/BICI/releases/download/v0.52/BICI_v0.52_windows.zip). Once unzipped BICI is run by clicking on the “BICI.exe” icon (if the error message “Windows protected your PC” appears, click on “More info” and “Run”).
+* **Windows:** [BICI_v0.6_windows.zip](https://github.com/theITEAM/BICI/releases/download/v0.6/BICI_v0.6_windows.zip). Once unzipped BICI is run by clicking on the “BICI.exe” icon (if the error message “Windows protected your PC” appears, click on “More info” and “Run”).
 
 * **Mac:** 
-[BICI_v0.4_mac.zip](https://github.com/theITEAM/BICI/releases/download/v0.4/BICI_v0.4_mac.zip).
+[BICI_v0.6_mac.zip](https://github.com/theITEAM/BICI/releases/download/v0.6/BICI_v0.6_mac.zip).
  Once unzipped BICI is run by clicking on the “BICI.app” icon (if the error message “BICI can’t be opened because it is from an unidentified developer…” appears, right click on “BICI.app” and select “Open” to give the option to run).
 
 ## Documentation
 
-The following manual can be downloaded [here](BICI_Manual_v0.52.pdf)
+The following manual can be downloaded [here](BICI_Manual_v0.6.pdf)
 
 ## Build
 

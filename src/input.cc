@@ -398,6 +398,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	linearise_eqn(75,85);               // Tries to linearise equations in terms of pops
 	
+	setup_der_func_eqn();               // Sets up equations for derived functions
+	
 	check_memory_too_large();
 	
 	percentage(85,100);
@@ -559,11 +561,33 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 			const auto &tag = cl.tags[k];
 			
 			auto na = tag.name;
-				
-			if(na == "value" || na == "boundary" || na == "constant" || na == "reparam" || na == "prior-split" || na == "dist-split" || 
-				na == "A" || na == "A-sparse" || na == "pedigree" || na == "X" || na == "file" || na == "text" || na == "ind-list" || na == "factor-weight"){
-				auto file = tag.value;
-				
+			
+			auto ty = 0u;
+			
+			if(na == "value" || na == "constant" || na == "reparam" || na == "text") ty = 1;
+		
+			if(na == "file" || na == "boundary" || na == "prior-split" || na == "dist-split" || 
+		   na == "A" || na == "Ainv" || na == "A-sparse" || na == "pedigree" || na == "X" || 
+			 na == "ind-list" || na == "factor-weight") ty = 2;
+			 
+			auto file = tag.value;
+			switch(ty){
+			case 0:   // Definitely not a file
+				if(is_file(file)){
+					string extra;
+					if(na == "prior"){
+						extra = " The tag 'prior-split' can be used to specify priors separately for each parameter element."; 
+					}
+					
+					if(na == "dist"){
+						extra = " The tag 'dist-split' can be used to specify distributions separately for each parameter element."; 
+					}
+					alert_line("A data table was not expected for '"+na+"'."+extra,cl.line_num);
+				}
+				break;
+			
+			case 1: // Maybe a file 
+			case 2: // Should be a file
 				if(is_file(file)){
 					auto k = 0u; while(k < files.size() && files[k].name != file) k++;
 					if(k == files.size()){
@@ -591,6 +615,12 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 						files.push_back(file_st);
 					}
 				}
+				else{
+					if(ty == 2){
+						alert_line("A data table was expected for '"+na+"'.",cl.line_num);
+					}
+				}
+				break;
 			}
 		}
 	}
@@ -1270,6 +1300,24 @@ void Input::check_param_used()
 	}
 }
 
+
+/// Convert parameter to paramvec in a spline
+void Input::calc_conv_param_vec(vector <Calculation> &calcu, const vector <ParamRef> &param_ref)
+{
+	for(auto &ca : calcu){
+		for(auto &it : ca.item){
+			if(it.type == PARAMETER){
+				if(it.num >= param_ref.size()) emsg_input("Out of range0");
+				const auto &pr = param_ref[it.num];
+				const auto &par = model.param[pr.th];
+				it.type = PARAMVEC;
+				it.num = par.get_param_vec(pr.index); 
+				if(it.num == UNSET) emsg("pvec element unset");
+			}
+		}
+	}
+}
+	
 	
 /// Orders parameters in a vector such that only dependent on an params with a smaller index
 void Input::create_param_vector()
@@ -1366,25 +1414,8 @@ void Input::create_param_vector()
 	
 	// Converts parameter references in equation to param_vec
 	for(auto &eq : model.eqn){
-		for(auto &ca : eq.calc){
-			for(auto &it : ca.item){
-				if(it.type == PARAMETER){
-					if(it.num >= eq.param_ref.size()) emsg_input("Out of range0");
-					const auto &pr = eq.param_ref[it.num];
-					const auto &par = model.param[pr.th];
-					it.type = PARAMVEC;
-					it.num = par.get_param_vec(pr.index); 
-					if(it.num == UNSET) emsg("pvec element unset");
-				}
-			}
-		}
-	
-		if(eq.ans.type == PARAMETER){
-			const auto &pr = eq.param_ref[eq.ans.num];
-			const auto &par = model.param[pr.th];
-			eq.ans.type = PARAMVEC;
-			eq.ans.num = par.get_param_vec(pr.index);
-		}
+		calc_conv_param_vec(eq.calcu,eq.param_ref);
+		for(auto &inte : eq.integral) calc_conv_param_vec(inte.calc,eq.param_ref);
 	}
 	model.nparam_vec = model.param_vec.size();
 
@@ -1437,13 +1468,13 @@ void Input::further_simplify_equations(unsigned int per_start, unsigned int per_
 	do{
 		flag_global = false;
 			
-		// If a reparameterised parameter is used and it is constant than substitutes 
+		// If a reparameterised parameter is used and it is constant then substitutes 
 		for(auto e = 0u; e < model.eqn.size(); e++){
 			if(first) percentage(per_start+double((per_end-per_start))*e/model.eqn.size(),100);
 			auto &eq = model.eqn[e];
 		
 			auto flag = false;
-			for(auto &ca : eq.calc){
+			for(auto &ca : eq.calcu){
 				for(auto &it : ca.item){
 					if(it.type == PARAMETER){
 						const auto &pr = eq.param_ref[it.num];
@@ -1452,12 +1483,11 @@ void Input::further_simplify_equations(unsigned int per_start, unsigned int per_
 						if(par.variety == REPARAM_PARAM){
 							const auto &eqn = model.eqn[par.get_eq_ref(pr.index)];
 							
-							if(eqn.calc.size() == 0){
-								if(eqn.ans.type == NUMERIC){
-									it.type = NUMERIC;
-									it.num = eq.add_cons(eqn.cons[eqn.ans.num]);
-									flag = true;
-								}
+							auto num = eqn.is_num();
+							if(num != UNSET){
+								it.type = NUMERIC;
+								it.num = eq.add_cons(num);
+								flag = true;
 							}
 						}
 					}
@@ -1465,7 +1495,7 @@ void Input::further_simplify_equations(unsigned int per_start, unsigned int per_
 			}
 			
 			if(flag == true){
-				eq.simplify();
+				eq.simplify(eq.calcu);
 				flag_global = true;
 			}
 		}

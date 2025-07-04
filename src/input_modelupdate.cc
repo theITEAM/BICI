@@ -224,7 +224,6 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 	model.create_species_simp();
 
 	Hash hash_eqn;
-	
 	for(auto &der : model.derive){                       // Derived quantities
 		for(auto &eq : der.eq) model.add_eq_ref(eq,hash_eqn);
 	}
@@ -239,7 +238,10 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 			auto &tr_gl = sp.tra_gl[i];
 				
 			if(i%100 == 0) percentage(per_st+fr*i,100);
-			if(tr_gl.branch == true && tr_gl.bp_set == BP_SET) model.add_eq_ref(tr_gl.bp,hash_eqn);
+			if(tr_gl.branch == true && tr_gl.bp_set == BP_SET){
+				model.add_eq_ref(tr_gl.bp,hash_eqn);
+			}
+			
 			for(auto &dp : tr_gl.dist_param){
 				model.add_eq_ref(dp,hash_eqn);
 			}
@@ -465,6 +467,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 /// Tries to linearise equations in terms of populations
 void Input::linearise_eqn(unsigned int per_start, unsigned int per_end)
 {
+	/* // This has been turned off because calculation ofr rep num requires linearisation
 	auto fl = false;
 	if(model.mode != INF){
 		fl = true;
@@ -474,6 +477,7 @@ void Input::linearise_eqn(unsigned int per_start, unsigned int per_end)
 	}
 
 	if(fl == true) return;
+	*/
 	
 	auto dper = double(per_end-per_start)/model.species.size();
 	
@@ -489,10 +493,6 @@ void Input::linearise_eqn(unsigned int per_start, unsigned int per_end)
 			model.eqn[me.eqn_ref].calculate_linearise();    
 		}			
 	}
-	
-	//for(auto &eq : model.eqn){
-	//eq.calculate_linearise();        // Tries to linearise equations in terms of populations
-	//}
 }
 
 
@@ -796,8 +796,6 @@ void Input::global_comp_trans_init()
 							for(auto &dp : tr_gl.dist_param) dp.infection_trans = true;
 						}
 						
-						tr_gl.bp.c = c;
-						
 						tr_gl.bp.te = swap_index_temp(dep_conv,bp_swap_temp);
 						if(check_swap){
 							auto te_ch = tr.bp.te;
@@ -807,8 +805,6 @@ void Input::global_comp_trans_init()
 						}
 						
 						for(auto i = 0u; i < tr_gl.dist_param.size(); i++){
-							tr_gl.dist_param[i].c = c;
-							
 							tr_gl.dist_param[i].te = swap_index_temp(dep_conv,dist_swap_temp[i]);
 							if(check_swap){
 								auto te_ch = tr.dist_param[i].te;
@@ -1386,34 +1382,26 @@ void Input::create_spline()
 	
 	// Converts equations such that the spline is referenced	
 	for(auto &eq : model.eqn){
-		for(auto &ca : eq.calc){
+		for(auto &ca : eq.calcu){
 			for(auto &it : ca.item){
 				if(it.type == SPLINE){
 					const auto &pr = eq.param_ref[it.num];
 					it.type = SPLINEREF;
 					it.num = get_spline_i(pr);
 				}
-				
-				if(it.type == SPLINE_TIME){
-					auto &tr = eq.time_ref[it.num];
-					const auto &pr = eq.param_ref[tr.num];
-					it.type = SPLINEREF_TIME;
-					tr.num = get_spline_i(pr);
-				}
 			}
 		}
-	
-		if(eq.ans.type == SPLINE){
-			const auto &pr = eq.param_ref[eq.ans.num];
-			eq.ans.type = SPLINEREF;
-			eq.ans.num = get_spline_i(pr);
-		}
 		
-		if(eq.ans.type == SPLINE_TIME){
-			auto &tr = eq.time_ref[eq.ans.num];
-			const auto &pr = eq.param_ref[tr.num];
-			eq.ans.type = SPLINEREF_TIME;
-			tr.num = get_spline_i(pr); 
+		for(auto &inte : eq.integral){
+			for(auto &ca : inte.calc){
+				for(auto &it : ca.item){
+					if(it.type == SPLINE){
+						const auto &pr = eq.param_ref[it.num];
+						it.type = SPLINEREF;
+						it.num = get_spline_i(pr);
+					}
+				}
+			}
 		}
 	}
 	
@@ -4180,7 +4168,7 @@ void Input::set_param_use()
 	}
 	
 	for(auto &eq : model.eqn){
-		for(auto &ca : eq.calc){
+		for(auto &ca : eq.calcu){
 			for(auto &it : ca.item){
 				if(it.type == PARAMETER){
 					const auto &pr = eq.param_ref[it.num]; 
@@ -4189,12 +4177,6 @@ void Input::set_param_use()
 					model.param[pr.th].set_used(pr.index);
 				}
 			}
-		}
-	
-		if(eq.ans.type == PARAMETER){
-			if(eq.ans.num == UNSET) emsg_input("done");
-			const auto &pr = eq.param_ref[eq.ans.num]; 
-			model.param[pr.th].set_used(pr.index);
 		}
 	}
 	
@@ -4253,5 +4235,365 @@ void Input::set_omega_fl()
 			cout << pv.name << " " << pv.omega_fl << endl;
 		}
 		emsg("done");
+	}
+}
+
+
+/// Sets up calculating derived functions
+void Input::setup_der_func(DerFuncType df_type, string te, DerFunc &df)
+{
+	df.on = true;
+	df.type = df_type;
+	
+	switch(df_type){
+	case RN: df.name = "RN"; break;
+	case RNE: df.name = "RNE"; break;
+	case RNC: df.name = "RNC"; break;
+	case GT: df.name = "GT"; break;
+	case GTE: df.name = "GTE"; break;
+	case GTC: df.name = "GTC"; break;
+	case DF_UNSET: emsg("Should not be unset"); break; 
+	}
+	
+	auto i = 0u;
+	while(i < te.length() && te.substr(i,1) != "(") i++;
+	if(i == te.length()){
+		alert_import("No left bracket '('");
+	}
+	i++;
+	auto ist = i;
+	while(i < te.length() && te.substr(i,1) != ")") i++;
+	if(i == te.length()){
+		alert_import("No right bracket ')'");
+	}
+	
+	auto after = trim(te.substr(i+1));
+	if(after != ""){
+		alert_import("Unexpected '"+after+"' at end of line."); 
+	}
+		
+	if(model.species.size() > 1){
+		alert_import("'"+df.name+"' can only be used for a single species."); 
+	}
+
+	df.cont = te.substr(ist,i-ist);
+}
+
+
+/// Sets up equations for derived functions
+void Input::setup_der_func_eqn()
+{
+	for(auto &der : model.derive){
+		auto &df = der.func; 
+		if(df.on){
+			auto cont = df.cont;
+			
+			auto spl = split(cont,',');
+	
+			auto cl_sel = UNSET;
+			vector <unsigned int> inf;
+			
+			const auto &sp = model.species[0]; 
+			for(auto k = 0u; k < spl.size(); k++){
+				auto na = trim(spl[k]);
+				if(na == ""){
+					alert_line("In '"+df.name+"' a compartment is missing.",der.line_num,true); 
+				}
+
+				auto fl = false;
+				for(auto cl = 0u; cl < sp.cla.size(); cl++){
+					const auto &claa = sp.cla[cl];
+					for(auto c = 0u; c < claa.comp.size(); c++){
+						const auto &co = claa.comp[c];
+						if(co.name == na || (co.erlang_hidden && co.erlang_source == na)){
+							inf.push_back(c);
+							fl = true;
+							
+							if(cl_sel == UNSET) cl_sel = cl;
+							else{
+								if(cl_sel != cl){
+									alert_line("In '"+df.name+"' the compartments must all come from the same classification.",der.line_num,true); 
+								}
+							}
+						}
+					}
+					if(fl == true) break;
+				}
+				
+				if(fl == false){
+					alert_line("In '"+df.name+"' could not find the compartment '"+na+"'.",der.line_num,true); 
+				}
+			}				
+
+			if(cl_sel == UNSET){
+				alert_line("In '"+df.name+"' problem unstanding content '"+cont+"'.",der.line_num,true); 
+			}
+
+			df.cl = cl_sel;
+			
+			auto cl = cl_sel;
+			
+			const auto &claa = sp.cla[cl];
+			
+			vector <bool> inf_map(claa.ncomp,false);
+			for(auto c : inf) inf_map[c] = true;
+			
+			// This references inf_c
+			vector <unsigned int> ref(sp.comp_gl.size(),UNSET);	
+			vector <unsigned int> inf_c;
+			
+			for(auto c = 0u; c < sp.comp_gl.size(); c++){
+				const auto &cgl = sp.comp_gl[c];
+				if(inf_map[cgl.cla_comp[cl]] == true){
+					ref[c] = inf_c.size();
+					inf_c.push_back(c);
+				}
+			}
+			df.ref = ref;
+		
+			auto N = inf_c.size();
+			
+			for(auto c : inf){
+				auto tr = 0u; while(tr < claa.ntra && claa.tra[tr].i != c) tr++;
+				if(tr == claa.ntra){
+					alert_line("'"+df.name+"' cannot be calculated because no transition leaving compartment '"+claa.comp[c].name+"'.",der.line_num,true);			
+				}
+			}
+			
+			auto calc = false;
+			switch(df.type){
+			case RNC: case GTC:
+				calc = true; 
+				if(sp.type == POPULATION){
+					alert_line("'"+df.name+"' cannot be calculated for a population-based model.",der.line_num,true);
+				}
+				break;
+			default: break;
+			}
+			
+			// Constructs F and S
+			auto &F_eq = df.F_eq;
+			auto &S_eq = df.S_eq;
+			auto &Feq_ref = df.Feq_ref;
+			auto &Seq_ref = df.Seq_ref;
+			
+			F_eq.resize(N); S_eq.resize(N);
+			for(auto i = 0u; i < N; i++){
+				F_eq[i].resize(N);
+				S_eq[i].resize(N);
+			}
+			
+			vector <bool> map_in(N,false);
+			vector < vector <unsigned int> > enter_eq;
+			vector < vector <unsigned int> > enter_c;
+			enter_eq.resize(N); enter_c.resize(N);
+			df.tau_eq.resize(N);
+			
+			auto inf_fl = false;
+			
+			for(const auto &tr : sp.tra_gl){
+				if(tr.i != UNSET){
+					auto start = false;
+					if(ref[tr.i] != UNSET) start = true;
+					
+					auto end = false;
+					if(tr.f != UNSET && ref[tr.f] != UNSET) end = true;
+					
+					if(start == false && end == true){ // Transitions entering infected
+						auto cin = ref[tr.f];
+						
+						switch(tr.type){
+						case EXP_RATE:
+							{
+								map_in[cin] = true;
+								
+								auto e = tr.dist_param[0].eq_ref;
+								const auto &eq = model.eqn[e];
+								const auto &lin = eq.linearise;
+								if(!lin.on) alert_line("'"+df.name+"' cannot be calculated because the equation '"+eq.te_raw+"' is not linearisable into populations.",der.line_num,true);
+							
+								if(lin.pop_grad_calc.size() > 0){
+									inf_fl = true;
+								}
+								
+								for(auto i = 0u; i < lin.pop_grad_calc.size(); i++){
+									const auto &po = model.pop[eq.pop_ref[i]];
+									if(calc == false && po.ind_eff_mult.size() > 0){
+										alert_line("'"+df.name+"' cannot be calculated because population contains an individual effect",der.line_num,true);
+									}
+												
+									if(calc == false && po.fix_eff_mult.size() > 0){
+										alert_line("'"+df.name+"' cannot be calculated because population '"+po.name+"' contains a fixed effect",der.line_num,true);
+									}
+									
+									auto k = 0u;
+									while(k < Feq_ref.size() && !(Feq_ref[k].e == e && Feq_ref[k].i == i)) k++;
+									if(k == Feq_ref.size()){
+										FRef fre; fre.e = e; fre.i = i; 
+										Feq_ref.push_back(fre);
+									}
+									
+									for(const auto &te : po.term){
+										auto c = te.c;
+										auto cc = ref[c];
+										if(cc == UNSET){
+											alert_line("'"+df.name+"' cannot be calculated because compartment '"+sp.comp_gl[c].name+"' in population '"+po.name+"' is not within infected compartments.",der.line_num,true);
+										}
+										
+										Fele fel; fel.k = k; fel.c_from = tr.i;
+										F_eq[cin][cc].push_back(fel);
+									}
+								}
+							}
+							break;
+							
+						default:
+							//alert_line("'"+df.name+"' cannot be calculated because transition '"+tr.name+"' entering is not a rate.",der.line_num,true); 
+							break;
+						}
+					}
+					
+					if(start == true){     // Transitions entering or moving within infected
+						auto cstart = ref[tr.i];
+						auto cend = UNSET; if(tr.f != UNSET) cend = ref[tr.f];
+				
+						switch(tr.type){
+						case WEIBULL:
+							alert_line("'"+df.name+"' cannot be calculated because transition '"+tr.name+"' has a Weibull distribution.",der.line_num,true); 
+							break;
+							
+						case GAMMA: case ERLANG: case LOG_NORMAL: case PERIOD:
+							{
+								if(!calc){
+									string dist;
+									switch(tr.type){
+									case GAMMA: dist = "Gamma"; break;
+									case ERLANG: dist = "Erlang"; break;
+									case LOG_NORMAL: dist = "log-normal"; break;
+									case PERIOD: dist = "period"; break;
+									default: break;
+									}
+									df.warn = "Calculation of '"+df.name+"' is approximate due to non-Markovian transitions.";
+								}
+							}
+						
+						case EXP_RATE: case EXP_MEAN:
+						case EXP_RATE_NM: case EXP_MEAN_NM:
+							{
+								auto e = tr.dist_param[0].eq_ref;
+								auto m = UNSET;
+								if(tr.bp_set) m = tr.nm_trans_ref;
+								
+								const auto &eq = model.eqn[e];
+								if(eq.pop_ref.size() > 0){
+									alert_line("'"+df.name+"' cannot be calculated because transition '"+tr.name+"' contains a population.",der.line_num,true);
+								}
+								
+								auto k = 0u;
+								while(k < Seq_ref.size() && !(Seq_ref[k].e == e && Seq_ref[k].m == m &&Seq_ref[k].type == tr.type)) k++;
+								if(k == Seq_ref.size()){
+									SRef fre; fre.e = e; fre.m = m; fre.type = tr.type; 
+									Seq_ref.push_back(fre);
+								}
+								
+								if(cend != UNSET){
+									enter_eq[cend].push_back(k);
+									enter_c[cend].push_back(cstart);
+								}
+						
+								EqSign es; es.k = k; es.sign = 1;
+						
+								S_eq[cstart][cstart].push_back(es);
+								
+								if(cend != UNSET){
+									es.sign = -1;
+									S_eq[cend][cstart].push_back(es);
+								}
+							}
+							break;
+							
+						default:
+							if(calc == false){
+								alert_line("'"+df.name+"' cannot be calculated because transition '"+tr.name+"' is non-Markovian.",der.line_num,true); 
+							}
+							break;
+						}
+					}
+				}
+			}
+					
+			if(inf_fl == false){
+				alert_line("'"+df.name+"' cannot be calculated because no infection transition enters specified compartments.",der.line_num,true);			
+			}
+			
+			if(df.type == GT || df.type == GTE){
+				for(auto c = 0u; c < N; c++){
+					auto cc = c;
+					while(map_in[cc] != true){
+						switch(enter_c[cc].size()){
+						case 0:
+							alert_line("'"+df.name+"' cannot be calculated because individuals can't reach the '"+sp.comp_gl[inf_c[cc]].name +"' compartment.",der.line_num,true);
+							break;
+						
+						case 1:
+							df.tau_eq[c].push_back(enter_eq[cc][0]);
+							cc = enter_c[cc][0];
+							break;
+							
+						default:
+							alert_line("'"+df.name+"' cannot be calculated because of branching.",der.line_num,true);
+							break;
+						}
+					}
+				}
+			}
+			
+			if(false){
+				cout << "Infected compartments: ";
+				for(auto c : inf) cout << claa.comp[c].name << " ";
+				cout << endl;
+				
+				cout << "Equations for F:" << endl;
+				for(auto k = 0u; k < Feq_ref.size(); k++){
+					const auto &ref = Feq_ref[k];
+					const auto &eq = model.eqn[ref.e];
+					eq.print_calc("calc "+tstr(k),eq.linearise.pop_grad_calc[ref.i]);
+				}
+				
+				for(auto c = 0u; c < N; c++){
+					for(auto cc = 0u; cc < N; cc++){
+						if(F_eq[c][cc].size() == 0) cout << ".";
+						else{
+							for(auto re : F_eq[c][cc]){
+								cout << "+" << re.k << "(" << sp.comp_gl[re.c_from].name << ")";
+							}
+						}
+						cout << "  ";
+					}
+					cout << "  F" << endl;
+				}
+				
+				cout << "Equations for S:" << endl;
+				for(auto k = 0u; k < Seq_ref.size(); k++){
+					const auto &ref = Seq_ref[k];
+					const auto &eq = model.eqn[ref.e];
+					cout << k << " "<< eq.te_raw << endl;
+				}
+				
+				for(auto c = 0u; c < N; c++){
+					for(auto cc = 0u; cc < N; cc++){
+						if(S_eq[c][cc].size() == 0) cout << ".";
+						else{
+							for(auto re : S_eq[c][cc]){
+								if(re.sign == 1) cout << "+"; else cout << "-";
+								cout << re.k;
+							}
+						}
+						cout << "  ";
+					}
+					cout << "  S" << endl;
+				}
+			}
+		}
 	}
 }

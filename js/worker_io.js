@@ -41,7 +41,12 @@ function initialise_filters()
 }
 
 
-//function 
+/// Restores model if import has failed
+function restore_model()
+{
+	if(model_store != undefined) model = model_store;
+}
+
 
 /// Loads up a file
 function load_fi(file,file_type,heading,format,op)
@@ -67,6 +72,7 @@ function load_fi(file,file_type,heading,format,op)
 			try {
 				load_fi2(fileReader.result,file,file_type,heading,format,op);
 			}catch(e){
+				restore_model();
 				post(e);
 			}
 		}
@@ -120,7 +126,7 @@ function load_fi2(te,file,file_type,heading,format,op)
 		import_file(te,op.path,true); 
 		break;
 	
-	case "A matrix":
+	case "A matrix": case "Ainv matrix":
 		{
 			let sep = "comma";
 			if(format == "tsv") sep = "tab"; 
@@ -128,7 +134,7 @@ function load_fi2(te,file,file_type,heading,format,op)
 		
 			if(typeof tab == 'string'){ alertp(tab); return;}
 			else{
-				A_matrix_loaded(tab,op.p,op.i);
+				A_matrix_loaded(tab,op.p,op.i,file_type);
 				post({species:strip_heavy(model.species), info:file_type});
 			}
 		}
@@ -181,7 +187,7 @@ function add_A_pedigree(tab,p,i)
 	let sp = model.species[p];
 	let Amat = sp.ind_eff_group[i].A_matrix;
 
-	Amat.pedigree = true;
+	Amat.type = "pedigree";
 	Amat.loaded = true;
 	Amat.ind_list = [];
 	Amat.sire_list = [];
@@ -196,7 +202,7 @@ function add_A_pedigree(tab,p,i)
 
 
 /// The function is called when the A matrix is loaded
-function A_matrix_loaded(tab,p,i)
+function A_matrix_loaded(tab,p,i,file_type)
 {
 	if(tab.ncol == 0){ alertp("The data table does not have any columns"); return;}
 	if(tab.nrow == 0){ alertp("The data table does not have any rows"); return;}
@@ -224,8 +230,9 @@ function A_matrix_loaded(tab,p,i)
 	let Amat = sp.ind_eff_group[i].A_matrix;
 	Amat.ind_list = tab.heading;
 	Amat.loaded = true;
-	Amat.pedigree = false;
-	
+	Amat.type = "A";
+	if(file_type == "Ainv matrix") Amat.type = "Ainv";
+
 	Amat.A_value = [];
 	for(let r = 0; r < tab.nrow; r++){
 		Amat.A_value[r] = [];
@@ -1331,7 +1338,7 @@ function generate_trans_tree(get_inf_from,result,sample)
 	
 	if(fl == false) return;
 	
-	// Creates a hash table of inidividuals
+	// Creates a hash table of individuals
 	let hash_vec = []; 
 	for(let p = 0; p < sample.species.length; p++){
 		hash_vec[p] = new Hash();
@@ -1420,6 +1427,7 @@ function load_file_http(file,type)
 	try{
 		xhr.send();
 	}catch(e){
+		restore_model();
 		fl = true;
 	}
 	
@@ -1559,5 +1567,4 @@ function load_bici(file)
 	let te = load_file_http(file);
 	loading_mess("Processing...");
 	import_file(te,file,true);
-	
 }

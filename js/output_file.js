@@ -1134,50 +1134,81 @@ function create_output_ind_eff(p,file_list,one_file)
 				add_warning({mess:"Error in individual effects", mess2:"The A matrix for individual effects '"+name+"' must be loaded", warn_type:"A matrix"});
 			}
 			else{
-				if(mat.pedigree == true){
-					let file = get_unique_file("pedigree-"+name,file_list,'.csv');
-					
-					let data = 'ID,sire,dam'+endl;
-					
-					for(let c = 0; c < mat.ind_list.length; c++){ 
-						data += '"'+mat.ind_list[c]+'"'+",";
-						data += '"'+mat.sire_list[c]+'"'+",";
-						data += '"'+mat.dam_list[c]+'"'+endl;
-					}
+				switch(mat.type){
+				case "pedigree":
+					{
+						let file = get_unique_file("pedigree-"+name,file_list,'.csv');
 						
-					write_file_store(data,file,file_list);
-					if(one_file) file = get_one_file(file_list);
-					te += ' pedigree="'+file+'"';
-				}
-				else{
-					let file = get_unique_file("A-matrix-"+name,file_list,'.csv');
-					
-					if(true){                                   // Sparse representation
-						let file_ind = get_unique_file("ind-list-"+name,file_list,'.csv');
-					
-						let data_ind = 'Individual'+endl;
+						let data = 'ID,sire,dam'+endl;
+						
 						for(let c = 0; c < mat.ind_list.length; c++){ 
-							data_ind += '"'+mat.ind_list[c]+'"'+endl;
+							data += '"'+mat.ind_list[c]+'"'+",";
+							data += '"'+mat.sire_list[c]+'"'+",";
+							data += '"'+mat.dam_list[c]+'"'+endl;
 						}
-					
-						write_file_store(data_ind,file_ind,file_list);
-						if(one_file) file_ind = get_one_file(file_list);
-						te += ' ind-list="'+file_ind+'"';
-						
-						let data = 'j,i,value'+endl;
-						for(let r = 0; r <  mat.ind_list.length; r++){
-							for(let c = 0; c <= r; c++){
-								let val = mat.A_value[r][c];
-								
-								if(val != 0) data += r+","+c+","+val+endl;
-							}
-						}
-			
+							
 						write_file_store(data,file,file_list);
 						if(one_file) file = get_one_file(file_list);
-						te += ' A-sparse="'+file+'"';
+						te += ' pedigree="'+file+'"';
 					}
-					else{	
+					break;
+					
+				case "A": 
+					{
+						let file = get_unique_file("A-matrix-"+name,file_list,'.csv');
+						
+						if(true){                                   // Sparse representation
+							let file_ind = get_unique_file("ind-list-"+name,file_list,'.csv');
+						
+							let data_ind = 'Individual'+endl;
+							for(let c = 0; c < mat.ind_list.length; c++){ 
+								data_ind += '"'+mat.ind_list[c]+'"'+endl;
+							}
+						
+							write_file_store(data_ind,file_ind,file_list);
+							if(one_file) file_ind = get_one_file(file_list);
+							te += ' ind-list="'+file_ind+'"';
+							
+							let data = 'j,i,value'+endl;
+							for(let r = 0; r <  mat.ind_list.length; r++){
+								for(let c = 0; c <= r; c++){
+									let val = mat.A_value[r][c];
+									
+									if(val != 0) data += r+","+c+","+val+endl;
+								}
+							}
+				
+							write_file_store(data,file,file_list);
+							if(one_file) file = get_one_file(file_list);
+							te += ' A-sparse="'+file+'"';
+						}
+						else{	
+							let data = '';
+							for(let c = 0; c < mat.ind_list.length; c++){ 
+								if(c != 0) data += ',';
+								data += '"'+mat.ind_list[c]+'"';
+							}
+							data += endl;
+
+							for(let r = 0; r <  mat.ind_list.length; r++){
+								for(let c = 0; c < mat.ind_list.length; c++){ 
+									if(c != 0) data += ',';
+									data += mat.A_value[r][c];
+								}
+								data += endl;
+							}
+				
+							write_file_store(data,file,file_list);
+							if(one_file) file = get_one_file(file_list);
+							te += ' A="'+file+'"';
+						}
+					}
+					break;
+					
+				case "Ainv": 
+					{
+						let file = get_unique_file("Ainv-matrix-"+name,file_list,'.csv');
+					
 						let data = '';
 						for(let c = 0; c < mat.ind_list.length; c++){ 
 							if(c != 0) data += ',';
@@ -1192,11 +1223,12 @@ function create_output_ind_eff(p,file_list,one_file)
 							}
 							data += endl;
 						}
-			
+				
 						write_file_store(data,file,file_list);
 						if(one_file) file = get_one_file(file_list);
-						te += ' A="'+file+'"';
+						te += ' Ainv="'+file+'"';
 					}
+					break;
 				}
 			}
 		}		

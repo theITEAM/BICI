@@ -1,0 +1,2304 @@
+{
+  timepoint 0:0.5:100
+}
+
+<<STATE 1>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-155.626
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z20,1,Z14,1,Z6,1,Z1,1,Z7,1,Z11,2,Z3,1,Z2,1,Z1,1,Z1,1,Z4,1,2,1,2,1,1,3,Z1,1,1,2,2,2,Z1,1,1,3,1,2,Z1,1,Z1,3,Z3,3,1,Z1,2,Z1,2,2,1,1,Z1,4,2,1,Z1,4,Z1,1,3,Z1,2,1,Z1,2,Z3,1,Z2,1,Z1,2,1,Z1,1,1,Z1,1,2,Z1,2,1,Z3,2,Z1,1,1,1,Z7,1,Z1,1,Z2,1,Z2,1,Z8,1,Z6,1,Z7,1,Z4
+
+<<STATE 2>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-152.343
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z11,1,Z5,1,Z2,1,Z1,1,Z3,1,Z7,1,1,1,Z4,1,1,Z7,1,Z1,1,1,Z3,2,Z1,3,1,1,Z2,1,1,2,Z3,1,Z1,2,Z1,1,3,1,1,1,1,3,1,Z1,1,2,1,1,1,Z1,2,Z1,2,1,3,2,1,Z1,1,2,Z1,2,Z1,2,1,Z1,1,1,Z1,1,2,2,2,Z1,2,2,Z1,1,Z1,1,2,1,Z1,2,1,1,Z1,2,Z2,1,1,Z5,1,2,Z6,1,Z1,1,Z6,1,Z9,1,Z3,1,Z8,1,Z23
+
+<<STATE 3>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-161.363
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z8,1,Z4,1,Z10,1,Z1,2,Z6,1,Z6,1,Z7,3,Z5,1,Z2,1,Z1,1,1,1,Z3,1,Z3,1,Z2,1,Z1,2,3,Z1,1,1,1,2,Z1,1,Z1,2,Z1,1,1,Z2,1,Z1,2,3,2,1,3,1,2,1,1,2,1,Z2,1,1,Z1,1,Z1,1,Z2,2,3,3,2,2,1,1,1,4,2,Z1,1,2,Z3,2,2,1,Z2,3,1,Z5,1,Z4,1,Z6,1,1,Z7,1,Z4,1,Z4,1,Z2,1,Z11,1,Z12
+
+<<STATE 4>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-168.168
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z15,1,Z10,1,Z4,1,Z6,1,Z3,1,Z9,1,Z1,1,Z1,1,Z1,1,Z9,1,2,Z1,1,Z1,2,Z5,2,Z1,1,Z4,1,2,1,1,Z1,2,1,1,1,Z1,1,Z3,2,2,1,1,Z1,3,3,Z1,1,1,Z1,1,3,Z1,1,Z2,2,1,1,1,1,3,2,1,Z2,1,Z3,1,5,Z2,4,Z1,2,1,Z1,1,Z1,1,Z2,3,Z3,1,2,Z2,1,Z1,2,Z2,1,Z4,1,Z1,1,Z1,1,Z1,1,Z3,1,Z1,1,Z2,1,Z3,1,Z13,2,Z3
+
+<<STATE 5>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-162.973
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z40,1,1,Z6,1,Z13,1,Z4,1,1,Z2,1,Z1,1,Z2,1,1,Z2,2,Z5,1,1,Z1,1,2,Z3,1,2,Z2,2,1,Z2,1,1,1,Z3,2,1,Z2,1,1,5,2,1,4,Z1,3,1,1,Z1,2,3,2,Z1,1,Z4,2,Z1,1,2,Z1,3,Z2,1,Z1,1,1,2,Z1,1,Z1,2,Z3,1,Z1,1,Z2,1,Z2,2,1,Z1,3,3,1,Z3,2,1,Z6,1,Z7,1,1,1,Z1,1,1,Z2,1,Z2,1,Z3
+
+<<STATE 6>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-152.599
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z13,1,Z18,1,Z16,1,1,Z1,1,1,2,Z4,1,Z1,1,Z2,1,2,Z5,2,Z1,2,Z5,1,1,1,1,1,Z1,1,1,1,3,4,1,1,1,1,4,2,2,2,Z1,1,Z1,1,1,1,1,1,1,Z1,1,Z1,1,Z2,4,Z1,1,3,1,2,Z1,2,Z1,3,4,1,1,2,2,1,1,Z3,1,2,1,4,1,1,Z7,1,Z3,1,Z2,1,1,Z15,1,Z16,1,Z1,1,Z10
+
+<<STATE 7>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-157.102
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z28,1,Z3,1,Z2,1,Z5,1,1,Z1,1,Z2,1,Z1,1,Z8,1,1,1,1,2,1,2,1,1,1,2,Z1,3,Z3,1,1,1,Z1,1,2,1,1,Z1,1,1,Z1,2,2,1,Z1,1,3,1,3,1,Z5,1,Z1,2,1,2,1,1,2,3,2,2,3,1,2,Z1,2,Z2,1,4,Z1,1,Z1,3,2,Z1,1,Z10,1,2,Z10,3,1,Z2,1,Z3,1,Z3,1,Z2,1,Z8,2,Z16,1,Z9
+
+<<STATE 8>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-149.945
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z4,1,Z4,1,Z5,2,Z4,1,1,2,Z2,1,Z1,2,Z1,1,Z3,1,2,Z2,3,2,1,Z2,2,Z3,1,2,3,Z1,3,1,Z2,2,1,Z2,1,Z1,1,Z2,3,1,1,1,1,3,2,2,1,Z1,1,3,2,1,1,1,2,1,2,Z2,1,1,Z2,1,Z2,1,3,3,1,1,3,2,Z1,1,1,3,1,Z1,1,1,Z1,1,Z4,1,Z3,1,Z4,2,Z7,1,Z7,1,Z3,1,Z58
+
+<<STATE 9>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-157.671
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z21,1,Z3,1,Z2,1,Z7,2,Z4,1,Z1,1,Z3,1,Z5,1,1,Z4,1,Z1,1,Z2,1,1,Z2,2,Z1,2,1,Z1,1,Z1,3,1,3,Z1,2,1,1,1,Z1,2,Z1,1,3,Z2,1,2,Z1,3,Z1,1,Z1,1,1,Z1,3,Z1,2,3,2,Z1,1,1,2,Z1,1,3,2,1,Z3,1,1,Z1,1,Z3,2,Z2,2,1,1,Z2,1,Z3,2,1,2,2,Z1,2,1,1,1,Z1,1,1,2,Z1,1,Z1,1,Z1,1,Z4,1,Z26,1,Z13
+
+<<STATE 10>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-153.632
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z5,1,Z12,1,Z2,1,1,Z6,1,1,Z1,1,Z1,2,1,1,Z7,3,Z4,1,Z1,1,1,3,1,3,Z1,2,1,3,3,1,1,Z1,1,3,Z1,1,1,2,2,2,Z1,2,Z1,1,Z1,2,2,1,1,3,1,1,Z1,4,Z1,4,3,1,3,Z1,5,1,Z3,1,Z1,2,Z1,2,Z3,1,Z4,1,Z4,2,Z1,1,Z4,1,1,Z5,1,Z6,3,Z29,1,Z3,1,Z29
+
+<<STATE 11>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-144.244
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z12,1,2,Z1,1,Z1,1,2,1,Z3,2,1,1,Z1,2,2,1,1,1,1,1,1,1,1,5,3,1,Z1,1,1,2,Z3,1,Z1,3,Z1,1,1,2,2,2,2,Z1,2,3,1,4,2,Z2,2,1,3,Z1,1,1,Z4,1,Z1,2,2,Z2,2,1,1,1,1,1,1,1,Z3,1,Z3,1,5,1,Z1,2,1,1,Z7,1,Z6,1,Z17,1,Z64
+
+<<STATE 12>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-151.868
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z45,1,Z7,1,Z15,1,Z2,1,Z1,1,Z2,1,1,1,Z2,2,Z4,1,Z2,1,1,Z1,1,Z2,1,Z2,1,1,1,1,2,Z1,1,1,Z2,1,1,1,2,Z2,4,1,Z1,1,1,Z1,1,Z1,1,1,3,2,Z1,1,Z1,1,2,Z2,1,2,Z1,2,Z1,1,2,2,3,Z3,3,Z1,3,1,Z1,2,1,2,1,2,1,Z2,2,2,Z2,3,Z5,2,Z1,1,1,Z6,1,Z4,1,Z7,3,Z3,1,Z3
+
+<<STATE 13>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-151.932
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:1,Z26,1,Z7,1,3,1,1,Z5,1,1,1,Z1,1,Z2,1,2,1,1,Z1,1,1,Z1,2,2,Z1,4,1,Z2,3,Z1,3,1,1,1,1,Z1,1,1,3,2,1,Z1,2,1,2,Z1,1,Z2,1,3,5,1,1,Z1,1,Z1,1,1,4,Z1,3,1,1,2,1,Z1,1,1,1,Z1,1,Z1,1,3,Z1,1,Z1,2,1,Z2,1,Z1,1,Z1,1,1,Z1,2,Z3,1,Z12,1,Z6,1,Z13,2,Z34
+
+<<STATE 14>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-147.328
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z12,1,Z5,1,1,Z1,2,Z3,1,Z2,1,Z4,1,Z2,2,1,Z7,1,1,Z2,2,Z2,1,1,3,Z1,1,1,3,Z1,1,1,Z1,1,Z1,1,1,1,2,2,3,Z1,1,2,1,Z1,2,6,2,1,3,1,2,1,2,Z2,1,1,3,Z1,2,2,2,Z4,1,1,1,1,2,2,1,1,Z1,1,Z1,1,1,Z1,1,Z1,1,1,Z1,1,Z1,1,Z3,1,1,1,1,Z1,1,Z1,1,Z16,1,1,Z26,1,Z24
+
+<<STATE 15>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-156.374
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z22,1,Z7,1,Z7,1,Z29,1,Z2,1,1,Z1,1,1,1,Z1,1,Z3,1,1,Z1,1,1,2,1,2,Z2,1,Z1,2,Z1,1,1,1,2,Z1,2,1,Z1,2,1,1,2,1,1,Z1,2,3,Z3,2,3,Z1,2,1,Z1,1,1,2,1,Z2,4,2,3,Z1,1,Z1,3,3,Z2,1,Z3,2,Z1,2,1,1,1,1,1,Z1,1,Z6,1,3,Z7,1,1,Z3,1,Z1,1,1,Z3,1,Z5,2,Z2,1,1,Z9,1
+
+<<STATE 16>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-148.576
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z25,1,Z4,1,Z4,2,1,Z5,2,Z3,1,1,1,1,Z5,1,1,Z1,2,Z2,2,1,Z1,1,1,1,1,Z1,1,Z1,1,1,1,1,3,3,1,Z1,2,Z1,1,2,3,Z2,1,2,2,1,1,Z1,1,1,3,3,3,Z1,1,3,1,Z2,1,1,1,2,3,2,1,1,1,1,Z2,2,Z1,3,1,Z2,1,1,Z1,2,Z1,1,1,Z3,1,Z2,1,Z4,1,Z13,1,Z4,1,Z2,1,Z2,1,Z5,1,Z4,1,Z24
+
+<<STATE 17>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-172.472
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z22,1,Z4,1,Z2,1,Z2,1,Z14,1,Z1,1,1,Z1,1,Z2,1,Z3,2,1,1,2,Z3,1,Z4,1,2,2,1,1,Z1,2,Z1,5,1,2,2,Z1,1,Z1,1,Z1,3,Z1,2,1,1,Z1,1,1,Z4,1,Z2,2,Z2,2,Z2,1,1,Z1,1,3,1,Z1,1,Z1,2,2,2,Z2,2,1,1,2,Z2,3,Z1,1,Z1,3,Z3,1,Z1,2,Z5,1,1,Z5,3,Z1,1,1,Z1,1,1,Z1,1,Z6,1,Z5,2,1,Z10,1,1,Z11,1
+
+<<STATE 18>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-153.454
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z8,1,Z12,2,1,Z7,1,Z6,1,Z1,1,Z1,1,Z3,1,1,1,2,2,Z1,2,1,Z1,1,1,Z1,3,3,Z2,1,Z4,1,Z1,3,1,2,1,1,4,1,1,1,3,1,1,1,2,2,1,Z1,1,1,4,1,Z1,2,Z3,2,1,Z1,4,1,1,1,1,Z1,1,Z1,2,3,Z1,1,Z1,1,1,Z1,1,1,Z1,1,Z1,2,Z2,1,1,Z1,1,Z3,1,Z4,1,Z4,1,Z4,2,Z9,1,Z1,1,Z7,1,Z2,1,Z33
+
+<<STATE 19>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-159.918
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z14,1,Z17,1,Z1,1,1,Z1,1,Z5,1,Z1,1,Z1,1,1,Z1,1,1,Z13,1,1,Z1,1,2,Z1,1,1,1,1,2,Z1,2,1,Z1,2,Z1,4,Z2,1,1,1,1,Z1,5,1,Z1,1,Z1,1,2,2,5,1,2,1,1,1,3,Z1,2,Z1,1,Z2,1,Z2,1,2,1,3,Z1,2,Z1,2,1,Z7,1,1,3,Z1,1,1,1,2,Z5,1,4,Z1,1,1,Z8,2,Z9,1,Z5,1,Z1,1,Z25
+
+<<STATE 20>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-162.406
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z5,1,Z4,1,1,Z4,1,Z13,1,1,Z4,1,Z4,1,Z2,1,Z2,1,1,1,1,1,Z5,2,1,Z2,1,Z2,1,Z1,3,2,2,2,2,2,4,4,1,1,2,2,2,1,Z3,3,Z1,2,1,1,Z1,1,3,2,Z6,1,1,4,1,Z1,1,1,Z2,1,1,Z1,1,Z1,3,Z2,1,1,Z1,2,Z4,4,1,1,1,Z2,1,Z3,1,1,1,Z1,1,1,Z7,1,1,Z15,1,Z8,1,Z2,1,Z2,1,Z21
+
+<<STATE 21>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-158.633
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z10,1,Z12,1,Z1,1,Z1,1,Z5,2,Z4,1,Z1,1,1,Z3,2,Z1,1,2,1,1,Z1,1,1,1,1,Z2,1,Z1,2,Z2,2,Z1,2,1,Z2,2,Z1,2,Z1,1,Z1,4,3,Z1,3,1,1,1,4,Z1,2,Z1,2,Z1,1,2,1,1,Z1,2,Z1,1,Z2,1,5,3,Z2,2,2,Z4,1,Z4,1,2,2,3,Z1,1,2,2,2,Z3,1,Z1,1,Z2,2,Z6,1,Z5,1,Z2,1,Z16,1,Z12,1,Z22
+
+<<STATE 22>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-151.685
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z6,1,Z39,1,1,Z1,1,Z7,1,Z2,1,Z2,2,Z3,1,Z5,1,1,Z2,1,1,1,Z2,1,Z1,2,Z5,1,Z1,1,2,2,1,1,1,4,1,Z1,1,1,2,1,1,1,Z2,1,2,1,Z1,3,2,5,1,Z2,1,1,3,2,2,2,1,Z2,1,1,1,1,Z3,2,2,2,2,1,1,2,3,Z1,1,1,Z1,2,Z2,1,1,1,1,Z3,1,Z6,1,1,1,1,Z14,2,1,Z16
+
+<<STATE 23>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-168.246
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z18,1,Z11,1,Z10,1,Z2,1,Z2,1,Z7,1,1,1,Z3,1,Z4,2,Z1,2,Z2,1,Z2,1,Z1,2,Z1,1,Z1,1,Z2,1,Z1,1,1,Z2,1,Z2,1,Z2,2,3,1,Z3,2,1,Z5,2,4,4,2,1,Z1,3,1,Z1,2,Z1,3,4,2,Z2,2,3,Z1,1,2,1,1,1,2,Z1,1,Z1,2,1,1,2,Z2,1,2,Z3,1,Z1,1,1,1,Z1,2,Z5,1,1,Z1,1,Z4,1,Z4,1,Z1,1,1,Z15,1,Z4,1,Z2,2
+
+<<STATE 24>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-161.805
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z2,1,Z32,1,2,Z2,2,Z9,1,Z2,1,1,Z2,1,Z1,1,1,Z2,1,Z1,1,Z2,1,1,Z2,1,Z1,2,Z1,2,1,Z1,1,1,Z1,2,Z2,1,1,2,Z2,1,Z1,1,Z4,1,1,2,3,Z3,2,1,1,1,1,2,1,Z1,2,1,1,1,Z1,3,1,1,3,Z1,1,3,Z1,1,1,1,3,1,Z1,3,2,Z2,2,1,2,Z1,1,2,Z2,1,1,Z5,1,Z7,1,Z1,1,1,Z8,1,3,Z3,1,Z1,1,Z1,1,Z21
+
+<<STATE 25>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-147.116
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z2,1,Z5,1,Z9,1,Z11,1,Z1,1,Z8,1,Z1,1,1,Z4,1,1,1,Z3,2,Z2,2,Z1,1,Z1,2,1,2,2,Z3,1,Z2,1,Z1,1,1,Z1,2,1,2,4,2,1,4,2,2,1,1,1,Z1,1,4,4,Z1,1,1,2,1,2,1,3,Z1,1,3,2,Z3,1,2,1,1,4,2,Z2,2,1,Z3,1,Z3,1,1,1,Z6,2,Z2,1,Z1,1,1,Z44,1,Z14
+
+<<STATE 26>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-146.534
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z13,1,Z49,1,Z12,1,Z7,1,1,Z4,2,2,Z3,1,2,2,Z1,1,Z4,2,Z1,1,1,1,1,2,2,1,2,Z3,1,1,Z5,1,1,Z1,1,2,1,1,2,1,Z1,1,1,1,1,1,2,Z2,1,1,1,1,1,2,2,2,Z1,1,1,2,2,2,3,Z1,1,Z1,2,3,1,Z3,3,2,1,1,Z2,5,Z1,1,Z4,1,Z1,2,Z1,1,Z6,1,Z9
+
+<<STATE 27>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-147.515
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z7,1,Z5,1,Z3,1,Z2,1,1,Z2,1,1,1,1,Z6,1,1,Z4,1,Z1,2,1,1,Z1,1,Z1,1,Z1,3,4,1,Z2,5,Z1,5,3,Z1,2,1,1,1,2,3,1,1,Z1,1,1,Z1,1,1,Z1,3,2,1,1,Z1,1,2,1,2,1,2,Z2,2,2,2,Z1,1,Z2,1,1,Z3,1,2,1,2,2,2,Z2,1,1,Z6,1,Z1,2,1,Z8,1,Z1,1,Z4,1,Z11,1,Z52
+
+<<STATE 28>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-133.092
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z54,1,Z34,1,Z9,1,1,Z1,1,Z4,1,Z3,1,3,Z2,2,Z1,1,1,Z1,2,2,1,2,1,Z2,1,Z1,2,2,Z4,2,Z1,1,1,Z1,2,2,Z1,1,1,2,1,Z1,2,2,1,Z1,1,1,Z3,4,Z1,1,1,Z1,1,1,1,2,Z1,1,1,1,3,1,2,1,1,Z1,1,Z2,1,2,1,Z4,3,Z1,1,Z1,1,1,Z2,1,Z2,1,Z1,1
+
+<<STATE 29>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-153.851
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z24,1,Z21,1,Z1,1,Z10,1,Z2,1,Z12,1,Z10,1,1,1,1,Z1,2,Z1,3,2,3,1,Z1,1,2,Z4,1,2,Z1,1,1,Z2,2,1,1,1,Z3,5,2,1,1,Z3,2,1,2,2,Z1,1,3,1,2,1,Z2,1,1,1,1,Z3,1,1,3,1,3,Z1,3,2,Z3,1,Z1,1,1,1,Z1,2,1,Z1,1,1,1,Z2,1,1,Z4,1,1,1,1,Z3,1,Z5,1,Z6,1,Z4
+
+<<STATE 30>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-154.082
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z36,1,Z11,1,Z2,1,Z14,1,Z4,1,1,Z2,1,Z1,1,Z2,1,Z4,1,2,Z6,1,Z1,2,Z5,2,3,Z1,2,2,1,3,Z2,2,1,Z1,2,2,Z1,1,3,Z1,2,2,1,Z1,2,Z1,1,1,2,1,1,Z1,5,1,Z1,1,4,1,2,1,1,2,2,Z2,1,1,1,1,1,1,Z1,1,Z2,1,Z1,1,2,Z1,1,2,1,2,Z4,4,1,Z2,1,Z1,1,Z2,1,Z5,1,Z4,1,Z5,1,Z6
+
+<<STATE 31>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-161.053
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z4,1,Z3,1,Z1,1,Z11,1,Z5,1,Z5,1,Z1,1,Z6,1,Z2,1,Z3,1,2,Z4,2,Z1,2,1,1,Z3,1,Z1,3,2,1,Z5,1,1,1,1,Z1,1,1,Z1,2,1,Z1,5,2,1,1,3,1,1,1,Z2,2,1,2,Z2,2,1,3,2,Z1,1,Z2,1,Z1,1,1,Z1,2,3,1,Z2,2,Z1,1,Z1,2,Z1,2,Z1,1,2,Z1,1,1,1,1,Z1,1,2,1,Z1,1,Z9,1,Z1,2,Z1,1,Z5,1,Z4,1,Z1,1,Z1,1,Z32
+
+<<STATE 32>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-149.729
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z4,1,Z11,1,Z8,1,Z2,1,Z2,1,Z3,1,Z8,1,2,1,1,Z1,2,Z5,1,2,2,Z1,2,1,Z1,1,2,2,Z1,1,Z2,1,2,2,2,2,Z3,3,1,Z1,2,Z1,1,2,Z1,1,Z1,1,3,1,Z1,1,2,1,1,1,2,2,1,1,2,3,1,3,Z3,2,1,Z1,1,1,1,1,Z1,1,Z2,1,1,2,1,Z1,1,Z1,2,1,1,1,1,Z2,1,Z2,2,Z8,1,Z2,1,Z11,1,Z30,1,Z9
+
+<<STATE 33>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-153.64
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z19,1,Z10,1,Z3,1,Z6,1,Z1,2,Z2,1,1,2,Z5,1,1,2,Z2,1,1,1,3,Z1,3,Z1,1,2,Z3,1,1,Z3,1,3,Z3,1,1,2,Z2,1,2,2,1,1,1,1,2,Z1,1,3,2,2,Z1,2,1,1,1,2,1,Z1,1,1,1,1,Z2,2,2,2,Z3,2,1,Z1,1,2,Z1,1,1,1,1,Z2,3,1,Z1,1,2,1,Z3,1,Z4,1,Z1,1,Z1,1,3,Z15,1,Z9,1,Z23
+
+<<STATE 34>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-159.578
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z10,1,Z3,1,Z14,2,Z4,3,Z1,2,Z4,2,Z2,1,Z1,1,Z1,1,1,1,Z4,2,1,Z1,2,1,4,1,2,1,1,Z2,1,1,1,1,Z1,1,2,Z2,4,Z1,1,1,Z1,2,2,1,Z1,2,Z3,1,2,3,1,2,1,1,Z1,2,Z1,2,1,1,1,Z1,2,1,3,Z2,1,1,2,Z2,3,1,1,Z5,1,1,Z3,1,2,1,Z3,3,Z3,1,2,Z4,1,Z4,1,Z1,1,Z35,1,Z13
+
+<<STATE 35>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-165.076
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z12,1,Z30,1,1,Z2,2,1,Z1,1,Z1,1,Z3,2,1,1,1,1,Z2,1,Z2,1,Z1,1,1,Z1,2,1,2,1,Z1,3,1,Z4,1,Z1,1,1,Z5,3,Z4,2,2,1,Z1,1,Z1,1,1,Z3,2,2,1,3,1,1,Z2,3,2,Z1,3,Z1,2,1,3,1,Z2,1,1,1,Z3,2,2,Z1,1,1,1,Z1,2,1,1,Z1,1,Z1,2,Z1,1,Z1,1,1,1,Z3,2,Z3,1,Z2,1,Z1,1,Z1,1,Z2,1,Z1,1,Z7,1,Z2,1,Z15,1,Z1
+
+<<STATE 36>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-154.31
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z32,1,Z19,1,Z15,1,Z6,2,Z3,2,1,1,1,Z1,1,1,1,1,1,Z2,1,2,1,Z1,1,1,1,1,Z1,1,Z1,2,3,Z1,2,1,2,2,1,1,2,Z1,1,1,1,Z1,2,1,1,Z1,2,3,Z1,1,Z1,2,1,3,Z1,1,Z2,1,1,Z1,1,Z1,1,Z1,1,1,1,3,Z1,1,Z3,1,Z1,1,2,1,Z1,2,2,2,Z2,1,1,1,Z9,1,1,Z2,2,1,Z3,3,Z2,1,Z6,1,Z1,1,Z2,1,Z2,1
+
+<<STATE 37>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-146.725
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z9,1,Z5,1,Z20,1,Z10,1,1,1,1,Z1,1,2,1,2,1,1,1,Z2,2,2,1,1,2,Z1,4,Z1,1,Z2,2,1,3,2,2,Z1,1,1,1,3,2,Z1,1,1,1,2,1,1,1,Z2,3,1,1,1,1,3,2,2,3,4,Z2,1,3,1,Z2,1,Z1,2,Z1,3,Z2,2,Z1,1,Z3,1,Z4,2,Z6,1,Z6,2,Z2,1,Z2,1,Z5,1,Z37,1,Z7
+
+<<STATE 38>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-162.383
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:1,Z11,1,Z8,1,Z1,1,Z6,1,2,Z11,2,1,Z2,1,Z2,1,1,1,Z3,1,Z3,2,Z2,1,1,1,3,Z1,1,1,Z3,1,1,3,2,Z1,1,Z2,1,1,1,2,3,1,1,1,2,Z1,2,2,1,2,1,2,Z3,1,Z1,2,1,2,1,2,1,Z1,1,2,1,Z3,2,Z1,4,Z1,1,3,1,Z4,1,Z2,1,1,Z1,2,Z1,2,Z1,2,Z2,1,Z1,1,Z2,1,Z1,1,Z9,2,1,Z12,1,1,Z17,1,Z10
+
+<<STATE 39>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-153.855
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z2,1,1,Z2,1,Z4,1,2,Z3,1,1,Z2,3,Z6,1,2,Z1,1,2,1,1,1,Z2,3,Z1,1,Z1,1,1,Z2,1,Z1,1,1,Z1,1,4,2,2,Z2,4,1,2,2,1,3,1,1,1,1,Z1,1,Z1,3,1,1,1,1,1,2,Z4,1,1,1,1,2,2,Z3,1,Z2,3,1,1,Z2,1,2,2,1,Z1,1,Z2,1,Z4,1,1,1,Z1,1,Z1,1,Z3,1,2,1,Z1,1,Z20,1,Z9,1,Z44
+
+<<STATE 40>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-147.552
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z13,1,Z16,1,Z23,1,Z2,1,Z7,1,Z2,1,Z1,1,1,2,Z1,1,1,1,Z3,1,2,Z1,2,1,2,Z1,2,2,2,Z1,2,Z2,2,2,1,1,1,Z1,1,6,1,1,Z1,4,2,1,2,2,Z1,1,3,1,Z1,1,1,1,1,Z1,1,Z1,1,3,1,Z1,1,2,2,2,1,1,1,Z1,2,Z3,1,Z3,2,Z4,1,2,Z1,1,Z2,1,3,Z2,1,1,Z6,2,Z7,1,Z26
+
+<<STATE 41>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-162.284
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z1,1,Z2,1,Z30,1,Z4,1,Z3,2,Z2,1,Z4,1,Z3,1,1,Z1,1,1,1,Z5,1,Z1,1,1,Z2,1,Z1,1,1,1,Z1,1,Z2,1,2,Z2,2,1,1,2,1,1,1,1,1,Z2,1,Z1,1,2,3,2,1,2,1,2,2,1,Z1,2,Z1,2,Z1,1,1,1,2,Z1,1,Z1,1,2,1,2,1,Z1,2,2,1,Z2,2,1,Z1,1,Z2,1,Z2,1,Z2,2,Z5,2,1,Z2,1,1,Z2,2,Z1,1,Z7,2,1,1,Z7,2,1,Z6,1,Z6,1,Z6
+
+<<STATE 42>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-158.023
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z7,1,Z10,1,Z3,1,Z11,1,1,Z4,1,Z1,1,Z1,2,Z2,1,Z2,1,2,1,1,Z1,1,Z2,1,Z2,2,Z2,2,Z1,1,2,2,Z2,2,Z1,1,1,Z1,3,Z1,2,2,1,Z1,2,2,Z1,2,2,3,Z1,1,Z1,1,1,Z2,1,3,3,1,1,Z2,2,Z1,1,2,2,Z1,1,1,1,Z1,1,Z4,2,1,1,Z1,1,2,Z1,2,2,2,2,1,Z2,1,Z1,1,Z1,1,1,Z7,1,Z2,1,Z2,1,Z13,1,Z1,1,Z20,1,Z1,1,Z10
+
+<<STATE 43>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-158.107
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z1,1,Z7,1,Z8,1,Z5,1,Z5,1,1,Z4,2,Z1,1,Z4,1,Z6,2,2,1,3,Z1,2,Z1,1,Z1,1,1,Z2,5,2,Z1,2,Z1,1,1,3,Z1,2,1,1,2,1,Z2,1,4,1,Z1,2,2,Z1,2,Z2,2,2,1,4,Z1,3,2,1,3,Z1,1,Z2,3,Z1,1,1,1,1,1,Z1,1,Z2,2,Z7,1,Z4,1,Z2,1,1,Z3,1,Z1,1,2,Z2,1,Z1,1,1,Z3,1,Z8,1,Z6,1,Z36
+
+<<STATE 44>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-147.266
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z37,1,1,Z6,1,Z2,2,Z1,1,Z1,1,Z1,1,Z4,1,2,1,Z2,1,Z1,2,1,Z1,1,1,Z2,1,1,1,Z3,1,1,Z1,1,Z1,1,2,2,1,1,3,Z1,1,2,1,3,Z2,3,1,3,Z1,2,Z1,1,Z1,1,2,1,1,Z2,2,2,1,3,4,3,1,2,Z1,1,1,Z1,3,Z1,1,Z1,1,1,Z2,2,1,1,Z2,1,Z1,2,Z1,1,Z4,1,Z1,1,Z4,1,Z1,1,1,1,Z7,1,Z9,1,Z25
+
+<<STATE 45>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-160.173
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:1,1,Z3,1,Z3,1,1,Z3,2,Z3,1,Z3,1,1,Z3,1,1,Z1,1,1,Z1,1,Z1,1,Z2,1,Z1,1,1,Z1,3,Z1,2,Z1,1,1,Z1,1,Z1,3,1,2,1,Z1,2,3,1,3,Z1,1,Z1,1,1,Z1,1,Z2,4,2,1,2,1,Z1,4,Z1,1,1,Z1,1,1,Z3,2,1,Z1,2,Z2,1,1,1,2,Z2,1,3,1,1,Z1,1,1,1,1,Z1,2,1,1,Z3,1,1,Z8,1,Z1,2,Z2,1,Z13,1,Z16,1,Z3,1,Z5,1,Z29
+
+<<STATE 46>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-153.998
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z2,1,Z2,1,1,Z8,1,Z6,1,2,Z4,2,Z1,1,Z6,2,1,Z1,1,Z2,1,Z1,1,Z1,1,1,Z3,1,3,2,Z2,2,3,4,2,2,Z1,1,3,2,1,Z2,1,2,1,1,5,1,2,Z1,2,1,1,Z1,3,Z2,1,Z2,1,2,2,1,2,1,2,1,Z1,1,3,1,1,Z1,1,1,1,Z1,2,1,Z3,1,Z1,1,Z1,1,Z8,1,Z3,1,Z5,1,Z5,2,Z5,1,Z13,1,Z20,1,Z19
+
+<<STATE 47>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-142.772
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z9,1,Z20,1,Z1,1,Z15,1,Z2,1,Z2,1,1,Z1,1,Z5,1,Z1,1,Z1,1,Z1,2,Z1,1,Z1,1,Z1,1,1,2,1,2,2,4,2,Z1,1,2,5,3,1,4,3,1,2,1,Z1,3,1,2,Z1,3,1,2,1,1,3,2,Z2,2,Z1,1,2,Z3,3,1,Z2,2,1,Z2,1,Z3,1,1,3,1,1,1,Z3,1,Z4,1,Z2,1,Z3,1,Z2,2,Z9,1,Z38
+
+<<STATE 48>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-150.411
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z12,1,Z36,1,Z1,1,Z9,1,1,Z1,1,Z1,1,1,Z5,2,Z1,2,2,1,1,2,Z2,2,1,1,Z1,1,1,1,Z1,3,Z2,1,1,Z1,1,Z1,1,2,2,2,3,1,Z1,1,2,1,Z1,1,Z1,1,Z2,3,1,2,1,1,Z1,1,Z1,2,1,1,2,3,3,2,2,2,Z1,1,1,2,1,Z2,1,1,Z1,2,2,2,Z3,2,Z3,1,Z2,1,Z4,1,Z2,1,1,Z12,1,Z19,1,1,Z1,1
+
+<<STATE 49>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-154.509
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z7,1,Z3,1,Z24,1,Z18,1,Z11,2,Z3,1,Z9,1,1,Z1,1,1,Z4,1,3,Z1,1,Z2,1,2,Z3,2,1,1,1,1,2,1,1,3,2,2,1,1,2,1,2,2,Z1,2,1,Z1,2,Z1,2,2,1,2,3,3,2,Z1,2,1,Z1,2,1,Z1,1,Z1,2,2,Z1,2,1,1,Z5,1,2,4,1,Z3,1,1,Z3,1,Z4,1,1,Z1,1,Z3,1,Z6,3,Z8,2,Z8
+
+<<STATE 50>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-154.269
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z12,1,Z39,1,1,Z12,1,Z2,1,Z2,1,Z6,1,1,Z2,1,3,2,1,1,Z4,2,1,1,Z1,1,Z2,1,Z1,1,1,Z1,1,1,2,Z1,2,1,Z1,1,2,4,3,2,2,1,1,1,Z1,2,3,Z1,1,1,Z1,1,3,Z1,1,Z1,1,1,1,1,Z2,1,1,2,Z2,1,1,2,4,Z1,3,Z2,1,Z1,1,1,Z2,2,3,Z2,2,1,4,Z7,2,Z2,1,1,Z22,1,Z1
+
+<<STATE 51>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-156.02
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z6,1,Z3,1,1,Z27,1,Z3,1,Z4,1,Z1,3,Z3,1,Z8,1,1,Z1,1,Z2,1,Z3,3,1,Z2,1,Z1,2,Z2,1,1,Z2,2,Z2,1,1,3,1,1,1,Z1,2,Z2,1,1,2,1,2,1,1,2,1,5,Z2,2,1,1,1,2,5,4,Z1,1,Z1,2,1,2,Z2,1,2,1,1,1,1,Z2,2,1,1,1,1,1,1,Z1,1,Z1,2,Z2,1,1,1,Z1,2,Z1,1,Z8,1,Z24,1,Z12
+
+<<STATE 52>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-148.183
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z32,1,Z8,1,Z8,1,Z2,1,Z2,1,Z1,1,1,Z1,1,Z6,1,3,Z4,2,Z1,1,1,Z1,2,Z4,2,1,1,Z1,2,2,1,Z1,3,Z1,1,Z1,2,1,2,3,Z1,4,2,Z2,3,3,1,1,2,2,1,3,1,1,2,Z1,3,Z1,2,1,1,Z1,1,1,1,Z4,1,2,Z1,2,1,1,1,1,Z1,1,Z2,1,2,Z4,1,1,2,2,1,1,1,Z3,1,Z7,1,Z23,1,Z9
+
+<<STATE 53>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-152.204
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z21,1,Z5,1,Z4,1,Z1,1,Z5,1,Z3,1,Z7,1,Z3,1,Z2,1,1,Z3,1,Z4,1,2,1,1,1,Z3,2,Z1,1,5,2,2,1,3,1,1,Z1,1,2,3,5,1,Z1,2,Z1,1,2,4,3,2,2,1,Z2,2,Z1,1,Z2,1,3,2,1,1,Z2,3,1,2,Z1,1,1,Z3,1,Z1,1,Z1,1,Z2,2,Z1,1,Z2,2,Z1,1,Z2,1,Z3,2,Z11,1,1,Z1,1,Z3,1,Z4,1,Z28
+
+<<STATE 54>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-157.158
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z10,1,Z5,1,Z7,1,1,1,1,Z2,1,Z1,1,Z1,2,Z1,1,Z5,1,Z1,2,2,Z1,1,2,Z1,1,2,2,1,Z2,1,1,1,1,3,Z1,1,1,2,Z1,2,2,2,2,2,2,2,3,2,1,Z9,1,3,2,Z1,1,1,Z1,2,2,Z1,1,Z1,1,1,2,1,1,4,1,1,Z1,1,Z1,1,Z3,2,Z3,1,1,Z1,1,Z2,1,Z5,1,Z6,1,2,Z5,1,1,Z1,1,Z6,1,Z4,1,Z6,1,Z20,1,Z14
+
+<<STATE 55>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-162.466
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z13,1,Z6,1,Z25,1,Z1,1,Z5,1,Z2,1,Z7,1,2,Z5,1,Z1,2,Z5,2,Z6,2,Z3,1,Z1,1,Z2,2,1,2,1,Z1,1,Z2,3,Z1,1,1,1,1,3,1,1,2,Z1,1,2,1,Z2,2,1,2,1,Z1,1,1,Z2,1,1,Z2,1,Z1,1,1,1,Z2,2,1,2,1,2,Z1,2,Z1,3,Z1,2,Z2,2,2,1,Z1,1,2,Z1,1,Z1,1,Z1,1,1,Z4,1,Z3,1,Z2,1,Z1,1,Z1,1,Z1,1,Z2,1,1,Z2,2,Z1,1,Z7
+
+<<STATE 56>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-92.4872
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z107,1,Z16,1,Z1,1,Z18,1,Z1,1,Z2,2,Z1,2,Z5,2,Z3,2,1,1,2,1,1,Z1,3,Z1,1,2,Z1,1,2,3,1,1,1,Z1,1,1,1,Z2,2,1,Z1,3,1,Z2,6,Z1,2,Z1,1,2,Z1
+
+<<STATE 57>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-155.628
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z35,1,Z3,1,Z2,1,Z15,2,Z9,1,1,Z10,1,Z4,2,Z9,1,1,Z1,1,1,1,Z3,1,Z2,1,Z2,1,1,2,Z4,1,1,1,Z1,1,1,1,2,1,Z3,1,3,1,2,1,3,2,1,Z1,1,1,3,Z2,4,Z1,1,3,1,4,Z1,1,Z1,1,2,Z2,1,2,Z1,2,2,Z4,2,2,Z1,1,Z2,1,Z2,2,Z1,1,1,Z1,1,1,Z2,1,Z2,2,1,1,1,1,Z2,1,Z1,1,Z4
+
+<<STATE 58>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-154.221
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z7,1,Z17,1,Z37,1,Z4,1,Z1,2,1,Z2,1,Z5,1,Z6,1,Z3,1,Z4,2,Z4,2,1,1,1,Z2,2,Z3,1,2,1,1,Z3,1,1,Z4,1,2,Z2,2,Z3,1,1,1,1,1,1,Z1,1,1,Z2,1,1,1,Z1,1,2,4,3,2,1,2,3,2,1,2,2,3,Z1,1,Z3,1,Z2,2,1,Z1,1,1,1,Z3,1,2,Z1,1,Z7,1,Z1,1,Z2,2,Z1,1,Z1,1,Z2
+
+<<STATE 59>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-153.078
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z12,1,Z18,1,Z5,1,Z2,1,Z4,1,2,Z8,1,1,1,1,Z1,1,1,Z1,1,Z1,1,1,1,1,1,Z1,1,Z1,1,1,2,Z2,1,2,1,2,2,Z1,1,2,Z1,2,Z2,3,Z1,2,1,Z1,1,1,1,2,Z2,1,1,4,2,2,4,Z2,2,2,Z2,2,1,Z1,1,Z1,1,Z1,2,1,Z1,5,1,1,Z1,1,3,Z6,1,1,Z1,2,Z3,1,Z1,1,2,Z5,2,1,Z3,1,Z3,1,Z7,1,Z31
+
+<<STATE 60>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-138.666
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z63,2,Z17,1,Z1,1,Z2,1,Z6,1,Z1,1,Z15,1,Z2,1,2,1,2,Z1,1,Z4,1,2,2,1,2,Z2,3,Z1,1,2,1,2,2,1,1,1,Z2,2,Z1,2,3,Z1,1,1,Z2,1,1,Z1,3,2,1,2,1,4,1,1,Z2,1,1,Z2,1,1,1,5,2,2,1,Z1,3,1,1,Z1,1,1,Z10,1,1,Z1,1,Z3
+
+<<STATE 61>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-113.43
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z82,1,Z18,1,Z1,1,Z4,1,Z8,1,Z5,2,1,Z7,1,Z3,1,Z1,1,Z6,1,1,2,Z2,1,2,Z2,1,Z1,3,2,3,1,Z1,2,1,Z1,2,1,2,1,3,2,1,2,1,Z3,2,1,2,1,1,1,1,Z2,2,1,3,2,2,1,2,3,1,3,Z1,2,1,Z2
+
+<<STATE 62>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-152.934
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z13,1,Z13,1,1,Z1,1,Z27,2,Z5,1,Z1,1,Z3,1,1,2,Z1,1,Z6,1,1,1,1,Z1,1,Z1,2,Z1,1,Z2,1,1,1,2,Z1,1,Z5,1,1,Z1,2,1,1,1,Z1,2,Z1,2,2,1,1,Z1,1,4,1,2,Z1,4,1,Z1,2,2,2,1,Z1,1,Z2,3,2,2,3,Z1,3,2,1,3,Z2,1,1,Z1,2,1,1,Z1,2,Z1,1,Z5,1,1,Z5,1,1,Z2,1,Z27
+
+<<STATE 63>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-148.085
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z10,1,Z4,1,Z9,1,Z19,1,Z1,2,Z2,1,Z2,2,Z2,1,Z1,1,Z1,1,Z1,1,Z6,2,Z2,2,1,Z2,2,Z1,2,Z3,1,3,1,Z1,1,1,1,2,2,1,3,1,3,2,Z1,2,Z1,1,1,1,Z1,1,1,1,1,1,2,1,1,Z2,4,2,1,1,1,1,1,1,2,3,2,Z1,2,1,2,Z2,1,2,2,1,Z1,1,Z4,2,Z1,1,Z1,1,1,Z4,1,1,1,Z7,1,Z9,1,Z29
+
+<<STATE 64>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-151.306
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z16,1,Z9,1,1,1,Z2,1,1,Z3,2,Z3,1,Z1,1,Z1,1,Z1,1,1,Z1,1,1,Z5,1,Z1,3,Z3,1,Z1,1,1,Z1,1,1,1,Z2,1,Z1,2,1,4,5,3,1,2,2,5,1,1,2,1,2,Z1,2,1,Z1,1,2,1,Z1,2,1,2,Z2,2,2,Z1,1,1,2,3,1,Z1,1,1,1,Z2,2,Z2,1,Z2,1,Z2,1,1,1,Z2,1,Z1,2,Z3,1,Z21,1,Z4,1,1,Z34,1,Z1
+
+<<STATE 65>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-146.437
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z27,1,Z1,1,1,1,Z9,1,Z2,1,Z1,1,Z2,1,Z3,1,1,1,1,1,2,1,1,Z1,1,1,Z4,2,2,1,2,Z2,1,Z1,1,Z2,1,1,3,2,2,4,2,Z2,3,1,Z1,3,4,2,Z2,2,Z1,2,2,1,4,1,Z1,4,Z1,1,2,2,Z1,3,Z2,1,2,1,Z1,3,Z2,1,2,Z3,1,Z4,1,Z2,1,Z2,1,Z3,1,Z2,1,Z1,1,Z5,1,Z2,1,Z45
+
+<<STATE 66>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-164.803
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z9,1,3,Z4,1,Z2,1,Z6,1,Z4,1,Z1,1,Z1,3,1,Z1,1,1,1,Z1,1,1,Z1,1,1,Z1,1,Z1,1,Z5,1,2,1,4,Z1,1,2,1,2,1,Z3,1,Z1,1,1,2,2,1,Z1,2,1,1,Z5,1,Z1,3,Z1,4,1,3,1,1,Z2,1,1,1,Z2,1,1,2,1,1,Z1,2,2,Z1,1,2,Z1,1,Z2,1,1,Z1,2,1,2,Z5,1,1,1,Z2,2,Z5,1,2,Z4,1,Z8,1,Z12,1,Z34
+
+<<STATE 67>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-154.599
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z9,1,Z6,1,Z3,1,Z16,1,1,Z2,1,Z5,1,Z2,2,1,Z6,2,Z1,1,1,1,Z2,7,Z4,1,Z1,1,Z1,3,Z2,2,Z1,1,2,1,1,Z1,2,Z1,2,Z1,1,2,1,4,3,2,3,3,1,1,3,Z1,2,5,1,1,1,1,1,1,2,Z1,1,2,1,Z1,2,Z2,1,Z1,1,1,1,1,Z2,1,1,Z3,1,Z4,1,Z2,1,Z1,2,Z1,1,Z3,1,Z7,1,Z11,1,Z4,1,Z28
+
+<<STATE 68>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-150.935
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z39,1,Z3,1,Z9,1,Z4,1,1,Z2,1,1,Z1,1,Z4,3,1,1,Z2,2,Z1,1,Z1,1,2,2,Z2,1,1,1,1,Z1,1,3,2,Z3,2,Z1,1,1,3,1,2,2,2,2,2,1,3,Z3,1,2,1,1,Z1,2,1,1,Z3,1,2,3,1,3,Z1,2,1,Z3,1,Z1,2,Z1,1,1,2,1,1,1,Z6,1,Z2,1,1,1,2,1,Z3,1,Z1,1,2,Z1,1,1,Z4,1,Z22,1,Z5
+
+<<STATE 69>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-157.467
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z4,1,Z4,1,Z12,1,Z5,1,Z9,1,Z4,1,Z3,1,1,Z2,1,Z4,2,Z1,1,Z4,1,Z3,1,Z1,1,3,1,2,Z1,1,Z2,1,2,Z2,4,Z1,2,1,1,3,1,3,1,3,1,1,Z1,3,2,Z2,1,2,3,1,2,2,1,2,Z1,1,1,1,2,1,1,2,Z1,2,1,1,Z2,2,Z3,3,1,1,Z4,1,1,3,Z3,1,1,Z14,2,Z6,1,1,Z4,1,Z4,1,Z12,1,Z4,1,Z10
+
+<<STATE 70>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-135.593
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z57,1,Z12,1,Z9,1,Z7,1,Z2,1,1,Z2,1,Z21,1,2,1,Z4,1,1,Z2,1,Z3,1,Z2,2,1,3,4,Z3,2,Z1,1,2,1,1,Z2,2,1,Z2,2,Z4,1,2,1,1,2,2,1,1,1,Z5,1,1,1,1,Z1,1,2,Z2,1,3,Z1,2,3,Z1,2,Z1,2,2,Z1,1,1,3,3,Z3
+
+<<STATE 71>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-147.729
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z22,1,Z1,1,Z5,2,Z3,1,Z1,1,Z13,1,1,Z3,1,Z4,1,1,2,2,Z3,1,1,1,1,1,1,Z3,2,2,1,Z2,1,3,2,Z1,1,2,1,1,2,Z1,1,1,3,3,3,1,1,2,2,1,2,1,1,1,1,5,1,2,1,1,1,2,Z2,1,1,3,2,2,Z5,1,Z3,2,Z4,1,1,1,1,Z12,2,1,1,Z2,2,Z11,2,Z32
+
+<<STATE 72>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-145.086
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z34,1,Z1,1,1,Z4,1,Z4,1,1,Z8,1,Z3,1,Z5,1,1,Z4,1,Z1,1,1,1,Z1,1,2,1,1,1,Z1,1,1,2,1,2,2,2,1,1,1,2,Z1,3,2,2,1,1,2,1,Z1,3,2,Z1,2,3,2,Z1,1,6,1,1,1,Z1,2,2,Z1,1,1,Z2,2,1,4,Z4,1,1,1,2,Z5,1,Z2,1,Z1,1,Z1,1,1,3,Z1,1,Z2,1,Z14,1,Z22,1,Z6
+
+<<STATE 73>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-156.489
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z7,1,Z17,1,Z8,2,Z3,1,Z10,1,Z3,1,3,Z5,1,2,Z1,3,1,1,1,1,Z3,3,1,2,1,Z3,1,5,2,2,1,Z1,1,3,Z1,2,1,2,Z1,2,1,1,1,Z1,1,1,1,1,Z2,2,Z1,1,2,3,1,1,2,2,1,Z1,1,1,2,Z1,1,2,1,2,2,Z3,1,2,Z5,1,Z1,1,Z4,1,Z4,1,Z2,2,Z1,1,Z3,2,Z4,1,1,1,Z3,1,Z7,1,Z27
+
+<<STATE 74>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-79.3693
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z94,1,1,Z4,1,Z47,1,Z2,1,Z2,1,1,Z3,1,Z1,1,Z6,1,Z1,1,2,Z2,1,Z1,3,Z1,1,Z2,2,Z1,1,Z3,1,1,2,Z1,1,2,2,Z3,4,4,1
+
+<<STATE 75>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-151.893
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z25,1,Z40,1,Z8,1,Z5,1,Z8,1,Z3,1,Z1,1,Z2,1,Z1,1,2,Z1,1,1,Z3,2,Z3,1,Z1,1,Z2,1,1,Z4,1,1,2,Z2,1,4,Z1,1,2,3,1,1,Z2,1,2,1,3,Z1,1,3,3,1,1,Z2,3,Z2,1,Z1,1,1,3,Z5,4,Z1,2,1,3,1,Z1,2,Z2,2,Z2,2,Z1,3,Z1,2,Z2,2,Z1,2,1,1,Z2,1,1,Z3,1,1,1,Z1
+
+<<STATE 76>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-147.983
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z36,1,Z3,1,Z20,1,Z3,1,Z5,1,Z9,1,Z10,1,Z1,1,2,Z1,1,2,1,2,Z2,1,2,2,Z1,1,1,2,Z1,3,3,1,1,Z1,1,3,1,Z1,2,1,1,1,2,Z2,2,2,1,2,3,3,1,3,Z2,1,1,1,Z1,3,Z1,2,1,1,2,2,2,1,Z2,1,Z1,1,Z6,1,Z3,1,1,Z1,3,2,1,Z2,1,1,Z1,1,Z2,1,1,Z2,1,1,Z1,1,1,Z12
+
+<<STATE 77>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-154.687
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z27,1,Z2,1,Z25,1,1,1,1,Z4,1,Z6,1,Z4,1,Z2,1,Z1,1,3,Z2,1,1,1,Z2,1,1,Z1,1,Z3,1,1,1,2,2,3,1,1,1,Z1,1,1,Z1,1,1,1,2,2,3,3,2,Z2,2,2,Z1,1,2,4,1,Z2,2,1,1,1,Z1,1,2,1,2,Z2,1,1,3,1,Z4,3,Z2,1,Z3,1,Z1,1,1,Z1,1,Z2,1,Z2,2,2,Z5,1,1,Z2,1,Z7,1,1,Z8,1,Z1,1,Z2
+
+<<STATE 78>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-158.413
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z4,1,Z1,1,Z7,1,Z4,1,Z1,1,Z6,1,3,Z9,1,Z1,3,1,Z3,3,1,1,1,1,Z1,2,Z1,1,Z2,2,2,1,1,1,Z1,2,2,1,2,1,1,1,2,1,Z1,1,Z3,3,1,2,Z2,2,Z1,1,3,3,3,Z1,1,4,Z2,1,3,Z2,1,1,2,Z2,1,Z1,3,Z1,2,2,Z3,1,3,Z3,1,2,Z2,1,Z2,2,1,Z3,1,1,Z1,1,Z8,1,Z6,2,Z52
+
+<<STATE 79>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-163.515
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z22,1,Z12,1,Z5,1,Z20,1,Z1,2,Z1,1,1,Z2,3,Z7,1,Z3,1,2,Z1,1,2,1,1,Z2,1,1,Z2,1,Z2,1,3,Z1,1,Z4,2,Z2,3,2,1,1,Z1,2,2,1,1,Z3,1,3,4,1,1,Z2,3,1,1,1,2,2,1,1,3,Z1,3,1,Z6,2,4,1,1,1,Z1,2,Z2,1,Z1,2,Z1,1,Z2,1,Z1,1,Z9,1,1,1,Z1,1,Z2,1,Z2,1,Z5,1,1,Z7,1
+
+<<STATE 80>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-158.936
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z16,1,Z6,1,Z1,1,Z1,1,2,Z2,1,1,Z1,1,Z2,1,Z1,1,Z6,1,1,Z3,4,1,2,Z2,1,Z1,1,Z1,1,1,2,Z1,1,1,1,1,1,1,Z1,1,Z1,1,Z1,3,1,Z1,3,1,2,1,Z2,1,2,Z1,3,1,4,Z1,2,3,2,2,2,1,1,1,Z1,1,Z3,1,2,Z1,1,Z1,2,1,Z2,2,Z1,2,Z1,1,Z1,1,Z1,3,2,1,2,Z15,2,Z5,1,Z5,1,Z7,1,1,1,Z28,1,Z8
+
+<<STATE 81>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-142.749
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z26,1,Z20,1,Z2,1,Z5,1,Z4,1,1,Z4,1,Z1,1,Z1,1,Z13,2,Z3,1,1,Z1,2,1,Z1,1,1,Z1,1,2,Z2,2,3,1,2,1,2,2,Z2,1,2,Z1,1,1,1,2,4,Z1,3,3,2,2,3,1,2,1,3,1,2,Z1,3,Z1,1,Z1,1,2,1,1,1,1,Z1,1,1,2,Z1,1,1,2,Z4,1,Z2,1,Z2,2,Z1,2,Z2,1,2,1,1,Z31
+
+<<STATE 82>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-141.773
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z42,1,Z15,2,Z8,1,Z1,1,1,Z2,1,Z5,1,Z9,1,2,Z4,1,1,1,Z1,2,1,1,Z1,1,1,Z1,1,1,2,1,Z1,1,3,Z2,2,1,1,3,1,1,3,Z1,1,2,2,1,1,Z1,2,1,Z1,1,2,Z1,2,1,Z1,1,Z1,2,1,1,3,1,1,2,3,1,Z1,1,1,1,1,1,Z1,2,1,Z1,2,1,1,1,1,Z5,1,Z3,1,Z1,2,Z1,1,1,Z4,1,Z6,1,Z9
+
+<<STATE 83>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-145.444
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z13,1,Z1,1,Z2,1,Z5,2,Z9,1,Z2,2,2,3,Z4,1,1,Z4,2,1,Z1,1,1,1,1,Z3,1,1,Z1,1,Z1,1,Z1,1,2,3,3,2,1,2,2,3,2,Z1,1,1,1,3,1,Z1,1,3,1,3,1,1,Z1,2,2,Z1,3,Z2,2,1,1,2,2,1,Z1,2,1,1,2,2,Z4,2,Z2,1,1,Z2,1,Z4,1,1,Z6,1,Z6,1,Z3,1,Z10,1,Z44
+
+<<STATE 84>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-152.99
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z38,1,Z28,1,1,Z5,1,Z2,1,Z3,1,Z4,1,1,1,Z1,1,1,1,3,1,Z3,1,1,1,Z2,1,1,1,1,Z2,2,1,3,2,Z1,1,2,1,Z2,2,4,Z1,1,1,1,2,1,Z1,1,1,2,1,3,Z3,3,1,1,Z1,1,Z2,2,1,Z1,3,Z1,5,Z2,2,2,3,1,Z1,1,Z2,2,Z3,1,Z6,1,Z1,1,Z6,1,1,Z1,1,Z2,1,Z1,1,Z1,1,Z1,2,Z3,1,Z1,1,Z2
+
+<<STATE 85>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-161.855
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z6,1,Z8,1,Z2,1,Z16,1,Z14,1,Z5,2,2,Z1,1,2,1,Z9,1,Z2,1,1,Z3,1,4,1,1,Z1,1,1,3,1,Z1,2,1,2,Z2,1,1,Z1,1,2,1,Z1,1,1,Z1,1,Z2,4,2,Z1,1,3,3,Z1,3,Z1,2,Z1,2,1,1,3,3,1,2,2,Z1,1,Z3,1,Z1,2,Z1,1,Z1,1,Z1,2,2,Z1,2,Z2,1,1,Z1,2,1,1,Z12,1,2,Z3,1,Z10,1,Z11,1,Z8
+
+<<STATE 86>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-158.829
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z11,1,Z15,1,2,Z14,1,1,Z5,1,Z2,1,Z3,3,Z5,1,Z1,1,1,1,Z1,1,Z1,1,1,2,3,1,1,1,Z1,1,1,Z1,1,2,Z1,1,1,Z1,1,1,1,Z1,1,1,2,1,1,1,1,Z1,2,1,1,Z2,3,Z1,4,2,3,2,Z3,5,Z1,1,2,2,3,Z1,3,Z2,2,1,Z1,1,Z1,1,2,Z1,1,Z4,1,1,2,Z8,1,Z1,3,Z1,1,Z5,1,Z1,1,Z5,1,Z1,1,Z15,1,Z15
+
+<<STATE 87>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-172.668
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z8,1,Z14,1,Z8,1,Z3,1,Z3,1,Z1,1,Z1,1,2,Z13,1,2,1,Z1,1,Z1,1,Z3,1,1,1,Z2,1,2,3,Z2,3,Z1,2,1,Z2,2,Z1,2,Z1,1,1,Z1,1,Z3,1,1,Z1,1,2,1,Z3,2,Z1,3,1,2,Z1,2,7,1,Z1,2,Z4,1,1,Z2,2,2,2,Z2,1,Z1,1,2,2,2,3,Z2,2,Z1,1,Z6,1,1,2,Z2,2,1,Z2,1,Z3,1,Z3,1,Z3,1,Z8,1,Z4,1,Z1,1,1,Z14
+
+<<STATE 88>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-144.673
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z11,1,Z41,1,Z13,1,Z15,2,Z3,1,1,Z2,1,1,Z3,1,2,Z5,1,1,Z1,1,Z1,1,1,1,1,1,1,Z1,2,1,1,2,3,1,2,1,1,Z2,3,Z1,1,2,1,2,1,Z2,2,2,1,1,3,2,1,Z2,2,2,Z1,1,2,Z2,1,2,3,1,1,Z3,1,Z1,1,Z1,1,Z1,2,1,2,1,1,Z1,4,3,1,1,Z2,1,Z3,1,Z10,1,Z4,1,Z2
+
+<<STATE 89>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-156.64
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z5,1,Z26,1,1,Z3,1,1,Z1,1,Z3,1,Z14,1,Z1,2,1,Z2,1,Z2,1,1,Z3,2,Z1,1,1,3,1,1,1,Z1,1,Z1,1,2,Z1,1,2,1,Z1,2,2,Z3,2,1,3,2,2,3,Z4,2,2,Z2,3,1,3,3,Z1,3,2,Z1,2,Z4,1,2,1,2,Z1,1,Z1,2,1,Z1,1,Z1,1,1,Z1,1,2,Z1,1,Z1,1,1,1,Z3,1,1,1,Z3,1,Z1,1,Z1,1,Z10,2,Z1,1,Z3,1,Z23
+
+<<STATE 90>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-147.28
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z8,1,Z1,1,Z2,1,Z3,1,Z2,1,Z1,1,Z4,1,1,Z1,1,Z1,1,Z4,1,Z4,2,2,1,Z1,1,3,1,2,1,1,Z2,1,1,2,1,Z1,2,1,1,Z1,1,4,1,3,1,1,Z1,1,2,2,Z3,1,Z1,3,1,Z1,3,Z3,1,1,Z1,1,3,2,2,1,1,1,Z1,1,Z1,2,2,Z1,2,1,Z1,5,1,2,1,1,Z1,1,1,Z1,1,1,Z5,1,1,2,Z5,1,Z3,1,Z3,1,Z63
+
+<<STATE 91>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-144.169
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z70,1,Z6,1,Z1,1,Z1,2,Z4,1,1,Z5,1,1,Z3,1,Z4,1,1,Z3,1,2,Z4,1,Z1,1,1,4,Z4,1,1,Z3,2,Z1,1,1,1,2,Z1,3,Z1,2,1,1,3,1,2,1,Z2,1,2,1,2,Z1,1,1,Z1,1,Z1,3,1,2,Z1,1,2,3,3,2,Z2,2,Z2,1,Z2,1,Z5,1,3,Z2,3,Z5,1,1,Z2,1,Z5,1
+
+<<STATE 92>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-139.862
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z21,1,Z9,2,Z8,2,Z5,2,Z2,2,Z1,1,1,Z1,1,1,1,Z1,1,Z2,1,2,Z2,2,1,1,Z1,1,1,1,1,Z2,2,2,1,1,Z1,3,1,1,2,3,1,1,2,2,3,Z1,2,1,1,2,1,1,1,2,Z1,3,1,1,1,1,2,2,3,1,2,1,3,1,1,Z1,2,1,1,1,Z1,1,Z1,1,1,Z5,1,Z2,1,Z11,2,Z14,1,Z2,1,Z16,1,Z20
+
+<<STATE 93>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-147.24
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z8,1,Z1,1,Z2,1,Z9,1,1,Z3,1,Z1,1,1,Z1,2,Z1,1,2,1,2,Z3,1,Z8,1,Z1,1,1,2,1,1,Z1,1,Z2,2,1,1,2,2,Z1,2,Z1,1,Z1,2,3,Z1,2,3,1,1,1,Z1,2,2,2,4,1,1,Z1,3,1,2,1,Z2,1,1,1,1,2,1,3,1,Z3,2,1,1,1,1,Z1,3,2,Z2,1,Z1,1,1,Z5,1,Z2,1,Z6,1,Z7,1,Z5,1,Z3,1,Z47
+
+<<STATE 94>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-141.877
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z41,1,Z8,1,Z11,1,Z8,1,Z19,1,Z2,1,Z1,1,Z8,1,Z3,1,2,Z2,1,Z2,1,Z3,1,Z2,3,1,2,Z3,1,1,Z2,1,Z1,2,1,1,Z1,2,Z3,1,2,1,Z1,2,1,1,1,Z1,5,1,1,1,5,Z2,2,2,3,1,Z1,1,Z1,3,1,3,1,1,1,2,3,2,3,1,Z2,1,Z3,1,1,Z2,1,1,1,1,Z1,1,Z1,1,Z5
+
+<<STATE 95>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-145.763
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z17,1,Z5,2,Z1,2,Z1,1,Z1,1,Z1,1,Z1,1,2,Z2,2,Z1,2,1,1,Z1,2,Z1,1,1,Z1,1,2,1,Z3,1,1,1,1,2,1,1,3,3,1,4,Z1,1,Z1,2,Z1,1,1,4,3,Z1,1,2,4,1,1,4,Z1,1,1,Z1,2,2,1,1,Z2,1,1,Z2,1,1,1,4,1,Z1,3,Z4,1,Z1,1,Z3,2,1,Z5,1,Z6,1,Z1,1,Z20,1,Z12,1,Z37
+
+<<STATE 96>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-167.186
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z17,1,Z2,1,Z3,1,Z1,1,1,2,Z8,1,Z14,1,Z4,1,2,Z1,2,1,1,1,1,Z2,1,1,Z1,2,Z1,1,Z1,2,1,Z1,2,1,1,3,Z1,1,Z5,2,2,Z1,3,Z1,3,Z1,1,3,2,1,Z1,1,1,1,1,Z2,2,2,2,1,Z1,2,1,Z1,2,Z1,2,1,Z1,1,Z1,2,Z2,1,1,Z1,1,Z2,2,Z1,3,Z1,1,1,1,Z3,1,Z2,1,Z1,3,Z4,1,Z2,2,1,Z2,1,Z3,1,Z2,1,Z2,1,Z1,1,Z7,1,Z17,1,Z4
+
+<<STATE 97>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-149.565
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z19,1,Z33,1,Z9,1,Z9,1,1,Z4,1,Z9,1,Z1,1,Z2,1,1,2,Z4,1,Z2,2,1,Z1,1,Z1,1,2,1,Z1,1,Z1,2,1,Z1,1,Z2,1,Z2,1,3,1,Z1,1,1,1,1,Z1,2,Z1,3,1,Z2,1,1,Z1,1,2,1,1,3,1,Z1,1,1,5,Z1,3,Z1,1,Z1,3,Z1,1,1,Z1,1,1,1,1,Z1,1,2,1,1,2,Z2,1,1,Z1,1,1,1,1,2,Z2,1,1,1,Z5,1,Z4,1,1,1
+
+<<STATE 98>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-145.786
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z20,1,Z15,1,1,Z2,1,Z2,1,Z3,1,Z3,1,Z2,1,Z1,1,Z4,1,1,Z1,1,1,2,Z1,1,Z1,1,1,Z1,1,2,1,2,1,3,1,1,Z1,1,2,1,1,1,Z2,4,Z1,1,Z1,4,Z1,3,2,3,1,Z1,3,2,2,Z1,3,1,Z1,3,2,1,2,2,Z3,1,1,2,1,1,2,Z1,1,Z1,1,2,1,2,Z2,2,Z2,1,1,Z11,2,Z10,2,Z15,1,Z8,1,Z17
+
+<<STATE 99>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-142.045
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z3,1,Z20,1,Z6,1,Z6,1,Z16,1,1,Z1,1,1,Z6,1,Z4,1,2,1,2,1,2,1,1,3,2,Z2,2,1,Z1,1,1,3,1,1,2,1,3,1,4,Z1,3,2,2,2,1,3,4,1,3,Z1,1,1,1,3,1,1,Z1,3,1,Z2,1,Z2,1,Z1,1,1,2,1,Z3,2,Z1,2,Z1,1,Z5,1,1,Z1,1,1,Z1,1,Z2,1,Z1,1,Z7,1,Z10,1,Z29
+
+<<STATE 100>>
+
+<PARAMETERS>
+"β",0.001
+L^markov,-157.547
+L^non-markov,0
+L^ie,0
+L^dist,0
+L^obs,0
+L^init,0
+Prior,0
+
+
+<SPECIES "People">
+
+<INITIAL POPULATION>
+compartment,population
+S,100
+I,1
+
+<TRANSITIONS>
+S->I:Z15,1,Z4,1,1,Z1,2,Z1,1,Z6,1,Z1,1,Z1,1,1,Z3,1,1,Z3,2,Z1,1,1,Z2,1,Z4,2,1,1,Z3,2,1,2,Z2,1,Z1,1,1,2,Z1,2,3,1,1,3,1,2,Z3,1,Z1,1,Z2,1,1,1,1,1,1,1,2,1,3,1,Z1,1,3,Z1,1,1,2,1,Z2,1,Z1,2,Z2,3,1,1,3,1,2,3,Z3,3,Z1,2,Z3,1,Z1,1,Z8,2,1,Z1,1,Z8,1,1,Z10,1,Z33
+

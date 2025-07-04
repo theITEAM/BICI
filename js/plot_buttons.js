@@ -685,7 +685,7 @@ Layer.prototype.plot_button = function (bu,ov)
 		break;
 		
 	case "TooBigElement": case "No element":	
-		plot_text(te,x+0.3,y+0.7*dy,bu.font,BLACK,dx-0.5);
+		plot_text(String(te),x+0.3,y+0.7*dy,bu.font,BLACK,dx-0.5);
 		break;
 	
 	case "ReparamEqn":

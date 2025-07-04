@@ -168,10 +168,13 @@ double memory_usage();
 double total_memory();
 double memory_available();
 string mem_print(double mem);
+double clip(double val, double thresh);
+double exp_clip(double val);
 	
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);
 string check_valid_name(string name, string type);
+unsigned int der_func_check(unsigned int i, string te, string name, string &warn_der);
 string basic_equation_check(string &te, EqnType eqn_type);
 string check_brackets_match(string te);
 string check_chnotallowed(string te);

@@ -228,27 +228,34 @@ vector <DeriveOutput> State::derive_calculate() const
 	for(const auto &der : model.derive){
 		DeriveOutput op;
 		vector < vector <double> > d_value;
-		for(auto i = 0u; i < der.eq.size(); i++){
-			auto &eqn = model.eqn[der.eq[i].eq_ref];
-			
-			vector <double> value;
-			
-			string val_str;
-			if(der.time_dep == false){
-				auto val = eqn.calculate_derive(UNSET,popnum_t,param_val,spline_val,der_value);
-				val_str = tstr(val);
-				value.push_back(val);
-			}
-			else{
-				for(auto ti = 0u; ti < T; ti++){	
-					auto val = eqn.calculate_derive(ti,popnum_t,param_val,spline_val,der_value);
+		if(der.func.on){
+			auto value = calculate_df(der.func);
+			auto val_str = compact_vector(value);
+			op.value_str.push_back(val_str);
+			d_value.push_back(value);
+		}
+		else{
+			for(auto i = 0u; i < der.eq.size(); i++){
+				auto &eqn = model.eqn[der.eq[i].eq_ref];
+				vector <double> value;
+				
+				string val_str;
+				if(der.time_dep == false){
+					auto val = eqn.calculate_derive(UNSET,popnum_t,param_val,spline_val,der_value);
+					val_str = tstr(val);
 					value.push_back(val);
 				}
-				val_str = compact_vector(value);
+				else{
+					for(auto ti = 0u; ti < T; ti++){	
+						auto val = eqn.calculate_derive(ti,popnum_t,param_val,spline_val,der_value);
+						value.push_back(val);
+					}
+					val_str = compact_vector(value);
+				}
+				d_value.push_back(value);
+				
+				op.value_str.push_back(val_str);
 			}
-			d_value.push_back(value);
-			
-			op.value_str.push_back(val_str);
 		}
 		
 		output.push_back(op);
@@ -259,6 +266,249 @@ vector <DeriveOutput> State::derive_calculate() const
 }
 
 
+/// Calculates derived functions
+vector <double> State::calculate_df(const DerFunc &df) const
+{
+	vector <double> vec;
+	vector < vector <double> > F, S, Sinv, V;
+	
+	auto &F_eq = df.F_eq;
+	auto &S_eq = df.S_eq;
+	auto &Feq_ref = df.Feq_ref;
+	auto &Seq_ref = df.Seq_ref;
+	
+	auto N = F_eq.size();
+	
+	F.resize(N); S.resize(N); 
+	for(auto c = 0u; c < N; c++){ F[c].resize(N); S[c].resize(N);}
+	
+	const auto &sp = model.species[0];
+	const auto &ssp = species[0];
+	 
+	// Initial guess for eigen vector
+	vector <double> evec(N);
+	for(auto i = 0u; i < N; i++) evec[i] = ran();
+		
+	auto cpop = ssp.cpop_st;
+	if(sp.type != POPULATION) cpop = ssp.ibm_cpop_st();
+		
+	auto type = df.type;
+	
+	// Computational approach to RN
+	if(type == RNC || type == GTC){
+		const auto &ref = df.ref;
+		auto dt = model.details.dt;
+		const auto &timepoint = model.timepoint;
+		
+		// Gets which individuals are in which populations
+		auto pop_ind = calculate_pop_ind_total(); 
+
+		// Gets periods over which individuals are infected
+		auto inf_period = ssp.get_inf_period(ref);
+		
+		// Goes through infection events and allocates contributions to individuals
+		for(const auto &ind : ssp.individual){
+			for(const auto &ev : ind.ev){
+				if(ev.type == M_TRANS_EV){
+					const auto &tr = sp.tra_gl[ev.tr_gl];
+					if(tr.i != UNSET && tr.f != UNSET){
+						if(ref[tr.i] == UNSET && ref[tr.f] != UNSET){
+							auto t = ev.t;
+							auto ti = get_ti(t);
+							
+							const auto &eqn = model.eqn[tr.dist_param[0].eq_ref];
+							const auto &lin = eqn.linearise;
+							if(!lin.on) emsg("Linearisation should be on");
+							
+							// Generates a list of all individuals which could have cause infection
+							vector <Poss> inf_pos;
+							auto sum = 0.0;
+							for(auto k = 0u; k < eqn.pop_ref.size(); k++){
+								auto po = eqn.pop_ref[k];
+								auto val = eqn.calculate_calculation(lin.pop_grad_calc[k],ti,param_val,spline_val);
+								for(auto poss : pop_ind[ti][po]){
+									poss.weight *= val;
+									inf_pos.push_back(poss);
+									sum += poss.weight;
+								}
+								
+								for(auto &pos : inf_pos){
+									auto i = pos.i;
+									auto k = 0u;
+									while(k < inf_period[i].size() && t > inf_period[i][k].end_inf) k++;	
+									if(k == inf_period[i].size()) emsg("Could not find in period");
+									
+									auto val = pos.weight/sum;
+									
+									inf_period[i][k].num_inf += val;
+									inf_period[i][k].num_inf_t += val*(t-inf_period[i][k].start);
+								}					
+							}
+						}
+					}
+				}
+			}						
+		}
+	
+		vec.resize(T,0);
+		vector <double> num(T,0);
+		for(auto i = 0u; i < inf_period.size(); i++){
+			for(const auto &ip : inf_period[i]){
+				auto start = ip.start;
+				auto end = ip.end;
+				auto ww = 1.0;
+				//auto ww = 1.0/(end-start); // This seems to give values too small
+				auto val = ip.num_inf;
+				if(type == GTC){
+					val = ip.num_inf_t/(ip.num_inf+TINY);
+				}				
+				auto ti = get_ti(start);
+				auto ti_end = get_ti(end);
+				if(ti == ti_end){
+					auto w = ww*(end-start);
+					vec[ti] += val*w;
+					num[ti] += w;
+				}
+				else{
+					auto wi = ww*(timepoint[ti+1]-start);
+					vec[ti] += val*wi;
+					num[ti] += wi;
+					
+					for(auto tii = ti+1; tii < ti_end; tii++){
+						auto w = ww*dt;
+						vec[tii] += val*w;
+						num[tii] += w;
+					}
+					
+					auto wf = ww*(end-timepoint[ti_end]);
+					vec[ti_end] += val*wf;
+					num[ti_end] += wf;	
+				}
+			}
+		}
+		
+		for(auto ti = 0u; ti < T; ti++) vec[ti] /= (num[ti]+TINY);
+	
+		if(false){
+			for(auto i = 0u; i < inf_period.size(); i++){
+				cout << i << ": ";
+				for(auto inf : inf_period[i]){
+					cout << inf.num_inf << "  ";
+				}
+				cout << endl;
+			}
+			emsg("do");
+		}
+	}
+	else{
+		for(auto ti = 0u; ti < T; ti++){	
+			vector <double> Fvalue;
+			for(auto i = 0u; i < Feq_ref.size(); i++){
+				const auto &fe = Feq_ref[i];
+				const auto &eqn = model.eqn[fe.e];
+				auto val = eqn.calculate_calculation(eqn.linearise.pop_grad_calc[fe.i],ti,param_val,spline_val);
+				Fvalue.push_back(val);
+			}
+			
+			vector <double> Svalue;
+			for(auto i = 0u; i < Seq_ref.size(); i++){
+				const auto &se = Seq_ref[i];
+				
+				// Calculates any branching factor
+				auto bp = 1.0;  
+				if(se.m != UNSET){
+					const auto &nmt = sp.nm_trans[se.m];
+					const auto &eqn = model.eqn[nmt.bp_eq];
+					
+					bp = eqn.calculate_no_popnum(ti,param_val,spline_val);
+					if(nmt.all_branches){
+						auto bp_tot = 0.0;
+						for(auto bp_eq : nmt.bp_all_eq){
+							const auto &eqn = model.eqn[bp_eq];
+							bp_tot += eqn.calculate_no_popnum(ti,param_val,spline_val);
+						}
+						bp /= bp_tot;
+					}
+				}
+			
+				const auto &eqn = model.eqn[se.e];
+				auto val = eqn.calculate_no_popnum(ti,param_val,spline_val);
+				
+				switch(se.type){
+				case EXP_RATE: case EXP_RATE_NM: 
+					Svalue.push_back(bp*val);
+					break;
+				case EXP_MEAN: case EXP_MEAN_NM: case GAMMA: 
+				case ERLANG: case LOG_NORMAL: case PERIOD: 
+					Svalue.push_back(bp/(val+TINY));
+					break;
+					
+				case WEIBULL: emsg("SHould not be weibull"); break; 
+				}
+			}
+			
+			for(auto c = 0u; c < N; c++){
+				for(auto cc = 0u; cc < N; cc++){
+					auto Fsum = 0.0;
+					for(const auto &re : F_eq[c][cc]){
+						if(type == RN || type == GT) Fsum += Fvalue[re.k]*cpop[0][re.c_from];
+						else Fsum += Fvalue[re.k]*cpop[ti][re.c_from];
+					}
+					F[c][cc] = Fsum;
+					
+					auto Ssum = 0.0;
+					for(const auto &re : S_eq[c][cc]){
+						Ssum += Svalue[re.k]*re.sign;
+					}
+					S[c][cc] = Ssum;
+				}
+			}
+			
+			//print_matrix("F",F);
+			//print_matrix("S",S);
+			
+			Sinv = invert_matrix(S);
+			V = matrix_mult(F,Sinv);
+			
+			auto Rval = largest_eigenvalue(V,evec);
+				
+			switch(type){
+			case RN: case RNE:
+				vec.push_back(Rval);
+				break;
+				
+			case GT: case GTE:
+				{
+					auto Z = matrix_mult(Sinv,evec);
+					vector <double> tau(N,0);
+					for(auto c = 0u; c < N; c++){
+						for(auto e : df.tau_eq[c]){
+							tau[c] += 1.0/Svalue[e];
+						}
+						tau[c] += 0.5/S[c][c];
+					}
+					
+					auto sum_top = 0.0, sum_bot = 0.0;
+					for(auto c = 0u; c < N; c++){
+						for(auto cc = 0u; cc < N; cc++){
+							sum_top += F[c][cc]*tau[cc]*Z[cc];
+							sum_bot += F[c][cc]*Z[cc];
+						}
+					}
+					vec.push_back(sum_top/(sum_bot+TINY));
+				}
+				break;
+			
+			default: emsg("op not here"); break;
+			}
+		}
+	}
+	vec.push_back(vec[vec.size()-1]);
+	
+	return vec;
+}
+	
+	
 /// Compactifies a vector into a string
 string State::compact_vector(const vector <double> &value) const
 {
@@ -1424,3 +1674,120 @@ vector < vector <double> > State::get_population_rates(unsigned int p) const
 	
 	return rate;
 }
+
+
+/// Calculates the individuals which are associated with a population
+vector < vector <Poss> > State::calculate_pop_ind() const 
+{
+	vector < vector <Poss> > pop_ind;
+	
+	auto p = 0u; while(p < nspecies && model.species[p].trans_tree == false) p++;
+	if(p == nspecies) return pop_ind;
+	
+	pop_ind.resize(model.pop.size());
+	
+	for(auto p = 0u; p < nspecies; p++){
+		const auto &ssp = species[p];
+		if(ssp.type == INDIVIDUAL){
+			const auto &sp = model.species[p];
+			for(auto i = 0u; i < ssp.individual.size(); i++){
+				const auto &ind = ssp.individual[i];
+				
+				auto c = ssp.ind_sim_c[i];
+				if(c != UNSET){
+					for(const auto &pr : sp.comp_gl[c].pop_ref){
+						const auto &po = model.pop[pr.po];	
+						if(po.term[pr.index].c != c) emsg("Problem");
+					
+						auto num = 1.0; 
+						if(po.ind_variation){
+							for(auto ie : po.ind_eff_mult) num *= ind.exp_ie[ie];
+							for(auto fe : po.fix_eff_mult) num *= ind.exp_fe[fe];
+						}
+				
+						Poss poss; poss.i = i; poss.weight = po.term[pr.index].w*num;
+						
+						pop_ind[pr.po].push_back(poss);
+					}
+				}
+			}
+		}
+	}
+	
+	return pop_ind;
+}
+
+
+/// Calculates the individuals which are associated with a population for all time
+vector < vector < vector <Poss> > > State::calculate_pop_ind_total() const 
+{
+	vector < vector < vector <Poss> > > pop_ind;
+	
+	const auto &timepoint = model.timepoint;
+	
+	pop_ind.resize(T);
+	for(auto ti = 0u; ti < T; ti++){
+		pop_ind[ti].resize(model.pop.size());
+	}
+	
+	for(auto p = 0u; p < nspecies; p++){
+		const auto &ssp = species[p];
+		if(ssp.type == INDIVIDUAL){
+			const auto &sp = model.species[p];
+			for(auto i = 0u; i < ssp.individual.size(); i++){
+				const auto &ind = ssp.individual[i];
+				
+				auto c = UNSET;
+				auto ti = 0u;
+				for(auto e = 0u; e <= ind.ev.size(); e++){
+					double t;
+					if(e < ind.ev.size()) t = ind.ev[e].t;
+					else t = timepoint[T];
+					
+					if(c != UNSET){
+						auto ti_start = ti;
+						for(const auto &pr : sp.comp_gl[c].pop_ref){
+							const auto &po = model.pop[pr.po];	
+							if(po.term[pr.index].c != c) emsg("Problem");
+						
+							auto num = 1.0; 
+							if(po.ind_variation){
+								for(auto ie : po.ind_eff_mult) num *= ind.exp_ie[ie];
+								for(auto fe : po.fix_eff_mult) num *= ind.exp_fe[fe];
+							}
+					
+							Poss poss; poss.i = i; poss.weight = po.term[pr.index].w*num;
+							
+							ti = ti_start;
+							while(timepoint[ti] < t){
+								pop_ind[ti][pr.po].push_back(poss);
+								ti++;
+							}
+						}
+					}
+					while(timepoint[ti] < t){
+						ti++;
+					}
+					
+					if(e < ind.ev.size()) c = ind.ev[e].c_after;
+				}
+			}
+		}
+	}
+	
+	if(false){
+		for(auto ti = 0u; ti < T; ti++){
+			for(const auto &pi : pop_ind[ti]){
+				cout << timepoint[ti] << " " << pi.size() << " pop" << endl;
+				
+				for(auto poss : pi){
+					cout << poss.i << " "<< poss.weight << "  iw" << endl;
+				}
+			}
+		}
+		emsg("do");
+	}
+	
+	return pop_ind;
+}
+

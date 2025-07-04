@@ -7,7 +7,14 @@ using namespace std;
 #include "struct.hh"
 #include "const.hh"
 
-enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAMETER, PARAMVEC, SPLINE, SPLINEREF, POPNUM, TIME, IE, ONE, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, TINT, POPNUM_TIME, DERIVE, SPLINE_TIME, SPLINEREF_TIME, NOOP};
+enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAMETER, PARAMVEC, SPLINE, SPLINEREF, POPNUM, TIME, IE, ONE, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, TINT, INTEGRAL, DERIVE, NOOP};
+
+struct EqItemList {                         // Allows for a list of equation items
+	EqItemType type;
+	unsigned int num;
+	unsigned int prev;
+	unsigned int next;
+};
 
 struct EqItem {                            // An individual operation in a calculation
 	EqItem(){ num = UNSET;}
@@ -24,7 +31,12 @@ struct PopRefFromPo {                      // Used to get pop_ref from populatio
 struct Calculation {                       // Stores a calculation (made up of operations)
 	vector <EqItem> item;                    // Items used to make the calculation
 	EqItemType op;                           // The operator used in the calculation
-	unsigned int reg_store;                  // The register where to store the results
+};
+
+struct Integral {                          // Stores the calculation within an integral
+	vector <Calculation> calc;    
+	unsigned int ti_min;
+	unsigned int ti_max;
 };
 
 struct PopCalculation                      // Used to describe a population calculation
@@ -33,12 +45,6 @@ struct PopCalculation                      // Used to describe a population calc
 	unsigned int po;                         // The population which multiplies calculation 
 };
 
-struct TimeRef                             // For time integrals allows for time index
-{
-	// For integral num and ti can store the bounds
-	unsigned int num;                        // The number of quantity (e.g. spline)
-	unsigned int ti;                         // The time step
-};
 	
 struct LinearCalculation                   // Stores a linear calculation
 {
@@ -69,18 +75,15 @@ class Equation                             // Stores information about the model
 		
 		bool plfl;                             // Determines if calculation is printed (for diagnostic purposes)
 	
-		vector <Calculation> calc;             // Stores calculation
+		vector <Calculation> calcu;            // Stores calculation
 
-		EqItem ans;                            // Stores the answer 
-		unsigned int nreg;                     // The number of registers used
-	
+		vector <Integral> integral;            // Calculation for integral
+
 		vector <ParamRef> param_ref;           // Stores the parameters used in the equation
 		
 		vector <DeriveRef> derive_ref;         // Stores derived used in the equation
 		
 		vector <double> cons;                  // Stores any constant values
-		
-		vector <TimeRef> time_ref;             // Used for time integrals
 		
 		vector <unsigned int> pop_ref;         // Stores the populations used in the equation
 		
@@ -92,7 +95,6 @@ class Equation                             // Stores information about the model
 		
 		vector <unsigned int> fix_eff_mult;    // Potential fixed effect multipier
 		
-		//string te_init;                        // The raw text used to generate the equation
 		string te;                             // Text for the equation (modified during operation)
 		string te_raw;                         // The text used to print to terminal 
 		
@@ -107,7 +109,8 @@ class Equation                             // Stores information about the model
 		EqnType type;                          // The type of the equation
 		
 		unsigned int sp_p, sp_cl;              // Species number and classification (if appropriate)
-		unsigned int sp_c;                     // The compartment number (used for sum max function)
+		
+		//unsigned int sp_c;                     // The compartment number (used for sum max function)
 
 		unsigned int ti_fix;                   // The fixed time point (e.g. for pop measurements)
 		
@@ -121,21 +124,24 @@ class Equation                             // Stores information about the model
 		
 		Linearise linearise;                   // Used for accelerated likelihood calculation
 		
-		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, unsigned int c, bool inf_trans, unsigned int tif, unsigned int li_num, vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, vector <Spline> &spline, vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, const vector <double> &timepoint);
+		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, vector <Spline> &spline, vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, const vector <double> &timepoint);
 		double calculate_param_only(const vector <double> &param_val) const;
 		double calculate_param_only_ti_fix(const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
 		double calculate_no_popnum(unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const; 
 		double calculate(unsigned int ti, const vector <double> &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
+		double calculate_integral(unsigned int i, const vector < vector <double> > &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector < vector <double> > > &derive_val) const;
 		double calculate_derive(unsigned int ti, const vector < vector <double> > &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector < vector <double> > > &derive_val) const;
 		void print_calculation() const;
-		void print_ca(const Calculation &ca) const;
+		void print_ca(unsigned int i, const Calculation &ca) const;
 		
 		double calculate_indfac(const Individual &ind, unsigned int ti, const vector <double> &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
 		double indfac(const Individual &ind) const;
 		bool param_linear(unsigned int th) const;
+		double is_num() const;
 		bool is_zero() const;
 		bool is_one() const;
-		void simplify();
+		void insert_reg(vector <Calculation> &calc, vector <bool> &calc_on);
+		void simplify(vector <Calculation> &calc);
 		vector < vector <unsigned int> > get_reg_used(const vector <Calculation> &calc) const;
 		void check_reg_used(const vector <Calculation> &calc, vector < vector <unsigned int> > &reg_used) const;
 		void setup_references();
@@ -146,7 +152,7 @@ class Equation                             // Stores information about the model
 		vector <unsigned int> getallcomp(string st);
 		void print_operations(const vector <EqItem> &op) const;
 		
-		vector <string> find_list_from_index(string ind, double dist_max) const;
+		vector <string> find_list_from_index(string ind, double dist_max, string comp_max) const;
 		vector <unsigned int> get_all_comp(unsigned int p, string te);
 		double get_float(unsigned int i, unsigned int &raend) const;
 		ParamRef get_param_name(unsigned int i, double &dist, unsigned int &raend);
@@ -156,9 +162,13 @@ class Equation                             // Stores information about the model
 		unsigned int get_fe(unsigned int i, unsigned int &raend);
 		bool pop_combine(const vector <EqItem> &op, unsigned int i,	unsigned int &popcomb, double &popcombnum) const;
 		bool quant(const vector <EqItem> &op, int i) const;
+		bool quantl(const vector <EqItemList> &opl, unsigned int i) const;
 		bool is_func(const vector <EqItem> &op, int i) const;
+		bool is_funcl(const vector <EqItemList> &opl, unsigned int i) const;
 		bool optype(const vector <EqItem> &op, int i, EqItemType type) const;
+		bool optypel(const vector <EqItemList> &opl, unsigned int i, EqItemType type) const;
 		int prio(const vector <EqItem> &op, int i) const;
+		int priol(const vector <EqItemList> &opl, unsigned int i) const;
 		void unravel_sum();
 		void minus_sign_adjust();
 		double calculate_operation(EqItemType op, vector <double> &num) const;
@@ -167,14 +177,21 @@ class Equation                             // Stores information about the model
 		unsigned int get_integral_bound(string st);
 		unsigned int extract_integral(const string &te, unsigned int i, vector <EqItem> &op);
 		void combine_populations(vector <EqItem> &op) const;
-		void create_calculation(vector <EqItem> &op);
+		vector <EqItemList> create_opl(const vector <EqItem> &op) const;
+		vector <EqItem> create_op_from_opl(const vector <EqItemList> &opl) const;
+		void erase_opl(unsigned int i, unsigned int n, vector <EqItemList> &opl) const;
+		EqItem get_op(const vector <EqItemList> &opl, unsigned int i) const;
+		unsigned int get_opl_start(const vector <EqItemList> &opl) const;
+		unsigned int get_opl_num(const vector <EqItemList> &opl) const;
+		vector <Calculation> create_calculation(vector <EqItem> &op);
 		void extract_ind_eff();
 		void extract_fix_eff();
 		CompRef find_comp_from_name(unsigned int p, string te) const;
-		void replace_reg(unsigned int num, EqItem it_change);
+		void replace_reg(const vector <EqItem> &reg_replace, vector <Calculation> &calc, const vector <bool> &calc_on);
 		void setup_comp_pref_convert();
 		void check();
-		void remove_unused();
+		void check_opl(const vector <EqItemList> &opl) const;
+		void remove_unused(vector <Calculation> &calc, vector <bool> &calc_on);
 		unsigned int add_const(EqItem item1, EqItem item2);
 		unsigned int mult_const(EqItem item1, EqItem item2);
 		void set_time_vari();

@@ -1,7 +1,7 @@
-# Example A3: Uncertain initial conditions (with focal classification)
+# Example A3: Uncertain initial conditions for PBM (with focal classification)
 
 ## Objective
-- Introduce specification of uncertainty in the initial population when there is more than one classification.
+- Introduce specification of uncertainty in the initial population for a population-based model when there is more than one classification.
 - The initial population is given on the 'Simulation→Initial Conditions' page.
 - Here disease status is a specified 'focal' classification.
 - Distributions for the initial populations in focal compartments are set (in this case chosen to be uniform distributions).

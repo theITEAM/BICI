@@ -2,7 +2,13 @@
 
 ## Objective
 - Derived quantities are functionally dependent on model parameters or populations, but are not themselves within the model.
-- In this example the basic reproduction number $R_0$ is calculated.
+- This example shows different derived expressions:
+(1) The basic reproduction number $R_0$ is calculated based on an user defined equation.
+(2) The time-varying reproduction number is calculated using the function RN(...), where the infected states are placed within the brackets.
+(3) The effective reproduction number is calculated using the function RNE(...).
+(4) The generation time is calculated using the function GT(...).
+(5) The estimated number of infections $NI$ is found by integrating over the force of infection multiplied by the number of susceptible.
+(6) The estimated number of recoveries $NR$ in the first 20 time units is derived.
 
 ## Data
 - Known event times.

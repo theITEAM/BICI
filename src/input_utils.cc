@@ -976,11 +976,14 @@ bool Input::is_file(string te) const
 	
 	if(te.substr(0,3) == "[[$" && te.substr(te.length()-3,3) == "&]]")	return true;
 	
-	auto k = te.length()-1;
-	auto kmin = k-10;
+	int k = te.length()-1;
+	int kmin = k-10;
+	
 	while(k > 0 && k > kmin && te.substr(k,1) != ".") k--;
 	if(k == 0 || k == kmin) return false;
+		
 	auto end = toLower(te.substr(k));
+	
 	if(end != ".csv" && end != ".txt" && end != ".tsv" && end != ".geojson") return false;
 
 	return true;
@@ -1636,6 +1639,10 @@ void Input::check_dt(const Details &details)
 	auto num = (details.t_end-details.t_start)/details.dt;
 	if(dif(num,double(round_int(num)),DIF_THRESH)){
 		alert_import("The difference between the start '"+tstr(details.t_start)+"' and end '"+tstr(details.t_end)+"' times is not a multiple of the time-step '"+tstr(details.dt)+"'.");
+	}
+	
+	if((details.t_end - details.t_start)/details.dt > TI_DIV_MAX){
+		//alert_import("The number of time divisions must be fewer than "+tstr(TI_DIV_MAX));
 	}
 }
 

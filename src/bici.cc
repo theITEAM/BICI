@@ -9,8 +9,12 @@
 // Load mpi: module load mpi/openmpi-x86_64
 // mpirun -n 1 ./bici-para file.bici sim
 // mpirun -n 1 ./bici-para Execute/init.bici sim
+// mpirun --output :raw -n 1 ./bici-para Execute/init.bici sim
 // mpirun -n 3 ./bici-para Execute/init.bici inf
+// mpirun -n 1 ./bici-para Examples/EX_A1.bici sim
 // mpirun -n 10 ./bici-para Execute/init.bici inf
+// mpirun -n 16 ./bici-para Jamie/scen-3-1.bici inf
+// mpirun -n 16 ./bici-para Execute/init.bici inf
 // mpirun -n 3 ./bici-para Grant/RealData_1000_DA_5000 inf
 // mpirun -n 3 ./bici-para Grant/RealData_2000_DA_5000 inf
 // mpirun -n 16 ./bici-para Jamie/scen-5-1.bici inf

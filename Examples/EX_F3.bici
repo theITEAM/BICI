@@ -51,13 +51,23 @@ trans-data name="I->R" obsrange="all" file="trans-data-2.csv"
 ######################## PARAMETERS ########################
 
 
+
+
 param name="β" value="0.003" prior="uniform(0,0.1)"
 
 param name="γ" value="0.1" prior="uniform(0,1)"
 
 
+
+
+
 # DERIVED
 
 derived name="R^0" eqn="100×β/γ"
+derived name="R(t)" eqn="RN(I)"
+derived name="R^eff(t)" eqn="RNE(I)"
+derived name="g(t)" eqn="GT(I)"
+derived name="NI" eqn="∫dt(β×{I}×{S})"
+derived name="NR" eqn="∫[0,20]dt(γ×{I})"
 
 

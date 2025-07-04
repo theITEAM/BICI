@@ -160,6 +160,24 @@ void StateSpecies::simulate_init()
 }
 
 
+/// Get an element from cinit_to_use 
+unsigned int StateSpecies::get_cinit_to_use(vector <unsigned int> &cinit_to_use) const 
+{
+	if(cinit_to_use.size() == 0){
+		emsg("The initial population is insufficiently large to accommodate the specified individuals."); 
+	}
+	
+	auto j = (unsigned int)(ran()*cinit_to_use.size());
+	auto c = cinit_to_use[j];
+	if(j+1 < cinit_to_use.size()){
+		cinit_to_use[j] = cinit_to_use[cinit_to_use.size()-1];
+	}
+	cinit_to_use.pop_back();
+	
+	return c;
+}
+
+						
 /// Initialises individuals to be simulated
 void StateSpecies::simulate_individual_init()
 {
@@ -167,12 +185,23 @@ void StateSpecies::simulate_individual_init()
 	calculate_obs_eqn(seq_vec(obs_eqn_value.size()));
 	
 	auto C = sp.comp_gl.size();
+		
+	// If the initial distribution is set then work out which compartemnts been to be used
+	vector <unsigned int> cinit_to_use;
+	auto cinit_to_use_fl = false;
+	if(sp.type == INDIVIDUAL && sp.init_cond.type != INIT_POP_NONE){
+		cinit_to_use_fl = true;
+		for(auto c = 0u; c < C; c++){
+			for(auto j = 0u; j < init_cond_val.cnum[c]; j++){
+				cinit_to_use.push_back(c);
+			}
+		}
+	}
 	
 	vector <unsigned int> pop_added(C,0);
-	
 	vector <unsigned int> unallocated;
 	
-	/// Adds any individuals from the data
+	// Adds any individuals from the data
 	for(auto i = 0u; i < sp.nindividual_obs; i++){
 		const auto &ind = sp.individual[i];
 		
@@ -245,11 +274,29 @@ void StateSpecies::simulate_individual_init()
 		
 		// Directly adds ENTER_EV at start of simulation
 		if(added_flag == false){                   // If individual not added then add at beginning
-			unsigned int c;
 			if(ind.ev.size() > 0 && ind.ev[0].type == ENTER_EV){
 				if(ind.ev[0].t != details.t_start) emsg("Should be at start");
-				c = ind_sample_init_c(ind);
 				
+				auto c = UNSET;
+				switch(sp.init_cond.type){
+				case INIT_POP_NONE: 
+					c = ind_sample_init_c(ind); 
+					break;
+				
+				case INIT_POP_FIXED: case INIT_POP_DIST: 
+					{
+						if(enter_flat_dist(ind) == false){
+							if(sp.init_cond.type == INIT_POP_FIXED){
+								emsg("Cannot have initial population specified as well as initial state of individuals."); 
+							}
+							else{
+								emsg("Cannot have initial population distribution specified as well as initial state of individuals."); 
+							}
+						}							
+						c = get_cinit_to_use(cinit_to_use);
+					}
+					break;
+				}
 				pop_added[c]++;
 			
 				IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
@@ -262,7 +309,6 @@ void StateSpecies::simulate_individual_init()
 		}
 	}
 
-	
 	ie_Amatrix_sampler_init();
 	sample_ie_Amatrix();	
 	
@@ -281,98 +327,102 @@ void StateSpecies::simulate_individual_init()
 
 	case INDIVIDUAL:
 		{
-			if(sp.init_cond.type != INIT_POP_NONE){
-				string pre = ""; if(sp.nindividual_obs > 0) pre = "UO ";
-				auto n = 0;
-				for(auto c = 0u; c < sp.comp_gl.size(); c++){
-					if(init_cond_val.cnum[c] > 0 && sp.fix_effect.size() > 0){
-						string st = "";
-						for(const auto &fe : sp.fix_effect){
-							if(st != "") st += ","; 
-							st += fe.name;
+			// Deals with unallocated individuals
+			if(unallocated.size() > 0){
+				vector <SourceSamp> source_samp;           // Generates a sampler for the source
+				auto sum = 0.0;
+				for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+					const auto &tra = sp.tra_gl[tr];
+				
+					if(tra.i == UNSET){
+						const auto &eq = eqn[tra.dist_param[0].eq_ref];
+						auto value = 1.0;
+						if(eq.pop_ref.size() == 0) value = eq.calculate_no_popnum(0,param_val,spline_val);
+						
+						if(value != 0){
+							SourceSamp ss; ss.tr_gl = tr; ss.prob_sum = sum;
+							source_samp.push_back(ss);
 						}
-						emsg("Cannot add unspecified individuals for a model with fixed effect(s) '"+st+"'"); 
 					}
-					
-					auto imax = init_cond_val.cnum[c];	
-					for(auto i = 0u; i < imax; i++){	
-						unsigned int ii;
-						if(unallocated.size() > 0){
-							ii = unallocated[0];
-							unallocated.erase(unallocated.begin());
-						}
-						else ii = add_individual(UNOBSERVED_IND);
+				}
+				
+				for(auto i : unallocated){
+					if(cinit_to_use_fl && cinit_to_use.size() > 0){    // If individuals specified from initial condition then allocate
+						auto c = get_cinit_to_use(cinit_to_use);						
+						pop_added[c]++;
 						
 						IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
-				
-						add_event(ENTER_EV,ii,UNSET,UNSET,UNSET,c,details.t_start,iif);
-						
-						n++;
+						add_event(ENTER_EV,i,UNSET,UNSET,UNSET,c,details.t_start,iif);
 					}
+					else{
+						const auto &ind = sp.individual[i];
+						
+						auto add_so = false;
+						
+						auto trange = source_time_range(ind);
+						if(trange.tmin != details.t_start) add_so = true;
+						else{
+							if(source_samp.size() > 0){
+								if(ran() < 0.5) add_so = true;
+							}
+						}
+					
+						if(cinit_to_use_fl) add_so = true; // If the intial condition is correct we must add as source
+						
+						if(add_so){ // Adds individual as a source
+							if(!sp.contains_source){
+								if(cinit_to_use_fl){
+									emsg("The initial sampled population size is insufficient to incorporate all observed individuals.");
+								}
+								else{								
+									emsg("Not all inividuals can be added to the system.");
+								}
+							}
+							
+							add_ind_source(i,source_samp);
+						}
+						else{	      // Adds individual at start
+							auto c = ind_sample_init_c(ind);
+						
+							pop_added[c]++;
+					
+							IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
+							add_event(ENTER_EV,i,UNSET,UNSET,UNSET,c,details.t_start,iif);
+						}
+					}
+				}
+				unallocated.clear();
+			}
+			
+			// Any further individuals are set to unobserved
+			if(cinit_to_use_fl && cinit_to_use.size() > 0){ 
+				string pre = ""; if(sp.nindividual_obs > 0) pre = "UO ";
+				
+				if(sp.fix_effect.size() > 0){
+					string st = "";
+					for(const auto &fe : sp.fix_effect){
+						if(st != "") st += ","; 
+						st += fe.name;
+					}
+					emsg("Cannot add unspecified individuals for a model with fixed effect(s) '"+st+"'"); 
+				}
+					
+				while(cinit_to_use.size() > 0){
+					auto ii = add_individual(UNOBSERVED_IND);
+						
+					auto c = get_cinit_to_use(cinit_to_use);	
+					
+					IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
+				
+					add_event(ENTER_EV,ii,UNSET,UNSET,UNSET,c,details.t_start,iif);
 				}
 			}
 		}
 		break;
 	}
 	
-	// Works out situation with individuals which do not have a specified starting position
-	if(unallocated.size() > 0){
-		vector <SourceSamp> source_samp;           // Generates a sampler for the source
-		auto sum = 0.0;
-		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
-			const auto &tra = sp.tra_gl[tr];
-		
-			if(tra.i == UNSET){
-				const auto &eq = eqn[tra.dist_param[0].eq_ref];
-				auto value = 1.0;
-				if(eq.pop_ref.size() == 0) value = eq.calculate_no_popnum(0,param_val,spline_val);
-				
-				if(value != 0){
-					SourceSamp ss; ss.tr_gl = tr; ss.prob_sum = sum;
-					source_samp.push_back(ss);
-				}
-			}
-		}
-		
-		switch(sp.init_cond.type){
-		case INIT_POP_NONE: case INIT_POP_DIST:
-			for(auto i : unallocated){
-				const auto &ind = sp.individual[i];
-				
-				auto add_so = false;
-				
-				auto trange = source_time_range(ind);
-				if(trange.tmin != details.t_start) add_so = true;
-				else{
-					if(source_samp.size() > 0){
-						if(ran() < 0.5) add_so = true;
-					}
-				}
-				
-				if(add_so){ // Adds individual as a source
-					add_ind_source(i,source_samp);
-				}
-				else{	      // Adds individual at start
-			
-					auto c = ind_sample_init_c(ind);
-				
-					pop_added[c]++;
-			
-					IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
-					add_event(ENTER_EV,i,UNSET,UNSET,UNSET,c,details.t_start,iif);
-				}
-			}
-			break;
-			
-		case INIT_POP_FIXED:
-			if(!sp.contains_source) emsg("Either an initial population distribution is added or the model must contain a source");
-		
-			for(auto i : unallocated){
-				add_ind_source(i,source_samp);
-			}
-			break;
-		}
-	}
+	if(unallocated.size() != 0) emsg("It was not possible to allocate all the individuals to the initial state."); 
+	if(cinit_to_use.size() != 0) emsg("It was not possible to allocate all the individuals in the initial population distribution."); 
 	
 	for(auto f = 0u; f < sp.fix_effect.size(); f++) set_exp_fe(f);
 	
@@ -770,11 +820,35 @@ void StateSpecies::set_tnum_mean(unsigned int ti_end, const vector < vector <dou
 }
 
 
+// Determines if there is a flat distribution in terms of individuals entering different compartments
+bool StateSpecies::enter_flat_dist(const IndData &ind) const 
+{
+	const auto &ent = sp.enter[ind.enter_ref];
+	if(sp.comp_gl.size() == 1) return true;
+	if(ent.c_set != UNSET) return false;
+	
+	for(auto cl = 0u; cl < sp.ncla; cl++){
+		const auto &ent_cl = ent.cla[cl];
+		if(ent_cl.c_set != UNSET) return false;
+		else{
+			const auto &claa = sp.cla[cl];
+			const auto &oer = ent_cl.obs_eqn_ref;
+			auto C = claa.ncomp;
+			for(auto c = 1u; c < C; c++){
+				if(obs_eqn_value[oer[c]] !=  obs_eqn_value[oer[0]]) return false;
+			}
+		}
+	}
+	
+	return true;
+}
+
+
 /// Samples the initial state for the individual
 unsigned int StateSpecies::ind_sample_init_c(const IndData &ind) const
 {
 	const auto &ent = sp.enter[ind.enter_ref];
-	
+
 	if(ent.c_set != UNSET) return ent.c_set;
 	
 	auto c_after = 0u;
@@ -782,7 +856,7 @@ unsigned int StateSpecies::ind_sample_init_c(const IndData &ind) const
 		const auto &ent_cl = ent.cla[cl];
 		if(ent_cl.c_set != UNSET) c_after += sp.comp_mult[cl]*ent_cl.c_set;
 		else{
-			auto sum = 0u; 
+			auto sum = 0.0; 
 			vector <double> prob, prob_sum;
 			const auto &claa = sp.cla[cl];
 			const auto &oer = ent_cl.obs_eqn_ref;
@@ -864,7 +938,9 @@ vector <double> StateSpecies::set_exp_fe(unsigned int f)
 	for(auto &ind : individual){
 		auto X = ind.X[f];
 		if(X == UNSET) ind.exp_fe[f] = 1;
-		else ind.exp_fe[f] *= fac;
+		else{
+			ind.exp_fe[f] *= fac;
+		}
 	}
 	
 	return store;
@@ -899,8 +975,7 @@ vector <double> StateSpecies::set_exp_ie(Individual &ind) const
 		auto var = iegs[ie.index].omega[ie.num][ie.num];
 		store.push_back(ind.exp_ie[i]);
 		
-		ind.exp_ie[i] = exp(ind.ie[i]-0.5*var);
-		//check_ie_out_of_range(i,ind);
+		ind.exp_ie[i] = exp_clip(ind.ie[i]-0.5*var);
 	}
 	
 	return store;
@@ -919,7 +994,7 @@ vector <double> StateSpecies::recalculate_exp_ie(unsigned int ie)
 	vector <double> store;
 	for(auto &ind : individual){	
 		store.push_back(ind.exp_ie[ie]);
-		ind.exp_ie[ie] = exp(ind.ie[ie]-0.5*var);
+		ind.exp_ie[ie] = exp_clip(ind.ie[ie]-0.5*var);
 	}
 	
 	return store;
@@ -1549,6 +1624,37 @@ void StateSpecies::set_cpop_st()
 }
 
 
+/// Calculates cpop for individual-based model (used for rep num)
+vector < vector <double> > StateSpecies::ibm_cpop_st() const
+{	
+	auto T = timepoint.size()-1;
+	auto C = sp.comp_gl.size();
+	
+	vector < vector <double> > cpop_st;
+	cpop_st.resize(T);
+	for(auto ti = 0u; ti < T; ti++) cpop_st[ti].resize(C,0);
+	
+	for(const auto &ind : individual){
+		auto c = UNSET;
+		auto ti = 0u;
+		for(auto e = 0u; e <= ind.ev.size(); e++){
+			double t;
+			if(e < ind.ev.size()) t = ind.ev[e].t;
+			else t = timepoint[T];
+						
+			while(timepoint[ti] < t){
+				if(c != UNSET) cpop_st[ti][c]++;
+				ti++;
+			}
+			
+			if(e < ind.ev.size()) c = ind.ev[e].c_after;
+		}
+	}
+	
+	return cpop_st;
+}
+
+
 /// Gets the observation probability on an observation for a transition
 double StateSpecies::get_trans_obs_prob(unsigned int trg, const ObsData &ob) const
 {
@@ -1794,3 +1900,58 @@ unsigned int StateSpecies::source_num(unsigned int min, unsigned int max) const
 }
 
 
+/// Establishes regions when individuals are infected
+vector < vector <InfPeriod> >  StateSpecies::get_inf_period(const vector <unsigned int> &ref) const
+{	
+	vector < vector <InfPeriod> > inf_period;
+	inf_period.resize(individual.size());
+	for(auto i = 0u; i < individual.size(); i++){
+		auto infe = false;
+		double inf_start = UNSET;
+		for(const auto &ev : individual[i].ev){
+			auto caf = ev.c_after;
+			if(infe){
+				if(caf == UNSET || ref[caf] == UNSET){
+					auto ti = get_ti(ev.t);
+					auto end_inf = details.t_start + (ti+1)*details.dt; 
+				
+					InfPeriod inf_per; 
+					inf_per.start = inf_start;
+					inf_per.end = ev.t;
+					inf_per.end_inf = end_inf;
+					inf_per.num_inf = 0;
+					inf_period[i].push_back(inf_per);
+					inf_start = UNSET;
+					infe = false;
+				}
+			}
+			else{
+				if(caf != UNSET && ref[caf] != UNSET){
+					inf_start = ev.t;
+					infe = true;
+				}
+			}	
+		}
+		
+		if(inf_start != UNSET){
+			InfPeriod inf_per; 
+			inf_per.start = inf_start;
+			inf_per.end = timepoint[T];
+			inf_per.num_inf = 0;;
+			inf_period[i].push_back(inf_per);
+		}
+	}
+	
+	if(false){
+		for(auto i = 0u; i < individual.size(); i++){
+			cout << individual[i].name << ": ";
+			for(auto ip : inf_period[i]){
+				cout << ip.start << " - " << ip.end << "   "; 
+			}
+			cout << endl;
+		}
+		emsg("rr");
+	}
+	
+	return inf_period;
+}

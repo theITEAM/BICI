@@ -913,17 +913,23 @@ function button_action(bu,action_type)
 				inter.help = {title:"Problem loading", te:"The A matrix must be loaded with a heading line which gives the names of individuals."};
 			}
 			else{
-				let pos;
-				switch(inter.radio_format.value){
-				case "csv": pos = ".csv"; break;
-				case "tsv": pos = ".tsv,.txt"; break;
-				default: error("Format wrong"); break;
+				if(edit_source.type == "LoadAinvmatrix" && inter.radio_heading.value == "No"){
+					inter.help = {title:"Problem loading", te:"The inverse A matrix must be loaded with a heading line which gives the names of individuals."};
 				}
-				
-				let file_type = "Data file";
-				if(edit_source.type == "LoadAmatrix") file_type = "A matrix";
-				
-				loading_dialogue("",pos,file_type);
+				else{
+					let pos;
+					switch(inter.radio_format.value){
+					case "csv": pos = ".csv"; break;
+					case "tsv": pos = ".tsv,.txt"; break;
+					default: error("Format wrong"); break;
+					}
+					
+					let file_type = "Data file";
+					if(edit_source.type == "LoadAmatrix") file_type = "A matrix";
+					if(edit_source.type == "LoadAinvmatrix") file_type = "Ainv matrix";
+					
+					loading_dialogue("",pos,file_type);
+				}
 			}
 		}
 		break;
@@ -1579,9 +1585,27 @@ function button_action(bu,action_type)
 		}
 		break;
 	
-	case "LoadAMarix":
-		start_data_source("LoadAmatrix",{},{p:bu.p,i:bu.i});
-		file_add_datatable(); 
+	case "LoadAMatrix":
+		{
+			select_bubble_over();
+		
+			let Amat = model.species[bu.p].ind_eff_group[bu.i].A_matrix;
+			inter.bubble.type_radio = {value:Amat.type};
+		}
+		break;
+	
+	case "LoadAMatrix2":
+		{
+			let ds;
+			switch(inter.bubble.type_radio.value){
+			case "A": ds = "LoadAmatrix"; break;
+			case "Ainv": ds = "LoadAinvmatrix"; break;
+			case "pedigree": ds = "APed"; break;
+			}
+		
+			start_data_source(ds,{},{p:bu.op.p,i:bu.op.i}); 
+			file_add_datatable(); 
+		}
 		break;
 		
 	case "APedAdd":
@@ -1589,18 +1613,25 @@ function button_action(bu,action_type)
 		close_data_source();
 		break;
 		
-	case "EditAPed":
-		start_worker("EditAPed",{p:bu.p, i:bu.i});
-		break;
-		
-		
 	case "LoadAPed":
 		start_data_source("APed",{},{p:bu.p,i:bu.i});
 		file_add_datatable(); 
 		break;
 	
 	case "EditAmatrix":
-		start_worker("Edit A matrix",{ i:bu.i, p:bu.p});
+		{
+			let Amat = model.species[bu.p].ind_eff_group[bu.i].A_matrix;
+			
+			switch(Amat.type){
+			case "A": case "Ainv":
+				start_worker("Edit A matrix",{ i:bu.i, p:bu.p});
+				break;
+				
+			case "pedigree":
+				start_worker("EditAPed",{p:bu.p, i:bu.i});
+				break;
+			}
+		}
 		break;
 		
 	case "EditSimValue":

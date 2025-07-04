@@ -9,9 +9,60 @@ using namespace std;
 #include "const.hh"
 #include "hash.hh"
 
+struct InfPeriod {                 // Defines an infectious period
+ double start;                     // Start and end time for period
+ double end;
+ double end_inf;                   // The end time of when stops being infectious
+ double num_inf;                   // Number of infections caused by individual
+ double num_inf_t;                 // Number inf multiplied by time from infection
+};
+
+struct FRef {                      // Equation used in F for rep num
+	unsigned int e;                  // Equation number
+	unsigned int i;                  // popref number
+};
+
+struct SRef {                      // Equation used in S for rep num
+	unsigned int e;                  // Equation number
+	unsigned int m;                  // If branching this gives the nmtrans number
+	TransType type;                  // Whether rate or mean
+};
+
+struct EqSign {                    // Includes equation ref with sign
+	unsigned int k;
+	int sign;
+};
+
+struct Fele {                      // Stores element of F matrix
+	unsigned int k;
+	unsigned int c_from; 
+};
+
+struct DerFunc {
+	bool on;
+	DerFuncType type;                // The type derived function
+	string name;                     // The name
+	string cont;                     // The content for specifying 
+	unsigned int cl;                 // The classification
+	vector <unsigned int> ref;       // References infected state
+	vector < vector <unsigned int> > tau_eq; // Gives equations for calculating GT
+	
+	vector <FRef> Feq_ref;           // References equations used to calculate F
+	vector <SRef> Seq_ref;           // References equations used to calculate S
+	vector < vector < vector <Fele> > > F_eq;
+	vector < vector < vector <EqSign> > > S_eq;
+	string warn;
+};
+
 struct Warn {                      // Stores warning information from ESS and GR
 	unsigned int th;                 // The parameter affected
 	double num;                      // The number 
+};
+
+struct Sum {                       // Stores information about an equation sum
+	vector <string> dep;
+	unsigned int i_start;
+	unsigned int i_end;
 };
 
 struct ParamRef {                  // Used to reference parameter
@@ -149,7 +200,7 @@ struct DepInfo {                   // Stores dependency info froman equation
 	unsigned int iend;               // The end position for the dependency
 	vector <string> spl;             // Splits the dependency into individual elements
 	vector <unsigned int> ipos;      // The positions for the different depedencies
-	Result result;                   // Stores any warning message
+	string warn;                     // Stores any warning message
 };
 
 struct SwapTemp {                  // Constructs a swap template
@@ -160,7 +211,7 @@ struct SwapTemp {                  // Constructs a swap template
 struct SwapResult {                // Stores the result of doing a substitution of indeces for values
 	string warn;                     // Stores the warning message
 	vector <bool> done;              // Registers true if a swap has been performed
-	vector <SwapTemp> swap_temp;     // The template from swapping
+	vector <SwapTemp> swap_temp;     // The template for swapping
 };
 
 struct DepConv {                   // Used to convert dependencies from index to value
@@ -169,11 +220,11 @@ struct DepConv {                   // Used to convert dependencies from index to
 };
 
 struct EquationInfo {              // Stores information about an equation (prior to equation being evaluated)
-	EquationInfo(){ te = ""; p = UNSET; cl = UNSET; c = UNSET; infection_trans = false;}
+	EquationInfo(){ te = ""; p = UNSET; cl = UNSET; infection_trans = false;}
 	string te_raw;                   // The rate text value (as seen in the input file)
 	string te;                       // The text value after processing
 	unsigned int p, cl;              // The species and classification for equation (if appropriate)
-	unsigned int c;                  // The global compartment (used for sum max function)
+	//unsigned int c;                  // The global compartment (used for sum max function)
 	EqnType type;                    // The type of the equation
 	bool infection_trans;            // Set if infection transition (used to calculate transtree likelihood)
 	double value;                    // The numerical value (if appropriate)
@@ -968,7 +1019,7 @@ struct WarnData {                  // Stores warning messages
 };
 
 struct SpeciesSimp {               // A simplified version of species to pass to equation
-	SpeciesSimp(string name_, const vector <Classification> &cla, vector <IndEffect> &ind_effect, vector <FixedEffect> &fix_effect, const vector <unsigned int> &comp_mult, const vector <CompGlobal> &comp_gl, bool trans_tree_) : cla(cla), ind_effect(ind_effect), fix_effect(fix_effect), comp_mult(comp_mult), comp_gl(comp_gl)
+	SpeciesSimp(string name_, const vector <Classification> &cla, vector <IndEffect> &ind_effect, vector <FixedEffect> &fix_effect, const vector <unsigned int> &comp_mult, const vector <CompGlobal> &comp_gl, const vector <TransGlobal> &tra_gl, bool trans_tree_) : cla(cla), ind_effect(ind_effect), fix_effect(fix_effect), comp_mult(comp_mult), comp_gl(comp_gl), tra_gl(tra_gl)
 	{
 		name = name_;
 		trans_tree = trans_tree_;
@@ -980,6 +1031,7 @@ struct SpeciesSimp {               // A simplified version of species to pass to
 	vector <FixedEffect> &fix_effect;// Any fixed effects within species
 	const vector <unsigned int> &comp_mult; // Used to convert from classification definition to global
 	const vector <CompGlobal> &comp_gl; // The global compartments
+	const vector <TransGlobal> &tra_gl; // The global transition
 	bool trans_tree;                 // Determines if the transmission tree is turned on
 };
 
@@ -995,6 +1047,7 @@ struct Derive {                    // Stores derived parameters
 	bool time_dep;                   // Time dependency
 	vector <Dependency> dep;         // Dependency for derived quantity (excluding time)
 	vector <EquationInfo> eq;        // The equations for each quantity
+	DerFunc func;                    // Stores information about derived function
 	unsigned int line_num;           // Stores the line number the equation comes from
 };
 

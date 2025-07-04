@@ -93,6 +93,8 @@ function import_file(te,file,clear_results)
 	// Keeps track of the current species and classification 
 	imp = { lines:lines, script:pro.formatted, previous_loaded_table:[], warn:false}; 
 
+	model_store = model;
+	
 	model = new Model();	 
 	model.start_new();
 	
@@ -148,7 +150,6 @@ function import_file(te,file,clear_results)
 			
 			com_ti_sum += 0.5*import_frac_pro; per = show_percent(com_ti_sum,per,per_start,per_end);
 		
-		
 			initialise_filters_setup();
 			
 			com_ti_sum += 0.2*import_frac_pro; per = show_percent(com_ti_sum,per,per_start,per_end);
@@ -161,7 +162,7 @@ function import_file(te,file,clear_results)
 			imp.typest = line.type;
 		
 			let cname = line.type;
-			//error(loop+" "+cname+" loop command");
+			//prr(loop+" "+cname+" loop command");
 			switch(cname){                               // Accounts for shortened versions of commands
 			case "comp": cname = "compartment"; break;
 			case "comp-all": cname = "compartment-all"; break;
@@ -180,17 +181,21 @@ function import_file(te,file,clear_results)
 			switch(loop){
 			case 0: // In the first pass create species, classifications, compartments and loads data directory
 				switch(cname){
-				case "species": case "classification": case "view": case "warning":
+				case "species": case "classification": case "view":
 				case "compartment": case "compartment-all": 
-				case "data-dir": break;
-				default: process = false; break;
+				case "data-dir": 
+					break;
+				default:
+					process = false; 
+					break;
 				}
 				break;
 				
 			case 1: // The next pass does loads the parameters 
 				process = false; 
 				switch(cname){
-				case "species": case "classification": case "view": case "param": case "derived": 
+				case "species": case "classification": case "view": 
+				case "param":
 					process = true; 
 					break;
 				}
@@ -199,7 +204,7 @@ function import_file(te,file,clear_results)
 			case 2: // The last pass does everything except the parameters and compartments
 				switch(cname){
 				case "compartment": case "compartment-all":
-				case "param": case "derived": case "data-dir":
+				case "param": case "data-dir":
 				case "sim-param": case "sim-state":
 				case "inf-param": case "inf-state": 
 				case "post-sim-param": case "post-sim-state": 
@@ -208,7 +213,8 @@ function import_file(te,file,clear_results)
 				case "trans-diag": 
 				case "add-ind-post-sim": case "remove-ind-post-sim": case "move-ind-post-sim":
 				case "add-pop-post-sim": case "remove-pop-post-sim":
-					process = false; break;
+					process = false; 
+					break;
 				}
 				break
 				
@@ -695,6 +701,7 @@ function alert_import(st,line)
 	
 	get_formatted_line_width();
 
+
 	throw({ type:"Alert Import", title:"Error importing file!", te:te, st:st, line:line, scroll_to_line:true, script:imp.script});
 }
 
@@ -957,23 +964,46 @@ function load_data_files(pro,per_start,per_end)
 			let tag = cl.tags[k];
 			
 			let file = tag.value;
-			if(typeof file == 'string'){
-				switch(tag.name){
-				case "value": case "boundary": case "constant": case "reparam": 
-				case "prior-split": case "dist-split": 
-				case "A": case "A-sparse": case "pedigree": case "X": case "file": 
-				case "text": case "ind-list": case"factor-weight":
-					{
-						if(is_file(file)){
-							load_list.push({j:j, k:k});
+			switch(tag.name){
+			case "value": case "constant": case "reparam": case "text":  // May or may not be a file
+				if(typeof file == 'string' && is_file(file)){
+					load_list.push({j:j, k:k});
+				}
+				break;
+					
+			case "file": case "boundary": 
+			case "prior-split": case "dist-split": 
+			case "A": case "Ainv": case "A-sparse": case "pedigree": case "X": 
+			case "ind-list": case"factor-weight":
+				{
+					if(typeof file == 'string' && is_file(file)){
+						load_list.push({j:j, k:k});
+					}
+					else{
+						if(typeof(file) != "object"){
+							alert_line("A data table was expected for '"+tag.name+"'.",cl.line);
 						}
 					}
-					break;
 				}
+				break;
+				
+			default:
+				if(typeof(file) == "object" || (typeof file == 'string' && is_file(file))){
+					let extra="";
+					switch(tag.name){
+					case "prior": 
+						extra = " The tag 'prior-split' can be used to specify priors separately for each parameter element."; 
+						break;
+					case "dist": 
+						extra = " The tag 'dist-split' can be used to specify distributions separately for each parameter element."; 
+						break;
+					}
+					alert_line("A data table was not expected for '"+tag.name+"'."+extra,cl.line);
+				}
+				break;
 			}
-		}			
+		}	
 	}
-	
 
 	let previous_loaded = [];
 

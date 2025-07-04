@@ -187,15 +187,8 @@ function add_model_param_content(lay)
 					
 					let te_mat = "Load <e>"+ieg.A_matrix.name+"</e> matrix"; 
 				
-					let te_ped = "Load <e>"+ieg.A_matrix.name+"</e> pedigree"; 
-				
 					if(ieg.A_matrix.loaded == true){ 
-						if(ieg.A_matrix.pedigree == true){
-							te_ped = "Reload <e>"+ieg.A_matrix.name+"</e> pedigree"; 
-						}
-						else{
-							te_mat = "Reload <e>"+ieg.A_matrix.name+"</e> matrix";
-						}
+						te_mat = "Reload <e>"+ieg.A_matrix.name+"</e> matrix";
 					}
 					
 					let xload = 4;
@@ -204,26 +197,11 @@ function add_model_param_content(lay)
 
 						let dxload = text_anno.wmax+0.5;
 					
-						lay.add_button({word:text_anno.word, x:xload, y:y+0.1, dx:dxload, dy:1.1, type:"LinkPara", ac:"LoadAMarix", p:p, i:i});
+						lay.add_button({word:text_anno.word, x:xload, y:y+0.1, dx:dxload, dy:1.1, type:"LinkPara", ac:"LoadAMatrix", p:p, i:i});
 						xload += dxload+0.3;
 		
-						if(ieg.A_matrix.loaded == true && ieg.A_matrix.pedigree == false){
+						if(ieg.A_matrix.loaded == true){
 							lay.add_button({te:"Edit", x:xload, y:y-0.05, dx:3.75, dy:1.2, ac:"EditAmatrix", type:"GreyView", p:p, i:i});
-							xload += 3.75;
-						}
-						xload += 3;
-					}
-					
-					if(te_ped != ""){
-						let text_anno = text_convert_annotation(te_ped,si,si,100,"",BLACK);
-
-						let dxload = text_anno.wmax+0.5;
-					
-						lay.add_button({word:text_anno.word, x:xload, y:y+0.1, dx:dxload, dy:1.1, type:"LinkPara", ac:"LoadAPed", p:p, i:i});
-						xload += dxload+0.3;
-		
-						if(ieg.A_matrix.loaded == true && ieg.A_matrix.pedigree == true){
-							lay.add_button({te:"Edit", x:xload, y:y-0.05, dx:3.75, dy:1.2, ac:"EditAPed", type:"GreyView", p:p, i:i});
 							xload += 3.75;
 						}
 						xload += 3;

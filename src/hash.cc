@@ -45,18 +45,12 @@ unsigned int Hash::existing(const vector <unsigned int> &vec) const
 	
 
 /// For equations converts from the equation information to a list of integers
-vector <unsigned int> Hash::get_vec_eqn(const string &te, unsigned int type, unsigned int p, unsigned int cl, bool infection_trans, unsigned int ti, const string &c_te) const
+vector <unsigned int> Hash::get_vec_eqn(const string &te, unsigned int type, unsigned int p, unsigned int cl, bool infection_trans, unsigned int ti) const
 {
 	vector <unsigned int> vec;
 	
 	for(auto i = 0u; i < te.length(); i++){
 		int ch = te.at(i);
-		if(ch < 0) ch += 256;
-		vec.push_back(ch);
-	}
-	
-	for(auto i = 0u; i < c_te.length(); i++){
-		int ch = c_te.at(i);
 		if(ch < 0) ch += 256;
 		vec.push_back(ch);
 	}

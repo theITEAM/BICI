@@ -595,8 +595,12 @@ function warning_command()
 {
 	let warn = get_tag_value("text"); if(warn == "") cannot_find_tag();
 	if(typeof warn == "object") warn = warn.te;
-	
-	model.warning = {show:false, te:warn};
+	if(warn.length > 0 && warn.substr(warn.length-1,1) == "\n"){
+		warn = warn.substr(0,warn.length-1);
+	}
+
+	model.run_warning_show = false;
+	model.run_warning.push(warn);
 }
 
 
@@ -1526,6 +1530,7 @@ function param_command2(full_name,per_start,per_end,op)
 	}
 
 	if(prior != ""){
+		
 		let pri = convert_text_to_prior(prior,par.pri_pos);
 		if(pri.err == true){
 			alert_import("For 'prior' error with expression '"+prior+"': "+pri.msg);
@@ -1998,22 +2003,24 @@ function ind_effect_command()
 	
 	let A = get_tag_value("A"); 
 	let A_sparse = get_tag_value("A-sparse"); 
+	let Ainv = get_tag_value("Ainv"); 
 	let pedigree = get_tag_value("pedigree"); 
 	
 	let num = 0;
 	if(A != "") num++;
 	if(A_sparse != "") num++;
+	if(Ainv != "") num++;
 	if(pedigree != "") num++;
 	
 	if(num > 1){
-		alert_import("Cannot specify more than one of 'A', 'A-sparse' and 'pedigree'."); return;
+		alert_import("Cannot specify more than one of: 'A', 'Ainv', 'A-sparse' and 'pedigree'."); return;
 	}
 	
-	let A_matrix = {check:false, loaded:false, A_value:[], ind_list:[], pedigree:false, sire_list:[], dam_list:[]};
+	let A_matrix = {check:false, loaded:false, A_value:[], ind_list:[], sire_list:[], dam_list:[]};
 	
 	if(num == 1){
 		if(pedigree != ""){
-			A_matrix = {check:true, loaded:true, A_value:[], ind_list:[], pedigree:true, sire_list:[], dam_list:[]};
+			A_matrix = {check:true, loaded:true, type:"pedigree", A_value:[], ind_list:[], sire_list:[], dam_list:[]};
 	
 			let tab_ped = load_table(pedigree.te,true,pedigree.sep,pedigree.name);
 				
@@ -2034,7 +2041,7 @@ function ind_effect_command()
 		}
 		
 		if(A_sparse != ""){
-			A_matrix = {check:true, loaded:true, pedigree:false, sire_list:[], dam_list:[]};
+			A_matrix = {check:true, loaded:true, type:"A", sire_list:[], dam_list:[]};
 			
 			let ind_list = get_tag_value("ind-list"); 
 		
@@ -2073,10 +2080,36 @@ function ind_effect_command()
 		}
 	
 		if(A != ""){
-			A_matrix = {check:true, loaded:true, pedigree:false, sire_list:[], dam_list:[]};
+			A_matrix = {check:true, loaded:true, type:"A", sire_list:[], dam_list:[]};
 			
 			let tab = load_table(A.te,true,A.sep,A.name);
 			//let tab = load_table_from_file(A);
+			if(tab == undefined) return;
+			if(typeof tab == 'string') alert_import(tab); 
+
+			A_matrix.ind_list = tab.heading;
+			if(tab.nrow != tab.ncol){
+				alert_import("The file '"+tab.filename+"' must contain an equal number of columns and rows."); 
+			}
+			
+			let val = [];
+			for(let r = 0; r < tab.nrow; r++){
+				val[r] = [];
+				for(let c = 0; c < tab.ncol; c++){
+					let ele = tab.ele[r][c];
+					if(isNaN(ele)){
+						alert_import(in_file_text(tab.filename)+" the element '"+ele+"' is not a number (row "+(r+2)+", col "+(c+1)+")");
+					}
+					val[r][c] = Number(ele);
+				}
+			}
+			A_matrix.A_value = val;
+		}
+		
+		if(Ainv != ""){
+			A_matrix = {check:true, loaded:true, type:"Ainv", sire_list:[], dam_list:[]};
+			
+			let tab = load_table(Ainv.te,true,Ainv.sep,Ainv.name);
 			if(tab == undefined) return;
 			if(typeof tab == 'string') alert_import(tab); 
 

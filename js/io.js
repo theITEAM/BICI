@@ -37,11 +37,10 @@ function load_file()
 	if(inter.radio_heading) op.heading = inter.radio_heading.value;
 	if(inter.radio_format) op.format = inter.radio_format.value;
 	
-	if(inter.file_type == "A matrix"){
+	if(inter.file_type == "A matrix" || inter.file_type == "Ainv matrix"){
 		op.p = edit_source.info.p;
 		op.i = edit_source.info.i;
 	}
-	
 	
 	if(inter.file_type == "GEOJSON_annotation"){
 		op.p = inter.p_cl_store.p;

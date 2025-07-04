@@ -47,7 +47,7 @@ init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
 
 init-pop type="fixed" file="init-pop-People.csv"
 
-pop-data filter="DS=file,Sex=file" error="normal:10%" file="pop-data.csv"
+pop-data filter="DS=file,Sex=file" error="poisson" file="pop-data.csv"
 
 
 

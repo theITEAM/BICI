@@ -1,44 +1,43 @@
-- prob1 adding individual and initial disitrubution
-- prob2 same
+- plot showing population density vs climate
+- plot showing climate mitigation vs climate
+- Model evidence
+- MC3
+
+- prob1: parameter a not being estimated correctly
+- mac interface
+- mac memory
+- Mac post-sim not working
 
 
+ME:
+- Code has been added to estimate reproduction number, with new derived functions RN(...), RNE(...) and RNC(...). RN(...) calculate R0 based on largest eigenvalue in the next generation matrix. RNE(...) calculates the effective reproduction number (this decreases as the susceptible population is exhausted). RNC(...) is a computational approach to calculating effective reproduction number (it bases its results of individuals which actually become infected)... this tends to be more noisy, but is the only approach which works when there is individual-based variation in traits.
+- Bugs fixed whereby a failed model load was incorrectly overwriting current model.
+- Brackets were not correctly displaying on description page.
+- An error in now given if repeated dependencies are used e.g. X_a,a
+- Example F3 has been modified to provides some extra examples of derived quantities.
+- Error messages when individual or fixed effects put into derived expressions.
+- Corrected problems related to displaying A matrix in interface.
+- Corrected timings diagnostics for proposals under PAS-MCMC
+- Added to the manual advice about setting priors/value for individual effects.
+- I've used Valgrind to identify a few instance when variables may not be initialised.
 
-
-
-
+GRANT:
+- Problem related to limited sums and integrals. Now sums with limit have a slightly modified syntax. "\sum_l' [l,30]" would be interpreted as the sum l' is limited to terms in which the distance between compartment l and l' is less than 30.
+- I was finding that the derived quantities for the big spatial models were not working very well. Basically they were using too much memory and were slow to initialise. I've had to substatially change how BICI calculates integrals, but at least this seems to have sorted out the problem. All these changes may have broken other things, so please let me know if you spot anything...
+- Problem with initial probabilies (e.g. S:0.995|I:0.005) fixed.  
+- I've also tried to improve how initial conditions are specified for individual-based models. Examples A5 and A6 have been added. 
+- Sorted out problem with loading large tensors into the interface (large that the size which can be editted). 
 
 
 JAMIE:
-- Progress bar. So as far as I can see this is just an Eddie issue. I quite like the horizontal progress bars, because it doesn't cause the terminal to scroll so much. So what I've done is add a progress file (located in the "Diagnostic" directory. This does use vertical updating. Perhaps you could check to see if that works with Eddie?
-
-- As an alternative I've now replaced cout with printf(..) and fflush(stdout). Perhaps this has sorted out the problem with the progress bar?
-
-- I've tried to improve the error messages regarding limitations to certain parameters (for example CV should not below 0.01 for numerical reasons). I've also added section 4.2.4 to the manual.
-
-- Now I've removed the error which is generated for {I;}
-
-- I've corrected the "sampler problem" error. It was indeed down to finite precision, but a tricky one to track down.
-
-
-GRANT:
-- Memory usage. So as I mentioned, there is nothing in C++ itself which gets this, but having investigated there are some platform dependent methods to get this info (the code isn't pretty, but it does the job). So now an estimate for memory is printed and also if its likely to run out of memory a warning message is given.
-
-- Code has been added to allow for time integrals to be done on derived quantities. They have the format “\int dt (…)”, where the content goes in the round brackets.  For example, the expression “\int dt ({I})” is mathematically represented by ∫{I}dt. By default, time is integrated over the entire system period, but limits can be placed (e.g. “\int[10,50] dt ({I})” becomes ∫_10^50{I}dt. Time integration can be used to estimate the relative contribution to different routes of transmission. For example, if the force of infection is given by β{I}+ϕ the derived quantity “\int dt (\phi) / \int dt (\beta{I}+\phi)” (mathematically (∫ϕdt)⁄(∫(β{I}+ϕ)dt)) gives the relative contribution of external infections).
-
-- I've added information which helps users to load up data table for parameter values (and prior/reparameterisation etc). There have been examples put in software [?] help files as well as lots of examples of input files I've now put in the manual (also section 2.2.9 has been added).
-
-ME:
-- I've corrected a mistake in how effective sample sizes are calculated. Values will now be lower than they were previously. 
-
-- Add filters for individuals (these filters are based on whether individuals at some point visit a specified set of compartments). Also some filter help has been added through the interface help symbols[?])
-
-- Allow for the possibility of derived parameters to depend on parameters which themselves are derived. 
-
-- I've done some general error checking for derived / reparameterised / distributions... I spotted a few mistakes.
-
-- Add a warning on ESS/GR. If this warning is set then don't show timestep warning (because this isn't very reliable for an unmixed system
-
-- Updates to the manual related to above.
+- Now there are three ways to incorporate A: directly, through inverse or from pedigree. See manual for details.
+- As far as I can find Scientific notation for numbers (e.g. 3e-2) should work. If you can find an example of there it doesn't work that would be much appreciated.
+- I've put a mention of “mpirun --output :raw” into the manual. Although it doesn't seem to work on gaia. Perhaps I'm running on an old version ('mpirun --version' gives 'mpirun (Open MPI) 4.1.4'). Which version is on your computer?
+- I've added in the "#ifdef WIN64 #define WINDOWS..." declaration. Thats handy!
+- I've added you commented out code for the time, although I'm not sure if it's needed now.
+- I've added an error message if 'prior' is used with a table and suggests to use 'prior-split' instead. More generally I've added error messages when and when not to incorporate data tables.
+- I've mentioned in the menu and interface about the zero indexing used when specifing pedigree information.
+- Corrections of various proposals to ensure that system does not stray into region where numerical accuracy problems occur.
 
 
 
@@ -49,15 +48,16 @@ ME:
 
 
 
-- output percent
-- \omega^ia,ta
 
 
 
 
 
-- prob1: parameter a not being estimated correctly
-- Mac post-sim not working
+
+
+
+
+
 
 
 

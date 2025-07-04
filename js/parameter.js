@@ -1402,13 +1402,6 @@ function check_derived_param(eqn,eqn_param,param)
 			}
 			else return err("Parameter '"+par.full_name+"' is not found in the model");
 		}
-		/*
-		else{
-			if(param[j].type == "derive_param"){
-				return err("Derived parameter '<e>"+eqn_param.te+"</e>' cannot depend on another derived parameter '"+par.full_name+"'.");
-			}
-		}
-		*/
 	}
 	
 	// Checks that the dependencies for a derived quantity agree with equation

@@ -20,7 +20,6 @@ function create_edit_param(lay)
 		doneac = "EditWeightDone";
 	}
 	
-	
 	let	load_title = "Load tensor values", load_te = load_tensor_text;
 	let load_ac = "LoadTensor";
 	
@@ -305,7 +304,7 @@ function load_tensor(ep,source)
 	let value = par.value;
 	if(ep.too_big){
 		ep.list = copy(par.list);
-		ep.value = copy(par.value);
+		if(par.value != undefined) ep.value = copy(par.value);
 		ep.too_big = false;
 	}
 	
@@ -354,9 +353,8 @@ function load_reparam(ep,source)
 	
 	if(ep.too_big){
 		ep.list = copy(list);
-		ep.value = copy(par.value);
+		if(par.value != undefined) ep.value = copy(par.value);
 		ep.too_big = false;
-		//ep.limit_dim = get_dimensions(ep.value);
 	}
 	
 	let value = ep.value;
@@ -390,8 +388,8 @@ function load_priorsplit(ep,source,dist)
 	
 	if(ep.too_big){
 		ep.list = copy(list);
-		ep.value = copy(par.value);
-		ep.prior_split = par.prior_split;
+		if(par.value != undefined) ep.value = copy(par.value);
+		if(par.prior_split != undefined) ep.prior_split = par.prior_split;
 		ep.too_big = false;
 		//ep.limit_dim = get_dimensions(ep.value);
 	}

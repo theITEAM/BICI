@@ -31,75 +31,23 @@ void Model::add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double t)
 	
 	if(eqi.te == "") emsg("Equation does not have any text");
 	
-	// If "max" is used in sums then this means the equation depends the state of eqi.c
-	string c_te = "";
-	if(eqi.c != UNSET && find_in(eqi.te,"max") != UNSET) c_te = find_eq_dif(eqi);
-	
-	auto vec = hash_eqn.get_vec_eqn(eqi.te,(unsigned int)eqi.type,eqi.p,eqi.cl,eqi.infection_trans,ti,c_te);
-	
+	auto vec = hash_eqn.get_vec_eqn(eqi.te,(unsigned int)eqi.type,eqi.p,eqi.cl,eqi.infection_trans,ti);
+
 	auto e = hash_eqn.existing(vec);
 	if(e != UNSET){
 		eqi.eq_ref = e;
-		/*
-		if(eqi.te != eqn[e].te_init){
-			cout << eqi.te << "| " << eqn[e].te_init <<" init" << endl;
-			emsg("wrong");
-		}
-		*/
 	}
 	else{
 		eqi.eq_ref = eqn.size();	
 		
 		hash_eqn.add(eqi.eq_ref,vec);
-		Equation eq(eqi.te,eqi.type,eqi.p,eqi.cl,eqi.c,eqi.infection_trans,ti,eqi.line_num,species_simp,param,derive,spline,param_vec,pop,hash_pop,timepoint);
+	
+		Equation eq(eqi.te,eqi.type,eqi.p,eqi.cl,eqi.infection_trans,ti,eqi.line_num,species_simp,param,derive,spline,param_vec,pop,hash_pop,timepoint);
 		
 		if(false && eq.warn != ""){ cout << eq.warn << endl; emsg("warning");}
 		
 		eqn.push_back(eq);
 	}
-}
-
-
-/// When an equation contains "max" this works out an equation differentiator
-string Model::find_eq_dif(const EquationInfo &eqi) const 
-{
-	const auto &sp = species[eqi.p];
-	
-	vector <bool> cl_fl(sp.ncla,false);
-	
-	auto te = eqi.te;
-	auto i = 0u;
-	auto len = te.length();
-	while(i < len){
-		while(i < len-4 && te.substr(i,4) != "max:") i++;
-		if(i < len-4){
-			while(i < len && te.substr(i,1) != "_") i++;
-			if(i < len){
-				i++;
-				auto di = get_dep_info(te,i,notparam_list);
-				for(auto ve : di.spl){
-					auto ind = remove_prime(ve);
-					for(auto cl = 0u; cl < sp.ncla; cl++){
-						if(sp.cla[cl].index == ind) cl_fl[cl] = true;
-					}
-				}
-				i = di.iend;
-			}				
-		}
-		i++;
-	}
-	
-	const auto &cgl = sp.comp_gl[eqi.c];
-	
-	string c_te = "";
-	for(auto cl = 0u; cl < sp.ncla; cl++){
-		if(cl_fl[cl] == true){
-			if(c_te != "") c_te += "_";
-			c_te += sp.cla[cl].comp[cgl.cla_comp[cl]].name;
-		}
-	}
-	
-	return c_te;
 }
 
 
@@ -487,7 +435,7 @@ void Model::recalculate_population_restore(vector < vector <double> > &popnum_t,
 void Model::create_species_simp()
 {
 	for(auto &sp :species){
-		SpeciesSimp ss(sp.name,sp.cla,sp.ind_effect,sp.fix_effect,sp.comp_mult,sp.comp_gl,sp.trans_tree);
+		SpeciesSimp ss(sp.name,sp.cla,sp.ind_effect,sp.fix_effect,sp.comp_mult,sp.comp_gl,sp.tra_gl,sp.trans_tree);
 		species_simp.push_back(ss);
 	}
 }
@@ -624,7 +572,6 @@ void Model::affect_linearise_speedup2(vector <AffectLike> &vec, const vector <un
 							break;
 						
 						case PARAMETER: case SPLINE: emsg("SHould not be"); break;
-						case SPLINE_TIME: case SPLINEREF_TIME:
 							emsg("SHould not be spline time");
 							break;
 						default: break;
@@ -1130,7 +1077,6 @@ vector <InitCondValue> Model::initc_sample(const vector <double> &param_val) con
 				auto foc_cl = ic.focal_cl;
 				if(foc_cl == UNSET){
 					inc.N_total = round_int(prior_sample(ic.pop_prior,param_val));
-
 					inc.frac = dirichlet_sample(ic.alpha);
 					inc.cnum = multinomial_sample(inc.N_total,inc.frac);
 				}
@@ -1498,7 +1444,7 @@ void Param::add_element(unsigned int i)
 		//if(variety == REPARAM_PARAM) ele.value = add_equation_info(default_text,REPARAM);
 		//else ele.value.te = default_text;
 		ele.prior_ref = default_prior_ref;
-		
+		ele.used = false;
 		element.push_back(ele);
 	}
 }

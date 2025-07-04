@@ -439,27 +439,13 @@ function copy_strip(source,dest)
 		let cont = false;
 		
 		switch(ele){
-		case "factor_weight":
-			//dest.weight_desc = get_weight_desc(source);
-			//dest.dim = get_value_dim(source);
-			break;
-			
-		case "value": 
-			if(source.ind_list == undefined){
-				//dest.value_desc = get_value_desc(source);
-				//dest.dim = get_value_dim(source);
-			}
-			
+		case "factor_weight": break;
+		case "value": 	
 			if(!Array.isArray(source.value)) dest.value = source.value;
 			break;
-			
-		case "prior_split": 
-			//dest.prior_split_desc = get_prior_split_desc(source);
-			break;
-			
+		case "prior_split":	break;
 		case "table": case "A_value": case "X_value": case "ind_list":
 		case "list": case "reparam_param_list": case "prior_param_list":
-		//case "co_list":
 			break;
 		
 		case "param": case "species": 

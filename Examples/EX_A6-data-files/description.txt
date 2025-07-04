@@ -1,18 +1,23 @@
-# Example A6: Add / move / remove individuals from IBM
+# Example A6: Uncertain initial conditions for IBM using a distribution
 
 ## Objective
-- To show how individuals can be added, moved and removed from the system.
-- 100 susceptible individuals are added at time $t=0$.
-- Here we have an SIR model within two fish tanks: $T1$ and $T2$.
-- 10 infected individuals are added to tank $T1$.
-- At time $t=100$, 10 specified individuals are moved from to tank $T2$. This then initiates an epidemic in tank $T2$.
+- Introduce uncertainty in the initial population for an individual-based model.
+- On the 'Simulation→Initial Conditions' page a population distribution is specified as an initial condition. 
+- Compared to example A5, this allows for greater flexibility.
+- 100 simulations are performed to see stochastic variation.
 
 ## Model
 - A single population-based species 'People' is created.
-- This contains a classification 'DS', which stands for 'disease status', and 'Tank'.
+- This contains a classification 'DS' which stands for 'disease status'.
 - DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
-- 'Tank' contains two fish tank compartments: $T1$ and $T2$.
 - A transmission rate $β$ determines the rate at which individuals become infected.
 
 ## Population
-- This consists of 100 initially susceptible individuals and one infected.
+- A population distribution fixes a total population of 1000 individuals.
+- A Dirichlet distribution sets the susceptible and infected populations.
+- $α^S$=10 and $α^I$=0.2 implies that there is a 10/(10+0.2)=98% mean probability of being in the $S$ compartment and a 2% probability of being in the $I$ compartment initially.
+- Compared to example A5, the distribution for the number of infected individuals is much broader.
+- Increasing $α^S$ and $α^I$ by a factor keeps the percentages the same but reduce the uncertainty in the distributions. 
+- The initial population consists of 1000 individuals added at the start time $t=0$.
+- They have an unspecified initial state (denoted by '.', which is equivalent to an equal probability of being in either state 'S|I').
+- Note, if a population distribution is specified, individual added at the start time must have an unspecified initial state.
