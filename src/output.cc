@@ -1306,7 +1306,24 @@ void Output::param_sample(unsigned int s, unsigned int chain, const State &state
 {
 	timer[PARAM_OUTPUT] -= clock();
 	auto part = state.generate_particle(s,chain,false);
+	
 	param_store.push_back(part);
+	
+	if(jamie_code && chain != GEN_PLOT){
+		string na = sampledir+"/param_"+tstr(chain)+".csv";
+		
+		if(s == 0){
+			ofstream fout(na);
+			fout << trace_init();		
+		}
+		
+		{
+			ofstream fout(na,std::ios::app);
+			auto value = param_value_from_vec(part.param_val_prop);
+			fout << param_output(part,value);
+		}
+	}
+	
 	timer[PARAM_OUTPUT] += clock();
 }
 

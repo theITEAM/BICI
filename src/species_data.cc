@@ -41,9 +41,9 @@ void Species::initialise_data()
 	if(type == INDIVIDUAL) jiggle_data();
 	
 	nindividual_in = individual.size();
- 
+
 	add_unobs_Amatrix_ind();
-	
+
 	X_vector_order();
 	
 	order_data_events();
@@ -1682,9 +1682,9 @@ void Species::add_tr_list(const vector <unsigned int> &tr_list, const vector <bo
 /// Adds any individuals which are unobserved 
 void Species::add_unobs_Amatrix_ind()
 {
-	
 	for(const auto &ieg : ind_eff_group){
 		const auto &A = ieg.A_matrix;
+		
 		if(A.set){
 			for(auto na : A.ind_list){
 				find_individual(na);

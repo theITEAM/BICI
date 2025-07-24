@@ -2257,7 +2257,6 @@ void Input::param_affect_likelihood()
 							
 							if(j == i){  // If on the di
 								auto ie = ieg.list[i].index;
-								
 								model.add_ie_affect(p,ie,model.param_vec[k].affect_like);
 							}
 							
@@ -4597,3 +4596,4 @@ void Input::setup_der_func_eqn()
 		}
 	}
 }
+

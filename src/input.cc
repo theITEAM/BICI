@@ -1219,37 +1219,6 @@ bool Input::is_zeroone(string num, string tag)
 void Input::map_ind_effect()
 {
 	for(auto &sp : model.species){
-		// Works out parameter references for omega
-		for(auto i = 0u; i < sp.ind_eff_group.size(); i++){
-			auto &ieg = sp.ind_eff_group[i];
-			
-			auto N = ieg.list.size();
-			
-			ieg.omega.resize(N); 	for(auto j = 0u; j < N; j++) ieg.omega[j].resize(N);
-			
-			for(auto j = 0u; j < N; j++){
-				for(auto jj = j; jj < N; jj++){
-					auto ie1 = ieg.list[j].name, ie2 = ieg.list[jj].name;
-					auto sup = "^"+ie1+","+ie2;
-					
-					string name;
-					if(j == jj) name = "Ω"+sup;
-					else name = "ω"+sup;
-					
-					auto th = 0u; while(th < model.param.size() && model.param[th].name != name) th++;
-					
-					if(th == model.param.size()){
-						alert_line("Parameter '"+name+"' must be specified for these individual effects",ieg.line_num);
-					}
-					else{
-						ieg.omega[j][jj] = th;
-						ieg.omega[jj][j] = th;
-						model.param[th].used = true;
-					}
-				}
-			}		
-		}
-		
 		// Links from ind_effect to ind_effect_group
 		for(auto i = 0u; i < sp.ind_effect.size(); i++){
 			auto &ie = sp.ind_effect[i];
@@ -1280,9 +1249,40 @@ void Input::map_ind_effect()
 			for(auto k = 0u; k < ieg.list.size(); k++){
 				const auto &li = ieg.list[k];
 				if(li.index == UNSET){
-					alert_line("Individual effect '"+li.name+"' not used in the model.",ieg.line_num);
+					alert_line("Individual effect '"+li.name+"' not used in the model.",ieg.line_num,true);
 				}
 			}
+		}
+		
+		// Works out parameter references for omega
+		for(auto i = 0u; i < sp.ind_eff_group.size(); i++){
+			auto &ieg = sp.ind_eff_group[i];
+			
+			auto N = ieg.list.size();
+			
+			ieg.omega.resize(N); 	for(auto j = 0u; j < N; j++) ieg.omega[j].resize(N);
+			
+			for(auto j = 0u; j < N; j++){
+				for(auto jj = j; jj < N; jj++){
+					auto ie1 = ieg.list[j].name, ie2 = ieg.list[jj].name;
+					auto sup = "^"+ie1+","+ie2;
+					
+					string name;
+					if(j == jj) name = "Ω"+sup;
+					else name = "ω"+sup;
+					
+					auto th = 0u; while(th < model.param.size() && model.param[th].name != name) th++;
+					
+					if(th == model.param.size()){
+						alert_line("Parameter '"+name+"' must be specified for these individual effects",ieg.line_num);
+					}
+					else{
+						ieg.omega[j][jj] = th;
+						ieg.omega[jj][j] = th;
+						model.param[th].used = true;
+					}
+				}
+			}		
 		}
 	}
 }

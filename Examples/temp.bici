@@ -2,31 +2,26 @@
 ####################### DESCRIPTION ########################
 
 description text="[[
-# Model 2.6: SIR model with demographic stratification
+# Model 1.2: Individual-based SI model
 
 ## Objective
-- Introduces an example of stratification into the SIR epidemiological model.
-- Here the population is divided into males and females.
-
+- Introduce the simplest possible individual-based epidemiological model.
+- Under simulation or inference, we see timelines for each of the individuals in the system.
 
 ## Model
-- A single population-based species 'People' is created.
-- This contains a classification 'DS' which stands for 'disease status' and a classification 'Sex'.
-- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
-- A transmission rate $β_s$ determines the rate at which individuals with sex $s$ become infected.
-- A recovery rate $γ_s$ determines the rate at which individuals recover with sex $s$.
-- $N$ is the total number of individuals (this model assumes frequency dependent transmission).
-- Classification 'Sex' contains the compartments $M$ and $F$ for male and female.
+- A single individual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
 
 ## Population
-- This consists of 10000 initially susceptible individuals and 2 infected.
-- There is a 50/50 split between males and females.
+- This consists of 100 initially susceptible individuals and one infected.
 ]]"
 
 
 ######################### DETAILS ##########################
 
-simulation start=0 end=100 number=100 timestep=0.5
+simulation start=0 end=100 timestep=0.5
 
 inference start=0 end=100 timestep=0.5 nchain=3
 
@@ -35,67 +30,32 @@ post-sim start=0 end=100
 
 ######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
 
-species name="People" type="individual"
+species name="People" type="individual" trans-tree="on"
 
 # SPECIES MODEL
 
-class name="DS" index="d"
+class name="DS" index="a"
 
 view x=0 y=0 scale=1
 
-comp name="S" color="#009900" x=-15 y=0
-comp name="I" color="#ff2222" x=0 y=0
-comp name="R" color="#4444ff" x=15 y=0
+comp name="S" color="#009900" infected="false" x=-10 y=0
+comp name="I" color="#ff2222" infected="true" x=10 y=0
 
-trans name="S->I" value="exp(rate:2×β_s×{I}/N)"
-trans name="I->R" value="exp(rate:γ_s)"
-
-class name="Sex" index="s"
-
-view x=0 y=0 scale=1
-
-comp name="M" color="#cb6a00" x=-10 y=0
-comp name="F" color="#aa00aa" x=10 y=0
+trans name="S->I" value="exp(rate:β×{I})"
 
 # SIMULATION INITIAL CONDITIONS
 
-init-pop-sim type="dist" focal="DS" file="[[
-"Compartment","Distribution"
-"S","uniform(100,200)"
-"I","exp(10)"
-"R","fix(0)"
-"M",2
-"F",1
-]]"
-
-add-ind-sim file="[[
-"ID","t","DS","Sex"
-"Ind-1",0,"S","M"
-"Ind-2",0,"S","M"
-"Ind-3",10,"I|R","F"
-"Ind-4",100,"I:0.4|R:0.6","F"
-"Ind-5",100,"I:a | R:1-a","F"
+init-pop-sim type="fixed" focal="DS" file="[[
+"Compartment","Population"
+"S",100
+"I",1
 ]]"
 
 
 
 ######################## PARAMETERS ########################
 
-param name="a"
-
-param name="N" constant="100"
-
-param name="β_s" value="[[
-"s",Value
-"M","0.6"
-"F","0.4"
-]]" prior="uniform(0,1)"
-
-param name="γ_s" value="[[
-"s",Value
-"M","0.1"
-"F","0.2"
-]]" prior="uniform(0,1)"
+param name="β" value="0.001" prior="uniform(0,0.01)"
 
 
 

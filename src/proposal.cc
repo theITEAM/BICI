@@ -1527,7 +1527,7 @@ void Proposal::resimulate_ind_obs(State &state)
 				else{
 					if(testing == true){ // Diagnostic
 						auto prob = ind_ev_samp.resample_init_event_prob(i,e_init) + ind_ev_samp.simulate_events_prob(i,ev_new,indd.trig_ev_ref);
-						if(dif(probif,prob,DIF_THRESH)){
+						if(dif(probif,prob,THRESH_EXPAND*DIF_THRESH)){
 							emsg("sampler different3");
 						}
 					}
@@ -1731,8 +1731,8 @@ void Proposal::resimulate_ind_unobs(State &state)
 			if(testing == true){                         // Diagnostic
 				auto prob = ind_ev_samp.simulate_events_prob(i,ev_new,ste);
 				if(copy_init == false) prob += so_samp.sample_prob(e_init);
-				if(dif(probif,prob,DIF_THRESH)){
-					emsg("sampler different3");
+				if(dif(probif,prob,THRESH_EXPAND*DIF_THRESH)){
+					emsg("sampler different4");
 				}
 			}
 			

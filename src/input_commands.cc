@@ -1978,6 +1978,8 @@ void Input::ind_effect_command()
 	
 	if(num == 1){
 		if(pedigree != ""){
+			A_matrix.set = true;
+			
 			auto tab_ped = load_table(pedigree);
 				
 			if(tab_ped.ncol != 3){

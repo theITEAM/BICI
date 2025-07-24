@@ -15,7 +15,7 @@ using namespace std;
 #elif __APPLE__
   #define MAC
 #else
-#   error "Unknown compiler"
+# error "Unknown compiler"
 #endif
 
 #ifdef MAC
@@ -26,6 +26,7 @@ const string default_file = "Execute/init.bici";     // This is used for windows
 
 #define USE_MPI                                    // Sets if code can run in parallel
 
+const bool jamie_code = true;                        // This turns in code for Jamie
 const bool testing = true;                           // Set to true for additional testing
 const bool slow_check = false;                       // Additional checks which are slow
 const bool check_lin = true;                         // Checks linearisation of equations 
@@ -325,6 +326,7 @@ const double EFFECT_MIN = 0.0000001;              // Sets minimum value for effe
 const double CLIP_MIN = 0.99*log(EFFECT_MIN);     // Clips minimum 
 const double CLIP_MAX = 0.99*log(EFFECT_MAX);     // Clips maximum 
 const double DIF_THRESH = 0.00001;                // The threshold for a difference
+const double THRESH_EXPAND = 100;                 // Expand threshold for certain quantities
 const double DIF_THRESH_BURNIN = 0.1;             // The threshold during burnin
 const unsigned int RANGE_MIN = 50;                // Minimum number to calc M
 

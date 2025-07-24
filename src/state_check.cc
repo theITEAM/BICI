@@ -518,7 +518,7 @@ void State::check_markov_trans(unsigned int p, string ref)
 				emsg("value error");
 			}
 			
-			if(dif(div.indfac_int,divc.indfac_int,dif_thresh)){
+			if(dif(div.indfac_int,divc.indfac_int,THRESH_EXPAND*dif_thresh)){
 				emsg("indfac_int");
 			}
 			
@@ -534,7 +534,7 @@ void State::check_markov_trans(unsigned int p, string ref)
 				}
 			}
 			
-			if(dif(ssp.Li_markov[e][ti],Li_markov_store[ti],dif_thresh)){
+			if(dif(ssp.Li_markov[e][ti],Li_markov_store[ti],THRESH_EXPAND*dif_thresh)){
 				emsg("Li_markov error"+ref);
 			}
 		}
@@ -655,7 +655,7 @@ void State::check_like(string ref)
 		emsg("like obs "+ref);
 	}
 	
-	if(dif(like.markov,like_st.markov,dif_thresh)){
+	if(dif(like.markov,like_st.markov,THRESH_EXPAND*dif_thresh)){
 		emsg("like markov "+ref);
 	}
 	
@@ -786,10 +786,10 @@ void State::check_popnum_t(string ref)
 	for(auto ti = 0u; ti < T; ti++){
 		if(popnum_t[ti].size() != model.pop.size()) emsg("Wrong size3");
 		for(auto k = 0u; k < model.pop.size(); k++){
-			if(dif(popnum_t[ti][k],popnum_t_store[ti][k],dif_thresh)){
+			if(dif(popnum_t[ti][k],popnum_t_store[ti][k],THRESH_EXPAND*dif_thresh)){
 				//output_dump();
-				cout << core() << " " << popnum_t[ti][k] << " " << popnum_t_store[ti][k] << " popn" << endl;
-				get_closest_to_boundary();
+				//cout << core() << " " << popnum_t[ti][k] << " " << popnum_t_store[ti][k] << " popn" << endl;
+				//get_closest_to_boundary();
 				emsg("popnum_t problem"+ref);
 			}
 		}

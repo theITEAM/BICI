@@ -16,4 +16,5 @@
 - The strength of this variation is determined through variance $Ω^gg$.
 
 ## Population
-- This consists of 100 initially susceptible individuals and one infected.
+- This consists of 60 groups each with 10 half-sib individuals.
+- 598 initially susceptible individuals and two infected.
