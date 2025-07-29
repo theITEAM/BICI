@@ -41,13 +41,15 @@ class State                                // Stores information about the state
 		
 		vector <Change> change;                // Stores changes in the state
 
-		vector <long> update_timer;            // Stores timers for parameter updates
-		vector <long> restore_timer;           // Stores timers for parameter restore
-		vector <long> timer;                   // General purpose timers
+		vector <double> update_timer;          // Stores timers for parameter updates
+		vector <double> restore_timer;         // Stores timers for parameter restore
+		vector <double> timer;                 // General purpose timers
 		
 		double dif_thresh;                     // Threshold for difference
 		
 		vector <BackPop> back_pop;             // Stores population info
+		
+		vector <AlgWarn> alg_warn;             // Stores any algorithm warnings
 		
 		State(const Model &model);
 		void init();
@@ -186,6 +188,8 @@ class State                                // Stores information about the state
 		void print_ev_data(string te, const vector <EventData> &event_data, unsigned int p) const;
 		void check_popnum_t(string ref);
 		void check_popnum_t2(string ref);
+		void check_neg_rate(string name);
+		void add_alg_warn(string te);
 	
 	private:
 		void check_dependent_param(string ref);
@@ -203,7 +207,7 @@ class State                                // Stores information about the state
 		void check_obs_like(unsigned int p, string ref);
 		void check_init_cond_like(unsigned int p, string ref);
 		void check_init_cond_prior(string ref);
-		void check_linearise() const;
+		void check_linearise();
 		void check_spline_store(string ref);
 		void check_genetic_value(string ref);
 		void check_popnum_ind(string ref);

@@ -53,7 +53,7 @@ void StateSpecies::check_markov_eqn_ref() const
 	 
 	for(auto e = 0u; e < N; e++){
 		const auto &me = sp.markov_eqn[e];
-		const auto &me_vari = markov_eqn_vari[e];
+		auto &me_vari = markov_eqn_vari[e];
 		
 		const auto &ind_tra = me_vari.ind_tra;
 		
@@ -73,7 +73,7 @@ void StateSpecies::check_markov_eqn_ref() const
 			}
 		}
 		
-		if(dif(markov_eqn_vari[e].indfac_sum,sum,dif_thresh)){
+		if(dif(me_vari.indfac_sum,sum,dif_thresh)){
 			emsg("Problem with ie_sum");
 		}
 	}
@@ -98,7 +98,7 @@ void StateSpecies::check_cpop() const
 	
 	for(auto c = 0u; c < N; c++){
 		if(dif(cpop[c],cpop_check[c],dif_thresh)){
-			cout << c << " " << cpop[c] << " "<< cpop_check[c] <<" dif" << endl;
+			//cout << c << " " << cpop[c] << " "<< cpop_check[c] <<" dif" << endl;
 			emsg("cpop wrong");
 		}
 	}				
@@ -219,50 +219,55 @@ void StateSpecies::ensure_consistent(vector <Event> &ev) const
 
 
 /// Prints a sequence of individual events
-void StateSpecies::print_event(string name, const Individual &ind) const
+string StateSpecies::print_event(string name, const Individual &ind) const
 {
-	cout << name << "  " << ind.name << ":"<< endl;
+	stringstream ss;
+	ss << name << "  " << ind.name << ":"<< endl;
 
-	print_event(ind.ev);
+	ss << print_event(ind.ev,true);
+	
+	return ss.str();
 }
 
 
 /// Prints a vector of events
-void StateSpecies::print_event(const vector <Event> &event) const
+string StateSpecies::print_event(const vector <Event> &event, bool str) const
 {
+	stringstream ss;
+	
 	auto c = UNSET;
 	for(auto &ev : event){
 		auto c_after = ev.c_after;
 	
 		switch(ev.type){
 		case ENTER_EV: 
-			cout << " ENTER " << ev.t << ", ";
+			ss << " ENTER " << ev.t << ", ";
 			c = ev.c_after;
 			break;
 		
 		case LEAVE_EV:
-			cout << " LEAVE " << ev.t << ", ";
+			ss << " LEAVE " << ev.t << ", ";
 			c = UNSET;
 			break;
 		
 		case MOVE_EV:
-			cout << " MOVE " << ev.t << ", ";
+			ss << " MOVE " << ev.t << ", ";
 			c = sp.update_c_comp(c,ev.cl,ev.move_c);
 			break;
 			
 		case M_TRANS_EV:	
-			cout << " >> " << ev.t << ", " << sp.tra_gl[ev.tr_gl].name << " >> ";
+			ss << " >> " << ev.t << ", " << sp.tra_gl[ev.tr_gl].name << " >> ";
 			c = sp.tra_gl[ev.tr_gl].f;
 			break;
 			
 		case NM_TRANS_EV:
-			cout << " >> " << ev.t << ", " << sp.tra_gl[ev.tr_gl].name;
-			cout << " (origin ";
+			ss << " >> " << ev.t << ", " << sp.tra_gl[ev.tr_gl].name;
+			ss << " (origin ";
 			if(ev.e_origin == UNSET) cout << "UNSET";
 			else{
-				cout << "[" << ev.e_origin << "]";
+				ss << "[" << ev.e_origin << "]";
 			}
-			cout << ") >> ";
+			ss << ") >> ";
 			c = sp.tra_gl[ev.tr_gl].f;
 			break;
 		}
@@ -271,25 +276,29 @@ void StateSpecies::print_event(const vector <Event> &event) const
 			emsg("after problem ere");
 		}
 			
-		if(c == UNSET) cout << " UNSET";
-		else cout << "[" << sp.comp_gl[c].name << "]";
+		if(c == UNSET) ss << " UNSET";
+		else ss << "[" << sp.comp_gl[c].name << "]";
 
 		const auto &iif = ev.ind_inf_from;
-		cout << "<" << iif.p << " " << iif.i << ">";
+		ss << "<" << iif.p << " " << iif.i << ">";
 
 		if(ev.inf_node_ref != UNSET){
 			const auto &iif = ev.ind_inf_from;
-			if(iif.p == ENTER_INF) cout << "(n=" << ev.inf_node_ref << ",ENT)";
+			if(iif.p == ENTER_INF) ss << "(n=" << ev.inf_node_ref << ",ENT)";
 			else{
-				if(iif.p == OUTSIDE_INF) cout << "(n=" << ev.inf_node_ref << ",OUT)";
-				else cout << "(n=" << ev.inf_node_ref << ",i=" << iif.i << ")";
+				if(iif.p == OUTSIDE_INF) ss << "(n=" << ev.inf_node_ref << ",OUT)";
+				else ss << "(n=" << ev.inf_node_ref << ",i=" << iif.i << ")";
 			}
 		}
 		
-		if(ev.observed) cout << "(obs)"; else cout << "(unobs)";
-		cout << "  ";
+		if(ev.observed) ss << "(obs)"; else ss << "(unobs)";
+		ss << "  ";
 	}
-	cout << endl;
+	ss << endl;
+	
+	if(str == false) cout << ss.str();
+	
+	return ss.str();
 }
 
 

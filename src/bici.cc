@@ -18,6 +18,11 @@
 // mpirun -n 3 ./bici-para Grant/RealData_1000_DA_5000 inf
 // mpirun -n 3 ./bici-para Grant/RealData_2000_DA_5000 inf
 // mpirun -n 16 ./bici-para Jamie/scen-5-1.bici inf
+// nohup mpirun -n 16 ./bici-para Jamie/scen-1-1.bici inf > big1.txt&
+// nohup mpirun -n 16 ./bici-para Jamie/scen-1-1b.bici inf > big2.txt&
+// mpirun -n 10 ./bici-para Execute/init.bici inf
+
+// ./bici-para Jamie/temp inf
 
 // ssh gaia.bioss.ac.uk   
 // tar -xzf foo.tgz

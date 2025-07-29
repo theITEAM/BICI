@@ -1490,7 +1490,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 		case INDIVIDUAL:
 			{
 				ss << "<INDIVIDUALS>" << endl;
-				ss << "name,source";
+				ss << "index,source";
 				for(auto i = 0u; i < sp.ind_effect.size(); i++) ss << "," << sp.ind_effect[i].name;
 				ss << ",events" << endl;
 				for(auto i = 0u; i < ssp.individual.size(); i++){
@@ -1707,9 +1707,14 @@ string Output::generate_state_head(const vector <string> &ind_key) const
 	
 	if(use_ind_key){	
 		ss << "{" << endl;
+		ss << "  # Time divisions" << endl;
 		ss << "  timepoint " << model.details.t_start << ":" <<  model.details.dt << ":" << model.details.t_end << endl;
-		for(auto i = 0u; i < ind_key.size(); i++){
-			ss << "  " << i << ":" << ind_key[i] << endl;
+		
+		if(ind_key.size() > 0){
+			ss << "  # Individual index" << endl;
+			for(auto i = 0u; i < ind_key.size(); i++){
+				ss << "  " << i << ":" << ind_key[i] << endl;
+			}
 		}
 		ss << "}" << endl << endl;
 	}
@@ -2028,6 +2033,8 @@ void Output::end(string file, unsigned int total_cpu) const
 		}
 	}
 	
+	auto alg_warn_flag = false;
+	
 	if(model.details.diagnostics_on){
 		auto diagnostic = diagnostic_store;
 	
@@ -2036,10 +2043,11 @@ void Output::end(string file, unsigned int total_cpu) const
 #endif
 
 		if(op() && diagnostic.size() > 0){
-			output_diagnostic(diagnostic,fout);
+			output_diagnostic(diagnostic,alg_warn_flag,fout);
 		}
 	}
-			
+	//cout << alg_warn_flag <<" warn fla\n";
+	
 	output_rate_warning(total_cpu,50,100,final_warning);
 
 	for(const auto &der : model.derive){
@@ -2049,6 +2057,7 @@ void Output::end(string file, unsigned int total_cpu) const
 	
 	if(op()){
 		for(auto te : final_warning) add_warning(te,fout);
+		if(alg_warn_flag) add_warning("This run has generated algorithm warnings. Please check the diagnostic file(s) for details",fout);
 	}
 	
 	if(com_op == true) cout << "<<END>>" << endl;
@@ -2304,7 +2313,7 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 			ss << "An estimated " << sa << " updates are required. ";
 		}
 		
-		ss << endl;
+		//ss << endl;
 		
 		if(ESS_warn.size() > 0){
 			string pte;
@@ -2313,10 +2322,10 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 				pte += model.param[wa.th].full_name;
 			}
 			
-			ss << endl;
+			//ss << endl;
 			if(ESS_warn.size() == 1) ss << "Parameter";
 			else ss << "Parameters";
-			ss << " below the " << ESS_THRESH << " ESS threshold: " << pte << ".";
+			ss << " below the " << ESS_THRESH << " ESS threshold: " << pte << ". ";
 		}
 		
 		if(GR_warn.size() > 0){
@@ -2326,14 +2335,14 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 				pte += model.param[wa.th].full_name;
 			}
 			
-			ss << endl;
+			//ss << endl;
 			if(GR_warn.size() == 1) ss << "Parameter";
 			else ss << "Parameters";
 		
-			ss << " above the " << GR_THRESH << " GR threshold: " << pte << ".";
+			ss << " above the " << GR_THRESH << " GR threshold: " << pte << ". ";
 		}
 		
-		final_warning.push_back(ss.str());
+		final_warning.push_back(trim(ss.str()));
 	}
 }
 	
@@ -2648,9 +2657,11 @@ void Output::output_generation(const vector <Particle> &part, ofstream &fout) co
 
 
 /// Outputs diagnostic information
-void Output::output_diagnostic(const vector <Diagnostic> &diagnostic, ofstream &fout) const
+void Output::output_diagnostic(const vector <Diagnostic> &diagnostic, bool &alg_warn_flag, ofstream &fout) const
 {
 	for(const auto &di :  diagnostic){
+		if(begin_str(di.te,ALG_WARN)) alg_warn_flag = true;
+		
 		string diag_out_file;
 	
 		if(diagdir != ""){

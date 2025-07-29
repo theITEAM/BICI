@@ -1428,7 +1428,9 @@ void Proposal::sample_ind_obs(State &state)
 							else{
 								if(testing == true){ // Diagnostic
 									auto prob = ind_ev_samp.sample_events_prob(ev_new);
-									if(dif(probif,prob,DIF_THRESH)) emsg("sampler different here");
+									if(dif(probif,prob,DIF_THRESH)){
+										state.add_alg_warn("sampler different here");
+									}
 								}
 								
 								auto ev_store = ind.ev;
@@ -1517,7 +1519,7 @@ void Proposal::resimulate_ind_obs(State &state)
 				auto ev_new = ind_ev_samp.simulate_events(i,e_init,probif,indd.trig_ev_ref);
 		
 				if(pl){
-					cout << "new: "; ssp.print_event(ind.ev); 	
+					cout << "new: "; ssp.print_event(ev_new); 	
 					if(ind_ev_samp.illegal) emsg("do");
 				}
 				ntr++; if(burn) isp.ntr++;
@@ -1528,7 +1530,11 @@ void Proposal::resimulate_ind_obs(State &state)
 					if(testing == true){ // Diagnostic
 						auto prob = ind_ev_samp.resample_init_event_prob(i,e_init) + ind_ev_samp.simulate_events_prob(i,ev_new,indd.trig_ev_ref);
 						if(dif(probif,prob,THRESH_EXPAND*DIF_THRESH)){
-							emsg("sampler different3");
+							stringstream ss;
+							ss << probif << " " << prob << "prob\n";
+							ss << "old: " << ssp.print_event(ind.ev,true); 
+							ss << "new: " << ssp.print_event(ev_new,true); 	
+							state.add_alg_warn("sampler different here:"+ss.str());
 						}
 					}
 					
@@ -1637,8 +1643,8 @@ void Proposal::resimulate_single_ind_obs(State &state)
 						if(testing == true){ // Diagnostic
 							auto prob = ind_ev_samp.simulate_single_events_prob(i,cl,ev_new,trig);
 							if(dif(probif,prob,DIF_THRESH)){
-								cout <<  probif << " " << prob << " prob" << endl;
-								emsg("sampler different4");
+								//cout <<  probif << " " << prob << " prob" << endl;
+								state.add_alg_warn("sampler different4");
 							}
 						}
 						
@@ -1732,7 +1738,7 @@ void Proposal::resimulate_ind_unobs(State &state)
 				auto prob = ind_ev_samp.simulate_events_prob(i,ev_new,ste);
 				if(copy_init == false) prob += so_samp.sample_prob(e_init);
 				if(dif(probif,prob,THRESH_EXPAND*DIF_THRESH)){
-					emsg("sampler different4");
+					state.add_alg_warn("sampler different5");
 				}
 			}
 			
@@ -1848,7 +1854,7 @@ void Proposal::add_rem_ind(State &state)
 						auto prob = so_samp.sample_prob(e_init) +
             						ind_ev_samp.simulate_events_prob(i,ev_new,ste);
 						if(dif(probif-probif_st,prob,DIF_THRESH)){
-							emsg("sampler different4a");
+							state.add_alg_warn("sampler different4a");
 						}
 					}
 			
@@ -2027,7 +2033,9 @@ void Proposal::add_rem_tt_ind(State &state)
 			if(testing == true){                         // Diagnostic
 				auto prob = so_samp.sample_prob(e_init) +
     				ind_ev_samp.simulate_events_prob(i,ev_new,ste);
-				if(dif(probif,prob,DIF_THRESH)) emsg("sampler different4b");
+				if(dif(probif,prob,DIF_THRESH)){
+					state.add_alg_warn("sampler different4b");
+				}
 			}
 		
 			auto gc = state.update_tree(p_prop,i,ev_new);
@@ -2745,7 +2753,7 @@ double Proposal::calculate_al(const Like &like_ch, double dprob) const
 
 
 /// Provides diagnostic information about the proposals
-string Proposal::diagnostics(long total_time) const
+string Proposal::diagnostics(double total_time) const
 {
 	stringstream ss;
 	

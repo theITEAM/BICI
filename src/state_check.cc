@@ -189,7 +189,7 @@ void State::check_dependent_param(string ref)
 			auto value = model.eqn[re].calculate_param_only(param_val);
 		
 			if(dif(value,param_val[th],dif_thresh)){
-				cout << value << " " << param_val[th] << "compare" << endl;
+				//cout << value << " " << param_val[th] << "compare" << endl;
 				emsg("Parameter value different "+ref);
 			}
 		}
@@ -272,7 +272,7 @@ void State::check_ref(unsigned int p, string refst)
 				auto dt = ev.t - t;				
 				
 				if(dif(ev.Li,nm_trans_like(nmt.type,dt,ref_val),dif_thresh)){
-					emsg("nm like not agree"+refst);
+					add_alg_warn("nm like not agree"+refst);
 				}
 				
 				auto bp_eq = nmt.bp_eq;
@@ -297,7 +297,7 @@ void State::check_ref(unsigned int p, string refst)
 					}
 					
 					if(dif(ev.Li_bp,get_log_zero_one(bp_val),dif_thresh)){
-						emsg("Libp like not agree");
+						add_alg_warn("Libp like not agree");
 					}
 				}
 				else{
@@ -327,7 +327,7 @@ void State::check_ref(unsigned int p, string refst)
 
 					auto Li_new = ssp.nm_trans_incomp_full_like(nmt.nmtrans_ref,dt,val.ref_val,val.bp_val);
 					if(dif(Li_new,inmtr.Li,dif_thresh)){
-						emsg("Li nm_trans_incomp does not agree");
+						add_alg_warn("Li nm_trans_incomp does not agree");
 					}			
 				}
 			}
@@ -357,7 +357,7 @@ void State::check_ref(unsigned int p, string refst)
 					}
 					
 					if(dif(it1.Li,it2.Li,dif_thresh)){
-						emsg("Li not right");
+						add_alg_warn("Li not right");
 					}
 				}
 			}
@@ -478,7 +478,7 @@ void State::check_markov_trans(unsigned int p, string ref)
 		
 		for(auto f = 0u; f < sp.fix_effect.size(); f++){
 			if(dif(ind.exp_fe[f],ind_st.exp_fe[f],dif_thresh)){
-				emsg("Error in exp_fe");
+				add_alg_warn("Error in exp_fe");
 			}
 		}
 	}
@@ -491,7 +491,7 @@ void State::check_markov_trans(unsigned int p, string ref)
 		
 		for(auto j = 0u; j < sp.ind_effect.size(); j++){
 			if(dif(ind.exp_ie[j],ind_store.exp_ie[j],dif_thresh)){
-				emsg("Error in exp_ie: "+ref);
+				add_alg_warn("Error in exp_ie: "+ref);
 			}
 		}
 	}
@@ -515,11 +515,11 @@ void State::check_markov_trans(unsigned int p, string ref)
 			const auto &divc = markov_eqn_vari_store[e].div[ti];
 				
 			if(dif(div.value,divc.value,dif_thresh)){
-				emsg("value error");
+				add_alg_warn("value error");
 			}
 			
 			if(dif(div.indfac_int,divc.indfac_int,THRESH_EXPAND*dif_thresh)){
-				emsg("indfac_int");
+				add_alg_warn("indfac_int");
 			}
 			
 			if(div.ind_trans.size() != divc.ind_trans.size()){
@@ -535,7 +535,7 @@ void State::check_markov_trans(unsigned int p, string ref)
 			}
 			
 			if(dif(ssp.Li_markov[e][ti],Li_markov_store[ti],THRESH_EXPAND*dif_thresh)){
-				emsg("Li_markov error"+ref);
+				add_alg_warn("Li_markov error"+ref);
 			}
 		}
 	}
@@ -595,10 +595,10 @@ void State::check_nm_trans(unsigned int p, string ref)
 			const auto &ev = ssp.individual[i].ev[e];
 			if(ev.type == NM_TRANS_EV){
 				if(dif(ev_store.Li,ev.Li,dif_thresh)){
-					emsg("ev Li problem");
+					add_alg_warn("ev Li problem");
 				}
 				if(dif(ev_store.Li_bp,ev.Li_bp,dif_thresh)){
-					emsg("ev Li_bp problem");
+					add_alg_warn("ev Li_bp problem");
 				}
 			}
 		}
@@ -615,7 +615,7 @@ void State::check_nm_trans(unsigned int p, string ref)
 			const auto &inmtr = ssp.individual[i].incomp_ref[e];
 			if(inmtr.on){
 				if(dif(inmtr_store.Li,inmtr.Li,dif_thresh)){
-					emsg("nm_ref Li problem"+ref);
+					add_alg_warn("nm_ref Li problem"+ref);
 				}
 			}
 		}
@@ -643,48 +643,49 @@ void State::check_like(string ref)
 	calculate_like();
 
 	if(dif(like.init_cond,like_st.init_cond,dif_thresh)){
-		emsg("like init_cond;"+ref);
+		add_alg_warn("like init_cond;"+ref);
 	}
 	
 	if(dif(like.init_cond_prior,like_st.init_cond_prior,dif_thresh)){
-		emsg("like init_cond_prior");
+		add_alg_warn("like init_cond_prior");
 	}
 	
 	if(dif(like.obs,like_st.obs,dif_thresh)){
-		cout << like.obs << " " << like_st.obs << " like" << endl;
-		emsg("like obs "+ref);
+		//cout << like.obs << " " << like_st.obs << " like" << endl;
+		add_alg_warn("like obs "+ref);
 	}
 	
 	if(dif(like.markov,like_st.markov,THRESH_EXPAND*dif_thresh)){
-		emsg("like markov "+ref);
+		//cout << like.markov << "  "<< like_st.markov << "kk\n";
+		add_alg_warn("like markov "+ref);
 	}
 	
 	if(dif(like.nm_trans,like_st.nm_trans,dif_thresh)){ 
 		//cout << like.nm_trans << " " << like_st.nm_trans << " " << like.nm_trans-like_st.nm_trans <<  " dif" << endl;
-		emsg("like nm_trans"+ref);
+		add_alg_warn("like nm_trans"+ref);
 	}
 	
 	if(dif(like.prior,like_st.prior,dif_thresh)){
-		emsg("like prior");
+		add_alg_warn("like prior");
 	}
 		
 	if(dif(like.ie,like_st.ie,dif_thresh)){
-		emsg("like ie");
+		add_alg_warn("like ie");
 	}
 	
 	if(dif(like.dist,like_st.dist,dif_thresh)){
-		emsg("like dist");
+		add_alg_warn("like dist");
 	}
 	
 	if(dif(like.spline_prior,like_st.spline_prior,dif_thresh)){
-		emsg("like spline prior "+ref);
+		add_alg_warn("like spline prior "+ref);
 	}
 	
 	const auto &gen_data = model.genetic_data;
 	
 	if(gen_data.on){
 		if(dif(like.genetic_process,like_st.genetic_process,dif_thresh)){
-			emsg("like genetic_process: "+ref);
+			add_alg_warn("like genetic_process: "+ref);
 		}
 		auto gen_dif = calculate_gen_dif();
 		
@@ -693,7 +694,7 @@ void State::check_like(string ref)
 		}
 		
 		if(dif(like.genetic_obs,like_st.genetic_obs,dif_thresh)){
-			emsg("like genetic_obs: "+ref);
+			add_alg_warn("like genetic_obs: "+ref);
 		}
 	}
 	else{
@@ -748,7 +749,7 @@ void State::check_prior(string ref)
 	prior_prob = model.prior_prob(param_val);
 	for(auto th = 0u; th < prior_prob.size(); th++){
 		if(dif(prior_prob[th],prior_prob_st[th],dif_thresh)){
-			emsg("Prior probability wrong"+ref);
+			add_alg_warn("Prior probability wrong"+ref);
 		}
 	}
 	
@@ -757,7 +758,7 @@ void State::check_prior(string ref)
 	dist_prob = model.dist_prob(param_val);
 	for(auto th = 0u; th < dist_prob.size(); th++){
 		if(dif(dist_prob[th],dist_prob_st[th],dif_thresh)){
-			emsg("Dist prob probability wrong");
+			add_alg_warn("Dist prob probability wrong");
 		}
 	}
 	
@@ -766,7 +767,7 @@ void State::check_prior(string ref)
 	spline_prior = model.spline_prior(param_val);
 	for(auto s = 0u; s < spline_prior.size(); s++){
 		if(dif(spline_prior[s],spline_prior_st[s],dif_thresh)){
-			emsg("Spline Prior probability wrong");
+			add_alg_warn("Spline Prior probability wrong");
 		}
 	}
 }
@@ -790,7 +791,7 @@ void State::check_popnum_t(string ref)
 				//output_dump();
 				//cout << core() << " " << popnum_t[ti][k] << " " << popnum_t_store[ti][k] << " popn" << endl;
 				//get_closest_to_boundary();
-				emsg("popnum_t problem"+ref);
+				add_alg_warn("popnum_t problem"+ref);
 			}
 		}
 	}
@@ -813,8 +814,8 @@ void State::check_popnum_t2(string ref)
 		for(auto k = 0u; k < model.pop.size(); k++){
 			if(dif(popnum_t[ti][k],popnum_t_store[ti][k],dif_thresh)){
 				//output_dump();
-				cout << core() << " " << popnum_t[ti][k] << " " << popnum_t_store[ti][k] << " popn" << endl;
-				emsg("popnum_t problem2"+ref);
+				//cout << core() << " " << popnum_t[ti][k] << " " << popnum_t_store[ti][k] << " popn" << endl;
+				add_alg_warn("popnum_t problem2"+ref);
 			}
 		}
 	}
@@ -867,7 +868,7 @@ void State::check_cpop_st(string ref)
 				auto cpop_st_st = ssp.cpop_st;
 				ssp.set_cpop_st();
 				if(dif(cpop_st_st,ssp.cpop_st,dif_thresh)){
-					emsg("error cpop_st"+ref);
+					add_alg_warn("error cpop_st"+ref);
 				}
 			}
 			break;
@@ -889,17 +890,17 @@ void State::check_ie(unsigned int p, string ref)
 		ssp.calculate_omega(g);
 		
 		if(dif(iesg_store.omega,iesg.omega,dif_thresh)){
-			print("om store",iesg_store.omega); print("om2",iesg.omega);
-			emsg("Omega problem");
+			//print("om store",iesg_store.omega); print("om2",iesg.omega);
+			add_alg_warn("Omega problem");
 		}
 		
 		if(dif(iesg_store.omega_Z, iesg.omega_Z,dif_thresh)){
-			emsg("Omega_Z problem");
+			add_alg_warn("Omega_Z problem");
 		}
 		
 		if(model.mode == INF){
 			if(dif(iesg_store.omega_inv,iesg.omega_inv,dif_thresh)){
-				emsg("Omega_inv problem");
+				add_alg_warn("Omega_inv problem");
 			}
 		}	
 		
@@ -908,7 +909,7 @@ void State::check_ie(unsigned int p, string ref)
 		ssp.likelihood_indeff_group(g,temp);
 	
 		if(dif(Li_ie_store,ssp.Li_ie[g],dif_thresh)){
-			emsg("L_ie problem"+ref);
+			add_alg_warn("L_ie problem"+ref);
 		}
 	}
 }
@@ -929,15 +930,15 @@ void State::check_pop_like(unsigned int p, string ref)
 	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 		for(auto ti = 0u; ti < T; ti++){
 			if(dif(ssp.tnum_mean_st[tr][ti],tnum_mean_st_st[tr][ti],dif_thresh)){
-				emsg("trans num mean prob"+ref);
+				add_alg_warn("trans num mean prob"+ref);
 			}			
 			
 			if(dif(ssp.trans_num[tr][ti],trans_num_store[tr][ti],dif_thresh)){
-				emsg("trans num prob"+ref);
+				add_alg_warn("trans num prob"+ref);
 			}
 			
 			if(dif(ssp.Li_markov_pop[tr][ti],Li_markov_pop_store[tr][ti],dif_thresh)){	
-				emsg("Li mark prob");
+				add_alg_warn("Li mark prob");
 			}
 		}
 	}
@@ -1015,7 +1016,7 @@ void State::check_obs_like(unsigned int p, string ref)
 	ssp.calculate_obs_eqn(seq_vec(sp.obs_eqn.size()));
 	
 	if(dif(obs_eqn_value_store,ssp.obs_eqn_value,dif_thresh)){
-		emsg("obs eqn value difference"+ref);
+		add_alg_warn("obs eqn value difference"+ref);
 	}
 
 	// Checks pop_data_cpop and pop_trans_data_tr are correctly set
@@ -1024,14 +1025,14 @@ void State::check_obs_like(unsigned int p, string ref)
 	ssp.calculate_pop_data_cgl_trgl();
 	
 	if(dif(pop_data_cgl_store,ssp.pop_data_cgl,dif_thresh)){
-		emsg("pop_data_cgl error"+ref);
+		add_alg_warn("pop_data_cgl error"+ref);
 	}
 	
 	if(dif(pop_trans_data_tgl_store,ssp.pop_trans_data_tgl,dif_thresh)){
 		//auto vec = which_dif(pop_trans_data_tgl_store,ssp.pop_trans_data_tgl);
 		//auto j = vec[0], i = vec[1];
 		//cout << j << " " << i << endl;
-		emsg(" pop_trans_data_tgl error"+ref);
+		add_alg_warn("pop_trans_data_tgl error"+ref);
 	}
 	
 	auto temp = 0.0;
@@ -1042,7 +1043,7 @@ void State::check_obs_like(unsigned int p, string ref)
 	
 	for(auto i = 0u; i < ssp.Li_obs_ind.size(); i++){
 		if(dif(Li_obs_ind_store[i],ssp.Li_obs_ind[i],dif_thresh)){
-			emsg("Li_obs_ind error"+ref);
+			add_alg_warn("Li_obs_ind error"+ref);
 		}
 	}
 	
@@ -1053,13 +1054,13 @@ void State::check_obs_like(unsigned int p, string ref)
 	
 	for(auto i = 0u; i < ssp.Li_obs_pop.size(); i++){		
 		if(dif(Li_obs_pop_store[i],ssp.Li_obs_pop[i],dif_thresh)){
-			emsg("Li_obs_pop error"+ref);
+			add_alg_warn("Li_obs_pop error"+ref);
 		}
 	}
 	
 	for(auto i = 0u; i < sp.pop_data.size(); i++){
 		if(dif(pop_data_num_store[i],ssp.pop_data_num[i],dif_thresh)){
-			emsg("pop_data_num error");
+			add_alg_warn("pop_data_num error");
 		}
 	}
 	
@@ -1071,13 +1072,13 @@ void State::check_obs_like(unsigned int p, string ref)
 	
 	for(auto i = 0u; i < sp.pop_trans_data.size(); i++){
 		if(dif(pop_trans_data_num_store[i],ssp.pop_trans_data_num[i],dif_thresh)){
-			emsg("pop_trans_data_num error");
+			add_alg_warn("pop_trans_data_num error");
 		}
 	}
 	
 	for(auto i = 0u; i < sp.pop_trans_data.size(); i++){
 		if(dif(Li_obs_pop_trans_store[i],ssp.Li_obs_pop_trans[i],dif_thresh)){
-			emsg("Li_obs_pop_trans error"+ref);
+			add_alg_warn("Li_obs_pop_trans error"+ref);
 		}
 	}
 	
@@ -1090,7 +1091,7 @@ void State::check_obs_like(unsigned int p, string ref)
 		
 		for(auto ti = 0u; ti < T; ti++){
 			if(dif(obs_trans_eqn_value_store[e][ti],ssp.obs_trans_eqn_value[e][ti],dif_thresh)){
-				emsg("obs_trans_eqn_value error");		
+				add_alg_warn("obs_trans_eqn_value error");
 			}
 		}
 	}
@@ -1131,7 +1132,7 @@ void State::check_init_cond_like(unsigned int p, string ref)
 			auto N_total_unobs_store = icv.N_total_unobs;
 			ssp.calculate_N_unobs();
 		
-			if(dif(N_total_unobs_store,icv.N_total_unobs,dif_thresh)){
+			if(difi(N_total_unobs_store,icv.N_total_unobs)){
 				emsg("N_total_unobs problem");
 			}
 		}
@@ -1200,7 +1201,7 @@ void State::check_init_cond_like(unsigned int p, string ref)
 		icv.frac_comb = model.frac_combine(p,icv.frac_focal);
 			
 		if(dif(frac_comb_store,icv.frac_comb,dif_thresh)){
-			emsg("frac_comp problem");
+			add_alg_warn("frac_comp problem");
 		}
 		
 		auto cnum_store = icv.cnum;
@@ -1215,7 +1216,7 @@ void State::check_init_cond_like(unsigned int p, string ref)
 	ssp.likelihood_init_cond(temp);
 	
 	if(dif(Li_init_cond_store,ssp.Li_init_cond,dif_thresh)){
-		emsg("Li_init_cond error"+ref);
+		add_alg_warn("Li_init_cond error"+ref);
 	}
 }
 
@@ -1226,13 +1227,13 @@ void State::check_init_cond_prior(string ref)
 	prior_init_cond(like.init_cond_prior);
 	
 	if(dif(init_cond_prior_store,like.init_cond_prior,dif_thresh)){
-		emsg("init_cond_prior prob"+ref);	
+		add_alg_warn("init_cond_prior prob"+ref);
 	}
 }
 
 
 /// Checks that the linearised version of the equations give the same as non-linearised
-void State::check_linearise() const 
+void State::check_linearise()
 {
 	auto ti = (unsigned int)(ran()*T);
 
@@ -1244,11 +1245,12 @@ void State::check_linearise() const
 			auto val = eq.calculate(ti,popnum,param_val,spline_val);
 			auto val2 = eq.calculate_linearise_check(ti,popnum,param_val,spline_val);
 			if(dif(val,val2,dif_thresh)){
-				cout << ti << "ti" << endl;
-				cout << eq.te << endl;
-				cout << val << " " << val2 << "val" << endl;
-				eq.print_linear_final();
-				emsg("Equation different");
+				//cout << ti << "ti" << endl;
+				//cout << eq.te << endl;
+				//cout << val << " " << val2 << "val" << endl;
+				//eq.print_linear_final();
+				add_alg_warn("Linearise problem"+eq.te);
+				//emsg("Equation different");
 			}
 		}
 	}
@@ -1277,15 +1279,18 @@ void State::check_genetic_value(string ref)
 	if(model.trans_tree == false) return;
 
 	if(gen_data.on){                                 // Checks mutation rate 
-		auto mut_rate = model.eqn[gen_data.mut_rate.eq_ref].calculate_param_only(param_val);
-		auto seq_var = model.eqn[gen_data.seq_var.eq_ref].calculate_param_only(param_val);
+		auto mut_rate_store = genetic_value.mut_rate;
+		genetic_value.mut_rate = model.eqn[gen_data.mut_rate.eq_ref].calculate_param_only(param_val);
 		
-		if(dif(mut_rate,genetic_value.mut_rate,dif_thresh)){
-			emsg("mut rate is wrong");
+		auto seq_var_store = genetic_value.seq_var;
+		genetic_value.seq_var = model.eqn[gen_data.seq_var.eq_ref].calculate_param_only(param_val);
+		
+		if(dif(mut_rate_store,genetic_value.mut_rate,dif_thresh)){
+			add_alg_warn("mut rate is wrong");
 		}
 		
-		if(dif(seq_var,genetic_value.seq_var,dif_thresh)){
-			emsg("seq var is wrong");
+		if(dif(seq_var_store,genetic_value.seq_var,dif_thresh)){
+			add_alg_warn("seq var is wrong");
 		}
 	}
 	
@@ -1297,7 +1302,7 @@ void State::check_genetic_value(string ref)
 
 			for(const auto &ind : ssp.individual){
 				for(auto ev : ind.ev){
-					const auto &iif = ev.ind_inf_from;
+					auto &iif = ev.ind_inf_from;
 				
 					switch(ev.type){
 					case ENTER_EV:
@@ -1351,8 +1356,9 @@ void State::check_genetic_value(string ref)
 									// Checks that the weight is correct
 									auto w = get_w_from_indinffrom(iif);
 									if(dif(w,iif.w,dif_thresh)){ 
-										emsg("iif.w not right");
+										add_alg_warn("iif.w not right");
 									}
+									iif.w = w;
 								}
 							}
 							else{
@@ -1397,7 +1403,7 @@ void State::check_genetic_value(string ref)
 					if(ev.type != M_TRANS_EV) emsg("SHould be markovian");
 					if(ev.t != t) emsg("Porblem with time");
 					
-					const auto &iif = ev.ind_inf_from;
+					auto &iif = ev.ind_inf_from;
 					
 					const auto &tra = model.species[in_inf.p].tra_gl[ev.tr_gl]; 
 					if(tra.infection.type != TRANS_INFECTION) emsg("SHould be and infection");
@@ -1424,8 +1430,9 @@ void State::check_genetic_value(string ref)
 					
 					auto w = get_w_from_indinffrom(iif);
 					if(dif(w,iif.w,dif_thresh)){
-						emsg("check w not agree");				
+						add_alg_warn("check w not agree");
 					}
+					iif.w = w;
 				}
 			}
 		}
@@ -1706,7 +1713,7 @@ void State::check_genetic_value(string ref)
 	auto fl = false;
 	for(auto j = 0u; j < nob; j++){
 		for(auto i = 0u; i < nob; i++){
-			if(dif(genetic_value.gen_dif[j][i],gen_dif[j][i],dif_thresh)){
+			if(difi(genetic_value.gen_dif[j][i],gen_dif[j][i])){
 				fl = true;
 				emsg("gen_dif problem1a");
 			}
@@ -1820,7 +1827,7 @@ void State::check_popnum_ind(string ref)
 				const auto &pir2 = popnum_ind_store[ti][po][k];
 				if(pir.i != pir2.i) emsg("popnum_ind i wrong");
 				if(dif(pir.w,pir2.w,dif_thresh)){
-					emsg("popnum_ind w wrong "+ref);
+					add_alg_warn("popnum_ind w wrong "+ref);
 				}
 			}
 		}
@@ -1990,9 +1997,10 @@ void State::check_event_boundary(string ref)
 			const auto &ssp = species[p];
 			for(const auto &ind : ssp.individual){
 				if(events_near_div(ind.ev,model.details)){
-					cout << ind.name <<":" << endl;
-					for(auto ev  : ind.ev) cout << ev.t << " t" << endl; 
-					emsg("Event near a boundary"+ref);
+					//cout << ind.name <<":" << endl;
+					//for(auto ev  : ind.ev) cout << ev.t << " t" << endl; 
+					//emsg("Event near a boundary"+ref);
+					add_alg_warn("Event near a boundary"+ref+ssp.print_event(ind.ev,true));
 				}
 			}
 		}
@@ -2090,3 +2098,46 @@ void State::get_closest_to_boundary()
 }
 
 
+/// Checks if there is a negative rate
+void State::check_neg_rate(string name)
+{
+	for(auto p = 0u; p < species.size(); p++){
+		const auto &sp = model.species[p];
+		const auto &ssp = species[p];
+		for(auto e = 0u; e < sp.markov_eqn.size(); e++){
+			//auto &me = sp.markov_eqn[e];
+			auto &me_vari = ssp.markov_eqn_vari[e];
+			for(auto ti = 0u; ti <  me_vari.div.size(); ti++){
+				auto &div =	me_vari.div[ti];
+				auto val = div.value;
+				if(val < -SMALL){
+					add_alg_warn("Negative problem. After proposal:"+name+" val="+tstr(val));
+				}				
+			}
+		}
+		
+		if(sp.type == INDIVIDUAL){	
+			const auto &ssp = species[p];
+			for(const auto &ind : ssp.individual){
+				if(events_near_div(ind.ev,model.details)){
+					add_alg_warn("Event near bou"+name);
+				}
+			}
+		}			
+	}
+}
+
+
+/// Adds an algorithm warning
+void State::add_alg_warn(string te)
+{
+	auto i = 0u; while(i < alg_warn.size() && alg_warn[i].te != te) i++;
+	if(i < alg_warn.size()){
+		alg_warn[i].num++;
+	}
+	else{
+		AlgWarn aw;
+		aw.te = te; aw.core = core(); aw.sample = sample; aw.num = 1;
+		alg_warn.push_back(aw);
+	}
+}

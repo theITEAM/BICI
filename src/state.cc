@@ -18,6 +18,7 @@ using namespace std;
 State::State(const Model &model) : model(model)
 {
 	dif_thresh = DIF_THRESH;
+	sample = UNSET;
 }
 
 

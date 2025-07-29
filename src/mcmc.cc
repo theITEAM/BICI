@@ -76,9 +76,10 @@ void MCMC::run()
 	
 	output.set_output_burnin(double(100.0*nburnin)/nsample);
 	
-	auto time_total = (clock()-time_start)/num_per_core;
+	double time_total = (clock()-time_start)/num_per_core;
 	for(auto ch = 0u; ch < num_per_core; ch++){
-		auto diag = chain[ch].diagnostics(time_total);
+		const auto &cha = chain[ch];
+		auto diag = cha.diagnostics(time_total);
 		output.set_diagnostics(mpi.core*num_per_core+ch,diag);
 	}
 	

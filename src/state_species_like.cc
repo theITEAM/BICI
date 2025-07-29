@@ -31,12 +31,13 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 		
 		auto val = div.value;
 		if(val < 0){
-			if(val > -SMALL){
+			if(val > -SMALLISH){
 				div.value = 0;
 				val = 0;
 			}
 			else{
-				emsg("Rate has become negative");
+				auto eq = eqn[me.eqn_ref];
+				emsg("The transition rate equation '"+eq.te_raw+"' has become negative.");
 			}
 		}
 		

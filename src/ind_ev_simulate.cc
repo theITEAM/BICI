@@ -87,8 +87,11 @@ vector <Event> IndEvSampler::simulate_events(unsigned int i, const Event &e_init
 				const auto &tra = sp.tra_gl[trg];
 				c = tra.f; 
 				sim_add_event(M_TRANS_EV,trg,tnew,tra.cl,UNSET,c,false,ev_new);
-				if(c == UNSET) return ev_new;
-			
+				if(c == UNSET){
+					if(events_near_div(ev_new,details)) illegal = true;
+					return ev_new;
+				}
+				
 				add_future_nm_event(c,tra.cl,t,i,future_nm,m,trig_event);
 				tnext_ev = find_tnext(m,trig_event,f,future_nm);
 				if(tnext_ev < tnext) tnext = tnext_ev;
@@ -108,7 +111,10 @@ vector <Event> IndEvSampler::simulate_events(unsigned int i, const Event &e_init
 			
 				c = tra2.f;
 				sim_add_event(NM_TRANS_EV,trg,t,tra.cl,UNSET,c,false,ev_new);
-				if(c == UNSET) return ev_new;
+				if(c == UNSET){
+					if(events_near_div(ev_new,details)) illegal = true;
+					return ev_new;
+				}
 				
 				add_future_nm_event(c,tra.cl,t,i,future_nm,m,trig_event);
 				f++;
@@ -122,8 +128,11 @@ vector <Event> IndEvSampler::simulate_events(unsigned int i, const Event &e_init
 						{
 							auto cl = sim_add_data_event(te,c,i,ev_new,probif);
 							
-							if(c == UNSET || illegal) return ev_new;	
-						
+							if(c == UNSET || illegal){
+								if(events_near_div(ev_new,details)) illegal = true;
+								return ev_new;	
+							}
+							
 							add_future_nm_event(c,cl,t,i,future_nm,m,trig_event);
 						}
 						break;
@@ -140,6 +149,7 @@ vector <Event> IndEvSampler::simulate_events(unsigned int i, const Event &e_init
 						
 					case TRIG_LEAVE_EV:
 						sim_add_event(LEAVE_EV,UNSET,te.t,UNSET,UNSET,UNSET,true,ev_new);
+						if(events_near_div(ev_new,details)) illegal = true;
 						return ev_new;
 					
 					default:
@@ -167,7 +177,6 @@ vector <Event> IndEvSampler::simulate_events(unsigned int i, const Event &e_init
 	}
 
 	if(events_near_div(ev_new,details)) illegal = true;
-
 	return ev_new;
 }
 

@@ -447,6 +447,8 @@ void Chain::update(unsigned int s)
 		
 			if(pl) state.check(" After prop check");
 			if(pl) state.check_popnum_t2("hhh");
+			
+			state.check_neg_rate(pro.name);
 		}
 	}
 	
@@ -885,9 +887,19 @@ string Chain::banner(string te) const
 
 
 /// Outputs diagnostics about the proposals
-string Chain::diagnostics(unsigned int total_time, unsigned int anneal_time) const
+string Chain::diagnostics(double total_time, double anneal_time) const
 {                    
 	stringstream ss;
+	
+	if(state.alg_warn.size() > 0){
+		ss << ALG_WARN << ":" << endl;
+		for(const auto &aw : state.alg_warn){
+			ss << aw.te << " (core: " << aw.core << ", sample: ";
+			if(aw.sample == UNSET) ss << "unset"; else ss << aw.sample;
+			ss << ", number: " << aw.num << ")" << endl;
+		}
+		ss << endl;
+	}
 	
 	{	
 		auto sum_param_prop = 0.0, sum_event_prop = 0.0;
@@ -968,8 +980,7 @@ string Chain::diagnostics(unsigned int total_time, unsigned int anneal_time) con
 		}
 
 	  ss << endl;
-
-		ss <<  "Total CPU time: " << total_time/CLOCKS_PER_SEC << " seconds" << endl;
+		ss <<  "Total CPU time: " << tstr(total_time/CLOCKS_PER_SEC,2) << " seconds" << endl;
 	
 		ss << endl << endl;
 	}

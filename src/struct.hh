@@ -9,6 +9,13 @@ using namespace std;
 #include "const.hh"
 #include "hash.hh"
 
+struct AlgWarn {                   // Stores an algorithm warning
+	string te;                       // Text for warning
+	unsigned int core;
+	unsigned int sample;
+	unsigned int num;
+};
+
 struct InfPeriod {                 // Defines an infectious period
  double start;                     // Start and end time for period
  double end;

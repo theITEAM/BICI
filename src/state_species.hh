@@ -79,7 +79,7 @@ class StateSpecies                         // Stores information about the state
 	
 		vector <SimTrigEventDiv> trig_div;     // Stores future non-Markovian events
 		
-		vector <long> timer;                   // General purpose timers
+		vector <double> timer;                 // General purpose timers
 		
 		StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const	vector <double> &timepoint, const	vector <double> &dtimepoint,  const vector <unsigned int> &pop_affect, Operation mode, const double &dif_thresh);
 	
@@ -180,8 +180,8 @@ class StateSpecies                         // Stores information about the state
 		void print_markov_eqn(unsigned int i) const;
 		void print_ind(unsigned int i) const;
 		void ensure_consistent(vector <Event> &ev) const;
-		void print_event(string name, const Individual &ind) const;
-		void print_event(const vector <Event> &event) const;
+		string print_event(string name, const Individual &ind) const;
+		string print_event(const vector <Event> &event, bool str=false) const;
 		void check_cl_ev(Individual ind) const;
 		void set_ind_sim_c(unsigned int ti);
 		bool all_events_correct(unsigned int i, unsigned int cl);

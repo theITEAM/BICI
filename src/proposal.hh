@@ -50,7 +50,7 @@ class Proposal                             // Implements a proposal
 		
 		unsigned int number;                   // The number of times the proposal is done
 		
-		vector <long> timer;                   // Times how long the proposal takes
+		vector <double> timer;                 // Times how long the proposal takes
 		
 		LocalSampler loc_samp;                 // Sampler used for local event changes
 		
@@ -107,7 +107,7 @@ class Proposal                             // Implements a proposal
 		void param_event_joint(Direction dir, State &state);
 		void init_cond_frac(State &state);
 		double calculate_al(const Like &like_ch, double prop_prob) const;
-		string diagnostics(long total_time) const;
+		string diagnostics(double total_time) const;
 		void update(State &state);
 		void switch_enter_source(State &state);
 		void switch_leave_sink(State &state);

@@ -62,7 +62,7 @@ void PAS::run()
 	
 	percentage_start(ANNEAL_PER);	
 	
-	auto time_anneal_start = clock();
+	double time_anneal_start = clock();
 
 	auto step_Lobs = gen_update/10;
 	if(step_Lobs == 0) step_Lobs = 1;
@@ -71,7 +71,7 @@ void PAS::run()
 	do{
 		percentage(phi,1);
 			
-		//if(op()) cout << "Generation " << g << ":  \phi=" << phi << endl;
+		//if(op()) cout << "Generation " << g << ":  phi=" << phi << endl;
 
 		for(auto &ch : chain){ ch.Lobs_av = 0; ch.nLobs_av = 0;}
 	 
@@ -100,7 +100,7 @@ void PAS::run()
 	}while(true);
 	percentage_end();
 		
-	auto time_anneal_end = clock();
+	double time_anneal_end = clock();
 	
 	// Running phase
 	percentage_start(RUN_PER);	

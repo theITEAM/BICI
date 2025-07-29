@@ -333,6 +333,7 @@ const unsigned int RANGE_MIN = 50;                // Minimum number to calc M
 const unsigned int H_BIN = 10;                    // Used for distributions in cumulative prob
 
 const double TWO_TINY = 2*TINY;                   // Used to represent a tiny number
+const double SMALLISH = 0.01;                     // Used to represent quite a small number
 const double SMALL = 0.00001;                     // Used to represent a small number
 const double LARGE = 1000000000;                  // Used to represent a big number
 const double LARGISH = 10000.0;                   // Used to represent a pretty large number 
@@ -354,7 +355,7 @@ const unsigned int TRUNC_MAX = 40;                // Truncates strings longer th
 
 const auto PHI_LIM = 1.0;                         // The final inverse temperature
 
-const auto CHECK_THIN = 100u;                      // Determines how often MCMC is checked
+const auto CHECK_THIN = 20u;                      // Determines how often MCMC is checked
 const auto SD_MIN = TINY;                         // The minimum value for sd
 const auto SD_MAX = LARGE;                        // The maximum value for sd
 const auto CV_MIN = 0.01;                         // The minimum value for cv
@@ -435,6 +436,7 @@ const string RNC_name = "RNC";                    // The computational rep numbe
 const string GT_name = "GT";                      // The basic generation time
 const string GTE_name = "GTE";                    // The effective generation time function
 const string GTC_name = "GTC";                    // The computational generation time function
+const string ALG_WARN = "ALGORITHM WARNINGS";
 
 // Checking for Σ and ∫ is done differently in c++ because it uses two characters
 const string sigma = "Σ";  

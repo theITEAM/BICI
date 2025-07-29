@@ -17,7 +17,7 @@ public:
 	void init(unsigned int ch, unsigned int ch_max);
 	void burn_update(unsigned int s);
 	void update(unsigned int s);
-	string diagnostics(unsigned int time, unsigned int anneal_time=UNSET) const;
+	string diagnostics(double time, double anneal_time=UNSET) const;
 	void pas_burn_update(unsigned int s, unsigned int g, unsigned int gen_update, double phi);
 	double like_total_obs() const;
 	void check_cor_matrix() const;

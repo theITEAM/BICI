@@ -557,7 +557,8 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 							auto z = ran()*sum_op_sum;
 							auto l = 0u; while(l < lmax && z > sum_store[l]) l++;
 							if(l == lmax){ 
-								cout << "problem with sampler" << endl; illegal = true; 
+								//cout << "problem with sampler" << endl; 
+								illegal = true; 
 								return ev_new;
 							}
 						
