@@ -23,7 +23,7 @@ void Proposal::mbp_population_affect()
 		for(auto &pmr : pop.markov_eqn_ref){
 			auto p = pmr.p, e = pmr.e;
 
-			AffectLike al; al.map.resize(model.ntimepoint-1,true);
+			AffectLike al; al.map.resize(model.details.T,true);
 			
 			al.type = DIV_VALUE_AFFECT; al.num = p; al.num2 = e;
 			param_vec_add_affect(affect_like,al);		
@@ -35,7 +35,7 @@ void Proposal::mbp_population_affect()
 		for(auto &tre : pop.trans_ref){
 			auto p = tre.p, tr = tre.tr;
 			if(p != p_prop){
-				AffectLike al; al.map.resize(model.ntimepoint-1,true);
+				AffectLike al; al.map.resize(model.details.T,true);
 				al.type = MARKOV_POP_AFFECT; al.num = p; al.num2 = tr;
 				param_vec_add_affect(affect_like,al);
 			}
@@ -186,9 +186,16 @@ void Proposal::update_sampler(const CorMatrix &cor_matrix)
 		
 		}
 		
-		print_matrix("A",M);
-		print_matrix("B",Mst);
+		
 		*/
+		//print_matrix("A",M);
+		//print_matrix("B",Mst);
+		
+		//for(auto th : param_list){
+			//auto pv = model.param_vec[th];
+			//cout << pv.name << "pv" << endl;
+		//}
+		print_matrix("B",Mst);
 		emsg("Cholesky problem");
 	}
 }
@@ -630,7 +637,7 @@ bool Proposal::event_dif(const vector <Event> &ev1, const vector <Event> &ev2) c
 	
 	for(auto i = 0u; i < ev1.size(); i++){
 		if(ev1[i].c_after != ev2[i].c_after) return true;
-		if(ev1[i].t != ev2[i].t) return true;
+		if(ev1[i].tdiv != ev2[i].tdiv) return true;
 	}
 	
 	return false;

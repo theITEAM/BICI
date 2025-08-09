@@ -15,7 +15,7 @@ using namespace std;
 /// Initialises the data sources
 void Species::initialise_data()
 {
-	T = timepoint.size()-1;
+	T = details.T;
 	
 	init_cond.type = INIT_POP_NONE;
 	
@@ -63,20 +63,20 @@ void Species::set_ind_tmin_tmax()
 		auto tmin = LARGE;
 		auto tmax = -LARGE;
 		for(const auto &ev : ind.ev){
-			auto t = ev.t;
+			auto t = ev.tdiv;
 			if(t < tmin) tmin = t;
 			if(t > tmax) tmax = t;
 		}
 			
 		for(const auto &ob : ind.obs){
 			if(!(ob.type == OBS_COMP_EV && ob.not_alive)){
-				auto t = ob.t;
+				auto t = ob.tdiv;
 				if(t < tmin) tmin = t;
 				if(t > tmax) tmax = t;
 			}
 		}
 		 
-		ind.tmin = tmin; ind.tmax = tmax;
+		ind.tdivmin = tmin; ind.tdivmax = tmax;
 	}
 }
 
@@ -499,11 +499,11 @@ void Species::add_pop_data(const DataSource &so, int sign)
 		if(t_str == "start") t = details.t_start;
 		
 		if(t < details.t_start || t >= details.t_end){
-			 alert_source("The time '"+t_str+"' must be between the start and end times",so); 
+			alert_source("The time '"+t_str+"' must be between the start and end times",so,0,j); 
 			 return;
 		}
 		
-		auto ti = get_ti(t); if(ti == T) ti--;
+		auto ti = get_ti(calc_tdiv(t,details)); 
 		
 		if(ncla+2 != tab.ncol) emsg_input("Columns not right1");
 		
@@ -567,10 +567,10 @@ void Species::add_ind_data(const DataSource &so)
 		if(t_str == "start") t = details.t_start;
 		
 		if(t < details.t_start || t >= details.t_end){
-			 alert_source("The time '"+t_str+"' must be between the start and end times",so,1,j); 
-			 return;
+			alert_source("The time '"+t_str+"' must be between the start and end times",so,1,j); 
+			return;
 		}
-		
+	
 		if(ncla+2 != tab.ncol) emsg_input("Columns not right2");
 		
 		auto name = t_str;
@@ -598,7 +598,9 @@ void Species::add_ind_data(const DataSource &so)
 			}
 		
 			Enter ep;
-			ep.name = name; ep.time = t; ep.c_set = c_set;
+			ep.name = name;
+			ep.tdiv = calc_tdiv(t,details); 
+			ep.c_set = c_set;
 			
 			if(c_set == UNSET){
 				ep.cla.resize(ncla);
@@ -631,7 +633,7 @@ void Species::add_ind_data(const DataSource &so)
 		ev.move_c = UNSET;
 		ev.cl = UNSET;
 		ev.tr = UNSET;
-		ev.t = t;
+		ev.tdiv = calc_tdiv(t,details);
 		ind.ev.push_back(ev);
 	}		
 }
@@ -649,13 +651,18 @@ void Species::remove_ind_data(const DataSource &so)
 		double t = number(t_str);
 		if(t_str == "start") t = details.t_start;
 		
+		if(t < details.t_start || t > details.t_end){
+			alert_source("The time '"+t_str+"' must be between the start and end times",so,1,j); 
+			 return;
+		}
+		
 		if(tab.ncol != 2) emsg_input("Columns not right3");
 		
 		EventData ev; 
 		ev.type = LEAVE_EV;
 		ev.cl = UNSET;
 		ev.tr = UNSET;
-		ev.t = t;
+		ev.tdiv = calc_tdiv(t,details);
 		ind.ev.push_back(ev);
 	}		
 }
@@ -673,6 +680,11 @@ void Species::move_ind_data(const DataSource &so)
 		double t = number(t_str);
 		if(t_str == "start") t = details.t_start;
 		
+		if(t < details.t_start || t >= details.t_end){
+			alert_source("The time '"+t_str+"' must be between the start and end times",so,1,j); 
+			 return;
+		}
+		
 		if(tab.ncol != 3) emsg_input("Columns not right4");
 		
 		auto cl = so.cl;
@@ -685,7 +697,7 @@ void Species::move_ind_data(const DataSource &so)
 		ev.move_c = c;
 		ev.cl = cl;
 		ev.tr = UNSET;
-		ev.t = t;
+		ev.tdiv = calc_tdiv(t,details);
 		ind.ev.push_back(ev);
 	}		
 }
@@ -702,9 +714,15 @@ void Species::comp_data(const DataSource &so)
 
 		auto val = tab.ele[j][1];
 		auto t = number(val);
+		if(val == "start") t = details.t_start;
 		if(t == UNSET){
 			alert_source("Value '"+val+"' is not a number2",so,1,j);
 			return;
+		}
+		
+		if(t < details.t_start || t > details.t_end){
+			alert_source("The time '"+val+"' must be between the start and end times",so,1,j); 
+			 return;
 		}
 		
 		auto cl = so.cl;
@@ -727,7 +745,7 @@ void Species::comp_data(const DataSource &so)
 				ob.c_obs_prob_eqn = create_eqn_vector(prob_str,COMP_PROB,so);
 			}
 			ob.cl = so.cl;
-			ob.t = t;
+			ob.tdiv = calc_tdiv(t,details);
 			ob.time_vari = false;
 			ind.obs.push_back(ob);		
 		}
@@ -753,7 +771,7 @@ void Species::genetic_data(const DataSource &so)
 	
 	string ems;
 	auto prob_str = find_comp_prob_str(infection_cl,str,LOWER_BOUND,ems);
-	if(ems != "") emsg_input("SHould not be error");
+	if(ems != "") emsg_input("Should not be error");
 		
 	auto p_eqn = create_eqn_vector(prob_str,COMP_PROB,so);
 	
@@ -776,7 +794,7 @@ void Species::genetic_data(const DataSource &so)
 			ob.not_alive = false;
 			ob.c_obs_prob_eqn = p_eqn;
 			ob.cl = infection_cl;
-			ob.t = t;
+			ob.tdiv = calc_tdiv(t,details);
 			ob.time_vari = false;
 			ind.obs.push_back(ob);		
 		}
@@ -804,7 +822,7 @@ void Species::test_data(const DataSource &so)
 		ob.type = OBS_TEST_EV;
 		ob.so = so.index;
 		ob.cl = so.cl;
-		ob.t = t;
+		ob.tdiv = calc_tdiv(t,details);
 		ob.not_alive = false;
 		ob.time_vari = false;
 		ob.Se_eqn = he(add_equation_info(so.obs_model.Se_str,SE),so);
@@ -881,7 +899,7 @@ void Species::population_data(const DataSource &so)
 		
 		PopData pd;
 		pd.so = so.index;
-		pd.t = t;
+		pd.tdiv = calc_tdiv(t,details);
 		pd.ref = pf;
 		pd.type = set_obs_mod_type(so.obs_model);
 		pd.value = value;
@@ -984,7 +1002,7 @@ void Species::trans_data(const DataSource &so)
 		ob.ref = obs_trans.size();
 		ob.type = OBS_TRANS_EV;
 		ob.cl = so.cl;
-		ob.t = t;
+		ob.tdiv = calc_tdiv(t,details);
 		ob.time_vari = false;
 		ob.not_alive = false;
 		
@@ -995,8 +1013,8 @@ void Species::trans_data(const DataSource &so)
 	auto ti_min = 0u, ti_max = T; 
 	
 	if(so.time_range == SPEC_TIME){
-		ti_min = get_ti(so.time_start);
-		ti_max = get_ti(so.time_end);
+		ti_min = get_ti(calc_tdiv(so.time_start,details));
+		ti_max = get_ti(calc_tdiv(so.time_end,details));
 	}
 
 	auto cf = set_comp_filt(so.filter_str,UNSET,LOWER_UPPER_BOUND,so);
@@ -1131,8 +1149,8 @@ void Species::popu_trans_data(const DataSource &so)
 		
 		PopTransData ptd;
 		ptd.so = so.index;
-		ptd.tmin = tstart;
-		ptd.tmax = tend;	
+		ptd.tdivmin = calc_tdiv(tstart,details);
+		ptd.tdivmax = calc_tdiv(tend,details);
 		ptd.ref = pf;		
 		ptd.type = set_obs_mod_type(so.obs_model);
 		ptd.value = value;
@@ -1223,7 +1241,7 @@ vector <string> Species::global_convert(const Filter &filt) const
 		string te="";
 		for(auto cl = 0u; cl < ncla; cl++){
 			auto &fcl = filt.cla[cl];
-			if(fcl.type != COMP_FILT) emsg_input("SHould be COMP_FILT");
+			if(fcl.type != COMP_FILT) emsg_input("Should be COMP_FILT");
 			if(te != "") te += "*";
 		
 			const auto cc = cgl.cla_comp[cl];
@@ -1259,22 +1277,22 @@ vector <string> Species::trans_global_convert(unsigned int cl, const vector <str
 
 /// Used to order events
 bool EventData_ord (const EventData &ev1, const EventData &ev2)                      
-{ return (ev1.t < ev2.t); };  
+{ return (ev1.tdiv < ev2.tdiv); };  
 
 
 /// Used to order observations
 bool ObsData_ord (const ObsData &ob1, const ObsData &ob2)                      
-{ return (ob1.t < ob2.t); };  
+{ return (ob1.tdiv < ob2.tdiv); };  
 
 
 /// Used to order population data times
 bool PopData_ord (const PopData &pd1, const PopData &pd2)                      
-{ return (pd1.t < pd2.t); }; 
+{ return (pd1.tdiv < pd2.tdiv); }; 
 
 
 /// Used to order poptrans data times
 bool PopTransData_ord (const PopTransData &pd1, const PopTransData &pd2)                      
-{ return (pd1.tmin < pd2.tmin); }; 
+{ return (pd1.tdivmin < pd2.tdivmin); }; 
 
 
 /// Orders individual events by time
@@ -1292,11 +1310,11 @@ void Species::order_data_events()
 		
 	if(false){
 		for(const auto &pd : pop_data){
-			cout << pd.t << " " << pd.value << " " << pd.obs_mod_val << " Population data" << endl;
+			cout << pd.tdiv << " " << pd.value << " " << pd.obs_mod_val << " Population data" << endl;
 		}
 		
 		for(const auto &ptd : pop_trans_data){
-			cout << ptd.tmin << " " << ptd.tmax << " " << ptd.value << " " << ptd.obs_mod_val << " Population trans data" << endl;
+			cout << ptd.tdivmin << " " << ptd.tdivmax << " " << ptd.value << " " << ptd.obs_mod_val << " Population trans data" << endl;
 		}
 	}
 }
@@ -1507,7 +1525,7 @@ vector <EquationInfo> Species::create_eqn_vector(const vector <string> &vec, Eqn
 /// For each time div and global transition references any transition data associated with it
 void Species::init_pop_trans_ref()
 {
-	T = timepoint.size()-1;
+	T = details.T;
 	
 	pop_trans_ref.resize(T);
 	for(auto ti = 0u; ti < T; ti++){
@@ -1518,8 +1536,8 @@ void Species::init_pop_trans_ref()
 		const auto &ptd = pop_trans_data[i];
 		const auto &ptf = pop_trans_filter[ptd.ref];
 		
-		auto ti_min = get_ti(ptd.tmin);
-		auto ti_max = get_ti(ptd.tmax);
+		auto ti_min = get_ti(ptd.tdivmin);
+		auto ti_max = get_ti(ptd.tdivmax);
 		
 		for(auto tr : ptf.tr_nonzero){
 			for(auto ti = ti_min; ti < ti_max; ti++){
@@ -1533,7 +1551,7 @@ void Species::init_pop_trans_ref()
 /// For each time div and global transition references any population data associated with it
 void Species::init_pop_data_ref()
 {
-	T = timepoint.size()-1;
+	T = details.T;
 	
 	pop_data_ref.resize(T);
 	for(auto ti = 0u; ti < T; ti++){
@@ -1544,7 +1562,7 @@ void Species::init_pop_data_ref()
 		const auto &ptd = pop_data[i];
 		const auto &pf = pop_filter[ptd.ref];
 
-		auto ti = get_ti(ptd.t); if(ti == T) ti--;
+		auto ti = get_ti(ptd.tdiv); if(ti == T) ti--;
 		
 		for(auto c : pf.c_nonzero){
 			pop_data_ref[ti][c].push_back(i);
@@ -1596,7 +1614,7 @@ void Species::set_default_enter()
 	if(fl == true){
 		Enter ep;
 		ep.name = "Uninformative"; 
-		ep.time = details.t_start; 
+		ep.tdiv = 0; 
 		ep.c_set = UNSET;
 		ep.cla.resize(ncla);
 		for(auto cl = 0u; cl < ncla; cl++){
@@ -1697,14 +1715,14 @@ void Species::add_unobs_Amatrix_ind()
 /// Makes tiny shifts in time ensure that transition times are not equal
 void Species::jiggle_data()
 {
-	auto range = NEAR_DIV_THRESH*details.dt*2;
+	auto range = TINY*details.dt*2;
 		
 	Hash hash_t;
 	
 	// Adds times to hash time when NOT a transition event
 	for(auto &ind : individual){	
 		for(const auto &ev : ind.ev){
-			auto vec = hash_t.get_vec_double(ev.t);
+			auto vec = hash_t.get_vec_double(ev.tdiv);
 			hash_t.add(0,vec);
 		}
 		
@@ -1713,7 +1731,7 @@ void Species::jiggle_data()
 			case OBS_SOURCE_EV: case OBS_SINK_EV: case OBS_TRANS_EV: break;
 			default:
 				{
-					auto vec = hash_t.get_vec_double(ob.t);
+					auto vec = hash_t.get_vec_double(ob.tdiv);
 					hash_t.add(0,vec);
 				}
 				break;
@@ -1729,36 +1747,36 @@ void Species::jiggle_data()
 				if(tmin != UNSET){
 					emsg("Cannot set entry time twice for individual '"+ind.name+"'");
 				}				
-				tmin = ev.t;
+				tmin = ev.tdiv;
 				break;
 				
 			case LEAVE_EV:
 				if(tmax != UNSET){
 					emsg("Cannot set leave time twice for individual '"+ind.name+"'");
 				}				
-				tmax = ev.t;
+				tmax = ev.tdiv;
 				break;
 			case MOVE_EV: break;
 			default: emsg("Should not have diferent type"); break;
 			}
 		}
 			
-		if(tmin == UNSET) tmin = details.t_start;
-		if(tmax == UNSET) tmax = details.t_end;
+		if(tmin == UNSET) tmin = 0;
+		if(tmax == UNSET) tmax = details.T;
 	
 		// Makes sure move events are in time range
 		for(const auto &ev : ind.ev){
 			switch(ev.type){
 			case MOVE_EV:
-				if(ev.t <= tmin || ev.t >= tmax){
-					emsg("The move event at time '"+tstr(ev.t)+" for '"+ind.name+"' is not within the time range.");
+				if(ev.tdiv <= tmin || ev.tdiv >= tmax){
+					emsg("The move event at time '"+tstr(calc_t(ev.tdiv,details))+" for '"+ind.name+"' is not within the time range.");
 				}
 				break;
 			
 				if(tmax != UNSET){
 					emsg("Cannot set leave time twice for individual '"+ind.name+"'");
 				}				
-				tmax = ev.t;
+				tmax = ev.tdiv;
 				break;
 				
 			default: break;
@@ -1766,8 +1784,8 @@ void Species::jiggle_data()
 		}
 		
 		for(auto &ob : ind.obs){
-			if(ob.t < tmin || ob.t > tmax){
-				emsg("Observation at time "+tstr(ob.t)+" on individual '"+ind.name+"' is out of range");
+			if(ob.tdiv < tmin || ob.tdiv > tmax){
+				emsg("Observation at time "+tstr(calc_t(ob.tdiv,details))+" on individual '"+ind.name+"' is out of range");
 			}
 			
 			switch(ob.type){
@@ -1777,14 +1795,14 @@ void Species::jiggle_data()
 					const auto loopmax = 1000;
 					auto loop = 0u;
 					do{
-						t = ob.t + loop*range;
-						if(!event_near_div(t,details) && t >= tmin && t <= tmax &&
+						t = ob.tdiv + loop*range;
+						if(t >= tmin && t <= tmax &&
    						hash_t.existing(hash_t.get_vec_double(t)) == UNSET){
 							break;
 						}
 						
-						t = ob.t - loop*range;
-						if(!event_near_div(t,details) && t >= tmin && t <= tmax &&
+						t = ob.tdiv - loop*range;
+						if(t >= tmin && t <= tmax &&
    						hash_t.existing(hash_t.get_vec_double(t)) == UNSET){
 							break;
 						}
@@ -1795,7 +1813,7 @@ void Species::jiggle_data()
 						emsg("Could not deal with transition event time '"+tstr(t)+"' on individual '"+ind.name+"'");
 					}
 					
-					ob.t = t;
+					ob.tdiv = t;
 					auto vec = hash_t.get_vec_double(t);
 					hash_t.add(0,vec);
 				}

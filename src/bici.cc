@@ -11,6 +11,7 @@
 // mpirun -n 1 ./bici-para Execute/init.bici sim
 // mpirun --output :raw -n 1 ./bici-para Execute/init.bici sim
 // mpirun -n 3 ./bici-para Execute/init.bici inf
+// mpirun -n 10 ./bici-para Execute/init.bici inf
 // mpirun -n 1 ./bici-para Examples/EX_A1.bici sim
 // mpirun -n 2 ./bici-para Execute/init.bici inf
 // mpirun -n 16 ./bici-para Jamie/scen-3-1.bici inf
@@ -18,9 +19,15 @@
 // mpirun -n 3 ./bici-para Grant/RealData_1000_DA_5000 inf
 // mpirun -n 3 ./bici-para Grant/RealData_2000_DA_5000 inf
 // mpirun -n 16 ./bici-para Jamie/scen-5-1.bici inf
-// nohup mpirun -n 16 ./bici-para Jamie/scen-1-1.bici inf > big1.txt&
+
 // nohup mpirun -n 16 ./bici-para Jamie/scen-1-1b.bici inf > big2.txt&
 // mpirun -n 10 ./bici-para Execute/init.bici inf
+// ./bici-para Geno/SI_catbad_g1.0.bici inf > q1&
+// ./bici-para Geno/farm_f1.0.bici inf > q1&
+// ./bici-para Geno/SI_catbad_m1.bici inf > y1&
+
+// nohup mpirun -n 16 ./bici-para Jamie/scen-1-1.bici inf > bbb.txt&
+// 06d_New_Inf_500.bici
 
 // ./bici-para Jamie/temp inf
 

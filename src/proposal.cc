@@ -26,7 +26,7 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	
 	name = "PROPOSAL ";
 	
-	auto win = (unsigned int)(model.ntimepoint/10); if(win == 0) win = 1;
+	auto win = (unsigned int)(model.details.T/10); if(win == 0) win = 1;
 	loc_samp.win = win;
 	
 	p_prop = UNSET;
@@ -326,7 +326,7 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 			if(vec.size() != 1) emsg("error vec num");
 			p_prop = vec[0];
 			ntr = 0; nac = 0;
-			auto T = model.ntimepoint-1;
+			auto T = model.details.T;
 			auto ntr = model.species[p_prop].tra_gl.size();
 			loc_samp.tr_samp.init(ntr,T);
 		}
@@ -739,7 +739,7 @@ void Proposal::mbp(State &state)
 	auto al = calculate_al(like_ch,0);
 	
 	if(pl) cout << al << " al" << endl; 
-	
+
 	if(ran() < al){
 		if(pl) cout << "accept" << endl;
 		nac++;
@@ -792,8 +792,7 @@ void Proposal::MH_event(State &state)
 	auto &sp = model.species[p_prop];
 	auto &ssp = state.species[p_prop];
 	
-	auto t_start = model.details.t_start;
-	auto t_end = model.details.t_end;
+	double t_start = 0, t_end = model.details.T;
 
 	for(auto i = 0u; i < ssp.individual.size(); i++){	
 		if(i >= sp.nindividual_obs || sp.individual[i].move_needed){
@@ -812,23 +811,23 @@ void Proposal::MH_event(State &state)
 					switch(ev.type){
 					case NM_TRANS_EV: case M_TRANS_EV:
 						if(!(sp.period_exist && ev.c_after != UNSET && sp.comp_period[ev.c_after][ev.cl])){							
-							auto t = ev.t;
+							auto t = ev.tdiv;
 					
 							auto tmin = t_start; 
-							if(ev.c_after == UNSET) tmin = event[e-1].t;
+							if(ev.c_after == UNSET) tmin = event[e-1].tdiv;
 							else{
 								auto e_before = get_event_before(e,event);
-								if(e_before != UNSET) tmin = event[e_before].t;
+								if(e_before != UNSET) tmin = event[e_before].tdiv;
 							}
 							
 							auto tmax = t_end;
 							if(e == 0){
-								if(event.size() > 1) tmax = event[1].t;
+								if(event.size() > 1) tmax = event[1].tdiv;
 								if(sp.tra_gl[ ev.tr_gl].variety != SOURCE_TRANS) emsg("Should be source trans");
 							}
 							else{	
 								auto e_after = get_event_after(e,event);
-								if(e_after != UNSET) tmax = event[e_after].t;
+								if(e_after != UNSET) tmax = event[e_after].tdiv;
 							}
 							
 							auto tr_gl = ev.tr_gl;
@@ -841,7 +840,7 @@ void Proposal::MH_event(State &state)
 							auto t_new = t + dt;
 							
 							samp.ntr++;
-							if(t_new <= tmin || t_new >= tmax || event_near_div(t_new,model.details)){
+							if(t_new <= tmin || t_new >= tmax){
 								samp.nfa++;
 								update_ind_samp_si(tr_gl,-0.005);
 							}
@@ -859,6 +858,7 @@ void Proposal::MH_event(State &state)
 								}
 								
 								auto gc = state.update_tree(p_prop,i,ev_new);
+								
 								if(gc.type == GENCHA_FAIL){
 									samp.nfa++;
 									update_ind_samp_si(tr_gl,-0.005);
@@ -953,18 +953,17 @@ void Proposal::MH_multi_event(State &state)
 					auto dt = normal_sample(0,samp.si,warn);
 					if(dt == UNSET) emsg("Problem with MCMC proposal3: "+warn);
 					
-					if(dt >= trange.tmax || dt < trange.tmin) ill = true;
+					if(dt >= trange.tdivmax || dt < trange.tdivmin) ill = true;
 					else{
 						// Reorders events 
 						for(auto e = 0u; e < E; e++){
-							auto tnew = event[e].t;
+							auto tnew = event[e].tdiv;
 							if(lm.move[e]){
 								tnew += dt;
-								if(event_near_div(tnew,model.details)) ill = true;
 							}
 							
 							EventMove em;
-							em.t = tnew;
+							em.tdiv = tnew;
 							em.e = e;
 							em.move = lm.move[e];
 							evmo.push_back(em);
@@ -978,7 +977,7 @@ void Proposal::MH_multi_event(State &state)
 						for(auto e = 0u; e < E; e++){
 							const auto &evm = evmo[e];
 							auto ev = event[evm.e];
-							ev.t = evm.t;
+							ev.tdiv = evm.tdiv;
 							ev_new.push_back(ev);
 							move_new.push_back(evm.move);
 						}
@@ -1068,8 +1067,7 @@ void Proposal::MH_event_all(State &state)
 	auto &sp = model.species[p_prop];
 	auto &ssp = state.species[p_prop];
 	
-	auto t_start = model.details.t_start;
-	auto t_end = model.details.t_end;
+	double t_start = 0, t_end = model.details.T;
 
 	for(auto i = 0u; i < sp.nindividual_obs; i++){	
 		if(sp.individual[i].move_needed){
@@ -1083,8 +1081,8 @@ void Proposal::MH_event_all(State &state)
 			auto tmin = t_start;
 			auto tmax = t_end;
 			
-			if(event[0].type == ENTER_EV){ emin = 1; tmin = event[0].t;}
-			if(event[E-1].type == LEAVE_EV){ emax = E-1; tmax = event[E-1].t;}
+			if(event[0].type == ENTER_EV){ emin = 1; tmin = event[0].tdiv;}
+			if(event[E-1].type == LEAVE_EV){ emax = E-1; tmax = event[E-1].tdiv;}
 			
 			auto ill = false;
 			for(auto e = emin; e < emax; e++){
@@ -1099,10 +1097,10 @@ void Proposal::MH_event_all(State &state)
 				if(dt == UNSET) emsg("Problem with MCMC proposal4: "+warn);
 				
 				if(dt > 0){
-					if(event[emax-1].t+dt > tmax) ill = true;
+					if(event[emax-1].tdiv+dt > tmax) ill = true;
 				}
 				else{
-					if(emin < E && event[emin].t+dt < tmin) ill = true;
+					if(emin < E && event[emin].tdiv+dt < tmin) ill = true;
 				}
 			
 				samp.ntr++;
@@ -1113,52 +1111,50 @@ void Proposal::MH_event_all(State &state)
 				else{
 					auto ev_new = event;
 					for(auto e = emin; e < emax; e++){
-						ev_new[e].t += dt;
+						ev_new[e].tdiv += dt;
 					}
 					
-					if(!events_near_div(ev_new,model.details)){
-						if(pl){
-							cout << endl << endl;
-							cout << ind.name << endl;
-							cout << "event old:" << endl; ssp.print_event(ind.ev);
-							cout << "event new:" << endl; ssp.print_event(ev_new);
-						}
+					if(pl){
+						cout << endl << endl;
+						cout << ind.name << endl;
+						cout << "event old:" << endl; ssp.print_event(ind.ev);
+						cout << "event new:" << endl; ssp.print_event(ev_new);
+					}
+					
+					auto gc = state.update_tree(p_prop,i,ev_new);
+					if(gc.type == GENCHA_FAIL){
+						samp.nfa++;
+						update_ind_samp_si(i,-0.005);
+					}
+					else{
+						auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+					
+						auto dprob = 0.0;
+						gc.update_like_ch(like_ch,dprob);
 						
-						auto gc = state.update_tree(p_prop,i,ev_new);
-						if(gc.type == GENCHA_FAIL){
-							samp.nfa++;
+						auto al = calculate_al(like_ch,dprob);
+				
+						if(pl) cout << i << " " <<  al << " al" << endl;
+					
+						if(ran() < al){
+							if(pl) cout << " accept" << endl;
+							samp.nac++;
+							state.add_like(like_ch);
+							state.gen_change_update(gc); 
+							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+							
+							update_ind_samp_si(i,0.005);
+						}
+						else{ 
+							if(pl) cout << "reject" << endl;
+							state.restore_back();
 							update_ind_samp_si(i,-0.005);
 						}
-						else{
-							auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-						
-							auto dprob = 0.0;
-							gc.update_like_ch(like_ch,dprob);
-							
-							auto al = calculate_al(like_ch,dprob);
-					
-							if(pl) cout << i << " " <<  al << " al" << endl;
-						
-							if(ran() < al){
-								if(pl) cout << " accept" << endl;
-								samp.nac++;
-								state.add_like(like_ch);
-								state.gen_change_update(gc); 
-								if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
-								
-								update_ind_samp_si(i,0.005);
-							}
-							else{ 
-								if(pl) cout << "reject" << endl;
-								state.restore_back();
-								update_ind_samp_si(i,-0.005);
-							}
 
-							if(pl) state.check("ind event all prop");
+						if(pl) state.check("ind event all prop");
 
-							if(pl){
-								state.check_popnum_t2("Pnum");
-							}
+						if(pl){
+							state.check_popnum_t2("Pnum");
 						}
 					}
 				}
@@ -1223,6 +1219,7 @@ void Proposal::MH_ind_local(State &state)
 			const auto &lich = licha[index];
 			
 			vector <Event> ev_new;
+			//if(lich.i == 23) pl = true; else pl = false;
 			
 			if(pl){
 				ssp.print_local_ind_change(lich);
@@ -1236,7 +1233,8 @@ void Proposal::MH_ind_local(State &state)
 			auto prob_try = ssp.create_local_change(timefac,lich,ev_new,enew,nind_obs,empty_event,LOCAL_FORWARD);
 		
 			//prob_try = 1.0/timefac;
-	
+			//prob_try = 1;
+			
 			auto &si = swap_info[lich.swap_rep_ref];
 			si.ntr++;
 		
@@ -1259,56 +1257,59 @@ void Proposal::MH_ind_local(State &state)
 						cout << "event new:" << endl; ssp.print_event(ev_new);
 					}
 				
-					if(!events_near_div(ev_new,model.details)){
-						auto i = lich.i;
+				
+					auto i = lich.i;
+				
+					auto gc = state.update_tree(p_prop,i,ev_new);
+					if(gc.type == GENCHA_FAIL){
+						si.nfa++;
+					}
+					else{
+						auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
 					
-						auto gc = state.update_tree(p_prop,i,ev_new);
-						if(gc.type == GENCHA_FAIL){
-							si.nfa++;
+						auto add = ssp.local_ind_change(i,cl);
+					
+						auto dprob = 0.0;
+						gc.update_like_ch(like_ch,dprob);
+						
+						auto al = calculate_al(like_ch,dprob);
+						
+						// Accounts for change in number of potential proposals
+						auto Ni = licha.size();
+						auto Nf = Ni + add.size() - lc_ref[i].size();
+						if(Nf != Ni) al *= double(Ni)/Nf; 
+										
+						al *= timefac/prob_try;
+					
+						//if(al < 0.95) emsg("UU");
+						if(pl) cout << al << " al" << endl;
+						
+						if(ran() < al){ 
+							if(pl) cout << "accept" << endl;
+						
+							//if(testing) ssp.swap_check_rev_prob_try(prob_try,timefac,lich,add,ev_store);
+							
+							si.nac++;
+							remove_li_cha(i,licha,lc_ref);
+							add_li_cha(i,add,licha,lc_ref);
+							state.add_like(like_ch);
+							state.gen_change_update(gc); 
+							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+							if(testing){ if(Nf != licha.size()) emsg("Wrong number");}
 						}
 						else{
-							auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-						
-							auto add = ssp.local_ind_change(i,cl);
-						
-							auto dprob = 0.0;
-							gc.update_like_ch(like_ch,dprob);
-							
-							auto al = calculate_al(like_ch,dprob);
-							
-							// Accounts for change in number of potential proposals
-							auto Ni = licha.size();
-							auto Nf = Ni + add.size() - lc_ref[i].size();
-							if(Nf != Ni) al *= double(Ni)/Nf; 
-											
-							al *= timefac/prob_try;
-							
-							if(pl) cout << al << " al" << endl;
-							
-							if(ran() < al){ 
-								if(pl) cout << "accept" << endl;
-							
-								if(testing) ssp.swap_check_rev_prob_try(prob_try,timefac,lich,add,ev_store);
-								si.nac++;
-								remove_li_cha(i,licha,lc_ref);
-								add_li_cha(i,add,licha,lc_ref);
-								state.add_like(like_ch);
-								state.gen_change_update(gc); 
-								if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
-								if(testing){ if(Nf != licha.size()) emsg("Wrong number");}
-							}
-							else{
-								if(pl) cout << "reject" << endl;
-								state.restore_back();
-							}
-							
-							if(pl) state.check("ind prop");
+							if(pl) cout << "reject" << endl;
+							state.restore_back();
 						}
-					}		
-				}
+						
+						if(pl) state.check("ind prop");
+					}
+				}		
 			}
 		}		
 	}
+
+	//emsg("RR");
 
 	if(false){  // Used for testing
 		for(auto j = 0u; j < licha.size(); j++){
@@ -1511,17 +1512,18 @@ void Proposal::resimulate_ind_obs(State &state)
 				
 				auto e_init = ind_ev_samp.resample_init_event(i,probif);
 		
-				if(pl){
-					cout << endl << endl << ind.name << "ind" << endl; 
-					cout << "older: "; ssp.print_event(ind.ev); 
-				}
+				//if(pl){
+					//cout << endl << endl << ind.name << "ind" << endl; 
+					//cout << "older: "; ssp.print_event(ind.ev); 
+				//}
 						
 				auto ev_new = ind_ev_samp.simulate_events(i,e_init,probif,indd.trig_ev_ref);
 		
-				if(pl){
-					cout << "new: "; ssp.print_event(ev_new); 	
-					if(ind_ev_samp.illegal) emsg("do");
-				}
+				//if(pl){
+					//cout << "new: "; ssp.print_event(ev_new); 	
+					//if(ind_ev_samp.illegal) emsg("do");
+				//}
+				
 				ntr++; if(burn) isp.ntr++;
 				if(ind_ev_samp.illegal){
 					nfa++;
@@ -1531,7 +1533,7 @@ void Proposal::resimulate_ind_obs(State &state)
 						auto prob = ind_ev_samp.resample_init_event_prob(i,e_init) + ind_ev_samp.simulate_events_prob(i,ev_new,indd.trig_ev_ref);
 						if(dif(probif,prob,THRESH_EXPAND*DIF_THRESH)){
 							stringstream ss;
-							ss << probif << " " << prob << "prob\n";
+							ss << probif << " " << prob << "prob" << endl;
 							ss << "old: " << ssp.print_event(ind.ev,true); 
 							ss << "new: " << ssp.print_event(ev_new,true); 	
 							state.add_alg_warn("sampler different here:"+ss.str());
@@ -1544,14 +1546,16 @@ void Proposal::resimulate_ind_obs(State &state)
 					if(gc.type == GENCHA_FAIL){
 						nfa++;
 					}
-					else{
+					else{			
 						if(pl){
 							cout << endl << endl << ind.name << "ind " << endl; 
 							cout << "old: "; ssp.print_event(ind.ev);
+							/*
 							for(auto i = 0u; i < ind.ev.size(); i++){
-								cout << ind.ev[i].t - int(ind.ev[i].t) << ",";
+								cout << ind.ev[i].tdiv - int(ind.ev[i].tdiv) << ",";
 							}
 							cout << " dif old " << endl;
+							*/
 						}
 						
 						probfi += ssp.nm_obs_dprob(ind);
@@ -1593,6 +1597,8 @@ void Proposal::resimulate_ind_obs(State &state)
 			}
 		}
 	}
+	
+	//emsg("do");
 }
 
 
@@ -1848,7 +1854,7 @@ void Proposal::add_rem_ind(State &state)
 						ssp.print_event(ev_new);
 					}
 					
-					if(ind_ev_samp.illegal) emsg("SHould not be illegal");
+					if(ind_ev_samp.illegal) emsg("Should not be illegal");
 					
 					if(testing == true){                     // Diagnostic
 						auto prob = so_samp.sample_prob(e_init) +
@@ -2028,7 +2034,7 @@ void Proposal::add_rem_tt_ind(State &state)
 			auto e_init = so_samp.sample(probif);
 			auto ev_new = ind_ev_samp.simulate_events(i,e_init,probif,ste);	
 			
-			if(ind_ev_samp.illegal) emsg("SHould not be illegal");
+			if(ind_ev_samp.illegal) emsg("Should not be illegal");
 		
 			if(testing == true){                         // Diagnostic
 				auto prob = so_samp.sample_prob(e_init) +
@@ -2426,7 +2432,7 @@ void Proposal::MH_ie_covar(State &state)
 	
 	auto illegal_bef = false;
 	auto Z_omega_bef = calculate_cholesky(omega_bef,illegal_bef);
-	if(illegal_bef) emsg("SHould not have cholesky error");
+	if(illegal_bef) emsg("Should not have cholesky error");
 		
 	auto inv_Z_omega_bef = invert_matrix(Z_omega_bef);
 			
@@ -2507,8 +2513,7 @@ void Proposal::param_event_joint(Direction dir, State &state)
 	auto &ssp = state.species[p_prop];
 
 	// Finds new events 	
-	auto tmin = model.details.t_start;
-	auto tmax = model.details.t_end;
+	double tmin = 0, tmax = model.details.T;
 	
 	vector < vector <Event> > ev_new, ev_old;
 	vector < vector <IncompNMTransRef> > incomp_ref_old, incomp_ref_new;
@@ -2538,17 +2543,17 @@ void Proposal::param_event_joint(Direction dir, State &state)
 							auto e_origin = ev.e_origin;
 							if(ev.type == M_TRANS_EV) e_origin = get_event_before(e,event);
 							
-							sh = (ev.t-ind.ev[e_origin].t)*(fac-1);
+							sh = (ev.tdiv-ind.ev[e_origin].tdiv)*(fac-1);
 							
-							ev.t += sh;
-							if(ev.t > tmax) illegal = true;
+							ev.tdiv += sh;
+							if(ev.tdiv > tmax) illegal = true;
 							cl_sel = ev.cl;
 						}
 					}
 					else{
 						if(ev.cl == cl_sel){
 							if(ev.observed) illegal = true;
-							ev.t += sh;
+							ev.tdiv += sh;
 						}
 					}
 				}
@@ -2570,19 +2575,19 @@ void Proposal::param_event_joint(Direction dir, State &state)
 							auto e_origin = ev.e_origin;
 							if(ev.type == M_TRANS_EV) e_origin = get_event_before(e,event);
 							
-							auto sh = (ev.t-ind.ev[e_origin].t)*(fac-1);
-							fac_squash = (tend-(ev.t+sh))/(tend-ev.t);
+							auto sh = (ev.tdiv-ind.ev[e_origin].tdiv)*(fac-1);
+							fac_squash = (tend-(ev.tdiv+sh))/(tend-ev.tdiv);
 							
 							if(fac_squash <= 0) illegal = true;
 				
-							ev.t += sh;
+							ev.tdiv += sh;
 							cl_sel = ev.cl;
 						}
 					}
 					else{
 						if(ev.cl == cl_sel){
 							if(ev.observed) illegal = true;
-							ev.t = tend-(tend-ev.t)*fac_squash;
+							ev.tdiv = tend-(tend-ev.tdiv)*fac_squash;
 							factor *= fac_squash;
 						}
 					}
@@ -2603,8 +2608,8 @@ void Proposal::param_event_joint(Direction dir, State &state)
 							auto e_origin = ev.e_origin;
 							if(ev.type == M_TRANS_EV) e_origin = get_event_before(e,event);
 							
-							auto t_ori = ind.ev[e_origin].t;
-							auto sh = (ev.t-t_ori)*(fac-1);
+							auto t_ori = ind.ev[e_origin].tdiv;
+							auto sh = (ev.tdiv-t_ori)*(fac-1);
 							fac_squash = (t_ori-tmin-sh)/(t_ori-tmin);
 							
 							if(fac_squash <= 0) illegal = true; 
@@ -2614,7 +2619,7 @@ void Proposal::param_event_joint(Direction dir, State &state)
 					}
 					else{
 						if(ev.cl == cl_sel){
-							ev.t = tmin+(ev.t-tmin)*fac_squash;
+							ev.tdiv = tmin+(ev.tdiv-tmin)*fac_squash;
 							factor *= fac_squash;
 						}
 					}
@@ -2622,7 +2627,7 @@ void Proposal::param_event_joint(Direction dir, State &state)
 			}
 			break;
 	
-		default: emsg("SHould not be here");
+		default: emsg("Should not be here");
 		}
 		
 		if(illegal) break;
@@ -3269,8 +3274,7 @@ void Proposal::switch_enter_source(State &state)
 	auto &ssp = state.species[p_prop];
 
 	const auto &det = sp.details;
-	auto t_start = det.t_start;
-	auto t_end = det.t_end;
+	double t_start = 0, t_end = det.T;
 	const auto tlim = t_start+0.05*(t_end-t_start);
 	
 	for(auto i = 0u; i < sp.nindividual_obs; i++){
@@ -3284,15 +3288,15 @@ void Proposal::switch_enter_source(State &state)
 			// Get the maximum time over which a swap could be done
 			auto tmax = tlim;
 			if(ev.size() > 1){
-				if(ev[1].t < tmax) tmax = ev[1].t; 
+				if(ev[1].tdiv < tmax) tmax = ev[1].tdiv; 
 			}
 			
 			if(indd.obs.size() > 0){
 				const auto &ob = indd.obs[0];
-				auto tma = ob.t;
+				auto tma = ob.tdiv;
 				if(indd.obs[0].not_alive){ // If there are not alive observation account for
 					auto trange = ssp.source_time_range(indd);
-					tma = trange.tmax;
+					tma = trange.tdivmax;
 				}
 				
 				if(tma < tmax) tmax = tma;
@@ -3315,14 +3319,12 @@ void Proposal::switch_enter_source(State &state)
 
 						IndInfFrom inf_from;
 						e_new = ssp.get_event(M_TRANS_EV,i,tr,UNSET,UNSET,tra.f,t,inf_from);
-						
-						if(event_near_div(t,model.details)) dprob = UNSET;
 					}
 				}
 				break;
 				
 			case M_TRANS_EV:  // Swiches from source to enter
-				if(e_init.observed == false && e_init.t < tmax){
+				if(e_init.observed == false && e_init.tdiv < tmax){
 					const auto &tra = sp.tra_gl[e_init.tr_gl];
 						
 					dprob = -log(tmax-t_start);
@@ -3349,36 +3351,34 @@ void Proposal::switch_enter_source(State &state)
 					cout << "event new:" << endl; ssp.print_event(ev_new);
 				}
 			
-				if(!events_near_div(ev_new,model.details)){
-					auto gc = state.update_tree(p_prop,i,ev_new);
-					if(gc.type == GENCHA_FAIL){
-						nfa++;
+				auto gc = state.update_tree(p_prop,i,ev_new);
+				if(gc.type == GENCHA_FAIL){
+					nfa++;
+				}
+				else{
+					auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+				
+					gc.update_like_ch(like_ch,dprob);
+					
+					auto al = calculate_al(like_ch,dprob);
+			
+					if(pl) print_like(like_ch);
+			
+					if(pl) cout << i << " " <<  al << " al" << endl;
+				
+					if(ran() < al){
+						if(pl) cout << " accept" << endl;
+						nac++;
+						state.add_like(like_ch);
+						state.gen_change_update(gc); 
+						if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 					}
-					else{
-						auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-					
-						gc.update_like_ch(like_ch,dprob);
-						
-						auto al = calculate_al(like_ch,dprob);
-				
-						if(pl) print_like(like_ch);
-				
-						if(pl) cout << i << " " <<  al << " al" << endl;
-					
-						if(ran() < al){
-							if(pl) cout << " accept" << endl;
-							nac++;
-							state.add_like(like_ch);
-							state.gen_change_update(gc); 
-							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
-						}
-						else{ 
-							if(pl) cout << "reject" << endl;
-							state.restore_back();
-						}
+					else{ 
+						if(pl) cout << "reject" << endl;
+						state.restore_back();
+					}
 
-						if(pl) state.check("ind prop");
-					}
+					if(pl) state.check("ind prop");
 				}
 			}
 		}
@@ -3395,8 +3395,7 @@ void Proposal::switch_leave_sink(State &state)
 	auto &ssp = state.species[p_prop];
 
 	const auto &det = sp.details;
-	auto t_start = det.t_start;
-	auto t_end = det.t_end;
+	double t_start = 0, t_end = det.T;
 	const auto tlim = t_end-0.05*(t_end-t_start);
 	
 	for(auto i = 0u; i < sp.nindividual_obs; i++){
@@ -3406,7 +3405,7 @@ void Proposal::switch_leave_sink(State &state)
 	
 		// Get the maximum time over which a swap could be done
 		auto tmin = tlim;
-		if(indd.tmax > tmin) tmin = indd.tmax;
+		if(indd.tdivmax > tmin) tmin = indd.tdivmax;
 		
 		vector <Event> ev_new;
 		
@@ -3415,8 +3414,8 @@ void Proposal::switch_leave_sink(State &state)
 		const auto &e_last = ev[ev.size()-1];
 		auto c = e_last.c_after;
 		if(c == UNSET){                 // Switches from sink to leave
-			if(!e_last.observed && e_last.t > tlim){		
-				auto tt = ev[ev.size()-2].t;
+			if(!e_last.observed && e_last.tdiv > tlim){		
+				auto tt = ev[ev.size()-2].tdiv;
 				if(tt > tmin) tmin = tt;
 		
 				dprob = -log(t_end-tmin);
@@ -3432,7 +3431,7 @@ void Proposal::switch_leave_sink(State &state)
 			
 			auto tr_gl = sp.cgl_tr_sink[c];
 			if(tr_gl != UNSET){
-				auto tt = e_last.t;
+				auto tt = e_last.tdiv;
 				if(tt > tmin) tmin = tt;
 			
 				if(tmin < t_end){
@@ -3449,7 +3448,7 @@ void Proposal::switch_leave_sink(State &state)
 			}
 		}
 		
-		if(dprob != UNSET && !events_near_div(ev_new,model.details)){
+		if(dprob != UNSET){
 			if(pl){
 				cout << endl << endl;
 				cout << ind.name << endl;
@@ -3510,9 +3509,9 @@ void Proposal::correct_obs_trans_events(State &state)
 			switch(ob.type){
 			case OBS_SINK_EV: case OBS_TRANS_EV:
 				{
-					auto t = ob.t;
-					while(e < ev.size() && ev[e].t < t) e++;
-					if(!(e < ev.size() && ev[e].t == t)){
+					auto t = ob.tdiv;
+					while(e < ev.size() && ev[e].tdiv < t) e++;
+					if(!(e < ev.size() && ev[e].tdiv == t)){
 						switch(ob.type){
 						case OBS_SINK_EV: enforce_add_sink(i,t,state); break;
 						case OBS_TRANS_EV: enforce_add_trans(i,ob,state); break;
@@ -3540,7 +3539,7 @@ void Proposal::enforce_add_sink(unsigned int i, double t, State &state)
 	vector <Event> ev_new;
 	auto e = 0u;
 	auto c = UNSET;
-	while(e < ev.size() && ev[e].t < t){
+	while(e < ev.size() && ev[e].tdiv < t){
 		ev_new.push_back(ev[e]);
 		c = ev[e].c_after;
 		e++;
@@ -3568,9 +3567,9 @@ void Proposal::enforce_add_trans(unsigned int i, const ObsData &ob, State &state
 	auto &ssp = state.species[p_prop];	
 	const auto &ev = ssp.individual[i].ev;
 	
-	auto t = ob.t;
+	auto t = ob.tdiv;
 	
-	auto e_mid = 0u; while(e_mid < ev.size() && ev[e_mid].t) e_mid++;
+	auto e_mid = 0u; while(e_mid < ev.size() && ev[e_mid].tdiv) e_mid++;
 
 	for(auto e = e_mid; e < ev.size(); e++){
 		if(try_move_obs_trans_event(i,e,t,ob,ev,state)) return;
@@ -3594,22 +3593,22 @@ bool Proposal::try_move_obs_trans_event(unsigned int i, unsigned int e, double t
 	
 	if(ssp.get_trans_obs_prob(trg,ob) == 0) return false; 
 	
-	if(eve.t > t){
+	if(eve.tdiv > t){
 		auto e_before = get_event_before(e,ev);
 		if(e_before != UNSET) 
-		if(ev[e_before].t > t) return false;
+		if(ev[e_before].tdiv > t) return false;
 	}
 	else{
 		auto e_after = get_event_after(e,ev);
 		if(e_after != UNSET) 
-		if(ev[e_after].t < t) return false;
+		if(ev[e_after].tdiv < t) return false;
 	}
 	
 	auto ev_new = ev;
 						
 	ssp.move_event(ev_new,e,t);
 		
-	auto ee = 0u; while(ee < ev_new.size() && ev_new[ee].t < t) ee++;
+	auto ee = 0u; while(ee < ev_new.size() && ev_new[ee].tdiv < t) ee++;
 	if(ee == ev_new.size()) emsg("Proble with ev new");
 	ev_new[ee].observed = true;	
 	
@@ -3662,24 +3661,46 @@ void Proposal::update(State &state)
 	
 	timer[PROP_TIMER] -= clock();
 	switch(type){
-	case TRANS_TREE_PROP: trans_tree(state); break;
-	case TRANS_TREE_SWAP_INF_PROP: trans_tree_swap_inf(state); break;
-	case TRANS_TREE_MUT_PROP: trans_tree_mut(state); break;
-	case TRANS_TREE_MUT_LOCAL_PROP: trans_tree_mut_local(state); break;
+	case TRANS_TREE_PROP: 
+		trans_tree(state); 
+		break;
+	case TRANS_TREE_SWAP_INF_PROP: 
+		trans_tree_swap_inf(state);
+		break;
+	case TRANS_TREE_MUT_PROP: 
+		trans_tree_mut(state); 
+		break;
+	case TRANS_TREE_MUT_LOCAL_PROP: 
+		trans_tree_mut_local(state); 
+		break;
 	case PARAM_PROP: MH(state); break;
 	case PAR_EVENT_FORWARD_PROP: param_event_joint(FORWARD,state); break;
 	case PAR_EVENT_FORWARD_SQ_PROP: param_event_joint(FORWARD_SQ,state); break;
 	case PAR_EVENT_BACKWARD_SQ_PROP: param_event_joint(BACKWARD_SQ,state); break;
-	case IND_EVENT_TIME_PROP: MH_event(state); break;
-	case IND_MULTI_EVENT_PROP: MH_multi_event(state); break;
-	case IND_EVENT_ALL_PROP: MH_event_all(state); break;
+	case IND_EVENT_TIME_PROP: 
+		MH_event(state); 
+		break;
+	case IND_MULTI_EVENT_PROP: 
+		MH_multi_event(state); 
+		break;
+	case IND_EVENT_ALL_PROP: 
+		MH_event_all(state); 
+		break;
 	case IND_OBS_SWITCH_ENTER_SOURCE_PROP: switch_enter_source(state); break;
 	case IND_OBS_SWITCH_LEAVE_SINK_PROP: switch_leave_sink(state); break;
 	case CORRECT_OBS_TRANS_PROP: correct_obs_trans_events(state); break;
-	case IND_LOCAL_PROP: MH_ind_local(state); break;
-	case IND_OBS_SAMP_PROP: sample_ind_obs(state); break;
-	case IND_OBS_RESIM_PROP: resimulate_ind_obs(state); break;
-	case IND_OBS_RESIM_SINGLE_PROP: resimulate_single_ind_obs(state); break;
+	case IND_LOCAL_PROP: 
+		MH_ind_local(state); 
+		break;
+	case IND_OBS_SAMP_PROP:
+		sample_ind_obs(state);
+		break;
+	case IND_OBS_RESIM_PROP: 
+		resimulate_ind_obs(state); 
+		break;
+	case IND_OBS_RESIM_SINGLE_PROP: 
+		resimulate_single_ind_obs(state);
+		break;
 	case IND_UNOBS_RESIM_PROP: resimulate_ind_unobs(state); break;
 	case IND_ADD_REM_PROP: add_rem_ind(state); break;
 	case IND_ADD_REM_TT_PROP: add_rem_tt_ind(state); break;

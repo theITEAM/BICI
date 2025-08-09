@@ -218,7 +218,7 @@ class Input                                // Stores information about the model
 		void add_genetic_data();
 		void set_contains_source_sink();
 		void create_trig_ev_ref();
-		bool trig_ev_exist(TrigEventType type, double t, const vector <TrigEventRef> &trig_event) const;
+		bool trig_ev_exist(TrigEventType type, double tdiv, const vector <TrigEventRef> &trig_event) const;
 		void create_cl_trig_ev_ref();
 		void set_joint_param_event();
 		void set_local_ind_init();

@@ -36,6 +36,8 @@ Chain::Chain(unsigned int nburnin_, unsigned int nsample_, const Model &model, O
 /// Initialises chain
 void Chain::init(unsigned int ch, unsigned int ch_max)
 {
+	print_diag(" update_init");
+		
 	update_init();
 	
 	auto Lmax = -LARGE;
@@ -58,7 +60,6 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 			model.print_param(param_val);
 		}
 		//output.print_param(param_val);
-	
 		
 		print_diag("simulate");
 		
@@ -104,7 +105,7 @@ void Chain::burn_update(unsigned int s)
 	if(burn_info.on){
 		state.dif_thresh = DIF_THRESH_BURNIN;
 		
-		cor_matrix.add_sample(state.get_param_val_prop(),cor_matrix.n/3);
+		cor_matrix.add_sample(state.get_param_val_prop(),cor_matrix.n*0.33);
 	
 		if(s%10 == 0){
 			state.update_individual_sampler();
@@ -124,8 +125,9 @@ void Chain::burn_update(unsigned int s)
 /// Iterates chain
 void Chain::pas_burn_update(unsigned int s, unsigned int g, unsigned int gen_update, double phi)
 {
-	burn_info.pas_setup(s,g,gen_update,phi);
 	burn_info.add_L(like_total_obs()); 
+	
+	burn_info.pas_setup(s,g,gen_update,phi);
 	
 	cor_matrix.add_sample(state.get_param_val_prop(),gen_update);
 
@@ -137,6 +139,30 @@ void Chain::pas_burn_update(unsigned int s, unsigned int g, unsigned int gen_upd
 	if(s != 0 && s%burn_info.prop_join_step == 0) check_join_proposal();
 
 	if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
+}
+
+
+/// Iterates chain
+void Chain::pas_burn_update_run(unsigned int s)
+{
+	burn_info.add_L(like_total_obs()); 
+	
+	burn_info.pas_setup_run(s,nburnin,nsample,model.details);
+	
+	if(burn_info.on){
+		cor_matrix.add_sample(state.get_param_val_prop(),cor_matrix.n*0.33);
+	
+		if(s%10 == 0){
+			state.update_individual_sampler();
+			for(auto &pro : proposal) pro.update_sampler(cor_matrix);
+		}
+		
+		if(s != 0 && s%burn_info.prop_join_step == 0) check_join_proposal();
+
+		if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
+	}
+	
+	state.dif_thresh = DIF_THRESH;
 }
 
 
@@ -362,6 +388,20 @@ void BurnInfo::pas_setup(unsigned int s, unsigned int g, unsigned int gen_update
 }
 
 
+/// Sets up quantities during the burn-in phase
+void BurnInfo::pas_setup_run(unsigned int s, unsigned int &nburnin,  unsigned int &nsample, const Details &details)
+{
+	phi = 1;
+	dprob_suppress = false;
+	
+	fac = 1;
+	if(s < nburnin) on = true; 
+	else on = false;
+	
+	set_phi();
+}
+
+
 /// Sets inverse temperatures based on global value phi
 void BurnInfo::set_phi()
 {
@@ -423,18 +463,31 @@ void Chain::update(unsigned int s)
 	for(auto &pro : proposal){ 
 		if(pro.on){
 			if(pl) cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
-				
+			//cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
+			
 			if(true){
 				pro.update(state);
 			}
 			else{
+				/*
+				IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, IE_VAR_CV_PROP, TRANS_TREE_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, 
+				IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP, IND_OBS_SWITCH_LEAVE_SINK_PROP 
+				 */
 				switch(pro.type){
-				//case IND_EVENT_TIME_PROP:
+				case IND_ADD_REM_PROP:
+				//case IND_EVENT_TIME_PROP:   
+				//case IND_MULTI_EVENT_PROP:
+				//case IND_EVENT_ALL_PROP:
+				//case IND_OBS_SAMP_PROP:
+				//case IND_OBS_RESIM_PROP: 
+				//case IND_OBS_RESIM_SINGLE_PROP:
+				//case IND_UNOBS_RESIM_PROP:
 				//case IND_LOCAL_PROP:
+				
 				//case PAR_EVENT_FORWARD_PROP:
 				//case PAR_EVENT_FORWARD_SQ_PROP:
 				//case PAR_EVENT_BACKWARD_SQ_PROP:
-				case IND_ADD_REM_PROP:
+				//case IND_ADD_REM_PROP:
 				//case IND_OBS_SWITCH_LEAVE_SINK_PROP:
 				//case IND_OBS_SWITCH_ENTER_SOURCE_PROP:
 					pro.update(state);
@@ -1159,9 +1212,12 @@ void Chain::check_join_proposal()
 
 	if(pl) print_matrix("mat",M);
 	
-	auto f = exp(-(cor_matrix.get_n()/400.0));
+	auto n = cor_matrix.get_n();
+	auto f = exp(-(n/400.0));
+		
 	auto thresh = f + (1-f)*PROP_JOIN_COR_MIN;
-
+	if(n < 50) thresh = LARGE;
+	
 	// Works out all multivariate proposals
 	vector < vector <unsigned int> > par_list;
 	for(auto i = 0u; i < model.nparam_vec_prop; i++){	
@@ -1203,7 +1259,7 @@ void Chain::check_join_proposal()
 		}
 	}
 	
-	// Switch on those which are is list
+	// Switch on those which are in list
 	vector <unsigned int> add;
 	for(auto j = 0u; j < par_list.size(); j++){
 		auto fl = false;
@@ -1266,56 +1322,6 @@ unsigned int Chain::find_which_list(unsigned int j, const vector < vector <unsig
 	
 	return UNSET;
 }
-
-/*
-/// Joins proposals parameters th1 and th2
-void Chain::join_proposal(unsigned int th1, unsigned int th2) 
-{
-	if(!model.param_vec[th1].prop_pos) return;
-	if(!model.param_vec[th2].prop_pos) return;
-	
-	auto th1_p = UNSET, th2_p = UNSET; 
-	for(auto p = 0u; p < proposal.size(); p++){
-		const auto &prop = proposal[p];
-		if(prop.type == PARAM_PROP){
-			if(find_in(prop.param_list,th1) != UNSET) th1_p = p;
-			if(find_in(prop.param_list,th2) != UNSET) th2_p = p;
-		}
-	}
-	if(th1_p == UNSET || th2_p == UNSET) emsg("th unset");
-				
-	if(th1_p == th2_p) return;
-	
-	auto &prop1 = proposal[th1_p]; 
-	auto &prop2 = proposal[th2_p];
-	
-	const auto &plist1 = prop1.param_list;
-	const auto &plist2 = prop2.param_list;
-	
-	// Switches off existing proposals (if they have more than one variable)
-	for(auto &prop : proposal){
-		if(prop.type == PARAM_PROP || prop.type == MBP_PROP){
-			auto si_lim = 1u; if(prop.type == MBP_PROP) si_lim = 0;
-			if(plist1.size() > si_lim && equal_vec(prop.param_list,plist1)) prop.on = false;
-			if(plist2.size() > si_lim && equal_vec(prop.param_list,plist2)) prop.on = false;
-		}
-	}
-	
-	auto param_list = combine(plist1,plist2);
-	
-	auto j_st = proposal.size();
-	
-	add_parameter_prop(param_list);
-	
-	for(auto j = j_st; j < proposal.size(); j++){
-		auto &prop = proposal[j];
-		cout << "JOIN ADD: " << prop.name << endl;
-		prop.update_sampler(cor_matrix);
-		
-		prop.calculate_affect_spline(); 
-	}
-}
-*/
 
 
 /// Check correlation matrix is specified correctly

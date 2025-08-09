@@ -69,10 +69,6 @@ vector <unsigned int>  StateSpecies::update_ind(unsigned int i, vector <Event> &
 	auto e_new = 0u;
 	auto e_new_max = ev_new.size();
 	
-	auto t_start = details.t_start;
-	auto t_end = details.t_end;
-	auto dt = details.dt;
-
 	auto m = 0u; // Indexes observations
 	auto k = 0u; // Indexes pop_data
 	
@@ -86,30 +82,29 @@ vector <unsigned int>  StateSpecies::update_ind(unsigned int i, vector <Event> &
 	
 	double t_old, t_new;
 	
-	auto t = t_start;
+	auto t = 0.0;
 	auto ti = 0u; 
 	do{
-		if(e_old < e_old_max) t_old = ev_old[e_old].t; else t_old = t_end;
-		if(e_new < e_new_max) t_new = ev_new[e_new].t; else t_new = t_end;
+		if(e_old < e_old_max) t_old = ev_old[e_old].tdiv; else t_old = T;
+		if(e_new < e_new_max) t_new = ev_new[e_new].tdiv; else t_new = T;
 		
 		auto t_next = t_old; if(t_new < t_next) t_next = t_new;
 		
-		auto ti_next = (unsigned int)(ALMOST_ONE+((t_next-t_start)/dt));
-		if(ti_next > T) ti_next = T;
+		auto ti_next = get_ti_next(t_next,details);
 	
-		while(k < popd.size() && popd[k].t <= t_next){   // Accounts for population data
+		while(k < popd.size() && popd[k].tdiv <= t_next){   // Accounts for population data
 			if(c_new != c_old) dLi_obs += update_pop_data(k,c_old,c_new);
 			k++;
 		}
 
-		while(m < obs.size() && obs[m].t <= t_next){
+		while(m < obs.size() && obs[m].tdiv <= t_next){
 			const auto &ob = obs[m];
 			
 			switch(ob.type){
 			case OBS_TRANS_EV:                              // Checks to see if agrees with observation
 			case OBS_SOURCE_EV:
 			case OBS_SINK_EV:  
-				if(obs[m].t == t_next){
+				if(obs[m].tdiv == t_next){
 					if(t_old != t_new){
 						if(t_next == t_new) dLi_obs_ind -= LI_WRONG;
 						else dLi_obs_ind += LI_WRONG;
@@ -174,7 +169,7 @@ vector <unsigned int>  StateSpecies::update_ind(unsigned int i, vector <Event> &
 			if(c_new != UNSET) update_indfac_int(c_new,t,t_next,ind,1,like_ch.markov);
 		}
 		
-		if(t_next == t_end) break;
+		if(t_next == T) break;
 		
 		t = t_next; ti = ti_next;
 		
@@ -198,7 +193,7 @@ vector <unsigned int>  StateSpecies::update_ind(unsigned int i, vector <Event> &
 				
 			case NM_TRANS_EV:	
 				if(eve_new.type == NM_TRANS_EV && eve_old.m == eve_new.m){
-					if(ev_old[eve_old.e_origin].t == ev_new[eve_new.e_origin].t){
+					if(ev_old[eve_old.e_origin].tdiv == ev_new[eve_new.e_origin].tdiv){
 						identical = true;
 						
 						eve_new.index = eve_old.index;
@@ -343,7 +338,7 @@ void StateSpecies::set_m_ti_origin(vector <Event> &ev_new) const
 					const auto &tra = sp.tra_gl[ev.tr_gl];
 					auto m = tra.markov_eqn_ref;
 					ev.m = m;
-					if(sp.markov_eqn[m].time_vari) ev.ti = get_ti(ev.t);
+					if(sp.markov_eqn[m].time_vari) ev.ti = get_ti(ev.tdiv);
 					else ev.ti = 0;
 					e_vec[tra.cl] = e;
 				}
@@ -358,12 +353,12 @@ void StateSpecies::set_m_ti_origin(vector <Event> &ev_new) const
 					ev.e_origin = e_vec[cl];
 					const auto &ev_orig = ev_new[ev.e_origin];
 					
-					ev.ti = get_ti(ev_orig.t);
+					ev.ti = get_ti(ev_orig.tdiv);
 					e_vec[cl] = e;
 					
 					if(tra.i != ev_orig.c_after){             // Accounts for intermediate transition
 						tr = sp.tr_trans(tr,ev_orig.c_after);
-						if(tr == UNSET) emsg("trg unset");
+						if(tr == UNSET) emsg("trg unset2");
 						ev.m = sp.tra_gl[tr].nm_trans_ref;
 					}
 					else ev.m = tra.nm_trans_ref;
@@ -382,7 +377,7 @@ void StateSpecies::set_m_ti_origin(vector <Event> &ev_new) const
 			if(ev.type == M_TRANS_EV){
 				auto m = sp.tra_gl[ev.tr_gl].markov_eqn_ref;
 				ev.m = m;
-				if(sp.markov_eqn[m].time_vari) ev.ti = get_ti(ev.t);
+				if(sp.markov_eqn[m].time_vari) ev.ti = get_ti(ev.tdiv);
 				else ev.ti = 0;
 				ev.index = UNSET;
 			}
@@ -413,7 +408,7 @@ void StateSpecies::remove_event(Event &ev, const Individual &ind, Like &like_ch,
 				}
 				else{
 					auto index = eref.e_end;
-					if(event_old[index].t > ev.t){	
+					if(event_old[index].tdiv > ev.tdiv){	
 						event_old[index].index = nmt_ind;
 					}
 					else{
@@ -446,7 +441,7 @@ void StateSpecies::remove_event(Event &ev, const Individual &ind, Like &like_ch,
 				}
 				else{
 					auto index = it_shift.index;
-					if(event_old[index].t > ev.t){	
+					if(event_old[index].tdiv > ev.tdiv){	
 						event_old[index].index = k;
 					}
 					else{
@@ -468,7 +463,7 @@ void StateSpecies::remove_event(Event &ev, const Individual &ind, Like &like_ch,
 				double va;
 				switch(p){
 				case OUTSIDE_INF: va = eq.calculate_calculation(lin.no_pop_calc,ti,param_val,spline_val); break;
-				case ENTER_INF: va = UNSET; emsg("SHould not be ENTER_INF"); break;
+				case ENTER_INF: va = UNSET; emsg("Should not be ENTER_INF"); break;
 				default: va = eq.calculate_calculation(lin.pop_grad_calc[iif.pref],ti,param_val,spline_val); break;
 				}
 				
@@ -496,22 +491,25 @@ void StateSpecies::remove_event(Event &ev, const Individual &ind, Like &like_ch,
 
 
 /// Adds event from individual to reference (either 
-void StateSpecies::add_event_ref(unsigned int i, unsigned int ee,  const vector < vector <double> > &popnum_t, Like &like_ch)
+void StateSpecies::add_event_ref(unsigned int i, unsigned int ee, const vector < vector <double> > &popnum_t, Like &like_ch)
 {
 	auto &ind = individual[i];
 	auto &event = ind.ev;
 	auto &ev = event[ee];
+	auto dt = details.dt;
 	
 	switch(ev.type){
 	case NM_TRANS_EV:
 		{
 			const auto &ev_orig = event[ev.e_origin];
-			auto t = ev_orig.t;		
+			auto t = ev_orig.tdiv;		
 			auto ti = ev.ti;
 			auto m = ev.m;
-			auto dt = ev.t - t; 
-			if(dt <= 0) emsg("zero time1");
+			auto dtdiv = ev.tdiv - t; 
 			
+			if(dtdiv <= 0){
+				emsg("zero time1");
+			}
 			const auto &tra = sp.tra_gl[ev.tr_gl];	
 			const auto &nmt = sp.nm_trans[m];
 			const auto &ref = nmt.dist_param_eq_ref;
@@ -527,7 +525,7 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee,  const vector 
 				}			
 			}
 					 
-			auto dLi = nm_trans_like(nmt.type,dt,ref_val);
+			auto dLi = nm_trans_like(nmt.type,dtdiv,dt,ref_val);
 			
 			auto dLi_bp = 0.0;
 			if(tra.branch){                               // Accounts for branching probability 
@@ -600,7 +598,7 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee,  const vector 
 					va = eq.calculate_calculation(lin.no_pop_calc,ti,param_val,spline_val);
 					break;
 				case ENTER_INF:
-					va = UNSET; emsg("SHould not be ENTER_INFa"); 
+					va = UNSET; emsg("Should not be ENTER_INFa"); 
 					break;
 				default: 
 					va = eq.calculate_calculation(lin.pop_grad_calc[iif.pref],ti,param_val,spline_val); 
@@ -608,11 +606,11 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee,  const vector 
 				}
 				
 				if(me.ind_variation) va *= get_indfac(ind,me);
+				va *= dt;
 				Li = log(va*iif.w);
 			}
 			else{
-				auto val = markov_eqn_vari[e].div[ti].value;
-			
+				auto val = markov_eqn_vari[e].div[ti].value;	
 				if(me.ind_variation) Li = log(get_indfac(ind,me)*(val+LOG_THRESH));
 				else Li = log(val+LOG_THRESH);
 			}
@@ -777,7 +775,7 @@ void StateSpecies::set_e_origin(Event &ev, unsigned int e, const vector <Event> 
 	ev.e_origin = e_bef;
 	
 	const auto &ev_orig = event[e_bef];
-	ev.ti = get_ti(ev_orig.t);
+	ev.ti = get_ti(ev_orig.tdiv);
 	
 	ev.m = sp.get_tra_m(ev.tr_gl,ev_orig);
 }
@@ -810,13 +808,14 @@ void StateSpecies::set_incomp_ref(unsigned int i, const vector < vector <double>
 	
 	auto el = ev.size()-1;
 	
-	auto t_end = details.t_end;
+	double t_end = details.T;
+	auto dt = details.dt;
 	
 	// Finds a list of classification which need incomplete likelihoods
 	auto c_last = ev[el].c_after;
 	
 	if(c_last == UNSET){
-		t_end = ev[el].t;
+		t_end = ev[el].tdiv;
 		el--; 
 		c_last = ev[el].c_after;
 	}
@@ -838,27 +837,27 @@ void StateSpecies::set_incomp_ref(unsigned int i, const vector < vector <double>
 			auto c = eve.c_after;
 			
 			auto n = sp.comp_gl[c].nmtransincomp_ref[cl];
-			if(n == UNSET) emsg("SHould not be unset");
+			if(n == UNSET) emsg("Should not be unset");
 		
-			auto t = eve.t;
+			auto t = eve.tdiv;
 			
 			auto ti = get_ti(t);
 	
-			auto dt = t_end - t; 
-			if(dt <= 0){
+			auto dtdiv = t_end - t; 
+			if(dtdiv <= 0){
 				emsg("zero time2");
 			}
 			
-			if(!(inm.on && inm.n == n && inm.ti == ti && inm.dt == dt && inm.e_begin == e && inm.t_end == t_end)){
+			if(!(inm.on && inm.n == n && inm.ti == ti && inm.dtdiv == dtdiv && inm.e_begin == e && inm.tdiv_end == t_end)){
 				if(inm.on){ 
 					like_ch -= inm.Li;
 					incomp_turn_off(inm);
 				}
-				incomp_turn_on(i,n,ti,dt,e,t_end,inm); 
+				incomp_turn_on(i,n,ti,dtdiv,e,t_end,inm); 
 				
 				const auto &nmt = sp.nm_trans_incomp[n];
 				auto val = get_nm_incomp_val(nmt,ti,ind,popnum_t);
-				inm.Li = nm_trans_incomp_full_like(nmt.nmtrans_ref,dt,val.ref_val,val.bp_val);
+				inm.Li = nm_trans_incomp_full_like(nmt.nmtrans_ref,dtdiv,dt,val.ref_val,val.bp_val);
 				like_ch += inm.Li;
 			}
 		}
@@ -880,12 +879,12 @@ void StateSpecies::adjust_incomp_ref(vector <IncompNMTransRef> &inmtr, const vec
 {
 	auto el = ev.size()-1;
 	
-	auto t_end = details.t_end;
+	double t_end = T;
 	
 	// Finds a list of classification which need incomplete likelihoods
 	auto c_last = ev[el].c_after;
 	if(c_last == UNSET){
-		t_end = ev[el].t;
+		t_end = ev[el].tdiv;
 		el--; 
 		c_last = ev[el].c_after;
 	}
@@ -905,17 +904,17 @@ void StateSpecies::adjust_incomp_ref(vector <IncompNMTransRef> &inmtr, const vec
 			auto c = eve.c_after;
 			
 			auto n = sp.comp_gl[c].nmtransincomp_ref[cl];
-			if(n == UNSET) emsg("SHould not be unset");
+			if(n == UNSET) emsg("Should not be unset");
 		
-			auto t = eve.t;
+			auto t = eve.tdiv;
 			
-			auto dt = t_end - t; if(dt <= 0) emsg("zero time3");
+			auto dtdiv = t_end - t; if(dtdiv <= 0) emsg("zero time3");
 		
-			inm.dt = dt;
+			inm.dtdiv = dtdiv;
 			inm.e_begin = e;
 			inm.n = n;
 			inm.ti = get_ti(t);
-			inm.t_end = t_end;
+			inm.tdiv_end = t_end;
 		}
 	}
 }
@@ -961,13 +960,13 @@ void StateSpecies::setup_nm_trans(const vector < vector <double> > &popnum_t)
 
 
 /// Turns on a reference in nm_trans_incomp_ref 
-void StateSpecies::incomp_turn_on(unsigned int i, unsigned int n, unsigned int ti, double dt, unsigned int e_begin, double t_end, IncompNMTransRef &inm)
+void StateSpecies::incomp_turn_on(unsigned int i, unsigned int n, unsigned int ti, double dtdiv, unsigned int e_begin, double t_end, IncompNMTransRef &inm)
 {   
 	inm.n = n;
 	inm.ti = ti;
-	inm.dt = dt;
+	inm.dtdiv = dtdiv;
 	inm.e_begin = e_begin;
-	inm.t_end = t_end;		
+	inm.tdiv_end = t_end;		
 			
 	auto &nmtr = nm_trans_incomp_ref[n][ti];
 	inm.index = nmtr.size();
@@ -1182,6 +1181,8 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 {
 	if(type != INDIVIDUAL) emsg("must be ind");
 	
+	const auto dt = details.dt;
+	
 	const auto &me = sp.markov_eqn[ee];
 	auto &me_vari = markov_eqn_vari[ee];
 
@@ -1213,7 +1214,7 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 		for(const auto &po_ch : pop_change){
 			auto pr = lin.get_pop_ref(po_ch.po);
 			if(pr != UNSET){
-				auto va = eq.calculate_calculation_notime(lin.pop_grad_calc[pr],param_val);
+				auto va = dt*eq.calculate_calculation_notime(lin.pop_grad_calc[pr],param_val);
 				diff += va*po_ch.num;
 			}
 		}
@@ -1237,7 +1238,7 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 	
 		switch(type){
 		case RECALC:
-			value = eq.calculate(tii,popnum_t[tii],param_val,spline_val);	
+			value = dt*eq.calculate(tii,popnum_t[tii],param_val,spline_val);	
 			break;
 			
 		case USE_POP_DIF:
@@ -1247,14 +1248,16 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 		case USE_POP_DIF_TIME:
 			{
 				value = val_old;
+				auto sum = 0.0;
 				for(auto k = 0u; k < pop_change.size(); k++){
 					auto pr = pr_store[k];
 					if(pr != UNSET){
 						const auto &po_ch = pop_change[k];
 						auto va = eq.calculate_calculation(lin.pop_grad_calc[pr],tii,param_val,spline_val);
-						value += va*po_ch.num;
+						sum += va*po_ch.num;
 					}
 				}
+				value += dt*sum;
 			
 				if(false){
 					auto val_ch = eq.calculate(tii,popnum_t[tii],param_val,spline_val);
@@ -1387,9 +1390,9 @@ void StateSpecies::restore_back()
 			const auto &inm_st = inm_st_list[cl];
 			
 			if(inm_st.on){
-				if(!(inm.on && inm.n == inm_st.n && inm.ti == inm_st.ti && inm.dt == inm_st.dt && inm.e_begin == inm_st.e_begin && inm.t_end == inm_st.t_end)){
+				if(!(inm.on && inm.n == inm_st.n && inm.ti == inm_st.ti && inm.dtdiv == inm_st.dtdiv && inm.e_begin == inm_st.e_begin && inm.tdiv_end == inm_st.tdiv_end)){
 					if(inm.on) incomp_turn_off(inm);
-					incomp_turn_on(ba_ind.i,inm_st.n,inm_st.ti,inm_st.dt,inm_st.e_begin,inm_st.t_end,inm); 
+					incomp_turn_on(ba_ind.i,inm_st.n,inm_st.ti,inm_st.dtdiv,inm_st.e_begin,inm_st.tdiv_end,inm); 
 					inm.Li = inm_st.Li;
 				}
 			}

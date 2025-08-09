@@ -124,7 +124,7 @@ class Equation                             // Stores information about the model
 		
 		Linearise linearise;                   // Used for accelerated likelihood calculation
 		
-		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, vector <Spline> &spline, vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, const vector <double> &timepoint);
+		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, vector <Spline> &spline, vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, const vector <double> &timepoint, const Details &details);
 		double calculate_param_only(const vector <double> &param_val) const;
 		double calculate_param_only_ti_fix(const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
 		double calculate_no_popnum(unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const; 
@@ -187,7 +187,7 @@ class Equation                             // Stores information about the model
 		void extract_ind_eff();
 		void extract_fix_eff();
 		CompRef find_comp_from_name(unsigned int p, string te) const;
-		void replace_reg(const vector <EqItem> &reg_replace, vector <Calculation> &calc, const vector <bool> &calc_on);
+		void replace_reg(const vector <EqItem> &reg_replace, vector <Calculation> &calc, const vector <bool> &calc_on, bool pl);
 		void setup_comp_pref_convert();
 		void check();
 		void check_opl(const vector <EqItemList> &opl) const;
@@ -212,6 +212,7 @@ class Equation                             // Stores information about the model
 		vector <Population> &pop;            // References the populations from the model
 		Hash &hash_pop;                      // Hash table for pop
 		const vector <double> &timepoint;    // References time points
+		const Details &details;              // Details
 		
 	// In equation_linearise.cc
 	public:
@@ -227,8 +228,8 @@ class Equation                             // Stores information about the model
 		void calc_div(vector <Calculation> &calc, const vector <Calculation> &calc2) const;
 		void print_linear_calc(string te, const LinearCalculation &lin) const;
 		void print_calc(string st, const vector <Calculation> &calc) const;
-		void single_param_func(Calculation ca, LinearCalculation &lin, const vector <LinearCalculation> &lin_calc) const;
-		void two_param_func(Calculation ca, LinearCalculation &lin, const vector <LinearCalculation> &lin_calc) const;
+		bool single_param_func(Calculation ca, LinearCalculation &lin, const vector <LinearCalculation> &lin_calc) const;
+		bool two_param_func(Calculation ca, LinearCalculation &lin, const vector <LinearCalculation> &lin_calc) const;
 		double calculate_calculation(const vector <Calculation> &calc, unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
 		double calculate_calculation_spline_store(const vector <Calculation> &calc, unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
 		bool calc_time_dep(const vector <Calculation> &calc) const;

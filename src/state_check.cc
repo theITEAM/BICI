@@ -52,7 +52,7 @@ void State::check_simp(string ref)
 					
 						const auto &mev = ssp.markov_eqn_vari[tra.markov_eqn_ref];
 						if(mev.time_vari){
-							if(ev.ti != ssp.get_ti(ev.t)) emsg("ti wrong1");
+							if(ev.ti != get_ti(ev.tdiv)) emsg("ti wrong1");
 						}
 						else{
 							if(ev.ti != 0) emsg("ti wrong2");
@@ -72,12 +72,12 @@ void State::check_simp(string ref)
 						}
 						
 						const auto &ev_orig = ind.ev[e_bef];
-	
+
 						if(ev.m != sp.get_tra_m(ev.tr_gl,ev_orig)){
 							emsg("NMarkov equation not correct2"+ref);
 						}
 						
-						if(ev.ti != ssp.get_ti(ev_orig.t)){
+						if(ev.ti != get_ti(ev_orig.tdiv)){
 							emsg("ti wrong3"+ref);
 						}
 					
@@ -121,8 +121,6 @@ void State::check(string ref)
 	timer[CHECK_TIMER] -= clock();
 
 	check_trans_num(ref);
-
-	check_event_boundary(ref);
 
 	check_effect_out_of_range();
 
@@ -202,6 +200,7 @@ void State::check_ref(unsigned int p, string refst)
 {
 	const auto &sp = model.species[p];
 	auto &ssp = species[p];
+	auto dt = model.details.dt;
 	
 	// Checks that event references are all correct
 	for(auto i = 0u; i < ssp.individual.size(); i++){
@@ -217,12 +216,13 @@ void State::check_ref(unsigned int p, string refst)
 				}
 				
 				const auto &ev_orig = ind.ev[ev.e_origin];
+				
 				auto m = sp.get_tra_m(ev.tr_gl,ev_orig);
 	
 				if(m != ev.m) emsg("m is not right");
 				
-				auto t = ind.ev[ev.e_origin].t;		
-				auto ti = sp.get_ti(t);
+				auto t = ind.ev[ev.e_origin].tdiv;		
+				auto ti = get_ti(t);
 				if(ti != ev.ti){
 					emsg("ti is not right");
 				}
@@ -233,9 +233,9 @@ void State::check_ref(unsigned int p, string refst)
 			if(ev.type == NM_TRANS_EV){
 				const auto &ev_orig = ind.ev[ev.e_origin];
 				
-				auto t = ev_orig.t;
+				auto t = ev_orig.tdiv;
 			
-				auto ti = sp.get_ti(t);
+				auto ti = get_ti(t);
 		
 				auto tr = ev.tr_gl;
 				const auto &tra = sp.tra_gl[tr];
@@ -269,9 +269,9 @@ void State::check_ref(unsigned int p, string refst)
 					ref_val[i] = model.eqn[ref[i]].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
 				}
 				
-				auto dt = ev.t - t;				
+				auto dtdiv = ev.tdiv - t;				
 				
-				if(dif(ev.Li,nm_trans_like(nmt.type,dt,ref_val),dif_thresh)){
+				if(dif(ev.Li,nm_trans_like(nmt.type,dtdiv,dt,ref_val),dif_thresh)){
 					add_alg_warn("nm like not agree"+refst);
 				}
 				
@@ -321,11 +321,11 @@ void State::check_ref(unsigned int p, string refst)
 						emsg("i does not agree "+refst);
 					}
 				
-					auto dt = inmtr.t_end - ind.ev[inmtr.e_begin].t; if(dt <= 0) emsg("zero time3");
+					auto dtdiv = inmtr.tdiv_end - ind.ev[inmtr.e_begin].tdiv; if(dtdiv <= 0) emsg("zero time3");
 				
 					auto val = ssp.get_nm_incomp_val(nmt,inmtr.ti,ind,popnum_t);
 
-					auto Li_new = ssp.nm_trans_incomp_full_like(nmt.nmtrans_ref,dt,val.ref_val,val.bp_val);
+					auto Li_new = ssp.nm_trans_incomp_full_like(nmt.nmtrans_ref,dtdiv,dt,val.ref_val,val.bp_val);
 					if(dif(Li_new,inmtr.Li,dif_thresh)){
 						add_alg_warn("Li nm_trans_incomp does not agree");
 					}			
@@ -348,7 +348,7 @@ void State::check_ref(unsigned int p, string refst)
 					if(it1.ti != it2.ti){
 						emsg("ti not right");
 					}
-					if(dif(it1.dt,it2.dt,dif_thresh)){
+					if(dif(it1.dtdiv,it2.dtdiv,dif_thresh)){
 						emsg("dt not right");
 					}
 					
@@ -383,7 +383,7 @@ void State::check_ref(unsigned int p, string refst)
 				
 				switch(ev.type){
 				case ENTER_EV: 
-					if(c != UNSET) emsg("SHould start unset");
+					if(c != UNSET) emsg("Should start unset");
 					c = ev.c_after;
 					if(ev.cl != UNSET) emsg("ev cl should be unset");
 					break;
@@ -412,7 +412,7 @@ void State::check_ref(unsigned int p, string refst)
 					break;
 				}
 				
-				if(c != ev.c_after) emsg("SHould be c_after");
+				if(c != ev.c_after) emsg("Should be c_after");
 			}
 		}
 	}
@@ -423,7 +423,7 @@ void State::check_ref(unsigned int p, string refst)
 
 		if(ind.ev.size() > 0){
 			for(auto k = 0u; k < ind.ev.size()-1; k++){
-				if(ind.ev[k].t > ind.ev[k+1].t) emsg("time ordering problem"+refst);
+				if(ind.ev[k].tdiv > ind.ev[k+1].tdiv) emsg("time ordering problem"+refst);
 			}
 		}
 	}
@@ -457,7 +457,7 @@ void State::check_markov_trans(unsigned int p, string ref)
 					if(ev.e_origin != e_bef) emsg("e_bef not right");
 					
 					const auto &ev_orig = ind.ev[e_bef];
-	
+
 					if(ev.m != sp.get_tra_m(ev.tr_gl,ev_orig)){
 						emsg("NMarkov equation not correct"+ref);
 					}
@@ -632,7 +632,7 @@ void State::check_like(string ref)
 	if(std::isnan(like.prior)) emsg("prior nan");
 	if(std::isnan(like.spline_prior)) emsg("spline_prior nan");
 	if(std::isnan(like.dist)) emsg("dist nan");
-	if(std::isnan(like.markov)) emsg("markov nan");
+	if(std::isnan(like.markov)) emsg("markov nan"+ref);
 	if(std::isnan(like.nm_trans)) emsg("nm_trans nan");
 	if(std::isnan(like.genetic_process)) emsg("genetic_process nan");
 	if(std::isnan(like.genetic_obs)) emsg("genetic_obs nan");
@@ -656,7 +656,6 @@ void State::check_like(string ref)
 	}
 	
 	if(dif(like.markov,like_st.markov,THRESH_EXPAND*dif_thresh)){
-		//cout << like.markov << "  "<< like_st.markov << "kk\n";
 		add_alg_warn("like markov "+ref);
 	}
 	
@@ -713,7 +712,7 @@ void State::check_like(string ref)
 	if(std::isnan(like.prior)) emsg("prior nan");
 	if(std::isnan(like.spline_prior)) emsg("spline_prior nan");
 	if(std::isnan(like.dist)) emsg("dist nan");
-	if(std::isnan(like.markov)) emsg("markov nan");
+	if(std::isnan(like.markov)) emsg("markov nan2"+ref);
 	if(std::isnan(like.nm_trans)) emsg("nm_trans nan");
 	if(std::isnan(like.genetic_process)) emsg("genetic_process nan");
 	if(std::isnan(like.genetic_obs)) emsg("genetic_obs nan");
@@ -790,7 +789,6 @@ void State::check_popnum_t(string ref)
 			if(dif(popnum_t[ti][k],popnum_t_store[ti][k],THRESH_EXPAND*dif_thresh)){
 				//output_dump();
 				//cout << core() << " " << popnum_t[ti][k] << " " << popnum_t_store[ti][k] << " popn" << endl;
-				//get_closest_to_boundary();
 				add_alg_warn("popnum_t problem"+ref);
 			}
 		}
@@ -1155,7 +1153,7 @@ void State::check_init_cond_like(unsigned int p, string ref)
 			
 			for(const auto &ind : ssp.individual){
 				if(ind.ev.size() > 0){
-					if(ind.ev[0].type == ENTER_EV && ind.ev[0].t == model.details.t_start){
+					if(ind.ev[0].type == ENTER_EV && ind.ev[0].tdiv == 0){
 						auto c = ind.ev[0].c_after;
 						const auto &crr = ic.comp_reduce_ref[c];
 						icv.cnum_reduce[crr.c][crr.cred]++; 
@@ -1184,7 +1182,7 @@ void State::check_init_cond_like(unsigned int p, string ref)
 			
 		for(const auto &ind : ssp.individual){
 			if(ind.ev.size() > 0){
-				if(ind.ev[0].type == ENTER_EV && ind.ev[0].t == model.details.t_start){
+				if(ind.ev[0].type == ENTER_EV && ind.ev[0].tdiv == 0){
 					auto c = ind.ev[0].c_after;
 					icv.cnum[c]++; 
 				}
@@ -1301,20 +1299,34 @@ void State::check_genetic_value(string ref)
 			const auto &ssp = species[p];
 
 			for(const auto &ind : ssp.individual){
+				auto c = UNSET;
 				for(auto ev : ind.ev){
 					auto &iif = ev.ind_inf_from;
 				
 					switch(ev.type){
 					case ENTER_EV:
 						if(sp.comp_gl[ev.c_after].infected == true){
-							if(iif.p != ENTER_INF) emsg("SHould be ENTER_INF1a");
+							if(iif.p != ENTER_INF) emsg("Should be ENTER_INF1a");
 							if(ev.inf_node_ref > CODE) emsg("Should not be code1");
 						}
 						else{
 							if(iif.p != UNSET){
-								emsg("SHould not be ENTER_INF1b");
+								emsg("Should not be ENTER_INF1b");
 							}
 							if(ev.inf_node_ref != UNSET) emsg("Should not be code2");
+						}
+						break;
+					
+					case MOVE_EV:
+						{
+							if(sp.comp_gl[c].infected == false && sp.comp_gl[ev.c_after].infected == true){
+								if(iif.p != ENTER_INF) emsg("Should be ENTER_INF1a");
+								if(ev.inf_node_ref > CODE) emsg("Should not be code1");
+							}
+							else{
+								if(iif.p != UNSET) emsg("Should be ENTER_INF 3");
+								if(ev.inf_node_ref != UNSET) emsg("Should not be code5");
+							}
 						}
 						break;
 						
@@ -1324,7 +1336,7 @@ void State::check_genetic_value(string ref)
 							if(tra.infection.type == TRANS_INFECTION){
 								if(iif.p != OUTSIDE_INF && iif.p > CODE){
 									species[p].print_event(ind.ev);
-									emsg("SHould be ENTER_INF2");
+									emsg("Should be ENTER_INF2");
 								}
 
 								if(ev.inf_node_ref > CODE){
@@ -1332,10 +1344,10 @@ void State::check_genetic_value(string ref)
 								}
 								
 								if(iif.p == OUTSIDE_INF){
-									if(iif.po != UNSET) emsg("SHould be UNSET1");
-									if(iif.pref != UNSET) emsg("SHould be UNSET2");
+									if(iif.po != UNSET) emsg("Should be UNSET1");
+									if(iif.pref != UNSET) emsg("Should be UNSET2");
 									if(iif.w != 1){
-										emsg("SHould be UNSET3");
+										emsg("Should be UNSET3");
 									}
 								}
 								else{                              // Checks pref and po consistent
@@ -1362,7 +1374,7 @@ void State::check_genetic_value(string ref)
 								}
 							}
 							else{
-								if(iif.p != UNSET) emsg("SHould not be ENTER_INF2");
+								if(iif.p != UNSET) emsg("Should not be ENTER_INF2");
 								if(ev.inf_node_ref != UNSET){
 									emsg("Should not be code4");
 								}
@@ -1371,10 +1383,11 @@ void State::check_genetic_value(string ref)
 						break;
 					
 					default:
-						if(iif.p != UNSET) emsg("SHould be ENTER_INF 3");
+						if(iif.p != UNSET) emsg("Should be ENTER_INF 3");
 						if(ev.inf_node_ref != UNSET) emsg("Should not be code5");
 						break;
 					}
+					c = ev.c_after;
 				}
 			}
 		}
@@ -1387,7 +1400,7 @@ void State::check_genetic_value(string ref)
 			
 			const auto &ev = event[in.e];
 			
-			if(in.t_start != ev.t) emsg("t_start not agree");
+			if(in.tdiv_start != ev.tdiv) emsg("t_start not agree");
 		
 			auto e = 0u;
 			auto c = UNSET;
@@ -1395,27 +1408,32 @@ void State::check_genetic_value(string ref)
 				const auto &ie = in.inf_ev[k];
 				
 				if(ie.type == INFECT_OTHER){
-					auto t = ie.t;
+					auto t = ie.tdiv;
 					
 					const auto &in_inf = genetic_value.inf_node[ie.index];
 					
 					auto ev = species[in_inf.p].individual[in_inf.i].ev[in_inf.e];
-					if(ev.type != M_TRANS_EV) emsg("SHould be markovian");
-					if(ev.t != t) emsg("Porblem with time");
+					if(ev.type != M_TRANS_EV) emsg("Should be markovian");
+					if(ev.tdiv != t) emsg("Porblem with time");
 					
 					auto &iif = ev.ind_inf_from;
 					
 					const auto &tra = model.species[in_inf.p].tra_gl[ev.tr_gl]; 
-					if(tra.infection.type != TRANS_INFECTION) emsg("SHould be and infection");
+					if(tra.infection.type != TRANS_INFECTION) emsg("Should be and infection");
 					
-					while(e < event.size() && event[e].t < t){
+					auto t_inf = round_down(t);
+					
+					while(e < event.size() && event[e].tdiv < t_inf){
 						c = event[e].c_after;
 						e++;
 					}
 				
 					const auto &inf_c = model.inf_cause[in_inf.p][ev.tr_gl][in.p][c];
-					if(inf_c.eq_ref == UNSET) emsg("Cannot fint equation for iif");
-						
+					if(inf_c.eq_ref == UNSET){
+						//species[0].print_event(event);
+						emsg("Cannot find equation for iif");
+					}
+					
 					if(iif.p != in.p) emsg("check p not agree");
 					if(iif.i != in.i) emsg("check i not agree");
 					if(iif.pref != inf_c.pref){
@@ -1453,7 +1471,7 @@ void State::check_genetic_value(string ref)
 			if(node_ev.index != m){
 				emsg("node ev index agree");
 			}
-			if(node_ev.t != gen_data.obs[m].t){
+			if(node_ev.tdiv != gen_data.obs[m].tdiv){
 				emsg("gen data obs t not agree");
 			}
 		}
@@ -1526,12 +1544,14 @@ void State::check_genetic_value(string ref)
 		for(auto n = 0u; n < inf_node.size(); n++){
 			const auto &in = inf_node[n];
 			for(const auto &iev : in.inf_ev){
-				if(iev.mut_num != UNSET) emsg("Mut_num should be UNSET");
+				if(iev.mut_num != UNSET){
+					emsg("Mut_num should be UNSET1"+ref);
+				}
 			}
 		}
 		
 		for(const auto &o : genetic_value.inf_origin){
-			if(o.mut_num != UNSET) emsg("Mut_num should be UNSET");
+			if(o.mut_num != UNSET) emsg("Mut_num should be UNSET2");
 		}
 	}
 			
@@ -1545,10 +1565,10 @@ void State::check_genetic_value(string ref)
 			if(inf_node[from.node].inf_ev[from.index].index != n) emsg("from problem");
 		}
 		
-		if(in.t_start != eve.t){
+		if(in.tdiv_start != eve.tdiv){
 			cout << in.p << " " << in.i << " "<< in.e  << "  inpie" << endl;
 			cout << n << " for node n" << endl;
-			cout << in.t_start << " " << eve.t << "  time" << endl;
+			cout << in.tdiv_start << " " << eve.tdiv << "  time" << endl;
 			cout << inf_node.size() <<" nn" << endl;
 			emsg("inf_node Times do not agree");
 		}
@@ -1558,9 +1578,9 @@ void State::check_genetic_value(string ref)
 		if(eve.ind_inf_from.p == UNSET) emsg("should not be unset");
 		
 		if(eve.ind_inf_from.p == ENTER_INF){
-			if(eve.type != ENTER_EV) emsg("Should be infected entry");	
+			if(eve.type != ENTER_EV && eve.type != MOVE_EV) emsg("Should be infected entry");	
 			if(sp.comp_gl[eve.c_after].infected != true) emsg("Shoudl be infection");
-			if(in.from.node != ENTER_INF) emsg("SHould not have a from node1");
+			if(in.from.node != ENTER_INF) emsg("Should not have a from node1");
 			
 			if(in.from.index == ENTER_INF || in.from.index == OUTSIDE_INF) emsg("index is wrong1");
 			const auto &io = genetic_value.inf_origin[in.from.index];
@@ -1570,7 +1590,7 @@ void State::check_genetic_value(string ref)
 			if(eve.ind_inf_from.p == OUTSIDE_INF){
 				if(eve.type != M_TRANS_EV) emsg("Should be outside transition");	
 				if(sp.comp_gl[eve.c_after].infected != true) emsg("Shoudl be infection");
-				if(in.from.node != OUTSIDE_INF) emsg("SHould not have a from node2");
+				if(in.from.node != OUTSIDE_INF) emsg("Should not have a from node2");
 				
 				if(in.from.index == ENTER_INF || in.from.index == OUTSIDE_INF) emsg("index is wrong2");
 			
@@ -1590,7 +1610,7 @@ void State::check_genetic_value(string ref)
 		}
 		
 		for(auto e = 1u; e < in.inf_ev.size(); e++){
-			if(in.inf_ev[e-1].t > in.inf_ev[e].t){
+			if(in.inf_ev[e-1].tdiv > in.inf_ev[e].tdiv){
 				emsg("inf_ev time order problem");
 			}
 		}
@@ -1618,7 +1638,7 @@ void State::check_genetic_value(string ref)
 					const auto &onr = genetic_value.obs_node_ref[iev.index];
 					if(onr.node != n) emsg("obs_node_ref node is wrong");
 					if(onr.index != e) emsg("obs_node_ref event is wrong");
-					if(iev.t != gen_data.obs[iev.index].t) emsg("obs_node_ref t wrong");
+					if(iev.tdiv != gen_data.obs[iev.index].tdiv) emsg("obs_node_ref t wrong");
 				}
 				break;
 			}
@@ -1641,6 +1661,8 @@ void State::check_genetic_value(string ref)
 		if(sp.trans_tree){		
 			for(auto i = 0u; i < species[p].individual.size(); i++){
 				const auto &ind = species[p].individual[i];
+				
+				auto c = UNSET;
 				for(auto e = 0u; e < ind.ev.size(); e++){
 					const auto &eve = ind.ev[e];
 					const auto &fr = eve.ind_inf_from;
@@ -1661,6 +1683,23 @@ void State::check_genetic_value(string ref)
 						
 						if(fr.i != UNSET) emsg("ind_inf_from.i should not be set");
 						if(fr.pref != UNSET) emsg("ind_inf_from.i should not be set");
+						break;
+						
+					case MOVE_EV:
+						if(sp.comp_gl[c].infected == false && sp.comp_gl[eve.c_after].infected == true){
+							if(eve.inf_node_ref == UNSET) emsg("inf_node_ref should be set2");	
+							const auto &in = genetic_value.inf_node[eve.inf_node_ref];
+							if(in.p != p) emsg("inf_node_ref p wrong");
+							if(in.i != i) emsg("inf_node_ref i wrong");
+							if(in.e != e) emsg("inf_node_ref e wrong");
+							if(fr.p != ENTER_INF) emsg("ind_inf_from.p should not be set1");
+						}
+						else{
+							if(eve.inf_node_ref != UNSET) emsg("inf_node_ref should be unset");
+							if(fr.p != UNSET) emsg("fr.p should be unset");
+							if(fr.i != UNSET) emsg("fr.i should be unset");
+							if(fr.pref != UNSET) emsg("fr.pref should be unset");
+						}
 						break;
 					
 					case M_TRANS_EV:
@@ -1702,6 +1741,8 @@ void State::check_genetic_value(string ref)
 						if(fr.pref != UNSET) emsg("fr.pref should be unset");
 						break;
 					}
+					
+					c = eve.c_after;
 				}
 			}
 		}
@@ -1725,9 +1766,9 @@ void State::check_genetic_value(string ref)
 	// Checks that inf_node are time ordered
 	for(auto n = 0u; n < genetic_value.inf_node.size(); n++){
 		const auto &in = genetic_value.inf_node[n];
-		auto t = in.t_start;
+		auto t = in.tdiv_start;
 		for(auto e = 0u; e < in.inf_ev.size(); e++){
-			auto tt = in.inf_ev[e].t;
+			auto tt = in.inf_ev[e].tdiv;
 			if(tt < t) emsg("inf_node time oprder prob");
 			tt = t;
 		}
@@ -1736,7 +1777,7 @@ void State::check_genetic_value(string ref)
 	// Checks t_rec correctly specified
 	for(auto n = 0u; n < genetic_value.inf_node.size(); n++){
 		const auto &in = genetic_value.inf_node[n];
-		if(in.t_rec != find_t_rec(in)) emsg("t_rec is wrong");
+		if(in.tdiv_rec != find_t_rec(in)) emsg("t_rec is wrong");
 	}
 	
 	// Checks that infections are within the infected periods of individuals
@@ -1748,7 +1789,7 @@ void State::check_genetic_value(string ref)
 
 				for(auto k = 0u; k < in.inf_ev.size(); k++){
 					const auto &iev = in.inf_ev[k];
-					if(iev.type == INFECT_OTHER && iev.t > t_rec){
+					if(iev.type == INFECT_OTHER && iev.tdiv > t_rec){
 						const auto &ssp = species[in.p];
 						const auto &ev = ssp.individual[in.i].ev;
 						ssp.print_event(ev);
@@ -1767,8 +1808,8 @@ void State::check_genetic_value(string ref)
 				}		
 			}				
 			else{	
-				auto t_start = in.t_start;
-				auto t_rec = in.t_rec;
+				auto t_start = in.tdiv_start;
+				auto t_rec = in.tdiv_rec;
 				
 				vector <unsigned int> list_in;
 				for(const auto &iev : in.inf_ev){
@@ -1777,7 +1818,7 @@ void State::check_genetic_value(string ref)
 				
 				vector <unsigned int> list_obs;
 				for(const auto &igo : gen_data.ind_gen_obs[in.p][in.i]){
-					if(igo.t >= t_start && igo.t <= t_rec) list_obs.push_back(igo.m);
+					if(igo.tdiv >= t_start && igo.tdiv <= t_rec) list_obs.push_back(igo.m);
 				}
 				
 				if(!equal_vec(list_in,list_obs)){
@@ -1785,11 +1826,11 @@ void State::check_genetic_value(string ref)
 					cout << "Individual " << in.i << ":" << endl;
 					
 					cout << "List from data: ";
-					for(auto m : list_obs) cout <<  gen_data.obs[m].t << ", ";
+					for(auto m : list_obs) cout <<  gen_data.obs[m].tdiv << ", ";
 					cout << endl;
 					
 					cout << "List from inf_node: ";
-					for(auto m : list_in) cout <<  gen_data.obs[m].t << ", ";
+					for(auto m : list_in) cout <<  gen_data.obs[m].tdiv << ", ";
 					cout << endl;
 					
 					emsg("Observations not correctly implemented");
@@ -1878,7 +1919,7 @@ void State::check_add_move_rem(string ref)
 								evd.type = ev.type;
 								evd.move_c = ev.move_c;
 								evd.cl = ev.cl;
-								evd.t = ev.t;
+								evd.tdiv = ev.tdiv;
 								evd.tr = ev.tr_gl;  //???Not sure about this
 								ed.push_back(evd);
 							}
@@ -1910,8 +1951,8 @@ void State::check_add_move_rem(string ref)
 							cout << e << ": cl wrong" << endl; fl = true;
 						}
 						
-						if(dif(ev1.t,ev2.t,dif_thresh)){ 
-							cout << e << ": t wrong" << " " << ev1.t << " " << ev2.t << " " << ev1.t - ev2.t  <<endl; 
+						if(dif(ev1.tdiv,ev2.tdiv,dif_thresh)){ 
+							cout << e << ": t wrong" << " " << ev1.tdiv << " " << ev2.tdiv << " " << ev1.tdiv - ev2.tdiv  <<endl; 
 							fl = true;
 						}
 					}
@@ -1945,7 +1986,7 @@ void State::print_ev_data(string te, const vector <EventData> &event_data, unsig
 		case M_TRANS_EV: cout << "markov trans " << sp.cla[ev.cl].tra[ev.tr].name; break;	
 		case NM_TRANS_EV: cout << "non-markov trans " << sp.cla[ev.cl].tra[ev.tr].name; break;
 		}
-		cout << "," << ev.t << "  ";
+		cout << "," << ev.tdiv << "  ";
 	}
 	cout << endl;
 }
@@ -1985,28 +2026,6 @@ void State::scan_variable(string name, double min, double max)
 		scan << val << " " << Li << endl;
 	}
 }
-
-
-/// Checks if any events are near to a division boundary
-void State::check_event_boundary(string ref)
-{
-	for(auto p = 0u; p < model.species.size(); p++){	
-		const auto &sp = model.species[p];
-		
-		if(sp.type == INDIVIDUAL){	
-			const auto &ssp = species[p];
-			for(const auto &ind : ssp.individual){
-				if(events_near_div(ind.ev,model.details)){
-					//cout << ind.name <<":" << endl;
-					//for(auto ev  : ind.ev) cout << ev.t << " t" << endl; 
-					//emsg("Event near a boundary"+ref);
-					add_alg_warn("Event near a boundary"+ref+ssp.print_event(ind.ev,true));
-				}
-			}
-		}
-	}
-}
-
 
 
 /// Checks if individual or fixed effect are too large or small
@@ -2067,37 +2086,6 @@ void State::output_dump() const
 }
 
 
-/// Gets the closest distance from a transition event and a division boundary
-void State::get_closest_to_boundary()
-{
-	auto t_start = model.details.t_start, dt = model.details.dt;
-		
-	for(const auto &ssp : species){
-		if(ssp.type == INDIVIDUAL){
-			auto dmin = LARGE;
-			for(const auto &ind : ssp.individual){
-				for(const auto &ev : ind.ev){
-					switch(ev.type){
-					case NM_TRANS_EV: case M_TRANS_EV:
-						{
-							auto f = (ev.t-t_start)/dt;
-							auto d = f-(unsigned int)(f+0.5);
-							if(d < 0) d = -d;
-							if(d < dmin) dmin = d;
-						}
-						break;
-						
-					default: break;
-					}
-				}
-			}
-			
-			cout << dmin << " smallest distance" << endl;
-		}
-	}
-}
-
-
 /// Checks if there is a negative rate
 void State::check_neg_rate(string name)
 {
@@ -2114,16 +2102,7 @@ void State::check_neg_rate(string name)
 					add_alg_warn("Negative problem. After proposal:"+name+" val="+tstr(val));
 				}				
 			}
-		}
-		
-		if(sp.type == INDIVIDUAL){	
-			const auto &ssp = species[p];
-			for(const auto &ind : ssp.individual){
-				if(events_near_div(ind.ev,model.details)){
-					add_alg_warn("Event near bou"+name);
-				}
-			}
-		}			
+		}	
 	}
 }
 

@@ -153,7 +153,6 @@ class Species   	                         // Stores details of a species
 		void create_markov_tree();
 		unsigned int find_c(unsigned int cl, string name) const;
 		unsigned int update_c_comp(unsigned int c, unsigned int cl, unsigned int c_comp) const;
-		unsigned int get_ti(double t) const;
 		void ind_ev_sampler_not_needed();
 		bool correct_ev(unsigned int c, Event &enew) const;
 		void create_ind_noobs();

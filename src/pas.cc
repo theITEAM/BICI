@@ -109,7 +109,7 @@ void PAS::run()
 		percentage(s,nsample);
 	
 		for(auto &ch : chain){
-			ch.burn_update(s);
+			ch.pas_burn_update_run(s);
 			ch.update(s);
 		}		
 		sample_op(s);
@@ -267,7 +267,7 @@ void PAS::bootstrap()
 					auto part = chain[ch_from].state.generate_particle(0,ch,true);
 					mpi.send_particle(j/num_per_core,part);
 #else
-					emsg("SHould be only one core");
+					emsg("Should be only one core");
 #endif
 				}
 			}

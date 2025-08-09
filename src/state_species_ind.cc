@@ -16,6 +16,8 @@ using namespace std;
 /// Updates the individuals in the system (using a modified Gillespie algorithm)
 void StateSpecies::update_individual_based(unsigned int ti, const vector < vector <Poss> > &pop_ind, const vector < vector <double> > &popnum_t)
 {
+	auto dt = details.dt;
+	
 	update_markov_eqn_value(ti,popnum_t);
 	
 	sort_trig_event(ti);
@@ -26,26 +28,38 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 	
 	auto &tri_ev = trig_div[ti].ev;
 
-	auto t = timepoint[ti];
-	auto tnext = timepoint[ti+1];
+	double t = ti;
+	double tnext = ti+1;
 	do{
-		double dt;
+		double dtdiv;
 		auto R = 0.0; if(nnode > 0) R = markov_tree_rate[nnode-1];
 	
-		if(R > -SMALL && R < TINY) dt = LARGE;
+		if(R > -SMALL && R < TINY) dtdiv = LARGE;
 		else{
 			if(R < 0){		
 				emsg("Negative rate2");
 			}
 			auto ra = ran(); if(ra == 0) ra = TINY;
-			dt = -log(ra)/R;
+			dtdiv = -log(ra)/(R*dt);
 		}
 		
-		auto tf = t + dt;
+		auto tf = t + dtdiv;
 		
-		if(i_trig < tri_ev.size() && tf > tri_ev[i_trig].t){ // Trigger event
+		if(tf < tnext){
+			
+			if(false){
+				if(t == ti && ran() < 1){
+					auto st = tf;
+					auto tfi = (unsigned int)(tf);
+					tf = tfi; 		
+					cout << st << tf << endl;					
+				}
+			}
+		}
+		
+		if(i_trig < tri_ev.size() && tf > tri_ev[i_trig].tdiv){ // Trigger event
 			const auto &trig = tri_ev[i_trig];
-			tf = trig.t;
+			tf = trig.tdiv;
 			auto i = trig.i;
 			
 			switch(trig.type){
@@ -83,7 +97,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 					vector <SimTrigEvent> trig_vec;
 					trig_vec.push_back(trig);
 					
-					while(i_trig+1 < tri_ev.size() && tri_ev[i_trig+1].t == tf && 
+					while(i_trig+1 < tri_ev.size() && tri_ev[i_trig+1].tdiv == tf && 
 					      tri_ev[i_trig+1].type == ty && tri_ev[i_trig+1].i == i){
 						i_trig++;
 						trig_vec.push_back(tri_ev[i_trig]);
@@ -165,7 +179,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 					if(j == it.size()) emsg("erro select");
 					
 					if(dif(sum,me_vari.indfac_sum,dif_thresh)){
-						emsg("SHould be the same");
+						emsg("Should be the same");
 					}
 				}
 			
@@ -207,7 +221,7 @@ bool StateSpecies::allow_event(double t, const IndTransRef &itr) const
 	// Don't allow event if sink and still trigger events
 	const auto &tr = sp.tra_gl[trg];
 	
-	if(mode == INF && tr.variety == SINK_TRANS && itr.i < sp.individual.size() && t < sp.individual[itr.i].tmax){
+	if(mode == INF && tr.variety == SINK_TRANS && itr.i < sp.individual.size() && t < sp.individual[itr.i].tdivmax){
 		return false;
 	}
 	
@@ -339,8 +353,8 @@ void StateSpecies::update_ind_c(unsigned int i, double t, unsigned int cl_trans,
 					if(flag == false){
 						auto trig = get_nm_trig_event(t,i,c,cl,popnum_t);
 						
-						auto t = trig.t;
-						if(t < details.t_end){
+						auto t = trig.tdiv;
+						if(t < details.T){
 							IndTransRef itr; itr.i = trig.i; itr.index = UNSET; itr.tr_gl = trig.trg;	
 							if(allow_event(t,itr)){
 								insert_trigger_event(trig);
@@ -369,15 +383,17 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 	
 	auto t_begin = t;
 	
+	auto dt = details.dt;
+	
 	// If mid-way through NM trans then find origin (used for PPC)
 
-	if(t_begin != ev[e].t){
+	if(t_begin != ev[e].tdiv){
 		while(e > 0){
 			auto &eve = ev[e];
 			if(eve.cl == cl && (eve.type == M_TRANS_EV || eve.type == NM_TRANS_EV)) break;
 			e--;
 		}
-		t_begin = ev[e].t;
+		t_begin = ev[e].tdiv;
 
 		c = ev[e].c_after;
 	}
@@ -447,21 +463,21 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 		string warn;
 		
 		switch(tr.type){	
-		case EXP_RATE: case EXP_MEAN: emsg("SHould not be rate2"); break;
+		case EXP_RATE: case EXP_MEAN: emsg("Should not be rate2"); break;
 		
 		case EXP_RATE_NM: 	
 			{
 				auto rate = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto ts = t_begin+exp_rate_sample(rate,warn);
-				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
+				auto ts = t_begin+exp_rate_sample(rate*dt,warn);
+				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = ts;
 			}
 			break;
 			
 		case EXP_MEAN_NM: 	
 			{
 				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto ts = t_begin+exp_mean_sample(mean,warn);
-				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
+				auto ts = t_begin+exp_mean_sample(mean/dt,warn);
+				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = ts;
 			}
 			break;
 
@@ -470,9 +486,9 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
 				auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
 			
-				auto ts = t_begin+gamma_sample(mean,cv,warn);
+				auto ts = t_begin+gamma_sample(mean/dt,cv,warn);
 				
-				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
+				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = ts;
 			}
 			break;
 		
@@ -480,9 +496,9 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 			{
 				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
 				auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto ts = t_begin+gamma_sample(mean,sqrt(1.0/shape),warn);
+				auto ts = t_begin+gamma_sample(mean/dt,sqrt(1.0/shape),warn);
 					
-				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
+				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = ts;
 			}
 			break;
 
@@ -490,9 +506,9 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 			{
 				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
 				auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto ts = t_begin+lognormal_sample(mean,cv,warn);
+				auto ts = t_begin+lognormal_sample(mean/dt,cv,warn);
 
-				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
+				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = ts;
 			}
 			break;
 			
@@ -500,18 +516,18 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 			{
 				auto scale = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
 				auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto ts = t_begin+weibull_sample(scale,shape,warn);
+				auto ts = t_begin+weibull_sample(scale/dt,shape,warn);
 		
-				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
+				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = ts;
 			}
 			break;
 			
 		case PERIOD:
 			{
 				auto time = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto ts = t_begin+period_sample(time,warn);
+				auto ts = t_begin+period_sample(time/dt,warn);
 	
-				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = ts;
+				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = ts;
 			}
 			break;
 		}	
@@ -524,7 +540,7 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 			ss << "Could not simulate from the system (transition '" << tr.name << "' on individual '" << ind.name << "' from time " << t_begin << " did not exceed " << t << " after " << SIM_TRY_MAX << " tries).";
 			emsg(ss.str());
 		}
-	}while(trig.t < t);
+	}while(trig.tdiv < t);
 	
 	return trig;
 }
@@ -542,7 +558,7 @@ bool StateSpecies::try_insert_data_trans_event(double t, unsigned int cl, unsign
 	
 	auto &obs = sp.individual[i].obs;
 
-	auto m = 0u; while(m < obs.size() && obs[m].t <= t) m++;
+	auto m = 0u; while(m < obs.size() && obs[m].tdiv <= t) m++;
 	
 	while(m < obs.size() && !((obs[m].type == OBS_TRANS_EV || obs[m].type == OBS_SINK_EV) && obs[m].cl == cl)) m++;
 
@@ -550,7 +566,7 @@ bool StateSpecies::try_insert_data_trans_event(double t, unsigned int cl, unsign
 
 	if(ind.ev.size() == 0) emsg("e origin prob");
 
-	auto t_event = obs[m].t;
+	auto t_event = obs[m].tdiv;
 	
 	vector <SimTrigEvent> trig_pos;
 	
@@ -565,7 +581,7 @@ bool StateSpecies::try_insert_data_trans_event(double t, unsigned int cl, unsign
 			val_sum_store.push_back(val_sum);
 						
 			SimTrigEvent trig; 
-			trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.t = t_event;
+			trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = t_event;
 			trig_pos.push_back(trig);
 		}
 	}
@@ -623,16 +639,16 @@ void StateSpecies::update_markov_tree_rate(unsigned int e, double dif)
 /// Inserts a future non-Markovian event
 void StateSpecies::insert_trigger_event(const SimTrigEvent &trig)
 {
-	auto t = trig.t;
+	auto t = trig.tdiv;
 	
-	if(t < details.t_end){
-		auto ti = get_ti(trig.t);
+	if(t < details.T){
+		auto ti = get_ti(trig.tdiv);
 		if(ti >= trig_div.size()) emsg("nm out of range8");
 		
 		auto &ev = trig_div[ti].ev;
 		
 		if(ti_sort == ti){  // If adding to present time segment then must do it in an ordered way
-			auto k = 0u; while(k < ev.size() && t > ev[k].t) k++;
+			auto k = 0u; while(k < ev.size() && t > ev[k].tdiv) k++;
 			ev.insert(ev.begin()+k,trig);
 		}
 		else{               // If added to a later time segment ordering is done later
@@ -708,11 +724,11 @@ void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vecto
 /// Used to order trigger events
 bool Sim_Trig_ord(const SimTrigEvent &ev1, const SimTrigEvent &ev2)                      
 { 
-	if(ev1.t == ev2.t){
+	if(ev1.tdiv == ev2.tdiv){
 		if(ev1.i == ev2.i) return ev1.i < ev2.i;
 		return ev1.type < ev2.type;
 	}
-	return ev1.t < ev2.t; 
+	return ev1.tdiv < ev2.tdiv; 
 }
 
 
@@ -915,7 +931,12 @@ void StateSpecies::update_ind_move(unsigned int i, double t, unsigned int c_comp
 	
 	auto cnew = sp.update_c_comp(c,cl,c_comp);
 	
-	add_event(MOVE_EV,i,UNSET,c_comp,cl,cnew,t,IndInfFrom());	
+	IndInfFrom iif;
+	if(sp.comp_gl[c].infected == false && sp.comp_gl[cnew].infected == true){
+		iif.p = ENTER_INF;
+	}
+	
+	add_event(MOVE_EV,i,UNSET,c_comp,cl,cnew,t,iif);	
 
 	remove_markov_trans(i);
 	
@@ -933,7 +954,7 @@ Event StateSpecies::get_event(EventType type, unsigned int i, unsigned int tr_gl
 	e.move_c = move_c;
 	e.cl = cl;
 	e.c_after = c_after;
-	e.t = t;
+	e.tdiv = t;
 	e.inf_node_ref = UNSET;
 	e.ind_inf_from = inf_from;
 	
@@ -942,7 +963,7 @@ Event StateSpecies::get_event(EventType type, unsigned int i, unsigned int tr_gl
 		for(const auto &ob : sp.individual[i].obs){
 			switch(ob.type){
 			case OBS_TRANS_EV: case OBS_SOURCE_EV: case OBS_SINK_EV: 
-				if(cl == ob.cl && ob.t == t) e.observed = true;
+				if(cl == ob.cl && ob.tdiv == t) e.observed = true;
 				break;
 			default: break;
 			}
@@ -958,25 +979,6 @@ void StateSpecies::add_event(EventType type, unsigned int i, unsigned int tr_gl,
 	auto &ind = individual[i];
 	auto &ev = ind.ev;
 	
-	// If event is near to division boundary then shifts
-	switch(type){
-	case NM_TRANS_EV: case M_TRANS_EV:
-		if(event_near_div(t,details)){
-			auto dtrange = NEAR_DIV_THRESH*details.dt;
-			t -= 2*dtrange;
-			if(ev.size() > 0 && t < ev[0].t){
-				t += 4*dtrange;
-			}
-			
-			if(event_near_div(t,details)){
-				emsg("still out of range");
-			}
-		}
-		break;
-		
-	default: break;
-	}
-		
 	auto e = get_event(type,i,tr_gl,move_c,cl,c_after,t,inf_from);
 	
 	ev.push_back(e);
@@ -1133,7 +1135,7 @@ void StateSpecies::calculate_N_unobs()
 	for(auto i = sp.nindividual_obs; i < individual.size(); i++){
 		const auto &ind = individual[i];
 		if(ind.ev.size() > 0){
-			if(ind.ev[0].type == ENTER_EV && ind.ev[0].t == details.t_start){
+			if(ind.ev[0].type == ENTER_EV && ind.ev[0].tdiv == 0){
 				if(foc_cl == UNSET) icv.N_total_unobs++;
 				else{
 					auto c = ind.ev[0].c_after;

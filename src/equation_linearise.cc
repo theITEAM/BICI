@@ -24,11 +24,16 @@ void Equation::calculate_linearise()
 
 	auto pl = false;
 	
+	if(pl){
+		cout << endl << endl << "START" << endl;
+		print_calculation();
+	}
+	
 	vector <LinearCalculation> lin_calc;
 	for(auto i = 0u; i < C; i++){
 		const auto &ca = calcu[i];
 		
-		if(ca.item.size() == 0) emsg("zero item problem");
+		if(i != 0 && ca.item.size() == 0) emsg("zero item problem");
 		
 		LinearCalculation lin;
 		switch(ca.op){
@@ -117,15 +122,15 @@ void Equation::calculate_linearise()
 		// Single parameter functions
 		case EXPFUNC: case SINFUNC: case COSFUNC: case LOGFUNC:  
 		case STEPFUNC: case ABSFUNC: case SQRTFUNC: case SIGFUNC:
-			single_param_func(ca,lin,lin_calc);
+			if(single_param_func(ca,lin,lin_calc) == false) return;
 			break;
 			
 		// Two parameter functions
 		case POWERFUNC: case THRESHFUNC: case UBOUNDFUNC: case MAXFUNC: case MINFUNC:
-			two_param_func(ca,lin,lin_calc);
+			if(two_param_func(ca,lin,lin_calc) == false) return;
 			break;
 	
-		case TAKE: emsg("SHould not have take"); break;
+		case TAKE: emsg("Should not have take"); break;
 		
 		default: emsg("Eq problem10"); break;
 		}
@@ -143,7 +148,7 @@ void Equation::calculate_linearise()
 		for(const auto &lin : lin_calc){
 			print_linear_calc("LIN FINAL ",lin);
 		}
-		emsg("lin final");
+		//emsg("lin final");
 	}
 
 	//auto lc_final = convert_to_linear_calculation(ans,ADD,lin_calc);
@@ -517,15 +522,15 @@ void Equation::print_calc(string st, const vector <Calculation> &calc) const
 
 
 /// Finds the linear calculation for a single parameter function
-void Equation::single_param_func(Calculation ca, LinearCalculation &lin, const vector <LinearCalculation> &lin_calc) const
+bool Equation::single_param_func(Calculation ca, LinearCalculation &lin, const vector <LinearCalculation> &lin_calc) const
 {
 	const auto &it = ca.item[0];
-	
+
 	switch(it.type){
 	case REG:
 		{
 			lin = lin_calc[it.num];
-			if(lin.pop_calc.size() > 0) return;
+			if(lin.pop_calc.size() > 0) return false;
 			auto &cal = lin.no_pop_calc.calc;
 			ca.item[0].num = cal.size()-1;
 			cal.push_back(ca);
@@ -538,15 +543,17 @@ void Equation::single_param_func(Calculation ca, LinearCalculation &lin, const v
 		lin.no_pop_calc.calc.push_back(ca);
 		break;
 		
-	case POPNUM: return;
+	case POPNUM: return false;
 	case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
 	default: emsg("Eq problem2"); break;
 	}
+	
+	return true;
 }
 
 
 /// Finds the linear calculation for a two parameter function
-void Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vector <LinearCalculation> &lin_calc) const
+bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vector <LinearCalculation> &lin_calc) const
 {
 	auto &it1 = ca.item[0];
 	auto &it2 = ca.item[1];
@@ -557,10 +564,10 @@ void Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 		case REG:
 			{		
 				lin = lin_calc[it1.num];
-				if(lin.pop_calc.size() > 0) return;
+				if(lin.pop_calc.size() > 0) return false;
 				
 				const auto &lin2 = lin_calc[it2.num];
-				if(lin2.pop_calc.size() > 0) return;
+				if(lin2.pop_calc.size() > 0) return false;
 				
 				auto &calc = lin.no_pop_calc.calc;
 				
@@ -588,13 +595,13 @@ void Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 		case PARAMVEC: case SPLINEREF: case NUMERIC: case TIME:
 			{		
 				lin = lin_calc[it1.num];
-				if(lin.pop_calc.size() > 0) return;
+				if(lin.pop_calc.size() > 0) return false;
 				auto &cal = lin.no_pop_calc.calc;
 				it1.num = cal.size()-1;
 				cal.push_back(ca);
 			}
 			break;
-		case POPNUM: return;
+		case POPNUM: return false;
 		case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
 		default: emsg("Eq problem2"); break;
 		}
@@ -605,7 +612,7 @@ void Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 		case REG:
 			{
 				lin = lin_calc[it2.num];
-				if(lin.pop_calc.size() > 0) return;
+				if(lin.pop_calc.size() > 0) return false;
 				auto &cal = lin.no_pop_calc.calc;
 				it2.num = cal.size()-1;
 				cal.push_back(ca);
@@ -617,15 +624,17 @@ void Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 				lin.no_pop_calc.calc.push_back(ca);
 			}
 			break;
-		case POPNUM: return;
+		case POPNUM: return false;
 		case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
 		default: emsg("Eq problem2"); break;
 		}
 		break;
-	case POPNUM: return;
+	case POPNUM: return false;
 	case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
 	default: emsg("Eq problem2"); break;
 	}
+	
+	return true;
 }
 
 
@@ -698,7 +707,7 @@ double Equation::calculate_calculation(const vector <Calculation> &calc, unsigne
 			const auto &it = item[j];
 			
 			switch(it.type){
-				case PARAMETER: emsg("SHould not be parameter"); break;
+				case PARAMETER: emsg("Should not be parameter"); break;
 				case PARAMVEC: num[j] = param_val[it.num]; break;
 				case SPLINE: emsg("Should not be spline"); break;
 				case SPLINEREF:	num[j] = spline_val[it.num].val[ti]; break;
@@ -740,9 +749,9 @@ double Equation::calculate_calculation_spline_store(const vector <Calculation> &
 			const auto &it = item[j];
 			
 			switch(it.type){
-				case PARAMETER: emsg("SHould not be param"); break;
+				case PARAMETER: emsg("Should not be param"); break;
 				case PARAMVEC: num[j] = param_val[it.num]; break;
-				case SPLINE: emsg("SHould not be spline"); break;
+				case SPLINE: emsg("Should not be spline"); break;
 				case SPLINEREF:
 					{
 						const auto &sv = spline_val[it.num];
@@ -884,8 +893,8 @@ InfSourceSampler Equation::setup_source_sampler(unsigned int ti, const vector <d
 		val_sum_store.push_back(val_sum);
 	}
 	
-	if(val_sum == 0) emsg("Problem selecting");
-	
+	ss.sum = val_sum;
+		
 	return ss;
 }
 
@@ -893,8 +902,10 @@ InfSourceSampler Equation::setup_source_sampler(unsigned int ti, const vector <d
 /// Samples from the source sampler
 unsigned int InfSourceSampler::sample_inf_source() const
 {
+	if(sum == 0) return UNSET;
+	
 	auto N = val_sum_store.size();
-	auto z = ran()*val_sum_store[N-1];
+	auto z = ran()*sum;
 			
 	auto j = 0u; while(j < N && z > val_sum_store[j]) j++;
 	if(j == N) emsg("Select prob");
@@ -906,7 +917,8 @@ unsigned int InfSourceSampler::sample_inf_source() const
 /// Samples from the source sampler
 double InfSourceSampler::prob_inf_source(unsigned int j) const
 {
-	return log(val_store[j]/val_sum_store[val_sum_store.size()-1]);
+	if(j == UNSET) return -LARGE;
+	return log(val_store[j]/sum);
 }
 
 /// Gets the population reference from the population

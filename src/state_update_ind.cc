@@ -104,7 +104,7 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 		
 		update_pop_change(ti,ti_next,pop_change,like_ch.markov);
 	}
-	
+
 	timer[IND_POP_UPDATE_TIMER] += clock();
 	
 	// Adds in new events
@@ -113,7 +113,7 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 	if(false) ssp.print_event("end",ind);
 	
 	timer[IND_TIMER] += clock();
-	
+
 	return like_ch;
 }
 
@@ -161,12 +161,7 @@ void State::initialise_update_ind_maps()
 
 /// Updates an individual with a new individual effect value
 void State::update_ie_population(unsigned int p, unsigned int i, unsigned int ie, double dif, double &like_ch)
-{
-	const auto &tp = model.timepoint;
-	auto t_start = tp[0];
-	auto t_end = tp[T];
-	auto dt = model.details.dt;
-	
+{	
 	auto &sp = model.species[p];
 	auto &ssp = species[p];
 	
@@ -180,10 +175,9 @@ void State::update_ie_population(unsigned int p, unsigned int i, unsigned int ie
 	auto ti = 0u;
 	
 	for(auto k = 0u; k <= ev.size(); k++){
-		auto t_ev = t_end; if(k < ind.ev.size()) t_ev = ev[k].t;
+		double t_ev = T; if(k < ind.ev.size()) t_ev = ev[k].tdiv;
 
-		auto ti_next = (unsigned int)(ALMOST_ONE+(t_ev-t_start)/dt);
-		if(ti_next > T) ti_next = T;
+		auto ti_next = get_ti_next(t_ev,model.details);
 							
 		if(c != UNSET){
 			vector <PopChange> pop_change;
@@ -260,7 +254,7 @@ void State::update_ie_trans_tree(unsigned int p, unsigned int i, unsigned int ie
 						like_ch += dLi;
 						const auto &sp2 = model.species[in2.p];
 
-						auto ti = sp2.get_ti(ev.t);
+						auto ti = get_ti(ev.tdiv);
 						const auto &tr = sp2.tra_gl[ev.tr_gl];
 						
 						ssp2.Li_markov[tr.markov_eqn_ref][ti] += dLi;

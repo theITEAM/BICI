@@ -285,7 +285,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 			auto &pf = sp.pop_filter[pd.ref];
 			pd.time_vari = pf.time_vari;
 			if(pd.time_vari){
-				for(auto &cpe : pf.comp_prob_eqn) model.add_eq_ref(cpe,hash_eqn,pd.t);
+				for(auto &cpe : pf.comp_prob_eqn) model.add_eq_ref(cpe,hash_eqn,pd.tdiv);
 				pd.comp_obs_mod_ref = sp.obs_eqn_add_vec(pf.comp_prob_eqn);
 			}
 		}
@@ -309,7 +309,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 			ptd.time_vari = ptf.time_vari;
 			if(ptd.time_vari){
 				for(auto &tpe : ptf.trans_prob_eqn){		
-					model.add_eq_ref(tpe,hash_eqn,0.5*(ptd.tmin+ptd.tmax));
+					model.add_eq_ref(tpe,hash_eqn,0.5*(ptd.tdivmin+ptd.tdivmax));
 				}
 				ptd.trans_obs_mod_ref = sp.obs_eqn_add_vec(ptf.trans_prob_eqn);
 			}
@@ -320,7 +320,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 				for(auto cl = 0u; cl < sp.ncla; cl++){
 					auto &ecp_cl = ecp.cla[cl];
 					if(ecp_cl.c_set == UNSET){
-						for(auto &cop : ecp_cl.eqn) model.add_eq_ref(cop,hash_eqn,ecp.time);					
+						for(auto &cop : ecp_cl.eqn) model.add_eq_ref(cop,hash_eqn,ecp.tdiv);					
 						ecp_cl.obs_eqn_ref = sp.obs_eqn_add_vec(ecp_cl.eqn);
 					}
 				}
@@ -354,7 +354,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 							if(ob.time_vari == true){
 								auto tra_prob_eqn = ot.tra_prob_eqn;
 								for(auto &tpe : tra_prob_eqn){
-									model.add_eq_ref(tpe,hash_eqn,ob.t);
+									model.add_eq_ref(tpe,hash_eqn,ob.tdiv);
 								}
 								
 								ob.obs_eqn_ref = sp.obs_eqn_add_vec(tra_prob_eqn);
@@ -366,7 +366,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 				case OBS_COMP_EV:                              // Ind. Compartment
 					if(ob.c_exact == UNSET){
 						for(auto &cop : ob.c_obs_prob_eqn){
-							model.add_eq_ref(cop,hash_eqn,ob.t);
+							model.add_eq_ref(cop,hash_eqn,ob.tdiv);
 						}
 				
 						ob.obs_eqn_ref = sp.obs_eqn_add_vec(ob.c_obs_prob_eqn);
@@ -375,10 +375,10 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 					break;
 					
 				case OBS_TEST_EV:                              // Ind. test
-					model.add_eq_ref(ob.Se_eqn,hash_eqn,ob.t);
+					model.add_eq_ref(ob.Se_eqn,hash_eqn,ob.tdiv);
 					ob.Se_obs_eqn_ref = add_to_vec(sp.obs_eqn,ob.Se_eqn.eq_ref);
 					
-					model.add_eq_ref(ob.Sp_eqn,hash_eqn,ob.t);
+					model.add_eq_ref(ob.Sp_eqn,hash_eqn,ob.tdiv);
 					ob.Sp_obs_eqn_ref = add_to_vec(sp.obs_eqn,ob.Sp_eqn.eq_ref);
 					break;
 				}
@@ -863,7 +863,8 @@ void Input::global_comp_trans_init()
 	for(auto &sp : model.species){
 		sp.tform_set = false;
 		if(sp.type == INDIVIDUAL){
-			if(1 == 0 && sp.tra_gl.size()*sp.comp_gl.size() < TFORM_MAX){ // TURN OFF
+			//if(1 == 0 && sp.tra_gl.size()*sp.comp_gl.size() < TFORM_MAX){ // TURN OFF
+			if(1 == 1){
 				sp.tform_set = true;
 				
 				for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
@@ -1246,7 +1247,7 @@ void Input::source_equation_comp()
 /// Calculates the timepoints used to solve the equations
 void Input::calculate_timepoint()
 {
-	const auto &de = model.details;
+	auto &de = model.details;
 	
 	auto t = de.t_start;
 	model.timepoint.push_back(t);
@@ -1259,9 +1260,9 @@ void Input::calculate_timepoint()
 		model.timepoint.push_back(t);
 		t += de.dt;
 	}
+	de.T = model.timepoint.size();		
 	model.timepoint.push_back(t_end);
-	model.ntimepoint = model.timepoint.size();
-	
+
 	if(false){
 		for(auto i = 0u; i < model.timepoint.size(); i++){
 			cout << i << " "<<  model.timepoint[i] << " timepoint" << endl;
@@ -1276,7 +1277,7 @@ unsigned int Input::get_spline_i(const ParamRef &pr)
 	const auto &spl = model.spline;		
 	
 	auto th = pr.th, index = pr.index;
-	auto ntimes = model.param[th].spline_info.knot_times.size();
+	auto ntimes = model.param[th].spline_info.knot_tdiv.size();
 	if(index%ntimes != 0) emsg_input("Should be zero1");
 	index /= ntimes;
 	auto i = 0u; while(i < spl.size() && !(spl[i].th == th && spl[i].index == index)) i++;
@@ -1292,6 +1293,8 @@ void Input::create_spline()
 	const auto &tp = model.timepoint;
 	auto ntp = tp.size();
 	
+	auto dt = model.details.dt;
+	
 	for(auto th = 0u; th < model.param.size(); th++){
 		const auto &par = model.param[th];
 		
@@ -1299,9 +1302,9 @@ void Input::create_spline()
 			auto &sinfo = par.spline_info;
 			if(sinfo.on != true) emsg_input("Problem loading spline");
 			
-			const auto &times = sinfo.knot_times;
+			const auto &times = sinfo.knot_tdiv;
 			auto ntimes = times.size();
-			
+					
 			auto dep_reduce = par.dep;
 			dep_reduce.pop_back();
 			
@@ -1341,16 +1344,18 @@ void Input::create_spline()
 				
 				auto i = 0u;                             // Indexes times
 				for(auto ti = 0u; ti < ntp-1; ti++){
-					if(tp[ti] < times[0]){ // Extends parameter factors to start time
+					if(tp[ti]/dt < times[0]){ // Extends parameter factors to start time
 						spl.const_val.push_back(1);
-						if(model.mode != PPC) emsg_input("Should be PPC");
+						if(model.mode != PPC) emsg_input("Should be PPC1");
 						if(!begin_str(spl.name,"f~")) emsg_input("Should be a parameter factor");
 					}
 					else{
-						auto tmid = (tp[ti]+tp[ti+1])/2;
+						auto tmid = (tp[ti]+tp[ti+1])/(2*dt);
 						while(i+1 < times.size() && times[i+1] < tmid) i++;
 						if(i+1 >= times.size()){ // This extends spline for PPC
-							if(model.mode != PPC) emsg_input("Should be PPC");
+							if(model.mode != PPC){
+								emsg_input("Should be PPC2");
+							}							
 							
 							if(spl.constant == false){
 								SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = param_ref[i]; sd.f = 1;	
@@ -1374,7 +1379,7 @@ void Input::create_spline()
 						}
 					}
 				}
-					
+			
 				model.spline.push_back(spl);
  			}
 		}			
@@ -1842,7 +1847,7 @@ void Input::create_island()
 				}
 				
 				// Links from island transitions to the equations determined by markov_eqn
-				const auto T = model.ntimepoint-1;
+				auto T = model.details.T;
 				for(auto &isl : island){
 					for(auto &co : isl.comp){
 						auto comp_nm_flag = false;
@@ -1963,7 +1968,7 @@ void Input::create_island()
 /// Works out how changes to parameters affect likelihoods
 void Input::param_affect_likelihood()
 {
-	auto T = model.ntimepoint-1;
+	auto T = model.details.T;
 
 	// Stores spline time maps for each of the model variables
 	vector < vector <bool> > spline_map;
@@ -1976,7 +1981,7 @@ void Input::param_affect_likelihood()
 		const auto &par = model.param[th];
 		
 		if(par.spline_info.on == true){	
-			auto nknot = par.spline_info.knot_times.size();
+			auto nknot = par.spline_info.knot_tdiv.size();
 		
 			auto s = 0u;
 			while(s < model.spline.size() && !(th == model.spline[s].th && ind/nknot == model.spline[s].index)) s++;
@@ -2014,7 +2019,7 @@ void Input::param_affect_likelihood()
 							auto k = par.get_param_vec(ind);	
 							if(k != UNSET){
 								if(par.spline_info.on == true){	
-									auto nknot = par.spline_info.knot_times.size();
+									auto nknot = par.spline_info.knot_tdiv.size();
 									
 									for(auto t = 0u; t < nknot; t++){ // Goes down the spline
 										k = par.get_param_vec(ind+t);
@@ -2057,7 +2062,7 @@ void Input::param_affect_likelihood()
 							auto k = par.get_param_vec(ind);	
 							if(k != UNSET){
 								if(par.spline_info.on == true){
-									auto nknot = par.spline_info.knot_times.size();
+									auto nknot = par.spline_info.knot_tdiv.size();
 								
 									for(auto t = 0u; t < nknot; t++){ // Goes down the spline
 										k = par.get_param_vec(ind+t);
@@ -2485,7 +2490,7 @@ void Input::omr_add_to_map(vector <unsigned int> &omr, unsigned int i, vector < 
 /// Add affect terms for NM_TRANS_AFFECT, NM_TRANS_BP_AFFECT and NM_TRANS_INCOMP
 void Input::add_nm_trans_affect(unsigned int p, unsigned int i, unsigned int eq, AffectType type, const vector < vector <bool> > &spline_map)
 {
-	auto T = model.ntimepoint-1;
+	auto T = model.details.T;
 	auto &sp = model.species[p];
 
 	auto &eqn = model.eqn[eq];
@@ -2497,7 +2502,7 @@ void Input::add_nm_trans_affect(unsigned int p, unsigned int i, unsigned int eq,
 			auto k = par.get_param_vec(ind);	
 			if(k != UNSET){
 				if(par.spline_info.on == true){	
-					auto nknot = par.spline_info.knot_times.size();
+					auto nknot = par.spline_info.knot_tdiv.size();
 					
 					for(auto t = 0u; t < nknot; t++){ // Goes down the spline
 						k = par.get_param_vec(ind+t);
@@ -2561,7 +2566,7 @@ void Input::add_obs_trans_eqn(unsigned int p, unsigned int e, const vector < vec
 			
 			if(spline_map[k].size() > 0){                // There is a spline in the equation	
 				if(!par.spline_info.on) emsg_input("Should be spline");
-				auto nknot = par.spline_info.knot_times.size();
+				auto nknot = par.spline_info.knot_tdiv.size();
 				
 				for(auto j = 0u; j < nknot; j++){
 					if(k+j >= spline_map.size()) emsg_input("Prob0");
@@ -2598,8 +2603,8 @@ void Input::add_to_map(unsigned int eq, unsigned int i, vector < vector <bool> >
 				auto ti = eqn.ti_fix;
 				if(ti == UNSET) emsg_input("Time should be fixed");
 				
-				if(!par.spline_info.on) emsg_input("SHould be spline");
-				auto nknot = par.spline_info.knot_times.size();
+				if(!par.spline_info.on) emsg_input("Should be spline");
+				auto nknot = par.spline_info.knot_tdiv.size();
 				
 				for(auto j = 0u; j < nknot; j++){
 					if(k+j >= spline_map.size()) emsg_input("Prob0");
@@ -3006,12 +3011,12 @@ void Input::set_trans_tree()
 
 /// Used to order genetic data
 bool ObsGeneticData_ord (const ObsGeneticData &in1, const ObsGeneticData &in2)
-{ return (in1.t < in2.t); };  
+{ return (in1.tdiv < in2.tdiv); };  
 
 
 /// Used to order individual genetic observations 
 bool ObsGenRef_ord (const ObsGenRef &ogr1, const ObsGenRef &ogr2)                      
-{ return (ogr1.t < ogr2.t); };  
+{ return (ogr1.tdiv < ogr2.tdiv); };  
 
 
 /// Adds genetic data to the model (this is potentially multi-species)
@@ -3058,9 +3063,10 @@ void Input::add_genetic_data()
 							ogd.i = ai.i;
 						
 							auto t_str = tab.ele[r][1];
-							ogd.t = number(t_str);
-							if(ogd.t == UNSET){ alert_import("'"+t_str+"' is not a number"); return;}
-						
+							auto t = number(t_str);
+							if(t == UNSET){ alert_import("'"+t_str+"' is not a number"); return;}
+							ogd.tdiv = model.calc_tdiv(t);
+							
 							for(auto j = 0u; j < nSNP; j++){
 								auto ch = tab.ele[r][j+2];
 								if(ch == "A") ogd.snp.push_back(A_CH);
@@ -3113,8 +3119,9 @@ void Input::add_genetic_data()
 							ogd.r = r;
 						
 							auto t_str = tab.ele[r][1];
-							ogd.t = number(t_str);
-							if(ogd.t == UNSET){ alert_import("'"+t_str+"' is not a number"); return;}
+							auto t = number(t_str);
+							if(t == UNSET){ alert_import("'"+t_str+"' is not a number"); return;}
+							ogd.tdiv = model.calc_tdiv(t);
 							
 							gd.obs.push_back(ogd);
 						}
@@ -3159,7 +3166,7 @@ void Input::add_genetic_data()
 		
 		for(auto m = 0u; m < gd.obs.size(); m++){
 			const auto &ob = gd.obs[m];
-			ObsGenRef ogr; ogr.m = m; ogr.t = ob.t;
+			ObsGenRef ogr; ogr.m = m; ogr.tdiv = ob.tdiv;
 			gd.ind_gen_obs[ob.p][ob.i].push_back(ogr);
 		}		
 		
@@ -3202,7 +3209,7 @@ void Input::set_contains_source_sink()
 
 /// Used to order trigger events
 bool TrigEvRef_ord(const TrigEventRef &st1, const TrigEventRef &st2)                      
-{ return (st1.t < st2.t); };  
+{ return (st1.tdiv < st2.tdiv); };  
 
 
 /// Creates timeline of events used for individual simulation 
@@ -3221,10 +3228,10 @@ void Input::create_trig_ev_ref()
 					switch(obs[m].type){
 					case OBS_TRANS_EV:case OBS_SINK_EV:
 						{
-							if(!trig_ev_exist(TRIG_OBS_TRANS_EV,obs[m].t,trig_event)){
+							if(!trig_ev_exist(TRIG_OBS_TRANS_EV,obs[m].tdiv,trig_event)){
 								TrigEventRef ste; 
 								ste.type = TRIG_OBS_TRANS_EV; 
-								ste.ref = m; ste.t = obs[m].t;
+								ste.ref = m; ste.tdiv = obs[m].tdiv;
 								trig_event.push_back(ste);
 							}
 						}
@@ -3241,9 +3248,9 @@ void Input::create_trig_ev_ref()
 					switch(eve.type){
 					case LEAVE_EV:
 						{
-							if(!trig_ev_exist(TRIG_LEAVE_EV,eve.t,trig_event)){
+							if(!trig_ev_exist(TRIG_LEAVE_EV,eve.tdiv,trig_event)){
 								TrigEventRef ste; 
-								ste.type = TRIG_LEAVE_EV; ste.ref = UNSET; ste.t = eve.t;
+								ste.type = TRIG_LEAVE_EV; ste.ref = UNSET; ste.tdiv = eve.tdiv;
 								trig_event.push_back(ste);
 							}
 						}
@@ -3252,7 +3259,7 @@ void Input::create_trig_ev_ref()
 					case MOVE_EV:
 						{
 							TrigEventRef ste; 
-							ste.type = TRIG_MOVE_EV; ste.ref = m; ste.t = eve.t;
+							ste.type = TRIG_MOVE_EV; ste.ref = m; ste.tdiv = eve.tdiv;
 							trig_event.push_back(ste);
 						}
 						break;
@@ -3270,12 +3277,12 @@ void Input::create_trig_ev_ref()
 
 
 /// Determines if a trigger event already exists at a given time
-bool Input::trig_ev_exist(TrigEventType type, double t, const vector <TrigEventRef> &trig_event) const 
+bool Input::trig_ev_exist(TrigEventType type, double tdiv, const vector <TrigEventRef> &trig_event) const 
 {
 	auto len = trig_event.size();
 	if(len > 0){
 		auto &te = trig_event[len-1];
-		if(te.t == t && te.type == type) return true;
+		if(te.tdiv == tdiv && te.type == type) return true;
 	}
 	
 	return false;
@@ -3303,9 +3310,9 @@ void Input::create_cl_trig_ev_ref()
 					switch(ob.type){
 					case OBS_TRANS_EV:
 						{
-							if(!trig_ev_exist(TRIG_OBS_TRANS_EV,obs[m].t,cl_trig_event[ob.cl])){
+							if(!trig_ev_exist(TRIG_OBS_TRANS_EV,obs[m].tdiv,cl_trig_event[ob.cl])){
 								TrigEventRef ste; 
-								ste.type = TRIG_OBS_TRANS_EV; ste.ref = m; ste.t = obs[m].t;
+								ste.type = TRIG_OBS_TRANS_EV; ste.ref = m; ste.tdiv = obs[m].tdiv;
 								cl_trig_event[ob.cl].push_back(ste);
 								fixed_trans_ev[ob.cl].push_back(ste);
 							}
@@ -3324,7 +3331,7 @@ void Input::create_cl_trig_ev_ref()
 					case MOVE_EV:
 						{
 							TrigEventRef ste; 
-							ste.type = TRIG_MOVE_EV; ste.ref = m; ste.t = eve.t;
+							ste.type = TRIG_MOVE_EV; ste.ref = m; ste.tdiv = eve.tdiv;
 							cl_trig_event[eve.cl].push_back(ste);
 							fixed_trans_ev[eve.cl].push_back(ste);
 						}

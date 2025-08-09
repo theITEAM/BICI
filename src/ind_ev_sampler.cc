@@ -16,6 +16,7 @@ using namespace std;
 IndEvSampler::IndEvSampler(vector <MarkovEqnVariation> &markov_eqn_vari, const vector <Individual> &individual, const Details &details, const Species &sp, vector <double> &obs_eqn_value, vector < vector <double> > &obs_trans_eqn_value, const vector <Equation> &eqn, const vector <InfNode> &inf_node, const vector <double> &param_val, const vector <SplineValue> &spline_val, vector < vector <double> > &popnum_t) : markov_eqn_vari(markov_eqn_vari), individual(individual), details(details), sp(sp), obs_eqn_value(obs_eqn_value), obs_trans_eqn_value(obs_trans_eqn_value), eqn(eqn), inf_node(inf_node), param_val(param_val),spline_val(spline_val),popnum_t(popnum_t),nm_trans(sp.nm_trans)
 {
 	T = sp.T;
+	dt = details.dt;
 	
 	auto compmax = 0u;
 	for(auto cl = 0u; cl < sp.ncla; cl++){
@@ -46,9 +47,9 @@ bool IndEvSampler::needed(unsigned int i, unsigned int cl)
 	illegal = false;
 	
 	const auto &e = ind.ev[0];
-	t_start = e.t;
+	t_start = e.tdiv;
 
-	ti_start = get_ti_upper(t_start);
+	ti_start = get_ti(t_start);
 	auto c_start = e.c_after;
 	
 	auto ci = sp.comp_gl[c_start].cla_comp[cl];
@@ -68,7 +69,7 @@ bool IndEvSampler::needed(unsigned int i, unsigned int cl)
 	
 	auto &obs = sp.individual[i].obs;
 	nobs = obs.size();
-	if(nobs > 0) ti_end	= 1+get_ti_lower(obs[nobs-1].t); 
+	if(nobs > 0) ti_end	= 1+get_ti_lower(obs[nobs-1].tdiv); 
 	else ti_end = ti_start;
 	
 	if(sp.obs_trans_exist){ // If transitions are observed, extend to cover region
@@ -77,7 +78,7 @@ bool IndEvSampler::needed(unsigned int i, unsigned int cl)
 			ti_end = ti_tobs;
 			const auto &e_last = ind.ev[ind.ev.size()-1];
 			if(e_last.c_after == UNSET){
-				auto ti_leave = 1+get_ti_lower(e_last.t); 
+				auto ti_leave = 1+get_ti_lower(e_last.tdiv); 
 				if(ti_end > ti_leave) ti_end = ti_leave;
 			}
 		}
@@ -89,7 +90,7 @@ bool IndEvSampler::needed(unsigned int i, unsigned int cl)
 	auto ti = ti_start;
 	for(auto k = 1u; k < ev.size(); k++){
 		const auto &e = ev[k];
-		auto ti_next = get_ti_lower(e.t);
+		auto ti_next = get_ti_lower(e.tdiv);
 		
 		while(ti <= ti_next){ c_timeline[ti] = c; ti++;}
 		
@@ -139,8 +140,6 @@ void IndEvSampler::generate_ind_obs_timeline()
 {
 	if(nm_trans.size() != nm_rate.size()) emsg("nm_rate not set");
 	
-	auto dt = details.dt;
-	
 	const auto &ind = individual[i_store];
 	
 	const auto &claa = sp.cla[cl_store];
@@ -148,8 +147,6 @@ void IndEvSampler::generate_ind_obs_timeline()
 	const auto &island = claa.island[isl];
 	
 	const auto &comp = island.comp;
-	
-	auto &tp = sp.timepoint;
 	
 	auto &obs = sp.individual[i_store].obs;
 	int oi = nobs-1;
@@ -160,7 +157,7 @@ void IndEvSampler::generate_ind_obs_timeline()
 			auto n = ev.inf_node_ref;
 			if(n != UNSET && n != inf_node.size()){
 				for(const auto &iev : inf_node[n].inf_ev){
-					inf_other.push_back(iev.t);
+					inf_other.push_back(iev.tdiv);
 				}
 			}
 		}
@@ -203,8 +200,8 @@ void IndEvSampler::generate_ind_obs_timeline()
 					const auto &le = co.leave[l];
 				
 					rate = calculate_rate(ind,le,ctime,tii);
+	
 					rs[l]	= rate;
-					rate *= dt;
 					num[l] = rate;
 					sum += rate;
 				}
@@ -239,7 +236,7 @@ void IndEvSampler::generate_ind_obs_timeline()
 		auto normalise = false;
 		
 		// Accounts for observation model	
-		while(oi >= 0 && obs[oi].t > tp[tii]){	
+		while(oi >= 0 && obs[oi].tdiv > tii){	
 			const auto &ob = obs[oi];
 			switch(ob.type){
 			case OBS_SOURCE_EV: 
@@ -289,7 +286,7 @@ void IndEvSampler::generate_ind_obs_timeline()
 					auto fl = false;
 					if(fixed_event_obs.size() > 0){
 						const auto &obs_last = obs[fixed_event_obs[fixed_event_obs.size()-1]];
-						if(obs_last.t == obs[oi].t) fl = true;
+						if(obs_last.tdiv == obs[oi].tdiv) fl = true;
 					}
 			
 					if(fl == false) fixed_event_obs.push_back(oi);
@@ -343,7 +340,7 @@ void IndEvSampler::generate_ind_obs_timeline()
 			normalise = true;
 		}
 		
-		while(gi >= 0 && inf_other[gi] > tp[tii]){
+		while(gi >= 0 && inf_other[gi] > tii){
 			for(auto j = 0u; j < C; j++){
 				if(claa.comp[comp[j].c].infected == COMP_UNINFECTED){
 					iop[j] = 0;
@@ -414,8 +411,6 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 	
 	const auto &comp = island.comp;
 	
-	auto &tp = sp.timepoint;
-	
 	auto t = t_start;
 	auto ti = ti_start;
 	
@@ -463,7 +458,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 
 	auto feo_max = fixed_event_obs.size();
 	int feo = int(feo_max)-1;
-	if(feo >= 0) time_fixed = obs[fixed_event_obs[feo]].t; else time_fixed = LARGE;
+	if(feo >= 0) time_fixed = obs[fixed_event_obs[feo]].tdiv; else time_fixed = LARGE;
 	
 	// Goes through events on the existing event sequence
 	for(auto k = 1u; k <= ev.size(); k++){
@@ -475,19 +470,19 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 		if(k < ev.size()){
 			const auto &e = ev[k];
 			
-			t_next = e.t;
+			t_next = e.tdiv;
 			if(e.type == M_TRANS_EV || e.type == NM_TRANS_EV){
 				const auto &tra = sp.tra_gl[e.tr_gl];
 				if(tra.cl == cl_store && tra.variety != SINK_TRANS) ignore = true;
 			}
 		}
-		else t_next = tp[T];
+		else t_next = T;
 		
 		if(ignore == false){
 			// Goes down the time period up to the next event adding in transition events
 			while(t < t_next){
 				double tt;
-				if(tp[ti+1] < t_next) tt = tp[ti+1];
+				if(ti+1 < t_next) tt = ti+1;
 				else tt = t_next;
 				if(tt > time_fixed) tt = time_fixed;
 				
@@ -511,7 +506,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 						auto cf = le.cf;
 					
 						if(iop[cf] == 0) num[l] = 0;
-						else{
+						else{	
 							if(ti < ti_end) num[l] = ddt*rate_store[tii][cisland][l];
 							else num[l] = ddt*calculate_rate(ind,le,ctime,ti);
 							
@@ -523,7 +518,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 								}
 							}
 							*/
-		
+	
 							sum += num[l];
 						
 							num_op[l] = num[l]*iop[cf];
@@ -583,7 +578,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 							enew.move_c = UNSET;
 							enew.cl = trg.cl;
 							enew.tr_gl = tr_gl;
-							enew.t = t_new;
+							enew.tdiv = t_new;
 							enew.observed = false;
 							enew.inf_node_ref = UNSET;
 							enew.ind_inf_from = IndInfFrom();
@@ -606,7 +601,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 				
 				t = tt;
 				
-				if(t == tp[ti+1]) ti++;
+				if(t == ti+1) ti++;
 				
 				if(t == time_fixed){           // Adds a fixed event to the time line
 					auto &ob = obs[fixed_event_obs[feo]];
@@ -662,7 +657,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 						enew.move_c = UNSET;
 						enew.cl = cl_store;
 						enew.tr_gl = tr_gl;
-						enew.t = ob.t;
+						enew.tdiv = ob.tdiv;
 						enew.observed = true;
 						enew.inf_node_ref = UNSET;
 						enew.ind_inf_from = IndInfFrom();						
@@ -673,7 +668,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 						ev_new.push_back(enew);
 					}
 					feo--;
-					if(feo >= 0) time_fixed = obs[fixed_event_obs[feo]].t; else time_fixed = LARGE;
+					if(feo >= 0) time_fixed = obs[fixed_event_obs[feo]].tdiv; else time_fixed = LARGE;
 				}
 			}
 			t = t_next;
@@ -697,8 +692,6 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 		illegal = true;
 		return ev_new;
 	}
-	
-	if(events_near_div(ev_new,details)) illegal = true;
 	
 	return ev_new;
 }
@@ -787,8 +780,6 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 	
 	const auto &comp = island.comp;
 	
-	auto &tp = sp.timepoint;
-	
 	auto t = t_start;
 	auto ti = ti_start;
 
@@ -814,7 +805,7 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 	double time_fixed;
 	auto feo_max = fixed_event_obs.size();
 	int feo = int(feo_max)-1;
-	if(feo >= 0) time_fixed = obs[fixed_event_obs[feo]].t; else time_fixed = LARGE;
+	if(feo >= 0) time_fixed = obs[fixed_event_obs[feo]].tdiv; else time_fixed = LARGE;
 	
 	vector <unsigned int> list;
 
@@ -828,23 +819,23 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 		if(k < ev.size()){
 			const auto &e = ev[k];
 			
-			t_next = e.t;
+			t_next = e.tdiv;
 			if(e.type == M_TRANS_EV || e.type == NM_TRANS_EV){
 				const auto &tra = sp.tra_gl[e.tr_gl];
 				if(tra.cl == cl_store && tra.variety != SINK_TRANS) ignore = true;
 			}
 		}
-		else t_next = tp[T];
+		else t_next = T;
 		
 		if(ignore == true){
 			list.push_back(k);
 		}
 		else{
-			auto t_event = LARGE; if(list.size() > 0) t_event = ev[list[0]].t;
+			auto t_event = LARGE; if(list.size() > 0) t_event = ev[list[0]].tdiv;
 		
 			while(t < t_next){
 				double tt;
-				if(tp[ti+1] < t_next) tt = tp[ti+1];
+				if(ti+1 < t_next) tt = ti+1;
 				else tt = t_next;
 		
 				if(tt > time_fixed) tt = time_fixed;
@@ -921,9 +912,9 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 							cisland = claa.comp[ci].island_ref.c;
 	
 							list.erase(list.begin());
-							t_event = LARGE; if(list.size() > 0) t_event = ev[list[0]].t;
+							t_event = LARGE; if(list.size() > 0) t_event = ev[list[0]].tdiv;
 							
-							tt = e.t;
+							tt = e.tdiv;
 						}
 						else{
 							pif *= stay_op/total;	
@@ -933,7 +924,7 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 				
 				t = tt;
 				
-				if(t == tp[ti+1]) ti++;
+				if(t == ti+1) ti++;
 				
 				if(t == time_fixed){ 
 					auto &ob = obs[fixed_event_obs[feo]];
@@ -965,11 +956,11 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 							cisland = claa.comp[ci].island_ref.c;
 		
 							list.erase(list.begin());
-							t_event = LARGE; if(list.size() > 0) t_event = ev[list[0]].t;	
+							t_event = LARGE; if(list.size() > 0) t_event = ev[list[0]].tdiv;	
 						}
 						
 						feo--;
-						if(feo >= 0) time_fixed = obs[fixed_event_obs[feo]].t;
+						if(feo >= 0) time_fixed = obs[fixed_event_obs[feo]].tdiv;
 						else time_fixed = LARGE;
 					}
 					else{
@@ -990,19 +981,6 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 	return log(pif);
 }
 
-
-/// Gets ti div time from an actual time (rounding down if equal)
-unsigned int IndEvSampler::get_ti_lower(double t) const
-{
-	return (unsigned int)(ALMOST_ONE*(t-details.t_start)/details.dt);
-}
-
-
-/// Gets ti div time from an actual time (rounding up if equal)
-unsigned int IndEvSampler::get_ti_upper(double t) const
-{
-	return (unsigned int)(OVER_ONE*(t-details.t_start)/details.dt);
-}
 
 
 /// Returns the individual-based factor which acts on Markov equation
@@ -1027,7 +1005,7 @@ void IndEvSampler::setup_nm()
 }
 
 
-/// Calculates the rate for a transition (for markovian and nm)
+/// Calculates the rate for a transition (for markovian and nm) (times by factor dt)
 double IndEvSampler::calculate_rate(const Individual &ind, const IslandTrans &le, unsigned int ctime, int tii) const
 {
 	if(le.nm_trans){ // Non markovian transition
@@ -1038,6 +1016,7 @@ double IndEvSampler::calculate_rate(const Individual &ind, const IslandTrans &le
 		}
 		else{
 			auto rate = nm_rate[m][tii];
+			
 			if(rate < TINY) rate = TINY;
 			if(ind_variation == true){
 				//for(const auto &ifr : sp.nm_trans[m].ind_fac_rate){
@@ -1097,28 +1076,28 @@ double IndEvSampler::calculate_nm_rate(const Individual &ind, unsigned int m, in
 	case GAMMA: case ERLANG: case LOG_NORMAL: case PERIOD: 
 		{
 			const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
-			return bp/eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			return dt*bp/eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
 		}
 		break;
 
 	case EXP_RATE_NM:
 		{
 			const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
-			return bp*eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			return dt*bp*eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
 		}
 		break;
 		
 	case EXP_MEAN_NM:
 		{
 			const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
-			return bp/eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			return dt*bp/eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
 		}
 		break;
 	
 	case WEIBULL:
 		{
 			const auto &eq = eqn[nmt.dist_param_eq_ref[0]];	
-			return bp/eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			return dt*bp/eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
 		}
 		break;
 		

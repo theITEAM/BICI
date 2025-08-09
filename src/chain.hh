@@ -19,6 +19,7 @@ public:
 	void update(unsigned int s);
 	string diagnostics(double time, double anneal_time=UNSET) const;
 	void pas_burn_update(unsigned int s, unsigned int g, unsigned int gen_update, double phi);
+	void pas_burn_update_run(unsigned int s);
 	double like_total_obs() const;
 	void check_cor_matrix() const;
 	

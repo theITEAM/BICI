@@ -38,8 +38,9 @@ void CorMatrix::add_sample(vector <double> param_val_prop, unsigned int range)
 	if(range < RANGE_MIN) range = RANGE_MIN;
 	
 	// Shifting ensure that values are not constant
-	auto sh = (ran()-0.5)*TINY;
-	for(auto &val : param_val_prop) val += sh;
+	for(auto &val : param_val_prop){
+		val += (ran()-0.5)*SMALL;
+	}
 	
 	samp.push_back(param_val_prop);
 	n++;
@@ -105,8 +106,11 @@ vector < vector <double> > CorMatrix::calculate_cor_matrix() const
 	for(auto i = 0u; i < N; i++) mu[i] = av[i]/nn;
 	
 	vector <double> var(N);
-	for(auto i = 0u; i < N; i++) var[i] = av2[i][i]/nn - mu[i]*mu[i];
-	
+	for(auto i = 0u; i < N; i++){
+		var[i] = av2[i][i]/nn - mu[i]*mu[i];
+		if(var[i] < TINY) var[i] = TINY;
+	}
+		
 	vector < vector <double> > M;
 	M.resize(N); for(auto i = 0u; i < N; i++) M[i].resize(N);
 	

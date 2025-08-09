@@ -14,8 +14,6 @@ class State                                // Stores information about the state
 		
 		unsigned int T;                        // Total number of divisions
 		
-		vector <double> dtimepoint;            // The difference between timepoints
-		
 		vector <unsigned int> empty;           // An empty vector
 		
 		vector <double> param_val;             // The parameter value
@@ -78,7 +76,6 @@ class State                                // Stores information about the state
 		void update_popnum_t_init(unsigned int p, vector <unsigned int> cnum_i, vector <unsigned int> cnum_f);
 		void back_init();
 		void restore_back();
-		unsigned int get_ti(double t) const;
 		vector <double> get_param_val_prop() const;
 		double get_trans_rate_est(unsigned int p, unsigned int tr, unsigned int ti) const;
 		vector < vector <double> > get_population_rates(unsigned int p) const;
@@ -114,8 +111,8 @@ class State                                // Stores information about the state
 		double sample_infection_source(Event &ev, unsigned int p) const;
 		bool trg_contains_outside(unsigned int p, unsigned int tr_gl) const;
 		double prob_infection_source(const Event &ev, unsigned int p) const;
-		NodeRef pass_down(const NodeRef &nr, double t, double probif) const;
-		NodeRef pass_up(const NodeRef &nr, double t, double probfi) const;
+		NodeRef pass_down(const NodeRef &nr, double t, double &probif) const;
+		NodeRef pass_up(const NodeRef &nr, double t, double &probfi) const;
 		InfNodeAlter get_inf_node_alteration(unsigned int p, unsigned int i,unsigned int n, const vector <Event> &ev_new, unsigned int e) const;
 		void setup_transtree();
 		void sample_genetic_value();
@@ -131,6 +128,8 @@ class State                                // Stores information about the state
 		double likelihood_genetic_obs(const vector < vector <unsigned int> > &gen_val);
 		void trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, unsigned int &ntr);
 		bool set_ind_inf_from(double t, unsigned int p, vector <Event> &event, unsigned int p_from, unsigned int i_from, const vector <Event> &event_from);
+		void set_ind_inf_from_outside(double t, vector <Event> &event);
+		
 		void trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int &nfa, unsigned int &nac, unsigned int &ntr);
 		void update_inf_node_ref(unsigned int k);
 		InfNodeAlter no_alter(unsigned int n) const;
@@ -190,7 +189,7 @@ class State                                // Stores information about the state
 		void check_popnum_t2(string ref);
 		void check_neg_rate(string name);
 		void add_alg_warn(string te);
-	
+		
 	private:
 		void check_dependent_param(string ref);
 		void check_ref(unsigned int p, string ref);
@@ -212,11 +211,9 @@ class State                                // Stores information about the state
 		void check_genetic_value(string ref);
 		void check_popnum_ind(string ref);
 		void check_add_move_rem(string ref);
-		void check_event_boundary(string ref);
 		void check_effect_out_of_range();
 		void output_dump() const;
-		void get_closest_to_boundary();
-		
+			
 	private:
 		const Model &model;
 };

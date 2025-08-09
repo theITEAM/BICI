@@ -27,7 +27,7 @@ class SourceSampler {
 	vector <unsigned int> me_map;            // Maps from tr_gl to list
 
 	public:
-		SourceSampler(const vector <MarkovEqn> &markov_eqn, const vector <TransGlobal> &tra_gl, const vector <CompGlobal> &comp_gl, const	vector <double> &timepoint, const	vector <double> &dtimepoint, const Details &details, const InitCond &init_cond);
+		SourceSampler(const vector <MarkovEqn> &markov_eqn, const vector <TransGlobal> &tra_gl, const vector <CompGlobal> &comp_gl, const Details &details, const InitCond &init_cond);
 		void update(unsigned int nind_obs, vector <Individual> &individual, const vector <MarkovEqnVariation> &markov_eqn_vari, bool contains_source);
 		Event sample(double &probif) const;
 		double sample_prob(const Event &ev) const;
@@ -37,8 +37,6 @@ class SourceSampler {
 		const vector <MarkovEqn> &markov_eqn;
 		const vector <TransGlobal> &tra_gl;
 		const vector <CompGlobal> &comp_gl;
-		const	vector <double> &timepoint;
-		const	vector <double> &dtimepoint;
 		const Details &details;
 		const InitCond &init_cond;
 };

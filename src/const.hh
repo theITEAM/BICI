@@ -280,6 +280,7 @@ const auto OUTSIDE_INF = 99999992u;               // Stands for outside infectio
 const auto ENTER_INF = 99999993u;                 // Stands for entering infection
 const auto BP_FROM_OTHERS = 99999994u;            // Branch probability is calculated from others
 const auto GEN_PLOT = 99999995u;                  // Used for a generation plot
+const auto LOG_HALF = log(0.5);
 
 const auto LINK_CV_THRESH = 0.3;                  // CV threshold for linking for multi-event
 const auto LINK_WEIBULL_SHAPE = 3.7;              // Shape thresh for linking for multi-event
@@ -320,7 +321,6 @@ const auto PROP_SIM_PROB_MIN = 0.05;              // Minimum probability for ind
 
 const double TINY = 0.000000001;                  // Used to represent a tiny number
 const double VTINY = 0.00000000000001;            // Used to represent a tiny number
-const double NEAR_DIV_THRESH = 0.00000001;        // Threshold for near a div
 const double EFFECT_MAX = 10000000;               // Sets maximum value for effect
 const double EFFECT_MIN = 0.0000001;              // Sets minimum value for effect
 const double CLIP_MIN = 0.99*log(EFFECT_MIN);     // Clips minimum 
@@ -342,7 +342,6 @@ const int LARGE_INT = 1000000000;                 // Used to represent a big int
 const double INFY = 1000000001;                   // Used to represent infinity
 const double UNDEF = 1000000002;                  // Used to represent undefined
 const double ALMOST_ONE = 0.9999999999999;        // Almost one   
-const double OVER_ONE = 1.0000000000001;          // Just over one
 const double LOG_THRESH = 0.00001;                // The threshold below which logs not calculated
 const double PROB_MOD = 0.001;                    // Avoids zero probability in local event props
 const double LOW_BOUND = 0;                       // The lower bound for observation probability

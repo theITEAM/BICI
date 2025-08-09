@@ -142,7 +142,7 @@ unsigned int get_event_after(unsigned int e, const vector <Event> &ev);
 double get_log_zero_one(double val);
 void set_seed(const int core, const Details &details, unsigned int seed_tag);
 void check_bp(double &bp);
-double nm_trans_like(TransType type, double dt, const vector <double> &ref_val);
+double nm_trans_like(TransType type, double dtdiv, double dt, const vector <double> &ref_val);
 vector <string> comma_split(string te);
 unsigned int get_op_step(unsigned int nnumber);
 vector <unsigned int> true_list(const vector <bool> &vec);	
@@ -151,8 +151,6 @@ vector <unsigned int> combine(const vector <unsigned int> &vec1, const vector <u
 bool begin_str(string st, string st2);
 bool end_str(string st, string st2);
 bool check_thresh(DistText dist, DistQuant dq, double val, string &err);
-bool events_near_div(const vector <Event> &ev, const Details &details);
-bool event_near_div(double t, const Details &details);
 string trunc(string te, unsigned int len);
 vector< vector <string> > get_escape_char();
 string add_escape_char(string te);
@@ -170,6 +168,13 @@ double memory_available();
 string mem_print(double mem);
 double clip(double val, double thresh);
 double exp_clip(double val);
+unsigned int get_ti(double t);
+unsigned int get_ti_lower(double t);
+unsigned int get_ti_next(double t_next, const Details &details);
+unsigned int get_ti_over(double tdiv);
+bool on_timestep(double t, const Details &details);
+double calc_tdiv(double t, const Details &details);
+double calc_t(double tdiv, const Details &details);
 	
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);

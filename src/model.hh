@@ -47,7 +47,6 @@ class Model                                // Stores information about the model
 		vector <Spline> spline;                // Stores information about splines
 	 	
 		vector <double> timepoint;             // Discrete timepoints	
-		unsigned int ntimepoint;               // The number of time points
 		
 		vector <Derive> derive;                // Derived quantities
 		  
@@ -62,7 +61,7 @@ class Model                                // Stores information about the model
 		Details details;                       // Details for simulation/inference
 		
 		Model(Operation mode_);
-		void add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double t = UNSET);
+		void add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv = UNSET);
 		//string find_eq_dif(const EquationInfo &eqi) const;
 		vector <double> param_sample() const;
 		vector <double> post_param(const Sample &samp) const;
@@ -99,6 +98,8 @@ class Model                                // Stores information about the model
 		void print_param(const vector <double> &vec) const;
 		vector <double> get_param_val_prop(const vector <double> &param_val) const;
 		vector <double> get_param_val(const vector <double> &param_val_prop) const;
+		double calc_tdiv(double t) const; 
+		double calc_t(double tdiv) const;
 	
 	private:
 		//Hash hash_eqn;                         // Stores a hash take for equations

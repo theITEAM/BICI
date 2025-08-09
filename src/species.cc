@@ -79,13 +79,6 @@ unsigned int Species::update_c_comp(unsigned int c, unsigned int cl, unsigned in
 }
 
 
-/// Gets ti (the division time) from an actual time
-unsigned int Species::get_ti(double t) const
-{
-	return (unsigned int)(OVER_ONE*(t-details.t_start)/details.dt);
-}
-
-
 /// Potentially corrects enew based on current compartment
 bool Species::correct_ev(unsigned int c, Event &enew) const
 {
@@ -143,8 +136,8 @@ void Species::create_ind_noobs()
 		IndData ind;
 		ind.name = "No observation";
 		ind.enter_ref = UNSET;
-		ind.tmin = -LARGE;
-		ind.tmax = -LARGE;
+		ind.tdivmin = -LARGE;
+		ind.tdivmax = -LARGE;
 		individual.push_back(ind);
 	}
 }
@@ -205,7 +198,9 @@ unsigned int Species::get_tra_m(unsigned int tr, const Event &ev_orig) const
 	const auto &tra = tra_gl[tr];
 	if(tra.i != ev_orig.c_after){ // accounts for intermediate transition
 		auto trg = tr_trans(tr,ev_orig.c_after);
-		if(trg == UNSET) emsg("trg unset");
+		if(trg == UNSET){
+			emsg("trg unset1");
+		}
 		return tra_gl[trg].nm_trans_ref;
 	}
 	return tra.nm_trans_ref;
@@ -269,6 +264,8 @@ vector <unsigned int> Species::get_vec_tr_swap_mid(unsigned int st, unsigned int
 vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector <double> > &popnum_t, const vector <Equation> &eqn, vector < vector <double> > &bp_store) const
 {
 	vector < vector <double> > nm_rate;
+	
+	auto dt = details.dt;
 	
 	auto M = nm_trans.size();
 	nm_rate.resize(M);
@@ -358,13 +355,13 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
 					if(eq.time_vari){
 						for(auto ti = 0u; ti < T; ti++){	
-							nm_rate[m][ti] = bp[ti]/eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+							nm_rate[m][ti] = dt*bp[ti]/eq.calculate(ti,popnum_t[ti],param_val,spline_val);
 						}
 					}
 					else{
 						auto val = 1.0/eq.calculate_param_only(param_val); 
 						for(auto ti = 0u; ti < T; ti++){
-							nm_rate[m][ti] = bp[ti]*val;
+							nm_rate[m][ti] = dt*bp[ti]*val;
 						}
 					}
 				}
@@ -375,13 +372,13 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
 					if(eq.time_vari){
 						for(auto ti = 0u; ti < T; ti++){	
-							nm_rate[m][ti] = bp[ti]*eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+							nm_rate[m][ti] = dt*bp[ti]*eq.calculate(ti,popnum_t[ti],param_val,spline_val);
 						}		
 					}
 					else{
 						auto val = eq.calculate_param_only(param_val); 
 						for(auto ti = 0u; ti < T; ti++){
-							nm_rate[m][ti] = bp[ti]*val;
+							nm_rate[m][ti] = dt*bp[ti]*val;
 						}
 					}
 				}
@@ -393,13 +390,13 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					const auto &eq = eqn[nmt.dist_param_eq_ref[0]];	
 					if(eq.time_vari){
 						for(auto ti = 0u; ti < T; ti++){	
-							nm_rate[m][ti] = bp[ti]/eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+							nm_rate[m][ti] = dt*bp[ti]/eq.calculate(ti,popnum_t[ti],param_val,spline_val);
 						}
 					}
 					else{
 						auto val = 1.0/eq.calculate_param_only(param_val); 
 						for(auto ti = 0u; ti < T; ti++){
-							nm_rate[m][ti] = bp[ti]*val;
+							nm_rate[m][ti] = dt*bp[ti]*val;
 						}
 					}
 					
@@ -409,11 +406,11 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					
 						if(eq.time_vari || eq_sh.time_vari){
 							for(auto ti = 0u; ti < T; ti++){
-								nm_rate[m][ti] = 1.0/eq.calculate_no_popnum(ti,param_val,spline_val);
+								nm_rate[m][ti] = dt/eq.calculate_no_popnum(ti,param_val,spline_val);
 							}
 						}
 						else{
-							auto val = 1.0/(eq.calculate_param_only(param_val)); 
+							auto val = dt/(eq.calculate_param_only(param_val)); 
 							
 							for(auto ti = 0u; ti < T; ti++) nm_rate[m][ti] = val;
 						}

@@ -170,7 +170,7 @@ struct ParamProp {                 // Stores properties of a parameter
 
 struct SplineInfo {                // Stores information about a parameter spline
 	bool on;                         // Detemines if spline is switched on
-	vector <double> knot_times;      // Times of knots (if time ariation)
+	vector <double> knot_tdiv;      // Times of knots (if time variation)
 	bool smooth;                     // Determines if smoothing is added
 	SmoothType smooth_type;          // The type of smoothing (normal or log-normal)
 	double smooth_value;             // The value used for the smoothing
@@ -227,7 +227,7 @@ struct DepConv {                   // Used to convert dependencies from index to
 };
 
 struct EquationInfo {              // Stores information about an equation (prior to equation being evaluated)
-	EquationInfo(){ te = ""; p = UNSET; cl = UNSET; infection_trans = false;}
+	EquationInfo(){ te = ""; p = UNSET; cl = UNSET; infection_trans = false; error=false; emsg="";}
 	string te_raw;                   // The rate text value (as seen in the input file)
 	string te;                       // The text value after processing
 	unsigned int p, cl;              // The species and classification for equation (if appropriate)
@@ -354,6 +354,7 @@ struct Details {                   // Stores details about simulation/inference/
 	double ppc_t_end;                // The end time for ppc
 	double inf_t_end;                // The end time for inference
 	double dt;                       // The time step 
+	unsigned int T;                  // The total number of divisions
  	unsigned int number;             // Number of simulations to be performed
 	unsigned int output_param;       // The number of output parameter samples (MCMC)
 	unsigned int output_state;       // The number of output state samples (MCMC)
@@ -607,6 +608,7 @@ struct TransInfection {            // Information about transition infection (fo
 struct InfSourceSampler {          // Used to sample the source of infection (for trans trees)
 	vector <double> val_store;       // The value for different sources
 	vector <double> val_sum_store;   // The cumulative value
+	double sum;                      // Total value for sum
 	unsigned int sample_inf_source() const;
 	double prob_inf_source(unsigned int j) const;
 };
@@ -816,7 +818,7 @@ struct Event {                     // A transition event
 	unsigned int cl;                 // The classification (M_TRANS_EV, NM_TRANS_EV, MOVE_EV)
 	unsigned int move_c;             // The compartment (for entry events) (MOVE_EV)
 	unsigned int c_after;            // The compartment after the transition
-	double t;                        // The time at which transition occurs
+	double tdiv;                     // The time at which transition occurs
 	double Li;                       // Likelihood for transition (for NM trans)
 	double Li_bp;                    // Likelihood for branch prob (for NM trans)
 	bool observed;                   // Determines if event is observed in data
@@ -834,7 +836,7 @@ struct Event {                     // A transition event
 };
 
 struct GlobalEvent {               // Global time event (used in trans_tree proposals)
-	double t;                        // Event time                    
+	double tdiv;                     // Event time                    
 	unsigned int p;                  // Species
 	unsigned int i;                  // Individual
 	unsigned int e;                  // Event number
@@ -857,9 +859,9 @@ struct IncompNMTransRef {          // References an incomplete transition
 	bool on;                         // Determine if set
 	unsigned int n;                  // References nm_trans_incomp
 	unsigned int ti;                 // The time division
-	double dt;                       // The time span
+	double dtdiv;                    // The time span
 	unsigned int e_begin;            // Event number at begining of transition
-	double t_end;                    // The end time of the transition
+	double tdiv_end;                 // The end time of the transition
 	unsigned int index;              // The index in nm_trans_incomp_ref
 	double Li;                       // Likelihood of transition
 };
@@ -891,7 +893,7 @@ struct SimTrigEvent {              // An event trigger (e.g. ind enters, leaves,
 	unsigned int c;                  // The state (if entering)
 	unsigned int i;                  // The individual on which the event happens
 	unsigned int trg;                // The global transtion
-	double t;                        // The time the event happens
+	double tdiv;                     // The time the event happens
 };
 
 struct SimTrigEventDiv {           // Stores a division of non-Markovian next events (simulation) 
@@ -901,12 +903,12 @@ struct SimTrigEventDiv {           // Stores a division of non-Markovian next ev
 struct TrigEventRef {              // Used when simulating new event sequence for individual
 	TrigEventType type;              // The type of event
 	unsigned int ref;                // If nm_trans then gives tr_gl, if trans data given obs num
-	double t;                        // The time the event happens
+	double tdiv;                     // The time the event happens
 };
 
 struct FutureNMEvent {             // Future  non-Markovian event (in simulation proposal)
 	unsigned int trg;                // The global transtion
-	double t;                        // The time the event happens
+	double tdiv;                     // The time the event happens
 };
 
 struct MarkovNode {                // Stores Markov node (used during simulation)
@@ -961,16 +963,16 @@ struct MarkovEqnVariation {        // Stores variation in Markov equations for a
 };
 
 struct EventData {                 // Stores individual data
-	EventData(){ move_c = UNSET; cl = UNSET; tr = UNSET; t = UNSET;}
+	EventData(){ move_c = UNSET; cl = UNSET; tr = UNSET; tdiv = UNSET;}
 	EventType type;                  // The type of the event
 	unsigned int move_c;             // The compartment in classification (when moving)
 	unsigned int cl;                 // The classification 
 	unsigned int tr;                 // The transition which occurs
-	double t;                        // The time at which transition occurs
+	double tdiv;                     // The time at which transition occurs
 };
 
 struct ObsData {
-	ObsData(){ so = UNSET; ref = UNSET; cl = UNSET; test_res = UNSET; t = UNSET;}
+	ObsData(){ so = UNSET; ref = UNSET; cl = UNSET; test_res = UNSET; tdiv = UNSET;}
 	
 	ObsType type;                    // The type of the observation
 	unsigned int so;                 // References the data source
@@ -986,7 +988,7 @@ struct ObsData {
 	unsigned int Se_obs_eqn_ref;     // References Se in obs_eqn
 	unsigned int Sp_obs_eqn_ref;     // References Sp in obs_eqn
 	bool test_res;                   // The result of a diagnostic test
-	double t;                        // The time at which observation occurs
+	double tdiv;                     // The time at which observation occurs
 	bool time_vari;                  // Determines if time variation
 };
 
@@ -998,7 +1000,7 @@ struct EnterCla {                  // Sets information about individuals enterin
 
 struct Enter {                     // Stores a probability distribution for entering ind
 	string name;                     // Reference name
-	double time;                     // The time the individual enters
+	double tdiv;                     // The time the individual enters
 	unsigned int c_set;              // If the global c value is set (otherwise eqn is used)
 	vector <EnterCla> cla;           // Information about probability entering different cla
 	bool set;                        // Determines if set
@@ -1016,8 +1018,8 @@ struct IndData {                   // Stores data on individuals
 	bool move_needed;                // Determines if individual move events
 	unsigned int enter_ref;          // References enter compartment probability
 	bool init_c_set;                 // Determines if the init individual compartment set
-	double tmin;                     // The minimum time for data
-	double tmax;                     // The maximim time for data
+	double tdivmin;                     // The minimum time for data
+	double tdivmax;                     // The maximim time for data
 };
 
 struct WarnData {                  // Stores warning messages
@@ -1124,7 +1126,7 @@ struct PopFilter {                 // Stores filter used for population data
 
 struct PopData {                   // Stores information about a population measurement
 	unsigned int so;                 // References the source 
-	double t;                        // The time of the population measurement
+	double tdiv;                     // The time of the population measurement
 	ObsModelVariety type;            // The type of observation
 	double value;                    // The value of the measurement
 	double obs_mod_val;              // The sd or p in the observation model
@@ -1144,8 +1146,8 @@ struct PopTransFilter {            // Stores filter used for population transiti
 
 struct PopTransData {              // Stores information about a population transitions
 	unsigned int so;                 // References the source 
-	double tmin;                     // The start time
-	double tmax;                     // The end time
+	double tdivmin;                  // The start time
+	double tdivmax;                  // The end time
 	ObsModelVariety type;            // The type of observation
 	double value;                    // The value of the measurement
 	double obs_mod_val;              // The SD or p in the observation model
@@ -1234,8 +1236,8 @@ struct InfNodeAlter {              // Determines an alternation in an infnode
 	InfNodeAlter(){ possible = true; unchanged = false; e_add = UNSET;}
 
 	unsigned e_add;                  // The event number for infection on new sequence
-	double t_start;                  // The time of the addition
-	double t_rec;                    // The recovery time of the added individual 
+	double tdiv_start;               // The time of the addition
+	double tdiv_rec;                 // The recovery time of the added individual 
 	vector <unsigned int> obs_add_begin; // Genetic observations added at the beginning
 	vector <unsigned int> obs_add_end;   // Genetic observations added at the beginning
 	bool possible;                   // Set if change is possible
@@ -1243,7 +1245,7 @@ struct InfNodeAlter {              // Determines an alternation in an infnode
 };
 
 struct InfEvent {                  // Infection event (references genetic observation or infection node)
-	double t;                        // The event time
+	double tdiv;                     // The event time
 	InfEventType type;               // INFECT_OTHER or GENETIC_OBS 
 	unsigned int index;              // Node infected or number of observation
 	unsigned int mut_num;            // The number of mutations immediately preceeding
@@ -1266,8 +1268,8 @@ struct ObsMut {                    // Used to store genetic observation (used in
 };
 
 struct InfNode {                   // Stores information about an infection events
-	double t_start;                  // The time the infection start
-	double t_rec;                    // The time the individual recovers
+	double tdiv_start;                  // The time the infection start
+	double tdiv_rec;                    // The time the individual recovers
 	unsigned int p;                  // The species of infected individual
 	unsigned int i;                  // Individual number of infected individual
 	unsigned int e;                  // The event number
@@ -1282,7 +1284,7 @@ struct GenChange {                 // Stores information about a change to
 		dlike_genetic_process = 0; dlike_genetic_obs = 0;
 		type = type_; 
 	}
-	void update_like_ch(Like &like_ch, double dprob);
+	void update_like_ch(Like &like_ch, double &dprob);
 	
 	GenChaType type;                 // The type of change
 	unsigned int n;                  // The node being changed
@@ -1304,12 +1306,12 @@ struct ObsGeneticData {            // Store individual genetic data
 	unsigned int p;                  // The species
 	unsigned int i;                  // The individual
 	unsigned int r;                  // Allows for reordering
-	double t;                        // The time of observation
+	double tdiv;                     // The time of observation
 	vector <GenChar> snp;            // The snps (used for snp data)
 };
 
 struct ObsGenRef{                  // References a genetic observation             
-	double t;                        // The time of observation
+	double tdiv;                     // The time of observation
 	unsigned int m;                  // The observation number
 };
 
@@ -1381,6 +1383,7 @@ struct BurnInfo {                  // Information about burnin phase
 	void add_L(double L);
 	void setup(unsigned int s, unsigned int &nburnin,  unsigned int &nsample, const Details &details);
 	void pas_setup(unsigned int s, unsigned int g, unsigned int gen_update, double phi_);
+	void pas_setup_run(unsigned int s, unsigned int &nburnin,  unsigned int &nsample, const Details &details);
 	void set_phi();
 };
 
@@ -1573,14 +1576,14 @@ struct EventCl {                   // Event for constructing timeline in a class
 	unsigned int c_bef;              // The compartment before event
 	unsigned int c_aft;              // The compartment after event
 	unsigned int e;                  // References event
-	double t;                        // Time of event
+	double tdiv;                     // Time of event
 };
 
 struct LocalIndChange {            // Stores potential local changes to individual
 	unsigned int i;                  // Individual
 	unsigned int cl;                 // Classification
-	double tmin;                     // Gives the minimum time for the local proposal
-	double tmax;                     // Gives the maximum time for the local proposal
+	double tdivmin;                  // Gives the minimum time for the local proposal
+	double tdivmax;                  // Gives the maximum time for the local proposal
 	vector <unsigned int> remove_e;  // Which events to remove
 	vector <TrSwap> tr_swap;         // Transitions which need to be added    
 	unsigned int swap_rep_ref;       // References swap_rep
@@ -1608,7 +1611,7 @@ struct CompR {                     // Compartment rate
 struct RatePosteriorMean {         // Stores posterior mean of rates (for local proposals)
 	RatePosteriorMean(const Details &details);
 
-	double t_start, dt;
+	//double tdiv_start, dtdiv;
 	
 	bool first;                      // Set if first time to be updated
 	vector <unsigned int> tramean_ref;         // References where to find transition rate [trg]
@@ -1620,11 +1623,6 @@ struct RatePosteriorMean {         // Stores posterior mean of rates (for local 
 	
 	double get_value(const vector <double> &vec, double v) const;
 	void update_prob_try_Rint(double t1, double t2, unsigned int tr_gl, unsigned int cl, unsigned int c, double &prob_try, double &Rint, const Individual &ind, Modify mod) const;
-				
-	//void update_prob_try_Rint(double t1, double t2, unsigned int tr_gl, unsigned int cl, unsigned int c, double &prob_try, double &Rint, const Individual &ind, Modify mod) const;
-	//void update_prob_try_event(unsigned int ti, unsigned int tr_gl, unsigned int cl, unsigned int c, double &prob_try, const Individual &ind, Modify mod) const;
-	//void update_prob_try_Rint_R(double t1, double t2, unsigned int cl, unsigned int c, double &prob_try, double &Rint, const Individual &ind, Modify mod) const;
-	//double rate_ratio(unsigned int ti, unsigned int tr_old, unsigned int tr_new) const;
 };
 
 struct SourceSamp {                // Used to generate a sample for the source
@@ -1645,7 +1643,6 @@ struct SampleSpecies {             // Used to store information about a posterio
 
 struct Sample {                    // Stores posterior sample (for PPC)
 	unsigned int num;                // The sample number    
-	vector <double> timepoint;       // Times points 
 	vector < vector <double> > param_value; // The parameter sample
 	vector <SampleSpecies> species;  // The state sample
 };
@@ -1692,8 +1689,8 @@ struct MeanSD {                    // Stores the mean and stadard deviation for 
 };
 
 struct TRange {                    // Stores a time range
-	double tmin;
-	double tmax;
+	double tdivmin;
+	double tdivmax;
 };
 
 struct ListMove {                  // Stores a list and a corresponding move
@@ -1702,7 +1699,7 @@ struct ListMove {                  // Stores a list and a corresponding move
 };
 
 struct EventMove {                 // Used for reordering event for multi-event proposal
-	double t;
+	double tdiv;
 	unsigned int e;
 	bool move;
 };	

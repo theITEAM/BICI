@@ -13,14 +13,14 @@ using namespace std;
 #include "utils.hh"
 #include "matrix.hh"
 
-SourceSampler::SourceSampler(const vector <MarkovEqn> &markov_eqn, const vector <TransGlobal> &tra_gl, const vector <CompGlobal> &comp_gl, const	vector <double> &timepoint, const	vector <double> &dtimepoint, const Details &details, const InitCond &init_cond) : markov_eqn(markov_eqn), tra_gl(tra_gl), comp_gl(comp_gl), timepoint(timepoint), dtimepoint(dtimepoint), details(details), init_cond(init_cond)
+SourceSampler::SourceSampler(const vector <MarkovEqn> &markov_eqn, const vector <TransGlobal> &tra_gl, const vector <CompGlobal> &comp_gl, const Details &details, const InitCond &init_cond) : markov_eqn(markov_eqn), tra_gl(tra_gl), comp_gl(comp_gl), details(details), init_cond(init_cond)
 {};
 	
 	
 /// Used to generate a sampler for adding new individuals
 void SourceSampler::update(unsigned int nind_obs, vector <Individual> &individual, const vector <MarkovEqnVariation> &markov_eqn_vari, bool contains_source)
 {
-	auto T = timepoint.size()-1;
+	auto T = details.T;
 	auto I = individual.size();
 	auto C = comp_gl.size();
 		
@@ -85,7 +85,7 @@ void SourceSampler::update(unsigned int nind_obs, vector <Individual> &individua
 		for(auto i = nind_obs; i < individual.size(); i++){
 			const auto &ind = individual[i];
 			if(ind.ev.size() > 0){
-				if(ind.ev[0].type == ENTER_EV && ind.ev[0].t == details.t_start){
+				if(ind.ev[0].type == ENTER_EV && ind.ev[0].tdiv == 0){
 					frac_unobs[ind.ev[0].c_after]++;
 					ntot++;
 				}
@@ -154,7 +154,7 @@ Event SourceSampler::sample(double &probif) const
 	ev.cl = UNSET;
 	ev.observed = false;
 	
-	auto T = timepoint.size()-1;
+	auto T = details.T;
 	auto N = me_list.size();
 	
 	if(ran() < enter_frac){   // An enter event
@@ -167,7 +167,7 @@ Event SourceSampler::sample(double &probif) const
 		 
 		ev.c_after = c;
 		ev.tr_gl = UNSET;
-		ev.t = timepoint[0];
+		ev.tdiv = 0;
 	
 		auto val = enter_frac*enter_prob[c];
 		if(val == 0) probif = -LARGE;
@@ -196,9 +196,9 @@ Event SourceSampler::sample(double &probif) const
 		ev.c_after = tr.f;
 		ev.cl = tr.cl;
 		ev.tr_gl = tr_gl;
-		ev.t = timepoint[ti]+ran()*dtimepoint[ti];
+		ev.tdiv = ti+ran();
 		
-		auto val = (1-enter_frac)*rate[ti][k]/(S*rate_total*dtimepoint[ti]);
+		auto val = (1-enter_frac)*rate[ti][k]/(S*rate_total);
 		if(val == 0) probif = -LARGE;
 		else probif += log(val);
 	}
@@ -219,11 +219,11 @@ double SourceSampler::sample_prob(const Event &ev) const
 	
 	case M_TRANS_EV:
 		{
-			auto ti = int((ev.t-timepoint[0])/details.dt);
+			auto ti = get_ti(ev.tdiv);
 			auto e = tra_gl[ev.tr_gl].markov_eqn_ref;
 			auto &me = markov_eqn[e];
 			auto S = me.source_tr_gl.size();
-			return log((1-enter_frac)*rate[ti][me_map[e]]/(S*rate_total*dtimepoint[ti]));
+			return log((1-enter_frac)*rate[ti][me_map[e]]/(S*rate_total));
 		}
 	
 	default:
@@ -236,7 +236,7 @@ double SourceSampler::sample_prob(const Event &ev) const
 /// Prints the sampler
 string SourceSampler::print() const 
 {
-	auto T = timepoint.size()-1;
+	auto T = details.T;
 	auto C = comp_gl.size();
 	auto N = me_list.size();
 	

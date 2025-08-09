@@ -178,7 +178,7 @@ void StateSpecies::print_markov_eqn(unsigned int e) const
 	
 	cout << "For Markov Equation: " << eqn[me.eqn_ref].te_raw << endl;
 	for(auto ti = 0u; ti < T; ti++){
-		cout << timepoint[ti] << " time" << endl;
+		cout << calc_t(ti,details) << " time" << endl;
 		const auto &div = me_vari.div[ti];
 		cout << "Value: " << div.value << "  indfac: "<< div.indfac_int << endl; 
 		
@@ -194,7 +194,7 @@ void StateSpecies::print_ind(unsigned int i) const
 	
 	cout << ind.name << ":" << endl;
 	for(const auto &ev : ind.ev){
-		cout << ev.t << " ";
+		cout << ev.tdiv << " ";
 		switch(ev.type){
 		case ENTER_EV: cout << "Enter"; break;
 		case LEAVE_EV: cout << "Leave"; break;
@@ -239,29 +239,31 @@ string StateSpecies::print_event(const vector <Event> &event, bool str) const
 	for(auto &ev : event){
 		auto c_after = ev.c_after;
 	
+		auto t = calc_t(ev.tdiv,details);
+		
 		switch(ev.type){
 		case ENTER_EV: 
-			ss << " ENTER " << ev.t << ", ";
+			ss << " ENTER " << t << ", ";
 			c = ev.c_after;
 			break;
 		
 		case LEAVE_EV:
-			ss << " LEAVE " << ev.t << ", ";
+			ss << " LEAVE " << t << ", ";
 			c = UNSET;
 			break;
 		
 		case MOVE_EV:
-			ss << " MOVE " << ev.t << ", ";
+			ss << " MOVE " << t << ", ";
 			c = sp.update_c_comp(c,ev.cl,ev.move_c);
 			break;
 			
 		case M_TRANS_EV:	
-			ss << " >> " << ev.t << ", " << sp.tra_gl[ev.tr_gl].name << " >> ";
+			ss << " >> " << t << ", " << sp.tra_gl[ev.tr_gl].name << " >> ";
 			c = sp.tra_gl[ev.tr_gl].f;
 			break;
 			
 		case NM_TRANS_EV:
-			ss << " >> " << ev.t << ", " << sp.tra_gl[ev.tr_gl].name;
+			ss << " >> " << t << ", " << sp.tra_gl[ev.tr_gl].name;
 			ss << " (origin ";
 			if(ev.e_origin == UNSET) cout << "UNSET";
 			else{
@@ -318,7 +320,7 @@ string StateSpecies::check_prior(const Equation &eq) const
 /// Sets ind_sim_c at time t based on inidividual timelines 
 void StateSpecies::set_ind_sim_c(unsigned int ti)
 {
-	auto t = timepoint[ti];
+	double t = ti;
 
 	auto imax = individual.size();
 	if(ind_sim_c.size() != imax) ind_sim_c.resize(imax);
@@ -326,7 +328,7 @@ void StateSpecies::set_ind_sim_c(unsigned int ti)
 		const auto &ind = individual[i];
 		
 		auto c = UNSET;
-		auto e = 0u; while(e < ind.ev.size() && ind.ev[e].t <= t){ c = ind.ev[e].c_after; e++;}
+		auto e = 0u; while(e < ind.ev.size() && ind.ev[e].tdiv <= t){ c = ind.ev[e].c_after; e++;}
 		
 		ind_sim_c[i] = c;
 	}

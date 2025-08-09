@@ -25,15 +25,12 @@ State::State(const Model &model) : model(model)
 /// Initialises state;
 void State::init()
 {
-	T = model.ntimepoint-1;
+	T = model.details.T;
 	
 	timer.resize(TIMER_MAX,0);
 	update_timer.resize(AFFECT_MAX,0);
 	restore_timer.resize(AFFECT_MAX,0);
 
-	dtimepoint.resize(T);
-	for(auto ti = 0u; ti < T; ti++) dtimepoint[ti] = model.timepoint[ti+1] - model.timepoint[ti];
-	
 	spline_val.clear();
 	spline_val.resize(model.spline.size());
 	for(auto &spl : spline_val){
@@ -50,7 +47,7 @@ void State::init()
 			if(model.pop[po].sp_p == p) pop_affect.push_back(po);
 		}
 		
-		StateSpecies ss(param_val,spline_val,model.eqn,model.param,model.param_vec,model.pop,model.species[p],model.genetic_data,model.details,model.timepoint,dtimepoint,pop_affect,model.mode,dif_thresh);
+		StateSpecies ss(param_val,spline_val,model.eqn,model.param,model.param_vec,model.pop,model.species[p],model.genetic_data,model.details,pop_affect,model.mode,dif_thresh);
 		species.push_back(ss);
 	}
 	
@@ -72,13 +69,13 @@ void State::simulate(const vector <double> &param_value, const vector <InitCondV
 		ssp.simulate_init();
 		ssp.simulate_individual_init();
 	}
-		
+	
 	popnum_t[0] = model.calculate_popnum(species);  
 
 	for(auto p = 0u; p < nspecies; p++){
 		auto &ssp = species[p];
 		if(ssp.type == INDIVIDUAL){
-			ssp.activate_initial_state(model.details.t_start,popnum_t);
+			ssp.activate_initial_state(0,popnum_t);
 		}
 	}
 
@@ -136,9 +133,8 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 {
 	for(auto ti = ti_start; ti < ti_end; ti++){	
 		//if(true && ti%op_step == 0) print_cpop(ti);
-	
 		auto &pop = popnum_t[ti];
-	
+
 		pop = model.calculate_popnum(species);          // Calculates the population numbers
 		
 		auto pop_ind = calculate_pop_ind(); 
@@ -204,7 +200,7 @@ void State::ensure_all_ind_event()
 					auto trange = ssp.source_time_range(indd);
 					
 					auto f = 0.9;
-					auto t = (1-f)*trange.tmin+f*trange.tmax;
+					auto t = (1-f)*trange.tdivmin+f*trange.tdivmax;
 					
 					auto c = (unsigned int)(ran()*sp.comp_gl.size());
 					IndInfFrom inf_from;
@@ -299,7 +295,6 @@ vector <double> State::calculate_df(const DerFunc &df) const
 	if(type == RNC || type == GTC){
 		const auto &ref = df.ref;
 		auto dt = model.details.dt;
-		const auto &timepoint = model.timepoint;
 		
 		// Gets which individuals are in which populations
 		auto pop_ind = calculate_pop_ind_total(); 
@@ -314,7 +309,7 @@ vector <double> State::calculate_df(const DerFunc &df) const
 					const auto &tr = sp.tra_gl[ev.tr_gl];
 					if(tr.i != UNSET && tr.f != UNSET){
 						if(ref[tr.i] == UNSET && ref[tr.f] != UNSET){
-							auto t = ev.t;
+							auto t = ev.tdiv;
 							auto ti = get_ti(t);
 							
 							const auto &eqn = model.eqn[tr.dist_param[0].eq_ref];
@@ -371,7 +366,7 @@ vector <double> State::calculate_df(const DerFunc &df) const
 					num[ti] += w;
 				}
 				else{
-					auto wi = ww*(timepoint[ti+1]-start);
+					auto wi = ww*(ti+1-start);
 					vec[ti] += val*wi;
 					num[ti] += wi;
 					
@@ -381,7 +376,7 @@ vector <double> State::calculate_df(const DerFunc &df) const
 						num[tii] += w;
 					}
 					
-					auto wf = ww*(end-timepoint[ti_end]);
+					auto wf = ww*(end-ti_end);
 					vec[ti_end] += val*wf;
 					num[ti_end] += wf;	
 				}
@@ -444,7 +439,7 @@ vector <double> State::calculate_df(const DerFunc &df) const
 					Svalue.push_back(bp/(val+TINY));
 					break;
 					
-				case WEIBULL: emsg("SHould not be weibull"); break; 
+				case WEIBULL: emsg("Should not be weibull"); break; 
 				}
 			}
 			
@@ -774,14 +769,14 @@ void State::update_spline(const vector <AffectLike> &affect_spline)
 {
 	vector <double> store;
 	for(const auto &aspline : affect_spline){
-		if(aspline.type != SPLINE_AFFECT) emsg("SHould be spline affect");
+		if(aspline.type != SPLINE_AFFECT) emsg("Should be spline affect");
 	
 		auto j = aspline.num; 
 		
 		const auto &spline = model.spline[j];
 		const auto &div = spline.div;
 			
-		if(spline.constant == true) emsg("SHould not recalculate");
+		if(spline.constant == true) emsg("Should not recalculate");
 		
 		auto &val = spline_val[j].val;
 		auto &store = spline_val[j].store;
@@ -799,7 +794,7 @@ void State::update_spline(const vector <AffectLike> &affect_spline)
 void State::restore_spline(const vector <AffectLike> &affect_spline)
 {
 	for(const auto &aspline : affect_spline){
-		if(aspline.type != SPLINE_AFFECT) emsg("SHould be spline affect");
+		if(aspline.type != SPLINE_AFFECT) emsg("Should be spline affect");
 	
 		auto j = aspline.num; 
 		auto &val = spline_val[j].val;
@@ -813,7 +808,7 @@ void State::restore_spline(const vector <AffectLike> &affect_spline)
 void State::remove_store_spline(const vector <AffectLike> &affect_spline)
 {
 	for(const auto &aspline : affect_spline){
-		if(aspline.type != SPLINE_AFFECT) emsg("SHould be spline affect");
+		if(aspline.type != SPLINE_AFFECT) emsg("Should be spline affect");
 	
 		auto j = aspline.num; 
 		auto &store = spline_val[j].store;
@@ -950,7 +945,7 @@ Like State::update_param(const vector <AffectLike> &affect_like, const vector <d
 			}
 			break;
 		
-		case SPLINE_AFFECT: emsg("SHould not be spline affect"); break;
+		case SPLINE_AFFECT: emsg("Should not be spline affect"); break;
 			
 		case DIV_VALUE_AFFECT:   // Updates div.value on Markov transition
 			{
@@ -1329,7 +1324,7 @@ void State::likelihood_from_scratch()
 	}
 
 	if(model.trans_tree) setup_transtree();
-	
+
 	if(model.genetic_data.on){
 		set_genetic_param();
 		sample_genetic_value();
@@ -1370,11 +1365,12 @@ void State::resample_ind(bool do_pl)
 						}
 						
 						ind_ev_samp.generate_ind_obs_timeline();
+						
 						auto loop_max = 1u;
 						for(auto loop = 0u; loop < loop_max; loop++){
 							auto probif = 0.0;
 							auto ev_new = ind_ev_samp.sample_events(probif);
-				
+						
 							if(pl){
 								cout << endl << endl << endl << endl;
 								cout << ssp.individual[i].name << endl;
@@ -1393,14 +1389,17 @@ void State::resample_ind(bool do_pl)
 										cout << endl;
 										cout << "After:" << endl; ssp.print_event(ssp.individual[i].ev);
 									}
-							
+								
 									add_like(like_ch);
+								
 									gen_change_update(gc); 	
 									if(sp.trans_tree) update_popnum_ind(p,i);
+									
+									if(pl) check("during resample");
 									break;
 								}
-							}
-						}
+							}	
+						}		
 					}
 				}
 			}
@@ -1458,7 +1457,7 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 		
 		tts.t_root = LARGE;
 		for(const auto &in : gv.inf_node){
-			if(in.t_start < tts.t_root) tts.t_root = in.t_start;
+			if(in.tdiv_start < tts.t_root) tts.t_root = model.calc_t(in.tdiv_start);
 		}	
 		
 		tts.N_origin = gv.inf_origin.size();
@@ -1609,13 +1608,6 @@ void State::restore_back()
 }
 
 
-/// Gets ti div time from an actual time
-unsigned int State::get_ti(double t) const
-{
-	return (unsigned int)(OVER_ONE*(t-model.details.t_start)/model.details.dt);
-}
-
-
 /// Gets param_val_prop from a full parameter vector (i.e. removes reparam)
 vector <double> State::get_param_val_prop() const
 {
@@ -1724,8 +1716,6 @@ vector < vector < vector <Poss> > > State::calculate_pop_ind_total() const
 {
 	vector < vector < vector <Poss> > > pop_ind;
 	
-	const auto &timepoint = model.timepoint;
-	
 	pop_ind.resize(T);
 	for(auto ti = 0u; ti < T; ti++){
 		pop_ind[ti].resize(model.pop.size());
@@ -1742,8 +1732,8 @@ vector < vector < vector <Poss> > > State::calculate_pop_ind_total() const
 				auto ti = 0u;
 				for(auto e = 0u; e <= ind.ev.size(); e++){
 					double t;
-					if(e < ind.ev.size()) t = ind.ev[e].t;
-					else t = timepoint[T];
+					if(e < ind.ev.size()) t = ind.ev[e].tdiv;
+					else t = T;
 					
 					if(c != UNSET){
 						auto ti_start = ti;
@@ -1760,13 +1750,13 @@ vector < vector < vector <Poss> > > State::calculate_pop_ind_total() const
 							Poss poss; poss.i = i; poss.weight = po.term[pr.index].w*num;
 							
 							ti = ti_start;
-							while(timepoint[ti] < t){
+							while(ti < t){
 								pop_ind[ti][pr.po].push_back(poss);
 								ti++;
 							}
 						}
 					}
-					while(timepoint[ti] < t){
+					while(ti < t){
 						ti++;
 					}
 					
@@ -1779,7 +1769,7 @@ vector < vector < vector <Poss> > > State::calculate_pop_ind_total() const
 	if(false){
 		for(auto ti = 0u; ti < T; ti++){
 			for(const auto &pi : pop_ind[ti]){
-				cout << timepoint[ti] << " " << pi.size() << " pop" << endl;
+				cout << model.calc_t(ti) << " " << pi.size() << " pop" << endl;
 				
 				for(auto poss : pi){
 					cout << poss.i << " "<< poss.weight << "  iw" << endl;

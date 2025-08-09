@@ -31,7 +31,7 @@ using namespace std;
     
 		
 /// Initialises the equation 
-Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, vector <Spline> &spline, vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, const vector <double> &timepoint) : species(species), param(param), derive(derive), spline(spline), param_vec(param_vec), pop(pop), hash_pop(hash_pop), timepoint(timepoint)
+Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, vector <Spline> &spline, vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, const vector <double> &timepoint, const Details &details) : species(species), param(param), derive(derive), spline(spline), param_vec(param_vec), pop(pop), hash_pop(hash_pop), timepoint(timepoint), details(details)
 {
 	plfl = false;  // Set to true to print operations to terminal (used for diagnostics)
 
@@ -80,8 +80,10 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool
 	
 	if(plfl == true) print_calculation();
 
-	if(simplify_eqn == true) simplify(calcu);     // Simplifies by combining constants
-
+	if(simplify_eqn == true){
+		simplify(calcu);     // Simplifies by combining constants
+	}
+	
 	if(warn != "") return;  
 
 	extract_ind_eff();                               // Extracts individual effects from equation	
@@ -106,7 +108,7 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool
 	set_time_vari();
 	
 	// Truncates strings to save memory
-	te.clear();//trunc(te);
+	te.clear();
 	if(type == REPARAM || type == REPARAM_EQN) te_raw = trunc(te_raw,5);
 	else te_raw = trunc(te_raw,20);	
 }
@@ -290,7 +292,7 @@ void Equation::print_operations(const vector <EqItem> &op) const
 				break;
 				
 			case PARAMVEC:
-				emsg("SHould not be param vec"); 
+				emsg("Should not be param vec"); 
 				break;
 				
 			case SPLINE:
@@ -1500,21 +1502,17 @@ unsigned int Equation::get_integral_bound(string st)
 		return UNSET;
 	}
 
-	if(t < timepoint[0] || t > timepoint[timepoint.size()-1]){
+	if(t < details.t_start || t > details.t_end){
 		warn = "Problem with expression. Integral bound '"+st+"' is not within the system time period.";
 		return UNSET;
 	}		
 	
-	auto dt = timepoint[1]-timepoint[0];
-	double ti_f = OVER_ONE*(t-timepoint[0])/dt;
-	auto ti = round_int(ti_f);
-	
-	if(dif(ti_f,ti,DIF_THRESH)){
+	if(!on_timestep(t,details)){
 		warn = "Problem with expression. Integral bound '"+st+"' is not at on a time-step.";
 		return UNSET;
 	}
 	
-	return ti;
+	return get_ti_over(calc_tdiv(t,details));
 }
 
 
@@ -1540,7 +1538,7 @@ unsigned int Equation::extract_integral(const string &te, unsigned int i, vector
 	cont = trim(cont.substr(0,cont.length()-2));
 	
 	auto ti_min = 0u;
-	auto ti_max = timepoint.size()-1; 
+	auto ti_max = details.T; 
 	
 	if(cont.length() != 0){
 		auto fl = false;
@@ -1902,7 +1900,7 @@ double Equation::calculate_param_only(const vector <double> &param_val) const
 			const auto &it = item[j];
 			
 			switch(it.type){
-				case PARAMETER: emsg("SHould not be param"); break;
+				case PARAMETER: emsg("Should not be param"); break;
 				case PARAMVEC:
 					num[j] = param_val[it.num]; 
 					if(num[j] == UNSET) emsg("Param must be set");
@@ -1945,14 +1943,14 @@ double Equation::calculate_param_only_ti_fix(const vector <double> &param_val, c
 			const auto &it = item[j];
 			
 			switch(it.type){
-				case PARAMETER: emsg("SHould not be parameter2"); break;
+				case PARAMETER: emsg("Should not be parameter2"); break;
 				case PARAMVEC: num[j] = param_val[it.num]; break;
-				case SPLINE: emsg("SHould not be spline"); break;
+				case SPLINE: emsg("Should not be spline"); break;
 				case SPLINEREF:
 					if(ti_fix == UNSET) emsg("Should not be here4");
 					num[j] = spline_val[it.num].val[ti_fix];
 					break;
-				case DERIVE: emsg("SHould not be derive"); return UNSET;
+				case DERIVE: emsg("Should not be derive"); return UNSET;
 				case IE: emsg("Should not include ind effect"); break;
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
@@ -1989,11 +1987,11 @@ double Equation::calculate_no_popnum(unsigned int ti, const vector <double> &par
 			const auto &it = item[j];
 			
 			switch(it.type){
-				case PARAMETER: emsg("SHould not be parameter4"); break;
+				case PARAMETER: emsg("Should not be parameter4"); break;
 				case PARAMVEC: num[j] = param_val[it.num]; break;
-				case SPLINE: emsg("SHould not be spline"); break;
+				case SPLINE: emsg("Should not be spline"); break;
 				case SPLINEREF: num[j] = spline_val[it.num].val[ti]; break;
-				case DERIVE: emsg("SHould not be derive"); break;
+				case DERIVE: emsg("Should not be derive"); break;
 				case IE: emsg("Should not include ind effect"); break;
 				case ONE: num[j] = 1; break;
 				case FE: emsg("Should not include fixed effect"); break;
@@ -2030,7 +2028,7 @@ double Equation::calculate(unsigned int ti, const vector <double> &popnum, const
 			const auto &it = item[j];
 			
 			switch(it.type){
-				case PARAMETER: emsg("SHould not be parameter6"); break;
+				case PARAMETER: emsg("Should not be parameter6"); break;
 				case PARAMVEC: num[j] = param_val[it.num]; break;
 				case SPLINE: emsg("Should not be spline"); break;
 				case SPLINEREF:	num[j] = spline_val[it.num].val[ti]; break;
@@ -2056,7 +2054,7 @@ double Equation::calculate(unsigned int ti, const vector <double> &popnum, const
 /// Calculate the value of an integral
 double Equation::calculate_integral(unsigned int i, const vector < vector <double> > &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector < vector <double> > > &derive_val) const
 {
-	auto dt = timepoint[1]-timepoint[0];
+	auto dt = details.dt;
 	const auto &inte = integral[i];
 	const auto &calc = inte.calc;
 	
@@ -2077,8 +2075,8 @@ double Equation::calculate_integral(unsigned int i, const vector < vector <doubl
 				const auto &it = item[j];
 				
 				switch(it.type){
-					case INTEGRAL: emsg("SHould not be integral"); break;
-					case PARAMETER: emsg("SHould not be parameter7"); break;
+					case INTEGRAL: emsg("Should not be integral"); break;
+					case PARAMETER: emsg("Should not be parameter7"); break;
 					case PARAMVEC: num[j] = param_val[it.num]; break;
 					case SPLINE: emsg("Should not be spline"); break;
 					
@@ -2152,7 +2150,7 @@ double Equation::calculate_derive(unsigned int ti, const vector < vector <double
 				case INTEGRAL:
 					num[j] = calculate_integral(it.num,popnum,param_val,spline_val,derive_val);
 					break;
-				case PARAMETER: emsg("SHould not be parameter8"); break;
+				case PARAMETER: emsg("Should not be parameter8"); break;
 				case PARAMVEC: num[j] = param_val[it.num]; break;
 				case SPLINE: emsg("Should not be spline"); break;
 				
@@ -2450,7 +2448,7 @@ CompRef Equation::find_comp_from_name(unsigned int p, string te) const
 
 
 /// Replaces a register with a constant 
-void Equation::replace_reg(const vector <EqItem> &reg_replace, vector <Calculation> &calc, const vector <bool> &calc_on)
+void Equation::replace_reg(const vector <EqItem> &reg_replace, vector <Calculation> &calc, const vector <bool> &calc_on, bool pl)
 {
 	for(auto i = 0u; i < calc.size(); i++){
 		if(calc_on[i]){
@@ -2460,12 +2458,23 @@ void Equation::replace_reg(const vector <EqItem> &reg_replace, vector <Calculati
 				auto &it = ca.item[j];
 				if(it.type == REG){
 					if(calc_on[it.num] == false){
+						if(pl) cout << it.num << " reg replace" << endl;
 						it = reg_replace[it.num];
 					}
 				}
 			}
 		}
 	}	
+	
+	if(pl){
+		cout << "after replace:" << endl;
+		
+		for(auto i = 0u; i < calcu.size(); i++){
+			print_ca(i,calcu[i]);
+			cout << "    " << calc_on[i];
+			cout << endl;
+		}	
+	}
 }
 
 
@@ -2540,9 +2549,9 @@ void Equation::insert_reg(vector <Calculation> &calc, vector <bool> &calc_on)
 // (3) Combining together addition and multiplication terms 
 void Equation::simplify(vector <Calculation> &calc)
 {
-	if(false){
-		cout << " START SIMPLIFY" << endl; print_calculation();
-	}
+	auto pl = false;
+	
+	if(pl){ cout << " START SIMPLIFY" << endl; print_calculation();}
 		
 	// This stores if the line of the calculation is on or off
 	// This is faster than using erase
@@ -2553,6 +2562,8 @@ void Equation::simplify(vector <Calculation> &calc)
 	auto loop = 0u;
 	bool flag;
 	do{		
+		if(pl) cout << loop << "Loop" << endl;
+		
 		flag = false;
 	
 		// Converts a negative TAKE constant to an ADD
@@ -2570,318 +2581,327 @@ void Equation::simplify(vector <Calculation> &calc)
 			}
 		}
 		
+		
 		insert_reg(calc,calc_on);
 	
 		for(auto i = 0u; i < calc.size(); i++){
 			if(calc_on[i]){
 				auto &ca = calc[i];
 
-				EqItem rep; rep.type = NOOP;
-				double rep_con = UNSET;
+				// Checks to see if there are any registers which have been turned off
+				auto ill = false;
+				for(auto j = 0u; j < ca.item.size(); j++){
+					if(ca.item[j].type == REG && calc_on[ca.item[j].num] == false){ ill = true; break;} 
+				}
+				
+				if(ill == false){
+					EqItem rep; rep.type = NOOP;
+					double rep_con = UNSET;
 
-				switch(ca.op){
-				case MULTIPLY:
-					{
-						// Combines together constant values
+					switch(ca.op){
+					case MULTIPLY:
 						{
+							// Combines together constant values
+							{
+								auto j = 0u; while(j < ca.item.size() && ca.item[j].type != NUMERIC) j++;
+								if(j < ca.item.size()){
+									auto jj = j+1;
+									while(jj < ca.item.size()){
+										if(ca.item[jj].type == NUMERIC){
+											ca.item[j].num = mult_const(ca.item[j],ca.item[jj]);
+											if(jj+1 < ca.item.size()){
+												ca.item[jj] = ca.item[ca.item.size()-1];
+											}
+											ca.item.pop_back();
+											flag = true;
+										}
+										else jj++;
+									}
+								}
+							}
+							
+							{
+								// Removes anything with one
+								auto j = 0u;
+								while(j < ca.item.size()){
+									if(ca.item[j].type == NUMERIC && cons[ca.item[j].num] == 1){
+										if(j+1 < ca.item.size()){
+											ca.item[j] = ca.item[ca.item.size()-1];
+										}
+										ca.item.pop_back();
+										flag = true;
+									}
+									else j++;
+								}
+							}
+							
+							// If contains zero then entire sum is zero
+							auto j = 0u;
+							while(j < ca.item.size() && !(ca.item[j].type == NUMERIC && cons[ca.item[j].num] == 0)) j++;
+							if(j < ca.item.size()) rep_con = 0;
+							else{
+								if(ca.item.size() == 0) rep_con = 1;
+								else{
+									if(ca.item.size() == 1) rep = ca.item[0];
+								}
+							}
+						}
+						break;
+						
+					case ADD:
+						{			
+							// Combines together constant values
 							auto j = 0u; while(j < ca.item.size() && ca.item[j].type != NUMERIC) j++;
 							if(j < ca.item.size()){
 								auto jj = j+1;
 								while(jj < ca.item.size()){
 									if(ca.item[jj].type == NUMERIC){
-										ca.item[j].num = mult_const(ca.item[j],ca.item[jj]);
+										ca.item[j].num = add_const(ca.item[j],ca.item[jj]);
 										if(jj+1 < ca.item.size()){
 											ca.item[jj] = ca.item[ca.item.size()-1];
 										}
 										ca.item.pop_back();
-										flag = true;
 									}
 									else jj++;
 								}
 							}
-						}
-						
-						{
-							// Removes anything with one
-							auto j = 0u;
+							
+							// Removes anything with zero
+							j = 0;
 							while(j < ca.item.size()){
-								if(ca.item[j].type == NUMERIC && cons[ca.item[j].num] == 1){
+								if(ca.item[j].type == NUMERIC && cons[ca.item[j].num] == 0){
 									if(j+1 < ca.item.size()){
 										ca.item[j] = ca.item[ca.item.size()-1];
 									}
 									ca.item.pop_back();
-									flag = true;
 								}
 								else j++;
 							}
+							
+							if(ca.item.size() == 0) rep_con = 0;
+							if(ca.item.size() == 1) rep = ca.item[0];
 						}
+						break;
 						
-						// If contains zero then entire sum is zero
-						auto j = 0u;
-						while(j < ca.item.size() && !(ca.item[j].type == NUMERIC && cons[ca.item[j].num] == 0)) j++;
-						if(j < ca.item.size()) rep_con = 0;
-						else{
-							if(ca.item.size() == 0) rep_con = 1;
+					case TAKE:
+						break;
+						
+					case DIVIDE:
+						{
+							double con1 = UNSET, con2 = UNSET;
+							if(ca.item[0].type == NUMERIC) con1 = cons[ca.item[0].num];
+							if(ca.item[1].type == NUMERIC) con2 = cons[ca.item[1].num];
+						
+							if(con2 == 0){
+								warn = "Equation contains a division by zero";
+							}
 							else{
-								if(ca.item.size() == 1) rep = ca.item[0];
-							}
-						}
-					}
-					break;
-					
-				case ADD:
-					{			
-						// Combines together constant values
-						auto j = 0u; while(j < ca.item.size() && ca.item[j].type != NUMERIC) j++;
-						if(j < ca.item.size()){
-							auto jj = j+1;
-							while(jj < ca.item.size()){
-								if(ca.item[jj].type == NUMERIC){
-									ca.item[j].num = add_const(ca.item[j],ca.item[jj]);
-									if(jj+1 < ca.item.size()){
-										ca.item[jj] = ca.item[ca.item.size()-1];
-									}
-									ca.item.pop_back();
-								}
-								else jj++;
-							}
-						}
-						
-						// Removes anything with zero
-						j = 0;
-						while(j < ca.item.size()){
-							if(ca.item[j].type == NUMERIC && cons[ca.item[j].num] == 0){
-								if(j+1 < ca.item.size()){
-									ca.item[j] = ca.item[ca.item.size()-1];
-								}
-								ca.item.pop_back();
-							}
-							else j++;
-						}
-						
-						if(ca.item.size() == 0) rep_con = 0;
-						if(ca.item.size() == 1) rep = ca.item[0];
-					}
-					break;
-					
-				case TAKE:
-					break;
-					
-				case DIVIDE:
-					{
-						double con1 = UNSET, con2 = UNSET;
-						if(ca.item[0].type == NUMERIC) con1 = cons[ca.item[0].num];
-						if(ca.item[1].type == NUMERIC) con2 = cons[ca.item[1].num];
-					
-						if(con2 == 0){
-							warn = "Equation contains a division by zero";
-						}
-						else{
-							if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
-							else{
-								if(con1 != UNSET){
-									if(con1 == 0) rep_con = 0;
-									else{
-										if(con1 == INFY) rep_con = INFY;
+								if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
+								else{
+									if(con1 != UNSET){
+										if(con1 == 0) rep_con = 0;
 										else{
-											if(con2 != UNSET){
-												if(con2 == INFY) rep_con = 0;
-												else rep_con = con1/con2;
+											if(con1 == INFY) rep_con = INFY;
+											else{
+												if(con2 != UNSET){
+													if(con2 == INFY) rep_con = 0;
+													else rep_con = con1/con2;
+												}
 											}
-										}
-									}								
+										}								
+									}
 								}
 							}
 						}
-					}
-					break;
-				
-				case EXPFUNC:
-					if(ca.item[0].type == NUMERIC){
-						auto con = cons[ca.item[0].num];
-						if(con == INFY) rep_con = INFY;
-						else{
-							if(con == UNDEF) rep_con = UNDEF;
-							else rep_con = exp(con);
-						}
-					}					
-					break;
-				
-				case SINFUNC:
-					if(ca.item[0].type == NUMERIC){
-						auto con = cons[ca.item[0].num];
-						if(con == INFY) rep_con = UNDEF;
-						else{
-							if(con == UNDEF) rep_con = UNDEF;
-							else rep_con = sin(con);
-						}
-					}					
-					break;
+						break;
 					
-				case COSFUNC:
-					if(ca.item[0].type == NUMERIC){
-						auto con = cons[ca.item[0].num];
-						if(con == INFY) rep_con = UNDEF;
-						else{
-							if(con == UNDEF) rep_con = UNDEF;
-							else rep_con = cos(con);
-						}	
-					}					
-					break;
-				
-				case LOGFUNC:
-					if(ca.item[0].type == NUMERIC){
-						auto con = cons[ca.item[0].num];
-						if(con <= 0){
-							warn = "Equation contains the logarithm of a non-positive";
-						}
-						else{
+					case EXPFUNC:
+						if(ca.item[0].type == NUMERIC){
+							auto con = cons[ca.item[0].num];
 							if(con == INFY) rep_con = INFY;
 							else{
 								if(con == UNDEF) rep_con = UNDEF;
-								else rep_con = log(con);	
+								else rep_con = exp(con);
+							}
+						}					
+						break;
+					
+					case SINFUNC:
+						if(ca.item[0].type == NUMERIC){
+							auto con = cons[ca.item[0].num];
+							if(con == INFY) rep_con = UNDEF;
+							else{
+								if(con == UNDEF) rep_con = UNDEF;
+								else rep_con = sin(con);
+							}
+						}					
+						break;
+						
+					case COSFUNC:
+						if(ca.item[0].type == NUMERIC){
+							auto con = cons[ca.item[0].num];
+							if(con == INFY) rep_con = UNDEF;
+							else{
+								if(con == UNDEF) rep_con = UNDEF;
+								else rep_con = cos(con);
+							}	
+						}					
+						break;
+					
+					case LOGFUNC:
+						if(ca.item[0].type == NUMERIC){
+							auto con = cons[ca.item[0].num];
+							if(con <= 0){
+								warn = "Equation contains the logarithm of a non-positive";
+							}
+							else{
+								if(con == INFY) rep_con = INFY;
+								else{
+									if(con == UNDEF) rep_con = UNDEF;
+									else rep_con = log(con);	
+								}
 							}
 						}
-					}
-					break;
-					
-				case POWERFUNC:
-					{
-						double con1 = UNSET, con2 = UNSET;
-						if(ca.item[0].type == NUMERIC) con1 = cons[ca.item[0].num];
-						if(ca.item[1].type == NUMERIC) con2 = cons[ca.item[1].num];
-					
-						if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
-						else{
-							if(con2 == 0) rep_con = 1;
+						break;
+						
+					case POWERFUNC:
+						{
+							double con1 = UNSET, con2 = UNSET;
+							if(ca.item[0].type == NUMERIC) con1 = cons[ca.item[0].num];
+							if(ca.item[1].type == NUMERIC) con2 = cons[ca.item[1].num];
+						
+							if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
 							else{
-								if(con1 != UNSET){
-									if(con1 == INFY || con2 == INFY) rep_con = INFY;
-									else{	
-										if(con1 == 0) rep_con = 0;
-										else{
-											if(con2 != UNSET) rep_con = pow(con1,con2);
+								if(con2 == 0) rep_con = 1;
+								else{
+									if(con1 != UNSET){
+										if(con1 == INFY || con2 == INFY) rep_con = INFY;
+										else{	
+											if(con1 == 0) rep_con = 0;
+											else{
+												if(con2 != UNSET) rep_con = pow(con1,con2);
+											}
 										}
 									}
 								}
 							}
-						}
-					}				
-					break;
-			
-				case THRESHFUNC:
-					if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
-						auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
-						if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
-						else{
-							if(con1 < con2) rep_con = 0;
-							else rep_con = con1;
-						}
-					}
-					break;
-					
-				case UBOUNDFUNC:
-					if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
-						auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
-						if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
-						else{
-							if(con1 > con2) rep_con = INFY;
-							else rep_con = con1;
-						}
-					}
-					break;
+						}				
+						break;
 				
-				case STEPFUNC:
-					if(ca.item[0].type == NUMERIC){
-						auto con = cons[ca.item[0].num];
-						if(con == UNDEF) rep_con = UNDEF;
-						else{
-							if(con > 0) rep_con = 1; else rep_con = 0;
-						}
-					}
-					break;
-					
-				case MAXFUNC:
-					if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
-						auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
-						if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
-						else{
-							if(con1 > con2) rep_con = con1;
-							else rep_con = con2;
-						}
-					}
-					break;
-					
-				case MINFUNC:
-					if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
-						auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
-						if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
-						else{
-							if(con1 < con2) rep_con = con1;
-							else rep_con = con2;
-						}
-					}
-					break;
-					
-				case ABSFUNC:
-					if(ca.item[0].type == NUMERIC){
-						auto con = cons[ca.item[0].num];
-						if(con == UNDEF) rep_con = UNDEF;
-						else{
-							if(con < 0) rep_con = -con;
-							else rep_con = con;
-						}
-					}
-					break;
-				
-				case SQRTFUNC:
-					if(ca.item[0].type == NUMERIC){
-						auto con = cons[ca.item[0].num];
-						if(con < 0){
-							warn = "Equation contains the square root of a non-positive";
-						}
-						else{
-							if(con == UNDEF) rep_con = UNDEF;
+					case THRESHFUNC:
+						if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
+							auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
+							if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
 							else{
-								if(con == INFY) rep_con = INFY;
-								else rep_con = sqrt(con);
+								if(con1 < con2) rep_con = 0;
+								else rep_con = con1;
 							}
 						}
-					}
-					break;
+						break;
+						
+					case UBOUNDFUNC:
+						if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
+							auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
+							if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
+							else{
+								if(con1 > con2) rep_con = INFY;
+								else rep_con = con1;
+							}
+						}
+						break;
 					
-				case SIGFUNC:
-					if(ca.item[0].type == NUMERIC){
-						auto con = cons[ca.item[0].num];
-						
-						if(con == UNDEF) rep_con = UNDEF;
-						else{
-							if(con == INFY) rep_con = 1;
-							else rep_con = 1/(1+exp(-con));
+					case STEPFUNC:
+						if(ca.item[0].type == NUMERIC){
+							auto con = cons[ca.item[0].num];
+							if(con == UNDEF) rep_con = UNDEF;
+							else{
+								if(con > 0) rep_con = 1; else rep_con = 0;
+							}
 						}
-					}
-					break;
+						break;
+						
+					case MAXFUNC:
+						if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
+							auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
+							if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
+							else{
+								if(con1 > con2) rep_con = con1;
+								else rep_con = con2;
+							}
+						}
+						break;
+						
+					case MINFUNC:
+						if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
+							auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
+							if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
+							else{
+								if(con1 < con2) rep_con = con1;
+								else rep_con = con2;
+							}
+						}
+						break;
+						
+					case ABSFUNC:
+						if(ca.item[0].type == NUMERIC){
+							auto con = cons[ca.item[0].num];
+							if(con == UNDEF) rep_con = UNDEF;
+							else{
+								if(con < 0) rep_con = -con;
+								else rep_con = con;
+							}
+						}
+						break;
+					
+					case SQRTFUNC:
+						if(ca.item[0].type == NUMERIC){
+							auto con = cons[ca.item[0].num];
+							if(con < 0){
+								warn = "Equation contains the square root of a non-positive";
+							}
+							else{
+								if(con == UNDEF) rep_con = UNDEF;
+								else{
+									if(con == INFY) rep_con = INFY;
+									else rep_con = sqrt(con);
+								}
+							}
+						}
+						break;
+						
+					case SIGFUNC:
+						if(ca.item[0].type == NUMERIC){
+							auto con = cons[ca.item[0].num];
+							
+							if(con == UNDEF) rep_con = UNDEF;
+							else{
+								if(con == INFY) rep_con = 1;
+								else rep_con = 1/(1+exp(-con));
+							}
+						}
+						break;
 
-				default: emsg("Should be simplification"); break;
-				}
-				
-				if(rep.type != NOOP || rep_con != UNSET){
-					if(i+1 != calc.size()){					
-						flag = true;
-						if(rep.type != NOOP && rep_con != UNSET) emsg("Cannot be both here");
-						
-						if(rep_con != UNSET){
-							rep.type = NUMERIC; rep.num = add_cons(rep_con);
+					default: emsg("Should be simplification"); break;
+					}
+					
+					if(rep.type != NOOP || rep_con != UNSET){
+						if(i+1 != calc.size()){					
+							flag = true;
+							if(rep.type != NOOP && rep_con != UNSET) emsg("Cannot be both here");
+							
+							if(rep_con != UNSET){
+								rep.type = NUMERIC; rep.num = add_cons(rep_con);
+							}
+							
+							reg_replace[i] = rep;
+							calc_on[i] = false;
 						}
-						
-						reg_replace[i] = rep;
-						calc_on[i] = false;
 					}
 				}
 			}
 		}
 		
-		replace_reg(reg_replace,calc,calc_on);
+		replace_reg(reg_replace,calc,calc_on,pl);
 		
 		loop++; if(loop > 100) emsg("Simplify equation problem");
 	}while(flag == true);

@@ -66,6 +66,7 @@ class Output                               // Stores information about the data
 		void output_state(unsigned int ch, const vector <Particle> &part, ofstream &fout) const;
 		void output_trans_diag(const vector <TransDiagSpecies> &trans_diag, ofstream &fout) const;
 		void add_warning(string err_msg, ofstream &fout) const;
+		void output_add_ind_warning(vector <string> &final_warning) const;
 		void output_rate_warning(unsigned int total_cpu, unsigned int per_start, unsigned int per_end, vector <string> &final_warning) const;
 		void output_generation(const vector <Particle> &part, ofstream &fout) const;
 		void output_diagnostic(const vector <Diagnostic> &diagnostic, bool &alg_warn_flag,ofstream &fout) const;

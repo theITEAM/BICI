@@ -22,12 +22,10 @@ Model::Model(Operation mode_)
 
 
 /// Adds an equation reference to EquationInfo
-void Model::add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double t)
+void Model::add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv)
 {
 	auto ti = UNSET;
-	if(t != UNSET){
-		ti = 0; while(ti < timepoint.size()-2 && timepoint[ti] < t) ti++;
-	}	
+	if(tdiv != UNSET) ti = get_ti(tdiv);
 	
 	if(eqi.te == "") emsg("Equation does not have any text");
 	
@@ -42,7 +40,7 @@ void Model::add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double t)
 		
 		hash_eqn.add(eqi.eq_ref,vec);
 	
-		Equation eq(eqi.te,eqi.type,eqi.p,eqi.cl,eqi.infection_trans,ti,eqi.line_num,species_simp,param,derive,spline,param_vec,pop,hash_pop,timepoint);
+		Equation eq(eqi.te,eqi.type,eqi.p,eqi.cl,eqi.infection_trans,ti,eqi.line_num,species_simp,param,derive,spline,param_vec,pop,hash_pop,timepoint,details);
 		
 		if(false && eq.warn != ""){ cout << eq.warn << endl; emsg("warning");}
 		
@@ -217,14 +215,14 @@ vector <double> Model::spline_prior(const vector <double> &param_val) const
 			auto sd = spl.info.smooth_value;
 			auto cv = sqrt(exp(sd*sd)-1);
 			
-			const auto &knot = spl.info.knot_times;
+			const auto &tdiv = spl.info.knot_tdiv;
 	
 			for(auto t = 1u; t < spl.param_ref.size(); t++){
 				auto val = param_val[spl.param_ref[t]];
 				auto last = param_val[spl.param_ref[t-1]];
 				
-				auto dt = knot[t]-knot[t-1];
-				if(dt > details.dt){  // Only applies spline prior if time difference greater than dt	
+				auto dt = tdiv[t]-tdiv[t-1];
+				if(dt > 1){  // Only applies spline prior if time difference greater than dt	
 					switch(type){
 					case LOG_NORMAL_SMOOTH: Li += lognormal_probability(val,last,cv); break;
 					case NORMAL_SMOOTH: Li += normal_probability(val,last,sd); break;
@@ -244,7 +242,7 @@ double Model::recalculate_spline_prior(unsigned int s, vector <double> &spline_p
 {
 	const auto &spl = spline[s];
 	const auto &info = spl.info;
-	const auto &knot = info.knot_times;
+	const auto &tdiv = info.knot_tdiv;
 		
 	auto type = info.smooth_type;
 	auto sd = info.smooth_value;
@@ -255,8 +253,8 @@ double Model::recalculate_spline_prior(unsigned int s, vector <double> &spline_p
 		auto val = param_val[spl.param_ref[t]];
 		auto last = param_val[spl.param_ref[t-1]];
 		
-		auto dt = knot[t]-knot[t-1];
-		if(dt > details.dt){  // Only applies spline prior if time difference greater than dt	
+		auto dt = tdiv[t]-tdiv[t-1];
+		if(dt > 1){  // Only applies spline prior if time difference greater than dt	
 			switch(type){
 			case LOG_NORMAL_SMOOTH: Li += lognormal_probability(val,last,cv); break;
 			case NORMAL_SMOOTH: Li += normal_probability(val,last,sd); break;
@@ -322,7 +320,7 @@ vector < vector <double> > Model::calculate_popnum_t(vector <StateSpecies> &stat
 {
 	vector < vector <double> > popnum_t;
 
-	if(ti_end == UNSET) ti_end = ntimepoint-1;
+	if(ti_end == UNSET) ti_end = details.T;
 	for(auto ti = 0u; ti < ti_end; ti++){
 		for(auto p = 0u; p < nspecies; p++){
 			auto &ssp = state_species[p];
@@ -346,7 +344,7 @@ vector <double> Model::recalculate_population(vector < vector <double> > &popnum
 	
 	if(pop.size() == 0) return store;
 	
-	auto T = ntimepoint-1;
+	auto T = details.T;
 	
 	for(auto k : list){
 		for(auto t = 0u; t < T; t++){
@@ -375,10 +373,10 @@ vector <double> Model::recalculate_population(vector < vector <double> > &popnum
 				auto c = UNSET;
 				for(auto e = 0u; e <= ind.ev.size(); e++){
 					double t;
-					if(e < ind.ev.size()) t = ind.ev[e].t;
-					else t = timepoint[T];
+					if(e < ind.ev.size()) t = ind.ev[e].tdiv;
+					else t = T;
 						
-					while(timepoint[ti] < t){
+					while(ti < t){
 						if(c != UNSET){						
 							for(const auto &pr : sp.comp_gl[c].pop_ref){
 								auto k = pr.po;
@@ -419,7 +417,7 @@ vector <double> Model::recalculate_population(vector < vector <double> > &popnum
 /// Recalculates popnum_t for populations identified by list and individuals in ssp 
 void Model::recalculate_population_restore(vector < vector <double> > &popnum_t, const vector <unsigned int> &list, const vector <double> &vec) const
 {
-	auto T = ntimepoint-1;
+	auto T = details.T;
 	
 	auto j = 0u;
 	for(auto k : list){
@@ -571,8 +569,8 @@ void Model::affect_linearise_speedup2(vector <AffectLike> &vec, const vector <un
 							}
 							break;
 						
-						case PARAMETER: case SPLINE: emsg("SHould not be"); break;
-							emsg("SHould not be spline time");
+						case PARAMETER: case SPLINE: emsg("Should not be"); break;
+							emsg("Should not be spline time");
 							break;
 						default: break;
 						}
@@ -852,7 +850,7 @@ void Model::joint_affect_like(PropType type, const vector <bool> &tr_change, uns
 		}
 		break;
 	
-	default: emsg("SHould not be op"); break;
+	default: emsg("Should not be op"); break;
 	}
 	
 	// Works out which and markov equation nmtrans are affected
@@ -870,7 +868,7 @@ void Model::joint_affect_like(PropType type, const vector <bool> &tr_change, uns
 		}
 	}
 	
-	auto T = ntimepoint-1;
+	auto T = details.T;
 	
 	// Adds changes to nm_trans
 	for(auto m = 0u; m < M; m++){
@@ -962,7 +960,7 @@ void Model::joint_affect_like(PropType type, const vector <bool> &tr_change, uns
 /// Adds all the downstream effects of making a change to a given individual effect
 void Model::add_ie_affect(unsigned int p, unsigned int ie, vector <AffectLike> &vec) const
 {
-	auto T = ntimepoint-1;
+	auto T = details.T;
 	
 	const auto &sp = species[p];
 	
@@ -1024,7 +1022,7 @@ void Model::add_ie_affect(unsigned int p, unsigned int ie, vector <AffectLike> &
 void Model::add_pop_affect(unsigned int po, vector <AffectLike> &vec) const
 {
 	const auto &popu = pop[po];
-	auto T = ntimepoint-1;
+	auto T = details.T;
 
 	AffectLike al; 	
 	al.type = POP_AFFECT; al.num = UNSET; al.num2 = UNSET; 
@@ -1245,7 +1243,7 @@ double Model::prior_sample(const Prior &pri, const vector <double> &param_val) c
 		
 	case MDIR_PR:	
 		val = UNSET;
-		emsg("SHould not sample from MDIR");
+		emsg("Should not sample from MDIR");
 		break;
 	
 	case UNSET_PR:
@@ -1567,4 +1565,18 @@ unsigned int Param::add_cons(double val)
 void Param::set_cons(unsigned int i, double val)
 {					
 	element_ref[i] = add_cons(val);
+}
+
+
+/// Calculates tdiv from t
+double Model::calc_tdiv(double t) const 
+{
+	return (t - details.t_start)/details.dt;
+}
+
+
+/// Calculates t from tdiv
+double Model::calc_t(double tdiv) const 
+{
+	return details.t_start + tdiv*details.dt;
 }

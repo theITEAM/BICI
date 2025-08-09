@@ -14,14 +14,14 @@ using namespace std;
 #include "matrix.hh"
 
 /// Initialises the state species
-StateSpecies::StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const	vector <double> &timepoint, const	vector <double> &dtimepoint, const vector <unsigned int> &pop_affect_, Operation mode_, const double &dif_thresh) : source_sampler(sp.markov_eqn,sp.tra_gl,sp.comp_gl,timepoint,dtimepoint,details,sp.init_cond), rate_mean(details), param_val(param_val), spline_val(spline_val), eqn(eqn), param(param), param_vec(param_vec), pop(pop), sp(sp), genetic_data(genetic_data), details(details), timepoint(timepoint), dtimepoint(dtimepoint), dif_thresh(dif_thresh)
+StateSpecies::StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const vector <unsigned int> &pop_affect_, Operation mode_, const double &dif_thresh) : source_sampler(sp.markov_eqn,sp.tra_gl,sp.comp_gl,details,sp.init_cond), rate_mean(details), param_val(param_val), spline_val(spline_val), eqn(eqn), param(param), param_vec(param_vec), pop(pop), sp(sp), genetic_data(genetic_data), details(details), dif_thresh(dif_thresh)
 {
 	timer.resize(STSP_TIMER_MAX,0);
 	
 	pop_affect = pop_affect_;
 	
 	N = sp.markov_eqn.size();
-	T = timepoint.size()-1;
+	T = details.T;
 	
 	mode = mode_;
 	
@@ -209,10 +209,10 @@ void StateSpecies::simulate_individual_init()
 		
 		if(i < sp.nindividual_in){		
 			for(const auto &ev : ind.ev){
-				auto t = ev.t;
+				auto t = ev.tdiv;
 				
-				if(t > details.t_start){
-					SimTrigEvent trig; trig.i = i; trig.t = t;
+				if(t > 0){
+					SimTrigEvent trig; trig.i = i; trig.tdiv = t;
 					
 					switch(ev.type){
 					case ENTER_EV:
@@ -247,7 +247,7 @@ void StateSpecies::simulate_individual_init()
 					{
 						SimTrigEvent trig; 
 						trig.type = DATA_TRANS_SIM_EV;
-						trig.i = i; trig.t = ob.t; trig.c = m; trig.trg = UNSET;
+						trig.i = i; trig.tdiv = ob.tdiv; trig.c = m; trig.trg = UNSET;
 						insert_trigger_event(trig);
 						
 						// Determines if individual is most likely to enter through an observed source
@@ -275,7 +275,7 @@ void StateSpecies::simulate_individual_init()
 		// Directly adds ENTER_EV at start of simulation
 		if(added_flag == false){                   // If individual not added then add at beginning
 			if(ind.ev.size() > 0 && ind.ev[0].type == ENTER_EV){
-				if(ind.ev[0].t != details.t_start) emsg("Should be at start");
+				if(ind.ev[0].tdiv != 0) emsg("Should be at start");
 				
 				auto c = UNSET;
 				switch(sp.init_cond.type){
@@ -301,7 +301,7 @@ void StateSpecies::simulate_individual_init()
 			
 				IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
 			
-				add_event(ENTER_EV,ii,UNSET,UNSET,UNSET,c,details.t_start,iif);
+				add_event(ENTER_EV,ii,UNSET,UNSET,UNSET,c,0,iif);
 			}
 			else{ 
 				unallocated.push_back(ii);
@@ -352,7 +352,7 @@ void StateSpecies::simulate_individual_init()
 						pop_added[c]++;
 						
 						IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
-						add_event(ENTER_EV,i,UNSET,UNSET,UNSET,c,details.t_start,iif);
+						add_event(ENTER_EV,i,UNSET,UNSET,UNSET,c,0,iif);
 					}
 					else{
 						const auto &ind = sp.individual[i];
@@ -360,7 +360,7 @@ void StateSpecies::simulate_individual_init()
 						auto add_so = false;
 						
 						auto trange = source_time_range(ind);
-						if(trange.tmin != details.t_start) add_so = true;
+						if(trange.tdivmin != 0) add_so = true;
 						else{
 							if(source_samp.size() > 0){
 								if(ran() < 0.5) add_so = true;
@@ -387,7 +387,7 @@ void StateSpecies::simulate_individual_init()
 							pop_added[c]++;
 					
 							IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
-							add_event(ENTER_EV,i,UNSET,UNSET,UNSET,c,details.t_start,iif);
+							add_event(ENTER_EV,i,UNSET,UNSET,UNSET,c,0,iif);
 						}
 					}
 				}
@@ -414,7 +414,7 @@ void StateSpecies::simulate_individual_init()
 					
 					IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
 				
-					add_event(ENTER_EV,ii,UNSET,UNSET,UNSET,c,details.t_start,iif);
+					add_event(ENTER_EV,ii,UNSET,UNSET,UNSET,c,0,iif);
 				}
 			}
 		}
@@ -449,7 +449,7 @@ void StateSpecies::add_ind_source(unsigned int i, const vector <SourceSamp> &sou
 	
 	SimTrigEvent trig; 
 	trig.type = SOURCE_SIM_EV;
-	trig.i = i; trig.t = trange.tmin+ran()*(trange.tmax-trange.tmin); trig.c = UNSET; 
+	trig.i = i; trig.tdiv = trange.tdivmin+ran()*(trange.tdivmax-trange.tdivmin); trig.c = UNSET; 
 	trig.trg = source_samp[j].tr_gl;
 	insert_trigger_event(trig);
 }
@@ -459,23 +459,22 @@ void StateSpecies::add_ind_source(unsigned int i, const vector <SourceSamp> &sou
 TRange StateSpecies::source_time_range(const IndData &ind) const
 {
 	const auto &obs = ind.obs;
-	auto tmin = details.t_start;
-	auto tmax = details.t_end;
+	double tmin = 0, tmax = details.T;
 	
 	auto j = 0u;
 	while(j < obs.size() && obs[j].not_alive == true) j++;
 	
 	if(j < obs.size()){
-		auto t = obs[j].t;
+		auto t = obs[j].tdiv;
 		if(t < tmax) tmax = t;
 		if(j > 0){
-			auto tmi = obs[j-1].t;
+			auto tmi = obs[j-1].tdiv;
 			if(tmi > tmin) tmin = tmi;
 			if(t < tmax) tmax = t;
 		}
 	}
 	
-	TRange tr; tr.tmin = tmin; tr.tmax = tmax;
+	TRange tr; tr.tdivmin = tmin; tr.tdivmax = tmax;
 	
 	return tr;
 }
@@ -491,7 +490,7 @@ void StateSpecies::error_load_sample(unsigned int num) const
 /// Initialises based on a posterior sample
 void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies &samp_sp)
 {
-	auto t_end = timepoint[ti_end];
+	double t_end = ti_end;
 	
 	string warn = "Problem loading posterior sample";
 			
@@ -641,10 +640,10 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 				
 				if(1 == 1 && i < sp.nindividual_in){		
 					for(const auto &ev : ind.ev){
-						auto t = ev.t;
+						auto t = ev.tdiv;
 						
 						if(t > t_end){
-							SimTrigEvent trig; trig.i = i; trig.t = t;
+							SimTrigEvent trig; trig.i = i; trig.tdiv = t;
 							
 							switch(ev.type){
 							case ENTER_EV:
@@ -677,7 +676,7 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 						if(ob.type == OBS_TRANS_EV){
 							SimTrigEvent trig; 
 							trig.type = DATA_TRANS_SIM_EV;
-							trig.i = i; trig.t = ob.t; trig.c = m; trig.trg = UNSET;
+							trig.i = i; trig.tdiv = ob.tdiv; trig.c = m; trig.trg = UNSET;
 							insert_trigger_event(trig);
 							
 							/// Determines if individual is most likely to enter through an observed source
@@ -718,7 +717,7 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 				if(added_flag == false && individual[ii].ev.size() == 0){
 					unsigned int c;
 					if(ind.ev.size() > 0 && ind.ev[0].type == ENTER_EV){
-						if(ind.ev[0].t < t_end){
+						if(ind.ev[0].tdiv < t_end){
 							stringstream ss;
 							ss << "Cannot add individual '" << ind.name << "' at time " << ind.ev[0].t << " prior to posterior simulation start time " << to_string(t_end) << ".";
 							emsg(ss.str());
@@ -729,7 +728,7 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 						
 						IndInfFrom iif; if(sp.comp_gl[c].infected == true) iif.p = ENTER_INF;
 					
-						add_event(ENTER_EV,ii,UNSET,UNSET,UNSET,c,details.t_start,iif);
+						add_event(ENTER_EV,ii,UNSET,UNSET,UNSET,c,0,iif);
 					}
 				}
 				*/
@@ -808,10 +807,9 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 /// Sets values for tnum_mean
 void StateSpecies::set_tnum_mean(unsigned int ti_end, const vector < vector <double> > &popnum_t)
 {
+	auto dt = details.dt;
 	for(auto ti = 0u; ti < ti_end; ti++){
-		auto ddt = timepoint[ti+1] - timepoint[ti];
-	
-		auto tnum_mean = calculate_tnum_mean(ti,popnum_t[ti],cpop_st[ti],param_val,ddt);
+		auto tnum_mean = calculate_tnum_mean(ti,popnum_t[ti],cpop_st[ti],param_val,dt);
 		
 		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 			tnum_mean_st[tr].push_back(tnum_mean[tr]);
@@ -1240,10 +1238,9 @@ double StateSpecies::get_indfac(const Individual &ind, const MarkovEqn &mar_eqn)
 /// Updates population-based species
 void StateSpecies::update_population_based(unsigned int ti, bool stoc, const vector <double> &popnum)
 {
-	auto t = timepoint[ti];
-	auto ddt = timepoint[ti+1] - t;
-		
-	auto tnum_mean = calculate_tnum_mean(ti,popnum,cpop,param_val,ddt);
+	auto dt = details.dt;
+			
+	auto tnum_mean = calculate_tnum_mean(ti,popnum,cpop,param_val,dt);
 	
 	if(false){
 		for(auto val : cpop) cout << val << ","; 
@@ -1358,7 +1355,7 @@ double StateSpecies::calculate_tnum_mean(unsigned int ti, unsigned int i, const 
 		}
 		break;
 		
-	default: rate = 0; emsg("SHould not be here"); break;
+	default: rate = 0; emsg("Should not be here"); break;
 	}
 	
 	auto ci = tr.i;
@@ -1406,6 +1403,8 @@ void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t)
 		
 	auto N = sp.tra_gl.size();
 	
+	auto dt = details.dt;
+	
 	string warn;
 	
 	vector <int> num(N);
@@ -1414,11 +1413,9 @@ void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t)
 	
 		cpop_st_f.push_back(cpop);
 	
-		auto ddt = dtimepoint[ti];
-	
 		for(auto tr = 0u; tr < N; tr++){
 			auto tnum_mean_i = tnum_mean_st[tr][ti];
-			auto tnum_mean_f = calculate_tnum_mean(ti,tr,popnum,cpop,param_val,ddt);
+			auto tnum_mean_f = calculate_tnum_mean(ti,tr,popnum,cpop,param_val,dt);
 
 			auto num_i = trans_num[tr][ti];
 
@@ -1491,12 +1488,13 @@ void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t)
 void StateSpecies::mbp_accept(double &like_ch, const vector < vector <double> > &popnum_t)
 {
 	like_ch -= sum(Li_markov_pop);
+	auto dt = details.dt;
 	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 		auto &Li = Li_markov_pop[tr];
 		auto &tn = trans_num[tr];
 		auto &tnm = tnum_mean_st[tr];
 		for(auto ti = 0u; ti < T; ti++){
-			tnm[ti] = calculate_tnum_mean(ti,tr,popnum_t[ti],cpop_st[ti],param_val,dtimepoint[ti]);
+			tnm[ti] = calculate_tnum_mean(ti,tr,popnum_t[ti],cpop_st[ti],param_val,dt);
 			Li[ti] = poisson_probability(tn[ti],tnm[ti]);
 		}
 	}
@@ -1510,17 +1508,17 @@ unsigned int StateSpecies::move_event(vector <Event> &ev, unsigned int index, do
 	auto flag = false;
 	auto ev_store = ev[index];
 	auto E = ev.size();
-	auto t = ev_store.t;
+	auto t = ev_store.tdiv;
 	
 	if(t_new > t){
-		while(index+1 < E && ev[index+1].t < t_new){
+		while(index+1 < E && ev[index+1].tdiv < t_new){
 			ev[index] = ev[index+1];
 			index++;
 			flag = true;
 		}							
 	}
 	else{
-		while(index > 0 && ev[index-1].t > t_new){
+		while(index > 0 && ev[index-1].tdiv > t_new){
 			ev[index] = ev[index-1];
 			index--;
 			flag = true;
@@ -1532,29 +1530,22 @@ unsigned int StateSpecies::move_event(vector <Event> &ev, unsigned int index, do
 	// If the move event crosses an event in another classification
 	if(flag == true){  
 		ev[index] = ev_store;
-		ev[index].t = t_new;
+		ev[index].tdiv = t_new;
 		
 		ensure_consistent(ev);
 		tr_gl_new = ev[index].tr_gl;
 	}
 	else{
-		ev[index].t = t_new;
+		ev[index].tdiv = t_new;
 	}
 
 	return tr_gl_new;
 }
 
 
-/// Gets ti div time from an actual time
-unsigned int StateSpecies::get_ti(double t) const
-{
-	return (unsigned int)(OVER_ONE*(t-details.t_start)/details.dt);
-}
-
-
 /// Used to order events
 bool Event_ord (const Event &ev1, const Event &ev2)                      
-{ return (ev1.t < ev2.t); };  
+{ return (ev1.tdiv < ev2.tdiv); };  
 
 
 /// Makes sure event sequence
@@ -1627,7 +1618,7 @@ void StateSpecies::set_cpop_st()
 /// Calculates cpop for individual-based model (used for rep num)
 vector < vector <double> > StateSpecies::ibm_cpop_st() const
 {	
-	auto T = timepoint.size()-1;
+	auto T = details.T;
 	auto C = sp.comp_gl.size();
 	
 	vector < vector <double> > cpop_st;
@@ -1639,10 +1630,10 @@ vector < vector <double> > StateSpecies::ibm_cpop_st() const
 		auto ti = 0u;
 		for(auto e = 0u; e <= ind.ev.size(); e++){
 			double t;
-			if(e < ind.ev.size()) t = ind.ev[e].t;
-			else t = timepoint[T];
+			if(e < ind.ev.size()) t = ind.ev[e].tdiv;
+			else t = T;
 						
-			while(timepoint[ti] < t){
+			while(ti < t){
 				if(c != UNSET) cpop_st[ti][c]++;
 				ti++;
 			}
@@ -1767,8 +1758,7 @@ TRange StateSpecies::ev_link_trange(const ListMove &lm, const vector <Event> &ev
 {
 	auto ncla = sp.ncla;
 	auto E = event.size();
-	auto t_start = details.t_start;
-	auto t_end = details.t_end;
+	double t_start = 0, t_end = details.T;
 
 	const auto &move = lm.move;
 	
@@ -1779,7 +1769,7 @@ TRange StateSpecies::ev_link_trange(const ListMove &lm, const vector <Event> &ev
 	double dtmin = -LARGE, dtmax = LARGE;
 	for(auto e = 0u; e < E; e++){
 		const auto &ev = event[e];
-		auto t = ev.t;
+		auto t = ev.tdiv;
 		
 		if(ev.c_after == UNSET){
 			for(auto cl = 0u; cl < ncla; cl++){
@@ -1823,7 +1813,7 @@ TRange StateSpecies::ev_link_trange(const ListMove &lm, const vector <Event> &ev
 						if(dtt < dtmax) dtmax = dtt;
 					}
 					
-					time[cl] = ev.t;
+					time[cl] = ev.tdiv;
 					e_st[cl] = e;
 				}
 				break;
@@ -1831,7 +1821,7 @@ TRange StateSpecies::ev_link_trange(const ListMove &lm, const vector <Event> &ev
 		}
 	}
 	
-	TRange trange; trange.tmin = dtmin; trange.tmax = dtmax;
+	TRange trange; trange.tdivmin = dtmin; trange.tdivmax = dtmax;
 	return trange;	
 }
 
@@ -1846,7 +1836,7 @@ bool StateSpecies::ev_link(const Event &ev, const Individual &ind, const vector 
 	auto ti = ev.ti;
 
 	switch(tra.type){
-	case EXP_RATE: case EXP_MEAN: emsg("SHould not be"); return false;
+	case EXP_RATE: case EXP_MEAN: emsg("Should not be"); return false;
 	case EXP_RATE_NM: case EXP_MEAN_NM: return false;
 	case GAMMA: case LOG_NORMAL:
 		{
@@ -1912,12 +1902,12 @@ vector < vector <InfPeriod> >  StateSpecies::get_inf_period(const vector <unsign
 			auto caf = ev.c_after;
 			if(infe){
 				if(caf == UNSET || ref[caf] == UNSET){
-					auto ti = get_ti(ev.t);
-					auto end_inf = details.t_start + (ti+1)*details.dt; 
+					auto ti = get_ti(ev.tdiv);
+					double end_inf = ti+1; 
 				
 					InfPeriod inf_per; 
 					inf_per.start = inf_start;
-					inf_per.end = ev.t;
+					inf_per.end = ev.tdiv;
 					inf_per.end_inf = end_inf;
 					inf_per.num_inf = 0;
 					inf_period[i].push_back(inf_per);
@@ -1927,7 +1917,7 @@ vector < vector <InfPeriod> >  StateSpecies::get_inf_period(const vector <unsign
 			}
 			else{
 				if(caf != UNSET && ref[caf] != UNSET){
-					inf_start = ev.t;
+					inf_start = ev.tdiv;
 					infe = true;
 				}
 			}	
@@ -1936,7 +1926,7 @@ vector < vector <InfPeriod> >  StateSpecies::get_inf_period(const vector <unsign
 		if(inf_start != UNSET){
 			InfPeriod inf_per; 
 			inf_per.start = inf_start;
-			inf_per.end = timepoint[T];
+			inf_per.end = T;
 			inf_per.num_inf = 0;;
 			inf_period[i].push_back(inf_per);
 		}

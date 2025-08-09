@@ -1585,11 +1585,14 @@ void Input::set_spline(string knot_times_str, string smooth, vector <string> &kn
 		if(j > 0 && num < times[times.size()-1]){
 			alert_import("'knot_times' must be time ordered"); return;
 		}
-		
+			
 		times.push_back(num);
 	}
-			
-	par.spline_info.knot_times = times;
+
+	// Converts to tdiv
+	for(auto &ti : times) ti = model.calc_tdiv(ti);
+					
+	par.spline_info.knot_tdiv = times;
 	
 	if(smooth == ""){
 		par.spline_info.smooth = false;
@@ -1641,8 +1644,8 @@ void Input::check_dt(const Details &details)
 		alert_import("The difference between the start '"+tstr(details.t_start)+"' and end '"+tstr(details.t_end)+"' times is not a multiple of the time-step '"+tstr(details.dt)+"'.");
 	}
 	
-	if((details.t_end - details.t_start)/details.dt > TI_DIV_MAX){
-		//alert_import("The number of time divisions must be fewer than "+tstr(TI_DIV_MAX));
+	if(model.calc_tdiv(details.t_end) > TI_DIV_MAX){
+		alert_import("The number of time divisions must be fewer than "+tstr(TI_DIV_MAX));
 	}
 }
 

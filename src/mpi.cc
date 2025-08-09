@@ -176,7 +176,7 @@ void Mpi::pack(const Particle &pa)
 				pack_item(eve.cl);
 				pack_item(eve.move_c);
 				pack_item(eve.c_after);
-				pack_item(eve.t);
+				pack_item(eve.tdiv);
 				pack_item(eve.Li);
 				pack_item(eve.Li_bp);
 				pack_item(eve.observed);
@@ -210,9 +210,9 @@ void Mpi::pack(const Particle &pa)
 				pack_item(ir.on);
 				pack_item(ir.n);
 				pack_item(ir.ti);
-				pack_item(ir.dt);
+				pack_item(ir.dtdiv);
 				pack_item(ir.e_begin);
-				pack_item(ir.t_end);
+				pack_item(ir.tdiv_end);
 				pack_item(ir.index);
 				pack_item(ir.Li);
 			}
@@ -260,8 +260,8 @@ void Mpi::pack(const Particle &pa)
 	pack_num(pa.inf_node.size());
 	for(auto i = 0u; i < pa.inf_node.size(); i++){
 		const auto &in = pa.inf_node[i];
-		pack_item(in.t_start);
-		pack_item(in.t_rec);
+		pack_item(in.tdiv_start);
+		pack_item(in.tdiv_rec);
 		pack_item(in.p);
 		pack_item(in.i);
 		pack_item(in.e);
@@ -271,7 +271,7 @@ void Mpi::pack(const Particle &pa)
 		pack_num(in.inf_ev.size());
 		for(auto j = 0u; j < in.inf_ev.size(); j++){
 			const auto &ie = in.inf_ev[j];
-			pack_item(ie.t);
+			pack_item(ie.tdiv);
 			pack_item(ie.type);
 			pack_item(ie.index);
 			pack_item(ie.mut_num);
@@ -320,7 +320,7 @@ void Mpi::unpack(Particle &pa)
 				unpack_item(eve.cl);
 				unpack_item(eve.move_c);
 				unpack_item(eve.c_after);
-				unpack_item(eve.t);
+				unpack_item(eve.tdiv);
 				unpack_item(eve.Li);
 				unpack_item(eve.Li_bp);
 				unpack_item(eve.observed);
@@ -357,9 +357,9 @@ void Mpi::unpack(Particle &pa)
 				unpack_item(ir.on);
 				unpack_item(ir.n);
 				unpack_item(ir.ti);
-				unpack_item(ir.dt);
+				unpack_item(ir.dtdiv);
 				unpack_item(ir.e_begin);
-				unpack_item(ir.t_end);
+				unpack_item(ir.tdiv_end);
 				unpack_item(ir.index);
 				unpack_item(ir.Li);
 				ind.incomp_ref.push_back(ir);
@@ -415,8 +415,8 @@ void Mpi::unpack(Particle &pa)
 	auto IN = unpack_num();
 	for(auto i = 0u; i < IN; i++){
 		InfNode in;
-		unpack_item(in.t_start);
-		unpack_item(in.t_rec);
+		unpack_item(in.tdiv_start);
+		unpack_item(in.tdiv_rec);
 		unpack_item(in.p);
 		unpack_item(in.i);
 		unpack_item(in.e);
@@ -426,7 +426,7 @@ void Mpi::unpack(Particle &pa)
 		auto IEV = unpack_num();
 		for(auto j = 0u; j < IEV; j++){
 			InfEvent ie;
-			unpack_item(ie.t);
+			unpack_item(ie.tdiv);
 			ie.type = (InfEventType)(unpack_num());
 			unpack_item(ie.index);
 			unpack_item(ie.mut_num);

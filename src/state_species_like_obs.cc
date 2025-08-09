@@ -32,7 +32,7 @@ vector <double> StateSpecies::likelihood_obs_ind(const vector <unsigned int> &li
 	
 	if(mode == SIM) return store;
 		
-	auto t_end = details.t_end;
+	double t_end = details.T;
 	for(auto i : list){
 		auto Li = 0.0;
 		
@@ -46,14 +46,14 @@ vector <double> StateSpecies::likelihood_obs_ind(const vector <unsigned int> &li
 		
 		for(auto k = 0u; k <= ev.size(); k++){
 			double t;	
-			if(k < ev.size()) t = ev[k].t; else t = t_end;
+			if(k < ev.size()) t = ev[k].tdiv; else t = t_end;
 			
-			while(m < obs.size() && obs[m].t <= t){
+			while(m < obs.size() && obs[m].tdiv <= t){
 				const auto &ob = obs[m];
 				
 				switch(ob.type){
 				case OBS_TRANS_EV: case OBS_SOURCE_EV: case OBS_SINK_EV: 
-					if(obs[m].t != t) Li += LI_WRONG; 
+					if(obs[m].tdiv != t) Li += LI_WRONG; 
 					else{
 						if(k < ev.size()){
 							const auto &e = ev[k];
@@ -128,8 +128,8 @@ vector <double> StateSpecies::likelihood_obs_pop(const vector <unsigned int> &li
 		const auto &pf = pop_filt[pd.ref];
 		
 		double num;
-		if(pd.time_vari) num = calculate_pop_num(i,pd.t,pf.c_nonzero,pd.comp_obs_mod_ref);
-		else num = calculate_pop_num(i,pd.t,pf.c_nonzero,pf.comp_obs_mod_ref);
+		if(pd.time_vari) num = calculate_pop_num(i,pd.tdiv,pf.c_nonzero,pd.comp_obs_mod_ref);
+		else num = calculate_pop_num(i,pd.tdiv,pf.c_nonzero,pf.comp_obs_mod_ref);
 		
 		auto val = obs_mod_probability(num,pd.type,pd.value,pd.obs_mod_val);
 		
@@ -261,18 +261,18 @@ vector <double> StateSpecies::calculate_pop_data_cgl_trgl()
 			
 			double t;
 			for(auto j = 0u; j <= popd.size(); j++){
-				if(j < popd.size()) t = popd[j].t; else t = LARGE;
+				if(j < popd.size()) t = popd[j].tdiv; else t = LARGE;
 				
 				for(auto i = 0u; i < N; i++){
 					//const auto &ind = individual[i];
 					auto c = indc[i];
 					
 					const auto &ev = individual[i].ev;
-					while(index[i] < ev.size() && ev[index[i]].t < t){
+					while(index[i] < ev.size() && ev[index[i]].tdiv < t){
 						const auto &e = ev[index[i]];
 					
 						if(e.type == M_TRANS_EV || e.type == NM_TRANS_EV){
-							auto ti = get_ti(e.t);
+							auto ti = get_ti(e.tdiv);
 							auto tr_gl = e.tr_gl;
 					
 							for(auto ref : sp.pop_trans_ref[ti][tr_gl]){
@@ -651,7 +651,7 @@ void StateSpecies::alter_obs_trans_eqn(unsigned int tr_gl, double t, int sign, b
 				auto eq = sp.obs_trans_eqn[m];
 	
 				for(const auto &od : obs_data){
-					auto tt = od.t;
+					auto tt = od.tdiv;
 					if(tt == t){
 						switch(od.type){
 						case OBS_SOURCE_EV: case OBS_TRANS_EV: case OBS_SINK_EV:
@@ -698,7 +698,7 @@ void StateSpecies::calculate_obs_trans_eqn_num()
 		for(const auto &ev : ind.ev){
 			if(ev.type == M_TRANS_EV || ev.type == NM_TRANS_EV){
 				auto temp = 0.0;
-				alter_obs_trans_eqn(ev.tr_gl,ev.t,1,ev.observed,sp.individual[i].obs,temp);
+				alter_obs_trans_eqn(ev.tr_gl,ev.tdiv,1,ev.observed,sp.individual[i].obs,temp);
 			}
 		}
 	}
@@ -740,7 +740,7 @@ void StateSpecies::set_event_observed()
 			case OBS_TRANS_EV: case OBS_SOURCE_EV: case OBS_SINK_EV: 
 				{
 					for(auto &ev : ind.ev){
-						if(ev.t == ob.t && (ev.type == M_TRANS_EV || ev.type == NM_TRANS_EV)){	
+						if(ev.tdiv == ob.tdiv && (ev.type == M_TRANS_EV || ev.type == NM_TRANS_EV)){	
 							ev.observed = true;
 							num++;
 						}						
@@ -766,7 +766,7 @@ void StateSpecies::set_event_observed()
 				switch(ob.type){
 				case OBS_TRANS_EV: case OBS_SOURCE_EV: case OBS_SINK_EV: 
 					for(auto &ev : ind.ev){
-						if(ev.t == ob.t && (ev.type == M_TRANS_EV || ev.type == NM_TRANS_EV)){	
+						if(ev.tdiv == ob.tdiv && (ev.type == M_TRANS_EV || ev.type == NM_TRANS_EV)){	
 							numi++;
 						}
 					}

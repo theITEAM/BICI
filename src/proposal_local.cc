@@ -226,7 +226,7 @@ void Proposal::update_win(unsigned int num, unsigned int num_opt)
 	auto win = f*loc_samp.win + (1-f)*loc_samp.win*(num_opt/(num+1));
 	
 	if(win < 1) win = 1;
-	auto T = model.ntimepoint;
+	auto T = model.details.T;
 	if(win > 1+T/10) win = 1+T/10;
 	loc_samp.win = win;
 }
@@ -644,7 +644,7 @@ void Proposal::pop_single_local(State &state)
 	
 	auto pl = false;
 	
-	const auto T = model.ntimepoint-1;
+	const auto T = model.details.T;
 	const auto &sp = model.species[p_prop];
 	auto &ssp = state.species[p_prop];
 	auto &tn = ssp.trans_num;

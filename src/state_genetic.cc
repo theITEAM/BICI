@@ -14,12 +14,12 @@ using namespace std;
 
 /// Used to time order infection nodes
 bool InfNode_ord (const InfNode &in1, const InfNode &in2)                      
-{ return (in1.t_start < in2.t_start); };  
+{ return (in1.tdiv_start < in2.tdiv_start); };  
 
 
 /// Used to time order infection events
 bool InfEv_ord (const InfEvent &ev1, const InfEvent &ev2)                      
-{ return (ev1.t < ev2.t); };  
+{ return (ev1.tdiv < ev2.tdiv); };  
 
 
 /// Given an initial event sequence works out how to adapt the transmission tree
@@ -89,6 +89,8 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 				
 				auto probif = sample_infection_source(ev,p);
 				
+				if(probif == UNSET) return GenChange(GENCHA_FAIL); // Fails to find infection
+					
 				if(testing){
 					auto prob = prob_infection_source(ev,p);
 					if(dif(prob,probif,dif_thresh)){
@@ -142,11 +144,10 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 				auto e_add = nodee_new[0];
 				auto &ev = ev_new[e_add];
 				
-				auto t_old = in_old.t_start;
-				auto t_new = ev.t;
+				auto t_old = in_old.tdiv_start;
+				auto t_new = ev.tdiv;
 		
 				auto ina = get_inf_node_alteration(p,i,n,ev_new,e_add);
-				
 				if(ina.possible == true){ 
 					if(ina.unchanged){
 						ev = ssp.individual[in_old.i].ev[in_old.e];
@@ -183,7 +184,7 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 					
 					if(nn == ENTER_INF || nn == OUTSIDE_INF){
 						auto nn_new = ENTER_INF;
-						if(t_new != model.details.t_start) nn_new = OUTSIDE_INF;
+						if(t_new != 0) nn_new = OUTSIDE_INF;
 						if(nn_new != nn && nn_new == OUTSIDE_INF){
 							if(trg_contains_outside(in_old.p,ev.tr_gl) == false) return GenChange(GENCHA_FAIL);	
 						}
@@ -199,7 +200,7 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 						const auto &in_new = inf_node[nn];
 					
 						// Checks if new connection point in within infectious range
-						if(t_new < in_new.t_start || t_new > round_up(in_new.t_rec)){
+						if(t_new < in_new.tdiv_start || t_new > round_up(in_new.tdiv_rec)){
 							return GenChange(GENCHA_FAIL);
 						}
 						
@@ -217,7 +218,7 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 						auto e = in_new.e;
 						
 						auto c = UNSET;
-						while(e < ev_inf.size() && ev_inf[e].t <= t_inf){ c = ev_inf[e].c_after; e++;}
+						while(e < ev_inf.size() && ev_inf[e].tdiv <= t_inf){ c = ev_inf[e].c_after; e++;}
 						if(c == UNSET) return GenChange(GENCHA_FAIL);
 						
 						// Works out pref from c
@@ -227,8 +228,8 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 						const auto &me = sp.markov_eqn[m];
 						const auto &eq = model.eqn[me.eqn_ref];
 						auto pref = eq.comp_pref_convert[pp][c];
-						
-						if(pref == UNSET) emsg("Could not get pref"); 
+						if(pref == UNSET) return GenChange(GENCHA_FAIL);
+						//if(pref == UNSET) emsg("Could not get pref"); 
 						
 						iif_prop.pref = pref;
 						iif_prop.po = eq.pop_ref[pref];
@@ -287,7 +288,7 @@ double State::sample_infection_source(Event &ev, unsigned int p) const
 	}
 	else{
 		const auto &sp = model.species[p];
-		auto ti = sp.get_ti(ev.t);
+		auto ti = get_ti(ev.tdiv);
 		
 		const auto &tra = sp.tra_gl[ev.tr_gl];
 		
@@ -305,12 +306,13 @@ double State::sample_infection_source(Event &ev, unsigned int p) const
 			
 		auto Npop = eq.pop_ref.size();
 			
-		
 		auto j = UNSET;
 			
-		if(lin.multi_source){        // Samples from available sources (either populations of fro outside)		
+		if(lin.multi_source){        // Samples from available sources (either populations of from outside)		
 			auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val,spline_val);	
 			j = ss.sample_inf_source();
+			if(j == UNSET) return UNSET;
+			
 			probif += ss.prob_inf_source(j);
 		}
 		else{
@@ -320,7 +322,7 @@ double State::sample_infection_source(Event &ev, unsigned int p) const
 			}
 			j = 0;
 		}
-			
+		
 		if(j == Npop){
 			if(false){
 				cout << "OUTSIDE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
@@ -338,7 +340,7 @@ double State::sample_infection_source(Event &ev, unsigned int p) const
 			const auto &pi = popnum_ind[ti][pr];
 			
 			auto si = pi.size();
-			if(si == 0)	emsg("Cannot find infector1");
+			if(si == 0) return UNSET;
 			
 			if(pop.ind_variation){ // Samples in proportion to weight
 				auto sum = 0.0;
@@ -384,7 +386,7 @@ double State::prob_infection_source(const Event &ev, unsigned int p) const
 	const auto &sp = model.species[p];
 	const auto &ssp = species[p];
 	
-	auto ti = sp.get_ti(ev.t);
+	auto ti = get_ti(ev.tdiv);
 	auto &iif = ev.ind_inf_from;
 
 	const auto &tra = sp.tra_gl[ev.tr_gl];
@@ -408,13 +410,16 @@ double State::prob_infection_source(const Event &ev, unsigned int p) const
 		
 	if(lin.multi_source){        // Prop from available sources (either populations or outside)		
 		auto value = mev.div[ti].value;
-		double val;
-		if(pref == UNSET) val = eq.calculate_calculation(lin.no_pop_calc,ti,param_val,spline_val);
-		else{
-			auto pr = eq.pop_ref[pref];
-			val = popnum_t[ti][pr]*eq.calculate_calculation(lin.pop_grad_calc[pref],ti,param_val,spline_val);
+		if(value < TINY) probfi -= LARGE;
+		else{		
+			double val;
+			if(pref == UNSET) val = eq.calculate_calculation(lin.no_pop_calc,ti,param_val,spline_val);
+			else{
+				auto pr = eq.pop_ref[pref];
+				val = popnum_t[ti][pr]*eq.calculate_calculation(lin.pop_grad_calc[pref],ti,param_val,spline_val);
+			}
+			probfi += log(val/value);
 		}
-		probfi += log(val/value);
 	}
 		
 	if(pref != UNSET){
@@ -424,8 +429,11 @@ double State::prob_infection_source(const Event &ev, unsigned int p) const
 		const auto &pi = popnum_ind[ti][pr];
 		
 		auto si = pi.size();
-		if(si == 0) emsg("Cannot find infector2");
-
+		if(si == 0){
+			return 0;
+			//emsg("Cannot find infector2"); LOOK AT
+		}
+		
 		if(pop.ind_variation){
 			auto sum = 0.0; for(auto k = 0u; k < si; k++) sum += pi[k].w;
 			probfi += log(iif.w/sum);
@@ -440,18 +448,18 @@ double State::prob_infection_source(const Event &ev, unsigned int p) const
 	
 	
 /// Passes down the tree until a certain time
-NodeRef State::pass_down(const NodeRef &nref, double t, double probif) const
+NodeRef State::pass_down(const NodeRef &nref, double t, double &probif) const
 {
 	auto n = nref.node;
 	const auto &inf_ev = genetic_value.inf_node[n].inf_ev;
 	
 	for(auto e = nref.index; e < inf_ev.size(); e++){
 		const auto &ev = inf_ev[e];
-		if(ev.t > t){
+		if(ev.tdiv > t){
 			NodeRef nr; nr.node = n; nr.index = e; return nr;
 		}
 		if(ev.type == INFECT_OTHER){
-			probif += log(0.5);
+			probif += LOG_HALF;
 			if(ran() < 0.5){
 				NodeRef nr_new; nr_new.node = ev.index; nr_new.index = 0;
 				return pass_down(nr_new,t,probif);
@@ -464,19 +472,19 @@ NodeRef State::pass_down(const NodeRef &nref, double t, double probif) const
 
 
 /// Passes up the tree until a certain time is reached
-NodeRef State::pass_up(const NodeRef &nref, double t, double probfi) const
+NodeRef State::pass_up(const NodeRef &nref, double t, double &probfi) const
 {
 	const auto &in = genetic_value.inf_node[nref.node];
 	const auto &inf_ev = in.inf_ev;
 	
 	for(int e = nref.index; e >= 0; e--){
-		double t_last; if(e > 0) t_last = inf_ev[e-1].t; else t_last = in.t_start;
+		double t_last; if(e > 0) t_last = inf_ev[e-1].tdiv; else t_last = in.tdiv_start;
 		
 		if(t_last < t){
 			NodeRef nr; nr.node = nref.node; nr.index = e; return nr;
 		}
 		if(inf_ev[e].type == INFECT_OTHER){
-			probfi += log(0.5);
+			probfi += LOG_HALF;
 		}
 	}
 	
@@ -497,13 +505,13 @@ InfNodeAlter State::get_inf_node_alteration(unsigned int p, unsigned int i, unsi
 
 	auto on = gen_data.on; if(i >= sp.nindividual_obs) on = false;
 	
-	auto t_start = ev_new[e_add].t;
-	auto t_rec = model.details.t_end;
+	auto t_start = ev_new[e_add].tdiv;
+	double t_rec = model.details.T;;
 	for(auto ee = e_add+1; ee < ev_new.size(); ee++){
 		const auto &ev = ev_new[ee];
 		if(ev.type == M_TRANS_EV){
 			if(sp.tra_gl[ev.tr_gl].infection.type == TRANS_RECOVERY){
-				t_rec = ev.t;
+				t_rec = ev.tdiv;
 				break;
 			}
 		}
@@ -512,59 +520,69 @@ InfNodeAlter State::get_inf_node_alteration(unsigned int p, unsigned int i, unsi
 	InfNodeAlter ina;
 	ina.e_add = e_add;
 	
-	ina.t_start = t_start;
-	ina.t_rec = t_rec;
+	ina.tdiv_start = t_start;
+	ina.tdiv_rec = t_rec;
 
 	if(n != UNSET){
 		const auto &in_old = genetic_value.inf_node[n];
 	
-		if(t_start == in_old.t_start && t_rec == in_old.t_rec){
+		if(t_start == in_old.tdiv_start && t_rec == in_old.tdiv_rec){
 			ina.unchanged = true;
 			return ina;
 		}	
 		
 		// Makes sure that any onward infections are within the time span
 		auto t_rec_ro = round_up(t_rec);
-		for(const auto &iev : in_old.inf_ev){
+		auto t_start_ro = round_up(t_start);
+		
+		const auto &inf_ev = in_old.inf_ev;
+		
+		for(auto k = 0u; k < inf_ev.size(); k++){
+			const auto &iev = inf_ev[k];
 			if(iev.type == INFECT_OTHER){
-				auto t = iev.t;
-				if(t < t_start || t > t_rec_ro) ina.possible = false;
+				auto t = iev.tdiv;
+				if(t < t_start_ro || t > t_rec_ro){
+				//if(t < t_start || t > t_rec_ro){
+					ina.possible = false;
+				}
 			}
 		}
 	
 		if(on){
 			const auto &obs = gen_data.ind_gen_obs[p][i];
 			
-			auto t_start_old = in_old.t_start;
+			auto t_start_old = in_old.tdiv_start;
 			if(t_start < t_start_old){                    // Looks to add observations at the beginning
 				auto k = 0u; 
-				while(k < obs.size() && obs[k].t < t_start) k++;
+				while(k < obs.size() && obs[k].tdiv < t_start) k++;
 
-				while(k < obs.size() && obs[k].t <= t_start_old){
+				while(k < obs.size() && obs[k].tdiv <= t_start_old){
 					ina.obs_add_begin.push_back(obs[k].m);
 					k++;
 				}
 			}
 			else{                                         // Impossible if removing observations
 				auto k = 0u; 
-				while(k < obs.size() && obs[k].t < t_start_old) k++;
-				if(k < obs.size() && obs[k].t <= t_start) ina.possible = false;
+				while(k < obs.size() && obs[k].tdiv < t_start_old) k++;
+				if(k < obs.size() && obs[k].tdiv <= t_start){
+					ina.possible = false;
+				}
 			}
 			
-			auto t_rec_old = in_old.t_rec;
+			auto t_rec_old = in_old.tdiv_rec;
 			if(t_rec > t_rec_old){                        // Looks to add observations at the end
 				auto k = 0u; 
-				while(k < obs.size() && obs[k].t < t_rec_old) k++;
+				while(k < obs.size() && obs[k].tdiv < t_rec_old) k++;
 
-				while(k < obs.size() && obs[k].t <= t_rec){
+				while(k < obs.size() && obs[k].tdiv <= t_rec){
 					ina.obs_add_end.push_back(obs[k].m);
 					k++;
 				}
 			}
 			else{                                         // Impossible if removing observations
 				auto k = 0u; 
-				while(k < obs.size() && obs[k].t <= t_rec) k++;
-				if(k < obs.size() && obs[k].t < t_rec_old) ina.possible = false;
+				while(k < obs.size() && obs[k].tdiv <= t_rec) k++;
+				if(k < obs.size() && obs[k].tdiv < t_rec_old) ina.possible = false;
 			}
 		}
 	}
@@ -573,9 +591,9 @@ InfNodeAlter State::get_inf_node_alteration(unsigned int p, unsigned int i, unsi
 			const auto &obs = gen_data.ind_gen_obs[p][i];
 		
 			auto k = 0u; 
-			while(k < obs.size() && obs[k].t < t_start) k++;
+			while(k < obs.size() && obs[k].tdiv < t_start) k++;
 
-			while(k < obs.size() && obs[k].t <= t_rec){
+			while(k < obs.size() && obs[k].tdiv <= t_rec){
 				ina.obs_add_end.push_back(obs[k].m);
 				k++;
 			}
@@ -609,8 +627,8 @@ void State::setup_transtree()
 				
 				if(eve.type == ENTER_EV){
 					if(sp.comp_gl[eve.c_after].infected == true){
-						InfNode in; in.t_start = eve.t; in.p = p; in.i = i; in.e = e; 
-						in.t_rec = find_t_rec(in);
+						InfNode in; in.tdiv_start = eve.tdiv; in.p = p; in.i = i; in.e = e; 
+						in.tdiv_rec = find_t_rec(in);
 						in.from.node = UNSET; in.from.index = UNSET;
 						inf_node.push_back(in);
 						
@@ -623,11 +641,31 @@ void State::setup_transtree()
 					}
 				}
 				else{
-					if(eve.ind_inf_from.p != UNSET){
-						InfNode in; in.t_start = eve.t; in.p = p; in.i = i; in.e = e; 
-						in.t_rec = find_t_rec(in);
-						in.from.node = UNSET; in.from.index = UNSET;
-						inf_node.push_back(in);
+					if(eve.type == MOVE_EV){
+						const auto &eve_last = ind.ev[e-1];
+						if(sp.comp_gl[eve_last.c_after].infected == false &&
+						   sp.comp_gl[eve.c_after].infected == true){
+							
+							InfNode in; in.tdiv_start = eve.tdiv; in.p = p; in.i = i; in.e = e; 
+							in.tdiv_rec = find_t_rec(in);
+							in.from.node = UNSET; in.from.index = UNSET;
+							inf_node.push_back(in);
+						
+							if(eve.ind_inf_from.p != ENTER_INF){
+								emsg("ind_inf_from.p should not be seta");
+							}
+						}
+						else{
+							if(eve.ind_inf_from.p != UNSET) emsg("ind_inf_from.p should not be setb");
+						}
+					}
+					else{
+						if(eve.ind_inf_from.p != UNSET){
+							InfNode in; in.tdiv_start = eve.tdiv; in.p = p; in.i = i; in.e = e; 
+							in.tdiv_rec = find_t_rec(in);
+							in.from.node = UNSET; in.from.index = UNSET;
+							inf_node.push_back(in);
+						}
 					}
 				}
 			}
@@ -660,9 +698,9 @@ void State::setup_transtree()
 	auto m = 0u;
 	for(auto k = 0u; k <= inf_node.size(); k++){
 		double t;
-		if(k < inf_node.size()) t = inf_node[k].t_start; else t = LARGE;
+		if(k < inf_node.size()) t = inf_node[k].tdiv_start; else t = LARGE;
 		
-		while(m < gen_data.obs.size() && gen_data.obs[m].t < t){  // Adds observations
+		while(m < gen_data.obs.size() && gen_data.obs[m].tdiv < t){  // Adds observations
 			const auto &obs = gen_data.obs[m];
 			
 			NodeRef nr;
@@ -675,13 +713,13 @@ void State::setup_transtree()
 			}
 			else{
 				auto &in2 = inf_node[kk];
-				if(obs.t < in2.t_start || obs.t > in2.t_rec){// Individual not infectious during observation
+				if(obs.tdiv < in2.tdiv_start || obs.tdiv > in2.tdiv_rec){// Individual not infectious during observation
 					genetic_value.nobs_not_infected++;
 					nr.node = UNSET;
 					nr.index = UNSET;
 				}
 				else{
-					InfEvent ie; ie.type = GENETIC_OBS; ie.t = obs.t; ie.index = m; ie.mut_num = UNSET;
+					InfEvent ie; ie.type = GENETIC_OBS; ie.tdiv = obs.tdiv; ie.index = m; ie.mut_num = UNSET;
 					
 					nr.index = in2.inf_ev.size();
 					in2.inf_ev.push_back(ie);
@@ -699,7 +737,7 @@ void State::setup_transtree()
 			const auto &eve = species[in.p].individual[in.i].ev[in.e];
 		
 			auto pp = eve.ind_inf_from.p;
-			if(pp == UNSET) emsg("SHould not be unset");
+			if(pp == UNSET) emsg("Should not be unset");
 		
 			if(pp == ENTER_INF || pp == OUTSIDE_INF){	
 				in.from.node = pp;
@@ -711,14 +749,17 @@ void State::setup_transtree()
 			}
 			else{
 				auto kk = ind_node_ref[eve.ind_inf_from.p][eve.ind_inf_from.i];
-				if(kk == UNSET) emsg("Problem with inf_from");
-				
+			
+				if(kk == UNSET){
+					emsg("Problem with inf_from");
+				}
+	
 				auto &in2 = inf_node[kk];
 				
 				in.from.node = kk;
 				in.from.index = in2.inf_ev.size();
 				
-				InfEvent ie; ie.type = INFECT_OTHER; ie.t = eve.t; ie.index = k; ie.mut_num = UNSET;
+				InfEvent ie; ie.type = INFECT_OTHER; ie.tdiv = eve.tdiv; ie.index = k; ie.mut_num = UNSET;
 				in2.inf_ev.push_back(ie);
 			}
 		}
@@ -728,10 +769,10 @@ void State::setup_transtree()
 		for(auto n = 0u; n < inf_node.size(); n++){
 			cout << "node " << n << endl;
 			const auto &no = inf_node[n];
-			cout << no.t_start << " " << no.t_rec << " time range" << endl;
+			cout << no.tdiv_start << " " << no.tdiv_rec << " time range" << endl;
 			
 			for(const auto &iev : no.inf_ev){
-				cout << iev.t << ",";
+				cout << iev.tdiv << ",";
 			}
 			cout << endl;
 		}
@@ -748,11 +789,11 @@ double State::find_t_rec(const InfNode &in) const
 	 
 	for(auto e = in.e; e < ev.size(); e++){
 		if(ev[e].type == M_TRANS_EV && sp.tra_gl[ev[e].tr_gl].infection.type == TRANS_RECOVERY){
-			return ev[e].t;
+			return ev[e].tdiv;
 		}
 	}
 
-	return model.details.t_end;
+	return model.details.T;
 }
 
 
@@ -775,7 +816,7 @@ vector <double> State::set_genetic_param()
 /// Samples quantities in sample_genetic_value()
 void State::sample_genetic_value()
 {
-	auto mut_rate = genetic_value.mut_rate;
+	auto mut_rate = genetic_value.mut_rate*model.details.dt;
 	
 	auto seq_var = genetic_value.seq_var;
 	
@@ -787,20 +828,20 @@ void State::sample_genetic_value()
 	for(auto k = 0u; k < inf_node.size(); k++){
 		auto &in = inf_node[k];
 		
-		auto t = in.t_start;
+		auto t = in.tdiv_start;
 		for(auto e = 0u; e < in.inf_ev.size(); e++){
 			auto &ev = in.inf_ev[e];
 			
-			auto val = poisson_sample(mut_rate*(ev.t-t),warn);
+			auto val = poisson_sample(mut_rate*(ev.tdiv-t),warn);
 			if(val == UNSET) emsg("Problem sampling from a Poisson distribution: "+warn);
 			ev.mut_num = val;
-			t = ev.t;
+			t = ev.tdiv;
 		}
 	}
 	
 	for(auto &io : genetic_value.inf_origin){
 		auto &in = inf_node[io.node];
-		auto val = poisson_sample(seq_var+mut_rate*(in.t_start-model.details.t_start),warn);
+		auto val = poisson_sample(seq_var+mut_rate*in.tdiv_start,warn);
 		if(val == UNSET) emsg("Problem sampling from a Poisson distribution: "+warn);
 		io.mut_num = val;
 	}
@@ -815,12 +856,12 @@ void State::sample_genetic_value()
 			
 		for(auto k = 0u; k < inf_node.size(); k++){
 			const auto &in = inf_node[k];
-			cout << k << " " << in.t_start << " " << model.species[in.p].individual[in.i].name 
+			cout << k << " " << in.tdiv_start << " " << model.species[in.p].individual[in.i].name 
 					 << "  from: " << in.from.node <<" " << in.from.index << endl;
 			
 			for(auto e = 0u; e < in.inf_ev.size(); e++){
 				const auto &ev = in.inf_ev[e];
-				cout << "  " << ev.t << " " << ev.mut_num << "  ";
+				cout << "  " << ev.tdiv << " " << ev.mut_num << "  ";
 				switch(ev.type){
 				case INFECT_OTHER: cout << "infect other "; break;
 				case GENETIC_OBS: cout << "observation "; break;
@@ -983,21 +1024,21 @@ double State::likelihood_genetic_process()
 	
 	auto Li = 0.0;
 
-	auto mut_rate = genetic_value.mut_rate;
+	auto mut_rate = genetic_value.mut_rate*model.details.dt;
 	auto seq_var = genetic_value.seq_var;
 	
 	for(const auto &in : genetic_value.inf_node){
-		auto t = in.t_start;
+		auto t = in.tdiv_start;
 		for(auto e = 0u; e < in.inf_ev.size(); e++){
 			auto &ev = in.inf_ev[e];
-			Li += poisson_probability(ev.mut_num,mut_rate*(ev.t-t));
-			t = ev.t;
+			Li += poisson_probability(ev.mut_num,mut_rate*(ev.tdiv-t));
+			t = ev.tdiv;
 		}
 	}
 	
 	for(auto &io : genetic_value.inf_origin){
 		const auto &in = genetic_value.inf_node[io.node];
-		Li += poisson_probability(io.mut_num,seq_var+mut_rate*(in.t_start-model.details.t_start));
+		Li += poisson_probability(io.mut_num,seq_var+mut_rate*in.tdiv_start);
 	}
 	
 	return Li;
@@ -1034,13 +1075,13 @@ double State::likelihood_genetic_obs(const vector < vector <unsigned int> > &gen
 
 /// Used to order global events
 bool GlobalEvent_ord(const GlobalEvent &ge1, const GlobalEvent &ge2)                      
-{ return (ge1.t < ge2.t); };  
+{ return (ge1.tdiv < ge2.tdiv); };  
 
 
 /// Performs a transmission tree proposal
 void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, unsigned int &ntr)
 {
-	auto pl = false;//true;
+	auto pl = false;
 	
 	// Makes a global list of all events
 	if(pl) cout << "Start trans tree proposal" << endl;
@@ -1054,7 +1095,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 			for(auto i = 0u; i < ssp.individual.size(); i++){	
 				const auto &ind = ssp.individual[i];
 				for(auto e = 0u; e < ind.ev.size(); e++){
-					GlobalEvent ge; ge.t = ind.ev[e].t; ge.p = p; ge.i = i; ge.e = e;
+					GlobalEvent ge; ge.tdiv = ind.ev[e].tdiv; ge.p = p; ge.i = i; ge.e = e;
 					glob_ev.push_back(ge);
 				}
 			}
@@ -1086,10 +1127,10 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 	auto egl = 0u;
 	for(auto ti = 0u; ti < T; ti++){
 		if(pl) cout << ti << "ti" << endl;
-		auto t = model.timepoint[ti];
 	
 		// Updates populations
-		while(egl < glob_ev.size() && glob_ev[egl].t <= t){
+		//while(egl < glob_ev.size() && glob_ev[egl].tdiv <= tdiv){
+		while(egl < glob_ev.size() && glob_ev[egl].tdiv <= ti){
 			const auto &ge = glob_ev[egl];
 			auto p = ge.p;
 			auto i = ge.i;
@@ -1139,10 +1180,10 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 		}
 		
 		// Tries to reassign infections in the next time period
-		auto t_next = t+model.details.dt;
+		auto t_next = ti+1;
 	
 		auto egl2 = egl;
-		while(egl2 < glob_ev.size() && glob_ev[egl2].t < t_next){
+		while(egl2 < glob_ev.size() && glob_ev[egl2].tdiv < t_next){
 			const auto &ge = glob_ev[egl2];
 			auto p = ge.p;
 			auto i = ge.i;
@@ -1158,7 +1199,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 					
 					if(pl){
 						cout << endl << endl << "START" << endl;
-						cout << "p:" << p << " individual:" << i << "   t:" << ev.t <<" t" << endl;
+						cout << "p:" << p << " individual:" << i << "   t:" << model.calc_t(ev.tdiv) <<" t" << endl;
 						ssp.print_event(ssp.individual[i].ev);
 					}
 					
@@ -1180,7 +1221,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 					// Works out the probability of the reverse transition
 					auto probfi = 0.0;
 					auto ii_from = ev.ind_inf_from;
-					
+				
 					{
 						auto k_from = ii_from.pref;
 						
@@ -1212,7 +1253,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 							probfi += log(num/popnum[pr]);
 						}
 					}
-					
+						
 					// Samples a new event source
 					auto probif = 0.0;
 					IndInfFrom ii_prop;
@@ -1222,66 +1263,69 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 					
 						if(lin.multi_source){ 	
 							auto ss = eq.setup_source_sampler(ti,popnum,param_val,spline_val);
-	
+
 							k_prop = ss.sample_inf_source();
+							//if(k_prop == UNSET) emsg("Cannot sample source");
 							probif += ss.prob_inf_source(k_prop);
 						}
 						
-						if(k_prop == Npop){	
-							ii_prop.p = OUTSIDE_INF;
-							ii_prop.pref = UNSET;
-							ii_prop.po = UNSET;
-							ii_prop.i = UNSET;
-							ii_prop.w = 1;
-						}
-						else{
-							auto pr = pop_ref[k_prop];
-								
-							const auto &po = model.pop[pr];
-						
-							auto p = po.sp_p;
-							
-							ii_prop.p = p;
-							ii_prop.pref = k_prop;
-							ii_prop.po = pr;
-							
-							const auto &list = pop_ind[pr];
-							if(po.ind_variation){
-								const auto &ssp = species[p];
-								
-								vector <Poss> poss;
-								for(auto i : list){
-									const auto &ind  = ssp.individual[i];
-									auto num = 1.0;
-									for(auto ie : po.ind_eff_mult) num *= ind.exp_ie[ie];
-									for(auto fe : po.fix_eff_mult) num *= ind.exp_fe[fe];
-									Poss pos; pos.i = i; pos.weight = num;	
-									poss.push_back(pos);									
-								}
-							
-								auto pos_sel = sample_possibility(poss);
-								ii_prop.i = pos_sel.i;
-								ii_prop.w = pos_sel.weight;
-								probif += sample_probability(pos_sel.i,poss);
+						if(k_prop != UNSET){
+							if(k_prop == Npop){	
+								ii_prop.p = OUTSIDE_INF;
+								ii_prop.pref = UNSET;
+								ii_prop.po = UNSET;
+								ii_prop.i = UNSET;
+								ii_prop.w = 1;
 							}
 							else{
-								if(list.size() == 0) emsg("zero list");
-								auto kk = (unsigned int)(ran()*list.size());
-								ii_prop.i = list[kk];
-								ii_prop.w = 1;
+								auto pr = pop_ref[k_prop];
+									
+								const auto &po = model.pop[pr];
 							
-								probif += log(1.0/list.size());
+								auto p = po.sp_p;
+								
+								ii_prop.p = p;
+								ii_prop.pref = k_prop;
+								ii_prop.po = pr;
+								
+								const auto &list = pop_ind[pr];
+								if(po.ind_variation){
+									const auto &ssp = species[p];
+									
+									vector <Poss> poss;
+									for(auto i : list){
+										const auto &ind  = ssp.individual[i];
+										auto num = 1.0;
+										for(auto ie : po.ind_eff_mult) num *= ind.exp_ie[ie];
+										for(auto fe : po.fix_eff_mult) num *= ind.exp_fe[fe];
+										Poss pos; pos.i = i; pos.weight = num;	
+										poss.push_back(pos);									
+									}
+								
+									auto pos_sel = sample_possibility(poss);
+									ii_prop.i = pos_sel.i;
+									ii_prop.w = pos_sel.weight;
+									probif += sample_probability(pos_sel.i,poss);
+								}
+								else{
+									if(list.size() == 0) emsg("zero list");
+									auto kk = (unsigned int)(ran()*list.size());
+									ii_prop.i = list[kk];
+									ii_prop.w = 1;
+								
+									probif += log(1.0/list.size());
+								}
 							}
 						}
 					}
 					
 					auto dlike_markov = probif - probfi;
 		
-					if(ii_from.i != ii_prop.i || ii_from.p != ii_prop.p || ii_from.pref != ii_prop.pref){
+					if(probif != -LARGE && (ii_from.i != ii_prop.i || ii_from.p != ii_prop.p || ii_from.pref != ii_prop.pref)){
 						auto n = ev.inf_node_ref;
-						
+					
 						auto gc = gen_change(REGRAFT_NODE,n,no_alter(n),ii_prop);
-						
+				
 						auto al = exp(burn_info.markov*dlike_markov 
 									+ burn_info.genetic_process*gc.dlike_genetic_process
 									+ burn_info.genetic_obs*gc.dlike_genetic_obs
@@ -1305,7 +1349,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 								cout << ir.i << " ";
 								auto ev = ssp.individual[ir.i].ev[ir.index];
 								auto iif = ev.ind_inf_from;
-								cout << ev.t << " p" << iif.p << " i"<< iif.i << " pref" << iif.pref << " po" << iif.po << "  yy" << endl;
+								cout << model.calc_t(ev.tdiv) << " p" << iif.p << " i"<< iif.i << " pref" << iif.pref << " po" << iif.po << "  yy" << endl;
 							}
 						}
 						
@@ -1323,24 +1367,24 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 
 
 /// Sets inf_ev_from in event at time t based on infection coming from event_from
-// If not mpossible then returns false
+// If not possible then returns false
 bool State::set_ind_inf_from(double t, unsigned int p, vector <Event> &event, unsigned int p_from, unsigned int i_from, const vector <Event> &event_from)
 {
-	auto e = 0u; while(e < event.size() && event[e].t < t) e++;
-	if(e == event.size() || t != event[e].t){
+	auto e = 0u; while(e < event.size() && event[e].tdiv < t) e++;
+	if(e == event.size() || t != event[e].tdiv){
 		emsg("Problem");
 	}
 	
 	auto c_from = UNSET;
 	auto e2 = 0u; 
-	while(e2 < event_from.size() && event_from[e2].t < t){ c_from = event_from[e2].c_after; e2++;}
+	while(e2 < event_from.size() && event_from[e2].tdiv < t){ c_from = event_from[e2].c_after; e2++;}
 	
-	if(c_from == UNSET) emsg("SHould not be unset");
+	if(c_from == UNSET) emsg("Should not be unset");
 	
 	auto &ev = event[e];
 	const auto &inf_c = model.inf_cause[p][ev.tr_gl][p_from][c_from];
 	auto pref = inf_c.pref;
-	if(pref == UNSET) emsg("SHould be p ref");
+	//if(pref == UNSET) emsg("Should be p ref");
 	if(pref == UNSET) return false;
 	
 	auto &iif = event[e].ind_inf_from;
@@ -1353,12 +1397,28 @@ bool State::set_ind_inf_from(double t, unsigned int p, vector <Event> &event, un
 }
 
 
+/// Sets inf_ev_from in event at time t based on infection coming from event_from
+// If not possible then returns false
+void State::set_ind_inf_from_outside(double t, vector <Event> &event)
+{
+	auto e = 0u; while(e < event.size() && event[e].tdiv < t) e++;
+	if(e == event.size() || t != event[e].tdiv) emsg("Problem");
+	
+	auto &iif = event[e].ind_inf_from;
+	iif.p = OUTSIDE_INF;
+	iif.i = UNSET;
+	iif.pref = UNSET;
+	iif.po = UNSET;
+	iif.w = 1;
+}
+
+
 /// Performs swapping of infected individual proposal
 // Here we look to replace node k_A with its infector node k_B
 void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int &nfa, unsigned int &nac, unsigned int &ntr)
 {
-	auto pl = false;// true;
-
+	auto pl = false;
+	
 	auto &inf_node = genetic_value.inf_node;
 	if(inf_node.size() == 0) return;
 	
@@ -1372,21 +1432,39 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 		auto &in_A = inf_node[k_A];
 		auto &fr_A = in_A.from;
 		auto e_index = in_A.from.index;
-		auto t_A = in_A.t_start;
+		auto t_A = in_A.tdiv_start;
 		
 		if(fr_A.node != ENTER_INF && fr_A.node != OUTSIDE_INF){
 			auto k_B = fr_A.node;
 			auto &in_B = inf_node[k_B];
-			auto t_B = in_B.t_start;
+			const auto &inf_evB = in_B.inf_ev;
+			auto t_B = in_B.tdiv_start;
 			
 			if(pl) cout << endl << endl << "START " << t_A << " "<< t_B << endl;
 			
 			// Checks to see if there is an observation
 			auto fl = false;
 			for(auto e = 0u; e < e_index; e++){
-				if(in_B.inf_ev[e].type == GENETIC_OBS) fl = true;
+				if(inf_evB[e].type == GENETIC_OBS) fl = true;
 			}	
 			
+			// Checks to see if there is an onward infection which
+			// cannot be accounted for deu to finite step size
+
+			auto t_inf_min = round_up(t_A);
+			for(auto e = e_index+1; e < inf_evB.size(); e++){
+				if(inf_evB[e].tdiv < t_inf_min){
+					if(inf_evB[e].type == INFECT_OTHER){
+						fl = true;
+					}
+				}
+				else break;
+			}
+			
+			// Checks to see if external infection
+			//if(in_B.from.node == ENTER_INF || in_B.from.node == OUTSIDE_INF) fl = true;
+			if(in_B.from.node == ENTER_INF) fl = true;
+		
 			ntr++;
 			if(fl == true) nfa++;
 			else{				
@@ -1404,15 +1482,15 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 				// Checks if in the time range
 				auto fl = false;
 				auto e_B_after = get_event_after(in_B.e,ev_B_new);
-				if(e_B_after != UNSET && ev_B_new[e_B_after].t < t_A) fl = true;
+				if(e_B_after != UNSET && ev_B_new[e_B_after].tdiv < t_A) fl = true;
 				 
 				auto e_A_before = get_event_before(in_A.e,ev_A_new);
-				if(e_A_before != UNSET && ev_A_new[e_A_before].t > t_B) fl = true;
+				if(e_A_before != UNSET && ev_A_new[e_A_before].tdiv > t_B) fl = true;
 				
 				// Check for unaccounted observatins on A
 				if(i_A < ind_gen_obs[p_A].size()){
 					const auto &igo = ind_gen_obs[p_A][i_A];
-					if(igo.size() > 0 && igo[0].t < t_A) fl = true;
+					if(igo.size() > 0 && igo[0].tdiv < t_A) fl = true;
 				}
 			
 				if(fl == true) nfa++;
@@ -1428,6 +1506,7 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 					
 						species[p_A].print_event(species[p_B].individual[i_B].ev);
 						print_node("node",k_B);
+						cout << endl << endl;
 					}
 					
 					auto &ev_B = ev_B_new[in_B.e]; 
@@ -1437,14 +1516,19 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 						fl = true;
 					}
 					else{
-						const auto &in_from = inf_node[in_B.from.node];
-						auto p_fr = in_from.p, i_fr = in_from.i;
-						
 						sp_A.move_event(ev_A_new,in_A.e,t_B);
 						sp_B.move_event(ev_B_new,in_B.e,t_A);
 						
-						if(set_ind_inf_from(t_B,p_A,ev_A_new,p_fr,i_fr,species[p_fr].individual[i_fr].ev) == false){
-							fl = true;
+						if(in_B.from.node == OUTSIDE_INF){
+							set_ind_inf_from_outside(t_B,ev_A_new);
+						}
+						else{
+							const auto &in_from = inf_node[in_B.from.node];
+							auto p_fr = in_from.p, i_fr = in_from.i;
+						
+							if(set_ind_inf_from(t_B,p_A,ev_A_new,p_fr,i_fr,species[p_fr].individual[i_fr].ev) == false){
+								fl = true;
+							}
 						}
 					}
 					
@@ -1453,6 +1537,8 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 					}
 					else{
 						vector <IIFChange> iif_change;
+						
+						auto ill_fl = false;
 						
 						// Looks at switch the source for other infections on B's time line
 						if(e_index > 0){
@@ -1464,14 +1550,14 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 							
 							for(auto e = 0u; e < e_index; e++){
 								const auto &ie = in_B.inf_ev[e];
-								auto tt = ie.t;
+								auto tt = ie.tdiv;
 								
-								while(e_bef < ev_bef.size() && ev_bef[e_bef].t < tt){
+								while(e_bef < ev_bef.size() && ev_bef[e_bef].tdiv < tt){
 									c_bef = ev_bef[e_bef].c_after;
 									e_bef++;
 								}
 								
-								while(e_aft < ev_aft.size() && ev_aft[e_aft].t < tt){
+								while(e_aft < ev_aft.size() && ev_aft[e_aft].tdiv < tt){
 									c_aft = ev_aft[e_aft].c_after;
 									e_aft++;
 								}
@@ -1507,112 +1593,118 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 									// Looks at after
 									const auto &inf_c_aft = model.inf_cause[p_ev][ev.tr_gl][p_A][c_aft];
 									auto pref = inf_c_aft.pref;
-									if(pref == UNSET) emsg("SHould be p ref");
-							
-									const auto &eq_aft = model.eqn[inf_c_aft.eq_ref];
-									const auto &lin_aft = eq_aft.linearise;
-									auto va_aft = eq_aft.calculate_calculation(lin_aft.pop_grad_calc[pref],ti,param_val,spline_val);
-	
-									auto &iif_aft = iif_ch.ind_inf_from;
-									iif_aft.p = p_A;
-									iif_aft.i = i_A;
-									iif_aft.pref = pref;
-									iif_aft.po = inf_c_aft.po;
-									iif_aft.w = get_w_from_indinffrom(iif_aft);
-									
-									iif_ch.Li_markov_aft = log(va_aft*iif_aft.w);
-							
-									iif_change.push_back(iif_ch);							
+									if(pref == UNSET) ill_fl = true;
+									else{
+										//if(pref == UNSET) emsg("Should be p ref");
+								
+										const auto &eq_aft = model.eqn[inf_c_aft.eq_ref];
+										const auto &lin_aft = eq_aft.linearise;
+										auto va_aft = eq_aft.calculate_calculation(lin_aft.pop_grad_calc[pref],ti,param_val,spline_val);
+		
+										auto &iif_aft = iif_ch.ind_inf_from;
+										iif_aft.p = p_A;
+										iif_aft.i = i_A;
+										iif_aft.pref = pref;
+										iif_aft.po = inf_c_aft.po;
+										iif_aft.w = get_w_from_indinffrom(iif_aft);
+										
+										iif_ch.Li_markov_aft = log(va_aft*iif_aft.w);
+								
+										iif_change.push_back(iif_ch);							
+									}
 								}
 							}
 						}
 						
-						back_init();
-						auto like_ch = update_ind(p_A,i_A,ev_A_new,UP_MULTI);
-						
-						auto li_ch = update_ind(p_B,i_B,ev_B_new,UP_MULTI);
-						
-						add_on_like(li_ch,like_ch);
+						if(ill_fl == false){
+							back_init();
+							auto like_ch = update_ind(p_A,i_A,ev_A_new,UP_MULTI);
 							
-						for(const auto &iif_ch : iif_change){
-							like_ch.markov += iif_ch.Li_markov_aft - iif_ch.Li_markov_bef;
-						}
-						
-						auto al = calc_al(like_ch,0,burn_info);
-						
-						if(pl) print_like(li_ch);
-						
-						if(pl) cout << al << " al" << endl;
-						if(ran() < al){
-							if(pl) cout << "accept" << endl;
-							add_like(like_ch);
-						
-							// Updates quantities for inf_node
-							InfNode in_A_new;
-							in_A_new.t_start = t_B;
-							in_A_new.t_rec = in_A.t_rec;
-							in_A_new.p = p_A;
-							in_A_new.i = i_A;
-							in_A_new.e = in_A.e;
-							in_A_new.from = in_B.from;
-							for(auto e = 0u; e <= e_index; e++){
-								in_A_new.inf_ev.push_back(in_B.inf_ev[e]);
-							}
+							auto li_ch = update_ind(p_B,i_B,ev_B_new,UP_MULTI);
 							
-							in_A_new.inf_ev[e_index].index = fr_A.node;
-
-							for(auto e = 0u; e < in_A.inf_ev.size(); e++){
-								in_A_new.inf_ev.push_back(in_A.inf_ev[e]);
-							}
-							
-							// Updates quantities for inf_node from
-							InfNode in_B_new;
-							in_B_new.t_start = t_A;
-							in_B_new.t_rec = in_B.t_rec;
-							in_B_new.p = p_B;
-							in_B_new.i = i_B;
-							in_B_new.e = in_B.e;
-							in_B_new.from.node = k_B;
-							in_B_new.from.index = e_index;
-							for(auto e = e_index+1; e < in_B.inf_ev.size(); e++){
-								in_B_new.inf_ev.push_back(in_B.inf_ev[e]);
-							}
-							
-							in_A = in_A_new;
-							in_B = in_B_new;
-	
-							for(const auto &iif_ch : iif_change){
-								auto p_ev = iif_ch.p_ev;
-								auto &ssp = species[p_ev];
-								auto &ev = ssp.individual[iif_ch.i_ev].ev[iif_ch.e_ev];
-								ev.ind_inf_from = iif_ch.ind_inf_from;
+							add_on_like(li_ch,like_ch);
 								
-								auto m = model.species[p_ev].tra_gl[ev.tr_gl].markov_eqn_ref;
-								ssp.Li_markov[m][iif_ch.ti] += iif_ch.Li_markov_aft - iif_ch.Li_markov_bef;
+							for(const auto &iif_ch : iif_change){
+								like_ch.markov += iif_ch.Li_markov_aft - iif_ch.Li_markov_bef;
 							}
 							
-							update_inf_node_ref(k_A);
-							update_inf_node_ref(k_B);
-						
-							if(pl){
-								cout << "AFTER" << endl;
-								cout << "Ind" << endl;
-								cout << "Event" << endl;
-								species[0].print_event(species[p_A].individual[i_A].ev);
-								print_node("node",k_A);
+							auto al = calc_al(like_ch,0,burn_info);
 							
-								species[0].print_event(species[p_B].individual[i_B].ev);
-								print_node("node",k_B);
+							if(pl) print_like(li_ch);
+							
+							if(pl) cout << al << " al" << endl;
+							if(ran() < al){
+								if(pl) cout << "accept" << endl;
+								add_like(like_ch);
+							
+								// Updates quantities for inf_node
+								InfNode in_A_new;
+								in_A_new.tdiv_start = t_B;
+								in_A_new.tdiv_rec = in_A.tdiv_rec;
+								in_A_new.p = p_A;
+								in_A_new.i = i_A;
+								in_A_new.e = in_A.e;
+								in_A_new.from = in_B.from;
+								for(auto e = 0u; e <= e_index; e++){
+									in_A_new.inf_ev.push_back(in_B.inf_ev[e]);
+								}
+								
+								in_A_new.inf_ev[e_index].index = fr_A.node;
+
+								for(auto e = 0u; e < in_A.inf_ev.size(); e++){
+									in_A_new.inf_ev.push_back(in_A.inf_ev[e]);
+								}
+								
+								// Updates quantities for inf_node from
+								InfNode in_B_new;
+								in_B_new.tdiv_start = t_A;
+								in_B_new.tdiv_rec = in_B.tdiv_rec;
+								in_B_new.p = p_B;
+								in_B_new.i = i_B;
+								in_B_new.e = in_B.e;
+								in_B_new.from.node = k_B;
+								in_B_new.from.index = e_index;
+								for(auto e = e_index+1; e < in_B.inf_ev.size(); e++){
+									in_B_new.inf_ev.push_back(in_B.inf_ev[e]);
+								}
+								
+								in_A = in_A_new;
+								in_B = in_B_new;
+		
+								for(const auto &iif_ch : iif_change){
+									auto p_ev = iif_ch.p_ev;
+									auto &ssp = species[p_ev];
+									auto &ev = ssp.individual[iif_ch.i_ev].ev[iif_ch.e_ev];
+									ev.ind_inf_from = iif_ch.ind_inf_from;
+									
+									auto m = model.species[p_ev].tra_gl[ev.tr_gl].markov_eqn_ref;
+									ssp.Li_markov[m][iif_ch.ti] += iif_ch.Li_markov_aft - iif_ch.Li_markov_bef;
+								}
+								
+								update_inf_node_ref(k_A);
+								update_inf_node_ref(k_B);
+							
+								if(pl){
+									cout << "AFTER" << endl;
+									cout << "Ind" << endl;
+									cout << "Event" << endl;
+									species[0].print_event(species[p_A].individual[i_A].ev);
+									print_node("node",k_A);
+								
+									species[0].print_event(species[p_B].individual[i_B].ev);
+									print_node("node",k_B);
+									cout << endl << endl;
+								}
+								
+								update_popnum_ind(p_A,i_A);
+								update_popnum_ind(p_B,i_B);
+								
+								nac++;
 							}
-							
-							update_popnum_ind(p_A,i_A);
-							update_popnum_ind(p_B,i_B);
-							
-							nac++;
-						}
-						else{
-							if(pl) cout << "reject" << endl;
-							restore_back();
+							else{
+								if(pl) cout << "reject" << endl;
+								restore_back();
+							}
 						}
 					}
 				}
@@ -1674,8 +1766,8 @@ InfNodeAlter State::no_alter(unsigned int n) const
 {
 	auto na = InfNodeAlter();
 	const auto &in = genetic_value.inf_node[n];
-	na.t_start = in.t_start;
-	na.t_rec = in.t_rec;
+	na.tdiv_start = in.tdiv_start;
+	na.tdiv_rec = in.tdiv_rec;
 	return na;
 }
 	
@@ -1688,7 +1780,7 @@ void State::trans_tree_mut_proposal(const BurnInfo &burn_info, unsigned int &nac
 	auto &inf_node = genetic_value.inf_node;
 	const auto &gen_data = model.genetic_data;
 	
-	auto mut_rate = genetic_value.mut_rate;
+	auto mut_rate = genetic_value.mut_rate*model.details.dt;
 	auto seq_var = genetic_value.seq_var;
 
 	auto &gen_dif = genetic_value.gen_dif;
@@ -1710,8 +1802,10 @@ void State::trans_tree_mut_proposal(const BurnInfo &burn_info, unsigned int &nac
 				auto num_new = num + dn;
 				
 				if(num_new >= 0){
-					double dt; if(e == 0) dt = iev.t-in.t_start; else dt = iev.t-in.inf_ev[e-1].t;
-					auto lam = mut_rate*dt;
+					double dtdiv;
+					if(e == 0) dtdiv = iev.tdiv-in.tdiv_start;
+					else dtdiv = iev.tdiv-in.inf_ev[e-1].tdiv;
+					auto lam = mut_rate*dtdiv;
 					
 					auto dlike_genetic_process = poisson_probability(num_new,lam) - poisson_probability(num,lam);
 			
@@ -1783,7 +1877,7 @@ void State::trans_tree_mut_proposal(const BurnInfo &burn_info, unsigned int &nac
 			auto num_new = num + dn;
 			
 			if(num_new >= 0){
-				auto lam = seq_var+mut_rate*(in.t_start-model.details.t_start);
+				auto lam = seq_var+mut_rate*in.tdiv_start;
 			
 				auto dlike_genetic_process = poisson_probability(num_new,lam) - poisson_probability(num,lam);
 		
@@ -1851,7 +1945,7 @@ void State::trans_tree_mut_local_proposal(const BurnInfo &burn_info, vector <Gen
 	auto &inf_node = genetic_value.inf_node;
 	const auto &gen_data = model.genetic_data;
 	
-	auto mut_rate = genetic_value.mut_rate;
+	auto mut_rate = genetic_value.mut_rate*model.details.dt;
 	auto seq_var = genetic_value.seq_var;
 	
 	auto nobs = genetic_value.obs_node_ref.size();
@@ -1897,10 +1991,12 @@ void State::trans_tree_mut_local_proposal(const BurnInfo &burn_info, vector <Gen
 										auto msel = ev.index;
 										
 										// Finds change in genetic process
-										double t_last; if(e > 0) t_last = in.inf_ev[e-1].t; else t_last = in.t_start;
+										double t_last; 
+										if(e > 0) t_last = in.inf_ev[e-1].tdiv; 
+										else t_last = in.tdiv_start;
 									
-										auto lam1 = mut_rate*(ev.t-t_last);
-										auto lam2 = mut_rate*(ev2.t-ev.t);
+										auto lam1 = mut_rate*(ev.tdiv-t_last);
+										auto lam2 = mut_rate*(ev2.tdiv-ev.tdiv);
 							
 										auto dlike_genetic_process = poisson_probability(num1_new,lam1) - poisson_probability(num1_old,lam1)
 																								+poisson_probability(num2_new,lam2) - poisson_probability(num2_old,lam2);
@@ -2004,9 +2100,11 @@ void State::trans_tree_mut_local_proposal(const BurnInfo &burn_info, vector <Gen
 										auto num_new = int(num_old)+dn;
 										if(num_new < 0) ill = true;
 										else{
-											double t_last; if(e > 0) t_last = in.inf_ev[e-1].t; else t_last = in.t_start;
+											double t_last; 
+											if(e > 0) t_last = in.inf_ev[e-1].tdiv;
+											else t_last = in.tdiv_start;
 										
-											auto lam2 = mut_rate*(ev.t-t_last);
+											auto lam2 = mut_rate*(ev.tdiv-t_last);
 											dlike_genetic_process += poisson_probability(num_new,lam2) - poisson_probability(num_old,lam2);
 										}
 									}
@@ -2017,7 +2115,7 @@ void State::trans_tree_mut_local_proposal(const BurnInfo &burn_info, vector <Gen
 										auto num_new = int(num_old)+dn2;
 										if(num_new < 0) ill = true;
 										else{
-											auto lam2 = mut_rate*(ev2.t-ev.t);
+											auto lam2 = mut_rate*(ev2.tdiv-ev.tdiv);
 											dlike_genetic_process += poisson_probability(num_new,lam2) - poisson_probability(num_old,lam2);
 										}
 									}
@@ -2028,7 +2126,7 @@ void State::trans_tree_mut_local_proposal(const BurnInfo &burn_info, vector <Gen
 										auto num_new = int(num_old)+dn3;
 										if(num_new < 0) ill = true;
 										else{
-											auto lam2 = mut_rate*(ev2.t-ev.t);
+											auto lam2 = mut_rate*(ev2.tdiv-ev.tdiv);
 											dlike_genetic_process += poisson_probability(num_new,lam2) - poisson_probability(num_old,lam2);
 										}
 									}
@@ -2163,11 +2261,11 @@ void State::trans_tree_mut_local_proposal(const BurnInfo &burn_info, vector <Gen
 					int num2_new = num2_old - dn;
 					
 					if(num_new >= 0 && num2_new >= 0){
-						auto lam = seq_var+mut_rate*(in.t_start-model.details.t_start);
+						auto lam = seq_var+mut_rate*in.tdiv_start;
 					
 						auto dlike_genetic_process = poisson_probability(num_new,lam) - poisson_probability(num_old,lam);
 				
-						auto lam2 = mut_rate*(ev.t-in.t_start);
+						auto lam2 = mut_rate*(ev.tdiv-in.tdiv_start);
 						dlike_genetic_process += poisson_probability(num2_new,lam2) - poisson_probability(num2_old,lam2);
 					
 						auto al = exp(burn_info.genetic_process*dlike_genetic_process);
@@ -2204,7 +2302,9 @@ void State::print_node(string te, unsigned int n) const
 	const auto &in = genetic_value.inf_node[n];
 		
 	cout << te << ": Infection node " << n << endl;
-	cout << "t_start=" << in.t_start << "  t_rec=" << in.t_rec << "  p=" << in.p << "  i=" << in.i << "  e="<< in.e << endl;
+	cout << "t_start=" << model.calc_t(in.tdiv_start);
+	cout << "  t_rec=" << model.calc_t(in.tdiv_rec);
+	cout << "  p=" << in.p << "  i=" << in.i << "  e="<< in.e << endl;
 	
 	if(in.from.node == OUTSIDE_INF){
 		cout << "from outside " <<  in.from.index << " ";
@@ -2221,7 +2321,7 @@ void State::print_node(string te, unsigned int n) const
 	
 	cout << "inf_ev" << endl;
 	for(const auto &ie : in.inf_ev){
-		cout << "t=" << ie.t << "  ";
+		cout << "t=" << model.calc_t(ie.tdiv) << "  ";
 		switch(ie.type){
 		case INFECT_OTHER: cout << "INFECT_OTHER (" << ie.index << ")"; break;
 		case GENETIC_OBS: cout << "GENETIC OBS (" << ie.index << ")"; break;
@@ -2245,16 +2345,14 @@ void State::print_inf_origin() const
 /// Rounds down to the begining of the division
 double State::round_down(double t) const 
 {
-	const auto &det = model.details;
-	return det.t_start+((unsigned int)((t-det.t_start)/det.dt))*det.dt;
+	return (unsigned int)(t);
 }
 
 
 /// Rounds up to the end of the division
 double State::round_up(double t) const 
 {
-	const auto &det = model.details;
-	return det.t_start+(((unsigned int)((t-det.t_start)/det.dt))+1)*det.dt;
+	return 1+(unsigned int)(t);
 }
 
 
@@ -2284,11 +2382,11 @@ void State::disconnect_inf_node(unsigned int n)
 		auto &in2 = inf_node[fr.node];
 		auto &inf_ev2 = in2.inf_ev;
 	
-		double t_last; if(ind > 0) t_last = inf_ev2[ind-1].t; else t_last = in2.t_start;
-		auto t1 = inf_ev2[ind].t;
+		double t_last; if(ind > 0) t_last = inf_ev2[ind-1].tdiv; else t_last = in2.tdiv_start;
+		auto t1 = inf_ev2[ind].tdiv;
 		
 		if(ind+1 < inf_ev2.size()){                    // Combines together mutations
-			auto t2 = inf_ev2[ind+1].t;
+			auto t2 = inf_ev2[ind+1].tdiv;
 			
 			auto frac = (t1-t_last)/(t2-t_last);
 			if(frac < 0 || frac > 1) emsg("frac out of range");
@@ -2360,7 +2458,7 @@ void State::connect_inf_node(unsigned int n, const IndInfFrom &iif, unsigned int
 		inf_origin.push_back(io);
 	}
 	else{
-		auto t = in.t_start;
+		auto t = in.tdiv_start;
 		
 		// Works out the node which instigates the infection
 		
@@ -2372,18 +2470,18 @@ void State::connect_inf_node(unsigned int n, const IndInfFrom &iif, unsigned int
 		
 		double t_last;
 		
-		if(j > 0) t_last = inf_ev2[j-1].t; else t_last = in2.t_start;
+		if(j > 0) t_last = inf_ev2[j-1].tdiv; else t_last = in2.tdiv_start;
 		auto t1 = t;
 
 		fr = nr;
 			
 		InfEvent ie_add;
-		ie_add.t = t;
+		ie_add.tdiv = t;
 		ie_add.type = INFECT_OTHER;
 		ie_add.index = n;
 		
 		if(j < inf_ev2.size()){                        // Inserting between two events
-			auto t2 = inf_ev2[j].t;
+			auto t2 = inf_ev2[j].tdiv;
 			
 			auto frac = (t1-t_last)/(t2-t_last);
 			if(frac < 0 || frac > 1) emsg("frac out of range");
@@ -2392,6 +2490,9 @@ void State::connect_inf_node(unsigned int n, const IndInfFrom &iif, unsigned int
 				auto mut_num = inf_ev2[j].mut_num;
 				inf_ev2[j].mut_num = mut_num-mut_num_store;
 				ie_add.mut_num = mut_num_store;
+			}
+			else{
+				ie_add.mut_num = UNSET;
 			}
 			
 			inf_ev2.insert(inf_ev2.begin()+j,ie_add);
@@ -2442,17 +2543,19 @@ NodeRef State::get_ind_noderef(unsigned int p, unsigned int i, double t) const
 	auto t_inf = round_down(t);
 
 	int e = ev.size()-1;
-	while(e >= 0 && ev[e].t > t_inf) e--;
+	while(e >= 0 && ev[e].tdiv > t_inf) e--;
 	if(e < 0) emsg("Problem e");
 		
 	while(e >= 0 && ev[e].inf_node_ref == UNSET) e--;
-	if(e < 0) emsg("Problem e2");
+	if(e < 0){
+		emsg("Problem e2");
+	}
 
 	auto n2 = ev[e].inf_node_ref;
 		
 	auto &inf_ev2 = genetic_value.inf_node[n2].inf_ev;
 		
-	auto j = 0u; while(j < inf_ev2.size() && inf_ev2[j].t < t) j++;
+	auto j = 0u; while(j < inf_ev2.size() && inf_ev2[j].tdiv < t) j++;
 	
 	NodeRef nr; nr.node = n2; nr.index = j;
 	
@@ -2494,7 +2597,7 @@ GenChange State::gen_change(GenChaType type, unsigned int n, const InfNodeAlter 
 {			
 	auto data_on = model.genetic_data.on;
 		
-	auto mut_rate = genetic_value.mut_rate;
+	auto mut_rate = genetic_value.mut_rate*model.details.dt;
 	auto seq_var = genetic_value.seq_var;
 	
 	GenChange gc(type);
@@ -2503,22 +2606,20 @@ GenChange State::gen_change(GenChaType type, unsigned int n, const InfNodeAlter 
 	gc.node_alter = node_alter;
 	gc.regraft_type = NORMAL_REGRAFT;
 	
-	auto t_add = node_alter.t_start;
+	auto t_add = node_alter.tdiv_start;
 	
 	switch(type){
-	case GENCHA_FAIL: emsg("SHould not fail"); break;
+	case GENCHA_FAIL: emsg("Should not fail"); break;
 	
 	case REGRAFT_NODE:
 		{
 			const auto &inf_node = genetic_value.inf_node;
-		
 			auto nr_add = get_ind_noderef(iif_add.p,iif_add.i,t_add); 
-		
 			gc.nr_add = nr_add;
 		
 			const auto &in = inf_node[n];
 	
-			auto t_now = in.t_start;
+			auto t_now = in.tdiv_start;
 			
 			const auto &nr_from = in.from;
 
@@ -2530,8 +2631,8 @@ GenChange State::gen_change(GenChaType type, unsigned int n, const InfNodeAlter 
 				if(t_add != t_now && data_on){
 					auto mut_num = genetic_value.inf_origin[nr_from.index].mut_num;
 					
-					gc.dlike_genetic_process += poisson_probability(mut_num,seq_var+mut_rate*(t_add-model.details.t_start))
-								-poisson_probability(mut_num,seq_var+mut_rate*(t_now-model.details.t_start));
+					gc.dlike_genetic_process += poisson_probability(mut_num,seq_var+mut_rate*t_add)
+								-poisson_probability(mut_num,seq_var+mut_rate*t_now);
 				}
 			}					
 			else{	
@@ -2544,9 +2645,10 @@ GenChange State::gen_change(GenChaType type, unsigned int n, const InfNodeAlter 
 						
 						auto j_from = nr_from.index;
 						
-						double t1; if(j_from > 0) t1 = inf_ev_from[j_from-1].t; else t1 = in_from.t_start;
+						double t1; 
+						if(j_from > 0) t1 = inf_ev_from[j_from-1].tdiv; 
+						else t1 = in_from.tdiv_start;
 				
-						
 						auto numA = inf_ev_from[j_from].mut_num;
 				
 						gc.dlike_genetic_process += poisson_probability(numA,mut_rate*(t_add-t1)) 
@@ -2554,7 +2656,7 @@ GenChange State::gen_change(GenChaType type, unsigned int n, const InfNodeAlter 
 						
 						if(j_from+1 < inf_ev_from.size()){
 							auto numB = inf_ev_from[j_from+1].mut_num;
-							auto t2 = inf_ev_from[j_from+1].t;
+							auto t2 = inf_ev_from[j_from+1].tdiv;
 							gc.dlike_genetic_process += poisson_probability(numB,mut_rate*(t2-t_add)) 
 																			- poisson_probability(numB,mut_rate*(t2-t_now)); 
 						}
@@ -2607,7 +2709,7 @@ GenChange State::gen_change(GenChaType type, unsigned int n, const InfNodeAlter 
 										else{
 											if(term_add == true){ path_from.push_back(fr_from); n_from = fr_from.node;}
 											else{
-												if(inf_node[n_from].t_start < inf_node[n_add].t_start){ 
+												if(inf_node[n_from].tdiv_start < inf_node[n_add].tdiv_start){ 
 													path_add.push_back(fr_add); n_add = fr_add.node;
 												}
 												else{
@@ -2951,8 +3053,8 @@ GenChange State::gen_change(GenChaType type, unsigned int n, const InfNodeAlter 
 				if(data_on){
 					if(t_now != t_add && in.inf_ev.size() > 0){
 						const auto &iev = in.inf_ev[0];
-						gc.dlike_genetic_process += poisson_probability(iev.mut_num,mut_rate*(iev.t-t_add)) 
-																			- poisson_probability(iev.mut_num,mut_rate*(iev.t-t_now));
+						gc.dlike_genetic_process += poisson_probability(iev.mut_num,mut_rate*(iev.tdiv-t_add)) 
+																			- poisson_probability(iev.mut_num,mut_rate*(iev.tdiv-t_now));
 					}
 					
 					gc.dlike_genetic_obs -= GEN_OBS_WRONG*(node_alter.obs_add_end.size() + 
@@ -2975,7 +3077,7 @@ GenChange State::gen_change(GenChaType type, unsigned int n, const InfNodeAlter 
 		{
 			if(data_on){
 				const auto &in = genetic_value.inf_node[n]; 
-				change_remove_node(in.t_start,in.from,gc);
+				change_remove_node(in.tdiv_start,in.from,gc);
 			}
 		}
 		break;
@@ -2992,7 +3094,7 @@ GenChange State::gen_change(GenChaType type, unsigned int n, const InfNodeAlter 
 void State::change_add_node(double t, const NodeRef &nr_add, GenChange &gc) const 
 {
 	const auto &inf_node = genetic_value.inf_node;
-	auto mut_rate = genetic_value.mut_rate;
+	auto mut_rate = genetic_value.mut_rate*model.details.dt;
 	
 	string warn;
 	
@@ -3002,7 +3104,8 @@ void State::change_add_node(double t, const NodeRef &nr_add, GenChange &gc) cons
 		auto j_add = nr_add.index;
 		
 		double t1; 
-		if(j_add > 0) t1 = inf_ev_add[j_add-1].t; else t1 = in_add.t_start;
+		if(j_add > 0) t1 = inf_ev_add[j_add-1].tdiv;
+		else t1 = in_add.tdiv_start;
 		auto t2 = t;
 		
 		if(j_add == inf_ev_add.size()){                // Adds at the end
@@ -3014,7 +3117,7 @@ void State::change_add_node(double t, const NodeRef &nr_add, GenChange &gc) cons
 			gc.probif += prob;
 		}
 		else{
-			auto t3 = inf_ev_add[j_add].t;
+			auto t3 = inf_ev_add[j_add].tdiv;
 			auto frac = (t2-t1)/(t3-t1);
 			auto num = inf_ev_add[j_add].mut_num;
 			
@@ -3031,7 +3134,7 @@ void State::change_add_node(double t, const NodeRef &nr_add, GenChange &gc) cons
 	else{
 		auto seq_var = genetic_value.seq_var;
 		
-		auto lam = seq_var+mut_rate*(t-model.details.t_start);
+		auto lam = seq_var+mut_rate*t;
 		auto val = poisson_sample(lam,warn);
 		if(val == UNSET) emsg("Problem sampling from a Poisson distribition: "+warn);
 		gc.mut_num = val;
@@ -3046,16 +3149,17 @@ void State::change_add_node(double t, const NodeRef &nr_add, GenChange &gc) cons
 void State::change_remove_node(double t, const NodeRef &nr_from, GenChange &gc) const 		
 {	
 	const auto &inf_node = genetic_value.inf_node;
-	auto mut_rate = genetic_value.mut_rate;
-	
+	auto mut_rate = genetic_value.mut_rate*model.details.dt;
+
 	if(nr_from.node != OUTSIDE_INF && nr_from.node != ENTER_INF){ // Removing current node position
 		const auto &in_from = inf_node[nr_from.node];
 		const auto &inf_ev_from = in_from.inf_ev;
 		auto j_from = nr_from.index;
 		
 		double t1; 
-		if(j_from > 0) t1 = inf_ev_from[j_from-1].t; else t1 = in_from.t_start;
-		auto t2 = inf_ev_from[j_from].t;
+		if(j_from > 0) t1 = inf_ev_from[j_from-1].tdiv; 
+		else t1 = in_from.tdiv_start;
+		auto t2 = inf_ev_from[j_from].tdiv;
 		
 		if(j_from+1 == inf_ev_from.size()){            // End event
 			auto num = inf_ev_from[j_from].mut_num;
@@ -3064,7 +3168,7 @@ void State::change_remove_node(double t, const NodeRef &nr_from, GenChange &gc) 
 			gc.probfi += prob;
 		}
 		else{
-			auto t3 = inf_ev_from[j_from+1].t;
+			auto t3 = inf_ev_from[j_from+1].tdiv;
 			auto numA = inf_ev_from[j_from].mut_num;
 			auto numB = inf_ev_from[j_from+1].mut_num;
 
@@ -3078,7 +3182,7 @@ void State::change_remove_node(double t, const NodeRef &nr_from, GenChange &gc) 
 	else{
 		auto seq_var = genetic_value.seq_var;
 	
-		auto lam = seq_var+mut_rate*(t-model.details.t_start);
+		auto lam = seq_var+mut_rate*t;
 		auto num = genetic_value.inf_origin[nr_from.index].mut_num;
 	
 		auto prob = poisson_probability(num,lam);
@@ -3138,9 +3242,9 @@ void State::output_gen_dif() const
 			for(auto n = 0u; n < inf_node.size(); n++){
 				auto &in = inf_node[n];
 				if(in.p == p && in.i == i){
-					fout2 << i << " " << in.t_start << "  ";
+					fout2 << i << " " << in.tdiv_start << "  ";
 					for(auto &ev : in.inf_ev){
-						fout2 << ev.t << " ";
+						fout2 << ev.tdiv << " ";
 						switch(ev.type){
 						case INFECT_OTHER: fout2 << "infect " << ev.index << " "; break;
 						case GENETIC_OBS: fout2 << "obs "; break;
@@ -3166,7 +3270,7 @@ void State::output_waifw(string file) const
 			for(auto &ev : ssp.individual[i].ev){
 				auto &iif  = ev.ind_inf_from;
 				if(iif.p != UNSET){
-					fout << i << "," << iif.p << "," << iif.i << "," << iif.pref << "," << ev.t << endl;
+					fout << i << "," << iif.p << "," << iif.i << "," << iif.pref << "," << ev.tdiv << endl;
 				}
 			}
 		}
@@ -3259,8 +3363,8 @@ void State::recalculate_popnum_ind_w_undo(unsigned int po, const vector <double>
 }
 
 
-/// Updates the lijelihood change and dprob based on changes to transmission tree
-void GenChange::update_like_ch(Like &like_ch, double dprob)
+/// Updates the likelihood change and dprob based on changes to transmission tree
+void GenChange::update_like_ch(Like &like_ch, double &dprob)
 {
 	if(type != NO_GENETIC_CHANGE){
 		dprob += probfi-probif;
@@ -3289,14 +3393,14 @@ void State::gen_change_update(const GenChange &gc)
 		n = inf_node.size();
 		inf_node.push_back(gc.node_add);
 	}
-	
+		
 	if(na.e_add != UNSET) inf_node[n].e = na.e_add;
 		
 	// Makes alterations to the connecting infnode
 	auto &in = inf_node[n];
 														
-	in.t_start = na.t_start;
-	in.t_rec = na.t_rec;
+	in.tdiv_start = na.tdiv_start;
+	in.tdiv_rec = na.tdiv_rec;
 	
 	string warn;
 	
@@ -3308,21 +3412,24 @@ void State::gen_change_update(const GenChange &gc)
 			auto m = na.obs_add_begin[k];
 			const auto &obs = model.genetic_data.obs[m];
 			
-			InfEvent iev; iev.t = obs.t; iev.type = GENETIC_OBS; iev.index = m; iev.mut_num = 0;
+			InfEvent iev; iev.tdiv = obs.tdiv; iev.type = GENETIC_OBS; iev.index = m; iev.mut_num = 0;
 			inf_ev.insert(inf_ev.begin()+k,iev);
 			genetic_value.nobs_not_infected--;
 		}
 			
+		auto mut_rate = genetic_value.mut_rate*model.details.dt;
+		
 		for(auto m : na.obs_add_end){                  // Adds observations at the end
 			const auto &obs = model.genetic_data.obs[m];
 			
 			double t_last;
-			if(inf_ev.size() == 0) t_last = in.t_start; else t_last = inf_ev[inf_ev.size()-1].t;
+			if(inf_ev.size() == 0) t_last = in.tdiv_start; 
+			else t_last = inf_ev[inf_ev.size()-1].tdiv;
 
-			auto num = poisson_sample(genetic_value.mut_rate*(obs.t-t_last),warn);
+			auto num = poisson_sample(mut_rate*(obs.tdiv-t_last),warn);
 			if(num == UNSET) emsg("Problem sampling from a Poisson distribition: "+warn);
 				
-			InfEvent iev; iev.t = obs.t; iev.type = GENETIC_OBS; iev.index = m; iev.mut_num = num;
+			InfEvent iev; iev.tdiv = obs.tdiv; iev.type = GENETIC_OBS; iev.index = m; iev.mut_num = num;
 			inf_ev.push_back(iev);
 			
 			genetic_value.nobs_not_infected--;
@@ -3342,7 +3449,7 @@ void State::gen_change_update(const GenChange &gc)
 		case ORIGIN_REGRAFT:
 			{
 				auto &nr_from = in.from;
-				if(na.t_start == model.details.t_start) nr_from.node = ENTER_INF;
+				if(na.tdiv_start == 0) nr_from.node = ENTER_INF;
 				else nr_from.node = OUTSIDE_INF;
 			}
 			break;
@@ -3351,7 +3458,7 @@ void State::gen_change_update(const GenChange &gc)
 			{
 				const auto &nr_from = in.from;
 				if(nr_from.node != ENTER_INF){
-					inf_node[nr_from.node].inf_ev[nr_from.index].t = na.t_start;	
+					inf_node[nr_from.node].inf_ev[nr_from.index].tdiv = na.tdiv_start;	
 				}
 			}
 			break;
@@ -3369,9 +3476,9 @@ void State::gen_change_update(const GenChange &gc)
 		
 	case NO_GENETIC_CHANGE: break;
 		
-	case GENCHA_FAIL: emsg("SHould not be here"); break;
+	case GENCHA_FAIL: emsg("Should not be here"); break;
 	}
-		
+	
 	auto &gen_dif = genetic_value.gen_dif;
 		
 	// If new observations have appeared then recalculate genetic difference and likelihood
@@ -3479,8 +3586,7 @@ void State::add_popnum_ind(unsigned int p, unsigned int i)
 
 	auto c = UNSET;
 	for(auto ti = 0u; ti < T; ti++){
-		auto t = model.timepoint[ti];
-		while(e < ind.ev.size() && ind.ev[e].t <= t){
+		while(e < ind.ev.size() && ind.ev[e].tdiv <= ti){
 			c = ind.ev[e].c_after; e++;
 		}
 		

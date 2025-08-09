@@ -28,6 +28,8 @@ class IndEvSampler                         // Stores information about an indivi
 		
 		double t_start;                        // The start time 
 		
+		double dt;                             // The timestep
+		
 		unsigned int c_start_raw;              // The start with the compartment in the selected classification set to zero
 		
 		unsigned int nobs;                     // The number of observations
@@ -54,8 +56,6 @@ class IndEvSampler                         // Stores information about an indivi
 		void rate_store_initialise();
 		double get_trans_obs_prob(unsigned int trg, const ObsData &ob) const;
 		void generate_ind_obs_timeline();
-		unsigned int get_ti_lower(double t) const;
-		unsigned int get_ti_upper(double t) const;
 		vector <Event> sample_events(double &probif);
 		double add_event(const Event &e, vector <Event> &ev_new, unsigned int nc_index, unsigned int fe_index, const vector <IslandComp> &island_comp, const vector <ObsData> &obs, const vector <TrigEventRef> &fixed_trans_ev) const;
 		bool contain_period(const vector <Event> &event, unsigned int cl) const;

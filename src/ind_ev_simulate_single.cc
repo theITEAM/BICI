@@ -30,9 +30,9 @@ vector <Event> IndEvSampler::simulate_single_events(unsigned int i, unsigned int
 	const auto &e_init = event[0];
 	ev_new.push_back(e_init);
 	auto c = e_init.c_after;
-	auto t = e_init.t;
+	auto t = e_init.tdiv;
 	
-	auto ti_start = get_ti_upper(t);
+	auto ti_start = get_ti(t);
 	
 	vector <FutureNMEvent> future_nm;
 
@@ -52,7 +52,7 @@ vector <Event> IndEvSampler::simulate_single_events(unsigned int i, unsigned int
 	auto terminal = false;
 	
 	for(auto ti = ti_start; ti < T; ti++){		
-		auto tend = sp.timepoint[ti+1];
+		double tend = ti+1;
 
 		do{
 			auto tnext = tend; if(tnext_ev < tnext) tnext = tnext_ev;
@@ -104,7 +104,7 @@ vector <Event> IndEvSampler::simulate_single_events(unsigned int i, unsigned int
 			
 			if(tnext == tend) break;
 			
-			if(e < event.size() && tnext == event[e].t){   // Inserts event from existing sequence
+			if(e < event.size() && tnext == event[e].tdiv){   // Inserts event from existing sequence
 				auto eve = event[e];
 				auto cll = eve.cl;
 				if(cll != cl || eve.c_after == UNSET){			
@@ -123,7 +123,7 @@ vector <Event> IndEvSampler::simulate_single_events(unsigned int i, unsigned int
 							
 							const auto &tra2 = sp.tra_gl[trg];		
 							
-							if(tra2.i != c) emsg("SHould be c other");
+							if(tra2.i != c) emsg("Should be c other");
 					
 							c = tra2.f;
 							eve.c_after = c;
@@ -152,7 +152,7 @@ vector <Event> IndEvSampler::simulate_single_events(unsigned int i, unsigned int
 				tnext_ev = find_tnext_single(m,trig_event,f,future_nm,e,event);	
 			}
 			else{
-				if(f < future_nm.size() && tnext == future_nm[f].t){ // Does a future nm event
+				if(f < future_nm.size() && tnext == future_nm[f].tdiv){ // Does a future nm event
 					const auto &fnm = future_nm[f];
 				
 					auto trg = fnm.trg;
@@ -189,7 +189,7 @@ vector <Event> IndEvSampler::simulate_single_events(unsigned int i, unsigned int
 							{
 								const auto &ev = sp.individual[i].ev[te.ref];
 								c = sp.update_c_comp(c,ev.cl,ev.move_c);
-								sim_add_event(MOVE_EV,UNSET,te.t,ev.cl,ev.move_c,c,true,ev_new);
+								sim_add_event(MOVE_EV,UNSET,te.tdiv,ev.cl,ev.move_c,c,true,ev_new);
 								add_future_nm_event(c,ev.cl,t,i,future_nm,m,trig_event);		
 								tnext_ev = find_tnext(m,trig_event,f,future_nm);				
 								if(c == UNSET) emsg("err");								
@@ -197,7 +197,7 @@ vector <Event> IndEvSampler::simulate_single_events(unsigned int i, unsigned int
 							break;
 							
 						case TRIG_LEAVE_EV:
-							sim_add_event(LEAVE_EV,UNSET,te.t,UNSET,UNSET,UNSET,true,ev_new);
+							sim_add_event(LEAVE_EV,UNSET,te.tdiv,UNSET,UNSET,UNSET,true,ev_new);
 							return ev_new;
 					
 						default:
@@ -225,8 +225,6 @@ vector <Event> IndEvSampler::simulate_single_events(unsigned int i, unsigned int
 		}
 	}
 
-	if(events_near_div(ev_new,details)) illegal = true;
-	
 	return ev_new;
 }
 
@@ -241,9 +239,9 @@ double IndEvSampler::simulate_single_events_prob(unsigned int i, unsigned int cl
 	const auto &e_init = ev[0];
 	auto c = e_init.c_after;
 
-	auto t = e_init.t;
+	auto t = e_init.tdiv;
 	
-	auto ti_start = get_ti_upper(t);
+	auto ti_start = get_ti(t);
 	
 	vector <double> trans_rate;
 	double R;
@@ -251,13 +249,13 @@ double IndEvSampler::simulate_single_events_prob(unsigned int i, unsigned int cl
 	auto E = ev.size();
 	auto e = 1u;
 	double t_ev_next;
-	if(e < E) t_ev_next = ev[e].t; else t_ev_next = LARGE;
+	if(e < E) t_ev_next = ev[e].tdiv; else t_ev_next = LARGE;
 	
 	const auto &term = sp.comp_terminal_cl[cl];
 	auto terminal = false;
 	
 	for(auto ti = ti_start; ti < T; ti++){
-		auto tend = sp.timepoint[ti+1];
+		double tend = ti+1;
 		
 		do{
 			auto do_ev = false;
@@ -292,7 +290,7 @@ double IndEvSampler::simulate_single_events_prob(unsigned int i, unsigned int cl
 				else{
 					if(eve.observed){  // An observed event
 						if(eve.type == NM_TRANS_EV){
-							auto k = 0u; while(k < trig_event.size() && trig_event[k].t != eve.t) k++;
+							auto k = 0u; while(k < trig_event.size() && trig_event[k].tdiv != eve.tdiv) k++;
 							if(k == trig_event.size()) emsg("Trig event not allowed");
 							
 							const auto &ob = sp.individual[i].obs[trig_event[k].ref];
@@ -331,14 +329,14 @@ double IndEvSampler::simulate_single_events_prob(unsigned int i, unsigned int cl
 						case NM_TRANS_EV:  // A non-markovian event
 							break;
 							
-						default: emsg("SHould not be here"); break;
+						default: emsg("Should not be here"); break;
 						}
 					}
 				}
 				
 				c = eve.c_after;
 				e++;
-				if(e < E) t_ev_next = ev[e].t; else t_ev_next = LARGE;
+				if(e < E) t_ev_next = ev[e].tdiv; else t_ev_next = LARGE;
 			}
 		}while(true);
 		if(c == UNSET) break;
@@ -352,12 +350,12 @@ double IndEvSampler::simulate_single_events_prob(unsigned int i, unsigned int cl
 double IndEvSampler::find_tnext_single(unsigned int m, const vector <TrigEventRef> &trig_event, unsigned int f, const vector <FutureNMEvent> &future_nm, unsigned int e, const vector <Event> &ev) const
 {
 	double te_next = LARGE; 
-	if(m < trig_event.size()) te_next = trig_event[m].t; 
+	if(m < trig_event.size()) te_next = trig_event[m].tdiv; 
 	if(f < future_nm.size()){
-		if(future_nm[f].t < te_next) te_next = future_nm[f].t;
+		if(future_nm[f].tdiv < te_next) te_next = future_nm[f].tdiv;
 	}
 	if(e < ev.size()){
-		if(ev[e].t < te_next) te_next = ev[e].t;
+		if(ev[e].tdiv < te_next) te_next = ev[e].tdiv;
 	}
 	return te_next;
 }

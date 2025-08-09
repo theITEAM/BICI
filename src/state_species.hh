@@ -81,7 +81,7 @@ class StateSpecies                         // Stores information about the state
 		
 		vector <double> timer;                 // General purpose timers
 		
-		StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const	vector <double> &timepoint, const	vector <double> &dtimepoint,  const vector <unsigned int> &pop_affect, Operation mode, const double &dif_thresh);
+		StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const vector <unsigned int> &pop_affect, Operation mode, const double &dif_thresh);
 	
 		void simulate_init();
 		unsigned int get_cinit_to_use(vector <unsigned int> &cinit_to_use) const;
@@ -113,7 +113,6 @@ class StateSpecies                         // Stores information about the state
 		unsigned int source_num(unsigned int min, unsigned int max) const;
 		vector < vector <InfPeriod> > get_inf_period(const vector <unsigned int> &ref) const;
 		
-		unsigned int get_ti(double t) const;
 		double get_indfac(const Individual &ind, const  MarkovEqn &mar_eqn) const;
 		void update_ind_basic(const vector < vector <Event> > &ev_new);
 		
@@ -206,8 +205,6 @@ class StateSpecies                         // Stores information about the state
 		const Species &sp;                     
 		const GeneticData &genetic_data;		
 		const Details &details;
-		const vector <double> &timepoint;
-		const vector <double> &dtimepoint;
 		const double &dif_thresh;
 		
 		vector <unsigned int> pop_affect;
@@ -222,9 +219,9 @@ class StateSpecies                         // Stores information about the state
 		void likelihood_nm_trans_incomp_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> store);
 		vector <double> likelihood_nm_trans_bp(unsigned int m, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, double &like_ch);
 		void likelihood_nm_trans_bp_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> store);
-		double nm_trans_incomp_full_like(const vector <unsigned int> &nmtrans_ref, double dt, const vector< vector <double> > &ref_val, const vector <double> &bp_val) const;
-		double nm_trans_incomp_like(TransType type, double dt, const vector <double> &ref_val) const;
-		double nm_trans_incomp_like_no_log(TransType type, double dt, const vector <double> &ref_val) const;
+		double nm_trans_incomp_full_like(const vector <unsigned int> &nmtrans_ref, double dtdiv, double dt, const vector< vector <double> > &ref_val, const vector <double> &bp_val) const;
+		double nm_trans_incomp_like(TransType type, double dtdiv, double dt, const vector <double> &ref_val) const;
+		double nm_trans_incomp_like_no_log(TransType type, double dtdiv, double dt, const vector <double> &ref_val) const;
 		vector <double> likelihood_markov_value(unsigned int e, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t);
 		vector <double> likelihood_markov_value_fast(const vector <unsigned int> &me_list, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const vector <double> &param_store, const vector <SplineValue> &spline_val);
 		vector <double> likelihood_markov_value_linear(const vector <unsigned int> &list, const LinearProp &linear_prop, const vector < vector <double> > &popnum_t);
@@ -296,7 +293,7 @@ class StateSpecies                         // Stores information about the state
 		void set_e_origin(Event &ev,  unsigned int e, const vector <Event> &event);
 		void set_incomp_ref(unsigned int i, const vector < vector <double> > &popnum_t, double &like_ch);
 		void setup_nm_trans(const vector < vector <double> > &popnum_t);
-		void incomp_turn_on(unsigned int i, unsigned int n, unsigned int ti, double dt, unsigned int e_begin, double t_end, IncompNMTransRef &inm);
+		void incomp_turn_on(unsigned int i, unsigned int n, unsigned int ti, double dtdiv, unsigned int e_begin, double t_end, IncompNMTransRef &inm);
 		void incomp_turn_off(IncompNMTransRef &inm);
 		
 		void likelihood_init_cond_change(unsigned int c_enter_old, unsigned int c_enter_new, Like &like_ch);

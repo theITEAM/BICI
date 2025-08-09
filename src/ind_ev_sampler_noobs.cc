@@ -148,14 +148,14 @@ vector <InitStateProb> IndEvSampler::source_sampler(unsigned int i, const Event 
 {
 	vector <InitStateProb> init_state;
 	
-	auto t = ev.t;
-	auto ti = sp.get_ti(t); 
+	auto t = ev.tdiv;
+	auto ti = get_ti(t); 
 	auto N = sp.tra_gl.size();
 
 	auto prob_sum = 0.0;
 	if(ev.observed){ // If the event is observed
 		const auto &ob = sp.individual[i].obs[0];
-		if(ob.t != t) emsg("Should have the same time");
+		if(ob.tdiv != t) emsg("Should have the same time");
 		
 		for(auto tr = 0u; tr < N; tr++){	
 			auto prob = 0.0;

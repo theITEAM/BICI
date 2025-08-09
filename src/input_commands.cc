@@ -201,17 +201,19 @@ void Input::import_data_table_command(Command cname)
 				break;
 				
 			case SPEC_TIME:
-				auto start = get_tag_value("start"); if(start == ""){ cannot_find_tag(); return;} 
-				if(!is_number(start,"start")) return;
-				ds.time_start = number(start);
+				{
+					auto start = get_tag_value("start"); if(start == ""){ cannot_find_tag(); return;} 
+					if(!is_number(start,"start")) return;
+					ds.time_start = number(start);
 			
-				auto end = get_tag_value("end"); if(end == ""){ cannot_find_tag(); return;} 
-				if(!is_number(end,"end")) return;
-				ds.time_end = number(end);
+					auto end = get_tag_value("end"); if(end == ""){ cannot_find_tag(); return;} 
+					if(!is_number(end,"end")) return;
+					ds.time_end = number(end);
 			
-				if(ds.time_start >= ds.time_end){
-					alert_import("The start time '"+start+"' must be before the end time '"+end+"'"); 
-					return;
+					if(ds.time_start >= ds.time_end){
+						alert_import("The start time '"+start+"' must be before the end time '"+end+"'"); 
+						return;
+					}
 				}
 				break;
 			}
@@ -1005,7 +1007,6 @@ void Input::transition_command2(vector <Tag> &tags)
 				alert_import("The period must be a positive number");		
 			}
 		
-			period += NEAR_DIV_THRESH*model.details.dt*2;
 			stringstream ss;
 			ss << fixed << std::setprecision(16);
 			ss << period;
@@ -1434,7 +1435,7 @@ void Input::param_command()
 			set_prior_element(par,ind,pri);
 		}
 	}
-	
+		
 	for(const auto &par2 : model.param){
 		if(par2.name == par.name){
 			alert_import("Parameter already defined"); 
@@ -1468,8 +1469,10 @@ void Input::param_command()
 		model.param.push_back(par);
 	}
 	
-	if(par.variety == REPARAM_PARAM){
-		for(const auto &ele : par.element) he(ele.value);
+	if(par.variety == REPARAM_PARAM){	
+		for(const auto &ele : par.element){		
+			he(ele.value);
+		}
 	}
 }
 
@@ -1896,7 +1899,10 @@ unsigned int Input::check_pos_integer(string te, unsigned int def)
 {
 	auto value = get_tag_value(te);
 	
-	if(value == "" && def != UNSET) return def;
+	if(value == ""){
+		if(def == UNSET) cannot_find_tag();
+		return def;
+	}
 	
 	auto num = number(value);
 	if(num == UNSET || num <= 0 || num != (int)num){
@@ -1912,7 +1918,10 @@ double Input::check_pos_number(string te, unsigned int def)
 {
 	auto value = get_tag_value(te);
 	
-	if(value == "") return def;
+	if(value == ""){
+		if(def == UNSET) cannot_find_tag();
+		return def;
+	}
 	
 	auto num = number(value);
 	if(num == UNSET || num <= 0){
@@ -1927,7 +1936,10 @@ double Input::check_zero_one(string te, double def)
 {
 	auto value = get_tag_value(te);
 	
-	if(value == "") return def;
+	if(value == ""){
+		if(def == UNSET) cannot_find_tag();
+		return def;
+	}
 	
 	auto num = number(value);
 	if(num == UNSET || num <= 0 || num > 1){

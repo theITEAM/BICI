@@ -43,7 +43,7 @@ vector <LocalIndChange> StateSpecies::local_ind_change(unsigned int i, unsigned 
 		EventCl evc;
 		evc.c_bef = c;
 		evc.c_aft = c_aft;
-		evc.t = eve.t;
+		evc.tdiv = eve.tdiv;
 		evc.e = e;
 		
 		switch(eve.type){
@@ -96,7 +96,7 @@ vector <LocalIndChange> StateSpecies::local_ind_change(unsigned int i, unsigned 
 		EventCl evc;
 		evc.c_bef = c;
 		evc.c_aft = C;
-		evc.t = details.t_end;
+		evc.tdiv = T;
 		evc.e = ev.size();
 		
 		evc.trs.type = LEAVE_SW;
@@ -107,7 +107,7 @@ vector <LocalIndChange> StateSpecies::local_ind_change(unsigned int i, unsigned 
 	if(false){
 		for(auto evc : timeline){
 			vector <TrSwap> trs; trs.push_back(evc.trs);
-			cout << "t=" << evc.t << "  e=" << evc.e << "  c_bef=" << evc.c_bef 
+			cout << "t=" << evc.tdiv << "  e=" << evc.e << "  c_bef=" << evc.c_bef 
 						<< "  c_aft=" << evc.c_aft << "  trs=" << sp.tr_swap_name(cl,trs) << endl;  
 		}
 		emsg("WW");
@@ -145,10 +145,10 @@ vector <LocalIndChange> StateSpecies::local_ind_change(unsigned int i, unsigned 
 							LocalIndChange lic;
 							lic.i = i;
 							lic.cl = cl;
-							if(j > 0) lic.tmin = timeline[j-1].t; 
-							else lic.tmin = timeline[j].t;
-							if(j+num < timeline.size()) lic.tmax = timeline[j+num].t; 
-							else lic.tmax = timeline[j+num-1].t;
+							if(j > 0) lic.tdivmin = timeline[j-1].tdiv; 
+							else lic.tdivmin = timeline[j].tdiv;
+							if(j+num < timeline.size()) lic.tdivmax = timeline[j+num].tdiv; 
+							else lic.tdivmax = timeline[j+num-1].tdiv;
 							
 							for(auto k = 0u; k < num; k++){
 								lic.remove_e.push_back(timeline[j+k].e);
@@ -183,7 +183,7 @@ vector <LocalIndChange> StateSpecies::local_ind_change(unsigned int i, unsigned 
 void StateSpecies::print_local_ind_change(const LocalIndChange &lich) const
 {
 	cout << individual[lich.i].name;
-	cout << "  t=" << lich.tmin << " - " << lich.tmax;
+	cout << "  t=" << lich.tdivmin << " - " << lich.tdivmax;
 	cout << "  " << sp.cla[lich.cl].swap_rep[lich.swap_rep_ref].name;
 	if(false){
 		cout << "  remove="; for(auto e : lich.remove_e) cout << e << ",";
@@ -210,9 +210,9 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 	const auto &obs = indd.obs;
 	
 	const auto &rem = lich.remove_e;
-	auto tmin = lich.tmin;
-	auto tmax = lich.tmax;
-	auto dt = tmax-tmin;
+	auto tmin = lich.tdivmin;
+	auto tmax = lich.tdivmax;
+	auto dtdiv = tmax-tmin;
 	
 	auto prob_try = 1.0;
 	
@@ -221,29 +221,29 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 	for(const auto &trs : lich.tr_swap){
 		switch(trs.type){
 		case ENTER_SW: case SOURCE_SW:
-			time_list.push_back(event[rem[0]].t);
+			time_list.push_back(event[rem[0]].tdiv);
 			break;
 			
 		case LEAVE_SW:
 			{
 				auto e_end = rem[rem.size()-1];
 				if(e_end == event.size()){
-					time_list.push_back(details.t_end);
+					time_list.push_back(details.T);
 				}
 				else{
-					time_list.push_back(event[e_end].t);
+					time_list.push_back(event[e_end].tdiv);
 				}
 			}
 			break;
 		
 		case SINK_SW:
-			time_list.push_back(event[rem[rem.size()-1]].t);
+			time_list.push_back(event[rem[rem.size()-1]].tdiv);
 			break;
 		
 		case TRANS_SW:
 			switch(dir){
 			case LOCAL_FORWARD: 
-				time_list.push_back(tmin+ran()*dt); 
+				time_list.push_back(tmin+ran()*dtdiv); 
 				break;
 		
 			case LOCAL_REVERSE:
@@ -251,9 +251,9 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 					auto ee_sel = UNSET;
 					for(auto ee = 0u; ee < ev_rev.size(); ee++){
 						const auto &evr = ev_rev[ee];
-						if(evr.t > tmin && evr.t < tmax && (evr.type == M_TRANS_EV || evr.type == NM_TRANS_EV)){
+						if(evr.tdiv > tmin && evr.tdiv < tmax && (evr.type == M_TRANS_EV || evr.type == NM_TRANS_EV)){
 							const auto &trg = sp.tra_gl[evr.tr_gl];
-							if(trg.cl == cl && trg.tr == trs.trc && find_in(time_list,evr.t) == UNSET){
+							if(trg.cl == cl && trg.tr == trs.trc && find_in(time_list,evr.tdiv) == UNSET){
 								if(ee_sel == UNSET) ee_sel = ee;
 								else emsg("Two fit");
 							}
@@ -261,7 +261,7 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 					}
 					if(ee_sel == UNSET) emsg("Could not find event");
 						
-					time_list.push_back(ev_rev[ee_sel].t); 
+					time_list.push_back(ev_rev[ee_sel].tdiv); 
 				}
 				break;
 			}
@@ -289,11 +289,11 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 	auto r = 0u;                            // Indexes removal of events
 	const auto &tr_swap = lich.tr_swap;
 	
-	if(tr_swap.size() != K) emsg("SHould be TL");
+	if(tr_swap.size() != K) emsg("Should be TL");
 	
 	// Adds events before time period
 	auto e = 0u;
-	while(e < E && event[e].t < tmin){
+	while(e < E && event[e].tdiv < tmin){
 		ev_new.push_back(event[e]); 
 		e++;
 	}
@@ -302,15 +302,15 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 	if(e > 0) c_new = ev_new[e-1].c_after;
 	auto c_old = c_new;
 	
-	while(m < M && obs[m].t < tmin) m++;
+	while(m < M && obs[m].tdiv < tmin) m++;
 	
 	auto t_old = tmin, t_new = tmin;
 	
 	double t_event_old, t_event_new, t_obs;
 
-	if(e < E) t_event_old = event[e].t; else t_event_old = LARGE;
+	if(e < E) t_event_old = event[e].tdiv; else t_event_old = LARGE;
 	if(k < K) t_event_new = time_list[k]; else t_event_new = LARGE;
-	if(m < M) t_obs = obs[m].t; else t_obs = LARGE;
+	if(m < M) t_obs = obs[m].tdiv; else t_obs = LARGE;
 	
 	auto next = DO_NOTHING_LOC;
 	
@@ -321,7 +321,6 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 		if(t_event_new < t_next){ t_next = t_event_new; next = NEW_EVENT_LOC;}
 		if(t_event_old < t_next){ t_next = t_event_old; next = OLD_EVENT_LOC;}
 		if(t_obs < t_next){ t_next = t_obs; next = OBS_LOC;}
-		
 		if(t_next > tmax) break;
 		
 		switch(next){
@@ -395,13 +394,13 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 						}
 						break;
 					
-					default: c_after = UNSET; tr_gl = UNSET; emsg("SHould not be move"); break;
+					default: c_after = UNSET; tr_gl = UNSET; emsg("Should not be move"); break;
 					}
 					
 					auto t = time_list[k];
 					enew.tr_gl = tr_gl;
 					enew.c_after = c_after;
-					enew.t = t;
+					enew.tdiv = t;
 					
 					rate_mean.update_prob_try_Rint(t_new,t,tr_gl,cl,c_new,prob_try,Rint,ind,MULT_MOD);
 					t_new = t;
@@ -420,7 +419,7 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 		case OLD_EVENT_LOC:                   // Removes old event
 			{
 				const auto &eve = event[e];
-				auto t = eve.t;
+				auto t = eve.tdiv;
 				auto tr_gl = UNSET;
 				
 				if(r < R && rem[r] == e){
@@ -448,7 +447,7 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 				}
 				
 				c_old = eve.c_after;
-				e++; if(e < E) t_event_old = event[e].t; else t_event_old = LARGE;
+				e++; if(e < E) t_event_old = event[e].tdiv; else t_event_old = LARGE;
 			}
 			break;
 		
@@ -505,11 +504,11 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 					}
 				}
 				
-				m++; if(m < M) t_obs = obs[m].t; else t_obs = LARGE;
+				m++; if(m < M) t_obs = obs[m].tdiv; else t_obs = LARGE;
 			}		
 			break;
 			
-		case DO_NOTHING_LOC: emsg("SHould not be here"); break;
+		case DO_NOTHING_LOC: emsg("Should not be here"); break;
 		}
 	}while(true);
 	
@@ -528,20 +527,20 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 	while(e < E){ ev_new.push_back(event[e]); e++;} 
 
 	if(dE > 0){
-		for(auto j = 0; j < dE; j++) timefac *= dt;
+		for(auto j = 0; j < dE; j++) timefac *= dtdiv;
 		timefac /= factori[dE];
 	}
 	else{
 		if(dE < 0){
-			for(auto j = 0; j < -dE; j++) timefac /= dt;
+			for(auto j = 0; j < -dE; j++) timefac /= dtdiv;
 			timefac *= factori[-dE];
 		}
 	}
 	
 	prob_try *= timefac;
-	
-	if(prob_try < 0.05) prob_try = 0.05;
-	if(prob_try > 20) prob_try = 20;			
+
+	if(prob_try < 0.1) prob_try = 0.1;
+	if(prob_try > 10) prob_try = 10;			
 
 	return prob_try;
 }
@@ -711,7 +710,7 @@ void StateSpecies::rate_store_init()
 
 /// Updates information which gives the rates of transition (for local proposals)
 void StateSpecies::update_rate_mean(const vector < vector <double> > &popnum_t)
-{
+{	
 	auto fac = UPDATE_RATE_FAC;
 	if(rate_mean.first == true){ fac = 0; rate_mean.first = false;}
 	auto omf = 1-fac;
@@ -750,8 +749,6 @@ void StateSpecies::update_rate_mean(const vector < vector <double> > &popnum_t)
 		}
 	}
 	
-	auto dt = details.dt;
-	
 	// Generates a smoothed version of rates (this helps the proposals)
 	for(auto tr = 0u; tr < rate_mean.tra_rate.size(); tr++){
 		auto &trate = rate_mean.tra_rate[tr];
@@ -771,7 +768,7 @@ void StateSpecies::update_rate_mean(const vector < vector <double> > &popnum_t)
 		auto sum = 0.0;
 		for(auto ti = 0u; ti < T; ti++){ 
 			integral[ti] = sum;
-			sum += value_new[ti]*dt;
+			sum += value_new[ti];
 		}
 		integral[T] = sum;
 		
@@ -804,7 +801,7 @@ void StateSpecies::update_rate_mean(const vector < vector <double> > &popnum_t)
 		switch(compr.update){
 		case SINGLE_BRANCH_UP: case MARKOV_COMPR_UP: 
 			{	
-				for(auto ti = 0u; ti < T; ti++) integral[ti] = 0;
+				for(auto ti = 0u; ti <= T; ti++) integral[ti] = 0;
 				
 				for(auto m : compr.list){
 					const auto &integral_add = rate_mean.tra_rate[m].integral;
@@ -829,8 +826,6 @@ void StateSpecies::update_rate_mean(const vector < vector <double> > &popnum_t)
 // Cnstructor
 RatePosteriorMean::RatePosteriorMean(const Details &details)
 {
-	t_start = details.t_start; 
-	dt = details.dt;
 }
 
 
@@ -838,8 +833,17 @@ RatePosteriorMean::RatePosteriorMean(const Details &details)
 double RatePosteriorMean::get_value(const vector <double> &vec, double v) const 
 {
 	auto i = (unsigned int) v;
-	if(i+1 >= vec.size()) emsg("Vec out of range");
-	auto f= v-i;
+	auto f = v-i;
+	if(i+1 >= vec.size()){
+		if(i+1 == vec.size()){
+			if(f > TINY) emsg("Vec out of range2"); 
+			return vec[i];
+		}
+		else{
+			emsg("Vec out of range"); 
+		}
+	}
+	
 	return vec[i]*(1-f) + vec[i+1]*f;
 }
 
@@ -848,16 +852,14 @@ double RatePosteriorMean::get_value(const vector <double> &vec, double v) const
 void RatePosteriorMean::update_prob_try_Rint(double t1, double t2, unsigned int tr_gl, unsigned int cl, unsigned int c, double &prob_try, double &Rint, const Individual &ind, Modify mod) const
 {	
 	const auto &compr = compR[compR_ref[cl][c]];
+
 	if(compr.update == NM_CALCALL_UP) return;
 	
-	auto v1 = ALMOST_ONE*(t1-t_start)/dt;
-	auto v2 = ALMOST_ONE*(t2-t_start)/dt;
-		
 	switch(compr.update){
 	case SINGLE_BRANCH_UP: case MARKOV_COMPR_UP: 
 		{
 			const auto &integral = compr.integral;
-			auto val = get_value(integral,v2) - get_value(integral,v1);
+			auto val = get_value(integral,t2) - get_value(integral,t1);
 			if(mod == MULT_MOD) Rint -= val;
 			else Rint += val;
 		}
@@ -869,7 +871,7 @@ void RatePosteriorMean::update_prob_try_Rint(double t1, double t2, unsigned int 
 			for(auto m : compr.list){
 				const auto &trate = tra_rate[m];
 				const auto &integral = trate.integral;
-				auto val = get_value(integral,v2) - get_value(integral,v1);
+				auto val = get_value(integral,t2) - get_value(integral,t1);
 			
 				if(trate.ind_variation){
 					for(const auto &ifr : trate.ind_fac_rate){
@@ -898,7 +900,7 @@ void RatePosteriorMean::update_prob_try_Rint(double t1, double t2, unsigned int 
 	if(tr_gl != UNSET){
 		const auto &trate = tra_rate[tramean_ref[tr_gl]];
 		
-		auto ti = (unsigned int)(ALMOST_ONE*(t2-t_start)/dt);
+		auto ti = (unsigned int)(t2);
 		auto rate = trate.value[ti];
 
 		if(trate.ind_variation){
@@ -931,8 +933,8 @@ void StateSpecies::swap_check_rev_prob_try(double prob_try, double timefac, cons
 		const auto &lich_new = add[k];
 		//print_local_ind_change(lich_new);
 	
-		if(lich_new.cl == lich.cl && lich_new.tmin == lich.tmin && 
-			lich_new.tmax == lich.tmax){
+		if(lich_new.cl == lich.cl && lich_new.tdivmin == lich.tdivmin && 
+			lich_new.tdivmax == lich.tdivmax){
 			if(tr_swap_same(lich_new.tr_swap,sw.start)){
 				if(k_sel == UNSET) k_sel = k;
 				else emsg("More than one");

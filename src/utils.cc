@@ -771,7 +771,7 @@ unsigned int binomial_sample(double p, unsigned int n, string &warn)
 	
 	if(n > LARGE){ warn = "Binomual cannot sample from negative"; return UNSET;} 
 	if(p < -TINY){ warn = "For the binomial distribution the probability must be postive"; return UNSET;}
-	if(p > OVER_ONE){
+	if(p > 1){
 		warn = "For the binomial distribution the probability must be one or less";
 		return UNSET;
 	}
@@ -2013,7 +2013,7 @@ Prior convert_text_to_prior(string te, unsigned int line_num, string in, bool di
 		}
 		break;
 		
-	case UNSET_PR: emsg("SHould not be unset"); break;
+	case UNSET_PR: emsg("Should not be unset"); break;
 	}
 
 	for(auto i = 0u; i < spl2.size(); i++){
@@ -2064,7 +2064,7 @@ string get_prior_string(Prior prior)
 		return "mdir("+prior.dist_param[0].te_raw+")";	
 		
 	case UNSET_PR: 
-		emsg("SHould not be unset"); 
+		emsg("Should not be unset"); 
 		return "";
 	}
 	
@@ -2347,17 +2347,17 @@ void check_bp(double &bp)
 
 
 /// Gets the likelihood for a transition
-double nm_trans_like(TransType type, double dt, const vector <double> &ref_val)  
+double nm_trans_like(TransType type, double dtdiv, double dt, const vector <double> &ref_val)  
 {		
 	switch(type){
 	case EXP_RATE: case EXP_MEAN: emsg("Should not be in NM"); return 0;
-	case EXP_RATE_NM:	return exp_rate_probability(dt,ref_val[0]); 
-	case EXP_MEAN_NM:	return exp_mean_probability(dt,ref_val[0]); 
-	case GAMMA: return gamma_probability(dt,ref_val[0],ref_val[1]);
-	case ERLANG: return gamma_probability(dt,ref_val[0],sqrt(1.0/ref_val[1])); 
-	case LOG_NORMAL: return lognormal_probability(dt,ref_val[0],ref_val[1]);
-	case WEIBULL:	return weibull_probability(dt,ref_val[0],ref_val[1]);
-	case PERIOD: return period_probability(dt,ref_val[0]); 
+	case EXP_RATE_NM:	return exp_rate_probability(dtdiv,ref_val[0]*dt); 
+	case EXP_MEAN_NM:	return exp_mean_probability(dtdiv,ref_val[0]/dt); 
+	case GAMMA: return gamma_probability(dtdiv,ref_val[0]/dt,ref_val[1]);
+	case ERLANG: return gamma_probability(dtdiv,ref_val[0]/dt,sqrt(1.0/ref_val[1])); 
+	case LOG_NORMAL: return lognormal_probability(dtdiv,ref_val[0],ref_val[1]);
+	case WEIBULL:	return weibull_probability(dtdiv,ref_val[0]/dt,ref_val[1]);
+	case PERIOD: return period_probability(dtdiv,ref_val[0]/dt); 
 	}
 	return UNSET;
 }
@@ -2449,7 +2449,7 @@ double prior_probability(double x, const Prior &pri, const vector <double> &para
 		break;
 		
 	case UNSET_PR:
-		emsg("SHould not be unset"); 
+		emsg("Should not be unset"); 
 		break;
 	}
 	
@@ -2579,7 +2579,7 @@ unsigned int get_core()
 void print_diag(string te)
 {
 	if(print_diag_on && !com_op && op()) cout << te << endl;
-	//cout << te << endl;
+	//cout << te << endl; 
 }
 
 
@@ -2781,45 +2781,6 @@ bool check_thresh(DistText dist, DistQuant dq, double val, string &err)
 	}
 	
 	if(err != "") return true;
-	return false;
-}
-
-
-/// Determines if events are near to a boundary 
-bool events_near_div(const vector <Event> &event, const Details &details)
-{
-	auto t_start = details.t_start, dt = details.dt;
-	for(const auto &ev : event){
-		switch(ev.type){
-		case NM_TRANS_EV: case M_TRANS_EV:
-			{
-				auto f = (ev.t-t_start)/dt;
-				auto d = f-(unsigned int)(f+0.5);
-				
-				if(d < NEAR_DIV_THRESH && d > -NEAR_DIV_THRESH){ 
-					return true;
-				}
-			}
-			break;
-			
-		default: break;
-		}
-	}
-	return false;
-}
-
-
-/// Determines if a single event is near to a boundary
-bool event_near_div(double t, const Details &details)
-{
-	auto t_start = details.t_start, dt = details.dt;
-	auto f = (t-t_start)/dt;
-	auto d = f-(unsigned int)(f+0.5);
-	
-	if(d < NEAR_DIV_THRESH && d > -NEAR_DIV_THRESH){ 
-		return true;
-	}
-
 	return false;
 }
 
@@ -3174,4 +3135,64 @@ double clip(double val, double thresh)
 {
 	if(val < thresh) return thresh;
 	return val;
+}
+
+
+/// Gets ti (the division time) from an actual time
+unsigned int get_ti(double t)
+{
+	return (unsigned int)(t);
+}
+
+
+/// Gets ti div time from div time (rounding down if equal)
+unsigned int get_ti_lower(double t)
+{
+	auto ro = (unsigned int)(t);
+	if(ro == t && ro != 0) return ro-1;
+	return ro;
+}
+
+
+/// Gets next ti 
+unsigned int get_ti_next(double t_next, const Details &details)
+{
+	//auto ti_next = (unsigned int)(ALMOST_ONE+((t_next-t_start)/dt));
+	//if(ti_next > T) ti_next = T;
+	auto ti_next = (unsigned int)(t_next);
+	if(ti_next != t_next && ti_next < details.T) ti_next++;		
+	
+	return ti_next;
+}
+
+
+/// Gets ti, but ensures boundary
+unsigned int get_ti_over(double tdiv)
+{
+	return (unsigned int)(tdiv+TINY);
+}
+
+
+/// Determines if time is on a timestep
+bool on_timestep(double t, const Details &details) 
+{
+	double tdiv = calc_tdiv(t,details);
+	auto ti = round_int(tdiv+TINY);
+	
+	if(dif(tdiv,ti,DIF_THRESH)) return false;
+	return true;
+}
+
+
+/// Calculates tdiv from t
+double calc_tdiv(double t, const Details &details)
+{
+	return (t - details.t_start)/details.dt;
+}
+
+
+/// Calculates t from tdiv
+double calc_t(double tdiv, const Details &details)
+{
+	return details.t_start + tdiv*details.dt;
 }

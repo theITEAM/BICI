@@ -9,6 +9,7 @@
 #include <algorithm> 
 #include <iomanip>
  
+ 
 using namespace std;
 
 #include "output.hh"
@@ -434,7 +435,7 @@ void Output::summary(const Model &model) const
 			for(const auto &ind : sp.individual){
 				fout << ind.name << ":" << endl;
 				for(const auto &ob : ind.obs){
-					fout << "t=" << ob.t << " ";
+					fout << "t=" << model.calc_t(ob.tdiv) << " ";
 					switch(ob.type){
 					case OBS_TRANS_EV: case OBS_SOURCE_EV: case OBS_SINK_EV:
 						fout << "Transition: ";
@@ -510,7 +511,7 @@ void Output::summary(const Model &model) const
 				}
 			}
 			fout << "  times: ";
-			for(auto val : par.spline_info.knot_times) fout << val << ",";
+			for(auto tdiv : par.spline_info.knot_tdiv) fout << model.calc_t(tdiv) << ",";
 			fout << endl;
 		}
 
@@ -934,7 +935,7 @@ void Output::data_summary(const Model &model) const
 		
 		fout << "ENTER:" << endl;
 		for(const auto &en : sp.enter){
-			fout << en.name << " "<< en.time;
+			fout << en.name << " "<< model.calc_t(en.tdiv);
 			if(en.c_set != UNSET){
 				fout << "  " << sp.comp_gl[en.c_set].name << endl;
 			}
@@ -973,7 +974,7 @@ void Output::data_summary(const Model &model) const
 				case NM_TRANS_EV: fout << "non-markov trans " << sp.cla[ev.cl].tra[ev.tr].name; 
 				break;
 				}
-				fout << "," << ev.t << "  ";
+				fout << "," << model.calc_t(ev.tdiv) << "  ";
 			}
 			fout << endl;
 			
@@ -996,7 +997,7 @@ void Output::data_summary(const Model &model) const
 		
 		fout << "Population data:" << endl;
 		for(const auto &pd : sp.pop_data){
-			fout << "t=" << pd.t << "  value=" << pd.value;
+			fout << "t=" << model.calc_t(pd.tdiv) << "  value=" << pd.value;
 			switch(pd.type){
 			case NORMAL_OBS: fout << "  normal(sd=" << pd.obs_mod_val << ")"; break;
 			case POISSON_OBS: fout << "  poisson()"; break;
@@ -1030,7 +1031,8 @@ void Output::data_summary(const Model &model) const
 		
 		fout << "Pop Trans data:" << endl;
 		for(const auto &ptd : sp.pop_trans_data){
-			fout << "start=" << ptd.tmin << "  end=" << ptd.tmax;
+			fout << "start=" << model.calc_t(ptd.tdivmin);
+			fout << "  end=" << model.calc_t(ptd.tdivmax);
 			fout << "  value=" << ptd.value;
 			
 			switch(ptd.type){
@@ -1594,7 +1596,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 								}
 								break;
 							}
-							ss << ":" << ev.t;
+							ss << ":" << model.calc_t(ev.tdiv);
 							c = cnew;
 						}
 					}
@@ -1666,7 +1668,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 		ss << "<PHYLOTREE>" << endl;
 		//if(part.inf_node.size() == 0) emsg(" zero");
 		for(const auto &in : part.inf_node){
-			ss << part.species[in.p].individual[in.i].name  << "|" << in.t_start << "|";	
+			ss << part.species[in.p].individual[in.i].name  << "|" << model.calc_t(in.tdiv_start) << "|";	
 			
 			auto n_from = in.from.node;
 			if(n_from == ENTER_INF || n_from == OUTSIDE_INF){
@@ -1687,7 +1689,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 				case GENETIC_OBS: ss << "OBS"; break;
 				}
 				
-				ss << "|" << iev.index << "|" << iev.t << "|";
+				ss << "|" << iev.index << "|" << model.calc_t(iev.tdiv) << "|";
 				if(iev.mut_num == UNSET) ss << "NA";
 				else ss << iev.mut_num;
 			}
@@ -1864,7 +1866,7 @@ string Output::print_obs_data(unsigned int p, const vector <ObsData> &obs) const
 	for(auto &ob : obs){
 		const auto &claa =  sp.cla[ob.cl];
 		
-		ss << ob.t << " ";
+		ss << model.calc_t(ob.tdiv) << " ";
 		switch(ob.type){
 		case OBS_TRANS_EV: 
 			ss << "OBS_TRANS_EV " << sp.obs_trans[ob.ref].name;
@@ -2046,10 +2048,11 @@ void Output::end(string file, unsigned int total_cpu) const
 			output_diagnostic(diagnostic,alg_warn_flag,fout);
 		}
 	}
-	//cout << alg_warn_flag <<" warn fla\n";
-	
-	output_rate_warning(total_cpu,50,100,final_warning);
 
+	output_add_ind_warning(final_warning);
+
+	output_rate_warning(total_cpu,50,100,final_warning);
+	
 	for(const auto &der : model.derive){
 		auto st = der.func.warn; 
 		if(der.func.on && st != "") final_warning.push_back(st);
@@ -2405,7 +2408,7 @@ void Output::output_trans_diag(const vector <TransDiagSpecies> &trans_diag, ofst
 {
 	stringstream sstd;
 	
-	auto T = model.ntimepoint-1;
+	auto T = model.details.T;
 	for(auto p = 0u; p < model.nspecies; p++){
 		const auto &sp = model.species[p];
 		if(sp.tra_gl.size() > 0){
@@ -2466,8 +2469,35 @@ void Output::add_warning(string err_msg, ofstream &fout) const
 	}
 }
 
+	
+/// Outputs a warning if individuals are in the system but not explicitly added
+void Output::output_add_ind_warning(vector <string> &final_warning) const
+{
+	for(const auto &sp : model.species){
+		if(sp.type == INDIVIDUAL){
+			string te = "";
+			auto added = false;
+			for(auto &ind : sp.individual){
+				if(ind.ev.size() != 0){
+					if(ind.ev[0].type == ENTER_EV) added = true;
+					else{
+						if(te.length() > 50){ te += "..."; break;}	
+						if(te != "") te += ", ";
+						te += "'"+ind.name+"'";
+					}
+				}					
+			}
 			
-/// Works out if time step is too small
+			if(added == true && te != ""){
+				auto msg = "The following individuals are not explicitly added to the system (is this correct?): "+te;
+				final_warning.push_back(msg);
+			}
+		}
+	}
+}
+		
+			
+/// Works out if time-step is too small
 void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start, unsigned int per_end, vector <string> &final_warning) const 
 {
 	State state(model);
@@ -2597,7 +2627,7 @@ void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start,
 		}
 	
 		if(err_msg != ""){
-			err_msg = "High transition rates mean that there is a potential for a finite time step disretisation error. It is recommended that this model is run with a time step below '"+tstr(RATE_RECOMMEND/rmax,2)+"'. The following transitions are affected: "+err_msg;
+			err_msg = "High transition rates mean that there is a potential for a finite time-step discretisation error. It is recommended that this model is run with a time-step below '"+tstr(RATE_RECOMMEND/rmax,2)+"'. The following transitions are affected: "+err_msg;
 		}
 		else{
 			if(total_cpu >= 100 && rmax != 0 && rmax < 0.1*rate_thresh){
@@ -2605,7 +2635,7 @@ void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start,
 				auto dt = RATE_RECOMMEND/rmax;
 				if(dt > tmax/10) dt = tmax/10;
 				
-				err_msg = "This is being run with a relatively small time step. Analysis suggests it could be reliably run up to a time step '"+tstr(dt,2)+"'.";
+				err_msg = "This is being run with a relatively small time-step. Analysis suggests it could be reliably run up to a time-step '"+tstr(dt,2)+"'.";
 			}
 		}
 		
@@ -2690,7 +2720,7 @@ void Output::output_diagnostic(const vector <Diagnostic> &diagnostic, bool &alg_
 /// Initialises structure for trans_diag observations
 vector <TransDiagSpecies> Output::trans_diag_init() const
 {
-	auto T = model.ntimepoint-1;
+	auto T = model.details.T;
 
 	vector <TransDiagSpecies> trans_diag;
 	for(auto p = 0u; p < model.nspecies; p++){
@@ -2713,7 +2743,7 @@ vector <TransDiagSpecies> Output::trans_diag_init() const
 /// Adds results from particle onto h_bin
 void Output::trans_diag_add(vector <TransDiagSpecies> &trans_diag, const vector <Particle> &part) const
 {
-	auto T = model.ntimepoint-1;
+	auto T = model.details.T;
 
 	for(const auto &pa : part){
 		for(auto p = 0u; p < model.nspecies; p++){
