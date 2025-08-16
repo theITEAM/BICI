@@ -26,12 +26,23 @@
 // ./bici-para Geno/farm_f1.0.bici inf > q1&
 // ./bici-para Geno/SI_catbad_m1.bici inf > y1&
 
-// nohup mpirun -n 16 ./bici-para Jamie/scen-1-1.bici inf > bbb.txt&
+//  ./bici-core Execute/init.bici inf
+
+//  nohup valgrind --leak-check=yes -s ./bici-para Jamie/scen-1-1.bici inf > bbbbbb.txt&
+
+// nohup mpirun -n 16 ./bici-para Jamie/scen-1-1.bici inf > ddddd.txt&
 // 06d_New_Inf_500.bici
+// nohup mpirun -n 16 ./bici-para Jamie/simp_model.bici inf > eeee.txt&
+// nohup mpirun -n 16 ./bici-para Jamie/testped2.bici inf > eeee.txt&
 
-// ./bici-para Jamie/temp inf
+// 06d_New_Inf_500.bici
+// ./bici-para Jamie/test.bici post-sim
+// valgrind --leak-check=yes -s  ./bici-para Jamie/test.bici post-sim
 
-// ssh gaia.bioss.ac.uk   
+
+// ssh gaia.bioss.ac.uk  ./bici-para Jamie/temp inf
+
+//  
 // tar -xzf foo.tgz
 
 // git clone https://github.com/theITEAM/BICI.git
@@ -125,7 +136,7 @@ int main(int argc, char** argv)
 			case 3: model.samp_type = SIM_CL_SAMP; break;
 			}
 			break;
-		case TAG_UNSET: emsg_input("Tag must be set"); break; 
+		case TAG_UNSET: alert_input("Tag must be set"); break; 
 		}
 	}
 	
@@ -198,7 +209,7 @@ int main(int argc, char** argv)
 				break;
 				
 			default: 
-				emsg_input("This algorithm has not been implemented yet");
+				alert_input("This algorithm has not been implemented yet");
 				return 0;
 			}
 		}
@@ -212,15 +223,17 @@ int main(int argc, char** argv)
 		break;
 		
 	case MODE_UNSET:
-		emsg_input("The mode is unset");
+		alert_input("The mode is unset");
 		break;
 	}
 	
 	auto total_cpu = (clock()-total_time)/CLOCKS_PER_SEC;
 	
+	auto op_time = clock();
 	output.end(file,total_cpu);
+	auto op_cpu = (clock()-op_time)/CLOCKS_PER_SEC;
 	
-	if(op() && !com_op) output.final_time(total_cpu);
+	if(op() && !com_op) output.final_time(total_cpu+op_cpu,op_cpu);
 	
 	if(!com_op) output.final_memory_usage();
 	
@@ -254,12 +267,12 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 			}
 			
 			if(mode_new == MODE_UNSET && file_new == ""){
-				emsg_input("Tag '"+te+"' is not recognised");
+				alert_input("Tag '"+te+"' is not recognised");
 			}
 			else{	
 				if(mode_new != MODE_UNSET){
 					if(mode != MODE_UNSET){
-						emsg_input("Cannot set multiple 'sim', 'inf' or 'post-sim'");
+						alert_input("Cannot set multiple 'sim', 'inf' or 'post-sim'");
 					}
 					else{
 						mode = mode_new;
@@ -268,7 +281,7 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 				
 				if(file_new != ""){
 					if(file != ""){
-						emsg_input("Cannot define multiple '.bici' files");
+						alert_input("Cannot define multiple '.bici' files");
 					}
 					else{
 						file = file_new;
@@ -281,7 +294,7 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 		
 			auto spl = split(te.substr(1),'=');
 	
-			if(spl.size() != 2) emsg_input("Tag '"+te+"' is not recognised");
+			if(spl.size() != 2) alert_input("Tag '"+te+"' is not recognised");
 			
 			if(spl[0] == "ch" || spl[0] == "chain"){
 				tag.type = CHAIN;
@@ -304,7 +317,7 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 			}
 
 			if(tag.type == TAG_UNSET){
-				emsg_input("Tag '"+te+"' is not recognised");
+				alert_input("Tag '"+te+"' is not recognised");
 			}
 		
 			tags.push_back(tag);
@@ -312,11 +325,11 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 	}
 	
 	if(mode == MODE_UNSET){
-		emsg_input("Either 'sim', 'inf' or 'post-sim' must be specified to tell BICI what to do.");
+		alert_input("Either 'sim', 'inf' or 'post-sim' must be specified to tell BICI what to do.");
 	}
 	
 	if(file == ""){
-		emsg_input("A '.bici' file must be specified.");
+		alert_input("A '.bici' file must be specified.");
 	}
 	
 	if(file == "default.bici"){

@@ -10,9 +10,10 @@ extern bool com_op;                            // Set to true for command line o
 #include "equation.hh"
 
 void emsg(const string &msg);
+void alert_input(const string &msg);
 void emsg_input(const string &msg);
 void end_code();
-void display_error(string msg);
+void display_error(string msg, bool internal);
 void display_warning(string msg);
 string trim(string te);
 string remove_prime(string te);
@@ -102,6 +103,7 @@ bool difi(unsigned int a, unsigned int b);
 bool difi(const vector <unsigned int> &a, const vector <unsigned int> &b);
 bool difi(const vector < vector <unsigned int> > &a, const vector < vector <unsigned int> > &b);
 string replace(string st, string st1, string st2);
+void remove_tab(string &st);
 void remove_cr(string &st);
 bool is_percent(string val);
 string get_param_name_with_dep(const Param &par, const vector <Dependency> &dep, unsigned int index);
@@ -175,6 +177,7 @@ unsigned int get_ti_over(double tdiv);
 bool on_timestep(double t, const Details &details);
 double calc_tdiv(double t, const Details &details);
 double calc_t(double tdiv, const Details &details);
+void add_alg_warning(string te, unsigned int sample, vector <AlgWarn> &alg_warn);
 	
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);

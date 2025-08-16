@@ -44,7 +44,6 @@ struct CommandLine {                       // Stores a command line instruction
 	string command_name;
 	unsigned int type_pos;
 	vector <Tag> tags;
-	unsigned int all_row;
 	unsigned int line_num;
 };
 
@@ -99,6 +98,7 @@ class Input                                // Stores information about the model
 		vector <GeoJSON> geo_json;             // Stores information about loaded geoJSON file
 		
 		vector <ErrorMess> error_mess;         // Stores error messages
+		string error_line;
 		
 		Hash hash_eqn;                         // Stores a hash take for equations
 	
@@ -136,28 +136,28 @@ class Input                                // Stores information about the model
 		void further_simplify_equations(unsigned int per_start, unsigned int per_end);
 		
 		// In 'input_commands.cc' 
-		void species_command(unsigned int loop);
-		void classification_command(unsigned int loop);
+		bool species_command(unsigned int loop);
+		bool classification_command(unsigned int loop);
 		void param_mult_command();
 		void set_command();
 		void camera_command();
 		vector < vector <Tag> > get_tags_list(string file);
 		void check_tags_used(unsigned int r, const vector <Tag> &tags);
-		void compartment_command();
-		void compartment_all_command();
-		void compartment_command2(vector <Tag> &tags);
-		void transition_command();
-		void transition_command2(vector <Tag> &tags);
-		void transition_all_command();
+		bool compartment_command();
+		bool compartment_all_command();
+		bool compartment_command2(vector <Tag> &tags);
+		bool transition_command();
+		bool transition_command2(vector <Tag> &tags);
+		bool transition_all_command();
 		void datadir_command();
 		void description_command();
 		void label_command();
 		void box_command();
 		void param_command();
 		void derived_command();
-		void simulation_command();
-		void inference_command();
-		void post_sim_command();
+		bool simulation_command();
+		bool inference_command();
+		bool post_sim_command();
 		void ind_effect_command();
 		void fixed_effect_command();
 		void import_data_table_command(Command cname);
@@ -169,8 +169,8 @@ class Input                                // Stores information about the model
 		// In 'input_modelupdate.cc'
 		void add_species(string name, SpeciesType sp_type, bool trans_tree);
 		void add_classification(unsigned int p, string name, string index, Coord coord);
-		void add_compartment(string name, unsigned int p, unsigned int cl, double x, double y, double lat, double lng, bool markov_branch, CompInfected infected, string erlang_source);
-		void add_transition(unsigned int p, unsigned int cl, unsigned int i,unsigned int f, TransType type);
+		bool add_compartment(string name, unsigned int p, unsigned int cl, double x, double y, double lat, double lng, bool markov_branch, CompInfected infected, string erlang_source);
+		bool add_transition(unsigned int p, unsigned int cl, unsigned int i,unsigned int f, TransType type);
 		void determine_branching() const;
 		void add_obs_model_eqn(Species &sp);
 		void create_equations(unsigned int per_start, unsigned int per_end);
@@ -273,11 +273,12 @@ class Input                                // Stores information about the model
 		void print_table(const Table &tab) const;
 		void add_to_list(vector <ParamRef> &list, const ParamRef &pr) const;
 		unsigned int get_dependency(vector <Dependency> &dep, const ParamProp &pp, const vector <string> &knot_times);
-		EquationInfo he(EquationInfo eqn_inf);
+		EquationInfo he(EquationInfo eqn_inf, unsigned int lnum = UNSET);
 		bool is_file(string te) const;
 		vector <unsigned int> find_index(unsigned int i, const vector <Dependency> &depend) const;
 		TransDef extract_trans_def(string value) const;
 		string get_prop(string value, string prop, string end) const;
+		string in_data_source(const DataSource &ds) const;
 		string in_file_text(string te) const;
 		void alert_sample(string warn, unsigned int num);
 		void read_state_sample(const vector <string> &lines, const vector <string> &ind_key);
@@ -286,7 +287,7 @@ class Input                                // Stores information about the model
 		void load_weight_value(const ParamProp &pp, string valu, Param &par, string desc);
 		void set_spline(string knot_times_str, string smooth, vector <string> &knot_times, bool use_inf_time, Param &par);
 		unsigned int get_seed();
-		void check_dt(const Details &details);
+		bool check_dt(const Details &details);
 		void add_param_cat_factor(Param &par);
 		//void load_reparam_eqn(string te, Param &par);
 		void add_reparam_eqn(Param &par, Hash &hash_eqn);
@@ -302,7 +303,7 @@ class Input                                // Stores information about the model
 		void check_import_correct();
 		void temp_check(unsigned int num);
 		void check_reparam_time();
-		bool check_name_input(string name, string te, bool sup_not_allow = false);
+		void check_name_input(string name, string te, bool sup_not_allow = false);
 		bool is_Color(string color) const;
 		void cannot_find_trans_comp(string te, unsigned int p, unsigned int cl, string co);
 		void param_eqn_mem() const;

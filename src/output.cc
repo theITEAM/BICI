@@ -1304,7 +1304,7 @@ string Output::to_str(double num) const
 
 
 /// Outputs a parameter sample
-void Output::param_sample(unsigned int s, unsigned int chain, const State &state)
+void Output::param_sample(unsigned int s, unsigned int chain, State &state)
 {
 	timer[PARAM_OUTPUT] -= clock();
 	auto part = state.generate_particle(s,chain,false);
@@ -1394,7 +1394,7 @@ string Output::param_output(const Particle &part, const vector < vector <double>
 
 
 /// Outputs a state sample
-void Output::state_sample(unsigned int s, unsigned int chain, const State &state)
+void Output::state_sample(unsigned int s, unsigned int chain, State &state)
 {
 	timer[STATE_OUTPUT] -= clock();
 	auto part = state.generate_particle(s,chain,true);
@@ -2056,6 +2056,16 @@ void Output::end(string file, unsigned int total_cpu) const
 	for(const auto &der : model.derive){
 		auto st = der.func.warn; 
 		if(der.func.on && st != "") final_warning.push_back(st);
+	}
+	
+	if(mpi.core == 0){ // Warnings for data out of range
+		for(const auto &sp : model.species){
+			for(auto warn : sp.data_warning){
+				auto wa = warn;
+				if(model.species.size() > 1) wa += "For species '"+sp.name+"': "+wa;
+				final_warning.push_back(wa);
+			}
+		}
 	}
 	
 	if(op()){
@@ -2861,12 +2871,14 @@ void Output::number_part(vector <Particle> &part) const
 
 
 /// Outputs the final cpu time
-void Output::final_time(long sec) const 
+void Output::final_time(long sec, long op_sec) const 
 {
+	auto op_st = " ("+tstr((int)((op_sec*100)/sec))+"% outputting)";
+	
 	cout << endl << "Total CPU time: ";
 	
 	if(sec < 60){
-		cout << sec << " seconds" << endl;
+		cout << sec << " seconds" << op_st << endl;
 		return;
 	}
 	
@@ -2875,18 +2887,18 @@ void Output::final_time(long sec) const
 		
 	auto min = sec/60.0;
 	if(min < 60){
-		cout << min << " minutes" << endl;
+		cout << min << " minutes" << op_st << endl;
 		return;
 	}
 	
 	auto hour = min/60.0;
 	if(hour < 24){
-		cout << hour << " hours" << endl;
+		cout << hour << " hours" << op_st << endl;
 		return;
 	}
 	
 	auto day = hour/24.0;
-	cout << day << " days" << endl;
+	cout << day << " days" << op_st << endl;
 }
 
 

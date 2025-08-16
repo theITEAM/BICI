@@ -197,6 +197,7 @@ class Equation                             // Stores information about the model
 		void set_time_vari();
 		double find_dist(unsigned int c, unsigned int cc, const vector <Compartment> &comp, Coord coord) const;
 		double get_distance(const ParamProp &pp);
+		double get_identity(const ParamProp &pp);
 		string op_name(EqItemType type) const;
 		void check_repeated_operator(const vector <EqItem> &op);
 		void time_integral(vector <EqItem> &op);

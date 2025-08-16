@@ -1899,7 +1899,7 @@ double StateSpecies::sum_markov_prob(double t1, double t2, unsigned int c, unsig
 
 
 /// Calculates the estimated and actual number of transitions in each division for each global transition
-void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <double> > &popnum_t) const
+void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <double> > &popnum_t)
 {
 	auto T = details.T;
 		
@@ -2002,7 +2002,23 @@ void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <d
 							auto b = (unsigned int)(pr*H_BIN);
 							if(b >= H_BIN){
 								if(b == H_BIN) b--;
-								else emsg("hbin range2");
+								else{
+									stringstream ss; 
+									ss << "hbin range: ";
+									ss << ind.name << " " << sum << " " << pr << " || ";
+									for(auto ee = origin[cl]; ee < e; ee++){
+										ss << "mar " << ee << "   " << eve[ee].tdiv << " " << eve[ee+1].tdiv << " " 
+												<< eve[ee].c_after << " " << tr_gl << " " << i << " ";
+										ss << sum_markov_prob(eve[ee].tdiv,eve[ee+1].tdiv,eve[ee].c_after,tr_gl,i,en);
+									}
+									ss << "Events: ";
+									for(auto e = 0u; e < eve.size(); e++){
+										ss << eve[e].tdiv << ", ";
+									}
+									
+									add_alg_warn(ss.str());
+									b = H_BIN-1;
+								}
 							}
 							
 							cpd[tr_gl][b]++;

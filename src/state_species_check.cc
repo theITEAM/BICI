@@ -369,3 +369,11 @@ void StateSpecies::check_trans_num_neg() const
 		}
 	}
 }
+
+
+/// Adds an algorithm warning
+void StateSpecies::add_alg_warn(string te)
+{
+	add_alg_warning(te,UNSET,alg_warn);
+}
+

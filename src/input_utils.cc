@@ -112,23 +112,30 @@ bool Input::check_comp_exist(string name, unsigned int p)
 	for(auto cl = 0u; cl < sp.ncla; cl++){
 		const auto &claa = sp.cla[cl];
 		if(claa.name == name){
-			alert_import("Cannot have a classification and compartment both '"+name+"'");
+			alert_import("Cannot have a classification and compartment both with the name '"+name+"'",true);
 			return true;
 		}
 		
 		if(claa.index == name){ 
-			alert_import("Cannot have a classification index and compartment both '"+name+"'");
+			alert_import("Cannot have a classification index and compartment both with the name '"+name+"'",true);
 			return true;
 		}
 		
 		auto c = find_c(p,cl,name);
 		if(c != UNSET){
-			alert_import("There is already a compartment with the name '"+name+"'");
+			alert_import("There is already a compartment with the name '"+name+"'",true);
 			return true;
 		}
 	}
 	
 	return false;
+}
+
+
+/// Displays text referencing a file/table
+string Input::in_data_source(const DataSource &ds) const 
+{
+	return "In table for data source '"+ds.name+"'";
 }
 
 
@@ -148,7 +155,7 @@ Table Input::load_table(const string file)
 	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
 	
 	if(i == files.size()){
-		alert_import("Could not find '"+file+"'");
+		alert_import("Could not find file '"+file+"'");
 		tab.error = true; 
 		return tab;
 	}
@@ -168,7 +175,10 @@ Table Input::load_table(const string file)
 	
 	tab.heading = split(lines[j],sep);
 
-	for(auto &val : tab.heading) val = trim(remove_quote(val));
+	for(auto &val : tab.heading){
+		if(sep == ',') remove_tab(val);
+		val = trim(remove_quote(val));
+	}
 	j++;
 
 	tab.ncol = tab.heading.size();
@@ -183,8 +193,11 @@ Table Input::load_table(const string file)
 				return tab;
 			}
 
-			for(auto &val : vec) val = trim(remove_quote(val));
-		
+			for(auto &val : vec){
+				if(sep == ',') remove_tab(val);
+				val = trim(remove_quote(val));
+			}
+			
 			tab.ele.push_back(vec);
 		}
 		j++;
@@ -317,7 +330,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 	
 	auto i = 0u; while(i < data_template.size() && data_template[i].cname != cname) i++;
 	
-	if(i == data_template.size()){ alert_import("Cannot find command"); return false;}
+	if(i == data_template.size()){ emsg_input("Cannot find command"); return false;}
 	
 	auto cols = data_template[i].cols;
 	
@@ -356,8 +369,8 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 
 			case CL_PROB_COL:
 				{
-					auto p = ds.p; if(p == UNSET){ alert_import("p should be defined"); return false;}
-					auto cl = ds.cl; if(cl == UNSET){ alert_import("cl should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
+					auto cl = ds.cl; if(cl == UNSET){ emsg_input("cl should be defined"); return false;}
 					
 					auto name = model.species[p].cla[cl].name; 
 						
@@ -367,7 +380,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 
 			case CL_ALL_COL:
 				{
-					auto p = ds.p; if(p == UNSET){ alert_import("p should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
 						
 					const auto &sp = model.species[p];
 					
@@ -394,7 +407,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 				
 			case CL_ALL_PROB_COL:
 				{
-					auto p = ds.p; if(p == UNSET){ alert_import("p should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
 						
 					const auto &sp = model.species[p];
 					for(auto cl = 0u; cl < sp.ncla; cl++){
@@ -405,8 +418,8 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 
 			case FROM_COL:
 				{
-					auto p = ds.p; if(p == UNSET){ alert_import("p should be defined"); return false;}
-					auto cl = ds.cl; if(cl == UNSET){ alert_import("cl should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
+					auto cl = ds.cl; if(cl == UNSET){ emsg_input("cl should be defined"); return false;}
 					
 					auto cl_name = model.species[p].cla[cl].name; 
 					load_col.push_back(LoadCol("From","the compartment in '"+cl_name+"' from which individuals come",COMP_SOURCE_SINK_EL,cl));
@@ -415,8 +428,8 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 
 			case TO_COL:
 				{
-					auto p = ds.p; if(p == UNSET){ alert_import("p should be defined"); return false;}
-					auto cl = ds.cl; if(cl == UNSET){ alert_import("cl should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
+					auto cl = ds.cl; if(cl == UNSET){ emsg_input("cl should be defined"); return false;}
 					
 					auto cl_name = model.species[p].cla[cl].name; 
 					load_col.push_back(LoadCol(cl_name,"the compartment in '"+cl_name+"' to which individuals go",COMP_SOURCE_SINK_EL,cl));
@@ -471,7 +484,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 				
 			case FILT_OBSPOP_COL:
 				{
-					auto p = ds.p; if(p == UNSET){ alert_import("p should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
 					auto &sp = model.species[p];
 					
 					const auto filt = sp.set_comp_filt(ds.filter_str,UNSET,LOWER_BOUND,ds);
@@ -500,8 +513,8 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 				
 			case FILT_OBSPOPTRANS_COL:
 				{		
-					auto p = ds.p; if(p == UNSET){ alert_import("p should be defined"); return false;}
-					auto cl = ds.cl; if(cl == UNSET){ alert_import("cl should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
+					auto cl = ds.cl; if(cl == UNSET){ emsg_input("cl should be defined"); return false;}
 					auto &sp = model.species[p];
 					
 					const auto filt = sp.set_comp_filt(ds.filter_str,cl,LOWER_BOUND,ds);
@@ -622,12 +635,12 @@ void Input::load_obs_model(ObsModel &om)
 	}
 	else{
 		if(str == "poisson"){
-			if(spl.size() != 1) alert_import("For 'error' problem with expression '"+error+"'");
+			if(spl.size() != 1) alert_import("For 'error' there is a problem with expression '"+error+"'");
 			om.type = POISSON_OBSMOD;
 		}
 		else{
 			if(str == "neg-binomial"){
-				if(spl.size() != 2) alert_import("For 'error' problem with expression '"+error+"'");
+				if(spl.size() != 2) alert_import("For 'error' there is a problem with expression '"+error+"'");
 	
 				auto val = trim(spl[1]);
 			
@@ -648,7 +661,7 @@ void Input::load_obs_model(ObsModel &om)
 				}
 			}
 			else{
-				alert_import("For 'error' the observation error '"+str+"' not recognised. It must be chosen from the following options: 'normal', 'poisson' or 'neg-binomial'.");
+				alert_import("For 'error' the observation error '"+str+"' is not recognised. It must be chosen from the following options: 'normal', 'poisson' or 'neg-binomial'.");
 			}
 		}
 	}
@@ -695,10 +708,8 @@ unsigned int Input::import_geojson(string file)
 {
 	if(check_char_allowed(file,"/<>:\"\\|?*") == false) return UNSET;
 
-	//if(datadir == ""){ alert_import("'datadir' must be first set"); return UNSET;}
-	
 	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
-	if(i == files.size()) alert_import("Could not find '"+file+"'",true);
+	if(i == files.size()) alert_import("Could not find file '"+file+"'",true);
 	
 	const auto &fs = files[i];
 	
@@ -731,7 +742,7 @@ unsigned int Input::import_geojson(string file)
 					}
 				}
 				
-				if(name.size() == 0){ alert_import("Problem loading '"+file+"'",true); return UNSET;}
+				if(name.size() == 0){ alert_import("Problem loading file '"+file+"'",true); return UNSET;}
 					
 				for(const auto &ob3 : val2.items()){
 					if(ob3.key() == "geometry"){
@@ -759,7 +770,7 @@ unsigned int Input::import_geojson(string file)
 											for(const auto &ob6 : ob5){
 												Pgon poly;
 												for(const auto &ob7 : ob6){
-													if(ob7.size() != 2){ alert_import("Problem loading '"+file+"'",true); return UNSET;}
+													if(ob7.size() != 2){ alert_import("Problem loading file '"+file+"'",true); return UNSET;}
 													LatLng po; po.lng = ob7[0]; po.lat = ob7[1];
 													poly.point.push_back(po);
 												}
@@ -771,7 +782,7 @@ unsigned int Input::import_geojson(string file)
 											{
 												Pgon poly;
 												for(const auto &ob6 : ob5){
-													if(ob6.size() != 2){ alert_import("Problem loading '"+file+"'",true); return UNSET;}
+													if(ob6.size() != 2){ alert_import("Problem loading file '"+file+"'",true); return UNSET;}
 													LatLng po; po.lat = ob6[0]; po.lng = ob6[1];
 													poly.point.push_back(po);
 												}
@@ -817,7 +828,7 @@ LatLng Input::boundary_mean_latlng(unsigned int i, string name)
 		}
 	}
 	
-	alert_import("Problem finding '"+name+"' in '"+geo_json[i].file+"'",true);
+	alert_import("Problem finding '"+name+"' in file '"+geo_json[i].file+"'",true);
 	LatLng po; po.lat = UNSET; po.lng = UNSET;			
 	return po;
 }
@@ -912,7 +923,7 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 		
 		if(index == "t"){
 			if(!(pp.time_dep == true && index == "t")){
-				alert_import("Problem with dependency"); 
+				emsg_input("Problem with dependency"); 
 				return UNSET;
 			}
 		
@@ -935,7 +946,7 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 				if(flag == true) break;
 			}
 			
-			if(flag != true){ alert_import("Cannot find the index '"+index+"'"); return UNSET;}
+			if(flag != true){ emsg_input("Cannot find the index '"+index+"'"); return UNSET;}
 		}
 		
 		dep.hash_list.create(dep.list);
@@ -961,10 +972,11 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 
 
 /// Handles any error message
-EquationInfo Input::he(EquationInfo eqn_inf)
+EquationInfo Input::he(EquationInfo eqn_inf, unsigned int lnum)
 {
-	eqn_inf.line_num = line_num;
-	if(eqn_inf.error) alert_import(eqn_inf.emsg);	
+	if(lnum != UNSET) eqn_inf.line_num = lnum;
+	else eqn_inf.line_num = line_num;
+	if(eqn_inf.error) alert_line(eqn_inf.emsg,eqn_inf.line_num);	
 	return eqn_inf;
 }	
 
@@ -1242,7 +1254,7 @@ void Input::read_state_sample(const vector <string> &lines, const vector <string
 						auto spl = split(lines[i],',');
 						
 						auto &ind_tab = samp.species[p].ind_tab;
-						if(spl.size() > 2 && spl[0] == "name" && spl[1] == "source"){
+						if(spl.size() > 2 && spl[0] == "index" && spl[1] == "source"){
 							ind_tab.heading = spl;
 							ind_tab.ncol = spl.size();
 						}
@@ -1393,7 +1405,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 			set_reparam_element(par,ind,he(add_equation_info(ele,REPARAM)));
 			break;
 			
-		default: alert_import("Should not be default3"); return;
+		default: emsg_input("Should not be default3"); return;
 		}
 	}
 	
@@ -1416,7 +1428,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 		}
 		break;
 		
-	default: alert_import("Should not be default3"); return;
+	default: emsg_input("Should not be default3"); return;
 	}
 	
 	if(par.cat_factor){
@@ -1425,7 +1437,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 		auto wsum = 0.0, wi = 0.0;
 		for(auto i = 0u; i < par.N; i++){
 			auto ref = par.element_ref[i];
-			if(ref == UNSET) emsg("ref should not be unset"); 
+			if(ref == UNSET) emsg_input("ref should not be unset"); 
 		
 			auto val = par.cons[ref];
 			auto w = par.weight[i];
@@ -1435,7 +1447,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 			}
 			else{
 				if(val < 0){
-					alert_import(desc+" the value '"+tstr(val)+"' must be positive for a factor.");
+					emsg_input(desc+" the value '"+tstr(val)+"' must be positive for a factor.");
 				}
 				sum += w*val;
 			}
@@ -1449,7 +1461,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 		if(num == 1){
 			auto val_new = (wsum-sum)/wi;
 			if(val_new < 0){
-				alert_import(desc+" the calculated value for '*' is '"+tstr(val_new)+"' which must be positive");
+				alert_import(desc+" the calculated value for '*' is '"+tstr(val_new)+"', which must be positive");
 			}
 			
 			par.set_cons(numi,val_new);
@@ -1478,7 +1490,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 	if(false){
 		for(auto i = 0u; i < par.N; i++){
 			auto ref = par.element_ref[i];
-			if(ref == UNSET) emsg("ref should not be unset"); 
+			if(ref == UNSET) emsg_input("ref should not be unset"); 
 			
 			auto &ele = par.element[ref];
 			cout << i << " " << ele.value.te << " val" << endl;
@@ -1637,16 +1649,20 @@ unsigned int Input::get_seed()
 
 
 /// Checks the timestep fits between the start and end times
-void Input::check_dt(const Details &details)
+bool Input::check_dt(const Details &details)
 {
 	auto num = (details.t_end-details.t_start)/details.dt;
 	if(dif(num,double(round_int(num)),DIF_THRESH)){
 		alert_import("The difference between the start '"+tstr(details.t_start)+"' and end '"+tstr(details.t_end)+"' times is not a multiple of the time-step '"+tstr(details.dt)+"'.");
+		return false;
 	}
 	
 	if(model.calc_tdiv(details.t_end) > TI_DIV_MAX){
 		alert_import("The number of time divisions must be fewer than "+tstr(TI_DIV_MAX));
+		return false;
 	}
+	
+	return true;
 }
 
 
@@ -1719,7 +1735,11 @@ void Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 	auto te = par.reparam_eqn;
 	par.reparam_eqn = "";
 	
-	auto eqn_raw = he(add_equation_info(te,REPARAM_EQN));
+	if(par.time_dep){
+		alert_line("Reparameterised parameter '"+par.full_name+"' cannot be time dependent",par.line_num);	
+	}
+	
+	auto eqn_raw = he(add_equation_info(te,REPARAM_EQN),par.line_num);
 		
 	vector <DepConv> dep_conv;
 	for(auto d = 0u; d < depend.size(); d++){
@@ -1765,6 +1785,11 @@ void Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 			eqn.type = REPARAM;
 			
 			model.add_eq_ref(eqn,hash_eqn);
+			
+			const auto &eqq = model.eqn[eqn.eq_ref];
+			if(eqq.time_vari == true){
+				alert_line("Reparameterised expression '"+eqq.te_raw+"' cannot be time dependent.",par.line_num);	
+			}
 			
 			par.element[ref].value = eqn;
 		}

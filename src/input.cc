@@ -60,10 +60,11 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	// (1) Simulation or inference details
 	// (2) Load species, classification and compartment information
 	// (3) Load parameter information
-	// (4) Adds inidividuals to the system
-	// (5) Everything else
+	// (4) Load transitions
+	// (5) Adds individuals to the system
+	// (6) Everything else
 	
-	for(auto loop = 1u; loop < 6; loop++){ 
+	for(auto loop = 1u; loop <= 6; loop++){ 
 		print_diag("loop="+to_string(loop));
 
 		// Keeps track of the current species and classification 
@@ -74,6 +75,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 			if(model.species[p_current].ncla == 1) cl_current = 0;
 		}
 	
+		auto num_sim = 0u, num_inf = 0u, num_ppc = 0u;
+		
 		for(const auto &line : command_line){
 			line_num = line.line_num;
 			auto cname = line.command;
@@ -84,14 +87,26 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 				switch(cname){
 				case SIMULATION: 
 					if(model.mode != SIM) process = false; 
+					else{
+						num_sim++;
+						if(num_sim > 1) alert_import("The 'simulation' command can only be specified once.");
+					}
 					break;
 				
 				case INFERENCE:
 					if(model.mode != INF && model.mode != PPC) process = false; 
+					else{
+						num_inf++;
+						if(num_inf > 1) alert_import("The 'inference' command can only be specified once.");
+					}
 					break;
 					
 				case POST_SIM:
 					if(model.mode != PPC) process = false; 
+					else{
+						num_ppc++;
+						if(num_ppc > 1) alert_import("The 'post-sim' command can only be specified once.");
+					}
 					break;
 				
 				case DATA_DIR: break;
@@ -114,7 +129,14 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 				}
 				break;
 			
-			case 4:   // Adding individuals to the system
+			case 4:   // Transitions
+				switch(cname){
+				case SPECIES: case CLASS: case TRANS: case TRANS_ALL: break;
+				default: process = false; break;
+				}
+				break;
+				
+			case 5:   // Adding individuals to the system
 				switch(cname){
 				case SPECIES: break;
 				
@@ -130,12 +152,12 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 				case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: case ADD_IND_POST_SIM:
 					if(model.mode == INF) process = false;
 					break;
-					
+			
 				default: process = false; break;
 				}
 				break;
 				
-			case 5:   // In the last pass everything else
+			case 6:   // In the last pass everything else
 				switch(cname){
 				case DATA_DIR: 
 				case SIMULATION: case INFERENCE: case POST_SIM:
@@ -145,6 +167,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 				case ADD_IND: case ADD_IND_SIM: case ADD_IND_POST_SIM: 
 				case PARAM_MULT:
 				case COMP: case COMP_ALL: 
+				case TRANS: case TRANS_ALL:
 					process = false;
 					break;
 					
@@ -180,7 +203,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 				process_command(line,loop);
 			
 				if(terminate == true){
-					output_error_messages(err_mess);
+					output_error_messages(err_mess,true);
 					return;
 				}
 			}
@@ -188,11 +211,30 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 		line_num = UNSET;
 			
 		switch(loop){
-		case 1: calculate_timepoint(); break;
+		case 1: 
+			calculate_timepoint();
+			switch(model.mode){
+			case SIM:
+				if(num_sim == 0) alert_import("The 'simulation' command must be specified."); 
+				break;
+				
+			case INF: 
+				if(num_inf == 0) alert_import("The 'inference' command must be specified."); 
+				break;
+				
+			case PPC: 
+				if(num_inf == 0) alert_import("The 'inference' command must also be specified for posterior simulation."); 
+				if(num_ppc == 0) alert_import("The 'post-sim' command must be specified.");
+				break;
+				
+			case MODE_UNSET:
+				break;
+			}
+			break;
 		case 2: check_comp_structure(); break; 		
 		}
 	}
-	
+
 	check_memory_too_large();
 	
 	output_error_messages(err_mess);
@@ -521,8 +563,10 @@ vector <CommandLine> Input::extract_command_line(vector <string> lines)
 					file_lines.push_back(te);
 					j++;
 				}
-				if(j == lines.size()) alert_import("Cannot find line with ']]\"' to specify end of file");
-			
+				if(j == lines.size()){
+					alert_import("Cannot find line with ']]\"' to specify end of file");
+				}
+				
 				FileStore file_st;
 				file_st.name = "[["+file_name+"]]";
 				file_st.lines = file_lines;
@@ -595,7 +639,7 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 							
 						auto full_name = data_dir+"/"+file; 
 						ifstream fin(full_name);
-						if(!fin) emsg_input("File '"+full_name+"' could not be loaded");
+						if(!fin) alert_input("File '"+full_name+"' could not be loaded");
 						
 						vector <string> lines;
 						
@@ -660,6 +704,80 @@ string Input::remove_escape_char(string te)
 /// Gets all the command tags from a given line
 CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 {
+	auto spl = split(trr,' ');
+	
+	auto type = spl[0];
+	
+	Command com = EMPTY;
+	if(type == "species") com = SPECIES;
+	if(type == "classification" || type == "class") com = CLASS;
+	if(type == "set") com = SET;
+	if(type == "camera" || type == "view") com = CAMERA;
+	if(type == "compartment" || type == "comp") com = COMP;
+	if(type == "compartment-all" || type == "comp-all") com = COMP_ALL;
+	if(type == "transition" || type == "trans") com = TRANS;
+	if(type == "transition-all" || type == "trans-all") com = TRANS_ALL;
+	if(type == "data-dir") com = DATA_DIR;
+	if(type == "description" || type == "desc") com = DESC;
+	if(type == "label") com = LABEL;
+	if(type == "box") com = BOX;
+	if(type == "parameter" || type == "param") com = PARAM;
+	if(type == "derived" || type == "der") com = DERIVED;
+	if(type == "init-pop-inf") com = INIT_POP;
+	if(type == "add-pop-inf") com = ADD_POP;
+	if(type == "remove-pop-inf") com = REMOVE_POP;
+	if(type == "add-ind-inf") com = ADD_IND;
+	if(type == "remove-ind-inf") com = REMOVE_IND;
+	if(type == "move-ind-inf") com = MOVE_IND;
+	if(type == "init-pop-sim") com = INIT_POP_SIM;
+	if(type == "add-pop-sim") com = ADD_POP_SIM;
+	if(type == "remove-pop-sim") com = REMOVE_POP_SIM;
+	if(type == "add-ind-sim") com = ADD_IND_SIM;
+	if(type == "remove-ind-sim") com = REMOVE_IND_SIM;
+	if(type == "move-ind-sim") com = MOVE_IND_SIM;
+	if(type == "add-pop-post-sim") com = ADD_POP_POST_SIM;
+	if(type == "remove-pop-post-sim") com = REMOVE_POP_POST_SIM;
+	if(type == "add-ind-post-sim") com = ADD_IND_POST_SIM;
+	if(type == "remove-ind-post-sim") com = REMOVE_IND_POST_SIM;
+	if(type == "move-ind-post-sim") com = MOVE_IND_POST_SIM;
+	if(type == "comp-data") com = COMP_DATA;
+	if(type == "trans-data") com = TRANS_DATA;
+	if(type == "test-data") com = TEST_DATA;
+	if(type == "pop-data") com = POP_DATA;
+	if(type == "pop-trans-data") com = POP_TRANS_DATA;
+	if(type == "ind-effect-data") com = IND_EFFECT_DATA;
+	if(type == "ind-group-data") com = IND_GROUP_DATA;
+	if(type == "genetic-data") com = GENETIC_DATA;
+	if(type == "simulation" || type == "sim") com = SIMULATION;
+	if(type == "inference" || type == "inf") com = INFERENCE; 
+	if(type == "posterior-simulation" || type == "post-sim") com = POST_SIM;
+	if(type == "ind-effect") com = IND_EFFECT;
+	if(type == "fixed-effect") com = FIXED_EFFECT;
+	if(type == "sim-param") com = SIM_PARAM;
+	if(type == "sim-state") com = SIM_STATE;
+	if(type == "inf-param") com = INF_PARAM;
+	if(type == "inf-param-stats") com = INF_PARAM_STATS;
+	if(type == "inf-generation") com = INF_GEN;
+	if(type == "inf-state") com = INF_STATE;
+	if(type == "post-sim-param") com = POST_SIM_PARAM;
+	if(type == "post-sim-state") com = POST_SIM_STATE;
+	if(type == "inf-diagnostics") com = INF_DIAGNOSTICS;
+	if(type == "map") com = MAP;
+	if(type == "post-sim" || type == "post-simulation" ) com = POST_SIM;
+	
+	if(type == "param-mult") com = PARAM_MULT;
+	
+	if(type == "trans-diag") com = TRANS_DIAG;
+	
+	if(type == "warning") com = WARNING;
+	
+	if(com == EMPTY){
+		alert_import("Command '"+type+"' not recognised.",true);
+		return syntax_error();
+	}
+	
+	auto must_term = false; if(find_in(must_term_str,type) != UNSET) must_term = true;
+		
 	auto num_quote = 0u;
 	vector <unsigned int> quote_pos;
 			
@@ -667,11 +785,11 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 		if(trr.substr(i,1) == "\""){ num_quote++; quote_pos.push_back(i);}
 	}
 	
-	if(num_quote%2 != 0){ alert_import("Syntax error: Quotes do not match up."); return syntax_error();}
+	if(num_quote%2 != 0){ alert_import("Syntax error: Quotes do not match up.",true); return syntax_error();}
 	
 	for(auto i = 0u; i < num_quote; i += 2){
 		if(quote_pos[i]+1 == quote_pos[i+1]){
-			alert_import("Syntax error: No content within the quotation marks."); 
+			alert_import("Syntax error: No content within the quotation marks.",true); 
 			return syntax_error();
 		}
 	}
@@ -716,122 +834,59 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 		}
 	}while(i < trr.length());
 	
-	if(frag.size() == 0){ alert_import("Does not contain any content"); return syntax_error();}
+	if(frag.size() == 0){ alert_import("Does not contain any content",true); return syntax_error();}
 	
-	if(frag[0].quote == 1){ alert_import("Should not start with quotes"); return syntax_error();}
-	auto type = frag[0].text;
-	
-	Command com = EMPTY;
-	if(type == "species") com = SPECIES;
-	if(type == "classification" || type == "class") com = CLASS;
-	if(type == "set") com = SET;
-	if(type == "camera" || type == "view") com = CAMERA;
-	if(type == "compartment" || type == "comp") com = COMP;
-	if(type == "compartment-all" || type == "comp-all") com = COMP_ALL;
-	if(type == "transition" || type == "trans") com = TRANS;
-	if(type == "transition-all" || type == "trans-all") com = TRANS_ALL;
-	if(type == "data-dir") com = DATA_DIR;
-	if(type == "description" || type == "desc") com = DESC;
-	if(type == "label") com = LABEL;
-	if(type == "box") com = BOX;
-	if(type == "parameter" || type == "param") com = PARAM;
-	if(type == "derived" || type == "der") com = DERIVED;
-	if(type == "init-pop") com = INIT_POP;
-	if(type == "add-pop") com = ADD_POP;
-	if(type == "remove-pop") com = REMOVE_POP;
-	if(type == "add-ind") com = ADD_IND;
-	if(type == "remove-ind") com = REMOVE_IND;
-	if(type == "move-ind") com = MOVE_IND;
-	if(type == "init-pop-sim") com = INIT_POP_SIM;
-	if(type == "add-pop-sim") com = ADD_POP_SIM;
-	if(type == "remove-pop-sim") com = REMOVE_POP_SIM;
-	if(type == "add-ind-sim") com = ADD_IND_SIM;
-	if(type == "remove-ind-sim") com = REMOVE_IND_SIM;
-	if(type == "move-ind-sim") com = MOVE_IND_SIM;
-	if(type == "add-pop-post-sim") com = ADD_POP_POST_SIM;
-	if(type == "remove-pop-post-sim") com = REMOVE_POP_POST_SIM;
-	if(type == "add-ind-post-sim") com = ADD_IND_POST_SIM;
-	if(type == "remove-ind-post-sim") com = REMOVE_IND_POST_SIM;
-	if(type == "move-ind-post-sim") com = MOVE_IND_POST_SIM;
-	if(type == "comp-data") com = COMP_DATA;
-	if(type == "trans-data") com = TRANS_DATA;
-	if(type == "test-data") com = TEST_DATA;
-	if(type == "pop-data") com = POP_DATA;
-	if(type == "pop-trans-data") com = POP_TRANS_DATA;
-	if(type == "ind-effect-data") com = IND_EFFECT_DATA;
-	if(type == "ind-group-data") com = IND_GROUP_DATA;
-	if(type == "genetic-data") com = GENETIC_DATA;
-	if(type == "simulation" || type == "sim") com = SIMULATION;
-	if(type == "inference" || type == "inf") com = INFERENCE;
-	if(type == "posterior-simulation" || type == "post-sim") com = POST_SIM;
-	if(type == "ind-effect") com = IND_EFFECT;
-	if(type == "fixed-effect") com = FIXED_EFFECT;
-	if(type == "sim-param") com = SIM_PARAM;
-	if(type == "sim-state") com = SIM_STATE;
-	if(type == "inf-param") com = INF_PARAM;
-	if(type == "inf-param-stats") com = INF_PARAM_STATS;
-	if(type == "inf-generation") com = INF_GEN;
-	if(type == "inf-state") com = INF_STATE;
-	if(type == "post-sim-param") com = POST_SIM_PARAM;
-	if(type == "post-sim-state") com = POST_SIM_STATE;
-	if(type == "inf-diagnostics") com = INF_DIAGNOSTICS;
-	if(type == "map") com = MAP;
-	if(type == "post-sim" || type == "post-simulation" ) com = POST_SIM;
-	
-	if(type == "param-mult") com = PARAM_MULT;
-	
-	if(type == "trans-diag") com = TRANS_DIAG;
-	
-	if(type == "warning") com = WARNING;
-		
-	if(com == EMPTY){ alert_import("Command '"+type+"' not recognised."); return syntax_error();}
+	if(frag[0].quote == 1){ alert_import("Should not start with quotes",true); return syntax_error();}
 	
 	auto num = double(frag.size()-1)/3;
 	auto numi = (unsigned int)(num);
 
 	for(auto n = 0u; n < num; n++){
 		auto ii = 1+n*3;
-
 		if(frag[ii].text == "="){
-			alert_import("An equal sign '=' is misplaced.");
+			alert_import("An equals sign '=' is misplaced.",must_term);
 			return syntax_error();
 		}
-			
+	}
+	
+	for(auto n = 0u; n < num; n++){
+		auto ii = 1+n*3;
+
 		if(ii+2 >= frag.size()){
 			if(ii+1 < frag.size() && frag[ii+1].text == "="){
-				alert_import("The property '"+frag[ii].text+"' is unset");
+				alert_import("The tag '"+frag[ii].text+"' is unset",must_term);
 			}
 			else{
-				alert_import("The text '"+frag[ii].text+"' cannot be understood");
+				alert_import("The text '"+frag[ii].text+"' cannot be understood",must_term);
 			}
 			return syntax_error();
 		}
 		
 		if(frag[ii+1].text != "="){
-			alert_import("The property '"+frag[ii].text+"' is missing an equals sign");
+			alert_import("The tag '"+frag[ii].text+"' is missing an equals sign",must_term);
 			return syntax_error();
 		}
 		
 		if(ii+2 < frag.size() && frag[ii+2].text == "="){
-			alert_import("The property '"+frag[ii].text+"' cannot be followed by '=='");
+			alert_import("The tag '"+frag[ii].text+"' cannot be followed by '=='",must_term);
 			return syntax_error();
 		}
 		
 		if(ii+3 < frag.size() && frag[ii+3].text == "="){
-			alert_import("The property '"+frag[ii].text+"' is unset");
+			alert_import("The tag '"+frag[ii].text+"' is unset",must_term);
 			return syntax_error();
 		}
 	}
 
-	if(num != numi){ alert_import("Syntax error"); return syntax_error();}
+	if(num != numi){ alert_import("Syntax error",must_term); return syntax_error();}
 	
 	vector <Tag> tags;
 
 	for(auto n = 0u; n < num; n++){
-		if(frag[1+3*n+0].quote != 0){ alert_import("Syntax error type 2"); return syntax_error();}
-		if(frag[1+3*n+1].text != "="){ alert_import("Syntax error type 3"); return syntax_error();}
-		if(frag[1+3*n+0].text == ""){ alert_import("Syntax error type 4"); return syntax_error();}
-		if(frag[1+3*n+2].text == ""){ alert_import("Property "+frag[1+3*n+0].text+" must have content"); return syntax_error();}
+		if(frag[1+3*n+0].quote != 0){ alert_import("Syntax error",must_term); return syntax_error();}
+		if(frag[1+3*n+1].text != "="){ alert_import("Syntax error",must_term); return syntax_error();}
+		if(frag[1+3*n+0].text == ""){ alert_import("Syntax error: Tag name not specified",must_term); return syntax_error();}
+		if(frag[1+3*n+2].text == ""){ alert_import("Tag "+frag[1+3*n+0].text+" must have content",must_term); return syntax_error();}
 		
 		const auto &fr = frag[1+3*n+0];
 		
@@ -845,7 +900,7 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 		for(auto n = 0u; n < tags.size()-1; n++){
 			for(auto nn = n+1; nn < tags.size(); nn++){
 				if(tags[n].name == tags[nn].name){
-					alert_import("The tag '"+tags[n].name+"' is set more than once");
+					alert_import("The tag '"+tags[n].name+"' is set more than once",must_term);
 					return syntax_error();
 				}
 			}
@@ -902,7 +957,7 @@ void Input::add_error_mess(unsigned int line_num, string st, ErrorType type)
 /// Error message for imported file 
 void Input::alert_import(string st, bool fatal)   
 {
-	add_error_mess(line_num,st,ERROR_FATAL);
+	add_error_mess(line_num,error_line+st,ERROR_FATAL);
 	
 	if(fatal){
 		output_error_messages(err_mess); 
@@ -961,6 +1016,8 @@ bool Input::fatal_error() const
 	for(auto i = 0u; i < error_mess.size(); i++){
 		if(error_mess[i].type == ERROR_FATAL) return true;
 	}
+	if(terminate) return true;
+	
 	return false;
 }
 
@@ -979,7 +1036,7 @@ void Input::output_error_messages(string te, bool end) const
 			}
 
 			switch(em.type){
-			case ERROR_FATAL: display_error(em.error);	break;
+			case ERROR_FATAL: display_error(em.error,false);	break;
 			case ERROR_WARNING: display_warning(em.error); break;
 			}
 			cout << endl;
@@ -1002,28 +1059,32 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 	cline_store = cline;
 	all_row = UNSET;
 	
+	//cout << cline.command_name << " COMMAND PROCESS" << endl;
+	
 	auto nem = error_mess.size();
 	
 	auto cname = cline.command;
 	
+	//cout << cline.command_name << " COMMAND" << endl;
+	
 	switch(cname){
-	case SPECIES: species_command(loop); break;
-	case CLASS: classification_command(loop); break;
+	case SPECIES: if(!species_command(loop)) terminate = true; break;
+	case CLASS: if(!classification_command(loop)) terminate = true; break;
 	case SET: set_command(); break;
 	case CAMERA: camera_command(); break;
-	case COMP: compartment_command(); break;
-	case COMP_ALL: compartment_all_command(); break;
-	case TRANS: transition_command(); break;
-	case TRANS_ALL: transition_all_command(); break;
+	case COMP: if(!compartment_command()) terminate = true; break;
+	case COMP_ALL: if(!compartment_all_command()) terminate = true; break;
+	case TRANS: if(!transition_command()) terminate = true; break;
+	case TRANS_ALL: if(!transition_all_command()) terminate = true; break;
 	case DATA_DIR: datadir_command(); break;
 	case DESC: description_command(); break;
 	case LABEL: label_command(); break;
 	case BOX: box_command(); break;
 	case PARAM: param_command(); break;
 	case DERIVED: derived_command(); break;
-	case SIMULATION: simulation_command(); break;
-	case INFERENCE: inference_command(); break;
-	case POST_SIM: post_sim_command(); break;
+	case SIMULATION: if(!simulation_command()) terminate = true; break;
+	case INFERENCE: if(!inference_command()) terminate = true; break;
+	case POST_SIM: if(!post_sim_command()) terminate = true; break;
 	
 	case IND_EFFECT: ind_effect_command(); break;
 	case FIXED_EFFECT: fixed_effect_command(); break;
@@ -1057,6 +1118,7 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 	
 	case IND_EFFECT_DATA:
 		get_tag_value("name"); 
+		get_tag_value("ie"); 
 		get_tag_value("file"); 
 		break;
 		
@@ -1086,7 +1148,6 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 	default: alert_import("Command not recognised"); return;
 	}
 	
-	
 	// Checks if all tags are used
 	auto error = false;
 	for(auto e = nem; e <  error_mess.size(); e++){
@@ -1113,6 +1174,7 @@ string Input::get_tag_value(string st)
 	for(auto i = 0u; i < tags.size(); i++){
 		if(tags[i].name == st){ tags[i].done = 1; return tags[i].value;}
 	}
+	
 	return "";
 }
 
@@ -1132,7 +1194,6 @@ string Input::get_tag_val(string st, vector <Tag> &tags)
 void Input::cannot_find_tag(bool fatal)                                   
 {
 	string te = "Cannot find the '"+tag_find+"' tag for '"+cline_store.command_name+"'";
-	if(all_row != UNSET) te += "( line "+to_string(all_row+2)+" in file)";
 	
 	alert_import(te,fatal);
 }
@@ -1208,7 +1269,7 @@ bool Input::is_zeroone(string num, string tag)
 {
 	auto val = number(num);
 	if(val == UNSET || val < 0 || val > 1){
-		alert_import("For '"+tag+"' thel value '"+num+"' must be between 0 and 1"); 
+		alert_import("For '"+tag+"' the value '"+num+"' must be between 0 and 1"); 
 		return false;
 	}
 	return true;
@@ -1310,16 +1371,17 @@ void Input::calc_conv_param_vec(vector <Calculation> &calcu, const vector <Param
 				if(it.num >= param_ref.size()) emsg_input("Out of range0");
 				const auto &pr = param_ref[it.num];
 				const auto &par = model.param[pr.th];
+			
 				it.type = PARAMVEC;
 				it.num = par.get_param_vec(pr.index); 
-				if(it.num == UNSET) emsg("pvec element unset");
+				if(it.num == UNSET) emsg_input("pvec element unset");
 			}
 		}
 	}
 }
 	
 	
-/// Orders parameters in a vector such that only dependent on an params with a smaller index
+/// Orders parameters in a vector such that only dependent on params with a smaller index
 void Input::create_param_vector()
 {
 	auto N = model.param.size();
@@ -1336,7 +1398,7 @@ void Input::create_param_vector()
 				auto th2 = pa.th;
 				
 				if(th2 == th){
-					alert_import("In parameter '"+par.name+"' error with one element dependent on another element");
+					alert_import("In parameter '"+par.name+"' there is an error with one element dependent on another element");
 					return;
 				}
 				else{
@@ -1375,12 +1437,13 @@ void Input::create_param_vector()
 		auto th = list[i];
 		auto &par = model.param[th];
 		
-		if(par.variety != CONST_PARAM || par.factor){	
+		// || par.factorzzz
+		if(par.variety != CONST_PARAM){	
 			for(auto j = 0u; j < par.N; j++){
 				auto ref = par.element_ref[j];
 				if(ref != UNSET){
 					auto &ele = par.element[ref];
-					
+			
 					if(removeparamvec_speedup == false || ele.used == true || par.spline_info.on == true){
 						ele.param_vec_ref = model.param_vec.size();
 					

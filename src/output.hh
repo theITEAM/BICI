@@ -33,10 +33,10 @@ class Output                               // Stores information about the data
 		//void updated_file(string file);
 		void constants(string file);
 		string to_str(double num) const;
-		void param_sample(unsigned int s, unsigned int chain, const State &state);
+		void param_sample(unsigned int s, unsigned int chain, State &state);
 		void param_sample(const Particle &part);
 		string param_output(const Particle &part, const vector < vector <double> > &value) const;
-		void state_sample(unsigned int s, unsigned int chain, const State &state);
+		void state_sample(unsigned int s, unsigned int chain, State &state);
 		void state_sample(const Particle &part);
 		string state_output(const Particle &part,	vector <string> &ind_key, Hash &hash_ind) const;
 		string trace_init() const;
@@ -48,7 +48,7 @@ class Output                               // Stores information about the data
 		vector <Particle> get_part_chain(unsigned int chain, const vector <Particle> &part) const;
 		string print_obs_data(unsigned int p, const vector <ObsData> &obs) const;
 		void print_individuals(unsigned int N, unsigned int p, const State &state) const;
-		void final_time(long total_cpu) const;
+		void final_time(long sec, long op_sec) const;
 		void final_memory_usage() const;
 	
 	private:

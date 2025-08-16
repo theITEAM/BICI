@@ -33,7 +33,7 @@ void Equation::calculate_linearise()
 	for(auto i = 0u; i < C; i++){
 		const auto &ca = calcu[i];
 		
-		if(i != 0 && ca.item.size() == 0) emsg("zero item problem");
+		if(i != 0 && ca.item.size() == 0) emsg_input("zero item problem");
 		
 		LinearCalculation lin;
 		switch(ca.op){
@@ -94,7 +94,7 @@ void Equation::calculate_linearise()
 					
 					if(false){
 						print_linear_calc("Lin after ",lin);
-						emsg("fin");
+						emsg_input("fin");
 					}
 				}
 			}
@@ -105,7 +105,7 @@ void Equation::calculate_linearise()
 				lin = convert_to_linear_calculation(ca.item[0],MULTIPLY,lin_calc);
 				auto lin_div = convert_to_linear_calculation(ca.item[1],MULTIPLY,lin_calc);
 				if(lin_div.pop_calc.size() > 0) return;
-				if(lin_div.no_pop_calc.calc.size() == 0) emsg("Problem with div");
+				if(lin_div.no_pop_calc.calc.size() == 0) emsg_input("Problem with div");
 				
 				calc_div(lin.no_pop_calc.calc,lin_div.no_pop_calc.calc);
 				for(auto j = 0u; j < lin.pop_calc.size(); j++){
@@ -114,7 +114,7 @@ void Equation::calculate_linearise()
 				
 				if(false){
 					print_linear_calc("Lin after ",lin);
-					emsg("fin");
+					emsg_input("fin");
 				}
 			}
 			break;
@@ -130,9 +130,9 @@ void Equation::calculate_linearise()
 			if(two_param_func(ca,lin,lin_calc) == false) return;
 			break;
 	
-		case TAKE: emsg("Should not have take"); break;
+		case TAKE: emsg_input("Should not have take"); break;
 		
-		default: emsg("Eq problem10"); break;
+		default: emsg_input("Eq problem10"); break;
 		}
 		
 		if(pl){
@@ -148,7 +148,6 @@ void Equation::calculate_linearise()
 		for(const auto &lin : lin_calc){
 			print_linear_calc("LIN FINAL ",lin);
 		}
-		//emsg("lin final");
 	}
 
 	//auto lc_final = convert_to_linear_calculation(ans,ADD,lin_calc);
@@ -161,7 +160,7 @@ void Equation::calculate_linearise()
 	
 	auto Npop = pop_ref.size();
 	if(Npop != lc_final.pop_calc.size()){
-		emsg("Pop_calc problem");
+		emsg_input("Pop_calc problem");
 	}
 	
 	// Orders gradients in the same way as pop_ref
@@ -170,7 +169,7 @@ void Equation::calculate_linearise()
 		auto po = pop_ref[i];
 		
 		auto k = 0u; while(k < Npop && lc_final.pop_calc[k].po != po) k++;
-		if(k == Npop) emsg("Could not find population");
+		if(k == Npop) emsg_input("Could not find population");
 		
 		const auto &calc = lc_final.pop_calc[k].calc; 
 		if(calc_time_dep(calc) == true){
@@ -189,8 +188,10 @@ void Equation::calculate_linearise()
 
 	linearise.init_pop_ref_from_po(pop_ref);
 	
-	if(linearise.pop_grad_calc.size() != pop_ref.size()) emsg("Population number does not agree");
-
+	if(linearise.pop_grad_calc.size() != pop_ref.size()){
+		emsg_input("Population number does not agree");
+	}
+	
 	if(false){
 		cout << endl << endl << te << ":" << endl;
 		print_calc("No pop dep",linearise.no_pop_calc);
@@ -198,7 +199,7 @@ void Equation::calculate_linearise()
 		for(auto k = 0u; k < linearise.pop_grad_calc.size(); k++){
 			print_calc(pop[pop_ref[k]].name,linearise.pop_grad_calc[k]);	
 		}
-		emsg("Linear done");
+		emsg_input("Linear done");
 	}
 }
 
@@ -252,8 +253,8 @@ LinearCalculation Equation::convert_to_linear_calculation(const EqItem &it, EqIt
 			}
 			break;
 		
-		case IE: case FE: case ONE: emsg("Should not be here7"); break;			
-		default: emsg("Equation error11"); break;
+		case IE: case FE: case ONE: emsg_input("Should not be here7"); break;			
+		default: emsg_input("Equation error11"); break;
 	}
 	
 	return lin;
@@ -388,7 +389,7 @@ void Equation::calc_add(vector <Calculation> &calc, const vector <Calculation> &
 		print_calc("calc",calc);
 		print_calc("calc2",calc2);
 		cout << "ADD" << endl;
-		emsg("here add");
+		emsg_input("here add");
 	}
 	
 	if(calc2.size() == 0) return;
@@ -468,10 +469,10 @@ void Equation::calc_div(vector <Calculation> &calc, const vector <Calculation> &
 		print_calc("calc2",calc2);
 	
 		cout << "DIV" << endl;
-		emsg("here div");
+		emsg_input("here div");
 	}
 	
-	if(calc2.size() == 0) emsg("Problem");
+	if(calc2.size() == 0) emsg_input("Problem");
 	if(calc.size() == 0) return;
 		
 	auto num = calc.size();
@@ -544,8 +545,8 @@ bool Equation::single_param_func(Calculation ca, LinearCalculation &lin, const v
 		break;
 		
 	case POPNUM: return false;
-	case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
-	default: emsg("Eq problem2"); break;
+	case IE: case ONE: case FE: emsg_input("Eq Lin should not be"); break;
+	default: emsg_input("Eq problem2"); break;
 	}
 	
 	return true;
@@ -587,7 +588,7 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 				calc.push_back(ca);
 				if(false){
 					print_linear_calc("calc",lin); 
-					emsg("K");
+					emsg_input("K");
 				}
 			}
 			break;
@@ -602,8 +603,8 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 			}
 			break;
 		case POPNUM: return false;
-		case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
-		default: emsg("Eq problem2"); break;
+		case IE: case ONE: case FE: emsg_input("Eq Lin should not be"); break;
+		default: emsg_input("Eq problem2"); break;
 		}
 		break;
 		
@@ -625,13 +626,13 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 			}
 			break;
 		case POPNUM: return false;
-		case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
-		default: emsg("Eq problem2"); break;
+		case IE: case ONE: case FE: emsg_input("Eq Lin should not be"); break;
+		default: emsg_input("Eq problem2"); break;
 		}
 		break;
 	case POPNUM: return false;
-	case IE: case ONE: case FE: emsg("Eq Lin should not be"); break;
-	default: emsg("Eq problem2"); break;
+	case IE: case ONE: case FE: emsg_input("Eq Lin should not be"); break;
+	default: emsg_input("Eq problem2"); break;
 	}
 	
 	return true;
@@ -677,8 +678,8 @@ bool Equation::calc_time_dep(const vector <Calculation> &calc) const
 				case FE:	case REG: case NUMERIC:
 					break;
 				case SPLINE: case SPLINEREF: case TIME: return true;
-				case POPNUM: emsg("Should not have a population"); break;
-				default: emsg("Equation error"); break;
+				case POPNUM: emsg_input("Should not have a population"); break;
+				default: emsg_input("Equation error"); break;
 			}
 		}
   }

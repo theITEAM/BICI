@@ -89,7 +89,7 @@ void PAS::run()
 			}
 			
 			if(s%step_gen_param == step_gen_param-1){ // Stores samples for generation plot
-				for(const auto &ch : chain) output.param_sample(g,GEN_PLOT,ch.state);
+				for(auto &ch : chain) output.param_sample(g,GEN_PLOT,ch.state);
 			}
 		}
 

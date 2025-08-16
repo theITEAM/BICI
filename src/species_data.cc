@@ -100,7 +100,6 @@ void Species::init_pop_data(const DataSource &so)
 	init_cond.focal_cl = foc_cl;
 	
 	const auto &comp = comp_gl;
-	
 	switch(init_cond.type){
 	case INIT_POP_FIXED:
 		if(foc_cl != UNSET){	
@@ -493,38 +492,41 @@ void Species::add_pop_data(const DataSource &so, int sign)
 	
 	add_rem_pop_on = true;
 	
+	auto warn = false;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto t_str = tab.ele[j][0];
 		double t = number(t_str);
 		if(t_str == "start") t = details.t_start;
 		
 		if(t < details.t_start || t >= details.t_end){
-			alert_source("The time '"+t_str+"' must be between the start and end times",so,0,j); 
-			 return;
+			warn = true;
 		}
-		
-		auto ti = get_ti(calc_tdiv(t,details)); 
-		
-		if(ncla+2 != tab.ncol) emsg_input("Columns not right1");
-		
-		auto name = t_str;
-		
-		auto c = 0u;
-		for(auto cl = 0u; cl < ncla; cl++){
-			auto name = tab.ele[j][cl+1];
+		else{
+			auto ti = get_ti(calc_tdiv(t,details)); 
+			
+			if(ncla+2 != tab.ncol) emsg_input("Columns not right1");
+			
+			auto name = t_str;
+			
+			auto c = 0u;
+			for(auto cl = 0u; cl < ncla; cl++){
+				auto name = tab.ele[j][cl+1];
+							
+				const auto &claa = cla[cl];
+				auto j = 0u; while(j < claa.ncomp && claa.comp[j].name != name) j++;
+				if(j == claa.ncomp){ alert_source("Could not find '"+name+"'",so); return;}
 						
-			const auto &claa = cla[cl];
-			auto j = 0u; while(j < claa.ncomp && claa.comp[j].name != name) j++;
-			if(j == claa.ncomp){ alert_source("Could not find '"+name+"'",so); return;}
-					
-			c += comp_mult[cl]*j;
-		}
+				c += comp_mult[cl]*j;
+			}
 
-		auto value_str = tab.ele[j][tab.ncol-1];
-		double value = number(value_str);
-	
-		add_rem_pop[ti][c] += value*sign; 
+			auto value_str = tab.ele[j][tab.ncol-1];
+			double value = number(value_str);
+		
+			add_rem_pop[ti][c] += value*sign; 
+		}
 	}
+	
+	if(warn) data_ignored(so);
 	
 	if(false){
 		for(auto ti = 0u; ti < T; ti++){
@@ -534,6 +536,13 @@ void Species::add_pop_data(const DataSource &so, int sign)
 		}
 		emsg_input("don");
 	}
+}
+
+
+/// Creates warning mnessage if data is outside of time range
+void Species::data_ignored(const DataSource &so)
+{
+	data_warning.push_back("Data outside of time range is ignored in source '"+so.name+"'."); 
 }
 
 
@@ -643,35 +652,8 @@ void Species::add_ind_data(const DataSource &so)
 void Species::remove_ind_data(const DataSource &so)
 {
 	const auto &tab = so.table;
-	for(auto j = 0u; j < tab.nrow; j++){
-		auto i = find_individual(tab.ele[j][0]);
-		auto &ind = individual[i];
-
-		auto t_str = tab.ele[j][1];
-		double t = number(t_str);
-		if(t_str == "start") t = details.t_start;
-		
-		if(t < details.t_start || t > details.t_end){
-			alert_source("The time '"+t_str+"' must be between the start and end times",so,1,j); 
-			 return;
-		}
-		
-		if(tab.ncol != 2) emsg_input("Columns not right3");
-		
-		EventData ev; 
-		ev.type = LEAVE_EV;
-		ev.cl = UNSET;
-		ev.tr = UNSET;
-		ev.tdiv = calc_tdiv(t,details);
-		ind.ev.push_back(ev);
-	}		
-}
-
-
-/// move-ind command
-void Species::move_ind_data(const DataSource &so)
-{
-	const auto &tab = so.table;
+	
+	auto warn = false;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto i = find_individual(tab.ele[j][0]);
 		auto &ind = individual[i];
@@ -681,25 +663,78 @@ void Species::move_ind_data(const DataSource &so)
 		if(t_str == "start") t = details.t_start;
 		
 		if(t < details.t_start || t >= details.t_end){
-			alert_source("The time '"+t_str+"' must be between the start and end times",so,1,j); 
-			 return;
+			warn = true;
 		}
+		else{
+			if(tab.ncol != 2) emsg_input("Columns not right3");
 		
-		if(tab.ncol != 3) emsg_input("Columns not right4");
-		
-		auto cl = so.cl;
-		auto val = tab.ele[j][2];
-		auto c = find_c(cl,val);
-		if(c == UNSET) alert_source("Value '"+val+"' is not a compartment2",so,2,j);
-			
-		EventData ev; 
-		ev.type = MOVE_EV;
-		ev.move_c = c;
-		ev.cl = cl;
-		ev.tr = UNSET;
-		ev.tdiv = calc_tdiv(t,details);
-		ind.ev.push_back(ev);
+			EventData ev; 
+			ev.type = LEAVE_EV;
+			ev.cl = UNSET;
+			ev.tr = UNSET;
+			ev.tdiv = calc_tdiv(t,details);
+			ind.ev.push_back(ev);
+		}
 	}		
+	
+	if(warn) data_ignored(so);
+}
+
+
+/// move-ind command
+void Species::move_ind_data(const DataSource &so)
+{
+	auto cl = so.cl;
+		
+	const auto &claa = cla[cl];
+	for(const auto &tr : claa.tra){
+		switch(tr.type){
+		case EXP_MEAN_NM: case GAMMA: case ERLANG: case LOG_NORMAL: case WEIBULL: case PERIOD:
+			alert_source("Move data cannot be applied to classification '"+claa.name+"' because this contains non-Markovian transitions.",so);
+			break;
+		default: break;
+		}
+	}
+	
+	const auto &tab = so.table;
+	auto warn = false;
+	for(auto j = 0u; j < tab.nrow; j++){
+		auto i = find_individual(tab.ele[j][0]);
+		auto &ind = individual[i];
+
+		auto t_str = tab.ele[j][1];
+		double t = number(t_str);
+		if(t_str == "start") t = details.t_start;
+		
+		if(t <= details.t_start || t >= details.t_end){
+			warn = true;
+		}
+		else{
+			if(tab.ncol != 3) emsg_input("Columns not right4");
+			
+			auto val = tab.ele[j][2];
+			auto c = find_c(cl,val);
+			if(c == UNSET) alert_source("Value '"+val+"' is not a compartment2",so,2,j);
+				
+			EventData ev; 
+			ev.type = MOVE_EV;
+			ev.move_c = c;
+			ev.cl = cl;
+			ev.tr = UNSET;
+			ev.tdiv = calc_tdiv(t,details);
+			
+			// Checks that 
+			for(const auto &eve : ind.ev){
+				if(eve.type == MOVE_EV && eve.tdiv == ev.tdiv){
+					alert_source("Individual '"+ind.name+"' cannot move more than once at time '"+t_str+"'",so,1,j); 
+				}
+			}
+			
+			ind.ev.push_back(ev);			
+		}
+	}		
+	
+	if(warn) data_ignored(so);
 }
 
 
@@ -708,6 +743,7 @@ void Species::comp_data(const DataSource &so)
 {
 	const auto &tab = so.table;
 	
+	auto warn = false;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto i = find_individual(tab.ele[j][0]);
 		auto &ind = individual[i];
@@ -721,35 +757,37 @@ void Species::comp_data(const DataSource &so)
 		}
 		
 		if(t < details.t_start || t > details.t_end){
-			alert_source("The time '"+val+"' must be between the start and end times",so,1,j); 
-			 return;
+			warn = true;
 		}
-		
-		auto cl = so.cl;
-		
-		auto comp = tab.ele[j][2];
-		if(comp != missing_str){
-			auto c_exact = find_c(cl,comp);
+		else{
+			auto cl = so.cl;
+			
+			auto comp = tab.ele[j][2];
+			if(comp != missing_str){
+				auto c_exact = find_c(cl,comp);
 
-			ObsData ob; 
-			ob.so = so.index;
-			ob.type = OBS_COMP_EV;
-			ob.c_exact = c_exact;
-			ob.not_alive = false;
-			if(c_exact == UNSET){
-				if(comp == not_alive_str) ob.not_alive = true;
-				
-				string emsg;
-				auto prob_str = find_comp_prob_str(cl,comp,LOWER_BOUND,emsg);
-				if(emsg != ""){ alert_source(emsg,so,2,j); return;}
-				ob.c_obs_prob_eqn = create_eqn_vector(prob_str,COMP_PROB,so);
+				ObsData ob; 
+				ob.so = so.index;
+				ob.type = OBS_COMP_EV;
+				ob.c_exact = c_exact;
+				ob.not_alive = false;
+				if(c_exact == UNSET){
+					if(comp == not_alive_str) ob.not_alive = true;
+					
+					string emsg;
+					auto prob_str = find_comp_prob_str(cl,comp,LOWER_BOUND,emsg);
+					if(emsg != ""){ alert_source(emsg,so,2,j); return;}
+					ob.c_obs_prob_eqn = create_eqn_vector(prob_str,COMP_PROB,so);
+				}
+				ob.cl = so.cl;
+				ob.tdiv = calc_tdiv(t,details);
+				ob.time_vari = false;
+				ind.obs.push_back(ob);		
 			}
-			ob.cl = so.cl;
-			ob.tdiv = calc_tdiv(t,details);
-			ob.time_vari = false;
-			ind.obs.push_back(ob);		
 		}
 	}
+
+	if(warn) data_ignored(so);
 }
 
 
@@ -775,6 +813,7 @@ void Species::genetic_data(const DataSource &so)
 		
 	auto p_eqn = create_eqn_vector(prob_str,COMP_PROB,so);
 	
+	auto warn = false;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto i = find_individual(tab.ele[j][0],false);
 		if(i != UNSET){
@@ -786,19 +825,26 @@ void Species::genetic_data(const DataSource &so)
 				alert_source("Value '"+val+"' is not a number2",so,1,j);
 				return;
 			}
-	
-			ObsData ob; 
-			ob.so = so.index;
-			ob.type = OBS_COMP_EV;
-			ob.c_exact = UNSET;
-			ob.not_alive = false;
-			ob.c_obs_prob_eqn = p_eqn;
-			ob.cl = infection_cl;
-			ob.tdiv = calc_tdiv(t,details);
-			ob.time_vari = false;
-			ind.obs.push_back(ob);		
+			
+			if(t < details.t_start || t > details.t_end){
+				warn = true;
+			}
+			else{
+				ObsData ob; 
+				ob.so = so.index;
+				ob.type = OBS_COMP_EV;
+				ob.c_exact = UNSET;
+				ob.not_alive = false;
+				ob.c_obs_prob_eqn = p_eqn;
+				ob.cl = infection_cl;
+				ob.tdiv = calc_tdiv(t,details);
+				ob.time_vari = false;
+				ind.obs.push_back(ob);	
+			}				
 		}
 	}
+	
+	if(warn) data_ignored(so);
 }
 
 
@@ -807,6 +853,7 @@ void Species::test_data(const DataSource &so)
 {
 	const auto &tab = so.table;
 	
+	auto warn = false;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto i = find_individual(tab.ele[j][0]);
 		auto &ind = individual[i];
@@ -818,28 +865,35 @@ void Species::test_data(const DataSource &so)
 			return;
 		}
 		
-		ObsData ob; 
-		ob.type = OBS_TEST_EV;
-		ob.so = so.index;
-		ob.cl = so.cl;
-		ob.tdiv = calc_tdiv(t,details);
-		ob.not_alive = false;
-		ob.time_vari = false;
-		ob.Se_eqn = he(add_equation_info(so.obs_model.Se_str,SE),so);
-		ob.Sp_eqn = he(add_equation_info(so.obs_model.Sp_str,SP),so);
-		
-		auto res = tab.ele[j][2];
-		if(res == so.obs_model.diag_pos) ob.test_res = true;
-		else{
-			if(res == so.obs_model.diag_neg) ob.test_res = false;
-			else{
-				alert_source("Value '"+res+"' is not a positive or negative test result",so,2,j);
-				return;
-			}
+		if(t < details.t_start || t > details.t_end){
+			warn = true;
 		}
+		else{
+			ObsData ob; 
+			ob.type = OBS_TEST_EV;
+			ob.so = so.index;
+			ob.cl = so.cl;
+			ob.tdiv = calc_tdiv(t,details);
+			ob.not_alive = false;
+			ob.time_vari = false;
+			ob.Se_eqn = he(add_equation_info(so.obs_model.Se_str,SE),so);
+			ob.Sp_eqn = he(add_equation_info(so.obs_model.Sp_str,SP),so);
+			
+			auto res = tab.ele[j][2];
+			if(res == so.obs_model.diag_pos) ob.test_res = true;
+			else{
+				if(res == so.obs_model.diag_neg) ob.test_res = false;
+				else{
+					alert_source("Value '"+res+"' is not a positive or negative test result",so,2,j);
+					return;
+				}
+			}
 		
-		ind.obs.push_back(ob);
+			ind.obs.push_back(ob);
+		}
 	}		
+	
+	if(warn) data_ignored(so);
 }
 
 
@@ -850,6 +904,7 @@ void Species::population_data(const DataSource &so)
 	
 	auto cf = set_comp_filt(so.filter_str,UNSET,LOWER_BOUND,so);
 
+	auto warn = false;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto time_str = tab.ele[j][0];
 		auto t = number(time_str);
@@ -858,55 +913,61 @@ void Species::population_data(const DataSource &so)
 			return;
 		}
 		
-		auto col = 1;
-		auto name = so.filter_str;
-		for(auto cl = 0u; cl < ncla; cl++){
-			if(cf.cla[cl].type == FILE_FILT){
-				name += "|file:"+tab.ele[j][col];
-				col++;
-			}
-		}	
-		
-		auto pf = 0u; while(pf < pop_filter.size() && pop_filter[pf].name != name) pf++;
-		
-		if(pf == pop_filter.size()){
-			auto co = 1;
-			auto cf2 = cf;
+		if(t < details.t_start || t > details.t_end){
+			warn = true;
+		}
+		else{
+			auto col = 1;
+			auto name = so.filter_str;
 			for(auto cl = 0u; cl < ncla; cl++){
 				if(cf.cla[cl].type == FILE_FILT){
-					cf2.cla[cl].type = COMP_FILT;
-					string emsg;
-					cf2.cla[cl].comp_prob_str = find_comp_prob_str(cl,tab.ele[j][co],LOWER_BOUND,emsg);
-					if(emsg != ""){ alert_source(emsg,so,co,j); return;}
-					co++;
+					name += "|file:"+tab.ele[j][col];
+					col++;
 				}
 			}	
-	
 			
-			PopFilter pofi; 
-			pofi.name = name;
-			pofi.comp_prob_eqn = create_eqn_vector(global_convert(cf2),COMP_PROB,so);
-			pop_filter.push_back(pofi);
+			auto pf = 0u; while(pf < pop_filter.size() && pop_filter[pf].name != name) pf++;
+			
+			if(pf == pop_filter.size()){
+				auto co = 1;
+				auto cf2 = cf;
+				for(auto cl = 0u; cl < ncla; cl++){
+					if(cf.cla[cl].type == FILE_FILT){
+						cf2.cla[cl].type = COMP_FILT;
+						string emsg;
+						cf2.cla[cl].comp_prob_str = find_comp_prob_str(cl,tab.ele[j][co],LOWER_BOUND,emsg);
+						if(emsg != ""){ alert_source(emsg,so,co,j); return;}
+						co++;
+					}
+				}	
+				
+				PopFilter pofi; 
+				pofi.name = name;
+				pofi.comp_prob_eqn = create_eqn_vector(global_convert(cf2),COMP_PROB,so);
+				pop_filter.push_back(pofi);
+			}
+			
+			auto val_str = tab.ele[j][col];
+			auto value = number(val_str);
+			if(value == UNSET){
+				alert_source("The value '"+val_str+"' is not a number5",so,1,j);
+				return;
+			}
+			col++;
+			
+			PopData pd;
+			pd.so = so.index;
+			pd.tdiv = calc_tdiv(t,details);
+			pd.ref = pf;
+			pd.type = set_obs_mod_type(so.obs_model);
+			pd.value = value;
+			pd.obs_mod_val = set_obs_mod_val(value,j,col,so.obs_model,tab,so);
+			pd.time_vari = false;
+			pop_data.push_back(pd);
 		}
-		
-		auto val_str = tab.ele[j][col];
-		auto value = number(val_str);
-		if(value == UNSET){
-			alert_source("The value '"+val_str+"' is not a number5",so,1,j);
-			return;
-		}
-		col++;
-		
-		PopData pd;
-		pd.so = so.index;
-		pd.tdiv = calc_tdiv(t,details);
-		pd.ref = pf;
-		pd.type = set_obs_mod_type(so.obs_model);
-		pd.value = value;
-		pd.obs_mod_val = set_obs_mod_val(value,j,col,so.obs_model,tab,so);
-		pd.time_vari = false;
-		pop_data.push_back(pd);
 	}		
+	
+	if(warn) data_ignored(so);
 }
 
 
@@ -983,8 +1044,22 @@ double Species::set_obs_mod_val(double value, unsigned int j, unsigned int col, 
 void Species::trans_data(const DataSource &so)
 {
 	const auto &tab = so.table;
+	
+	// Accounts for the time period measurements are made
+	auto so_ts = details.t_start;
+	auto so_te = details.t_end;
+	if(so.time_range == SPEC_TIME){
+		so_ts = so.time_start;
+		so_te = so.time_end;
+	}
+	
+	if(so_ts > details.t_end || so_te < details.t_start){
+		data_warning.push_back("Data entirely outside of time range ignored in source '"+so.name+"'."); 
+		return;
+	}
 
 	// Adds the times of events
+	auto warn = false;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto i = find_individual(tab.ele[j][0]);
 		auto &ind = individual[i];
@@ -997,25 +1072,26 @@ void Species::trans_data(const DataSource &so)
 			return;
 		}
 		
-		ObsData ob; 
-		ob.so = so.index;
-		ob.ref = obs_trans.size();
-		ob.type = OBS_TRANS_EV;
-		ob.cl = so.cl;
-		ob.tdiv = calc_tdiv(t,details);
-		ob.time_vari = false;
-		ob.not_alive = false;
+		if(so.time_range == SPEC_TIME && (t < so_ts || t > so_te)){
+			alert_source("Value '"+val+"' is outside the time range over which transitions are observed.",so,1,j);
+		}			
 		
-		ind.obs.push_back(ob);
+		if(t < details.t_start || t >= details.t_end){
+			warn = true;
+		}
+		else{
+			ObsData ob; 
+			ob.so = so.index;
+			ob.ref = obs_trans.size();
+			ob.type = OBS_TRANS_EV;
+			ob.cl = so.cl;
+			ob.tdiv = calc_tdiv(t,details);
+			ob.time_vari = false;
+			ob.not_alive = false;
+			
+			ind.obs.push_back(ob);
+		}
 	}		
-	
-	// Accounts for the time period measurements are made 
-	auto ti_min = 0u, ti_max = T; 
-	
-	if(so.time_range == SPEC_TIME){
-		ti_min = get_ti(calc_tdiv(so.time_start,details));
-		ti_max = get_ti(calc_tdiv(so.time_end,details));
-	}
 
 	auto cf = set_comp_filt(so.filter_str,UNSET,LOWER_UPPER_BOUND,so);
 
@@ -1024,6 +1100,12 @@ void Species::trans_data(const DataSource &so)
 	
 	if(errmsg != ""){ alert_source(errmsg,so); return;}
 	
+	if(so_ts < details.t_start) so_ts = details.t_start;
+	if(so_te > details.t_end) so_ts = details.t_end;
+	
+	auto ti_min = get_ti(calc_tdiv(so_ts,details));
+	auto ti_max = get_ti(calc_tdiv(so_te,details));
+		
 	auto prob_str = trans_global_convert(so.cl,trans_filt,cf);
 	ObsTrans ob_tr;
 	ob_tr.name = so.filter_trans_str;
@@ -1035,6 +1117,8 @@ void Species::trans_data(const DataSource &so)
 	obs_trans.push_back(ob_tr);
 	
 	obs_trans_exist = true;
+	
+	if(warn) data_ignored(so);
 }
 
 
@@ -1056,15 +1140,15 @@ void Species::set_ob_trans_ev(const vector <Equation> &eqn)
 		}
 
 		if(source_fl && trans_fl){
-			emsg_input("Transition data '"+ot.name+"' cannot include source and non-source transitions");
+			alert_input("Transition data '"+ot.name+"' cannot include source and non-source transitions");
 		}
 
 		if(sink_fl && trans_fl){
-			emsg_input("Transition data '"+ot.name+"' cannot include sink and non-sink transitions");
+			alert_input("Transition data '"+ot.name+"' cannot include sink and non-sink transitions");
 		}
 
 		if(source_fl && sink_fl){
-			emsg_input("Transition data '"+ot.name+"' cannot include source and sink transitions");
+			alert_input("Transition data '"+ot.name+"' cannot include source and sink transitions");
 		}
 
 		ot.type = OBS_TRANS_EV;
@@ -1091,6 +1175,7 @@ void Species::popu_trans_data(const DataSource &so)
 	auto trans_filt = set_trans_filt(so.cl,so.filter_trans_str,LOWER_BOUND,emg);
 	if(emg != ""){ alert_source(emg,so); return;}
 	
+	auto warn = false;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto tstart_str = tab.ele[j][0];
 		auto tstart = number(tstart_str);
@@ -1106,60 +1191,67 @@ void Species::popu_trans_data(const DataSource &so)
 			return;
 		}
 		
-		auto col = 2;
-		auto name = so.filter_trans_str+"|"+so.filter_str;
-		for(auto cl = 0u; cl < ncla; cl++){
-			if(cl != so.cl && cf.cla[cl].type == FILE_FILT){	
-				name += "|file:"+tab.ele[j][col];
-				col++;
-			}
-		}	
-		
-		auto pf = 0u; 
-		while(pf < pop_trans_filter.size() && pop_trans_filter[pf].name != name) pf++;
-		
-		if(pf == pop_trans_filter.size()){
-			auto co = 2;
-			auto cf2 = cf;
+		if(tstart < details.t_start || tend > details.t_end){
+			warn = true;
+		}
+		else{
+			auto col = 2;
+			auto name = so.filter_trans_str+"|"+so.filter_str;
 			for(auto cl = 0u; cl < ncla; cl++){
-				if(cl != so.cl && cf.cla[cl].type == FILE_FILT){
-					cf2.cla[cl].type = COMP_FILT;
-					string emsg;
-					cf2.cla[cl].comp_prob_str = find_comp_prob_str(cl,tab.ele[j][co],LOWER_BOUND,emsg);
-					if(emsg != ""){ alert_source(emsg,so,col,j); return;}
-					co++;
+				if(cl != so.cl && cf.cla[cl].type == FILE_FILT){	
+					name += "|file:"+tab.ele[j][col];
+					col++;
 				}
+			}	
+			
+			auto pf = 0u; 
+			while(pf < pop_trans_filter.size() && pop_trans_filter[pf].name != name) pf++;
+			
+			if(pf == pop_trans_filter.size()){
+				auto co = 2;
+				auto cf2 = cf;
+				for(auto cl = 0u; cl < ncla; cl++){
+					if(cl != so.cl && cf.cla[cl].type == FILE_FILT){
+						cf2.cla[cl].type = COMP_FILT;
+						string emsg;
+						cf2.cla[cl].comp_prob_str = find_comp_prob_str(cl,tab.ele[j][co],LOWER_BOUND,emsg);
+						if(emsg != ""){ alert_source(emsg,so,col,j); return;}
+						co++;
+					}
+				}
+			
+				auto prob_str = trans_global_convert(so.cl,trans_filt,cf2);
+		
+				PopTransFilter pofi; 
+				pofi.name = name;
+				pofi.trans_prob_eqn = create_eqn_vector(prob_str,TRANS_PROB,so);
+				pop_trans_filter.push_back(pofi);
 			}
-		
-			auto prob_str = trans_global_convert(so.cl,trans_filt,cf2);
-	
-			PopTransFilter pofi; 
-			pofi.name = name;
-			pofi.trans_prob_eqn = create_eqn_vector(prob_str,TRANS_PROB,so);
-			pop_trans_filter.push_back(pofi);
-		}
-		
-		auto val_str = tab.ele[j][col];
-		auto value = number(val_str);
+			
+			auto val_str = tab.ele[j][col];
+			auto value = number(val_str);
 
-		if(value == UNSET){
-			alert_source("The value '"+val_str+"' is not a number9",so,1,j);
-			return;
+			if(value == UNSET){
+				alert_source("The value '"+val_str+"' is not a number9",so,1,j);
+				return;
+			}
+			
+			PopTransData ptd;
+			ptd.so = so.index;
+			ptd.tdivmin = calc_tdiv(tstart,details);
+			ptd.tdivmax = calc_tdiv(tend,details);
+			ptd.ref = pf;		
+			ptd.type = set_obs_mod_type(so.obs_model);
+			ptd.value = value;
+			ptd.obs_mod_val = set_obs_mod_val(value,j,col,so.obs_model,tab,so);
+			ptd.time_vari = false;
+			pop_trans_data.push_back(ptd);
+			
+			pop_trans_data_exist = true;
 		}
-		
-		PopTransData ptd;
-		ptd.so = so.index;
-		ptd.tdivmin = calc_tdiv(tstart,details);
-		ptd.tdivmax = calc_tdiv(tend,details);
-		ptd.ref = pf;		
-		ptd.type = set_obs_mod_type(so.obs_model);
-		ptd.value = value;
-		ptd.obs_mod_val = set_obs_mod_val(value,j,col,so.obs_model,tab,so);
-		ptd.time_vari = false;
-		pop_trans_data.push_back(ptd);
-		
-		pop_trans_data_exist = true;
 	}		
+	
+	if(warn) data_ignored(so);
 }
 
 
@@ -1182,7 +1274,7 @@ unsigned int Species::find_individual(string name, bool create)
 	if(i == UNSET && create){
 		i = individual.size();
 		if(i >= details.individual_max){
-			emsg_input("The number of individuals exceeds the limit of "+to_string(details.individual_max)+".");
+			alert_input("The number of individuals exceeds the limit of "+to_string(details.individual_max)+".");
 		}
 		
 		hash_ind.add(i,vec);
@@ -1740,43 +1832,45 @@ void Species::jiggle_data()
 	}
 	
 	for(auto &ind : individual){	
-		double tmin = UNSET, tmax = UNSET;
+		double t_enter = UNSET, t_leave = UNSET;
 		for(const auto &ev : ind.ev){
 			switch(ev.type){
 			case ENTER_EV:
-				if(tmin != UNSET){
-					emsg("Cannot set entry time twice for individual '"+ind.name+"'");
+				if(t_enter != UNSET){
+					alert_input("Cannot set entry time twice for individual '"+ind.name+"'");
 				}				
-				tmin = ev.tdiv;
+				t_enter = ev.tdiv;
 				break;
 				
 			case LEAVE_EV:
-				if(tmax != UNSET){
-					emsg("Cannot set leave time twice for individual '"+ind.name+"'");
+				if(t_leave != UNSET){
+					alert_input("Cannot set leave time twice for individual '"+ind.name+"'");
 				}				
-				tmax = ev.tdiv;
+				t_leave = ev.tdiv;
 				break;
 			case MOVE_EV: break;
-			default: emsg("Should not have diferent type"); break;
+			default: emsg_input("Should not have diferent type"); break;
 			}
 		}
 			
-		if(tmin == UNSET) tmin = 0;
-		if(tmax == UNSET) tmax = details.T;
+		double tmin = 0.0, tmax = details.T;
 	
 		// Makes sure move events are in time range
 		for(const auto &ev : ind.ev){
 			switch(ev.type){
 			case MOVE_EV:
-				if(ev.tdiv <= tmin || ev.tdiv >= tmax){
-					emsg("The move event at time '"+tstr(calc_t(ev.tdiv,details))+" for '"+ind.name+"' is not within the time range.");
+				if(t_enter != UNSET && ev.tdiv <= t_enter){
+					alert_input("The move event at time "+tstr(calc_t(ev.tdiv,details))+" for '"+ind.name+"' must be after the individual enters the system.");
 				}
-				break;
+				
+				if(t_leave != UNSET && ev.tdiv >= t_leave){
+					
+					alert_input("The move event at time "+tstr(calc_t(ev.tdiv,details))+" for '"+ind.name+"' must be before the individual leaves the system.");
+				}
 			
-				if(tmax != UNSET){
-					emsg("Cannot set leave time twice for individual '"+ind.name+"'");
-				}				
-				tmax = ev.tdiv;
+				if(ev.tdiv <= tmin || ev.tdiv >= tmax){	
+					alert_input("The move event at time "+tstr(calc_t(ev.tdiv,details))+" for '"+ind.name+"' is not within the time range.");
+				}
 				break;
 				
 			default: break;
@@ -1784,8 +1878,16 @@ void Species::jiggle_data()
 		}
 		
 		for(auto &ob : ind.obs){
+			if(t_enter != UNSET && ob.tdiv < t_enter){
+				alert_input("The observation at time "+tstr(calc_t(ob.tdiv,details))+" on individual '"+ind.name+"' must be after the individual enters the system");
+			}
+			
+			if(t_leave != UNSET && ob.tdiv > t_leave){
+				alert_input("The observation at time "+tstr(calc_t(ob.tdiv,details))+" on individual '"+ind.name+"' must be before the individual leaves the system");
+			}
+			
 			if(ob.tdiv < tmin || ob.tdiv > tmax){
-				emsg("Observation at time "+tstr(calc_t(ob.tdiv,details))+" on individual '"+ind.name+"' is out of range");
+				alert_input("Observation at time "+tstr(calc_t(ob.tdiv,details))+" on individual '"+ind.name+"' is out of range");
 			}
 			
 			switch(ob.type){
@@ -1810,7 +1912,7 @@ void Species::jiggle_data()
 					}while(loop < loopmax);
 					
 					if(loop == loopmax){
-						emsg("Could not deal with transition event time '"+tstr(t)+"' on individual '"+ind.name+"'");
+						alert_input("Could not deal with transition event time '"+tstr(t)+"' on individual '"+ind.name+"'");
 					}
 					
 					ob.tdiv = t;

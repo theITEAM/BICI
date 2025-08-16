@@ -162,6 +162,11 @@ enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER,
 // Different output timers
 enum OutTimer { PARAM_OUTPUT, STATE_OUTPUT, OUTTIMER_MAX };
 
+// Different check timers 
+enum CheckTimer { CHECK_TRANS_NUM, CHECK_DEP_PARAM, CHECK_REF, CHECK_MARKOV, CHECK_NM, CHECK_LIKE, CHECK_SPLINE, CHECK_PRIOR, CHECK_POP, CHECK_POP2, CHECK_CPOP, CHECK_IE, CHECK_POP_LIKE, CHECK_MAPS, CHECK_EV_OBS, CHECK_OBS_LIKE, CHECK_IC, CHECK_LIN, CHECK_GEN,CHECK_POP_IND, CHECK_ADD_REM, CHECK_RANGE, CHECK_SIMP, CHECK_POP_IND_GENTIC, CHECK_MAX};
+
+const vector <string> check_name = { "CHECK_TRANS_NUM", "CHECK_DEP_PARAM", "CHECK_REF", "CHECK_MARKOV", "CHECK_NM", "CHECK_LIKE", "CHECK_SPLINE", "CHECK_PRIOR", "CHECK_POP", "CHECK_POP2", "CHECK_CPOP", "CHECK_IE", "CHECK_POP_LIKE", "CHECK_MAPS", "CHECK_EV_OBS", "CHECK_OBS_LIKE", "CHECK_IC", "CHECK_LIN", "CHECK_GEN", "CHECK_POP_IND", "CHECK_ADD_REM", "CHECK_RANGE", "CHECK_SIMP", "CHECK_POP_IND_GENTIC", "CHECK_MAX"};
+
 // Different proposal timers
 enum PropTimer { PROP_TIMER, PROPTIMER_MAX };
 
@@ -429,6 +434,8 @@ const string fe_char = "μ";                       // Character used for fixed e
 const auto name_ch_max = 40;                      // Maximum number of characters allowed
 const string endli = "\n";
 const string dist_matrix_name = "D";              // The name of a distance matrix
+const string iden_matrix_name = "δ";              // The name of identity matrix
+const string iden_matrix_name2 = "\\delta";       // The name of identity matrix
 const string RN_name = "RN";                      // The name of rep. number function
 const string RNE_name = "RNE";                    // The effective rep number function
 const string RNC_name = "RNC";                    // The computational rep number function
@@ -448,6 +455,7 @@ const string not_alive_str = "!";                 // Denotes individul not alive
 
 const string err_mess = "Please correct these errors and rerun.";
 const string err_mess_sing = "Please correct this error and rerun.";
+const vector <string> must_term_str = { "simulation","sim","inference","inf","posterior-simulation","post-sim"};
 
 /************************** Object constants ******************************/
 

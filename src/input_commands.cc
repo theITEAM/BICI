@@ -48,7 +48,20 @@ void Input::import_data_table_command(Command cname)
 		return;
 	}
 	
+	auto name = get_tag_value("name"); 
+	if(name == ""){ 
+		switch(cname){
+		case INIT_POP: name = "Initial population"; break;
+		case ADD_IND: name = "Added individuals"; break;
+		case REMOVE_IND: name = "Removed individuals"; break;
+		case ADD_POP: name = "Added populations"; break;
+		case REMOVE_POP: name = "Removed populations"; break;
+		default: cannot_find_tag(); return;
+		}
+	}
+	
 	DataSource ds;
+	ds.name = name;
 	ds.line_num = line_num;
 	ds.p = p; ds.cl = UNSET;
 	ds.cname = cname; ds.focal_cl = UNSET;
@@ -149,7 +162,7 @@ void Input::import_data_table_command(Command cname)
 			
 			auto cl = get_cl_from_comp(spl[0],p);
 			if(cl == UNSET){ 
-				alert_import("Value '"+spl[0]+"' is not a compartment5");
+				alert_import("Value '"+spl[0]+"' is not a compartment");
 				return;
 			}
 			
@@ -178,13 +191,13 @@ void Input::import_data_table_command(Command cname)
 		{
 			ds.filter_str = get_tag_value("filter");
 			
-			auto name = get_tag_value("name");
-			ds.filter_trans_str = name;
+			auto trans = get_tag_value("trans");
+			ds.filter_trans_str = trans;
 		
-			auto cl_sel = get_cl_from_trans(name,p);
+			auto cl_sel = get_cl_from_trans(trans,p);
 		
 			if(cl_sel == UNSET){
-				alert_import("For 'name' the value '"+name+"' is not recognised");
+				alert_import("For 'trans' the value '"+trans+"' is not recognised");
 				return;
 			}
 		
@@ -224,13 +237,14 @@ void Input::import_data_table_command(Command cname)
 		{
 			ds.filter_str = get_tag_value("filter");
 			
-			auto name = get_tag_value("name");
-			ds.filter_trans_str = name;
+			auto trans = get_tag_value("trans");
+			ds.filter_trans_str = trans;
 			
-			auto cl_sel = get_cl_from_trans(name,p);
+			auto cl_sel = get_cl_from_trans(trans,p);
 		
 			if(cl_sel == UNSET){
-				alert_import("For 'name' the value '"+name+"' is not recognised"); return;
+				alert_import("For 'trans' the value '"+trans+"' is not recognised");
+				return;
 			}
 		
 			ds.cl = cl_sel;
@@ -261,7 +275,7 @@ void Input::import_data_table_command(Command cname)
 		}
 		break;
 		
-	default: alert_import("Should not be default2"); return;
+	default: emsg_input("Should not be default2"); return;
 	}
 	
 	if(set_loadcol(cname,ds) == false) return;
@@ -282,14 +296,14 @@ void Input::import_data_table_command(Command cname)
 		auto spl = split(cols,',');
 
 		if(spl.size() != col_name.size()){
-			alert_import("'cols' does not have the correct number of entries (expected something in the order '"+stringify(col_name)+"')"); 
+			alert_import("'cols' does not have the correct number of entries (expected a table with headings in the order '"+stringify(col_name)+"')"); 
 			return;
 		}
 		
 		for(auto i = 0u; i < spl.size(); i++){
 			for(auto j = 0u; j < col_name.size(); j++){
 				if(spl[i] == col_name[j] && i != j){
-					alert_import("'cols' does not have the correct order (expected something in the order '"+stringify(col_name)+"')"); 
+					alert_import("'cols' does not have the correct order (expected a table with headings in the order '"+stringify(col_name)+"')"); 
 					return;
 				}
 			}
@@ -328,16 +342,16 @@ void Input::import_data_table_command(Command cname)
 
 
 /// Adds a species to the model
-void Input::species_command(unsigned int loop)
+bool Input::species_command(unsigned int loop)
 {
 	auto name = get_tag_value("name");
-	if(name == ""){ cannot_find_tag(); return;}
+	if(name == ""){ cannot_find_tag(); return false;}
 	
 	auto type = toLower(get_tag_value("type"));
-	if(type == ""){ cannot_find_tag(); return;}
+	if(type == ""){ cannot_find_tag(); return false;}
 	
 	auto sp_type = SpeciesType(option_error("type",type,{"population","individual"},{ POPULATION, INDIVIDUAL}));
-	if(sp_type == UNSET) return;
+	if(sp_type == UNSET) return false;
 
 	auto trans_tree = false;
 	if(sp_type == INDIVIDUAL){
@@ -347,7 +361,7 @@ void Input::species_command(unsigned int loop)
 			else{
 				if(trans_tree_str != "off"){ 
 					alert_import("'trans-tree' must be either 'off' or 'on'");
-					return;
+					return false;
 				}
 			}
 		}
@@ -362,27 +376,29 @@ void Input::species_command(unsigned int loop)
 		p_current = find_p(name);
 		if(p_current == UNSET){
 			alert_import("Problem finding species '"+name+"'"); 
-			return;
+			return false;
 		}
 	}
 	cl_current = UNSET;
+	
+	return true;
 }
 
 
 
 /// Adds a classification to the model
-void Input::classification_command(unsigned int loop)
+bool Input::classification_command(unsigned int loop)
 {
 	auto p = p_current;
 	if(p == UNSET){ 
-		alert_import("A species must be defined before a classification can be added",true); 
-		return;
+		alert_import("A species must be defined before a classification can be added"); 
+		return false;
 	}
 		
 	auto &sp = model.species[p];
 	
 	auto name = get_tag_value("name");
-	if(name == ""){ cannot_find_tag(true); return;}
+	if(name == ""){ cannot_find_tag(true); return false;}
 	
 	auto clone = get_tag_value("clone");
 	if(clone != ""){ // Clones a classification from another species
@@ -390,14 +406,14 @@ void Input::classification_command(unsigned int loop)
 			auto p2 = find_p(clone);
 			if(p2 == UNSET){
 				alert_import("For 'clone' cannot find the species '"+clone+"'");
-				return;
+				return false;
 			}
 			
 			auto cl2 = find_cl(p2,name);
 			
 			if(cl2 == UNSET){
 				alert_import("In clone species '"+clone+"' cannot find the classification '"+name+"'");
-				return;
+				return false;
 			} 
 				
 			auto ncl = sp.ncla;
@@ -408,26 +424,26 @@ void Input::classification_command(unsigned int loop)
 			cl_current = find_cl(p,name);
 			if(cl_current == UNSET){
 				alert_import("Problem finding classification '"+name+"'"); 
-				return;
+				return false;
 			}
 		}
 	}
 	else{
 		auto index = get_tag_value("index");
-		if(index == ""){ cannot_find_tag(true); return;}
+		if(index == ""){ cannot_find_tag(true); return false;}
 		if(index.length() != 1){ 
-			alert_import("The index '"+index+"' must be just a single character",true); 
-			return;
+			alert_import("The index '"+index+"' must be just a single character"); 
+			return false;
 		}
 		
 		if(index == "t"){ 
-			alert_import("The index 't' cannot be used because it is reserved for time variation",true); 
-			return;
+			alert_import("The index 't' cannot be used because it is reserved for time variation"); 
+			return false;
 		}
 		
 		if(find_in(alphabet,index) == UNSET){ 
-			alert_import("Index '"+index+"' must be from the lowercase alphabet",true); 
-			return;
+			alert_import("Index '"+index+"' must be from the lowercase alphabet"); 
+			return false;
 		}
 		
 		auto coord = toLower(get_tag_value("coord"));
@@ -436,7 +452,7 @@ void Input::classification_command(unsigned int loop)
 		
 		if(coord != ""){
 			coord_type = Coord(option_error("coord",coord,{"cartesian", "latlng"},{ CARTESIAN, LATLNG}));
-			if(coord_type == UNSET) return;
+			if(coord_type == UNSET) return false;
 		}
 		
 		if(coord == "latlng"){
@@ -444,7 +460,7 @@ void Input::classification_command(unsigned int loop)
 			if(def_map != ""){
 				if(def_map != "load"){ 
 					alert_import("'map' must be set to 'load'");
-					return;
+					return false;
 				}
 			}
 		}
@@ -458,10 +474,12 @@ void Input::classification_command(unsigned int loop)
 			cl_current = find_cl(p,name);
 			if(cl_current == UNSET){ 
 				alert_import("Problem finding classification '"+name+"'"); 
-				return;
+				return false;
 			}
 		}
 	}
+	
+	return true;
 }
 
 
@@ -508,6 +526,7 @@ void Input::param_mult_command()
 		par.name = "f~"+par_orig.name;
 		par.full_name = "f~"+par_orig.full_name;
 	}
+
 	auto pp = get_param_prop(par.full_name);
 		
 	auto mult = get_dependency(par.dep,pp,knot_times); if(mult == UNSET) return; 
@@ -540,7 +559,7 @@ void Input::set_command()
 	auto name = get_tag_value("classification");
 	if(name != ""){
 		if(p == UNSET){
-			alert_import("A species must be set before a 'classification' can be set"); 
+			alert_import("A species must be specified before a 'classification' can be set"); 
 			return;
 		}
 	
@@ -625,11 +644,18 @@ vector < vector <Tag> > Input::get_tags_list(string file)
 	
 	for(auto r = 0u; r < tab.nrow; r++){
 		const auto &row = tab.ele[r];
-		auto tags = cline_store.tags;
+		vector <Tag> tags; 
+		for(const auto &ta : cline_store.tags){
+			if(ta.name != "file"){
+				tags.push_back(ta);
+			}
+		}
+		
 		for(auto i = 0u; i < N; i++){
 			auto te = row[i];
+			te = trim(te);
 			if(te != ""){
-				Tag tag; tag.name = head[i]; tag.value = te; tag.done = 0;
+				Tag tag; tag.name = trim(head[i]); tag.value = te; tag.done = 0;
 				tags.push_back(tag);
 			}
 		}
@@ -654,7 +680,7 @@ void Input::check_tags_used(unsigned int r, const vector <Tag> &tags)
 	for(auto i = 0u; i < tags.size(); i++){
 		const auto &tag = tags[i];
 		if(tag.done == 0){
-			alert_import("The value '"+tag.value+"' for property '"+tag.name+"' is not used (line "+to_string(r+2)+" in file).");
+			alert_import("The value '"+tag.value+"' for tag '"+tag.name+"' is not used (line "+to_string(r+2)+" in file).");
 			return;
 		}			
 	}
@@ -662,53 +688,63 @@ void Input::check_tags_used(unsigned int r, const vector <Tag> &tags)
 
 
 /// Adds a compartment to the model
-void Input::compartment_command()
+bool Input::compartment_command()
 {
-	compartment_command2(cline_store.tags);
+	return compartment_command2(cline_store.tags);
 }
 
 
 /// Adds all compartments to the model
-void Input::compartment_all_command()
+bool Input::compartment_all_command()
 {
-	auto file = get_tag_value("file"); if(file == ""){ cannot_find_tag(true); return;}
+	auto file = get_tag_value("file"); if(file == ""){ cannot_find_tag(true); return false;}
 
 	auto tags_list = get_tags_list(file);
 	
 	for(auto i = 0u; i < tags_list.size(); i++){
+		error_line = in_file_text(file)+" on line "+tstr(i+2)+": ";
+		
 		auto &tags = tags_list[i];
-		all_row = i;
-		compartment_command2(tags);
+	
+		if(!compartment_command2(tags)) return false;
+		
 		check_tags_used(i,tags);
 	}
 	
 	for(auto &ta : cline_store.tags) ta.done = 1;
+	
+	error_line = "";
+	
+	return true;
 }
 
 
 /// Adds a compartment to the model
-void Input::compartment_command2(vector <Tag> &tags)
+bool Input::compartment_command2(vector <Tag> &tags)
 {
-	if(check_claa_error() == true) return;
-	
+	if(check_claa_error() == true) return false;
+
 	const auto &claa = get_claa();
 	auto p = p_current;
 	auto cl = cl_current;
 	
-	auto name = get_tag_val("name",tags); if(name == ""){ cannot_find_tag(true); return;}
-	 
+	auto name = get_tag_val("name",tags); if(name == ""){ cannot_find_tag(true); return false;}
+
 	// Checks that a compartment name is valid
 	check_name_input(name,"Compartment name");
-	
+
 	auto color = get_tag_val("color",tags); 
 	if(color != ""){
-		if(!is_Color(color)) alert_import("'"+color+"' is not a valid color.",true); 
+		if(!is_Color(color)){
+			alert_import("'"+color+"' is not a valid color.",true); 
+			return false;
+		}
 	}
-	
+
 	auto fix_str = get_tag_val("fix",tags);
 	
 	double x = UNSET, y = UNSET, lat = UNSET, lng = UNSET;
-	
+
 	switch(claa.coord){
 	case CARTESIAN:
 		{
@@ -719,20 +755,20 @@ void Input::compartment_command2(vector <Tag> &tags)
 			}
 			else{ 
 				x_str = get_tag_val("x",tags);
-				if(x_str == ""){ cannot_find_tag(true); return;}
-				if(!is_number(x_str,"x",true)) return;
+				if(x_str == ""){ cannot_find_tag(true); return false;}
+				if(!is_number(x_str,"x",true)) return false;
 				x = number(x_str); 
 			
 				y_str = get_tag_val("y",tags);
-				if(y_str == ""){ cannot_find_tag(true); return;}
-				if(!is_number(y_str,"y",true)) return;
+				if(y_str == ""){ cannot_find_tag(true); return false;}
+				if(!is_number(y_str,"y",true)) return false;
 				y = number(y_str);
 				
 				if(x != UNSET && y != UNSET){
 					for(auto i = 0u; i < claa.ncomp; i++){
 						if(claa.comp[i].x == x && claa.comp[i].y == y){		
-							alert_import("Compartments '"+name+"' and '"+claa.comp[i].name+"' cannot have the same position",true);	
-							return;
+							alert_import("Compartments '"+name+"' and '"+claa.comp[i].name+"' cannot have the same position");	
+							return false;
 						}
 					}
 				}
@@ -744,7 +780,7 @@ void Input::compartment_command2(vector <Tag> &tags)
 		{
 			auto bound_file = get_tag_val("boundary",tags);
 			if(bound_file != ""){
-				auto i = import_geojson(bound_file); if(i == UNSET) return;
+				auto i = import_geojson(bound_file); if(i == UNSET) return false;
 				
 				auto po = boundary_mean_latlng(i,name);
 			
@@ -752,15 +788,15 @@ void Input::compartment_command2(vector <Tag> &tags)
 			}
 			else{
 				auto lat_str = get_tag_val("lat",tags);
-				if(!is_number(lat_str,"lat",true)) return;
+				if(!is_number(lat_str,"lat",true)) return false;
 				lat = number(lat_str);
 				
 				auto lng_str = get_tag_val("lng",tags);
-				if(!is_number(lng_str,"lng",true)) return;
+				if(!is_number(lng_str,"lng",true)) return false;
 				lng = number(lng_str);
 			
 				if(lat != UNSET && lng != UNSET){
-					if(check_latlng_error(lat,lng,true) == true) return;
+					if(check_latlng_error(lat,lng,true) == true) return false;
 				}					
 			}
 		}
@@ -775,7 +811,7 @@ void Input::compartment_command2(vector <Tag> &tags)
 			if(infected_str == "false") infected = COMP_UNINFECTED;
 			else{
 				alert_import("'infected' must be 'true' or 'false'"); 
-				return;
+				return false;
 			}
 		}
 	}
@@ -788,61 +824,69 @@ void Input::compartment_command2(vector <Tag> &tags)
 			if(markov_branch_str == "false") markov_branch = false;
 			else{
 				alert_import("'branch-prob' must be 'true' or 'false'"); 
-				return;
+				return false;
 			}
 		}
 	}
 	
-	add_compartment(name,p,cl,x,y,lat,lng,markov_branch,infected,"");
+	if(!add_compartment(name,p,cl,x,y,lat,lng,markov_branch,infected,"")) return false;
+
+	return true;
 }
 
 
 /// Adds a transition / source / sink to the model
-void Input::transition_command()
+bool Input::transition_command()
 {
-	transition_command2(cline_store.tags);
+	return transition_command2(cline_store.tags);
 }
 
 
 /// Adds a transition / source / sink to the model
-void Input::transition_all_command()
+bool Input::transition_all_command()
 {
-	auto file = get_tag_value("file"); if(file == ""){ cannot_find_tag(); return;}
+	auto file = get_tag_value("file"); if(file == ""){ cannot_find_tag(); return false;}
 
 	auto tags_list = get_tags_list(file);
-	
+
 	for(auto i = 0u; i < tags_list.size(); i++){
+		error_line = in_file_text(file)+" on line "+tstr(i+2)+": ";
+		
 		auto &tags = tags_list[i];
-		all_row = i;
-		transition_command2(tags);
+
+		if(!transition_command2(tags)) return false;
 		check_tags_used(i,tags);
 	}
 	
 	for(auto &ta : cline_store.tags) ta.done = 1;
+	
+	error_line = "";
+	
+	return true;
 }
 
 
 /// Adds a transition / source / sink to the model
-void Input::transition_command2(vector <Tag> &tags)
+bool Input::transition_command2(vector <Tag> &tags)
 {
-	if(check_claa_error() == true) return;
+	if(check_claa_error() == true) return false;
 	auto &claa = get_claa();
 
 	auto p = p_current;
 	auto cl = cl_current;
 	
-	auto te = get_tag_val("name",tags); if(te == ""){ cannot_find_tag(); return;}
+	auto te = get_tag_val("name",tags); if(te == ""){ cannot_find_tag(); return false;}
 	
 	if(te.length() < 2){ 
 		alert_import("Transition name '"+te+"' is not understood. Expected format: 'Initial compartment'->'final compartment'."); 
-		return;
+		return false;
 	}
 	
 	auto i = 0u; while(i < te.length()-1 && te.substr(i,2) != "->") i++;
 	
 	if(i == te.length()-1){ 
 		alert_import("Transition name '"+te+"' is not understood. Expected format: 'Initial compartment'->'final compartment'."); 
-		return;
+		return false;
 	}
 	
 	string fr = trim(te.substr(0,i));
@@ -851,13 +895,14 @@ void Input::transition_command2(vector <Tag> &tags)
 	string to = trim(te.substr(i+2));
 	if(to == "-") to = "Sink";
 	
-	auto value_str = get_tag_val("value",tags); if(value_str == ""){ cannot_find_tag(); return;}
+	auto value_str = get_tag_val("value",tags); 
+	if(value_str == ""){ cannot_find_tag(); return false;}
 
 	auto trans_def = extract_trans_def(value_str);
 
 	if(trans_def.set == false){ 
 		alert_import("In the expression '"+value_str+"' the transition distribution is incorrectly specified. Expected format: 'exp(rate:...)', 'gamma(mean:...,cv:...)', 'erlang(mean:...,shape:)', 'log-normal(mean:...,cv:...)', 'weibull(scale:...,shape:...)' or 'period(time:...)'.");
-		return;
+		return false;
 	}
 	
 	unsigned int ci, cf;
@@ -865,7 +910,7 @@ void Input::transition_command2(vector <Tag> &tags)
 	if(fr == "Source") ci = UNSET;
 	else{
 		ci = find_c(p,cl,fr);
-		if(ci == UNSET){ cannot_find_trans_comp(te,p,cl,fr); return;}
+		if(ci == UNSET){ cannot_find_trans_comp(te,p,cl,fr); return false;}
 	}
 	
 	if(to == "Sink") cf = UNSET;
@@ -873,7 +918,7 @@ void Input::transition_command2(vector <Tag> &tags)
 		cf = find_c(p,cl,to);
 		if(cf == UNSET){
 			cannot_find_trans_comp(te,p,cl,to);
-			return;
+			return false;
 		}
 	}
 
@@ -881,16 +926,16 @@ void Input::transition_command2(vector <Tag> &tags)
 		if(claa.tra[tr].i == ci && claa.tra[tr].f == cf){
 			if(ci == UNSET){ 
 				alert_import("Source to '"+to+"' already exists"); 
-				return;
+				return false;
 			}
 			else{
 				if(cf == UNSET){
 					alert_import("Sink from '"+fr+"' already exists"); 
-					return;
+					return false;
 				}
 				else{
 					alert_import("Transition from '"+fr+"' to '"+to+"' already exists");
-					return;
+					return false;
 				}
 			}
 		}
@@ -907,7 +952,7 @@ void Input::transition_command2(vector <Tag> &tags)
 	auto lngmid = get_tag_val("mid-lng",tags);
 	auto latmid = get_tag_val("mid-lat",tags);
 			
-	add_transition(p,cl,ci,cf,trans_def.type);
+	if(!add_transition(p,cl,ci,cf,trans_def.type)) return false;
 
 	auto &tra = claa.tra[claa.ntra-1];
 	
@@ -1015,6 +1060,8 @@ void Input::transition_command2(vector <Tag> &tags)
 		}
 		break;
 	}
+	
+	return true;
 }
 
 
@@ -1210,7 +1257,7 @@ void Input::param_command()
 		if(weight != ""){
 			par.cat_factor_weight_on = true;
 			if(is_file(weight) == false){
-				alert_import("'factor-weight' must be a data table");
+				alert_import("'factor-weight' must be defined through a data table");
 			}		
 			else{
 				load_weight_value(pp,weight,par,"In 'file'");
@@ -1228,6 +1275,10 @@ void Input::param_command()
 		alert_import("The distance matrix '"+par.full_name+"' must not be set");
 	}
 	
+	if(par.name == iden_matrix_name || par.name == iden_matrix_name2){
+		alert_import("The identity matrix '"+par.full_name+"' must not be set");
+	}
+	
 	auto name = par.name;
 	if(name == RN_name || name == RNE_name || name == RNC_name){
 		alert_import("The reproduction function '"+name+"' must not be set");
@@ -1239,7 +1290,7 @@ void Input::param_command()
 	
 	auto pre = "Parameter '"+par.full_name+"': ";
 	
-	if(value == "auto") emsg("auto no longer supported");
+	if(value == "auto") emsg_input("auto no longer supported");
 		
 	if(pp.dep.size() == 0){
 		if(value != ""){
@@ -1284,7 +1335,7 @@ void Input::param_command()
 						par.variety = REPARAM_PARAM;		
 					}
 					else{ 
-						alert_import("Problem importing"); 
+						emsg_input("Problem importing"); 
 						return;
 					}
 				}
@@ -1298,7 +1349,7 @@ void Input::param_command()
 				if(is_file(valu) == false){
 					double val = number(valu);
 					
-					if(par.variety != CONST_PARAM) emsg("Should be const");
+					if(par.variety != CONST_PARAM) emsg_input("Should be const");
 				
 					if(val == UNSET){
 						alert_import(desc+" '"+valu+"' is not a number");
@@ -1438,7 +1489,7 @@ void Input::param_command()
 		
 	for(const auto &par2 : model.param){
 		if(par2.name == par.name){
-			alert_import("Parameter already defined"); 
+			alert_import("Parameter '"+par.name+"' is already defined"); 
 			return;
 		}
 	}
@@ -1563,27 +1614,26 @@ void Input::derived_command()
 
 
 /// Applies the simulation command
-void Input::simulation_command()
+bool Input::simulation_command()
 {
 	auto &details = model.details;
 	
 	auto start = get_tag_value("start"); 
-	if(start == ""){ terminate = true; cannot_find_tag(); return;}
-	if(!is_number(start,"start")){ terminate = true; return;}
+	if(start == ""){ cannot_find_tag(); return false;}
+	if(!is_number(start,"start")) return false;
 	details.t_start = number(start);	
 	
 	auto end = get_tag_value("end");
-	if(end == ""){ terminate = true; cannot_find_tag(); return;}
+	if(end == ""){ cannot_find_tag(); return false;}
 
-	if(!is_number(end,"end")){ terminate = true; return;}
+	if(!is_number(end,"end")) return false;
 	auto end_num = number(end);
 	
 	details.t_end = end_num;
 	
 	if(details.t_start >= details.t_end){
-		terminate = true;
 		alert_import("The start time '"+start+"' must be before the end time '"+end+"'");
-		return;
+		return false;
 	}
 
 	details.number = check_pos_integer("number",SIM_NUM_DEFAULT);
@@ -1601,12 +1651,12 @@ void Input::simulation_command()
 	if(alg == "") alg = "gillespie";
 	
 	details.algorithm = Algorithm(option_error("algorithm",alg,{"gillespie","tau"},{ GILLESPIE, TAU }));
-	if(details.algorithm == UNSET) return;
+	if(details.algorithm == UNSET) return false;
 	
 	auto dt_str = get_tag_value("timestep"); 
-	if(dt_str == ""){ terminate = true; cannot_find_tag(); return;}
+	if(dt_str == ""){ cannot_find_tag(); return false;}
 	
-	if(!is_positive(dt_str,"timestep")){ terminate = true; return;}
+	if(!is_positive(dt_str,"timestep")) return false;
 	
 	details.dt = number(dt_str);
 	details.stochastic = true;
@@ -1617,29 +1667,30 @@ void Input::simulation_command()
 	details.anneal_power = UNSET;
 	details.diagnostics_on = false;
 	
-	check_dt(details);
+	if(check_dt(details) == false) return false;
+	
+	return true;
 }
 
 
 /// Applies the inference command
-void Input::inference_command()
+bool Input::inference_command()
 {
 	auto &details = model.details;
 
 	auto start = get_tag_value("start"); 
-	if(start == ""){ terminate = true; cannot_find_tag(); return;}
-	if(!is_number(start,"start")){ terminate = true; return;}
+	if(start == ""){ cannot_find_tag(); return false;}
+	if(!is_number(start,"start")) return false;
 	details.t_start = number(start);
 	
 	auto end = get_tag_value("end"); 
-	if(end == ""){ terminate = true; cannot_find_tag(); return;}
-	if(!is_number(end,"end")){ terminate = true; return;}
+	if(end == ""){ cannot_find_tag(); return false;}
+	if(!is_number(end,"end")) return false;
 	details.t_end = number(end);
 	
 	if(details.t_start >= details.t_end){
-		terminate = true;
 		alert_import("The start time '"+start+"' must be before the end time '"+end+"'");
-		return;
+		return false;
 	}
 	
 	details.seed = get_seed();
@@ -1650,15 +1701,16 @@ void Input::inference_command()
 	
 	if(alg != ""){
 		details.algorithm = Algorithm(option_error("algorithm",alg,{"DA-MCMC","PAS-MCMC","MFA","ABC","ABC-SMC","ABC-MBP","PMCMC","HMC"},{ DA_MCMC, PAS_MCMC, MFA_ALG, ABC_ALG, ABC_SMC_ALG, ABC_MBP, PMCMC, HMC }));
-		if(details.algorithm == UNSET) return;
+		if(details.algorithm == UNSET) return false;
 	}
 	
 	auto dt_str = get_tag_value("timestep"); 
-	if(dt_str == ""){ terminate = true; cannot_find_tag(); return;}
+	if(dt_str == ""){ cannot_find_tag(); return false;}
 
-	if(!is_positive(dt_str,"timestep")){ terminate = true; return;}
+	if(!is_positive(dt_str,"timestep")) return false;
 	
 	details.dt = number(dt_str);
+
 	details.sample = MCMC_SAMPLE_DEFAULT;
 	details.output_param = MCMC_OP_PARAM_DEFAULT;
 	details.output_state = MCMC_OP_STATE_DEFAULT;
@@ -1743,7 +1795,7 @@ void Input::inference_command()
 			else{
 				if(diag != "off"){
 					alert_import("'diagnostics' has a value '"+diag+"' but must be 'off' or 'on'");
-					return;
+					return false;
 				}
 			}
 		}
@@ -1762,9 +1814,8 @@ void Input::inference_command()
 		if(burnin_str != ""){
 			auto burnin = number(burnin_str);
 			if(burnin == UNSET || burnin < 1 || burnin > 90){
-				terminate = true;
 				alert_import("For 'burnin-percent' the value '"+burnin_str+"' must be a number between 1 and 90");
-				return;		
+				return false;		
 			}
 			details.burnin_frac = burnin;
 		}	
@@ -1780,9 +1831,8 @@ void Input::inference_command()
 		if(genper_str != ""){
 			genper = number(genper_str);
 			if(genper == UNSET || genper <= 0 || genper >= 100){
-				terminate = true;
 				alert_import("For 'gen-percent' the value '"+genper_str+"' must be a number between 0 and 100, exclusive");
-				return;		
+				return false;		
 			}
 		}	
 		
@@ -1798,14 +1848,14 @@ void Input::inference_command()
 		auto anneal_str = get_tag_value("anneal"); 
 		if(anneal_str != ""){
 			details.anneal_type = AnnealType(option_error("anneal",anneal_str,{"none","scan","power-auto","log-auto","power"},{ ANNEAL_NONE, ANNEAL_SCAN, ANNEAL_POWERAUTO, ANNEAL_LOGAUTO, ANNEAL_POWER}));
-			if(details.anneal_type == UNSET) return;
+			if(details.anneal_type == UNSET) return false;
 		
 			switch(details.anneal_type){
 			case ANNEAL_SCAN:
 				{
 					auto rate_str = get_tag_value("rate");
 					if(rate_str != ""){ 
-						if(!is_positive(rate_str,"rate")) return;
+						if(!is_positive(rate_str,"rate")) return false;
 						details.anneal_rate = number(rate_str);
 					}
 				}
@@ -1815,7 +1865,7 @@ void Input::inference_command()
 				{
 					auto power_str = get_tag_value("power");
 					if(power_str != ""){ 
-						if(!is_positive(power_str,"power")) return;
+						if(!is_positive(power_str,"power")) return false;
 						details.anneal_power = number(power_str);
 					}
 				}
@@ -1826,43 +1876,45 @@ void Input::inference_command()
 		}
 	}
 	
-	check_dt(details);
+	if(check_dt(details) == false) return false;
+	
+	return true;
 }
 
 
 /// Applies the post-sim command
-void Input::post_sim_command()
+bool Input::post_sim_command()
 {
 	auto &details = model.details;
 	
 	auto start = get_tag_value("start"); 
-	if(start == ""){ terminate = true; cannot_find_tag(); return;}
-	if(!is_number(start,"start")){ terminate = true; return;}
+	if(start == ""){ cannot_find_tag(); return false;}
+	if(!is_number(start,"start")) return false;
 	details.ppc_t_start = number(start);
 	
 	auto end = get_tag_value("end"); 
-	if(end == ""){ terminate = true; cannot_find_tag(); return;}
-	if(!is_number(end,"end")){ terminate = true; return;}
+	if(end == ""){ cannot_find_tag(); return false;}
+	if(!is_number(end,"end")) return false;
 	auto end_num = number(end);
 	
 	if(details.ppc_t_start >= end_num){
 		alert_import("The start time '"+start+"' must be before the end time '"+end+"'.");
-		return;
+		return false;
 	}
 	
 	if(details.ppc_t_start < details.t_start){
 		alert_import("The start time '"+start+"' cannot be before the inference start time '"+tstr(details.t_start)+"'.");
-		return;
+		return false;
 	}
 	
 	if(details.ppc_t_start > details.t_end){
 		alert_import("The start time '"+start+"' cannot be after the inference end time '"+tstr(details.t_end)+"'.");
-		return;
+		return false;
 	}
 	
 	if(end_num < details.t_end){
 		alert_import("The end time '"+end+"' cannot be before the inference end time '"+tstr(details.t_end)+"'.");
-		return;
+		return false;
 	}
 	
 	details.ppc_t_end = end_num;
@@ -1870,9 +1922,8 @@ void Input::post_sim_command()
 	if(end_num > details.t_end) details.t_end = end_num;
 	
 	if(details.t_start >= details.t_end){
-		terminate = true;
 		alert_import("The start time '"+start+"' must be before the end time '"+end+"'");
-		return;
+		return false;
 	}
 
 	details.number = check_pos_integer("number",PPC_NUM_DEFAULT);
@@ -1890,7 +1941,9 @@ void Input::post_sim_command()
 	details.ppc_resample = get_tag_value("resample");
 	details.diagnostics_on = false;
 	
-	check_dt(details);
+	if(check_dt(details) == false) return false;
+	
+	return true;
 }
 
 
@@ -1981,7 +2034,7 @@ void Input::ind_effect_command()
 	if(A_sparse != "") num++;
 	if(pedigree != "") num++;
 	if(num > 1){
-		alert_import("Cannot specify more than one of 'A', 'A-sparse' and 'pedigree'."); 
+		alert_import("Cannot specify more than one of 'A', 'A-sparse' or 'pedigree'."); 
 		return;
 	}
 	
@@ -1995,12 +2048,12 @@ void Input::ind_effect_command()
 			auto tab_ped = load_table(pedigree);
 				
 			if(tab_ped.ncol != 3){
-				alert_import("'pedigree' file should have 3 columns"); return;
+				alert_import("The 'pedigree' file should have three columns"); return;
 			}
 				
 			if(tab_ped.heading[0] != "ID" || tab_ped.heading[1] != "sire" || 
 					tab_ped.heading[2] != "dam"){
-				alert_import("'pedigree' file should have columns with headings 'ID', 'sire' and 'dam'"); return;
+				alert_import("The 'pedigree' file should have columns with headings 'ID', 'sire' and 'dam'"); return;
 			}
 			
 			for(auto r = 0u; r < tab_ped.nrow; r++){
@@ -2032,7 +2085,7 @@ void Input::ind_effect_command()
 				if(te != "."){
 					auto i = A_matrix.hash_ind_list.find(te);
 					if(i == UNSET){
-						alert_import("Dam '"+te+"' cannot be found in individual list");
+						alert_import("Dam '"+te+"' cannot be found on individual list");
 					}
 					else par.push_back(i);
 				}			
@@ -2066,7 +2119,7 @@ void Input::ind_effect_command()
 					}
 					break;
 					
-				default: emsg("Not right"); break;
+				default: emsg_input("Not right"); break;
 				}				
 			}
 		
@@ -2134,7 +2187,7 @@ void Input::ind_effect_command()
 				for(auto c = 0u; c < tab.ncol; c++){
 					auto ele = number(tab.ele[r][c]);
 					if(ele == UNSET){
-						alert_import(in_file_text(tab.file)+ " the element '"+tstr(ele)+"' is not a number2 (row "+tstr(r+2)+", col "+tstr(c+1)+")");
+						alert_import(in_file_text(tab.file)+ " the element '"+tstr(ele)+"' is not a number (row "+tstr(r+2)+", col "+tstr(c+1)+")");
 						return;
 					}
 					val[r][c] = ele;
@@ -2201,7 +2254,7 @@ void Input::fixed_effect_command()
 	
 		auto val = number(tab.ele[r][1]);
 		if(val == UNSET){
-			alert_import(in_file_text(tab.file)+" the element '"+tstr(val)+"' is not a number3 (row "+tstr(r+2)+")");
+			alert_import(in_file_text(tab.file)+" the element '"+tstr(val)+"' is not a number (row "+tstr(r+2)+")");
 			return;
 		}
 		X_vector.value.push_back(val);
@@ -2213,7 +2266,7 @@ void Input::fixed_effect_command()
 	
 	auto th = 0u; while(th < model.param.size() && model.param[th].name != fix_name) th++;
 	if(th == model.param.size()){
-		alert_import("Parameter '"+fix_name+"' is not specified by 'param'");
+		alert_import("Parameter '"+fix_name+"' is not specified by a 'param' command");
 		return;
 	}
 	model.param[th].used = true;
@@ -2242,7 +2295,7 @@ void Input::inf_state_command()
 	
 	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
 	if(i == files.size()){
-		alert_import("Could not find '"+file+"'");
+		alert_import("Could not find the file '"+file+"'");
 		return;
 	}
 
@@ -2256,16 +2309,17 @@ void Input::inf_state_command()
 		string warn = "Problem loading state file";
 		
 		while(li < flines.size() && trim(flines[li]) != "{") li++;
-		if(li == flines.size()) alert_import(warn+"1");
-		while(li < flines.size() && !begin_str(flines[li],"timepoint")) li++;
-		if(li == flines.size()) alert_import(warn+"2");
+		if(li == flines.size()) alert_import(warn);
+		while(li < flines.size() && !begin_str(trim(flines[li]),"timepoint")) li++;
+		if(li == flines.size()) alert_import(warn);
 		li++;
+		while(li < flines.size() && begin_str(trim(flines[li]),"#")) li++;
 		while(li < flines.size()){
 			auto line = trim(flines[li]);
 			if(line == "}") break;
 			if(line != ""){
 				auto spl = split(flines[li],':');
-				if(spl.size() != 2) alert_import(warn+"3");
+				if(spl.size() != 2) alert_import(warn);
 				auto num = number(spl[0]);
 				auto name = spl[1];
 				if(num >= ind_key.size()) ind_key.resize(num+1);
@@ -2275,7 +2329,7 @@ void Input::inf_state_command()
 		}
 		
 		while(li < flines.size() && !begin_str(flines[li],"<<")) li++;
-		if(li == flines.size()) alert_import(warn+"4");
+		if(li == flines.size()) alert_import(warn);
 	}
 	
 	vector <string> lines; 

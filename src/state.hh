@@ -42,6 +42,7 @@ class State                                // Stores information about the state
 		vector <double> update_timer;          // Stores timers for parameter updates
 		vector <double> restore_timer;         // Stores timers for parameter restore
 		vector <double> timer;                 // General purpose timers
+		vector <double> check_timer;           // General purpose timers
 		
 		double dif_thresh;                     // Threshold for difference
 		
@@ -69,7 +70,7 @@ class State                                // Stores information about the state
 		void restore(const vector <AffectLike> &affect_like);
 		void likelihood_from_scratch();
 		void resample_ind(bool do_pl = false);
-		Particle generate_particle(unsigned int s, unsigned int chain, bool store_state) const;
+		Particle generate_particle(unsigned int s, unsigned int chain, bool store_state);
 		void set_particle(const Particle &part, bool calc_like=true);
 		vector <double> prior_init_cond(double &like_ch);
 		void update_individual_sampler();
@@ -142,7 +143,7 @@ class State                                // Stores information about the state
 		void disconnect_inf_node(unsigned int n);
 		void connect_inf_node(unsigned int n, const IndInfFrom &iif, unsigned int mut_num_store);
 		
-		void check_pop_ind(vector < vector <unsigned int> > pop_ind, const vector < vector <IndPop> > &ind_pop) const;
+		void check_pop_ind(vector < vector <unsigned int> > pop_ind, const vector < vector <IndPop> > &ind_pop);
 		NodeRef get_ind_noderef(unsigned int p, unsigned int i, double t) const;
 		GenChange gen_change(GenChaType type, unsigned int n, const InfNodeAlter &node_alter, const IndInfFrom &iif_add) const; 
 		void gen_change_update(const GenChange &gc);

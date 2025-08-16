@@ -431,6 +431,7 @@ struct CompRef {                   // References a particular compartment
 };
 
 struct DataSource {                // Stores information about a data source
+	string name;                     // The name of the data source 
 	unsigned int index;              // Index within vector
 	Command cname;                   // The name of the command
 	Table table;                     // The table which stores the data
@@ -1383,7 +1384,7 @@ struct BurnInfo {                  // Information about burnin phase
 	void add_L(double L);
 	void setup(unsigned int s, unsigned int &nburnin,  unsigned int &nsample, const Details &details);
 	void pas_setup(unsigned int s, unsigned int g, unsigned int gen_update, double phi_);
-	void pas_setup_run(unsigned int s, unsigned int &nburnin,  unsigned int &nsample, const Details &details);
+	void pas_setup_run(unsigned int s, unsigned int &nburnin);
 	void set_phi();
 };
 
@@ -1609,10 +1610,8 @@ struct CompR {                     // Compartment rate
 };
 
 struct RatePosteriorMean {         // Stores posterior mean of rates (for local proposals)
-	RatePosteriorMean(const Details &details);
+	RatePosteriorMean();
 
-	//double tdiv_start, dtdiv;
-	
 	bool first;                      // Set if first time to be updated
 	vector <unsigned int> tramean_ref;         // References where to find transition rate [trg]
 	vector <vector <unsigned int> > compR_ref; // References transition linked to comp [cl][cgl]

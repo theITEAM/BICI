@@ -27,7 +27,7 @@ void Model::add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv)
 	auto ti = UNSET;
 	if(tdiv != UNSET) ti = get_ti(tdiv);
 	
-	if(eqi.te == "") emsg("Equation does not have any text");
+	if(eqi.te == "") emsg_input("Equation does not have any text");
 	
 	auto vec = hash_eqn.get_vec_eqn(eqi.te,(unsigned int)eqi.type,eqi.p,eqi.cl,eqi.infection_trans,ti);
 
@@ -42,7 +42,7 @@ void Model::add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv)
 	
 		Equation eq(eqi.te,eqi.type,eqi.p,eqi.cl,eqi.infection_trans,ti,eqi.line_num,species_simp,param,derive,spline,param_vec,pop,hash_pop,timepoint,details);
 		
-		if(false && eq.warn != ""){ cout << eq.warn << endl; emsg("warning");}
+		if(false && eq.warn != ""){ cout << eq.warn << endl; emsg_input("warning");}
 		
 		eqn.push_back(eq);
 	}
@@ -84,7 +84,11 @@ vector <double> Model::param_sample() const
 		if(!ie_cholesky_error(param_val)) break;
 		loop++;
 	}while(loop < loopmax);
-	if(loop == loopmax) emsg("Could not sample parameters due to Cholesky error");
+	
+	if(loop == loopmax){
+		for(auto val : param_val) cout << val << "parameter value" << endl;
+		emsg("Could not sample parameters due to Cholesky error");
+	}
 	
 	return param_val;
 }
@@ -569,9 +573,7 @@ void Model::affect_linearise_speedup2(vector <AffectLike> &vec, const vector <un
 							}
 							break;
 						
-						case PARAMETER: case SPLINE: emsg("Should not be"); break;
-							emsg("Should not be spline time");
-							break;
+						case PARAMETER: case SPLINE: emsg_input("Should not be"); break;
 						default: break;
 						}
 					}
@@ -740,7 +742,7 @@ void Model::affect_linearise_speedup(vector <AffectLike> &vec) const
 						for(auto &gr : pa.pop_grad_ref) cout << gr.ref << "," << gr.index <<"   ";
 						cout << endl;
 					}
-					emsg("affect");
+					emsg_input("affect");
 				}
 					
 				vec[imin] = af;
@@ -821,7 +823,7 @@ void Model::add_popnum_ind_w_affect(vector <AffectLike> &vec) const
 }
 
 
-/// For joint proposals works out the tihings which need updating
+/// For joint proposals works out the things which need updating
 void Model::joint_affect_like(PropType type, const vector <bool> &tr_change, unsigned int p, vector <AffectLike> &vec) const
 {
 	add_like_obs_affect(p,vec);
@@ -1287,8 +1289,6 @@ void Model::add_like_obs_affect(unsigned int p, vector <AffectLike> &affect_like
 /// Finds an individual reference based on its name
 AllInd Model::find_all_ind(string name) const
 {
-	//auto vec = hash_all_ind.get_vec_string(name);
-	//auto j = hash_all_ind.existing(vec);	
 	auto j = hash_all_ind.find(name);
 	if(j == UNSET) emsg("Could not find individual '"+name+"'");
 	return all_ind[j];
@@ -1302,8 +1302,6 @@ void Model::set_hash_all_ind()
 		const auto &sp = species[p];
 		if(sp.type == INDIVIDUAL){
 			for(auto i = 0u; i < sp.individual.size(); i++){
-				//auto vec = hash_all_ind.get_vec_string(sp.individual[i].name);
-				//hash_all_ind.add(all_ind.size(),vec);
 				hash_all_ind.add(all_ind.size(),sp.individual[i].name);
 				AllInd ai; ai.i = i; ai.p = p;
 				all_ind.push_back(ai);
@@ -1421,7 +1419,7 @@ const vector <ParamRef>& Param::get_parent(unsigned int i) const
 /// Gets equation reference
 unsigned int Param::get_eq_ref(unsigned int i) const
 {
-	auto ref = element_ref[i]; if(ref == UNSET) emsg("Cannot get element ref3");
+	auto ref = element_ref[i]; if(ref == UNSET) emsg_input("Cannot get element ref3");
 	return element[ref].value.eq_ref;
 }
 
@@ -1439,8 +1437,6 @@ void Param::add_element(unsigned int i)
 	if(element_ref[i] == UNSET){
 		element_ref[i] = element.size();
 		ParamElement ele;
-		//if(variety == REPARAM_PARAM) ele.value = add_equation_info(default_text,REPARAM);
-		//else ele.value.te = default_text;
 		ele.prior_ref = default_prior_ref;
 		ele.used = false;
 		element.push_back(ele);
@@ -1459,7 +1455,7 @@ void Param::set_prior(unsigned int i, unsigned int prior_ref)
 /// Adds a parent onto the list
 void Param::add_parent(unsigned int i, const ParamRef &pr)
 {
-	auto ref = element_ref[i]; if(ref == UNSET) emsg("Cannot get element ref4");
+	auto ref = element_ref[i]; if(ref == UNSET) emsg_input("Cannot get element ref4");
 	return element[ref].parent.push_back(pr);
 }
 
@@ -1467,7 +1463,7 @@ void Param::add_parent(unsigned int i, const ParamRef &pr)
 /// Adds a child onto the list
 void Param::add_child(unsigned int i, const ParamRef &pr)
 {
-	auto ref = element_ref[i]; if(ref == UNSET) emsg("Cannot get element ref");
+	auto ref = element_ref[i]; if(ref == UNSET) emsg_input("Cannot get element ref");
 	return element[ref].child.push_back(pr);
 }
 
@@ -1484,7 +1480,7 @@ double Param::get_value(unsigned int i) const
 /// Gets the value of an element
 unsigned int Param::get_prior_ref(unsigned int i) const 
 {
-	auto ref = element_ref[i]; if(ref == UNSET) emsg("Cannot get element ref6");
+	auto ref = element_ref[i]; if(ref == UNSET) emsg_input("Cannot get element ref6");
 	return element[ref].prior_ref;
 }
 
@@ -1493,7 +1489,7 @@ unsigned int Param::get_prior_ref(unsigned int i) const
 /// Sets an element as used
 void Param::set_used(unsigned int i) 
 {
-	auto ref = element_ref[i]; if(ref == UNSET) emsg("Cannot get element ref7");
+	auto ref = element_ref[i]; if(ref == UNSET) emsg_input("Cannot get element ref7");
 	if(variety != CONST_PARAM) element[ref].used = true;
 }
 
@@ -1509,7 +1505,7 @@ void Param::set_value_te(unsigned int i, string te)
 /// Gets the value of an element
 string Param::get_value_te(unsigned int i) const
 {
-	auto ref = element_ref[i]; if(ref == UNSET) emsg("Cannot get element ref8");
+	auto ref = element_ref[i]; if(ref == UNSET) emsg_input("Cannot get element ref8");
 	return element[ref].value.te;
 }
 
@@ -1520,24 +1516,6 @@ void Param::set_value_eqn(unsigned int i, const EquationInfo &val)
 	add_element(i);
 	element[element_ref[i]].value = val;
 }
-
-/*
-/// Sets the value of a weight
-void Param::set_weight(unsigned int i, double w) 
-{
-	auto ref = element_ref[i]; if(ref == UNSET) emsg("Cannot get element ref");
-	element[element_ref[i]].weight = w;
-}
-*/
-
-/*
-/// Gets the value of a weight
-double Param::get_weight(unsigned int i) 
-{
-	auto ref = element_ref[i]; if(ref == UNSET) emsg("Cannot get element ref");
-	return element[element_ref[i]].weight;
-}
-*/
 
 
 /// Gets the value of an element

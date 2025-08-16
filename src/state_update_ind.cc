@@ -35,6 +35,14 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 	// Deals with event changes
 	Like like_ch;
 	
+	const auto &ev = ind.ev;
+	if(ev[0].tdiv < 0 || ev[ev.size()-1].tdiv >= T){
+		if(ev[0].tdiv < 0) cout << ev[0].tdiv << "event before\n";
+		else cout << ev[ev.size()-1].tdiv << "event after\n";
+		like_ch.prior -= LARGE;
+		return like_ch;
+	}
+	
 	vector <PopUpdate> pop_update;
 	
 	auto add_ev = ssp.update_ind(i,ev_ne,popnum_t,pop_update,like_ch);
@@ -111,6 +119,8 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 	for(auto e : add_ev) ssp.add_event_ref(i,e,popnum_t,like_ch);
 	
 	if(false) ssp.print_event("end",ind);
+	
+	
 	
 	timer[IND_TIMER] += clock();
 

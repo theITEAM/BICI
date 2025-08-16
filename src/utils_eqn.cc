@@ -35,8 +35,10 @@ EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p, unsig
 
 	info.error = false;
 	info.emsg = basic_equation_check(info.te,_type);
-	if(info.emsg != "") info.error = true;
-		
+	if(info.emsg != ""){
+		info.emsg = "In equation '"+info.te_raw+"': "+info.emsg;
+		info.error = true;
+	}		
 	return info;
 }
 
@@ -258,8 +260,6 @@ string basic_equation_check(string &te, EqnType eqn_type)
 						}
 					}
 									
-					
-					
 					Sum su; su.dep = dep; su.i_start = ibra; su.i_end = iend+1;
 					sum.push_back(su);
 					
@@ -331,6 +331,10 @@ string basic_equation_check(string &te, EqnType eqn_type)
 					auto tex = te.substr(ist+1,i-ist-1);
 					if(type == "pop"){
 						emg = check_valid_name(tex,"population"); if(emg != "") return emg;
+						
+						if(eqn_type == REPARAM_EQN){
+							return "Reparameterisation equation cannot contain populations.";
+						}
 					}
 
 					if(type == "ie"){

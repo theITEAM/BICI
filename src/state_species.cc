@@ -14,7 +14,7 @@ using namespace std;
 #include "matrix.hh"
 
 /// Initialises the state species
-StateSpecies::StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const vector <unsigned int> &pop_affect_, Operation mode_, const double &dif_thresh) : source_sampler(sp.markov_eqn,sp.tra_gl,sp.comp_gl,details,sp.init_cond), rate_mean(details), param_val(param_val), spline_val(spline_val), eqn(eqn), param(param), param_vec(param_vec), pop(pop), sp(sp), genetic_data(genetic_data), details(details), dif_thresh(dif_thresh)
+StateSpecies::StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const vector <unsigned int> &pop_affect_, Operation mode_, const double &dif_thresh) : source_sampler(sp.markov_eqn,sp.tra_gl,sp.comp_gl,details,sp.init_cond), rate_mean(), param_val(param_val), spline_val(spline_val), eqn(eqn), param(param), param_vec(param_vec), pop(pop), sp(sp), genetic_data(genetic_data), details(details), dif_thresh(dif_thresh)
 {
 	timer.resize(STSP_TIMER_MAX,0);
 	
@@ -179,14 +179,14 @@ unsigned int StateSpecies::get_cinit_to_use(vector <unsigned int> &cinit_to_use)
 
 						
 /// Initialises individuals to be simulated
-void StateSpecies::simulate_individual_init()
+void StateSpecies::simulate_individual_init()// zz
 {
 	// Loads observation equations (using in sampling individual initial state
 	calculate_obs_eqn(seq_vec(obs_eqn_value.size()));
 	
 	auto C = sp.comp_gl.size();
 		
-	// If the initial distribution is set then work out which compartemnts been to be used
+	// If the initial distribution is set then works out which compartemnts have been used
 	vector <unsigned int> cinit_to_use;
 	auto cinit_to_use_fl = false;
 	if(sp.type == INDIVIDUAL && sp.init_cond.type != INIT_POP_NONE){
@@ -197,7 +197,7 @@ void StateSpecies::simulate_individual_init()
 			}
 		}
 	}
-	
+
 	vector <unsigned int> pop_added(C,0);
 	vector <unsigned int> unallocated;
 	
@@ -488,7 +488,7 @@ void StateSpecies::error_load_sample(unsigned int num) const
 
 
 /// Initialises based on a posterior sample
-void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies &samp_sp)
+void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies &samp_sp)//zz
 {
 	double t_end = ti_end;
 	
@@ -736,11 +736,23 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 		
 			
 			for(auto f = 0u; f < sp.fix_effect.size(); f++) set_exp_fe(f);
-		}
 		
-		ie_Amatrix_sampler_init();
-		sample_ie_Amatrix();	
-		//emsg("do");
+			ie_Amatrix_sampler_init();
+			sample_ie_Amatrix();	
+			
+			auto C = sp.comp_gl.size();
+			vector <unsigned int> pop_added(C,0);
+			for(const auto &ind : individual){
+				if(ind.ev.size() > 0){
+					const auto &ev = ind.ev[0];
+					if(ev.type == ENTER_EV && ev.tdiv == 0){
+						pop_added[ev.c_after]++;
+					}
+				}
+			}
+
+			init_cond_val.cnum = pop_added;			
+		}
 		break;
 	
 	case POPULATION:
@@ -1045,7 +1057,7 @@ void StateSpecies::ie_Amatrix_sampler_init()
 			for(auto i = 0u; i < I; i++){
 				auto name = individual[i].name;
 				auto ii = Aieg.hash_ind_list.find(name);
-				if(ii == UNSET) emsg("Cannot find individual '"+name+"' in the A matrix");
+				if(ii == UNSET) alert_input("Cannot find individual '"+name+"' in the A matrix");
 				map[i] = ii;
 			}
 			
@@ -1060,7 +1072,8 @@ void StateSpecies::ie_Amatrix_sampler_init()
 			
 			auto illegal = false;
 			iegs.A_Z = calculate_cholesky(A,illegal);
-			if(illegal) emsg("Cholesky decomposition of A matrix not possible");
+		
+			if(illegal) alert_input("Cholesky decomposition of A matrix not possible. This means that the matrix A is not positive-definite, and it is not possible model individual effects using a multivariate-normal distribution. This can happen when using the genomic relationship matrix (GRM) for A. Techniques like blending the GRM with a pedigree-based matrix or using a weighted GRM can help resolve this issue.");
 			
 			auto A_inv = invert_matrix(A);
 			tidy(A_inv);
@@ -1102,7 +1115,7 @@ vector <double> StateSpecies::calculate_omega(unsigned int g)
 	
 	auto illegal = false;
 	iegs.omega_Z = calculate_cholesky(iegs.omega,illegal);
-	if(illegal) emsg("Cholesky should not be illegal");
+	if(illegal) emsg_input("Cholesky should not be illegal");
 	
 	iegs.omega_inv = invert_matrix(iegs.omega);
 	

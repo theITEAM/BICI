@@ -66,14 +66,14 @@ double percent_done;
 ofstream progress;
 bool progress_on = false;
 
-/// Displays an error message
+/// Displays an error message which comes from an internal problem and kills otehr cores
 void emsg(const string &msg)
 {
 	if(false) throw(std::runtime_error(msg));
 	
 	cout << endl;
 	
-	display_error(msg);
+	display_error(msg,true);
 	if(false) raise(SIGABRT);
 	
 #ifdef USE_MPI
@@ -81,6 +81,7 @@ void emsg(const string &msg)
 	int num;
 	MPI_Comm_rank(MPI_COMM_WORLD,&num);
 	cout << "Error from core: " << num << endl;	
+	//MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 	exit (EXIT_FAILURE);
 	//MPI_Finalize();
 #else
@@ -89,11 +90,24 @@ void emsg(const string &msg)
 }
 
 
-/// Displays an error message (this only exits when all core reach it)
+/// Displays a human readable error message (this only exits when all core reach it)
+void alert_input(const string &msg)
+{
+	if(false) throw(std::runtime_error(msg));
+	if(op()) display_error(msg,false);
+	//else cout << "e\n";
+	if(false) raise(SIGABRT);
+	
+	end_code();
+}
+
+
+/// Displays an error message for internal problem (this only exits when all core reach it)
 void emsg_input(const string &msg)
 {
 	if(false) throw(std::runtime_error(msg));
-	if(op()) display_error(msg);
+	if(op()) display_error(msg,true);
+	//else cout << "e\n";
 	if(false) raise(SIGABRT);
 	
 	end_code();
@@ -114,9 +128,12 @@ void end_code()
 
 
 /// Displays an error message
-void display_error(string msg)
+void display_error(string msg, bool internal)
 {
 	add_full_stop(msg);
+	if(internal){
+		msg = " This is an internal error to BICI and not something you have done wrong! Please send the BICI script to Chris for diagnosis. Error generated: "+msg;
+	}
 	
 	if(com_op == true){
 		cout << "<<ERROR>>" << endl <<  msg << endl << "<<END>>" << endl;
@@ -347,7 +364,7 @@ double number(string st)
 {
 	if(allow_string(st,"-0123456789.e") == false) return UNSET;
 	
-	double val = atof(st.c_str());// zz
+	double val = atof(st.c_str());
 	if(val == 0 && trim(st) != "0" && trim(st).substr(0,3) != "0.0" && trim(st).substr(0,3) != "0.") return UNSET;
 	return val;
 }
@@ -1449,10 +1466,19 @@ string replace(string st, string st1, string st2)
 	
 	auto i = 0u;
 	while(i <= st.length()-st1.length()){
-		if(st.substr(i,st1.length()) == st1) st = st.substr(0,i)+st2+st.substr(i+st1.length());
+		if(st.substr(i,st1.length()) == st1){
+			st = st.substr(0,i)+st2+st.substr(i+st1.length());
+			i += st2.length();
+		}
 		else i++;
 	}
 	return st;
+}
+
+/// Replaces any tab characters with spaces
+void remove_tab(string &st)
+{
+	st = replace(st,"\t"," ");
 }
 
 
@@ -3195,4 +3221,19 @@ double calc_tdiv(double t, const Details &details)
 double calc_t(double tdiv, const Details &details)
 {
 	return details.t_start + tdiv*details.dt;
+}
+
+
+/// Adds algorithm warning to a list
+void add_alg_warning(string te, unsigned int sample, vector <AlgWarn> &alg_warn)
+{
+	auto i = 0u; while(i < alg_warn.size() && alg_warn[i].te != te) i++;
+	if(i < alg_warn.size()){
+		alg_warn[i].num++;
+	}
+	else{
+		AlgWarn aw;
+		aw.te = te; aw.core = core(); aw.sample = sample; aw.num = 1;
+		alg_warn.push_back(aw);
+	}
 }

@@ -150,6 +150,8 @@ class Species   	                         // Stores details of a species
 		
 		Hash hash_enter;                       // Stores enter in a hash table
 
+		vector <string> data_warning;          // Warning about data outside of range 
+		
 		void create_markov_tree();
 		unsigned int find_c(unsigned int cl, string name) const;
 		unsigned int update_c_comp(unsigned int c, unsigned int cl, unsigned int c_comp) const;
@@ -192,6 +194,7 @@ class Species   	                         // Stores details of a species
 		void init_pop_data(const DataSource &so);
 		vector < vector <double> > pop_get_percentage(const DataSource &so);
 		void add_pop_data(const DataSource &so, int sign);
+		void data_ignored(const DataSource &so);
 		void set_add_rem_pop_change();
 		void add_ind_data(const DataSource &so);
 		void remove_ind_data(const DataSource &so);

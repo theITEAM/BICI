@@ -40,7 +40,7 @@ class StateSpecies                         // Stores information about the state
 		// USED IN OBSERVATION MODELS
 		vector <double> pop_data_num;          // Values at pop data measurements ([pop meas])
 		vector <double> pop_trans_data_num;    // Values at pop trans data meas. ([pop trans meas])
-		vector < vector <double> > pop_data_cgl;// Populations at data measurements ([pd meas][clgl])
+		vector < vector <double> > pop_data_cgl;      // Populations at data measurements ([pd meas][clgl])
 		vector < vector <double> > pop_trans_data_tgl;// Transitions at data measurements ([td meas][trgl])
 		
 		vector <double> obs_eqn_value;         // Observation equation values (e.g. Se)
@@ -80,6 +80,8 @@ class StateSpecies                         // Stores information about the state
 		vector <SimTrigEventDiv> trig_div;     // Stores future non-Markovian events
 		
 		vector <double> timer;                 // General purpose timers
+		
+		vector <AlgWarn> alg_warn;             // Stores any algorithm warnings
 		
 		StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const vector <unsigned int> &pop_affect, Operation mode, const double &dif_thresh);
 	
@@ -194,6 +196,7 @@ class StateSpecies                         // Stores information about the state
 		void check_event() const;
 		void check_erlang() const;
 		void check_trans_num_neg() const;
+		void add_alg_warn(string te);
 		string check_prior(const Equation &eq) const;
 		
 		const vector <double> &param_val;      // Quantities reference from state
@@ -248,7 +251,7 @@ class StateSpecies                         // Stores information about the state
 		double nm_single_obs_dprob(unsigned int cl, const Individual &ind) const;
 		
 		double sum_markov_prob(double t1, double t2, unsigned int c, unsigned int tr_gl, unsigned int i, vector < vector <double> > &en) const;
-		void calc_trans_diag(ParticleSpecies &ps, const vector < vector <double> > &popnum_t) const;
+		void calc_trans_diag(ParticleSpecies &ps, const vector < vector <double> > &popnum_t);
 		void add_nm_prob(unsigned tr_gl_or, double t1, ParticleSpecies &ps, const vector < vector <double> > &popnum_t, const Individual &ind) const;
 		void add_nm_cpd(unsigned tr_gl_or, double t1, double t2, ParticleSpecies &ps, const vector < vector <double> > &popnum_t, const Individual &ind) const;
 	

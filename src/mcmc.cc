@@ -44,7 +44,7 @@ MCMC::MCMC(const Model &model, Output &output, Mpi &mpi) : model(model), output(
 	for(auto ch = 0u; ch < num_per_core; ch++){
 		chain.push_back(Chain(nburnin,nsample,model,output));
 	}
-	
+
 	for(auto &ch : chain) ch.state.init();
 }
  

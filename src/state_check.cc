@@ -15,6 +15,8 @@ using namespace std;
 /// Checks for any transition numbers becoming negative
 void State::check_trans_num(string ref)
 {
+	check_timer[CHECK_TRANS_NUM] -= clock();
+	
 	for(auto p = 0u; p < model.species.size(); p++){	
 		const auto &sp = model.species[p]; 
 		auto &ssp = species[p];
@@ -27,12 +29,16 @@ void State::check_trans_num(string ref)
 			}
 		}
 	}
+	
+	check_timer[CHECK_TRANS_NUM] += clock();
 }
 
 
 /// Performs a simple check
 void State::check_simp(string ref)
 {
+	check_timer[CHECK_SIMP] -= clock();
+	
 	for(auto p = 0u; p < model.species.size(); p++){	
 		const auto &sp = model.species[p]; 
 		auto &ssp = species[p];
@@ -110,6 +116,8 @@ void State::check_simp(string ref)
 			}
 		}
 	}
+	
+	check_timer[CHECK_SIMP] += clock();
 }
 
 
@@ -179,6 +187,8 @@ void State::check(string ref)
 /// Checks that dependent parameters are correctly set
 void State::check_dependent_param(string ref)
 {
+	check_timer[CHECK_DEP_PARAM] -= clock();
+	
 	for(auto th = 0u; th < model.param_vec.size(); th++){	
 		const auto &pv = model.param_vec[th];
 		if(pv.variety == REPARAM_PARAM){
@@ -192,12 +202,16 @@ void State::check_dependent_param(string ref)
 			}
 		}
 	}
+	
+	check_timer[CHECK_DEP_PARAM] += clock();
 }
 
 
 /// Checks references between markov_eqn_vari, ind.ev and nm_trans
 void State::check_ref(unsigned int p, string refst)
 {
+	check_timer[CHECK_REF] -= clock();
+	
 	const auto &sp = model.species[p];
 	auto &ssp = species[p];
 	auto dt = model.details.dt;
@@ -427,12 +441,16 @@ void State::check_ref(unsigned int p, string refst)
 			}
 		}
 	}
+	
+	check_timer[CHECK_REF] += clock();
 }
 
 
 // Checks the likelihood is correctly specified
 void State::check_markov_trans(unsigned int p, string ref)
 {
+	check_timer[CHECK_MARKOV] -= clock();
+	
 	const auto &sp = model.species[p]; 
 	auto &ssp = species[p];
 
@@ -569,12 +587,16 @@ void State::check_markov_trans(unsigned int p, string ref)
 			}
 		}
 	}
+	
+	check_timer[CHECK_MARKOV] += clock();
 }
 
 
 /// Checks likelihoods for non-Markovian transitions
 void State::check_nm_trans(unsigned int p, string ref)
 {
+	check_timer[CHECK_NM] -= clock();
+	
 	const auto &sp = model.species[p];
 	
 	auto all_vec = seq_vec(T);
@@ -620,12 +642,16 @@ void State::check_nm_trans(unsigned int p, string ref)
 			}
 		}
 	}
+	
+	check_timer[CHECK_NM] += clock();
 }
 
 
 // Checks the quantities in "like" are correctly specified
 void State::check_like(string ref)
 {
+	check_timer[CHECK_LIKE] -= clock();
+	
 	if(std::isnan(like.init_cond)) emsg("init_cond nan");
 	if(std::isnan(like.init_cond_prior)) emsg("init_cond_prior nan");
 	if(std::isnan(like.obs)) emsg("obs nan");
@@ -717,12 +743,16 @@ void State::check_like(string ref)
 	if(std::isnan(like.genetic_process)) emsg("genetic_process nan");
 	if(std::isnan(like.genetic_obs)) emsg("genetic_obs nan");
 	if(std::isnan(like.ie)) emsg("ie nan");
+	
+	check_timer[CHECK_LIKE] += clock();
 }
 
 
 /// Checks the splines are correctly specified
 void State::check_spline(string ref)
-{	
+{
+	check_timer[CHECK_SPLINE] -= clock();
+	
 	auto spline_val_st = spline_val;
 	if(spline_val.size() != model.spline.size()) emsg("Wrong size1 "+ref);
 			
@@ -737,12 +767,16 @@ void State::check_spline(string ref)
 			}
 		}
 	}
+	
+	check_timer[CHECK_SPLINE] += clock();
 }
 
 
 /// Checks that priors are correctly specified
 void State::check_prior(string ref)
 {
+	check_timer[CHECK_PRIOR] -= clock();
+	
 	// Checks prior_prob is correct
 	auto prior_prob_st = prior_prob;
 	prior_prob = model.prior_prob(param_val);
@@ -769,12 +803,16 @@ void State::check_prior(string ref)
 			add_alg_warn("Spline Prior probability wrong");
 		}
 	}
+	
+	check_timer[CHECK_PRIOR] += clock();
 }
 
 
 /// Checks that popnum_t is correctly specified
 void State::check_popnum_t(string ref)
 {
+	check_timer[CHECK_POP] -= clock();
+	
 	auto popnum_t_store = popnum_t;
 	
 	popnum_t = model.calculate_popnum_t(species);
@@ -793,12 +831,16 @@ void State::check_popnum_t(string ref)
 			}
 		}
 	}
+	
+	check_timer[CHECK_POP] += clock();
 }
 
 
 /// Checks that popnum_t is correctly specified
 void State::check_popnum_t2(string ref)
 {
+	check_timer[CHECK_POP2] -= clock();
+	
 	auto popnum_t_store = popnum_t;
 	
 	popnum_t = model.calculate_popnum_t(species);
@@ -818,12 +860,16 @@ void State::check_popnum_t2(string ref)
 		}
 	}
 	popnum_t = popnum_t_store; 
+	
+	check_timer[CHECK_POP2] += clock();
 }
 
 
 /// Checks that cpop_st is correctly set	
 void State::check_cpop_st(string ref)
 {
+	check_timer[CHECK_CPOP] -= clock();
+	
 	for(auto p = 0u; p < model.nspecies; p++){
 		auto &sp = model.species[p];
 		auto &ssp = species[p];
@@ -834,21 +880,20 @@ void State::check_cpop_st(string ref)
 				auto C = sp.comp_gl.size();
 				
 				vector <double> cpop(C,0); 
-
 				switch(sp.init_cond.type){
 				case INIT_POP_FIXED: case INIT_POP_DIST:
 					{		
 						for(auto c = 0u; c < C; c++){
 							cpop[c] = double(ssp.init_cond_val.cnum[c]);
 						}
-						
+					
 						ssp.set_ind_sim_c(0);
 						vector <double> cpo(C,0);
 						for(auto i = 0u; i < ssp.individual.size(); i++){
 							auto c = ssp.ind_sim_c[i];
 							if(c != UNSET) cpo[c]++;
 						}
-								
+						
 						for(auto c = 0u; c < C; c++){
 							if(cpop[c] != cpo[c]){
 								emsg("error init_cond_valh "+ref);
@@ -872,32 +917,40 @@ void State::check_cpop_st(string ref)
 			break;
 		}
 	}
+	
+	check_timer[CHECK_CPOP] += clock();
 }
 
 
 /// Checks likelihoods for individual effect
 void State::check_ie(unsigned int p, string ref)
 {
+	check_timer[CHECK_IE] -= clock();
+	
 	auto &sp = model.species[p];
 	auto &ssp = species[p];
 
 	for(auto g = 0u; g < sp.ind_eff_group.size(); g++){
 		const auto &iesg = ssp.ind_eff_group_sampler[g];
-		auto iesg_store = iesg;
+		//auto iesg_store = iesg;
 		
+		auto omega_store =  iesg.omega;
+		auto omega_Z_store =  iesg.omega_Z;
+		auto omega_inv_store =  iesg.omega_inv;
+
 		ssp.calculate_omega(g);
 		
-		if(dif(iesg_store.omega,iesg.omega,dif_thresh)){
+		if(dif(omega_store,iesg.omega,dif_thresh)){
 			//print("om store",iesg_store.omega); print("om2",iesg.omega);
 			add_alg_warn("Omega problem");
 		}
 		
-		if(dif(iesg_store.omega_Z, iesg.omega_Z,dif_thresh)){
+		if(dif(omega_Z_store, iesg.omega_Z,dif_thresh)){
 			add_alg_warn("Omega_Z problem");
 		}
 		
 		if(model.mode == INF){
-			if(dif(iesg_store.omega_inv,iesg.omega_inv,dif_thresh)){
+			if(dif(omega_inv_store,iesg.omega_inv,dif_thresh)){
 				add_alg_warn("Omega_inv problem");
 			}
 		}	
@@ -910,12 +963,16 @@ void State::check_ie(unsigned int p, string ref)
 			add_alg_warn("L_ie problem"+ref);
 		}
 	}
+	
+	check_timer[CHECK_IE] += clock();
 }
 
 
 // Checks the population likelihood is correct
 void State::check_pop_like(unsigned int p, string ref)
 {
+	check_timer[CHECK_POP_LIKE] -= clock();
+	
 	auto &sp = model.species[p];
 	auto &ssp = species[p];
 	
@@ -940,12 +997,16 @@ void State::check_pop_like(unsigned int p, string ref)
 			}
 		}
 	}
+	
+	check_timer[CHECK_POP_LIKE] += clock();
 }
 
 
 /// Checks all the maps are correcly set
 void State::check_maps(string ref)
 {
+	check_timer[CHECK_MAPS] -= clock();
+	
 	if(pop_list.size() != 0) emsg("pop list"+ref);
 	if(markov_eqn_list.size() != 0) emsg("markov_eqn_list");
 	if(trans_list.size() != 0) emsg("trans_list");
@@ -981,12 +1042,16 @@ void State::check_maps(string ref)
 			break;
 		}
 	}
+	
+	check_timer[CHECK_MAPS] += clock();
 }
 
 
 /// Checks that the "Observed" property of individual events is correctly set
 void State::check_event_observed(unsigned int p, string ref)
 {
+	check_timer[CHECK_EV_OBS] -= clock();
+	
 	auto &ssp = species[p];
 	auto individual_store = ssp.individual;
 	
@@ -1000,12 +1065,16 @@ void State::check_event_observed(unsigned int p, string ref)
 			}
 		}
 	}
+	
+	check_timer[CHECK_EV_OBS] += clock();
 }
 
 
 /// Checks that the observation likelihood is correctly specified
 void State::check_obs_like(unsigned int p, string ref)
 {
+	check_timer[CHECK_OBS_LIKE] -= clock();
+	
 	auto &sp = model.species[p];
 	auto &ssp = species[p];
 
@@ -1109,19 +1178,26 @@ void State::check_obs_like(unsigned int p, string ref)
 		}	
 		emsg("obs_trans_eqn_num error "+ref);		
 	}
+	
+	check_timer[CHECK_OBS_LIKE] += clock();
 }
 
 
 /// Checks that the initial condition likelihood is correctly specified
 void State::check_init_cond_like(unsigned int p, string ref)
 {
+	check_timer[CHECK_IC] -= clock();
+	
 	auto &sp = model.species[p];
 	auto &ssp = species[p];
 	
 	const auto &ic = sp.init_cond;
 	auto &icv = ssp.init_cond_val;
 
-	if(ic.type != INIT_POP_DIST) return;
+	if(ic.type != INIT_POP_DIST){
+		check_timer[CHECK_IC] += clock();
+		return;
+	}
 
 	auto foc_cl = ic.focal_cl;
 
@@ -1216,6 +1292,8 @@ void State::check_init_cond_like(unsigned int p, string ref)
 	if(dif(Li_init_cond_store,ssp.Li_init_cond,dif_thresh)){
 		add_alg_warn("Li_init_cond error"+ref);
 	}
+	
+	check_timer[CHECK_IC] += clock();
 }
 
 /// Checks that the initial condition likelihood is correctly specified
@@ -1233,6 +1311,8 @@ void State::check_init_cond_prior(string ref)
 /// Checks that the linearised version of the equations give the same as non-linearised
 void State::check_linearise()
 {
+	check_timer[CHECK_LIN] -= clock();
+	
 	auto ti = (unsigned int)(ran()*T);
 
 	const auto &popnum = popnum_t[ti];
@@ -1252,6 +1332,8 @@ void State::check_linearise()
 			}
 		}
 	}
+	
+	check_timer[CHECK_LIN] += clock();
 }
 
 
@@ -1272,9 +1354,14 @@ void State::check_spline_store(string ref)
 /// Checks that quantities in genetic_value are correctly specified
 void State::check_genetic_value(string ref)
 {
+	check_timer[CHECK_GEN] -= clock();
+	
 	const auto &gen_data = model.genetic_data;
 
-	if(model.trans_tree == false) return;
+	if(model.trans_tree == false){
+		check_timer[CHECK_GEN] += clock();
+		return;
+	}
 
 	if(gen_data.on){                                 // Checks mutation rate 
 		auto mut_rate_store = genetic_value.mut_rate;
@@ -1838,14 +1925,17 @@ void State::check_genetic_value(string ref)
 			}
 		}
 	}
+	
+	timer[CHECK_GEN] += clock();
 }
 
 
 /// CHecks that popnum_ind is correctly specified
 void State::check_popnum_ind(string ref)
 {
+	check_timer[CHECK_POP_IND] -= clock();
+	
 	auto popnum_ind_store = popnum_ind;
-	auto species_store = species;
 	
 	calculate_popnum_ind();
 	
@@ -1887,12 +1977,16 @@ void State::check_popnum_ind(string ref)
 			}
 		}
 	}
+	
+	check_timer[CHECK_POP_IND] += clock();
 }
 
 
 /// Checks that add rem and move events are strictly followed
 void State::check_add_move_rem(string ref)
 {
+	check_timer[CHECK_ADD_REM] -= clock();
+	
 	for(auto p = 0u; p < species.size(); p++){
 		const auto &sp = model.species[p];
 		const auto &ssp = species[p];
@@ -1969,6 +2063,8 @@ void State::check_add_move_rem(string ref)
 			}
 		}
 	}
+	
+	check_timer[CHECK_ADD_REM] += clock();
 }
 
 
@@ -2031,6 +2127,8 @@ void State::scan_variable(string name, double min, double max)
 /// Checks if individual or fixed effect are too large or small
 void State::check_effect_out_of_range()
 {
+	check_timer[CHECK_RANGE] -= clock();
+	
 	string ty = "value"; if(model.mode == INF) ty = "prior";
 		
 	for(auto p = 0u; p < model.species.size(); p++){	
@@ -2067,6 +2165,8 @@ void State::check_effect_out_of_range()
 			}
 		}
 	}
+	
+	check_timer[CHECK_RANGE] += clock();
 }
 
 
@@ -2110,13 +2210,5 @@ void State::check_neg_rate(string name)
 /// Adds an algorithm warning
 void State::add_alg_warn(string te)
 {
-	auto i = 0u; while(i < alg_warn.size() && alg_warn[i].te != te) i++;
-	if(i < alg_warn.size()){
-		alg_warn[i].num++;
-	}
-	else{
-		AlgWarn aw;
-		aw.te = te; aw.core = core(); aw.sample = sample; aw.num = 1;
-		alg_warn.push_back(aw);
-	}
+	add_alg_warning(te,sample,alg_warn);
 }

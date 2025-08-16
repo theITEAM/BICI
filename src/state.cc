@@ -30,6 +30,7 @@ void State::init()
 	timer.resize(TIMER_MAX,0);
 	update_timer.resize(AFFECT_MAX,0);
 	restore_timer.resize(AFFECT_MAX,0);
+	check_timer.resize(CHECK_MAX,0);
 
 	spline_val.clear();
 	spline_val.resize(model.spline.size());
@@ -98,8 +99,8 @@ void State::post_sim(const vector <double> &param_value, const Sample &samp)
 	auto t_start = model.details.ppc_t_start;
 	
 	auto t_end = model.details.ppc_t_end;
-	auto ti_start = get_ti(t_start);
-	auto ti_end = get_ti(t_end);
+	auto ti_start = get_ti(calc_tdiv(t_start,model.details));
+	auto ti_end = get_ti(calc_tdiv(t_end,model.details));
 	
 	for(auto p = 0u; p < model.species.size(); p++){
 		auto &ssp = species[p];
@@ -337,7 +338,7 @@ vector <double> State::calculate_df(const DerFunc &df) const
 									auto val = pos.weight/sum;
 									
 									inf_period[i][k].num_inf += val;
-									inf_period[i][k].num_inf_t += val*(t-inf_period[i][k].start);
+									inf_period[i][k].num_inf_t += val*(t-inf_period[i][k].start)*dt;
 								}					
 							}
 						}
@@ -371,7 +372,7 @@ vector <double> State::calculate_df(const DerFunc &df) const
 					num[ti] += wi;
 					
 					for(auto tii = ti+1; tii < ti_end; tii++){
-						auto w = ww*dt;
+						auto w = ww;
 						vec[tii] += val*w;
 						num[tii] += w;
 					}
@@ -1409,7 +1410,7 @@ void State::resample_ind(bool do_pl)
 
  
 /// Generates a particle from the state
-Particle State::generate_particle(unsigned int s, unsigned int chain, bool store_state) const
+Particle State::generate_particle(unsigned int s, unsigned int chain, bool store_state)
 {
 	Particle part;
 	part.s = s; part.chain = chain;
@@ -1418,7 +1419,7 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 	part.dir_out = derive_calculate();
 	
 	for(auto p = 0u; p < species.size(); p++){
-		const auto &ssp = species[p];
+		auto &ssp = species[p];
 		ParticleSpecies part_sp;
 		part_sp.init_cond_val = ssp.init_cond_val;
 		

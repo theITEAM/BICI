@@ -67,7 +67,7 @@ void Input::check_initial_pop_error(bool end)
 		case PPC:
 			break;
 			
-		default: alert_import("Should not be default3a"); return;
+		default: emsg_input("Should not be default3a"); return;
 		}
 	}
 }
@@ -84,7 +84,7 @@ void Input::data_source_check_error(const DataSource &ds)
 			for(auto r = 0u; r < tab.nrow; r++){
 				auto result = check_element(ds,r,c);
 				if(result != ""){
-					string te = in_file_text(tab.file);
+					auto te = in_data_source(ds); 
 					te += " the element '"+tab.ele[r][c]+"' (col '"+tab.heading[c]+"', row "+tstr(r+2)+") has the following error: "+result;
 					alert_import(te);
 					return;
@@ -99,7 +99,7 @@ void Input::data_source_check_error(const DataSource &ds)
 			auto sta_str = tab.ele[r][0], end_str = tab.ele[r][1];
 			auto sta = number(sta_str), end = number(end_str);
 			if(sta >= end){
-				alert_import(in_file_text(tab.file)+" on row "+tstr(r+2)+", the start time '"+sta_str+"' must be less than the end time '"+end_str+"'.");
+				alert_import(in_data_source(ds)+" on row "+tstr(r+2)+", the start time '"+sta_str+"' must be less than the end time '"+end_str+"'.");
 				return;
 			}
 		}
@@ -135,20 +135,18 @@ string Input::check_element(const DataSource &ds, unsigned int r, unsigned int c
 				case TRANS_DATA:	
 					if(ds.time_start != UNSET){
 						if(num <= ds.time_start || num >= ds.time_end){
-							return "Time '"+te+"' must be between the start and end times";
-						}
-					}
-					else{
-						if(num <= model.details.t_start || num >= model.details.t_end){
-							return "Time '"+te+"' must be between the start and end times";
+							return "Time '"+te+"' must be between the observation start and end times";
 						}
 					}
 					break;
 				
-				default:
+				case ADD_IND:
 					if(num < model.details.t_start || num > model.details.t_end){
 						return "Time '"+te+"' must be between the start and end times";
 					}
+					break;
+					
+				default:
 					break;
 				}
 			}
@@ -439,7 +437,7 @@ void Input::check_reparam_time()
 							alert_import("The reparamerised parameter '"+par.full_name+"' element '"+eqi.te_raw+"' should not contain populations.");
 						}
 						else{
-							alert_import("The reparamerised parameter '"+par.full_name+"' element '"+eqi.te_raw+"' should not contain contain time variation.");
+							alert_import("The reparamerised parameter '"+par.full_name+"' element '"+eqi.te_raw+"' should not contain time variation.");
 						}
 					}
 				}
@@ -450,41 +448,42 @@ void Input::check_reparam_time()
 
 
 /// Checks the name is valid
-bool Input::check_name_input(string name, string te, bool sup_not_allow) 
+void Input::check_name_input(string name, string te, bool sup_not_allow) 
 {
 	if(name.length() > name_ch_max){
-		alert_import(te+" '"+name+"' cannot be more than "+tstr(name_ch_max)+" characters");
+		alert_import(te+" '"+name+"' cannot be more than "+tstr(name_ch_max)+" characters",true);
+		return;
 	}
 	
 	vector <string> invalid_name = {"Compartment","Population","Alpha","Distribution","file"};
 	
 	for(auto i = 0u; i < invalid_name.size(); i++){
 		if(toLower(name) == toLower(invalid_name[i])){
-			alert_import(te+" cannot use reserved word '"+name+"'"); 
+			alert_import(te+" cannot use reserved word '"+name+"'",true); 
+			return;
 		}
 	}
 	
 	for(auto i = 0u; i < name.length(); i++){
 		auto ch = name.substr(i,1);
 		if(includes(name_notallow,ch)){
-			alert_import(te+" '"+name+"' cannot use the character '"+ch+"'");
-			return true;
+			if(ch == " ") alert_import(te+" '"+name+"' cannot contain any spaces",true);
+			else alert_import(te+" '"+name+"' cannot use the character '"+ch+"'",true);
+			return;
 		}
 		
 		if(str_eq(name,i,sigma)){
-			alert_import(te+" '"+name+"' cannot use the character '"+sigma+"'");
-			return true;
+			alert_import(te+" '"+name+"' cannot use the character '"+sigma+"'",true);
+			return;
 		}
 		
 		if(sup_not_allow){
 			if(ch == "^"){
-				alert_import(te+" '"+name+"' cannot contain the superscript character '"+ch+"'");
-				return true;
+				alert_import(te+" '"+name+"' cannot contain the superscript character '"+ch+"'",true);
+				return;
 			}
 		}
 	}
-	
-	return false;
 }
 
 
@@ -522,19 +521,25 @@ bool Input::is_Color(string color) const
 /// Calls when cannot find a compartment in 
 void Input::cannot_find_trans_comp(string te, unsigned int p, unsigned int cl, string co)
 {
+	
 	string st = "In transition '"+te+"' cannot find compartment '"+co+"'";
 	
-	const auto &sp = model.species[p];
-	if(sp.ncla > 1) st += " in classification '"+sp.cla[cl].name+"'";
-	st += ".";
-	
-	for(auto cl2 = 0u; cl2 < sp.ncla; cl2++){
-		if(cl2 != cl){
-			auto c = find_c(p,cl2,co);
-			if(c != UNSET){
-				st += " Perhaps this transition should be placed in classification '"+sp.cla[cl2].name+"'?";
+	if(co == ""){
+		st = "In transition '"+te+"' the initial and final compartment aren't specified";
+	}
+	else{
+		const auto &sp = model.species[p];
+		if(sp.ncla > 1) st += " in classification '"+sp.cla[cl].name+"'";
+		st += ".";
+		
+		for(auto cl2 = 0u; cl2 < sp.ncla; cl2++){
+			if(cl2 != cl){
+				auto c = find_c(p,cl2,co);
+				if(c != UNSET){
+					st += " Perhaps this transition should be placed in classification '"+sp.cla[cl2].name+"'?";
+				}
 			}
-		}
+		}	
 	}
 	
 	alert_import(st); 

@@ -147,7 +147,7 @@ void Chain::pas_burn_update_run(unsigned int s)
 {
 	burn_info.add_L(like_total_obs()); 
 	
-	burn_info.pas_setup_run(s,nburnin,nsample,model.details);
+	burn_info.pas_setup_run(s,nburnin);
 	
 	if(burn_info.on){
 		cor_matrix.add_sample(state.get_param_val_prop(),cor_matrix.n*0.33);
@@ -389,7 +389,7 @@ void BurnInfo::pas_setup(unsigned int s, unsigned int g, unsigned int gen_update
 
 
 /// Sets up quantities during the burn-in phase
-void BurnInfo::pas_setup_run(unsigned int s, unsigned int &nburnin,  unsigned int &nsample, const Details &details)
+void BurnInfo::pas_setup_run(unsigned int s, unsigned int &nburnin)
 {
 	phi = 1;
 	dprob_suppress = false;
@@ -501,7 +501,7 @@ void Chain::update(unsigned int s)
 			if(pl) state.check(" After prop check");
 			if(pl) state.check_popnum_t2("hhh");
 			
-			state.check_neg_rate(pro.name);
+			//state.check_neg_rate(pro.name);
 		}
 	}
 	
@@ -944,13 +944,26 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 {                    
 	stringstream ss;
 	
-	if(state.alg_warn.size() > 0){
+	auto num = state.alg_warn.size();
+	for(const auto &ssp : state.species) num += ssp.alg_warn.size();
+	
+	if(num > 0){
 		ss << ALG_WARN << ":" << endl;
 		for(const auto &aw : state.alg_warn){
 			ss << aw.te << " (core: " << aw.core << ", sample: ";
 			if(aw.sample == UNSET) ss << "unset"; else ss << aw.sample;
 			ss << ", number: " << aw.num << ")" << endl;
 		}
+		
+		for(auto p = 0u; p < model.species.size(); p++){
+			const auto &ssp = state.species[p];
+			if(ssp.alg_warn.size() > 0){
+				ss << "Warning in species " << model.species[p].name << endl;
+				for(const auto &aw : ssp.alg_warn){
+					ss << aw.te << " (core: " << aw.core << ", number: " << aw.num << ")" << endl;
+				}
+			}
+		}		
 		ss << endl;
 	}
 	
@@ -1033,6 +1046,20 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 		}
 
 	  ss << endl;
+		ss << banner("CHECKING") << endl;
+		ss << "Shows how run-time CPU checking time is distributed:" << endl << endl;
+		auto ttot = state.timer[CHECK_TIMER];
+		auto fl = false;
+		for(auto j = 0u; j < CHECK_MAX-1; j++){
+			auto t = state.check_timer[j];
+			if(t > 0.00*ttot){
+				if(fl == true) ss << ", ";
+				ss << check_name[j] << " "  << cpu_percent(t,ttot);
+				fl = true;
+			}
+		}
+		ss << endl << endl;
+		
 		ss <<  "Total CPU time: " << tstr(total_time/CLOCKS_PER_SEC,2) << " seconds" << endl;
 	
 		ss << endl << endl;
@@ -1111,34 +1138,6 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 			ss << endl;
 		}
 	}
-	
-	
-
-	/*
-	for(const auto &ssp : state.species){
-		ss << "Markov " << cpu_percent(ssp.timer[MARKOV_TIMER],total_time) << endl;
-		ss << "Linear " << cpu_percent(ssp.timer[LINEAR_TIMER],total_time) << endl;
-		ss << "Linear zero " << cpu_percent(ssp.timer[LINEARZERO_TIMER],total_time) << endl;
-		ss << "Linear nopop " << cpu_percent(ssp.timer[LINEARNOPOP_TIMER],total_time) << endl;
-		ss << "Splinechange " << cpu_percent(ssp.timer[SPLINECHANGE_TIMER],total_time) << endl;
-		ss << "Splinechangegrad " << cpu_percent(ssp.timer[SPLINECHANGEGRAD_TIMER],total_time) << endl;
-	}
-	*/
-	
-	
-	/*
-	ss <<  "Gen dif CPU  time: " << cpu_percent(state.timer[GEN_DIF_TIMER],total_time) << endl;
-	ss <<  "trans tree like CPU  time: " << cpu_percent(state.timer[TRANS_TREE_LIKE_TIMER],total_time) << endl;
-	ss <<  "genetic proc like CPU  time: " << cpu_percent(state.timer[GENETIC_PROC_LIKE_TIMER],total_time) << endl;
-	ss <<  "genetic obs like CPU  time: " << cpu_percent(state.timer[GENETIC_OBS_LIKE_TIMER],total_time) << endl;
-	
-
-	
-	ss <<  "Update sampler: " << cpu_percent(state.timer[UPDATE_SAMPLER_TIMER],total_time) << endl;
-
-	ss <<  "Restore ind: " << cpu_percent(state.timer[RESTORE_TIMER],total_time) << endl;
-	ss << endl;
-	*/
 	
 	ss << endl;
 

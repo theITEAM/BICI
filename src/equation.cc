@@ -166,10 +166,10 @@ void Equation::check_opl(const vector <EqItemList> &opl) const
 	auto op = create_op_from_opl(opl);
 	for(auto i = 0u; i < op.size(); i++){
 		if(op[i].type == POWERFUNC){
-			if(i+5 >= op.size()) emsg("op prob3");
-			if(op[i+1].type != LEFTBRACKET) emsg("op prob1");
-			if(op[i+3].type != FUNCDIVIDE) emsg("op prob2");
-			if(op[i+5].type != RIGHTBRACKET) emsg("op prob2");
+			if(i+5 >= op.size()) emsg_input("op prob3");
+			if(op[i+1].type != LEFTBRACKET) emsg_input("op prob1");
+			if(op[i+3].type != FUNCDIVIDE) emsg_input("op prob2");
+			if(op[i+5].type != RIGHTBRACKET) emsg_input("op prob2");
 		}
 	}
 }
@@ -287,18 +287,18 @@ void Equation::print_operations(const vector <EqItem> &op) const
       case PARAMETER: 
 				{
 					const auto &pr = param_ref[op[i].num];
-					cout << param[pr.th].name << pr.index;
+					cout << add_escape_char(param[pr.th].name) << pr.index;
 				}
 				break;
 				
 			case PARAMVEC:
-				emsg("Should not be param vec"); 
+				emsg_input("Should not be param vec"); 
 				break;
 				
 			case SPLINE:
 				{
 					const auto &pr = param_ref[op[i].num];
-					cout << "Spline " << param[pr.th].name << pr.index;
+					cout << "Spline " << add_escape_char(param[pr.th].name) << pr.index;
 				}
 				break;
 			
@@ -310,7 +310,7 @@ void Equation::print_operations(const vector <EqItem> &op) const
 				}
 				break;
 				
-			case SPLINEREF: emsg("spline ref should not"); break;
+			case SPLINEREF: emsg_input("spline ref should not"); break;
 			case IE: cout << species[sp_p].ind_effect[op[i].num].name; break;
 			case ONE: cout << "1"; break;
 			case FE: cout << species[sp_p].fix_effect[op[i].num].name; break;
@@ -346,7 +346,7 @@ void Equation::print_operations(const vector <EqItem> &op) const
 /// Prints steps used for a calculation
 void Equation::print_calculation() const   
 {
-	cout << "For equation '" << te_raw << "' calculation:" << endl;
+	cout << "For equation '" << add_escape_char(te_raw) << "' calculation:" << endl;
 
   for(auto i = 0u; i < calcu.size(); i++){
 		print_ca(i,calcu[i]);
@@ -384,7 +384,7 @@ void Equation::print_ca(unsigned int i, const Calculation &ca) const
 	case TAKE: break;
 	case MULTIPLY: break;
 	case DIVIDE: break;
-	default: emsg("Eq problem1"); break;
+	default: emsg_input("Eq problem1"); break;
 	}
 		 
 	for(auto j = 0u; j < ca.item.size(); j++){
@@ -400,7 +400,7 @@ void Equation::print_ca(unsigned int i, const Calculation &ca) const
 		case PARAMETER: 
 			{
 				const auto &pr = param_ref[it.num];
-				cout << param[pr.th].name << pr.index;
+				cout << add_escape_char(param[pr.th].name) << pr.index;
 			}
 			break;
 			
@@ -412,7 +412,7 @@ void Equation::print_ca(unsigned int i, const Calculation &ca) const
 			{
 				const auto &pr = param_ref[it.num];
 				auto par = param[pr.th]; 
-				cout << "Spline " << get_param_name_with_dep(par,par.dep,pr.index);
+				cout << "Spline " << add_escape_char(get_param_name_with_dep(par,par.dep,pr.index));
 			}
 			break;
 			
@@ -447,7 +447,7 @@ void Equation::print_ca(unsigned int i, const Calculation &ca) const
 			}
 			break;
 		case TIME: cout << "time"; break;
-		default: emsg("Eq problem2a"); break;
+		default: emsg_input("Eq problem2a"); break;
 		}
 		
 		if(j != ca.item.size()-1){
@@ -532,7 +532,7 @@ void Equation::unravel_sum()
 				auto dist = trim(te.substr(di.iend,ibra-(di.iend)));
 				if(dist != ""){
 					auto spl = split(dist.substr(1,dist.length()-2),',');
-					if(spl.size() != 2) emsg("Split prob");
+					if(spl.size() != 2) emsg_input("Split prob");
 					
 					comp_max = trim(spl[0]);			
 					distmax = number(spl[1]);
@@ -617,7 +617,7 @@ void Equation::unravel_sum()
 						if(res.warn != ""){ warn = res.warn; return;}
 						if(cont_new != cont_new_ch){
 							cout << cont_new << " " << cont_new_ch << " compare" << endl; 
-							emsg("Swap index dif res");
+							emsg_input("Swap index dif res");
 						}
 					}
 					
@@ -655,7 +655,7 @@ vector <string> Equation::find_list_from_index(string ind, double dist_max, stri
 
 	if(dist_max != UNSET){
 		if(comp_max == ""){
-			emsg("Error with 'max' function. The compartment isn't specified");
+			emsg_input("Error with 'max' function. The compartment isn't specified");
 		}
 		
 		for(auto p = 0u; p < species.size(); p++){
@@ -669,7 +669,7 @@ vector <string> Equation::find_list_from_index(string ind, double dist_max, stri
 					for(c = 0u; c < comp.size(); c++){
 						if(comp[c].name == comp_max) break;
 					}
-					if(c == comp.size()) emsg("Could not find compartment '"+comp_max+"'");
+					if(c == comp.size()) emsg_input("Could not find compartment '"+comp_max+"'");
 					
 					for(auto cc = 0u; cc < comp.size(); cc++){
 						auto d = find_dist(c,cc,comp,claa.coord); 
@@ -679,7 +679,7 @@ vector <string> Equation::find_list_from_index(string ind, double dist_max, stri
 				}
 			}	
 		}
-		emsg("Could not find");
+		emsg_input("Could not find");
 	}
 					
 	for(auto p = 0u; p < nspecies; p++){
@@ -756,7 +756,12 @@ ParamRef Equation::get_param_name(unsigned int i, double &dist, unsigned int &ra
 					dist = get_distance(pp);
 				}
 				else{
-					warn = "Could not find parameter '"+name+"'"; return pref;
+					if(name == iden_matrix_name || name == iden_matrix_name2){
+						dist = get_identity(pp);
+					}
+					else{
+						warn = "Could not find parameter '"+name+"'"; return pref;
+					}
 				}
 			}
 			
@@ -1369,7 +1374,7 @@ vector <EqItem> Equation::extract_operations()
 									auto &par = param[pref.th];
 									
 									if(par.time_dep == true){
-										if(par.spline_info.on != true) emsg("Spline should be on");
+										if(par.spline_info.on != true) emsg_input("Spline should be on");
 										item.type = SPLINE;
 									}							
 									else item.type = PARAMETER; 
@@ -1409,21 +1414,24 @@ vector <EqItem> Equation::extract_operations()
 											{
 												EqItem item2; item2.type = MULTIPLY; op.push_back(item2); 
 											}
-											item.type = SPLINE; 
-											auto &pr = param_ref[item.num];
-											pr.th = par.param_mult;
+												
+											auto pref_fac = param_ref[item.num];
 											
 											if(par.time_dep){
 												const auto &dep = par.dep;
-												pr.index /= dep[dep.size()-1].list.size();
+												pref_fac.index /= dep[dep.size()-1].list.size();
 											}
 											
 											const auto &par_mult = param[par.param_mult];
 											const auto &dep = par_mult.dep;
+											pref_fac.index *= dep[dep.size()-1].list.size();
+											pref_fac.th = par.param_mult;
 											
-											pr.index *= dep[dep.size()-1].list.size();
+											EqItem item3;
+											item3.type = SPLINE; 
+											item3.num = add_param_ref(pref_fac);
 											
-											op.push_back(item); 
+											op.push_back(item3); 
 										}
 									}
 									
@@ -1631,7 +1639,7 @@ void Equation::erase_opl(unsigned int i, unsigned int n, vector <EqItemList> &op
 {
 	auto iend = i;
 	for(auto j = 0u; j < n; j++){
-		if(i == UNSET_LIST) emsg("Problem with erase");
+		if(i == UNSET_LIST) emsg_input("Problem with erase");
 		iend = opl[iend].next;
 	}
 	
@@ -1665,7 +1673,7 @@ unsigned int Equation::get_opl_start(const vector <EqItemList> &opl) const
 {
 	auto i = 0u; 
 	while(i < opl.size() && opl[i].prev != UNSET_LIST) i++;
-	if(i == opl.size()) emsg("Cannot find start of equation");
+	if(i == opl.size()) emsg_input("Cannot find start of equation");
 	
 	return i;
 }		
@@ -1709,7 +1717,7 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 			auto inext5 = UNSET_LIST; if(inext4 != UNSET_LIST) inext5 = opl[inext4].next;
 			
   		switch(opl[i].type){
-			case TINT: emsg("Integral should not be here"); break;
+			case TINT: emsg_input("Integral should not be here"); break;
 			
 			case LEFTBRACKET: case RIGHTBRACKET:
 				break;
@@ -1822,7 +1830,7 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 				}
 				break;
 				
-			case NOOP: emsg("Hould not be no op"); break;
+			case NOOP: emsg_input("Hould not be no op"); break;
 			}
 			
 			if(i == UNSET_LIST || i == CUT_LIST){ flag = true; break;}
@@ -1856,7 +1864,7 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 		else{
 			wa = "The equation syntax is incorrect. ";
 		}
-		emsg("done");
+		emsg_input("done");
 	}
 
 	if(wa != ""){
@@ -1868,7 +1876,7 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 
 	int i = opl.size()-1;
 	while(i >= 0 && opl[i].next != UNSET_LIST) i--;
-	if(i < 0) emsg("Could not find last");
+	if(i < 0) emsg_input("Could not find last");
 	
 	auto last = get_op(opl,i);
 	if(last.type != REG){
@@ -2129,7 +2137,7 @@ double Equation::calculate_integral(unsigned int i, const vector < vector <doubl
 }
 
 
-/// Calculates kderived equations
+/// Calculates derived equations
 double Equation::calculate_derive(unsigned int ti, const vector < vector <double> > &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector < vector <double> > > &derive_val) const 
 {
 	auto C = calcu.size();
@@ -2491,7 +2499,7 @@ void Equation::insert_reg(vector <Calculation> &calc, vector <bool> &calc_on)
 			for(auto j = 0u; j < item.size(); j++){
 				if(item[j].type == REG){
 					auto ii = item[j].num;
-					if(!calc_on[ii]) emsg("Calc should be on");
+					if(!calc_on[ii]) emsg_input("Calc should be on");
 					reg_used[ii]++;
 				}
 			}
@@ -2881,13 +2889,13 @@ void Equation::simplify(vector <Calculation> &calc)
 						}
 						break;
 
-					default: emsg("Should be simplification"); break;
+					default: emsg_input("Should be simplification"); break;
 					}
 					
 					if(rep.type != NOOP || rep_con != UNSET){
 						if(i+1 != calc.size()){					
 							flag = true;
-							if(rep.type != NOOP && rep_con != UNSET) emsg("Cannot be both here");
+							if(rep.type != NOOP && rep_con != UNSET) emsg_input("Cannot be both here");
 							
 							if(rep_con != UNSET){
 								rep.type = NUMERIC; rep.num = add_cons(rep_con);
@@ -2903,7 +2911,7 @@ void Equation::simplify(vector <Calculation> &calc)
 		
 		replace_reg(reg_replace,calc,calc_on,pl);
 		
-		loop++; if(loop > 100) emsg("Simplify equation problem");
+		loop++; if(loop > 100) emsg_input("Simplify equation problem");
 	}while(flag == true);
 
 	remove_unused(calc,calc_on);
@@ -2930,12 +2938,12 @@ void Equation::remove_unused(vector <Calculation> &calc, vector <bool> &calc_on)
 	if(false) print_calculation();
 
 	auto C = calc.size();
-	if(C == 0) emsg("calc no size");
+	if(C == 0) emsg_input("calc no size");
 	
 	vector <bool> used(C,false);
 	
 	int j = C-1;
-	if(calc_on[j] != true) emsg("Last should not change");
+	if(calc_on[j] != true) emsg_input("Last should not change");
 	
 	used[j] = true;
 	while(j >= 0){
@@ -2943,7 +2951,7 @@ void Equation::remove_unused(vector <Calculation> &calc, vector <bool> &calc_on)
 			for(const auto &it : calc[j].item){
 				if(it.type == REG){
 					auto jj = it.num;
-					if(calc_on[jj] != true) emsg("calc should be on");
+					if(calc_on[jj] != true) emsg_input("calc should be on");
 					used[jj] = true;
 				}
 			}
@@ -2976,7 +2984,7 @@ void Equation::remove_unused(vector <Calculation> &calc, vector <bool> &calc_on)
 			auto &it = ca.item[j];
 			if(it.type == REG){
 				auto num = map[it.num];
-				if(num == UNSET_LIST) emsg("calc map problem");
+				if(num == UNSET_LIST) emsg_input("calc map problem");
 				it.num = num;
 			}
 		}
@@ -3135,6 +3143,7 @@ double Equation::indfac(const Individual &ind) const
 /// Determines if equation is linear in a given parameter
 bool Equation::param_linear(unsigned int th) const
 {
+	if(false) cout << th << endl;
 	// This is only used for joint parameter/event proposals and these are turned off
 	/*
 	if(calcu.size() == 1){
@@ -3315,7 +3324,7 @@ double Equation::find_dist(unsigned int c, unsigned int cc, const vector <Compar
 		break;
 	}
 
-	emsg("Cannot find distance");
+	emsg_input("Cannot find distance");
 	return UNSET;
 }
 
@@ -3351,6 +3360,42 @@ double Equation::get_distance(const ParamProp &pp)
 	}
 	
 	warn = "Compartment '"+dep1+"' is not recognised in distance matrix.";
+	return UNSET;
+}
+
+
+/// Gets the distance between two compartments
+double Equation::get_identity(const ParamProp &pp)
+{
+	if(pp.dep.size() != 2){	
+		warn = "The identity matrix '"+pp.name+"' must have two indices."; 
+		return UNSET;
+	}
+	
+	auto dep1 = pp.dep[0];
+	auto dep2 = pp.dep[1];
+
+	for(auto p = 0u; p < species.size(); p++){
+		const auto &sp = species[p];
+		for(auto cl = 0u; cl < sp.cla.size(); cl++){
+			const auto &claa = sp.cla[cl];
+			
+			auto c = claa.hash_comp.find(dep1);
+			if(c != UNSET){
+				auto cc = claa.hash_comp.find(dep2);
+				if(cc == UNSET){
+					warn = "Compartment '"+dep2+"' is not recognised in distance matrix.";
+					return UNSET;
+				}
+				else{
+					if(c == cc) return 1;
+					else return 0;
+				}
+			}
+		}
+	}
+	
+	warn = "Compartment '"+dep1+"' is not recognised in identity matrix.";
 	return UNSET;
 }
 

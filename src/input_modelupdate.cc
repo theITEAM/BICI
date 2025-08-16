@@ -73,9 +73,9 @@ void Input::add_classification(unsigned int p, string name, string index, Coord 
 
 
 /// Adds a new compartment to the model
-void Input::add_compartment(string name, unsigned int p, unsigned int cl, double x, double y, double lat, double lng, bool markov_branch, CompInfected infected, string erlang_source)
+bool Input::add_compartment(string name, unsigned int p, unsigned int cl, double x, double y, double lat, double lng, bool markov_branch, CompInfected infected, string erlang_source)
 {
-	if(check_comp_exist(name,p) == true) return;
+	if(check_comp_exist(name,p)) return true;
 	
 	auto &sp = model.species[p];
 	auto &claa = sp.cla[cl];
@@ -97,7 +97,9 @@ void Input::add_compartment(string name, unsigned int p, unsigned int cl, double
 	co.erlang_source = erlang_source;
 	
 	if(infected == COMP_INFECTED){
-		if(sp.infection_cl != cl && sp.infection_cl != UNSET) alert_import("Cannot sect 'infected' for more than one classification"); 
+		if(sp.infection_cl != cl && sp.infection_cl != UNSET){
+			alert_import("Cannot set 'infected' for more than one classification"); 
+		}
 		sp.infection_cl = cl;
 	}
 	
@@ -106,11 +108,13 @@ void Input::add_compartment(string name, unsigned int p, unsigned int cl, double
 
 	claa.comp.push_back(co);
 	claa.ncomp++;
+	
+	return true;
 }
 	
 
 /// Adds a transition to the model
-void Input::add_transition(unsigned int p, unsigned int cl, unsigned int i, unsigned int f, TransType type)
+bool Input::add_transition(unsigned int p, unsigned int cl, unsigned int i, unsigned int f, TransType type)
 {
 	auto &sp = model.species[p];
 	auto &claa = sp.cla[cl];
@@ -118,18 +122,27 @@ void Input::add_transition(unsigned int p, unsigned int cl, unsigned int i, unsi
 	
 	for(auto j = 0u; j < tra.size(); j++){
 		if(tra[j].i == i && tra[j].f == f){
-			if(i == UNSET){ alert_import("Cannot have two sources into the same compartment"); return;}
+			if(i == UNSET){
+				alert_import("Cannot have two sources entering the same compartment"); 
+				return false;
+			}
 			else{
-				if(f == UNSET){ alert_import("Cannot have two sinks leaving the same compartment"); return;}
+				if(f == UNSET){ 
+					alert_import("Cannot have two sinks leaving the same compartment"); 
+					return false;
+				}
 				else{
-					alert_import("Cannot have two transitions with the same source and destination compartments");
-					return;
+					alert_import("Cannot have two transitions with the same initial and final compartments");
+					return false;
 				}
 			}
 		}
 	}
 	
-	if(i == f){ alert_import("The 'from' and 'to' compartments must be different"); return;}
+	if(i == f){
+		alert_import("The 'from' and 'to' compartments must be different"); 
+		return false;
+	}
 		
 	Transition tr;
 	tr.i = i; tr.f = f;
@@ -162,6 +175,8 @@ void Input::add_transition(unsigned int p, unsigned int cl, unsigned int i, unsi
 	
 	tra.push_back(tr);	
 	claa.ntra++;
+	
+	return true;
 }
 	
 
@@ -327,7 +342,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 			}
 		}
 		
-		// Deals with individual observation probabilities with obs model time independant
+		// Deals with individual observation probabilities with obs model time independent
 		for(auto &ot : sp.obs_trans){                      // Observed transition data 
 			ot.time_vari = false;
 			for(auto &tpe : ot.tra_prob_eqn){
@@ -548,7 +563,7 @@ void Input::create_markov_eqn()
 	
 		switch(eqn.type){
 		case TRANS_RATE: case TRANS_MEAN: case SOURCE_RATE: case SOURCE_MEAN:
-			if(eqn.sp_p == UNSET) alert_import("Equation problem"); 
+			if(eqn.sp_p == UNSET) emsg_input("Equation problem3"); 
 			else{
 				auto &sp = model.species[eqn.sp_p];
 				
@@ -1067,7 +1082,7 @@ void Input::set_precalc_nm_rate()
 				const auto &eq = model.eqn[nmt.dist_param_eq_ref[0]];
 				for(auto pr : eq.pop_ref){
 					if(model.pop[pr].sp_p == p){ 
-						alert_import("Non-Markovian transition cannot depend on a population in the same species");
+						alert_import("Non-Markovian transitions cannot depend on a population in the same species");
 					}
 				}
 			}
@@ -1080,7 +1095,7 @@ void Input::set_precalc_nm_rate()
 						
 						for(auto pr : eq.pop_ref){
 							if(model.pop[pr].sp_p == p){ 
-								alert_import("Non-Markovian transition cannot depend on a population in the same species");
+								alert_import("Non-Markovian transitions cannot depend on a population in the same species");
 							}
 						}
 						
@@ -1139,7 +1154,7 @@ void Input::check_nm_pop()
 					for(auto &pop : eq.pop_ref){
 						const auto &po = model.pop[pop];
 						if(po.sp_p == p){
-							alert_import("Non-Markovian parameter cannot depend on population from the same species.");
+							alert_import("Non-Markovian parameters cannot depend on population from the same species.");
 						}
 					}
 				}
@@ -1149,7 +1164,7 @@ void Input::check_nm_pop()
 					for(auto &pop : eq.pop_ref){
 						const auto &po = model.pop[pop];
 						if(po.sp_p == p){
-							alert_import("Branching probability cannot depend on population from the same species.");
+							alert_import("Branching probabilities cannot depend on a population from the same species.");
 						}
 					}
 				}
@@ -1251,11 +1266,12 @@ void Input::calculate_timepoint()
 	
 	auto t = de.t_start;
 	model.timepoint.push_back(t);
-	t += de.dt+TINY;
+	t += de.dt;
 
 	auto t_end = de.t_end;
+
 	if(model.mode == PPC) t_end = de.ppc_t_end;
-	
+
 	while(t < t_end-TINY){
 		model.timepoint.push_back(t);
 		t += de.dt;
@@ -1277,6 +1293,7 @@ unsigned int Input::get_spline_i(const ParamRef &pr)
 	const auto &spl = model.spline;		
 	
 	auto th = pr.th, index = pr.index;
+
 	auto ntimes = model.param[th].spline_info.knot_tdiv.size();
 	if(index%ntimes != 0) emsg_input("Should be zero1");
 	index /= ntimes;
@@ -1294,7 +1311,7 @@ void Input::create_spline()
 	auto ntp = tp.size();
 	
 	auto dt = model.details.dt;
-	
+
 	for(auto th = 0u; th < model.param.size(); th++){
 		const auto &par = model.param[th];
 		
@@ -2717,7 +2734,7 @@ void Input::source_rate_divide() const
 								switch(trg.type){
 								case EXP_RATE: trg.dist_param[0].te = to_string(fac)+"*("+val.rate+")"; break;
 								case EXP_MEAN: trg.dist_param[0].te = "("+val.rate+")/"+to_string(fac); break;
-								default: emsg("Source not exponential"); break;
+								default: emsg_input("Source not exponential"); break;
 								}
 							}
 						}
@@ -3077,7 +3094,7 @@ void Input::add_genetic_data()
 										else{
 											if(ch == "G") ogd.snp.push_back(G_CH);
 											else{
-												alert_import("SNP character '"+ch+"' not recognised");
+												alert_import("SNP character '"+ch+"' is not recognised");
 											}
 										}
 									}
@@ -4228,7 +4245,7 @@ void Input::set_omega_fl()
 				for(auto i = 0u; i < N; i++){
 					auto &par = model.param[ieg.omega[j][i]];
 					if(par.variety != CONST_PARAM){
-						auto th = par.get_param_vec(0); if(th == UNSET) emsg("Should not be unset2");
+						auto th = par.get_param_vec(0); if(th == UNSET) emsg_input("Should not be unset2");
 						model.param_vec[th].omega_fl = true;
 					}
 				}
@@ -4240,7 +4257,7 @@ void Input::set_omega_fl()
 		for(auto &pv : model.param_vec){
 			cout << pv.name << " " << pv.omega_fl << endl;
 		}
-		emsg("done");
+		emsg_input("done");
 	}
 }
 
@@ -4258,7 +4275,7 @@ void Input::setup_der_func(DerFuncType df_type, string te, DerFunc &df)
 	case GT: df.name = "GT"; break;
 	case GTE: df.name = "GTE"; break;
 	case GTC: df.name = "GTC"; break;
-	case DF_UNSET: emsg("Should not be unset"); break; 
+	case DF_UNSET: emsg_input("Should not be unset"); break; 
 	}
 	
 	auto i = 0u;
@@ -4463,13 +4480,17 @@ void Input::setup_der_func_eqn()
 						auto cstart = ref[tr.i];
 						auto cend = UNSET; if(tr.f != UNSET) cend = ref[tr.f];
 				
-						switch(tr.type){
+						auto ty = tr.type;
+						
+						switch(ty){
 						case WEIBULL:
 							alert_line("'"+df.name+"' cannot be calculated because transition '"+tr.name+"' has a Weibull distribution.",der.line_num,true); 
 							break;
 							
 						case GAMMA: case ERLANG: case LOG_NORMAL: case PERIOD:
-							{
+						case EXP_RATE: case EXP_MEAN:
+						case EXP_RATE_NM: case EXP_MEAN_NM:
+							if(ty == GAMMA || ty == ERLANG || ty == LOG_NORMAL || ty == PERIOD){
 								if(!calc){
 									string dist;
 									switch(tr.type){
@@ -4482,9 +4503,7 @@ void Input::setup_der_func_eqn()
 									df.warn = "Calculation of '"+df.name+"' is approximate due to non-Markovian transitions.";
 								}
 							}
-						
-						case EXP_RATE: case EXP_MEAN:
-						case EXP_RATE_NM: case EXP_MEAN_NM:
+							
 							{
 								auto e = tr.dist_param[0].eq_ref;
 								auto m = UNSET;

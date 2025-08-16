@@ -824,7 +824,7 @@ void StateSpecies::update_rate_mean(const vector < vector <double> > &popnum_t)
 
 
 // Cnstructor
-RatePosteriorMean::RatePosteriorMean(const Details &details)
+RatePosteriorMean::RatePosteriorMean()
 {
 }
 

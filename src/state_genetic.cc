@@ -2564,8 +2564,10 @@ NodeRef State::get_ind_noderef(unsigned int p, unsigned int i, double t) const
 
 
 /// Checks that pop_ind is correctly specified
-void State::check_pop_ind(vector < vector <unsigned int> > pop_ind, const vector < vector <IndPop> > &ind_pop) const 
+void State::check_pop_ind(vector < vector <unsigned int> > pop_ind, const vector < vector <IndPop> > &ind_pop) 
 {
+	check_timer[CHECK_POP_IND_GENTIC] -= clock();
+	
 	vector < vector <unsigned int> > pop_ind_compare;
 	pop_ind_compare.resize(model.pop.size());
 	
@@ -2589,6 +2591,8 @@ void State::check_pop_ind(vector < vector <unsigned int> > pop_ind, const vector
 		
 		if(!equal_vec(pop_ind[po],pop_ind_compare[po])) emsg("pop_ind problem");
 	}
+	
+	check_timer[CHECK_POP_IND_GENTIC] += clock();
 }
 
 

@@ -1210,7 +1210,7 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 	case RECALC:              // If recalculating
 		break;
 		
-	case USE_POP_DIF:         // If population gradient not time dependant
+	case USE_POP_DIF:         // If population gradient not time dependent
 		for(const auto &po_ch : pop_change){
 			auto pr = lin.get_pop_ref(po_ch.po);
 			if(pr != UNSET){
@@ -1220,7 +1220,7 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 		}
 		break;
 	
-	case USE_POP_DIF_TIME:         // If population gradient time dependant
+	case USE_POP_DIF_TIME:         // If population gradient time dependent
 		// Makes a list of populations
 		for(auto k = 0u; k < pop_change.size(); k++){
 			auto pr = lin.get_pop_ref(pop_change[k].po);
