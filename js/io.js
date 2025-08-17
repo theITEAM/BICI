@@ -327,7 +327,6 @@ function export_matrix_table(filename)
 	write_file_async(te,filename,"export");
 }
 
-
 /// Writes a file asynchronously
 function write_file_async(te,filename,op)
 {
@@ -346,4 +345,41 @@ function write_file_async(te,filename,op)
 			 }
 		 }
 		});
+}
+
+
+/// Gets a path
+function get_path(file)
+{
+	let root = "Examples\\";
+	if(begin(file,root)) file = "..\\"+file;
+	
+	if(ver=="windows") file = file.replace(/\//g,"\\");
+	return file;
+}
+
+
+/// Loads any files within the BICI file
+function load_BICI_files(ans,per_start,per_end)
+{
+	var fs = nw.require('fs');
+	
+	let dfl = ans.data_file_list;
+	let num = 0, num_max = dfl.length;
+	for(let i = 0; i < num_max; i++){
+		let file = get_path(dfl[i].full_name);
+		if(begin_str(file,"..\\")) file = file.substr(3);
+	
+		fs.readFile(file, 'utf8', function(err, txt) {
+			if(err){ alert_help("Problem loading file","The following error occurred: "+err); return;}
+	
+			dfl[i].te = txt;
+			num++;
+			set_loading_percent(per_start+((num+0.5)/num_max)*(per_end-per_start));
+		
+			if(num == num_max){
+				setTimeout(function(){ start_worker("Import2",{ data_file_list:dfl});	}, 10);
+			}
+		});
+	}
 }

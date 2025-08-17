@@ -158,8 +158,8 @@ function extract_equation_properties(eqn)
 				if(tex == "t"){
 					eqn.time_vari = true;
 					
-					let dep=[]; dep.push("t");
-					add_eqn_dep(eqn,dep,ist);
+					let dep=[]; dep.push("t"); 
+					add_eqn_dep(eqn,dep,[],ist);
 				}
 				else{
 					let icur3 = icur2+ist;
@@ -196,10 +196,10 @@ function extract_equation_properties(eqn)
 		if(eqn.param[i].time_dep == true) eqn.time_vari = true;
 	}
 
-	if(eqn.type == "reparam"){
+	if(eqn.type == "reparam" || eqn.type == "reparam_eqn"){
 		if(eqn.time_vari == true){
 			if(eqn.pop.length > 0){
-				eqn.warn.push({te:"Reparameterisation should not depend on population."});
+				eqn.warn.push({te:"Reparameterisation should not depend on populations."});
 			}
 			else{
 				eqn.warn.push({te:"Reparameterisation should not depend on time."});
@@ -238,7 +238,7 @@ function der_func_check(i,lin2,name,eqn)
 		}
 		
 		let dep=[]; dep.push("t");
-		add_eqn_dep(eqn,dep,ist);
+		add_eqn_dep(eqn,dep,[],ist);
 		
 		if(eqn.type != "derive_eqn"){
 			eqn.warn.push({te:"'"+name+"' can only be used for a derived expression.", cur:ist, len:name.length});
@@ -400,9 +400,10 @@ function check_indexes_match(eqn)
 	
 	for(let i = 0; i < eqn.param.length; i++){
 		let par = eqn.param[i];
+	
 		for(let j = 0; j < par.dep.length; j++){
 			let ind = par.dep[j];
-			if(is_prime(ind)){
+			if(par.dep_used[j] != false && is_prime(ind)){
 				let k = find_in(list,ind);
 				if(k == undefined){
 					if(eqn.type != "reparam_eqn" && eqn.type != "derive_param" && eqn.type != "derive_eqn"){
@@ -550,7 +551,7 @@ function check_sum(tex,icur,lin,i_bra,eqn)
 		
 		// Adds dependency to list
 		let de=[]; de.push(spl[0]);	
-		add_eqn_dep(eqn,de,icur);
+		add_eqn_dep(eqn,de,[],icur);
 	}
 	
 		
@@ -747,7 +748,7 @@ function check_parameter(te,icur,eqn)
 		}
 	}
 	
-	let dep=[]; 
+	let dep=[], dep_used=[]; 
 	let spl = te.split("_");
 	if(spl.length > 2){
 		eqn.warn.push({te:"Did not expect more than one underscore", cur:icur, len:te.length});
@@ -799,8 +800,11 @@ function check_parameter(te,icur,eqn)
 				let na = dep[i];
 				let index = remove_prime(na);
 			
+				let is_comp = false;
+				dep_used[i] = true;
+				
 				if(eqn.type != "derive_eqn" && eqn.type != "derive_param" && eqn.type != "reparam_eqn" && eqn.type != "test"){
-					if(sp == undefined) error("SHould be defined");
+					if(sp == undefined) error("Should be defined");
 					let cl2; cl2 = find(sp.cla,"index",index);	
 					if(cl2 == undefined){
 						/// Looks for potential indices in other species
@@ -812,7 +816,18 @@ function check_parameter(te,icur,eqn)
 							}
 						}
 						if(cl3 == undefined){
-							eqn.warn.push({te:"'"+index+"' is not a classification index name", cur:icur2, len:index.length});
+							for(let cl = 0; cl < sp.cla.length; cl++){
+								let claa = sp.cla[cl];
+								if(hash_find(claa.hash_comp,index) != undefined){
+									is_comp = true;
+									dep[i] = claa.index
+									dep_used[i] = false;
+									break;
+								}
+							}
+							if(is_comp == false){
+								eqn.warn.push({te:"'"+index+"' is not a classification index name", cur:icur2, len:index.length});
+							}
 						}
 						else{
 							if(index == na){
@@ -827,18 +842,36 @@ function check_parameter(te,icur,eqn)
 					}
 				}
 				
-				eqn.index_name_list.push({ p_name:p_name, index_name:index, icur:icur2});
-
+				if(is_comp == false){
+					eqn.index_name_list.push({ p_name:p_name, index_name:index, icur:icur2});
+				}
+				
 				icur2 += na.length+1;
 			}
 		}
 	}
 	
-	if(time_dep == true) dep.push("t");
+	if(time_dep == true){ dep.push("t"); dep_used.push(true);}
 	
-	add_eqn_dep(eqn,dep,icur);
+	add_eqn_dep(eqn,dep,dep_used,icur);
 	
-	let par = { name:name, p_name:eqn.p_name, cl_name:eqn.cl_name, dep:dep, type:eqn.type, time_dep:time_dep};
+	set_indep_index(dep,dep_used);
+
+	if(name == dist_matrix_name || name == iden_matrix_name || name == iden_matrix_name2){
+		let ty = "distance";
+		if(name != dist_matrix_name) ty = "identity";
+		
+		if(dep.length != 2){
+			eqn.warn.push({te:"The "+ty+" matrix '"+name+"' must have two indices", cur:icur, len:name.length});
+		}
+		else{
+			if(remove_prime(dep[0]) != remove_prime(dep[1])){
+				eqn.warn.push({te:"The "+ty+" matrix '"+name+"' must have two indices which correspond to the same classification", cur:icur, len:name.length});
+			}
+		}
+	}
+
+	let par = { name:name, p_name:eqn.p_name, cl_name:eqn.cl_name, dep:dep, dep_used:dep_used, type:eqn.type, time_dep:time_dep};
 
 	par.full_name = param_name(par);
 	
@@ -846,13 +879,36 @@ function check_parameter(te,icur,eqn)
 }
 
 
+
+/// Sorts out indices which are not dependent e.g. \delta_s,M
+function set_indep_index(dep,dep_used)
+{
+	for(let d = 0; d < dep.length; d++){
+		if(dep_used[d] == false){
+			let ind = dep[d];
+			let num = 0;
+			do{
+				let ind2 = ind;
+				for(let i = 0; i < num; i++) ind2 += "'";
+				
+				if(find_in(dep,ind2) == undefined){
+					dep[d] = ind2;
+					break;
+				}
+				num++;
+			}while(true);	
+		}
+	}
+}
+
+
 /// Adds a dependency to the equation
-function add_eqn_dep(eqn,dep,icur)
+function add_eqn_dep(eqn,dep,dep_used,icur)
 {
 	for(let k = 0; k < dep.length; k++){
 		let de = dep[k];
 		
-		if(find_in(eqn.dep,de) == undefined){
+		if(dep_used[k] != false && find_in(eqn.dep,de) == undefined){
 			// Checks to see if on a sum 
 			let fl = false;
 			for(let j = 0; j < eqn.sum.length; j++){
@@ -1118,7 +1174,7 @@ function check_population(te,icur,eqn)
 	}
 	
 	dep.push("t");
-	add_eqn_dep(eqn,dep,icur);
+	add_eqn_dep(eqn,dep,[],icur);
 	
 	eqn.pop.push(pop);
 }

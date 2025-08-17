@@ -1167,14 +1167,16 @@ function copy_back_to_source2(tbs)
 		
 	case "reparam_eqn": 
 		{
-			let val = Number(te); if(isNaN(val)) val = te; 
+			//let val = Number(te); if(isNaN(val)) val = te; 
+			let val = te; 
 			model.change_param(inter.bubble.th,"value",val);
 		}
 		break;
 		
 	case "reparam_equation": 
 		{
-			let val = Number(te); if(isNaN(val)) val = te; 
+			//let val = Number(te); if(isNaN(val)) val = te; 
+			let val = te; 
 			model.change_param(inter.bubble.th,"reparam_eqn",val);
 		}
 		break;
@@ -1364,6 +1366,7 @@ function copy_back_to_source2(tbs)
 	case "group_name": edit_source.spec.gname = te; break;
 	case "slice_time": inter.bubble.slice_time = te; break;
 	case "suffix": inter.bubble.suffix = te; break;
+	case "dataname": inter.bubble.dataso.name = te; break;
 	case "wild_card": inter.bubble.wildcard = te; break;
 	case "comp_acc": edit_source.comp_acc = te; break;
 	default: error("SOURCE PROBLEM: "+so.type); break;
@@ -1951,6 +1954,10 @@ function check_error_textbox2(tbs)
 				if(!model.allow_suffix(te)){
 					warn = "Not valid";
 				}
+				break;
+				
+			case "dataname":
+				char_lim = 100;
 				break;
 				
 			case "label_size": case "label_anno_size":

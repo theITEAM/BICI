@@ -831,7 +831,7 @@ class Layer
 						if(wrap == "word") cx = marx;
 						else{
 							cx = textbox_tab; 
-							this.add_button({x:cx, y:cy, dx:textbox_tab-2*marx, dy:lh, type:"TextboxTab", col:BLACK, i:i, font:font, si:fsi });
+							this.add_button({x:marx-0.5, y:cy+lh, dx:textbox_tab-2*marx, dy:lh, type:"TextboxTab", col:BLACK, i:i, font:font, si:fsi });
 						}
 			
 						cy += lh; text_nrow++;
@@ -1360,19 +1360,22 @@ class Layer
 		case "element_Xvector": te = String(inter.edit_Xvector.X_value[so.i]); break;
 		case "element_eqn":
 			{
-				let st = String(get_element(inter.edit_param.value,so.pindex));
+				let val = get_element(inter.edit_param.value,so.pindex);
+				let st = ""; if(val != undefined) st = String(val);
 				eqn = create_equation(st,"reparam");
 			}
 			break;
 		case "reparam_eqn": 
 			{
-				let st = String(model.param[inter.bubble.th].value);
+				let val = model.param[inter.bubble.th].value;
+				let st = ""; if(val != undefined) st = String(val);
 				eqn = create_equation(st,"reparam"); 
 			}
 			break;		
 		case "reparam_equation": 
 			{
-				let st = String(model.param[inter.bubble.th].reparam_eqn);
+				let val = model.param[inter.bubble.th].reparam_eqn;
+				let st = ""; if(val != undefined) st = String(val);
 				eqn = create_equation(st,"reparam_eqn"); 
 			}
 			break;		
@@ -1469,13 +1472,14 @@ class Layer
 		case "group_name": te = String(edit_source.spec.gname); break;
 		case "slice_time": te = String(inter.bubble.slice_time); break;
 		case "suffix": te = String(inter.bubble.suffix); break;
+		case "dataname": te = String(inter.bubble.dataso.name); break;
 		case "wild_card": te = String(inter.bubble.wildcard); break;
 		case "comp_acc": te = String(edit_source.comp_acc); break;
 		default: error("SOURCE PROBLEM2: "+so.type); break;
 		}
 
 		if(eqn != undefined){
-			te = eqn.te; 
+			te = String(eqn.te); 
 			eqn = copy(eqn);
 		}
 		

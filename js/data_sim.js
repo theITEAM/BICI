@@ -220,6 +220,8 @@ function simulate_data(so)
 			let times = get_timepoints(t_start,t_end,so);
 			if(typeof times == 'string'){ alert_help("Problem with times",times); return;}
 	
+			let f = so.frac_obs;
+			
 			head.push("ID");
 			head.push("t");
 			let cl_drop = spec.cl_drop;
@@ -231,62 +233,64 @@ function simulate_data(so)
 				let ind = sim.individual[i];
 				if(ind.obs){	
 					for(let k = 0; k < times.length; k++){
-						let t = times[k];
-					
-						let c = ind.cinit;
-						let e = 0; 
-						while(e < ind.ev.length && ind.ev[e].t < t){
-							c = c_after_event(ind.ev[e],sp);
-							e++;
-						}
-					
-						let te;
-					
-						let row = [];	
-						row.push(ind.name);
-						row.push(t);
+						if(Math.random() < f){	
+							let t = times[k];
 						
-						if(c == SOURCE || c == SINK || c == OUT){
-							te = "!";
-						}
-						else{
-							let cgl = sp.comp_gl[c];
+							let c = ind.cinit;
+							let e = 0; 
+							while(e < ind.ev.length && ind.ev[e].t < t){
+								c = c_after_event(ind.ev[e],sp);
+								e++;
+							}
 						
-							let comp = sp.cla[cl_sel].comp;
-							let ci = cgl.cla_comp[cl_sel];
+							let te;
 						
+							let row = [];	
+							row.push(ind.name);
+							row.push(t);
 							
-							if(exact){
-								te = comp[ci].name;
+							if(c == SOURCE || c == SINK || c == OUT){
+								te = "!";
 							}
 							else{
-								te = comp[ci].name+":"+acc;
-								if(comp.length > COMP_NOISY_MAX){  // If many comparmtents then randomly chooses some 
-									let list=[];
-									for(let cii = 0; cii < comp.length; cii++){
-										if(cii != ci) list.push(cii);
-									}
-									let ac_other = precision(((1-acc)/(COMP_NOISY_MAX-1)),3);
-									for(let k = 0; k < COMP_NOISY_MAX-1; k++){
-										let m = Math.floor(Math.random()*list.length);
-										let cii = list[m];
-										te += "|"+comp[cii].name+":"+ac_other;
-										list[m] = list[list.length-1];
-										list.pop();
-									}
+								let cgl = sp.comp_gl[c];
+							
+								let comp = sp.cla[cl_sel].comp;
+								let ci = cgl.cla_comp[cl_sel];
+							
+								
+								if(exact){
+									te = comp[ci].name;
 								}
 								else{
-									let ac_other = precision(((1-acc)/(comp.length-1)),3);
-									for(let cii = 0; cii < comp.length; cii++){
-										if(cii != ci){
+									te = comp[ci].name+":"+acc;
+									if(comp.length > COMP_NOISY_MAX){  // If many comparmtents then randomly chooses some 
+										let list=[];
+										for(let cii = 0; cii < comp.length; cii++){
+											if(cii != ci) list.push(cii);
+										}
+										let ac_other = precision(((1-acc)/(COMP_NOISY_MAX-1)),3);
+										for(let k = 0; k < COMP_NOISY_MAX-1; k++){
+											let m = Math.floor(Math.random()*list.length);
+											let cii = list[m];
 											te += "|"+comp[cii].name+":"+ac_other;
+											list[m] = list[list.length-1];
+											list.pop();
+										}
+									}
+									else{
+										let ac_other = precision(((1-acc)/(comp.length-1)),3);
+										for(let cii = 0; cii < comp.length; cii++){
+											if(cii != ci){
+												te += "|"+comp[cii].name+":"+ac_other;
+											}
 										}
 									}
 								}
 							}
+							row.push(te);
+							ele.push(row);
 						}
-						row.push(te);
-						ele.push(row);
 					}
 				}
 			}
@@ -364,36 +368,40 @@ function simulate_data(so)
 			let neg = spec.neg_result;
 			let pos = spec.pos_result;
 		
+			let f = so.frac_obs;
+		
 			for(let i = 0; i < sim.individual.length; i++){
 				let ind = sim.individual[i];
 				if(ind.obs){	
 					for(let k = 0; k < times.length; k++){
-						let t = times[k];
-					
-						let c = ind.cinit;
-						let e = 0; 
-						while(e < ind.ev.length && ind.ev[e].t < t){
-							c = c_after_event(ind.ev[e],sp);
-							e++;
-						}
-					
-						if(c != SOURCE && c != SINK && c != OUT){
-							let cgl = sp.comp_gl[c];
-							let ci = cgl.cla_comp[cl_sel];
+						if(Math.random() < f){	
+							let t = times[k];
+						
+							let c = ind.cinit;
+							let e = 0; 
+							while(e < ind.ev.length && ind.ev[e].t < t){
+								c = c_after_event(ind.ev[e],sp);
+								e++;
+							}
+						
+							if(c != SOURCE && c != SINK && c != OUT){
+								let cgl = sp.comp_gl[c];
+								let ci = cgl.cla_comp[cl_sel];
 
-							let res;
-							if(spec.check_box.value[ci].check == true){
-								if(Math.random() < Se) res = pos; else res = neg;
+								let res;
+								if(spec.check_box.value[ci].check == true){
+									if(Math.random() < Se) res = pos; else res = neg;
+								}
+								else{
+									if(Math.random() < Sp) res = neg; else res = pos;
+								}
+								
+								let row = [];
+								row.push(ind.name);
+								row.push(t);
+								row.push(res);
+								ele.push(row);
 							}
-							else{
-								if(Math.random() < Sp) res = neg; else res = pos;
-							}
-							
-							let row = [];
-							row.push(ind.name);
-							row.push(t);
-							row.push(res);
-							ele.push(row);
 						}
 					}
 				}
@@ -944,9 +952,85 @@ function get_timepoints(t_start,t_end,so)
 			times.push(num);
 		}
 		break;
+	
+	case "Data":
+		alertp("Should not be data");
+		break;
 	}
 	
 	return times;
+}
+
+
+/// Gets timepoints specified in the bubble
+function get_ind_times(t_start,t_end,so,samp,hash,ind_list)
+{
+	let ind_times = [];
+	
+	for(let p = 0; p < samp.species.length; p++){
+		ind_times[p]=[];
+		let sosp = samp.species[p];
+		for(let i = 0; i < sosp.individual.length; i++) ind_times[p][i] = [];
+	}
+		
+	switch(so.time_radio.value){
+	case "Periodic": case "Specified": 
+		{	
+			let times = get_timepoints(t_start,t_end,so);
+			
+			for(let p = 0; p < samp.species.length; p++){
+				let sosp = samp.species[p];
+				for(let i = 0; i < sosp.individual.length; i++){
+					for(let j = 0; j < times.length; j++) ind_times[p][i].push(times[j]);
+				}
+			}
+		}
+		break;
+	
+	case "Data":
+		{
+			let sel = so.sel_data;
+			let gen_so = model.sim_res.plot_filter.species[sel.p].gen_source[sel.i];
+			
+			switch(gen_so.type){
+			case "Compartment": case "Transition": case "Diag. Test":
+				{
+					let ele = gen_so.table.ele;
+					for(let r = 0; r < ele.length; r++){
+						let ro = ele[r];
+						let id = ro[0];
+						let t = ro[1];
+						
+						let j = hash.find(id);
+						if(j == undefined) alertp("Should not be undefined");
+						else{
+							let il = ind_list[j];
+							let tf = Number(t);
+							if(isNaN(tf)){
+								if(t == "start") tf = t_start;
+								else{
+									if(t == "end") tf = t_end;
+									else{
+										alertp("Not a number");
+									}
+								}
+							}
+							if(gen_so.type == "Transition") tf += TINY;
+							ind_times[il.p][il.i].push(tf);
+						}
+					}
+				}
+				break;
+				
+			default:
+				alert_help("Cannot used this data source");
+				break;
+			}
+		}			
+		break;	
+	}
+	
+	return ind_times;
 }
 
 
@@ -1043,16 +1127,37 @@ function simulate_genetic_snp(t_start,t_end,ele,head,so)
 	head.push("t");
 	for(let i = 0; i < N; i++) head.push(so.spec.snp_root+(i+1));
 	
-	let times = get_timepoints(t_start,t_end,so);
-	if(typeof times == 'string'){ alert_help("Problem with times",times); return;}
+	let samp = result.sample[0];
+
+	// Makes a hash table of individuals
+	let hash = new Hash();
+	
+	let ind_list = [];
+	for(let p = 0; p < samp.species.length; p++){
+		let sosp = samp.species[p];
+		for(let i = 0; i < sosp.individual.length; i++){
+			let ind = sosp.individual[i];
+	
+			let name = ind.name;
+			let j = hash.find(name);
+			if(j == undefined){
+				j = ind_list.length;
+				hash.add(name,ind_list.length);
+				ind_list.push({name:name, p:p, i:i});
+			}
+		}
+	}
+	
+	let ind_times = get_ind_times(t_start,t_end,so,samp,hash,ind_list);
+	
+	//let times = get_timepoints(t_start,t_end,so);
+	//if(typeof times == 'string'){ alert_help("Problem with times",times); return;}
 	
 	let ref_seq = [];
 	for(let j = 0; j < N; j++){
 		ref_seq.push(Math.floor(4*Math.random()));
 	}
 	
-	let samp = result.sample[0];
-
 	// Generates timelines in which an individual infects another 
 	let ind_infect=[];
 	for(let p = 0; p < samp.species.length; p++){
@@ -1094,7 +1199,7 @@ function simulate_genetic_snp(t_start,t_end,ele,head,so)
 				c = c_after_event(ev[e],sp);
 				let infe = ev[e].infection;
 				if(infe){
-					if(comp_gl[c].infected != true) error("SHould be infected");
+					if(comp_gl[c].infected != true) error("Should be infected");
 					if(inf_flag != false) error("Already infected");
 					inf_flag = true;	
 					
@@ -1136,7 +1241,7 @@ function simulate_genetic_snp(t_start,t_end,ele,head,so)
 		let num = poisson_sample(seq_var+(ie.t-t_start)*mu);
 		mutate_seq(num,new_seq);
 		
-		seq_sim_ind(ie.p,ie.i,new_seq,ie.t,ind_infect,ele,mu,f,times,samp,node_list);
+		seq_sim_ind(ie.p,ie.i,new_seq,ie.t,ind_infect,ele,mu,f,ind_times,samp,node_list);
 	}
 	
 	node_list.sort( function(a, b){ return a.i-b.i});
@@ -1182,9 +1287,6 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 	
 	let f = so.frac_obs;
 
-	let times = get_timepoints(t_start,t_end,so);
-	if(typeof times == 'string'){ alert_help("Problem with times",times); return;}
-	
 	let samp = result.sample[0];
 	
 	let inf_node = samp.inf_node;
@@ -1210,6 +1312,8 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 			}
 		}
 	}
+	
+	let ind_times = get_ind_times(t_start,t_end,so,samp,hash,ind_list);
 	
 	// Adds in observations
 	let obs = [];
@@ -1246,8 +1350,9 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 			e++;
 		}
 
-		for(let k = 0; k < times.length; k++){
-			let tt = times[k];
+		let ti_list = ind_times[p][il.i];
+		for(let k = 0; k < ti_list.length; k++){
+			let tt = ti_list[k];
 			if(tt > t && tt < tmax){
 				if(Math.random() < f){
 					infn.inf_ev.push({ty: "OBS", i:obs.length, t:tt, num:UNSET});
@@ -1371,7 +1476,7 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 						let mm = ovv[kk].m;
 						let sum_kk = ovv[kk].sum;
 					
-						if(mat[m][mm] != undefined)	alertp("SHould not be defined");
+						if(mat[m][mm] != undefined)	alertp("Should not be defined");
 						mat[m][mm] = sum_k + sum_kk+ num + numm;
 						mat[mm][m] = mat[m][mm];
 					}
@@ -1404,7 +1509,7 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 
 
 /// Sets sequence for individual and evolves in time
-function seq_sim_ind(p,i,new_seq,t,ind_infect,ele,mu,f,times,samp,node_list)
+function seq_sim_ind(p,i,new_seq,t,ind_infect,ele,mu,f,ind_times,samp,node_list)
 {
 	let ind_inf = ind_infect[p][i];
 	let node = {t:t, p:p, i:i, inf_ev:[]};
@@ -1412,15 +1517,17 @@ function seq_sim_ind(p,i,new_seq,t,ind_infect,ele,mu,f,times,samp,node_list)
 	let e = 0;
 	while(e < ind_inf.length && ind_inf[e].t <= t) e++;
 	
+	let ti_list = ind_times[p][i];
+	
 	let m = 0; 
-	while(m < times.length && times[m] <= t) m++;
+	while(m < ti_list.length && ti_list[m] <= t) m++;
 	
 	let inf_flag = true;
 	
 	do{
 		let t_next = LARGE;
 		
-		if(m < times.length && times[m] < t_next) t_next = times[m];
+		if(m < ti_list.length && ti_list[m] < t_next) t_next = ti_list[m];
 		
 		if(e < ind_inf.length && ind_inf[e].t < t_next) t_next = ind_inf[e].t;
 		
@@ -1432,7 +1539,7 @@ function seq_sim_ind(p,i,new_seq,t,ind_infect,ele,mu,f,times,samp,node_list)
 		
 		t = t_next;
 		
-		if(m < times.length && times[m] == t){
+		if(m < ti_list.length && ti_list[m] == t){
 			if(inf_flag == true){
 				node.inf_ev.push({type:"obs", t:t, mut_num:num});
 			
@@ -1461,7 +1568,7 @@ function seq_sim_ind(p,i,new_seq,t,ind_infect,ele,mu,f,times,samp,node_list)
 			else{
 				if(indinf.type == "infect"){
 					node.inf_ev.push({type:"infect", t:t, infi:indinf.i, mut_num:num});
-					seq_sim_ind(indinf.p,indinf.i,copy(new_seq),t,ind_infect,ele,mu,f,times,samp,node_list);
+					seq_sim_ind(indinf.p,indinf.i,copy(new_seq),t,ind_infect,ele,mu,f,ind_times,samp,node_list);
 				}
 				else{
 					if(indinf.type != "recovery") error("Option not recognised");

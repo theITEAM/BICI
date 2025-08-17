@@ -35,6 +35,8 @@ function add_examples_buts(lay)
 	
 	let ex_mod=[];
 	
+	//ex_mod.push({mod:"M", te:"Temp",file:"temp",mod_type:"IBM", pic:"SI"});
+	
 	if(true){
 		if(false){
 			ex_mod.push({te:"M) Science Review",help:"Illustrates some simple examples for the Science Review."});
@@ -47,10 +49,19 @@ function add_examples_buts(lay)
 			ex_mod.push({mod:"SR3", te:"Metapopulation model using geographical regions",file:"EX_SR3",mod_type:"POP", pic:"scotland"});
 		}
 	
-		//ex_mod.push({mod:"M5.2", te:"Multiple contact groups, investigating infectivity",file:"EX_E1",mod_type:"IBM", pic:"group"});
-		
-		//ex_mod.push({mod:"M", te:"temp",file:"temp",mod_type:"IBM", pic:"carryage"});
 	
+		//ex_mod.push({mod:"M5.2", te:"Multiple contact groups, investigating infectivity",file:"EX_E1",mod_type:"IBM", pic:"group"});
+		/*
+		ex_mod.push({mod:"M2.6", te:"SIR model (PBM) with demographic stratification",file:"temp2",mod_type:"POP", pic:"SIR_sex2"});
+		
+		ex_mod.push({mod:"M", te:"Temp",file:"temp",mod_type:"IBM", pic:"SI"});
+	
+	
+		ex_mod.push({mod:"M", te:"Geno model",file:"geno",mod_type:"IBM", pic:"SI"});
+		ex_mod.push({mod:"M", te:"Geno model with cattle/badgers",file:"geno_bad_cat",mod_type:"IBM", pic:"SI"});
+		ex_mod.push({mod:"M", te:"Geno farm",file:"geno_farm",mod_type:"IBM", pic:"SI"});
+		*/
+
 		ex_mod.push({te:"M1) Simple epidemiological models",help:"This section gives some examples of simple epidemiological models, illustrating both individual and population-based approaches."+mod_mess});
 		
 		ex_mod.push({mod:"M1.1", te:"SI population-based model (PBM)",file:"EX_M1-1",mod_type:"POP", pic:"SI"});
@@ -102,11 +113,13 @@ function add_examples_buts(lay)
 		ex_mod.push({mod:"M6.2", te:"Age-structured model",file:"EX_M6-2",mod_type:"POP", pic:"covidage"});
 	}
 	else{
+		/*
 		ex_mod.push({mod:"M1.1", te:"SI population-based model (PBM)",file:"EX_M1-1",mod_type:"POP", pic:"SI"});
 		ex_mod.push({mod:"M1.2", te:"SI individual-based model (IBM)",file:"EX_M1-2",mod_type:"IBM", pic:"SI"});
 		ex_mod.push({mod:"M2.6", te:"SIRD model (PBM) with demographic stratification",file:"EX_M2-6",mod_type:"POP", pic:"SIR_sex"});
 		ex_mod.push({mod:"M2.8", te:"SIR model (IBM) with demographic stratification",file:"EX_M2-8",mod_type:"POP", pic:"SIR_sex2"});
 		ex_mod.push({mod:"M1.3", te:"SIR model (IBM)",file:"EX_M1-3",mod_type:"IBM", pic:"SIR"});
+		*/
 	}
 	
 	let gap = 0.3;
@@ -120,7 +133,6 @@ function add_examples_buts(lay)
 	ex_mod.push({te:"A6: Uncertain initial conditions for IBM using population distribution", mod:"M1.2",link:true, mod_type:"IBM"});
 	ex_mod.push({te:"A7: Add / remove individuals from PBM", mod:"M2.6", link:true, mod_type:"POP"});
 	ex_mod.push({te:"A8: Add / move / remove individuals from IBM",link:true, mod_type:"IBM"});
-	
 	
 	ex_mod.push({te:"B) Population-level data types",help:"These examples look at different types of population data."+mod_mess, gap:gap});
 	ex_mod.push({te:"B1: Time series population observations", mod:"M1.1", link:true, mod_type:"POP"});
@@ -165,7 +177,6 @@ function add_examples_buts(lay)
 	
 	ex_mod.push({te:"D8: Time-varying covariate affecting branching probability", mod:"M2.2", link:true, mod_type:"IBM"}); 
 	
-	
 	ex_mod.push({te:"E) Individual-based variation",help:"These examples look at how individual-based variation can be incorporated into the model"+mod_mess, gap:gap});
 	ex_mod.push({te:"E1: Individual fixed effect applied to a transition", mod:"M1.2", link:true, mod_type:"IBM"}); 
 	ex_mod.push({te:"E2: Individual fixed effect applied to a population", link:true, mod_type:"IBM"}); 
@@ -175,7 +186,7 @@ function add_examples_buts(lay)
 	ex_mod.push({te:"E6: Individual fixed effect applied to a branching probability", mod:"M2.3", link:true, mod_type:"IBM"}); 
 	
 	ex_mod.push({te:"E7: Individual effect applied to a branching probability", mod:"M2.3", link:true, mod_type:"IBM"}); 
-	
+	ex_mod.push({te:"E8: Correlated individual effect applied to a transition with pedigree", mod:"M1.2", link:true, mod_type:"IBM"});
 
 	ex_mod.push({te:"F) Parameter definitions",help:"These examples look at how parameters can be reparameterised, set to distributions or derived from other quantities"+mod_mess, gap:gap});
 	ex_mod.push({te:"F1: Reparameterisation", mod:"M3.4", link:true, mod_type:"IBM"}); 

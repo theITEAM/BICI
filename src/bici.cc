@@ -33,8 +33,6 @@
 // nohup mpirun -n 16 ./bici-para Jamie/scen-1-1.bici inf > ddddd.txt&
 // 06d_New_Inf_500.bici
 // nohup mpirun -n 16 ./bici-para Jamie/simp_model.bici inf > eeee.txt&
-// nohup mpirun -n 16 ./bici-para Jamie/testped2.bici inf > eeee.txt&
-
 // 06d_New_Inf_500.bici
 // ./bici-para Jamie/test.bici post-sim
 // valgrind --leak-check=yes -s  ./bici-para Jamie/test.bici post-sim

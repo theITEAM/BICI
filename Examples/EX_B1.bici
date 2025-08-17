@@ -38,9 +38,9 @@ init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
 
 # INFERENCE DATA
 
-init-pop type="fixed" file="init-pop-People.csv"
+init-pop-inf type="fixed" file="init-pop-People.csv"
 
-pop-data filter="DS=I" error="normal:10%" file="pop-data.csv"
+pop-data name="Population data" filter="DS=I" error="normal:10%" file="pop-data.csv"
 
 
 

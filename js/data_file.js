@@ -264,7 +264,6 @@ function fill_in_percentages(so)
 							for(let c = 0; c < claa.ncomp; c++){
 								if(clas.comp_init_pop[c].pop == undefined){
 									clas.comp_init_pop[c].pop = 0;
-									//alert_import("Initial population for '"+clas.comp_init_pop[c].comp_name_store+"' not set");
 								}
 							}
 						}
@@ -316,7 +315,6 @@ function fill_in_percentages(so)
 			for(let c = 0; c < so.glob_comp.length; c++){
 				if(so.glob_comp[c].pop == undefined){
 					so.glob_comp[c].pop = 0;
-					//alert_import("Population for '"+get_glob_comp_name(so.glob_comp[c])+"' not set");
 				}
 			}
 			break;
@@ -440,7 +438,7 @@ function init_pop_convert_to_graphical(so,imp)
 									if(so.spec.focal.te == claa.name){
 										let pri = convert_text_to_prior(val,prior_pos_positive,false);
 										if(pri.err == true){
-											let te = "Problem converting prior string '"+val+"':"+pri.msg;
+											let te = "Problem converting prior string '"+val+"': "+pri.msg;
 											if(imp) alert_import(te); 
 											else alert_help("Prior problem",te);
 										}
@@ -553,7 +551,10 @@ function move_data_bubble(cont,type)
 
 	cont.dx = 5.2+wmax;
 
-	bubble_addtitle(cont,"Move individuals",{te:move_ind_text});
+	let te = move_ind_text, ti = "Move Individuals";
+	if(edit_source.info.siminf == "gen"){ te = sim_move_ind_text; ti = "Generate move individual data";}			
+					
+	bubble_addtitle(cont,"Move individuals",{title:ti, te:te});
 	bubble_addparagraph(cont,"The classification in which individuals move compartment must be identified.",0,cont.dx); cont.y += 0.2;
 	
 	bubble_adddropdown(cont,5.2,wmax,cl_drop,cl_pos); cont.y -= 1.0;
@@ -594,7 +595,10 @@ function comp_data_bubble(cont,type)
 
 	if(type == "view") cl_pos = undefined;
 	
-	bubble_addtitle(cont,"Compartmental data",{te:comp_data_text});
+	let te = comp_data_text, ti = "Compartmental data";
+	if(edit_source.info.siminf == "gen"){ te = sim_comp_data_text; ti = "Generate individual compartmental data";}			
+				
+	bubble_addtitle(cont,"Compartmental data",{title:ti, te:te});
 	
 	if(cl_pos && cl_pos.length == 1){
 		cl_drop.te = cl_pos[0].te;
@@ -607,6 +611,8 @@ function comp_data_bubble(cont,type)
 	cont.y += 0.5;
 	
 	if(sim_options()){
+		bubble_input(cont,"Fraction observed:",{type:"frac_obs"});
+		
 		add_timepoint_options(cont);
 		
 		cont.y += 0.6;
@@ -651,6 +657,45 @@ function add_timepoint_options(cont)
 	
 	bubble_input(cont,name,{x:1, w:cont.dx-1, type:"time_gen"});
 }
+
+
+/// Adds options for time points (used to generate simulated data)
+function add_timepoint_data_options(cont)
+{
+	cont.y += 0.6;
+
+	let so = edit_source;
+	bubble_add_minititle(cont,"Times of observations:"); 
+	cont.y -= 0.4;
+
+	bubble_addradio(cont,0,"Periodic","Periodic",so.time_radio); cont.y -= 1.4;
+	bubble_addradio(cont,4.9,"Specified","Specified",so.time_radio); cont.y -= 1.4;
+	bubble_addradio(cont,10.1,"Data","Data",so.time_radio);
+
+	if(so.time_radio.value == "Data"){
+		let wmax = get_w_drop(so.sel_data_pos);
+		if(wmax < 8) wmax = 8;
+		if(wmax > 12.5) wmax = 12.5;
+		
+		cont.y += 0.2;
+		if(so.sel_data_pos.length == 0){
+			bubble_addparagraph(cont,"No data sources",1,10); 
+		}
+		else{
+			bubble_adddropdown(cont,1.5,wmax,so.sel_data,so.sel_data_pos);
+		}
+		cont.y += 0.2;
+	}
+	else{
+		let name;
+		switch(so.time_radio.value){
+		case "Periodic": name = "Time-step:"; break;
+		case "Specified": name = "Times (comma separated):"; break;
+		}
+		
+		bubble_input(cont,name,{x:1, w:cont.dx-1, type:"time_gen"});
+	}
+}
 			
 			
 /// Loads up the compartment data bubble
@@ -663,6 +708,7 @@ function comp_data(bu)
 	edit_source.exact = {value:"Exact"};
 	edit_source.comp_acc = "1";
 	edit_source.time_gen = "";
+	edit_source.frac_obs = 1;
 }
 
 
@@ -676,7 +722,10 @@ function trans_data_bubble(cont,type)
 
 	cont.dx = 17;
 	
-	bubble_addtitle(cont,"Transition data",{te:poptrans_data_text});
+	let te = trans_data_text, ti = "Transition data";
+	if(edit_source.info.siminf == "gen"){ te = sim_trans_data_text; ti = "Generate individual transition data";}			
+	
+	bubble_addtitle(cont,"Transition data",{title:ti, te:te});
 	
 	let res = bubble_add_trans_info(cont,disable);
 	
@@ -731,7 +780,10 @@ function diagtest_data_bubble(cont,type)
 	
 	if(type == "view") cl_pos = undefined;
 	
-	bubble_addtitle(cont,"Diagnostic tests",{te:diag_test_data_text});
+	let te = diag_test_data_text, ti = "Diagnostic test data";
+	if(edit_source.info.siminf == "gen"){ te = sim_diag_test_data_text; ti = "Generate individual diagnostic test data";}			
+							
+	bubble_addtitle(cont,"Diagnostic tests",{title:ti, te:te});
 	
 	bubble_addparagraph(cont,"Select the classification the test is sensitive to:",0,cont.dx);
 	cont.y += 0.2;
@@ -769,7 +821,11 @@ function diagtest_data_bubble(cont,type)
 		bubble_double_input(cont,"Positive text:",{type:"pos_result"},
 														 "Negative text:",{type:"neg_result"});
 														 
-		if(sim_options()) add_timepoint_options(cont);
+		if(sim_options()){
+			bubble_input(cont,"Fraction observed:",{type:"frac_obs"});
+		
+			add_timepoint_options(cont);
+		}
 	}	
 	else{ 
 		bubble_input(cont,"Sensitivity:",{hidden:true, type:"Se", eqn:true});
@@ -821,6 +877,7 @@ function diagtest_data(bu)
 	
 	edit_source.time_radio = {value:"Periodic"};
 	edit_source.time_gen = "";
+	edit_source.frac_obs = 1;
 }
 
 
@@ -832,7 +889,10 @@ function population_data_bubble(cont,type)
 	
 	cont.dx = 20.5;
 	
-	bubble_addtitle(cont,"Population data",{te:pop_data_text});
+	let te = pop_data_text, ti = "Population data";
+	if(edit_source.info.siminf == "gen"){ te = sim_pop_data_text; ti = "Generate population data";}			
+	
+	bubble_addtitle(cont,"Population data",{title:ti, te:te});
 	
 	let p = model.get_p();
 	
@@ -850,7 +910,9 @@ function population_data_bubble(cont,type)
 		
 	bub_observation_error(cont,spec,disable);
 	
-	if(sim_options()) add_timepoint_options(cont);
+	if(sim_options()){
+		add_timepoint_options(cont);
+	}
 	
 	let but_name = "Next"; if(type == "view") but_name = "Done";
 
@@ -963,7 +1025,11 @@ function poptrans_data_bubble(cont,type)
 
 	cont.dx = 20;
 	
-	bubble_addtitle(cont,"Aggregated transition data",{te:poptrans_data_text});
+	let te = poptrans_data_text, ti = "Aggregated transition data";
+	if(edit_source.info.siminf == "gen"){ te = sim_poptrans_data_text; ti = "Generate aggregated transition data";}			
+	
+	
+	bubble_addtitle(cont,"Aggregated transition data",{title:ti, te:te});
 	
 	let res = bubble_add_trans_info(cont,disable);
 	
@@ -978,7 +1044,9 @@ function poptrans_data_bubble(cont,type)
 	
 	if(cl_sel != select_drop_str){
 		bub_observation_error(cont,spec,disable);
-		if(sim_options()) add_timepoint_options(cont);
+		if(sim_options()){
+			add_timepoint_options(cont);
+		}
 	}	
 	
 	let but_name = "Next"; if(type == "view") but_name = "Done";
@@ -1365,14 +1433,18 @@ function add_radio_list(lay,list,prop,so,cy,dx)
 
 function sequence_data_bubble(cont,type)
 {
-	cont.dx = 11;
+	cont.dx = 14;
 	
-	bubble_addtitle(cont,"Genetic data",{te:seq_data_text});
+	let info = edit_source.info;
+	
+	let te = seq_data_text, ti = "Genetic data";
+	if(info.siminf == "gen"){ te = sim_seq_data_text; ti = "Generate pathogen genetic data";}		
+	
+	bubble_addtitle(cont,"Genetic data",{title:ti, te:te});
 	
 	let eqn_on = true;
 	if(sim_options()) eqn_on = false;
-		
-	let info = edit_source.info
+	
 	if(sim_options() && info.siminf == "gen"){
 		let sp = model.sim_res.plot_filter.species[info.p];
 		if(sp.trans_tree.check == false){
@@ -1406,7 +1478,7 @@ function sequence_data_bubble(cont,type)
 		
 		bubble_input(cont,"Fraction observed:",{type:"frac_obs"});
 		
-		add_timepoint_options(cont);
+		add_timepoint_data_options(cont);
 	}
 	
 	if(type == "view") add_end_button(cont,"Done","DataTableBack");
@@ -1435,6 +1507,25 @@ function sequence_data(bu)
 	edit_source.time_radio = {value:"Periodic"};
 	edit_source.time_gen = "";
 	
+	let pos = [];
+	let p	= model.get_p();
+	let gen_so = model.sim_res.plot_filter.species[p].gen_source;
+	
+	for(let i = 0; i < gen_so.length; i++){
+		switch(gen_so[i].type){
+		case "Compartment": case "Transition": case "Diag. Test":
+			{
+				let te = gen_so[i].title;
+				if(model.species.length > 1) te = model.species[p].name+": "+te;
+				pos.push({te:te, p:p, i:i});
+			}
+			break;
+		}
+	}
+	
+	edit_source.sel_data_pos = pos; 		
+	edit_source.sel_data = {te:select_str};
+
 	edit_source.numbp = 1000;
 	edit_source.frac_obs = 1;
 }
@@ -1458,7 +1549,10 @@ function ind_eff_data_bubble(cont,type)
 
 	cont.dx = 4.2+wmax;
 
-	bubble_addtitle(cont,"Individual effect",{te:move_ind_text});
+	let te = ind_eff_data_text, ti = "Individual effect";
+	if(edit_source.info.siminf == "gen"){ te = sim_ind_eff_data_text; ti = "Generate individual effect data";}			
+	
+	bubble_addtitle(cont,"Individual effect",{title:ti, te:te});
 	
 	let drop = edit_source.spec.drop;
 	
@@ -1497,8 +1591,11 @@ function ind_group_data_bubble(cont,type)
 {
 	let spec = edit_source.spec;
 	
+	let te = ind_group_data_text, ti = "Group data";
+	if(edit_source.info.siminf == "gen"){ te = sim_ind_group_data_text; ti = "Generate group data";}	
+	
 	cont.dx = 20;
-	bubble_addtitle(cont,"Individual group",{te:move_ind_text});
+	bubble_addtitle(cont,"Individual group",{tite:ti, te:te});
 	
 	bubble_input(cont,"Group name",{x:0, w:cont.dx-1, type:"group_name"});
 	
@@ -1596,7 +1693,7 @@ function select_ind_wildcard()
 	bub.ind_group_radio.value = "Specify";
 	
 	let name_list = bub.name_list;
-	
+
 	let cb = bub.check_box;
 	for(let i = 0; i < name_list.length; i++){
 		cb.value[i].check = false;
@@ -1610,7 +1707,7 @@ function select_ind_wildcard()
 /// Determines if a string matchs a wildcard
 function wildcard_match(name,filt)
 {
-	let spl = filt.split("×");
+	let spl = filt.split("*");
 
 	return wildcard_match2(name,spl);
 }
@@ -1635,7 +1732,8 @@ function wildcard_match2(name,spl)
 						let name_next = name.substr(i+len);
 						let spl_next=[];
 						for(let k = 1; k < spl.length; k++) spl_next.push(spl[k]);
-						return wildcard_match2(name_next,spl_next);
+						let res = wildcard_match2(name_next,spl_next);
+						if(res == true) return true;
 					}
 				}
 			}

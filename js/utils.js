@@ -850,7 +850,8 @@ function check_name_warn(name,te,sup_not_allow)
 	for(let i = 0; i < name.length; i++){
 		let ch = name.substr(i,1);
 		if(name_notallow.includes(ch)){
-			return te+" '"+name+"' cannot use the character '"+ch+"'";
+			if(ch == " ") return te+" '"+name+"' cannot contain any spaces";
+			else return te+" '"+name+"' cannot use the character '"+ch+"'";
 		}
 		
 		if(sup_not_allow){
@@ -981,4 +982,44 @@ function add_full_stop(te)
 		if(ch != "." && ch != "?" && ch != "!" && ch != "\n") te += ".";
 	}
 	return te;
+}
+
+
+/// Sorts string
+function sort_string(a,b,sign)
+{
+	const A = String(a).toUpperCase(); 
+  const B = String(b).toUpperCase();
+  if(A < B) return -1*sign; 
+	if(A > B) return 1*sign;
+  return 0;
+}
+
+
+/// Sorts string
+function sort_number(a,b,sign)
+{
+	const A = Number(a); 
+  const B = Number(b);
+	if(isNaN(A) || isNaN(B)) return 0;
+  if(A < B) return -1*sign; 
+	if(A > B) return 1*sign;
+  return 0;
+}
+
+
+/// Sorts string and number
+function sort_string_number(a,b,at,bt,sign)
+{
+	const A = String(a).toUpperCase(); 
+  const B = String(b).toUpperCase();
+  if(A < B) return -1*sign; 
+	if(A > B) return 1*sign;
+	
+	const At = Number(at); 
+  const Bt = Number(bt);
+	if(isNaN(At) || isNaN(Bt)) return 0;
+  if(A < B) return -1*sign; 
+	if(A > B) return 1*sign;
+  return 0;
 }

@@ -1,234 +1,48 @@
+TO DO
+model E5 checking takes ages...
+ind eff group name
+integrals are working correctly
+G1 not working
+5.3 small time step
+
+outputting taking a long time for Jamie model....
+
+test post-sim for all examples
+
+test proposals using initial state
+test trans-tree proposals using initial state
+
+- mac memory
+trans tree not displaying correctly for bad cat model
+error bad cat model when Ib not set to infected  Chech that Ib is infected
+geno_farm with gamma distribution
+
+- prob1: parameter a not being estimated correctly
+
+
+
+investigate if(1 == 0 && sp.tra_gl.size()*sp.comp_gl.size() <
+
+
+
+FUTURE THINGS TO GET SORTED
 - plot showing population density vs climate
 - plot showing climate mitigation vs climate
 - Model evidence
 - MC3
 
-- prob1: parameter a not being estimated correctly
-- mac interface
-- mac memory
-- Mac post-sim not working
-
-
-ME:
-- Code has been added to estimate reproduction number, with new derived functions RN(...), RNE(...) and RNC(...). RN(...) calculate R0 based on largest eigenvalue in the next generation matrix. RNE(...) calculates the effective reproduction number (this decreases as the susceptible population is exhausted). RNC(...) is a computational approach to calculating effective reproduction number (it bases its results of individuals which actually become infected)... this tends to be more noisy, but is the only approach which works when there is individual-based variation in traits.
-- Bugs fixed whereby a failed model load was incorrectly overwriting current model.
-- Brackets were not correctly displaying on description page.
-- An error in now given if repeated dependencies are used e.g. X_a,a
-- Example F3 has been modified to provides some extra examples of derived quantities.
-- Error messages when individual or fixed effects put into derived expressions.
-- Corrected problems related to displaying A matrix in interface.
-- Corrected timings diagnostics for proposals under PAS-MCMC
-- Added to the manual advice about setting priors/value for individual effects.
-- I've used Valgrind to identify a few instance when variables may not be initialised.
-
-GRANT:
-- Problem related to limited sums and integrals. Now sums with limit have a slightly modified syntax. "\sum_l' [l,30]" would be interpreted as the sum l' is limited to terms in which the distance between compartment l and l' is less than 30.
-- I was finding that the derived quantities for the big spatial models were not working very well. Basically they were using too much memory and were slow to initialise. I've had to substatially change how BICI calculates integrals, but at least this seems to have sorted out the problem. All these changes may have broken other things, so please let me know if you spot anything...
-- Problem with initial probabilies (e.g. S:0.995|I:0.005) fixed.  
-- I've also tried to improve how initial conditions are specified for individual-based models. Examples A5 and A6 have been added. 
-- Sorted out problem with loading large tensors into the interface (large that the size which can be editted). 
-
-
-JAMIE:
-- Now there are three ways to incorporate A: directly, through inverse or from pedigree. See manual for details.
-- As far as I can find Scientific notation for numbers (e.g. 3e-2) should work. If you can find an example of there it doesn't work that would be much appreciated.
-- I've put a mention of “mpirun --output :raw” into the manual. Although it doesn't seem to work on gaia. Perhaps I'm running on an old version ('mpirun --version' gives 'mpirun (Open MPI) 4.1.4'). Which version is on your computer?
-- I've added in the "#ifdef WIN64 #define WINDOWS..." declaration. Thats handy!
-- I've added you commented out code for the time, although I'm not sure if it's needed now.
-- I've added an error message if 'prior' is used with a table and suggests to use 'prior-split' instead. More generally I've added error messages when and when not to incorporate data tables.
-- I've mentioned in the menu and interface about the zero indexing used when specifing pedigree information.
-- Corrections of various proposals to ensure that system does not stray into region where numerical accuracy problems occur.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Write to Aiden
-
-
-
-TO DO §
-X(7) Checks on data tables
-X(13) Check error messages when changing BICI file
-(4) Look at doing posterior simulation from all examples
-(1) Go through all the examples and check they are working... look at diagnostic information
-
-(2) Look at diagnostics for kernels
-(5) Update manual
-
-X(3) Get period working - move multiple events 
-
-
-x(6) Error for poptrans data
-
-X(8) joining proposals
-(9) example giving age variation using period
-
-LATER
-NEW Adding a categorical fixed effect 
-
-(11) Capture recapture example
-X(12) Not alive comp measurement
-
-X(14) add grid view
-X(15) empty parameter
-(20) Get a version 0.4 on github
-
-Changes made for v0.4:
-- New diagnostic information which can be found on the "Diagnostics" menu item when inference is performed: (1) This shows expected number of transition from model vs actual number, (2) Distributions are probed looking at the uniformness of the cumulative probability distributions for evidence of biased transitions (see Max Lau paper), (3) MCMC diagnostic information.
-- Updates to the manual to help improve the explanations.
-- Incorporation of "period" transitions, which allow for a transition event after a certain time period. E.g. this can be used to implement age progression within individuals.
-- THe possiblity for parameter "factors" has been added to the model. This provides a good way for adding in categorical fixed effect into models.
-- Several new proposals have to added (moving mutiple linked events, moving all events for the same individual, leave/sink proposals.
-- Corrections made to add/rem individual proposals (such that they work when some individuals are observed in the system).
-- Significant improvements have been made on error messages in both the visual interface and direct from BICI script. These will help user to understand mistakes in the model
-- Added example M4.5 to illustrate "period" transition
-- Improvements in how loading is displayed in both interface ("Initialising..", "Running..." messages with percentages) and on the terminal.
-- Lots of bug finding. 
-
-There have been some minor changes to the syntax for BICI-script, so you might find that ".bici" files which previous loaded up now give error messages. The current manual contains all the BICI command. If you have difficulities let me know and I can help!
-
-
-
-(4) comp data seems to be shifted to the left
-(5) move multiple events 
-(6) local with ie 
-(7) test different event proposals in a number of scenarios
-(8) inidividual level transition in manual
-(9) FLICKERING INPUT
-
-
-
-- T=0 not shown on density maps right
-- B8 post sim crashes
-- C4 ppc 20-200 time 
-- C5 ooc "f not in model"
-
-- INLA BREW
-
-
-Need to sort out joining
-sort out "to do2"
-
-
-
-B5 joining of proposals
-
-D8 to do
-E6 to do
-E7
-
-
-§
-	if(style && inter.printing) w *= print_line_factor;
-		
-BICI achieves Bayesian inference by means of drawing samples from the posterior distribution using a widely applied technique known as “Markov chain Monte Carlo” (MCMC). Unlike many other statistical techniques (such as maximum likelihood), MCMC does not simply follow a predetermined algorithm and produce a final end r
-
-esult. Instead, it successively generates samples that progressively improve the accuracy with which the posterior is approximated. MCMC is continuously run until sufficient precision. 
-
-Currently working on making farm-based models faster
-- At the moment simulation is slow so working on improving that
-
-
-- Using Mareks disease status
-- cutting off first passage
-- ppc
-- time dependency
-- .
-
-make_comp_name(
-
-(1) // TO DO Need a faster way  -  fast way to reduce multinomial
-(2) // TO DO EQN CHECK
-
-
-- Need to sort out local event changes (to do sections)
-
-
-- FARM model with known infection times not working correctly
-- file saved in temp
-
-
-
-- direct message from software
-- get all examples done
-- finish off MFA
-- PAS
-- when initial "Cannot change pop fixed." error message
-
-
-
-
-
-
-
-
-- Get Marek's individual sampling working
-
-- Get individual sampler sorted
-
-- For transmission trees the rate must be linearly expressed in terms of populations.
-
-- matrix comp plot
-
-
-- siumulation slow when doing inference
-
-
-
-a×η(t)+β×Σ_l' ((1/(1+pow(ubound(d_l,l'|40)/r|α))) {I,l'})
-
-took around 1 min to do
-
-(0) a = a for reparaemterisation
-
-(1) Loading symbol when paraemter spline being viewed
-(2) paraemter loading symbol pausing
-(3) When matrix is too big then do not output results (maximum 
-e.g. let toobig = false; if(num_element(par) > ELEMENT_MAX) toobig = true;
-(4) Get AI working with ||l,l'|| approach
-
-
-
-model.init_param_needed = true;
-
-
-loading dirchlet prior
-start_add_initial_population();
-import_data_table_command(cname);
- get_prior_from_file(pri)
-Copy simulated parameters
-
-
-
-TO DO
-Sort out prior
-sort out map
-do compartment maps
-menu icon
-sum using prime
-a greek letter must be selected
 
 DONE
-chaging name for species, comp etc...
-- ctl c v to copy values and priors
+- Check derived functions
+- initial conditions not working
+- output slow...
+- Mac version not load
+- Can populations be used in reparameterise equations?
+
+- Can move events be used with NM transitions?
+{I^b} dies not display correctly
+- FMD_v2.5_markets move events test
+grant email
+add names to data source
+make alterations to bici file and check error messages
+check obs warning is working

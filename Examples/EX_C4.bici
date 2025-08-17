@@ -40,9 +40,9 @@ init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
 
 # INFERENCE DATA
 
-add-ind file="add-ind.csv"
+add-ind-inf file="add-ind.csv"
 
-test-data Se="0.6" Sp="0.99" pos="+" neg="-" comp="I" file="test-data.csv"
+test-data name="Test data" Se="0.6" Sp="0.99" pos="+" neg="-" comp="I" file="test-data.csv"
 
 
 

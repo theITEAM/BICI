@@ -1342,7 +1342,9 @@ function add_individual_buts(res,lay)
 		return;
 	}
 	
-	switch(plot_variety(inter.graph.type)){
+	let vari = plot_variety(inter.graph.type);
+	
+	switch(vari){
 	case "Line plot": inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); break;
 	case "Stat table plot": inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); break;
 	case "Scatter plot": 
@@ -1363,8 +1365,9 @@ function add_individual_buts(res,lay)
 	case "Individual plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); break;
 	case "TransTree plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); break;
 	case "PhyloTree plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); break;
+	case "Histogram plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); break;
 	case "No graph plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); break;
-	default: error("Graph not plotting"); break;
+	default: error("Graph not plotting"+vari); break;
 	}
 }
 
@@ -1472,6 +1475,16 @@ function graph_ind_calculate(result,rpf,burn,p)
 	
 	if(rpf.sel_indview.te == "Phylo. Tree"){
 		add_phylo_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn);
+		return;		
+	}
+	
+	if(rpf.sel_indview.te == "First Inf. Time"){
+		add_first_inf_time(imin,imax,tmin,tmax,chsel,result,rpf,burn);
+		return;		
+	}
+	
+	if(rpf.sel_indview.te == "First Inf. Ind."){
+		add_first_inf_ind(imin,imax,tmin,tmax,chsel,result,rpf,burn);
 		return;		
 	}
 	
@@ -2162,7 +2175,8 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 		default: error("Source not found"); break;
 		}
 		
-		let te = so.type; if(so.desc != "-") te += ": "+so.desc;
+		//let te = so.type; if(so.desc != "-") te += ": "+so.desc;
+		let te = so.name;
 		add_table_column(te,mat[j],table);
 	}
 	
@@ -2751,6 +2765,168 @@ function add_trans_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 }
 
 
+/// Gets a list of first infected individuals
+function get_first_infected_time(sampl)
+{
+	let tmin = LARGE;
+	for(let p = 0; p < sampl.species.length; p++){
+		let sa = sampl.species[p];
+
+		for(let i = 0; i < sa.individual.length; i++){
+			let ind = sa.individual[i];
+	
+			let ev = ind.ev;
+			for(let e = 0; e < ev.length; e++){
+				let eve = ev[e];
+				if(eve.infection){
+					if(eve.t < tmin) tmin = eve.t;
+				}
+			}
+		}
+	}
+	
+	if(tmin == LARGE) return;
+	
+	return tmin;
+}
+
+
+function get_first_infected_list(tmin,sampl)	
+{
+	let fi = [];
+	
+	for(let p = 0; p < sampl.species.length; p++){
+		let sa = sampl.species[p];
+
+		for(let i = 0; i < sa.individual.length; i++){
+			let ind = sa.individual[i];
+	
+			let ev = ind.ev;
+			for(let e = 0; e < ev.length; e++){
+				let eve = ev[e];
+				if(eve.infection){
+					if(eve.t == tmin){
+						fi.push({p:p, i:i, e:e});
+					}
+				}
+			}
+		}
+	}
+
+	return fi;
+}
+
+
+/// Creates a distribution plot for the first infection time
+function add_first_inf_time(imin,imax,tmin,tmax,chsel,result,rpf,burn)
+{	
+	let vec=[];
+	for(let samp = imin; samp < imax; samp++){
+		let sampl = result.sample[samp];
+		if(sampl.num >= burn && !(chsel != "All" && sampl.chain != chsel)){	
+			let tmin = get_first_infected_time(sampl);
+			if(tmin != undefined) vec.push(tmin);
+		}						
+	}
+	
+	if(vec.length == 0){
+		post(no_graph_msg("No first infection"));
+		return;
+	}
+		
+	let key = [];
+	let data = [];
+	
+	let show_mean = rpf.dist_settings.show_mean.check;
+	let line_max = false;
+	
+	distribution_add_data_line(vec,"",BLUE,data,key,rpf,show_mean);
+	
+	post({type:"Graph define", variety:"Distribution", view:"Graph", data:data, op:{x_label:"Time", x_param:true, y_label:"Probability", param:false, key:key, line_max:line_max, yaxis:false}});
+}
+
+
+/// Creates a distribution plot for the first infection time
+function add_first_inf_ind(imin,imax,tmin,tmax,chsel,result,rpf,burn)
+{	
+	let fii_all = [];
+
+	let sampl = result.sample[0];
+		
+	{	
+		for(let p = 0; p < sampl.species.length; p++){
+			fii_all[p]=[];
+			
+			let sa = sampl.species[p];
+			for(let i = 0; i < sa.individual.length; i++){
+				fii_all[p][i]=[];
+			}			
+		}
+	}
+	
+	let num = 0;
+	for(let samp = imin; samp < imax; samp++){
+		let sampl = result.sample[samp];
+		if(sampl.num >= burn && !(chsel != "All" && sampl.chain != chsel)){	
+			let tmin = get_first_infected_time(sampl);
+			if(tmin != undefined){
+				let fii=[];
+				for(let p = 0; p < sampl.species.length; p++){
+					fii[p]=[];
+			
+					let sa = sampl.species[p];
+					for(let i = 0; i < sa.individual.length; i++) fii[p][i] = 0;
+				}
+				
+				let fil = get_first_infected_list(tmin,sampl);
+				
+				let fac = 1.0/fil.length;
+				
+				for(let k = 0; k < fil.length; k++){
+					let val = fil[k];
+					fii[val.p][val.i] += fac;
+				}
+				num++;
+				
+				for(let p = 0; p < sampl.species.length; p++){
+					let sa = sampl.species[p];
+					for(let i = 0; i < sa.individual.length; i++){
+						fii_all[p][i].push(fii[p][i]);
+					}
+				}
+			}
+		}						
+	}
+	
+	if(num == 0){
+		post(no_graph_msg("No first infection"));
+		return;
+	}
+	
+	let data=[];
+	
+	let x = 0;
+	for(let p = 0; p < sampl.species.length; p++){
+		let sa = sampl.species[p];
+		for(let i = 0; i < sa.individual.length; i++){
+			let ind = sa.individual[i];
+			
+			let fa = fii_all[p][i];
+			let j = 0; while(j < fa.length && fa[j] == 0) j++;
+			if(j < fa.length){
+				let stat = get_statistic(fa);
+				
+				data.push({type:"Bar", name:ind.name, x:x+0.5, y:stat.mean, thick:bar_thick, col:DGREY});
+				data.push({type:"ErrorBar", x:x+0.5, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
+				x++;
+			}
+		}
+	}
+		
+	post({type:"Graph define", variety:"Histogram", view:"Histogram", data:data, op:{x_label:"Individual", x_param:false, y_label:"Probability"}});
+}
+
+
 /// Creates a plot for the phylogenetic tree
 function add_phylo_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 {	
@@ -3297,6 +3473,8 @@ function create_view_graph_calculate(name,sel_view,so)
 /// Based on spline information constructs over time
 function construct_spline_timevariation(par,value,details)
 {
+	if(value == undefined) return err("No value");
+
 	let knot = par.spline.knot;
 
 	let res = get_times(knot,details);

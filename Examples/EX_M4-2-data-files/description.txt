@@ -14,7 +14,7 @@
 - Population contains two compartments: $Prey$ and $Pred$.
 - A birth rate $α$ determines how fast prey are born.
 - A mortality rate $β$ determines how fast prey die.
-- A birth rate $δ$ determines how fast predators are born.
+- A birth rate $φ$ determines how fast predators are born.
 - A mortality rate $γ$ determines how fast predators die.
 
 ## Population

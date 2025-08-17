@@ -45,11 +45,11 @@ init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
 
 # INFERENCE DATA
 
-init-pop type="fixed" file="init-pop-People.csv"
+init-pop-inf type="fixed" file="init-pop-People.csv"
 
-pop-data filter="DS=I,Sex=file" error="normal:10%" file="pop-data.csv"
+pop-data name="Infected pop. by sex" filter="DS=I,Sex=file" error="normal:10%" file="pop-data.csv"
 
-pop-data filter="DS=I|R" error="normal:10%" file="pop-data-2.csv"
+pop-data name="Inf or rec population" filter="DS=I|R" error="normal:10%" file="pop-data-2.csv"
 
 
 

@@ -1950,8 +1950,11 @@ class Model
 			let ch = te.substr(i,1);
 		
 			if(name_notallow.includes(ch)){
-				if(op == "full") return "Compartment name '"+te+"' cannot use the character '"+ch+"'";
-				else return "Cannot use the character '"+ch+"'";
+				if(ch == " ") return "Cannot contain any spaces";
+				else{
+					if(op == "full") return "Compartment name '"+te+"' cannot use the character '"+ch+"'";
+					else return "Cannot use the character '"+ch+"'";
+				}
 			}
 		}
 	}
@@ -2913,8 +2916,8 @@ class Model
 	{
 		let exa_store;
 		
-		if(model.example && not_zero_page) exa_store = model.example;
-		
+		if(this.example && not_zero_page) exa_store = this.example;
+	
 		let mod = ans.model;
 		
 		for(let ele in mod) this[ele] = mod[ele];
@@ -2948,7 +2951,7 @@ class Model
 			}
 		}
 		
-		if(exa_store) model.example = exa_store;
+		if(exa_store) this.example = exa_store;
 		
 		let wa = mod.run_warning;
 		if(wa.length > 0 && mod.run_warning_show == false){
@@ -3038,7 +3041,8 @@ class Model
 			let ch = te.substr(i,1);
 		
 			if(name_notallow.includes(ch)){
-				return "Cannot use the character '"+ch+"'";
+				if(ch == " ") return "Cannot contain any spaces";
+				else return "Cannot use the character '"+ch+"'";
 			}
 		}
 		

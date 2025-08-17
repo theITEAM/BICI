@@ -42,9 +42,9 @@ add-ind-sim file="add-ind-sim.csv"
 
 # INFERENCE DATA
 
-add-ind file="add-ind.csv"
+add-ind-inf file="add-ind.csv"
 
-trans-data name="S->I" obsrange="all" file="trans-data.csv"
+trans-data name="Infections" trans="S->I" obsrange="all" file="trans-data.csv"
 
 
 

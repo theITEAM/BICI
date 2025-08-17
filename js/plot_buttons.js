@@ -470,6 +470,14 @@ Layer.prototype.plot_button = function (bu,ov)
 		}
 		break;
 		
+	case "NameLink":
+		{
+			fill_rectangle(x,y,dx,dy,WHITE);
+			let col = BLUE; if(ov) col = LBLUE;
+			plot_text(te,x,y+bu.si,bu.font,col,dx);
+		}
+		break;
+		
 	case "Link":
 		{
 			fill_rectangle(x,y,dx,dy,WHITE);
@@ -634,7 +642,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			plot_text(te[0],x+0.3,y+0.7*space, get_font(si_table,"bold"),BLACK,dx);
 			
 			let rmi = Math.floor((0-0.7*space-y)/space); if(rmi < 1) rmi = 1; 
-			let rma = Math.floor(1+(this.dy-0.7*space-y)/space); if(rma > te.length) rma = te.length;	
+			let rma = Math.floor(2+(this.dy-0.7*space-y)/space); if(rma > te.length) rma = te.length;	
 			for(let r = rmi; r < rma; r++){
 				plot_text(te[r],x+0.3,y+r*space+0.7*space,get_font(si_table),BLACK,dx);
 			}
@@ -646,7 +654,7 @@ Layer.prototype.plot_button = function (bu,ov)
 	case "ParamFactorConst": case "ParamWeightConst":
 	case "PriorSplitElement": case "DistSplitElement":
 	case "ParamSimElement": case "DistSimElement": 
-	case "ReparamElement": case "ReparamTableElement": 
+	case "ReparamElement": case "ReparamTableElement":  
 	case "PriorElement": case "DistElement": case "SplineKnots": 
 	case "SmoothValue": case "Amatrix": case "Xvector": case "AmatrixElement": case "XvectorElement":
 		if(bu.ac == undefined && (bu.type == "ParamElement" || bu.type == "ReparamElement" || bu.type == "ParamElementConst")){
@@ -674,12 +682,24 @@ Layer.prototype.plot_button = function (bu,ov)
 				if(bu.type == "ParamSimElement" && bu.source != model) colte = BLACK;
 			}
 		
+			let ddy = dy; if(bu.type == "Element") ddy = dy_table;
+		
 			if(bu.head){
-				plot_text(te,x+0.3,y+0.7*dy,bu.font,colte); 
+				plot_text(te,x+0.3,y+0.7*ddy,bu.font,colte); 
 			}
 			else{
-				let tsa = text_sup_anno(te,si_table,dx-0.5);
-				plot_text_tsa(tsa,x+0.3,y+0.7*dy,colte);
+				switch(bu.type){
+				case "ReparamElement": case "ReparamTableElement":  
+					{
+						let tsa = text_sup_anno(te,si_table,dx-0.5);
+						plot_text_tsa(tsa,x+0.3,y+0.7*ddy,colte);
+					}
+					break;
+					
+				default:
+					plot_text(te,x+0.3,y+0.7*ddy,bu.font,colte,dx);
+					break;
+				}
 			}
 		}
 		break;

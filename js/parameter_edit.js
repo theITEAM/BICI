@@ -79,11 +79,16 @@ function create_edit_param(lay)
 	if(too_big) title = title.substr(5,1).toUpperCase()+title.substr(6)+" (too large to edit)";
 	
 	if(par.dist_mat) cy = lay.add_title("Distance matrix",cx,cy,{te:dist_mat_text});
-	else cy = lay.add_title(title,cx,cy,{te:help});
+	else{
+		if(par.iden_mat) cy = lay.add_title("Identity matrix",cx,cy,{te:iden_mat_text});
+		else{
+			cy = lay.add_title(title,cx,cy,{te:help});
+		}
+	}
 	
 	add_layer("CreateEditParamContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{type:lay.op.type});
 	
-	if(too_big == true || par.dist_mat){
+	if(too_big == true || par.dist_mat || par.iden_mat){
 		lay.add_corner_button([["Back","Grey","CancelEditParam"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
 	else{
@@ -93,7 +98,7 @@ function create_edit_param(lay)
 	let x = 1.2, y = lay.dy-1.6;
 	let gap = 3.5;
 	
-	if(!par.dist_mat){
+	if(!par.dist_mat && !par.iden_mat){
 		let w = model.add_object_button(lay,"Load",x,y,load_ac,{ back:WHITE, active:true, info:{}, title:load_title, te:load_te}); 
 		x += w+gap;
 	}
@@ -144,7 +149,7 @@ function add_create_edit_param_buts(lay)
 	default: error(lay.op.type); error("option not recog"); break;
 	}
 	
-	if(eparam.too_big == true || par.dist_mat){ ele_type = "TooBigElement"; action = undefined;}
+	if(eparam.too_big == true || par.dist_mat || par.iden_mat){ ele_type = "TooBigElement"; action = undefined;}
 	
 	let value = eparam.value;
 	
@@ -214,7 +219,10 @@ function add_create_edit_param_buts(lay)
 		let out_dx = dx*list[1].length+2*mar;
 		let out_dy = dy_table_param*list[0].length+2*mar;
 		
-		if(eparam.too_big == true){ out_dx += 2; out_dy += dy_table_param;}
+		if(eparam.too_big == true){
+			if(eparam.shrunk[1]) out_dx += 2; 
+			if(eparam.shrunk[0]) out_dy += dy_table_param;
+		}
 		
 		cx = 2;
 		lay.add_button({x:cx+w_dep[0]+gap-mar, y:cy-mar, dx:out_dx, dy:out_dy, type:"Outline", col:BLACK});
@@ -232,13 +240,14 @@ function add_create_edit_param_buts(lay)
 				lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:ele_type, font:fo_table, i:i, pindex:pindex, ac:action});
 				cx += dx;
 			}
-			if(eparam.too_big == true){
+			
+			if(eparam.too_big == true && eparam.shrunk[1]){
 				lay.add_button({te:"...", x:cx, y:cy, dx:2, dy:dy_table_param, type:"Text", si:si_mar, font:fo_mar, col:mar_col});
 			}
 			cy += dy_table_param;
 		}
 		
-		if(eparam.too_big == true){
+		if(eparam.too_big == true && eparam.shrunk[0]){
 			let cx = 2+w_dep[0]+gap;
 			for(let i = 0; i < list[1].length; i++){
 				lay.add_button({te:"⋮", x:cx, y:cy, dx:2, dy:dy_table_param, type:"RightText", si:si_mar, font:fo_mar, col:mar_col});
@@ -301,34 +310,43 @@ function load_tensor(ep,source)
 	
 	let dep = par.dep;
 	let list = par.list;
-	let value = par.value;
 	if(ep.too_big){
-		ep.list = copy(par.list);
-		if(par.value != undefined) ep.value = copy(par.value);
-		ep.too_big = false;
+		ep.list = copy(list);
+		ep.value = par_find_template(list);
 	}
-	
 	let ep_value = ep.value;
+	
 	set_zero(ep_value);
 	
 	let tab = source.table;
 
+	let hash_list = calc_hash_list(list);
+
 	for(let r = 0; r < tab.nrow; r++){
 		let ind=[];
-		let flag = false;
 		for(let i = 0; i < dep.length; i++){
 			let te = tab.ele[r][i].trim();
-			let k = 0; while(k < list[i].length && te != list[i][k]) k++;
-			if(k < list[i].length) ind[i] = k;
-			else{ flag = true; error("Problem loading");}
+		
+			let k = hash_list[i].find(te);
+			if(k == undefined) alertp("The value '"+te+"' is not found (col "+(i+1)+", row "+(r+1)+")");
+			else ind[i] = k;
 		}
 		
-		if(flag == false){
-			let val = Number(tab.ele[r][dep.length]);
-	
-			set_element(ep_value,ind,val);
-		}
+		let va = tab.ele[r][dep.length];
+		if(isNaN(va)) error("Problem loading. The value '"+va+"' on line "+(r+1)+" is not a number");
+		let val = Number(va);
+		set_element(ep_value,ind,val);
 	}
+	
+	if(ep.too_big){ 
+		par.value = copy(ep_value);
+		par.set = true;
+		reduce_size(ep,par);
+	
+		ep.value_desc = get_value_desc(par);
+		par.value_desc = get_value_desc(par);
+	}
+	ep.set = par.set;
 }
 
 
@@ -353,29 +371,59 @@ function load_reparam(ep,source)
 	
 	if(ep.too_big){
 		ep.list = copy(list);
-		if(par.value != undefined) ep.value = copy(par.value);
-		ep.too_big = false;
+		ep.value = par_find_template(list);
 	}
 	
-	let value = ep.value;
+	let ep_value = ep.value;
 	let tab = source.table;
+	
+	set_zero(ep_value);
+	
+	let hash_list = calc_hash_list(list);
 	
 	for(let r = 0; r < tab.nrow; r++){
 		let ind=[];
-		let flag = false;
 		for(let i = 0; i < dep.length; i++){
 			let te = tab.ele[r][i].trim();
-			let k = 0; while(k < list[i].length && te != list[i][k]) k++;
-			if(k < list[i].length) ind[i] = k;
-			else{ flag = true; error("Problem loading");}
+			
+			let k = hash_list[i].find(te);
+			if(k == undefined) alertp("The value '"+te+"' is not found (col "+(i+1)+", row "+(r+1)+")");
+			else ind[i] = k;
 		}
 		
-		if(flag == false){
-			let val = tab.ele[r][dep.length];
-			if(!isNaN(val)) val = Number(val);
-			set_element(value,ind,val);
+		let val = tab.ele[r][dep.length];
+		if(!isNaN(val)) val = Number(val);
+		set_element(ep_value,ind,val);
+	}
+	
+	if(ep.too_big){ 
+		par.value = copy(ep_value);
+		reduce_size(ep,par);
+		par.set = true;
+		get_reparam_param_list(par);
+	
+		ep.value_desc = get_value_desc(par);
+		par.value_desc = get_value_desc(par);
+	}
+	ep.set = par.set;
+}
+
+
+/// Creates a hash table for the list
+function calc_hash_list(list)
+{
+	let hash_list = [];
+
+	for(let d = 0; d < list.length; d++){
+		hash_list[d] = new Hash();
+		
+		let li = list[d];
+		for(let i = 0; i < li.length; i++){
+			hash_list[d].add(li[i],i);
 		}
 	}
+	
+	return hash_list;
 }
 
 
@@ -388,37 +436,60 @@ function load_priorsplit(ep,source,dist)
 	
 	if(ep.too_big){
 		ep.list = copy(list);
-		if(par.value != undefined) ep.value = copy(par.value);
-		if(par.prior_split != undefined) ep.prior_split = par.prior_split;
-		ep.too_big = false;
-		//ep.limit_dim = get_dimensions(ep.value);
+		ep.value = par_find_template(list);
+		ep.prior_split = par_find_template(list);
 	}
+	
 	let prior_split = ep.prior_split;
 	let value = ep.value;
 	let tab = source.table;
 	
+	let hash_list = calc_hash_list(list);
+	
 	for(let r = 0; r < tab.nrow; r++){
 		let ind=[];
-		let flag = false;
 		for(let i = 0; i < dep.length; i++){
 			let te = tab.ele[r][i].trim();
-			let k = 0; while(k < list[i].length && te != list[i][k]) k++;
-			if(k < list[i].length) ind[i] = k;
-			else{ flag = true; error("Problem loading");}
+			let k = hash_list[i].find(te);
+			if(k == undefined) alertp("The value '"+te+"' is not found (col "+(i+1)+", row "+(r+1)+")");
+			else ind[i] = k;
 		}
 	
-		if(flag == false){
-			let ele = tab.ele[r][dep.length];
-		
-			let pri = convert_text_to_prior(ele,par.pri_pos,dist);
-			if(pri.err == true){
-				alertp("Problem loading the element '"+ele+"' (col "+(dep.length+1)+", row "+(r+1)+"): "+pri.msg+" .");
-			}
-			
-			set_element(prior_split,ind,pri);
-			set_element(value,ind,get_prior_string(pri));
+		let ele = tab.ele[r][dep.length];
+	
+		let pri = convert_text_to_prior(ele,par.pri_pos,dist);
+		if(pri.err == true){
+			alertp("Problem loading the element '"+ele+"' (col "+(dep.length+1)+", row "+(r+1)+"): "+pri.msg+" .");
 		}
+		
+		set_element(prior_split,ind,pri);
+		set_element(value,ind,get_prior_string(pri));
 	}
+	
+	if(ep.too_big){ 
+		let dim = get_dimensions(prior_split);
+		let ele_list = get_element_list(prior_split,dim);
+
+		for(let k = 0; k < ele_list.length; k++){
+			let el = get_element(prior_split,ele_list[k]);
+			if(el == undefined){
+				let te = "Not all elements in the tensor could be loaded (e.g. '";
+				for(let i = 0; i < dep.length; i++){
+					if(i != 0) te += ", ";
+					te += "'"+list[i][ele_list[k][i]]+"'";
+				}
+				te += "). For split priors all elements must be specified.";
+				alertp(te);
+			}
+		}
+	
+		par.prior_split = copy(prior_split);
+		par.prior_split_set = true;
+		reduce_size(ep,par);
+		ep.prior_split_desc = get_prior_split_desc(par);
+		par.prior_split_desc = get_prior_split_desc(par);
+	}
+	ep.prior_split_set = par.prior_split_set;
 }
 
 
@@ -457,7 +528,7 @@ function par_find_list(par)
 	}
 	
 	// In the case of the distance matrix truncates if too large
-	if(par.dist_mat){
+	if(par.dist_mat || par.iden_mat){
 		let list_max = Math.floor(Math.sqrt(ELEMENT_MAX))+1;
 		
 		for(let k = list_max; k < list[0].length; k++){

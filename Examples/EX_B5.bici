@@ -49,17 +49,17 @@ init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
 
 # INFERENCE DATA
 
-init-pop type="fixed" file="init-pop-People.csv"
+init-pop-inf type="fixed" file="init-pop-People.csv"
 
-pop-trans-data name="E->I" error="normal:10%" file="pop-trans-data.csv"
+pop-trans-data name="Exposures" trans="E->I" error="normal:10%" file="pop-trans-data.csv"
 
-pop-trans-data name="I->H" error="normal:10%" file="pop-trans-data-2.csv"
+pop-trans-data name="Hospitalised" trans="I->H" error="normal:10%" file="pop-trans-data-2.csv"
 
-pop-trans-data name="H->D" error="normal:10%" file="pop-trans-data-3.csv"
+pop-trans-data name="Deaths" trans="H->D" error="normal:10%" file="pop-trans-data-3.csv"
 
-pop-data filter="DS=E|I|A" error="normal:10%" file="pop-data.csv"
+pop-data name="Infected" filter="DS=E|I|A" error="normal:10%" file="pop-data.csv"
 
-pop-data filter="DS=E|I|A|R" error="normal:10%" file="pop-data-2.csv"
+pop-data name="Antibody" filter="DS=E|I|A|R" error="normal:10%" file="pop-data-2.csv"
 
 
 

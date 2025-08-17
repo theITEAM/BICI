@@ -17,8 +17,8 @@ let testing = false;                              // Used logo to load up result
 let load_map_fast = false;                        // If loads up world map from local computer
 
 let win_linux = false;//true;                             // When working on win running linux 
-if(win_linux){ testing = true; debug = true; load_map_fast = true;}
-
+if(win_linux || false){ testing = true; debug = true; load_map_fast = true;}
+	
 let make_file = false;                            // Determines if makes file or runs
 let thick_line = false;                           // Used for making figures
 let big_eqn = false;
@@ -53,11 +53,11 @@ const command_list = [
 {na:"param",ti:1},
 {na:"derived",ti:0},
 {na:"der",ti:0},
-{na:"init-pop",ti:0},
-{na:"add-pop",ti:0},
-{na:"remove-pop",ti:0},
-{na:"add-ind",ti:0},
-{na:"remove-ind",ti:0},
+{na:"init-pop-inf",ti:0},
+{na:"add-pop-inf",ti:0},
+{na:"remove-pop-inf",ti:0},
+{na:"add-ind-inf",ti:0},
+{na:"remove-ind-inf",ti:0},
 {na:"move-ind",ti:0},
 {na:"init-pop-sim",ti:0},
 {na:"add-pop-sim",ti:0},
@@ -104,7 +104,7 @@ const command_list = [
 ];
 
 // Lists all commands which need to load files
-const data_command_list = ["init-pop", "add-pop", "remove-pop", "add-ind", "remove-ind", "move-ind", "init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data","param-mult"];
+const data_command_list = ["init-pop-inf", "add-pop-inf", "remove-pop-inf", "add-ind-inf", "remove-ind-inf", "move-ind", "init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data","param-mult"];
 
 const sim_alg_list = ["gillespie","tau"];
 const inf_alg_list = ["DA-MCMC","PAS-MCMC","MFA","ABC","ABC-SMC","ABC-MBP","PMCMC","HMC"];
@@ -256,13 +256,13 @@ let name_ch_max = 40;                                   // The maximum number of
 let invalid_name = ["Compartment","Population","Alpha","Distribution","file"];
 
 const convert = [
-		{command:"add-pop", type:"Add Pop."},
-		{command:"remove-pop", type:"Remove Pop."},
-		{command:"add-ind", type:"Add Ind."},
-		{command:"remove-ind", type:"Remove Ind."},
+		{command:"add-pop-inf", type:"Add Pop."},
+		{command:"remove-pop-inf", type:"Remove Pop."},
+		{command:"add-ind-inf", type:"Add Ind."},
+		{command:"remove-ind-inf", type:"Remove Ind."},
 		{command:"move-ind", type:"Move Ind."},
 		{command:"fixed-eff", type:"Fixed Eff."},
-		{command:"init-pop", type:"Init. Pop."},
+		{command:"init-pop-inf", type:"Init. Pop."},
 		{command:"comp-data", type:"Compartment"},
 		{command:"trans-data", type:"Transition"},
 		{command:"test-data", type:"Diag. Test"},	
@@ -397,6 +397,7 @@ const NODE_PLOT_MAX = 1000;                        // Maximum number nodes is ph
 const SCRIPT_LINE_MAX = 1000;                      // The maximum number of script lines to show
 
 const ELE_REDUCE_FAC = 0.7;                        // Factor reduction when too many elements
+const TABLE_ROW_MAX = 10000;                       // The maximum number of rows displayed on a table
 
 const DEN_X = 200;                                 // Resolution of density p;ots
 const SR_MIN = 5;                                  // Determines if DEN_X must be increased
@@ -439,6 +440,8 @@ const unset_type = "unset_type";                   // Denotes unset type
 const no_elements = "No elements";                 // Message if no elements in array
 const data_invalid = "Data source is invalid";     // Invalid data source message
 const dist_matrix_name = "D";                      // The name of a distance matrix
+const iden_matrix_name = "δ";                      // The name of identity matrix
+const iden_matrix_name2 = "\\delta";               // The name of identity matrix
 const RN_name = "RN";                              // The basic reproduction number function
 const RNE_name = "RNE";                            // The effective reproduction number function
 const RNC_name = "RNC";                            // The computational reproduction number function
@@ -499,6 +502,7 @@ const SEED_DEFAULT = 0;                            // The default seed
 const ANNEAL_POWER_DEFAULT = "4";                  // Default annealing power
 const ANNEAL_RATE_DEFAULT = "0.01";                // Rate at which annealing is done
 const COORD_DEFAULT = "cartesian";                 // Default coordinate system
+const INTERNAL_ERROR = " This is an internal error to BICI and not something you have done wrong! Please send the BICI script to const Chris for diagnosis.";
 
 const PARAM_OUTPUT_MAX_DEFAULT = 1000;             // The default maximum number of tensor elements to be output
 const INDMAX_DEFAULT = 20000;                      // The default maximum number of individuals

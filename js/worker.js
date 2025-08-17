@@ -151,7 +151,8 @@ function process(e)
 			let par = model.param[info.i];
 			if(par.variety != "const" && par.dep.length != 0){
 				let list = par_find_list(par);
-				par.value = par_find_template(list);
+				par.value = undefined;
+				par.set = false;
 			}
 			par.variety = "normal";
 			update_mod = true;
@@ -190,8 +191,8 @@ function process(e)
 			if(res.err == false){			
 				if(info.op.coord == "latlng" && info.op.default_map == true){
 					let mfi = "../Maps/World.json"; if(load_map_fast) mfi = "D:/BICI_nolongerused/Maps/World.json";
-						
-					let te = load_file_http(mfi);
+					
+					let te = load_file_local(mfi);
 					let map = load_annotation_map(te);	
 					
 					post({species:strip_heavy(model.species), feature:map.feature, box:map.box, info:{p:p,cl:model.species[p].ncla-1,default_map:true}});
@@ -286,6 +287,11 @@ function process(e)
 		create_ppc_file();
 		break;
 
+
+	case "Import2":
+		import_file2(info.data_file_list);
+		break;
+		
 	case "Spawn Output":
 		import_file(info.content,"Execute/init.bici",false);
 		break;
@@ -474,7 +480,12 @@ function process(e)
 				set_dist(info,par);
 			}
 			else{
-				if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
+				if(par.iden_mat){
+					set_iden(info,par);
+				}
+				else{
+					if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
+				}
 			}
 			
 			post({ info:info});
@@ -536,7 +547,6 @@ function process(e)
 			let ep = info.ep;
 			data_source_check_error("worker",info.source);
 			load_tensor(ep,info.source);
-			
 			post({ ep:ep});
 		}
 		break;
@@ -549,6 +559,7 @@ function process(e)
 		data_source(info.type,info.edit_source,info.info);
 		break;
 	
+	/*
 	case "Load map":
 		{
 			let te = load_file_http(info);
@@ -556,7 +567,8 @@ function process(e)
 			post({ feature:map.feature, box:map.box, info:info});
 		}
 		break;
-		
+	*/
+	
 	case "New model":
 		new_model();
 		break;
@@ -673,7 +685,7 @@ function process(e)
 		{
 			let fi = "M:/Github/theITEAM/BICI/Execute/init.bici";
 			if(ver =="windows" && !win_linux){
-				fi = "C:/Users/cpooley/Desktop/BICI_release/BICI_v0.3_windows/Execute/init.bici";
+				fi = "C:/Users/cpooley/Desktop/BICI_release/BICI_v0.6_windows/Execute/init.bici";
 			}
 			percent(2)
 			load_bici(fi);
@@ -760,7 +772,8 @@ function create_invalid_message(mess)
 					for(let j = source.length-1; j >= 0; j--){
 						let so = source[j];
 						if(so.error == true){
-							list.push("• <b>"+type+"</b> - "+so.type+": "+so.desc);
+							//list.push("• <b>"+type+"</b> - "+so.type+": "+so.desc);
+							list.push("• <b>"+type+"</b> - "+so.name);
 							source.splice(j,1);
 						}
 					}

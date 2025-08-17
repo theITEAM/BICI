@@ -35,9 +35,9 @@ init-pop-sim type="fixed" focal="Area" file="init-pop-sim-Animal.csv"
 
 # INFERENCE DATA
 
-init-pop type="fixed" file="init-pop-Animal.csv"
+init-pop-inf type="fixed" file="init-pop-Animal.csv"
 
-pop-data filter="Area=P:a×exp(b×cos(0.06×t))" error="normal:10%" file="pop-data.csv"
+pop-data name="Partially observed population" filter="Area=P:a×exp(b×cos(0.06×t))" error="normal:10%" file="pop-data.csv"
 
 
 

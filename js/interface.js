@@ -200,7 +200,7 @@ function key_press(e)
 
 	if(code == 16 || code == 17) return;
 	
-	if(code == 27 && win_linux){ // Escape key
+	if(code == 27 && testing){ // Escape key
 		console.clear();
 		location.reload(true);
 	}
@@ -380,7 +380,7 @@ function key_press(e)
 					if(text_lay){
 						switch(text_lay.op.source.type){
 						case "find": case "replace": case "description": case "element_factor_const":
-						case "element_weight_const":
+						case "element_weight_const": case "wild_card":
 							fl = true; 
 							break;				
 						}
@@ -514,8 +514,17 @@ function create_edit_table(lay)
 			ac = "TableEditOn";
 		}
 		else{
-			te = "Edit this table (optional) and click 'Done' to complete."; 
-
+			let nrow;
+			if(tab_source != undefined) nrow = tab_source.nrow;
+			if(tab_dest != undefined) nrow = tab_dest.nrow;
+			
+			if(nrow != undefined && nrow > TABLE_ROW_MAX){
+				te = "This table is too large to edit. Click 'Done' to complete."; 
+			}
+			else{
+				te = "Edit this table (optional) and click 'Done' to complete."; 
+			}
+			
 			switch(so.type){
 			case "KnotTimes": ac = "AddKnotTimes"; break;
 			case "CompMap": ac = "AddCompMap"; break;
@@ -634,6 +643,11 @@ function add_create_edit_table_buts(lay)
 /// Draws a specified data table at a given location
 function draw_data_table(lay,x,y,tab,op)
 {
+	let nrow = tab.nrow;
+	let too_big = false;
+	if(nrow > TABLE_ROW_MAX){ nrow = TABLE_ROW_MAX; too_big = true;}
+	let nr = (nrow+1);
+	
 	let pad = 1;
 	let mar = 0.4;
 	let name = op.name;
@@ -641,7 +655,7 @@ function draw_data_table(lay,x,y,tab,op)
 	let x_start = x;
 	let si_num = 0.8;
 	let fo_num = get_font(si_num);
-	let wnum = text_width(String(tab.nrow),fo_num);
+	let wnum = text_width(String(nrow),fo_num);
 	x += wnum+0.6;
 	
 	let wmin = 0;
@@ -680,7 +694,7 @@ function draw_data_table(lay,x,y,tab,op)
 			}
 			
 			let lenmax = 0, longest="";
-			for(let r = 0; r < tab.nrow; r++){
+			for(let r = 0; r < nrow; r++){
 				let te = get_table_ele_text(tab,r,c);
 				let l = te.length;
 				if(l > lenmax){ lenmax = l; longest = te;}
@@ -694,9 +708,9 @@ function draw_data_table(lay,x,y,tab,op)
 			
 			let cy = y+mar;
 
-			if(op.edit == true){
+			if(op.edit == true && too_big == false){
 				lay.add_button({te:head, x:cx, y:cy, dx:wmax, dy:dy_table, type:"Element", c:c, ac:"EditTableHead", head:true, font:get_font(si_table,"bold")}); cy += dy_table;
-				for(let r = 0; r < tab.nrow; r++){
+				for(let r = 0; r < nrow; r++){
 					let te = get_table_ele_text(tab,r,c); 
 					lay.add_button({te:te, x:cx, y:cy, dx:wmax, comp_col:comp_col, dy:dy_table, type:"Element", c:c, r:r, ac:"EditTableElement", font:get_font(si_table)}); cy += dy_table;
 				}
@@ -704,19 +718,24 @@ function draw_data_table(lay,x,y,tab,op)
 			else{
 				let column=[];
 				column.push(head);
-				for(let r = 0; r < tab.nrow; r++){
+				for(let r = 0; r < nrow; r++){
 					let te = get_table_ele_text(tab,r,c); 
 					column.push(te);
 				}
 				
-				lay.add_button({te:column, x:cx, y:cy, dx:wmax, dy:column.length*dy_table, type:"Column", space:dy_table, c:c, ac:op.ac});
+				lay.add_button({te:column, x:cx, y:cy, dx:wmax, dy:nr*dy_table, type:"Column", space:dy_table, c:c, ac:op.ac});
 			}
-			
+				
+			if(too_big){
+				let si_mar = 1;
+				let fo_mar = get_font(si_mar);
+				let mar_col = EDIT_MARGIN_COL;
+				lay.add_button({te:"⋮", x:cx, y:cy+nr*dy_table, dx:2, dy:dy_table_param, type:"RightText", si:si_mar, font:fo_mar, col:mar_col});
+			}
 			cx += wmax;
 		}
 	}
 	
-	let nr = (tab.nrow+1);
 	if(cx == x+mar){
 		let column=[];
 		let te = "Empty"; nr = 1;
@@ -725,13 +744,15 @@ function draw_data_table(lay,x,y,tab,op)
 		lay.add_button({te:column, x:cx, y:y+mar, dx:dx, dy:column.length*dy_table, type:"Column", space:dy_table});
 		cx += dx;
 	}
-
+	
 	let ww = cx+mar-x;
 	for(let r = 0; r < nr-1; r++){
-		let ac; if(op.edit == true) ac = "RowNumber"
+		let ac; if(op.edit == true && too_big == false) ac = "RowNumber"
 		lay.add_button({te:String(r+1), x:x_start, y:y+mar+(1+r)*dy_table, dx:x-x_start-0.1, dy:dy_table, type:"RowNumber", r:r, si:si_num, font:fo_num, col:RED, ac:ac});
 	}
-	lay.add_button({x:x, y:y, dx:ww, dy:nr*dy_table+2*mar, type:"Outline", col:BLACK});
+	let dyout = nr*dy_table+2*mar; if(too_big) dyout += dy_table_param;
+	
+	lay.add_button({x:x, y:y, dx:ww, dy:dyout, type:"Outline", col:BLACK});
 
 	lay.add_button({x:x, y:y+nr*dy_table+2*mar, dx:ww+0.1, dy:0.1, type:"Nothing"});
 
@@ -980,29 +1001,6 @@ function search_next()
 	inter.bubble.mode = bub.mode;
 	inter.bubble.search_select = bub.search_select;
 	inter.bubble.row_find = bub.row_find;
-}
-
-
-/// Sorts string
-function sort_string(a,b,sign)
-{
-	const A = String(a).toUpperCase(); 
-  const B = String(b).toUpperCase();
-  if(A < B) return -1*sign; 
-	if(A > B) return 1*sign;
-  return 0;
-}
-
-
-/// Sorts string
-function sort_number(a,b,sign)
-{
-	const A = Number(a); 
-  const B = Number(b);
-	if(isNaN(A) || isNaN(B)) return 0;
-  if(A < B) return -1*sign; 
-	if(A > B) return 1*sign;
-  return 0;
 }
 
 
@@ -1276,6 +1274,10 @@ function add_table_content(lay,table,back_col,dy)
 			case "View":
 				lay.add_button({te:ele.te, x:cx, y:cy+0.1, dx:w-0.5, dy:1.2, type:"GreyView", back_col:back_col, info:ele.info, ac:ele.ac}); 
 				break;
+			
+			case "Source Name":
+				lay.add_button({te:ele.name, x:cx, y:cy+0.1, dx:w-0.5, dy:1.2, type:"NameLink", ac:ele.ac, si:si, font:get_font(si), so:ele.so}); 
+				break;
 				
 			case "Delete":
 				{
@@ -1285,24 +1287,26 @@ function add_table_content(lay,table,back_col,dy)
 				break;
 			
 			default:
-				let fo = get_font(si);
-			
-				if(ele.ac != undefined){
-					let ww = text_width(ele.te,fo)+0.1;
-					if(ww > w) ww = w;
-					lay.add_button({te:ele.te, x:cx, y:cy, dx:ww, dy:1.3, type:"Link", i:ele.i, ac:ele.ac, si:si, font:fo});
-				}
-				else{
-					if(ele.pname == true){
-						lay.add_button({te:ele.te, x:cx, y:cy, dx:w, dy:1.3, type:"ParamText", back_col:back_col, si:si, font:fo, col:col});
+				{
+					let fo = get_font(si);
+				
+					if(ele.ac != undefined){
+						let ww = text_width(ele.te,fo)+0.1;
+						if(ww > w) ww = w;
+						lay.add_button({te:ele.te, x:cx, y:cy, dx:ww, dy:1.3, type:"Link", i:ele.i, ac:ele.ac, si:si, font:fo});
 					}
 					else{
-						let comp_col;
-						if(head[c].name == "Details") comp_col = true; 
-							
-						lay.add_button({te:ele.te, comp_col:comp_col, x:cx, y:cy, dx:w, dy:1.3, type:"Text", back_col:back_col, si:si, font:fo, col:col});
-					}
-				}					
+						if(ele.pname == true){
+							lay.add_button({te:ele.te, x:cx, y:cy, dx:w, dy:1.3, type:"ParamText", back_col:back_col, si:si, font:fo, col:col});
+						}
+						else{
+							let comp_col;
+							if(head[c].name == "Details") comp_col = true; 
+								
+							lay.add_button({te:ele.te, comp_col:comp_col, x:cx, y:cy, dx:w, dy:1.3, type:"Text", back_col:back_col, si:si, font:fo, col:col});
+						}
+					}					
+				}
 				break;	
 			}
 			
@@ -1490,6 +1494,10 @@ function view_warning(i)
 	case "NoClaComp":
 		change_page({pa:"Model", su:"Compartments", susu:warn.p, sususu:warn.cl});
 		break;
+		
+	case "TransTreeComp":
+		change_page({pa:"Model", su:"Compartments", susu:warn.p, sususu:warn.cl});
+		break;
 	
 	case "MissingComp": case "MissingColour":
 		select_bubble_compartment(warn.p,warn.cl,warn.c);
@@ -1592,7 +1600,7 @@ function view_warning(i)
 				break;
 			
 			default: 
-				error("This equation type is not recognised:"+warn.eqn_type);
+				error("This equation type is not recognised: "+warn.eqn_type);
 				break;
 			}
 		}
@@ -1632,7 +1640,7 @@ function view_warning(i)
 		break;
 	
 	default:
-		error("This warning type is not recognised:"+warn.warn_type);
+		error("This warning type is not recognised: "+warn.warn_type);
 		break;
 	}
 }

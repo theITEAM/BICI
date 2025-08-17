@@ -40,7 +40,7 @@ comp name="T2" color="#888888" x=10 y=0
 
 add-ind-sim file="add-ind-sim.csv"
 
-move-ind-sim class="Tank" file="move-ind-sim.csv"
+move-ind-sim name="Move individuals" class="Tank" file="move-ind-sim.csv"
 
 remove-ind-sim file="remove-ind-sim.csv"
 

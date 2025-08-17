@@ -42,11 +42,11 @@ add-ind-sim file="add-ind-sim.csv"
 
 # INFERENCE DATA
 
-add-ind file="add-ind.csv"
+add-ind-inf file="add-ind.csv"
 
-trans-data name="S->I" obsrange="all" file="trans-data.csv"
+trans-data name="Infections" trans="S->I" obsrange="all" file="trans-data.csv"
 
-ind-effect-data name="g" file="ind-effect-data.csv"
+ind-effect-data name="Sus. ind. eff." ie="g" file="ind-effect-data.csv"
 
 ind-group-data name="sire" file="ind-group-data.csv"
 

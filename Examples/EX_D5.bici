@@ -38,11 +38,11 @@ init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
 
 # INFERENCE DATA
 
-add-ind file="add-ind.csv"
+add-ind-inf file="add-ind.csv"
 
-comp-data class="DS" file="comp-data-DS.csv"
+comp-data name="Observations in DS" class="DS" file="comp-data-DS.csv"
 
-trans-data name="S->I:a+b×cos(0.03×t)" obsrange="all" file="trans-data.csv"
+trans-data name="Partially observed infections" trans="S->I:a+b×cos(0.03×t)" obsrange="all" file="trans-data.csv"
 
 
 

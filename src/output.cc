@@ -2873,7 +2873,7 @@ void Output::number_part(vector <Particle> &part) const
 /// Outputs the final cpu time
 void Output::final_time(long sec, long op_sec) const 
 {
-	auto op_st = " ("+tstr((int)((op_sec*100)/sec))+"% outputting)";
+	auto op_st = " ("+tstr((int)((op_sec*100)/(sec+TINY)))+"% outputting)";
 	
 	cout << endl << "Total CPU time: ";
 	

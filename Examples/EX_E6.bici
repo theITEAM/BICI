@@ -46,9 +46,9 @@ add-ind-sim file="add-ind-sim.csv"
 
 # INFERENCE DATA
 
-add-ind file="add-ind.csv"
+add-ind-inf file="add-ind.csv"
 
-comp-data class="DS" file="comp-data-DS.csv"
+comp-data name="DS observations" class="DS" file="comp-data-DS.csv"
 
 
 

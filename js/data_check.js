@@ -8,7 +8,16 @@ function data_source_check_error(out_type,so)
 	
 	let sp = model.species[p];
 
-	if(so.info.siminf == "gen") sp = model.sim_res.plot_filter.species[p];
+	if(so.info.siminf == "gen"){
+		sp = model.sim_res.plot_filter.species[p];	
+		for(let cl = 0; cl < sp.cla.length; cl++){
+			let claa = sp.cla[cl];
+			if(claa.hash_comp == undefined){
+				claa.hash_comp=[];
+				hash_redo(claa.hash_comp,claa.comp);
+			}
+		}
+	}
 	so.error = false;
 	
 	let tab = so.table;
@@ -39,7 +48,6 @@ function data_source_check_error(out_type,so)
 		}
 	}
 
-	
 	switch(so.type){
 	case "Pop. Trans.":
 		for(let r = 0; r < tab.nrow; r++){
@@ -49,6 +57,22 @@ function data_source_check_error(out_type,so)
 				data_error("The start time '"+sta_str+"' must be less than the end time '"+end_str+"'.",out_type,so,{r:r});
 			}
 		}	
+		break;
+	
+	case "Move Ind.":
+		{
+			let cl = find(sp.cla,"name",so.spec.cl_drop.te);
+			let claa = sp.cla[cl];
+			for(let tr = 0; tr < claa.ntra; tr++){
+				let tra = claa.tra[tr];
+				switch(tra.type){
+				case "gamma": case "erlang": case "log-normal": case "weibull": case "period":
+					data_error("Move data cannot be applied to classification '"+claa.name+"' because this contains non-Markovian transitions.",out_type,so);
+					break;
+				default: break;
+				}
+			}
+		}
 		break;
 	}
 
@@ -90,7 +114,20 @@ function data_source_check_error(out_type,so)
 			if(repeat != ""){
 				let te; if(so.type == "Add Ind.") te = "added"; else te = "removed";
 				
-				data_error("The following individuals are "+te+" more than once:"+repeat,out_type,so);
+				data_error("The following individuals occur "+te+" more than once: "+repeat,out_type,so);
+			}
+		}
+		break;
+	
+	case "Move Ind.":
+		{
+			// Checks not moving individual twice at the same time
+			let list=[];
+			for(let r = 0; r < tab.nrow; r++) list.push({ID:tab.ele[r][0],t:tab.ele[r][1]});
+			let repeat = check_repeat_time(list);
+		
+			if(repeat != ""){
+				data_error("The following individuals move more than once at the same time: "+repeat,out_type,so);
 			}
 		}
 		break;
@@ -294,6 +331,7 @@ function data_source_check_error(out_type,so)
 					let tab = so.table;
 					for(let r = 0; r < tab.nrow; r++){
 						let to = tab.ele[r][2];
+		
 						if(hash_find(claa.hash_comp,to) == undefined){
 							data_error("The value '"+to+"' is not a compartment in classification '"+claa.name+"'",out_type,so,{r:r,c:3,num:13});
 						}
@@ -481,7 +519,8 @@ function check_data_time(out_type)
 								}
 								else{
 									let t = Number(te);
-									if(t < t_start || t > t_end){
+									
+									if(so.type == "Add Ind." && (t < t_start || t > t_end)){
 										data_error("The time '"+t+"' must be between the start and end times","warn",so,{minor:true, c:c, r:r, num:130});
 										break;
 									}	
@@ -782,6 +821,25 @@ function check_repeat(list)
 }
 
 
+/// Checks to see if elements are repeated
+function check_repeat_time(list)
+{
+	list.sort( function(a, b){ return sort_string_number(a.ID,b.ID,a.t,b.t,1)});
+	
+	let repeat="";
+	
+	for(let i = 0; i < list.length-1; i++){
+		if(list[i].ID == list[i+1].ID && list[i].t == list[i+1].t){
+			if(repeat != "") repeat += ", ";
+			repeat += list[i].ID;
+			while(i < list.length-1 && list[i].ID == list[i+1].ID) i++;
+		}
+	}
+
+	return repeat;
+}
+
+
 /// Adds a warning to the list
 function add_warning(wa)
 {
@@ -805,6 +863,9 @@ function data_error(warn,out_type,so,op)
 	if(op != undefined && op.minor) minor_warn = true;
 	else so.error = true;
 	
+	warn = "For '"+so.name+"': "+warn;
+	
+	/*
 	if(out_type == "warn"){
 		let de = so.type;
 		if(so.desc != undefined) de += " "+so.desc;
@@ -818,6 +879,8 @@ function data_error(warn,out_type,so,op)
 			warn = in_file_text(so.table.filename)+": "+warn;
 		}
 	}
+	*/
+	
 	
 	if(warn.substr(warn.length-1,1) == ".") warn = warn.substr(0,warn.length-1);	
 	if(op != undefined && op.r != undefined){

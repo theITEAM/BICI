@@ -346,7 +346,7 @@ function load_table(te,head,sep,filename)
 /// Reads parameter samples from a file 
 function read_param_samples_file(chain,file,result)
 {
-	let te= file.te;
+	let te = file.te;
 
 	let warn = "Problem loading file '"+file.name+"'";
 	if(file.name == "inline") warn = "Problem loading parameter sample";
@@ -607,8 +607,7 @@ function read_param_samples(chain,te,result,warn)
 	for(let th = 0; th < result.param.length; th++){
 		let par = result.param[th];
 		
-		if(par.dist_mat || (par.variety == "reparam" && par.reparam_eqn_on)){
-			//if(par.co_list.length != 0) error("Param error");
+		if(par.dist_mat || par.iden_mat || (par.variety == "reparam" && par.reparam_eqn_on)){
 			if(par.value.length != 0) error("Param error");
 			if(par.prior_split.length != 0) error("Param error");
 		}
@@ -664,8 +663,8 @@ function load_state_sample_header(te,result,warn)
 	let ind_key=[];
 	for(let j = 0; j < spl.length; j++){
 		let st = spl[j].trim();
-		if(st != ""){
-			if(st.length > 10 && st.substr(0,10) == "timepoint "){
+		if(st != "" && !begin_str(st,"#")){
+			if(begin_str(st,"timepoint ")){
 				let spl = st.split(" ");
 				let spl2 = spl[1].split(":");
 				
@@ -1013,7 +1012,7 @@ function read_state_sample(te,chain,result,warning)
 			
 						let spl = lines[i].split(",");
 				
-						if(spl.length > 2 && spl[0] == "name" && spl[1] == "source"){
+						if(spl.length > 2 && spl[0] == "index" && spl[1] == "source"){
 							sp.ind_effect = [];
 							for(let k = 2; k < spl.length-1; k++) sp.ind_effect.push(spl[k]);	
 						}
@@ -1410,8 +1409,8 @@ function get_subtable(tab,col_name)
 }
  
 
-/// Loads a file using a http request
-function load_file_http(file,type)
+/// Loads a local file using a http request
+function load_file_local(file,type)
 {
 	let root = "Examples\\";
 	if(begin(file,root)) file = "..\\"+file;
@@ -1462,18 +1461,39 @@ function text_width_worker(te,si,bold)
 /// Reduces the size of a tensor returned from the worker
 function reduce_size(info,par)
 {
-	let scale = ELE_REDUCE_FAC*Math.pow(ELEMENT_MAX/num_element(par),1.0/par.dep.length);
-			
 	let list_shrink=[];
-	for(let d = 0; d < par.dep.length; d++){
-		let li=[];
-		let imax = Math.floor(scale*par.list[d].length);
-		if(imax < 0) imax = 1;
+	
+	if(par.dep.length == 2){ // For a matrix try to make square
+		let n = ELE_REDUCE_FAC*Math.sqrt(ELEMENT_MAX);
+	
+		let nx = n, ny = n;
+		let dy = par.list[0].length;
+		let dx = par.list[1].length;
+		if(nx > dx){ nx = dx; ny = n*n/nx;}
+		if(ny > dy){ ny = dy; nx = n*n/ny;}
 		
-		for(let i = 0; i < imax; i++){
-			li[i] = par.list[d][i];
+		{
+			let li=[];
+			for(let i = 0; i < ny; i++) li[i] = par.list[0][i];
+			list_shrink.push(li);
 		}
-		list_shrink.push(li);
+		
+		{
+			let li=[];
+			for(let i = 0; i < nx; i++) li[i] = par.list[1][i];
+			list_shrink.push(li);
+		}
+	}
+	else{
+		let scale = ELE_REDUCE_FAC*Math.pow(ELEMENT_MAX/num_element(par),1.0/par.dep.length);
+		for(let d = 0; d < par.dep.length; d++){
+			let li=[];
+			let imax = Math.floor(scale*par.list[d].length);
+			if(imax < 0) imax = 1;
+			
+			for(let i = 0; i < imax; i++) li[i] = par.list[d][i];
+			list_shrink.push(li);
+		}
 	}
 
 	let temp = par_find_template(list_shrink);
@@ -1485,10 +1505,27 @@ function reduce_size(info,par)
 		let ind = co_list[i].index;
 		set_element(temp,ind,get_element(value,ind));
 	}
-			
+	
+	if(info.type == "PriorSplit"){
+		let pr_split = info.prior_split;
+		let pr_temp = par_find_template(list_shrink);
+		for(let i = 0; i < co_list.length; i++){
+			let ind = co_list[i].index;
+			set_element(pr_temp,ind,get_element(pr_split,ind));
+		}
+		info.prior_split = pr_temp;
+	}
+	
+	let shrunk=[];
+	for(let d = 0; d < par.dep.length; d++){
+		if(list_shrink[d].length < par.list[d].length) shrunk[d] = true;
+		else shrunk[d] = false;
+	}
+	
 	info.value = temp;
 	info.list = list_shrink;
 	info.too_big = true;
+	info.shrunk = shrunk;
 }
 
 
@@ -1564,7 +1601,7 @@ function extract_text_samples(siminf,type,result)
 /// Loads up a bici file
 function load_bici(file)
 {
-	let te = load_file_http(file);
+	let te = load_file_local(file);
 	loading_mess("Processing...");
 	import_file(te,file,true);
 }

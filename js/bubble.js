@@ -18,6 +18,13 @@ function add_bubble_buts(lay)
 	bub.warning = false;
 
 	switch(bu.type){	
+	case "NameLink":
+		cont.dx = 14;
+		bubble_addtitle(cont,"Data source name",{te:data_source_text});
+		bubble_input(cont,"Name:",{type:"dataname"});
+		add_end_button(cont,"Done","Done",{});	
+		break;
+		
 	case "LinkPara":
 		switch(bu.ac){
 		case "LoadAMatrix":

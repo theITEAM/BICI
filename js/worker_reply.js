@@ -21,7 +21,7 @@ worker.onmessage = function (e)
 	if(false){ prr("Worker reply: "+ans.type); prr("ans"); prr(ans);}
 
 	if(inter.worker_mess.active != "stop"){
-		if(ans.type != "Start" && ans.type != "StartPPC") stop_loading_symbol();
+		if(ans.type != "Start" && ans.type != "StartPPC" && ans.type != "Import model files") stop_loading_symbol();
 		
 		switch(ans.type){		
 		case "EditAPed":
@@ -204,10 +204,27 @@ worker.onmessage = function (e)
 			generate_screen();
 			break;
 		
-		case "Load PriorSplit": case "Load Reparam": case "Load Tensor":
-			inter.edit_param = ans.ep;
-			close_data_source();
-			generate_screen();
+	 case "Load Reparam": case "Load Tensor":
+			{
+				inter.edit_param = ans.ep;
+				let par = model.param[ans.ep.i];
+				par.value_desc = ans.ep.value_desc;
+				par.set = ans.ep.set;
+				close_data_source();
+				if(ans.type == "Load Reparam") update_param();
+				generate_screen();
+			}
+			break;
+			
+		case "Load PriorSplit":
+			{
+				inter.edit_param = ans.ep;
+				let par = model.param[ans.ep.i];
+				par.prior_split_desc = ans.ep.prior_split_desc;
+				par.prior_split_set = ans.ep.prior_split_set;
+				close_data_source();
+				generate_screen();
+			}
 			break;
 			
 		case "Edit PriorSplit": case "Edit DistSplit":
@@ -290,6 +307,14 @@ worker.onmessage = function (e)
 		
 		case "Load Example":
 			model.load(ans);
+			break;
+		
+		case "Import model files":
+			load_BICI_files(ans,15,30);
+			break;
+		
+		case "Import2":
+			model.load(ans);	
 			break;
 		
 		case "Load File":

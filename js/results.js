@@ -161,15 +161,15 @@ function create_param_const(result,siminf)
 /// Sends an error that the sample could not be loaded
 function alert_sample(warn,code)
 {
-	if(isNaN(code)) alert_import(warn+" ERROR: "+code);
-	else alert_import(warn+" CODE: "+code);
+	if(isNaN(code)) alert_import(warn+" ERROR: "+code+INTERNAL_ERROR);
+	else alert_import(warn+" CODE: "+code+INTERNAL_ERROR);
 }
 
 
 /// Sends an error that the sample could not be loaded
 function alert_param_sample(warn,code)
 {
-	alert_import(warn+" CODE: "+code);
+	alert_import(warn+" CODE: "+code+INTERNAL_ERROR);
 }
 
 
@@ -968,6 +968,17 @@ function initialise_plot_filters(result,source)
 					
 	rpf.pos_indview.push({te:"Table"});
 	
+	{
+		for(let p = 0; p < result.species.length; p++){
+			if(result.species[p].trans_tree.check == true){
+				rpf.pos_indview.push({te:"First Inf. Time"});
+				rpf.pos_indview.push({te:"First Inf. Ind."});
+				rpf.pos_indview.push({te:"First Inf. Comp."});
+				break;
+			}
+		}
+	}
+	
 	rpf.sel_indview = copy(rpf.pos_indview[0]);
 	
 	// Possiblities for time-step
@@ -1055,14 +1066,15 @@ function initialise_plot_filters(result,source)
 				switch(so.type){
 				case "Population": case "Pop. Trans.": 
 					{
-						let desc_base ;
+						let desc_base = so.name;
+						let filt = so.spec.filter;		
+						
+						/*
 						if(so.type == "Population") desc_base = "Pop. "; 
 						else{
 							let spl = so.desc.split(" ");
 							desc_base = spl[0]+" ";
 						}		
-						
-						let filt = so.spec.filter;				
 						
 						for(let cl = 0; cl < filt.cla.length; cl++){
 							let claa = filt.cla[cl];
@@ -1080,7 +1092,7 @@ function initialise_plot_filters(result,source)
 								break;
 							}
 						}
-						
+						*/
 						
 						let strat = get_stratify_data(filt);
 			
@@ -1407,7 +1419,7 @@ function get_pos_paramview(result)
 	for(let th = 0; th < result.param.length; th++){
 		let par = result.param[th];
 	
-		if(par.dep.length > 0 && par.type != "param factor" && !par.dist_mat){
+		if(par.dep.length > 0 && par.type != "param factor" && !par.dist_mat && !par.iden_mat){
 			let list = [];
 			let list_split = [];
 			let para = true;

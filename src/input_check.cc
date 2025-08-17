@@ -879,6 +879,7 @@ void Input::check_memory_too_large()
 #endif
 	
 	auto fl = false;
+	/*
 	if(f_mem > MEM_FRAC_MAX){
 		fl = true;
 		alert_import("Out of memory error. BICI currently requires '"+mem_print(mem)+"' and this computer only has '"+mem_print(mem*MEM_FRAC_MAX/f_mem)+"' available");
@@ -889,6 +890,7 @@ void Input::check_memory_too_large()
 			alert_import("Out of memory error. This computer potentially has enough memory but other processes need to be terminated. BICI currently requires '"+mem_print(mem)+"' and this computer has '"+mem_print(mem*MEM_FRAC_MAX/f_mem)+"' available");
 		}
 	}
+	*/
 	
 	if(fl) output_error_messages(err_mess,true);
 }

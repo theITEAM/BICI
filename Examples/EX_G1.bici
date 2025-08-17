@@ -38,11 +38,11 @@ init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
 
 # INFERENCE DATA
 
-add-ind file="add-ind.csv"
+add-ind-inf file="add-ind.csv"
 
-trans-data name="S->I" obsrange="all" file="trans-data.csv"
+trans-data name="Infections" trans="S->I" obsrange="all" file="trans-data.csv"
 
-genetic-data type="matrix" mut-rate="1" seq-var="1" file="genetic-data.csv"
+genetic-data name="Genetic data" type="matrix" mut-rate="1" seq-var="1" file="genetic-data.csv"
 
 
 

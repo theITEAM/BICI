@@ -96,7 +96,7 @@ function check_param_complete()
 	for(let th = 0; th < model.param.length; th++){
 		let par = model.param[th];
 		if(flag[th] != true && !is_in_obsmodel(par) && par.type != "derive_param"){
-			if(!par.dist_mat){
+			if(!par.dist_mat && !par.iden_mat){
 				alert_noline("Parameter "+par.full_name+" is not specified as a 'param'");
 			}
 		}
@@ -113,7 +113,7 @@ function is_file(te)
 {
 	if(te == "") return false;
 	
-	if(te.te != undefined) return true;
+	if(te.te != undefined || te.ref != undefined) return true;
 	
 	let k = te.length-1;
 	let kmin = k-10;
@@ -130,21 +130,26 @@ function is_file(te)
 function cannot_find_trans_comp(te,p,cl,co)
 {
 	let st = "In transition '"+te+"' cannot find compartment '"+co+"'";
-	
-	let sp = model.species[p];
-	
-	if(sp.ncla > 1) st += " in classification '"+sp.cla[cl].name+"'";
-	st += ".";
-	
-	for(let cl2 = 0; cl2 < sp.ncla; cl2++){
-		if(cl2 != cl){
-			let c = hash_find(sp.cla[cl2].hash_comp,co);
-			if(c != undefined){
-				st += " Perhaps this transition should be placed in classification '"+sp.cla[cl2].name+"'?";
+
+	if(co == ""){
+		st = "In transition '"+te+"' the initial and final compartment aren't specified";
+	}
+	else{
+		let sp = model.species[p];
+		
+		if(sp.ncla > 1) st += " in classification '"+sp.cla[cl].name+"'";
+		st += ".";
+		
+		for(let cl2 = 0; cl2 < sp.ncla; cl2++){
+			if(cl2 != cl){
+				let c = hash_find(sp.cla[cl2].hash_comp,co);
+				if(c != undefined){
+					st += " Perhaps this transition should be placed in classification '"+sp.cla[cl2].name+"'?";
+				}
 			}
 		}
 	}
-	
+		
 	alert_import(st);
 }
 			

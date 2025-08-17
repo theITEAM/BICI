@@ -38,11 +38,11 @@ init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
 
 # INFERENCE DATA
 
-init-pop type="fixed" file="init-pop-People.csv"
+init-pop-inf type="fixed" file="init-pop-People.csv"
 
-pop-data filter="DS=file" error="normal:10%" file="pop-data.csv"
+pop-data name="Stratified pop. data" filter="DS=file" error="normal:10%" file="pop-data.csv"
 
-pop-trans-data name="S->I:a+b×cos(0.06×t)" error="normal:10%" file="pop-trans-data.csv"
+pop-trans-data name="Partially observed infections" trans="S->I:a+b×cos(0.06×t)" error="normal:10%" file="pop-trans-data.csv"
 
 
 

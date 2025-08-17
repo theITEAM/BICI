@@ -4,7 +4,8 @@
 - Introduce spatial kernels.
 - A kernel is a specified function that gives the probability the disease is transmitted a certain distance.
 - Typically, they have a high value at close distance, but decay away to zero in the large distance limit.
-- This example uses a so-called "power-law" spatial kernel.
+- This example uses a so-called "power-law" spatial kernel 
+- To increase computational speed, the kernel is truncated to a maximum distance of 200km.
 - The 100 largest cities in the UK are incorporated into the model.
 
 ## Model

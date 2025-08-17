@@ -13,7 +13,7 @@ class Data
 	
 	constructor()
 	{
-		this.source_width = [8,23,7,3.5,3,1.5]; 
+		this.source_width = [13,8,12,5,3.5,3,1.5]; 
 		this.table_width = [1,17.5,5,5,1.5];
 	}
 }
@@ -28,7 +28,56 @@ function start_data_source(type,spec,info)
 		info.p = model.get_p();
 	}
 	
-	edit_source = { type:type, table_loaded:false, load_datatable:true, table:{filename:"",heading:[], col_used:[], ele:[], ncol:0, nrow:0, edit:false}, spec:spec, info:info};
+	// Gets the default name for the data source
+	let name;
+	switch(type){
+	case "Init. Pop.": name = "Initial population"; break;
+	case "Move Ind.": name = "Individual move data"; break;
+	case "Compartment": name = "Compartment data"; break;
+	case "Transition": name = "Transition data"; break;
+	case "Diag. Test": name = "Diagnostic test data"; break;
+	case "Population": name = "Population data"; break;
+	case "Pop. Trans.": name = "Pop. trans data"; break;
+	case "Genetic": name = "Genetic data"; break;
+	case "Ind. Eff.": name = "True individual effects"; break;
+	case "Ind. Group": name = "Group"; break;
+	case "Add Pop.": name = "Added populations"; break;
+	case "Remove Pop.": name = "Removed populations"; break;
+	case "Add Ind.": name = "Added individuals"; break;
+	case "Remove Ind.": name = "Removed individuals"; break;
+	case "KnotTimes": name = "Knot times"; break;
+	case "APed": name = "Pedigree data"; break;
+	case "Fixed Effect": name = "Fixed effect data"; break;
+	default: name = "Data"; break;
+	}
+	
+	{ // Adds number if multiple sources with the same name
+		let siminf = info.siminf;
+		let p = info.p;
+		
+		let sp = model.species[p];
+		if(siminf == "gen") sp = model.sim_res.plot_filter.species[p];
+		if(siminf == "ppc") sp = model.inf_res.plot_filter.species[p];
+		
+		let source;
+		switch(siminf){
+		case "sim": source = sp.sim_source; break;
+		case "inf": case "infic": source = sp.inf_source; break;
+		case "ppc": source = sp.ppc_source; break;
+		case "gen": source = sp.gen_source; break;
+		}
+		
+		let num = 1;
+		do{
+			let name2 = name; if(num > 1) name2+= num;
+			if(find(source,"name",name2)== undefined){
+				name = name2; break;
+			}
+			num++;
+		}while(true);
+	}
+	
+	edit_source = { name:name, type:type, table_loaded:false, load_datatable:true, table:{filename:"",heading:[], col_used:[], ele:[], ncol:0, nrow:0, edit:false}, spec:spec, info:info};
 
 	set_loadcol();
 }
@@ -337,10 +386,11 @@ function add_init_cont_buts(lay,siminf)
 	
 	
 	let info = {siminf:siminf};
-		let x = 1.2, y = lay.dy-1.6;
-	let gap = 3.4;
-		model.add_object_button(lay,"Init. Pop.",x,y,"AddInitialPopulation",{back:WHITE, active:true, info:info, title:"Initial population", te:init_pop_text, siminf:siminf}); 
 	
+	let x = 1.2, y = lay.dy-1.6;
+	let gap = 3.4;
+	
+	model.add_object_button(lay,"Init. Pop.",x,y,"AddInitialPopulation",{back:WHITE, active:true, info:info, title:"Initial population", te:init_pop_text, siminf:siminf}); 
 }
 
 
@@ -384,6 +434,7 @@ function add_data_buts(lay,siminf)
 		return;
 	}
 	
+	
 	let source;
 	switch(siminf){
 	case "sim": source = sp.sim_source; break;
@@ -397,7 +448,7 @@ function add_data_buts(lay,siminf)
 		if(siminf == "sim") table = "There is currently no initial condition information.";
 	}
 	else{
-		table = { width:data.source_width, heading:[{name:"Type"},{name:"Details"},{name:"Number"},{name:"Spec."},{name:"Table"},{name:""}], content:[]};
+		table = { width:data.source_width, heading:[{name:"Name"},{name:"Type"},{name:"Details"},{name:"Number"},{name:"Spec."},{name:"Table"},{name:""}], content:[]};
 	
 		for(let i = 0; i < source.length; i++){
 			let so = source[i];
@@ -425,7 +476,7 @@ function add_data_buts(lay,siminf)
 			}
 
 			let desc_ob = {te:so.desc};
-			table.content.push([{te:so.type},desc_ob,{te:so.num},view_ob,edit_ob,{te:"Delete",ac:"DeleteSource",error:so.error,siminf:siminf,p:p,i:i}]);
+			table.content.push([{te:"Source Name",name:so.name,ac:"EditSourceName",so:so},{te:so.type},desc_ob,{te:so.num},view_ob,edit_ob,{te:"Delete",ac:"DeleteSource",error:so.error,siminf:siminf,p:p,i:i}]);
 		}
 	} 
 	
@@ -438,7 +489,7 @@ function add_data_buts(lay,siminf)
 	
 	let w;
 
-	if(inter.data_type == undefined) inter.data_type = {te:data_types[0]};
+	if(inter.data_type == undefined) inter.data_type = {te:data_types[0]}; // Default data type
 	let pos = []; for(let i = 0; i < data_types.length; i++) pos.push({te:data_types[i]});
 
 	let data_ty;
@@ -470,24 +521,49 @@ function add_data_buts(lay,siminf)
 		{
 			active = true; 
 			if(siminf != "ppc"){
-				w = model.add_object_button(lay,"Init. Pop.",x,y,"AddInitialPopulation",{back:WHITE, active:active, info:info, title:"Initial population", te:init_pop_text, siminf:siminf}); x += w+gap;
+				let te = init_pop_text, ti = "Initial population";
+				if(siminf == "gen"){ te = sim_init_pop_text; ti = "Generate initial population data";}
+				w = model.add_object_button(lay,"Init. Pop.",x,y,"AddInitialPopulation",{back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
+				x += w+gap;
 			}
 			
 			switch(sp.type){
 			case "Population":
-				w = model.add_object_button(lay,"Add Pop.",x,y,"AddPop",{back:WHITE, active:active, info:info, title:"Add Population", te:add_ind_text, siminf:siminf}); x += w+gap;
-			
-				w = model.add_object_button(lay,"Remove Pop.",x,y,"RemPop",{back:WHITE, active:active, info:info, title:"Remove Population", te:add_ind_text, siminf:siminf}); x += w+gap;
+				{
+					let te = add_pop_text, ti = "Add Population";
+					if(siminf == "gen"){ te = sim_add_pop_text; ti = "Generate added population data";}
+					w = model.add_object_button(lay,"Add Pop.",x,y,"AddPop",{back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
+					x += w+gap;
+				}
+				
+				{
+					let te = remove_pop_text, ti = "Remove Population";
+					if(siminf == "gen"){ te = sim_remove_pop_text; ti = "Generate remnoved population data";}
+					w = model.add_object_button(lay,"Remove Pop.",x,y,"RemPop",{back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
+					x += w+gap;
+				}
 				break;
 			
 			case "Individual":
 				if(sp.type != "Individual") active = false;
 
-				w = model.add_object_button(lay,"Add Ind.",x,y,"AddIndividuals",{back:WHITE, active:active, info:info, title:"Add Individuals", te:add_ind_text, siminf:siminf}); x += w+gap;
+				{
+					let te = add_ind_text, ti = "Add Individuals";
+					if(siminf == "gen"){ te = sim_add_ind_text; ti = "Generate added individual data";}		
+					w = model.add_object_button(lay,"Add Ind.",x,y,"AddIndividuals",{back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); x += w+gap;
+				}
 				
-				w = model.add_object_button(lay,"Remove Ind.",x,y,"RemIndividuals",{back:WHITE, active:active, info:info, title:"Remove Individuals", te:rem_ind_text, siminf:siminf}); x += w+gap;
+				{
+					let te = rem_ind_text, ti = "Remove Individuals";
+					if(siminf == "gen"){ te = sim_rem_ind_text; ti = "Generate removed individual data";}			
+					w = model.add_object_button(lay,"Remove Ind.",x,y,"RemIndividuals",{back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); x += w+gap;
+				}
 				
-				w = model.add_object_button(lay,"Move Ind.",x,y,"MoveIndividuals",{back:WHITE, active:active, info:info, title:"Move Individuals", te:move_ind_text, siminf:siminf}); x += w+gap;
+				{
+					let te = move_ind_text, ti = "Move Individuals";
+					if(siminf == "gen"){ te = sim_move_ind_text; ti = "Generate move individual data";}			
+					w = model.add_object_button(lay,"Move Ind.",x,y,"MoveIndividuals",{back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); x += w+gap;
+				}
 				break;
 			}
 		}
@@ -497,30 +573,71 @@ function add_data_buts(lay,siminf)
 		{
 			active = true; if(sp.type != "Individual") active = false;
 			
-			w = model.add_object_button(lay,"Compartment",x,y,"CompData",{ back:WHITE, active:active, info:info, title:"Compartmental data", te:comp_data_text, siminf:siminf}); x += w+gap;
-	
-			w = model.add_object_button(lay,"Transition",x,y,"TransData",{ back:WHITE, active:active, info:info, title:"Transition data", te:trans_data_text, siminf:siminf}); x += w+gap;
+			{
+				let te = comp_data_text, ti = "Compartmental data";
+				if(siminf == "gen"){ te = sim_comp_data_text; ti = "Generate individual compartmental data";}			
+				w = model.add_object_button(lay,"Compartment",x,y,"CompData",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf});
+				x += w+gap;
+			}
 			
-			w = model.add_object_button(lay,"Diag. Test",x,y,"DiagTestData",{ back:WHITE, active:active, info:info, title:"Diagnostic test data", te:diag_test_data_text, siminf:siminf}); x += w+gap;
+			{
+				let te = trans_data_text, ti = "Transition data";
+				if(siminf == "gen"){ te = sim_trans_data_text; ti = "Generate individual transition data";}			
+				w = model.add_object_button(lay,"Transition",x,y,"TransData",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf});
+				x += w+gap;
+			}
 			
-			w = model.add_object_button(lay,"Genetic data",x,y,"SeqData",{ back:WHITE, active:active, info:info, title:"Genetic data", te:seq_data_text, siminf:siminf}); x += w+gap;	
+			{
+				let te = diag_test_data_text, ti = "Diagnostic test data";
+				if(siminf == "gen"){ te = sim_diag_test_data_text; ti = "Generate individual diagnostic test data";}			
+				w = model.add_object_button(lay,"Diag. Test",x,y,"DiagTestData",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
+				x += w+gap;
+			}
+			
+			{
+				let te = seq_data_text, ti = "Genetic data";
+				if(siminf == "gen"){ te = sim_seq_data_text; ti = "Generate pathogen genetic data";}			
+				w = model.add_object_button(lay,"Genetic data",x,y,"SeqData",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
+				x += w+gap;	
+			}
 		}
 		break;
 
 	case "Population":
 		{	
 			active = true;
-			w = model.add_object_button(lay,"Population",x,y,"PopulationData",{ back:WHITE, active:active, info:info, title:"Population data", te:pop_data_text, siminf:siminf}); x += w+gap;
-	
-			w = model.add_object_button(lay,"Pop. Transition",x,y,"PopTransData",{ back:WHITE, active:active, info:info, title:"Aggregated transition data", te:poptrans_data_text, siminf:siminf}); x += w+gap;
+			{
+				let te = pop_data_text, ti = "Population data";
+				if(siminf == "gen"){ te = sim_pop_data_text; ti = "Generate population data";}			
+				w = model.add_object_button(lay,"Population",x,y,"PopulationData",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
+				x += w+gap;
+			}
+			
+			{
+				let te = poptrans_data_text, ti = "Aggregated transition data";
+				if(siminf == "gen"){ te = sim_poptrans_data_text; ti = "Generate aggregated transition data";}		
+				w = model.add_object_button(lay,"Pop. Transition",x,y,"PopTransData",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf});
+				x += w+gap;
+			}
 		}
 		break;
 
 	case "Additional":
 		active = true; if(sp.type != "Individual") active = false;	
-		w = model.add_object_button(lay,"Ind. Effect",x,y,"IndEffData",{ back:WHITE, active:active, info:info, title:"Individual effect data", te:ind_eff_data_text, siminf:siminf}); x += w+gap;
-	
-		w = model.add_object_button(lay,"Ind. Group",x,y,"IndGroupData",{ back:WHITE, active:active, info:info, title:"Individual group data", te:ind_group_data_text, siminf:siminf}); x += w+gap;
+		
+		{
+			let te = ind_eff_data_text, ti = "Individual effect data";
+			if(siminf == "gen"){ te = sim_ind_eff_data_text; ti = "Generate individual effect data";}		
+			w = model.add_object_button(lay,"Ind. Effect",x,y,"IndEffData",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
+			x += w+gap;
+		}
+		
+		{
+			let te = ind_group_data_text, ti = "Individual group data";
+			if(siminf == "gen"){ te = sim_ind_group_data_text; ti = "Generate individual group data";}		
+			w = model.add_object_button(lay,"Ind. Group",x,y,"IndGroupData",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
+			x += w+gap;
+		}
 		break;
 		
 	default: error("Option not recognised 20"); break;		

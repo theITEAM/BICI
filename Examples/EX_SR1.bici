@@ -58,7 +58,7 @@ init-pop-sim type="fixed" focal="DS" file="[[
 
 # INFERENCE DATA
 
-add-ind file="[[
+add-ind-inf file="[[
 "ID","t","DS"
 "Sim-People-Ind-1",0,"S"
 "Sim-People-Ind-2",0,"S"

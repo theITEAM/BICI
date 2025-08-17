@@ -7,30 +7,31 @@ function import_data_table_command(cname)
 	let siminf = "inf";
 
 	switch(cname){
-	case "add-pop-sim": cname = "add-pop"; siminf = "sim"; break;
-	case "remove-pop-sim": cname = "remove-pop"; siminf = "sim"; break;	
-	case "add-ind-sim": cname = "add-ind"; siminf = "sim"; break;
-	case "remove-ind-sim": cname = "remove-ind"; siminf = "sim"; break;
+	case "add-pop-sim": cname = "add-pop-inf"; siminf = "sim"; break;
+	case "remove-pop-sim": cname = "remove-pop-inf"; siminf = "sim"; break;	
+	case "add-ind-sim": cname = "add-ind-inf"; siminf = "sim"; break;
+	case "remove-ind-sim": cname = "remove-ind-inf"; siminf = "sim"; break;
 	case "move-ind-sim": cname = "move-ind"; siminf = "sim"; break;
-	case "init-pop-sim": cname = "init-pop"; siminf = "sim"; break;
-	case "add-pop-post-sim": cname = "add-pop"; siminf = "ppc"; break;
-	case "remove-pop-post-sim": cname = "remove-pop"; siminf = "ppc"; break;	
-	case "add-ind-post-sim": cname = "add-ind"; siminf = "ppc"; break;
-	case "remove-ind-post-sim": cname = "remove-ind"; siminf = "ppc"; break;
+	case "init-pop-sim": cname = "init-pop-inf"; siminf = "sim"; break;
+	case "add-pop-post-sim": cname = "add-pop-inf"; siminf = "ppc"; break;
+	case "remove-pop-post-sim": cname = "remove-pop-inf"; siminf = "ppc"; break;	
+	case "add-ind-post-sim": cname = "add-ind-inf"; siminf = "ppc"; break;
+	case "remove-ind-post-sim": cname = "remove-ind-inf"; siminf = "ppc"; break;
 	case "move-ind-post-sim": cname = "move-ind"; siminf = "ppc"; break;
 	}
 	
 	let i = find(convert,"command",cname);
 	if(i == undefined){
-		error("Counld not not import data table:"+cname);
+		error("Counld not not import data table: "+cname);
 		return;
 	}
 	
 	let type = convert[i].type;
 	
-	let file = get_tag_value("file"); if(file == "") cannot_find_tag();
-	
-	let tab = load_table(file.te,true,file.sep,file.name);
+	let file = get_tag_value("file"); if(file == "") cannot_find_tag(); 
+
+	let fi = get_fi(file);
+	let tab = load_table(fi.te,true,fi.sep,fi.name);
 	
 	if(typeof tab == 'string'){
 		alert_import(tab);
@@ -95,9 +96,9 @@ function import_data_table_command(cname)
 		
 	case "Ind. Eff.":
 		{
-			let name = get_tag_value("name"); if(name == "") cannot_find_tag();
+			let ie = get_tag_value("ie"); if(ie == "") cannot_find_tag();
 		
-			spec = {drop:{te:name}};
+			spec = {drop:{te:ie}};
 		}
 		break;
 		
@@ -124,13 +125,13 @@ function import_data_table_command(cname)
 		
 	case "Transition": 
 		{
-			let name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
-			name = name.replace(/->/g,"→")
+			let trans = get_tag_value("trans"); if(trans == ""){ cannot_find_tag(); return;}
+			trans = trans.replace(/->/g,"→")
 			
-			let cl_sel = get_cl_from_trans(name,p);
+			let cl_sel = get_cl_from_trans(trans,p);
 		
 			if(cl_sel == undefined){
-				alert_import("For 'name' the value '"+name+"' is not recognised"); return; 
+				alert_import("For 'trans' the value '"+trans+"' is not recognised"); return; 
 			}
 
 			let filter = get_tag_value("filter");
@@ -139,7 +140,7 @@ function import_data_table_command(cname)
 
 			let claa_sel = sp.cla[cl_sel];
 		
-			set_get_tra_filt_from_str(claa_sel,filt,name);
+			set_get_tra_filt_from_str(claa_sel,filt,trans);
 
 			spec = {cl_drop:{te:claa_sel.name}, filter:filt};
 
@@ -245,13 +246,13 @@ function import_data_table_command(cname)
 		
 	case "Pop. Trans.":
 		{
-			let name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
-			name = name.replace(/->/g,"→")
+			let trans = get_tag_value("trans"); if(trans == ""){ cannot_find_tag(); return;}
+			trans = trans.replace(/->/g,"→")
 			
-			let cl_sel = get_cl_from_trans(name,p);
+			let cl_sel = get_cl_from_trans(trans,p);
 		
 			if(cl_sel == undefined){
-				alert_import("For 'name' the value '"+name+"' is not recognised"); return;
+				alert_import("For 'trans' the value '"+trans+"' is not recognised"); return;
 			}
 
 			let filter = get_tag_value("filter");
@@ -260,7 +261,7 @@ function import_data_table_command(cname)
 
 			let claa_sel = sp.cla[cl_sel];
 		
-			set_get_tra_filt_from_str(claa_sel,filt,name);
+			set_get_tra_filt_from_str(claa_sel,filt,trans);
 
 			spec = {cl_drop:{te:claa_sel.name}, filter:filt};
 
@@ -288,6 +289,19 @@ function import_data_table_command(cname)
 	start_data_source(type,spec,info);
 	
 	let so = edit_source;
+	
+	let name = get_tag_value("name"); 
+	if(name == ""){ 
+		switch(type){
+		case "Init. Pop.": name = "Initial population"; break;
+		case "Add Ind.": name =	"Added individuals"; break;
+		case "Remove Ind.": name = "Removed individuals"; break;
+		case "Add Pop.": name = "Added populations"; break;
+		case "Remove Pop.": name = "Removed populations"; break;
+		default: cannot_find_tag(); return;
+		}
+	}
+	so.name = name;
 	
 	if(type == "Genetic"){
 		switch(so.spec.type_radio.value){
@@ -594,7 +608,9 @@ function camera_command()
 function warning_command()
 {
 	let warn = get_tag_value("text"); if(warn == "") cannot_find_tag();
-	if(typeof warn == "object") warn = warn.te;
+	
+	warn = text_from_file(warn);
+	
 	if(warn.length > 0 && warn.substr(warn.length-1,1) == "\n"){
 		warn = warn.substr(0,warn.length-1);
 	}
@@ -608,7 +624,9 @@ function warning_command()
 function get_tags_list(file)
 {
 	let tags_list=[];
-	let tab = load_table(file.te,true,file.sep,file.name);
+	
+	let fi = get_fi(file);
+	let tab = load_table(fi.te,true,fi.sep,fi.name);
 	let N = tab.ncol;
 	
 	let head = tab.heading;
@@ -669,6 +687,8 @@ function compartment_all_command()
 	}
 	
 	for(let m = 0; m < imp.tags.length; m++) imp.tags[m].done = 1; 
+	
+	imp.all_row = "";
 }
 
 	
@@ -783,7 +803,8 @@ function compartment_command2(tags)
 			if(bound_file != ""){
 				let claa = get_claa(); if(claa == undefined) return;
 
-				output_error(add_individual_compartment_boundary(name,imp.p,imp.cl,bound_file,color,infected));
+				let fi = get_fi(bound_file);
+				output_error(add_individual_compartment_boundary(name,imp.p,imp.cl,fi,color,infected));
 			}
 			else{
 				let lat = get_tag_val("lat",tags); if(lat == "") cannot_find_tag();
@@ -850,11 +871,11 @@ function check_char_allowed(st,not_allowed)
 function description_command()
 {
 	let te = get_tag_value("text"); if(te == "") cannot_find_tag();
-	if(typeof te == "object") te = te.te;
-	else te = te.replace(/\|/g,"\n");
-
+	te = text_from_file(te);
+	
 	model.description.te = te;
 }
+	
 	
 /// Adds a transition / source / sink to the model
 function transition_command()
@@ -871,12 +892,16 @@ function transition_all_command()
 	let tags_list = get_tags_list(file);
 
 	for(let i = 0; i < tags_list.length; i++){
+		imp.all_row = "(line "+(i+2)+" in file)";
+		
 		let tags = tags_list[i];
 		transition_command2(tags);
 		check_tags_used(i,tags);
 	}
 	
 	for(let m = 0; m < imp.tags.length; m++) imp.tags[m].done = 1; 
+	
+	imp.all_row = "";
 }
 
 
@@ -1225,7 +1250,9 @@ function map_command()
 	
 	let file = get_tag_value("file"); if(filev == "") cannot_find_tag();
 	
-	let res = load_annotation_map(file.te);
+	let fi = get_fi(file);
+	
+	let res = load_annotation_map(fi.te);
 	
 	let name = "file"+Math.random();
 	map_store.push({name:name, feature:res.feature, box:res.box});
@@ -1244,6 +1271,7 @@ function param_mult_command(per_start,per_end)
 	par.full_name = param_name(par);
 	
 	let f_par = get_param_mult(par);
+
 	model.param_factor.push({f_param:f_par, param:{name:par.name,dep:copy(par.dep), full_name:par.full_name}});
 
 	param_command2(remove_eq_quote(f_par.full_name),per_start,per_end,"mult");
@@ -1329,7 +1357,8 @@ function param_command2(full_name,per_start,per_end,op)
 		
 		set_default_factor_weight(par);
 		
-		let tab = load_table(fw.te,true,fw.sep,fw.name);
+		let fi = get_fi(fw);
+		let tab = load_table(fi.te,true,fi.sep,fi.name);
 			
 		if(tab == undefined) return;
 		if(typeof tab == 'string') alert_import(tab);
@@ -1401,6 +1430,10 @@ function param_command2(full_name,per_start,per_end,op)
 		alert_import("The distance matrix '"+dist_matrix_name+"' cannot be set"); 
 	}
 	
+	if(par.iden_mat){
+		alert_import("The identity matrix '"+iden_matrix_name+"' cannot be set"); 
+	}
+	
 	par.reparam_eqn = "";
 	par.reparam_eqn_on = false;
 
@@ -1441,6 +1474,9 @@ function param_command2(full_name,per_start,per_end,op)
 			}
 		
 			if(reparam != "" && is_file(valu) == false){
+				if(par.time_dep){
+					alert_import("Reparameteristed parameter '"+par.full_name+"' cannot be time dependent."); 
+				}
 				par.reparam_eqn = reparam;
 				par.reparam_eqn_on = true;
 			}
@@ -1461,7 +1497,8 @@ function param_command2(full_name,per_start,per_end,op)
 						set_element(par.value,ele_list[k],"0");
 					}
 					
-					let tab = load_table(valu.te,true,valu.sep,valu.name);
+					let fi = get_fi(valu);
+					let tab = load_table(fi.te,true,fi.sep,fi.name);
 				
 					if(tab == undefined) return;
 					if(typeof tab == 'string') alert_import(tab);
@@ -1547,7 +1584,8 @@ function param_command2(full_name,per_start,per_end,op)
 			alert_import("'prior-split' can only be used if the parameter has a dependency.");  
 		}
 	
-		let tab = load_table(prior_split.te,true,prior_split.sep,prior_split.name);
+		let fi = get_fi(prior_split);
+		let tab = load_table(fi.te,true,fi.sep,fi.name);
 		if(tab == undefined) return;	
 		if(typeof tab == 'string') alert_import(tab);
 		
@@ -1599,8 +1637,8 @@ function param_command2(full_name,per_start,per_end,op)
 			alert_import("'dist-split' can only be used if the parameter has a dependency.");  
 		}
 		
-		let tab = load_table(dist_split.te,true,dist_split.sep,dist_split.name);
-		//let tab = load_table_from_file(dist_split);
+		let fi = get_fi(dist_split);
+		let tab = load_table(fi.te,true,fi.sep,fi.name);
 		
 		if(tab == undefined) return;	
 		if(typeof tab == 'string') alert_import(tab);
@@ -2022,7 +2060,8 @@ function ind_effect_command()
 		if(pedigree != ""){
 			A_matrix = {check:true, loaded:true, type:"pedigree", A_value:[], ind_list:[], sire_list:[], dam_list:[]};
 	
-			let tab_ped = load_table(pedigree.te,true,pedigree.sep,pedigree.name);
+			let fi = get_fi(pedigree);
+			let tab_ped = load_table(fi.te,true,fi.sep,fi.name);
 				
 			if(tab_ped.ncol != 3){
 				alert_import("'pedigree' file should have 3 columns"); return;
@@ -2045,7 +2084,8 @@ function ind_effect_command()
 			
 			let ind_list = get_tag_value("ind-list"); 
 		
-			let tab_ind = load_table(ind_list.te,true,ind_list.sep,ind_list.name);
+			let fi = get_fi(ind_list);
+			let tab_ind = load_table(fi.te,true,fi.sep,fi.name);
 			if(tab_ind == undefined) return;
 			
 			let list=[];
@@ -2062,7 +2102,8 @@ function ind_effect_command()
 				for(let c = 0; c < N; c++) val[r][c] = 0;
 			}
 		
-			let tab = load_table(A_sparse.te,true,A_sparse.sep,A_sparse.name);
+			let fi2 = get_fi(A_sparse);
+			let tab = load_table(fi2.te,true,fi2.sep,fi2.name);
 			if(tab == undefined) return;
 		
 			for(let r = 0; r < tab.nrow; r++){
@@ -2082,7 +2123,8 @@ function ind_effect_command()
 		if(A != ""){
 			A_matrix = {check:true, loaded:true, type:"A", sire_list:[], dam_list:[]};
 			
-			let tab = load_table(A.te,true,A.sep,A.name);
+			let fi = get_fi(A);
+			let tab = load_table(fi.te,true,fi.sep,fi.name);
 			//let tab = load_table_from_file(A);
 			if(tab == undefined) return;
 			if(typeof tab == 'string') alert_import(tab); 
@@ -2109,7 +2151,8 @@ function ind_effect_command()
 		if(Ainv != ""){
 			A_matrix = {check:true, loaded:true, type:"Ainv", sire_list:[], dam_list:[]};
 			
-			let tab = load_table(Ainv.te,true,Ainv.sep,Ainv.name);
+			let fi = get_fi(Ainv);
+			let tab = load_table(fi.te,true,fi.sep,fi.name);
 			if(tab == undefined) return;
 			if(typeof tab == 'string') alert_import(tab); 
 
@@ -2177,7 +2220,9 @@ function fixed_effect_command()
 	let X = get_tag_value("X"); 
 	if(X != ""){
 		X_vector.loaded = true;		
-		let tab = load_table(X.te,true,X.sep,X.name);		
+		
+		let fi = get_fi(X);
+		let tab = load_table(fi.te,true,fi.sep,fi.name);		
 		if(tab == undefined) return;
 		
 		let col_name = ["ID","value"]; 
@@ -2508,8 +2553,9 @@ function sim_param_command()
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
+	let fi = get_fi(file);
 	
-	read_param_samples_file(0,file,sim_result);
+	read_param_samples_file(0,fi,sim_result);
 }
 
 
@@ -2527,10 +2573,11 @@ function inf_param_command()
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
+	let fi = get_fi(file);
 	
 	let chain = get_chain_value();
 
-	read_param_samples_file(chain,file,inf_result);
+	read_param_samples_file(chain,fi,inf_result);
 }
 
 
@@ -2539,8 +2586,9 @@ function inf_generation_command()
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
+	let fi = get_fi(file);
 	
-	read_param_samples_file("gen-plot",file,inf_result);
+	read_param_samples_file("gen-plot",fi,inf_result);
 }
 
 
@@ -2549,10 +2597,11 @@ function inf_diagnostics_command()
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
+	let fi = get_fi(file);
 	
 	let chain = get_chain_value();
 	
-	inf_result.diagnostics[chain] = file.te;
+	inf_result.diagnostics[chain] = fi.te;
 	inf_result.prop_diag_on = true;
 }
 
@@ -2562,8 +2611,9 @@ function post_sim_param_command()
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
+	let fi = get_fi(file);
 	
-	read_param_samples_file(0,file,ppc_result);
+	read_param_samples_file(0,fi,ppc_result);
 }
 
 
@@ -2572,8 +2622,9 @@ function sim_state_command()
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
+	let fi = get_fi(file);
 	
-	read_state_samples_file(0,file,sim_result);
+	read_state_samples_file(0,fi,sim_result);
 }
 
 
@@ -2582,10 +2633,11 @@ function inf_state_command()
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
+	let fi = get_fi(file);
 	
 	let chain = get_chain_value();
 	
-	read_state_samples_file(chain,file,inf_result);
+	read_state_samples_file(chain,fi,inf_result);
 }
 
 
@@ -2594,8 +2646,9 @@ function post_sim_state_command()
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
+	let fi = get_fi(file);
 	
-	read_state_samples_file(0,file,ppc_result);
+	read_state_samples_file(0,fi,ppc_result);
 }
 
 
@@ -2604,6 +2657,18 @@ function trans_diag_command()
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
+	let fi = get_fi(file);
 	
-	read_trans_diag(file,inf_result);
+	read_trans_diag(fi,inf_result);
+}
+
+
+/// Determines if importing from a file
+function loading_from_file()
+{
+	if(input.type == "Load File" || input.type == "Load Example" || input.type == "Import output"){
+		return true;
+	}
+	
+	return false;
 }

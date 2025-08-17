@@ -1826,7 +1826,7 @@ function button_action(bu,action_type)
 			if(check_error_textbox() == false){
 				copy_back_to_source();
 				
-				if(check_time_error() == false){
+				if(check_time_error() == false ){
 					let det = model.inf_details;
 				
 					switch(det.run_local.value){
@@ -2354,6 +2354,11 @@ function button_action(bu,action_type)
 			if(cam.grid == "off") cam.grid = "on"; 
 			else cam.grid = "off"; 
 		}
+		break;
+		
+	case "EditSourceName":
+		select_bubble_over();
+		inter.bubble.dataso = bu.so; 
 		break;
 		
 	default:

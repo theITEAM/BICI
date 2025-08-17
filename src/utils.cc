@@ -32,6 +32,10 @@
 #include <math.h>
 #include <algorithm>
 #include <boost/math/special_functions/gamma.hpp>
+#ifdef MAC
+#include <sys/time.h>
+#include <sys/resource.h>
+#endif
 
 using namespace std;
 
@@ -3074,6 +3078,18 @@ double memory_usage()
 	fclose(file);
 	return result;
 #endif
+
+#ifdef MAC
+	struct rusage usage;
+	if(0 == getrusage(RUSAGE_SELF, &usage)){
+		return usage.ru_maxrss/1024.0; // bytes
+	}
+	 else{
+    		return 0;
+	}
+#endif
+
+	return 0;
 }
 
 
@@ -3097,6 +3113,12 @@ double total_memory()
 	totalVirtualMem /= 1024.0; // Convert to K
 	return totalVirtualMem;
 #endif
+
+#ifdef MAC
+	return LARGE;
+#endif
+
+	return LARGE;
 }
 
 
@@ -3116,6 +3138,12 @@ double memory_available()
 	sysinfo (&memInfo);
 	return memInfo.freeram/1024.0;
 #endif
+
+#ifdef MAC
+	return LARGE;
+#endif
+
+	return LARGE;
 }
 
 

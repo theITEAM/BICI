@@ -1,0 +1,32 @@
+UPDATES TO BICI v0.6
+
+CHANGES TO BICI SCRIPT
+- The former command "add-ind" has been replace by "add-ind-inf" (and similarly for "init-pop", "add-pop", "remove-pop", "remove-ind"). This is just to emphasise the fact that this command adds individuals when inference is being perfomed.
+
+- Updated data sources so they now have a name associated with them (see updated manual, e.g. "trans-data" definition in Appendix A). This was done to make clearer which errors relate to which data source.
+
+
+JAMIE
+- The Mac version can now load up BICI files which use the "data-dir" command (i.e. they reference other files which contain the data). This turned out to be rather complicated to fix, due to the different levels of file access between the windows/mac versions..
+- Internal time line altered to coincide with timestep divisions. This has needed substatial code changes.
+- A small error for local change proposals was corrected.
+- Corrected definition of gen-percent in manual.
+
+GRANT
+- Corrected problem with loading large tensors.
+- Added warning when individual in system not explicitly added.
+- I've added the possibility of using the identity matrix in equations (see 2.1.10 in manual). This is a more natural way to add rates which only happen when the individual is in a given state (where previosuly you were ingeniously using populations with the step function). 
+
+CHRIS
+- I've had a thorough go through all the error messages genetated trying to make them more descriptive and understandable. Error messages which include "This is an internal error to BICI..." have been added. These are generated when BICI encounters some internal error.. generally these should not happen and indicate a problem with the code. If you ever get these please send the BICI script to me for diagnosis of the problem.
+If you get error messages that don't make any sense then also let me know!
+- I've spent some time systematically going through lots of models trying to weed out any bugs.
+- Corrected some errors in genetic part of code.
+- Fixed bug in equation simplification algorithm.
+- Corrected error in equation text box.
+- Corrected an error in the linearisation of equations.
+- Added Appendix J to the manual to give information on BICI warning messages.
+- Corrected bug relating to checking for population dependence on reparamerised equations.
+- Improved error handing for add, remove and move data.
+- Now display equations correctly when superscripts are placed on populations.
+- Stop multiple error message appearing for multiple cores when using the MPI version.

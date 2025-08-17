@@ -78,7 +78,7 @@ init-pop-sim type="fixed" focal="DS" file="[[
 
 # INFERENCE DATA
 
-init-pop type="fixed" file="[[
+init-pop-inf type="fixed" file="[[
 "DS","Population"
 "S",68000000
 "E",0

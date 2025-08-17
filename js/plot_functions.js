@@ -1674,7 +1674,9 @@ function label_convert(te,si,wmax)
 				}
 				tex = tex.trim();
 				
-				if(type == "param" || pair == "}" || pair == "("){
+			
+				
+				if(type == "param" || pair == "("){
 					let sub = "", sup = "", time = "";
 				
 					if(tex.length > 3){
@@ -1708,10 +1710,6 @@ function label_convert(te,si,wmax)
 						
 					let k = 0; while(k < tex.length && tex.substr(k,1) != "^" && tex.substr(k,1) != "_") k++;
 					let main = tex.substr(0,k);
-					if(pair == "}"){
-						if(main == "") main = "All";
-						main = "{"+main+"}";
-					}
 				
 					if(pair == "("){
 						main = fch+main;
@@ -1785,16 +1783,34 @@ function label_convert(te,si,wmax)
 					if(pair == "(") i--;
 				}
 				else{
-					if(pair == "]"){
-						tex = "["+tex+"]";
-					}
-					
-					if(pair == "〉"){
-						tex = "〈"+tex+"〉";
-					}
+					if(pair == "}"){ // Deals with populations
+						x = add_frag("{",col,x,0*si,gap,fo,frag);
 						
-					frag.push({ te:tex, col:col, x:x, y:0*si, fo:fo});
-					x += text_width(tex,fo)+gap;  
+						let spl = tex.split(",");
+						for(let j = 0; j < spl.length; j++){
+							if(j != 0) x = add_frag(",",col,x,0*si,gap,fo,frag);
+							
+							let val = spl[j];
+							let spl2 = val.split("^");
+							x = add_frag(spl2[0],col,x,0*si,gap,fo,frag);
+							for(let k = 1; k < spl2.length; k++){
+								x = add_frag(spl2[k],col,x,-0.45*si,gap,sup_fo,frag);
+							}
+						}
+						x = add_frag("}",col,x,0*si,gap,fo,frag);
+					}
+					else{
+						if(pair == "]"){
+							tex = "["+tex+"]";
+						}
+						
+						if(pair == "〉"){
+							tex = "〈"+tex+"〉";
+						}
+							
+						frag.push({ te:tex, col:col, x:x, y:0*si, fo:fo});
+						x += text_width(tex,fo)+gap;  
+					}
 				}
 			}
 		}
@@ -1843,6 +1859,14 @@ function label_convert(te,si,wmax)
 }
 
 
+/// Adds a fragment
+function add_frag(tex,col,x,y,gap,fo,frag)
+{
+	frag.push({ te:tex, col:col, x:x, y:y, fo:fo});
+	return x + text_width(tex,fo)+gap; 
+}
+
+
 /// Plots an equation
 function plot_equation(te,x,y,si,w,col)
 {
@@ -1853,6 +1877,8 @@ function plot_equation(te,x,y,si,w,col)
 /// Plots equation at an angle
 function plot_angle_equation(te,x,y,nx,ny,si,w,orient,col)
 {
+	if(typeof te != "string") te = String(te);
+
 	if(col == undefined) col = BLACK;
 	let label_conv = label_convert(te,si,w);
 

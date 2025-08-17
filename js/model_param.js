@@ -259,6 +259,7 @@ function add_model_param_content(lay)
 		let num = 0;
 		for(let i = 0; i < model.param.length; i++){
 			let par = model.param[i];
+			
 			if(par.spline.on == true && par.type != "derive_param" && par.type != "param factor"){
 				num++;
 				if(model.param[i].spline.smooth.check == true) num++;
@@ -331,7 +332,7 @@ function add_model_param_content(lay)
 						display_constant(i,x,y,lay,w);
 					}
 					
-					if(!par.dist_mat){
+					if(!par.dist_mat && !par.iden_mat){
 						lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamConst"});
 					}
 					
@@ -657,6 +658,7 @@ function param_pos(par,op)
 		
 	case "reparam":
 		if(par.variety != "normal") return false;
+		if(par.time_dep) return false;
 		if(par.factor) return false;
 		break;
 		

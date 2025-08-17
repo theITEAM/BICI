@@ -448,9 +448,9 @@ function add_ppc_start_buts(lay)
 	
 		if(model.ppc_details.check_box_list){
 			if(model.ppc_details.check_box_list.length > 0){
-				cy += 2;
+				cy += 3;
 				cy = lay.add_subtitle("Resampling",cx,cy,WHITE,{te:ppc_num_text});
-				cy = lay.add_paragraph("Select which parameter or individual effects get resampled:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				cy = lay.add_paragraph("Select which parameter or individual effect gets resampled:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 				
 				cy += 0.5;
 				
@@ -693,8 +693,11 @@ function display_constant(i,x,y,lay,w,allow_edit,source)
 		if(allow_edit == false && isNaN(te)) te = "Auto calculate"; 
 	}
 	else{
-		if(par.dist_mat) te = "Distance "; 
-		te += par.value_desc;
+		if(par.dist_mat) te = "Distance matrix"; 
+		else{
+			if(par.iden_mat) te = "Identity matrix"; 
+			else te += par.value_desc;
+		}
 	}
 	
 	let fo = get_font(1.1,"","times");
@@ -756,7 +759,7 @@ function display_reparam(i,x,y,lay,w)
 	}
 	
 	let fo = get_font(1.1,"","times");
-	
+
 	lay.add_button({te:te, x:x+1.6, y:y+0., dx:w-x-1.6, dy:1.6, type:type, font:fo, ac:ac, i:i, name:par.name, label_info:par.label_info});
 }
 
@@ -814,7 +817,7 @@ function add_view_button(par,x,y,i,lay,source)
 {
 	if(par.set == false) return false;
 		
-	if(!par.dist_mat && (par.variety == "normal" || par.variety == "const")){
+	if(!par.dist_mat && !par.iden_mat && (par.variety == "normal" || par.variety == "const")){
 		let pos_view = get_par_pos_view(par,source);
 		if(pos_view.length > 0){
 			lay.add_button({te:"View", source:source, x:x, y:y+0.2, dx:3.5, dy:1.2, ac:"ViewParam", type:"GreyView", i:i, pos_view:pos_view});

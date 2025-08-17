@@ -40,11 +40,11 @@ init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
 
 # INFERENCE DATA
 
-add-ind file="add-ind.csv"
+add-ind-inf file="add-ind.csv"
 
-trans-data name="I->R" obsrange="all" file="trans-data.csv"
+trans-data name="Recoveries" trans="I->R" obsrange="all" file="trans-data.csv"
 
-trans-data name="S->I:f" obsrange="all" file="trans-data-2.csv"
+trans-data name="Fraction of infections" trans="S->I:f" obsrange="all" file="trans-data-2.csv"
 
 
 

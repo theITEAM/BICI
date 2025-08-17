@@ -2,10 +2,10 @@
 // Functions for imports information from a .bici file
 
 /* // List of commands in alphabetical order
-	add-ind
+	add-ind-inf
 	add-ind-post-sim
 	add-ind-sim
-	add-pop
+	add-pop-inf
 	add-pop-post-sim
 	add-pop-sim
 	box
@@ -28,11 +28,11 @@
 	inf-param-stats
 	inf-state
 	inf-diagnostics
-	init-pop
+	init-pop-inf
 	init-pop-sim
 	label
 	map
-	move-ind
+	move-ind-inf
 	move-ind-post-sim
 	move-ind-sim
 	param-mult
@@ -42,7 +42,7 @@
 	posterior-simulation/post-sim
 	post-sim-param
 	post-sim-state
-	remove-ind
+	remove-ind-inf
 	remove-ind-post-sim
 	remove-ind-sim
 	remove-pop
@@ -86,19 +86,48 @@ function import_file(te,file,clear_results)
 	
 	percent(10);
 
-	load_data_files(pro,10,30);
-
-	percent(30);
+	let data_file_list = get_data_file_list(pro,10,15);
 
 	// Keeps track of the current species and classification 
-	imp = { lines:lines, script:pro.formatted, previous_loaded_table:[], warn:false}; 
+	imp = { pro:pro, lines:lines, clear_results:clear_results, script:pro.formatted, previous_loaded_table:[], warn:false}; 
 
+	if(data_file_list.length > 0){
+		if(begin_str(data_file_list[0].full_name,"..")) load_local(data_file_list,15,30);
+		else post({type:"Import model files", data_file_list:data_file_list});
+	}
+	else{
+		import_file2(data_file_list);
+	}
+}
+
+
+/// Loads up files locally
+function load_local(data_file_list,per_start,per_end)
+{
+	for(let i = 0; i < data_file_list.length; i++){
+		percent(per_start+((i+0.5)/data_file_list.length)*(per_end-per_start));
+		let dfl = data_file_list[i];
+		dfl.te = load_file_local(dfl.full_name);
+	}
+	
+	import_file2(data_file_list);
+}
+
+
+/// Continues importing after all files have been loaded
+function import_file2(data_file_list)
+{
+	let pro = imp.pro;
+	imp.data_file_list = data_file_list;
+	
+	percent(30);
+	
 	model_store = model;
 	
 	model = new Model();	 
 	model.start_new();
 	
-	init_result(pro,clear_results);
+	init_result(pro,imp.clear_results);
 
 	let per_start = 30, per_end = 70, com_ti_sum = 0;
 	let per = per_start;
@@ -121,7 +150,7 @@ function import_file(te,file,clear_results)
 			
 			model.determine_branching("set all_branches");
 
-			// Checks information about all parameters have been loaded correctly
+			// Checks information about all parameters have been loaded correctly			
 			check_param_complete(); 
 
 			com_ti_sum += 0.1*import_frac_pro; per = show_percent(com_ti_sum,per,per_start,per_end);
@@ -377,7 +406,7 @@ function load_default_map()
 					let mfi = "../Maps/World.json";
 					if(load_map_fast) mfi = "D:/BICI_nolongerused/Maps/World.json";
 				
-					let te = load_file_http(mfi,"import");
+					let te = load_file_local(mfi,"import");
 					if(te == "") alert_import("The file '"+filename(mfi)+"' does not exist or is empty.");
 						 
 					map = load_annotation_map(te);
@@ -488,7 +517,7 @@ function import_table(te)
 	if(nrow > 0){
 		for(let j = 0; j < nrow; j++){
 			if(ele[j].length != ncol){
-				alert_import("The rows do not all have the same size:"+ele[j].length+" "+ncol);
+				alert_import("The rows do not all have the same size: "+ele[j].length+" "+ncol);
 			}
 		}
 	}
@@ -594,32 +623,36 @@ function get_command_tags(trr)
 		let ii = 1+n*3;
 
 		if(frag[ii].text == "="){
-			alert_import("An equal sign '=' is misplaced.");
+			alert_import("An equals sign '=' is misplaced.");
 			return syntax_error();
 		}
+	}
+	
+	for(let n = 0; n < num; n++){
+		let ii = 1+n*3;
 			
 		if(ii+2 >= frag.length){
 			if(ii+1 < frag.length && frag[ii+1].text == "="){
-				alert_import("The property '"+frag[ii].text+"' is unset");
+				alert_import("The tag '"+frag[ii].text+"' is unset");
 			}
 			else{
-				alert_import("The text '"+frag[ii].text+"' cannot be understood");
+				alert_import("The tag '"+frag[ii].text+"' cannot be understood");
 			}
 			return syntax_error();
 		}
 		
 		if(frag[ii+1].text != "="){
-			alert_import("The property '"+frag[ii].text+"' is missing an equals sign");
+			alert_import("The tag '"+frag[ii].text+"' is missing an equals sign");
 			return syntax_error();
 		}
 		
 		if(ii+2 < frag.length && frag[ii+2].text == "="){
-			alert_import("The property '"+frag[ii].text+"' cannot be followed by '=='");
+			alert_import("The tag '"+frag[ii].text+"' cannot be followed by '=='");
 			return syntax_error();
 		}
 		
-		if(ii+3 < frag.lengh && frag[ii+3].text == "="){
-			alert_import("The property '"+frag[ii].text+"' is unset");
+		if(ii+3 < frag.length && frag[ii+3].text == "="){
+			alert_import("The tag '"+frag[ii].text+"' is unset");
 			return syntax_error();
 		}
 	}
@@ -628,10 +661,10 @@ function get_command_tags(trr)
 	let tags=[];
 
 	for(let n = 0; n < num; n++){
-		if(frag[1+3*n+0].quote != 0) alert_import("Syntax error type 2"); 
-		if(frag[1+3*n+1].text != "=") alert_import("Syntax error type 3");
-		if(frag[1+3*n+0].text == "") alert_import("Syntax error type 4");
-		if(frag[1+3*n+2].text == "") alert_import("Property "+frag[1+3*n+0].text+" must have content");
+		if(frag[1+3*n+0].quote != 0) alert_import("Syntax error"); 
+		if(frag[1+3*n+1].text != "=") alert_import("Syntax error");
+		if(frag[1+3*n+0].text == "") alert_import("Syntax error: Tag name not specified");
+		if(frag[1+3*n+2].text == "") alert_import("Tag "+frag[1+3*n+0].text+" must have content");
 		let fr = frag[1+3*n+0];
 		tags.push({name:fr.text, pos:fr.pos, pos_end:fr.pos_end, value:frag[1+3*n+2].text, done:0});
 	}
@@ -650,7 +683,7 @@ function get_command_tags(trr)
 function find_column(tab,colname)
 {
 	let i = 0; while(i < tab.ncol && tab.heading[i] != colname) i++;
-	if(i == tab.ncol)	alert_import("The table does not have the column '"+colname+"'");
+	if(i == tab.ncol)	alert_import("The table does not have a column with heading '"+colname+"'");
 	
 	return i;
 }
@@ -683,7 +716,6 @@ function get_tag_val(st,tags)
 function cannot_find_tag()                                   
 {
 	let te = "Cannot find the '"+imp.tagst+"' tag for '"+imp.typest+"'";
-	if(imp.all_row != "") te += " "+imp.all_row;
 	alert_import(te);
 }
 
@@ -695,12 +727,13 @@ function alert_import(st,line)
 	
 	let te;
 	if(line) te = "On line "+(line+1)+": "+st;
+	if(imp.all_row != "") te += " "+imp.all_row;
+	
 	else te = st;
 	
 	te = add_full_stop(te);
 	
 	get_formatted_line_width();
-
 
 	throw({ type:"Alert Import", title:"Error importing file!", te:te, st:st, line:line, scroll_to_line:true, script:imp.script});
 }
@@ -955,7 +988,7 @@ function process_lines(lines,file,per_start,per_end)
 
 
 /// Loads up any data files
-function load_data_files(pro,per_start,per_end)
+function get_data_file_list(pro,per_start,per_end)
 {
 	let load_list=[];
 	for(let j = 0; j < pro.processed.length; j++){
@@ -1005,7 +1038,7 @@ function load_data_files(pro,per_start,per_end)
 		}	
 	}
 
-	let previous_loaded = [];
+	let data_file_list = [];
 
 	let per = per_start;
 	for(let i = 0; i < load_list.length; i++){
@@ -1022,25 +1055,24 @@ function load_data_files(pro,per_start,per_end)
 			
 		let file = tag.value;
 		
-		let m = 0; while(m < previous_loaded.length && file != previous_loaded[m]) m++;
-							
-		if(m < previous_loaded.length){
-			tag.value =  previous_loaded[m];
-		}
-		else{
+		let m = 0; while(m < data_file_list.length && file != data_file_list[m].name) m++;
+		
+		tag.value = {ref:m};
+		
+		if(m == data_file_list.length){
 			check_char_allowed(file,"<>:\"|?*");
 
 			if(pro.data_dir == undefined) alert_import("The 'data-dir' command must be set");
+		
 			let full_name = pro.data_dir+"/"+file;
 			
-			let te = load_file_http(full_name,"import");
-			if(te == "") alert_import("The file '"+filename(file)+"' does not exist or is empty.",cl.line);
-	 
 			let sep = "comma"; if(file.substr(file.length-4,4) == ".tsv") sep = "tab";
-			tag.value = {name:file, full_name:full_name, sep:sep, te:te};
-			previous_loaded.push(tag.value);
+			
+			data_file_list.push({name:file, full_name:full_name, sep:sep,});
 		}
 	}
+	
+	return data_file_list;
 }
 	
 
@@ -1492,4 +1524,27 @@ function import_post_mess(mess)
 {
 	if(imp.warn == false) post(mess);
 	imp.warn = true;
+}
+
+
+/// Gets file text from a given tag
+function get_fi(file)
+{
+	if(file.te != undefined) return file;
+	if(file.ref != undefined) return imp.data_file_list[file.ref];
+	error("Problem getting file");
+}
+
+
+
+/// If text from file then extracts
+function text_from_file(te)
+{
+	if(is_file(te)){
+		let fi = get_fi(te);
+		return fi.te;
+	}
+	else{
+		return te.replace(/\|/g,"\n");
+	}
 }

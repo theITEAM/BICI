@@ -77,11 +77,11 @@ function create_output_file(save_type,map_store)
 function err_warning()
 {
 	if(model.warn.length > 0){
-		if(input.type == "Load Example" || input.type == "Import output"){
+		if(loading_from_file()){
 			let wa = model.warn[0];
 			let msg = wa.mess+": "+wa.mess2;
 			if(wa.line) alert_line(msg,wa.line)
-			else alert_import(msjg);
+			else alert_import(msg);
 			return;
 		}
 	}
@@ -94,7 +94,7 @@ function err_warning()
 		full_warn = true;
 		break;
 	}
-	
+
 	let wa = {type:"Model warning", command_type:input.type, species:strip_heavy(model.species), warn:model.warn, full_warn:full_warn};
 	if(try_on == false) prr(wa);
 	else throw(wa);
@@ -137,7 +137,7 @@ function create_output_details(save_type,file_list,one_file)
 	}
 	
 	te += banner("DESCRIPTION");
-		
+	
 	let desc = model.description.te;
 	let j = desc.length-1;
 	while(j >= 0 && (desc.substr(j,1) == "\n" || desc.substr(j,1) == "\r")) j--;
@@ -742,7 +742,7 @@ function output_param(par,save_type,file_list,one_file)
 		let te1 = "param";
 		if(par.type == "param factor"){
 			let pfac = model.param_factor;
-				
+		
 			let k = 0, kmax = pfac.length; 
 
 			while(k < kmax && pfac[k].f_param.full_name != par.full_name) k++;
@@ -757,7 +757,7 @@ function output_param(par,save_type,file_list,one_file)
 		let te2 = "";
 		let display = false;
 		
-		if(par.dist_mat){
+		if(par.dist_mat || par.iden_mat){
 			display = true;
 		}
 		else{
@@ -880,8 +880,8 @@ function output_param(par,save_type,file_list,one_file)
 			te1 += ' sim-sample="false"';
 		}
 				
-		if(!par.dist_mat){
-			te += te1+te2+endl;
+		if(!par.dist_mat && !par.iden_mat){
+			te += te1+te2+endl+endl;
 		}
 		
 		if(display == false && (save_type == "sim" || save_type == "inf")){
@@ -890,7 +890,6 @@ function output_param(par,save_type,file_list,one_file)
 			}
 		}
 	}
-	te += endl;
 	
 	return te;
 }
@@ -1578,7 +1577,7 @@ function create_output_sim_inf_source(p,sim_or_inf,file_list,one_file)
 			switch(so.type){
 			case "Init. Pop.":
 				{
-					let com = "init-pop"; if(sim_or_inf == "sim") com = "init-pop-sim";
+					let com = "init-pop-inf"; if(sim_or_inf == "sim") com = "init-pop-sim";
 		
 					let ic_type = so.spec.radio_dist.value;
 					
@@ -1784,28 +1783,28 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 	
 	if(sim_or_inf == "sim"){
 		switch(com){
-		case "add-pop": com = "add-pop-sim"; break;
-		case "remove-pop": com = "remove-pop-sim"; break;
-		case "add-ind": com = "add-ind-sim"; break;
-		case "remove-ind": com = "remove-ind-sim"; break;
+		case "add-pop-inf": com = "add-pop-sim"; break;
+		case "remove-pop-inf": com = "remove-pop-sim"; break;
+		case "add-ind-inf": com = "add-ind-sim"; break;
+		case "remove-ind-inf": com = "remove-ind-sim"; break;
 		case "move-ind": com = "move-ind-sim"; break;
-		case "init-pop": com = "init-pop-sim"; break;
+		case "init-pop-inf": com = "init-pop-sim"; break;
 		}
 	}
 	
 	if(sim_or_inf == "ppc"){
 		switch(com){
-		case "add-pop": com = "add-pop-post-sim"; break;
-		case "remove-pop": com = "remove-pop-post-sim"; break;
-		case "add-ind": com = "add-ind-post-sim"; break;
-		case "remove-ind": com = "remove-ind-post-sim"; break;
+		case "add-pop-inf": com = "add-pop-post-sim"; break;
+		case "remove-pop-inf": com = "remove-pop-post-sim"; break;
+		case "add-ind-inf": com = "add-ind-post-sim"; break;
+		case "remove-ind-inf": com = "remove-ind-post-sim"; break;
 		case "move-ind": com = "move-ind-post-sim"; break;
 		}
 	}
 	
 	let file = com;
 	
-	let te = com+' ';
+	let te = com+' name=\"'+so.name+'\" ';
 	
 	let spec = so.spec;
 	
@@ -1838,8 +1837,8 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 		
 			let cl = find(sp.cla,"name",spec.cl_drop.te);
 
-			let name_fi = output_add_trans_filt(spec.filter,p,cl,so,index);
-			if(name_fi != "") te += 'name="'+name_fi+'" ';
+			let trans_fi = output_add_trans_filt(spec.filter,p,cl,so,index);
+			if(trans_fi != "") te += 'trans="'+trans_fi+'" ';
 			
 			let filt = output_add_comp_filt(spec,sp,cl,p,so,index);
 			if(filt != "") te += 'filter="'+filt+'" ';
@@ -1887,8 +1886,8 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 		
 			let cl = find(sp.cla,"name",spec.cl_drop.te);
 
-			let name_fi = output_add_trans_filt(spec.filter,p,cl,so,index);
-			if(name_fi != "") te += 'name="'+name_fi+'" ';
+			let trans_fi = output_add_trans_filt(spec.filter,p,cl,so,index);
+			if(trans_fi != "") te += 'trans="'+trans_fi+'" ';
 			
 			let filt = output_add_comp_filt(spec,sp,cl,p,so,index);
 			if(filt != "") te += 'filter="'+filt+'" ';
@@ -1940,13 +1939,13 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 		
 	case "Ind. Eff.":
 		{
-			te += 'name="'+so.spec.drop.te+'" ';
+			te += 'ie="'+so.spec.drop.te+'" ';
 		}
 		break;
 		
 	case "Ind. Group":
 		{
-			te += 'name="'+so.spec.gname+'" ';
+			//te += 'name="'+so.spec.gname+'" ';
 		}
 		break;
 		

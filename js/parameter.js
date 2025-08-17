@@ -340,7 +340,7 @@ function add_par_to_list(par,list,eqn,mess)
 	}
 	
 	if(eqn != undefined){
-	list[j].eqn_appear.push(eqn);
+		list[j].eqn_appear.push(eqn);
 	}
 }
 
@@ -774,7 +774,7 @@ function update_model_param(par_list)
 	if(model.warn.length > 0) err_warning();
 	
 	let param_old = model.param;
-				
+			
 	let param=[];
 	for(let i = 0; i < par_list.length; i++){
 		let par = par_list[i];
@@ -787,6 +787,10 @@ function update_model_param(par_list)
 					let k = 0; 
 					while(k < par.dep.length && par.dep[k] == par_old.dep[k]) k++;
 					if(k == par.dep.length) break;
+				}
+				
+				if(loading_from_file()){
+					alert_line("The parameter definition '"+par_old.full_name+"' doesn't agree with that in the model '"+par.full_name+"'.",par_old.import_line);
 				}
 			}
 		}
@@ -821,30 +825,36 @@ function add_dependent_param(param,par_list)
 {
 	let par = param[param.length-1];
 	
+	let eqn_info = {par_name:par.name};
+	
 	let vari = par.variety;
 	
 	let warn =[];
 	
 	switch(vari){
 	case "reparam":
-		if(par.dep.length == 0) add_ele_param(par.value,vari,par_list,warn,{par_name:par.name});
+		if(par.dep.length == 0){
+			add_ele_param(par.value,vari,par_list,eqn_info,warn);
+		}
 		else{
-			if(par.reparam_eqn_on) add_ele_param(par.reparam_eqn,"reparam_eqn",par_list,warn,{par_name:par.name});
+			if(par.reparam_eqn_on) add_ele_param(par.reparam_eqn,"reparam_eqn",par_list,eqn_info,warn);
 			else{
 				for(let k = 0; k < par.reparam_warn.length; k++) warn.push(par.reparam_warn[k]);
-				add_to_par_list(par.reparam_param_list,par_list);
+				
 			}
 		}
+
+		add_to_par_list(par.reparam_param_list,par_list);
 		
 		if(warn.length > 0){
-			add_warning({mess:"Reparameterisation error", mess2:"The reparameterisation of '"+par.full_name+"':"+warn[0], warn_type:"reparam", name:par.name});
+			add_warning({mess:"Reparameterisation error", mess2:"The reparameterisation of '"+par.full_name+"': "+warn[0], warn_type:"reparam", name:par.name});
 		}
 		break;
 		
 	case "dist":
 		{
 			if(par.dep.length == 0 || par.prior_split_check.check == false){	
-				add_distribution_eqn(par.prior,vari,par_list,warn,{par_name:par.name});	
+				add_distribution_eqn(par.prior,vari,par_list,eqn_info,warn);	
 			}
 			else{
 				for(let k = 0; k < par.prior_warn.length; k++) warn.push(par.prior_warn[k]);
@@ -939,7 +949,9 @@ function add_ele_param(ele,variety,par_list,eqn_info,warn,op)
 		let eqn = create_equation(ele,variety);
 		eqn.eqn_info = eqn_info;
 		
-		if(eqn.warn.length > 0) warn.push(eqn.warn[0].te);
+		if(eqn.warn.length > 0){
+			warn.push(eqn.warn[0].te);
+		}
 	
 		if(op == "single eqn_appear"){  // In this case only want one eqn_appear 
 			for(let i = 0; i < eqn.param.length; i++){
@@ -965,17 +977,22 @@ function get_reparam_param_list(par)
 {
 	par.reparam_param_list=[];
 	par.reparam_warn=[];
-	if(par.variety == "reparam" && par.dep.length > 0 && par.reparam_eqn_on != true){
+	if(par.variety == "reparam" && par.reparam_eqn_on != true){
 		let eqn_info = {par_name:par.name};
 		let par_list = [];
 		let vari = par.variety;
 		
-		let co_list = generate_co_list(par.list);
-		for(let i = 0; i < co_list.length; i++){
-			let comb = co_list[i];
-			let ele = get_element(par.value,comb.index);
-			eqn_info.index = comb.index;
-			add_ele_param(ele,vari,par_list,eqn_info,par.reparam_warn,"single eqn_appear");
+		if(par.dep.length == 0){
+			add_ele_param(par.value,vari,par_list,eqn_info,par.reparam_warn,"single eqn_appear");
+		}
+		else{
+			let co_list = generate_co_list(par.list);
+			for(let i = 0; i < co_list.length; i++){
+				let comb = co_list[i];
+				let ele = get_element(par.value,comb.index);
+				eqn_info.index = comb.index;
+				add_ele_param(ele,vari,par_list,eqn_info,par.reparam_warn,"single eqn_appear");
+			}
 		}
 	
 		par.reparam_param_list = par_list;
@@ -1055,7 +1072,8 @@ function default_smooth()
 function par_set_default(par)
 {
 	par.dist_mat = false;
-			
+	par.iden_mat = false;
+	
 	if(par.dep.length == 0){
 		par.value = set_str;
 		if(par.list){
@@ -1068,6 +1086,8 @@ function par_set_default(par)
 	else{
 		if(par.name == dist_matrix_name){ dist_set_default(par); return;}
 		
+		if(par.name == iden_matrix_name || par.name == iden_matrix_name2){ iden_set_default(par); return;}
+	
 		if(par.variety == "reparam" && par.reparam_eqn_on){ reparam_eqn_set_default(par); return;}
 		
 		par.list = par_find_list(par);
@@ -1081,7 +1101,6 @@ function par_set_default(par)
 	par.prior_warn = [];
 	par.factor = false;
 	par.factor_weight_on = {check:false};
-
 }
 
 
@@ -1089,13 +1108,26 @@ function par_set_default(par)
 function dist_set_default(par)
 {
 	par.list = par_find_list(par);
-	//par.co_list = [];
 	par.value = [];
 	par.prior_split = [];
 	par.prior_split_check = {check:false};
 	par.variety = "const";	
-	par.set = true;		
 	par.dist_mat = true;
+	par.iden_mat = false;
+	par.set = false;
+}
+
+
+/// Sets default values for identity matrix
+function iden_set_default(par)
+{
+	par.list = par_find_list(par);
+	par.value = [];
+	par.prior_split = [];
+	par.prior_split_check = {check:false};
+	par.variety = "const";
+	par.dist_mat = false;	
+	par.iden_mat = true;
 	par.set = false;
 }
 
@@ -1104,12 +1136,10 @@ function dist_set_default(par)
 function reparam_eqn_set_default(par)
 {
 	par.list = par_find_list(par);
-	//par.co_list = [];
 	par.value = [];
 	par.prior_split = [];
 	par.prior_split_check = {check:false};
 	par.variety = "reparam";	
-	par.set = true;		
 	par.set = false;
 }
 
@@ -1117,7 +1147,7 @@ function reparam_eqn_set_default(par)
 /// Sets default values for tensor
 function set_default_value(par)
 {
-	if(par.dist_mat) return;
+	if(par.dist_mat || par.iden_mat) return;
 	
 	let value = par.value;
 	let dim = get_dimensions(value);
@@ -1161,12 +1191,15 @@ function copy_param_info(par,old)
 	par.reparam_eqn_on = old.reparam_eqn_on;
 	par.reparam_eqn = old.reparam_eqn;
 	par.dist_mat = false;
+	par.iden_mat = false;
 	par.factor = old.factor;
 	par.factor_weight_on = old.factor_weight_on;
 	
 	par.pri_pos = set_pri_pos(par.type,par.factor);
 	
 	if(par.name == dist_matrix_name){ dist_set_default(par); return par;}
+	
+	if(par.name == iden_matrix_name || par.name == iden_matrix_name2){ iden_set_default(par); return par;}
 	
 	if(par.variety == "reparam" && par.reparam_eqn_on){ reparam_eqn_set_default(par); return par;}
 	
@@ -1395,7 +1428,7 @@ function check_derived_param(eqn,eqn_param,param)
 		while(j < param.length && par_same(par,param[j]) == false) j++;
 		
 		if(j == param.length){
-			let k = find(param,"name",par.name);
+			let k = find(param,"na[me",par.name);
 			if(k != undefined){
 				let par_exist = param[k];
 				return err("Parameter '"+par.full_name+"' should have the dependency '"+par_exist.full_name+"' from the model");
@@ -1569,7 +1602,7 @@ function get_spline_name(par,ind,list)
 }
 
 
-/// If any parameters are called "dist" then put values for the distance matrix into them
+/// If any parameters are called "D" then put values for the distance matrix into them
 function set_dist(info,par)
 {
 	let claa = get_cla_from_index(model,par.dep[0]);
@@ -1652,6 +1685,53 @@ function set_dist(info,par)
 	}
 	
 	info.value = value;
+	let shrunk=[];
+	for(let d = 0; d < par.dep.length; d++){
+		if(info.list.length < par.list[d].length) shrunk[d] = true;
+		else shrunk[d] = false;
+	}
+	info.shrunk = shrunk;
+}
+	
+	
+/// If any parameters are called "D" then put values for the distance matrix into them
+function set_iden(info,par)
+{
+	let claa = get_cla_from_index(model,par.dep[0]);
+	if(claa == undefined){ error("Classification is undefined"); return;}
+	
+	let N = claa.comp.length;
+
+	// Works out if we need to calculate the full matrix
+	if(N*N > ELEMENT_MAX){
+		N = Math.floor(ELE_REDUCE_FAC*Math.sqrt(ELEMENT_MAX));
+		info.too_big = true;
+	}
+	
+	let li=[];
+	for(let i = 0; i < N; i++){
+		li.push(claa.comp[i].name);
+	}
+	
+	info.list[0] = li;
+	info.list[1] = li;
+	
+	let value = [];
+	for(let j = 0; j < N; j++){
+		value[j]=[];
+		for(let i = 0; i < N; i++){
+			if(i == j) value[j][i] = 1;
+			else value[j][i] = 0;
+		}
+	}
+	
+	info.value = value;
+	let shrunk=[];
+	for(let d = 0; d < par.dep.length; d++){
+		if(info.list.length < par.list[d].length) shrunk[d] = true;
+		else shrunk[d] = false;
+	}
+	info.shrunk = shrunk;
 }
 	
 
@@ -1910,6 +1990,8 @@ function add_equation_to_list(eqn_list,source,eqn_info)
 function get_param_mult(par)
 {
 	let dep = copy(par.dep);
+	if(par.time_dep) dep.pop();
+	
 	let name = "f~"+par.name;
 	let full_name = "<e>"+name;
 	if(dep.length > 0){
@@ -1920,8 +2002,10 @@ function get_param_mult(par)
 		}
 	}
 	
-	if(par.time_dep == false) dep.push("t");
-	full_name += "(t)</e>";
+	dep.push("t");
+	full_name += "(t)";
+	
+	full_name += "</e>";
 	return {name:name, full_name:full_name, dep:dep, time_dep:true, type:"param factor"};
 }
 

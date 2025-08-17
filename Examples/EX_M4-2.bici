@@ -31,7 +31,7 @@ comp name="Pred" color="#974500" x=0 y=5
 
 trans name="+->Prey" x=-19 y=-5 value="exp(rate:α×{Prey})"
 trans name="Prey->-" x=16 y=-5 value="exp(rate:β×{Pred})"
-trans name="+->Pred" x=-19 y=5 value="exp(rate:δ×{Prey}×{Pred})"
+trans name="+->Pred" x=-19 y=5 value="exp(rate:φ×{Prey}×{Pred})"
 trans name="Pred->-" x=16 y=5 value="exp(rate:γ)"
 
 # SIMULATION INITIAL CONDITIONS
@@ -48,7 +48,7 @@ param name="β" value="0.0004" prior="uniform(0,0.001)"
 
 param name="γ" value="0.05" prior="uniform(0,0.1)"
 
-param name="δ" value="0.00005" prior="uniform(0,0.0001)"
+param name="φ" value="0.00005" prior="uniform(0,0.0001)"
 
 
 
