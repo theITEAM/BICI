@@ -372,14 +372,14 @@ vector <double> StateSpecies::likelihood_indfac_int()
 					}
 					else{
 						if(ti_new == ti){
-							mev.div[ti].indfac_int += (t_ev-t)*indfac;
+							if(ti < T) mev.div[ti].indfac_int += (t_ev-t)*indfac;
 						}
 						else{
 							mev.div[ti].indfac_int += (ti+1-t)*indfac;
 							for(auto j = ti+1; j < ti_new; j++){
 								mev.div[j].indfac_int += indfac;
 							}
-							mev.div[ti_new].indfac_int += (t_ev-ti_new)*indfac;
+							if(ti_new < T) mev.div[ti_new].indfac_int += (t_ev-ti_new)*indfac;
 						}
 					}
 				}
@@ -618,13 +618,15 @@ void StateSpecies::update_indfac_int(unsigned int c, double t1, double t2, const
 			auto ti = get_ti(t1);
 			auto ti_new = get_ti(t2);
 			if(ti_new == ti){
-				dif = (t2-t1)*indfac;
-				auto &div = mev.div[ti];
-				div.indfac_int += dif;
-				dLi = -div.value*dif;
-				ti_store.push_back(ti); dif_store.push_back(dif); dLi_store.push_back(dLi);
-				Li_m[ti] += dLi;
-				like_ch += dLi;
+				if(ti < T){
+					dif = (t2-t1)*indfac;
+					auto &div = mev.div[ti];
+					div.indfac_int += dif;
+					dLi = -div.value*dif;
+					ti_store.push_back(ti); dif_store.push_back(dif); dLi_store.push_back(dLi);
+					Li_m[ti] += dLi;
+					like_ch += dLi;
+				}
 			}
 			else{
 				dif = (ti+1-t1)*indfac;
@@ -645,13 +647,15 @@ void StateSpecies::update_indfac_int(unsigned int c, double t1, double t2, const
 					like_ch += dLi;
 				}
 				
-				dif = (t2-ti_new)*indfac;
-				auto &div2 = mev.div[ti_new];
-				div2.indfac_int += dif;
-				dLi = -div2.value*dif;
-				ti_store.push_back(ti_new); dif_store.push_back(dif); dLi_store.push_back(dLi);
-				Li_m[ti_new] += dLi;
-				like_ch += dLi;
+				if(ti_new < T){
+					dif = (t2-ti_new)*indfac;
+					auto &div2 = mev.div[ti_new];
+					div2.indfac_int += dif;
+					dLi = -div2.value*dif;
+					ti_store.push_back(ti_new); dif_store.push_back(dif); dLi_store.push_back(dLi);
+					Li_m[ti_new] += dLi;
+					like_ch += dLi;
+				}
 			}
 		}
 		

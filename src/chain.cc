@@ -1020,7 +1020,7 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 		if(sum_event_prop != 0){
 			ss << "Events - " << cpu_percent(sum_event_prop,total_time);
 
-			ss << " (ind update:" << cpu_percent(state.timer[IND_TIMER],total_time) << " on which " << cpu_percent(state.timer[IND_POP_UPDATE_TIMER],total_time) << " is from population)" <<  endl;
+			ss << " (ind update:" << cpu_percent(state.timer[IND_TIMER],total_time) << " of which " << cpu_percent(state.timer[IND_POP_UPDATE_TIMER],total_time) << " is from population)" <<  endl;
 
 		}
 		
@@ -1052,7 +1052,7 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 		auto fl = false;
 		for(auto j = 0u; j < CHECK_MAX-1; j++){
 			auto t = state.check_timer[j];
-			if(t > 0.00*ttot){
+			if(t >= 0.01*ttot){
 				if(fl == true) ss << ", ";
 				ss << check_name[j] << " "  << cpu_percent(t,ttot);
 				fl = true;

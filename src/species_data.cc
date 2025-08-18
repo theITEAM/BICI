@@ -13,7 +13,7 @@ using namespace std;
 #include "species.hh"
 
 /// Initialises the data sources
-void Species::initialise_data()
+void Species::initialise_data(Operation mode)
 {
 	T = details.T;
 	
@@ -38,7 +38,7 @@ void Species::initialise_data()
 		}
 	}
 
-	if(type == INDIVIDUAL) jiggle_data();
+	if(type == INDIVIDUAL) jiggle_data(mode);
 	
 	nindividual_in = individual.size();
 
@@ -1805,7 +1805,7 @@ void Species::add_unobs_Amatrix_ind()
 
 
 /// Makes tiny shifts in time ensure that transition times are not equal
-void Species::jiggle_data()
+void Species::jiggle_data(Operation mode)
 {
 	auto range = TINY*details.dt*2;
 		
@@ -1837,14 +1837,16 @@ void Species::jiggle_data()
 			switch(ev.type){
 			case ENTER_EV:
 				if(t_enter != UNSET){
-					alert_input("Cannot set entry time twice for individual '"+ind.name+"'");
+					auto extra = post_sim_define_twice("Enter",mode);
+					alert_input("Cannot set entry time twice for individual '"+ind.name+"'."+extra);
 				}				
 				t_enter = ev.tdiv;
 				break;
 				
 			case LEAVE_EV:
 				if(t_leave != UNSET){
-					alert_input("Cannot set leave time twice for individual '"+ind.name+"'");
+					auto extra = post_sim_define_twice("Leave",mode);
+					alert_input("Cannot set leave time twice for individual '"+ind.name+"'."+extra);
 				}				
 				t_leave = ev.tdiv;
 				break;
@@ -1925,4 +1927,16 @@ void Species::jiggle_data()
 			}
 		}
 	}
+}
+
+
+/// Adds a waring message about adding/removing individuals twice
+string Species::post_sim_define_twice(string type, Operation mode) const
+{
+	if(mode != PPC) return "";
+	
+	//if(type == "
+	
+	//Note, under posterior simulation individuals are added and removed based on the posterior. 
+	return "";
 }

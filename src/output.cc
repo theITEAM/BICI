@@ -2103,7 +2103,14 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 	string param_out_file;
 
 	if(sampledir != ""){
-		string add; if(nchain > 1) add = "_"+tstr(ch);
+		string add; 
+		switch(model.mode){
+		case SIM: add += "_sim"; break;
+		case INF: add += "_inf"; break;
+		case PPC: add += "_psim"; break;
+		default: emsg("Should not be default12"); break;
+		}
+		if(nchain > 1) add = "_"+tstr(ch);
 
 		param_out_file = "param"+add+".csv";
 
@@ -2376,7 +2383,14 @@ void Output::output_state(unsigned int ch, const vector <Particle> &part, ofstre
 	string state_out_file;
 
 	if(sampledir != ""){
-		string add; if(nchain > 1) add = "_"+tstr(ch);
+		string add;
+		switch(model.mode){
+		case SIM: add += "_sim"; break;
+		case INF: add += "_inf"; break;
+		case PPC: add += "_psim"; break;
+		default: emsg("Should not be default12"); break;
+		}
+		if(nchain > 1) add = "_"+tstr(ch);
 
 		state_out_file = "state"+add+".txt";
 

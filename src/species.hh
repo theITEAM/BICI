@@ -169,7 +169,7 @@ class Species   	                         // Stores details of a species
 		
 	// In 'species_data.cc':
 	public: 
-		void initialise_data();
+		void initialise_data(Operation mode);
 		void order_data_events();
 		Filter set_comp_filt(string te, unsigned int cl_not_allow, BoundType bound, const DataSource &so);
 		void init_pop_trans_ref();
@@ -179,7 +179,8 @@ class Species   	                         // Stores details of a species
 		vector <AddRemLocal> find_add_rem_list() const;
 		void add_tr_list(const vector <unsigned int> &tr_list, const vector <bool> &cp, vector <AddRemLocal> &add_rem_local) const;
 		void add_unobs_Amatrix_ind();
-		void jiggle_data();
+		void jiggle_data(Operation mode);
+		string post_sim_define_twice(string type, Operation mode) const;
 		bool is_pop_num_fixed() const;
 		void nm_trans_incomp_info();
 		unsigned int get_tra_m(unsigned int tr, const Event &ev_orig) const;

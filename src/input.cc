@@ -286,7 +286,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	print_diag("loaded8");
 
 	for(auto &sp : model.species){	
-		sp.initialise_data();            // Extracts data structures from data sources
+		sp.initialise_data(model.mode);            // Extracts data structures from data sources
 	
 		for(const auto &wa : sp.warn) alert_line(wa.te,wa.line_num);    
 	}
@@ -510,7 +510,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	}
 	
 	if(model.mode == PPC && model.sample.size() == 0){
-		alert_import("Posterior samples (from the commands 'inf-param' and 'inf-state') must be specified for 'post-sim' to be run.");
+		alert_import("Posterior samples (from the commands 'inf-param' and 'inf-state') must be specified for 'post-sim' to be run. Please run inference before posterior simulation.");
 	}		
 
 	if(model.mode == PPC) set_ppc_resample();

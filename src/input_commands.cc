@@ -1897,6 +1897,11 @@ bool Input::post_sim_command()
 	if(!is_number(end,"end")) return false;
 	auto end_num = number(end);
 	
+	auto dt = get_tag_value("time-step"); 
+	if(dt != ""){
+		alert_import("'time-step' should not be set for 'post-sim'");
+	}
+	
 	if(details.ppc_t_start >= end_num){
 		alert_import("The start time '"+start+"' must be before the end time '"+end+"'.");
 		return false;

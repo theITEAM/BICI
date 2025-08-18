@@ -1397,6 +1397,17 @@ void State::resample_ind(bool do_pl)
 									if(sp.trans_tree) update_popnum_ind(p,i);
 									
 									if(pl) check("during resample");
+									
+									if(std::isnan(like.markov)){
+										cout << endl << endl << endl << endl;
+										cout << ssp.individual[i].name << endl;
+										cout << "Before:" << endl; ssp.print_event(ssp.individual[i].ev);
+										cout << endl;
+										cout << "Propose:" << endl; ssp.print_event(ev_new);
+								
+								
+										emsg("markov is nan");
+									}
 									break;
 								}
 							}	
