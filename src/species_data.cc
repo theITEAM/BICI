@@ -1935,8 +1935,24 @@ string Species::post_sim_define_twice(string type, Operation mode) const
 {
 	if(mode != PPC) return "";
 	
-	//if(type == "
+	auto fl = false;
+	for(const auto &so : source){
+		switch(so.cname){
+		case ADD_IND: if(type == "Enter") fl = true; break;
+		case REMOVE_IND: if(type == "Leave") fl = true; break;
+		default: break;
+		}
+	}
 	
-	//Note, under posterior simulation individuals are added and removed based on the posterior. 
+	if(fl == false) return "";
+	
+	if(type == "Enter"){
+		return " Note, under posterior simulation individuals are added based on the posterior. The commands 'add-ind-post-sim' is only used to add additional individuals.";
+	}
+	
+	if(type == "Leave"){
+		return " Note, under posterior simulation individuals are removed based on the posterior. The commands 'remove-ind-post-sim' is only used to remove additional individuals.";
+	}
+	
 	return "";
 }

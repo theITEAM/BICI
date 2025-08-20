@@ -17,8 +17,9 @@ using namespace std;
 class Output                               // Stores information about the data
 {
 	public:
-		string diagdir;                        // The diagnostics directory (within Data if available)
-		string sampledir;                      // The samples directory (within Data if available)
+		string diagdir;                        // The diagnostics directory (within data folder)
+		string sampledir;                      // The samples directory (within data folder)
+		string sampledir_rel;                  // The samples directory relative to data folder
 		
 		vector <double> timer;                 // General purpose timers
 		
@@ -59,6 +60,7 @@ class Output                               // Stores information about the data
 		string transtype_text(TransType type) const;
 		void number_part(vector <Particle> &part) const;
 		void output_trace(unsigned int ch, const vector <Particle> &part, vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout) const;
+		string get_file_name(string root, unsigned int ch, unsigned int nchain, string end) const;
 		string get_effective_sample_size(vector <double> vec) const;
 		string get_Gelman_Rubin_statistic(const vector < vector <double> > &cha) const;
 		string param_stat(unsigned int th, unsigned int i, const vector < vector < vector < vector <double> > > > &param_samp, vector <Warn> &ESS_warn, vector <Warn> &GR_warn) const;

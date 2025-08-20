@@ -464,7 +464,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 					
 				case CONST_PARAM: emsg_input("Should not be const"); break;
 					
-				case UNSET_PARAM: emsg_input("Should not be unset7"); break;
+				case UNSET_PARAM: break;
 				}
 			}
 		}
@@ -4183,8 +4183,6 @@ void Input::set_param_use()
 	auto N = model.param.size();
 	
 	// Finds which parameters are actually used in the equations
-	//vector < vector <bool> > eqn_used;
-	//eqn_used.resize(N);
 	for(auto th = 0u; th < N; th++){
 		auto &par = model.param[th];
 		for(auto &ele : par.element) ele.used = false;
@@ -4216,6 +4214,11 @@ void Input::set_param_use()
 		for(const auto &fe : sp.fix_effect){
 			model.param[fe.th].set_used(0);
 		}
+	}
+	
+	// If a parameter isn't used then is should not be output
+	for(auto &par : model.param){
+		if(par.used == false) par.trace_output = false;
 	}
 	
 	if(false){

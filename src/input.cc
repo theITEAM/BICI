@@ -27,7 +27,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	if(op()){
 		ifstream fin(file);
-		if(!fin) emsg("File '"+file+"' could not be loaded");
+		if(!fin) alert_input("File '"+file+"' could not be loaded");
 	
 		do{
 			string line;

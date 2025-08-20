@@ -1069,9 +1069,9 @@ bool Input::transition_command2(vector <Tag> &tags)
 void Input::datadir_command()
 {
 	datadir = get_tag_value("folder"); if(datadir == ""){ cannot_find_tag(); return;}
-	
+
 	datadir = get_data_dir(datadir);
-	
+
 	if(check_char_allowed(datadir,"<>\"|?*") == false) return;
 
 	struct stat st;
@@ -1502,7 +1502,7 @@ void Input::param_command()
 				break;
 	
 			case SIM: 
-				alert_warning("A value has not been set for parameter '"+par.full_name+"'");
+				alert_warning("A value has not been set for parameter '"+par.full_name+"'. Ignore this warning if this parameter is used in the observation process.");
 				break;
 			default: break;
 			}

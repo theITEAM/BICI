@@ -21,15 +21,25 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 {
 	timer.resize(OUTTIMER_MAX); for(auto &ti : timer) ti = 0;
 	
-	diagdir = "";	sampledir = "";	
+	diagdir = "";	sampledir = ""; sampledir_rel = "";
+
 	if(input.datadir != ""){
-		diagdir = input.datadir+"/Diagnostic";
-		ensure_directory(diagdir);                  // Creates the diagnostics directory
+		switch(model.mode){
+		case SIM: sampledir_rel = "sim-output"; break;
+		case INF: sampledir_rel = "inf-output"; break;
+		case PPC: sampledir_rel = "post-sim-output"; break;
+		case MODE_UNSET: emsg("Option not recognised"); break;
+		}
 		
-		sampledir = input.datadir+"/Sample";
-		ensure_directory(sampledir);                // Creates the Samples directory
-	
-		if(op()) start_progess_file(diagdir+"/progress.txt");
+		sampledir = input.datadir+"/"+sampledir_rel;
+		ensure_directory(sampledir);  
+		
+		if(model.mode == INF){
+			diagdir = sampledir+"/diagnostic";
+			ensure_directory(diagdir);                  // Creates the diagnostics directory
+		}
+		
+		//if(op()) start_progess_file(diagdir+"/progress.txt");
 	}
 	
 	if(op()){
@@ -45,34 +55,19 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 			
 			auto flag = false;
 			
-			if(st == "# OUTPUT") flag = true;
-			
-			if(command == "sim-param" || command == "sim-state"){
-				flag = true;
+			if(command == "sim-param" || command == "sim-state" || st == "# OUTPUT SIMULATION"){
+				if(model.mode == SIM) flag = true;
 			}
 			
-			if(command == "inf-param" || command == "inf-param-stats" || command == "inf-state"){
-				if(model.mode != PPC) flag = true;
+			if(command == "inf-param" || command == "inf-param-stats" || command == "inf-state" || 
+			   command == "inf-diagnostics" || command == "inf-generation" || command == "trans-diag" || st == "# OUTPUT INFERENCE"){
+				if(model.mode == INF) flag = true;
 			}
 			
-			if(command == "warning") flag = true;
-			
-			if(command == "post-sim-param" || command == "post-sim-state"){
-				flag = true;
+			if(command == "post-sim-param" || command == "post-sim-state" || st == "# OUTPUT POSTERIOR SIMULATION"){
+				if(model.mode == INF || model.mode == PPC) flag = true;
 			}
-			
-			if(command == "inf-diagnostics"){
-				if(model.mode != PPC) flag = true;
-			}
-			
-			if(command == "inf-generation"){
-				if(model.mode != PPC) flag = true;
-			}
-			
-			if(command == "trans-diag"){
-				if(model.mode != PPC) flag = true;
-			}
-			
+	
 			if(flag == true){
 				if(st.length() >= 3 && st.substr(st.length()-3,3) == "\"[["){
 					auto j = i+1;
@@ -92,7 +87,12 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 		}
 		
 		lines_raw.push_back("");
-		lines_raw.push_back("# OUTPUT");
+		switch(model.mode){
+		case SIM: lines_raw.push_back("# OUTPUT SIMULATION"); break;
+		case INF: lines_raw.push_back("# OUTPUT INFERENCE"); break;
+		case PPC: lines_raw.push_back("# OUTPUT POSTERIOR SIMULATION"); break;
+		case MODE_UNSET: break;
+		}
 		lines_raw.push_back("");
 	}
 };
@@ -1137,6 +1137,7 @@ string Output::trace_init() const
 		
 		if(par.trace_output){
 			auto pn = replace_arrow(par.name);
+			pn = add_escape_char(pn);
 			
 			if(par.dep.size() == 0){		
 				ss << ",\"" << pn << "\"";
@@ -1311,8 +1312,10 @@ void Output::param_sample(unsigned int s, unsigned int chain, State &state)
 	
 	param_store.push_back(part);
 	
-	if(jamie_code && chain != GEN_PLOT){
-		string na = sampledir+"/param_"+tstr(chain)+".csv";
+	if(sampledir != "" && jamie_code && chain != GEN_PLOT){
+		auto nchain = model.details.nchain;
+		
+		string na = sampledir+"/"+get_file_name("param",chain,nchain,".csv"); 
 		
 		if(s == 0){
 			ofstream fout(na);
@@ -1348,6 +1351,8 @@ string Output::param_output(const Particle &part, const vector < vector <double>
 		const auto &par = model.param[th];
 		if(par.trace_output){
 			for(auto j = 0u; j < par.N; j++){
+				if(th >= value.size()) emsg("r");
+				if(j >= value[th].size()) emsg("r2");
 				ss << "," << value[th][j];
 			}
 		}
@@ -1465,7 +1470,8 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 				ss << "<TRANSITIONS>" << endl;
 				// A compressed format
 				for(auto i = 0u; i < sp.tra_gl.size(); i++){
-					ss << replace_arrow(sp.tra_gl[i].name) << ":";
+					auto pn = replace_arrow(sp.tra_gl[i].name); 
+					ss << pn << ":";
 					
 					auto flag = false;
 					auto ti = 0u;
@@ -1801,7 +1807,9 @@ string Output::output_param(const vector < vector <double> > &value, const Parti
 		const auto &par = model.param[th];
 		
 		if(par.trace_output){
-			ss << "\"" << replace_arrow(par.name) << "\"";
+			auto pn = replace_arrow(par.name);
+			pn = add_escape_char(pn);
+			ss << "\"" << pn << "\"";
 			if(par.dep.size() == 0){
 				ss << "," << value[th][0] << endl;
 			}
@@ -1974,7 +1982,7 @@ void Output::end(string file, unsigned int total_cpu) const
 	
 	vector < vector < vector < vector <double> > > > param_samp;
 	param_samp.resize(nchain);
-	
+
 	for(auto ch = 0u; ch < nchain; ch++){
 		auto frac = double(ch)/nchain;
 		percentage(frac*25,100);
@@ -1984,7 +1992,7 @@ void Output::end(string file, unsigned int total_cpu) const
 #ifdef USE_MPI	
 		mpi.transfer_particle(part);
 #endif
-		
+	
 		if(op() && part.size() > 0){
 			number_part(part);
 			output_trace(ch,part,param_samp,fout);
@@ -2103,22 +2111,13 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 	string param_out_file;
 
 	if(sampledir != ""){
-		string add; 
-		switch(model.mode){
-		case SIM: add += "_sim"; break;
-		case INF: add += "_inf"; break;
-		case PPC: add += "_psim"; break;
-		default: emsg("Should not be default12"); break;
-		}
-		if(nchain > 1) add = "_"+tstr(ch);
-
-		param_out_file = "param"+add+".csv";
+		param_out_file = get_file_name("param",ch,nchain,".csv"); 
 
 		ofstream pout(sampledir+"/"+param_out_file);
 		check_open(pout,param_out_file);
 		pout << param_out;
 
-		param_out_file = "Sample/"+param_out_file;
+		param_out_file = sampledir_rel+"/"+param_out_file;
 	}
 	else{  // Embeds output into file
 		param_out_file = "[["+endli+param_out+"]]";
@@ -2144,6 +2143,17 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 	
 	if(com_op == true) cout << ss.str();
 	else fout << ss.str();
+}
+
+
+/// Gets a file name based on a root and chain number 
+string Output::get_file_name(string root, unsigned int ch, unsigned int nchain, string end) const
+{
+	auto name = root;
+	if(ch != UNSET && ch != GEN_PLOT && nchain > 1 && model.mode != PPC) name += "_"+tstr(ch);
+	name += end;
+	
+	return name;
 }
 
 
@@ -2308,7 +2318,7 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 		check_open(pout,stat_out_file);
 		pout << stat_table;
 
-		stat_out_file = "Sample/"+stat_out_file;
+		stat_out_file = sampledir_rel+"/"+stat_out_file;
 	}
 	else{  // Embeds output into file
 		stat_out_file = "[["+endli+stat_table+"]]";
@@ -2383,22 +2393,13 @@ void Output::output_state(unsigned int ch, const vector <Particle> &part, ofstre
 	string state_out_file;
 
 	if(sampledir != ""){
-		string add;
-		switch(model.mode){
-		case SIM: add += "_sim"; break;
-		case INF: add += "_inf"; break;
-		case PPC: add += "_psim"; break;
-		default: emsg("Should not be default12"); break;
-		}
-		if(nchain > 1) add = "_"+tstr(ch);
-
-		state_out_file = "state"+add+".txt";
-
+		state_out_file = get_file_name("state",ch,nchain,".txt"); 
+		
 		ofstream pout(sampledir+"/"+state_out_file);
 		check_open(pout,state_out_file);
 		pout << state_head << state_out;
 
-		state_out_file = "Sample/"+state_out_file;
+		state_out_file = sampledir_rel+"/"+state_out_file;
 	}
 	else{  // Embeds output into file
 		state_out_file = "[["+endli+state_head+state_out+"]]";
@@ -2454,13 +2455,13 @@ void Output::output_trans_diag(const vector <TransDiagSpecies> &trans_diag, ofst
 	string trans_diag_out_file;
 	
 	if(sampledir != ""){
-		trans_diag_out_file = "trans_diag.txt";
+		trans_diag_out_file = "diagnostic/trans_diag.txt";
 
 		ofstream pout(sampledir+"/"+trans_diag_out_file);
 		check_open(pout,trans_diag_out_file);
 		pout << trans_diag_out;
 
-		trans_diag_out_file = "Sample/"+trans_diag_out_file;
+		trans_diag_out_file = sampledir_rel+"/"+trans_diag_out_file;
 	}
 	else{  // Embeds output into file
 		trans_diag_out_file = "[["+endli+trans_diag_out+"]]";
@@ -2689,13 +2690,13 @@ void Output::output_generation(const vector <Particle> &part, ofstream &fout) co
 	string param_out_file;
 
 	if(sampledir != ""){
-		param_out_file = "generation.csv";
+		param_out_file = "diagnostic/generation.csv";
 
 		ofstream pout(sampledir+"/"+param_out_file);
 		check_open(pout,param_out_file);
 		pout << param_out;
 
-		param_out_file = "Sample/"+param_out_file;
+		param_out_file = sampledir_rel+"/"+param_out_file;
 	}
 	else{  // Embeds output into file
 		param_out_file = "[["+endli+param_out+"]]";
@@ -2719,13 +2720,15 @@ void Output::output_diagnostic(const vector <Diagnostic> &diagnostic, bool &alg_
 		string diag_out_file;
 	
 		if(diagdir != ""){
-			diag_out_file = "diagnostic_"+tstr(di.ch)+".txt";
+			auto nchain = model.details.nchain;
+			
+			diag_out_file = get_file_name("info",di.ch,nchain,".txt");  
 
 			ofstream pout(diagdir+"/"+diag_out_file);
 			check_open(pout,diag_out_file);
 			pout << di.te;
 
-			diag_out_file = "Diagnostic/"+diag_out_file;
+			diag_out_file = sampledir_rel+"/diagnostic/"+diag_out_file;
 		}
 		else{  // Embeds output into file
 			diag_out_file = "[["+endli+di.te+"]]";

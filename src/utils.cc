@@ -67,8 +67,8 @@ vector <double> log_integer;
 
 double percent_done;
 
-ofstream progress;
-bool progress_on = false;
+//ofstream progress;
+//bool progress_on = false;
 
 /// Displays an error message which comes from an internal problem and kills otehr cores
 void emsg(const string &msg)
@@ -2897,12 +2897,15 @@ string replace_arrow(string te)
 }
 
 
+/*
 /// Initialises a file for outputting progress
 void start_progess_file(string file)
 {
 	progress_on = true;
 	progress.open(file);	
 }
+*/
+
 
 
 /// Resets the percentage
@@ -2932,10 +2935,13 @@ void percentage_start(PercentType type, unsigned int gen)
 		}
 		cout << te << endl;
 		cout.flush();
+		
+		/*
 		if(progress_on){ 
 			progress << te << endl;
 			progress.flush();
 		}
+		*/
 	}
 	
 	percent_done = UNSET;
@@ -2984,10 +2990,12 @@ void percentage(double val, double val2)
 				fflush(stdout); 
 				//cout << percent_done << "%";
 				
+				/*
 				if(progress_on){ 
 					progress << percent_done << "%" << endl; 
 					progress.flush();
 				}
+				*/
 					
 				if(percent_done == 100){ 
 					percent_done = LARGE;

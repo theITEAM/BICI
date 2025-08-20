@@ -1296,6 +1296,7 @@ unsigned int Input::get_param_value(vector < vector <double> > &param_value, uns
 	
 	auto spl = comma_split(lines[i]);
 	auto name = remove_quote(replace(spl[0],"->","→"));// remove_quote(spl[0].replace(/->/g,"→"));
+	name = remove_escape_char(name);
 	
 	if(find_in(not_param_list,name) != UNSET){
 		return i;
@@ -1303,12 +1304,16 @@ unsigned int Input::get_param_value(vector < vector <double> > &param_value, uns
 	
 	auto th = 0u;
 	while(th < model.param.size() && model.param[th].name != name) th++;
-	if(th == model.param.size()) alert_sample(warn,13);
+	if(th == model.param.size()){
+		alert_sample(warn,13);
+		return i;
+	}
 
 	const auto &par = model.param[th];
-
 	param_value[th].resize(par.N,UNSET);
 
+	if(par.used) return i;
+	
 	switch(spl.size()){
 	case 1:           // Set parameter value with dependency
 		{

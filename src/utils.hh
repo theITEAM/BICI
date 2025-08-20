@@ -157,7 +157,7 @@ string trunc(string te, unsigned int len);
 vector< vector <string> > get_escape_char();
 string add_escape_char(string te);
 string replace_arrow(string te);
-void start_progess_file(string file);
+//void start_progess_file(string file);
 void percentage(double val, double val2);
 void percentage_start(PercentType type, unsigned int gen=UNSET);
 void percentage_end();	

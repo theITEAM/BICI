@@ -447,13 +447,15 @@ vector <double> StateSpecies::likelihood_ie_change(unsigned int i, unsigned int 
 						}
 						else{
 							if(ti_new == ti){
-								va = (t_ev-t)*indfac;
-								div[ti].indfac_int += va;
-								dLi = -va*div[ti].value;
-								Li_mark[ti] += dLi;
-								dLi_sum += dLi;
-								store.push_back(va);
-								store.push_back(dLi);
+								if(ti < T){
+									va = (t_ev-t)*indfac;
+									div[ti].indfac_int += va;
+									dLi = -va*div[ti].value;
+									Li_mark[ti] += dLi;
+									dLi_sum += dLi;
+									store.push_back(va);
+									store.push_back(dLi);
+								}
 							}
 							else{
 								va = (ti+1-t)*indfac;
@@ -474,13 +476,15 @@ vector <double> StateSpecies::likelihood_ie_change(unsigned int i, unsigned int 
 									store.push_back(dLi);
 								}
 								
-								va = (t_ev-ti_new)*indfac;
-								div[ti_new].indfac_int += va;
-								dLi = -va*div[ti_new].value;
-								Li_mark[ti_new] += dLi;
-								dLi_sum += dLi;
-								store.push_back(va);
-								store.push_back(dLi);
+								if(ti_new < T){
+									va = (t_ev-ti_new)*indfac;
+									div[ti_new].indfac_int += va;
+									dLi = -va*div[ti_new].value;
+									Li_mark[ti_new] += dLi;
+									dLi_sum += dLi;
+									store.push_back(va);
+									store.push_back(dLi);
+								}
 							}
 						}
 					}
@@ -548,8 +552,10 @@ void StateSpecies::likelihood_ie_change_restore(unsigned int i, unsigned int ie,
 						}
 						else{
 							if(ti_new == ti){
-								div[ti].indfac_int -= store[j]; j++;
-								Li_mark[ti] -= store[j]; j++;
+								if(ti < T){
+									div[ti].indfac_int -= store[j]; j++;
+									Li_mark[ti] -= store[j]; j++;
+								}
 							}
 							else{
 								div[ti].indfac_int -= store[j]; j++;
@@ -558,8 +564,10 @@ void StateSpecies::likelihood_ie_change_restore(unsigned int i, unsigned int ie,
 									div[k].indfac_int -= store[j]; j++;
 									Li_mark[k] -= store[j]; j++;	
 								}
-								div[ti_new].indfac_int -= store[j]; j++;
-								Li_mark[ti_new] -= store[j]; j++;	
+								if(ti_new < T){
+									div[ti_new].indfac_int -= store[j]; j++;
+									Li_mark[ti_new] -= store[j]; j++;	
+								}
 							}
 						}
 					}

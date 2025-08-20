@@ -28,7 +28,7 @@
 
 //  ./bici-core Execute/init.bici inf
 
-//valgrind --leak-check=yes -s ./bici-para Execute/init.bici inf
+//valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici post-sim
 
 // nohup mpirun -n 16 ./bici-para Jamie/scen-1-1.bici inf > ddddd.txt&
 // 06d_New_Inf_500.bici
@@ -36,8 +36,9 @@
 // 06d_New_Inf_500.bici
 // ./bici-para Jamie/test.bici post-sim
 // ./bici-para Jamie/testped2.bici post-sim
-// valgrind --leak-check=yes -s  ./bici-para Jamie/test.bici post-sim
+// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s  ./bici-para Execute/init.bici post-sim
 
+// mpirun -n 4  ./bici-para Execute/init.bici inf
 
 // ssh gaia.bioss.ac.uk  ./bici-para Jamie/temp inf
 
@@ -53,9 +54,9 @@
 
 // When running in parallel then load mpi using: module load mpi/openmpi-x86_64
 
-// Test: valgrind --leak-check=yes -s ./bici-para Execute/init.bici sim
-// Test: valgrind --leak-check=yes -s ./bici-para Execute/init.bici inf
-// Test:  valgrind --leak-check=yes -s  ./bici-para simple_model.bici inf
+// Test: valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici sim
+// Test: valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici inf
+// Test:  valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s  ./bici-para simple_model.bici inf
 
 // Compiling for windows: .\make.bat from the directory D:\C_complier_BICI2.0\bin
 
@@ -155,7 +156,7 @@ int main(int argc, char** argv)
 
 	Output output(model,input,mpi);         // Sets up the class for model outputs
 
-	if(op()){
+	if(false && op()){
 		output.summary(model);                // Outputs a text file sumarising the model
 
 		output.data_summary(model);           // Outputs a text file sumarising the data
