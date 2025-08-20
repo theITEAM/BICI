@@ -1897,7 +1897,7 @@ bool Input::post_sim_command()
 	if(!is_number(end,"end")) return false;
 	auto end_num = number(end);
 	
-	auto dt = get_tag_value("time-step"); 
+	auto dt = get_tag_value("timestep"); 
 	if(dt != ""){
 		alert_import("'time-step' should not be set for 'post-sim'");
 	}
@@ -2036,10 +2036,11 @@ void Input::ind_effect_command()
 	
 	auto num = 0u;
 	if(A != "") num++;
+	if(A_inv != "") num++;
 	if(A_sparse != "") num++;
 	if(pedigree != "") num++;
 	if(num > 1){
-		alert_import("Cannot specify more than one of 'A', 'A-sparse' or 'pedigree'."); 
+		alert_import("Cannot specify more than one of 'A', 'Ainv', 'A-sparse' or 'pedigree'."); 
 		return;
 	}
 	
@@ -2201,6 +2202,38 @@ void Input::ind_effect_command()
 			A_matrix.value = val;
 			A_matrix.hash_ind_list.create(A_matrix.ind_list);
 		}
+		
+		if(A_inv != ""){
+			A_matrix.set = true;
+			auto tab = load_table(A_inv);
+			if(tab.error == true) return;
+		
+			A_matrix.ind_list = tab.heading;
+			if(tab.nrow != tab.ncol){
+				alert_import("The file '"+tab.file+"' must contain an equal number of columns and rows."); 
+				return;
+			}
+			
+			vector < vector <double> > val;
+			val.resize(tab.nrow);
+			for(auto r = 0u; r < tab.nrow; r++){
+				val[r].resize(tab.ncol);
+				for(auto c = 0u; c < tab.ncol; c++){
+					auto ele = number(tab.ele[r][c]);
+					if(ele == UNSET){
+						alert_import(in_file_text(tab.file)+ " the element '"+tstr(ele)+"' is not a number (row "+tstr(r+2)+", col "+tstr(c+1)+")");
+						return;
+					}
+					val[r][c] = ele;
+				}
+			}
+			
+			auto val_inv = invert_matrix(val);
+			A_matrix.value = val_inv;
+			A_matrix.hash_ind_list.create(A_matrix.ind_list);
+		}
+		
+		if(A_matrix.set != true) emsg("A-matrix should be set");
 	}
 	
 	// Checks that ind effects do not already exist

@@ -3983,13 +3983,22 @@ void Input::set_ppc_resample()
 	
 	auto spl = split(st,',');
 	for(auto i = 0u; i < spl.size(); i++){
-		auto name = spl[i];
+		auto name = remove_escape_char(spl[i]);		
+		
+		auto spl = split(name,'_');
+		if(spl.size() > 1) name = spl[0];
+		
 		auto fl = false;
 		
 		// Looks at parameters
 		for(auto &pv : model.param_vec){
-			if(model.param[pv.th].name == name){
+			const auto &par = model.param[pv.th];
+			if(par.name == name){
 				pv.ppc_resample = true;
+				if(par.variety != DIST_PARAM){
+					alert_import("For 'post-sim' the parameter '"+name+"' in 'resample' is not sampled from a distribution in the model.");
+				}
+						
 				fl = true;
 			}
 		}
@@ -4006,10 +4015,26 @@ void Input::set_ppc_resample()
 						fl = true;
 					}
 				}
+				else{
+					auto partial = false;
+					for(auto k = 0u; k < ieg.list.size(); k++){
+						if(find_in(spl2,ieg.list[k].name) != UNSET) partial = true;
+					}
+					
+					if(partial){
+						string su = "";
+						for(auto k = 0u; k < ieg.list.size(); k++){
+							if(k != 0) su += "-";
+							su += ieg.list[k].name;
+						}
+						alert_input("In 'post-sim' tag 'resample' the value '"+name+"' is not correct. Is should be '"+su+"'.");
+						return;						
+					}
+				}
 			}
 		}
 		
-		if(fl == false) emsg_input("For 'resample' the value '"+name+"' is not within the model"); 
+		if(fl == false) alert_input("In 'post-sim' tag 'resample' the value '"+name+"' is not within the model"); 
 	}
 
 	if(false){

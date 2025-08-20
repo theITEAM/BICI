@@ -769,7 +769,11 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 	
 	if(type == "trans-diag") com = TRANS_DIAG;
 	
-	if(type == "warning") com = WARNING;
+	if(type == "sim-warning") com = SIM_WARNING;
+	
+	if(type == "inf-warning") com = INF_WARNING;
+	
+	if(type == "post-sim-warning") com = PPC_WARNING;
 	
 	if(com == EMPTY){
 		alert_import("Command '"+type+"' not recognised.",true);
@@ -1130,7 +1134,7 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 	case SIM_PARAM: case SIM_STATE: dummy_file_command(); break;
 	case POST_SIM_PARAM: case POST_SIM_STATE: dummy_file_command(); break;
 	case INF_PARAM: case INF_PARAM_STATS: dummy_file_command(); break;
-	case WARNING: warning_command(); break;
+	case SIM_WARNING: case INF_WARNING: case PPC_WARNING: warning_command(); break;
 	case INF_DIAGNOSTICS: dummy_file_command(); break;
 	case INF_GEN: dummy_file_command(); break;
 	

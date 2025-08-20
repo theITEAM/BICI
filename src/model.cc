@@ -99,6 +99,14 @@ vector <double> Model::post_param(const Sample &samp) const
 {
 	vector <double> param_val(nparam_vec);
 	
+	/*
+	for(auto th = 0u; th < nparam_vec; th++){
+		const auto &pv = param_vec[th];	
+		const auto &par = param[pv.th];
+		cout << par.name << " " << samp.param_value[pv.th][pv.index] << endl;
+	}
+	*/
+	
 	for(auto th = 0u; th < nparam_vec; th++){
 		const auto &pv = param_vec[th];	
 		const auto &par = param[pv.th];

@@ -55,16 +55,17 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 			
 			auto flag = false;
 			
-			if(command == "sim-param" || command == "sim-state" || st == "# OUTPUT SIMULATION"){
+			if(command == "sim-param" || command == "sim-state" || command == "sim-warning" || st == "# OUTPUT SIMULATION"){
 				if(model.mode == SIM) flag = true;
 			}
 			
 			if(command == "inf-param" || command == "inf-param-stats" || command == "inf-state" || 
-			   command == "inf-diagnostics" || command == "inf-generation" || command == "trans-diag" || st == "# OUTPUT INFERENCE"){
+			   command == "inf-diagnostics" || command == "inf-generation" || 
+				 command == "trans-diag" || command == "inf-warning" || st == "# OUTPUT INFERENCE"){
 				if(model.mode == INF) flag = true;
 			}
 			
-			if(command == "post-sim-param" || command == "post-sim-state" || st == "# OUTPUT POSTERIOR SIMULATION"){
+			if(command == "post-sim-param" || command == "post-sim-state" || command == "post-sim-warning" || st == "# OUTPUT POSTERIOR SIMULATION"){
 				if(model.mode == INF || model.mode == PPC) flag = true;
 			}
 	
@@ -84,6 +85,15 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 		
 		while(lines_raw.size() > 0 && lines_raw[lines_raw.size()-1] == ""){
 			lines_raw.erase(lines_raw.begin()+lines_raw.size()-1); 
+		}
+		
+		// Removes more than double space
+		auto j = 0u;
+		while(j+2 < lines_raw.size()){
+			if(trim(lines_raw[j]) == "" && trim(lines_raw[j+1]) == "" && trim(lines_raw[j+2]) == ""){
+				lines_raw.erase(lines_raw.begin()+j);
+			}
+			else j++;
 		}
 		
 		lines_raw.push_back("");
@@ -2479,7 +2489,16 @@ void Output::output_trans_diag(const vector <TransDiagSpecies> &trans_diag, ofst
 /// Adds an output warning
 void Output::add_warning(string err_msg, ofstream &fout) const
 {
-	auto line = "warning text=\"[["+endli;
+	string line;
+	
+	switch(model.mode){
+	case SIM: line = "sim-warning"; break;
+	case INF: line = "inf-warning"; break;
+	case PPC: line = "post-sim-warning"; break;
+	case MODE_UNSET: emsg("op problem"); break;
+	}
+	
+	line += " text=\"[["+endli;
 	line += err_msg+endli;
 	line += "]]\""+endli+endli;
 	

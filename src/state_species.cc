@@ -1182,36 +1182,39 @@ vector <double> StateSpecies::sample_ie() const
 /// Samples the individual effects with A matrix
 void StateSpecies::sample_ie_Amatrix()
 {
-	auto flag = false;
+	//auto flag = false;
 	string warn;
 	for(auto i = 0u; i < sp.ind_eff_group.size(); i++){
 		const auto &ieg = sp.ind_eff_group[i];
 		
 		const auto &iegs = ind_eff_group_sampler[i];
-		
-		if(ieg.A_matrix.set == true && !(mode == PPC && ieg.ppc_resample == false)){
-			flag = true;
-			
-			auto N = ieg.list.size();
-			auto I = individual.size();
-			auto M = N*I;
-			
-			vector <double> vec(M);
-			for(auto i = 0u; i < M; i++) vec[i] = normal_sample(0,1,warn);
-			
-			for(auto j = 0u; j < M; j++){
-				auto j_A = (unsigned int)(j/N);
-				auto j_O = j%N;
+
+		if(ieg.A_matrix.set == true){
+			//flag = true;
+			if(mode == PPC && ieg.ppc_resample == false){
+			}
+			else{
+				auto N = ieg.list.size();
+				auto I = individual.size();
+				auto M = N*I;
 				
-				auto sum = 0.0;
-				for(auto i = 0u; i < M; i++){
-					auto i_A = (unsigned int)(i/N);
-					auto i_O = i%N;
+				vector <double> vec(M);
+				for(auto i = 0u; i < M; i++) vec[i] = normal_sample(0,1,warn);
 				
-					sum += iegs.A_Z[j_A][i_A]*iegs.omega_Z[j_O][i_O]*vec[i];
-				}
-				
-				individual[j_A].ie[ieg.list[j_O].index] = sum;
+				for(auto j = 0u; j < M; j++){
+					auto j_A = (unsigned int)(j/N);
+					auto j_O = j%N;
+					
+					auto sum = 0.0;
+					for(auto i = 0u; i < M; i++){
+						auto i_A = (unsigned int)(i/N);
+						auto i_O = i%N;
+					
+						sum += iegs.A_Z[j_A][i_A]*iegs.omega_Z[j_O][i_O]*vec[i];
+					}
+					
+					individual[j_A].ie[ieg.list[j_O].index] = sum;
+				}			
 			}				
 		}
 	}
@@ -1222,7 +1225,7 @@ void StateSpecies::sample_ie_Amatrix()
 			if(ind.ie[i] == UNSET) emsg("Should be set1");
 		}
 
-		if(flag == true) set_exp_ie(ind);
+		//if(flag == true) set_exp_ie(ind);
 	}
 }
 
