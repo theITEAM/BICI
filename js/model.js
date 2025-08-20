@@ -41,7 +41,6 @@ class Model
 		this.param = [];
 		this.param_factor = [];
 		this.derive = [];   
-		this.run_warning = [];
 		
 		this.sim_details = { t_start:"", t_end:"", timestep:"", indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, algorithm:{value:"gillespie"}, number:SIM_NUM_DEFAULT, run_local:{value:"Yes"}, seed_on:{value:"No"}, seed:SEED_DEFAULT };    
 		
@@ -51,6 +50,13 @@ class Model
 			
 		this.start = true;
 		this.filename = "";
+		
+		this.sim_res.run_warning=[];
+		this.sim_res.run_warning_show = false; 
+		this.inf_res.run_warning=[];
+		this.inf_res.run_warning_show = false; 
+		this.ppc_res.run_warning=[];
+		this.ppc_res.run_warning_show = false; 
 	}
 	
 	
@@ -2952,22 +2958,8 @@ class Model
 		}
 		
 		if(exa_store) this.example = exa_store;
-		
-		let wa = mod.run_warning;
-		if(wa.length > 0 && mod.run_warning_show == false){
-			if(wa.length == 1){
-				alert_help("Run time warning",wa[0]);
-			}
-			else{
-				let te="";
-				for(let i = 0; i < wa.length; i++){
-					te += "• "+wa[i]+endl;
-				}
-				alert_help("Run time warnings",te);
-			}
-		
-			mod.run_warning_show = true;
-		}
+	
+		model.check_show_warning(); // Checks if we should show a model warning
 	}
 	
 	
@@ -3335,6 +3327,44 @@ class Model
 			if(fl && no_plot == false){
 				this.replot();
 			}
+		}
+	}
+	
+	
+	/// Checks if we should show a model warning
+	check_show_warning()
+	{
+		let na = inter.page_name;
+		let tree = na.split("->");
+		
+		let res;
+		if(tree[1] == "Results"){
+			switch(tree[0]){
+			case "Simulation": res = this.sim_res; break;
+			case "Inference": res = this.inf_res; break;
+			case "Post. Simulation": res = this.ppc_res; break;
+			default: break;
+			}
+		}			
+		
+		if(res == undefined) return;
+	
+		if(res.run_warning_show == true) return;
+
+		let wa = res.run_warning;
+		if(wa.length > 0){
+			if(wa.length == 1){
+				alert_help("Run time warning",wa[0]);
+			}
+			else{
+				let te="";
+				for(let i = 0; i < wa.length; i++){
+					te += "• "+wa[i]+endl;
+				}
+				alert_help("Run time warnings",te);
+			}
+		
+			res.run_warning_show = true;
 		}
 	}
 }

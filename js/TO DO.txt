@@ -1,5 +1,11 @@
 TO DO
-model E5 checking takes ages...
+
+
+list too long in interface
+update error messages
+high transition rate warning
+post_sim_define_twice
+
 ind eff group name
 integrals are working correctly
 G1 not working
@@ -8,7 +14,6 @@ G1 not working
 outputting taking a long time for Jamie model....
 
 test post-sim for all examples
-
 test proposals using initial state
 test trans-tree proposals using initial state
 
@@ -46,3 +51,7 @@ grant email
 add names to data source
 make alterations to bici file and check error messages
 check obs warning is working
+model E5 checking takes ages...
+sort out directories form sim 
+C5 D4, D5, D6 Dposterior simulation valgrind
+E3, E4, E8, G1 inf

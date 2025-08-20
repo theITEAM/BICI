@@ -362,6 +362,8 @@ function get_path(file)
 /// Loads any files within the BICI file
 function load_BICI_files(ans,per_start,per_end)
 {
+	loading_symbol_message("Loading...");
+	
 	var fs = nw.require('fs');
 	
 	let dfl = ans.data_file_list;

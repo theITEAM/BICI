@@ -24,7 +24,7 @@ const string default_file = "/tmp/init.bici";        // This is used for Mac
 const string default_file = "Execute/init.bici";     // This is used for windows / linux
 #endif
 
-#define USE_MPI                                    // Sets if code can run in parallel
+//#define USE_MPI                                    // Sets if code can run in parallel
 
 const bool jamie_code = true;                        // This turns in code for Jamie
 const bool testing = true;                           // Set to true for additional testing

@@ -28,6 +28,7 @@
 	inf-param-stats
 	inf-state
 	inf-diagnostics
+	inf-warning
 	init-pop-inf
 	init-pop-sim
 	label
@@ -42,6 +43,7 @@
 	posterior-simulation/post-sim
 	post-sim-param
 	post-sim-state
+	post-sim-warning
 	remove-ind-inf
 	remove-ind-post-sim
 	remove-ind-sim
@@ -53,13 +55,14 @@
 	simulation / sim
 	sim-param
 	sim-state
+	sim-warning
 	test-data
 	trans-data
 	trans-diag
 	transition / trans
 	transition-all / trans-all
 	view
-	warning
+	
 	*/
 	
 let imp = {};                                      // Stores information as import is done
@@ -88,9 +91,14 @@ function import_file(te,file,clear_results)
 
 	let data_file_list = get_data_file_list(pro,10,15);
 
+	model_store = model;
+	
+	init_result(pro,clear_results);
+
 	// Keeps track of the current species and classification 
 	imp = { pro:pro, lines:lines, clear_results:clear_results, script:pro.formatted, previous_loaded_table:[], warn:false}; 
 
+	
 	if(data_file_list.length > 0){
 		if(begin_str(data_file_list[0].full_name,"..")) load_local(data_file_list,15,30);
 		else post({type:"Import model files", data_file_list:data_file_list});
@@ -120,15 +128,11 @@ function import_file2(data_file_list)
 	let pro = imp.pro;
 	imp.data_file_list = data_file_list;
 	
-	percent(30);
-	
-	model_store = model;
-	
 	model = new Model();	 
 	model.start_new();
 	
-	init_result(pro,imp.clear_results);
-
+	percent(30);
+	
 	let per_start = 30, per_end = 70, com_ti_sum = 0;
 	let per = per_start;
 	for(let loop = 0; loop < 4; loop++){ 
@@ -170,7 +174,7 @@ function import_file2(data_file_list)
 			model.update_pline_all();
 
 			com_ti_sum += 0.1*import_frac_pro; per = show_percent(com_ti_sum,per,per_start,per_end);
-				
+			
 			if(sim_result.load) results_add_model(sim_result,model.sim_details,"sim");
 			if(inf_result.load) results_add_model(inf_result,model.inf_details,"inf");
 			if(ppc_result.load) results_add_model(ppc_result,model.ppc_details,"ppc");
@@ -333,7 +337,7 @@ function show_percent(com_ti_sum,per,per_start,per_end)
 function init_result(pro,clear_results)
 {
 	if(clear_results){
-		sim_result = {siminf:"sim"};                  // Stores results from simulation
+		sim_result = {siminf:"sim"};                    // Stores results from simulation
 		inf_result = {siminf:"inf"};                  // Stores results from inference
 		ppc_result = {siminf:"ppc"};
 	}
@@ -436,7 +440,9 @@ function process_command(cname,tags,loop,per_start,per_end)
 	case "classification": classification_command(loop); break;
 	case "set": set_command(); break;
 	case "view": camera_command(); break;
-	case "warning": warning_command(); break;
+	case "sim-warning": warning_command("sim"); break;
+	case "inf-warning": warning_command("inf"); break;
+	case "post-sim-warning": warning_command("ppc"); break;
 	case "compartment": compartment_command(); break;
 	case "compartment-all": compartment_all_command(); break;
 	case "transition": transition_command(); break;

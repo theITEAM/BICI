@@ -605,7 +605,7 @@ function camera_command()
 
 
 /// Sets a camera in a classification
-function warning_command()
+function warning_command(type)
 {
 	let warn = get_tag_value("text"); if(warn == "") cannot_find_tag();
 	
@@ -614,9 +614,12 @@ function warning_command()
 	if(warn.length > 0 && warn.substr(warn.length-1,1) == "\n"){
 		warn = warn.substr(0,warn.length-1);
 	}
-
-	model.run_warning_show = false;
-	model.run_warning.push(warn);
+	
+	switch(type){
+	case "sim": model.sim_res.run_warning.push(warn); break;
+	case "inf": model.inf_res.run_warning.push(warn); break;
+	case "ppc": model.ppc_res.run_warning.push(warn); break;
+	}
 }
 
 

@@ -2172,12 +2172,13 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 		switch(result.siminf){
 		case "sim": so = sp.sim_source[list[j]]; break;
 		case "inf": so = sp.inf_source[list[j]]; break;
-		default: error("Source not found"); break;
+		default: break;
 		}
 		
-		//let te = so.type; if(so.desc != "-") te += ": "+so.desc;
-		let te = so.name;
-		add_table_column(te,mat[j],table);
+		if(so != undefined){
+			let te = so.name;
+			add_table_column(te,mat[j],table);
+		}
 	}
 	
 	// Adds padding on the last column (if possible)

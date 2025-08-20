@@ -373,6 +373,7 @@ function read_param_samples(chain,te,result,warn)
 	for(let i = 1; i < J; i++){
 		let name = remove_quote(spl[i]).replace(/->/g,"→");
 		name = name.replace(/\|/g,",");
+		name = remove_escape_char(name);
 	
 		let ref_add = hash_ref.find(name)
 		if(ref_add == undefined){
@@ -381,7 +382,6 @@ function read_param_samples(chain,te,result,warn)
 				ref_add = {th:th, index:[]};
 				
 				result.param.push({name:name, full_name:name, dep:[], time_dep:false, variety: "likelihood", selop:"like"});
-				
 			}
 			else{
 				if(find_in(trans_tree_name,name) != undefined){

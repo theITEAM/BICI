@@ -53,28 +53,30 @@ function start_data_source(type,spec,info)
 	
 	{ // Adds number if multiple sources with the same name
 		let siminf = info.siminf;
-		let p = info.p;
-		
-		let sp = model.species[p];
-		if(siminf == "gen") sp = model.sim_res.plot_filter.species[p];
-		if(siminf == "ppc") sp = model.inf_res.plot_filter.species[p];
-		
-		let source;
-		switch(siminf){
-		case "sim": source = sp.sim_source; break;
-		case "inf": case "infic": source = sp.inf_source; break;
-		case "ppc": source = sp.ppc_source; break;
-		case "gen": source = sp.gen_source; break;
-		}
-		
-		let num = 1;
-		do{
-			let name2 = name; if(num > 1) name2+= num;
-			if(find(source,"name",name2)== undefined){
-				name = name2; break;
+		if(siminf != undefined){
+			let p = info.p;
+			
+			let sp = model.species[p];
+			if(siminf == "gen") sp = model.sim_res.plot_filter.species[p];
+			if(siminf == "ppc") sp = model.inf_res.plot_filter.species[p];
+			
+			let source;
+			switch(siminf){
+			case "sim": source = sp.sim_source; break;
+			case "inf": case "infic": source = sp.inf_source; break;
+			case "ppc": source = sp.ppc_source; break;
+			case "gen": source = sp.gen_source; break;
 			}
-			num++;
-		}while(true);
+			
+			let num = 1;
+			do{
+				let name2 = name; if(num > 1) name2 += num;
+				if(find(source,"name",name2) == undefined){
+					name = name2; break;
+				}
+				num++;
+			}while(true);
+		}
 	}
 	
 	edit_source = { name:name, type:type, table_loaded:false, load_datatable:true, table:{filename:"",heading:[], col_used:[], ele:[], ncol:0, nrow:0, edit:false}, spec:spec, info:info};

@@ -233,6 +233,7 @@ function get_param_value(i,source,lines,result,warn,mode)
 
 	let spl = comma_split(lines[i]);
 	let name = remove_quote(spl[0].replace(/->/g,"→"));
+	name = remove_escape_char(name);
 	
 	let th = find(result.param,"name",name);
 	if(th == undefined) alert_sample(warn,13);

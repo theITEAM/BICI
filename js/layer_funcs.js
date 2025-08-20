@@ -6,8 +6,8 @@ function generate_screen(update)
 {		
 	if(update != false && model.update_model_needed == true && inter.page_name){
 		let na = inter.page_name;
-	
 		let tree = na.split("->");
+	
 		if((tree[0] == "Model" && tree[1] == "Parameters") ||
 			(tree[0] == "Simulation" && tree[1] == "Parameters") ||
 			(tree[0] == "Simulation" && tree[1] == "Initial Conditions") ||

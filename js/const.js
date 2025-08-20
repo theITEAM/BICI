@@ -16,7 +16,7 @@ let debug = false;                                // Determines if debugger used
 let testing = false;                              // Used logo to load up results (false)
 let load_map_fast = false;                        // If loads up world map from local computer
 
-let win_linux = false;//true;                             // When working on win running linux 
+let win_linux = false;                             // When working on win running linux 
 if(win_linux || false){ testing = true; debug = true; load_map_fast = true;}
 	
 let make_file = false;                            // Determines if makes file or runs
@@ -84,14 +84,17 @@ const command_list = [
 {na:"inf",ti:0},
 {na:"post-sim",ti:0},
 {na:"posterior-simulation",ti:0},
+{na:"post-sim-warning",ti:0},
 {na:"ind-effect",ti:0},
 {na:"fixed-effect",ti:0},
 {na:"sim-param",ti:0.5},
 {na:"sim-state",ti:1},
+{na:"sim-warning",ti:0},
 {na:"inf-param",ti:5},
 {na:"inf-param-stats",ti:1},
 {na:"inf-generation",ti:1},
 {na:"inf-state",ti:10},
+{na:"inf-warning",ti:0},
 {na:"trans-diag",ti:1},
 {na:"post-sim-param",ti:5},
 {na:"post-sim-state",ti:10},
@@ -99,8 +102,7 @@ const command_list = [
 {na:"map",ti:5},
 {na:"post-sim",ti:0},
 {na:"post-simulation",ti:0},
-{na:"param-mult",ti:0},
-{na:"warning",ti:0}
+{na:"param-mult",ti:0}
 ];
 
 // Lists all commands which need to load files

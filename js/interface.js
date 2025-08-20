@@ -124,6 +124,8 @@ function change_page(page_new)
 			}
 		}
 	}
+	
+	model.check_show_warning();
 }
 
 
