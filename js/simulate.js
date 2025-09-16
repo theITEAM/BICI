@@ -387,6 +387,15 @@ function run_local(cx,cy,details,lay)
 	xx += gap;
 	xx = lay.add_radio(xx,cy+0.1,"No","No",details.run_local,{back_col:WHITE});		
 	
+	if(details.run_local.value == "No"){
+		xx += 3;
+		lay.add_paragraph("SAVE:",5,xx,cy+0.1,BLACK,para_si,para_lh);
+		xx += 3;
+		xx = lay.add_radio(xx,cy+0.1,"Save","Single script file",details.run_save_type,{back_col:WHITE});
+		xx += gap;
+		xx = lay.add_radio(xx,cy+0.1,"Export","Script file + data directory",details.run_save_type,{back_col:WHITE});		
+	}
+	
 	return cy;
 }
 		
@@ -454,7 +463,7 @@ function add_ppc_start_buts(lay)
 				
 				cy += 0.5;
 				
-				add_layer("SamplingCheckbox",lay.x+cx,lay.y+cy,lay.dx-2*cx-20,lay.dy-cy-3.5,{});
+				add_layer("SamplingCheckbox",lay.x+cx,lay.y+cy,lay.dx-2*cx-20,lay.dy-cy-1.5,{});
 			}
 		}
 		

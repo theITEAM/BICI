@@ -20,7 +20,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	timer.resize(PROPTIMER_MAX,0);
 
 	type = type_;
-	prop_prob = 1;
 	prop_weight = w;
 	number = 0;
 	
@@ -81,6 +80,8 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	
 		get_dependency();                       // Gets how other parameter and priors are affect by change
 	
+		calculate_update_precalc();             // Finds how precalculation is updated 
+		
 		get_affect_like();                      // Gets how the likelihood is altered under the change
 	
 		si = 0.1;
@@ -138,6 +139,8 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		initialise_variables();                 // Initialises the basic sampling variables
 	
 		get_dependency();                       // Gets how other parameter and priors are affect by change
+	
+		calculate_update_precalc();             // Finds how precalculation is updated 
 	
 		get_affect_like();                      // Gets how the likelihood is altered under the change
 		break;
@@ -358,6 +361,8 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	plot_index = 0;
 	
 	set_omega_check();
+	
+	prop_prob = set_prop_prob();
 }
 
 
@@ -378,11 +383,127 @@ void Proposal::initialise_variables()
 }
 
 
+/// Works out how to update precalculation
+void Proposal::calculate_update_precalc()
+{
+	// For dependent parameters
+	auto M = model.precalc_eqn.calcu.size();
+	vector <bool> mapl(M,false);
+	{
+		dependent_update_precalc.clear();
+		
+		for(auto k = 0u; k < dependent.size(); k++){
+			auto j = dependent[k];
+			const auto &pv = model.param_vec[j];
+			
+			UpdatePrecalc up_pre;
+			up_pre.list_precalc_time = pv.list_precalc_time;
+			for(auto i : pv.list_precalc_before){
+				if(mapl[i] == false){
+					up_pre.list_precalc.push_back(i);
+					mapl[i] = true;
+				}
+			}
+			
+			dependent_update_precalc.push_back(up_pre);
+		}
+	}
+	
+	// After parameters have been defined
+	auto dif = false;
+	if(param_list.size() > 1){
+		const auto &pv = model.param_vec[param_list[0]];
+		for(auto i = 1u; i < param_list.size(); i++){
+			const auto &pv2 = model.param_vec[param_list[i]];
+			if(equal_vec(pv.list_precalc_time,pv2.list_precalc_time) == false) dif = true;
+		}
+	}
+
+	if(dif == true){  // If there is a difference in the times of the proposals then do seperately
+		for(auto j : param_list){
+			const auto &pv = model.param_vec[j];
+			auto list_new = remove_precalc_done(pv.list_precalc,mapl);
+			if(list_new.size() > 0){				
+				UpdatePrecalc up_pre;
+				up_pre.list_precalc = list_new;
+				up_pre.list_precalc_time = pv.list_precalc_time;			
+				update_precalc.push_back(up_pre);
+			}
+		}
+	}
+	else{
+		const auto &pv = model.param_vec[param_list[0]];
+		
+		UpdatePrecalc up_pre;
+		up_pre.list_precalc_time = pv.list_precalc_time;			
+		
+		vector <unsigned int> list_precalc;
+		
+		auto C = param_list.size();
+		vector <unsigned int> index(C,0);
+
+		do{
+			auto imin = LARGE;
+			for(auto j = 0u; j < C; j++){
+				const auto &pc = model.param_vec[param_list[j]].list_precalc;
+				if(index[j] < pc.size()){
+					auto i = pc[index[j]];
+					if(i < imin) imin = i;
+				}
+			}
+			
+			if(imin == LARGE) break;
+			
+			if(mapl[imin] == false) list_precalc.push_back(imin);
+			
+			for(auto j = 0u; j < C; j++){
+				const auto &pc = model.param_vec[param_list[j]].list_precalc;
+				if(index[j] < pc.size() && pc[index[j]] == imin) index[j]++;
+			}
+		}while(true);
+		
+		if(false && C > 1){
+			for(auto j = 0u; j < C; j++){
+				const auto &pc = model.param_vec[param_list[j]].list_precalc;
+				for(auto i : pc) cout << i << ",";
+				cout << endl;			
+			}
+			
+			cout << "after" << endl;
+			for(auto i : list_precalc) cout << i << ",";
+			cout << endl;
+			emsg("comb");
+		}
+		
+		if(list_precalc.size() > 0){
+			up_pre.list_precalc = list_precalc;
+			update_precalc.push_back(up_pre);
+		}
+	}
+}
+
+
+/// Removes any precalculations already done
+vector <unsigned int> Proposal::remove_precalc_done(const vector <unsigned int> &list_precalc, vector <bool> &mapl) const
+{
+	vector <unsigned int> list_precalc_new;
+	for(auto i : list_precalc){
+		if(mapl[i] == false){
+			list_precalc_new.push_back(i);
+			mapl[i] = true;
+		}			
+	}
+	
+	return list_precalc_new;
+}
+
+
 /// Prints information about the sampler
 string Proposal::print_info() const
 {
 	stringstream ss;
 
+	ss << "prob: " << prop_prob << " ";
 	switch(type){
 	case TRANS_TREE_PROP:
 		ss << "TRANSMISSION TREE SAMPLER";	
@@ -599,8 +720,35 @@ string Proposal::print_info() const
 
 	if(1 == 0) cout << "Affect like output is turned off in code" << endl;		
 	else{
-		for(const auto &al : affect_like){
+		auto imax = affect_like.size(); 
+		//if(imax > 10) imax  = 10; zzz
+		for(auto i = 0u; i < imax; i++){
+			const auto &al = affect_like[i];
 			ss << output.print_affect_like(al) << endl;
+		}
+		if(imax < affect_like.size()) ss << "...+ more" << endl;
+	}
+	
+	if(false) ss << "Precalc output turned off in code" << endl;
+	else{
+		if(param_list.size() > 0){
+			ss << "Precalc dependent: ";
+			for(const auto &up_pr : dependent_update_precalc){
+				for(auto i : up_pr.list_precalc) ss << i << ",";
+				ss << "   time: ";
+				if(up_pr.list_precalc_time.size() == model.details.T) ss << "All";
+				else for(auto i : up_pr.list_precalc_time) ss << i << ",";
+				ss << endl;
+			}
+			
+			ss << "Precalc update: ";
+			for(const auto &up_pr : update_precalc){
+				for(auto i : up_pr.list_precalc) ss << i << ",";
+				ss << "   time: ";
+				if(up_pr.list_precalc_time.size() == model.details.T) ss << "All";
+				else for(auto i : up_pr.list_precalc_time) ss << i << ",";
+				ss << endl;
+			}
 		}
 	}
 	
@@ -618,33 +766,23 @@ void Proposal::MH(State &state)
 {
 	auto pl = false;
 	
-	auto param_store = state.param_val;
-	
-	state.param_val = sample(state.param_val);
+	auto &param_val = state.param_val;
 
-	if(false){
-		for(auto j = 0u; j < model.param_vec.size(); j++){
-			cout << name << endl;
-			
-			const auto &pv = model.param_vec[j];
-			if(param_store[j] != state.param_val[j]){
-				cout << pv.name << " " << param_store[j] << " -> " << state.param_val[j] << endl;
-			}
-		}
-	}
-	
 	ntr++; 
 	
-	if(model.inbounds(state.param_val) == false || 
-		(omega_check && model.ie_cholesky_error(state.param_val))){ 
-		state.param_val = param_store; 
+	if(param_resample(param_val) == false){
 		update_si(-0.005);
 		return;
 	}
-
-	state.update_spline(affect_spline);
 	
-	auto like_ch = state.update_param(affect_like,param_store);
+	if(false){
+		for(auto i : param_val.value_ch){
+			const auto &pv = model.param_vec[i];
+			cout << pv.name << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
+		}
+	}
+	
+	auto like_ch = state.update_param(affect_like);
 	
 	auto al = calculate_al(like_ch,0);
 	
@@ -652,21 +790,16 @@ void Proposal::MH(State &state)
 	if(ran() < al){ 
 		if(pl) cout << "accept" << endl;
 		nac++;
-			
-		state.add_like(like_ch);
+		state.accept(like_ch);
 		update_si(0.01);
-		state.remove_store_spline(affect_spline);
 	}
 	else{ 
 		if(pl) cout << "reject" << endl;
-		state.param_val = param_store;
 		state.restore(affect_like);
-		state.restore_spline(affect_spline);
-		
 		update_si(-0.005); if(si > 3) si *= 0.75;
 	}
 
-	if(pl) state.check("ev");
+	if(pl) state.check("evafter");
 }
 
 
@@ -687,10 +820,7 @@ void Proposal::mbp(State &state)
 	auto sim_prob = 0.0;
 	switch(type){
 	case MBP_PROP: 
-		state.param_val = sample(state.param_val); 
-
-		if(model.inbounds(state.param_val) == false){
-			state.param_val = param_store; 
+		if(param_resample(state.param_val) == false){ 
 			update_si(-0.005);
 			return;
 		}
@@ -730,11 +860,9 @@ void Proposal::mbp(State &state)
 	auto tnum_mean_st_st = ssp.tnum_mean_st;
 	auto cpop_st_st = ssp.cpop_st;
 	
-	state.update_spline(affect_spline);
-
 	ssp.mbp(sim_prob,state.popnum_t);
 
-	auto like_ch = state.update_param(affect_like,param_store);
+	auto like_ch = state.update_param(affect_like);
 	
 	auto al = calculate_al(like_ch,0);
 	
@@ -751,12 +879,11 @@ void Proposal::mbp(State &state)
 		default: break;
 		}
 		
-		state.add_like(like_ch);
+		state.accept(like_ch);
 		ssp.mbp_accept(state.like.markov,state.popnum_t);
 	
 		update_si(0.005); 
 		if(si > 1 && (type == MBPII_PROP || type == MBP_IC_RESAMP_PROP)) si = 1;
-		state.remove_store_spline(affect_spline);
 	}
 	else{ 
 		if(pl) cout << "reject" << endl;
@@ -773,7 +900,6 @@ void Proposal::mbp(State &state)
 		}
 		
 		state.restore(affect_like);		
-		state.restore_spline(affect_spline);
 		update_si(-0.005);
 		if(type == MBP_IC_POP_PROP || type == MBP_IC_POPTOTAL_PROP){
 			if(si < POP_SI_LIM) si = POP_SI_LIM;
@@ -785,7 +911,7 @@ void Proposal::mbp(State &state)
 /// Performs a Metropolis-Hastings proposal update for an individual event time
 void Proposal::MH_event(State &state)
 {
-	if(skip_proposal(0.5)) return;
+	//if(skip_proposal(0.5)) return;
 
 	auto pl = false;
 
@@ -882,7 +1008,7 @@ void Proposal::MH_event(State &state)
 									if(ran() < al){
 										if(pl) cout << " accept" << endl;
 										samp.nac++;
-										state.add_like(like_ch);
+										state.accept(like_ch);
 										state.gen_change_update(gc); 
 										if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 										
@@ -917,7 +1043,7 @@ void Proposal::MH_event(State &state)
 /// Performs a Metropolis-Hastings proposal update for multiple individual event times
 void Proposal::MH_multi_event(State &state)
 {
-	if(skip_proposal(0.5)) return;
+	//if(skip_proposal(0.5)) return;
 
 	auto pl = false;
 
@@ -1034,7 +1160,7 @@ void Proposal::MH_multi_event(State &state)
 							if(ran() < al){
 								if(pl) cout << " accept" << endl;
 								samp.nac++;
-								state.add_like(like_ch);
+								state.accept(like_ch);
 								state.gen_change_update(gc); 
 								if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 								
@@ -1060,7 +1186,7 @@ void Proposal::MH_multi_event(State &state)
 /// Performs a Metropolis-Hastings proposal update for all individual event times
 void Proposal::MH_event_all(State &state)
 {
-	if(skip_proposal(0.5)) return;
+	//if(skip_proposal(0.5)) return;
 
 	auto pl = false;
 
@@ -1139,7 +1265,7 @@ void Proposal::MH_event_all(State &state)
 						if(ran() < al){
 							if(pl) cout << " accept" << endl;
 							samp.nac++;
-							state.add_like(like_ch);
+							state.accept(like_ch);
 							state.gen_change_update(gc); 
 							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 							
@@ -1192,7 +1318,7 @@ void Proposal::MH_ind_local(State &state)
 	
 	if(false){
 		for(auto &lich : licha) ssp.print_local_ind_change(lich);
-		emsg("do");	
+		emsg("local changes");	
 	}
 		
 	const vector <Event> empty_event;           
@@ -1292,7 +1418,7 @@ void Proposal::MH_ind_local(State &state)
 							si.nac++;
 							remove_li_cha(i,licha,lc_ref);
 							add_li_cha(i,add,licha,lc_ref);
-							state.add_like(like_ch);
+							state.accept(like_ch);
 							state.gen_change_update(gc); 
 							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 							if(testing){ if(Nf != licha.size()) emsg("Wrong number");}
@@ -1347,7 +1473,7 @@ void Proposal::MH_ind_local(State &state)
 /// Performs a transmission tree proposal
 void Proposal::trans_tree(State &state)
 {
-	if(skip_proposal(0.9)) return;
+	//if(skip_proposal(0.9)) return;
 	
 	state.trans_tree_proposal(burn_info,nac,ntr);
 }
@@ -1356,7 +1482,7 @@ void Proposal::trans_tree(State &state)
 /// Performs a transmission tree proposal swapping infectee and infector
 void Proposal::trans_tree_swap_inf(State &state)
 {
-	if(skip_proposal(0.9)) return;
+	//if(skip_proposal(0.9)) return;
 	
 	state.trans_tree_swap_inf_proposal(burn_info,nfa,nac,ntr);
 }
@@ -1365,7 +1491,7 @@ void Proposal::trans_tree_swap_inf(State &state)
 /// Performs a transmission tree mutation proposal (simple change in mutation number on a link)
 void Proposal::trans_tree_mut(State &state)
 {
-	if(skip_proposal(0.9)) return;
+	//if(skip_proposal(0.9)) return;
 	
 	state.trans_tree_mut_proposal(burn_info,nac,ntr,si);
 }
@@ -1374,7 +1500,7 @@ void Proposal::trans_tree_mut(State &state)
 /// Performs a local tree proposal (shifts events around a branching point
 void Proposal::trans_tree_mut_local(State &state)
 {
-	if(skip_proposal(0.9)) return;
+	//if(skip_proposal(0.9)) return;
 	
 	state.trans_tree_mut_local_proposal(burn_info,gen_mut_info);
 }
@@ -1383,7 +1509,7 @@ void Proposal::trans_tree_mut_local(State &state)
 /// Performs a sampling proposal update for an observed individual 
 void Proposal::sample_ind_obs(State &state)
 {
-	if(skip_proposal(0.8)) return;
+	//if(skip_proposal(0.8)) return;
 	
 	auto pl = false;
 	
@@ -1391,10 +1517,10 @@ void Proposal::sample_ind_obs(State &state)
 
 	if(pl) state.check("before");
 	
-	auto &sp = model.species[p_prop];
+	const auto &sp = model.species[p_prop];
 	auto &ssp = state.species[p_prop];
 	
-	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val,state.spline_val,state.popnum_t);
+	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popnum_t);
 	
 	ind_ev_samp.setup_nm();
 	
@@ -1411,8 +1537,9 @@ void Proposal::sample_ind_obs(State &state)
 					
 						if(ran() < isp.prob){
 							ntr++; if(burn) isp.ntr++;
-							ind_ev_samp.generate_ind_obs_timeline();
 							
+							ind_ev_samp.generate_ind_obs_timeline();
+						
 							auto probif = 0.0;
 						
 							auto ev_new = ind_ev_samp.sample_events(probif);
@@ -1447,6 +1574,7 @@ void Proposal::sample_ind_obs(State &state)
 									}
 									
 									ind_ev_samp.generate_ind_obs_timeline();
+										
 									auto probfi = ind_ev_samp.sample_events_prob(ev_store);
 									
 									auto dprob = probfi-probif;
@@ -1463,7 +1591,7 @@ void Proposal::sample_ind_obs(State &state)
 									if(ran() < al){
 										if(pl) cout << "ac ind" << endl;
 										nac++; if(burn){ if(event_dif(ev_store,ind.ev)) isp.nac++;}
-										state.add_like(like_ch);
+										state.accept(like_ch);
 										state.gen_change_update(gc); 	
 										if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 									}
@@ -1475,6 +1603,7 @@ void Proposal::sample_ind_obs(State &state)
 								
 								if(pl) state.check(" indupdate");
 							}
+							
 							if(burn) ind_obs_prob_update(isp);
 						}
 					}
@@ -1498,8 +1627,9 @@ void Proposal::resimulate_ind_obs(State &state)
 	
 	if(sp.nindividual_in == 0) return;
 
-	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val,state.spline_val,state.popnum_t);
+	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popnum_t);
 		
+	
 	for(auto i = 0u; i < sp.nindividual_in; i++){	
 		const auto &indd = sp.individual[i];
 		
@@ -1518,11 +1648,6 @@ void Proposal::resimulate_ind_obs(State &state)
 				//}
 						
 				auto ev_new = ind_ev_samp.simulate_events(i,e_init,probif,indd.trig_ev_ref);
-		
-				//if(pl){
-					//cout << "new: "; ssp.print_event(ev_new); 	
-					//if(ind_ev_samp.illegal) emsg("do");
-				//}
 				
 				ntr++; if(burn) isp.ntr++;
 				if(ind_ev_samp.illegal){
@@ -1546,7 +1671,7 @@ void Proposal::resimulate_ind_obs(State &state)
 					if(gc.type == GENCHA_FAIL){
 						nfa++;
 					}
-					else{			
+					else{		
 						if(pl){
 							cout << endl << endl << ind.name << "ind " << endl; 
 							cout << "old: "; ssp.print_event(ind.ev);
@@ -1565,7 +1690,7 @@ void Proposal::resimulate_ind_obs(State &state)
 						if(pl){
 							cout << "new: "; ssp.print_event(ind.ev);
 						}
-						
+							
 						probfi += ind_ev_samp.resample_init_event_prob(i,ev_store[0]) + 
 											ind_ev_samp.simulate_events_prob(i,ev_store,indd.trig_ev_ref);
 				
@@ -1580,7 +1705,7 @@ void Proposal::resimulate_ind_obs(State &state)
 						if(ran() < al){ 
 							if(pl) cout << "ac ind" << endl;
 							nac++; if(burn){ if(event_dif(ev_store,ind.ev)) isp.nac++;}
-							state.add_like(like_ch);
+							state.accept(like_ch);
 							state.gen_change_update(gc); 	
 							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 						}
@@ -1597,15 +1722,13 @@ void Proposal::resimulate_ind_obs(State &state)
 			}
 		}
 	}
-	
-	//emsg("do");
 }
 
 
 /// Performs resimulation proposal update for an observed individual in different classifications
 void Proposal::resimulate_single_ind_obs(State &state)
 {
-	if(skip_proposal(0.5)) return;
+	//if(skip_proposal(0.5)) return;
 	
 	auto pl = false;
 	auto burn = burn_info.on;
@@ -1615,7 +1738,7 @@ void Proposal::resimulate_single_ind_obs(State &state)
 	
 	if(sp.nindividual_in == 0) return;
 
-	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val,state.spline_val,state.popnum_t);
+	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popnum_t);
 	
 	for(auto i = 0u; i < sp.nindividual_in; i++){	
 		const auto &indd = sp.individual[i];
@@ -1683,7 +1806,7 @@ void Proposal::resimulate_single_ind_obs(State &state)
 							if(ran() < al){
 								if(pl) cout << "ac ind" << endl;
 								nac++; if(burn){ if(event_dif(ev_store,ind.ev)) isp.nac++;}
-								state.add_like(like_ch);
+								state.accept(like_ch);
 								state.gen_change_update(gc); 	
 								if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 							}
@@ -1713,7 +1836,7 @@ void Proposal::resimulate_ind_unobs(State &state)
 	
 	if(sp.nindividual_obs == ssp.individual.size()) return;
 
-	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val,state.spline_val,state.popnum_t);
+	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popnum_t);
 	
 	const auto &so_samp = ssp.source_sampler;
 	
@@ -1779,7 +1902,7 @@ void Proposal::resimulate_ind_unobs(State &state)
 				if(ran() < al){ 
 					if(pl) cout << "ac ind" << endl;
 					nac++;
-					state.add_like(like_ch);
+					state.accept(like_ch);
 					state.gen_change_update(gc); 	
 					if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 				}
@@ -1803,7 +1926,7 @@ void Proposal::add_rem_ind(State &state)
 	const auto &so_samp = ssp.source_sampler;
 	auto &inf_node = state.genetic_value.inf_node;
 	
-	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val,state.spline_val,state.popnum_t);
+	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popnum_t);
 	
 	vector <Event> ev_empty;
 	
@@ -1890,7 +2013,7 @@ void Proposal::add_rem_ind(State &state)
 				if(ran() < al){ 
 					if(pl) cout << "ac ind" << endl;
 					nac++;
-					state.add_like(like_ch);
+					state.accept(like_ch);
 		
 					for(auto i : i_store){
 						unobs.add(i);
@@ -1968,7 +2091,7 @@ void Proposal::add_rem_ind(State &state)
 					if(ran() < al){ 
 						if(pl) cout << "ac ind" << endl;
 						nac++;
-						state.add_like(like_ch);
+						state.accept(like_ch);
 						
 						sort(i_store.begin(),i_store.end());   
 						for(int k = dN-1; k >= 0; k--){
@@ -2010,7 +2133,7 @@ void Proposal::add_rem_tt_ind(State &state)
 	auto &ssp = state.species[p_prop];
 	const auto &so_samp = ssp.source_sampler;
 	
-	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val,state.spline_val,state.popnum_t);
+	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popnum_t);
 	
 	auto &inf_node = state.genetic_value.inf_node;
 	
@@ -2072,7 +2195,7 @@ void Proposal::add_rem_tt_ind(State &state)
 				if(ran() < al){ 
 					if(pl) cout << "ac ind" << endl;
 					nac++;
-					state.add_like(li_ch);
+					state.accept(li_ch);
 					state.gen_change_update(gc); 	
 					if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 					
@@ -2138,7 +2261,7 @@ void Proposal::add_rem_tt_ind(State &state)
 						if(ran() < al){ 
 							if(pl) cout << "ac ind" << endl;
 							nac++;
-							state.add_like(li_ch);
+							state.accept(li_ch);
 							state.gen_change_update(gc); 	
 							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 												
@@ -2164,6 +2287,8 @@ void Proposal::add_rem_tt_ind(State &state)
 /// Performs a Metropolis-Hastings proposal update for individual effects
 void Proposal::MH_ie(State &state)
 {	
+	//if(skip_proposal(0.8)) return;
+	
 	auto pl = false;
 	
 	auto &sp = model.species[p_prop];
@@ -2250,7 +2375,7 @@ void Proposal::MH_ie(State &state)
 		if(ran() < al){ 
 			if(pl) cout << "ac ind" << endl;
 			nac++;
-			state.add_like(like_ch);
+			state.accept(like_ch);
 			
 			ind.ie[ie_prop] = value_prop;
 			ind.exp_ie[ie_prop] = exp_prop;
@@ -2289,26 +2414,23 @@ void Proposal::MH_ie_var(State &state)
 {
 	auto pl = false;
 	
-	auto param_store = state.param_val;
-	
-	state.param_val = sample(state.param_val);
+	auto &param_val = state.param_val;
+	auto &value = param_val.value;
 	
 	auto th = param_list[0];
+	auto val_st = value[th];
 	
-	if(state.param_val[th] <= 0 || model.inbounds(state.param_val) == false || 
-		model.ie_cholesky_error(state.param_val)){ 
+	if(param_resample(param_val) == false){
 		update_si(-0.005);
-		state.param_val = param_store; 
 		return;
 	}
 	
-	auto factor = sqrt(state.param_val[th]/param_store[th]);
+	auto factor = sqrt(value[th]/val_st);
 
 	auto &ssp = state.species[p_prop];
 	for(auto &ind : ssp.individual) ind.ie[ie_prop] *= factor;
 	
-	state.update_spline(affect_spline);
-	auto like_ch = state.update_param(affect_like,param_store);
+	auto like_ch = state.update_param(affect_like);
 
 	auto al = calculate_al(like_ch,-like_ch.ie);
 	
@@ -2317,14 +2439,11 @@ void Proposal::MH_ie_var(State &state)
 	if(ran() < al){
 		if(pl) cout << "accept" << endl;
 		nac++;
-		state.add_like(like_ch);
+		state.accept(like_ch);
 		update_si(0.01);
-		state.remove_store_spline(affect_spline);
 	}
 	else{ 
-		state.param_val = param_store;
 		state.restore(affect_like);
-		state.restore_spline(affect_spline);
 		for(auto &ind : ssp.individual) ind.ie[ie_prop] /= factor;
 		update_si(-0.005);
 	}
@@ -2338,28 +2457,29 @@ void Proposal::MH_ie_var_cv(State &state)
 {
 	auto pl = false;//true;
 	
-	auto param_store = state.param_val;
-	
-	state.param_val = sample(state.param_val);
-	
-	if(model.inbounds(state.param_val) == false || 
-		 model.ie_cholesky_error(state.param_val)){ 
-		update_si(-0.005);
-		state.param_val = param_store; 
-		return;
-	}
+	auto &param_val = state.param_val;
+	auto &value = param_val.value;
 	
 	auto th = param_list[0];
 	
-	if(state.param_val[th] < TINY){ state.param_val = param_store; return;}
+	auto val_st = value[th];
 	
-	auto factor = sqrt(state.param_val[th]/param_store[th]);
+	if(param_resample(param_val)){
+		update_si(-0.005);
+		return;
+	}
+	
+	if(value[th] < TINY){ 
+		param_val.restore(); 
+		return;
+	}
+	
+	auto factor = sqrt(value[th]/val_st);
 
 	auto &ssp = state.species[p_prop];
 	for(auto &ind : ssp.individual) ind.ie[ie_prop] *= factor;
 	
-	state.update_spline(affect_spline);
-	auto like_ch = state.update_param(affect_like,param_store);
+	auto like_ch = state.update_param(affect_like);
 
 	auto al = calculate_al(like_ch,-like_ch.ie);
 	
@@ -2368,14 +2488,11 @@ void Proposal::MH_ie_var_cv(State &state)
 	if(ran() < al){
 		if(pl) cout << "accept" << endl;
 		nac++;
-		state.add_like(like_ch);
+		state.accept(like_ch);
 		update_si(0.01);
-		state.remove_store_spline(affect_spline);
 	}
 	else{ 
-		state.param_val = param_store;
 		state.restore(affect_like);
-		state.restore_spline(affect_spline);
 		for(auto &ind : ssp.individual) ind.ie[ie_prop] /= factor;
 		update_si(-0.005);
 	}
@@ -2389,17 +2506,18 @@ void Proposal::MH_ie_covar(State &state)
 {
 	auto pl = false;
 	
-	auto param_store = state.param_val;
-
-	state.param_val = sample(state.param_val);
+	auto &param_val = state.param_val;
+	auto &value = param_val.value;
 	
-	if(model.inbounds(state.param_val) == false){ 
-		state.param_val = param_store; 
+	auto th = param_list[0];
+	
+	auto val_st = value[th];
+	
+	if(param_resample(param_val) == false){
 		update_si(-0.005);
 		return;
 	}
 	
-	auto th = param_list[0];
 	auto g = ind_eff_group_ref.ieg;
 	
 	auto &ssp = state.species[p_prop];
@@ -2410,7 +2528,7 @@ void Proposal::MH_ie_covar(State &state)
 
 	auto E = ieg.list.size();
 	
-	auto fac = state.param_val[th]/param_store[th]; 
+	auto fac = value[th]/val_st; 
 		
 	auto omega_bef = iegs.omega;
 	auto omega_aft = omega_bef;
@@ -2425,7 +2543,7 @@ void Proposal::MH_ie_covar(State &state)
 	auto illegal_aft = false;
 	auto Z_omega_aft = calculate_cholesky(omega_aft,illegal_aft);
 	if(illegal_aft){
-		state.param_val = param_store; 
+		param_val.restore(); 
 		update_si(-0.005);
 		return;
 	}
@@ -2459,8 +2577,7 @@ void Proposal::MH_ie_covar(State &state)
 
 	//ssp.compare_covar("AFTER",omega_aft,g);
 
-	state.update_spline(affect_spline);
-	auto like_ch = state.update_param(affect_like,param_store);
+	auto like_ch = state.update_param(affect_like);
 
 	auto al = calculate_al(like_ch,-like_ch.ie);
 	
@@ -2469,14 +2586,11 @@ void Proposal::MH_ie_covar(State &state)
 	if(ran() < al){ 
 		if(pl) cout << "ac" << endl;
 		nac++;
-		state.add_like(like_ch);
+		state.accept(like_ch);
 		update_si(0.01);
-		state.remove_store_spline(affect_spline);
 	}
 	else{ 
-		state.param_val = param_store;
 		state.restore(affect_like);
-		state.restore_spline(affect_spline);
 		
 		for(auto i = 0u; i < ssp.individual.size(); i++){
 			auto &ie = ssp.individual[i].ie;
@@ -2495,18 +2609,22 @@ void Proposal::param_event_joint(Direction dir, State &state)
 	
 	auto th = param_list[0];
 	
-	auto param_new = sample(state.param_val);
+	auto &param_val = state.param_val;
+	auto &value = param_val.value;
 	
-	ntr++; 	
-	if(model.inbounds(param_new) == false){ 
+	auto val_st = value[th];
+	
+	if(param_resample(param_val) == false){
 		nfa++;
 		update_si(-0.005);
 		return;
 	}
+	
+	ntr++; 	
 
 	auto illegal = false;
 
-	auto fac = param_new[th]/state.param_val[th];
+	auto fac = value[th]/val_st;
 	if(fac < 0) illegal = true;
 
 	const auto &sp = model.species[p_prop];
@@ -2659,12 +2777,9 @@ void Proposal::param_event_joint(Direction dir, State &state)
 	ssp.add_all_event_ref(ind_list,ev_new);
 	if(incomp_fl) ssp.add_all_nmincomp_ref(ind_list,incomp_ref_new);
 
-	auto param_store = state.param_val;
-	state.param_val = param_new;
-	
 	// Update param
-	state.update_spline(affect_spline);
-	auto like_ch = state.update_param(affect_like,param_store);
+	
+	auto like_ch = state.update_param(affect_like);
 	
 	double n = ind_list.size();
 
@@ -2676,16 +2791,13 @@ void Proposal::param_event_joint(Direction dir, State &state)
 		if(pl) cout << "accept" << endl;
 		nac++;
 			
-		state.add_like(like_ch);
+		state.accept(like_ch);
 		update_si(0.01);
-		state.remove_store_spline(affect_spline);
 	}
 	else{ 
 		if(pl) cout << "reject" << endl;
 		
-		state.param_val = param_store;
 		state.restore(affect_like);
-		state.restore_spline(affect_spline);
 		
 		ssp.remove_all_event_ref(ind_list);
 		ssp.add_all_event_ref(ind_list,ev_old);
@@ -3257,9 +3369,15 @@ string Proposal::diagnostics(double total_time) const
 		}
 		break;
 	}
+
+	ss << "CPU time: " << cpu_percent(timer[PROP_TIMER],total_time);
+	//ss << "CPU time: " << 100*double(timer[PROP_TIMER])/total_time; 
 	
-	ss << "CPU time: " << cpu_percent(timer[PROP_TIMER],total_time) << endl;
-	//	 << "  Prob: " << prop_prob << endl;
+	{
+		auto per = cpu_percent(timer[PARAM_RESAMPLE_TIMER],total_time);
+		if(per != "0%") ss << " (" << per << " from precalc)";
+	}
+	ss << endl;
 	
 	return ss.str();
 }
@@ -3369,7 +3487,7 @@ void Proposal::switch_enter_source(State &state)
 					if(ran() < al){
 						if(pl) cout << " accept" << endl;
 						nac++;
-						state.add_like(like_ch);
+						state.accept(like_ch);
 						state.gen_change_update(gc); 
 						if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 					}
@@ -3474,7 +3592,7 @@ void Proposal::switch_leave_sink(State &state)
 				if(ran() < al){
 					if(pl) cout << " accept" << endl;
 					nac++;
-					state.add_like(like_ch);
+					state.accept(like_ch);
 					state.gen_change_update(gc); 
 					if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 				}
@@ -3638,7 +3756,7 @@ void Proposal::basic_ind_update(unsigned int i, vector <Event> &ev_new, State &s
 
 		if(ran() < al){
 			if(pl) cout << " accept" << endl;
-			state.add_like(like_ch);
+			state.accept(like_ch);
 			state.gen_change_update(gc); 
 			if(model.species[p_prop].trans_tree) state.update_popnum_ind(p_prop,i);
 		}
@@ -3648,6 +3766,67 @@ void Proposal::basic_ind_update(unsigned int i, vector <Event> &ev_new, State &s
 		}
 
 		if(pl) state.check("basic ind");
+	}
+}
+
+
+/// Stores old value of precalc
+void PV::precalc_change(unsigned int i)
+{
+	if(precalc_old[i] == UNSET){
+		precalc_old[i] = precalc[i]; 
+		precalc_ch.push_back(i);
+	}
+}
+
+
+/// Stores old value of precalc
+void PV::value_change(unsigned int i)
+{
+	if(value_old[i] == UNSET){
+		value_old[i] = value[i]; 
+		value_ch.push_back(i);
+	}
+}
+
+
+/// Restores parameters to previous values
+void PV::restore()
+{
+	for(auto i : value_ch){
+		value[i] = value_old[i];
+		value_old[i] = UNSET;
+	}
+
+	for(auto i : precalc_ch){
+		precalc[i] = precalc_old[i];
+		precalc_old[i] = UNSET;
+	}
+
+	value_ch.clear();
+	precalc_ch.clear();
+}
+
+
+/// Clears any change information
+void PV::clear()
+{
+	for(auto i : value_ch) value_old[i] = UNSET;
+	for(auto i : precalc_ch) precalc_old[i] = UNSET;
+	
+	value_ch.clear();
+	precalc_ch.clear();
+}
+
+/// Checks all the values are unset
+void PV::check()
+{
+	for(auto va : value_old){
+		if(va != UNSET) emsg("value should be unset");
+	}
+	
+	for(auto va : precalc_old){
+		if(va != UNSET) emsg("precalc should be unset");
 	}
 }
 

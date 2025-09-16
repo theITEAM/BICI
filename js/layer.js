@@ -66,7 +66,7 @@ class Layer
 	
 		let tree = inter.page_name.split("->");
 	
-		if(inter.loading_symbol.on == true) return;
+		if(loading_sym()) return;
 		
 		switch(tree[0]){
 		case "Home": add_home_page_buts(this); break;
@@ -639,8 +639,9 @@ class Layer
 		this.add_button({x:0, y:loading_si, dx:this.dx, dy:1, type:"LoadMessage"});
 	
 		let ls = inter.loading_symbol;
+	
 		switch(ls.type){
-		case "Start": case "StartPPC": case "Load File":
+		case "Start": case "StartPPC": case "Load File": case "Creating": case "mp4":
 			{
 				if(ls.message != "Processing..."){				
 					let si = 3;
@@ -945,7 +946,7 @@ class Layer
 	
 	/// Adds dropdown menu
 	add_dropdown(x,y,dx,dymax,source,pos,style)	
-	{		
+	{
 		add_layer("Dropdown",this.x+x,this.y+y,dx,dropdown_height,{source:source, pos:pos, style:style});
 	}
 
@@ -1469,6 +1470,7 @@ class Layer
 		case "time_step": te = String(edit_source.time_step); break;
 		case "alpha_val": te = String(inter.bubble.alpha_val); break;
 		case "BF_val": te = String(inter.bubble.BF_val); break;
+		case "fps": te = String(inter.fps); break;
 		case "group_name": te = String(edit_source.spec.gname); break;
 		case "slice_time": te = String(inter.bubble.slice_time); break;
 		case "suffix": te = String(inter.bubble.suffix); break;

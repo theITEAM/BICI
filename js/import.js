@@ -16,19 +16,14 @@
 	data-dir
 	derived / der
 	description /desc
+	diagnostics-inf
 	fixed-effect
+	generation-inf
 	genetic-data
 	ind-effect
 	ind-effect-data
 	ind-group-data
 	inference / inf
-	inf-diagnostics
-	inf-generation
-	inf-param
-	inf-param-stats
-	inf-state
-	inf-diagnostics
-	inf-warning
 	init-pop-inf
 	init-pop-sim
 	label
@@ -36,33 +31,36 @@
 	move-ind-inf
 	move-ind-post-sim
 	move-ind-sim
+	param / parameter
+	param-inf
 	param-mult
-	parameter
+	param-sim
+	param-stats-inf
 	pop-data
 	pop-trans-data
 	posterior-simulation/post-sim
-	post-sim-param
-	post-sim-state
-	post-sim-warning
+	param-post-sim
 	remove-ind-inf
 	remove-ind-post-sim
 	remove-ind-sim
-	remove-pop
+	remove-pop-inf
 	remove-pop-post-sim
 	remove-pop-sim
-	species
 	set
 	simulation / sim
-	sim-param
-	sim-state
-	sim-warning
+	species
+	state-inf
+	state-post-sim
+	state-sim
 	test-data
 	trans-data
-	trans-diag
+	trans-diag-inf
 	transition / trans
 	transition-all / trans-all
 	view
-	
+	warning-inf
+	warning-post-sim
+	warning-sim
 	*/
 	
 let imp = {};                                      // Stores information as import is done
@@ -73,7 +71,7 @@ function import_file(te,file,clear_results)
 	import_te = te;
 
 	percent(0);
-			
+
 	te = remove_escape_char(te);
 	
 	let	lines = te.split('\n');
@@ -98,7 +96,6 @@ function import_file(te,file,clear_results)
 	// Keeps track of the current species and classification 
 	imp = { pro:pro, lines:lines, clear_results:clear_results, script:pro.formatted, previous_loaded_table:[], warn:false}; 
 
-	
 	if(data_file_list.length > 0){
 		if(begin_str(data_file_list[0].full_name,"..")) load_local(data_file_list,15,30);
 		else post({type:"Import model files", data_file_list:data_file_list});
@@ -135,7 +132,7 @@ function import_file2(data_file_list)
 	
 	let per_start = 30, per_end = 70, com_ti_sum = 0;
 	let per = per_start;
-	for(let loop = 0; loop < 4; loop++){ 
+	for(let loop = 0; loop <= 4; loop++){ 
 		// Import happens in four stages:
 		// (0) Load species and classification information
 		// (1) Load parameter information
@@ -238,28 +235,37 @@ function import_file2(data_file_list)
 				switch(cname){
 				case "compartment": case "compartment-all":
 				case "param": case "data-dir":
-				case "sim-param": case "sim-state":
-				case "inf-param": case "inf-state": 
-				case "post-sim-param": case "post-sim-state": 
-				case "inf-generation":
-				case "inf-diagnostics":
-				case "trans-diag": 
+				case "param-sim": case "state-sim":
+				case "param-inf": case "state-inf": 
+				case "param-post-sim": case "state-post-sim": 
+				case "generation-inf":
+				case "diagnostics-inf":
+				case "trans-diag-inf": 
 				case "add-ind-post-sim": case "remove-ind-post-sim": case "move-ind-post-sim":
 				case "add-pop-post-sim": case "remove-pop-post-sim":
 					process = false; 
 					break;
 				}
 				break
-				
+
 			case 3:
 				process = false; 
 				switch(cname){
-				case "sim-param": case "sim-state":
-				case "inf-param": case "inf-state": 
-				case "post-sim-param": case "post-sim-state": 
-				case "inf-generation":
-				case "inf-diagnostics":
-				case "trans-diag":
+				case "state-sim": case "state-inf": case "state-post-sim": 
+					process = true; 
+					break;
+				}
+				break;
+				
+			case 4:
+				process = false; 
+				switch(cname){
+				case "param-sim": 
+				case "param-inf":
+				case "param-post-sim": 
+				case "generation-inf":
+				case "diagnostics-inf":
+				case "trans-diag-inf":
 				case "add-ind-post-sim": case "remove-ind-post-sim": case "move-ind-post-sim":
 				case "add-pop-post-sim": case "remove-pop-post-sim":
 					process = true; 
@@ -268,7 +274,7 @@ function import_file2(data_file_list)
 				break;
 			}
 			
-			if(cname == "inf-param-stats") process = false;
+			if(cname == "param-stats-inf") process = false;
 			
 			if(process == true){	
 				com_ti_sum += line.com_ti; line.com_ti = 0;
@@ -351,9 +357,9 @@ function init_result(pro,clear_results)
 		let cname = line.type;
 		
 		switch(cname){
-		case "sim-param": case "sim-state": turn_result_on(sim_result,"sim"); break;
-		case "inf-param": case "inf-state": turn_result_on(inf_result,"inf"); break;
-		case "post-sim-param": case "post-sim-state": turn_result_on(ppc_result,"ppc"); break;
+		case "param-sim": case "state-sim": turn_result_on(sim_result,"sim"); break;
+		case "param-inf": case "state-inf": turn_result_on(inf_result,"inf"); break;
+		case "param-post-sim": case "state-post-sim": turn_result_on(ppc_result,"ppc"); break;
 		default: break;
 		}
 	}
@@ -440,9 +446,9 @@ function process_command(cname,tags,loop,per_start,per_end)
 	case "classification": classification_command(loop); break;
 	case "set": set_command(); break;
 	case "view": camera_command(); break;
-	case "sim-warning": warning_command("sim"); break;
-	case "inf-warning": warning_command("inf"); break;
-	case "post-sim-warning": warning_command("ppc"); break;
+	case "warning-sim": warning_command("sim"); break;
+	case "warning-inf": warning_command("inf"); break;
+	case "warning-post-sim": warning_command("ppc"); break;
 	case "compartment": compartment_command(); break;
 	case "compartment-all": compartment_all_command(); break;
 	case "transition": transition_command(); break;
@@ -460,15 +466,15 @@ function process_command(cname,tags,loop,per_start,per_end)
 	case "post-sim": post_sim_command(); break;
 	case "ind-effect": ind_effect_command(); break;
 	case "fixed-effect": fixed_effect_command(); break;
-	case "sim-param": sim_param_command(); break;
-	case "sim-state": sim_state_command(); break;
-	case "inf-param": inf_param_command(); break;
-	case "inf-state": inf_state_command(); break;
-	case "post-sim-param": post_sim_param_command(); break;
-	case "post-sim-state": post_sim_state_command(); break;
-	case "inf-diagnostics": inf_diagnostics_command(); break;
-	case "inf-generation": inf_generation_command(); break;
-	case "trans-diag": trans_diag_command(); break;
+	case "param-sim": sim_param_command(); break;
+	case "state-sim": sim_state_command(); break;
+	case "param-inf": inf_param_command(); break;
+	case "state-inf": inf_state_command(); break;
+	case "param-post-sim": post_sim_param_command(); break;
+	case "state-post-sim": post_sim_state_command(); break;
+	case "diagnostics-inf": inf_diagnostics_command(); break;
+	case "generation-inf": inf_generation_command(); break;
+	case "trans-diag-inf": trans_diag_command(); break;
 		
 	default: 
 		if(find_in(data_command_list,cname) != undefined){
@@ -476,7 +482,7 @@ function process_command(cname,tags,loop,per_start,per_end)
 		}
 		else{
 			error("'"+cname+"' not recognised");
-			alert_import("Command '"+cname+"' not recognised"); 
+			alert_import("Command '"+cname+"' not recognised."); 
 		}
 		break;
 	}
@@ -617,6 +623,18 @@ function get_command_tags(trr)
 	if(frag[0].quote == 1) alert_import("Should not start with quotes");
 	let type = frag[0].text, type_pos = frag[0].pos; 
 	
+	switch(type){
+	case "sim-param": type = "param-sim"; break;
+	case "inf-param": type = "param-inf"; break;
+	case "post-sim-param": type = "param-post-sim"; break;
+	case "sim-state": type = "state-sim"; break;
+	case "inf-state": type = "state-inf"; break;
+	case "post-sim-state": type = "state-post-sim"; break;
+	case "sim-warning": type = "warning-sim"; break;
+	case "inf-warning": type = "warning-inf"; break;
+	case "post-sim-warning": type = "warning-post-sim"; break;
+	}
+	
 	let com_ti;
 	let k = find(command_list,"na",type);
 	if(k == undefined) alert_import("Command '"+type+"' not recognised.");
@@ -733,7 +751,7 @@ function alert_import(st,line)
 	
 	let te;
 	if(line) te = "On line "+(line+1)+": "+st;
-	if(imp.all_row != "") te += " "+imp.all_row;
+	if(imp.all_row != undefined && imp.all_row != "") te += " "+imp.all_row;
 	
 	else te = st;
 	

@@ -27,7 +27,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	if(op()){
 		ifstream fin(file);
-		if(!fin) alert_input("File '"+file+"' could not be loaded");
+		if(!fin) run_error("File '"+file+"' could not be loaded");
 	
 		do{
 			string line;
@@ -235,6 +235,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 		}
 	}
 
+	print_diag("start");
+	
 	check_memory_too_large();
 	
 	output_error_messages(err_mess);
@@ -309,6 +311,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 
 	create_equations(30,60);           // Creates equation calculations
 
+	combine_populations();             // Combines together populations which appear together
+	
 	output_error_messages(err_mess);
 
 	check_derived_order();             // Checks to see if derived quantities do not use derived quanties yet to be calculated  
@@ -437,8 +441,21 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	print_diag("h15");
 	
 	percentage(75,100);
+
+	model.create_precalc_equation();    // Extracts precalculations (for non-population parts of equations)
+	
+	model.set_list_precalc_time();      // Sets list for any populations in precalc
 	
 	linearise_eqn(75,85);               // Tries to linearise equations in terms of pops
+	//emsg("ll");
+	
+	model.create_precalc_pop_grad();    // Shifts calculations in pop_grad into precalc
+	
+	linearise_precalc();                // References precalculation in linearisation
+	
+	model.precalc_affect();             // Works out how precalculation is affected by changes in parameters
+	
+	model.create_precalc_derive();      // Extracts precalculations for derived quantities
 	
 	setup_der_func_eqn();               // Sets up equations for derived functions
 	
@@ -510,7 +527,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	}
 	
 	if(model.mode == PPC && model.sample.size() == 0){
-		alert_import("Posterior samples (from the commands 'inf-param' and 'inf-state') must be specified for 'post-sim' to be run. Please run inference before posterior simulation.");
+		alert_import("Posterior samples (from the commands 'param-inf' and 'state-inf') must be specified for 'post-sim' to be run. Please run inference before posterior simulation.");
 	}		
 
 	if(model.mode == PPC) set_ppc_resample();
@@ -753,27 +770,27 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 	if(type == "posterior-simulation" || type == "post-sim") com = POST_SIM;
 	if(type == "ind-effect") com = IND_EFFECT;
 	if(type == "fixed-effect") com = FIXED_EFFECT;
-	if(type == "sim-param") com = SIM_PARAM;
-	if(type == "sim-state") com = SIM_STATE;
-	if(type == "inf-param") com = INF_PARAM;
-	if(type == "inf-param-stats") com = INF_PARAM_STATS;
-	if(type == "inf-generation") com = INF_GEN;
-	if(type == "inf-state") com = INF_STATE;
-	if(type == "post-sim-param") com = POST_SIM_PARAM;
-	if(type == "post-sim-state") com = POST_SIM_STATE;
-	if(type == "inf-diagnostics") com = INF_DIAGNOSTICS;
+	if(type == "param-sim") com = SIM_PARAM;
+	if(type == "state-sim") com = SIM_STATE;
+	if(type == "param-inf") com = INF_PARAM;
+	if(type == "param-stats-inf") com = INF_PARAM_STATS;
+	if(type == "generation-inf") com = INF_GEN;
+	if(type == "state-inf") com = INF_STATE;
+	if(type == "param-post-sim") com = POST_SIM_PARAM;
+	if(type == "state-post-sim") com = POST_SIM_STATE;
+	if(type == "diagnostics-inf") com = INF_DIAGNOSTICS;
 	if(type == "map") com = MAP;
 	if(type == "post-sim" || type == "post-simulation" ) com = POST_SIM;
 	
 	if(type == "param-mult") com = PARAM_MULT;
 	
-	if(type == "trans-diag") com = TRANS_DIAG;
+	if(type == "trans-diag-inf") com = TRANS_DIAG;
 	
-	if(type == "sim-warning") com = SIM_WARNING;
+	if(type == "warning-sim") com = SIM_WARNING;
 	
-	if(type == "inf-warning") com = INF_WARNING;
+	if(type == "warning-inf") com = INF_WARNING;
 	
-	if(type == "post-sim-warning") com = PPC_WARNING;
+	if(type == "warning-post-sim") com = PPC_WARNING;
 	
 	if(com == EMPTY){
 		alert_import("Command '"+type+"' not recognised.",true);
@@ -1440,8 +1457,7 @@ void Input::create_param_vector()
 	for(auto i = 0u; i < N; i++){
 		auto th = list[i];
 		auto &par = model.param[th];
-		
-		// || par.factorzzz
+	
 		if(par.variety != CONST_PARAM){	
 			for(auto j = 0u; j < par.N; j++){
 				auto ref = par.element_ref[j];
@@ -1452,7 +1468,7 @@ void Input::create_param_vector()
 						ele.param_vec_ref = model.param_vec.size();
 					
 						ParamVecEle pr; 
-						pr.name = get_param_name_with_dep(par,par.dep,j);
+						pr.name = add_escape_char(get_param_name_with_dep(par,par.dep,j));
 						pr.th = th; 
 						pr.index = j;
 						if(par.variety == PRIOR_PARAM || par.variety == DIST_PARAM){
@@ -1542,6 +1558,8 @@ void Input::further_simplify_equations(unsigned int per_start, unsigned int per_
 		
 			auto flag = false;
 			for(auto &ca : eq.calcu){
+				//if(ca.op == ADD && ca.item.size() <= 1) flag = true;
+				
 				for(auto &it : ca.item){
 					if(it.type == PARAMETER){
 						const auto &pr = eq.param_ref[it.num];
@@ -1553,7 +1571,7 @@ void Input::further_simplify_equations(unsigned int per_start, unsigned int per_
 							auto num = eqn.is_num();
 							if(num != UNSET){
 								it.type = NUMERIC;
-								it.num = eq.add_cons(num);
+								it.num = model.constant.add(num);
 								flag = true;
 							}
 						}

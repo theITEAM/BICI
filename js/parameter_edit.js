@@ -507,7 +507,7 @@ function update_prior_split()
 
 
 /// Finds the lists for the dependencies
-function par_find_list(par)
+function par_find_list(par,op)
 {
 	let dep = par.dep;
 	let ndep = dep.length;

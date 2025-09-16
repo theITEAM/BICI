@@ -389,6 +389,8 @@ void StateSpecies::set_m_ti_origin(vector <Event> &ev_new) const
 /// Removes event from old event sequence 
 void StateSpecies::remove_event(Event &ev, const Individual &ind, Like &like_ch, unsigned int i, vector <Event> &event_old)
 {
+	const auto &precalc = param_val.precalc;
+	
 	switch(ev.type){
 	case NM_TRANS_EV:
 		{
@@ -462,9 +464,9 @@ void StateSpecies::remove_event(Event &ev, const Individual &ind, Like &like_ch,
 				auto p = iif.p;
 				double va;
 				switch(p){
-				case OUTSIDE_INF: va = eq.calculate_calculation(lin.no_pop_calc,ti,param_val,spline_val); break;
+				case OUTSIDE_INF: va = eq.calculate_no_pop(ti,precalc); break;
 				case ENTER_INF: va = UNSET; emsg("Should not be ENTER_INF"); break;
-				default: va = eq.calculate_calculation(lin.pop_grad_calc[iif.pref],ti,param_val,spline_val); break;
+				default: va = eq.calculate_pop_grad(iif.pref,ti,precalc); break;
 				}
 				
 				if(me.ind_variation) va *= get_indfac(ind,me);
@@ -496,6 +498,8 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee, const vector <
 	auto &ind = individual[i];
 	auto &event = ind.ev;
 	auto &ev = event[ee];
+	const auto &precalc = param_val.precalc;
+	
 	auto dt = details.dt;
 	
 	switch(ev.type){
@@ -518,10 +522,10 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee, const vector <
 
 			for(auto i = 0u; i < ref.size(); i++){
 				const auto &eq = eqn[ref[i]];
-				if(eq.ind_eff == true) ref_val[i] = eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+				if(eq.ind_eff == true) ref_val[i] = eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);
 				else{
-					if(eq.time_vari) ref_val[i] = eq.calculate(ti,popnum_t[ti],param_val,spline_val);
-					else ref_val[i] = eq.calculate_param_only(param_val);
+					if(eq.time_vari) ref_val[i] = eq.calculate(ti,popnum_t[ti],precalc);
+					else ref_val[i] = eq.calculate_param(precalc);
 				}			
 			}
 					 
@@ -534,17 +538,17 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee, const vector <
 				if(bq_eq == BP_FROM_OTHERS){
 					bp = 1;
 					for(auto e : nmt.bp_other_eq){
-						bp -= eqn[e].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+						bp -= eqn[e].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 					}
 				}
 				else{
 					const auto &eq = eqn[nmt.bp_eq];
-					bp = eq.calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+					bp = eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);
 					
 					if(nmt.all_branches){
 						auto div = 0.0;
 						for(auto e: nmt.bp_all_eq){
-							div += eqn[e].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+							div += eqn[e].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 						}
 						bp /= div;
 					}			
@@ -595,13 +599,13 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee, const vector <
 				double va;
 				switch(p){
 				case OUTSIDE_INF:
-					va = eq.calculate_calculation(lin.no_pop_calc,ti,param_val,spline_val);
+					va = eq.calculate_no_pop(ti,precalc);
 					break;
 				case ENTER_INF:
 					va = UNSET; emsg("Should not be ENTER_INFa"); 
 					break;
 				default: 
-					va = eq.calculate_calculation(lin.pop_grad_calc[iif.pref],ti,param_val,spline_val); 
+					va = eq.calculate_pop_grad(iif.pref,ti,precalc); 
 					break;
 				}
 				
@@ -995,6 +999,7 @@ void StateSpecies::incomp_turn_off(IncompNMTransRef &inm)
 void StateSpecies::likelihood_init_cond_change(unsigned int c_enter_old, unsigned int c_enter_new, Like &like_ch)
 {	
 	const auto &ic = sp.init_cond;
+	const auto &precalc = param_val.precalc;
 	
 	auto &icv = init_cond_val;
 	
@@ -1037,10 +1042,10 @@ void StateSpecies::likelihood_init_cond_change(unsigned int c_enter_old, unsigne
 				else dLi_init_cond -= log_int(icv.N_total);
 			}
 			
-			auto dprior = -prior_probability(icv.N_total,ic.pop_prior,param_val,eqn);
+			auto dprior = -prior_probability(icv.N_total,ic.pop_prior,precalc,eqn);
 			
 			icv.N_total += dN;
-			dprior += prior_probability(icv.N_total,ic.pop_prior,param_val,eqn);
+			dprior += prior_probability(icv.N_total,ic.pop_prior,precalc,eqn);
 		
 			like_ch.init_cond_prior += dprior;
 		}
@@ -1059,7 +1064,7 @@ void StateSpecies::likelihood_init_cond_change(unsigned int c_enter_old, unsigne
 			auto c = crr.c;
 			auto cred = crr.cred;
 			
-			like_ch.init_cond_prior -= prior_probability(icv.N_focal[c],ic.comp_prior[c],param_val,eqn);
+			like_ch.init_cond_prior -= prior_probability(icv.N_focal[c],ic.comp_prior[c],precalc,eqn);
 			
 			icv.N_focal[c]--;
 			icv.cnum_reduce[c][cred]--;
@@ -1072,7 +1077,7 @@ void StateSpecies::likelihood_init_cond_change(unsigned int c_enter_old, unsigne
 			else{
 				dLi_init_cond -= log_int(icv.N_focal[c]+1) - log_int(icv.cnum_reduce[c][cred]+1);	
 			}
-			like_ch.init_cond_prior += prior_probability(icv.N_focal[c],ic.comp_prior[c],param_val,eqn);
+			like_ch.init_cond_prior += prior_probability(icv.N_focal[c],ic.comp_prior[c],precalc,eqn);
 			
 			auto fr = icv.frac_comb[cred];
 			if(fr < TINY) dLi_init_cond += LARGISH;
@@ -1085,7 +1090,7 @@ void StateSpecies::likelihood_init_cond_change(unsigned int c_enter_old, unsigne
 			auto c = crr.c;
 			auto cred = crr.cred;
 			
-			like_ch.init_cond_prior -= prior_probability(icv.N_focal[c],ic.comp_prior[c],param_val,eqn);
+			like_ch.init_cond_prior -= prior_probability(icv.N_focal[c],ic.comp_prior[c],precalc,eqn);
 			
 			icv.N_focal[c]++;
 			icv.cnum_reduce[c][cred]++;
@@ -1099,7 +1104,7 @@ void StateSpecies::likelihood_init_cond_change(unsigned int c_enter_old, unsigne
 				dLi_init_cond += log_int(icv.N_focal[c]) - log_int(icv.cnum_reduce[c][cred]);	
 			}
 			
-			like_ch.init_cond_prior += prior_probability(icv.N_focal[c],ic.comp_prior[c],param_val,eqn);
+			like_ch.init_cond_prior += prior_probability(icv.N_focal[c],ic.comp_prior[c],precalc,eqn);
 			
 			auto fr = icv.frac_comb[cred];
 			if(fr < TINY) dLi_init_cond -= LARGISH;
@@ -1188,6 +1193,7 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 
 	const auto &eq = eqn[me.eqn_ref];
 	const auto &lin = eq.linearise;
+	const auto &precalc = param_val.precalc;
 	
 	auto &Li_m = Li_markov[ee];
 	
@@ -1196,13 +1202,21 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 	// Different type of update:
 	// RECALC This recalculates each time
 	// USE_POP_DIF This uses just the change in populations (when equation can be linearised)
+	// USE_POP_DIF_FAC This uses just the change in populations (when factor time dependent)
 	// USE_POP_DIF_TIME This uses just the change in populations (when gradient time dependent)
 	
 	auto type = RECALC;
-	if(linearise_speedup3 && lin.on){
+	
+	if(update_ind_linearise_speedup && lin.on){
 		type = USE_POP_DIF;	
-		if(lin.pop_grad_calc_time_dep) type = USE_POP_DIF_TIME;
+		if(lin.pop_grad_time_dep) type = USE_POP_DIF_TIME;
+		else{
+			if(lin.factor_time_dep) type = USE_POP_DIF_FAC;
+		}
 	}
+	if(type == RECALC && calc_para_speedup) type = RECALC_PARA;
+	
+	vector <double> value_para;
 	
 	vector <unsigned int> pr_store;
 	auto diff = 0.0;
@@ -1210,21 +1224,43 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 	case RECALC:              // If recalculating
 		break;
 		
+	case RECALC_PARA:         // Recalculates in parallel
+		{
+			vector <unsigned int> list;
+			for(auto tii = ti; tii < ti_next; tii++) list.push_back(tii);
+			
+			const vector < vector < vector <double> > > derive_val;
+			value_para = eq.calculate_para(eq.calcu,list,popnum_t,precalc,derive_val); 
+		}
+		break;
+		
 	case USE_POP_DIF:         // If population gradient not time dependent
 		for(const auto &po_ch : pop_change){
 			auto pr = lin.get_pop_ref(po_ch.po);
 			if(pr != UNSET){
-				auto va = dt*eq.calculate_calculation_notime(lin.pop_grad_calc[pr],param_val);
+				auto va = eq.calculate_pop_grad_no_time(pr,precalc);
 				diff += va*po_ch.num;
 			}
 		}
+		diff *= dt;
+		break;
+		
+	case USE_POP_DIF_FAC:      // If population gradient without factor not time dependent
+		for(const auto &po_ch : pop_change){
+			auto pr = lin.get_pop_ref(po_ch.po);
+			if(pr != UNSET){
+				auto va = eq.calculate_pop_grad_without_factor(pr,precalc);
+				diff += va*po_ch.num;
+			}
+		}
+		diff *= dt;
 		break;
 	
 	case USE_POP_DIF_TIME:         // If population gradient time dependent
 		// Makes a list of populations
 		for(auto k = 0u; k < pop_change.size(); k++){
 			auto pr = lin.get_pop_ref(pop_change[k].po);
-			pr_store.push_back(pr);
+			if(pr != UNSET) pr_store.push_back(pr);
 		}
 		break;
 	}
@@ -1238,11 +1274,19 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 	
 		switch(type){
 		case RECALC:
-			value = dt*eq.calculate(tii,popnum_t[tii],param_val,spline_val);	
+			value = dt*eq.calculate(tii,popnum_t[tii],precalc);	
+			break;
+		
+		case RECALC_PARA:
+			value = dt*value_para[tii-ti];
 			break;
 			
 		case USE_POP_DIF:
 			value = val_old+diff;
+			break;
+			
+		case USE_POP_DIF_FAC:
+			value = val_old+diff*eq.calculate_factor(tii,precalc);
 			break;
 			
 		case USE_POP_DIF_TIME:
@@ -1250,23 +1294,27 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 				value = val_old;
 				auto sum = 0.0;
 				for(auto k = 0u; k < pop_change.size(); k++){
-					auto pr = pr_store[k];
-					if(pr != UNSET){
-						const auto &po_ch = pop_change[k];
-						auto va = eq.calculate_calculation(lin.pop_grad_calc[pr],tii,param_val,spline_val);
-						sum += va*po_ch.num;
-					}
+					const auto &po_ch = pop_change[k];
+					auto va = eq.calculate_pop_grad(pr_store[k],tii,precalc);
+					sum += va*po_ch.num;
 				}
 				value += dt*sum;
-			
-				if(false){
-					auto val_ch = eq.calculate(tii,popnum_t[tii],param_val,spline_val);
-					if(dif(value,val_ch,dif_thresh)){
-						emsg("problem with value");
-					}
-				}
 			}
 			break;
+		}
+		
+		if(false){
+			auto val_ch = dt*eq.calculate(tii,popnum_t[tii],precalc);
+			if(dif(value,val_ch,dif_thresh)){
+				emsg("problem with value");
+			}
+		}
+				
+		if(value < 0){
+			if(value > -VTINY) value = 0;
+			else{
+				emsg("Markov equation has become negative");
+			}
 		}
 	
 		auto dLi = -(value-val_old)*div.indfac_int;
@@ -1278,7 +1326,7 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 		dLi_store.push_back(dLi); value_store.push_back(div.value);
 		
 		Li_m[tii] += dLi;
-		like_ch += dLi;
+		like_ch += dLi;	
 		div.value = value;
 	}
 	

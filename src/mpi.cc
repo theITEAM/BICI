@@ -52,6 +52,29 @@ void Mpi::transfer_particle(vector <Particle> &part)
 {
 	if(ncore == 1) return;
 	
+	auto n = part.size();
+	
+	auto nvec = gather(n);
+	
+	if(core != 0){
+		for(const auto &pa : part){
+			pack_initialise();
+			pack(pa);
+			pack_send(0);
+		}
+	}
+	else{
+		for(auto co = 1u; co < ncore; co++){
+			for(auto i = 0u; i < nvec[co]; i++){
+				pack_recv(co);	
+				Particle pa;
+				unpack(pa);
+				part.push_back(pa);
+			}
+		}
+	}
+	
+	/*
 	if(core != 0){
 		pack_initialise();
 		pack_particle(part);
@@ -63,6 +86,7 @@ void Mpi::transfer_particle(vector <Particle> &part)
 			unpack_particle(part);
 		}
 	}
+	*/
 }
 
 
@@ -623,6 +647,17 @@ vector <double> Mpi::gather(const vector <double> &vec)
 }
 
 
+/// Gathers unsigned int across all cores and returns the combined vector to core 0
+vector <unsigned int> Mpi::gather(const unsigned int val)
+{
+	vector <unsigned int> valtot;
+	valtot.resize(ncore);
+
+	MPI_Gather(&val,1,MPI_UNSIGNED,&valtot[0],1,MPI_UNSIGNED,0,MPI_COMM_WORLD);
+	return valtot;
+}
+
+
 /// Copies a variable in core 0 to all the other cores
 void Mpi::bcast(unsigned int &val)
 {
@@ -679,6 +714,17 @@ void Mpi::bcast(vector <string> &vec)
 void Mpi::barrier() const
 {
 	MPI_Barrier(MPI_COMM_WORLD);  
+}
+
+
+/// Waits for all processes
+void Mpi::sample_barrier(unsigned int s, unsigned int nsample) const
+{
+	auto step = (unsigned int)(nsample/20);
+	if(step == 0) step = 1;
+	if(s%step == step-1){
+		MPI_Barrier(MPI_COMM_WORLD);  
+	}
 }
 
 

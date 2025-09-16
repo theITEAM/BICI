@@ -602,15 +602,15 @@ void Input::param_vec_mem_usage() const
 	
 		for(const auto &al : pele.affect_like){
 			affect_like += 4;
-			affect_like_me_list += vecsize + al.me_list.size();
+			affect_like_me_list += vecsize + al.div_value_nonpop.me_list.size();
 			affect_like_list += vecsize + al.list.size();
 			affect_like_map += vecsize + al.map.size();
-			affect_like_linear_prop += vecsize + al.linear_prop.me.size();
-			affect_like_linear_prop += vecsize + al.linear_prop.me_no_pop.size();
-			affect_like_linear_prop += vecsize + al.linear_prop.no_pop_ref.size();
+			affect_like_linear_prop += vecsize + al.div_value_linear.me.size();
+			//affect_like_linear_prop += vecsize + al.div_value_linear.me_no_pop.size();
+			//affect_like_linear_prop += vecsize + al.div_value_linear.no_pop_ref.size();
 			
 			affect_like_linear_prop += vecsize;
-			for(const auto &pa : al.linear_prop.pop_affect){
+			for(const auto &pa : al.div_value_linear.pop_affect){
 				affect_like_linear_prop += 1 + vecsize + 2*pa.pop_grad_ref.size();
 			}
 		}
@@ -649,7 +649,7 @@ void Input::eqn_mem_usage(string name, const vector <unsigned int> &vec) const
 		tex += strsize*3+eqn.te.length() + eqn.te_raw.length() + eqn.warn.length();
 		timer += vecsize + 2*eqn.timer.size();
 		calc += vecsize; for(const auto &ca : eqn.calcu) calc += 2 + vecsize + 2*ca.item.size();
-		cons += vecsize+2*eqn.cons.size();
+		cons += vecsize+2*model.constant.value.size();
 		param_ref += vecsize+3*eqn.param_ref.size();
 		pop_ref += vecsize+eqn.pop_ref.size();
 		source_tr_gl += vecsize+eqn.source_tr_gl.size();
@@ -663,10 +663,9 @@ void Input::eqn_mem_usage(string name, const vector <unsigned int> &vec) const
 		const auto &lin = eqn.linearise;
 		
 		linear += 4;
-		for(auto &ca : lin.no_pop_calc) linear += 2 + vecsize + 2*ca.item.size();
-		for(const auto &pgc : lin.pop_grad_calc){
-			linear += vecsize;
-			for(const auto &ca : pgc) linear += 2 + vecsize + 2*ca.item.size();
+		//for(auto &ca : lin.no_pop_calc) linear += 2 + vecsize + 2*ca.item.size();
+		for(const auto &pgc : lin.pop_grad_calc_store){
+			linear += 2*pgc.size();
 		}
 		linear += vecsize; 
 		for(const auto &prfp : lin.pop_ref_from_po){
@@ -882,16 +881,16 @@ void Input::check_memory_too_large()
 	
 	if(f_mem > MEM_FRAC_MAX){
 		fl = true;
-		alert_import("Out of memory error. BICI currently requires '"+mem_print(mem)+"' and this computer only has '"+mem_print(mem*MEM_FRAC_MAX/f_mem)+"' available");
+		alert_warning("Potential out of memory error. BICI currently requires '"+mem_print(mem)+"' and this computer only has '"+mem_print(mem*MEM_FRAC_MAX/f_mem)+"' available");
 	}
 	else{
 		if(f_free < MEM_FREE_MIN){
 			fl = true;
-			alert_import("Out of memory error. This computer potentially has enough memory but other processes need to be terminated. BICI currently requires '"+mem_print(mem)+"' and this computer has '"+mem_print(mem*MEM_FRAC_MAX/f_mem)+"' available");
+			alert_warning("Potential out of memory error. This computer has enough memory but other processes need to be terminated. BICI currently requires '"+mem_print(mem)+"' and this computer has '"+mem_print(mem*MEM_FRAC_MAX/f_mem)+"' available");
 		}
 	}
 	
-	if(fl) output_error_messages(err_mess,true);
+	if(fl) output_error_messages(err_mess);
 }
 
 

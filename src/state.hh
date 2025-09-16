@@ -16,10 +16,8 @@ class State                                // Stores information about the state
 		
 		vector <unsigned int> empty;           // An empty vector
 		
-		vector <double> param_val;             // The parameter value
-		
-		vector <SplineValue> spline_val;       // Values for the spline
-		
+		PV param_val;                          // The parameter value
+	
 		Like like;                             // Stores the overall likelihood and prior
 		
 		vector <double> prior_prob;            // The prior probability for each parameter
@@ -52,21 +50,18 @@ class State                                // Stores information about the state
 		
 		State(const Model &model);
 		void init();
-		void simulate(const vector <double> &param_value, const vector <InitCondValue> &initc_val);
-		void post_sim(const vector <double> &param_value, const Sample &samp);
+		void simulate(const PV &param_value, const vector <InitCondValue> &initc_val);
+		void post_sim(const PV &param_value, const Sample &samp);
 		void simulate_iterate(unsigned int ti_start, unsigned int ti_end);
 		void ensure_all_ind_event();
-		vector <DeriveOutput> derive_calculate() const;
+		vector <DeriveOutput> derive_calculate();
 		void calculate_likelihood();
 		void calculate_like();
-		void add_like(Like like_ch);
+		void accept(Like like_ch);
 		void change_add(const vector <double> &vec);
 		void change_add(double num);
 		void change_add();
-		void update_spline(const vector <AffectLike> &affect_spline);
-		void restore_spline(const vector <AffectLike> &affect_spline);
-		void remove_store_spline(const vector <AffectLike> &affect_spline);
-		Like update_param(const vector <AffectLike> &affect_like, const vector <double> &param_store);
+		Like update_param(const vector <AffectLike> &affect_like);
 		void restore(const vector <AffectLike> &affect_like);
 		void likelihood_from_scratch();
 		void resample_ind(bool do_pl = false);
@@ -177,19 +172,21 @@ class State                                // Stores information about the state
 	
 	// In like_integrate
 	public:
-		double like_integrate(const vector <double> &param_value);
+		double like_integrate(const PV &param_value);
 	
 	// In state_check.cc
 	public:
 		void check_trans_num(string ref);
 		void check_simp(string ref);
 		void check(string ref);
-		void scan_variable(string name, double min, double max);
+		//void scan_variable(string name, double min, double max);
 		void print_ev_data(string te, const vector <EventData> &event_data, unsigned int p) const;
 		void check_popnum_t(string ref);
 		void check_popnum_t2(string ref);
+		void check_precalc_eqn(string ref);
 		void check_neg_rate(string name);
 		void add_alg_warn(string te);
+		void check_markov_div_value(unsigned int p, string ref);
 		
 	private:
 		void check_dependent_param(string ref);
@@ -198,7 +195,7 @@ class State                                // Stores information about the state
 		void check_nm_trans(unsigned int p, string ref);
 		void check_prior(string ref);
 		void check_like(string ref);
-		void check_spline(string ref);
+		//void check_spline(string ref);
 		void check_ie(unsigned int p, string ref);
 		void check_pop_like(unsigned int p, string ref);
 		void check_cpop_st(string ref);
@@ -208,7 +205,8 @@ class State                                // Stores information about the state
 		void check_init_cond_like(unsigned int p, string ref);
 		void check_init_cond_prior(string ref);
 		void check_linearise();
-		void check_spline_store(string ref);
+		void check_para_speedup(unsigned int p, string ref);
+		//void check_spline_store(string ref);
 		void check_genetic_value(string ref);
 		void check_popnum_ind(string ref);
 		void check_add_move_rem(string ref);

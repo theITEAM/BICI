@@ -37,8 +37,8 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 	
 	const auto &ev = ind.ev;
 	if(ev[0].tdiv < 0 || ev[ev.size()-1].tdiv >= T){
-		if(ev[0].tdiv < 0) cout << ev[0].tdiv << "event before\n";
-		else cout << ev[ev.size()-1].tdiv << "event after\n";
+		if(ev[0].tdiv < 0) cout << ev[0].tdiv << "event before" << endl;
+		else cout << ev[ev.size()-1].tdiv << "event after" << endl;
 		like_ch.prior -= LARGE;
 		return like_ch;
 	}

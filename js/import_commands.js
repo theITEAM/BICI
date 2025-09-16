@@ -11,13 +11,13 @@ function import_data_table_command(cname)
 	case "remove-pop-sim": cname = "remove-pop-inf"; siminf = "sim"; break;	
 	case "add-ind-sim": cname = "add-ind-inf"; siminf = "sim"; break;
 	case "remove-ind-sim": cname = "remove-ind-inf"; siminf = "sim"; break;
-	case "move-ind-sim": cname = "move-ind"; siminf = "sim"; break;
+	case "move-ind-sim": cname = "move-ind-inf"; siminf = "sim"; break;
 	case "init-pop-sim": cname = "init-pop-inf"; siminf = "sim"; break;
 	case "add-pop-post-sim": cname = "add-pop-inf"; siminf = "ppc"; break;
 	case "remove-pop-post-sim": cname = "remove-pop-inf"; siminf = "ppc"; break;	
 	case "add-ind-post-sim": cname = "add-ind-inf"; siminf = "ppc"; break;
 	case "remove-ind-post-sim": cname = "remove-ind-inf"; siminf = "ppc"; break;
-	case "move-ind-post-sim": cname = "move-ind"; siminf = "ppc"; break;
+	case "move-ind-post-sim": cname = "move-ind-inf"; siminf = "ppc"; break;
 	}
 	
 	let i = find(convert,"command",cname);
@@ -1333,6 +1333,20 @@ function param_command2(full_name,per_start,per_end,op)
 			if(Number(val) <= 0) alert_import("For 'smooth' the value '"+val+"' is not positive");
 			par.spline.smooth.value = val;
 		}
+		
+		par.spline.spline_radio = spline_radio_pos[0];
+		let sptype = get_tag_value("spline-type").toLowerCase().trim();
+		
+		if(sptype != ""){
+			if(option_error("spline-type",sptype,["linear","square","cubic +ve","cubic"]) == true) return;
+		
+			switch(sptype){
+			case "linear": par.spline.spline_radio = spline_radio_pos[0]; break;
+			case "square": par.spline.spline_radio = spline_radio_pos[1]; break;
+			case "cubic +ve": par.spline.spline_radio = spline_radio_pos[2]; break;
+			case "cubic": par.spline.spline_radio = spline_radio_pos[3]; break;
+			}
+		}
 	}
 
 	if(par.dep.length > 0){
@@ -1478,7 +1492,9 @@ function param_command2(full_name,per_start,per_end,op)
 		
 			if(reparam != "" && is_file(valu) == false){
 				if(par.time_dep){
-					alert_import("Reparameteristed parameter '"+par.full_name+"' cannot be time dependent."); 
+					if(par.spline.spline_radio.value != "Square"){
+						alert_import("A square spline must be used for time-varying reparameterised parameter '"+par.full_name+"'."); 
+					}
 				}
 				par.reparam_eqn = reparam;
 				par.reparam_eqn_on = true;

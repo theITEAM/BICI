@@ -24,28 +24,30 @@ const string default_file = "/tmp/init.bici";        // This is used for Mac
 const string default_file = "Execute/init.bici";     // This is used for windows / linux
 #endif
 
-//#define USE_MPI                                    // Sets if code can run in parallel
+#define USE_MPI                                    // Sets if code can run in parallel
 
-const bool jamie_code = true;                        // This turns in code for Jamie
+const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
 const bool testing = true;                           // Set to true for additional testing
 const bool slow_check = false;                       // Additional checks which are slow
 const bool check_lin = true;                         // Checks linearisation of equations 
-const bool adapt_prop_prob = false;//true;           // Determines if proposals prob adapted
 const bool check_swap = false;                       // Used to check if new swap is working
 const bool use_ind_key = true;                       // Determines if indindividual key
 const bool print_diag_on = false;                    // Prints diagnostic statements to terminal
 const bool cum_diag = true;                          // Cumulative probability diagnostic
 
-const bool linearise_speedup = true;                 // Linearisation speed-up of likelihood
+const bool linearise_speedup = true;                 // Linearisation speed-up of div value calculation
 // This speeds up by taking account of linear population terms when calculation div values
 
-const bool linearise_speedup2 = true;                // Linearisation speed-up likelihood
-// This speeds up by considering changes to non-population terms when calculating div 
+const bool nonpop_speedup = true;                    // Linearisation speed-up likelihood
+// This speeds up making changes to non-population term when calculating div values
 
-const bool linearise_speedup3 = true;                 // Linearisation speed-up of likelihood
+const bool update_ind_linearise_speedup = true;      // Linearisation speed-up of likelihood
 // This speeds up update_ind by updating value based on changes in population (good for sums)
 
+const bool calc_para_speedup = true;                 // Speeds up by paralising calculation over time
+
 const bool removeparamvec_speedup = true;            // Removes zeros from paramter vector
+
 const bool simplify_eqn = true;                      // Simplifies equations (to speed up)
 
 /************************** Enumerated values ******************************/
@@ -61,7 +63,7 @@ enum Algorithm { GILLESPIE, TAU, DA_MCMC, PAS_MCMC, MFA_ALG, ABC_ALG, ABC_SMC_AL
 enum FeatureType { POLYGON, MULTI_POLYGON, NO_FEATURE };
 
 // Different types of equation
-enum EqnType { SE, SP, COMP_PROB, TRANS_PROB, BP, SOURCE_RATE, SOURCE_MEAN, TRANS_RATE, TRANS_MEAN, TRANS_NM_RATE, TRANS_NM_MEAN, TRANS_SHAPE, TRANS_SCALE, TRANS_CV, REPARAM, REPARAM_EQN, DIST, DERIVE_PARAM, DERIVE_EQN, SEQ_VAR,CONST_EQN , MUT_RATE };
+enum EqnType { SE, SP, COMP_PROB, TRANS_PROB, BP, SOURCE_RATE, SOURCE_MEAN, TRANS_RATE, TRANS_MEAN, TRANS_NM_RATE, TRANS_NM_MEAN, TRANS_SHAPE, TRANS_SCALE, TRANS_CV, REPARAM, REPARAM_EQN, DIST, DERIVE_PARAM, DERIVE_EQN,SEQ_VAR,CONST_EQN, MUT_RATE };
 
 // Differetn restrictions placeed on equarions
 enum EqnMode { PARAM_ONLY, PARAM_WITH_DEP, ALL, DERIVE_PARAM_MODE, DERIVE_MODE };
@@ -148,7 +150,7 @@ enum TrigEventType { TRIG_OBS_TRANS_EV, TRIG_MOVE_EV, TRIG_LEAVE_EV };
 enum ObsType { OBS_SOURCE_EV, OBS_TRANS_EV, OBS_SINK_EV, OBS_COMP_EV, OBS_TEST_EV };
 
 // Different ways a parameter can affect likelihoods
-enum AffectType { SPLINE_PRIOR_AFFECT, PRIOR_AFFECT, DIST_AFFECT, SPLINE_AFFECT, EXP_FE_AFFECT, DIV_VALUE_AFFECT, DIV_VALUE_FAST_AFFECT, DIV_VALUE_LINEAR_AFFECT, MARKOV_LIKE_AFFECT, POP_AFFECT, NM_TRANS_AFFECT, NM_TRANS_BP_AFFECT, NM_TRANS_INCOMP_AFFECT, OMEGA_AFFECT, EXP_IE_AFFECT, LIKE_IE_AFFECT, INDFAC_INT_AFFECT, MARKOV_POP_AFFECT, LIKE_OBS_IND_AFFECT, LIKE_OBS_POP_AFFECT, LIKE_OBS_POP_TRANS_AFFECT, OBS_EQN_AFFECT, LIKE_UNOBS_TRANS_AFFECT, POP_DATA_CGL_TGL_AFFECT, LIKE_INIT_COND_AFFECT, PRIOR_INIT_COND_AFFECT, LIKE_GENETIC_PROCESS_AFFECT, GENETIC_VALUE_AFFECT, LIKE_GENETIC_OBS_AFFECT, IIF_W_AFFECT, POPNUM_IND_W_AFFECT, AFFECT_MAX };
+enum AffectType { SPLINE_PRIOR_AFFECT, PRIOR_AFFECT, DIST_AFFECT, EXP_FE_AFFECT, DIV_VALUE_AFFECT, DIV_VALUE_NONPOP_AFFECT, DIV_VALUE_LINEAR_AFFECT, MARKOV_LIKE_AFFECT, POP_AFFECT, NM_TRANS_AFFECT, NM_TRANS_BP_AFFECT, NM_TRANS_INCOMP_AFFECT, OMEGA_AFFECT, EXP_IE_AFFECT, LIKE_IE_AFFECT, INDFAC_INT_AFFECT, MARKOV_POP_AFFECT, LIKE_OBS_IND_AFFECT, LIKE_OBS_POP_AFFECT, LIKE_OBS_POP_TRANS_AFFECT, OBS_EQN_AFFECT, LIKE_UNOBS_TRANS_AFFECT, POP_DATA_CGL_TGL_AFFECT, LIKE_INIT_COND_AFFECT, PRIOR_INIT_COND_AFFECT, LIKE_GENETIC_PROCESS_AFFECT, GENETIC_VALUE_AFFECT, LIKE_GENETIC_OBS_AFFECT, IIF_W_AFFECT, POPNUM_IND_W_AFFECT, AFFECT_MAX };
 
 // Different proposal types
 enum PropType { PARAM_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT_PROP, IND_EVENT_ALL_PROP, IND_OBS_SAMP_PROP, IND_OBS_RESIM_PROP, IND_OBS_RESIM_SINGLE_PROP, IND_UNOBS_RESIM_PROP, IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, IE_VAR_CV_PROP, TRANS_TREE_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP, IND_OBS_SWITCH_LEAVE_SINK_PROP };
@@ -157,7 +159,7 @@ enum PropType { PARAM_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT_PROP, IND_EVENT
 enum AnnealType { ANNEAL_NONE, ANNEAL_SCAN, ANNEAL_POWERAUTO, ANNEAL_LOGAUTO, ANNEAL_POWER };
 
 // Different state timers
-enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER, TIMER_MAX };
+enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER, DERIVE_TIMER,DERIVE_PRECALC_TIMER, TIMER_MAX };
 
 // Different output timers
 enum OutTimer { PARAM_OUTPUT, STATE_OUTPUT, OUTTIMER_MAX };
@@ -168,7 +170,7 @@ enum CheckTimer { CHECK_TRANS_NUM, CHECK_DEP_PARAM, CHECK_REF, CHECK_MARKOV, CHE
 const vector <string> check_name = { "CHECK_TRANS_NUM", "CHECK_DEP_PARAM", "CHECK_REF", "CHECK_MARKOV", "CHECK_NM", "CHECK_LIKE", "CHECK_SPLINE", "CHECK_PRIOR", "CHECK_POP", "CHECK_POP2", "CHECK_CPOP", "CHECK_IE", "CHECK_POP_LIKE", "CHECK_MAPS", "CHECK_EV_OBS", "CHECK_OBS_LIKE", "CHECK_IC", "CHECK_LIN", "CHECK_GEN", "CHECK_POP_IND", "CHECK_ADD_REM", "CHECK_RANGE", "CHECK_SIMP", "CHECK_POP_IND_GENTIC", "CHECK_MAX"};
 
 // Different proposal timers
-enum PropTimer { PROP_TIMER, PROPTIMER_MAX };
+enum PropTimer { PROP_TIMER, PARAM_RESAMPLE_TIMER, PROPTIMER_MAX };
 
 // Different state species timers
 enum StateSpeciesTimer { STSP_TIMER_MAX };
@@ -254,7 +256,7 @@ enum LocalDir { LOCAL_FORWARD, LOCAL_REVERSE };
 enum BoundType { LOWER_BOUND, LOWER_UPPER_BOUND };
 
 // Sets how markov equation is recalculated
-enum RecalcMarkovType { RECALC, USE_POP_DIF, USE_POP_DIF_TIME};
+enum RecalcMarkovType { RECALC, RECALC_PARA, USE_POP_DIF, USE_POP_DIF_FAC, USE_POP_DIF_TIME};
 
 // Sets diffent distribution for displaying text
 enum DistText { NORM_TE, LOGNORM_TE, WEIBULL_TE, GAMMA_TE, BETA_TE, NEGBINO_TE, BERN_TE, EXP_RATE_TE, EXP_MEAN_TE, POIS_TE, PERIOD_TE};
@@ -268,6 +270,15 @@ enum PercentType { LOAD_PER, INIT_PER, RUN_PER, RUN_GEN_PER, ANNEAL_PER, OUTPUT_
 // Different types of derived function
 enum DerFuncType { RN, RNE, RNC, GT, GTE, GTC, DF_UNSET};
  
+// Equation types 
+enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAMETER, PARAMVEC, SPLINE, SPLINEREF, CONSTSPLINEREF, POPNUM, TIME, IE, ONE, ZERO, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, TINT, INTEGRAL, DERIVE, REG_FAC, REG_PRECALC, REG_PRECALC_TIME, SINGLE, NOOP};
+
+// Different types of spline
+enum SplineType { LINEAR_SPL, SQUARE_SPL, CUBICPOS_SPL, CUBIC_SPL};
+
+// Different ways in which equations are added to precalculation
+enum PrecalcAddType { PRECALC_ALL, PRECALC_STOP_COMBINE_MULT, PRECALC_PARAM_ONLY};
+
 /************************** Numeric constants ******************************/
 
 const auto ERR_MSG_MAX = 5u;                     // The maximum number of error messages
@@ -325,7 +336,7 @@ const auto PROP_SIM_PROB_FADE = 0.98;             // Used for time fading of sim
 const auto PROP_SIM_PROB_MIN = 0.05;              // Minimum probability for ind sim proposal
 
 const double TINY = 0.000000001;                  // Used to represent a tiny number
-const double VTINY = 0.00000000000001;            // Used to represent a tiny number
+const double VTINY = 0.00000000000001;            // Used to represent a very tiny number
 const double EFFECT_MAX = 10000000;               // Sets maximum value for effect
 const double EFFECT_MIN = 0.0000001;              // Sets minimum value for effect
 const double CLIP_MIN = 0.99*log(EFFECT_MIN);     // Clips minimum 
@@ -337,7 +348,6 @@ const unsigned int RANGE_MIN = 50;                // Minimum number to calc M
 
 const unsigned int H_BIN = 10;                    // Used for distributions in cumulative prob
 
-const double TWO_TINY = 2*TINY;                   // Used to represent a tiny number
 const double SMALLISH = 0.01;                     // Used to represent quite a small number
 const double SMALL = 0.00001;                     // Used to represent a small number
 const double LARGE = 1000000000;                  // Used to represent a big number

@@ -869,7 +869,7 @@ class Graph
 	press_timebar(bu)
 	{
 		let lay = get_lay("AnimControls");
-		let anim = inter.graph.animation;
+		let anim = this.animation;
 			
 		let x = inter.mx-bu.x-lay.x;
 
@@ -888,7 +888,7 @@ class Graph
 		let info = bu.info;
 	
 		let lay = get_lay(info.lay);
-		let anim = inter.graph.animation;
+		let anim = this.animation;
 			
 		let x = inter.mx-bu.x-lay.x;
 
@@ -899,7 +899,7 @@ class Graph
 		
 		if(update == true){
 			switch(bu.info.update){
-			case "density": inter.graph.density_init(); break;
+			case "density": this.density_init(); break;
 			case "compmatrix": this.comp_matrix_init(); break;
 			case "scale": model.update_pline(this.get_cla(bu.p,bu.cl)); break;
 			default: error("update not recognised"); break;
@@ -911,7 +911,7 @@ class Graph
 	/// Changes the frame (forward or backward)
 	change_frame(d)
 	{
-		let anim = inter.graph.animation;
+		let anim = this.animation;
 		anim.playing = false;	
 		anim.playframe += d;
 		if(anim.playframe < 0) anim.playframe = 0;
@@ -2280,7 +2280,7 @@ class Graph
 		}
 		
 		let timepoint = this.op.timepoint;
-		let anim = inter.graph.animation;
+		let anim = this.animation;
 		if(timepoint && anim.playing == false){
 			let si = 1.2;
 			lay.add_button({te:"t="+timepoint[anim.playframe], x:lay.dx/2-3, y:0.3, dx:6, dy:si, type:"CenterText", font:get_font(si)}); 
@@ -2790,8 +2790,11 @@ class Graph
 	
 	
 	/// Exports an image of the graph
-	export_image(filename)
+	export_image(sc,filename)
 	{
+		print_scale_factor = sc;                        // Increase is screen size for print
+		print_line_factor = sc; 
+
 		// Shifts scrollbars to the origin in tables (if necessary)	
 		inter.export_image = true;
 		if(subsubtab_name() == "Individuals" && this.variety == "Individual"){	
@@ -2862,6 +2865,9 @@ class Graph
 		let w = ro(xmax-xmin+2*mar);
 		let h = ro(ymax-ymin+2*mar);
 		
+		w = Math.floor(w/2)*2;
+		h = Math.floor(h/2)*2;
+		
 		let outcan = document.createElement('canvas');
 		outcan.width = w;
 		outcan.height = h;
@@ -2890,6 +2896,118 @@ class Graph
 		else print_image(outcan)
 	}
 	
+	
+	/// Exports an image of the graph
+	export_video(filename)
+	{
+		let anim = this.animation;
+		
+		start_loading_symbol(0,"Creating");
+		generate_screen();
+	
+		this.fr_first = anim.playframe
+		this.video_filename = filename;
+		
+		anim.playing = true;
+		
+		this.delete_files(filename);
+	}
+	
+	
+	/// Deletes files from the frame directory
+	delete_files(filename)
+	{
+		let anim = this.animation;
+		
+		const fs = require("fs");
+		const path = require("path");
+
+		const directory = "frame";
+
+		fs.readdir(directory, (err, files) => {
+			if(!err){
+				for (const file of files) {
+					fs.unlink(path.join(directory, file), (err) => {
+						if (err) error("unlink");
+					});
+				}
+				
+				if(filename != undefined){
+					setTimeout(function(){ inter.graph.export_video2(0,filename);}, 10);
+				}
+			}
+		});
+	}
+	
+
+	/// Exports a frame of the animation
+	export_video2(fr,filename)
+	{
+		if(inter.loading_symbol.on != true){ this.stop_video_export(); return;}
+		
+		let anim = this.animation;
+
+		set_loading_percent(100*fr/anim.playframe_max);
+
+		anim.playframe = fr;
+		
+		let te;
+		if(fr < 10) te = "0000"+fr;
+		else if(fr < 100) te = "000"+fr;
+		else if(fr < 1000) te = "00"+fr;
+		else if(fr < 10000) te = "0"+fr;
+		else te = fr;
+
+		let sc;
+		switch(inter.mp4quality_radio.value){
+		case "Low": sc = mp4_factor_low; break; 
+		case "Medium": sc = mp4_factor_medium; break; 
+		case "High": sc = mp4_factor_high; break; 
+		}
+		
+		this.export_image(sc,"frame/"+te+".png");
+		
+		generate_screen();
+		
+		if(fr+1 <	anim.playframe_max){ 
+			setTimeout(function(){ inter.graph.export_video2(fr+1,filename);}, 10);
+		}
+		else{
+			start_loading_symbol(0,"mp4");
+				
+			this.spw = spawn("ffmpeg/bin/ffmpeg.exe",["-y","-f","image2","-framerate",inter.fps,"-i","frame/%05d.png","-c:v","libx264","-r","30","-pix_fmt","yuv420p",filename]);
+			
+			this.spw.stdout.on('data', function (data) {
+				//prr("data");
+				//prr("he"+data);
+			});
+
+			this.spw.stderr.on('data', function (data) {
+				//prr("error");
+				//prr("er"+data);
+			});
+
+			this.spw.on('close', function (code) {
+				setTimeout(function(){ 
+					inter.graph.delete_files();
+					inter.graph.stop_video_export();
+				}, 10);
+			});
+		}
+	}
+	
+	
+	/// Stops video export from happening
+	stop_video_export()
+	{
+		let anim = this.animation;
+
+		anim.playing = false; 
+		anim.playframe = this.fr_first;
+		stop_loading_symbol();
+		generate_screen();
+	}
+
 	
 	/// Exports a figure
 	export_figure(filename)

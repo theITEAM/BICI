@@ -113,7 +113,15 @@ void PAS::run()
 			ch.update(s);
 		}		
 		sample_op(s);
+		
+#ifdef USE_MPI
+		mpi.sample_barrier(s,nsample);
+#endif
 	}
+
+#ifdef USE_MPI
+	mpi.barrier();
+#endif
 	
 	output.set_output_burnin(double(100.0*nburnin)/nsample);
 	

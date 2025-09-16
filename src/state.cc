@@ -31,13 +31,6 @@ void State::init()
 	update_timer.resize(AFFECT_MAX,0);
 	restore_timer.resize(AFFECT_MAX,0);
 	check_timer.resize(CHECK_MAX,0);
-
-	spline_val.clear();
-	spline_val.resize(model.spline.size());
-	for(auto &spl : spline_val){
-		spl.val.resize(T,UNSET);
-		spl.store.resize(T,UNSET);
-	}
 	
 	popnum_t.resize(T);
 
@@ -48,7 +41,7 @@ void State::init()
 			if(model.pop[po].sp_p == p) pop_affect.push_back(po);
 		}
 		
-		StateSpecies ss(param_val,spline_val,model.eqn,model.param,model.param_vec,model.pop,model.species[p],model.genetic_data,model.details,pop_affect,model.mode,dif_thresh);
+		StateSpecies ss(param_val,model.eqn,model.param,model.param_vec,model.pop,model.species[p],model.genetic_data,model.details,pop_affect,model.mode,dif_thresh);
 		species.push_back(ss);
 	}
 	
@@ -58,11 +51,9 @@ void State::init()
 
 
 /// Simulate the state from parameter values, individual effects and initial conditions
-void State::simulate(const vector <double> &param_value, const vector <InitCondValue> &initc_val) 
+void State::simulate(const PV &param_value, const vector <InitCondValue> &initc_val) 
 {
 	param_val = param_value;
-
-	spline_init(); 
 
 	for(auto p = 0u; p < nspecies; p++){
 		auto &ssp = species[p];
@@ -90,11 +81,9 @@ void State::simulate(const vector <double> &param_value, const vector <InitCondV
 
 
 /// Simulate the state from parameter values, individual effects and initial conditions
-void State::post_sim(const vector <double> &param_value, const Sample &samp)
+void State::post_sim(const PV &param_value, const Sample &samp)
 {
 	param_val = param_value;
-	
-	spline_init(); 
 	
 	auto t_start = model.details.ppc_t_start;
 	
@@ -133,9 +122,11 @@ void State::post_sim(const vector <double> &param_value, const Sample &samp)
 void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end) 
 {
 	for(auto ti = ti_start; ti < ti_end; ti++){	
-		//if(true && ti%op_step == 0) print_cpop(ti);
-		auto &pop = popnum_t[ti];
+		//if(true && ti%op_step == 0) print_cpop(ti);		
+		//cout << ti << " ti" << endl;
 
+		auto &pop = popnum_t[ti];
+	
 		pop = model.calculate_popnum(species);          // Calculates the population numbers
 		
 		auto pop_ind = calculate_pop_ind(); 
@@ -151,6 +142,7 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 				ssp.update_population_based(ti,model.details.stochastic,pop);
 				break;
 			}
+		
 			ssp.check(ti,popnum_t);
 		}
 	}
@@ -174,7 +166,6 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 		auto prob_sum = 0.0;
 		for(const auto &ssp : species) prob_sum += ssp.prob_trans_tree;
 		if(prob_sum != 0) cout << "Probability trans tree = " << prob_sum << endl;
-		//emsg("do");
 	}
 
 	likelihood_from_scratch();
@@ -185,12 +176,14 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 // (If the model has a source its possible simulation results in no event
 void State::ensure_all_ind_event()
 {
+	const auto &precalc = param_val.precalc;
+	
 	for(auto p = 0u; p < species.size(); p++){
 		const auto &sp = model.species[p];
 		auto &ssp = species[p];
 		
 		if(sp.type == INDIVIDUAL && sp.contains_source){	
-			IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,genetic_value.inf_node,param_val,spline_val,popnum_t);
+			IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,genetic_value.inf_node,precalc,popnum_t);
 	
 			for(auto i = 0u; i < sp.nindividual_obs; i++){
 				auto &ev = ssp.individual[i].ev;
@@ -217,11 +210,21 @@ void State::ensure_all_ind_event()
 
 
 /// Calcualtes derived quantities
-vector <DeriveOutput> State::derive_calculate() const
+vector <DeriveOutput> State::derive_calculate()
 {
 	vector <DeriveOutput> output;
 	
+	timer[DERIVE_PRECALC_TIMER] -= clock();
+	
 	vector < vector < vector <double> > > der_value; 
+	
+	const auto &precalc = param_val.precalc;
+	
+	model.precalc_eqn.calculate(model.list_precalc_derive,get_list(model.details.T),param_val,false);
+	
+	timer[DERIVE_PRECALC_TIMER] += clock();
+	
+	timer[DERIVE_TIMER] -= clock();
 	
 	for(const auto &der : model.derive){
 		DeriveOutput op;
@@ -239,13 +242,13 @@ vector <DeriveOutput> State::derive_calculate() const
 				
 				string val_str;
 				if(der.time_dep == false){
-					auto val = eqn.calculate_derive(UNSET,popnum_t,param_val,spline_val,der_value);
+					auto val = eqn.calculate_derive(UNSET,popnum_t,precalc,der_value);
 					val_str = tstr(val);
 					value.push_back(val);
 				}
 				else{
 					for(auto ti = 0u; ti < T; ti++){	
-						auto val = eqn.calculate_derive(ti,popnum_t,param_val,spline_val,der_value);
+						auto val = eqn.calculate_derive(ti,popnum_t,precalc,der_value);
 						value.push_back(val);
 					}
 					val_str = compact_vector(value);
@@ -259,6 +262,8 @@ vector <DeriveOutput> State::derive_calculate() const
 		output.push_back(op);
 		der_value.push_back(d_value);
 	}
+	
+	timer[DERIVE_TIMER] += clock();
 	
 	return output;
 }
@@ -282,6 +287,8 @@ vector <double> State::calculate_df(const DerFunc &df) const
 	
 	const auto &sp = model.species[0];
 	const auto &ssp = species[0];
+	 
+	const auto &precalc = param_val.precalc;
 	 
 	// Initial guess for eigen vector
 	vector <double> evec(N);
@@ -322,7 +329,7 @@ vector <double> State::calculate_df(const DerFunc &df) const
 							auto sum = 0.0;
 							for(auto k = 0u; k < eqn.pop_ref.size(); k++){
 								auto po = eqn.pop_ref[k];
-								auto val = eqn.calculate_calculation(lin.pop_grad_calc[k],ti,param_val,spline_val);
+								auto val = eqn.calculate_pop_grad(k,ti,precalc);
 								for(auto poss : pop_ind[ti][po]){
 									poss.weight *= val;
 									inf_pos.push_back(poss);
@@ -394,7 +401,7 @@ vector <double> State::calculate_df(const DerFunc &df) const
 				}
 				cout << endl;
 			}
-			emsg("do");
+			emsg("inf_ period");
 		}
 	}
 	else{
@@ -403,7 +410,7 @@ vector <double> State::calculate_df(const DerFunc &df) const
 			for(auto i = 0u; i < Feq_ref.size(); i++){
 				const auto &fe = Feq_ref[i];
 				const auto &eqn = model.eqn[fe.e];
-				auto val = eqn.calculate_calculation(eqn.linearise.pop_grad_calc[fe.i],ti,param_val,spline_val);
+				auto val = eqn.calculate_pop_grad(fe.i,ti,precalc);
 				Fvalue.push_back(val);
 			}
 			
@@ -417,19 +424,19 @@ vector <double> State::calculate_df(const DerFunc &df) const
 					const auto &nmt = sp.nm_trans[se.m];
 					const auto &eqn = model.eqn[nmt.bp_eq];
 					
-					bp = eqn.calculate_no_popnum(ti,param_val,spline_val);
+					bp = eqn.calculate_no_popnum(ti,precalc);
 					if(nmt.all_branches){
 						auto bp_tot = 0.0;
 						for(auto bp_eq : nmt.bp_all_eq){
 							const auto &eqn = model.eqn[bp_eq];
-							bp_tot += eqn.calculate_no_popnum(ti,param_val,spline_val);
+							bp_tot += eqn.calculate_no_popnum(ti,precalc);
 						}
 						bp /= bp_tot;
 					}
 				}
 			
 				const auto &eqn = model.eqn[se.e];
-				auto val = eqn.calculate_no_popnum(ti,param_val,spline_val);
+				auto val = eqn.calculate_no_popnum(ti,precalc);
 				
 				switch(se.type){
 				case EXP_RATE: case EXP_RATE_NM: 
@@ -528,7 +535,7 @@ string State::compact_vector(const vector <double> &value) const
 	return st;
 }
 
-
+/*
 /// Works out values for the spline based on the parameter vector
 void State::spline_init()
 {
@@ -546,6 +553,7 @@ void State::spline_init()
 		else val = spline.const_val;
 	}
 }
+*/
 
 
 /// Prints cpop to the console
@@ -749,7 +757,7 @@ void State::calculate_like()
 
 
 /// Adds a change in likelihood to the state
-void State::add_like(Like like_ch)
+void State::accept(Like like_ch)
 {
 	like.init_cond += like_ch.init_cond;
 	like.init_cond_prior += like_ch.init_cond_prior;
@@ -762,64 +770,13 @@ void State::add_like(Like like_ch)
 	like.nm_trans += like_ch.nm_trans;
 	like.genetic_process += like_ch.genetic_process;
 	like.genetic_obs += like_ch.genetic_obs;
-}
-
-
-/// Updates splines
-void State::update_spline(const vector <AffectLike> &affect_spline)
-{
-	vector <double> store;
-	for(const auto &aspline : affect_spline){
-		if(aspline.type != SPLINE_AFFECT) emsg("Should be spline affect");
 	
-		auto j = aspline.num; 
-		
-		const auto &spline = model.spline[j];
-		const auto &div = spline.div;
-			
-		if(spline.constant == true) emsg("Should not recalculate");
-		
-		auto &val = spline_val[j].val;
-		auto &store = spline_val[j].store;
-		
-		for(auto ti : aspline.list){
-			auto f = div[ti].f;
-			store[ti] = val[ti];
-			val[ti] = param_val[div[ti].th1]*f + param_val[div[ti].th2]*(1-f);
-		}
-	}
-}
-
-
-/// Restores splines to their original value
-void State::restore_spline(const vector <AffectLike> &affect_spline)
-{
-	for(const auto &aspline : affect_spline){
-		if(aspline.type != SPLINE_AFFECT) emsg("Should be spline affect");
-	
-		auto j = aspline.num; 
-		auto &val = spline_val[j].val;
-		auto &store = spline_val[j].store;
-		for(auto ti : aspline.list){ val[ti] = store[ti]; store[ti] = UNSET;}
-	}
-}
-
-
-/// Restores splines to their original value
-void State::remove_store_spline(const vector <AffectLike> &affect_spline)
-{
-	for(const auto &aspline : affect_spline){
-		if(aspline.type != SPLINE_AFFECT) emsg("Should be spline affect");
-	
-		auto j = aspline.num; 
-		auto &store = spline_val[j].store;
-		for(auto ti : aspline.list){ store[ti] = UNSET;}
-	}
+	param_val.clear();
 }
 
 
 /// Updates state based on a change in parameters
-Like State::update_param(const vector <AffectLike> &affect_like, const vector <double> &param_store)
+Like State::update_param(const vector <AffectLike> &affect_like)
 {	
 	Like like_ch;
 	
@@ -829,9 +786,11 @@ Like State::update_param(const vector <AffectLike> &affect_like, const vector <d
 	for(auto i = 0u; i < K; i++){
 		const auto &alike = affect_like[i];
 		
-		update_timer[alike.type] -= clock();
+		auto ty = alike.type;
 		
-		switch(alike.type){
+		update_timer[alike.type] -= clock();
+	
+		switch(ty){
 		case OBS_EQN_AFFECT:
 			{
 				change_add(species[alike.num].calculate_obs_eqn(alike.list));
@@ -946,8 +905,6 @@ Like State::update_param(const vector <AffectLike> &affect_like, const vector <d
 			}
 			break;
 		
-		case SPLINE_AFFECT: emsg("Should not be spline affect"); break;
-			
 		case DIV_VALUE_AFFECT:   // Updates div.value on Markov transition
 			{
 				auto p = alike.num, e = alike.num2;
@@ -955,17 +912,18 @@ Like State::update_param(const vector <AffectLike> &affect_like, const vector <d
 			} 
 			break;
 			
-		case DIV_VALUE_FAST_AFFECT:   // Updates div.value on Markov transition
+		case DIV_VALUE_NONPOP_AFFECT:   // Updates div.value on Markov transition
 			{
 				auto p = alike.num;
-				change_add(species[p].likelihood_markov_value_fast(alike.me_list,alike.list,popnum_t,param_store,spline_val));
+				const auto &me_list = alike.div_value_nonpop.me_list;
+				change_add(species[p].likelihood_markov_value_nonpop(me_list,alike.list,popnum_t,param_val));
 			}
 			break;
 			
 		case DIV_VALUE_LINEAR_AFFECT:   // Updates div.value on Markov transition
 			{
 				auto p = alike.num;
-				change_add(species[p].likelihood_markov_value_linear(alike.list,alike.linear_prop,popnum_t));
+				change_add(species[p].likelihood_markov_value_linear(alike.list,alike.div_value_linear,popnum_t));
 			}
 			break;
 		
@@ -1173,8 +1131,6 @@ void State::restore(const vector <AffectLike> &affect_like)
 			}
 			break;
 			
-		case SPLINE_AFFECT: emsg("Should not be spline affect"); break;
-		
 		case DIV_VALUE_AFFECT:                 // Restore div.value on Markov transition
 			{
 				auto p = alike.num, e = alike.num2;
@@ -1183,23 +1139,18 @@ void State::restore(const vector <AffectLike> &affect_like)
 			}
 			break;
 			
-		case DIV_VALUE_FAST_AFFECT:  
+		case DIV_VALUE_NONPOP_AFFECT:  
 			{
-				auto &mev = species[alike.num].markov_eqn_vari;
-				auto m = 0u;
-				for(auto k = 0u; k < li.size(); k++){
-					for(auto e : alike.me_list){
-						mev[e].div[li[k]].value = vec[m];
-						m++;
-					}
-				}
+				auto p = alike.num;
+				const auto &me_list = alike.div_value_nonpop.me_list;
+				species[p].likelihood_markov_value_nonpop_restore(me_list,alike.list,vec);
 			}
 			break;
 			
 		case DIV_VALUE_LINEAR_AFFECT:   // Restore div.value on Markov transition
 			{
 				auto p = alike.num;
-				species[p].likelihood_markov_value_linear_restore(alike.list,alike.linear_prop,vec);
+				species[p].likelihood_markov_value_linear_restore(alike.list,alike.div_value_linear,vec);
 			}
 			break;
 			
@@ -1249,6 +1200,8 @@ void State::restore(const vector <AffectLike> &affect_like)
 		
 		restore_timer[alike.type] += clock();
 	}
+	
+	param_val.restore();
 }
 
 
@@ -1342,6 +1295,8 @@ void State::resample_ind(bool do_pl)
 	
 	auto popnum_t = model.calculate_popnum_t(species);
 	
+	const auto &precalc = param_val.precalc;
+	
 	auto pl = false; 
 	if(do_pl) pl = true;
 
@@ -1352,7 +1307,7 @@ void State::resample_ind(bool do_pl)
 		if(sp.type == INDIVIDUAL){
 			auto &ssp = species[p];
 	
-			IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,genetic_value.inf_node,param_val,spline_val,popnum_t);
+			IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,genetic_value.inf_node,precalc,popnum_t);
 			
 			ind_ev_samp.setup_nm();
 		
@@ -1391,7 +1346,7 @@ void State::resample_ind(bool do_pl)
 										cout << "After:" << endl; ssp.print_event(ssp.individual[i].ev);
 									}
 								
-									add_like(like_ch);
+									accept(like_ch);
 								
 									gen_change_update(gc); 	
 									if(sp.trans_tree) update_popnum_ind(p,i);
@@ -1425,8 +1380,11 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 {
 	Particle part;
 	part.s = s; part.chain = chain;
+	
 	part.param_val_prop = model.get_param_val_prop(param_val);
+	
 	part.like = like;
+	
 	part.dir_out = derive_calculate();
 	
 	for(auto p = 0u; p < species.size(); p++){
@@ -1439,6 +1397,7 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 			part_sp.individual = ssp.individual;
 			if(cum_diag && model.mode == INF) ssp.calc_trans_diag(part_sp,popnum_t);
 		}
+
 		part_sp.nindividual = ssp.individual.size();
 		
 		part.species.push_back(part_sp);
@@ -1487,8 +1446,6 @@ void State::set_particle(const Particle &part, bool calc_like)
 	param_val = model.get_param_val(part.param_val_prop);
 	like = part.like;
 	
-	spline_init();
-
 	for(auto p = 0u; p < species.size(); p++){
 		auto &ssp = species[p];
 		const auto &part_sp = part.species[p];
@@ -1513,6 +1470,8 @@ vector <double> State::prior_init_cond(double &like_ch)
 {
 	vector <double> store;
 
+	const auto &precalc = param_val.precalc;
+
 	if(model.mode == SIM) return store;
 	
 	store.push_back(like.init_cond_prior);
@@ -1529,14 +1488,14 @@ vector <double> State::prior_init_cond(double &like_ch)
 			auto foc_cl = ic.focal_cl;
 
 			if(foc_cl == UNSET){
-				prior += prior_probability(icv.N_total,ic.pop_prior,param_val,model.eqn);
+				prior += prior_probability(icv.N_total,ic.pop_prior,precalc,model.eqn);
 	
 				prior += dirichlet_probability(icv.frac,ic.alpha);
 			}
 			else{                                        // A focal classification is set
 				const auto &claa = sp.cla[foc_cl];
 				for(auto c = 0u; c < claa.ncomp; c++){
-					prior += prior_probability(icv.N_focal[c],ic.comp_prior[c],param_val,model.eqn);
+					prior += prior_probability(icv.N_focal[c],ic.comp_prior[c],precalc,model.eqn);
 				}
 				
 				for(auto cl = 0u; cl < sp.ncla; cl++){
@@ -1627,19 +1586,26 @@ vector <double> State::get_param_val_prop() const
 }
 
 
-/// Gets the estimated rate for a 
+/// Gets the estimated rate for a transition
 double State::get_trans_rate_est(unsigned int p, unsigned int tr, unsigned int ti) const
 {
 	const auto &tra = model.species[p].tra_gl[tr];
 	const auto &eq = model.eqn[tra.dist_param[0].eq_ref];
+	const auto &precalc = param_val.precalc;
 		
 	switch(tra.type){
-	case EXP_RATE: case EXP_RATE_NM:
-		return eq.calculate(ti,popnum_t[ti],param_val,spline_val); 
+	case EXP_RATE: 
+		return eq.calculate(ti,popnum_t[ti],precalc); 
+		
+	case EXP_RATE_NM:
+		return eq.calculate(ti,popnum_t[ti],precalc); 
 			
-	case EXP_MEAN: case EXP_MEAN_NM: case GAMMA: case ERLANG: case LOG_NORMAL: 
+	case EXP_MEAN:
+		return 1.0/(TINY+eq.calculate(ti,popnum_t[ti],precalc)); 
+		
+	case EXP_MEAN_NM: case GAMMA: case ERLANG: case LOG_NORMAL: 
 	case PERIOD: case WEIBULL:
-		return 1.0/(TINY+eq.calculate(ti,popnum_t[ti],param_val,spline_val)); 
+		return 1.0/(TINY+eq.calculate(ti,popnum_t[ti],precalc)); 
 	}
 	return UNSET;
 }
@@ -1788,9 +1754,8 @@ vector < vector < vector <Poss> > > State::calculate_pop_ind_total() const
 				}
 			}
 		}
-		emsg("do");
+		emsg("output pos");
 	}
 	
 	return pop_ind;
 }
-

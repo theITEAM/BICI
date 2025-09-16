@@ -35,8 +35,10 @@ void PostSim::run()
 		percentage(s,smax);
 		
 		const auto &samp = model.sample[(unsigned int)(model.sample.size()*ran())];
+		//const auto &samp = model.sample[0];
 
 		auto param_val = model.post_param(samp);
+		//model.print_param(param_val);
 		
 		if(false) model.print_param(param_val);
 
@@ -46,6 +48,10 @@ void PostSim::run()
 	
 		output.param_sample(s,0,state);
 		output.state_sample(s,0,state);
+		
+#ifdef USE_MPI
+		mpi.sample_barrier(s,smax);
+#endif
 	}
 	
 #ifdef USE_MPI

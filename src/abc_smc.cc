@@ -82,10 +82,10 @@ void ABC_SMC::run()
 				auto p = particle_sampler();                  // Samples from a particle in last gen
 				const auto &part = particle_store[p];
 				
-				auto param_val = model.get_param_val(part.param_val_prop);
-				auto param_prop = prop.sample(param_val);     // Proposes a new parameter set using MVN kernal
+					auto param_val = model.get_param_val(part.param_val_prop);
+				auto param_prop = param_val;  // Proposes a new parameter set using MVN kernal
 				
-				if(model.inbounds(param_prop) == true){       // Checks if parameters within bounds
+				if(prop.param_resample(param_prop) == true){				
 					auto initc_val = model.initc_sample(param_prop);
 
 					state.simulate(param_prop,initc_val);       // Simulates a new state
@@ -119,7 +119,6 @@ void ABC_SMC::run()
 			cout << "Cut-off: " << obs_cutoff << "   # Particle: " <<  particle_store.size() << endl << endl;
 		}
 	}
-
 
 	setup_particle_sampler(particle_store);    
 	for(auto s = 0u; s < smax; s++){
@@ -179,7 +178,7 @@ double ABC_SMC::implement_cutoff_frac(vector <Particle> &particle) const
 
 
 /// Calculates the weights for the different particles
-double ABC_SMC::calculate_particle_weight(const vector <double> &param_prop, const vector <Particle> &particle, const Proposal &prop) const 
+double ABC_SMC::calculate_particle_weight(const PV &param_prop, const vector <Particle> &particle, const Proposal &prop) const 
 {	
 	auto param_prop_prop = model.get_param_val_prop(param_prop);
 	

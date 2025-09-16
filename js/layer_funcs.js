@@ -542,9 +542,11 @@ function add_screen_buts(lay)
 	
 	let so = edit_source;
 	let type = so.type;
+	
+	let loading = loading_sym();
 
-	if(inter.loading_symbol.on == true || model.show_warning() == true){
-		if(inter.loading_symbol.on == true) add_layer("Blank",x2,y1,x3-x2,y2-y1,{});	
+	if(loading == true || model.show_warning() == true){
+		if(loading == true) add_layer("Blank",x2,y1,x3-x2,y2-y1,{});	
 		else add_layer("ShowWarning",x2,y1,x3-x2,y2-y1,{});
 	}
 	else{
@@ -708,7 +710,7 @@ function add_screen_buts(lay)
 	
 	if(inter.view_graph.value != undefined) right_menu = "GraphView";
 
-	if(right_menu != "" && !inter.loading_symbol.on){	
+	if(right_menu != "" && !loading){	
 		let xr = x3-right_menu_width;
 		let yr = y1 + right_menu_top;
 	
@@ -760,7 +762,7 @@ function add_screen_buts(lay)
 
 	add_layer("Menu",x1,yb,x2-x1,yc-yb,{});
 
-	if(inter.loading_symbol.on){
+	if(loading){
 		let six = 4.7, siy = 3.7;
 		add_layer("LoadingSymbol",(x2+x3)/2-six/2,(y1+y2)/2-siy/2,six,siy+8,{});
 		
@@ -793,6 +795,14 @@ function add_screen_buts(lay)
 	
 	if(make_fig) add_layer("Figure",0,0,lay.dx,lay.dy,{});
 } 
+
+
+/// Determines if loading symbol
+function loading_sym()
+{
+	if(inter.loading_symbol.on == true && inter.printing == false) return true;
+	return false;
+}
 
 
 /// Places the selected dropdown layer on top of all the others
@@ -840,11 +850,16 @@ function start_loading_symbol(per,type)
 		let interval = setInterval(function(){ inter.loading_symbol.offset++; replot_loading_symbol();},110);
 		inter.loading_symbol = {on:true, offset:0, interval:interval, percent:per, type:type};
 	}
+	else{
+		inter.loading_symbol.percent = per;
+		inter.loading_symbol.type = type;
+	}
 		
-		switch(type){
-	case "Start": case "StartPPC": loading_symbol_message("Creating..."); break;
+	switch(type){
+	case "Start": case "StartPPC": case "Creating": loading_symbol_message("Creating..."); break;
 	case "Spawn": loading_symbol_message("Initialising..."); break;
 	case "Load File": case "Load Example": loading_symbol_message("Loading..."); break;
+	case "mp4": loading_symbol_message("Create mp4..."); break;
 	}
 }
 
@@ -993,15 +1008,20 @@ function add_ref(source)
 /// Replots the loading symbol
 function replot_loading_symbol()
 {
-	let lay = get_lay("LoadingSymbol");
-	if(lay){
-		lay.plot_button(lay.but[0]);	
-		cv = inter.canvas_cv;
-		cv.drawImage(lay.can,Math.round(lay.x*inter.sca),Math.round(lay.y*inter.sca));
-		
-		lay.plot_button(lay.but[1]);	
-		cv.drawImage(lay.can,Math.round(lay.x*inter.sca),Math.round(lay.y*inter.sca));	
+	let l = find(inter.layer,"name","LoadingSymbol");
+	if(l == undefined){
+		if(inter.printing == false) error("Cannot replot loading symbol");
+		return;
 	}
+	
+	let lay = inter.layer[l];
+	
+	lay.plot_button(lay.but[0]);	
+	cv = inter.canvas_cv;
+	cv.drawImage(lay.can,Math.round(lay.x*inter.sca),Math.round(lay.y*inter.sca));
+	
+	lay.plot_button(lay.but[1]);	
+	cv.drawImage(lay.can,Math.round(lay.x*inter.sca),Math.round(lay.y*inter.sca));	
 }
 
 
@@ -1363,6 +1383,7 @@ function copy_back_to_source2(tbs)
 	case "time_step": edit_source.time_step = te; break;
 	case "alpha_val": inter.bubble.alpha_val = te; break;
 	case "BF_val": inter.bubble.BF_val = te; break;
+	case "fps": inter.fps = te; break;
 	case "group_name": edit_source.spec.gname = te; break;
 	case "slice_time": inter.bubble.slice_time = te; break;
 	case "suffix": inter.bubble.suffix = te; break;
@@ -1643,7 +1664,7 @@ function check_error_textbox2(tbs)
 
 			case "inf_sample": case "inf_abcsample": 
 				warn = check_posinteger(te);
-				if(warn == "" && Number(te) < 100) warn = "Must be 100 or more";
+				if(warn == "" && Number(te) < 100 && testing == false) warn = "Must be 100 or more";
 				break;
 			
 			case "inf_chain":
@@ -1931,6 +1952,10 @@ function check_error_textbox2(tbs)
 				
 			case "BF_val":
 				warn = check_number(te);	
+				break;
+				
+			case "fps":
+				warn = check_posinteger(te);	
 				break;
 				
 			case "group_name":

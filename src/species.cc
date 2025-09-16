@@ -260,8 +260,8 @@ vector <unsigned int> Species::get_vec_tr_swap_mid(unsigned int st, unsigned int
 }
 
 
-/// Calculates non-Markovian rate
-vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector <double> > &popnum_t, const vector <Equation> &eqn, vector < vector <double> > &bp_store) const
+/// Calcucalculate_no_popnum(lates non-Markovian rate
+vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <double> &precalc, const vector < vector <double> > &popnum_t, const vector <Equation> &eqn, vector < vector <double> > &bp_store) const
 {
 	vector < vector <double> > nm_rate;
 	
@@ -291,7 +291,7 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 							const auto &popnum = popnum_t[ti];
 							auto bp_f = 1.0;
 							for(auto e : nmt.bp_other_eq){
-								bp_f -= eqn[e].calculate(ti,popnum,param_val,spline_val);
+								bp_f -= eqn[e].calculate(ti,popnum,precalc);
 							}
 							check_bp(bp_f);
 							bp[ti] = bp_f;
@@ -300,7 +300,7 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					else{
 						auto bp_f = 1.0;
 						for(auto e : nmt.bp_other_eq){
-							bp_f -= eqn[e].calculate_param_only(param_val);
+							bp_f -= eqn[e].calculate_param(precalc);
 						}
 						check_bp(bp_f);
 						for(auto ti = 0u; ti < T; ti++) bp[ti] = bp_f;
@@ -319,11 +319,11 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					if(update == UPDATE_TIME){
 						for(auto ti = 0u; ti < T; ti++){
 							const auto &popnum = popnum_t[ti];
-							auto bp_f = eq.calculate(ti,popnum,param_val,spline_val);
+							auto bp_f = eq.calculate(ti,popnum,precalc);
 							if(nmt.all_branches){
 								auto div = 0.0;
 								for(auto e : nmt.bp_all_eq){
-									div += eqn[e].calculate(ti,popnum,param_val,spline_val);
+									div += eqn[e].calculate(ti,popnum,precalc);
 								}
 								bp_f /= div;
 							}
@@ -332,11 +332,11 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 						}
 					}
 					else{
-						auto bp_f = eq.calculate_param_only(param_val);
+						auto bp_f = eq.calculate_param(precalc);
 						if(nmt.all_branches){
 							auto div = 0.0;
 							for(auto e : nmt.bp_all_eq){
-								div += eqn[e].calculate_param_only(param_val);
+								div += eqn[e].calculate_param(precalc);
 							}
 							bp_f /= div;
 						}
@@ -355,11 +355,11 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
 					if(eq.time_vari){
 						for(auto ti = 0u; ti < T; ti++){	
-							nm_rate[m][ti] = dt*bp[ti]/eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+							nm_rate[m][ti] = dt*bp[ti]/eq.calculate(ti,popnum_t[ti],precalc);
 						}
 					}
 					else{
-						auto val = 1.0/eq.calculate_param_only(param_val); 
+						auto val = 1.0/eq.calculate_param(precalc); 
 						for(auto ti = 0u; ti < T; ti++){
 							nm_rate[m][ti] = dt*bp[ti]*val;
 						}
@@ -372,11 +372,11 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
 					if(eq.time_vari){
 						for(auto ti = 0u; ti < T; ti++){	
-							nm_rate[m][ti] = dt*bp[ti]*eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+							nm_rate[m][ti] = dt*bp[ti]*eq.calculate(ti,popnum_t[ti],precalc);
 						}		
 					}
 					else{
-						auto val = eq.calculate_param_only(param_val); 
+						auto val = eq.calculate_param(precalc); 
 						for(auto ti = 0u; ti < T; ti++){
 							nm_rate[m][ti] = dt*bp[ti]*val;
 						}
@@ -390,11 +390,11 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					const auto &eq = eqn[nmt.dist_param_eq_ref[0]];	
 					if(eq.time_vari){
 						for(auto ti = 0u; ti < T; ti++){	
-							nm_rate[m][ti] = dt*bp[ti]/eq.calculate(ti,popnum_t[ti],param_val,spline_val);
+							nm_rate[m][ti] = dt*bp[ti]/eq.calculate(ti,popnum_t[ti],precalc);
 						}
 					}
 					else{
-						auto val = 1.0/eq.calculate_param_only(param_val); 
+						auto val = 1.0/eq.calculate_param(precalc); 
 						for(auto ti = 0u; ti < T; ti++){
 							nm_rate[m][ti] = dt*bp[ti]*val;
 						}
@@ -406,11 +406,11 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					
 						if(eq.time_vari || eq_sh.time_vari){
 							for(auto ti = 0u; ti < T; ti++){
-								nm_rate[m][ti] = dt/eq.calculate_no_popnum(ti,param_val,spline_val);
+								nm_rate[m][ti] = dt/eq.calculate_no_popnum(ti,precalc);
 							}
 						}
 						else{
-							auto val = dt/(eq.calculate_param_only(param_val)); 
+							auto val = dt/(eq.calculate_param(precalc)); 
 							
 							for(auto ti = 0u; ti < T; ti++) nm_rate[m][ti] = val;
 						}
@@ -672,10 +672,12 @@ vector <unsigned int> Species::get_cv_list(unsigned int ie, const vector <Param>
 
 
 /// Calculate the actual omega matrix
-vector < vector <double> > Species::calculate_omega_basic(unsigned int g, const vector <double> &param_val, const vector <Param> &param) const
+vector < vector <double> > Species::calculate_omega_basic(unsigned int g, const PV &param_val, const vector <Param> &param) const
 {
 	const auto &ieg = ind_eff_group[g];
 	auto N = ieg.list.size();
+	
+	const auto &value = param_val.value;
 	
 	vector < vector <double> > omega;
 	
@@ -687,7 +689,7 @@ vector < vector <double> > Species::calculate_omega_basic(unsigned int g, const 
 			if(par.variety == CONST_PARAM) omega[j][i] = par.get_value(0);
 			else{
 				auto th2 = par.get_param_vec(0); if(th2 == UNSET) emsg("Should not be unset2");
-				omega[j][i] = param_val[th2];
+				omega[j][i] = value[th2];
 			}
 		}
 	}
@@ -745,6 +747,6 @@ unsigned int Species::get_comp_global_convert(unsigned int cgl, unsigned int cl,
 void Species::sampling_error(unsigned int trg, string warn) const
 {
 	const auto &tra = tra_gl[trg];
-	emsg("Sampling error for transition '"+cla[tra.cl].tra[tra.tr].name+"': "+warn+". Transition distribution quantities (means, sds etc...) have threshold limits to ensure numerical accuracy. Consider changing the values or restricting the priors on model parameter which determine this transition."); 
+	run_error("Sampling error for transition '"+cla[tra.cl].tra[tra.tr].name+"': "+warn+". Transition distribution quantities (means, sds etc...) have threshold limits to ensure numerical accuracy. Consider changing the values or restricting the priors on model parameter which determine this transition."); 
 }
 

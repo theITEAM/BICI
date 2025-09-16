@@ -25,12 +25,14 @@ public:
 	void share_particle(vector <Particle> &part);
 	void transfer_lines_raw(vector <string> &lines_raw);
 	vector <double> gather(const vector <double> &vec);
+	vector <unsigned int> gather(const unsigned int val);
 	void bcast(unsigned int &val);
 	void bcast(double &val);
 	void bcast(vector <unsigned int> &vec);
 	void bcast(vector <double> &vec);
 	void bcast(vector <string> &vec);
 	void barrier() const;
+	void sample_barrier(unsigned int s, unsigned int nsample) const;
 	void mess(string te) const;
 	void sum(vector < vector <double> > &array);
 	void sum(double &val);

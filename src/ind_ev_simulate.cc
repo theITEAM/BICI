@@ -251,7 +251,7 @@ void IndEvSampler::add_future_nm_event(unsigned int c, unsigned int cl, double t
 		vector <double> sum_store;
 		for(auto b = 0u; b < B; b++){
 			const auto &tra = sp.tra_gl[tr_list[b]];
-			sum += eqn[tra.bp.eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			sum += eqn[tra.bp.eq_ref].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 			sum_store.push_back(sum);
 		}
 			
@@ -274,30 +274,30 @@ void IndEvSampler::add_future_nm_event(unsigned int c, unsigned int cl, double t
 	
 	case EXP_RATE_NM: 	
 		{
-			auto rate = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			auto rate = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 			ts = t+exp_rate_sample(rate*dt,warn);
 		}
 		break;
 		
 	case EXP_MEAN_NM: 	
 		{
-			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 			ts = t+exp_mean_sample(mean/dt,warn);
 		}
 		break;
 
 	case GAMMA:
 		{
-			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
-			auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+			auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 			ts = t+gamma_sample(mean/dt,cv,warn);	
 		}
 		break;
 	
 	case ERLANG:
 		{
-			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
-			auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+			auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 			auto cv = sqrt(1.0/shape);
 			ts = t+gamma_sample(mean/dt,cv,warn);
 		}
@@ -305,23 +305,23 @@ void IndEvSampler::add_future_nm_event(unsigned int c, unsigned int cl, double t
 
 	case LOG_NORMAL:
 		{
-			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
-			auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+			auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 			ts = t + lognormal_sample(mean/dt,cv,warn);
 		}
 		break;
 		
 	case WEIBULL:
 		{
-			auto scale = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
-			auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			auto scale = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+			auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 			ts = t+weibull_sample(scale/dt,shape,warn);
 		}
 		break;
 		
 	case PERIOD:
 		{
-			auto time = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			auto time = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 			ts = t+period_sample(time,warn)/dt;
 		}
 		break;

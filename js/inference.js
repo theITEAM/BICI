@@ -5,10 +5,11 @@
 function run_cluster()
 {
 	let siminf;
+	let details;
 	switch(tab_name()){
-	case "Simulation": siminf = "sim"; break;
-	case "Inference": siminf = "inf"; break;
-	case "Post. Simulation": siminf = "ppc"; break;
+	case "Simulation": siminf = "sim"; details = model.sim_details; break;
+	case "Inference": siminf = "inf"; details = model.inf_details; break;
+	case "Post. Simulation": siminf = "ppc"; details = model.ppc_details; break;
 	}
 	
 	let ncore;
@@ -53,7 +54,10 @@ function run_cluster()
 	butte = "'⟨⟨COPY⟩⟩'"; if(line1 == inter.copied) butte = "'⟨⟨COPIED⟩⟩'";
 	te += "Note, if the error “mpirun: command not found...” is encountered, MPI can be loaded with the terminal command:\n]>'<b>"+line1+"</b>' ["+butte+",'CopyText|BB"+line1+"']\n• <b>Visualise</b> – Once BICI has run it puts its results into the script file. Copy this back to your local computer and load into the interface.";
 	
-	inter.help = { title:"Run BICI on Linux cluster", te:te, siminf:siminf, save:"StartCluster"};  
+	let sa = "StartClusterSave";
+	if(details.run_save_type.value == "Export") sa = "StartClusterExport";
+	
+	inter.help = { title:"Run BICI on Linux cluster", te:te, run_save_type:details.run_save_type.value, siminf:siminf, save:sa};  
 	inter.copied = undefined;	
 }			
 
@@ -140,7 +144,9 @@ function check_time_error()
 	for(let th = 0; th < model.param.length; th++){
 		let par = model.param[th];
 		if(par.spline.on){
-			let gtimes = get_times(par.spline.knot,de);
+			let spl = par.spline;
+			
+			let gtimes = get_times(spl.knot,de);
 			
 			if(gtimes.err){
 				return add_knot_warning(gtimes.msg,par);
@@ -148,14 +154,24 @@ function check_time_error()
 			
 			let times = gtimes.times;
 			
-			if(times[0] != t_start){
-				return add_knot_warning("The knot start time must be 'start' instead of '"+times[0]+"'.",par);
+			if(times[0] > t_start){
+				return add_knot_warning("The knot start time '"+times[0]+"' cannot be after '"+t_start+"'.",par);
 			}
 			
-			if(times[times.length-1] != t_end){
-				return add_knot_warning("The knot end time must be 'end' instead of '"+times[times.length-1]+"'.",par);
+			if(spl.spline_radio.value == "Square"){		
+				if(times[times.length-1] == t_end){
+					return add_knot_warning("For a square spline the last knot time cannot be at the end timepoint.",par);
+				}
+			}
+			else{
+				if(pag.name != "Post. Simulation"){
+					if(times[times.length-1] < t_end){
+						return add_knot_warning("The knot end time "+times[times.length-1]+" is less that "+t_end+".",par);
+					}
+				}
 			}
 			
+			/*
 			for(let i = 1; i < times.length-1; i++){
 				if(times[i] < t_start || times[i] > t_end){
 					return add_knot_warning("The knot time '"+times[i]+"' is outside the time range.",par);
@@ -169,6 +185,7 @@ function check_time_error()
 					return add_knot_warning("The end knot time '"+times[i]+"' is set twice.",par);
 				}
 			}
+			*/
 			
 			for(let i = 0; i < times.length-1; i++){
 				if(times[i] > times[i+1]){

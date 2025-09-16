@@ -128,6 +128,11 @@ void State::check(string ref)
 	
 	timer[CHECK_TIMER] -= clock();
 
+	if(param_val.value_ch.size() != 0) emsg("Value_ch problem");
+	if(param_val.precalc_ch.size() != 0) emsg("precalc_ch problem");
+	
+	check_precalc_eqn(ref);
+
 	check_trans_num(ref);
 
 	check_effect_out_of_range();
@@ -140,12 +145,12 @@ void State::check(string ref)
 	
 	check_genetic_value(ref);
 	
-	check_spline_store(ref);
+	//check_spline_store(ref);
 	
 	check_cpop_st(ref);
 	
 	check_popnum_t(ref);
-	
+
 	for(auto p = 0u; p < nspecies; p++){
 		const auto &sp = model.species[p];
 		
@@ -165,12 +170,13 @@ void State::check(string ref)
 		
 		check_obs_like(p,ref);
 		check_init_cond_like(p,ref);
+		if(calc_para_speedup) check_para_speedup(p,ref);
 	}
 	check_init_cond_prior(ref);
 	
 	check_like(ref);
 	
-	check_spline(ref);
+	//check_spline(ref);
 	
 	check_prior(ref);
 	
@@ -184,20 +190,48 @@ void State::check(string ref)
 }
 
 
+/// Check that precalc is correct
+void State::check_precalc_eqn(string ref)
+{
+	const auto &precalc = param_val.precalc;
+	
+	auto n = model.precalc_eqn.calcu.size();
+	if(precalc.size() != n){
+		emsg("precalc size problem"+ref);
+	}
+	
+	for(auto &ssp : species){
+		ssp.check_precalc_num(n);
+	}
+	
+	auto val = precalc;
+	model.precalc_eqn.calculate_all(model.list_precalc,param_val);
+
+	for(auto i = 0u; i < precalc.size(); i++){
+		if(dif(val[i],precalc[i],dif_thresh)){
+			cout << val[i] << " " << precalc[i] << endl;
+			emsg("precalc problem"+ref);
+		}
+	}
+}
+
+
 /// Checks that dependent parameters are correctly set
 void State::check_dependent_param(string ref)
 {
 	check_timer[CHECK_DEP_PARAM] -= clock();
+	
+	const auto &precalc = param_val.precalc;
 	
 	for(auto th = 0u; th < model.param_vec.size(); th++){	
 		const auto &pv = model.param_vec[th];
 		if(pv.variety == REPARAM_PARAM){
 			auto re = model.param[pv.th].get_eq_ref(pv.index);
 			if(re == UNSET) emsg("Reparam is not set");	
-			auto value = model.eqn[re].calculate_param_only(param_val);
+			auto value = model.eqn[re].calculate_param(precalc);
 		
-			if(dif(value,param_val[th],dif_thresh)){
-				//cout << value << " " << param_val[th] << "compare" << endl;
+			if(dif(value,param_val.value[th],dif_thresh)){
+				cout << th << " " << value << " " << param_val.value[th] << "compare" << endl;
 				emsg("Parameter value different "+ref);
 			}
 		}
@@ -214,6 +248,8 @@ void State::check_ref(unsigned int p, string refst)
 	
 	const auto &sp = model.species[p];
 	auto &ssp = species[p];
+	const auto &precalc = param_val.precalc;
+	
 	auto dt = model.details.dt;
 	
 	// Checks that event references are all correct
@@ -280,7 +316,7 @@ void State::check_ref(unsigned int p, string refst)
 			
 				vector <double> ref_val(ref.size());
 				for(auto i = 0u; i < ref.size(); i++){
-					ref_val[i] = model.eqn[ref[i]].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+					ref_val[i] = model.eqn[ref[i]].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 				}
 				
 				auto dtdiv = ev.tdiv - t;				
@@ -295,16 +331,16 @@ void State::check_ref(unsigned int p, string refst)
 					if(bp_eq == BP_FROM_OTHERS){
 						bp_val = 1.0;
 						for(auto e : nmt.bp_other_eq){
-							bp_val -=  model.eqn[e].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+							bp_val -=  model.eqn[e].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 						}
 					}
 					else{
-						bp_val = model.eqn[bp_eq].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+						bp_val = model.eqn[bp_eq].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 						
 						if(nmt.all_branches){
 							auto div = 0.0;
 							for(auto e : nmt.bp_all_eq){
-								div += model.eqn[e].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+								div += model.eqn[e].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 							}
 							bp_val /= div;
 						}
@@ -446,7 +482,7 @@ void State::check_ref(unsigned int p, string refst)
 }
 
 
-// Checks the likelihood is correctly specified
+/// Checks the likelihood is correctly specified
 void State::check_markov_trans(unsigned int p, string ref)
 {
 	check_timer[CHECK_MARKOV] -= clock();
@@ -548,7 +584,7 @@ void State::check_markov_trans(unsigned int p, string ref)
 				auto k = 0u; while(k < divc.ind_trans.size() && !(div.ind_trans[j].i == divc.ind_trans[k].i && div.ind_trans[j].index == divc.ind_trans[k].index)) k++;
 				
 				if(k == divc.ind_trans.size()){
-					emsg("Cannot find here");
+					//emsg("Cannot find here");
 				}
 			}
 			
@@ -589,6 +625,54 @@ void State::check_markov_trans(unsigned int p, string ref)
 	}
 	
 	check_timer[CHECK_MARKOV] += clock();
+}
+
+
+/// Checks that parallel speed up of calculation is working
+void State::check_para_speedup(unsigned int p, string ref)
+{
+	auto &ssp = species[p];
+	const auto &sp = model.species[p];
+		
+	vector < vector < vector <double> > > derive_val;
+
+	for(auto e = 0u; e < ssp.N; e++){			
+		auto &me = sp.markov_eqn[e];
+		const auto &eq = model.eqn[me.eqn_ref];
+	
+		auto list = seq_vec(model.details.T);
+		eq.test_calculate_para(eq.calcu,list,popnum_t,param_val.precalc,derive_val,ref);
+	}
+}
+	
+	
+/// Checks the div value
+void State::check_markov_div_value(unsigned int p, string ref)
+{
+	auto &ssp = species[p];
+
+	auto markov_eqn_vari_store = ssp.markov_eqn_vari;
+	ssp.likelihood_indfac_int();
+	ssp.likelihood_ind_trans();
+	
+	// Checks that markov equations are correctly specified
+	for(auto e = 0u; e < ssp.N; e++){			
+		auto Li_markov_store = ssp.Li_markov[e];
+		
+		auto list = seq_vec(ssp.markov_eqn_vari[e].div.size());
+		ssp.likelihood_markov_value(e,list,popnum_t);
+		auto temp = 0.0;
+		ssp.likelihood_markov(e,list,temp);
+			
+		const auto &divi = ssp.markov_eqn_vari[e].div;
+		for(auto ti = 0u; ti < divi.size(); ti++){
+			auto &div = divi[ti];
+			const auto &divc = markov_eqn_vari_store[e].div[ti];
+			if(dif(div.value,divc.value,dif_thresh)){
+				add_alg_warn("value error"+ref);
+			}
+		}
+	}
 }
 
 
@@ -747,7 +831,7 @@ void State::check_like(string ref)
 	check_timer[CHECK_LIKE] += clock();
 }
 
-
+/*
 /// Checks the splines are correctly specified
 void State::check_spline(string ref)
 {
@@ -770,6 +854,7 @@ void State::check_spline(string ref)
 	
 	check_timer[CHECK_SPLINE] += clock();
 }
+*/
 
 
 /// Checks that priors are correctly specified
@@ -1315,13 +1400,14 @@ void State::check_linearise()
 	
 	auto ti = (unsigned int)(ran()*T);
 
+	const auto &precalc = param_val.precalc;
 	const auto &popnum = popnum_t[ti];
 	
 	for(auto e = 0u; e < model.eqn.size(); e++){
 		const auto &eq = model.eqn[e];
 		if(eq.linearise.on){
-			auto val = eq.calculate(ti,popnum,param_val,spline_val);
-			auto val2 = eq.calculate_linearise_check(ti,popnum,param_val,spline_val);
+			auto val = eq.calculate(ti,popnum,precalc);
+			auto val2 = eq.calculate_linearise_check(ti,popnum,precalc);
 			if(dif(val,val2,dif_thresh)){
 				//cout << ti << "ti" << endl;
 				//cout << eq.te << endl;
@@ -1337,6 +1423,7 @@ void State::check_linearise()
 }
 
 
+/*
 /// Checks the spline store value are all UNSET
 void State::check_spline_store(string ref)
 {
@@ -1348,7 +1435,7 @@ void State::check_spline_store(string ref)
 		}
 	}
 }
-
+*/
 
 
 /// Checks that quantities in genetic_value are correctly specified
@@ -1357,6 +1444,7 @@ void State::check_genetic_value(string ref)
 	check_timer[CHECK_GEN] -= clock();
 	
 	const auto &gen_data = model.genetic_data;
+	const auto &precalc = param_val.precalc;
 
 	if(model.trans_tree == false){
 		check_timer[CHECK_GEN] += clock();
@@ -1365,10 +1453,10 @@ void State::check_genetic_value(string ref)
 
 	if(gen_data.on){                                 // Checks mutation rate 
 		auto mut_rate_store = genetic_value.mut_rate;
-		genetic_value.mut_rate = model.eqn[gen_data.mut_rate.eq_ref].calculate_param_only(param_val);
+		genetic_value.mut_rate = model.eqn[gen_data.mut_rate.eq_ref].calculate_param(precalc);
 		
 		auto seq_var_store = genetic_value.seq_var;
-		genetic_value.seq_var = model.eqn[gen_data.seq_var.eq_ref].calculate_param_only(param_val);
+		genetic_value.seq_var = model.eqn[gen_data.seq_var.eq_ref].calculate_param(precalc);
 		
 		if(dif(mut_rate_store,genetic_value.mut_rate,dif_thresh)){
 			add_alg_warn("mut rate is wrong");
@@ -2087,7 +2175,7 @@ void State::print_ev_data(string te, const vector <EventData> &event_data, unsig
 	cout << endl;
 }
 
-
+/*
 /// Scans a variable and plots the variation in likelihood
 void State::scan_variable(string name, double min, double max) 
 {
@@ -2122,6 +2210,7 @@ void State::scan_variable(string name, double min, double max)
 		scan << val << " " << Li << endl;
 	}
 }
+*/
 
 
 /// Checks if individual or fixed effect are too large or small
@@ -2210,5 +2299,8 @@ void State::check_neg_rate(string name)
 /// Adds an algorithm warning
 void State::add_alg_warn(string te)
 {
+	if(debugging) emsg(te+" ALG WARNING"); 
+	
 	add_alg_warning(te,sample,alg_warn);
 }
+

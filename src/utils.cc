@@ -99,10 +99,20 @@ void alert_input(const string &msg)
 {
 	if(false) throw(std::runtime_error(msg));
 	if(op()) display_error(msg,false);
-	//else cout << "e\n";
 	if(false) raise(SIGABRT);
 	
 	end_code();
+}
+
+
+/// Displays a human readable error message and kill s other mpi process
+void run_error(const string &msg)
+{
+	if(false) throw(std::runtime_error(msg));
+	if(op()) display_error(msg,false);
+	if(false) raise(SIGABRT);
+
+	exit (EXIT_FAILURE);
 }
 
 
@@ -111,7 +121,6 @@ void emsg_input(const string &msg)
 {
 	if(false) throw(std::runtime_error(msg));
 	if(op()) display_error(msg,true);
-	//else cout << "e\n";
 	if(false) raise(SIGABRT);
 	
 	end_code();
@@ -902,6 +911,16 @@ bool equal_vec(const vector <bool> &vec1, const vector <bool> &vec2)
 }
 
 
+/// Gets a list up to a number
+vector <unsigned int> get_list(unsigned int num)
+{
+	vector <unsigned int> list;
+	for(auto i = 0u; i < num; i++) list.push_back(i);
+	
+	return list;
+}
+
+
 /// Converts a value tensor into a string
 string stringify(const vector <EquationInfo> &value, const vector <Dependency> &dep)
 {
@@ -1544,11 +1563,10 @@ string get_affect_name(AffectType type)
 	case SPLINE_PRIOR_AFFECT: return "SPLINE_PRIOR_AFFECT";
 	case PRIOR_AFFECT: return "PRIOR_AFFECT";
 	case DIST_AFFECT: return "DIST_AFFECT";
-	case SPLINE_AFFECT: return "SPLINE_AFFECT";
 	case EXP_FE_AFFECT: return "EXP_FE_AFFECT";
 	case INDFAC_INT_AFFECT: return "INDFAC_INT_AFFECT";
 	case DIV_VALUE_AFFECT: return "DIV_VALUE_AFFECT";
-	case DIV_VALUE_FAST_AFFECT: return "DIV_VALUE_FAST_AFFECT";
+	case DIV_VALUE_NONPOP_AFFECT: return "DIV_VALUE_NONPOP_AFFECT";
 	case DIV_VALUE_LINEAR_AFFECT: return "DIV_VALUE_LINEAR_AFFECT";
 	case MARKOV_LIKE_AFFECT: return "MARKOV_LIKE_AFFECT";
 	case NM_TRANS_AFFECT: return "NM_TRANS_AFFECT";
@@ -1572,7 +1590,7 @@ string get_affect_name(AffectType type)
 void param_vec_add_affect(vector <AffectLike> &vec, const AffectLike &al)
 {
 	switch(al.type){
-	case SPLINE_AFFECT: case DIV_VALUE_AFFECT: case DIV_VALUE_FAST_AFFECT: 
+	case DIV_VALUE_AFFECT: case DIV_VALUE_NONPOP_AFFECT: 
 	case DIV_VALUE_LINEAR_AFFECT: 
 	case MARKOV_LIKE_AFFECT: case POP_AFFECT:
 	case MARKOV_POP_AFFECT:
@@ -1582,7 +1600,7 @@ void param_vec_add_affect(vector <AffectLike> &vec, const AffectLike &al)
 	case NM_TRANS_AFFECT:	case NM_TRANS_BP_AFFECT: case NM_TRANS_INCOMP_AFFECT:
 		if(al.map.size() == 0) emsg("map should be set: "+get_affect_name(al.type)); 
 		break;
-		
+	
 	default:
 		if(al.map.size() != 0) emsg("map should not be set: "+get_affect_name(al.type));
 		break;
@@ -2385,7 +2403,7 @@ double nm_trans_like(TransType type, double dtdiv, double dt, const vector <doub
 	case EXP_MEAN_NM:	return exp_mean_probability(dtdiv,ref_val[0]/dt); 
 	case GAMMA: return gamma_probability(dtdiv,ref_val[0]/dt,ref_val[1]);
 	case ERLANG: return gamma_probability(dtdiv,ref_val[0]/dt,sqrt(1.0/ref_val[1])); 
-	case LOG_NORMAL: return lognormal_probability(dtdiv,ref_val[0],ref_val[1]);
+	case LOG_NORMAL: return lognormal_probability(dtdiv,ref_val[0]/dt,ref_val[1]);
 	case WEIBULL:	return weibull_probability(dtdiv,ref_val[0]/dt,ref_val[1]);
 	case PERIOD: return period_probability(dtdiv,ref_val[0]/dt); 
 	}
@@ -2393,13 +2411,13 @@ double nm_trans_like(TransType type, double dtdiv, double dt, const vector <doub
 }
 
 /// The log probability of sampling from a distribution
-double prior_probability(double x, const Prior &pri, const vector <double> &param_val,const vector <Equation> &eqn)
+double prior_probability(double x, const Prior &pri, const vector <double> &precalc, const vector <Equation> &eqn)
 {				
 	switch(pri.type){
 	case UNIFORM_PR:
 		{	
-			auto min = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
-			auto max = eqn[pri.dist_param[1].eq_ref].calculate_param_only(param_val);
+			auto min = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
+			auto max = eqn[pri.dist_param[1].eq_ref].calculate_param(precalc);
 			if(x < min || x > max) return -LARGE;
 			return log(1.0/(max-min));
 		}
@@ -2407,7 +2425,7 @@ double prior_probability(double x, const Prior &pri, const vector <double> &para
 		
 	case EXP_PR:
 		{	
-			auto mean = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
+			auto mean = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
 			if(x < 0 || mean <= 0) return -LARGE;
 			return exp_mean_probability(x,mean);
 		}
@@ -2415,8 +2433,8 @@ double prior_probability(double x, const Prior &pri, const vector <double> &para
 	
 	case NORMAL_PR:
 		{	
-			auto mean = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
-			auto sd = eqn[pri.dist_param[1].eq_ref].calculate_param_only(param_val);
+			auto mean = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
+			auto sd = eqn[pri.dist_param[1].eq_ref].calculate_param(precalc);
 			if(sd <= 0) return -LARGE;
 			return normal_probability(x,mean,sd);
 		}
@@ -2424,8 +2442,8 @@ double prior_probability(double x, const Prior &pri, const vector <double> &para
 		
 	case GAMMA_PR:
 		{	
-			auto mean = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
-			auto cv = eqn[pri.dist_param[1].eq_ref].calculate_param_only(param_val);
+			auto mean = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
+			auto cv = eqn[pri.dist_param[1].eq_ref].calculate_param(precalc);
 			if(x <= 0 || mean <= 0 || cv <= 0) return -LARGE;
 			return gamma_probability(x,mean,cv);
 		}
@@ -2433,8 +2451,8 @@ double prior_probability(double x, const Prior &pri, const vector <double> &para
 	
 	case LOG_NORMAL_PR:
 		{	
-			auto mean = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
-			auto cv = eqn[pri.dist_param[1].eq_ref].calculate_param_only(param_val);
+			auto mean = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
+			auto cv = eqn[pri.dist_param[1].eq_ref].calculate_param(precalc);
 			if(x <= 0 || mean <= 0 || cv <= 0) return -LARGE;
 			return lognormal_probability(x,mean,cv);
 		}
@@ -2442,8 +2460,8 @@ double prior_probability(double x, const Prior &pri, const vector <double> &para
 		
 	case BETA_PR:
 		{	
-			auto alpha = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
-			auto beta = eqn[pri.dist_param[1].eq_ref].calculate_param_only(param_val);
+			auto alpha = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
+			auto beta = eqn[pri.dist_param[1].eq_ref].calculate_param(precalc);
 			if(x <= 0 || x >= 1 || alpha <= 0 || beta <= 0) return -LARGE;
 			return beta_probability(x,alpha,beta);
 		}
@@ -2451,7 +2469,7 @@ double prior_probability(double x, const Prior &pri, const vector <double> &para
 	
 	case BERNOULLI_PR:
 		{	
-			auto z = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
+			auto z = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
 			if(x != 0 && x != 1) return -LARGE;
 			if(z < 0 || z > 1) return -LARGE;
 			return bernoulli_probability(x,z);
@@ -2460,7 +2478,7 @@ double prior_probability(double x, const Prior &pri, const vector <double> &para
 		
 	case FIX_PR:
 		{
-			auto val = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
+			auto val = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
 			if(x != val) return -LARGE;
 			return 0;
 		}
@@ -2468,7 +2486,7 @@ double prior_probability(double x, const Prior &pri, const vector <double> &para
 		
 	case DIRICHLET_PR:
 		{
-			auto alpha = eqn[pri.dist_param[0].eq_ref].calculate_param_only(param_val);
+			auto alpha = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
 			if(x <= 0 || alpha <= 0) return -LARGE; 
 			return gamma_alpha_probability(x,alpha);
 		}
@@ -2550,7 +2568,7 @@ double calc_al(const Like &like_ch, double dprob, const BurnInfo &burn_info)
 						+ dprob);
 	}
 	
-	if(burn_info.dprob_suppress == true) if(dprob < -10) dprob = -10;
+	//if(burn_info.dprob_suppress == true) if(dprob < -10) dprob = -10;
 	
 	return exp(burn_info.init_cond*like_ch.init_cond 
 					+ burn_info.init_cond_prior*like_ch.init_cond_prior
@@ -2926,6 +2944,19 @@ void percentage_start(PercentType type, unsigned int gen)
 	else{
 		string te;
 		switch(type){
+			case LOAD_PER: te = "Loading: "; break;
+			case INIT_PER: te = "Initialising: "; break;
+			case RUN_PER: te = "Running: "; break;
+			case RUN_GEN_PER: te = "Generation "+tstr(gen)+": "; break;
+			case ANNEAL_PER: te = "Annealing: "; break;
+			case OUTPUT_PER: te = "Outputting: "; break;
+		}
+		cout << te;
+		cout.flush();
+		
+		/*
+		string te;
+		switch(type){
 		case LOAD_PER: te = "Loading..."; break;
 		case INIT_PER: te = "Initialising..."; break;
 		case RUN_PER: te = "Running..."; break;
@@ -2935,6 +2966,7 @@ void percentage_start(PercentType type, unsigned int gen)
 		}
 		cout << te << endl;
 		cout.flush();
+		*/
 		
 		/*
 		if(progress_on){ 
@@ -2982,7 +3014,6 @@ void percentage(double val, double val2)
 		}	
 		*/
 
-		// Write progress values line-by-line to work around mpi's broken flush
 		auto per = 100*val/val2;
 		while(percent_done <= per){
 			if(int(percent_done)%10 == 0){
@@ -3009,6 +3040,29 @@ void percentage(double val, double val2)
 			cout.flush();
 			percent_done += PERCENT_STEP;
 		}		
+		
+		/*
+		// Write progress values line-by-line to work around mpi's broken flush
+		auto per = 100*val/val2;
+		while(percent_done <= per){
+			if(int(percent_done)%10 == 0){
+				printf("%d%%",(unsigned int)(percent_done));
+				fflush(stdout); 
+				//cout << percent_done << "%";
+						
+				if(percent_done == 100){ 
+					percent_done = LARGE;
+					cout << endl; cout.flush(); 
+					return;
+				}
+			}
+			printf(".");
+			fflush(stdout); 
+			//cout << "."; 
+			cout.flush();
+			percent_done += PERCENT_STEP;
+		}	
+		*/		
 	}
 	else{
 		auto per = (unsigned int)(100*val/val2);
@@ -3271,5 +3325,242 @@ void add_alg_warning(string te, unsigned int sample, vector <AlgWarn> &alg_warn)
 		AlgWarn aw;
 		aw.te = te; aw.core = core(); aw.sample = sample; aw.num = 1;
 		alg_warn.push_back(aw);
+	}
+}
+
+
+
+/// Gets a string output from an equation type
+void eqn_type_error(EqItemType type, unsigned int ref)
+{
+	string st;
+	switch(type){
+	case PARAMETER: st = "PARAMETER"; break;
+	case PARAMVEC: st = "PARAMVEC"; break;
+	case SPLINE: st = "SPLINE"; break;
+	case SPLINEREF: st = "SPLINEREF"; break;
+	case DERIVE: st = "DERIVE"; break;
+	case IE: st = "IE"; break;
+	case FE: st = "FE"; break;
+	case POPNUM: st = "POPNUM"; break;
+	case TIME: st = "TIME"; break;
+	default: st = "DEFAULT"; break;
+	}
+	
+	emsg("EQN TYPE ERROR: "+st+" "+tstr(ref));
+}
+
+
+/// Performs an operation on a set of numbers 
+double calculate_operation(EqItemType op, vector <double> &num)
+{
+	auto N = num.size();
+	
+	switch(op){
+	case ADD:
+		{
+			auto ans = 0.0; 
+			for(auto val : num) ans += val;
+			return ans;
+		}
+		
+	case TAKE:
+		if(N != 2){
+			emsg("For TAKE should be 2");
+		}
+		return num[0]-num[1]; 
+	
+	case MULTIPLY:
+		{
+			auto ans = 1.0; 
+			for(auto val : num) ans *= val;
+			return ans;
+		}
+		
+	case DIVIDE:
+		if(N != 2) emsg("For DIVIDE should be 2");
+		if(num[1] == 0) run_error("Equation caused a division by zero."); 
+		return num[0]/num[1]; 
+		
+	case EXPFUNC:
+		if(N != 1) emsg("For EXPFUNC should be 1");
+		return exp(num[0]); 
+			
+	case SINFUNC:
+		if(N != 1) emsg("For SINFUNC should be 1");
+		return sin(num[0]); 
+	
+	case COSFUNC: 
+		if(N != 1) emsg("For COSFUNC should be 1");
+		return cos(num[0]); 
+		
+	case LOGFUNC: 
+		if(N != 1) emsg("For LOGFUNC should be 1");
+		if(num[0] <= 0) run_error("The quantity inside a log function became negative."); 
+		return log(num[0]);
+		
+	case STEPFUNC:
+		if(N != 1) emsg("For STEPFUNC should be 1");
+		if(num[0] > 0) return 1;
+		return 0; 
+		
+	case POWERFUNC:
+		if(N != 2) emsg("For POWERFUNC should be 2");
+		return pow(num[0],num[1]);
+	
+	case THRESHFUNC:
+		if(N != 2) emsg("For THRESHFUNC should be 2");
+		if(num[0] < num[1]) return 0;
+		return num[0];
+		
+	case UBOUNDFUNC:
+		if(N != 2) emsg("For UBOUNDFUNC should be 2");
+		if(num[0] > num[1]) return INFINITY;
+		return num[0];
+	
+	case MAXFUNC:
+		if(N != 2) emsg("For MAXFUNC should be 2");
+		if(num[0] > num[1]) return num[0];
+		return num[1]; 
+		
+	case MINFUNC:
+		if(N != 2) emsg("For MINFUNC should be 2");
+		if(num[0] < num[1]) return num[0];
+		return num[1]; 
+		
+	case ABSFUNC:
+		if(N != 1) emsg("For MINFUNC should be 1");
+		if(num[0] > 0) return num[0]; 
+		return -num[0];
+		
+	case SQRTFUNC:
+		if(N != 1) emsg("For SQRTFUNC should be 1");
+		if(num[0] < 0) run_error("A square root of a negative number was found in an equation."); 
+		return sqrt(num[0]);
+		
+	case SIGFUNC:
+		if(N != 1) emsg("For SIGFUNCT should be 1");
+		return 1/(1+exp(-num[0]));
+		
+	case NOOP: 
+		return 0;
+	
+	default: emsg("Equation error7"); break;
+	}
+	
+	return 0;
+}
+
+
+/// Tests the cubic spline algorithm 
+void solve_cubic_spline_test()
+{
+	vector <double> x, f;
+	 
+	x.push_back(0); f.push_back(1);
+	x.push_back(1); f.push_back(1.5);
+	x.push_back(2); f.push_back(1.3);
+	x.push_back(3); f.push_back(1.4);
+	
+	auto cspl = solve_cubic_spline(x,f,CUBIC_SPL);
+	
+	ofstream fout("../OP/spl.txt");
+	
+	for(auto xf = 0.0; xf <= 3; xf += 0.01){
+		fout << xf << " " << calculate_cubic_spline(xf,cspl) << endl; 
+	}
+}
+
+
+/// This provides an algorithm for solving cubic splines
+CubicSpline solve_cubic_spline(const vector <double> &x, vector <double> f, SplineType type)
+{
+	CubicSpline cspl;
+	cspl.type = type;
+	
+	auto n = x.size()-1;
+	
+	if(type == CUBICPOS_SPL){
+		for(auto i = 0u; i <= n; i++){
+			if(f[i] <= 0){
+				run_error("For a 'Cubic +ve' spline all knot values must be positive");
+			}
+			
+			f[i] = log(f[i]);
+		}
+	}
+	
+	vector <double> h(n), al(n), I(n), mu(n), z(n), a(n), b(n), c(n), d(n);
+	
+	for(auto i = 0u; i < n; i++){
+		a[i] = f[i];
+		h[i] = x[i+1]-x[i];
+	}
+	
+	for(auto i = 1u; i < n; i++){
+		al[i] = (3/h[i])*(f[i+1] - f[i]) - (3/h[i-1])*(f[i] - f[i-1]);
+	}
+	
+	I[0] = 1; mu[0] = 0; z[0] = 0;
+	
+	for(auto i = 1u; i < n; i++){
+		I[i] = 2*(x[i+1]-x[i-1]) - h[i-1]*mu[i-1];
+		mu[i] = h[i]/I[i];
+		z[i] = (al[i]-h[i-1]*z[i-1])/I[i];
+	}
+	
+	for(int j = n-1; j >= 0; j--){
+		auto cne = 0.0; if(j < int(n-1)) cne = c[j+1];
+		c[j] = z[j] - mu[j]*cne;
+		b[j] = ((f[j+1]-f[j])/h[j]) - ((h[j]*(cne+2*c[j])/3));
+		d[j] = (cne-c[j])/(3*h[j]);
+	}
+	
+	cspl.x = x; cspl.a = a; cspl.b = b; cspl.c = c; cspl.d = d;
+	
+	return cspl;
+}
+
+
+/// Calculates a cubic spline from 
+double calculate_cubic_spline(double xf, const CubicSpline &cspl) 
+{
+	const auto &x = cspl.x;
+	 
+	if(xf < x[0]) run_error("Value '"+tstr(xf)+"' outside of spline range");
+	
+	auto i = 0u;
+	while(i+1 < x.size() && x[i+1] < xf) i++;
+	
+	if(i+1 == x.size()) run_error("Value '"+tstr(xf)+"' outside of spline range");
+	
+	auto dx = xf-x[i];
+	
+	auto val = cspl.a[i] + cspl.b[i]*dx + cspl.c[i]*dx*dx + cspl.d[i]*dx*dx*dx;
+	
+	if(cspl.type == CUBICPOS_SPL) return exp(val);
+	return val;
+}
+
+
+/// Calculates a cubic spline from 
+void calculate_cubic_spline_precalc(vector <double> &precalc, unsigned int i, const vector <unsigned int> &list_time, const vector <CubicDiv> &div, const CubicSpline &cspl)
+{
+	const auto &a = cspl.a, &b = cspl.b, &c = cspl.c, &d = cspl.d;
+	
+	if(cspl.type == CUBICPOS_SPL){ 
+		for(auto ti : list_time){
+			const auto &di = div[ti];
+			auto k = di.i;
+			precalc[i+ti] = exp(a[k] + b[k]*di.dx + c[k]*di.dx2 + d[k]*di.dx3);
+		}
+	}
+	else{
+		for(auto ti : list_time){
+			const auto &di = div[ti];
+			auto k = di.i;
+			precalc[i+ti] = a[k] + b[k]*di.dx + c[k]*di.dx2 + d[k]*di.dx3;
+		
+		}
 	}
 }

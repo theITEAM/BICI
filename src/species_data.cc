@@ -638,6 +638,7 @@ void Species::add_ind_data(const DataSource &so)
 		ind.enter_ref = k;
 	
 		EventData ev; 
+		ev.so = so.index;
 		ev.type = ENTER_EV;
 		ev.move_c = UNSET;
 		ev.cl = UNSET;
@@ -669,6 +670,7 @@ void Species::remove_ind_data(const DataSource &so)
 			if(tab.ncol != 2) emsg_input("Columns not right3");
 		
 			EventData ev; 
+			ev.so = so.index;
 			ev.type = LEAVE_EV;
 			ev.cl = UNSET;
 			ev.tr = UNSET;
@@ -717,6 +719,7 @@ void Species::move_ind_data(const DataSource &so)
 			if(c == UNSET) alert_source("Value '"+val+"' is not a compartment2",so,2,j);
 				
 			EventData ev; 
+			ev.so = so.index;
 			ev.type = MOVE_EV;
 			ev.move_c = c;
 			ev.cl = cl;
@@ -1833,6 +1836,7 @@ void Species::jiggle_data(Operation mode)
 	
 	for(auto &ind : individual){	
 		double t_enter = UNSET, t_leave = UNSET;
+		auto enter_so = UNSET, leave_so = UNSET;
 		for(const auto &ev : ind.ev){
 			switch(ev.type){
 			case ENTER_EV:
@@ -1840,7 +1844,7 @@ void Species::jiggle_data(Operation mode)
 					auto extra = post_sim_define_twice("Enter",mode);
 					alert_input("Cannot set entry time twice for individual '"+ind.name+"'."+extra);
 				}				
-				t_enter = ev.tdiv;
+				t_enter = ev.tdiv; enter_so = ev.so;
 				break;
 				
 			case LEAVE_EV:
@@ -1848,7 +1852,7 @@ void Species::jiggle_data(Operation mode)
 					auto extra = post_sim_define_twice("Leave",mode);
 					alert_input("Cannot set leave time twice for individual '"+ind.name+"'."+extra);
 				}				
-				t_leave = ev.tdiv;
+				t_leave = ev.tdiv; leave_so = ev.so;
 				break;
 			case MOVE_EV: break;
 			default: emsg_input("Should not have diferent type"); break;
@@ -1862,12 +1866,11 @@ void Species::jiggle_data(Operation mode)
 			switch(ev.type){
 			case MOVE_EV:
 				if(t_enter != UNSET && ev.tdiv <= t_enter){
-					alert_input("The move event at time "+tstr(calc_t(ev.tdiv,details))+" for '"+ind.name+"' must be after the individual enters the system.");
+					alert_input("The move event at time "+tstr(calc_t(ev.tdiv,details))+" for '"+ind.name+"' "+fr_ds(ev.so)+" must be after the individual enters the system "+fr_ds(enter_so)+".");
 				}
 				
 				if(t_leave != UNSET && ev.tdiv >= t_leave){
-					
-					alert_input("The move event at time "+tstr(calc_t(ev.tdiv,details))+" for '"+ind.name+"' must be before the individual leaves the system.");
+					alert_input("The move event at time "+tstr(calc_t(ev.tdiv,details))+" for '"+ind.name+"' "+fr_ds(ev.so)+" must be before the individual leaves the system "+fr_ds(leave_so)+".");
 				}
 			
 				if(ev.tdiv <= tmin || ev.tdiv >= tmax){	
@@ -1881,11 +1884,11 @@ void Species::jiggle_data(Operation mode)
 		
 		for(auto &ob : ind.obs){
 			if(t_enter != UNSET && ob.tdiv < t_enter){
-				alert_input("The observation at time "+tstr(calc_t(ob.tdiv,details))+" on individual '"+ind.name+"' must be after the individual enters the system");
+				alert_input("The observation at time "+tstr(calc_t(ob.tdiv,details))+" on individual '"+ind.name+"' "+fr_ds(ob.so)+" must be after the individual enters the system "+fr_ds(enter_so)+".");
 			}
 			
 			if(t_leave != UNSET && ob.tdiv > t_leave){
-				alert_input("The observation at time "+tstr(calc_t(ob.tdiv,details))+" on individual '"+ind.name+"' must be before the individual leaves the system");
+				alert_input("The observation at time "+tstr(calc_t(ob.tdiv,details))+" on individual '"+ind.name+"' "+fr_ds(ob.so)+" must be before the individual leaves the system "+fr_ds(leave_so)+".");
 			}
 			
 			if(ob.tdiv < tmin || ob.tdiv > tmax){
@@ -1927,6 +1930,13 @@ void Species::jiggle_data(Operation mode)
 			}
 		}
 	}
+}
+
+
+/// Gives a string which describes where the data comes from
+string Species::fr_ds(unsigned int so) const
+{
+	return "(from data '"+source[so].name+"')";
 }
 
 

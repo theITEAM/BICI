@@ -107,6 +107,7 @@ int main(int argc, char** argv)
 
 	init_log_sum();
 	
+	//solve_cubic_spline_test(); return 0;
 	//test_distribution(); return 0; 
 	//test_incomplete_distribution(); return 0;
 	//generate_data();  return 0; 
@@ -140,13 +141,13 @@ int main(int argc, char** argv)
 		}
 	}
 	
-	if(false){
+	if(true){
 		switch(model.samp_type){
 		case LOCAL_SAMP: cout << "Local samp" << endl; break;
 		case SAMP_SAMP: cout << "Samp samp" << endl; break;
 		case SIM_SAMP: cout << "Sim samp" << endl; break;
 		case SIM_CL_SAMP: cout << "Sim cl samp" << endl; break;
-		case ALL_SAMP: cout << "All samp" << endl; break;
+		case ALL_SAMP: break;
 		}
 	}
 	

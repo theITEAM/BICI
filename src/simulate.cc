@@ -39,6 +39,10 @@ void Simulate::run()
 		output.param_sample(UNSET,0,state);
 		output.state_sample(UNSET,0,state);
 		
+#ifdef USE_MPI
+		mpi.sample_barrier(s,smax);
+#endif
+
 		if(false) state.output_waifw("waifw.txt");
 	}
 	

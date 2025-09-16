@@ -45,8 +45,9 @@ class Output                               // Stores information about the data
 		string ic_output(const Particle &part) const;
 		void set_output_burnin(double burnin_frac);
 		void set_diagnostics(unsigned int ch, string diag);
-		void end(string file, unsigned int total_cpu) const;
-		vector <Particle> get_part_chain(unsigned int chain, const vector <Particle> &part) const;
+		void end(string file, unsigned int total_cpu);
+		vector <Particle> get_part_chain(unsigned int chain, vector <Particle> &part) const;
+		void clear_part(Particle &pa) const;
 		string print_obs_data(unsigned int p, const vector <ObsData> &obs) const;
 		void print_individuals(unsigned int N, unsigned int p, const State &state) const;
 		void final_time(long sec, long op_sec) const;
@@ -54,8 +55,9 @@ class Output                               // Stores information about the data
 	
 	private:
 		vector < vector <double> > param_value_from_vec(const vector <double> &param_val_prop) const;
+		void infection_info(const IndInfFrom &iif, unsigned int p, const Particle &part, stringstream &ss) const;
 		string generate_state_head(const vector <string> &ind_key) const;
-		string output_param(const vector < vector <double> > &value, const Particle &part) const;
+		string output_param(const vector < vector <double> > &value) const;
 		vector < vector <double> > param_value_from_value() const;
 		string transtype_text(TransType type) const;
 		void number_part(vector <Particle> &part) const;
@@ -70,6 +72,7 @@ class Output                               // Stores information about the data
 		void add_warning(string err_msg, ofstream &fout) const;
 		void output_add_ind_warning(vector <string> &final_warning) const;
 		void output_rate_warning(unsigned int total_cpu, unsigned int per_start, unsigned int per_end, vector <string> &final_warning) const;
+		void output_spline_out_warning(vector <string> &final_warning) const;
 		void output_generation(const vector <Particle> &part, ofstream &fout) const;
 		void output_diagnostic(const vector <Diagnostic> &diagnostic, bool &alg_warn_flag,ofstream &fout) const;
 		vector <TransDiagSpecies> trans_diag_init() const;

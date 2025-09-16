@@ -220,7 +220,7 @@ function stand_filt(y,rpf,lay,op)
 		y = add_filter("Classification",y,rpf2.sel_class,rpf2.pos_class,lay);
 	}
 	
-	if(!(rpf.plot_average && (op == "pop" || op == "trans")) && op != "trans-diag"){
+	if(!(rpf.plot_average && (op == "pop" || op == "trans")) && op != "trans-diag-inf"){
 		y = chain_sample_filt(y,rpf,lay);
 	}
 	

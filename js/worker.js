@@ -261,12 +261,18 @@ function process(e)
 		break;
 								
 	case "View Code": case "Export BICI": case "Start": case "Save BICI": 
-		create_output_file(info.save_type,info.map_store);
+		{
+			let one_file = true; if(input.type == "Export BICI") one_file = false;
+			create_output_file(info.save_type,one_file,info.map_store);
+		}
 		break;
 		
-	case "StartCluster":
-		if(info.save_type == "ppc") create_ppc_file();
-		else create_output_file(info.save_type,info.map_store);
+	case "StartClusterSave": case "StartClusterExport":
+		{
+			let one_file = true; if(input.type == "StartClusterExport") one_file = false;
+			if(info.save_type == "ppc") create_ppc_file();
+			else create_output_file(info.save_type,one_file,info.map_store);
+		}
 		break;
 		
 	case"Save Sim": case"Save Inf": case"Save PPC":
@@ -684,8 +690,9 @@ function process(e)
 	case "Import output":
 		{
 			let fi = "M:/Github/theITEAM/BICI/Execute/init.bici";
-			if(ver =="windows" && !win_linux){
-				fi = "C:/Users/cpooley/Desktop/BICI_release/BICI_v0.6_windows/Execute/init.bici";
+			//if(ver =="windows" && !win_linux){
+			if(ver =="windows"){
+				fi = "C:/Users/cpooley/Desktop/BICI_release/BICI_v0.7_windows/Execute/init.bici";
 			}
 			percent(2)
 			load_bici(fi);
@@ -729,6 +736,11 @@ function process(e)
 		break;
 		
 	case "UpdateModel":
+		update_mod = true;
+		break;
+		
+	case "CopyValue":
+		copy_model_value();
 		update_mod = true;
 		break;
 		

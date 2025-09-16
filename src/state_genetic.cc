@@ -264,7 +264,8 @@ bool State::trg_contains_outside(unsigned int p, unsigned int tr_gl) const
 	const auto &me = sp.markov_eqn[tra.markov_eqn_ref];
 	const auto &eq = model.eqn[me.eqn_ref];
 	const auto &lin = eq.linearise;
-	if(lin.no_pop_calc.size() == 0) return false;
+	
+	if(lin.no_pop_precalc.type == ZERO) return false;
 	return true;
 }
 
@@ -309,7 +310,7 @@ double State::sample_infection_source(Event &ev, unsigned int p) const
 		auto j = UNSET;
 			
 		if(lin.multi_source){        // Samples from available sources (either populations of from outside)		
-			auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val,spline_val);	
+			auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val);	
 			j = ss.sample_inf_source();
 			if(j == UNSET) return UNSET;
 			
@@ -318,7 +319,7 @@ double State::sample_infection_source(Event &ev, unsigned int p) const
 		else{
 			if(testing){
 				if(Npop > 1) emsg("Npop wrong");
-				if(Npop == 1 && lin.no_pop_calc.size() > 0) emsg("Npop wrong");
+				if(Npop == 1 && lin.no_pop_precalc.type != ZERO) emsg("Npop wrong");
 			}
 			j = 0;
 		}
@@ -398,6 +399,8 @@ double State::prob_infection_source(const Event &ev, unsigned int p) const
 	
 	const auto &eq = model.eqn[me.eqn_ref];
 		
+	const auto &precalc = param_val.precalc;
+	
 	const auto &lin = eq.linearise;
 		
 	if(!lin.on) emsg("Linearisation should be on");
@@ -407,16 +410,18 @@ double State::prob_infection_source(const Event &ev, unsigned int p) const
 	auto probfi = 0.0;
 	
 	auto pref = iif.pref;
-		
+	
+	//const auto &precalc = param_val.precalc;
+	
 	if(lin.multi_source){        // Prop from available sources (either populations or outside)		
 		auto value = mev.div[ti].value;
 		if(value < TINY) probfi -= LARGE;
 		else{		
 			double val;
-			if(pref == UNSET) val = eq.calculate_calculation(lin.no_pop_calc,ti,param_val,spline_val);
+			if(pref == UNSET) val = eq.calculate_no_pop(ti,precalc);
 			else{
 				auto pr = eq.pop_ref[pref];
-				val = popnum_t[ti][pr]*eq.calculate_calculation(lin.pop_grad_calc[pref],ti,param_val,spline_val);
+				val = popnum_t[ti][pr]*eq.calculate_pop_grad(pref,ti,precalc);
 			}
 			probfi += log(val/value);
 		}
@@ -804,10 +809,12 @@ vector <double> State::set_genetic_param()
 	store.push_back(genetic_value.mut_rate);
 	store.push_back(genetic_value.seq_var);
 	
-	const auto &gen_data = model.genetic_data;
-	genetic_value.mut_rate = model.eqn[gen_data.mut_rate.eq_ref].calculate_param_only(param_val);
+	const auto &precalc = param_val.precalc;
 	
-	genetic_value.seq_var = model.eqn[gen_data.seq_var.eq_ref].calculate_param_only(param_val);
+	const auto &gen_data = model.genetic_data;
+	genetic_value.mut_rate = model.eqn[gen_data.mut_rate.eq_ref].calculate_param(precalc);
+	
+	genetic_value.seq_var = model.eqn[gen_data.seq_var.eq_ref].calculate_param(precalc);
 
 	return store;
 }
@@ -1086,6 +1093,8 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 	// Makes a global list of all events
 	if(pl) cout << "Start trans tree proposal" << endl;
 	
+	const auto &precalc = param_val.precalc;
+	
 	vector <GlobalEvent> glob_ev;
 	
 	for(auto p = 0u; p < model.species.size(); p++){
@@ -1227,11 +1236,12 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 						
 						if(lin.multi_source){ 	
 							if(k_from == UNSET){
-								auto val = eq.calculate_calculation(lin.no_pop_calc,ti,param_val,spline_val);	probfi += log(val/mev.div[ti].value);
+								auto val = eq.calculate_no_pop(ti,precalc);	
+								probfi += log(val/mev.div[ti].value);
 							}
 							else{
 								auto pr = pop_ref[k_from];
-								auto val = eq.calculate_calculation(lin.pop_grad_calc[k_from],ti,param_val,spline_val);
+								auto val = eq.calculate_pop_grad(k_from,ti,precalc);
 							
 								probfi += log(val*popnum[pr]/mev.div[ti].value);
 							}
@@ -1262,7 +1272,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 						auto k_prop = 0u;
 					
 						if(lin.multi_source){ 	
-							auto ss = eq.setup_source_sampler(ti,popnum,param_val,spline_val);
+							auto ss = eq.setup_source_sampler(ti,popnum,param_val);
 
 							k_prop = ss.sample_inf_source();
 							//if(k_prop == UNSET) emsg("Cannot sample source");
@@ -1418,6 +1428,8 @@ void State::set_ind_inf_from_outside(double t, vector <Event> &event)
 void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int &nfa, unsigned int &nac, unsigned int &ntr)
 {
 	auto pl = false;
+	
+	const auto &precalc = param_val.precalc;
 	
 	auto &inf_node = genetic_value.inf_node;
 	if(inf_node.size() == 0) return;
@@ -1585,8 +1597,7 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 									if(inf_c_bef.po != iif_bef.po) emsg("po not agree");
 									
 									const auto &eq_bef = model.eqn[inf_c_bef.eq_ref];
-									const auto &lin_bef = eq_bef.linearise;
-									auto va_bef = eq_bef.calculate_calculation(lin_bef.pop_grad_calc[iif_bef.pref],ti,param_val,spline_val);
+									auto va_bef = eq_bef.calculate_pop_grad(iif_bef.pref,ti,precalc);
 									
 									iif_ch.Li_markov_bef = log(va_bef*iif_bef.w);
 									
@@ -1598,8 +1609,7 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 										//if(pref == UNSET) emsg("Should be p ref");
 								
 										const auto &eq_aft = model.eqn[inf_c_aft.eq_ref];
-										const auto &lin_aft = eq_aft.linearise;
-										auto va_aft = eq_aft.calculate_calculation(lin_aft.pop_grad_calc[pref],ti,param_val,spline_val);
+										auto va_aft = eq_aft.calculate_pop_grad(pref,ti,precalc);
 		
 										auto &iif_aft = iif_ch.ind_inf_from;
 										iif_aft.p = p_A;
@@ -1635,7 +1645,7 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 							if(pl) cout << al << " al" << endl;
 							if(ran() < al){
 								if(pl) cout << "accept" << endl;
-								add_like(like_ch);
+								accept(like_ch);
 							
 								// Updates quantities for inf_node
 								InfNode in_A_new;

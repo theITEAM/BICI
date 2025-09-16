@@ -1121,7 +1121,8 @@ function add_bubble_buts(lay)
 			case "Order":
 				cont.dx = 10;
 				bubble_addtitle(cont,"Order column",{te:order_text});
-				bubble_addradio(cont,0,"A-Z","Alphabetically (A-Z)",inter.bubble.order_radio);			bubble_addradio(cont,0,"Z-A","Alphabetically (Z-A)",inter.bubble.order_radio);
+				bubble_addradio(cont,0,"A-Z","Alphabetically (A-Z)",inter.bubble.order_radio);			
+				bubble_addradio(cont,0,"Z-A","Alphabetically (Z-A)",inter.bubble.order_radio);
 				bubble_addradio(cont,0,"Low-High","Numerically (Low-High)",inter.bubble.order_radio);
 				bubble_addradio(cont,0,"High-Low","Numerically (High-Low)",inter.bubble.order_radio);
 				add_end_button(cont,"Order","DoneOrder");	
@@ -1354,7 +1355,7 @@ function press_button_prop(lay_name,type,info,value,op)
 	close_bubble();
 	generate_screen();
 	
-	if(inter.loading_symbol.on) return;
+	if(loading_sym()) return;
 	
 	let lay = get_lay(lay_name);
 	if(lay == undefined){

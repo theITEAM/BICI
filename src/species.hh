@@ -162,7 +162,7 @@ class Species   	                         // Stores details of a species
 		void set_ind_samp_needed(const vector <Equation> &eqn);
 		double calc_enter_prob(unsigned int c, unsigned int entref, const vector <double> &obs_eqn_value) const;
 		vector <unsigned int> get_cv_list(unsigned int ie, const vector <Param> &param, const vector <Equation> &eqn) const;
-		vector < vector <double> > calculate_omega_basic(unsigned int g, const vector <double> &param_val, const vector <Param> &param) const;
+		vector < vector <double> > calculate_omega_basic(unsigned int g, const PV &param_val, const vector <Param> &param) const;
 		unsigned int tr_trans(unsigned int trg, unsigned int c) const;
 		unsigned int get_comp_global_convert(unsigned int cgl, unsigned int cl, unsigned int c) const;
 		void sampling_error(unsigned int trg, string warn) const;
@@ -180,6 +180,7 @@ class Species   	                         // Stores details of a species
 		void add_tr_list(const vector <unsigned int> &tr_list, const vector <bool> &cp, vector <AddRemLocal> &add_rem_local) const;
 		void add_unobs_Amatrix_ind();
 		void jiggle_data(Operation mode);
+		string fr_ds(unsigned int so) const;
 		string post_sim_define_twice(string type, Operation mode) const;
 		bool is_pop_num_fixed() const;
 		void nm_trans_incomp_info();
@@ -187,7 +188,7 @@ class Species   	                         // Stores details of a species
 		string tr_swap_name(unsigned int cl, const vector <TrSwap> &tswa) const;
 		vector <unsigned int> get_vec_tr_swap(unsigned int c, const vector <TrSwap> &start) const;
 		vector <unsigned int> get_vec_tr_swap_mid(unsigned int st, unsigned int num, const vector <EventCl> &timeline) const;
-		vector < vector <double> > calc_nm_rate(bool calc_bp, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector <double> > &popnum_t, const vector <Equation> &eqn, vector < vector <double> > &bp_store) const;
+		vector < vector <double> > calc_nm_rate(bool calc_bp, const vector <double> &precalc, const vector < vector <double> > &popnum_t, const vector <Equation> &eqn, vector < vector <double> > &bp_store) const;
 		void set_ob_trans_ev(const vector <Equation> &eqn);
 
  	private:

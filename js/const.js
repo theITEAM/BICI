@@ -10,14 +10,16 @@ let ver="windows";         // Determines platform
 //let ver="linux";
 //let ver="mac";
 
+let win_linux = false;//true;                             // When working on win running linux 
+
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
 let debug = false;                                // Determines if debugger used (false)
 let testing = false;                              // Used logo to load up results (false)
 let load_map_fast = false;                        // If loads up world map from local computer
 
-let win_linux = false;                             // When working on win running linux 
-if(win_linux || false){ testing = true; debug = true; load_map_fast = true;}
+//if(win_linux || true){ testing = true; debug = true; load_map_fast = true;}
+if(win_linux){ testing = true; debug = true; load_map_fast = true;}
 	
 let make_file = false;                            // Determines if makes file or runs
 let thick_line = false;                           // Used for making figures
@@ -58,12 +60,12 @@ const command_list = [
 {na:"remove-pop-inf",ti:0},
 {na:"add-ind-inf",ti:0},
 {na:"remove-ind-inf",ti:0},
-{na:"move-ind",ti:0},
+{na:"move-ind-inf",ti:0},
 {na:"init-pop-sim",ti:0},
 {na:"add-pop-sim",ti:0},
 {na:"remove-pop-sim",ti:0},
 {na:"add-ind-sim",ti:0},
-{na: "remove-ind-sim",ti:0},
+{na:"remove-ind-sim",ti:0},
 {na:"move-ind-sim",ti:0},
 {na:"add-pop-post-sim",ti:0},
 {na:"remove-pop-post-sim",ti:0},
@@ -84,21 +86,21 @@ const command_list = [
 {na:"inf",ti:0},
 {na:"post-sim",ti:0},
 {na:"posterior-simulation",ti:0},
-{na:"post-sim-warning",ti:0},
+{na:"warning-post-sim",ti:0},
 {na:"ind-effect",ti:0},
 {na:"fixed-effect",ti:0},
-{na:"sim-param",ti:0.5},
-{na:"sim-state",ti:1},
-{na:"sim-warning",ti:0},
-{na:"inf-param",ti:5},
-{na:"inf-param-stats",ti:1},
-{na:"inf-generation",ti:1},
-{na:"inf-state",ti:10},
-{na:"inf-warning",ti:0},
-{na:"trans-diag",ti:1},
-{na:"post-sim-param",ti:5},
-{na:"post-sim-state",ti:10},
-{na:"inf-diagnostics",ti:0.1},
+{na:"param-sim",ti:0.5},
+{na:"state-sim",ti:1},
+{na:"warning-sim",ti:0},
+{na:"param-inf",ti:5},
+{na:"param-stats-inf",ti:1},
+{na:"generation-inf",ti:1},
+{na:"state-inf",ti:10},
+{na:"warning-inf",ti:0},
+{na:"trans-diag-inf",ti:1},
+{na:"param-post-sim",ti:5},
+{na:"state-post-sim",ti:10},
+{na:"diagnostics-inf",ti:0.1},
 {na:"map",ti:5},
 {na:"post-sim",ti:0},
 {na:"post-simulation",ti:0},
@@ -106,7 +108,7 @@ const command_list = [
 ];
 
 // Lists all commands which need to load files
-const data_command_list = ["init-pop-inf", "add-pop-inf", "remove-pop-inf", "add-ind-inf", "remove-ind-inf", "move-ind", "init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data","param-mult"];
+const data_command_list = ["init-pop-inf", "add-pop-inf", "remove-pop-inf", "add-ind-inf", "remove-ind-inf", "move-ind-inf", "init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data","param-mult"];
 
 const sim_alg_list = ["gillespie","tau"];
 const inf_alg_list = ["DA-MCMC","PAS-MCMC","MFA","ABC","ABC-SMC","ABC-MBP","PMCMC","HMC"];
@@ -188,6 +190,8 @@ const tick_si = 0.4;                               // Size of tick marks
 const yaxisgap = 0.5;                              // the extra size on the y-axis tick marks
 const si_big = 1.4;                                // Used for displaying variable names
 const si_sub = 0.7;                                // Size of subscript
+const dy_spline_fac = 0.9;                         // Factor which multiplies line height for splines 
+const dy_spline_fac2 = 0.7;                         // Factor which multiplies line height for splines 
 const dy_table = 1.3;                              // The gap between lines of a table
 const dy_table_param = 1.8;                        // The gap between lines for parameter values
 const expand_dx = 1;                               // Determines the size of the expand textbox icon
@@ -234,8 +238,12 @@ const marnew = 0.1;                                // Margin used for new compar
 const seed_max = 10000;                            // The maximum seed number
 const letter_size = 2;                             // Letter size when making figures 
 
-const print_scale_factor = 3;                      // Increase is screen size for print
-const print_line_factor = 3;                       // Increase in line thickness print
+const image_scale_factor = 3;                      // Increase in screen size for print image
+const mp4_factor_low = 1;                          // For low quality scale factor
+const mp4_factor_medium = 2;                       // For medium quality scale factor 
+const mp4_factor_high = 3;                         // For medium quality scale factor 
+let print_scale_factor;                            // Increase is screen size for print
+let print_line_factor;                             // Increase in line thickness print
 
 // Lists parameter types not needed for simulation
 const sim_param_not_needed = ["Se","Sp","mut_rate","seq_var","trans_prob","comp_prob","derive_param"];
@@ -262,7 +270,7 @@ const convert = [
 		{command:"remove-pop-inf", type:"Remove Pop."},
 		{command:"add-ind-inf", type:"Add Ind."},
 		{command:"remove-ind-inf", type:"Remove Ind."},
-		{command:"move-ind", type:"Move Ind."},
+		{command:"move-ind-inf", type:"Move Ind."},
 		{command:"fixed-eff", type:"Fixed Eff."},
 		{command:"init-pop-inf", type:"Init. Pop."},
 		{command:"comp-data", type:"Compartment"},
@@ -466,6 +474,8 @@ const functi = ["exp","cos","sin","log","pow","max","min","abs","sqrt","step","s
 const functi_dx = ["def","def","def","def","def","def","def","def",2.8,2.8,"def",3.4,3.7];
 
 const opbut = ["_","^","+","-","\u00d7","\u2215","(",")","Σ","∫","'"];
+
+const spline_radio_pos = [{value:"Linear"},{value:"Square"},{value:"Cubic +ve"},{value:"Cubic"}];
 
 const numbut = ["0","1","2","3","4","5","6","7","8","9","."];
 

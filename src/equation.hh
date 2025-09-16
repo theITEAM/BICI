@@ -7,8 +7,6 @@ using namespace std;
 #include "struct.hh"
 #include "const.hh"
 
-enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAMETER, PARAMVEC, SPLINE, SPLINEREF, POPNUM, TIME, IE, ONE, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, TINT, INTEGRAL, DERIVE, NOOP};
-
 struct EqItemList {                         // Allows for a list of equation items
 	EqItemType type;
 	unsigned int num;
@@ -16,22 +14,13 @@ struct EqItemList {                         // Allows for a list of equation ite
 	unsigned int next;
 };
 
-struct EqItem {                            // An individual operation in a calculation
-	EqItem(){ num = UNSET;}
-	
-	EqItemType type;
-	unsigned int num;
-};
+
 
 struct PopRefFromPo {                      // Used to get pop_ref from population number
 	unsigned int i;                          // Index on pop_ref
 	unsigned int po;                         // Population number
 };
 
-struct Calculation {                       // Stores a calculation (made up of operations)
-	vector <EqItem> item;                    // Items used to make the calculation
-	EqItemType op;                           // The operator used in the calculation
-};
 
 struct Integral {                          // Stores the calculation within an integral
 	vector <Calculation> calc;    
@@ -54,12 +43,31 @@ struct LinearCalculation                   // Stores a linear calculation
 
 struct Linearise {                         // Information about linearising an equation 
 	bool on;                                 // Determines if linearisation is possible
-	vector <Calculation> no_pop_calc;        // The calculation not involving populations
-	bool no_pop_calc_time_dep;               // Determines if time dependent
 	
-	vector < vector <Calculation> > pop_grad_calc; // Calculations involving populations (ordered by pop_ref)
-	bool pop_grad_calc_time_dep;             // Determines if time dependent
+	vector <Calculation> no_pop_calc_store;  // Stores no pop calculation
+	
+	vector < vector <Calculation> > pop_grad_calc_store;  // Stores no pop calculation
+	
+	vector <Calculation> factor_calc;        // Quantities multiplied together for the factor 
 
+	EqItem no_pop_precalc;                   // Stores no precalc number for 
+	
+	vector <EqItem> pop_grad_precalc;        // Stores no pop calculation
+	
+	EqItem factor_precalc;                   // Quantities multiplied together for the factor 
+	
+	bool no_pop_calc_time_dep;               // Determines if time dependent
+	bool factor_time_dep;                    // Set if the factor is time dependent
+	bool pop_grad_time_dep;                  // Set if population gradient is dependent
+	
+	/*
+	EqItem no_pop_calc;                      // The calculation not involving populations
+	
+	
+	vector <EqItem> factor;                  // Quantities multiplied together for the factor 
+	vector < vector <EqItem> > pop_grad_calc;// Quantities multiplied together for the population gradient
+	*/
+	
 	vector < vector <PopRefFromPo> > pop_ref_from_po; // Gets pop_ref from population	
 		
 	bool multi_source;                       // Detemines if comes from multiple sources (used in transmission trees)
@@ -68,7 +76,7 @@ struct Linearise {                         // Information about linearising an e
 	unsigned int get_pop_ref(unsigned int po) const;	
 };
 
-class Equation                             // Stores information about the model
+class Equation                             // Stores information about an equation
 {
 	public:
 		vector <double> timer;
@@ -82,8 +90,6 @@ class Equation                             // Stores information about the model
 		vector <ParamRef> param_ref;           // Stores the parameters used in the equation
 		
 		vector <DeriveRef> derive_ref;         // Stores derived used in the equation
-		
-		vector <double> cons;                  // Stores any constant values
 		
 		vector <unsigned int> pop_ref;         // Stores the populations used in the equation
 		
@@ -122,19 +128,18 @@ class Equation                             // Stores information about the model
 		
 		vector <double> time;                  // Stores the times of the time points (such that t can be used)
 		
+		bool precalc_done;                     // Stores whether precalculation has been done
+		bool stop_combine_fl;                  // Sets if combining of multiplicative terms stopped
+		
 		Linearise linearise;                   // Used for accelerated likelihood calculation
 		
-		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, vector <Spline> &spline, vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, const vector <double> &timepoint, const Details &details);
-		double calculate_param_only(const vector <double> &param_val) const;
-		double calculate_param_only_ti_fix(const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
-		double calculate_no_popnum(unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const; 
-		double calculate(unsigned int ti, const vector <double> &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
-		double calculate_integral(unsigned int i, const vector < vector <double> > &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector < vector <double> > > &derive_val) const;
-		double calculate_derive(unsigned int ti, const vector < vector <double> > &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector < vector <double> > > &derive_val) const;
-		void print_calculation() const;
-		void print_ca(unsigned int i, const Calculation &ca) const;
+		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details);
 		
-		double calculate_indfac(const Individual &ind, unsigned int ti, const vector <double> &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
+		void print_calculation() const;
+		void print_item(const EqItem &it) const;
+		void print_ca(unsigned int i, const Calculation &ca) const;
+		void print_mult(string name, const vector <EqItem> &item) const;
+		
 		double indfac(const Individual &ind) const;
 		bool param_linear(unsigned int th) const;
 		double is_num() const;
@@ -146,7 +151,6 @@ class Equation                             // Stores information about the model
 		void check_reg_used(const vector <Calculation> &calc, vector < vector <unsigned int> > &reg_used) const;
 		void setup_references();
 		double get_calc_hash_num(const vector <Calculation> &calc) const;
-		unsigned int add_cons(double val);
 		
 	private:
 		vector <unsigned int> getallcomp(string st);
@@ -171,8 +175,6 @@ class Equation                             // Stores information about the model
 		int priol(const vector <EqItemList> &opl, unsigned int i) const;
 		void unravel_sum();
 		void minus_sign_adjust();
-		double calculate_operation(EqItemType op, vector <double> &num) const;
-		
 		vector <EqItem> extract_operations();
 		unsigned int get_integral_bound(string st);
 		unsigned int extract_integral(const string &te, unsigned int i, vector <EqItem> &op);
@@ -204,14 +206,15 @@ class Equation                             // Stores information about the model
 		void replace_minus(vector <EqItem> &op);
 		unsigned int add_param_ref(const ParamRef &pref);
 				
-		vector <SpeciesSimp> &species;       // References the species from the model
+		const vector <SpeciesSimp> &species;       // References the species from the model
 		unsigned int nspecies;
 		vector <Param> &param;               // References the parameters from the model
 		const vector <Derive> &derive;       // Reference derived quantities in the model
-		vector <Spline> &spline;             // References splines from the model
-		vector <ParamVecEle> &param_vec;     // References the param_vec from the model
+		const vector <Spline> &spline;             // References splines from the model
+		const vector <ParamVecEle> &param_vec;     // References the param_vec from the model
 		vector <Population> &pop;            // References the populations from the model
 		Hash &hash_pop;                      // Hash table for pop
+		Constant &constant;                  // Stores constants in the model
 		const vector <double> &timepoint;    // References time points
 		const Details &details;              // Details
 		
@@ -231,14 +234,42 @@ class Equation                             // Stores information about the model
 		void print_calc(string st, const vector <Calculation> &calc) const;
 		bool single_param_func(Calculation ca, LinearCalculation &lin, const vector <LinearCalculation> &lin_calc) const;
 		bool two_param_func(Calculation ca, LinearCalculation &lin, const vector <LinearCalculation> &lin_calc) const;
-		double calculate_calculation(const vector <Calculation> &calc, unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
-		double calculate_calculation_spline_store(const vector <Calculation> &calc, unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
+		
+		//double calculate_calculation_spline_store(const vector <Calculation> &calc, unsigned int ti, const vector <double> &precalc) const;
 		bool calc_time_dep(const vector <Calculation> &calc) const;
-		double calculate_calculation_notime(const vector <Calculation> &calc, const vector <double> &param_val) const;
-		double calculate_linearise_check(unsigned int ti, const vector <double> &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
-		bool equal_calc(const vector <Calculation> &calc1, const vector <double> &cons, const vector <Calculation> &calc2, const vector <double> &cons2) const;
-		vector <double> calculate_popnum_gradient(const vector <double> &param_val) const;
-		double calculate_no_pop(unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
-		InfSourceSampler setup_source_sampler(unsigned int ti, const vector <double> &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val) const;
+		bool item_time_dep(const vector <EqItem> item) const;
+		bool it_time_dep(const EqItem &it) const;
+		
+		double calculate_linearise_check(unsigned int ti, const vector <double> &popnum, const vector <double> &precalc) const;
+		bool equal_calc(const vector <Calculation> &calc1, const vector <Calculation> &calc2) const;
+		
+		InfSourceSampler setup_source_sampler(unsigned int ti, const vector <double> &popnum, const PV &param_val) const;
+		void get_pop_grad_calc_factorise();
+		void set_precalc();
+		EqItem get_precalc(const vector <Calculation> &calc) const;
+		
+	// In equation_calculate.cc
+	public:
+		double calculate_param_ti_fix(const vector <double> &precalc) const;
+		double calculate(unsigned int ti, const vector <double> &popnum, const vector <double> &precalc) const;
+		double calculate_calc(const vector <Calculation> &calc, unsigned int ti, const vector <double> &popnum, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
+		void test_calculate_para(const vector <Calculation> &calc, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val, string ref) const;
+		vector <double> calculate_para(const vector <Calculation> &calc, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
+		double calculate_param(const vector <double> &precalc) const;
+		double calculate_no_popnum(unsigned int ti, const vector <double> &precalc) const; 
+		double calculate_integral(unsigned int i, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
+		double calculate_derive(unsigned int ti, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
+		double calculate_indfac(const Individual &ind, unsigned int ti, const vector <double> &popnum, const vector <double> &precalc) const;
+		double calculate_pop_grad(unsigned int pref, unsigned int ti, const vector <double> &precalc) const;
+		double calculate_pop_grad_no_time(unsigned int pref, const vector <double> &precalc) const;
+		double calculate_pop_grad_without_factor(unsigned int pref, const vector <double> &precalc) const;
+		double calculate_factor(unsigned int ti, const vector <double> &precalc) const;
+		vector <double> calculate_popnum_gradient_without_factor(const vector <double> &precalc) const;
+		double calculate_no_pop(unsigned int ti, const vector <double> &precalc) const;
+		double calculate_item(const EqItem &it, unsigned int ti, const vector <double> &precalc) const;
+		double calculate_item_no_time(const EqItem &it, const vector <double> &precalc) const;
+		double calculate_item_old(const EqItem &it, unsigned int ti, const vector <double> &precalc, const vector <double> &precalc_old) const;
+		double calculate_item_old_no_time(const EqItem &it, const vector <double> &precalc, const vector <double> &precalc_old) const;
+	private:
+		
 };
-

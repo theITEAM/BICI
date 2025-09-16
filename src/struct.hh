@@ -95,22 +95,31 @@ struct PopAffect {                 // Lists all populations which affect DIV_VAL
 	vector <GradRef> pop_grad_ref;   // References population in Markov equation 
 };
 
-struct LinearProp {                // Store information about DIV_VALUE_LINEAR_AFFECT proposal
+struct DivValueLinear {            // Stores information for DIV_VALUE_LINEAR speedup
+	bool factor_same;                // Determines if factor is the same for all markov equations
+	bool nonpop_same;                // Determines if non-population part same for all markov equations
 	vector <unsigned int> me;        // Markov eqn ref
-	vector <unsigned int> me_no_pop; // Which no_pop calculations need to be done
-	vector <unsigned int> no_pop_ref;// References no_pop which needs to be updated
 	vector <PopAffect> pop_affect;   // References populations which affect
+};
+
+struct DivValueNonPop {            // Stores information for DIV_VALUE_NONPOP_AFFECT
+	vector <unsigned int> me_list;   // Stores list of Markov equantions
 };
 
 struct AffectLike {                // Determines how a parameter affects likelihoods
 	AffectType type;                 // The type of likelihood being affected
 	unsigned int num;                // The reference number
 	unsigned int num2;               // Another reference number
-	vector <unsigned int> me_list;   // Stores a list of Markov equantions (used in DIV_VALUE_FAST_AFFECT)
 	vector <bool> map;               // Maps all time elements which are affected
 	vector <unsigned int> list;      // Lists all map which is true
 	unsigned int order_num;          // Used to order terms by list priority
-	LinearProp linear_prop;          // Used for DIV_VALUE_LINEAR_AFFECT
+	DivValueLinear div_value_linear; // Stores information for DIV_VALUE_NONPOP_AFFECT
+	DivValueNonPop div_value_nonpop; // Stores information for DIV_VALUE_NONPOP_AFFECT
+};
+
+struct AffectME {                  // Determines if affects a Markov equation
+	unsigned int p;                  // Species
+	unsigned int e;                  // markov equation number 
 };
 
 struct PopulationTerm {            // A term in the population
@@ -157,7 +166,6 @@ struct Population {                // Stores a population (used in an equation)
 	vector <PopulationTerm> term;    // The global compartments which contribute to the popualtion
 	vector <PopMarkovEqnRef> markov_eqn_ref;// References Markov equations which include population
 	vector <PopTransRef> trans_ref;  // References transitions which include population
-	//PopChangeSpeedup speedup;        // Used for speeding up population change in update_ind
 };
 
 struct ParamProp {                 // Stores properties of a parameter
@@ -170,7 +178,8 @@ struct ParamProp {                 // Stores properties of a parameter
 
 struct SplineInfo {                // Stores information about a parameter spline
 	bool on;                         // Detemines if spline is switched on
-	vector <double> knot_tdiv;      // Times of knots (if time variation)
+	SplineType type;                 // Type of spline (linear, square, cubic-pos, cubic) 	
+	vector <double> knot_tdiv;       // Times of knots (if time variation)
 	bool smooth;                     // Determines if smoothing is added
 	SmoothType smooth_type;          // The type of smoothing (normal or log-normal)
 	double smooth_value;             // The value used for the smoothing
@@ -182,21 +191,34 @@ struct SplineDiv {                 // A div in spline is calculated from a weigh
 	double f;                        // The factor 1=th1  0=th2
 };
 
+struct CubicDiv {                  // A div in a cubic spline 
+	unsigned int i;                  // The polynomial
+	double dx;                       // The difference between the time and beginning of segment
+	double dx2;                      // The difference between the time and beginning of segment
+	double dx3;                      // The difference between the time and beginning of segment
+};
+
 struct Spline {                    // Stores an individual spline
 	string name;                     // Name of the spline
+	SplineType type;                 // Type of spline (linear, square, cubic-pos, cubic) 	
 	bool constant;                   // Determines if spline is constant
 	unsigned int th;                 // The parameter
 	unsigned int index;              // The index giving the dependency
 	vector <unsigned int> param_ref; // References the parameters along the spline
 	SplineInfo info;                 // Stores information about spline (copied from par)
 	vector <SplineDiv> div;          // A division within the spline
+	vector <CubicDiv> cubic_div;     // A division within a cubic spline
 	vector <double> const_val;       // If spline is constant then works out what value it should have
 };
 
+
+/*
 struct SplineValue {               // Stores values for a spline
 	vector <double> val;             // The value down the spline
 	vector <double> store;           // The value down the spline
 };
+*/
+
 
 struct CompPos {                   // Used to go through comparmtental possibilities
 	vector <string> list;            // Stores a list of compartmental possibilities
@@ -249,6 +271,7 @@ struct IEname {                    // Stores individual effect name
 struct Amatrix {                   // Stores an A matrix
 	bool set;                        // Determines if the A matrix has been set
 	vector < vector <double> > value;// The values in the matrix
+	double sparsity;                 // The fraction of elements which are non-zero
 	vector <string> ind_list;        // The names of individuals in the system
 	Hash hash_ind_list;              // Hash table for individual list
 };
@@ -294,7 +317,10 @@ struct Dependency {                // A dependency in the model
 	string index;                    // The index in the model
 	string index_with_prime;         // The index in the model including any prime
 	vector <string> list;            // List of possible values (either compartments or times along spline)
+	vector <string> list_out;        // Elements which are out of range   
+	
 	Hash hash_list;                  // Generates a hash table for list
+	Hash hash_list_out;                  // Generates a hash table for list
 	unsigned int mult;               // Multiplicative factor when accessing an element
 };
 
@@ -318,6 +344,9 @@ struct ParamVecEle                 // Stores information about an element in par
 	bool prop_pos;                   // Set if it is possible to do a proposal on this parameter
 	bool omega_fl;                   // Detemines if in omega
 	vector <AffectLike> affect_like; // Determines how parameter affects likelihoods
+	vector <unsigned int> list_precalc_before; // Lists any precalculation which need to be done before parameter evaluated
+	vector <unsigned int> list_precalc_time; // Stores which times are affected by change
+	vector <unsigned int> list_precalc; // Lists any precalculation which need to be done before parameter evaluated
 	unsigned int ref;                // Reference param_vec_prop
 };
 
@@ -486,12 +515,18 @@ struct ParamElement {              // Stores information about a parameter eleme
 	unsigned int param_vec_ref;      // References the value on param_vec_ref
 };
 
+struct SplineOut {                 // Stores information if spline in output is restriced
+	bool on;                         // Determines if switched on
+	vector <string> list;            // Determines times of spline out
+};
+
 struct Param {                     // Stores a model parameter
 	string full_name;                // The full name (as defined in the input file)
 	string name;                     // The name after removing dependencies
 	vector <Dependency> dep;         // Dependency for parameter
 	bool time_dep;                   // Time dependency
 	SplineInfo spline_info;          // Stores information about spline (if used)
+	SplineOut spline_out;                 // Determines if the spline is restricted
 	bool sim_sample;                 // Set to true if value sampled from the distribution (simulation)
 	ParamVariety variety;            // Determines the variety of parameter	
 	unsigned int N;                  // The number of elements in the parameter
@@ -512,7 +547,9 @@ struct Param {                     // Stores a model parameter
 	unsigned int param_mult;         // If the parameter is multiplied by a factor this is th
 	bool used;                       // Determines if param used in model
 	bool not_set;                    // Detemines if not set
-
+	bool spline_outside;             // Set if the spline parameter is outside 
+	bool spline_outside_par;         // Set if the spline is at least partially out
+	
 	bool cat_factor;                 // Set if parameter is a categorical factor
 	bool cat_factor_weight_on;       // Determines if there is a weight factor
 	
@@ -530,8 +567,6 @@ struct Param {                     // Stores a model parameter
 	void set_value_te(unsigned int i, string te);
 	string get_value_te(unsigned int i) const;
 	void set_value_eqn(unsigned int i, const EquationInfo &val);
-	//void set_weight(unsigned int i, double w);
-	//double get_weight(unsigned int i);
 	unsigned int get_prior_ref(unsigned int i) const;
 	bool exist(unsigned int i) const;
 	unsigned int add_cons(double val);
@@ -965,6 +1000,7 @@ struct MarkovEqnVariation {        // Stores variation in Markov equations for a
 
 struct EventData {                 // Stores individual data
 	EventData(){ move_c = UNSET; cl = UNSET; tr = UNSET; tdiv = UNSET;}
+	unsigned int so;                 // References the data source
 	EventType type;                  // The type of the event
 	unsigned int move_c;             // The compartment in classification (when moving)
 	unsigned int cl;                 // The classification 
@@ -1706,5 +1742,79 @@ struct EventMove {                 // Used for reordering event for multi-event 
 struct PropTime {                  // Used for orthering proposal times
 	unsigned int i;
 	long time;
+};
+
+struct EqItem {                    // An individual operation in a calculation
+	EqItem(){ num = UNSET;}
+	
+	EqItemType type;
+	unsigned int num;
+};
+
+struct Calculation {               // Stores a calculation (made up of operations)
+	vector <EqItem> item;            // Items used to make the calculation
+	EqItemType op;                   // The operator used in the calculation
+};
+
+struct PreCalc {                   // Stores a precalculation (made up of operations)
+	vector <EqItem> item;            // Items used to make the calculation
+	EqItemType op;                   // The operator used in the calculation
+	bool time_dep;
+};
+
+struct EqItemTime {                // An individual operation in a calculation
+	EqItemTime(){ num = UNSET;}
+	
+	EqItemType type; 
+	unsigned int num;
+	unsigned int ti;
+};
+
+struct CalcTime {                  // Stores a calculation (made up of operations)
+	vector <EqItem> item;            // Items used to make the calculation
+	EqItemType op;                   // The operator used in the calculation
+};
+
+/*
+struct ParamChange {               // Stores change to parameter
+	ParamChange(unsigned int index_, double value_){
+		index = index_; value = value_;
+	};
+	unsigned int index;              // Index of change
+	double value;                    // Stores old value            
+};
+*/
+
+struct PV {                         // Stores parameter values along with precalculation
+	vector <double> value;           // The value of paramvec
+	vector <double> precalc;         // The array of precaclulated quantities
+	vector <double> value_old;       // The value of paramvec before 
+	vector <double> precalc_old;     // The array of precaclulated quantities
+	
+	vector <unsigned int> value_ch;   // Stores any change to value
+	vector <unsigned int> precalc_ch; // Stores any change to precalc
+	
+	void precalc_change(unsigned int i); // Changes a precalc
+	void value_change(unsigned int i);   // Changes a value 
+	void restore(); 
+	void clear();	
+	void check();
+};
+
+struct Constant {                  // Stores all the constants in the model
+	vector <double> value;
+	Hash hash;
+	
+	unsigned int add(double val);
+};	
+
+struct UpdatePrecalc {             // Stores information to generate precaculation for a proposal
+	vector <unsigned int> list_precalc; // Lists any precalculation which need to be done before parameter evaluated
+	vector <unsigned int> list_precalc_time; // Stores which times are affected by change
+};
+
+struct CubicSpline {               // Stores information about a segment in a cubic spline
+	vector <double> x,a,b,c,d;       // Parameters which defined cubic polynomial
+	SplineType type;                 // Type cubic of cubic +ve
 };
 

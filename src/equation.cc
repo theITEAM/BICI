@@ -31,9 +31,12 @@ using namespace std;
     
 		
 /// Initialises the equation 
-Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, vector <Spline> &spline, vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, const vector <double> &timepoint, const Details &details) : species(species), param(param), derive(derive), spline(spline), param_vec(param_vec), pop(pop), hash_pop(hash_pop), timepoint(timepoint), details(details)
+Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details) : species(species), param(param), derive(derive), spline(spline), param_vec(param_vec), pop(pop), hash_pop(hash_pop), constant(constant), timepoint(timepoint), details(details)
 {
 	plfl = false;  // Set to true to print operations to terminal (used for diagnostics)
+
+	precalc_done = false;
+	stop_combine_fl = false;
 
 	if(plfl) cout << endl << tex << "  start equation" << endl;
 
@@ -64,13 +67,15 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool
 	
 	check_repeated_operator(op);                     // Checks for repeated operators e.g. "**"
 	
+	//if(integral.size() > 0){ print_operations(op); emsg("op");}
+
 	if(warn != "") return; 
 	
 	replace_minus(op);                               // Replaces minums sign with (-1)*
 		
 	if(plfl) print_operations(op);
 
-	time_integral(op);                               // Incorporates time integral
+	time_integral(op);                            // Incorporates time integral
 
 	if(warn != "") return; 
 	
@@ -109,8 +114,10 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool
 	
 	// Truncates strings to save memory
 	te.clear();
-	if(type == REPARAM || type == REPARAM_EQN) te_raw = trunc(te_raw,5);
-	else te_raw = trunc(te_raw,20);	
+	if(!debugging){
+		if(type == REPARAM || type == REPARAM_EQN) te_raw = trunc(te_raw,5);
+		else te_raw = trunc(te_raw,20);	
+	}
 }
 
 
@@ -267,20 +274,18 @@ vector <unsigned int> Equation::get_all_comp(unsigned int p, string te)
 void Equation::print_operations(const vector <EqItem> &op) const
 {
 	cout << "List of operations:" << endl;
-	auto imin = 0u;
 	auto imax = op.size();
-	//if(imax > 100) imax = 100;
-	if(imax > 100) imin = imax-100;
-  for(auto i = imin; i < imax; i++){
+	if(imax > 100) imax = 100;
+  for(auto i = 0u; i < imax; i++){
     switch(op[i].type){
-			case TINT: cout << "∫dt"; break;
+			case TINT: cout << "\\int dt"; break;
       case LEFTBRACKET: cout << "("; break;
       case RIGHTBRACKET: cout << ")"; break;
 			case FUNCDIVIDE: cout << "|"; break;
 			case INTEGRAL: 
 				{
 					const auto &inte = integral[op[i].num];
-					cout << "∫dt[" << inte.ti_min << "," << inte.ti_max << "]";
+					cout << "\\int dt[" << inte.ti_min << "," << inte.ti_max << "]";
 				}
 				break;
 				
@@ -310,9 +315,10 @@ void Equation::print_operations(const vector <EqItem> &op) const
 				}
 				break;
 				
-			case SPLINEREF: emsg_input("spline ref should not"); break;
+			case SPLINEREF: case CONSTSPLINEREF: emsg_input("spline ref should not"); break;
 			case IE: cout << species[sp_p].ind_effect[op[i].num].name; break;
 			case ONE: cout << "1"; break;
+			case ZERO: cout << "0"; break;
 			case FE: cout << species[sp_p].fix_effect[op[i].num].name; break;
       case POPNUM: cout << pop[op[i].num].name; break;
       case EXPFUNC: cout << "exp"; break;
@@ -331,14 +337,19 @@ void Equation::print_operations(const vector <EqItem> &op) const
 			case ADD: cout << "+"; break;
       case TAKE: cout << "-"; break;
       case MULTIPLY: cout << "*"; break;
+			case SINGLE: break;
 			case DIVIDE: cout << "/"; break;
       case REG: cout << "R" << op[i].num; break;
-      case NUMERIC: cout << "numeric" << cons[op[i].num]; break;
+      case NUMERIC: cout << "numeric" << constant.value[op[i].num]; break;
 			case TIME: cout << "time"; break;
+			case REG_FAC: cout << "Rfac" << op[i].num; break;
+			case REG_PRECALC: cout << "Rpre" << op[i].num; break;
+			case REG_PRECALC_TIME: cout << "Rpretime" << op[i].num; break;
 			case NOOP: cout << "No operation"; break;
 		}
     cout << " ";
   }
+	if(imax < op.size()) cout << "...";
   cout << endl;
 }
 
@@ -347,11 +358,14 @@ void Equation::print_operations(const vector <EqItem> &op) const
 void Equation::print_calculation() const   
 {
 	cout << "For equation '" << add_escape_char(te_raw) << "' calculation:" << endl;
-
-  for(auto i = 0u; i < calcu.size(); i++){
-		print_ca(i,calcu[i]);
+	auto imax = calcu.size();
+	if(imax > 10) imax = 10;
+  for(auto i = 0u; i < imax; i++){
+		const auto &ca = calcu[i];
+		print_ca(i,ca);
 		cout << endl;
   }
+	if(imax < calcu.size()) cout << "..." << endl;
 
   cout << endl << endl;
 	
@@ -364,6 +378,8 @@ void Equation::print_calculation() const
 	}
 }
 
+
+/// Prints the calculation from a specific calculation
 void Equation::print_ca(unsigned int i, const Calculation &ca) const
 {  
 	switch(ca.op){
@@ -383,78 +399,24 @@ void Equation::print_ca(unsigned int i, const Calculation &ca) const
 	case ADD: break;
 	case TAKE: break;
 	case MULTIPLY: break;
+	case SINGLE: break;
 	case DIVIDE: break;
 	default: emsg_input("Eq problem1"); break;
 	}
-		 
-	for(auto j = 0u; j < ca.item.size(); j++){
-		const auto &it = ca.item[j];
-		switch(it.type){
-		case INTEGRAL:
-			{
-				const auto &inte = integral[it.num];
-				cout << "∫dt[" << inte.ti_min << "," << inte.ti_max << "]";
-			}
-			break;
-			
-		case PARAMETER: 
-			{
-				const auto &pr = param_ref[it.num];
-				cout << add_escape_char(param[pr.th].name) << pr.index;
-			}
-			break;
-			
-		case PARAMVEC: 
-			cout << param_vec[it.num].name;
-			break;
 		
-		case SPLINE: 
-			{
-				const auto &pr = param_ref[it.num];
-				auto par = param[pr.th]; 
-				cout << "Spline " << add_escape_char(get_param_name_with_dep(par,par.dep,pr.index));
-			}
-			break;
-			
-		case SPLINEREF:
-			cout << "Spline " << spline[it.num].name; 
-			break;
+	const auto &item = ca.item;
 		
-		case DERIVE: 
-			{
-				const auto &dr = derive_ref[it.num];
-				cout << "Derive(" << derive[dr.i].name << dr.index << ")";
-				if(dr.ti != UNSET) cout << "(ti=" << dr.ti << ")";
-			}
-			break;
-				
-		case POPNUM: 
-			cout << "'" << pop[it.num].name << "'";
-			break;
-	
-		case IE: cout << species[sp_p].ind_effect[it.num].name; break;
-		case ONE: cout << "1"; break;
-		case FE: cout << species[sp_p].fix_effect[it.num].name; break;
-		case REG: cout << "R" << it.num; break;
-		case NUMERIC: 
-			{
-				auto val = cons[it.num];
-				if(val == INFY) cout << "INFY";
-				else{
-					if(val == UNDEF) cout << "UNDEF";
-					else cout << val; 
-				}
-			}
-			break;
-		case TIME: cout << "time"; break;
-		default: emsg_input("Eq problem2a"); break;
-		}
+	auto jmax = item.size();
+	if(jmax > 10) jmax = 10;
+	for(auto j = 0u; j < jmax; j++){
+		print_item(item[j]);
 		
-		if(j != ca.item.size()-1){
+		if(j != item.size()-1){
 			switch(ca.op){
 			case ADD: cout <<  "+"; break;
 			case TAKE: cout <<  "-"; break;
-			case MULTIPLY: cout <<  "*"; break;
+			case MULTIPLY: cout << "*"; break;
+			case SINGLE: cout <<  ""; break;
 			case DIVIDE: cout <<  "/"; break;
 			case POWERFUNC: cout << "|"; break;
 			case THRESHFUNC: cout << "|"; break;
@@ -466,6 +428,7 @@ void Equation::print_ca(unsigned int i, const Calculation &ca) const
 			}
 		}
 	}
+	if(jmax < item.size()) cout << "...";
 
 	switch(ca.op){
 	case EXPFUNC: case SINFUNC: case COSFUNC: case LOGFUNC: case STEPFUNC: case POWERFUNC: 
@@ -481,6 +444,92 @@ void Equation::print_ca(unsigned int i, const Calculation &ca) const
 }
  
  
+/// Prints a multiplication
+void Equation::print_mult(string name, const vector <EqItem> &item) const
+{  
+	cout << name << ": ";
+	for(auto j = 0u; j < item.size(); j++){
+		if(j != 0) cout << "*";
+		print_item(item[j]);
+	}	
+	cout << endl;
+}
+
+ 
+ /// Prints a simgle item
+void Equation::print_item(const EqItem &it) const
+{
+	switch(it.type){
+	case INTEGRAL:
+		{
+			const auto &inte = integral[it.num];
+			cout << "\\int dt[" << inte.ti_min << "," << inte.ti_max << "]";
+		}
+		break;
+		
+	case PARAMETER: 
+		{
+			const auto &pr = param_ref[it.num];
+			cout << add_escape_char(param[pr.th].name) << pr.index;
+		}
+		break;
+		
+	case PARAMVEC: 
+		cout << add_escape_char(param_vec[it.num].name);
+		break;
+	
+	case SPLINE: 
+		{
+			const auto &pr = param_ref[it.num];
+			auto par = param[pr.th]; 
+			cout << "Spline " << add_escape_char(get_param_name_with_dep(par,par.dep,pr.index));
+		}
+		break;
+		
+	case SPLINEREF:
+		cout << "Spline " << add_escape_char(spline[it.num].name); 
+		break;
+		
+	case CONSTSPLINEREF:
+		cout << "Const Spline " << add_escape_char(spline[it.num].name); 
+		break;
+	
+	case DERIVE: 
+		{
+			const auto &dr = derive_ref[it.num];
+			cout << "Derive(" << derive[dr.i].name << dr.index << ")";
+			if(dr.ti != UNSET) cout << "(ti=" << dr.ti << ")";
+		}
+		break;
+			
+	case POPNUM: 
+		cout << "'" << pop[it.num].name << "'";
+		break;
+
+	case IE: cout << species[sp_p].ind_effect[it.num].name; break;
+	case ONE: cout << "1"; break;
+	case ZERO: cout << "0"; break;
+	case FE: cout << species[sp_p].fix_effect[it.num].name; break;
+	case REG: cout << "R" << it.num; break;
+	case REG_FAC: cout << "Rfac" << it.num; break;
+	case REG_PRECALC: cout << "Rpre" << it.num; break;
+	case REG_PRECALC_TIME: cout << "Rpretime" << it.num; break;
+	case NUMERIC: 
+		{
+			auto val = constant.value[it.num];
+			if(val == INFY) cout << "INFY";
+			else{
+				if(val == UNDEF) cout << "UNDEF";
+				else cout << val; 
+			}
+		}
+		break;
+	case TIME: cout << "time"; break;
+	default: emsg_input("Eq problem2a"); break;
+	}
+}
+
+		
 /// Unravels all the sums in the equation
 void Equation::unravel_sum() 
 {
@@ -716,12 +765,12 @@ double Equation::get_float(unsigned int i, unsigned int &raend) const
   if(te.substr(i,1) == "."){   // looks for a decimal point
     i++;
     auto fac = 0.1;
-    do{
+    while(i < te.length()){
 			num = te.at(i)-48;
       if(num >= 0 && num <= 9){ num2 += fac*num; fac /= 10;}
       else break;
       i++;
-    }while(i < te.length());
+    }
   }
 
   raend = i;
@@ -904,7 +953,7 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 		p = hash_pop.existing(vec);
 		if(p == UNSET){
 			p = pop.size();
-			hash_pop.add(pop.size(),vec);
+			hash_pop.add(p,vec);
 			
 			string start = "In population {"+cont+"}: ";
 	
@@ -1103,7 +1152,7 @@ bool Equation::quant(const vector <EqItem> &op, int i) const
   if(i < 0 || i >= (int)op.size()) return false;
   switch(op[i].type){
 	case PARAMETER: case PARAMVEC:
-	case SPLINE: case SPLINEREF:
+	case SPLINE: case SPLINEREF: case CONSTSPLINEREF:
 	case DERIVE:
 	case INTEGRAL:
 	case POPNUM: case IE: case FE: case REG: case NUMERIC: case TIME: 
@@ -1119,7 +1168,7 @@ bool Equation::quantl(const vector <EqItemList> &opl, unsigned int i) const
   if(i == UNSET_LIST) return false;
   switch(opl[i].type){
 	case PARAMETER: case PARAMVEC:
-	case SPLINE: case SPLINEREF:
+	case SPLINE: case SPLINEREF: case CONSTSPLINEREF:
 	case DERIVE:
 	case INTEGRAL:
 	case POPNUM: case IE: case FE: case REG: case NUMERIC: case TIME: 
@@ -1212,6 +1261,7 @@ vector <EqItem> Equation::extract_operations()
   while(i < te.length()){ 
 		if(str_eq(te,i,tint)){
 			i = extract_integral(te,i,op);
+			
 			if(warn != "") return op;
 		}
 		else{
@@ -1317,7 +1367,7 @@ vector <EqItem> Equation::extract_operations()
 						if(num != UNSET){
 							i = raend-1; 
 							item.type = NUMERIC; 
-							item.num = add_cons(num);
+							item.num = constant.add(num);
 							op.push_back(item); 
 							doneflag = true;
 						}
@@ -1357,13 +1407,13 @@ vector <EqItem> Equation::extract_operations()
 							i = raend-1;
 							
 							if(dist != UNSET){
-								item.type = NUMERIC; item.num = add_cons(dist); op.push_back(item); 
+								item.type = NUMERIC; item.num = constant.add(dist); op.push_back(item); 
 							}
 							else{
 								if(pref.th == TIME_VAR){
 									if(ti_fix != UNSET){
 										item.type = NUMERIC; 
-										item.num = add_cons(timepoint[ti_fix]); 
+										item.num = constant.add(timepoint[ti_fix]); 
 										op.push_back(item); 
 									}
 									else{
@@ -1385,7 +1435,7 @@ vector <EqItem> Equation::extract_operations()
 										if(item.type == PARAMETER && param[pref.th].variety == CONST_PARAM){
 											item.type = NUMERIC; 
 											const auto &par = param[pref.th];
-											item.num = add_cons(par.cons[par.element_ref[pref.index]]);
+											item.num = constant.add(par.cons[par.element_ref[pref.index]]);
 											op.push_back(item); 
 											done = true;
 										}
@@ -1396,7 +1446,7 @@ vector <EqItem> Equation::extract_operations()
 											auto num = number(par.get_value_te(pref.index));
 											if(num != UNSET){
 												item.type = NUMERIC; 
-												item.num = add_cons(num);
+												item.num = constant.add(num);
 												op.push_back(item); 
 												done = true;
 											}
@@ -1770,8 +1820,9 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 			
 			// Removes brackets around a quantity
 			case PARAMETER: case PARAMVEC:
+			case SINGLE:
 			case INTEGRAL:
-			case SPLINE: case SPLINEREF:
+			case SPLINE: case SPLINEREF: case CONSTSPLINEREF:
 			case DERIVE:
 			case POPNUM:
 			case IE: case FE: case REG: case NUMERIC: case TIME: 
@@ -1784,7 +1835,7 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 				}
 				break;
 				
-			case ONE: break;
+			case ONE: case ZERO: break;
 			
 			case FUNCDIVIDE: break;
 			
@@ -1829,7 +1880,11 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 					flag = true;
 				}
 				break;
-				
+			
+			case REG_FAC: emsg_input("Should not be reg fac"); break;
+			case REG_PRECALC: emsg_input("Should not be reg precalc"); break;
+			case REG_PRECALC_TIME: emsg_input("Should not be reg precalc time"); break;
+			
 			case NOOP: emsg_input("Hould not be no op"); break;
 			}
 			
@@ -1842,7 +1897,7 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 		
 		loop++;
   }while(flag == true);
-
+	
  	string wa = "";
 
 	if(get_opl_num(opl) != 1){
@@ -1864,7 +1919,7 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 		else{
 			wa = "The equation syntax is incorrect. ";
 		}
-		emsg_input("done");
+		//emsg_input("done");
 	}
 
 	if(wa != ""){
@@ -1887,432 +1942,6 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 	}
 	
 	return calc;
-}
-
-
-/// Calculates the value for an equation (assuming equation only has parameters)
-double Equation::calculate_param_only(const vector <double> &param_val) const 
-{
-	auto C = calcu.size();
- 	vector <double> regcalc(C);
-
-  for(auto i = 0u; i < C; i++){
-		const auto &ca = calcu[i];
-		
-		const auto &item = ca.item;
-		const auto N = item.size();
-		
-		vector <double> num(N);
-		
-		for(auto j = 0u; j < N; j++){
-			const auto &it = item[j];
-			
-			switch(it.type){
-				case PARAMETER: emsg("Should not be param"); break;
-				case PARAMVEC:
-					num[j] = param_val[it.num]; 
-					if(num[j] == UNSET) emsg("Param must be set");
-					break;
-				case SPLINE: case SPLINEREF: emsg("Should not be here1"); break;
-				case DERIVE: emsg("Should not be here1"); break;
-				case IE: emsg("Should not include ind effect"); break;
-				case ONE: num[j] = 1; break;
-				case FE: emsg("Should not include fixed effect"); break;
-				case POPNUM: emsg("Should not include population"); break;
-				case REG: num[j] = regcalc[it.num]; break;
-				case NUMERIC: num[j] = cons[it.num]; break;
-				case TIME: emsg("Should not include time1"); break;
-				default: emsg("Equation error"); break;
-			}
-		}
-
-    regcalc[i] = calculate_operation(ca.op,num);
-  }
-
-	return regcalc[C-1];
-}
-
-
-/// Calculates the value for an equation using only parameters and splines (if ti_fix is set)
-double Equation::calculate_param_only_ti_fix(const vector <double> &param_val, const vector <SplineValue> &spline_val) const 
-{
-	auto C = calcu.size();
- 	vector <double> regcalc(C);
-
-  for(auto i = 0u; i < C; i++){
-		const auto &ca = calcu[i];
-		
-		const auto &item = ca.item;
-		const auto N = item.size();
-		
-		vector <double> num(N);
-		
-		for(auto j = 0u; j < N; j++){
-			const auto &it = item[j];
-			
-			switch(it.type){
-				case PARAMETER: emsg("Should not be parameter2"); break;
-				case PARAMVEC: num[j] = param_val[it.num]; break;
-				case SPLINE: emsg("Should not be spline"); break;
-				case SPLINEREF:
-					if(ti_fix == UNSET) emsg("Should not be here4");
-					num[j] = spline_val[it.num].val[ti_fix];
-					break;
-				case DERIVE: emsg("Should not be derive"); return UNSET;
-				case IE: emsg("Should not include ind effect"); break;
-				case ONE: num[j] = 1; break;
-				case FE: emsg("Should not include fixed effect"); break;
-				case POPNUM: emsg("Should not include population"); break;
-				case REG: num[j] = regcalc[it.num]; break;
-				case NUMERIC: num[j] = cons[it.num]; break;
-				case TIME: emsg("Should not include time3"); break;
-				default: emsg("Equation error"); break;
-			}
-		}
-
-    regcalc[i] = calculate_operation(ca.op,num);
-  }
-
-	return regcalc[C-1];
-}
-
-
-/// Calculates the value for an equation (but does not allow population number)
-double Equation::calculate_no_popnum(unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const 
-{
-	auto C = calcu.size();
- 	vector <double> regcalc(C);
-
-  for(auto i = 0u; i < calcu.size(); i++){
-		const auto &ca = calcu[i];
-		
-		const auto &item = ca.item;
-		const auto N = item.size();
-		
-		vector <double> num(N);
-		
-		for(auto j = 0u; j < N; j++){
-			const auto &it = item[j];
-			
-			switch(it.type){
-				case PARAMETER: emsg("Should not be parameter4"); break;
-				case PARAMVEC: num[j] = param_val[it.num]; break;
-				case SPLINE: emsg("Should not be spline"); break;
-				case SPLINEREF: num[j] = spline_val[it.num].val[ti]; break;
-				case DERIVE: emsg("Should not be derive"); break;
-				case IE: emsg("Should not include ind effect"); break;
-				case ONE: num[j] = 1; break;
-				case FE: emsg("Should not include fixed effect"); break;
-				case POPNUM: emsg("Should not include popnum"); break;
-				case REG: num[j] = regcalc[it.num]; break;
-				case NUMERIC: num[j] = cons[it.num]; break;
-				case TIME: num[j] = timepoint[ti]; break;
-				default: emsg("Equation error"); break;
-			}
-		}
-
-    regcalc[i] = calculate_operation(ca.op,num);
-  }
-
-	return regcalc[C-1];
-}
-
-
-/// Calculates the value for an equation
-double Equation::calculate(unsigned int ti, const vector <double> &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val) const 
-{
-	auto C = calcu.size();
- 	vector <double> regcalc(C);
-
-  for(auto i = 0u; i < C; i++){
-		const auto &ca = calcu[i];
-		
-		const auto &item = ca.item;
-		const auto N = item.size();
-		
-		vector <double> num(N);
-		
-		for(auto j = 0u; j < N; j++){
-			const auto &it = item[j];
-			
-			switch(it.type){
-				case PARAMETER: emsg("Should not be parameter6"); break;
-				case PARAMVEC: num[j] = param_val[it.num]; break;
-				case SPLINE: emsg("Should not be spline"); break;
-				case SPLINEREF:	num[j] = spline_val[it.num].val[ti]; break;
-				case DERIVE: emsg("Should not be derive"); break;
-				case IE: emsg("Should not include ind effect"); break;
-				case ONE: num[j] = 1; break;
-				case FE: emsg("Should not include fixed effect"); break;
-				case POPNUM: num[j] = rectify(popnum[it.num]); break;
-				case REG: num[j] = regcalc[it.num]; break;
-				case NUMERIC: num[j] = cons[it.num]; break;
-				case TIME: num[j] = timepoint[ti]; break;
-				default: emsg("Equation error"); break;
-			}
-		}
-
-    regcalc[i] = calculate_operation(ca.op,num);
-  }
-
-	return regcalc[C-1];
-}
-
-
-/// Calculate the value of an integral
-double Equation::calculate_integral(unsigned int i, const vector < vector <double> > &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector < vector <double> > > &derive_val) const
-{
-	auto dt = details.dt;
-	const auto &inte = integral[i];
-	const auto &calc = inte.calc;
-	
-	auto C = calc.size();
- 	vector <double> regcalc(C);
-
-	auto sum = 0.0;
-	for(auto ti = inte.ti_min; ti < inte.ti_max; ti++){
-		for(auto i = 0u; i < C; i++){
-			const auto &ca = calc[i];
-			
-			const auto &item = ca.item;
-			const auto N = item.size();
-			
-			vector <double> num(N);
-			
-			for(auto j = 0u; j < N; j++){
-				const auto &it = item[j];
-				
-				switch(it.type){
-					case INTEGRAL: emsg("Should not be integral"); break;
-					case PARAMETER: emsg("Should not be parameter7"); break;
-					case PARAMVEC: num[j] = param_val[it.num]; break;
-					case SPLINE: emsg("Should not be spline"); break;
-					
-					case SPLINEREF:
-						{
-							if(ti == UNSET) emsg("ti should be set");
-							num[j] = spline_val[it.num].val[ti]; 
-						}
-						break;
-						
-					case DERIVE:
-						{
-							const auto &dr = derive_ref[it.num];
-							const auto &dv = derive_val[dr.i][dr.index];
-							if(dv.size() == 1) num[j] = dv[0];  // Not time dependent
-							else{
-								if(dr.ti != UNSET) num[j] = dv[dr.ti];
-								else{
-									if(ti != UNSET) num[j] = dv[ti];
-									else emsg("Derive problem");
-								}
-							}
-						}
-						break;
-						
-					case IE: emsg("Should not include ind effect"); break;
-					case ONE: num[j] = 1; break;
-					case FE: emsg("Should not include fixed effect"); break;
-					
-					case POPNUM:
-						{
-							if(ti == UNSET) emsg("ti should be set");
-							num[j] = rectify(popnum[ti][it.num]); 
-						}
-						break;		
-					case REG: num[j] = regcalc[it.num]; break;
-					case NUMERIC: num[j] = cons[it.num]; break;
-					case TIME: num[j] = timepoint[ti]; break;
-					default: emsg("Equation error"); break;
-				}
-			}
-
-			regcalc[i] = calculate_operation(ca.op,num);
-		}
-
-		sum += regcalc[C-1];
-	}		
-	
-	return dt*sum;
-}
-
-
-/// Calculates derived equations
-double Equation::calculate_derive(unsigned int ti, const vector < vector <double> > &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector < vector < vector <double> > > &derive_val) const 
-{
-	auto C = calcu.size();
- 	vector <double> regcalc(C);
-
-  for(auto i = 0u; i < C; i++){
-		const auto &ca = calcu[i];
-		
-		const auto &item = ca.item;
-		const auto N = item.size();
-		
-		vector <double> num(N);
-		
-		for(auto j = 0u; j < N; j++){
-			const auto &it = item[j];
-			
-			switch(it.type){
-				case INTEGRAL:
-					num[j] = calculate_integral(it.num,popnum,param_val,spline_val,derive_val);
-					break;
-				case PARAMETER: emsg("Should not be parameter8"); break;
-				case PARAMVEC: num[j] = param_val[it.num]; break;
-				case SPLINE: emsg("Should not be spline"); break;
-				
-				case SPLINEREF:
-					{
-						if(ti == UNSET) emsg("ti should be set");
-						num[j] = spline_val[it.num].val[ti]; 
-					}
-					break;
-					
-				case DERIVE:
-					{
-						const auto &dr = derive_ref[it.num];
-						const auto &dv = derive_val[dr.i][dr.index];
-						if(dv.size() == 1) num[j] = dv[0];  // Not time dependent
-						else{
-							if(dr.ti != UNSET) num[j] = dv[dr.ti];
-							else{
-								if(ti != UNSET) num[j] = dv[ti];
-								else emsg("Derive problem");
-							}
-						}
-					}
-					break;
-					
-				case IE: emsg("Should not include ind effect"); break;
-				case ONE: num[j] = 1; break;
-				case FE: emsg("Should not include fixed effect"); break;
-				
-				case POPNUM:
-					{
-						if(ti == UNSET) emsg("ti should be set");
-						num[j] = rectify(popnum[ti][it.num]); 
-					}
-					break;
-				case REG: num[j] = regcalc[it.num]; break;
-				case NUMERIC: num[j] = cons[it.num]; break;
-				case TIME: num[j] = timepoint[ti]; break;
-				default: emsg("Equation error"); break;
-			}
-		}
-
-    regcalc[i] = calculate_operation(ca.op,num);
-  }
-
-	return regcalc[C-1];
-}
-
-
-/// Calculates the value for an equation (including individual-based factor)
-double Equation::calculate_indfac(const Individual &ind, unsigned int ti, const vector <double> &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val) const 
-{	
-	return indfac(ind)*calculate(ti,popnum,param_val,spline_val);
-}
-
-
-/// Performs an operation on a set of numbers 
-double Equation::calculate_operation(EqItemType op, vector <double> &num) const 
-{
-	auto N = num.size();
-	
-	switch(op){
-	case ADD:
-		{
-			auto ans = 0.0; 
-			for(auto val : num) ans += val;
-			return ans;
-		}
-		
-	case TAKE:
-		if(N != 2){
-			emsg("For TAKE should be 2");
-		}
-		return num[0]-num[1]; 
-	
-	case MULTIPLY:
-		{
-			auto ans = 1.0; 
-			for(auto val : num) ans *= val;
-			return ans;
-		}
-		
-	case DIVIDE:
-		if(N != 2) emsg("For DIVIDE should be 2");
-		if(num[1] == 0) emsg("Equation '"+te_raw+"' caused a division by zero."); 
-		return num[0]/num[1]; 
-		
-	case EXPFUNC:
-		if(N != 1) emsg("For EXPFUNC should be 1");
-		return exp(num[0]); 
-			
-	case SINFUNC:
-		if(N != 1) emsg("For SINFUNC should be 1");
-		return sin(num[0]); 
-	
-	case COSFUNC: 
-		if(N != 1) emsg("For COSFUNC should be 1");
-		return cos(num[0]); 
-		
-	case LOGFUNC: 
-		if(N != 1) emsg("For LOGFUNC should be 1");
-		if(num[0] <= 0) emsg("For equation '"+te_raw+"' the quantity inside the log became negative."); 
-		return log(num[0]);
-		
-	case STEPFUNC:
-		if(N != 1) emsg("For STEPFUNC should be 1");
-		if(num[0] > 0) return 1;
-		return 0; 
-		
-	case POWERFUNC:
-		if(N != 2) emsg("For POWERFUNC should be 2");
-		return pow(num[0],num[1]);
-	
-	case THRESHFUNC:
-		if(N != 2) emsg("For THRESHFUNC should be 2");
-		if(num[0] < num[1]) return 0;
-		return num[0];
-		
-	case UBOUNDFUNC:
-		if(N != 2) emsg("For UBOUNDFUNC should be 2");
-		if(num[0] > num[1]) return INFINITY;
-		return num[0];
-	
-	case MAXFUNC:
-		if(N != 2) emsg("For MAXFUNC should be 2");
-		if(num[0] > num[1]) return num[0];
-		return num[1]; 
-		
-	case MINFUNC:
-		if(N != 2) emsg("For MINFUNC should be 2");
-		if(num[0] < num[1]) return num[0];
-		return num[1]; 
-		
-	case ABSFUNC:
-		if(N != 1) emsg("For MINFUNC should be 1");
-		if(num[0] > 0) return num[0]; 
-		return -num[0];
-		
-	case SQRTFUNC:
-		if(N != 1) emsg("For SQRTFUNC should be 1");
-		if(num[0] < 0) emsg("For equation '"+te_raw+"' the quantity inside the square root became negative."); 
-		return sqrt(num[0]);
-		
-	case SIGFUNC:
-		if(N != 1) emsg("For SIGFUNCT should be 1");
-		return 1/(1+exp(-num[0]));
-		
-	case NOOP: 
-		return 0;
-	
-	default: emsg("Equation error"); break;
-	}
-	
-	return 0;
 }
 
 
@@ -2478,7 +2107,8 @@ void Equation::replace_reg(const vector <EqItem> &reg_replace, vector <Calculati
 		cout << "after replace:" << endl;
 		
 		for(auto i = 0u; i < calcu.size(); i++){
-			print_ca(i,calcu[i]);
+			const auto &ca = calcu[i];
+			print_ca(i,ca);
 			cout << "    " << calc_on[i];
 			cout << endl;
 		}	
@@ -2567,6 +2197,8 @@ void Equation::simplify(vector <Calculation> &calc)
 	
 	vector <EqItem> reg_replace(calc.size());
 	
+	const auto &cval = constant.value;
+	
 	auto loop = 0u;
 	bool flag;
 	do{		
@@ -2581,14 +2213,31 @@ void Equation::simplify(vector <Calculation> &calc)
 				if(ca.op == TAKE){
 					auto &it = ca.item[1];
 					if(it.type == NUMERIC){
+						auto val = cval[it.num];
+						
 						ca.op = ADD; 
-						it.num = add_cons(cons[it.num]);
+						it.num = constant.add(val);
 						flag = true;
 					}
 				}
 			}
 		}
 		
+		// Converts DIVIDE my constant to MULTIPLY
+		for(auto i = 0u; i < calc.size(); i++){
+			if(calc_on[i]){
+				auto &ca = calc[i];
+				if(ca.op == DIVIDE){
+					if(ca.item[0].type != NUMERIC && ca.item[1].type == NUMERIC){
+						auto val = cval[ca.item[1].num];
+						if(val != 0){
+							ca.op = MULTIPLY;
+							ca.item[1].num = constant.add(1.0/val);
+						}
+					}
+				}
+			}
+		}
 		
 		insert_reg(calc,calc_on);
 	
@@ -2632,7 +2281,7 @@ void Equation::simplify(vector <Calculation> &calc)
 								// Removes anything with one
 								auto j = 0u;
 								while(j < ca.item.size()){
-									if(ca.item[j].type == NUMERIC && cons[ca.item[j].num] == 1){
+									if(ca.item[j].type == NUMERIC && cval[ca.item[j].num] == 1){
 										if(j+1 < ca.item.size()){
 											ca.item[j] = ca.item[ca.item.size()-1];
 										}
@@ -2645,7 +2294,7 @@ void Equation::simplify(vector <Calculation> &calc)
 							
 							// If contains zero then entire sum is zero
 							auto j = 0u;
-							while(j < ca.item.size() && !(ca.item[j].type == NUMERIC && cons[ca.item[j].num] == 0)) j++;
+							while(j < ca.item.size() && !(ca.item[j].type == NUMERIC && cval[ca.item[j].num] == 0)) j++;
 							if(j < ca.item.size()) rep_con = 0;
 							else{
 								if(ca.item.size() == 0) rep_con = 1;
@@ -2677,7 +2326,7 @@ void Equation::simplify(vector <Calculation> &calc)
 							// Removes anything with zero
 							j = 0;
 							while(j < ca.item.size()){
-								if(ca.item[j].type == NUMERIC && cons[ca.item[j].num] == 0){
+								if(ca.item[j].type == NUMERIC && cval[ca.item[j].num] == 0){
 									if(j+1 < ca.item.size()){
 										ca.item[j] = ca.item[ca.item.size()-1];
 									}
@@ -2697,8 +2346,8 @@ void Equation::simplify(vector <Calculation> &calc)
 					case DIVIDE:
 						{
 							double con1 = UNSET, con2 = UNSET;
-							if(ca.item[0].type == NUMERIC) con1 = cons[ca.item[0].num];
-							if(ca.item[1].type == NUMERIC) con2 = cons[ca.item[1].num];
+							if(ca.item[0].type == NUMERIC) con1 = cval[ca.item[0].num];
+							if(ca.item[1].type == NUMERIC) con2 = cval[ca.item[1].num];
 						
 							if(con2 == 0){
 								warn = "Equation contains a division by zero";
@@ -2725,7 +2374,7 @@ void Equation::simplify(vector <Calculation> &calc)
 					
 					case EXPFUNC:
 						if(ca.item[0].type == NUMERIC){
-							auto con = cons[ca.item[0].num];
+							auto con = cval[ca.item[0].num];
 							if(con == INFY) rep_con = INFY;
 							else{
 								if(con == UNDEF) rep_con = UNDEF;
@@ -2736,7 +2385,7 @@ void Equation::simplify(vector <Calculation> &calc)
 					
 					case SINFUNC:
 						if(ca.item[0].type == NUMERIC){
-							auto con = cons[ca.item[0].num];
+							auto con = cval[ca.item[0].num];
 							if(con == INFY) rep_con = UNDEF;
 							else{
 								if(con == UNDEF) rep_con = UNDEF;
@@ -2747,7 +2396,7 @@ void Equation::simplify(vector <Calculation> &calc)
 						
 					case COSFUNC:
 						if(ca.item[0].type == NUMERIC){
-							auto con = cons[ca.item[0].num];
+							auto con = cval[ca.item[0].num];
 							if(con == INFY) rep_con = UNDEF;
 							else{
 								if(con == UNDEF) rep_con = UNDEF;
@@ -2758,7 +2407,7 @@ void Equation::simplify(vector <Calculation> &calc)
 					
 					case LOGFUNC:
 						if(ca.item[0].type == NUMERIC){
-							auto con = cons[ca.item[0].num];
+							auto con = cval[ca.item[0].num];
 							if(con <= 0){
 								warn = "Equation contains the logarithm of a non-positive";
 							}
@@ -2775,8 +2424,8 @@ void Equation::simplify(vector <Calculation> &calc)
 					case POWERFUNC:
 						{
 							double con1 = UNSET, con2 = UNSET;
-							if(ca.item[0].type == NUMERIC) con1 = cons[ca.item[0].num];
-							if(ca.item[1].type == NUMERIC) con2 = cons[ca.item[1].num];
+							if(ca.item[0].type == NUMERIC) con1 = cval[ca.item[0].num];
+							if(ca.item[1].type == NUMERIC) con2 = cval[ca.item[1].num];
 						
 							if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
 							else{
@@ -2798,7 +2447,7 @@ void Equation::simplify(vector <Calculation> &calc)
 				
 					case THRESHFUNC:
 						if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
-							auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
+							auto con1 = cval[ca.item[0].num], con2 = cval[ca.item[1].num];
 							if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
 							else{
 								if(con1 < con2) rep_con = 0;
@@ -2809,7 +2458,7 @@ void Equation::simplify(vector <Calculation> &calc)
 						
 					case UBOUNDFUNC:
 						if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
-							auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
+							auto con1 = cval[ca.item[0].num], con2 = cval[ca.item[1].num];
 							if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
 							else{
 								if(con1 > con2) rep_con = INFY;
@@ -2820,7 +2469,7 @@ void Equation::simplify(vector <Calculation> &calc)
 					
 					case STEPFUNC:
 						if(ca.item[0].type == NUMERIC){
-							auto con = cons[ca.item[0].num];
+							auto con = cval[ca.item[0].num];
 							if(con == UNDEF) rep_con = UNDEF;
 							else{
 								if(con > 0) rep_con = 1; else rep_con = 0;
@@ -2830,7 +2479,7 @@ void Equation::simplify(vector <Calculation> &calc)
 						
 					case MAXFUNC:
 						if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
-							auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
+							auto con1 = cval[ca.item[0].num], con2 = cval[ca.item[1].num];
 							if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
 							else{
 								if(con1 > con2) rep_con = con1;
@@ -2841,7 +2490,7 @@ void Equation::simplify(vector <Calculation> &calc)
 						
 					case MINFUNC:
 						if(ca.item[0].type == NUMERIC && ca.item[1].type == NUMERIC){
-							auto con1 = cons[ca.item[0].num], con2 = cons[ca.item[1].num];
+							auto con1 = cval[ca.item[0].num], con2 = cval[ca.item[1].num];
 							if(con1 == UNDEF || con2 == UNDEF) rep_con = UNDEF;
 							else{
 								if(con1 < con2) rep_con = con1;
@@ -2852,7 +2501,7 @@ void Equation::simplify(vector <Calculation> &calc)
 						
 					case ABSFUNC:
 						if(ca.item[0].type == NUMERIC){
-							auto con = cons[ca.item[0].num];
+							auto con = cval[ca.item[0].num];
 							if(con == UNDEF) rep_con = UNDEF;
 							else{
 								if(con < 0) rep_con = -con;
@@ -2863,7 +2512,7 @@ void Equation::simplify(vector <Calculation> &calc)
 					
 					case SQRTFUNC:
 						if(ca.item[0].type == NUMERIC){
-							auto con = cons[ca.item[0].num];
+							auto con = cval[ca.item[0].num];
 							if(con < 0){
 								warn = "Equation contains the square root of a non-positive";
 							}
@@ -2879,7 +2528,7 @@ void Equation::simplify(vector <Calculation> &calc)
 						
 					case SIGFUNC:
 						if(ca.item[0].type == NUMERIC){
-							auto con = cons[ca.item[0].num];
+							auto con = cval[ca.item[0].num];
 							
 							if(con == UNDEF) rep_con = UNDEF;
 							else{
@@ -2898,7 +2547,7 @@ void Equation::simplify(vector <Calculation> &calc)
 							if(rep.type != NOOP && rep_con != UNSET) emsg_input("Cannot be both here");
 							
 							if(rep_con != UNSET){
-								rep.type = NUMERIC; rep.num = add_cons(rep_con);
+								rep.type = NUMERIC; rep.num = constant.add(rep_con);
 							}
 							
 							reg_replace[i] = rep;
@@ -2911,6 +2560,17 @@ void Equation::simplify(vector <Calculation> &calc)
 		
 		replace_reg(reg_replace,calc,calc_on,pl);
 		
+		// If last entry just refers to previous register then remove
+		if(calcu.size() > 0){
+			const auto &la = calcu[calcu.size()-1];
+			if((la.op == ADD || la.op == MULTIPLY) && la.item.size() == 1){
+				if(la.item[0].type == REG && la.item[0].num+2 == calcu.size()){
+					calcu.pop_back();
+					flag = true;
+				}
+			}
+		}
+		
 		loop++; if(loop > 100) emsg_input("Simplify equation problem");
 	}while(flag == true);
 
@@ -2922,8 +2582,8 @@ void Equation::simplify(vector <Calculation> &calc)
 		for(auto j = 0u; j < ca.item.size(); j++){
 			const auto &it = ca.item[j];
 			if(it.type == NUMERIC){
-				if(cons[it.num] == UNDEF) warn = "The equation contains an undefined quantity";
-				if(cons[it.num] == INFY) warn = "The equation contains an infinite quantity";
+				if(cval[it.num] == UNDEF) warn = "The equation contains an undefined quantity";
+				if(cval[it.num] == INFY) warn = "The equation contains an infinite quantity";
 			}
 		}
 	}
@@ -2995,7 +2655,7 @@ void Equation::remove_unused(vector <Calculation> &calc, vector <bool> &calc_on)
 /// Adds constant values
 unsigned int Equation::add_const(EqItem item1, EqItem item2)
 {
-	auto val1 = cons[item1.num], val2 = cons[item2.num];
+	auto val1 = constant.value[item1.num], val2 = constant.value[item2.num];
 	
 	double num;
 	if(val1 == UNDEF || val2 == UNDEF) num = UNDEF; 
@@ -3004,14 +2664,14 @@ unsigned int Equation::add_const(EqItem item1, EqItem item2)
 		else num = val1+val2;
 	}
 	
-	return add_cons(num);
+	return constant.add(num);
 }
 
 
 /// Multiplies constant values
 unsigned int Equation::mult_const(EqItem item1, EqItem item2)
 {
-	auto val1 = cons[item1.num], val2 = cons[item2.num];
+	auto val1 = constant.value[item1.num], val2 = constant.value[item2.num];
 
 	double num;
 	if(val1 == UNDEF || val2 == UNDEF) num = UNDEF;
@@ -3031,7 +2691,7 @@ unsigned int Equation::mult_const(EqItem item1, EqItem item2)
 		}
 	}
 	
-	return add_cons(num);
+	return constant.add(num);
 }
 
 
@@ -3065,7 +2725,7 @@ double Equation::is_num() const
 		if(ca.op == ADD || ca.op == MULTIPLY){ 	
 			if(ca.item.size() == 1){
 				const auto &it = ca.item[0];
-				if(it.type == NUMERIC && cons[it.num] == 1) return cons[it.num];
+				if(it.type == NUMERIC) return constant.value[it.num];
 			}
 		}
 	}
@@ -3084,7 +2744,7 @@ bool Equation::is_zero() const
 			
 			if(ca.item.size() == 1){
 				const auto &it = ca.item[0];
-				if(it.type == NUMERIC && cons[it.num] == 0) return true;
+				if(it.type == NUMERIC && constant.value[it.num] == 0) return true;
 			}
 		}
 	}
@@ -3103,7 +2763,7 @@ bool Equation::is_one() const
 			
 			if(ca.item.size() == 1){
 				const auto &it = ca.item[0];
-				if(it.type == NUMERIC && cons[it.num] == 1) return true;
+				if(it.type == NUMERIC && constant.value[it.num] == 1) return true;
 			}
 		}
 	}
@@ -3494,7 +3154,7 @@ void Equation::check_repeated_operator(const vector <EqItem> &op)
 }
 
 
-/// Replaces time integral with seperate calculation
+/// Replaces time integral with separate calculation
 void Equation::time_integral(vector <EqItem> &op)
 {
 	auto i = 0u; 
@@ -3539,13 +3199,7 @@ void Equation::time_integral(vector <EqItem> &op)
 				return;
 			}
 			
-			op.erase(op.begin()+i,op.begin()+j+1);
-			
-			EqItem add;
-			add.type = INTEGRAL;
-			add.num = e;
-			op.insert(op.begin()+i,add);
-			
+			// Creates mini calculation within integral
 			vector <EqItem> op_mini;
 			for(auto k = ist+1; k < j; k++){
 				op_mini.push_back(op[k]);
@@ -3556,6 +3210,15 @@ void Equation::time_integral(vector <EqItem> &op)
 			
 			inte.calc = calc;
 			
+			// Removes calculation
+			op.erase(op.begin()+i,op.begin()+j+1);
+			
+			// Adds intergal reference term
+			EqItem add;
+			add.type = INTEGRAL;
+			add.num = e;
+			op.insert(op.begin()+i,add);
+		
 			if(type != DERIVE_EQN){
 				warn = "Time integrals can only appear in derived equations.";
 			}
@@ -3572,7 +3235,7 @@ void Equation::replace_minus(vector <EqItem> &op)
 		if(op[i].type == TAKE){
 			op[i].type = ADD;
 			
-			EqItem item2; item2.type = NUMERIC; item2.num = add_cons(-1);
+			EqItem item2; item2.type = NUMERIC; item2.num = constant.add(-1);
 			op.insert(op.begin()+i+1,item2);
 	
 			EqItem item3; item3.type = MULTIPLY;
@@ -3580,20 +3243,6 @@ void Equation::replace_minus(vector <EqItem> &op)
 		}
 		else i++;
 	}
-}
-
-
-/// Adds a constant to the list
-unsigned int Equation::add_cons(double val)
-{
-	auto num = cons.size();
-	if(num < 10){ // Looks through exisiting constants
-		auto i = 0u; while(i < num && cons[i] != val) i++;
-		if(i < cons.size()) return i;
-	}
-
-	cons.push_back(val);
-	return num;
 }
 
 
@@ -3609,12 +3258,14 @@ unsigned int Equation::add_param_ref(const ParamRef &pref)
 /// Gets a number to represent an equation
 double Equation::get_calc_hash_num(const vector <Calculation> &calc) const
 {
+	const auto &cval = constant.value;
+	
 	auto val = 0.0;
 	for(auto i = 0u; i < calc.size(); i++){
 		const auto &ca = calc[i];
 		for(const auto &it : ca.item){
 			val += MM_PI*it.type;
-			if(it.type == NUMERIC) val += cons[it.num];
+			if(it.type == NUMERIC) val += cval[it.num];
 			else val += 0.3*it.num;
 		}
 		val += 0.1*ca.op + i;

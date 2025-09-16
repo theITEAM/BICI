@@ -15,6 +15,8 @@ class Proposal                             // Implements a proposal
 	public:
 		Proposal(PropType type_, vector <unsigned int> vec, const Model &model, const Output &output, double w, const BurnInfo &burn_info);
 		void initialise_variables();
+		void calculate_update_precalc();
+		vector <unsigned int> remove_precalc_done(const vector <unsigned int> &list_precalc, vector <bool> &mapl) const;
 		
 		string print_info() const;
 		void MH(State &state);
@@ -59,8 +61,11 @@ class Proposal                             // Implements a proposal
 		vector <SwapProp> swap_info;           // Stores information about local swaps [#swap_rep]
 		
 		vector <AffectLike> affect_like;       // Stores how the likelihood is affected by proposal
-		vector <AffectLike> affect_spline;     // Stores how splines are affected by proposal
-			
+		
+		vector <UpdatePrecalc> dependent_update_precalc; // Works out update precalc for parameter sampling
+		
+		vector <UpdatePrecalc> update_precalc; // Works out how to update precalculation
+	
 		// IND_PROP
 		unsigned int p_prop;                   // The species for the proposals
 		
@@ -126,10 +131,9 @@ class Proposal                             // Implements a proposal
 	// Used in proposal_utils.cc
 	public:
 		void update_sampler(const CorMatrix &cor_matrix);
-		void calculate_affect_spline();
 		void mbp_population_affect();
 		void set_mvn(double si_, const CorMatrix &cor_matrix);
-		vector <double> sample(vector <double> param_val);
+		bool param_resample(PV &param_val);
 		double mvn_probability(const vector <double> &param_prop1, const vector <double> &param_prop2) const;
 		
 	private:
@@ -145,10 +149,11 @@ class Proposal                             // Implements a proposal
 		void initialise_swap_variable();
 		void update_si(double fac);
 		void update_ind_samp_si(unsigned int tr_gl, double fac);
-		bool skip_proposal(double val) const;
+		//bool skip_proposal(double val) const;
 		void set_omega_check();
 		bool event_dif(const vector <Event> &ev1, const vector <Event> &ev2) const;
 		void ind_obs_prob_update(IndSimProb &isp) const;
+		double set_prop_prob();
 	
 	// Used in proposal_local.cc
 	private:

@@ -681,10 +681,29 @@ function load_state_sample_header(te,result,warn)
 				result.timepoint = timepoint;
 			}
 			else{
-				let spl = st.split(":");
-				if(spl.length == 2){
-					let i = Number(spl[0]); if(isNaN(i)) alert_sample(warn,33);
-					ind_key[i] = spl[1];
+				if(begin_str(st,"spline-out ")){
+					let spl = st.split(" ");
+					if(spl.length != 3) alert_sample(warn,30);
+					
+					let name = spl[1];
+					let th = find(result.param,"name",name);
+					if(th == undefined) alert_sample(warn,31);
+					
+					let par = result.param[th];
+					let knot = spl[2].split(",");
+					let spl_knot = par.spline.knot;
+					if(knot.length != spl_knot.length){
+						reduce_knot(par.value,knot,spl_knot);		
+						if(par.prior_split_check.check == true) reduce_knot(par.prior_split,knot,spl_knot);		
+						par.spline.knot	= knot;					
+					}
+				}
+				else{
+					let spl = st.split(":");
+					if(spl.length == 2){
+						let i = Number(spl[0]); if(isNaN(i)) alert_sample(warn,33);
+						ind_key[i] = spl[1];
+					}
 				}
 			}
 		}		
@@ -692,6 +711,44 @@ function load_state_sample_header(te,result,warn)
 
 	result.ind_key = ind_key;
 	if(result.timepoint == undefined) alert_sample(warn,29);
+}
+
+
+/// Reduces number the number of knows in an object
+function reduce_knot(value,knot_new,knot_old)
+{
+	let N = knot_new.length;
+	let M = knot_old.length;
+	let sh = 0; while(sh < M && knot_old[sh] != knot_new[0]) sh++;	
+	if(sh == M){ error("Could not find reduce"); return;}
+	
+	let dim = get_dimensions(value);
+	let ele_list = get_element_list(value,dim);
+	let last = dim.length-1;
+	for(let i = 0; i < ele_list.length; i++){
+		let ele = ele_list[i];
+		let k = ele[last];
+		if(k < N){
+			ele[last] += sh;
+			let val = get_element(value,ele);
+			
+			ele[last] -= sh;
+			set_element(value,ele,val);
+		}
+	}
+	
+	let D = M-N;
+	for(let i = 0; i < ele_list.length; i+= M){
+		let ele = ele_list[i];
+		switch(ele.length){
+		case 1: value.length -= D; break;
+		case 2: value[ele[0]].length -= D;; break;
+		case 3: value[ele[0]][ele[1]].length -= D; break;
+		case 4: value[ele[0]][ele[1]][ele[2]].length -= D; break;
+		case 5: value[ele[0]][ele[1]][ele[2]][ele[3]].length -= D; break;
+		case 6: value[ele[0]][ele[1]][ele[2]][ele[3]][ele[4]].length -= D; break;
+		}
+	}
 }
 
 
@@ -840,7 +897,7 @@ function read_state_sample(te,chain,result,warning)
 					mode = "derive";
 					break;
 					
-				case "PHYLOTREE":
+				case "TRANSTREE":
 					mode = "phylo";
 					break;
 					
@@ -1055,7 +1112,10 @@ function read_state_sample(te,chain,result,warning)
 									let t = Number(tspl[1]); if(isNaN(t)) alert_sample(warn,34);
 									
 									if(c == OUT){                    // Individual enters the system
-										c = hash_compgl[p].find(tspl[0]);
+										let co = tspl[0];
+										co = extract_infection_info(co,get_inf_from,p,ev,ssp);
+										
+										c = hash_compgl[p].find(co);
 										if(c == undefined) alert_sample(warn,35);
 										
 										if(t == t_start) cinit = c;
@@ -1085,6 +1145,7 @@ function read_state_sample(te,chain,result,warning)
 											else{			
 												if(tr.length > 6 && tr.substr(0,6) == "move->"){
 													let nam = tr.substr(6);
+													nam = extract_infection_info(nam,get_inf_from,p,ev,ssp);
 													let co = find_comp_from_name(nam,sp.name);
 													if(co.warn != undefined) alert_sample(warn,38);
 													
@@ -1353,11 +1414,11 @@ function generate_trans_tree(get_inf_from,result,sample)
 		
 		let p_from, i_from;
 		
-		if(te == "OUT_INF"){
+		if(te == "OUT_INF" || te == "ENT_INF"){
 			p_from = OUTSIDE_INF;
 			i_from = OUTSIDE_INF;
 		}
-		else{
+		else{		
 			let spl = te.split("|");
 			if(spl.length > 2) error("Problem with split");
 			p_from = gif.p;
@@ -1605,3 +1666,19 @@ function load_bici(file)
 	loading_mess("Processing...");
 	import_file(te,file,true);
 }
+
+
+/// Copies values from simulation to inference
+function copy_model_value()
+{
+	for(let i = 0; i < model.param.length; i++){
+		let par = model.param[i];
+		if(par.variety == "normal"){
+			if(typeof (par.value) == "string"){ 	
+				par.prior.type = {te: "fix"}
+				par.prior.value.mean_eqn = {te: par.value, type: 'prior', mode: 'param only'};
+			}
+		}
+	}
+}
+

@@ -392,6 +392,23 @@ function drop_menu(cont,lay)
 {
 	let bub = inter.bubble;
 		
+	if(bub.mode == "Video"){
+		let dx = 8, dy = 1.2;
+		cont.dx = dx;
+		
+		bubble_addtitle(cont,"Export Video",{title:"Export video", te:exportvideo_text});
+	
+		bubble_add_minititle(cont,"Quality:");
+		cont.y -= 0.4;
+		bubble_addradio(cont,0,"Low","Low quality",inter.mp4quality_radio);
+		bubble_addradio(cont,0,"Medium","Medium quality",inter.mp4quality_radio); 
+		bubble_addradio(cont,0,"High","High quality",inter.mp4quality_radio);
+		cont.y += 0.3;
+		bubble_input(cont,"Frame per second:",{type:"fps"});
+		add_end_button(cont,"Export","ExportVideo2");
+		return;
+	}
+		
 	let dx = 6.5, dy = 1.2;
 	cont.dx = dx;
 	
@@ -427,18 +444,6 @@ function drop_menu(cont,lay)
 		menu.push({te:"File",sub:sub, help:file_text});
 	}
 	
-	/*
-	{
-		let sub = [];
-		let active = cont.bu.show_model;
-		sub.push({te:"Compartments", ac:"ImportComp", active:active});
-		let active2 = active; if(active2 == true && cont.bu.coord != "latlng") active2 = false;
-		sub.push({te:"Comp. Map", ac:"ImportCompMap", active:active2});			
-					
-		sub.push({te:"Transitions", ac:"ImportTrans", active:active});
-		menu.push({te:"Import",sub:sub, help:import_text});
-	}
-	*/
 	{
 		let sub = [];
 		let active = false; 
@@ -452,6 +457,11 @@ function drop_menu(cont,lay)
 		
 		sub.push({te:"Print", ac:"PrintGraph", active:active});
 		sub.push({te:"Image (.png)", ac:"ExportGraph", active:active});
+		
+		let active_video = false;	
+		if(find(inter.layer,"name","AnimControls") != undefined) active_video = true;
+	
+		sub.push({te:"Video (.mp4)", ac:"ExportVideo", active:active_video});
 		
 		let ac = "ExportTable";
 

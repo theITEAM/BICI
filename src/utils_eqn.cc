@@ -332,9 +332,9 @@ string basic_equation_check(string &te, EqnType eqn_type)
 					if(type == "pop"){
 						emg = check_valid_name(tex,"population"); if(emg != "") return emg;
 						
-						if(eqn_type == REPARAM_EQN){
-							return "Reparameterisation equation cannot contain populations.";
-						}
+						//if(eqn_type == REPARAM_EQN){
+							//return "Reparameterisation equation cannot contain populations.";
+						//}
 					}
 
 					if(type == "ie"){

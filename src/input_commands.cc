@@ -502,7 +502,10 @@ void Input::param_mult_command()
 	Param par; 
 	par.variety = CONST_PARAM;
 	par.time_dep = true;
+	par.spline_out.on = false;
 	par.spline_info.on = true;
+	par.spline_outside = false;
+	par.spline_outside_par = false;
 	par.used = true;
 	par.param_mult = UNSET;
 	par.factor = true;
@@ -513,8 +516,15 @@ void Input::param_mult_command()
 	auto knot_times_str = get_tag_value("knot-times"); 
 	if(knot_times_str == ""){ cannot_find_tag(); return;}
 	
-	vector <string> knot_times;
-	set_spline(knot_times_str,"",knot_times,false,par);
+	auto type = LINEAR_SPL;
+		
+	auto sptype = trim(toLower(get_tag_value("spline-type")));
+	if(sptype != ""){
+		type = SplineType(option_error("spline-type",sptype,{"linear","square","cubic +ve","cubic"},{ LINEAR_SPL, SQUARE_SPL, CUBICPOS_SPL, CUBIC_SPL}));
+	}
+		
+	vector <string> knot_times, knot_times_out;
+	set_spline(type,knot_times_str,"",knot_times,knot_times_out,false,par);
 	
 	par.dep = par_orig.dep;
 
@@ -529,7 +539,7 @@ void Input::param_mult_command()
 
 	auto pp = get_param_prop(par.full_name);
 		
-	auto mult = get_dependency(par.dep,pp,knot_times); if(mult == UNSET) return; 
+	auto mult = get_dependency(par.dep,pp,knot_times,knot_times_out); if(mult == UNSET) return; 
 	
 	par.element_ref.resize(mult,UNSET);
 	
@@ -1129,19 +1139,29 @@ void Input::param_command()
 	par.name = pp.name;
 	par.full_name = full_name;
 	par.time_dep = pp.time_dep;
+	par.spline_out.on = false;
 	par.spline_info.on = false;
+	par.spline_outside = false;
+	par.spline_outside_par = false;
 	par.used = false;
 	par.param_mult = UNSET;
 	par.factor = false;
 	par.line_num = line_num;
 	
-	vector <string> knot_times;
+	vector <string> knot_times, knot_times_out;
 	if(pp.time_dep == true){
 		auto knot_times_str = get_tag_value("knot-times"); if(knot_times_str == ""){ cannot_find_tag(); return;}
 		
 		auto smooth = trim(toLower(get_tag_value("smooth")));
 		
-		set_spline(knot_times_str,smooth,knot_times,true,par);
+		auto type = LINEAR_SPL;
+		
+		auto sptype = trim(toLower(get_tag_value("spline-type")));
+		if(sptype != ""){
+			type = SplineType(option_error("spline-type",sptype,{"linear","square","cubic +ve","cubic"},{ LINEAR_SPL, SQUARE_SPL, CUBICPOS_SPL, CUBIC_SPL}));
+		}
+		
+		set_spline(type,knot_times_str,smooth,knot_times,knot_times_out,true,par);
 	}
 	
 	auto cons = get_tag_value("constant"); 
@@ -1209,7 +1229,7 @@ void Input::param_command()
 		par.not_set = true;
 	}
 	
-	auto mult = get_dependency(par.dep,pp,knot_times); if(mult == UNSET) return; 
+	auto mult = get_dependency(par.dep,pp,knot_times,knot_times_out); if(mult == UNSET) return; 
 	
 	par.element_ref.resize(mult,UNSET);
 	
@@ -1415,22 +1435,32 @@ void Input::param_command()
 		
 		for(auto r = 0u; r < subtab.nrow; r++){
 			vector <unsigned int> ind(ncol-1);
+			
+			auto fl = false;
 			for(auto i = 0u; i < ncol-1; i++){
-				ind[i] = par.dep[i].hash_list.find(subtab.ele[r][i]);
+				auto ele = subtab.ele[r][i];
+				
+				ind[i] = par.dep[i].hash_list.find(ele);
 				if(ind[i] == UNSET){ 
-					alert_import("The table element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
-					return;
+					fl = true;
+					
+					if(par.dep[i].hash_list_out.find(ele) == UNSET){	
+						alert_import("The table element '"+ele+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
+						return;
+					}
 				}
 			}
 			
-			auto pri = convert_text_to_prior(subtab.ele[r][ncol-1],line_num,par.full_name,false);
-			
-			if(pri.error != ""){
-				alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not a valid prior specification: "+pri.error+" (col '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+").");
-				return;
+			if(fl == false){
+				auto pri = convert_text_to_prior(subtab.ele[r][ncol-1],line_num,par.full_name,false);
+				
+				if(pri.error != ""){
+					alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not a valid prior specification: "+pri.error+" (col '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+").");
+					return;
+				}
+				
+				set_prior_element(par,ind,pri);
 			}
-			
-			set_prior_element(par,ind,pri);
 		}
 	}
 	
@@ -1467,23 +1497,33 @@ void Input::param_command()
 		
 		for(auto r = 0u; r < subtab.nrow; r++){
 			vector <unsigned int> ind(ncol-1);
+			
+			auto fl = false;
 			for(auto i = 0u; i < ncol-1; i++){
-				ind[i] = par.dep[i].hash_list.find(subtab.ele[r][i]);
+				auto ele = subtab.ele[r][i];
+				
+				ind[i] = par.dep[i].hash_list.find(ele);
 	
 				if(ind[i] == UNSET){ 
-					alert_import("The table element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
-					return;
+					fl = true;
+					
+					if(par.dep[i].hash_list_out.find(ele) == UNSET){	
+						alert_import("The table element '"+ele+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
+						return;
+					}
 				}
 			}
 			
-			auto pri = convert_text_to_prior(subtab.ele[r][ncol-1],line_num,par.full_name,true);
+			if(fl == false){
+				auto pri = convert_text_to_prior(subtab.ele[r][ncol-1],line_num,par.full_name,true);
 			
-			if(pri.error != ""){
-				alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not a valid distribution specification: "+pri.error+" (col '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+").");
-				return;
+				if(pri.error != ""){
+					alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not a valid distribution specification: "+pri.error+" (col '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+").");
+					return;
+				}
+				
+				set_prior_element(par,ind,pri);
 			}
-			
-			set_prior_element(par,ind,pri);
 		}
 	}
 		
@@ -1519,7 +1559,7 @@ void Input::param_command()
 		
 		model.param.push_back(par);
 	}
-	
+
 	if(par.variety == REPARAM_PARAM){	
 		for(const auto &ele : par.element){		
 			he(ele.value);
@@ -1561,7 +1601,8 @@ void Input::derived_command()
 		setup_der_func(df_type,eqn_name,der.func);
 	}
 	else{			
-		auto mult = get_dependency(der.dep,pp,vector <string> ()); if(mult == UNSET) return; 
+		auto mult = get_dependency(der.dep,pp,vector <string> (),vector <string> ()); 
+		if(mult == UNSET) return; 
 		
 		const auto &depend = der.dep;
 		
@@ -2250,6 +2291,20 @@ void Input::ind_effect_command()
 		}
 	}
 	
+	if(A_matrix.set){
+		const auto &A = A_matrix.value;
+		auto M = A.size();
+		auto num = 0.0;		
+		for(auto j = 0u; j < M; j++){
+			for(auto i = 0u; i < M; i++){
+				if(A[j][i] != 0) num++;
+			}
+		}
+		
+		A_matrix.sparsity = num/(M*M);
+	}
+	else A_matrix.sparsity = UNSET; 
+	
 	IEgroup ieg; 
 	ieg.list = list; 
 	ieg.A_matrix = A_matrix;
@@ -2348,22 +2403,46 @@ void Input::inf_state_command()
 		
 		while(li < flines.size() && trim(flines[li]) != "{") li++;
 		if(li == flines.size()) alert_import(warn);
-		while(li < flines.size() && !begin_str(trim(flines[li]),"timepoint")) li++;
-		if(li == flines.size()) alert_import(warn);
 		li++;
-		while(li < flines.size() && begin_str(trim(flines[li]),"#")) li++;
-		while(li < flines.size()){
-			auto line = trim(flines[li]);
-			if(line == "}") break;
-			if(line != ""){
-				auto spl = split(flines[li],':');
-				if(spl.size() != 2) alert_import(warn);
-				auto num = number(spl[0]);
-				auto name = spl[1];
-				if(num >= ind_key.size()) ind_key.resize(num+1);
-				ind_key[num] = name;
+		
+		auto li_st = li;
+		
+		while(li < flines.size() && trim(flines[li]) != "}") li++;
+		if(li == flines.size()) alert_import(warn);
+		
+		for(auto i = li_st; i < li; i++){
+			auto st = trim(flines[i]);
+			if(st.length() > 0 && !begin_str(st,"#")){
+				if(begin_str(st,"timepoint")){
+				}
+				else{
+					if(begin_str(st,"spline-out")){
+						auto spl = split(st,' ');
+						if(spl.size() != 3){ alert_import(warn); return;}
+						
+						auto name = spl[1];
+						auto th = 0u;
+						while(th < model.param.size() && model.param[th].name != name) th++;
+						if(th == model.param.size()){ alert_import(warn); return;}
+						
+						auto &par = model.param[th];
+						if(!par.time_dep){ alert_import(warn); return;}
+						
+						if(!par.spline_out.on){
+							par.spline_out.on = true;
+							par.spline_out.list = split(spl[2],',');
+						}
+					}
+					else{
+						auto spl = split(st,':');
+						if(spl.size() != 2) alert_import(warn);
+						auto num = number(spl[0]);
+						auto name = spl[1];
+						if(num >= ind_key.size()) ind_key.resize(num+1);
+						ind_key[num] = name;
+					}
+				}
 			}
-			li++;
 		}
 		
 		while(li < flines.size() && !begin_str(flines[li],"<<")) li++;

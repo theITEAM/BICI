@@ -117,7 +117,7 @@ void MFA::run()
 				}
 			}
 	
-			if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
+			//if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
 		}
 		
 		update(s);

@@ -15,10 +15,12 @@ using namespace std;
 /// Calculates values for the observation equations
 vector <double> StateSpecies::calculate_obs_eqn(const vector <unsigned int> &list)
 {
+	const auto &precalc = param_val.precalc;
+	
 	vector <double> store;
 	for(auto i : list){
 		store.push_back(obs_eqn_value[i]);
-		obs_eqn_value[i] = eqn[sp.obs_eqn[i]].calculate_param_only_ti_fix(param_val,spline_val);
+		obs_eqn_value[i] = eqn[sp.obs_eqn[i]].calculate_param_ti_fix(precalc);
 	}
 
 	return store;
@@ -576,10 +578,11 @@ vector <double> StateSpecies::likelihood_unobs_trans(unsigned int e, const vecto
 	const auto &eq = eqn[sp.obs_trans_eqn[e]];
 	auto &otev = obs_trans_eqn_value[e];
 	const auto &oten = obs_trans_eqn_num[e];
+	const auto &precalc = param_val.precalc;
 
 	double log_val;
 	if(eq.time_vari == false){
-		auto val = 1 - eq.calculate_param_only(param_val);
+		auto val = 1 - eq.calculate_param(precalc);
 		if(val < TINY) log_val = LI_WRONG;
 		else{
 			if(val > 1) emsg("Trans prob out of range");
@@ -596,7 +599,7 @@ vector <double> StateSpecies::likelihood_unobs_trans(unsigned int e, const vecto
 	else{
 		auto num=0u;
 		for(auto ti : list){
-			auto val = 1 - eq.calculate_no_popnum(ti,param_val,spline_val);	
+			auto val = 1 - eq.calculate_no_popnum(ti,precalc);	
 		
 			if(val < TINY) log_val = LI_WRONG;
 			else{

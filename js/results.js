@@ -234,7 +234,7 @@ function get_param_value(i,source,lines,result,warn,mode)
 	let spl = comma_split(lines[i]);
 	let name = remove_quote(spl[0].replace(/->/g,"→"));
 	name = remove_escape_char(name);
-	
+
 	let th = find(result.param,"name",name);
 	if(th == undefined) alert_sample(warn,13);
 	
@@ -255,8 +255,9 @@ function get_param_value(i,source,lines,result,warn,mode)
 				
 			value = par_find_template(list);
 			let co_list = generate_co_list(list);
+			
 			par.list = list;
-			//par.co_list = co_list;
+			par.co_list = co_list;
 		
 			i++;
 			let spl_head = comma_split(lines[i]);
@@ -265,7 +266,9 @@ function get_param_value(i,source,lines,result,warn,mode)
 			
 			let ndep = dep.length;
 		
-			if(spl_head.length != ndep+1) alert_sample(warn,14);
+			if(spl_head.length != ndep+1){
+				alert_sample(warn,14);
+			}
 			
 			for(let d = 0; d < ndep; d++){
 				if(remove_prime(dep[d]) != remove_prime(spl_head[d])){
@@ -283,7 +286,9 @@ function get_param_value(i,source,lines,result,warn,mode)
 				let index=[];
 				for(let d = 0; d < ndep; d++){
 					let k = find_in(list[d], spl_row[d]);
-					if(k == undefined) alert_sample(warn,18);
+					if(k == undefined){
+						alert_sample(warn,18);
+					}
 					index.push(k);
 				}
 				let val = spl_row[ndep];
@@ -1099,7 +1104,7 @@ function initialise_plot_filters(result,source)
 			
 						for(let k = 0; k < strat.comb.length; k++){
 							let ind = strat.comb[k].index;
-							let desc = desc_base;
+							let desc = desc_base+" ";
 							let strat_filt=[];
 							for(let m = 0; m < ind.length; m++){
 								if(m != 0) desc += ",";
@@ -1266,7 +1271,6 @@ function get_par_pos_view(par,so)
 		}
 		
 		let title = "Time variation in "+name;
-	
 		switch(par.dep.length){
 		case 2:
 			{

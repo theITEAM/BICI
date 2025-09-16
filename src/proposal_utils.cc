@@ -121,8 +121,8 @@ void Proposal::get_affect_like()
 		
 	model.add_popnum_ind_w_affect(affect_like);
 
-	if(linearise_speedup2 && type == PARAM_PROP){
-		model.affect_linearise_speedup2(affect_like,param_list,dependent);
+	if(nonpop_speedup && type == PARAM_PROP){   
+		model.affect_nonpop_speedup(affect_like,dependent_update_precalc,update_precalc);
 	}
 	
 	model.order_affect(affect_like);
@@ -201,22 +201,68 @@ void Proposal::update_sampler(const CorMatrix &cor_matrix)
 }
 
 /// Samples from the covariance matrix
-vector <double> Proposal::sample(vector <double> param_val)
+bool Proposal::param_resample(PV &param_val)
 {
+	timer[PARAM_RESAMPLE_TIMER] -= clock();
+	
 	auto vec = sample_mvn(Z);
 
+	auto &value = param_val.value;
+	auto &precalc = param_val.precalc;
+	
 	for(auto i = 0u; i < N; i++){
-		param_val[param_list[i]] += si*vec[i];
-	}	
+		auto j = param_list[i];
+		param_val.value_change(j);
+		value[j] += si*vec[i];
+		//model.param_update_precalc(j,param_val,true);
 		
-	for(auto j : dependent){
+		if(model.in_bounds(value[j],j,precalc) == false){
+			param_val.restore(); 
+			timer[PARAM_RESAMPLE_TIMER] += clock();
+			return false;
+		}
+		
+		model.param_update_precalc_after(j,param_val,true);
+	}	
+	
+	for(auto k = 0u; k < dependent.size(); k++){
+		auto j = dependent[k];
+
 		const auto &pv = model.param_vec[j];
 		auto ref = model.param[pv.th].get_eq_ref(pv.index);
 		if(ref == UNSET) emsg("Reparam is not set");	
-		param_val[j] = model.eqn[ref].calculate_param_only(param_val);
+		
+		const auto &dup = dependent_update_precalc[k];
+		if(dup.list_precalc.size() > 0){
+			model.precalc_eqn.calculate(dup.list_precalc,dup.list_precalc_time,param_val,true);
+		}
+		
+		//model.param_update_precalc(j,param_val,true);
+		param_val.value_change(j);
+		value[j] = model.eqn[ref].calculate_param(precalc);
+		
+		if(model.in_bounds(value[j],j,precalc) == false){
+			param_val.restore(); 
+			timer[PARAM_RESAMPLE_TIMER] += clock();
+			return false;
+		}
+		
+		model.param_update_precalc_after(j,param_val,true);
+	}
+
+	if(omega_check && model.ie_cholesky_error(param_val)){
+		param_val.restore(); 
+		timer[PARAM_RESAMPLE_TIMER] += clock();
+		return false;
 	}
 	
-	return param_val;
+	for(const auto &pr_up : update_precalc){
+		model.precalc_eqn.calculate(pr_up.list_precalc,pr_up.list_precalc_time,param_val,true);
+	}
+	
+	timer[PARAM_RESAMPLE_TIMER] += clock();
+	
+	return true;
 }
 
 
@@ -264,7 +310,7 @@ ICResult Proposal::propose_init_cond(InitCondValue &icv, const State &state)
 				
 				icv.N_total += dN_total;
 		
-				if(prior_probability(icv.N_total,ic.pop_prior,state.param_val,model.eqn) == -LARGE){
+				if(prior_probability(icv.N_total,ic.pop_prior,state.param_val.precalc,model.eqn) == -LARGE){
 					return IC_FAIL;
 				}
 		
@@ -301,7 +347,7 @@ ICResult Proposal::propose_init_cond(InitCondValue &icv, const State &state)
 				
 				icv.N_focal[cpr] += dN_focal;
 		
-				if(prior_probability(icv.N_focal[cpr],ic.comp_prior[cpr],state.param_val,model.eqn) == -LARGE){
+				if(prior_probability(icv.N_focal[cpr],ic.comp_prior[cpr],state.param_val.precalc,model.eqn) == -LARGE){
 					return IC_FAIL;
 				}
 			
@@ -597,26 +643,14 @@ void Proposal::update_ind_samp_si(unsigned int tr_gl, double fac)
 }
 
 
-/// Separate list of changes to splines from other changes
-void Proposal::calculate_affect_spline()
-{
-	auto i = 0u;
-	while(i < affect_like.size()){
-		if(affect_like[i].type == SPLINE_AFFECT){
-			affect_spline.push_back(affect_like[i]);
-			affect_like.erase(affect_like.begin()+i);
-		}
-		else i++;
-	}
-}
-
-
+/*
 /// Deterines probability proposal won't be performed (assuming no prob adaptation)
 bool Proposal::skip_proposal(double val) const 
 {
 	if(!adapt_prop_prob && ran() < val) return true;
 	return false;
 }
+*/
 
 
 /// Determines if omega needs to be checked over proposal
@@ -656,3 +690,87 @@ void Proposal::ind_obs_prob_update(IndSimProb &isp) const
 	isp.done = true;
 }
 
+
+/// Sets the proposal probability 
+double Proposal::set_prop_prob()
+{
+	switch(type){
+	case IND_OBS_SAMP_PROP:
+		{
+			// This works out a metric for the time taken to do generate_ind_obs_timeline()
+			const auto &sp = model.species[p_prop];
+			
+			auto effort = 0.0;
+			for(auto cl = 0u; cl < sp.ncla; cl++){
+				const auto &claa = sp.cla[cl];
+		
+				auto av = 0.0, nav = 0.0;
+				for(auto i = 0u; i < claa.island.size(); i++){
+					auto sum = 0u;
+					const auto &comp = claa.island[i].comp;
+					if(comp.size() > 1){
+						for(const auto &co : comp) sum += (1+co.leave.size());
+					}
+					av += sum; nav++;
+				}				
+				av /= nav;
+				effort += av; 
+			}
+			
+			auto pr = 0.5/effort;
+			if(pr > 0.4) pr = 0.4;
+			if(pr < 0.01) pr = 0.01;
+			return pr;
+		}
+		
+	case IE_PROP: case IE_VAR_PROP: case IE_COVAR_PROP: case IE_VAR_CV_PROP:
+		{
+			const auto &sp = model.species[p_prop];
+			
+			auto g = UNSET;
+			switch(type){
+			case IE_PROP: case IE_VAR_PROP: case IE_VAR_CV_PROP: g = sp.ind_effect[ie_prop].index; break;
+			case IE_COVAR_PROP: g = ind_eff_group_ref.ieg; break;
+			default: break;
+			}			
+			
+			const auto &ieg = sp.ind_eff_group[g];
+	
+			auto N = ieg.list.size();
+			auto effort = N;
+			const auto &A = ieg.A_matrix;
+			if(A.set == true) effort *= A.sparsity*A.value.size();
+			
+			auto pr = 4000.0/(2000+effort);
+			
+			switch(type){
+			case IE_PROP: 
+				pr *= 0.2;
+				if(pr > 0.2) pr = 0.2;
+				if(pr < 0.05) pr = 0.05;
+				break;
+				
+			default:
+				if(pr > 1) pr = 1;
+				if(pr < 0.1) pr = 0.1;
+				break;
+			}
+			
+			return pr;
+		}
+		
+	case PARAM_PROP: return 0.5;
+
+	case IND_OBS_RESIM_SINGLE_PROP: return 0.5;
+	case IND_OBS_RESIM_PROP: return 0.5;
+	case IND_MULTI_EVENT_PROP: return 0.5;
+	case IND_EVENT_ALL_PROP: return 0.5;
+	case TRANS_TREE_PROP: return 0.1;
+	case TRANS_TREE_SWAP_INF_PROP: return 0.1;
+	case TRANS_TREE_MUT_PROP: return 0.1;
+	case TRANS_TREE_MUT_LOCAL_PROP: return 0.1;
+	case POP_SINGLE_LOCAL_PROP: return 0.2;
+	default: break;
+	}
+	return 1;
+}

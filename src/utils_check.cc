@@ -55,7 +55,7 @@ void test_distribution()
 			sum += exp(val);
 		}			
 		cout << sum << " sum" << endl;
-		emsg("do");
+		emsg("check dist");
 	}
 	
 	{

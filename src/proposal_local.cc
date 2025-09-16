@@ -288,7 +288,7 @@ void Proposal::pop_add_rem_local(State &state)
 					nac++;	
 					
 					for(auto j = 0u; j < L; j++) samp[j].update(local_change[j].ti-tmin,1);
-					state.add_like(like_ch);
+					state.accept(like_ch);
 				}
 				else{
 					state.calculate_local_change(p_prop,local_change,-1,ill);
@@ -320,7 +320,7 @@ void Proposal::pop_add_rem_local(State &state)
 					if(ran() < al){
 						nac++;	
 						for(auto j = 0u; j < L; j++) samp[j].update(local_change[j].ti-tmin,-1);
-						state.add_like(like_ch);
+						state.accept(like_ch);
 					}
 					else{ 
 						state.calculate_local_change(p_prop,local_change,-1,ill);
@@ -389,7 +389,7 @@ void Proposal::pop_move_local(State &state)
 				nac++;
 				samp.update(tr,ti-tmin,-1);
 				samp.update(tr,ti_new-tmin,1);
-				state.add_like(like_ch);
+				state.accept(like_ch);
 			}
 			else{ 
 				state.calculate_local_change(p_prop,local_change,-1,ill);
@@ -467,7 +467,7 @@ void Proposal::pop_ic_local(State &state)
 					if(ran() < al){ 
 						nac++;
 						samp.update(tr,ti,1);
-						state.add_like(like_ch);
+						state.accept(like_ch);
 					}
 					else{ 
 						state.calculate_local_change(p_prop,local_change,-1,ill);
@@ -503,7 +503,7 @@ void Proposal::pop_ic_local(State &state)
 						if(ran() < al){ 
 							nac++;
 							samp.update(tr,ti,-1);
-							state.add_like(like_ch);
+							state.accept(like_ch);
 						}
 						else{ 
 							state.calculate_local_change(p_prop,local_change,-1,ill);
@@ -583,7 +583,7 @@ void Proposal::pop_end_local(State &state)
 				if(ran() < al){ 
 					nac++;
 					samp.update(tr,ti-ti_shift,1);
-					state.add_like(like_ch);
+					state.accept(like_ch);
 				}
 				else{ 
 					state.calculate_local_change(p_prop,local_change,-1,ill);
@@ -613,7 +613,7 @@ void Proposal::pop_end_local(State &state)
 					if(ran() < al){ 
 						nac++;
 						samp.update(tr,ti-ti_shift,-1);
-						state.add_like(like_ch);
+						state.accept(like_ch);
 					}
 					else{ 
 						state.calculate_local_change(p_prop,local_change,-1,ill);
@@ -640,7 +640,7 @@ void Proposal::pop_end_local(State &state)
 /// Adds or removes single events (with potentially making corresponding change to IC)
 void Proposal::pop_single_local(State &state)
 {
-	if(skip_proposal(0.8)) return;
+	//if(skip_proposal(0.8)) return;
 	
 	auto pl = false;
 	
@@ -710,7 +710,7 @@ void Proposal::pop_single_local(State &state)
 						if(ran() < al){ 
 							nac++;	
 							tr_sel.update(tr,ti,1);
-							state.add_like(like_ch);
+							state.accept(like_ch);
 						}
 						else{ 
 							state.calculate_local_change(p_prop,local_change,-1,ill);
@@ -749,7 +749,7 @@ void Proposal::pop_single_local(State &state)
 							if(ran() < al){ 
 								nac++;
 								tr_sel.update(tr,ti,-1);
-								state.add_like(like_ch);
+								state.accept(like_ch);
 							}
 							else{ 
 								state.calculate_local_change(p_prop,local_change,-1,ill);
@@ -785,7 +785,7 @@ void Proposal::pop_single_local(State &state)
 					if(ran() < al){ 
 						nac++;	
 						tr_sel.update(tr,ti,1);
-						state.add_like(like_ch);
+						state.accept(like_ch);
 					}
 					else{ 
 						state.calculate_local_change(p_prop,local_change,-1,ill);
@@ -819,7 +819,7 @@ void Proposal::pop_single_local(State &state)
 						if(ran() < al){ 
 							nac++;
 							tr_sel.update(tr,ti,-1);
-							state.add_like(like_ch);
+							state.accept(like_ch);
 						}
 						else{ 
 							state.calculate_local_change(p_prop,local_change,-1,ill);
@@ -885,7 +885,7 @@ void Proposal::pop_ic(State &state)
 					if(ran() < al){
 						nac++;	
 						samp.update(c,1);
-						state.add_like(like_ch);
+						state.accept(like_ch);
 					}
 					else{ 
 						state.calculate_local_change(p_prop,local_change,-1,ill);
@@ -915,7 +915,7 @@ void Proposal::pop_ic(State &state)
 						if(ran() < al){ 
 							nac++;
 							samp.update(c,-1);
-							state.add_like(like_ch);
+							state.accept(like_ch);
 						}
 						else{ 
 							state.calculate_local_change(p_prop,local_change,-1,ill);
@@ -988,7 +988,7 @@ void Proposal::pop_ic_swap(State &state)
 				nac++;	
 				samp.update(ci,-1);
 				samp.update(cf,1);
-				state.add_like(like_ch);
+				state.accept(like_ch);
 			}
 			else{ 
 				state.calculate_local_change(p_prop,local_change,-1,ill);

@@ -1849,8 +1849,12 @@ function button_action(bu,action_type)
 		}
 		break;
 		
-	case "StartCluster":
-		start_worker("StartCluster",{save_type:inter.help.siminf, map_store:map_store, ver:ver});		
+	case "StartClusterSave":
+		start_worker("StartClusterSave",{save_type:inter.help.siminf, map_store:map_store, ver:ver});		
+		break;
+		
+	case "StartClusterExport":
+		start_worker("StartClusterExport",{save_type:inter.help.siminf, map_store:map_store, ver:ver});		
 		break;
 
 	case "CopyText":
@@ -1884,7 +1888,7 @@ function button_action(bu,action_type)
 	case "ExportScript":
 		close_bubble();
 		inter.file_store.type = "SaveAs";
-		start_worker("Save BICI",{save_type:"export", map_store:map_store});
+		start_worker("Export BICI",{save_type:"save", map_store:map_store});
 		break;
 		
 	case "ParamInfo":
@@ -2146,7 +2150,7 @@ function button_action(bu,action_type)
 		
 	case "ViewCode":
 		close_bubble();
-		start_worker("View Code",{save_type:"export", map_store:map_store});
+		start_worker("View Code",{save_type:"save", map_store:map_store});
 		break;
 	
 	case "GraphSettings":
@@ -2190,9 +2194,28 @@ function button_action(bu,action_type)
 		saving_dialogue("",".png","Export graph");
 		break;
 		
+	case "ExportVideo":
+		{
+			change_bubble_mode("Video");
+		
+			inter.fps = "25";
+
+			let anim = inter.graph.animation;
+			let speed = anim.speed.value;
+			let fps =  Math.floor(anim.playframe_max*speed/4);
+			if(fps == 0) fps = 1;
+			inter.fps = String(fps);
+		}
+		break;
+	
+	case "ExportVideo2":
+		close_bubble();
+		saving_dialogue("",".mp4","Export video");
+		break;
+	
 	case "PrintGraph":
 		close_bubble();
-		inter.graph.export_image();
+		inter.graph.export_image(image_scale_factor);
 		break;
 	
 	case "ExportTable":
@@ -2238,8 +2261,14 @@ function button_action(bu,action_type)
 		break;
 	
 	case "Stop":
-		if(inter.running_status == true) terminate();
-		else stop_worker();
+		switch(inter.loading_symbol.type){
+		case "Creating": inter.graph.stop_video_export(); break;
+		case "mp4": inter.graph.spw.kill(); inter.graph.stop_video_export(); break;
+		default:
+			if(inter.running_status == true) terminate();
+			else stop_worker();
+			break;
+		}
 		break;
 		
 	case "MatrixEleBut":	

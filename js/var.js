@@ -17,6 +17,9 @@ let inter=                                         // Dynamic variables related 
 	density_slider:{update:"density",lay:"AnimControls", min:-3, max:3, value:0},      // Information about density slider
 	compmatrix_slider:{update:"compmatrix",lay:"AnimControls", min:-1, max:1, value:0},// Slider used for matrix
 	
+	mp4quality_radio: { value:"Low"},                // The default quality for mp4    
+	fps: 25,                                         // The frames per second for mp4
+	
 	mx:undefined,                                    // Position of the mouse
 	my:undefined,
 	

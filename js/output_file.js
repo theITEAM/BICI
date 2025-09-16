@@ -3,16 +3,15 @@
 
 /// Creates an output file
 // save_type has the values:
-// sim - In one file 
-// inf - In one file
-// save - In one file
-// export - References data files
-function create_output_file(save_type,map_store)
+// sim - Saves a simulation (this performs additional simulation checks)
+// inf - Saves an inference (this performs additional simulation checks)
+// save - Saves files (somes things are not checked
+
+// one_file deterines if a a single file is generated or a file and directory are made
+// 
+function create_output_file(save_type,one_file,map_store)
 {
 	let file_list=[];  // Used to make sure that files to not share the same name
-	
-	let one_file = true;
-	if(save_type == "export") one_file = false; 
 	
 	percent(0);
 
@@ -90,7 +89,7 @@ function err_warning()
 	
 	switch(input.type){
 	case "View Code": case "Export BICI": case "Start": case "Save BICI": 
-	case "StartCluster": case "StartPPC":
+	case "StartClusterSave": case "StartClusterExport": case "StartPPC":
 		full_warn = true;
 		break;
 	}
@@ -130,7 +129,7 @@ function create_output_details(save_type,file_list,one_file)
 {
 	let te = "";
 
-	if(save_type == "export"){
+	if(!one_file){
 		te += banner("DATA DIRECTORY");
 		te += 'data-dir folder="."'+endl;
 		te += endl;
@@ -805,6 +804,7 @@ function output_param(par,save_type,file_list,one_file)
 							let err = check_param_value("Set Param",par,par.value);
 							if(err){
 								add_warning({mess:"Problem with "+par.full_name+" value", mess2:err, warn_type:"MissingSimValue", name:par.name});
+								return;
 							}
 						
 							file = output_value_table(par,par.value,file,file_list,one_file);
@@ -848,10 +848,12 @@ function output_param(par,save_type,file_list,one_file)
 					for(let j = 0; j < par.spline.knot.length; j++){
 						let num = par.spline.knot[j];
 						if(num != "start" && num != "end"){
+							/*
 							num = Number(num);
 							if(num < t_start || num > t_end){
 								add_warning({mess:"Knot problem", mess2:"Knot time '"+num+"' must be between the start and end times", warn_type:"KnotProblem", name:par.name});
 							}
+							*/
 						}
 					}
 				}
@@ -861,6 +863,17 @@ function output_param(par,save_type,file_list,one_file)
 				let sm = par.spline.smooth;
 				if(sm.check == true){
 					te2 += ' smooth="'+sm.type.value.toLowerCase()+'('+sm.value+')"';
+				}
+				
+				let sel = par.spline.spline_radio.value;
+
+				if(sel != "Linear"){
+					switch(sel){
+					case "Linear": te2 += ' spline-type="linear"'; break;
+					case "Square": te2 += ' spline-type="square"'; break;
+					case "Cubic +ve": te2 += ' spline-type="cubic +ve"'; break;
+					case "Cubic": te2 += ' spline-type="cubic"'; break;
+					}
 				}
 			}
 		}
@@ -1787,7 +1800,7 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 		case "remove-pop-inf": com = "remove-pop-sim"; break;
 		case "add-ind-inf": com = "add-ind-sim"; break;
 		case "remove-ind-inf": com = "remove-ind-sim"; break;
-		case "move-ind": com = "move-ind-sim"; break;
+		case "move-ind-inf": com = "move-ind-sim"; break;
 		case "init-pop-inf": com = "init-pop-sim"; break;
 		}
 	}
@@ -1798,7 +1811,7 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 		case "remove-pop-inf": com = "remove-pop-post-sim"; break;
 		case "add-ind-inf": com = "add-ind-post-sim"; break;
 		case "remove-ind-inf": com = "remove-ind-post-sim"; break;
-		case "move-ind": com = "move-ind-post-sim"; break;
+		case "move-ind-inf": com = "move-ind-post-sim"; break;
 		}
 	}
 	

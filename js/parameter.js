@@ -361,6 +361,8 @@ function param_eqn_desc(eqn)
 	case "trans_cv": return "in a transition coefficient of variation";
 	case "comp_prob": case "sim_comp_prob": return "in a compartmental probability";
 	case "reparam": return "in a reparametersation";
+	case "derive_param": return "in a derived parameter";
+	case "derive_eqn": return "in a derived equation";
 	default: error("option not pos:"+eqn.type); break;	
 	}
 }
@@ -1044,7 +1046,7 @@ function create_new_param(par,variety)
 	let on = false;
 	if(par.time_dep == true) on = true;
 	
-	par.spline = { on:on, smooth:default_smooth(), time_dep:par.time_dep, knot:knot}; 
+	par.spline = { on:on, smooth:default_smooth(), spline_radio:spline_radio_pos[0], time_dep:par.time_dep, knot:knot}; 
 		
 	par.sim_sample = {check:true};
 		 
@@ -2034,7 +2036,7 @@ function add_param_ppc_factor(par_list)
 }
 
 
-/// Sets up a blank parameter specification (
+/// Sets up a blank parameter specification
 function param_blank(par)
 {
 	let temp = par_find_template(par.list);

@@ -14,7 +14,7 @@ using namespace std;
 #include "matrix.hh"
 
 /// Initialises the state species
-StateSpecies::StateSpecies(const vector <double> &param_val, const vector <SplineValue> &spline_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const vector <unsigned int> &pop_affect_, Operation mode_, const double &dif_thresh) : source_sampler(sp.markov_eqn,sp.tra_gl,sp.comp_gl,details,sp.init_cond), rate_mean(), param_val(param_val), spline_val(spline_val), eqn(eqn), param(param), param_vec(param_vec), pop(pop), sp(sp), genetic_data(genetic_data), details(details), dif_thresh(dif_thresh)
+StateSpecies::StateSpecies(const PV &param_val, const vector <Equation> &eqn, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, const Species &sp, const GeneticData &genetic_data, const Details &details, const vector <unsigned int> &pop_affect_, Operation mode_, const double &dif_thresh) : source_sampler(sp.markov_eqn,sp.tra_gl,sp.comp_gl,details,sp.init_cond), rate_mean(), param_val(param_val), eqn(eqn), param(param), param_vec(param_vec), pop(pop), sp(sp), genetic_data(genetic_data), details(details), dif_thresh(dif_thresh)
 {
 	timer.resize(STSP_TIMER_MAX,0);
 	
@@ -287,10 +287,10 @@ void StateSpecies::simulate_individual_init()// zz
 					{
 						if(enter_flat_dist(ind) == false){
 							if(sp.init_cond.type == INIT_POP_FIXED){
-								emsg("Cannot have initial population specified as well as initial state of individuals."); 
+								run_error("Cannot have initial population specified as well as initial state of individuals."); 
 							}
 							else{
-								emsg("Cannot have initial population distribution specified as well as initial state of individuals."); 
+								run_error("Cannot have initial population distribution specified as well as initial state of individuals."); 
 							}
 						}							
 						c = get_cinit_to_use(cinit_to_use);
@@ -315,7 +315,9 @@ void StateSpecies::simulate_individual_init()// zz
 	if(sp.init_cond.type == INIT_POP_NONE){
 		init_cond_val.cnum = pop_added;					
 	}
-		
+	
+	const auto &precalc = param_val.precalc;
+	
 	switch(type){
 	case POPULATION:
 		{
@@ -337,7 +339,7 @@ void StateSpecies::simulate_individual_init()// zz
 					if(tra.i == UNSET){
 						const auto &eq = eqn[tra.dist_param[0].eq_ref];
 						auto value = 1.0;
-						if(eq.pop_ref.size() == 0) value = eq.calculate_no_popnum(0,param_val,spline_val);
+						if(eq.pop_ref.size() == 0) value = eq.calculate_no_popnum(0,precalc);
 						
 						if(value != 0){
 							SourceSamp ss; ss.tr_gl = tr; ss.prob_sum = sum;
@@ -372,10 +374,10 @@ void StateSpecies::simulate_individual_init()// zz
 						if(add_so){ // Adds individual as a source
 							if(!sp.contains_source){
 								if(cinit_to_use_fl){
-									emsg("The initial sampled population size is insufficient to incorporate all observed individuals.");
+									run_error("The initial sampled population size is insufficient to incorporate all observed individuals.");
 								}
 								else{								
-									emsg("Not all inividuals can be added to the system.");
+									run_error("Not all inividuals can be added to the system.");
 								}
 							}
 							
@@ -404,7 +406,7 @@ void StateSpecies::simulate_individual_init()// zz
 						if(st != "") st += ","; 
 						st += fe.name;
 					}
-					emsg("Cannot add unspecified individuals for a model with fixed effect(s) '"+st+"'"); 
+					run_error("Cannot add unspecified individuals for a model with fixed effect(s) '"+st+"'"); 
 				}
 					
 				while(cinit_to_use.size() > 0){
@@ -421,8 +423,8 @@ void StateSpecies::simulate_individual_init()// zz
 		break;
 	}
 	
-	if(unallocated.size() != 0) emsg("It was not possible to allocate all the individuals to the initial state."); 
-	if(cinit_to_use.size() != 0) emsg("It was not possible to allocate all the individuals in the initial population distribution."); 
+	if(unallocated.size() != 0) run_error("It was not possible to allocate all the individuals to the initial state."); 
+	if(cinit_to_use.size() != 0) run_error("It was not possible to allocate all the individuals in the initial population distribution."); 
 	
 	for(auto f = 0u; f < sp.fix_effect.size(); f++) set_exp_fe(f);
 	
@@ -564,9 +566,16 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 				else{
 					for(const auto &ieg : sp.ind_eff_group){
 						if(ieg.ppc_resample == false){
+							const auto &indeff = sp.ind_effect;
+							const auto &iegs = ind_eff_group_sampler;
+	
 							for(const auto &li : ieg.list){
 								auto e = li.index;
-								ind.ie[e] = log(number(row[2+e]));
+								
+								const auto &ie = indeff[e];
+								auto var = iegs[ie.index].omega[ie.num][ie.num];
+								
+								ind.ie[e] = 0.5*var+log(number(row[2+e]));
 							}
 						}
 					}
@@ -821,7 +830,7 @@ void StateSpecies::set_tnum_mean(unsigned int ti_end, const vector < vector <dou
 {
 	auto dt = details.dt;
 	for(auto ti = 0u; ti < ti_end; ti++){
-		auto tnum_mean = calculate_tnum_mean(ti,popnum_t[ti],cpop_st[ti],param_val,dt);
+		auto tnum_mean = calculate_tnum_mean(ti,popnum_t[ti],cpop_st[ti],dt);
 		
 		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 			tnum_mean_st[tr].push_back(tnum_mean[tr]);
@@ -922,7 +931,7 @@ vector <double> StateSpecies::set_exp_fe(unsigned int f)
 	else{
 		auto th2 = par.get_param_vec(0);
 		if(th2 == UNSET) emsg("Should not be unset1");		
-		pval = param_val[th2];
+		pval = param_val.value[th2];
 	}
 	
 	vector <double> store;
@@ -1256,13 +1265,13 @@ void StateSpecies::update_population_based(unsigned int ti, bool stoc, const vec
 {
 	auto dt = details.dt;
 			
-	auto tnum_mean = calculate_tnum_mean(ti,popnum,cpop,param_val,dt);
+	auto tnum_mean = calculate_tnum_mean(ti,popnum,cpop,dt);
 	
 	if(false){
 		for(auto val : cpop) cout << val << ","; 
 		cout << "cpop" << endl;
 		
-		for(auto val : param_val) cout << val << ","; 
+		for(auto val : param_val.value) cout << val << ","; 
 		cout << "paramval" << endl;
 		
 		for(auto val : popnum) cout << val << ","; 
@@ -1325,46 +1334,49 @@ vector <double> StateSpecies::sample_trans_num(const vector <double> &tnum_mean,
 
 
 /// Calculates the rate for different transitions
-vector <double> StateSpecies::calculate_tnum_mean(unsigned int ti, const vector <double> &popnum, const vector <double> &cpop, const vector <double> &param_val, double dt) const
+vector <double> StateSpecies::calculate_tnum_mean(unsigned int ti, const vector <double> &popnum, const vector <double> &cpop, double dt) const
 {
 	auto N = sp.tra_gl.size();
 	vector <double> tnum_mean(N);
 	
 	for(auto i = 0u; i < N; i++){
-		tnum_mean[i] = calculate_tnum_mean(ti,i,popnum,cpop,param_val,dt);
+		tnum_mean[i] = calculate_tnum_mean(ti,i,popnum,cpop,dt);
 	}
 	
 	return tnum_mean;
 }
 
+
 /// Calculates the rate for different transitions
-double StateSpecies::calculate_tnum_mean(unsigned int ti, unsigned int i, const vector <double> &popnum, const vector <double> &cpop, const vector <double> &param_val, double dt) const
+double StateSpecies::calculate_tnum_mean(unsigned int ti, unsigned int i, const vector <double> &popnum, const vector <double> &cpop, double dt) const
 {
 	const auto &tr = sp.tra_gl[i];
 	if(tr.ev_type != M_TRANS_EV) emsg("Should be exponential");
 	
 	const auto &eq = eqn[tr.dist_param[0].eq_ref];
+	const auto &precalc = param_val.precalc;
 	double rate;
 
 	switch(tr.type){
 	case EXP_RATE: 
 		{
-			rate = eq.calculate(ti,popnum,param_val,spline_val);
+			rate = eq.calculate(ti,popnum,precalc);
 			if(rate < 0){	
-				emsg("The transition rate for '"+tr.name+"' through equation '"+eq.te_raw+"' has become negative."+check_prior(eq));
+				eq.print_calculation();
+				run_error("The transition rate for '"+tr.name+"' through equation '"+eq.te_raw+"' has become negative."+check_prior(eq));
 			}
 		}
 		break;
 		
 	case EXP_MEAN: 
 		{
-			auto mean = eq.calculate(ti,popnum,param_val,spline_val);
+			auto mean = eq.calculate(ti,popnum,precalc);
 			if(mean <= 0){	
 				if(mean < 0){	
-					emsg("The transition mean for '"+tr.name+"' through equation '"+eq.te_raw+"' has become negative."+check_prior(eq));
+					run_error("The transition mean for '"+tr.name+"' through equation '"+eq.te_raw+"' has become negative."+check_prior(eq));
 				}
 				else{
-					emsg("The transition mean for '"+tr.name+"' through equation '"+eq.te_raw+"' has become zero."+check_prior(eq));
+					run_error("The transition mean for '"+tr.name+"' through equation '"+eq.te_raw+"' has become zero."+check_prior(eq));
 				}
 			}
 			rate = 1/mean;
@@ -1408,6 +1420,12 @@ void StateSpecies::generate_A()
 }
 
 
+void StateSpecies::check_precalc_num(unsigned int n)
+{
+	const auto &precalc = param_val.precalc;
+	if(precalc.size() != n) emsg("problem");
+}
+
 /// Performs a MBP
 void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t)
 {
@@ -1428,11 +1446,10 @@ void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t)
 		const auto &popnum = popnum_t[ti];
 	
 		cpop_st_f.push_back(cpop);
-	
+
 		for(auto tr = 0u; tr < N; tr++){
 			auto tnum_mean_i = tnum_mean_st[tr][ti];
-			auto tnum_mean_f = calculate_tnum_mean(ti,tr,popnum,cpop,param_val,dt);
-
+			auto tnum_mean_f = calculate_tnum_mean(ti,tr,popnum,cpop,dt);
 			auto num_i = trans_num[tr][ti];
 
 			unsigned int num_f;	
@@ -1510,7 +1527,7 @@ void StateSpecies::mbp_accept(double &like_ch, const vector < vector <double> > 
 		auto &tn = trans_num[tr];
 		auto &tnm = tnum_mean_st[tr];
 		for(auto ti = 0u; ti < T; ti++){
-			tnm[ti] = calculate_tnum_mean(ti,tr,popnum_t[ti],cpop_st[ti],param_val,dt);
+			tnm[ti] = calculate_tnum_mean(ti,tr,popnum_t[ti],cpop_st[ti],dt);
 			Li[ti] = poisson_probability(tn[ti],tnm[ti]);
 		}
 	}
@@ -1849,6 +1866,7 @@ bool StateSpecies::ev_link(const Event &ev, const Individual &ind, const vector 
 	auto m = tra.nm_trans_ref;
 	const auto &nmt = sp.nm_trans[m];
 	const auto &ref = nmt.dist_param_eq_ref;
+	const auto &precalc = param_val.precalc;
 	auto ti = ev.ti;
 
 	switch(tra.type){
@@ -1856,14 +1874,14 @@ bool StateSpecies::ev_link(const Event &ev, const Individual &ind, const vector 
 	case EXP_RATE_NM: case EXP_MEAN_NM: return false;
 	case GAMMA: case LOG_NORMAL:
 		{
-			auto cv = eqn[ref[1]].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			auto cv = eqn[ref[1]].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 			if(cv < LINK_CV_THRESH) return true;
 		}
 		return false;
 	
 	case ERLANG:
 		{
-			auto shape = eqn[ref[1]].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			auto shape = eqn[ref[1]].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 			if(1.0/sqrt(shape) < LINK_CV_THRESH) return true;
 			return true;
 		}
@@ -1871,7 +1889,7 @@ bool StateSpecies::ev_link(const Event &ev, const Individual &ind, const vector 
 		
 	case WEIBULL: 
 		{
-			auto shape = eqn[ref[1]].calculate_indfac(ind,ti,popnum_t[ti],param_val,spline_val);
+			auto shape = eqn[ref[1]].calculate_indfac(ind,ti,popnum_t[ti],precalc);
 			if(shape > LINK_WEIBULL_SHAPE) return true;
 		}
 		return false;

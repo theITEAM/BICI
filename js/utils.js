@@ -903,19 +903,31 @@ function remove_escape_char(te)
 	
 	let i = 0;
 
+	let te_new="";
+	
 	while(i < te.length){
-		if(te.substr(i,1) == "\\"){
+		//if(i%1000 == 0) prr(i+" "+te.length);
+		let ch = te.substr(i,1); 
+		if(ch == "\\"){
 			let j = 0; 
 			while(j < escape_char.length && te.substr(i,escape_char[j][0].length) != escape_char[j][0]) j++;
 			if(j < escape_char.length){
-				te = te.substr(0,i)+escape_char[j][1]+te.substr(i+escape_char[j][0].length);
+				te_new += escape_char[j][1];
+				i += escape_char[j][0].length;
+				//te = te.substr(0,i)+escape_char[j][1]+te.substr(i+escape_char[j][0].length);
 			}
-			else i++;
+			else{
+				te_new += ch;
+				i++;
+			}
 		}
-		else i++;
+		else{
+			te_new += ch;
+			i++;
+		}
 	}
 	
-	return te;
+	return te_new;
 }
 
 
@@ -1022,4 +1034,75 @@ function sort_string_number(a,b,at,bt,sign)
   if(A < B) return -1*sign; 
 	if(A > B) return 1*sign;
   return 0;
+}
+
+
+/// This provides an algorithm for solving cubic splines
+function solve_cubic_spline(x,f,spl_type)
+{
+	let n = x.length-1;
+	
+	let h=[], al=[], I=[], mu=[], z=[], a=[], b=[], c=[], d=[];
+	
+	if(spl_type == "Cubic +ve"){
+		f = copy(f);
+		for(let i = 0; i <= n; i++){
+			if(f[i] <= 0) return "For a 'Cubic +ve' spline all knot values must be positive";
+			f[i] = Math.log(f[i]);
+		}
+	}
+	
+	for(let i = 0; i < n; i++){
+		a[i] = f[i];
+		h[i] = x[i+1]-x[i];
+		if(h[i] <= 0) return "Spline times must be monatonically increasing";
+	}
+
+	for(let i = 1; i < n; i++){
+		al[i] = (3/h[i])*(f[i+1] - f[i]) - (3/h[i-1])*(f[i] - f[i-1]);
+	}
+	
+	I[0] = 1; mu[0] = 0; z[0] = 0;
+	
+	for(let i = 1; i < n; i++){
+		I[i] = 2*(x[i+1]-x[i-1]) - h[i-1]*mu[i-1];
+		mu[i] = h[i]/I[i];
+		z[i] = (al[i]-h[i-1]*z[i-1])/I[i];
+	}
+
+	for(let j = n-1; j >= 0; j--){
+		let cne = 0; if(j < n-1) cne = c[j+1];
+		c[j] = z[j] - mu[j]*cne;
+		b[j] = ((f[j+1]-f[j])/h[j]) - ((h[j]*(cne+2*c[j])/3));
+		d[j] = (cne-c[j])/(3*h[j]);
+	}
+	
+	return {x:x, a:a, b:b, c:c, d:d, type:spl_type};
+}
+
+
+/// Calculates a cubic spline from 
+function calculate_cubic_spline(xf,cspl)
+{
+	let x = cspl.x;
+	 
+	if(xf < x[0]){
+		error("Value '"+xf+"' outside of spline range");
+		return 0;
+	}
+	
+	let i = 0;
+	while(i+1 < x.length && x[i+1] < xf) i++;
+	
+	if(i+1 == x.length){
+		error("Value '"+xf+"' outside of spline range");
+		return 0;
+	}
+	
+	let dx = xf-x[i];
+	
+	let val = cspl.a[i] + cspl.b[i]*dx + cspl.c[i]*dx*dx + cspl.d[i]*dx*dx*dx;
+	
+	if(cspl.type == "Cubic +ve") return Math.exp(val);
+	return val;
 }

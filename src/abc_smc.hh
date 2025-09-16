@@ -16,7 +16,7 @@ class ABC_SMC
 		Proposal intialise_proposal() const;
 		double implement_cutoff_frac(vector <Particle> &particle) const;
 		
-		double calculate_particle_weight(const vector <double> &param_val, const vector <Particle> &particle, const Proposal &prop) const;
+		double calculate_particle_weight(const PV &param_prop, const vector <Particle> &particle, const Proposal &prop) const;
 		void setup_particle_sampler(const vector <Particle> &particle);
 		unsigned int particle_sampler() const;
 	

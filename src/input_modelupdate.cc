@@ -318,7 +318,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 			ptf.eqn_zero = set_eqn_zero(ptf.trans_prob_eqn);
 			ptf.tr_nonzero = false_list(ptf.eqn_zero);
 		}
-		
+	
 		for(auto &ptd : sp.pop_trans_data){                // Population transition data
 			auto &ptf = sp.pop_trans_filter[ptd.ref];
 			ptd.time_vari = ptf.time_vari;
@@ -479,21 +479,185 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 }
 
 
+/// Combines together populations which appear in equations
+void Input::combine_populations()
+{
+	auto &pop = model.pop;
+	auto &hash_pop = model.hash_pop;
+	
+	vector < vector <double> > mapw;
+	mapw.resize(model.nspecies);
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];
+		mapw[p].resize(sp.comp_gl.size(),UNSET);
+	}
+	
+	vector <unsigned int> listw;
+	
+	auto fl = false;
+	for(auto &eqn : model.eqn){
+		auto simp_fl = false;
+		for(auto &ca : eqn.calcu){
+			if(ca.op == ADD){
+				auto &item = ca.item;
+				auto i = 0u; while(i+1 < item.size() && item[i].type != POPNUM) i++;
+				if(i+1 < item.size()){
+					auto po = item[i].num;
+					
+					vector <unsigned int> list;
+					list.push_back(i);
+					for(auto j = i+1; j < item.size(); j++){
+						if(item[j].type == POPNUM){
+							auto po2 = item[j].num;
+							if(equal_pop(pop[po],pop[po2])) list.push_back(j);
+						}
+					}
+					
+					if(list.size() > 1){
+						string name;
+						for(auto i : list){
+							if(name != "") name += "+";
+							name += pop[item[i].num].name;
+						}
+						
+						auto vec = hash_pop.get_vec_string(name);
+						auto k = hash_pop.existing(vec);
+						if(k == UNSET){
+							k = pop.size();
+							hash_pop.add(k,vec);
+							
+							auto po_new = pop[po];
+							po_new.name = name;
+							
+							auto p = po_new.sp_p;
+					
+							for(auto j : list){
+								for(const auto &te : pop[item[j].num].term){
+									auto c = te.c;
+									if(mapw[p][c] == UNSET){
+										mapw[p][c] = te.w;
+										listw.push_back(c);
+									}										
+									else{
+										mapw[p][c] += te.w;
+									}
+								}
+							}
+								
+							po_new.term.clear();
+							for(auto c : listw){
+								PopulationTerm pt; pt.c = c; pt.w = mapw[p][c];
+								po_new.term.push_back(pt);
+								mapw[p][c] = UNSET;
+							}
+							listw.clear();
+							
+							pop.push_back(po_new);
+						}
+							
+						item[i].num = k;
+							
+						while(list.size() > 1){
+							auto j = list[list.size()-1];
+							list.pop_back();
+							item.erase(item.begin()+j);
+						}
+						if(item.size() == 1) simp_fl = true;
+						
+						fl = true;
+					}
+				}
+			}
+		}
+		
+		if(simp_fl) eqn.simplify(eqn.calcu);
+	}		
+	
+	if(fl == false) return;
+	
+	// Removes any unused populations
+	vector <bool> used(pop.size(),false);
+	
+	for(const auto &eqn : model.eqn){
+		for(const auto &ca : eqn.calcu){
+			for(const auto &it : ca.item){
+				if(it.type == POPNUM) used[it.num] = true;
+			}
+		}
+		
+		for(const auto &inte : eqn.integral){
+			for(const auto &ca : inte.calc){
+				for(const auto &it : ca.item){
+					if(it.type == POPNUM) used[it.num] = true;
+				}
+			}
+		}
+	}
+	
+	vector <Population> pop_new;
+	vector <unsigned int> pop_map(pop.size(),UNSET);
+	for(auto k = 0u; k < pop.size(); k++){
+		if(used[k] == true){
+			pop_map[k] = pop_new.size();
+			pop_new.push_back(pop[k]);
+		}
+	}
+	
+	if(false){
+		for(auto k = 0u; k < pop.size(); k++){
+			cout << pop[k].name << " " << used[k] << " used" << endl;
+		}
+	}
+	
+	pop = pop_new;
+	
+	for(auto &eqn : model.eqn){
+		for(auto &ca : eqn.calcu){
+			for(auto &it : ca.item){
+				if(it.type == POPNUM) it.num = pop_map[it.num];
+			}
+		}
+		
+		for(auto &inte : eqn.integral){
+			for(auto &ca : inte.calc){
+				for(auto &it : ca.item){
+					if(it.type == POPNUM) it.num = pop_map[it.num];
+				}
+			}
+		}
+	}
+	
+	//for(auto &eqn : model.eqn) eqn.print_calculation();
+}
+
+
+/// Determines if two populations are equal, apart from term
+bool Input::equal_pop(const Population &popA, const Population &popB) const
+{
+	if(popA.sp_p != popB.sp_p) return false;
+	if(popA.ind_variation != popB.ind_variation) return false;
+	if(!equal_vec(popA.ind_eff_mult,popB.ind_eff_mult)) return false;
+	if(!equal_vec(popA.fix_eff_mult,popB.fix_eff_mult)) return false;
+	
+	if(popA.markov_eqn_ref.size() != popB.markov_eqn_ref.size()) return false;
+	for(auto i = 0u; i < popA.markov_eqn_ref.size(); i++){
+		if(popA.markov_eqn_ref[i].p != popB.markov_eqn_ref[i].p) return false;
+		if(popA.markov_eqn_ref[i].e != popB.markov_eqn_ref[i].e) return false;
+	}
+	
+	if(popA.trans_ref.size() != popB.trans_ref.size()) return false;
+	for(auto i = 0u; i < popA.trans_ref.size(); i++){
+		if(popA.trans_ref[i].p != popB.trans_ref[i].p) return false;
+		if(popA.trans_ref[i].tr != popB.trans_ref[i].tr) return false;
+	}
+	
+	return true;
+}
+
+
 /// Tries to linearise equations in terms of populations
 void Input::linearise_eqn(unsigned int per_start, unsigned int per_end)
 {
-	/* // This has been turned off because calculation ofr rep num requires linearisation
-	auto fl = false;
-	if(model.mode != INF){
-		fl = true;
-		for(const auto &sp : model.species){
-			if(sp.trans_tree) fl = false;
-		}
-	}
-
-	if(fl == true) return;
-	*/
-	
 	auto dper = double(per_end-per_start)/model.species.size();
 	
 	for(auto p = 0u; p < model.nspecies; p++){
@@ -507,6 +671,15 @@ void Input::linearise_eqn(unsigned int per_start, unsigned int per_end)
 			if(e%100 == 0) percentage(per_st+fr*e,100);
 			model.eqn[me.eqn_ref].calculate_linearise();    
 		}			
+	}
+}
+
+
+/// References precalculation in linearisation
+void Input::linearise_precalc()
+{
+	for(auto &eq : model.eqn){
+		if(eq.linearise.on) eq.set_precalc();
 	}
 }
 
@@ -1334,14 +1507,17 @@ void Input::create_spline()
 			for(auto j = 0u; j < N; j++){
 				Spline spl; 
 				spl.name = get_param_name_with_dep(par,dep_reduce,j);
+				spl.type = sinfo.type;
 				spl.th = th; 
 				spl.index = j;
 				spl.constant = false;
 				spl.info = par.spline_info;
 		
 				vector <unsigned int> param_ref;
-			
-				if(par.variety == CONST_PARAM) spl.constant = true;
+		
+				if(par.variety == CONST_PARAM){
+					spl.constant = true;
+				}
 				else{	
 					for(auto i = 0u; i < ntimes; i++){
 						auto k = 0u;
@@ -1351,7 +1527,8 @@ void Input::create_spline()
 							if(pv.th == th && pv.index == j*ntimes + i) break;
 							k++;
 						}
-						if(k == model.param_vec.size()) emsg_input("Could not find");
+						
+						if(k == model.param_vec.size()) emsg_input("Could not find2");
 						
 						param_ref.push_back(k);
 					}
@@ -1359,44 +1536,107 @@ void Input::create_spline()
 					spl.param_ref = param_ref;
 				}
 				
-				auto i = 0u;                             // Indexes times
-				for(auto ti = 0u; ti < ntp-1; ti++){
-					if(tp[ti]/dt < times[0]){ // Extends parameter factors to start time
-						spl.const_val.push_back(1);
-						if(model.mode != PPC) emsg_input("Should be PPC1");
-						if(!begin_str(spl.name,"f~")) emsg_input("Should be a parameter factor");
+				auto type = spl.type;
+				
+				if(type == CUBICPOS_SPL || type == CUBIC_SPL){
+					if(spl.constant == true){
+						vector <double> val;
+						for(auto k = 0u; k < ntimes; k++){
+							val.push_back(par.get_value(j*ntimes+k));
+						}
+							
+						auto cspl = solve_cubic_spline(times,val,type);
+						
+						for(auto ti = 0u; ti < ntp-1; ti++){
+							auto tmid = (tp[ti]+tp[ti+1])/(2*dt);  
+							spl.const_val.push_back(calculate_cubic_spline(tmid,cspl));
+						}	
 					}
 					else{
-						auto tmid = (tp[ti]+tp[ti+1])/(2*dt);
-						while(i+1 < times.size() && times[i+1] < tmid) i++;
-						if(i+1 >= times.size()){ // This extends spline for PPC
-							if(model.mode != PPC){
-								emsg_input("Should be PPC2");
-							}							
+						// For cubic splines th1 stores which line polynomial and f stores time difference
+						const auto &tdiv = spl.info.knot_tdiv;
+					
+						auto k = 0u;
+						for(auto ti = 0u; ti < ntp-1; ti++){
+							auto tmid = (tp[ti]+tp[ti+1])/(2*dt); 
+						
+							while(k+1 < tdiv.size() && tdiv[k+1] < tmid) k++;
 							
-							if(spl.constant == false){
-								SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = param_ref[i]; sd.f = 1;	
-								spl.div.push_back(sd);
-							}
-							else{
-								spl.const_val.push_back(par.get_value(j*ntimes+i));
-							}
+							auto dx = tmid-tdiv[k];
+							CubicDiv cd; cd.i = k; cd.dx = dx; cd.dx2 = dx*dx; cd.dx3 = dx*dx*dx; 	
+							spl.cubic_div.push_back(cd);
+						}
+					}
+				}
+				else{		
+					auto i = 0u;                             // Indexes times
+					for(auto ti = 0u; ti < ntp-1; ti++){
+						if(tp[ti]/dt < times[0]){ // Extends parameter factors to start time
+							spl.const_val.push_back(1);
+							if(model.mode != PPC) emsg_input("Should be PPC1");
+							if(!begin_str(spl.name,"f~")) emsg_input("Should be a parameter factor");
 						}
 						else{
-							auto f = (times[i+1]-tmid)/(times[i+1]-times[i]);
-							if(spl.constant == false){
-								SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = param_ref[i+1]; sd.f = f;	
-								spl.div.push_back(sd);
+							auto tmid = (tp[ti]+tp[ti+1])/(2*dt); // TO DO DIFFERENT SPLINES
+							
+							while(i+1 < times.size() && times[i+1] < tmid) i++;
+							if(i+1 >= times.size() && spl.type != SQUARE_SPL){ // This extends spline for PPC			
+								if(model.mode != PPC){
+									emsg_input("Should be PPC2");
+								}							
+								
+								if(spl.constant == false){
+									SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = param_ref[i]; sd.f = 1;	
+									spl.div.push_back(sd);
+								}
+								else{
+									spl.const_val.push_back(par.get_value(j*ntimes+i));
+								}
 							}
-							else{
-								auto val1 = par.get_value(j*ntimes+i);
-								auto val2 = par.get_value(j*ntimes+i+1);
-								spl.const_val.push_back(val1*f+val2*(1-f));
+							else{		
+								switch(spl.type){
+								case LINEAR_SPL:
+									{
+										auto f = (times[i+1]-tmid)/(times[i+1]-times[i]);
+								
+										if(spl.constant == false){
+											SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = param_ref[i+1]; sd.f = f;	
+											spl.div.push_back(sd);
+										}
+										else{
+											auto val1 = par.get_value(j*ntimes+i);
+											auto val2 = par.get_value(j*ntimes+i+1);
+											spl.const_val.push_back(val1*f+val2*(1-f));
+										}
+									}
+									break;
+									
+								case SQUARE_SPL:
+									if(spl.constant == false){
+										SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = UNSET; sd.f = UNSET;	
+										spl.div.push_back(sd);
+									}
+									else{
+										auto val1 = par.get_value(j*ntimes+i);
+										spl.const_val.push_back(val1);
+									}
+									break;
+									
+								default:
+									emsg("Option err");
+									break;
+								}
 							}
 						}
 					}
 				}
 			
+				if(false){
+					for(auto i = 0u; i < spl.const_val.size(); i++){
+						cout << i << " "<<  spl.const_val[i] << " cont val" << endl;
+					}
+				}
+				
 				model.spline.push_back(spl);
  			}
 		}			
@@ -1438,9 +1678,20 @@ void Input::create_spline()
 			for(auto j : spl.param_ref) cout << j << ","; 
 			cout << "param_ref" << endl;
 			
-			for(auto d = 0u; d < spl.div.size(); d++){
-				const auto &di = spl.div[d];
-				cout << d << " " << model.param_vec[di.th1].name << " " <<  model.param_vec[di.th2].name << " " << di.f << " div"<< endl;
+			switch(spl.type){
+			case LINEAR_SPL: case SQUARE_SPL:
+				for(auto d = 0u; d < spl.div.size(); d++){
+					const auto &di = spl.div[d];
+					cout << d << " " << model.param_vec[di.th1].name << " " <<  model.param_vec[di.th2].name << " " << di.f << " div"<< endl;
+				}
+				break;
+				
+			case CUBICPOS_SPL: case CUBIC_SPL:
+				for(auto d = 0u; d < spl.cubic_div.size(); d++){
+					const auto &di = spl.cubic_div[d];
+					cout << di.i << " " << di.dx << "cubic div" << endl;
+				}
+				break;
 			}
 		}
 		emsg_input("Done");
@@ -1986,8 +2237,7 @@ void Input::create_island()
 void Input::param_affect_likelihood()
 {
 	auto T = model.details.T;
-
-	// Stores spline time maps for each of the model variables
+	
 	vector < vector <bool> > spline_map;
 	spline_map.resize(model.param_vec.size());
 	for(auto k = 0u; k < model.param_vec.size(); k++){
@@ -2007,99 +2257,24 @@ void Input::param_affect_likelihood()
 			const auto &spl = model.spline[s];
 			
 			vector <bool> map(T,false);
-			for(auto ti = 0u; ti < T; ti++){ 
-				if(spl.div[ti].th1 == k || spl.div[ti].th2 == k) map[ti] = true;
+			switch(spl.type){
+			case LINEAR_SPL: case SQUARE_SPL:
+				for(auto ti = 0u; ti < T; ti++){ 
+					if(spl.div[ti].th1 == k || spl.div[ti].th2 == k) map[ti] = true;
+				}
+				break;
+				
+			case CUBICPOS_SPL: case CUBIC_SPL:	
+				for(auto ti = 0u; ti < T; ti++){ 
+					map[ti] = true;
+				}
+				break;
 			}
 	
 			spline_map[k] = map;
-			AffectLike al; al.type = SPLINE_AFFECT; al.num = s; al.num2 = UNSET; al.map = map;
-			param_vec_add_affect(model.param_vec[k].affect_like,al);		
+			//AffectLike al; al.type = SPLINE_AFFECT; al.num = s; al.num2 = UNSET; al.map = map;
+			//param_vec_add_affect(model.param_vec[k].affect_like,al);		
 		}		
-	}
-
-	/// The effect of parameters on Markov equations
-	for(auto p = 0u; p < model.species.size(); p++){
-		auto &sp =  model.species[p];
-		switch(sp.type){
-		case INDIVIDUAL:
-			{
-				for(auto i = 0u; i < sp.markov_eqn.size(); i++){
-					const auto &me = sp.markov_eqn[i];
-				
-					const auto &eqn = model.eqn[me.eqn_ref];
-				
-					for(auto &pref : eqn.param_ref){
-						auto th = pref.th, ind = pref.index;
-						auto &par = model.param[th];
-					
-						if(par.variety != CONST_PARAM){
-							auto k = par.get_param_vec(ind);	
-							if(k != UNSET){
-								if(par.spline_info.on == true){	
-									auto nknot = par.spline_info.knot_tdiv.size();
-									
-									for(auto t = 0u; t < nknot; t++){ // Goes down the spline
-										k = par.get_param_vec(ind+t);
-										AffectLike al; al.map = spline_map[k];
-										al.type = DIV_VALUE_AFFECT; al.num = p; al.num2 = i;
-										param_vec_add_affect(model.param_vec[k].affect_like,al);		
-								
-										al.type = MARKOV_LIKE_AFFECT;
-										param_vec_add_affect(model.param_vec[k].affect_like,al);
-									}
-								}
-								else{
-									AffectLike al; 
-									if(me.time_vari == true) al.map.resize(T,true);
-									else al.map.resize(1,true);
-						
-									al.type = DIV_VALUE_AFFECT; al.num = p; al.num2 = i;
-									param_vec_add_affect(model.param_vec[k].affect_like,al);
-								
-									al.type = MARKOV_LIKE_AFFECT;
-									param_vec_add_affect(model.param_vec[k].affect_like,al);
-								}
-							}
-						}
-					}
-				}
-			}
-			break;
-			
-		case POPULATION:
-			{
-				for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
-					const auto &tra = sp.tra_gl[tr];
-					const auto &eqn = model.eqn[tra.dist_param[0].eq_ref];
-					for(auto &pref : eqn.param_ref){
-						auto th = pref.th, ind = pref.index;
-					
-						auto &par = model.param[th];
-						if(par.variety != CONST_PARAM){
-							auto k = par.get_param_vec(ind);	
-							if(k != UNSET){
-								if(par.spline_info.on == true){
-									auto nknot = par.spline_info.knot_tdiv.size();
-								
-									for(auto t = 0u; t < nknot; t++){ // Goes down the spline
-										k = par.get_param_vec(ind+t);
-										AffectLike al; al.map = spline_map[k];
-										al.type = MARKOV_POP_AFFECT; al.num = p; al.num2 = tr; 
-										param_vec_add_affect(model.param_vec[k].affect_like,al);
-									}
-								}
-								else{
-									AffectLike al; al.map.resize(T,true);
-									al.type = MARKOV_POP_AFFECT; al.num = p; al.num2 = tr;
-									param_vec_add_affect(model.param_vec[k].affect_like,al);
-								}
-							}
-						}
-					}
-				}
-			}
-			break;
-		}
 	}
 	
 	// Works out how the parameter affect the prior
@@ -4463,11 +4638,11 @@ void Input::setup_der_func_eqn()
 								const auto &lin = eq.linearise;
 								if(!lin.on) alert_line("'"+df.name+"' cannot be calculated because the equation '"+eq.te_raw+"' is not linearisable into populations.",der.line_num,true);
 							
-								if(lin.pop_grad_calc.size() > 0){
+								if(lin.pop_grad_precalc.size() > 0){
 									inf_fl = true;
 								}
 								
-								for(auto i = 0u; i < lin.pop_grad_calc.size(); i++){
+								for(auto i = 0u; i < lin.pop_grad_precalc.size(); i++){
 									const auto &po = model.pop[eq.pop_ref[i]];
 									if(calc == false && po.ind_eff_mult.size() > 0){
 										alert_line("'"+df.name+"' cannot be calculated because population contains an individual effect",der.line_num,true);
@@ -4610,7 +4785,9 @@ void Input::setup_der_func_eqn()
 				for(auto k = 0u; k < Feq_ref.size(); k++){
 					const auto &ref = Feq_ref[k];
 					const auto &eq = model.eqn[ref.e];
-					eq.print_calc("calc "+tstr(k),eq.linearise.pop_grad_calc[ref.i]);
+					cout << "calc "+tstr(k);
+					eq.print_item(eq.linearise.pop_grad_precalc[ref.i]);
+					cout << endl;
 				}
 				
 				for(auto c = 0u; c < N; c++){
@@ -4650,4 +4827,3 @@ void Input::setup_der_func_eqn()
 		}
 	}
 }
-

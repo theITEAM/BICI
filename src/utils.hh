@@ -11,6 +11,7 @@ extern bool com_op;                            // Set to true for command line o
 
 void emsg(const string &msg);
 void alert_input(const string &msg);
+void run_error(const string &msg);
 void emsg_input(const string &msg);
 void end_code();
 void display_error(string msg, bool internal);
@@ -75,6 +76,7 @@ double rectify(double val);
 bool equal_vec(const vector <string> &vec1, const vector <string> &vec2);
 bool equal_vec(const vector <unsigned int> &vec1, const vector <unsigned int> &vec2);
 bool equal_vec(const vector <bool> &vec1, const vector <bool> &vec2);
+vector <unsigned int> get_list(unsigned int num);
 string stringify(const vector <EquationInfo> &value, const vector <Dependency> &dep);
 bool includes(string st, string ch);
 DepInfo get_dep_info(const string &te, unsigned int i, const string &not_allowed);
@@ -178,7 +180,13 @@ bool on_timestep(double t, const Details &details);
 double calc_tdiv(double t, const Details &details);
 double calc_t(double tdiv, const Details &details);
 void add_alg_warning(string te, unsigned int sample, vector <AlgWarn> &alg_warn);
-	
+void eqn_type_error(EqItemType type, unsigned int ref);
+double calculate_operation(EqItemType op, vector <double> &num);
+void solve_cubic_spline_test();
+CubicSpline solve_cubic_spline(const vector <double> &x, vector <double> f, SplineType type);
+double calculate_cubic_spline(double xf, const CubicSpline &cspl);
+void calculate_cubic_spline_precalc(vector <double> &precalc, unsigned int i, const vector <unsigned int> &list_time, const vector <CubicDiv> &div, const CubicSpline &cspl);
+
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);
 string check_valid_name(string name, string type);
@@ -191,7 +199,7 @@ Poss sample_possibility(const vector <Poss> &pos);
 double sample_probability(unsigned int i, const vector <Poss> &pos);
 string trunc(const string &str);
 double indfac(const Individual &ind);
-double prior_probability(double x, const Prior &pri, const vector <double> &param_val,const vector <Equation> &eqn);
+double prior_probability(double x, const Prior &pri, const vector <double> &precalc,const vector <Equation> &eqn);
 void add_on_like(const Like li1, Like &li2);
 double calc_al(const Like &like_ch, double dprob, const BurnInfo &burn_info);
 void print_like(const Like &like);

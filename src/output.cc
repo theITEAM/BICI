@@ -25,9 +25,9 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 
 	if(input.datadir != ""){
 		switch(model.mode){
-		case SIM: sampledir_rel = "sim-output"; break;
-		case INF: sampledir_rel = "inf-output"; break;
-		case PPC: sampledir_rel = "post-sim-output"; break;
+		case SIM: sampledir_rel = "output-sim"; break;
+		case INF: sampledir_rel = "output-inf"; break;
+		case PPC: sampledir_rel = "output-post-sim"; break;
 		case MODE_UNSET: emsg("Option not recognised"); break;
 		}
 		
@@ -55,17 +55,17 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 			
 			auto flag = false;
 			
-			if(command == "sim-param" || command == "sim-state" || command == "sim-warning" || st == "# OUTPUT SIMULATION"){
+			if(command == "param-sim" || command == "state-sim" || command == "warning-sim" || st == "# OUTPUT SIMULATION"){
 				if(model.mode == SIM) flag = true;
 			}
 			
-			if(command == "inf-param" || command == "inf-param-stats" || command == "inf-state" || 
-			   command == "inf-diagnostics" || command == "inf-generation" || 
-				 command == "trans-diag" || command == "inf-warning" || st == "# OUTPUT INFERENCE"){
+			if(command == "param-inf" || command == "param-stats-inf" || command == "state-inf" || 
+			   command == "diagnostics-inf" || command == "generation-inf" || 
+				 command == "trans-diag-inf" || command == "warning-inf" || st == "# OUTPUT INFERENCE"){
 				if(model.mode == INF) flag = true;
 			}
 			
-			if(command == "post-sim-param" || command == "post-sim-state" || command == "post-sim-warning" || st == "# OUTPUT POSTERIOR SIMULATION"){
+			if(command == "param-post-sim" || command == "state-post-sim" || command == "warning-post-sim" || st == "# OUTPUT POSTERIOR SIMULATION"){
 				if(model.mode == INF || model.mode == PPC) flag = true;
 			}
 	
@@ -624,7 +624,7 @@ void Output::prop_summary(string te) const
 {
 	if(!op()) return;
 		
-	if(false){ // TURN OFF
+	if(debugging){
 		auto file = "proposal.txt";
 		ofstream fout(file);
 		check_open(fout,file);
@@ -775,13 +775,7 @@ string Output::print_affect_like(const AffectLike &al) const
 			ss << "AFFECT Distribution affect " << model.param_vec[al.num].name << endl;	
 		}
 		break;
-		
-	case SPLINE_AFFECT:
-		{
-			ss << "AFFECT Spline affect " << model.spline[al.num].name << endl;	
-		}
-		break;
-		
+	
 	case DIV_VALUE_AFFECT:
 		{
 			auto eq = model.species[al.num].markov_eqn[al.num2].eqn_ref;
@@ -789,10 +783,10 @@ string Output::print_affect_like(const AffectLike &al) const
 		}
 		break;
 		
-	case DIV_VALUE_FAST_AFFECT:
+	case DIV_VALUE_NONPOP_AFFECT:
 		{
 			auto eq = model.species[al.num].markov_eqn[al.num2].eqn_ref;
-			ss << "AFFECT Div Value Fast" << model.eqn[eq].te_raw << endl;
+			ss << "AFFECT Div Value Nonpop" << model.eqn[eq].te_raw << endl;
 		}
 		break;
 		
@@ -801,7 +795,7 @@ string Output::print_affect_like(const AffectLike &al) const
 			ss << "AFFECT Div Value Linear";
 			{
 				string str = "";
-				for(auto k : al.linear_prop.me){
+				for(auto k : al.div_value_linear.me){
 					auto eq = model.species[al.num].markov_eqn[k].eqn_ref;
 					str += model.eqn[eq].te_raw +", ";
 				}
@@ -898,9 +892,10 @@ string Output::print_affect_like(const AffectLike &al) const
 			
 			if(al.list.size() == al.map.size()) ss << " All";
 			else{
-				ss << al.list.size() << " " << al.map.size() << ": ";
-				for(auto t : al.list) ss << t << ",";
-
+				if(al.list.size() == 0) emsg("No time affected");
+				ss << al.list[0] << " - " << al.list[al.list.size()-1];
+				//ss << al.list.size() << " " << al.map.size() << ": ";
+				//for(auto t : al.list) ss << t << ",";
 			}				
 			break;
 		}
@@ -1319,10 +1314,10 @@ void Output::param_sample(unsigned int s, unsigned int chain, State &state)
 {
 	timer[PARAM_OUTPUT] -= clock();
 	auto part = state.generate_particle(s,chain,false);
-	
+
 	param_store.push_back(part);
 	
-	if(sampledir != "" && jamie_code && chain != GEN_PLOT){
+	if(sampledir != "" && chain != GEN_PLOT){
 		auto nchain = model.details.nchain;
 		
 		string na = sampledir+"/"+get_file_name("param",chain,nchain,".csv"); 
@@ -1437,7 +1432,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 	
 	ss << "<PARAMETERS>" << endl;
 	
-	ss << output_param(value,part);
+	ss << output_param(value);
 
 	if(use_ind_key == false){
 		ss << "<TIMEPOINT " << model.details.t_start << ":" <<  model.details.dt << ":" << model.details.t_end << ">" << endl;
@@ -1558,7 +1553,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 				
 						for(auto i = 0u; i < sp.ind_effect.size(); i++) ss << "," << ind.exp_ie[i]; 
 						ss << ",";
-						auto c = UNSET;//ind.cinit;
+						auto c = UNSET;
 						for(auto e = 0u; e < ind.ev.size(); e++){
 							const auto &ev = ind.ev[e];
 							auto cnew = c;
@@ -1570,6 +1565,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 									if(c != UNSET) emsg("Inconsistent");
 									cnew = ev.c_after; 
 									ss << sp.comp_gl[cnew].name;
+									infection_info(ev.ind_inf_from,p,part,ss);
 								}
 								break;
 
@@ -1583,6 +1579,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 									auto cl = ev.cl;
 									cnew = sp.update_c_comp(c,cl,ev.move_c);
 									ss << "move->" << sp.cla[cl].comp[ev.move_c].name;
+									infection_info(ev.ind_inf_from,p,part,ss);
 								}
 								break;
 								
@@ -1595,17 +1592,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 										ss << replace_arrow(tr.name);
 									}
 									
-									const auto &iif = ev.ind_inf_from;
-									if(iif.p != UNSET){
-										ss << "[";
-										if(iif.p == OUTSIDE_INF) ss << "OUT_INF"; 
-										else{
-											auto pp = iif.p;
-											if(pp != p) ss << model.species[pp].name << "|";
-											ss << part.species[pp].individual[iif.i].name;
-										}
-										ss << "]";
-									}
+									infection_info(ev.ind_inf_from,p,part,ss);
 									
 									if(c != trg.i) emsg("Inconsist");
 									cnew = trg.f;
@@ -1681,7 +1668,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 	}
 	
 	if(model.trans_tree){                   // Outputs the phylogenetic tree
-		ss << "<PHYLOTREE>" << endl;
+		ss << "<TRANSTREE>" << endl;
 		//if(part.inf_node.size() == 0) emsg(" zero");
 		for(const auto &in : part.inf_node){
 			ss << part.species[in.p].individual[in.i].name  << "|" << model.calc_t(in.tdiv_start) << "|";	
@@ -1718,6 +1705,27 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 }
 
 
+/// Generate test to indicate an infection
+void Output::infection_info(const IndInfFrom &iif, unsigned int p, const Particle &part, stringstream &ss) const
+{
+	if(iif.p != UNSET){
+		ss << "[";
+		switch(iif.p){
+		case ENTER_INF: ss << "ENT_INF"; break; 
+		case OUTSIDE_INF: ss << "OUT_INF"; break;
+		default:
+			{
+				auto pp = iif.p;
+				if(pp != p) ss << model.species[pp].name << "|";
+				ss << part.species[pp].individual[iif.i].name;
+			}
+			break;
+		}
+		ss << "]";
+	}
+}
+
+
 /// Generates the final output files
 string Output::generate_state_head(const vector <string> &ind_key) const
 {
@@ -1727,6 +1735,24 @@ string Output::generate_state_head(const vector <string> &ind_key) const
 		ss << "{" << endl;
 		ss << "  # Time divisions" << endl;
 		ss << "  timepoint " << model.details.t_start << ":" <<  model.details.dt << ":" << model.details.t_end << endl;
+		
+		auto out_fl = false;
+		for(auto &par : model.param){ if(par.spline_outside) out_fl = true;}
+		if(out_fl == true){
+			ss << "  # Spline out of range" << endl;
+			for(auto &par : model.param){
+				if(par.spline_outside){
+					ss << "  spline-out " << par.name << " ";
+					const auto &dep = par.dep;
+					const auto &list = dep[dep.size()-1].list;
+					for(auto k = 0u; k < list.size(); k++){
+						if(k != 0) ss << ",";
+						ss << list[k];
+					}
+					ss << endl;
+				}
+			}
+		}
 		
 		if(ind_key.size() > 0){
 			ss << "  # Individual index" << endl;
@@ -1744,6 +1770,7 @@ string Output::generate_state_head(const vector <string> &ind_key) const
 vector < vector <double> > Output::param_value_from_vec(const vector <double> &param_val_prop) const 
 {
 	auto param_val = model.get_param_val(param_val_prop);
+	const auto &val = param_val.value;
 	
 	vector < vector <double> > value;
 	
@@ -1755,15 +1782,18 @@ vector < vector <double> > Output::param_value_from_vec(const vector <double> &p
 		}
 	}
 	
-	if(param_val.size() != model.param_vec.size()) emsg("param_val the wrong size");
+	if(val.size() != model.param_vec.size()) emsg("param_val the wrong size");
 	
 	for(auto i = 0u; i < model.param_vec.size(); i++){
 		const auto &mpv = model.param_vec[i];
 		auto th = mpv.th;
 		if(model.param[th].trace_output){
-			value[mpv.th][mpv.index] = param_val[i]; 
+			value[mpv.th][mpv.index] = val[i]; 
 		}
 	}
+	
+	
+	const auto &precalc = param_val.precalc;
 	
 	// Fills in any unset values
 	for(auto th = 0u; th < model.param.size(); th++){
@@ -1778,7 +1808,7 @@ vector < vector <double> > Output::param_value_from_vec(const vector <double> &p
 					else{
 						auto eq = par.get_eq_ref(j);
 						if(eq != UNSET){			
-							value[th][j] = model.eqn[eq].calculate_param_only(param_val);
+							value[th][j] = model.eqn[eq].calculate_param(precalc);
 						}
 					}
 				}
@@ -1809,7 +1839,7 @@ vector < vector <double> > Output::param_value_from_value() const
 
 
 /// Outputs a string version of parameters which are either constant or non-constant 
-string Output::output_param(const vector < vector <double> > &value, const Particle &part) const
+string Output::output_param(const vector < vector <double> > &value) const
 {
 	stringstream ss;
 	
@@ -1845,7 +1875,7 @@ string Output::output_param(const vector < vector <double> > &value, const Parti
 			}
 		}
 	}
-	
+	/*
 	const auto &like = part.like;
 	ss << "L^markov," << like.markov << endl;
 	ss << "L^non-markov," << like.nm_trans << endl;
@@ -1854,6 +1884,7 @@ string Output::output_param(const vector < vector <double> > &value, const Parti
 	ss << "L^obs," << like.obs << endl;
 	ss << "L^init," << like.init_cond << endl;
 	ss << "Prior," << like.prior << endl;
+	*/
 	
 	ss << endl;
 	
@@ -1861,15 +1892,46 @@ string Output::output_param(const vector < vector <double> > &value, const Parti
 }
 
 
-/// Gets the particles for a given chain
-vector <Particle> Output::get_part_chain(unsigned int chain, const vector <Particle> &part) const
+/// Gets the particles for a given chain and deletes from list
+vector <Particle> Output::get_part_chain(unsigned int chain, vector <Particle> &part) const
 {
 	vector <Particle> part_ch;
-	for(const auto &pa : part){
-		if(pa.chain == chain) part_ch.push_back(pa);
+	
+	vector <unsigned int> hole;
+	auto j = 0u;
+	
+	for(auto i = 0u; i < part.size(); i++){
+		auto &pa = part[i];
+		if(pa.chain == chain){
+			part_ch.push_back(pa);
+			clear_part(pa);
+			hole.push_back(i);
+		}
+		else{
+			if(j < hole.size()){
+				part[hole[j]] = pa;
+				clear_part(pa);
+				j++;
+			}
+		}
+	}
+	
+	if(j < hole.size()){
+		part.resize(part.size()-(hole.size()-j));
 	}
 	
 	return part_ch;
+}
+
+
+/// Clears a particle
+void Output::clear_part(Particle &pa) const
+{
+	pa.param_val_prop.clear();
+	pa.species.clear();
+	pa.dir_out.clear();
+	pa.inf_origin.clear();
+	pa.inf_node.clear();
 }
 
 
@@ -1963,7 +2025,7 @@ void Output::set_diagnostics(unsigned int ch, string diag)
 
 
 /// Generates the final outputs
-void Output::end(string file, unsigned int total_cpu) const
+void Output::end(string file, unsigned int total_cpu)
 {
 	percentage_start(OUTPUT_PER);
 		
@@ -2071,6 +2133,8 @@ void Output::end(string file, unsigned int total_cpu) const
 
 	output_rate_warning(total_cpu,50,100,final_warning);
 	
+	output_spline_out_warning(final_warning);
+
 	for(const auto &der : model.derive){
 		auto st = der.func.warn; 
 		if(der.func.on && st != "") final_warning.push_back(st);
@@ -2112,6 +2176,7 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 	param_out += trace_init();
 	for(const auto &pa : part){
 		auto value = param_value_from_vec(pa.param_val_prop);
+	
 		if(model.mode == INF && pa.s >= burn){
 			param_samp[ch].push_back(value);				
 		}
@@ -2136,15 +2201,15 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 	stringstream ss;
 	switch(model.mode){
 	case SIM:
-		ss << "sim-param file=\"" << param_out_file << "\"" << endl;
+		ss << "param-sim file=\"" << param_out_file << "\"" << endl;
 		break;
 
 	case INF:
-		ss << "inf-param chain=" << ch << " file=\""+param_out_file+"\"" << endl;
+		ss << "param-inf chain=" << ch << " file=\""+param_out_file+"\"" << endl;
 		break;
 	
 	case PPC:
-		ss << "post-sim-param file=\"" << param_out_file << "\"" <<  endl;
+		ss << "param-post-sim file=\"" << param_out_file << "\"" <<  endl;
 		break;
 	
 	default: emsg("Should not be default12"); break;
@@ -2322,7 +2387,7 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 	string stat_out_file;
 	
 	if(sampledir != ""){
-		stat_out_file = "inf-param-stats.csv";
+		stat_out_file = "param-stats-inf.csv";
 
 		ofstream pout(sampledir+"/"+stat_out_file);
 		check_open(pout,stat_out_file);
@@ -2335,7 +2400,7 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 	}
 	
 	stringstream ss;
-	ss << "inf-param-stats file=\""+stat_out_file+"\"" << endl;
+	ss << "param-stats-inf file=\""+stat_out_file+"\"" << endl;
 	ss << endl;
 	
 	if(com_op == true) cout << ss.str();
@@ -2418,15 +2483,15 @@ void Output::output_state(unsigned int ch, const vector <Particle> &part, ofstre
 	stringstream ss;
 	switch(model.mode){
 	case SIM:
-		ss << "sim-state file=\"" << state_out_file << "\"" << endl;
+		ss << "state-sim file=\"" << state_out_file << "\"" << endl;
 		break;
 
 	case INF:
-		ss << "inf-state chain=" << ch << " file=\""+state_out_file+"\"" << endl;
+		ss << "state-inf chain=" << ch << " file=\""+state_out_file+"\"" << endl;
 		break;
 	
 	case PPC:
-		ss << "post-sim-state file=\"" << state_out_file << "\"" <<  endl;
+		ss << "state-post-sim file=\"" << state_out_file << "\"" <<  endl;
 		break;
 	
 	default: emsg("Should not be default12"); break;
@@ -2478,7 +2543,7 @@ void Output::output_trans_diag(const vector <TransDiagSpecies> &trans_diag, ofst
 	}
 
 	stringstream ss;
-	ss << "trans-diag file=\"" << trans_diag_out_file << "\"" << endl;
+	ss << "trans-diag-inf file=\"" << trans_diag_out_file << "\"" << endl;
 	ss << endl;
 	
 	if(com_op == true) cout << ss.str();
@@ -2492,9 +2557,9 @@ void Output::add_warning(string err_msg, ofstream &fout) const
 	string line;
 	
 	switch(model.mode){
-	case SIM: line = "sim-warning"; break;
-	case INF: line = "inf-warning"; break;
-	case PPC: line = "post-sim-warning"; break;
+	case SIM: line = "warning-sim"; break;
+	case INF: line = "warning-inf"; break;
+	case PPC: line = "warning-post-sim"; break;
 	case MODE_UNSET: emsg("op problem"); break;
 	}
 	
@@ -2694,6 +2759,23 @@ void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start,
 }
 
 
+/// Outputs a warning if a spline is outside time range
+void Output::output_spline_out_warning(vector <string> &final_warning) const
+{
+	string te = "";
+	for(const auto &par : model.param){
+		if(par.spline_outside_par){
+			if(te != "") te += ", ";
+			te += par.full_name;
+		}
+	}
+	
+	if(te != ""){
+		final_warning.push_back("The following splines were truncated because they were outside the time range: "+te);
+	}
+}
+
+
 /// Outputs information about generations (for PAS-MBP and ABC-SMC)
 void Output::output_generation(const vector <Particle> &part, ofstream &fout) const
 {
@@ -2722,7 +2804,7 @@ void Output::output_generation(const vector <Particle> &part, ofstream &fout) co
 	}
 
 	stringstream ss;
-	ss << "inf-generation file=\""+param_out_file+"\"" << endl;
+	ss << "generation-inf file=\""+param_out_file+"\"" << endl;
 	ss << endl;
 	
 	if(com_op == true) cout << ss.str();
@@ -2754,7 +2836,7 @@ void Output::output_diagnostic(const vector <Diagnostic> &diagnostic, bool &alg_
 		}
 		
 		stringstream ss;
-		ss << "inf-diagnostics chain=" << di.ch << " file=\""+diag_out_file+"\"" << endl;
+		ss << "diagnostics-inf chain=" << di.ch << " file=\""+diag_out_file+"\"" << endl;
 		ss << endl;
 		
 		if(com_op == true) cout << ss.str();

@@ -261,13 +261,13 @@ function add_model_param_content(lay)
 			let par = model.param[i];
 			
 			if(par.spline.on == true && par.type != "derive_param" && par.type != "param factor"){
-				num++;
-				if(model.param[i].spline.smooth.check == true) num++;
+				num += dy_spline_fac+dy_spline_fac2; 
+				if(model.param[i].spline.smooth.check == true) num += dy_spline_fac2;
 			}
 		}
 
 		if(num > 0){
-			lay.add_button({te:"Splines", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5, col:col_round, col2:col_text, type:"CurvedOutline"});
+			lay.add_button({te:"Splines", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5+1, col:col_round, col2:col_text, type:"CurvedOutline"});
 			y += 1.4;
 			
 			for(let i = 0; i < model.param.length; i++){
@@ -276,8 +276,8 @@ function add_model_param_content(lay)
 				if(spl.on == true && par.type != "derive_param" && par.type != "param factor"){
 					lay.display_param(x-par.label_info.dx-0.7,y-0.1,par.label_info);
 				
-					let si = 1.0, fo = get_font(si,"","times");
-					lay.add_button({te:"Knots =", x:x+1.8, y:y+0.3, dy:si, si:si, font:fo, type:"Text", col:BLACK});
+					let te_si = 0.8, te_fo = get_font(te_si,"","times");
+					lay.add_button({te:"KNOTS:", x:x+1.8, y:y+0.45, dy:te_si, si:te_si, font:te_fo, type:"Text", col:BLACK});
 					
 					let te = stringify(spl.knot);
 					
@@ -285,25 +285,39 @@ function add_model_param_content(lay)
 					
 					lay.add_checkbox(w-4,y+0.3,"Smooth","Smooth",spl.smooth,WHITE,{title:"Smoothing", te:smoothing_text});
 					w -= 4;
+					
+					lay.add_button({te:te, x:x+5.4, y:y+0., dx:w-x-5.4, dy:1.6, type:"SplineKnots", font: get_font(1.1,"","times"), ac:"EditSplineKnots", i:i});
 				
-					lay.add_button({te:te, x:x+5.6, y:y+0., dx:w-x-5.6, dy:1.6, type:"SplineKnots", font: get_font(1.1,"","times"), ac:"EditSplineKnots", i:i});
-				
-					y += dy;
+					y += dy_spline_fac*dy;
+					
+					lay.add_button({te:"TYPE:", x:x+1.8, y:y+0.3, dy:te_si, si:te_si, font:te_fo, type:"Text", col:BLACK});
+					
+					let xx = x+5;
+					lay.add_radio(xx,y,"Linear","Linear",spl.spline_radio); xx += 7;
+					lay.add_radio(xx,y,"Square","Square",spl.spline_radio); xx += 7;
+					lay.add_radio(xx,y,"Cubic +ve","Cubic +ve",spl.spline_radio); xx += 7;
+					lay.add_radio(xx,y,"Cubic","Cubic",spl.spline_radio); xx += 7;
+					
+					y += dy_spline_fac2*dy;
 					
 					if(spl.smooth.check == true){
-						lay.add_radio(x+1.6,y,"Log-Normal","Log-Normal",spl.smooth.type);
-						lay.add_radio(x+8.6,y,"Normal","Normal",spl.smooth.type);
+						lay.add_button({te:"SMOOTH:", x:x+1.8, y:y+0.3, dy:te_si, si:te_si, font:te_fo, type:"Text", col:BLACK});
+					
+						let xx = x+5;
+						lay.add_radio(xx,y,"Log-Normal","Log-Normal",spl.smooth.type); xx += 7;
+						lay.add_radio(xx,y,"Normal","Normal",spl.smooth.type); xx += 7.7;
 						
 						let si = 0.9, fo = get_font(si,"","times");
 						let sh = 0.15;
-						lay.add_button({te:"Value =", x:x+16.6, y:y+0.03+sh, dy:si, si:si, font:fo, type:"Text", col:BLACK});
+						lay.add_button({te:"Value =", x:xx, y:y+0.03+sh, dy:si, si:si, font:fo, type:"Text", col:BLACK}); xx += 3;
 					
-						lay.add_button({te:spl.smooth.value, x:x+19.4, y:y+sh, dx:8, dy:1.2, type:"SmoothValue", font: get_font(0.9), ac:"EditSplineKnots", i:i});
-						y += dy;
+						lay.add_button({te:spl.smooth.value, x:xx, y:y+sh, dx:8, dy:1.2, type:"SmoothValue", font: get_font(0.9), ac:"EditSplineKnots", i:i});
+						y += dy_spline_fac2*dy;
 					}
 				}
 			}
-			y += 1;
+			
+			y += 1+1;
 		}
 	}
 	
@@ -658,7 +672,7 @@ function param_pos(par,op)
 		
 	case "reparam":
 		if(par.variety != "normal") return false;
-		if(par.time_dep) return false;
+		//if(par.time_dep) return false;
 		if(par.factor) return false;
 		break;
 		

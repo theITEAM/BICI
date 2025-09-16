@@ -196,6 +196,7 @@ function extract_equation_properties(eqn)
 		if(eqn.param[i].time_dep == true) eqn.time_vari = true;
 	}
 
+	/*
 	if(eqn.type == "reparam" || eqn.type == "reparam_eqn"){
 		if(eqn.time_vari == true){
 			if(eqn.pop.length > 0){
@@ -206,6 +207,8 @@ function extract_equation_properties(eqn)
 			}
 		}
 	}
+	*/
+	
 
 	check_sum_bracket(eqn);
 	

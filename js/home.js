@@ -37,7 +37,7 @@ function add_examples_buts(lay)
 	
 	//ex_mod.push({mod:"M", te:"Temp",file:"temp",mod_type:"IBM", pic:"SI"});
 	
-	if(true){
+	if(testing){
 		if(false){
 			ex_mod.push({te:"M) Science Review",help:"Illustrates some simple examples for the Science Review."});
 			ex_mod.push({mod:"SR1", te:"SIR model (IBM)",file:"EX_SR1",mod_type:"IBM", pic:"SIR"});
@@ -56,12 +56,17 @@ function add_examples_buts(lay)
 		
 		ex_mod.push({mod:"M", te:"Temp",file:"temp",mod_type:"IBM", pic:"SI"});
 	
-	
+	*/
+			ex_mod.push({mod:"M", te:"Test",file:"test",mod_type:"IBM", pic:"SI"});
+
+
 		ex_mod.push({mod:"M", te:"Geno model",file:"geno",mod_type:"IBM", pic:"SI"});
 		ex_mod.push({mod:"M", te:"Geno model with cattle/badgers",file:"geno_bad_cat",mod_type:"IBM", pic:"SI"});
 		ex_mod.push({mod:"M", te:"Geno farm",file:"geno_farm",mod_type:"IBM", pic:"SI"});
-		*/
-
+	}
+	
+	
+	if(true){
 		ex_mod.push({te:"M1) Simple epidemiological models",help:"This section gives some examples of simple epidemiological models, illustrating both individual and population-based approaches."+mod_mess});
 		
 		ex_mod.push({mod:"M1.1", te:"SI population-based model (PBM)",file:"EX_M1-1",mod_type:"POP", pic:"SI"});

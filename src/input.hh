@@ -174,8 +174,11 @@ class Input                                // Stores information about the model
 		void determine_branching() const;
 		void add_obs_model_eqn(Species &sp);
 		void create_equations(unsigned int per_start, unsigned int per_end);
+		void combine_populations();
+		bool equal_pop(const Population &popA, const Population &popB) const;
 		void linearise_eqn(unsigned int per_start, unsigned int per_end);
 		void add_eq_ref(EquationInfo &eqi);	
+		void linearise_precalc();
 		vector <bool> set_eqn_zero(const vector <EquationInfo> &eq_info);
 		void add_parent_child(const EquationInfo eqi, unsigned int i, unsigned int th, Hash &hash);
 		void create_markov_eqn();
@@ -242,7 +245,7 @@ class Input                                // Stores information about the model
 		void set_omega_fl();
 		void setup_der_func(DerFuncType df_type, string te, DerFunc &df);
 		void setup_der_func_eqn();
-	
+		
 		// In 'input_utils.cc'
 		unsigned int find_p(string name) const;
 		unsigned int find_cl(unsigned int p, string name) const;
@@ -272,7 +275,7 @@ class Input                                // Stores information about the model
 		void clone_class(unsigned int p_to, unsigned int p_from, unsigned int cl_from);
 		void print_table(const Table &tab) const;
 		void add_to_list(vector <ParamRef> &list, const ParamRef &pr) const;
-		unsigned int get_dependency(vector <Dependency> &dep, const ParamProp &pp, const vector <string> &knot_times);
+		unsigned int get_dependency(vector <Dependency> &dep, const ParamProp &pp, const vector <string> &knot_times, const vector <string> &knot_times_out);
 		EquationInfo he(EquationInfo eqn_inf, unsigned int lnum = UNSET);
 		bool is_file(string te) const;
 		vector <unsigned int> find_index(unsigned int i, const vector <Dependency> &depend) const;
@@ -285,7 +288,7 @@ class Input                                // Stores information about the model
 		unsigned int get_param_value(vector < vector <double> > &param_value, unsigned int i, const vector <string> &lines, string warn);
 		void load_param_value(const ParamProp &pp, string valu, Param &par, string desc);
 		void load_weight_value(const ParamProp &pp, string valu, Param &par, string desc);
-		void set_spline(string knot_times_str, string smooth, vector <string> &knot_times, bool use_inf_time, Param &par);
+		void set_spline(SplineType type, string knot_times_str, string smooth, vector <string> &knot_times,  vector <string> &knot_times_out, bool use_inf_time, Param &par);
 		unsigned int get_seed();
 		bool check_dt(const Details &details);
 		void add_param_cat_factor(Param &par);

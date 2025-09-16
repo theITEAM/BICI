@@ -108,6 +108,8 @@ void StateSpecies::check_cpop() const
 /// Checks that markov_eqn is correctly set
 void StateSpecies::check_markov_eqn(unsigned int ti, const vector <double> &popnum) const
 {
+	const auto &precalc = param_val.precalc;
+	
 	for(auto e = 0u; e < N; e++){
 		const auto &me = sp.markov_eqn[e];
 		
@@ -115,10 +117,10 @@ void StateSpecies::check_markov_eqn(unsigned int ti, const vector <double> &popn
 		
 		double value;
 		if(me.rate){
-			value = eqn[me.eqn_ref].calculate(ti,popnum,param_val,spline_val);	
+			value = eqn[me.eqn_ref].calculate(ti,popnum,precalc);	
 		}
 		else{
-			auto mean = eqn[me.eqn_ref].calculate(ti,popnum,param_val,spline_val);
+			auto mean = eqn[me.eqn_ref].calculate(ti,popnum,precalc);
 			value = 1.0/mean;
 		}
 		

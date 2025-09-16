@@ -703,7 +703,7 @@ void StateSpecies::rate_store_init()
 			}
 			cout << endl;
 		}
-		emsg("P");
+		emsg("TR RATE");
 	}
 }
 
@@ -732,8 +732,10 @@ void StateSpecies::update_rate_mean(const vector < vector <double> > &popnum_t)
 	
 	auto M = sp.markov_eqn.size();
 	
+	const auto &precalc = param_val.precalc;
+	
 	vector < vector <double> > bp_store;
-	auto nm_rate = sp.calc_nm_rate(true,param_val,spline_val,popnum_t,eqn,bp_store);
+	auto nm_rate = sp.calc_nm_rate(true,precalc,popnum_t,eqn,bp_store);
 	
 	for(auto m = 0u; m < sp.nm_trans.size(); m++){
 		auto &trate = rate_mean.tra_rate[M+m];
@@ -817,7 +819,7 @@ void StateSpecies::update_rate_mean(const vector < vector <double> > &popnum_t)
 			for(auto ti = 0u; ti <= T; ti++){
 				cout << ti << " " << integral[ti] << "Integra" << endl;
 			}
-			emsg("do");
+			emsg("integral");
 		}
 	}
 }

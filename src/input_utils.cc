@@ -910,7 +910,7 @@ void Input::add_to_list(vector <ParamRef> &list, const ParamRef &pr) const
 
 
 /// Creates a dependency from an vector of indices
-unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamProp &pp, const vector <string> &knot_times)
+unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamProp &pp, const vector <string> &knot_times, const vector <string> &knot_times_out)
 {
 	dep_alter.clear();
 	
@@ -928,6 +928,7 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 			}
 		
 			dep.list = knot_times;
+			dep.list_out = knot_times_out;
 		}
 		else{
 			auto flag = false;
@@ -950,6 +951,7 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 		}
 		
 		dep.hash_list.create(dep.list);
+		dep.hash_list_out.create(dep.list_out);
 		/*
 		for(auto k = 0u; k < dep.list.size(); k++){
 			auto te = dep.list[k];
@@ -1111,11 +1113,6 @@ void Input::read_state_sample(const vector <string> &lines, const vector <string
 {
 	Sample samp;
 	samp.param_value.resize(model.param.size());
-	/*
-	for(auto th = 0u; th < model.param.size(); th++){
-		samp.param_value[th].resize(model.param[th].value.size(),UNSET);
-	}
-	*/
 	
 	samp.species.resize(model.species.size());
 	
@@ -1184,7 +1181,7 @@ void Input::read_state_sample(const vector <string> &lines, const vector <string
 					mode = MODE_DERIVE;
 				}
 					
-				if(va == "PHYLOTREE"){
+				if(va == "TRANSTREE"){
 					mode = MODE_PHYLO;
 				}
 				
@@ -1326,18 +1323,49 @@ unsigned int Input::get_param_value(vector < vector <double> > &param_value, uns
 				if(title[k] != par.dep[k].index_with_prime) alert_sample(warn,15);
 			}
 			if(title[par.dep.size()] != "Value") alert_sample(warn,16);
+			
+			if(par.spline_out.on){ // Spline has been restricted
+				const auto &dp_last = par.dep[par.dep.size()-1];
+				const auto &list = dp_last.list;
+				const auto &solist = par.spline_out.list;
 				
-			for(auto j = 0u; j < par.N; j++){
-				i++;
-				auto li = comma_split(lines[i]);
-				for(auto k = 0u; k < par.dep.size(); k++){
-					const auto &dp = par.dep[k];
-					auto m = (unsigned int)(j/dp.mult)%dp.list.size();
-					if(li[k] != dp.list[m]) alert_sample(warn,17);
+				if(solist.size() > list.size()) alert_sample(warn,17);
+				for(auto k = 0u; k < solist.size(); k++){
+					if(solist[k] != list[k]) alert_sample(warn,18);
 				}
-				auto value = number(li[par.dep.size()]);
-				if(value == UNSET) alert_sample(warn,19);
-				param_value[th][j] = value;
+
+				for(auto j = 0u; j < par.N; j++){
+					auto mm = (unsigned int)(j/dp_last.mult)%list.size();
+					if(mm < solist.size()){
+						i++;
+						auto li = comma_split(lines[i]);
+						for(auto k = 0u; k < par.dep.size(); k++){
+							const auto &dp = par.dep[k];
+							auto m = (unsigned int)(j/dp.mult)%dp.list.size();
+							if(li[k] != dp.list[m]) alert_sample(warn,17);
+						}
+						auto value = number(li[par.dep.size()]);
+						if(value == UNSET) alert_sample(warn,19);
+						param_value[th][j] = value;
+					}
+					else{
+						param_value[th][j] = param_value[th][j-1]; 
+					}
+				}
+			}
+			else{
+				for(auto j = 0u; j < par.N; j++){
+					i++;
+					auto li = comma_split(lines[i]);
+					for(auto k = 0u; k < par.dep.size(); k++){
+						const auto &dp = par.dep[k];
+						auto m = (unsigned int)(j/dp.mult)%dp.list.size();
+						if(li[k] != dp.list[m]) alert_sample(warn,17);
+					}
+					auto value = number(li[par.dep.size()]);
+					if(value == UNSET) alert_sample(warn,19);
+					param_value[th][j] = value;
+				}
 			}
 		}
 		break;
@@ -1373,44 +1401,53 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 	auto ndep = pp.dep.size();
 	
 	for(auto r = 0u; r < subtab.nrow; r++){
+		auto fl = false;
+		
 		vector <unsigned int> ind(ndep);
 		for(auto i = 0u; i < ndep; i++){
-			ind[i] = par.dep[i].hash_list.find(subtab.ele[r][i]);
+			auto ele = subtab.ele[r][i];
+			ind[i] = par.dep[i].hash_list.find(ele);
 	
 			if(ind[i] == UNSET){ 
-				alert_import(desc+" the element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
-				return;
+				fl = true;
+				
+				if(par.dep[i].hash_list_out.find(ele) == UNSET){	
+					alert_import(desc+" the element '"+ele+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
+					return;
+				}
 			}
 		}
 		
-		auto ele = subtab.ele[r][ncol-1];
+		if(fl == false){
+			auto ele = subtab.ele[r][ncol-1];
 
-		double val = number(ele);
-		switch(par.variety){
-		case CONST_PARAM:
-			if(val == UNSET){
-				if(par.cat_factor && ele == "*"){
+			double val = number(ele);
+			switch(par.variety){
+			case CONST_PARAM:
+				if(val == UNSET){
+					if(par.cat_factor && ele == "*"){
+					}
+					else{
+						alert_import(desc+" the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
+						return;
+					}
 				}
-				else{
-					alert_import(desc+" the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
-					return;
-				}
-			}
-						
-			set_const(par,ind,val);
-			break;
-		
-		case REPARAM_PARAM:
-			if(val == UNSET){
-				if(check_eqn_valid(ele) != SUCCESS){
-					alert_import(desc+" the element '"+ele+"' is not a valid equation (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
-					return;
-				}
-			}
-			set_reparam_element(par,ind,he(add_equation_info(ele,REPARAM)));
-			break;
+							
+				set_const(par,ind,val);
+				break;
 			
-		default: emsg_input("Should not be default3"); return;
+			case REPARAM_PARAM:
+				if(val == UNSET){
+					if(check_eqn_valid(ele) != SUCCESS){
+						alert_import(desc+" the element '"+ele+"' is not a valid equation (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
+						return;
+					}
+				}
+				set_reparam_element(par,ind,he(add_equation_info(ele,REPARAM)));
+				break;
+				
+			default: emsg_input("Should not be default3"); return;
+			}
 		}
 	}
 	
@@ -1523,39 +1560,51 @@ void Input::load_weight_value(const ParamProp &pp, string valu, Param &par, stri
 	
 	for(auto r = 0u; r < subtab.nrow; r++){
 		vector <unsigned int> ind(ndep);
+		
+		auto fl = false;
 		for(auto i = 0u; i < ndep; i++){
-			ind[i] = par.dep[i].hash_list.find(subtab.ele[r][i]);
+			auto ele = subtab.ele[r][i];
+			
+			ind[i] = par.dep[i].hash_list.find(ele);
 	
 			if(ind[i] == UNSET){ 
-				alert_import(desc+" the element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
-				return;
+				fl = true;
+				
+				if(par.dep[i].hash_list_out.find(ele) == UNSET){	
+					alert_import(desc+" the element '"+ele+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
+					return;
+				}
 			}
 		}
 		
-		auto ele = subtab.ele[r][ncol-1];
+		if(fl == false){
+			auto ele = subtab.ele[r][ncol-1];
 
-		double val = number(ele);
-	
-		if(val == UNSET){
-			alert_import(desc+" the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
-			return;
-		}
+			double val = number(ele);
 		
-		auto sum = 0u;
-		for(auto i = 0u; i < par.dep.size(); i++) sum += par.dep[i].mult*ind[i];
-		if(sum >= par.N) emsg_input("Problem setting element");
- 
-		par.weight[sum] = val;
+			if(val == UNSET){
+				alert_import(desc+" the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
+				return;
+			}
+			
+			auto sum = 0u;
+			for(auto i = 0u; i < par.dep.size(); i++) sum += par.dep[i].mult*ind[i];
+			if(sum >= par.N) emsg_input("Problem setting element");
+	 
+			par.weight[sum] = val;
+		}
 		//par.set_weight(sum,val);
 	}
 }
 
 	
 /// Sets spline based on knot-times and smooth specification
-void Input::set_spline(string knot_times_str, string smooth, vector <string> &knot_times, bool use_inf_time, Param &par)
+void Input::set_spline(SplineType type, string knot_times_str, string smooth, vector <string> &knot_times, vector <string> &knot_times_out, bool use_inf_time, Param &par)
 {
 	par.spline_info.on = true;
 
+	par.spline_info.type = type;
+	
 	vector <double> times;
 	
 	auto t_start = model.details.t_start;
@@ -1585,7 +1634,7 @@ void Input::set_spline(string knot_times_str, string smooth, vector <string> &kn
 				}
 				else{
 					if(num < t_start || num > t_end){
-						alert_import("For 'knot_times' the value '"+te+"' must be after the start time and before the end time"); return;
+						par.spline_outside_par = true;
 					}
 					
 					if(num == t_start && j != 0){
@@ -1608,7 +1657,38 @@ void Input::set_spline(string knot_times_str, string smooth, vector <string> &kn
 
 	// Converts to tdiv
 	for(auto &ti : times) ti = model.calc_tdiv(ti);
-					
+	
+	// Removes times which are outside of range
+	auto &info = par.spline_info;
+	auto T = model.details.T;
+	
+	auto kmax = times.size()-1;
+	while(kmax > 0 && times[kmax] >= T) kmax--;
+	if(info.type != SQUARE_SPL) kmax++;
+	kmax++;
+	
+	auto kmin = 1u; while(kmin < times.size() && times[kmin] <= 0) kmin++;
+	kmin--;
+	
+	//tdiv.resize(k+1);
+	if(kmin > 0 || kmax < times.size()){
+		par.spline_outside = true;
+		
+		auto times_old = times;
+		auto knot_times_old = knot_times;
+		times.clear();
+		knot_times.clear();
+		for(auto k = 0u; k < times_old.size(); k++){
+			if(k >= kmin && k < kmax){
+				times.push_back(times_old[k]);
+				knot_times.push_back(knot_times_old[k]);
+			}
+			else{
+				knot_times_out.push_back(knot_times_old[k]);
+			}
+		}			
+	}
+	
 	par.spline_info.knot_tdiv = times;
 	
 	if(smooth == ""){
@@ -1741,7 +1821,9 @@ void Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 	par.reparam_eqn = "";
 	
 	if(par.time_dep){
-		alert_line("Reparameterised parameter '"+par.full_name+"' cannot be time dependent",par.line_num);	
+		if(par.spline_info.type != SQUARE_SPL){
+			alert_line("A square spline must be used for reparameterised parameter '"+par.full_name+"'.",par.line_num);
+		}			
 	}
 	
 	auto eqn_raw = he(add_equation_info(te,REPARAM_EQN),par.line_num);
@@ -1793,9 +1875,11 @@ void Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 			
 			const auto &eqq = model.eqn[eqn.eq_ref];
 			if(eqq.time_vari == true){
-				alert_line("Reparameterised expression '"+eqq.te_raw+"' cannot be time dependent.",par.line_num);	
+				if(par.spline_info.type != SQUARE_SPL){
+					alert_line("A square spline must be used for time-varying reparameterised expression '"+eqq.te_raw+"'.",par.line_num);	
+				}
 			}
-			
+		
 			par.element[ref].value = eqn;
 		}
 	}

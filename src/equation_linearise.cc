@@ -134,8 +134,8 @@ void Equation::calculate_linearise()
 		
 		default: emsg_input("Eq problem10"); break;
 		}
-		
-		if(pl){
+	
+		if(pl && false){
 			cout << endl;
 			print_linear_calc("LIN FINAL "+to_string(i),lin);
 			cout << endl;
@@ -153,8 +153,21 @@ void Equation::calculate_linearise()
 	//auto lc_final = convert_to_linear_calculation(ans,ADD,lin_calc);
 	auto lc_final = lin_calc[lin_calc.size()-1];
 	
-	linearise.no_pop_calc = lc_final.no_pop_calc.calc;
-	linearise.no_pop_calc_time_dep = calc_time_dep(linearise.no_pop_calc);
+	{
+		//linearise.no_pop_calc.type = ZERO; 
+		
+		auto &calc = lc_final.no_pop_calc.calc;
+		
+		if(calc.size() == 0){ // Sets up a zero sum
+			Calculation ca; ca.op = ADD;
+			EqItem it; it. type = ZERO; it.num = UNSET;
+			ca.item.push_back(it);
+			calc.push_back(ca);
+		}
+		else simplify(calc); 
+		
+		linearise.no_pop_calc_store = calc;
+	}
 	
 	if(false) print_linear_final();
 	
@@ -164,42 +177,59 @@ void Equation::calculate_linearise()
 	}
 	
 	// Orders gradients in the same way as pop_ref
-	linearise.pop_grad_calc_time_dep = false;
 	for(auto i = 0u; i < Npop; i++){
 		auto po = pop_ref[i];
 		
 		auto k = 0u; while(k < Npop && lc_final.pop_calc[k].po != po) k++;
 		if(k == Npop) emsg_input("Could not find population");
 		
-		const auto &calc = lc_final.pop_calc[k].calc; 
-		if(calc_time_dep(calc) == true){
-			linearise.pop_grad_calc_time_dep = true;
-		}
-		linearise.pop_grad_calc.push_back(calc);
+		auto &calc = lc_final.pop_calc[k].calc; 
+		linearise.pop_grad_calc_store.push_back(calc);
+		
+		/*
+		if(calc.size() != 1) return;
+		if(calc[0].op != MULTIPLY) return;
+		linearise.pop_grad_calc.push_back(calc[0].item);
+		*/
 	}
 
 	linearise.multi_source = false;
 	
-	auto num = linearise.pop_grad_calc.size();
-	if(linearise.no_pop_calc.size() > 0) num++;
+	auto num = linearise.pop_grad_calc_store.size();
+	if(linearise.no_pop_calc_store.size() > 0) num++;
 	if(num > 1) linearise.multi_source = true; 
 	
 	linearise.on = true;
-
-	linearise.init_pop_ref_from_po(pop_ref);
 	
-	if(linearise.pop_grad_calc.size() != pop_ref.size()){
+	linearise.init_pop_ref_from_po(pop_ref);
+		
+	if(linearise.pop_grad_calc_store.size() != pop_ref.size()){
 		emsg_input("Population number does not agree");
 	}
 	
 	if(false){
+		print_calculation();
+		cout << endl << "AFTER LINEARISE" << endl;
 		cout << endl << endl << te << ":" << endl;
-		print_calc("No pop dep",linearise.no_pop_calc);
+		print_calc("No pop dep: ",linearise.no_pop_calc_store);
 
-		for(auto k = 0u; k < linearise.pop_grad_calc.size(); k++){
-			print_calc(pop[pop_ref[k]].name,linearise.pop_grad_calc[k]);	
+		for(auto k = 0u; k < linearise.pop_grad_calc_store.size(); k++){
+			print_calc(pop[pop_ref[k]].name,linearise.pop_grad_calc_store[k]);	
 		}
 		emsg_input("Linear done");
+	}
+	
+	get_pop_grad_calc_factorise();
+	
+	// Adds a one term if there is no term
+	for(auto &calc : linearise.pop_grad_calc_store){
+		if(calc.size() == 1){
+			auto &ca = calc[0];
+			if(ca.op == MULTIPLY && ca.item.size() == 0){
+				EqItem it; it.type = ONE; it.num = UNSET;
+				ca.item.push_back(it);
+			}
+		}
 	}
 }
 
@@ -212,10 +242,10 @@ void Equation::print_linear_final() const
 	cout << endl << endl;
 
 	cout << endl << endl << te << ":" << endl;
-	print_calc("No pop dep",linearise.no_pop_calc);
+	print_calc("No pop dep: ",linearise.no_pop_calc_store);
 
-	for(auto k = 0u; k < linearise.pop_grad_calc.size(); k++){
-		print_calc(pop[pop_ref[k]].name,linearise.pop_grad_calc[k]);	
+	for(auto k = 0u; k < linearise.pop_grad_calc_store.size(); k++){
+		print_calc(pop[pop_ref[k]].name,linearise.pop_grad_calc_store[k]);	
 	}
 }
 	
@@ -236,7 +266,7 @@ LinearCalculation Equation::convert_to_linear_calculation(const EqItem &it, EqIt
 		case POPNUM: 
 			{
 				Calculation ca; ca.op = op;
-				EqItem it2; it2.type = NUMERIC; it2.num = add_cons(1);
+				EqItem it2; it2.type = NUMERIC; it2.num = constant.add(1);
 				ca.item.push_back(it2);
 				
 				PopCalculation pop_c;
@@ -246,14 +276,15 @@ LinearCalculation Equation::convert_to_linear_calculation(const EqItem &it, EqIt
 			}
 			break;
 		
-		case PARAMVEC: case SPLINEREF: case NUMERIC: case TIME: 
+		case PARAMVEC: case SPLINEREF: case CONSTSPLINEREF: case NUMERIC: case TIME:
+		case REG_PRECALC: case REG_PRECALC_TIME:
 			{
 				Calculation ca; ca.op = op; ca.item.push_back(it);
 				lin.no_pop_calc.calc.push_back(ca);
 			}
 			break;
 		
-		case IE: case FE: case ONE: emsg_input("Should not be here7"); break;			
+		case IE: case FE: case ONE: case ZERO: emsg_input("Should not be here7"); break;			
 		default: emsg_input("Equation error11"); break;
 	}
 	
@@ -272,6 +303,8 @@ void Equation::calc_mult(vector <Calculation> &calc, const vector <Calculation> 
 	
 	if(calc.size() == 0) return;
 	if(calc2.size() == 0){ calc.resize(0); return;}
+	
+	const auto &cval = constant.value;
 	
 	if(true){ // Extra code to make more efficient
 		if(calc.size() == 1){
@@ -296,11 +329,11 @@ void Equation::calc_mult(vector <Calculation> &calc, const vector <Calculation> 
 					}
 					else{
 						if(ca.item.size() == 1 && ca.item[0].type == NUMERIC){
-							auto con = cons[ca.item[0].num];
+							auto con = cval[ca.item[0].num];
 							calc = calc2;
 							Calculation ca; ca.op = MULTIPLY; 
 							EqItem it1; it1.type = REG; it1.num = calc.size()-1;
-							EqItem it2; it2.type = NUMERIC; it2.num = add_cons(con);
+							EqItem it2; it2.type = NUMERIC; it2.num = constant.add(con);
 							ca.item.push_back(it1);
 							ca.item.push_back(it2);
 							calc.push_back(ca);
@@ -315,7 +348,7 @@ void Equation::calc_mult(vector <Calculation> &calc, const vector <Calculation> 
 			const auto &ca2 = calc2[0];
 		
 			if(ca2.op == MULTIPLY){
-				if(ca2.item.size() == 1 && ca2.item[0].type == NUMERIC && cons[ca2.item[0].num] == 1){
+				if(ca2.item.size() == 1 && ca2.item[0].type == NUMERIC && cval[ca2.item[0].num] == 1){
 					return;
 				}					
 				else{
@@ -334,11 +367,11 @@ void Equation::calc_mult(vector <Calculation> &calc, const vector <Calculation> 
 					}
 					else{
 						if(ca2.item.size() == 1 && ca2.item[0].type == NUMERIC){
-							auto con = cons[ca2.item[0].num];
+							auto con = cval[ca2.item[0].num];
 								
 							Calculation ca; ca.op = MULTIPLY;
 							EqItem it1; it1.type = REG; it1.num = calc.size()-1;
-							EqItem it2; it2.type = NUMERIC; it2.num = add_cons(con);
+							EqItem it2; it2.type = NUMERIC; it2.num = constant.add(con);
 							ca.item.push_back(it1);
 							ca.item.push_back(it2);
 							calc.push_back(ca);
@@ -454,7 +487,7 @@ void Equation::calc_add(vector <Calculation> &calc, const vector <Calculation> &
 /// Detemines if a calculation is one
 bool Equation::ca_is_one(const Calculation &ca) const
 {
-	if(ca.item.size() == 1 && ca.item[0].type == NUMERIC && cons[ca.item[0].num] == 1){
+	if(ca.item.size() == 1 && ca.item[0].type == NUMERIC && constant.value[ca.item[0].num] == 1){
 		if(ca.op == MULTIPLY || ca.op == ADD) return true;
 	}
 	return false;
@@ -515,7 +548,8 @@ void Equation::print_calc(string st, const vector <Calculation> &calc) const
 {
 	cout << st << ": "; 
 	for(auto i = 0u; i < calc.size(); i++){
-		print_ca(i,calc[i]); 
+		const auto &ca = calc[i];
+		print_ca(i,ca); 
 		cout << ",  ";
 	}
 	cout << endl;
@@ -540,12 +574,12 @@ bool Equation::single_param_func(Calculation ca, LinearCalculation &lin, const v
 		}
 		break;
 		
-	case PARAMVEC: case SPLINEREF: case NUMERIC: case TIME: 
+	case PARAMVEC: case SPLINEREF: case CONSTSPLINEREF: case NUMERIC: case TIME: 
 		lin.no_pop_calc.calc.push_back(ca);
 		break;
 		
 	case POPNUM: return false;
-	case IE: case ONE: case FE: emsg_input("Eq Lin should not be"); break;
+	case IE: case ONE: case ZERO: case FE: emsg_input("Eq Lin should not be"); break;
 	default: emsg_input("Eq problem2"); break;
 	}
 	
@@ -593,7 +627,7 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 			}
 			break;
 			
-		case PARAMVEC: case SPLINEREF: case NUMERIC: case TIME:
+		case PARAMVEC: case SPLINEREF: case CONSTSPLINEREF: case NUMERIC: case TIME:
 			{		
 				lin = lin_calc[it1.num];
 				if(lin.pop_calc.size() > 0) return false;
@@ -603,12 +637,12 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 			}
 			break;
 		case POPNUM: return false;
-		case IE: case ONE: case FE: emsg_input("Eq Lin should not be"); break;
+		case IE: case ONE: case ZERO: case FE: emsg_input("Eq Lin should not be"); break;
 		default: emsg_input("Eq problem2"); break;
 		}
 		break;
 		
-	case PARAMVEC: case SPLINEREF: case NUMERIC: case TIME: 
+	case PARAMVEC: case SPLINEREF: case CONSTSPLINEREF: case NUMERIC: case TIME: 
 		switch(it2.type){
 		case REG:
 			{
@@ -620,18 +654,18 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 			}
 			break;
 			
-		case PARAMVEC: case SPLINEREF: case NUMERIC: case TIME:
+		case PARAMVEC: case SPLINEREF: case CONSTSPLINEREF: case NUMERIC: case TIME:
 			{		
 				lin.no_pop_calc.calc.push_back(ca);
 			}
 			break;
 		case POPNUM: return false;
-		case IE: case ONE: case FE: emsg_input("Eq Lin should not be"); break;
+		case IE: case ONE: case ZERO: case FE: emsg_input("Eq Lin should not be"); break;
 		default: emsg_input("Eq problem2"); break;
 		}
 		break;
 	case POPNUM: return false;
-	case IE: case ONE: case FE: emsg_input("Eq Lin should not be"); break;
+	case IE: case ONE: case ZERO: case FE: emsg_input("Eq Lin should not be"); break;
 	default: emsg_input("Eq problem2"); break;
 	}
 	
@@ -640,24 +674,17 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 
 
 /// Calculates the vector of gradients against population number
-vector <double> Equation::calculate_popnum_gradient(const vector <double> &param_val) const
+vector <double> Equation::calculate_popnum_gradient_without_factor(const vector <double> &precalc) const
 {
-	const auto &pop_grad_calc = linearise.pop_grad_calc;
-	
 	vector <double> pop_grad;
-	
-	for(auto i = 0u; i < pop_grad_calc.size(); i++){
-		pop_grad.push_back(calculate_calculation_notime(pop_grad_calc[i],param_val));
+
+	const auto &pop_grad_precalc = linearise.pop_grad_precalc;
+
+	for(auto i = 0u; i < pop_grad_precalc.size(); i++){
+		pop_grad.push_back(calculate_item_no_time(pop_grad_precalc[i],precalc));
 	}
 	
 	return pop_grad;
-}
-
-
-/// Calculates the term with no population
-double Equation::calculate_no_pop(unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const
-{
-	return calculate_calculation(linearise.no_pop_calc,ti,param_val,spline_val);
 }
 
 
@@ -667,170 +694,52 @@ bool Equation::calc_time_dep(const vector <Calculation> &calc) const
   for(auto i = 0u; i < calc.size(); i++){
 		const auto &ca = calc[i];
 		
-		const auto &item = ca.item;
-		const auto N = item.size();
-		
-		for(auto j = 0u; j < N; j++){
-			const auto &it = item[j];
-			
-			switch(it.type){
-				case PARAMETER: case PARAMVEC: case IE: case ONE: 
-				case FE:	case REG: case NUMERIC:
-					break;
-				case SPLINE: case SPLINEREF: case TIME: return true;
-				case POPNUM: emsg_input("Should not have a population"); break;
-				default: emsg_input("Equation error"); break;
-			}
-		}
+		if(item_time_dep(ca.item)) return true;
   }
 	
 	return false;
 }
 
 
-/// Calculates based on calc
-double Equation::calculate_calculation(const vector <Calculation> &calc, unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const 
+/// Determines if a vector of equation items is time dependent
+bool Equation::item_time_dep(const vector <EqItem> item) const 
 {
-	auto imax = calc.size();
-	if(imax == 0) return 0;
+	const auto N = item.size();
+		
+	for(auto j = 0u; j < N; j++){
+		const auto &it = item[j];
+		if(it_time_dep(it)) return true;
+	}
 	
-	vector <double> regcalc(imax);
-
-  for(auto i = 0u; i < imax; i++){
-		const auto &ca = calc[i];
-		
-		const auto &item = ca.item;
-		const auto N = item.size();
-		
-		vector <double> num(N);
-		
-		for(auto j = 0u; j < N; j++){
-			const auto &it = item[j];
-			
-			switch(it.type){
-				case PARAMETER: emsg("Should not be parameter"); break;
-				case PARAMVEC: num[j] = param_val[it.num]; break;
-				case SPLINE: emsg("Should not be spline"); break;
-				case SPLINEREF:	num[j] = spline_val[it.num].val[ti]; break;
-				case IE: emsg("Should not include ind effect"); break;
-				case ONE: num[j] = 1; break;
-				case FE: emsg("Should not include fixed effect"); break;
-				case POPNUM: emsg("Should not have a population"); break;
-				case REG: num[j] = regcalc[it.num]; break;
-				case NUMERIC: num[j] = cons[it.num]; break;
-				case TIME: num[j] = timepoint[ti]; break;
-				default: emsg("Equation error"); break;
-			}
-		}
-
-    regcalc[i] = calculate_operation(ca.op,num);
-  }
-	
-	return regcalc[imax-1];
+	return false;
 }
 
 
-/// Calculates based on calc (using spline store if that is set)
-double Equation::calculate_calculation_spline_store(const vector <Calculation> &calc, unsigned int ti, const vector <double> &param_val, const vector <SplineValue> &spline_val) const 
+/// Determines if item is time dependent
+bool Equation::it_time_dep(const EqItem &it) const
 {
-	auto imax = calc.size();
-	if(imax == 0) return 0;
+	switch(it.type){
+	case PARAMETER: case PARAMVEC: case IE: case ONE: case ZERO: 
+	case FE:	case REG: case NUMERIC: case REG_PRECALC:
+		return false;
+	case SPLINE: case SPLINEREF: case CONSTSPLINEREF:
+	case TIME: case REG_PRECALC_TIME:
+		return true;
+	case POPNUM: emsg_input("Should not have a population"); break;
+	default: emsg_input("Equation error8"); break;
+	}
 	
-	vector <double> regcalc(imax);
-
-  for(auto i = 0u; i < imax; i++){
-		const auto &ca = calc[i];
-		
-		const auto &item = ca.item;
-		const auto N = item.size();
-		
-		vector <double> num(N);
-		
-		for(auto j = 0u; j < N; j++){
-			const auto &it = item[j];
-			
-			switch(it.type){
-				case PARAMETER: emsg("Should not be param"); break;
-				case PARAMVEC: num[j] = param_val[it.num]; break;
-				case SPLINE: emsg("Should not be spline"); break;
-				case SPLINEREF:
-					{
-						const auto &sv = spline_val[it.num];
-						num[j] = sv.store[ti];
-						if(num[j] == UNSET) num[j] = sv.val[ti];
-					}
-					break;
-				case IE: emsg("Should not include ind effect"); break;
-				case ONE: num[j] = 1; break;
-				case FE: emsg("Should not include fixed effect"); break;
-				case POPNUM: emsg("Should not have a population"); break;
-				case REG: num[j] = regcalc[it.num]; break;
-				case NUMERIC: num[j] = cons[it.num]; break;
-				case TIME: num[j] = timepoint[ti]; break;
-				default: emsg("Equation error"); break;
-			}
-		}
-
-    regcalc[i] = calculate_operation(ca.op,num);
-  }
-	
-	return regcalc[imax-1];
+	return false;
 }
 
-
-/// Calculates based on calc (no time variation)
-double Equation::calculate_calculation_notime(const vector <Calculation> &calc, const vector <double> &param_val) const 
-{
-	auto imax = calc.size();
-	if(imax == 0) return 0;
-	
-	vector <double> regcalc(imax);
-
-  for(auto i = 0u; i < imax; i++){
-		const auto &ca = calc[i];
 		
-		const auto &item = ca.item;
-		const auto N = item.size();
-		
-		vector <double> num(N);
-		
-		for(auto j = 0u; j < N; j++){
-			const auto &it = item[j];
-			
-			switch(it.type){
-				case PARAMETER: emsg("Shoudl not be param"); break;
-				case PARAMVEC: num[j] = param_val[it.num]; break;
-				case SPLINE: emsg("Should not include spline"); break;
-				case SPLINEREF: emsg("Should not include spline"); break;
-				case IE: emsg("Should not include ind effect"); break;
-				case ONE: num[j] = 1; break;
-				case FE: emsg("Should not include fixed effect"); break;
-				case POPNUM: emsg("Should not have a population"); break;
-				case REG: num[j] = regcalc[it.num]; break;
-				case NUMERIC: num[j] = cons[it.num]; break;
-				case TIME: emsg("Should not have time"); break;
-				default: emsg("Equation error"); break;
-			}
-		}
-
-    regcalc[i] = calculate_operation(ca.op,num);
-  }
-	
-	return regcalc[imax-1];
-}
-
-
 /// Calculates the value for an equation using the linearised form (for diagnostic checking)
-double Equation::calculate_linearise_check(unsigned int ti, const vector <double> &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val) const 
+double Equation::calculate_linearise_check(unsigned int ti, const vector <double> &popnum, const vector <double> &precalc) const 
 {
-	auto val = 0.0;
-	
-	const auto &calc = linearise.no_pop_calc;
-	if(calc.size() > 0) val += calculate_calculation(calc,ti,param_val,spline_val);
-	
+	auto val = calculate_item(linearise.no_pop_precalc,ti,precalc);
+	auto factor = calculate_item(linearise.factor_precalc,ti,precalc);
 	for(auto j = 0u; j < pop_ref.size(); j++){
-		const auto &pc = linearise.pop_grad_calc[j];
-		val += rectify(popnum[pop_ref[j]])*calculate_calculation(pc,ti,param_val,spline_val);
+		val += rectify(popnum[pop_ref[j]])*factor*calculate_item(linearise.pop_grad_precalc[j],ti,precalc);
 	}
 	
 	return val;
@@ -838,7 +747,7 @@ double Equation::calculate_linearise_check(unsigned int ti, const vector <double
 
 
 /// Determines if two calculations are the same
-bool Equation::equal_calc(const vector <Calculation> &calc1, const vector <double> &cons, const vector <Calculation> &calc2, const vector <double> &cons2) const 
+bool Equation::equal_calc(const vector <Calculation> &calc1, const vector <Calculation> &calc2) const 
 {
 	if(calc1.size() != calc2.size()) return false;
 		
@@ -852,22 +761,15 @@ bool Equation::equal_calc(const vector <Calculation> &calc1, const vector <doubl
 			const auto &it2 = ca2.item[j];
 			
 			if(it1.type != it2.type) return false;
-			if(it1.type == NUMERIC){
-				if(cons[it1.num] != cons2[it2.num]) return false;
-			}
-			else{
-				if(it1.num != it2.num) return false;
-			}
 		}
 	}
 
 	return true;
 }
 	
-
-
+				
 /// Creates a source sampler
-InfSourceSampler Equation::setup_source_sampler(unsigned int ti, const vector <double> &popnum, const vector <double> &param_val, const vector <SplineValue> &spline_val) const 
+InfSourceSampler Equation::setup_source_sampler(unsigned int ti, const vector <double> &popnum, const PV &param_val) const 
 {
 	InfSourceSampler ss;
 	auto &val_store = ss.val_store;
@@ -875,11 +777,14 @@ InfSourceSampler Equation::setup_source_sampler(unsigned int ti, const vector <d
 	
 	auto Npop = pop_ref.size();
 
+	const auto &precalc = param_val.precalc;
+
+	auto factor = 1.0;  emsg("fa");// calculate_mult(linearise.factor,ti,precalc);
+	
 	auto val_sum = 0.0;
 	for(auto j = 0u; j < Npop; j++){
 		auto po = pop_ref[j];
-		
-		auto val = popnum[po]*(calculate_calculation(linearise.pop_grad_calc[j],ti,param_val,spline_val));
+		auto val = popnum[po]*factor; emsg("H");// *calculate_mult(linearise.pop_grad_calc[j],ti,precalc);
 		
 		val_sum += val;
 		val_store.push_back(val);
@@ -887,7 +792,7 @@ InfSourceSampler Equation::setup_source_sampler(unsigned int ti, const vector <d
 	}
 
 	{
-		auto val = calculate_calculation(linearise.no_pop_calc,ti,param_val,spline_val);
+		auto val = calculate_no_pop(ti,precalc);
 		val_sum += val;
 		
 		val_store.push_back(val);
@@ -945,3 +850,145 @@ unsigned int Linearise::get_pop_ref(unsigned int po) const
 	return UNSET;
 }
 
+
+/// Tries to take any common factors from pop_grad_calc
+void Equation::get_pop_grad_calc_factorise()
+{	
+	auto &pgc = linearise.pop_grad_calc_store;
+	
+	Calculation fac_ca;
+	fac_ca.op = MULTIPLY;
+	
+	if(pgc.size() == 0){
+		if(fac_ca.item.size() == 0){
+			EqItem it; it.type = ONE; it.num = UNSET; fac_ca.item.push_back(it);
+		}
+		linearise.factor_calc.push_back(fac_ca);
+		return;
+	}
+	
+	auto j = 0u;
+	while(j < pgc[0][pgc[0].size()-1].item.size()){
+		const auto &it_fi = pgc[0][pgc[0].size()-1].item[j];
+		
+		switch(it_fi.type){
+		case ONE: case ZERO: case REG_PRECALC: case REG_PRECALC_TIME: 
+		case NUMERIC: case TIME: case CONSTSPLINEREF: 
+			{
+				auto fl = false;
+				
+				vector <unsigned int> list;
+				for(auto i = 0u; i < pgc.size(); i++){
+					const auto &item = pgc[i][pgc[i].size()-1].item;
+					
+					unsigned int k;
+					for(k = 0; k < item.size(); k++){
+						const auto &it = item[k];
+						if(it_fi.type == it.type && it_fi.num == it.num){
+							list.push_back(k);
+							break;
+						}
+					}
+					if(k == item.size()){ fl = true; break;}
+				}
+				
+				if(fl == false){
+					fac_ca.item.push_back(it_fi);
+					for(auto i = 0u; i < pgc.size(); i++){
+						auto &ite = pgc[i][pgc[i].size()-1].item;
+						
+						auto k = list[i];
+						if(k >= ite.size()) emsg("wrong");
+						if(k+1 < ite.size()){
+							ite[k] = ite[ite.size()-1];
+						}
+						ite.pop_back();
+					}
+				}
+				else j++;
+			}
+			break;
+
+		default:
+			j++;
+			break;
+		}
+	}
+	
+	if(fac_ca.item.size() == 0){
+		EqItem it; it.type = ONE; it.num = UNSET; fac_ca.item.push_back(it);
+	}
+	linearise.factor_calc.push_back(fac_ca);
+	
+	if(false){
+		//print_calculation();
+	
+		cout << " AFTE FACTOR" << endl;
+		for(auto k = 0u; k < pgc.size(); k++){
+			print_calc(pop[pop_ref[k]].name,pgc[k]);	
+		}
+		print_calc("factor",linearise.factor_calc);
+		print_calc("no pop",linearise.no_pop_calc_store);
+	}
+	//emsg("jj");
+}
+
+
+/// References precalculation in linearisation
+void Equation::set_precalc()
+{
+	//print_calculation();
+	
+	linearise.no_pop_precalc = get_precalc(linearise.no_pop_calc_store);
+	
+	for(auto i = 0u; i < linearise.pop_grad_calc_store.size(); i++){
+		linearise.pop_grad_precalc.push_back(get_precalc(linearise.pop_grad_calc_store[i]));
+	}
+
+	linearise.factor_precalc = get_precalc(linearise.factor_calc);
+
+	linearise.pop_grad_time_dep = false;
+	for(const auto &it : linearise.pop_grad_precalc){
+		if(it_time_dep(it)){ linearise.pop_grad_time_dep = true; break;}
+	}
+	
+	linearise.factor_time_dep = it_time_dep(linearise.factor_precalc);
+	linearise.no_pop_calc_time_dep = it_time_dep(linearise.no_pop_precalc);
+		
+	/*
+	cout << "no_pop"; print_item(linearise.no_pop_precalc); cout << endl;
+	cout << "factor"; print_item(linearise.factor_precalc); cout << endl;
+	for(const auto &it : linearise.pop_grad_precalc){
+		cout << "grad"; print_item(it); cout << endl;
+	}
+	*/
+	
+	// Deletes calculations as they are no longer required
+	linearise.no_pop_calc_store.clear();
+	linearise.pop_grad_calc_store.clear();
+	linearise.factor_calc.clear();
+}
+
+
+/// Converts from a calculation to a precalc
+EqItem Equation::get_precalc(const vector <Calculation> &calc) const
+{
+	//print_calc("pc",calc);
+	if(calc.size() != 1) emsg("precalc should be one");
+	const auto &ca = calc[0];
+	
+	if(ca.op != ADD && ca.op != MULTIPLY) emsg("precalc op");
+	if(ca.item.size() != 1) emsg("precalc item wrong");
+	
+	const auto &it = ca.item[0];
+	switch(it.type){
+	case REG_PRECALC: case REG_PRECALC_TIME: case ONE: case ZERO: 
+	case NUMERIC: case TIME: case CONSTSPLINEREF:  
+		break;
+	default: 
+		emsg("precalc should be reg"); 
+		break;
+	}
+	
+	return it;
+}

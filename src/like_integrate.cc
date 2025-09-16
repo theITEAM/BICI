@@ -14,11 +14,10 @@ using namespace std;
 #include "utils.hh"
 
 /// Intergates the approximate likelihood 
-double State::like_integrate(const vector <double> &param_value)
+double State::like_integrate(const PV &param_value)
 {
 	param_val = param_value;
-	spline_init();
-	
+
 	for(auto p = 0u; p < model.species.size(); p++){
 		const auto &sp = model.species[p];
 		

@@ -169,6 +169,11 @@ function key_press(e)
 	if(false) error(e.keyCode+" code");
 	
 	let code = e.keyCode;	
+	//prr(code+"code");
+	
+	if(code == 223 && tab_name() == "Inference" && testing){
+		start_worker("CopyValue");
+	}
 	
 	if(make_fig){
 		switch(code){
@@ -1629,7 +1634,7 @@ function view_warning(i)
 		change_page({pa:"Model", su:"Parameters"});
 		break;
 		
-	case "ParamValueProblem": case "KnotTimeProblem":
+	case "ParamValueProblem":
 		if(warn.par.type == "param factor"){
 			change_page({pa:"Post. Simulation", su:"Parameter Mult."});
 		}
@@ -1640,9 +1645,14 @@ function view_warning(i)
 			}
 		}
 		break;
-	
-	default:
-		error("This warning type is not recognised: "+warn.warn_type);
+		
+	case "KnotTimeProblem":
+		if(warn.par.type == "param factor"){
+			change_page({pa:"Post. Simulation", su:"Parameter Mult."});
+		}
+		else{				
+			change_page({pa:"Model", su:"Parameters"}); 
+		}	
 		break;
 	}
 }

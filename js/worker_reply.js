@@ -97,7 +97,7 @@ worker.onmessage = function (e)
 			}
 			break;
 			
-		case "Save BICI":	case "Export BICI": case "StartCluster":
+		case "Save BICI":	case "Export BICI": case "StartClusterSave": case "StartClusterExport":
 			inter.file_store.file_list = ans.file_list;
 			inter.file_store.save_type = ans.save_type;
 			
@@ -447,13 +447,13 @@ worker.onmessage = function (e)
 		case "Get Ind List":
 			ind_group_data2(ans.name_list);
 			break;
-			
+		
 		case "Error":
 			error("Error: "+ans.te);
 			break;
 			
 		default:
-			error("Option not recognisted: "+ans.type);
+			error("Option not recognisted2: "+ans.type);
 			break;
 		}
 	}

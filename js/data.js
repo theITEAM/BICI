@@ -36,8 +36,8 @@ function start_data_source(type,spec,info)
 	case "Compartment": name = "Compartment data"; break;
 	case "Transition": name = "Transition data"; break;
 	case "Diag. Test": name = "Diagnostic test data"; break;
-	case "Population": name = "Population data"; break;
-	case "Pop. Trans.": name = "Pop. trans data"; break;
+	case "Population": name = "Pop. data"; break;
+	case "Pop. Trans.": name = "Pop. trans. data"; break;
 	case "Genetic": name = "Genetic data"; break;
 	case "Ind. Eff.": name = "True individual effects"; break;
 	case "Ind. Group": name = "Group"; break;

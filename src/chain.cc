@@ -36,7 +36,7 @@ Chain::Chain(unsigned int nburnin_, unsigned int nsample_, const Model &model, O
 /// Initialises chain
 void Chain::init(unsigned int ch, unsigned int ch_max)
 {
-	print_diag(" update_init");
+	print_diag("update_init");
 		
 	update_init();
 	
@@ -88,11 +88,11 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 	
 		//state.check("after resample");
 	}
-	if(Lmax == -LARGE) emsg("Could not find initial state");
+	if(Lmax == -LARGE) run_error("Could not find initial state");
 	
 	state.set_particle(part);
 	
-	state.check("before");
+	state.check("init");
 }
 
 
@@ -114,7 +114,7 @@ void Chain::burn_update(unsigned int s)
 		
 		if(s != 0 && s%burn_info.prop_join_step == 0) check_join_proposal();
 
-		if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
+		//if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
 	}
 	else{
 		state.dif_thresh = DIF_THRESH;
@@ -138,7 +138,7 @@ void Chain::pas_burn_update(unsigned int s, unsigned int g, unsigned int gen_upd
 	
 	if(s != 0 && s%burn_info.prop_join_step == 0) check_join_proposal();
 
-	if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
+	//if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
 }
 
 
@@ -159,7 +159,7 @@ void Chain::pas_burn_update_run(unsigned int s)
 		
 		if(s != 0 && s%burn_info.prop_join_step == 0) check_join_proposal();
 
-		if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
+		//if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
 	}
 	
 	state.dif_thresh = DIF_THRESH;
@@ -462,19 +462,17 @@ void Chain::update(unsigned int s)
 	
 	for(auto &pro : proposal){ 
 		if(pro.on){
-			if(pl) cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
 			//cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
 			
 			if(true){
+				if(pl) cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
+				
 				pro.update(state);
 			}
 			else{
-				/*
-				IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, IE_VAR_CV_PROP, TRANS_TREE_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, 
-				IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP, IND_OBS_SWITCH_LEAVE_SINK_PROP 
-				 */
 				switch(pro.type){
-				case IND_ADD_REM_PROP:
+				case PARAM_PROP:
+				//case IND_ADD_REM_PROP:
 				//case IND_EVENT_TIME_PROP:   
 				//case IND_MULTI_EVENT_PROP:
 				//case IND_EVENT_ALL_PROP:
@@ -490,6 +488,8 @@ void Chain::update(unsigned int s)
 				//case IND_ADD_REM_PROP:
 				//case IND_OBS_SWITCH_LEAVE_SINK_PROP:
 				//case IND_OBS_SWITCH_ENTER_SOURCE_PROP:
+					if(pl) cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
+			
 					pro.update(state);
 					break;
 			
@@ -502,6 +502,7 @@ void Chain::update(unsigned int s)
 			if(pl) state.check_popnum_t2("hhh");
 			
 			//state.check_neg_rate(pro.name);
+			//state.check_markov_div_value(0," after update");
 		}
 	}
 	
@@ -709,25 +710,24 @@ void Chain::update_init()
 		for(auto p = 0u; p < model.nspecies; p++){
 			auto &sp = model.species[p];
 			auto st = model.samp_type;
-			
 			if(sp.type == INDIVIDUAL){	
 				vector <unsigned int> vec; vec.push_back(p);
 				{				
 					Proposal pp(IND_EVENT_TIME_PROP,vec,model,output,1,burn_info);
-					//if(st == LOCAL_SAMP || st == ALL_SAMP) proposal.push_back(pp); 
-					proposal.push_back(pp); 
+					if(st == LOCAL_SAMP || st == ALL_SAMP) proposal.push_back(pp); 
+					//proposal.push_back(pp); 
 				}
 				
 				{				
 					Proposal pp(IND_MULTI_EVENT_PROP,vec,model,output,1,burn_info);
-					//if(st == LOCAL_SAMP || st == ALL_SAMP) proposal.push_back(pp); 
-					proposal.push_back(pp); 
+					if(st == LOCAL_SAMP || st == ALL_SAMP) proposal.push_back(pp); 
+					//proposal.push_back(pp); 
 				}
 				
 				{				
 					Proposal pp(IND_EVENT_ALL_PROP,vec,model,output,1,burn_info);
-					//if(st == LOCAL_SAMP || st == ALL_SAMP) proposal.push_back(pp); 
-					proposal.push_back(pp); 
+					if(st == LOCAL_SAMP || st == ALL_SAMP) proposal.push_back(pp); 
+					//proposal.push_back(pp); 
 				}
 				
 				for(auto cl = 0u; cl < sp.ncla; cl++){
@@ -862,15 +862,13 @@ void Chain::update_init()
 			}
 		}
 	}				
-					
-	for(auto i = 0u; i < 100; i++){
+	
+	for(auto i = 0u; i < 50; i++){
 		auto param_val = model.param_sample();
 		cor_matrix.add_sample(model.get_param_val_prop(param_val),LARGE);
 	}
 	
 	for(auto &pro : proposal) pro.update_sampler(cor_matrix);
-	
-	for(auto &pro : proposal) pro.calculate_affect_spline(); 
 	
 	if(1 == 0) cout << "print_info_turned off in code" << endl;
 	else{
@@ -1036,8 +1034,11 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 		ss << "Non-proposal - " << cpu_percent(other,total_time);
 		ss << " (samplers: " << cpu_percent(state.timer[UPDATE_SAMPLER_TIMER],total_time);
     ss << ", o/p params: " << cpu_percent(output.timer[PARAM_OUTPUT],total_time);
-		ss << ", o/p state: " << cpu_percent(output.timer[STATE_OUTPUT],total_time);
+			ss << ", o/p state: " << cpu_percent(output.timer[STATE_OUTPUT],total_time);
+		ss << ", der-pre: " << cpu_percent(state.timer[DERIVE_PRECALC_TIMER],total_time);
+		ss << ", derive: " << cpu_percent(state.timer[DERIVE_TIMER],total_time);
 		ss << ", checking: " << cpu_percent(state.timer[CHECK_TIMER],total_time);
+	
 		ss << ")" << endl;
 		
 		if(anneal_time != UNSET){
@@ -1079,10 +1080,9 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 				case SPLINE_PRIOR_AFFECT: ss << "Spline prior"; break; 
 				case PRIOR_AFFECT: ss << "Prior"; break; 
 				case DIST_AFFECT: ss << "Distribution"; break; 
-				case SPLINE_AFFECT: ss << "Spline"; break;  
 				case EXP_FE_AFFECT: ss << "Exp FE"; break; 
 				case DIV_VALUE_AFFECT: ss << "Div value"; break; 
-				case DIV_VALUE_FAST_AFFECT: ss << "Div value fast"; break; 
+				case DIV_VALUE_NONPOP_AFFECT: ss << "Div value nonpop"; break; 
 				case DIV_VALUE_LINEAR_AFFECT: ss << "Div value linear"; break; 
 				case MARKOV_LIKE_AFFECT: ss << "Markov like"; break; 
 				case POP_AFFECT: ss << "Population"; break; 
@@ -1156,6 +1156,7 @@ bool PS_ord (const PropSpeed &ps1, const PropSpeed &ps2)
 { return (ps1.time_per_prop < ps2.time_per_prop); };  
 
 
+/*
 /// Sets the proposal probabilities based on the amount of CPU time taken 
 void Chain::set_proposal_prob()
 {
@@ -1200,6 +1201,7 @@ void Chain::set_proposal_prob()
 		}
 	}
 }
+*/
 
 
 /// Checks if new proposals are added which join parameters
@@ -1271,7 +1273,6 @@ void Chain::check_join_proposal()
 					if(on_st[i] == false){
 						if(pl) cout << "RE TURN ON: " << prop.name << endl;
 						prop.update_sampler(cor_matrix);
-						prop.calculate_affect_spline(); 
 					}
 				}
 			}
@@ -1297,7 +1298,6 @@ void Chain::check_join_proposal()
 		auto &prop = proposal[j];
 		if(pl) cout << "JOIN ADD: " << prop.name << endl;
 		prop.update_sampler(cor_matrix);
-		prop.calculate_affect_spline(); 
 	}
 	
 	if(pl){

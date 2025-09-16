@@ -9,7 +9,15 @@ function add_pop_buts(res,lay)
 	let cx = corner.x;
 	let cy = corner.y;
 	
-	cy = lay.add_title("Populations",cx,cy,{te:pop_plot_text});
+	let ti = "Populations";
+	
+	let rpf = res.plot_filter;	
+	
+	if(rpf.sel_view.te == "Data") ti = rpf.sel_popdata.te;
+	
+	rpf = get_inf_res().plot_filter;
+	
+	cy = lay.add_title(ti,cx,cy,{te:pop_plot_text});
 	
 	cy += 1;
 
@@ -18,7 +26,7 @@ function add_pop_buts(res,lay)
 		start_worker("Graph pop",res_worker(res));
 		return;
 	}
-	
+
 	switch(plot_variety(inter.graph.type)){
 	case "Line plot": inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); break;
 	case "Comp plot": inter.graph.create(1,cy-1,graph_width-right_menu_width+0.5,lay.dy-cy,lay); break;
@@ -2552,7 +2560,7 @@ function add_trans_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 			}
 		}
 	}
-
+	
 	percent(10);
 
 	let t_start = Number(result.details.t_start);
@@ -3486,22 +3494,23 @@ function construct_spline_timevariation(par,value,details)
 	let tp = get_time_points(details);
 
 	let val_spl = copy(value);
-			
+	let type = par.spline.spline_radio.value;
+
 	switch(par.dep.length){
 	case 1: 
-		val_spl = get_time_variation(val_spl,times,tp); 
+		val_spl = get_time_variation(val_spl,times,tp,type); 
 		break;
 		
 	case 2: 
 		for(let j = 0; j < val_spl.length; j++){
-			val_spl[j] = get_time_variation(val_spl[j],times,tp);
+			val_spl[j] = get_time_variation(val_spl[j],times,tp,type);
 		}
 		break;
 		
 	case 3:
 		for(let j = 0; j < val_spl.length; j++){
 			for(let i = 0; i < val_spl[j].length; i++){
-				val_spl[j][i] = get_time_variation(val_spl[j][i],times,tp);
+				val_spl[j][i] = get_time_variation(val_spl[j][i],times,tp,type);
 			}
 		}
 		break;
@@ -3536,6 +3545,8 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 				
 					let tp = get_time_points(details);
 					
+					let spl_type = par.spline.spline_radio.value;
+					
 					if(typeof times == 'string'){ alertp(times); close_view_graph(); return;}
 					
 					let ntimes = times.length;
@@ -3565,6 +3576,13 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 						let index = co_list[i].index;
 						
 						let vec_val = get_element(value,index);
+						
+						for(let k = 0; k < vec_val.length; k++){
+							if(vec_val[k] == undefined){
+								return no_graph_msg("Not all spline values are specified");
+							}
+						}
+						
 						let type = "Line";
 						if(CImin){
 							type = "Line CI";
@@ -3584,8 +3602,47 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 								break;
 								
 							case "view_graph":
-								for(let t = 0; t < ntimes; t++){
-									point.push({x:times[t], y:vec_val[t]});
+								switch(spl_type){
+								case "Square":
+									{
+										let tend;
+										if(!isNaN(details.t_end)){
+											let num =  Number(details.t_end);
+											if(num > times[times.length-1]) tend = num;
+										}
+										for(let t = 0; t < ntimes; t++){
+											point.push({x:times[t], y:vec_val[t]});
+											if(t+1 < ntimes) point.push({x:times[t+1], y:vec_val[t]});
+											else{
+												if(tend != undefined) point.push({x:tend, y:vec_val[t]});
+											}
+										}
+									}
+									break;
+									
+								case "Linear":
+									for(let t = 0; t < ntimes; t++){
+										point.push({x:times[t], y:vec_val[t]});
+									}
+									break;
+									
+								case "Cubic": case "Cubic +ve":
+									{
+										let dt;
+										let tsta = times[0], tend = times[times.length-1];
+										if(!isNaN(details.timestep)) dt = Number(details.timestep);
+										else dt = (tend-tsta)/100;
+										
+										let cspl = solve_cubic_spline(times,vec_val,spl_type);
+										if(typeof cspl == "string"){
+											return no_graph_msg(cspl);
+										}
+										
+										for(let t = tsta; t <= tend; t += dt){
+											point.push({x:t, y:calculate_cubic_spline(t,cspl)});
+										}
+									}
+									break;
 								}
 								break;
 								
@@ -3608,7 +3665,6 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 						// Adds in simuation values
 						if(par.variety != "const" && rpf && rpf.sim_val.check == true && rpf.siminf != "sim" && par.type != "derive_param"){	
 							let res = construct_spline_timevariation(par,par.value,so.details);
-						
 							if(!res.err){ 
 								let vec_val = get_element(res.value,index);
 								
@@ -3844,20 +3900,45 @@ function get_time_points(details)
 
 
 /// Converts splines from times at know to time on global time line
-function get_time_variation(val,times,tp)
+function get_time_variation(val,times,tp,type)
 {
 	let value = [];
-	let j = 0;
-	for(let i = 0; i < tp.length; i++){
-		let t = tp[i];
-		while(j < times.length-1 && times[j+1] < t) j++;
-		
-		if(j == times.length-1){                      // Extended beyond end time (for PCC)
-			value.push(val[j]);
+	
+	if(type == "Cubic" || type == "Cubic +ve"){	
+		let cspl = solve_cubic_spline(times,val,type);
+		if(typeof cspl == "string"){
+			return no_graph_msg(cspl);
 		}
-		else{
-			let frac = (t-times[j])/(times[j+1]-times[j]);
-			value.push(val[j]*(1-frac) + val[j+1]*frac);
+																			
+		for(let i = 0; i < tp.length; i++){
+			value.push(calculate_cubic_spline(tp[i],cspl));
+		}
+	}
+	else{
+		let j = 0;
+		for(let i = 0; i < tp.length; i++){
+			let t = tp[i];
+			while(j < times.length-1 && times[j+1] < t) j++;
+			
+			if(j == times.length-1){                      // Extended beyond end time (for PCC)
+				value.push(val[j]);
+			}
+			else{
+				switch(type){
+				case "Square": 
+					value.push(val[j]);
+					break;
+				
+				case "Linear":
+					{
+						let frac = (t-times[j])/(times[j+1]-times[j]);
+						value.push(val[j]*(1-frac) + val[j+1]*frac);
+					}
+					break;
+		
+				default: error("Spline type to do"); break;
+				}
+			}
 		}
 	}
 	return value;
@@ -4004,7 +4085,6 @@ function get_radio_param(ax)
 function graph_param_calculate(result,rpf,burn)
 {	
 	let data = [];
-	
 	let pview = rpf.sel_paramview;
 	
 	if(graph_dia) prr("GRAPH DIA  graph_param_calculate: pview:"+pview.te);
@@ -4138,7 +4218,7 @@ function graph_param_calculate(result,rpf,burn)
 			}
 			
 			let vte = rpf.sel_paramviewtype.te;
-		
+	
 			switch(vte){
 			case "Trace": case "Samples":
 				{
@@ -4428,7 +4508,7 @@ function multivariate_param_plot(result,rpf,burn)
 	value = copy(sam);
 	CImin = copy(sam);
 	CImax = copy(sam);
-	
+
 	let dim = get_dimensions(sam);
 	let list = get_element_list(sam,dim);
 	for(let i = 0; i < list.length; i++){

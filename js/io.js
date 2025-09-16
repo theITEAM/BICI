@@ -64,11 +64,15 @@ function save_file(filename,type)
 		break;
 	
 	case "Export script":
-		start_worker("Export BICI",{save_type:"export", map_store:map_store});
+		start_worker("Export BICI",{save_type:"save", map_store:map_store});
 		return;
 		
 	case "Export graph":
-		inter.graph.export_image(filename);
+		inter.graph.export_image(image_scale_factor,filename);
+		return;
+		
+	case "Export video":
+		inter.graph.export_video(filename);
 		return;
 		
 	case "Export figure":
@@ -98,7 +102,8 @@ function save_bici(filename)
 	let file_list = inter.file_store.file_list;
 	
 	let dir;
-	if(filename != undefined && file_list.length > 1 && inter.file_store.save_type == "export"){
+	//if(filename != undefined && file_list.length > 1 && inter.file_store.save_type == "export"){
+	if(filename != undefined && file_list.length > 1){
 		let root = find_root(filename);
 		let file_local = find_file(filename);
 		
@@ -373,10 +378,19 @@ function load_BICI_files(ans,per_start,per_end)
 		if(begin_str(file,"..\\")) file = file.substr(3);
 	
 		fs.readFile(file, 'utf8', function(err, txt) {
-			if(err){ alert_help("Problem loading file","The following error occurred: "+err); return;}
+			if(err){ 
+				setTimeout(function(){ 
+					stop_loading_symbol();
+					alert_help("Problem loading file","The following error occurred: "+err);
+					generate_screen();
+					}, 10);
+	
+				return;
+			}
 	
 			dfl[i].te = txt;
 			num++;
+		
 			set_loading_percent(per_start+((num+0.5)/num_max)*(per_end-per_start));
 		
 			if(num == num_max){

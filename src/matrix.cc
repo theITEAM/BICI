@@ -113,7 +113,7 @@ vector < vector <double> > invert_matrix_sparse(vector <vector <double> > M)
 		}
 	}
 	
-	if(true){
+	if(debugging){
 		check_sparse("M",M,M_ele,M_map); check_sparse("M_inv",inv_M,inv_M_ele,inv_M_map);
 	}
 	
@@ -145,7 +145,7 @@ vector < vector <double> > invert_matrix_sparse(vector <vector <double> > M)
 		}
 	}
 
-	if(true){
+	if(debugging){
 		check_sparse("M",M,M_ele,M_map); check_sparse("M_inv",inv_M,inv_M_ele,inv_M_map);
 	}
 	
@@ -170,7 +170,7 @@ vector < vector <double> > invert_matrix_sparse(vector <vector <double> > M)
 	//emsg("L");
 	//check_sparse("M_inv",inv_M,inv_M_ele,inv_M_map);
 
-	if(true){ // checks inverse
+	if(debugging){ // checks inverse
 		auto M_st = M;
 		cout << "Check matrix" << endl;
 		for(auto j = 0; j < nvar; j++){
@@ -189,7 +189,7 @@ vector < vector <double> > invert_matrix_sparse(vector <vector <double> > M)
 				}
 			}
 		}
-		//emsg("do");
+		emsg("check inverse");
 	}
 
 	return inv_M;

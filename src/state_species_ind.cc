@@ -17,9 +17,9 @@ using namespace std;
 void StateSpecies::update_individual_based(unsigned int ti, const vector < vector <Poss> > &pop_ind, const vector < vector <double> > &popnum_t)
 {
 	auto dt = details.dt;
-	
+
 	update_markov_eqn_value(ti,popnum_t);
-	
+
 	sort_trig_event(ti);
 	
 	auto i_trig = 0u;                            // This indexes potential trigger events
@@ -196,7 +196,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 		
 		t = tf;
 	}while(true);
-	
+
 	if(testing) check(T,popnum_t);
 }
 
@@ -279,6 +279,8 @@ void StateSpecies::activate_initial_state(double t, const vector < vector <doubl
 	auto ti = get_ti(t);
 	const auto &popnum = popnum_t[ti];
 	
+	const auto &precalc = param_val.precalc;
+	
 	const auto &node = sp.markov_tree.node;
 
 	markov_tree_rate.clear();
@@ -291,10 +293,10 @@ void StateSpecies::activate_initial_state(double t, const vector < vector <doubl
 		
 		double value;
 		if(me.rate){
-			value = eq.calculate(0,popnum,param_val,spline_val);
+			value = eq.calculate(0,popnum,precalc);
 		}
 		else{
-			auto mean = eq.calculate(0,popnum,param_val,spline_val);
+			auto mean = eq.calculate(0,popnum,precalc);
 			value = 1/mean;
 		}
 		
@@ -407,6 +409,8 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 	
 	const auto &tref = tlg.tr_list;
 	
+	const auto &precalc = param_val.precalc;
+	
 	auto loop = 0u;
 	do{
 		if(tlg.branch == true){                         // If branching then select branch	
@@ -423,11 +427,11 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 				if(eq_ref == UNSET){
 					prob = 1.0;
 					for(auto e : trg.bp_other_eq){
-						prob -= eqn[e].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+						prob -= eqn[e].calculate_indfac(ind,ti,popnum,precalc);
 					}
 				}
 				else{
-					prob = eqn[eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+					prob = eqn[eq_ref].calculate_indfac(ind,ti,popnum,precalc);
 				}
 			
 				if(prob < 0) prob = 0;
@@ -441,7 +445,7 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 				const auto &trg = sp.tra_gl[tref[0]];
 				const auto &tr = sp.cla[trg.cl].tra[trg.tr];
 				const auto &co = sp.cla[trg.cl].comp[tr.i];
-				emsg("Branching probabilities leaving compartment '"+co.name+"' sum to greater than one");
+				run_error("Branching probabilities leaving compartment '"+co.name+"' sum to greater than one");
 			}
 			
 			auto z = sum*ran();
@@ -467,7 +471,7 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 		
 		case EXP_RATE_NM: 	
 			{
-				auto rate = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+				auto rate = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,precalc);
 				auto ts = t_begin+exp_rate_sample(rate*dt,warn);
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = ts;
 			}
@@ -475,7 +479,7 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 			
 		case EXP_MEAN_NM: 	
 			{
-				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,precalc);
 				auto ts = t_begin+exp_mean_sample(mean/dt,warn);
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = ts;
 			}
@@ -483,8 +487,8 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 
 		case GAMMA:
 			{
-				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,precalc);
+				auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,precalc);
 			
 				auto ts = t_begin+gamma_sample(mean/dt,cv,warn);
 				
@@ -494,8 +498,8 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 		
 		case ERLANG:
 			{
-				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,precalc);
+				auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,precalc);
 				auto ts = t_begin+gamma_sample(mean/dt,sqrt(1.0/shape),warn);
 					
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = ts;
@@ -504,8 +508,8 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 
 		case LOG_NORMAL:
 			{
-				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+				auto mean = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,precalc);
+				auto cv = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,precalc);
 				auto ts = t_begin+lognormal_sample(mean/dt,cv,warn);
 
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = ts;
@@ -514,8 +518,8 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 			
 		case WEIBULL:
 			{
-				auto scale = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
-				auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+				auto scale = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,precalc);
+				auto shape = eqn[dp[1].eq_ref].calculate_indfac(ind,ti,popnum,precalc);
 				auto ts = t_begin+weibull_sample(scale/dt,shape,warn);
 		
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = ts;
@@ -524,7 +528,7 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 			
 		case PERIOD:
 			{
-				auto time = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,param_val,spline_val);
+				auto time = eqn[dp[0].eq_ref].calculate_indfac(ind,ti,popnum,precalc);
 				auto ts = t_begin+period_sample(time/dt,warn);
 	
 				trig.type = NM_TRANS_SIM_EV; trig.i = i; trig.c = UNSET; trig.trg = tgl; trig.tdiv = ts;
@@ -690,6 +694,7 @@ void StateSpecies::calculate_indfac_sum()
 void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vector <double> > &popnum_t)
 {
 	const auto &popnum = popnum_t[ti];
+	const auto &precalc = param_val.precalc;
 	
 	for(auto e = 0u; e < sp.markov_eqn.size(); e++){
 		auto &me = sp.markov_eqn[e];
@@ -698,17 +703,16 @@ void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vecto
 		const auto &eq = eqn[me.eqn_ref]; 
 		double value;
 		if(me.rate){		
-			value = eq.calculate(ti,popnum,param_val,spline_val);
+			value = eq.calculate(ti,popnum,precalc);
 			if(value < -TINY){
-				
-				emsg("The transition rate determined by equation '"+eq.te_raw+"' has become negative");
+				run_error("The transition rate determined by equation '"+eq.te_raw+"' has become negative");
 			}
 		}
 		else{
-			auto mean = eq.calculate(ti,popnum,param_val,spline_val);
+			auto mean = eq.calculate(ti,popnum,precalc);
 			if(mean <= 0){
-				if(mean < 0) emsg("The transition mean determined by equation '"+eq.te_raw+"' has become negative");
-				if(mean == 0) emsg("The transition mean determined by equation '"+eq.te_raw+"' has become zero");
+				if(mean < 0) run_error("The transition mean determined by equation '"+eq.te_raw+"' has become negative");
+				if(mean == 0) run_error("The transition mean determined by equation '"+eq.te_raw+"' has become zero");
 			}
 			value = 1.0/mean;
 		}
@@ -763,7 +767,7 @@ void StateSpecies::sample_infecting_ind(unsigned int i, double t, unsigned int t
 		
 		if(lin.multi_source){ // Samples from available sources (either populations of fro outside)		
 			auto ti = get_ti(t);
-			auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val,spline_val);
+			auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val);
 	
 			j = ss.sample_inf_source();
 		
@@ -772,7 +776,7 @@ void StateSpecies::sample_infecting_ind(unsigned int i, double t, unsigned int t
 		else{
 			if(testing){
 				if(Npop > 1) emsg("Npop wrong");
-				if(Npop == 1 && lin.no_pop_calc.size() > 0) emsg("Npop wrong");
+				if(Npop == 1 && lin.no_pop_precalc.type != ZERO) emsg("Npop wrong");
 			}
 			j = 0;
 		}
@@ -1036,7 +1040,7 @@ unsigned int StateSpecies::add_individual(IndType ind_type, string name)
 
 	switch(type){
 	case UNOBSERVED_IND:
-		if(sp.fix_effect.size() > 0) emsg("Cannot have fixed affects with unobserved individuals");
+		if(sp.fix_effect.size() > 0) run_error("Cannot have fixed affects with unobserved individuals");
 		break;
 		
 	case OBSERVED_IND:
@@ -1044,7 +1048,7 @@ unsigned int StateSpecies::add_individual(IndType ind_type, string name)
 			const auto &fe = sp.fix_effect[f];
 			const auto &X = fe.X_vector;
 			
-			if(i >= X.ind_list.size()) emsg("Individual '"+name+"' does not have a design matrix X specified for fixed effect '"+fe.name+"'");
+			if(i >= X.ind_list.size()) run_error("Individual '"+name+"' does not have a design matrix X specified for fixed effect '"+fe.name+"'");
 			
 			if(X.ind_list[i] != name) emsg("Names do not agree");
 			ind.X.push_back(X.value[i]);
@@ -1058,7 +1062,7 @@ unsigned int StateSpecies::add_individual(IndType ind_type, string name)
 	ind_sim_c.push_back(UNSET);
 
 	if(individual.size() > details.individual_max){
-		emsg("Maximum number of "+tstr(details.individual_max)+" individuals reached");
+		run_error("Maximum number of "+tstr(details.individual_max)+" individuals reached");
 	}
 	
 	return i;
