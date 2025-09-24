@@ -34,7 +34,7 @@ vector <double> StateSpecies::likelihood_obs_ind(const vector <unsigned int> &li
 	
 	if(mode == SIM) return store;
 		
-	double t_end = details.T;
+	double t_end = T;
 	for(auto i : list){
 		auto Li = 0.0;
 		
@@ -496,9 +496,13 @@ double StateSpecies::update_single_pop_trans_data(double dnum, unsigned int ref)
 	//auto dL = -normal_probability(pop_trans_data_num[ref],ptd.value,ptd.sd);
 	auto dL = -obs_mod_probability(pop_trans_data_num[ref],ptd.type,ptd.value,ptd.obs_mod_val);
 	
+	back.push_back(Back(POP_TRANS_DATA_NUM_SINGLE,ref,pop_trans_data_num[ref]));
+	
 	pop_trans_data_num[ref] += dnum;
 	//dL += normal_probability(pop_trans_data_num[ref],ptd.value,ptd.sd);
 	dL += obs_mod_probability(pop_trans_data_num[ref],ptd.type,ptd.value,ptd.obs_mod_val);
+	
+	back.push_back(Back(LI_OBS_POP_TRANS_SINGLE,ref,Li_obs_pop_trans[ref]));
 	
 	Li_obs_pop_trans[ref] += dL;
 	
@@ -514,9 +518,13 @@ double StateSpecies::update_single_pop_data(double dnum, unsigned int ref)
 	//auto dL = -normal_probability(pop_data_num[ref],ptd.value,ptd.sd);
 	auto dL = -obs_mod_probability(pop_data_num[ref],ptd.type,ptd.value,ptd.obs_mod_val);
 	
+	back.push_back(Back(POP_DATA_NUM,ref,pop_data_num[ref]));
+	
 	pop_data_num[ref] += dnum;
 	//dL += normal_probability(pop_data_num[ref],ptd.value,ptd.sd);
 	dL += obs_mod_probability(pop_data_num[ref],ptd.type,ptd.value,ptd.obs_mod_val);
+	
+	back.push_back(Back(LI_OBS_POP,ref,Li_obs_pop[ref]));
 	
 	Li_obs_pop[ref] += dL;
 	

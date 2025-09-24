@@ -31,11 +31,11 @@ void Simulate::run()
 	
 		auto param_val = model.param_sample();
 		auto initc_val = model.initc_sample(param_val);
-
+		
 		state.simulate(param_val,initc_val);
 
 		state.check("Check state");
-	
+
 		output.param_sample(UNSET,0,state);
 		output.state_sample(UNSET,0,state);
 		
@@ -49,6 +49,6 @@ void Simulate::run()
 #ifdef USE_MPI
 	mpi.barrier();
 #endif
-	
+
 	percentage_end();
 }

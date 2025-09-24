@@ -167,6 +167,7 @@ void Mpi::share_particle(vector <Particle> &part)
 void Mpi::pack(const Particle &pa)
 {
 	pack_item(pa.param_val_prop);
+	pack_item(pa.param_val_tvreparam);
 	
 	// Species
 	pack_num(pa.species.size());
@@ -312,6 +313,7 @@ void Mpi::pack(const Particle &pa)
 void Mpi::unpack(Particle &pa)
 {
 	unpack_item(pa.param_val_prop);
+	unpack_item(pa.param_val_tvreparam);
 
 	auto S = unpack_num();
 	for(auto sp = 0u; sp < S; sp++){

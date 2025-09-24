@@ -55,6 +55,8 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 			
 			auto flag = false;
 			
+			if(begin_str(st,"# PROCESSED USING")) flag = false;
+
 			if(command == "param-sim" || command == "state-sim" || command == "warning-sim" || st == "# OUTPUT SIMULATION"){
 				if(model.mode == SIM) flag = true;
 			}
@@ -150,7 +152,7 @@ void Output::summary(const Model &model) const
 		fout << "SPECIES: " << sp.name << "   type: ";
 		switch(sp.type){
 		case POPULATION: fout << "population-based"; break;
-		case INDIVIDUAL: fout << "inidividual-based"; break;
+		case INDIVIDUAL: fout << "individual-based"; break;
 		}
 
 		fout << endl << endl;
@@ -629,7 +631,6 @@ void Output::prop_summary(string te) const
 		ofstream fout(file);
 		check_open(fout,file);
 		fout << te;
-		cout << "TURN OFF" << endl;
 		return;
 	}
 
@@ -783,21 +784,45 @@ string Output::print_affect_like(const AffectLike &al) const
 		}
 		break;
 		
-	case DIV_VALUE_NONPOP_AFFECT:
+	case DIV_VALUE_NOPOP_AFFECT:
 		{
 			auto eq = model.species[al.num].markov_eqn[al.num2].eqn_ref;
-			ss << "AFFECT Div Value Nonpop" << model.eqn[eq].te_raw << endl;
+			ss << "AFFECT Div Value nopop" << model.eqn[eq].te_raw << endl;
 		}
 		break;
 		
 	case DIV_VALUE_LINEAR_AFFECT:
 		{
-			ss << "AFFECT Div Value Linear";
+			ss << "AFFECT Div Value Linear ";
 			{
+				if(al.lin_form.factor_nopop_only) ss << "[factor/no-pop] ";
+				else ss << "[full] ";
+				string str = "";	
+				for(const auto &lf : al.lin_form.list){
+					str += model.eqn[lf.e].te_raw +", ";
+				}
+				ss << trunc(str,1000);
+			}
+			ss << endl;
+		}
+		break;
+		
+	case MARKOV_POP_NOPOP_AFFECT:
+		{
+			auto eq = model.species[al.num].tra_gl[al.num2].dist_param[0].eq_ref;
+			ss << "AFFECT Markov pop nopop" << model.eqn[eq].te_raw << endl;
+		}
+		break;
+		
+	case MARKOV_POP_LINEAR_AFFECT:
+		{
+			ss << "AFFECT Markov pop linear ";
+			{
+				if(al.lin_form.factor_nopop_only) ss << "[factor/no-pop] ";
+				else ss << "[full] ";
 				string str = "";
-				for(auto k : al.div_value_linear.me){
-					auto eq = model.species[al.num].markov_eqn[k].eqn_ref;
-					str += model.eqn[eq].te_raw +", ";
+				for(const auto &lf : al.lin_form.list){
+					str += model.eqn[lf.e].te_raw +", ";
 				}
 				ss << trunc(str,1000);
 			}
@@ -1329,7 +1354,7 @@ void Output::param_sample(unsigned int s, unsigned int chain, State &state)
 		
 		{
 			ofstream fout(na,std::ios::app);
-			auto value = param_value_from_vec(part.param_val_prop);
+			auto value = param_value_from_vec(part);
 			fout << param_output(part,value);
 		}
 	}
@@ -1425,7 +1450,7 @@ void Output::state_sample(const Particle &part)
 /// Outputs a state sample
 string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash &hash_ind) const
 {
-	auto value = param_value_from_vec(part.param_val_prop); 
+	auto value = param_value_from_vec(part); 
 	
 	stringstream ss;
 	ss << "<<STATE " << part.s << ">>" << endl << endl;
@@ -1767,11 +1792,14 @@ string Output::generate_state_head(const vector <string> &ind_key) const
 
 
 /// Generates values from parameter vector
-vector < vector <double> > Output::param_value_from_vec(const vector <double> &param_val_prop) const 
+vector < vector <double> > Output::param_value_from_vec(const Particle &pa) const 
 {
-	auto param_val = model.get_param_val(param_val_prop);
-	const auto &val = param_val.value;
+	auto param_val = model.get_param_val(pa);
 	
+	model.add_tvreparam(param_val,pa.param_val_tvreparam);
+	
+	const auto &val = param_val.value;
+
 	vector < vector <double> > value;
 	
 	value.resize(model.param.size());
@@ -2034,6 +2062,7 @@ void Output::end(string file, unsigned int total_cpu)
 	if(com_op == true){
 		cout << "<<OUTPUT FILE>>" << endl;
 		if(mpi.core == 0){
+			cout << "# PROCESSED USING BICI " << bici_version << endl;
 			for(auto li : lines_raw){
 				cout << li << endl;
 			}
@@ -2045,13 +2074,14 @@ void Output::end(string file, unsigned int total_cpu)
 	if(com_op == false && op()){
 		fout.open(file);
 
+		fout << "# PROCESSED USING BICI " << bici_version << endl;
 		for(auto li : lines_raw){
 			fout << li << endl;
 		}
 	}
 	
 	auto nchain = model.details.nchain;
-	
+
 	vector < vector < vector < vector <double> > > > param_samp;
 	param_samp.resize(nchain);
 
@@ -2070,7 +2100,7 @@ void Output::end(string file, unsigned int total_cpu)
 			output_trace(ch,part,param_samp,fout);
 		}
 	}
-	
+
 	vector <string> final_warning;
 	
 	if(op() && model.mode == INF && com_op == false){
@@ -2094,10 +2124,11 @@ void Output::end(string file, unsigned int total_cpu)
 		if(op() && part.size() > 0){
 			number_part(part);
 			if(trans_diag_on) trans_diag_add(trans_diag,part); 
+
 			output_state(ch,part,fout);
 		}
 	}
-	
+
 	if(op() && trans_diag_on){
 		output_trans_diag(trans_diag,fout);
 	}
@@ -2114,7 +2145,7 @@ void Output::end(string file, unsigned int total_cpu)
 			output_generation(part,fout);
 		}
 	}
-	
+
 	auto alg_warn_flag = false;
 	
 	if(model.details.diagnostics_on){
@@ -2139,7 +2170,7 @@ void Output::end(string file, unsigned int total_cpu)
 		auto st = der.func.warn; 
 		if(der.func.on && st != "") final_warning.push_back(st);
 	}
-	
+
 	if(mpi.core == 0){ // Warnings for data out of range
 		for(const auto &sp : model.species){
 			for(auto warn : sp.data_warning){
@@ -2175,8 +2206,8 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 	
 	param_out += trace_init();
 	for(const auto &pa : part){
-		auto value = param_value_from_vec(pa.param_val_prop);
-	
+		auto value = param_value_from_vec(pa);
+
 		if(model.mode == INF && pa.s >= burn){
 			param_samp[ch].push_back(value);				
 		}
@@ -2783,7 +2814,7 @@ void Output::output_generation(const vector <Particle> &part, ofstream &fout) co
 			
 	string content;
 	for(const auto &pa : part){
-		auto value = param_value_from_vec(pa.param_val_prop);
+		auto value = param_value_from_vec(pa);
 		content += param_output(pa,value);
 	}
 	param_out += generation_average(trace_init(),content);

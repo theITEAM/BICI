@@ -418,7 +418,7 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 				}
 				break;
 				
-			default: emsg("op not here"); break;
+			default: emsg("op not here2"); break;
 			}
 		}
 		else{

@@ -210,7 +210,7 @@ double Equation::calculate(unsigned int ti, const vector <double> &popnum, const
 				case NUMERIC: num[j] = cval[it.num]; break;
 				case CONSTSPLINEREF: num[j] = spline[it.num].const_val[ti]; break;
 				case TIME: num[j] = timepoint[ti]; break;
-				default: eqn_type_error(it.type,7); break;
+				default: eqn_type_error(it.type,17); break;
 			}
 		}
 
@@ -343,7 +343,7 @@ vector <double> Equation::calculate_para(const vector <Calculation> &calc, const
 							break;
 							
 						default:
-							eqn_type_error(it.type,18); 
+							eqn_type_error(it.type,180); 
 							break;
 					}
 				}
@@ -465,7 +465,7 @@ vector <double> Equation::calculate_para(const vector <Calculation> &calc, const
 							break;
 							
 						default:
-							eqn_type_error(it.type,18); 
+							eqn_type_error(it.type,181); 
 							break;
 					}
 				}
@@ -627,7 +627,7 @@ vector <double> Equation::calculate_para(const vector <Calculation> &calc, const
 							break;
 							
 						default:
-							eqn_type_error(it.type,18); 
+							eqn_type_error(it.type,182); 
 							break;
 					}
 					
@@ -763,7 +763,7 @@ double Equation::calculate_param(const vector <double> &precalc) const
 				case REG: num[j] = regcalc[it.num]; break;
 				case REG_PRECALC: num[j] = precalc[it.num]; break;
 				case NUMERIC: num[j] = cval[it.num]; break;
-				default: eqn_type_error(it.type,7); break;
+				default: eqn_type_error(it.type,183); break;
 			}
 		}
 
@@ -822,7 +822,7 @@ double Equation::calculate_item(const EqItem &it, unsigned int ti, const vector 
 	case NUMERIC: return constant.value[it.num]; 
 	case CONSTSPLINEREF: return spline[it.num].const_val[ti];		
 	case TIME: return timepoint[ti]; 
-	default: eqn_type_error(it.type,11); break;
+	default: eqn_type_error(it.type,12); break;
 	}
 	
 	return UNSET;
@@ -837,7 +837,7 @@ double Equation::calculate_item_no_time(const EqItem &it, const vector <double> 
 	case ONE: return 1;
 	case REG_PRECALC: return precalc[it.num];
 	case NUMERIC: return constant.value[it.num]; 
-	default: eqn_type_error(it.type,11); break;
+	default: eqn_type_error(it.type,13); break;
 	}
 	
 	return UNSET;
@@ -867,7 +867,7 @@ double Equation::calculate_item_old(const EqItem &it, unsigned int ti, const vec
 	case NUMERIC: return constant.value[it.num]; 
 	case CONSTSPLINEREF: return spline[it.num].const_val[ti];		
 	case TIME: return timepoint[ti]; 
-	default: eqn_type_error(it.type,11); break;
+	default: eqn_type_error(it.type,14); break;
 	}
 	
 	return UNSET;
@@ -888,7 +888,7 @@ double Equation::calculate_item_old_no_time(const EqItem &it, const vector <doub
 		}
 		break;
 	case NUMERIC: return constant.value[it.num]; 
-	default: eqn_type_error(it.type,11); break;
+	default: eqn_type_error(it.type,15); break;
 	}
 	
 	return UNSET;

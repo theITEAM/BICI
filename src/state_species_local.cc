@@ -228,7 +228,7 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 			{
 				auto e_end = rem[rem.size()-1];
 				if(e_end == event.size()){
-					time_list.push_back(details.T);
+					time_list.push_back(T);
 				}
 				else{
 					time_list.push_back(event[e_end].tdiv);

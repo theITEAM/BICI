@@ -40,8 +40,8 @@ void State::init()
 		for(auto po = 0u; po < model.pop.size(); po++){
 			if(model.pop[po].sp_p == p) pop_affect.push_back(po);
 		}
-		
-		StateSpecies ss(param_val,model.eqn,model.param,model.param_vec,model.pop,model.species[p],model.genetic_data,model.details,pop_affect,model.mode,dif_thresh);
+			
+		StateSpecies ss(param_val,model.eqn,model.species[p],model,pop_affect,model.mode,dif_thresh);
 		species.push_back(ss);
 	}
 	
@@ -62,7 +62,7 @@ void State::simulate(const PV &param_value, const vector <InitCondValue> &initc_
 		ssp.simulate_individual_init();
 	}
 	
-	popnum_t[0] = model.calculate_popnum(species);  
+	popnum_t[0] = calculate_popnum();  
 
 	for(auto p = 0u; p < nspecies; p++){
 		auto &ssp = species[p];
@@ -97,7 +97,7 @@ void State::post_sim(const PV &param_value, const Sample &samp)
 		ssp.simulate_sample_init(ti_start,samp.species[p]);
 	}
 	
-	popnum_t = model.calculate_popnum_t(species,ti_start+1);
+	popnum_t = calculate_popnum_t(ti_start+1);
 	popnum_t.resize(T);
 	for(auto p = 0u; p < nspecies; p++){
 		auto &ssp = species[p];
@@ -124,10 +124,12 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 	for(auto ti = ti_start; ti < ti_end; ti++){	
 		//if(true && ti%op_step == 0) print_cpop(ti);		
 		//cout << ti << " ti" << endl;
-
+		
 		auto &pop = popnum_t[ti];
 	
-		pop = model.calculate_popnum(species);          // Calculates the population numbers
+		pop = calculate_popnum();          // Calculates the population numbers
+	
+		model.param_update_precalc_time(ti,pop,param_val,false);
 		
 		auto pop_ind = calculate_pop_ind(); 
 	
@@ -167,6 +169,8 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 		for(const auto &ssp : species) prob_sum += ssp.prob_trans_tree;
 		if(prob_sum != 0) cout << "Probability trans tree = " << prob_sum << endl;
 	}
+
+	//popnum_t = calculate_popnum_t();
 
 	likelihood_from_scratch();
 }
@@ -220,7 +224,7 @@ vector <DeriveOutput> State::derive_calculate()
 	
 	const auto &precalc = param_val.precalc;
 	
-	model.precalc_eqn.calculate(model.list_precalc_derive,get_list(model.details.T),param_val,false);
+	model.precalc_eqn.calculate(model.list_precalc_derive,get_list(T),param_val,false);
 	
 	timer[DERIVE_PRECALC_TIMER] += clock();
 	
@@ -503,7 +507,7 @@ vector <double> State::calculate_df(const DerFunc &df) const
 				}
 				break;
 			
-			default: emsg("op not here"); break;
+			default: emsg("op not here1"); break;
 			}
 		}
 	}
@@ -844,6 +848,19 @@ Like State::update_param(const vector <AffectLike> &affect_like)
 				change_add(species[alike.num].likelihood_pop_change(alike.num2,alike.list,popnum_t,like_ch.markov));
 			}
 			break;
+		
+		case MARKOV_POP_NOPOP_AFFECT:
+			{
+				change_add(species[alike.num].likelihood_pop_change_nopop(alike.list,alike.eq_nopop,like_ch.markov));
+			}
+			break;
+			
+		case MARKOV_POP_LINEAR_AFFECT:   // Updates div.value on Markov transition
+			{
+				auto p = alike.num;
+				change_add(species[p].likelihood_pop_change_linear(alike.list,alike.lin_form,popnum_t,like_ch.markov));
+			}
+			break;
 			
 		case LIKE_IE_AFFECT:
 			{
@@ -883,7 +900,7 @@ Like State::update_param(const vector <AffectLike> &affect_like)
 			
 		case POP_AFFECT:
 			{	
-				change_add(model.recalculate_population(popnum_t,alike.list,species));
+				change_add(recalculate_population(alike.list));
 			}
 			break;
 			
@@ -912,18 +929,18 @@ Like State::update_param(const vector <AffectLike> &affect_like)
 			} 
 			break;
 			
-		case DIV_VALUE_NONPOP_AFFECT:   // Updates div.value on Markov transition
+		case DIV_VALUE_NOPOP_AFFECT:   // Updates div.value on Markov transition
 			{
 				auto p = alike.num;
-				const auto &me_list = alike.div_value_nonpop.me_list;
-				change_add(species[p].likelihood_markov_value_nonpop(me_list,alike.list,popnum_t,param_val));
+				const auto &me_list = alike.eq_nopop.list;
+				change_add(species[p].likelihood_markov_value_nopop(me_list,alike.list,popnum_t,param_val));
 			}
 			break;
 			
 		case DIV_VALUE_LINEAR_AFFECT:   // Updates div.value on Markov transition
 			{
 				auto p = alike.num;
-				change_add(species[p].likelihood_markov_value_linear(alike.list,alike.div_value_linear,popnum_t));
+				change_add(species[p].likelihood_markov_value_linear(alike.list,alike.lin_form,popnum_t));
 			}
 			break;
 		
@@ -1071,6 +1088,20 @@ void State::restore(const vector <AffectLike> &affect_like)
 			}
 			break;
 			
+		case MARKOV_POP_NOPOP_AFFECT:     // Restores values on population transitions
+			{
+				auto p = alike.num;
+				species[p].likelihood_pop_change_nopop_restore(alike.list,alike.eq_nopop,vec);
+			}
+			break;
+			
+		case MARKOV_POP_LINEAR_AFFECT:   // Restores values on population transitions
+			{
+				auto p = alike.num;
+				species[p].likelihood_pop_change_linear_restore(alike.list,alike.lin_form,vec);
+			}
+			break;
+			
 		case LIKE_IE_AFFECT:
 			{
 				species[alike.num].Li_ie[alike.num2] = change[i].num;
@@ -1109,7 +1140,7 @@ void State::restore(const vector <AffectLike> &affect_like)
 			
 		case POP_AFFECT:
 			{
-				model.recalculate_population_restore(popnum_t,alike.list,vec);
+				recalculate_population_restore(popnum_t,alike.list,vec);
 			}
 			break;
 			
@@ -1139,18 +1170,18 @@ void State::restore(const vector <AffectLike> &affect_like)
 			}
 			break;
 			
-		case DIV_VALUE_NONPOP_AFFECT:  
+		case DIV_VALUE_NOPOP_AFFECT:  
 			{
 				auto p = alike.num;
-				const auto &me_list = alike.div_value_nonpop.me_list;
-				species[p].likelihood_markov_value_nonpop_restore(me_list,alike.list,vec);
+				const auto &me_list = alike.eq_nopop.list;
+				species[p].likelihood_markov_value_nopop_restore(me_list,alike.list,vec);
 			}
 			break;
 			
 		case DIV_VALUE_LINEAR_AFFECT:   // Restore div.value on Markov transition
 			{
 				auto p = alike.num;
-				species[p].likelihood_markov_value_linear_restore(alike.list,alike.div_value_linear,vec);
+				species[p].likelihood_markov_value_linear_restore(alike.list,alike.lin_form,vec);
 			}
 			break;
 			
@@ -1232,9 +1263,6 @@ void State::change_add()
 /// Sets up everything needed to represent the Markov likelihood
 void State::likelihood_from_scratch()
 {
-	// Finds the populations
-	popnum_t = model.calculate_popnum_t(species);
-
 	// Sets up non-markovian transitions
 	for(auto p = 0u; p < nspecies; p++){ 
 		auto &ssp = species[p];
@@ -1293,7 +1321,7 @@ void State::resample_ind(bool do_pl)
 {
 	print_diag("Start resample...");
 	
-	auto popnum_t = model.calculate_popnum_t(species);
+	auto popnum_t = calculate_popnum_t();
 	
 	const auto &precalc = param_val.precalc;
 	
@@ -1383,6 +1411,8 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 	
 	part.param_val_prop = model.get_param_val_prop(param_val);
 	
+	part.param_val_tvreparam = model.get_param_val_tvreparam(param_val);
+	
 	part.like = like;
 	
 	part.dir_out = derive_calculate();
@@ -1394,7 +1424,9 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 		
 		if(store_state){
 			part_sp.trans_num = ssp.trans_num;
+			
 			part_sp.individual = ssp.individual;
+			
 			if(cum_diag && model.mode == INF) ssp.calc_trans_diag(part_sp,popnum_t);
 		}
 
@@ -1435,7 +1467,7 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 		tts.N_inf = gv.inf_node.size();
 		tts.N_unobs = gv.nobs_not_infected;
 	}
-
+	
 	return part;
 }
 
@@ -1443,7 +1475,8 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 /// Generates a state from a particle 
 void State::set_particle(const Particle &part, bool calc_like)
 {
-	param_val = model.get_param_val(part.param_val_prop);
+	param_val = model.get_param_val(part);
+
 	like = part.like;
 	
 	for(auto p = 0u; p < species.size(); p++){
@@ -1460,8 +1493,11 @@ void State::set_particle(const Particle &part, bool calc_like)
 		genetic_value.inf_node = part.inf_node;
 	}
 	
-	if(calc_like) likelihood_from_scratch();
-	else popnum_t = model.calculate_popnum_t(species);
+	popnum_t = calculate_popnum_t();
+	
+	model.param_update_precalc_time_all(popnum_t,param_val,false); 
+	
+	if(calc_like) likelihood_from_scratch(); 
 }
 
 
@@ -1517,11 +1553,12 @@ vector <double> State::prior_init_cond(double &like_ch)
 void State::update_individual_sampler()
 {
 	timer[UPDATE_SAMPLER_TIMER] -= clock();
+	
 	for(auto p = 0u; p < model.nspecies; p++){ 
 		const auto &sp = model.species[p];
 		if(sp.type == INDIVIDUAL){
 			auto &ssp = species[p];
-			ssp.source_sampler.update(sp.nindividual_obs,ssp.individual,ssp.markov_eqn_vari,sp.contains_source);                            // Optimises individual sampler
+			ssp.source_sampler.update(sp.nindividual_obs,ssp.individual,ssp.markov_eqn_vari,sp.contains_source); // Optimises individual sampler
 			
 			ssp.update_rate_mean(popnum_t);
 		}
@@ -1576,6 +1613,8 @@ void State::restore_back()
 			break;
 		}
 	}
+	
+	param_val.restore();
 }
 
 
@@ -1587,27 +1626,26 @@ vector <double> State::get_param_val_prop() const
 
 
 /// Gets the estimated rate for a transition
-double State::get_trans_rate_est(unsigned int p, unsigned int tr, unsigned int ti) const
+vector <double> State::get_trans_rate_est_para(const vector <unsigned int> &list, unsigned int p, unsigned int tr) const
 {
 	const auto &tra = model.species[p].tra_gl[tr];
 	const auto &eq = model.eqn[tra.dist_param[0].eq_ref];
 	const auto &precalc = param_val.precalc;
-		
+	
+	vector < vector < vector <double> > > derive_val;		
+	auto vec = eq.calculate_para(eq.calcu,list,popnum_t,precalc,derive_val);
+	
 	switch(tra.type){
-	case EXP_RATE: 
-		return eq.calculate(ti,popnum_t[ti],precalc); 
-		
-	case EXP_RATE_NM:
-		return eq.calculate(ti,popnum_t[ti],precalc); 
-			
+	case EXP_RATE: case EXP_RATE_NM: break;	
 	case EXP_MEAN:
-		return 1.0/(TINY+eq.calculate(ti,popnum_t[ti],precalc)); 
-		
 	case EXP_MEAN_NM: case GAMMA: case ERLANG: case LOG_NORMAL: 
 	case PERIOD: case WEIBULL:
-		return 1.0/(TINY+eq.calculate(ti,popnum_t[ti],precalc)); 
+		for(auto &va : vec) va = 1.0/(TINY+va);
+		break;
+	default: emsg("Problem calculating rate"); break;
 	}
-	return UNSET;
+	
+	return vec;
 }
 	
 			
@@ -1615,7 +1653,7 @@ double State::get_trans_rate_est(unsigned int p, unsigned int tr, unsigned int t
 vector < vector <double> > State::get_population_rates(unsigned int p) const
 {
 	const auto &sp = model.species[p];
-	
+
 	vector < vector <double> > rate;
 	rate.resize(sp.tra_gl.size());
 	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
@@ -1630,14 +1668,14 @@ vector < vector <double> > State::get_population_rates(unsigned int p) const
 		}
 		else{
 			if(eq.time_vari){
-				for(auto ti = 0u; ti < T; ti++){		
-					rate[tr][ti] = get_trans_rate_est(p,tr,ti);
-				}
+				auto list = seq_vec(T);
+				rate[tr] = get_trans_rate_est_para(list,p,tr);
 			}
 			else{
-				auto va = get_trans_rate_est(p,tr,0);
+				auto list = seq_vec(0);
+				auto va = get_trans_rate_est_para(list,p,tr);
 				for(auto ti = 0u; ti < T; ti++){		
-					rate[tr][ti] = va;
+					rate[tr][ti] = va[0];
 				}
 			}
 		}
@@ -1759,3 +1797,158 @@ vector < vector < vector <Poss> > > State::calculate_pop_ind_total() const
 	
 	return pop_ind;
 }
+
+
+/// Calculates pop from cpop
+vector <double> State::calculate_popnum() const
+{
+	vector <double> popnum(model.pop.size(),0);
+	
+	for(auto i = 0u; i < model.pop.size(); i++){            // Calculates population based on cpop
+		const auto &po = model.pop[i];
+		const auto &ssp = species[po.sp_p];
+		if(ssp.type == POPULATION){
+			auto sum = 0.0;
+			for(auto &te : po.term) sum += ssp.cpop[te.c]*te.w;
+			popnum[i] = sum;
+		}
+	}
+
+	for(auto p = 0u; p < nspecies; p++){
+		const auto &ssp = species[p];
+		if(ssp.type == INDIVIDUAL){
+			const auto &sp = model.species[p];
+			for(auto i = 0u; i < ssp.individual.size(); i++){
+				const auto &ind = ssp.individual[i];
+				
+				auto c = ssp.ind_sim_c[i];
+				if(c != UNSET){
+					for(const auto &pr : sp.comp_gl[c].pop_ref){
+						const auto &po = model.pop[pr.po];
+				
+						auto num = 1.0; 
+						for(auto ie : po.ind_eff_mult) num *= ind.exp_ie[ie];
+						for(auto fe : po.fix_eff_mult) num *= ind.exp_fe[fe];
+							
+						if(po.term[pr.index].c != c) emsg("Problem");
+						popnum[pr.po] += po.term[pr.index].w*num;
+					}
+				}
+			}
+		}
+	}
+		
+	return popnum;
+}
+
+
+/// Recalculates popnum_t for populations identified by list and individuals in ssp 
+// Used only for diagnostics
+vector < vector <double> > State::calculate_popnum_t(unsigned int ti_end)
+{
+	vector < vector <double> > popnum_t;
+
+	if(ti_end == UNSET) ti_end = T;
+	for(auto ti = 0u; ti < ti_end; ti++){
+		for(auto p = 0u; p < nspecies; p++){
+			auto &ssp = species[p];
+			switch(ssp.type){
+			case INDIVIDUAL: ssp.set_ind_sim_c(ti); break;
+			case POPULATION: ssp.cpop = ssp.cpop_st[ti]; break;
+			}
+		}
+
+		popnum_t.push_back(calculate_popnum());	
+	}
+	
+	return popnum_t;
+}
+
+
+/// Recalculates popnum_t for populations identified by list and individuals in ssp 
+vector <double> State::recalculate_population(const vector <unsigned int> &list)
+{
+	vector <double> store;
+	
+	if(model.pop.size() == 0) return store;
+	
+	for(auto k : list){
+		for(auto t = 0u; t < T; t++){
+			store.push_back(popnum_t[t][k]);
+			popnum_t[t][k] = 0;
+		}
+	}
+	
+	// This map shows which populations need to be recalulated
+	vector <bool> map(model.pop.size(),false); for(auto k : list) map[k] = true;
+	
+	// This stores individual factors for different populations
+	vector <double> inffac(model.pop.size(),UNSET);	
+
+	for(auto p = 0u; p < nspecies; p++){
+		const auto &ssp = species[p];
+		if(ssp.type == INDIVIDUAL){
+			const auto &sp = model.species[p];
+		
+			// Goes through each individual and works out how pop is updated				
+			for(const auto &ind : ssp.individual){
+				auto ti = 0u;
+		
+				vector <unsigned int> indfac_calc;
+		
+				auto c = UNSET;
+				for(auto e = 0u; e <= ind.ev.size(); e++){
+					double t;
+					if(e < ind.ev.size()) t = ind.ev[e].tdiv;
+					else t = T;
+						
+					while(ti < t){
+						if(c != UNSET){						
+							for(const auto &pr : sp.comp_gl[c].pop_ref){
+								auto k = pr.po;
+								if(map[k] == true){
+									auto num = inffac[k];
+									if(inffac[k] == UNSET){
+										const auto &po = model.pop[k];
+										
+										num = 1.0; 
+										for(auto ie : po.ind_eff_mult) num *=  ind.exp_ie[ie];
+										for(auto fe : po.fix_eff_mult) num *= ind.exp_fe[fe];
+							
+										indfac_calc.push_back(k);
+										inffac[k] = num;
+									}
+								
+									popnum_t[ti][k] += num; 
+								}
+							}
+						}
+						ti++;			
+					}
+					
+					if(e < ind.ev.size()) c = ind.ev[e].c_after;
+				}
+				
+				if(ti != T) emsg("Problem with ti");
+				
+				for(auto k : indfac_calc) inffac[k] = UNSET;
+			}
+		}
+	}
+	
+	return store;
+}
+
+
+/// Recalculates popnum_t for populations identified by list and individuals in ssp 
+void State::recalculate_population_restore(vector < vector <double> > &popnum_t, const vector <unsigned int> &list, const vector <double> &vec) const
+{
+	auto j = 0u;
+	for(auto k : list){
+		for(auto t = 0u; t < T; t++){
+			popnum_t[t][k] = vec[j]; j++; 
+		}
+	}
+}
+
+

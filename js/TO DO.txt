@@ -1,38 +1,18 @@
 TO DO
--- test derive
--- test reparam
-
--- test spline
-
--- prioblem with farm 1
-
--- temp.bici get exteded spline working
--- sort out square spline exmaple in Execute/temp.bici
--- Name of data source not showing on graph
-
-
-put on github
-
-
-
+-- Sort out fixed initial population for individual and population-based models (perhaps convert to Dirichlet?)
+-- allow for restart of inference
 
 NEXT
 get mac version video working
--- start point to restart inference
 -- Sort out how partially observed transitions affect ind sampler... 
 SEE if(sp.obs_trans_exist){  // Accounts for observation probability on transi
 
--- population dependency of reparam
-pop gradient in precalc
--- Jamie problems sorting out fishboost
 -- Stop file read from loading when one file cannot be loaded
 -- get_calc_hash_num(  does this need to be improved?
 -- running in non dividable steps
 list too long in interface
 high transition rate warning
 5.3 small time step
-post_sim_define_twice
-ind eff group name?
 
 AFTER
 test proposals using initial state
@@ -43,7 +23,7 @@ error bad cat model when Ib not set to infected  Chech that Ib is infected
 geno_farm with gamma distribution
 - prob1: parameter a not being estimated correctly
 investigate if(1 == 0 && sp.tra_gl.size()*sp.comp_gl.size() <
-can mbp be speeded up? if different transition equation differ by a small element? is age dependent covid model an example?
+
 
 
 
@@ -97,3 +77,8 @@ div-value calculate over time
 ways to speed up fishboost
 go through others
 test all examples
+markov likelihood para
+-- If equations differ by a factor then speed up using this
+pop-based models
+version in output file
+-- mention in manual about speed of BICI

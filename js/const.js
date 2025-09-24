@@ -4,7 +4,7 @@
 // 53754 lines of code (16/11/24)
 // 50018 lines of code (18/11/24)
 // 59127 lines of code (16/15/25)
-
+// 62667 lines of code (17/09/25)
 
 let ver="windows";         // Determines platform
 //let ver="linux";
@@ -17,9 +17,10 @@ const turn_off_random_seed = false;               // Used in testing (false)
 let debug = false;                                // Determines if debugger used (false)
 let testing = false;                              // Used logo to load up results (false)
 let load_map_fast = false;                        // If loads up world map from local computer
+let make_one_chain = false;                       // Make into one chain (for diagnostic purposes)
 
-//if(win_linux || true){ testing = true; debug = true; load_map_fast = true;}
-if(win_linux){ testing = true; debug = true; load_map_fast = true;}
+if(win_linux || false){ testing = true; debug = true; load_map_fast = true; make_one_chain = true;}
+//if(win_linux){ testing = true; debug = true; load_map_fast = true;}
 	
 let make_file = false;                            // Determines if makes file or runs
 let thick_line = false;                           // Used for making figures

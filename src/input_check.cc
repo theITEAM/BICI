@@ -594,7 +594,7 @@ void Input::param_vec_mem_usage() const
 	string ss;
 	auto strsize = sizeof(ss)/4;
 	
-	auto norm = 0.0, affect_like = 0.0,	affect_like_me_list = 0.0, affect_like_list = 0.0, affect_like_map = 0.0, affect_like_linear_prop = 0.0;
+	auto norm = 0.0, affect_like = 0.0,	affect_like_me_list = 0.0, affect_like_list = 0.0, affect_like_map = 0.0, affect_like_lin_form = 0.0;
 		
 	for(const auto &pele : model.param_vec){
 		norm += strsize+pele.name.length();
@@ -602,21 +602,19 @@ void Input::param_vec_mem_usage() const
 	
 		for(const auto &al : pele.affect_like){
 			affect_like += 4;
-			affect_like_me_list += vecsize + al.div_value_nonpop.me_list.size();
+			affect_like_me_list += vecsize + al.eq_nopop.list.size();
 			affect_like_list += vecsize + al.list.size();
 			affect_like_map += vecsize + al.map.size();
-			affect_like_linear_prop += vecsize + al.div_value_linear.me.size();
-			//affect_like_linear_prop += vecsize + al.div_value_linear.me_no_pop.size();
-			//affect_like_linear_prop += vecsize + al.div_value_linear.no_pop_ref.size();
+			affect_like_lin_form += vecsize + al.lin_form.list.size()*8 + al.lin_form.sum_e.size();
 			
-			affect_like_linear_prop += vecsize;
-			for(const auto &pa : al.div_value_linear.pop_affect){
-				affect_like_linear_prop += 1 + vecsize + 2*pa.pop_grad_ref.size();
+			affect_like_lin_form += vecsize;
+			for(const auto &pa : al.lin_form.pop_affect){
+				affect_like_lin_form += 1 + vecsize + 2*pa.pop_grad_ref.size();
 			}
 		}
 	}
 	
-	auto sum = norm + affect_like + affect_like_me_list + affect_like_list + affect_like_map +affect_like_linear_prop;
+	auto sum = norm + affect_like + affect_like_me_list + affect_like_list + affect_like_map +affect_like_lin_form;
 	
 	cout << "Param vec	memory usage = " << 4*sum/(1000000) << "(";
 	
@@ -625,7 +623,7 @@ void Input::param_vec_mem_usage() const
 	cout << "affect_like_me_list:" << int(100*affect_like_me_list/sum) << ")";
 	cout << "affect_like_list:" << int(100*affect_like_list/sum) << ")";
 	cout << "affect_like_map:" << int(100*affect_like_map/sum) << ")";
-	cout << "affect_like_linear_prop:" << int(100*affect_like_linear_prop/sum) << ")";
+	cout << "affect_like_lin_form:" << int(100*affect_like_lin_form/sum) << ")";
 	cout << endl << endl;
 }
 

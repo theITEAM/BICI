@@ -180,7 +180,7 @@ void StateSpecies::print_markov_eqn(unsigned int e) const
 	
 	cout << "For Markov Equation: " << eqn[me.eqn_ref].te_raw << endl;
 	for(auto ti = 0u; ti < T; ti++){
-		cout << calc_t(ti,details) << " time" << endl;
+		cout << calc_t(ti,model.details) << " time" << endl;
 		const auto &div = me_vari.div[ti];
 		cout << "Value: " << div.value << "  indfac: "<< div.indfac_int << endl; 
 		
@@ -241,7 +241,7 @@ string StateSpecies::print_event(const vector <Event> &event, bool str) const
 	for(auto &ev : event){
 		auto c_after = ev.c_after;
 	
-		auto t = calc_t(ev.tdiv,details);
+		auto t = calc_t(ev.tdiv,model.details);
 		
 		switch(ev.type){
 		case ENTER_EV: 
@@ -313,13 +313,13 @@ string StateSpecies::check_prior(const Equation &eq) const
 	
 	if(eq.param_ref.size() == 1){
 		const auto &pr = eq.param_ref[0];
-		return " Please check the "+type+" correctly set for "+param[pr.th].full_name;
+		return " Please check the "+type+" correctly set for "+model.param[pr.th].full_name;
 	}		
 	return " Please check the "+type+" correctly set.";
 }
 
 
-/// Sets ind_sim_c at time t based on inidividual timelines 
+/// Sets ind_sim_c at time t based on individual timelines 
 void StateSpecies::set_ind_sim_c(unsigned int ti)
 {
 	double t = ti;

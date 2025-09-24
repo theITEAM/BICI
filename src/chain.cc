@@ -25,7 +25,8 @@ Chain::Chain(unsigned int nburnin_, unsigned int nsample_, const Model &model, O
 		burn_info.prop_join_step = 20;
 	}
 	else{
-		burn_info.prop_join_step = nburnin/4;
+		auto val = nburnin/4; if(val == 0) val = 1;
+		burn_info.prop_join_step = val;
 	}
 	
 	burn_info.on = true;
@@ -53,18 +54,18 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 		percentage(loop+ch*loop_max,loop_max*ch_max);
 		
 		auto param_val = model.param_sample();
+
 		auto initc_val = model.initc_sample(param_val);
 		
 		if(false){
 			output.print_initc(initc_val);
 			model.print_param(param_val);
 		}
-		//output.print_param(param_val);
-		
+	
 		print_diag("simulate");
 		
 		state.simulate(param_val,initc_val);
-	
+
 		print_diag("simulate done");
 	
 		state.check("First check");
@@ -461,7 +462,13 @@ void Chain::update(unsigned int s)
 	auto pl = false;
 	
 	for(auto &pro : proposal){ 
+		//state.check_markov_value_dif();
+
 		if(pro.on){
+			//if(op()) state.check_markov_value_dif();
+				
+			//if(op()) cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
+			
 			//cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
 			
 			if(true){
@@ -471,9 +478,12 @@ void Chain::update(unsigned int s)
 			}
 			else{
 				switch(pro.type){
-				case PARAM_PROP:
+				//case PARAM_PROP:
+				//case MBP_PROP:
+				//case POP_ADD_REM_LOCAL_PROP: 
+				//case POP_SINGLE_LOCAL_PROP:
 				//case IND_ADD_REM_PROP:
-				//case IND_EVENT_TIME_PROP:   
+				case IND_EVENT_TIME_PROP:   
 				//case IND_MULTI_EVENT_PROP:
 				//case IND_EVENT_ALL_PROP:
 				//case IND_OBS_SAMP_PROP:
@@ -661,7 +671,7 @@ void Chain::update_init()
 				{
 					vector <unsigned int> vec; vec.push_back(p); 
 					Proposal pp(POP_SINGLE_LOCAL_PROP,vec,model,output,PROP_LOCAL_W,burn_info);
-					proposal.push_back(pp);
+					proposal.push_back(pp); 
 				}
 				
 				{
@@ -879,6 +889,19 @@ void Chain::update_init()
 }
 
 
+/// Determines if affect type if Markov pop
+bool Chain::is_markov_pop(const AffectLike &al) const
+{
+	switch(al.type){
+	case MARKOV_POP_AFFECT: case MARKOV_POP_NOPOP_AFFECT: case MARKOV_POP_LINEAR_AFFECT: 
+		return true;
+	default: break;
+	}
+	
+	return false;
+}	
+
+
 /// Adds a parameter 
 void Chain::add_parameter_prop(const vector <unsigned int> &vec)
 {
@@ -888,9 +911,7 @@ void Chain::add_parameter_prop(const vector <unsigned int> &vec)
 	/// Looks at adding MBPs
 	vector <unsigned int> list;
 	for(const auto &al : pp.affect_like){
-		if(al.type == MARKOV_POP_AFFECT){
-			add_to_vec(list,al.num);
-		}
+		if(is_markov_pop(al)) add_to_vec(list,al.num);
 	}
 
 	for(auto k = 0u; k < list.size(); k++){    // Adds one MBP per species affected
@@ -900,7 +921,7 @@ void Chain::add_parameter_prop(const vector <unsigned int> &vec)
 		auto j = 0u;                             // Removes MARKOV_POP_AFFECT from list
 		while(j < pp2.affect_like.size()){
 			auto al = pp2.affect_like[j];
-			if(al.type == MARKOV_POP_AFFECT && al.num == list[k]){
+			if(is_markov_pop(al) && al.num == list[k]){
 				pp2.affect_like.erase(pp2.affect_like.begin()+j);
 			}
 			else j++;
@@ -911,6 +932,7 @@ void Chain::add_parameter_prop(const vector <unsigned int> &vec)
 		pp2.type = MBP_PROP;
 		pp2.name = "MBP "+pp2.name;
 		pp2.mbp_population_affect();
+	
 		proposal.push_back(pp2);
 	}
 }
@@ -1034,7 +1056,7 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 		ss << "Non-proposal - " << cpu_percent(other,total_time);
 		ss << " (samplers: " << cpu_percent(state.timer[UPDATE_SAMPLER_TIMER],total_time);
     ss << ", o/p params: " << cpu_percent(output.timer[PARAM_OUTPUT],total_time);
-			ss << ", o/p state: " << cpu_percent(output.timer[STATE_OUTPUT],total_time);
+		ss << ", o/p state: " << cpu_percent(output.timer[STATE_OUTPUT],total_time);
 		ss << ", der-pre: " << cpu_percent(state.timer[DERIVE_PRECALC_TIMER],total_time);
 		ss << ", derive: " << cpu_percent(state.timer[DERIVE_TIMER],total_time);
 		ss << ", checking: " << cpu_percent(state.timer[CHECK_TIMER],total_time);
@@ -1082,7 +1104,7 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 				case DIST_AFFECT: ss << "Distribution"; break; 
 				case EXP_FE_AFFECT: ss << "Exp FE"; break; 
 				case DIV_VALUE_AFFECT: ss << "Div value"; break; 
-				case DIV_VALUE_NONPOP_AFFECT: ss << "Div value nonpop"; break; 
+				case DIV_VALUE_NOPOP_AFFECT: ss << "Div value nopop"; break; 
 				case DIV_VALUE_LINEAR_AFFECT: ss << "Div value linear"; break; 
 				case MARKOV_LIKE_AFFECT: ss << "Markov like"; break; 
 				case POP_AFFECT: ss << "Population"; break; 
@@ -1093,7 +1115,9 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 				case EXP_IE_AFFECT: ss << "Exp IE"; break; 
 				case LIKE_IE_AFFECT: ss << "Like IE"; break; 
 				case INDFAC_INT_AFFECT: ss << "Individual factor"; break; 
-				case MARKOV_POP_AFFECT: ss << "Markov Pop"; break; 
+				case MARKOV_POP_AFFECT: ss << "Markov pop"; break; 
+				case MARKOV_POP_NOPOP_AFFECT: ss << "Markov pop nopop"; break; 
+				case MARKOV_POP_LINEAR_AFFECT: ss << "Markov pop linear"; break; 
 				case OBS_EQN_AFFECT: ss << "Obs Eqn"; break; 
 				case LIKE_OBS_IND_AFFECT: ss << "Like Obs Ind"; break; 
 				case LIKE_OBS_POP_AFFECT: ss << "Like Obs Pop"; break; 

@@ -26,6 +26,8 @@ const string default_file = "Execute/init.bici";     // This is used for windows
 
 #define USE_MPI                                    // Sets if code can run in parallel
 
+const string bici_version = "v0.71";                  // Sets the BICI version
+
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
 const bool testing = true;                           // Set to true for additional testing
 const bool slow_check = false;                       // Additional checks which are slow
@@ -38,13 +40,18 @@ const bool cum_diag = true;                          // Cumulative probability d
 const bool linearise_speedup = true;                 // Linearisation speed-up of div value calculation
 // This speeds up by taking account of linear population terms when calculation div values
 
-const bool nonpop_speedup = true;                    // Linearisation speed-up likelihood
+const bool linearise_factor_nopop_speedup = true;    // Linearisation speed-up of div value calculation
+// This speeds up making changes to the factor
+
+const bool nopop_speedup = true;                    // Linearisation speed-up likelihood
 // This speeds up making changes to non-population term when calculating div values
 
 const bool update_ind_linearise_speedup = true;      // Linearisation speed-up of likelihood
 // This speeds up update_ind by updating value based on changes in population (good for sums)
 
 const bool calc_para_speedup = true;                 // Speeds up by paralising calculation over time
+
+const bool factor_speedup = true;                    // Speeds up by identifying equations which differ by a factor 
 
 const bool removeparamvec_speedup = true;            // Removes zeros from paramter vector
 
@@ -150,7 +157,7 @@ enum TrigEventType { TRIG_OBS_TRANS_EV, TRIG_MOVE_EV, TRIG_LEAVE_EV };
 enum ObsType { OBS_SOURCE_EV, OBS_TRANS_EV, OBS_SINK_EV, OBS_COMP_EV, OBS_TEST_EV };
 
 // Different ways a parameter can affect likelihoods
-enum AffectType { SPLINE_PRIOR_AFFECT, PRIOR_AFFECT, DIST_AFFECT, EXP_FE_AFFECT, DIV_VALUE_AFFECT, DIV_VALUE_NONPOP_AFFECT, DIV_VALUE_LINEAR_AFFECT, MARKOV_LIKE_AFFECT, POP_AFFECT, NM_TRANS_AFFECT, NM_TRANS_BP_AFFECT, NM_TRANS_INCOMP_AFFECT, OMEGA_AFFECT, EXP_IE_AFFECT, LIKE_IE_AFFECT, INDFAC_INT_AFFECT, MARKOV_POP_AFFECT, LIKE_OBS_IND_AFFECT, LIKE_OBS_POP_AFFECT, LIKE_OBS_POP_TRANS_AFFECT, OBS_EQN_AFFECT, LIKE_UNOBS_TRANS_AFFECT, POP_DATA_CGL_TGL_AFFECT, LIKE_INIT_COND_AFFECT, PRIOR_INIT_COND_AFFECT, LIKE_GENETIC_PROCESS_AFFECT, GENETIC_VALUE_AFFECT, LIKE_GENETIC_OBS_AFFECT, IIF_W_AFFECT, POPNUM_IND_W_AFFECT, AFFECT_MAX };
+enum AffectType { SPLINE_PRIOR_AFFECT, PRIOR_AFFECT, DIST_AFFECT, EXP_FE_AFFECT, DIV_VALUE_AFFECT, DIV_VALUE_NOPOP_AFFECT, DIV_VALUE_LINEAR_AFFECT, MARKOV_LIKE_AFFECT, POP_AFFECT, NM_TRANS_AFFECT, NM_TRANS_BP_AFFECT, NM_TRANS_INCOMP_AFFECT, OMEGA_AFFECT, EXP_IE_AFFECT, LIKE_IE_AFFECT, INDFAC_INT_AFFECT, MARKOV_POP_AFFECT, MARKOV_POP_NOPOP_AFFECT, MARKOV_POP_LINEAR_AFFECT, LIKE_OBS_IND_AFFECT, LIKE_OBS_POP_AFFECT, LIKE_OBS_POP_TRANS_AFFECT, OBS_EQN_AFFECT, LIKE_UNOBS_TRANS_AFFECT, POP_DATA_CGL_TGL_AFFECT, LIKE_INIT_COND_AFFECT, PRIOR_INIT_COND_AFFECT, LIKE_GENETIC_PROCESS_AFFECT, GENETIC_VALUE_AFFECT, LIKE_GENETIC_OBS_AFFECT, IIF_W_AFFECT, POPNUM_IND_W_AFFECT, AFFECT_MAX };
 
 // Different proposal types
 enum PropType { PARAM_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT_PROP, IND_EVENT_ALL_PROP, IND_OBS_SAMP_PROP, IND_OBS_RESIM_PROP, IND_OBS_RESIM_SINGLE_PROP, IND_UNOBS_RESIM_PROP, IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, IE_VAR_CV_PROP, TRANS_TREE_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP, IND_OBS_SWITCH_LEAVE_SINK_PROP };
@@ -217,7 +224,7 @@ enum BpType { BP_UNSET, BP_SET, BP_DERIVED };
 enum Direction { FORWARD, FORWARD_SQ, BACKWARD_SQ };
  
 // Different ways to restore state after an individual change
-enum BackType { REMOVE_LI_MARKOV, ADD_LI_MARKOV, POP_DATA_NUM, LI_OBS_POP, POP_DATA_CGL, POP_TRANS_DATA_NUM, LI_OBS_POP_TRANS, LI_OBS_IND, TI_INDFAC, DLI_INDFAC, DIF_INDFAC, LI_MARKOV, OBS_TRANS_EQN_NUM, VALUE_MARKOV, IND_COND_VAL };
+enum BackType { REMOVE_LI_MARKOV, ADD_LI_MARKOV, POP_DATA_NUM, LI_OBS_POP, POP_DATA_CGL, POP_TRANS_DATA_NUM, LI_OBS_POP_TRANS, LI_OBS_IND, TI_INDFAC, DLI_INDFAC, DIF_INDFAC, LI_MARKOV, OBS_TRANS_EQN_NUM, VALUE_MARKOV, IND_COND_VAL, CPOP_ST, TRANS_MEAN_ST, LI_MARKOV_POP, TRANS_NUM, LI_MARKOV_POP_SINGLE, LI_OBS_POP_TRANS_SINGLE, POP_TRANS_DATA_NUM_SINGLE, POP_TRANS_DATA_TGL};
 
 // Different ways restore population after an individual change
 enum BackPopType { POP_NUM_T };
@@ -341,9 +348,9 @@ const double EFFECT_MAX = 10000000;               // Sets maximum value for effe
 const double EFFECT_MIN = 0.0000001;              // Sets minimum value for effect
 const double CLIP_MIN = 0.99*log(EFFECT_MIN);     // Clips minimum 
 const double CLIP_MAX = 0.99*log(EFFECT_MAX);     // Clips maximum 
-const double DIF_THRESH = 0.00001;                // The threshold for a difference
+const double DIF_THRESH = 0.0000001;              // The threshold for a difference
 const double THRESH_EXPAND = 100;                 // Expand threshold for certain quantities
-const double DIF_THRESH_BURNIN = 0.1;             // The threshold during burnin
+const double DIF_THRESH_BURNIN = 0.001;           // The threshold during burnin
 const unsigned int RANGE_MIN = 50;                // Minimum number to calc M
 
 const unsigned int H_BIN = 10;                    // Used for distributions in cumulative prob

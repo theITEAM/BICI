@@ -380,8 +380,6 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	print_diag("h5");
 	
-	create_markov_eqn_pop_ref();       // Works out which populations affect which markov eqns (and vice versa)
-	
 	check_memory_too_large();
 	
 	print_diag("h6");
@@ -398,6 +396,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	create_spline();                   // Creates any splines in the model
 
+	create_markov_eqn_pop_ref();       // Works out which populations affect which markov eqns (and vice versa)
+	
 	print_diag("h10");
 	
 	ind_fix_eff_group_trans_ref();     // References markov eqns and nm_trans ind_eff_group and fix_effect
@@ -444,8 +444,6 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 
 	model.create_precalc_equation();    // Extracts precalculations (for non-population parts of equations)
 	
-	model.set_list_precalc_time();      // Sets list for any populations in precalc
-	
 	linearise_eqn(75,85);               // Tries to linearise equations in terms of pops
 	//emsg("ll");
 	
@@ -456,6 +454,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	model.precalc_affect();             // Works out how precalculation is affected by changes in parameters
 	
 	model.create_precalc_derive();      // Extracts precalculations for derived quantities
+	
+	model.set_update_precalc_time();    // Sets update form precalc a different times (for tv reparam)
 	
 	setup_der_func_eqn();               // Sets up equations for derived functions
 	
@@ -1478,9 +1478,13 @@ void Input::create_param_vector()
 							pr.prior_ref = UNSET;
 						}
 						pr.variety = par.variety;
+						pr.reparam_time_dep = false;
+						if(pr.variety == REPARAM_PARAM && par.time_dep) pr.reparam_time_dep = true;
 						pr.ppc_resample = false;
+						pr.reparam_spl_ti = UNSET;
+						pr.spline_ref = UNSET;
 						pr.ref = UNSET;
-				
+						
 						pr.prop_pos = false;
 						if(pr.variety == PRIOR_PARAM || pr.variety == DIST_PARAM){
 							if(model.prior[pr.prior_ref].type != FIX_PR){
@@ -1505,14 +1509,25 @@ void Input::create_param_vector()
 	// Creates a vector of parameters which can undergoe proposals
 	
 	for(auto th = 0u; th < model.nparam_vec; th++){
-		auto &par = model.param_vec[th];
-		if(par.prop_pos){
-			par.ref = model.param_vec_prop.size();
+		auto &pv = model.param_vec[th];
+		if(pv.prop_pos){
+			pv.ref = model.param_vec_prop.size();
 			model.param_vec_prop.push_back(th);
 		}			
 	}
 	model.nparam_vec_prop = model.param_vec_prop.size();
 
+	for(auto th = 0u; th < model.nparam_vec; th++){
+		const auto &pv = model.param_vec[th];
+		if(pv.reparam_time_dep){
+			model.param_vec_tvreparam.push_back(th);
+		}			
+	}
+	model.nparam_vec_tvreparam = model.param_vec_tvreparam.size();
+
+	model.contains_tvreparam = false;
+	if(model.nparam_vec_tvreparam > 0) model.contains_tvreparam = true;
+	
 	if(false){
 		auto imax = model.nparam_vec;
 		if(imax > 100) imax = 100;

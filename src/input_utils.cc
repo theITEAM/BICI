@@ -1822,7 +1822,7 @@ void Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 	
 	if(par.time_dep){
 		if(par.spline_info.type != SQUARE_SPL){
-			alert_line("A square spline must be used for reparameterised parameter '"+par.full_name+"'.",par.line_num);
+			alert_line("A square spline must be used for time-varying reparameterised parameter '"+par.full_name+"'.",par.line_num);
 		}			
 	}
 	

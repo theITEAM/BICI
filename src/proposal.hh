@@ -83,6 +83,8 @@ class Proposal                             // Implements a proposal
 			
 		bool all_events_correct;               // Flag determining if all obs events correct
 	
+		MBPfast mbp_fast;                      // This is used to speed up calculation for MBPs
+		
 		void MH_event(State &state);
 		void MH_multi_event(State &state);
 		void MH_event_all(State &state);
@@ -133,7 +135,7 @@ class Proposal                             // Implements a proposal
 		void update_sampler(const CorMatrix &cor_matrix);
 		void mbp_population_affect();
 		void set_mvn(double si_, const CorMatrix &cor_matrix);
-		bool param_resample(PV &param_val);
+		bool param_resample(PV &param_val, const vector < vector <double> > &popnum_t);
 		double mvn_probability(const vector <double> &param_prop1, const vector <double> &param_prop2) const;
 		
 	private:
@@ -153,6 +155,7 @@ class Proposal                             // Implements a proposal
 		void set_omega_check();
 		bool event_dif(const vector <Event> &ev1, const vector <Event> &ev2) const;
 		void ind_obs_prob_update(IndSimProb &isp) const;
+		void set_mbp_fast();
 		double set_prop_prob();
 	
 	// Used in proposal_local.cc

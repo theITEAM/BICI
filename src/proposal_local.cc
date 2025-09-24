@@ -278,7 +278,7 @@ void Proposal::pop_add_rem_local(State &state)
 				local_change.push_back(lc);
 			}
 			
-			auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+			auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 		
 			if(!ill){
 				auto al = calculate_al(like_ch,dprob);
@@ -291,7 +291,7 @@ void Proposal::pop_add_rem_local(State &state)
 					state.accept(like_ch);
 				}
 				else{
-					state.calculate_local_change(p_prop,local_change,-1,ill);
+					state.restore_back();
 					if(ill) emsg("Should not be illegal");
 				}
 			}
@@ -310,7 +310,7 @@ void Proposal::pop_add_rem_local(State &state)
 				}
 				dprob += L*log(1.0/win);
 						
-				auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+				auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 			
 				if(!ill){
 					auto al = calculate_al(like_ch,dprob);
@@ -323,7 +323,7 @@ void Proposal::pop_add_rem_local(State &state)
 						state.accept(like_ch);
 					}
 					else{ 
-						state.calculate_local_change(p_prop,local_change,-1,ill);
+						state.restore_back();
 						if(ill) emsg("Should not be illegal");
 					}
 				}
@@ -379,7 +379,7 @@ void Proposal::pop_move_local(State &state)
 		lc.type = ADD_EVENT; lc.tr = tr; lc.ti = ti_new;
 		local_change.push_back(lc);
 		
-		auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+		auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 		
 		if(!ill){
 			auto al = calculate_al(like_ch,0);
@@ -392,7 +392,7 @@ void Proposal::pop_move_local(State &state)
 				state.accept(like_ch);
 			}
 			else{ 
-				state.calculate_local_change(p_prop,local_change,-1,ill);
+				state.restore_back();
 				if(ill) emsg("Should not be illegal");
 			}
 		}
@@ -458,7 +458,7 @@ void Proposal::pop_ic_local(State &state)
 				lc.type = ADD_EVENT; lc.tr = tr; lc.ti = ti;
 				local_change.push_back(lc);
 				
-				auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+				auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 				
 				if(!ill){
 					auto al = calculate_al(like_ch,dprob);
@@ -470,7 +470,7 @@ void Proposal::pop_ic_local(State &state)
 						state.accept(like_ch);
 					}
 					else{ 
-						state.calculate_local_change(p_prop,local_change,-1,ill);
+						state.restore_back();
 						if(ill) emsg("Should not be illegal");
 					}
 				}
@@ -494,7 +494,7 @@ void Proposal::pop_ic_local(State &state)
 					lc.type = REMOVE_EVENT; lc.tr = tr; lc.ti = ti;
 					local_change.push_back(lc);
 				
-					auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+					auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 				
 					if(!ill){
 						auto al = calculate_al(like_ch,dprob);
@@ -506,7 +506,7 @@ void Proposal::pop_ic_local(State &state)
 							state.accept(like_ch);
 						}
 						else{ 
-							state.calculate_local_change(p_prop,local_change,-1,ill);
+							state.restore_back();
 							if(ill) emsg("Should not be illegal");
 						}
 					}
@@ -574,7 +574,7 @@ void Proposal::pop_end_local(State &state)
 			lc.type = ADD_EVENT; lc.tr = tr; lc.ti = ti;
 			local_change.push_back(lc);
 				
-			auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+			auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 			
 			if(!ill){
 				auto al = calculate_al(like_ch,dprob);
@@ -586,7 +586,7 @@ void Proposal::pop_end_local(State &state)
 					state.accept(like_ch);
 				}
 				else{ 
-					state.calculate_local_change(p_prop,local_change,-1,ill);
+					state.restore_back();
 					if(ill) emsg("Should not be illegal");
 				}
 			}
@@ -604,7 +604,7 @@ void Proposal::pop_end_local(State &state)
 				lc.type = REMOVE_EVENT; lc.tr = tr; lc.ti = ti;
 				local_change.push_back(lc);
 			
-				auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+				auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 			
 				if(!ill){
 					auto al = calculate_al(like_ch,dprob);
@@ -616,7 +616,7 @@ void Proposal::pop_end_local(State &state)
 						state.accept(like_ch);
 					}
 					else{ 
-						state.calculate_local_change(p_prop,local_change,-1,ill);
+						state.restore_back();
 						if(ill) emsg("Should not be illegal");
 					}
 				}
@@ -700,11 +700,11 @@ void Proposal::pop_single_local(State &state)
 					lc.type = ADD_EVENT; lc.tr = tr; lc.ti = ti;
 					local_change.push_back(lc);
 						
-					auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+					auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 					
 					if(!ill){
 						auto al = calculate_al(like_ch,dprob);
-						if(pl) cout << al << "al add" << endl;
+						if(pl) cout << al << "al add1" << endl;
 						
 						ntr++;
 						if(ran() < al){ 
@@ -712,8 +712,8 @@ void Proposal::pop_single_local(State &state)
 							tr_sel.update(tr,ti,1);
 							state.accept(like_ch);
 						}
-						else{ 
-							state.calculate_local_change(p_prop,local_change,-1,ill);
+						else{
+							state.restore_back();
 							if(ill) emsg("Should not be illegal");
 						}
 					}
@@ -739,11 +739,11 @@ void Proposal::pop_single_local(State &state)
 						lc.type = REMOVE_EVENT; lc.tr = tr; lc.ti = ti;
 						local_change.push_back(lc);
 					
-						auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+						auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 				
 						if(!ill){
 							auto al = calculate_al(like_ch,dprob);
-							if(pl) cout << al << "al rem" << endl;
+							if(pl) cout << al << "al rem1" << endl;
 					
 							ntr++;
 							if(ran() < al){ 
@@ -752,7 +752,7 @@ void Proposal::pop_single_local(State &state)
 								state.accept(like_ch);
 							}
 							else{ 
-								state.calculate_local_change(p_prop,local_change,-1,ill);
+								state.restore_back();
 								if(ill) emsg("Should not be illegal");
 							}
 						}
@@ -776,10 +776,11 @@ void Proposal::pop_single_local(State &state)
 				lc.type = ADD_EVENT; lc.tr = tr; lc.ti = ti;
 				local_change.push_back(lc);
 					
-				auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+				auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 				
 				if(!ill){
 					auto al = calculate_al(like_ch,dprob);
+					if(pl) cout << al << "al add2" << endl;
 					
 					ntr++;
 					if(ran() < al){ 
@@ -787,8 +788,8 @@ void Proposal::pop_single_local(State &state)
 						tr_sel.update(tr,ti,1);
 						state.accept(like_ch);
 					}
-					else{ 
-						state.calculate_local_change(p_prop,local_change,-1,ill);
+					else{
+						state.restore_back();						
 						if(ill) emsg("Should not be illegal");
 					}
 				}
@@ -810,19 +811,20 @@ void Proposal::pop_single_local(State &state)
 					lc.type = REMOVE_EVENT; lc.tr = tr; lc.ti = ti;
 					local_change.push_back(lc);
 				
-					auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+					auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 			
 					if(!ill){
 						auto al = calculate_al(like_ch,dprob);
-				
+						if(pl) cout << al << "al rem2" << endl;
+					
 						ntr++;
 						if(ran() < al){ 
 							nac++;
 							tr_sel.update(tr,ti,-1);
 							state.accept(like_ch);
 						}
-						else{ 
-							state.calculate_local_change(p_prop,local_change,-1,ill);
+						else{
+							state.restore_back();							
 							if(ill) emsg("Should not be illegal");
 						}
 					}
@@ -876,7 +878,7 @@ void Proposal::pop_ic(State &state)
 				lc.type = ADD_C_IC; lc.tr = c; lc.ti = -1;
 				local_change.push_back(lc);
 					
-				auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+				auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 					
 				if(!ill){
 					auto al = calculate_al(like_ch,dprob);
@@ -888,7 +890,7 @@ void Proposal::pop_ic(State &state)
 						state.accept(like_ch);
 					}
 					else{ 
-						state.calculate_local_change(p_prop,local_change,-1,ill);
+						state.restore_back();
 						if(ill) emsg("Should not be illegal");
 					}
 				}
@@ -906,7 +908,7 @@ void Proposal::pop_ic(State &state)
 					lc.type = REMOVE_C_IC; lc.tr = c; lc.ti = -1;
 					local_change.push_back(lc);
 			
-					auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+					auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 			
 					if(!ill){
 						auto al = calculate_al(like_ch,dprob);
@@ -918,7 +920,7 @@ void Proposal::pop_ic(State &state)
 							state.accept(like_ch);
 						}
 						else{ 
-							state.calculate_local_change(p_prop,local_change,-1,ill);
+							state.restore_back();
 							if(ill) emsg("Should not be illegal");
 						}
 					}
@@ -978,7 +980,7 @@ void Proposal::pop_ic_swap(State &state)
 		lc.type = ADD_C_IC; lc.tr = cf; lc.ti = -1;
 		local_change.push_back(lc);
 				
-		auto like_ch = state.calculate_local_change(p_prop,local_change,1,ill);
+		auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 				
 		if(!ill){
 			auto al = calculate_al(like_ch,dprob);
@@ -991,7 +993,7 @@ void Proposal::pop_ic_swap(State &state)
 				state.accept(like_ch);
 			}
 			else{ 
-				state.calculate_local_change(p_prop,local_change,-1,ill);
+				state.restore_back();
 				if(ill) emsg("Should not be illegal");
 			}
 		}

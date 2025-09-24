@@ -63,7 +63,8 @@ void ABC_SMC::run()
 		}
 		else{
 			if(g == 1){
-				auto param_val = model.get_param_val(particle_store[0].param_val_prop);
+				const auto &ps = particle_store[0];
+				auto param_val = model.get_param_val(ps);
 				prior_ref = model.prior_total(param_val);
 			}
 			
@@ -82,10 +83,10 @@ void ABC_SMC::run()
 				auto p = particle_sampler();                  // Samples from a particle in last gen
 				const auto &part = particle_store[p];
 				
-					auto param_val = model.get_param_val(part.param_val_prop);
+				auto param_val = model.get_param_val(part);
 				auto param_prop = param_val;  // Proposes a new parameter set using MVN kernal
 				
-				if(prop.param_resample(param_prop) == true){				
+				if(prop.param_resample(param_prop,state.popnum_t) == true){				// TO DO
 					auto initc_val = model.initc_sample(param_prop);
 
 					state.simulate(param_prop,initc_val);       // Simulates a new state

@@ -1810,8 +1810,39 @@ void Species::add_unobs_Amatrix_ind()
 /// Makes tiny shifts in time ensure that transition times are not equal
 void Species::jiggle_data(Operation mode)
 {
-	auto range = TINY*details.dt*2;
-		
+	auto range = TINY;
+	
+	// Shifts events away from division boundaries
+	for(auto &ind : individual){	
+		for(auto &ev : ind.ev){
+			if(ev.tdiv == (unsigned int)(ev.tdiv)){
+				switch(ev.type){
+				case ENTER_EV: 
+					if(ev.tdiv > TINY) ev.tdiv -= TINY;
+					break;
+				case LEAVE_EV: case MOVE_EV: default:
+					if(ev.tdiv < T-TINY) ev.tdiv += TINY;
+					break;
+				}
+			}
+		}
+
+		for(auto &ob : ind.obs){
+			if(ob.tdiv == (unsigned int)(ob.tdiv)){
+				switch(ob.type){
+				case OBS_SOURCE_EV: 
+					if(ob.tdiv > TINY) ob.tdiv -= TINY;
+					break;
+					
+				case OBS_SINK_EV: case OBS_TRANS_EV: 
+				default:
+					if(ob.tdiv < T-TINY) ob.tdiv += TINY;
+					break;
+				}
+			}
+		}
+	}
+	
 	Hash hash_t;
 	
 	// Adds times to hash time when NOT a transition event
@@ -1837,7 +1868,7 @@ void Species::jiggle_data(Operation mode)
 	for(auto &ind : individual){	
 		double t_enter = UNSET, t_leave = UNSET;
 		auto enter_so = UNSET, leave_so = UNSET;
-		for(const auto &ev : ind.ev){
+		for(auto &ev : ind.ev){
 			switch(ev.type){
 			case ENTER_EV:
 				if(t_enter != UNSET){
@@ -1852,6 +1883,7 @@ void Species::jiggle_data(Operation mode)
 					auto extra = post_sim_define_twice("Leave",mode);
 					alert_input("Cannot set leave time twice for individual '"+ind.name+"'."+extra);
 				}				
+		
 				t_leave = ev.tdiv; leave_so = ev.so;
 				break;
 			case MOVE_EV: break;
@@ -1899,16 +1931,20 @@ void Species::jiggle_data(Operation mode)
 			case OBS_SOURCE_EV: case OBS_SINK_EV: case OBS_TRANS_EV: 
 				{
 					double t;
-					const auto loopmax = 1000;
+					const auto loopmax = 100;
 					auto loop = 0u;
+					
 					do{
-						t = ob.tdiv + loop*range;
+						auto d = (double(loop)*range)/loopmax;
+						
+						t = ob.tdiv + d;
+							
 						if(t >= tmin && t <= tmax &&
    						hash_t.existing(hash_t.get_vec_double(t)) == UNSET){
 							break;
 						}
 						
-						t = ob.tdiv - loop*range;
+						t = ob.tdiv - d;
 						if(t >= tmin && t <= tmax &&
    						hash_t.existing(hash_t.get_vec_double(t)) == UNSET){
 							break;
@@ -1928,6 +1964,16 @@ void Species::jiggle_data(Operation mode)
 				
 			default: break;
 			}
+		}
+	}
+	
+	if(false){
+		for(auto &ind : individual){
+			cout << ind.name << ": ";		
+			for(auto &ev : ind.ev){
+				cout << ev.tdiv << "(" << int(ev.tdiv) << "),";
+			}
+			cout << "time" << endl;
 		}
 	}
 }

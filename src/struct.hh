@@ -95,15 +95,48 @@ struct PopAffect {                 // Lists all populations which affect DIV_VAL
 	vector <GradRef> pop_grad_ref;   // References population in Markov equation 
 };
 
-struct DivValueLinear {            // Stores information for DIV_VALUE_LINEAR speedup
-	bool factor_same;                // Determines if factor is the same for all markov equations
-	bool nonpop_same;                // Determines if non-population part same for all markov equations
-	vector <unsigned int> me;        // Markov eqn ref
+struct EqItem {                    // An individual operation in a calculation
+	EqItem(){ num = UNSET;}
+	
+	EqItemType type;
+	unsigned int num;
+};
+
+struct LinearFormInit {
+ 	unsigned int m;                  // Reference number
+	unsigned int e;                  // Equation number
+};
+
+struct LinearFormItem {            // Stores an item in LinearForm
+	unsigned int m;                  // Reference number
+	unsigned int e;                  // Equation number
+	unsigned int sum_e_ref;          // References which sum e
+	EqItem factor_precalc;           // Factor which pre-calculates equation
+	EqItem no_pop_precalc;           // Non-population part
+};
+	
+struct LinearForm {                // Stores information for mbp speedup
+	bool factor_nopop_only;          // Determines if only the factor is affected by the proposal
+	bool factor_same;                // Determines if factor is the same for all equations
+	bool nopop_same;                // Determines if non-population part same for all equations
+	vector <LinearFormItem> list;// Transitions which can be calculated fast
+	vector <unsigned int> sum_e;     // The equations for the sums 
 	vector <PopAffect> pop_affect;   // References populations which affect
 };
 
-struct DivValueNonPop {            // Stores information for DIV_VALUE_NONPOP_AFFECT
-	vector <unsigned int> me_list;   // Stores list of Markov equantions
+struct MBPfast {
+	vector <unsigned int> calc_tr;   // Transitions which must be calculated
+	LinearForm lin_form;
+};
+
+struct AffectMap {                 // Provides information about how a proposal affects quantities
+ 	vector <bool> precalc_map;       // Precalculation
+	vector < vector <bool> > ie_map; // Individual effect
+	vector < vector <bool> > fe_map; // Fixed effects
+};
+
+struct EqnNoPop {                  // Information for DIV_VALUE_NOPOP_AFFECT / MARKOV_POP_NOPOP_AFFECT
+	vector <unsigned int> list;      // Stores list of Markov equantions / transitions
 };
 
 struct AffectLike {                // Determines how a parameter affects likelihoods
@@ -113,8 +146,13 @@ struct AffectLike {                // Determines how a parameter affects likelih
 	vector <bool> map;               // Maps all time elements which are affected
 	vector <unsigned int> list;      // Lists all map which is true
 	unsigned int order_num;          // Used to order terms by list priority
-	DivValueLinear div_value_linear; // Stores information for DIV_VALUE_NONPOP_AFFECT
-	DivValueNonPop div_value_nonpop; // Stores information for DIV_VALUE_NONPOP_AFFECT
+	LinearForm lin_form;             // Information for DIV_VALUE_LINEAR_AFFECT / MARKOV_POP_LINEAR_AFFECT 
+	EqnNoPop eq_nopop;               // Information for DIV_VALUE_NOPOP_AFFECT / MARKOV_POP_NOPOP_AFFECT 
+};
+
+struct Listie {                    // Stores a list with equation number
+	unsigned int i; 
+	unsigned int e;
 };
 
 struct AffectME {                  // Determines if affects a Markov equation
@@ -166,6 +204,7 @@ struct Population {                // Stores a population (used in an equation)
 	vector <PopulationTerm> term;    // The global compartments which contribute to the popualtion
 	vector <PopMarkovEqnRef> markov_eqn_ref;// References Markov equations which include population
 	vector <PopTransRef> trans_ref;  // References transitions which include population
+	vector <unsigned int> spline_update; // Stores any reparam which need updating
 };
 
 struct ParamProp {                 // Stores properties of a parameter
@@ -209,6 +248,8 @@ struct Spline {                    // Stores an individual spline
 	vector <SplineDiv> div;          // A division within the spline
 	vector <CubicDiv> cubic_div;     // A division within a cubic spline
 	vector <double> const_val;       // If spline is constant then works out what value it should have
+	vector <PopMarkovEqnRef> markov_eqn_ref;// References Markov equations which include spline
+	vector <PopTransRef> trans_ref;  // References transitions which include spline
 };
 
 
@@ -340,6 +381,7 @@ struct ParamVecEle                 // Stores information about an element in par
 	unsigned int index;              // The index where to find 
 	unsigned int prior_ref;          // References the prior
 	ParamVariety variety;            // The parameter variety (copied from param)
+	bool reparam_time_dep;           // Set if the parameter is a reparameterisation and time dependent
 	bool ppc_resample;               // Sets if parameter gets resampled for ppc
 	bool prop_pos;                   // Set if it is possible to do a proposal on this parameter
 	bool omega_fl;                   // Detemines if in omega
@@ -347,6 +389,8 @@ struct ParamVecEle                 // Stores information about an element in par
 	vector <unsigned int> list_precalc_before; // Lists any precalculation which need to be done before parameter evaluated
 	vector <unsigned int> list_precalc_time; // Stores which times are affected by change
 	vector <unsigned int> list_precalc; // Lists any precalculation which need to be done before parameter evaluated
+	unsigned int spline_ref;         // References the spline the parameter is on 
+	unsigned int reparam_spl_ti;     // If on a reparameterised spline this gives the time
 	unsigned int ref;                // Reference param_vec_prop
 };
 
@@ -1055,8 +1099,8 @@ struct IndData {                   // Stores data on individuals
 	bool move_needed;                // Determines if individual move events
 	unsigned int enter_ref;          // References enter compartment probability
 	bool init_c_set;                 // Determines if the init individual compartment set
-	double tdivmin;                     // The minimum time for data
-	double tdivmax;                     // The maximim time for data
+	double tdivmin;                  // The minimum time for data
+	double tdivmax;                  // The maximim time for data
 };
 
 struct WarnData {                  // Stores warning messages
@@ -1374,7 +1418,8 @@ struct GeneticDataValue {          // Stores state values for genetic data
 };
 
 struct Particle {                  // Stores information from state
-	vector <double> param_val_prop;  // The parameter value (without const or reparameterisation)
+	vector <double> param_val_prop;  // The parameter value (without const or reparam)
+	vector <double> param_val_tvreparam;  // The parameter value for time varying reparams
 	vector <ParticleSpecies> species;// Species state data
 	
 	vector <DeriveOutput> dir_out;   // Derived outputs
@@ -1744,13 +1789,6 @@ struct PropTime {                  // Used for orthering proposal times
 	long time;
 };
 
-struct EqItem {                    // An individual operation in a calculation
-	EqItem(){ num = UNSET;}
-	
-	EqItemType type;
-	unsigned int num;
-};
-
 struct Calculation {               // Stores a calculation (made up of operations)
 	vector <EqItem> item;            // Items used to make the calculation
 	EqItemType op;                   // The operator used in the calculation
@@ -1810,6 +1848,12 @@ struct Constant {                  // Stores all the constants in the model
 
 struct UpdatePrecalc {             // Stores information to generate precaculation for a proposal
 	vector <unsigned int> list_precalc; // Lists any precalculation which need to be done before parameter evaluated
+	vector <unsigned int> list_precalc_time; // Stores which times are affected by change
+};
+
+struct UpdatePrecalcTime {         // Stores information about 
+	vector <unsigned int> pv;        // The parameter vector elements
+	vector <unsigned int> list_precalc; // Lists precalculation which need to be done 
 	vector <unsigned int> list_precalc_time; // Stores which times are affected by change
 };
 

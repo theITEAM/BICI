@@ -28,7 +28,7 @@
 
 //  ./bici-core Execute/init.bici inf
 
-//valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici post-sim
+//valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici inf
 
 // nohup mpirun -n 16 ./bici-para Jamie/scen-1-1.bici inf > ddddd.txt&
 // 06d_New_Inf_500.bici
@@ -36,13 +36,16 @@
 // 06d_New_Inf_500.bici
 // ./bici-para Jamie/test.bici post-sim
 // ./bici-para Jamie/testped2.bici post-sim
-// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s  ./bici-para Execute/init.bici post-sim
+// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s  ./bici-para Execute/init.bici inf
+// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s  ./bici-para Execute/init.bici sim
+// ./bici-para Jamie/temp4/scen-4-11.bici inf
+// mpirun -n 10 ./bici-para Jamie/temp4/scen-4-11.bici inf
+//  valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Jamie/temp4/scen-4-11.bici inf
 
 // mpirun -n 4  ./bici-para Execute/init.bici inf
 
 // ssh gaia.bioss.ac.uk  ./bici-para Jamie/temp inf
 
-//  
 // tar -xzf foo.tgz
 
 // git clone https://github.com/theITEAM/BICI.git
@@ -63,6 +66,7 @@
 // 45541 lines of code (15/11/24)
 // 51000 lines of code (18/12/24)
 // 56000 lines of code (16/05/25)
+// 65634 lines of code (17/09/25)
 
 #include <iostream>
 #include <sstream>

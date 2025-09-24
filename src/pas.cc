@@ -76,6 +76,8 @@ void PAS::run()
 		for(auto &ch : chain){ ch.Lobs_av = 0; ch.nLobs_av = 0;}
 	 
 		for(auto s = 0u; s < gen_update; s++) {   // Updates mcmc
+			//if(op()) cout << s << endl; 
+			
 			for(auto &ch : chain){
 				ch.pas_burn_update(s,g,gen_update,phi);
 				ch.update(s);

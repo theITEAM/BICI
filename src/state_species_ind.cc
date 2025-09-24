@@ -16,8 +16,6 @@ using namespace std;
 /// Updates the individuals in the system (using a modified Gillespie algorithm)
 void StateSpecies::update_individual_based(unsigned int ti, const vector < vector <Poss> > &pop_ind, const vector < vector <double> > &popnum_t)
 {
-	auto dt = details.dt;
-
 	update_markov_eqn_value(ti,popnum_t);
 
 	sort_trig_event(ti);
@@ -67,7 +65,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 				{
 					IndInfFrom iif;
 					if(sp.comp_gl[trig.c].infected == true) iif.p = ENTER_INF;
-					add_event(ENTER_EV,i,UNSET,UNSET,UNSET,trig.c,t,iif);	
+					add_event(ENTER_EV,i,UNSET,UNSET,UNSET,trig.c,tf,iif);	
 					update_ind_c(i,tf,UNSET,popnum_t);
 				}
 				break;
@@ -356,7 +354,7 @@ void StateSpecies::update_ind_c(unsigned int i, double t, unsigned int cl_trans,
 						auto trig = get_nm_trig_event(t,i,c,cl,popnum_t);
 						
 						auto t = trig.tdiv;
-						if(t < details.T){
+						if(t < T){
 							IndTransRef itr; itr.i = trig.i; itr.index = UNSET; itr.tr_gl = trig.trg;	
 							if(allow_event(t,itr)){
 								insert_trigger_event(trig);
@@ -384,8 +382,6 @@ SimTrigEvent StateSpecies::get_nm_trig_event(double t, unsigned int i, unsigned 
 	auto e = ev.size()-1;
 	
 	auto t_begin = t;
-	
-	auto dt = details.dt;
 	
 	// If mid-way through NM trans then find origin (used for PPC)
 
@@ -644,11 +640,10 @@ void StateSpecies::update_markov_tree_rate(unsigned int e, double dif)
 void StateSpecies::insert_trigger_event(const SimTrigEvent &trig)
 {
 	auto t = trig.tdiv;
-	
-	if(t < details.T){
+		
+	if(t < T){
 		auto ti = get_ti(trig.tdiv);
 		if(ti >= trig_div.size()) emsg("nm out of range8");
-		
 		auto &ev = trig_div[ti].ev;
 		
 		if(ti_sort == ti){  // If adding to present time segment then must do it in an ordered way
@@ -793,7 +788,7 @@ void StateSpecies::sample_infecting_ind(unsigned int i, double t, unsigned int t
 		}
 		else{
 			auto pr = eq.pop_ref[j];
-			inf_from.p = pop[pr].sp_p;
+			inf_from.p = model.pop[pr].sp_p;
 			
 			auto pos = sample_possibility(pop_ind[pr]);		
 			inf_from.i = pos.i;
@@ -1061,8 +1056,8 @@ unsigned int StateSpecies::add_individual(IndType ind_type, string name)
 	
 	ind_sim_c.push_back(UNSET);
 
-	if(individual.size() > details.individual_max){
-		run_error("Maximum number of "+tstr(details.individual_max)+" individuals reached");
+	if(individual.size() > model.details.individual_max){
+		run_error("Maximum number of "+tstr(model.details.individual_max)+" individuals reached");
 	}
 	
 	return i;

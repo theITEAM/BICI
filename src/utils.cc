@@ -1267,6 +1267,32 @@ unsigned int add_to_vec(vector <ParamRef> &vec, unsigned int th, unsigned int in
 }
 
 
+/// Adds a value to a vector (if it doesn't already exist)
+unsigned int add_to_vec(vector <PopTransRef> &vec, unsigned int p, unsigned int tr)
+{
+	auto i = 0u; 
+	while(i < vec.size() && !(vec[i].p == p && vec[i].tr == tr)) i++;
+	if(i == vec.size()){
+		PopTransRef pref; pref.p = p; pref.tr = tr; 
+		vec.push_back(pref);
+	}	
+	return i;
+}
+
+
+/// Adds a value to a vector (if it doesn't already exist)
+unsigned int add_to_vec(vector <PopMarkovEqnRef> &vec, unsigned int p, unsigned int e)
+{
+	auto i = 0u; 
+	while(i < vec.size() && !(vec[i].p == p && vec[i].e == e)) i++;
+	if(i == vec.size()){
+		PopMarkovEqnRef pref; pref.p = p; pref.e = e; 
+		vec.push_back(pref);
+	}	
+	return i;
+}
+
+
 /// Prints a vector
 void print(string name, const vector <double> &vec)
 {
@@ -1556,6 +1582,8 @@ string get_affect_name(AffectType type)
 	case LIKE_OBS_POP_AFFECT: return "LIKE_OBS_POP_AFFECT";
 	case LIKE_OBS_POP_TRANS_AFFECT: return "LIKE_OBS_POP_TRANS_AFFECT";
 	case MARKOV_POP_AFFECT: return "MARKOV_POP_AFFECT";
+	case MARKOV_POP_NOPOP_AFFECT: return "MARKOV_POP_NOPOP_AFFECT";
+	case MARKOV_POP_LINEAR_AFFECT: return "MARKOV_POP_LINEAR_AFFECT";
 	case LIKE_IE_AFFECT: return "LIKE_IE_AFFECT";
 	case EXP_IE_AFFECT: return "EXP_IE_AFFECT";
 	case OMEGA_AFFECT: return "OMEGA_AFFECT";
@@ -1566,7 +1594,7 @@ string get_affect_name(AffectType type)
 	case EXP_FE_AFFECT: return "EXP_FE_AFFECT";
 	case INDFAC_INT_AFFECT: return "INDFAC_INT_AFFECT";
 	case DIV_VALUE_AFFECT: return "DIV_VALUE_AFFECT";
-	case DIV_VALUE_NONPOP_AFFECT: return "DIV_VALUE_NONPOP_AFFECT";
+	case DIV_VALUE_NOPOP_AFFECT: return "DIV_VALUE_NOPOP_AFFECT";
 	case DIV_VALUE_LINEAR_AFFECT: return "DIV_VALUE_LINEAR_AFFECT";
 	case MARKOV_LIKE_AFFECT: return "MARKOV_LIKE_AFFECT";
 	case NM_TRANS_AFFECT: return "NM_TRANS_AFFECT";
@@ -1590,10 +1618,10 @@ string get_affect_name(AffectType type)
 void param_vec_add_affect(vector <AffectLike> &vec, const AffectLike &al)
 {
 	switch(al.type){
-	case DIV_VALUE_AFFECT: case DIV_VALUE_NONPOP_AFFECT: 
+	case DIV_VALUE_AFFECT: case DIV_VALUE_NOPOP_AFFECT: 
 	case DIV_VALUE_LINEAR_AFFECT: 
 	case MARKOV_LIKE_AFFECT: case POP_AFFECT:
-	case MARKOV_POP_AFFECT:
+	case MARKOV_POP_AFFECT: case MARKOV_POP_NOPOP_AFFECT: case MARKOV_POP_LINEAR_AFFECT:
 	case LIKE_OBS_IND_AFFECT: case LIKE_OBS_POP_AFFECT:
 	case LIKE_OBS_POP_TRANS_AFFECT: case OBS_EQN_AFFECT:
 	case LIKE_UNOBS_TRANS_AFFECT:
@@ -1804,6 +1832,16 @@ vector <unsigned int> seq_vec(unsigned int N)
 {
 	vector <unsigned int> vec;
 	for(auto i = 0u; i < N; i++) vec.push_back(i);
+	
+	return vec;
+}
+
+
+/// Constructs a sequention vector, e.g. n1,2,3,...n2-1
+vector <unsigned int> seq_vec(unsigned int n1, unsigned int n2)
+{
+	vector <unsigned int> vec;
+	for(auto i = n1; i < n2; i++) vec.push_back(i);
 	
 	return vec;
 }

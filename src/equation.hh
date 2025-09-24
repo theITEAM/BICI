@@ -50,23 +50,15 @@ struct Linearise {                         // Information about linearising an e
 	
 	vector <Calculation> factor_calc;        // Quantities multiplied together for the factor 
 
-	EqItem no_pop_precalc;                   // Stores no precalc number for 
+	EqItem no_pop_precalc;                   // Stores no_pop precalc number 
 	
-	vector <EqItem> pop_grad_precalc;        // Stores no pop calculation
+	vector <EqItem> pop_grad_precalc;        // Stores calculation precalc for gradients
 	
 	EqItem factor_precalc;                   // Quantities multiplied together for the factor 
 	
 	bool no_pop_calc_time_dep;               // Determines if time dependent
 	bool factor_time_dep;                    // Set if the factor is time dependent
 	bool pop_grad_time_dep;                  // Set if population gradient is dependent
-	
-	/*
-	EqItem no_pop_calc;                      // The calculation not involving populations
-	
-	
-	vector <EqItem> factor;                  // Quantities multiplied together for the factor 
-	vector < vector <EqItem> > pop_grad_calc;// Quantities multiplied together for the population gradient
-	*/
 	
 	vector < vector <PopRefFromPo> > pop_ref_from_po; // Gets pop_ref from population	
 		
@@ -116,8 +108,6 @@ class Equation                             // Stores information about an equati
 		
 		unsigned int sp_p, sp_cl;              // Species number and classification (if appropriate)
 		
-		//unsigned int sp_c;                     // The compartment number (used for sum max function)
-
 		unsigned int ti_fix;                   // The fixed time point (e.g. for pop measurements)
 		
 		string warn;                           // Stores error warning message

@@ -1,50 +1,14 @@
-UPDATE TO BICI LANGUAGE
-To make things more consistent, I've changed the following
-"sim-param" -> "param-sim"
-"sim-state" -> "state-sim"
-"sim-warning" -> "warning-sim"
 
-"inf-param" -> "param-inf"
-"inf-param-stats" -> "param-stats-inf"
-"inf-diagnostics" -> "diagnostics-inf"
-"inf-state" -> "state-inf"
-"inf-warning" -> "warning-inf"
-"inf-generation" -> "generation-inf" 
-"trans-diag" -> "trans-diag-inf"
-
-"post-sim-param" -> "param-post-sim"
-"post-sim-state" -> "state-post-sim"
-"post-sim-warning" -> "warning-post-sim"
-
-Also when working with the multi-file version of BICI I've changed the output directory names
-"inf-output" -> "output-inf"
-"sim-output" -> "output-sim"
-"post-sim-output" -> "output-post-sim"
- 
-GRANT
-- The way splines work has been somewhat overhalled. Now there are four possibilities for splines: "Linear" - piecewise linear, "Square" - this keeps splines constant bewtween knot points (this is the one you need for the FMD model), "Cubic" - this fits a cubic spline to points, "Cubic +ve" - this fits a cubic spline to the log of points, so ensuring that the spline remains positive. 
-- I've made it so splines don't have to be defined just for the time-span under simulation/inference. This fits in with your idea of just generating warnings when things are outside of time ranges. This is much better I think, so thanks for that suggestion.
-- I've added the possibility for animations to be exported in '.mp4' format. ffmpeg is really good, so also thank you very much for that suggestion!
-- With regards to the slow outputting, I think I've got to the bottom of that. Basically the time it looks like it is "outputting" the outputting core is just waiting for the other cores to catch up. I've added some MPI schronisation between cores to avoid this problem.
-- One thing I noticed is that when you defined populations, you might write something like "{E}+{I}", which is indeed correct. Now it turns out that it is computationally more efficient to write "{E|I}". I've now added code to anyway combine them under the hood, so it doesn't matter whcih you use.
-- I've sorted out the bug with moving indivdual data type. 
-- I've sorted out the problem related to integrals not being evaluated correctly. 
-Actually the expression you have for calculating the estimated fraction of between farm transmission isn't quite right... You do it on a farm level r_l, but of course if a farm never experiences any force of infection this would be an undefined quantity. I think the way to do it is sum over all location l in the numerator and denominator giving a parameter r (which would then given a posterior distribution to show the uncertainty). The attached file gives an example (here I first derived r^bet and r^ext for the total integrated rate for between farms, and then define the ratio). It's just a very short run to see if the derived quantities are being calculated properly.
-
-
-JAMIE
-- I've change the code to better balance the time spent on different MCMC proposals (a lot of CPU time was being spend on one specific type of proposal which wasn't so efficient).
-- I've changes memory errors to just warnings. 
-- I've made the outputing procedure more memory efficient (remember this was causing it to run out of memory previously). 
-- Improved error message warning against move time data being before the enter time or after the leave time.
-- Speed up how individual effect likelihoods are calculated
 
 CHRIS
-- The big alteration related to how equations are calculated. In particular precalculation quantities which are shared across different equations has helped to speed up things under some circumstances.
-- Corrected title for population with data plot.
-- Got rid of error which caused "1." equation to not be valid.
-- Makes sure exits properly in MPI version with file not found.
-- Corrected bug such that error message appears on Windows version when a file can't be loaded.
-- Updated manual, especially for the description of splines, the updated BICI-script commands and description of exporting videos.
-- I've done some work to increase speed of integrals
-- When not running in local machine not the option is given to either save as a single file or as a file+data directory.
+- Transfered some of the ideas which helped speed up IBMs to PBMs (specificically parallelisation of calculations and using linearisation to estimate change in markov values)  
+- Improved speed of MBPs when equations can be put into the linear form.
+- Corrected a mistake for annealing under DA-MCMC
+- Section 4.3.3 has been added to the manual and this discusses things which determine running time.
+
+JAMIE
+- Correction of problem which gave the error "Markov equation has become negative". 
+- Added a line to the top of the BICI script to show which version processed it 
+
+GRANT
+- So reparameterisation of splines is now possible, provided the splines are square. This turned out to be rather tricky to implement... Basically there was a nice separation between parameters and the system state. But now the two are potentially related and this meant a lot of structural changes to BICI. So I think this can now be used to implement a cattle trading bTB model.

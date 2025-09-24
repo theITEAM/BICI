@@ -15,11 +15,12 @@ using namespace std;
 /// Initialises local_map (used for local proposals)
 void State::initialise_local_map()
 {
-	comp_local_map.resize(species.size());
-	pop_trans_map.resize(species.size());
-	pop_data_map.resize(species.size());
-	for(auto p = 0u; p < species.size(); p++){
+	comp_local_map.resize(model.species.size());
+	pop_trans_map.resize(model.species.size());
+	pop_data_map.resize(model.species.size());
+	for(auto p = 0u; p < model.species.size(); p++){
 		const auto &sp = model.species[p];
+	
 		comp_local_map[p].resize(sp.comp_gl.size(),UNSET);
 		pop_trans_map[p].resize(sp.pop_trans_data.size(),UNSET);
 		pop_data_map[p].resize(sp.pop_data.size(),UNSET);
@@ -33,9 +34,11 @@ bool LocalChange_ord (LocalChange lc1, LocalChange lc2)
 
 
 /// Calculates the likelihood change associated with a local change 
-Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_change, int dir, bool &ill)
+Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_change, bool &ill)
 {
 	Like like_ch;
+	
+	back_init();
 	
 	const auto &sp = model.species[p];
 	auto &ssp = species[p];
@@ -45,11 +48,10 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 	for(const auto &lc : local_change){
 		switch(lc.type){
 		case REMOVE_EVENT:
-			if(dir == 1){ if(ssp.trans_num[lc.tr][lc.ti] == 0){ ill = true; return like_ch;}}
+			if(ssp.trans_num[lc.tr][lc.ti] == 0){ ill = true; return like_ch;}
 			break;
 
 		case ADD_EVENT:
-			if(dir == -1){ if(ssp.trans_num[lc.tr][lc.ti] == 0){ ill = true; return like_ch;}}
 			break;
 		
 		default: break;
@@ -109,12 +111,12 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 		int sign = 0;
 		
 		switch(lc.type){
-		case ADD_EVENT: sign = dir; break;
-		case REMOVE_EVENT: sign = -dir; break;
-		case ADD_IC: sign = -dir; break;
-		case REMOVE_IC: sign = dir; break;
-		case ADD_C_IC: sign = dir; break;
-		case REMOVE_C_IC: sign = -dir; break;
+		case ADD_EVENT: sign = 1; break;
+		case REMOVE_EVENT: sign = -1; break;
+		case ADD_IC: sign = -1; break;
+		case REMOVE_IC: sign = 1; break;
+		case ADD_C_IC: sign = 1; break;
+		case REMOVE_C_IC: sign = -1; break;
 		}
 		
 		auto c_old = UNSET, c_new = UNSET;
@@ -166,9 +168,8 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 		for(auto c : cmap_list){
 			auto ma = cmap[c];
 			if(ma != 0){
+				ssp.cpop_st_update(ti,ti_next,c,ma);
 				for(auto tii = ti; tii < ti_next; tii++){
-					ssp.cpop_st[tii][c] += ma;
-					
 					double val;
 					for(auto ref : pop_data_ref[tii][c]){
 						const auto &pd = pop_data[ref];			
@@ -191,11 +192,17 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 		vector <PopChange> pop_change;
 		for(auto k : pop_list){
 			auto ma = pop_map[k];
-			const auto &po = model.pop[k];
+			//const auto &po = model.pop[k];
 			if(ma != 0){
+				back_pop.push_back(BackPop(POP_NUM_T,ti,ti_next,k,ma));
+
 				PopChange po_ch; po_ch.po = k; po_ch.num = ma; 
 				pop_change.push_back(po_ch);
-				
+
+				change_population(ti,ti_next,k,ma);
+				fl = true;
+
+				/*
 				for(auto tii = ti; tii < ti_next; tii++) popnum_t[tii][k] += ma;
 				fl = true;
 			
@@ -212,6 +219,16 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 						trans_list.push_back(mtf);
 					}
 				}
+				
+				if(model.contains_tvreparam){
+					for(auto su : po.spline_update){
+						if(spline_up_map[su] == false){
+							spline_up_map[su] = true;
+							spline_up_list.push_back(su);
+						}
+					}
+				}
+				*/
 			}
 		}		
 		
@@ -241,13 +258,15 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 			int sign = 0;
 			
 			switch(lc.type){
-			case ADD_EVENT: sign = dir; break;
-			case REMOVE_EVENT: sign = -dir; break;
+			case ADD_EVENT: sign = 1; break;
+			case REMOVE_EVENT: sign = -1; break;
 			case ADD_IC: case ADD_C_IC: case REMOVE_IC: case REMOVE_C_IC: emsg("Should not be here"); break;
 			}
 			like_ch.markov += ssp.Li_update_tn(tr,ti,sign);
 			
 			double val;
+			ssp.back.push_back(Back(POP_TRANS_DATA_TGL,ti,tr,sign));
+			
 			for(auto ref : pop_trans_ref[ti][tr]){
 				const auto &ptd = pop_trans_data[ref];
 			

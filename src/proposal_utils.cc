@@ -41,6 +41,8 @@ void Proposal::mbp_population_affect()
 			}
 		}
 	}
+	
+	set_mbp_fast();
 }
 
 
@@ -61,6 +63,7 @@ void Proposal::get_dependency()
 		
 		const auto &pv = model.param_vec[j];
 		const auto &par = model.param[pv.th];
+	
 		for(const auto &ch : par.get_child(pv.index)){
 			const auto &par_child = model.param[ch.th];
 			
@@ -121,14 +124,18 @@ void Proposal::get_affect_like()
 		
 	model.add_popnum_ind_w_affect(affect_like);
 
-	if(nonpop_speedup && type == PARAM_PROP){   
-		model.affect_nonpop_speedup(affect_like,dependent_update_precalc,update_precalc);
+	if(nopop_speedup && type == PARAM_PROP){   
+		model.affect_nopop_speedup(affect_like,dependent_update_precalc,update_precalc);
 	}
 	
 	model.order_affect(affect_like);
 	
 	if(linearise_speedup){
 		model.affect_linearise_speedup(affect_like);
+	}
+	
+	if(linearise_factor_nopop_speedup && type == PARAM_PROP){ 
+		model.set_factor_nopop_only(affect_like,dependent_update_precalc,update_precalc);
 	}
 	
 	model.order_affect(affect_like);
@@ -201,7 +208,7 @@ void Proposal::update_sampler(const CorMatrix &cor_matrix)
 }
 
 /// Samples from the covariance matrix
-bool Proposal::param_resample(PV &param_val)
+bool Proposal::param_resample(PV &param_val, const vector < vector <double> > &popnum_t)
 {
 	timer[PARAM_RESAMPLE_TIMER] -= clock();
 	
@@ -214,7 +221,6 @@ bool Proposal::param_resample(PV &param_val)
 		auto j = param_list[i];
 		param_val.value_change(j);
 		value[j] += si*vec[i];
-		//model.param_update_precalc(j,param_val,true);
 		
 		if(model.in_bounds(value[j],j,precalc) == false){
 			param_val.restore(); 
@@ -224,12 +230,14 @@ bool Proposal::param_resample(PV &param_val)
 		
 		model.param_update_precalc_after(j,param_val,true);
 	}	
-	
+
 	for(auto k = 0u; k < dependent.size(); k++){
 		auto j = dependent[k];
 
 		const auto &pv = model.param_vec[j];
-		auto ref = model.param[pv.th].get_eq_ref(pv.index);
+		const auto &par = model.param[pv.th]; 
+		
+		auto ref = par.get_eq_ref(pv.index);
 		if(ref == UNSET) emsg("Reparam is not set");	
 		
 		const auto &dup = dependent_update_precalc[k];
@@ -238,15 +246,21 @@ bool Proposal::param_resample(PV &param_val)
 		}
 		
 		//model.param_update_precalc(j,param_val,true);
+		
+		
 		param_val.value_change(j);
-		value[j] = model.eqn[ref].calculate_param(precalc);
+		if(pv.reparam_time_dep == false) value[j] = model.eqn[ref].calculate_param(precalc);
+		else{
+			auto ti = pv.reparam_spl_ti;
+			value[j] = model.eqn[ref].calculate(ti,popnum_t[ti],precalc);
+		}
 		
 		if(model.in_bounds(value[j],j,precalc) == false){
 			param_val.restore(); 
 			timer[PARAM_RESAMPLE_TIMER] += clock();
 			return false;
 		}
-		
+	
 		model.param_update_precalc_after(j,param_val,true);
 	}
 
@@ -691,6 +705,31 @@ void Proposal::ind_obs_prob_update(IndSimProb &isp) const
 }
 
 
+/// Sets quantities used to speed up MBPs
+void Proposal::set_mbp_fast()
+{
+	const auto &sp = model.species[p_prop];
+	
+	vector <LinearFormInit> lfinit;
+	
+	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+		const auto &tra = sp.tra_gl[tr];
+		auto e = tra.dist_param[0].eq_ref;
+		const auto &eq = model.eqn[e];
+		
+		if(eq.linearise.on && eq.linearise.pop_grad_time_dep == false){
+			LinearFormInit lfi; lfi.m = tr; lfi.e = e;
+			lfinit.push_back(lfi);
+		}
+		else{
+			mbp_fast.calc_tr.push_back(tr);
+		}
+	}
+	
+	model.set_linear_form(p_prop,mbp_fast.lin_form,lfinit);
+}
+
+
 /// Sets the proposal probability 
 double Proposal::set_prop_prob()
 {
@@ -769,7 +808,8 @@ double Proposal::set_prop_prob()
 	case TRANS_TREE_SWAP_INF_PROP: return 0.1;
 	case TRANS_TREE_MUT_PROP: return 0.1;
 	case TRANS_TREE_MUT_LOCAL_PROP: return 0.1;
-	case POP_SINGLE_LOCAL_PROP: return 0.2;
+	case POP_SINGLE_LOCAL_PROP: return 0.5;
+	case POP_ADD_REM_LOCAL_PROP: return 0.5;
 	default: break;
 	}
 	return 1;

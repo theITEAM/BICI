@@ -90,7 +90,7 @@ vector <unsigned int>  StateSpecies::update_ind(unsigned int i, vector <Event> &
 		
 		auto t_next = t_old; if(t_new < t_next) t_next = t_new;
 		
-		auto ti_next = get_ti_next(t_next,details);
+		auto ti_next = get_ti_next(t_next,model.details);
 	
 		while(k < popd.size() && popd[k].tdiv <= t_next){   // Accounts for population data
 			if(c_new != c_old) dLi_obs += update_pop_data(k,c_old,c_new);
@@ -500,8 +500,6 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee, const vector <
 	auto &ev = event[ee];
 	const auto &precalc = param_val.precalc;
 	
-	auto dt = details.dt;
-	
 	switch(ev.type){
 	case NM_TRANS_EV:
 		{
@@ -812,8 +810,7 @@ void StateSpecies::set_incomp_ref(unsigned int i, const vector < vector <double>
 	
 	auto el = ev.size()-1;
 	
-	double t_end = details.T;
-	auto dt = details.dt;
+	double t_end = T;
 	
 	// Finds a list of classification which need incomplete likelihoods
 	auto c_last = ev[el].c_after;
@@ -1186,8 +1183,6 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 {
 	if(type != INDIVIDUAL) emsg("must be ind");
 	
-	const auto dt = details.dt;
-	
 	const auto &me = sp.markov_eqn[ee];
 	auto &me_vari = markov_eqn_vari[ee];
 
@@ -1311,9 +1306,9 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 		}
 				
 		if(value < 0){
-			if(value > -VTINY) value = 0;
+			if(value > -SMALL) value = 0;
 			else{
-				emsg("Markov equation has become negative");
+				emsg("Markov equation has become negative2");
 			}
 		}
 	
@@ -1454,6 +1449,43 @@ void StateSpecies::restore_back()
 		for(int b = back.size()-1; b >= 0; b--){
 			const auto &ba = back[b];
 			switch(ba.type){
+			case LI_MARKOV_POP_SINGLE:
+				Li_markov_pop[ba.i][ba.index] = ba.value;
+				break;
+				
+			case TRANS_NUM:
+				trans_num[ba.i][ba.index] -= ba.value;
+				break;
+			
+			case CPOP_ST:
+				{
+					auto ti = ba.i, ti_next = ba.index;
+					unsigned int c = ba.value;
+					int ma = ba.vec[0];
+					for(auto tii = ti; tii < ti_next; tii++){
+						cpop_st[tii][c] -= ma;
+					}				
+				}
+				break;
+				
+			case TRANS_MEAN_ST:
+				{
+					auto &tnm = tnum_mean_st[ba.i];
+					auto ti = ba.index;
+					const auto &vec = ba.vec;
+					for(auto k = 0u; k < vec.size(); k++) tnm[ti+k] = vec[k];
+				}
+				break;
+			
+			case LI_MARKOV_POP:
+				{
+					auto &Li = Li_markov_pop[ba.i];
+					auto ti = ba.index;
+					const auto &vec = ba.vec;
+					for(auto k = 0u; k < vec.size(); k++) Li[ti+k] = vec[k];
+				}
+				break;
+				
 			case REMOVE_LI_MARKOV:
 				Li_markov[ba.i][ba.index] += ba.value;
 				break;
@@ -1474,6 +1506,20 @@ void StateSpecies::restore_back()
 				pop_data_cgl[ba.i][ba.index] -= ba.value;
 				break;
 				
+			case POP_TRANS_DATA_NUM_SINGLE:
+				pop_trans_data_num[ba.i] = ba.value;
+				break;
+				
+			case POP_TRANS_DATA_TGL:
+				{
+					auto ti = ba.i, tr = ba.index;
+					auto sign = ba.value;
+					for(auto ref : sp.pop_trans_ref[ti][tr]){
+						pop_trans_data_tgl[ref][tr] -= sign;
+					}
+				}
+				break;
+				
 			case POP_TRANS_DATA_NUM:
 				{
 					const auto &vec = ba.vec;
@@ -1485,6 +1531,10 @@ void StateSpecies::restore_back()
 						pop_trans_data_num[ref] -= vec[k]; k++;
 					}
 				}
+				break;
+			
+			case LI_OBS_POP_TRANS_SINGLE:
+				Li_obs_pop_trans[ba.i] = ba.value; 
 				break;
 				
 			case LI_OBS_POP_TRANS:

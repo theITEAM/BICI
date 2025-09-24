@@ -38,6 +38,7 @@ private:
 	vector <Proposal> proposal;            // Stores all the proposals
 
 	void update_init();
+	bool is_markov_pop(const AffectLike &al) const;
 	void add_parameter_prop(const vector <unsigned int> &vec);
 	void set_proposal_prob();
 	void check_join_proposal();

@@ -29,19 +29,25 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 	if(false){
 		cout << " change" << endl;	
 		ssp.print_event(ind.ev);
+		cout << "TO" << endl;
 		ssp.print_event(ev_ne);
 	}
 	
 	// Deals with event changes
 	Like like_ch;
 	
+
+	/*
 	const auto &ev = ind.ev;
-	if(ev[0].tdiv < 0 || ev[ev.size()-1].tdiv >= T){
-		if(ev[0].tdiv < 0) cout << ev[0].tdiv << "event before" << endl;
-		else cout << ev[ev.size()-1].tdiv << "event after" << endl;
-		like_ch.prior -= LARGE;
-		return like_ch;
+	if(ev.size() > 0){
+		if(ev[0].tdiv < 0 || ev[ev.size()-1].tdiv >= T){
+			if(ev[0].tdiv < 0) cout << ev[0].tdiv << "event before" << endl;
+			else cout << ev[ev.size()-1].tdiv << "event after" << endl;
+			like_ch.prior -= LARGE;
+			return like_ch;
+		}
 	}
+	*/
 	
 	vector <PopUpdate> pop_update;
 	
@@ -69,12 +75,14 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 			}
 		}
 	
+		auto fl = false;
+		
 		vector <PopChange> pop_change;
 		for(auto k : pop_list){
 			auto ma = pop_map[k];
-			const auto &po = model.pop[k];
-			
 			if(ma != 0){
+				const auto &po = model.pop[k];
+			
 				double num = ma; 
 				for(auto ie : po.ind_eff_mult) num *= ind.exp_ie[ie];
 				for(auto fe : po.fix_eff_mult) num *= ind.exp_fe[fe];
@@ -83,22 +91,9 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 
 				PopChange po_ch; po_ch.po = k; po_ch.num = num; 
 				pop_change.push_back(po_ch);
-				
-				for(auto tii = ti; tii < ti_next; tii++) popnum_t[tii][k] += num;
-				
-				for(const auto &mef : po.markov_eqn_ref){
-					if(markov_eqn_map[mef.p][mef.e] == false){
-						markov_eqn_map[mef.p][mef.e] = true;
-						markov_eqn_list.push_back(mef);
-					}
-				}
-				
-				for(const auto &mtf : po.trans_ref){
-					if(trans_map[mtf.p][mtf.tr] == false){
-						trans_map[mtf.p][mtf.tr] = true;
-						trans_list.push_back(mtf);
-					}
-				}
+
+				change_population(ti,ti_next,k,num);
+				fl = true;
 			}
 				
 			pop_map[k] = UNSET;
@@ -110,7 +105,7 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 			for(auto pc : pop_change) cout << pc.po << " " << pc.num << "pc" << endl; 
 		}
 		
-		update_pop_change(ti,ti_next,pop_change,like_ch.markov);
+		if(fl) update_pop_change(ti,ti_next,pop_change,like_ch.markov);
 	}
 
 	timer[IND_POP_UPDATE_TIMER] += clock();
@@ -120,11 +115,41 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 	
 	if(false) ssp.print_event("end",ind);
 	
-	
-	
 	timer[IND_TIMER] += clock();
 
 	return like_ch;
+}
+
+
+/// Changes a given population by a certain amount over a given time range
+void State::change_population(unsigned int ti, unsigned int ti_next, unsigned int k, double num)
+{
+	for(auto tii = ti; tii < ti_next; tii++) popnum_t[tii][k] += num;
+
+	const auto &po = model.pop[k];
+
+	for(const auto &mef : po.markov_eqn_ref){
+		if(markov_eqn_map[mef.p][mef.e] == false){
+			markov_eqn_map[mef.p][mef.e] = true;
+			markov_eqn_list.push_back(mef);
+		}
+	}
+
+	for(const auto &mtf : po.trans_ref){
+		if(trans_map[mtf.p][mtf.tr] == false){
+			trans_map[mtf.p][mtf.tr] = true;
+			trans_list.push_back(mtf);
+		}
+	}
+
+	if(model.contains_tvreparam){
+		for(auto su : po.spline_update){
+			if(spline_up_map[su] == false){
+				spline_up_map[su] = true;
+				spline_up_list.push_back(su);
+			}
+		}
+	}
 }
 
 
@@ -145,11 +170,50 @@ void State::update_pop_change(unsigned int ti, unsigned int ti_next, const vecto
 		auto pp = mtf.p, tr = mtf.tr;
 		if(model.species[pp].type != POPULATION) emsg("must be ind");
 		
-		species[pp].likelihood_pop_section(tr,ti,ti_next,popnum_t,like_ch);
+		species[pp].likelihood_pop_section(tr,ti,ti_next,popnum_t,pop_change,like_ch);
 		
 		trans_map[pp][tr] = false;
 	}
 	trans_list.clear();
+	
+	// Updates any splines (which depend on populations)
+	if(model.contains_tvreparam){
+		auto &value = param_val.value;
+		auto &precalc = param_val.precalc;
+	
+		for(auto spli : spline_up_list){
+			const auto &spl = model.spline[spli];
+			unsigned th_start;
+			if(ti == 0) th_start = spl.div[0].th1;
+			else th_start = spl.div[ti-1].th1+1;
+			for(auto th = th_start; th <= spl.div[ti_next-1].th1; th++){
+				const auto &pv = model.param_vec[th];
+				const auto &par = model.param[pv.th];
+				auto eq_ref = par.get_eq_ref(pv.index);
+			
+				auto ti = pv.reparam_spl_ti;
+				value[th] = model.eqn[eq_ref].calculate(ti,popnum_t[ti],precalc);
+				
+				const auto &pct = pv.list_precalc_time;
+				model.precalc_eqn.calculate(pv.list_precalc,pct,param_val,true);
+				
+				auto ti_start = pct[0];
+				auto ti_end = pct[pct.size()-1]+1;
+				
+				for(const auto &mer : spl.markov_eqn_ref){
+					species[mer.p].likelihood_ib_spline_section(mer.e,ti_start,ti_end,popnum_t,like_ch);
+				}
+				
+				for(const auto &trar : spl.trans_ref){	
+					species[trar.p].likelihood_pop_spline_section(trar.tr,ti_start,ti_end,popnum_t,like_ch);
+				}
+			}
+		
+			spline_up_map[spli] = false;
+		}
+	
+		spline_up_list.clear();
+	}
 }
 
 
@@ -166,6 +230,8 @@ void State::initialise_update_ind_maps()
 		case POPULATION: trans_map[p].resize(model.species[p].tra_gl.size(),false);
 		}
 	}
+	
+	spline_up_map.resize(model.spline.size(),false);
 }
 
 

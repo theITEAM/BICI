@@ -7,7 +7,8 @@ using namespace std;
 #include "struct.hh"
 #include "equation.hh"
 #include "precalc.hh"
-#include "state_species.hh"
+#include "species.hh"
+//#include "state_species.hh"
 #include "hash.hh"
 
 class Model                                // Stores information about the model
@@ -31,6 +32,11 @@ class Model                                // Stores information about the model
 		
 		vector <unsigned int> param_vec_prop;  // Vector of param_vec elements which undergo proposals
 		unsigned int nparam_vec_prop;          // Total number of parameters under proposal
+			
+		vector <unsigned int> param_vec_tvreparam;// Vector of tvreparam (needed for op of param w/o state)
+		unsigned int nparam_vec_tvreparam;     // Total number of tvreparam
+		
+		bool contains_tvreparam;               // Set if model contains some tvreparam
 		
 		vector <Population> pop;               // Stores information about populations of interest
 		
@@ -62,8 +68,8 @@ class Model                                // Stores information about the model
 		Precalc precalc_eqn;                   // The equation which precalculates quantities
 		vector <unsigned int> list_precalc;    // Stores list of i used in precalcultion
 		vector <unsigned int> list_precalc_derive; // Stores list for precalcultion of derived (for integrals)
-		vector < vector <unsigned int> > list_precalc_time; // Precalculation at different times
-		
+		vector <UpdatePrecalcTime> update_precalc_time; // Precalculation at different times
+	
 		vector <double> param_vec_ref;         // Stores where param are on precalc
 		vector <double> spline_ref;            // Stores where spline is on precalc
 	
@@ -71,6 +77,8 @@ class Model                                // Stores information about the model
 		void add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv = UNSET);
 		void param_val_init(PV &param_val) const;
 		PV param_sample() const;
+		void param_update_precalc_time(unsigned int ti, const vector <double> &popnum, PV &param_val, bool store) const;
+		void param_update_precalc_time_all(const vector < vector <double> > &popnum_t, PV &param_val, bool store) const;
 		void param_update_precalc_before(unsigned int th, PV &param_val, bool store) const;
 		void param_update_precalc_after(unsigned int th, PV &param_val, bool store) const;
 		PV post_param(const Sample &samp) const;
@@ -79,15 +87,12 @@ class Model                                // Stores information about the model
 		double recalculate_prior(unsigned int th, vector <double> &prior_prob, const PV &param_val, double &like_ch) const;
 		vector <double> spline_prior(const PV &param_val) const;
 		double recalculate_spline_prior(unsigned int s, vector <double> &spline_prior, PV &param_val, double &like_ch) const;
-		vector <double> calculate_popnum(vector <StateSpecies> &state_species) const;
-		vector < vector <double> > calculate_popnum_t(vector <StateSpecies> &state_species, unsigned int ti_end = UNSET) const;
-		vector <double> recalculate_population(vector < vector <double> > &popnum_t, const vector <unsigned int> &list, const vector <StateSpecies> &state_species) const;
-		void recalculate_population_restore(vector < vector <double> > &popnum_t, const vector <unsigned int> &list, const vector <double> &vec) const;
 		void create_species_simp();
 		void order_affect(vector <AffectLike> &vec) const;
-		bool div_value_nonpop_possible(const AffectLike &al) const;
 		void affect_linearise_speedup(vector <AffectLike> &vec) const;
-		void affect_nonpop_speedup(vector <AffectLike> &vec, const vector <UpdatePrecalc> &dependent_update_precalc, const vector <UpdatePrecalc> &update_precalc) const;
+		AffectMap get_affect_map(vector <AffectLike> &vec, const vector <UpdatePrecalc> &dependent_update_precalc, const vector <UpdatePrecalc> &update_precalc) const;
+		void affect_nopop_speedup(vector <AffectLike> &vec, const vector <UpdatePrecalc> &dependent_update_precalc, const vector <UpdatePrecalc> &update_precalc) const;
+		void set_factor_nopop_only(vector <AffectLike> &vec, const vector <UpdatePrecalc> &dependent_update_precalc, const vector <UpdatePrecalc> &update_precalc) const;
 		bool item_equal(const EqItem &it1, const EqItem &it2) const;
 		void add_iif_w_affect(vector <AffectLike> &vec) const;
 		void add_popnum_ind_w_affect(vector <AffectLike> &vec) const;
@@ -106,18 +111,21 @@ class Model                                // Stores information about the model
 		bool ie_cholesky_error(const PV &param_val) const;
 		void print_param(const PV &param_val) const;
 		vector <double> get_param_val_prop(const PV &param_val) const;
-		PV get_param_val(const vector <double> &param_val_prop) const;
+		vector <double> get_param_val_tvreparam(const PV &param_val) const;
+		void add_tvreparam(PV &param_val, const vector <double> &param_val_tvreparam) const;
+		PV get_param_val(const Particle &pa) const;
 		double calc_tdiv(double t) const; 
 		double calc_t(double tdiv) const;
 		void create_precalc_equation();
-		void set_list_precalc_time();
+		void set_update_precalc_time();
 		void create_precalc_derive();
 		void create_precalc_pop_grad();
 		void precalc_affect();
 		vector <unsigned int> get_last_spline() const;
 		void add_affect_like(unsigned int i, unsigned int i2, const vector <bool> &map_time, vector <bool> &map_PC, vector < vector <bool> > &map_me, ParamVecEle &pvec, const vector < vector <unsigned int> > &affect, const vector < vector <AffectME> > &affect_me);
 		bool in_bounds(double x, unsigned int j, const vector <double> &precalc) const;
-	
+		void set_linear_form(unsigned int p, LinearForm &lin_form, const vector <LinearFormInit> &lfinit) const;
+
 	private:
 		Hash hash_all_ind;                     // Stores individuals in a hash table
 		

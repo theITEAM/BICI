@@ -6,6 +6,7 @@ using namespace std;
 
 #include "struct.hh"
 #include "model.hh"
+#include "state_species.hh"
 
 class State                                // Stores information about the state
 {
@@ -73,7 +74,7 @@ class State                                // Stores information about the state
 		void back_init();
 		void restore_back();
 		vector <double> get_param_val_prop() const;
-		double get_trans_rate_est(unsigned int p, unsigned int tr, unsigned int ti) const;
+		vector <double> get_trans_rate_est_para(const vector <unsigned int> &list, unsigned int p, unsigned int tr) const;
 		vector < vector <double> > get_population_rates(unsigned int p) const;
 		void init_cor_matrix(); 
 	
@@ -82,11 +83,16 @@ class State                                // Stores information about the state
 		string compact_vector(const vector <double> &value) const;
 		void spline_init();
 		void print_cpop(unsigned int ti) const;	
+		vector <double> calculate_popnum() const;
+		vector < vector <double> > calculate_popnum_t(unsigned int ti_end = UNSET);
+		vector <double> recalculate_population(const vector <unsigned int> &list);
+		void recalculate_population_restore(vector < vector <double> > &popnum_t, const vector <unsigned int> &list, const vector <double> &vec) const;
 		
 	// In state_update_ind.cc
 	public:
 		void update_markov_eqn_value(MarkovEqnDiv &div, double value, double &Li_markov, double &like_ch);
 		Like update_ind(unsigned int p, unsigned int i, vector <Event> &ev_new, UpdateType type);
+		void change_population(unsigned int ti, unsigned int ti_next, unsigned int k, double num);
 		void update_pop_change(unsigned int ti, unsigned int ti_next, const vector <PopChange> &pop_change, double &like_ch);
 		void update_ie_population(unsigned int p, unsigned int i, unsigned int ie, double factor, double &like_ch);
 		void update_ie_trans_tree(unsigned int p, unsigned int i, unsigned int ie, double ratio, double &like_ch);
@@ -100,6 +106,8 @@ class State                                // Stores information about the state
 		vector <PopMarkovEqnRef> markov_eqn_list;
 		vector < vector <bool> > trans_map; 
 		vector <PopTransRef> trans_list;
+		vector <bool> spline_up_map; 
+		vector <unsigned int> spline_up_list;
 		
 	// In state_genetic.cc
 	public:	
@@ -161,7 +169,7 @@ class State                                // Stores information about the state
 		 
 	// In state_local.cc
 	public:
-		Like calculate_local_change(unsigned int p, vector <LocalChange> &local_change, int dir, bool &ill);
+		Like calculate_local_change(unsigned int p, vector <LocalChange> &local_change, bool &ill);
 	
 	private:
 		void initialise_local_map(); 
@@ -185,6 +193,7 @@ class State                                // Stores information about the state
 		void check_popnum_t2(string ref);
 		void check_precalc_eqn(string ref);
 		void check_neg_rate(string name);
+		void check_markov_value_dif();
 		void add_alg_warn(string te);
 		void check_markov_div_value(unsigned int p, string ref);
 		

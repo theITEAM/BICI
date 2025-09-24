@@ -1547,6 +1547,10 @@ function view_warning(i)
 		press_button_prop("ModelParamContent","ReparamElement",["name"],warn.name);
 		break;
 	
+	case "ReparamSquareSpline":
+		change_page({pa:"Model", su:"Parameters"});
+		break;
+		
 	case "SimPopulationProb":
 		change_page({pa:"Simulation", su:"Initial Conditions", susu:warn.p});
 		break;

@@ -503,6 +503,7 @@ void Equation::print_item(const EqItem &it) const
 		break;
 			
 	case POPNUM: 
+		//cout << "P" << it.num;
 		cout << "'" << pop[it.num].name << "'";
 		break;
 

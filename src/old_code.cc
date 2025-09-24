@@ -1,3 +1,12 @@
+for(auto ti = 0u; ti < T; ti++){
+						for(auto c = 0u; c < ssp.cpop_st[ti].size(); c++){
+							if(cpop_st_st[ti][c] != ssp.cpop_st[ti][c]){
+								cout << ti << " " << c << " dif";
+							}
+						}
+					}
+					
+					
 	const auto &par = param[pv.th];
 			switch(par.variety){
 			case CONST_PARAM:

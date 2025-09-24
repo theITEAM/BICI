@@ -735,6 +735,12 @@ function output_param(par,save_type,file_list,one_file)
 	let te = "";
 	let dist_done = false;
 	
+	if(par.time_dep){
+		if(par.spline.spline_radio.value != "Square"){
+			//add_warning({mess:"Reparameterised spline", mess2:"A square spline must be used for time-varying reparameterised parameter '"+par.full_name+"'.", warn_type:"ReparamSquareSpline", name:par.name});
+		}
+	}
+				
 	if(par.type != "derive_param"){	 
 		let num_warn = model.warn.length;
 	
@@ -1461,7 +1467,7 @@ function create_output_siminf(save_type)
 						break;
 						
 					case "power":
-						te += ' power="' +details.anneal_rate+'"';
+						te += ' power="' +details.anneal_power+'"';
 						break;
 					}
 				}

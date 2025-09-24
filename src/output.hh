@@ -54,7 +54,7 @@ class Output                               // Stores information about the data
 		void final_memory_usage() const;
 	
 	private:
-		vector < vector <double> > param_value_from_vec(const vector <double> &param_val_prop) const;
+		vector < vector <double> > param_value_from_vec(const Particle &pa) const;
 		void infection_info(const IndInfFrom &iif, unsigned int p, const Particle &part, stringstream &ss) const;
 		string generate_state_head(const vector <string> &ind_key) const;
 		string output_param(const vector < vector <double> > &value) const;

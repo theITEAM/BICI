@@ -1864,6 +1864,12 @@ function inference_command()
 		break;
 	}
 	
+	if(make_one_chain){
+		details.algorithm.value = "DA-MCMC";
+		details.nchain = 1;
+		details.sample = 1000;
+	}
+	
 	details.burnin_frac = BURNIN_FRAC_DEFAULT;
 	details.anneal_type = {te:ANNEAL_DEFAULT};
 	details.anneal_rate = ANNEAL_RATE_DEFAULT;

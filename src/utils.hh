@@ -87,6 +87,8 @@ string swap_index_temp(const vector <DepConv> &dep_conv, const SwapResult &temp)
 ParamProp get_param_prop(string st);
 unsigned int add_to_vec(vector <unsigned int> &vec, unsigned int val);
 unsigned int add_to_vec(vector <ParamRef> &vec, unsigned int th, unsigned int index);
+unsigned int add_to_vec(vector <PopTransRef> &vec, unsigned int p, unsigned int tr);
+unsigned int add_to_vec(vector <PopMarkovEqnRef> &vec, unsigned int p, unsigned int e);
 void print(string name, const vector <double> &vec);
 unsigned int get_core();
 void print_diag(string te);
@@ -128,6 +130,7 @@ unsigned int core();
 unsigned int num_core();
 bool op();
 vector <unsigned int> seq_vec(unsigned int N);
+vector <unsigned int> seq_vec(unsigned int n1, unsigned int n2);
 vector <bool> true_vec(unsigned int N);
 string get_affect_name(AffectType type);
 Prior convert_text_to_prior(string te, unsigned int line_num, string in, bool dist);

@@ -701,7 +701,7 @@ vector <bool> Input::set_eqn_zero(const vector <EquationInfo> &eq_info)
 void Input::add_parent_child(const EquationInfo eqi, unsigned int i, unsigned int th, Hash &hash)
 {
 	ParamRef parref; parref.th = th; parref.index = i;
-					
+				
 	auto &par = model.param[th];
 	
 	auto ref = eqi.eq_ref;
@@ -804,17 +804,29 @@ void Input::create_markov_eqn_pop_ref()
 		switch(sp.type){
 		case INDIVIDUAL:
 			{
-				
 				for(auto e = 0u; e < sp.markov_eqn.size(); e++){
 					auto eq = sp.markov_eqn[e].eqn_ref;
 					if(eq == UNSET) emsg_input("Problem with ME");
 				
-					for(auto k : model.eqn[eq].pop_ref){
+					const auto &eqn = model.eqn[eq];
+					
+					for(auto k : eqn.pop_ref){
 						PopMarkovEqnRef mer; mer.p = p; mer.e = e;
 						model.pop[k].markov_eqn_ref.push_back(mer);
 					}
+					
+					for(const auto &pr : eqn.param_ref){
+						const auto &par = model.param[pr.th];
+						if(par.variety == REPARAM_PARAM && par.time_dep){
+							auto k = par.get_param_vec(pr.index);
+							const auto &pv = model.param_vec[k];
+							if(pv.reparam_time_dep){
+								auto sp = pv.spline_ref;
+								add_to_vec(model.spline[sp].markov_eqn_ref,p,e);
+							}
+						}
+					}
 				}
-				
 			}
 			break;
 			
@@ -829,16 +841,56 @@ void Input::create_markov_eqn_pop_ref()
 					if(tra.bp.eq_ref != UNSET) list.push_back(tra.bp.eq_ref);
 					
 					for(auto eq : list){
-						for(auto k : model.eqn[eq].pop_ref){
+						const auto &eqn  = model.eqn[eq];
+						for(auto k : eqn.pop_ref){
 							PopTransRef mtr; mtr.p = p; mtr.tr = tr;
 							model.pop[k].trans_ref.push_back(mtr);
+						}
+						
+						for(const auto &pr : eqn.param_ref){
+							const auto &par = model.param[pr.th];
+							if(par.variety == REPARAM_PARAM && par.time_dep){
+								auto k = par.get_param_vec(pr.index);
+								const auto &pv = model.param_vec[k];
+								if(pv.reparam_time_dep){
+									auto sp = pv.spline_ref;
+									add_to_vec(model.spline[sp].trans_ref,p,tr);
+								}
+							}
 						}
 					}
 				}
 			}
 			break;
 		}
-	}		
+	}
+	
+	for(const auto &pv : model.param_vec){
+		if(pv.reparam_time_dep){
+			const auto &par = model.param[pv.th];
+			auto eq_ref = par.get_eq_ref(pv.index);
+			if(eq_ref == UNSET) emsg("eq_ref should be set");
+
+			auto sp = pv.spline_ref;
+
+			const auto &eq = model.eqn[eq_ref];
+			for(auto po : eq.pop_ref){
+				auto &pop = model.pop[po];
+				add_to_vec(pop.spline_update,sp);	
+			}
+		}
+	}
+	
+	if(false){
+		for(auto &po : model.pop){
+			cout << po.name << ": ";
+			for(auto su : po.spline_update){
+				cout << model.spline[su].name << ",";
+			}
+			cout << endl;
+		}
+	}
+	//emsg("YY");
 }
 
 
@@ -1637,6 +1689,9 @@ void Input::create_spline()
 					}
 				}
 				
+				for(auto th : spl.param_ref){
+					model.param_vec[th].spline_ref = model.spline.size();
+				}
 				model.spline.push_back(spl);
  			}
 		}			
@@ -4391,11 +4446,30 @@ void Input::set_param_use()
 	for(auto &eq : model.eqn){
 		for(auto &ca : eq.calcu){
 			for(auto &it : ca.item){
-				if(it.type == PARAMETER){
-					const auto &pr = eq.param_ref[it.num]; 
-					if(pr.th >= model.param.size()) emsg_input("Out of range1");
-					if(pr.index >= model.param[pr.th].N) emsg_input("Out of range2");
-					model.param[pr.th].set_used(pr.index);
+				switch(it.type){
+				case PARAMETER:
+					{
+						const auto &pr = eq.param_ref[it.num]; 
+						if(pr.th >= model.param.size()) emsg_input("Out of range1");
+						if(pr.index >= model.param[pr.th].N) emsg_input("Out of range2");
+						model.param[pr.th].set_used(pr.index);
+					}
+					break;
+					
+				case SPLINE:
+					{
+						const auto &pr = eq.param_ref[it.num]; 
+						if(pr.th >= model.param.size()) emsg_input("Out of range1");
+						if(pr.index >= model.param[pr.th].N) emsg_input("Out of range2");
+						auto &par = model.param[pr.th]; 
+						const auto &spl = par.spline_info;
+						if(!spl.on) emsg("SHould be a spline");
+						auto num = spl.knot_tdiv.size();
+						for(auto k = pr.index; k < pr.index+num; k++) par.set_used(k);
+					}
+					break;
+					
+				default: break;
 				}
 			}
 		}

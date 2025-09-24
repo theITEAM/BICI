@@ -23,7 +23,7 @@ void Equation::calculate_linearise()
 	auto C = calcu.size();
 
 	auto pl = false;
-	
+
 	if(pl){
 		cout << endl << endl << "START" << endl;
 		print_calculation();
@@ -207,6 +207,9 @@ void Equation::calculate_linearise()
 		emsg_input("Population number does not agree");
 	}
 	
+	simplify(linearise.no_pop_calc_store);
+	for(auto &ca : linearise.pop_grad_calc_store) simplify(ca);
+		
 	if(false){
 		print_calculation();
 		cout << endl << "AFTER LINEARISE" << endl;
@@ -936,9 +939,7 @@ void Equation::get_pop_grad_calc_factorise()
 
 /// References precalculation in linearisation
 void Equation::set_precalc()
-{
-	//print_calculation();
-	
+{	
 	linearise.no_pop_precalc = get_precalc(linearise.no_pop_calc_store);
 	
 	for(auto i = 0u; i < linearise.pop_grad_calc_store.size(); i++){
@@ -955,13 +956,15 @@ void Equation::set_precalc()
 	linearise.factor_time_dep = it_time_dep(linearise.factor_precalc);
 	linearise.no_pop_calc_time_dep = it_time_dep(linearise.no_pop_precalc);
 		
-	/*
-	cout << "no_pop"; print_item(linearise.no_pop_precalc); cout << endl;
-	cout << "factor"; print_item(linearise.factor_precalc); cout << endl;
-	for(const auto &it : linearise.pop_grad_precalc){
-		cout << "grad"; print_item(it); cout << endl;
+	if(false){
+		cout << "LINEARISATION" << endl;
+		print_calculation();
+		cout << "no_pop: "; print_item(linearise.no_pop_precalc); cout << endl;
+		cout << "factor: "; print_item(linearise.factor_precalc); cout << endl;
+		for(const auto &it : linearise.pop_grad_precalc){
+			cout << "grad: "; print_item(it); cout << endl;
+		}
 	}
-	*/
 	
 	// Deletes calculations as they are no longer required
 	linearise.no_pop_calc_store.clear();

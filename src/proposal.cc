@@ -721,7 +721,7 @@ string Proposal::print_info() const
 	if(1 == 0) cout << "Affect like output is turned off in code" << endl;		
 	else{
 		auto imax = affect_like.size(); 
-		//if(imax > 10) imax  = 10; zzz
+		if(imax > 5) imax  = 5; 
 		for(auto i = 0u; i < imax; i++){
 			const auto &al = affect_like[i];
 			ss << output.print_affect_like(al) << endl;
@@ -729,7 +729,7 @@ string Proposal::print_info() const
 		if(imax < affect_like.size()) ss << "...+ more" << endl;
 	}
 	
-	if(false) ss << "Precalc output turned off in code" << endl;
+	if(true) ss << "Precalc output turned off in code" << endl;
 	else{
 		if(param_list.size() > 0){
 			ss << "Precalc dependent: ";
@@ -763,14 +763,14 @@ string Proposal::print_info() const
 
 /// Performs a Metropolis-Hastings proposal update
 void Proposal::MH(State &state)
-{
+{	
 	auto pl = false;
 	
 	auto &param_val = state.param_val;
 
 	ntr++; 
 	
-	if(param_resample(param_val) == false){
+	if(param_resample(param_val,state.popnum_t) == false){
 		update_si(-0.005);
 		return;
 	}
@@ -808,7 +808,6 @@ void Proposal::mbp(State &state)
 {
 	auto pl = false;
 	
-	auto param_store = state.param_val;
 	InitCondValue init_cond_store;
 	
 	auto &ssp = state.species[p_prop];
@@ -820,7 +819,7 @@ void Proposal::mbp(State &state)
 	auto sim_prob = 0.0;
 	switch(type){
 	case MBP_PROP: 
-		if(param_resample(state.param_val) == false){ 
+		if(param_resample(state.param_val,state.popnum_t) == false){ 
 			update_si(-0.005);
 			return;
 		}
@@ -860,7 +859,7 @@ void Proposal::mbp(State &state)
 	auto tnum_mean_st_st = ssp.tnum_mean_st;
 	auto cpop_st_st = ssp.cpop_st;
 	
-	ssp.mbp(sim_prob,state.popnum_t);
+	ssp.mbp(sim_prob,state.popnum_t,mbp_fast);
 
 	auto like_ch = state.update_param(affect_like);
 	
@@ -880,14 +879,12 @@ void Proposal::mbp(State &state)
 		}
 		
 		state.accept(like_ch);
-		ssp.mbp_accept(state.like.markov,state.popnum_t);
-	
+		ssp.mbp_accept(state.like.markov);
 		update_si(0.005); 
 		if(si > 1 && (type == MBPII_PROP || type == MBP_IC_RESAMP_PROP)) si = 1;
 	}
 	else{ 
 		if(pl) cout << "reject" << endl;
-		state.param_val = param_store;
 		state.popnum_t = popnum_t_st;
 		ssp.trans_num = trans_num_st;
 		ssp.tnum_mean_st = tnum_mean_st_st;
@@ -1345,7 +1342,6 @@ void Proposal::MH_ind_local(State &state)
 			const auto &lich = licha[index];
 			
 			vector <Event> ev_new;
-			//if(lich.i == 23) pl = true; else pl = false;
 			
 			if(pl){
 				ssp.print_local_ind_change(lich);
@@ -1840,8 +1836,9 @@ void Proposal::resimulate_ind_unobs(State &state)
 	
 	const auto &so_samp = ssp.source_sampler;
 	
+	auto ic_type = sp.init_cond.type;
 	auto copy_init = false;
-	if(sp.init_cond.type != INIT_POP_DIST && sp.contains_source == false) copy_init = true;
+	if(ic_type != INIT_POP_DIST && sp.contains_source == false) copy_init = true;
 	
 	vector <TrigEventRef> ste;
 	
@@ -1855,8 +1852,11 @@ void Proposal::resimulate_ind_unobs(State &state)
 		
 		auto probif = 0.0, probfi = 0.0;
 	
+		auto copy = copy_init;
+		//if(ic_type == INIT_POP_FIXED && ind.ev[0].tdiv == 0) copy = true;
+		
 		Event e_init;
-		if(copy_init == true) e_init = ind.ev[0]; 
+		if(copy == true) e_init = ind.ev[0]; 
 		else e_init = so_samp.sample(probif);
 		auto ev_new = ind_ev_samp.simulate_events(i,e_init,probif,ste);
 		
@@ -1865,7 +1865,7 @@ void Proposal::resimulate_ind_unobs(State &state)
 		else{
 			if(testing == true){                         // Diagnostic
 				auto prob = ind_ev_samp.simulate_events_prob(i,ev_new,ste);
-				if(copy_init == false) prob += so_samp.sample_prob(e_init);
+				if(copy == false) prob += so_samp.sample_prob(e_init);
 				if(dif(probif,prob,THRESH_EXPAND*DIF_THRESH)){
 					state.add_alg_warn("sampler different5");
 				}
@@ -1890,7 +1890,7 @@ void Proposal::resimulate_ind_unobs(State &state)
 				probif += ssp.nm_obs_dprob(ind);
 			
 				probfi += ind_ev_samp.simulate_events_prob(i,ev_store,ste);
-				if(copy_init == false) probfi += so_samp.sample_prob(ev_store[0]);
+				if(copy == false) probfi += so_samp.sample_prob(ev_store[0]);
 			
 				auto dprob = probfi-probif;
 				gc.update_like_ch(like_ch,dprob);
@@ -2064,7 +2064,7 @@ void Proposal::add_rem_ind(State &state)
 						}
 					
 						const auto &e_init = ev_store[0];
-						if(so_samp.enter_frac == 0 && e_init.type == ENTER_EV) emsg("prob samp");
+						if(so_samp.enter_frac == 0 && e_init.type == ENTER_EV) emsg("prob sampA");
 						if(so_samp.enter_frac == 1 && e_init.type != ENTER_EV) emsg("prob samp2");
 							
 						probfi += ssp.nm_obs_dprob(ssp.individual[i]);
@@ -2243,7 +2243,7 @@ void Proposal::add_rem_tt_ind(State &state)
 					if(gc.type == GENCHA_FAIL) nfa++;
 					else{	
 						const auto &e_init = ev_store[0];
-						if(so_samp.enter_frac == 0 && e_init.type == ENTER_EV) emsg("prob samp");
+						if(so_samp.enter_frac == 0 && e_init.type == ENTER_EV) emsg("prob sampB");
 						if(so_samp.enter_frac == 1 && e_init.type != ENTER_EV) emsg("prob samp2");
 							
 						probfi += ssp.nm_obs_dprob(ssp.individual[i]);
@@ -2420,7 +2420,7 @@ void Proposal::MH_ie_var(State &state)
 	auto th = param_list[0];
 	auto val_st = value[th];
 	
-	if(param_resample(param_val) == false){
+	if(param_resample(param_val,state.popnum_t) == false){
 		update_si(-0.005);
 		return;
 	}
@@ -2464,7 +2464,7 @@ void Proposal::MH_ie_var_cv(State &state)
 	
 	auto val_st = value[th];
 	
-	if(param_resample(param_val)){
+	if(param_resample(param_val,state.popnum_t)){
 		update_si(-0.005);
 		return;
 	}
@@ -2513,7 +2513,7 @@ void Proposal::MH_ie_covar(State &state)
 	
 	auto val_st = value[th];
 	
-	if(param_resample(param_val) == false){
+	if(param_resample(param_val,state.popnum_t) == false){
 		update_si(-0.005);
 		return;
 	}
@@ -2614,7 +2614,7 @@ void Proposal::param_event_joint(Direction dir, State &state)
 	
 	auto val_st = value[th];
 	
-	if(param_resample(param_val) == false){
+	if(param_resample(param_val,state.popnum_t) == false){
 		nfa++;
 		update_si(-0.005);
 		return;
@@ -2875,6 +2875,9 @@ string Proposal::diagnostics(double total_time) const
 	stringstream ss;
 	
 	if(!on) ss << "<Switched off>" << endl;
+	
+	ss << "Prob: " << prop_prob << "  ";
+	
 	switch(type){
 	case TRANS_TREE_PROP:
 		{
