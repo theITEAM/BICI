@@ -1,14 +1,21 @@
 
 
 CHRIS
-- Transfered some of the ideas which helped speed up IBMs to PBMs (specificically parallelisation of calculations and using linearisation to estimate change in markov values)  
-- Improved speed of MBPs when equations can be put into the linear form.
-- Corrected a mistake for annealing under DA-MCMC
-- Section 4.3.3 has been added to the manual and this discusses things which determine running time.
+- Implementation of Jeffreys priors in models.
+- Changes all the examples to use Jeffreys priors.
+- Three new prior types have been added "inverse", "power", "mvn-jeffreys" and "mvn-uniform".
+- Appendix F has been added which gives a full description of Jeffreys priors. I've dervied the Jeffreys priors for all the distributions used in BICI. Also I've verified these expressions by comparison with numerical integration. 
+- An example F4 had now been added to illustrate "factors". There are parameters which can depend on a classification, but are constrained to have a mean of one.
+- Section 2.2.9 has been added to the manual to explain parameter factors.
+- Allow for matrix representation in output files. This is somewhat more concise for square matrices and is more logical for covarinace matrices.
+- In interface, now scrolls to error in script when found.
+- Error now appears when trying and failing to load comp-all.
+- Corrected problem with spline when starting time is not zero.
+- Updated all the examples in BICI to use Jeffreys priors.
+
+
 
 JAMIE
-- Correction of problem which gave the error "Markov equation has become negative". 
-- Added a line to the top of the BICI script to show which version processed it 
 
 GRANT
-- So reparameterisation of splines is now possible, provided the splines are square. This turned out to be rather tricky to implement... Basically there was a nice separation between parameters and the system state. But now the two are potentially related and this meant a lot of structural changes to BICI. So I think this can now be used to implement a cattle trading bTB model.
+

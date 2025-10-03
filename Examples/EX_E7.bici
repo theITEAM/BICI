@@ -37,22 +37,22 @@ trans name="I->D" value="gamma(mean:m^D, cv:c^D)" bp="b×[g]"
 
 # INDIVIDUAL EFFECTS
 
-ind-effect name="g" ind-list="ind-list-g.csv" A-sparse="A-matrix-g.csv"
+ind-effect name="var" ie="g" ind-list="ind-list-.csv" A-sparse="A-matrix-.csv"
 
 # SIMULATION INITIAL CONDITIONS
 
-add-ind-sim file="add-ind-sim.csv"
+add-ind-sim name="Added individuals" file="add-ind-sim.csv"
 
 
 # INFERENCE DATA
 
-add-ind-inf file="add-ind.csv"
+add-ind-inf name="Added individuals" file="add-ind-inf.csv"
 
 trans-data name="Infections" trans="S->I" obsrange="all" file="trans-data.csv"
 
-trans-data name="Recoveries" trans="I->R" obsrange="all" file="trans-data-2.csv"
+trans-data name="Recovery" trans="I->R" obsrange="all" file="trans-data-2.csv"
 
-trans-data name="Deaths" trans="I->D" obsrange="all" file="trans-data-3.csv"
+trans-data name="Death" trans="I->D" obsrange="all" file="trans-data-3.csv"
 
 
 
@@ -60,17 +60,17 @@ trans-data name="Deaths" trans="I->D" obsrange="all" file="trans-data-3.csv"
 
 param name="b" value="0.3" prior="uniform(0,1)"
 
-param name="c^D" value="0.5" prior="uniform(0,1)"
+param name="c^D" value="0.5" prior="power(0.01,1,-2)"
 
-param name="c^R" value="0.3" prior="uniform(0,1)"
+param name="c^R" value="0.3" prior="power(0.01,1,-2)"
 
-param name="m^D" value="20" prior="uniform(0,30)"
+param name="m^D" value="20" prior="inverse(1,30)"
 
-param name="m^R" value="10" prior="uniform(0,30)"
+param name="m^R" value="10" prior="inverse(1,30)"
 
-param name="β" value="0.0005" prior="uniform(0,0.1)"
+param name="β" value="0.0005" prior="inverse(0.0001,0.01)"
 
-param name="Ω^g,g" value="1.5" prior="uniform(0,3)"
+param name="Ω^var" value="1.5" prior="mvn-jeffreys(0.01,4)"
 
 
 

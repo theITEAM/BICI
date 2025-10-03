@@ -9,7 +9,6 @@
 #include <algorithm> 
 #include <iomanip>
  
- 
 using namespace std;
 
 #include "output.hh"
@@ -125,7 +124,7 @@ void Output::ensure_directory(const string &path) const
 #endif
 		
 		if(ret == -1){
-			emsg("Error creating the directory '"+path+"'");
+			run_error("Error creating the directory '"+path+"'");
 		}
 	}
 }
@@ -134,7 +133,7 @@ void Output::ensure_directory(const string &path) const
 /// Checks that the file has been successfully open
 void Output::check_open(ofstream &fout, string file) const 
 {
-	if(!fout) emsg("Could not write to file '"+file+"'");
+	if(!fout) run_error("Could not write to file '"+file+"'");
 }
 
 
@@ -383,10 +382,10 @@ void Output::summary(const Model &model) const
 			fout << endl;
 			fout << "Omega:" << endl;
 			auto N = ieg.list.size();
+			const auto &par = model.param[ieg.th];
 			for(auto j = 0u; j < N; j++){
 				for(auto i = 0u; i < N; i++){
-					auto &par = model.param[ieg.omega[j][i]];
-					fout <<par.name << "  ";
+					fout << par.name << "_" << ieg.list[j].name << "," << ieg.list[i].name << "  ";
 				}
 				fout << endl;
 			}
@@ -762,6 +761,13 @@ string Output::print_affect_like(const AffectLike &al) const
 	case SPLINE_PRIOR_AFFECT:
 		{
 			ss << "AFFECT Spline Prior affect " << model.spline[al.num].name << endl;	
+		}
+		break;
+		
+	case IEG_PRIOR_AFFECT:
+		{
+			const auto &iegr = model.ieg_ref[al.num];
+			ss << "AFFECT IEG Prior affect " << model.species[iegr.p].ind_eff_group[iegr.i].name << endl;	
 		}
 		break;
 		
@@ -1173,15 +1179,33 @@ string Output::trace_init() const
 				ss << ",\"" << pn << "\"";
 			}
 			else{
-				for(auto j = 0u; j < par.N; j++){
-					ss << ",\"" << pn << "_";
-					for(auto k = 0u; k < par.dep.size(); k++){
-						const auto &dp = par.dep[k];
-						auto m = (unsigned int)(j/dp.mult)%dp.list.size();
-						if(k != 0) ss << ",";
-						ss << dp.list[m];
+				if(model.is_symmetric(par)){  // Outputs covariance matrix
+					auto L = par.dep[0].list.size();
+					for(auto j = 0u; j < L; j++){  // Diagonal elements
+						ss << ",\"" << pn << "_";
+						ss << par.dep[0].list[j] << "," << par.dep[0].list[j];
+						ss << "\"";
 					}
-					ss << "\"";
+					
+					for(auto j = 0u; j < L; j++){  // Off-diagonal elements
+						for(auto i = j+1; i < L; i++){	
+							ss << ",\"" << model.exchange_omega(pn) << "_";
+							ss << par.dep[0].list[j] << "," << par.dep[0].list[i];
+							ss << "\"";
+						}
+					}
+				}
+				else{
+					for(auto j = 0u; j < par.N; j++){
+						ss << ",\"" << pn << "_";
+						for(auto k = 0u; k < par.dep.size(); k++){
+							const auto &dp = par.dep[k];
+							auto m = (unsigned int)(j/dp.mult)%dp.list.size();
+							if(k != 0) ss << ",";
+							ss << dp.list[m];
+						}
+						ss << "\"";
+					}
 				}
 			}
 		}
@@ -1218,8 +1242,10 @@ string Output::trace_init() const
 	
 	ss << ic_output_head();
 	
-	ss << ",L^markov,L^non-markov,L^ie,L^dist,L^obs,L^genetic-proc,L^genetic-obs,L^init,Prior";
+	ss << ",L^markov,L^non-markov,L^ie,L^dist,L^obs,L^genetic-proc,L^genetic-obs,L^init";
 
+	if(model.mode == INF) ss << ",Prior";
+	
 	ss << endl;
 	
 	return ss.str();
@@ -1380,10 +1406,24 @@ string Output::param_output(const Particle &part, const vector < vector <double>
 	for(auto th = 0u; th < model.param.size(); th++){
 		const auto &par = model.param[th];
 		if(par.trace_output){
-			for(auto j = 0u; j < par.N; j++){
-				if(th >= value.size()) emsg("r");
-				if(j >= value[th].size()) emsg("r2");
-				ss << "," << value[th][j];
+			if(model.is_symmetric(par)){  // Outputs covariance matrix
+				auto L = par.dep[0].list.size();
+				for(auto j = 0u; j < L; j++){  // Diagonal elements
+					ss << "," << value[th][j*L+j];
+				}
+	
+				for(auto j = 0u; j < L; j++){  // Off-diagonal elements
+					for(auto i = j+1; i < L; i++){	
+						ss << "," << value[th][j*L+i]; 
+					}
+				}
+			}
+			else{			
+				for(auto j = 0u; j < par.N; j++){
+					if(th >= value.size()) emsg("r");
+					if(j >= value[th].size()) emsg("r2");
+					ss << "," << value[th][j];
+				}
 			}
 		}
 	}
@@ -1421,7 +1461,9 @@ string Output::param_output(const Particle &part, const vector < vector <double>
 	const auto &like = part.like;
 	
 	if(std::isnan(like.init_cond)) emsg("pp");
-	ss << "," << like.markov << "," << like.nm_trans << "," << like.ie << "," << like.dist << "," << like.obs << "," << like.genetic_process << "," << like.genetic_obs << "," << like.init_cond << "," << like.prior+like.spline_prior+like.init_cond_prior;
+	ss << "," << like.markov << "," << like.nm_trans << "," << like.ie << "," << like.dist << "," << like.obs << "," << like.genetic_process << "," << like.genetic_obs << "," << like.init_cond;
+
+	if(model.mode == INF) ss << "," << like.prior+like.spline_prior+like.init_cond_prior;
 	
 	ss << endl;
 	return ss.str();
@@ -1795,11 +1837,12 @@ string Output::generate_state_head(const vector <string> &ind_key) const
 vector < vector <double> > Output::param_value_from_vec(const Particle &pa) const 
 {
 	auto param_val = model.get_param_val(pa);
+	//cout << "PRINT" << endl;
+	//model.print_param(param_val);
 	
 	model.add_tvreparam(param_val,pa.param_val_tvreparam);
 	
 	const auto &val = param_val.value;
-
 	vector < vector <double> > value;
 	
 	value.resize(model.param.size());
@@ -1807,11 +1850,25 @@ vector < vector <double> > Output::param_value_from_vec(const Particle &pa) cons
 		const auto &par = model.param[th];
 		if(par.trace_output){
 			value[th].resize(par.N,UNSET);
+			if(par.variety != CONST_PARAM){
+				for(auto j = 0u; j < par.N; j++){
+					auto ref = par.element_ref[j];
+					if(ref != UNSET){
+						const auto &ele = par.element[ref];
+						auto k = ele.param_vec_ref;
+				
+						if(k != UNSET){
+							value[th][j] = val[k];
+						}
+					}
+				}
+			}
 		}
 	}
 	
 	if(val.size() != model.param_vec.size()) emsg("param_val the wrong size");
 	
+	/*
 	for(auto i = 0u; i < model.param_vec.size(); i++){
 		const auto &mpv = model.param_vec[i];
 		auto th = mpv.th;
@@ -1819,7 +1876,18 @@ vector < vector <double> > Output::param_value_from_vec(const Particle &pa) cons
 			value[mpv.th][mpv.index] = val[i]; 
 		}
 	}
+	*/
 	
+	if(false){
+		for(auto th = 0u; th < model.param.size(); th++){
+			const auto &par = model.param[th];
+			cout << par.name << endl;
+			for(auto j = 0u; j < par.N; j++){
+				cout << value[th][j]  << ",";
+			}
+			cout << " va" << endl;
+		}
+	}
 	
 	const auto &precalc = param_val.precalc;
 	
@@ -1884,21 +1952,41 @@ string Output::output_param(const vector < vector <double> > &value) const
 			else{
 				ss << endl;
 				ss << "  ";
-				for(auto k = 0u; k < par.dep.size(); k++){
-					if(k != 0) ss << ",";
-					ss << par.dep[k].index_with_prime;
-				}
-				ss << ",Value" << endl;
-					
-				for(auto j = 0u; j < value[th].size(); j++){
-					ss << "  ";
-					for(auto k = 0u; k < par.dep.size(); k++){
-						const auto &dp = par.dep[k];
-						auto m = (unsigned int)(j/dp.mult)%dp.list.size();
-						if(k != 0) ss << ",";
-						ss << dp.list[m];
+				if(model.is_symmetric(par)){       // Outputs covariance matrix
+					auto L = par.dep[0].list.size();
+					for(auto i = 0u; i < L; i++){
+						if(i != 0) ss << ",";
+						ss << par.dep[0].list[i];
 					}
-					ss << "," << value[th][j] << endl;
+					ss << endl;
+					
+					for(auto j = 0u; j < L; j++){ 
+						ss << "  ";
+						for(auto i = 0u; i < L; i++){
+							if(i != 0) ss << ",";
+							if(i < j) ss << ".";
+							else ss << value[th][j*L+i]; 
+						}
+						ss << endl;
+					}
+				}
+				else{
+					for(auto k = 0u; k < par.dep.size(); k++){
+						if(k != 0) ss << ",";
+						ss << par.dep[k].index_with_prime;
+					}
+					ss << ",Value" << endl;
+						
+					for(auto j = 0u; j < value[th].size(); j++){
+						ss << "  ";
+						for(auto k = 0u; k < par.dep.size(); k++){
+							const auto &dp = par.dep[k];
+							auto m = (unsigned int)(j/dp.mult)%dp.list.size();
+							if(k != 0) ss << ",";
+							ss << dp.list[m];
+						}
+						ss << "," << value[th][j] << endl;
+					}
 				}
 			}
 		}

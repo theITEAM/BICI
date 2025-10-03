@@ -33,23 +33,37 @@ void CorMatrix::init()
 
 
 /// Adds a sample
-void CorMatrix::add_sample(vector <double> param_val_prop, unsigned int range)
+void CorMatrix::add_sample(vector <double> param_val_pr, unsigned int range)
 {
 	if(range < RANGE_MIN) range = RANGE_MIN;
 	
 	// Shifting ensure that values are not constant
-	for(auto &val : param_val_prop){
-		val += (ran()-0.5)*SMALL;
+	for(auto &val : param_val_pr){
+		val += ran()*SMALL;
 	}
 	
-	samp.push_back(param_val_prop);
+	// Converts to log of value for quantities which are strictly positive
+	for(auto i = 0u; i < model.nparam_vec_prop; i++){
+		const auto &pv = model.param_vec[model.param_vec_prop[i]];
+		const auto &pri = model.prior[pv.prior_ref];
+		switch(pri.type){
+		case INVERSE_PR:
+		case POWER_PR: 
+		//case MVN_JEF_PR: case MVN_UNIFORM_PR: 
+			param_val_pr[i] = log(param_val_pr[i]);
+			break;
+		default: break;
+		}
+	}
+	
+	samp.push_back(param_val_pr);
 	n++;
 
 	for(auto i = 0u; i < N; i++){
-		auto vali = param_val_prop[i];
+		auto vali = param_val_pr[i];
 		av[i] += vali;
 		for(auto j = i; j < N; j++){
-			auto valj = param_val_prop[j];
+			auto valj = param_val_pr[j];
 			av2[i][j] += vali*valj;
 		}
 	}

@@ -2389,7 +2389,12 @@ function button_action(bu,action_type)
 		select_bubble_over();
 		inter.bubble.dataso = bu.so; 
 		break;
-		
+	
+	case "IEGroupName":
+		select_bubble_over();
+		inter.bubble.source = bu.source; 
+		break;
+	
 	default:
 		error(ac+" Action not recognised"); 
 		break;

@@ -75,6 +75,8 @@ function create_edit_param(lay)
 	}
 	
 	title += " for "+par.full_name;
+
+	if(is_symmetric(par)) title += " (variances on diagonal, otherwise correlations)";
 	
 	if(too_big) title = title.substr(5,1).toUpperCase()+title.substr(6)+" (too large to edit)";
 	
@@ -166,6 +168,8 @@ function add_create_edit_param_buts(lay)
 	let cy = 0;
 	let mar_col = EDIT_MARGIN_COL;
 	
+	let sym = is_symmetric(par);
+	
 	let w_dep = [];
 	for(let i = 0; i < dep.length; i++){
 		let wmax = 0;
@@ -185,11 +189,17 @@ function add_create_edit_param_buts(lay)
 			for(let i = 0; i < list[1].length; i++){
 				let va = value[j][i];
 				let val;
-				if(va == undefined) val = "Unset";
-				else val = String(value[j][i]);
-				if(val.length > ch){
-					ch = val.length;
-					longest = val;
+				
+				if(sym && i > j){
+					val = ".";
+				}
+				else{
+					if(va == undefined) val = "Unset";
+					else val = String(value[j][i]);
+					if(val.length > ch){
+						ch = val.length;
+						longest = val;
+					}
 				}
 			}
 		}
@@ -236,8 +246,13 @@ function add_create_edit_param_buts(lay)
 				let pindex = [j,i];
 				let val = get_element(value,pindex);
 				if(val == undefined) val = "Unset";
-					
-				lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:ele_type, font:fo_table, i:i, pindex:pindex, ac:action});
+				
+				if(sym && i < j){
+					lay.add_button({te:"", x:cx, y:cy, dx:dx, dy:dy_table_param, type:"SymmetricParam", font:fo_table});
+				}
+				else{
+					lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:ele_type, font:fo_table, i:i, pindex:pindex, sym:sym, ac:action});
+				}
 				cx += dx;
 			}
 			
@@ -300,6 +315,14 @@ function add_create_edit_param_buts(lay)
 	}
 	
 	lay.add_button({x:0, y:cy, dx:0, dy:0.5, type:"Nothing"});
+}
+
+
+/// Determines if a parameter is a covariance matrix
+function is_symmetric(par)
+{
+	if(is_matrix(par) && begin(par.name,"Ω")) return true;
+	return false;
 }
 
 
@@ -522,8 +545,14 @@ function par_find_list(par,op)
 			list[i]	= par.spline.knot;
 		}
 		else{
-			list[i] = find_comp_from_index(dep[i]);
-			if(list.length == 0) error("Cannot find compartments from index");
+			if(remove_prime(dep[i]) == "z"){
+				list[i] = find_ieg_list(par);
+				if(list.length == 0) error("Cannot find ie list");
+			}
+			else{
+				list[i] = find_comp_from_index(dep[i]);
+				if(list.length == 0) error("Cannot find compartments from index");
+			}
 		}
 	}
 	

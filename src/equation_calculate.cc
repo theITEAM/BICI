@@ -12,6 +12,20 @@ using namespace std;
 #include "equation.hh"
 #include "utils.hh"
 
+/// Calculates a constant 
+double Equation::calculate_constant() const 
+{
+	if(calcu.size() != 1) emsg("Constant problem1");
+	const auto &ca = calcu[0];
+	if(ca.op != ADD && ca.op != MULTIPLY) emsg("Constant problem2");
+	if(ca.item.size() != 1) emsg("Constant problem3");
+	
+	const auto &it = ca.item[0];
+	if(it.type != NUMERIC) emsg("Constant problem4");
+	return constant.value[it.num];
+}
+
+
 /// Calculates the value for an equation using only parameters and splines (if ti_fix is set)
 double Equation::calculate_param_ti_fix(const vector <double> &precalc) const 
 {

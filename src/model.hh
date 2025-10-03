@@ -47,6 +47,8 @@ class Model                                // Stores information about the model
 		// This is a quick reference to see the population which causes infection
 		vector < vector < vector < vector <InfCause> > > > inf_cause; // [p][tr_gl][p_from][c_from]
 		
+		vector <IEGref> ieg_ref;               // References all the ind effect groups in the model
+		
 		vector <Spline> spline;                // Stores information about splines
 	 	
 		vector <double> timepoint;             // Discrete timepoints	
@@ -78,13 +80,20 @@ class Model                                // Stores information about the model
 		void param_val_init(PV &param_val) const;
 		PV param_sample() const;
 		void param_update_precalc_time(unsigned int ti, const vector <double> &popnum, PV &param_val, bool store) const;
+		void sample_ieg_cv(PV &param_val) const;
 		void param_update_precalc_time_all(const vector < vector <double> > &popnum_t, PV &param_val, bool store) const;
 		void param_update_precalc_before(unsigned int th, PV &param_val, bool store) const;
 		void param_update_precalc_after(unsigned int th, PV &param_val, bool store) const;
 		PV post_param(const Sample &samp) const;
 		vector <double> prior_prob(const PV &param_val) const;
 		vector <double> dist_prob(const PV &param_val) const;
+		double recalculate_ieg_prior(unsigned int j, vector <double> &prior_ieg, const PV &param_val, double &like_ch) const;
 		double recalculate_prior(unsigned int th, vector <double> &prior_prob, const PV &param_val, double &like_ch) const;
+		vector <double> prior_ieg_all(const PV &param_val) const;
+		double prior_ieg_calculate(const IEGref &iegr, const PV &param_val) const;
+		void set_ieg_ref();
+		void set_omega_pv();
+		string exchange_omega(string name) const;
 		vector <double> spline_prior(const PV &param_val) const;
 		double recalculate_spline_prior(unsigned int s, vector <double> &spline_prior, PV &param_val, double &like_ch) const;
 		void create_species_simp();
@@ -108,7 +117,8 @@ class Model                                // Stores information about the model
 		void add_like_obs_affect(unsigned int p, vector <AffectLike> &affect_like) const;
 		AllInd find_all_ind(string name) const;
 		void set_hash_all_ind();
-		bool ie_cholesky_error(const PV &param_val) const;
+		//bool ie_cholesky_error(const PV &param_val) const;
+		bool ieg_check_prior_error(const IEGref &iegr, const PV &param_val) const;
 		void print_param(const PV &param_val) const;
 		vector <double> get_param_val_prop(const PV &param_val) const;
 		vector <double> get_param_val_tvreparam(const PV &param_val) const;
@@ -125,6 +135,8 @@ class Model                                // Stores information about the model
 		void add_affect_like(unsigned int i, unsigned int i2, const vector <bool> &map_time, vector <bool> &map_PC, vector < vector <bool> > &map_me, ParamVecEle &pvec, const vector < vector <unsigned int> > &affect, const vector < vector <AffectME> > &affect_me);
 		bool in_bounds(double x, unsigned int j, const vector <double> &precalc) const;
 		void set_linear_form(unsigned int p, LinearForm &lin_form, const vector <LinearFormInit> &lfinit) const;
+		bool is_matrix(const Param &par) const;
+		bool is_symmetric(const Param &par) const;
 
 	private:
 		Hash hash_all_ind;                     // Stores individuals in a hash table

@@ -117,7 +117,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 				
 			case 2:   // In the first pass create species, classifications and compartments
 				switch(cname){
-				case SPECIES: case CLASS: case COMP: case COMP_ALL: break;
+				case SPECIES: case CLASS: case COMP: case COMP_ALL: case IND_EFFECT: break;
 				default: process = false; break;
 				}
 				break;
@@ -166,7 +166,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 				case REMOVE_POP: case REMOVE_POP_SIM:  case REMOVE_POP_POST_SIM:
 				case ADD_IND: case ADD_IND_SIM: case ADD_IND_POST_SIM: 
 				case PARAM_MULT:
-				case COMP: case COMP_ALL: 
+				case COMP: case COMP_ALL: case IND_EFFECT:
 				case TRANS: case TRANS_ALL:
 					process = false;
 					break;
@@ -341,6 +341,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	check_reparam_time();              // Checks if reparameterised equations involve time
 	
+	model.set_ieg_ref();               // Sets ieg_ref which references ind effect groups
+	
 	print_diag("h1d");
 	map_ind_effect();                  // Maps individual effects with groups
 
@@ -389,7 +391,9 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	print_diag("h8");
 	
 	create_param_vector();             // Creates an overall parameter vector
-	
+
+	model.set_omega_pv();              // Sets param vec which determines covariance matrices
+
 	check_memory_too_large();
 	
 	print_diag("h9");
@@ -520,7 +524,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	set_cgl_tr_source_sink();                  // Sets trg reference from compartments
 	
-	set_omega_fl();                            // Sets a flag if param in in omega
+	//set_omega_fl();                            // Sets a flag if param in in omega
 	
 	if(model.trans_tree){
 		set_inf_cause();                         // Reference to see the population which causes infection 
@@ -1300,7 +1304,9 @@ bool Input::is_zeroone(string num, string tag)
 /// Maps from individual effects on species to those stored in IEgroups
 void Input::map_ind_effect()
 {
-	for(auto &sp : model.species){
+	for(auto p = 0u; p < model.species.size(); p++){
+		auto &sp = model.species[p];
+		
 		// Links from ind_effect to ind_effect_group
 		for(auto i = 0u; i < sp.ind_effect.size(); i++){
 			auto &ie = sp.ind_effect[i];
@@ -1340,31 +1346,55 @@ void Input::map_ind_effect()
 		for(auto i = 0u; i < sp.ind_eff_group.size(); i++){
 			auto &ieg = sp.ind_eff_group[i];
 			
-			auto N = ieg.list.size();
+			//auto N = ieg.list.size();
 			
-			ieg.omega.resize(N); 	for(auto j = 0u; j < N; j++) ieg.omega[j].resize(N);
+			//ieg.omega.resize(N); 	for(auto j = 0u; j < N; j++) ieg.omega[j].resize(N);
 			
-			for(auto j = 0u; j < N; j++){
-				for(auto jj = j; jj < N; jj++){
-					auto ie1 = ieg.list[j].name, ie2 = ieg.list[jj].name;
-					auto sup = "^"+ie1+","+ie2;
-					
-					string name;
-					if(j == jj) name = "Ω"+sup;
-					else name = "ω"+sup;
-					
-					auto th = 0u; while(th < model.param.size() && model.param[th].name != name) th++;
-					
-					if(th == model.param.size()){
-						alert_line("Parameter '"+name+"' must be specified for these individual effects",ieg.line_num);
+			auto name = "Ω^"+ieg.name;
+		
+			auto th = 0u; while(th < model.param.size() && model.param[th].name != name) th++;
+						
+			if(th == model.param.size()){
+				alert_line("Parameter '"+name+"' must be specified for these individual effects",ieg.line_num);
+			}
+			
+			ieg.th = th;
+			
+			auto &par = model.param[th]; 
+			
+			IEGref iegr; iegr.p = p; iegr.i = i;
+			par.ieg_ref.push_back(iegr);
+			
+			par.used = true;
+			/*
+			if(N == 1){
+				auto name = "Ω"+ieg.name;
+			}
+			else{
+				emsg("here");
+				for(auto j = 0u; j < N; j++){
+					for(auto jj = j; jj < N; jj++){
+						auto ie1 = ieg.list[j].name, ie2 = ieg.list[jj].name;
+						auto sup = "^"+ie1+","+ie2;
+						
+						string name;
+						if(j == jj) name = "Ω"+sup;
+						else name = "ω"+sup;
+						
+						auto th = 0u; while(th < model.param.size() && model.param[th].name != name) th++;
+						
+						if(th == model.param.size()){
+							alert_line("Parameter '"+name+"' must be specified for these individual effects",ieg.line_num);
+						}
+						else{
+							ieg.omega[j][jj] = th;
+							ieg.omega[jj][j] = th;
+							model.param[th].used = true;
+						}
 					}
-					else{
-						ieg.omega[j][jj] = th;
-						ieg.omega[jj][j] = th;
-						model.param[th].used = true;
-					}
-				}
-			}		
+				}		
+			}
+			*/
 		}
 	}
 }
@@ -1459,9 +1489,20 @@ void Input::create_param_vector()
 		auto &par = model.param[th];
 	
 		if(par.variety != CONST_PARAM){	
+			vector <bool> allow;   // Accounts for symmetric maxtrix
+			auto sym_fl = false;
+			if(model.is_symmetric(par)){
+				sym_fl = true;
+				allow.resize(par.N,true);
+				auto L = par.dep[0].list.size();
+				for(auto j = 0u; j < L; j++){
+					for(auto i = 0u; i < j; i++) allow[j*L+i] = false;
+				}
+			}
+		
 			for(auto j = 0u; j < par.N; j++){
 				auto ref = par.element_ref[j];
-				if(ref != UNSET){
+				if(ref != UNSET && !(sym_fl && !allow[j])){
 					auto &ele = par.element[ref];
 			
 					if(removeparamvec_speedup == false || ele.used == true || par.spline_info.on == true){
@@ -1495,7 +1536,40 @@ void Input::create_param_vector()
 						model.param_vec.push_back(pr);
 					}
 				}
-			}		 
+			}
+			
+			if(sym_fl){ // Adds in symmetric reference
+				sym_fl = true;
+				auto L = par.dep[0].list.size();
+				for(auto j = 0u; j < L; j++){
+					for(auto i = 0u; i < L; i++){
+						auto k = j*L+i;
+						
+						auto ref = par.element_ref[k];
+						if(ref != UNSET && !allow[k]){
+							auto &ele = par.element[ref];
+			
+							if(removeparamvec_speedup == false || ele.used == true || par.spline_info.on == true){
+								auto ref_rev = par.element_ref[i*L+j];
+								if(ref_rev != UNSET){
+									const auto &ele_rev = par.element[ref_rev];
+								
+									ele.param_vec_ref = ele_rev.param_vec_ref;
+								}
+							}
+						}
+					}
+				}
+			}
+			
+			if(false){
+				for(auto j = 0u; j < par.N; j++){
+					auto ref = par.element_ref[j];
+					auto &ele = par.element[ref];
+					cout << ele.param_vec_ref << ",";
+				}
+				cout << "ref" << endl;
+			}
 		}
 	}
 	

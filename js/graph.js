@@ -318,7 +318,6 @@ class Graph
 		
 		switch(this.variety){
 		case "TransBias": ymin = -1; ymax = 1; break;
-		//case "TransP": ymin = 0; break;
 		}
 		
 		this.range = {xmin:xmin, ymin:ymin, xmax:xmax, ymax:ymax};
@@ -1065,25 +1064,30 @@ class Graph
 						let marx = 0.03*dx;
 						let mary = 0.03*dy;
 						
-						let stat; if(da.mat_stat) stat = da.mat_stat[j][i];
-					
-						let col, value, CImin, CImax, te;
-						if(this.variety == "MatrixAnim"){
-							col = da.mat_col[j][i][fr];
-							value = precision(da.mat[j][i][fr]);
-							if(da.CImin) CImin = precision(da.CImin[j][i][fr]);
-							if(da.CImax) CImax = precision(da.CImax[j][i][fr]);
-							te = da.mat[j][i][fr];
+						if(da.mat[j][i] == "."){
+							lay.add_button({x:fraci*lay.dx+marx, y:(1-fracj)*lay.dy-dy+mary, dx:dx-2*marx, dy:dy-2*mary, type:"MatrixEleBlankBut"});
 						}
 						else{
-							col = da.mat_col[j][i];
-							value = precision(da.mat[j][i]);
-							if(da.CImin) CImin = precision(da.CImin[j][i]);
-							if(da.CImax) CImax = precision(da.CImax[j][i]);
-							te = da.mat[j][i];
-						}							
+							let stat; if(da.mat_stat) stat = da.mat_stat[j][i];
 						
-						lay.add_button({te:precision(te), x:fraci*lay.dx+marx, y:(1-fracj)*lay.dy-dy+mary, dx:dx-2*marx, dy:dy-2*mary, value:value, CImin:CImin, CImax:CImax, i:i, j:j, labels:labels, stat:stat, col:col, type:"MatrixEleBut", ac:"MatrixEleBut"});
+							let col, value, CImin, CImax, te;
+							if(this.variety == "MatrixAnim"){
+								col = da.mat_col[j][i][fr];
+								value = precision(da.mat[j][i][fr]);
+								if(da.CImin) CImin = precision(da.CImin[j][i][fr]);
+								if(da.CImax) CImax = precision(da.CImax[j][i][fr]);
+								te = da.mat[j][i][fr];
+							}
+							else{
+								col = da.mat_col[j][i];
+								value = precision(da.mat[j][i]);
+								if(da.CImin) CImin = precision(da.CImin[j][i]);
+								if(da.CImax) CImax = precision(da.CImax[j][i]);
+								te = da.mat[j][i];
+							}							
+							
+							lay.add_button({te:precision(te), x:fraci*lay.dx+marx, y:(1-fracj)*lay.dy-dy+mary, dx:dx-2*marx, dy:dy-2*mary, value:value, CImin:CImin, CImax:CImax, i:i, j:j, labels:labels, stat:stat, col:col, type:"MatrixEleBut", ac:"MatrixEleBut"});
+						}
 					}
 				}
 			}
@@ -3012,6 +3016,9 @@ class Graph
 	/// Exports a figure
 	export_figure(filename)
 	{
+		print_scale_factor = image_scale_factor;                        // Increase is screen size for print
+		print_line_factor = image_scale_factor; 
+
 		//inter.export_image = true;	
 		inter.printing = true;
 		generate_screen();

@@ -86,7 +86,8 @@ void ABC_SMC::run()
 				auto param_val = model.get_param_val(part);
 				auto param_prop = param_val;  // Proposes a new parameter set using MVN kernal
 				
-				if(prop.param_resample(param_prop,state.popnum_t) == true){				// TO DO
+				auto ps_fac = prop.param_resample(param_prop,state.popnum_t);
+				if(ps_fac != UNSET){				// TO DO
 					auto initc_val = model.initc_sample(param_prop);
 
 					state.simulate(param_prop,initc_val);       // Simulates a new state

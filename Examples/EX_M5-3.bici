@@ -37,8 +37,8 @@ comp-all color="#aa00aa" fix="true" file="comp-Group.csv"
 
 # INDIVIDUAL EFFECTS
 
-ind-effect name="fe,ge"
-ind-effect name="fa,ga" ind-list="ind-list-fa,ga.csv" A-sparse="A-matrix-fa,ga.csv"
+ind-effect name="env" ie="fe,ge"
+ind-effect name="gen" ie="fa,ga" ind-list="ind-list-fa,ga.csv" A-sparse="A-matrix-fa,ga.csv"
 
 # SIMULATION INITIAL CONDITIONS
 
@@ -50,19 +50,18 @@ add-ind-sim file="add-ind-sim.csv"
 
 param name="N" constant="10"
 
-param name="β" value="0.4" prior="uniform(0,1)"
+param name="β" value="0.4" prior="inverse(0.01,1)"
 
-param name="Ω^fa,fa" value="2" prior="uniform(0.01,3)"
+param name="Ω^gen_z,z'" value="[[
+fa,ga
+2,0.3
+.,1
+]]" prior="mvn-jeffreys(0.01,3)"
 
-param name="ω^fa,ga" value="0.3" prior="uniform(-0.9,0.9)"
-
-param name="Ω^fe,fe" value="1" prior="uniform(0.01,3)"
-
-param name="ω^fe,ge" value="0.4" prior="uniform(-0.9,0.9)"
-
-param name="Ω^ga,ga" value="1" prior="uniform(0.01,3)"
-
-param name="Ω^ge,ge" value="1" prior="uniform(0.01,3)"
-
+param name="Ω^env_z,z'" value="[[
+fe,ge
+1,0.4
+.,1
+]]" prior="mvn-jeffreys(0.01,3)"
 
 

@@ -4218,7 +4218,7 @@ function graph_param_calculate(result,rpf,burn)
 			}
 			
 			let vte = rpf.sel_paramviewtype.te;
-	
+
 			switch(vte){
 			case "Trace": case "Samples":
 				{
@@ -4311,7 +4311,7 @@ function graph_param_calculate(result,rpf,burn)
 			
 					let xax = "# Updates";
 					if(vte == "Samples") xax = "Sample"; 
-					
+				
 					post({type:"Graph define", variety:vte, view:"Graph", data:data, op:{x_label:xax, y_label:name, y_param:true, key:key}});
 					return;
 				}
@@ -4339,7 +4339,7 @@ function graph_param_calculate(result,rpf,burn)
 							let li = pview.list[i];
 						
 							let stat = get_param_stats(li.th,li.index,result,rpf,burn);
-							table.content.push([{te:stat.name, pname:true},{te:stat.mean},{te:stat.CImin},{te:stat.CImax}]);
+							table.content.push([{te:li.name, pname:true},{te:stat.mean},{te:stat.CImin},{te:stat.CImax}]);
 						}
 						break;
 						
@@ -4351,7 +4351,7 @@ function graph_param_calculate(result,rpf,burn)
 							let li = pview.list[i];
 						
 							let stat = get_param_stats(li.th,li.index,result,rpf,burn);
-							table.content.push([{te:stat.name, pname:true},{te:stat.mean},{te:stat.CImin},{te:stat.CImax},{te:stat.ESS},{te:stat.GR}]);
+							table.content.push([{te:li.name, pname:true},{te:stat.mean},{te:stat.CImin},{te:stat.CImax},{te:stat.ESS},{te:stat.GR}]);
 						}
 						break;
 					}
@@ -4519,12 +4519,16 @@ function multivariate_param_plot(result,rpf,burn)
 			vec.push(get_element(samp_val_list[s],index));
 		}
 		
-		let stat = get_statistic(vec);
-		set_element(value,index,stat.mean);
-		set_element(CImin,index,stat.CImin);
-		set_element(CImax,index,stat.CImax);
+		if(vec.length > 0 && vec[0] == undefined){
+			set_element(value,index,".");
+		}
+		else{
+			let stat = get_statistic(vec);
+			set_element(value,index,stat.mean);
+			set_element(CImin,index,stat.CImin);
+			set_element(CImax,index,stat.CImax);
+		}
 	}
-	//}
 
 	post(define_parameter_plot("param_calc",par,value,CImin,CImax,pviewtype,result.details,result,rpf));
 }
@@ -4785,6 +4789,50 @@ function setup_distribution(result,rpf,burn)
 				point.push({x:max, y:0});
 			}
 			break;
+		
+		case "mvn-jeffreys": case "mvn-uniform":
+			break;
+			
+		case "inverse":
+			{	
+				let min = Number(pri.value.min_eqn.te);
+				let max = Number(pri.value.max_eqn.te);
+			
+				let fac = 1/Math.log(max/min);
+				
+				point.push({x:min, y:0});
+				for(let i = 0; i <= N; i++){
+					let x = min + i*(max-min)/N;
+					let prob = fac/x;
+					point.push({x:x, y:prob});
+				}
+				point.push({x:max, y:0});
+			}
+			break;
+			
+		case "power":
+			{	
+				let min = Number(pri.value.min_eqn.te);
+				let max = Number(pri.value.max_eqn.te);
+				let power = Number(pri.value.power_eqn.te);
+				
+				let fac;
+				if(power == -1) fac = 1/Math.log(max/min);
+				else fac = (power+1)/(Math.pow(max,power+1)-Math.pow(min,power+1));
+		
+				if(fac < 0) fac = -fac;
+				
+				point.push({x:min, y:0});
+				for(let i = 0; i <= N; i++){
+					let x = min + i*(max-min)/N;
+					let prob;
+					if(power == -1) prob = fac/x;
+					else prob = fac*Math.pow(x,power);
+					point.push({x:x, y:prob});
+				}
+				point.push({x:max, y:0});
+			}
+			break;
 			
 		case "exp":
 			{	
@@ -4930,6 +4978,12 @@ function get_prior_clip(par,ind)
 		case "uniform": 
 			return {min:Number(pri.value.min_eqn.te), max: Number(pri.value.max_eqn.te)};
 			
+		case "mvn-jeffreys": case "mvn-uniform":
+			return {min:undefined, max:undefined};
+		
+		case "inverse": case "power":
+			return {min:Number(pri.value.min_eqn.te), max: Number(pri.value.max_eqn.te)};
+		
 		case "gamma": case "log-normal":
 			return {min:0, max: LARGE};
 		

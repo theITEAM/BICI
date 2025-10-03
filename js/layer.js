@@ -1349,7 +1349,7 @@ class Layer
 		case "init_per": te = String(edit_source.cla[so.cl].comp_init_pop[so.c].pop_per); break;
 		case "init_globpopulation": te = String(edit_source.glob_comp[so.c].pop);	break;
 		case "element": te = String(edit_source.table.ele[so.r][so.c]);	break;
-		case "element_param": case "element_param_const":
+		case "element_param": case "element_param_const": case "element_param_const_sym":
 		case "element_factor_const": case "element_weight_const":
 			{
 				let ele = get_element(inter.edit_param.value,so.pindex);
@@ -1405,6 +1405,7 @@ class Layer
 		case "label_anno_size": te = String(model.species[so.p].cla[so.cl].annotation[so.i].size); break;
 		case "prior_min": te = inter.bubble.prior.value.min_eqn.te; break;
 		case "prior_max": te = inter.bubble.prior.value.max_eqn.te; break;
+		case "prior_power": te = inter.bubble.prior.value.power_eqn.te; break;
 		case "prior_mean": te = inter.bubble.prior.value.mean_eqn.te; break;
 		case "prior_shape": te = inter.bubble.prior.value.shape_eqn.te; break;
 		case "prior_sd": te = inter.bubble.prior.value.sd_eqn.te; break;
@@ -1414,6 +1415,7 @@ class Layer
 		case "prior_sigma": te = inter.bubble.prior.value.sigma_eqn.te; break;
 		case "prior_dist_min": eqn = inter.bubble.prior.value.min_eqn; break;
 		case "prior_dist_max": eqn = inter.bubble.prior.value.max_eqn; break;
+		case "prior_dist_power": eqn = inter.bubble.prior.value.power_eqn; break;
 		case "prior_dist_mean": eqn = inter.bubble.prior.value.mean_eqn; break;
 		case "prior_dist_shape": eqn = inter.bubble.prior.value.shape_eqn; break;
 		case "prior_dist_sd": eqn = inter.bubble.prior.value.sd_eqn; break;
@@ -1475,6 +1477,7 @@ class Layer
 		case "slice_time": te = String(inter.bubble.slice_time); break;
 		case "suffix": te = String(inter.bubble.suffix); break;
 		case "dataname": te = String(inter.bubble.dataso.name); break;
+		case "iegrname": te = String(inter.bubble.source.name); break;
 		case "wild_card": te = String(inter.bubble.wildcard); break;
 		case "comp_acc": te = String(edit_source.comp_acc); break;
 		default: error("SOURCE PROBLEM2: "+so.type); break;

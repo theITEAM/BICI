@@ -1600,7 +1600,7 @@ void Input::create_spline()
 						auto cspl = solve_cubic_spline(times,val,type);
 						
 						for(auto ti = 0u; ti < ntp-1; ti++){
-							auto tmid = (tp[ti]+tp[ti+1])/(2*dt);  
+							auto tmid = model.calc_tdiv((tp[ti]+tp[ti+1])/2);  
 							spl.const_val.push_back(calculate_cubic_spline(tmid,cspl));
 						}	
 					}
@@ -1610,8 +1610,8 @@ void Input::create_spline()
 					
 						auto k = 0u;
 						for(auto ti = 0u; ti < ntp-1; ti++){
-							auto tmid = (tp[ti]+tp[ti+1])/(2*dt); 
-						
+							auto tmid = model.calc_tdiv((tp[ti]+tp[ti+1])/2);
+
 							while(k+1 < tdiv.size() && tdiv[k+1] < tmid) k++;
 							
 							auto dx = tmid-tdiv[k];
@@ -1629,9 +1629,10 @@ void Input::create_spline()
 							if(!begin_str(spl.name,"f~")) emsg_input("Should be a parameter factor");
 						}
 						else{
-							auto tmid = (tp[ti]+tp[ti+1])/(2*dt); // TO DO DIFFERENT SPLINES
-							
+							auto tmid = model.calc_tdiv((tp[ti]+tp[ti+1])/2);
+
 							while(i+1 < times.size() && times[i+1] < tmid) i++;
+							
 							if(i+1 >= times.size() && spl.type != SQUARE_SPL){ // This extends spline for PPC			
 								if(model.mode != PPC){
 									emsg_input("Should be PPC2");
@@ -2060,7 +2061,7 @@ void Input::ind_fix_eff_group_trans_ref()
 				}					
 			}
 		}
-		emsg_input("J");
+		emsg_input("Ind eff");
 	}
 }
 
@@ -2337,15 +2338,28 @@ void Input::param_affect_likelihood()
 		const auto &pv = model.param_vec[th];
 		const auto &par = model.param[pv.th];
 		if(par.variety == PRIOR_PARAM || par.variety == DIST_PARAM){
-			AffectLike al;  al.num = th; al.num2 = UNSET; 
-			if(par.variety == PRIOR_PARAM) al.type = PRIOR_AFFECT; else al.type = DIST_AFFECT;
+			if(par.ieg_ref.size() > 0){
+				for(const auto &iegr : par.ieg_ref){
+					auto j = find_in(model.ieg_ref,iegr);
+					if(j == UNSET) emsg("Could not find iegr");
+					
+					AffectLike al; al.type = IEG_PRIOR_AFFECT; al.num = j; al.num2 = UNSET; 
 			
-			param_vec_add_affect(model.param_vec[th].affect_like,al);
-			
-			for(const auto &pref : par.get_parent(pv.index)){
-				const auto th_par = model.param[pref.th].get_param_vec(pref.index);				
-				if(th_par != UNSET){
-					param_vec_add_affect(model.param_vec[th_par].affect_like,al);
+					param_vec_add_affect(model.param_vec[th].affect_like,al);
+				}
+			}
+			else{
+				AffectLike al;  al.num = th; al.num2 = UNSET; 
+				
+				if(par.variety == PRIOR_PARAM) al.type = PRIOR_AFFECT; else al.type = DIST_AFFECT;
+				
+				param_vec_add_affect(model.param_vec[th].affect_like,al);
+				
+				for(const auto &pref : par.get_parent(pv.index)){
+					const auto th_par = model.param[pref.th].get_param_vec(pref.index);				
+					if(th_par != UNSET){
+						param_vec_add_affect(model.param_vec[th_par].affect_like,al);
+					}
 				}
 			}
 		}
@@ -2496,19 +2510,21 @@ void Input::param_affect_likelihood()
 				const auto &ieg = sp.ind_eff_group[g];
 				auto N = ieg.list.size();
 				
-				for(auto j = 0u; j < N; j++){
-					for(auto i = 0u; i < N; i++){
-						auto &par = model.param[ieg.omega[j][i]];
-						if(par.variety != CONST_PARAM){
-							auto k = par.get_param_vec(0);
-							if(k == UNSET) emsg_input("Should not be unset6");
-							
+				const auto &par = model.param[ieg.th];
+				if(par.variety != CONST_PARAM){
+					for(auto j = 0u; j < N; j++){
+						for(auto i = 0u; i <= j; i++){			
+							auto k = ieg.omega_pv[j][i];
+						
 							AffectLike al; 	
 							al.type = OMEGA_AFFECT; al.num = p; al.num2 = g;
 							param_vec_add_affect(model.param_vec[k].affect_like,al);	
 							
 							if(j == i){  // If on the di
 								auto ie = ieg.list[i].index;
+								
+								//AffectLike al; al.type = EXP_IE_AFFECT; al.num = p; al.num2 = ie;
+								//param_vec_add_affect(model.param_vec[k].affect_like,al);	
 								model.add_ie_affect(p,ie,model.param_vec[k].affect_like);
 							}
 							
@@ -4477,12 +4493,17 @@ void Input::set_param_use()
 	
 	for(const auto &sp : model.species){
 		for(const auto &ieg : sp.ind_eff_group){
+			auto &par = model.param[ieg.th];
+			for(auto k = 0u; k < par.N; k++) par.set_used(k);
+			
+			/*
 			auto N = ieg.list.size(); 
 			for(auto j = 0u; j < N; j++){
 				for(auto i = 0u; i < N; i++){
 					model.param[ieg.omega[j][i]].set_used(0);
 				}
 			}
+			*/
 		}
 		
 		for(const auto &fe : sp.fix_effect){
@@ -4507,7 +4528,7 @@ void Input::set_param_use()
 	}
 }
 
-
+/*
 /// Sets a flag if param is in omega
 void Input::set_omega_fl()
 {
@@ -4537,6 +4558,7 @@ void Input::set_omega_fl()
 		emsg_input("done");
 	}
 }
+*/
 
 
 /// Sets up calculating derived functions

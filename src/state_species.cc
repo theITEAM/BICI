@@ -995,9 +995,11 @@ vector <double> StateSpecies::set_exp_ie(Individual &ind) const
 vector <double> StateSpecies::recalculate_exp_ie(unsigned int ie)
 {
 	auto &ind_eff = sp.ind_effect[ie];
+	
 	auto g = ind_eff.index;
 	auto j = ind_eff.num;
 	const auto &iegs = ind_eff_group_sampler[g];
+	
 	auto var = iegs.omega[j][j];
 		
 	vector <double> store;

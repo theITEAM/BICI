@@ -4,11 +4,12 @@
 /// Creates an output file
 // save_type has the values:
 // sim - Saves a simulation (this performs additional simulation checks)
-// inf - Saves an inference (this performs additional simulation checks)
-// save - Saves files (somes things are not checked
+// inf - Saves an inference (this performs additional inference checks)
+// save - Saves files (somes things are not checked)
 
 // one_file deterines if a a single file is generated or a file and directory are made
-// 
+
+/// Creates the ouytput file from the model
 function create_output_file(save_type,one_file,map_store)
 {
 	let file_list=[];  // Used to make sure that files to not share the same name
@@ -735,11 +736,13 @@ function output_param(par,save_type,file_list,one_file)
 	let te = "";
 	let dist_done = false;
 	
+	/*
 	if(par.time_dep){
 		if(par.spline.spline_radio.value != "Square"){
 			//add_warning({mess:"Reparameterised spline", mess2:"A square spline must be used for time-varying reparameterised parameter '"+par.full_name+"'.", warn_type:"ReparamSquareSpline", name:par.name});
 		}
 	}
+	*/
 				
 	if(par.type != "derive_param"){	 
 		let num_warn = model.warn.length;
@@ -813,7 +816,7 @@ function output_param(par,save_type,file_list,one_file)
 								return;
 							}
 						
-							file = output_value_table(par,par.value,file,file_list,one_file);
+							file = output_value_table(par,par.value,"Value",file,file_list,one_file,"value",save_type);
 							te2 += '"'+file+'"';
 						}
 						else{
@@ -889,7 +892,7 @@ function output_param(par,save_type,file_list,one_file)
 			
 			if(par.factor_weight_on.check == true){
 				let file = get_unique_file("weight-"+par.name,file_list,'.csv');
-				file = output_value_table(par,par.factor_weight,file,file_list,one_file);
+				file = output_value_table(par,par.factor_weight,"Value",file,file_list,one_file,"value",save_type);
 				te1 += ' factor-weight="'+file+'"';
 			}
 		}
@@ -915,37 +918,72 @@ function output_param(par,save_type,file_list,one_file)
 	
 	
 /// Outputs the value of a table
-function output_value_table(par,value,file,file_list,one_file)
-{													
-	let data = '';
-	for(let d = 0; d < par.dep.length; d++){	
-		data += '"'+par.dep[d]+'",';
-	}
-	data += 'Value' + endl;
-
+function output_value_table(par,value,head_col,file,file_list,one_file,key,save_type)
+{	
 	let list = par.list;
-
-	let co_list = generate_co_list(par.list);
-	for(let i = 0; i < co_list.length; i++){
-		let comb = co_list[i];
-		let el = get_element(value,comb.index);
-		if(el == undefined){
-			let me = "A value for parameter "+par.full_name+" is undefined (";
-			for(let j = 0; j < par.dep.length; j++){
-				if(j != 0) me += ",";
-				me += list[j][comb.index[j]];
-			}
-			me += ").";
+	
+	if(value == undefined){
+		let wt, ty;
+		switch(head_col){
+		case "Dist": 
+			wt = "MissingDistValue"; 
+			if(save_type != "sim" && save_type != "inf") return; 	
+			break;
 			
-			add_warning({mess:"Parameter value is undefined", mess2:me, warn_type:"ParamValueProblem", par:par});
-			return;
+		case "Prior":
+			wt = "MissingPriorSplitValue"; 
+			if(save_type != "inf") return; 	
+			break;
+			
+		case "Value":
+			wt = "MissingSimValue";
+			if(save_type != "sim" && save_type != "inf") return; 	
+			break;
 		}
 		
-		if(el != 0){	
-			for(let d = 0; d < par.dep.length; d++){
-				data += '"'+list[d][comb.index[d]]+'",';
+		add_warning({mess:"Missing "+key, mess2:"The "+key+" for "+par.full_name+" must be set.", warn_type:wt, name:par.name});
+		return;
+	}
+						
+	let data = '';
+	if(is_matrix(par)){   // Matrix format
+		for(let i = 0; i < list[1].length; i++){
+			if(i != 0) data += ",";
+			data += list[1][i];
+		}
+		data += endl;
+		
+		for(let j = 0; j < list[0].length; j++){
+			for(let i = 0; i < list[1].length; i++){
+				if(i != 0) data += ",";
+				
+				let index = []; index[0] = j; index[1] = i;
+				let el = get_element(value,index);
+				if(el == undefined){ param_undefined(par,index); return;}
+					
+				data += get_op_val(el,head_col,par);
 			}
-			data += '"'+el+'"'+endl;
+			data += endl;
+		}
+	}
+	else{
+		for(let d = 0; d < par.dep.length; d++){	
+			data += '"'+par.dep[d]+'",';
+		}
+		data += head_col + endl;
+
+		let co_list = generate_co_list(par.list);
+		for(let i = 0; i < co_list.length; i++){
+			let comb = co_list[i];
+			let el = get_element(value,comb.index);
+			if(el == undefined){ param_undefined(par,comb.index); return;}
+			
+			if(el != 0){	
+				for(let d = 0; d < par.dep.length; d++){
+					data += '"'+list[d][comb.index[d]]+'",';
+				}
+				data += get_op_val(el,head_col,par)+endl;
+			}
 		}
 	}
 
@@ -953,6 +991,36 @@ function output_value_table(par,value,file,file_list,one_file)
 	if(one_file) file = get_one_file(file_list);
 	
 	return file;
+}
+
+
+/// For output convert an element to output text
+function get_op_val(el,head_col,par)
+{
+	if(head_col == "Dist" || head_col == "Prior"){
+		if(el.type.te == select_str){
+			add_warning({mess:"Missing "+key, mess2:"The "+key+" for "+par.full_name+" must be set.", warn_type:"MissingPriorSplitValue", name:par.name});
+			return "";
+		}
+	
+		return '"'+get_prior_string(el)+'"';
+	}
+	
+	return el;
+}
+
+					
+/// Outputs a warning message because parameter undefined
+function param_undefined(par,index)
+{
+	let me = "A value for parameter "+par.full_name+" is undefined (";
+	for(let j = 0; j < par.dep.length; j++){
+		if(j != 0) me += ",";
+		me += list[j][index[j]];
+	}
+	me += ").";
+				
+	add_warning({mess:"Parameter value is undefined", mess2:me, warn_type:"ParamValueProblem", par:par});
 }
 
 
@@ -981,45 +1049,15 @@ function output_add_prior_distribution(save_type,par,variety,file_list,one_file)
 		else{
 			let file = get_unique_file(key+"-"+par.name,file_list,'.csv');
 			
-			let col;
-			
+			let head_col;
 			switch(variety){
-			case "dist": st += ' dist-split'; col = 'Dist'; break;
-			case "prior": st += ' prior-split'; col = 'Prior'; break;
+			case "dist": st += ' dist-split'; head_col = 'Dist'; break;
+			case "prior": st += ' prior-split'; head_col = 'Prior'; break;
 			default: error("option prob"); break;
 			}
-						
-			if(par.prior_split == undefined){
-				add_warning({mess:"Missing "+key, mess2:"The "+key+" for "+par.full_name+" must be set.", warn_type:"MissingPriorSplitValue", name:par.name});
-				return "";
-			}
-				
-			let data = '';
-			for(let d = 0; d < par.dep.length; d++){
-				data += '"'+par.dep[d]+'",';
-			}
-			data += col+endl;
 			
-			let list = par.list;
-			let co_list = generate_co_list(list);
-			for(let i = 0; i < co_list.length; i++){
-				let comb = co_list[i];
-				for(let d = 0; d < par.dep.length; d++){
-					data += '"'+list[d][comb.index[d]]+'",';
-				}
-				
-				let pri = get_element(par.prior_split,comb.index);
-				
-				if(pri.type.te == select_str){
-					add_warning({mess:"Missing "+key, mess2:"The "+key+" for "+par.full_name+" must be set.", warn_type:"MissingPriorSplitValue", name:par.name});
-					return "";
-				}
-				
-				data += '"'+get_prior_string(pri)+'"'+endl;
-			}
-		
-			write_file_store(data,file,file_list);
-			if(one_file) file = get_one_file(file_list);
+			file = output_value_table(par,par.prior_split,head_col,file,file_list,one_file,key,save_type);
+			if(file == undefined) return "";
 			st += '="'+file+'"';
 		}
 	}
@@ -1137,13 +1175,13 @@ function create_output_ind_eff(p,file_list,one_file)
 
 	for(let i = 0; i < iegs.length; i++){
 		let ieg = iegs[i];
-		let name = "";
+		let ie = "";
 		for(let j = 0; j < ieg.ie_list.length; j++){
-			if(j > 0) name += ",";
-			name += ieg.ie_list[j].name;
+			if(j > 0) ie += ",";
+			ie += ieg.ie_list[j].name;
 		}
 			
-		te += 'ind-effect name="'+name+'"';
+		te += 'ind-effect name="'+ieg.name+'" ie="'+ie+'"';
 		
 		let mat = ieg.A_matrix;
 		

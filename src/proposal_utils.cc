@@ -208,7 +208,7 @@ void Proposal::update_sampler(const CorMatrix &cor_matrix)
 }
 
 /// Samples from the covariance matrix
-bool Proposal::param_resample(PV &param_val, const vector < vector <double> > &popnum_t)
+double Proposal::param_resample(PV &param_val, const vector < vector <double> > &popnum_t)
 {
 	timer[PARAM_RESAMPLE_TIMER] -= clock();
 	
@@ -217,15 +217,36 @@ bool Proposal::param_resample(PV &param_val, const vector < vector <double> > &p
 	auto &value = param_val.value;
 	auto &precalc = param_val.precalc;
 	
+	auto ps_fac = 0.0;
+	
 	for(auto i = 0u; i < N; i++){
 		auto j = param_list[i];
 		param_val.value_change(j);
-		value[j] += si*vec[i];
+			
+		const auto &pv = model.param_vec[j];
+		const auto &pri = model.prior[pv.prior_ref];
 		
+		auto dv = si*vec[i];
+		
+		switch(pri.type){
+		case INVERSE_PR: 
+		case POWER_PR:
+		// case MVN_JEF_PR: case MVN_UNIFORM_PR:
+			{
+				ps_fac += dv;
+				value[j] *= exp(dv);
+			}
+			break;
+			
+		default:
+			value[j] += dv;
+			break;
+		}
+	
 		if(model.in_bounds(value[j],j,precalc) == false){
 			param_val.restore(); 
 			timer[PARAM_RESAMPLE_TIMER] += clock();
-			return false;
+			return UNSET;
 		}
 		
 		model.param_update_precalc_after(j,param_val,true);
@@ -245,9 +266,6 @@ bool Proposal::param_resample(PV &param_val, const vector < vector <double> > &p
 			model.precalc_eqn.calculate(dup.list_precalc,dup.list_precalc_time,param_val,true);
 		}
 		
-		//model.param_update_precalc(j,param_val,true);
-		
-		
 		param_val.value_change(j);
 		if(pv.reparam_time_dep == false) value[j] = model.eqn[ref].calculate_param(precalc);
 		else{
@@ -258,16 +276,18 @@ bool Proposal::param_resample(PV &param_val, const vector < vector <double> > &p
 		if(model.in_bounds(value[j],j,precalc) == false){
 			param_val.restore(); 
 			timer[PARAM_RESAMPLE_TIMER] += clock();
-			return false;
+			return UNSET;
 		}
 	
 		model.param_update_precalc_after(j,param_val,true);
 	}
 
-	if(omega_check && model.ie_cholesky_error(param_val)){
-		param_val.restore(); 
-		timer[PARAM_RESAMPLE_TIMER] += clock();
-		return false;
+	for(const auto &ieg_ref : ieg_check_pri){
+		if(model.ieg_check_prior_error(ieg_ref,param_val)){
+			param_val.restore(); 
+			timer[PARAM_RESAMPLE_TIMER] += clock();
+			return UNSET;
+		}
 	}
 	
 	for(const auto &pr_up : update_precalc){
@@ -276,7 +296,7 @@ bool Proposal::param_resample(PV &param_val, const vector < vector <double> > &p
 	
 	timer[PARAM_RESAMPLE_TIMER] += clock();
 	
-	return true;
+	return ps_fac;
 }
 
 
@@ -667,6 +687,27 @@ bool Proposal::skip_proposal(double val) const
 */
 
 
+/// Sets check for ind effect group prior check
+void Proposal::set_ieg_check_pri() 
+{
+	for(auto th : param_list){
+		const auto &pv = model.param_vec[th];
+		const auto &par = model.param[pv.th];
+		for(const auto &iefr : par.ieg_ref){
+			add_to_vec(ieg_check_pri,iefr);
+		}
+	}
+
+	if(false){
+		cout << name << ":" << endl;
+		for(const auto &iefr : ieg_check_pri){
+			cout << iefr.p << " "<< iefr.i << "  jeffreys check" << endl;
+		}
+	}		
+}
+
+
+/*
 /// Determines if omega needs to be checked over proposal
 void Proposal::set_omega_check()
 {
@@ -676,6 +717,7 @@ void Proposal::set_omega_check()
 		if(model.param_vec[th].omega_fl) omega_check = true;
 	}
 }
+*/
 
 
 /// Determines if two sampled sequences are different

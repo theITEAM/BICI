@@ -80,9 +80,9 @@ init-pop-sim type="fixed" file="init-pop-sim-People.csv"
 
 param name="N" constant="5436406"
 
-param name="β" value="0.5" prior="uniform(0,1)"
+param name="β" value="0.5" prior="inverse(0.01,1)"
 
-param name="γ" value="0.05" prior="uniform(0,1)"
+param name="γ" value="0.05" prior="inverse(0.01,1)"
 
 param name="η" constant="0.3"
 

@@ -477,6 +477,7 @@ function rightmid_menu_buts(lay)
 		case "Parameters":
 			{
 				let selpv = rpf.sel_paramview;
+				
 				let title = ""; 
 				
 				switch(selpv.te){

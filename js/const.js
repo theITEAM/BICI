@@ -10,7 +10,7 @@ let ver="windows";         // Determines platform
 //let ver="linux";
 //let ver="mac";
 
-let win_linux = false;//true;                             // When working on win running linux 
+let win_linux = false;                            // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
@@ -19,7 +19,7 @@ let testing = false;                              // Used logo to load up result
 let load_map_fast = false;                        // If loads up world map from local computer
 let make_one_chain = false;                       // Make into one chain (for diagnostic purposes)
 
-if(win_linux || false){ testing = true; debug = true; load_map_fast = true; make_one_chain = true;}
+if(win_linux || false){ testing = true; debug = true; load_map_fast = true;}
 //if(win_linux){ testing = true; debug = true; load_map_fast = true;}
 	
 let make_file = false;                            // Determines if makes file or runs
@@ -253,9 +253,10 @@ const inf_param_not_needed = ["derive_param"];
 const dist_pos = ["exp(rate)","exp(mean)","gamma","erlang","log-normal","weibull","period"];
 const exp_dist_pos = ["exp(rate)","exp(mean)","erlang"];
 const source_dist_pos = ["exp(rate)","exp(mean)"];
-const prior_pos = ["uniform","exp","normal","gamma","log-normal","beta","bernoulli","fix"];
+const prior_pos = ["inverse","uniform","power","exp","normal","gamma","log-normal","beta","bernoulli","fix"];
 const prior_factor_pos = ["mdir"];
-const prior_pos_positive = ["uniform","exp","gamma","log-normal","fix"];
+const prior_cv_pos = ["mvn-jeffreys","mvn-uniform"];
+const prior_pos_positive = ["inverse","uniform","power","exp","gamma","log-normal","fix"];
 
 const data_types = ["Init. Cond.", "Individual", "Population", "Additional"];
 
@@ -342,7 +343,7 @@ const data_template = [
 // Loading tensor of values for reparameterisation
 {type:"LoadReparam", title:"Load reparameterisation", help:load_reparam_text2, cols:["dep","eqn"]},
 
-/// Loading tensor of values for priors
+// Loading tensor of values for priors
 {type:"LoadPriorSplit", title:"Load priors", help:load_priorsplit_text2, cols:["dep","prior"]},
 
 // Loading tensor of values for distributions
@@ -515,7 +516,7 @@ const SEED_DEFAULT = 0;                            // The default seed
 const ANNEAL_POWER_DEFAULT = "4";                  // Default annealing power
 const ANNEAL_RATE_DEFAULT = "0.01";                // Rate at which annealing is done
 const COORD_DEFAULT = "cartesian";                 // Default coordinate system
-const INTERNAL_ERROR = " This is an internal error to BICI and not something you have done wrong! Please send the BICI script to const Chris for diagnosis.";
+const INTERNAL_ERROR = " This is an internal error to BICI and not something you have done wrong! Please send the BICI script to Chris for diagnosis.";
 
 const PARAM_OUTPUT_MAX_DEFAULT = 1000;             // The default maximum number of tensor elements to be output
 const INDMAX_DEFAULT = 20000;                      // The default maximum number of individuals

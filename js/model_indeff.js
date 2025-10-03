@@ -7,7 +7,7 @@ function display_ind_eff_group(p,i,x,y,lay,wmax)
 	let ieg = model.species[p].ind_eff_group[i];
 	let ie_list = ieg.ie_list;
 	
-	ieg.A_matrix.name = get_A_matrix_name(ie_list);
+	//ieg.A_matrix.name = get_A_matrix_name(ie_list);
 	
 	lay.add_checkbox(wmax-4,y+0.3,"Ind. Cor.","Ind. Cor.",ieg.A_matrix,WHITE,{title:"Individual correlation", te:corrlation_text});
 	wmax -= 4;
@@ -29,49 +29,56 @@ function display_ind_eff_group(p,i,x,y,lay,wmax)
 	
 	if(ie_list.length == 0) error("Should contain IE");
 	
+	let te_si = 0.8, te_fo = get_font(te_si,"","times");
+	
+	lay.add_button({te:"NAME:", x:x, y:y+0.45, dy:te_si, si:te_si, font:te_fo, type:"Text", col:BLACK});
+
+	let fo_name = get_font(1.1,"","times");
+	lay.add_button({te:ieg.name, x:x+2.7, y:y+0., dx:4, dy:1.6, type:"IEGroupName", font:fo_name, ac:"IEGroupName", source:ieg });
+	
+	let xx = x + 8;
+	
 	if(ie_list.length == 1){
 		let st = ie_list[0].name;
 		let st2 = "["+st+"]";
 		let w = text_width(st2,fo);
-
-		lay.add_button({te:st2, x:x-w-0.6, y:y, dy:si_big, type:"Text", font:fo, si:si_big, col:BLACK});
 	
-		lay.add_button({te:"~", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
+		lay.add_button({te:st2, x:xx, y:y, dy:si_big, type:"Text", font:fo, si:si_big, col:BLACK});
+	
+		lay.add_button({te:"~", x:xx+w+0.6, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
 		
-		let eq = "Ω^"+st+","+st; 
+		let eq = "Ω^"+ieg.name; 
 		let te = "<e>Shifted LN("+eq;
 		
 		if(ieg.A_matrix.check == true){
-			te += "</e><e>⊗</e><e>"+ieg.A_matrix.name+"</e>";
+			te += "</e><e>⊗</e><e>A^"+ieg.name+"</e>";
 		}
 		te += ")</e>";
 		
-		lay.add_paragraph(te,wmax-x-1.6,x+1.6,y+0.2,BLACK,para_eq_si,para_lh);
+		lay.add_paragraph(te,wmax-x-w-0.6-1.6,xx+w+0.6+1.6,y+0.2,BLACK,para_eq_si,para_lh);
 	}
 	else{
-		let st = "", st2 = "";
+		let st = "";
 		for(let j = 0; j < ie_list.length; j++){
 			if(st != "") st += ", ";
 			st += "["+ie_list[j].name+"]";
-			if(st2 != "") st2 += ",";
-			st2 += ie_list[j].name;
 		}
 		st = "("+st+")";
 		
 		let w = text_width(st,fo);
 		
-		if(x-w-0.6 < 2) x = 2+w+0.6;
-		lay.add_button({te:st, x:x-w-0.6, y:y, dy:si_big, type:"Text", font:fo, si:si_big, col:BLACK});
+		//if(x-w-0.6 < 2) x = 2+w+0.6;
+		lay.add_button({te:st, x:xx, y:y, dy:si_big, type:"Text", font:fo, si:si_big, col:BLACK});
 		
-		lay.add_button({te:"~", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
+		lay.add_button({te:"~", x:xx+w+0.6, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
 		
-		let eq = "Ω^"+st2; 
+		let eq = "Ω^"+ieg.name; 
 		let te = "<e>Shifted MVLN("+eq;
 		
-		if(ieg.A_matrix.check == true) te += "</e><e>⊗</e><e>"+ieg.A_matrix.name;
+		if(ieg.A_matrix.check == true) te += "</e><e>⊗</e><e>A^"+ieg.name;
 		te += ")</e>";
 		
-		lay.add_paragraph(te,wmax-x-1.6,x+1.6,y+0.2,BLACK,para_eq_si,para_lh);
+		lay.add_paragraph(te,wmax-x-w-0.6-1.6,xx+w+0.6+1.6,y+0.2,BLACK,para_eq_si,para_lh);
 	}
 }
 
@@ -183,6 +190,7 @@ function split_ie(p,i)
 		let ieg2 = sp.ind_eff_group[sp.ind_eff_group.length-1];
 		ieg2.ie_list.length = 0;
 		ieg2.ie_list.push(copy(ieg.ie_list[j]));
+		if(j > 0) ieg2.name = generate_iegroup_name();
 	}
 	
 	sp.ind_eff_group.splice(i,1);

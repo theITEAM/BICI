@@ -33,7 +33,7 @@ trans name="S->I" value="exp(rate:β×[g]×{I})"
 
 # INDIVIDUAL EFFECTS
 
-ind-effect name="g" ind-list="ind-list-g.csv" A-sparse="A-matrix-g.csv"
+ind-effect name="var" ie="g" ind-list="ind-list-g.csv" A-sparse="A-matrix-g.csv"
 
 # SIMULATION INITIAL CONDITIONS
 
@@ -52,9 +52,9 @@ ind-effect-data name="True ie for sus" ie="g" file="ind-effect-data.csv"
 
 ######################## PARAMETERS ########################
 
-param name="β" value="0.0005" prior="uniform(0,0.1)"
+param name="β" value="0.0005" prior="inverse(0.0001,0.01)"
 
-param name="Ω^g,g" value="1" prior="uniform(0,2)"
+param name="Ω^var" value="1" prior="mvn-jeffreys(0.01,2)"
 
 
 

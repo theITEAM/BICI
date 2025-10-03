@@ -68,54 +68,48 @@ PV Model::param_sample() const
 {
 	PV param_val;
 	param_val_init(param_val);
+	
 	auto &value = param_val.value;
 	auto &precalc = param_val.precalc;
 	
-	auto loop = 0u, loopmax = 100u;
-	do{
-		for(auto th = 0u; th < nparam_vec; th++){
-			const auto &pv = param_vec[th];
-			
-			param_update_precalc_before(th,param_val,false);
+	for(auto th = 0u; th < nparam_vec; th++){
+		const auto &pv = param_vec[th];
 		
-			const auto &par = param[pv.th];
-			switch(par.variety){
-			case CONST_PARAM:
-				value[th] = par.get_value(pv.index);
-				param_update_precalc_after(th,param_val,false);
-				break;
-			
-			case REPARAM_PARAM: 
-				{
-					if(pv.reparam_time_dep == false){
-						auto eq_ref = par.get_eq_ref(pv.index);
-						if(eq_ref == UNSET) emsg("eq_ref should be set");
-
-						value[th] = eqn[eq_ref].calculate_param(precalc);
-						param_update_precalc_after(th,param_val,false);
-					}
-				}
-				break;
-				
-			case DIST_PARAM: case PRIOR_PARAM:	
-				value[th] = prior_sample(prior[pv.prior_ref],precalc);
-				param_update_precalc_after(th,param_val,false);
-				break;
-				
-			case UNSET_PARAM: emsg("error param"); break;
-			}
-		}
-		
-		if(!ie_cholesky_error(param_val)) break;
-		loop++;
-	}while(loop < loopmax);
+		param_update_precalc_before(th,param_val,false);
 	
-	if(loop == loopmax){
-		for(auto val : value) cout << val << "parameter value" << endl;
-		emsg("Could not sample parameters due to Cholesky error");
+		const auto &par = param[pv.th];
+		switch(par.variety){
+		case CONST_PARAM:
+			value[th] = par.get_value(pv.index);
+			param_update_precalc_after(th,param_val,false);
+			break;
+		
+		case REPARAM_PARAM: 
+			{
+				if(pv.reparam_time_dep == false){
+					auto eq_ref = par.get_eq_ref(pv.index);
+					if(eq_ref == UNSET) emsg("eq_ref should be set");
+
+					value[th] = eqn[eq_ref].calculate_param(precalc);
+					param_update_precalc_after(th,param_val,false);
+				}
+			}
+			break;
+			
+		case DIST_PARAM: case PRIOR_PARAM:	
+			value[th] = prior_sample(prior[pv.prior_ref],precalc);
+			param_update_precalc_after(th,param_val,false);
+			break;
+			
+		case UNSET_PARAM: emsg("error param"); break;
+		}
 	}
 	
+	sample_ieg_cv(param_val); // Samples any individual effect covariances 
+	
 	precalc_eqn.calculate(list_precalc,get_list(details.T),param_val,false);
+
+	//print_param(param_val);
 	
 	if(false){
 		for(auto val: param_val.value) cout << val << ","; 	
@@ -129,6 +123,56 @@ PV Model::param_sample() const
 }
 
 
+/// Samples covariance matrices for indidivudal effects using Wishart distribution
+void Model::sample_ieg_cv(PV &param_val) const
+{
+	for(auto p = 0u; p < species.size(); p++){
+		const auto &sp = species[p];
+		for(auto g = 0u; g < sp.ind_eff_group.size(); g++){
+			const auto &ieg = sp.ind_eff_group[g];
+			
+			const auto &par = param[ieg.th];
+			if(par.variety == PRIOR_PARAM){
+				const auto &pri = prior[ieg.prior_ref];
+				if(pri.type != MVN_JEF_PR && pri.type != MVN_UNIFORM_PR) emsg("Should be mvn-jeffreys or mvn-uniform");
+		
+				auto N = ieg.list.size();
+				
+				auto det = 0.0;
+				auto det_min = exp(ieg.log_det_min);
+				auto det_max = exp(ieg.log_det_max);
+		
+				switch(pri.type){
+				case MVN_UNIFORM_PR:
+					det = det_min+ran()*(det_max-det_min);
+					break;
+					
+				case MVN_JEF_PR:
+					if(N == 1) det = det_min*exp(ran()*log(det_max/det_min));
+					else{
+						auto power = -0.5*N-0.5;				
+						det = pow(pow(det_min,power+1)+ran()*(pow(det_max,power+1)-pow(det_min,power+1)),1.0/(power+1));
+					}
+					break;
+					
+				default: emsg("op er"); break;
+				}
+				
+				auto var = pow(det,1.0/N);
+				
+				for(auto j = 0u; j < N; j++){
+					for(auto i = 0u; i < N; i++){
+						auto valu = 0.0; if(i == j) valu = var;
+						param_val.value[ieg.omega_pv[j][i]] = valu;
+					}
+				}
+			}
+		}			
+	}
+}
+
+	
+/// Updatews precalc for all times
 void Model::param_update_precalc_time_all(const vector < vector <double> > &popnum_t, PV &param_val, bool store) const
 {
 	for(auto ti = 0u; ti < details.T; ti++){
@@ -303,6 +347,17 @@ vector <double> Model::dist_prob(const PV &param_val) const
 }
 
 
+/// Recalculates the prior for a given ind effect group
+double Model::recalculate_ieg_prior(unsigned int j, vector <double> &prior_ieg, const PV &param_val, double &like_ch) const
+{
+	auto store = prior_ieg[j];
+	prior_ieg[j] = prior_ieg_calculate(ieg_ref[j],param_val);
+	like_ch += prior_ieg[j]-store;
+	
+	return store;
+}
+
+
 /// Recalculates the prior for a given parameter
 double Model::recalculate_prior(unsigned int th, vector <double> &prior_prob, const PV &param_val, double &like_ch) const
 {
@@ -315,6 +370,147 @@ double Model::recalculate_prior(unsigned int th, vector <double> &prior_prob, co
 	like_ch += prior_prob[th]-store;
 	
 	return store;
+}
+
+
+/// The prior for all the ind effect groups
+vector <double> Model::prior_ieg_all(const PV &param_val) const 
+{
+	vector <double> pri;
+	for(auto i = 0u; i < ieg_ref.size(); i++){
+		pri.push_back(prior_ieg_calculate(ieg_ref[i],param_val));
+	}
+	
+	return pri;
+}
+
+
+/// The prior for an ind effect group
+double Model::prior_ieg_calculate(const IEGref &iegr, const PV &param_val) const
+{
+	const auto &sp = species[iegr.p];
+	
+	const auto &ieg = sp.ind_eff_group[iegr.i];
+	
+	const auto &par = param[ieg.th];
+	
+	if(par.variety == CONST_PARAM) return UNSET;
+	
+	auto omega = sp.calculate_omega_basic(iegr.i,param_val,param);
+	
+	for(auto i = 0u; i < omega.size(); i++){
+		if(omega[i][i] < ieg.var_min) return -LARGE;
+		if(omega[i][i] > ieg.var_max) return -LARGE;
+	}
+	
+	auto N = ieg.list.size();
+
+	auto log_det = determinant_fast(omega);
+	
+	//if(log_det == UNSET) emsg("Out of range");
+	//if(log_det < ieg.log_det_min || log_det > ieg.log_det_max) emsg("Out of range2");
+	
+	if(log_det == UNSET) return -LARGE;
+	//if(log_det < ieg.log_det_min || log_det > ieg.log_det_max) return -LARGE;
+		
+	const auto &pri = prior[ieg.prior_ref];
+	
+	switch(pri.type){
+	case MVN_JEF_PR: return -(0.5*N+0.5)*log_det;
+	case MVN_UNIFORM_PR: return 0;
+	default: emsg("opp prob"); break;
+	}
+
+	return UNSET;
+}
+
+
+/// Sets ieg_ref which references ind effect groups
+void Model::set_ieg_ref()
+{
+	for(auto p = 0u; p < species.size(); p++){
+		const auto &sp = species[p];
+		for(auto i = 0u; i < sp.ind_eff_group.size(); i++){
+			IEGref iegr; iegr.p = p; iegr.i = i;
+			ieg_ref.push_back(iegr);
+		}
+	}
+}
+
+
+/// Sets param vec which determines covariance matrices
+void Model::set_omega_pv()
+{
+	for(auto &iegr : ieg_ref){
+		auto &sp = species[iegr.p];
+		auto &ieg = sp.ind_eff_group[iegr.i];
+		
+		const auto &par = param[ieg.th];
+		if(par.variety == CONST_PARAM){ // Checks that set matrix is valid
+			auto omega = sp.calculate_omega_const(iegr.i,param);
+			auto N = omega.size();
+			for(auto j = 0u; j < N; j++){
+				for(auto i = 0u; i < N; i++){
+					if(j != i){
+						auto val = omega[j][i];
+						auto name = exchange_omega(par.name)+"_"+ieg.list[j].name+","+ieg.list[i].name; 
+						if(val >= 1) alert_input("The correlation "+name+" must be less than 1");
+						if(val <= -1) alert_input("The correlation "+name+" must be greater than -1");
+					}
+				}
+			}
+			
+			sp.convert_cor_var(omega);
+			auto log_det = determinant_fast(omega);
+			if(log_det == UNSET){
+				alert_input("The matrix "+par.name+" must have a positive determinant");
+			}						
+		}
+		else{
+			auto N = ieg.list.size();
+			ieg.prior_ref = par.element[0].prior_ref;
+			
+			const auto &pri = prior[ieg.prior_ref];
+	
+			auto min = eqn[pri.dist_param[0].eq_ref].calculate_constant();
+			auto max = eqn[pri.dist_param[1].eq_ref].calculate_constant();
+
+			if(min <= 0) alert_input("For the prior '"+pri.name+"' the minumum value '"+tstr(min)+"' must be positive.");
+			
+			if(max <= 0) alert_input("For the prior '"+pri.name+"' the maximum value '"+tstr(max)+"' must be positive.");
+			
+			if(min >= max){
+				alert_input("For the prior '"+pri.name+"' the minumum value '"+tstr(min)+"' is larger than the maximum value '"+tstr(max)+"'.");
+			}
+			
+			ieg.log_det_min = N*log(min);
+			ieg.log_det_max = N*log(max);
+			ieg.var_min = 1*min;
+			ieg.var_max = 1*max;
+			
+			ieg.omega_pv.resize(N);
+			for(auto j = 0u; j < N; j++){
+				ieg.omega_pv[j].resize(N);
+				for(auto i = 0u; i < N; i++){
+					auto val =  par.get_param_vec(j*N+i);
+					if(j > i) val = par.get_param_vec(i*N+j);
+					if(val == UNSET) emsg("Problem with omega matrix");
+					ieg.omega_pv[j][i] = val;
+				}
+			}
+		}
+	}
+}
+
+
+/// Exchanges \Omega with \omega
+string Model::exchange_omega(string name) const 
+{
+	if(begin_str(name,"\\Omega")) return "\\omega"+name.substr(6);
+	if(begin_str(name,"Ω")) return "ω"+name.substr(1);
+	
+	emsg("Omega exhange problem");
+	return name;
 }
 
 
@@ -413,7 +609,7 @@ void Model::order_affect(vector <AffectLike> &vec) const
 {
 	for(auto &al : vec){
 		switch(al.type){
-		case SPLINE_PRIOR_AFFECT: case PRIOR_AFFECT: case DIST_AFFECT: case OMEGA_AFFECT: 
+		case SPLINE_PRIOR_AFFECT: case IEG_PRIOR_AFFECT:  case PRIOR_AFFECT: case DIST_AFFECT: case OMEGA_AFFECT: 
 		case LIKE_INIT_COND_AFFECT: case PRIOR_INIT_COND_AFFECT:
 		case GENETIC_VALUE_AFFECT:
 			al.order_num = 1; 
@@ -1199,12 +1395,44 @@ double Model::prior_sample(const Prior &pri, const vector <double> &precalc) con
 	string warn;
 	
 	switch(pri.type){
+	case MVN_JEF_PR: case MVN_UNIFORM_PR: case MVN_COR_PR:  // Sampling for this is done collectively
+		return UNSET;
+	
+	case INVERSE_PR:
+		{	
+			auto min = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
+			auto max = eqn[pri.dist_param[1].eq_ref].calculate_param(precalc);
+			if(min <= 0) run_error("For the prior '"+pri.name+"' the minumum value '"+tstr(min)+"' has become non-positive.");
+			
+			if(max <= 0) run_error("For the prior '"+pri.name+"' the maximum value '"+tstr(max)+"' has become non-positive.");
+			
+			if(min >= max) run_error("For the prior '"+pri.name+"' the minumum value '"+tstr(min)+"' is larger than the maximum value '"+tstr(max)+"'.");
+			val = min*exp(ran()*log(max/min));
+		}
+		break;
+		
+	case POWER_PR:
+		{	
+			auto min = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
+			auto max = eqn[pri.dist_param[1].eq_ref].calculate_param(precalc);
+			if(min <= 0) run_error("For the prior '"+pri.name+"' the minumum value '"+tstr(min)+"' has become non-positive.");
+			
+			if(max <= 0) run_error("For the prior '"+pri.name+"' the maximum value '"+tstr(max)+"' has become non-positive.");
+			
+			if(min >= max) run_error("For the prior '"+pri.name+"' the minumum value '"+tstr(min)+"' is larger than the maximum value '"+tstr(max)+"'.");
+			
+			auto power = eqn[pri.dist_param[2].eq_ref].calculate_param(precalc);
+			if(power == -1) val = min*exp(ran()*log(max/min));
+			else val = pow(pow(min,power+1)+ ran()*(pow(max,power+1)-pow(min,power+1)),1.0/(power+1));
+		}
+		break;
+		
 	case UNIFORM_PR:
 		{	
 			auto min = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
 			auto max = eqn[pri.dist_param[1].eq_ref].calculate_param(precalc);
 		
-			if(min >= max) emsg("For the prior '"+pri.name+"' the minumum value '"+tstr(min)+"' is larger than the maximum value '"+tstr(max)+"'.");
+			if(min >= max) run_error("For the prior '"+pri.name+"' the minumum value '"+tstr(min)+"' is larger than the maximum value '"+tstr(max)+"'.");
 			val = min+ran()*(max-min);
 		}
 		break;
@@ -1336,6 +1564,34 @@ void Model::set_hash_all_ind()
 }
 
 
+/// Checks that the prior for the ind effect group is within bounds
+bool Model::ieg_check_prior_error(const IEGref &iegr, const PV &param_val) const
+{
+	const auto &sp = species[iegr.p];
+	
+	const auto &ieg = sp.ind_eff_group[iegr.i];
+	
+	const auto &par = param[ieg.th];
+	
+	if(par.variety == CONST_PARAM) return false;
+	
+	auto omega = sp.calculate_omega_basic(iegr.i,param_val,param);
+	
+	auto L = omega.size();
+	for(auto j = 0u; j < L; j++){
+		auto val = omega[j][j]; 
+		if(val < ieg.var_min || val > ieg.var_max) return true;
+	}
+	
+	auto det = determinant_fast(omega);
+
+	if(det == UNSET) return true;
+	//if(det < ieg.log_det_min || det > ieg.log_det_max) return true;
+	
+	return false;
+}
+
+/*
 /// Checks that the cholesky matrices can all be specified
 bool Model::ie_cholesky_error(const PV &param_val) const
 {
@@ -1351,6 +1607,7 @@ bool Model::ie_cholesky_error(const PV &param_val) const
 
 	return false;
 }
+*/
 
 
 /// Prints a set of parameters
@@ -1441,7 +1698,7 @@ PV Model::get_param_val(const Particle &pa) const
 			const auto &par = param[pv.th];
 				
 			switch(par.variety){
-			case PRIOR_PARAM:
+			case PRIOR_PARAM: case DIST_PARAM:
 				{
 					const auto &pri = prior[par.get_prior_ref(pv.index)];
 					if(pri.type != FIX_PR) emsg("Prior should be fixed");
@@ -2200,6 +2457,23 @@ bool Model::in_bounds(double x, unsigned int j, const vector <double> &precalc) 
 		{
 			const auto &pri = prior[pv.prior_ref];
 			switch(pri.type){
+			case MVN_JEF_PR: case MVN_UNIFORM_PR: 
+				if(x < TINY) return false;
+				break;
+				
+			case MVN_COR_PR: 
+				if(x < -COR_MAX || x > COR_MAX) return false;
+				break;
+				
+			case INVERSE_PR: case POWER_PR:
+				{	
+					auto min = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
+					auto max = eqn[pri.dist_param[1].eq_ref].calculate_param(precalc);
+					if(min <= 0 || max <= 0) return false;
+					if(x < min || x > max) return false;
+				}
+				break;
+				
 			case UNIFORM_PR:
 				{	
 					auto min = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
@@ -2379,4 +2653,20 @@ void Model::set_linear_form(unsigned int p, LinearForm &lin_form, const vector <
 		*/
 		emsg("mbp speed up");
 	}
+}
+
+
+/// Determines if a parameter is a matrix
+bool Model::is_matrix(const Param &par) const 
+{
+	if(par.dep.size() == 2 && par.dep[0].index == par.dep[1].index) return true;
+	return false;
+}
+
+
+/// Determines if parameter is symmetric
+bool Model::is_symmetric(const Param &par) const
+{
+	if(is_matrix(par) && begin_str(par.name,"Ω")) return true;
+	return false;
 }

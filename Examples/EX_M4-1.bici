@@ -39,11 +39,11 @@ init-pop-sim type="fixed" focal="Alive" file="init-pop-sim-Animal.csv"
 
 ######################## PARAMETERS ########################
 
-param name="α" value="0.2" prior="uniform(0,1)"
+param name="α" value="0.2" prior="inverse(0.01,1)"
 
 param name="κ" value="200" prior="uniform(0,1000)"
 
-param name="μ" value="0.05" prior="uniform(0,1)"
+param name="μ" value="0.05" prior="inverse(0.01,1)"
 
 
 

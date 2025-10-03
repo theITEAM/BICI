@@ -52,9 +52,9 @@ remove-pop-sim file="remove-pop-sim.csv"
 
 param name="N" constant="10000"
 
-param name="β_s" value="value-beta.csv" prior="uniform(0,1)"
+param name="β_s" value="value-beta.csv" prior="inverse(0.01,1)"
 
-param name="γ_s" value="value-gamma.csv" prior="uniform(0,1)"
+param name="γ_s" value="value-gamma.csv" prior="inverse(0.01,1)"
 
 
 

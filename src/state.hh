@@ -22,6 +22,8 @@ class State                                // Stores information about the state
 		Like like;                             // Stores the overall likelihood and prior
 		
 		vector <double> prior_prob;            // The prior probability for each parameter
+	
+		vector <double> prior_ieg;             // The prior for ind effect groups
 		
 		vector <double> dist_prob;             // The distribution probability for each parameter
 		

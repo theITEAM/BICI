@@ -554,13 +554,12 @@ void Chain::update_init()
 		
 		for(auto i = 0u; i < sp.ind_eff_group.size(); i++){
 			auto &ieg = sp.ind_eff_group[i];
-			for(auto j = 0u; j < ieg.list.size(); j++){
-				auto &par = model.param[ieg.omega[j][j]];
-				if(par.variety != CONST_PARAM){
+			const auto &par = model.param[ieg.th];
+			if(par.variety != CONST_PARAM){
+				for(auto j = 0u; j < ieg.list.size(); j++){	
 					auto ie = ieg.list[j].index;
-					
 					vector <unsigned int> vec;
-					vec.push_back(par.get_param_vec(0));
+					vec.push_back(ieg.omega_pv[j][j]);
 					vec.push_back(p);
 					vec.push_back(ie);
 					
@@ -576,15 +575,12 @@ void Chain::update_init()
 						proposal.push_back(pp);
 					}
 				}
-			}
 			
-			if(ieg.list.size() > 0){
-				for(auto j = 0u; j < ieg.list.size(); j++){
-					for(auto k = j+1; k < ieg.list.size(); k++){
-						auto &par = model.param[ieg.omega[j][k]];
-						if(par.variety != CONST_PARAM){
+				if(ieg.list.size() > 0){
+					for(auto j = 0u; j < ieg.list.size(); j++){
+						for(auto k = j+1; k < ieg.list.size(); k++){
 							vector <unsigned int> vec;
-							vec.push_back(par.get_param_vec(0));
+							vec.push_back(ieg.omega_pv[j][k]);
 							vec.push_back(p);
 							vec.push_back(i);
 							vec.push_back(j);
@@ -1101,6 +1097,7 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 				switch(i){
 				case SPLINE_PRIOR_AFFECT: ss << "Spline prior"; break; 
 				case PRIOR_AFFECT: ss << "Prior"; break; 
+				case IEG_PRIOR_AFFECT: ss << "IEG Prior"; break; 
 				case DIST_AFFECT: ss << "Distribution"; break; 
 				case EXP_FE_AFFECT: ss << "Exp FE"; break; 
 				case DIV_VALUE_AFFECT: ss << "Div value"; break; 

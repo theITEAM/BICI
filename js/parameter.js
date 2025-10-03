@@ -599,6 +599,30 @@ function find_comp_from_index(index)
 }
 
 
+/// Finds the individual effect in a ind effect group from the parameter make
+function find_ieg_list(par)
+{
+	let list = [];
+	
+	let spl = par.name.split("^");
+	if(spl.length != 2){ error("Spl should be 2"); return;}
+	if(spl[0] != "Ω"){ error("Should be Ω"); return;}
+	
+	let name = spl[1];
+	for(let p = 0; p < model.species.length; p++){
+		let sp = model.species[p];
+		for(let j = 0; j < sp.ind_eff_group.length; j++){
+			let ieg = sp.ind_eff_group[j];
+			if(ieg.name == name){
+				for(let k = 0; k < ieg.ie_list.length; k++) list.push(ieg.ie_list[k].name);
+				return list;
+			}
+		}
+	}
+	return list;
+}
+		
+
 /// Finds the classification from the index name
 function find_cla_from_index(name)
 {
@@ -657,7 +681,7 @@ function update_model_ind_eff(ielist)
 				}
 			
 				if(flag == false){
-					sp.ind_eff_group.push({p_name:ie.p_name, A_matrix:{check:false, loaded:false, value:[], ind_list:[], pedigree:false, sire_list:[], dam_list:[]}, ie_list:[{name:ie.name}]});
+					sp.ind_eff_group.push({name:generate_iegroup_name(), p_name:ie.p_name, A_matrix:{check:false, loaded:false, value:[], ind_list:[], pedigree:false, sire_list:[], dam_list:[]}, ie_list:[{name:ie.name}]});
 				}
 			}
 		}
@@ -688,6 +712,26 @@ function update_model_ind_eff(ielist)
 			model.warn.push({mess:"Cannot have individual effects", mess2:"A population-based model cannot have individual effects such as '["+name+"]'", warn_type:"Equation"});
 		}
 	}
+}
+
+
+/// Generates a unique iegroup name
+function generate_iegroup_name()
+{
+	let list=[];
+	for(let p = 0; p < model.species.length; p++){
+		let sp = model.species[p];
+		for(let i = 0; i < sp.ind_eff_group.length; i++){
+			list.push(sp.ind_eff_group[i].name);
+		}
+	}
+
+	let k = 1;
+	while(true){
+		let name = "CM"; if(k > 1) name += k;
+		if(find_in(list,name) == undefined) return name;
+		k++;
+	}	
 }
 
 
@@ -747,22 +791,20 @@ function add_ind_eff_param(par_list)
 		
 		for(let i = 0; i < sp.ind_eff_group.length; i++){
 			let ieg = sp.ind_eff_group[i];
-			for(let j = 0; j < ieg.ie_list.length; j++){
-				for(let jj = j; jj < ieg.ie_list.length; jj++){
-					let ie1 = ieg.ie_list[j].name, ie2 = ieg.ie_list[jj].name;
-					let sup = "^"+ie1+","+ie2;
-					
-					let par;
-					if(j == jj){
-						par = { name:"Ω"+sup, time_dep: false, dep:[], eqn_appear:[], type: "variance"};
-					}
-					else{
-						par = { name:"ω"+sup, time_dep: false, dep:[], eqn_appear:[], type: "correlation"};
-					}
-				
-					add_par_to_list(par,par_list,{p:p, ieg:i, ie1:ie1, ie2:ie2},"Individual effect variance");
-				}
-			}		
+			
+			let name = "Ω^"+ieg.name;
+			if(ieg.ie_list.length == 1){
+				let par = { name:name, time_dep:false, dep:[], eqn_appear:[], type: "variance"};
+				par.full_name = param_name(par);			
+				add_par_to_list(par,par_list,{p:p, ieg:i},"Individual effect variance");
+			}
+			else{
+				let dep = ["z","z'"];
+				let par = { name:name, time_dep:false, dep:dep, eqn_appear:[], type: "variance"};
+				par.full_name = param_name(par);			
+				par_find_list(par);
+				add_par_to_list(par,par_list,{p:p, ieg:i, ie:ieg.ie_list[0].name},"Individual effect variance");
+			}
 		}
 	}
 } 	
@@ -902,6 +944,22 @@ function add_distribution_eqn(dist,vari,par_list,eqn_info,warn,op)
 	case "uniform":
 		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn,op);
 		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn,op);
+		break;
+		
+	case "mvn-jeffreys": case "mvn-uniform":
+		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn,op);
+		break;
+		
+	case "inverse":
+		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn,op);
+		break;
+		
+	case "power":
+		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.power_eqn.te,vari,par_list,eqn_info,warn,op);
 		break;
 		
 	case "exp": 
@@ -1330,7 +1388,8 @@ function set_pri_pos(type,factor)
 {
 	let pri_pos = prior_pos;  
 	if(factor) pri_pos = prior_factor_pos;
-		
+	if(type == "variance") pri_pos = prior_cv_pos;
+	
 	return pri_pos;
 }
 
@@ -1384,7 +1443,7 @@ function generate_co_list(list)
 function unset_prior(par_type)
 {
 	var eb = {te:"", type:"prior", mode:"param only"};
-	var value = {min_eqn:copy(eb), max_eqn:copy(eb), mean_eqn:copy(eb), shape_eqn:copy(eb), cv_eqn:copy(eb), sd_eqn:copy(eb), alpha_eqn:copy(eb), beta_eqn:copy(eb), sigma_eqn:copy(eb)};
+	var value = {min_eqn:copy(eb), max_eqn:copy(eb), mean_eqn:copy(eb), power_eqn:copy(eb), shape_eqn:copy(eb), cv_eqn:copy(eb), sd_eqn:copy(eb), alpha_eqn:copy(eb), beta_eqn:copy(eb), sigma_eqn:copy(eb)};
 	
 	let te = select_str;
 	

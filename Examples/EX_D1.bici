@@ -48,7 +48,7 @@ pop-data name="Infected population" filter="DS=I" error="normal:10%" file="pop-d
 
 param name="N" constant="1001"
 
-param name="β(t)" value="value-beta.csv" prior="uniform(0,1)" knot-times="start,10,30,50,70,end" smooth="log-normal(1)"
+param name="β(t)" value="value-beta.csv" prior="inverse(0.01,1)" knot-times="start,10,30,50,70,end" smooth="log-normal(1)"
 
 
 

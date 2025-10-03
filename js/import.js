@@ -214,6 +214,7 @@ function import_file2(data_file_list)
 				case "species": case "classification": case "view":
 				case "compartment": case "compartment-all": 
 				case "data-dir": 
+				case "ind-effect":
 					break;
 				default:
 					process = false; 
@@ -234,7 +235,8 @@ function import_file2(data_file_list)
 			case 2: // The last pass does everything except the parameters and compartments
 				switch(cname){
 				case "compartment": case "compartment-all":
-				case "param": case "data-dir":
+				case "param": case "data-dir": 
+				case "ind-effect":
 				case "param-sim": case "state-sim":
 				case "param-inf": case "state-inf": 
 				case "param-post-sim": case "state-post-sim": 
@@ -1572,3 +1574,165 @@ function text_from_file(te)
 		return te.replace(/\|/g,"\n");
 	}
 }
+
+
+/// Loads up parameter values from a file
+function load_param_value(par,value,head_col,valu,desc)
+{
+	let dim = get_dimensions(value);
+	let ele_list = get_element_list(value,dim);
+		
+	// Sets a default value of zero
+	for(let k = 0; k < ele_list.length; k++){
+		set_element(value,ele_list[k],"0");
+	}
+	
+	let fi = get_fi(valu);
+	
+	let tab = load_table(fi.te,true,fi.sep,fi.name);
+	if(typeof tab == 'string') alert_import(tab);
+
+	let load_type = "normal";
+	
+	let col_name = copy(par.dep);
+	col_name.push(head_col);
+	
+	let subtab = get_subtable(tab,col_name);
+	if(subtab.error != ""){
+		if(is_matrix(par)){ // Tries to load a matrix
+			col_name = par.list[0];
+			subtab = get_subtable(tab,col_name);
+			if(subtab.error != ""){ alert_import(subtab.error); return;}
+			load_type = "matrix";
+		}
+		else alert_import(subtab.error);
+	}
+	
+	switch(load_type){
+	case "matrix":    // Loads using a matrix format
+		{
+			let sym = is_symmetric(par);
+			for(let j = 0; j < par.list[0].length; j++){
+				for(let i = 0; i < par.list[1].length; i++){
+					let ind=[]; ind[0] = j; ind[1] = i;
+					let ele = subtab.ele[j][i];
+					
+					if(sym == true && i < j){
+						if(ele != "."){
+							let name = "<e>"+par.name+"_"+par.list[0][j]+","+par.list[0][i]+"</e>";
+							alert_import(desc+" the element '"+ele+"' for "+name+" should be set to '.' because it is in the bottom left-hand corneter of the covariance matrix definition");
+						}
+						set_element(value,ind,ele);
+					}
+					else{
+						let val = get_val_from_ele(ele,par,head_col,desc,j,subtab.heading[i]);
+
+						set_element(value,ind,val);
+					}
+				}
+			}
+		}
+		break;
+		
+	case "normal":
+		{
+			let ncol = subtab.ncol;
+
+			for(let r = 0; r < subtab.nrow; r++){
+				let ind = [];
+				for(let i = 0; i < ncol-1; i++){
+					ind[i] = find_in(par.list[i],subtab.ele[r][i]);
+					if(ind[i] == undefined){
+						alert_import(desc+" the element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+(r+2)+")");
+					}
+				}
+				let ele = subtab.ele[r][ncol-1];
+				
+				let val = get_val_from_ele(ele,par,head_col,desc,r,subtab.heading[ncol-1]);
+				
+				set_element(value,ind,val);
+			}
+		}
+		break;
+		
+	default: error("op problem"); break;
+	}
+			
+	if(head_col == "Value" && is_symmetric(par)){  // Checks that matrix is symmtric 
+		for(let j = 0; j < par.list[0].length; j++){
+			for(let i	= 0; i < j; i++){
+				let ind1=[]; ind1[0] = j; ind1[1] = i;
+				let el1 = get_element(value,ind1);
+				
+				if(el1 != "."){
+					let name = "<e>"+par.name+"_"+par.list[0][j]+","+par.list[0][i]+"</e>";
+					alert_import(desc+" the element '"+el1+"' for "+name+" should be set to '.' because it is in the bottom left-hand corneter of the covariance matrix definition");
+				}
+			}
+		}
+	}
+}
+
+
+/// Gets a value from an element
+function get_val_from_ele(ele,par,head_col,desc,r,col)
+{
+	let val;
+	
+	ele = ele.trim();
+	if(ele == ""){
+		alert_import(desc+" no content in table element (column '"+col+"', row "+(r+2)+").");
+		return ele;
+	}
+
+	switch(head_col){
+	case "Prior":
+		val = convert_text_to_prior(ele,par.pri_pos);
+		if(val.err == true){
+			alert_import(desc+" the table element '"+ele+"' is not a valid prior specification (column '"+col+"', row "+(r+2)+"). "+val.msg);
+		}
+		break;
+		
+	case "Dist":
+		val = convert_text_to_prior(ele,par.pri_pos,true);
+		if(val.err == true){
+			alert_import(desc+" the table element '"+ele+"' is not a valid distribution specification (column '"+col+"', row "+(r+2)+"). "+val.msg);
+		}
+		break;
+
+	default:
+		switch(par.variety){
+		case "normal": case "const":
+			if(par.factor && ele == "*"){
+				val = ele;
+			}
+			else{
+				val = Number(ele);
+				if(isNaN(val)){
+					alert_import(desc+" the element '"+ele+"' is not a number (column '"+col+"', row "+(r+2)+")");
+				}
+			}
+			break;
+		
+		case "reparam":
+			if(!isNaN(ele)) val = Number(ele);
+			else{
+				let conv_res = detect_greek(ele,0);
+				ele = conv_res.te;
+			
+				val = ele;
+				
+				let res = is_eqn(val,"Table element",{});
+				if(res.err == true){
+					alert_import(desc+" the element '"+ele+"' is not a valid equation (column '"+col+"', row "+(r+2)+")");
+				}
+			}
+			break;
+			
+		default: error("option not recognised1"); break;
+		}
+	}
+	
+	return val;
+}
+	

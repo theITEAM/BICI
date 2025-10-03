@@ -738,16 +738,17 @@ function add_screen_buts(lay)
 			case "split":
 				{
 					let lay = get_lay("Main");
+					if(lay){
+						let si = 0.8;
 					
-					let si = 0.8;
-				
-					let h1 = yr2+0.01*hh;
-					lay.add_button({te:"X-AXIS", x:xr-lay.x+2.5, y:h1-1.4, dx:3, dy:0.8, si:si, font:get_font(si,"bold"), type:"Text", back_col:WHITE, col:BLACK});
-					add_layer("RightMidMenu",xr,h1,x3-xr-0.5,0.43*hh,{});
-					
-					let h2 = yr2+0.55*hh;
-					lay.add_button({te:"Y-AXIS", x:xr-lay.x+2.5, y:h2-1.4, dx:3, dy:0.8, si:si, font:get_font(si,"bold"), type:"Text", back_col:WHITE, col:BLACK});
-					add_layer("RightBotMenu",xr,h2,x3-xr-0.5,0.43*hh,{});
+						let h1 = yr2+0.01*hh;
+						lay.add_button({te:"X-AXIS", x:xr-lay.x+2.5, y:h1-1.4, dx:3, dy:0.8, si:si, font:get_font(si,"bold"), type:"Text", back_col:WHITE, col:BLACK});
+						add_layer("RightMidMenu",xr,h1,x3-xr-0.5,0.43*hh,{});
+						
+						let h2 = yr2+0.55*hh;
+						lay.add_button({te:"Y-AXIS", x:xr-lay.x+2.5, y:h2-1.4, dx:3, dy:0.8, si:si, font:get_font(si,"bold"), type:"Text", back_col:WHITE, col:BLACK});
+						add_layer("RightBotMenu",xr,h2,x3-xr-0.5,0.43*hh,{});
+					}
 				}
 				break;
 			}
@@ -1195,7 +1196,6 @@ function copy_back_to_source2(tbs)
 		
 	case "reparam_equation": 
 		{
-			//let val = Number(te); if(isNaN(val)) val = te; 
 			let val = te; 
 			model.change_param(inter.bubble.th,"reparam_eqn",val);
 		}
@@ -1205,6 +1205,18 @@ function copy_back_to_source2(tbs)
 		{
 			let val = Number(te);
 			set_element(inter.edit_param.value,so.pindex,val);
+		}
+		break;
+		
+	case "element_param_const_sym":
+		{
+			let val = Number(te);
+			set_element(inter.edit_param.value,so.pindex,val);
+		
+			let rev=[]; rev[0] = so.pindex[1]; rev[1] = so.pindex[0];
+			if(rev[0] != rev[1]){
+				set_element(inter.edit_param.value,rev,".");
+			}
 		}
 		break;
 	
@@ -1305,6 +1317,9 @@ function copy_back_to_source2(tbs)
 	case "prior_max": case "prior_dist_max": 
 		inter.bubble.prior.value.max_eqn.te = te; 
 		break;
+	case "prior_power": case "prior_dist_power": 
+		inter.bubble.prior.value.power_eqn.te = te; 
+		break;
 	case "prior_mean": case "prior_dist_mean": 
 		inter.bubble.prior.value.mean_eqn.te = te; 
 		break;
@@ -1388,6 +1403,7 @@ function copy_back_to_source2(tbs)
 	case "slice_time": inter.bubble.slice_time = te; break;
 	case "suffix": inter.bubble.suffix = te; break;
 	case "dataname": inter.bubble.dataso.name = te; break;
+	case "iegrname": inter.bubble.source.name = te; break;
 	case "wild_card": inter.bubble.wildcard = te; break;
 	case "comp_acc": edit_source.comp_acc = te; break;
 	default: error("SOURCE PROBLEM: "+so.type); break;
@@ -1808,6 +1824,15 @@ function check_error_textbox2(tbs)
 					if(isNaN(num)) warn = "Must be a number";
 				}
 				break;
+			
+			case "element_param_const_sym": 
+				{
+					let num = Number(te);
+					if(isNaN(num)) warn = "Must be a number";
+					if(num <= -1) warn = "Must be greater than -1";
+					if(num >= 1) warn = "Must be less than 1";
+				}
+				break;
 				
 			case "element_factor_const": 
 				{
@@ -1849,11 +1874,15 @@ function check_error_textbox2(tbs)
 				warn = check_posinteger(te);
 				break;
 			
-			case "prior_min": case "prior_max": case "prior_mean":
+			case "prior_min": case "prior_max": case "prior_mean": case "prior_max":
 				switch(bub.prior.type.te){
 				case "exp": case "gamma": case "log-normal": warn = check_posnumber(te); break;
 				case "normal": warn = check_number(te); break;
 				case "uniform": warn = check_number(te); break;
+				case "inverse": warn = check_posnumber(te); break;
+				case "power": warn = check_posnumber(te); break;
+				case "mvn-jeffreys": warn = check_posnumber(te); break;
+				case "mvn-uniform": warn = check_posnumber(te); break;
 				case "fix": warn = check_number(te); break;
 				case "bernoulli": warn = check_zeroone(te); break;
 				default: error("option problem"); break;
@@ -1870,7 +1899,7 @@ function check_error_textbox2(tbs)
 				warn = check_posnumber(te);
 				break;
 				
-			case "prior_dist_min": case "prior_dist_max": 
+			case "prior_dist_min": case "prior_dist_max": case "prior_dist_power": 
 				warn = check_param_or_number(te);			
 				break;
 				
@@ -1983,6 +2012,10 @@ function check_error_textbox2(tbs)
 				
 			case "dataname":
 				char_lim = 100;
+				break;
+				
+			case "iegrname":
+				char_lim = 10;
 				break;
 				
 			case "label_size": case "label_anno_size":

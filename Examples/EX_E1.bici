@@ -50,7 +50,7 @@ trans-data name="Infections" trans="S->I" obsrange="all" file="trans-data.csv"
 
 ######################## PARAMETERS ########################
 
-param name="β" value="0.001" prior="uniform(0,0.1)"
+param name="β" value="0.001" prior="inverse(0.0001,0.01)"
 
 param name="μ^g" value="0.5" prior="uniform(-1,1)"
 

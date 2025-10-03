@@ -242,7 +242,7 @@ class Input                                // Stores information about the model
 		void set_eqn_ind_eff_exist();
 		void set_param_parent_child();
 		void set_param_use();
-		void set_omega_fl();
+		//void set_omega_fl();
 		void setup_der_func(DerFuncType df_type, string te, DerFunc &df);
 		void setup_der_func_eqn();
 		
@@ -255,8 +255,8 @@ class Input                                // Stores information about the model
 		Classification& get_claa();
 		bool check_char_allowed(string st, string not_allowed);
 		bool check_comp_exist(string name, unsigned int p);
-		Table load_table(const string file);
-		Table get_subtable(const Table &tab, const vector <string> &col_name);
+		Table load_table(const string file, string desc="");
+		Table get_subtable(const Table &tab, const vector <string> &col_name, string desc="");
 		unsigned int get_cl_from_comp(string name, unsigned int p) const;
 		unsigned int get_cl_from_trans(string name, unsigned int p) const;
 		unsigned int find_string_in(const vector <string> &arr, string val) const;
@@ -282,12 +282,13 @@ class Input                                // Stores information about the model
 		TransDef extract_trans_def(string value) const;
 		string get_prop(string value, string prop, string end) const;
 		string in_data_source(const DataSource &ds) const;
-		string in_file_text(string te) const;
+		string in_file_text(string te, string desc="") const;
 		void alert_sample(string warn, unsigned int num);
 		void read_state_sample(const vector <string> &lines, const vector <string> &ind_key);
 		unsigned int get_param_value(vector < vector <double> > &param_value, unsigned int i, const vector <string> &lines, string warn);
-		void load_param_value(const ParamProp &pp, string valu, Param &par, string desc);
-		void load_weight_value(const ParamProp &pp, string valu, Param &par, string desc);
+		void load_param_value(const ParamProp &pp, string valu, Param &par, string desc, LoadParamType type);
+		void set_val_from_ele(string ele, const vector <unsigned int> &ind, Param &par, string desc, unsigned int r, string col, LoadParamType type);
+		//void load_weight_value(const ParamProp &pp, string valu, Param &par, string desc);
 		void set_spline(SplineType type, string knot_times_str, string smooth, vector <string> &knot_times,  vector <string> &knot_times_out, bool use_inf_time, Param &par);
 		unsigned int get_seed();
 		bool check_dt(const Details &details);

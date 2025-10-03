@@ -49,9 +49,9 @@ add-ind-sim file="add-ind-sim.csv"
 
 ######################## PARAMETERS ########################
 
-param name="r" value="25" prior="uniform(0,100)"
+param name="r" value="25" prior="uniform(1,100)"
 
-param name="β" value="0.03" prior="uniform(0,0.1)"
+param name="β" value="0.03" prior="inverse(0.001,0.1)"
 
 param name="μ^g" value="0.4" prior="uniform(-1,1)"
 

@@ -360,7 +360,8 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	
 	plot_index = 0;
 	
-	set_omega_check();
+	//set_omega_check();
+	set_ieg_check_pri();
 	
 	prop_prob = set_prop_prob();
 }
@@ -770,12 +771,11 @@ void Proposal::MH(State &state)
 
 	ntr++; 
 	
-	if(param_resample(param_val,state.popnum_t) == false){
-		update_si(-0.005);
-		return;
-	}
+	auto ps_fac = param_resample(param_val,state.popnum_t);
+	if(ps_fac == UNSET){ update_si(-0.005); return;}
 	
-	if(false){
+	if(false){     
+		cout << endl << endl;
 		for(auto i : param_val.value_ch){
 			const auto &pv = model.param_vec[i];
 			cout << pv.name << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
@@ -784,7 +784,7 @@ void Proposal::MH(State &state)
 	
 	auto like_ch = state.update_param(affect_like);
 	
-	auto al = calculate_al(like_ch,0);
+	auto al = calculate_al(like_ch,ps_fac);
 	
 	if(pl) cout << al << "al" << endl;
 	if(ran() < al){ 
@@ -817,11 +817,13 @@ void Proposal::mbp(State &state)
 	auto popnum_t_st = state.popnum_t;
 
 	auto sim_prob = 0.0;
+	auto ps_fac = 0.0;
+	
 	switch(type){
 	case MBP_PROP: 
-		if(param_resample(state.param_val,state.popnum_t) == false){ 
-			update_si(-0.005);
-			return;
+		{
+			ps_fac = param_resample(state.param_val,state.popnum_t);
+			if(ps_fac == UNSET){ update_si(-0.005); return;}
 		}
 		break;
 		
@@ -863,7 +865,7 @@ void Proposal::mbp(State &state)
 
 	auto like_ch = state.update_param(affect_like);
 	
-	auto al = calculate_al(like_ch,0);
+	auto al = calculate_al(like_ch,ps_fac);
 	
 	if(pl) cout << al << " al" << endl; 
 
@@ -1208,8 +1210,11 @@ void Proposal::MH_event_all(State &state)
 			if(event[E-1].type == LEAVE_EV){ emax = E-1; tmax = event[E-1].tdiv;}
 			
 			auto ill = false;
-			for(auto e = emin; e < emax; e++){
-				if(event[e].observed) ill = true;
+			if(emin == emax) ill = true;
+			else{	
+				for(auto e = emin; e < emax; e++){
+					if(event[e].observed) ill = true;
+				}
 			}
 			
 			if(ill == false){
@@ -2420,10 +2425,9 @@ void Proposal::MH_ie_var(State &state)
 	auto th = param_list[0];
 	auto val_st = value[th];
 	
-	if(param_resample(param_val,state.popnum_t) == false){
-		update_si(-0.005);
-		return;
-	}
+	auto ps_fac = param_resample(param_val,state.popnum_t);
+	
+	if(ps_fac == UNSET){ update_si(-0.005); return;}
 	
 	auto factor = sqrt(value[th]/val_st);
 
@@ -2432,7 +2436,7 @@ void Proposal::MH_ie_var(State &state)
 	
 	auto like_ch = state.update_param(affect_like);
 
-	auto al = calculate_al(like_ch,-like_ch.ie);
+	auto al = calculate_al(like_ch,ps_fac-like_ch.ie);
 	
 	if(pl) cout << al << " al" << endl;
 	ntr++;
@@ -2464,10 +2468,9 @@ void Proposal::MH_ie_var_cv(State &state)
 	
 	auto val_st = value[th];
 	
-	if(param_resample(param_val,state.popnum_t)){
-		update_si(-0.005);
-		return;
-	}
+	auto ps_fac = param_resample(param_val,state.popnum_t);
+	
+	if(ps_fac == UNSET){ update_si(-0.005); return;}
 	
 	if(value[th] < TINY){ 
 		param_val.restore(); 
@@ -2481,7 +2484,7 @@ void Proposal::MH_ie_var_cv(State &state)
 	
 	auto like_ch = state.update_param(affect_like);
 
-	auto al = calculate_al(like_ch,-like_ch.ie);
+	auto al = calculate_al(like_ch,ps_fac-like_ch.ie);
 	
 	if(pl) cout << al << " al" << endl;
 	ntr++;
@@ -2513,10 +2516,9 @@ void Proposal::MH_ie_covar(State &state)
 	
 	auto val_st = value[th];
 	
-	if(param_resample(param_val,state.popnum_t) == false){
-		update_si(-0.005);
-		return;
-	}
+	auto ps_fac = param_resample(param_val,state.popnum_t);
+	
+	if(ps_fac == UNSET){ update_si(-0.005); return;}
 	
 	auto g = ind_eff_group_ref.ieg;
 	
@@ -2579,7 +2581,7 @@ void Proposal::MH_ie_covar(State &state)
 
 	auto like_ch = state.update_param(affect_like);
 
-	auto al = calculate_al(like_ch,-like_ch.ie);
+	auto al = calculate_al(like_ch,ps_fac-like_ch.ie);
 	
 	if(pl) cout << al << " al" << endl;
 	ntr++;
@@ -2614,11 +2616,9 @@ void Proposal::param_event_joint(Direction dir, State &state)
 	
 	auto val_st = value[th];
 	
-	if(param_resample(param_val,state.popnum_t) == false){
-		nfa++;
-		update_si(-0.005);
-		return;
-	}
+	auto ps_fac = param_resample(param_val,state.popnum_t);
+
+	if(ps_fac == UNSET){ nfa++; update_si(-0.005); return;}
 	
 	ntr++; 	
 
@@ -2783,7 +2783,7 @@ void Proposal::param_event_joint(Direction dir, State &state)
 	
 	double n = ind_list.size();
 
-	auto al = calculate_al(like_ch,n*log(fac)+log(factor));
+	auto al = calculate_al(like_ch,ps_fac + n*log(fac)+log(factor));
 	
 	if(pl) cout << al << " al" << endl;
 		
@@ -3255,7 +3255,7 @@ string Proposal::diagnostics(double total_time) const
 			auto name = model.param[th].name;
 			auto ie_name = model.species[p_prop].ind_effect[ie_prop].name;
 
-			ss << "Joint proposal on " << name << " and " << ie_name;
+			ss << "Joint proposal on " << name << "_" << ie_name << "," << ie_name << " and " << ie_name;
 			ss << endl;
 			
 			if(ntr == 0) ss << "No proposals";
@@ -3268,9 +3268,11 @@ string Proposal::diagnostics(double total_time) const
 		{
 			auto j = param_list[0];
 			auto th = model.param_vec[j].th;
-			auto name = model.param[th].name;
-			
-			ss << "Joint proposal on " << name << " and individual effects";
+			auto ie_name = model.species[p_prop].ind_effect[ind_eff_group_ref.i].name;
+			auto ie_name2 = model.species[p_prop].ind_effect[ind_eff_group_ref.j].name;
+			auto name = model.param[th].name+"_"+ie_name+","+ie_name2;
+		
+			ss << "Joint proposal on " << name << " and "+ie_name+","+ie_name2;
 			ss << endl;
 			
 			if(ntr == 0) ss << "No proposals";
@@ -3283,9 +3285,9 @@ string Proposal::diagnostics(double total_time) const
 		{
 			auto j = param_list[0];
 			auto th = model.param_vec[j].th;
-			auto name = model.param[th].name;
 			auto ie_name = model.species[p_prop].ind_effect[ie_prop].name;
-
+			auto name = model.param[th].name+"_"+ie_name+","+ie_name;
+		
 			ss << "Joint proposal on " << name << " and " << ie_name;
 			
 			ss << " chainging ";

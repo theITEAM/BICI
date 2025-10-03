@@ -52,7 +52,7 @@ param name="N" constant="10"
 
 param name="f_v" factor="true" value="value-f.csv" prior="mdir(0.5)"
 
-param name="β_v" value="value-beta.csv" prior="uniform(0,1)"
+param name="β_v" value="value-beta.csv" prior="inverse(0.01,1)"
 
 
 

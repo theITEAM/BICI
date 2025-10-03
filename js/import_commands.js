@@ -31,11 +31,9 @@ function import_data_table_command(cname)
 	let file = get_tag_value("file"); if(file == "") cannot_find_tag(); 
 
 	let fi = get_fi(file);
-	let tab = load_table(fi.te,true,fi.sep,fi.name);
 	
-	if(typeof tab == 'string'){
-		alert_import(tab);
-	}
+	let tab = load_table(fi.te,true,fi.sep,fi.name);
+	if(typeof tab == 'string') alert_import(tab);
 	
 	let cols = get_tag_value("cols");
 	let cols_split = cols.split(",");
@@ -471,6 +469,10 @@ function classification_command(loop)
 		
 		if(index == "t"){
 			alert_import("The index 't' cannot be used because it is reserved for time variation");
+		}
+		
+		if(index == "z"){
+			alert_import("The index 'z' cannot be used because it is reserved for covariance matrices");
 		}	
 		
 		if(find_in(alphabet,index) == undefined){
@@ -629,7 +631,10 @@ function get_tags_list(file)
 	let tags_list=[];
 	
 	let fi = get_fi(file);
-	let tab = load_table(fi.te,true,fi.sep,fi.name);
+	
+	let tab = load_table(fi.te,true,fi.sep,fi.name,);
+	if(typeof tab == 'string') alert_import(tab);
+	
 	let N = tab.ncol;
 	
 	let head = tab.heading;
@@ -1295,7 +1300,9 @@ function param_command2(full_name,per_start,per_end,op)
 	let pp = get_param_prop(full_name);
 
 	let par = create_new_param(pp,"normal");
-
+	
+	if(begin(par.name,"Ω")) par.pri_pos = prior_cv_pos;
+	
 	par.import_line = imp.line;
 
 	if(par.time_dep == true){
@@ -1374,37 +1381,8 @@ function param_command2(full_name,per_start,per_end,op)
 		
 		set_default_factor_weight(par);
 		
-		let fi = get_fi(fw);
-		let tab = load_table(fi.te,true,fi.sep,fi.name);
-			
-		if(tab == undefined) return;
-		if(typeof tab == 'string') alert_import(tab);
-	
-		let col_name = copy(par.dep);
-		col_name.push("Value");
-		
-		let subtab = get_subtable(tab,col_name);
-		if(subtab.error != "") alert_import(subtab.error);
-
-		let ncol = subtab.ncol;
-	
-		for(let r = 0; r < subtab.nrow; r++){
-			let ind = [];
-			for(let i = 0; i < ncol-1; i++){
-				ind[i] = find_in(par.list[i],subtab.ele[r][i]);
-				if(ind[i] == undefined){
-					alert_import("For 'factor-weight' the element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+(r+2)+")");
-				}
-			}
-			let ele = subtab.ele[r][ncol-1];
-			let val = Number(ele);
-			
-			if(isNaN(val)){
-				alert_import("For 'factor-weight' the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+(r+2)+")");
-			}
-				
-			set_element(par.factor_weight,ind,val);
-		}	
+		let desc = "For 'factor-weight'";
+		load_param_value(par,par.factor_weight,"Value",fw,desc);
 	}
 	
 	let cons = get_tag_value("constant"); 
@@ -1415,9 +1393,6 @@ function param_command2(full_name,per_start,per_end,op)
 	let prior = get_tag_value("prior"); 
 	let prior_split = get_tag_value("prior-split"); 
 	
-	//let dist_mat = get_tag_value("distance-matrix").toLowerCase(); 
-	//let dist_mat = "";
-
 	let param_tag = [];
 	param_tag.push({val:cons, tag:"constant"});
 	param_tag.push({val:value, tag:"value"});
@@ -1502,80 +1477,15 @@ function param_command2(full_name,per_start,per_end,op)
 			else{		
 				par.value = param_blank(par);
 			
-				let dim = get_dimensions(par.value);
-				let ele_list = get_element_list(par.value,dim);
-		
 				if(is_file(valu) == false){ // Sets all elements to the same	
+					let dim = get_dimensions(par.value);
+					let ele_list = get_element_list(par.value,dim);
 					for(let k = 0; k < ele_list.length; k++){
 						set_element(par.value,ele_list[k],valu);
 					}
 				}
 				else{
-					// Sets a default value of zero
-					for(let k = 0; k < ele_list.length; k++){
-						set_element(par.value,ele_list[k],"0");
-					}
-					
-					let fi = get_fi(valu);
-					let tab = load_table(fi.te,true,fi.sep,fi.name);
-				
-					if(tab == undefined) return;
-					if(typeof tab == 'string') alert_import(tab);
-				
-					let col_name = copy(par.dep);
-					col_name.push("Value");
-					
-					let subtab = get_subtable(tab,col_name);
-					if(subtab.error != "") alert_import(subtab.error);
-			
-					let ncol = subtab.ncol;
-				
-					for(let r = 0; r < subtab.nrow; r++){
-						let ind = [];
-						for(let i = 0; i < ncol-1; i++){
-							ind[i] = find_in(par.list[i],subtab.ele[r][i]);
-							if(ind[i] == undefined){
-								alert_import(desc+" the element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+(r+2)+")");
-							}
-						}
-						let ele = subtab.ele[r][ncol-1];
-						let val;
-						
-						switch(par.variety){
-						case "normal": case "const":
-							if(par.factor && ele == "*"){
-								val = ele;
-							}
-							else{
-								val = Number(ele);
-						
-								if(isNaN(val)){
-									alert_import(desc+" the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+(r+2)+")");
-								}
-							}
-							break;
-						
-						case "reparam":
-							if(!isNaN(ele)) val = Number(ele);
-							else{
-								let conv_res = detect_greek(ele,0);
-								ele = conv_res.te;
-								subtab.ele[r][ncol-1] = ele;
-
-								val = ele;
-								
-								let res = is_eqn(val,"Table element",{});
-								if(res.err == true){
-									alert_import(desc+" the element '"+ele+"' is not a valid equation (column '"+subtab.heading[ncol-1]+"', row "+(r+2)+")");
-								}
-							}
-							break;
-							
-						default: error("option not recognised1"); break;
-						}
-								
-						set_element(par.value,ind,val);
-					}
+					load_param_value(par,par.value,"Value",valu,desc);
 				}
 				
 				let err = check_param_value("Set Param",par,par.value);
@@ -1586,7 +1496,6 @@ function param_command2(full_name,per_start,per_end,op)
 	}
 
 	if(prior != ""){
-		
 		let pri = convert_text_to_prior(prior,par.pri_pos);
 		if(pri.err == true){
 			alert_import("For 'prior' error with expression '"+prior+"': "+pri.msg);
@@ -1603,35 +1512,16 @@ function param_command2(full_name,per_start,per_end,op)
 			alert_import("'prior-split' can only be used if the parameter has a dependency.");  
 		}
 	
-		let fi = get_fi(prior_split);
-		let tab = load_table(fi.te,true,fi.sep,fi.name);
-		if(tab == undefined) return;	
-		if(typeof tab == 'string') alert_import(tab);
-		
-		let col_name = copy(par.dep);
-		col_name.push("Prior");
-		
-		let subtab = get_subtable(tab,col_name);
-		if(subtab.error != "") alert_import(subtab.error);
-	
-		let ncol = subtab.ncol;
-		
-		for(let r = 0; r < subtab.nrow; r++){
-			let ind = [];
-			for(let i = 0; i < ncol-1; i++){
-				ind[i] = find_in(par.list[i],subtab.ele[r][i]);
-				if(ind[i] == undefined){ 
-					alert_import("The table element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+(r+2)+")");
-				}
-			}
-			
-			let pri = convert_text_to_prior(subtab.ele[r][ncol-1],par.pri_pos);
-			if(pri.err == true){
-				alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not a valid prior specification (col '"+subtab.heading[ncol-1]+"', row "+(r+2)+"). "+pri);
-			}
-			
-			set_element(par.prior_split,ind,pri);
+		if(par.factor){
+			alert_import("'prior-split' cannot be used for a factor."); 
 		}
+		
+		if(is_symmetric(par)){
+			alert_import("'prior-split' cannot be used for a covariance matrix."); 
+		}
+		
+		let desc = "For 'prior-split'";
+		load_param_value(par,par.prior_split,"Prior",prior_split,desc);
 	}
 	
 	if(dist != ""){
@@ -1644,7 +1534,6 @@ function param_command2(full_name,per_start,per_end,op)
 		par.variety = "dist";
 	}
 	
-			
 	if(dist_split != ""){
 		par.prior_split_check = {check:true};
 		par.variety = "dist";
@@ -1656,36 +1545,8 @@ function param_command2(full_name,per_start,per_end,op)
 			alert_import("'dist-split' can only be used if the parameter has a dependency.");  
 		}
 		
-		let fi = get_fi(dist_split);
-		let tab = load_table(fi.te,true,fi.sep,fi.name);
-		
-		if(tab == undefined) return;	
-		if(typeof tab == 'string') alert_import(tab);
-		
-		let col_name = copy(par.dep);
-		col_name.push("Dist");
-		
-		let subtab = get_subtable(tab,col_name);
-		if(subtab.error != "") alert_import(subtab.error);
-	
-		let ncol = subtab.ncol;
-		
-		for(let r = 0; r < subtab.nrow; r++){
-			let ind = [];
-			for(let i = 0; i < ncol-1; i++){
-				ind[i] = find_in(par.list[i],subtab.ele[r][i]);
-				if(ind[i] == undefined){ 
-					alert_import("The table element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+(r+2)+")");
-				}
-			}
-			
-			let pri = convert_text_to_prior(subtab.ele[r][ncol-1],par.pri_pos,true);
-			if(pri.err == true){
-				alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not a valid distribution specification (col '"+subtab.heading[ncol-1]+"', row "+(r+2)+"). "+pri);
-			}
-			
-			set_element(par.prior_split,ind,pri);
-		}
+		let desc = "For 'dist-split'";
+		load_param_value(par,par.prior_split,"Dist",dist_split,desc);
 	}
 	
 	let sim_sample = get_tag_value("sim-sample").toLowerCase(); 
@@ -2056,7 +1917,9 @@ function ind_effect_command()
 		
 	let name = get_tag_value("name"); if(name == "") cannot_find_tag();
 	
-	let spl = name.split(",");
+	let ie = get_tag_value("ie"); if(ie == "") cannot_find_tag();
+	
+	let spl = ie.split(",");
 	let ie_list = []; 
 	for(let i = 0; i < spl.length; i++){
 		let nam = spl[i];
@@ -2086,8 +1949,10 @@ function ind_effect_command()
 			A_matrix = {check:true, loaded:true, type:"pedigree", A_value:[], ind_list:[], sire_list:[], dam_list:[]};
 	
 			let fi = get_fi(pedigree);
+			
 			let tab_ped = load_table(fi.te,true,fi.sep,fi.name);
-				
+			if(typeof tab_ped == 'string') alert_import(tab_ped);
+			
 			if(tab_ped.ncol != 3){
 				alert_import("'pedigree' file should have 3 columns"); return;
 			}
@@ -2111,7 +1976,7 @@ function ind_effect_command()
 		
 			let fi = get_fi(ind_list);
 			let tab_ind = load_table(fi.te,true,fi.sep,fi.name);
-			if(tab_ind == undefined) return;
+			if(typeof tab_ind == 'string') alert_import(tab_ind);
 			
 			let list=[];
 			for(let r = 0; r < tab_ind.nrow; r++){ 
@@ -2129,7 +1994,7 @@ function ind_effect_command()
 		
 			let fi2 = get_fi(A_sparse);
 			let tab = load_table(fi2.te,true,fi2.sep,fi2.name);
-			if(tab == undefined) return;
+			if(typeof tab == 'string') alert_import(tab);
 		
 			for(let r = 0; r < tab.nrow; r++){
 				let fl = false;
@@ -2150,8 +2015,6 @@ function ind_effect_command()
 			
 			let fi = get_fi(A);
 			let tab = load_table(fi.te,true,fi.sep,fi.name);
-			//let tab = load_table_from_file(A);
-			if(tab == undefined) return;
 			if(typeof tab == 'string') alert_import(tab); 
 
 			A_matrix.ind_list = tab.heading;
@@ -2177,8 +2040,8 @@ function ind_effect_command()
 			A_matrix = {check:true, loaded:true, type:"Ainv", sire_list:[], dam_list:[]};
 			
 			let fi = get_fi(Ainv);
+			
 			let tab = load_table(fi.te,true,fi.sep,fi.name);
-			if(tab == undefined) return;
 			if(typeof tab == 'string') alert_import(tab); 
 
 			A_matrix.ind_list = tab.heading;
@@ -2215,8 +2078,8 @@ function ind_effect_command()
 			}
 		}
 	}
-	
-	model.species[p].ind_eff_group.push({ie_list:ie_list, A_matrix:A_matrix});
+
+	model.species[p].ind_eff_group.push({name:name, ie_list:ie_list, A_matrix:A_matrix});
 }
 
 
@@ -2247,8 +2110,9 @@ function fixed_effect_command()
 		X_vector.loaded = true;		
 		
 		let fi = get_fi(X);
+		
 		let tab = load_table(fi.te,true,fi.sep,fi.name);		
-		if(tab == undefined) return;
+		if(typeof tab == 'string') alert_import(tab);
 		
 		let col_name = ["ID","value"]; 
 		let subtab = get_subtable(tab,col_name);

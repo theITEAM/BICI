@@ -329,9 +329,14 @@ struct IndEffect {                 // Store infortmation about an individual eff
 };
 
 struct IEgroup {                   // Stores information about a group of individual effects
+	string name;
 	vector <IEname> list;            // The list of individual effect names
 	Amatrix A_matrix;                // The A matrix
-	vector < vector <unsigned int> > omega;// Matrix of parameter values 
+	unsigned int th;                 // The parameter which controls the covariance matrix
+	unsigned int prior_ref;          // References the prior forMVN distribution 
+	vector < vector <unsigned int> > omega_pv;// Matrix of param_vec values 
+	double log_det_min, log_det_max; // The range for the log of the determinant
+	double var_min, var_max;         // Minimum variance
 	unsigned int line_num;           // Stores the line number the equation comes from
 	bool ppc_resample;               // Determines if individual effects resampled 
 	vector <unsigned int> markov_eqn_ref;  // Indexes any Markov equations involving ies
@@ -374,8 +379,12 @@ struct Prior {                     // Defines a parameter prior
 	string error;                    // Stores error message if declared incorrectly
 };
 
-struct ParamVecEle                 // Stores information about an element in param vec
-{
+struct IEGref {                    // References and individual effect group
+	unsigned int p;                  // The species number
+	unsigned int i;                  // The inf_eff
+};
+
+struct ParamVecEle {               // Stores information about an element in param vec
 	string name;                     // The name of the parameter
 	unsigned int th;                 // The number of the parameter
 	unsigned int index;              // The index where to find 
@@ -384,7 +393,6 @@ struct ParamVecEle                 // Stores information about an element in par
 	bool reparam_time_dep;           // Set if the parameter is a reparameterisation and time dependent
 	bool ppc_resample;               // Sets if parameter gets resampled for ppc
 	bool prop_pos;                   // Set if it is possible to do a proposal on this parameter
-	bool omega_fl;                   // Detemines if in omega
 	vector <AffectLike> affect_like; // Determines how parameter affects likelihoods
 	vector <unsigned int> list_precalc_before; // Lists any precalculation which need to be done before parameter evaluated
 	vector <unsigned int> list_precalc_time; // Stores which times are affected by change
@@ -596,6 +604,8 @@ struct Param {                     // Stores a model parameter
 	
 	bool cat_factor;                 // Set if parameter is a categorical factor
 	bool cat_factor_weight_on;       // Determines if there is a weight factor
+	
+	vector <IEGref> ieg_ref;         // References if parameter is for cov var in ind effect group
 	
 	unsigned int get_param_vec(unsigned int i) const; 
 	const vector <ParamRef>& get_child(unsigned int i) const;

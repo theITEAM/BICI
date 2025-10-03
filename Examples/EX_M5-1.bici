@@ -46,7 +46,7 @@ init-pop-sim type="fixed" focal="DS" file="init-pop-sim-Animal.csv"
 
 param name="N" constant="202"
 
-param name="β_v" value="value-beta.csv" prior="uniform(0,1)"
+param name="β_v" value="value-beta.csv" prior="inverse(0.01,1)"
 
 
 

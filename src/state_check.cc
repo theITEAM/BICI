@@ -918,6 +918,15 @@ void State::check_prior(string ref)
 		}
 	}
 	
+	// Checks prior_ieg is correct
+	auto prior_ieg_st = prior_ieg;
+	prior_ieg = model.prior_ieg_all(param_val);
+	for(auto i = 0u; i < prior_ieg.size(); i++){
+		if(dif(prior_ieg[i],prior_ieg_st[i],dif_thresh)){
+			add_alg_warn("Prior ieg probability wrong"+ref);
+		}
+	}
+
 	// Checks dist_prob is correct
 	auto dist_prob_st = dist_prob;
 	dist_prob = model.dist_prob(param_val);

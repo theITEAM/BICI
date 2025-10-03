@@ -1,0 +1,65 @@
+﻿
+###################### DATA DIRECTORY ######################
+
+data-dir folder="EX_F4-data-files"
+
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5 nchain=3
+
+post-sim start=0 end=100
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
+
+species name="People" type="population"
+
+# SPECIES MODEL
+
+class name="DS" index="d"
+
+comp name="S" color="#009900" x=-15 y=0
+comp name="I" color="#ff2222" x=0 y=0
+comp name="R" color="#4444ff" x=15 y=0
+
+trans name="S->I" value="exp(rate:β×f_s×{I}/N)"
+trans name="I->R" value="exp(rate:γ_s)"
+
+class name="Sex" index="s"
+
+comp name="M" color="#cb6a00" x=-10 y=0
+comp name="F" color="#aa00aa" x=10 y=0
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
+
+
+# INFERENCE DATA
+
+init-pop-inf type="fixed" file="init-pop-inf-People.csv"
+
+pop-data name="Pop. data" filter="DS=I,Sex=file" error="poisson" file="pop-data.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="N" constant="10000"
+
+param name="β" value="0.5" prior="inverse(0.01,1)"
+
+param name="f_s" factor="true" value="value-f.csv" prior="mdir(0.5)"
+
+param name="γ_s" value="value-gamma.csv" prior="inverse(0.01,1)"
+
+
+

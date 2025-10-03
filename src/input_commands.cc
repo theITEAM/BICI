@@ -441,6 +441,11 @@ bool Input::classification_command(unsigned int loop)
 			return false;
 		}
 		
+		if(index == "z"){ 
+			alert_import("The index 'z' cannot be used because it is reserved for covariance matrices"); 
+			return false;
+		}
+		
 		if(find_in(alphabet,index) == UNSET){ 
 			alert_import("Index '"+index+"' must be from the lowercase alphabet"); 
 			return false;
@@ -547,7 +552,7 @@ void Input::param_mult_command()
 	par.trace_output = false;
 	
 	auto file = get_tag_value("constant"); if(file == ""){ cannot_find_tag(); return;}
-	load_param_value(pp,file,par,"In 'file'");
+	load_param_value(pp,file,par,"In 'file'",VALUE_LOAD);
 
 	model.param.push_back(par);
 };
@@ -1147,7 +1152,7 @@ void Input::param_command()
 	par.param_mult = UNSET;
 	par.factor = false;
 	par.line_num = line_num;
-	
+		
 	vector <string> knot_times, knot_times_out;
 	if(pp.time_dep == true){
 		auto knot_times_str = get_tag_value("knot-times"); if(knot_times_str == ""){ cannot_find_tag(); return;}
@@ -1270,7 +1275,6 @@ void Input::param_command()
 	}
 	
 	if(par.cat_factor){
-		//for(auto i = 0u; i < mult; i++) par.add_element(i);
 		par.weight.resize(par.N,1);
 		
 		auto weight = get_tag_value("factor-weight"); 
@@ -1280,13 +1284,11 @@ void Input::param_command()
 				alert_import("'factor-weight' must be defined through a data table");
 			}		
 			else{
-				load_weight_value(pp,weight,par,"In 'file'");
+				string desc = "For 'factor-weight'";
+				load_param_value(pp,weight,par,desc,FACW_LOAD);
 			}
 		}
 	}
-	
-	// Sets default value to zero
-	//for(auto i = 0u; i < mult; i++) par.value[i].te = "0";
 	
 	par.trace_output = true;
 	if(cons != "" || mult > model.details.param_output_max) par.trace_output = false;
@@ -1326,7 +1328,6 @@ void Input::param_command()
 		if(reparam != ""){
 			par.variety = REPARAM_PARAM;
 			par.reparam_eqn = reparam;
-			//par.set_value_eqn(0,reparam);
 		}
 		
 		if(cons != ""){
@@ -1363,7 +1364,6 @@ void Input::param_command()
 			
 			if(reparam != "" && is_file(valu) == false){
 				par.reparam_eqn = reparam;
-				//load_reparam_eqn(reparam,par);
 			}
 			else{
 				if(is_file(valu) == false){
@@ -1380,7 +1380,7 @@ void Input::param_command()
 					for(auto k = 0u; k < mult; k++) par.element_ref[k] = ref;
 				}
 				else{
-					load_param_value(pp,valu,par,desc);
+					load_param_value(pp,valu,par,desc,VALUE_LOAD);
 				}
 			}
 		}
@@ -1410,12 +1410,42 @@ void Input::param_command()
 		
 		auto ref = model.prior.size();
 		par.default_prior_ref = ref;
-		model.prior.push_back(pri);
-		for(auto i = 0u; i < mult; i++) par.set_prior(i,ref);
+		
+		if(model.is_symmetric(par)){                             // Deals with covariance matrix 
+			model.prior.push_back(pri);
+			auto L = par.dep[0].list.size();
+			for(auto i = 0u; i < L; i++) par.set_prior(i*L+i,ref); // Places prior along diagonal
+			
+			if(L > 1){                                             // Places correlations off diagonal
+				Prior pri_off;
+				pri_off.name = "Correlation";
+				pri_off.type = MVN_COR_PR;
+				auto ref_cor = model.prior.size();
+				for(auto j = 0u; j < L; j++){
+					for(auto i = 0u; i < L; i++){
+						if(i != j) par.set_prior(j*L+i,ref_cor); 
+					}
+				}
+				model.prior.push_back(pri_off);
+			}
+			
+			if(false){
+				for(auto j = 0u; j < L; j++){
+					for(auto i = 0u; i < L; i++){
+						auto pri = model.prior[par.element[par.element_ref[j*L+i]].prior_ref];
+						cout << pri.type << ",";
+					}
+					cout << " pr" << endl;
+				}
+			}				
+		}
+		else{
+			model.prior.push_back(pri);
+			for(auto i = 0u; i < mult; i++) par.set_prior(i,ref);
+		}
 	}
 	
 	if(prior_split != ""){
-		//par.prior.resize(mult);
 		par.variety = PRIOR_PARAM;
 		
 		if(par.dep.size() == 0){
@@ -1423,45 +1453,18 @@ void Input::param_command()
 			return;
 		}
 	
-		auto tab = load_table(prior_split);
-		if(tab.error == true) return;	
-		
-		auto col_name = pp.dep;
-		col_name.push_back("Prior");
-		
-		auto subtab = get_subtable(tab,col_name); if(subtab.error == true) return;
-		
-		auto ncol = subtab.ncol;
-		
-		for(auto r = 0u; r < subtab.nrow; r++){
-			vector <unsigned int> ind(ncol-1);
-			
-			auto fl = false;
-			for(auto i = 0u; i < ncol-1; i++){
-				auto ele = subtab.ele[r][i];
-				
-				ind[i] = par.dep[i].hash_list.find(ele);
-				if(ind[i] == UNSET){ 
-					fl = true;
-					
-					if(par.dep[i].hash_list_out.find(ele) == UNSET){	
-						alert_import("The table element '"+ele+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
-						return;
-					}
-				}
-			}
-			
-			if(fl == false){
-				auto pri = convert_text_to_prior(subtab.ele[r][ncol-1],line_num,par.full_name,false);
-				
-				if(pri.error != ""){
-					alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not a valid prior specification: "+pri.error+" (col '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+").");
-					return;
-				}
-				
-				set_prior_element(par,ind,pri);
-			}
+		if(par.cat_factor){
+			alert_import("'prior-split' cannot be used for a factor."); 
+			return;
 		}
+		
+		if(model.is_symmetric(par)){
+			alert_import("'prior-split' cannot be used for a covariance matrix."); 
+			return;
+		}
+		
+		string desc = "For 'prior-split'";
+		load_param_value(pp,prior_split,par,desc,PRIOR_SPLIT_LOAD);
 	}
 	
 	if(dist != ""){
@@ -1485,46 +1488,8 @@ void Input::param_command()
 			return;
 		}
 		
-		auto tab = load_table(dist_split);
-		if(tab.error == true) return;	
-		
-		auto col_name = pp.dep;
-		col_name.push_back("Dist");
-		
-		auto subtab = get_subtable(tab,col_name); if(subtab.error == true) return;
-		
-		auto ncol = subtab.ncol;
-		
-		for(auto r = 0u; r < subtab.nrow; r++){
-			vector <unsigned int> ind(ncol-1);
-			
-			auto fl = false;
-			for(auto i = 0u; i < ncol-1; i++){
-				auto ele = subtab.ele[r][i];
-				
-				ind[i] = par.dep[i].hash_list.find(ele);
-	
-				if(ind[i] == UNSET){ 
-					fl = true;
-					
-					if(par.dep[i].hash_list_out.find(ele) == UNSET){	
-						alert_import("The table element '"+ele+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
-						return;
-					}
-				}
-			}
-			
-			if(fl == false){
-				auto pri = convert_text_to_prior(subtab.ele[r][ncol-1],line_num,par.full_name,true);
-			
-				if(pri.error != ""){
-					alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not a valid distribution specification: "+pri.error+" (col '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+").");
-					return;
-				}
-				
-				set_prior_element(par,ind,pri);
-			}
-		}
+		string desc = "For 'dist-split'";
+		load_param_value(pp,dist_split,par,desc,DIST_SPLIT_LOAD);
 	}
 		
 	for(const auto &par2 : model.param){
@@ -1878,8 +1843,8 @@ bool Input::inference_command()
 		}	
 		
 		auto update = (unsigned int)(genper*details.sample/100.0);
-		if(update < 10){
-			update = 10;
+		if(update < 5){
+			update = 5;
 			alert_warning("'gen-percent' set to "+tstr(update*100/details.sample)+"% because the value "+tstr(genper)+"% was too small.");
 		}
 		details.gen_update = update;
@@ -2060,7 +2025,9 @@ void Input::ind_effect_command()
 	
 	auto name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
 	
-	auto spl = split(name,',');
+	auto ie = get_tag_value("ie"); if(ie == ""){ cannot_find_tag(); return;}
+	
+	auto spl = split(ie,',');
 	vector <IEname> list; 
 	for(auto i = 0u; i < spl.size(); i++){
 		auto nam = spl[i];
@@ -2306,10 +2273,14 @@ void Input::ind_effect_command()
 	else A_matrix.sparsity = UNSET; 
 	
 	IEgroup ieg; 
+	ieg.name = name;
 	ieg.list = list; 
 	ieg.A_matrix = A_matrix;
 	ieg.line_num = line_num;
 	ieg.ppc_resample = false;
+	ieg.prior_ref = UNSET;
+	ieg.log_det_min = UNSET;
+	ieg.log_det_max = UNSET;
 	model.species[p].ind_eff_group.push_back(ieg);
 }
 

@@ -18,6 +18,450 @@ using namespace std;
 #include "const.hh"
 #include "utils.hh"
 
+
+/// Calculates the tri_gamma function
+double tri_gamma(double z)
+{
+	auto sum = 0.0;
+	//for(auto n = 0u; n < LARGE; n++){
+	//for(auto n = 0u; n < 1000*z; n++){
+	for(auto n = 0u; n < 10000000; n++){
+			
+		auto d = 1.0/((z+n)*(z+n));
+		sum += d;
+	}
+	
+	/*
+	auto dx = 0.01;
+	auto sum2 = 0.0;
+	for(auto x = dx; x < 1; x+= dx){
+		sum2 += dx*pow(x,z-1)*log(x)/(1-x);
+	}
+	*/
+	
+	//return -sum2;
+	//cout << sum << " " << sum2 << " j" << endl;
+	return sum;
+}
+
+
+/// Calculates the tri_gamma function
+double di_gamma(double z)
+{
+	auto c = 0.577215664901532860;
+	
+	auto sum = -c;
+	//for(auto n = 0u; n < LARGE; n++){
+	for(auto n = 0u; n < 10*z; n++){
+		auto d = (z-1)/((1+n)*(z+n));
+		sum += d;
+	}	
+	
+	return sum;
+}
+
+
+/// This tests if the Jeffreys expression in the paper are correct or not
+void test_jeffreys()
+{
+	if(false){  // exp_mean
+		auto pmin = 0.05, pmax = 5.0, dp = 0.01;
+		auto xmax = 10000.0, dx = 0.01;
+		
+		ofstream fout("Output/mean.txt");
+		for(auto p = pmin; p < pmax; p += 0.1){
+			auto sum = 0.0, sum2 = 0.0;
+			for(auto x = dx; x < xmax; x += dx){
+				auto v_pp = exp_mean_probability(x,p+dp);
+				auto v_pm = exp_mean_probability(x,p-dp);
+				auto v = exp_mean_probability(x,p);
+				auto dpp = (v_pp+v_pm-2*v)/(dp*dp);
+				auto f = exp(v);
+				sum += dpp*f*dx;
+				sum2 += f*dx;
+			}
+			sum /= sum2;
+			if(sum2 < 0.99) cout << p << " " << sum2 <<  " ran" << endl;
+			
+			if(sum < 0) sum = -sum;
+			fout << p << " " << sqrt(sum) << " " << 0.5/p << endl; 
+		}
+	}
+	
+	if(false){  // exp_rate
+		auto pmin = 0.05, pmax = 5.0, dp = 0.01;
+		auto xmax = 10000.0, dx = 0.01;
+		
+		ofstream fout("Output/rate.txt");
+		for(auto p = pmin; p < pmax; p += 0.1){
+			auto sum = 0.0, sum2 = 0.0;
+			for(auto x = dx; x < xmax; x += dx){
+				auto v_pp = exp_rate_probability(x,p+dp);
+				auto v_pm = exp_rate_probability(x,p-dp);
+				auto v = exp_rate_probability(x,p);
+				auto dpp = (v_pp+v_pm-2*v)/(dp*dp);
+				auto f = exp(v);
+				sum += dpp*f*dx;
+				sum2 += f*dx;
+			}
+			sum /= sum2;
+			if(sum2 < 0.99) cout << p << " " << sum2 <<  " ran" << endl;
+			
+			if(sum < 0) sum = -sum;
+			fout << p << " " << sqrt(sum) << " " << 0.5/p << endl; 
+		}
+	}
+	
+	if(false){  // gamma fixed
+		auto m = 1.0;
+		auto pmin = 0.05, pmax = 2.0, dp = 0.001;
+		auto xmax = 100.0, dx = 0.001;
+		
+		ofstream fout("Output/gamma_fixed.txt");
+		for(auto p = pmin; p < pmax; p += 0.01){
+			auto sum = 0.0, sum2 = 0.0;
+			for(auto x = 0.1*dx; x < xmax; x += dx){
+				auto v_pp = gamma_probability(x,m,p+dp);
+				auto v_pm = gamma_probability(x,m,p-dp);
+				auto v = gamma_probability(x,m,p);
+				auto dpp = (v_pp+v_pm-2*v)/(dp*dp);
+				auto f = exp(v);
+				sum += dpp*f*dx;
+				sum2 += f*dx;
+			}
+			sum /= sum2;
+			if(sum2 < 0.99) cout << p << " " << sum2 <<  " ran" << endl;
+			
+			if(sum < 0) sum = -sum;
+			fout << p << " " << sqrt(sum) << " " << sqrt(tri_gamma(1/(p*p)) - (p*p))/(p*p*p) << " " << 1/(p) << endl; 
+		}
+	}
+	
+	if(false){  // gamma 
+		auto m = 1.0, dm = 0.001;
+		auto pmin = 0.05, pmax = 2.0, dp = 0.001;
+		auto xmax = 100.0, dx = 0.001;
+		
+		ofstream fout("Output/gamma.txt");
+		for(auto p = pmin; p < pmax; p += 0.01){
+			auto sum2 = 0.0;
+			auto dmm_sum = 0.0, dmp_sum = 0.0, dpp_sum = 0.0;
+			for(auto x = 0.1*dx; x < xmax; x += dx){
+				auto v_pp = gamma_probability(x,m+dm,p+dp);
+				auto v_pm = gamma_probability(x,m+dm,p-dp);
+				auto v_mp = gamma_probability(x,m-dm,p+dp);
+				auto v_mm = gamma_probability(x,m-dm,p-dp);
+				auto v = gamma_probability(x,m,p);
+				auto dmm = ((v_pp+v_pm)/2 + (v_mp+v_mm)/2 - 2*v)/(dm*dm);
+				auto dmp = (v_pp+v_mm - v_pm - v_mp)/(4*dm*dp);
+				auto dpp = ((v_pp+v_mp)/2 + (v_mm+v_pm)/2 - 2*v)/(dp*dp);
+				auto f = exp(v);
+				dmm_sum += dmm*f*dx;
+				dmp_sum += dmp*f*dx;
+				dpp_sum += dpp*f*dx;
+				sum2 += f*dx;
+			}
+			dmm_sum /= sum2;
+			dmp_sum /= sum2;
+			dpp_sum /= sum2;
+			
+			if(sum2 < 0.99) cout << p << " " << sum2 <<  " ran" << endl;
+			
+			auto det = dmm_sum*dpp_sum - dmp_sum*dmp_sum;
+				
+			//cout << tri_gamma(1/(p*p)) << " " << (p*p) << "U" << endl;
+			fout << p << " " << sqrt(det) << " " << sqrt(tri_gamma(1/(p*p)) - (p*p))/(p*p*p*p) << " " << 1/(p*p) << endl; 
+		}
+	}
+	
+	
+	if(false){  // lognormal fixed
+		auto m = 1.0;
+		auto pmin = 0.05, pmax = 2.0, dp = 0.001;
+		auto xmax = 100.0, dx = 0.001;
+		
+		ofstream fout("Output/lognormal_fixed.txt");
+		for(auto p = pmin; p < pmax; p += 0.01){
+			auto sum = 0.0, sum2 = 0.0;
+			for(auto x = 0.1*dx; x < xmax; x += dx){
+				auto v_pp = lognormal_probability(x,m,p+dp);
+				auto v_pm = lognormal_probability(x,m,p-dp);
+				auto v = lognormal_probability(x,m,p);
+				auto dpp = (v_pp+v_pm-2*v)/(dp*dp);
+				auto f = exp(v);
+				sum += dpp*f*dx;
+				sum2 += f*dx;
+			}
+			sum /= sum2;
+			if(sum2 < 0.99) cout << p << " " << sum2 <<  " ran" << endl;
+			
+			if(sum < 0) sum = -sum;
+			fout << p << " " << sqrt(sum) << " " << p/(log(1+p*p)*(1+p*p)) << " " << 2/(p) << endl; 
+		}
+	}
+	
+	if(false){  // lognormal 
+		auto m = 1.0, dm = 0.0001;
+		auto pmin = 0.05, pmax = 2.0, dp = 0.0001;
+		auto xmax = 100.0, dx = 0.001;
+		
+		ofstream fout("Output/lognormal.txt");
+		for(auto p = pmin; p < pmax; p += 0.01){
+			auto sum2 = 0.0;
+			auto dmm_sum = 0.0, dmp_sum = 0.0, dpp_sum = 0.0;
+			for(auto x = 0.1*dx; x < xmax; x += dx){
+				auto v_pp = lognormal_probability(x,m+dm,p+dp);
+				auto v_pm = lognormal_probability(x,m+dm,p-dp);
+				auto v_mp = lognormal_probability(x,m-dm,p+dp);
+				auto v_mm = lognormal_probability(x,m-dm,p-dp);
+				auto v = lognormal_probability(x,m,p);
+				auto dmm = ((v_pp+v_pm)/2 + (v_mp+v_mm)/2 - 2*v)/(dm*dm);
+				auto dmp = (v_pp+v_mm - v_pm - v_mp)/(4*dm*dp);
+				auto dpp = ((v_pp+v_mp)/2 + (v_mm+v_pm)/2 - 2*v)/(dp*dp);
+				auto f = exp(v);
+				dmm_sum += dmm*f*dx;
+				dmp_sum += dmp*f*dx;
+				dpp_sum += dpp*f*dx;
+				sum2 += f*dx;
+			}
+			dmm_sum /= sum2;
+			dmp_sum /= sum2;
+			dpp_sum /= sum2;
+			
+			if(sum2 < 0.99) cout << p << " " << sum2 <<  " ran" << endl;
+			
+			auto det = dmm_sum*dpp_sum - dmp_sum*dmp_sum;
+				
+			//cout << tri_gamma(1/(p*p)) << " " << (p*p) << "U" << endl;
+			fout << p << " " << sqrt(det) << " " << p/(pow(log(1+p*p),1.5)*(1+p*p)) << " " << 2/(p*p) << endl; 
+		}
+	}
+	
+	
+	if(false){  // weibull fixed
+		auto m = 1.0;
+		//auto pmin = 0.05, pmax = 2.0, dp = 0.001;
+		auto pmin = 0.5, pmax = 40.0, dp = 0.001;
+		auto xmax = 100.0, dx = 0.001;
+		
+		ofstream fout("Output/weibull_fixed.txt");
+		for(auto p = pmin; p < pmax; p += 0.1){
+			auto sum = 0.0, sum2 = 0.0;
+			for(auto x = 0.1*dx; x < xmax; x += dx){
+				auto v_pp = weibull_probability(x,m,p+dp);
+				auto v_pm = weibull_probability(x,m,p-dp);
+				auto v = weibull_probability(x,m,p);
+				auto dpp = (v_pp+v_pm-2*v)/(dp*dp);
+				auto f = exp(v);
+				sum += dpp*f*dx;
+				sum2 += f*dx;
+			}
+			sum /= sum2;
+			if(sum2 < 0.99) cout << p << " " << sum2 <<  " ran" << endl;
+			
+			if(sum < 0) sum = -sum;
+			fout << p << " " << sqrt(sum) << " " << p/(log(1+p*p)*(1+p*p)) << " " << 2/(p) << endl; 
+		}
+	}
+	
+	if(false){  // weibull
+		auto m = 1.0, dm = 0.001;
+		//auto pmin = 0.05, pmax = 2.0, dp = 0.001;
+		auto pmin = 0.5, pmax = 40.0, dp = 0.001;
+		auto xmax = 100.0, dx = 0.001;
+		
+		ofstream fout("Output/weibull.txt");
+		for(auto p = pmin; p < pmax; p += 0.1){
+			auto sum2 = 0.0;
+			auto dmm_sum = 0.0, dmp_sum = 0.0, dpp_sum = 0.0;
+			for(auto x = 0.1*dx; x < xmax; x += dx){
+				auto v_pp = weibull_probability(x,m+dm,p+dp);
+				auto v_pm = weibull_probability(x,m+dm,p-dp);
+				auto v_mp = weibull_probability(x,m-dm,p+dp);
+				auto v_mm = weibull_probability(x,m-dm,p-dp);
+				auto v = weibull_probability(x,m,p);
+				auto dmm = ((v_pp+v_pm)/2 + (v_mp+v_mm)/2 - 2*v)/(dm*dm);
+				//cout << v_pp << " " << v_pm << " " << v_mp  << " "<< v_mm << "uu" << endl;
+				auto dmp = (v_pp+v_mm - v_pm - v_mp)/(4*dm*dp);
+				auto dpp = ((v_pp+v_mp)/2 + (v_mm+v_pm)/2 - 2*v)/(dp*dp);
+				auto f = exp(v);
+				//cout << f << "f" << endl;
+				dmm_sum += dmm*f*dx;
+				dmp_sum += dmp*f*dx;
+				dpp_sum += dpp*f*dx;
+				sum2 += f*dx;
+			}
+			dmm_sum /= sum2;
+			dmp_sum /= sum2;
+			dpp_sum /= sum2;
+			
+			if(sum2 < 0.99) cout << p << " " << sum2 <<  " ran" << endl;
+			
+			auto det = dmm_sum*dpp_sum - dmp_sum*dmp_sum;
+				
+			//cout << tri_gamma(1/(p*p)) << " " << (p*p) << "U" << endl;
+			fout << p << " " << sqrt(det) << " " << p/(pow(log(1+p*p),1.5)*(1+p*p)) << " " << 2/(p*p) << endl; 
+		}
+	}
+	
+	
+	if(false){  // normal fixed
+		auto m = 1.0;
+		auto pmin = 0.05, pmax = 2.0, dp = 0.001;
+		auto xmax = 100.0, dx = 0.0001;
+		
+		ofstream fout("Output/normal_fixed.txt");
+		for(auto p = pmin; p < pmax; p += 0.01){
+			auto sum = 0.0, sum2 = 0.0;
+			for(auto x = -xmax; x < xmax; x += dx){
+				auto v_pp = normal_probability(x,m,p+dp);
+				auto v_pm = normal_probability(x,m,p-dp);
+				auto v = normal_probability(x,m,p);
+				auto dpp = (v_pp+v_pm-2*v)/(dp*dp);
+				auto f = exp(v);
+				sum += dpp*f*dx;
+				sum2 += f*dx;
+			}
+			sum /= sum2;
+			if(sum2 < 0.99) cout << p << " " << sum2 <<  " ran" << endl;
+			
+			if(sum < 0) sum = -sum;
+			fout << p << " " << sqrt(sum) << " " << 2/p << " " << 2/(p) << endl; 
+		}
+	}
+	
+	if(false){  // normal 
+		auto m = 1.0, dm = 0.0001;
+		auto pmin = 0.05, pmax = 2.0, dp = 0.0001;
+		auto xmax = 100.0, dx = 0.001;
+		
+		ofstream fout("Output/normal.txt");
+		for(auto p = pmin; p < pmax; p += 0.01){
+			auto sum2 = 0.0;
+			auto dmm_sum = 0.0, dmp_sum = 0.0, dpp_sum = 0.0;
+			for(auto x = -xmax; x < xmax; x += dx){
+				auto v_pp = normal_probability(x,m+dm,p+dp);
+				auto v_pm = normal_probability(x,m+dm,p-dp);
+				auto v_mp = normal_probability(x,m-dm,p+dp);
+				auto v_mm = normal_probability(x,m-dm,p-dp);
+				auto v = normal_probability(x,m,p);
+				auto dmm = ((v_pp+v_pm)/2 + (v_mp+v_mm)/2 - 2*v)/(dm*dm);
+				auto dmp = (v_pp+v_mm - v_pm - v_mp)/(4*dm*dp);
+				auto dpp = ((v_pp+v_mp)/2 + (v_mm+v_pm)/2 - 2*v)/(dp*dp);
+				auto f = exp(v);
+				dmm_sum += dmm*f*dx;
+				dmp_sum += dmp*f*dx;
+				dpp_sum += dpp*f*dx;
+				sum2 += f*dx;
+			}
+			dmm_sum /= sum2;
+			dmp_sum /= sum2;
+			dpp_sum /= sum2;
+			
+			if(sum2 < 0.99) cout << p << " " << sum2 <<  " ran" << endl;
+			
+			auto det = dmm_sum*dpp_sum - dmp_sum*dmp_sum;
+				
+			//cout << tri_gamma(1/(p*p)) << " " << (p*p) << "U" << endl;
+			fout << p << " " << sqrt(det) << " " << 2/(p*p) << " " << 2/(p*p) << endl; 
+		}
+	}
+	
+	/*
+	if(false){  // mvn fixed
+		auto m = 1.0;
+		auto pmin = 0.05, pmax = 2.0, dp = 0.001;
+		auto xmax = 100.0, dx = 0.0001;
+		vector < vector <double> > covar;
+		covar.resize(2);
+		covar.push_back(1);	covar.push_back(0);
+		covar.push_back(0);	covar.push_back(1);
+		
+		vector <double> mean;
+		mean.push_back(0); mean.push_back(0); 
+		
+		
+		ofstream fout("Output/mvn_fixed.txt");
+		for(auto p = pmin; p < pmax; p += 0.01){
+			auto sum = 0.0, sum2 = 0.0;
+			for(auto xi = -xmax; xi < xmax; xi += dx){
+				for(auto xj = -xmax; xj < xmax; xj += dx){
+					vector <double> x;
+					x.push_back(xi); x.push_back(xj);
+					
+				auto v_pp = mvn_probability(x,m,p+dp);
+				auto v_pm = normal_probability(x,m,p-dp);
+				auto v = normal_probability(x,m,p);
+				auto dpp = (v_pp+v_pm-2*v)/(dp*dp);
+				auto f = exp(v);
+				sum += dpp*f*dx;
+				sum2 += f*dx;
+			}
+			sum /= sum2;
+			if(sum2 < 0.99) cout << p << " " << sum2 <<  " ran" << endl;
+			
+			if(sum < 0) sum = -sum;
+			fout << p << " " << sqrt(sum) << " " << 2/p << " " << 2/(p) << endl; 
+		}
+	}
+	
+	if(false){  // normal 
+		auto m = 1.0, dm = 0.0001;
+		auto pmin = 0.05, pmax = 2.0, dp = 0.0001;
+		auto xmax = 100.0, dx = 0.001;
+		
+		ofstream fout("Output/normal.txt");
+		for(auto p = pmin; p < pmax; p += 0.01){
+			auto sum2 = 0.0;
+			auto dmm_sum = 0.0, dmp_sum = 0.0, dpp_sum = 0.0;
+			for(auto x = -xmax; x < xmax; x += dx){
+				auto v_pp = normal_probability(x,m+dm,p+dp);
+				auto v_pm = normal_probability(x,m+dm,p-dp);
+				auto v_mp = normal_probability(x,m-dm,p+dp);
+				auto v_mm = normal_probability(x,m-dm,p-dp);
+				auto v = normal_probability(x,m,p);
+				auto dmm = ((v_pp+v_pm)/2 + (v_mp+v_mm)/2 - 2*v)/(dm*dm);
+				auto dmp = (v_pp+v_mm - v_pm - v_mp)/(4*dm*dp);
+				auto dpp = ((v_pp+v_mp)/2 + (v_mm+v_pm)/2 - 2*v)/(dp*dp);
+				auto f = exp(v);
+				dmm_sum += dmm*f*dx;
+				dmp_sum += dmp*f*dx;
+				dpp_sum += dpp*f*dx;
+				sum2 += f*dx;
+			}
+			dmm_sum /= sum2;
+			dmp_sum /= sum2;
+			dpp_sum /= sum2;
+			
+			if(sum2 < 0.99) cout << p << " " << sum2 <<  " ran" << endl;
+			
+			auto det = dmm_sum*dpp_sum - dmp_sum*dmp_sum;
+				
+			//cout << tri_gamma(1/(p*p)) << " " << (p*p) << "U" << endl;
+			fout << p << " " << sqrt(det) << " " << 2/(p*p) << " " << 2/(p*p) << endl; 
+		}
+	}
+	*/
+	
+	/*
+	{
+		ofstream fout("Output/trigamma.txt");
+		for(auto cv = 0.05; cv < 1; cv += 0.1){
+			fout << cv << " " << tri_gamma(1/(cv*cv)) << " " << cv*cv <<  endl;
+		}
+	}
+	
+	{
+		ofstream fout("Output/digamma.txt");
+		for(auto cv = 0.05; cv < 1; cv += 0.1){
+			fout << cv << " " << di_gamma(1/(cv*cv)) << " " << cv*cv <<  endl;
+		}
+	}
+	*/
+	cout << "done" << endl;
+}
+
+	
 /// Checks that a distribution is being generated correctly
 void test_distribution()
 {

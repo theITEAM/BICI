@@ -50,7 +50,7 @@ param name="N" constant="1001"
 
 param name="α" value="0.06" prior="uniform(0,0.2)"
 
-param name="β" value="0.09" prior="uniform(0,1)"
+param name="β" value="0.09" prior="inverse(0.01,1)"
 
 param name="Δ" value="0.7" prior="uniform(0,1)"
 

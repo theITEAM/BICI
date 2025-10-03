@@ -579,7 +579,7 @@ function get_param_cat(filt_list,filt_type)
 				 param_cat[5].list.push(i);
 			}
 			else{
-				if(param[i].type == "variance" || param[i].type == "correlation") param_cat[4].list.push(i);
+				if(param[i].type == "variance") param_cat[4].list.push(i);
 				else{
 					let n = param[i].dep.length; if(n > 3) n = 3;
 					param_cat[n].list.push(i);

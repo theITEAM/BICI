@@ -195,10 +195,9 @@ function add_examples_buts(lay)
 
 	ex_mod.push({te:"F) Parameter definitions",help:"These examples look at how parameters can be reparameterised, set to distributions or derived from other quantities"+mod_mess, gap:gap});
 	ex_mod.push({te:"F1: Reparameterisation", mod:"M3.4", link:true, mod_type:"IBM"}); 
-
 	ex_mod.push({te:"F2: Parameter distribution", mod:"M5.2", link:true, mod_type:"IBM"}); 
-	
 	ex_mod.push({te:"F3: Derived quantities", mod:"M1.3", link:true, mod_type:"IBM"}); 
+	ex_mod.push({te:"F4: Factor", mod:"M2.6", link:true, mod_type:"PBP"}); 
 	
 	ex_mod.push({te:"G) Incorporating pathogen genetics",help:"", gap:gap});
 	ex_mod.push({te:"G1: Matrix of genetic differences", mod:"M1.2", link:true, mod_type:"IBM"}); 

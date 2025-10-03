@@ -149,7 +149,7 @@ add-ind-sim file="[[
 "Ind-100",0,"S"
 ]]"
 
-move-ind-sim class="DS" file="[[
+move-ind-sim  name="mo" class="DS" file="[[
 "ID","t","DS"
 "Ind-1",30,"I"
 ]]"
@@ -157,7 +157,7 @@ move-ind-sim class="DS" file="[[
 
 # INFERENCE DATA
 
-add-ind file="[[
+add-ind-inf file="[[
 "ID","t","DS"
 "Ind-1",0,"S"
 "Ind-2",0,"S"
@@ -261,7 +261,7 @@ add-ind file="[[
 "Ind-100",0,"S"
 ]]"
 
-comp-data class="DS" file="[[
+comp-data name="co" class="DS" file="[[
 "ID","t","DS"
 "Ind-1",20,"S"
 "Ind-1",40,"I"

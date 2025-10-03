@@ -240,6 +240,7 @@ class Equation                             // Stores information about an equati
 		
 	// In equation_calculate.cc
 	public:
+		double calculate_constant() const;
 		double calculate_param_ti_fix(const vector <double> &precalc) const;
 		double calculate(unsigned int ti, const vector <double> &popnum, const vector <double> &precalc) const;
 		double calculate_calc(const vector <Calculation> &calc, unsigned int ti, const vector <double> &popnum, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;

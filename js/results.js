@@ -230,7 +230,7 @@ function calculate_burnin(result,source)
 function get_param_value(i,source,lines,result,warn,mode)
 {
 	let param = result.param;
-
+	
 	let spl = comma_split(lines[i]);
 	let name = remove_quote(spl[0].replace(/->/g,"→"));
 	name = remove_escape_char(name);
@@ -251,61 +251,94 @@ function get_param_value(i,source,lines,result,warn,mode)
 	switch(spl.length){
 	case 1:                                          // Set 	
 		{		
-			let list = par_find_list(par);
-				
+			let list = par_find_list(par);	
+			
 			value = par_find_template(list);
-			let co_list = generate_co_list(list);
-			
-			par.list = list;
-			par.co_list = co_list;
-		
-			i++;
-			let spl_head = comma_split(lines[i]);
-			
-			let dep = par.dep;
-			
-			let ndep = dep.length;
-		
-			if(spl_head.length != ndep+1){
-				alert_sample(warn,14);
-			}
-			
-			for(let d = 0; d < ndep; d++){
-				if(remove_prime(dep[d]) != remove_prime(spl_head[d])){
-					alert_sample(warn,15); 
-				}
-			}
-
-			if(spl_head[ndep] != "Value") alert_sample(warn,16); 
 				
-			i++;
-			for(let j = 0; j < co_list.length; j++){
-				let spl_row = lines[i].split(",");
-			
-				if(spl_row.length != ndep+1) alert_sample(warn,17);
-				let index=[];
-				for(let d = 0; d < ndep; d++){
-					let k = find_in(list[d], spl_row[d]);
-					if(k == undefined){
-						alert_sample(warn,18);
-					}
-					index.push(k);
-				}
-				let val = spl_row[ndep];
-				
-				if(der_time_var){
-					if(mode == "derive") val = split_compact(val);
-					else val = split_spline(val);
-				}
-				else{
-					if(isNaN(val)) alert_sample(warn,100);
-					val = Number(val);
-				}
-
-				set_element(value,index,val);		
+			if(is_symmetric(par)){  // Loads covariance matrix
 				i++;
+				let spl_head = comma_split(lines[i]);
+				let pli = par.list[0];
+				
+				let L = list[0].length; 
+				if(spl_head.length != L) alert_sample(warn,150);
+				for(let ii = 0; ii < L; ii++){
+					if(spl_head[ii] != pli[ii]) alert_sample(warn,151);
+				}
+
+				for(let jj = 0; jj < L; jj++){
+					i++;
+					let row = comma_split(lines[i]);
+					if(row.length != L) alert_sample(warn,152);
+					for(let ii = 0; ii < L; ii++){
+						let val = row[ii];
+						if(ii < jj){
+							if(val != ".") alert_sample(warn,153);
+						}
+						else{
+							if(isNaN(val)) alert_sample(warn,154);
+							val = Number(val);
+							let index=[]; index[0] = jj; index[1] = ii;
+							
+							set_element(value,index,val);		
+						}
+					}
+				}
 			}
-			i--;
+			else{
+				let co_list = generate_co_list(list);
+				
+				par.list = list;
+				par.co_list = co_list;
+			
+				i++;
+				let spl_head = comma_split(lines[i]);
+				
+				let dep = par.dep;
+				
+				let ndep = dep.length;
+			
+				if(spl_head.length != ndep+1){
+					alert_sample(warn,14);
+				}
+				
+				for(let d = 0; d < ndep; d++){
+					if(remove_prime(dep[d]) != remove_prime(spl_head[d])){
+						alert_sample(warn,15); 
+					}
+				}
+
+				if(spl_head[ndep] != "Value") alert_sample(warn,16); 
+					
+				i++;
+				for(let j = 0; j < co_list.length; j++){
+					let spl_row = lines[i].split(",");
+				
+					if(spl_row.length != ndep+1) alert_sample(warn,17);
+					let index=[];
+					for(let d = 0; d < ndep; d++){
+						let k = find_in(list[d], spl_row[d]);
+						if(k == undefined){
+							alert_sample(warn,18);
+						}
+						index.push(k);
+					}
+					let val = spl_row[ndep];
+					
+					if(der_time_var){
+						if(mode == "derive") val = split_compact(val);
+						else val = split_spline(val);
+					}
+					else{
+						if(isNaN(val)) alert_sample(warn,100);
+						val = Number(val);
+					}
+
+					set_element(value,index,val);		
+					i++;
+				}
+				i--;
+			}
 		}
 		break;
 		
@@ -338,9 +371,11 @@ function get_param_value(i,source,lines,result,warn,mode)
 	}
 	
 	if(par.list != undefined){
-		let co_list = generate_co_list(par.list);
-		for(let j = 0; j < co_list.length; j++){
-			if(get_element(value,co_list[j].index) == undefined) alert_sample(warn,101);
+		if(is_symmetric(par) != true){
+			let co_list = generate_co_list(par.list);
+			for(let j = 0; j < co_list.length; j++){
+				if(get_element(value,co_list[j].index) == undefined) alert_sample(warn,101);
+			}
 		}
 	}
 			
@@ -1430,23 +1465,53 @@ function get_pos_paramview(result)
 			let para = true;
 		
 			if(par.output == true){
-				let co_list = generate_co_list(par.list);
-				for(let j = 0; j < co_list.length; j++){	
-					let ind = co_list[j].index;
-					
-					let name = param_name_index(par,ind);
-					list.push({th:th, index:ind, name:name});
-					
-					if(par.time_dep){
-						if(ind[ind.length-1] == 0){
-							let ind2 = copy(ind); ind2.pop();
-							let spl = name.split("(");
-							list_split.push({th:th, index:ind2, name:spl[0]});
+				if(is_symmetric(par)){
+					let pli = par.list[0];
+					let L = pli.length;
+					for(let j = 0; j < L; j++){
+						let ind=[]; ind[0] = j; ind[1] = j;
+						
+						let name = param_name_index(par,ind);
+						list.push({th:th, index:ind, name:name});
+						
+						if(par.variety != "const"){
+							total_param_list.push({th:th, index:ind, name:name});
 						}
 					}
 					
-					if(par.variety != "const"){
-						total_param_list.push({th:th, index:ind, name:param_name_index(par,ind)});
+					for(let j = 0; j < L; j++){
+						for(let i = j+1; i < L; i++){
+							let ind=[]; ind[0] = j; ind[1] = i;
+							
+							let name = param_name_index(par,ind);
+							name = "ω"+name.substr(1);
+							list.push({th:th, index:ind, name:name});
+							
+							if(par.variety != "const"){
+								total_param_list.push({th:th, index:ind, name:name});
+							}
+						}
+					}
+				}
+				else{
+					let co_list = generate_co_list(par.list);
+					for(let j = 0; j < co_list.length; j++){	
+						let ind = co_list[j].index;
+						
+						let name = param_name_index(par,ind);
+						list.push({th:th, index:ind, name:name});
+						
+						if(par.time_dep){
+							if(ind[ind.length-1] == 0){
+								let ind2 = copy(ind); ind2.pop();
+								let spl = name.split("(");
+								list_split.push({th:th, index:ind2, name:spl[0]});
+							}
+						}
+						
+						if(par.variety != "const"){
+							total_param_list.push({th:th, index:ind, name:param_name_index(par,ind)});
+						}
 					}
 				}
 			}

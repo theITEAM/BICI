@@ -513,6 +513,7 @@ double determinant_fast(const vector < vector <double> > &a)
 		det += log(valu * vall);
 	}
 
+	if(neg%2 == 1) return UNSET;	
 	return det;
 }
 

@@ -48,7 +48,7 @@ pop-data name="Stratified population data" filter="DS=file" error="normal:10%" f
 
 param name="N" constant="1001"
 
-param name="β" value="0.13" prior="uniform(0,1)"
+param name="β" value="0.13" prior="inverse(0.01,1)"
 
 param name="Δ" value="0.9" prior="uniform(0,2)"
 

@@ -37,7 +37,7 @@ comp-all color="#aa00aa" fix="true" file="comp-Group.csv"
 
 # INDIVIDUAL EFFECTS
 
-ind-effect name="f" ind-list="ind-list-f.csv" A-sparse="A-matrix-f.csv"
+ind-effect name="inf" ie="f" ind-list="ind-list-f.csv" A-sparse="A-matrix-f.csv"
 
 # SIMULATION INITIAL CONDITIONS
 
@@ -56,9 +56,9 @@ trans-data name="Infections" trans="S->I" obsrange="all" file="trans-data.csv"
 
 param name="N" constant="10"
 
-param name="β" value="0.2" prior="uniform(0,1)"
+param name="β" value="0.2" prior="inverse(0.01,1)"
 
-param name="Ω^f,f" value="1.5" prior="uniform(0,3)"
+param name="Ω^inf" value="1.5" prior="mvn-jeffreys(0.01,4)"
 
 
 

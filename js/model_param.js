@@ -177,7 +177,7 @@ function add_model_param_content(lay)
 			y += 1.4;
 			
 			for(let i = 0; i < sp.ind_eff_group.length; i++){
-				display_ind_eff_group(p,i,x,y,lay,wright);
+				display_ind_eff_group(p,i,mar,y,lay,wright);
 				y += dy;
 				
 				let ieg = sp.ind_eff_group[i];
@@ -185,10 +185,10 @@ function add_model_param_content(lay)
 					
 					let si = 0.9;
 					
-					let te_mat = "Load <e>"+ieg.A_matrix.name+"</e> matrix"; 
+					let te_mat = "Load <e>A^"+ieg.name+"</e> matrix"; 
 				
 					if(ieg.A_matrix.loaded == true){ 
-						te_mat = "Reload <e>"+ieg.A_matrix.name+"</e> matrix";
+						te_mat = "Reload <e>A^"+ieg.name+"</e> matrix";
 					}
 					
 					let xload = 4;
@@ -776,16 +776,21 @@ function set_paramselect_bubble(cont,eqn_appear)
 	case "normal":
 		if(par.type == "fixed effect"){ te = "This parameter is a fixed effect."; fl = true;}
 		if(par.type == "derive_param") te = "This parameter is derived."; 
-		if(par.type == "variance" || par.type == "correlation"){
+		if(par.type == "variance"){
 			let info = par.eqn_appear[0];
 			let ieg = model.species[info.p].ind_eff_group[info.ieg];
 			fl = true;
 
-			if(par.type == "variance"){
-				te = "This is the variance for individual effect <e>"+info.ie1+"</e>.";
+			if(ieg.ie_list.length == 1){
+				te = "This is the variance for individual effect <e>"+ieg.ie_list[0].name+"</e>.";
 			}
 			else{
-				te = "Correlation between individual effects <e>"+info.ie1+"</e> and <e>"+info.ie2+"</e>.";
+				let na = "";
+				for(let k = 0; k < ieg.ie_list.length; k++){
+					if(k != 0) na += ",";
+					na += ieg.ie_list[k].name;
+				}
+				te = "This is the covariance matrix for individual effects <e>"+na+"</e>.";
 			}
 		}
 		
@@ -814,7 +819,7 @@ function set_paramselect_bubble(cont,eqn_appear)
 		te2 = "It appears in:";
 	}
 
-	if(par.type != "derive_param" && par.type != "variance" && par.type != "correlation"){
+	if(par.type != "derive_param" && par.type != "variance"){
 		bubble_addparagraph(cont,te2,0,cont.dx);
 	
 		cont.y += 0.2;

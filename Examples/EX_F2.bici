@@ -57,11 +57,11 @@ trans-data name="Infections" trans="S->I" obsrange="all" file="trans-data.csv"
 
 param name="N" constant="10"
 
-param name="σ^G" value="0.5" prior="uniform(0,2)"
+param name="σ^G" value="0.5" prior="inverse(0.01,2)"
 
 param name="G_g" dist="normal(0,σ^G)"
 
-param name="β_v" value="value-beta.csv" prior="uniform(0,1)"
+param name="β_v" value="value-beta.csv" prior="inverse(0.01,1)"
 
 
 

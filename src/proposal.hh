@@ -45,7 +45,7 @@ class Proposal                             // Implements a proposal
 		
 		vector < vector <double> > M_inv;      // The covariance matrix
 		
-		bool omega_check;                      // Set if omega needs to be checked
+		vector <IEGref> ieg_check_pri;         // Stores which ind effect group priors need to be checked
 		double prop_weight;                    // The weight given to certain proposals
 		
 		double prop_prob;                      // The probability of performing proposal update
@@ -135,7 +135,7 @@ class Proposal                             // Implements a proposal
 		void update_sampler(const CorMatrix &cor_matrix);
 		void mbp_population_affect();
 		void set_mvn(double si_, const CorMatrix &cor_matrix);
-		bool param_resample(PV &param_val, const vector < vector <double> > &popnum_t);
+		double param_resample(PV &param_val, const vector < vector <double> > &popnum_t);
 		double mvn_probability(const vector <double> &param_prop1, const vector <double> &param_prop2) const;
 		
 	private:
@@ -152,7 +152,9 @@ class Proposal                             // Implements a proposal
 		void update_si(double fac);
 		void update_ind_samp_si(unsigned int tr_gl, double fac);
 		//bool skip_proposal(double val) const;
-		void set_omega_check();
+	
+		void set_ieg_check_pri();
+		//void set_omega_check();
 		bool event_dif(const vector <Event> &ev1, const vector <Event> &ev2) const;
 		void ind_obs_prob_update(IndSimProb &isp) const;
 		void set_mbp_fast();

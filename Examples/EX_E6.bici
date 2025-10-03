@@ -56,15 +56,15 @@ comp-data name="DS observations" class="DS" file="comp-data-DS.csv"
 
 param name="b" value="0.3" prior="uniform(0,1)"
 
-param name="c^D" value="0.5" prior="uniform(0.01,1)"
+param name="c^D" value="0.5" prior="power(0.01,1,-2)"
 
-param name="c^R" value="0.3" prior="uniform(0.01,1)"
+param name="c^R" value="0.3" prior="power(0.01,1,-2)"
 
-param name="m^D" value="20" prior="uniform(0,30)"
+param name="m^D" value="20" prior="inverse(1,30)"
 
-param name="m^R" value="10" prior="uniform(0,30)"
+param name="m^R" value="10" prior="inverse(1,30)"
 
-param name="β" value="0.002" prior="uniform(0,0.1)"
+param name="β" value="0.002" prior="inverse(0.0001,0.01)"
 
 param name="μ^g" value="0.8" prior="uniform(-2,2)"
 

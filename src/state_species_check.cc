@@ -166,7 +166,7 @@ void StateSpecies::check_markov_tree_rate() const
 	
 	for(auto i = 0u; i < markov_tree_rate.size(); i++){
 		if(dif(markov_tree_rate_check[i],markov_tree_rate[i],dif_thresh)){
-			emsg("markov tree problem");
+			emsg("markov tree problem"); 
 		}
 	}		
 }

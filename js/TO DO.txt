@@ -1,4 +1,7 @@
 TO DO
+-- ABC param_resample sort out
+-- Interface Markeks radio buttons shoul dnot be on histogram plot
+-- Mareks diagnostic expected transition rate not right 
 -- Sort out fixed initial population for individual and population-based models (perhaps convert to Dirichlet?)
 -- allow for restart of inference
 

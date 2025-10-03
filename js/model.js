@@ -2797,6 +2797,7 @@ class Model
 			let ch = alphabet[i];
 			let flag = false;
 			if(ch == "t") flag = true;
+			if(ch == "z") flag = true;
 			
 			if(ch != def_pos){
 				for(let p = 0; p < this.species.length; p++){

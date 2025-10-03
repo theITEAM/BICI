@@ -628,6 +628,8 @@ void State::calculate_likelihood()
 {
 	prior_prob = model.prior_prob(param_val);
 	
+	prior_ieg = model.prior_ieg_all(param_val);
+	
 	dist_prob = model.dist_prob(param_val);
 	
 	spline_prior = model.spline_prior(param_val);
@@ -706,7 +708,7 @@ void State::calculate_likelihood()
 /// Calculates the overall likelihood 
 void State::calculate_like()
 {
-	like.prior = sum(prior_prob);
+	like.prior = sum(prior_prob) + sum(prior_ieg);
 	like.dist = sum(dist_prob);
 	like.spline_prior = sum(spline_prior);
 	
@@ -907,6 +909,12 @@ Like State::update_param(const vector <AffectLike> &affect_like)
 		case SPLINE_PRIOR_AFFECT:
 			{
 				change_add(model.recalculate_spline_prior(alike.num,spline_prior,param_val,like_ch.spline_prior));
+			}
+			break;
+		
+		case IEG_PRIOR_AFFECT:
+			{
+				change_add(model.recalculate_ieg_prior(alike.num,prior_ieg,param_val,like_ch.prior));
 			}
 			break;
 			
@@ -1147,6 +1155,12 @@ void State::restore(const vector <AffectLike> &affect_like)
 		case SPLINE_PRIOR_AFFECT:
 			{
 				spline_prior[alike.num] = change[i].num;
+			}
+			break;
+			
+		case IEG_PRIOR_AFFECT:
+			{
+				prior_ieg[alike.num] = change[i].num;
 			}
 			break;
 			

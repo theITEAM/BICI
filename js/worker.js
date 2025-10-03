@@ -690,7 +690,6 @@ function process(e)
 	case "Import output":
 		{
 			let fi = "M:/Github/theITEAM/BICI/Execute/init.bici";
-			//if(ver =="windows" && !win_linux){
 			if(ver =="windows"){
 				fi = "C:/Users/cpooley/Desktop/BICI_release/BICI_v0.7_windows/Execute/init.bici";
 			}
@@ -704,7 +703,7 @@ function process(e)
 		break;
 		
 	case "Combine IE":
-		add_ie_to_group(info.p,info.e,info.i);
+		add_ie_to_group(info.p,info.i,info.e);
 		update_mod = true;
 		break;
 		

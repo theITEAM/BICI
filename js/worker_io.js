@@ -290,7 +290,8 @@ function load_table(te,head,sep,filename)
 						}
 					}
 					
-					if(ist < st.length) li.push(st.substr(ist,st.length-ist));
+					//if(ist < st.length) 
+					li.push(st.substr(ist,st.length-ist));
 				}
 				break;
 
@@ -355,6 +356,29 @@ function read_param_samples_file(chain,file,result)
 }
 
 
+/// Determines if a name is a correlation
+function is_correlation(name,result)
+{
+	let spl = name.split("_");
+	if(spl.length != 2) return false;
+	let spl2 = spl[0].split("^");
+	if(spl2.length != 2) return false;
+	
+	if(spl2[0] != "ω") return false;
+	
+	let na = spl2[1];
+	for(let p = 0; p < result.species.length; p++){
+		let sp = result.species[p];
+		for(let g = 0; g < sp.ind_eff_group.length; g++){
+			if(sp.ind_eff_group[g].name == na) return true;
+		}
+	}
+
+	return false;
+}
+
+
+
 /// Reads in a parameter samples from a file
 function read_param_samples(chain,te,result,warn)
 {
@@ -374,7 +398,11 @@ function read_param_samples(chain,te,result,warn)
 		let name = remove_quote(spl[i]).replace(/->/g,"→");
 		name = name.replace(/\|/g,",");
 		name = remove_escape_char(name);
-	
+		
+		if(begin_str(name,"ω")){
+			if(is_correlation(name,result)) name = "Ω"+name.substr(1);
+		}
+		
 		let ref_add = hash_ref.find(name)
 		if(ref_add == undefined){
 			if(find_in(like_name,name) != undefined){
@@ -391,7 +419,7 @@ function read_param_samples(chain,te,result,warn)
 				}
 				else{
 					let pp = get_param_prop(name);
-			
+		
 					let th = find(result.param,"name",pp.name);
 			
 					if(th == undefined && begin(name,"N^")){
@@ -488,11 +516,13 @@ function read_param_samples(chain,te,result,warn)
 					}
 				
 					if(th == undefined){
+						
 						alert_param_sample(warn,-2);
 						return;
 					}
 					
 					let par = result.param[th];
+			
 					if(pp.dep.length != par.dep.length){ alert_param_sample(warn,-3); return;}
 					
 					let ind = [];

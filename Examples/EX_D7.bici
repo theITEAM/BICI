@@ -50,9 +50,9 @@ pop-data name="Stratified populations" filter="DS=file" error="poisson" file="po
 
 ######################## PARAMETERS ########################
 
-param name="β" value="0.0004" prior="uniform(0,0.1)"
+param name="β" value="0.0004" prior="inverse(0.00001,0.001)"
 
-param name="γ" value="0.1" prior="uniform(0,1)"
+param name="γ" value="0.1" prior="inverse(0.01,1)"
 
 param name="b(t)" value="value-b.csv" prior="uniform(0,1)" knot-times="start,20,40,60,80,end" smooth="log-normal(0.5)"
 

@@ -40,9 +40,9 @@ init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
 
 ######################## PARAMETERS ########################
 
-param name="β" value="0.003" prior="uniform(0,0.01)"
+param name="β" value="0.003" prior="inverse(0.0001,0.01)"
 
-param name="γ" value="0.1" prior="uniform(0,1)"
+param name="γ" value="0.1" prior="inverse(0.01,1)"
 
 
 

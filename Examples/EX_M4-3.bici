@@ -38,7 +38,7 @@ init-pop-sim type="fixed" focal="Location" file="init-pop-sim-Landscape.csv"
 
 ######################## PARAMETERS ########################
 
-param name="ω" value="0.01" prior="uniform(0,0.1)"
+param name="ω" value="0.01" prior="inverse(0.001,0.1)"
 
 
 

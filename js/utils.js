@@ -1106,3 +1106,12 @@ function calculate_cubic_spline(xf,cspl)
 	if(cspl.type == "Cubic +ve") return Math.exp(val);
 	return val;
 }
+
+
+/// Determines if a parameter is a matrix
+function is_matrix(par)
+{
+	if(par.dep.length == 2 && remove_prime(par.dep[0]) == remove_prime(par.dep[1])) return true;
+	return false;
+}
+

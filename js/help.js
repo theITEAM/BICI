@@ -53,10 +53,9 @@ function add_help_buts(lay)
 			for(let ll = l_store+1; ll < inter.layer.length; ll++){
 				if(inter.layer[ll].name == "Yscroll"){
 					let y = inter.help.liney - 1.4*5; if(y < 0) y = 0; 
-					if(y > 0){
-						change_scroll(y,inter.layer[ll].but[0],"page_set");
-						generate_screen(); return;
-					}
+					change_scroll(y,inter.layer[ll].but[0],"page_set");
+					generate_screen();
+					return;
 				}
 			}
 		}

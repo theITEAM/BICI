@@ -48,7 +48,7 @@ genetic-data name="Genetic data" type="matrix" mut-rate="1" seq-var="1" file="ge
 
 ######################## PARAMETERS ########################
 
-param name="β" value="0.001" prior="uniform(0,0.1)"
+param name="β" value="0.001" prior="inverse(0.0001,0.01)"
 
 
 

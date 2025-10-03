@@ -33,7 +33,7 @@ trans name="S->I" value="exp(rate:β×[g]×{I})"
 
 # INDIVIDUAL EFFECTS
 
-ind-effect name="g" pedigree="pedigree-g.csv"
+ind-effect name="sus" ie="g" pedigree="pedigree-g.csv"
 
 # SIMULATION INITIAL CONDITIONS
 
@@ -58,9 +58,9 @@ ind-group-data name="prod" file="ind-group-data-3.csv"
 
 ######################## PARAMETERS ########################
 
-param name="β" value="0.0005" prior="uniform(0,0.1)"
+param name="β" value="0.0005" prior="inverse(0.0001,0.01)"
 
-param name="Ω^g,g" value="1" prior="uniform(0,2)"
+param name="Ω^sus" value="1" prior="mvn-jeffreys(0.01,4)"
 
 
 

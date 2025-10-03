@@ -31,12 +31,14 @@ unsigned int find_in(const vector <string> &vec, const string val, unsigned int 
 unsigned int find_in(string st1, string st2);
 unsigned int find_in(const vector <bool> &vec, const bool val);
 unsigned int find_in(const vector <Warn> &vec, const unsigned int val);
+unsigned int find_in(const vector <IEGref> &vec, const IEGref val);
 unsigned int integer(string st);
 double number(string st);
 double ran();
 double normal_sample(const double mean, const double sd, string &warn);
 int normal_int_sample(double si, string &warn);
 double normal_probability(const double x, const double mean, const double sd);
+double mvn_probability(const vector <double> x, const vector <double> mean, const vector < vector <double> > &covar);
 double lognormal_sample(const double mean, const double cv, string &warn);
 double lognormal_probability(const double x, const double mean, const double cv); 
 double lognormal_upper_probability(const double xmin, const double mean, const double cv);
@@ -89,6 +91,7 @@ unsigned int add_to_vec(vector <unsigned int> &vec, unsigned int val);
 unsigned int add_to_vec(vector <ParamRef> &vec, unsigned int th, unsigned int index);
 unsigned int add_to_vec(vector <PopTransRef> &vec, unsigned int p, unsigned int tr);
 unsigned int add_to_vec(vector <PopMarkovEqnRef> &vec, unsigned int p, unsigned int e);
+unsigned int add_to_vec(vector <IEGref> &vec, const IEGref &val); 
 void print(string name, const vector <double> &vec);
 unsigned int get_core();
 void print_diag(string te);
@@ -210,6 +213,7 @@ void print(string te);
 void print(double num, string te);
 
 /// In utils_check
+void test_jeffreys();
 void test_distribution();
 void generate_data();
 void simulate_trans_exp();

@@ -57,9 +57,9 @@ trans-data name="Male infections" trans="S->I" filter="Sex=M" obsrange="all" fil
 
 param name="N" constant="101"
 
-param name="β_s" value="value-beta.csv" prior="uniform(0,2)"
+param name="β_s" value="value-beta.csv" prior="inverse(0.01,2)"
 
-param name="γ_s" value="value-gamma.csv" prior="uniform(0,1)"
+param name="γ_s" value="value-gamma.csv" prior="inverse(0.01,1)"
 
 
 

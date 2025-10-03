@@ -140,15 +140,18 @@ string Input::in_data_source(const DataSource &ds) const
 
 
 /// Displays text referencing a file/table
-string Input::in_file_text(string te) const 
+string Input::in_file_text(string te, string desc) const 
 {
-	if(te.substr(0,7) == "[[$FILE") return "In table '[[...]]'";
-	return "In file '"+te+"'";
+	if(desc != "") desc += ": ";
+	if(te.substr(0,7) == "[[$FILE"){
+		return desc+"In table '[[...]]'";
+	}
+	return desc+"In file '"+te+"'";
 }
 
 
 /// Loads a table from a file
-Table Input::load_table(const string file)
+Table Input::load_table(const string file, string desc)
 {
 	Table tab; tab.error = false;
 	
@@ -188,7 +191,7 @@ Table Input::load_table(const string file)
 			auto vec = split(lines[j],sep);
 	
 			if(vec.size() != tab.ncol){
-				alert_import(in_file_text(file)+" there are "+tstr(tab.ncol)+" headings but line "+tstr(j+1)+" ("+trunc(lines[j],30)+") contains "+tstr(vec.size())+" columns.");
+				alert_import(in_file_text(file,desc)+" there are "+tstr(tab.ncol)+" headings but line "+tstr(j+1)+" ("+trunc(lines[j],30)+") contains "+tstr(vec.size())+" columns.");
 				tab.error = true; 
 				return tab;
 			}
@@ -210,7 +213,7 @@ Table Input::load_table(const string file)
 
 
 /// Gets a sub-table based on a series of column heading names
-Table Input::get_subtable(const Table &tab, const vector <string> &col_name)
+Table Input::get_subtable(const Table &tab, const vector <string> &col_name, string desc)
 {
 	Table table;
 	table.error = false;
@@ -226,7 +229,7 @@ Table Input::get_subtable(const Table &tab, const vector <string> &col_name)
 		
 		auto c = find_string_in(tab.heading,cname);
 		if(c == UNSET){
-			alert_import(in_file_text(tab.file)+" cannot find heading '"+cname+"'");
+			alert_import(in_file_text(tab.file,desc)+" cannot find heading '"+cname+"'");
 			table.error = true;
 			return table;
 		}
@@ -931,34 +934,63 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 			dep.list_out = knot_times_out;
 		}
 		else{
-			auto flag = false;
-			for(auto p = 0u; p < model.nspecies; p++){
-				const auto &sp = model.species[p];
-			
-				for(auto cl = 0u; cl < sp.ncla; cl++){
-					const auto &claa = sp.cla[cl];
-				
-					if(claa.index == index){
-						for(auto c = 0u; c < claa.ncomp; c++) dep.list.push_back(claa.comp[c].name);
-						flag = true;
-						break;
-					}
+			if(index == "z"){
+				auto name = pp.name;
+				if(!begin_str(name,"Ω")){
+					emsg_input("Parameter '"+pp.name+"' cannot have index z, because this is reserved for covariance matrices."); 
+					return UNSET;
 				}
-				if(flag == true) break;
+				
+				auto spl = split(name,'^');
+				if(spl.size() != 2){
+					emsg_input("Covariance matrices should have the format 'Ω^name', where 'name' corresponds to the name in 'ind-effect'."); 
+					return UNSET;
+				}
+				
+				auto fl = false;
+				
+				auto na = trim(spl[1]);
+				for(const auto &sp : model.species){
+					for(const auto &ieg : sp.ind_eff_group){
+						if(ieg.name == na){
+							for(auto li : ieg.list){
+								dep.list.push_back(li.name);
+							}
+							fl = true;
+							break;
+						}
+					}
+					if(fl == true) break;
+				}
+				
+				if(fl == false){
+					emsg_input("For covariance matrix '"+name+"' could not find grouping with name '"+na+"'."); 
+					return UNSET;
+				}
 			}
-			
-			if(flag != true){ emsg_input("Cannot find the index '"+index+"'"); return UNSET;}
+			else{
+				auto flag = false;
+				for(auto p = 0u; p < model.nspecies; p++){
+					const auto &sp = model.species[p];
+				
+					for(auto cl = 0u; cl < sp.ncla; cl++){
+						const auto &claa = sp.cla[cl];
+					
+						if(claa.index == index){
+							for(auto c = 0u; c < claa.ncomp; c++) dep.list.push_back(claa.comp[c].name);
+							flag = true;
+							break;
+						}
+					}
+					if(flag == true) break;
+				}
+				
+				if(flag != true){ emsg_input("Cannot find the index '"+index+"'"); return UNSET;}
+			}
 		}
 		
 		dep.hash_list.create(dep.list);
 		dep.hash_list_out.create(dep.list_out);
-		/*
-		for(auto k = 0u; k < dep.list.size(); k++){
-			auto te = dep.list[k];
-			auto vec = dep.hash_list.get_vec_string(te);
-			dep.hash_list.add(k,vec);
-		}
-		*/
 	
 		dep_alter.push_back(dep);
 	}
@@ -1386,149 +1418,188 @@ unsigned int Input::get_param_value(vector < vector <double> > &param_value, uns
 
 
 /// Loads parameter values from a file 
-void Input::load_param_value(const ParamProp &pp, string valu, Param &par, string desc)
+void Input::load_param_value(const ParamProp &pp, string valu, Param &par, string desc, LoadParamType type)
 {
-	auto tab = load_table(valu); if(tab.error == true) return;
+	auto tab = load_table(valu,desc); if(tab.error == true) return;
 
 	auto col_name = pp.dep_with_prime;
 
-	col_name.push_back("Value");
+	string he;
+	switch(type){
+	case VALUE_LOAD: he = "Value"; break;
+	case PRIOR_SPLIT_LOAD: he = "Prior"; break;
+	case DIST_SPLIT_LOAD: he = "Dist"; break;
+	case FACW_LOAD: he = "Value"; break;
+	}
+	col_name.push_back(he);
 	
-	auto subtab = get_subtable(tab,col_name); if(subtab.error == true) return;
+	auto try_matrix = false; 
+	if(model.is_matrix(par)){
+		for(auto i = 0u; i < col_name.size(); i++){
+			auto cname = col_name[i];
+			if(find_string_in(tab.heading,col_name[i]) == UNSET) try_matrix = true;
+		}
+	}
 	
-	auto ncol = subtab.ncol;
+	if(try_matrix){
+		auto mat_col = par.dep[0].list;
+		auto subtab = get_subtable(tab,mat_col,desc);
+		if(subtab.error == true) return;
 	
-	auto ndep = pp.dep.size();
+		auto sym = model.is_symmetric(par);
 	
-	for(auto r = 0u; r < subtab.nrow; r++){
-		auto fl = false;
-		
-		vector <unsigned int> ind(ndep);
-		for(auto i = 0u; i < ndep; i++){
-			auto ele = subtab.ele[r][i];
-			ind[i] = par.dep[i].hash_list.find(ele);
-	
-			if(ind[i] == UNSET){ 
-				fl = true;
+		for(auto j = 0u; j < par.dep[0].list.size(); j++){
+			for(auto i = 0u; i < par.dep[1].list.size(); i++){
+				vector <unsigned int> ind; ind.push_back(j); ind.push_back(i);
+				auto ele = subtab.ele[j][i];
 				
-				if(par.dep[i].hash_list_out.find(ele) == UNSET){	
-					alert_import(desc+" the element '"+ele+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
-					return;
+				if(sym == true && i < j){
+					if(ele != "."){
+						auto name = par.name+"_"+par.dep[0].list[j]+","+par.dep[1].list[i];
+						alert_input(desc+" the element '"+ele+"' for "+name+" should be set to '.' because it is in the bottom left-hand corneter of the covariance matrix definition");
+					}
+					set_const(par,ind,UNSET);
+				}
+				else{	
+					set_val_from_ele(ele,ind,par,desc,j,subtab.heading[i],type);
 				}
 			}
 		}
+	}
+	else{
+		auto subtab = get_subtable(tab,col_name,desc);
+		if(subtab.error == true) return;
 		
-		if(fl == false){
-			auto ele = subtab.ele[r][ncol-1];
+		auto ncol = subtab.ncol;
+		
+		auto ndep = pp.dep.size();
+		
+		for(auto r = 0u; r < subtab.nrow; r++){
+			auto fl = false;
+			
+			vector <unsigned int> ind(ndep);
+			for(auto i = 0u; i < ndep; i++){
+				auto ele = subtab.ele[r][i];
+				ind[i] = par.dep[i].hash_list.find(ele);
+		
+				if(ind[i] == UNSET){ 
+					fl = true;
+					
+					if(par.dep[i].hash_list_out.find(ele) == UNSET){	
+						alert_import(desc+" the element '"+ele+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
+						return;
+					}
+				}
+			}
+			
+			if(fl == false){
+				auto ele = subtab.ele[r][ncol-1];
 
-			double val = number(ele);
-			switch(par.variety){
-			case CONST_PARAM:
-				if(val == UNSET){
-					if(par.cat_factor && ele == "*"){
-					}
-					else{
-						alert_import(desc+" the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
-						return;
-					}
-				}
-							
-				set_const(par,ind,val);
-				break;
-			
-			case REPARAM_PARAM:
-				if(val == UNSET){
-					if(check_eqn_valid(ele) != SUCCESS){
-						alert_import(desc+" the element '"+ele+"' is not a valid equation (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
-						return;
-					}
-				}
-				set_reparam_element(par,ind,he(add_equation_info(ele,REPARAM)));
-				break;
-				
-			default: emsg_input("Should not be default3"); return;
+				set_val_from_ele(ele,ind,par,desc,r,subtab.heading[ncol-1],type);
 			}
 		}
 	}
 	
-	// Sets default values for any missing
-	switch(par.variety){
-	case CONST_PARAM:
-		{
-			auto ref = par.add_cons(0);
-			for(auto i = 0u; i < par.N; i++){
-				if(par.element_ref[i] == UNSET) par.element_ref[i] = ref;
-			}
-		}
+	switch(type){
+	case PRIOR_SPLIT_LOAD: case DIST_SPLIT_LOAD: case FACW_LOAD:
 		break;
 		
-	case REPARAM_PARAM:
-		{
-			for(auto i = 0u; i < par.N; i++){
-				if(par.element_ref[i] == UNSET) par.set_value_te(i,"0"); 
+	default:
+		// Sets default values for any missing
+		switch(par.variety){
+		case CONST_PARAM:
+			{
+				auto ref = par.add_cons(0);
+				for(auto i = 0u; i < par.N; i++){
+					if(par.element_ref[i] == UNSET) par.element_ref[i] = ref;
+				}
 			}
-		}
-		break;
-		
-	default: emsg_input("Should not be default3"); return;
-	}
-	
-	if(par.cat_factor){
-		auto num = 0u, numi = 0u;
-		auto sum = 0.0;
-		auto wsum = 0.0, wi = 0.0;
-		for(auto i = 0u; i < par.N; i++){
-			auto ref = par.element_ref[i];
-			if(ref == UNSET) emsg_input("ref should not be unset"); 
-		
-			auto val = par.cons[ref];
-			auto w = par.weight[i];
+			break;
 			
-			if(val == UNSET){
-				num++; numi = i; wi = w;
-			}
-			else{
-				if(val < 0){
-					emsg_input(desc+" the value '"+tstr(val)+"' must be positive for a factor.");
+		case REPARAM_PARAM:
+			{
+				for(auto i = 0u; i < par.N; i++){
+					if(par.element_ref[i] == UNSET) par.set_value_te(i,"0"); 
 				}
-				sum += w*val;
 			}
-			wsum += w;
-		}
-		
-		if(num > 1){
-			alert_import(desc+" this shouldn't contain more than one element with value '*'");
-		}
-		
-		if(num == 1){
-			auto val_new = (wsum-sum)/wi;
-			if(val_new < 0){
-				alert_import(desc+" the calculated value for '*' is '"+tstr(val_new)+"', which must be positive");
-			}
+			break;
 			
-			par.set_cons(numi,val_new);
+		default: emsg_input("Should not be default4"); return;
 		}
 		
-		if(num == 0){
-			auto mean = sum/wsum;
-			if(dif(mean,1,DIF_THRESH)){
-				if(!par.cat_factor_weight_on){ 	
-					alert_import(desc+" the mean of elements is "+tstr(mean)+" and it should be 1");
-				}
-				else{
-					alert_import(desc+" the weighted mean of elements is "+tstr(mean)+" and it should be 1");
-				}
-			}
-		}
-		
-		if(false){
+		if(par.cat_factor){
+			auto num = 0u, numi = 0u;
+			auto sum = 0.0;
+			auto wsum = 0.0, wi = 0.0;
 			for(auto i = 0u; i < par.N; i++){
 				auto ref = par.element_ref[i];
-				cout << par.cons[ref] << "  param fact" << endl;
+				if(ref == UNSET) emsg_input("ref should not be unset"); 
+			
+				auto val = par.cons[ref];
+				auto w = par.weight[i];
+				
+				if(val == UNSET){
+					num++; numi = i; wi = w;
+				}
+				else{
+					if(val < 0){
+						emsg_input(desc+" the value '"+tstr(val)+"' must be positive for a factor.");
+					}
+					sum += w*val;
+				}
+				wsum += w;
+			}
+			
+			if(num > 1){
+				alert_import(desc+" this shouldn't contain more than one element with value '*'");
+			}
+			
+			if(num == 1){
+				auto val_new = (wsum-sum)/wi;
+				if(val_new < 0){
+					alert_import(desc+" the calculated value for '*' is '"+tstr(val_new)+"', which must be positive");
+				}
+				
+				par.set_cons(numi,val_new);
+			}
+			
+			if(num == 0){
+				auto mean = sum/wsum;
+				if(dif(mean,1,DIF_THRESH)){
+					if(!par.cat_factor_weight_on){ 	
+						alert_import(desc+" the mean of elements is "+tstr(mean)+" and it should be 1");
+					}
+					else{
+						alert_import(desc+" the weighted mean of elements is "+tstr(mean)+" and it should be 1");
+					}
+				}
+			}
+			
+			if(false){
+				for(auto i = 0u; i < par.N; i++){
+					auto ref = par.element_ref[i];
+					cout << par.cons[ref] << "  param fact" << endl;
+				}
+			}
+		}	
+		
+		if(type == VALUE_LOAD && model.is_symmetric(par)){  // Checks that matrix is symmtric 
+			auto N = par.dep[0].list.size();
+			for(auto j = 0u; j < N; j++){
+				for(auto i = 0u; i < j; i++){
+					auto val1 = par.get_value(j*N+i);
+					auto val2 = par.get_value(i*N+j);
+				
+					if(val1 != UNSET) emsg("Should be unset");
+					
+					vector <unsigned int> ind; ind.push_back(j); ind.push_back(i);
+					set_const(par,ind,val2);
+				}
 			}
 		}
+		break;
 	}
-		
+	
 	if(false){
 		for(auto i = 0u; i < par.N; i++){
 			auto ref = par.element_ref[i];
@@ -1541,62 +1612,86 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 }
 
 
-/// Loads parameter weight from a file 
-void Input::load_weight_value(const ParamProp &pp, string valu, Param &par, string desc)
+/// Sets for value of a specified element
+void Input::set_val_from_ele(string ele, const vector <unsigned int> &ind, Param &par, string desc, unsigned int r, string col, LoadParamType type)
 {
-	auto tab = load_table(valu); if(tab.error == true) return;
-
-	auto col_name = pp.dep_with_prime;
-
-	col_name.push_back("Value");
-	
-	auto subtab = get_subtable(tab,col_name); if(subtab.error == true) return;
-	
-	auto ncol = subtab.ncol;
-	
-	auto ndep = pp.dep.size();
-	
-	par.weight.resize(par.N,1);
-	
-	for(auto r = 0u; r < subtab.nrow; r++){
-		vector <unsigned int> ind(ndep);
-		
-		auto fl = false;
-		for(auto i = 0u; i < ndep; i++){
-			auto ele = subtab.ele[r][i];
+	switch(type){
+	case PRIOR_SPLIT_LOAD:
+		{
+			auto pri = convert_text_to_prior(ele,line_num,par.full_name,false);
 			
-			ind[i] = par.dep[i].hash_list.find(ele);
-	
-			if(ind[i] == UNSET){ 
-				fl = true;
-				
-				if(par.dep[i].hash_list_out.find(ele) == UNSET){	
-					alert_import(desc+" the element '"+ele+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
-					return;
-				}
+			if(pri.error != ""){
+				alert_import(desc+" the table element '"+ele+"' is not a valid distribution specification: "+pri.error+" (col '"+col+"', row "+tstr(r+2)+").");
+				return;
 			}
+				
+			set_prior_element(par,ind,pri);
 		}
+		break;
+	
+	case DIST_SPLIT_LOAD:
+		{
+			auto pri = convert_text_to_prior(ele,line_num,par.full_name,true);
+			
+			if(pri.error != ""){
+				alert_import(desc+" the table element '"+ele+"' is not a valid distribution specification: "+pri.error+" (col '"+col+"', row "+tstr(r+2)+").");
+				return;
+			}
+				
+			set_prior_element(par,ind,pri);
+		}
+		break;
 		
-		if(fl == false){
-			auto ele = subtab.ele[r][ncol-1];
-
+	case FACW_LOAD:
+		{
 			double val = number(ele);
 		
 			if(val == UNSET){
-				alert_import(desc+" the element '"+ele+"' is not a number (column '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+")");
+				alert_import(desc+" the element '"+ele+"' is not a number (column '"+col+"', row "+tstr(r+2)+")");
 				return;
 			}
 			
 			auto sum = 0u;
 			for(auto i = 0u; i < par.dep.size(); i++) sum += par.dep[i].mult*ind[i];
 			if(sum >= par.N) emsg_input("Problem setting element");
-	 
 			par.weight[sum] = val;
 		}
-		//par.set_weight(sum,val);
+		break;
+		
+	default:
+		{
+			double val = number(ele);
+			switch(par.variety){
+			case CONST_PARAM:
+				if(val == UNSET){
+					if(par.cat_factor && ele == "*"){
+					}
+					else{
+						alert_import(desc+" the element '"+ele+"' is not a number (column '"+col+"', row "+tstr(r+2)+")");
+						return;
+					}
+				}
+							
+				set_const(par,ind,val);
+				break;
+			
+			case REPARAM_PARAM:
+				if(val == UNSET){
+					if(check_eqn_valid(ele) != SUCCESS){
+						alert_import(desc+" the element '"+ele+"' is not a valid equation (column '"+col+"', row "+tstr(r+2)+")");
+						return;
+					}
+				}
+				set_reparam_element(par,ind,he(add_equation_info(ele,REPARAM)));
+				break;
+				
+			default: emsg_input("Should not be default3"); return;
+			}
+		}
+		break;
 	}
 }
-
+				
 	
 /// Sets spline based on knot-times and smooth specification
 void Input::set_spline(SplineType type, string knot_times_str, string smooth, vector <string> &knot_times, vector <string> &knot_times_out, bool use_inf_time, Param &par)

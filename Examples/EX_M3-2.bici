@@ -50,11 +50,11 @@ init-pop-sim type="fixed" file="init-pop-sim-People.csv"
 
 param name="P" constant="8000000000"
 
-param name="β" value="0.15" prior="uniform(0,1)"
+param name="β" value="0.15" prior="inverse(0.01,1)"
 
-param name="γ" value="0.05" prior="uniform(0,1)"
+param name="γ" value="0.05" prior="inverse(0.01,1)"
 
-param name="λ" value="0.0001" prior="uniform(0,0.001)"
+param name="λ" value="0.0001" prior="inverse(0.00001,0.001)"
 
 param name="N_l" constant="constant-N.csv"
 

@@ -42,9 +42,14 @@
 // mpirun -n 10 ./bici-para Jamie/temp4/scen-4-11.bici inf
 //  valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Jamie/temp4/scen-4-11.bici inf
 
+// nohup valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/mod13.bici inf > moddd13.txt
+
+// nohup gdb -ex=r ./bici-para  --args Execute/mod14.bici inf > moddd14.txt
+
+//nohup  mpirun -n 10  ./bici-para Execute/mod10.bici inf >  modd10.txt&
 // mpirun -n 4  ./bici-para Execute/init.bici inf
 
-// ssh gaia.bioss.ac.uk  ./bici-para Jamie/temp inf
+// ssh gaia.bioss.ac.uk  
 
 // tar -xzf foo.tgz
 
@@ -111,6 +116,7 @@ int main(int argc, char** argv)
 
 	init_log_sum();
 	
+	//test_jeffreys(); return 0;
 	//solve_cubic_spline_test(); return 0;
 	//test_distribution(); return 0; 
 	//test_incomplete_distribution(); return 0;

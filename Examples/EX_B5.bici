@@ -36,7 +36,7 @@ comp name="R" color="#4444ff" x=13 y=-5
 
 trans name="S->E" value="exp(rate:(η+β(t)({I}+f^A×{A}))/N)"
 trans name="E->I" value="exp(rate:r^E)" bp="b^I"
-trans name="E->A" value="exp(rate:r^A)" bp="*"
+trans name="E->A" value="exp(rate:r^E)" bp="*"
 trans name="I->H" value="exp(rate:r^I)"
 trans name="H->D" value="exp(rate:r^H)" bp="b^D"
 trans name="A->R" value="exp(rate:r^A)"
@@ -83,7 +83,7 @@ param name="r^I" value="0.25" prior="gamma(0.25,0.1)"
 
 param name="η" constant="0.1"
 
-param name="β(t)" value="value-beta.csv" prior="uniform(0,2)" knot-times="start,14,28,42,56,70,84,98,112,126,140,154,168,182,196,210,224,238,252,266,280,294,308,322,336,350,364,378,392,406,420,434,448,462,476,490,504,518,532,546,560,574,end" smooth="log-normal(0.5)"
+param name="β(t)" value="value-beta.csv" prior="inverse(0.01,2)" knot-times="start,14,28,42,56,70,84,98,112,126,140,154,168,182,196,210,224,238,252,266,280,294,308,322,336,350,364,378,392,406,420,434,448,462,476,490,504,518,532,546,560,574,end" smooth="log-normal(0.5)"
 
 
 

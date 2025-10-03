@@ -1,0 +1,22 @@
+# Model F4: SIR model with demographic stratification with a factor
+
+## Objective
+- This is the same model as M2.6, but here the difference is disease transmission between sexes is implemented as a factor.
+
+## Data 
+- Initial population in each compartment.
+- Time-series measurements on infected population, stratified by sex.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status' and a classification 'Sex'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A factor $f_s$ allows for differences in susceptibility between the sexes.
+- A recovery rate $γ_s$ determines the rate at which individuals recover with sex $s$.
+- $N$ is the total number of individuals (this model assumes frequency dependent transmission).
+- Classification 'Sex' contains the compartments $M$ and $F$ for male and female.
+
+## Population
+- This consists of 10000 initially susceptible individuals and 2 infected.
+- There is a 50/50 split between males and females.

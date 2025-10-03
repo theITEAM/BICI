@@ -64,13 +64,13 @@ class name="Group" clone="Animal"
 
 ######################## PARAMETERS ########################
 
-param name="λ" value="0.01" prior="uniform(0,0.1)"
+param name="λ" value="0.01" prior="inverse(0.001,0.1)"
 
-param name="τ" value="0.2" prior="uniform(0,1)"
+param name="τ" value="0.2" prior="inverse(0.001,1)"
 
 param name="f_v" factor="true" value="value-f.csv" prior="mdir(0.5)"
 
-param name="β_v" value="value-beta.csv" prior="uniform(0,0.01)"
+param name="β_v" value="value-beta.csv" prior="inverse(0.0001,0.01)"
 
 
 

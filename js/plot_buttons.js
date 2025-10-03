@@ -648,12 +648,18 @@ Layer.prototype.plot_button = function (bu,ov)
 			}
 		}
 		break;
-		
+	
+	case "SymmetricParam":
+		fill_rectangle(x,y,dx,dy,LLLGREY);
+		//plot_text(te,x+0.3,y+0.7*dy,bu.font,LGREY,dx);
+		break;
+	
 	case "Element":
 	case "ParamElement": case "ParamElementConst": case "ParamElementEq": 
 	case "ParamFactorConst": case "ParamWeightConst":
 	case "PriorSplitElement": case "DistSplitElement":
 	case "ParamSimElement": case "DistSimElement": 
+	case "IEGroupName":
 	case "ReparamElement": case "ReparamTableElement":  
 	case "PriorElement": case "DistElement": case "SplineKnots": 
 	case "SmoothValue": case "Amatrix": case "Xvector": case "AmatrixElement": case "XvectorElement":
@@ -2134,7 +2140,7 @@ Layer.prototype.plot_button = function (bu,ov)
 				if(i != undefined){
 					if(eqn_types[i].obs_model == true){ co = DBROWN; if(ov) co = BROWN;}
 				}					
-				if(par.type == "variance" || par.type == "correlation"){ co = DCYAN; if(ov) co = CYAN;} 
+				if(par.type == "variance"){ co = DCYAN; if(ov) co = CYAN;} 
 				break;
 			case "const": co = DBLUE; if(ov) co = BLUE; break;
 			case "dist": co = DPURPLE; if(ov) co = PURPLE; break;
@@ -2198,6 +2204,10 @@ Layer.prototype.plot_button = function (bu,ov)
 	
 	case "GraphContentBut":
 		inter.graph.draw_content_button(x,y,dx,dy);
+		break;
+		
+	case "MatrixEleBlankBut":
+		fill_rectangle(x,y,dx,dy,LLLGREY);
 		break;
 		
 	case "MatrixEleBut":

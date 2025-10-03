@@ -671,42 +671,74 @@ vector <unsigned int> Species::get_cv_list(unsigned int ie, const vector <Param>
 }
 
 
+/// Calculates constant omega
+vector < vector <double> > Species::calculate_omega_const(unsigned int g, const vector <Param> &param) const
+{
+	const auto &ieg = ind_eff_group[g];
+	const auto &par = param[ieg.th];
+	auto N = ieg.list.size();
+	
+	vector < vector <double> > omega;
+	omega.resize(N);
+	for(auto j = 0u; j < N; j++) omega[j].resize(N);
+	
+	for(auto j = 0u; j < N; j++){
+		for(auto i = 0u; i < N; i++){
+			omega[j][i] = par.get_value(j*N+i);
+		}
+	}
+	
+	return omega;
+}
+
+
 /// Calculate the actual omega matrix
 vector < vector <double> > Species::calculate_omega_basic(unsigned int g, const PV &param_val, const vector <Param> &param) const
 {
-	const auto &ieg = ind_eff_group[g];
-	auto N = ieg.list.size();
-	
-	const auto &value = param_val.value;
-	
+	const auto &ieg = ind_eff_group[g];		
+	const auto &par = param[ieg.th];
 	vector < vector <double> > omega;
 	
-	omega.resize(N);
-	for(auto j = 0u; j < N; j++){
-		omega[j].resize(N);
-		for(auto i = 0u; i < N; i++){
-			auto &par = param[ieg.omega[j][i]];
-			if(par.variety == CONST_PARAM) omega[j][i] = par.get_value(0);
-			else{
-				auto th2 = par.get_param_vec(0); if(th2 == UNSET) emsg("Should not be unset2");
-				omega[j][i] = value[th2];
+	if(par.variety == CONST_PARAM){
+		omega = calculate_omega_const(g,param);
+	}
+	else{
+		auto N = ieg.list.size();
+	
+		const auto &value = param_val.value;
+
+		omega.resize(N);
+		for(auto j = 0u; j < N; j++) omega[j].resize(N);
+
+		for(auto j = 0u; j < N; j++){
+			for(auto i = 0u; i < N; i++){
+				omega[j][i] = value[ieg.omega_pv[j][i]];
 			}
 		}
 	}
 	
-	if(false) print("Omega",omega);
+	convert_cor_var(omega);
 	
-	// Converts correlations to variances
-	for(auto j = 0u; j < N; j++){
-		for(auto i = 0u; i < N; i++){
-			if(j != i) omega[j][i] *= sqrt(omega[i][i]*omega[j][j]);
-		}
-	}
+	//print_matrix("om",omega);
 	
 	return omega;
 }	
 
 
+/// Converts correlations to variances
+void Species::convert_cor_var(vector < vector <double> > &omega) const
+{
+	auto N = omega.size();
+	for(auto j = 0u; j < N; j++){
+		for(auto i = 0u; i < N; i++){
+			if(j != i){
+				omega[j][i] *= sqrt(omega[i][i]*omega[j][j]);
+			}
+		}
+	}
+}
+
+	
 /// Shifts a global transition such that fits with a given c
 unsigned int Species::tr_trans(unsigned int trg, unsigned int c) const
 {

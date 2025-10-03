@@ -1,4 +1,49 @@
-for(auto ti = 0u; ti < T; ti++){
+This is parameterised through its diagonals and correlation coefficients . For reasons of numerical stability, it is inadvisable for the diagonals to exceed around four , or for the correlation coefficients to go outside the range -0.9 to 0.9. If simulating, ensure the values are within this range. If performing inference, appropriate priors could be “uniform(0,4)” for diagonals and “uniform(-0.9,0.9)” for correlations.
+
+/*		
+		auto tab = load_table(dist_split);
+		if(tab.error == true) return;	
+		
+		auto col_name = pp.dep;
+		col_name.push_back("Dist");
+		
+		auto subtab = get_subtable(tab,col_name); if(subtab.error == true) return;
+		
+		auto ncol = subtab.ncol;
+		
+		for(auto r = 0u; r < subtab.nrow; r++){
+			vector <unsigned int> ind(ncol-1);
+			
+			auto fl = false;
+			for(auto i = 0u; i < ncol-1; i++){
+				auto ele = subtab.ele[r][i];
+				
+				ind[i] = par.dep[i].hash_list.find(ele);
+	
+				if(ind[i] == UNSET){ 
+					fl = true;
+					
+					if(par.dep[i].hash_list_out.find(ele) == UNSET){	
+						alert_import("The table element '"+ele+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
+						return;
+					}
+				}
+			}
+			
+			if(fl == false){
+				auto pri = convert_text_to_prior(subtab.ele[r][ncol-1],line_num,par.full_name,true);
+			
+				if(pri.error != ""){
+					alert_import("The table element '"+subtab.ele[r][ncol-1]+"' is not a valid distribution specification: "+pri.error+" (col '"+subtab.heading[ncol-1]+"', row "+tstr(r+2)+").");
+					return;
+				}
+				
+				set_prior_element(par,ind,pri);
+			}
+		}
+		*/
+		
+		for(auto ti = 0u; ti < T; ti++){
 						for(auto c = 0u; c < ssp.cpop_st[ti].size(); c++){
 							if(cpop_st_st[ti][c] != ssp.cpop_st[ti][c]){
 								cout << ti << " " << c << " dif";

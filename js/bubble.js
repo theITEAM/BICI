@@ -18,6 +18,13 @@ function add_bubble_buts(lay)
 	bub.warning = false;
 
 	switch(bu.type){	
+	case "IEGroupName":
+		cont.dx = 9;
+		bubble_addtitle(cont,"IE group name",{te:ie_group_name_text});
+		bubble_input(cont,"Name:",{type:"iegrname"});
+		add_end_button(cont,"Done","Done",{});	
+		break;
+		
 	case "NameLink":
 		cont.dx = 14;
 		bubble_addtitle(cont,"Data source name",{te:data_source_text});
@@ -813,10 +820,14 @@ function add_bubble_buts(lay)
 		break;
 		
 	case "ParamElementConst":
-		cont.dx = 10;
-		bubble_addtitle(cont,"Edit constant",{te:editconstparam_text});
-		bubble_input(cont,"Value:",{type:"element_param_const", pindex:bu.pindex});
-		add_end_button(cont,"Done","Done");	
+		{
+			cont.dx = 10;
+			bubble_addtitle(cont,"Edit constant",{te:editconstparam_text});
+			let ty = "element_param_const";
+			if(bu.sym == true) ty = "element_param_const_sym";
+			bubble_input(cont,"Value:",{type:ty, pindex:bu.pindex});
+			add_end_button(cont,"Done","Done");	
+		}
 		break;
 		
 	case "ParamFactorConst":
@@ -935,6 +946,31 @@ function add_bubble_buts(lay)
 			case "fix":
 				bubble_input(cont,"Value:",{type:str+"mean", val:bu.i, eqn:ae});
 				mean_fl = true; 
+				break;
+			
+			case "mvn-jeffreys":		
+				bubble_input(cont,"Min:",{type:str+"min", val:bu.i, eqn:ae});
+				bubble_input(cont,"Max:",{type:str+"max", val:bu.i, eqn:ae});
+				min_fl = true; max_fl = true; 
+				break;
+				
+			case "mvn-uniform":		
+				bubble_input(cont,"Min:",{type:str+"min", val:bu.i, eqn:ae});
+				bubble_input(cont,"Max:",{type:str+"max", val:bu.i, eqn:ae});
+				min_fl = true; max_fl = true; 
+				break;
+			
+			case "inverse":		
+				bubble_input(cont,"Min:",{type:str+"min", val:bu.i, eqn:ae});
+				bubble_input(cont,"Max:",{type:str+"max", val:bu.i, eqn:ae});
+				min_fl = true; max_fl = true; 
+				break;
+				
+			case "power":		
+				bubble_input(cont,"Min:",{type:str+"min", val:bu.i, eqn:ae});
+				bubble_input(cont,"Max:",{type:str+"max", val:bu.i, eqn:ae});
+				bubble_input(cont,"Power:",{type:str+"power", val:bu.i, eqn:ae});
+				min_fl = true; max_fl = true; 
 				break;
 				
 			case "uniform":		

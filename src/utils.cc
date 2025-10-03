@@ -361,6 +361,17 @@ unsigned int find_in(const vector <Warn> &vec, const unsigned int val)
 	return UNSET;
 }
 
+
+/// Finds the index of a value in a vector
+unsigned int find_in(const vector <IEGref> &vec, const IEGref val)
+{
+	for(auto i = 0u; i < vec.size(); i++){
+		if(vec[i].p == val.p && vec[i].i == val.i) return i;
+	}
+	return UNSET;
+}
+
+
 /// Checks a string has a certain set of characters
 bool allow_string(const string st, const string ok_char)
 {
@@ -452,6 +463,24 @@ double normal_probability(const double x, const double mean, const double sd)
 	auto var = sd*sd;
   return -0.5*log(2*MM_PI*var) - (x-mean)*(x-mean)/(2*var);
 }
+
+
+/*
+/// The log of the probability from the normal distribution
+double mvn_probability(const vector <double> x, const vector <double> mean, const vector < vector <double> > &covar)
+{
+	auto determinant_fast(const vector < vector <double> > &a)
+	auto var = sd*sd;
+	auto d = x.size();
+	auto sum = 0.0;
+	for(auto i = 0u; i < d; i++){
+		for(auto j = 0u; j < d; j++){
+			sum += (x[j]-mean[j])*covar[j][i]*(x[i]-mean[i]);
+		}
+	}
+  return -(d/2)*log(2*MM_PI) - (d/2)*determinant_fast(covar) - 0.5*sum;
+}
+*/
 
 
 /// Draws a log-normally distributed number with mean mu and standard deviation sd
@@ -578,7 +607,7 @@ double gamma_probability(const double x, const double mean, const double cv)
 	
 	auto shape = 1.0/(cv*cv);
 	auto b = shape/mean;
-  return (shape-1)*log(x) - b*x + shape*log(b) - lgamma(shape);
+	return (shape-1)*log(x) - b*x + shape*log(b) - lgamma(shape);
 }
 
 
@@ -1293,6 +1322,18 @@ unsigned int add_to_vec(vector <PopMarkovEqnRef> &vec, unsigned int p, unsigned 
 }
 
 
+/// Adds a value to a vector (if it doesn't already exist)
+unsigned int add_to_vec(vector <IEGref> &vec, const IEGref &val)
+{
+	auto i = 0u; 
+	while(i < vec.size() && !(vec[i].p == val.p && vec[i].i == val.i)) i++;
+	if(i == vec.size()){
+		vec.push_back(val);
+	}	
+	return i;
+}
+
+
 /// Prints a vector
 void print(string name, const vector <double> &vec)
 {
@@ -1589,6 +1630,7 @@ string get_affect_name(AffectType type)
 	case OMEGA_AFFECT: return "OMEGA_AFFECT";
 	case POP_AFFECT: return "POP_AFFECT";
 	case SPLINE_PRIOR_AFFECT: return "SPLINE_PRIOR_AFFECT";
+	case IEG_PRIOR_AFFECT: return "IEG PRIOR_AFFECT";
 	case PRIOR_AFFECT: return "PRIOR_AFFECT";
 	case DIST_AFFECT: return "DIST_AFFECT";
 	case EXP_FE_AFFECT: return "EXP_FE_AFFECT";
@@ -1875,6 +1917,10 @@ Prior convert_text_to_prior(string te, unsigned int line_num, string in, bool di
 	
 	auto fl = false;
 	if(type == "uniform"){ pri.type = UNIFORM_PR; fl = true;}
+	if(type == "inverse"){ pri.type = INVERSE_PR; fl = true;}
+	if(type == "power"){ pri.type = POWER_PR; fl = true;}
+	if(type == "mvn-jeffreys"){ pri.type = MVN_JEF_PR; fl = true;}
+	if(type == "mvn-uniform"){ pri.type = MVN_UNIFORM_PR; fl = true;}
 	if(type == "exp"){ pri.type = EXP_PR; fl = true;}
 	if(type == "normal"){ pri.type = NORMAL_PR; fl = true;}
 	if(type == "gamma"){ pri.type = GAMMA_PR; fl = true;}
@@ -1893,6 +1939,58 @@ Prior convert_text_to_prior(string te, unsigned int line_num, string in, bool di
 	auto spl2 = split(bra,',');
 
 	switch(pri.type){
+	case MVN_COR_PR: emsg("Correlation not defined"); break;
+	case INVERSE_PR: case MVN_JEF_PR: case MVN_UNIFORM_PR:
+		{
+			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
+			
+			if(!dist){
+				if(number(spl2[0]) == UNSET){
+					pri.error = "The value '"+spl2[0]+"' must be a number"; return pri;
+				}
+				if(number(spl2[1]) == UNSET){ 
+					pri.error = "The value '"+spl2[1]+"' must be a number"; return pri;
+				}
+				if(number(spl2[0]) <= 0){  
+					pri.error = "Minimum must be a positive number"; return pri;
+				}
+				if(number(spl2[1]) <= 0){  
+					pri.error = "Maximum must be a positive number"; return pri;
+				}
+				if(number(spl2[0]) >= number(spl2[1])){  
+					pri.error = "Minimum must be smaller than maximum";return pri;
+				}
+			}
+		}
+		break;
+		
+	case POWER_PR:
+		{
+			if(spl2.size() != 3){ pri.error = "Expected three values in the brackets"; return pri;}
+			
+			if(!dist){
+				if(number(spl2[0]) == UNSET){
+					pri.error = "The value '"+spl2[0]+"' must be a number"; return pri;
+				}
+				if(number(spl2[1]) == UNSET){ 
+					pri.error = "The value '"+spl2[1]+"' must be a number"; return pri;
+				}
+				if(number(spl2[2]) == UNSET){ 
+					pri.error = "The value '"+spl2[2]+"' must be a number"; return pri;
+				}
+				if(number(spl2[0]) <= 0){  
+					pri.error = "Minimum must be a positive number"; return pri;
+				}
+				if(number(spl2[1]) <= 0){  
+					pri.error = "Maximum must be a positive number"; return pri;
+				}
+				if(number(spl2[0]) >= number(spl2[1])){  
+					pri.error = "Minimum must be smaller than maximum";return pri;
+				}
+			}
+		}
+		break;
+		
 	case FIX_PR:
 		{
 			if(spl2.size() != 1){ pri.error = "Expected one value in the brackets"; return pri;}
@@ -2119,6 +2217,19 @@ Prior convert_text_to_prior(string te, unsigned int line_num, string in, bool di
 string get_prior_string(Prior prior)
 {
 	switch(prior.type){
+	case MVN_COR_PR: emsg("Prior not defined"); break;
+	case MVN_JEF_PR:
+		return "mvn-jeffreys("+prior.dist_param[0].te_raw+","+prior.dist_param[1].te_raw+")";
+	
+	case MVN_UNIFORM_PR:
+		return "mvn-uniform("+prior.dist_param[0].te_raw+","+prior.dist_param[1].te_raw+")";
+	
+	case INVERSE_PR:
+		return "inverse("+prior.dist_param[0].te_raw+","+prior.dist_param[1].te_raw+")";
+
+	case POWER_PR:
+		return "power("+prior.dist_param[0].te_raw+","+prior.dist_param[1].te_raw+","+prior.dist_param[2].te_raw+")";
+
 	case FIX_PR:
 		return "fix("+prior.dist_param[0].te_raw+")";
 		
@@ -2452,6 +2563,34 @@ double nm_trans_like(TransType type, double dtdiv, double dt, const vector <doub
 double prior_probability(double x, const Prior &pri, const vector <double> &precalc, const vector <Equation> &eqn)
 {				
 	switch(pri.type){
+	case MVN_JEF_PR: case MVN_UNIFORM_PR: case MVN_COR_PR: // This is done collectively
+		return 0;
+		
+	case INVERSE_PR: 
+		{	
+			auto min = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
+			auto max = eqn[pri.dist_param[1].eq_ref].calculate_param(precalc);
+			if(min <= 0 || max <= 0) return -LARGE;
+			if(x < min || x > max) return -LARGE;
+			return log(1.0/(x*log(max/min)));
+		}
+		break;
+		
+	case POWER_PR:
+		{	
+			auto min = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
+			auto max = eqn[pri.dist_param[1].eq_ref].calculate_param(precalc);
+			auto power = eqn[pri.dist_param[2].eq_ref].calculate_param(precalc);
+			if(min <= 0 || max <= 0) return -LARGE;
+			if(x < min || x > max) return -LARGE;
+			if(power == -1) return log(1.0/(x*log(max/min)));
+			else{
+				auto c = (power+1)/(pow(max,power+1)-pow(min,power+1));
+				return power*log(x)+log(c);
+			}
+		}
+		break;
+		
 	case UNIFORM_PR:
 		{	
 			auto min = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);

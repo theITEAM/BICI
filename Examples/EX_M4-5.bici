@@ -50,11 +50,11 @@ init-pop-sim type="fixed" file="init-pop-sim-Animal.csv"
 
 ######################## PARAMETERS ########################
 
-param name="α" value="0.3" prior="uniform(0,1)"
+param name="α" value="0.3" prior="inverse(0.01,1)"
 
 param name="κ" value="200" prior="uniform(100,300)"
 
-param name="μ_a" value="value-mu.csv" prior="uniform(0,1)"
+param name="μ_a" value="value-mu.csv" prior="inverse(0.01,1)"
 
 
 
