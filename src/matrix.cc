@@ -488,7 +488,8 @@ double determinant_fast(const vector < vector <double> > &a)
 		for(j = i + 1; j < n; j++){
 			auto &uj = u[j];
 
-			if(li[i] == 0) emsg("Matrix9");
+			//if(li[i] == 0) emsg("Matrix9");
+			if(li[i] >= -VTINY && li[i] <= VTINY) return UNSET;
 			
 			auto fac = 1.0 / li[i];
 			auto val = fac * a[i][j];
@@ -510,7 +511,10 @@ double determinant_fast(const vector < vector <double> > &a)
 			vall = -vall;
 			neg++;
 		}
-		det += log(valu * vall);
+		auto valval = valu*vall;
+		if(valval == 0) return UNSET;	
+			
+		det += log(valval);
 	}
 
 	if(neg%2 == 1) return UNSET;	
