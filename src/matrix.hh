@@ -15,6 +15,7 @@ vector <double> matrix_mult(const vector < vector <double> > &M, const vector <d
 vector <double> matrix_mult(const vector <double> &vec, const vector < vector <double> > &M);
 vector < vector <double> > matrix_mult(const vector < vector <double> > &M1, const vector < vector <double> > &M2);
 vector < vector <double> > calculate_cholesky(const vector < vector <double> > &M, bool &illegal);
+double diag_log_sum(const vector < vector <double> > &a);
 double determinant_fast(const vector < vector <double> > &a);
 double determinant_sparse(const vector < vector <double> > &a);
 void add_mat_element(unsigned int i, vector <double> &Mjj, vector <unsigned int> &M_elejj,  vector <unsigned int> &M_mapjj);

@@ -410,13 +410,14 @@ void BurnInfo::set_phi()
 	init_cond_prior = 1;
 	obs = phi;
 	prior = 1;
+	prior_bounded = phi;
 	spline_prior = 1;
 	dist = 1;
 	markov = phi;
 	nm_trans = phi;
 	genetic_process = phi;
 	genetic_obs = phi;
-	ie = 1;
+	ie = 1;//phi;
 	
 	/*
 	if(s < nburnin){
@@ -449,7 +450,7 @@ void BurnInfo::add_L(double L)
 double Chain::like_total_obs() const
 {
 	const auto &like = state.like;
-	return like.init_cond + like.obs + like.markov + like.nm_trans + 
+	return like.init_cond + like.prior_bounded + like.obs + like.markov + like.nm_trans + 
 	       like.genetic_process + like.genetic_obs;
 }	
 
@@ -463,7 +464,8 @@ void Chain::update(unsigned int s)
 	
 	for(auto &pro : proposal){ 
 		//state.check_markov_value_dif();
-
+		//cout << pro.name << endl;
+	
 		if(pro.on){
 			//if(op()) state.check_markov_value_dif();
 				

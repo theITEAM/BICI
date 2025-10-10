@@ -114,18 +114,31 @@ PV Model::param_sample() const
 	if(false){
 		for(auto val: param_val.value) cout << val << ","; 	
 		cout << " value" << endl;
-		for(auto val: param_val.precalc) cout << val << ","; 	
-		cout << " precalc" << endl;
-		emsg("sample");
+		//for(auto val: param_val.precalc) cout << val << ","; 	
+		//cout << " precalc" << endl;
+		//emsg("sample");
 	}
 	
 	return param_val;
 }
 
 
+/// Determines if bounded priors are sampled or they use a uniform distribution
+// For PAS and DA it makes sense to use a uniform, such that there is diversity in initial state
+bool Model::sample_bounded() const
+{
+	switch(details.algorithm){
+	case DA_MCMC: case PAS_MCMC: return false;
+	default: return true;	
+	}
+}
+
+
 /// Samples covariance matrices for indidivudal effects using Wishart distribution
 void Model::sample_ieg_cv(PV &param_val) const
 {
+	auto sbound = sample_bounded();
+	
 	for(auto p = 0u; p < species.size(); p++){
 		const auto &sp = species[p];
 		for(auto g = 0u; g < sp.ind_eff_group.size(); g++){
@@ -134,40 +147,70 @@ void Model::sample_ieg_cv(PV &param_val) const
 			const auto &par = param[ieg.th];
 			if(par.variety == PRIOR_PARAM){
 				const auto &pri = prior[ieg.prior_ref];
-				if(pri.type != MVN_JEF_PR && pri.type != MVN_UNIFORM_PR) emsg("Should be mvn-jeffreys or mvn-uniform");
-		
+				if(pri.type != MVN_JEF_PR && pri.type != MVN_UNIFORM_PR){
+					emsg("Should be mvn-jeffreys or mvn-uniform");
+				}
+				
 				auto N = ieg.list.size();
 				
-				auto det = 0.0;
-				auto det_min = exp(ieg.log_det_min);
-				auto det_max = exp(ieg.log_det_max);
-		
-				switch(pri.type){
-				case MVN_UNIFORM_PR:
-					det = det_min+ran()*(det_max-det_min);
-					break;
-					
-				case MVN_JEF_PR:
-					if(N == 1) det = det_min*exp(ran()*log(det_max/det_min));
+				auto loop = 0u, loopmax = 1000u;
+				for(loop = 0; loop < loopmax; loop++){
+					if(sbound){
+						emsg("To do");
+						auto det = 0.0;
+						auto det_min = exp(ieg.log_det_min);
+						//auto det_max = exp(  ieg.log_det_max);
+						auto det_max = UNSET;//exp(  ieg.log_det_max);
+				
+						switch(pri.type){
+						case MVN_UNIFORM_PR:
+							det = det_min+ran()*(det_max-det_min);
+							break;
+							
+						case MVN_JEF_PR:
+							if(N == 1) det = det_min*exp(ran()*log(det_max/det_min));
+							else{
+								auto power = -0.5*N-0.5;				
+								det = pow(pow(det_min,power+1)+ran()*(pow(det_max,power+1)-pow(det_min,power+1)),1.0/(power+1));
+							}
+							break;
+							
+						default: emsg("op er"); break;
+						}
+						
+						auto var = pow(det,1.0/N);
+						
+						for(auto j = 0u; j < N; j++){
+							for(auto i = 0u; i < N; i++){
+								auto valu = 0.0; if(i == j) valu = var;
+								param_val.value[ieg.omega_pv[j][i]] = valu;
+							}
+						}
+					}
 					else{
-						auto power = -0.5*N-0.5;				
-						det = pow(pow(det_min,power+1)+ran()*(pow(det_max,power+1)-pow(det_min,power+1)),1.0/(power+1));
+						for(auto j = 0u; j < N; j++){
+							for(auto i = 0u; i < N; i++){
+								auto valu = 0.0; 
+								if(i == j) valu = ran()*(ieg.var_max);
+								else valu = COR_MAX*(2*ran()-1);
+									
+								auto th = ieg.omega_pv[j][i];
+								param_val.value[th] = valu;
+							}
+						}
 					}
-					break;
 					
-				default: emsg("op er"); break;
+					auto omega = sp.calculate_omega_basic(g,param_val,param);
+					
+					auto det = determinant_fast(omega);
+					if(det != UNSET && det > ieg.log_det_min) break;
 				}
 				
-				auto var = pow(det,1.0/N);
-				
-				for(auto j = 0u; j < N; j++){
-					for(auto i = 0u; i < N; i++){
-						auto valu = 0.0; if(i == j) valu = var;
-						param_val.value[ieg.omega_pv[j][i]] = valu;
-					}
+				if(loop == loopmax){
+					run_error("Could not sample a covariance matrix.");
 				}
-			}
-		}			
+			}			
+		}
 	}
 }
 
@@ -359,7 +402,25 @@ double Model::recalculate_ieg_prior(unsigned int j, vector <double> &prior_ieg, 
 
 
 /// Recalculates the prior for a given parameter
-double Model::recalculate_prior(unsigned int th, vector <double> &prior_prob, const PV &param_val, double &like_ch) const
+double Model::recalculate_prior(unsigned int th, vector <double> &prior_prob, const PV &param_val, double &prior_ch, double &prior_bounded_ch) const
+{
+	const auto &precalc = param_val.precalc;
+	const auto &value = param_val.value;
+	
+	auto store = prior_prob[th];
+
+	const auto &pv = param_vec[th];
+	prior_prob[th] = prior_probability(value[th],prior[pv.prior_ref],precalc,eqn);
+	
+	if(is_prior_bounded(th)) prior_bounded_ch += prior_prob[th]-store;
+	else prior_ch += prior_prob[th]-store;
+	
+	return store;
+}
+
+
+/// Recalculates the distribution for a given parameter
+double Model::recalculate_dist(unsigned int th, vector <double> &prior_prob, const PV &param_val, double &like_ch) const
 {
 	const auto &precalc = param_val.precalc;
 	const auto &value = param_val.value;
@@ -367,6 +428,7 @@ double Model::recalculate_prior(unsigned int th, vector <double> &prior_prob, co
 	auto store = prior_prob[th];
 	const auto &pv = param_vec[th];
 	prior_prob[th] = prior_probability(value[th],prior[pv.prior_ref],precalc,eqn);
+	
 	like_ch += prior_prob[th]-store;
 	
 	return store;
@@ -399,7 +461,6 @@ double Model::prior_ieg_calculate(const IEGref &iegr, const PV &param_val) const
 	auto omega = sp.calculate_omega_basic(iegr.i,param_val,param);
 	
 	for(auto i = 0u; i < omega.size(); i++){
-		if(omega[i][i] < ieg.var_min) return -LARGE;
 		if(omega[i][i] > ieg.var_max) return -LARGE;
 	}
 	
@@ -407,16 +468,17 @@ double Model::prior_ieg_calculate(const IEGref &iegr, const PV &param_val) const
 
 	auto log_det = determinant_fast(omega);
 	
-	//if(log_det == UNSET) emsg("Out of range");
-	//if(log_det < ieg.log_det_min || log_det > ieg.log_det_max) emsg("Out of range2");
-	
 	if(log_det == UNSET) return -LARGE;
-	//if(log_det < ieg.log_det_min || log_det > ieg.log_det_max) return -LARGE;
+	if(log_det < ieg.log_det_min) return -LARGE;
 		
 	const auto &pri = prior[ieg.prior_ref];
 	
 	switch(pri.type){
-	case MVN_JEF_PR: return -(0.5*N+0.5)*log_det;
+	case MVN_JEF_PR: 
+		{
+			return (0.5*N-0.5)*diag_log_sum(omega)-(0.5*N+0.5)*log_det;
+		}
+		
 	case MVN_UNIFORM_PR: return 0;
 	default: emsg("opp prob"); break;
 	}
@@ -484,9 +546,7 @@ void Model::set_omega_pv()
 			}
 			
 			ieg.log_det_min = N*log(min);
-			ieg.log_det_max = N*log(max);
-			ieg.var_min = 1*min;
-			ieg.var_max = 1*max;
+			ieg.var_max = max;
 			
 			ieg.omega_pv.resize(N);
 			for(auto j = 0u; j < N; j++){
@@ -1407,7 +1467,9 @@ double Model::prior_sample(const Prior &pri, const vector <double> &precalc) con
 			if(max <= 0) run_error("For the prior '"+pri.name+"' the maximum value '"+tstr(max)+"' has become non-positive.");
 			
 			if(min >= max) run_error("For the prior '"+pri.name+"' the minumum value '"+tstr(min)+"' is larger than the maximum value '"+tstr(max)+"'.");
-			val = min*exp(ran()*log(max/min));
+			//val = min*exp(ran()*log(max/min));
+			
+			val = min+ran()*(max-min);
 		}
 		break;
 		
@@ -1421,9 +1483,10 @@ double Model::prior_sample(const Prior &pri, const vector <double> &precalc) con
 			
 			if(min >= max) run_error("For the prior '"+pri.name+"' the minumum value '"+tstr(min)+"' is larger than the maximum value '"+tstr(max)+"'.");
 			
-			auto power = eqn[pri.dist_param[2].eq_ref].calculate_param(precalc);
-			if(power == -1) val = min*exp(ran()*log(max/min));
-			else val = pow(pow(min,power+1)+ ran()*(pow(max,power+1)-pow(min,power+1)),1.0/(power+1));
+			//auto power = eqn[pri.dist_param[2].eq_ref].calculate_param(precalc);
+			//if(power == -1) val = min*exp(ran()*log(max/min));
+			//else val = pow(pow(min,power+1)+ ran()*(pow(max,power+1)-pow(min,power+1)),1.0/(power+1));
+			val = min+ran()*(max-min);
 		}
 		break;
 		
@@ -1580,13 +1643,13 @@ bool Model::ieg_check_prior_error(const IEGref &iegr, const PV &param_val) const
 	auto L = omega.size();
 	for(auto j = 0u; j < L; j++){
 		auto val = omega[j][j]; 
-		if(val < ieg.var_min || val > ieg.var_max) return true;
+		if(val > ieg.var_max) return true;
 	}
 	
 	auto det = determinant_fast(omega);
 
 	if(det == UNSET) return true;
-	//if(det < ieg.log_det_min || det > ieg.log_det_max) return true;
+	if(det < ieg.log_det_min) return true;
 	
 	return false;
 }
@@ -2556,6 +2619,19 @@ bool Model::in_bounds(double x, unsigned int j, const vector <double> &precalc) 
 	}
 	
 	return true;
+}
+
+
+/// Determines if the prior is bounded or not
+bool Model::is_prior_bounded(unsigned int th) const
+{
+	switch(prior[param_vec[th].prior_ref].type){
+	case INVERSE_PR: case UNIFORM_PR: case POWER_PR: case MVN_JEF_PR: case MVN_UNIFORM_PR:
+		return true;	
+		
+	default:
+		return false;	
+	}
 }
 
 

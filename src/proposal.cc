@@ -766,15 +766,15 @@ string Proposal::print_info() const
 void Proposal::MH(State &state)
 {	
 	auto pl = false;
-	
+
 	auto &param_val = state.param_val;
 
 	ntr++; 
 	
 	auto ps_fac = param_resample(param_val,state.popnum_t);
 	if(ps_fac == UNSET){ update_si(-0.005); return;}
-	
-	if(false){     
+
+	if(pl){     
 		cout << endl << endl;
 		for(auto i : param_val.value_ch){
 			const auto &pv = model.param_vec[i];
@@ -786,7 +786,12 @@ void Proposal::MH(State &state)
 	
 	auto al = calculate_al(like_ch,ps_fac);
 	
+	if(pl){ 
+		print_like(like_ch);
+	}
+	
 	if(pl) cout << al << "al" << endl;
+	
 	if(ran() < al){ 
 		if(pl) cout << "accept" << endl;
 		nac++;
@@ -798,7 +803,7 @@ void Proposal::MH(State &state)
 		state.restore(affect_like);
 		update_si(-0.005); if(si > 3) si *= 0.75;
 	}
-
+	
 	if(pl) state.check("evafter");
 }
 
@@ -2508,7 +2513,7 @@ void Proposal::MH_ie_var_cv(State &state)
 void Proposal::MH_ie_covar(State &state)
 {
 	auto pl = false;
-	
+
 	auto &param_val = state.param_val;
 	auto &value = param_val.value;
 	
@@ -2517,6 +2522,14 @@ void Proposal::MH_ie_covar(State &state)
 	auto val_st = value[th];
 	
 	auto ps_fac = param_resample(param_val,state.popnum_t);
+	
+	if(pl){     
+		cout << endl << endl;
+		for(auto i : param_val.value_ch){
+			const auto &pv = model.param_vec[i];
+			cout << pv.name << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
+		}
+	}
 	
 	if(ps_fac == UNSET){ update_si(-0.005); return;}
 	
@@ -2563,8 +2576,6 @@ void Proposal::MH_ie_covar(State &state)
 		index.push_back(ieg.list[e].index);
 	}	
 	
-	//ssp.compare_covar("BEFORE",omega_bef,g);
-	
 	vector <double> vec(E), vec_new(E);
 	vector < vector <double> > store;
 	for(auto i = 0u; i < ssp.individual.size(); i++){
@@ -2577,13 +2588,14 @@ void Proposal::MH_ie_covar(State &state)
 		for(auto e = 0u; e < E; e++) ie[index[e]] = vec_new[e];
 	}
 
-	//ssp.compare_covar("AFTER",omega_aft,g);
-
 	auto like_ch = state.update_param(affect_like);
+
+	if(pl) print_like(like_ch);
 
 	auto al = calculate_al(like_ch,ps_fac-like_ch.ie);
 	
 	if(pl) cout << al << " al" << endl;
+	
 	ntr++;
 	if(ran() < al){ 
 		if(pl) cout << "ac" << endl;

@@ -2717,6 +2717,7 @@ void add_on_like(const Like li1, Like &li2)
 	li2.init_cond_prior += li1.init_cond_prior;
 	li2.obs += li1.obs;
 	li2.prior += li1.prior; 
+	li2.prior_bounded += li1.prior_bounded; 
 	li2.spline_prior += li1.spline_prior; 
 	li2.dist += li1.dist;
 	li2.markov += li1.markov; 
@@ -2735,6 +2736,7 @@ double calc_al(const Like &like_ch, double dprob, const BurnInfo &burn_info)
 						+ like_ch.init_cond_prior
 						+ like_ch.obs 
 						+ like_ch.prior 
+						+ like_ch.prior_bounded 
 						+ like_ch.spline_prior 
 						+ like_ch.dist 
 						+ like_ch.markov 
@@ -2751,6 +2753,7 @@ double calc_al(const Like &like_ch, double dprob, const BurnInfo &burn_info)
 					+ burn_info.init_cond_prior*like_ch.init_cond_prior
 					+ burn_info.obs*like_ch.obs 
 					+ burn_info.prior*like_ch.prior 
+				  + burn_info.prior_bounded*like_ch.prior_bounded 
 					+ burn_info.spline_prior*like_ch.spline_prior 
 					+ burn_info.dist*like_ch.dist 
 					+ burn_info.markov*like_ch.markov 
@@ -2770,6 +2773,7 @@ void print_like(const Like &like)
 	if(like.init_cond_prior != 0) cout << "ind_cond_prior " << like.init_cond_prior << "  ";
 	if(like.obs != 0) cout << "obs " << like.obs << "  ";
 	if(like.prior != 0) cout << "prior " << like.prior << "  ";
+	if(like.prior_bounded != 0) cout << "prior_bounded " << like.prior_bounded << "  ";
 	if(like.spline_prior != 0) cout << "spline_prior " << like.spline_prior << "  ";
 	if(like.dist != 0) cout << "dist " << like.dist << "  ";
 	if(like.markov != 0) cout << "markov " << like.markov << "  ";

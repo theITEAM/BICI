@@ -259,6 +259,7 @@ void Mpi::pack(const Particle &pa)
 	pack_item(li.init_cond_prior);
 	pack_item(li.obs);
 	pack_item(li.prior);
+	pack_item(li.prior_bounded);
 	pack_item(li.spline_prior);
 	pack_item(li.dist);
 	pack_item(li.markov);
@@ -414,6 +415,7 @@ void Mpi::unpack(Particle &pa)
 	unpack_item(li.init_cond_prior);
 	unpack_item(li.obs);
 	unpack_item(li.prior);
+	unpack_item(li.prior_bounded);
 	unpack_item(li.spline_prior);
 	unpack_item(li.dist);
 	unpack_item(li.markov);

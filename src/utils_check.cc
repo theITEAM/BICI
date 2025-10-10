@@ -17,7 +17,7 @@ using namespace std;
 
 #include "const.hh"
 #include "utils.hh"
-
+#include "matrix.hh"
 
 /// Calculates the tri_gamma function
 double tri_gamma(double z)
@@ -1082,3 +1082,206 @@ void test_incomplete_distribution()
 		cout << " - " << int(100.0*tim_store[type]/max) << "%" << endl;
 	}
 }
+
+
+/// Gets M from K
+vector < vector <double> > M_from_K(vector < vector <double> > &K)
+{
+	auto M = K;	
+	
+	auto N = M.size();
+	for(auto j = 0u; j < N; j++){
+		for(auto i = 0u; i < N; i++){
+			if(j != i){
+				M[j][i] *= sqrt(M[i][i]*M[j][j]);
+			}
+		}
+	}
+	
+	return M;
+}
+
+
+/// Checks the mvn jeffreys prior
+void mvn_jeffreys_check()
+{
+	auto N = 3u;
+	
+	vector < vector <double> > M;
+
+	M.resize(N);
+	for(auto j = 0u; j < N; j++){
+		M[j].resize(N);
+		for(auto i = 0u; i < N; i++){
+			if(j == i) M[j][i] = 1;
+			else M[j][i] = 0;
+		}
+	}
+	
+	auto det = determinant_fast(M);
+	
+	auto nac = 0.0, ntr = 0.0;
+	
+	ofstream fout("Output/cor.txt");
+	
+	fout << "State";
+	for(auto j = 0u; j < N; j++){
+		for(auto i = 0u; i <= j; i++){
+			fout << "\tM" << j << i;
+		}
+	}
+	fout << "\t" << det << endl;
+
+	string warn;
+
+	auto var_min = 0.5, var_max = 4.0;
+	//auto var_min = 0.2, var_max = 4.0;
+
+	//auto det_min = 0.33*N*log(var_min);
+	auto det_min = N*log(var_min);
+
+	auto smax = 1000000u;
+
+	for(auto s = 0u;  s < smax; s++){
+		if(s%1000 == 0){
+			fout << s;
+			for(auto j = 0u; j < N; j++){
+				for(auto i = 0u; i <= j; i++){
+					if(j == i) fout << "\t" << M[j][i];
+					else fout << "\t" << M[j][i]/sqrt(M[i][i]* M[j][j]);
+				}
+			}			
+			fout << "\t" << det << endl;
+		}
+		
+		for(auto j = 0u; j < N; j++){
+			for(auto i = 0u; i <= j; i++){
+				auto d = normal_sample(0,0.1,warn);
+				M[j][i] += d; M[i][j] += d;
+				auto det_new = determinant_fast(M);
+				ntr++;
+				//if(det_new == UNSET || det_new < det_min || (i == j && M[i][i] > var_max) || (i == j && M[i][i] < var_min)){
+				if(det_new == UNSET || det_new < det_min || (i == j && M[i][i] > var_max)){
+					M[j][i] -= d; M[i][j] -= d;
+				}
+				else{
+					auto al = exp(-(0.5*N+0.5)*(det_new-det));
+					if(ran() < al){
+						nac++;
+						det = det_new;
+					}
+					else{
+						M[j][i] -= d; M[i][j] -= d;
+					}
+				}
+			}
+		}
+	}		
+	cout << nac/ntr << " acc" << endl;
+	
+	
+	vector < vector <double> > K;
+
+	K.resize(N);
+	for(auto j = 0u; j < N; j++){
+		K[j].resize(N);
+		for(auto i = 0u; i < N; i++){
+			if(j == i) K[j][i] = 1;
+			else K[j][i] = 0;
+		}
+	}
+	
+	M = M_from_K(K);
+	
+	det = determinant_fast(M);
+	auto diag = diag_log_sum(M);
+				
+	ofstream fout2("Output/cor2.txt");
+	
+	fout2 << "State";
+	for(auto j = 0u; j < N; j++){
+		for(auto i = 0u; i <= j; i++){
+			fout2 << "\tM" << j << i;
+		}
+	}
+	fout2 << "\t" << det << endl;
+
+	auto si = 1.0, si2 = 1.0;
+	
+	auto burn = smax/10;
+	
+	vector < vector <double> > nacc, ntrr;
+	nacc.resize(N); ntrr.resize(N);
+	for(auto j = 0u; j < N; j++){
+		nacc[j].resize(N,0); ntrr[j].resize(N,0);
+	}
+	
+	for(auto s = 0u;  s < smax; s++){
+		if(s%1000 == 0){
+			fout2 << s;
+			for(auto j = 0u; j < N; j++){
+				for(auto i = 0u; i <= j; i++){
+					fout2 << "\t" << K[j][i];
+				}
+			}			
+			fout2 << "\t" << det << endl;
+		}
+		
+		for(auto j = 0u; j < N; j++){
+			for(auto i = 0u; i <= j; i++){
+				double d;
+				if(i == j) d = normal_sample(0,si,warn);
+				else d = normal_sample(0,si2,warn);
+				
+				K[j][i] += d; K[i][j] += d;
+				M = M_from_K(K);
+				
+				auto det_new = determinant_fast(M);
+				auto diag_new = diag_log_sum(M);
+				
+				ntrr[j][i]++;
+				//if(det_new == UNSET || det_new < det_min || (i == j && M[i][i] > var_max) || (i == j && M[i][i] < var_min)){
+				if(det_new == UNSET || det_new < det_min || (i == j && M[i][i] > var_max)){
+					K[j][i] -= d; K[i][j] -= d;
+					if(s < burn){
+						if(i == j) si *= 0.999;
+						else si2 *= 0.999;
+					}
+				}
+				else{
+					//auto al = exp(-(0.5*N+0.5)*(det_new-det));
+					auto al = exp((0.5*N-0.5)*(diag_new-diag) - (0.5*N+0.5)*(det_new-det));
+					if(ran() < al){
+						nacc[j][i]++;
+						det = det_new;
+						diag = diag_new;
+						if(s < burn){
+							if(i == j) si *= 1.001;
+							else si2 *= 1.001;
+						}
+					}
+					else{
+						K[j][i] -= d; K[i][j] -= d;
+						if(s < burn){
+							if(i == j) si *= 0.999;
+							else si2 *= 0.999;
+						}
+					}
+				}
+			
+			}
+		}
+
+	}		
+	//cout	<< nac/ntr << " acc" << endl;
+	
+	for(auto j = 0u; j < N; j++){
+		for(auto i = 0u; i < N; i++){
+			cout << nacc[j][i]/ntrr[j][i] << ",";
+		}
+		cout << endl;
+	}
+	cout << si << " " << si2 << " jj" << endl;
+}
+	
+	

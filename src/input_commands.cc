@@ -2280,7 +2280,7 @@ void Input::ind_effect_command()
 	ieg.ppc_resample = false;
 	ieg.prior_ref = UNSET;
 	ieg.log_det_min = UNSET;
-	ieg.log_det_max = UNSET;
+	ieg.var_max = UNSET;
 	model.species[p].ind_eff_group.push_back(ieg);
 }
 

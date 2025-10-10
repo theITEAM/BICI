@@ -218,3 +218,4 @@ void test_distribution();
 void generate_data();
 void simulate_trans_exp();
 void test_incomplete_distribution();
+void mvn_jeffreys_check();

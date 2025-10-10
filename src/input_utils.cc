@@ -13,6 +13,7 @@ using json = nlohmann::json;
 
 #include "input.hh"
 #include "utils.hh"
+#include "matrix.hh"
 
 /// Returns the species number from its name
 unsigned int Input::find_p(string name) const 
@@ -1346,29 +1347,92 @@ unsigned int Input::get_param_value(vector < vector <double> > &param_value, uns
 	switch(spl.size()){
 	case 1:           // Set parameter value with dependency
 		{
-			i++;
-			auto title = comma_split(lines[i]);
-	
-			if(title.size() != par.dep.size()+1) alert_sample(warn,14);
-			
-			for(auto k = 0u; k < par.dep.size(); k++){
-				if(title[k] != par.dep[k].index_with_prime) alert_sample(warn,15);
-			}
-			if(title[par.dep.size()] != "Value") alert_sample(warn,16);
-			
-			if(par.spline_out.on){ // Spline has been restricted
-				const auto &dp_last = par.dep[par.dep.size()-1];
-				const auto &list = dp_last.list;
-				const auto &solist = par.spline_out.list;
+			if(model.is_symmetric(par)){  // Loads covariance matrix
+				i++;
+				auto spl_head = comma_split(lines[i]);
+				auto pli = par.dep[0].list;
 				
-				if(solist.size() > list.size()) alert_sample(warn,17);
-				for(auto k = 0u; k < solist.size(); k++){
-					if(solist[k] != list[k]) alert_sample(warn,18);
+				auto L = pli.size(); 
+				if(spl_head.size() != L) alert_sample(warn,150);
+				for(auto ii = 0u; ii < L; ii++){
+					if(spl_head[ii] != pli[ii]) alert_sample(warn,151);
 				}
 
-				for(auto j = 0u; j < par.N; j++){
-					auto mm = (unsigned int)(j/dp_last.mult)%list.size();
-					if(mm < solist.size()){
+				for(auto jj = 0u; jj < L; jj++){
+					i++;
+					auto row = comma_split(lines[i]);
+					if(row.size() != L) alert_sample(warn,152);
+					for(auto ii = 0u; ii < L; ii++){
+						auto val = row[ii];
+						if(ii < jj){
+							if(val != ".") alert_sample(warn,153);
+						}
+						else{
+							auto val_num = number(val);
+							if(val_num == UNSET) alert_sample(warn,154);
+							param_value[th][jj*L+ii] = val_num;
+						}
+					}
+				}
+				
+				// Checks that the determinant is positive (due to finite precition of output file this may not be)
+				vector < vector <double> > M;
+				M.resize(L);
+				for(auto jj = 0u; jj < L; jj++){
+					M[jj].resize(L);
+					for(auto ii = 0u; ii < L; ii++){
+						if(ii > jj) M[jj][ii] = param_value[th][jj*L+ii];
+						else M[jj][ii] = param_value[th][ii*L+jj];
+					}
+				}
+			
+				
+				if(determinant_fast(M) == UNSET){
+					emsg("determinant not set");
+				}
+			}
+			else{
+				i++;
+				auto title = comma_split(lines[i]);
+		
+				if(title.size() != par.dep.size()+1) alert_sample(warn,14);
+				
+				for(auto k = 0u; k < par.dep.size(); k++){
+					if(title[k] != par.dep[k].index_with_prime) alert_sample(warn,15);
+				}
+				if(title[par.dep.size()] != "Value") alert_sample(warn,16);
+				
+				if(par.spline_out.on){ // Spline has been restricted
+					const auto &dp_last = par.dep[par.dep.size()-1];
+					const auto &list = dp_last.list;
+					const auto &solist = par.spline_out.list;
+					
+					if(solist.size() > list.size()) alert_sample(warn,17);
+					for(auto k = 0u; k < solist.size(); k++){
+						if(solist[k] != list[k]) alert_sample(warn,18);
+					}
+
+					for(auto j = 0u; j < par.N; j++){
+						auto mm = (unsigned int)(j/dp_last.mult)%list.size();
+						if(mm < solist.size()){
+							i++;
+							auto li = comma_split(lines[i]);
+							for(auto k = 0u; k < par.dep.size(); k++){
+								const auto &dp = par.dep[k];
+								auto m = (unsigned int)(j/dp.mult)%dp.list.size();
+								if(li[k] != dp.list[m]) alert_sample(warn,17);
+							}
+							auto value = number(li[par.dep.size()]);
+							if(value == UNSET) alert_sample(warn,19);
+							param_value[th][j] = value;
+						}
+						else{
+							param_value[th][j] = param_value[th][j-1]; 
+						}
+					}
+				}
+				else{
+					for(auto j = 0u; j < par.N; j++){
 						i++;
 						auto li = comma_split(lines[i]);
 						for(auto k = 0u; k < par.dep.size(); k++){
@@ -1380,23 +1444,6 @@ unsigned int Input::get_param_value(vector < vector <double> > &param_value, uns
 						if(value == UNSET) alert_sample(warn,19);
 						param_value[th][j] = value;
 					}
-					else{
-						param_value[th][j] = param_value[th][j-1]; 
-					}
-				}
-			}
-			else{
-				for(auto j = 0u; j < par.N; j++){
-					i++;
-					auto li = comma_split(lines[i]);
-					for(auto k = 0u; k < par.dep.size(); k++){
-						const auto &dp = par.dep[k];
-						auto m = (unsigned int)(j/dp.mult)%dp.list.size();
-						if(li[k] != dp.list[m]) alert_sample(warn,17);
-					}
-					auto value = number(li[par.dep.size()]);
-					if(value == UNSET) alert_sample(warn,19);
-					param_value[th][j] = value;
 				}
 			}
 		}

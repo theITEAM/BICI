@@ -61,9 +61,8 @@ void MCMC::run()
 	percentage_start(RUN_PER);
 	
 	long time_start = clock();
-
+	
 	for(auto s = 0u; s < nsample; s++){
-		//if(mpi.core == 0) cout << s << " samp" << endl;
 		percentage(s,nsample);
 		
 		for(auto &ch : chain){

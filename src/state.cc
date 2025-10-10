@@ -708,7 +708,12 @@ void State::calculate_likelihood()
 /// Calculates the overall likelihood 
 void State::calculate_like()
 {
-	like.prior = sum(prior_prob) + sum(prior_ieg);
+	like.prior = 0; like.prior_bounded = sum(prior_ieg);
+	for(auto i = 0u; i < model.param_vec.size(); i++){
+		if(model.is_prior_bounded(i)) like.prior_bounded += prior_prob[i];
+		else like.prior += prior_prob[i];
+	}
+	
 	like.dist = sum(dist_prob);
 	like.spline_prior = sum(spline_prior);
 	
@@ -769,6 +774,7 @@ void State::accept(Like like_ch)
 	like.init_cond_prior += like_ch.init_cond_prior;
 	like.obs += like_ch.obs;
 	like.prior += like_ch.prior;
+	like.prior_bounded += like_ch.prior_bounded;
 	like.dist += like_ch.dist;
 	like.ie += like_ch.ie;
 	like.spline_prior += like_ch.spline_prior;
@@ -914,19 +920,20 @@ Like State::update_param(const vector <AffectLike> &affect_like)
 		
 		case IEG_PRIOR_AFFECT:
 			{
-				change_add(model.recalculate_ieg_prior(alike.num,prior_ieg,param_val,like_ch.prior));
+				change_add(model.recalculate_ieg_prior(alike.num,prior_ieg,param_val,like_ch.prior_bounded));
 			}
 			break;
 			
 		case PRIOR_AFFECT:
 			{
-				change_add(model.recalculate_prior(alike.num,prior_prob,param_val,like_ch.prior));
+				//cout << like_ch.prior << " " << like_ch.prior_bounded
+				change_add(model.recalculate_prior(alike.num,prior_prob,param_val,like_ch.prior,like_ch.prior_bounded));
 			}
 			break;
 			
 		case DIST_AFFECT:
 			{
-				change_add(model.recalculate_prior(alike.num,dist_prob,param_val,like_ch.dist));
+				change_add(model.recalculate_dist(alike.num,dist_prob,param_val,like_ch.dist));
 			}
 			break;
 		

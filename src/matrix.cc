@@ -458,6 +458,15 @@ vector < vector <double> > calculate_cholesky(const vector < vector <double> > &
 }
 
 
+/// Sums up the log of the diagonal elements
+double diag_log_sum(const vector < vector <double> > &a)
+{
+	auto sum = 0.0;
+	for(auto i = 0u; i < a.size(); i++) sum += log(a[i][i]);
+	return sum;
+}
+
+
 /// Performs LU decomposition to return the log of the determinant
 // LU decomposition converts into a lower and an upper triagular matrix
 double determinant_fast(const vector < vector <double> > &a)

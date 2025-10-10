@@ -1463,7 +1463,7 @@ string Output::param_output(const Particle &part, const vector < vector <double>
 	if(std::isnan(like.init_cond)) emsg("pp");
 	ss << "," << like.markov << "," << like.nm_trans << "," << like.ie << "," << like.dist << "," << like.obs << "," << like.genetic_process << "," << like.genetic_obs << "," << like.init_cond;
 
-	if(model.mode == INF) ss << "," << like.prior+like.spline_prior+like.init_cond_prior;
+	if(model.mode == INF) ss << "," << like.prior+like.prior_bounded+like.spline_prior+like.init_cond_prior;
 	
 	ss << endl;
 	return ss.str();

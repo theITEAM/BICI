@@ -26,7 +26,7 @@ public:
 	State state;
 	double Lobs_av;                        // Calculates Lobs (for PAS)
 	double nLobs_av;                        // Calculates Lobs (for PAS)
-	
+
 private:
 	unsigned int nsample;                  // The total number of samples
 	unsigned int nburnin;                  // The total burn-in time
@@ -35,7 +35,7 @@ private:
 		
 	CorMatrix cor_matrix;                  // Stores information about the correlation matrix
 
-	vector <Proposal> proposal;            // Stores all the proposals
+	vector <Proposal> proposal;            // Stores all the proposals 
 
 	void update_init();
 	bool is_markov_pop(const AffectLike &al) const;

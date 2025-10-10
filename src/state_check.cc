@@ -787,6 +787,7 @@ void State::check_like(string ref)
 	if(std::isnan(like.init_cond_prior)) emsg("init_cond_prior nan");
 	if(std::isnan(like.obs)) emsg("obs nan");
 	if(std::isnan(like.prior)) emsg("prior nan");
+	if(std::isnan(like.prior_bounded)) emsg("prior bounded nan");
 	if(std::isnan(like.spline_prior)) emsg("spline_prior nan");
 	if(std::isnan(like.dist)) emsg("dist nan");
 	if(std::isnan(like.markov)) emsg("markov nan"+ref);
@@ -822,7 +823,14 @@ void State::check_like(string ref)
 	}
 	
 	if(dif(like.prior,like_st.prior,dif_thresh)){
+		cout << like.prior << " " << like_st.prior << " " << like.prior_bounded << " " <<like_st.prior_bounded << endl;
 		add_alg_warn("like prior");
+	}
+	
+	if(dif(like.prior_bounded,like_st.prior_bounded,dif_thresh)){
+		cout << like.prior << " " << like_st.prior << " " << like.prior_bounded << " " <<like_st.prior_bounded << endl;
+			
+		add_alg_warn("like prior bounded");
 	}
 		
 	if(dif(like.ie,like_st.ie,dif_thresh)){
@@ -867,6 +875,7 @@ void State::check_like(string ref)
 	if(std::isnan(like.init_cond_prior)) emsg("init_cond_prior nan");
 	if(std::isnan(like.obs)) emsg("obs nan");
 	if(std::isnan(like.prior)) emsg("prior nan");
+	if(std::isnan(like.prior_bounded)) emsg("prior bounded nan");
 	if(std::isnan(like.spline_prior)) emsg("spline_prior nan");
 	if(std::isnan(like.dist)) emsg("dist nan");
 	if(std::isnan(like.markov)) emsg("markov nan2"+ref);
@@ -1073,9 +1082,9 @@ void State::check_ie(unsigned int p, string ref)
 		const auto &iesg = ssp.ind_eff_group_sampler[g];
 		//auto iesg_store = iesg;
 		
-		auto omega_store =  iesg.omega;
-		auto omega_Z_store =  iesg.omega_Z;
-		auto omega_inv_store =  iesg.omega_inv;
+		auto omega_store = iesg.omega;
+		auto omega_Z_store = iesg.omega_Z;
+		auto omega_inv_store = iesg.omega_inv;
 
 		ssp.calculate_omega(g);
 		
@@ -2256,6 +2265,7 @@ void State::scan_variable(string name, double min, double max)
 		like.init_cond_prior+
 		like.obs+
 		like.prior+ 
+		like.prior_bounded+ 
 		like.spline_prior+ 
 		like.dist+
 		like.markov+ 

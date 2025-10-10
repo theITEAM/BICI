@@ -6,6 +6,10 @@
 // Compilation: make
 // Run: ./bici 
 
+// ssh gaia.bioss.ac.uk  
+
+// tar -xzf foo.tgz
+
 // Load mpi: module load mpi/openmpi-x86_64
 // mpirun -n 1 ./bici-para file.bici sim
 // mpirun -n 1 ./bici-para Execute/init.bici sim
@@ -48,10 +52,6 @@
 
 //nohup  mpirun -n 10  ./bici-para Execute/mod10.bici inf >  modd10.txt&
 // mpirun -n 4  ./bici-para Execute/init.bici inf
-
-// ssh gaia.bioss.ac.uk  
-
-// tar -xzf foo.tgz
 
 // git clone https://github.com/theITEAM/BICI.git
 
@@ -109,6 +109,8 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file);
 int main(int argc, char** argv)
 {	
 	auto total_time = clock();
+	
+	//mvn_jeffreys_check(); return 0; 
 	
 #ifdef USE_MPI                            // This is for the parallel version of the code 
   MPI_Init(&argc,&argv);                 

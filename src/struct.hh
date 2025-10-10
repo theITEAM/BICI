@@ -335,8 +335,8 @@ struct IEgroup {                   // Stores information about a group of indivi
 	unsigned int th;                 // The parameter which controls the covariance matrix
 	unsigned int prior_ref;          // References the prior forMVN distribution 
 	vector < vector <unsigned int> > omega_pv;// Matrix of param_vec values 
-	double log_det_min, log_det_max; // The range for the log of the determinant
-	double var_min, var_max;         // Minimum variance
+	double log_det_min;              // The minimum for the determinant
+	double var_max;                  // The Maximum for the variance
 	unsigned int line_num;           // Stores the line number the equation comes from
 	bool ppc_resample;               // Determines if individual effects resampled 
 	vector <unsigned int> markov_eqn_ref;  // Indexes any Markov equations involving ies
@@ -1166,6 +1166,7 @@ struct Like {                      // Stores a likelihood (or change in likeliho
 		init_cond_prior = 0;
 		obs = 0;
 		prior = 0; 
+		prior_bounded = 0;
 		spline_prior = 0; 
 		dist = 0;
 		markov = 0; 
@@ -1177,7 +1178,8 @@ struct Like {                      // Stores a likelihood (or change in likeliho
 	double init_cond;                // The likelhood for initial conditions
 	double init_cond_prior;          // The prior for indivdual conditions
 	double obs;                      // The observation probability
-	double prior;                    // The prior
+	double prior;                    // The prior for unbounded quantities
+	double prior_bounded;            // The prior for bounded quantitites
 	double spline_prior;             // The spline prior
 	double dist;                     // The probability of internal distributions
 	double markov;                   // The likelihood of Markovian transitions
@@ -1461,6 +1463,7 @@ struct BurnInfo {                  // Information about burnin phase
 	double init_cond_prior;               
 	double obs; 
 	double prior;
+	double prior_bounded; 
 	double spline_prior;
 	double dist;
 	double markov;

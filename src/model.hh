@@ -80,6 +80,7 @@ class Model                                // Stores information about the model
 		void param_val_init(PV &param_val) const;
 		PV param_sample() const;
 		void param_update_precalc_time(unsigned int ti, const vector <double> &popnum, PV &param_val, bool store) const;
+		bool sample_bounded() const;
 		void sample_ieg_cv(PV &param_val) const;
 		void param_update_precalc_time_all(const vector < vector <double> > &popnum_t, PV &param_val, bool store) const;
 		void param_update_precalc_before(unsigned int th, PV &param_val, bool store) const;
@@ -88,7 +89,8 @@ class Model                                // Stores information about the model
 		vector <double> prior_prob(const PV &param_val) const;
 		vector <double> dist_prob(const PV &param_val) const;
 		double recalculate_ieg_prior(unsigned int j, vector <double> &prior_ieg, const PV &param_val, double &like_ch) const;
-		double recalculate_prior(unsigned int th, vector <double> &prior_prob, const PV &param_val, double &like_ch) const;
+		double recalculate_prior(unsigned int th, vector <double> &prior_prob, const PV &param_val, double &prior_ch, double &prior_bounded_ch) const;
+		double recalculate_dist(unsigned int th, vector <double> &prior_prob, const PV &param_val, double &like_ch) const;
 		vector <double> prior_ieg_all(const PV &param_val) const;
 		double prior_ieg_calculate(const IEGref &iegr, const PV &param_val) const;
 		void set_ieg_ref();
@@ -134,6 +136,7 @@ class Model                                // Stores information about the model
 		vector <unsigned int> get_last_spline() const;
 		void add_affect_like(unsigned int i, unsigned int i2, const vector <bool> &map_time, vector <bool> &map_PC, vector < vector <bool> > &map_me, ParamVecEle &pvec, const vector < vector <unsigned int> > &affect, const vector < vector <AffectME> > &affect_me);
 		bool in_bounds(double x, unsigned int j, const vector <double> &precalc) const;
+		bool is_prior_bounded(unsigned int th) const;
 		void set_linear_form(unsigned int p, LinearForm &lin_form, const vector <LinearFormInit> &lfinit) const;
 		bool is_matrix(const Param &par) const;
 		bool is_symmetric(const Param &par) const;
