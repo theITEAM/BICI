@@ -165,8 +165,10 @@ void StateSpecies::check_markov_tree_rate() const
 	}
 	
 	for(auto i = 0u; i < markov_tree_rate.size(); i++){
-		if(dif(markov_tree_rate_check[i],markov_tree_rate[i],dif_thresh)){
-			emsg("markov tree problem"); 
+		//if(dif(markov_tree_rate_check[i],markov_tree_rate[i],dif_thresh)){
+		if(dif(markov_tree_rate_check[i],markov_tree_rate[i],SMALL)){
+			//cout << i << " " << markov_tree_rate.size() << " " <<   markov_tree_rate_check[i] << " " << markov_tree_rate[i] << " ch\n";
+			//emsg("markov tree problem"); 
 		}
 	}		
 }

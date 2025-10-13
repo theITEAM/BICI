@@ -2625,6 +2625,9 @@ bool Model::in_bounds(double x, unsigned int j, const vector <double> &precalc) 
 /// Determines if the prior is bounded or not
 bool Model::is_prior_bounded(unsigned int th) const
 {
+	auto pref = param_vec[th].prior_ref;
+	if(pref == UNSET) return false;
+	
 	switch(prior[param_vec[th].prior_ref].type){
 	case INVERSE_PR: case UNIFORM_PR: case POWER_PR: case MVN_JEF_PR: case MVN_UNIFORM_PR:
 		return true;	

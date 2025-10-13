@@ -630,7 +630,10 @@ void StateSpecies::update_markov_tree_rate(unsigned int e, double dif)
 	const auto &node = sp.markov_tree.node;
 
 	do{
-		markov_tree_rate[e] += dif;
+		auto va = markov_tree_rate[e]+dif;
+		//if(va > -TINY && va < TINY) va = 0;
+		if(va < 0) va = 0;
+		markov_tree_rate[e] = va;
 		e = node[e].parent;
 	}while(e != UNSET);
 }

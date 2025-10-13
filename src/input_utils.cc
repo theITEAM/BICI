@@ -1385,8 +1385,8 @@ unsigned int Input::get_param_value(vector < vector <double> > &param_value, uns
 						else M[jj][ii] = param_value[th][ii*L+jj];
 					}
 				}
+				model.species[0].convert_cor_var(M);
 			
-				
 				if(determinant_fast(M) == UNSET){
 					emsg("determinant not set");
 				}
