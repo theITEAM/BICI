@@ -2215,7 +2215,25 @@ function select_bubble_data_element(p,i,r,c)
 	if(j == bu.length){ error("Problem selecting3"); return;}
 	
 	activate_button(lay,j); 
+	select_table_elelent(r,c);
+}	
+
+
+/// Selects the simulation data table element
+function select_bubble_sim_data_element(p,i,r,c)
+{
+	change_page({pa:"Simulation",su:"Initial Conditions",susu:p});
 	
+	let lay_name = "TableContent";
+	let lay = get_lay(lay_name);
+	
+	let bu = lay.but;
+
+	let j = 0;
+	while(j < bu.length && !(bu[j].te == "Edit" && bu[j].info.i == i)) j++;
+	if(j == bu.length){ error("Problem selecting3"); return;}
+	
+	activate_button(lay,j); 
 	select_table_elelent(r,c);
 }	
 

@@ -1,4 +1,239 @@
-This is parameterised through its diagonals and correlation coefficients . For reasons of numerical stability, it is inadvisable for the diagonals to exceed around four , or for the correlation coefficients to go outside the range -0.9 to 0.9. If simulating, ensure the values are within this range. If performing inference, appropriate priors could be “uniform(0,4)” for diagonals and “uniform(-0.9,0.9)” for correlations.
+	/*
+	// After parameters have been defined
+	auto dif = false;
+	if(param_list.size() > 1){
+		const auto &pv = model.param_vec[param_list[0]];
+		for(auto i = 1u; i < param_list.size(); i++){
+			const auto &pv2 = model.param_vec[param_list[i]];
+			if(equal_vec(pv.list_precalc_time,pv2.list_precalc_time) == false){ dif = true; break;}
+		}
+	}
+	
+	//cout << name << " na";
+	//zz
+	
+	if(dif == true){  // If there is a difference in the times of the proposals then do seperately
+		for(auto j : param_list){
+			const auto &pv = model.param_vec[j];
+			auto list_new = remove_precalc_done(pv.list_precalc,mapl);
+			if(list_new.size() > 0){				
+				SpecPrecalc up_pre;
+				up_pre.list_precalc = list_new;
+				up_pre.list_precalc_time = pv.list_precalc_time;			
+				spec_precalc.push_back(up_pre);
+			}
+		}
+		
+		emsg("dif time");
+	}
+	else{
+		const auto &pv = model.param_vec[param_list[0]];
+		
+		SpecPrecalc up_pre;
+		up_pre.list_precalc_time = pv.list_precalc_time;			
+		
+		vector <unsigned int> list_precalc;
+		
+		auto C = param_list.size();
+		vector <unsigned int> index(C,0);
+
+		do{
+			auto imin = LARGE;
+			for(auto j = 0u; j < C; j++){
+				const auto &pc = model.param_vec[param_list[j]].list_precalc;
+				if(index[j] < pc.size()){
+					auto i = pc[index[j]];
+					if(i < imin) imin = i;
+				}
+			}
+			
+			if(imin == LARGE) break;
+			
+			if(mapl[imin] == false) list_precalc.push_back(imin);
+			
+			for(auto j = 0u; j < C; j++){
+				const auto &pc = model.param_vec[param_list[j]].list_precalc;
+				if(index[j] < pc.size() && pc[index[j]] == imin) index[j]++;
+			}
+		}while(true);
+		
+		if(false && C > 1){
+			for(auto j = 0u; j < C; j++){
+				const auto &pc = model.param_vec[param_list[j]].list_precalc;
+				for(auto i : pc) cout << i << ",";
+				cout << endl;			
+			}
+			
+			cout << "after" << endl;
+			for(auto i : list_precalc) cout << i << ",";
+			cout << endl;
+			emsg("comb");
+		}
+		
+		if(list_precalc.size() > 0){
+			up_pre.list_precalc = list_precalc;
+			spec_precalc.push_back(up_pre);
+		}
+	}
+	*/
+	
+	/*
+	// For dependent parameters
+	auto M = model.precalc_eqn.calcu.size();
+	vector <bool> mapl(M,false);
+	{
+		dependent_spec_precalc.clear();
+		
+		for(auto k = 0u; k < dependent.size(); k++){
+			auto j = dependent[k];
+			const auto &pv = model.param_vec[j];
+			
+			SpecPrecalc up_pre;
+			up_pre.list_precalc_time = pv.list_precalc_time;
+			for(auto i : pv.list_precalc_before){
+				if(mapl[i] == false){
+					up_pre.list_precalc.push_back(i);
+					mapl[i] = true;
+				}
+			}
+			
+			dependent_spec_precalc.push_back(up_pre);
+		}
+	}
+	
+	// After parameters have been defined
+	auto dif = false;
+	if(param_list.size() > 1){
+		const auto &pv = model.param_vec[param_list[0]];
+		for(auto i = 1u; i < param_list.size(); i++){
+			const auto &pv2 = model.param_vec[param_list[i]];
+			if(equal_vec(pv.list_precalc_time,pv2.list_precalc_time) == false){ dif = true; break;}
+		}
+	}
+	
+	//cout << name << " na";
+	//zz
+	
+	if(dif == true){  // If there is a difference in the times of the proposals then do seperately
+		for(auto j : param_list){
+			const auto &pv = model.param_vec[j];
+			auto list_new = remove_precalc_done(pv.list_precalc,mapl);
+			if(list_new.size() > 0){				
+				SpecPrecalc up_pre;
+				up_pre.list_precalc = list_new;
+				up_pre.list_precalc_time = pv.list_precalc_time;			
+				spec_precalc.push_back(up_pre);
+			}
+		}
+		
+		emsg("dif time");
+	}
+	else{
+		const auto &pv = model.param_vec[param_list[0]];
+		
+		SpecPrecalc up_pre;
+		up_pre.list_precalc_time = pv.list_precalc_time;			
+		
+		vector <unsigned int> list_precalc;
+		
+		auto C = param_list.size();
+		vector <unsigned int> index(C,0);
+
+		do{
+			auto imin = LARGE;
+			for(auto j = 0u; j < C; j++){
+				const auto &pc = model.param_vec[param_list[j]].list_precalc;
+				if(index[j] < pc.size()){
+					auto i = pc[index[j]];
+					if(i < imin) imin = i;
+				}
+			}
+			
+			if(imin == LARGE) break;
+			
+			if(mapl[imin] == false) list_precalc.push_back(imin);
+			
+			for(auto j = 0u; j < C; j++){
+				const auto &pc = model.param_vec[param_list[j]].list_precalc;
+				if(index[j] < pc.size() && pc[index[j]] == imin) index[j]++;
+			}
+		}while(true);
+		
+		if(false && C > 1){
+			for(auto j = 0u; j < C; j++){
+				const auto &pc = model.param_vec[param_list[j]].list_precalc;
+				for(auto i : pc) cout << i << ",";
+				cout << endl;			
+			}
+			
+			cout << "after" << endl;
+			for(auto i : list_precalc) cout << i << ",";
+			cout << endl;
+			emsg("comb");
+		}
+		
+		if(list_precalc.size() > 0){
+			up_pre.list_precalc = list_precalc;
+			spec_precalc.push_back(up_pre);
+		}
+	}
+	*/
+
+	const auto &calcu = model.precalc_eqn.calcu;
+	auto M = calcu.size();
+	//vector <bool> mapl_first(M,false);
+	vector <bool> mapl(M,false);
+		
+		
+			model.precalc_eqn.sv_add_map(dependent_spec_precalc,pv.
+			
+			SpecPrecalc up_pre;
+			up_pre.list_precalc_time = pv.list_precalc_time;
+			for(auto i : pv.list_precalc_before){
+				const auto &ca = calcu[i];
+				if(ca.time_dep){
+					auto fl = false;
+					for(auto ti : pv.list_precalc_time){
+						if(mapl[i+ti] == false){
+							mapl[i+ti] = true;
+							fl = true;
+						}
+					}
+					if(fl == true) up_pre.list_precalc.push_back(i);
+				}
+				else{
+					if(mapl[i] == false){
+						up_pre.list_precalc.push_back(i);
+						mapl[i] = true;
+					}
+				}
+			}
+			
+			dependent_spec_precalc.push_back(up_pre);
+			
+			/*
+											else{
+												const auto &el = par.element[ele.index];
+												auto prr = el.prior_ref;
+												if(prr != UNSET){
+													const auto &pri = prior[prr];	
+													if(pri.type == FIX_PR){
+														const auto &dp = pri.dist_param[0];
+														cout << dp.eq_ref << " "<< dp.te_raw << " " << par.name << " " << dp.value << " dp";
+														
+														
+														if(dp.value != UNSET){
+															item.type = NUMERIC; 
+															item.num = constant.add(dp.value);
+															op.push_back(item); 
+															done = true;
+														}
+													}
+												}
+											}
+											*/
+											
+											This is parameterised through its diagonals and correlation coefficients . For reasons of numerical stability, it is inadvisable for the diagonals to exceed around four , or for the correlation coefficients to go outside the range -0.9 to 0.9. If simulating, ensure the values are within this range. If performing inference, appropriate priors could be “uniform(0,4)” for diagonals and “uniform(-0.9,0.9)” for correlations.
 
 /*		
 		auto tab = load_table(dist_split);

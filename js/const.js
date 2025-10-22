@@ -6,13 +6,13 @@
 // 59127 lines of code (16/15/25)
 // 62667 lines of code (17/09/25)
 
-let ver="windows";         // Determines platform
-//let ver="linux";
+//let ver="windows";         // Determines platform
+let ver="linux";
 //let ver="mac";
 
-let win_linux = false;                            // When working on win running linux 
+let win_linux = true;                            // When working on win running linux 
 
-const try_on = true;                              // Deterimines if try/catch is on (true)   
+const try_on = false;//true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
 let debug = false;                                // Determines if debugger used (false)
 let testing = false;                              // Used logo to load up results (false)
@@ -189,6 +189,7 @@ const si_graph_param_label = 1.2;                  // Size of font for axis labe
 const si_graph_tick = 0.9;                         // Size of font for ticks
 const tick_si = 0.4;                               // Size of tick marks
 const yaxisgap = 0.5;                              // the extra size on the y-axis tick marks
+const width_table_max = 10;                        // The maximum width for table elements
 const si_big = 1.4;                                // Used for displaying variable names
 const si_sub = 0.7;                                // Size of subscript
 const dy_spline_fac = 0.9;                         // Factor which multiplies line height for splines 
@@ -507,6 +508,8 @@ const ELEMENT_MAX = 1000;                          // The maximum number of elem
 const PARAM_LIST_MAX = 1000;                       // The maximum number of parameters on list
 const HASH_MAX = 10000;                            // The value used for the hash tables
 const H_BIN = 10;                                  // Used for distributions in cumulative prob
+
+const COR_MAX = 0.9;                               // Maximum correlation for individual effects
 
 const SIM_NUM_DEFAULT = 1;                         // The default simulation number
 const PPC_NUM_DEFAULT = 200;                       // The default number of ppc simulation

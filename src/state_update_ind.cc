@@ -183,29 +183,41 @@ void State::update_pop_change(unsigned int ti, unsigned int ti_next, const vecto
 	
 		for(auto spli : spline_up_list){
 			const auto &spl = model.spline[spli];
-			unsigned th_start;
-			if(ti == 0) th_start = spl.div[0].th1;
-			else th_start = spl.div[ti-1].th1+1;
-			for(auto th = th_start; th <= spl.div[ti_next-1].th1; th++){
-				const auto &pv = model.param_vec[th];
-				const auto &par = model.param[pv.th];
-				auto eq_ref = par.get_eq_ref(pv.index);
+			unsigned int ind_start;
+			if(ti == 0) ind_start = spl.div[0].index;
+			else ind_start = spl.div[ti-1].index+1;
 			
-				auto ti = pv.reparam_spl_ti;
-				value[th] = model.eqn[eq_ref].calculate(ti,popnum_t[ti],precalc);
+			for(auto ind = ind_start; ind <= spl.div[ti_next-1].index; ind++){
+				const auto &pr = spl.param_ref[ind];
 				
-				const auto &pct = pv.list_precalc_time;
-				model.precalc_eqn.calculate(pv.list_precalc,pct,param_val,true);
+				if(!pr.cons){
+					auto th = pr.index;
+					const auto &pv = model.param_vec[th];
+					const auto &par = model.param[pv.th];
+					auto eq_ref = par.get_eq_ref(pv.index);
 				
-				auto ti_start = pct[0];
-				auto ti_end = pct[pct.size()-1]+1;
-				
-				for(const auto &mer : spl.markov_eqn_ref){
-					species[mer.p].likelihood_ib_spline_section(mer.e,ti_start,ti_end,popnum_t,like_ch);
-				}
-				
-				for(const auto &trar : spl.trans_ref){	
-					species[trar.p].likelihood_pop_spline_section(trar.tr,ti_start,ti_end,popnum_t,like_ch);
+					auto ti = pv.reparam_spl_ti;
+					param_val.value_change(th);
+					value[th] = model.eqn[eq_ref].calculate(ti,popnum_t[ti],precalc);
+					
+					const auto &spre = pv.spec_precalc_after;
+					model.precalc_eqn.calculate(spre,param_val,true);
+					
+					if(spre.list_time.size() != 1) emsg("cannot find list time");
+					
+					const auto &pct = spre.list_time[0];
+					if(pct.size() == 0) emsg("zero list time");
+					
+					auto ti_start = pct[0];
+					auto ti_end = pct[pct.size()-1]+1;
+					
+					for(const auto &mer : spl.markov_eqn_ref){
+						species[mer.p].likelihood_ib_spline_section(mer.e,ti_start,ti_end,popnum_t,like_ch);
+					}
+					
+					for(const auto &trar : spl.trans_ref){	
+						species[trar.p].likelihood_pop_spline_section(trar.tr,ti_start,ti_end,popnum_t,like_ch);
+					}
 				}
 			}
 		

@@ -90,6 +90,7 @@ class Species   	                         // Stores details of a species
 		vector <NMTransIncomp> nm_trans_incomp;// A list of incomplete non-Markovian transitions
 		
 		vector <unsigned int> obs_eqn;         // Lists observation equations
+		HashSimp hash_obs_eqn;
 		
 		// References observation transitions [trgl][ti][#]
 		vector < vector < vector <unsigned int> > > obs_trans_eqn_ref;
@@ -97,7 +98,8 @@ class Species   	                         // Stores details of a species
 		unsigned int last_obs_trans_ti;        // Last ti point for obs_trans
 		
 		vector <unsigned int> obs_trans_eqn;   // Lists all equations used in obs_trans 
-
+		HashSimp hash_obs_trans_eqn;
+		
 		vector <ObsTrans> obs_trans;           // Any observations on transitions
 		
 		vector < vector <bool> > comp_period;  // Determines if comp begins or ends transition period [cgl][cl]
@@ -206,11 +208,11 @@ class Species   	                         // Stores details of a species
 		void genetic_data(const DataSource &so);
 		void comp_data(const DataSource &so);
 		void test_data(const DataSource &so);
-		void population_data(const DataSource &so);
+		void population_data(const DataSource &so, Hash &hash_pop_filter);
 		ObsModelVariety set_obs_mod_type(const ObsModel &om) const;
 		double set_obs_mod_val(double value, unsigned int j, unsigned int col, const ObsModel &om, const Table &tab, const DataSource &so);
 		void trans_data(const DataSource &so);
-		void popu_trans_data(const DataSource &so);
+		void popu_trans_data(const DataSource &so, Hash &hash_pop_trans_filter);
 		vector <string> global_convert(const Filter &filt) const;
 		vector <string> trans_global_convert(unsigned int cl, const vector <string> &trans_name_str, const Filter &comp_filt);
 		void set_default_enter();

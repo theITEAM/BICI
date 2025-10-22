@@ -93,7 +93,7 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 	
 	state.set_particle(part);
 	
-	state.check("init");
+	//state.check("init");
 }
 
 
@@ -413,9 +413,12 @@ void BurnInfo::set_phi()
 	prior_bounded = phi;
 	spline_prior = 1;
 	dist = 1;
-	markov = phi;
-	nm_trans = phi;
-	genetic_process = phi;
+	//markov = phi;
+	markov = 1;
+	//nm_trans = phi;	
+	nm_trans = 1;
+	//genetic_process = phi;
+	genetic_process = 1;
 	genetic_obs = phi;
 	ie = 1;//phi;
 	
@@ -450,8 +453,12 @@ void BurnInfo::add_L(double L)
 double Chain::like_total_obs() const
 {
 	const auto &like = state.like;
-	return like.init_cond + like.prior_bounded + like.obs + like.markov + like.nm_trans + 
-	       like.genetic_process + like.genetic_obs;
+	
+	
+	return like.init_cond + like.prior_bounded + like.obs + like.genetic_obs;
+				 
+	//return like.init_cond + like.prior_bounded + like.obs + like.markov + like.nm_trans + 
+	  //     like.genetic_process + like.genetic_obs;
 }	
 
 
@@ -475,7 +482,7 @@ void Chain::update(unsigned int s)
 			
 			if(true){
 				if(pl) cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
-				
+			
 				pro.update(state);
 			}
 			else{
@@ -513,12 +520,13 @@ void Chain::update(unsigned int s)
 			if(pl) state.check(" After prop check");
 			if(pl) state.check_popnum_t2("hhh");
 			
+			//state.check_precalc_eqn("up");
 			//state.check_neg_rate(pro.name);
 			//state.check_markov_div_value(0," after update");
 		}
 	}
 	
-	//if(testing == true && s%10 == 0) state.check("turn off check");
+	//if(testing == true && s%10 == 0) state.check("check");
 
 	if(testing == true && s%CHECK_THIN == CHECK_THIN-1) state.check("end");
 }
@@ -536,6 +544,7 @@ void Chain::update_init()
 			add_parameter_prop(vec);
 		}
 	}
+
 	
 	// Proposals on individual effects
 	for(auto p = 0u; p < model.nspecies; p++){
@@ -870,12 +879,12 @@ void Chain::update_init()
 			}
 		}
 	}				
-	
+	 
 	for(auto i = 0u; i < 50; i++){
 		auto param_val = model.param_sample();
 		cor_matrix.add_sample(model.get_param_val_prop(param_val),LARGE);
 	}
-	
+	 
 	for(auto &pro : proposal) pro.update_sampler(cor_matrix);
 	
 	if(1 == 0) cout << "print_info_turned off in code" << endl;
@@ -908,8 +917,9 @@ void Chain::add_parameter_prop(const vector <unsigned int> &vec)
 
 	/// Looks at adding MBPs
 	vector <unsigned int> list;
+	HashSimp hash_list;
 	for(const auto &al : pp.affect_like){
-		if(is_markov_pop(al)) add_to_vec(list,al.num);
+		if(is_markov_pop(al)) add_to_vec(list,al.num,hash_list);
 	}
 
 	for(auto k = 0u; k < list.size(); k++){    // Adds one MBP per species affected

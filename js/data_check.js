@@ -8,16 +8,22 @@ function data_source_check_error(out_type,so)
 	
 	let sp = model.species[p];
 
+	if(so.info.siminf == "gen") return;
+	
+	/*
 	if(so.info.siminf == "gen"){
+		
 		sp = model.sim_res.plot_filter.species[p];	
 		for(let cl = 0; cl < sp.cla.length; cl++){
 			let claa = sp.cla[cl];
 			if(claa.hash_comp == undefined){
-				claa.hash_comp=[];
+				claa.hash_comp=[];	
 				hash_redo(claa.hash_comp,claa.comp);
 			}
 		}
 	}
+	*/
+	
 	so.error = false;
 	
 	let tab = so.table;
@@ -479,6 +485,46 @@ function data_source_check_error(out_type,so)
 }
 
 
+/// This converts from a string to one of the knot time possibilities (e.g. "0.0" becomes "start" "1.0" -> "1"
+function convert_knottime(te,pos)
+{
+	if(te == "start" || te == "end") return te;
+	
+	if(find_in(pos,te) != undefined) return te;
+	
+	let val = Number(te);
+	if(isNaN(val)) return te;
+				
+	te = String(val);
+	if(find_in(pos,te) != undefined) return te;
+	
+	for(let i = 0; i < pos.length; i++){
+		let pos_val = Number(pos[i]);
+		if(pos_val == val) return pos[i];
+	}
+	
+	{
+		let det = model.sim_details;
+		let t_start = Number(det.t_start);
+		if(!isNaN(t_start) && t_start == val) return "start";
+		
+		let t_end = Number(det.t_end);
+		if(!isNaN(t_end) && t_end == val) return "end"; 
+	}
+	
+	{
+		let det = model.inf_details;
+		let t_start = Number(det.t_start);
+		if(!isNaN(t_start) && t_start == val) return "start";
+		
+		let t_end = Number(det.t_end);
+		if(!isNaN(t_end) && t_end == val) return "end";
+	}
+	
+	return te;
+}
+
+				
 /// Checks that the time column is within the range
 function check_data_time(out_type)
 {
@@ -640,8 +686,11 @@ function check_element(te,c,so)
 		break;
 		
 	case "knot":
-		if(find_in(col.knot,te) == undefined){
-			return "The value '"+te+"' is not a knot time";
+		{
+			let st = convert_knottime(te,col.knot);
+			if(find_in(col.knot,st) == undefined){
+				return "The value '"+te+"' is not a knot time";
+			}
 		}
 		break;
 		

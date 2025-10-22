@@ -54,7 +54,7 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 			
 			auto flag = false;
 			
-			if(begin_str(st,"# PROCESSED USING")) flag = false;
+			if(begin_str(st,"# PROCESSED USING")) flag = true;
 
 			if(command == "param-sim" || command == "state-sim" || command == "warning-sim" || st == "# OUTPUT SIMULATION"){
 				if(model.mode == SIM) flag = true;
@@ -922,12 +922,7 @@ string Output::print_affect_like(const AffectLike &al) const
 			ss << "   Times affected: ";	
 			
 			if(al.list.size() == al.map.size()) ss << " All";
-			else{
-				if(al.list.size() == 0) emsg("No time affected");
-				ss << al.list[0] << " - " << al.list[al.list.size()-1];
-				//ss << al.list.size() << " " << al.map.size() << ": ";
-				//for(auto t : al.list) ss << t << ",";
-			}				
+			else ss << model.str_time_range(al.list);	
 			break;
 		}
 		ss << endl;	
@@ -1852,13 +1847,16 @@ vector < vector <double> > Output::param_value_from_vec(const Particle &pa) cons
 			value[th].resize(par.N,UNSET);
 			if(par.variety != CONST_PARAM){
 				for(auto j = 0u; j < par.N; j++){
-					auto ref = par.element_ref[j];
-					if(ref != UNSET){
-						const auto &ele = par.element[ref];
-						auto k = ele.param_vec_ref;
-				
-						if(k != UNSET){
-							value[th][j] = val[k];
+					const auto &er = par.element_ref[j];
+					auto ind = er.index;
+					if(ind != UNSET){
+						if(er.cons){
+							value[th][j] = par.constant.value[ind];
+						}
+						else{
+							const auto &ele = par.element[ind];
+							auto k = ele.param_vec_ref;
+							if(k != UNSET) value[th][j] = val[k];
 						}
 					}
 				}

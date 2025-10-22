@@ -1,4 +1,24 @@
+while potentially slow
+auto j = 0u; while(j < C && z > sampler[j].prob_sum) j++;
+auto j = 0u; while(j < C && claa.island[isl].comp[j].c != ci) j++;
+auto l = 0u; while(l < lmax && co.leave[l].tr != tr) l++;
+auto k = 0u; while(k < sampler.size() && z > sampler[k].prob_sum) k++;
+auto c = 0u; while(c < C && z > prob_sum[c]) c++;
+auto k = 0u; while(k < sampler.size() && z > sampler[k].prob_sum) k++;
+auto k = 0u; while(k < sum_store.size() && z > sum_store[k]) k++;
+k = 0u; while(k < B && z > sum_store[k]) k++;
+auto k = 0u; while(k < sum_store.size() && z > sum_store[k]) k++;
+auto k = 0u; while(k < trig_event.size() && trig_event[k].tdiv != eve.tdiv) k++;
+
 TO DO
+-- omega wrong in graph axis
+
+
+-- Reduce processing time for markeks
+
+-- when histogram should not have radio buts
+
+
 -- ABC param_resample sort out
 -- Interface Markeks radio buttons shoul dnot be on histogram plot
 -- Mareks diagnostic expected transition rate not right 
@@ -85,3 +105,4 @@ markov likelihood para
 pop-based models
 version in output file
 -- mention in manual about speed of BICI
+-- markov tree problem

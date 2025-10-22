@@ -504,7 +504,7 @@ void Input::param_mult_command()
 
 	par_orig.param_mult = model.param.size();
 
-	Param par; 
+	Param par(model.constant); 
 	par.variety = CONST_PARAM;
 	par.time_dep = true;
 	par.spline_out.on = false;
@@ -517,6 +517,7 @@ void Input::param_mult_command()
 	par.line_num = line_num;
 	par.cat_factor = false;
 	par.cat_factor_weight_on = false;
+	par.default_prior_ref = UNSET;
 	
 	auto knot_times_str = get_tag_value("knot-times"); 
 	if(knot_times_str == ""){ cannot_find_tag(); return;}
@@ -546,7 +547,8 @@ void Input::param_mult_command()
 		
 	auto mult = get_dependency(par.dep,pp,knot_times,knot_times_out); if(mult == UNSET) return; 
 	
-	par.element_ref.resize(mult,UNSET);
+	par.element_ref.resize(mult);
+	for(auto &er : par.element_ref) er.index = UNSET;
 	
 	par.N = mult;
 	par.trace_output = false;
@@ -1139,7 +1141,7 @@ void Input::param_command()
 	
 	auto pp = get_param_prop(full_name);
 
-	Param par; 
+	Param par(model.constant); 
 	par.variety = UNSET_PARAM;
 	par.name = pp.name;
 	par.full_name = full_name;
@@ -1152,6 +1154,7 @@ void Input::param_command()
 	par.param_mult = UNSET;
 	par.factor = false;
 	par.line_num = line_num;
+	par.default_prior_ref = UNSET;
 		
 	vector <string> knot_times, knot_times_out;
 	if(pp.time_dep == true){
@@ -1236,7 +1239,8 @@ void Input::param_command()
 	
 	auto mult = get_dependency(par.dep,pp,knot_times,knot_times_out); if(mult == UNSET) return; 
 	
-	par.element_ref.resize(mult,UNSET);
+	par.element_ref.resize(mult);
+	for(auto &er : par.element_ref) er.index = UNSET; 
 	
 	par.N = mult;
 	
@@ -1376,8 +1380,10 @@ void Input::param_command()
 						return;
 					}
 						
-					auto ref = par.add_cons(val);
-					for(auto k = 0u; k < mult; k++) par.element_ref[k] = ref;
+					ElementRef er; er.index = par.add_cons(val); er.cons = true;
+					for(auto k = 0u; k < mult; k++){
+						par.element_ref[k] = er;
+					}
 				}
 				else{
 					load_param_value(pp,valu,par,desc,VALUE_LOAD);
@@ -1432,7 +1438,7 @@ void Input::param_command()
 			if(false){
 				for(auto j = 0u; j < L; j++){
 					for(auto i = 0u; i < L; i++){
-						auto pri = model.prior[par.element[par.element_ref[j*L+i]].prior_ref];
+						auto pri = model.prior[par.element[par.element_ref[j*L+i].index].prior_ref];
 						cout << pri.type << ",";
 					}
 					cout << " pr" << endl;
@@ -2071,10 +2077,16 @@ void Input::ind_effect_command()
 			}
 			
 			for(auto r = 0u; r < tab_ped.nrow; r++){
-				A_matrix.ind_list.push_back(tab_ped.ele[r][0]);
+				auto id = tab_ped.ele[r][0];
+				auto k = A_matrix.hash_ind_list.find(id);
+				if(k != UNSET){
+					alert_import("Individual '"+id+"' is referenced more than once"); 
+					return;
+				}
+				
+				A_matrix.hash_ind_list.add(A_matrix.ind_list.size(),id);
+				A_matrix.ind_list.push_back(id);
 			}
-			
-			A_matrix.hash_ind_list.create(A_matrix.ind_list);
 			
 			auto N = A_matrix.ind_list.size();
 		
@@ -2151,12 +2163,19 @@ void Input::ind_effect_command()
 			
 			auto tab_ind = load_table(ind_list);
 			if(tab_ind.error == true) return;
-			vector <string> list;
 			for(auto r = 0u; r < tab_ind.nrow; r++){ 
-				list.push_back(tab_ind.ele[r][0]);
+				auto id = tab_ind.ele[r][0];
+				auto k = A_matrix.hash_ind_list.find(id);
+				if(k != UNSET){
+					alert_import("Individual '"+id+"' is referenced more than once"); 
+					return;
+				}
+				
+				A_matrix.hash_ind_list.add(A_matrix.ind_list.size(),id);
+				A_matrix.ind_list.push_back(id);
 			}			
 		
-			A_matrix.ind_list = list;
+			const auto &list = A_matrix.ind_list;
 		
 			auto N = list.size();
 			vector < vector <double> > val;
@@ -2180,7 +2199,6 @@ void Input::ind_effect_command()
 				val[i][j] = value;
 			}
 			A_matrix.value = val;
-			A_matrix.hash_ind_list.create(A_matrix.ind_list);
 		}
 	
 		if(A != ""){
@@ -2188,7 +2206,21 @@ void Input::ind_effect_command()
 			auto tab = load_table(A);
 			if(tab.error == true) return;
 		
-			A_matrix.ind_list = tab.heading;
+			for(auto i = 0u; i < tab.heading.size(); i++){
+				auto id = tab.heading[i];
+				auto k = A_matrix.hash_ind_list.find(id);
+				if(k != UNSET){
+					alert_import("Individual '"+id+"' is referenced more than once"); 
+					return;
+				}
+				
+				A_matrix.hash_ind_list.add(A_matrix.ind_list.size(),id);
+				A_matrix.ind_list.push_back(id);
+			}
+			
+			//A_matrix.ind_list = tab.heading;
+			
+			
 			if(tab.nrow != tab.ncol){
 				alert_import("The file '"+tab.file+"' must contain an equal number of columns and rows."); 
 				return;
@@ -2208,7 +2240,6 @@ void Input::ind_effect_command()
 				}
 			}
 			A_matrix.value = val;
-			A_matrix.hash_ind_list.create(A_matrix.ind_list);
 		}
 		
 		if(A_inv != ""){
@@ -2216,7 +2247,19 @@ void Input::ind_effect_command()
 			auto tab = load_table(A_inv);
 			if(tab.error == true) return;
 		
-			A_matrix.ind_list = tab.heading;
+			for(auto i = 0u; i < tab.heading.size(); i++){
+				auto id = tab.heading[i];
+				auto k = A_matrix.hash_ind_list.find(id);
+				if(k != UNSET){
+					alert_import("Individual '"+id+"' is referenced more than once"); 
+					return;
+				}
+				
+				A_matrix.hash_ind_list.add(A_matrix.ind_list.size(),id);
+				A_matrix.ind_list.push_back(id);
+			}
+			
+			//A_matrix.ind_list = tab.heading;
 			if(tab.nrow != tab.ncol){
 				alert_import("The file '"+tab.file+"' must contain an equal number of columns and rows."); 
 				return;
@@ -2238,7 +2281,6 @@ void Input::ind_effect_command()
 			
 			auto val_inv = invert_matrix(val);
 			A_matrix.value = val_inv;
-			A_matrix.hash_ind_list.create(A_matrix.ind_list);
 		}
 		
 		if(A_matrix.set != true) emsg("A-matrix should be set");
@@ -2314,18 +2356,24 @@ void Input::fixed_effect_command()
 	
 	for(auto r = 0u; r < subtab.nrow; r++){
 		auto id = subtab.ele[r][0];
-		X_vector.ind_list.push_back(id);
-	
-		auto val = number(tab.ele[r][1]);
-		if(val == UNSET){
-			alert_import(in_file_text(tab.file)+" the element '"+tstr(val)+"' is not a number (row "+tstr(r+2)+")");
-			return;
+		
+		auto j = X_vector.hash_ind_list.find(id);
+		if(j != UNSET){
+			alert_import(in_file_text(tab.file)+" individual '"+id+"' has more than one entry (row "+tstr(r+2)+")");
 		}
-		X_vector.value.push_back(val);
+		else{
+			X_vector.hash_ind_list.add(X_vector.ind_list.size(),id);
+			X_vector.ind_list.push_back(id);
+		
+			auto val = number(tab.ele[r][1]);
+			if(val == UNSET){
+				alert_import(in_file_text(tab.file)+" the element '"+tstr(val)+"' is not a number (row "+tstr(r+2)+")");
+				return;
+			}
+			X_vector.value.push_back(val);
+		}
 	}
 	
-	X_vector.hash_ind_list.create(X_vector.ind_list);
-
 	auto fix_name = fe_char+"^"+name;
 	
 	auto th = 0u; while(th < model.param.size() && model.param[th].name != fix_name) th++;

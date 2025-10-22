@@ -12,7 +12,7 @@ using namespace std;
 #include "utils.hh"
 
 /// Check under simulation
-void StateSpecies::check(unsigned int ti, const vector < vector <double> > &popnum_t) const
+void StateSpecies::check(unsigned int ti, const vector < vector <double> > &popnum_t)
 {
 	const auto &popnum = popnum_t[ti];
 	
@@ -146,29 +146,15 @@ void StateSpecies::check_markov_eqn(unsigned int ti, const vector <double> &popn
 
 
 /// Checks that markov_tree_rate is correctly set
-void StateSpecies::check_markov_tree_rate() const
+void StateSpecies::check_markov_tree_rate()
 {
-	const auto &node = sp.markov_tree.node;
+	auto markov_tree_rate_store = markov_tree_rate;
 	
-	vector <double> markov_tree_rate_check(node.size());
-	
-	for(auto i = 0u; i < N; i++){
-		auto &me_vari = markov_eqn_vari[i];
-		markov_tree_rate_check[i] = me_vari.value*me_vari.indfac_sum;
-	}
-	
-	for(auto i = N; i < node.size(); i++){
-		const auto &no = node[i];
-		
-		auto sum = 0.0; for(auto j : no.child) sum += markov_tree_rate_check[j];
-		markov_tree_rate_check[i] = sum;
-	}
-	
+	set_markov_tree_rate();
+
 	for(auto i = 0u; i < markov_tree_rate.size(); i++){
-		//if(dif(markov_tree_rate_check[i],markov_tree_rate[i],dif_thresh)){
-		if(dif(markov_tree_rate_check[i],markov_tree_rate[i],SMALL)){
-			//cout << i << " " << markov_tree_rate.size() << " " <<   markov_tree_rate_check[i] << " " << markov_tree_rate[i] << " ch\n";
-			//emsg("markov tree problem"); 
+		if(dif(markov_tree_rate_store[i],markov_tree_rate[i],dif_thresh)){
+			emsg("markov tree problem"); 
 		}
 	}		
 }

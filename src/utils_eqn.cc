@@ -35,10 +35,8 @@ EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p, unsig
 
 	info.error = false;
 	info.emsg = basic_equation_check(info.te,_type);
-	if(info.emsg != ""){
-		info.emsg = "In equation '"+info.te_raw+"': "+info.emsg;
-		info.error = true;
-	}		
+	if(info.emsg != "") info.error = true;
+
 	return info;
 }
 
@@ -46,8 +44,6 @@ EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p, unsig
 /// Checks that a string is a valid name for a parameter / fe or ie
 string check_valid_name(string name, string type)
 {
-	auto escape_char = get_escape_char();
-	
 	if(name == "" && type != "population") return "The "+type+" name is not set";	
 
 	if(type == "parameter"){

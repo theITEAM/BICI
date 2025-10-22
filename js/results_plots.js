@@ -3891,6 +3891,8 @@ function get_time_points(details)
 	let ti = Number(details.t_start);
 	let tf = Number(details.t_end);
 	let dt = Number(details.timestep);
+	if(isNaN(details.timestep) || dt == 0) dt = (tf-ti)/100;
+
 	let tp = [];
 	
 	for(let t = ti; t < tf; t += dt) tp.push(t);
@@ -3899,7 +3901,7 @@ function get_time_points(details)
 }
 
 
-/// Converts splines from times at know to time on global time line
+/// Converts splines from times at known to time on global time line
 function get_time_variation(val,times,tp,type)
 {
 	let value = [];
@@ -3936,7 +3938,7 @@ function get_time_variation(val,times,tp,type)
 					}
 					break;
 		
-				default: error("Spline type to do"); break;
+				default: error("Option error"); break;
 				}
 			}
 		}

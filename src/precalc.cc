@@ -19,9 +19,8 @@ Precalc::Precalc(const vector <SpeciesSimp> &species, const vector <Spline> &spl
 {
 }
 
-
 /// Adds an equation onto the precalculated equation calculation
-bool Precalc::add_eqn(vector <Calculation> &calc, const vector <double> &param_vec_ref, const vector <double> &spline_ref, vector <unsigned int> &list_precalc, PrecalcAddType add_type)
+bool Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref, SpecPrecalc &spec_precalc, PrecalcAddType add_type)
 {
 	vector <unsigned int> become_Rrecalc(calc.size(),UNSET);
 
@@ -79,7 +78,7 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <double> &param_v
 				// This replaces calculation with that in non-pop 
 				if(nregderpop == 0 && i+1 != calc.size()){  	
 					PreCalc pc; pc.op = ca.op; pc.item = ca.item;
-					auto it = add(pc,list_precalc);
+					auto it = add(pc,spec_precalc);
 					become_Rrecalc[i] = it.num;
 				}
 				else{ // Attempts to put part of calculation into non-pop
@@ -96,7 +95,7 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <double> &param_v
 							pcalc.item.push_back(one);	
 							pcalc.item.push_back(denom);
 							
-							denom = add(pcalc,list_precalc);
+							denom = add(pcalc,spec_precalc);
 						}
 					}
 					
@@ -119,7 +118,7 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <double> &param_v
 									pcalc.item.push_back(one);
 									pcalc.item.push_back(denom);
 									
-									auto inew = add(pcalc,list_precalc);
+									auto inew = add(pcalc,spec_precalc);
 									
 									PreCalc pcalc2;
 									pcalc2.op = MULTIPLY;
@@ -135,7 +134,7 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <double> &param_v
 									}
 									pcalc2.item.push_back(inew);
 								
-									auto inew2 = add(pcalc2,list_precalc);
+									auto inew2 = add(pcalc2,spec_precalc);
 									item_new.push_back(inew2);
 									
 									ca_next.op = MULTIPLY;
@@ -166,7 +165,7 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <double> &param_v
 									}
 								}
 						
-								auto inew = add(pcalc,list_precalc);
+								auto inew = add(pcalc,spec_precalc);
 								item_new.push_back(inew);
 								
 								ca.item = item_new;
@@ -231,7 +230,7 @@ unsigned int Precalc::add_param(unsigned int th)
 	
 	EqItem it;
 	it.type = PARAMVEC;
-	it.num = th;
+	it.num = th; if(th == UNSET) emsg("Parem vec problem");
 	ca.item.push_back(it);
 
 	auto vec = get_vec(ca);
@@ -250,7 +249,7 @@ unsigned int Precalc::add_param(unsigned int th)
 
 
 /// Adds a spline to precalculation
-unsigned int Precalc::add_spline(unsigned int s, vector <unsigned int> &list_precalc)
+unsigned int Precalc::add_spline(unsigned int s, SpecPrecalc &spec_precalc)
 {
 	PreCalc ca;
 	ca.op = SINGLE;
@@ -263,19 +262,30 @@ unsigned int Precalc::add_spline(unsigned int s, vector <unsigned int> &list_pre
 
 	const auto &spl = spline[s];
 	for(auto i = 0u; i < spl.param_ref.size(); i++){
-		EqItem it;
-		it.type = PARAMVEC;
-		it.num = spl.param_ref[i];
-		ca.item.push_back(it);
+		const auto &pr = spl.param_ref[i];
+		if(pr.cons){
+			EqItem it;
+			it.type = NUMERIC;
+			it.num = pr.index;
+			ca.item.push_back(it);
+		}
+		else{
+			EqItem it;
+			it.type = PARAMVEC;
+			it.num = pr.index;
+			ca.item.push_back(it);
+		}
 	}
 	auto vec = get_vec(ca);
 	
 	auto j = hash_ca.existing(vec);
 	if(j == UNSET){
 		j = calcu.size();
-		list_precalc.push_back(j);
 		
 		calcu.push_back(ca);
+		
+		sp_add(spec_precalc,j,all_time);
+		
 		hash_ca.add(j,vec);
 		
 		for(auto ti = 1u; ti < details.T; ti++){
@@ -291,7 +301,7 @@ unsigned int Precalc::add_spline(unsigned int s, vector <unsigned int> &list_pre
 
 
 /// Adds a calculation 
-EqItem Precalc::add(PreCalc &pcalc, vector <unsigned int> &list_precalc)
+EqItem Precalc::add(PreCalc &pcalc, SpecPrecalc &spec_precalc)
 {
 	auto vec = get_vec(pcalc);
 	
@@ -310,11 +320,12 @@ EqItem Precalc::add(PreCalc &pcalc, vector <unsigned int> &list_precalc)
 	auto j = hash_ca.existing(vec);
 	if(j == UNSET){
 		j = calcu.size();
-		list_precalc.push_back(j);
 		
 		hash_ca.add(j,vec);
 		
 		calcu.push_back(pcalc);	
+		
+		sp_add(spec_precalc,j,all_time);
 		
 		if(pcalc.time_dep == true){
 			PreCalc ca2; ca2.op = NOOP; ca2.time_dep = true;
@@ -370,29 +381,188 @@ void Precalc::print_calc() const
 }
 
 
-/// Calculates the entire precacluation
-void Precalc::calculate_all(const vector <unsigned int> &list_recalc, PV &param_val) const 
+/// Gets a value for a spline knot
+double Precalc::get_splineval(const ElementRef &er, const vector <double> &value, const vector <double> &cval) const
 {
-	vector <unsigned int> list_time;
-	for(auto ti = 0u; ti < details.T; ti++) list_time.push_back(ti);
+	if(er.cons) return cval[er.index];
+	return value[er.index];
+}
+
+
+/*
+/// Works out any constants within splines
+void Precalc::calc_spline_const(PV &param_val, const vector <unsigned int> &spline_ref) const
+{
+	for(auto i = 0u; i < spline.size(); i++){
+		const auto &spl = spline[i];
+		
+		vector <unsigned int> list_time;
+		switch(spl.type){
+		case SQUARE_SPL:
+			for(auto ti = 0u; ti < details.T; ti++){
+				const auto &div = spl.div[ti];
+				if(spl.param_ref[div.index].cons){
+					list_time.push_back(ti);
+				}
+			}
+			break;
+		
+		default: break;
+		}
+		
+		if(list_time.size() > 0){
+			vector <unsigned int> list_recalc;
+			list_recalc.push_back(spline_ref[i]);
+			calculate(list_recalc,list_time,param_val,false);
+		}
+	}
+}
+*/
+
+
+/// Calulcates initial value for precalc (using any constant values_)
+/// Calculates the value for an equation
+vector <double> Precalc::calculate_precalc_init(const SpecPrecalc &spec_precalc) const 
+{
+	vector <double> precalc(calcu.size(),UNSET);
+	const auto &cval = constant.value;
 	
-	calculate(list_recalc,list_time,param_val,false);
+	//auto list_time = get_list(details.T);
+	
+	for(const auto &in : spec_precalc.info){
+		auto i = in.i;
+		
+		const auto &ca = calcu[i];
+		
+		if(ca.op == SINGLE){
+			const auto &it = ca.item[0];
+			switch(it.type){
+			case PARAMVEC: 
+				break;
+			
+			case SPLINEREF:
+				{
+					const auto &spl = spline[it.num];
+					if(spl.constant){
+						for(auto ti : all_time){
+							precalc[i+ti] = spl.const_val[ti];
+						}
+					}
+					else{
+						switch(spl.type){
+						case LINEAR_SPL:
+							for(auto ti : all_time){
+								const auto &div = spl.div[ti];
+						
+								auto f = div.f;
+								auto ind = div.index;
+							
+								const auto &pr = spl.param_ref[ind];
+								const auto &pr2 = spl.param_ref[ind];
+								
+								if(pr.cons && pr2.cons){
+									auto val1 = cval[pr.index];
+									auto val2 = cval[pr2.index]; 
+									precalc[i+ti] = val1*f+val2*(1-f);
+								}
+							}
+							break;
+							
+						case SQUARE_SPL:
+							for(auto ti : all_time){
+								const auto &div = spl.div[ti];
+								const auto &pr = spl.param_ref[div.index];
+								if(pr.cons) precalc[i+ti] = cval[pr.index]; 
+							}
+							break;
+							
+						case CUBICPOS_SPL: case CUBIC_SPL: 
+							{
+								vector <double> val;
+								auto fl = false;
+								for(const auto &pr : spl.param_ref){
+									if(pr.cons) val.push_back(cval[pr.index]);
+									else fl = true;
+								}
+								
+								if(fl == false){
+									auto cspl = solve_cubic_spline(spl.info.knot_tdiv,val,spl.type);
+									calculate_cubic_spline_precalc(precalc,i,all_time,spl.cubic_div,cspl);
+								}
+							}
+							break;
+						}
+					}
+				}
+				break;
+				
+			default: emsg("Should not be single"); break;
+			}
+		}
+		else{
+			const auto &item = ca.item;
+			const auto N = item.size();
+			
+			vector <double> num(N);
+			
+			if(ca.time_dep){
+				for(auto ti : all_time){
+					auto fl = false;
+					for(auto j = 0u; j < N; j++){
+						const auto &it = item[j];
+						
+						switch(it.type){
+							case REG_PRECALC: num[j] = precalc[it.num]; break;
+							case REG_PRECALC_TIME: num[j] = precalc[it.num+ti]; break;							
+							case ONE: num[j] = 1; break;
+							case NUMERIC: num[j] = constant.value[it.num]; break;
+							case CONSTSPLINEREF: num[j] = spline[it.num].const_val[ti]; break;
+							case TIME: num[j] = timepoint[ti]; break;
+							default: eqn_type_error(it.type,6); break;
+						}
+						if(num[j] == UNSET){ fl = true; break;}
+					}
+
+					if(fl == false) precalc[i+ti] = calculate_operation(ca.op,num);
+				}
+			}
+			else{			
+				auto fl = false;
+				for(auto j = 0u; j < N; j++){
+					const auto &it = item[j];	
+					switch(it.type){	
+						case ONE: num[j] = 1; break;
+						case REG_PRECALC: num[j] = precalc[it.num]; break;
+						case NUMERIC: num[j] = cval[it.num]; break;
+						default: eqn_type_error(it.type,8); break;
+					}
+					if(num[j] == UNSET){ fl = true; break;}
+				}
+
+				if(fl == false) precalc[i] = calculate_operation(ca.op,num);
+			}
+		}
+  }
+	
+	return precalc;
 }
 
 
 /// Calculates the value for an equation
-void Precalc::calculate(const vector <unsigned int> &list_recalc, const vector <unsigned int> &list_time, PV &param_val, bool store) const 
+void Precalc::calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store) const 
 {
 	const auto &value = param_val.value;
 	const auto &cval = constant.value;
 	auto &precalc = param_val.precalc;
 	
-	for(auto i : list_recalc){
+	for(const auto &ci : spec_calc.info){
+		auto i = ci.i;
+
 		const auto &ca = calcu[i];
 		
 		if(store){
 			if(ca.time_dep){ 
-				for(auto ti : list_time) param_val.precalc_change(i+ti);
+				for(auto ti : spec_calc.list_time[ci.tlist]) param_val.precalc_change(i+ti);
 			}
 			else{
 				param_val.precalc_change(i);
@@ -409,34 +579,43 @@ void Precalc::calculate(const vector <unsigned int> &list_recalc, const vector <
 			case SPLINEREF:
 				{
 					const auto &spl = spline[it.num];
-					
-					switch(spl.type){
-					case LINEAR_SPL:
-						for(auto ti : list_time){
-							const auto &div = spl.div[ti];
-					
-							auto f = div.f;
-							precalc[i+ti] = value[div.th1]*f+value[div.th2]*(1-f);
+					if(!spl.constant){
+						const auto &list_time = spec_calc.list_time[ci.tlist];
+						
+						switch(spl.type){
+						case LINEAR_SPL:
+							for(auto ti : list_time){
+								const auto &div = spl.div[ti];
+						
+								auto f = div.f;
+								auto ind = div.index;
+								
+								auto val1 = get_splineval(spl.param_ref[ind],value,cval);
+								auto val2 = get_splineval(spl.param_ref[ind+1],value,cval);
+								precalc[i+ti] = val1*f+val2*(1-f);
+							}
+							break;
+							
+						case SQUARE_SPL:
+							for(auto ti : list_time){
+								const auto &div = spl.div[ti];
+								precalc[i+ti] = get_splineval(spl.param_ref[div.index],value,cval);
+							}
+							break;
+							
+						case CUBICPOS_SPL: case CUBIC_SPL: 
+							{
+								vector <double> val;
+								for(const auto &pr : spl.param_ref){
+									val.push_back(get_splineval(pr,value,cval));
+								}
+								
+								auto cspl = solve_cubic_spline(spl.info.knot_tdiv,val,spl.type);
+							
+								calculate_cubic_spline_precalc(precalc,i,list_time,spl.cubic_div,cspl);
+							}
+							break;
 						}
-						break;
-						
-					case SQUARE_SPL:
-						for(auto ti : list_time){
-							const auto &div = spl.div[ti];
-							precalc[i+ti] = value[div.th1];
-						}
-						break;
-						
-					case CUBICPOS_SPL: case CUBIC_SPL: 
-						{
-							vector <double> val;
-							for(auto pr : spl.param_ref) val.push_back(value[pr]);
-						
-							auto cspl = solve_cubic_spline(spl.info.knot_tdiv,val,spl.type);
-						
-							calculate_cubic_spline_precalc(precalc,i,list_time,spl.cubic_div,cspl);
-						}
-						break;
 					}
 				}
 				break;
@@ -451,6 +630,8 @@ void Precalc::calculate(const vector <unsigned int> &list_recalc, const vector <
 			vector <double> num(N);
 			
 			if(ca.time_dep){
+				const auto &list_time = spec_calc.list_time[ci.tlist];
+						
 				for(auto ti : list_time){
 					for(auto j = 0u; j < N; j++){
 						const auto &it = item[j];
@@ -604,3 +785,131 @@ void Precalc::print_ca(unsigned int i, const PreCalc &ca) const
 	if(ca.time_dep) cout << " Time dep";
 }
  
+
+/// Adds an element to a precalculation
+void Precalc::sp_add(SpecPrecalc &sprec, unsigned int i, const vector <unsigned int> &ltime) const 
+{
+	auto &list_time = sprec.list_time;
+			
+	auto k = sprec.hash.find(i);
+	if(k != UNSET){ // Already exists
+		emsg("already");
+		auto &in = sprec.info[k];
+		
+		if(calcu[i].time_dep){
+			if(!equal_vec(list_time[in.tlist],ltime)){
+				emsg("create new");
+			}
+		}
+	}
+	else{
+		PrecalcInfo pi; pi.i = i; 
+		
+		if(calcu[i].time_dep){
+			auto j = 0u;
+			while(j < list_time.size() && !equal_vec(ltime,list_time[j])) j++;
+			if(j == list_time.size()) list_time.push_back(ltime);
+		
+			pi.tlist = j;
+		}
+		else{
+			pi.tlist = UNSET;
+		}
+		
+		sprec.hash.add(sprec.info.size(),i);
+		sprec.info.push_back(pi);
+	}
+}
+
+
+/// Adds a list of elements to a precalculation
+void Precalc::sp_add(SpecPrecalc &sprec, const vector <unsigned int> &i_list, const vector <unsigned int> &ltime) const
+{
+	if(i_list.size() == 0) return;
+	
+	for(auto i : i_list) sp_add(sprec,i,ltime);
+	
+/*
+	auto &list_time = sprec.list_time;
+		
+	auto j = 0u;
+	while(j < list_time.size() && !equal_vec(ltime,sprec.list_time[j])) j++;
+	if(j == list_time.size()) list_time.push_back(ltime);
+
+	for(auto i : i_list){
+		if(calcu[i].time_dep){
+			PrecalcInfo pi; pi.i = i; pi.tlist = j;
+			sprec.info.push_back(pi);
+		}
+		else{
+			PrecalcInfo pi; pi.i = i; pi.tlist = UNSET;
+			sprec.info.push_back(pi);
+		}
+	}
+	*/
+}
+
+
+/// Sets up a spec precalc bu combining several together
+SpecPrecalc Precalc::combine_spec_precalc(const vector <unsigned int> &param_list_tot) const 
+{
+	auto C = param_list_tot.size();
+	
+	if(C == 1) return param_vec[param_list_tot[0]].spec_precalc_after;
+	
+	auto T = details.T;
+	
+	SpecPrecalc spre;
+
+	vector <unsigned int> index(C,0);
+	
+	do{
+		auto imin = LARGE;
+		for(auto j = 0u; j < C; j++){
+			const auto &info = param_vec[param_list_tot[j]].spec_precalc_after.info;
+			if(index[j] < info.size()){
+				auto i = info[index[j]].i;
+				if(i < imin) imin = i;
+			}
+		}
+			
+		if(imin == LARGE) break;
+		
+		if(calcu[imin].time_dep == false){	
+			sp_add(spre,imin,all_time); 
+		}
+		else{
+			vector <bool> map_ti(T,false);
+			
+			for(auto j = 0u; j < C; j++){
+				const auto &spa = param_vec[param_list_tot[j]].spec_precalc_after;
+				const auto &in = spa.info[index[j]];
+				if(in.i == imin){
+					for(auto ti : spa.list_time[in.tlist]) map_ti[ti] = true;
+				}
+			}
+			
+			vector <unsigned int> ti_vec;
+			for(auto ti = 0u; ti < T; ti++){
+				if(map_ti[ti]) ti_vec.push_back(ti);
+			}
+		
+			sp_add(spre,imin,ti_vec); 
+		}
+		
+		for(auto j = 0u; j < C; j++){
+			const auto &spa = param_vec[param_list_tot[j]].spec_precalc_after;
+			if(spa.info[index[j]].i == imin) index[j]++;
+		}
+	}while(true);
+		
+	return spre;
+}
+
+
+/// Sets varaible all time
+void Precalc::set_all_time()
+{
+	all_time = seq_vec(details.T);
+}
+

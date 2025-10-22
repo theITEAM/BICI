@@ -98,7 +98,8 @@ unsigned int Hash::get_model_hash_number(const vector <unsigned int> &vec) const
 	
 	auto i = 0u;
 	for(auto j = 0u; j < vec.size(); j++){
-		i = (i+256+vec[j])%HASH_CODE_MAX; num += hash_code[i];
+		i = (i+256+vec[j])%HASH_CODE_MAX; 
+		num += hash_code[i];
 	}
 	
 	return num%HASH_MAX;

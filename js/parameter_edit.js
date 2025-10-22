@@ -179,6 +179,8 @@ function add_create_edit_param_buts(lay)
 			let w = text_width(te,fo_mar);
 			if(w > wmax) wmax = w;
 		}
+		if(wmax > width_table_max) wmax = width_table_max ;
+		
 		w_dep[i] = wmax+1;
 	}
 		
@@ -206,6 +208,8 @@ function add_create_edit_param_buts(lay)
 		
 		let welemax = text_width(longest,fo_table);
 		welemax++;
+		
+		if(welemax > width_table_max) welemax = width_table_max ;
 		
 		let dx = w_dep[1];
 		if(welemax > dx) dx = welemax;
@@ -251,7 +255,8 @@ function add_create_edit_param_buts(lay)
 					lay.add_button({te:"", x:cx, y:cy, dx:dx, dy:dy_table_param, type:"SymmetricParam", font:fo_table});
 				}
 				else{
-					lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:ele_type, font:fo_table, i:i, pindex:pindex, sym:sym, ac:action});
+					let sym2 = sym; if(i == j) sym2 = false;
+					lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:ele_type, font:fo_table, i:i, pindex:pindex, sym:sym2, ac:action});
 				}
 				cx += dx;
 			}
@@ -350,7 +355,10 @@ function load_tensor(ep,source)
 		for(let i = 0; i < dep.length; i++){
 			let te = tab.ele[r][i].trim();
 		
-			let k = hash_list[i].find(te);
+			let te2 = te;
+			if(dep[i] == "t") te2 = convert_knottime(te,list[i]);
+			
+			let k = hash_list[i].find(te2);
 			if(k == undefined) alertp("The value '"+te+"' is not found (col "+(i+1)+", row "+(r+1)+")");
 			else ind[i] = k;
 		}
@@ -389,6 +397,7 @@ function set_zero(value)
 function load_reparam(ep,source)
 {
 	let par = model.param[ep.i];
+
 	let dep = par.dep;
 	let list = par.list;
 	
@@ -409,7 +418,10 @@ function load_reparam(ep,source)
 		for(let i = 0; i < dep.length; i++){
 			let te = tab.ele[r][i].trim();
 			
-			let k = hash_list[i].find(te);
+			let te2 = te;
+			if(dep[i] == "t") te2 = convert_knottime(te,list[i]);
+			
+			let k = hash_list[i].find(te2);
 			if(k == undefined) alertp("The value '"+te+"' is not found (col "+(i+1)+", row "+(r+1)+")");
 			else ind[i] = k;
 		}
@@ -473,7 +485,11 @@ function load_priorsplit(ep,source,dist)
 		let ind=[];
 		for(let i = 0; i < dep.length; i++){
 			let te = tab.ele[r][i].trim();
-			let k = hash_list[i].find(te);
+			
+			let te2 = te;
+			if(dep[i] == "t") te2 = convert_knottime(te,list[i]);
+			
+			let k = hash_list[i].find(te2);
 			if(k == undefined) alertp("The value '"+te+"' is not found (col "+(i+1)+", row "+(r+1)+")");
 			else ind[i] = k;
 		}
@@ -616,6 +632,15 @@ function check_param_valid(type)
 {
 	for(let i = 0; i < model.param.length; i++){
 		let par = model.param[i];
+		
+		if(par.variety == "reparam"){
+			if(par.time_dep){
+				if(par.spline.spline_radio.value != "Square"){
+					add_warning({mess:"Reparameterisation error", mess2:"A square spline must be used for time-varying reparameterised parameter '"+par.full_name+"'.", warn_type:"reparam", siminf:type, name:par.name});
+				}
+			}
+		}
+		/*
 		if(par.variety == "reparam"){
 			if(par.dep.length == 0){
 				if(!isNaN(par.value)){
@@ -632,5 +657,27 @@ function check_param_valid(type)
 				}
 			}
 		}
+		*/
 	}
 }
+
+
+/// This ensures that a parameter is in view when it is altered on model->param page (e.g. reparamerisation)
+function par_in_view(type,th)
+{
+	generate_screen();
+		
+	// Scrolls so can be viewed
+	let l = find(inter.layer,"name","ModelParamContent");
+	if(l == undefined) return;
+	
+	let lay = inter.layer[l];
+	for(let i = 0; i < lay.but.length; i++){
+		let bu = lay.but[i];
+		if(bu.type == type && bu.i == th){
+			shift_button_in_view(l,i);
+			return;
+		}
+	}
+}
+	

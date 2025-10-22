@@ -6,7 +6,8 @@
 #include <fstream>
 #include <cmath>
 #include <algorithm> 
- 
+#include <unistd.h>
+
 using namespace std;
 
 #include "pas.hh"
@@ -168,7 +169,6 @@ bool PartRO_ord (const PartReorder &p1, const PartReorder &p2)
 void PAS::bootstrap()
 {
 	vector <double> L_store;
-	
 	for(const auto &ch : chain){
 		L_store.push_back(ch.Lobs_av/ch.nLobs_av);
 	}

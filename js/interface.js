@@ -1046,12 +1046,10 @@ function select_table_elelent(r,c)
 	close_bubble();
 	
 	let lay_name = "CreateEditTableContent";
-		
-	let l = 0; while(l < inter.layer.length && inter.layer[l].name != lay_name) l++;
-	if(l == inter.layer.length){
-		error("Cannot find layer1 "+lay_name); return;
-	}
-
+	
+	let l = find(inter.layer,"name",lay_name);
+	if(l == undefined){ error("Cannot find layer1 "+lay_name); return;}
+	
 	let lay = inter.layer[l];
 	let but = lay.but;
 	
@@ -1458,7 +1456,7 @@ function get_w_drop(pos)
 function view_warning(i)
 {
 	let warn = model.warn[i];
-	
+
 	model.warn_view = false;
 
 	//error(warn.warn_type+" warn");
@@ -1525,6 +1523,11 @@ function view_warning(i)
 	case "MissingSimValue":
 		change_page({pa:"Simulation", su:"Parameters"});
 		press_button_prop("ParamValueContent","ParamSimElement",["name"],warn.name);
+		break;
+		
+	case "ReparamValue":
+		change_page({pa:"Model", su:"Parameters"});
+		press_button_prop("ModelParamContent","ReparamElement",["name"],warn.name);
 		break;
 		
 	case "MissingPriorValue": case "ErrorPriorValue":

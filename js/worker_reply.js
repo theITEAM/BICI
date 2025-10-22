@@ -210,9 +210,12 @@ worker.onmessage = function (e)
 				let par = model.param[ans.ep.i];
 				par.value_desc = ans.ep.value_desc;
 				par.set = ans.ep.set;
+				inter.edit_source = false;
+				close_bubble();
 				close_data_source();
-				if(ans.type == "Load Reparam") update_param();
+				close_param_source();
 				generate_screen();
+				if(ans.type == "Load Reparam") update_param();
 			}
 			break;
 			

@@ -15,7 +15,7 @@ class Proposal                             // Implements a proposal
 	public:
 		Proposal(PropType type_, vector <unsigned int> vec, const Model &model, const Output &output, double w, const BurnInfo &burn_info);
 		void initialise_variables();
-		void calculate_update_precalc();
+		void calculate_spec_precalc();
 		vector <unsigned int> remove_precalc_done(const vector <unsigned int> &list_precalc, vector <bool> &mapl) const;
 		
 		string print_info() const;
@@ -46,6 +46,8 @@ class Proposal                             // Implements a proposal
 		vector < vector <double> > M_inv;      // The covariance matrix
 		
 		vector <IEGref> ieg_check_pri;         // Stores which ind effect group priors need to be checked
+		Hash hash_ieg_check_pri;
+		
 		double prop_weight;                    // The weight given to certain proposals
 		
 		double prop_prob;                      // The probability of performing proposal update
@@ -62,10 +64,10 @@ class Proposal                             // Implements a proposal
 		
 		vector <AffectLike> affect_like;       // Stores how the likelihood is affected by proposal
 		
-		vector <UpdatePrecalc> dependent_update_precalc; // Works out update precalc for parameter sampling
+		vector <SpecPrecalc> dependent_spec_precalc; // Works out update precalc for parameter sampling
 		
-		vector <UpdatePrecalc> update_precalc; // Works out how to update precalculation
-	
+		SpecPrecalc spec_precalc_after;           // Works out how to update precalculation
+		
 		// IND_PROP
 		unsigned int p_prop;                   // The species for the proposals
 		

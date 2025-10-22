@@ -18,6 +18,7 @@ function results_add_model(result,details,siminf)
 	result.par_sample = [];
 	result.hash_ref = new Hash(); 
 	let alg = details.algorithm.value;
+	
 	if(alg == "PAS-MCMC" || alg == "ABC-SMC") result.generation = [];
 	result.plot_average = false;
 	result.diagnostics = [];

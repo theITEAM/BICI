@@ -49,9 +49,18 @@ void Equation::calculate_linearise()
 					for(auto k = 0u; k < lin_it.pop_calc.size(); k++){
 						const auto &pc = lin_it.pop_calc[k];
 						auto po = pc.po;
-						auto m = 0u; while(m < lin.pop_calc.size() && lin.pop_calc[m].po != po) m++;
 						
-						if(m == lin.pop_calc.size()){
+						// turn off testing
+						if(true){
+							auto mm = 0u; while(mm < lin.pop_calc.size() && lin.pop_calc[mm].po != po) mm++;
+							if(mm == lin.pop_calc.size()) mm = UNSET;
+							if(mm != lin.hash_simp.find(po)) emsg("not agree");
+						}
+						
+						auto m = lin.hash_simp.find(po);
+						if(m == UNSET){
+							m = lin.pop_calc.size();
+							lin.hash_simp.add(m,po);
 							lin.pop_calc.push_back(pc);
 						}
 						else{
@@ -86,6 +95,7 @@ void Equation::calculate_linearise()
 					for(auto k = 0u; k < lin_it.pop_calc.size(); k++){
 						auto &pc = lin_it.pop_calc[k];
 						calc_mult(pc.calc,lin.no_pop_calc.calc);
+						lin.hash_simp.add(lin.pop_calc.size(),pc.po);
 						lin.pop_calc.push_back(pc);
 					}
 					
@@ -180,8 +190,13 @@ void Equation::calculate_linearise()
 	for(auto i = 0u; i < Npop; i++){
 		auto po = pop_ref[i];
 		
-		auto k = 0u; while(k < Npop && lc_final.pop_calc[k].po != po) k++;
-		if(k == Npop) emsg_input("Could not find population");
+		auto k = lc_final.hash_simp.find(po);
+		if(k == UNSET) emsg_input("Could not find population");
+		
+		{// turn off testing
+			auto k = 0u; while(k < Npop && lc_final.pop_calc[k].po != po) k++;
+			if(k != lc_final.hash_simp.find(po)) emsg("not agree");
+		}
 		
 		auto &calc = lc_final.pop_calc[k].calc; 
 		linearise.pop_grad_calc_store.push_back(calc);
@@ -275,6 +290,7 @@ LinearCalculation Equation::convert_to_linear_calculation(const EqItem &it, EqIt
 				PopCalculation pop_c;
 				pop_c.po = it.num;
 				pop_c.calc.push_back(ca);
+				lin.hash_simp.add(lin.pop_calc.size(),it.num);
 				lin.pop_calc.push_back(pop_c);
 			}
 			break;

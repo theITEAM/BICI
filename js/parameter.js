@@ -30,7 +30,7 @@ function update_model()
 	set_generate_pos();                              // Sets if possible to generate results
 	
 	update_desc();                                   // Updates descriptions of parameter
-	
+
 	if(model.warn.length > 0) err_warning();
 }
 

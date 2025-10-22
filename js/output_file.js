@@ -736,14 +736,6 @@ function output_param(par,save_type,file_list,one_file)
 	let te = "";
 	let dist_done = false;
 	
-	/*
-	if(par.time_dep){
-		if(par.spline.spline_radio.value != "Square"){
-			//add_warning({mess:"Reparameterised spline", mess2:"A square spline must be used for time-varying reparameterised parameter '"+par.full_name+"'.", warn_type:"ReparamSquareSpline", name:par.name});
-		}
-	}
-	*/
-				
 	if(par.type != "derive_param"){	 
 		let num_warn = model.warn.length;
 	
@@ -803,7 +795,7 @@ function output_param(par,save_type,file_list,one_file)
 						}
 									
 						te2 += ' '+exp+'=';
-						
+					
 						let file;				
 						if(par.dep.length > 0){
 							file = get_unique_file(exp+"-"+par.name,file_list,'.csv');
@@ -812,7 +804,9 @@ function output_param(par,save_type,file_list,one_file)
 						if(file != undefined){
 							let err = check_param_value("Set Param",par,par.value);
 							if(err){
-								add_warning({mess:"Problem with "+par.full_name+" value", mess2:err, warn_type:"MissingSimValue", name:par.name});
+								let wt = "MissingSimValue"; if(par.variety == "reparam") wt = "ReparamValue";
+								
+								add_warning({mess:"Problem with "+par.full_name+" value", mess2:err, warn_type:wt, name:par.name});
 								return;
 							}
 						
@@ -919,7 +913,7 @@ function output_param(par,save_type,file_list,one_file)
 	
 /// Outputs the value of a table
 function output_value_table(par,value,head_col,file,file_list,one_file,key,save_type)
-{	
+{
 	let list = par.list;
 	
 	if(value == undefined){
@@ -961,7 +955,7 @@ function output_value_table(par,value,head_col,file,file_list,one_file,key,save_
 				let el = get_element(value,index);
 				if(el == undefined){ param_undefined(par,index); return;}
 					
-				data += get_op_val(el,head_col,par);
+				data += '"'+get_op_val(el,head_col,par)+'"';
 			}
 			data += endl;
 		}
@@ -982,7 +976,7 @@ function output_value_table(par,value,head_col,file,file_list,one_file,key,save_
 				for(let d = 0; d < par.dep.length; d++){
 					data += '"'+list[d][comb.index[d]]+'",';
 				}
-				data += get_op_val(el,head_col,par)+endl;
+				data += '"'+get_op_val(el,head_col,par)+'"'+endl;
 			}
 		}
 	}
@@ -1003,7 +997,7 @@ function get_op_val(el,head_col,par)
 			return "";
 		}
 	
-		return '"'+get_prior_string(el)+'"';
+		return get_prior_string(el);
 	}
 	
 	return el;

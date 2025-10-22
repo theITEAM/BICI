@@ -286,7 +286,7 @@ function add_model_param_content(lay)
 					lay.add_checkbox(w-4,y+0.3,"Smooth","Smooth",spl.smooth,WHITE,{title:"Smoothing", te:smoothing_text});
 					w -= 4;
 					
-					lay.add_button({te:te, x:x+5.4, y:y+0., dx:w-x-5.4, dy:1.6, type:"SplineKnots", font: get_font(1.1,"","times"), ac:"EditSplineKnots", i:i});
+					lay.add_button({te:te, x:x+5.4, y:y+0., dx:w-x-5.4, dy:1.6, type:"SplineKnots", font: get_font(1.1,"","times"), spline_radio:spl.spline_radio, ac:"EditSplineKnots", i:i});
 				
 					y += dy_spline_fac*dy;
 					
@@ -664,7 +664,11 @@ function check_param_free(op)
 function param_pos(par,op)
 {
 	if(par.type == "derive_param") return false;
-		 
+	
+	if(par.name == "D") return false; // Does not allow distance matrix
+	
+	if(par.name == "δ" || par.name == "\\delta") return false; // Does not allow delta function
+	
 	switch(op){
 	case "const":
 		if(par.variety != "normal") return false;
@@ -888,6 +892,11 @@ function param_details_scrollable(lay)
 			ac = "SelectDerived";
 			break;
 		
+		case "sim_comp_prob":
+			te = "Simulation comp. probability";
+			ac = "SelectSimDataElement";	
+			break;
+			
 		case "comp_prob":
 			te = "Compartmental probability";
 			ac = "SelectDataElement";
@@ -898,7 +907,6 @@ function param_details_scrollable(lay)
 			ac = "SelectDataSpec";
 			break;
 		
-			
 		case "reparam":
 			{
 				te = "Reparameterisation";

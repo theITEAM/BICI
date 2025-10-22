@@ -71,7 +71,6 @@ bool IndEvSampler::needed(unsigned int i, unsigned int cl)
 	nobs = obs.size();
 	if(nobs > 0) ti_end	= 1+get_ti_lower(obs[nobs-1].tdiv); 
 	else ti_end = ti_start;
-	//ti_end = T;// zz switch off
 	
 	if(sp.obs_trans_exist){ // If transitions are observed, extend to cover region
 		auto ti_tobs = sp.last_obs_trans_ti;

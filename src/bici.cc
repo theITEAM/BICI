@@ -32,7 +32,7 @@
 
 //  ./bici-core Execute/init.bici inf
 
-//valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici inf
+//valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici sim
 
 // nohup mpirun -n 16 ./bici-para Jamie/scen-1-1.bici inf > ddddd.txt&
 // 06d_New_Inf_500.bici

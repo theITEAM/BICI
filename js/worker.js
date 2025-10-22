@@ -155,6 +155,7 @@ function process(e)
 				par.set = false;
 			}
 			par.variety = "normal";
+			par.reparam_param_list=[];
 			update_mod = true;
 		}
 		break;
@@ -414,6 +415,10 @@ function process(e)
 		{
 			let i = info.i;
 			let par = model.param[i];
+			
+			let err = check_prior_split(input.type,par,info.prior_split);
+			if(typeof err == 'string') alert_help("Problem updating",err);
+			
 			par.prior_split = info.prior_split;
 			par.prior_split_set = true;
 			get_prior_param_list(par);

@@ -269,12 +269,12 @@ class Input                                // Stores information about the model
 		unsigned int import_geojson(string file);
 		LatLng boundary_mean_latlng(unsigned int i, string name);
 		void set_const(Param &par, const vector <unsigned int> &ind, double val);
-		void set_element(Param &par, const vector <unsigned int> &ind, string te);
+		//void set_element(Param &par, const vector <unsigned int> &ind, string te);
 		void set_reparam_element(Param &par, const vector <unsigned int> &ind, const EquationInfo &val);
 		void set_prior_element(Param &par, const vector <unsigned int> &ind, Prior pri);
 		void clone_class(unsigned int p_to, unsigned int p_from, unsigned int cl_from);
 		void print_table(const Table &tab) const;
-		void add_to_list(vector <ParamRef> &list, const ParamRef &pr) const;
+		//void add_to_list(vector <ParamRef> &list, const ParamRef &pr) const;
 		unsigned int get_dependency(vector <Dependency> &dep, const ParamProp &pp, const vector <string> &knot_times, const vector <string> &knot_times_out);
 		EquationInfo he(EquationInfo eqn_inf, unsigned int lnum = UNSET);
 		bool is_file(string te) const;
@@ -294,7 +294,7 @@ class Input                                // Stores information about the model
 		bool check_dt(const Details &details);
 		void add_param_cat_factor(Param &par);
 		//void load_reparam_eqn(string te, Param &par);
-		void add_reparam_eqn(Param &par, Hash &hash_eqn);
+		bool add_reparam_eqn(Param &par, Hash &hash_eqn);
 		string get_data_dir(string data_dir);
 		//unsigned int add_cons(double val);
 		

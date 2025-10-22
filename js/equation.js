@@ -1140,6 +1140,14 @@ function create_equation(te,type,p,cl)
 }
 
 
+/// Determines if an equation contains a population
+function contains_population(te)
+{
+	if(te.indexOf("{") != -1) return true;
+	return false;
+}
+
+
 /// Checks if a string is an equation with a single parameter or a number
 function is_eqn(te,tag,op)
 {

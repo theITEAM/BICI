@@ -1829,8 +1829,8 @@ function check_error_textbox2(tbs)
 				{
 					let num = Number(te);
 					if(isNaN(num)) warn = "Must be a number";
-					if(num <= -1) warn = "Must be greater than -1";
-					if(num >= 1) warn = "Must be less than 1";
+					if(num <= -COR_MAX) warn = "Must be greater than -"+COR_MAX;
+					if(num >= COR_MAX) warn = "Must be less than "+COR_MAX;
 				}
 				break;
 				

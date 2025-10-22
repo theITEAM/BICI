@@ -14,12 +14,17 @@ using namespace std;
 #include "matrix.hh"
 
 /// Updates the individuals in the system (using a modified Gillespie algorithm)
-void StateSpecies::update_individual_based(unsigned int ti, const vector < vector <Poss> > &pop_ind, const vector < vector <double> > &popnum_t)
+void StateSpecies::update_individual_based(unsigned int ti, const vector < vector <Poss> > &pop_ind, const vector < vector <double> > &popnum_t, const vector <double> &val_fast)
 {
-	update_markov_eqn_value(ti,popnum_t);
+	timer[UP_MARKOV] -= clock();	
+	update_markov_eqn_value(ti,popnum_t,val_fast);
+	timer[UP_MARKOV] += clock();	
 
+	timer[SORT] -= clock();	
 	sort_trig_event(ti);
-	
+	timer[SORT] += clock();	
+
+	timer[ITER] -= clock();	
 	auto i_trig = 0u;                            // This indexes potential trigger events
 	
 	const auto &node = sp.markov_tree.node;
@@ -115,7 +120,10 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 			i_trig++;
 		}
 		else{ 														   				    // Markovian event
-			if(tf > tnext) return;
+			if(tf > tnext){
+				timer[ITER] += clock();	
+				return;
+			}
 			
 			auto num = ran()*R;
 		
@@ -194,8 +202,11 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 		
 		t = tf;
 	}while(true);
+	timer[ITER] += clock();	
 
+	timer[CHECK] -= clock();	
 	if(testing) check(T,popnum_t);
+	timer[CHECK] += clock();	
 }
 
 						
@@ -271,10 +282,11 @@ void StateSpecies::add_data_event(unsigned int i, double t, const vector <SimTri
 }
 
 
-/// Adds all the initial individuals to system
+/// Adds all the initial individuals to a given time point
 void StateSpecies::activate_initial_state(double t, const vector < vector <double> > &popnum_t)
 {
 	auto ti = get_ti(t);
+
 	const auto &popnum = popnum_t[ti];
 	
 	const auto &precalc = param_val.precalc;
@@ -639,6 +651,27 @@ void StateSpecies::update_markov_tree_rate(unsigned int e, double dif)
 }
 
 
+/// Sets the values for markov_tree_rate
+void StateSpecies::set_markov_tree_rate()
+{
+	for(auto i = 0u; i < N; i++){
+		auto &me_vari = markov_eqn_vari[i];
+		if(me_vari.value == UNSET){
+			emsg("Markov unset problem");
+		}
+		markov_tree_rate[i] = me_vari.value*me_vari.indfac_sum;
+	}
+	
+	const auto &node = sp.markov_tree.node;
+	for(auto i = N; i < node.size(); i++){
+		const auto &no = node[i];
+		
+		auto sum = 0.0; for(auto j : no.child) sum += markov_tree_rate[j];
+		markov_tree_rate[i] = sum;
+	}
+}
+
+
 /// Inserts a future non-Markovian event
 void StateSpecies::insert_trigger_event(const SimTrigEvent &trig)
 {
@@ -688,38 +721,85 @@ void StateSpecies::calculate_indfac_sum()
 }
 
 
-/// Updates the value of the markov equations
-void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vector <double> > &popnum_t)
+/// Recalculates a Markov equation
+void StateSpecies::markov_eqn_recalc(unsigned int e, unsigned int ti, const vector <double> &popnum)
+{		
+	const auto &precalc = param_val.precalc;
+	auto &me = sp.markov_eqn[e];
+	auto &me_vari = markov_eqn_vari[e];
+	
+	const auto &eq = eqn[me.eqn_ref]; 
+
+	if(me.rate){		
+		me_vari.value = eq.calculate(ti,popnum,precalc);
+		if(me_vari.value < -TINY){
+			run_error("The transition rate determined by equation '"+eq.te_raw+"' has become negative");
+		}
+	}
+	else{
+		auto mean = eq.calculate(ti,popnum,precalc);
+		if(mean <= 0){
+			if(mean < 0) run_error("The transition mean determined by equation '"+eq.te_raw+"' has become negative");
+			if(mean == 0) run_error("The transition mean determined by equation '"+eq.te_raw+"' has become zero");
+		}
+		me_vari.value = 1.0/mean;
+	}
+}
+
+
+/// Sets the transition number 
+void StateSpecies::markov_eqn_recalc_fast(unsigned int ti, const vector <double> &popnum, const vector <double> &val_fast)
 {
-	const auto &popnum = popnum_t[ti];
 	const auto &precalc = param_val.precalc;
 	
-	for(auto e = 0u; e < sp.markov_eqn.size(); e++){
+	const auto &lin_form = sim_linear_speedup.lin_form;
+	const auto &eq_temp = eqn[0];
+
+	for(const auto &lf : lin_form.list){
+		auto val = eq_temp.calculate_item(lf.factor_precalc,ti,precalc)*val_fast[lf.sum_e_ref] + 
+		           eq_temp.calculate_item(lf.no_pop_precalc,ti,precalc);
+		auto e = lf.m;
+	
 		auto &me = sp.markov_eqn[e];
 		auto &me_vari = markov_eqn_vari[e];
-		
+	
 		const auto &eq = eqn[me.eqn_ref]; 
-		double value;
+
 		if(me.rate){		
-			value = eq.calculate(ti,popnum,precalc);
-			if(value < -TINY){
+			me_vari.value = val;
+			if(me_vari.value < -TINY){
 				run_error("The transition rate determined by equation '"+eq.te_raw+"' has become negative");
 			}
 		}
 		else{
-			auto mean = eq.calculate(ti,popnum,precalc);
+			auto mean = val;
 			if(mean <= 0){
 				if(mean < 0) run_error("The transition mean determined by equation '"+eq.te_raw+"' has become negative");
 				if(mean == 0) run_error("The transition mean determined by equation '"+eq.te_raw+"' has become zero");
 			}
-			value = 1.0/mean;
-		}
-
-		if(me_vari.value != value){
-			update_markov_tree_rate(e,(value-me_vari.value)*me_vari.indfac_sum);
-			me_vari.value = value;
+			me_vari.value = 1.0/mean;
 		}
 	}
+	
+	for(auto e : sim_linear_speedup.calc) markov_eqn_recalc(e,ti,popnum);	
+}
+
+		
+/// Updates the value of the markov equations
+void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vector <double> > &popnum_t, const vector <double> &val_fast)
+{
+	markov_eqn_recalc_fast(ti,popnum_t[ti],val_fast);
+	
+	if(false){
+		for(auto e = 0u; e < sp.markov_eqn.size(); e++){
+			auto &me_vari = markov_eqn_vari[e];
+			auto num = me_vari.value;
+			markov_eqn_recalc(e,ti,popnum_t[ti]);	
+			if(dif(num,me_vari.value,TINY)) emsg("dif");
+		}
+	}
+	
+	set_markov_tree_rate();
 }
 
 
@@ -884,7 +964,7 @@ void StateSpecies::update_ind_trans(double t, const IndTransRef &itr, const vect
 // Removes all current markov transitions for an individual
 void StateSpecies::remove_markov_trans(unsigned int i)
 {
-	Individual &ind = individual[i];
+	auto &ind = individual[i];
 	for(const auto &mef : ind.markov_eqn_ref){
 		auto &me = sp.markov_eqn[mef.e];
 		auto &me_vari = markov_eqn_vari[mef.e];
@@ -1055,6 +1135,7 @@ unsigned int StateSpecies::add_individual(IndType ind_type, string name)
 		break;
 	}
 	
+	//hash_individual.add(individual.size(),ind.name);
 	individual.push_back(ind);
 	
 	ind_sim_c.push_back(UNSET);
@@ -1071,6 +1152,7 @@ unsigned int StateSpecies::add_individual(IndType ind_type, string name)
 void StateSpecies::remove_individual(unsigned int i, vector <InfNode> &inf_node)
 {
 	auto &ind = individual[i];
+	//hash_individual.remove(ind.name);
 	
 	unused_name.push_back(ind.name);
 	

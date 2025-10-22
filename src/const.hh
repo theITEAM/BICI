@@ -26,7 +26,7 @@ const string default_file = "Execute/init.bici";     // This is used for windows
 
 #define USE_MPI                                    // Sets if code can run in parallel
 
-const string bici_version = "v0.73";                 // Sets the BICI version
+const string bici_version = "v0.74";                 // Sets the BICI version
 
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
 const bool testing = true;                           // Set to true for additional testing
@@ -36,6 +36,9 @@ const bool check_swap = false;                       // Used to check if new swa
 const bool use_ind_key = true;                       // Determines if indindividual key
 const bool print_diag_on = false;                    // Prints diagnostic statements to terminal
 const bool cum_diag = true;                          // Cumulative probability diagnostic
+
+const bool sim_linearise_speedup = true;             // Speeds up simulation
+// Takes advantage of lineared equations with no time dependence
 
 const bool linearise_speedup = true;                 // Linearisation speed-up of div value calculation
 // This speeds up by taking account of linear population terms when calculation div values
@@ -166,7 +169,7 @@ enum PropType { PARAM_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT_PROP, IND_EVENT
 enum AnnealType { ANNEAL_NONE, ANNEAL_SCAN, ANNEAL_POWERAUTO, ANNEAL_LOGAUTO, ANNEAL_POWER };
 
 // Different state timers
-enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER, DERIVE_TIMER,DERIVE_PRECALC_TIMER, TIMER_MAX };
+enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER, DERIVE_TIMER,DERIVE_PRECALC_TIMER, SIM_CALC_POPNUM, SIM_PRECALC, SIM_POPIND, SIM_UPDATE, SIM_CHECK, TIMER_MAX };
 
 // Different output timers
 enum OutTimer { PARAM_OUTPUT, STATE_OUTPUT, OUTTIMER_MAX };
@@ -180,7 +183,7 @@ const vector <string> check_name = { "CHECK_TRANS_NUM", "CHECK_DEP_PARAM", "CHEC
 enum PropTimer { PROP_TIMER, PARAM_RESAMPLE_TIMER, PROPTIMER_MAX };
 
 // Different state species timers
-enum StateSpeciesTimer { STSP_TIMER_MAX };
+enum StateSpeciesTimer {UP_MARKOV, SORT, ITER, CHECK, STSP_TIMER_MAX };
 
 // INIT_POP_FIXED means init pop has been specified in the data file
 // INIT_POP_DIST means a distribution has been specified in the data file
@@ -308,6 +311,8 @@ const auto ENTER_INF = 99999993u;                 // Stands for entering infecti
 const auto BP_FROM_OTHERS = 99999994u;            // Branch probability is calculated from others
 const auto GEN_PLOT = 99999995u;                  // Used for a generation plot
 const auto LOG_HALF = log(0.5);
+
+const auto SPECIES_MAX = 100;                     // Maximum number of species
 
 const auto LINK_CV_THRESH = 0.3;                  // CV threshold for linking for multi-event
 const auto LINK_WEIBULL_SHAPE = 3.7;              // Shape thresh for linking for multi-event
@@ -483,6 +488,8 @@ const string err_mess = "Please correct these errors and rerun.";
 const string err_mess_sing = "Please correct this error and rerun.";
 const vector <string> must_term_str = { "simulation","sim","inference","inf","posterior-simulation","post-sim"};
 
+const vector< vector <string> > escape_char {{"\\alpha","α"},{"\\beta","β"},{"\\gamma","γ"},{"\\Gamma","Γ"},{"\\delta","δ"},{"\\Delta","Δ"},{"\\epsilon","ε"},{"\\zeta","ζ"},{"\\eta","η"},{"\\Eta","Η"},{"\\theta","θ"},{"\\Theta","Θ"},{"\\iota","ι"},{"\\kappa","κ"},{"\\lambda","λ"},{"\\Lambda","Λ"},{"\\mu","μ"},{"\\nu","ν"},{"\\xi","ξ"},{"\\Xi","Ξ"},{"\\omicron","ο"},{"\\pi","π"},{"\\Pi","Π"},{"\\rho","ρ"},{"\\sigma","σ"},{"\\tau","τ"},{"\\upsilon","υ"},{"\\phi","φ"},{"\\Phi","Φ"},{"\\chi","χ"},{"\\psi","ψ"},{"\\Psi","Ψ"},{"\\omega","ω"},{"\\Omega","Ω"},{"\\sum","Σ"},{"\\int","∫"}};
+	
 /************************** Object constants ******************************/
 
 struct EqnInfo {

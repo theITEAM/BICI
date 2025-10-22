@@ -940,6 +940,7 @@ bool equal_vec(const vector <bool> &vec1, const vector <bool> &vec2)
 }
 
 
+/*
 /// Gets a list up to a number
 vector <unsigned int> get_list(unsigned int num)
 {
@@ -948,6 +949,7 @@ vector <unsigned int> get_list(unsigned int num)
 	
 	return list;
 }
+*/
 
 
 /// Converts a value tensor into a string
@@ -1275,61 +1277,121 @@ ParamProp get_param_prop(string st)
 
 
 /// Adds a value to a vector (if it doesn't already exist)
-unsigned int add_to_vec(vector <unsigned int> &vec, unsigned int val)
+unsigned int add_to_vec(vector <unsigned int> &vec, unsigned int val, HashSimp &hash)
 {
+	auto i = hash.find(val);
+	if(i == UNSET){
+		i = vec.size();
+		hash.add(i,val);
+		
+		vec.push_back(val);
+	}
+	
+	/* turn off
 	auto i = find_in(vec,val);
 	if(i == UNSET){ i = vec.size(); vec.push_back(val);}
+	*/
 	return i;
 }
 
 
 /// Adds a value to a vector (if it doesn't already exist)
-unsigned int add_to_vec(vector <ParamRef> &vec, unsigned int th, unsigned int index)
+unsigned int add_to_vec(vector <ParamRef> &vec, unsigned int th, unsigned int index, Hash &hash)
 {
+	vector <unsigned int> v; v.push_back(th); v.push_back(index);
+	auto i = hash.existing(v);
+	if(i == UNSET){
+		i = vec.size();
+		hash.add(i,v);
+		ParamRef pref; pref.th = th; pref.index = index; 
+		vec.push_back(pref);
+	}
+	
+	/* turn off
 	auto i = 0u; 
 	while(i < vec.size() && !(vec[i].th == th && vec[i].index == index)) i++;
 	if(i == vec.size()){
 		ParamRef pref; pref.th = th; pref.index = index; 
 		vec.push_back(pref);
 	}	
+	*/
+	
 	return i;
 }
 
 
 /// Adds a value to a vector (if it doesn't already exist)
-unsigned int add_to_vec(vector <PopTransRef> &vec, unsigned int p, unsigned int tr)
+unsigned int add_to_vec(vector <PopTransRef> &vec, unsigned int p, unsigned int tr, HashSimp &hash)
 {
+	auto v = tr*SPECIES_MAX+p; 
+	
+	auto i = hash.find(v);
+	if(i == UNSET){
+		i = vec.size();
+		hash.add(i,v);
+		
+		PopTransRef pref; pref.p = p; pref.tr = tr; 
+		vec.push_back(pref);
+	}	
+	
+	/* turn off
 	auto i = 0u; 
 	while(i < vec.size() && !(vec[i].p == p && vec[i].tr == tr)) i++;
 	if(i == vec.size()){
 		PopTransRef pref; pref.p = p; pref.tr = tr; 
 		vec.push_back(pref);
 	}	
+	*/
+	
 	return i;
 }
 
 
 /// Adds a value to a vector (if it doesn't already exist)
-unsigned int add_to_vec(vector <PopMarkovEqnRef> &vec, unsigned int p, unsigned int e)
+unsigned int add_to_vec(vector <PopMarkovEqnRef> &vec, unsigned int p, unsigned int e, HashSimp &hash)
 {
+	auto v = e*SPECIES_MAX+p; 
+	//vector <unsigned int> v; v.push_back(p); v.push_back(e);
+	auto i = hash.find(v);
+	if(i == UNSET){
+		i = vec.size();
+		hash.add(i,v);
+		
+		PopMarkovEqnRef pref; pref.p = p; pref.e = e; 
+		vec.push_back(pref);
+	}
+	
+	/* turn off
 	auto i = 0u; 
 	while(i < vec.size() && !(vec[i].p == p && vec[i].e == e)) i++;
 	if(i == vec.size()){
 		PopMarkovEqnRef pref; pref.p = p; pref.e = e; 
 		vec.push_back(pref);
 	}	
+	*/
 	return i;
 }
 
 
 /// Adds a value to a vector (if it doesn't already exist)
-unsigned int add_to_vec(vector <IEGref> &vec, const IEGref &val)
+unsigned int add_to_vec(vector <IEGref> &vec, const IEGref &val, Hash &hash)
 {
+	vector <unsigned int> v; v.push_back(val.p); v.push_back(val.i);
+	auto i = hash.existing(v);
+	if(i == UNSET){
+		i = vec.size();
+		hash.add(i,v);
+		
+		vec.push_back(val);
+	}
+	
+	/* turn off
 	auto i = 0u; 
 	while(i < vec.size() && !(vec[i].p == val.p && vec[i].i == val.i)) i++;
 	if(i == vec.size()){
 		vec.push_back(val);
-	}	
+	}
+	*/	
 	return i;
 }
 
@@ -2808,7 +2870,7 @@ unsigned int get_core()
 void print_diag(string te)
 {
 	if(print_diag_on && !com_op && op()) cout << te << endl;
-	//cout << te << endl; 
+	//cout <<  te << endl;    
 }
 
 
@@ -3022,58 +3084,9 @@ string trunc(string te, unsigned int len)
 }
 
 
-/// Returns a list of escape characters
-vector< vector <string> > get_escape_char()
-{
-	vector< vector <string> > escape_char;
-	
-	escape_char.push_back({"\\alpha","α"});
-	escape_char.push_back({"\\beta","β"});
-	escape_char.push_back({"\\gamma","γ"});
-	escape_char.push_back({"\\Gamma","Γ"});
-	escape_char.push_back({"\\delta","δ"});
-	escape_char.push_back({"\\Delta","Δ"});
-	escape_char.push_back({"\\epsilon","ε"});
-	escape_char.push_back({"\\zeta","ζ"});
-	escape_char.push_back({"\\eta","η"});
-	escape_char.push_back({"\\Eta","Η"});
-	escape_char.push_back({"\\theta","θ"});
-	escape_char.push_back({"\\Theta","Θ"});
-	escape_char.push_back({"\\iota","ι"});
-	escape_char.push_back({"\\kappa","κ"});
-	escape_char.push_back({"\\lambda","λ"});
-	escape_char.push_back({"\\Lambda","Λ"});
-	escape_char.push_back({"\\mu","μ"});
-	escape_char.push_back({"\\nu","ν"});
-	escape_char.push_back({"\\xi","ξ"});
-	escape_char.push_back({"\\Xi","Ξ"});
-	escape_char.push_back({"\\omicron","ο"});
-	escape_char.push_back({"\\pi","π"});
-	escape_char.push_back({"\\Pi","Π"});
-	escape_char.push_back({"\\rho","ρ"});
-	escape_char.push_back({"\\sigma","σ"});
-	//escape_char.push_back({"\\Sigma","Σ"});
-	escape_char.push_back({"\\tau","τ"});
-	escape_char.push_back({"\\upsilon","υ"});
-	escape_char.push_back({"\\phi","φ"});
-	escape_char.push_back({"\\Phi","Φ"});
-	escape_char.push_back({"\\chi","χ"});
-	escape_char.push_back({"\\psi","ψ"});
-	escape_char.push_back({"\\Psi","Ψ"});
-	escape_char.push_back({"\\omega","ω"});	
-	escape_char.push_back({"\\Omega","Ω"});	
-	escape_char.push_back({"\\sum","Σ"});		
-	escape_char.push_back({"\\int","∫"});		
-	
-	return escape_char;
-}
-
-
 /// Replaces greek letters with escape characters
 string add_escape_char(string te)
 {
-	auto escape_char = get_escape_char();
-
 	for(auto i = 0u; i < escape_char.size(); i++){
 		auto st1 = escape_char[i][0];
 		auto st2 = escape_char[i][1];
@@ -3105,6 +3118,13 @@ void start_progess_file(string file)
 }
 */
 
+/// Pads a string up to a certain length
+string pad(string te, unsigned int len)
+{
+	te += ":";
+	while(te.length() < len) te += " ";
+	return te;
+}
 
 
 /// Resets the percentage
@@ -3123,14 +3143,16 @@ void percentage_start(PercentType type, unsigned int gen)
 		}
 	}
 	else{
+		auto pad_len = 8u;
+		
 		string te;
 		switch(type){
-			case LOAD_PER: te = "Loading: "; break;
-			case INIT_PER: te = "Initialising: "; break;
-			case RUN_PER: te = "Running: "; break;
-			case RUN_GEN_PER: te = "Generation "+tstr(gen)+": "; break;
-			case ANNEAL_PER: te = "Annealing: "; break;
-			case OUTPUT_PER: te = "Outputting: "; break;
+			case LOAD_PER: te = pad("Load",pad_len); break;
+			case INIT_PER: te = pad("Init.",pad_len); break;
+			case RUN_PER: te = pad("Run",pad_len); break;
+			case RUN_GEN_PER:	te = pad("Gen. "+tstr(gen),pad_len); break;
+			case ANNEAL_PER: te =  pad("Anneal",pad_len); break;
+			case OUTPUT_PER: te = pad("Output",pad_len); break;
 		}
 		cout << te;
 		cout.flush();
@@ -3198,7 +3220,8 @@ void percentage(double val, double val2)
 		auto per = 100*val/val2;
 		while(percent_done <= per){
 			if(int(percent_done)%10 == 0){
-				printf("%d%%",(unsigned int)(percent_done));
+				printf("%d",(unsigned int)(percent_done));
+				if(percent_done == 100) printf("%%");
 				fflush(stdout); 
 				//cout << percent_done << "%";
 				

@@ -8,6 +8,7 @@ using namespace std;
 
 #include "const.hh"
 #include "hash.hh"
+#include "hash_simp.hh"
 
 struct AlgWarn {                   // Stores an algorithm warning
 	string te;                       // Text for warning
@@ -95,6 +96,11 @@ struct PopAffect {                 // Lists all populations which affect DIV_VAL
 	vector <GradRef> pop_grad_ref;   // References population in Markov equation 
 };
 
+struct SimSpeed {                  // Stores quantities to speed up simulation
+	vector <double> val_fast;
+	vector < vector <double> > pop_grad;
+};
+
 struct EqItem {                    // An individual operation in a calculation
 	EqItem(){ num = UNSET;}
 	
@@ -118,15 +124,22 @@ struct LinearFormItem {            // Stores an item in LinearForm
 struct LinearForm {                // Stores information for mbp speedup
 	bool factor_nopop_only;          // Determines if only the factor is affected by the proposal
 	bool factor_same;                // Determines if factor is the same for all equations
-	bool nopop_same;                // Determines if non-population part same for all equations
-	vector <LinearFormItem> list;// Transitions which can be calculated fast
+	bool nopop_same;                 // Determines if non-population part same for all equations
+	vector <LinearFormItem> list;    // Transitions which can be calculated fast
 	vector <unsigned int> sum_e;     // The equations for the sums 
 	vector <PopAffect> pop_affect;   // References populations which affect
+	HashSimp hash_po;
 };
+
 
 struct MBPfast {
 	vector <unsigned int> calc_tr;   // Transitions which must be calculated
 	LinearForm lin_form;
+};
+
+struct SimLinearSpeedup {          // Information for simulation speedup 
+	vector <unsigned int> calc;      // List of equations which have not been sped up
+	LinearForm lin_form;             // Stores the linear form
 };
 
 struct AffectMap {                 // Provides information about how a proposal affects quantities
@@ -205,6 +218,7 @@ struct Population {                // Stores a population (used in an equation)
 	vector <PopMarkovEqnRef> markov_eqn_ref;// References Markov equations which include population
 	vector <PopTransRef> trans_ref;  // References transitions which include population
 	vector <unsigned int> spline_update; // Stores any reparam which need updating
+	HashSimp hash_spline_update;
 };
 
 struct ParamProp {                 // Stores properties of a parameter
@@ -225,8 +239,7 @@ struct SplineInfo {                // Stores information about a parameter splin
 };
 
 struct SplineDiv {                 // A div in spline is calculated from a weighting of params
-	unsigned int th1;                // The reference for the parameter 1
-	unsigned int th2;                // The reference for the parameter 2
+	unsigned int index;              // Referernces param_ref
 	double f;                        // The factor 1=th1  0=th2
 };
 
@@ -237,28 +250,27 @@ struct CubicDiv {                  // A div in a cubic spline
 	double dx3;                      // The difference between the time and beginning of segment
 };
 
+struct ElementRef {                // Stores an element reference
+	unsigned int index;              // This sets the index
+	bool cons;                       // Set to true if the value is constant
+};
+
 struct Spline {                    // Stores an individual spline
 	string name;                     // Name of the spline
 	SplineType type;                 // Type of spline (linear, square, cubic-pos, cubic) 	
 	bool constant;                   // Determines if spline is constant
 	unsigned int th;                 // The parameter
 	unsigned int index;              // The index giving the dependency
-	vector <unsigned int> param_ref; // References the parameters along the spline
+	vector <ElementRef> param_ref;   // References the parameters along the spline (or constant)
 	SplineInfo info;                 // Stores information about spline (copied from par)
 	vector <SplineDiv> div;          // A division within the spline
 	vector <CubicDiv> cubic_div;     // A division within a cubic spline
 	vector <double> const_val;       // If spline is constant then works out what value it should have
 	vector <PopMarkovEqnRef> markov_eqn_ref;// References Markov equations which include spline
+	HashSimp hash_markov_eqn_ref;
 	vector <PopTransRef> trans_ref;  // References transitions which include spline
+	HashSimp hash_trans_ref;
 };
-
-
-/*
-struct SplineValue {               // Stores values for a spline
-	vector <double> val;             // The value down the spline
-	vector <double> store;           // The value down the spline
-};
-*/
 
 
 struct CompPos {                   // Used to go through comparmtental possibilities
@@ -322,9 +334,13 @@ struct IndEffect {                 // Store infortmation about an individual eff
 	unsigned int index;              // References ind_eff_group
 	unsigned int num;                // The number within ind_eff_group
 	vector <unsigned int> markov_eqn_ref; // References any Markov equations the ie appears in
+	HashSimp hash_markov_eqn_ref;
 	vector <unsigned int> nm_trans_ref;   // Indexes nm_trans involving ies
+	HashSimp hash_nm_trans_ref;
 	vector <unsigned int> nm_trans_incomp_ref;// Indexes nm_trans_incomp involving ies
+	HashSimp hash_nm_trans_incomp_ref;
 	vector <unsigned int> pop_ref;   // Populations that ie appear in
+	HashSimp hash_pop_ref;
 	unsigned int line_num;           // The line number in input file 
 };
 
@@ -366,7 +382,7 @@ struct Dependency {                // A dependency in the model
 	vector <string> list_out;        // Elements which are out of range   
 	
 	Hash hash_list;                  // Generates a hash table for list
-	Hash hash_list_out;                  // Generates a hash table for list
+	Hash hash_list_out;              // Generates a hash table for list
 	unsigned int mult;               // Multiplicative factor when accessing an element
 };
 
@@ -384,6 +400,18 @@ struct IEGref {                    // References and individual effect group
 	unsigned int i;                  // The inf_eff
 };
 
+
+struct PrecalcInfo {                  // Specified which i and time 
+	unsigned int i;
+	unsigned int tlist;
+};
+
+struct SpecPrecalc {                  // Specifies a precalculation
+	vector <PrecalcInfo> info;
+	vector < vector <unsigned int > > list_time;
+	HashSimp hash;
+};
+
 struct ParamVecEle {               // Stores information about an element in param vec
 	string name;                     // The name of the parameter
 	unsigned int th;                 // The number of the parameter
@@ -394,9 +422,11 @@ struct ParamVecEle {               // Stores information about an element in par
 	bool ppc_resample;               // Sets if parameter gets resampled for ppc
 	bool prop_pos;                   // Set if it is possible to do a proposal on this parameter
 	vector <AffectLike> affect_like; // Determines how parameter affects likelihoods
-	vector <unsigned int> list_precalc_before; // Lists any precalculation which need to be done before parameter evaluated
-	vector <unsigned int> list_precalc_time; // Stores which times are affected by change
-	vector <unsigned int> list_precalc; // Lists any precalculation which need to be done before parameter evaluated
+	
+	SpecPrecalc spec_precalc_before; // Precalculation which need to be done before parameter evaluated
+	SpecPrecalc set_param_spec_precalc; // Sets the parameter
+	SpecPrecalc spec_precalc_after;  // Precalculation which need to be done after parameter
+	
 	unsigned int spline_ref;         // References the spline the parameter is on 
 	unsigned int reparam_spl_ti;     // If on a reparameterised spline this gives the time
 	unsigned int ref;                // Reference param_vec_prop
@@ -572,7 +602,16 @@ struct SplineOut {                 // Stores information if spline in output is 
 	vector <string> list;            // Determines times of spline out
 };
 
+struct Constant {                  // Stores all the constants in the model
+	vector <double> value;
+	Hash hash;
+	
+	unsigned int add(double val);
+};	
+
 struct Param {                     // Stores a model parameter
+	Param(Constant &constant);      
+	
 	string full_name;                // The full name (as defined in the input file)
 	string name;                     // The name after removing dependencies
 	vector <Dependency> dep;         // Dependency for parameter
@@ -586,12 +625,12 @@ struct Param {                     // Stores a model parameter
 	
 	unsigned int default_prior_ref;  // Default prior reference
 		
-	vector <unsigned int> element_ref; // This references a given element
+	vector <ElementRef> element_ref; // This references a given element
 	vector <ParamElement> element;   // This stores information about elements in parameter
 	
 	vector <double> weight;          // Different weights given to categories for factor
 
-	vector <double> cons;            // Stores constant values
+	//vector <double> cons;            // Stores constant values
 	string reparam_eqn;              // Used to store reparameterisation eqn
 	
 	unsigned int line_num;           // The line num in input file when parameter is defined
@@ -612,19 +651,21 @@ struct Param {                     // Stores a model parameter
 	const vector <ParamRef>& get_parent(unsigned int i) const;
 	unsigned int get_eq_ref(unsigned int i) const;
 	void all_elements();
-	void add_element(unsigned int i); 
+	void add_element(unsigned int i, bool all_spline = false); 
 	void set_prior(unsigned int i, unsigned int prior_ref);
 	void add_parent(unsigned int i, const ParamRef &pr);
 	void add_child(unsigned int i, const ParamRef &pr);
 	double get_value(unsigned int i) const;
 	void set_used(unsigned int i);
-	void set_value_te(unsigned int i, string te);
+	//void set_value_te(unsigned int i, string te);
 	string get_value_te(unsigned int i) const;
 	void set_value_eqn(unsigned int i, const EquationInfo &val);
 	unsigned int get_prior_ref(unsigned int i) const;
 	bool exist(unsigned int i) const;
 	unsigned int add_cons(double val);
 	void set_cons(unsigned int i, double val);
+	
+	Constant &constant;   
 };
 
 struct CompGlTransGroup {          // Information about transitions from a compartment (in a cl)
@@ -748,6 +789,7 @@ struct IslandComp {                // Transitions within an island
 
 struct Island {                    // An island is a group of compartments not connected to rest
 	vector <IslandComp> comp;        // Compartment in island
+	HashSimp hash_comp; 
 };
 
 struct TrSwap {                    // Information about locally swapping transition events
@@ -862,9 +904,13 @@ struct FixedEffect {               // Stores an individual fixed IndEffMult
 	unsigned int th;                 // The number of the parameter
 	Xvector X_vector;                // The covariate as loaded from the file
 	vector <unsigned int> markov_eqn_ref;  // References any Markov equations the fe appears in
+	HashSimp hash_markov_eqn_ref;
 	vector <unsigned int> nm_trans_ref;    // Indexes nm_trans involving fes
+	HashSimp hash_nm_trans_ref;
 	vector <unsigned int> nm_trans_incomp_ref;// Indexes nm_trans involving fes
+	HashSimp hash_nm_trans_incomp_ref;
 	vector <unsigned int> pop_ref;         // Populations that fe appear in
+	HashSimp hash_pop_ref;
 	unsigned int line_num;                 // The line number
 };
 
@@ -1807,6 +1853,7 @@ struct Calculation {               // Stores a calculation (made up of operation
 	EqItemType op;                   // The operator used in the calculation
 };
 
+
 struct PreCalc {                   // Stores a precalculation (made up of operations)
 	vector <EqItem> item;            // Items used to make the calculation
 	EqItemType op;                   // The operator used in the calculation
@@ -1852,22 +1899,10 @@ struct PV {                         // Stores parameter values along with precal
 	void check();
 };
 
-struct Constant {                  // Stores all the constants in the model
-	vector <double> value;
-	Hash hash;
-	
-	unsigned int add(double val);
-};	
 
-struct UpdatePrecalc {             // Stores information to generate precaculation for a proposal
-	vector <unsigned int> list_precalc; // Lists any precalculation which need to be done before parameter evaluated
-	vector <unsigned int> list_precalc_time; // Stores which times are affected by change
-};
-
-struct UpdatePrecalcTime {         // Stores information about 
+struct SpecPrecalcTime {           // Stores information about 
 	vector <unsigned int> pv;        // The parameter vector elements
-	vector <unsigned int> list_precalc; // Lists precalculation which need to be done 
-	vector <unsigned int> list_precalc_time; // Stores which times are affected by change
+	SpecPrecalc spec_precalc;        // Used to update precalc
 };
 
 struct CubicSpline {               // Stores information about a segment in a cubic spline

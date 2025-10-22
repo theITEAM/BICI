@@ -1508,14 +1508,14 @@ function comp_filter_desc(clz,sp)
 {
 	let te = "", st = "";
 	for(let cl = 0; cl < clz.length; cl++){
-		let clzz = clz[cl];
-		if(clzz != undefined && clzz.radio != undefined){
-			switch(clzz.radio.value){
+		let clz_ = clz[cl];
+		if(clz_ != undefined && clz_.radio != undefined){
+			switch(clz_.radio.value){
 			case "Comp":
 				{
 					let te2 = "";
-					for(let j = 0; j < clzz.comp.length; j++){
-						if(clzz.comp[j].check == true){
+					for(let j = 0; j < clz_.comp.length; j++){
+						if(clz_.comp[j].check == true){
 							if(te2 != "") te2 += "|";
 							te2 += sp.cla[cl].comp[j].name;
 						}
@@ -1527,8 +1527,8 @@ function comp_filter_desc(clz,sp)
 			case "ObsMod":
 				{
 					let te2 = "";
-					for(let j = 0; j < clzz.comp.length; j++){
-						let pro = clzz.comp[j].prob_eqn.te.trim();
+					for(let j = 0; j < clz_.comp.length; j++){
+						let pro = clz_.comp[j].prob_eqn.te.trim();
 						if(pro != "0"){
 							if(te2 != "") te2 += "|";
 							te2 += sp.cla[cl].comp[j].name+":"+pro;
@@ -1546,7 +1546,7 @@ function comp_filter_desc(clz,sp)
 			case "All":
 				break;
 
-			default: error("Option not recognised 23"+clzz.radio.value); break;
+			default: error("Option not recognised 23"+clz_.radio.value); break;
 			}
 		}
 	}
@@ -1662,8 +1662,21 @@ function edit_param_check_error(error_mess_only)
 	return false;
 }
 
+/// Checks to see if prior is correctly specified
+function check_prior_split(type,par,prior_split)
+{
+	let co_list = generate_co_list(par.list);
+	for(let i = 0; i < co_list.length; i++){
+		let comb = co_list[i];
+		let el = get_element(prior_split,comb.index);
+		
+		if(!el) return "This contains unset elements";
+		if(!el.type) return "This contains unset elements";
+		if(el.type.te == select_str) return "This contains unset elements";
+	}
+}
 
-
+	
 /// CHecks to see if factor is correctly specified
 function check_param_value(type,par,value)
 {
@@ -1724,6 +1737,18 @@ function check_param_value(type,par,value)
 					}
 					else{
 						return "The weighted mean of elements is "+mean+" and it should be 1";
+					}
+				}
+			}
+		}
+		
+		if(par.time_dep && par.variety == "reparam"){
+			if(par.spline.spline_radio.value != "Square"){	
+				for(let i = 0; i < co_list.length; i++){
+					let comb = co_list[i];
+					let el = String(get_element(value,comb.index));
+					if(contains_population(el)){
+						return "The value '"+el+"' can only contain a population if the spline type is set to square.";
 					}
 				}
 			}

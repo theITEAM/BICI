@@ -610,6 +610,7 @@ function read_param_samples(chain,te,result,warn)
 				}
 
 				sa = { num:Number(spl[0]), mean:par_mean, CImin:par_CImin, CImax:par_CImax};
+				
 				result.generation.push(sa);
 			}
 			else{
@@ -744,7 +745,7 @@ function load_state_sample_header(te,result,warn)
 }
 
 
-/// Reduces number the number of knows in an object
+/// Reduces number the number of knots in an object
 function reduce_knot(value,knot_new,knot_old)
 {
 	let N = knot_new.length;

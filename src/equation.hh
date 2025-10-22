@@ -5,6 +5,7 @@
 using namespace std;
 
 #include "struct.hh"
+#include "hash_simp.hh"
 #include "const.hh"
 
 struct EqItemList {                         // Allows for a list of equation items
@@ -39,6 +40,7 @@ struct LinearCalculation                   // Stores a linear calculation
 {
 	PopCalculation no_pop_calc;              // Calculates non-population part
 	vector <PopCalculation> pop_calc;        // Calculates parts multiplying populations
+	HashSimp hash_simp;                      // Simple hash table for population
 };
 
 struct Linearise {                         // Information about linearising an equation 
@@ -83,6 +85,8 @@ class Equation                             // Stores information about an equati
 		
 		vector <DeriveRef> derive_ref;         // Stores derived used in the equation
 		
+		bool contain_population;               // Determines if contains a population
+		
 		vector <unsigned int> pop_ref;         // Stores the populations used in the equation
 		
 		vector <unsigned> source_tr_gl;        // Stores any global transitions from source (if eqn SOURCE_RATE)
@@ -123,7 +127,7 @@ class Equation                             // Stores information about an equati
 		
 		Linearise linearise;                   // Used for accelerated likelihood calculation
 		
-		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details);
+		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details);
 		
 		void print_calculation() const;
 		void print_item(const EqItem &it) const;
@@ -199,6 +203,7 @@ class Equation                             // Stores information about an equati
 		const vector <SpeciesSimp> &species;       // References the species from the model
 		unsigned int nspecies;
 		vector <Param> &param;               // References the parameters from the model
+		vector <Prior> &prior;               // References the priors in the model
 		const vector <Derive> &derive;       // Reference derived quantities in the model
 		const vector <Spline> &spline;             // References splines from the model
 		const vector <ParamVecEle> &param_vec;     // References the param_vec from the model

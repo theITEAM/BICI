@@ -45,6 +45,22 @@ void Simulate::run()
 
 		if(false) state.output_waifw("waifw.txt");
 	}
+
+	if(false){
+		auto tot = state.timer[SIM_CALC_POPNUM]+state.timer[SIM_PRECALC]+state.timer[SIM_POPIND]+state.timer[SIM_UPDATE]+state.timer[SIM_CHECK];
+		cout << cpu_percent(state.timer[SIM_CALC_POPNUM],tot) << "sim calc" << endl;
+		cout << cpu_percent(state.timer[SIM_PRECALC],tot) << "sim precalc" << endl;
+		cout << cpu_percent(state.timer[SIM_POPIND],tot) << "sim popind" << endl;
+		cout << cpu_percent(state.timer[SIM_UPDATE],tot) << "sim update" << endl;
+		cout << cpu_percent(state.timer[SIM_CHECK],tot) << "sim check" << endl;
+		
+		const auto &ssp = state.species[0];
+		auto up = state.timer[SIM_UPDATE];
+		cout <<  cpu_percent(ssp.timer[UP_MARKOV],up) << "up markov" << endl;
+		cout <<  cpu_percent(ssp.timer[SORT],up) << "sort" << endl;
+		cout <<  cpu_percent(ssp.timer[ITER],up) << "iter" << endl;
+		cout <<  cpu_percent(ssp.timer[CHECK],up) << "check" << endl;	
+	}
 	
 #ifdef USE_MPI
 	mpi.barrier();

@@ -31,12 +31,13 @@ using namespace std;
     
 		
 /// Initialises the equation 
-Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details) : species(species), param(param), derive(derive), spline(spline), param_vec(param_vec), pop(pop), hash_pop(hash_pop), constant(constant), timepoint(timepoint), details(details)
+Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details) : species(species), param(param), prior(prior), derive(derive), spline(spline), param_vec(param_vec), pop(pop), hash_pop(hash_pop), constant(constant), timepoint(timepoint), details(details)
 {
 	plfl = false;  // Set to true to print operations to terminal (used for diagnostics)
 
 	precalc_done = false;
 	stop_combine_fl = false;
+	contain_population = false;
 
 	if(plfl) cout << endl << tex << "  start equation" << endl;
 
@@ -115,8 +116,9 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool
 	// Truncates strings to save memory
 	te.clear();
 	if(!debugging){
-		if(type == REPARAM || type == REPARAM_EQN) te_raw = trunc(te_raw,5);
-		else te_raw = trunc(te_raw,20);	
+		//if(type == REPARAM || type == REPARAM_EQN) te_raw = trunc(te_raw,20);
+		//else te_raw = trunc(te_raw,20);	
+		te_raw = trunc(te_raw,20);	
 	}
 }
 
@@ -1059,6 +1061,8 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 			po.ind_variation = false;
 			if(po.ind_eff_mult.size() > 0 || po.fix_eff_mult.size() > 0) po.ind_variation = true;
 			
+			contain_population = true;
+			
 			pop.push_back(po);
 		}
 		i++;
@@ -1257,7 +1261,7 @@ int Equation::priol(const vector <EqItemList> &opl, unsigned int i) const
 vector <EqItem> Equation::extract_operations()
 {
 	vector <EqItem> op;
-	
+
 	auto i = 0u;
   while(i < te.length()){ 
 		if(str_eq(te,i,tint)){
@@ -1433,12 +1437,15 @@ vector <EqItem> Equation::extract_operations()
 									auto done = false;
 									
 									if(done == false){ 
-										if(item.type == PARAMETER && param[pref.th].variety == CONST_PARAM){
-											item.type = NUMERIC; 
-											const auto &par = param[pref.th];
-											item.num = constant.add(par.cons[par.element_ref[pref.index]]);
-											op.push_back(item); 
-											done = true;
+										//if(item.type == PARAMETER && param[pref.th].variety == CONST_PARAM){
+										const auto &ele =	par.element_ref[pref.index];
+										if(item.type == PARAMETER){
+											if(ele.cons){
+												item.type = NUMERIC; 
+												item.num = ele.index; //constant.add(par.cons[ele.index]);
+												op.push_back(item); 
+												done = true;
+											}
 										}
 									}
 									
@@ -1457,9 +1464,9 @@ vector <EqItem> Equation::extract_operations()
 									if(done == false){
 										item.num = add_param_ref(pref);
 										op.push_back(item); 
-										
-										par.add_element(pref.index);
-										
+									
+										par.add_element(pref.index,true);
+									
 										// Adds in factor to equation
 										if(par.param_mult != UNSET){
 											{
@@ -2699,10 +2706,12 @@ unsigned int Equation::mult_const(EqItem item1, EqItem item2)
 /// Calculates a list of all population used 
 void Equation::calculate_pop_ref()
 {				
+	pop_ref.clear();
+	HashSimp hash_pr;
 	for(auto i = 0u; i < calcu.size(); i++){
 		const auto &ca = calcu[i];
 		for(const auto &it : ca.item){
-			if(it.type == POPNUM) add_to_vec(pop_ref,it.num);
+			if(it.type == POPNUM) add_to_vec(pop_ref,it.num,hash_pr);
 		}
 	}
 	
@@ -2711,7 +2720,7 @@ void Equation::calculate_pop_ref()
 		for(auto i = 0u; i < calc.size(); i++){
 			const auto &ca = calc[i];
 			for(const auto &it : ca.item){
-				if(it.type == POPNUM) add_to_vec(pop_ref,it.num);
+				if(it.type == POPNUM) add_to_vec(pop_ref,it.num,hash_pr);
 			}
 		}
 	}

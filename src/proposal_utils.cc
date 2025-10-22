@@ -125,7 +125,7 @@ void Proposal::get_affect_like()
 	model.add_popnum_ind_w_affect(affect_like);
 
 	if(nopop_speedup && type == PARAM_PROP){   
-		model.affect_nopop_speedup(affect_like,dependent_update_precalc,update_precalc);
+		model.affect_nopop_speedup(affect_like,dependent_spec_precalc,spec_precalc_after);
 	}
 	
 	model.order_affect(affect_like);
@@ -135,7 +135,7 @@ void Proposal::get_affect_like()
 	}
 	
 	if(linearise_factor_nopop_speedup && type == PARAM_PROP){ 
-		model.set_factor_nopop_only(affect_like,dependent_update_precalc,update_precalc);
+		model.set_factor_nopop_only(affect_like,dependent_spec_precalc,spec_precalc_after);
 	}
 	
 	model.order_affect(affect_like);
@@ -249,7 +249,8 @@ double Proposal::param_resample(PV &param_val, const vector < vector <double> > 
 			return UNSET;
 		}
 		
-		model.param_update_precalc_after(j,param_val,true);
+		model.precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,true);
+		//model.param_spec_precalc_after(j,param_val,true);
 	}	
 
 	for(auto k = 0u; k < dependent.size(); k++){
@@ -261,10 +262,12 @@ double Proposal::param_resample(PV &param_val, const vector < vector <double> > 
 		auto ref = par.get_eq_ref(pv.index);
 		if(ref == UNSET) emsg("Reparam is not set");	
 		
-		const auto &dup = dependent_update_precalc[k];
-		if(dup.list_precalc.size() > 0){
-			model.precalc_eqn.calculate(dup.list_precalc,dup.list_precalc_time,param_val,true);
-		}
+		model.precalc_eqn.calculate(dependent_spec_precalc[k],param_val,true);
+		
+		//const auto &dup = dependent_spec_precalc[k];
+		//if(dup.list_precalc.size() > 0){
+			
+		//}
 		
 		param_val.value_change(j);
 		if(pv.reparam_time_dep == false) value[j] = model.eqn[ref].calculate_param(precalc);
@@ -279,7 +282,8 @@ double Proposal::param_resample(PV &param_val, const vector < vector <double> > 
 			return UNSET;
 		}
 	
-		model.param_update_precalc_after(j,param_val,true);
+		model.precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,true);
+		//model.param_spec_precalc_after(j,param_val,true);
 	}
 
 	for(const auto &ieg_ref : ieg_check_pri){
@@ -290,9 +294,7 @@ double Proposal::param_resample(PV &param_val, const vector < vector <double> > 
 		}
 	}
 	
-	for(const auto &pr_up : update_precalc){
-		model.precalc_eqn.calculate(pr_up.list_precalc,pr_up.list_precalc_time,param_val,true);
-	}
+	model.precalc_eqn.calculate(spec_precalc_after,param_val,true);
 	
 	timer[PARAM_RESAMPLE_TIMER] += clock();
 	
@@ -694,7 +696,7 @@ void Proposal::set_ieg_check_pri()
 		const auto &pv = model.param_vec[th];
 		const auto &par = model.param[pv.th];
 		for(const auto &iefr : par.ieg_ref){
-			add_to_vec(ieg_check_pri,iefr);
+			add_to_vec(ieg_check_pri,iefr,hash_ieg_check_pri);
 		}
 	}
 

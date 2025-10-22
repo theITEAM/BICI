@@ -149,6 +149,8 @@ void StateSpecies::reset_arrays()
 	cpop.resize(C,0);	
 	
 	ti_sort = UNSET;
+	
+	sim_linear_speedup_init();
 }
 
 
@@ -531,10 +533,6 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 				error_load_sample(1);
 			}
 			
-			if(ind_tab.ncol-3 != sp.ind_effect.size()){
-				error_load_sample(20);
-			}
-			
 			for(auto e = 0u; e < sp.ind_effect.size(); e++){
 				if(ind_tab.heading[e+2] != sp.ind_effect[e].name){
 					error_load_sample(2);
@@ -589,6 +587,8 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 						if(tspl.size() != 2) error_load_sample(3);
 						auto t = number(tspl[1]); if(t == UNSET) error_load_sample(4);
 						
+						t = calc_tdiv(t,model.details);
+						
 						if(t <= t_end){
 							if(c == UNSET && source == false){
 								c = hash_compgl.find(tspl[0]);
@@ -641,7 +641,7 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 				if(1 == 1 && i < sp.nindividual_in){		
 					for(const auto &ev : ind.ev){
 						auto t = ev.tdiv;
-						
+					
 						if(t > t_end){
 							SimTrigEvent trig; trig.i = i; trig.tdiv = t;
 							
@@ -819,8 +819,15 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 /// Sets values for tnum_mean
 void StateSpecies::set_tnum_mean(unsigned int ti_end, const vector < vector <double> > &popnum_t)
 {
+	const auto &lin_form = sim_linear_speedup.lin_form;
+	auto pop_grad = pop_grad_calc(lin_form);
+	auto val_fast = calc_val_fast_init(lin_form,pop_grad,popnum_t[0]);
+	
 	for(auto ti = 0u; ti < ti_end; ti++){
-		auto tnum_mean = calculate_tnum_mean(ti,popnum_t[ti],cpop_st[ti],dt);
+		if(ti > 0) val_fast_update(ti,val_fast,popnum_t,pop_grad,lin_form);
+		
+		//auto tnum_mean = calculate_tnum_mean_all(ti,popnum_t[ti],cpop_st[ti],dt);
+		auto tnum_mean = calculate_tnum_mean_fast(ti,popnum_t[ti],cpop_st[ti],dt,val_fast);
 		
 		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 			tnum_mean_st[tr].push_back(tnum_mean[tr]);
@@ -888,6 +895,7 @@ unsigned int StateSpecies::ind_sample_init_c(const IndData &ind) const
 }
 
 
+/*
 /// Gets a new unique name for an individual
 string StateSpecies::get_new_ind_name(string pre, unsigned int num) const
 {
@@ -905,6 +913,7 @@ string StateSpecies::get_new_ind_name(string pre, unsigned int num) const
 	emsg("Could not get individual name");
 	return "";
 }
+*/
 
 
 /// Sets up the exponential of the fixed effects
@@ -1253,9 +1262,10 @@ double StateSpecies::get_indfac(const Individual &ind, const MarkovEqn &mar_eqn)
 
 
 /// Updates population-based species
-void StateSpecies::update_population_based(unsigned int ti, bool stoc, const vector <double> &popnum)
+void StateSpecies::update_population_based(unsigned int ti, bool stoc, const vector <double> &popnum, const vector <double> &val_fast)
 {		
-	auto tnum_mean = calculate_tnum_mean(ti,popnum,cpop,dt);
+	//auto tnum_mean = calculate_tnum_mean_all(ti,popnum,cpop,dt);
+	auto tnum_mean = calculate_tnum_mean_fast(ti,popnum,cpop,dt,val_fast);
 	
 	if(false){
 		for(auto val : cpop) cout << val << ","; 
@@ -1324,7 +1334,7 @@ vector <double> StateSpecies::sample_trans_num(const vector <double> &tnum_mean,
 
 
 /// Calculates the rate for different transitions
-vector <double> StateSpecies::calculate_tnum_mean(unsigned int ti, const vector <double> &popnum, const vector <double> &cpop, double dt) const
+vector <double> StateSpecies::calculate_tnum_mean_all(unsigned int ti, const vector <double> &popnum, const vector <double> &cpop, double dt) const
 {
 	auto N = sp.tra_gl.size();
 	vector <double> tnum_mean(N);
@@ -1335,6 +1345,86 @@ vector <double> StateSpecies::calculate_tnum_mean(unsigned int ti, const vector 
 	
 	return tnum_mean;
 }
+
+
+/// Calculates the rate for different transitions
+vector <double> StateSpecies::calculate_tnum_mean_fast(unsigned int ti, const vector <double> &popnum, const vector <double> &cpop, double dt, const vector <double> &val_fast) const
+{
+	auto N = sp.tra_gl.size();
+	vector <double> tnum_mean(N);
+	
+	const auto &precalc = param_val.precalc;
+	
+	const auto &lin_form = sim_linear_speedup.lin_form;
+	const auto &eq_temp = eqn[0];
+	const auto &tra_gl = sp.tra_gl;
+	
+	for(const auto &lf : lin_form.list){
+		auto val = eq_temp.calculate_item(lf.factor_precalc,ti,precalc)*val_fast[lf.sum_e_ref] + 
+		           eq_temp.calculate_item(lf.no_pop_precalc,ti,precalc);
+		auto tr = lf.m;
+		const auto &tra = tra_gl[tr];
+				
+		switch(tra.type){
+		case EXP_RATE: 
+			{
+				if(val < 0){	
+					if(val >= -TINY) val = 0;
+					else{
+						const auto &eq = eqn[lf.e];
+						run_error("The transition rate for '"+tra.name+"' through equation '"+eq.te_raw+"' has become negative."+check_prior(eq));
+					}
+				}
+			}
+			break;
+			
+		case EXP_MEAN: 
+			{
+				if(val <= 0){	
+					const auto &eq = eqn[lf.e];
+					if(val < 0){	
+						run_error("The transition mean for '"+tra.name+"' through equation '"+eq.te_raw+"' has become negative."+check_prior(eq));
+					}
+					else{
+						run_error("The transition mean for '"+tra.name+"' through equation '"+eq.te_raw+"' has become zero."+check_prior(eq));
+					}
+				}
+				val = 1/val;
+			}
+			break;
+			
+		default: emsg("Not option"); break;
+		}
+		
+		auto ci = tra.i;
+		if(ci == UNSET) val *= dt;
+		else{
+			auto pop = cpop[ci]; 
+			if(pop <= 0) val = 0;
+			else val *= pop*dt;
+		}
+	
+		if(val < 0) emsg("A transition rate has become negative");
+	
+		tnum_mean[tr] = val;
+	}
+	
+	for(auto tr : sim_linear_speedup.calc){
+		tnum_mean[tr] = calculate_tnum_mean(ti,tr,popnum,cpop,dt);
+	}
+	
+	if(false){
+		for(auto i = 0u; i < N; i++){
+			auto val = calculate_tnum_mean(ti,i,popnum,cpop,dt);
+			if(dif(val,tnum_mean[i],TINY)){
+				emsg("different");
+			}
+		}
+	}
+	
+	return tnum_mean;
+}
+
 
 
 /// Calculates the rate for different transitions
@@ -1476,6 +1566,7 @@ void StateSpecies::check_precalc_num(unsigned int n)
 	if(precalc.size() != n) emsg("problem");
 }
 
+
 /// Performs a MBP
 void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t, const MBPfast &mbp_fast)
 {				
@@ -1489,7 +1580,7 @@ void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t, co
 	
 	const auto &lin_form = mbp_fast.lin_form;
 	
-	auto pop_grad = mbp_pop_grad_calc(lin_form);
+	auto pop_grad = pop_grad_calc(lin_form);
 	
 	auto val_fast = calc_val_fast_init(lin_form,pop_grad,popnum_t[0]);
 
@@ -1502,7 +1593,7 @@ void StateSpecies::mbp(double sim_prob, vector < vector <double> > &popnum_t, co
 		if(ti > 0) val_fast_update(ti,val_fast,popnum_t,pop_grad,lin_form);
 		const auto &popnum = popnum_t[ti];
 	
-		model.param_update_precalc_time(ti,popnum_t[ti],param_val,true);
+		model.param_spec_precalc_time(ti,popnum_t[ti],param_val,true);
 		
 		set_tnum_mean_st_f(tnum_mean_st_f,ti,popnum,cpop,dt,val_fast,mbp_fast);
 		
@@ -1647,6 +1738,7 @@ void StateSpecies::set_tnum_mean_st_f(vector < vector <double> > &tnum_mean_st_f
 	}
 }
 
+
 /// Updates val_fast based on populations which change
 void StateSpecies::val_fast_update(unsigned int ti, vector <double> &val_fast, const vector < vector <double> > &popnum_t, const vector < vector <double> > &pop_grad, const LinearForm &lin_form) const
 {
@@ -1751,7 +1843,7 @@ void StateSpecies::linear_form_calculate(vector < vector <double> > &val_store, 
 	
 	const auto &precalc = param_val.precalc;
 	
-	auto pop_grad = mbp_pop_grad_calc(lin_form);
+	auto pop_grad = pop_grad_calc(lin_form);
 	vector <double> val_fast;
 	
 	for(auto k = 0u; k < L; k++){
@@ -1834,7 +1926,7 @@ void StateSpecies::linear_form_calculate(vector < vector <double> > &val_store, 
 	
 	
 /// Calculates any population gradients for fast calculation
-vector < vector <double> > StateSpecies::mbp_pop_grad_calc(const LinearForm &lin_form) const
+vector < vector <double> > StateSpecies::pop_grad_calc(const LinearForm &lin_form) const
 {
 	vector < vector <double> > pop_grad;
 	
@@ -2359,3 +2451,63 @@ void StateSpecies::cpop_st_update(unsigned int ti, unsigned int ti_next, unsigne
 	vector <double> vec; vec.push_back(ma);
 	back.push_back(Back(CPOP_ST,ti,ti_next,c,vec));
 }
+
+
+/// Works out how to update equations using changes in populations
+void StateSpecies::sim_linear_speedup_init()
+{
+	if(!sim_linearise_speedup){
+		switch(sp.type){
+		case INDIVIDUAL:
+			for(auto m = 0u; m < sp.markov_eqn.size(); m++){
+				sim_linear_speedup.calc.push_back(m);
+			}
+			break;
+			
+		case POPULATION:
+			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+				sim_linear_speedup.calc.push_back(tr);
+			}
+			break;
+		}
+		return;
+	}
+	
+	vector <LinearFormInit> lfinit;
+	
+	switch(sp.type){
+	case INDIVIDUAL:
+		for(auto m = 0u; m < sp.markov_eqn.size(); m++){
+			const auto &me = sp.markov_eqn[m];
+			auto e = me.eqn_ref;
+			const auto &eq = eqn[e]; 
+				if(eq.linearise.on && eq.linearise.pop_grad_time_dep == false){
+				LinearFormInit lfi; lfi.m = m; lfi.e = e;
+				lfinit.push_back(lfi);
+			}
+			else{
+				sim_linear_speedup.calc.push_back(m);
+			}
+		}
+		break;
+		
+	case POPULATION:
+		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+			const auto &tra = sp.tra_gl[tr];
+			auto e = tra.dist_param[0].eq_ref;
+			const auto &eq = model.eqn[e];
+			
+			if(eq.linearise.on && eq.linearise.pop_grad_time_dep == false){
+				LinearFormInit lfi; lfi.m = tr; lfi.e = e;
+				lfinit.push_back(lfi);
+			}
+			else{
+				sim_linear_speedup.calc.push_back(tr);
+			}
+		}
+		break;
+	}
+	
+	model.set_linear_form(UNSET,sim_linear_speedup.lin_form,lfinit);
+}
+

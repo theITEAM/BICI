@@ -19,7 +19,14 @@ void Species::initialise_data(Operation mode)
 	
 	init_cond.type = INIT_POP_NONE;
 	
+	Hash hash_pop_filter; 
+	Hash hash_pop_trans_filter; 
+	
+	print_diag("load data start");
+	
 	for(const auto &so : source){
+		print_diag("load "+so.name);
+		
 		switch(so.cname){
 		case INIT_POP: init_pop_data(so); break;
 		case ADD_POP: add_pop_data(so,1); break;
@@ -29,15 +36,17 @@ void Species::initialise_data(Operation mode)
 		case MOVE_IND: move_ind_data(so); break;
 		case COMP_DATA: comp_data(so); break;
 		case TEST_DATA: test_data(so); break;
-		case POP_DATA: population_data(so); break;
+		case POP_DATA: population_data(so,hash_pop_filter); break;
 		case TRANS_DATA: trans_data(so); break;
-		case POP_TRANS_DATA: popu_trans_data(so); break;
+		case POP_TRANS_DATA: popu_trans_data(so,hash_pop_trans_filter); break;
 		case GENETIC_DATA: genetic_data(so); break;
 		default:
 			emsg_input("data type not added:"); break;
 		}
 	}
 
+	print_diag("load data end");
+	
 	if(type == INDIVIDUAL) jiggle_data(mode);
 	
 	nindividual_in = individual.size();
@@ -189,9 +198,10 @@ void Species::init_pop_data(const DataSource &so)
 					auto name = tab.ele[r][cl];
 				
 					const auto &claa = cla[cl];
-					auto j = 0u; while(j < claa.ncomp && claa.comp[j].name != name) j++;
-					if(j == claa.ncomp){ alert_source("Could not find '"+name+"'",so); return;}
-					
+				
+					auto j = claa.hash_comp.find(name);
+					if(j == UNSET){ alert_source("Could not find '"+name+"'",so); return;}
+			
 					c += comp_mult[cl]*j;
 				}
 				
@@ -345,9 +355,9 @@ void Species::init_pop_data(const DataSource &so)
 					auto name = tab.ele[r][cl];
 				
 					const auto &claa = cla[cl];
-					auto j = 0u; while(j < claa.ncomp && claa.comp[j].name != name) j++;
-					if(j == claa.ncomp){ alert_source("Could not find '"+name+"'",so); return;}
-					
+					auto j = claa.hash_comp.find(name);
+					if(j == UNSET){ alert_source("Could not find '"+name+"'",so); return;}
+			
 					c += comp_mult[cl]*j;
 				}
 				
@@ -513,8 +523,9 @@ void Species::add_pop_data(const DataSource &so, int sign)
 				auto name = tab.ele[j][cl+1];
 							
 				const auto &claa = cla[cl];
-				auto j = 0u; while(j < claa.ncomp && claa.comp[j].name != name) j++;
-				if(j == claa.ncomp){ alert_source("Could not find '"+name+"'",so); return;}
+				
+				auto j = claa.hash_comp.find(name);
+				if(j == UNSET){ alert_source("Could not find '"+name+"'",so); return;}
 						
 				c += comp_mult[cl]*j;
 			}
@@ -901,7 +912,7 @@ void Species::test_data(const DataSource &so)
 
 
 /// pop-data command
-void Species::population_data(const DataSource &so)
+void Species::population_data(const DataSource &so, Hash &hash_pop_filter)
 {
 	const auto &tab = so.table;
 	
@@ -929,9 +940,11 @@ void Species::population_data(const DataSource &so)
 				}
 			}	
 			
-			auto pf = 0u; while(pf < pop_filter.size() && pop_filter[pf].name != name) pf++;
-			
-			if(pf == pop_filter.size()){
+			auto pf = hash_pop_filter.find(name);
+			if(pf == UNSET){
+				pf = pop_filter.size();
+				hash_pop_filter.add(pf,name);
+				
 				auto co = 1;
 				auto cf2 = cf;
 				for(auto cl = 0u; cl < ncla; cl++){
@@ -1168,7 +1181,7 @@ void Species::set_ob_trans_ev(const vector <Equation> &eqn)
 
 
 /// trans_data and pop-trans-data command
-void Species::popu_trans_data(const DataSource &so)
+void Species::popu_trans_data(const DataSource &so, Hash &hash_pop_trans_filter)
 {
 	const auto &tab = so.table;
 	
@@ -1207,10 +1220,12 @@ void Species::popu_trans_data(const DataSource &so)
 				}
 			}	
 			
-			auto pf = 0u; 
-			while(pf < pop_trans_filter.size() && pop_trans_filter[pf].name != name) pf++;
+			auto pf = hash_pop_trans_filter.find(name);
 			
-			if(pf == pop_trans_filter.size()){
+			if(pf == UNSET){
+				pf = pop_trans_filter.size();
+				hash_pop_trans_filter.add(pf,name);
+				
 				auto co = 2;
 				auto cf2 = cf;
 				for(auto cl = 0u; cl < ncla; cl++){
@@ -1692,7 +1707,7 @@ vector <unsigned int> Species::obs_eqn_add_vec(vector <EquationInfo> &eqn_info)
 {
 	vector <unsigned int> vec;
 	for(auto i = 0u; i < eqn_info.size(); i++){
-		vec.push_back(add_to_vec(obs_eqn,eqn_info[i].eq_ref));
+		vec.push_back(add_to_vec(obs_eqn,eqn_info[i].eq_ref,hash_obs_eqn));
 	}	
 	return vec;
 }

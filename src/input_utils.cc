@@ -850,7 +850,8 @@ void Input::set_const(Param &par, const vector <unsigned int> &ind, double val)
 	par.set_cons(sum,val);
 }
 			
-			
+
+/*
 /// Sets the text value of an element based on a dependency and an index
 void Input::set_element(Param &par, const vector <unsigned int> &ind, string te)
 {
@@ -862,6 +863,7 @@ void Input::set_element(Param &par, const vector <unsigned int> &ind, string te)
  
 	par.set_value_te(sum,te);
 }
+*/
 
 
 /// Sets the text value of an element based on a dependency and an index
@@ -905,12 +907,14 @@ void Input::print_table(const Table &tab) const
 }
 
 
+/*
 /// Adds a parameter reference to a list (if it doesn't already exist)
 void Input::add_to_list(vector <ParamRef> &list, const ParamRef &pr) const 
 {
 	auto i = 0u; while(i < list.size() && !(list[i].th == pr.th && list[i].index == pr.index)) i++;
 	if(i == list.size()) list.push_back(pr);
 }
+*/
 
 
 /// Creates a dependency from an vector of indices
@@ -1556,9 +1560,9 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 		switch(par.variety){
 		case CONST_PARAM:
 			{
-				auto ref = par.add_cons(0);
+				ElementRef er; er.index = par.add_cons(0); er.cons = true;
 				for(auto i = 0u; i < par.N; i++){
-					if(par.element_ref[i] == UNSET) par.element_ref[i] = ref;
+					if(par.element_ref[i].index == UNSET) par.element_ref[i] = er;
 				}
 			}
 			break;
@@ -1566,7 +1570,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 		case REPARAM_PARAM:
 			{
 				for(auto i = 0u; i < par.N; i++){
-					if(par.element_ref[i] == UNSET) par.set_value_te(i,"0"); 
+					if(par.element_ref[i].index == UNSET) par.set_cons(i,0);
 				}
 			}
 			break;
@@ -1579,10 +1583,12 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 			auto sum = 0.0;
 			auto wsum = 0.0, wi = 0.0;
 			for(auto i = 0u; i < par.N; i++){
-				auto ref = par.element_ref[i];
-				if(ref == UNSET) emsg_input("ref should not be unset"); 
+				const auto &er = par.element_ref[i];
+				auto ind = er.index;
+				if(ind == UNSET) emsg_input("ref should not be unset"); 
+				if(!er.cons) emsg_input("Should be constant");
 			
-				auto val = par.cons[ref];
+				auto val = par.constant.value[ind];// par.cons[ind];
 				auto w = par.weight[i];
 				
 				if(val == UNSET){
@@ -1624,8 +1630,8 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 			
 			if(false){
 				for(auto i = 0u; i < par.N; i++){
-					auto ref = par.element_ref[i];
-					cout << par.cons[ref] << "  param fact" << endl;
+					auto ref = par.element_ref[i].index;
+					cout << par.constant.value[ref] << "  param fact" << endl;
 				}
 			}
 		}	
@@ -1649,7 +1655,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 	
 	if(false){
 		for(auto i = 0u; i < par.N; i++){
-			auto ref = par.element_ref[i];
+			auto ref = par.element_ref[i].index;
 			if(ref == UNSET) emsg_input("ref should not be unset"); 
 			
 			auto &ele = par.element[ref];
@@ -1728,8 +1734,10 @@ void Input::set_val_from_ele(string ele, const vector <unsigned int> &ind, Param
 						alert_import(desc+" the element '"+ele+"' is not a valid equation (column '"+col+"', row "+tstr(r+2)+")");
 						return;
 					}
+					
+					set_reparam_element(par,ind,he(add_equation_info(ele,REPARAM)));
 				}
-				set_reparam_element(par,ind,he(add_equation_info(ele,REPARAM)));
+				else set_const(par,ind,val);
 				break;
 				
 			default: emsg_input("Should not be default3"); return;
@@ -1956,11 +1964,13 @@ void Input::add_param_cat_factor(Param &par)
 
 
 /// Loads up a reparameterisation
-void Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
+bool Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 {
+	auto ch_flag = false;
+	
 	const auto &depend = par.dep;
 	auto te = par.reparam_eqn;
-	par.reparam_eqn = "";
+	//par.reparam_eqn = "";
 	
 	if(par.time_dep){
 		if(par.spline_info.type != SQUARE_SPL){
@@ -1981,50 +1991,57 @@ void Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 	auto swap_temp = swap_template(eqn_raw.te,dep_conv);
 	if(swap_temp.warn != ""){ 
 		alert_import(swap_temp.warn); 
-		return;
+		return false;
 	}
-		
+	
 	for(auto i = 0u; i < par.N; i++){
-		auto ref = par.element_ref[i];
-		if(ref != UNSET){
-			//auto &ele = par.element[ref];
+		const auto &er = par.element_ref[i];
+		auto ind = er.index;
+		if(er.cons) emsg("SHould not be constant");
+		if(ind != UNSET){
+			auto &ele = par.element[ind];
+			if(ele.value.te == ""){		// Adds a new element
+				ch_flag = true;
 			
-			for(auto d = 0u; d < depend.size(); d++){
-				const auto &dep = depend[d];
-				dep_conv[d].after = dep.list[(i/dep.mult)%dep.list.size()];
-			}
-			
-			auto eqn = eqn_raw;
-			eqn.te = swap_index_temp(dep_conv,swap_temp);
-			
-			if(check_swap){
-				auto te_st = eqn.te;
-				auto res = swap_index(eqn.te,dep_conv);
-				if(res.warn != ""){
-					alert_import(res.warn); 
-					return;
+				for(auto d = 0u; d < depend.size(); d++){
+					const auto &dep = depend[d];
+					dep_conv[d].after = dep.list[(i/dep.mult)%dep.list.size()];
 				}
 				
-				if(eqn.te != te_st){
-					cout << eqn.te << " " << te_st << " compare" << endl; 
-					emsg_input("Swap index dif res");
+				auto eqn = eqn_raw;
+				eqn.te = swap_index_temp(dep_conv,swap_temp);
+				
+				if(check_swap){
+					auto te_st = eqn.te;
+					auto res = swap_index(eqn.te,dep_conv);
+					if(res.warn != ""){
+						alert_import(res.warn); 
+						return false;
+					}
+					
+					if(eqn.te != te_st){
+						cout << eqn.te << " " << te_st << " compare" << endl; 
+						emsg_input("Swap index dif res");
+					}
 				}
-			}
-			
-			eqn.type = REPARAM;
-			
-			model.add_eq_ref(eqn,hash_eqn);
-			
-			const auto &eqq = model.eqn[eqn.eq_ref];
-			if(eqq.time_vari == true){
-				if(par.spline_info.type != SQUARE_SPL){
-					alert_line("A square spline must be used for time-varying reparameterised expression '"+eqq.te_raw+"'.",par.line_num);	
+				
+				eqn.type = REPARAM;
+				
+				model.add_eq_ref(eqn,hash_eqn);
+				
+				const auto &eqq = model.eqn[eqn.eq_ref];
+				if(eqq.time_vari == true){
+					if(par.spline_info.type != SQUARE_SPL){
+						alert_line("A square spline must be used for time-varying reparameterised expression '"+eqq.te_raw+"'.",par.line_num);	
+					}
 				}
+
+				ele.value = eqn;
 			}
-		
-			par.element[ref].value = eqn;
 		}
 	}
+	
+	return ch_flag;
 }
 
 

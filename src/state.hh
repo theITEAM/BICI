@@ -92,7 +92,7 @@ class State                                // Stores information about the state
 		
 	// In state_update_ind.cc
 	public:
-		void update_markov_eqn_value(MarkovEqnDiv &div, double value, double &Li_markov, double &like_ch);
+		//void update_markov_eqn_value(MarkovEqnDiv &div, double value, double &Li_markov, double &like_ch);
 		Like update_ind(unsigned int p, unsigned int i, vector <Event> &ev_new, UpdateType type);
 		void change_population(unsigned int ti, unsigned int ti_next, unsigned int k, double num);
 		void update_pop_change(unsigned int ti, unsigned int ti_next, const vector <PopChange> &pop_change, double &like_ch);
@@ -197,6 +197,7 @@ class State                                // Stores information about the state
 		void check_neg_rate(string name);
 		void check_markov_value_dif();
 		void add_alg_warn(string te);
+		void check_precalc_dif(string ref);
 		void check_markov_div_value(unsigned int p, string ref);
 		
 	private:

@@ -80,7 +80,7 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	
 		get_dependency();                       // Gets how other parameter and priors are affect by change
 	
-		calculate_update_precalc();             // Finds how precalculation is updated 
+		calculate_spec_precalc();             // Finds how precalculation is updated 
 		
 		get_affect_like();                      // Gets how the likelihood is altered under the change
 	
@@ -140,7 +140,7 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	
 		get_dependency();                       // Gets how other parameter and priors are affect by change
 	
-		calculate_update_precalc();             // Finds how precalculation is updated 
+		calculate_spec_precalc();             // Finds how precalculation is updated 
 	
 		get_affect_like();                      // Gets how the likelihood is altered under the change
 		break;
@@ -385,101 +385,32 @@ void Proposal::initialise_variables()
 
 
 /// Works out how to update precalculation
-void Proposal::calculate_update_precalc()
+void Proposal::calculate_spec_precalc()
 {
+	auto param_list_tot = param_list;
+	
 	// For dependent parameters
-	auto M = model.precalc_eqn.calcu.size();
-	vector <bool> mapl(M,false);
-	{
-		dependent_update_precalc.clear();
-		
-		for(auto k = 0u; k < dependent.size(); k++){
-			auto j = dependent[k];
-			const auto &pv = model.param_vec[j];
-			
-			UpdatePrecalc up_pre;
-			up_pre.list_precalc_time = pv.list_precalc_time;
-			for(auto i : pv.list_precalc_before){
-				if(mapl[i] == false){
-					up_pre.list_precalc.push_back(i);
-					mapl[i] = true;
-				}
-			}
-			
-			dependent_update_precalc.push_back(up_pre);
-		}
+	// This takes a simple approach (its possible it causes some overlap in calculation
+	dependent_spec_precalc.resize(dependent.size());
+	for(auto k = 0u; k < dependent.size(); k++){
+		auto th = dependent[k];
+		param_list_tot.push_back(th);
+		dependent_spec_precalc[k] = model.param_vec[th].spec_precalc_before;
 	}
 	
-	// After parameters have been defined
-	auto dif = false;
-	if(param_list.size() > 1){
-		const auto &pv = model.param_vec[param_list[0]];
-		for(auto i = 1u; i < param_list.size(); i++){
-			const auto &pv2 = model.param_vec[param_list[i]];
-			if(equal_vec(pv.list_precalc_time,pv2.list_precalc_time) == false) dif = true;
-		}
-	}
-
-	if(dif == true){  // If there is a difference in the times of the proposals then do seperately
-		for(auto j : param_list){
-			const auto &pv = model.param_vec[j];
-			auto list_new = remove_precalc_done(pv.list_precalc,mapl);
-			if(list_new.size() > 0){				
-				UpdatePrecalc up_pre;
-				up_pre.list_precalc = list_new;
-				up_pre.list_precalc_time = pv.list_precalc_time;			
-				update_precalc.push_back(up_pre);
+	spec_precalc_after = model.precalc_eqn.combine_spec_precalc(param_list_tot);
+	
+	if(false){
+		cout << "PROPOSAL PRECALC " << name << endl;
+		
+		if(dependent.size() > 0){
+			for(auto k = 0u; k < dependent.size(); k++){
+				model.print_spec_precalc(model.param_vec[dependent[k]].name,dependent_spec_precalc[k]);
 			}
 		}
-	}
-	else{
-		const auto &pv = model.param_vec[param_list[0]];
 		
-		UpdatePrecalc up_pre;
-		up_pre.list_precalc_time = pv.list_precalc_time;			
-		
-		vector <unsigned int> list_precalc;
-		
-		auto C = param_list.size();
-		vector <unsigned int> index(C,0);
-
-		do{
-			auto imin = LARGE;
-			for(auto j = 0u; j < C; j++){
-				const auto &pc = model.param_vec[param_list[j]].list_precalc;
-				if(index[j] < pc.size()){
-					auto i = pc[index[j]];
-					if(i < imin) imin = i;
-				}
-			}
-			
-			if(imin == LARGE) break;
-			
-			if(mapl[imin] == false) list_precalc.push_back(imin);
-			
-			for(auto j = 0u; j < C; j++){
-				const auto &pc = model.param_vec[param_list[j]].list_precalc;
-				if(index[j] < pc.size() && pc[index[j]] == imin) index[j]++;
-			}
-		}while(true);
-		
-		if(false && C > 1){
-			for(auto j = 0u; j < C; j++){
-				const auto &pc = model.param_vec[param_list[j]].list_precalc;
-				for(auto i : pc) cout << i << ",";
-				cout << endl;			
-			}
-			
-			cout << "after" << endl;
-			for(auto i : list_precalc) cout << i << ",";
-			cout << endl;
-			emsg("comb");
-		}
-		
-		if(list_precalc.size() > 0){
-			up_pre.list_precalc = list_precalc;
-			update_precalc.push_back(up_pre);
-		}
+		model.print_spec_precalc("After",spec_precalc_after);
+		//emsg("do");
 	}
 }
 
@@ -489,6 +420,7 @@ vector <unsigned int> Proposal::remove_precalc_done(const vector <unsigned int> 
 {
 	vector <unsigned int> list_precalc_new;
 	for(auto i : list_precalc){
+		
 		if(mapl[i] == false){
 			list_precalc_new.push_back(i);
 			mapl[i] = true;
@@ -504,6 +436,7 @@ string Proposal::print_info() const
 {
 	stringstream ss;
 
+	ss << "<<<<<<< ";
 	ss << "prob: " << prop_prob << " ";
 	switch(type){
 	case TRANS_TREE_PROP:
@@ -533,111 +466,111 @@ string Proposal::print_info() const
 			{
 				string str = ""; 
 				for(auto th : param_list) str +=  model.param_vec[th].name+", ";
-				ss << "param: " << trunc(str) << endl;
+				ss << "param: " << trunc(str) << " ";
 			}
 			
-			{
+			if(dependent.size() > 0){
 				string str = ""; 
 				for(auto th : dependent) str += model.param_vec[th].name+", ";
-				ss << "dependent" << trunc(str) << endl;
+				ss << "dependent" << trunc(str);
 			}
 		}
 		break;
 		
 	case PAR_EVENT_FORWARD_PROP:
 		{
-			ss << "INDIVIDUAL forward joint parameter event for species " << model.species[p_prop].name << endl;
+			ss << "INDIVIDUAL forward joint parameter event for species " << model.species[p_prop].name;
 		}
 		break;
 		
 	case PAR_EVENT_FORWARD_SQ_PROP:
 		{
-			ss << "INDIVIDUAL forward squash joint parameter event for species " << model.species[p_prop].name << endl;
+			ss << "INDIVIDUAL forward squash joint parameter event for species " << model.species[p_prop].name;
 		}
 		break;
 		
 	case PAR_EVENT_BACKWARD_SQ_PROP:
 		{
-			ss << "INDIVIDUAL backward squash joint parameter event for species " << model.species[p_prop].name << endl;
+			ss << "INDIVIDUAL backward squash joint parameter event for species " << model.species[p_prop].name;
 		}
 		break;
 		
 	case IND_EVENT_TIME_PROP:
 		{
-			ss << "INDIVIDUAL event time sampler for species " << model.species[p_prop].name << endl;
+			ss << "INDIVIDUAL event time sampler for species " << model.species[p_prop].name;
 		}
 		break;
 		
 	case IND_MULTI_EVENT_PROP:
 		{
-			ss << "INDIVIDUAL multi event time sampler for species " << model.species[p_prop].name << endl;
+			ss << "INDIVIDUAL multi event time sampler for species " << model.species[p_prop].name;
 		}
 		break;
 		
 	case IND_EVENT_ALL_PROP:
 		{
-			ss << "INDIVIDUAL all event time sampler for species " << model.species[p_prop].name << endl;
+			ss << "INDIVIDUAL all event time sampler for species " << model.species[p_prop].name;
 		}
 		break;
 		
 	case IND_OBS_SWITCH_ENTER_SOURCE_PROP:
-		ss << "INDIVIDUAL correct switch enter/source propsal for species " << model.species[p_prop].name << endl;
+		ss << "INDIVIDUAL correct switch enter/source propsal for species " << model.species[p_prop].name;
 		break;
 		
 	case IND_OBS_SWITCH_LEAVE_SINK_PROP:
-		ss << "INDIVIDUAL correct switch leave/sink propsal for species " << model.species[p_prop].name << endl;
+		ss << "INDIVIDUAL correct switch leave/sink propsal for species " << model.species[p_prop].name;
 		break;
 	
 	case CORRECT_OBS_TRANS_PROP:
-		ss << "INDIVIDUAL correct obs trans propsal for species " << model.species[p_prop].name << endl;
+		ss << "INDIVIDUAL correct obs trans propsal for species " << model.species[p_prop].name;
 		break;
 		
 	case IND_LOCAL_PROP:
 		{
 			ss << "INDIVIDUAL local propsal for species " << model.species[p_prop].name 
-					<< " classification " << model.species[p_prop].cla[cl_prop].name << endl;
+					<< " classification " << model.species[p_prop].cla[cl_prop].name;
 		}
 		break;
 		
 	case IND_OBS_SAMP_PROP:
 		{
-			ss << "INDIVIDUAL sampler for species (observed) " << model.species[p_prop].name << endl;
+			ss << "INDIVIDUAL sampler for species (observed) " << model.species[p_prop].name;
 		}
 		break;
 		
 	case IND_OBS_RESIM_PROP:
 		{
-			ss << "INDIVIDUAL resimulate for species (observed) " << model.species[p_prop].name << endl;
+			ss << "INDIVIDUAL resimulate for species (observed) " << model.species[p_prop].name;
 		}
 		break;
 		
 	case IND_OBS_RESIM_SINGLE_PROP:
 		{
-			ss << "INDIVIDUAL resimulate single cl for species (observed) " << model.species[p_prop].name << endl;
+			ss << "INDIVIDUAL resimulate single cl for species (observed) " << model.species[p_prop].name;
 		}
 		break;
 		
 	case IND_UNOBS_RESIM_PROP:
 		{
-			ss << "INDIVIDUAL resimulate for species (unobserved) " << model.species[p_prop].name << endl;
+			ss << "INDIVIDUAL resimulate for species (unobserved) " << model.species[p_prop].name;
 		}
 		break;
 	
 	case IND_ADD_REM_PROP:
 		{
-			ss << "INDIVIDUAL add/remove (unobserved) " << model.species[p_prop].name << endl;
+			ss << "INDIVIDUAL add/remove (unobserved) " << model.species[p_prop].name;
 		}
 		break;
 		
 	case IND_ADD_REM_TT_PROP:
 		{
-			ss << "INDIVIDUAL add/remove with trans-tree (unobserved) " << model.species[p_prop].name << endl;
+			ss << "INDIVIDUAL add/remove with trans-tree (unobserved) " << model.species[p_prop].name;
 		}
 		break;
 		
 	case MBPII_PROP:
 		{
-			ss << "MBP TYPE II for species "  << model.species[p_prop].name << endl;
+			ss << "MBP TYPE II for species "  << model.species[p_prop].name;
 		}
 		break;
 	
@@ -645,79 +578,81 @@ string Proposal::print_info() const
 		{
 			const auto &sp = model.species[p_prop];
 			ss << "MBP for initial population for species "  << sp.name;
-			ss << " for " << sp.cla[cl_prop].name << " compartment " << sp.cla[cl_prop].comp[c_prop].name << endl;
+			ss << " for " << sp.cla[cl_prop].name << " compartment " << sp.cla[cl_prop].comp[c_prop].name;
 		}
 		break;
 		
 	case MBP_IC_POPTOTAL_PROP:
 		{
 			const auto &sp = model.species[p_prop];
-			ss << "MBP for total initial population for species "  << sp.name << endl;
+			ss << "MBP for total initial population for species "  << sp.name;
 		}
 		break;
 		
 	case MBP_IC_RESAMP_PROP:
 		{
 			const auto &sp = model.species[p_prop];
-			ss << "MBP resampling init_cond for "  << sp.name << endl;
+			ss << "MBP resampling init_cond for "  << sp.name;
 		}
 		break;
 		
 		case INIT_COND_FRAC_PROP:
 		{
 			const auto &sp = model.species[p_prop];
-			ss << "Gibbs proposal for init_cond fractions "  << sp.name << endl;
+			ss << "Gibbs proposal for init_cond fractions "  << sp.name;
 		}
 		break;
 	
 	case IE_PROP:
 		{
-			ss << "IE sampler for " << model.species[p_prop].ind_effect[ie_prop].name << endl;
+			ss << "IE sampler for " << model.species[p_prop].ind_effect[ie_prop].name;
 		}
 		break;
 		
 	case POP_ADD_REM_LOCAL_PROP:
 		{
-			ss << "LOCAL sampler add remove evnets for " << model.species[p_prop].name << endl;
+			ss << "LOCAL sampler add remove evnets for " << model.species[p_prop].name;
 		}
 		break;
 		
 	case POP_MOVE_LOCAL_PROP:
 		{
-			ss << "LOCAL sampler move events for " << model.species[p_prop].name << endl;
+			ss << "LOCAL sampler move events for " << model.species[p_prop].name;
 		}
 		break;
 		
 	case POP_IC_LOCAL_PROP:
 		{
-			ss << "LOCAL sampler init cond for " << model.species[p_prop].name << endl;
+			ss << "LOCAL sampler init cond for " << model.species[p_prop].name;
 		}
 		break;
 		
 	case POP_END_LOCAL_PROP:
 		{
-			ss << "LOCAL sampler end for " << model.species[p_prop].name << endl;
+			ss << "LOCAL sampler end for " << model.species[p_prop].name;
 		}
 		break;
 		
 	case POP_SINGLE_LOCAL_PROP:
 		{
-			ss << "LOCAL sampler single events for " << model.species[p_prop].name << endl;
+			ss << "LOCAL sampler single events for " << model.species[p_prop].name;
 		}
 		break;
 		
 	case POP_IC_PROP:
 		{
-			ss << "GLOBAL sampler init cond for " << model.species[p_prop].name << endl;
+			ss << "GLOBAL sampler init cond for " << model.species[p_prop].name;
 		}
 		break;
 		
 	case POP_IC_SWAP_PROP:
 		{
-			ss << "GLOBAL sampler init cond swap for " << model.species[p_prop].name << endl;
+			ss << "GLOBAL sampler init cond swap for " << model.species[p_prop].name;
 		}
 		break;
 	}
+	
+	ss << " >>>>>>>" << endl;
 
 	if(1 == 0) cout << "Affect like output is turned off in code" << endl;		
 	else{
@@ -730,27 +665,14 @@ string Proposal::print_info() const
 		if(imax < affect_like.size()) ss << "...+ more" << endl;
 	}
 	
-	if(true) ss << "Precalc output turned off in code" << endl;
+	if(false) ss << "Precalc output turned off in code" << endl;
 	else{
-		if(param_list.size() > 0){
-			ss << "Precalc dependent: ";
-			for(const auto &up_pr : dependent_update_precalc){
-				for(auto i : up_pr.list_precalc) ss << i << ",";
-				ss << "   time: ";
-				if(up_pr.list_precalc_time.size() == model.details.T) ss << "All";
-				else for(auto i : up_pr.list_precalc_time) ss << i << ",";
-				ss << endl;
-			}
-			
-			ss << "Precalc update: ";
-			for(const auto &up_pr : update_precalc){
-				for(auto i : up_pr.list_precalc) ss << i << ",";
-				ss << "   time: ";
-				if(up_pr.list_precalc_time.size() == model.details.T) ss << "All";
-				else for(auto i : up_pr.list_precalc_time) ss << i << ",";
-				ss << endl;
-			}
+		ss << "<<Precalc dependent>>" << endl;
+		for(auto k = 0u; k < dependent.size(); k++){
+			ss << model.str_spec_precalc(model.param_vec[dependent[k]].name,dependent_spec_precalc[k]);
 		}
+			
+		ss << model.str_spec_precalc("Update after",spec_precalc_after);
 	}
 	
 	if(!on) ss << "Proposal switched off" << endl;
@@ -780,6 +702,10 @@ void Proposal::MH(State &state)
 			const auto &pv = model.param_vec[i];
 			cout << pv.name << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
 		}
+		for(auto val : param_val.precalc){
+			cout << val << ",";
+		}
+		cout << "val" << endl;
 	}
 	
 	auto like_ch = state.update_param(affect_like);
@@ -804,7 +730,7 @@ void Proposal::MH(State &state)
 		update_si(-0.005); if(si > 3) si *= 0.75;
 	}
 	
-	if(pl) state.check("evafter");
+	if(pl) state.check("mh after");
 }
 
 
@@ -812,6 +738,8 @@ void Proposal::MH(State &state)
 void Proposal::mbp(State &state)
 {
 	auto pl = false;
+	
+	if(pl) state.check_precalc_dif("BEFORE");
 	
 	InitCondValue init_cond_store;
 	
@@ -829,6 +757,15 @@ void Proposal::mbp(State &state)
 		{
 			ps_fac = param_resample(state.param_val,state.popnum_t);
 			if(ps_fac == UNSET){ update_si(-0.005); return;}
+			
+			if(pl){     
+				cout << endl << endl;
+				const auto &param_val = state.param_val;
+				for(auto i : param_val.value_ch){
+					const auto &pv = model.param_vec[i];
+					cout << pv.name << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
+				}
+			}
 		}
 		break;
 		
@@ -909,6 +846,10 @@ void Proposal::mbp(State &state)
 			if(si < POP_SI_LIM) si = POP_SI_LIM;
 		}
 	}
+	
+	if(pl) state.check_precalc_dif("AFTER");
+	
+	if(pl) state.check("mbp");
 }
 
 

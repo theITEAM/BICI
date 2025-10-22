@@ -196,6 +196,7 @@ void State::check(string ref)
 void State::check_precalc_eqn(string ref)
 {
 	const auto &precalc = param_val.precalc;
+	const auto &value = param_val.value;
 	
 	auto n = model.precalc_eqn.calcu.size();
 	if(precalc.size() != n){
@@ -206,14 +207,44 @@ void State::check_precalc_eqn(string ref)
 		ssp.check_precalc_num(n);
 	}
 	
-	auto val = precalc;
-	model.precalc_eqn.calculate_all(model.list_precalc,param_val);
+	if(param_val.value_ch.size() != 0) emsg("value_ch size");
+	if(param_val.precalc_ch.size() != 0) emsg("value_ch size");
 	
-	model.param_update_precalc_time_all(popnum_t,param_val,false);
-
+	for(auto th = 0u; th < param_val.value_old.size(); th++){
+		if(param_val.value_old[th] != UNSET) emsg("value_old");
+	}
+	
 	for(auto i = 0u; i < precalc.size(); i++){
-		if(dif(val[i],precalc[i],dif_thresh)){
-			cout << val[i] << " " << precalc[i] << endl;
+		if(param_val.precalc_old[i] != UNSET) emsg("precalc_old");
+	}
+	
+	auto precalc_st = precalc;
+	auto value_st = value;
+	
+	model.precalc_eqn.calculate(model.spec_precalc,param_val,false);
+	
+	//model.precalc_eqn.calculate_all(model.list_precalc,param_val);
+	
+	model.param_spec_precalc_time_all(popnum_t,param_val,false);
+
+	for(auto th = 0u; th < value.size(); th++){
+		if(value_st[th] == UNSET) emsg("Value should not be unset");
+		
+		if(dif(value_st[th],value[th],dif_thresh)){
+			cout << model.param_vec[th].name << " " << value_st[th] << " " << value[th] << endl;
+			cout << model.param_vec[th].name << " " << value_st[th] << " " << value[th] << endl;
+			emsg("value problem"+ref);
+		}
+	}
+	
+	for(auto i = 0u; i < precalc.size(); i++){
+		if(precalc_st[i] == UNSET){
+			//for(auto i = 0u; i < precalc.size(); i++) cout << i << " " << precalc_st[i] << " pre" << endl;
+			emsg("Precalc should not be unset1");
+		}
+		
+		if(dif(precalc_st[i],precalc[i],dif_thresh)){
+			cout << i << " " << precalc.size() << " " << precalc_st[i] << " " << precalc[i] << endl;
 			emsg("precalc problem"+ref);
 		}
 	}
@@ -245,7 +276,7 @@ void State::check_dependent_param(string ref)
 	}
 	
 	for(auto ti = 0u; ti < T; ti++){
-		const auto &upt = model.update_precalc_time[ti];
+		const auto &upt = model.spec_precalc_time[ti];
 		
 		for(auto th : upt.pv){
 			const auto &pv = model.param_vec[th];
@@ -2426,3 +2457,40 @@ void State::add_alg_warn(string te)
 	add_alg_warning(te,sample,alg_warn);
 }
 
+
+/// Checks precalc difference with out updating values
+void State::check_precalc_dif(string ref)
+{
+	auto &precalc = param_val.precalc;
+	auto &value = param_val.value;
+	
+	auto precalc_st = precalc;
+	auto value_st = value;
+	
+	model.precalc_eqn.calculate(model.spec_precalc,param_val,false);
+	
+	model.param_spec_precalc_time_all(popnum_t,param_val,false);
+
+	auto dthmax = 0.0;
+	for(auto th = 0u; th < value.size(); th++){
+		if(value_st[th] == UNSET) emsg("Value should not be unset");
+		
+		auto d = value_st[th]-value[th];
+		if(d*d > dthmax) dthmax = d*d;
+	}
+	
+	auto dpmax = 0.0;
+	for(auto i = 0u; i < precalc.size(); i++){
+		if(precalc_st[i] == UNSET){
+			emsg("Precalc should not be unset2");
+		}
+		
+		auto d = precalc_st[i] - precalc[i];
+		if(d*d > dpmax) dpmax = d*d;
+	}
+	
+	cout << ref << ": dthmax " << sqrt(dthmax) << " dpmax " << sqrt(dpmax) << endl;
+	
+	precalc = precalc_st;
+	value = value_st;
+}

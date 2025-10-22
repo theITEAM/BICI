@@ -626,9 +626,11 @@ function simulate_data(so)
 		break;
 	}
 
+	/*
 	if(ele.length == 0){
 		alert_help("No data","This data is empty.");
 	}
+	*/
 	
 	post({ type:input.type, head:head, ele:ele});
 }

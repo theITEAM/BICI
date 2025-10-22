@@ -50,7 +50,8 @@ class Model                                // Stores information about the model
 		vector <IEGref> ieg_ref;               // References all the ind effect groups in the model
 		
 		vector <Spline> spline;                // Stores information about splines
-	 	
+	 	Hash hash_spline;
+		
 		vector <double> timepoint;             // Discrete timepoints	
 		
 		vector <Derive> derive;                // Derived quantities
@@ -68,23 +69,24 @@ class Model                                // Stores information about the model
 		Constant constant;                     // Stores all the contants in the model
 		
 		Precalc precalc_eqn;                   // The equation which precalculates quantities
-		vector <unsigned int> list_precalc;    // Stores list of i used in precalcultion
-		vector <unsigned int> list_precalc_derive; // Stores list for precalcultion of derived (for integrals)
-		vector <UpdatePrecalcTime> update_precalc_time; // Precalculation at different times
-	
-		vector <double> param_vec_ref;         // Stores where param are on precalc
-		vector <double> spline_ref;            // Stores where spline is on precalc
+		SpecPrecalc spec_precalc;              // Stores precalcultion
+		SpecPrecalc spec_precalc_derive;       // Stores list for precalcultion of derived (for integrals)
+		vector <SpecPrecalcTime> spec_precalc_time; // Precalculation at different times
+		vector <double> precalc_init;          // Initial value for precalc
+		
+		vector <unsigned int> param_vec_ref;   // Stores where param are on precalc
+		vector <unsigned int> spline_ref;      // Stores where spline is on precalc
 	
 		Model(Operation mode_);
 		void add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv = UNSET);
 		void param_val_init(PV &param_val) const;
 		PV param_sample() const;
-		void param_update_precalc_time(unsigned int ti, const vector <double> &popnum, PV &param_val, bool store) const;
+		void param_spec_precalc_time(unsigned int ti, const vector <double> &popnum, PV &param_val, bool store) const;
 		bool sample_bounded() const;
 		void sample_ieg_cv(PV &param_val) const;
-		void param_update_precalc_time_all(const vector < vector <double> > &popnum_t, PV &param_val, bool store) const;
-		void param_update_precalc_before(unsigned int th, PV &param_val, bool store) const;
-		void param_update_precalc_after(unsigned int th, PV &param_val, bool store) const;
+		void param_spec_precalc_time_all(const vector < vector <double> > &popnum_t, PV &param_val, bool store) const;
+		//void param_spec_precalc_before(unsigned int th, PV &param_val, bool store) const;
+		//void param_spec_precalc_after(unsigned int th, PV &param_val, bool store) const;
 		PV post_param(const Sample &samp) const;
 		vector <double> prior_prob(const PV &param_val) const;
 		vector <double> dist_prob(const PV &param_val) const;
@@ -101,9 +103,9 @@ class Model                                // Stores information about the model
 		void create_species_simp();
 		void order_affect(vector <AffectLike> &vec) const;
 		void affect_linearise_speedup(vector <AffectLike> &vec) const;
-		AffectMap get_affect_map(vector <AffectLike> &vec, const vector <UpdatePrecalc> &dependent_update_precalc, const vector <UpdatePrecalc> &update_precalc) const;
-		void affect_nopop_speedup(vector <AffectLike> &vec, const vector <UpdatePrecalc> &dependent_update_precalc, const vector <UpdatePrecalc> &update_precalc) const;
-		void set_factor_nopop_only(vector <AffectLike> &vec, const vector <UpdatePrecalc> &dependent_update_precalc, const vector <UpdatePrecalc> &update_precalc) const;
+		AffectMap get_affect_map(vector <AffectLike> &vec, const vector <SpecPrecalc> &dependent_spec_precalc, const SpecPrecalc &spec_precalc_after) const;
+		void affect_nopop_speedup(vector <AffectLike> &vec, const vector <SpecPrecalc> &dependent_spec_precalc, const SpecPrecalc &spec_precalc_after) const;
+		void set_factor_nopop_only(vector <AffectLike> &vec, const vector <SpecPrecalc> &dependent_spec_precalc, const SpecPrecalc &spec_precalc_after) const;
 		bool item_equal(const EqItem &it1, const EqItem &it2) const;
 		void add_iif_w_affect(vector <AffectLike> &vec) const;
 		void add_popnum_ind_w_affect(vector <AffectLike> &vec) const;
@@ -129,7 +131,8 @@ class Model                                // Stores information about the model
 		double calc_tdiv(double t) const; 
 		double calc_t(double tdiv) const;
 		void create_precalc_equation();
-		void set_update_precalc_time();
+		void set_precalc_init();
+		void set_spec_precalc_time();
 		void create_precalc_derive();
 		void create_precalc_pop_grad();
 		void precalc_affect();
@@ -140,6 +143,11 @@ class Model                                // Stores information about the model
 		void set_linear_form(unsigned int p, LinearForm &lin_form, const vector <LinearFormInit> &lfinit) const;
 		bool is_matrix(const Param &par) const;
 		bool is_symmetric(const Param &par) const;
+		void convert_fix_pr_const();
+		void print_spec_precalc(string st, const SpecPrecalc &spre) const;
+		string str_time_range(const vector <unsigned int> &lt) const;
+		string str_spec_precalc(string st, const SpecPrecalc &spre) const;
+		void set_param_spec_precalc();
 
 	private:
 		Hash hash_all_ind;                     // Stores individuals in a hash table

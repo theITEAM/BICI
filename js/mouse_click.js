@@ -1047,8 +1047,14 @@ function button_action(bu,action_type)
 						if(t == t_start) vec.push("start");
 						else vec.push(String(t));
 					}						
-					vec.push("end");
-				
+					
+					if(bub.bu.spline_radio == undefined) vec.push("end");
+					else{
+						if(bub.bu.spline_radio.value != "Square"){
+							vec.push("end");
+						}
+					}
+					
 					change_spline_knot(model.param[bub.bu.i],vec);
 					update_param();					
 					close_bubble();
@@ -1460,8 +1466,10 @@ function button_action(bu,action_type)
 		
 	case "AddConstParam":
 		{
-			model.param[bu.i].variety = "const";
+			let th = bu.i;
+			model.param[th].variety = "const";
 			close_bubble();
+			par_in_view("ParamSimElement",th);
 		}
 		break;
 		
@@ -1492,11 +1500,13 @@ function button_action(bu,action_type)
 		
 	case "AddReparamParam2":
 		{
-			let par = model.param[inter.bubble.k];
+			let th = inter.bubble.k;
+			let par = model.param[th];
 			par.variety = "reparam";
 			par.reparam_eqn_on = false;
 			if(inter.bubble.radio.value == "equation") par.reparam_eqn_on = true;
-			close_bubble();
+			close_bubble();	
+			par_in_view("ReparamElement",th);
 		}
 		break;
 		
@@ -1946,6 +1956,13 @@ function button_action(bu,action_type)
 		{
 			let info = bu.eqn_info;
 			select_bubble_data_element(info.p,info.i,info.r,info.c);
+		}
+		break;
+		
+	case "SelectSimDataElement":
+		{
+			let info = bu.eqn_info;
+			select_bubble_sim_data_element(info.p,info.i,info.r,info.c);
 		}
 		break;
 	

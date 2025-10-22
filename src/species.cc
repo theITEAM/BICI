@@ -634,7 +634,9 @@ vector <unsigned int> Species::get_cv_list(unsigned int ie, const vector <Param>
 	
 	const auto &ind_eff = ind_effect[ie]; 
 	
-	vector <unsigned int> list; 	
+	vector <unsigned int> list;
+	HashSimp hash_list;
+	
 	if(ind_eff.markov_eqn_ref.size() > 0) fl = false;
 	else{
 		for(auto ref : ind_eff.nm_trans_ref){
@@ -655,7 +657,7 @@ vector <unsigned int> Species::get_cv_list(unsigned int ie, const vector <Param>
 						else{
 							auto th = par.get_param_vec(pr.index);	
 							if(th == UNSET) fl = false;
-							else add_to_vec(list,th);
+							else add_to_vec(list,th,hash_list);
 						}
 					}
 				}

@@ -71,10 +71,12 @@ void State::simulate(const PV &param_value, const vector <InitCondValue> &initc_
 		}
 	}
 
+	/*
 	for(auto p = 0u; p < nspecies; p++){
 		auto &ssp = species[p];
 		ssp.check(0,popnum_t);
 	}
+	*/
 
 	simulate_iterate(0,T);
 }
@@ -84,12 +86,12 @@ void State::simulate(const PV &param_value, const vector <InitCondValue> &initc_
 void State::post_sim(const PV &param_value, const Sample &samp)
 {
 	param_val = param_value;
+
+	auto t_start = calc_tdiv(model.details.ppc_t_start,model.details);	
+	auto t_end = calc_tdiv(model.details.ppc_t_end,model.details);
 	
-	auto t_start = model.details.ppc_t_start;
-	
-	auto t_end = model.details.ppc_t_end;
-	auto ti_start = get_ti(calc_tdiv(t_start,model.details));
-	auto ti_end = get_ti(calc_tdiv(t_end,model.details));
+	auto ti_start = get_ti(t_start);
+	auto ti_end = get_ti(t_end);
 	
 	for(auto p = 0u; p < model.species.size(); p++){
 		auto &ssp = species[p];
@@ -121,34 +123,65 @@ void State::post_sim(const PV &param_value, const Sample &samp)
 /// Once a simulation is setup this iterates equations
 void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end) 
 {
+	vector <SimSpeed> sim_speed(nspecies);
+	
+	// Initialises speedup
+	for(auto p = 0u; p < nspecies; p++){
+		const auto &ssp = species[p];
+		sim_speed[p].pop_grad = ssp.pop_grad_calc(ssp.sim_linear_speedup.lin_form);
+	}
+	
+	vector <double> val_fast;
+	
 	for(auto ti = ti_start; ti < ti_end; ti++){	
 		//if(true && ti%op_step == 0) print_cpop(ti);		
-		//cout << ti << " ti" << endl;
+		//cout << ti << " ti sim" << endl;
 		
 		auto &pop = popnum_t[ti];
 	
+		timer[SIM_CALC_POPNUM] -= clock();
 		pop = calculate_popnum();          // Calculates the population numbers
-	
-		model.param_update_precalc_time(ti,pop,param_val,false);
-		
+		timer[SIM_CALC_POPNUM] += clock();
+
+		timer[SIM_PRECALC] -= clock();
+		model.param_spec_precalc_time(ti,pop,param_val,false);
+		timer[SIM_PRECALC] += clock();
+
+		timer[SIM_POPIND] -= clock();	
 		auto pop_ind = calculate_pop_ind(); 
-	
+		timer[SIM_POPIND] += clock();
+
+		timer[SIM_UPDATE] -= clock();	
 		for(auto p = 0u; p < nspecies; p++){
 			auto &ssp = species[p];
+			
+			const auto &lin_form = ssp.sim_linear_speedup.lin_form;
+			auto &ss = sim_speed[p];
+			if(ti == ti_start) ss.val_fast = ssp.calc_val_fast_init(lin_form,ss.pop_grad,pop);
+			else ssp.val_fast_update(ti,ss.val_fast,popnum_t,ss.pop_grad,lin_form);
+			
 			switch(ssp.type){
 			case INDIVIDUAL:
-				ssp.update_individual_based(ti,pop_ind,popnum_t);
+				ssp.update_individual_based(ti,pop_ind,popnum_t,ss.val_fast);
 				break;
 				
 			case POPULATION: 
-				ssp.update_population_based(ti,model.details.stochastic,pop);
+				ssp.update_population_based(ti,model.details.stochastic,pop,ss.val_fast);
 				break;
 			}
+			timer[SIM_UPDATE] += clock();	
 		
-			ssp.check(ti,popnum_t);
+			//if(ti%10 == 0){
+			if(ti+1 == ti_end){
+				timer[SIM_CHECK] -= clock();	
+				ssp.check(ti,popnum_t);
+				timer[SIM_CHECK] += clock();	
+			}
 		}
 	}
 
+	//emsg("sim done");
+	
 	if(model.mode == INF) ensure_all_ind_event();
 
 	if(false){
@@ -169,8 +202,6 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 		for(const auto &ssp : species) prob_sum += ssp.prob_trans_tree;
 		if(prob_sum != 0) cout << "Probability trans tree = " << prob_sum << endl;
 	}
-
-	//popnum_t = calculate_popnum_t();
 
 	likelihood_from_scratch();
 }
@@ -224,7 +255,7 @@ vector <DeriveOutput> State::derive_calculate()
 	
 	const auto &precalc = param_val.precalc;
 	
-	model.precalc_eqn.calculate(model.list_precalc_derive,get_list(T),param_val,false);
+	model.precalc_eqn.calculate(model.spec_precalc_derive,param_val,false);
 	
 	timer[DERIVE_PRECALC_TIMER] += clock();
 	
@@ -1516,7 +1547,7 @@ void State::set_particle(const Particle &part, bool calc_like)
 	
 	popnum_t = calculate_popnum_t();
 	
-	model.param_update_precalc_time_all(popnum_t,param_val,false); 
+	model.param_spec_precalc_time_all(popnum_t,param_val,false); 
 	
 	if(calc_like) likelihood_from_scratch(); 
 }

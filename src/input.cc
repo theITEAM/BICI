@@ -308,8 +308,12 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	print_diag("h1");
 
 	percentage(30,100);
-
+	
+	model.convert_fix_pr_const();      // Converts any fixed priors to constants
+	
 	create_equations(30,60);           // Creates equation calculations
+
+	print_diag("h1a");
 
 	combine_populations();             // Combines together populations which appear together
 	
@@ -400,6 +404,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	create_spline();                   // Creates any splines in the model
 
+	print_diag("h9a");
+
 	create_markov_eqn_pop_ref();       // Works out which populations affect which markov eqns (and vice versa)
 	
 	print_diag("h10");
@@ -455,11 +461,15 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	linearise_precalc();                // References precalculation in linearisation
 	
+	model.set_param_spec_precalc();     // Sets precalculation for parameter value
+	
 	model.precalc_affect();             // Works out how precalculation is affected by changes in parameters
 	
 	model.create_precalc_derive();      // Extracts precalculations for derived quantities
 	
-	model.set_update_precalc_time();    // Sets update form precalc a different times (for tv reparam)
+	model.set_precalc_init();           // Sets the initial value for precalc
+	
+	model.set_spec_precalc_time();      // Sets update for precalc at different times (for tv reparam)
 	
 	setup_der_func_eqn();               // Sets up equations for derived functions
 	
@@ -695,8 +705,6 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 /// Adds text escape characters
 string Input::remove_escape_char(string te)
 {
-	auto escape_char = get_escape_char();
-
 	te = replace(te,"〈","<");
 	te = replace(te,"〉",">");
 	
@@ -1438,8 +1446,10 @@ void Input::create_param_vector()
 	auto N = model.param.size();
 
 	vector < vector <unsigned int> > needed;
-	
 	needed.resize(N);
+	
+	vector <HashSimp> hash_needed;
+	hash_needed.resize(N);
 
 	for(auto th = 0u; th < N; th++){		
 		const auto &par = model.param[th];
@@ -1453,7 +1463,7 @@ void Input::create_param_vector()
 					return;
 				}
 				else{
-					add_to_vec(needed[th],th2);
+					add_to_vec(needed[th],th2,hash_needed[th]);
 				}
 			}				
 		}
@@ -1483,7 +1493,7 @@ void Input::create_param_vector()
 	if(list.size() != N){
 		alert_import("Could not order parameters (e.g. cyclic dependencies exist such as A dependent on B and B dependent on A)");
 	}
-	
+
 	for(auto i = 0u; i < N; i++){
 		auto th = list[i];
 		auto &par = model.param[th];
@@ -1501,13 +1511,14 @@ void Input::create_param_vector()
 			}
 		
 			for(auto j = 0u; j < par.N; j++){
-				auto ref = par.element_ref[j];
-				if(ref != UNSET && !(sym_fl && !allow[j])){
-					auto &ele = par.element[ref];
-			
+				const auto &er = par.element_ref[j];
+				auto ind = er.index;
+				if(ind != UNSET && !er.cons && !(sym_fl && !allow[j])){
+					auto &ele = par.element[ind];
+						
 					if(removeparamvec_speedup == false || ele.used == true || par.spline_info.on == true){
 						ele.param_vec_ref = model.param_vec.size();
-					
+						
 						ParamVecEle pr; 
 						pr.name = add_escape_char(get_param_name_with_dep(par,par.dep,j));
 						pr.th = th; 
@@ -1520,7 +1531,9 @@ void Input::create_param_vector()
 						}
 						pr.variety = par.variety;
 						pr.reparam_time_dep = false;
-						if(pr.variety == REPARAM_PARAM && par.time_dep) pr.reparam_time_dep = true;
+						if(pr.variety == REPARAM_PARAM && par.time_dep){
+							if(par.spline_info.type == SQUARE_SPL) pr.reparam_time_dep = true;
+						}
 						pr.ppc_resample = false;
 						pr.reparam_spl_ti = UNSET;
 						pr.spline_ref = UNSET;
@@ -1545,12 +1558,12 @@ void Input::create_param_vector()
 					for(auto i = 0u; i < L; i++){
 						auto k = j*L+i;
 						
-						auto ref = par.element_ref[k];
+						auto ref = par.element_ref[k].index;
 						if(ref != UNSET && !allow[k]){
 							auto &ele = par.element[ref];
 			
 							if(removeparamvec_speedup == false || ele.used == true || par.spline_info.on == true){
-								auto ref_rev = par.element_ref[i*L+j];
+								auto ref_rev = par.element_ref[i*L+j].index;
 								if(ref_rev != UNSET){
 									const auto &ele_rev = par.element[ref_rev];
 								
@@ -1564,7 +1577,7 @@ void Input::create_param_vector()
 			
 			if(false){
 				for(auto j = 0u; j < par.N; j++){
-					auto ref = par.element_ref[j];
+					auto ref = par.element_ref[j].index;
 					auto &ele = par.element[ref];
 					cout << ele.param_vec_ref << ",";
 				}
@@ -1580,7 +1593,7 @@ void Input::create_param_vector()
 	}
 	model.nparam_vec = model.param_vec.size();
 
-	// Creates a vector of parameters which can undergoe proposals
+	// Creates a vector of parameters which can undergo proposals
 	
 	for(auto th = 0u; th < model.nparam_vec; th++){
 		auto &pv = model.param_vec[th];

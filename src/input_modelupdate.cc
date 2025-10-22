@@ -45,6 +45,8 @@ void Input::add_species(string name, SpeciesType type, bool trans_tree)
 	
 	model.species.push_back(sp);	
 	model.nspecies = model.species.size();  
+	
+	if(model.nspecies >= SPECIES_MAX) alert_import("Cannot exceed the species limit of "+tstr(SPECIES_MAX));
 }
 
 
@@ -90,8 +92,16 @@ bool Input::add_compartment(string name, unsigned int p, unsigned int cl, double
 	co.erlang_c_start = UNSET;
 	if(erlang_source != ""){
 		co.erlang_hidden = true;
-		auto cc = 0u; while(cc < claa.comp.size() && claa.comp[cc].name != erlang_source) cc++;
-		if(cc == claa.comp.size()) emsg_input("Erlang source problem");
+		//auto cc = 0u; while(cc < claa.comp.size() && claa.comp[cc].name != erlang_source) cc++;
+		//if(cc == claa.comp.size()) emsg_input("Erlang source problem");
+		{ // turn off
+			auto cc = 0u; while(cc < claa.comp.size() && claa.comp[cc].name != erlang_source) cc++;
+			if(cc != claa.hash_comp.find(erlang_source)) emsg("cc wrong");
+		}
+		
+		auto cc = claa.hash_comp.find(erlang_source);		
+		if(cc == UNSET) emsg_input("Erlang source problem");
+		
 		co.erlang_c_start = cc;
 	}	
 	co.erlang_source = erlang_source;
@@ -262,7 +272,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 			}
 		}
 	}
-	
+
 	for(auto &sp : model.species){                       // Initial conditions
 		auto &ic = sp.init_cond;
 		if(ic.type == INIT_POP_DIST){
@@ -280,7 +290,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 			}  
 		}
 	}
-	
+
 	for(auto &sp : model.species){                       // Observation model
 		for(auto &pf : sp.pop_filter){                     // Population filter   
 			pf.time_vari = false;
@@ -391,10 +401,10 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 					
 				case OBS_TEST_EV:                              // Ind. test
 					model.add_eq_ref(ob.Se_eqn,hash_eqn,ob.tdiv);
-					ob.Se_obs_eqn_ref = add_to_vec(sp.obs_eqn,ob.Se_eqn.eq_ref);
+					ob.Se_obs_eqn_ref = add_to_vec(sp.obs_eqn,ob.Se_eqn.eq_ref,sp.hash_obs_eqn);
 					
 					model.add_eq_ref(ob.Sp_eqn,hash_eqn,ob.tdiv);
-					ob.Sp_obs_eqn_ref = add_to_vec(sp.obs_eqn,ob.Sp_eqn.eq_ref);
+					ob.Sp_obs_eqn_ref = add_to_vec(sp.obs_eqn,ob.Sp_eqn.eq_ref,sp.hash_obs_eqn);
 					break;
 				}
 			}
@@ -420,16 +430,16 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 			}
 		}
 	}
-	
+
 	// Adds in any parameter reparameterisation 
-	// This is done at the end so it is only aplied to any "used" parameter  
+	// This is done at the end so it is only aplied to any "used" parameters  
 	bool flag;
 	do{
 		flag = false;
 		auto num = 0u;
 		for(auto th = 0u; th < model.param.size(); th++){
 			auto &par = model.param[th];
-		
+
 			if(par.variety != CONST_PARAM){
 				switch(par.variety){
 				case DIST_PARAM: case PRIOR_PARAM:
@@ -447,8 +457,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 				
 				case REPARAM_PARAM:
 					if(par.reparam_eqn != ""){   // Reparameterisation set by equation
-						add_reparam_eqn(par,hash_eqn); 
-						flag = true;
+						if(add_reparam_eqn(par,hash_eqn)) flag = true;; 	
 					}
 					else{                        // Reparametersisation set individually
 						for(auto &ele : par.element){
@@ -457,6 +466,13 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 								flag = true;
 								num++;
 								model.add_eq_ref(eqi,hash_eqn);
+								
+								auto &eq = model.eqn[eqi.eq_ref];
+								if(eq.warn == "" && eq.contain_population){
+									if(par.time_dep && par.spline_info.type != SQUARE_SPL){
+										eq.warn = "Reparametererised splines can only contain populations if they are square.";
+									}
+								}
 							}
 						}
 					}
@@ -701,14 +717,14 @@ vector <bool> Input::set_eqn_zero(const vector <EquationInfo> &eq_info)
 void Input::add_parent_child(const EquationInfo eqi, unsigned int i, unsigned int th, Hash &hash)
 {
 	ParamRef parref; parref.th = th; parref.index = i;
-				
+			
 	auto &par = model.param[th];
-	
+
 	auto ref = eqi.eq_ref;
 	if(ref != UNSET){
 		const auto &eq = model.eqn[ref];
 
-		for(auto pr : eq.param_ref){
+		for(auto pr : eq.param_ref){			
 			vector <unsigned int> vec;
 			vec.push_back(th); vec.push_back(i);
 			vec.push_back(pr.th); vec.push_back(pr.index);
@@ -716,9 +732,11 @@ void Input::add_parent_child(const EquationInfo eqi, unsigned int i, unsigned in
 			auto p = hash.existing(vec);
 			if(p == UNSET){
 				hash.add(0,vec);
-		
+
 				par.add_parent(i,pr);
-				model.param[pr.th].add_child(pr.index,parref);
+			
+				auto &par_chi = model.param[pr.th];
+				if(!par_chi.element_ref[pr.index].cons) par_chi.add_child(pr.index,parref);
 			}
 			
 			//add_to_list(par.parent[i],pr);
@@ -818,11 +836,14 @@ void Input::create_markov_eqn_pop_ref()
 					for(const auto &pr : eqn.param_ref){
 						const auto &par = model.param[pr.th];
 						if(par.variety == REPARAM_PARAM && par.time_dep){
-							auto k = par.get_param_vec(pr.index);
-							const auto &pv = model.param_vec[k];
-							if(pv.reparam_time_dep){
-								auto sp = pv.spline_ref;
-								add_to_vec(model.spline[sp].markov_eqn_ref,p,e);
+							if(!par.element_ref[pr.index].cons){
+								auto k = par.get_param_vec(pr.index);
+								const auto &pv = model.param_vec[k];
+								if(pv.reparam_time_dep){
+									auto sp = pv.spline_ref;
+									auto &spl = model.spline[sp];
+									add_to_vec(spl.markov_eqn_ref,p,e,spl.hash_markov_eqn_ref);
+								}
 							}
 						}
 					}
@@ -850,11 +871,14 @@ void Input::create_markov_eqn_pop_ref()
 						for(const auto &pr : eqn.param_ref){
 							const auto &par = model.param[pr.th];
 							if(par.variety == REPARAM_PARAM && par.time_dep){
-								auto k = par.get_param_vec(pr.index);
-								const auto &pv = model.param_vec[k];
-								if(pv.reparam_time_dep){
-									auto sp = pv.spline_ref;
-									add_to_vec(model.spline[sp].trans_ref,p,tr);
+								if(!par.element_ref[pr.index].cons){
+									auto k = par.get_param_vec(pr.index);
+									const auto &pv = model.param_vec[k];
+									if(pv.reparam_time_dep){
+										auto sp = pv.spline_ref;
+										auto &spl = model.spline[sp];
+										add_to_vec(spl.trans_ref,p,tr,spl.hash_trans_ref);
+									}
 								}
 							}
 						}
@@ -876,11 +900,11 @@ void Input::create_markov_eqn_pop_ref()
 			const auto &eq = model.eqn[eq_ref];
 			for(auto po : eq.pop_ref){
 				auto &pop = model.pop[po];
-				add_to_vec(pop.spline_update,sp);	
+				add_to_vec(pop.spline_update,sp,pop.hash_spline_update);	
 			}
 		}
 	}
-	
+
 	if(false){
 		for(auto &po : model.pop){
 			cout << po.name << ": ";
@@ -1522,8 +1546,16 @@ unsigned int Input::get_spline_i(const ParamRef &pr)
 	auto ntimes = model.param[th].spline_info.knot_tdiv.size();
 	if(index%ntimes != 0) emsg_input("Should be zero1");
 	index /= ntimes;
-	auto i = 0u; while(i < spl.size() && !(spl[i].th == th && spl[i].index == index)) i++;
-	if(i == spl.size()) emsg_input("Spline could not be found");
+	
+	vector <unsigned int> vec; vec.push_back(th); vec.push_back(index); 
+				
+	auto i = model.hash_spline.existing(vec);
+	if(i == UNSET) emsg_input("Spline could not be found");
+
+	{	 // turn off
+		auto ii = 0u; while(ii < spl.size() && !(spl[ii].th == th && spl[ii].index == index)) ii++;
+		if(ii != i) emsg("spline prob");
+	}
 	
 	return i;
 }
@@ -1556,6 +1588,50 @@ void Input::create_spline()
 			auto N = 1u;
 			for(auto d = 0u; d < ndep; d++) N *= dep_reduce[d].list.size();
 
+			// Works out which parameters 
+			vector < vector <ElementRef> > param_ref_list;
+			param_ref_list.resize(N);
+			for(auto j = 0u; j < N; j++){
+				param_ref_list[j].resize(ntimes);
+				for(auto k = 0u; k < ntimes; k++){
+					param_ref_list[j][k].index = UNSET;
+				}
+			}
+			
+			for(auto k = 0u; k < model.param_vec.size(); k++){
+				const auto &pv = model.param_vec[k];
+				if(pv.th == th){
+					auto ind = pv.index;
+					auto j = ind/ntimes;
+					auto i = ind%ntimes;
+					auto &pv = param_ref_list[j][i];
+					pv.index = k;
+					pv.cons = false;
+				}
+			}
+			
+			for(auto j = 0u; j < N; j++){
+				for(auto k = 0u; k < ntimes; k++){
+					auto &pv = param_ref_list[j][k];
+					if(pv.index == UNSET){
+						auto val = par.get_value(j*ntimes+k);
+						pv.index = model.constant.add(val);
+						pv.cons = true;
+					}
+				}
+			}
+			
+			if(false){
+				for(auto j = 0u; j < N; j++){
+					for(auto k = 0u; k < ntimes; k++){
+						auto &pv = param_ref_list[j][k];
+						cout << j << " " << k << " ";
+						if(pv.cons) cout << "cons" << model.constant.value[pv.index] << endl;
+						else cout << "P" << model.param_vec[pv.index].name << endl;
+					}
+				}
+			}
+					
 			for(auto j = 0u; j < N; j++){
 				Spline spl; 
 				spl.name = get_param_name_with_dep(par,dep_reduce,j);
@@ -1565,26 +1641,13 @@ void Input::create_spline()
 				spl.constant = false;
 				spl.info = par.spline_info;
 		
-				vector <unsigned int> param_ref;
+				vector <ElementRef> param_ref;
 		
 				if(par.variety == CONST_PARAM){
 					spl.constant = true;
 				}
-				else{	
-					for(auto i = 0u; i < ntimes; i++){
-						auto k = 0u;
-						while(k < model.param_vec.size()){
-							const auto &pv = model.param_vec[k];
-							
-							if(pv.th == th && pv.index == j*ntimes + i) break;
-							k++;
-						}
-						
-						if(k == model.param_vec.size()) emsg_input("Could not find2");
-						
-						param_ref.push_back(k);
-					}
-					
+				else{
+					param_ref = param_ref_list[j];
 					spl.param_ref = param_ref;
 				}
 				
@@ -1639,7 +1702,9 @@ void Input::create_spline()
 								}							
 								
 								if(spl.constant == false){
-									SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = param_ref[i]; sd.f = 1;	
+									SplineDiv sd;	
+									sd.index = i;
+									sd.f = 1;	
 									spl.div.push_back(sd);
 								}
 								else{
@@ -1653,7 +1718,9 @@ void Input::create_spline()
 										auto f = (times[i+1]-tmid)/(times[i+1]-times[i]);
 								
 										if(spl.constant == false){
-											SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = param_ref[i+1]; sd.f = f;	
+											SplineDiv sd;	
+											sd.index = i;
+											sd.f = f;	
 											spl.div.push_back(sd);
 										}
 										else{
@@ -1666,7 +1733,9 @@ void Input::create_spline()
 									
 								case SQUARE_SPL:
 									if(spl.constant == false){
-										SplineDiv sd;	sd.th1 = param_ref[i]; sd.th2 = UNSET; sd.f = UNSET;	
+										SplineDiv sd;	
+										sd.index = i;
+										sd.f = UNSET;	
 										spl.div.push_back(sd);
 									}
 									else{
@@ -1690,9 +1759,15 @@ void Input::create_spline()
 					}
 				}
 				
-				for(auto th : spl.param_ref){
-					model.param_vec[th].spline_ref = model.spline.size();
+				for(const auto &pr : spl.param_ref){
+					if(!pr.cons){
+						model.param_vec[pr.index].spline_ref = model.spline.size();
+					}
 				}
+
+				vector <unsigned int> vec; vec.push_back(spl.th); vec.push_back(spl.index); 
+				model.hash_spline.add(model.spline.size(),vec);
+				
 				model.spline.push_back(spl);
  			}
 		}			
@@ -1731,14 +1806,38 @@ void Input::create_spline()
 			cout << spl.constant << "const" << endl;
 			cout << model.param[spl.th].name << " param" << endl;
 			cout << spl.index << " index" << endl;
-			for(auto j : spl.param_ref) cout << j << ","; 
+			for(const auto &pr : spl.param_ref){
+				if(pr.cons) cout << "C"; else cout << "P";
+				cout << pr.index << ","; 
+			}
 			cout << "param_ref" << endl;
 			
 			switch(spl.type){
-			case LINEAR_SPL: case SQUARE_SPL:
+			case LINEAR_SPL: 
 				for(auto d = 0u; d < spl.div.size(); d++){
 					const auto &di = spl.div[d];
-					cout << d << " " << model.param_vec[di.th1].name << " " <<  model.param_vec[di.th2].name << " " << di.f << " div"<< endl;
+					cout << d << " ";
+					auto ind = di.index;
+					const auto &pv = spl.param_ref[ind];
+					if(pv.cons) cout << "C" << pv.index; 
+					else cout << model.param_vec[pv.index].name;
+					
+					const auto &pv2 = spl.param_ref[ind+1];
+					if(pv2.cons) cout << "C" << pv2.index; 
+					else cout << model.param_vec[pv2.index].name;
+					cout << di.f << " div"<< endl;
+				}
+				break;
+				
+			case SQUARE_SPL:
+				for(auto d = 0u; d < spl.div.size(); d++){
+					const auto &di = spl.div[d];
+					cout << d << " ";
+					auto ind = di.index;
+					const auto &pv = spl.param_ref[ind];
+					if(pv.cons) cout << "C" << pv.index; 
+					else cout << model.param_vec[pv.index].name;
+					cout << " div"<< endl;
 				}
 				break;
 				
@@ -2021,20 +2120,22 @@ void Input::ind_fix_eff_group_trans_ref()
 					for(auto ie : model.eqn[eq].ind_eff_mult){
 						if(find_in(ie_list,ie) != UNSET){
 							ieg.nm_trans_ref.push_back(e);
-							add_to_vec(sp.ind_effect[ie].nm_trans_ref,e);
+							auto &inde = sp.ind_effect[ie];
+							add_to_vec(inde.nm_trans_ref,e,inde.hash_nm_trans_ref);
 							break;
 						}
 					}
 					
 					for(auto ie : model.eqn[eq].ind_eff_mult){
-						add_to_vec(sp.ind_effect[ie].nm_trans_ref,e);
-						add_to_vec(sp.ind_effect[ie].nm_trans_incomp_ref,nmt.trans_incomp_ref);
+						auto &inde = sp.ind_effect[ie];
+						add_to_vec(inde.nm_trans_ref,e,inde.hash_nm_trans_ref);
+						add_to_vec(inde.nm_trans_incomp_ref,nmt.trans_incomp_ref,inde.hash_nm_trans_incomp_ref);
 					}
 					
 					for(auto fe : model.eqn[eq].fix_eff_mult){
-						add_to_vec(sp.fix_effect[fe].nm_trans_ref,e);
-						
-						add_to_vec(sp.fix_effect[fe].nm_trans_incomp_ref,nmt.trans_incomp_ref);
+						auto &fixe = sp.fix_effect[fe];
+						add_to_vec(fixe.nm_trans_ref,e,fixe.hash_nm_trans_ref);
+						add_to_vec(fixe.nm_trans_incomp_ref,nmt.trans_incomp_ref,fixe.hash_nm_trans_incomp_ref);
 					}
 				}
 			}
@@ -2042,11 +2143,13 @@ void Input::ind_fix_eff_group_trans_ref()
 		
 		for(auto e = 0u; e < sp.markov_eqn.size(); e++){
 			for(auto ie : sp.markov_eqn[e].ind_eff_mult){
-				add_to_vec(sp.ind_effect[ie].markov_eqn_ref,e);
+				auto &inde = sp.ind_effect[ie];
+				add_to_vec(inde.markov_eqn_ref,e,inde.hash_markov_eqn_ref);
 			}
 			
 			for(auto fe : sp.markov_eqn[e].fix_eff_mult){
-				add_to_vec(sp.fix_effect[fe].markov_eqn_ref,e);
+				auto &fixe = sp.fix_effect[fe];
+				add_to_vec(fixe.markov_eqn_ref,e,fixe.hash_markov_eqn_ref);
 			}
 		}
 	}
@@ -2073,12 +2176,14 @@ void Input::ind_fix_eff_pop_ref()
 		const auto &pop = model.pop[k];
 		for(auto ie : pop.ind_eff_mult){
 			auto &sp = model.species[pop.sp_p];
-			add_to_vec(sp.ind_effect[ie].pop_ref,k);
+			auto &inde = sp.ind_effect[ie];
+			add_to_vec(inde.pop_ref,k,inde.hash_pop_ref);
 		}
 		
 		for(auto fe : pop.fix_eff_mult){
 			auto &sp = model.species[pop.sp_p];
-			add_to_vec(sp.fix_effect[fe].pop_ref,k);
+			auto &fixe = sp.fix_effect[fe];
+			add_to_vec(fixe.pop_ref,k,fixe.hash_pop_ref);
 		}
 	}
 }
@@ -2128,6 +2233,7 @@ void Input::create_island()
 				for(auto c = 0u; c < claa.ncomp; c++){
 					Island isl; 
 					IslandComp ico; ico.c = c; ico.nm_trans = false;
+					isl.hash_comp.add(isl.comp.size(),c);
 					isl.comp.push_back(ico);
 					
 					island.push_back(isl);
@@ -2142,9 +2248,22 @@ void Input::create_island()
 						
 						unsigned int isl1, j = UNSET; 
 						for(isl1 = 0u; isl1 < island.size(); isl1++){
-							const auto &co = island[isl1].comp;
-							j = 0; while(j < co.size() && co[j].c != c1) j++;
-							if(j < co.size()) break;
+							{ // turn off
+								const auto &co = island[isl1].comp;
+								auto jj = 0u; while(jj < co.size() && co[jj].c != c1) jj++;
+								if(jj < co.size()){
+									if(jj != island[isl1].hash_comp.find(c1)){
+										emsg("not find1");
+									}
+								}
+							}
+								
+							j = island[isl1].hash_comp.find(c1);
+							if(j != UNSET) break;
+					
+							//const auto &co = island[isl1].comp;
+							//j = 0; while(j < co.size() && co[j].c != c1) j++;
+							//if(j < co.size()) break;
 						}
 						if(isl1 == island.size()) emsg_input("Cannot find island1");
 							
@@ -2156,15 +2275,29 @@ void Input::create_island()
 						auto isl2 = UNSET;
 						if(c2 != UNSET){
 							for(isl2 = 0u; isl2 < island.size(); isl2++){
-								const auto &co = island[isl2].comp;
-								j = 0; while(j < co.size() && co[j].c != c2) j++;
-								if(j < co.size()) break;
+								{ // turn off
+									const auto &co = island[isl2].comp;
+									auto jj = 0u; while(jj < co.size() && co[jj].c != c2) jj++;
+									if(jj < co.size()){
+										if(jj !=  island[isl2].hash_comp.find(c2)) emsg("not find2");
+									}
+								}
+									
+								j = island[isl2].hash_comp.find(c2);
+								if(j != UNSET) break;
+								//const auto &co = island[isl2].comp;
+								//j = 0; while(j < co.size() && co[j].c != c2) j++;
+								//if(j < co.size()) break;
 							}
 							if(isl2 == island.size()) emsg_input("Cannot find island2");
 						}
 						
 						if(isl1 != isl2){
-							for(const auto &co : island[isl2].comp) island[isl1].comp.push_back(co);
+							auto &isl = island[isl1];
+							for(const auto &co : island[isl2].comp){
+								isl.hash_comp.add(isl.comp.size(),co.c);
+								isl.comp.push_back(co);
+							}
 							island.erase(island.begin()+isl2);
 						}
 					}
@@ -2181,8 +2314,16 @@ void Input::create_island()
 							
 							// Sets cf which gives the final
 							auto f = tra.f;
-							auto j = 0u; while(j < isl.comp.size() && isl.comp[j].c != f) j++;
-							if(j == isl.comp.size()) emsg_input("problem");
+							
+							{ // turn off
+								auto jj = 0u; while(jj < isl.comp.size() && isl.comp[jj].c != f) jj++;
+								if(jj != isl.hash_comp.find(f)) emsg("prob");
+							}
+							
+							auto j = isl.hash_comp.find(f);
+							if(j == UNSET) emsg_input("problem");
+							//auto j = 0u; while(j < isl.comp.size() && isl.comp[j].c != f) j++;
+							//if(j == isl.comp.size()) emsg_input("problem");
 							le.cf = j;
 							
 							// Given a global compartment c  works put the me which should be used
@@ -2305,18 +2446,38 @@ void Input::param_affect_likelihood()
 		
 		if(par.spline_info.on == true){	
 			auto nknot = par.spline_info.knot_tdiv.size();
+			
+			vector <unsigned int> vec; vec.push_back(th); vec.push_back(ind/nknot); 
+	
+			auto s = model.hash_spline.existing(vec);
+			if(s == UNSET) emsg_input("Cannot find spline");
 		
-			auto s = 0u;
-			while(s < model.spline.size() && !(th == model.spline[s].th && ind/nknot == model.spline[s].index)) s++;
-			if(s == model.spline.size()) emsg_input("Cannot find spline");
-		
+			{ // turn off
+				auto ss = 0u;
+				while(ss < model.spline.size() && !(th == model.spline[ss].th && ind/nknot == model.spline[ss].index)) ss++;
+				if(s != ss) emsg("s problem");
+			}
+			
 			const auto &spl = model.spline[s];
 			
 			vector <bool> map(T,false);
 			switch(spl.type){
-			case LINEAR_SPL: case SQUARE_SPL:
+			case LINEAR_SPL:
 				for(auto ti = 0u; ti < T; ti++){ 
-					if(spl.div[ti].th1 == k || spl.div[ti].th2 == k) map[ti] = true;
+					auto ind = spl.div[ti].index;
+					const auto &pv = spl.param_ref[ind];
+					if(!pv.cons && pv.index == k) map[ti] = true;
+					
+					const auto &pv2 = spl.param_ref[ind+1];
+					if(!pv2.cons && pv2.index == k) map[ti] = true;
+				}
+				break;
+				
+			case SQUARE_SPL:
+				for(auto ti = 0u; ti < T; ti++){ 
+					auto ind = spl.div[ti].index;
+					const auto &pv = spl.param_ref[ind];
+					if(!pv.cons && pv.index == k) map[ti] = true;
 				}
 				break;
 				
@@ -2372,7 +2533,8 @@ void Input::param_affect_likelihood()
 		if(spl.constant == false && spl.info.smooth == true){
 			AffectLike al; al.type = SPLINE_PRIOR_AFFECT; al.num = s; al.num2 = UNSET; 
 			for(auto t = 0u; t < spl.param_ref.size(); t++){
-				param_vec_add_affect(model.param_vec[spl.param_ref[t]].affect_like,al);
+				const auto &pv = spl.param_ref[t];
+				if(!pv.cons) param_vec_add_affect(model.param_vec[pv.index].affect_like,al);
 			}
 		}
 	}
@@ -3001,12 +3163,13 @@ void Input::setup_obs_trans_is_one()
 			ot.is_one.resize(sp.tra_gl.size(),false);
 			
 			vector <unsigned> tr_list;
+			HashSimp hash;
 			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 				const auto &eq = model.eqn[ot.tra_prob_eqn[tr].eq_ref];
 				if(eq.is_one()) ot.is_one[tr] = true;
 				if(!eq.is_zero()){
 					const auto &tra = sp.tra_gl[tr];
-					add_to_vec(tr_list,tra.tr);
+					add_to_vec(tr_list,tra.tr,hash);
 				}
 			}
 			if(tr_list.size() <= 1) ot.single_trans = true;
@@ -3034,7 +3197,7 @@ void Input::setup_obs_trans()
 				auto eq = ot.tra_prob_eqn[tr].eq_ref;
 				
 				if(!model.eqn[eq].is_zero()){
-					auto index = add_to_vec(sp.obs_trans_eqn,eq);
+					auto index = add_to_vec(sp.obs_trans_eqn,eq,sp.hash_obs_trans_eqn);
 					for(auto ti = ot.ti_min; ti < ot.ti_max; ti++){
 						sp.obs_trans_eqn_ref[tr][ti].push_back(index);
 					}
@@ -4415,9 +4578,10 @@ void Input::set_param_parent_child()
 		switch(par.variety){
 		case DIST_PARAM: case PRIOR_PARAM:
 			for(auto i = 0u; i < par.N; i++){
-				auto ref = par.element_ref[i];
-				if(ref != UNSET){
-					const auto &ele = par.element[ref];
+				const auto &er = par.element_ref[i];
+				auto ind = er.index;
+				if(ind != UNSET && !er.cons){
+					const auto &ele = par.element[ind];
 					if(ele.used){
 						const auto &pri = model.prior[ele.prior_ref];
 						for(const auto &eqi : pri.dist_param){
@@ -4430,9 +4594,10 @@ void Input::set_param_parent_child()
 			
 		case REPARAM_PARAM:
 			for(auto i = 0u; i < par.N; i++){
-				auto ref = par.element_ref[i];
-				if(ref != UNSET){
-					const auto &ele = par.element[ref];
+				auto er = par.element_ref[i];
+				auto ind = er.index;
+				if(ind != UNSET && !er.cons){
+					const auto &ele = par.element[ind];
 					if(ele.used){
 						const auto &eqi = ele.value;	
 						add_parent_child(eqi,i,th,hash); 
