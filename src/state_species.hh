@@ -83,9 +83,7 @@ class StateSpecies                         // Stores information about the state
 		vector <unsigned int> ind_sim_c;       // Under simulation stores compartment state
 	
 		vector <SimTrigEventDiv> trig_div;     // Stores future non-Markovian events
-		
-		SimLinearSpeedup sim_linear_speedup;   // Stores information to speed up simulation
-		
+
 		vector <double> timer;                 // General purpose timers
 		
 		vector <AlgWarn> alg_warn;             // Stores any algorithm warnings
@@ -130,7 +128,6 @@ class StateSpecies                         // Stores information about the state
 		vector < vector <InfPeriod> > get_inf_period(const vector <unsigned int> &ref) const;
 		void tnum_mean_st_back(unsigned int tr, unsigned int ti1, unsigned int ti2);
 		void cpop_st_update(unsigned int ti, unsigned int ti_next, unsigned int c, int ma);
-		void sim_linear_speedup_init();
 		
 		double get_indfac(const Individual &ind, const  MarkovEqn &mar_eqn) const;
 		void update_ind_basic(const vector < vector <Event> > &ev_new);

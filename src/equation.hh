@@ -85,6 +85,8 @@ class Equation                             // Stores information about an equati
 		
 		vector <DeriveRef> derive_ref;         // Stores derived used in the equation
 		
+		vector <PopTimeRef> pop_time_ref;      // References a population time
+		
 		bool contain_population;               // Determines if contains a population
 		
 		vector <unsigned int> pop_ref;         // Stores the populations used in the equation
@@ -155,7 +157,7 @@ class Equation                             // Stores information about an equati
 		double get_float(unsigned int i, unsigned int &raend) const;
 		ParamRef get_param_name(unsigned int i, double &dist, unsigned int &raend);
 		DeriveRef get_derive_name(unsigned int i, unsigned int &raend);
-		unsigned int get_pop(unsigned int i, unsigned int &raend);
+		PopTimeRef get_pop(unsigned int i, unsigned int &raend);
 		unsigned int get_ie(unsigned int i, unsigned int &raend);
 		unsigned int get_fe(unsigned int i, unsigned int &raend);
 		bool pop_combine(const vector <EqItem> &op, unsigned int i,	unsigned int &popcomb, double &popcombnum) const;
@@ -248,6 +250,7 @@ class Equation                             // Stores information about an equati
 		double calculate_constant() const;
 		double calculate_param_ti_fix(const vector <double> &precalc) const;
 		double calculate(unsigned int ti, const vector <double> &popnum, const vector <double> &precalc) const;
+		double calculate_all_time(unsigned int ti, const vector < vector <double> > &popnum_t, const vector <double> &precalc) const;
 		double calculate_calc(const vector <Calculation> &calc, unsigned int ti, const vector <double> &popnum, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
 		void test_calculate_para(const vector <Calculation> &calc, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val, string ref) const;
 		vector <double> calculate_para(const vector <Calculation> &calc, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;

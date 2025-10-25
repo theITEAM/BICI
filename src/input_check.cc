@@ -919,3 +919,23 @@ void Input::check_derived_order()
 		}			
 	} 
 }
+
+
+/// Checks when t=... are used in populations
+void Input::check_eqn_fixed_time()
+{
+	for(const auto &eq : model.eqn){
+		for(const auto &ca : eq.calcu){
+			for(const auto &it : ca.item){
+				if(it.type == POPTIMENUM){
+					const auto &ptr = eq.pop_time_ref[it.num];
+					if(eq.type != REPARAM && eq.type != DERIVE_EQN){
+						auto t1 = model.calc_t(ptr.ti);
+						alert_line("The time 't="+tstr(t1)+"' cannot be set in this equation. Fixed times can only be used for derived quantities and reparameterised square splines",eq.line_num);
+					}
+				}
+			}
+		}
+	}
+}
+

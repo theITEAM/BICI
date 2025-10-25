@@ -492,6 +492,7 @@ function rightmid_menu_buts(lay)
 				default:
 					switch(rpf.sel_paramviewtype.te){
 					case "Graph (split)": param_list(title,selpv.radio_split,selpv.list_split,lay); break;
+					case "Histogram": break;
 					default: param_list(title,selpv.radio,selpv.list,lay); break;
 					}
 					break;

@@ -28,8 +28,6 @@ private:
 	vector <double> av;              // The sum of parameter values 
 	vector < vector <double> > av2;  // The sum of param*param 
 	vector < vector <double> > samp; // Stores historic parameter values
-
-	
 	
 	const Model &model;
 };

@@ -217,7 +217,7 @@ struct Population {                // Stores a population (used in an equation)
 	vector <PopulationTerm> term;    // The global compartments which contribute to the popualtion
 	vector <PopMarkovEqnRef> markov_eqn_ref;// References Markov equations which include population
 	vector <PopTransRef> trans_ref;  // References transitions which include population
-	vector <unsigned int> spline_update; // Stores any reparam which need updating
+	//vector <unsigned int> spline_update; // Stores any reparam which need updating
 	HashSimp hash_spline_update;
 };
 
@@ -432,6 +432,10 @@ struct ParamVecEle {               // Stores information about an element in par
 	unsigned int ref;                // Reference param_vec_prop
 };
 
+struct PopTimeRef {                // References a population (and also a time, if appropriate)
+	unsigned int po;                 // Population
+	unsigned int ti;                 // Gets time population is evaluated
+};
 
 struct ErrorMess {                 // Stores error messages when importing 
 	unsigned int line_num;           // The number of the line in the input file

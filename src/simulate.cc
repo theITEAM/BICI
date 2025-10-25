@@ -31,7 +31,7 @@ void Simulate::run()
 	
 		auto param_val = model.param_sample();
 		auto initc_val = model.initc_sample(param_val);
-		
+
 		state.simulate(param_val,initc_val);
 
 		state.check("Check state");

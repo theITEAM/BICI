@@ -656,9 +656,7 @@ void StateSpecies::set_markov_tree_rate()
 {
 	for(auto i = 0u; i < N; i++){
 		auto &me_vari = markov_eqn_vari[i];
-		if(me_vari.value == UNSET){
-			emsg("Markov unset problem");
-		}
+		if(me_vari.value == UNSET) emsg("Markov unset problem");
 		markov_tree_rate[i] = me_vari.value*me_vari.indfac_sum;
 	}
 	
@@ -732,6 +730,8 @@ void StateSpecies::markov_eqn_recalc(unsigned int e, unsigned int ti, const vect
 
 	if(me.rate){		
 		me_vari.value = eq.calculate(ti,popnum,precalc);
+		//eq.print_calculation();
+		if(me_vari.value == UNSET) emsg("P");
 		if(me_vari.value < -TINY){
 			run_error("The transition rate determined by equation '"+eq.te_raw+"' has become negative");
 		}
@@ -752,7 +752,7 @@ void StateSpecies::markov_eqn_recalc_fast(unsigned int ti, const vector <double>
 {
 	const auto &precalc = param_val.precalc;
 	
-	const auto &lin_form = sim_linear_speedup.lin_form;
+	const auto &lin_form = sp.sim_linear_speedup.lin_form;
 	const auto &eq_temp = eqn[0];
 
 	for(const auto &lf : lin_form.list){
@@ -781,7 +781,7 @@ void StateSpecies::markov_eqn_recalc_fast(unsigned int ti, const vector <double>
 		}
 	}
 	
-	for(auto e : sim_linear_speedup.calc) markov_eqn_recalc(e,ti,popnum);	
+	for(auto e : sp.sim_linear_speedup.calc) markov_eqn_recalc(e,ti,popnum);	
 }
 
 		
@@ -789,16 +789,20 @@ void StateSpecies::markov_eqn_recalc_fast(unsigned int ti, const vector <double>
 void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vector <double> > &popnum_t, const vector <double> &val_fast)
 {
 	markov_eqn_recalc_fast(ti,popnum_t[ti],val_fast);
-	
-	if(false){
+		
+	if(true){
 		for(auto e = 0u; e < sp.markov_eqn.size(); e++){
 			auto &me_vari = markov_eqn_vari[e];
 			auto num = me_vari.value;
 			markov_eqn_recalc(e,ti,popnum_t[ti]);	
-			if(dif(num,me_vari.value,TINY)) emsg("dif");
+			if(me_vari.value == UNSET) emsg("II");
+			if(dif(num,me_vari.value,TINY)){
+				cout << num << " " << me_vari.value << " val\n";
+				emsg("dif");
+			}
 		}
 	}
-	
+
 	set_markov_tree_rate();
 }
 

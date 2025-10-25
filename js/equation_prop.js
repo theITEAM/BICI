@@ -190,6 +190,12 @@ function extract_equation_properties(eqn)
 		icur = lin.length+1;
 	}
 	
+	/*
+	for(let i = 0; i < eqn.pop.length; i++){
+		if(eqn.pop[i].t == undefined) eqn.time_vari = true;
+	}
+	*/
+	
 	if(eqn.pop.length > 0) eqn.time_vari = true;
 
 	for(let i = 0; i < eqn.param.length; i++){
@@ -1008,8 +1014,32 @@ function check_population(te,icur,eqn)
 	}
 	
 	let spl = te.split(";");
-
+	
 	let start = "In population {"+te+"}: ";
+	
+	let pop_ti;
+	if(spl.length > 1){
+		let last = spl[spl.length-1];
+		let sple = last.split("=");
+		if(sple.length == 2){
+			if(sple[0] != "t"){
+				eqn.warn.push({te:start+"'t' should be before equals sign", cur:icur, len:te.length});
+				return;
+			}
+			
+			if(isNaN(sple[1])){
+				eqn.warn.push({te:start+"'"+sple[1]+"' should be a number", cur:icur, len:te.length});
+				return;
+			}
+			
+			if(eqn.type != "reparam" && eqn.type != "test" && eqn.type != "derive_eqn"){
+				eqn.warn.push({te:start+"Fixed times can only be used for derived quantities and reparameterised square splines", cur:icur, len:te.length});
+			}
+		
+			pop_ti = Number(sple[1]);
+			spl.pop();
+		}
+	}		
 	
 	if(spl.length > 2){
 		eqn.warn.push({te:start+"More than one ';' unexpected", cur:icur, len:te.length});
@@ -1078,9 +1108,9 @@ function check_population(te,icur,eqn)
 				return;
 			}
 		}				
-	
-		te = spl[0];
 	}
+	
+	te = spl[0];
 	
 	// Checks that population individual/fixed effects are divided correctly
 	for(let k = 0; k < te.length; k++){
@@ -1106,6 +1136,8 @@ function check_population(te,icur,eqn)
 	let dep = [];
 	
 	let pop = {index:[]};
+
+	//if(pop_ti != undefined) pop.t = pop_ti;
 	
 	// Goes through compartment names
 	let icur3 = icur;
@@ -1176,10 +1208,12 @@ function check_population(te,icur,eqn)
 		}
 	}
 	
-	dep.push("t");
-	add_eqn_dep(eqn,dep,[],icur);
+	if(pop_ti == undefined){
+		dep.push("t");
+		add_eqn_dep(eqn,dep,[],icur);
 	
-	eqn.pop.push(pop);
+		eqn.pop.push(pop);
+	}
 }
 
 

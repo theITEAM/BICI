@@ -1485,7 +1485,7 @@ function get_pos_paramview(result)
 							let ind=[]; ind[0] = j; ind[1] = i;
 							
 							let name = param_name_index(par,ind);
-							name = "ω"+name.substr(1);
+							//name = "ω"+name.substr(1);
 							list.push({th:th, index:ind, name:name});
 							
 							if(par.variety != "const"){

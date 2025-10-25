@@ -203,6 +203,9 @@ void State::check_precalc_eqn(string ref)
 		emsg("precalc size problem"+ref);
 	}
 	
+	vector <bool> derive_fl(n,false);
+	for(const auto &in : model.spec_precalc_derive.info) derive_fl[in.i] = true;
+
 	for(auto &ssp : species){
 		ssp.check_precalc_num(n);
 	}
@@ -221,25 +224,41 @@ void State::check_precalc_eqn(string ref)
 	auto precalc_st = precalc;
 	auto value_st = value;
 	
-	model.precalc_eqn.calculate(model.spec_precalc,param_val,false);
+	model.precalc_eqn.calculate(model.spec_precalc_all,param_val,false);
 	
 	//model.precalc_eqn.calculate_all(model.list_precalc,param_val);
 	
 	model.param_spec_precalc_time_all(popnum_t,param_val,false);
 
 	for(auto th = 0u; th < value.size(); th++){
-		if(value_st[th] == UNSET) emsg("Value should not be unset");
+		if(value_st[th] == UNSET){
+			emsg("Value should not be unset1");
+		}
 		
 		if(dif(value_st[th],value[th],dif_thresh)){
-			cout << model.param_vec[th].name << " " << value_st[th] << " " << value[th] << endl;
-			cout << model.param_vec[th].name << " " << value_st[th] << " " << value[th] << endl;
+			cout << model.param_vec[th].name << " " << value_st[th] << " " << value[th] << " wrong" << endl;
+		
+		
+			const auto &pv = model.param_vec[th];
+			const auto &par = model.param[pv.th];
+			auto eq_ref = par.get_eq_ref(pv.index);
+			if(eq_ref == UNSET) emsg("eq_ref should be set");
+			
+			//print_spec_precalc("before",pv.spec_precalc_before);
+			//precalc_eqn.calculate(pv.spec_precalc_before,param_val,false);
+			
+			//if(store) param_val.value_change(th);
+			//auto ti = pv.reparam_spl_ti;
+			//auto val =  model.eqn[eq_ref].calculate(ti,popnum_t[ti],precalc);
+			//cout <<val << " cllll" << endl;
+			//model.eqn[eq_ref].print_calculation();
+		
 			emsg("value problem"+ref);
 		}
 	}
 	
 	for(auto i = 0u; i < precalc.size(); i++){
-		if(precalc_st[i] == UNSET){
-			//for(auto i = 0u; i < precalc.size(); i++) cout << i << " " << precalc_st[i] << " pre" << endl;
+		if(precalc_st[i] == UNSET && !derive_fl[i]){
 			emsg("Precalc should not be unset1");
 		}
 		
@@ -285,7 +304,7 @@ void State::check_dependent_param(string ref)
 			auto re = model.param[pv.th].get_eq_ref(pv.index);
 			if(re == UNSET) emsg("Reparam is not set");	
 				
-			auto value = model.eqn[re].calculate(ti,popnum_t[ti],precalc);
+			auto value = model.eqn[re].calculate_all_time(ti,popnum_t,precalc);
 			if(dif(value,param_val.value[th],dif_thresh)){
 				cout << th << " " << value << " " << param_val.value[th] << "compare" << endl;
 				emsg("Reparam value different "+ref);
@@ -2467,13 +2486,13 @@ void State::check_precalc_dif(string ref)
 	auto precalc_st = precalc;
 	auto value_st = value;
 	
-	model.precalc_eqn.calculate(model.spec_precalc,param_val,false);
+	model.precalc_eqn.calculate(model.spec_precalc_all,param_val,false);
 	
 	model.param_spec_precalc_time_all(popnum_t,param_val,false);
 
 	auto dthmax = 0.0;
 	for(auto th = 0u; th < value.size(); th++){
-		if(value_st[th] == UNSET) emsg("Value should not be unset");
+		if(value_st[th] == UNSET) emsg("Value should not be unset2");
 		
 		auto d = value_st[th]-value[th];
 		if(d*d > dthmax) dthmax = d*d;

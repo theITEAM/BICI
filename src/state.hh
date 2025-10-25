@@ -108,8 +108,10 @@ class State                                // Stores information about the state
 		vector <PopMarkovEqnRef> markov_eqn_list;
 		vector < vector <bool> > trans_map; 
 		vector <PopTransRef> trans_list;
-		vector <bool> spline_up_map; 
-		vector <unsigned int> spline_up_list;
+		//vector <bool> spline_up_map; 
+		//vector <unsigned int> spline_up_list;
+		vector <bool> reparamth_up_map; 
+		vector <unsigned int> reparamth_up_list;
 		
 	// In state_genetic.cc
 	public:	

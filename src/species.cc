@@ -784,3 +784,174 @@ void Species::sampling_error(unsigned int trg, string warn) const
 	run_error("Sampling error for transition '"+cla[tra.cl].tra[tra.tr].name+"': "+warn+". Transition distribution quantities (means, sds etc...) have threshold limits to ensure numerical accuracy. Consider changing the values or restricting the priors on model parameter which determine this transition."); 
 }
 
+
+/// Works out how to update equations using changes in populations
+void Species::sim_linear_speedup_init(const vector <Equation> &eqn)
+{
+	if(!sim_linearise_speedup){
+		switch(type){
+		case INDIVIDUAL:
+			for(auto m = 0u; m < markov_eqn.size(); m++){
+				sim_linear_speedup.calc.push_back(m);
+			}
+			break;
+			
+		case POPULATION:
+			for(auto tr = 0u; tr < tra_gl.size(); tr++){
+				sim_linear_speedup.calc.push_back(tr);
+			}
+			break;
+		}
+		return;
+	}
+	
+	vector <LinearFormInit> lfinit;
+	
+	switch(type){
+	case INDIVIDUAL:
+		for(auto m = 0u; m < markov_eqn.size(); m++){
+			const auto &me = markov_eqn[m];
+			auto e = me.eqn_ref;
+			const auto &eq = eqn[e]; 
+				if(eq.linearise.on && eq.linearise.pop_grad_time_dep == false){
+				LinearFormInit lfi; lfi.m = m; lfi.e = e;
+				lfinit.push_back(lfi);
+			}
+			else{
+				sim_linear_speedup.calc.push_back(m);
+			}
+		}
+		break;
+		
+	case POPULATION:
+		for(auto tr = 0u; tr < tra_gl.size(); tr++){
+			const auto &tra = tra_gl[tr];
+			auto e = tra.dist_param[0].eq_ref;
+			const auto &eq = eqn[e];
+			
+			if(eq.linearise.on && eq.linearise.pop_grad_time_dep == false){
+				LinearFormInit lfi; lfi.m = tr; lfi.e = e;
+				lfinit.push_back(lfi);
+			}
+			else{
+				sim_linear_speedup.calc.push_back(tr);
+			}
+		}
+		break;
+	}
+	
+	set_linear_form(sim_linear_speedup.lin_form,lfinit,eqn);
+}
+
+
+/// Sets a linear form such that proposals can be made more quickly
+void Species::set_linear_form(LinearForm &lin_form, const vector <LinearFormInit> &lfinit, const vector <Equation> &eqn) const
+{
+	lin_form.factor_nopop_only = false;
+	
+	Hash hash;
+	for(auto k = 0u; k < lfinit.size(); k++){
+		const auto &lfi = lfinit[k];
+		
+		auto e = lfi.e;
+		const auto &eq = eqn[e];
+		
+		auto &lin = eq.linearise;
+		
+		// Generates a hash vector
+		vector <unsigned int> vec;
+		if(lin.pop_grad_precalc.size() != eq.pop_ref.size()) emsg("pop_ref size not right");
+		
+		for(auto i = 0u; i < eq.pop_ref.size(); i++){
+			const auto &it = lin.pop_grad_precalc[i];
+			vec.push_back(it.type);
+			vec.push_back(it.num);
+			vec.push_back(eq.pop_ref[i]);
+		}
+		
+		auto n = hash.existing(vec);
+		if(n == UNSET){
+			n = lin_form.sum_e.size();
+			hash.add(n,vec);
+			lin_form.sum_e.push_back(e);
+			
+			for(auto i = 0u; i < eq.pop_ref.size(); i++){
+				auto po = eq.pop_ref[i];
+							
+				{ // turn off
+					auto k = 0u; while(k < lin_form.pop_affect.size() && lin_form.pop_affect[k].po != po) k++;
+					if(k == lin_form.pop_affect.size()) k = UNSET;
+					if(k != lin_form.hash_po.find(po)) emsg("lf prob");
+				}
+				
+				auto k = lin_form.hash_po.find(po);
+				if(k == UNSET){
+					k = lin_form.pop_affect.size();
+					PopAffect pa; pa.po = po;
+					lin_form.hash_po.add(k,po);
+					lin_form.pop_affect.push_back(pa);
+				}
+			
+				GradRef gr; gr.ref = n; gr.index = i;
+				lin_form.pop_affect[k].pop_grad_ref.push_back(gr);
+			}
+		}
+		
+		LinearFormItem lf;
+		lf.m = lfi.m; lf.e = e; lf.sum_e_ref = n;
+		lf.factor_precalc = eq.linearise.factor_precalc;
+		lf.no_pop_precalc = eq.linearise.no_pop_precalc;
+
+		lin_form.list.push_back(lf);
+	}
+	
+	lin_form.nopop_same = true;
+	lin_form.factor_same = true;
+	
+	const auto &list = lin_form.list;
+	
+	if(list.size() > 0){
+		const auto &factor_precalc_fir = list[0].factor_precalc;
+		const auto &no_pop_precalc_fir = list[0].no_pop_precalc;
+
+		for(auto k = 1u; k < list.size(); k++){
+			if(!item_equal(factor_precalc_fir,list[k].factor_precalc)){
+				lin_form.factor_same = false;
+			}				
+			
+			if(!item_equal(no_pop_precalc_fir,list[k].no_pop_precalc)){
+				lin_form.nopop_same = false;
+			}				
+		}			
+	}
+	
+	if(false){
+		cout << lin_form.nopop_same << " nopop_same" << endl;
+		cout << lin_form.factor_same << " factor same" << endl;
+
+		for(const auto &lf : lin_form.list){
+			cout << tra_gl[lf.m].name << ", ";
+		}
+		cout << "calculate fast" << endl;
+		
+		cout << lin_form.list.size() << " " << lin_form.sum_e.size() << "num" << endl;
+		/*
+		for(auto k = 0u; k < lin_form.pop_affect.size(); k++){
+			const auto &pa = lin_form.pop_affect[k];
+			cout << "  " << pa.po << ": ";
+			for(const auto &pgr : pa.pop_grad_ref) cout << pgr.ref << " " << pgr.index << ", ";
+			cout << "  grad ref" << endl;
+		}
+		*/
+		emsg("mbp speed up");
+	}
+}
+
+
+/// Determines if two equation items are equal
+bool Species::item_equal(const EqItem &it1, const EqItem &it2) const
+{
+	if(it1.type != it2.type) return false;
+	if(it1.num != it2.num) return false;
+	return true;
+}

@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 // Lists all the constant values used within the interface
 
 // 53754 lines of code (16/11/24)
@@ -10,9 +10,9 @@
 let ver="linux";
 //let ver="mac";
 
-let win_linux = true;                            // When working on win running linux 
+let win_linux = false;//true;                            // When working on win running linux 
 
-const try_on = false;//true;                              // Deterimines if try/catch is on (true)   
+const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
 let debug = false;                                // Determines if debugger used (false)
 let testing = false;                              // Used logo to load up results (false)
@@ -261,7 +261,8 @@ const prior_pos_positive = ["inverse","uniform","power","exp","gamma","log-norma
 
 const data_types = ["Init. Cond.", "Individual", "Population", "Additional"];
 
-let chnotallowed = "\"$&=~#\\→";
+//let chnotallowed = "\"$&=~#\\→";
+let chnotallowed = "\"$&~#\\→";
 let notparam_list = "+-*×/0123456789.{}<>〈〉()|\n\r Σ∫′→;";// Sets not a parameter character
 let paramend_list = "+-*×/|.{}<>〈〉[]$\n\r Σ∫";	            // Sets characters which end parameter
 let name_notallow = "|\"*×_ {}<>〈〉[]()=Σ∫′→;$&#\\";       // Character not allowed in species, class or comp names

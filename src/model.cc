@@ -75,7 +75,6 @@ PV Model::param_sample() const
 	
 	for(auto th = 0u; th < nparam_vec; th++){
 		const auto &pv = param_vec[th];
-	
 		precalc_eqn.calculate(pv.spec_precalc_before,param_val,false);
 	
 		const auto &par = param[pv.th];
@@ -109,7 +108,9 @@ PV Model::param_sample() const
 	
 	sample_ieg_cv(param_val); // Samples any individual effect covariances 
 	
-	precalc_eqn.calculate(spec_precalc,param_val,false);
+	//precalc_eqn.calculate(spec_precalc,param_val,false);
+	precalc_eqn.calculate(spec_precalc_sample,param_val,false);
+	
 	
 	//print_param(param_val);
 	
@@ -118,9 +119,12 @@ PV Model::param_sample() const
 		cout << " value" << endl;
 		
 		//for(auto val: param_val.precalc) cout << val << ","; 	
-		for(auto i = 0u; i < param_val.precalc.size(); i++){
+		auto imax =  param_val.precalc.size();
+		if(imax > 1000) imax = 1000;
+		for(auto i = 0u; i < imax; i++){
 			cout << i << " " << param_val.precalc[i] << " prec" << endl;
 		}
+		if(imax == 1000) cout << "..." << endl;
 		cout << " precalc" << endl;
 		emsg("sample");
 	}
@@ -225,21 +229,19 @@ void Model::sample_ieg_cv(PV &param_val) const
 	}
 }
 
-	
 /// Updatews precalc for all times
 void Model::param_spec_precalc_time_all(const vector < vector <double> > &popnum_t, PV &param_val, bool store) const
 {
 	for(auto ti = 0u; ti < details.T; ti++){
-		param_spec_precalc_time(ti,popnum_t[ti],param_val,store);
+		param_spec_precalc_time(ti,popnum_t,param_val,store);
 	}
 }
 
 	
 /// Updates parameter precalculation at given time point
-void Model::param_spec_precalc_time(unsigned int ti, const vector <double> &popnum, PV &param_val, bool store) const
+void Model::param_spec_precalc_time(unsigned int ti, const vector < vector <double> > &popnum_t, PV &param_val, bool store) const
 {
 	const auto &upt = spec_precalc_time[ti];
-	
 	if(upt.pv.size() > 0){
 		auto &value = param_val.value;
 		auto &precalc = param_val.precalc;
@@ -249,9 +251,12 @@ void Model::param_spec_precalc_time(unsigned int ti, const vector <double> &popn
 			const auto &par = param[pv.th];
 			auto eq_ref = par.get_eq_ref(pv.index);
 			if(eq_ref == UNSET) emsg("eq_ref should be set");
-			
+				
+			precalc_eqn.calculate(pv.spec_precalc_before,param_val,false);
+		
 			if(store) param_val.value_change(th);
-			value[th] = eqn[eq_ref].calculate(ti,popnum,precalc);
+			value[th] = eqn[eq_ref].calculate_all_time(ti,popnum_t,precalc);
+			
 			precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,store);
 		}
 	}
@@ -259,29 +264,6 @@ void Model::param_spec_precalc_time(unsigned int ti, const vector <double> &popn
 	precalc_eqn.calculate(upt.spec_precalc,param_val,store);
 }
 
-
-/*
-/// Updates precalc such that a parameter can be calculated
-void Model::param_spec_precalc_before(unsigned int th, PV &param_val, bool store) const
-{
-	const auto &list = param_vec[th].list_precalc_before;
-	if(list.size() == 0) return;
-	
-	precalc_eqn.calculate(list,get_list(details.T),param_val,store);
-}
-*/
-
-/*
-/// Updates precalc such that a parameter can be calculated
-void Model::param_spec_precalc_after(unsigned int th, PV &param_val, bool store) const
-{
-	vector <unsigned int> list;
-	list.push_back(param_vec_ref[th]);
-	
-	precalc_eqn.calculate(list,vector <unsigned int>(),param_val,store);
-}
-*/
-				
 
 /// Gather a parameter set from a posterior sample
 PV Model::post_param(const Sample &samp) const
@@ -309,7 +291,6 @@ PV Model::post_param(const Sample &samp) const
 		case CONST_PARAM:
 			value[th] = par.get_value(pv.index);
 			precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,false);
-			//param_spec_precalc_after(th,param_val,false);
 			break;
 			
 		case REPARAM_PARAM:
@@ -319,7 +300,6 @@ PV Model::post_param(const Sample &samp) const
 			
 				value[th] = eqn[eq_ref].calculate_param(precalc);
 				precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,false);
-				//param_spec_precalc_after(th,param_val,false);
 			}
 			break;
 			
@@ -332,7 +312,6 @@ PV Model::post_param(const Sample &samp) const
 				if(value[th] == UNSET) emsg("Parameter is unspecified");
 			}
 			precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,false);
-			//param_spec_precalc_after(th,param_val,false);
 			break;
 			
 		case UNSET_PARAM: emsg("error param"); break;
@@ -740,7 +719,7 @@ void Model::order_affect(vector <AffectLike> &vec) const
 
 
 /// Gets a map which stores how the proposal changes the system
-AffectMap Model::get_affect_map(vector <AffectLike> &vec, const vector <SpecPrecalc> &dependent_spec_precalc, const SpecPrecalc &spec_precalc_after) const
+AffectMap Model::get_affect_map(vector <AffectLike> &vec, const vector <unsigned int> &param_list, const vector <unsigned int> &dependent, const SpecPrecalc &spec_precalc_after) const
 {
 	AffectMap amap;
 	
@@ -749,12 +728,18 @@ AffectMap Model::get_affect_map(vector <AffectLike> &vec, const vector <SpecPrec
 	
 	// Creates a map which shows all precalc which are affected by proposal
 	
-	for(auto &dsp : dependent_spec_precalc){
-		for(const auto &pi : dsp.info) map[pi.i] = true;
+	for(auto th : param_list){
+		const auto &pv = param_vec[th];
+		for(const auto &in : pv.set_param_spec_precalc.info) map[in.i] = true;
 	}
 	
+	for(auto th : dependent){
+		const auto &pv = param_vec[th];
+		for(const auto &in : pv.spec_precalc_before.info) map[in.i] = true;
+		for(const auto &in : pv.set_param_spec_precalc.info) map[in.i] = true;
+	}
 	
-	for(const auto &pi : spec_precalc_after.info) map[pi.i] = true;
+	for(const auto &in : spec_precalc_after.info) map[in.i] = true;
 	
 	// Creates maps for fixed and individual effects which change	
 	auto &ie_map = amap.ie_map;
@@ -785,9 +770,9 @@ AffectMap Model::get_affect_map(vector <AffectLike> &vec, const vector <SpecPrec
 	
 /// Looks to speed up calculation of DIV_VALUE_AFFECT for parameter proposals
 // Calculates changes in non-population term as a way to speed up div value calculation 
-void Model::affect_nopop_speedup(vector <AffectLike> &vec, const vector <SpecPrecalc> &dependent_spec_precalc, const SpecPrecalc &spec_precalc_after) const
+void Model::affect_nopop_speedup(vector <AffectLike> &vec, const vector <unsigned int> &param_list, const vector <unsigned int> &dependent, const SpecPrecalc &spec_precalc_after) const
 {			
-	auto affect_map = get_affect_map(vec,dependent_spec_precalc,spec_precalc_after);
+	auto affect_map = get_affect_map(vec,param_list,dependent,spec_precalc_after);
 	
 	// Generates a list of elements in vec which can be converted	
 	vector <Listie>	vec_list;
@@ -905,9 +890,9 @@ void Model::affect_nopop_speedup(vector <AffectLike> &vec, const vector <SpecPre
 
 /// Looks to speed up calculation of DIV_VALUE_LINEAR_AFFECT/MARKOV_POP_LINEAR_AFFECT
 // Makes changes to factor or no-pop value 
-void Model::set_factor_nopop_only(vector <AffectLike> &vec, const vector <SpecPrecalc> &dependent_spec_precalc, const SpecPrecalc &spec_precalc_after) const
+void Model::set_factor_nopop_only(vector <AffectLike> &vec, const vector <unsigned int> &param_list, const vector <unsigned int> &dependent, const SpecPrecalc &spec_precalc_after) const
 {				
-	auto affect_map = get_affect_map(vec,dependent_spec_precalc,spec_precalc_after);
+	auto affect_map = get_affect_map(vec,param_list,dependent,spec_precalc_after);
 	
 	for(auto i = 0u; i < vec.size(); i++){
 		auto &ve = vec[i];
@@ -1034,9 +1019,8 @@ void Model::affect_linearise_speedup(vector <AffectLike> &vec) const
 					else lfi.e = sp.tra_gl[me].dist_param[0].eq_ref;
 					lfinit.push_back(lfi);
 				}
-				
-				
-				set_linear_form(p,af.lin_form,lfinit);
+						
+				species[p].set_linear_form(af.lin_form,lfinit,eqn);
 				
 				vec[imin] = af;
 				
@@ -1048,15 +1032,6 @@ void Model::affect_linearise_speedup(vector <AffectLike> &vec) const
 			i++;
 		}
 	}
-}
-	
-	
-/// Determines if two equation items are equal
-bool Model::item_equal(const EqItem &it1, const EqItem &it2) const
-{
-	if(it1.type != it2.type) return false;
-	if(it1.num != it2.num) return false;
-	return true;
 }
 
 	
@@ -1774,7 +1749,6 @@ PV Model::get_param_val(const Particle &pa) const
 		auto th = param_vec_prop[i];
 		value[th] = pa.param_val_prop[i];
 		precalc_eqn.calculate(param_vec[th].set_param_spec_precalc,param_val,false);
-		//param_spec_precalc_after(th,param_val,false);
 	}
 
 	for(auto th = 0u; th < nparam_vec; th++){
@@ -1793,7 +1767,6 @@ PV Model::get_param_val(const Particle &pa) const
 					
 					value[th] = prior_sample(pri,precalc);
 					precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,false);
-					//param_spec_precalc_after(th,param_val,false);
 				}
 				break;
 				
@@ -1804,7 +1777,6 @@ PV Model::get_param_val(const Particle &pa) const
 					
 					value[th] = eqn[eq_ref].calculate_param(precalc);
 					precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,false);
-					//param_spec_precalc_after(th,param_val,false);
 				}
 				break;
 			
@@ -2117,32 +2089,37 @@ void Model::set_spec_precalc_time()
 {
 	auto T = details.T;
 	
+	SpecPrecalc spre_before;
+	auto s_before = UNSET;
+	
 	spec_precalc_time.resize(T);
 	for(auto th = 0u; th < param_vec.size(); th++){
 		auto &pv = param_vec[th];
 	
 		if(pv.reparam_time_dep){
-			const auto &spl = spline[pv.spline_ref];
+			auto s = pv.spline_ref;
+			const auto &spl = spline[s];
 			if(spl.type == SQUARE_SPL){
+				if(s != s_before){
+					s_before = s; 
+					spre_before = pv.spec_precalc_before;
+				}
+				
 				const auto &list_time = pv.spec_precalc_after.list_time;
-				if(list_time.size() > 0 && list_time[0].size() > 0){
-					auto ti = list_time[0][0];
-					pv.reparam_spl_ti = ti;
-					spec_precalc_time[ti].pv.push_back(th);
+				if(list_time.size() > 0){
+					const auto &lt = list_time[0];
+					if(lt.size() > 0){
+						auto ti = lt[0];
+						
+						if(pv.reparam_spl_ti != ti) emsg("reparam_spl_ti problem");
+						spec_precalc_time[ti].pv.push_back(th);
+						
+						pv.spec_precalc_before = precalc_eqn.shrink_sprec(lt,spre_before);
+					}
 				}
 			}
 		}
 	}
-	
-	/*
-	// Sets precalc which needs to be updated for parameters 
-	for(auto ti = 0u; ti < T; ti++){
-		auto &upt = spec_precalc_time[ti];
-		for(auto th : upt.pv){
-			upt.pv_list_precalc.push_back(param_vec_ref[th]);
-		}
-	}
-	*/
 	
 	const auto S = spline.size();
 	vector < vector <unsigned int> > spline_precalc;
@@ -2295,6 +2272,20 @@ void Model::set_precalc_init()
 	}
 }
 	
+	
+/// Sets precalculation to be done after sampling 
+void Model::set_spec_precalc_sample()
+{
+	spec_precalc_sample = precalc_eqn.calculate_spec_precalc_sample(spec_precalc);
+}
+
+	
+/// Sets precalculation to be done after sampling 
+void Model::set_spec_precalc_all()
+{
+	spec_precalc_all = precalc_eqn.calculate_spec_precalc_all(spec_precalc,spec_precalc_time);
+}
+
 	
 /// Creates any precalulation for derived quantities
 void Model::create_precalc_derive()
@@ -2552,22 +2543,36 @@ void Model::precalc_affect()
 				if(eq.calcu.size() > 0) eq.print_calculation();
 			}
 		}
-		
-		precalc_eqn.print_calc();
-		
-		cout << "PARAM PRECALC" << endl;
-		for(auto &pv : param_vec){
-			cout << "<<" << pv.name << ">>" << endl;
-			print_spec_precalc("before",pv.spec_precalc_before);
-			print_spec_precalc("set param",pv.set_param_spec_precalc);
-			print_spec_precalc("after",pv.spec_precalc_after);
-			cout << endl;
-		}
-		
-		print_spec_precalc("spec_precalc",spec_precalc);
-		
-		//emsg("PRECALC");
 	}
+	
+	if(false) print_precalc();
+}
+
+
+/// Prints information about precalculation
+void Model::print_precalc() const
+{		
+	precalc_eqn.print_calc(); 
+	
+	cout << "PARAM PRECALC" << endl;
+	auto thmax = param_vec.size();
+	if(thmax > 100) thmax = 100;
+	for(auto th = 0u; th < thmax; th++){
+		const auto &pv = param_vec[th];
+	
+		cout << "<<" << pv.name << ">>" << endl;
+		print_spec_precalc("before",pv.spec_precalc_before);
+		print_spec_precalc("set param",pv.set_param_spec_precalc);
+		print_spec_precalc("after",pv.spec_precalc_after);
+		cout << endl;
+	} 
+	if(thmax == 100) cout << "..." << endl;
+	
+	//print_spec_precalc("spec_precalc",spec_precalc);
+		
+	print_spec_precalc("HERE spec_precalc_sample",spec_precalc_sample);
+		
+	emsg("PRECALC");
 }
 
 
@@ -2618,10 +2623,6 @@ void Model::add_affect_like(unsigned int i, unsigned int i2, const vector <bool>
 		if(map_time[ti] == true) list_time.push_back(ti);
 	}
 
-	//auto list_wo = list;  // Removes parameter definition from list
-	//list_wo.erase(list_wo.begin());
-	
-	//precalc_eqn.sp_add(pvec.spec_precalc_after,list_wo,list_time);
 	precalc_eqn.sp_add(pvec.spec_precalc_after,list,list_time);
 	
 	for(auto i : list) map_PC[i] = false;
@@ -2819,111 +2820,6 @@ bool Model::is_prior_bounded(unsigned int th) const
 }
 
 
-/// Sets a linear form such that proposals can be made more quickly
-void Model::set_linear_form(unsigned int p, LinearForm &lin_form, const vector <LinearFormInit> &lfinit) const
-{
-	lin_form.factor_nopop_only = false;
-	
-	Hash hash;
-	for(auto k = 0u; k < lfinit.size(); k++){
-		const auto &lfi = lfinit[k];
-		
-		auto e = lfi.e;
-		const auto &eq = eqn[e];
-		
-		auto &lin = eq.linearise;
-		
-		// Generates a hash vector
-		vector <unsigned int> vec;
-		if(lin.pop_grad_precalc.size() != eq.pop_ref.size()) emsg("pop_ref size not right");
-		
-		for(auto i = 0u; i < eq.pop_ref.size(); i++){
-			const auto &it = lin.pop_grad_precalc[i];
-			vec.push_back(it.type);
-			vec.push_back(it.num);
-			vec.push_back(eq.pop_ref[i]);
-		}
-		
-		auto n = hash.existing(vec);
-		if(n == UNSET){
-			n = lin_form.sum_e.size();
-			hash.add(n,vec);
-			lin_form.sum_e.push_back(e);
-			
-			for(auto i = 0u; i < eq.pop_ref.size(); i++){
-				auto po = eq.pop_ref[i];
-							
-				{ // turn off
-					auto k = 0u; while(k < lin_form.pop_affect.size() && lin_form.pop_affect[k].po != po) k++;
-					if(k == lin_form.pop_affect.size()) k = UNSET;
-					if(k != lin_form.hash_po.find(po)) emsg("lf prob");
-				}
-				
-				auto k = lin_form.hash_po.find(po);
-				if(k == UNSET){
-					k = lin_form.pop_affect.size();
-					PopAffect pa; pa.po = po;
-					lin_form.hash_po.add(k,po);
-					lin_form.pop_affect.push_back(pa);
-				}
-			
-				GradRef gr; gr.ref = n; gr.index = i;
-				lin_form.pop_affect[k].pop_grad_ref.push_back(gr);
-			}
-		}
-		
-		LinearFormItem lf;
-		lf.m = lfi.m; lf.e = e; lf.sum_e_ref = n;
-		lf.factor_precalc = eq.linearise.factor_precalc;
-		lf.no_pop_precalc = eq.linearise.no_pop_precalc;
-
-		lin_form.list.push_back(lf);
-	}
-	
-	lin_form.nopop_same = true;
-	lin_form.factor_same = true;
-	
-	const auto &list = lin_form.list;
-	
-	if(list.size() > 0){
-		const auto &factor_precalc_fir = list[0].factor_precalc;
-		const auto &no_pop_precalc_fir = list[0].no_pop_precalc;
-
-		for(auto k = 1u; k < list.size(); k++){
-			if(!item_equal(factor_precalc_fir,list[k].factor_precalc)){
-				lin_form.factor_same = false;
-			}				
-			
-			if(!item_equal(no_pop_precalc_fir,list[k].no_pop_precalc)){
-				lin_form.nopop_same = false;
-			}				
-		}			
-	}
-	
-	if(false){
-		cout << lin_form.nopop_same << " nopop_same" << endl;
-		cout << lin_form.factor_same << " factor same" << endl;
-
-		const auto &sp = species[p]; 
-		for(const auto &lf : lin_form.list){
-			cout << sp.tra_gl[lf.m].name << ", ";
-		}
-		cout << "calculate fast" << endl;
-		
-		cout << lin_form.list.size() << " " << lin_form.sum_e.size() << "num" << endl;
-		/*
-		for(auto k = 0u; k < lin_form.pop_affect.size(); k++){
-			const auto &pa = lin_form.pop_affect[k];
-			cout << "  " << pa.po << ": ";
-			for(const auto &pgr : pa.pop_grad_ref) cout << pgr.ref << " " << pgr.index << ", ";
-			cout << "  grad ref" << endl;
-		}
-		*/
-		emsg("mbp speed up");
-	}
-}
-
-
 /// Determines if a parameter is a matrix
 bool Model::is_matrix(const Param &par) const 
 {
@@ -2997,7 +2893,12 @@ string Model::str_spec_precalc(string st, const SpecPrecalc &spre) const
 {
 	stringstream ss;
 	ss << st << ": ";
-	for(const auto &in : spre.info){
+	
+	auto imax = spre.info.size();
+	if(imax > 100) imax = 100;
+	
+	for(auto i = 0u; i < imax; i++){
+		const auto &in = spre.info[i];
 		ss << in.i;
 		if(in.tlist != UNSET){
 			const auto &lt = spre.list_time[in.tlist];
@@ -3007,6 +2908,7 @@ string Model::str_spec_precalc(string st, const SpecPrecalc &spre) const
 		ss << ",";
 	}
 	ss << endl;
+	if(imax == 100) ss << "..." << endl;
 	
 	return ss.str();
 }
@@ -3018,6 +2920,70 @@ void Model::set_param_spec_precalc()
 	vector <unsigned int> no_time;
 	
 	for(auto th = 0u; th < param_vec.size(); th++){
-		precalc_eqn.sp_add(param_vec[th].set_param_spec_precalc,param_vec_ref[th],no_time);
+		auto &pv = param_vec[th];
+		auto spl_fl = false; if(pv.spline_ref != UNSET) spl_fl = true;
+		precalc_eqn.set_param(pv.set_param_spec_precalc,pv.spec_precalc_after,spl_fl);
+		//precalc_eqn.sp_add(pv.set_param_spec_precalc,param_vec_ref[th],no_time);
+	}
+}
+
+
+/// If model contains tvreparam then create a reference from pop to th
+void Model::set_pop_reparam_th()
+{
+	if(!contains_tvreparam) return;
+	
+	auto P = pop.size();
+	auto T = details.T;
+	
+	pop_reparam_th.resize(P);
+	for(auto po = 0u; po < P; po++){
+		pop_reparam_th[po].resize(T);
+	}
+	
+	for(auto th = 0u; th < param_vec.size(); th++){
+		const auto &pv = param_vec[th];
+		if(pv.reparam_time_dep){
+			const auto &par = param[pv.th];
+			auto eq_ref = par.get_eq_ref(pv.index);
+			if(eq_ref == UNSET) emsg("eq_ref should be set");
+
+			const auto &eq = eqn[eq_ref];
+			for(const auto &ca : eq.calcu){
+				for(const auto &it : ca.item){
+					switch(it.type){
+					case POPNUM:
+						add_to_vec(pop_reparam_th[it.num][pv.reparam_spl_ti],th);
+						break;
+						
+					case POPTIMENUM:
+						{
+							const auto &ptr = eq.pop_time_ref[it.num];
+							if(ptr.ti > pv.reparam_spl_ti){
+								auto t1 = calc_t(ptr.ti);
+								auto t2 = calc_t(pv.reparam_spl_ti);
+								alert_input("Equation '"+eq.te_raw+"' cannot be evaluated because time "+tstr(t1)+" is after the time "+tstr(t2)+" when this expressions is calculated");
+							}	
+							add_to_vec(pop_reparam_th[ptr.po][ptr.ti],th);		
+						}
+						break;
+						
+					default:
+						break;
+					}
+				}
+			}
+		}						
+	}
+
+	if(false){
+		for(auto po = 0u; po < P; po++){
+			for(auto ti = 0u; ti < T; ti++){
+				for(auto th : pop_reparam_th[po][ti]){
+					cout << ti << " " << pop[po].name << " " << param_vec[th].name << endl;
+				}
+			}
+		}
+		emsg("pop reparam th");
 	}
 }

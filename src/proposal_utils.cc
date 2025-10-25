@@ -125,7 +125,7 @@ void Proposal::get_affect_like()
 	model.add_popnum_ind_w_affect(affect_like);
 
 	if(nopop_speedup && type == PARAM_PROP){   
-		model.affect_nopop_speedup(affect_like,dependent_spec_precalc,spec_precalc_after);
+		model.affect_nopop_speedup(affect_like,param_list,dependent,spec_precalc_after);
 	}
 	
 	model.order_affect(affect_like);
@@ -135,7 +135,7 @@ void Proposal::get_affect_like()
 	}
 	
 	if(linearise_factor_nopop_speedup && type == PARAM_PROP){ 
-		model.set_factor_nopop_only(affect_like,dependent_spec_precalc,spec_precalc_after);
+		model.set_factor_nopop_only(affect_like,param_list,dependent,spec_precalc_after);
 	}
 	
 	model.order_affect(affect_like);
@@ -228,19 +228,24 @@ double Proposal::param_resample(PV &param_val, const vector < vector <double> > 
 		
 		auto dv = si*vec[i];
 		
-		switch(pri.type){
-		case INVERSE_PR: 
-		case POWER_PR:
-		// case MVN_JEF_PR: case MVN_UNIFORM_PR:
-			{
-				ps_fac += dv;
-				value[j] *= exp(dv);
-			}
-			break;
-			
-		default:
+		if(model.details.algorithm == ABC_SMC_ALG){
 			value[j] += dv;
-			break;
+		}
+		else{
+			switch(pri.type){
+			case INVERSE_PR: 
+			case POWER_PR:
+			// case MVN_JEF_PR: case MVN_UNIFORM_PR:
+				{
+					ps_fac += dv;
+					value[j] *= exp(dv);
+				}
+				break;
+				
+			default:
+				value[j] += dv;
+				break;
+			}
 		}
 	
 		if(model.in_bounds(value[j],j,precalc) == false){
@@ -249,8 +254,8 @@ double Proposal::param_resample(PV &param_val, const vector < vector <double> > 
 			return UNSET;
 		}
 		
-		model.precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,true);
-		//model.param_spec_precalc_after(j,param_val,true);
+		//model.print_spec_precalc("urr",pv.set_param_spec_precalc); 
+		model.precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,true);	
 	}	
 
 	for(auto k = 0u; k < dependent.size(); k++){
@@ -262,20 +267,18 @@ double Proposal::param_resample(PV &param_val, const vector < vector <double> > 
 		auto ref = par.get_eq_ref(pv.index);
 		if(ref == UNSET) emsg("Reparam is not set");	
 		
+		//model.print_spec_precalc("BEFORE",dependent_spec_precalc[k]);
+		
 		model.precalc_eqn.calculate(dependent_spec_precalc[k],param_val,true);
 		
-		//const auto &dup = dependent_spec_precalc[k];
-		//if(dup.list_precalc.size() > 0){
-			
-		//}
-		
 		param_val.value_change(j);
+		
 		if(pv.reparam_time_dep == false) value[j] = model.eqn[ref].calculate_param(precalc);
 		else{
 			auto ti = pv.reparam_spl_ti;
 			value[j] = model.eqn[ref].calculate(ti,popnum_t[ti],precalc);
 		}
-		
+	
 		if(model.in_bounds(value[j],j,precalc) == false){
 			param_val.restore(); 
 			timer[PARAM_RESAMPLE_TIMER] += clock();
@@ -283,7 +286,6 @@ double Proposal::param_resample(PV &param_val, const vector < vector <double> > 
 		}
 	
 		model.precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,true);
-		//model.param_spec_precalc_after(j,param_val,true);
 	}
 
 	for(const auto &ieg_ref : ieg_check_pri){
@@ -770,7 +772,7 @@ void Proposal::set_mbp_fast()
 		}
 	}
 	
-	model.set_linear_form(p_prop,mbp_fast.lin_form,lfinit);
+	model.species[p_prop].set_linear_form(mbp_fast.lin_form,lfinit,model.eqn);
 }
 
 

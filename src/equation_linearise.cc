@@ -294,6 +294,10 @@ LinearCalculation Equation::convert_to_linear_calculation(const EqItem &it, EqIt
 				lin.pop_calc.push_back(pop_c);
 			}
 			break;
+			
+		case POPTIMENUM:
+			emsg("SHould not be in linear");
+			break;
 		
 		case PARAMVEC: case SPLINEREF: case CONSTSPLINEREF: case NUMERIC: case TIME:
 		case REG_PRECALC: case REG_PRECALC_TIME:

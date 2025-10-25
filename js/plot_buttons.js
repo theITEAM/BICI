@@ -596,7 +596,7 @@ Layer.prototype.plot_button = function (bu,ov)
 				plot_text_tsa(tsa,x,y+dy/2+0.35*bu.si,bu.col);
 			}
 			else{
-				plot_text(te,x,y+dy/2+0.35*bu.si,bu.font,bu.col,ddx);
+				plot_text(String(te),x,y+dy/2+0.35*bu.si,bu.font,bu.col,ddx);
 			}
 		}
 		break;

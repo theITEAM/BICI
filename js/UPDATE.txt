@@ -1,18 +1,24 @@
 
 
 CHRIS
-- Speed up the initialisation time for models (especially farm-based ones)
 - Speed up simulation for individual and population-based models. This takes advantage of the linearisation of equations in terms of population. Grant, I think the FMD model should simulate quite a lot faster than before.
+- Speed up the initialisation time for models (especially farm-based ones)
+- Sorted out possibility of equations for reparameterised splines (and derived quantities) depending on populations from an ealier time (syntax: {I;t=30})
 - Example F5 has been added to show reparameteristion of splines.
 - Speed-up in how data is loaded up
 - I've been through all the model setup function and sped up where I can with hash tables (this reduces the time spent setting up models, which can be quite substantial)
+- Numerous corrections have been made to the inference (errors found by testing lots of different types of model).
+- Stopped parameter menu when histogram is being viewed.
+- The manual has been updated to reflect the above
 
 JAMIE
+- Changes have been made to the annealing under PAS (in particalar the markov process is no-longer under annealing)
 - There has been a small alteration in term of how the progress bar works (just to make it a bit neater). In the output it now says "Load: " instead of "Loading: ", and similarly with others:
 Load:   0....10....20....30....40....50....60....70....80....90....100%
 
 
 GRANT
-- Sorted out problem related to reparameterised values not being put in quote (causing problems with commas)
-- I've improved efficiecy of the algorithm under reparameteristion when most elements are numeric value. This is the canse for you direct transmission and markets in the FMD model, as most elements are zero.
+- Sorted out bugs related to reparameterised splines.
+- Sorted out problem related to reparameterised values not being put in quotes (causing problems with commas)
+- I've improved efficiecy of the algorithm under reparameteristion when most elements are numeric values. This is the case for you direct transmission and markets in the FMD model, as most elements are zero.
 

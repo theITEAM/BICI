@@ -181,6 +181,7 @@ class Input                                // Stores information about the model
 		void linearise_precalc();
 		vector <bool> set_eqn_zero(const vector <EquationInfo> &eq_info);
 		void add_parent_child(const EquationInfo eqi, unsigned int i, unsigned int th, Hash &hash);
+		void add_parent_child2(const ParamRef &parref, const ParamRef &pr, Hash &hash);
 		void create_markov_eqn();
 		void create_markov_eqn_pop_ref();
 		void global_comp_trans_init();
@@ -324,5 +325,6 @@ class Input                                // Stores information about the model
 		double check_zero_one(string te, double def);
 		void check_memory_too_large();
 		void check_derived_order();
+		void check_eqn_fixed_time();
 };
 

@@ -1,4 +1,64 @@
-	/*
+	for(auto spli : spline_up_list){
+			const auto &spl = model.spline[spli];
+			unsigned int ind_start;
+			if(ti == 0) ind_start = spl.div[0].index;
+			else ind_start = spl.div[ti-1].index+1;
+			
+			for(auto ind = ind_start; ind <= spl.div[ti_next-1].index; ind++){
+				const auto &pr = spl.param_ref[ind];
+		
+		for(auto spli : spline_up_list){
+			const auto &spl = model.spline[spli];
+			unsigned int ind_start;
+			if(ti == 0) ind_start = spl.div[0].index;
+			else ind_start = spl.div[ti-1].index+1;
+			
+			for(auto ind = ind_start; ind <= spl.div[ti_next-1].index; ind++){
+				const auto &pr = spl.param_ref[ind];
+				
+				if(!pr.cons){
+					auto th = pr.index;
+					const auto &pv = model.param_vec[th];
+					auto ti = pv.reparam_spl_ti;
+					
+					if(ti != UNSET){
+						const auto &par = model.param[pv.th];
+						auto eq_ref = par.get_eq_ref(pv.index);
+
+						model.precalc_eqn.calculate(pv.spec_precalc_before,param_val,true);
+									
+						param_val.value_change(th);
+						cout << "cal" << endl;
+						value[th] = model.eqn[eq_ref].calculate_all_time(ti,popnum_t,precalc);
+					
+						model.precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,true);
+					
+						const auto &spre = pv.spec_precalc_after;
+						model.precalc_eqn.calculate(spre,param_val,true);
+					
+						if(spre.list_time.size() != 1) emsg("cannot find list time");
+						
+						const auto &pct = spre.list_time[0];
+						if(pct.size() == 0) emsg("zero list time");
+						
+						auto ti_start = pct[0];
+						auto ti_end = pct[pct.size()-1]+1;
+						
+						for(const auto &mer : spl.markov_eqn_ref){
+							species[mer.p].likelihood_ib_spline_section(mer.e,ti_start,ti_end,popnum_t,like_ch);
+						}
+						
+						for(const auto &trar : spl.trans_ref){	
+							species[trar.p].likelihood_pop_spline_section(trar.tr,ti_start,ti_end,popnum_t,like_ch);
+						}
+					}
+				}
+			}
+		
+			spline_up_map[spli] = false;
+		}
+		
+		/*
 	// After parameters have been defined
 	auto dif = false;
 	if(param_list.size() > 1){

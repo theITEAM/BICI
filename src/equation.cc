@@ -76,19 +76,17 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool
 		
 	if(plfl) print_operations(op);
 
-	time_integral(op);                            // Incorporates time integral
+	time_integral(op);                               // Incorporates time integral
 
 	if(warn != "") return; 
 	
-	calcu = create_calculation(op);               // Works out the sequence of calculation to generate result
+	calcu = create_calculation(op);                  // Works out the sequence of calculation to generate result
 	
 	if(warn != "") return; 
 	
 	if(plfl == true) print_calculation();
 
-	if(simplify_eqn == true){
-		simplify(calcu);     // Simplifies by combining constants
-	}
+	if(simplify_eqn == true) simplify(calcu);        // Simplifies by combining constants
 	
 	if(warn != "") return;  
 
@@ -323,6 +321,12 @@ void Equation::print_operations(const vector <EqItem> &op) const
 			case ZERO: cout << "0"; break;
 			case FE: cout << species[sp_p].fix_effect[op[i].num].name; break;
       case POPNUM: cout << pop[op[i].num].name; break;
+      case POPTIMENUM:
+				{		
+					const auto &ptr = pop_time_ref[op[i].num];
+					cout << pop[ptr.po].name << "(t=" << ptr.ti << ")";
+				}
+				break;
       case EXPFUNC: cout << "exp"; break;
       case SINFUNC: cout << "sin"; break;
       case COSFUNC: cout << "cos"; break;
@@ -425,7 +429,6 @@ void Equation::print_ca(unsigned int i, const Calculation &ca) const
 			case UBOUNDFUNC: cout << "|"; break;
 			case MAXFUNC: cout << "|"; break;
 			case MINFUNC: cout << "|"; break;
-		
 			default: break;
 			}
 		}
@@ -484,16 +487,16 @@ void Equation::print_item(const EqItem &it) const
 		{
 			const auto &pr = param_ref[it.num];
 			auto par = param[pr.th]; 
-			cout << "Spline " << add_escape_char(get_param_name_with_dep(par,par.dep,pr.index));
+			cout << "Spline " << get_param_name_with_dep(par,par.dep,pr.index);
 		}
 		break;
 		
 	case SPLINEREF:
-		cout << "Spline " << add_escape_char(spline[it.num].name); 
+		cout << "Spline " << spline[it.num].name; 
 		break;
 		
 	case CONSTSPLINEREF:
-		cout << "Const Spline " << add_escape_char(spline[it.num].name); 
+		cout << "Const Spline " << spline[it.num].name; 
 		break;
 	
 	case DERIVE: 
@@ -505,10 +508,16 @@ void Equation::print_item(const EqItem &it) const
 		break;
 			
 	case POPNUM: 
-		//cout << "P" << it.num;
 		cout << "'" << pop[it.num].name << "'";
 		break;
-
+	
+	case POPTIMENUM:	
+		{		
+			const auto &ptr = pop_time_ref[it.num];
+			cout << pop[ptr.po].name << "(t=" << ptr.ti << ")";
+		}
+		break;
+		
 	case IE: cout << species[sp_p].ind_effect[it.num].name; break;
 	case ONE: cout << "1"; break;
 	case ZERO: cout << "0"; break;
@@ -921,29 +930,29 @@ DeriveRef Equation::get_derive_name(unsigned int i, unsigned int &raend)
 
 
 /// Tries to get a population from the equation
-unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)            
+PopTimeRef Equation::get_pop(unsigned int i, unsigned int &raend)            
 {
-	auto p = UNSET;
-	
+	PopTimeRef ptr; ptr.po = UNSET; ptr.ti = UNSET;
+	 
 	if(te.substr(i,1) == "{"){
 		i++;
 		auto ist = i;
 		while(i < te.length() && te.substr(i,1) != "}") i++;
-		if(i == te.length()){ warn = "The '{' bracket does not match up"; return p;}
+		if(i == te.length()){ warn = "The '{' bracket does not match up"; return ptr;}
 
 		auto sp_p2 = sp_p;
 		if(sp_p2 == UNSET && species.size() == 1) sp_p2 = 0;
 			
-		if(sp_p2 == UNSET){ warn = "A population can only be set if there is a species"; return p;}
+		if(sp_p2 == UNSET){ warn = "A population can only be set if there is a species"; return ptr;}
 
 		auto cont = te.substr(ist,i-ist);
 		if(includes(cont,":")){
 			auto spl = split(cont,':');
-			if(spl.size() != 2){ warn = "A population contains more than one ':'"; return p;}
+			if(spl.size() != 2){ warn = "A population contains more than one ':'"; return ptr;}
 			
 			auto name = spl[0];
 			sp_p2 = 0; while(sp_p2 < nspecies && species[sp_p2].name != name) sp_p2++;
-			if(sp_p2 == nspecies){ warn = "Species '"+name+"' does not exist"; return p;}
+			if(sp_p2 == nspecies){ warn = "Species '"+name+"' does not exist"; return ptr;}
 
 			cont = spl[1];
 		}
@@ -953,10 +962,10 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 		name += "{"+cont+"}";
 
 		auto vec = hash_pop.get_vec_string(name);
-		p = hash_pop.existing(vec);
-		if(p == UNSET){
-			p = pop.size();
-			hash_pop.add(p,vec);
+		ptr.po = hash_pop.existing(vec);
+		if(ptr.po == UNSET){
+			ptr.po = pop.size();
+			hash_pop.add(ptr.po,vec);
 			
 			string start = "In population {"+cont+"}: ";
 	
@@ -965,15 +974,33 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 			
 			auto spl = split(cont,';');
 			
+			if(spl.size() > 1){
+				const auto &last = spl[spl.size()-1];
+				auto sple = split(last,'=');
+				if(sple.size() == 2){
+					if(sple[0] != "t"){ warn = "'t' should be before equals sign"; return ptr;}
+				
+					auto pop_ti = number(sple[1]);
+					if(pop_ti == UNSET){ warn = "'"+sple[1]+"' should be a number"; return ptr;}
+					
+					if(pop_ti < details.t_start || pop_ti >= details.t_end){
+						warn = "The time '"+sple[1]+"' is not within the system time range"; return ptr;
+					}
+					
+					auto tdiv = calc_tdiv(pop_ti,details);
+					ptr.ti = get_ti(tdiv);
+			
+					spl.pop_back();
+				}
+			}
+			
 			if(spl.size() > 2){
-				warn = start+"More than one ';' unexpected"; return p;
+				warn = start+"More than one ';' unexpected"; return ptr;
 			}
 			
 			if(spl.size() == 2){
 				auto extra = spl[1];
 			
-				cont = spl[0];	
-				
 				auto k = 0u;
 				while(k < extra.length()){
 					while(k < extra.length() && extra.substr(k,1) == " ") k++;
@@ -984,17 +1011,17 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 						auto kst = k;
 						
 						while(k < extra.length() && extra.substr(k,1) != "]" && extra.substr(k,1) != ">") k++;
-						if(k == extra.length()){ warn = "Brackets do not match up in '"+name+"'"; return p;}
+						if(k == extra.length()){ warn = "Brackets do not match up in '"+name+"'"; return ptr;}
 						
 						auto ch2 = extra.substr(k,1);
 						if(ch == "["){
-							if(ch2 != "]"){ warn = "Brackets do not match up in '"+name+"'"; return p;}
+							if(ch2 != "]"){ warn = "Brackets do not match up in '"+name+"'"; return ptr;}
 							
 							auto ie_name = extra.substr(kst+1,k-(kst+1));
 							auto &sp = species[sp_p2];
 							auto ie = 0u; while(ie < sp.ind_effect.size() && sp.ind_effect[ie].name != ie_name) ie++;
 							if(ie == sp.ind_effect.size()){
-								if(ie_name  == ""){ warn = "Individual effect in population '[]' must contain text"; return p;}
+								if(ie_name  == ""){ warn = "Individual effect in population '[]' must contain text"; return ptr;}
 									
 								IndEffect ind_eff; 
 								ind_eff.name = ie_name; ind_eff.index = UNSET; ind_eff.num = UNSET; 
@@ -1004,41 +1031,43 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 							po.ind_eff_mult.push_back(ie);
 						}
 						else{
-							if(ch2 != ">"){ warn = "Brackets do not match up in '"+name+"'"; return p;}
+							if(ch2 != ">"){ warn = "Brackets do not match up in '"+name+"'"; return ptr;}
 							
 							auto fe_name = extra.substr(kst+1,k-(kst+1));
 	
-							if(fe_name  == ""){ warn = "Fixed effect in population '<>' must contain text"; return p;}
+							if(fe_name  == ""){ warn = "Fixed effect in population '<>' must contain text"; return ptr;}
 							
 							auto &sp = species[sp_p2];
 							auto fe = 0u; 
 							while(fe < sp.fix_effect.size() && sp.fix_effect[fe].name != fe_name) fe++;
 							if(fe == sp.fix_effect.size()){
-								warn = "Fixed effect '<"+fe_name+">' unspecified. This must be specified through the 'fixed-effect' command"; return p;
+								warn = "Fixed effect '<"+fe_name+">' unspecified. This must be specified through the 'fixed-effect' command"; return ptr;
 							}
 							po.fix_eff_mult.push_back(fe);
 						}
 					}
 					else{
 						if(ch != "×" && ch != "*"){
-							warn = start+"Character '"+ch+"' is unexpected"; return p;
+							warn = start+"Character '"+ch+"' is unexpected"; return ptr;
 						}
 					}
 					k++;
 				}
 			}
 	
+			cont = spl[0];	
+				
 			// Checks that population individual/fixed effects are divided correctly
 			for(auto k = 0u; k < cont.length(); k++){
 				auto ch = cont.substr(k,1);
 				if(ch == "<"){
 					warn = start+"Population fixed effects must be placed after ';' divider";
-					return p;
+					return ptr;
 				}
 				
 				if(ch == "["){
 					warn = start+"Population individual effects must be placed after ';' divider";
-					return p;
+					return ptr;
 				}
 			}
 	
@@ -1069,7 +1098,7 @@ unsigned int Equation::get_pop(unsigned int i, unsigned int &raend)
 		raend = i;
 	}
 	
-	return p;
+	return ptr;
 }
 
 
@@ -1160,7 +1189,7 @@ bool Equation::quant(const vector <EqItem> &op, int i) const
 	case SPLINE: case SPLINEREF: case CONSTSPLINEREF:
 	case DERIVE:
 	case INTEGRAL:
-	case POPNUM: case IE: case FE: case REG: case NUMERIC: case TIME: 
+	case POPNUM: case POPTIMENUM: case IE: case FE: case REG: case NUMERIC: case TIME: 
 		return true;
   default: return false;
 	}
@@ -1176,7 +1205,7 @@ bool Equation::quantl(const vector <EqItemList> &opl, unsigned int i) const
 	case SPLINE: case SPLINEREF: case CONSTSPLINEREF:
 	case DERIVE:
 	case INTEGRAL:
-	case POPNUM: case IE: case FE: case REG: case NUMERIC: case TIME: 
+	case POPNUM: case POPTIMENUM: case IE: case FE: case REG: case NUMERIC: case TIME: 
 		return true;
   default: return false;
 	}
@@ -1503,10 +1532,16 @@ vector <EqItem> Equation::extract_operations()
 					// Looks for populations
 					if(doneflag == false){
 						unsigned int raend;
-						auto numi = get_pop(i,raend); if(warn != "") return op;
-						if(numi != UNSET){
+						auto ptr = get_pop(i,raend); if(warn != "") return op;
+						if(ptr.po != UNSET){
 							i = raend-1;
-							item.type = POPNUM; item.num = numi; op.push_back(item); 
+							if(ptr.ti != UNSET){
+								item.type = POPTIMENUM; item.num = pop_time_ref.size(); op.push_back(item); 
+								pop_time_ref.push_back(ptr);
+							}
+							else{
+								item.type = POPNUM; item.num = ptr.po; op.push_back(item); 
+							}
 							doneflag = true;
 						}
 					}
@@ -1832,7 +1867,7 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 			case INTEGRAL:
 			case SPLINE: case SPLINEREF: case CONSTSPLINEREF:
 			case DERIVE:
-			case POPNUM:
+			case POPNUM: case POPTIMENUM:
 			case IE: case FE: case REG: case NUMERIC: case TIME: 
 				if(optypel(opl,iprev,LEFTBRACKET) && optypel(opl,inext,RIGHTBRACKET) && !is_funcl(opl,iprev2)){
 					opl[iprev].type = opl[i].type;
@@ -2712,6 +2747,7 @@ void Equation::calculate_pop_ref()
 		const auto &ca = calcu[i];
 		for(const auto &it : ca.item){
 			if(it.type == POPNUM) add_to_vec(pop_ref,it.num,hash_pr);
+			if(it.type == POPTIMENUM)	add_to_vec(pop_ref,pop_time_ref[it.num].po,hash_pr);
 		}
 	}
 	
@@ -2721,6 +2757,7 @@ void Equation::calculate_pop_ref()
 			const auto &ca = calc[i];
 			for(const auto &it : ca.item){
 				if(it.type == POPNUM) add_to_vec(pop_ref,it.num,hash_pr);
+				if(it.type == POPTIMENUM)	add_to_vec(pop_ref,pop_time_ref[it.num].po,hash_pr);
 			}
 		}
 	}

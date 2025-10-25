@@ -1277,6 +1277,16 @@ ParamProp get_param_prop(string st)
 
 
 /// Adds a value to a vector (if it doesn't already exist)
+unsigned int add_to_vec(vector <unsigned int> &vec, unsigned int val)
+{
+	auto i = find_in(vec,val);
+	if(i == UNSET){ i = vec.size(); vec.push_back(val);}
+
+	return i;
+}
+
+
+/// Adds a value to a vector (if it doesn't already exist)
 unsigned int add_to_vec(vector <unsigned int> &vec, unsigned int val, HashSimp &hash)
 {
 	auto i = hash.find(val);
@@ -1669,8 +1679,8 @@ string get_param_name_with_dep(const Param &par, const vector <Dependency> &dep,
 			name += dep[d].list[(index/dep[d].mult)%dep[d].list.size()];
 		}	
 	}
-	
-	return name;
+
+	return add_escape_char(trunc(name,100));
 }
 
 
@@ -3547,6 +3557,7 @@ void eqn_type_error(EqItemType type, unsigned int ref)
 	case IE: st = "IE"; break;
 	case FE: st = "FE"; break;
 	case POPNUM: st = "POPNUM"; break;
+	case POPTIMENUM: st = "POPTIMENUM"; break;
 	case TIME: st = "TIME"; break;
 	default: st = "DEFAULT"; break;
 	}

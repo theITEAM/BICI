@@ -46,13 +46,16 @@ void CorMatrix::add_sample(vector <double> param_val_pr, unsigned int range)
 	for(auto i = 0u; i < model.nparam_vec_prop; i++){
 		const auto &pv = model.param_vec[model.param_vec_prop[i]];
 		const auto &pri = model.prior[pv.prior_ref];
-		switch(pri.type){
-		case INVERSE_PR:
-		case POWER_PR: 
-		//case MVN_JEF_PR: case MVN_UNIFORM_PR: 
-			param_val_pr[i] = log(param_val_pr[i]);
-			break;
-		default: break;
+		
+		if(model.details.algorithm != ABC_SMC_ALG){
+			switch(pri.type){
+			case INVERSE_PR:
+			case POWER_PR: 
+			//case MVN_JEF_PR: case MVN_UNIFORM_PR: 
+				param_val_pr[i] = log(param_val_pr[i]);
+				break;
+			default: break;
+			}
 		}
 	}
 	

@@ -61,7 +61,7 @@ void State::simulate(const PV &param_value, const vector <InitCondValue> &initc_
 		ssp.simulate_init();
 		ssp.simulate_individual_init();
 	}
-	
+
 	popnum_t[0] = calculate_popnum();  
 
 	for(auto p = 0u; p < nspecies; p++){
@@ -70,13 +70,6 @@ void State::simulate(const PV &param_value, const vector <InitCondValue> &initc_
 			ssp.activate_initial_state(0,popnum_t);
 		}
 	}
-
-	/*
-	for(auto p = 0u; p < nspecies; p++){
-		auto &ssp = species[p];
-		ssp.check(0,popnum_t);
-	}
-	*/
 
 	simulate_iterate(0,T);
 }
@@ -128,14 +121,15 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 	// Initialises speedup
 	for(auto p = 0u; p < nspecies; p++){
 		const auto &ssp = species[p];
-		sim_speed[p].pop_grad = ssp.pop_grad_calc(ssp.sim_linear_speedup.lin_form);
+		const auto &sp = model.species[p];
+		sim_speed[p].pop_grad = ssp.pop_grad_calc(sp.sim_linear_speedup.lin_form);
 	}
 	
 	vector <double> val_fast;
 	
 	for(auto ti = ti_start; ti < ti_end; ti++){	
 		//if(true && ti%op_step == 0) print_cpop(ti);		
-		//cout << ti << " ti sim" << endl;
+		//cout << ti << " ti sim" << endl;  
 		
 		auto &pop = popnum_t[ti];
 	
@@ -144,7 +138,7 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 		timer[SIM_CALC_POPNUM] += clock();
 
 		timer[SIM_PRECALC] -= clock();
-		model.param_spec_precalc_time(ti,pop,param_val,false);
+		model.param_spec_precalc_time(ti,popnum_t,param_val,false);
 		timer[SIM_PRECALC] += clock();
 
 		timer[SIM_POPIND] -= clock();	
@@ -153,9 +147,10 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 
 		timer[SIM_UPDATE] -= clock();	
 		for(auto p = 0u; p < nspecies; p++){
+			const auto &sp = model.species[p];
 			auto &ssp = species[p];
 			
-			const auto &lin_form = ssp.sim_linear_speedup.lin_form;
+			const auto &lin_form = sp.sim_linear_speedup.lin_form;
 			auto &ss = sim_speed[p];
 			if(ti == ti_start) ss.val_fast = ssp.calc_val_fast_init(lin_form,ss.pop_grad,pop);
 			else ssp.val_fast_update(ti,ss.val_fast,popnum_t,ss.pop_grad,lin_form);
@@ -180,8 +175,6 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 		}
 	}
 
-	//emsg("sim done");
-	
 	if(model.mode == INF) ensure_all_ind_event();
 
 	if(false){
@@ -189,7 +182,6 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 		for(auto p = 0u; p < nspecies; p++){
 			auto &ssp = species[p];
 			for(auto i = 0u; i < ssp.individual.size(); i++){
-			//for(auto i = 0u; i <10; i++){
 				ssp.print_ind(i);
 				ssp.print_event("start",ssp.individual[i]);
 			}	
@@ -1386,9 +1378,9 @@ void State::resample_ind(bool do_pl)
 		auto &sp = model.species[p];
 		if(sp.type == INDIVIDUAL){
 			auto &ssp = species[p];
-	
+		
 			IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,genetic_value.inf_node,precalc,popnum_t);
-			
+
 			ind_ev_samp.setup_nm();
 		
 			for(auto i = 0u; i < sp.nindividual_in; i++){
@@ -1401,12 +1393,12 @@ void State::resample_ind(bool do_pl)
 						}
 						
 						ind_ev_samp.generate_ind_obs_timeline();
-						
+
 						auto loop_max = 1u;
 						for(auto loop = 0u; loop < loop_max; loop++){
 							auto probif = 0.0;
 							auto ev_new = ind_ev_samp.sample_events(probif);
-						
+
 							if(pl){
 								cout << endl << endl << endl << endl;
 								cout << ssp.individual[i].name << endl;
@@ -1425,12 +1417,12 @@ void State::resample_ind(bool do_pl)
 										cout << endl;
 										cout << "After:" << endl; ssp.print_event(ssp.individual[i].ev);
 									}
-								
+		
 									accept(like_ch);
 								
 									gen_change_update(gc); 	
 									if(sp.trans_tree) update_popnum_ind(p,i);
-									
+			
 									if(pl) check("during resample");
 									
 									if(std::isnan(like.markov)){
@@ -1546,6 +1538,8 @@ void State::set_particle(const Particle &part, bool calc_like)
 	}
 	
 	popnum_t = calculate_popnum_t();
+	
+	model.precalc_eqn.calculate(model.spec_precalc_all,param_val,false);
 	
 	model.param_spec_precalc_time_all(popnum_t,param_val,false); 
 	

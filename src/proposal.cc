@@ -694,7 +694,7 @@ void Proposal::MH(State &state)
 	ntr++; 
 	
 	auto ps_fac = param_resample(param_val,state.popnum_t);
-	if(ps_fac == UNSET){ update_si(-0.005); return;}
+	if(ps_fac == UNSET){ update_si(-0.005);	return;}
 
 	if(pl){     
 		cout << endl << endl;
@@ -702,9 +702,9 @@ void Proposal::MH(State &state)
 			const auto &pv = model.param_vec[i];
 			cout << pv.name << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
 		}
-		for(auto val : param_val.precalc){
-			cout << val << ",";
-		}
+		//for(auto val : param_val.precalc){
+			//cout << val << ",";
+		//}
 		cout << "val" << endl;
 	}
 	

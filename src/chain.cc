@@ -72,8 +72,12 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 	
 		print_diag("Checked");
 		
+		print_diag("resample");
+		
 		auto pl = false;
 		state.resample_ind(pl);    // Resamples individual such that fixed events become correct
+
+		print_diag("resampled");
 
 		state.check("Resample check");
 	
@@ -544,7 +548,6 @@ void Chain::update_init()
 			add_parameter_prop(vec);
 		}
 	}
-
 	
 	// Proposals on individual effects
 	for(auto p = 0u; p < model.nspecies; p++){

@@ -201,34 +201,6 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 
 				change_population(ti,ti_next,k,ma);
 				fl = true;
-
-				/*
-				for(auto tii = ti; tii < ti_next; tii++) popnum_t[tii][k] += ma;
-				fl = true;
-			
-				for(const auto &mef : po.markov_eqn_ref){
-					if(markov_eqn_map[mef.p][mef.e] == false){
-						markov_eqn_map[mef.p][mef.e] = true;
-						markov_eqn_list.push_back(mef);
-					}
-				}
-				
-				for(const auto &mtf : po.trans_ref){
-					if(trans_map[mtf.p][mtf.tr] == false){
-						trans_map[mtf.p][mtf.tr] = true;
-						trans_list.push_back(mtf);
-					}
-				}
-				
-				if(model.contains_tvreparam){
-					for(auto su : po.spline_update){
-						if(spline_up_map[su] == false){
-							spline_up_map[su] = true;
-							spline_up_list.push_back(su);
-						}
-					}
-				}
-				*/
 			}
 		}		
 		

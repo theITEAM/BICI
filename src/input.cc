@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <cmath> 
+#include <algorithm> 
  
 using namespace std;
 
@@ -313,6 +314,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	create_equations(30,60);           // Creates equation calculations
 
+	check_eqn_fixed_time();            // Checks when t=... are used in populations
+	
 	print_diag("h1a");
 
 	combine_populations();             // Combines together populations which appear together
@@ -408,6 +411,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 
 	create_markov_eqn_pop_ref();       // Works out which populations affect which markov eqns (and vice versa)
 	
+	model.set_pop_reparam_th();        // If model contains tvreparam creates reference from pop to th
+	
 	print_diag("h10");
 	
 	ind_fix_eff_group_trans_ref();     // References markov eqns and nm_trans ind_eff_group and fix_effect
@@ -461,8 +466,6 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	linearise_precalc();                // References precalculation in linearisation
 	
-	model.set_param_spec_precalc();     // Sets precalculation for parameter value
-	
 	model.precalc_affect();             // Works out how precalculation is affected by changes in parameters
 	
 	model.create_precalc_derive();      // Extracts precalculations for derived quantities
@@ -470,6 +473,14 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	model.set_precalc_init();           // Sets the initial value for precalc
 	
 	model.set_spec_precalc_time();      // Sets update for precalc at different times (for tv reparam)
+	
+	model.set_param_spec_precalc();     // Sets precalculation for parameter value
+	
+	model.set_spec_precalc_sample();    // Sets precalculation to be done after sampling 
+	
+	model.set_spec_precalc_all();       // Sets a;; precalculation to be done 
+	
+	//model.print_precalc();            // Outputs pre-calculation (for diagnostic purposes)
 	
 	setup_der_func_eqn();               // Sets up equations for derived functions
 	
@@ -545,7 +556,11 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	}		
 
 	if(model.mode == PPC) set_ppc_resample();
-		
+	
+	for(auto &sp : model.species){
+		sp.sim_linear_speedup_init(model.eqn);  // Sets up quantities for fast simulation
+	}
+	
 	check_markov_or_nm();                      // Checks that transition are either markovian or non-markovian
 		
 	check_nm_pop();                            // Checks no population in species for nm trans	
@@ -1440,6 +1455,15 @@ void Input::calc_conv_param_vec(vector <Calculation> &calcu, const vector <Param
 }
 	
 	
+/// Used to order parameter vector elements based on time or reparam spline
+bool param_vec_ord (const ParamVecEle &pv1, const ParamVecEle &pv2)                      
+{
+	int pvt1 = pv1.reparam_spl_ti; if(pvt1 == UNSET) pvt1 = -1;
+	int pvt2 = pv2.reparam_spl_ti; if(pvt2 == UNSET) pvt2 = -1;
+	return pvt1 < pvt2; 
+};  
+
+
 /// Orders parameters in a vector such that only dependent on params with a smaller index
 void Input::create_param_vector()
 {
@@ -1494,6 +1518,10 @@ void Input::create_param_vector()
 		alert_import("Could not order parameters (e.g. cyclic dependencies exist such as A dependent on B and B dependent on A)");
 	}
 
+	auto reparam_spl_fl = false;
+	
+	vector <unsigned int> sym_list;
+	
 	for(auto i = 0u; i < N; i++){
 		auto th = list[i];
 		auto &par = model.param[th];
@@ -1503,6 +1531,7 @@ void Input::create_param_vector()
 			auto sym_fl = false;
 			if(model.is_symmetric(par)){
 				sym_fl = true;
+				sym_list.push_back(th);
 				allow.resize(par.N,true);
 				auto L = par.dep[0].list.size();
 				for(auto j = 0u; j < L; j++){
@@ -1517,10 +1546,10 @@ void Input::create_param_vector()
 					auto &ele = par.element[ind];
 						
 					if(removeparamvec_speedup == false || ele.used == true || par.spline_info.on == true){
-						ele.param_vec_ref = model.param_vec.size();
+						//ele.param_vec_ref = model.param_vec.size();
 						
 						ParamVecEle pr; 
-						pr.name = add_escape_char(get_param_name_with_dep(par,par.dep,j));
+						pr.name = get_param_name_with_dep(par,par.dep,j);
 						pr.th = th; 
 						pr.index = j;
 						if(par.variety == PRIOR_PARAM || par.variety == DIST_PARAM){
@@ -1531,11 +1560,17 @@ void Input::create_param_vector()
 						}
 						pr.variety = par.variety;
 						pr.reparam_time_dep = false;
+						pr.reparam_spl_ti = UNSET;
 						if(pr.variety == REPARAM_PARAM && par.time_dep){
-							if(par.spline_info.type == SQUARE_SPL) pr.reparam_time_dep = true;
+							if(par.spline_info.type == SQUARE_SPL){
+								pr.reparam_time_dep = true;
+								const auto &kn = par.spline_info.knot_tdiv;
+								pr.reparam_spl_ti = (unsigned int)(kn[j%kn.size()]);
+								reparam_spl_fl = true;
+							}
 						}
 						pr.ppc_resample = false;
-						pr.reparam_spl_ti = UNSET;
+						
 						pr.spline_ref = UNSET;
 						pr.ref = UNSET;
 						
@@ -1550,40 +1585,58 @@ void Input::create_param_vector()
 					}
 				}
 			}
-			
-			if(sym_fl){ // Adds in symmetric reference
-				sym_fl = true;
-				auto L = par.dep[0].list.size();
-				for(auto j = 0u; j < L; j++){
-					for(auto i = 0u; i < L; i++){
-						auto k = j*L+i;
+		}
+	}
+	
+	// Time orders parameters based on reparam_time_dep
+	if(reparam_spl_fl) sort(model.param_vec.begin(),model.param_vec.end(),param_vec_ord);
+	
+	// Adds reference from param to param_vec
+	for(auto k = 0u; k < model.param_vec.size(); k++){
+		const auto &pv = model.param_vec[k];
+		
+		auto &par = model.param[pv.th];
+		const auto &er = par.element_ref[pv.index];
+		if(er.cons) emsg("cannot be constant");
+		par.element[er.index].param_vec_ref = k;
+	}
+	
+	// Adds in symmetric reference
+	for(auto th : sym_list){
+		auto &par = model.param[th];
+		auto L = par.dep[0].list.size();
+		for(auto j = 0u; j < L; j++){
+			for(auto i = 0u; i < L; i++){
+				auto k = j*L+i;
+				
+				auto ref = par.element_ref[k].index;
+				if(ref == UNSET) emsg("reference should not be unset");
+				auto &ele = par.element[ref];
+	
+				auto ref_rev = par.element_ref[i*L+j].index;
+				if(ref_rev == UNSET) emsg("reference should not be unset");
+				const auto &ele_rev = par.element[ref_rev];
 						
-						auto ref = par.element_ref[k].index;
-						if(ref != UNSET && !allow[k]){
-							auto &ele = par.element[ref];
-			
-							if(removeparamvec_speedup == false || ele.used == true || par.spline_info.on == true){
-								auto ref_rev = par.element_ref[i*L+j].index;
-								if(ref_rev != UNSET){
-									const auto &ele_rev = par.element[ref_rev];
-								
-									ele.param_vec_ref = ele_rev.param_vec_ref;
-								}
-							}
-						}
-					}
-				}
-			}
-			
-			if(false){
-				for(auto j = 0u; j < par.N; j++){
-					auto ref = par.element_ref[j].index;
-					auto &ele = par.element[ref];
-					cout << ele.param_vec_ref << ",";
-				}
-				cout << "ref" << endl;
+				ele.param_vec_ref = ele_rev.param_vec_ref;
 			}
 		}
+			
+		if(false){
+			for(auto j = 0u; j < par.N; j++){
+				auto ref = par.element_ref[j].index;
+				auto &ele = par.element[ref];
+				cout << ele.param_vec_ref << ",";
+			}
+			cout << "ref" << endl;
+		}
+	}
+	
+	
+	if(false){
+		for(const auto &pv : model.param_vec){
+			cout << pv.reparam_spl_ti << " " << pv.name << " na" << endl;
+		}
+		emsg("dd");
 	}
 	
 	// Converts parameter references in equation to param_vec

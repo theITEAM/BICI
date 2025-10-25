@@ -27,7 +27,11 @@ class Precalc                             // Stores information about the model
 		void sp_add(SpecPrecalc &sprec, const vector <unsigned int> &i_list, const vector <unsigned int> &ltime) const;
 		void print_calc() const;
 		SpecPrecalc combine_spec_precalc(const vector <unsigned int> &param_list_tot) const;
+		SpecPrecalc shrink_sprec(const vector <unsigned int> &lt, SpecPrecalc spre) const;
+		void set_param(SpecPrecalc &set_param_spec_precalc, SpecPrecalc &spec_precalc_after, bool spl_fl) const;
+		SpecPrecalc calculate_spec_precalc_sample(const SpecPrecalc &spec_precalc) const;
 		void set_all_time();
+		SpecPrecalc calculate_spec_precalc_all(const SpecPrecalc &spec_precalc, const vector <SpecPrecalcTime> &spec_precalc_time) const;
 		
 	private:
 		vector <unsigned int> get_vec(const PreCalc &ca) const;

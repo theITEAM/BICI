@@ -1990,6 +1990,10 @@ function plot_param_info(te,si)
 	if(sup) sup = remove_bracket(sup).replace(/\^/g,"-");
 
 	name = spl3[0];
+	if(name == "Ω" && sub){
+		let spc = sub.split(",");
+		if(spc.length == 2 && remove_prime(spc[0]) != remove_prime(spc[1])) name = "ω";
+	}
 	
 	let font = get_font(si);
 	let x = 0;

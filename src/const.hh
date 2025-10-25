@@ -1,4 +1,4 @@
-/// Stores constant values used and enumerated types
+﻿/// Stores constant values used and enumerated types
 
 #pragma once
 
@@ -183,7 +183,7 @@ const vector <string> check_name = { "CHECK_TRANS_NUM", "CHECK_DEP_PARAM", "CHEC
 enum PropTimer { PROP_TIMER, PARAM_RESAMPLE_TIMER, PROPTIMER_MAX };
 
 // Different state species timers
-enum StateSpeciesTimer {UP_MARKOV, SORT, ITER, CHECK, STSP_TIMER_MAX };
+enum StateSpeciesTimer { UP_MARKOV, SORT, ITER, CHECK, STSP_TIMER_MAX };
 
 // INIT_POP_FIXED means init pop has been specified in the data file
 // INIT_POP_DIST means a distribution has been specified in the data file
@@ -281,7 +281,7 @@ enum PercentType { LOAD_PER, INIT_PER, RUN_PER, RUN_GEN_PER, ANNEAL_PER, OUTPUT_
 enum DerFuncType { RN, RNE, RNC, GT, GTE, GTC, DF_UNSET};
  
 // Equation types 
-enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAMETER, PARAMVEC, SPLINE, SPLINEREF, CONSTSPLINEREF, POPNUM, TIME, IE, ONE, ZERO, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, TINT, INTEGRAL, DERIVE, REG_FAC, REG_PRECALC, REG_PRECALC_TIME, SINGLE, NOOP};
+enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAMETER, PARAMVEC, SPLINE, SPLINEREF, CONSTSPLINEREF, POPNUM, POPTIMENUM, TIME, IE, ONE, ZERO, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, TINT, INTEGRAL, DERIVE, REG_FAC, REG_PRECALC, REG_PRECALC_TIME, SINGLE, NOOP};
 
 // Different types of spline
 enum SplineType { LINEAR_SPL, SQUARE_SPL, CUBICPOS_SPL, CUBIC_SPL};
@@ -457,7 +457,8 @@ const vector <unsigned int> factori = {1,1,2,6,24};// Fatorial N! for first 5 nu
 const vector <string> alphabet = {"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"};
 
 
-const string chnotallowed = "\"$&=~#\\→";     // Character not allowed in equations
+//const string chnotallowed = "\"$&=~#\\→";     // Character not allowed in equations
+const string chnotallowed = "\"$&~#\\→";     // Character not allowed in equations
 const string notparam_list = "+-*×/0123456789.{}<>〈〉() $′→;";   // Sets not a parameter character
 const string paramend_list = "+-*×/|.{<>〈〉}[] $"; // Sets characters which end parameter
 const string name_notallow = "|\"*×_ {<>〈〉}[]()=~′→;$&#\\";// Character not allowed in names

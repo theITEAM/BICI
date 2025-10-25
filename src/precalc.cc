@@ -427,8 +427,6 @@ vector <double> Precalc::calculate_precalc_init(const SpecPrecalc &spec_precalc)
 	vector <double> precalc(calcu.size(),UNSET);
 	const auto &cval = constant.value;
 	
-	//auto list_time = get_list(details.T);
-	
 	for(const auto &in : spec_precalc.info){
 		auto i = in.i;
 		
@@ -551,11 +549,14 @@ vector <double> Precalc::calculate_precalc_init(const SpecPrecalc &spec_precalc)
 /// Calculates the value for an equation
 void Precalc::calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store) const 
 {
+	const auto &info = spec_calc.info;
+	if(info.size() == 0) return;
+	
 	const auto &value = param_val.value;
 	const auto &cval = constant.value;
 	auto &precalc = param_val.precalc;
 	
-	for(const auto &ci : spec_calc.info){
+	for(const auto &ci : info){
 		auto i = ci.i;
 
 		const auto &ca = calcu[i];
@@ -696,87 +697,108 @@ void Precalc::print_ca(unsigned int i, const PreCalc &ca) const
 		
 	const auto &item = ca.item;
 	
-	for(auto j = 0u; j < item.size(); j++){
-		const auto &it = item[j];
+	if(item.size() > 0 && (item[0].type == SPLINEREF || item[0].type == CONSTSPLINEREF)){
+		const auto &it = item[0];
 		switch(it.type){
-		case INTEGRAL:
-			emsg("Should not have integral");
-			break;
-			
-		case PARAMETER: 
-			emsg("Should not be parameter");
-			break;
-			
-		case PARAMVEC: 
-			cout << add_escape_char(param_vec[it.num].name);
-			break;
-		
-		case SPLINE: 
-			emsg("Should not be spline");
-			break;
-			
 		case SPLINEREF:
-			cout << "Spline " << add_escape_char(spline[it.num].name); 
+			cout << "Spline " << spline[it.num].name; 
 			break;
 		
 		case CONSTSPLINEREF:
-			cout << "Const Spline " << add_escape_char(spline[it.num].name); 
+			cout << "Const Spline " << spline[it.num].name; 
 			break;
 			
-		case DERIVE: 
-			emsg("Should not be derive");
+		default:
 			break;
-				
-		case POPNUM: 
-			cout << "'" << pop[it.num].name << "'";
-			break;
-	
-		case IE: emsg("SHould not be ie"); break;
-		case ONE: cout << "1"; break;
-		case FE: emsg("SHould not be fe"); break;
-		case REG: cout << "R" << it.num; break;
-		case REG_FAC: cout << "Rfac" << it.num; break;
-		case REG_PRECALC: cout << "Rpre" << it.num; break;
-		case REG_PRECALC_TIME: cout << "Rpretime" << it.num; break;
-		case NUMERIC: 
-			{
-				auto val = constant.value[it.num];
-				if(val == INFY) cout << "INFY";
-				else{
-					if(val == UNDEF) cout << "UNDEF";
-					else cout << val; 
-				}
-			}
-			break;
-		case TIME: cout << "time"; break;
-		default: cout << it.type << endl; emsg_input("Precalc Eq "); break;
-		}
-		
-		if(j != item.size()-1){
-			switch(ca.op){
-			case ADD: cout <<  "+"; break;
-			case TAKE: cout <<  "-"; break;
-			case MULTIPLY: cout << "*"; break;
-			case SINGLE: cout <<  ""; break;
-			case DIVIDE: cout <<  "/"; break;
-			case POWERFUNC: cout << "|"; break;
-			case THRESHFUNC: cout << "|"; break;
-			case UBOUNDFUNC: cout << "|"; break;
-			case MAXFUNC: cout << "|"; break;
-			case MINFUNC: cout << "|"; break;
-		
-			default: break;
-			}
 		}
 	}
+	else{
+		for(auto j = 0u; j < item.size(); j++){
+			const auto &it = item[j];
+			switch(it.type){
+			case INTEGRAL:
+				emsg("Should not have integral");
+				break;
+				
+			case PARAMETER: 
+				emsg("Should not be parameter");
+				break;
+				
+			case PARAMVEC: 
+				cout << param_vec[it.num].name;
+				break;
+			
+			case SPLINE: 
+				emsg("Should not be spline");
+				break;
+				
+			case SPLINEREF:
+				cout << "Spline " << spline[it.num].name; 
+				break;
+			
+			case CONSTSPLINEREF:
+				cout << "Const Spline " << spline[it.num].name; 
+				break;
+				
+			case DERIVE: 
+				emsg("Should not be derive");
+				break;
+					
+			case POPNUM: 
+				cout << "'" << pop[it.num].name << "'";
+				break;
+				
+			case POPTIMENUM: 
+				emsg("Should not be poptime num");
+				break;
+				
+			case IE: emsg("SHould not be ie"); break;
+			case ONE: cout << "1"; break;
+			case FE: emsg("SHould not be fe"); break;
+			case REG: cout << "R" << it.num; break;
+			case REG_FAC: cout << "Rfac" << it.num; break;
+			case REG_PRECALC: cout << "Rpre" << it.num; break;
+			case REG_PRECALC_TIME: cout << "Rpretime" << it.num; break;
+			case NUMERIC: 
+				{
+					auto val = constant.value[it.num];
+					if(val == INFY) cout << "INFY";
+					else{
+						if(val == UNDEF) cout << "UNDEF";
+						else cout << val; 
+					}
+				}
+				break;
+			case TIME: cout << "time"; break;
+			default: cout << it.type << endl; emsg_input("Precalc Eq "); break;
+			}
+			
+			if(j != item.size()-1){
+				switch(ca.op){
+				case ADD: cout <<  "+"; break;
+				case TAKE: cout <<  "-"; break;
+				case MULTIPLY: cout << "*"; break;
+				case SINGLE: cout <<  ""; break;
+				case DIVIDE: cout <<  "/"; break;
+				case POWERFUNC: cout << "|"; break;
+				case THRESHFUNC: cout << "|"; break;
+				case UBOUNDFUNC: cout << "|"; break;
+				case MAXFUNC: cout << "|"; break;
+				case MINFUNC: cout << "|"; break;
+			
+				default: break;
+				}
+			}
+		}
 
-	switch(ca.op){
-	case EXPFUNC: case SINFUNC: case COSFUNC: case LOGFUNC: case STEPFUNC: case POWERFUNC: 
-	case THRESHFUNC: case UBOUNDFUNC: case MAXFUNC: case MINFUNC: case ABSFUNC: case SQRTFUNC:
-	case SIGFUNC:
-		cout << ")"; 
-		break;
-	default: break;
+		switch(ca.op){
+		case EXPFUNC: case SINFUNC: case COSFUNC: case LOGFUNC: case STEPFUNC: case POWERFUNC: 
+		case THRESHFUNC: case UBOUNDFUNC: case MAXFUNC: case MINFUNC: case ABSFUNC: case SQRTFUNC:
+		case SIGFUNC:
+			cout << ")"; 
+			break;
+		default: break;
+		}
 	}
 		
 	cout <<  " > ";
@@ -904,6 +926,138 @@ SpecPrecalc Precalc::combine_spec_precalc(const vector <unsigned int> &param_lis
 	}while(true);
 		
 	return spre;
+}
+
+
+/// This shrinks a precalculation based on only being needed for a given time range
+SpecPrecalc Precalc::shrink_sprec(const vector <unsigned int> &lt, SpecPrecalc spre) const
+{
+	auto T = details.T;
+	
+	vector <bool> map(T,false);
+	for(auto ti : lt) map[ti] = true;
+	for(auto &listt : spre.list_time){
+		vector <unsigned int> listt_new;
+		for(auto ti : listt){
+			if(map[ti] == true) listt_new.push_back(ti);
+		}			
+		listt = listt_new;
+	}
+	
+	vector <PrecalcInfo> info_new;
+	for(const auto &in : spre.info){
+		if(in.tlist == UNSET) info_new.push_back(in);
+		else{
+			if(spre.list_time[in.tlist].size() > 0) info_new.push_back(in);
+		}
+	}
+	
+	if(info_new.size() != spre.info.size()) spre.info = info_new;
+	
+	return spre;
+}
+
+
+/// 
+void Precalc::set_param(SpecPrecalc &set_param_spec_precalc, SpecPrecalc &spec_precalc_after, bool spl_fl) const
+{
+	// Transfers over parameter
+	auto &info = spec_precalc_after.info;
+
+	if(info.size() == 0) emsg("zero size");
+	const auto &list_time = spec_precalc_after.list_time;
+	set_param_spec_precalc.info.push_back(info[0]);
+	info.erase(info.begin());
+
+	// Transfers the spline (if it exists)
+	if(spl_fl){
+		const auto &in = info[0];
+		sp_add(set_param_spec_precalc,in.i,list_time[in.tlist]);
+		info.erase(info.begin());
+	}
+	
+	/*
+	// Transfers over parameter
+	auto &info = spec_precalc_after.info;
+
+	if(info.size() == 0) emsg("zero size");
+	const auto &list_time = spec_precalc_after.list_time;
+	set_param_spec_precalc.info.push_back(info[0]);
+	//info.erase(info.begin());
+
+	// Transfers the spline (if it exists)
+	if(spl_fl){
+		const auto &in = info[1];
+		sp_add(set_param_spec_precalc,in.i,list_time[in.tlist]);
+		//info.erase(info.begin());
+	}
+	*/
+}
+
+
+// Sets precalculation to be done after sampling 
+SpecPrecalc Precalc::calculate_spec_precalc_sample(const SpecPrecalc &spec_precalc) const
+{
+	auto C = calcu.size();
+	vector <bool> map(C,false);
+	
+	for(auto &in : spec_precalc.info) map[in.i] = true;
+	
+	for(const auto &pv : param_vec){
+		
+		for(auto &in : pv.spec_precalc_before.info) map[in.i] = true;
+		
+		if(!pv.reparam_time_dep){
+			for(auto &in : pv.spec_precalc_after.info) map[in.i] = true;
+		}
+	}
+	
+	SpecPrecalc spec;
+	spec.list_time.push_back(all_time);
+	
+	for(auto i = 0u; i < C; i++){
+		if(map[i]){
+			PrecalcInfo pi; pi.i = i;
+			if(calcu[i].time_dep) pi.tlist = 0;
+			else pi.tlist = UNSET;	
+			spec.info.push_back(pi);			
+		}
+	}
+	
+	return spec;
+}
+
+
+// Sets all precalculation to be done (apart from derived)
+SpecPrecalc Precalc::calculate_spec_precalc_all(const SpecPrecalc &spec_precalc, const vector <SpecPrecalcTime> &spec_precalc_time) const
+{
+	auto C = calcu.size();
+	vector <bool> map(C,false);
+	
+	for(auto &in : spec_precalc.info) map[in.i] = true;
+	
+	for(const auto &pv : param_vec){
+		for(auto &in : pv.spec_precalc_before.info) map[in.i] = true;
+		
+		if(!pv.reparam_time_dep){
+			for(auto &in : pv.set_param_spec_precalc.info) map[in.i] = true;
+			for(auto &in : pv.spec_precalc_after.info) map[in.i] = true;
+		}
+	}
+	
+	SpecPrecalc spec;
+	spec.list_time.push_back(all_time);
+	
+	for(auto i = 0u; i < C; i++){
+		if(map[i]){
+			PrecalcInfo pi; pi.i = i;
+			if(calcu[i].time_dep) pi.tlist = 0;
+			else pi.tlist = UNSET;	
+			spec.info.push_back(pi);			
+		}
+	}
+	
+	return spec;
 }
 
 

@@ -135,6 +135,8 @@ class Species   	                         // Stores details of a species
 		
 		vector <WarnData> warn;                // Stores any errors used to generate data
 
+		SimLinearSpeedup sim_linear_speedup;   // Stores information to speed up simulation
+		
 		unsigned int T;                        // The maximum time
 		
 		unsigned int line_num;                 // Stores the import line (for diagnostic error messages)
@@ -170,7 +172,10 @@ class Species   	                         // Stores details of a species
 		unsigned int tr_trans(unsigned int trg, unsigned int c) const;
 		unsigned int get_comp_global_convert(unsigned int cgl, unsigned int cl, unsigned int c) const;
 		void sampling_error(unsigned int trg, string warn) const;
-		
+		void sim_linear_speedup_init(const vector <Equation> &eqn);
+		void set_linear_form(LinearForm &lin_form, const vector <LinearFormInit> &lfinit, const vector <Equation> &eqn) const;
+		bool item_equal(const EqItem &it1, const EqItem &it2) const;
+				
 	// In 'species_data.cc':
 	public: 
 		void initialise_data(Operation mode);

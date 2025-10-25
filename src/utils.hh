@@ -87,6 +87,7 @@ SwapResult swap_index(string &te, const vector <DepConv> &dep_conv);
 SwapResult swap_template(string te, const vector <DepConv> &dep_conv);
 string swap_index_temp(const vector <DepConv> &dep_conv, const SwapResult &temp);
 ParamProp get_param_prop(string st);
+unsigned int add_to_vec(vector <unsigned int> &vec, unsigned int val);
 unsigned int add_to_vec(vector <unsigned int> &vec, unsigned int val, HashSimp &hash);
 unsigned int add_to_vec(vector <ParamRef> &vec, unsigned int th, unsigned int index, Hash &hash);
 unsigned int add_to_vec(vector <PopTransRef> &vec, unsigned int p, unsigned int tr, HashSimp &hash);

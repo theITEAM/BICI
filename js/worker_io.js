@@ -378,7 +378,6 @@ function is_correlation(name,result)
 }
 
 
-
 /// Reads in a parameter samples from a file
 function read_param_samples(chain,te,result,warn)
 {
@@ -399,9 +398,11 @@ function read_param_samples(chain,te,result,warn)
 		name = name.replace(/\|/g,",");
 		name = remove_escape_char(name);
 		
+		
 		if(begin_str(name,"ω")){
 			if(is_correlation(name,result)) name = "Ω"+name.substr(1);
 		}
+	
 		
 		let ref_add = hash_ref.find(name)
 		if(ref_add == undefined){

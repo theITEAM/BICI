@@ -718,31 +718,47 @@ void Input::add_parent_child(const EquationInfo eqi, unsigned int i, unsigned in
 {
 	ParamRef parref; parref.th = th; parref.index = i;
 			
-	auto &par = model.param[th];
-
 	auto ref = eqi.eq_ref;
 	if(ref != UNSET){
 		const auto &eq = model.eqn[ref];
-
-		for(auto pr : eq.param_ref){			
-			vector <unsigned int> vec;
-			vec.push_back(th); vec.push_back(i);
-			vec.push_back(pr.th); vec.push_back(pr.index);
-		
-			auto p = hash.existing(vec);
-			if(p == UNSET){
-				hash.add(0,vec);
-
-				par.add_parent(i,pr);
-			
-				auto &par_chi = model.param[pr.th];
-				if(!par_chi.element_ref[pr.index].cons) par_chi.add_child(pr.index,parref);
+		for(const auto &pr : eq.param_ref){	
+			const auto &par = model.param[pr.th];
+			if(par.time_dep){  // If dependent on a spline then need put in all elements of spline
+				auto ntime = par.spline_info.knot_tdiv.size();
+				auto pr_shift = pr;
+				for(auto k = 0u; k < ntime; k++){
+					add_parent_child2(parref,pr_shift,hash);
+					pr_shift.index++;
+				}					
 			}
-			
-			//add_to_list(par.parent[i],pr);
-			//add_to_list(model.param[pr.th].child[pr.index],parref);
+			else{
+				add_parent_child2(parref,pr,hash);
+			}
 		}
 	}
+}
+
+
+/// Adds parent child relationship
+void Input::add_parent_child2(const ParamRef &parref, const ParamRef &pr, Hash &hash)
+{
+	vector <unsigned int> vec;
+	vec.push_back(parref.th); vec.push_back(parref.index);
+	vec.push_back(pr.th); vec.push_back(pr.index);
+
+	auto p = hash.existing(vec);
+	if(p == UNSET){
+		hash.add(0,vec);
+
+		auto &par = model.param[parref.th];
+		if(!par.element_ref[parref.index].cons) par.add_parent(parref.index,pr);
+		
+		auto &par_chi = model.param[pr.th];
+		if(!par_chi.element_ref[pr.index].cons) par_chi.add_child(pr.index,parref);
+	}
+	
+	//add_to_list(par.parent[i],pr);
+	//add_to_list(model.param[pr.th].child[pr.index],parref);
 }
 
 						
@@ -889,31 +905,6 @@ void Input::create_markov_eqn_pop_ref()
 		}
 	}
 	
-	for(const auto &pv : model.param_vec){
-		if(pv.reparam_time_dep){
-			const auto &par = model.param[pv.th];
-			auto eq_ref = par.get_eq_ref(pv.index);
-			if(eq_ref == UNSET) emsg("eq_ref should be set");
-
-			auto sp = pv.spline_ref;
-
-			const auto &eq = model.eqn[eq_ref];
-			for(auto po : eq.pop_ref){
-				auto &pop = model.pop[po];
-				add_to_vec(pop.spline_update,sp,pop.hash_spline_update);	
-			}
-		}
-	}
-
-	if(false){
-		for(auto &po : model.pop){
-			cout << po.name << ": ";
-			for(auto su : po.spline_update){
-				cout << model.spline[su].name << ",";
-			}
-			cout << endl;
-		}
-	}
 	//emsg("YY");
 }
 

@@ -125,6 +125,7 @@ void StateSpecies::check_markov_eqn(unsigned int ti, const vector <double> &popn
 		}
 		
 		if(dif(value,me_vari.value,dif_thresh)){
+			cout << value << " " << me_vari.value << "val dif\n";
 			emsg("value problem");
 		}
 		
