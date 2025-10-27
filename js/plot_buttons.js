@@ -654,6 +654,8 @@ Layer.prototype.plot_button = function (bu,ov)
 		//plot_text(te,x+0.3,y+0.7*dy,bu.font,LGREY,dx);
 		break;
 	
+	case "FactorElement": break;
+	
 	case "Element":
 	case "ParamElement": case "ParamElementConst": case "ParamElementEq": 
 	case "ParamFactorConst": case "ParamWeightConst":

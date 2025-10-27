@@ -22,7 +22,7 @@ class Data
 /// Starts loading a data source
 function start_data_source(type,spec,info)
 {
-	if(info.p == undefined && type != "LoadTensor" && 
+	if(info.p == undefined && type != "LoadTensor" &&
 		type != "LoadPriorSplit" && type != "LoadDistSplit" && type != "LoadReparam" && type != "LoadAmatrix" &&
 		type != "Fixed Effect"){
 		info.p = model.get_p();

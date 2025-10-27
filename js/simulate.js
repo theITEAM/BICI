@@ -725,7 +725,9 @@ function display_factor(i,x,y,lay,w,allow_edit,source)
 	let par = model.param[i];
 	
 	lay.display_param(x-par.label_info.dx-0.7,y-0.1,par.label_info);
-
+	
+	lay.add_button({te:"", x:x+5.9, y:y+0., dx:0, dy:1.6, type:"FactorElement", i:i});
+	
 	if(par.factor_weight_on.check){
 		let te = par.weight_desc;
 	
@@ -735,10 +737,10 @@ function display_factor(i,x,y,lay,w,allow_edit,source)
 		let fo = get_font(1.1,"","times");
 		
 		let ac = "EditWeightValue";
-		lay.add_button({te:te, x:x+5.9, y:y+0., dx:w-x-9.6, dy:1.6, type:"ParamSimElement", source:source, font:fo, ac:ac, i:i, name:par.name, label_info:par.label_info});
+		lay.add_button({te:te, x:x+5.9, y:y+0., dx:w-x-9.6-0.8, dy:1.6, type:"ParamSimElement", source:source, font:fo, ac:ac, i:i, name:par.name, label_info:par.label_info});
 	}
 	
-	lay.add_checkbox(w-4,y+0.3,"Weight","Weight",par.factor_weight_on,WHITE,{title:"Factor weight", te:factor_weight_text});
+	lay.add_checkbox(w-4.8,y+0.3,"Weight","Weight",par.factor_weight_on,WHITE,{title:"Factor weight", te:factor_weight_text});
 }
 
 

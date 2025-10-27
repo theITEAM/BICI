@@ -206,16 +206,22 @@ worker.onmessage = function (e)
 		
 	 case "Load Reparam": case "Load Tensor":
 			{
-				inter.edit_param = ans.ep;
-				let par = model.param[ans.ep.i];
-				par.value_desc = ans.ep.value_desc;
-				par.set = ans.ep.set;
-				inter.edit_source = false;
-				close_bubble();
+				let ep = ans.ep;
+				inter.edit_param = ep;
+				let par = model.param[ep.i];
+			
+				if(ep.type != "weight") par.set = ans.ep.set;
 				close_data_source();
-				close_param_source();
+				
+				if(ans.ep.too_big){ 
+					if(ep.type == "weight") par.weight_desc = ep.weight_desc;	
+					else par.value_desc = ep.value_desc;	
+					inter.edit_source = false;
+					close_bubble();
+					close_param_source();
+					if(ans.type == "Load Reparam") update_param();
+				}
 				generate_screen();
-				if(ans.type == "Load Reparam") update_param();
 			}
 			break;
 			
@@ -223,9 +229,15 @@ worker.onmessage = function (e)
 			{
 				inter.edit_param = ans.ep;
 				let par = model.param[ans.ep.i];
-				par.prior_split_desc = ans.ep.prior_split_desc;
 				par.prior_split_set = ans.ep.prior_split_set;
 				close_data_source();
+				
+				if(ans.ep.too_big){ 
+					par.prior_split_desc = ans.ep.prior_split_desc;
+					inter.edit_source = false;
+					close_bubble();
+					close_param_source();
+				}
 				generate_screen();
 			}
 			break;

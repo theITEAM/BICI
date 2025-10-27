@@ -1168,8 +1168,10 @@ function par_set_default(par)
 function dist_set_default(par)
 {
 	par.list = par_find_list(par);
-	par.value = [];
-	par.prior_split = [];
+	//par.value = [];
+	//par.prior_split = [];
+	if(par.prior_split) delete par.prior_split;
+	if(par.value) delete par.value;
 	par.prior_split_check = {check:false};
 	par.variety = "const";	
 	par.dist_mat = true;
@@ -1182,8 +1184,10 @@ function dist_set_default(par)
 function iden_set_default(par)
 {
 	par.list = par_find_list(par);
-	par.value = [];
-	par.prior_split = [];
+	//par.value = [];
+	//par.prior_split = [];
+	if(par.prior_split) delete par.prior_split;
+	if(par.value) delete par.value;
 	par.prior_split_check = {check:false};
 	par.variety = "const";
 	par.dist_mat = false;	
@@ -1196,8 +1200,10 @@ function iden_set_default(par)
 function reparam_eqn_set_default(par)
 {
 	par.list = par_find_list(par);
-	par.value = [];
-	par.prior_split = [];
+	//par.value = [];
+	//par.prior_split = [];
+	if(par.prior_split) delete par.prior_split;
+	if(par.value) delete par.value;
 	par.prior_split_check = {check:false};
 	par.variety = "reparam";	
 	par.set = false;

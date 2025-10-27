@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 // Lists all the constant values used within the interface
 
 // 53754 lines of code (16/11/24)
@@ -6,8 +6,8 @@
 // 59127 lines of code (16/15/25)
 // 62667 lines of code (17/09/25)
 
-//let ver="windows";         // Determines platform
-let ver="linux";
+let ver="windows";         // Determines platform
+//let ver="linux";
 //let ver="mac";
 
 let win_linux = false;//true;                            // When working on win running linux 
@@ -404,7 +404,7 @@ const GRAPH_LINE_MAX = 1000;                       // Maximum number of lines on
 const IND_PLOT_MAX = 20000;                        // Manimum number of individuals plotted
 const MATRIX_PLOT_MAX = 40000;                     // The maximim number of nodes plotted
 const MATRIX_COMP_MAX = 200;                       // The maximum comparments for MatrixAnim
-const HISTO_PLOT_MAX = 100;                         // Maximum number of bars in histogram
+const HISTO_PLOT_MAX = 100;                        // Maximum number of bars in histogram
 const POINT_PLOT_MAX = 1000;                       // Maximum number of points in scatter
 const PARAM_STAT_MAX = 1000;                       // Maximum number of parameter statistics
 const NODE_PLOT_MAX = 1000;                        // Maximum number nodes is phylogenetic tree

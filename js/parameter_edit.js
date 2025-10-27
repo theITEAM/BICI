@@ -14,14 +14,17 @@ function create_edit_param(lay)
 	let help = edittensor_text;
 	let doneac = "EditParamDone";
 	
+	let	load_title = "Load tensor values", load_te = load_tensor_text;
+	let load_ac = "LoadTensor";
+	
 	if(inter.edit_param.type == "weight"){
 		title = "Edit tensor weights";
 		help = edittensorweight_text;
 		doneac = "EditWeightDone";
+		load_title = "Load weight values";
+		load_te = load_weight_text;
 	}
 	
-	let	load_title = "Load tensor values", load_te = load_tensor_text;
-	let load_ac = "LoadTensor";
 	
 	let par = model.param[inter.edit_param.i];
 	
@@ -340,6 +343,8 @@ function load_tensor(ep,source)
 	let list = par.list;
 	if(ep.too_big){
 		ep.list = copy(list);
+		//if(ep.type == "Weight") ep.weight = par_find_template(list);
+		//else ep.value = par_find_template(list);
 		ep.value = par_find_template(list);
 	}
 	let ep_value = ep.value;
@@ -364,20 +369,33 @@ function load_tensor(ep,source)
 		}
 		
 		let va = tab.ele[r][dep.length];
-		if(isNaN(va)) error("Problem loading. The value '"+va+"' on line "+(r+1)+" is not a number");
-		let val = Number(va);
-		set_element(ep_value,ind,val);
+		
+		if(par.factor == true && va == "*") set_element(ep_value,ind,va);
+		else{
+			if(isNaN(va)) alertp("Problem loading. The value '"+va+"' on line "+(r+1)+" is not a number");
+			let val = Number(va);
+			set_element(ep_value,ind,val);
+		}
 	}
 	
 	if(ep.too_big){ 
-		par.value = copy(ep_value);
-		par.set = true;
-		reduce_size(ep,par);
-	
-		ep.value_desc = get_value_desc(par);
-		par.value_desc = get_value_desc(par);
+		if(ep.type == "weight"){
+			par.factor_weight = copy(ep_value);
+			reduce_size(ep,par);
+			ep.weight_desc = get_weight_desc(par);
+			par.weight_desc = get_weight_desc(par);
+		}			
+		else{
+			par.value = copy(ep_value);
+			par.set = true;
+
+			reduce_size(ep,par);
+		
+			ep.value_desc = get_value_desc(par);
+			par.value_desc = get_value_desc(par);
+		}
 	}
-	ep.set = par.set;
+	if(ep.type != "weight") ep.set = par.set;
 }
 
 
@@ -668,6 +686,7 @@ function par_in_view(type,th)
 	generate_screen();
 		
 	// Scrolls so can be viewed
+	
 	let l = find(inter.layer,"name","ModelParamContent");
 	if(l == undefined) return;
 	

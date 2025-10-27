@@ -48,8 +48,11 @@ function data_source_check_error(out_type,so)
 	
 		for(let c = 0; c < tab.ncol; c++){
 			for(let r = 0; r < tab.nrow; r++){
-				let warn = check_element(tab.ele[r][c],c,so);			
-				if(warn != "") data_error(warn,out_type,so,{r:r,c:c});
+				let el = tab.ele[r][c];
+				if(el != "*"){
+					let warn = check_element(el,c,so);		
+					if(warn != "") data_error(warn,out_type,so,{r:r,c:c});
+				}
 			}
 		}
 	}

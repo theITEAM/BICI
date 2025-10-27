@@ -1475,10 +1475,12 @@ function button_action(bu,action_type)
 		
 	case "AddFactorParam":
 		{
+			let th = bu.i;
 			let par = model.param[bu.i];
 			par.factor = true;
 			par.pri_pos = prior_factor_pos;
 			close_bubble();
+			par_in_view("FactorElement",th);
 		}
 		break;
 		
@@ -1506,7 +1508,8 @@ function button_action(bu,action_type)
 			par.reparam_eqn_on = false;
 			if(inter.bubble.radio.value == "equation") par.reparam_eqn_on = true;
 			close_bubble();	
-			par_in_view("ReparamElement",th);
+			if(par.reparam_eqn_on) par_in_view("ReparamEqn",th);
+			else par_in_view("ReparamElement",th);
 		}
 		break;
 		

@@ -558,6 +558,7 @@ function process(e)
 			let ep = info.ep;
 			data_source_check_error("worker",info.source);
 			load_tensor(ep,info.source);
+		
 			post({ ep:ep});
 		}
 		break;
