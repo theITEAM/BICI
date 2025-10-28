@@ -1804,6 +1804,16 @@ function start_worker(type,info)
 	
 	inter.worker_mess.next = {type:type, info:info};
 	
+	if(false){ // This is used to diagnose which part of info is using a lot of memory
+		if(info && info.plot_filter){
+			for(let ele in info.plot_filter){
+				let el = info.plot_filter[ele]
+				let te = JSON.stringify(el);
+				prr(ele+":"+te.length);		
+			}
+		}
+	}
+	
 	if(subtab_name() != "Results") inter.worker_mess.next.model = model;
 
 	setTimeout(worker_mess_process,10);

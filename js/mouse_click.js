@@ -475,7 +475,7 @@ function button_action(bu,action_type)
 			copy_back_to_source();	
 			inter.bubble.bu.rpf.slice_time = inter.bubble.slice_time;
 			close_bubble();
-			inter.graph.init = undefined;
+			reset_graph();
 		}
 		break;
 		
@@ -535,7 +535,7 @@ function button_action(bu,action_type)
 		}
 		
 		bu.source.value = bu.value;
-		if(bu.source.noupdate != true) inter.graph.init = undefined;
+		if(bu.source.noupdate != true) reset_graph();
 		break;
 		
 	case "DeleteSpecies":
@@ -644,7 +644,7 @@ function button_action(bu,action_type)
 				inter.bubble.find_focus = true;			
 			}
 		
-			if(pos.noupdate != true) inter.graph.init = undefined;
+			if(pos.noupdate != true) reset_graph();
 			
 			if(bu.source.bub_off) close_bubble();
 		}
@@ -717,7 +717,7 @@ function button_action(bu,action_type)
 			for(let c = 0; c < so.length; c++) so[c].check = bso.check;
 		}
 		
-		if(bso.update == true) inter.graph.init = undefined;
+		if(bso.update == true) reset_graph();
 		
 		if(bso.update_fraction && bso.check == true) update_popfilt_fraction(bso.p,bso.cl);
 	
@@ -725,7 +725,7 @@ function button_action(bu,action_type)
 			for(let j = 0; j < bso.list.length; j++){
 				bso.list[j].checkb.check = bso.check;
 			}				
-			inter.graph.init = undefined;
+			reset_graph();
 		}
 		break;
 		
@@ -2197,7 +2197,7 @@ function button_action(bu,action_type)
 			source.burnin_factor = Number(inter.bubble.burnin)/100;
 			source.burnin = Math.floor(source.burnin_factor*source.samp_max);
 			close_bubble();
-			inter.graph.init = undefined;
+			reset_graph();
 		}
 		break;
 	
@@ -2205,7 +2205,7 @@ function button_action(bu,action_type)
 		if(bubble_check_error() == false){			
 			copy_back_to_source();
 			close_bubble();
-			inter.graph.init = undefined;
+			reset_graph();
 		}	
 		break;
 	
@@ -2329,7 +2329,7 @@ function button_action(bu,action_type)
 	
 	case "SelectInd":
 		inter.graph.ind_sel = bu.te;
-		inter.graph.init = undefined;
+		reset_graph();
 		break;
 		
 	case "CopyPic":

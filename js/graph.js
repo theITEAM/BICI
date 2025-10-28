@@ -3075,3 +3075,11 @@ class Graph
 		change_bubble_mode("bf");
 	}
 }
+
+
+/// Resets the graph
+function reset_graph()
+{
+	inter.graph.init = undefined;
+	generate_screen();
+}

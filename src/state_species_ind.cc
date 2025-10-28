@@ -797,7 +797,6 @@ void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vecto
 			markov_eqn_recalc(e,ti,popnum_t[ti]);	
 			if(me_vari.value == UNSET) emsg("II");
 			if(dif(num,me_vari.value,TINY)){
-				cout << num << " " << me_vari.value << " val\n";
 				emsg("dif");
 			}
 		}

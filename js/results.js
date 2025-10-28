@@ -45,7 +45,7 @@ function results_add_model(result,details,siminf)
 	
 	result.param = copy(model.param);
 	
-	set_par_output(result.param);
+	set_par_output(result.param,details.param_output_max);
 
 	create_param_const(result,siminf);            // Creates constant values for non-variable parameters 
 
@@ -56,13 +56,17 @@ function results_add_model(result,details,siminf)
 
 
 /// Sets whether a parameter is output or not
-function set_par_output(param)
+function set_par_output(param,max)
 {
 	for(let th = 0; th < param.length; th++){
 		let par = param[th];
 		par.output = false;
-		if(par.variety == "const") par.output = true;
-		if(par.type == "derive_param") par.output = true;
+		if(par.variety == "const"){
+			if(param_num_element(par) < max) par.output = true;
+		}
+		if(par.type == "derive_param"){
+			par.output = true;
+		}
 	}
 }
 
@@ -1415,6 +1419,109 @@ function change_remove_filter(pos)
 	}
 }
 	
+	
+/// Adds univariate parameters	
+function add_univariate(name,result,total_param_list,pos_paramview,pos_genview,der_fl)
+{                                              
+	let list = [];
+	
+	for(let th = 0; th < result.param.length; th++){
+		let par = result.param[th];			
+		if((par.type == "derive_param" && der_fl) || (par.type != "derive_param" && !der_fl)){
+			if(par.output == true && par.dep.length == 0 && par.selop == undefined){
+				
+				list.push({th:th, index:[], name:param_name_index(par,[])});
+				if(par.variety != "const"){
+					total_param_list.push({th:th, index:[], name:param_name_index(par,[])});
+				}
+			}
+		}
+	}
+		
+	if(list.length > 0){
+		let add = {te:name, param:true, radio:{value:0, param:true}, list:list};
+		pos_paramview.push(add);
+		pos_genview.push(add);
+	}
+}
+	
+	
+/// Adds multivariate parameters	
+function add_multivariate(result,total_param_list,pos_paramview,pos_genview,der_fl)
+{	
+	for(let th = 0; th < result.param.length; th++){
+		let par = result.param[th];
+	
+		if((par.type == "derive_param" && der_fl) || (par.type != "derive_param" && !der_fl)){
+			if(par.dep.length > 0 && par.type != "param factor" && !par.dist_mat && !par.iden_mat){
+				let list = [];
+				let list_split = [];
+				let para = true;
+			
+				if(par.output == true){
+					if(is_symmetric(par)){
+						let pli = par.list[0];
+						let L = pli.length;
+						for(let j = 0; j < L; j++){
+							let ind=[]; ind[0] = j; ind[1] = j;
+							
+							let name = param_name_index(par,ind);
+							list.push({th:th, index:ind, name:name});
+							
+							if(par.variety != "const"){
+								total_param_list.push({th:th, index:ind, name:name});
+							}
+						}
+						
+						for(let j = 0; j < L; j++){
+							for(let i = j+1; i < L; i++){
+								let ind=[]; ind[0] = j; ind[1] = i;
+								
+								let name = param_name_index(par,ind);
+								list.push({th:th, index:ind, name:name});
+								
+								if(par.variety != "const"){
+									total_param_list.push({th:th, index:ind, name:name});
+								}
+							}
+						}
+					}
+					else{
+						let co_list = generate_co_list(par.list);
+						for(let j = 0; j < co_list.length; j++){	
+							let ind = co_list[j].index;
+							
+							let name = param_name_index(par,ind);
+							list.push({th:th, index:ind, name:name});
+							
+							if(par.time_dep){
+								if(ind[ind.length-1] == 0){
+									let ind2 = copy(ind); ind2.pop();
+									let spl = name.split("(");
+									list_split.push({th:th, index:ind2, name:spl[0]});
+								}
+							}
+							
+							if(par.variety != "const"){
+								total_param_list.push({th:th, index:ind, name:param_name_index(par,ind)});
+							}
+						}
+					}
+				}
+				else para = "too big";
+				
+				let name = remove_eq_quote(par.full_name)
+				if(der_fl) name = "Der. "+name;
+				
+				let ppv = {te:name, param:para, radio:{value:0, param:true}, list:list, radio_split:{value:0, param:true}, list_split:list_split};
+				
+				pos_paramview.push(ppv);
+				pos_genview.push(ppv);
+			}
+		}
+	}
+}
+	
 
 /// Gets a list of all possible parameter views
 function get_pos_paramview(result)
@@ -1436,95 +1543,15 @@ function get_pos_paramview(result)
 	
 	let pos_paramview = [];
 	let pos_genview = [];
-	{                                               // Univariate parameters
-		let list = [];
-		
-		for(let th = 0; th < result.param.length; th++){
-			let par = result.param[th];
-
-			if(par.output == true && par.dep.length == 0 && par.selop == undefined){
-				list.push({th:th, index:[], name:param_name_index(par,[])});
-				if(par.variety != "const"){
-					total_param_list.push({th:th, index:[], name:param_name_index(par,[])});
-				}
-			}
-		}
-		
-		if(list.length > 0){
-			let add = {te:"Univariate", param:true, radio:{value:0, param:true}, list:list};
-			pos_paramview.push(add);
-			pos_genview.push(add);
-		}
-	}
 	
-	for(let th = 0; th < result.param.length; th++){
-		let par = result.param[th];
-	
-		if(par.dep.length > 0 && par.type != "param factor" && !par.dist_mat && !par.iden_mat){
-			let list = [];
-			let list_split = [];
-			let para = true;
-		
-			if(par.output == true){
-				if(is_symmetric(par)){
-					let pli = par.list[0];
-					let L = pli.length;
-					for(let j = 0; j < L; j++){
-						let ind=[]; ind[0] = j; ind[1] = j;
-						
-						let name = param_name_index(par,ind);
-						list.push({th:th, index:ind, name:name});
-						
-						if(par.variety != "const"){
-							total_param_list.push({th:th, index:ind, name:name});
-						}
-					}
-					
-					for(let j = 0; j < L; j++){
-						for(let i = j+1; i < L; i++){
-							let ind=[]; ind[0] = j; ind[1] = i;
-							
-							let name = param_name_index(par,ind);
-							//name = "ω"+name.substr(1);
-							list.push({th:th, index:ind, name:name});
-							
-							if(par.variety != "const"){
-								total_param_list.push({th:th, index:ind, name:name});
-							}
-						}
-					}
-				}
-				else{
-					let co_list = generate_co_list(par.list);
-					for(let j = 0; j < co_list.length; j++){	
-						let ind = co_list[j].index;
-						
-						let name = param_name_index(par,ind);
-						list.push({th:th, index:ind, name:name});
-						
-						if(par.time_dep){
-							if(ind[ind.length-1] == 0){
-								let ind2 = copy(ind); ind2.pop();
-								let spl = name.split("(");
-								list_split.push({th:th, index:ind2, name:spl[0]});
-							}
-						}
-						
-						if(par.variety != "const"){
-							total_param_list.push({th:th, index:ind, name:param_name_index(par,ind)});
-						}
-					}
-				}
-			}
-			else para = "too big";
-			
-			let ppv = {te:remove_eq_quote(par.full_name), param:para, radio:{value:0, param:true}, list:list, radio_split:{value:0, param:true}, list_split:list_split};
-			
-			pos_paramview.push(ppv);
-			pos_genview.push(ppv);
-		}
-	}
+	add_univariate("Parameter",result,total_param_list,pos_paramview,pos_genview,false);
 
+	add_multivariate(result,total_param_list,pos_paramview,pos_genview,false);
+	
+	add_univariate("Der. Param.",result,total_param_list,pos_paramview,pos_genview,true);
+
+	add_multivariate(result,total_param_list,pos_paramview,pos_genview,true);
+	
 	result.total_param_list = total_param_list;
 
 	if(total_param_list.length > 1 && (result.siminf == "inf" || result.siminf == "ppc")){

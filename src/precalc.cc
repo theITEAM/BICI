@@ -366,7 +366,9 @@ void Precalc::print_calc() const
 	
 	auto T = details.T;
 	auto imax = calcu.size(); 
-	if(imax > 1000) imax = 1000;
+	auto imax_lim = LARGE;
+	//auto imax_lim = 1000;
+	if(imax > imax_lim) imax = imax_lim;
   for(auto i = 0u; i < imax; i++){
 		const auto &ca = calcu[i];
 		print_ca(i,ca);

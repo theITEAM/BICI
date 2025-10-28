@@ -2107,3 +2107,14 @@ function param_blank(par)
 	let temp = par_find_template(par.list);
 	return temp;
 }
+
+
+/// Gets the number of elements in a parameter value
+function param_num_element(par)
+{
+	let num = 1; 
+	for(let i = 0; i < par.list.length; i++){
+		num *= par.list[i].length;
+	}
+	return num;
+}

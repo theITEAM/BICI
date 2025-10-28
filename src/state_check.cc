@@ -198,13 +198,21 @@ void State::check_precalc_eqn(string ref)
 	const auto &precalc = param_val.precalc;
 	const auto &value = param_val.value;
 	
-	auto n = model.precalc_eqn.calcu.size();
+	const auto &calcu = model.precalc_eqn.calcu; 
+	auto n = calcu.size();
 	if(precalc.size() != n){
 		emsg("precalc size problem"+ref);
 	}
 	
 	vector <bool> derive_fl(n,false);
-	for(const auto &in : model.spec_precalc_derive.info) derive_fl[in.i] = true;
+	for(const auto &in : model.spec_precalc_derive.info){
+		auto i = in.i;
+		const auto &ca = calcu[i];
+		if(ca.time_dep){
+			for(auto ti = 0u; ti < T; ti++) derive_fl[i+ti] = true;
+		}
+		else derive_fl[i] = true;
+	}
 
 	for(auto &ssp : species){
 		ssp.check_precalc_num(n);
