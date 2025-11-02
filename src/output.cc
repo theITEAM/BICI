@@ -1469,6 +1469,7 @@ string Output::param_output(const Particle &part, const vector < vector <double>
 void Output::state_sample(unsigned int s, unsigned int chain, State &state)
 {
 	timer[STATE_OUTPUT] -= clock();
+	state.check_final_li_wrong();
 	auto part = state.generate_particle(s,chain,true);
 	state_store.push_back(part);
 	timer[STATE_OUTPUT] += clock();

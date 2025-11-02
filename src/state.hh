@@ -67,7 +67,7 @@ class State                                // Stores information about the state
 		Like update_param(const vector <AffectLike> &affect_like);
 		void restore(const vector <AffectLike> &affect_like);
 		void likelihood_from_scratch();
-		void resample_ind(bool do_pl = false);
+		void resample_ind(bool if_wrong);
 		Particle generate_particle(unsigned int s, unsigned int chain, bool store_state);
 		void set_particle(const Particle &part, bool calc_like=true);
 		vector <double> prior_init_cond(double &like_ch);
@@ -197,6 +197,7 @@ class State                                // Stores information about the state
 		void check_popnum_t2(string ref);
 		void check_precalc_eqn(string ref);
 		void check_neg_rate(string name);
+		void check_final_li_wrong();
 		void check_markov_value_dif();
 		void add_alg_warn(string te);
 		void check_precalc_dif(string ref);

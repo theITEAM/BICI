@@ -1031,7 +1031,7 @@ SpecPrecalc Precalc::calculate_spec_precalc_sample(const SpecPrecalc &spec_preca
 
 
 // Sets all precalculation to be done (apart from derived)
-SpecPrecalc Precalc::calculate_spec_precalc_all(const SpecPrecalc &spec_precalc, const vector <SpecPrecalcTime> &spec_precalc_time) const
+SpecPrecalc Precalc::calculate_spec_precalc_all(const SpecPrecalc &spec_precalc) const
 {
 	auto C = calcu.size();
 	vector <bool> map(C,false);

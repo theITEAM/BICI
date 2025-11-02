@@ -2283,7 +2283,7 @@ void Model::set_spec_precalc_sample()
 /// Sets precalculation to be done after sampling 
 void Model::set_spec_precalc_all()
 {
-	spec_precalc_all = precalc_eqn.calculate_spec_precalc_all(spec_precalc,spec_precalc_time);
+	spec_precalc_all = precalc_eqn.calculate_spec_precalc_all(spec_precalc);
 }
 
 	

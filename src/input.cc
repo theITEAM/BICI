@@ -1600,13 +1600,13 @@ void Input::create_param_vector()
 		if(er.cons) emsg("cannot be constant");
 		par.element[er.index].param_vec_ref = k;
 	}
-	
+
 	// Adds in symmetric reference
 	for(auto th : sym_list){
 		auto &par = model.param[th];
 		auto L = par.dep[0].list.size();
 		for(auto j = 0u; j < L; j++){
-			for(auto i = 0u; i < L; i++){
+			for(auto i = 0u; i < j; i++){
 				auto k = j*L+i;
 				
 				auto ref = par.element_ref[k].index;
@@ -1616,7 +1616,7 @@ void Input::create_param_vector()
 				auto ref_rev = par.element_ref[i*L+j].index;
 				if(ref_rev == UNSET) emsg("reference should not be unset");
 				const auto &ele_rev = par.element[ref_rev];
-						
+				
 				ele.param_vec_ref = ele_rev.param_vec_ref;
 			}
 		}

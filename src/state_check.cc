@@ -565,6 +565,22 @@ void State::check_ref(unsigned int p, string refst)
 }
 
 
+/// Checks to see if individual has LI_WRONG in final state
+void State::check_final_li_wrong()
+{
+	for(auto p = 0u; p < model.species.size(); p++){
+		const auto &sp = model.species[p];
+		const auto &ssp = species[p];
+	
+		for(auto i = 0u; i < sp.nindividual_in; i++){
+			if(ssp.Li_obs_ind[i] < LI_WRONG/2){
+				add_alg_warn("Individual '"+sp.individual[i].name+"' does not agree with data");
+			}
+		}
+	}
+}
+
+
 /// Checks the likelihood is correctly specified
 void State::check_markov_trans(unsigned int p, string ref)
 {

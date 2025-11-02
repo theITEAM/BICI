@@ -186,7 +186,7 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 				ssp.print_event("start",ssp.individual[i]);
 			}	
 		}	
-		emsg("done");
+		emsg("print event");
 	}
 	
 	if(false){
@@ -1361,17 +1361,15 @@ void State::likelihood_from_scratch()
 
 
 /// Resamples individual using the observation sampler (this gets fixed events correct)
-void State::resample_ind(bool do_pl)
+void State::resample_ind(bool if_wrong)
 {
-	print_diag("Start resample...");
-	
-	auto popnum_t = calculate_popnum_t();
+	//auto popnum_t = calculate_popnum_t();
 	
 	const auto &precalc = param_val.precalc;
 	
 	auto pl = false; 
-	if(do_pl) pl = true;
-
+	//if(if_wrong) pl = true;
+	
 	if(pl) check(" before resample");
 			
 	for(auto p = 0u; p < species.size(); p++){
@@ -1379,71 +1377,91 @@ void State::resample_ind(bool do_pl)
 		if(sp.type == INDIVIDUAL){
 			auto &ssp = species[p];
 		
-			IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,genetic_value.inf_node,precalc,popnum_t);
-
-			ind_ev_samp.setup_nm();
-		
+			vector <unsigned int> ind_list;
 			for(auto i = 0u; i < sp.nindividual_in; i++){
-				for(auto cl = 0u; cl < sp.ncla; cl++){
-					if(ind_ev_samp.needed(i,cl) == true){
-						if(pl){
-							cout << endl << endl << endl << endl;
-							cout << ssp.individual[i].name << endl;
-							cout << "Before:" << endl; ssp.print_event(ssp.individual[i].ev);
-						}
-						
-						ind_ev_samp.generate_ind_obs_timeline();
+				if(if_wrong == false || ssp.Li_obs_ind[i] < LI_WRONG/2) ind_list.push_back(i);
+			}
+			
+			//cout << ind_list.size() << "si\n";
+			if(ind_list.size() > 0){
+				IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,genetic_value.inf_node,precalc,popnum_t,if_wrong);
 
-						auto loop_max = 1u;
-						for(auto loop = 0u; loop < loop_max; loop++){
-							auto probif = 0.0;
-							auto ev_new = ind_ev_samp.sample_events(probif);
-
-							if(pl){
+				ind_ev_samp.setup_nm();
+			
+				for(auto i : ind_list){
+					for(auto cl = 0u; cl < sp.ncla; cl++){
+						if(ind_ev_samp.needed(i,cl) == true){
+							if(false && pl){
 								cout << endl << endl << endl << endl;
 								cout << ssp.individual[i].name << endl;
 								cout << "Before:" << endl; ssp.print_event(ssp.individual[i].ev);
-								cout << endl;
-								cout << "Propose:" << endl; ssp.print_event(ev_new);
-								
-								cout << "Illegal:" << ind_ev_samp.illegal << endl;
+								cout << ssp.Li_obs_ind[i] << " Liobs befor" << endl;
 							}
+							
+							ind_ev_samp.generate_ind_obs_timeline();
+
+							auto loop_max = 1u;
+							for(auto loop = 0u; loop < loop_max; loop++){
+								auto probif = 0.0;
+								auto ev_new = ind_ev_samp.sample_events(probif);
+
+								if(pl){
+									cout << endl << endl << endl << endl;
+									cout << ssp.individual[i].name << endl;
+									cout << "Before:" << endl; ssp.print_event(ssp.individual[i].ev);
+									cout << endl;
+									cout << "Propose:" << endl; ssp.print_event(ev_new);
+									cout << "Liobs befor: " << ssp.Li_obs_ind[i] << endl;
 						
-							if(ind_ev_samp.illegal == false){
-								auto gc = update_tree(p,i,ev_new);
-								if(gc.type != GENCHA_FAIL){
-									auto like_ch = update_ind(p,i,ev_new,UP_SINGLE);
-									if(pl){
-										cout << endl;
-										cout << "After:" << endl; ssp.print_event(ssp.individual[i].ev);
-									}
-		
-									accept(like_ch);
-								
-									gen_change_update(gc); 	
-									if(sp.trans_tree) update_popnum_ind(p,i);
-			
-									if(pl) check("during resample");
-									
-									if(std::isnan(like.markov)){
-										cout << endl << endl << endl << endl;
-										cout << ssp.individual[i].name << endl;
-										cout << "Before:" << endl; ssp.print_event(ssp.individual[i].ev);
-										cout << endl;
-										cout << "Propose:" << endl; ssp.print_event(ev_new);
-								
-								
-										emsg("markov is nan");
-									}
-									break;
+									cout << "Illegal:" << ind_ev_samp.illegal << endl;
 								}
-							}	
-						}		
+							
+								if(ind_ev_samp.illegal == false){
+									auto gc = update_tree(p,i,ev_new);
+									if(gc.type != GENCHA_FAIL){
+										auto like_ch = update_ind(p,i,ev_new,UP_SINGLE);
+										if(pl){
+											cout << endl;
+											cout << "After:" << endl; ssp.print_event(ssp.individual[i].ev);
+											cout << "Liobs after: " << ssp.Li_obs_ind[i] << endl;
+											
+											/*
+											if(ssp.Li_obs_ind[i] < LI_WRONG/2){
+												ind_ev_samp.print_ind_obs_timeline();
+												ind_ev_samp.pr_generate_ind_obs_timeline();
+												
+												model.print_param(param_val);
+												emsg("done");
+											}
+											*/
+										}
+			
+										accept(like_ch);
+									
+										gen_change_update(gc); 	
+										if(sp.trans_tree) update_popnum_ind(p,i);
+				
+										if(pl) check("during resample");
+										
+										if(std::isnan(like.markov)){
+											cout << endl << endl << endl << endl;
+											cout << ssp.individual[i].name << endl;
+											cout << "Before:" << endl; ssp.print_event(ssp.individual[i].ev);
+											cout << endl;
+											cout << "Propose:" << endl; ssp.print_event(ev_new);
+									
+											emsg("markov is nan");
+										}
+										break;
+									}
+								}	
+							}		
+						}
 					}
 				}
 			}
-		}
-	}	
+		}	
+	}
 }
 
  

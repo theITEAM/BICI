@@ -31,7 +31,7 @@ class Precalc                             // Stores information about the model
 		void set_param(SpecPrecalc &set_param_spec_precalc, SpecPrecalc &spec_precalc_after, bool spl_fl) const;
 		SpecPrecalc calculate_spec_precalc_sample(const SpecPrecalc &spec_precalc) const;
 		void set_all_time();
-		SpecPrecalc calculate_spec_precalc_all(const SpecPrecalc &spec_precalc, const vector <SpecPrecalcTime> &spec_precalc_time) const;
+		SpecPrecalc calculate_spec_precalc_all(const SpecPrecalc &spec_precalc) const;
 		
 	private:
 		vector <unsigned int> get_vec(const PreCalc &ca) const;

@@ -1,4 +1,4 @@
-/// Stores constant values used and enumerated types
+﻿/// Stores constant values used and enumerated types
 
 #pragma once
 
@@ -378,7 +378,7 @@ const double LOG_THRESH = 0.00001;                // The threshold below which l
 const double PROB_MOD = 0.001;                    // Avoids zero probability in local event props
 const double LOW_BOUND = 0;                       // The lower bound for observation probability
 const double UP_BOUND = 1;                        // The lower bound for observation probability
-const double OBS_COMP_MIN = 0.00001;              // Minimum value for observed compartment
+const double OBS_COMP_MIN = VTINY;                    // Minimum value for observed compartment
 const double PROP_JOIN_COR_MIN = 0.8;             // The threshold corrlelation above which proposals join
 const unsigned int SEED_MAX = 10000;              // The maximum seed number
 

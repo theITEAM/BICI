@@ -74,8 +74,7 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 		
 		print_diag("resample");
 		
-		auto pl = false;
-		state.resample_ind(pl);    // Resamples individual such that fixed events become correct
+		state.resample_ind(false);    // Resamples individual such that fixed events become correct
 
 		print_diag("resampled");
 
@@ -529,6 +528,9 @@ void Chain::update(unsigned int s)
 			//state.check_markov_div_value(0," after update");
 		}
 	}
+	
+	// This resamples to remove any indiviudals with LI_WROMG
+	if(burn_info.on) state.resample_ind(true);   
 	
 	//if(testing == true && s%10 == 0) state.check("check");
 

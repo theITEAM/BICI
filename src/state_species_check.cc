@@ -248,7 +248,7 @@ string StateSpecies::print_event(const vector <Event> &event, bool str) const
 			break;
 			
 		case M_TRANS_EV:	
-			ss << " >> " << t << ", " << sp.tra_gl[ev.tr_gl].name << " >> ";
+			ss << " >> " << t << ", " << add_escape_char(sp.tra_gl[ev.tr_gl].name) << " >> ";
 			c = sp.tra_gl[ev.tr_gl].f;
 			break;
 			
