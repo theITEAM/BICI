@@ -1,6 +1,7 @@
 "use strict";
 // Functions which set up the plots from results
 
+
 /// Adds buttons associated with a population plot
 function add_pop_buts(res,lay)
 {
@@ -1329,11 +1330,32 @@ function add_individual_buts(res,lay)
 		return;
 	}
 	
-	cy = lay.add_title("Individuals",cx,cy,{te:ind_plot_text});
+	let title = "Individuals", he = ind_plot_text;
+	
+	let rpf = res.plot_filter;	
+		
+	switch(rpf.sel_indview.te){
+	case "Timeline": title = "Individual timelines"; he = ind_timeline_text; break
+	case "Ind. Eff.":
+		switch(rpf.sel_indeffview.te){
+		case "Pred. Acc.": title = "Prediction accuracy"; he = ind_predacc_text; break;
+		case "Dist. (log)": title = "Distribution in log of individual effect"; he = ind_distlog_text; break;
+		case "Dist. (norm)": title = "Distribution in individual effect"; he = ind_distnorm_text; break;
+		case "Scatter": title = "Comparing individual effects"; he = ind_scatter_text; break;
+		default: break;
+		}
+		break
+	case "Table": title = "Table of individuals"; he = ind_table_text; break;
+	case "Statistics": title = "Individual effect statistics"; he = ind_statistics_text; break;
+	case "Trans. Tree": title = "Transmission tree"; he = ind_transtree_text; break;
+	case "Phylo. Tree": title = "Phylogenetic tree"; he = ind_phylotree_text; break;
+	default: break;
+	}
+
+	cy = lay.add_title(title,cx,cy,{te:he});
 	
 
 	// Sets species
-	let rpf = res.plot_filter;	
 	let p = model.get_p();
 	
 	if(rpf.species[p].type == "Population"){
@@ -1496,198 +1518,223 @@ function graph_ind_calculate(result,rpf,burn,p)
 		return;		
 	}
 	
-	let key = [];
-	let data = [];
-
-	// Sets up a potential individual filter
-	let hash_filt;
-	if(rpf2.sel_indgroup.te != "All"){
-		let name_list = rpf2.sel_indgroup.name_list;
-		hash_filt = new Hash();
-		for(let k = 0; k < name_list.length; k++) hash_filt.add(name_list[k],k);
-	}
-
-	// Makes a list of individuals from all samples
-	let hash = new Hash();
-
-	let ind_max = false;
+	let sel_ig = rpf2.sel_indgroup.te;
+	let name_list = rpf2.sel_indgroup.name_list;
+	let popfilt = get_popfilt(rpf2,"Populations");
+	let sort = rpf2.sel_sort.te;
+	
+	let gfilt = JSON.stringify({ p:p, cl:cl, sel_ig:sel_ig, name_list:name_list, chsel:chsel, imin:imin, imax:imax, popfilt:popfilt, sort:sort});
 	
 	let ind_list = [];
-	for(let samp = imin; samp < imax; samp++){
-		let sampl = result.sample[samp];
-		if(sampl.num >= burn && !(chsel != "All" && sampl.chain != chsel)){		
-			let sa = sampl.species[p];
-			let imax = sa.individual.length;
-			if(imax > IND_PLOT_MAX){
-				imax = IND_PLOT_MAX;
-				ind_max = true;
-			}
-				
-			for(let i = 0; i < imax; i++){
-				let ind = sa.individual[i];
-				
-				let name = ind.name;
-				if(hash_filt == undefined || hash_filt.find(name) != undefined){
-					let j = hash.find(name);
-					if(j == undefined){
-						j = ind_list.length;
-						hash.add(name,ind_list.length);
-						ind_list.push({name:name, sa_ref:[], obs:[]});
-					}
-					ind_list[j].sa_ref.push({sample:samp, i:i});
-				}
-			}
-		}
+	let ind_max = false;
+	
+	if(result.graph_ind_store == undefined) result.graph_ind_store={};
+	let gs = result.graph_ind_store;
+	
+	if(gs.gfilt == gfilt){ 
+		ind_list = gs.ind_list; ind_max = gs.ind_max;
 	}
+	else{
+		// Sets up a potential individual filter
+		let hash_filt;
+		if(sel_ig != "All"){
+			hash_filt = new Hash();
+			for(let k = 0; k < name_list.length; k++) hash_filt.add(name_list[k],k);
+		}
 
-	let popfilt = get_popfilt(rpf2,"Populations");
-		
-	/// Filters individuals based on a population filter
-	if(popfilt && popfilt.length > 0){
-		let g_filt = get_g_filt(popfilt,sp);
-		
-		let ind_list_new=[];
-		
-		for(let k = 0; k < ind_list.length; k++){
-			let ind_li = ind_list[k];
-			
-			let fl = false;
-			for(let j = 0; j < ind_li.sa_ref.length; j++){
-				let sr = ind_li.sa_ref[j];
-				
-				let ind = result.sample[sr.sample].species[p].individual[sr.i];
-				
-				let c = ind.cinit;
-				if(g_filt[c] == true){ fl = true; break;}
-				
-				let eve = ind.ev;
-						
-				for(let e = 0; e < eve.length; e++){
-					let ev = eve[e];
-						
-					switch(ev.type){
-					case EV_TRANS: c = sp.tra_gl[ev.trg].f; break;
-					case EV_ENTER: c = ev.c; break;	
-					case EV_LEAVE: c = OUT; break;		
-					case EV_MOVE: c = ev.cf; break;
-					default: error("option not recognised"); break;
-					}
+		// Makes a list of individuals from all samples
+		let hash = new Hash();
+
+		for(let samp = imin; samp < imax; samp++){
+			let sampl = result.sample[samp];
+			if(sampl.num >= burn && !(chsel != "All" && sampl.chain != chsel)){		
+				let sa = sampl.species[p];
+				let imax = sa.individual.length;
+				if(imax > IND_PLOT_MAX){
+					imax = IND_PLOT_MAX;
+					ind_max = true;
+				}
 					
-					if(c != OUT && g_filt[c] == true){ fl = true; break;}
-				}
-			
-				if(fl == true) break;
-			}
-			
-			if(fl == true) ind_list_new.push(ind_li);
-		}
-		
-		ind_list = ind_list_new;
-		
-		// Redos hash for reduced list
-		hash = new Hash(); for(let j = 0; j < ind_list.length; j++) hash.add(ind_list[j].name,j);
-	}
-
-	percent(10);
-
-	// Looks to add actual values for individual effects from data
-	if(result.siminf == "inf" || result.siminf == "ppc"){   
-		for(let k = 0; k < sp.inf_source.length; k++){
-			let so = sp.inf_source[k];
-			if(so.type == "Ind. Eff."){
-				let tab = so.table;
-				let ie = so.spec.drop.te;
-				for(let r = 0; r < tab.nrow; r++){
-					let j = hash.find(tab.ele[r][0]);
-					if(j != undefined){
-						ind_list[j][ie] = tab.ele[r][1];
+				for(let i = 0; i < imax; i++){
+					let ind = sa.individual[i];
+					
+					let name = ind.name;
+					if(hash_filt == undefined || hash_filt.find(name) != undefined){
+						let j = hash.find(name);
+						if(j == undefined){
+							j = ind_list.length;
+							hash.add(name,ind_list.length);
+							ind_list.push({name:name, sa_ref:[], obs:[]});
+						}
+						ind_list[j].sa_ref.push({sample:samp, i:i});
 					}
 				}
 			}
 		}
-	}
-	
-	switch(result.siminf){
-	case "sim": 
-		add_source_obs(sp.sim_source,claa,hash,result,ind_list);
-		break;
-	case "inf": 
-		add_source_obs(sp.inf_source,claa,hash,result,ind_list);
-		break;
-	case "ppc": 
-		add_source_obs(sp.inf_source,claa,hash,result,ind_list);
-		add_source_obs(model.inf_res.plot_filter.species[p].ppc_source,claa,hash,result,ind_list);
-		break;
-	}
-	
-	// Genetic data could be places in any species
-	if(result.siminf == "inf" || result.siminf == "ppc"){     
-		for(let p2 = 0; p2 < result.species.length; p2++){
-			let sp2 = result.species[p2];
+			
+		/// Filters individuals based on a population filter
+		if(popfilt && popfilt.length > 0){
+			let g_filt = get_g_filt(popfilt,sp);
+			
+			let ind_list_new=[];
+			
+			for(let k = 0; k < ind_list.length; k++){
+				let ind_li = ind_list[k];
+				
+				let fl = false;
+				for(let j = 0; j < ind_li.sa_ref.length; j++){
+					let sr = ind_li.sa_ref[j];
+					
+					let ind = result.sample[sr.sample].species[p].individual[sr.i];
+					
+					let c = ind.cinit;
+					if(g_filt[c] == true){ fl = true; break;}
+					
+					let eve = ind.ev;
+							
+					for(let e = 0; e < eve.length; e++){
+						let ev = eve[e];
+							
+						switch(ev.type){
+						case EV_TRANS: c = sp.tra_gl[ev.trg].f; break;
+						case EV_ENTER: c = ev.c; break;	
+						case EV_LEAVE: c = OUT; break;		
+						case EV_MOVE: c = ev.cf; break;
+						default: error("option not recognised"); break;
+						}
+						
+						if(c != OUT && g_filt[c] == true){ fl = true; break;}
+					}
+				
+					if(fl == true) break;
+				}
+				
+				if(fl == true) ind_list_new.push(ind_li);
+			}
+			
+			ind_list = ind_list_new;
+			
+			// Redos hash for reduced list
+			hash = new Hash(); for(let j = 0; j < ind_list.length; j++) hash.add(ind_list[j].name,j);
+		}
 		
-			for(let i = 0; i < sp2.inf_source.length; i++){
-				let so = sp2.inf_source[i];
+		percent(10);
 
-				if(so.type == "Genetic"){
+		// Looks to add actual values for individual effects from data
+		if(result.siminf == "inf" || result.siminf == "ppc"){   
+			for(let k = 0; k < sp.inf_source.length; k++){
+				let so = sp.inf_source[k];
+				if(so.type == "Ind. Eff."){
 					let tab = so.table;
-					
+					let ie = so.spec.drop.te;
 					for(let r = 0; r < tab.nrow; r++){
 						let j = hash.find(tab.ele[r][0]);
 						if(j != undefined){
-							let tstr = get_time(tab.ele[r][1],result);
-							let t = Number(tstr);	
-							ind_list[j].obs.push({type:"GeneticObs", t:t, tstr:tstr, i:i});
+							ind_list[j][ie] = tab.ele[r][1];
 						}
 					}
 				}
 			}
 		}
-	}
-	
-	percent(20);
-	
-	// Gets statistics about individual effects
-	for(let i = 0; i < ind_list.length; i++){
-		if(i%100 == 0) percent(20+60*i/ind_list.length);
+		
+		switch(result.siminf){
+		case "sim": 
+			add_source_obs(sp.sim_source,claa,hash,result,ind_list);
+			break;
+		case "inf": 
+			add_source_obs(sp.inf_source,claa,hash,result,ind_list);
+			break;
+		case "ppc": 
+			add_source_obs(sp.inf_source,claa,hash,result,ind_list);
+			add_source_obs(model.inf_res.plot_filter.species[p].ppc_source,claa,hash,result,ind_list);
+			break;
+		}
+		
+		// Genetic data could be places in any species
+		if(result.siminf == "inf" || result.siminf == "ppc"){     
+			for(let p2 = 0; p2 < result.species.length; p2++){
+				let sp2 = result.species[p2];
 			
-		let comb_ind = ind_list[i];
-		
-		let ie_vec = [], log_ie_vec = [];
-		let nie = sp.ind_effect.length;
-		for(let e = 0; e < nie; e++){ ie_vec[e] = []; log_ie_vec[e] = [];}
-		
-		let kmax = comb_ind.sa_ref.length;
-		for(let k = 0; k < kmax; k++){
-			let sr = comb_ind.sa_ref[k];
-			let ind = result.sample[sr.sample].species[p].individual[sr.i];
-			if(ind.ie.length != nie) error("ie not the right size");
-			for(let e = 0; e < nie; e++){
-				ie_vec[e].push(ind.ie[e]);
-				log_ie_vec[e].push(Math.log(ind.ie[e]));
+				for(let i = 0; i < sp2.inf_source.length; i++){
+					let so = sp2.inf_source[i];
+
+					if(so.type == "Genetic"){
+						let tab = so.table;
+						
+						for(let r = 0; r < tab.nrow; r++){
+							let j = hash.find(tab.ele[r][0]);
+							if(j != undefined){
+								let tstr = get_time(tab.ele[r][1],result);
+								let t = Number(tstr);	
+								ind_list[j].obs.push({type:"GeneticObs", t:t, tstr:tstr, i:i});
+							}
+						}
+					}
+				}
 			}
 		}
 		
-		comb_ind.ie_stat = []; 
-		comb_ind.log_ie_stat = [];
-		for(let e = 0; e < nie; e++){
-			comb_ind.ie_stat[e] = get_statistic(ie_vec[e]);
-			comb_ind.log_ie_stat[e] = get_statistic(log_ie_vec[e]);
+		percent(20);
+		
+		// Gets statistics about individual effects
+		for(let i = 0; i < ind_list.length; i++){
+			if(i%100 == 0) percent(20+60*i/ind_list.length);
+				
+			let comb_ind = ind_list[i];
+			
+			let ie_vec = [], log_ie_vec = [];
+			let nie = sp.ind_effect.length;
+			for(let e = 0; e < nie; e++){ ie_vec[e] = []; log_ie_vec[e] = [];}
+			
+			let kmax = comb_ind.sa_ref.length;
+			for(let k = 0; k < kmax; k++){
+				let sr = comb_ind.sa_ref[k];
+				let ind = result.sample[sr.sample].species[p].individual[sr.i];
+				if(ind.ie.length != nie) error("ie not the right size");
+				for(let e = 0; e < nie; e++){
+					ie_vec[e].push(ind.ie[e]);
+					log_ie_vec[e].push(Math.log(ind.ie[e]));
+				}
+			}
+			
+			comb_ind.ie_stat = []; 
+			comb_ind.log_ie_stat = [];
+			for(let e = 0; e < nie; e++){
+				comb_ind.ie_stat[e] = get_statistic(ie_vec[e]);
+				comb_ind.log_ie_stat[e] = get_statistic(log_ie_vec[e]);
+			}
 		}
+		
+		// Sorts based on individual effect
+		if(sort != "None"){
+			let ie = rpf2.sel_sort.i;
+			let dir = rpf2.sel_sort.c;
+			ind_list.sort( function(a, b){ return -dir*(a.ie_stat[ie].mean -  b.ie_stat[ie].mean)});
+		}
+		
+		percent(80);
+		
+		// Stores the result (to speed up if samedata is used)
+		result.graph_ind_store = { gfilt:gfilt, ind_list:ind_list, ind_max:ind_max};
 	}
-	
-	percent(80);
-	
+
+	let key = [];
+	let data = [];
+
 	// Goes through all individuals from all samples
 	switch(rpf.sel_indview.te){
 	case "Timeline": add_timelines(ind_list,tmin,tmax,p,cl,result,data,key,ind_max); break
 	case "Ind. Eff.":
 		switch(rpf.sel_indeffview.te){
+		case "Pred. Acc.": add_ind_eff_PA_scatter(ind_list,p,result,rpf,data,key,ind_max); break;
+		case "Dist. (log)": add_ind_eff_distribution(ind_list,p,result,rpf,data,key,ind_max,true); break;
+		case "Dist. (norm)": add_ind_eff_distribution(ind_list,p,result,rpf,data,key,ind_max,false); break;
 		case "Scatter": add_ind_eff_scatter(ind_list,p,result,rpf,data,key,ind_max); break;
-		case "Distribution": add_ind_eff_distribution(ind_list,p,result,rpf,data,key,ind_max); break;
 		default: error("Option sel ind eff view not here");
 		}
 		break
 	case "Table": add_individual_table(ind_list,p,result,data,ind_max); break;
+	case "Statistics": add_individual_stats_table(ind_list,p,result,data,ind_max); break;
 	default: error("Option not here: "+rpf.sel_indview.te); break;
 	}
 }
@@ -1703,7 +1750,7 @@ function add_source_obs(source,claa,hash,result,ind_list)
 		switch(so.type){
 		case "Add Ind.":
 			if(so.table_loaded == true){
-				let tab = so.table;							
+				let tab = so.table;			
 				let c = find_in(tab.heading,claa.name);
 				if(c == undefined) error("Could not find classification1");
 				else{
@@ -1714,8 +1761,8 @@ function add_source_obs(source,claa,hash,result,ind_list)
 							
 							let t = Number(tstr);
 					
-							let list = find_obs_colour(claa,tab.ele[r][c]);
-							ind_list[j].obs.push({type:"AddObs", t:t, tstr:tstr, col_list:list, i:i});
+							let list = find_obs_colour(claa,tab.ele[r][c]); 
+							ind_list[j].obs.push({type:"AddObs", t:t, tstr:tstr, col_list:list, i:i, r:r});		
 						}
 					}
 				}
@@ -1751,7 +1798,7 @@ function add_source_obs(source,claa,hash,result,ind_list)
 							let t = Number(tstr);
 					
 							let list = find_obs_colour(claa,tab.ele[r][2]);
-							ind_list[j].obs.push({type:"MoveObs", t:t, tstr:tstr, col_list:list, i:i});
+							ind_list[j].obs.push({type:"MoveObs", t:t, tstr:tstr, col_list:list, i:i, r:r});
 						}
 					}
 				}
@@ -1811,7 +1858,7 @@ function add_source_obs(source,claa,hash,result,ind_list)
 							let cname = tab.ele[r][2];
 							if(j != undefined){
 								let list = find_obs_colour(claa,cname);
-								ind_list[j].obs.push({type:"CompObs", t:t, tstr:tstr, col_list:list, i:i});
+								ind_list[j].obs.push({type:"CompObs", t:t, tstr:tstr, col_list:list, i:i, r:r});
 							}
 						}
 					}
@@ -2130,7 +2177,7 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 	percent(90);
 	
 	let fe_lookup = create_fe_lookup(sp);
-	
+		
 	let head = fe_lookup.head;
 	for(let f = 0; f < head.length; f++){
 		let hash = fe_lookup.hash_fe[f];
@@ -2161,17 +2208,55 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 		mat[j] = [];
 		for(let i = 0; i < ind_list.length; i++) mat[j][i] = "";
 	}
-	
+
 	for(let i = 0; i < ind_list.length; i++){
 		let obs = ind_list[i].obs;
 		for(let k = 0; k < obs.length; k++){
 			let ob = obs[k];
 			let j = find_in(list,ob.i);
-			if(mat[j][i] != "") mat[j][i] += "|"; 
-			mat[j][i] += "t="+ob.tstr;
-			if(ob.res != undefined){
-				if(ob.res == true) mat[j][i] += ":+"; else mat[j][i] += ":-";
+			
+			let te = mat[j][i];
+			
+			if(te != "") te += "|"; 
+			te += "t="+ob.tstr;
+			
+			let so;
+			switch(result.siminf){
+			case "sim": so = sp.sim_source[ob.i]; break;
+			case "inf": so = sp.inf_source[ob.i]; break;
+			default: break;
 			}
+				
+			switch(ob.type){	
+			case "AddObs":
+				{
+					let row = so.table.ele[ob.r];
+					te += " (";
+					for(let c = 2; c < row.length; c++){
+						if(c != 2) te += "|";
+						te += row[c];
+					}
+					te += ")";
+				}
+				break;
+			
+			case "MoveObs": case "CompObs": 
+				{
+					let row = so.table.ele[ob.r];
+					te += " ("+row[row.length-1]+")";
+				}
+				break;
+			case "DiagObs":
+				if(ob.res == true) te += ":+"; 
+				else te += ":-";
+				break;
+				
+			case "RemObs": break;
+			case "TransObs": break;		
+			case "GeneticObs": break;
+			}
+			
+			mat[j][i] = te;
 		}
 	}
 	
@@ -2199,10 +2284,52 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 	data.push({type:"Table", table:table});
 	
 	percent(100);
-	
+
 	post({type:"Graph define", variety:"Stat Table", view:"Stat Table", data:data, op:{ind_max:ind_max}});
 }
 
+/// Adds individual table
+function add_individual_stats_table(ind_list,p,result,data,ind_max)
+{
+	let sp = result.species[p];
+	
+	let table_width = [10,10,9,9];
+	
+	let table = {width:table_width, heading:[{name:"Quantity"},{name:"Mean"},{name:"CI min"},{name:"CI max"}], content:[]};
+
+	let nie = sp.ind_effect.length;
+	for(let e = 0; e < nie; e++){	
+		let name = "⟨["+sp.ind_effect[e]+"]⟩";
+	
+		let vec=[];
+		for(let i = 0; i < ind_list.length; i++){
+			let st = ind_list[i].ie_stat[e];
+			vec.push(st.mean);
+		}
+		let stat = get_statistic(vec);
+		
+		table.content.push([{te:name, pname:false},{te:stat.mean.toPrecision(4)},{te:stat.CImin.toPrecision(4)},{te:stat.CImax.toPrecision(4)}]);
+	}
+		
+	for(let e = 0; e < nie; e++){	
+		let name = "⟨log(["+sp.ind_effect[e]+"])⟩";
+	
+		let vec=[];
+		for(let i = 0; i < ind_list.length; i++){
+			let st = ind_list[i].log_ie_stat[e];
+			vec.push(st.mean);
+		}
+		let stat = get_statistic(vec);
+		
+		table.content.push([{te:name, pname:false},{te:stat.mean.toPrecision(4)},{te:stat.CImin.toPrecision(4)},{te:stat.CImax.toPrecision(4)}]);
+	}	
+	
+	data.push({type:"Table", table:table});
+	
+	percent(100);
+
+	post({type:"Graph define", variety:"Stat Table", view:"Stat Table", data:data, op:{ind_max:ind_max}});
+}
 
 /// Adds a column to a table
 function add_table_column(head,vec,table)
@@ -2241,7 +2368,7 @@ function text_width_para(te)
 	
 	
 /// Adds scatter plot showing true vs estimated individual effect
-function add_ind_eff_scatter(ind_list,p,result,rpf,data,key,ind_max)
+function add_ind_eff_PA_scatter(ind_list,p,result,rpf,data,key,ind_max)
 {		
 	let seliev = rpf.sel_ie_data_view[p];
 	
@@ -2297,8 +2424,193 @@ function add_ind_eff_scatter(ind_list,p,result,rpf,data,key,ind_max)
 }
 
 
+/// Adds a colour to individuals
+function colourise_ind_list(ind_list,p,rpf,result,key)
+{
+	let sp = result.species[p];
+	let filt = rpf.species[p].col_filt;
+
+	let cl_list = [];
+	for(let cl = 0; cl < filt.cla_split.length; cl++){
+		let cspl = filt.cla_split[cl];
+		if(cspl.checkb.check == true){
+			cl_list.push(cl);
+		}
+	}
+	
+	if(cl_list.length == 0) return;
+	
+	let mu = 1;
+	let list = [];
+	let mult=[];
+	for(let k = 0; k < cl_list.length; k++){
+		list[k] = [];
+		let comp = sp.cla[cl_list[k]].comp;
+		for(let c = 0; c < comp.length; c++) list[k].push(comp[c].name);
+		
+		mult[k] = mu; 
+		mu *= comp.length;
+	}
+	
+	let comb = generate_co_list(list);
+	
+	let col_store=[];
+	
+	for(let k = 0; k < comb.length; k++){
+		let ind = comb[k].index;
+		
+		let te = "";
+		for(let k = 0; k < cl_list.length; k++){
+			if(k != 0) te += ",";
+			te += list[k][ind[k]];
+		}
+		let col = auto_color[k%auto_color.length];
+		
+		col_store[get_cs_index(ind,mult)] = col;
+
+		key.push({type:"Rect", te:te, col:col});
+	}
+	
+	let comp_gl = sp.comp_gl;
+	
+	let fl = false;
+	for(let i = 0; i < ind_list.length; i++){
+		let indl = ind_list[i];
+		
+		let c_cl=[];
+		for(let k = 0; k < cl_list.length; k++) c_cl[k]=[];
+		let n = 0;
+		
+		for(let j = 0; j < indl.sa_ref.length; j++){
+			let sa = indl.sa_ref[j];
+			let ind = result.sample[sa.sample].species[p].individual[sa.i];
+			let c = ind.cinit;
+			if(c != UNSET && c != OUT){
+				let cgl = comp_gl[c];
+				for(let k = 0; k < cl_list.length; k++){
+					c_cl[k].push(cgl.cla_comp[cl_list[k]]);
+				}
+				n++;
+			}
+		}
+		
+		if(n > 0){
+			let fli = [];
+			for(let k = 0; k < cl_list.length; k++){
+				fli.push(most_freq(c_cl[k]));
+			}
+		
+			indl.col = col_store[get_cs_index(fli,mult)]
+		}
+		else{
+			fl = true;
+			indl.col = BLACK;
+		}
+	}
+
+	if(fl){
+		key.push({type:"Rect", te:"No group", col:BLACK});
+	}
+}
+
+
+/// Gets an index for a colour
+function get_cs_index(ind,mult)
+{
+	let sum = 0; 
+	for(let k = 0; k < ind.length; k++) sum += ind[k]*mult[k];
+	return sum;
+}
+
+
+/*
+/// Gets a colour from a set of list numbers 
+function get_col_fli(fli,cl_list,sp)
+{
+	let col =	"rgb(";
+	for(let k = 0; k < 3; k++){
+		if(k != 0) col += ",";
+		let co = 255;
+		if(k < cl_list.length){
+			let cl = cl_list[k];
+			co = Math.floor(255*(fli[k]+0.5)/sp.cla[cl].comp.length);
+		}
+		col += co;
+	}
+	col += ")";
+	
+	return col;
+}
+*/
+
+
+/// Adds scatter plot showing one estimated individual effect against another
+function add_ind_eff_scatter(ind_list,p,result,rpf,data,key,ind_max)
+{		
+	colourise_ind_list(ind_list,p,rpf,result,key);
+	
+	let rpf2 = rpf.species[p];
+	
+	let ind_effect = result.species[p].ind_effect;
+	
+	let name_x = rpf2.sel_ie_xaxis.te;
+	
+	let ie_x = name_x.substr(1,name_x.length-2);
+	
+	let e_x = find_in(ind_effect,ie_x);
+	if(e_x == undefined) alertp("Problem getting ie");
+	
+	name_x = "log("+name_x+")";
+				
+	let name_y = rpf2.sel_ie_yaxis.te;
+	
+	let ie_y = name_y.substr(1,name_y.length-2);
+	
+	let e_y = find_in(ind_effect,ie_y);
+	if(e_y == undefined) alertp("Problem getting ie");
+	
+	name_y = "log("+name_y+")";
+							
+	let vecA=[], vecB=[];
+	let point=[];
+	for(let i = 0; i < ind_list.length; i++){
+		if(i%100 == 0) percent(80+20*i/ind_list.length);
+		
+		let stat_x = ind_list[i].log_ie_stat[e_x];
+		let stat_y = ind_list[i].log_ie_stat[e_y];
+	
+		vecA.push(stat_x.mean); vecB.push(stat_y.mean);
+				
+		if(rpf.scatter_ie_settings.show_eb.check == true){
+			data.push({type:"ErrorBar", x:stat_x.mean, ymin:stat_y.CImin, y:stat_y.mean, ymax:stat_y.CImax, col:BLACK}); 
+			data.push({type:"HErrorBar", y:stat_y.mean, xmin:stat_x.CImin, x:stat_x.mean, xmax:stat_x.CImax, col:BLACK}); 
+		}
+				
+		point.push({x:stat_x.mean, y:stat_y.mean});
+	}
+
+	for(let i = 0; i < ind_list.length; i++){
+		let indl = ind_list[i];
+		let stat_x = indl.log_ie_stat[e_x];
+		let stat_y = indl.log_ie_stat[e_y];
+		
+		let col = BLUE;
+		if(indl.col != undefined) col = indl.col;
+			
+		data.push({x:stat_x.mean, y:stat_y.mean, type:"Point", col:col});
+	}
+	
+	percent(100);
+	
+	let cor = get_correlation(vecA,vecB);
+	let title = "Correlation = "+cor.toPrecision(pre);
+	
+	post({type:"Graph define", variety:"Scatter", view:"Scatter", data:data, op:{x_label:name_x, x_param:true, y_label:name_y, y_param:true, key:key, title:title, ind_max:ind_max}});		
+}
+
+
 /// Shows distribution in individual effect
-function add_ind_eff_distribution(ind_list,p,result,rpf,data,key,ind_max)
+function add_ind_eff_distribution(ind_list,p,result,rpf,data,key,ind_max,log_fl)
 {	
 	let seliev = rpf.sel_ie_view[p];
 	
@@ -2320,12 +2632,14 @@ function add_ind_eff_distribution(ind_list,p,result,rpf,data,key,ind_max)
 		
 	let vec=[];
 	for(let i = 0; i < ind_list.length; i++){
-		vec.push(ind_list[i].log_ie_stat[e].mean);
+		if(log_fl) vec.push(ind_list[i].log_ie_stat[e].mean);
+		else vec.push(ind_list[i].ie_stat[e].mean);
 	}
 	
 	percent(90);
 		
-	distribution_add_data_line(vec,posterior_name(result),BLUE,data,key,rpf,true);
+	//distribution_add_data_line(vec,posterior_name(result),BLUE,data,key,rpf,true);
+	distribution_add_data_line(vec,"",BLUE,data,key,rpf,true);
 		
 	percent(100);
 	
@@ -2403,6 +2717,8 @@ function add_timelines(ind_list,tmin,tmax,p,cl,result,data,key,ind_max)
 	
 	let fe_lookup = create_fe_lookup(sp);
 
+	let dtmin = (tmax-tmin)/500;
+
 	for(let i = 0; i < ind_list.length; i++){
 		if(i%100 == 0) percent(80+20*i/ind_list.length);
 		
@@ -2472,13 +2788,19 @@ function add_timelines(ind_list,tmin,tmax,p,cl,result,data,key,ind_max)
 		
 		if(nalive > 0 || cla_ev.length > 0){
 			col_timeline.push({t:tmin, col:get_mix_colour(comp_col,cpop), alpha:nalive/nsamp});
-			
-			for(let k = 0; k < cla_ev.length; k++){
+		
+			let tt = tmin;
+			let kmax = cla_ev.length;
+			for(let k = 0; k < kmax; k++){
 				let clev = cla_ev[k];	
 				let ci = clev.ci; if(ci == OUT) nalive++; else cpop[ci]--;
 				let cf = clev.cf; if(cf == OUT) nalive--; else cpop[cf]++;
 				
-				col_timeline.push({t:clev.t, col:get_mix_colour(comp_col,cpop), alpha:nalive/nsamp});
+				let tt_new = clev.t;
+				if(k == kmax-1 || (tt_new-tt > dtmin && tt_new < cla_ev[k+1].t)){
+					tt = tt_new;
+					col_timeline.push({t:tt, col:get_mix_colour(comp_col,cpop), alpha:nalive/nsamp});
+				}
 			}
 			col_timeline.push({t:tmax, col:get_mix_colour(comp_col,cpop), alpha:nalive/nsamp});
 		}
@@ -5138,7 +5460,7 @@ function distribution_add_data_line(vec,name,col,data,key,rpf,show_mean,clip_min
 	
 	data.push({point:point, col:col, CImin:stat.CImin, CImax:stat.CImax, type:"Distribution"});
 	
-	key.push({type:"Line", te:name, col:col});
+	if(name != "") key.push({type:"Line", te:name, col:col});
 }
 
 

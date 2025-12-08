@@ -87,7 +87,7 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 		
 		if(L > Lmax){
 			Lmax = L;
-			part = state.generate_particle(UNSET,UNSET,true);
+			part = state.generate_particle(UNSET,UNSET,true,false);
 		}
 	
 		//state.check("after resample");

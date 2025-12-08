@@ -1,4 +1,11 @@
+
 TO DO
+//emsg("fa");// calculate_mult(linearise.factor,ti,precalc);
+//emsg("H");// *calculate_mult(linearise.pop_grad_calc[j],ti,precalc);
+-- Do testing of genetic part
+
+-- sampling improvement
+-- seg faults when doing pas-mcmc on windows version with 2 parts
 -- Synchornise proposals
 -- For initial conditions view as table or as compartment (good when there are a lot of compartments)
 -- Delay differential equations 
@@ -46,6 +53,12 @@ FUTURE THINGS TO GET SORTED
 
 
 DONE
+-- "cols" not being used when loading up individual effects (Jamie problem)
+-- density
+-- Grant problem
+-- Grant problem2
+-- Visualisation time slow for Jamies model
+
 - Check derived functions
 - initial conditions not working
 - output slow...

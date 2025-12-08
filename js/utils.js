@@ -599,6 +599,35 @@ function num_element(par)
 	return num;
 }
 
+// Use timer.start(0) to start timer.stop(0) to stop timer.print() to print
+
+/// Gets some timers()
+class Timer
+{
+	ti=[];
+	name=[];
+	
+	constructor()
+	{
+	}
+	
+	start(num)
+	{
+		this.ti[num] = -clock();
+	}		
+	
+	stop(num)
+	{
+		this.ti[num] += clock();
+	}		
+	
+	print()
+	{
+		for(let i = 0; i < this.ti.length; i++){
+			prr(i+": "+this.ti[i]);
+		}
+	}
+}
 
 /// Gets the clock time (in milliseconds)
 function clock()
@@ -941,8 +970,8 @@ function add_escape_char(te)
 		te = te.replace(regex,st1);
 	}
 	
-	te = te.replace("×","*");
-	te = te.replace("→","->");
+	te = te.replace(/×/g,"*");
+	te = te.replace(/→/g,"->");
 	
 	return te;
 }
@@ -957,6 +986,7 @@ function apply_filter(rpf2,i,name)
 	switch(name){
 	case "Transitions": ty = "trans"; break;
 	case "Populations": case "Individuals":  ty = "pop"; break;
+	case "Diagnostics": ty = "trans"; break;
 	default: error("Name not recognised"+name); break;
 	}
 	
@@ -1113,5 +1143,28 @@ function is_matrix(par)
 {
 	if(par.dep.length == 2 && remove_prime(par.dep[0]) == remove_prime(par.dep[1])) return true;
 	return false;
+}
+
+
+/// Determines the most frequent element in a list
+function most_freq(list)
+{
+	list.sort();
+	let max = 0; 
+	let val_store = UNSET;
+	let val_store_max;
+	let num = 0;
+	for(let i = 0; i < list.length; i++){
+		let val = list[i];
+		if(val == val_store) num++;
+		else{
+			if(num > max){ max = num; val_store_max = val_store;}
+			val_store = val;
+			num = 1;
+		}
+	}
+	if(num > max){ max = num; val_store_max = val_store;}
+	
+	return val_store_max;
 }
 

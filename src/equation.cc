@@ -31,7 +31,7 @@ using namespace std;
     
 		
 /// Initialises the equation 
-Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details) : species(species), param(param), prior(prior), derive(derive), spline(spline), param_vec(param_vec), pop(pop), hash_pop(hash_pop), constant(constant), timepoint(timepoint), details(details)
+Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details) : species(species), param(param), prior(prior), derive(derive), spline(spline), param_vec(param_vec), density(density), pop(pop), hash_pop(hash_pop), constant(constant), timepoint(timepoint), details(details)
 {
 	plfl = false;  // Set to true to print operations to terminal (used for diagnostics)
 
@@ -61,13 +61,13 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool
 	if(warn != "") return;
 
 	te = replace(te,"×","*");                        // Converts × to *
-	
+
 	auto op = extract_operations();                  // Extracts the operations in the 	expression
-	
+
 	if(warn != "") return; 
 	
 	check_repeated_operator(op);                     // Checks for repeated operators e.g. "**"
-	
+
 	//if(integral.size() > 0){ print_operations(op); emsg("op");}
 
 	if(warn != "") return; 
@@ -116,7 +116,7 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool
 	if(!debugging){
 		//if(type == REPARAM || type == REPARAM_EQN) te_raw = trunc(te_raw,20);
 		//else te_raw = trunc(te_raw,20);	
-		te_raw = trunc(te_raw,20);	
+		//te_raw = trunc(te_raw,20);	
 	}
 }
 
@@ -663,7 +663,7 @@ void Equation::unravel_sum()
 				
 				auto swap_temp = swap_template(content,dep_conv);
 				if(swap_temp.warn != ""){ warn = swap_temp.warn; return;}
-		
+			
 				bool fl;			
 				do{
 					for(auto j = 0u; j < ndep; j++){
@@ -821,7 +821,13 @@ ParamRef Equation::get_param_name(unsigned int i, double &dist, unsigned int &ra
 						dist = get_identity(pp);
 					}
 					else{
-						warn = "Could not find parameter '"+name+"'"; return pref;
+						if(is_density_name(name)){
+							dist = get_density(pp);
+							if(warn != "") return pref;
+						}
+						else{
+							warn = "Could not find parameter '"+name+"'"; return pref;
+						}
 					}
 				}
 			}
@@ -869,6 +875,16 @@ ParamRef Equation::get_param_name(unsigned int i, double &dist, unsigned int &ra
 	
   return pref;
 }
+
+
+/// Determines if the parameter is a density
+bool Equation::is_density_name(string name) const 
+{
+	auto spl = split(name,'^');
+	if(spl[0] == density_name || spl[0] == rdensity_name) return true;
+	return false;
+}
+
 
 
 /// Tries to get a parameter name from a string
@@ -1577,16 +1593,22 @@ vector <EqItem> Equation::extract_operations()
 			i++;
 		}
   }
-
-  i = 0;                                            // Adds in unspecified multiply signs
-  while(i+1 < op.size()){
-		if((quant(op,i) || optype(op,i,RIGHTBRACKET)) && 
-		    (quant(op,i+1) || is_func(op,i+1) || optype(op,i+1,LEFTBRACKET))){		 
-			EqItem item; item.type = MULTIPLY;
-      op.insert(op.begin()+i+1,item);
+	
+	// Adds in unspecified multiply signs
+	vector <EqItem> op_new;
+	for(auto i = 0u; i < op.size(); i++){
+		op_new.push_back(op[i]);
+		
+		if(i+1 < op.size()){
+			if((quant(op,i) || optype(op,i,RIGHTBRACKET)) && 
+		    (quant(op,i+1) || is_func(op,i+1) || optype(op,i+1,LEFTBRACKET) || optype(op,i+1,TINT))){	
+				EqItem item; item.type = MULTIPLY;
+				op_new.push_back(item);
+			}
     }
-    else i++;
-  }
+	}
+
+	op = op_new;
 	
 	if(op.size() > OP_MAX) warn = "The calculation is too long.";
 	
@@ -3018,21 +3040,24 @@ double Equation::find_dist(unsigned int c, unsigned int cc, const vector <Compar
 			auto lat2 = comp[cc].lat*MM_PI/180.0;
 			auto lng2 = comp[cc].lng*MM_PI/180.0;
 
-			auto r = 6371.0;
-
-			auto dlng = lng2-lng;
-			if(dlng > MM_PI) dlng -= 2*MM_PI;
-			if(dlng < -MM_PI) dlng += 2*MM_PI;
-	
-			auto si = sin(0.5*(lat2-lat));
-			auto si2 = sin(0.5*dlng);
-			return 2*r*asin(sqrt(si*si + cos(lat)*cos(lat2)*si2*si2));
+			return geo_dist(lat,lng,lat2,lng2);
 		}
 		break;
 	}
 
 	emsg_input("Cannot find distance");
 	return UNSET;
+}
+
+
+/// Calculates geographical distance	
+double Equation::geo_dist(double lat1, double lng1, double lat2, double lng2) const
+{
+	auto r = 6371.0;
+	
+	auto si = sin(0.5*(lat2-lat1));
+	auto si2 = sin(0.5*(lng2-lng1));
+	return 2*r*asin(sqrt(si*si + cos(lat1)*cos(lat2)*si2*si2));
 }
 
 				
@@ -3068,6 +3093,248 @@ double Equation::get_distance(const ParamProp &pp)
 	
 	warn = "Compartment '"+dep1+"' is not recognised in distance matrix.";
 	return UNSET;
+}
+
+
+/// Gets the distance between two compartments
+double Equation::get_density(const ParamProp &pp)
+{
+	auto spl = split(pp.name,'^');
+	
+	if(spl.size() != 2){
+		warn = "'"+pp.name+"' should be in the format '"+spl[0]+"^d' where 'd' is the radius used for KDE.";
+		return UNSET;
+	}
+	
+	auto r = number(spl[1]);
+	
+	if(r == UNSET || r <= 0){
+		warn = "The KDE radius '"+spl[1]+"' must be a positive number";
+		return UNSET;
+	}
+	
+	auto rel_den = false;
+	if(spl[0] == rdensity_name) rel_den = true;
+	
+	auto dep1 = pp.dep[0];
+	
+	for(auto p = 0u; p < species.size(); p++){
+		const auto &sp = species[p];
+		for(auto cl = 0u; cl < sp.cla.size(); cl++){
+			const auto &claa = sp.cla[cl];
+			
+			auto c = claa.hash_comp.find(dep1);
+			if(c != UNSET){
+				auto i = 0u; while(i < density.size() && !(density[i].p == p && density[i].cl == cl && density[i].r == r && density[i].rel_den == rel_den)) i++;
+				
+				if(i == density.size()){
+					Density den; 
+					den.p = p; den.cl = cl; den.r = r; den.rel_den = rel_den;
+					den.value = set_density(p,cl,r,rel_den);
+					density.push_back(den);
+					
+					if(false){
+						for(auto i = 0u; i < claa.comp.size(); i++){
+							cout << claa.comp[i].name << " " << den.value[i] << " den" << endl;  
+						}
+						emsg("density");
+					}
+				}
+
+				return density[i].value[c];
+			}
+		}
+	}
+	
+	warn = "Compartment '"+dep1+"' is not recognised in distance matrix.";
+	return UNSET;
+}
+
+
+/// Sets the density for a set of compartments 
+vector <double> Equation::set_density(unsigned int p, unsigned int cl, double r, bool rel_den) const 
+{
+	const auto &claa = species[p].cla[cl];
+			
+	auto N = claa.comp.size();
+	
+	vector <double> value(N);
+	
+	vector < vector < vector <unsigned int> > > grid;
+			
+	switch(claa.coord){
+	case CARTESIAN:
+		{
+			vector <double> px, py;
+	
+			double xmin = LARGE, xmax = -LARGE, ymin = LARGE, ymax = -LARGE;
+		
+			for(auto i = 0u; i < N; i++){
+				auto x = claa.comp[i].x;
+				auto y = claa.comp[i].y;
+				
+				px.push_back(x);
+				py.push_back(y);
+				
+				if(x > xmax) xmax = x;
+				if(x < xmin) xmin = x;
+				if(y > ymax) ymax = y;
+				if(y < ymin) ymin = y;
+			}
+		
+			auto xdist = xmax-xmin;
+			auto ydist = ymax-ymin;
+			
+			auto LX = (unsigned int)(xdist/r); if(LX > 100) LX = 100;
+			auto LY = (unsigned int)(ydist/r); if(LY > 100) LY = 100;
+			
+			auto dx = xdist/(LX*ALMOST_ONE);
+			auto dy = ydist/(LY*ALMOST_ONE);
+			
+			grid.resize(LY);
+			for(auto j = 0u; j < LY; j++) grid[j].resize(LX);
+			
+			for(auto k = 0u; k < N; k++){
+				int i = (unsigned int)((px[k]-xmin)/dx); if(i < 0 || i >= (int)LX) emsg("Out of range");
+				int j = (unsigned int)((py[k]-ymin)/dy); if(j < 0 || j >= (int)LY) emsg("Out of range");
+				grid[j][i].push_back(k);
+			}
+
+			for(auto k = 0u; k < N; k++){
+				int imid = (int)((px[k]-xmin)/dx); if(imid < 0 || imid >= (int)LX) emsg("Out of range");
+				int jmid = (int)((py[k]-ymin)/dy); if(jmid < 0 || jmid >= (int)LY) emsg("Out of range");
+		
+				auto sum = 0.0;
+				for(int j = jmid-density_kernel_max; j <= jmid+(int)density_kernel_max; j++){
+					if(j >= 0 && j < (int)LY){
+						for(int i = imid-density_kernel_max; i <= imid+(int)density_kernel_max; i++){
+							if(i >= 0 && i < (int)LX){
+								for(auto kk : grid[j][i]){
+									auto ddx = px[kk]-px[k];
+									auto ddy = py[kk]-py[k];
+									auto dd = ddx*ddx + ddy*ddy;
+						
+									auto dd_sc = dd/(r*r);
+									if(dd_sc < density_kernel_max*density_kernel_max){
+										sum += exp(-0.5*dd_sc);
+									}
+								}
+							}
+						}		
+					}
+				}
+				value[k] = sum/(2*MM_PI*r*r);
+			
+				if(false){  // Used for checking
+					auto sum_ch = 0.0;
+					for(auto i = 0u; i < N; i++){	
+						auto ddx = px[i]-px[k];
+						auto ddy = py[i]-py[k];
+						auto dd = ddx*ddx + ddy*ddy;
+			
+						auto dd_sc = dd/(r*r);
+						if(dd_sc < density_kernel_max*density_kernel_max){
+							sum_ch += exp(-0.5*dd_sc);
+						}
+					}
+					
+					if(dif(sum,sum_ch,TINY)) emsg("Sum not agree");
+				}
+			}
+		}
+		break;
+		
+	case LATLNG:
+		{
+			vector <double> lat, lng;
+			
+			double lat_min = LARGE, lat_max = -LARGE, lng_min = LARGE, lng_max = -LARGE;
+			
+			for(auto i = 0u; i < N; i++){
+				const auto &co = claa.comp[i];
+			
+				auto la = co.lat*MM_PI/180;
+				auto ln = co.lng*MM_PI/180;
+				
+				lat.push_back(la);
+				lng.push_back(ln);
+				
+				if(la > lat_max) lat_max = la;
+				if(la < lat_min) lat_min = la;
+				if(ln > lng_max) lng_max = ln;
+				if(ln < lng_min) lng_min = ln;
+			}
+		
+			auto lat_far = lat_max; if(lat_min*lat_min > lat_max*lat_max) lat_far = lat_min;
+			
+			auto lng_dist = geo_dist(lat_far,lng_min,lat_far,lng_max);
+			auto lat_dist = geo_dist(lat_min,lng_max,lat_max,lng_max);
+			
+			auto LX = (unsigned int)(lng_dist/r); if(LX > 100) LX = 100;
+			auto LY = (unsigned int)(lat_dist/r); if(LY > 100) LY = 100;
+			
+			auto dlng = (lng_max-lng_min)/(LX*ALMOST_ONE);
+			auto dlat = (lat_max-lat_min)/(LY*ALMOST_ONE);
+			
+			grid.resize(LY);
+			for(auto j = 0u; j < LY; j++) grid[j].resize(LX);
+			
+			for(auto k = 0u; k < N; k++){
+				auto i = (int)((lng[k]-lng_min)/dlng); if(i < 0 || i >= (int)LX) emsg("Out of range");
+				auto j = (int)((lat[k]-lat_min)/dlat); if(j < 0 || j >= (int)LY) emsg("Out of range");
+				grid[j][i].push_back(k);
+			}
+
+			for(auto k = 0u; k < N; k++){
+				int imid = (unsigned int)((lng[k]-lng_min)/dlng); if(imid < 0 || imid >= (int)LX) emsg("Out of range");
+				int jmid = (unsigned int)((lat[k]-lat_min)/dlat); if(jmid < 0 || jmid >= (int)LY) emsg("Out of range");
+		
+				auto sum = 0.0;
+				for(int j = jmid-(int)density_kernel_max; j <= jmid+(int)density_kernel_max; j++){
+					if(j >= 0 && j < (int)LY){
+						for(int i = imid-(int)density_kernel_max; i <= imid+(int)density_kernel_max; i++){
+							if(i >= 0 && i < (int)LX){
+								for(auto kk : grid[j][i]){
+									auto d = geo_dist(lat[kk],lng[kk],lat[k],lng[k]);
+						
+									auto d_sc = d/r;
+									if(d_sc < density_kernel_max){
+										sum += exp(-0.5*d_sc*d_sc);
+									}
+								}
+							}
+						}		
+					}
+				}
+				value[k] = sum/(2*MM_PI*r*r);
+			
+				if(false){  // Used for checking
+					auto sum_ch = 0.0;
+					for(auto i = 0u; i < N; i++){
+						auto d = geo_dist(lat[i],lng[i],lat[k],lng[k]);
+						
+						auto d_sc = d/r;
+						if(d_sc < density_kernel_max){
+							sum_ch += exp(-0.5*d_sc*d_sc);
+						}
+					}
+					
+					if(dif(sum,sum_ch,TINY)) emsg("Sum not agree");
+				}
+			}
+		}
+		break;
+	}
+	
+	if(rel_den){ // Converts to the relative density 
+		auto sum = 0.0;
+		for(auto k = 0u; k < N; k++) sum += value[k];
+		sum /= N;
+	
+		for(auto k = 0u; k < N; k++) value[k] /= sum;
+	}
+	
+	return value;
 }
 
 
@@ -3204,11 +3471,9 @@ void Equation::check_repeated_operator(const vector <EqItem> &op)
 /// Replaces time integral with separate calculation
 void Equation::time_integral(vector <EqItem> &op)
 {
-	auto i = 0u; 
-	while(i < op.size()){
-		while(i < op.size() && op[i].type != TINT) i++;
-		
-		if(i < op.size()){
+	vector <EqItem> op_new;
+	for(auto i = 0u; i < op.size(); i++){
+		if(op[i].type == TINT){
 			auto e = op[i].num;
 			auto &inte = integral[e];
 			
@@ -3257,39 +3522,46 @@ void Equation::time_integral(vector <EqItem> &op)
 			
 			inte.calc = calc;
 			
-			// Removes calculation
-			op.erase(op.begin()+i,op.begin()+j+1);
-			
+			i = j;
+				
 			// Adds intergal reference term
 			EqItem add;
 			add.type = INTEGRAL;
 			add.num = e;
-			op.insert(op.begin()+i,add);
+			op_new.push_back(add);
 		
 			if(type != DERIVE_EQN){
 				warn = "Time integrals can only appear in derived equations.";
 			}
 		}
-	}	
+		else{
+			op_new.push_back(op[i]);
+		}
+	}
+	op = op_new;
 }
 
 
 /// Replaces minus sign with plus one multiply
 void Equation::replace_minus(vector <EqItem> &op)
 {
-	auto i = 0u;
-	while(i < op.size()){
-		if(op[i].type == TAKE){
-			op[i].type = ADD;
-			
+	vector <EqItem> op_new;
+	
+	for(auto i = 0u; i < op.size(); i++){
+		auto opp = op[i];
+		if(opp.type == TAKE){
+			opp.type = ADD;
+			op_new.push_back(opp);
+			 
 			EqItem item2; item2.type = NUMERIC; item2.num = constant.add(-1);
-			op.insert(op.begin()+i+1,item2);
+			op_new.push_back(item2);
 	
 			EqItem item3; item3.type = MULTIPLY;
-			op.insert(op.begin()+i+2,item3);
+			op_new.push_back(item3);
 		}
-		else i++;
-	}
+		else op_new.push_back(opp);
+	}		
+	op = op_new;
 }
 
 

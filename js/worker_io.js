@@ -249,7 +249,7 @@ function load_table(te,head,sep,filename)
 {
 	let file_simp = cut_path(filename);
 	
-	te.replace(/\r/g,"");
+	
 	let lines = te.split("\n");
 	
 	while(lines.length > 0 && (begin_str(lines[0].trim(),"#") || lines[0].trim() == "")){
@@ -639,7 +639,7 @@ function read_param_samples(chain,te,result,warn)
 	for(let th = 0; th < result.param.length; th++){
 		let par = result.param[th];
 		
-		if(par.dist_mat || par.iden_mat || (par.variety == "reparam" && par.reparam_eqn_on)){
+		if(par.dist_mat || par.iden_mat || par.den_vec || (par.variety == "reparam" && par.reparam_eqn_on)){
 			if(par.value){
 				if(par.value.length != 0) error("Param error");
 			}
@@ -814,7 +814,7 @@ function create_compartment_hash(result)
 function read_state_sample(te,chain,result,warning)
 {
 	create_compartment_hash(result);
-	
+
 	let lines = te.split('\n');
 	
 	for(let i = 0; i < lines.length; i++) lines[i] = lines[i].trim();
@@ -836,7 +836,7 @@ function read_state_sample(te,chain,result,warning)
 	let timepoint = result.timepoint;
 	
 	let p;
-	for(let i = 0; i < lines.length; i++){
+	for(let i = 0; i < lines.length; i++){ // SLOW
 		let li = lines[i];
 	
 		if(li != ""){
@@ -1222,17 +1222,17 @@ function read_state_sample(te,chain,result,warning)
 			}
 		}
 	}
-	
+
 	generate_trans_tree(get_inf_from,result,sample);
 
 	generate_cpop_init_from_ind(result,sample);
 
 	generate_transnum_from_ind(result,sample);
 
-	generate_cpop_from_transnum(result,sample);
+	generate_cpop_from_transnum(result,sample); // SLOW
 
 	update_average(result,sample);
-	
+
 	remove_dpop(sample);
 	
 	result.state_memory += obj_memory(sample);

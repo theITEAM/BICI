@@ -62,13 +62,13 @@ function create_output_file(save_type,one_file,map_store)
 		
 		let pro = process_lines(lines,"");
 		
-		post({formatted:pro.formatted,  param:strip_heavy(model.param), species:strip_heavy(model.species)});
+		post({formatted:pro.formatted, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
 	}
 	else{
 		percent(90);
 		write_file_store(te,"bicifile",file_list,"bicifile");
 		percent(100);
-		post({save_type:save_type, file_list:file_list, param:strip_heavy(model.param), species:strip_heavy(model.species)});
+		post({save_type:save_type, file_list:file_list, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
 	}
 }
 
@@ -757,7 +757,7 @@ function output_param(par,save_type,file_list,one_file)
 		let te2 = "";
 		let display = false;
 		
-		if(par.dist_mat || par.iden_mat){
+		if(par.dist_mat || par.iden_mat || par.den_vec){
 			display = true;
 		}
 		else{
@@ -896,7 +896,7 @@ function output_param(par,save_type,file_list,one_file)
 			te1 += ' sim-sample="false"';
 		}
 				
-		if(!par.dist_mat && !par.iden_mat){
+		if(!par.dist_mat && !par.iden_mat && !par.den_vec){
 			te += te1+te2+endl+endl;
 		}
 		
@@ -2533,5 +2533,5 @@ function create_ppc_file()
 	
 	write_file_store(te,"bicifile",file_list,"bicifile");
 
-	post({save_type:"ppc", file_list:file_list, param:strip_heavy(model.param), species:strip_heavy(model.species)});
+	post({save_type:"ppc", file_list:file_list, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
 }

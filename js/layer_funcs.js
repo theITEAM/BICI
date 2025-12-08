@@ -56,6 +56,8 @@ function generate_screen(update)
 
 	reset_textbox_store();
 	
+	inter.corner_but = false;
+	
 	add_layer("Screen",0,0,width/inter.sca,height/inter.sca,{});
 
 	purge_textbox_store();
@@ -698,7 +700,12 @@ function add_screen_buts(lay)
 					break;
 				
 				case "Individuals":
-					if(rpf.sel_indview.te == "Ind. Eff.") right_mid = "with key";
+					if(rpf.sel_indview.te == "Ind. Eff."){
+						switch(rpf.sel_indeffview.te){
+						case "Scatter": right_mid = "key only"; break;
+						default: right_mid = "no key"; break;
+						}
+					}
 					break;
 				}
 				break;
@@ -711,14 +718,16 @@ function add_screen_buts(lay)
 	if(inter.view_graph.value != undefined) right_menu = "GraphView";
 
 	if(right_menu != "" && !loading){	
+		let bot = y2; if(inter.corner_but) bot -= 3;
+		
 		let xr = x3-right_menu_width;
 		let yr = y1 + right_menu_top;
 	
-		add_layer("RightMenuSlider",xr-right_menu_slider,yr,right_menu_slider,y2-yr-1,{});
+		add_layer("RightMenuSlider",xr-right_menu_slider,yr,right_menu_slider,bot-yr-1,{});
 		
 		let l = inter.layer.length;
 		
-		add_layer("RightMenu",xr,yr,x3-xr,y2-yr,{type:right_menu});
+		add_layer("RightMenu",xr,yr,x3-xr,bot-yr,{type:right_menu});
 		
 		let box = get_but_box(inter.layer[l].but);
 		
@@ -727,8 +736,16 @@ function add_screen_buts(lay)
 		let yr2 = yr+ymax+3;	
 	
 		if(right_mid){
-			let hh = y2-yr2-0.5;
+			let hh = bot-yr2-0.5;
 			switch(right_mid){
+			case "key only":
+				add_layer("RightBotMenu",xr,yr2,x3-xr-0.5,hh,{});
+				break;
+				
+			case "no key":
+				add_layer("RightMidMenu",xr,yr2,x3-xr-0.5,hh,{});
+				break;
+				
 			case "with key":
 				add_layer("RightMidMenu",xr,yr2,x3-xr-0.5,0.63*hh,{});
 				
@@ -754,7 +771,7 @@ function add_screen_buts(lay)
 			}
 		}
 		else{
-			let dy = y2-yr2-0.5;
+			let dy = bot-yr2-0.5;
 			add_layer("RightBotMenu",xr,yr2,x3-xr-0.5,dy,{});
 		}
 	}

@@ -399,7 +399,9 @@ const SUM_COL = DPURPLE;
 
 const TI_DIV_MAX = 10000;                          // Maximum number of time divisions
 const DISPLAY_FILE_LEN_MAX = 100;
-const KEY_LINE_MAX = 100;                          // Maximum number of key lines on a graph    
+const KEY_LINE_MAX = 100;                          // Maximum number of key lines on a graph   
+const KEY_MAX = 20;                                // Maximum number of elements on key
+const RIGHT_MENU_DY = 1.8; 
 const GRAPH_LINE_MAX = 1000;                       // Maximum number of lines on graph    
 const IND_PLOT_MAX = 20000;                        // Manimum number of individuals plotted
 const MATRIX_PLOT_MAX = 40000;                     // The maximim number of nodes plotted
@@ -456,6 +458,9 @@ const data_invalid = "Data source is invalid";     // Invalid data source messag
 const dist_matrix_name = "D";                      // The name of a distance matrix
 const iden_matrix_name = "δ";                      // The name of identity matrix
 const iden_matrix_name2 = "\\delta";               // The name of identity matrix
+const density_name = "DEN";                        // The name of density vector
+const rdensity_name = "RDEN";                      // The name of the relative density vector
+const density_kernel_max = 4;                      // Sets the maximum radius when calculating density
 const RN_name = "RN";                              // The basic reproduction number function
 const RNE_name = "RNE";                            // The effective reproduction number function
 const RNC_name = "RNC";                            // The computational reproduction number function
@@ -468,6 +473,7 @@ const collist = [LGREEN,LRED,LBLUE,LPURPLE,LORANGE,LYELLOW,LBROWN,LGREY,GREEN,RE
 
 // List of colours used for lines
 const auto_color = [BLUE,RED,GREEN,DRED,PURPLE,ORANGE,BROWN,GREY,GREEN,DRED,DBLUE,DPURPLE,DORANGE,DBROWN,DGREY,LGREEN,LRED,LBLUE,LPURPLE,LORANGE,LBROWN,LGREY,DDGREEN,DDRED,DDBLUE,DDPURPLE,DDORANGE,DDBROWN,BLACK];
+const scat_color = [BLUE,RED,GREEN,DRED,PURPLE,ORANGE,BROWN,GREY,GREEN,DRED,DBLUE,DPURPLE,DORANGE,DBROWN,DGREY,LGREEN,LRED,LBLUE,LPURPLE,LORANGE,LBROWN,LGREY,DDGREEN,DDRED,DDBLUE,DDPURPLE,DDORANGE,DDBROWN,BLACK];
 
 // Colours for OK buttons
 const OK_butcol = "#444499", OK_butcol2 = "#333399";

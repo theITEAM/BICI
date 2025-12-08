@@ -8,8 +8,7 @@ function right_menu_buts(lay)
 
 	if(type != "Diagnostics" && inter.graph.init != true && inter.graph.init != "no data") return;
 
-	let dygap = 0.2;
-	
+	let dygap = 0;//0.2;
 	
 	let rpf; if(type != "GraphView") rpf = get_inf_res().plot_filter;
 
@@ -68,6 +67,8 @@ function right_menu_buts(lay)
 		
 	case "Individuals":
 		{
+			let inf_eff_pl = false;
+			
 			if(rpf.pos_indview.length > 1 && inter.graph.ind_sel == undefined){
 				y = add_filter("View",y,rpf.sel_indview,rpf.pos_indview,lay);
 				y += dygap;	
@@ -77,6 +78,7 @@ function right_menu_buts(lay)
 						y = add_filter("Graph",y,rpf.sel_indeffview,rpf.pos_indeffview,lay);
 						y += dygap;
 					}
+					inf_eff_pl = true;
 				}
 			}
 			
@@ -84,8 +86,13 @@ function right_menu_buts(lay)
 				y = add_filter("View",y,rpf.sel_ind_sel_view,rpf.pos_ind_sel_view,lay);
 				y += dygap;	
 			}
-			
-			y = stand_filt(y,rpf,lay);		
+	
+			if(inf_eff_pl){			
+				y = chain_sample_filt(y,rpf,lay);
+			}
+			else{
+				y = stand_filt(y,rpf,lay);		
+			}
 			
 			if(rpf.siminf == "inf" || rpf.siminf == "ppc"){ // Individual group filter
 				let p = model.get_p();
@@ -94,6 +101,12 @@ function right_menu_buts(lay)
 				if(rpf2.pos_indgroup.length > 1){
 					y = add_filter("Ind. Group",y,rpf2.sel_indgroup,rpf2.pos_indgroup,lay);
 				}
+				
+				if(rpf.sel_indview.te == "Timeline" || rpf.sel_indview.te == "Table"){
+					if(rpf2.pos_sort.length > 1){
+						y = add_filter("Sort",y,rpf2.sel_sort,rpf2.pos_sort,lay);
+					}
+				}
 			}
 	
 			if(false){
@@ -101,11 +114,24 @@ function right_menu_buts(lay)
 				lay.add_button({te:"Create SIRE", x:0.1, y:y, dx:dx, dy:dropdown_height, ac:"CreateSIRE", type:"SliceTime"}); y += 2;
 			}
 			
+			if(inf_eff_pl && rpf.sel_indeffview.te == "Scatter"){
+				let p = model.get_p();
+				let rpf2 = rpf.species[p];
+				y = add_colour_filter(y,rpf,rpf2.col_filt,lay);
+			}
+				
 			if(inter.graph.ind_sel){
 				y = additional_filt(y,rpf,lay);
 			}
 			else{
 				y = additional_filt(y,rpf,lay);
+			}
+			
+			if(inf_eff_pl && rpf.sel_indeffview.te == "Scatter"){
+				let p = model.get_p();
+				let rpf2 = rpf.species[p];
+				y = add_filter("X-axis",y,rpf2.sel_ie_xaxis,rpf2.pos_ie_axis,lay);
+				y = add_filter("Y-axis",y,rpf2.sel_ie_yaxis,rpf2.pos_ie_axis,lay);		
 			}
 		}
 		break;
@@ -324,7 +350,7 @@ function additional_filt(y,rpf,lay)
 		
 	lay.add_help_button(w+1.5,y+1.4,{title:"Filter", te:filter_text, back_col:WHITE});
 		
-	y += 1.5;
+	y += RIGHT_MENU_DY;
 	
 	return y;
 }
@@ -341,7 +367,33 @@ function add_filter(te,y,source,pos,lay)
 	
 	lay.add_dropdown(0.1,y,dx,10,source,pos);
 	
-	return y+2;
+	return y+RIGHT_MENU_DY;
+}
+
+
+/// Used to add a filter to the model
+function add_colour_filter(y,rpf,filter,lay)
+{
+	let dx = right_menu_width-1.6;
+
+	lay.add_button({te:"Colour:", x:0.1, y:y, dx:dx, dy:0.8, type:"InputBoxName"});
+	y += 0.9;
+	
+	let desc = "";
+	
+	let cs = filter.cla_split;
+	for(let k = 0; k < cs.length; k++){
+		let fi = cs[k];
+		if(fi.checkb.check == true){
+			if(desc != "") desc += ",";
+			desc += fi.name;
+		}
+	}
+	if(desc == "") desc = "None";
+
+	lay.add_button({te:desc, x:0.1, y:y, dx:dx, dy:dropdown_height, rpf:rpf, filter:filter, ac:"ColourFilt", type:"ColourFilt"});
+
+	return y+RIGHT_MENU_DY;
 }
 
 
@@ -359,7 +411,7 @@ function add_population_filter(te,y,desc,rpf,filter,num,lay)
 	let si = 1;
 	lay.add_button({x:0.1+dx+0.2, y:y+0.1, dx:si, dy:si, op:{p:filter.p, num:num, rpf:rpf}, ac:"RemoveFilter", type:"Delete"});
 	
-	return y+2;
+	return y+RIGHT_MENU_DY;
 }
 
 
@@ -372,7 +424,7 @@ function add_slice_time(te,rpf,y,lay)
 	
 	lay.add_button({te:rpf.slice_time, x:0.1, y:y, dx:dx, dy:dropdown_height, rpf:rpf, ac:"SliceTime", type:"SliceTime"});
 	
-	return y+2;
+	return y+RIGHT_MENU_DY;
 }
 
 
@@ -393,13 +445,30 @@ function rightbot_menu_buts(lay)
 		let rpf = gir.plot_filter;
 	
 		if(rpf){
-			if(rpf.sel_paramview && subsubtab_name() == "Parameters"){
-				let selpv = rpf.sel_paramview;
-			
-				if(selpv.te == "Scatter"){
-					tot_param_list("",rpf.yaxis_radio,lay);
-					return;
+			switch(subsubtab_name()){
+			case "Parameters":
+				{
+					let selpv = rpf.sel_paramview;
+					if(selpv && selpv.te == "Scatter"){
+						tot_param_list("",rpf.yaxis_radio,lay);
+						return;
+					}
 				}
+				break;
+				
+			/*
+			case "Individuals":
+				{
+					let sel_ind = rpf.sel_indeffview;
+					if(sel_ind && sel_ind.te == "Scatter"){
+						let p = model.get_p();
+						let seliev = rpf.sel_ie_view2[p]; 
+						param_list("",seliev.radio,seliev.list,lay);
+						return;
+					}
+				}
+				break;
+				*/
 			}
 		}
 	}
@@ -412,7 +481,9 @@ function rightbot_menu_buts(lay)
     let y = lay.dy-key.length*dy-4; 
 		if(y < 0) y = 0;
 		
-		for(let i = 0; i < key.length; i++){
+		let imax = key.length;
+		if(imax > KEY_MAX) imax = KEY_MAX;	
+		for(let i = 0; i < imax; i++){
 			let ke = key[i];
 			
 			switch(ke.type){
@@ -439,6 +510,10 @@ function rightbot_menu_buts(lay)
 			}
 			y += dy; 
 		}
+		
+		if(imax != key.length){
+			lay.add_button({te:"⋮", x:0, y:y, dx:lay.dx-0.8, dy:dy, type:"KeyNone"});
+		}			
 	}
 	
 	let mkey = inter.graph.colour_key;
@@ -514,8 +589,10 @@ function rightmid_menu_buts(lay)
 				
 				let seliev;
 				switch(rpf.sel_indeffview.te){
-				case "Scatter": seliev = rpf.sel_ie_data_view[p]; break;
-				case "Distribution": seliev = rpf.sel_ie_view[p]; break;
+				case "Pred. Acc.": seliev = rpf.sel_ie_data_view[p]; break;
+				case "Dist. (log)": seliev = rpf.sel_ie_view[p]; break;
+				case "Dist. (norm)": seliev = rpf.sel_ie_view[p]; break;
+				case "Scatter": seliev = rpf.sel_ie_view[p]; break;
 				default: error("Default option problem"); break;
 				}
 			

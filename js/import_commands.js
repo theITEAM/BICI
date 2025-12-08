@@ -1401,8 +1401,7 @@ function param_command2(full_name,per_start,per_end,op)
 	param_tag.push({val:reparam, tag:"reparam"});
 	param_tag.push({val:prior, tag:"prior"});
 	param_tag.push({val:prior_split, tag:"prior-split"});
-	//param_tag.push({val:dist_mat, tag:"distance-matrix"});
-
+	
 	for(let j = 0; j < param_tag.length; j++){
 		for(let i = j+1; i < param_tag.length; i++){
 			let ptvj = param_tag[j];
@@ -1420,6 +1419,11 @@ function param_command2(full_name,per_start,per_end,op)
 	
 	if(par.dist_mat){
 		alert_import("The distance matrix '"+dist_matrix_name+"' cannot be set"); 
+	}
+	
+	if(par.den_vec){
+		if(relative_den(par.name)) alert_import("The relative density vector '"+rdensity_name+"' cannot be set"); 
+		else alert_import("The density vector '"+density_name+"' cannot be set"); 
 	}
 	
 	if(par.iden_mat){
@@ -2490,7 +2494,8 @@ function inf_diagnostics_command()
 	
 	let chain = get_chain_value();
 	
-	inf_result.diagnostics[chain] = fi.te;
+	let te = fi.te.replace(/\r/g,"");
+	inf_result.diagnostics[chain] = te;
 	inf_result.prop_diag_on = true;
 }
 

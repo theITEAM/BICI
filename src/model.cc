@@ -40,7 +40,7 @@ void Model::add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv)
 		
 		hash_eqn.add(eqi.eq_ref,vec);
 	
-		Equation eq(eqi.te,eqi.type,eqi.p,eqi.cl,eqi.infection_trans,ti,eqi.line_num,species_simp,param,prior,derive,spline,param_vec,pop,hash_pop,constant,timepoint,details);
+		Equation eq(eqi.te,eqi.type,eqi.p,eqi.cl,eqi.infection_trans,ti,eqi.line_num,species_simp,param,prior,derive,spline,param_vec,density,pop,hash_pop,constant,timepoint,details);
 		
 		if(false && eq.warn != ""){ cout << eq.warn << endl; emsg_input("warning");}
 		
@@ -2171,50 +2171,51 @@ void Model::set_spec_precalc_time()
 			const auto &spl = spline[s];
 			
 			auto R = spl.param_ref.size();
-			
-			vector < vector <unsigned int> > ti_list;
-			ti_list.resize(R);
-			for(auto ti = 0u; ti < T; ti++){
-				ti_list[spl.div[ti].index].push_back(ti);
-			}
-			
-			if(false){
-				for(auto r = 0u; r < R; r++){
-					cout << r << ": ";
-					for(auto ti : ti_list[r]) cout << ti << ",";
-					cout << "r" << endl;
+			if(R > 0){
+				vector < vector <unsigned int> > ti_list;
+				ti_list.resize(R);
+				for(auto ti = 0u; ti < T; ti++){
+					ti_list[spl.div[ti].index].push_back(ti);
 				}
-			}
-			
-			for(auto r = 0u; r < R; r++){
-				auto ti_first = ti_list[r][0];
 				
-				for(auto i : list){
-					vector <unsigned int> ti_not_const;
-					for(auto ti : ti_list[r]){
-						if(precalc_init[i+ti] == UNSET) ti_not_const.push_back(ti);
+				if(false){
+					for(auto r = 0u; r < R; r++){
+						cout << r << ": ";
+						for(auto ti : ti_list[r]) cout << ti << ",";
+						cout << "r" << endl;
 					}
+				}
+				
+				for(auto r = 0u; r < R; r++){
+					auto ti_first = ti_list[r][0];
 					
-					if(ti_not_const.size() > 0){	
-						precalc_eqn.sp_add(spec_precalc_time[ti_first].spec_precalc,i,ti_not_const);
-					}
-					/*
-						auto &sp = spec_precalc_time[ti_first].spec_precalc;
-						
-						//auto k = hash_ti[ti_first].existing(ti_not_const);
-						//if(k == UNSET){
-							k = spec_precalc_time[ti_first].update.size();
-							hash_ti[ti_first].add(k, ti_not_const);
-							
-							SpecPrecalc up;
-							up.list_precalc_time = ti_not_const;
-							
-							spec_precalc_time[ti_first].update.push_back(up);
+					for(auto i : list){
+						vector <unsigned int> ti_not_const;
+						for(auto ti : ti_list[r]){
+							if(precalc_init[i+ti] == UNSET) ti_not_const.push_back(ti);
 						}
 						
-						spec_precalc_time[ti_first].update[k].list_precalc.push_back(i);
+						if(ti_not_const.size() > 0){	
+							precalc_eqn.sp_add(spec_precalc_time[ti_first].spec_precalc,i,ti_not_const);
+						}
+						/*
+							auto &sp = spec_precalc_time[ti_first].spec_precalc;
+							
+							//auto k = hash_ti[ti_first].existing(ti_not_const);
+							//if(k == UNSET){
+								k = spec_precalc_time[ti_first].update.size();
+								hash_ti[ti_first].add(k, ti_not_const);
+								
+								SpecPrecalc up;
+								up.list_precalc_time = ti_not_const;
+								
+								spec_precalc_time[ti_first].update.push_back(up);
+							}
+							
+							spec_precalc_time[ti_first].update[k].list_precalc.push_back(i);
+						}
+						*/
 					}
-					*/
 				}
 			}
 		}

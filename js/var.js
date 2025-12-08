@@ -79,6 +79,8 @@ let inter=                                         // Dynamic variables related 
 	
 	options:false,                                   // Determines if options on the start inference page are shown
 	
+	corner_but:false,                                // Determines if there is a corner button
+	
 	graph:undefined,                                 // Used to plot graphs
 	
 	comp_select:{list:[]},                           // Stores information about selected compartments

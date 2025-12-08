@@ -224,7 +224,7 @@ void Equation::calculate_linearise()
 	
 	simplify(linearise.no_pop_calc_store);
 	for(auto &ca : linearise.pop_grad_calc_store) simplify(ca);
-		
+	
 	if(false){
 		print_calculation();
 		cout << endl << "AFTER LINEARISE" << endl;
@@ -234,7 +234,7 @@ void Equation::calculate_linearise()
 		for(auto k = 0u; k < linearise.pop_grad_calc_store.size(); k++){
 			print_calc(pop[pop_ref[k]].name,linearise.pop_grad_calc_store[k]);	
 		}
-		emsg_input("Linear done");
+		//emsg_input("Linear done");
 	}
 	
 	get_pop_grad_calc_factorise();
@@ -246,6 +246,16 @@ void Equation::calculate_linearise()
 			if(ca.op == MULTIPLY && ca.item.size() == 0){
 				EqItem it; it.type = ONE; it.num = UNSET;
 				ca.item.push_back(it);
+			}
+		}
+	}
+	
+	if(false){
+		for(auto i = 0u; i < linearise.pop_grad_calc_store.size(); i++){
+			const auto &ca = linearise.pop_grad_calc_store[i];
+			if(ca.size() == 1 && ca[0].item.size() == 0){
+				//print_calculation();
+				emsg("Prob");
 			}
 		}
 	}
@@ -802,12 +812,15 @@ InfSourceSampler Equation::setup_source_sampler(unsigned int ti, const vector <d
 
 	const auto &precalc = param_val.precalc;
 
-	auto factor = 1.0;  emsg("fa");// calculate_mult(linearise.factor,ti,precalc);
+	auto factor = 1.0;  
+	//emsg("fa");// calculate_mult(linearise.factor,ti,precalc);
 	
 	auto val_sum = 0.0;
 	for(auto j = 0u; j < Npop; j++){
 		auto po = pop_ref[j];
-		auto val = popnum[po]*factor; emsg("H");// *calculate_mult(linearise.pop_grad_calc[j],ti,precalc);
+		auto val = popnum[po]*factor; 
+		
+		//emsg("H");// *calculate_mult(linearise.pop_grad_calc[j],ti,precalc);
 		
 		val_sum += val;
 		val_store.push_back(val);
@@ -890,54 +903,64 @@ void Equation::get_pop_grad_calc_factorise()
 		return;
 	}
 	
-	auto j = 0u;
-	while(j < pgc[0][pgc[0].size()-1].item.size()){
-		const auto &it_fi = pgc[0][pgc[0].size()-1].item[j];
-		
-		switch(it_fi.type){
-		case ONE: case ZERO: case REG_PRECALC: case REG_PRECALC_TIME: 
-		case NUMERIC: case TIME: case CONSTSPLINEREF: 
-			{
-				auto fl = false;
-				
-				vector <unsigned int> list;
-				for(auto i = 0u; i < pgc.size(); i++){
-					const auto &item = pgc[i][pgc[i].size()-1].item;
+	const auto &fir = pgc[0][pgc[0].size()-1];
+	
+	if(fir.op == MULTIPLY || (fir.op == ADD && fir.item.size() == 1)){
+		auto j = 0u;
+		while(j < fir.item.size()){
+			const auto &it_fi = fir.item[j];
+			
+			switch(it_fi.type){
+			case ONE: case ZERO: case REG_PRECALC: case REG_PRECALC_TIME: 
+			case NUMERIC: case TIME: case CONSTSPLINEREF: 
+				{
+					auto fl = false;
 					
-					unsigned int k;
-					for(k = 0; k < item.size(); k++){
-						const auto &it = item[k];
-						if(it_fi.type == it.type && it_fi.num == it.num){
-							list.push_back(k);
-							break;
-						}
-					}
-					if(k == item.size()){ fl = true; break;}
-				}
-				
-				if(fl == false){
-					fac_ca.item.push_back(it_fi);
+					vector <unsigned int> list;
 					for(auto i = 0u; i < pgc.size(); i++){
-						auto &ite = pgc[i][pgc[i].size()-1].item;
-						
-						auto k = list[i];
-						if(k >= ite.size()) emsg("wrong");
-						if(k+1 < ite.size()){
-							ite[k] = ite[ite.size()-1];
+						const auto &ca = pgc[i][pgc[i].size()-1];
+						if(ca.op == MULTIPLY || (ca.op == ADD && ca.item.size() == 1)){						
+							const auto &item = ca.item;
+							
+							unsigned int k;
+							for(k = 0; k < item.size(); k++){
+								const auto &it = item[k];
+								if(it_fi.type == it.type && it_fi.num == it.num){
+									list.push_back(k);
+									break;
+								}
+							}
+							if(k == item.size()){ fl = true; break;}
 						}
-						ite.pop_back();
+						else{
+							fl = true; break;
+						}
 					}
+					
+					if(fl == false){
+						fac_ca.item.push_back(it_fi);
+						for(auto i = 0u; i < pgc.size(); i++){
+							auto &ite = pgc[i][pgc[i].size()-1].item;
+							
+							auto k = list[i];
+							if(k >= ite.size()) emsg("wrong");
+							if(k+1 < ite.size()){
+								ite[k] = ite[ite.size()-1];
+							}
+							ite.pop_back();
+						}
+					}
+					else j++;
 				}
-				else j++;
-			}
-			break;
+				break;
 
-		default:
-			j++;
-			break;
+			default:
+				j++;
+				break;
+			}
 		}
 	}
-	
+		
 	if(fac_ca.item.size() == 0){
 		EqItem it; it.type = ONE; it.num = UNSET; fac_ca.item.push_back(it);
 	}
@@ -961,7 +984,7 @@ void Equation::get_pop_grad_calc_factorise()
 void Equation::set_precalc()
 {	
 	linearise.no_pop_precalc = get_precalc(linearise.no_pop_calc_store);
-	
+
 	for(auto i = 0u; i < linearise.pop_grad_calc_store.size(); i++){
 		linearise.pop_grad_precalc.push_back(get_precalc(linearise.pop_grad_calc_store[i]));
 	}
@@ -1001,7 +1024,9 @@ EqItem Equation::get_precalc(const vector <Calculation> &calc) const
 	const auto &ca = calc[0];
 	
 	if(ca.op != ADD && ca.op != MULTIPLY) emsg("precalc op");
-	if(ca.item.size() != 1) emsg("precalc item wrong");
+	if(ca.item.size() != 1){
+		emsg("precalc item wrong");
+	}
 	
 	const auto &it = ca.item[0];
 	switch(it.type){

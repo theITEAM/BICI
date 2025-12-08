@@ -96,7 +96,7 @@ function check_param_complete()
 	for(let th = 0; th < model.param.length; th++){
 		let par = model.param[th];
 		if(flag[th] != true && !is_in_obsmodel(par) && par.type != "derive_param"){
-			if(!par.dist_mat && !par.iden_mat){
+			if(!par.dist_mat && !par.iden_mat && !par.den_vec){
 				alert_noline("Parameter "+par.full_name+" is not specified as a 'param'");
 			}
 		}

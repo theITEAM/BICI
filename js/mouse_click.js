@@ -621,7 +621,7 @@ function button_action(bu,action_type)
 			if(pos.i != undefined) source.i = pos.i;
 			if(pos.p != undefined) source.p = pos.p;
 			if(pos.cl != undefined) source.cl = pos.cl;
-			if(pos.tr != undefined) source.tr = pos.cl;
+			if(pos.tr != undefined) source.tr = pos.tr;
 			if(pos.c != undefined) source.c = pos.c;
 			if(pos.param != undefined) source.param = pos.param;
 			if(pos.list != undefined) source.list = pos.list;
@@ -2300,6 +2300,11 @@ function button_action(bu,action_type)
 		inter.bubble.popfilt = {rpf:bu.rpf, filter:bu.filter};
 		break;
 		
+	case "ColourFilt":
+		select_bubble_over();
+		inter.bubble.colfilt = {rpf:bu.rpf, filter:bu.filter};
+		break;
+		
 	case "RemoveFilter":
 		{
 			let op = bu.op;
@@ -2309,6 +2314,11 @@ function button_action(bu,action_type)
 		
 	case "DoneFilter":
 		done_filter();
+		break;
+		
+	case "DoneColour":
+		inter.graph.init = undefined;
+		close_bubble();	
 		break;
 		
 	case "Slider":

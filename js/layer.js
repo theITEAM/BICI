@@ -1030,6 +1030,8 @@ class Layer
 	/// Add corner buttons
 	add_corner_button(arr,pos,op)
 	{
+		inter.corner_but = true;
+		
 		let gap = 0.8;
 		let cx = pos.x-arr.length*but_width- (arr.length-1)*gap-0.3, cy = pos.y-but_height-0.3;
 

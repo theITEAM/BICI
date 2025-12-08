@@ -1284,4 +1284,3 @@ void mvn_jeffreys_check()
 	cout << si << " " << si2 << " jj" << endl;
 }
 	
-	

@@ -79,21 +79,26 @@ function create_edit_param(lay)
 	
 	title += " for "+par.full_name;
 
-	if(is_symmetric(par)) title += " (variances on diagonal, otherwise correlations)";
-	
-	if(too_big) title = title.substr(5,1).toUpperCase()+title.substr(6)+" (too large to edit)";
-	
-	if(par.dist_mat) cy = lay.add_title("Distance matrix",cx,cy,{te:dist_mat_text});
-	else{
-		if(par.iden_mat) cy = lay.add_title("Identity matrix",cx,cy,{te:iden_mat_text});
-		else{
-			cy = lay.add_title(title,cx,cy,{te:help});
-		}
+	let fl = false;
+	if(par.dist_mat){ title = "Distance matrix"; help = dist_mat_text; fl = true;}
+	if(par.iden_mat){ title = "Identity matrix"; help = iden_mat_text; fl = true;}
+	if(par.den_vec){
+		if(relative_den(par.name)){ title = "Relative density vector"; help = rden_vec_text; fl = true;}
+		else{ title = "Density vector"; help = den_vec_text; fl = true;}
 	}
+	
+	if(is_symmetric(par)) title += " (variances on diagonal, otherwise correlations)";
+
+	if(too_big){
+		if(fl) title += " (too large to show all)";
+		else title += " (too large to edit)";
+	}
+	
+	cy = lay.add_title(title,cx,cy,{te:help});
 	
 	add_layer("CreateEditParamContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{type:lay.op.type});
 	
-	if(too_big == true || par.dist_mat || par.iden_mat){
+	if(too_big == true || par.dist_mat || par.iden_mat || par.den_vec){
 		lay.add_corner_button([["Back","Grey","CancelEditParam"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
 	else{
@@ -103,10 +108,18 @@ function create_edit_param(lay)
 	let x = 1.2, y = lay.dy-1.6;
 	let gap = 3.5;
 	
-	if(!par.dist_mat && !par.iden_mat){
+	if(!par.dist_mat && !par.iden_mat && !par.den_vec){
 		let w = model.add_object_button(lay,"Load",x,y,load_ac,{ back:WHITE, active:true, info:{}, title:load_title, te:load_te}); 
 		x += w+gap;
 	}
+}
+
+
+/// Determines if relative density
+function relative_den(name)
+{
+	if(begin_str(name,rdensity_name)) return true;
+	return false;
 }
 
 
@@ -154,7 +167,9 @@ function add_create_edit_param_buts(lay)
 	default: error(lay.op.type); error("option not recog"); break;
 	}
 	
-	if(eparam.too_big == true || par.dist_mat || par.iden_mat){ ele_type = "TooBigElement"; action = undefined;}
+	if(eparam.too_big == true || par.dist_mat || par.iden_mat || par.den_vec){ 
+		ele_type = "TooBigElement"; action = undefined;
+	}
 	
 	let value = eparam.value;
 	
@@ -597,6 +612,14 @@ function par_find_list(par,op)
 		for(let k = list_max; k < list[0].length; k++){
 			list[0][k] = undefined;
 			list[1][k] = undefined;
+		}		
+	}
+	
+	// In the case of the distance matrix truncates if too large
+	if(par.dist_mat || par.iden_mat || par.den_vec){
+		let list_max = ELEMENT_MAX;
+		for(let k = list_max; k < list[0].length; k++){
+			list[0][k] = undefined;
 		}		
 	}
 	

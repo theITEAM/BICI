@@ -250,7 +250,9 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 
 	Hash hash_eqn;
 	for(auto &der : model.derive){                       // Derived quantities
-		for(auto &eq : der.eq) model.add_eq_ref(eq,hash_eqn);
+		for(auto &eq : der.eq){
+			model.add_eq_ref(eq,hash_eqn);
+		}
 	}
 
 	auto dper = double(per_end-per_start)/model.species.size();

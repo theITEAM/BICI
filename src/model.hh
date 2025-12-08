@@ -58,6 +58,8 @@ class Model                                // Stores information about the model
 		
 		vector <Derive> derive;                // Derived quantities
 		  
+		vector <Density> density;              // Used for the DEN and RDEN functions 
+	
 		vector <Equation> eqn;                 // Stores all the equations for the species
 	
 		bool trans_tree;                       // Set if trans_tree exists in the model

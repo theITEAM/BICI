@@ -705,7 +705,13 @@ function display_constant(i,x,y,lay,w,allow_edit,source)
 		if(par.dist_mat) te = "Distance matrix"; 
 		else{
 			if(par.iden_mat) te = "Identity matrix"; 
-			else te += par.value_desc;
+			else{
+				if(par.den_vec){
+					if(relative_den(par.name)) te = "Relative density vector"; 
+					else te = "Density vector";
+				}					
+				else te += par.value_desc;
+			}
 		}
 	}
 	
@@ -826,9 +832,15 @@ function maximim_label_width()
 /// Adds a "View" button to allow for the data to be visualised
 function add_view_button(par,x,y,i,lay,source)
 {
+	if(par.den_vec){	
+		let pos_view = get_par_pos_view(par,source);
+		lay.add_button({te:"View", source:source, x:x, y:y+0.2, dx:3.5, dy:1.2, ac:"ViewParam", type:"GreyView", i:i, pos_view:pos_view});
+		return true;
+	}
+	
 	if(par.set == false) return false;
 		
-	if(!par.dist_mat && !par.iden_mat && (par.variety == "normal" || par.variety == "const")){
+	if(!par.dist_mat && !par.iden_mat && !par.den_vec && (par.variety == "normal" || par.variety == "const")){
 		let pos_view = get_par_pos_view(par,source);
 		if(pos_view.length > 0){
 			lay.add_button({te:"View", source:source, x:x, y:y+0.2, dx:3.5, dy:1.2, ac:"ViewParam", type:"GreyView", i:i, pos_view:pos_view});

@@ -312,11 +312,15 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	model.convert_fix_pr_const();      // Converts any fixed priors to constants
 	
+	print_diag("h1a");
+	
 	create_equations(30,60);           // Creates equation calculations
+
+	print_diag("h1b");
 
 	check_eqn_fixed_time();            // Checks when t=... are used in populations
 	
-	print_diag("h1a");
+	print_diag("h1c");
 
 	combine_populations();             // Combines together populations which appear together
 	
@@ -459,18 +463,31 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 
 	model.create_precalc_equation();    // Extracts precalculations (for non-population parts of equations)
 	
+	print_diag("h15a");
+	
 	linearise_eqn(75,85);               // Tries to linearise equations in terms of pops
 	//emsg("ll");
+	print_diag("h15b");
 	
 	model.create_precalc_pop_grad();    // Shifts calculations in pop_grad into precalc
 	
+	print_diag("h15c");
+	
 	linearise_precalc();                // References precalculation in linearisation
+	
+	print_diag("h15d");
 	
 	model.precalc_affect();             // Works out how precalculation is affected by changes in parameters
 	
+	print_diag("h15e");
+	
 	model.create_precalc_derive();      // Extracts precalculations for derived quantities
 	
+	print_diag("h15f");
+	
 	model.set_precalc_init();           // Sets the initial value for precalc
+	
+	print_diag("h15g");
 	
 	model.set_spec_precalc_time();      // Sets update for precalc at different times (for tv reparam)
 	
@@ -478,7 +495,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	model.set_spec_precalc_sample();    // Sets precalculation to be done after sampling 
 	
-	model.set_spec_precalc_all();       // Sets a;; precalculation to be done 
+	model.set_spec_precalc_all();       // Sets all precalculation to be done 
 	
 	//model.print_precalc();            // Outputs pre-calculation (for diagnostic purposes)
 	

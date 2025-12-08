@@ -237,7 +237,7 @@ void State::ensure_all_ind_event()
 
 
 /// Calcualtes derived quantities
-vector <DeriveOutput> State::derive_calculate()
+vector <DeriveOutput> State::derive_calculate(bool store_state)
 {
 	vector <DeriveOutput> output;
 	
@@ -256,33 +256,35 @@ vector <DeriveOutput> State::derive_calculate()
 	for(const auto &der : model.derive){
 		DeriveOutput op;
 		vector < vector <double> > d_value;
-		if(der.func.on){
-			auto value = calculate_df(der.func);
-			auto val_str = compact_vector(value);
-			op.value_str.push_back(val_str);
-			d_value.push_back(value);
-		}
-		else{
-			for(auto i = 0u; i < der.eq.size(); i++){
-				auto &eqn = model.eqn[der.eq[i].eq_ref];
-				vector <double> value;
-				
-				string val_str;
-				if(der.time_dep == false){
-					auto val = eqn.calculate_derive(UNSET,popnum_t,precalc,der_value);
-					val_str = tstr(val);
-					value.push_back(val);
-				}
-				else{
-					for(auto ti = 0u; ti < T; ti++){	
-						auto val = eqn.calculate_derive(ti,popnum_t,precalc,der_value);
+		if((store_state && der.time_dep) || (!store_state && !der.time_dep)){
+			if(der.func.on){
+				auto value = calculate_df(der.func);
+				auto val_str = compact_vector(value);
+				op.value_str.push_back(val_str);
+				d_value.push_back(value);
+			}
+			else{
+				for(auto i = 0u; i < der.eq.size(); i++){
+					auto &eqn = model.eqn[der.eq[i].eq_ref];
+					vector <double> value;
+					
+					string val_str;
+					if(der.time_dep == false){
+						auto val = eqn.calculate_derive(UNSET,popnum_t,precalc,der_value);
+						val_str = tstr(val);
 						value.push_back(val);
 					}
-					val_str = compact_vector(value);
+					else{
+						for(auto ti = 0u; ti < T; ti++){	
+							auto val = eqn.calculate_derive(ti,popnum_t,precalc,der_value);
+							value.push_back(val);
+						}
+						val_str = compact_vector(value);
+					}
+					d_value.push_back(value);
+					
+					op.value_str.push_back(val_str);
 				}
-				d_value.push_back(value);
-				
-				op.value_str.push_back(val_str);
 			}
 		}
 		
@@ -1382,7 +1384,6 @@ void State::resample_ind(bool if_wrong)
 				if(if_wrong == false || ssp.Li_obs_ind[i] < LI_WRONG/2) ind_list.push_back(i);
 			}
 			
-			//cout << ind_list.size() << "si\n";
 			if(ind_list.size() > 0){
 				IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,genetic_value.inf_node,precalc,popnum_t,if_wrong);
 
@@ -1466,7 +1467,7 @@ void State::resample_ind(bool if_wrong)
 
  
 /// Generates a particle from the state
-Particle State::generate_particle(unsigned int s, unsigned int chain, bool store_state)
+Particle State::generate_particle(unsigned int s, unsigned int chain, bool store_state, bool dir_fl)
 {
 	Particle part;
 	part.s = s; part.chain = chain;
@@ -1477,7 +1478,7 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 	
 	part.like = like;
 	
-	part.dir_out = derive_calculate();
+	if(dir_fl) part.dir_out = derive_calculate(store_state);
 	
 	for(auto p = 0u; p < species.size(); p++){
 		auto &ssp = species[p];

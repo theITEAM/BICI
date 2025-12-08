@@ -56,6 +56,8 @@ let map_store = [];                               // Stores annotation maps
 
 let child=[];
 
+let timer = new Timer();                          // Stores timers (for diagnostic purposes)
+	
 let run_chain = [];
 
 let fileReader = new FileReader();
@@ -63,6 +65,7 @@ let fileReader = new FileReader();
 onmessage = function(e) 
 {
 	if(false){ prr("Worker start"); prr(e.data);}
+	//prr("START"+e.data.type);
 
 	if(try_on){
 		try {
@@ -331,7 +334,7 @@ function process(e)
 		
 	case "Rename Index":
 		model.rename_index(info.index_new,info.p,info.cl,true);			
-		post({index_old:info.index_old, param:strip_heavy(model.param), species:strip_heavy(model.species)});
+		post({index_old:info.index_old, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
 		break;
 		
 	case "Rename Compartment":
@@ -466,6 +469,10 @@ function process(e)
 	case "View Param":
 		{	
 			let par = model.param[info.i];
+			
+			if(par.den_vec){ set_density(info,par,false); par.value = info.value;}
+			else info.value = par.value;
+			
 			let dim = get_dimensions(par.value);
 		
 			for(let i = 0; i < dim.length; i++){
@@ -474,7 +481,6 @@ function process(e)
 				}
 			}
 			
-			info.value = par.value;
 			post({ info:info});
 		}
 		break;
@@ -495,7 +501,12 @@ function process(e)
 					set_iden(info,par);
 				}
 				else{
-					if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
+					if(par.den_vec){
+						set_density(info,par);
+					}
+					else{
+						if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
+					}
 				}
 			}
 			

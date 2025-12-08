@@ -2361,6 +2361,8 @@ double StateSpecies::nm_single_obs_dprob(unsigned int cl, const Individual &ind)
 /// Used to sum up probability of an event
 double StateSpecies::sum_markov_prob(double t1, double t2, unsigned int c, unsigned int tr_gl, unsigned int i, vector < vector <double> > &en) const
 {
+	if(c == UNSET) return 0;
+	
 	auto tr_gl_cor = tr_gl;
 	if(c != UNSET){
 		if(sp.tra_gl[tr_gl_cor].i != c){

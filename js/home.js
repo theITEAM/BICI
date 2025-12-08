@@ -94,6 +94,7 @@ function add_examples_buts(lay)
 		ex_mod.push({mod:"M3.2", te:"Metapopulation model using geographical points",file:"EX_M3-2",mod_type:"POP", pic:"world"});
 		ex_mod.push({mod:"M3.3", te:"Metapopulation model using a distance kernel",file:"EX_M3-3",mod_type:"POP", pic:"uk"});
 		ex_mod.push({mod:"M3.4", te:"Farm-based model using a distance kernel",file:"EX_M3-4",mod_type:"IBM", pic:"farm"});
+		ex_mod.push({mod:"M3.5", te:"Farm-based model with density dependency",file:"EX_M3-5",mod_type:"IBM", pic:"farm2"});
 	
 		ex_mod.push({te:"M4) Ecological models",help:"Compartmental models are often applied to epidemiological applications, but they can equally be used in other settings. Here we look at some examples from ecology."+mod_mess});
 		ex_mod.push({mod:"M4.1", te:"Logistic growth population model",file:"EX_M4-1",mod_type:"IBM", pic:"carry"});

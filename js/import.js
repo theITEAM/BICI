@@ -72,6 +72,7 @@ function import_file(te,file,clear_results)
 
 	percent(0);
 
+	//te = te.replace(/\r/g,"");
 	te = remove_escape_char(te);
 	
 	let	lines = te.split('\n');
@@ -122,15 +123,17 @@ function load_local(data_file_list,per_start,per_end)
 /// Continues importing after all files have been loaded
 function import_file2(data_file_list)
 {
+	loading_mess("Processing...");
+	
 	let pro = imp.pro;
 	imp.data_file_list = data_file_list;
 	
 	model = new Model();	 
 	model.start_new();
 	
-	percent(30);
+	percent(0);
 	
-	let per_start = 30, per_end = 70, com_ti_sum = 0;
+	let per_start = 0, per_end = 70, com_ti_sum = 0;
 	let per = per_start;
 	for(let loop = 0; loop <= 4; loop++){ 
 		// Import happens in four stages:

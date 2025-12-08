@@ -1,0 +1,21 @@
+# Model F5: Spline reparameterisation
+
+## Objective
+- Provide an example of when splines are reparameterised.
+- In the special case in which the spline is square, values can depend on populations at the knot time points.
+- This is used here to incorporate the effect of disease transmission through marketplaces in a farm-based model.
+- Farms are represented as geographical points (either as compartments with *x* / *y* positions, or using longitudes and latitudes).
+- Each farm contains a single "individual" that is used to denote the disease status of that farm.
+
+
+## Model
+- A single individual-based species 'Farm' is created.
+- This contains classifications 'DS', which stands for 'disease status', and 'Location'.
+- 'DS' contains three compartments: susceptible farm $S$, infected farm $I$ and recovered farm $R$.
+- 'Location' contains 200 farm positions.
+- A transmission rate $β$ determines the rate at which susceptible farms become infected due to infection coming from markets.
+- Square spline $f_l(t)$ represent the disease risk of acquiring infection from one of the other farms which have been at market. It has knot times at daily intervals.
+- A recovery rate $γ$ determines how quickly farms recover.
+
+## Population
+- A single individual is added to each farm location. All farms are initially susceptible except for one infected.

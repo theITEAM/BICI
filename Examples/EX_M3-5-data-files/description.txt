@@ -1,0 +1,20 @@
+# Model 3.5: Farm-based model with density dependency
+
+## Objective
+- Introduce density dependency in farm-based models.
+- In these models farms are represented as geographical points (either as compartments with *x* / *y* positions, or using longitudes and latitudes).
+- Each farm contains a single "individual" that is used to denote the disease status of that farm.
+- A spatial kernel allows for spread of the disease between farms.
+- A density-dependent susceptibility is employed. This is implemented using the 'RDEN' vector, which given the relative density of farms (this has an average of one and is calculated using KDE with a radius of 30km). 
+
+## Model
+- A single individual-based species 'Farm' is created.
+- This contains classifications 'DS', which stands for 'disease status', and 'Location'.
+- 'DS' contains three compartments: susceptible farm $S$, infected farm $I$ and recovered farm $R$.
+- 'Location' contains 800 farm positions (a sub-sample of poultry farms across the UK).
+- A transmission rate $β$ determines the rate at which susceptible farms become infected due to surrounding infected farms.
+- A rate $η$ determines infections from outside the system. 
+- A recovery rate $γ$ determines how quickly farms recover.
+
+## Population
+- A single individual is added to each farm location. All farms are initially susceptible.

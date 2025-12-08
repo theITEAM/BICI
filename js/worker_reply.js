@@ -468,6 +468,8 @@ worker.onmessage = function (e)
 			break;
 			
 		default:
+			prr("ans");
+			prr(ans);
 			error("Option not recognisted2: "+ans.type);
 			break;
 		}

@@ -84,7 +84,7 @@ void ABC_SMC::run()
 				const auto &part = particle_store[p];
 				
 				auto param_val = model.get_param_val(part);
-				auto param_prop = param_val;  // Proposes a new parameter set using MVN kernal
+				auto param_prop = param_val;  // Proposes a new parameter set using MVN kernel
 				
 				auto ps_fac = prop.param_resample(param_prop,state.popnum_t);
 				if(ps_fac != UNSET){				// TO DO

@@ -195,7 +195,10 @@ function export_table(filename)
 	}
 
 	te = add_escape_char(te);
-
+	te = te.replace(/—/g,"-");
+	te = te.replace(/⟨/g,"<");
+	te = te.replace(/⟩/g,">");
+	
 	write_file_async(te,filename,"export");
 }
 

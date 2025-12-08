@@ -206,6 +206,11 @@ class Graph
 				if(da.ymin < ymin) ymin = da.ymin; if(da.ymax > ymax) ymax = da.ymax;
 				break;
 				
+			case "HErrorBar":
+				if(da.xmin < xmin) xmin = da.xmin; if(da.xmax > xmax) xmax = da.xmax;
+				if(da.y < ymin) ymin = da.y; if(da.y > ymax) ymax = da.y;
+				break;
+				
 			case "Matrix": case "MatrixAnim": case "Correlation":
 				xmin = 0; xmax = da.xlab.length;
 				ymin = 0; ymax = da.ylab.length;
@@ -256,6 +261,13 @@ class Graph
 						if(y > ymax) ymax = y;
 						if(y < ymin) ymin = y;
 					}
+				}
+				break;
+			
+			case "Point":
+				{
+					let x = da.x; if(x < xmin) xmin = x; if(x > xmax) xmax = x;
+					let y = da.y; if(y < ymin) ymin = y; if(y > ymax) ymax = y;
 				}
 				break;
 				
@@ -1124,14 +1136,17 @@ class Graph
 			case "Bar": this.draw_bar(x,y,dx,dy,ra,da); break;
 			case "SplineAnim": this.draw_splinebar(x,y,dx,dy,ra,da,li); break;
 			case "ErrorBar": this.draw_errorbar(x,y,dx,dy,ra,da); break;
+			case "HErrorBar": this.draw_hor_errorbar(x,y,dx,dy,ra,da); break;
 			case "Cross": this.draw_data_cross(x,y,dx,dy,ra,da); break;
 			case "Distribution": this.draw_distribution(x,y,dx,dy,ra,da); break;
 			case "VertLine": this.draw_vert_line(x,y,dx,dy,ra,da); break;
 			case "VertLine2": this.draw_vert_line2(x,y,dx,dy,ra,da); break;
 			case "VertDashLine": this.draw_vert_dash_line(x,y,dx,dy,ra,da); break;
 			case "Points": this.draw_point(x,y,dx,dy,ra,da); break;
+			case "Point": this.draw_single_point(x,y,dx,dy,ra,da); break;
 			case "SimX": this.draw_vert(x,y,dx,dy,ra,da); break;
 			case "SimY": this.draw_hor(x,y,dx,dy,ra,da); break;
+			case "Individual": break;
 			default: error("Option not recongnised: "+da.type); break;
 			}
 		}
@@ -1494,6 +1509,23 @@ class Graph
 	}
 	
 	
+	/// Draws single points
+	draw_single_point(x,y,dx,dy,ra,da)
+	{
+		cv.fillStyle = da.col;
+	
+		cv.beginPath();
+		let r = ro(0.1);
+		
+		let xp = ro(x+dx*((da.x-ra.xmin)/(ra.xmax-ra.xmin)));
+		let yp = ro(y+dy-dy*((da.y-ra.ymin)/(ra.ymax-ra.ymin)));
+			
+		cv.beginPath();
+		cv.arc(xp,yp,r,0,2*Math.PI);
+		cv.fill();
+	}
+	
+	
 	/// Draws a vertical line
 	draw_vert(x,y,dx,dy,ra,da)
 	{
@@ -1767,6 +1799,23 @@ class Graph
 		draw_line(xp-d,ymin,xp+d,ymin,da.col,thick);
 		draw_line(xp-d/2,yp,xp+d/2,yp,da.col,thick);
 		draw_line(xp-d,ymax,xp+d,ymax,da.col,thick);
+	}
+	
+	
+	/// Draws a horizontal errorbar 
+	draw_hor_errorbar(x,y,dx,dy,ra,da)
+	{
+		let d = 0.3;
+		let yp = y+dy-dy*((da.y-ra.ymin)/(ra.ymax-ra.ymin));
+		let xp = x+dx*((da.x-ra.xmin)/(ra.xmax-ra.xmin));
+		let xmin = x+dx*((da.xmin-ra.xmin)/(ra.xmax-ra.xmin));
+		let xmax = x+dx*((da.xmax-ra.xmin)/(ra.xmax-ra.xmin));
+
+		let thick = MEDIUMLINE;
+		draw_line(xmin,yp,xmax,yp,da.col,thick);
+		draw_line(xmin,yp-d,xmin,yp+d,da.col,thick);
+		draw_line(xp,yp-d/2,xp,yp+d/2,da.col,thick);
+		draw_line(xmax,yp-d,xmax,yp+d,da.col,thick);
 	}
 	
 	
@@ -2489,8 +2538,15 @@ class Graph
 		bubble_addtitle(cont,"Settings",{});
 		
 		if(subsubtab_name() == "Individuals"){
-			let seb = get_inf_res().plot_filter.scatter_settings.show_eb;
-			bubble_addcheckbox(cont,0,"Show error bars",seb);
+			let rpf = get_inf_res().plot_filter;
+			if(rpf.sel_indeffview.te == "Scatter"){
+				let seb = rpf.scatter_ie_settings.show_eb;
+				bubble_addcheckbox(cont,0,"Show error bars",seb);
+			}
+			else{
+				let seb = rpf.scatter_settings.show_eb;
+				bubble_addcheckbox(cont,0,"Show error bars",seb);
+			}
 		}
 		else{
 			let ds = get_inf_res().plot_filter.sim_val;	

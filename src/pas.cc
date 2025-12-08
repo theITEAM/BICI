@@ -257,7 +257,7 @@ void PAS::bootstrap()
 				if(from/num_per_core == mpi.core){ // Comes from the same core	
 					auto ch_from = from%num_per_core;
 
-					auto part = chain[ch_from].state.generate_particle(0,ch,true);
+					auto part = chain[ch_from].state.generate_particle(0,ch,true,false);
 					chain[ch].state.set_particle(part);
 				}
 				else{
@@ -274,7 +274,7 @@ void PAS::bootstrap()
 				if(from/num_per_core == mpi.core){     // Send
 #ifdef USE_MPI
 					auto ch_from = from%num_per_core;
-					auto part = chain[ch_from].state.generate_particle(0,ch,true);
+					auto part = chain[ch_from].state.generate_particle(0,ch,true,false);
 					mpi.send_particle(j/num_per_core,part);
 #else
 					emsg("Should be only one core");

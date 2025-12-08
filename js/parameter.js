@@ -1133,6 +1133,7 @@ function par_set_default(par)
 {
 	par.dist_mat = false;
 	par.iden_mat = false;
+	par.den_vec = false;
 	
 	if(par.dep.length == 0){
 		par.value = set_str;
@@ -1144,6 +1145,8 @@ function par_set_default(par)
 		}
 	}
 	else{
+		if(is_density_name(par.name)){ density_set_default(par); return;}
+		
 		if(par.name == dist_matrix_name){ dist_set_default(par); return;}
 		
 		if(par.name == iden_matrix_name || par.name == iden_matrix_name2){ iden_set_default(par); return;}
@@ -1168,13 +1171,27 @@ function par_set_default(par)
 function dist_set_default(par)
 {
 	par.list = par_find_list(par);
-	//par.value = [];
-	//par.prior_split = [];
 	if(par.prior_split) delete par.prior_split;
 	if(par.value) delete par.value;
 	par.prior_split_check = {check:false};
 	par.variety = "const";	
 	par.dist_mat = true;
+	par.iden_mat = false;
+	par.den_vec = false;
+	par.set = false;
+}
+
+
+/// Sets default values for distance matrix
+function density_set_default(par)
+{
+	par.list = par_find_list(par);
+	if(par.prior_split) delete par.prior_split;
+	if(par.value) delete par.value;
+	par.prior_split_check = {check:false};
+	par.variety = "const";	
+	par.den_vec = true;
+	par.dist_mat = false;
 	par.iden_mat = false;
 	par.set = false;
 }
@@ -1192,6 +1209,7 @@ function iden_set_default(par)
 	par.variety = "const";
 	par.dist_mat = false;	
 	par.iden_mat = true;
+	par.den_vec = false;
 	par.set = false;
 }
 
@@ -1213,7 +1231,7 @@ function reparam_eqn_set_default(par)
 /// Sets default values for tensor
 function set_default_value(par)
 {
-	if(par.dist_mat || par.iden_mat) return;
+	if(par.dist_mat || par.iden_mat || par.den_vec) return;
 	
 	let value = par.value;
 	let dim = get_dimensions(value);
@@ -1258,11 +1276,14 @@ function copy_param_info(par,old)
 	par.reparam_eqn = old.reparam_eqn;
 	par.dist_mat = false;
 	par.iden_mat = false;
+	par.den_vec = false;
 	par.factor = old.factor;
 	par.factor_weight_on = old.factor_weight_on;
 	
 	par.pri_pos = set_pri_pos(par.type,par.factor);
 	
+	if(is_density_name(par.name)){ density_set_default(par); return par;}
+		
 	if(par.name == dist_matrix_name){ dist_set_default(par); return par;}
 	
 	if(par.name == iden_matrix_name || par.name == iden_matrix_name2){ iden_set_default(par); return par;}
@@ -1386,6 +1407,15 @@ function copy_param_info(par,old)
 	}
 	
 	return par;
+}
+
+
+/// Determines if the parameter is a density
+function is_density_name(name)
+{
+	let spl = name.split("^");
+	if(spl[0] == density_name || spl[0] == rdensity_name) return true;
+	return false;
 }
 
 
@@ -1733,15 +1763,11 @@ function set_dist(info,par)
 				lng.push(p.lng*Math.PI/180);
 			}
 		
-			let r = 6371;
-
 			for(let j = 0; j < N; j++){
 				for(let i = j; i < N; i++){
 					if(i == j) value[j][i] = 0;
 					else{
-						let si = Math.sin(0.5*(lat[j]-lat[i]));
-						let si2 = Math.sin(0.5*(lng[j]-lng[i]))
-						value[j][i] = precision(2*r*Math.asin(Math.sqrt(si*si + Math.cos(lat[i])*Math.cos(lat[j])*si2*si2)),5);
+						value[j][i] = precision(geo_dist(lat[i],lng[i],lat[j],lng[j]),5);
 					}
 					
 					value[i][j] = value[j][i];
@@ -1759,8 +1785,18 @@ function set_dist(info,par)
 	}
 	info.shrunk = shrunk;
 }
-	
-	
+
+
+/// Calculates geographical distance	
+function geo_dist(lat1,lng1,lat2,lng2)
+{
+	let r = 6371;
+	let si = Math.sin(0.5*(lat2-lat1));
+	let si2 = Math.sin(0.5*(lng2-lng1))
+	return 2*r*Math.asin(Math.sqrt(si*si + Math.cos(lat1)*Math.cos(lat2)*si2*si2));
+}
+
+
 /// If any parameters are called "D" then put values for the distance matrix into them
 function set_iden(info,par)
 {
@@ -1801,6 +1837,238 @@ function set_iden(info,par)
 	info.shrunk = shrunk;
 }
 	
+
+/// If any parameters are called "DEN" then put values for the density vector into them
+function set_density(info,par,limit_on)
+{
+	let spl = par.name.split("^");
+	let kernel_r = Number(spl[1]);
+	
+	let claa = get_cla_from_index(model,par.dep[0]);
+	if(claa == undefined){ error("Classification is undefined"); return;}
+	
+	let N = claa.comp.length;
+	let N_tot = N;
+	
+	/*
+	// Works out if we need to calculate the full matrix
+	if(N > ELEMENT_MAX && limit_on != false){
+		N = ELEMENT_MAX;
+		info.too_big = true;
+	}
+	*/
+	
+	let li=[];
+	for(let i = 0; i < N; i++){
+		li.push(claa.comp[i].name);
+	}
+	
+	info.list=[];
+	info.list[0] = li;
+	
+	let value = [];
+				
+	switch(claa.camera.coord){
+	case "cartesian":
+		{
+			let px=[], py=[];
+	
+			let xmin = LARGE, xmax = -LARGE, ymin = LARGE, ymax = -LARGE;
+		
+			for(let i = 0; i < N_tot; i++){
+				let x = claa.comp[i].x;
+				let y = claa.comp[i].y;
+				
+				px.push(x);
+				py.push(y);
+				
+				if(x > xmax) xmax = x;
+				if(x < xmin) xmin = x;
+				if(y > ymax) ymax = y;
+				if(y < ymin) ymin = y;
+			}
+		
+			let xdist = xmax-xmin;
+			let ydist = ymax-ymin;
+			
+			let LX = Math.floor(xdist/kernel_r); if(LX > 100) LX = 100;
+			let LY = Math.floor(ydist/kernel_r); if(LY > 100) LY = 100;
+			
+			let dx = xdist/(LX*ALMOST_ONE);
+			let dy = ydist/(LY*ALMOST_ONE);
+			
+			let grid=[];
+			for(let j = 0; j < LY; j++){
+				grid[j]=[];
+				for(let i = 0; i < LX; i++){
+					grid[j][i]=[];
+				}
+			}
+			
+			for(let k = 0; k < N_tot; k++){
+				let i = Math.floor((px[k]-xmin)/dx); if(i < 0 || i >= LX) error("Out of range");
+				let j = Math.floor((py[k]-ymin)/dy); if(j < 0 || j >= LY) error("Out of range");
+				grid[j][i].push(k);
+			}
+
+			for(let k = 0; k < N; k++){
+				let imid = Math.floor((px[k]-xmin)/dx); if(imid < 0 || imid >= LX) error("Out of range");
+				let jmid = Math.floor((py[k]-ymin)/dy); if(jmid < 0 || jmid >= LY) error("Out of range");
+		
+				let sum = 0.0;
+				for(let j = jmid-density_kernel_max; j <= jmid+density_kernel_max; j++){
+					if(j >= 0 && j < LY){
+						for(let i = imid-density_kernel_max; i <= imid+density_kernel_max; i++){
+							if(i >= 0 && i < LX){
+								for(let m = 0; m < grid[j][i].length; m++){
+									let kk = grid[j][i][m];
+									let ddx = px[kk]-px[k];
+									let ddy = py[kk]-py[k];
+									let dd = ddx*ddx + ddy*ddy;
+						
+									let dd_sc = dd/(kernel_r*kernel_r);
+									if(dd_sc < density_kernel_max*density_kernel_max){
+										sum += Math.exp(-0.5*dd_sc);
+									}
+								}
+							}
+						}		
+					}
+				}
+				value[k] = sum/(2*Math.PI*kernel_r*kernel_r);
+			
+				if(false){  // Used for checking
+					let sum_ch = 0.0;
+					for(let i = 0; i < N_tot; i++){	
+						let ddx = px[i]-px[k];
+						let ddy = py[i]-py[k];
+						let dd = ddx*ddx + ddy*ddy;
+			
+						let dd_sc = dd/(kernel_r*kernel_r);
+						if(dd_sc < density_kernel_max*density_kernel_max){
+							sum_ch += Math.exp(-0.5*dd_sc);
+						}
+					}
+					
+					if(dif(sum,sum_ch)) error("Sum not agree");
+				}
+			}
+		}
+		break;
+		
+	case "latlng":
+		{
+			let lat=[], lng=[];
+			
+			let lat_min = LARGE, lat_max = -LARGE, lng_min = LARGE, lng_max = -LARGE;
+			
+			for(let i = 0; i < N_tot; i++){
+				let co = claa.comp[i];
+				
+				let x, y;
+				if(co.type == "boundary"){ x = co.xmid; y = co.ymid;}
+				else{ x = co.x; y = co.y;}
+				
+				let p = transform_latlng_inv(x,y);
+				
+				let la = p.lat*Math.PI/180;
+				let ln = p.lng*Math.PI/180;
+				
+				lat.push(la);
+				lng.push(ln);
+				
+				if(la > lat_max) lat_max = la;
+				if(la < lat_min) lat_min = la;
+				if(ln > lng_max) lng_max = ln;
+				if(ln < lng_min) lng_min = ln;
+			}
+		
+			let lat_far = lat_max; if(lat_min*lat_min > lat_max*lat_max) lat_far = lat_min;
+			
+			let lng_dist = geo_dist(lat_far,lng_min,lat_far,lng_max);
+			let lat_dist = geo_dist(lat_min,lng_max,lat_max,lng_max);
+			
+			let LX = Math.floor(lng_dist/kernel_r); if(LX > 100) LX = 100;
+			let LY = Math.floor(lat_dist/kernel_r); if(LY > 100) LY = 100;
+			
+			let dlng = (lng_max-lng_min)/(LX*ALMOST_ONE);
+			let dlat = (lat_max-lat_min)/(LY*ALMOST_ONE);
+			
+			let grid=[];
+			for(let j = 0; j < LY; j++){
+				grid[j]=[];
+				for(let i = 0; i < LX; i++){
+					grid[j][i]=[];
+				}
+			}
+			
+			for(let k = 0; k < N_tot; k++){
+				let i = Math.floor((lng[k]-lng_min)/dlng); if(i < 0 || i >= LX) error("Out of range");
+				let j = Math.floor((lat[k]-lat_min)/dlat); if(j < 0 || j >= LY) error("Out of range");
+				grid[j][i].push(k);
+			}
+
+			for(let k = 0; k < N; k++){
+				let imid = Math.floor((lng[k]-lng_min)/dlng); if(imid < 0 || imid >= LX) error("Out of range");
+				let jmid = Math.floor((lat[k]-lat_min)/dlat); if(jmid < 0 || jmid >= LY) error("Out of range");
+		
+				let sum = 0.0;
+				for(let j = jmid-density_kernel_max; j <= jmid+density_kernel_max; j++){
+					if(j >= 0 && j < LY){
+						for(let i = imid-density_kernel_max; i <= imid+density_kernel_max; i++){
+							if(i >= 0 && i < LX){
+								for(let m = 0; m < grid[j][i].length; m++){
+									let kk = grid[j][i][m];
+									let d = geo_dist(lat[kk],lng[kk],lat[k],lng[k]);
+						
+									let d_sc = d/kernel_r;
+									if(d_sc < density_kernel_max){
+										sum += Math.exp(-0.5*d_sc*d_sc);
+									}
+								}
+							}
+						}		
+					}
+				}
+				value[k] = sum/(2*Math.PI*kernel_r*kernel_r);
+			
+				if(false){  // Used for checking
+					let sum_ch = 0.0;
+					for(let i = 0; i < N_tot; i++){
+						let d = geo_dist(lat[i],lng[i],lat[k],lng[k]);
+						
+						let d_sc = d/kernel_r;
+						if(d_sc < density_kernel_max){
+							sum_ch += Math.exp(-0.5*d_sc*d_sc);
+						}
+					}
+					
+					if(dif(sum,sum_ch)) error("Sum not agree");
+				}
+			}
+		}
+		break;
+	}
+	
+	if(relative_den(par.name)){ // Converts to the relative density 
+		let sum = 0.0;
+		for(let k = 0; k < N; k++) sum += value[k];
+		sum /= N;
+		for(let k = 0; k < N; k++) value[k] /= sum;
+	}
+	
+	// Sets to a certain precision
+	for(let k = 0; k < N; k++) value[k] = precision(value[k],5);
+		
+	info.value = value;
+	let shrunk=[];
+	for(let d = 0; d < par.dep.length; d++){
+		if(info.list.length < par.list[d].length) shrunk[d] = true;
+		else shrunk[d] = false;
+	}
+	info.shrunk = shrunk;
+}
+
 
 /// Finds a list of all the equations in the model
 function find_equation_list(all_param)
@@ -2113,6 +2381,7 @@ function param_blank(par)
 function param_num_element(par)
 {
 	let num = 1; 
+	if(par.dep.length == 0) return num;
 	for(let i = 0; i < par.list.length; i++){
 		num *= par.list[i].length;
 	}

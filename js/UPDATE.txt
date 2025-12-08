@@ -1,0 +1,27 @@
+JAMIE
+- You were asking about whether the same table can be used to store all the information about individuals. So the "cols" tag can be used for this. This overrides what is expected for column headings. E.g.
+
+add-ind-inf name="Added individuals" file="file.csv" cols="ID,tstart,DSstart"
+comp-data name="Compartmental data" class="DS" file="file.csv" cols="ID,tcomp,DScomp"
+
+Let me know if this doesn't work (I seemed to remember you had a problem with this feature, but can't remember what).
+ 
+GRANT
+- Improved speed for loading up large integrals.
+- Sorted out problem with PH.bici
+- Sorted out problem with HPAI_SML.bici
+- The new function RDEN and DEN have been added to calculate density using KDE (see manual). I've added example M3.5 to the examples.
+
+
+CHRIS
+- Improved speed when dealing with complex derived quantities.
+- Corrected bug in interface related to param_factor.
+- Corrected bug which allows for format "2\int dt({I})".
+- Added extra information in individual tables.
+- Helped to improve speed of interface when loading up Fishboost model.
+- Allow for sorting by individual effect size.
+- Added some new visualisations for individual effects (in particular looking at correlations between individual effects and allow the user to colourise scatter plots).
+- A few bugs in interface corrected (e.g. bottom right hand corner overlapping right hand menu).
+- Corrected problem with expected transition number (in diagnostics).
+- Updates to the manual and help information in interface.
+

@@ -290,7 +290,7 @@ struct SwapTemp {                  // Constructs a swap template
 	unsigned int num;                // Number to substitute
 };
 
-struct SwapResult {                // Stores the result of doing a substitution of indeces for values
+struct SwapResult {                // Stores the result of doing a substitution of indices for values
 	string warn;                     // Stores the warning message
 	vector <bool> done;              // Registers true if a swap has been performed
 	vector <SwapTemp> swap_temp;     // The template for swapping
@@ -1166,6 +1166,14 @@ struct IndData {                   // Stores data on individuals
 struct WarnData {                  // Stores warning messages
 	string te;                       // The text for the warning
 	unsigned int line_num;           // The line number in the input file
+};
+
+struct Density {                   // Used for the DEN and RDEN functions 
+	unsigned int p;                  // The species number
+	unsigned int cl;                 // The classification number
+	double r;                        // The radius for KDE
+	bool rel_den;                    // Determines if the relative density
+	vector <double> value;           // The density value
 };
 
 struct SpeciesSimp {               // A simplified version of species to pass to equation

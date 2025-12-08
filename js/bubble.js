@@ -211,6 +211,22 @@ function add_bubble_buts(lay)
 			add_end_button(cont,"Done","DoneFilter",{});	
 		}
 		break;
+	
+	case "ColourFilt":
+		{
+			cont.dx = 9;
+			bubble_addtitle(cont,"Colourise",{te:colour_split_text});
+			
+			let filt = bub.colfilt;
+			let cla_split = filt.filter.cla_split;
+	
+			for(let cl = 0; cl < cla_split.length; cl++){
+				bubble_addcheckbox(cont,0,cla_split[cl].name,cla_split[cl].checkb);
+			}
+			
+			add_end_button(cont,"Done","DoneColour",{});	
+		}
+		break;
 		
 	case "MatrixEleBut":	
 		{
@@ -1363,7 +1379,7 @@ function select_bubble_but_prop(lay_name,type,info,value,op)
 		}
 	}
 	
-	error("Could not find");
+	error("Could not find1");
 }
 
 
@@ -1381,7 +1397,7 @@ function press_bubble_OK()
 		}
 	}
 	
-	error("Could not find");
+	error("Could not find2");
 }
 
 

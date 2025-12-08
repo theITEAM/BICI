@@ -129,7 +129,7 @@ class Equation                             // Stores information about an equati
 		
 		Linearise linearise;                   // Used for accelerated likelihood calculation
 		
-		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details);
+		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details);
 		
 		void print_calculation() const;
 		void print_item(const EqItem &it) const;
@@ -156,6 +156,7 @@ class Equation                             // Stores information about an equati
 		vector <unsigned int> get_all_comp(unsigned int p, string te);
 		double get_float(unsigned int i, unsigned int &raend) const;
 		ParamRef get_param_name(unsigned int i, double &dist, unsigned int &raend);
+		bool is_density_name(string name) const;
 		DeriveRef get_derive_name(unsigned int i, unsigned int &raend);
 		PopTimeRef get_pop(unsigned int i, unsigned int &raend);
 		unsigned int get_ie(unsigned int i, unsigned int &raend);
@@ -194,8 +195,11 @@ class Equation                             // Stores information about an equati
 		unsigned int mult_const(EqItem item1, EqItem item2);
 		void set_time_vari();
 		double find_dist(unsigned int c, unsigned int cc, const vector <Compartment> &comp, Coord coord) const;
+		double geo_dist(double lat1, double lng1, double lat2, double lng2) const;
 		double get_distance(const ParamProp &pp);
 		double get_identity(const ParamProp &pp);
+		vector <double> set_density(unsigned int p, unsigned int cl, double r, bool rel_den) const;
+		double get_density(const ParamProp &pp);
 		string op_name(EqItemType type) const;
 		void check_repeated_operator(const vector <EqItem> &op);
 		void time_integral(vector <EqItem> &op);
@@ -209,6 +213,7 @@ class Equation                             // Stores information about an equati
 		const vector <Derive> &derive;       // Reference derived quantities in the model
 		const vector <Spline> &spline;             // References splines from the model
 		const vector <ParamVecEle> &param_vec;     // References the param_vec from the model
+		vector <Density> &density;           // Used for the DEN and RDEN functions 
 		vector <Population> &pop;            // References the populations from the model
 		Hash &hash_pop;                      // Hash table for pop
 		Constant &constant;                  // Stores constants in the model

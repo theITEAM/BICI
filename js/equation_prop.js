@@ -866,6 +866,23 @@ function check_parameter(te,icur,eqn)
 	
 	set_indep_index(dep,dep_used);
 
+	if(is_density_name(name)){
+		let ty = "density";
+		if(relative_den(name)) ty = "relative density";
+		if(dep.length != 1){
+			eqn.warn.push({te:"The "+ty+" vector '"+name+"' must have one index", cur:icur, len:name.length});
+		}
+		
+		let spl = name.split("^");
+		if(spl.length != 2){
+			eqn.warn.push({te:"'"+name+"' should be in the format '"+spl[0]+"^d' where 'd' is the radius used for KDE.", cur:icur, len:name.length});
+		}
+	
+		if(isNaN(spl[1]) || Number(spl[1]) <= 0){
+			eqn.warn.push({te:"The KDE radius '"+spl[1]+"' must be a positive number", cur:icur, len:name.length});
+		}
+	}
+	
 	if(name == dist_matrix_name || name == iden_matrix_name || name == iden_matrix_name2){
 		let ty = "distance";
 		if(name != dist_matrix_name) ty = "identity";

@@ -77,8 +77,8 @@ void emsg(const string &msg)
 	
 	cout << endl;
 	
-	display_error(msg,true);
-	if(false) raise(SIGABRT);
+	display_error(msg,true); 
+ 	if(false) raise(SIGABRT);
 	
 #ifdef USE_MPI
 	//MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
@@ -1620,22 +1620,35 @@ bool difi(const vector < vector <unsigned int> > &a, const vector < vector <unsi
 	return false;
 }
 
-
 /// Replaces one substring with another
 string replace(string st, string st1, string st2)
 {
 	if(st.length() < st1.length()) return st;
 	
+	string st_new = "";
+	
+	auto fl = false;
+	auto i_start = 0u;
 	auto i = 0u;
 	while(i <= st.length()-st1.length()){
 		if(st.substr(i,st1.length()) == st1){
-			st = st.substr(0,i)+st2+st.substr(i+st1.length());
-			i += st2.length();
+			if(i != i_start) st_new += st.substr(i_start,i-i_start);
+			st_new += st2;
+			i += st1.length();
+			i_start = i;
+			fl = true;
 		}
 		else i++;
 	}
-	return st;
+
+	if(!fl) return st;
+	
+	auto len = st.length();
+	st_new += st.substr(i_start,len-i_start);
+		
+	return st_new;
 }
+
 
 /// Replaces any tab characters with spaces
 void remove_tab(string &st)

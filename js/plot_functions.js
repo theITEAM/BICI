@@ -1280,7 +1280,7 @@ function text_convert_annotation(te,si,lh,dx,align,col)
 			}					
 		}
 	}
-	
+
 	let para = te.split("\n");
 	
 	let word=[];
@@ -1358,7 +1358,7 @@ function text_convert_annotation(te,si,lh,dx,align,col)
 				wo.push({ te:te2, space:space, col:col, bo_flag:bo_flag, it_flag:it_flag, eq_flag:eq_flag});	
 			}
 		}	
-		
+
 		let contain_word = false;
 		for(let j = 0; j < wo.length; j++){
 			let wor = wo[j];

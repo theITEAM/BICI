@@ -1,4 +1,4 @@
-﻿/// Stores constant values used and enumerated types
+/// Stores constant values used and enumerated types
 
 #pragma once
 
@@ -26,7 +26,7 @@ const string default_file = "Execute/init.bici";     // This is used for windows
 
 #define USE_MPI                                    // Sets if code can run in parallel
 
-const string bici_version = "v0.78";                 // Sets the BICI version
+const string bici_version = "v0.79";                 // Sets the BICI version
 
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
 const bool testing = true;                           // Set to true for additional testing
@@ -169,15 +169,15 @@ enum PropType { PARAM_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT_PROP, IND_EVENT
 enum AnnealType { ANNEAL_NONE, ANNEAL_SCAN, ANNEAL_POWERAUTO, ANNEAL_LOGAUTO, ANNEAL_POWER };
 
 // Different state timers
-enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER, DERIVE_TIMER,DERIVE_PRECALC_TIMER, SIM_CALC_POPNUM, SIM_PRECALC, SIM_POPIND, SIM_UPDATE, SIM_CHECK, TIMER_MAX };
+enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER, DERIVE_TIMER,DERIVE_PRECALC_TIMER, SIM_CALC_POPNUM, SIM_PRECALC, SIM_POPIND, SIM_UPDATE, SIM_CHECK,  TIMER_MAX };
 
 // Different output timers
 enum OutTimer { PARAM_OUTPUT, STATE_OUTPUT, OUTTIMER_MAX };
 
 // Different check timers 
-enum CheckTimer { CHECK_TRANS_NUM, CHECK_DEP_PARAM, CHECK_REF, CHECK_MARKOV, CHECK_NM, CHECK_LIKE, CHECK_SPLINE, CHECK_PRIOR, CHECK_POP, CHECK_POP2, CHECK_CPOP, CHECK_IE, CHECK_POP_LIKE, CHECK_MAPS, CHECK_EV_OBS, CHECK_OBS_LIKE, CHECK_IC, CHECK_LIN, CHECK_GEN,CHECK_POP_IND, CHECK_ADD_REM, CHECK_RANGE, CHECK_SIMP, CHECK_POP_IND_GENTIC, CHECK_MAX};
+enum CheckTimer { CHECK_TRANS_NUM, CHECK_DEP_PARAM, CHECK_REF, CHECK_MARKOV, CHECK_NM, CHECK_LIKE, CHECK_SPLINE, CHECK_PRIOR, CHECK_POP, CHECK_POP2, CHECK_CPOP, CHECK_IE, CHECK_POP_LIKE, CHECK_MAPS, CHECK_EV_OBS, CHECK_OBS_LIKE, CHECK_IC, CHECK_LIN, CHECK_GEN,CHECK_POP_IND, CHECK_ADD_REM, CHECK_RANGE, CHECK_SIMP, CHECK_POP_IND_GENTIC, CHECK_PRECALC, CHECK_FINAL_LI_WRONG, CHECK_PARA_SPEEDUP, CHECK_MARKOV_DIV, CHECK_MARKOV_VALUE_DIF, CHECK_PRECALC_DIF,CHECK_MAX};
 
-const vector <string> check_name = { "CHECK_TRANS_NUM", "CHECK_DEP_PARAM", "CHECK_REF", "CHECK_MARKOV", "CHECK_NM", "CHECK_LIKE", "CHECK_SPLINE", "CHECK_PRIOR", "CHECK_POP", "CHECK_POP2", "CHECK_CPOP", "CHECK_IE", "CHECK_POP_LIKE", "CHECK_MAPS", "CHECK_EV_OBS", "CHECK_OBS_LIKE", "CHECK_IC", "CHECK_LIN", "CHECK_GEN", "CHECK_POP_IND", "CHECK_ADD_REM", "CHECK_RANGE", "CHECK_SIMP", "CHECK_POP_IND_GENTIC", "CHECK_MAX"};
+const vector <string> check_name = { "CHECK_TRANS_NUM", "CHECK_DEP_PARAM", "CHECK_REF", "CHECK_MARKOV", "CHECK_NM", "CHECK_LIKE", "CHECK_SPLINE", "CHECK_PRIOR", "CHECK_POP", "CHECK_POP2", "CHECK_CPOP", "CHECK_IE", "CHECK_POP_LIKE", "CHECK_MAPS", "CHECK_EV_OBS", "CHECK_OBS_LIKE", "CHECK_IC", "CHECK_LIN", "CHECK_GEN", "CHECK_POP_IND", "CHECK_ADD_REM", "CHECK_RANGE", "CHECK_SIMP", "CHECK_POP_IND_GENTIC", "CHECK_PRECALC", "CHECK_FINAL_LI_WRONG", "CHECK_PARA_SPEEDUP", "CHECK_MARKOV_DIV", "CHECK_MARKOV_VALUE_DIF", "CHECK_PRECALC_DIF", "CHECK_MAX"};
 
 // Different proposal timers
 enum PropTimer { PROP_TIMER, PARAM_RESAMPLE_TIMER, PROPTIMER_MAX };
@@ -468,6 +468,9 @@ const string endli = "\n";
 const string dist_matrix_name = "D";              // The name of a distance matrix
 const string iden_matrix_name = "δ";              // The name of identity matrix
 const string iden_matrix_name2 = "\\delta";       // The name of identity matrix
+const string density_name = "DEN";                // The name of density vector
+const string rdensity_name = "RDEN";              // The name of the relative density vector
+const auto density_kernel_max = 4u;               // Sets the maximum radius when calculating density
 const string RN_name = "RN";                      // The name of rep. number function
 const string RNE_name = "RNE";                    // The effective rep number function
 const string RNC_name = "RNC";                    // The computational rep number function

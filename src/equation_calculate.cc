@@ -142,7 +142,6 @@ double Equation::calculate_derive(unsigned int ti, const vector < vector <double
 		const auto N = item.size();
 		
 		vector <double> num(N);
-		
 		for(auto j = 0u; j < N; j++){
 			const auto &it = item[j];
 			

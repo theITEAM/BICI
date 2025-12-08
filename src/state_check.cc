@@ -174,6 +174,7 @@ void State::check(string ref)
 		check_init_cond_like(p,ref);
 		if(calc_para_speedup) check_para_speedup(p,ref);
 	}
+	
 	check_init_cond_prior(ref);
 	
 	check_like(ref);
@@ -187,7 +188,7 @@ void State::check(string ref)
 	check_add_move_rem(ref);
 	
 	if(check_lin) check_linearise();
-	
+
 	timer[CHECK_TIMER] += clock();
 }
 
@@ -195,6 +196,8 @@ void State::check(string ref)
 /// Check that precalc is correct
 void State::check_precalc_eqn(string ref)
 {
+	check_timer[CHECK_PRECALC] -= clock();
+	
 	const auto &precalc = param_val.precalc;
 	const auto &value = param_val.value;
 	
@@ -275,6 +278,8 @@ void State::check_precalc_eqn(string ref)
 			emsg("precalc problem"+ref);
 		}
 	}
+	
+	check_timer[CHECK_PRECALC] += clock();
 }
 
 
@@ -568,6 +573,8 @@ void State::check_ref(unsigned int p, string refst)
 /// Checks to see if individual has LI_WRONG in final state
 void State::check_final_li_wrong()
 {
+	check_timer[CHECK_FINAL_LI_WRONG] -= clock();
+	
 	for(auto p = 0u; p < model.species.size(); p++){
 		const auto &sp = model.species[p];
 		const auto &ssp = species[p];
@@ -578,6 +585,8 @@ void State::check_final_li_wrong()
 			}
 		}
 	}
+	
+	check_timer[CHECK_FINAL_LI_WRONG] += clock();
 }
 
 
@@ -730,6 +739,8 @@ void State::check_markov_trans(unsigned int p, string ref)
 /// Checks that parallel speed up of calculation is working
 void State::check_para_speedup(unsigned int p, string ref)
 {
+	check_timer[CHECK_PARA_SPEEDUP] -= clock();
+	
 	auto &ssp = species[p];
 	const auto &sp = model.species[p];
 		
@@ -764,12 +775,16 @@ void State::check_para_speedup(unsigned int p, string ref)
 		}
 		break;
 	}
+	
+	check_timer[CHECK_PARA_SPEEDUP] += clock();
 }
 	
 	
 /// Checks the div value
 void State::check_markov_div_value(unsigned int p, string ref)
 {
+	check_timer[CHECK_MARKOV_DIV] -= clock();
+		
 	auto &ssp = species[p];
 
 	auto markov_eqn_vari_store = ssp.markov_eqn_vari;
@@ -794,6 +809,8 @@ void State::check_markov_div_value(unsigned int p, string ref)
 			}
 		}
 	}
+	
+	check_timer[CHECK_MARKOV_DIV] += clock();
 }
 
 
@@ -960,31 +977,6 @@ void State::check_like(string ref)
 	
 	check_timer[CHECK_LIKE] += clock();
 }
-
-/*
-/// Checks the splines are correctly specified
-void State::check_spline(string ref)
-{
-	check_timer[CHECK_SPLINE] -= clock();
-	
-	auto spline_val_st = spline_val;
-	if(spline_val.size() != model.spline.size()) emsg("Wrong size1 "+ref);
-			
-	spline_init();
-
-	for(auto j = 0u; j < model.spline.size(); j++){
-		const auto &val = spline_val[j].val;
-		const auto &val_st = spline_val_st[j].val;
-		for(auto ti = 0u; ti < T; ti++){
-			if(val[ti] != val_st[ti]){
-				emsg("Spline error");
-			}
-		}
-	}
-	
-	check_timer[CHECK_SPLINE] += clock();
-}
-*/
 
 
 /// Checks that priors are correctly specified
@@ -1560,21 +1552,6 @@ void State::check_linearise()
 	
 	check_timer[CHECK_LIN] += clock();
 }
-
-
-/*
-/// Checks the spline store value are all UNSET
-void State::check_spline_store(string ref)
-{
-	for(auto &spl : spline_val){
-		for(auto &val : spl.store){
-			if(val != UNSET){
-				emsg("spline store error"+ref);
-			}
-		}
-	}
-}
-*/
 
 
 /// Checks that quantities in genetic_value are correctly specified
@@ -2440,6 +2417,8 @@ void State::check_neg_rate(string name)
 /// CWorks out the difference between true markov value and one set
 void State::check_markov_value_dif()
 {
+	check_timer[CHECK_MARKOV_VALUE_DIF] -= clock();
+		
 	auto list = seq_vec(0,T);
 	auto dt = model.details.dt;
 	
@@ -2489,6 +2468,8 @@ void State::check_markov_value_dif()
 		}
 	}
 	cout << sqrt(dmax) << " dmax " << endl;
+	
+	check_timer[CHECK_MARKOV_VALUE_DIF] += clock();
 }
 
 
@@ -2504,6 +2485,8 @@ void State::add_alg_warn(string te)
 /// Checks precalc difference with out updating values
 void State::check_precalc_dif(string ref)
 {
+	check_timer[CHECK_PRECALC_DIF] -= clock();
+		
 	auto &precalc = param_val.precalc;
 	auto &value = param_val.value;
 	
@@ -2536,4 +2519,6 @@ void State::check_precalc_dif(string ref)
 	
 	precalc = precalc_st;
 	value = value_st;
+	
+	check_timer[CHECK_PRECALC_DIF] += clock();
 }

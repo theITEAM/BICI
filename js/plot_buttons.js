@@ -1915,7 +1915,7 @@ Layer.prototype.plot_button = function (bu,ov)
 		}
 		break;
 	
-	case "PopFilt": case "SliceTime":
+	case "PopFilt": case "SliceTime": case "ColourFilt":
 		{
 			clear_rectangle(x,y,dx,dy);
 
@@ -2312,7 +2312,14 @@ Layer.prototype.plot_button = function (bu,ov)
 			plot_text(te,x+3,y+dy/2+0.4,get_font(0.8),BLACK); 
 		}
 		break;
-	
+		
+	case "KeyNone":
+		{
+			clear_rectangle(x,y,dx,dy);
+			plot_text(te,x+3,y+dy/2+0.4,get_font(0.8),BLACK); 
+		}
+		break;
+			
 	case "KeySymb":
 		{
 			let xx = x+1.7;
@@ -2343,7 +2350,6 @@ Layer.prototype.plot_button = function (bu,ov)
 			case "DiagObs": draw_rect(xx-si/2,y+0.6*dy-si/2,si,si,WHITE,BLACK,NORMLINE); break;
 			
 			case "GeneticObs": draw_X(x+1.7,y+dy/2,0.45*dy); break;
-				
 			}
 			plot_text(te,x+3,y+dy/2+0.4,get_font(0.8),BLACK); 
 		}

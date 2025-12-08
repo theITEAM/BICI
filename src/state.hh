@@ -57,7 +57,7 @@ class State                                // Stores information about the state
 		void post_sim(const PV &param_value, const Sample &samp);
 		void simulate_iterate(unsigned int ti_start, unsigned int ti_end);
 		void ensure_all_ind_event();
-		vector <DeriveOutput> derive_calculate();
+		vector <DeriveOutput> derive_calculate(bool store_state);
 		void calculate_likelihood();
 		void calculate_like();
 		void accept(Like like_ch);
@@ -68,7 +68,7 @@ class State                                // Stores information about the state
 		void restore(const vector <AffectLike> &affect_like);
 		void likelihood_from_scratch();
 		void resample_ind(bool if_wrong);
-		Particle generate_particle(unsigned int s, unsigned int chain, bool store_state);
+		Particle generate_particle(unsigned int s, unsigned int chain, bool store_state, bool dir_fl = true);
 		void set_particle(const Particle &part, bool calc_like=true);
 		vector <double> prior_init_cond(double &like_ch);
 		void update_individual_sampler();

@@ -337,7 +337,7 @@ function add_model_param_content(lay)
 				if(par.variety == "const" && par.type != "param factor"){
 					let w = wright;
 					
-					if(par.value_desc == no_elements){
+					if(par.value_desc == no_elements && !den_vec){
 						display_no_element(par,x,y,lay,w);
 					}
 					else{
@@ -346,7 +346,7 @@ function add_model_param_content(lay)
 						display_constant(i,x,y,lay,w);
 					}
 					
-					if(!par.dist_mat && !par.iden_mat){
+					if(!par.dist_mat && !par.iden_mat && !par.den_vec){
 						lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamConst"});
 					}
 					
