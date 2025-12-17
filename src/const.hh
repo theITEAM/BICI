@@ -1,4 +1,4 @@
-/// Stores constant values used and enumerated types
+﻿/// Stores constant values used and enumerated types
 
 #pragma once
 
@@ -24,7 +24,7 @@ const string default_file = "/tmp/init.bici";        // This is used for Mac
 const string default_file = "Execute/init.bici";     // This is used for windows / linux
 #endif
 
-//#define USE_MPI                                    // Sets if code can run in parallel
+#define USE_MPI                                    // Sets if code can run in parallel
 
 const string bici_version = "v0.80";                 // Sets the BICI version
 
