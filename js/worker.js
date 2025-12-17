@@ -92,13 +92,12 @@ function process(e)
 		fileReader.abort();
 		return;
 	}
-
-
+	
 	let info = input.info;
 
 	let update_mod = false;
 
-	model_store = undefined;
+	if(input.type != "Import2") model_store = undefined;
 
 	if(model && input.model){
 		copy_strip(input.model,model);
@@ -296,7 +295,10 @@ function process(e)
 	case "StartPPC":
 		create_ppc_file();
 		break;
-
+		
+	case "StartEXT":
+		create_ext_file();
+		break;
 
 	case "Import2":
 		import_file2(info.data_file_list);
@@ -709,6 +711,9 @@ function process(e)
 			let fi = "M:/Github/theITEAM/BICI/Execute/init.bici";
 			if(ver =="windows"){
 				fi = "C:/Users/cpooley/Desktop/BICI_release/BICI_v0.7_windows/Execute/init.bici";
+			}
+			if(ver =="mac"){
+				fi = "/tmp/init.bici";
 			}
 			percent(2)
 			load_bici(fi);

@@ -85,7 +85,7 @@ void State::post_sim(const PV &param_value, const Sample &samp)
 	
 	auto ti_start = get_ti(t_start);
 	auto ti_end = get_ti(t_end);
-	
+
 	for(auto p = 0u; p < model.species.size(); p++){
 		auto &ssp = species[p];
 		ssp.simulate_init();
@@ -94,6 +94,11 @@ void State::post_sim(const PV &param_value, const Sample &samp)
 	
 	popnum_t = calculate_popnum_t(ti_start+1);
 	popnum_t.resize(T);
+	
+	for(auto ti = 0u; ti < ti_start; ti++){
+		model.param_spec_precalc_time(ti,popnum_t,param_val,false);
+	}
+	
 	for(auto p = 0u; p < nspecies; p++){
 		auto &ssp = species[p];
 		switch(ssp.type){
@@ -110,6 +115,30 @@ void State::post_sim(const PV &param_value, const Sample &samp)
 	}
 
 	simulate_iterate(ti_start,ti_end);
+}
+
+
+/// Loads a sample
+void State::load_samp(const PV &param_value, const Sample &samp)
+{
+	param_val = param_value;
+	
+	for(auto p = 0u; p < model.species.size(); p++){
+		auto &ssp = species[p];
+		ssp.simulate_init();
+		ssp.simulate_sample_init(T,samp.species[p]);
+	}
+	
+	popnum_t = calculate_popnum_t(T);
+
+	model.param_spec_precalc_time_all(popnum_t,param_val,false);
+	
+	for(auto p = 0u; p < nspecies; p++){
+		auto &ssp = species[p];
+		if(ssp.type == POPULATION) ssp.set_tnum_mean(T,popnum_t);
+	}
+
+	likelihood_from_scratch();
 }
 
 
@@ -175,7 +204,7 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 		}
 	}
 
-	if(model.mode == INF) ensure_all_ind_event();
+	if(model.mode == INF || model.mode == EXT) ensure_all_ind_event();
 
 	if(false){
 		cout << "PRINT" << endl;	
@@ -1490,7 +1519,9 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 			
 			part_sp.individual = ssp.individual;
 			
-			if(cum_diag && model.mode == INF) ssp.calc_trans_diag(part_sp,popnum_t);
+			if(cum_diag && (model.mode == INF || model.mode == EXT)){
+				ssp.calc_trans_diag(part_sp,popnum_t);
+			}
 		}
 
 		part_sp.nindividual = ssp.individual.size();
@@ -1737,11 +1768,9 @@ vector < vector <double> > State::get_population_rates(unsigned int p) const
 				rate[tr] = get_trans_rate_est_para(list,p,tr);
 			}
 			else{
-				auto list = seq_vec(0);
+				auto list = seq_vec(1);
 				auto va = get_trans_rate_est_para(list,p,tr);
-				for(auto ti = 0u; ti < T; ti++){		
-					rate[tr][ti] = va[0];
-				}
+				for(auto ti = 0u; ti < T; ti++) rate[tr][ti] = va[0];
 			}
 		}
 	}
@@ -2015,5 +2044,3 @@ void State::recalculate_population_restore(vector < vector <double> > &popnum_t,
 		}
 	}
 }
-
-

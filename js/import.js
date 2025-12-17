@@ -40,6 +40,7 @@
 	pop-trans-data
 	posterior-simulation/post-sim
 	param-post-sim
+	proposal-inf
 	remove-ind-inf
 	remove-ind-post-sim
 	remove-ind-sim
@@ -90,7 +91,7 @@ function import_file(te,file,clear_results)
 
 	let data_file_list = get_data_file_list(pro,10,15);
 
-	model_store = model;
+	if(model != undefined) model_store = copy(model);
 	
 	init_result(pro,clear_results);
 
@@ -480,7 +481,8 @@ function process_command(cname,tags,loop,per_start,per_end)
 	case "diagnostics-inf": inf_diagnostics_command(); break;
 	case "generation-inf": inf_generation_command(); break;
 	case "trans-diag-inf": trans_diag_command(); break;
-		
+	case "proposal-inf": proposal_inf_command(); break;
+	
 	default: 
 		if(find_in(data_command_list,cname) != undefined){
 			import_data_table_command(cname);

@@ -10,6 +10,8 @@ let ver="windows";         // Determines platform
 //let ver="linux";
 //let ver="mac";
 
+let mac_temp_dir = "/tmp/BICI_files/";
+
 let win_linux = false;//true;                            // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
@@ -20,8 +22,10 @@ let load_map_fast = false;                        // If loads up world map from 
 let make_one_chain = false;                       // Make into one chain (for diagnostic purposes)
 
 if(win_linux || false){ testing = true; debug = true; load_map_fast = true;}
+//testing = true;
 //if(win_linux){ testing = true; debug = true; load_map_fast = true;}
-	
+//if(true){ testing = true; debug = true;};
+
 let make_file = false;                            // Determines if makes file or runs
 let thick_line = false;                           // Used for making figures
 let big_eqn = false;
@@ -105,7 +109,8 @@ const command_list = [
 {na:"map",ti:5},
 {na:"post-sim",ti:0},
 {na:"post-simulation",ti:0},
-{na:"param-mult",ti:0}
+{na:"param-mult",ti:0},
+{na:"proposal-inf",ti:0}
 ];
 
 // Lists all commands which need to load files
@@ -140,7 +145,7 @@ const eqn_types = [
 const param_type = ["normal","const","dist","reparam"]; // Different varieties of parameter
 
 const graph_but_not_print = ["Settings","ZoomIn",  // Buttons which are not printed
-"ZoomOut","RadioButton","RadioButtonText"];
+"ZoomOut","RadioButton","RadioButtonText","BayesFactor" ];
 	
 const mask_size = 100;                             // Size to make comp. map mask
 
@@ -239,6 +244,7 @@ const compartment_width_min = 4;                   // The min width of compartme
 const marnew = 0.1;                                // Margin used for new compartments added
 const seed_max = 10000;                            // The maximum seed number
 const letter_size = 2;                             // Letter size when making figures 
+const comp_init_pop_max = 4;                       // Maximum number of init pop compartments to view
 
 const image_scale_factor = 3;                      // Increase in screen size for print image
 const mp4_factor_low = 1;                          // For low quality scale factor
@@ -530,7 +536,7 @@ const INTERNAL_ERROR = " This is an internal error to BICI and not something you
 
 const PARAM_OUTPUT_MAX_DEFAULT = 1000;             // The default maximum number of tensor elements to be output
 const INDMAX_DEFAULT = 20000;                      // The default maximum number of individuals
-const BURNIN_FRAC_DEFAULT = 20;                    // The default percentage burnin
+const BURNIN_FRAC_DEFAULT = 30;                    // The default percentage burnin
 const MCMC_SAMPLE_DEFAULT = 5000;                  // The default number of MCMC samples
 const MCMC_OP_PARAM_DEFAULT = 1000;                // The default number of output parameters
 const MCMC_OP_STATE_DEFAULT = 200;                 // The default number of output states  

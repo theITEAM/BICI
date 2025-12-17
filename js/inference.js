@@ -9,7 +9,7 @@ function run_cluster()
 	switch(tab_name()){
 	case "Simulation": siminf = "sim"; details = model.sim_details; break;
 	case "Inference": siminf = "inf"; details = model.inf_details; break;
-	case "Post. Simulation": siminf = "ppc"; details = model.ppc_details; break;
+	default: error("OPtion problem"); break;
 	}
 	
 	let ncore;
@@ -39,7 +39,6 @@ function run_cluster()
 	switch(siminf){
 	case "sim": line2 += " sim"; break;
 	case "inf": line2 += " inf"; break;
-	case "ppc": line2 += " post-sim"; break;
 	}
 	
 	let te = "To run BICI on a Linux cluster the following steps must be followed:\n• <b>Create BICI file</b> – Click on the 'Save' button below to create and save the initialisation BICI file. Copy this to the cluster where you want BICI to run.\n• <b>Executable</b> – The executable 'bici-para' must also be copied from the BICI main folder to the cluster (<i>e.g.</i> this could be in the same directory as the BICI file).\n";
@@ -58,6 +57,100 @@ function run_cluster()
 	if(details.run_save_type.value == "Export") sa = "StartClusterExport";
 	
 	inter.help = { title:"Run BICI on Linux cluster", te:te, run_save_type:details.run_save_type.value, siminf:siminf, save:sa};  
+	inter.copied = undefined;	
+}			
+
+
+/// Starts ppc on a linux cluster
+function run_cluster_ppc()
+{
+	let siminf;
+	let details;
+	switch(tab_name()){
+	case "Post. Simulation": siminf = "ppc"; details = model.ppc_details; break;
+	default: error("OPtion problem"); break;
+	}
+	
+	let ncore;
+	
+	let line1 = "module load mpi/openmpi-x86_64";
+	
+	let line2="";
+	if(ncore != 1){
+		line2 += "mpirun -n ";
+		if(ncore != undefined) line2 += ncore+" "; else line2 += "[cores] ";
+	}		
+	line2 += "./bici-para ";
+	if(true) line2 += "[file.bici]";
+	else line2 += "Execute/init.bici";
+
+	switch(siminf){
+	case "ppc": line2 += " post-sim"; break;
+	}
+	
+	let te = "To run posterior simulation on a Linux cluster the following steps must be followed:\n• <b>Save</b> – Click on the 'Save' button to replace the BICI file used to run the inference.\n";
+	
+	let butte = "'⟨⟨COPY⟩⟩'"; if(line2 == inter.copied) butte = "'⟨⟨COPIED⟩⟩'";
+	te += "• <b>Run</b> – Using:\n]><b>'"+line2+"</b>' ["+butte+",'CopyText|BB"+line2+"']\n>>(where ";
+	if(ncore == undefined) te += "'[core]' is the number of CPU cores and ";
+	te += "'[file.bici]' is replaced by the name of the BICI file you created). ";
+
+	butte = "'⟨⟨COPY⟩⟩'"; if(line1 == inter.copied) butte = "'⟨⟨COPIED⟩⟩'";
+	te += "\n• <b>Visualise</b> – Once BICI has run it puts its results into the script file. Copy this back to your local computer and load into the interface.";
+	
+	let sa = "StartClusterSave";
+	if(details.run_save_type.value == "Export") sa = "StartClusterExport";
+	
+	inter.help = { title:"Posterior simulation on Linux cluster", te:te, run_save_type:details.run_save_type.value, siminf:siminf, save:sa};  
+	inter.copied = undefined;	
+}			
+
+
+/// Starts ext on a linux cluster
+function run_cluster_ext()
+{
+	let siminf;
+	let details;
+	switch(tab_name()){
+	case "Post. Simulation": siminf = "ppc"; details = model.ppc_details; break;
+	default: error("OPtion problem"); break;
+	}
+	
+	let ncore;
+	
+	let line1 = "module load mpi/openmpi-x86_64";
+	
+	let line2="";
+	if(ncore != 1){
+		line2 += "mpirun -n ";
+		if(ncore != undefined) line2 += ncore+" "; else line2 += "[cores] ";
+	}		
+	line2 += "./bici-para ";
+	if(true) line2 += "[file.bici]";
+	else line2 += "Execute/init.bici";
+
+	switch(siminf){
+	case "ppc": line2 += " post-sim"; break;
+	}
+	
+	let te = "Extending inference can be done by a simple alteration to the command used to run BICI-script. Instead of 'inf' used for inference, 'ext <i>x</i>' tells BICI to generate more MCMC updates (on top of those already generated). Here <i>x</i> can either be a final number of updates or a percentage relative to the current update number.\n";
+	
+	let rpf = get_inf_res().plot_filter;
+	let de = rpf.details;
+	
+	let ncore_sug = 4;
+	switch(de.algorithm.value){
+	case "DA-MCMC": ncore_sug = Number(de.nchain)/Number(de.cha_per_core); break;
+	case "PAS-MCMC": ncore_sug = Number(de.npart)/Number(de.part_per_core); break;
+	}
+			
+	te += "For example the command:\n";
+	te += "]><b>"
+	if(ncore_sug != 1) te += "mpirun -"+ncore_sug;
+	te += " ./bici-para my-file.bici ext "+inter.inf_extend+"</b>\n";
+	te += "would extend the number of updates to "+inter.inf_extend+".";
+	
+	inter.help = { title:"Extend inference on Linux cluster", te:te};  
 	inter.copied = undefined;	
 }			
 
@@ -146,8 +239,8 @@ function check_time_error()
 		if(par.spline.on){
 			let spl = par.spline;
 			
-			let gtimes = get_times(spl.knot,de);
-			
+			let gtimes = get_times(spl.knot,de,true);
+		
 			if(gtimes.err){
 				return add_knot_warning(gtimes.msg,par);
 			}
@@ -402,8 +495,8 @@ function add_inf_start_buts(lay)
 		cy += 1;
 		
 		let gap = 1.8;
-		if(alg =="DA-MCMC") gap = 0.9;
-		if(alg =="PAS-MCMC") gap = 1.4;
+		if(alg =="DA-MCMC") gap = 0.7;
+		if(alg =="PAS-MCMC") gap = 1.0;
 		
 		switch(alg){
 		case "DA-MCMC": case "PAS-MCMC": 
@@ -555,8 +648,46 @@ function add_inf_start_buts(lay)
 		
 		cy = set_seed(cx,cy,"inf_seed",model.inf_details,lay);
 		
+		switch(alg){
+		case "DA-MCMC": case "PAS-MCMC":
+			cy = set_sync(cx,cy,model.inf_details,lay);
+			break;
+		}
+		
 		lay.add_corner_button([["Done","Grey","OptionsDone"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
+}
+
+
+/// Sets buttons used to start inference
+function add_extend_start_buts(lay)
+{
+	let cx = corner.x;
+	let cy = corner.y;
+	
+	cy = lay.add_title("Extend inference",cx,cy,{te:inf_extend_text});
+	
+	let gapop = 1;
+		
+	cy += gapop;	
+	
+	{
+		cy = lay.add_subtitle("New update number",cx,cy,WHITE,{te:ext_percent_text});
+
+		cy = lay.add_paragraph("Set the new number of MCMC updates (either as a value or a percentage):",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+
+		let yy = cy-2.5;
+		add_right_input_field(yy,"New updates",{type:"inf_extend",update:true},lay);
+	}
+	cy += gapop;	
+	
+	cy += gapop;	
+	
+	cy = run_local_simple(cx,cy,model.inf_details,lay);
+	
+	cy += gapop;	
+	
+	lay.add_corner_button([["Extend","Grey","StartEXT"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 }
 
 

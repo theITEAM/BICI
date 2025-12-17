@@ -1244,7 +1244,7 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 		for(const auto &po_ch : pop_change){
 			auto pr = lin.get_pop_ref(po_ch.po);
 			if(pr != UNSET){
-				auto va = eq.calculate_pop_grad_without_factor(pr,precalc);
+				auto va = eq.calculate_pop_grad_without_factor_no_time(pr,precalc);
 				diff += va*po_ch.num;
 			}
 		}

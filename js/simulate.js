@@ -3,11 +3,30 @@
 
 const spawn = require('child_process').spawn;
 
+/// Makes a directory
+function make_dir(dir)
+{
+	const fs = require('fs');  // Creates the data directory
+	if (dir != undefined && !fs.existsSync(dir)) {
+		fs.mkdir(dir, function(err) {
+			if(err) {
+				alertp("There was a problem creating the directory '"+dir+"'");
+			}
+		});
+	}
+}
+
+
 /// Starts creation of files for spawning
 function start_spawn(file_list)
 {
-	let file = "Execute/init.bici"; if(ver == "mac") file = "/tmp/init.bici";
+	let file = "Execute/init.bici"; 
 	let dir;
+
+	if(ver == "mac"){
+		dir = mac_temp_dir;
+		file = "init.bici";
+	}
 
 	create_files(file_list,file,dir,"spawn");
 }
@@ -16,23 +35,15 @@ function start_spawn(file_list)
 /// Saves all the files needed for analysis
 function create_files(file_list,file,dir,type)
 {
-	if(dir != undefined){
-		const fs = require('fs');  // Creates the data directory
-		if (dir != undefined && !fs.existsSync(dir)) {
-			fs.mkdir(dir, function(err) {
-				if(err) { 
-					alertp("There was a problem creating the directoy '"+dir+"'");
-				}
-			});
-		}
-	}
+	if(dir != undefined) make_dir(dir);
 	
 	inter.saving = { num:0, num_to_do:file_list.length, type:type}
 		
 	for(let i = 0; i < file_list.length; i++){
 		let finfo = file_list[i]
 		if(finfo.type == "bicifile"){
-			write_file_async(finfo.data,file);
+			if(dir == undefined) write_file_async(finfo.data,file);
+			else write_file_async(finfo.data,dir+"/"+file);
 		}
 		else{
 			if(dir == undefined) error("dir should be defined");
@@ -78,15 +89,15 @@ function start(siminf)
 
 	inter.running_status = true;
 
-	inter.chain = [];
+	inter.core = [];
 	
-	let nchain = 1; 
-	if(inter.save_type == "inf" && model.inf_details.algorithm.value =="DA-MCMC"){
-		nchain = model.inf_details.nchain;
+	let ncore = 1; 
+	if((inter.save_type == "inf" || inter.save_type == "ext") && model.inf_details.algorithm.value =="DA-MCMC"){
+		ncore = Number(model.inf_details.nchain)/Number(model.inf_details.cha_per_core);
 	}
 	
-	for(let ch = 0; ch < nchain; ch++){
-		startspawn(ch,nchain,siminf);
+	for(let co = 0; co < ncore; co++){
+		startspawn(co,ncore,siminf);
 	}
 }
 
@@ -97,7 +108,7 @@ function get_seed_not_set(siminf)
 	let details;
 	switch(siminf){
 	case "sim": details = model.sim_details; break;
-	case "inf": details = model.inf_details; break;
+	case "inf": case "ext": details = model.inf_details; break;
 	case "ppc": details = model.ppc_details; break;
 	}
 
@@ -108,33 +119,35 @@ function get_seed_not_set(siminf)
 
 
 /// Starts execution of C++ code
-function startspawn(ch,nchain,siminf)                                    
+function startspawn(co,ncore,siminf)                                    
 {	
 	let seed_not_set = get_seed_not_set(siminf);
 
-	inter.chain[ch] = { done:false, siminf:siminf, term:false, prog:0, leftover:"", lines:[]};
+	inter.core[co] = { done:false, siminf:siminf, term:false, prog:0, leftover:"", lines:[]};
 
 	let do_com = siminf; if(do_com == "ppc") do_com="post-sim";
 
 	let file = "bici-core.exe";
 	if(ver == "mac") file = "./bici-core";
 	
-	if(seed_not_set != undefined){
-		inter.child[ch] = spawn(file,["default.bici",do_com,"-chain="+ch,"-seed="+seed_not_set]);
-	}
-	else{
-		inter.child[ch] = spawn(file,["default.bici",do_com,"-chain="+ch]);
-	}		
-			
-	funct(inter.child[ch],ch);
+	let li = [];
+	li.push("default.bici");
+	li.push(do_com);
+	if(do_com == "ext")  li.push(inter.inf_extend);
+	li.push("-core="+co);
+	if(seed_not_set != undefined) li.push("-seed="+seed_not_set);
+
+	inter.child[co] = spawn(file,li);
+	
+	funct(inter.child[co],co);
 }
 
 
 /// This function executes the c++ code
-function funct(chi,ch)                             // Gathers output of C++ file
+function funct(chi,co)                             // Gathers output of C++ file
 {
 	chi.stdout.on('data', function (data) {
-		let cha = inter.chain[ch];
+		let cha = inter.core[co];
 		let st = cha.leftover + data;
 
 		let lines = st.split('\n');
@@ -174,10 +187,15 @@ function funct(chi,ch)                             // Gathers output of C++ file
 				if(begin(line,"<PROGRESS>")){
 					cha.prog = Number(line.substr(10));
 					let progmin = LARGE;
-					for(let ch2 = 0; ch2 < inter.chain.length; ch2++){
-						if(inter.chain[ch2].prog < progmin) progmin = inter.chain[ch2].prog;
+					for(let co2 = 0; co2 < inter.core.length; co2++){
+						if(inter.core[co2].prog < progmin) progmin = inter.core[co2].prog;
 					}
 					set_loading_percent(progmin);
+					fl = true;
+				}
+				
+				if(begin(line,"<TERM>")){
+					prr("TERM: "+line.substr(6));
 					fl = true;
 				}
 					
@@ -199,11 +217,12 @@ function funct(chi,ch)                             // Gathers output of C++ file
 
 	chi.on('close', function (code) {
 		if(inter.running_status == true){
-			let cha = inter.chain[ch];
+			let cha = inter.core[co];
 			cha.done = true;
 			
 			// Extracts the file from the output
 			let lines = cha.lines;
+			
 			for(let c = 0; c < lines.length; c++){ lines[c] = lines[c].replace(/\r/g, "");}
 			
 			let i = 0;
@@ -234,9 +253,9 @@ function funct(chi,ch)                             // Gathers output of C++ file
 			}
 		
 			let j = 0; 
-			while(j < inter.chain.length && inter.chain[j].done == true && inter.chain[j].term == false) j++;
-			if(j == inter.chain.length){
-				setTimeout(function(){ process_all_chains()}, 10);
+			while(j < inter.core.length && inter.core[j].done == true && inter.core[j].term == false) j++;
+			if(j == inter.core.length){
+				setTimeout(function(){ process_all_cores()}, 10);
 			}
 		}
 	});
@@ -244,17 +263,18 @@ function funct(chi,ch)                             // Gathers output of C++ file
 
 
 /// Processes information from all chains
-function process_all_chains()
+function process_all_cores()
 {
 	loading_symbol_message("Processing...");
 	
 	inter.running_status = false;
 	
-	let content = inter.chain[0].content;
-	for(let ch = 1; ch < inter.chain.length; ch++){
-		content += endl+inter.chain[ch].content;
+	let content = inter.core[0].content;
+
+	for(let co = 1; co < inter.core.length; co++){
+		content += endl+inter.core[co].content;
 	}
-	 
+	
 	set_loading_percent(1);
 	start_worker("Spawn Output",{content:content});	
 }
@@ -265,11 +285,12 @@ function terminate(te)
 {
 	if(inter.running_status == false) return;
 	
-	for(let ch = 0; ch < inter.chain.length; ch++){
-		let cha = inter.child[ch];
-		inter.chain[ch].term = true;
-		inter.child[ch].stdin.pause();
-		inter.child[ch].kill();
+	for(let co = 0; co < inter.core.length; co++){
+		inter.core[co].term = true;
+		
+		let cha = inter.child[co];
+		cha.stdin.pause();
+		cha.kill();
 	}
 	
 				
@@ -398,13 +419,27 @@ function run_local(cx,cy,details,lay)
 	
 	return cy;
 }
+
+
+/// Sets button if running locally
+function run_local_simple(cx,cy,details,lay)
+{
+	cy = lay.add_subtitle("Run on local machine",cx,cy,WHITE,{te:run_local_simp_text});
+		
+	let xx = 3, gap = 0.5;
+	xx = lay.add_radio(xx,cy+0.1,"Yes","Yes",details.run_local,{back_col:WHITE});
+	xx += gap;
+	xx = lay.add_radio(xx,cy+0.1,"No","No",details.run_local,{back_col:WHITE});		
+	
+	return cy;
+}
 		
 		
 /// Sets the seed option
 function set_seed(cx,cy,ref,details,lay)
 {
 	cy = lay.add_subtitle("Set random seed",cx,cy,WHITE,{te:seed_text});
-		
+	
 	let xx = 3, gap = 0.5;
 	xx = lay.add_radio(xx,cy+0.1,"Yes","Yes",details.seed_on,{back_col:WHITE});
 	xx += gap;
@@ -415,9 +450,25 @@ function set_seed(cx,cy,ref,details,lay)
 		add_right_input_field(yy,"Seed",{type:ref,update:true},lay);
 	}
 	
+	cy += 2;
+	
 	return cy;
 }
 
+	
+/// Sets the sychronisation option
+function set_sync(cx,cy,details,lay)
+{
+	cy = lay.add_subtitle("Proposal synchronisation",cx,cy,WHITE,{te:sync_text});
+	
+	//cy -= 1.5;
+	
+	let xx = 3, gap = 0.5;
+	xx = lay.add_radio(xx,cy+0.1,"On","On",details.sync_on,{back_col:WHITE});
+	xx += gap;
+	xx = lay.add_radio(xx,cy+0.1,"Off","Off",details.sync_on,{back_col:WHITE});		
+}
+	
 
 /// Adds buttons to start a posterior predictive check
 function add_ppc_start_buts(lay)
@@ -453,7 +504,7 @@ function add_ppc_start_buts(lay)
 		
 		cy += 2;
 	
-		cy = run_local(cx,cy,model.ppc_details,lay);
+		cy = run_local_simple(cx,cy,model.ppc_details,lay);
 	
 		if(model.ppc_details.check_box_list){
 			if(model.ppc_details.check_box_list.length > 0){
@@ -894,7 +945,7 @@ function check_memory(ans)
 		P = S;
 		break;
 	
-	case "inf":
+	case "inf": case "ext":
 		details = model.inf_details;
 		S = details.output_state;
 		P = details.output_param;
@@ -946,7 +997,7 @@ function check_memory(ans)
 		let source;
 		switch(type){
 		case "sim": source = sp.sim_source; break;
-		case "inf": case "ppc": source = sp.inf_source; break; 
+		case "inf": case "ppc": case "ext": source = sp.inf_source; break; 
 		}
 		
 		let NI = 0, Npopdata = 0, Npoptransdata = 0;

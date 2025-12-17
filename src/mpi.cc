@@ -90,6 +90,64 @@ void Mpi::transfer_particle(vector <Particle> &part)
 }
 
 
+/// Transfers proposal information from other cores to zero
+void Mpi::transfer_prop_info(vector <PropInfo> &prop_info)
+{
+	if(ncore == 1) return;
+	
+	auto n = prop_info.size();
+	
+	auto nvec = gather(n);
+	
+	if(core != 0){
+		for(const auto &pi : prop_info){
+			pack_initialise();
+			pack(pi);
+			pack_send(0);
+		}
+	}
+	else{
+		for(auto co = 1u; co < ncore; co++){
+			for(auto i = 0u; i < nvec[co]; i++){
+				pack_recv(co);	
+				PropInfo pi;
+				unpack(pi);
+				prop_info.push_back(pi);
+			}
+		}
+	}
+}
+
+
+/// Transfers particles from other cores to zero
+void Mpi::transfer_samp(vector < vector <double> > &samp)
+{
+	if(ncore == 1) return;
+	
+	auto n = samp.size();
+	
+	auto nvec = gather(n);
+	
+	if(core != 0){
+		for(const auto &sa : samp){
+			pack_initialise();
+			pack_item(sa);
+			pack_send(0);
+		}
+	}
+	else{
+		for(auto co = 1u; co < ncore; co++){
+			for(auto i = 0u; i < nvec[co]; i++){
+				pack_recv(co);	
+				vector <double> sa;
+				unpack_item(sa);
+				samp.push_back(sa);
+			}
+		}
+	}
+}
+
+
 /// Transfers diagnostic description from other cores to zero
 void Mpi::transfer_diagnostic(vector <Diagnostic> &diag)
 {
@@ -113,6 +171,54 @@ void Mpi::transfer_diagnostic(vector <Diagnostic> &diag)
 				unpack_item(di.ch);
 				unpack_item(di.te);
 				diag.push_back(di);
+			}
+			unpack_check();
+		}
+	}
+}
+
+
+/// Transfers diagnostic description from other cores to zero
+void Mpi::transfer_terminal_info(vector <TerminalInfo> &term_info)
+{
+	if(ncore == 1) return;
+	
+	if(core != 0){
+		pack_initialise();
+		pack_num(term_info.size());
+		
+		for(auto i = 0u; i < term_info.size(); i++){
+			const auto &ti = term_info[i];
+			pack_item(ti.ch);
+			auto J = ti.prop_info_store.size();
+			pack_num(J);
+			for(auto j = 0u; j < J; j++) pack(ti.prop_info_store[j]);
+			pack_item(ti.n);
+			pack_item(ti.n_start);
+			pack_item(ti.av);
+			pack_item(ti.av2);
+		}
+		pack_send(0);
+	}
+	else{
+		for(auto co = 1u; co < ncore; co++){
+			pack_recv(co);	
+			auto N = unpack_num();
+			for(auto i = 0u; i < N; i++){
+				TerminalInfo ti;
+				unpack_item(ti.ch);
+				auto J = unpack_num();
+				for(auto j = 0u; j < J; j++){
+					PropInfo pi;
+					unpack(pi);
+					ti.prop_info_store.push_back(pi);
+				}
+				unpack_item(ti.n);
+				unpack_item(ti.n_start);
+				unpack_item(ti.av);
+				unpack_item(ti.av2);
+				
+				term_info.push_back(ti);
 			}
 			unpack_check();
 		}
@@ -470,6 +576,28 @@ void Mpi::unpack(Particle &pa)
 }
 
 
+/// Packs up PropInfo
+void Mpi::pack(const PropInfo &pi)
+{
+	unsigned int ty = pi.type;
+	pack_item(ty);
+	pack_item(pi.id);
+	pack_item(pi.value);
+	pack_item(pi.vec);
+}
+
+/// Packs up PropInfo
+void Mpi::unpack(PropInfo &pi)
+{
+	unsigned int ty;
+	unpack_item(ty);
+	pi.type = (PropType)ty;
+	unpack_item(pi.id);
+	unpack_item(pi.value);
+	unpack_item(pi.vec);
+}
+
+
 /// Transfers lines_raw from other core to zero
 void Mpi::transfer_lines_raw(vector <string> &lines_raw)
 {
@@ -714,6 +842,70 @@ void Mpi::bcast(vector <string> &vec)
 }
 
 
+/// Transfers from core zero to all others
+void Mpi::distribute(vector < vector <double> > &samp)
+{
+	pack_initialise();
+	if(core == 0){
+		pack_item(samp.size());
+		for(auto s = 0u; s < samp.size(); s++){
+			pack_item(samp[s]);
+		}
+	}
+	
+	unsigned int N = buffer.size();
+	bcast(N);
+	
+	if(core != 0) buffer.resize(N);
+	
+	bcast(buffer);
+	
+	if(core != 0){
+		samp.clear();
+		
+		unsigned int n; 
+		unpack_item(n);
+		for(auto s = 0u; s < n; s++){
+			vector <double> vec; 
+			unpack_item(vec);
+			samp.push_back(vec);
+		}
+	}		
+}
+
+
+/// Transfers from core zero to all others
+void Mpi::distribute(vector <PropInfo> &prop_sync)
+{
+	pack_initialise();
+	if(core == 0){
+		pack_item(prop_sync.size());
+		for(auto s = 0u; s < prop_sync.size(); s++){
+			pack(prop_sync[s]);
+		}
+	}
+	
+	unsigned int N = buffer.size();
+	bcast(N);
+	
+	if(core != 0) buffer.resize(N);
+	
+	bcast(buffer);
+	
+	if(core != 0){
+		prop_sync.clear();
+		
+		unsigned int n; 
+		unpack_item(n);
+		for(auto s = 0u; s < n; s++){
+			PropInfo ps; 
+			unpack(ps);
+			prop_sync.push_back(ps);
+		}
+	}		
+}
+
+
 /// Waits for all processes
 void Mpi::barrier() const
 {
@@ -785,5 +977,7 @@ void Mpi::sum(vector < vector <double> > &array)
 		}
 	}
 }
+
+
 
 #endif

@@ -778,7 +778,7 @@ function add_screen_buts(lay)
 
 	add_layer("Frame",0,0,lay.dx,lay.dy,{x:x2, y:y1, dx:x3-x2, dy:y2-y1});
 
-	add_layer("Menu",x1,yb,x2-x1,yc-yb,{});
+	add_layer("Menu",x1,yb,x2-x1,y2-yb,{});
 
 	if(loading){
 		let six = 4.7, siy = 3.7;
@@ -874,7 +874,7 @@ function start_loading_symbol(per,type)
 	}
 		
 	switch(type){
-	case "Start": case "StartPPC": case "Creating": loading_symbol_message("Creating..."); break;
+	case "Start": case "StartPPC": case "StartEXT": case "Creating": loading_symbol_message("Creating..."); break;
 	case "Spawn": loading_symbol_message("Initialising..."); break;
 	case "Load File": case "Load Example": loading_symbol_message("Loading..."); break;
 	case "mp4": loading_symbol_message("Create mp4..."); break;
@@ -1384,6 +1384,7 @@ function copy_back_to_source2(tbs)
 	case "inf_t_end": model.inf_details.t_end = te; break;
 	case "inf_timestep": model.inf_details.timestep = te; break;
 	case "inf_sample": model.inf_details.sample = te; break;
+	case "inf_extend": inter.inf_extend = te; break;
 	case "inf_seed": model.inf_details.seed = te; break;
 	case "inf_abcsample": model.inf_details.abcsample = te; break;
 	case "inf_output_param ": model.inf_details.output_param  = te; break;
@@ -1698,6 +1699,26 @@ function check_error_textbox2(tbs)
 			case "inf_sample": case "inf_abcsample": 
 				warn = check_posinteger(te);
 				if(warn == "" && Number(te) < 100 && testing == false) warn = "Must be 100 or more";
+				break;
+				
+			case "inf_extend":
+				{
+					let spl = te.split("%");
+					warn = check_posinteger(spl[0]);
+					
+					let num = Number(spl[0]);
+					if(!isNaN(num)){
+						if(spl.length == 1){
+							let rpf = get_inf_res().plot_filter;
+							if(num <= rpf.details.sample){
+								warn = "Must be greater than "+rpf.details.sample;
+							}
+						}
+						else{
+							if(num <= 100) warn = "Must be greater than 100%";
+						}
+					}
+				}					
 				break;
 			
 			case "inf_chain":

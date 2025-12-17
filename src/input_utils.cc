@@ -334,7 +334,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 	
 	auto i = 0u; while(i < data_template.size() && data_template[i].cname != cname) i++;
 	
-	if(i == data_template.size()){ emsg_input("Cannot find command"); return false;}
+	if(i == data_template.size()){ alert_emsg_input("Cannot find command"); return false;}
 	
 	auto cols = data_template[i].cols;
 	
@@ -373,8 +373,8 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 
 			case CL_PROB_COL:
 				{
-					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
-					auto cl = ds.cl; if(cl == UNSET){ emsg_input("cl should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ alert_emsg_input("p should be defined"); return false;}
+					auto cl = ds.cl; if(cl == UNSET){ alert_emsg_input("cl should be defined"); return false;}
 					
 					auto name = model.species[p].cla[cl].name; 
 						
@@ -384,7 +384,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 
 			case CL_ALL_COL:
 				{
-					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ alert_emsg_input("p should be defined"); return false;}
 						
 					const auto &sp = model.species[p];
 					
@@ -411,7 +411,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 				
 			case CL_ALL_PROB_COL:
 				{
-					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ alert_emsg_input("p should be defined"); return false;}
 						
 					const auto &sp = model.species[p];
 					for(auto cl = 0u; cl < sp.ncla; cl++){
@@ -422,8 +422,8 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 
 			case FROM_COL:
 				{
-					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
-					auto cl = ds.cl; if(cl == UNSET){ emsg_input("cl should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ alert_emsg_input("p should be defined"); return false;}
+					auto cl = ds.cl; if(cl == UNSET){ alert_emsg_input("cl should be defined"); return false;}
 					
 					auto cl_name = model.species[p].cla[cl].name; 
 					load_col.push_back(LoadCol("From","the compartment in '"+cl_name+"' from which individuals come",COMP_SOURCE_SINK_EL,cl));
@@ -432,8 +432,8 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 
 			case TO_COL:
 				{
-					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
-					auto cl = ds.cl; if(cl == UNSET){ emsg_input("cl should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ alert_emsg_input("p should be defined"); return false;}
+					auto cl = ds.cl; if(cl == UNSET){ alert_emsg_input("cl should be defined"); return false;}
 					
 					auto cl_name = model.species[p].cla[cl].name; 
 					load_col.push_back(LoadCol(cl_name,"the compartment in '"+cl_name+"' to which individuals go",COMP_SOURCE_SINK_EL,cl));
@@ -441,7 +441,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 				break;
 
 			case INIT_POP_COL:
-				if(ds.cname != INIT_POP) emsg_input("Should be init pop");
+				if(ds.cname != INIT_POP) alert_emsg_input("Should be init pop");
 			
 				switch(ds.init_pop_type){
 				case INIT_POP_FIXED: 
@@ -462,7 +462,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 					}
 					break;
 					
-				default: emsg_input("Def op wrong"); break;
+				default: alert_emsg_input("Def op wrong"); break;
 				}
 				break;
 		
@@ -488,7 +488,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 				
 			case FILT_OBSPOP_COL:
 				{
-					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ alert_emsg_input("p should be defined"); return false;}
 					auto &sp = model.species[p];
 					
 					const auto filt = sp.set_comp_filt(ds.filter_str,UNSET,LOWER_BOUND,ds);
@@ -517,8 +517,8 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 				
 			case FILT_OBSPOPTRANS_COL:
 				{		
-					auto p = ds.p; if(p == UNSET){ emsg_input("p should be defined"); return false;}
-					auto cl = ds.cl; if(cl == UNSET){ emsg_input("cl should be defined"); return false;}
+					auto p = ds.p; if(p == UNSET){ alert_emsg_input("p should be defined"); return false;}
+					auto cl = ds.cl; if(cl == UNSET){ alert_emsg_input("cl should be defined"); return false;}
 					auto &sp = model.species[p];
 					
 					const auto filt = sp.set_comp_filt(ds.filter_str,cl,LOWER_BOUND,ds);
@@ -669,18 +669,6 @@ void Input::load_obs_model(ObsModel &om)
 			}
 		}
 	}
-}
-
-
-/// Write an array as a string
-string Input::stringify(const vector <string> &arr) const
-{
-	string te="";
-	for(auto i = 0u; i < arr.size(); i++){
-		if(i != 0) te += ","; 
-		te += arr[i];
-	}
-	return te;
 }
 
 
@@ -845,7 +833,7 @@ void Input::set_const(Param &par, const vector <unsigned int> &ind, double val)
 	
 	auto sum = 0u;
 	for(auto i = 0u; i < dep.size(); i++) sum += dep[i].mult*ind[i];
-	if(sum >= par.N) emsg_input("Problem setting element");
+	if(sum >= par.N) alert_emsg_input("Problem setting element");
  
 	par.set_cons(sum,val);
 }
@@ -859,7 +847,7 @@ void Input::set_element(Param &par, const vector <unsigned int> &ind, string te)
 	
 	auto sum = 0u;
 	for(auto i = 0u; i < dep.size(); i++) sum += dep[i].mult*ind[i];
-	if(sum >= par.N) emsg_input("Problem setting element");
+	if(sum >= par.N) alert_emsg_input("Problem setting element");
  
 	par.set_value_te(sum,te);
 }
@@ -873,7 +861,7 @@ void Input::set_reparam_element(Param &par, const vector <unsigned int> &ind, co
 	
 	auto sum = 0u;
 	for(auto i = 0u; i < dep.size(); i++) sum += dep[i].mult*ind[i];
-	if(sum >= par.N) emsg_input("Problem setting element");
+	if(sum >= par.N) alert_emsg_input("Problem setting element");
  
 	par.set_value_eqn(sum,val);
 }
@@ -886,7 +874,7 @@ void Input::set_prior_element(Param &par, const vector <unsigned int> &ind, Prio
 	
 	auto sum = 0u;
 	for(auto i = 0u; i < dep.size(); i++) sum += dep[i].mult*ind[i];
-	if(sum >= par.N) emsg_input("Problem setting element");
+	if(sum >= par.N) alert_emsg_input("Problem setting element");
 
 	par.set_prior(sum,model.prior.size());
 	model.prior.push_back(pri);
@@ -931,7 +919,7 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 		
 		if(index == "t"){
 			if(!(pp.time_dep == true && index == "t")){
-				emsg_input("Problem with dependency"); 
+				alert_emsg_input("Problem with dependency"); 
 				return UNSET;
 			}
 		
@@ -942,13 +930,13 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 			if(index == "z"){
 				auto name = pp.name;
 				if(!begin_str(name,"Ω")){
-					emsg_input("Parameter '"+pp.name+"' cannot have index z, because this is reserved for covariance matrices."); 
+					alert_import("Parameter '"+pp.name+"' cannot have index z, because this is reserved for covariance matrices.",true); 
 					return UNSET;
 				}
 				
 				auto spl = split(name,'^');
 				if(spl.size() != 2){
-					emsg_input("Covariance matrices should have the format 'Ω^name', where 'name' corresponds to the name in 'ind-effect'."); 
+					alert_import("Covariance matrices should have the format 'Ω^name', where 'name' corresponds to the name in 'ind-effect'.",true); 
 					return UNSET;
 				}
 				
@@ -969,7 +957,7 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 				}
 				
 				if(fl == false){
-					emsg_input("For covariance matrix '"+name+"' could not find grouping with name '"+na+"'."); 
+					alert_import("For covariance matrix '"+name+"' could not find grouping with name '"+na+"'.",true); 
 					return UNSET;
 				}
 			}
@@ -990,7 +978,7 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 					if(flag == true) break;
 				}
 				
-				if(flag != true){ emsg_input("Cannot find the index '"+index+"'"); return UNSET;}
+				if(flag != true){ alert_import("Cannot find the index '"+index+"'",true); return UNSET;}
 			}
 		}
 		
@@ -1146,9 +1134,10 @@ void Input::alert_sample(string warn, unsigned int num)
 
 
 /// Reads a state file from text
-void Input::read_state_sample(const vector <string> &lines, const vector <string> &ind_key)
+void Input::read_state_sample(unsigned int ch, const vector <string> &lines, const vector <string> &ind_key)
 {
 	Sample samp;
+	samp.ch = ch;
 	samp.param_value.resize(model.param.size());
 	
 	samp.species.resize(model.species.size());
@@ -1310,12 +1299,36 @@ void Input::read_state_sample(const vector <string> &lines, const vector <string
 		}
 	}
 	
+	// Check to see if all parameters have been loaded
+	for(auto th = 0u; th < model.param.size(); th++){
+		auto &par = model.param[th];
+		auto &value = samp.param_value[th];
+		 
+		switch(par.variety){
+		case PRIOR_PARAM: case DIST_PARAM:
+			if(value.size() == 0){
+				if(!par.trace_output && par.N > model.details.param_output_max){	 
+					alert_import("Cannot find information about parameter '"+par.full_name+"' in inferred states. This parameter has not been output during inference because the number of elements "+tstr(par.N)+" exceeds the thresehold "+tstr(model.details.param_output_max)+". Please consider changing this threshold and re-running inference.");
+				}
+				else{
+					alert_import("Cannot find information about parameter '"+par.full_name+"' in inferred states.");
+				}
+			}
+			break;
+			
+		default:
+			break;
+		}
+	}
+	
+	
 	if(false){
 		for(auto th = 0u; th < model.param.size(); th++){
 			cout << model.param[th].name << " ";
 			for(auto va : samp.param_value[th]) cout << va << ",";
 			cout << "  value" << endl;
 		}
+		emsg("param samp");
 	}
 	
 	model.sample.push_back(samp);
@@ -1507,7 +1520,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 				if(sym == true && i < j){
 					if(ele != "."){
 						auto name = par.name+"_"+par.dep[0].list[j]+","+par.dep[1].list[i];
-						alert_input(desc+" the element '"+ele+"' for "+name+" should be set to '.' because it is in the bottom left-hand corneter of the covariance matrix definition");
+						alert_import(desc+" the element '"+ele+"' for "+name+" should be set to '.' because it is in the bottom left-hand corneter of the covariance matrix definition");
 					}
 					set_const(par,ind,UNSET);
 				}
@@ -1575,7 +1588,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 			}
 			break;
 			
-		default: emsg_input("Should not be default4"); return;
+		default: alert_emsg_input("Should not be default4"); return;
 		}
 		
 		if(par.cat_factor){
@@ -1585,8 +1598,8 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 			for(auto i = 0u; i < par.N; i++){
 				const auto &er = par.element_ref[i];
 				auto ind = er.index;
-				if(ind == UNSET) emsg_input("ref should not be unset"); 
-				if(!er.cons) emsg_input("Should be constant");
+				if(ind == UNSET) alert_emsg_input("ref should not be unset"); 
+				if(!er.cons) alert_emsg_input("Should be constant");
 			
 				auto val = par.constant.value[ind];// par.cons[ind];
 				auto w = par.weight[i];
@@ -1596,7 +1609,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 				}
 				else{
 					if(val < 0){
-						emsg_input(desc+" the value '"+tstr(val)+"' must be positive for a factor.");
+						alert_import(desc+" the value '"+tstr(val)+"' must be positive for a factor.",true);
 					}
 					sum += w*val;
 				}
@@ -1656,7 +1669,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 	if(false){
 		for(auto i = 0u; i < par.N; i++){
 			auto ref = par.element_ref[i].index;
-			if(ref == UNSET) emsg_input("ref should not be unset"); 
+			if(ref == UNSET) alert_emsg_input("ref should not be unset"); 
 			
 			auto &ele = par.element[ref];
 			cout << i << " " << ele.value.te << " val" << endl;
@@ -1706,7 +1719,7 @@ void Input::set_val_from_ele(string ele, const vector <unsigned int> &ind, Param
 			
 			auto sum = 0u;
 			for(auto i = 0u; i < par.dep.size(); i++) sum += par.dep[i].mult*ind[i];
-			if(sum >= par.N) emsg_input("Problem setting element");
+			if(sum >= par.N) alert_emsg_input("Problem setting element");
 			par.weight[sum] = val;
 		}
 		break;
@@ -1740,7 +1753,7 @@ void Input::set_val_from_ele(string ele, const vector <unsigned int> &ind, Param
 				else set_const(par,ind,val);
 				break;
 				
-			default: emsg_input("Should not be default3"); return;
+			default: alert_emsg_input("Should not be default3"); return;
 			}
 		}
 		break;
@@ -2021,7 +2034,7 @@ bool Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 					
 					if(eqn.te != te_st){
 						cout << eqn.te << " " << te_st << " compare" << endl; 
-						emsg_input("Swap index dif res");
+						alert_emsg_input("Swap index dif res");
 					}
 				}
 				
@@ -2053,4 +2066,20 @@ string Input::get_data_dir(string data_dir)
 	}
 	return data_dir;
 }
+
+
+/// Gets the chain number 
+unsigned int Input::get_chain()
+{
+	auto chain = get_tag_value("chain"); 
+	auto ch = integer(chain);
+	if(ch == UNSET){
+		alert_import("Chain '"+chain+"' must be a number");
+	}
+	if(ch < 1 || ch > model.details.nchain) alert_import("Chain '"+chain+"' out of range");
+	
+	return ch-1;
+}
+
+
 				

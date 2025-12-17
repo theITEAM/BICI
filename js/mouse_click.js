@@ -875,6 +875,8 @@ function button_action(bu,action_type)
 		
 	case "InitPopAdd":
 		start_worker("Init pop convert",edit_source);
+		//inter.edit_source = false;
+		//start_worker("Data Source",{type:"Add", edit_source:edit_source});
 		break;
 		
 	case "EditSource":
@@ -1820,7 +1822,7 @@ function button_action(bu,action_type)
 						break;
 						
 					case "No":
-						run_cluster();
+						run_cluster_ppc();
 						break;
 					}
 				}
@@ -1858,6 +1860,22 @@ function button_action(bu,action_type)
 						break;
 					}
 				}
+			}
+		}
+		break;
+		
+	case "StartEXT":
+		if(check_error_textbox() == false){
+			copy_back_to_source();
+		
+			switch(model.inf_details.run_local.value){
+			case "Yes":
+				start_worker("StartEXT",{save_type:"ext", map_store:map_store, ver:ver});
+				break;
+				
+			case "No":
+				run_cluster_ext();
+				break;
 			}
 		}
 		break;
@@ -2224,6 +2242,7 @@ function button_action(bu,action_type)
 			let speed = anim.speed.value;
 			let fps =  Math.floor(anim.playframe_max*speed/4);
 			if(fps == 0) fps = 1;
+			if(fps > 50) fps = 50;
 			inter.fps = String(fps);
 		}
 		break;

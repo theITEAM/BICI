@@ -13,7 +13,7 @@ using namespace std;
 
 #include "output.hh"
 #include "utils.hh"
-//#include "state.hh"
+
 
 /// Initialises the output 
 Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model), mpi(mpi)
@@ -25,7 +25,7 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 	if(input.datadir != ""){
 		switch(model.mode){
 		case SIM: sampledir_rel = "output-sim"; break;
-		case INF: sampledir_rel = "output-inf"; break;
+		case INF: case EXT: sampledir_rel = "output-inf"; break;
 		case PPC: sampledir_rel = "output-post-sim"; break;
 		case MODE_UNSET: emsg("Option not recognised"); break;
 		}
@@ -33,7 +33,7 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 		sampledir = input.datadir+"/"+sampledir_rel;
 		ensure_directory(sampledir);  
 		
-		if(model.mode == INF){
+		if(model.mode == INF || model.mode == EXT){
 			diagdir = sampledir+"/diagnostic";
 			ensure_directory(diagdir);                  // Creates the diagnostics directory
 		}
@@ -61,13 +61,19 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 			}
 			
 			if(command == "param-inf" || command == "param-stats-inf" || command == "state-inf" || 
-			   command == "diagnostics-inf" || command == "generation-inf" || 
+			   command == "diagnostics-inf" || 
 				 command == "trans-diag-inf" || command == "warning-inf" || st == "# OUTPUT INFERENCE"){
+				if(model.mode == INF || model.mode == EXT){
+					flag = true;
+				}
+			}
+			
+			if(command == "generation-inf" || command == "proposal-inf"){
 				if(model.mode == INF) flag = true;
 			}
 			
 			if(command == "param-post-sim" || command == "state-post-sim" || command == "warning-post-sim" || st == "# OUTPUT POSTERIOR SIMULATION"){
-				if(model.mode == INF || model.mode == PPC) flag = true;
+				if(model.mode == INF || model.mode == PPC || model.mode == EXT) flag = true;
 			}
 	
 			if(flag == true){
@@ -100,7 +106,7 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 		lines_raw.push_back("");
 		switch(model.mode){
 		case SIM: lines_raw.push_back("# OUTPUT SIMULATION"); break;
-		case INF: lines_raw.push_back("# OUTPUT INFERENCE"); break;
+		case INF: case EXT: lines_raw.push_back("# OUTPUT INFERENCE"); break;
 		case PPC: lines_raw.push_back("# OUTPUT POSTERIOR SIMULATION"); break;
 		case MODE_UNSET: break;
 		}
@@ -1239,7 +1245,7 @@ string Output::trace_init() const
 	
 	ss << ",L^markov,L^non-markov,L^ie,L^dist,L^obs,L^genetic-proc,L^genetic-obs,L^init";
 
-	if(model.mode == INF) ss << ",Prior";
+	if(model.mode == INF || model.mode == EXT) ss << ",Prior";
 	
 	ss << endl;
 	
@@ -1325,19 +1331,34 @@ string Output::ic_output(const Particle &part) const
 }
 
 
-/// Outputs the burnin fraction (needed for anneal scan)	
-void Output::set_output_burnin(double burnin_frac)
+/// Sets inference property (needed for anneal scan)	
+void Output::set_inference_prop(double value, string tag, double def)
 {
 	if(!op()) return;
+	
+	auto te = " "+tag;
+	auto len = te.length();
 	
 	for(auto j = 0u; j < lines_raw.size(); j++){
 		auto st = lines_raw[j];
 		auto spl = split(st,' ');
 		if(spl[0] == "inference"){
-			auto k = 0u; while(k < st.length()-15 && st.substr(k,15) != " burnin-percent") k++;
-			if(k < st.length()-15) st = st.substr(0,k);
-			if(burnin_frac != BURNIN_FRAC_DEFAULT){
-				st += " burnin-percent=" + to_str(burnin_frac);
+			auto k = 0u; while(k < st.length()-len && st.substr(k,len) != te) k++;
+			if(k < st.length()-len){ 
+				auto kk = k+len;
+				while(kk < st.length() && st.substr(kk,1) != "=") kk++;
+				kk++;
+				while(kk < st.length() && st.substr(kk,1) == " ") kk++;
+				auto kstart = kk;
+				while(kk < st.length() && st.substr(kk,1) != " ") kk++;
+				auto kend = kk;
+				
+				st = st.substr(0,kstart)+to_str(value)+st.substr(kend);
+			}
+			else{ // Adds to end
+				if(value != def){
+					st += te+"=" + to_str(value);
+				}
 			}
 			lines_raw[j] = st;
 			return;
@@ -1391,6 +1412,54 @@ void Output::param_sample(const Particle &part)
 	param_store.push_back(part);
 	timer[PARAM_OUTPUT] += clock();
 }
+
+
+/// Gets parameter vector from a row in the loaded table (used for EXT)
+vector < vector <double> > Output::get_param_from_table_row(const vector <string> &row) const
+{
+	vector <double> vec;
+	
+	for(auto i = 1u; i < row.size(); i++){
+		auto val = number(row[i]);
+		if(val == UNSET) emsg("Loaded row not a number");
+		vec.push_back(val);
+	}
+	
+	auto k = 0u;
+	
+	vector < vector <double> > value;
+	
+	value.resize(model.param.size());
+	for(auto th = 0u; th < model.param.size(); th++){
+		const auto &par = model.param[th];
+		if(par.trace_output){
+			if(model.is_symmetric(par)){  // Outputs covariance matrix
+				auto L = par.dep[0].list.size();
+				value[th].resize(L*L);
+				for(auto j = 0u; j < L; j++){  // Diagonal elements
+					value[th][j*L+j] = vec[k]; k++;
+				}
+	
+				for(auto j = 0u; j < L; j++){  // Off-diagonal elements
+					for(auto i = j+1; i < L; i++){	
+						value[th][j*L+i] = vec[k]; 
+						value[th][i*L+j] = vec[k]; 
+						k++;
+					}
+				}
+			}
+			else{			
+				value[th].resize(par.N);
+				for(auto j = 0u; j < par.N; j++){
+					value[th][j] = vec[k]; k++; 
+				}
+			}
+		}
+	}
+	
+	return value;
+}
+
 
 /// Outputs a parameter sample 
 string Output::param_output(const Particle &part, const vector < vector <double> > &value) const
@@ -1458,7 +1527,9 @@ string Output::param_output(const Particle &part, const vector < vector <double>
 	if(std::isnan(like.init_cond)) emsg("pp");
 	ss << "," << like.markov << "," << like.nm_trans << "," << like.ie << "," << like.dist << "," << like.obs << "," << like.genetic_process << "," << like.genetic_obs << "," << like.init_cond;
 
-	if(model.mode == INF) ss << "," << like.prior+like.prior_bounded+like.spline_prior+like.init_cond_prior;
+	if(model.mode == INF || model.mode == EXT){
+		ss << "," << like.prior+like.prior_bounded+like.spline_prior+like.init_cond_prior;
+	}
 	
 	ss << endl;
 	return ss.str();
@@ -1677,7 +1748,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 			break;
 		}
 		
-		if(cum_diag && model.mode == INF){
+		if(cum_diag && (model.mode == INF || model.mode == EXT)){
 			ss << "<TRANSDISTPROB>" << endl;
 				
 			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
@@ -1835,7 +1906,7 @@ vector < vector <double> > Output::param_value_from_vec(const Particle &pa) cons
 	auto param_val = model.get_param_val(pa);
 	//cout << "PRINT" << endl;
 	//model.print_param(param_val);
-	
+		
 	model.add_tvreparam(param_val,pa.param_val_tvreparam);
 	
 	const auto &val = param_val.value;
@@ -1844,7 +1915,7 @@ vector < vector <double> > Output::param_value_from_vec(const Particle &pa) cons
 	value.resize(model.param.size());
 	for(auto th = 0u; th < model.param.size(); th++){
 		const auto &par = model.param[th];
-		if(par.trace_output){
+		if(par.trace_output || par.state_output){
 			value[th].resize(par.N,UNSET);
 			if(par.variety != CONST_PARAM){
 				for(auto j = 0u; j < par.N; j++){
@@ -1941,7 +2012,7 @@ string Output::output_param(const vector < vector <double> > &value) const
 	for(auto th = 0u; th < model.param.size(); th++){
 		const auto &par = model.param[th];
 		
-		if(par.trace_output){
+		if(par.state_output){
 			auto pn = replace_arrow(par.name);
 			pn = add_escape_char(pn);
 			ss << "\"" << pn << "\"";
@@ -2014,7 +2085,7 @@ vector <Particle> Output::get_part_chain(unsigned int chain, vector <Particle> &
 	
 	vector <unsigned int> hole;
 	auto j = 0u;
-	
+					
 	for(auto i = 0u; i < part.size(); i++){
 		auto &pa = part[i];
 		if(pa.chain == chain){
@@ -2026,15 +2097,16 @@ vector <Particle> Output::get_part_chain(unsigned int chain, vector <Particle> &
 			if(j < hole.size()){
 				part[hole[j]] = pa;
 				clear_part(pa);
+				hole.push_back(i);
 				j++;
 			}
 		}
 	}
-	
+
 	if(j < hole.size()){
 		part.resize(part.size()-(hole.size()-j));
 	}
-	
+
 	return part_ch;
 }
 
@@ -2189,37 +2261,43 @@ void Output::end(string file, unsigned int total_cpu)
 	}
 
 	vector <string> final_warning;
-	
-	if(op() && model.mode == INF && com_op == false){
-		output_param_statistics(param_samp,fout,final_warning);
-	}
-	
-	auto trans_diag = trans_diag_init(); 
-	
-	auto trans_diag_on = false; if(model.mode == INF) trans_diag_on = true;
+
+	output_rate_warning(total_cpu,50,100,final_warning);
+		
+	auto trans_diag_on = false; 
+	if(model.mode == INF || model.mode == EXT) trans_diag_on = true;
 	
 	for(auto ch = 0u; ch < model.details.nchain; ch++){
+		auto trans_diag = trans_diag_init(); 
+	
 		auto frac = double(ch)/nchain;
 		percentage(25+frac*25,100);
 
 		auto part = get_part_chain(ch,state_store);
-		
+
 #ifdef USE_MPI	
 		mpi.transfer_particle(part);
 #endif
-	
+
 		if(op() && part.size() > 0){
 			number_part(part);
-			if(trans_diag_on) trans_diag_add(trans_diag,part); 
-
+			if(trans_diag_on){
+				trans_diag_add(trans_diag,part); 
+				output_trans_diag(ch,trans_diag,fout);
+			}
+			
 			output_state(ch,part,fout);
 		}
 	}
 
-	if(op() && trans_diag_on){
-		output_trans_diag(trans_diag,fout);
+#ifdef USE_MPI	
+	mpi.transfer_terminal_info(terminal_info);
+#endif
+
+	if(op() && model.mode == INF){
+		output_prop_info(fout);
 	}
-	
+
 	auto alg = model.details.algorithm;
 	if(alg == PAS_MCMC || alg == ABC_SMC_ALG){
 		auto part = get_part_chain(GEN_PLOT,param_store);
@@ -2247,10 +2325,12 @@ void Output::end(string file, unsigned int total_cpu)
 		}
 	}
 
+	if(op() && (model.mode == INF || model.mode == EXT) && com_op == false){
+		output_param_statistics(param_samp,fout,final_warning);
+	}
+	
 	output_add_ind_warning(final_warning);
 
-	output_rate_warning(total_cpu,50,100,final_warning);
-	
 	output_spline_out_warning(final_warning);
 
 	for(const auto &der : model.derive){
@@ -2292,10 +2372,32 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 	string param_out;
 	
 	param_out += trace_init();
+	
+	if(model.mode == EXT){  // Adds any existing samples
+		const auto &tab = model.param_samp_store[ch];
+	
+		auto spl = split(param_out,',');
+		if(spl.size() != tab.ncol){
+			emsg("Error loading previous parameter samples due to inconsistency with the model.");
+		}			
+	
+		for(auto r = 0u; r < tab.nrow; r++){
+			param_out += stringify(tab.ele[r])+endli;
+			
+			auto s = number(tab.ele[r][0]);
+			if(s == UNSET) emsg("Problem with unset");
+			
+			if(s >= burn){
+				auto value = get_param_from_table_row(tab.ele[r]);
+				param_samp[ch].push_back(value);				
+			}
+		}
+	}
+	
 	for(const auto &pa : part){
 		auto value = param_value_from_vec(pa);
 
-		if(model.mode == INF && pa.s >= burn){
+		if((model.mode == INF && pa.s >= burn) || model.mode == EXT){
 			param_samp[ch].push_back(value);				
 		}
 		param_out += param_output(pa,value);
@@ -2322,8 +2424,8 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 		ss << "param-sim file=\"" << param_out_file << "\"" << endl;
 		break;
 
-	case INF:
-		ss << "param-inf chain=" << ch << " file=\""+param_out_file+"\"" << endl;
+	case INF: case EXT:
+		ss << "param-inf chain=" << (ch+1) << " file=\""+param_out_file+"\"" << endl;
 		break;
 	
 	case PPC:
@@ -2343,7 +2445,7 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 string Output::get_file_name(string root, unsigned int ch, unsigned int nchain, string end) const
 {
 	auto name = root;
-	if(ch != UNSET && ch != GEN_PLOT && nchain > 1 && model.mode != PPC) name += "_"+tstr(ch);
+	if(ch != UNSET && ch != GEN_PLOT && nchain > 1 && model.mode != PPC) name += "_"+tstr(ch+1);
 	name += end;
 	
 	return name;
@@ -2532,8 +2634,16 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 			auto ESS_min = LARGE;
 			for(const auto &wa : ESS_warn){ if(wa.num < ESS_min) ESS_min = wa.num;}
 			
-			auto sa = (unsigned int)(1.1*model.details.sample*double(ESS_THRESH)/ESS_min);
-			ss << "An estimated " << sa << " updates are required. ";
+			double nsamp = model.details.sample;
+			if(model.mode == EXT){
+				const auto &ef = model.ext_factor;
+				if(ef.percent) nsamp *= ef.value/100.0;
+				else nsamp = ef.value;
+			}
+		
+			auto sa = (unsigned int)(1.1*nsamp*double(ESS_THRESH)/ESS_min);
+			
+			ss << "An estimated " << sig_fig(sa,2) << " updates are required. ";
 		}
 		
 		//ss << endl;
@@ -2570,6 +2680,83 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 }
 	
 
+/// Outputs proposal information
+void Output::output_prop_info(ofstream &fout) const
+{
+	auto nchain = model.details.nchain;
+	
+	for(auto ch = 0u; ch < model.details.nchain; ch++){
+		auto j = 0u; while(j < terminal_info.size() && terminal_info[j].ch != ch) j++;
+		if(j != terminal_info.size()){
+			const auto &ti = terminal_info[j];
+		
+			stringstream ss;
+			ss << "covar_matrix";
+			ss << "|";
+			ss << ti.n << "|";
+			ss << ti.n_start << "|";
+			auto N = ti.av.size();
+			for(auto k = 0u; k < N; k++){
+				if(k != 0) ss << ",";
+				ss << ti.av[k];
+			}
+			ss << "|";
+			for(auto j = 0u; j < N; j++){
+				for(auto k = 0u; k < N; k++){
+					if(!(j == 0 && k == 0)) ss << ",";
+					ss << ti.av2[j][k];
+				}
+			}
+			ss << endl;
+			
+			for(const auto &pi : ti.prop_info_store){
+				auto j = 0u;
+				while(j < prop_info_list.size() && prop_info_list[j] != pi.type) j++;
+				if(j == prop_info_list.size()) emsg("could not find");
+				
+				ss << prop_info_str[j];
+				ss << "|";
+				for(auto k = 0u; k < pi.id.size(); k++){
+					if(k != 0) ss << ",";
+					auto va = pi.id[k];
+					if(va != UNSET) ss << va;
+				}
+				ss << "|";
+				ss << pi.value;
+				ss << "|";
+				for(auto k = 0u; k < pi.vec.size(); k++){
+					if(k != 0) ss << ",";
+					ss << pi.vec[k];
+				}
+				ss << endl;
+			}
+				
+			string file;
+				
+			if(sampledir != ""){
+				file = get_file_name("prop-info",ch,nchain,".txt");  
+		
+				ofstream pout(sampledir+"/"+file);
+				check_open(pout,file);
+				pout << ss.str();
+
+				file = sampledir_rel+"/"+file;
+			}
+			else{  // Embeds output into file
+				file = "[["+endli+ss.str()+"]]";
+			}
+
+			stringstream ss2;
+			ss2 << "proposal-inf chain=" << (ch+1) << " file=\"" << file << "\"" << endl;
+			ss2 << endl;
+			
+			if(com_op == true) cout << ss2.str();
+			else fout << ss2.str();
+		}
+	}
+}
+
+
 /// Outputs state samples
 void Output::output_state(unsigned int ch, const vector <Particle> &part, ofstream &fout) const
 {
@@ -2604,8 +2791,8 @@ void Output::output_state(unsigned int ch, const vector <Particle> &part, ofstre
 		ss << "state-sim file=\"" << state_out_file << "\"" << endl;
 		break;
 
-	case INF:
-		ss << "state-inf chain=" << ch << " file=\""+state_out_file+"\"" << endl;
+	case INF: case EXT:
+		ss << "state-inf chain=" << (ch+1) << " file=\""+state_out_file+"\"" << endl;
 		break;
 	
 	case PPC:
@@ -2622,10 +2809,12 @@ void Output::output_state(unsigned int ch, const vector <Particle> &part, ofstre
 
 	
 /// Outputs results for trans_diag
-void Output::output_trans_diag(const vector <TransDiagSpecies> &trans_diag, ofstream &fout) const
+void Output::output_trans_diag(unsigned int ch, const vector <TransDiagSpecies> &trans_diag, ofstream &fout) const
 {
-	stringstream sstd;
+	auto nchain = model.details.nchain;
 	
+	stringstream sstd;
+
 	auto T = model.details.T;
 	for(auto p = 0u; p < model.nspecies; p++){
 		const auto &sp = model.species[p];
@@ -2648,7 +2837,8 @@ void Output::output_trans_diag(const vector <TransDiagSpecies> &trans_diag, ofst
 	string trans_diag_out_file;
 	
 	if(sampledir != ""){
-		trans_diag_out_file = "diagnostic/trans_diag.txt";
+		trans_diag_out_file = get_file_name("diagnostic/trans_diag",ch,nchain,".txt");  
+		
 
 		ofstream pout(sampledir+"/"+trans_diag_out_file);
 		check_open(pout,trans_diag_out_file);
@@ -2661,7 +2851,7 @@ void Output::output_trans_diag(const vector <TransDiagSpecies> &trans_diag, ofst
 	}
 
 	stringstream ss;
-	ss << "trans-diag-inf file=\"" << trans_diag_out_file << "\"" << endl;
+	ss << "trans-diag-inf chain=" << (ch+1) << " file=\"" << trans_diag_out_file << "\"" << endl;
 	ss << endl;
 	
 	if(com_op == true) cout << ss.str();
@@ -2676,7 +2866,7 @@ void Output::add_warning(string err_msg, ofstream &fout) const
 	
 	switch(model.mode){
 	case SIM: line = "warning-sim"; break;
-	case INF: line = "warning-inf"; break;
+	case INF: case EXT: line = "warning-inf"; break;
 	case PPC: line = "warning-post-sim"; break;
 	case MODE_UNSET: emsg("op problem"); break;
 	}
@@ -2735,7 +2925,7 @@ void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start,
 	
 	auto T = state.T;
 	auto dt = model.details.dt;
-	
+
 	rate_sum.resize(model.nspecies); 
 	for(auto p = 0u; p < model.nspecies; p++){
 		const auto &sp = model.species[p];	
@@ -2782,7 +2972,7 @@ void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start,
 
 	if(op()){
 		auto rate_thresh = RATE_RECOMMEND/dt;
-		
+
 		string err_msg = "";
 		for(auto p = 0u; p < model.nspecies; p++){		
 			const auto &sp = model.species[p];
@@ -2806,6 +2996,7 @@ void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start,
 				else{
 					for(auto ti = 0u; ti < T; ti++){
 						auto val = rate_sum[p][tr][ti]/nrate_sum;
+
 						if(val > rmax) rmax = val;
 						if(val > rate_thresh) fl = true;
 					}
@@ -2954,7 +3145,7 @@ void Output::output_diagnostic(const vector <Diagnostic> &diagnostic, bool &alg_
 		}
 		
 		stringstream ss;
-		ss << "diagnostics-inf chain=" << di.ch << " file=\""+diag_out_file+"\"" << endl;
+		ss << "diagnostics-inf chain=" << (di.ch+1) << " file=\""+diag_out_file+"\"" << endl;
 		ss << endl;
 		
 		if(com_op == true) cout << ss.str();

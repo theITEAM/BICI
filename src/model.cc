@@ -14,9 +14,11 @@ using namespace std;
 #include "matrix.hh"
 
 /// Initialises the model 
-Model::Model(Operation mode_) : precalc_eqn(species_simp,spline,param_vec,pop,constant,timepoint,details)
+Model::Model(Operation mode_, ExtFactor ext_factor_) : precalc_eqn(species_simp,spline,param_vec,pop,constant,timepoint,details)
 {
-	mode = mode_;  
+	mode = mode_; 
+	ext_factor = ext_factor_;	
+	sync_on = true;
 	nspecies = 0;
 };
 
@@ -229,7 +231,7 @@ void Model::sample_ieg_cv(PV &param_val) const
 	}
 }
 
-/// Updatews precalc for all times
+/// Updates precalc for all times
 void Model::param_spec_precalc_time_all(const vector < vector <double> > &popnum_t, PV &param_val, bool store) const
 {
 	for(auto ti = 0u; ti < details.T; ti++){
@@ -1742,12 +1744,14 @@ PV Model::get_param_val(const Particle &pa) const
 	param_val_init(param_val);
 	auto &value = param_val.value;
 	auto &precalc = param_val.precalc;
-	
+
 	for(auto &va : value) va = UNSET;
 	
 	for(auto i = 0u; i < nparam_vec_prop; i++){
 		auto th = param_vec_prop[i];
+	
 		value[th] = pa.param_val_prop[i];
+	
 		precalc_eqn.calculate(param_vec[th].set_param_spec_precalc,param_val,false);
 	}
 
@@ -1784,7 +1788,7 @@ PV Model::get_param_val(const Particle &pa) const
 			}
 		}
 	}
-
+	
 	precalc_eqn.calculate(spec_precalc,param_val,false);
 
 	if(false){
@@ -2987,4 +2991,68 @@ void Model::set_pop_reparam_th()
 		}
 		emsg("pop reparam th");
 	}
+}
+
+
+/// Loads up proposal information from the file
+string Model::load_prop_info(unsigned int ch, const vector <string> &lines)
+{
+	TerminalInfo ti;
+	ti.ch = ch;
+	for(auto i = 0u; i < lines.size(); i++){
+		auto spl = split(lines[i],'|');
+			
+		auto type = spl[0];
+		
+		if(type == "covar_matrix"){	
+			if(spl.size() != 5) return "not 5";
+		
+			ti.n = number(spl[1]);
+			if(ti.n == UNSET) return "n unset";
+
+			ti.n_start = number(spl[2]);
+			if(ti.n_start == UNSET) return "n_start unset";
+
+			auto vec = get_number_vec(spl[3]);
+			for(auto va : vec) if(va == UNSET) return "av unset";
+			auto N = vec.size();
+			ti.av = vec;
+			
+			auto vec2 = get_number_vec(spl[4]);
+			for(auto va : vec2) if(va == UNSET) return "av2 unset";
+			
+			if(vec2.size() != N*N) return "Not square";
+			
+			ti.av2.resize(N);
+			for(auto j = 0u; j < N; j++){
+				for(auto k = 0u; k < N; k++) ti.av2[j].push_back(vec2[j*N+k]);
+			}
+		}
+		else{
+			if(spl.size() != 4) return "not 4";
+		
+			auto j = 0u;
+			while(j < prop_info_str.size() && prop_info_str[j] != type) j++;
+			if(j == prop_info_str.size()) emsg("could not find");
+		
+			PropInfo pi;
+			pi.type = prop_info_list[j];
+			auto vec = get_number_vec(spl[1]);
+			for(auto va : vec){
+				if(va == UNSET) return "va uns";
+				pi.id.push_back(va);
+			}
+			pi.value = number(spl[2]);
+			pi.vec = get_number_vec(spl[3]);
+			for(auto va : pi.vec){
+				if(va == UNSET) return "va unse2";
+			}
+			
+			ti.prop_info_store.push_back(pi);
+		}
+	}
+	
+	terminal_info.push_back(ti);
+	
+	return "";
 }

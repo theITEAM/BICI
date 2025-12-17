@@ -243,7 +243,7 @@ void State::check_precalc_eqn(string ref)
 
 	for(auto th = 0u; th < value.size(); th++){
 		if(value_st[th] == UNSET){
-			emsg("Value should not be unset1");
+			emsg("Value should not be unset1 "+ref);
 		}
 		
 		if(dif(value_st[th],value[th],dif_thresh)){
@@ -1163,7 +1163,7 @@ void State::check_ie(unsigned int p, string ref)
 			add_alg_warn("Omega_Z problem");
 		}
 		
-		if(model.mode == INF){
+		if(model.mode == INF || model.mode == EXT){
 			if(dif(omega_inv_store,iesg.omega_inv,dif_thresh)){
 				add_alg_warn("Omega_inv problem");
 			}
@@ -1705,7 +1705,7 @@ void State::check_genetic_value(string ref)
 					
 					auto ev = species[in_inf.p].individual[in_inf.i].ev[in_inf.e];
 					if(ev.type != M_TRANS_EV) emsg("Should be markovian");
-					if(ev.tdiv != t) emsg("Porblem with time");
+					if(ev.tdiv != t) emsg("Problem with time");
 					
 					auto &iif = ev.ind_inf_from;
 					
@@ -1713,12 +1713,11 @@ void State::check_genetic_value(string ref)
 					if(tra.infection.type != TRANS_INFECTION) emsg("Should be and infection");
 					
 					auto t_inf = round_down(t);
-					
-					while(e < event.size() && event[e].tdiv < t_inf){
+					while(e < event.size() && event[e].tdiv <= t_inf){
 						c = event[e].c_after;
 						e++;
 					}
-				
+		
 					const auto &inf_c = model.inf_cause[in_inf.p][ev.tr_gl][in.p][c];
 					if(inf_c.eq_ref == UNSET){
 						//species[0].print_event(event);
@@ -2336,7 +2335,7 @@ void State::check_effect_out_of_range()
 {
 	check_timer[CHECK_RANGE] -= clock();
 	
-	string ty = "value"; if(model.mode == INF) ty = "prior";
+	string ty = "value"; if(model.mode == INF || model.mode == EXT) ty = "prior";
 		
 	for(auto p = 0u; p < model.species.size(); p++){	
 		const auto &sp = model.species[p];

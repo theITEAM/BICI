@@ -11,9 +11,17 @@ public:
 	CorMatrix(const Model &model);
    
 	unsigned int n;                  // Number of samples added to av and av2
+	
+	unsigned int n_start;            // The start of samples within av and av2
+
+	vector <double> av;              // The sum of parameter values 
+	vector < vector <double> > av2;  // The sum of param*param 
+	
+	vector < vector <double> > samp; // Stores historic parameter values
 
 	void init();
 	void add_sample(vector <double> param_val_prop, unsigned int range);
+	void add_sample2(vector <double> param_val_pr, unsigned int range);
 	void check() const;
 	vector < vector <double> > calculate_cor_matrix() const;
 	void set_mvn_from_particle(vector <Particle> &particle);
@@ -21,13 +29,7 @@ public:
 	unsigned int get_n();
 	
 private:
-	unsigned int n_start;            // The start of samp
-
 	unsigned int N;                  // The number of parameters
-	
-	vector <double> av;              // The sum of parameter values 
-	vector < vector <double> > av2;  // The sum of param*param 
-	vector < vector <double> > samp; // Stores historic parameter values
 	
 	const Model &model;
 };

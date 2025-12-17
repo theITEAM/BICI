@@ -1678,7 +1678,7 @@ function inference_command()
 	
 	let alg = get_tag_value("algorithm").toUpperCase();
 	if(alg == "" || set_default) alg = ALG_DEFAULT;
-	
+
 	if(option_error("algorithm",alg,inf_alg_list) == true) return;
 	
 	details.algorithm.value = alg;	
@@ -1693,7 +1693,7 @@ function inference_command()
 	details.indmax = check_pos_integer("ind-max",INDMAX_DEFAULT);
 	
 	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
-	
+
 	switch(alg){
 	case "DA-MCMC":
 		details.nchain = check_pos_integer("nchain",MCMC_CHAIN_DEFAULT);
@@ -1730,9 +1730,9 @@ function inference_command()
 	}
 	
 	if(make_one_chain){
-		details.algorithm.value = "DA-MCMC";
 		details.nchain = 1;
-		details.sample = 1000;
+		//details.algorithm.value = "DA-MCMC";
+		//details.sample = 1000;
 	}
 	
 	details.burnin_frac = BURNIN_FRAC_DEFAULT;
@@ -1785,11 +1785,18 @@ function inference_command()
 		}
 	}
 	
-	let ppc = model.ppc_details;
-
-	if(ppc.ppc_t_start == ""){
-		ppc.ppc_t_start = details.t_start;
-		ppc.ppc_t_end = details.t_end;
+	if(alg == "DA-MCMC" || alg == "PAS-MCMC"){
+		let sync = get_tag_value("sync").toLowerCase();
+		if(sync != ""){
+			if(option_error("sync",sync,["on","off"]) == true) return;
+		}
+		if(sync == "off") details.sync_on.value = "Off";
+	}
+	
+	let det_ppc = model.ppc_details;
+	if(det_ppc.ppc_t_start == ""){
+		det_ppc.ppc_t_start = details.t_start;
+		det_ppc.ppc_t_end = details.t_end;
 	}
 	
 	let diag = get_tag_value("diagnostics").toLowerCase();
@@ -2023,7 +2030,7 @@ function ind_effect_command()
 
 			A_matrix.ind_list = tab.heading;
 			if(tab.nrow != tab.ncol){
-				alert_import("The file '"+tab.filename+"' must contain an equal number of columns and rows."); 
+				alert_import("The file '"+tab.filename+"' must contain an equal number of columns and rows "+print_row_col(tab)+"."); 
 			}
 			
 			let val = [];
@@ -2050,7 +2057,7 @@ function ind_effect_command()
 
 			A_matrix.ind_list = tab.heading;
 			if(tab.nrow != tab.ncol){
-				alert_import("The file '"+tab.filename+"' must contain an equal number of columns and rows."); 
+				alert_import("The file '"+tab.filename+"' must contain an equal number of columns and rows "+print_row_col(tab)+"."); 
 			}
 			
 			let val = [];
@@ -2456,8 +2463,10 @@ function sim_param_command()
 function get_chain_value()
 {
 	let chain = get_tag_value("chain");
-	if(chain == "") chain = "0";
-	return String(Number(chain)+1);
+	if(chain == "") chain = "1";
+	if(isNaN(chain)) alert_import("For 'chain' the value '"+chain+"' must be a number.");
+	
+	return String(Number(chain));
 }
 
 
@@ -2522,6 +2531,16 @@ function sim_state_command()
 }
 
 
+/// Reads in proposal informatio
+function proposal_inf_command()
+{
+	let file = get_tag_value("file");
+	if(file == "") cannot_find_tag();
+	
+	let ch = get_chain_value();
+}
+
+
 /// Reads in state samples into inf_results
 function inf_state_command()
 {
@@ -2530,7 +2549,7 @@ function inf_state_command()
 	let fi = get_fi(file);
 	
 	let chain = get_chain_value();
-	
+
 	read_state_samples_file(chain,fi,inf_result);
 }
 
@@ -2553,7 +2572,9 @@ function trans_diag_command()
 	if(file == "") cannot_find_tag();
 	let fi = get_fi(file);
 	
-	read_trans_diag(fi,inf_result);
+	let ch = get_chain_value();
+	
+	read_trans_diag(ch,fi,inf_result);
 }
 
 

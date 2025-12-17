@@ -16,6 +16,8 @@ class Model                                // Stores information about the model
 	public:
 		SampType samp_type;                    // Used to change individual sampling
 	
+		bool sync_on;                          // Determines if sychronisation of proposals is done
+		
 		vector <Species> species;              // Compartmental model /data for different species
 		unsigned int nspecies;                 // The number of species
 		
@@ -64,9 +66,15 @@ class Model                                // Stores information about the model
 	
 		bool trans_tree;                       // Set if trans_tree exists in the model
 		
-		vector <Sample> sample;                // Stores inferred state (used for PPC)
+		vector <Table> param_samp_store;       // Stores parameter samples (used for EXT);
+		
+		vector <Sample> sample;                // Stores inferred state (used for PPC/EXT)
+		
+		vector <TerminalInfo> terminal_info;   // Loaded proposal information [chain]
 		
 		Operation mode;                        // SIM for simulation, INF for inference, PPC for post sim
+		
+		ExtFactor ext_factor;                  // Extension factor                  
 		
 		Details details;                       // Details for simulation/inference
 		
@@ -83,7 +91,7 @@ class Model                                // Stores information about the model
 		vector <unsigned int> param_vec_ref;   // Stores where param are on precalc
 		vector <unsigned int> spline_ref;      // Stores where spline is on precalc
 	
-		Model(Operation mode_);
+		Model(Operation mode_, ExtFactor ext_factor_);
 		void add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv = UNSET);
 		void param_val_init(PV &param_val) const;
 		PV param_sample() const;
@@ -156,7 +164,8 @@ class Model                                // Stores information about the model
 		string str_spec_precalc(string st, const SpecPrecalc &spre) const;
 		void set_param_spec_precalc();
 		void set_pop_reparam_th();
-
+		string load_prop_info(unsigned int ch, const vector <string> &lines);
+		
 	private:
 		Hash hash_all_ind;                     // Stores individuals in a hash table
 		

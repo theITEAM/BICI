@@ -39,7 +39,7 @@ void Input::check_initial_pop_error(bool end)
 			}
 			break;
 		
-		case INF:
+		case INF: case EXT:
 			if(ninitpop > 1){
 				alert_import("Only one initial population should be set for species '"+name+"'");
 				return;
@@ -67,7 +67,7 @@ void Input::check_initial_pop_error(bool end)
 		case PPC:
 			break;
 			
-		default: emsg_input("Should not be default3a"); return;
+		default: alert_emsg_input("Should not be default3a"); return;
 		}
 	}
 }
@@ -939,3 +939,17 @@ void Input::check_eqn_fixed_time()
 	}
 }
 
+
+/// Prints the number of columns and rows in a table
+string Input::print_row_col(const Table &tab) const
+{
+	stringstream ss;
+	ss << "(there ";
+	if(tab.ncol == 1) ss << "is " << tstr(tab.ncol) << " column"; 
+	else ss << "are " << tstr(tab.ncol) << " columns";
+	ss << " and ";
+	if(tab.nrow == 1) ss << tstr(tab.nrow) << " row"; 
+	else ss << tstr(tab.nrow) << " rows)";
+	
+	return ss.str();
+}

@@ -1058,17 +1058,27 @@ function graph_trans_expect_calculate(result,rpf,burn,p,type)
 			add_line(view,line,col,tr.name,data,key);
 			
 			// Adds in line for expected transition number
+			let list=[];
+			for(let i = 0; i < result.td_res.length; i++){
+				if(result.td_res[i].chain == chsel || chsel == "All") list.push(i);
+			}
+			let kmax = list.length;
+			
 			let point=[];
 			for(let t = 0; t < T; t += step){
 				let step_max = t + step; if(step_max > T) step_max = T;
 					
 				let dt = timepoint[step_max] - timepoint[t];
-						
+								
 				let num = 0;
-				for(let ij = 0; ij < tr_list.length; ij++){
-					let exp_num = sp.exp_num[tr_list[ij]];
-					for(let tt = t; tt < step_max; tt++) num += exp_num[tt];
+				for(let k = 0; k < kmax; k++){
+					let en = result.td_res[list[k]].species[p].exp_num;
+					for(let ij = 0; ij < tr_list.length; ij++){
+						let exp_num = en[tr_list[ij]];
+						for(let tt = t; tt < step_max; tt++) num += exp_num[tt];
+					}
 				}
+				num /= kmax;
 		
 				if(T <= step){
 					point.push({x:timepoint[t], y:num/dt});
@@ -1081,7 +1091,6 @@ function graph_trans_expect_calculate(result,rpf,burn,p,type)
 				
 			let col_sh = shift_colour(col,0.6);
 			data.push({point:point, col:col_sh, view:view, type:"Line", dash:TRANS_EXP_DASH, thick:TRANS_EXP_THICK});
-			
 		}
 	}
 	
@@ -1349,6 +1358,10 @@ function add_individual_buts(res,lay)
 	case "Statistics": title = "Individual effect statistics"; he = ind_statistics_text; break;
 	case "Trans. Tree": title = "Transmission tree"; he = ind_transtree_text; break;
 	case "Phylo. Tree": title = "Phylogenetic tree"; he = ind_phylotree_text; break;
+	case "First Inf. Time": title = "First infection time"; he = ind_first_inf_time_text; break;
+	case "First Inf. Ind.": title = "First infected individual"; he = ind_first_inf_ind_text; break;
+	case "First Inf. Comp.": title = "First infected compartment"; he = ind_first_inf_comp_text; break;
+	
 	default: break;
 	}
 
@@ -1392,10 +1405,12 @@ function add_individual_buts(res,lay)
 			inter.graph.create(x,cy,w,h,lay); 
 		}
 		break;
-	case "Individual plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); break;
+	case "Individual plot":
+		inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); 
+		break;
 	case "TransTree plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); break;
 	case "PhyloTree plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); break;
-	case "Histogram plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); break;
+	case "Histogram plot": inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); break;
 	case "No graph plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); break;
 	default: error("Graph not plotting"+vari); break;
 	}
@@ -1515,6 +1530,11 @@ function graph_ind_calculate(result,rpf,burn,p)
 	
 	if(rpf.sel_indview.te == "First Inf. Ind."){
 		add_first_inf_ind(imin,imax,tmin,tmax,chsel,result,rpf,burn);
+		return;		
+	}
+	
+	if(rpf.sel_indview.te == "First Inf. Comp."){
+		add_first_inf_comp(imin,imax,tmin,tmax,chsel,result,rpf,burn,p,cl);
 		return;		
 	}
 	
@@ -3122,6 +3142,33 @@ function get_first_infected_time(sampl)
 }
 
 
+/// Gets transition of first infected individual
+function get_first_infected_tra(sampl)
+{
+	let tmin = get_first_infected_time(sampl);
+	let res=[];
+	for(let p = 0; p < sampl.species.length; p++){
+		let sa = sampl.species[p];
+
+		for(let i = 0; i < sa.individual.length; i++){
+			let ind = sa.individual[i];
+	
+			let ev = ind.ev;
+			for(let e = 0; e < ev.length; e++){
+				let eve = ev[e];
+				if(eve.infection){
+					if(eve.t == tmin){
+						res.push({p:p, tr:eve.trg});
+					}
+				}
+			}
+		}
+	}
+	
+	return res;
+}
+
+
 function get_first_infected_list(tmin,sampl)	
 {
 	let fi = [];
@@ -3251,6 +3298,60 @@ function add_first_inf_ind(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 				data.push({type:"ErrorBar", x:x+0.5, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
 				x++;
 			}
+		}
+	}
+		
+	post({type:"Graph define", variety:"Histogram", view:"Histogram", data:data, op:{x_label:"Individual", x_param:false, y_label:"Probability"}});
+}
+
+
+/// Creates a distribution plot for the first infection time
+function add_first_inf_comp(imin,imax,tmin,tmax,chsel,result,rpf,burn,p,cl)
+{	
+	let sp = result.species[p];
+	let claa = sp.cla[cl];
+	
+	let dist=[];
+	for(let c = 0; c < claa.comp.length; c++){
+		dist[c] = 0;
+	}
+	
+	let num = 0;
+	for(let samp = imin; samp < imax; samp++){
+		let sampl = result.sample[samp];
+		if(sampl.num >= burn && !(chsel != "All" && sampl.chain != chsel)){	
+		
+			let res = get_first_infected_tra(sampl);
+		
+			for(let j = 0; j < res.length; j++){
+				let re = res[j];
+				if(re.p == p){
+					let cfin = sp.tra_gl[re.tr].f;
+					let c = sp.comp_gl[cfin].cla_comp[cl];
+					dist[c]++;
+					num++;
+				}
+			}
+			
+		}						
+	}
+	
+	if(num == 0){
+		post(no_graph_msg("No first infection"));
+		return;
+	}
+	
+	for(let c = 0; c < claa.comp.length; c++){
+		dist[c] /= num;
+	}
+	
+	let data=[];
+	
+	let x = 0;
+	for(let c = 0; c < claa.comp.length; c++){
+		if(dist[c] > 0){
+			data.push({type:"Bar", name:claa.comp[c].name, x:x+0.5, y:dist[c], thick:bar_thick, col:DGREY});
+			x += 1;
 		}
 	}
 		
@@ -4575,7 +4676,7 @@ function graph_param_calculate(result,rpf,burn)
 						
 						let iburn = imin;
 						
-						if(vte == "Trace"){
+						if(vte == "Trace" && par.type != "derive_param"){
 							while(iburn < sample.length && sample[iburn].num < burn) iburn++;
 							
 							if(iburn > imin){
@@ -4592,9 +4693,10 @@ function graph_param_calculate(result,rpf,burn)
 								data.push({point:point, col:col, type:"BurninLine"});
 							}
 						}
-						
+					
 						for(let i = iburn; i < sample.length; i++){
 							let samp = sample[i];
+							
 							if(samp.chain == cha){
 								point.push({x:samp.num, y:get_param_val(ind,samp.param[th],par)});
 							}
@@ -4675,7 +4777,22 @@ function graph_param_calculate(result,rpf,burn)
 							let li = pview.list[i];
 						
 							let stat = get_param_stats(li.th,li.index,result,rpf,burn);
-							table.content.push([{te:li.name, pname:true},{te:stat.mean},{te:stat.CImin},{te:stat.CImax},{te:stat.ESS},{te:stat.GR}]);
+							
+							let ESS_col = BLACK; 
+							let ESS = Number(stat.ESS);
+							if(!isNaN(ESS)){ 
+								if(ESS < 200) ESS_col = ORANGE;
+								if(ESS < 150) ESS_col = RED;
+							}
+							
+							let GR_col = BLACK; 
+							let GR = Number(stat.GR);
+							if(!isNaN(GR)){ 
+								if(GR > 1.05) ESS_col = ORANGE;
+								if(GR > 1.1) ESS_col = RED;
+							}
+							
+							table.content.push([{te:li.name, pname:true},{te:stat.mean},{te:stat.CImin},{te:stat.CImax},{te:stat.ESS, stat_col:ESS_col},{te:stat.GR, stat_col:GR_col}]);
 						}
 						break;
 					}
@@ -4723,9 +4840,17 @@ function graph_generation_calculate(result,rpf,burn)
 	for(let g = 0; g < result.generation.length; g++){
 		let gen = result.generation[g];
 	
-		pmean.push({x:g+0.5, y:get_element(gen.mean[th],ind)});
-		pCImin.push({x:g+0.5, y:get_element(gen.CImin[th],ind)});
-		pCImax.push({x:g+0.5, y:get_element(gen.CImax[th],ind)});
+		if(gen.mean[th] == "const"){
+			let val = get_element(par.value,ind);
+			pmean.push({x:g+0.5, y:val});
+			pCImin.push({x:g+0.5, y:val});
+			pCImax.push({x:g+0.5, y:val});	
+		}
+		else{
+			pmean.push({x:g+0.5, y:get_element(gen.mean[th],ind)});
+			pCImin.push({x:g+0.5, y:get_element(gen.CImin[th],ind)});
+			pCImax.push({x:g+0.5, y:get_element(gen.CImax[th],ind)});
+		}
 	}
 										
 	data.push({point:pmean, col:GENRATION_COL, type:"Line"});

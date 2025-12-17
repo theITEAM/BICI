@@ -2336,7 +2336,8 @@ class Graph
 		let anim = this.animation;
 		if(timepoint && anim.playing == false){
 			let si = 1.2;
-			lay.add_button({te:"t="+timepoint[anim.playframe], x:lay.dx/2-3, y:0.3, dx:6, dy:si, type:"CenterText", font:get_font(si)}); 
+				
+			lay.add_button({te:"t="+precision(timepoint[anim.playframe],3), x:lay.dx/2-3, y:0.3, dx:6, dy:si, type:"CenterText", font:get_font(si)}); 
 		}
 	}
 
@@ -2960,6 +2961,7 @@ class Graph
 	/// Exports an image of the graph
 	export_video(filename)
 	{
+
 		let anim = this.animation;
 		
 		start_loading_symbol(0,"Creating");
@@ -2982,8 +2984,11 @@ class Graph
 		const fs = require("fs");
 		const path = require("path");
 
-		const directory = "frame";
-
+		let directory = "frame";
+		if(ver=="mac"){
+			make_dir(mac_temp_dir+"frame");
+			directory = mac_temp_dir+"frame";
+		}
 		fs.readdir(directory, (err, files) => {
 			if(!err){
 				for (const file of files) {
@@ -3024,8 +3029,14 @@ class Graph
 		case "Medium": sc = mp4_factor_medium; break; 
 		case "High": sc = mp4_factor_high; break; 
 		}
-		
-		this.export_image(sc,"frame/"+te+".png");
+
+		let directory = "frame";
+		let exfi ="ffmpeg/bin/ffmpeg.exe";
+		if(ver=="mac"){
+			directory = mac_temp_dir+"frame";
+			exfi ="ffmpeg/ffmpeg";
+		}
+		this.export_image(sc,directory+"/"+te+".png");
 		
 		generate_screen();
 		
@@ -3035,7 +3046,7 @@ class Graph
 		else{
 			start_loading_symbol(0,"mp4");
 				
-			this.spw = spawn("ffmpeg/bin/ffmpeg.exe",["-y","-f","image2","-framerate",inter.fps,"-i","frame/%05d.png","-c:v","libx264","-r","30","-pix_fmt","yuv420p",filename]);
+			this.spw = spawn(exfi,["-y","-f","image2","-framerate",inter.fps,"-i",directory+"/%05d.png","-c:v","libx264","-r","30","-pix_fmt","yuv420p",filename]);
 			
 			this.spw.stdout.on('data', function (data) {
 				//prr("data");

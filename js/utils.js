@@ -345,6 +345,14 @@ function update_param()
 /// Samples Poisson. This version should not fail when mean becomes large
 function poisson_sample(mean)
 {
+	if(mean > 100){  // Does normal approximation
+		let val; 
+		do{
+			val = Math.floor(normal_sample(mean,Math.sqrt(mean))+0.5);
+		}while(val < 0);
+		return val;
+	}
+	
 	let left = mean, k = 0, p = 1, STEP=500;
  
 	do{
@@ -383,8 +391,8 @@ function poisson_sample_old(mean)
 /// Checks the Poisson sampling is being done correctly
 function check_poisson()
 {
-	let m = 10000;
-	let max = 100000;
+	let m = 10000.5;
+	let max = 1000000;
 	let av = 0, av2 = 0;
 	for(let l = 0; l < max; l++){
 		let sa = poisson_sample(m);
@@ -412,6 +420,16 @@ function neg_binommial_sample(mean,p)
 	let r = Math.round(mean*p/(1-p));
 	if(r < 1) r = 1;
 	
+	if(mean > 100){ // Normal approximation
+		let sd = Math.sqrt(r*(1-p)/(p*p));
+		
+		let val;
+		do{
+			val = Math.floor(normal_sample(mean,sd)+0.5);
+		}while(val < 0);
+		return val;
+	}
+	
 	let nfail = 0, nsuc = 0; 
 	do{
 		if(Math.random() < p) nsuc++;
@@ -421,6 +439,27 @@ function neg_binommial_sample(mean,p)
 }
 
 
+/// Checks the negative binomial sampling is being done correctly
+function check_neg_binommial_sample()
+{
+	let mean = 100;
+	let p = 0.5;
+	
+	let r = Math.round(mean*p/(1-p));
+	let va = r*(1-p)/(p*p);
+		
+	let max = 100000;
+	let av = 0, av2 = 0;
+	for(let l = 0; l < max; l++){
+		let sa = neg_binommial_sample(mean,p)
+		av += sa; av2 += sa*sa;
+	}	
+	av /= max; av2 /= max;
+	
+	prr(av+" "+(av2-av*av)+" "+mean+" "+va+" Check neg_binommial");
+}
+	
+	
 /// Copies a source to a destination but omits certain data 
 function copy_strip(source,dest)
 {

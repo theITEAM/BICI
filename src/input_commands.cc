@@ -275,7 +275,7 @@ void Input::import_data_table_command(Command cname)
 		}
 		break;
 		
-	default: emsg_input("Should not be default2"); return;
+	default: alert_emsg_input("Should not be default2"); return;
 	}
 	
 	if(set_loadcol(cname,ds) == false) return;
@@ -486,6 +486,28 @@ bool Input::classification_command(unsigned int loop)
 	
 	return true;
 }
+
+
+/// Loads up proposal information
+void Input::proposal_info_command()
+{
+	auto file = get_tag_value("file"); if(file == ""){ cannot_find_tag(); return;}
+	
+	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
+	if(i == files.size()){
+		alert_import("Could not find the file '"+file+"'");
+		return;
+	}
+
+	auto ch = get_chain();
+
+	// For ext in -core mode only need to load states for that core
+	if(model.mode == EXT && mpi.core != ch/model.details.num_per_core) return;
+	
+	auto err = model.load_prop_info(ch,files[i].lines);
+	
+	if(err != "") alert_import("Proposal information could not be loaded: "+err);
+}	
 
 
 /// Adds a multiplier to a parameter (used in PPC)
@@ -1201,7 +1223,7 @@ void Input::param_command()
 	}
 	
 	switch(mode){
-	case INF: case PPC:
+	case INF: case PPC: case EXT:
 		value = "";
 		break;
 		
@@ -1316,7 +1338,7 @@ void Input::param_command()
 	
 	auto pre = "Parameter '"+par.full_name+"': ";
 	
-	if(value == "auto") emsg_input("auto no longer supported");
+	if(value == "auto") alert_emsg_input("auto no longer supported");
 		
 	if(pp.dep.size() == 0){
 		if(value != ""){
@@ -1360,7 +1382,7 @@ void Input::param_command()
 						par.variety = REPARAM_PARAM;		
 					}
 					else{ 
-						emsg_input("Problem importing"); 
+						alert_emsg_input("Problem importing"); 
 						return;
 					}
 				}
@@ -1373,7 +1395,7 @@ void Input::param_command()
 				if(is_file(valu) == false){
 					double val = number(valu);
 					
-					if(par.variety != CONST_PARAM) emsg_input("Should be const");
+					if(par.variety != CONST_PARAM) alert_emsg_input("Should be const");
 				
 					if(val == UNSET){
 						alert_import(desc+" '"+valu+"' is not a number");
@@ -1508,14 +1530,15 @@ void Input::param_command()
 	if(par.variety == UNSET_PARAM){
 		if(par.not_set){
 			switch(model.mode){	
-			case INF: case PPC:
+			case INF: case PPC: case EXT:
 				alert_import("A prior should be set for parameter '"+par.full_name+"'");
 				break;
 	
 			case SIM: 
 				alert_warning("A value has not been set for parameter '"+par.full_name+"'. Ignore this warning if this parameter is used in the observation process.");
 				break;
-			default: break;
+				
+			default: emsg("option he"); break;
 			}
 		}
 		else{
@@ -1524,7 +1547,8 @@ void Input::param_command()
 		return;
 	}
 	else{	
-		if(par.cat_factor && model.mode == INF){ // Adds an extra parameter to model categorical factor
+		// Adds an extra parameter to model categorical factor
+		if(par.cat_factor && (model.mode == INF || model.mode == EXT)){ 
 			add_param_cat_factor(par);
 		}
 		
@@ -1613,7 +1637,7 @@ void Input::derived_command()
 				
 				if(te_ch != der_eqn.te){
 					cout << der_eqn.te << " " << te_ch << " compare" << endl; 
-					emsg_input("Swap index dif res");
+					alert_emsg_input("Swap index dif res");
 				}
 			}
 			
@@ -1739,7 +1763,7 @@ bool Input::inference_command()
 	case DA_MCMC:
 		details.sample = check_pos_integer("update",MCMC_SAMPLE_DEFAULT);
 		details.nchain = check_pos_integer("nchain");
-		if(details.nchain%mpi.ncore != 0 && model.mode == INF){
+		if(details.nchain%mpi.ncore != 0 && (model.mode == INF || model.mode == EXT)){
 			alert_import("For 'nchain' the value '"+tstr(details.nchain)+"' must be a multiple of the number of cores");
 		}
 		details.num_per_core = check_pos_integer("chain-per-core",MCMC_CHAIN_PER_CORE_DEFAULT);
@@ -1751,7 +1775,7 @@ bool Input::inference_command()
 			details.accfrac = check_zero_one("acc-frac",ABC_ACFRAC_DEFAULT);
 			auto num = (unsigned int)(details.sample/details.accfrac);
 			
-			if(num%mpi.ncore != 0 && model.mode == INF){
+			if(num%mpi.ncore != 0 && (model.mode == INF || model.mode == EXT)){
 				alert_import("'sample' divided by 'acc-frac' must be a multiple of the number of cores"); 
 			}			
 			details.num_per_core = num/mpi.ncore;
@@ -1764,7 +1788,7 @@ bool Input::inference_command()
 		details.numgen = check_pos_integer("gen",ABCSMC_GEN_DEFAULT);
 		details.kernelsize = check_pos_number("kernel-size",ABCSMC_KERNEL_DEFAULT);
 		
-		if(details.sample%mpi.ncore != 0 && model.mode == INF){
+		if(details.sample%mpi.ncore != 0 && (model.mode == INF || model.mode == EXT)){
 			alert_import("For 'sample' the value '"+tstr(details.sample)+"' must be a multiple of the number of cores");
 		}	
 		details.num_per_core = details.sample/mpi.ncore;
@@ -1777,13 +1801,33 @@ bool Input::inference_command()
 			alert_import("For 'npart' the value '"+tstr(details.nchain)+"' must be 2 or above");
 		}
 		
-		if(details.nchain%mpi.ncore != 0 && model.mode == INF){
+		if(details.nchain%mpi.ncore != 0 && (model.mode == INF || model.mode == EXT)){
 			alert_import("For 'npart' the value '"+tstr(details.nchain)+"' must be a multiple of the number of cores");
 		}
 		details.num_per_core = check_pos_integer("part-per-core",PAS_PART_PER_CORE_DEFAULT);
 		break;
 		
 	default: break;
+	}
+	
+	model.sync_on = true;
+	auto sync = get_tag_value("sync");
+	auto sync_lo = toLower(sync);
+	
+	if(sync_lo != ""){
+		if(sync_lo == "on") model.sync_on = true;
+		else{
+			if(sync_lo == "off") model.sync_on = false;
+			else{
+				alert_import("For 'sync' the value '"+sync+"' must be a multiple of the number of cores");
+			}
+		}
+	}
+		
+	if(com_op){
+		if(details.num_per_core != details.nchain){
+			model.sync_on = false;
+		}
 	}
 	
 	details.diagnostics_on = true;
@@ -1796,7 +1840,7 @@ bool Input::inference_command()
 		if(details.output_state < 1) details.output_state = 1;	
 		
 		auto ncore = details.nchain/details.num_per_core;
-		if(ncore != mpi.ncore && model.mode == INF && mpi.core_spec_on == false){
+		if(ncore != mpi.ncore && (model.mode == INF || model.mode == EXT) && mpi.core_spec_on == false){
 			alert_import("The number of cores is '"+tstr(mpi.ncore)+"' and should be '"+tstr(ncore)+"'");
 		}
 	
@@ -1889,6 +1933,18 @@ bool Input::inference_command()
 	}
 	
 	if(check_dt(details) == false) return false;
+	
+	switch(algo){
+	case DA_MCMC: case PAS_MCMC:
+		if(model.mode == EXT && !model.ext_factor.percent){
+			if(model.ext_factor.value <= details.sample){
+				alert_import("The extended number of updates "+tstr(model.ext_factor.value)+" must be larger than the current number "+tstr(details.sample)+".");
+			}
+		}
+		break;
+		
+	default: break;
+	}
 	
 	return true;
 }
@@ -2060,12 +2116,13 @@ void Input::ind_effect_command()
 	
 	Amatrix A_matrix;
 	A_matrix.set = false;
-	
+
 	if(num == 1){
 		if(pedigree != ""){
 			A_matrix.set = true;
 			
 			auto tab_ped = load_table(pedigree);
+			if(tab_ped.error == true) return;
 				
 			if(tab_ped.ncol != 3){
 				alert_import("The 'pedigree' file should have three columns"); return;
@@ -2145,7 +2202,7 @@ void Input::ind_effect_command()
 					}
 					break;
 					
-				default: emsg_input("Not right"); break;
+				default: alert_emsg_input("Not right"); break;
 				}				
 			}
 		
@@ -2163,6 +2220,7 @@ void Input::ind_effect_command()
 			
 			auto tab_ind = load_table(ind_list);
 			if(tab_ind.error == true) return;
+			
 			for(auto r = 0u; r < tab_ind.nrow; r++){ 
 				auto id = tab_ind.ele[r][0];
 				auto k = A_matrix.hash_ind_list.find(id);
@@ -2183,7 +2241,6 @@ void Input::ind_effect_command()
 			for(auto j = 0u; j < N; j++) val[j].resize(N,0);
 		
 			auto tab = load_table(A_sparse);
-			
 			if(tab.error == true) return;
 		
 			for(auto r = 0u; r < tab.nrow; r++){
@@ -2218,11 +2275,8 @@ void Input::ind_effect_command()
 				A_matrix.ind_list.push_back(id);
 			}
 			
-			//A_matrix.ind_list = tab.heading;
-			
-			
 			if(tab.nrow != tab.ncol){
-				alert_import("The file '"+tab.file+"' must contain an equal number of columns and rows."); 
+				alert_import("The file '"+tab.file+"' must contain an equal number of columns and rows "+print_row_col(tab)+"."); 
 				return;
 			}
 			
@@ -2258,10 +2312,9 @@ void Input::ind_effect_command()
 				A_matrix.hash_ind_list.add(A_matrix.ind_list.size(),id);
 				A_matrix.ind_list.push_back(id);
 			}
-			
-			//A_matrix.ind_list = tab.heading;
+	
 			if(tab.nrow != tab.ncol){
-				alert_import("The file '"+tab.file+"' must contain an equal number of columns and rows."); 
+				alert_import("The file '"+tab.file+"' must contain an equal number of columns and rows "+print_row_col(tab)+"."); 
 				return;
 			}
 			
@@ -2285,7 +2338,7 @@ void Input::ind_effect_command()
 		
 		if(A_matrix.set != true) emsg("A-matrix should be set");
 	}
-	
+
 	// Checks that ind effects do not already exist
 	for(const auto &sp : model.species){
 		for(const auto &ieg : sp.ind_eff_group){
@@ -2299,7 +2352,7 @@ void Input::ind_effect_command()
 			}
 		}
 	}
-	
+
 	if(A_matrix.set){
 		const auto &A = A_matrix.value;
 		auto M = A.size();
@@ -2399,20 +2452,56 @@ void Input::map_command()
 }
 
 
-/// Loads inference states into the model (for PPC)
+/// Loads inference parameter into the model (for EXT)
+void Input::inf_param_command()
+{
+	auto file = get_tag_value("file");
+	auto ch = get_chain();
+	
+	if(find_in(inf_state_list,ch) != UNSET){
+		alert_import("There are multiple 'state-inf' commands for chain "+tstr(ch+1)+"'.");
+	}
+	inf_param_list.push_back(ch);
+	
+	// Only loads parameter samples for the output core
+	if(!op() || model.mode != EXT) return; 
+	
+	auto tab = load_table(file); if(tab.error == true) return;
+
+	if(model.param_samp_store.size() == 0){
+		model.param_samp_store.resize(model.details.nchain);
+	}
+	
+	model.param_samp_store[ch] = tab;
+}
+
+
+/// Loads inference states into the model (for PPC/EXT)
 void Input::inf_state_command()
 {
 	auto file = get_tag_value("file");
-	auto chain = get_tag_value("chain"); 
+	auto ch = get_chain();
+
+	if(find_in(inf_state_list,ch) != UNSET){
+		alert_import("There are multiple 'param-inf' commands for chain "+tstr(ch+1)+"'.");
+	}
+	inf_state_list.push_back(ch);
+
+	if(model.mode != PPC && model.mode != EXT) return;
+		
+	// For ext in -core mode only need to load states for that core
+	if(model.mode == EXT && mpi.core != ch/model.details.num_per_core) return;
 	
+	//term_out("load chain"+tstr(ch));
+		
 	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
 	if(i == files.size()){
 		alert_import("Could not find the file '"+file+"'");
 		return;
 	}
 
-	const auto &flines = files[i].lines;
-
+	const auto &flines = files[i].lines;	
+	
 	auto li = 0u;
 	
 	// Reads in individual key
@@ -2473,15 +2562,16 @@ void Input::inf_state_command()
 	while(li < flines.size()){	
 		auto lin = trim(flines[li]);
 		if(lin.length() > 2 && lin.substr(0,2) == "<<"){
-			if(lines.size() > 0) read_state_sample(lines,ind_key);
+			if(lines.size() > 0) read_state_sample(ch,lines,ind_key);
 			lines.clear();
 		}
 		lines.push_back(lin);
 		li++;
 	}
 
-	if(lines.size() > 0) read_state_sample(lines,ind_key);
+	if(lines.size() > 0) read_state_sample(ch,lines,ind_key);
 }
+
 
 /// Warning command
 void Input::warning_command()
@@ -2495,4 +2585,6 @@ void Input::dummy_file_command()
 {
 	auto file = get_tag_value("file"); 
 	auto chain = get_tag_value("chain"); 
+	if(false) cout << file << " " << chain << endl;
 }
+

@@ -103,6 +103,10 @@ function initialise_pages()
 				subsub.push({name:"Diagnostics", sub:[]});
 				add_species_options(subsub,model.inf_res.species_name);
 			}	
+			
+			if(alg == "DA-MCMC" || alg == "PAS-MCMC"){
+				subsub.push({name:"Extend", sub:[]});
+			}
 		}
 	}
 	
@@ -269,7 +273,7 @@ function add_menu_buts(lay)
 	
 	let ddy = nearest_pixel(1.7);
 	let dby = nearest_pixel(0.15);
-	let dby2 = nearest_pixel(1.2);
+	let dby2 = nearest_pixel(1.1);
 	let dysub = nearest_pixel(1.6);
 	let dysubsub = nearest_pixel(1.3);
 	let xsub = nearest_pixel(0.5);
@@ -404,7 +408,7 @@ function drop_menu(cont,lay)
 		bubble_addradio(cont,0,"Medium","Medium quality",inter.mp4quality_radio); 
 		bubble_addradio(cont,0,"High","High quality",inter.mp4quality_radio);
 		cont.y += 0.3;
-		bubble_input(cont,"Frame per second:",{type:"fps"});
+		bubble_input(cont,"Frames per second:",{type:"fps"});
 		add_end_button(cont,"Export","ExportVideo2");
 		return;
 	}

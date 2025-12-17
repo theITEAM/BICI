@@ -13,6 +13,7 @@ using namespace std;
 #include "state.hh"
 #include "utils.hh"
 #include "matrix.hh"
+#include "synchronise.hh"
 
 Chain::Chain(unsigned int nburnin_, unsigned int nsample_, const Model &model, Output &output) : state(model), cor_matrix(model), model(model),  output(output)
 {
@@ -41,60 +42,77 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 		
 	update_init();
 	
-	auto Lmax = -LARGE;
+	if(model.mode == EXT){    // Loads initial state
+		if(model.sample.size() == 0) emsg("Must be a sample");
 	
-	print_diag("Finding initial state...");
-
-	Particle part;
-
-	auto loop_max = 3u;
-	for(auto loop = 0u; loop < loop_max; loop++){ 
-		print_diag(to_string(loop)+" Initial state");
-		
-		percentage(loop+ch*loop_max,loop_max*ch_max);
-		
-		auto param_val = model.param_sample();
-
-		auto initc_val = model.initc_sample(param_val);
-		
-		if(false){
-			output.print_initc(initc_val);
-			model.print_param(param_val);
+		auto smax = 0u, imax = 0u;
+		for(auto i = 0u; i < model.sample.size(); i++){
+			const auto &sa = model.sample[i];
+			
+			if(sa.ch == ch && sa.num > smax){ smax = sa.num; imax = i;}
 		}
-	
-		print_diag("simulate");
 		
-		state.simulate(param_val,initc_val);
-
-		print_diag("simulate done");
-	
-		state.check("First check");
-	
-		print_diag("Checked");
+		const auto &samp = model.sample[imax];
 		
-		print_diag("resample");
-		
-		state.resample_ind(false);    // Resamples individual such that fixed events become correct
-
-		print_diag("resampled");
-
-		state.check("Resample check");
-	
-		print_diag("resampled");
-		
-		auto L = like_total_obs();
-		burn_info.add_L(L); 
-		
-		if(L > Lmax){
-			Lmax = L;
-			part = state.generate_particle(UNSET,UNSET,true,false);
-		}
-	
-		//state.check("after resample");
+		auto param_val = model.post_param(samp);
+		state.load_samp(param_val,samp);
 	}
-	if(Lmax == -LARGE) run_error("Could not find initial state");
+	else{                     // Simulates initial state
+		auto Lmax = -LARGE;
 	
-	state.set_particle(part);
+		print_diag("Finding initial state...");
+
+		Particle part;
+
+		auto loop_max = 3u;
+		for(auto loop = 0u; loop < loop_max; loop++){ 
+			print_diag(to_string(loop)+" Initial state");
+			
+			percentage(loop+ch*loop_max,loop_max*ch_max);
+			
+			auto param_val = model.param_sample();
+
+			auto initc_val = model.initc_sample(param_val);
+			
+			if(false){
+				output.print_initc(initc_val);
+				model.print_param(param_val);
+			}
+		
+			print_diag("simulate");
+			
+			state.simulate(param_val,initc_val);
+
+			print_diag("simulate done");
+		
+			state.check("First check");
+		
+			print_diag("Checked");
+			
+			print_diag("resample");
+			
+			state.resample_ind(false);    // Resamples individual such that fixed events become correct
+
+			print_diag("resampled");
+
+			state.check("Resample check");
+		
+			print_diag("resampled");
+			
+			auto L = like_total_obs();
+			burn_info.add_L(L); 
+			
+			if(L > Lmax){
+				Lmax = L;
+				part = state.generate_particle(UNSET,UNSET,true,false);
+			}
+		
+			//state.check("after resample");
+		}
+		if(Lmax == -LARGE) run_error("Could not find initial state");
+		
+		state.set_particle(part);
+	}
 	
 	//state.check("init");
 }
@@ -109,7 +127,7 @@ void Chain::burn_update(unsigned int s)
 	if(burn_info.on){
 		state.dif_thresh = DIF_THRESH_BURNIN;
 		
-		cor_matrix.add_sample(state.get_param_val_prop(),cor_matrix.n*0.33);
+		cor_matrix.add_sample(state.get_param_val_prop(),cor_matrix.n*FRAC_COR_UNUSED);
 	
 		if(s%10 == 0){
 			state.update_individual_sampler();
@@ -126,12 +144,26 @@ void Chain::burn_update(unsigned int s)
 }
 
 
+/// Gets the value for nburnin
+unsigned int Chain::get_nburnin()
+{
+		return nburnin;
+}
+
+
+/// Updates any joint proposals
+void Chain::join_proposal_update()
+{
+	check_join_proposal();
+}
+
+
 /// Iterates chain
-void Chain::pas_burn_update(unsigned int s, unsigned int g, unsigned int gen_update, double phi)
+void Chain::pas_burn_update(unsigned int s, unsigned int gen_update, double phi)
 {
 	burn_info.add_L(like_total_obs()); 
 	
-	burn_info.pas_setup(s,g,gen_update,phi);
+	burn_info.pas_setup(gen_update,phi);
 	
 	cor_matrix.add_sample(state.get_param_val_prop(),gen_update);
 
@@ -154,7 +186,7 @@ void Chain::pas_burn_update_run(unsigned int s)
 	burn_info.pas_setup_run(s,nburnin);
 	
 	if(burn_info.on){
-		cor_matrix.add_sample(state.get_param_val_prop(),cor_matrix.n*0.33);
+		cor_matrix.add_sample(state.get_param_val_prop(),cor_matrix.n*FRAC_COR_UNUSED);
 	
 		if(s%10 == 0){
 			state.update_individual_sampler();
@@ -170,6 +202,46 @@ void Chain::pas_burn_update_run(unsigned int s)
 }
 
 
+/// Updates the size of the proposal (if in burnin phase)
+void BurnInfo::update_si(double &si, PropResult res, unsigned int ntr) const 
+{
+	if(on){
+		auto fac = 0.01;
+		switch(res){
+		case ACCEPT: fac = 0.01; break;
+		case ACCEPT50: fac = 0.005; break;
+		case REJECT: fac = -0.005; break;
+		case ACCEPT_SMALL: fac = 0.001; break;
+		case ACCEPT50_SMALL: fac = 0.0005; break;
+		case REJECT_SMALL: fac = -0.0005; break;
+		}
+		
+		switch(res){
+		case ACCEPT: case ACCEPT50: case REJECT:
+			if(ntr < 20) fac *= 50;
+			else{
+				if(ntr < 200) fac *= 10;
+			}
+			break;
+			
+		case ACCEPT_SMALL: case ACCEPT50_SMALL: case REJECT_SMALL:
+			if(ntr < 20) fac *= 500;
+			else{
+				if(ntr < 100) fac *= 100;
+				else{
+					if(ntr < 200) fac *= 10;
+				}
+			}
+			break;
+		}
+	
+		si *= 1+fac;
+		if(si < 0.001) si = 0.001;
+		if(si > 1000) si = 1000;
+	}
+}
+
+
 /// Sets up quantities during the burn-in phase
 void BurnInfo::setup(unsigned int s, unsigned int &nburnin,  unsigned int &nsample, const Details &details)
 {
@@ -177,10 +249,10 @@ void BurnInfo::setup(unsigned int s, unsigned int &nburnin,  unsigned int &nsamp
 	
 	if(s < nburnin){
 		on = true; 	
-		if(s < 100 && s < nburnin/8) fac = 20;
-		else{ if(s < 200 && s < nburnin/2) fac = 10; else fac = 1;}
+		//if(s < 100 && s < nburnin/8) fac = 20;
+		//else{ if(s < 200 && s < nburnin/2) fac = 10; else fac = 1;}
 		
-		if(s < nburnin/8) dprob_suppress = true;
+		//if(s < nburnin/8) dprob_suppress = true;
 	}
 	else on = false;
 	
@@ -377,14 +449,14 @@ void BurnInfo::setup(unsigned int s, unsigned int &nburnin,  unsigned int &nsamp
 
 
 /// Sets up quantities during the burn-in phase
-void BurnInfo::pas_setup(unsigned int s, unsigned int g, unsigned int gen_update, double phi_)
+void BurnInfo::pas_setup(unsigned int gen_update, double phi_)
 {
 	phi = phi_;
 	dprob_suppress = false;
 	
 	on = true;
-	if(g == 0 && s < gen_update/2) fac = 20;
-	else fac = 1;
+	//if(g == 0 && s < gen_update/2) fac = 20;
+	//else fac = 1;
 	
 	set_phi();
 	
@@ -398,7 +470,7 @@ void BurnInfo::pas_setup_run(unsigned int s, unsigned int &nburnin)
 	phi = 1;
 	dprob_suppress = false;
 	
-	fac = 1;
+	//fac = 1;
 	if(s < nburnin) on = true; 
 	else on = false;
 	
@@ -885,9 +957,11 @@ void Chain::update_init()
 		}
 	}				
 	 
-	for(auto i = 0u; i < 50; i++){
-		auto param_val = model.param_sample();
-		cor_matrix.add_sample(model.get_param_val_prop(param_val),LARGE);
+	if(model.mode != EXT){
+		for(auto i = 0u; i < 50; i++){
+			auto param_val = model.param_sample();
+			cor_matrix.add_sample(model.get_param_val_prop(param_val),LARGE);
+		}
 	}
 	 
 	for(auto &pro : proposal) pro.update_sampler(cor_matrix);
@@ -1253,7 +1327,7 @@ void Chain::check_join_proposal()
 	
 	auto n = cor_matrix.get_n();
 	auto f = exp(-(n/400.0));
-		
+
 	auto thresh = f + (1-f)*PROP_JOIN_COR_MIN;
 	if(n < 50) thresh = LARGE;
 	
@@ -1368,3 +1442,51 @@ void Chain::check_cor_matrix() const
 }
 
 
+/// Gathers all the infomation used in proposals
+vector <PropInfo> Chain::get_prop_info() const
+{
+	vector <PropInfo> prop_info;
+	
+	for(auto i = 0u; i < proposal.size(); i++){
+		const auto &pro = proposal[i];
+		if(pro.on && pro.prop_info_on()){
+			prop_info.push_back(pro.get_prop_info());
+		}
+	}
+	
+	return prop_info;
+}
+
+
+/// Sets the propsal info
+void Chain::set_prop_info(const vector <PropInfo> &prop_info)
+{
+	for(auto i = 0u; i < proposal.size(); i++){
+		auto &pro = proposal[i];
+		if(pro.on && pro.prop_info_on()){
+			auto id = pro.get_prop_id();
+			
+			auto j = 0u; 
+			while(j < prop_info.size() && !(prop_info[j].type == pro.type && equal_vec(prop_info[j].id,id))) j++;
+			if(j == prop_info.size()){
+				emsg("Coudl not find prop_sync"+pro.name+" "+print_prop_info(prop_info,model));
+			}
+			pro.set_prop_info(prop_info[j]);
+		}
+	}
+}
+
+
+/// Gets terminal information from chain
+TerminalInfo Chain::get_terminal_info(unsigned int ch_tot) const 
+{
+	TerminalInfo ti;
+	ti.ch = ch_tot;
+	ti.prop_info_store = get_prop_info();
+	ti.n = cor_matrix.n; 
+	ti.n_start = cor_matrix.n_start; 
+	ti.av = cor_matrix.av;
+	ti.av2 = cor_matrix.av2;
+	
+	return ti;
+}

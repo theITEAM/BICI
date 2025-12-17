@@ -55,6 +55,7 @@ class State                                // Stores information about the state
 		void init();
 		void simulate(const PV &param_value, const vector <InitCondValue> &initc_val);
 		void post_sim(const PV &param_value, const Sample &samp);
+		void load_samp(const PV &param_value, const Sample &samp);
 		void simulate_iterate(unsigned int ti_start, unsigned int ti_end);
 		void ensure_all_ind_event();
 		vector <DeriveOutput> derive_calculate(bool store_state);

@@ -1,31 +1,26 @@
 
 TO DO
-//emsg("fa");// calculate_mult(linearise.factor,ti,precalc);
-//emsg("H");// *calculate_mult(linearise.pop_grad_calc[j],ti,precalc);
+-- HPAI_SML_update using lots of cpu on ind-update population
+-- E4 expected rate is off
+-- Installing mpi on windows... How to check if there... change functionality
 -- Do testing of genetic part
 
--- sampling improvement
--- seg faults when doing pas-mcmc on windows version with 2 parts
--- Synchornise proposals
 -- For initial conditions view as table or as compartment (good when there are a lot of compartments)
--- Delay differential equations 
--- Reduce processing time for mareks
 
--- Mareks diagnostic expected transition rate not right 
 -- Sort out fixed initial population for individual and population-based models (perhaps convert to Dirichlet?)
--- allow for restart of inference
+
+SORT out sampler:
+-- sampling improvement
+-- Sort out how partially observed transitions affect ind sampler... 
 
 NEXT
+-- Delay differential equations 
 get mac version video working
--- Sort out how partially observed transitions affect ind sampler... 
+
 SEE if(sp.obs_trans_exist){  // Accounts for observation probability on transi
 
 -- Stop file read from loading when one file cannot be loaded
 -- get_calc_hash_num(  does this need to be improved?
--- running in non dividable steps
-list too long in interface
-high transition rate warning
-5.3 small time step
 
 AFTER
 test proposals using initial state
@@ -53,6 +48,17 @@ FUTURE THINGS TO GET SORTED
 
 
 DONE
+-- allow for restart of inference
+-- Mareks diagnostic expected transition rate not right
+-- annealing too fast?
+-- speed up grant?
+-- Synchornise proposals for non-parameter
+list too long in interface
+-- Reduce processing time for mareks
+-- seg faults when doing pas-mcmc on windows version with 2 parts
+//emsg("fa");// calculate_mult(linearise.factor,ti,precalc);
+//emsg("H");// *calculate_mult(linearise.pop_grad_calc[j],ti,precalc);
+-- sort out examples (download from github)
 -- "cols" not being used when loading up individual effects (Jamie problem)
 -- density
 -- Grant problem

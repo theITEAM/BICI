@@ -128,6 +128,7 @@ class StateSpecies                         // Stores information about the state
 		vector < vector <InfPeriod> > get_inf_period(const vector <unsigned int> &ref) const;
 		void tnum_mean_st_back(unsigned int tr, unsigned int ti1, unsigned int ti2);
 		void cpop_st_update(unsigned int ti, unsigned int ti_next, unsigned int c, int ma);
+		void fit_obs_trans(double t_end);
 		
 		double get_indfac(const Individual &ind, const  MarkovEqn &mar_eqn) const;
 		void update_ind_basic(const vector < vector <Event> > &ev_new);

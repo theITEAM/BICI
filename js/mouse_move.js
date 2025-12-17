@@ -43,10 +43,16 @@ function mouse_move(x,y)
 		{	
 			let pos = inter.scroll_position[inter.mode.scroll_ref];
 		
+			let sh;
+			if(inter.mode.type == "Drag_VerticalSlider") sh	= inter.mode.sh + (y-inter.mode.y)*pos.scale;
+			else sh	= inter.mode.sh + (x-inter.mode.x)*pos.scale;
+			
+			/*
 			let sh = pos.shift;
 			if(inter.mode.type == "Drag_VerticalSlider") sh += (y-yst)*pos.scale;
 			else sh += (x-xst)*pos.scale;
-				
+			*/
+			
 			if(sh < 0) sh = 0;
 			if(sh > pos.max*(1-pos.frac)) sh = pos.max*(1-pos.frac);
 			pos.shift = sh;

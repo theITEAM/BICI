@@ -152,6 +152,10 @@ class Layer
 				case "Diagnostics":
 					add_diagnostic_buts(model.inf_res,this);
 					break;
+				
+				case "Extend":
+					add_extend_start_buts(this);	
+					break;
 				}
 				break;
 			}
@@ -640,8 +644,9 @@ class Layer
 	
 		let ls = inter.loading_symbol;
 	
-		switch(ls.type){
-		case "Start": case "StartPPC": case "Load File": case "Creating": case "mp4":
+			switch(ls.type){
+		case "Spawn":
+		case "Start": case "StartPPC": case "StartEXT": case "Load File": case "Creating": case "mp4":
 			{
 				if(ls.message != "Processing..."){				
 					let si = 3;
@@ -1443,6 +1448,7 @@ class Layer
 		case "inf_t_end": te = String(model.inf_details.t_end); break;
 		case "inf_timestep": te = String(model.inf_details.timestep); break;
 		case "inf_sample": te = String(model.inf_details.sample); break;
+		case "inf_extend": te = String(inter.inf_extend); break;
 		case "inf_seed": te = String(model.inf_details.seed); break;
 		case "inf_chain": te = String(model.inf_details.nchain); break;
 		case "inf_abcsample": te = String(model.inf_details.abcsample); break;

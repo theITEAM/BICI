@@ -72,6 +72,8 @@ let inter=                                         // Dynamic variables related 
 	edit_Amatrix:{},                                 // Used when editing values for an A matrix
 	edit_Xvector:{},                                 // Used when editing design matrix for fixed effect
 	view_graph:{},                                   // Used when viewing a specified graph
+
+	inf_extend:"200%",                               // Default percentage increase when extending MCMC
 	
 	file_store:{filename:""},                        // Temporarily stores files before saving
 	
@@ -91,7 +93,7 @@ let inter=                                         // Dynamic variables related 
 	running_status:false,                            // Determines if code is running
 	
 	child:[],                                        // Stores the c++ process 
-	chain:[],                                        // Stores information as it is proccessed
+	core:[],                                         // Stores information as it is proccessed
 	
 	figure:[],                                       // Stores letters used on figures           
 	

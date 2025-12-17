@@ -37,7 +37,7 @@ function add_examples_buts(lay)
 	
 	//ex_mod.push({mod:"M", te:"Temp",file:"temp",mod_type:"IBM", pic:"SI"});
 	
-	if(testing){
+	if(testing && false){
 		if(false){
 			ex_mod.push({te:"M) Science Review",help:"Illustrates some simple examples for the Science Review."});
 			ex_mod.push({mod:"SR1", te:"SIR model (IBM)",file:"EX_SR1",mod_type:"IBM", pic:"SIR"});
@@ -54,10 +54,13 @@ function add_examples_buts(lay)
 		/*
 		ex_mod.push({mod:"M2.6", te:"SIR model (PBM) with demographic stratification",file:"temp2",mod_type:"POP", pic:"SIR_sex2"});
 		
-		ex_mod.push({mod:"M", te:"Temp",file:"temp",mod_type:"IBM", pic:"SI"});
-	
+		
 	*/
-			ex_mod.push({mod:"M", te:"Test",file:"test",mod_type:"IBM", pic:"SI"});
+		ex_mod.push({te:"B1: Time series population observations", mod:"M1.1", link:true, mod_type:"POP"});
+	
+		ex_mod.push({mod:"M", te:"Temp",file:"temp",mod_type:"IBM", pic:"SI"});
+
+		ex_mod.push({mod:"M", te:"Test",file:"test",mod_type:"IBM", pic:"SI"});
 
 
 		ex_mod.push({mod:"M", te:"Geno model",file:"geno",mod_type:"IBM", pic:"SI"});
@@ -65,8 +68,9 @@ function add_examples_buts(lay)
 		ex_mod.push({mod:"M", te:"Geno farm",file:"geno_farm",mod_type:"IBM", pic:"SI"});
 	}
 	
+	let all_on = true;
 	
-	if(true){
+	if(false || all_on){
 		ex_mod.push({te:"M1) Simple epidemiological models",help:"This section gives some examples of simple epidemiological models, illustrating both individual and population-based approaches."+mod_mess});
 		
 		ex_mod.push({mod:"M1.1", te:"SI population-based model (PBM)",file:"EX_M1-1",mod_type:"POP", pic:"SI"});
@@ -130,79 +134,93 @@ function add_examples_buts(lay)
 	
 	let gap = 0.3;
 	
-	ex_mod.push({te:"A) Simulation features and initial conditions",help:"These examples look at various simulation features and ways to implement initial conditions."+mod_mess, gap:gap});
-	ex_mod.push({te:"A1: Multiple simulations", mod:"M1.1", link:true, mod_type:"POP"});
-	ex_mod.push({te:"A2: Uncertain initial conditions for PBM — single classification", mod:"M1.1", link:true, mod_type:"POP"});
-	ex_mod.push({te:"A3: Uncertain initial conditions for PBM — multiple classifications — focal selected", mod:"M2.6", link:true, mod_type:"POP"});
-	ex_mod.push({te:"A4: Uncertain initial conditions for PBM — multiple classifications — total population selected", mod:"M2.6",link:true, mod_type:"POP"});
-	ex_mod.push({te:"A5: Uncertain initial conditions for IBM using individual state", mod:"M1.2",link:true, mod_type:"IBM"});
-	ex_mod.push({te:"A6: Uncertain initial conditions for IBM using population distribution", mod:"M1.2",link:true, mod_type:"IBM"});
-	ex_mod.push({te:"A7: Add / remove individuals from PBM", mod:"M2.6", link:true, mod_type:"POP"});
-	ex_mod.push({te:"A8: Add / move / remove individuals from IBM",link:true, mod_type:"IBM"});
+	if(false || all_on){
+		ex_mod.push({te:"A) Simulation features and initial conditions",help:"These examples look at various simulation features and ways to implement initial conditions."+mod_mess, gap:gap});
+		ex_mod.push({te:"A1: Multiple simulations", mod:"M1.1", link:true, mod_type:"POP"});
+		ex_mod.push({te:"A2: Uncertain initial conditions for PBM — single classification", mod:"M1.1", link:true, mod_type:"POP"});
+		ex_mod.push({te:"A3: Uncertain initial conditions for PBM — multiple classifications — focal selected", mod:"M2.6", link:true, mod_type:"POP"});
+		ex_mod.push({te:"A4: Uncertain initial conditions for PBM — multiple classifications — total population selected", mod:"M2.6",link:true, mod_type:"POP"});
+		ex_mod.push({te:"A5: Uncertain initial conditions for IBM using individual state", mod:"M1.2",link:true, mod_type:"IBM"});
+		ex_mod.push({te:"A6: Uncertain initial conditions for IBM using population distribution", mod:"M1.2",link:true, mod_type:"IBM"});
+		ex_mod.push({te:"A7: Add / remove individuals from PBM", mod:"M2.6", link:true, mod_type:"POP"});
+		ex_mod.push({te:"A8: Add / move / remove individuals from IBM",link:true, mod_type:"IBM"});
+	}
 	
-	ex_mod.push({te:"B) Population-level data types",help:"These examples look at different types of population data."+mod_mess, gap:gap});
-	ex_mod.push({te:"B1: Time series population observations", mod:"M1.1", link:true, mod_type:"POP"});
-	ex_mod.push({te:"B2: Time series population-level transition observations for PBM", mod:"M1.1", link:true, mod_type:"POP"});
-	ex_mod.push({te:"B3: Stratified time series population observations for PBM", mod:"M2.6",link:true, mod_type:"POP"});
-	ex_mod.push({te:"B4: Population observations from multiple compartments", mod:"M2.6", link:true, mod_type:"POP"});
-	ex_mod.push({te:"B5: Combined population-based data sources in a COVID-19 model", mod:"M6.1", link:true, mod_type:"POP"});
-	ex_mod.push({te:"B6: Time series population observations with IBM", mod:"M1.2", link:true, mod_type:"IBM"}); 
+	if(false || all_on){
+		ex_mod.push({te:"B) Population-level data types",help:"These examples look at different types of population data."+mod_mess, gap:gap});
+		ex_mod.push({te:"B1: Time series population observations", mod:"M1.1", link:true, mod_type:"POP"});
+		ex_mod.push({te:"B2: Time series population-level transition observations for PBM", mod:"M1.1", link:true, mod_type:"POP"});
+		ex_mod.push({te:"B3: Stratified time series population observations for PBM", mod:"M2.6",link:true, mod_type:"POP"});
+		ex_mod.push({te:"B4: Population observations from multiple compartments", mod:"M2.6", link:true, mod_type:"POP"});
+		ex_mod.push({te:"B5: Combined population-based data sources in a COVID-19 model", mod:"M6.1", link:true, mod_type:"POP"});
+		ex_mod.push({te:"B6: Time series population observations with IBM", mod:"M1.2", link:true, mod_type:"IBM"}); 
+	}
 
-	ex_mod.push({te:"C) Individual-level data types",help:"These examples look at different types of individual-level data."+mod_mess, gap:gap});
-	ex_mod.push({te:"C1: Known transition events — infection and recovery", mod:"M1.3", link:true, mod_type:"IBM"});
+	if(false || all_on){
+		ex_mod.push({te:"C) Individual-level data types",help:"These examples look at different types of individual-level data."+mod_mess, gap:gap});
+		ex_mod.push({te:"C1: Known transition events — infection and recovery", mod:"M1.3", link:true, mod_type:"IBM"});
 
-	ex_mod.push({te:"C2: Incomplete transition events - recovery only", mod:"M1.3", link:true,  mod_type:"IBM"}); 
-	
-	ex_mod.push({te:"C3: Compartmental observations", mod:"M1.3", link:true, mod_type:"IBM"}); 
-	
-	ex_mod.push({te:"C4: Disease diagnostic test results", mod:"M1.3", link:true, mod_type:"IBM"}); 
-	
-	ex_mod.push({te:"C5: A partially observed transition", mod:"M1.3", link:true, mod_type:"IBM"}); 
-	
-	ex_mod.push({te:"C6: A transition observed over a time window", mod:"M1.3", link:true, mod_type:"IBM"}); 
-	
-	ex_mod.push({te:"C7: A transition observed in a demographic category", mod:"M2.8", link:true, mod_type:"IBM"}); 
-	
-	ex_mod.push({te:"C8: Uncertain compartmental observations", mod:"M1.3", link:true,  mod_type:"IBM"}); 
-	
-	ex_mod.push({te:"D) Time variation",help:"These examples look at different ways in which time variation can be added into the model"+mod_mess, gap:gap});
-
-	ex_mod.push({te:"D1: Time variation in transmission rate", mod:"M1.1", link:true, mod_type:"POP"}); 
-	
-	ex_mod.push({te:"D2: Time variation in transmission rate using a trigonometric function", mod:"M1.1", link:true, mod_type:"POP"}); 
-	
-	ex_mod.push({te:"D3: Time variation in transmission rate through a covariate", mod:"M1.1", link:true, mod_type:"POP"}); 
-	
-	ex_mod.push({te:"D4: Time variation in population-level transition observation probability", mod:"M1.1", link:true, mod_type:"POP"}); 
-
-	ex_mod.push({te:"D5: Time variation in individual transition observation probability", mod:"M1.2", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"C2: Incomplete transition events - recovery only", mod:"M1.3", link:true,  mod_type:"IBM"}); 
 		
-	ex_mod.push({te:"D6: Time variation in population observation probability", link:true,  mod_type:"POP"}); 
+		ex_mod.push({te:"C3: Compartmental observations", mod:"M1.3", link:true, mod_type:"IBM"}); 
+		
+		ex_mod.push({te:"C4: Disease diagnostic test results", mod:"M1.3", link:true, mod_type:"IBM"}); 
+		
+		ex_mod.push({te:"C5: A partially observed transition", mod:"M1.3", link:true, mod_type:"IBM"}); 
+		
+		ex_mod.push({te:"C6: A transition observed over a time window", mod:"M1.3", link:true, mod_type:"IBM"}); 
+		
+		ex_mod.push({te:"C7: A transition observed in a demographic category", mod:"M2.8", link:true, mod_type:"IBM"}); 
+		
+		ex_mod.push({te:"C8: Uncertain compartmental observations", mod:"M1.3", link:true,  mod_type:"IBM"}); 	
+	}
 	
-	ex_mod.push({te:"D7: Time variation in branching probability", mod:"M2.1", link:true,  mod_type:"POP"}); 
-	
-	ex_mod.push({te:"D8: Time-varying covariate affecting branching probability", mod:"M2.2", link:true, mod_type:"IBM"}); 
-	
-	ex_mod.push({te:"E) Individual-based variation",help:"These examples look at how individual-based variation can be incorporated into the model"+mod_mess, gap:gap});
-	ex_mod.push({te:"E1: Individual fixed effect applied to a transition", mod:"M1.2", link:true, mod_type:"IBM"}); 
-	ex_mod.push({te:"E2: Individual fixed effect applied to a population", link:true, mod_type:"IBM"}); 
-	ex_mod.push({te:"E3: Individual effect applied to a transition", mod:"M1.2", link:true, mod_type:"IBM"}); 
-	ex_mod.push({te:"E4: Correlated individual effect applied to a transition", mod:"M1.2", link:true, mod_type:"IBM"});
-	ex_mod.push({te:"E5: Correlated individual effect applied to a population", mod:"M5.3", link:true, mod_type:"IBM"});
-	ex_mod.push({te:"E6: Individual fixed effect applied to a branching probability", mod:"M2.3", link:true, mod_type:"IBM"}); 
-	
-	ex_mod.push({te:"E7: Individual effect applied to a branching probability", mod:"M2.3", link:true, mod_type:"IBM"}); 
-	ex_mod.push({te:"E8: Correlated individual effect applied to a transition with pedigree", mod:"M1.2", link:true, mod_type:"IBM"});
+	if(false || all_on){
+		ex_mod.push({te:"D) Time variation",help:"These examples look at different ways in which time variation can be added into the model"+mod_mess, gap:gap});
 
-	ex_mod.push({te:"F) Parameter definitions",help:"These examples look at how parameters can be reparameterised, set to distributions or derived from other quantities"+mod_mess, gap:gap});
-	ex_mod.push({te:"F1: Reparameterisation", mod:"M3.4", link:true, mod_type:"IBM"}); 
-	ex_mod.push({te:"F2: Parameter distribution", mod:"M5.2", link:true, mod_type:"IBM"}); 
-	ex_mod.push({te:"F3: Derived quantities", mod:"M1.3", link:true, mod_type:"IBM"}); 
-	ex_mod.push({te:"F4: Factor", mod:"M2.6", link:true, mod_type:"PBP"}); 
-	ex_mod.push({te:"F5: Spline reparameterisation", mod:"M3.4", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"D1: Time variation in transmission rate", mod:"M1.1", link:true, mod_type:"POP"}); 
 	
-	ex_mod.push({te:"G) Incorporating pathogen genetics",help:"", gap:gap});
-	ex_mod.push({te:"G1: Matrix of genetic differences", mod:"M1.2", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"D2: Time variation in transmission rate using a trigonometric function", mod:"M1.1", link:true, mod_type:"POP"}); 
+	
+		ex_mod.push({te:"D3: Time variation in transmission rate through a covariate", mod:"M1.1", link:true, mod_type:"POP"}); 
+		
+		ex_mod.push({te:"D4: Time variation in population-level transition observation probability", mod:"M1.1", link:true, mod_type:"POP"}); 
+
+		ex_mod.push({te:"D5: Time variation in individual transition observation probability", mod:"M1.2", link:true, mod_type:"IBM"}); 
+			
+		ex_mod.push({te:"D6: Time variation in population observation probability", link:true,  mod_type:"POP"}); 
+		
+		ex_mod.push({te:"D7: Time variation in branching probability", mod:"M2.1", link:true,  mod_type:"POP"}); 
+		
+		ex_mod.push({te:"D8: Time-varying covariate affecting branching probability", mod:"M2.2", link:true, mod_type:"IBM"}); 
+	}
+
+	if(false || all_on){	
+		ex_mod.push({te:"E) Individual-based variation",help:"These examples look at how individual-based variation can be incorporated into the model"+mod_mess, gap:gap});
+		ex_mod.push({te:"E1: Individual fixed effect applied to a transition", mod:"M1.2", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"E2: Individual fixed effect applied to a population", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"E3: Individual effect applied to a transition", mod:"M1.2", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"E4: Correlated individual effect applied to a transition", mod:"M1.2", link:true, mod_type:"IBM"});
+		ex_mod.push({te:"E5: Correlated individual effect applied to a population", mod:"M5.3", link:true, mod_type:"IBM"});
+		ex_mod.push({te:"E6: Individual fixed effect applied to a branching probability", mod:"M2.3", link:true, mod_type:"IBM"}); 
+		
+		ex_mod.push({te:"E7: Individual effect applied to a branching probability", mod:"M2.3", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"E8: Correlated individual effect applied to a transition with pedigree", mod:"M1.2", link:true, mod_type:"IBM"});
+	}
+	
+	if(false || all_on){	
+		ex_mod.push({te:"F) Parameter definitions",help:"These examples look at how parameters can be reparameterised, set to distributions or derived from other quantities"+mod_mess, gap:gap});
+		ex_mod.push({te:"F1: Reparameterisation", mod:"M3.4", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"F2: Parameter distribution", mod:"M5.2", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"F3: Derived quantities", mod:"M1.3", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"F4: Factor", mod:"M2.6", link:true, mod_type:"PBP"}); 
+		ex_mod.push({te:"F5: Spline reparameterisation", mod:"M3.4", link:true, mod_type:"IBM"}); 
+	}
+
+	if(false || all_on){	
+		ex_mod.push({te:"G) Incorporating pathogen genetics",help:"", gap:gap});
+		ex_mod.push({te:"G1: Matrix of genetic differences", mod:"M1.2", link:true, mod_type:"IBM"}); 
+	}
 	
 	// Adds file names
 	for(let i = 0; i < ex_mod.length; i++){
@@ -293,7 +311,7 @@ function add_examples_buts(lay)
 				word[i].x += ma, word[i].y += dy-0.5*text_anno.height-2;
 			}
 			
-			lay.add_button({word:word, x:cx, y:cy, dx:dx, dy:dy, ac:"ExampleModel", type:"ExampleModel", mod_ty:mod_ty, mod_ty2:mod_ty2, pic:pic, sel:sel, file:ex.file}); 
+			lay.add_button({word:word, x:cx, y:cy, dx:dx, dy:dy, ac:"ExampleModel", type:"ExampleModel", mod_ty:mod_ty, mod_ty2:mod_ty2, pic:pic, sel:sel, file:ex.file});
 			cx += dx+gapx; if(cx > W){ cx = 0; cy += dy+gapy;}
 		}
 	}

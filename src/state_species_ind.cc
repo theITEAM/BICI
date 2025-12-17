@@ -230,7 +230,7 @@ bool StateSpecies::allow_event(double t, const IndTransRef &itr) const
 	// Don't allow event if sink and still trigger events
 	const auto &tr = sp.tra_gl[trg];
 	
-	if(mode == INF && tr.variety == SINK_TRANS && itr.i < sp.individual.size() && t < sp.individual[itr.i].tdivmax){
+	if((mode == INF || mode == EXT) && tr.variety == SINK_TRANS && itr.i < sp.individual.size() && t < sp.individual[itr.i].tdivmax){
 		return false;
 	}
 	
@@ -360,7 +360,7 @@ void StateSpecies::update_ind_c(unsigned int i, double t, unsigned int cl_trans,
 					auto flag = false;
 
 					// Tries to insert a data event
-					if(mode == INF) flag = try_insert_data_trans_event(t,cl,i);
+					if(mode == INF || mode == EXT) flag = try_insert_data_trans_event(t,cl,i);
 				
 					if(flag == false){
 						auto trig = get_nm_trig_event(t,i,c,cl,popnum_t);
@@ -832,7 +832,7 @@ void StateSpecies::sample_infecting_ind(unsigned int i, double t, unsigned int t
 {
 	const auto &tra = sp.tra_gl[tr_gl];
 	if(tra.infection.type == TRANS_INFECTION){ 
-		if(mode == INF && false){ inf_from = get_waifw(i,t); return;}
+		if((mode == INF || mode == EXT) && false){ inf_from = get_waifw(i,t); return;}
 		
 		const auto &me = sp.markov_eqn[tra.markov_eqn_ref];
 		const auto &eq = eqn[me.eqn_ref];
@@ -1044,7 +1044,7 @@ Event StateSpecies::get_event(EventType type, unsigned int i, unsigned int tr_gl
 	e.ind_inf_from = inf_from;
 	
 	e.observed = false;
-	if(mode == INF && i < sp.nindividual_in){
+	if((mode == INF || mode == EXT) && i < sp.nindividual_in){
 		for(const auto &ob : sp.individual[i].obs){
 			switch(ob.type){
 			case OBS_TRANS_EV: case OBS_SOURCE_EV: case OBS_SINK_EV: 
@@ -1068,7 +1068,7 @@ void StateSpecies::add_event(EventType type, unsigned int i, unsigned int tr_gl,
 	
 	ev.push_back(e);
 
-	if(mode == INF){
+	if(mode == INF || mode == EXT){
 		if(type == M_TRANS_EV || type == NM_TRANS_EV){
 			auto iobs = i;
 			if(iobs >= sp.nindividual_obs) iobs = sp.nindividual_obs;

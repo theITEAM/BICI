@@ -93,11 +93,17 @@ function mouse_down(xx,yy,evt)
 					break;
 					
 				case "VerticalSlider":
-					inter.mode={ type:"Drag_VerticalSlider", drag:true, scroll_ref:bu.scroll_ref, scale:bu.scale, pn:bu.pn};
+					{
+						let pos = inter.scroll_position[bu.scroll_ref];
+						inter.mode={ type:"Drag_VerticalSlider", drag:true, scroll_ref:bu.scroll_ref, scale:bu.scale, pn:bu.pn, sh:pos.shift, y:inter.my};
+					}
 					break;
 					
 				case "HorizontalSlider":
-					inter.mode={ type:"Drag_HorizontalSlider", drag:true, scroll_ref:bu.scroll_ref, scale:bu.scale, pn:bu.pn};
+					{
+						let pos = inter.scroll_position[bu.scroll_ref];
+						inter.mode={ type:"Drag_HorizontalSlider", drag:true, scroll_ref:bu.scroll_ref, scale:bu.scale, pn:bu.pn, sh:pos.shift, x:inter.mx};
+					}
 					break;
 				
 				case "TableSlider":
@@ -277,7 +283,7 @@ function mouse_down(xx,yy,evt)
 			break;
 		}
 	}
-	
+
 	if(inter.equation.te != undefined) keep_cursor_flag = true;
 
 	if(keep_cursor_flag == false){

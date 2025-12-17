@@ -21,6 +21,8 @@ class Output                               // Stores information about the data
 		string sampledir;                      // The samples directory (within data folder)
 		string sampledir_rel;                  // The samples directory relative to data folder
 		
+		vector <TerminalInfo> terminal_info;   // Stores information about proposals
+		
 		vector <double> timer;                 // General purpose timers
 		
 		Output(const Model &model, const Input &input, Mpi &mpi);
@@ -36,6 +38,7 @@ class Output                               // Stores information about the data
 		string to_str(double num) const;
 		void param_sample(unsigned int s, unsigned int chain, State &state);
 		void param_sample(const Particle &part);
+		vector < vector <double> > get_param_from_table_row(const vector <string> &row) const;
 		string param_output(const Particle &part, const vector < vector <double> > &value) const;
 		void state_sample(unsigned int s, unsigned int chain, State &state);
 		void state_sample(const Particle &part);
@@ -43,7 +46,7 @@ class Output                               // Stores information about the data
 		string trace_init() const;
 		string ic_output_head() const;
 		string ic_output(const Particle &part) const;
-		void set_output_burnin(double burnin_frac);
+		void set_inference_prop(double value, string tag, double def);
 		void set_diagnostics(unsigned int ch, string diag);
 		void end(string file, unsigned int total_cpu);
 		vector <Particle> get_part_chain(unsigned int chain, vector <Particle> &part) const;
@@ -67,8 +70,9 @@ class Output                               // Stores information about the data
 		string get_Gelman_Rubin_statistic(const vector < vector <double> > &cha) const;
 		string param_stat(unsigned int th, unsigned int i, const vector < vector < vector < vector <double> > > > &param_samp, vector <Warn> &ESS_warn, vector <Warn> &GR_warn) const;
 		void output_param_statistics(const vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout, vector <string> &final_warning) const;
+		void output_prop_info(ofstream &fout) const;
 		void output_state(unsigned int ch, const vector <Particle> &part, ofstream &fout) const;
-		void output_trans_diag(const vector <TransDiagSpecies> &trans_diag, ofstream &fout) const;
+		void output_trans_diag(unsigned int ch, const vector <TransDiagSpecies> &trans_diag, ofstream &fout) const;
 		void add_warning(string err_msg, ofstream &fout) const;
 		void output_add_ind_warning(vector <string> &final_warning) const;
 		void output_rate_warning(unsigned int total_cpu, unsigned int per_start, unsigned int per_end, vector <string> &final_warning) const;
@@ -85,7 +89,7 @@ class Output                               // Stores information about the data
 		vector <Particle> param_store;
 		vector <Particle> state_store;
 		vector <Diagnostic> diagnostic_store;
-		
+	
 		const Model &model;	
 		Mpi &mpi;	
 };

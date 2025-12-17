@@ -35,8 +35,6 @@ void CorMatrix::init()
 /// Adds a sample
 void CorMatrix::add_sample(vector <double> param_val_pr, unsigned int range)
 {
-	if(range < RANGE_MIN) range = RANGE_MIN;
-	
 	// Shifting ensure that values are not constant
 	for(auto &val : param_val_pr){
 		val += ran()*SMALL;
@@ -58,6 +56,15 @@ void CorMatrix::add_sample(vector <double> param_val_pr, unsigned int range)
 			}
 		}
 	}
+
+	add_sample2(param_val_pr,range);
+}
+
+
+/// Adds sample after any transformation
+void CorMatrix::add_sample2(vector <double> param_val_pr, unsigned int range)
+{
+	if(range < RANGE_MIN) range = RANGE_MIN;
 	
 	samp.push_back(param_val_pr);
 	n++;

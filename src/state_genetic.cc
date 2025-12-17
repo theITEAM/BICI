@@ -1846,11 +1846,8 @@ void State::trans_tree_mut_proposal(const BurnInfo &burn_info, unsigned int &nac
 					auto al = exp(burn_info.genetic_process*dlike_genetic_process
 									+ burn_info.genetic_obs*dlike_genetic_obs);
 			
-					auto fac = -0.005;
-			
 					ntr++;
 					if(ran() < al){ 
-						fac = 0.01;	
 						nac++;
 					
 						like.genetic_process += dlike_genetic_process;
@@ -1864,10 +1861,13 @@ void State::trans_tree_mut_proposal(const BurnInfo &burn_info, unsigned int &nac
 						}
 						
 						iev.mut_num = num_new;	
+						
+						burn_info.update_si(si,ACCEPT,ntr);
+					}
+					else{
+						burn_info.update_si(si,REJECT,ntr); if(si < 1) si = 1;
 					}
 						
-					if(burn_info.on){ si *= 1+fac*burn_info.fac; if(si < 1) si = 1;}
-			
 					if(pl) check("update");
 				}
 			}
@@ -1918,11 +1918,8 @@ void State::trans_tree_mut_proposal(const BurnInfo &burn_info, unsigned int &nac
 				auto al = exp(burn_info.genetic_process*dlike_genetic_process
 								+ burn_info.genetic_obs*dlike_genetic_obs);
 	
-				auto fac = -0.005;
-				
 				ntr++;
 				if(ran() < al){ 
-					fac = 0.01;	
 					nac++;
 				
 					like.genetic_process += dlike_genetic_process;
@@ -1936,10 +1933,13 @@ void State::trans_tree_mut_proposal(const BurnInfo &burn_info, unsigned int &nac
 					}
 					
 					io.mut_num = num_new;	
-				}
 					
-				if(burn_info.on){ si *= 1+fac*burn_info.fac; if(si < 1) si = 1;}
-		
+					burn_info.update_si(si,ACCEPT,ntr);
+				}
+				else{
+					burn_info.update_si(si,REJECT,ntr); if(si < 1) si = 1;
+				}
+							
 				if(pl) check("update");
 			}
 		}
@@ -2048,11 +2048,9 @@ void State::trans_tree_mut_local_proposal(const BurnInfo &burn_info, vector <Gen
 															+ burn_info.genetic_obs*dlike_genetic_obs);
 				
 										if(pl) cout << al << " al" << endl;
-										auto fac = -0.005;
-									
+										
 										gmi.ntr++;
 										if(ran() < al){ 
-											fac = 0.01;	
 											gmi.nac++;
 										
 											like.genetic_process += dlike_genetic_process;
@@ -2070,9 +2068,12 @@ void State::trans_tree_mut_local_proposal(const BurnInfo &burn_info, vector <Gen
 											
 											ev.mut_num = num1_new;	
 											ev2.mut_num = num2_new;	
+													
+											burn_info.update_si(gmi.si,ACCEPT,gmi.ntr);
 										}
-											
-										if(burn_info.on){ gmi.si *= 1+fac*burn_info.fac; if(gmi.si < 1) gmi.si = 1;}
+										else{
+											burn_info.update_si(gmi.si,REJECT,gmi.ntr); if(gmi.si < 1) gmi.si = 1;
+										}
 										
 										if(pl) check("update");
 									}
@@ -2215,11 +2216,9 @@ void State::trans_tree_mut_local_proposal(const BurnInfo &burn_info, vector <Gen
 																+ burn_info.genetic_obs*dlike_genetic_obs);
 										
 										if(pl) cout << al << " " << dlike_genetic_process << " " << dlike_genetic_obs << " al" << endl;
-										auto fac = -0.005;
 									
 										gmi.ntr++;
 										if(ran() < al){
-											fac = 0.01;	
 											gmi.nac++;
 										
 											like.genetic_process += dlike_genetic_process;
@@ -2237,10 +2236,11 @@ void State::trans_tree_mut_local_proposal(const BurnInfo &burn_info, vector <Gen
 													}
 												}
 											}
-										}
 											
-										if(burn_info.on){
-											gmi.si *= 1+fac*burn_info.fac; if(gmi.si < 1) gmi.si = 1;
+											burn_info.update_si(gmi.si,ACCEPT,gmi.ntr);
+										}
+										else{
+											burn_info.update_si(gmi.si,REJECT,gmi.ntr); if(gmi.si < 1) gmi.si = 1;
 										}
 										
 										if(pl) check("update21");
@@ -2279,20 +2279,21 @@ void State::trans_tree_mut_local_proposal(const BurnInfo &burn_info, vector <Gen
 						dlike_genetic_process += poisson_probability(num2_new,lam2) - poisson_probability(num2_old,lam2);
 					
 						auto al = exp(burn_info.genetic_process*dlike_genetic_process);
-						auto fac = -0.005;
 						
 						gmi.ntr++;
 						if(ran() < al){ 
-							fac = 0.01;	
 							gmi.nac++;
 						
 							like.genetic_process += dlike_genetic_process;
 						
 							io.mut_num = num_new;	
 							ev.mut_num = num2_new;
-						}
 							
-						if(burn_info.on){ gmi.si *= 1+fac*burn_info.fac; if(gmi.si < 1) gmi.si = 1;}
+							burn_info.update_si(gmi.si,ACCEPT,gmi.ntr);
+						}
+						else{
+							burn_info.update_si(gmi.si,REJECT,gmi.ntr); if(gmi.si < 1) gmi.si = 1;
+						}
 				
 						if(pl) check("update31");
 					}

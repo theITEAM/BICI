@@ -891,7 +891,7 @@ double Equation::calculate_pop_grad_no_time(unsigned int pref, const vector <dou
 
 
 /// Calculates a population gradient without factor term
-double Equation::calculate_pop_grad_without_factor(unsigned int pref, const vector <double> &precalc) const
+double Equation::calculate_pop_grad_without_factor_no_time(unsigned int pref, const vector <double> &precalc) const
 {
 	return calculate_item_no_time(linearise.pop_grad_precalc[pref],precalc);	
 }
@@ -901,6 +901,13 @@ double Equation::calculate_pop_grad_without_factor(unsigned int pref, const vect
 double Equation::calculate_factor(unsigned int ti, const vector <double> &precalc) const
 {
 	return calculate_item(linearise.factor_precalc,ti,precalc);
+}
+
+
+/// Calculates a population gradient without factor term
+double Equation::calculate_pop_grad_without_factor(unsigned int pref, unsigned int ti, const vector <double> &precalc) const
+{
+	return  calculate_item(linearise.pop_grad_precalc[pref],ti,precalc);
 }
       
 

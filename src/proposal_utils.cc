@@ -657,38 +657,19 @@ void Proposal::initialise_swap_variable()
 
 
 /// Updates the size of the proposal (if in burnin phase)
-void Proposal::update_si(double fac)
+void Proposal::update_si(PropResult res)
 {
-	if(burn_info.on){
-		auto f = 1+fac*burn_info.fac;
-		if(f < 0.5) f = 0.5; 
-		if(f > 10) f = 10;
-		si *= f;
-		if(si < 0.001) si = 0.001;
-		if(si > 1000) si = 1000;
-	}
+	burn_info.update_si(si,res,ntr);
 }
 
 
 /// Updates the size of individual sampler (if in burnin phase)
-void Proposal::update_ind_samp_si(unsigned int tr_gl, double fac)
+void Proposal::update_ind_samp_si(unsigned int tr_gl, PropResult res, unsigned int ntr)
 {
-	if(burn_info.on){
-		auto &si = ind_sampler[tr_gl].si;
-		si *= 1+fac*burn_info.fac;
-		if(si < SD_MIN) si = SD_MIN;
-	}
+	auto &si = ind_sampler[tr_gl].si;
+	burn_info.update_si(si,res,ntr);
+	if(si < SD_MIN) si = SD_MIN;
 }
-
-
-/*
-/// Deterines probability proposal won't be performed (assuming no prob adaptation)
-bool Proposal::skip_proposal(double val) const 
-{
-	if(!adapt_prop_prob && ran() < val) return true;
-	return false;
-}
-*/
 
 
 /// Sets check for ind effect group prior check
@@ -859,4 +840,431 @@ double Proposal::set_prop_prob()
 	default: break;
 	}
 	return 1;
+}
+
+
+/// Determines if there is proposal information
+bool Proposal::prop_info_on() const
+{
+	switch(type){
+	case PARAM_PROP:
+	case MBP_PROP: case MBPII_PROP: 
+	case MBP_IC_POP_PROP: case MBP_IC_POPTOTAL_PROP: case MBP_IC_RESAMP_PROP:
+	case IND_ADD_REM_PROP: 
+	case IE_PROP: case IE_VAR_PROP:
+	case IE_COVAR_PROP: case IE_VAR_CV_PROP:
+	case POP_ADD_REM_LOCAL_PROP: 
+	case POP_IC_LOCAL_PROP: case POP_END_LOCAL_PROP:
+	case POP_SINGLE_LOCAL_PROP: case POP_IC_PROP: case POP_IC_SWAP_PROP:
+	case TRANS_TREE_MUT_LOCAL_PROP:
+	case IND_EVENT_TIME_PROP: case IND_MULTI_EVENT_PROP: case IND_EVENT_ALL_PROP: 
+	case IND_OBS_RESIM_PROP:
+	case IND_OBS_SAMP_PROP: case IND_OBS_RESIM_SINGLE_PROP:
+		return true;
+	
+	default: return false;
+	}
+}
+
+
+/// Gets proposal information
+PropInfo Proposal::get_prop_info() const
+{
+	PropInfo pi;
+	pi.type = type;
+	pi.id = get_prop_id();
+	
+	switch(type){
+	case PARAM_PROP: case MBP_PROP: 
+		{
+			pi.value = si;
+		}
+		break;
+
+	case MBPII_PROP:
+	case MBP_IC_POPTOTAL_PROP: case MBP_IC_RESAMP_PROP:
+	case IND_ADD_REM_PROP: 
+		{
+			pi.value = si;
+		}
+		break;
+		
+	case IE_PROP: 
+		{
+			pi.value = si;
+		}
+		break;
+		
+	case IE_VAR_PROP:
+		{
+			pi.value = si;
+		}
+		break;
+		
+	case IE_COVAR_PROP:
+		{
+			pi.value = si;
+		}
+		break;
+		
+	case IE_VAR_CV_PROP:
+		{
+			pi.value = si;
+		}
+		break;
+		
+	case MBP_IC_POP_PROP:
+		{
+			pi.value = si;
+		}
+		break;
+		
+	case POP_ADD_REM_LOCAL_PROP: 
+		{
+			const auto &ls = loc_samp;
+			pi.value = ls.win;
+		}
+		break;
+		
+	case POP_IC_LOCAL_PROP: case POP_END_LOCAL_PROP:
+		{
+			const auto &ls = loc_samp;
+			pi.value = ls.win;
+			add_sampler_info(pi.vec,ls.tr_ic);
+		}
+		break;
+		
+	case POP_SINGLE_LOCAL_PROP: 
+		{
+			const auto &ls = loc_samp;
+			add_sampler2D_info(pi.vec,ls.tr_samp);
+		}
+		break;
+	
+	case POP_IC_PROP: case POP_IC_SWAP_PROP:
+		{
+			const auto &ls = loc_samp;
+			add_sampler_info(pi.vec,ls.comp_ic);
+		}
+		break;
+
+	case TRANS_TREE_MUT_LOCAL_PROP:
+		{
+			for(auto k = 0u; k < gen_mut_info.size(); k++){
+				pi.vec.push_back(gen_mut_info[k].si);
+			}
+		}
+		break;
+		
+	case IND_EVENT_TIME_PROP: case IND_MULTI_EVENT_PROP: 
+	case IND_EVENT_ALL_PROP: 
+		{
+			for(auto k = 0u; k < ind_sampler.size(); k++){
+				pi.vec.push_back(ind_sampler[k].si);
+			}
+		}
+		break;
+	
+	case IND_OBS_RESIM_PROP:
+		{
+			for(auto k = 0u; k < ind_sim_prob.size(); k++){
+				pi.vec.push_back(ind_sim_prob[k].prob);
+			}
+		}
+		break;
+		
+	case IND_OBS_SAMP_PROP: case IND_OBS_RESIM_SINGLE_PROP:
+		for(auto cl = 0u; cl < ind_sim_prob_cl.size(); cl++){
+			for(auto k = 0u; k < ind_sim_prob_cl[cl].size(); k++){
+				pi.vec.push_back(ind_sim_prob_cl[cl][k].prob);
+			}
+		}
+		break;
+		
+	default: emsg("Not dealt with"); break;
+	}
+	
+	return pi;
+}
+
+
+/// Sets proposal information
+void Proposal::set_prop_info(const PropInfo &pi)
+{
+	switch(type){
+	case PARAM_PROP: case MBP_PROP: 
+		{
+			si = pi.value;
+		}
+		break;
+
+	case MBPII_PROP:
+	case MBP_IC_POPTOTAL_PROP: case MBP_IC_RESAMP_PROP:
+	case IND_ADD_REM_PROP: 
+		{
+			si = pi.value;
+		}
+		break;
+		
+	case IE_PROP: 
+		{
+			si = pi.value;
+		}
+		break;
+		
+	case IE_VAR_PROP:
+		{
+			si = pi.value;
+		}
+		break;
+		
+	case IE_COVAR_PROP:
+		{
+			si = pi.value;
+		}
+		break;
+		
+	case IE_VAR_CV_PROP:
+		{
+			si = pi.value;
+		}
+		break;
+		
+	case MBP_IC_POP_PROP:
+		{
+			si = pi.value;
+		}
+		break;
+		
+	case POP_ADD_REM_LOCAL_PROP: 
+		{
+			auto &ls = loc_samp;
+			ls.win = pi.value;
+		}
+		break;
+		
+	case POP_IC_LOCAL_PROP: case POP_END_LOCAL_PROP:
+		{
+			auto &ls = loc_samp;
+			ls.win = pi.value;
+			set_sampler_info(pi.vec,ls.tr_ic);
+		}
+		break;
+		
+	case POP_SINGLE_LOCAL_PROP: 
+		{
+			auto &ls = loc_samp;
+			set_sampler2D_info(pi.vec,ls.tr_samp);
+		}
+		break;
+	
+	case POP_IC_PROP: case POP_IC_SWAP_PROP:
+		{
+			auto &ls = loc_samp;
+			set_sampler_info(pi.vec,ls.comp_ic);
+		}
+		break;
+	
+	case TRANS_TREE_MUT_LOCAL_PROP:
+		{
+			for(auto k = 0u; k < gen_mut_info.size(); k++){
+				gen_mut_info[k].si = pi.vec[k];
+			}
+		}
+		break;
+		
+	case IND_EVENT_TIME_PROP: case IND_MULTI_EVENT_PROP: 
+	case IND_EVENT_ALL_PROP: 
+		{
+			for(auto k = 0u; k < ind_sampler.size(); k++){
+				ind_sampler[k].si = pi.vec[k];
+			}
+		}
+		break;
+	
+	case IND_OBS_RESIM_PROP:
+		{
+			for(auto k = 0u; k < ind_sim_prob.size(); k++){
+				ind_sim_prob[k].prob = pi.vec[k];
+			}
+		}
+		break;
+		
+	case IND_OBS_SAMP_PROP: case IND_OBS_RESIM_SINGLE_PROP:
+		{
+			auto m = 0u;
+			for(auto cl = 0u; cl < ind_sim_prob_cl.size(); cl++){
+				for(auto k = 0u; k < ind_sim_prob_cl[cl].size(); k++){
+					ind_sim_prob_cl[cl][k].prob = pi.vec[m]; m++;
+				}
+			}
+			if(m != pi.vec.size()) emsg("wrong size");
+		}
+		break;
+		
+	default: emsg("Not here"); break;
+	}
+}
+
+
+/// Gets a unique identifier for a proposal
+vector <unsigned int> Proposal::get_prop_id() const
+{
+	vector <unsigned int> id;
+	
+	switch(type){
+	case PARAM_PROP: case MBP_PROP: 
+		for(auto th : param_list) id.push_back(th);
+		break;
+
+	case MBPII_PROP:
+	case MBP_IC_POPTOTAL_PROP: case MBP_IC_RESAMP_PROP:
+	case IND_ADD_REM_PROP: 
+		id.push_back(p_prop);
+		break;
+		
+	case IE_PROP: 
+		id.push_back(p_prop);
+		id.push_back(ie_prop);
+		break;
+		
+	case IE_VAR_PROP:
+		id.push_back(p_prop);
+		for(auto th : param_list) id.push_back(th);
+		break;
+		
+	case IE_COVAR_PROP:
+		id.push_back(p_prop);
+		for(auto th : param_list) id.push_back(th);
+		id.push_back(ind_eff_group_ref.i);
+		id.push_back(ind_eff_group_ref.j);
+		break;
+		
+	case IE_VAR_CV_PROP:
+		id.push_back(p_prop);
+		for(auto th : param_list) id.push_back(th);
+		id.push_back(ie_prop);
+		break;
+		
+	case MBP_IC_POP_PROP:
+		id.push_back(p_prop);
+		id.push_back(cl_prop);
+		id.push_back(c_prop);
+		break;
+		
+	case POP_ADD_REM_LOCAL_PROP: 
+		{
+			id.push_back(p_prop);
+			const auto &ls = loc_samp;
+			for(auto tr : ls.tr_list) id.push_back(tr);
+		}
+		break;
+		
+	case POP_IC_LOCAL_PROP: case POP_END_LOCAL_PROP:
+		id.push_back(p_prop);
+		break;
+		
+	case POP_SINGLE_LOCAL_PROP: 
+		id.push_back(p_prop);
+		break;
+	
+	case POP_IC_PROP: case POP_IC_SWAP_PROP:
+		id.push_back(p_prop);
+		break;
+
+	case TRANS_TREE_MUT_LOCAL_PROP:
+		break;
+		
+	case IND_EVENT_TIME_PROP: case IND_MULTI_EVENT_PROP: 
+	case IND_EVENT_ALL_PROP: 
+		id.push_back(p_prop);
+		break;
+	
+	case IND_OBS_RESIM_PROP:
+		id.push_back(p_prop);
+		break;
+		
+	case IND_OBS_SAMP_PROP: case IND_OBS_RESIM_SINGLE_PROP:
+		id.push_back(p_prop);
+		break;
+		
+	default: emsg("Not dealt with"); break;
+	}
+	
+	for(auto va : id) if(va == UNSET) emsg("id should not be unset");
+	return id;
+}
+
+
+/// Adds sampling information to be averaged
+void Proposal::add_sampler_info(vector <double> &vec, const Sampler &sa) const
+{
+	for(auto va : sa.num) vec.push_back(va);
+}
+
+
+/// Sets sampling information to average
+void Proposal::set_sampler_info(const vector <double> &vec, Sampler &sa) const
+{
+	auto k = 0u;
+	for(auto &va : sa.num){ va = vec[k]; k++;} 
+	if(k != vec.size()) emsg("wrong size");
+	sa.setup();
+}
+
+
+/// Adds sampling information to be averaged
+void Proposal::add_sampler2D_info(vector <double> &vec, const Sampler2D &sa) const
+{
+	for(const auto &list : sa.num){
+		for(auto va : list) vec.push_back(va);
+	}
+}
+
+
+/// Sets sampling information to average
+void Proposal::set_sampler2D_info(const vector <double> &vec, Sampler2D &sa) const
+{
+	auto k = 0u;
+	for(auto &list : sa.num){
+		for(auto &va : list){ va = vec[k]; k++;}
+	}
+	if(k != vec.size()) emsg("wrong size");
+	
+	sa.setup();
+}
+
+
+/// Prints the acceptance rate
+string Proposal::print_ac(unsigned int nac, unsigned int ntr) const
+{
+	auto per = 100.0*nac/(ntr+TINY);
+	if(on){
+		if(per < 20) term_out(name+" "+tstr(per)+" too low");
+		if(per > 85) term_out(name+" "+tstr(per)+" too high");
+	}
+	
+	return " Acceptance: "+to_string((unsigned int)per)+"% "; 
+}
+
+/// Prints the acceptance rate
+string Proposal::print_fa(unsigned int nfa, unsigned int ntr) const
+{
+	auto per = 100.0*nfa/(ntr+TINY);
+	return " Fail: "+to_string((unsigned int)per)+"%  "; 
+}
+
+
+/// Outputs a range or values
+string Proposal::print_range(string te, const vector <double> &list) const
+{
+	auto me = mean(list);
+	
+	
+	if(on){
+		if(te == "Acceptance" && me < 20) term_out(name+" "+tstr(me)+" too low");
+		if(te == "Acceptance" && me > 90) term_out(name+" "+tstr(me)+" too high");
+	}
+	
+	return " "+te+": "+tstr(me)+"("+tstr(min(list))+" - "+tstr(max(list))+")  ";
 }

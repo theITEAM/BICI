@@ -14,6 +14,7 @@ using namespace std;
 #include "state.hh"
 #include "utils.hh"
 #include "matrix.hh"
+#include "synchronise.hh"
 
 PAS::PAS(const Model &model, Output &output, Mpi &mpi) : model(model), output(output),  mpi(mpi)
 {	
@@ -70,23 +71,24 @@ void PAS::run()
 
 	auto g = 0;
 	do{
-		percentage(phi,1);
+		estimate_percentage();
 			
 		//if(op()) cout << "Generation " << g << ":  phi=" << phi << endl;
 
-		for(auto &ch : chain){ ch.Lobs_av = 0; ch.nLobs_av = 0;}
+		for(auto &ch : chain){ ch.Lobs_av = 0; ch.Lobs_av2 = 0; ch.nLobs_av = 0;}
 	 
 		for(auto s = 0u; s < gen_update; s++) {   // Updates mcmc
 			//if(op()) cout << s << endl; 
 			
 			for(auto &ch : chain){
-				ch.pas_burn_update(s,g,gen_update,phi);
+				ch.pas_burn_update(s,gen_update,phi);
 				ch.update(s);
 			}
 			
 			if(s%step_Lobs == step_Lobs-1){
 				for(auto &ch : chain){
-					ch.Lobs_av += ch.like_total_obs(); 
+					auto L = ch.like_total_obs(); 
+					ch.Lobs_av += L; ch.Lobs_av2 += L*L; 
 					ch.nLobs_av++;
 				}
 			}
@@ -99,6 +101,9 @@ void PAS::run()
 		if(phi == phi_final) break;
 		
 		bootstrap();
+		
+		if(model.sync_on) synchronise_proposal(UNSET,chain,mpi);
+		
 		g++;
 	}while(true);
 	percentage_end();
@@ -110,6 +115,8 @@ void PAS::run()
 	
 	for(auto s = 0u; s < nsample; s++){
 		percentage(s,nsample);
+	
+		if(model.sync_on) synchronise_proposal(s,chain,mpi);
 	
 		for(auto &ch : chain){
 			ch.pas_burn_update_run(s);
@@ -126,11 +133,15 @@ void PAS::run()
 	mpi.barrier();
 #endif
 	
-	output.set_output_burnin(double(100.0*nburnin)/nsample);
+	output.set_inference_prop(double(100.0*nburnin)/nsample,"burnin-percent",BURNIN_FRAC_DEFAULT);
 	
 	for(auto ch = 0u; ch < num_per_core; ch++){
-		auto diag = chain[ch].diagnostics(clock()-time_anneal_start,time_anneal_end-time_anneal_start);
-		output.set_diagnostics(mpi.core*num_per_core+ch,diag);
+		auto ch_tot = mpi.core*num_per_core+ch;
+		const auto &cha = chain[ch];
+		
+		auto diag = cha.diagnostics(clock()-time_anneal_start,time_anneal_end-time_anneal_start);
+		output.set_diagnostics(ch_tot,diag);
+		output.terminal_info.push_back(cha.get_terminal_info(ch_tot));
 	}
 	
 	percentage_end();
@@ -168,51 +179,50 @@ bool PartRO_ord (const PartReorder &p1, const PartReorder &p2)
 /// Works out which particles should be copied and sets new inverse temperature
 void PAS::bootstrap()
 {
-	vector <double> L_store;
+	vector <double> L_av, L_var;
 	for(const auto &ch : chain){
-		L_store.push_back(ch.Lobs_av/ch.nLobs_av);
+		auto av = ch.Lobs_av, av2 = ch.Lobs_av2;
+		auto n = ch.nLobs_av;
+		L_av.push_back(av/n);
+		L_var.push_back(av2/n - (av/n)*(av/n)+TINY);
 	}
 	
 #ifdef USE_MPI 
-	auto L_store_tot = mpi.gather(L_store);
-	unsigned int Ntot = L_store_tot.size();
+	auto L_av_tot = mpi.gather(L_av);
+	auto L_var_tot = mpi.gather(L_var);
+	unsigned int Ntot = L_av_tot.size();
 	mpi.bcast(Ntot);
 #else
-	auto L_store_tot = L_store;
-	unsigned int Ntot = L_store_tot.size();
+	auto L_av_tot = L_av;
+	auto L_var_tot = L_var;
+	unsigned int Ntot = L_av_tot.size();
 #endif
 	
 	vector <unsigned int> partcopy(Ntot);
 	
 	if(op()){
-		vector <PartReorder> part_ro(Ntot);
-		for(auto i = 0u; i < Ntot; i++){ part_ro[i].i = i; part_ro[i].L = L_store_tot[i];}
+		// Variance within chain
+		auto L_var_mean = mean(L_var_tot);
 		
-		sort(part_ro.begin(),part_ro.end(),PartRO_ord);  // Sorts EFs
+		// Variance between chain
+		auto av = 0.0, av2 = 0.0, nav = 0.0; 
+		for(auto va : L_av){ av += va; av2 += va*va; nav++;}
+		auto L_var_bet = (av2/nav) - (av/nav)*(av/nav);
 		
-		auto i1 = int(0.5*Ntot);
-		auto i2 = int(0.75*Ntot);
-		if(i1 == i2){
-			if(i1 > 0) i1--;
-			else i2++;
-		}
-		auto L_range = part_ro[i2].L - part_ro[i1].L;
+		auto L_sd_mean = sqrt(L_var_mean+L_var_bet+TINY);
+		if(L_sd_mean == 0) L_sd_mean = 1;
 	
-		if(L_range == 0) L_range = 1;
-	
-	  auto dphi = quench_factor/L_range;   // Sets the increase in inverse temperature
+	  auto dphi = quench_factor/L_sd_mean;   // Sets the increase in inverse temperature
 		
 		if(phi+dphi > phi_final) dphi = phi_final-phi;  // Limits phi to phifinal
 		
-		auto Lav = 0.0;                           // Calculates the average in EF across runs
-		for(auto val : L_store_tot) Lav += val;
-		Lav /= Ntot;
-		
+		auto Lav = mean(L_av_tot);         // Calculates the average in EF across runs
+	
 		vector <double> wsum(Ntot);                             // Weights particles
 		vector <unsigned int> num(Ntot,0);   
 		auto sum = 0.0;
 		for(auto j = 0u; j < Ntot; j++){
-			sum += exp(0.5*dphi*(L_store_tot[j]-Lav));
+			sum += exp(0.5*dphi*(L_av_tot[j]-Lav));
 			wsum[j] = sum;
 		}
 		if(sum == 0) emsg("Zero probability");
@@ -241,13 +251,15 @@ void PAS::bootstrap()
 		}
 		if(list.size() != 0) emsg("PAS");
 		
-		phi += dphi;
+		phi += dphi; //cout << phi << "phi" << endl;
 	}
 	
 #ifdef USE_MPI 
 	mpi.bcast(partcopy);
 	mpi.bcast(phi);
 #endif
+	
+	phi_list.push_back(phi);
 	
 	for(auto j = 0u; j < Ntot; j++){  	
 		auto from = partcopy[j];
@@ -284,3 +296,65 @@ void PAS::bootstrap()
 		}
 	}
 }
+
+
+/// Estimates percentage based on list of phi
+void PAS::estimate_percentage() const 
+{
+	auto N = phi_list.size();
+	if(N < 2){
+		percentage(0.01*N,1);
+	}
+	else{ // Performs linear regression to estimate when annealing will finish
+		vector <double> x, y;
+		for(auto j = 0u; j < N; j++){
+			x.push_back(j+1); y.push_back(log(phi_list[j]));
+		}
+		
+		vector <double> w(N);
+		auto v = 1.0;
+		for(int j = N-1; j >= 0; j--){
+			w[j] = v; v *= 0.8;
+		}	
+
+		auto x_av = 0.0, y_av = 0.0, nav = 0.0;
+		for(auto j = 0u; j < N; j++){
+			x_av += w[j]*x[j];
+			y_av += w[j]*y[j];
+			nav += w[j];
+		}
+		x_av /= nav; y_av /= nav;
+		
+		auto sum = 0.0, sum2 = 0.0;
+		for(auto j = 0u; j < N; j++){
+			auto dx = x[j]-x_av, dy = y[j]-y_av;
+			sum += w[j]*dx*dy; sum2 += w[j]*dx*dx;
+		}
+		auto beta = sum/sum2;
+		auto alpha = y_av - beta*x_av;
+		
+		auto x_final = (unsigned int)(1-alpha/beta);  // The estimates number of generations
+
+		if(false){
+			ofstream fout("point.txt");
+			for(auto j = 0u; j < N; j++){
+				fout << x[j] << " " << y[j] << " " << w[j] << endl;
+			}
+		
+			ofstream fout2("line.txt");
+			fout2 << 0 << " " << alpha << endl;
+			fout2 << 20 << " " << (alpha + 20*beta) << endl;
+		}
+		
+		auto frac_done = double(N)/x_final;
+		if(frac_done > 1) frac_done = 1;
+		if(frac_done < 0.6){
+			auto Nstart = 10u;
+			if(N < Nstart){
+				frac_done *= double(N)/Nstart;	
+			}
+		}
+		percentage(frac_done,1);
+	}
+}
+		

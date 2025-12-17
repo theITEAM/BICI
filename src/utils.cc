@@ -386,11 +386,26 @@ bool allow_string(const string st, const string ok_char)
 /// Converts a string to a number
 double number(string st)
 {
-	if(allow_string(st,"-0123456789.e") == false) return UNSET;
+	if(allow_string(st,"+-0123456789.e") == false) return UNSET;
 	
 	double val = atof(st.c_str());
 	if(val == 0 && trim(st) != "0" && trim(st).substr(0,3) != "0.0" && trim(st).substr(0,3) != "0.") return UNSET;
 	return val;
+}
+
+
+/// Gets a vector from a list of numbers, e.g. "4.5,2.3"
+vector <double> get_number_vec(string st)
+{
+	vector <double> vec;
+	if(trim(st) == "") return vec;
+	
+	auto spl = split(st,',');
+	for(auto i = 0u; i < spl.size(); i++){
+		vec.push_back(number(spl[i]));
+	}
+	
+	return vec;
 }
 
 
@@ -950,6 +965,17 @@ vector <unsigned int> get_list(unsigned int num)
 	return list;
 }
 */
+
+/// Write an vector as a string
+string stringify(const vector <string> &arr)
+{
+	string te="";
+	for(auto i = 0u; i < arr.size(); i++){
+		if(i != 0) te += ","; 
+		te += arr[i];
+	}
+	return te;
+}
 
 
 /// Converts a value tensor into a string
@@ -3791,4 +3817,80 @@ void calculate_cubic_spline_precalc(vector <double> &precalc, unsigned int i, co
 		
 		}
 	}
+}
+
+
+/// Converts from a proposal type to a string
+string prop_type_str(PropType type)
+{
+	switch(type){
+	case PARAM_PROP: return "param";
+	case IND_EVENT_TIME_PROP: return "ind-event-time";
+	case IND_MULTI_EVENT_PROP: return "ind-multi-event";
+	case IND_EVENT_ALL_PROP: return "ind-event-all";
+	case IND_OBS_SAMP_PROP: return "ind-obs-samp";
+	case IND_OBS_RESIM_PROP: return "ind-obs-resim";
+	case IND_OBS_RESIM_SINGLE_PROP: return "ind-obs-resim-single";
+	case IND_UNOBS_RESIM_PROP: return "ind-unobs-resim";
+	case IND_ADD_REM_PROP: return "ind-add-rem";
+	case IND_ADD_REM_TT_PROP: return "ind-add-rem-tt";
+	case MBP_PROP: return "mbp";
+	case MBPII_PROP: return "mbpII";
+	case MBP_IC_POP_PROP: return "mbp-ic-pop";
+	case MBP_IC_POPTOTAL_PROP: return "mbp-ic-poptotal";
+	case MBP_IC_RESAMP_PROP: return "mbp-ic-resamp";
+	case INIT_COND_FRAC_PROP: return "init-cond-frac";
+	case IE_PROP: return "ie";
+	case IE_VAR_PROP: return "ie-var";
+	case IE_COVAR_PROP: return "ie-covar";
+	case IE_VAR_CV_PROP: return "ie-var-cv";
+	case TRANS_TREE_PROP: return "trans-tree";
+  case TRANS_TREE_SWAP_INF_PROP: return "trans-tree-swap-inf";
+	case TRANS_TREE_MUT_PROP: return "trans-tree-mut";
+	case TRANS_TREE_MUT_LOCAL_PROP: return "trans-tree-mut";
+	case POP_ADD_REM_LOCAL_PROP: return "pop-add-rem-local";
+	case POP_MOVE_LOCAL_PROP: return "pop-move-local";
+	case POP_IC_LOCAL_PROP: return "pop-ic-local";
+	case POP_END_LOCAL_PROP: return "pop-end-local";
+	case POP_SINGLE_LOCAL_PROP: return "pop-single-local";
+	case POP_IC_PROP: return "pop-ic";
+	case POP_IC_SWAP_PROP: return "pop-ac-swap";
+	case PAR_EVENT_FORWARD_PROP: return "par-event-forward";
+	case PAR_EVENT_FORWARD_SQ_PROP: return "par-event-forward-sq";
+	case PAR_EVENT_BACKWARD_SQ_PROP: return "par-event-backward-sq";
+	case IND_LOCAL_PROP: return "ind-local";
+	case CORRECT_OBS_TRANS_PROP: return "correct-obs-trans";
+	case IND_OBS_SWITCH_ENTER_SOURCE_PROP: return "ind-obs-switch-enter-source"; 
+	case IND_OBS_SWITCH_LEAVE_SINK_PROP: return "ind-obs-switch-leave-sink";
+	}
+	emsg("Cannot find text");
+	return "";
+}
+
+
+/// Prints out to the terminal in the interface
+void term_out(string te)
+{
+	if(false){
+		if(com_op){
+			cout << "<TERM>" << te << endl;
+		}
+		else{
+			cout << "Term: " << te << endl;
+		}
+	}
+}
+
+
+/// Outputs a number to a certain number of significant digits
+string sig_fig(double num, unsigned int fig)
+{	
+	auto lo = log10(num);
+	auto fl = floor_int(lo);
+	auto sh = fl-fig+1;
+	auto shift = pow(10,log10(num)-sh);
+	auto ro = round(shift);
+	auto ans = pow(10,log10(ro)+sh);
+	
+	return tstr(ans);
 }

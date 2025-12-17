@@ -7,6 +7,8 @@
 #include <cmath>
 #include <math.h>
 #include <algorithm>
+#include <iomanip>
+
 
 using namespace std;
 
@@ -23,7 +25,7 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	prop_weight = w;
 	number = 0;
 	
-	name = "PROPOSAL ";
+	name = "PROPOSAL "+prop_type_str(type)+" ";
 	
 	auto win = (unsigned int)(model.details.T/10); if(win == 0) win = 1;
 	loc_samp.win = win;
@@ -39,29 +41,19 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	switch(type){
 	case IND_OBS_SWITCH_ENTER_SOURCE_PROP:
 		p_prop = vec[0];
-		name += "IND_OBS_SWITCH_ENTER_SOURCE_PROP";	
 		break;
 		
 	case IND_OBS_SWITCH_LEAVE_SINK_PROP:
 		p_prop = vec[0];
-		name += "IND_OBS_SWITCH_LEAVE_SINK_PROP";	
 		break;
 		
 	case CORRECT_OBS_TRANS_PROP: 
 		p_prop = vec[0];
 		all_events_correct = false;
-		name += "CORRECT_OBS_TRANS_PROP";	
 		break;
 		
 	case PAR_EVENT_FORWARD_PROP: case PAR_EVENT_FORWARD_SQ_PROP:
 	case PAR_EVENT_BACKWARD_SQ_PROP:
-		switch(type){
-		case PAR_EVENT_FORWARD_PROP: name += "PAR_EVENT_FORWARD_PROP "; break;
-		case PAR_EVENT_FORWARD_SQ_PROP: name += "PAR_EVENT_FORWARD_SQ_PROP "; break;
-		case PAR_EVENT_BACKWARD_SQ_PROP: name += "PAR_EVENT_BACKWARD_SQ_PROP "; break;
-		default: emsg("not here"); break;
-		}
-	
 		p_prop = vec[0];
 		param_list.push_back(vec[1]);
 		tr_change.resize(model.species[p_prop].tra_gl.size(),false);
@@ -88,38 +80,30 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		break;
 		
 	case TRANS_TREE_PROP:
-		name += "TRANS_TREE_PROP ";
 		si = 0.1;
 		break;
 		
 	case TRANS_TREE_SWAP_INF_PROP:
-		name += "TRANS_TREE_SWAP_INF_PROP ";
 		si = 0.1;
 		break;
 		
 	case TRANS_TREE_MUT_PROP:
-		name += "TRANS_TREE_MUT_PROP ";
 		si = 1;
 		break;
 		
 	case TRANS_TREE_MUT_LOCAL_PROP:
-		name += "TRANS_TREE_MUT_LOCAL_PROP ";
 		gen_mut_info.resize(GEN_UPDATE_MAX);
 		break;
 		
 	case PARAM_PROP: case MBP_PROP:    // Parameter proposals
 	case IE_VAR_PROP: case IE_COVAR_PROP: case IE_VAR_CV_PROP: 
-		if(type == PARAM_PROP) name += "PARAM_PROP ";
-		if(type == MBP_PROP) name += "MBP_PROP ";
 		if(type == IE_VAR_PROP){
-			name += "IE_VAR_PROP ";
 			if(vec.size() != 3) emsg("ert");
 			p_prop = vec[1]; ie_prop = vec[2];
 			vec.resize(1);
 		}
 		
 		if(type == IE_COVAR_PROP){
-			name += "IE_COVAR_PROP ";
 			if(vec.size() != 5) emsg("ert");
 			p_prop = vec[1]; 
 			ind_eff_group_ref.ieg = vec[2];
@@ -129,7 +113,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		}
 		
 		if(type == IE_VAR_CV_PROP){
-			name += "IE_VAR_CV_PROP ";
 			p_prop = vec[1]; ie_prop = vec[2];
 			vec.erase(vec.begin()+1,vec.begin()+3);
 		}
@@ -146,7 +129,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		break;
 		
 	case IND_EVENT_TIME_PROP:                 // Individual event time proposals
-		name += "IND_EVENT_TIME_PROP";	
 		if(vec.size() != 1) emsg("error vec num");
 		p_prop = vec[0];
 		
@@ -154,7 +136,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		break;
 		
 	case IND_MULTI_EVENT_PROP:                 // Individual multi event time proposals
-		name += "IND_MULTI_EVENT_PROP";	
 		if(vec.size() != 1) emsg("error vec num");
 		p_prop = vec[0];
 		
@@ -162,7 +143,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		break;
 	
 	case IND_EVENT_ALL_PROP:                 // Individual event time proposals for all events
-		name += "IND_EVENT_ALL_PROP";	
 		if(vec.size() != 1) emsg("error vec num");
 		p_prop = vec[0];
 		
@@ -170,7 +150,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		break;
 		
 	case IND_LOCAL_PROP:                      // Individual event time proposals
-		name += "IND_LOCAL_PROP";	
 		if(vec.size() != 2) emsg("error vec num");
 		p_prop = vec[0]; cl_prop = vec[1];
 		
@@ -179,7 +158,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	
 	case IND_OBS_RESIM_PROP:  
 		{
-			name += "IND_OBS_RESIM_PROP"; 
 			if(vec.size() != 1) emsg("error vec num");
 			p_prop = vec[0];
 			ntr = 0; nac = 0; nfa = 0;
@@ -196,12 +174,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	case IND_OBS_SAMP_PROP:                   // Individual proposals
 	case IND_OBS_RESIM_SINGLE_PROP:  
 		{
-			switch(type){
-			case IND_OBS_SAMP_PROP: name += "IND_OBS_SAMP_PROP"; break;
-			case IND_OBS_RESIM_SINGLE_PROP: name += "IND_OBS_RESIM_SINGLE_PROP"; break;
-			default: emsg("op prob"); break;
-			}
-			
 			if(vec.size() != 1) emsg("error vec num");
 			p_prop = vec[0];
 			ntr = 0; nac = 0; nfa = 0;
@@ -224,20 +196,12 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	case IND_UNOBS_RESIM_PROP:         
 	case IND_ADD_REM_PROP:    
 	case IND_ADD_REM_TT_PROP:  	
-		switch(type){
-		case IND_UNOBS_RESIM_PROP: name += "IND_UNOBS_RESIM_PROP"; break;
-		case IND_ADD_REM_PROP: name += "IND_ADD_REM_PROP"; break;
-		case IND_ADD_REM_TT_PROP: name += "IND_ADD_REM_TT_PROP"; break;
-		default: emsg("op prob"); break;
-		}
-			
 		if(vec.size() != 1) emsg("error vec num");
 		p_prop = vec[0];
 		ntr = 0; nac = 0; nfa = 0; si = 5; 
 		break;
 		
 	case MBPII_PROP:
-		name += "MBPII_PROP";
 		if(vec.size() != 1) emsg("error vec num");
 		p_prop = vec[0];
 		ntr = 0; nac = 0; si = 1;
@@ -245,7 +209,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		break;
 		
 	case MBP_IC_POP_PROP:
-		name += "MBP_IC_POP_PROP";
 		if(vec.size() != 3) emsg("error vec num");
 		p_prop = vec[0];
 		cl_prop = vec[1];
@@ -255,7 +218,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		break;
 		
 	case MBP_IC_POPTOTAL_PROP:
-		name += "MBP_IC_POPTOTAL_PROP";
 		if(vec.size() != 1) emsg("error vec num");
 		p_prop = vec[0];
 		cl_prop = UNSET;
@@ -265,7 +227,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		break;
 		
 	case MBP_IC_RESAMP_PROP:
-		name += "MBP_IC_RESAMP_PROP";
 		if(vec.size() != 1) emsg("error vec num");
 		p_prop = vec[0];
 		ntr = 0; nac = 0; si = 1;
@@ -273,14 +234,12 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		break;
 		
 	case INIT_COND_FRAC_PROP:
-		name += "INIT_COND_FRAC_PROP";
 		if(vec.size() != 1) emsg("error vec num");
 		p_prop = vec[0];
 		ntr = 0; nac = 0; 
 		break;
 		
 	case IE_PROP:                            // Individual proposals
-		name += "IE_PROP";
 		if(vec.size() != 2) emsg("error vec num");
 		p_prop = vec[0];
 		ie_prop = vec[1];
@@ -288,14 +247,12 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		break;
 		
 	case POP_ADD_REM_LOCAL_PROP:
-		name += "POP_ADD_REM_LOCAL_PROP";
 		loc_samp.tr_list = vec; loc_samp.tr_list.pop_back();
 		p_prop = vec[vec.size()-1];
 		ntr = 0; nac = 0;
 		break;
 		
 	case POP_MOVE_LOCAL_PROP:
-		name += "POP_MOVE_LOCAL_PROP";
 		if(vec.size() != 1) emsg("error vec num");
 		p_prop = vec[0];
 		ntr = 0; nac = 0;
@@ -303,7 +260,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	
 	case POP_IC_LOCAL_PROP:
 		{
-			name += "POP_IC_LOCAL_PROP";
 			if(vec.size() != 1) emsg("error vec num");
 			p_prop = vec[0];
 			ntr = 0; nac = 0;
@@ -314,8 +270,7 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		
 	case POP_END_LOCAL_PROP:
 		{
-			name += "POP_END_LOCAL_PROP";
-			if(vec.size() != 1) emsg("error vec num");
+		if(vec.size() != 1) emsg("error vec num");
 			p_prop = vec[0];
 			ntr = 0; nac = 0;
 			auto N = model.species[p_prop].tra_gl.size();
@@ -325,7 +280,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		
 	case POP_SINGLE_LOCAL_PROP:
 		{
-			name += "POP_SINGLE_LOCAL_PROP";
 			if(vec.size() != 1) emsg("error vec num");
 			p_prop = vec[0];
 			ntr = 0; nac = 0;
@@ -337,7 +291,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		
 	case POP_IC_PROP:
 		{
-			name += "POP_IC_PROP";
 			if(vec.size() != 1) emsg("error vec num");
 			p_prop = vec[0];
 			ntr = 0; nac = 0;
@@ -348,7 +301,6 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		
 	case POP_IC_SWAP_PROP:
 		{
-			name += "POP_IC_SWAP_PROP";
 			if(vec.size() != 1) emsg("error vec num");
 			p_prop = vec[0];
 			ntr = 0; nac = 0;
@@ -694,8 +646,8 @@ void Proposal::MH(State &state)
 	ntr++; 
 	
 	auto ps_fac = param_resample(param_val,state.popnum_t);
-	if(ps_fac == UNSET){ update_si(-0.005);	return;}
-
+	if(ps_fac == UNSET){ update_si(REJECT);	return;}
+	
 	if(pl){     
 		cout << endl << endl;
 		for(auto i : param_val.value_ch){
@@ -722,12 +674,12 @@ void Proposal::MH(State &state)
 		if(pl) cout << "accept" << endl;
 		nac++;
 		state.accept(like_ch);
-		update_si(0.01);
+		update_si(ACCEPT);
 	}
 	else{ 
 		if(pl) cout << "reject" << endl;
 		state.restore(affect_like);
-		update_si(-0.005); if(si > 3) si *= 0.75;
+		update_si(REJECT); if(si > 3) si *= 0.75;
 	}
 	
 	if(pl) state.check("mh after");
@@ -756,7 +708,7 @@ void Proposal::mbp(State &state)
 	case MBP_PROP: 
 		{
 			ps_fac = param_resample(state.param_val,state.popnum_t);
-			if(ps_fac == UNSET){ update_si(-0.005); return;}
+			if(ps_fac == UNSET){ update_si(REJECT); return;}
 			
 			if(pl){     
 				cout << endl << endl;
@@ -782,7 +734,7 @@ void Proposal::mbp(State &state)
 			if(res != IC_SUCCESS){
 				ssp.init_cond_val = init_cond_store;
 				if(res != IC_ZERO){
-					update_si(-0.005);
+					update_si(REJECT);
 					if(type == MBP_IC_POP_PROP || type == MBP_IC_POPTOTAL_PROP){
 						if(si < POP_SI_LIM) si = POP_SI_LIM;
 					}
@@ -824,7 +776,7 @@ void Proposal::mbp(State &state)
 		
 		state.accept(like_ch);
 		ssp.mbp_accept(state.like.markov);
-		update_si(0.005); 
+		update_si(ACCEPT50); 
 		if(si > 1 && (type == MBPII_PROP || type == MBP_IC_RESAMP_PROP)) si = 1;
 	}
 	else{ 
@@ -841,7 +793,8 @@ void Proposal::mbp(State &state)
 		}
 		
 		state.restore(affect_like);		
-		update_si(-0.005);
+		update_si(REJECT);
+
 		if(type == MBP_IC_POP_PROP || type == MBP_IC_POPTOTAL_PROP){
 			if(si < POP_SI_LIM) si = POP_SI_LIM;
 		}
@@ -913,7 +866,7 @@ void Proposal::MH_event(State &state)
 							samp.ntr++;
 							if(t_new <= tmin || t_new >= tmax){
 								samp.nfa++;
-								update_ind_samp_si(tr_gl,-0.005);
+								update_ind_samp_si(tr_gl,REJECT,samp.ntr);
 							}
 							else{
 								auto ev_new = ind.ev;
@@ -932,7 +885,7 @@ void Proposal::MH_event(State &state)
 								
 								if(gc.type == GENCHA_FAIL){
 									samp.nfa++;
-									update_ind_samp_si(tr_gl,-0.005);
+									update_ind_samp_si(tr_gl,REJECT,samp.ntr);
 								}
 								else{
 									auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
@@ -957,12 +910,12 @@ void Proposal::MH_event(State &state)
 										state.gen_change_update(gc); 
 										if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 										
-										update_ind_samp_si(tr_gl,0.005);
+										update_ind_samp_si(tr_gl,ACCEPT50,samp.ntr);
 									}
 									else{ 
 										if(pl) cout << "reject" << endl;
 										state.restore_back();
-										update_ind_samp_si(tr_gl,-0.005);
+										update_ind_samp_si(tr_gl,REJECT,samp.ntr);
 									}
 
 									if(pl) state.check("ind prop");
@@ -1079,13 +1032,13 @@ void Proposal::MH_multi_event(State &state)
 					samp.ntr++;
 					if(ill){
 						samp.nfa++;
-						update_ind_samp_si(tr_gl,-0.005);
+						update_ind_samp_si(tr_gl,REJECT,samp.ntr);
 					}
 					else{		
 						auto gc = state.update_tree(p_prop,i,ev_new);
 						if(gc.type == GENCHA_FAIL){
 							samp.nfa++;
-							update_ind_samp_si(tr_gl,-0.005);
+							update_ind_samp_si(tr_gl,REJECT,samp.ntr);
 						}
 						else{
 							auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
@@ -1109,12 +1062,12 @@ void Proposal::MH_multi_event(State &state)
 								state.gen_change_update(gc); 
 								if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 								
-								update_ind_samp_si(tr_gl,0.005);
+								update_ind_samp_si(tr_gl,ACCEPT50,samp.ntr);
 							}
 							else{ 
 								if(pl) cout << "reject" << endl;
 								state.restore_back();
-								update_ind_samp_si(tr_gl,-0.005);
+								update_ind_samp_si(tr_gl,REJECT,samp.ntr);
 							}
 
 							if(pl) state.check("ind multi event");
@@ -1180,7 +1133,7 @@ void Proposal::MH_event_all(State &state)
 				samp.ntr++;
 				if(ill){
 					samp.nfa++;
-					update_ind_samp_si(i,-0.005);
+					update_ind_samp_si(i,REJECT,samp.ntr);
 				}
 				else{
 					auto ev_new = event;
@@ -1198,7 +1151,7 @@ void Proposal::MH_event_all(State &state)
 					auto gc = state.update_tree(p_prop,i,ev_new);
 					if(gc.type == GENCHA_FAIL){
 						samp.nfa++;
-						update_ind_samp_si(i,-0.005);
+						update_ind_samp_si(i,REJECT,samp.ntr);
 					}
 					else{
 						auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
@@ -1217,12 +1170,12 @@ void Proposal::MH_event_all(State &state)
 							state.gen_change_update(gc); 
 							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 							
-							update_ind_samp_si(i,0.005);
+							update_ind_samp_si(i,ACCEPT50,samp.ntr);
 						}
 						else{ 
 							if(pl) cout << "reject" << endl;
 							state.restore_back();
-							update_ind_samp_si(i,-0.005);
+							update_ind_samp_si(i,REJECT,samp.ntr);
 						}
 
 						if(pl) state.check("ind event all prop");
@@ -1972,7 +1925,7 @@ void Proposal::add_rem_ind(State &state)
 					
 					Nso_unobs = Nso_unobs_new;
 					
-					update_si(0.005); if(si > ADD_REM_IND_MAX) si = ADD_REM_IND_MAX;
+					update_si(ACCEPT50); if(si > ADD_REM_IND_MAX) si = ADD_REM_IND_MAX;
 				}
 				else{
 					state.restore_back();
@@ -1980,14 +1933,14 @@ void Proposal::add_rem_ind(State &state)
 						auto i = i_store[k];	
 						ssp.remove_individual(i,inf_node);
 					}
-					update_si(-0.005); if(si < 1) si = 1;
+					update_si(REJECT); if(si < 1) si = 1;
 				}
 			}
 			else{                                        // Removes individuals
 				dN *= -1;
 			
 				if(int(nunobs) < dN){
-					update_si(-0.005); if(si < 1) si = 1;
+					update_si(REJECT); if(si < 1) si = 1;
 				}
 				else{
 					vector < vector <Event> > event_store;
@@ -2053,7 +2006,7 @@ void Proposal::add_rem_ind(State &state)
 						
 						Nso_unobs = Nso_unobs_new;
 					
-						update_si(0.005); if(si > ADD_REM_IND_MAX) si = ADD_REM_IND_MAX;
+						update_si(ACCEPT50); if(si > ADD_REM_IND_MAX) si = ADD_REM_IND_MAX;
 					}
 					else{
 						for(int k = dN-1; k >= 0; k--){
@@ -2061,7 +2014,7 @@ void Proposal::add_rem_ind(State &state)
 							unobs.add_hole(i);
 						}
 						state.restore_back();
-						update_si(-0.005); if(si < 1) si = 1;
+						update_si(REJECT); if(si < 1) si = 1;
 					}
 				}				
 			}
@@ -2151,12 +2104,12 @@ void Proposal::add_rem_tt_ind(State &state)
 					if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
 					
 					Nso_unobs = Nso_unobs_new;
-					update_si(0.005);
+					update_si(ACCEPT50);
 				}
 				else{
 					state.restore_back();
 					ssp.remove_individual(i,inf_node);
-					update_si(-0.005); if(si < 1) si = 1;
+					update_si(REJECT); if(si < 1) si = 1;
 				}
 			}
 		}
@@ -2218,11 +2171,11 @@ void Proposal::add_rem_tt_ind(State &state)
 												
 							ssp.remove_individual(i,inf_node);
 							Nso_unobs = Nso_unobs_new;
-							update_si(0.005);
+							update_si(ACCEPT50);
 						}
 						else{
 							state.restore_back();
-							update_si(-0.005); if(si < 1) si = 1;
+							update_si(REJECT); if(si < 1) si = 1;
 						}
 					}				
 				}
@@ -2336,7 +2289,7 @@ void Proposal::MH_ie(State &state)
 		
 			if(inde.pop_ref.size() > 0) state.popnum_ind_recalc_w(p_prop,i);
 			
-			update_si(0.0005);
+			update_si(ACCEPT50_SMALL);
 		}
 		else{ 
 			if(pl) cout << "rej ind" << endl;
@@ -2353,7 +2306,7 @@ void Proposal::MH_ie(State &state)
 				state.update_ie_trans_tree(p_prop,i,ie_prop,exp_old/exp_prop,like_ch.markov);
 			}
 
-			update_si(-0.001);
+			update_si(REJECT_SMALL);
 		}
 		if(pl) state.check("ind prop");
 	}
@@ -2373,7 +2326,7 @@ void Proposal::MH_ie_var(State &state)
 	
 	auto ps_fac = param_resample(param_val,state.popnum_t);
 	
-	if(ps_fac == UNSET){ update_si(-0.005); return;}
+	if(ps_fac == UNSET){ update_si(REJECT); return;}
 	
 	auto factor = sqrt(value[th]/val_st);
 
@@ -2390,12 +2343,12 @@ void Proposal::MH_ie_var(State &state)
 		if(pl) cout << "accept" << endl;
 		nac++;
 		state.accept(like_ch);
-		update_si(0.01);
+		update_si(ACCEPT);
 	}
 	else{ 
 		state.restore(affect_like);
 		for(auto &ind : ssp.individual) ind.ie[ie_prop] /= factor;
-		update_si(-0.005);
+		update_si(REJECT);
 	}
 	
 	if(pl) state.check("covar ie");
@@ -2416,7 +2369,7 @@ void Proposal::MH_ie_var_cv(State &state)
 	
 	auto ps_fac = param_resample(param_val,state.popnum_t);
 	
-	if(ps_fac == UNSET){ update_si(-0.005); return;}
+	if(ps_fac == UNSET){ update_si(REJECT); return;}
 	
 	if(value[th] < TINY){ 
 		param_val.restore(); 
@@ -2438,12 +2391,12 @@ void Proposal::MH_ie_var_cv(State &state)
 		if(pl) cout << "accept" << endl;
 		nac++;
 		state.accept(like_ch);
-		update_si(0.01);
+		update_si(ACCEPT);
 	}
 	else{ 
 		state.restore(affect_like);
 		for(auto &ind : ssp.individual) ind.ie[ie_prop] /= factor;
-		update_si(-0.005);
+		update_si(REJECT);
 	}
 	
 	if(pl) state.check("covar ie");
@@ -2472,7 +2425,7 @@ void Proposal::MH_ie_covar(State &state)
 		}
 	}
 	
-	if(ps_fac == UNSET){ update_si(-0.005); return;}
+	if(ps_fac == UNSET){ update_si(REJECT); return;}
 	
 	auto g = ind_eff_group_ref.ieg;
 	
@@ -2500,7 +2453,7 @@ void Proposal::MH_ie_covar(State &state)
 	auto Z_omega_aft = calculate_cholesky(omega_aft,illegal_aft);
 	if(illegal_aft){
 		param_val.restore(); 
-		update_si(-0.005);
+		update_si(REJECT);
 		return;
 	}
 	
@@ -2542,7 +2495,7 @@ void Proposal::MH_ie_covar(State &state)
 		if(pl) cout << "ac" << endl;
 		nac++;
 		state.accept(like_ch);
-		update_si(0.01);
+		update_si(ACCEPT);
 	}
 	else{ 
 		state.restore(affect_like);
@@ -2551,7 +2504,7 @@ void Proposal::MH_ie_covar(State &state)
 			auto &ie = ssp.individual[i].ie;
 			for(auto e = 0u; e < E; e++) ie[index[e]] = store[i][e];
 		}
-		update_si(-0.005);
+		update_si(REJECT);
 	}
 	if(pl) state.check("uuu");
 }
@@ -2571,7 +2524,7 @@ void Proposal::param_event_joint(Direction dir, State &state)
 	
 	auto ps_fac = param_resample(param_val,state.popnum_t);
 
-	if(ps_fac == UNSET){ nfa++; update_si(-0.005); return;}
+	if(ps_fac == UNSET){ nfa++; update_si(REJECT); return;}
 	
 	ntr++; 	
 
@@ -2709,7 +2662,7 @@ void Proposal::param_event_joint(Direction dir, State &state)
 		}
 	}
 	
-	if(illegal){ nfa++; update_si(-0.005); return;}
+	if(illegal){ nfa++; update_si(REJECT); return;}
 
 	ssp.remove_all_event_ref(ind_list);
 	if(incomp_fl) ssp.remove_all_nmincomp_ref(ind_list);
@@ -2745,7 +2698,7 @@ void Proposal::param_event_joint(Direction dir, State &state)
 		nac++;
 			
 		state.accept(like_ch);
-		update_si(0.01);
+		update_si(ACCEPT);
 	}
 	else{ 
 		if(pl) cout << "reject" << endl;
@@ -2760,7 +2713,7 @@ void Proposal::param_event_joint(Direction dir, State &state)
 			ssp.add_all_nmincomp_ref(ind_list,incomp_ref_old);
 		}
 		
-		update_si(-0.005);
+		update_si(REJECT);
 	}
 
 	if(pl) state.check("ev");
@@ -2825,7 +2778,8 @@ double Proposal::calculate_al(const Like &like_ch, double dprob) const
 /// Provides diagnostic information about the proposals
 string Proposal::diagnostics(double total_time) const
 {
-	stringstream ss;
+	stringstream ss;	
+  ss << setprecision(3);
 	
 	if(!on) ss << "<Switched off>" << endl;
 	
@@ -2836,7 +2790,7 @@ string Proposal::diagnostics(double total_time) const
 		{
 			ss << "Transmission tree proposal: " << endl;
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/ntr) << "% ";
+			else ss << print_ac(nac,ntr);
 			ss << endl;  
 		}
 		break;
@@ -2846,8 +2800,8 @@ string Proposal::diagnostics(double total_time) const
 			ss << "Transmission tree swap inf proposal: " << endl;
 			if(ntr == 0) ss << "No proposals";
 			else{
-				ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr-nfa+TINY)) << "% ";
-				ss << " Fail: " << (unsigned int) (100.0*nfa/ntr) << "% ";
+				ss << print_ac(nac,ntr-nfa);
+				ss << print_fa(nfa,ntr);
 			}
 			ss << endl;  
 		}
@@ -2857,7 +2811,7 @@ string Proposal::diagnostics(double total_time) const
 		{
 			ss << "Transmission tree mutation proposal: " << endl;
 			if(ntr == 0) ss << "No proposals";
-			else	ss << " Acceptance: " << (unsigned int) (100.0*nac/ntr) << "%  Size:" << si;	
+			else	ss << print_ac(nac,ntr) << " Size:" << si;	
 			ss << endl;  
 		}
 		break;
@@ -2879,7 +2833,7 @@ string Proposal::diagnostics(double total_time) const
 				ss << " - ";
 				const auto &gmi = gen_mut_info[type];
 				if(gmi.ntr == 0) ss << "No proposals";
-				else ss << " Acceptance: " << (unsigned int) (100.0*gmi.nac/gmi.ntr) << "%  Size:" << gmi.si;	
+				else ss << print_ac(gmi.nac,gmi.ntr) << " Size:" << gmi.si;	
 			}
 			ss << endl;  
 		}
@@ -2897,7 +2851,7 @@ string Proposal::diagnostics(double total_time) const
 			ss << endl;
 			if(ntr == 0) ss << "No proposals";
 			else{
-				ss << " Acceptance: " << (unsigned int) (100.0*nac/ntr) << "%   Size:" << si;
+				ss << print_ac(nac,ntr) << " Size:" << si;
 			}
 			ss << endl;
 		}
@@ -2921,7 +2875,7 @@ string Proposal::diagnostics(double total_time) const
 			ss << endl;
 			if(ntr == 0) ss << "No proposals";
 			else{
-				ss << " Acceptance: " << (unsigned int) (100.0*nac/ntr) << "%   Size:" << si;
+				ss << print_ac(nac,ntr) << " Size:" << si;
 			}
 			ss << endl;
 		}
@@ -2937,7 +2891,7 @@ string Proposal::diagnostics(double total_time) const
 			}
 			ss << endl;
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/ntr) << "%   Size:" << si;
+			else ss << print_ac(nac,ntr) << " Size:" << si;
 			ss << endl;
 		}
 		break;
@@ -2946,7 +2900,7 @@ string Proposal::diagnostics(double total_time) const
 		{
 			ss << "Type II MBP proposal for species " << model.species[p_prop].name << endl;
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/ntr) << "%   Probability:" << si;
+			else ss << print_ac(nac,ntr) << " Probability:" << si;
 			ss << endl;
 		}
 		break;
@@ -2957,7 +2911,7 @@ string Proposal::diagnostics(double total_time) const
 			ss << "MBP proposal initial population for species "  << sp.name;
 			ss << " for " << sp.cla[cl_prop].name << " compartment " << sp.cla[cl_prop].comp[c_prop].name << endl;
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/ntr) << "%   Size:" << si;
+			else ss << print_ac(nac,ntr) << " Size:" << si;
 			ss << endl;
 		}
 		break;
@@ -2967,7 +2921,7 @@ string Proposal::diagnostics(double total_time) const
 			const auto &sp = model.species[p_prop];
 			ss << "MBP proposal total initial population for species "  << sp.name << endl;
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/ntr) << "%   Size:" << si;
+			else ss << print_ac(nac,ntr) << " Size:" << si;
 			ss << endl;
 		}
 		break;
@@ -2977,7 +2931,7 @@ string Proposal::diagnostics(double total_time) const
 			const auto &sp = model.species[p_prop];
 			ss << "MBP proposal for resampling init_cond for species " << sp.name << endl;
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/ntr) << "%   Size:" << si;
+			else ss << print_ac(nac,ntr) << " Size:" << si;
 			ss << endl;
 		}
 		break;
@@ -3025,10 +2979,11 @@ string Proposal::diagnostics(double total_time) const
 						const auto &tra = claa.tra[tr];
 						
 						if(ac_list[cl][tr].size() > 0){
+							
 							ss << replace_arrow(tra.name) << "   ";
-							ss << " Acceptance: " << min(ac_list[cl][tr]) << " - " << max(ac_list[cl][tr]) << "%   ";
-							ss << " Fail: " << min(fa_list[cl][tr]) << " - " << max(fa_list[cl][tr]) << "%   ";
-							ss << "Size:" << min(si_list[cl][tr]) << " - " << max(si_list[cl][tr]) ;
+							ss << print_range("Acceptance",ac_list[cl][tr]);
+							ss << print_range("Fail",fa_list[cl][tr]);
+							ss << print_range("Size",si_list[cl][tr]);
 							ss << endl;
 						}
 					}
@@ -3058,9 +3013,9 @@ string Proposal::diagnostics(double total_time) const
 		
 			if(ntot == 0) ss << "No proposals" << endl;
 			else{
-				ss << " Acceptance: " << int(mean(ac_list)) << " (" << min(ac_list) << " - " << max(ac_list) << ")    ";
-				ss << " Fail: " << int(mean(fa_list)) << " (" << min(fa_list) << " - " << max(fa_list) << ")   ";
-				ss << "Size:" << mean(si_list) << " (" << min(si_list) << " - " << max(si_list) << ")";
+				ss << print_range("Acceptance",ac_list);
+				ss << print_range("Fail",fa_list);
+				ss << print_range("Size",si_list);
 				ss << endl;
 			}
 		}
@@ -3074,8 +3029,8 @@ string Proposal::diagnostics(double total_time) const
 					
 			if(ntr == 0) ss << "No proposals";
 			else{
-				ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%    ";
-				ss << " Fail: " << (unsigned int) (100.0*nfa/(ntr+TINY)) << "%    ";
+				ss << print_ac(nac,ntr);
+				ss << print_fa(nfa,ntr);
 				
 				vector <double> prob_list;
 				for(const auto &isp : ind_sim_prob){
@@ -3102,8 +3057,8 @@ string Proposal::diagnostics(double total_time) const
 			ss << ":" << endl;	
 			if(ntr == 0) ss << "No proposals";
 			else{
-				ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%    ";
-				ss << " Fail: " << (unsigned int) (100.0*nfa/(ntr+TINY)) << "%    ";
+				ss << print_ac(nac,ntr);
+				ss << print_fa(nfa,ntr);
 				
 				const auto &sp = model.species[p_prop];
 				for(auto cl = 0u; cl < sp.ncla; cl++){
@@ -3126,8 +3081,8 @@ string Proposal::diagnostics(double total_time) const
 			ss << ":" << endl;	
 			if(ntr == 0) ss << "No proposals";
 			else{
-				ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%    ";
-				ss << " Fail: " << (unsigned int) (100.0*nfa/(ntr+TINY)) << "%    ";
+				ss << print_ac(nac,ntr);
+				ss << print_fa(nfa,ntr);
 			}
 			ss << endl;
 		}
@@ -3136,14 +3091,14 @@ string Proposal::diagnostics(double total_time) const
 	case IND_OBS_SWITCH_ENTER_SOURCE_PROP:
 		ss << "Switch enter source prop" << endl;
 		if(ntr == 0) ss << "No proposals";
-		else ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%";
+		else ss << print_ac(nac,ntr);
 		ss << endl;
 		break;
 
 	case IND_OBS_SWITCH_LEAVE_SINK_PROP:
 		ss << "Switch leave sink prop" << endl;
 		if(ntr == 0) ss << "No proposals";
-		else ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%";
+		else ss << print_ac(nac,ntr);
 		ss << endl;
 		break;
 		
@@ -3160,8 +3115,8 @@ string Proposal::diagnostics(double total_time) const
 				ss << replace_arrow(claa.swap_rep[j].name) << " ";
 				if(si.ntr == 0) ss << "No proposals";
 				else{
-					ss << " Acceptance: " << (unsigned int) (100.0*si.nac/(si.ntr2+TINY)) << "%  ";
-					ss << " Fail: " << (unsigned int) (100.0*si.nfa/(si.ntr+TINY)) << "%  ";
+					ss << print_ac(si.nac,si.ntr2);
+					ss << print_fa(si.nfa,si.ntr);
 					ss << " Zero: " << (unsigned int) (100.0*si.nzero/(si.ntr+TINY)) << "%  ";
 					ss << " Filt: " << (unsigned int) (100.0*si.nfilt/(si.ntr+TINY)) << "%  ";
 				}
@@ -3175,7 +3130,7 @@ string Proposal::diagnostics(double total_time) const
 			ss << "Individual add/remove proposals (for unobserved):" << endl;
 			
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%  Size:" << si;;
+			else ss << print_ac(nac,ntr) << " Size:" << si;;
 			ss << endl;
 		}
 		break;
@@ -3185,18 +3140,18 @@ string Proposal::diagnostics(double total_time) const
 			ss << "Individual add/remove proposals with trans-tree (for unobserved):" << endl;
 			
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%";
+			else ss << print_ac(nac,ntr);
 			ss << endl;
 		}
 		break;
 		
 	case IE_PROP:
 		{
-			auto ie_name =  model.species[p_prop].ind_effect[ie_prop].name;
+			auto ie_name = model.species[p_prop].ind_effect[ie_prop].name;
 			ss << "Individual effect proposal for " << ie_name;
 			ss << endl;
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/ntr) << "%   Size:" << si;
+			else ss << print_ac(nac,ntr) << " Size:" << si;
 			ss << endl;
 		}
 		break;
@@ -3212,7 +3167,7 @@ string Proposal::diagnostics(double total_time) const
 			ss << endl;
 			
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/ntr) << "%   Size:" << si;
+			else ss << print_ac(nac,ntr) << " Size:" << si;
 			ss << endl;
 		}
 		break;
@@ -3229,7 +3184,7 @@ string Proposal::diagnostics(double total_time) const
 			ss << endl;
 			
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/ntr) << "%   Size:" << si;
+			else ss << print_ac(nac,ntr) << " Size:" << si;
 			ss << endl;
 		}
 		break;
@@ -3252,7 +3207,7 @@ string Proposal::diagnostics(double total_time) const
 			ss << endl;
 			
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/ntr) << "%   Size:" << si;
+			else ss << print_ac(nac,ntr) << " Size:" << si;
 			ss << endl;
 		}
 		break;
@@ -3264,7 +3219,7 @@ string Proposal::diagnostics(double total_time) const
 			ss << endl;
 			
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%";
+			else ss << print_ac(nac,ntr);
 			ss << "  Window: " << loc_samp.win << endl;
 		}
 		break;
@@ -3273,7 +3228,7 @@ string Proposal::diagnostics(double total_time) const
 		{
 			ss << "Population move local proposals:" << endl;
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%";
+			else ss << print_ac(nac,ntr);
 			ss << endl;
 		}
 		break;
@@ -3282,7 +3237,7 @@ string Proposal::diagnostics(double total_time) const
 		{
 			ss << "Population init cond local proposals:" << endl;
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%";
+			else ss << print_ac(nac,ntr);
 			ss << "  Window: " << loc_samp.win << endl;
 		}
 		break;
@@ -3292,7 +3247,7 @@ string Proposal::diagnostics(double total_time) const
 			ss << "Population end local proposals:" << endl;
 			
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%";
+			else ss << print_ac(nac,ntr);
 			ss << "  Window: " << loc_samp.win << endl;
 		}
 		break;
@@ -3302,7 +3257,7 @@ string Proposal::diagnostics(double total_time) const
 			ss << "Population single add/remove local proposals:" << endl;
 			
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%";
+			else ss << print_ac(nac,ntr);
 			ss << endl;
 		}
 		break;
@@ -3312,7 +3267,7 @@ string Proposal::diagnostics(double total_time) const
 			ss << "Population IC proposals:" << endl;
 			
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%";
+			else ss << print_ac(nac,ntr);
 			ss << endl;
 		}
 		break;
@@ -3322,7 +3277,7 @@ string Proposal::diagnostics(double total_time) const
 			ss << "Population IC swap proposals:" << endl;
 			
 			if(ntr == 0) ss << "No proposals";
-			else ss << " Acceptance: " << (unsigned int) (100.0*nac/(ntr+TINY)) << "%";
+			else ss << print_ac(nac,ntr);
 			ss << endl;
 		}
 		break;

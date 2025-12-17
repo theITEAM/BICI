@@ -1238,7 +1238,6 @@ function add_table_content(lay,table,back_col,dy)
 	let col = BLACK;
 	if(back_col != WHITE) col = WHITE;
 	
-	
 	if(typeof table == 'string'){
 		lay.add_button({te:table, x:cx, y:cy, dx:lay.dx-5, dy:1.3, type:"Text", si:si, font:get_font(si), col:col}); 
 		return;
@@ -1307,8 +1306,14 @@ function add_table_content(lay,table,back_col,dy)
 						else{
 							let comp_col;
 							if(head[c].name == "Details") comp_col = true; 
-								
-							lay.add_button({te:ele.te, comp_col:comp_col, x:cx, y:cy, dx:w, dy:1.3, type:"Text", back_col:back_col, si:si, font:fo, col:col});
+							
+							if(ele.stat_col != undefined){
+								if(ele.stat_col != BLACK) fo = get_font(si,"bold");
+								lay.add_button({te:ele.te, comp_col:comp_col, x:cx, y:cy, dx:w, dy:1.3, type:"Text", back_col:back_col, si:si, font:fo, col:ele.stat_col});
+							}
+							else{
+								lay.add_button({te:ele.te, comp_col:comp_col, x:cx, y:cy, dx:w, dy:1.3, type:"Text", back_col:back_col, si:si, font:fo, col:col});
+							}
 						}
 					}					
 				}

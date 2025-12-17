@@ -17,6 +17,7 @@ function results_add_model(result,details,siminf)
 	result.sample = [];
 	result.par_sample = [];
 	result.hash_ref = new Hash(); 
+
 	let alg = details.algorithm.value;
 	
 	if(alg == "PAS-MCMC" || alg == "ABC-SMC") result.generation = [];
@@ -241,7 +242,14 @@ function get_param_value(i,source,lines,result,warn,mode)
 	name = remove_escape_char(name);
 
 	let th = find(result.param,"name",name);
-	if(th == undefined) alert_sample(warn,13);
+	if(th == undefined){
+		if(begin_str(name,"basic")){
+			i++;
+			while(i < lines.length && lines[i] != "" && !begin_str(lines[i],'"')) i++;
+			return i-1;
+		}
+		alert_sample(warn,13);
+	}
 	
 	let par = result.param[th];
 	
@@ -1505,9 +1513,9 @@ function add_univariate(name,result,total_param_list,pos_paramview,pos_genview,d
 		let par = result.param[th];			
 		if((par.type == "derive_param" && der_fl) || (par.type != "derive_param" && !der_fl)){
 			if(par.output == true && par.dep.length == 0 && par.selop == undefined){
-				
-				list.push({th:th, index:[], name:param_name_index(par,[])});
 				if(par.variety != "const"){
+					list.push({th:th, index:[], name:param_name_index(par,[])});
+				
 					total_param_list.push({th:th, index:[], name:param_name_index(par,[])});
 				}
 			}
@@ -1922,15 +1930,17 @@ function done_filter()
 	
 
 /// Converts the knot text entries into numerical value
-function get_times(knot,details)
+function get_times(knot,details,op)
 {
 	let t_start = details.t_start;
 	let t_end = details.t_end;
-	if(details.inf_t_end != undefined) t_end = details.inf_t_end;
 	
-	if(details.ppc_t_start != undefined) t_start = details.ppc_t_start;
-	if(details.ppc_t_end != undefined) t_end = details.ppc_t_end;
-
+	if(op != true){
+		if(details.inf_t_end != undefined) t_end = details.inf_t_end;
+		if(details.ppc_t_start != undefined) t_start = details.ppc_t_start;
+		if(details.ppc_t_end != undefined) t_end = details.ppc_t_end;
+	}
+	
 	let times = [];
 	for(let k = 0; k < knot.length; k++){
 		let t;

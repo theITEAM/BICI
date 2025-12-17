@@ -57,7 +57,7 @@
 // git clone https://github.com/theITEAM/BICI.git
 
 // Different commands
-// -ch=0 / -chain=0                           Runs the zeroth chain
+// -co=0 / -core=0                            Runs the zeroth core
 // -samp=0                                    Sets how sampling is done (for diagnostic purposes)
 // -seed=100                                  This overides seed set in bici file 
 
@@ -103,9 +103,10 @@ bool com_op = false;                                 // Set to true for command 
 #include "abc_smc.hh"
 #include "mfa.hh"
 #include "pas.hh"
+#include "extend.hh"
 #include "mpi.hh"
 
-vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file);
+vector <BICITag> get_tags(int argc, char** argv, Operation &mode, ExtFactor &ext_factor,string &file);
 
 int main(int argc, char** argv)
 {	
@@ -129,17 +130,19 @@ int main(int argc, char** argv)
 	auto core_spec = UNSET;
 	auto seed = UNSET;
 	auto mode = MODE_UNSET;
+	
+	ExtFactor ext_factor;
 	string file="";
 	
-	auto tags = get_tags(argc,argv,mode,file);
+	auto tags = get_tags(argc,argv,mode,ext_factor,file);
 	
-	Model model(mode);                        // Used to store the model structure 
+	Model model(mode,ext_factor);       // Used to store the model structure 
 	
 	model.samp_type = ALL_SAMP;
 	
 	for(const auto &tag : tags){
 		switch(tag.type){
-		case CHAIN: core_spec = tag.value; break;  
+		case CORE: core_spec = tag.value; break;  
 		case SEED: seed = tag.value; break;  
 		case OP: file = tag.te; break;
 		case SAMP_TYPE:
@@ -166,7 +169,7 @@ int main(int argc, char** argv)
 	
 	Mpi mpi(core_spec,model);               // Sets up mpi
 
-	Input input(model,file,seed,mpi);       // Imports information from input file into model
+	Input input(model,file,seed,mpi);// Imports information from input file into model
 
 	Output output(model,input,mpi);         // Sets up the class for model outputs
 
@@ -236,6 +239,13 @@ int main(int argc, char** argv)
 		}
 		break;
 		
+	case EXT:                               // Simulates from the posterior
+		{
+			Extend extend(model,output,mpi);
+			extend.run();
+		}
+		break;
+		
 	case MODE_UNSET:
 		alert_input("The mode is unset");
 		break;
@@ -258,11 +268,12 @@ int main(int argc, char** argv)
 
 
 /// Gets values for tags when BICI is run
-vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
+vector <BICITag> get_tags(int argc, char** argv, Operation &mode, ExtFactor &ext_factor, string &file)
 {
 	vector <BICITag> tags;
 	
-	for(auto i = 1u; i < (unsigned int)argc; i++){
+	auto N = (unsigned int)argc;
+	for(auto i = 1u; i < N; i++){
 		string te = argv[i];
 		if(te.substr(0,1) != "-"){
 			auto mode_new = MODE_UNSET;
@@ -273,8 +284,38 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 				else{
 					if(te == "post-sim" || te == "posterior-simulation") mode_new = PPC;
 					else{
-						if(end_str(te,".bici")){
-							file_new = te;
+						if(te == "ext" || te == "extend"){
+							mode_new = EXT;
+							
+							if(i+1 == N) alert_input("There must be a value after 'ext'.");
+							else{
+								auto spl = split(argv[i+1],'%');
+								auto val = number(spl[0]);
+							
+								if(val == UNSET){
+									alert_input("'"+spl[0]+"' must be a number.");
+								}
+								else{
+									ext_factor.value = val;
+								
+									if(spl.size() == 1){
+										ext_factor.percent = false;
+									}
+									else{
+										ext_factor.percent = true;
+										
+										if(val <= 100){
+											alert_input("'"+te+"' must have a percentage greater than 100%.");	
+										}
+									}								
+								}
+							}
+							i++;
+						}
+						else{
+							if(end_str(te,".bici")){
+								file_new = te;
+							}
 						}
 					}
 				}
@@ -310,8 +351,8 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 	
 			if(spl.size() != 2) alert_input("Tag '"+te+"' is not recognised");
 			
-			if(spl[0] == "ch" || spl[0] == "chain"){
-				tag.type = CHAIN;
+			if(spl[0] == "co" || spl[0] == "core"){
+				tag.type = CORE;
 				tag.value = number(spl[1]);
 			}
 			
@@ -350,7 +391,6 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, string &file)
 		file = default_file;
 		com_op = true;
 	}
-	//com_op = true;
 	
 	return tags;
 }

@@ -340,7 +340,6 @@ function additional_filt(y,rpf,lay)
 		}
 	}
 	
-	
 	let te = "Add filter";
 
 	let si = 0.8;

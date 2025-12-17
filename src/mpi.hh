@@ -21,7 +21,10 @@ public:
 	void send_particle(unsigned int co, const Particle &part);
 	void get_particle(unsigned int co, Particle &part);
 	void transfer_particle(vector <Particle> &part);
+	void transfer_prop_info(vector <PropInfo> &prop_info);
+	void transfer_samp(vector < vector <double> > &samp);
 	void transfer_diagnostic(vector <Diagnostic> &diag);
+	void transfer_terminal_info(vector <TerminalInfo> &term_info);
 	void share_particle(vector <Particle> &part);
 	void transfer_lines_raw(vector <string> &lines_raw);
 	vector <double> gather(const vector <double> &vec);
@@ -31,6 +34,8 @@ public:
 	void bcast(vector <unsigned int> &vec);
 	void bcast(vector <double> &vec);
 	void bcast(vector <string> &vec);
+	void distribute(vector < vector <double> > &samp);
+	void distribute(vector <PropInfo> &prop_info);
 	void barrier() const;
 	void sample_barrier(unsigned int s, unsigned int nsample) const;
 	void mess(string te) const;
@@ -63,6 +68,8 @@ private:
 	void unpack(vector <string> &vec_str);
 	void pack(const Particle &pa);
 	void unpack(Particle &pa);
+	void pack(const PropInfo &ps);
+	void unpack(PropInfo &ps);
 	
 	size_t packsize();
 	double *packbuffer();

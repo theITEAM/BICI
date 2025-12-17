@@ -33,9 +33,12 @@ class PAS                                 // Implements PAS algorithm
 	private:
 		void sample_op(unsigned int s);
 		void bootstrap();
+		void estimate_percentage() const;
 		
 		double phi;
 		double phi_final;
+		
+		vector <double> phi_list;
 		
 		unsigned int step_gen_param;             // The step used for outputing generation param
 		

@@ -1683,7 +1683,7 @@ void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, uns
 					}
 					if(negfl) break;
 					
-					auto va = eq.calculate_pop_grad_without_factor(pr,precalc);
+					auto va = eq.calculate_pop_grad_without_factor_no_time(pr,precalc);
 					diff += va*dpop;
 				}
 			}
@@ -1693,7 +1693,7 @@ void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, uns
 					auto po = po_ch.po;
 					auto pr = lin.get_pop_ref(po);
 					if(pr != UNSET){
-						auto va = dt*eq.calculate_pop_grad_without_factor(pr,precalc);
+						auto va = dt*eq.calculate_pop_grad_without_factor_no_time(pr,precalc);
 						auto dpop = po_ch.num;
 						
 						for(auto ti = ti1; ti < ti2; ti++){

@@ -24,9 +24,9 @@ const string default_file = "/tmp/init.bici";        // This is used for Mac
 const string default_file = "Execute/init.bici";     // This is used for windows / linux
 #endif
 
-#define USE_MPI                                    // Sets if code can run in parallel
+//#define USE_MPI                                    // Sets if code can run in parallel
 
-const string bici_version = "v0.79";                 // Sets the BICI version
+const string bici_version = "v0.80";                 // Sets the BICI version
 
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
 const bool testing = true;                           // Set to true for additional testing
@@ -63,7 +63,7 @@ const bool simplify_eqn = true;                      // Simplifies equations (to
 /************************** Enumerated values ******************************/
 
 // Information from tags when BICI is run
-enum TagType { CHAIN, OP, SAMP_TYPE, SEED, TAG_UNSET };
+enum TagType { CORE, OP, SAMP_TYPE, SEED, TAG_UNSET };
 
 
 // Different types of algorithm for simulation / inference
@@ -100,13 +100,13 @@ enum IndFacRateType { IND_EFF_MULT, IND_EFF_DIV, FIX_EFF_MULT, FIX_EFF_DIV };
 enum TransVariety { NORMAL, SOURCE_TRANS, SINK_TRANS };
 
 // Different modes of operation
-enum Operation { SIM, INF, PPC, MODE_UNSET };
+enum Operation { SIM, INF, PPC, EXT, MODE_UNSET };
 
 // Different prior possibilities
 enum PriorPos { INVERSE_PR, UNIFORM_PR, POWER_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, DIRICHLET_PR, MDIR_PR, MVN_JEF_PR, MVN_UNIFORM_PR, MVN_COR_PR, UNSET_PR };
  
 // Different possible command types
-enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, INF_PARAM_STATS, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, SIM_WARNING, INF_WARNING, PPC_WARNING,
+enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, PROPOSAL_INFO, INF_PARAM_STATS, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, SIM_WARNING, INF_WARNING, PPC_WARNING,
 
 // These are not commands but varient used when loading data
 TRANS_TIMERANGE_DATA,
@@ -292,6 +292,9 @@ enum PrecalcAddType { PRECALC_ALL, PRECALC_STOP_COMBINE_MULT, PRECALC_PARAM_ONLY
 // Different quantities which can be loaded into a parameter
 enum LoadParamType { VALUE_LOAD, PRIOR_SPLIT_LOAD, DIST_SPLIT_LOAD, FACW_LOAD};
 
+
+// Different results from MCMC proposal;
+enum PropResult { ACCEPT, ACCEPT50, REJECT, ACCEPT_SMALL, ACCEPT50_SMALL, REJECT_SMALL};
 	
 /************************** Numeric constants ******************************/
 
@@ -311,6 +314,7 @@ const auto ENTER_INF = 99999993u;                 // Stands for entering infecti
 const auto BP_FROM_OTHERS = 99999994u;            // Branch probability is calculated from others
 const auto GEN_PLOT = 99999995u;                  // Used for a generation plot
 const auto LOG_HALF = log(0.5);
+const auto FRAC_COR_UNUSED = 0.33;                // Fraction of samples not used in calculating cor.
 
 const auto SPECIES_MAX = 100;                     // Maximum number of species
 
@@ -378,9 +382,11 @@ const double LOG_THRESH = 0.00001;                // The threshold below which l
 const double PROB_MOD = 0.001;                    // Avoids zero probability in local event props
 const double LOW_BOUND = 0;                       // The lower bound for observation probability
 const double UP_BOUND = 1;                        // The lower bound for observation probability
-const double OBS_COMP_MIN = VTINY;                    // Minimum value for observed compartment
+const double OBS_COMP_MIN = VTINY;                // Minimum value for observed compartment
 const double PROP_JOIN_COR_MIN = 0.8;             // The threshold corrlelation above which proposals join
 const unsigned int SEED_MAX = 10000;              // The maximum seed number
+
+const double UP_SI_SMALL = 0.0005;                       // Sets rate of adaptation for MCMC proposals
 
 const unsigned int TRUNC_MAX = 40;                // Truncates strings longer than this
 
@@ -423,7 +429,7 @@ const unsigned int TI_DIV_MAX = 10000;            // Maximum number of time divi
 
 const unsigned int PARAM_OUTPUT_MAX_DEFAULT = 1000;// The default maximum number of tensor elements to be output
 const auto INDMAX_DEFAULT = 20000u;               // The default maximum number of individuals
-const auto BURNIN_FRAC_DEFAULT = 20.0;            // The default percentage burnin
+const auto BURNIN_FRAC_DEFAULT = 30.0;            // The default percentage burnin
 const auto MCMC_SAMPLE_DEFAULT = 5000u;           // The default number of MCMC samples
 const auto MCMC_OP_PARAM_DEFAULT = 1000u;         // The default number of output parameters
 const auto MCMC_OP_STATE_DEFAULT = 200u;          // The default number of output states  
@@ -493,6 +499,12 @@ const string err_mess_sing = "Please correct this error and rerun.";
 const vector <string> must_term_str = { "simulation","sim","inference","inf","posterior-simulation","post-sim"};
 
 const vector< vector <string> > escape_char {{"\\alpha","α"},{"\\beta","β"},{"\\gamma","γ"},{"\\Gamma","Γ"},{"\\delta","δ"},{"\\Delta","Δ"},{"\\epsilon","ε"},{"\\zeta","ζ"},{"\\eta","η"},{"\\Eta","Η"},{"\\theta","θ"},{"\\Theta","Θ"},{"\\iota","ι"},{"\\kappa","κ"},{"\\lambda","λ"},{"\\Lambda","Λ"},{"\\mu","μ"},{"\\nu","ν"},{"\\xi","ξ"},{"\\Xi","Ξ"},{"\\omicron","ο"},{"\\pi","π"},{"\\Pi","Π"},{"\\rho","ρ"},{"\\sigma","σ"},{"\\tau","τ"},{"\\upsilon","υ"},{"\\phi","φ"},{"\\Phi","Φ"},{"\\chi","χ"},{"\\psi","ψ"},{"\\Psi","Ψ"},{"\\omega","ω"},{"\\Omega","Ω"},{"\\sum","Σ"},{"\\int","∫"}};
+	
+// These lists are used to read and write proposal information
+const vector <PropType> prop_info_list = { PARAM_PROP,MBP_PROP,MBPII_PROP,MBP_IC_POP_PROP,MBP_IC_POPTOTAL_PROP,MBP_IC_RESAMP_PROP,IND_ADD_REM_PROP,IE_PROP,IE_VAR_PROP,IE_COVAR_PROP,IE_VAR_CV_PROP,POP_ADD_REM_LOCAL_PROP,POP_IC_LOCAL_PROP,POP_END_LOCAL_PROP,POP_SINGLE_LOCAL_PROP,POP_IC_PROP,POP_IC_SWAP_PROP,TRANS_TREE_MUT_LOCAL_PROP,IND_EVENT_TIME_PROP,IND_MULTI_EVENT_PROP,IND_EVENT_ALL_PROP,IND_OBS_RESIM_PROP,IND_OBS_SAMP_PROP,IND_OBS_RESIM_SINGLE_PROP};
+
+const vector <string> prop_info_str = {"param","mbp","mbpII","mbp_ic_pop","mbp_ic_poptot","mbp_ic_resamp","ind_add_rem","ie","ie_var","ie_covar","ie_var_cv","pop_add_rem_local","pop_ic_local","pop_end_local","pop_single_local","pop_ic","pop_ic_swap","trans_tree_mut_local","ind_event_time","ind_multi_event","ind_event_all","ind_obs_resim","ind_obs_samp","ind_obs_resim_single"};
+ 
 	
 /************************** Object constants ******************************/
 

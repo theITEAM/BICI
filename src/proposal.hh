@@ -66,7 +66,7 @@ class Proposal                             // Implements a proposal
 		
 		vector <SpecPrecalc> dependent_spec_precalc; // Works out update precalc for parameter sampling
 		
-		SpecPrecalc spec_precalc_after;           // Works out how to update precalculation
+		SpecPrecalc spec_precalc_after;        // Works out how to update precalculation
 		
 		// IND_PROP
 		unsigned int p_prop;                   // The species for the proposals
@@ -79,7 +79,7 @@ class Proposal                             // Implements a proposal
 		
 		vector <IndSimProb> ind_sim_prob;      // Probability of proposing ind sim prop [i]
 		
-		vector < vector <IndSimProb> > ind_sim_prob_cl;// Probability of proposing ind simp prop [i][cl]
+		vector < vector <IndSimProb> > ind_sim_prob_cl;// Probability of proposing ind sim prop [i][cl]
 		
 		vector <bool> tr_change;               // Store transition change under par/event joint prop
 			
@@ -139,6 +139,10 @@ class Proposal                             // Implements a proposal
 		void set_mvn(double si_, const CorMatrix &cor_matrix);
 		double param_resample(PV &param_val, const vector < vector <double> > &popnum_t);
 		double mvn_probability(const vector <double> &param_prop1, const vector <double> &param_prop2) const;
+		bool prop_info_on() const;
+		PropInfo get_prop_info() const;
+		void set_prop_info(const PropInfo &pi);
+		vector <unsigned int> get_prop_id() const;
 		
 	private:
 		void get_dependency();
@@ -151,8 +155,8 @@ class Proposal                             // Implements a proposal
 		void initialise_ind_variable();
 		void initialise_ind_time_sampler();
 		void initialise_swap_variable();
-		void update_si(double fac);
-		void update_ind_samp_si(unsigned int tr_gl, double fac);
+		void update_si(PropResult res);
+		void update_ind_samp_si(unsigned int tr_gl, PropResult res, unsigned int ntr);
 		//bool skip_proposal(double val) const;
 	
 		void set_ieg_check_pri();
@@ -161,7 +165,14 @@ class Proposal                             // Implements a proposal
 		void ind_obs_prob_update(IndSimProb &isp) const;
 		void set_mbp_fast();
 		double set_prop_prob();
-	
+		void add_sampler_info(vector <double> &vec, const Sampler &sa) const;
+		void set_sampler_info(const vector <double> &vec, Sampler &sa) const;
+		void add_sampler2D_info(vector <double> &vec, const Sampler2D &sa) const;
+		void set_sampler2D_info(const vector <double> &vec, Sampler2D &sa) const;
+		string print_ac(unsigned int nac, unsigned int ntr) const;
+		string print_fa(unsigned int nfa, unsigned int ntr) const;
+		string print_range(string te, const vector <double> &list) const;
+
 	// Used in proposal_local.cc
 	private:
 		unsigned get_win() const;

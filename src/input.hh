@@ -91,6 +91,9 @@ class Input                                // Stores information about the model
 		
 		unsigned int line_num;                 // Stores the line being processed
 	
+		vector <unsigned int> inf_param_list;  // List inf_param commands (used for diagnostics)
+		vector <unsigned int> inf_state_list;  // List inf_state commands
+		
 		CommandLine cline_store;               // Stores the line for the current command being processed
 		string tag_find;                       // The current tag being found
 		unsigned int all_row;                  // The row when comp_all or trans_all are loaded
@@ -113,6 +116,7 @@ class Input                                // Stores information about the model
 		void alert(string st);
 		void add_error_mess(unsigned int line_num, string st, ErrorType type);
 		void alert_import(string st, bool fatal=false);  
+		void alert_emsg_input(string te) const;
 		void alert_line(string st, unsigned int line, bool fatal = false);  
 		void alert_equation(const EquationInfo &eqi, const string &warn);
 		void alert_warning(string st);  
@@ -139,6 +143,7 @@ class Input                                // Stores information about the model
 		bool species_command(unsigned int loop);
 		bool classification_command(unsigned int loop);
 		void param_mult_command();
+		void proposal_info_command();
 		void set_command();
 		void camera_command();
 		vector < vector <Tag> > get_tags_list(string file);
@@ -162,6 +167,7 @@ class Input                                // Stores information about the model
 		void fixed_effect_command();
 		void import_data_table_command(Command cname);
 		void map_command();
+		void inf_param_command();
 		void inf_state_command();
 		void warning_command();
 		void dummy_file_command();
@@ -243,9 +249,9 @@ class Input                                // Stores information about the model
 		void set_eqn_ind_eff_exist();
 		void set_param_parent_child();
 		void set_param_use();
-		//void set_omega_fl();
 		void setup_der_func(DerFuncType df_type, string te, DerFunc &df);
 		void setup_der_func_eqn();
+		void set_param_state_output();
 		
 		// In 'input_utils.cc'
 		unsigned int find_p(string name) const;
@@ -265,7 +271,6 @@ class Input                                // Stores information about the model
 		void set_SNP_columns(const Table &tab, DataSource &ds);
 		void set_genetic_matrix_columns(const Table &tab, DataSource &ds);
 		void load_obs_model(ObsModel &om);
-		string stringify(const vector <string> &arr) const;
 		CompRef find_comp_from_name(unsigned int p, string te) const;
 		unsigned int import_geojson(string file);
 		LatLng boundary_mean_latlng(unsigned int i, string name);
@@ -285,7 +290,7 @@ class Input                                // Stores information about the model
 		string in_data_source(const DataSource &ds) const;
 		string in_file_text(string te, string desc="") const;
 		void alert_sample(string warn, unsigned int num);
-		void read_state_sample(const vector <string> &lines, const vector <string> &ind_key);
+		void read_state_sample(unsigned int ch, const vector <string> &lines, const vector <string> &ind_key);
 		unsigned int get_param_value(vector < vector <double> > &param_value, unsigned int i, const vector <string> &lines, string warn);
 		void load_param_value(const ParamProp &pp, string valu, Param &par, string desc, LoadParamType type);
 		void set_val_from_ele(string ele, const vector <unsigned int> &ind, Param &par, string desc, unsigned int r, string col, LoadParamType type);
@@ -297,6 +302,7 @@ class Input                                // Stores information about the model
 		//void load_reparam_eqn(string te, Param &par);
 		bool add_reparam_eqn(Param &par, Hash &hash_eqn);
 		string get_data_dir(string data_dir);
+		unsigned int get_chain();
 		//unsigned int add_cons(double val);
 		
 		// In 'input_check.cc'
@@ -326,5 +332,6 @@ class Input                                // Stores information about the model
 		void check_memory_too_large();
 		void check_derived_order();
 		void check_eqn_fixed_time();
+		string print_row_col(const Table &tab) const;
 };
 

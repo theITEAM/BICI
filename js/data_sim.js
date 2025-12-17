@@ -98,10 +98,11 @@ function simulate_data(so)
 			if(sim.add_rem_pop_change){
 				let sign = 1; if(so.type == "Remove Pop.") sign = -1;
 				let T = tp.length-1;
+		
 				head.push("t");
 				for(let cl = 0; cl < sp.ncla; cl++) head.push(sp.cla[cl].name);
 				head.push("Population");
-		
+				
 				for(let ti = 0; ti < T; ti++){	
 					if(sim.add_rem_pop_change[ti]){	
 						let arpc = sim.add_rem_pop_change[ti];
@@ -430,12 +431,12 @@ function simulate_data(so)
 				
 				for(let k = 0; k < times.length; k++){
 					let t = times[k];
-					
+				
 					let posg = get_comp_prob(t,filt,sp);
 					for(let c = 0; c < sp.comp_gl.length; c++){
 						if(posg[c] < 0){ alert_help("Problem with observation model","The observation model has become negative"); return;}
 					}
-					
+				
 					let popc = [];
 					
 					switch(sp.type){
@@ -478,9 +479,11 @@ function simulate_data(so)
 					for(let c = 0; c < sp.comp_gl.length; c++){
 						sum += posg[c]*popc[c];
 					}
-				
+					
 					let result = obs_model_sample(sum,so);
+
 					row.push(precision(result,5));
+
 					ele.push(row);
 				}
 			}
@@ -626,11 +629,9 @@ function simulate_data(so)
 		break;
 	}
 
-	/*
-	if(ele.length == 0){
+	if(ele.length == 0 && so.type != "Transition"){
 		alert_help("No data","This data is empty.");
 	}
-	*/
 	
 	post({ type:input.type, head:head, ele:ele});
 }

@@ -812,15 +812,12 @@ InfSourceSampler Equation::setup_source_sampler(unsigned int ti, const vector <d
 
 	const auto &precalc = param_val.precalc;
 
-	auto factor = 1.0;  
-	//emsg("fa");// calculate_mult(linearise.factor,ti,precalc);
+	auto factor = calculate_factor(ti,precalc); 
 	
 	auto val_sum = 0.0;
 	for(auto j = 0u; j < Npop; j++){
 		auto po = pop_ref[j];
-		auto val = popnum[po]*factor; 
-		
-		//emsg("H");// *calculate_mult(linearise.pop_grad_calc[j],ti,precalc);
+		auto val = popnum[po]*factor*calculate_pop_grad_without_factor(j,ti,precalc); 
 		
 		val_sum += val;
 		val_store.push_back(val);

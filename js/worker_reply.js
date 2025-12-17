@@ -21,7 +21,7 @@ worker.onmessage = function (e)
 	if(false){ prr("Worker reply: "+ans.type); prr("ans"); prr(ans);}
 
 	if(inter.worker_mess.active != "stop"){
-		if(ans.type != "Start" && ans.type != "StartPPC" && ans.type != "Import model files") stop_loading_symbol();
+		if(ans.type != "Start" && ans.type != "StartPPC" && ans.type != "StartEXT" && ans.type != "Import model files") stop_loading_symbol();
 		
 		switch(ans.type){		
 		case "EditAPed":
@@ -401,11 +401,12 @@ worker.onmessage = function (e)
 			model_updated(ans);
 			break;
 			
-		case "Start": case "StartPPC":
+		case "Start": case "StartPPC":  case "StartEXT":
 			{
 				model_updated(ans);
 		
 				inter.save_type = ans.save_type;
+
 				if(check_memory(ans)){
 					start_spawn(ans.file_list);
 				}

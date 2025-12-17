@@ -13,6 +13,7 @@ using namespace std;
 #include "state.hh"
 #include "utils.hh"
 #include "matrix.hh"
+#include "synchronise.hh"
 
 MCMC::MCMC(const Model &model, Output &output, Mpi &mpi) : model(model), output(output), mpi(mpi)
 {	
@@ -66,6 +67,8 @@ void MCMC::run()
 	
 	for(auto s = 0u; s < nsample; s++){
 		percentage(s,nsample);
+	
+		if(model.sync_on) synchronise_proposal(s,chain,mpi);
 		
 		for(auto &ch : chain){
 			ch.burn_update(s);
@@ -83,13 +86,16 @@ void MCMC::run()
 	mpi.barrier();
 #endif
 
-	output.set_output_burnin(double(100.0*nburnin)/nsample);
+	output.set_inference_prop(double(100.0*nburnin)/nsample,"burnin-percent",BURNIN_FRAC_DEFAULT);
 	
 	double time_total = (clock()-time_start)/num_per_core;
 	for(auto ch = 0u; ch < num_per_core; ch++){
+		auto ch_tot = mpi.core*num_per_core+ch;
+		
 		const auto &cha = chain[ch];
 		auto diag = cha.diagnostics(time_total);
-		output.set_diagnostics(mpi.core*num_per_core+ch,diag);
+		output.set_diagnostics(ch_tot,diag);
+		output.terminal_info.push_back(cha.get_terminal_info(ch_tot));
 	}
 	
 	percentage_end();

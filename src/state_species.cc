@@ -541,13 +541,20 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 			
 			for(auto r = 0u; r < ind_tab.nrow; r++){
 				const auto &row = ind_tab.ele[r];
-				
+					
 				auto name = row[0];
-				auto hash_vec = hash_compgl.get_vec_string(name);
-				auto i = hash_ind.existing(hash_vec);
-				if(i == UNSET){
-					i = add_individual(OBSERVED_IND,name);
-					hash_ind.add(i,hash_vec);
+				
+				unsigned int i;
+				if(name == sp.name+"-"+unobserved_str){
+					i = add_individual(UNOBSERVED_IND,"");
+				}
+				else{
+					auto hash_vec = hash_compgl.get_vec_string(name);
+					i = hash_ind.existing(hash_vec);
+					if(i == UNSET){
+						i = add_individual(OBSERVED_IND,name);
+						hash_ind.add(i,hash_vec);
+					}			
 				}					
 			
 				auto &ind = individual[i];
@@ -751,7 +758,9 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 				}
 			}
 
-			init_cond_val.cnum = pop_added;			
+			init_cond_val.cnum = pop_added;	
+
+			fit_obs_trans(t_end);   // Fits any observed transition time to events
 		}
 		break;
 	
@@ -2452,3 +2461,67 @@ void StateSpecies::cpop_st_update(unsigned int ti, unsigned int ti_next, unsigne
 	back.push_back(Back(CPOP_ST,ti,ti_next,c,vec));
 }
 
+
+/// Fits any observed transitions to events (up to final time t_end)
+void StateSpecies::fit_obs_trans(double t_end)
+{
+	auto thresh = 0.0001*0.0001;
+	
+	for(auto i = 0u; i < sp.nindividual_in; i++){	
+		const auto &indi = sp.individual[i];
+		auto &ind = individual[i];
+		auto &eve = ind.ev;
+		
+		for(const auto &ob : indi.obs){
+			switch(ob.type){
+			case OBS_SOURCE_EV: case OBS_TRANS_EV: case OBS_SINK_EV:
+				{
+					auto t = ob.tdiv;
+					if(t < t_end){
+						auto min = LARGE;
+						unsigned int esel;
+						for(auto e = 0u; e < eve.size(); e++){ // Finds the nearest event
+							const auto &ev = eve[e];
+							switch(ev.type){
+							case NM_TRANS_EV: case M_TRANS_EV:
+								{
+									auto dt = ev.tdiv-t;
+									if(dt*dt < min){ min = dt*dt; esel = e;}
+								}
+								break;
+								
+							default: break;
+							}
+						}
+						
+						if(min < thresh){
+							auto &ev = eve[esel];
+							if(!ev.observed){
+								auto ill = false;
+								
+								if(esel > 0 && eve[esel-1].tdiv >= t) ill = true;
+								
+								if(esel+1 < eve.size() && eve[esel+1].tdiv <= t) ill = true;
+										 
+								const auto &tra = sp.tra_gl[ev.tr_gl];
+								switch(ob.type){
+								case OBS_SOURCE_EV: if(tra.i != UNSET) ill = true; break;
+								case OBS_SINK_EV: if(tra.f != UNSET) ill = true; break;
+								case OBS_TRANS_EV: break;
+								default: break;
+								}
+								
+								if(!ill){
+									ev.tdiv = t;
+									ev.observed = true;
+								}
+							}
+						}
+					}
+				}
+				
+				default: break;
+			}
+		}
+	}
+}

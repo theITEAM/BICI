@@ -90,7 +90,7 @@ function err_warning()
 	
 	switch(input.type){
 	case "View Code": case "Export BICI": case "Start": case "Save BICI": 
-	case "StartClusterSave": case "StartClusterExport": case "StartPPC":
+	case "StartClusterSave": case "StartClusterExport": case "StartPPC": case "StartEXT":
 		full_warn = true;
 		break;
 	}
@@ -1520,6 +1520,12 @@ function create_output_siminf(save_type)
 			}
 			break;
 		}
+	
+		switch(details.algorithm.value){
+		case "DA-MCMC": case "PAS-MCMC":
+			if(details.sync_on.value == "Off") te += ' sync="Off"';
+			break;
+		}
 		
 		te += endl;
 		te += endl;
@@ -2534,4 +2540,50 @@ function create_ppc_file()
 	write_file_store(te,"bicifile",file_list,"bicifile");
 
 	post({save_type:"ppc", file_list:file_list, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
+}
+
+
+/// Creates a file to start extension
+function create_ext_file()
+{
+	let te = inf_result.import_te;
+
+	let file_list=[];
+/*	
+	
+	
+	te = remove_command(te,"post-sim,posterior-simulation,add-pop-post-sim,remove-pop-post-sim,add-ind-post-sim,remove-ind-post-sim,move-ind-post-sim,param-mult,# MODIFICATION DATA");
+	te += endl+get_ppc_command("ppc")+endl+endl;
+
+	for(let p = 0; p < inf_result.species.length; p++){
+		let sp = inf_result.species[p];
+		if(inf_result.species.length > 1) te += 'set species="'+sp.name+'"'+endl;
+		te += create_output_sim_inf_source(p,"ppc",file_list,true);
+	}
+	
+	let pfac_list=[];
+	for(let th = 0; th < model.param.length; th++){
+		let par = model.param[th];
+		if(par.type == "param factor") pfac_list.push(th);
+	}
+	
+	if(pfac_list.length > 0){
+		te += mini_banner("PARAMETER MULTIPLIERS");
+		for(let k = 0; k < pfac_list.length; k++){
+			let par = model.param[pfac_list[k]];
+			if(par.type == "param factor"){
+				te += output_param(par,"ppc",file_list,true);
+			}
+		}
+		te += endl;
+	}
+ 
+	te = tidy_code(te);
+	
+	if(model.warn.length > 0) err_warning();
+	*/
+	
+	write_file_store(te,"bicifile",file_list,"bicifile");
+
+	post({save_type:"ext", file_list:file_list, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
 }

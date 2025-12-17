@@ -266,7 +266,8 @@ class Equation                             // Stores information about an equati
 		double calculate_indfac(const Individual &ind, unsigned int ti, const vector <double> &popnum, const vector <double> &precalc) const;
 		double calculate_pop_grad(unsigned int pref, unsigned int ti, const vector <double> &precalc) const;
 		double calculate_pop_grad_no_time(unsigned int pref, const vector <double> &precalc) const;
-		double calculate_pop_grad_without_factor(unsigned int pref, const vector <double> &precalc) const;
+		double calculate_pop_grad_without_factor_no_time(unsigned int pref, const vector <double> &precalc) const;
+		double calculate_pop_grad_without_factor(unsigned int pref, unsigned int ti, const vector <double> &precalc) const;
 		double calculate_factor(unsigned int ti, const vector <double> &precalc) const;
 		vector <double> calculate_popnum_gradient_without_factor(const vector <double> &precalc) const;
 		double calculate_no_pop(unsigned int ti, const vector <double> &precalc) const;

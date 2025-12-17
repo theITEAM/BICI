@@ -95,7 +95,9 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 					break;
 				
 				case INFERENCE:
-					if(model.mode != INF && model.mode != PPC) process = false; 
+					if(model.mode != INF && model.mode != PPC && model.mode != EXT){
+						process = false; 
+					}
 					else{
 						num_inf++;
 						if(num_inf > 1) alert_import("The 'inference' command can only be specified once.");
@@ -151,7 +153,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 					
 				case ADD_POP_SIM: case REMOVE_POP_SIM: case ADD_IND_SIM:
 				case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: case ADD_IND_POST_SIM:
-					if(model.mode == INF) process = false;
+					if(model.mode == INF || model.mode == EXT) process = false;
 					break;
 			
 				default: process = false; break;
@@ -173,7 +175,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 					break;
 					
 				case INIT_POP_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM:
-					if(model.mode == INF) process = false;
+					if(model.mode == INF || model.mode == EXT) process = false;
 					break;
 					
 				case INIT_POP: case REMOVE_IND: case MOVE_IND:
@@ -219,7 +221,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 				if(num_sim == 0) alert_import("The 'simulation' command must be specified."); 
 				break;
 				
-			case INF: 
+			case INF: case EXT:
 				if(num_inf == 0) alert_import("The 'inference' command must be specified."); 
 				break;
 				
@@ -235,7 +237,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 		case 2: check_comp_structure(); break; 		
 		}
 	}
-
+	
 	print_diag("start");
 	
 	check_memory_too_large();
@@ -244,7 +246,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	percentage(5,100);
 	
-	auto inf = false; if(model.mode == INF) inf = true;
+	auto inf = false; if(model.mode == INF || model.mode == EXT) inf = true;
 	
 	print_diag("loaded");
 	
@@ -425,8 +427,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	ind_fix_eff_pop_ref();             // References populations in ind_effect and fix_effect
 	
-	if(model.mode == INF || model.mode == PPC){
-		create_trg_from_tr();      // Works out a convertion from tr to trg
+	if(model.mode == INF || model.mode == PPC || model.mode == EXT){
+		create_trg_from_tr();            // Works out a convertion from tr to trg
 	}
 	
 	print_diag("h12");
@@ -562,6 +564,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	set_cgl_tr_source_sink();                  // Sets trg reference from compartments
 	
+	set_param_state_output();                  // Determines which parameters are output in state
+
 	//set_omega_fl();                            // Sets a flag if param in in omega
 	
 	if(model.trans_tree){
@@ -570,6 +574,10 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	if(model.mode == PPC && model.sample.size() == 0){
 		alert_import("Posterior samples (from the commands 'param-inf' and 'state-inf') must be specified for 'post-sim' to be run. Please run inference before posterior simulation.");
+	}		
+	
+	if(model.mode == EXT && model.sample.size() == 0){
+		alert_import("Posterior samples (from the commands 'param-inf' and 'state-inf') must be specified for 'ext' to be run.");
 	}		
 
 	if(model.mode == PPC) set_ppc_resample();
@@ -828,6 +836,8 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 	
 	if(type == "param-mult") com = PARAM_MULT;
 	
+	if(type == "proposal-inf") com = PROPOSAL_INFO;
+	
 	if(type == "trans-diag-inf") com = TRANS_DIAG;
 	
 	if(type == "warning-sim") com = SIM_WARNING;
@@ -1034,6 +1044,14 @@ void Input::alert_import(string st, bool fatal)
 }
 
 
+/// Adds any previous messages and puts a final fatal error message
+void Input::alert_emsg_input(string te) const
+{
+	output_error_messages(err_mess); 
+	emsg_input(te);
+}
+
+
 /// Error message for imported file (for specific line)
 void Input::alert_line(string st, unsigned int line, bool fatal)                         
 {
@@ -1104,7 +1122,7 @@ void Input::output_error_messages(string te, bool end) const
 			case ERROR_FATAL: display_error(em.error,false);	break;
 			case ERROR_WARNING: display_warning(em.error); break;
 			}
-			cout << endl;
+			cout << endl << endl;
 		}
 	}
 	
@@ -1154,6 +1172,7 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 	case IND_EFFECT: ind_effect_command(); break;
 	case FIXED_EFFECT: fixed_effect_command(); break;
 	case PARAM_MULT: param_mult_command(); break;
+	case PROPOSAL_INFO: proposal_info_command(); break;
 	
 	case INIT_POP_SIM:
 	case ADD_POP_SIM: case REMOVE_POP_SIM: 
@@ -1194,15 +1213,12 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 	
 	case SIM_PARAM: case SIM_STATE: dummy_file_command(); break;
 	case POST_SIM_PARAM: case POST_SIM_STATE: dummy_file_command(); break;
-	case INF_PARAM: case INF_PARAM_STATS: dummy_file_command(); break;
+	case INF_PARAM_STATS: dummy_file_command(); break;
 	case SIM_WARNING: case INF_WARNING: case PPC_WARNING: warning_command(); break;
 	case INF_DIAGNOSTICS: dummy_file_command(); break;
 	case INF_GEN: dummy_file_command(); break;
-	
-	case INF_STATE: 
-		if(model.mode == PPC) inf_state_command();
-		else dummy_file_command();
-		break;
+	case INF_PARAM: inf_param_command(); break;
+	case INF_STATE: inf_state_command(); break;
 		
 	case MAP: map_command(); break;
 		
@@ -1459,13 +1475,13 @@ void Input::calc_conv_param_vec(vector <Calculation> &calcu, const vector <Param
 	for(auto &ca : calcu){
 		for(auto &it : ca.item){
 			if(it.type == PARAMETER){
-				if(it.num >= param_ref.size()) emsg_input("Out of range0");
+				if(it.num >= param_ref.size()) alert_emsg_input("Out of range0");
 				const auto &pr = param_ref[it.num];
 				const auto &par = model.param[pr.th];
 			
 				it.type = PARAMVEC;
 				it.num = par.get_param_vec(pr.index); 
-				if(it.num == UNSET) emsg_input("pvec element unset");
+				if(it.num == UNSET) alert_emsg_input("pvec element unset");
 			}
 		}
 	}
@@ -1692,7 +1708,7 @@ void Input::create_param_vector()
 			cout << model.param_vec[i].name << " vec" << endl;
 		}
 		
-		emsg_input("param vec");
+		alert_emsg_input("param vec");
 	}
 }
 

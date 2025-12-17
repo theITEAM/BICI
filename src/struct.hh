@@ -626,6 +626,7 @@ struct Param {                     // Stores a model parameter
 	ParamVariety variety;            // Determines the variety of parameter	
 	unsigned int N;                  // The number of elements in the parameter
 	bool trace_output;               // Determines if parameter is output (if not too big and not constant)
+	bool state_output;               // Determines if output instate (if not too big and not constant)
 	
 	unsigned int default_prior_ref;  // Default prior reference
 		
@@ -952,6 +953,12 @@ struct IIFChange {                 // Stores changes to iif
 	double Li_markov_aft;            // The likelihood after
 };
 
+struct ExtFactor {                 // Stores an extend factor
+	ExtFactor(){ value = UNSET, percent =false;}
+	double value;                    // The 
+	bool percent;                    // Determines if a percent
+};
+
 struct Event {                     // A transition event
 	EventType type;                  // The type of the event
 	unsigned int tr_gl;              // The global transition which occurs 
@@ -1252,7 +1259,7 @@ struct IndRef {                    // An individual reference
 	unsigned int i;                  // Individual number
 };
 
-struct IndSimProb {                // User to workout if simulation proposal should be done
+struct IndSimProb {                // Used to work out if simulation proposal should be done
 	double ntr;                      // Number of proposals tried (with time fading)
 	double nac;                      // Number of proposals accepted (with time fading)
 	double prob;                     // Probability of trying 
@@ -1509,7 +1516,7 @@ struct BurnInfo {                  // Information about burnin phase
 	BurnInfo(){ phi = 0; L_samp_sum = 0; L_samp_sum2 = 0; start = 0;} 
 
 	bool on;                         // Determines if burning in
-	double fac;                      // Allows for proposals to change quickly in initial burnin 
+	//double fac;                      // Allows for proposals to change quickly in initial burnin 
 	vector <double> L_samp;          // Samples of the likelihood
 	double L_samp_sum, L_samp_sum2;  // Keeps a running sum
 	unsigned int start;              // First sample used in sum
@@ -1535,9 +1542,10 @@ struct BurnInfo {                  // Information about burnin phase
 	
 	void add_L(double L);
 	void setup(unsigned int s, unsigned int &nburnin,  unsigned int &nsample, const Details &details);
-	void pas_setup(unsigned int s, unsigned int g, unsigned int gen_update, double phi_);
+	void pas_setup(unsigned int gen_update, double phi_);
 	void pas_setup_run(unsigned int s, unsigned int &nburnin);
 	void set_phi();
+	void update_si(double &si, PropResult res, unsigned int ntr) const;
 };
 
 struct Fraction {                  // Used to store a fraction (used in initial state)
@@ -1583,7 +1591,7 @@ struct Sampler2D {                 // Used to sample from a two dimensional quan
 	unsigned int N2;                 // The number in second dimension
 	vector <KernelAdd> kernel;       // Sets up a kernel when adding to sampler
 	vector < vector <double> > num;  // Probability of sampling transitions at different times [tr][ti]
-	vector < vector <double> > num_sum; // Cululative sum  
+	vector < vector <double> > num_sum; // Cumulative sum  
 	vector <double> marg_sum;        // Marginal sum
 	double S;                        // Total sum
 	
@@ -1793,6 +1801,7 @@ struct SampleSpecies {             // Used to store information about a posterio
 };
 
 struct Sample {                    // Stores posterior sample (for PPC)
+	unsigned int ch;                 // The chain number
 	unsigned int num;                // The sample number    
 	vector < vector <double> > param_value; // The parameter sample
 	vector <SampleSpecies> species;  // The state sample
@@ -1860,6 +1869,22 @@ struct PropTime {                  // Used for orthering proposal times
 	long time;
 };
 
+struct PropInfo {                  // Used for storeing information about proposals
+	PropType type;                   // The proposal type
+	vector <unsigned int> id;
+	double value;
+	vector <double> vec;
+};
+
+struct TerminalInfo {              // Stores info about the terminal state of chain
+	unsigned int ch;                 // The number of the chain
+	vector <PropInfo> prop_info_store;// Stores proposal information
+	unsigned int n;                  // Information about cor matrix
+	unsigned int n_start;
+	vector <double> av;              // The sum of parameter values 
+	vector < vector <double> > av2;  // The sum of param*param 
+};	
+				
 struct Calculation {               // Stores a calculation (made up of operations)
 	vector <EqItem> item;            // Items used to make the calculation
 	EqItemType op;                   // The operator used in the calculation

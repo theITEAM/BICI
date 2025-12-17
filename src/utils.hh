@@ -34,6 +34,7 @@ unsigned int find_in(const vector <Warn> &vec, const unsigned int val);
 unsigned int find_in(const vector <IEGref> &vec, const IEGref val);
 unsigned int integer(string st);
 double number(string st);
+vector <double> get_number_vec(string st);
 double ran();
 double normal_sample(const double mean, const double sd, string &warn);
 int normal_int_sample(double si, string &warn);
@@ -78,7 +79,8 @@ double rectify(double val);
 bool equal_vec(const vector <string> &vec1, const vector <string> &vec2);
 bool equal_vec(const vector <unsigned int> &vec1, const vector <unsigned int> &vec2);
 bool equal_vec(const vector <bool> &vec1, const vector <bool> &vec2);
-//vector <unsigned int> get_list(unsigned int num);
+
+string stringify(const vector <string> &arr);
 string stringify(const vector <EquationInfo> &value, const vector <Dependency> &dep);
 bool includes(string st, string ch);
 DepInfo get_dep_info(const string &te, unsigned int i, const string &not_allowed);
@@ -192,6 +194,9 @@ void solve_cubic_spline_test();
 CubicSpline solve_cubic_spline(const vector <double> &x, vector <double> f, SplineType type);
 double calculate_cubic_spline(double xf, const CubicSpline &cspl);
 void calculate_cubic_spline_precalc(vector <double> &precalc, unsigned int i, const vector <unsigned int> &list_time, const vector <CubicDiv> &div, const CubicSpline &cspl);
+string prop_type_str(PropType type);
+void term_out(string te);
+string sig_fig(double num, unsigned int fig);
 
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);

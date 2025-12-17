@@ -336,23 +336,25 @@ function export_matrix_table(filename)
 }
 
 /// Writes a file asynchronously
-function write_file_async(te,filename,op)
+function write_file_async(te,filename,type)
 {
 	const fs = require('fs');
-
+	
 	fs.writeFile(filename, te, function (err) {
-		 if (err) {
-			 setTimeout(function(){ alertp("There was an error attempting to save your data.");}, 10);
-			 return;
-		 }
-		 else{
-			 inter.saving.num++;
-			 set_loading_percent(70+30*inter.saving.num/inter.saving.num_to_do);
-			 if(inter.saving.num == inter.saving.num_to_do){
-				 saving_done();
-			 }
-		 }
-		});
+		if (err) {
+			setTimeout(function(){ alertp("There was an error attempting to save your data.");}, 10);
+			return;
+		}
+		else{
+			if(type != "image"){
+				inter.saving.num++;
+				set_loading_percent(70+30*inter.saving.num/inter.saving.num_to_do);
+				if(inter.saving.num == inter.saving.num_to_do){
+					saving_done();
+				}
+			}
+		}
+	});
 }
 
 

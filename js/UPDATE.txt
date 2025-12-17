@@ -1,10 +1,13 @@
 JAMIE
+- Corrected problem with error messages not showing.
 - You were asking about whether the same table can be used to store all the information about individuals. So the "cols" tag can be used for this. This overrides what is expected for column headings. E.g.
 
 add-ind-inf name="Added individuals" file="file.csv" cols="ID,tstart,DSstart"
 comp-data name="Compartmental data" class="DS" file="file.csv" cols="ID,tcomp,DScomp"
 
 Let me know if this doesn't work (I seemed to remember you had a problem with this feature, but can't remember what).
+
+
  
 GRANT
 - Improved speed for loading up large integrals.
@@ -14,6 +17,11 @@ GRANT
 
 
 CHRIS
+- Allows for the possibility of extending MCMC chains. When running BICI script the "ext" command is used and when running in the interface there is an "Extend" tab (see manual 7.3.1). 
+- Testing of genetic parts of BICI (in preparation for simulation study).
+- A correction has been made to PAS-MCMC. It was quenching faster than it should have been.
+- The annealing time-bar has been improved (before it started very slowly and gor quicker).
+- Visualisation for compartment of first infected individual.
 - Improved speed when dealing with complex derived quantities.
 - Corrected bug in interface related to param_factor.
 - Corrected bug which allows for format "2\int dt({I})".
@@ -24,4 +32,7 @@ CHRIS
 - A few bugs in interface corrected (e.g. bottom right hand corner overlapping right hand menu).
 - Corrected problem with expected transition number (in diagnostics).
 - Updates to the manual and help information in interface.
-
+- Corrected problem with PAS when running multiple particles on a single core
+- Corrected problem to allow for model to restore after error in import
+- Improvement to how proposals are MCMC proposals are dynamically updated (the size of adaptation is larger initially) 
+- Estimated sample number gets estimated to two significant figures

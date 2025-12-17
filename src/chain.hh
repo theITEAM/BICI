@@ -18,14 +18,24 @@ public:
 	void burn_update(unsigned int s);
 	void update(unsigned int s);
 	string diagnostics(double time, double anneal_time=UNSET) const;
-	void pas_burn_update(unsigned int s, unsigned int g, unsigned int gen_update, double phi);
+	void pas_burn_update(unsigned int s, unsigned int gen_update, double phi);
+	void join_proposal_update();
+	unsigned int get_nburnin();
 	void pas_burn_update_run(unsigned int s);
 	double like_total_obs() const;
 	void check_cor_matrix() const;
-	
+	vector <PropInfo> get_prop_info() const;
+	void set_prop_info(const vector <PropInfo> &prop_info);
+	TerminalInfo get_terminal_info(unsigned int ch_tot) const;
+
 	State state;
-	double Lobs_av;                        // Calculates Lobs (for PAS)
-	double nLobs_av;                        // Calculates Lobs (for PAS)
+	double Lobs_av;                        // Calculates variance in Lobs (for PAS)
+	double Lobs_av2;                        
+	double nLobs_av;                       
+
+	CorMatrix cor_matrix;                  // Stores information about the correlation matrix
+
+	vector <Proposal> proposal;            // Stores all the proposals 
 
 private:
 	unsigned int nsample;                  // The total number of samples
@@ -33,10 +43,6 @@ private:
 	
 	BurnInfo burn_info;                    // Information about burnin
 		
-	CorMatrix cor_matrix;                  // Stores information about the correlation matrix
-
-	vector <Proposal> proposal;            // Stores all the proposals 
-
 	void update_init();
 	bool is_markov_pop(const AffectLike &al) const;
 	void add_parameter_prop(const vector <unsigned int> &vec);
@@ -44,8 +50,7 @@ private:
 	void check_join_proposal();
 	unsigned int find_which_list(unsigned int j, const vector < vector <unsigned int> > &par_list) const;
 	string banner(string te) const;
-	//void join_proposal(unsigned int th1, unsigned int th2);
-
+	
 	const Model &model;
 	Output &output;
 };

@@ -44,7 +44,9 @@ function initialise_filters()
 /// Restores model if import has failed
 function restore_model()
 {
-	if(model_store != undefined) model = model_store;
+	if(model_store != undefined){
+		model = model_store;	
+	}
 }
 
 
@@ -381,6 +383,15 @@ function is_correlation(name,result)
 /// Reads in a parameter samples from a file
 function read_param_samples(chain,te,result,warn)
 {
+	// Makes sure there aren't multiple instances for param sample files files 
+	if(result.param_sample_chain == undefined) result.param_sample_chain=[];
+	let psc = result.param_sample_chain;
+	if(find_in(psc,chain) != undefined){
+		alert_sample("There are multiple parameter samples for chain "+chain,1);
+		return;
+	}		
+	psc.push(chain);
+	
 	let lines = te.split('\n');
 	
 	let spl = comma_split(lines[0].trim());
@@ -611,7 +622,7 @@ function read_param_samples(chain,te,result,warn)
 				}
 
 				sa = { num:Number(spl[0]), mean:par_mean, CImin:par_CImin, CImax:par_CImax};
-				
+			
 				result.generation.push(sa);
 			}
 			else{
@@ -670,6 +681,15 @@ function read_state_samples_file(chain,file,result)
 /// Reads in state samples from text
 function read_state_samples(chain,te,result,warn)
 {
+	// Makes sure there aren't multiple instances for state sample files files 
+	if(result.state_sample_chain == undefined) result.state_sample_chain=[];
+	let ssc = result.state_sample_chain;
+	if(find_in(ssc,chain) != undefined){
+		alert_sample("There are multiple state samples for chain "+chain,1);
+		return;
+	}		
+	ssc.push(chain);
+	
 	let i = 0;
 	while(i < te.length && te.substr(i,1) != "{") i++;
 	let i_st = i;
@@ -852,7 +872,8 @@ function read_state_sample(te,chain,result,warning)
 				case "<STATE":
 					{
 						let spl2 = spl[1].split(">");
-						sample.num = spl2[0];
+						sample.num = Number(spl2[0]);
+						if(isNaN(sample.num)) alert_sample(warn,1);
 					}
 					break;
 					
@@ -1244,17 +1265,22 @@ function read_state_sample(te,chain,result,warning)
 
 
 /// Reads in  information about transition diagnostics
-function read_trans_diag(file,result)
+function read_trans_diag(ch,file,result)
 {
 	create_compartment_hash(result);
 	
 	let warning = "Problem loading file '"+file.name+"'";
-	if(file.name == "inline") warning = "Problem loading state sample";
+	if(file.name == "inline") warning = "Problem loading transition diagnostics";
 	
 	let line = file.te.split("\n");
 	
 	let T = result.timepoint.length-1;
-					
+	
+	let res = {chain:ch, species:[]};
+	for(let p = 0; p < result.species.length; p++){
+		res.species[p] = {exp_num:[]};
+	}
+	
 	let p = 0;
 	
 	for(let i = 0; i < line.length; i++){
@@ -1302,15 +1328,14 @@ function read_trans_diag(file,result)
 						exp_num[ti] = Number(spl2[ti]);
 					}
 					
-					if(!result.species[p].exp_num) result.species[p].exp_num = [];
-					result.species[p].exp_num[trg] = exp_num;					
+					res.species[p].exp_num[trg] = exp_num;
 				}
 			}				
 		}
 	}
 	
-	//prr("res");
-	//prr(result);
+	if(!result.td_res) result.td_res = [];
+	result.td_res.push(res);	
 }
 
 
@@ -1468,7 +1493,11 @@ function generate_trans_tree(get_inf_from,result,sample)
 			if(i_from == undefined) alert_import("Could not find individual '"+te+"'");
 		}
 		
-		sample.species[gif.p].individual[gif.i].ev[gif.e].infection = {p:p_from, i:i_from};
+		let ev = sample.species[gif.p].individual[gif.i].ev;
+		
+		if(!(te == "ENT_INF" && gif.e >= ev.length)){
+			ev[gif.e].infection = {p:p_from, i:i_from};
+		}
 	}
 }
 	
@@ -1659,7 +1688,8 @@ function extract_text_samples(siminf,type,result)
 					switch(type){
 					case "state":
 						if(nchain > 1){
-							te += "CHAIN "+(ch+1)+endl;
+							//te += "CHAIN "+(ch+1)+endl;
+							te += "CHAIN "+(ch)+endl;
 						}
 						te += tag.value.te;
 						break;

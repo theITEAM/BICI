@@ -93,14 +93,14 @@ bool Input::add_compartment(string name, unsigned int p, unsigned int cl, double
 	if(erlang_source != ""){
 		co.erlang_hidden = true;
 		//auto cc = 0u; while(cc < claa.comp.size() && claa.comp[cc].name != erlang_source) cc++;
-		//if(cc == claa.comp.size()) emsg_input("Erlang source problem");
+		//if(cc == claa.comp.size()) alert_emsg_input("Erlang source problem");
 		{ // turn off
 			auto cc = 0u; while(cc < claa.comp.size() && claa.comp[cc].name != erlang_source) cc++;
 			if(cc != claa.hash_comp.find(erlang_source)) emsg("cc wrong");
 		}
 		
 		auto cc = claa.hash_comp.find(erlang_source);		
-		if(cc == UNSET) emsg_input("Erlang source problem");
+		if(cc == UNSET) alert_emsg_input("Erlang source problem");
 		
 		co.erlang_c_start = cc;
 	}	
@@ -480,7 +480,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 					}
 					break;
 					
-				case CONST_PARAM: emsg_input("Should not be const"); break;
+				case CONST_PARAM: alert_emsg_input("Should not be const"); break;
 					
 				case UNSET_PARAM: break;
 				}
@@ -772,7 +772,7 @@ void Input::create_markov_eqn()
 	
 		switch(eqn.type){
 		case TRANS_RATE: case TRANS_MEAN: case SOURCE_RATE: case SOURCE_MEAN:
-			if(eqn.sp_p == UNSET) emsg_input("Equation problem3"); 
+			if(eqn.sp_p == UNSET) alert_emsg_input("Equation problem3"); 
 			else{
 				auto &sp = model.species[eqn.sp_p];
 				
@@ -811,9 +811,9 @@ void Input::create_markov_eqn()
 		for(auto &tr : sp.tra_gl){
 			tr.markov_eqn_ref = UNSET;
 			if(tr.type == EXP_RATE || tr.type == EXP_MEAN){
-				auto e = tr.dist_param[0].eq_ref; if(e == UNSET) emsg_input("Prob1");
+				auto e = tr.dist_param[0].eq_ref; if(e == UNSET) alert_emsg_input("Prob1");
 				const auto &eq = model.eqn[e];
-				auto mef = eq.markov_eqn_ref; if(mef == UNSET) emsg_input("Prob2");
+				auto mef = eq.markov_eqn_ref; if(mef == UNSET) alert_emsg_input("Prob2");
 				tr.markov_eqn_ref = mef;
 			}
 		}
@@ -842,7 +842,7 @@ void Input::create_markov_eqn_pop_ref()
 			{
 				for(auto e = 0u; e < sp.markov_eqn.size(); e++){
 					auto eq = sp.markov_eqn[e].eqn_ref;
-					if(eq == UNSET) emsg_input("Problem with ME");
+					if(eq == UNSET) alert_emsg_input("Problem with ME");
 				
 					const auto &eqn = model.eqn[eq];
 					
@@ -1058,7 +1058,7 @@ void Input::global_comp_trans_init()
 							auto te_ch = tr.bp.te;
 							auto res = swap_index(te_ch,dep_conv); 
 							if(res.warn != ""){ alert_equation(tr_gl.bp,res.warn); return;}
-							if(te_ch != tr_gl.bp.te) emsg_input("Swap not agree");
+							if(te_ch != tr_gl.bp.te) alert_emsg_input("Swap not agree");
 						}
 						
 						for(auto i = 0u; i < tr_gl.dist_param.size(); i++){
@@ -1067,13 +1067,13 @@ void Input::global_comp_trans_init()
 								auto te_ch = tr.dist_param[i].te;
 								auto res = swap_index(te_ch,dep_conv); 	
 								if(res.warn != ""){ alert_equation(tr_gl.dist_param[i],res.warn); return;}
-								if(te_ch != tr_gl.dist_param[i].te) emsg_input("Swap not agree");
+								if(te_ch != tr_gl.dist_param[i].te) alert_emsg_input("Swap not agree");
 							}
 						}
 
 						if(ii != UNSET){
 							auto &ti = sp.comp_gl[ii].tra_leave_group[cl];
-							if(ti.branch != tr.branch) emsg_input("Branch does not agree");
+							if(ti.branch != tr.branch) alert_emsg_input("Branch does not agree");
 					
 							ti.tr_list.push_back(sp.tra_gl.size());
 						}
@@ -1304,7 +1304,7 @@ void Input::set_tr_connected()
 				cout << "trans before" << endl;
 			}				
 		}
-		emsg_input("done");
+		alert_emsg_input("done");
 	}
 }
 	
@@ -1377,7 +1377,7 @@ void Input::check_markov_or_nm() const
 			if(tr.nm_trans_ref != UNSET) num++;
 			if(tr.markov_eqn_ref != UNSET) num++;
 
-			if(num != 1) emsg_input("Transition should be markovian or nm");
+			if(num != 1) alert_emsg_input("Transition should be markovian or nm");
 		}
 	}
 }
@@ -1537,13 +1537,13 @@ unsigned int Input::get_spline_i(const ParamRef &pr)
 	auto th = pr.th, index = pr.index;
 
 	auto ntimes = model.param[th].spline_info.knot_tdiv.size();
-	if(index%ntimes != 0) emsg_input("Should be zero1");
+	if(index%ntimes != 0) alert_emsg_input("Should be zero1");
 	index /= ntimes;
 	
 	vector <unsigned int> vec; vec.push_back(th); vec.push_back(index); 
 				
 	auto i = model.hash_spline.existing(vec);
-	if(i == UNSET) emsg_input("Spline could not be found");
+	if(i == UNSET) alert_emsg_input("Spline could not be found");
 
 	{	 // turn off
 		auto ii = 0u; while(ii < spl.size() && !(spl[ii].th == th && spl[ii].index == index)) ii++;
@@ -1567,7 +1567,7 @@ void Input::create_spline()
 		
 		if(par.time_dep == true){
 			auto &sinfo = par.spline_info;
-			if(sinfo.on != true) emsg_input("Problem loading spline");
+			if(sinfo.on != true) alert_emsg_input("Problem loading spline");
 			
 			const auto &times = sinfo.knot_tdiv;
 			auto ntimes = times.size();
@@ -1681,8 +1681,8 @@ void Input::create_spline()
 					for(auto ti = 0u; ti < ntp-1; ti++){
 						if(tp[ti]/dt < times[0]){ // Extends parameter factors to start time
 							spl.const_val.push_back(1);
-							if(model.mode != PPC) emsg_input("Should be PPC1");
-							if(!begin_str(spl.name,"f~")) emsg_input("Should be a parameter factor");
+							if(model.mode != PPC) alert_emsg_input("Should be PPC1");
+							if(!begin_str(spl.name,"f~")) alert_emsg_input("Should be a parameter factor");
 						}
 						else{
 							auto tmid = model.calc_tdiv((tp[ti]+tp[ti+1])/2);
@@ -1691,7 +1691,7 @@ void Input::create_spline()
 							
 							if(i+1 >= times.size() && spl.type != SQUARE_SPL){ // This extends spline for PPC			
 								if(model.mode != PPC){
-									emsg_input("Should be PPC2");
+									alert_emsg_input("Should be PPC2");
 								}							
 								
 								if(spl.constant == false){
@@ -1842,7 +1842,7 @@ void Input::create_spline()
 				break;
 			}
 		}
-		emsg_input("Done");
+		alert_emsg_input("Done");
 	}
 }
 
@@ -1902,7 +1902,7 @@ void Input::create_nm_trans()
 				
 				// Finds how individual factor alter the rate (used in individual sampling)
 				switch(type){
-				case EXP_RATE: case EXP_MEAN: emsg_input("Should not be here"); break;
+				case EXP_RATE: case EXP_MEAN: alert_emsg_input("Should not be here"); break;
 				
 				case GAMMA: case ERLANG: case LOG_NORMAL: case PERIOD: case WEIBULL:
 				case EXP_MEAN_NM:
@@ -1969,7 +1969,7 @@ void Input::create_nm_trans()
 						const auto &tra = sp.tra_gl[tr];
 						if(tra.all_branches) nmtrin.all_branches = true;
 						auto m = tra.nm_trans_ref;	
-						if(m == UNSET) emsg_input("nm_trans_ref should be set");
+						if(m == UNSET) alert_emsg_input("nm_trans_ref should be set");
 						nmtrin.nmtrans_ref.push_back(m);
 					}
 		
@@ -1991,7 +1991,7 @@ void Input::create_nm_trans()
 		}
 		
 		for(const auto &nmt : sp.nm_trans){
-			if(nmt.trans_incomp_ref == UNSET) emsg_input("trans_incomp_ref not set");
+			if(nmt.trans_incomp_ref == UNSET) alert_emsg_input("trans_incomp_ref not set");
 		}
 	}
 	
@@ -2010,7 +2010,7 @@ void Input::create_nm_trans()
 			}
 		}
 		
-		emsg_input("done");
+		alert_emsg_input("done");
 	}
 }
 
@@ -2157,7 +2157,7 @@ void Input::ind_fix_eff_group_trans_ref()
 				}					
 			}
 		}
-		emsg_input("Ind eff");
+		alert_emsg_input("Ind eff");
 	}
 }
 
@@ -2197,11 +2197,11 @@ void Input::create_markov_comp_gl()
 					for(const auto &tgl :  co.tra_leave_group[cl].tr_list){
 						const auto &tr = sp.tra_gl[tgl];
 						if(tr.type == EXP_RATE || tr.type == EXP_MEAN){
-							if(tr.markov_eqn_ref == UNSET) emsg_input("Should not be unset4");
+							if(tr.markov_eqn_ref == UNSET) alert_emsg_input("Should not be unset4");
 							co.me_ref.push_back(tr.markov_eqn_ref);
 						}
 						else{
-							if(tr.markov_eqn_ref != UNSET) emsg_input("Should not be set3");
+							if(tr.markov_eqn_ref != UNSET) alert_emsg_input("Should not be set3");
 						}
 					}
 				}
@@ -2258,7 +2258,7 @@ void Input::create_island()
 							//j = 0; while(j < co.size() && co[j].c != c1) j++;
 							//if(j < co.size()) break;
 						}
-						if(isl1 == island.size()) emsg_input("Cannot find island1");
+						if(isl1 == island.size()) alert_emsg_input("Cannot find island1");
 							
 						IslandTrans itr;
 						itr.tr = tr;
@@ -2282,7 +2282,7 @@ void Input::create_island()
 								//j = 0; while(j < co.size() && co[j].c != c2) j++;
 								//if(j < co.size()) break;
 							}
-							if(isl2 == island.size()) emsg_input("Cannot find island2");
+							if(isl2 == island.size()) alert_emsg_input("Cannot find island2");
 						}
 						
 						if(isl1 != isl2){
@@ -2314,9 +2314,9 @@ void Input::create_island()
 							}
 							
 							auto j = isl.hash_comp.find(f);
-							if(j == UNSET) emsg_input("problem");
+							if(j == UNSET) alert_emsg_input("problem");
 							//auto j = 0u; while(j < isl.comp.size() && isl.comp[j].c != f) j++;
-							//if(j == isl.comp.size()) emsg_input("problem");
+							//if(j == isl.comp.size()) alert_emsg_input("problem");
 							le.cf = j;
 							
 							// Given a global compartment c  works put the me which should be used
@@ -2333,7 +2333,7 @@ void Input::create_island()
 									if(me == UNSET){
 										switch(trg.type){
 										case EXP_RATE: case EXP_MEAN:
-											emsg_input("Should not be unset5");
+											alert_emsg_input("Should not be unset5");
 											break;
 										default:
 											nm_flag = true;
@@ -2354,7 +2354,7 @@ void Input::create_island()
 							
 							if(nm_flag == false){
 								for(auto c = 0u; c < sp.comp_gl.size(); c++){
-									if(me_ref[c] == UNSET) emsg_input("me ref prob");
+									if(me_ref[c] == UNSET) alert_emsg_input("me ref prob");
 								}							
 								
 								// Accounts for time variation  
@@ -2413,7 +2413,7 @@ void Input::create_island()
 						cout << endl;
 						cout << endl;
 					}
-					emsg_input("Islands");
+					alert_emsg_input("Islands");
 				}
 				
 				claa.island = island;
@@ -2443,7 +2443,7 @@ void Input::param_affect_likelihood()
 			vector <unsigned int> vec; vec.push_back(th); vec.push_back(ind/nknot); 
 	
 			auto s = model.hash_spline.existing(vec);
-			if(s == UNSET) emsg_input("Cannot find spline");
+			if(s == UNSET) alert_emsg_input("Cannot find spline");
 		
 			{ // turn off
 				auto ss = 0u;
@@ -2546,8 +2546,8 @@ void Input::param_affect_likelihood()
 					const auto &fe = sp.fix_effect[f];
 					
 					const auto &par = model.param[fe.th];
-					if(par.name != fe_char+"^"+fe.name) emsg_input("names do not match");
-					if(par.N != 1) emsg_input("Should be univariate");
+					if(par.name != fe_char+"^"+fe.name) alert_emsg_input("names do not match");
+					if(par.N != 1) alert_emsg_input("Should be univariate");
 					
 					if(par.variety != CONST_PARAM){
 						auto k = par.get_param_vec(0);
@@ -2581,12 +2581,12 @@ void Input::param_affect_likelihood()
 			for(auto f : pop.fix_eff_mult){		
 				const auto &fe = sp.fix_effect[f];
 				const auto &par = model.param[fe.th];
-				if(par.name != fe_char+"^"+fe.name) emsg_input("names do not match");
-				if(par.N != 1) emsg_input("Should be univariate");
+				if(par.name != fe_char+"^"+fe.name) alert_emsg_input("names do not match");
+				if(par.N != 1) alert_emsg_input("Should be univariate");
 				
 				if(par.variety != CONST_PARAM){
 					auto k = par.get_param_vec(0);
-					if(k == UNSET) emsg_input("Problem with fix_eff_mult");
+					if(k == UNSET) alert_emsg_input("Problem with fix_eff_mult");
 					
 					AffectLike al; 	
 					al.type = EXP_FE_AFFECT; al.num = p; al.num2 = f;
@@ -2762,7 +2762,7 @@ void Input::param_affect_likelihood()
 					case OBS_COMP_EV:
 						for(auto c = 0u; c < ob.c_obs_prob_eqn.size(); c++){
 							auto eq = ob.c_obs_prob_eqn[c].eq_ref;
-							if(eq == UNSET) emsg_input("Equation is not set");
+							if(eq == UNSET) alert_emsg_input("Equation is not set");
 							add_to_map(eq,i,map,spline_map);
 						}
 						break;
@@ -2787,7 +2787,7 @@ void Input::param_affect_likelihood()
 					}
 					cout << endl;
 				}
-				emsg_input("done");
+				alert_emsg_input("done");
 			}
 			
 			add_map_list(map,p,LIKE_OBS_IND_AFFECT);
@@ -2852,7 +2852,7 @@ void Input::param_affect_likelihood()
 				const auto &par = model.param[pref.th];
 				if(par.variety != CONST_PARAM){
 					auto k = par.get_param_vec(pref.index);
-					if(k == UNSET) emsg_input("Parameter prob");
+					if(k == UNSET) alert_emsg_input("Parameter prob");
 					
 					{
 						AffectLike al; 	
@@ -2875,7 +2875,7 @@ void Input::param_affect_likelihood()
 				const auto &par = model.param[pref.th];
 				if(par.variety != CONST_PARAM){
 					auto k = par.get_param_vec(pref.index);
-					if(k == UNSET) emsg_input("Parameter prob");
+					if(k == UNSET) alert_emsg_input("Parameter prob");
 					
 					{
 						AffectLike al; 	
@@ -2946,8 +2946,8 @@ void Input::add_nm_trans_affect(unsigned int p, unsigned int i, unsigned int eq,
 	
 		const auto &par = model.param[fe.th];
 		
-		if(par.name != fe_char+"^"+fe.name) emsg_input("names do not match");
-		if(par.N != 1) emsg_input("Should be univariate");
+		if(par.name != fe_char+"^"+fe.name) alert_emsg_input("names do not match");
+		if(par.N != 1) alert_emsg_input("Should be univariate");
 		
 		if(par.variety != CONST_PARAM){
 			auto k = par.get_param_vec(0);
@@ -2980,14 +2980,14 @@ void Input::add_obs_trans_eqn(unsigned int p, unsigned int e, const vector < vec
 		const auto &par = model.param[pref.th];
 		if(par.variety != CONST_PARAM){	
 			auto k = par.get_param_vec(pref.index);
-			if(k == UNSET) emsg_input("Parameter prob");
+			if(k == UNSET) alert_emsg_input("Parameter prob");
 			
 			if(spline_map[k].size() > 0){                // There is a spline in the equation	
-				if(!par.spline_info.on) emsg_input("Should be spline");
+				if(!par.spline_info.on) alert_emsg_input("Should be spline");
 				auto nknot = par.spline_info.knot_tdiv.size();
 				
 				for(auto j = 0u; j < nknot; j++){
-					if(k+j >= spline_map.size()) emsg_input("Prob0");
+					if(k+j >= spline_map.size()) alert_emsg_input("Prob0");
 					
 					{
 						AffectLike al; 
@@ -3015,30 +3015,30 @@ void Input::add_to_map(unsigned int eq, unsigned int i, vector < vector <bool> >
 		const auto &par = model.param[pref.th];
 		if(par.variety != CONST_PARAM){
 			auto k = par.get_param_vec(pref.index);
-			if(k == UNSET) emsg_input("Parameter prob");
+			if(k == UNSET) alert_emsg_input("Parameter prob");
 			
 			if(spline_map[k].size() > 0){                // There is a spline in the equation
 				auto ti = eqn.ti_fix;
-				if(ti == UNSET) emsg_input("Time should be fixed");
+				if(ti == UNSET) alert_emsg_input("Time should be fixed");
 				
-				if(!par.spline_info.on) emsg_input("Should be spline");
+				if(!par.spline_info.on) alert_emsg_input("Should be spline");
 				auto nknot = par.spline_info.knot_tdiv.size();
 				
 				for(auto j = 0u; j < nknot; j++){
-					if(k+j >= spline_map.size()) emsg_input("Prob0");
+					if(k+j >= spline_map.size()) alert_emsg_input("Prob0");
 					if(ti >= spline_map[k+j].size()){
-						emsg_input("Prob-1");
+						alert_emsg_input("Prob-1");
 					}
 					if(spline_map[k+j][ti] == true){
-						if(k+j >= map.size()) emsg_input("Prob1");
-						if(i >= map[k+j].size()) emsg_input("Prob2");
+						if(k+j >= map.size()) alert_emsg_input("Prob1");
+						if(i >= map[k+j].size()) alert_emsg_input("Prob2");
 						map[k+j][i] = true;
 					}
 				}
 			}
 			else{
-				if(k >= map.size()) emsg_input("Prob3");
-				if(i >= map[k].size()) emsg_input("Prob4");
+				if(k >= map.size()) alert_emsg_input("Prob3");
+				if(i >= map[k].size()) alert_emsg_input("Prob4");
 				map[k][i] = true;
 			}
 		}
@@ -3135,7 +3135,7 @@ void Input::source_rate_divide() const
 								switch(trg.type){
 								case EXP_RATE: trg.dist_param[0].te = to_string(fac)+"*("+val.rate+")"; break;
 								case EXP_MEAN: trg.dist_param[0].te = "("+val.rate+")/"+to_string(fac); break;
-								default: emsg_input("Source not exponential"); break;
+								default: alert_emsg_input("Source not exponential"); break;
 								}
 							}
 						}
@@ -3263,7 +3263,7 @@ void Input::bp_create_unset()
 						break;
 					
 					default:
-						emsg_input("Branching probabilities should be set");
+						alert_emsg_input("Branching probabilities should be set");
 						break;
 					}
 				}
@@ -3567,7 +3567,7 @@ void Input::add_genetic_data()
 						}
 						cout << endl;
 					}
-					emsg_input("Genetic difference");
+					alert_emsg_input("Genetic difference");
 				}
 			}
 		}
@@ -3859,7 +3859,7 @@ void Input::set_joint_param_event()
 				cout << " transitions" << endl;
 			}
 		}
-		emsg_input("done");
+		alert_emsg_input("done");
 	}
 }
 
@@ -3982,9 +3982,9 @@ void Input::set_local_ind_init()
 							auto cf = tr_swap_leave[ci][j];
 						
 							if(cf != C && cf != ci){
-								if(ci >= tr_swap_ref.size()) emsg_input("prob");
+								if(ci >= tr_swap_ref.size()) alert_emsg_input("prob");
 								if(cf >= tr_swap_ref[ci].size()){
-									emsg_input("prob2here");
+									alert_emsg_input("prob2here");
 								}
 								
 								auto ref = tr_swap_ref[ci][cf];
@@ -4138,7 +4138,7 @@ void Input::set_local_ind_init()
 				cout << claa.swap.size() << " " << claa.swap_rep.size() << " " << C << " swap" << endl;
 			}
 		}
-		emsg_input("gg");
+		alert_emsg_input("gg");
 	}
 	
 	if(false){
@@ -4151,7 +4151,7 @@ void Input::set_local_ind_init()
 				}
 			}
 		}
-		emsg_input("done");
+		alert_emsg_input("done");
 	}
 	
 	if(false){
@@ -4164,7 +4164,7 @@ void Input::set_local_ind_init()
 				}					
 			}
 		}
-		emsg_input("done");
+		alert_emsg_input("done");
 	}
 }
 
@@ -4194,7 +4194,7 @@ void Input::print_tr_swap(unsigned int cl, const vector < vector <unsigned int> 
 			}
 		}
 	}
-	//emsg_input("done print_tr_swap");
+	//alert_emsg_input("done print_tr_swap");
 }
 
 
@@ -4451,7 +4451,7 @@ void Input::set_ppc_resample()
 			}
 		}
 		
-		emsg_input("Resample");
+		alert_emsg_input("Resample");
 	}
 }
 
@@ -4530,7 +4530,7 @@ void Input::set_sink_exist()
 			for(auto cl = 0u; cl < sp.ncla; cl++){
 				cout << cl << " " << sp.sink_exist[cl] << "sink exist" << endl;
 			}
-			emsg_input("done");
+			alert_emsg_input("done");
 		}
 	}
 }
@@ -4545,7 +4545,7 @@ void Input::set_eqn_ind_eff_exist()
 		case TRANS_NM_RATE: case TRANS_NM_MEAN: case TRANS_SHAPE: case TRANS_SCALE: case TRANS_CV:
 			{
 				auto p = eqn.sp_p;
-				if(p == UNSET) emsg_input("Species is unset"); 
+				if(p == UNSET) alert_emsg_input("Species is unset"); 
 				
 				const auto &sp = model.species[p];
 				
@@ -4624,8 +4624,8 @@ void Input::set_param_use()
 				case PARAMETER:
 					{
 						const auto &pr = eq.param_ref[it.num]; 
-						if(pr.th >= model.param.size()) emsg_input("Out of range1");
-						if(pr.index >= model.param[pr.th].N) emsg_input("Out of range2");
+						if(pr.th >= model.param.size()) alert_emsg_input("Out of range1");
+						if(pr.index >= model.param[pr.th].N) alert_emsg_input("Out of range2");
 						model.param[pr.th].set_used(pr.index);
 					}
 					break;
@@ -4633,8 +4633,8 @@ void Input::set_param_use()
 				case SPLINE:
 					{
 						const auto &pr = eq.param_ref[it.num]; 
-						if(pr.th >= model.param.size()) emsg_input("Out of range1");
-						if(pr.index >= model.param[pr.th].N) emsg_input("Out of range2");
+						if(pr.th >= model.param.size()) alert_emsg_input("Out of range1");
+						if(pr.index >= model.param[pr.th].N) alert_emsg_input("Out of range2");
 						auto &par = model.param[pr.th]; 
 						const auto &spl = par.spline_info;
 						if(!spl.on) emsg("SHould be a spline");
@@ -4682,7 +4682,7 @@ void Input::set_param_use()
 			for(auto i = 0u; i < imax; i++) cout << par.element[i].used << " ";
 			cout << endl;
 		}
-		emsg_input("Shows parameters used");
+		alert_emsg_input("Shows parameters used");
 	}
 }
 
@@ -4701,7 +4701,7 @@ void Input::set_omega_fl()
 				for(auto i = 0u; i < N; i++){
 					auto &par = model.param[ieg.omega[j][i]];
 					if(par.variety != CONST_PARAM){
-						auto th = par.get_param_vec(0); if(th == UNSET) emsg_input("Should not be unset2");
+						auto th = par.get_param_vec(0); if(th == UNSET) alert_emsg_input("Should not be unset2");
 						model.param_vec[th].omega_fl = true;
 					}
 				}
@@ -4713,7 +4713,7 @@ void Input::set_omega_fl()
 		for(auto &pv : model.param_vec){
 			cout << pv.name << " " << pv.omega_fl << endl;
 		}
-		emsg_input("done");
+		alert_emsg_input("done");
 	}
 }
 */
@@ -4732,7 +4732,7 @@ void Input::setup_der_func(DerFuncType df_type, string te, DerFunc &df)
 	case GT: df.name = "GT"; break;
 	case GTE: df.name = "GTE"; break;
 	case GTC: df.name = "GTC"; break;
-	case DF_UNSET: emsg_input("Should not be unset"); break; 
+	case DF_UNSET: alert_emsg_input("Should not be unset"); break; 
 	}
 	
 	auto i = 0u;
@@ -5081,3 +5081,14 @@ void Input::setup_der_func_eqn()
 		}
 	}
 }
+
+
+/// Determines which parameters are output in state
+void Input::set_param_state_output()
+{
+	for(auto &par : model.param){
+		par.state_output = par.trace_output;
+		if(par.cat_factor && (model.mode == INF || model.mode == EXT)) par.state_output = true;
+	}
+}
+  

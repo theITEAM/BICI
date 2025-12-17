@@ -153,3 +153,16 @@ function cannot_find_trans_comp(te,p,cl,co)
 	alert_import(st);
 }
 			
+
+/// Prints the number of columns and rows in a table
+function print_row_col(tab)
+{
+	let te = "(there ";
+	if(tab.ncol == 1) te += "is "+tab.ncol+" column"; 
+	else te += "are "+tab.ncol+" columns";
+	te += " and ";
+	if(tab.nrow == 1) te += tab.nrow+" row"; 
+	else te += tab.nrow+" rows)";
+	
+	return te;
+}
