@@ -43,7 +43,7 @@ The current version contains the following features:
 
 ## Documentation
 
-The following manual can be downloaded [here](BICI_Manual_v0.79.pdf)
+The following manual can be downloaded [here](BICI_Manual_v0.80.pdf)
 
 ## Build
 
