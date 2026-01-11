@@ -1205,7 +1205,6 @@ function copy_back_to_source2(tbs)
 		
 	case "reparam_eqn": 
 		{
-			//let val = Number(te); if(isNaN(val)) val = te; 
 			let val = te; 
 			model.change_param(inter.bubble.th,"value",val);
 		}
@@ -1215,6 +1214,13 @@ function copy_back_to_source2(tbs)
 		{
 			let val = te; 
 			model.change_param(inter.bubble.th,"reparam_eqn",val);
+		}
+		break;
+		
+	case "define_eqn": 
+		{
+			let val = te; 
+			model.change_param(inter.bubble.th,"define_eqn",val);
 		}
 		break;
 		
@@ -1596,7 +1602,7 @@ function check_error_textbox2(tbs)
 		
 		let char_lim = 20;
 
-		if(warn == ""){	
+		if(warn == ""){		
 			switch(source.type){ 			
 			case "compartment":
 				{
@@ -1850,10 +1856,11 @@ function check_error_textbox2(tbs)
 			case "element_eqn":
 				break;
 			
-			case "reparam_eqn":
-				break;
-				
-			case "reparam_equation":
+			case "define_eqn": case "reparam_eqn": case "reparam_equation":
+				{
+					let res = check_reparam(te,inter.bubble.th);
+					if(res.err == true) warn = res.msg;
+				}
 				break;
 				
 			case "element_param_const": 

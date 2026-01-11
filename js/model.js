@@ -1200,6 +1200,33 @@ class Model
 	}
 	
 	
+	/// Checks reparameterised eqaution
+	check_reparam()
+	{
+		let th = inter.bubble.th;
+		let par = model.param[th];
+		let res = check_reparam(par.reparam_eqn,th);
+		if(res.err == true) return res;
+	
+		update_param();
+	
+		return success();
+	}
+	
+	/// Adds a defined equaation
+	check_define()
+	{
+		let th = inter.bubble.th;
+		let par = model.param[th];
+		let res = check_reparam(par.define_eqn,th);
+		if(res.err == true) return res;
+	
+		update_param();
+	
+		return success();
+	}
+	
+	
 	/// Adds a derived quantity to the model
 	add_modify_derived(ob,mod)
 	{
@@ -1212,8 +1239,8 @@ class Model
 			if(par.length > 1) return err("Should not contain more than one parameter");
 		}
 		else{
-			if(par[0].name == "D") return err("Name 'D' is reserved for the distance matrix");
-			if(par[0].name == "t") return err("Name 't' is reserved for time");
+			let warn = check_reserved_name(par[0].name);
+			if(warn != "") return err(warn);
 		}
 		
 		let res = check_derived_param(ob.eqn2,ob.eqn1);

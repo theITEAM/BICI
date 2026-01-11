@@ -5218,7 +5218,7 @@ function setup_distribution(result,rpf,burn)
 	}
 	
 	// Draws the prior
-	if(result.siminf != "sim" && rpf.dist_settings.show_prior.check == true && par.variety != "reparam" && par.variety != "likelihood" && par.prior && par.type != "derive_param"){
+	if(result.siminf != "sim" && rpf.dist_settings.show_prior.check == true && par.variety != "reparam" && par.variety != "define" && par.variety != "likelihood" && par.prior && par.type != "derive_param"){
 		let N = 200;                                   // The number of points
 		
 		let pri;
@@ -5418,7 +5418,7 @@ function get_prior_clip(par,ind)
 {
 	let clip_min, clip_max;
 		
-	if(par.variety != "reparam" && par.variety != "likelihood" && par.prior){
+	if(par.variety != "reparam" && par.variety != "define" && par.variety != "likelihood" && par.prior){
 		let pri;
 		if(par.dep.length > 0 && par.prior_split_set == true) pri = get_element(par.prior_split,ind);
 		else pri = par.prior;

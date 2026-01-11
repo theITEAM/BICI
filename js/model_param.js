@@ -25,6 +25,9 @@ function add_model_param_buts(lay)
 	let w = model.add_object_button(lay,"Constant",x,y,"SetConstant",{ back:WHITE, active:active, info:{}, title:"Constant", te:constant_text}); 
 	x += w+gap;
 	
+	w = model.add_object_button(lay,"Define",x,y,"SetDefine",{ back:WHITE, active:active, info:{}, title:"Define", te:define_text}); 
+	x += w+gap;
+	
 	w = model.add_object_button(lay,"Reparam.",x,y,"SetReparam",{ back:WHITE, active:active, info:{}, title:"Reparameterisation", te:reparam_text}); 
 	x += w+gap;
 	
@@ -257,10 +260,12 @@ function add_model_param_content(lay)
 	// SPLINES
 	{
 		let num = 0;
+		let th_list=[];
 		for(let i = 0; i < model.param.length; i++){
 			let par = model.param[i];
 			
-			if(par.spline.on == true && par.type != "derive_param" && par.type != "param factor"){
+			if(par.spline.on == true && par.type != "derive_param" && par.type != "param factor" && par.variety != "define"){
+				th_list.push(i);
 				num += dy_spline_fac+dy_spline_fac2; 
 				if(model.param[i].spline.smooth.check == true) num += dy_spline_fac2;
 			}
@@ -270,7 +275,8 @@ function add_model_param_content(lay)
 			lay.add_button({te:"Splines", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5+1, col:col_round, col2:col_text, type:"CurvedOutline"});
 			y += 1.4;
 			
-			for(let i = 0; i < model.param.length; i++){
+			for(let k = 0; k < th_list.length; k++){
+				let i = th_list[k];
 				let par = model.param[i];
 				let spl = par.spline;
 				if(spl.on == true && par.type != "derive_param" && par.type != "param factor"){
@@ -375,6 +381,27 @@ function add_model_param_content(lay)
 					display_factor(i,x,y,lay,w);
 	
 					lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamFactor"});				
+					y += dy;
+				}
+			}
+			y += 1;
+		}
+	}
+	
+	{ // DEFINE
+		let num = count(model.param,"variety","define");
+		if(num > 0){
+			lay.add_button({te:"Defined", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5, col:col_round, col2:col_text, type:"CurvedOutline"});
+			y += 1.4;
+
+			for(let i = 0; i < model.param.length; i++){
+				let par = model.param[i];
+				if(par.variety == "define"){
+					let w = wright;
+					
+					display_define(i,x,y,lay,w);
+					
+					lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamDefine"});
 					y += dy;
 				}
 			}
@@ -552,6 +579,30 @@ function set_reparam_bubble2(cont)
 }
 
 
+/// Bubble which allows user to select a define parameter
+function set_define_bubble(cont)
+{	
+	let bub = inter.bubble;
+	
+	if(check_param_free("define") == true){
+		cont.dx = 20;
+		bubble_addtitle(cont,"Define parmeter");
+
+		bubble_addparagraph(cont,"Select parameter which is going to be defined:",0,cont.dx);
+		cont.y += 0.2;
+	
+		bubble_addscrollable(cont,{type:"reparam param sel", ymax:10, ac:"AddDefineParam"});
+		add_bubble_end(cont);	
+	}
+	else{
+		cont.dx = 17;
+		bubble_addtitle(cont,"Define");
+
+		bubble_addparagraph(cont,"There are currently no free parameters to set.",0,cont.dx); 
+	}
+}
+
+
 /// Bubble which allows user to select a parameter for distribution
 function set_distribution_bubble(cont)
 {
@@ -676,7 +727,11 @@ function param_pos(par,op)
 		
 	case "reparam":
 		if(par.variety != "normal") return false;
-		//if(par.time_dep) return false;
+		if(par.factor) return false;
+		break;
+		
+	case "define":
+		if(par.variety != "normal") return false;
 		if(par.factor) return false;
 		break;
 		
@@ -914,6 +969,17 @@ function param_details_scrollable(lay)
 					let name = get_full_parameter_name(eq.eqn_info.par_name);
 					te = "Reparameterisation of <e>"+name+"</e>";
 					ac = "SelectReparam";
+				}
+			}
+			break;
+			
+		case "define_eqn":
+			{
+				te = "Defined";
+				if(eq.eqn_info != undefined){
+					let name = get_full_parameter_name(eq.eqn_info.par_name);
+					te = "Definition of <e>"+name+"</e>";
+					ac = "SelectDefine";
 				}
 			}
 			break;

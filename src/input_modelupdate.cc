@@ -434,7 +434,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 	}
 
 	// Adds in any parameter reparameterisation 
-	// This is done at the end so it is only aplied to any "used" parameters  
+	// This is done at the end so it is only applied to any "used" parameters  
 	bool flag;
 	do{
 		flag = false;
@@ -458,8 +458,8 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 					break;
 				
 				case REPARAM_PARAM:
-					if(par.reparam_eqn != ""){   // Reparameterisation set by equation
-						if(add_reparam_eqn(par,hash_eqn)) flag = true;; 	
+					if(par.reparam_eqn.te != ""){   // Reparameterisation set by equation
+						if(add_reparam_eqn(par,hash_eqn)) flag = true;	
 					}
 					else{                        // Reparametersisation set individually
 						for(auto &ele : par.element){

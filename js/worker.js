@@ -710,7 +710,7 @@ function process(e)
 		{
 			let fi = "M:/Github/theITEAM/BICI/Execute/init.bici";
 			if(ver =="windows"){
-				fi = "C:/Users/cpooley/Desktop/BICI_release/BICI_v0.7_windows/Execute/init.bici";
+				fi = "C:/Users/cpooley/Desktop/BICI_release/BICI_v0.8_windows/Execute/init.bici";
 			}
 			if(ver =="mac"){
 				fi = "/tmp/init.bici";

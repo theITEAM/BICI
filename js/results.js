@@ -1510,13 +1510,15 @@ function add_univariate(name,result,total_param_list,pos_paramview,pos_genview,d
 	let list = [];
 	
 	for(let th = 0; th < result.param.length; th++){
-		let par = result.param[th];			
-		if((par.type == "derive_param" && der_fl) || (par.type != "derive_param" && !der_fl)){
-			if(par.output == true && par.dep.length == 0 && par.selop == undefined){
-				if(par.variety != "const"){
-					list.push({th:th, index:[], name:param_name_index(par,[])});
-				
-					total_param_list.push({th:th, index:[], name:param_name_index(par,[])});
+		let par = result.param[th];		
+		if(par.variety != "define"){
+			if((par.type == "derive_param" && der_fl) || (par.type != "derive_param" && !der_fl)){
+				if(par.output == true && par.dep.length == 0 && par.selop == undefined){
+					if(par.variety != "const"){
+						list.push({th:th, index:[], name:param_name_index(par,[])});
+					
+						total_param_list.push({th:th, index:[], name:param_name_index(par,[])});
+					}
 				}
 			}
 		}
@@ -1536,30 +1538,19 @@ function add_multivariate(result,total_param_list,pos_paramview,pos_genview,der_
 	for(let th = 0; th < result.param.length; th++){
 		let par = result.param[th];
 	
-		if((par.type == "derive_param" && der_fl) || (par.type != "derive_param" && !der_fl)){
-			if(par.dep.length > 0 && par.type != "param factor" && !par.dist_mat && !par.iden_mat && !par.den_vec){
-				let list = [];
-				let list_split = [];
-				let para = true;
-			
-				if(par.output == true){
-					if(is_symmetric(par)){
-						let pli = par.list[0];
-						let L = pli.length;
-						for(let j = 0; j < L; j++){
-							let ind=[]; ind[0] = j; ind[1] = j;
-							
-							let name = param_name_index(par,ind);
-							list.push({th:th, index:ind, name:name});
-							
-							if(par.variety != "const"){
-								total_param_list.push({th:th, index:ind, name:name});
-							}
-						}
-						
-						for(let j = 0; j < L; j++){
-							for(let i = j+1; i < L; i++){
-								let ind=[]; ind[0] = j; ind[1] = i;
+		if(par.variety != "define"){
+			if((par.type == "derive_param" && der_fl) || (par.type != "derive_param" && !der_fl)){
+				if(par.dep.length > 0 && par.type != "param factor" && !par.dist_mat && !par.iden_mat && !par.den_vec){
+					let list = [];
+					let list_split = [];
+					let para = true;
+				
+					if(par.output == true){
+						if(is_symmetric(par)){
+							let pli = par.list[0];
+							let L = pli.length;
+							for(let j = 0; j < L; j++){
+								let ind=[]; ind[0] = j; ind[1] = j;
 								
 								let name = param_name_index(par,ind);
 								list.push({th:th, index:ind, name:name});
@@ -1568,39 +1559,52 @@ function add_multivariate(result,total_param_list,pos_paramview,pos_genview,der_
 									total_param_list.push({th:th, index:ind, name:name});
 								}
 							}
-						}
-					}
-					else{
-						let co_list = generate_co_list(par.list);
-						for(let j = 0; j < co_list.length; j++){	
-							let ind = co_list[j].index;
 							
-							let name = param_name_index(par,ind);
-							list.push({th:th, index:ind, name:name});
-							
-							if(par.time_dep){
-								if(ind[ind.length-1] == 0){
-									let ind2 = copy(ind); ind2.pop();
-									let spl = name.split("(");
-									list_split.push({th:th, index:ind2, name:spl[0]});
+							for(let j = 0; j < L; j++){
+								for(let i = j+1; i < L; i++){
+									let ind=[]; ind[0] = j; ind[1] = i;
+									
+									let name = param_name_index(par,ind);
+									list.push({th:th, index:ind, name:name});
+									
+									if(par.variety != "const"){
+										total_param_list.push({th:th, index:ind, name:name});
+									}
 								}
 							}
-							
-							if(par.variety != "const"){
-								total_param_list.push({th:th, index:ind, name:param_name_index(par,ind)});
+						}
+						else{
+							let co_list = generate_co_list(par.list);
+							for(let j = 0; j < co_list.length; j++){	
+								let ind = co_list[j].index;
+								
+								let name = param_name_index(par,ind);
+								list.push({th:th, index:ind, name:name});
+								
+								if(par.time_dep){
+									if(ind[ind.length-1] == 0){
+										let ind2 = copy(ind); ind2.pop();
+										let spl = name.split("(");
+										list_split.push({th:th, index:ind2, name:spl[0]});
+									}
+								}
+								
+								if(par.variety != "const"){
+									total_param_list.push({th:th, index:ind, name:param_name_index(par,ind)});
+								}
 							}
 						}
 					}
+					else para = "too big";
+					
+					let name = remove_eq_quote(par.full_name)
+					if(der_fl) name = "Der. "+name;
+					
+					let ppv = {te:name, param:para, radio:{value:0, param:true}, list:list, radio_split:{value:0, param:true}, list_split:list_split};
+					
+					pos_paramview.push(ppv);
+					pos_genview.push(ppv);
 				}
-				else para = "too big";
-				
-				let name = remove_eq_quote(par.full_name)
-				if(der_fl) name = "Der. "+name;
-				
-				let ppv = {te:name, param:para, radio:{value:0, param:true}, list:list, radio_split:{value:0, param:true}, list_split:list_split};
-				
-				pos_paramview.push(ppv);
-				pos_genview.push(ppv);
 			}
 		}
 	}

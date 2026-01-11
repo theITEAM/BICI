@@ -1,38 +1,21 @@
+Hi Grant,
+
+So I've finally sorted out your issues. There were two problems: (1) you were trying to do something that wasn't possible (although perfectly sensible) and (2) I hadn't added the error checking code to tell the user this wasn't possible. 
+
+Basically there is a distinction between time-varying parameters and time-varying equations. So for example the equation "{I}" represents a time varying equation (it tracks the population in compartment I over time). But a time-varying parameter has to have a time-varying spline defined, and so this has restrictions associated with it.
+
+So to do what you are wanting to do, I've come up with a new way to define parameters through the "define" command. This is available both in the interface and in BICI-script. Basically it allows the user to substitute a parameter with an equation and in doing so the parameter itself is removed from the model. 
+
+
+
 JAMIE
-- Corrected problem with error messages not showing.
-- You were asking about whether the same table can be used to store all the information about individuals. So the "cols" tag can be used for this. This overrides what is expected for column headings. E.g.
-
-add-ind-inf name="Added individuals" file="file.csv" cols="ID,tstart,DSstart"
-comp-data name="Compartmental data" class="DS" file="file.csv" cols="ID,tcomp,DScomp"
-
-Let me know if this doesn't work (I seemed to remember you had a problem with this feature, but can't remember what).
-
 
  
 GRANT
-- Improved speed for loading up large integrals.
-- Sorted out problem with PH.bici
-- Sorted out problem with HPAI_SML.bici
-- The new function RDEN and DEN have been added to calculate density using KDE (see manual). I've added example M3.5 to the examples.
+- Correct issue with exporting files
+- Introduced 'define' command. This allows for equation expressions to be simplified by spliting them up into managable pieces.
 
 
 CHRIS
-- Allows for the possibility of extending MCMC chains. When running BICI script the "ext" command is used and when running in the interface there is an "Extend" tab (see manual 7.3.1). 
-- Testing of genetic parts of BICI (in preparation for simulation study).
-- A correction has been made to PAS-MCMC. It was quenching faster than it should have been.
-- The annealing time-bar has been improved (before it started very slowly and gor quicker).
-- Visualisation for compartment of first infected individual.
-- Improved speed when dealing with complex derived quantities.
-- Corrected bug in interface related to param_factor.
-- Corrected bug which allows for format "2\int dt({I})".
-- Added extra information in individual tables.
-- Helped to improve speed of interface when loading up Fishboost model.
-- Allow for sorting by individual effect size.
-- Added some new visualisations for individual effects (in particular looking at correlations between individual effects and allow the user to colourise scatter plots).
-- A few bugs in interface corrected (e.g. bottom right hand corner overlapping right hand menu).
-- Corrected problem with expected transition number (in diagnostics).
-- Updates to the manual and help information in interface.
-- Corrected problem with PAS when running multiple particles on a single core
-- Corrected problem to allow for model to restore after error in import
-- Improvement to how proposals are MCMC proposals are dynamically updated (the size of adaptation is larger initially) 
-- Estimated sample number gets estimated to two significant figures
+- Tried to add in some error checking for reparameterisation, defining and derived quantities, both in the interfact and core code.
+

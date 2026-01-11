@@ -42,10 +42,9 @@ void Model::add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv)
 		
 		hash_eqn.add(eqi.eq_ref,vec);
 	
-		Equation eq(eqi.te,eqi.type,eqi.p,eqi.cl,eqi.infection_trans,ti,eqi.line_num,species_simp,param,prior,derive,spline,param_vec,density,pop,hash_pop,constant,timepoint,details);
+		Equation eq(eqi.te,eqi.type,eqi.p,eqi.cl,eqi.infection_trans,ti,eqi.line_num,species_simp,param,prior,derive,spline,param_vec,density,pop,hash_pop,constant,timepoint,details,define);
 		
 		if(false && eq.warn != ""){ cout << eq.warn << endl; emsg_input("warning");}
-		
 		eqn.push_back(eq);
 	}
 }
@@ -3056,3 +3055,212 @@ string Model::load_prop_info(unsigned int ch, const vector <string> &lines)
 	
 	return "";
 }
+
+
+/// Works out where the end bracket is
+unsigned int Model::get_end_bracket(string &te, unsigned int i)
+{
+	while(i < te.length() && te.substr(i,1) != "(") i++;
+	if(i == te.length()) return i;
+	i++;
+	
+	auto num = 1u;
+	while(i < te.length()){
+		while(i < te.length() && te.substr(i,1) != "(" && te.substr(i,1) != ")") i++;
+		if(i == te.length()) return i;
+	
+		if(te.substr(i,1) == "(") num++;
+		else{
+			num--;
+			if(num == 0) return i;
+		}
+		i++;
+	}
+	
+	return i;
+}
+
+
+/// Determines if in integral
+bool Model::in_integral(unsigned int i, const vector <SumRange> &int_range) const
+{
+	for(const auto &ir : int_range){
+		if(i > ir.i_start && i < ir.i_end) return true;
+	}
+	return false;
+}
+		
+		
+/// Works out dependency for an equation
+vector <string> Model::equation_dep(string te, string &warn)
+{
+	vector <string> dep;
+	
+	// Sum range
+	vector <SumRange> sum_range;
+	
+	{
+		auto i = 0u;
+		while(i < te.length()){
+			while(i < te.length() && !in_text(te,i,"Σ")) i++;
+			if(i < te.length()){
+				while(i < te.length() && te.substr(i,1) != "_") i++;
+				if(i < te.length()){
+					i++;
+					auto di = get_dep_info(te,i,"(");
+
+					if(di.warn != ""){
+						warn = "An error occured: "+di.warn;
+						return dep;
+					}
+
+					for(auto de : di.spl){				
+						SumRange ra;
+						ra.i_start = i;
+						ra.i_end = get_end_bracket(te,i);
+						ra.index = de;
+						sum_range.push_back(ra);
+					}
+				}
+			}
+		}
+	}
+	
+	// Integral range
+	vector <SumRange> int_range;
+	{
+		auto i = 0u;
+		while(i < te.length()){
+			while(i < te.length() && !in_text(te,i,"∫")) i++;
+			if(i < te.length()){
+				SumRange ra;
+				ra.i_start = i;
+				ra.i_end = get_end_bracket(te,i);
+				ra.index = "t";
+				int_range.push_back(ra);
+				i++;
+			}
+		}
+	}
+	
+	if(false){
+		for(auto sr : sum_range){
+			cout << sr.i_start << " " << sr.i_end << " "<< sr.index << "  sum range" << endl;
+		}
+		
+		for(auto sr : int_range){
+			cout << sr.i_start << " " << sr.i_end << " "<< sr.index << "  int range" << endl;
+		}
+	}
+	
+	auto time_dep = false;
+	
+	auto i = 0u;
+	while(i < te.length()){
+		while(i < te.length() && te.substr(i,1) != "%" && te.substr(i,1) != "{" && !in_text(te,i,"Σ")) i++;
+		if(i < te.length()){
+			auto istore = i; 
+
+			string type = "";
+			if(in_text(te,i,"Σ")){  // Changes in a sum max
+				while(i < te.length() && te.substr(i,1) != "[" && te.substr(i,1) != "(") i++;
+				if(i < te.length() && te.substr(i,1) == "["){
+					type = "sum";
+					i++;
+				}
+			}
+			else{
+				if(te.substr(i,1) == "{"){  // Changes in a population
+					if(!in_integral(i,int_range)) time_dep = true;
+				
+					type = "pop";
+					i++;
+					auto ist = i;
+					while(i < te.length() && te.substr(i,1) != ":" &&  te.substr(i,1) != "}") i++;
+					if(i < te.length() && te.substr(i,1) == ":") i++;
+					else i = ist;
+				}
+				else{                               // Changes in a parameter
+					auto j = i; 	
+					while(j <= te.length()-3 && te.substr(j,3) != "(t)" && te.substr(j,1) != "$") j++;
+					if(j <= te.length()-3 && te.substr(j,3) == "(t)"){
+						if(!in_integral(i,int_range)) time_dep = true;		
+					}
+				
+					auto ist = i;
+					while(i < te.length() && te.substr(i,1) != "_" && te.substr(i,1) != "$") i++;
+					if(i < te.length()){
+						if(te.substr(i,1) == "_"){
+							type = "param";
+							i++;
+						}
+						else{
+							if(te.substr(ist+1,i-ist-1) == "t"){
+								if(!in_integral(i,int_range)) time_dep = true;		
+							}								
+						}
+					}
+				}
+			}
+			
+			if(type != ""){
+				auto end = "$}[<(;"; if(type == "sum") end = ",";
+				
+				auto ist = i;
+				auto di = get_dep_info(te,i,end);
+
+				if(di.warn != ""){
+					warn = "An error occured: ";
+					if(type == "pop"){
+						warn = "Population '{"+te.substr(ist,di.iend-ist)+"}' has an error: ";
+					}
+					if(type == "param"){
+						warn = "Parameter '"+te.substr(istore+1,i-istore-2)+"' has a misspecified dependency: ";
+					}
+					if(type == "sum"){
+						warn = "Sum '"+te.substr(istore+1,i-istore-2)+"' has a misspecified dependency: ";
+					}
+					warn += di.warn;
+					return dep;
+				}
+		
+				for(auto k = 0u; k < di.spl.size(); k++){
+					auto de = di.spl[k];
+					
+					if(type == "pop"){ // Checks to see if compartment
+						auto spl = split(de,'|');
+						if(spl.size() > 1) de = "";
+						else{
+							for(const auto &sp : species){
+								for(const auto &claa : sp.cla){ 	
+									if(claa.hash_comp.find(de) != UNSET) de = "";
+								}
+							}
+						}
+					}
+					
+					if(de != ""){
+						auto k = 0u; 
+						while(k < sum_range.size() && !(i > sum_range[k].i_start && i < sum_range[k].i_end && sum_range[k].index == de)) k++;
+						
+						if(k == sum_range.size()) dep.push_back(de);
+					}
+				}
+				i = di.iend;
+			}
+		}
+	}
+
+	if(time_dep) dep.push_back("t");
+
+	if(false){
+		cout << endl;
+		cout << te << " Equation" << endl;
+		for(auto de : dep) cout << "," << de;
+		cout << endl;
+		emsg("do");
+	}
+		
+	return dep;
+}
+

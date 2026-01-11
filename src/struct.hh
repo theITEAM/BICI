@@ -306,7 +306,6 @@ struct EquationInfo {              // Stores information about an equation (prio
 	string te_raw;                   // The rate text value (as seen in the input file)
 	string te;                       // The text value after processing
 	unsigned int p, cl;              // The species and classification for equation (if appropriate)
-	//unsigned int c;                  // The global compartment (used for sum max function)
 	EqnType type;                    // The type of the equation
 	bool infection_trans;            // Set if infection transition (used to calculate transtree likelihood)
 	double value;                    // The numerical value (if appropriate)
@@ -373,6 +372,12 @@ struct IEGroupSampler {            // Stores a sample for an individual effect g
 	vector < vector <double> > A_inv;// The inverse relationship matrix
 	vector <double> A_inv_diag;      // The diagonal elements of Ainv
 	vector < vector <NZElement> > A_inv_nonzero;// The non-zero  elements
+};
+
+struct SumRange {
+	unsigned int i_start;
+	unsigned int i_end;
+	string index;
 };
 
 struct Dependency {                // A dependency in the model
@@ -635,8 +640,7 @@ struct Param {                     // Stores a model parameter
 	
 	vector <double> weight;          // Different weights given to categories for factor
 
-	//vector <double> cons;            // Stores constant values
-	string reparam_eqn;              // Used to store reparameterisation eqn
+	EquationInfo reparam_eqn;        // Used to store reparameterisation eqn
 	
 	unsigned int line_num;           // The line num in input file when parameter is defined
 	bool factor;                     // Set if parameter is a param_mult
@@ -1208,11 +1212,22 @@ struct ParamTag {                  // Used to check tags on parameters specified
 
 struct Derive {                    // Stores derived parameters
 	string name;                     // The name of the derived quantity
-	string full_name;                // Full name including dependency        
+	string full_name;                // Full name including dependency   
+	EquationInfo eq_raw;             // Stores equation before substitutions       
 	bool time_dep;                   // Time dependency
 	vector <Dependency> dep;         // Dependency for derived quantity (excluding time)
 	vector <EquationInfo> eq;        // The equations for each quantity
 	DerFunc func;                    // Stores information about derived function
+	unsigned int line_num;           // Stores the line number the equation comes from
+};
+
+struct Define {                    // Stores definition
+	string name;                     // The name of the derived quantity
+	EquationInfo value;              // Value for definition
+	string full_name;                // Full name including dependency        
+	bool time_dep;                   // Time dependency
+	vector <Dependency> dep;         // Dependency for derived quantity (excluding time)
+	SwapResult swap_temp;            // Swap result
 	unsigned int line_num;           // Stores the line number the equation comes from
 };
 

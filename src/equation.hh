@@ -129,7 +129,7 @@ class Equation                             // Stores information about an equati
 		
 		Linearise linearise;                   // Used for accelerated likelihood calculation
 		
-		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details);
+		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details, const vector <Define> &define);
 		
 		void print_calculation() const;
 		void print_item(const EqItem &it) const;
@@ -205,7 +205,8 @@ class Equation                             // Stores information about an equati
 		void time_integral(vector <EqItem> &op);
 		void replace_minus(vector <EqItem> &op);
 		unsigned int add_param_ref(const ParamRef &pref);
-				
+		void substitute_define(const vector <Define> &define);
+					
 		const vector <SpeciesSimp> &species;       // References the species from the model
 		unsigned int nspecies;
 		vector <Param> &param;               // References the parameters from the model

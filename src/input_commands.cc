@@ -1156,6 +1156,56 @@ void Input::box_command()
 }
 
 
+/// Sets any defined equations
+void Input::define_command()
+{
+	auto full_name = get_tag_value("name"); if(full_name == ""){ cannot_find_tag(); return;}
+	auto value = get_tag_value("value"); if(value == ""){ cannot_find_tag(); return;}
+	
+	auto pp = get_param_prop(full_name);
+	
+	Define def;
+	def.name = pp.name;
+
+	def.line_num = line_num;
+	def.full_name = full_name;
+	def.time_dep = pp.time_dep;
+	
+	auto mult = get_dependency(def.dep,pp,vector <string> (),vector <string> ()); 
+	if(mult == UNSET) return; 
+	
+	auto def_eqn_raw = he(add_equation_info(value,DEFINE_EQN));
+	def.value = def_eqn_raw;
+	
+	string warn = "";
+	auto eq_dep = model.equation_dep(def_eqn_raw.te,warn);
+	if(warn != ""){ alert_import(warn,true); return;}
+	
+	auto res = dep_agree(full_name,def.dep,eq_dep);
+	if(res != ""){ alert_import(res,true); return;}
+		
+	const auto &depend = def.dep;
+		
+	vector <DepConv> dep_conv;
+	for(auto d = 0u; d < depend.size(); d++){
+		const auto &dep = depend[d];
+		DepConv dc; 
+		dc.before = dep.index_with_prime;
+		dep_conv.push_back(dc);
+	}
+	
+	auto swap_temp = swap_template(def_eqn_raw.te,dep_conv);
+	if(swap_temp.warn != ""){ 
+		alert_import(swap_temp.warn); 
+		return;
+	}
+	
+	def.swap_temp = swap_temp;
+	
+	model.define.push_back(def);
+}
+
+	
 /// Sets the value for a parameter in the model
 void Input::param_command()
 {
@@ -1319,22 +1369,8 @@ void Input::param_command()
 	par.trace_output = true;
 	if(cons != "" || mult > model.details.param_output_max) par.trace_output = false;
 
-	if(par.name == dist_matrix_name){
-		alert_import("The distance matrix '"+par.full_name+"' must not be set");
-	}
-	
-	if(par.name == iden_matrix_name || par.name == iden_matrix_name2){
-		alert_import("The identity matrix '"+par.full_name+"' must not be set");
-	}
-	
-	auto name = par.name;
-	if(name == RN_name || name == RNE_name || name == RNC_name){
-		alert_import("The reproduction function '"+name+"' must not be set");
-	}
-	
-	if(name == GT_name || name == GTE_name || name == GTC_name){
-		alert_import("The generation time '"+name+"' must not be set");
-	}
+	auto warn = check_reserved_name(par.name);	
+	if(warn != "") alert_import(warn);
 	
 	auto pre = "Parameter '"+par.full_name+"': ";
 	
@@ -1353,7 +1389,8 @@ void Input::param_command()
 		
 		if(reparam != ""){
 			par.variety = REPARAM_PARAM;
-			par.reparam_eqn = reparam;
+			auto eqn = he(add_equation_info(reparam,REPARAM_EQN));
+			par.reparam_eqn = eqn;
 		}
 		
 		if(cons != ""){
@@ -1389,7 +1426,9 @@ void Input::param_command()
 			}
 			
 			if(reparam != "" && is_file(valu) == false){
-				par.reparam_eqn = reparam;
+				auto eqn = he(add_equation_info(reparam,REPARAM_EQN));
+
+				par.reparam_eqn = eqn;
 			}
 			else{
 				if(is_file(valu) == false){
@@ -1412,6 +1451,15 @@ void Input::param_command()
 				}
 			}
 		}
+	}
+
+	if(par.reparam_eqn.te != ""){
+		string warn = "";
+		auto eq_dep = model.equation_dep(par.reparam_eqn.te,warn);
+		if(warn != ""){ alert_import(warn,true); return;}
+			
+		auto res = dep_agree(full_name,par.dep,eq_dep);
+		if(res != ""){ alert_import(res,true); return;}
 	}
 
 	if(prior != ""){
@@ -1570,10 +1618,11 @@ void Input::derived_command()
 	auto eqn_name = get_tag_value("eqn"); if(eqn_name == ""){ cannot_find_tag(); return;}
 	
 	auto pp = get_param_prop(full_name);
+	auto dep_eqn = pp.dep_with_prime;
 	if(pp.time_dep == true) pp.dep.pop_back();
 	
-	if(pp.name == "D") alert_import("Name 'D' is reserved for the distance matrix");
-	if(pp.name == "t") alert_import("Name 't' is reserved for time");
+	auto warn = check_reserved_name(pp.name);
+	if(warn != "") alert_import(warn);
 	
 	Derive der;
 	der.name = pp.name;
@@ -1603,6 +1652,15 @@ void Input::derived_command()
 		
 		auto der_eqn_raw = he(add_equation_info(eqn_name,DERIVE_EQN));
 		
+		der.eq_raw = der_eqn_raw;
+		
+		string warn = "";
+		auto eq_dep = model.equation_dep(der_eqn_raw.te,warn);
+		if(warn != ""){ alert_import(warn,true); return;}
+			
+		auto res = dep_agree(full_name,dep_eqn,eq_dep);
+		if(res != ""){ alert_import(res,true); return;}
+						
 		vector <DepConv> dep_conv;
 		for(auto d = 0u; d < depend.size(); d++){
 			const auto &dep = depend[d];
@@ -1624,7 +1682,7 @@ void Input::derived_command()
 			}
 			
 			auto der_eqn = der_eqn_raw;
-			
+	
 			der_eqn.te = swap_index_temp(dep_conv,swap_temp);
 			
 			if(check_swap){

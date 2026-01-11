@@ -1207,3 +1207,17 @@ function most_freq(list)
 	return val_store_max;
 }
 
+
+/// Checks that the parameter name is not a reserved name
+function check_reserved_name(name,op)
+{
+	let spl = name.split('^');
+	for(let i = 0; i < reserved_param.length; i++){
+		if(name == reserved_param[i].name && !(op == "par_allow" && reserved_param[i].par_allow == true)){
+			return "Name '"+name+"' is reserved for "+reserved_param[i].desc;
+		}
+	}
+	
+	return "";
+}
+

@@ -59,7 +59,9 @@ class Model                                // Stores information about the model
 		vector <double> timepoint;             // Discrete timepoints	
 		
 		vector <Derive> derive;                // Derived quantities
-		  
+
+		vector <Define> define;                // Used to to definitions
+		
 		vector <Density> density;              // Used for the DEN and RDEN functions 
 	
 		vector <Equation> eqn;                 // Stores all the equations for the species
@@ -165,6 +167,9 @@ class Model                                // Stores information about the model
 		void set_param_spec_precalc();
 		void set_pop_reparam_th();
 		string load_prop_info(unsigned int ch, const vector <string> &lines);
+		unsigned int get_end_bracket(string &te, unsigned int i);
+		bool in_integral(unsigned int i, const vector <SumRange> &int_range) const;
+		vector <string> equation_dep(string te, string &warn);
 		
 	private:
 		Hash hash_all_ind;                     // Stores individuals in a hash table

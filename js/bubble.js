@@ -748,10 +748,11 @@ function add_bubble_buts(lay)
 			case "SetConstant": set_constant_bubble(cont); break;
 			case "SetFactor": set_factor_bubble(cont); break;
 			case "SetReparam": set_reparam_bubble(cont); break;
+			case "SetDefine": set_define_bubble(cont); break;
 			case "SetDistribution": set_distribution_bubble(cont); break;
 			case "SetDerived": set_derived_bubble(cont); break;
 			case "AddParamMult": add_param_mult_bubble(cont); break;
-			default: error("Cannot find source2"); break;
+			default: error("Cannot find source2: "+bu.ac); break;
 			}
 		}
 		break;
@@ -876,21 +877,28 @@ function add_bubble_buts(lay)
 	
 	case "ReparamElement":
 		cont.dx = 15;
-		bubble_addtitle(cont,"Edit equation",{te:editeqnparam_text});	
+		bubble_addtitle(cont,"Edit equation",{te:editreparam_eqn_text});	
 		bubble_input(cont,"Equation:",{type:"reparam_eqn", eqn:true});
 		add_end_button(cont,"Done","DoneReparamEquation");	
 		break;
 		
+	case "DefineElement":
+		cont.dx = 15;
+		bubble_addtitle(cont,"Edit equation",{te:editdefine_eqn_text});	
+		bubble_input(cont,"Equation:",{type:"define_eqn", eqn:true});
+		add_end_button(cont,"Done","DoneDefineEquation");	
+		break;
+		
 	case "ReparamEqn":
 		cont.dx = 15;
-		bubble_addtitle(cont,"Edit equation",{te:editeqnparam_text});	
+		bubble_addtitle(cont,"Edit equation",{te:editreparam_eqn_text});	
 		bubble_input(cont,"Equation:",{type:"reparam_equation", eqn:true});
 		add_end_button(cont,"Done","DoneReparamEquation");	
 		break;
 		
 	case "ReparamTableElement":
 		cont.dx = 15;
-		bubble_addtitle(cont,"Edit equation",{te:editeqnparam_text});	
+		bubble_addtitle(cont,"Edit equation",{te:editreparam_eqn_text});	
 		bubble_input(cont,"Equation:",{type:"element_eqn", eqn:true, pindex:bu.pindex});
 		add_end_button(cont,"Done","Done");	
 		break;
@@ -2126,7 +2134,7 @@ function setup_bubble_back(cont)
 	
 	let back_bu = back_lay.but[0];
 
-	back_bu.tag = {x0:pa.x-xref, y0:pa.y-yref, x1:pb.x-xref, y1:pb.y-yref, x2:pc.x-xref, y2:pc.y-yref};
+	back_bu.tag = { x0:pa.x-xref, y0:pa.y-yref, x1:pb.x-xref, y1:pb.y-yref, x2:pc.x-xref, y2:pc.y-yref};
 	
 	back_bu.x = lay.x - marx - xref;
 	back_bu.y = lay.y - mary - yref;
@@ -2269,6 +2277,29 @@ function select_reparam_element(par_name,index)
 
 	let j = 0;
 	while(j < bu.length && !(bu[j].ac	== "EditReparamValue" && bu[j].i == i)) j++;
+	if(j == bu.length){ error("Problem selecting5"); return;}
+	
+	activate_button(lay,j); 
+	
+	if(index != undefined) select_param_element(index);
+}
+
+
+/// Selects a 
+function select_define_element(par_name,index)
+{
+	goto_param_page();
+	
+	let lay_name = "ModelParamContent";
+	let lay = get_lay(lay_name);
+	
+	let bu = lay.but;
+
+	let i = find(model.param,"name",par_name);
+	if(i == undefined){ error("Problem selecting6"); return;}
+
+	let j = 0;
+	while(j < bu.length && !(bu[j].ac	== "EditDefineValue" && bu[j].i == i)) j++;
 	if(j == bu.length){ error("Problem selecting5"); return;}
 	
 	activate_button(lay,j); 

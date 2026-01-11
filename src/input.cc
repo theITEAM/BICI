@@ -120,7 +120,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 				
 			case 2:   // In the first pass create species, classifications and compartments
 				switch(cname){
-				case SPECIES: case CLASS: case COMP: case COMP_ALL: case IND_EFFECT: break;
+				case SPECIES: case CLASS: case COMP: case COMP_ALL: case IND_EFFECT: 
+				case DEFINE: break;
 				default: process = false; break;
 				}
 				break;
@@ -164,7 +165,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 				switch(cname){
 				case DATA_DIR: 
 				case SIMULATION: case INFERENCE: case POST_SIM:
-				case PARAM: case DERIVED: 
+				case PARAM: case DERIVED: case DEFINE:
 				case ADD_POP: case ADD_POP_SIM: case ADD_POP_POST_SIM:
 				case REMOVE_POP: case REMOVE_POP_SIM:  case REMOVE_POP_POST_SIM:
 				case ADD_IND: case ADD_IND_SIM: case ADD_IND_POST_SIM: 
@@ -234,9 +235,13 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 				break;
 			}
 			break;
-		case 2: check_comp_structure(); break; 		
+		case 2: 
+			check_comp_structure(); 
+			break; 		
 		}
 	}
+	
+	check_param_define_all();
 	
 	print_diag("start");
 	
@@ -791,6 +796,7 @@ CommandLine Input::get_command_tags(string trr, unsigned int line_num)
 	if(type == "label") com = LABEL;
 	if(type == "box") com = BOX;
 	if(type == "parameter" || type == "param") com = PARAM;
+	if(type == "define") com = DEFINE;
 	if(type == "derived" || type == "der") com = DERIVED;
 	if(type == "init-pop-inf") com = INIT_POP;
 	if(type == "add-pop-inf") com = ADD_POP;
@@ -1164,6 +1170,7 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 	case LABEL: label_command(); break;
 	case BOX: box_command(); break;
 	case PARAM: param_command(); break;
+	case DEFINE: define_command(); break;
 	case DERIVED: derived_command(); break;
 	case SIMULATION: if(!simulation_command()) terminate = true; break;
 	case INFERENCE: if(!inference_command()) terminate = true; break;

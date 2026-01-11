@@ -12,7 +12,7 @@ let ver="windows";         // Determines platform
 
 let mac_temp_dir = "/tmp/BICI_files/";
 
-let win_linux = false;//true;                            // When working on win running linux 
+let win_linux = false;                            // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
@@ -57,6 +57,7 @@ const command_list = [
 {na:"label",ti:0},
 {na:"box",ti:0},
 {na:"parameter",ti:1},
+{na:"define",ti:0},
 {na:"param",ti:1},
 {na:"derived",ti:0},
 {na:"der",ti:0},
@@ -136,6 +137,7 @@ const eqn_types = [
 {name:"trans_cv", mode:"all"},
 {name:"reparam", mode:"param only"},
 {name:"reparam_eqn", mode:"all"},
+{name:"define_eqn", mode:"all"},
 {name:"dist", mode:"param only"},
 {name:"derive_param", mode:"derive_param"},
 {name:"derive_eqn", mode:"derive"},
@@ -461,11 +463,13 @@ const select_drop_str = "Select";                  // String prompt to set dropd
 const unset_type = "unset_type";                   // Denotes unset type
 const no_elements = "No elements";                 // Message if no elements in array
 const data_invalid = "Data source is invalid";     // Invalid data source message
+
 const dist_matrix_name = "D";                      // The name of a distance matrix
 const iden_matrix_name = "δ";                      // The name of identity matrix
 const iden_matrix_name2 = "\\delta";               // The name of identity matrix
 const density_name = "DEN";                        // The name of density vector
 const rdensity_name = "RDEN";                      // The name of the relative density vector
+
 const density_kernel_max = 4;                      // Sets the maximum radius when calculating density
 const RN_name = "RN";                              // The basic reproduction number function
 const RNE_name = "RNE";                            // The effective reproduction number function
@@ -474,6 +478,20 @@ const GT_name = "GT";                              // The basic generation time
 const GTE_name = "GTE";                            // The effective generation time function
 const GTC_name = "GTC";                            // The computational generation time function
 
+
+const reserved_param = [{name:"t", desc:"time", par_allow:false},
+												{name:dist_matrix_name, desc:"the distance matrix", par_allow:true},
+												{name:iden_matrix_name, desc:"the identity matrix", par_allow:true},
+												{name:iden_matrix_name2, desc:"the identity matrix", par_allow:true},
+												{name:density_name, desc:"the density vector", par_allow:true},
+												{name:rdensity_name, desc:"the relative density vector", par_allow:true},
+												{name:RN_name, desc:"the reproduction number", par_allow:false},
+												{name:RNE_name, desc:"the reproduction number", par_allow:false},
+												{name:RNC_name, desc:"the reproduction number", par_allow:false},
+												{name:GT_name, desc:"the generation time", par_allow:false},
+												{name:GTE_name, desc:"the generation time", par_allow:false},
+												{name:GTC_name, desc:"the generation time", par_allow:false}
+												];
 // List of colours used for compartments
 const collist = [LGREEN,LRED,LBLUE,LPURPLE,LORANGE,LYELLOW,LBROWN,LGREY,GREEN,RED,BLUE,PURPLE,ORANGE,YELLOW,BROWN,GREY,DGREEN,DRED,DBLUE,DPURPLE,DORANGE,DYELLOW,DBROWN,DGREY,DDGREEN,DDRED,DDBLUE,DDPURPLE,DDORANGE,DDYELLOW,DDBROWN,BLACK];
 

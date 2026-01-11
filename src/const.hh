@@ -73,7 +73,7 @@ enum Algorithm { GILLESPIE, TAU, DA_MCMC, PAS_MCMC, MFA_ALG, ABC_ALG, ABC_SMC_AL
 enum FeatureType { POLYGON, MULTI_POLYGON, NO_FEATURE };
 
 // Different types of equation
-enum EqnType { SE, SP, COMP_PROB, TRANS_PROB, BP, SOURCE_RATE, SOURCE_MEAN, TRANS_RATE, TRANS_MEAN, TRANS_NM_RATE, TRANS_NM_MEAN, TRANS_SHAPE, TRANS_SCALE, TRANS_CV, REPARAM, REPARAM_EQN, DIST, DERIVE_PARAM, DERIVE_EQN,SEQ_VAR,CONST_EQN, MUT_RATE };
+enum EqnType { SE, SP, COMP_PROB, TRANS_PROB, BP, SOURCE_RATE, SOURCE_MEAN, TRANS_RATE, TRANS_MEAN, TRANS_NM_RATE, TRANS_NM_MEAN, TRANS_SHAPE, TRANS_SCALE, TRANS_CV, REPARAM, REPARAM_EQN, DIST, DERIVE_PARAM, DERIVE_EQN, DEFINE_EQN, SEQ_VAR, CONST_EQN, MUT_RATE };
 
 // Differetn restrictions placeed on equarions
 enum EqnMode { PARAM_ONLY, PARAM_WITH_DEP, ALL, DERIVE_PARAM_MODE, DERIVE_MODE };
@@ -106,7 +106,7 @@ enum Operation { SIM, INF, PPC, EXT, MODE_UNSET };
 enum PriorPos { INVERSE_PR, UNIFORM_PR, POWER_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, DIRICHLET_PR, MDIR_PR, MVN_JEF_PR, MVN_UNIFORM_PR, MVN_COR_PR, UNSET_PR };
  
 // Different possible command types
-enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, PROPOSAL_INFO, INF_PARAM_STATS, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, SIM_WARNING, INF_WARNING, PPC_WARNING,
+enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, DEFINE, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, PROPOSAL_INFO, INF_PARAM_STATS, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, SIM_WARNING, INF_WARNING, PPC_WARNING,
 
 // These are not commands but varient used when loading data
 TRANS_TIMERANGE_DATA,
@@ -476,6 +476,8 @@ const string iden_matrix_name = "δ";              // The name of identity matri
 const string iden_matrix_name2 = "\\delta";       // The name of identity matrix
 const string density_name = "DEN";                // The name of density vector
 const string rdensity_name = "RDEN";              // The name of the relative density vector
+
+												
 const auto density_kernel_max = 4u;               // Sets the maximum radius when calculating density
 const string RN_name = "RN";                      // The name of rep. number function
 const string RNE_name = "RNE";                    // The effective rep number function
@@ -484,6 +486,20 @@ const string GT_name = "GT";                      // The basic generation time
 const string GTE_name = "GTE";                    // The effective generation time function
 const string GTC_name = "GTC";                    // The computational generation time function
 const string ALG_WARN = "ALGORITHM WARNINGS";
+
+const vector < vector <string> > reserved_param = {{"t","time"},
+												{dist_matrix_name,"the distance matrix"},
+												{iden_matrix_name,"the identity matrix"},
+												{iden_matrix_name2,"the identity matrix"},
+												{density_name,"the density vector"},
+												{rdensity_name,"the relative density vector"},
+												{RN_name,"the reproduction number"},
+												{RNE_name,"the reproduction number"},
+												{RNC_name,"the reproduction number"},
+												{GT_name,"the generation time"},
+												{GTE_name,"the generation time"},
+												{GTC_name,"the generation time"}
+};
 
 // Checking for Σ and ∫ is done differently in c++ because it uses two characters
 const string sigma = "Σ";  
@@ -535,5 +551,6 @@ EqnInfo(TRANS_CV,ALL,false),
 EqnInfo(REPARAM,PARAM_ONLY,false),
 EqnInfo(DIST,PARAM_ONLY,false),
 EqnInfo(DERIVE_EQN,DERIVE_MODE,false),
+EqnInfo(DEFINE_EQN,ALL,false),
 EqnInfo(REPARAM_EQN,ALL,false)
 };

@@ -1982,7 +1982,7 @@ bool Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 	auto ch_flag = false;
 	
 	const auto &depend = par.dep;
-	auto te = par.reparam_eqn;
+	const auto &eqn_raw = par.reparam_eqn;
 	//par.reparam_eqn = "";
 	
 	if(par.time_dep){
@@ -1991,7 +1991,7 @@ bool Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 		}			
 	}
 	
-	auto eqn_raw = he(add_equation_info(te,REPARAM_EQN),par.line_num);
+	//auto eqn_raw = he(add_equation_info(te,REPARAM_EQN),par.line_num);
 		
 	vector <DepConv> dep_conv;
 	for(auto d = 0u; d < depend.size(); d++){
@@ -2010,7 +2010,7 @@ bool Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 	for(auto i = 0u; i < par.N; i++){
 		const auto &er = par.element_ref[i];
 		auto ind = er.index;
-		if(er.cons) emsg("SHould not be constant");
+		if(er.cons) emsg("Should not be constant");
 		if(ind != UNSET){
 			auto &ele = par.element[ind];
 			if(ele.value.te == ""){		// Adds a new element
@@ -2044,8 +2044,8 @@ bool Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 				
 				const auto &eqq = model.eqn[eqn.eq_ref];
 				if(eqq.time_vari == true){
-					if(par.spline_info.type != SQUARE_SPL){
-						alert_line("A square spline must be used for time-varying reparameterised expression '"+eqq.te_raw+"'.",par.line_num);	
+					if(!par.time_dep){
+						alert_line("Parameter "+par.full_name+" must be time dependent.",par.line_num);	
 					}
 				}
 

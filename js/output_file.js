@@ -721,7 +721,13 @@ function create_output_param(save_type,file_list,one_file)
 	let te = banner("PARAMETERS");
 	
 	for(let th = 0; th < model.param.length; th++){
-		te += output_param(model.param[th],save_type,file_list,one_file);
+		let par = model.param[th];
+		if(par.variety == "define") te += output_define(par)
+	}
+	
+	for(let th = 0; th < model.param.length; th++){
+		let par = model.param[th];
+		if(par.variety != "define") te += output_param(model.param[th],save_type,file_list,one_file);
 	}
 	
 	te += endl;
@@ -730,13 +736,24 @@ function create_output_param(save_type,file_list,one_file)
 }
 
 
+/// Outputs any parameter definitions
+function output_define(par)
+{
+	if(par.variety != "define") error("Equation should be define");
+	
+	let te = 'define name="'+remove_eq_quote(par.full_name)+'" value="'+par.define_eqn.trim()+'"'+endl+endl;
+	
+	return te;
+}
+		
+		
 /// Outputs a single parameter
 function output_param(par,save_type,file_list,one_file)
 {
 	let te = "";
 	let dist_done = false;
-	
-	if(par.type != "derive_param"){	 
+
+	if(par.type != "derive_param"){		
 		let num_warn = model.warn.length;
 	
 		let te1 = "param";
@@ -762,7 +779,7 @@ function output_param(par,save_type,file_list,one_file)
 		}
 		else{
 			// Constants and simulation parameters
-			if(par.variety == "reparam" && par.reparam_eqn_on){
+			if(par.variety == "reparam" && par.reparam_eqn_on){	
 				if(par.reparam_eqn.trim() != ""){
 					te1 += ' reparam="'+par.reparam_eqn+'"';
 				}

@@ -804,7 +804,7 @@ function check_parameter(te,icur,eqn)
 			if(tee2.length < tee.length) icur2++; 
 
 			dep = tee2.split(",");
-		
+	
 			for(let i = 0; i < dep.length; i++){
 				let na = dep[i];
 				let index = remove_prime(na);
@@ -812,7 +812,7 @@ function check_parameter(te,icur,eqn)
 				let is_comp = false;
 				dep_used[i] = true;
 				
-				if(eqn.type != "derive_eqn" && eqn.type != "derive_param" && eqn.type != "reparam_eqn" && eqn.type != "test"){
+				if(eqn.type != "derive_eqn" && eqn.type != "derive_param" && eqn.type != "reparam_eqn" && eqn.type != "define_eqn" && eqn.type != "test"){
 					if(sp == undefined) error("Should be defined");
 					let cl2; cl2 = find(sp.cla,"index",index);	
 					if(cl2 == undefined){

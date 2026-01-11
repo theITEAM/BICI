@@ -160,6 +160,7 @@ class Input                                // Stores information about the model
 		void box_command();
 		void param_command();
 		void derived_command();
+		void define_command();
 		bool simulation_command();
 		bool inference_command();
 		bool post_sim_command();
@@ -333,5 +334,11 @@ class Input                                // Stores information about the model
 		void check_derived_order();
 		void check_eqn_fixed_time();
 		string print_row_col(const Table &tab) const;
+		string dep_agree(string name, const vector <Dependency> &dep1, const vector <string> &dep2) const;
+		string dep_agree(string name, const vector <string> &dep1, const vector <string> &dep2) const;
+		bool check_dep_without_prime_error(const vector <Dependency> &dep1, const vector <string> &dep2) const;
+		void check_param_define_all();
+		void check_param_define(const EquationInfo &ei);
+		string check_reserved_name(string name) const;
 };
 

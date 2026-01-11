@@ -31,7 +31,7 @@ using namespace std;
     
 		
 /// Initialises the equation 
-Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details) : species(species), param(param), prior(prior), derive(derive), spline(spline), param_vec(param_vec), density(density), pop(pop), hash_pop(hash_pop), constant(constant), timepoint(timepoint), details(details)
+Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details, const vector <Define> &define) : species(species), param(param), prior(prior), derive(derive), spline(spline), param_vec(param_vec), density(density), pop(pop), hash_pop(hash_pop), constant(constant), timepoint(timepoint), details(details)
 {
 	plfl = false;  // Set to true to print operations to terminal (used for diagnostics)
 
@@ -53,6 +53,10 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool
 	te_raw = te;
 	te_raw = replace(te_raw,"%","");
 	te_raw = replace(te_raw,"$","");
+	
+	if(warn != "") return;
+
+	substitute_define(define);
 	
 	if(warn != "") return;
 
@@ -108,6 +112,8 @@ Equation::Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool
 	if(ind_eff_mult.size() > 0 || fix_eff_mult.size() > 0) ind_eff = true;
 	
 	if(plfl) print_calculation();
+	
+	//calculate_pop_ref();   
 	
 	set_time_vari();
 	
@@ -854,9 +860,6 @@ ParamRef Equation::get_param_name(unsigned int i, double &dist, unsigned int &ra
 			
 				for(auto de = 0u; de < par.dep.size(); de++){
 					if(!(par.time_dep == true && de == par.dep.size()-1)){
-						//const auto &hash_list = par.dep[de].hash_list;
-						//auto vec = hash_list.get_vec_string(remove_prime(pp.dep[de]));
-						//auto j = hash_list.existing(vec);
 						auto j = par.dep[de].hash_list.find(remove_prime(pp.dep[de]));
 						if(j == UNSET){
 							warn = "'"+content+"' does not agree with the definition '"+par.full_name+"'.";
@@ -2845,14 +2848,20 @@ bool Equation::is_one() const
 void Equation::set_time_vari()
 {
 	time_vari = false;
-	if(pop_ref.size() > 0) time_vari = true;
+	//if(pop_ref.size() > 0) time_vari = true;
 	for(const auto &pr : param_ref){
 		if(param[pr.th].time_dep == true) time_vari = true;
 	}
 	
   for(const auto &ca : calcu){
 		for(const auto &it : ca.item){
-			if(it.type == TIME) time_vari = true;
+			switch(it.type){
+			case SPLINE: case SPLINEREF: case CONSTSPLINEREF: case POPNUM: case POPTIMENUM:
+			case TIME:
+				time_vari = true;
+				break;
+			default: break;
+			}
 		}
 	}
 }
@@ -3593,3 +3602,49 @@ double Equation::get_calc_hash_num(const vector <Calculation> &calc) const
 	
 	return val;
 }
+
+
+/// Substitutes in any definitions
+void Equation::substitute_define(const vector <Define> &define)
+{
+	if(define.size() == 0) return;
+	
+	auto i = 0u;
+	
+	while(i < te.size()){
+		while(i < te.size() && te.substr(i,1) != "%") i++;
+		if(i < te.size()){
+			auto ist = i;
+			while(i < te.length() && te.substr(i,1) != "$") i++;
+			if(i < te.length()){
+				auto content = trim(te.substr(ist+1,i-ist-1));
+				auto pp = get_param_prop(content);
+				
+				auto k = 0u; while(k < define.size() && define[k].name != pp.name) k++;
+				
+				if(k < define.size()){
+					const auto &def = define[k];
+					
+					if(pp.dep.size() != def.dep.size()){
+						warn = "The dependency is different between '"+content+"' and '"+def.full_name+"'.";
+						return;
+					}
+					
+					vector <DepConv> dep_conv;
+					for(auto j = 0u; j < def.dep.size(); j++){
+						DepConv dc; 
+						dc.before = def.dep[j].index;
+						dc.after = pp.dep[j];
+						dep_conv.push_back(dc);
+					}
+					
+					auto cont_new = swap_index_temp(dep_conv,def.swap_temp);
+					
+					te = te.substr(0,ist)+"("+cont_new+")"+te.substr(i+1);
+					i = ist;
+				}
+			}
+		}
+	}
+}
+

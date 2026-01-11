@@ -663,6 +663,7 @@ Layer.prototype.plot_button = function (bu,ov)
 	case "ParamSimElement": case "DistSimElement": 
 	case "IEGroupName":
 	case "ReparamElement": case "ReparamTableElement":  
+	case "DefineElement": 
 	case "PriorElement": case "DistElement": case "SplineKnots": 
 	case "SmoothValue": case "Amatrix": case "Xvector": case "AmatrixElement": case "XvectorElement":
 		if(bu.ac == undefined && (bu.type == "ParamElement" || bu.type == "ReparamElement" || bu.type == "ParamElementConst")){

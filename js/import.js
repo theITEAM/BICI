@@ -14,6 +14,7 @@
 	compartment-all / comp-all
 	comp-data
 	data-dir
+	define
 	derived / der
 	description /desc
 	diagnostics-inf
@@ -219,6 +220,7 @@ function import_file2(data_file_list)
 				case "compartment": case "compartment-all": 
 				case "data-dir": 
 				case "ind-effect":
+				case "define":
 					break;
 				default:
 					process = false; 
@@ -239,7 +241,7 @@ function import_file2(data_file_list)
 			case 2: // The last pass does everything except the parameters and compartments
 				switch(cname){
 				case "compartment": case "compartment-all":
-				case "param": case "data-dir": 
+				case "param": case "data-dir":  case "define":
 				case "ind-effect":
 				case "param-sim": case "state-sim":
 				case "param-inf": case "state-inf": 
@@ -464,6 +466,7 @@ function process_command(cname,tags,loop,per_start,per_end)
 	case "label": label_command(); break;
 	case "box": box_command(); break;
 	case "map": map_command(); break;
+	case "define": define_command(per_start,per_end); break;
 	case "param": param_command(per_start,per_end); break;
 	case "param-mult": param_mult_command(per_start,per_end); break;
 	case "derived": derived_command(); break;

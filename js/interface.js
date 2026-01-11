@@ -1600,6 +1600,9 @@ function view_warning(i)
 				select_reparam_element(info.par_name, info.index);
 				break;
 			
+			case "reparam_eqn":
+				break;
+				
 			case "Se": case "Sp":
 				select_bubble_data_spec(info.p,info.i);
 				break;

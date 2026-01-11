@@ -86,6 +86,7 @@ bool includes(string st, string ch);
 DepInfo get_dep_info(const string &te, unsigned int i, const string &not_allowed);
 bool str_eq(const string &te, unsigned int i, const string &te2);
 SwapResult swap_index(string &te, const vector <DepConv> &dep_conv);
+bool in_text(const string &te, unsigned int i, string te2);
 SwapResult swap_template(string te, const vector <DepConv> &dep_conv);
 string swap_index_temp(const vector <DepConv> &dep_conv, const SwapResult &temp);
 ParamProp get_param_prop(string st);

@@ -42,8 +42,9 @@ function create_files(file_list,file,dir,type)
 	for(let i = 0; i < file_list.length; i++){
 		let finfo = file_list[i]
 		if(finfo.type == "bicifile"){
-			if(dir == undefined) write_file_async(finfo.data,file);
-			else write_file_async(finfo.data,dir+"/"+file);
+			write_file_async(finfo.data,file);
+			//if(dir == undefined) write_file_async(finfo.data,file);
+			//else write_file_async(finfo.data,dir+"/"+file);
 		}
 		else{
 			if(dir == undefined) error("dir should be defined");
@@ -624,6 +625,7 @@ function get_param_cat(filt_list,filt_type)
 		!(filt_type == "only normal" && param[i].variety != "normal") &&
 		!(filt_type == "for sim" && param[i].variety == "const") &&
 		!(filt_type == "for sim" && param[i].variety == "reparam") && 
+		!(filt_type == "for sim" && param[i].variety == "define") &&
 		param[i].type != "param factor"
 		){
 			if(param[i].type == "fixed effect"){
@@ -671,7 +673,7 @@ function add_param_value_content(lay)
 				let i = pc.list[cati];
 				let par = param[i];
 			
-				if(par.variety != "const" && par.variety != "reparam"){
+				if(par.variety != "const" && par.variety != "reparam" &&  par.variety != "define"){
 					if(!find_in(sim_param_not_needed,par.type)){
 						let w = wright2;
 					
@@ -801,7 +803,7 @@ function display_factor(i,x,y,lay,w,allow_edit,source)
 }
 
 
-/// Displays a row allowing a variable constant to be set
+/// Displays a row allowing reparameterisation to be set
 function display_reparam(i,x,y,lay,w)
 {
 	let par = model.param[i];
@@ -825,6 +827,26 @@ function display_reparam(i,x,y,lay,w)
 			te += par.value_desc;
 		}
 	}
+	
+	let fo = get_font(1.1,"","times");
+
+	lay.add_button({te:te, x:x+1.6, y:y+0., dx:w-x-1.6, dy:1.6, type:type, font:fo, ac:ac, i:i, name:par.name, label_info:par.label_info});
+}
+
+
+/// Displays a row allowing a variable definitionto be set
+function display_define(i,x,y,lay,w)
+{
+	let par = model.param[i];
+	
+	lay.display_param(x-par.label_info.dx-0.7,y-0.1,par.label_info);
+
+	let si = 1.5;
+	lay.add_button({te:"=", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
+	
+	let ac = "EditDefineValue", type = "DefineElement";
+	let te = par.define_eqn;
+	if(te == "") te = "Unset";
 	
 	let fo = get_font(1.1,"","times");
 

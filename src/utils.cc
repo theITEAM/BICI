@@ -1131,7 +1131,7 @@ SwapResult swap_index(string &te, const vector <DepConv> &dep_conv)
 }
 
 
-/// Determines 
+/// Determines if a string is in text
 bool in_text(const string &te, unsigned int i, string te2)
 {
 	if(i+te2.length() > te.length()) return false;

@@ -30,7 +30,7 @@
 // ./bici-para Geno/farm_f1.0.bici inf > q1&
 // ./bici-para Geno/SI_catbad_m1.bici inf > y1&
 
-//  ./bici-core Execute/init.bici inf
+// ./bici-core Execute/init.bici inf
 
 //valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici sim
 //valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici inf
@@ -380,7 +380,7 @@ vector <BICITag> get_tags(int argc, char** argv, Operation &mode, ExtFactor &ext
 	}
 	
 	if(mode == MODE_UNSET){
-		alert_input("Either 'sim', 'inf' or 'post-sim' must be specified to tell BICI what to do.");
+		alert_input("Either 'sim', 'inf', 'post-sim' or 'ext' must be specified to tell BICI what to do.");
 	}
 	
 	if(file == ""){

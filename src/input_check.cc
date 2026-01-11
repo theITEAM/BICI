@@ -953,3 +953,174 @@ string Input::print_row_col(const Table &tab) const
 	
 	return ss.str();
 }
+
+
+/// Checks if two sets of dependencies are consistent
+string Input::dep_agree(string name, const vector <Dependency> &dep1, const vector <string> &dep2) const
+{
+	for(auto d = 0u; d < dep2.size(); d++){
+		auto de = dep2[d];
+		auto i = 0u; while(i < dep1.size() && dep1[i].index_with_prime != de) i++;
+		
+		if(i == dep1.size()){
+			auto j = 0u; while(j < dep1.size() && dep1[j].index != remove_prime(de)) j++;
+			if(j < dep1.size()){
+				string te = "Problem with primed dependency - The expression depends on index "+de+" and the parameter "+name+" depends on index "+dep1[j].index_with_prime;
+				return te;
+			}
+			else{
+				string te = "Problem with dependency - The expression depends on ";
+				if(de == "t") te += "time";
+				else te += "index "+de;
+				te += ", but this isn't contained in parameter "+name;
+				return te;
+			}
+		}
+	}
+	
+	return "";
+}
+
+
+/// Checks if two sets of dependencies are consistent
+string Input::dep_agree(string name, const vector <string> &dep1, const vector <string> &dep2) const
+{
+	for(auto d = 0u; d < dep2.size(); d++){
+		auto de = dep2[d];
+		auto i = 0u; while(i < dep1.size() && dep1[i] != de) i++;
+		
+		if(i == dep1.size()){
+			auto j = 0u; while(j < dep1.size() && remove_prime(dep1[j]) != remove_prime(de)) j++;
+			if(j < dep1.size()){
+				string te = "Problem with primed dependency - The expression depends on index "+de+" and the parameter "+name+" depends on index "+dep1[j];
+				return te;
+			}
+			else{
+				string te = "Problem with dependency - The expression depends on ";
+				if(de == "t") te += "time";
+				else te += "index "+de;
+				te += ", but this isn't contained in parameter "+name;
+			
+				return te;
+			}
+		}
+	}
+	
+	return "";
+}
+
+
+/// Checks if dependency without prime agrees
+bool Input::check_dep_without_prime_error(const vector <Dependency> &dep1, const vector <string> &dep2) const
+{
+	if(dep1.size() != dep2.size()) return true;
+	for(auto i = 0u; i < dep1.size(); i++){
+		if(dep1[i].index != dep2[i]) return true;
+	}
+	
+	return false;
+}
+
+
+/// Checks that all parameters in definitions exist
+void Input::check_param_define_all()
+{
+	for(const auto &pri : model.prior){
+		for(const auto &dp : pri.dist_param) check_param_define(dp);
+	}
+	
+	for(const auto &sp : model.species){
+		for(const auto &claa : sp.cla){
+			for(const auto &tra : claa.tra){
+				check_param_define(tra.bp);
+				for(auto &dp : tra.dist_param) check_param_define(dp);
+			}
+		}
+	}
+	
+	for(const auto &der : model.derive){
+		if(der.eq_raw.te != "") check_param_define(der.eq_raw);
+	}
+	
+	for(const auto &def : model.define) check_param_define(def.value);
+	
+	for(const auto &par : model.param){
+		if(par.reparam_eqn.te != "") check_param_define(par.reparam_eqn);
+	}
+}
+
+
+/// Checks if expression only uses a parameter or a definition
+void Input::check_param_define(const EquationInfo &ei)
+{
+	auto te = ei.te;	
+	auto line_num = ei.line_num;
+	
+	auto i = 0u;
+	while(i < te.length()){
+		while(i < te.length() && te.substr(i,1) != "%") i++;
+		if(i < te.length()){
+			auto ist = i;
+			while(i < te.length() && te.substr(i,1) != "$") i++;
+			if(i < te.length()){
+				auto cont = te.substr(ist+1,i-ist-1);
+				
+				auto pp = get_param_prop(cont);
+				
+				auto name = pp.name;
+				
+				auto spl = split(name,'^');
+				auto k = 0u; while(k < reserved_param.size() && spl[0] != reserved_param[k][0]) k++;
+				if(k == reserved_param.size()){
+					auto fl = false; 
+					for(auto &par : model.param){
+						if(par.name == name){
+							if(check_dep_without_prime_error(par.dep,pp.dep)){
+								alert_line("The parameter '"+cont+"' doesn't have the same dependency as the parameter definition '"+par.full_name+"'",line_num,true);
+							}
+							fl = true;
+							break;
+						}
+					}
+					
+					
+					for(auto &def : model.define){
+						if(def.name == pp.name){
+							if(check_dep_without_prime_error(def.dep,pp.dep)){
+								alert_line("The value '"+cont+"' doesn't have the same dependency as the definition '"+def.full_name+"'",line_num,true);
+							}
+							fl = true;
+						}
+					}
+					
+					for(auto &der : model.derive){
+						if(der.name == name){
+							if(check_dep_without_prime_error(der.dep,pp.dep)){
+								alert_line("The value '"+cont+"' doesn't have the same dependency as the definition '"+der.full_name+"'",line_num,true);
+							}
+							fl = true;
+						}
+					}
+					
+					if(fl == false){
+						alert_line("The parameter '"+cont+"' is not defined.",line_num,true);
+					}
+				}
+			}
+		}
+	}
+}
+
+/// Checks that the parameter name is not a reserved name
+string Input::check_reserved_name(string name) const 
+{
+	auto spl = split(name,'^');
+	for(auto i = 0u; i < reserved_param.size(); i++){
+		if(spl[0] == reserved_param[i][0]){
+			return "Name '"+name+"' is reserved for "+reserved_param[i][1];
+		}
+	}
+	
+	return "";
+}
+

@@ -1287,6 +1287,40 @@ function param_mult_command(per_start,per_end)
 
 
 /// Sets the value for a parameter in the model
+function define_command(per_start,per_end)
+{
+	let full_name = get_tag_value("name"); if(full_name == "") cannot_find_tag();
+	let value = get_tag_value("value"); if(value == "") cannot_find_tag();
+	
+	let pp = get_param_prop(full_name);
+
+	let par = create_new_param(pp,"normal");
+	
+	par.import_line = imp.line;
+	par_set_default(par);
+	
+	if(par.dep.length > 0){
+		par.list = par_find_list(par);
+	}
+	
+	par.define_eqn = value;
+	par.variety = "define";
+	par.type = "define_parameter";
+	
+	par.full_name = param_name(par);
+
+	get_reparam_param_list(par);
+	
+	get_prior_param_list(par);
+	
+	model.param.push(par);
+	
+	let res = check_reparam(value,model.param.length-1);
+	if(res.err) alert_import(res.msg); 
+}
+
+
+/// Sets the value for a parameter in the model
 function param_command(per_start,per_end)
 {
 	let full_name = get_tag_value("name"); if(full_name == "") cannot_find_tag();
@@ -1417,6 +1451,10 @@ function param_command2(full_name,per_start,per_end,op)
 	
 	let j = 0; while(j < param_tag.length && param_tag[j].val == "") j++;
 	
+	let warn = check_reserved_name(par.name);
+	if(warn != "") alert_import(warn);
+		
+	/*
 	if(par.dist_mat){
 		alert_import("The distance matrix '"+dist_matrix_name+"' cannot be set"); 
 	}
@@ -1429,9 +1467,12 @@ function param_command2(full_name,per_start,per_end,op)
 	if(par.iden_mat){
 		alert_import("The identity matrix '"+iden_matrix_name+"' cannot be set"); 
 	}
+	*/
 	
 	par.reparam_eqn = "";
 	par.reparam_eqn_on = false;
+
+	par.define_eqn = "";
 
 	if(par.dep.length == 0){
 		if(value != ""){
@@ -1589,9 +1630,8 @@ function derived_command()
 		alert_import("'name' must contain a single paramter");
 	}
 	else{
-		let name = eqn1.param[0].name;
-		if(name == "D") alert_import("Name 'D' is reserved for the distance matrix");
-		if(name == "t") alert_import("Name 't' is reserved for time");
+		let warn = check_reserved_name(eqn1.param[0].name);
+		if(warn != "") alert_import(warn);
 	}
 
 	let eqn2 = create_equation(eqn_name,"derive_eqn");

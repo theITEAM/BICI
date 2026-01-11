@@ -1380,6 +1380,13 @@ class Layer
 				eqn = create_equation(st,"reparam"); 
 			}
 			break;		
+		case "define_eqn": 
+			{
+				let val = model.param[inter.bubble.th].define_eqn;
+				let st = ""; if(val != undefined) st = String(val);
+				eqn = create_equation(st,"define_eqn"); 
+			}
+			break;		
 		case "reparam_equation": 
 			{
 				let val = model.param[inter.bubble.th].reparam_eqn;

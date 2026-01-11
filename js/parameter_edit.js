@@ -673,7 +673,12 @@ function check_param_valid(type)
 {
 	for(let i = 0; i < model.param.length; i++){
 		let par = model.param[i];
-		
+			
+		let warn = check_reserved_name(par.name,"par_allow");
+		if(warn != ""){
+			add_warning({mess:"Parameter name error", mess2:warn, warn_type:"reparam", siminf:type, name:par.name});
+		}
+	
 		if(par.variety == "reparam"){
 			if(par.time_dep){
 				if(par.spline.spline_radio.value != "Square"){

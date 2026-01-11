@@ -598,7 +598,7 @@ cout << endl;
 		}
 		
 		//for(auto c = 0u; c < C; c++) cout << iop[c] <<",";
-		//cout << " OP\n";
+		//cout << " OP" << endl;
 	}
 
 	if(false) print_ind_obs_timeline();
@@ -788,7 +788,6 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 						auto stay_op = (1-sum)*iop[cisland];
 						
 						auto total = stay_op+sum_op;
-						//cout << t << " " << sum_op/total << " prob of trans\n";
 						
 						if(ran()*total < sum_op){    // An event happens and is added to timeline
 							pif *= sum_op/total;

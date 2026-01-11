@@ -251,10 +251,12 @@ function check_time_error()
 				return add_knot_warning("The knot start time '"+times[0]+"' cannot be after '"+t_start+"'.",par);
 			}
 			
-			if(spl.spline_radio.value == "Square"){		
+			if(spl.spline_radio.value == "Square"){	
+				/*			
 				if(times[times.length-1] == t_end){
 					return add_knot_warning("For a square spline the last knot time cannot be at the end timepoint.",par);
 				}
+				*/
 			}
 			else{
 				if(pag.name != "Post. Simulation"){

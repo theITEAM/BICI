@@ -210,6 +210,10 @@ function generate_parameter_list()
 			mess = "For reparameterisation of <e>"+get_full_parameter_name(info.par_name)+"</e>";
 			break;
 			
+		case "define_eqn":
+			mess = "For definition of <e>"+get_full_parameter_name(info.par_name)+"</e>";
+			break;
+			
 		case "prior":
 			mess = "For a distribution";
 			break;
@@ -306,8 +310,9 @@ function add_par_to_list(par,list,eqn,mess)
 		let parlist = list[j];
 		
 		if(par.name == parlist.name){
-			if(par.type != "derived" && parlist.type != "derived"){					
-				if(par.type != parlist.type){
+			if(par.type != "derived" && parlist.type != "derived" && 
+				 par.type != "define_eqn" && parlist.type != "define_eqn"){					 
+				if(par.type != parlist.type && par.type != "define_eqn" && parlist.type != "define_eqn"){
 					model.warn.push({mess:"The parameter '"+par.name+"' has contrasting types in different parts of the model", mess2:"This parameter is used "+param_eqn_desc(eqn), eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
 					
 					let eqn2 = parlist.eqn_appear[parlist.eqn_appear.length-1];
@@ -361,6 +366,7 @@ function param_eqn_desc(eqn)
 	case "trans_cv": return "in a transition coefficient of variation";
 	case "comp_prob": case "sim_comp_prob": return "in a compartmental probability";
 	case "reparam": return "in a reparametersation";
+	case "define_eqn": return "in a definition";
 	case "derive_param": return "in a derived parameter";
 	case "derive_eqn": return "in a derived equation";
 	default: error("option not pos:"+eqn.type); break;	
@@ -818,7 +824,18 @@ function update_model_param(par_list)
 	if(model.warn.length > 0) err_warning();
 	
 	let param_old = model.param;
-			
+	
+	// Copies across any definitions
+	for(let th = 0; th < param_old.length; th++){
+		let par = param_old[th];
+		if(par.variety == "define"){
+			let i = 0; while(i < par_list.length && par_list[i].name != par.name) i++;
+			if(i == par_list.length){
+				par_list.push(par);
+			}
+		}
+	}
+	
 	let param=[];
 	for(let i = 0; i < par_list.length; i++){
 		let par = par_list[i];
@@ -861,6 +878,7 @@ function update_model_param(par_list)
 	model.param = param;
 	
 	check_derived_param_all(model.param);
+	check_reparam_all(model.param);
 }
 
 
@@ -884,7 +902,6 @@ function add_dependent_param(param,par_list)
 			if(par.reparam_eqn_on) add_ele_param(par.reparam_eqn,"reparam_eqn",par_list,eqn_info,warn);
 			else{
 				for(let k = 0; k < par.reparam_warn.length; k++) warn.push(par.reparam_warn[k]);
-				
 			}
 		}
 
@@ -893,6 +910,10 @@ function add_dependent_param(param,par_list)
 		if(warn.length > 0){
 			add_warning({mess:"Reparameterisation error", mess2:"The reparameterisation of '"+par.full_name+"': "+warn[0], warn_type:"reparam", name:par.name});
 		}
+		break;
+	
+	case "define":
+		add_ele_param(par.define_eqn,"define_eqn",par_list,eqn_info,warn);
 		break;
 		
 	case "dist":
@@ -909,8 +930,6 @@ function add_dependent_param(param,par_list)
 	}
 	
 	par.full_name = param_name(par);
-	
-	
 }
 
 
@@ -1113,6 +1132,8 @@ function create_new_param(par,variety)
 	par.reparam_eqn_on = false;
 	par.reparam_eqn = "";
 	
+	par.define_eqn = "";
+	
 	par_set_default(par);
 
 	par.full_name = param_name(par);
@@ -1274,6 +1295,7 @@ function copy_param_info(par,old)
 	par.prior_param_list = old.prior_param_list;
 	par.reparam_eqn_on = old.reparam_eqn_on;
 	par.reparam_eqn = old.reparam_eqn;
+	par.define_eqn = old.define_eqn;
 	par.dist_mat = false;
 	par.iden_mat = false;
 	par.den_vec = false;
@@ -1530,7 +1552,9 @@ function check_derived_param(eqn,eqn_param,param)
 				let par_exist = param[k];
 				return err("Parameter '"+par.full_name+"' should have the dependency '"+par_exist.full_name+"' from the model");
 			}
-			else return err("Parameter '"+par.full_name+"' is not found in the model");
+			else{
+				return err("Parameter '"+par.full_name+"' is not found in the model");
+			}
 		}
 	}
 	
@@ -1581,6 +1605,46 @@ function check_derived_param(eqn,eqn_param,param)
 	return success();
 }
 
+
+/// Checks all the derived parameters
+function check_reparam_all(param)
+{
+	for(let th = 0; th < param.length; th++){
+		let par = param[th];
+		if(par.variety == "reparam" && par.reparam_eqn_on){
+			let res = check_reparam(par.reparam_eqn,th);
+			
+			if(res.err == true){
+				model.warn.push({mess:"Error in reparameterised expression", mess2:res.msg, warn_type:"Equation", eqn_info:{i:th}, eqn_type:"reparam_eqn", line:par.import_line});
+			}
+		}
+	}
+}
+
+/// Checks reparameterisation is correct
+function check_reparam(te,th)
+{
+	let eqn = create_equation(te,"reparam_eqn",undefined,undefined);
+		
+	let par = model.param[th];
+		
+	// Makes sure that all dependencies in equation are in the parameter
+	let fl = false;
+	for(let d = 0; d < eqn.dep.length; d++){
+		let de = eqn.dep[d];
+		if(find_in(par.dep,de) == undefined){
+			let te = "Problem with dependency - The expression depends on ";
+			if(de == "t") te += "time";
+			else te += "index "+de;
+			te += ", but this isn't contained in parameter "+par.name;
+			
+			return err(te);
+		}
+	}
+	
+	return success();
+}
+		
 
 /// Returns text with the name of a parameter
 function param_name(par)

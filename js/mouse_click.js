@@ -842,6 +842,16 @@ function button_action(bu,action_type)
 	case "DoneReparamEquation": 
 		if(bubble_check_error() == false){
 			copy_back_to_source();
+			
+			let res = model.check_reparam()
+			if(res.err == false) close_bubble();
+			else output_help(res);
+		}
+		break;
+		
+	case "DoneDefineEquation": 
+		if(bubble_check_error() == false){
+			copy_back_to_source();
 			close_bubble();
 			update_param();
 		}
@@ -1461,7 +1471,7 @@ function button_action(bu,action_type)
 		start_worker("Load PriorSplit",{ep:inter.edit_param, source:edit_source, dist:true});	
 		break;
 		
-	case "SetConstant": case "SetReparam":
+	case "SetConstant": case "SetReparam": case "SetDefine":
 		select_bubble_over();
 		inter.bubble.set_reparam_type = false;
 		break;
@@ -1499,6 +1509,17 @@ function button_action(bu,action_type)
 				par.reparam_eqn_on = false;
 				press_button_prop("ModelParamContent","ReparamElement",["name"],par.name);
 			}
+		}
+		break;
+		
+	case "AddDefineParam":
+		{
+			let par = model.param[bu.i];
+			par.variety = "define";
+			//par.define_eqn = "";
+			
+			press_button_prop("ModelParamContent","DefineElement",["name"],par.name);
+			//}
 		}
 		break;
 		
@@ -1544,6 +1565,10 @@ function button_action(bu,action_type)
 		
 	case "DeleteParamReparam":
 		inter.help = {title: "Delete reparameterisation", te: "Are you sure you want to delete this reparameterisation?", i:bu.i, ok:"DeleteParamDistConfirm"};
+		break;
+		
+	case "DeleteParamDefine":
+		inter.help = {title: "Delete parameter definition", te: "Are you sure you want to delete this definition?", i:bu.i, ok:"DeleteParamDistConfirm"};
 		break;
 		
 	case "DeleteParamDist":
@@ -1683,6 +1708,11 @@ function button_action(bu,action_type)
 		
 	case "EditReparamValue":
 		edit_reparam_value(bu.i,inter.layer[inter.over.layer].name,inter.over.i,bu.source);
+		break;
+		
+	case "EditDefineValue":
+		select_bubble_over();
+		inter.bubble.th = bu.i;
 		break;
 		
 	case "EditAlpha":
@@ -1991,6 +2021,13 @@ function button_action(bu,action_type)
 		{
 			let info = bu.eqn_info;
 			select_reparam_element(info.par_name,info.index);
+		}
+		break;
+		
+	case "SelectDefine":
+		{
+			let info = bu.eqn_info;
+			select_define_element(info.par_name,info.index);
 		}
 		break;
 		
