@@ -95,7 +95,7 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		gen_mut_info.resize(GEN_UPDATE_MAX);
 		break;
 		
-	case PARAM_PROP: case MBP_PROP:    // Parameter proposals
+	case PARAM_PROP: case PARAM_DET_PROP: case MBP_PROP:    // Parameter proposals
 	case IE_VAR_PROP: case IE_COVAR_PROP: case IE_VAR_CV_PROP: 
 		if(type == IE_VAR_PROP){
 			if(vec.size() != 3) emsg("ert");
@@ -123,7 +123,7 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	
 		get_dependency();                       // Gets how other parameter and priors are affect by change
 	
-		calculate_spec_precalc();             // Finds how precalculation is updated 
+		calculate_spec_precalc();               // Finds how precalculation is updated 
 	
 		get_affect_like();                      // Gets how the likelihood is altered under the change
 		break;
@@ -407,9 +407,10 @@ string Proposal::print_info() const
 		ss << "TRANSMISSION TREE LOCAL MUTATION NUMBER SAMPLER";	
 		break;
 		
-	case PARAM_PROP: case MBP_PROP: case IE_VAR_PROP: case IE_COVAR_PROP: case IE_VAR_CV_PROP: 
+	case PARAM_PROP: case PARAM_DET_PROP: case MBP_PROP: case IE_VAR_PROP: case IE_COVAR_PROP: case IE_VAR_CV_PROP: 
 		{
 			if(type == PARAM_PROP) ss << "PARAMETER SAMPLER for ";
+			if(type == PARAM_DET_PROP) ss << "PARAMETER SAMPLER for ";
 			if(type == MBP_PROP) ss << "MBP SAMPLER for ";
 			if(type == IE_VAR_PROP) ss << "IE VAR SAMPLER for ";
 			if(type == IE_COVAR_PROP) ss << "IE COVAR SAMPLER for ";
@@ -686,6 +687,58 @@ void Proposal::MH(State &state)
 }
 
 
+/// Performs a parameter change in a determinisitic model
+void Proposal::param_det(State &state)
+{	
+	/*
+	auto pl = false;
+
+	auto &param_val = state.param_val;
+
+	ntr++; 
+	
+	auto ps_fac = param_resample(param_val,state.popnum_t);
+	if(ps_fac == UNSET){ update_si(REJECT);	return;}
+	
+	if(pl){     
+		cout << endl << endl;
+		for(auto i : param_val.value_ch){
+			const auto &pv = model.param_vec[i];
+			cout << pv.name << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
+		}
+		//for(auto val : param_val.precalc){
+			//cout << val << ",";
+		//}
+		cout << "val" << endl;
+	}
+	
+	auto like_ch = state.update_param(affect_like);
+	
+	auto al = calculate_al(like_ch,ps_fac);
+	
+	if(pl){ 
+		print_like(like_ch);
+	}
+	
+	if(pl) cout << al << "al" << endl;
+	
+	if(ran() < al){ 
+		if(pl) cout << "accept" << endl;
+		nac++;
+		state.accept(like_ch);
+		update_si(ACCEPT);
+	}
+	else{ 
+		if(pl) cout << "reject" << endl;
+		state.restore(affect_like);
+		update_si(REJECT); if(si > 3) si *= 0.75;
+	}
+	
+	if(pl) state.check("mh after");
+	*/
+}
+
+
 /// Performs a MBP proposal update
 void Proposal::mbp(State &state)
 {
@@ -749,7 +802,7 @@ void Proposal::mbp(State &state)
 	default: emsg("op err"); break;
 	}
 	
-	if(ssp.type != POPULATION) emsg("must be population");
+	if(ssp.type != POPULATION && ssp.type != DETERMINISTIC) emsg("must be population");
 	
 	auto trans_num_st = ssp.trans_num;
 	auto tnum_mean_st_st = ssp.tnum_mean_st;
@@ -2840,7 +2893,7 @@ string Proposal::diagnostics(double total_time) const
 		break;
 		
 		
-	case PARAM_PROP:
+	case PARAM_PROP: case PARAM_DET_PROP:
 		{
 			ss << "Parameter proposal: ";
 			for(auto i = 0u; i < param_list.size(); i++){
@@ -3766,6 +3819,7 @@ void Proposal::update(State &state)
 		trans_tree_mut_local(state); 
 		break;
 	case PARAM_PROP: MH(state); break;
+	case PARAM_DET_PROP: param_det(state); break;
 	case PAR_EVENT_FORWARD_PROP: param_event_joint(FORWARD,state); break;
 	case PAR_EVENT_FORWARD_SQ_PROP: param_event_joint(FORWARD_SQ,state); break;
 	case PAR_EVENT_BACKWARD_SQ_PROP: param_event_joint(BACKWARD_SQ,state); break;

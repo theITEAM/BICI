@@ -826,6 +826,7 @@ double Proposal::set_prop_prob()
 		}
 		
 	case PARAM_PROP: return 0.5;
+	case PARAM_DET_PROP: return 0.5;
 
 	case IND_OBS_RESIM_SINGLE_PROP: return 0.5;
 	case IND_OBS_RESIM_PROP: return 0.5;
@@ -847,7 +848,7 @@ double Proposal::set_prop_prob()
 bool Proposal::prop_info_on() const
 {
 	switch(type){
-	case PARAM_PROP:
+	case PARAM_PROP: case PARAM_DET_PROP:
 	case MBP_PROP: case MBPII_PROP: 
 	case MBP_IC_POP_PROP: case MBP_IC_POPTOTAL_PROP: case MBP_IC_RESAMP_PROP:
 	case IND_ADD_REM_PROP: 
@@ -875,7 +876,7 @@ PropInfo Proposal::get_prop_info() const
 	pi.id = get_prop_id();
 	
 	switch(type){
-	case PARAM_PROP: case MBP_PROP: 
+	case PARAM_PROP: case PARAM_DET_PROP: case MBP_PROP: 
 		{
 			pi.value = si;
 		}
@@ -992,7 +993,7 @@ PropInfo Proposal::get_prop_info() const
 void Proposal::set_prop_info(const PropInfo &pi)
 {
 	switch(type){
-	case PARAM_PROP: case MBP_PROP: 
+	case PARAM_PROP: case PARAM_DET_PROP: case MBP_PROP: 
 		{
 			si = pi.value;
 		}
@@ -1113,7 +1114,7 @@ vector <unsigned int> Proposal::get_prop_id() const
 	vector <unsigned int> id;
 	
 	switch(type){
-	case PARAM_PROP: case MBP_PROP: 
+	case PARAM_PROP: case PARAM_DET_PROP: case MBP_PROP: 
 		for(auto th : param_list) id.push_back(th);
 		break;
 

@@ -712,10 +712,16 @@ function update_model_ind_eff(ielist)
 	// Checks that there are no individual effects in population-based models
 	for(let p = 0; p < model.species.length; p++){
 		let sp = model.species[p];
-	
-		if(sp.type == "Population" && sp.ind_eff_group.length > 0){
-			let name = sp.ind_eff_group[0].ie_list[0].name;
-			model.warn.push({mess:"Cannot have individual effects", mess2:"A population-based model cannot have individual effects such as '["+name+"]'", warn_type:"Equation"});
+
+		if(sp.ind_eff_group.length > 0){
+			switch(sp.type){
+			case "Population": case "Deterministic":
+				{
+					let name = sp.ind_eff_group[0].ie_list[0].name;
+					model.warn.push({mess:"Cannot have individual effects", mess2:"A population-based model cannot have individual effects such as '["+name+"]'", warn_type:"Equation"});
+				}
+				break;
+			}
 		}
 	}
 }
@@ -781,9 +787,15 @@ function update_model_fix_eff(felist)
 	for(let p = 0; p < model.species.length; p++){
 		let sp = model.species[p];
 	
-		if(sp.type == "Population" && sp.fix_eff.length > 0){
-			let name = sp.fix_eff[0].name;
-			model.warn.push({mess:"Cannot have fixed effects", mess2:"A population-based model cannot have fixed effects such as '〈"+name+"〉'", warn_type:"Equation"});
+		if(sp.fix_eff.length > 0){
+			switch(sp.type){
+			case "Population": case "Deterministic":
+				{
+					let name = sp.fix_eff[0].name;
+					model.warn.push({mess:"Cannot have fixed effects", mess2:"A population-based model cannot have fixed effects such as '〈"+name+"〉'", warn_type:"Equation"});
+				}
+				break;
+			}
 		}
 	}
 }

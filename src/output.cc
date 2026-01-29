@@ -20,6 +20,7 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 {
 	timer.resize(OUTTIMER_MAX); for(auto &ti : timer) ti = 0;
 	
+	datadir = input.datadir;
 	diagdir = "";	sampledir = ""; sampledir_rel = "";
 
 	if(input.datadir != ""){
@@ -27,6 +28,9 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 		case SIM: sampledir_rel = "output-sim"; break;
 		case INF: case EXT: sampledir_rel = "output-inf"; break;
 		case PPC: sampledir_rel = "output-post-sim"; break;
+		case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: 
+			sampledir_rel = "output-sim";
+			break;
 		case MODE_UNSET: emsg("Option not recognised"); break;
 		}
 		
@@ -42,12 +46,15 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 	}
 	
 	if(op()){
-		lines_raw = input.lines_raw;
+		for(auto i = 0u; i < input.lines_raw.size(); i++){
+			LinesRaw lr; lr.st = input.lines_raw[i]; lr.li = i;
+			lines_raw.push_back(lr);
+		}
 		
 		auto i = 0u;
 		while(i < lines_raw.size())
 		{
-			auto st = trim(lines_raw[i]);
+			auto st = trim(lines_raw[i].st);
 			
 			auto spl = split(st,' ');
 			auto command = spl[0];
@@ -56,13 +63,13 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 			
 			if(begin_str(st,"# PROCESSED USING")) flag = true;
 
-			if(command == "param-sim" || command == "state-sim" || command == "warning-sim" || st == "# OUTPUT SIMULATION"){
+			if(command == "param-sim" || command == "state-sim" || command == "warning-sim" || st == OUT_SIM_BANNER){
 				if(model.mode == SIM) flag = true;
 			}
 			
 			if(command == "param-inf" || command == "param-stats-inf" || command == "state-inf" || 
 			   command == "diagnostics-inf" || 
-				 command == "trans-diag-inf" || command == "warning-inf" || st == "# OUTPUT INFERENCE"){
+				 command == "trans-diag-inf" || command == "warning-inf" || st == OUT_INF_BANNER){
 				if(model.mode == INF || model.mode == EXT){
 					flag = true;
 				}
@@ -72,47 +79,88 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 				if(model.mode == INF) flag = true;
 			}
 			
-			if(command == "param-post-sim" || command == "state-post-sim" || command == "warning-post-sim" || st == "# OUTPUT POSTERIOR SIMULATION"){
+			if(command == "param-post-sim" || command == "state-post-sim" || command == "warning-post-sim" || st == OUT_POST_SIM_BANNER){
 				if(model.mode == INF || model.mode == PPC || model.mode == EXT) flag = true;
 			}
 	
-			if(flag == true){
-				if(st.length() >= 3 && st.substr(st.length()-3,3) == "\"[["){
-					auto j = i+1;
-					while(j < lines_raw.size() && !(lines_raw[j].length() >= 3 && lines_raw[j].substr(0,3) == "]]\"")) j++;
-					if(j == lines_raw.size()) emsg("Problem removing output");
-					lines_raw.erase(lines_raw.begin()+i,lines_raw.begin()+j+1); 
-				}
-				else{
-					lines_raw.erase(lines_raw.begin()+i); 
-				}
-			}
+			if(flag == true) erase_command(i);
 			else i++;
 		}
 		
-		while(lines_raw.size() > 0 && lines_raw[lines_raw.size()-1] == ""){
+		while(lines_raw.size() > 0 && lines_raw[lines_raw.size()-1].st == ""){
 			lines_raw.erase(lines_raw.begin()+lines_raw.size()-1); 
 		}
 		
-		// Removes more than double space
-		auto j = 0u;
-		while(j+2 < lines_raw.size()){
-			if(trim(lines_raw[j]) == "" && trim(lines_raw[j+1]) == "" && trim(lines_raw[j+2]) == ""){
-				lines_raw.erase(lines_raw.begin()+j);
-			}
-			else j++;
-		}
+		remove_double_space();
+		remove_double_space();
+	
+		lines_raw.push_back(new_lr(""));
 		
-		lines_raw.push_back("");
 		switch(model.mode){
-		case SIM: lines_raw.push_back("# OUTPUT SIMULATION"); break;
-		case INF: case EXT: lines_raw.push_back("# OUTPUT INFERENCE"); break;
-		case PPC: lines_raw.push_back("# OUTPUT POSTERIOR SIMULATION"); break;
+		case SIM: lines_raw.push_back(new_lr(OUT_SIM_BANNER)); break;
+		case INF: case EXT: lines_raw.push_back(new_lr(OUT_INF_BANNER)); break;
+		case PPC: lines_raw.push_back(new_lr(OUT_POST_SIM_BANNER)); break;
+		case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: break;
 		case MODE_UNSET: break;
 		}
-		lines_raw.push_back("");
+		lines_raw.push_back(new_lr(""));
 	}
 };
+
+
+/// Removes more than double space
+void Output::remove_double_space()
+{
+	auto j = 0u;
+	while(j+2 < lines_raw.size()){
+		if(trim(lines_raw[j].st) == "" && trim(lines_raw[j+1].st) == "" && trim(lines_raw[j+2].st) == ""){
+			lines_raw.erase(lines_raw.begin()+j);
+		}
+		else j++;
+	}
+}
+
+
+/// Erases a command starting at a given line
+void Output::erase_command(unsigned int i)
+{
+	auto pad_before = false;
+	if(i > 0 && trim(lines_raw[i-1].st) == "") pad_before = true;
+	
+	auto i_end = i+1;
+	
+	auto st = trim(lines_raw[i].st);
+	if(st.length() >= 3 && st.substr(st.length()-3,3) == "\"[["){
+		while(i_end < lines_raw.size() && !(lines_raw[i_end].st.length() >= 3 && lines_raw[i_end].st.substr(0,3) == "]]\"")) i_end++;
+		if(i_end == lines_raw.size()) emsg("Problem removing output");
+		i_end++;
+	}
+
+	auto pad_after = false;
+	if(i_end < lines_raw.size() && trim(lines_raw[i_end].st) == "") pad_after = true;
+	
+	if(pad_before && pad_after) i_end++;
+	
+	lines_raw.erase(lines_raw.begin()+i,lines_raw.begin()+i_end); 
+}
+
+
+/// Creates a new lines_raw
+LinesRaw Output::new_lr(string st) const
+{
+	LinesRaw lr; lr.st = st; lr.li = UNSET;
+	return lr;
+}
+
+
+/// Finds a lines_raw line number
+unsigned int Output::lr_find(unsigned int line_num) const
+{
+	for(auto i = 0u; i < lines_raw.size(); i++){
+		if(lines_raw[i].li == line_num) return i;
+	}
+	return UNSET;
+}
 
 
 /// Create a directory if it doesn't already exist
@@ -158,6 +206,7 @@ void Output::summary(const Model &model) const
 		switch(sp.type){
 		case POPULATION: fout << "population-based"; break;
 		case INDIVIDUAL: fout << "individual-based"; break;
+		case DETERMINISTIC: fout << "deterministic"; break;
 		}
 
 		fout << endl << endl;
@@ -566,6 +615,9 @@ void Output::summary(const Model &model) const
 			break;
 
 		case INF: case PPC:
+			break;
+			
+		case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR:
 			break;
 
 		default:  emsg("Model output error10"); break;
@@ -1340,7 +1392,7 @@ void Output::set_inference_prop(double value, string tag, double def)
 	auto len = te.length();
 	
 	for(auto j = 0u; j < lines_raw.size(); j++){
-		auto st = lines_raw[j];
+		auto st = lines_raw[j].st;
 		auto spl = split(st,' ');
 		if(spl[0] == "inference"){
 			auto k = 0u; while(k < st.length()-len && st.substr(k,len) != te) k++;
@@ -1360,7 +1412,7 @@ void Output::set_inference_prop(double value, string tag, double def)
 					st += te+"=" + to_str(value);
 				}
 			}
-			lines_raw[j] = st;
+			lines_raw[j].st = st;
 			return;
 		}
 	}
@@ -1582,7 +1634,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 		ss << endl;
 			
 		switch(sp.type){
-		case POPULATION:
+		case POPULATION: case DETERMINISTIC:
 			{
 				ss << "<INITIAL POPULATION>" << endl;
 				ss << "compartment,population" << endl;
@@ -1621,7 +1673,9 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 						if(ssp.trans_num[i][ti] == 0){
 							auto num = 0u;
 							while(ti < T && ssp.trans_num[i][ti] == 0){ ti++; num++;}
-							ss << "Z" << num;
+							
+							if(num == 0) ss << "0"; 
+							else ss << "Z" << num;
 						}
 						else{
 							ss << ssp.trans_num[i][ti];
@@ -1748,18 +1802,20 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 			break;
 		}
 		
-		if(cum_diag && (model.mode == INF || model.mode == EXT)){
-			ss << "<TRANSDISTPROB>" << endl;
-				
-			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
-				ss << replace_arrow(sp.tra_gl[tr].name) << ":";
-				for(auto i = 0u; i < H_BIN; i++){
-					if(i != 0) ss << "|";
-					ss << ssp.cum_prob_dist[tr][i];
+		if(sp.type != DETERMINISTIC){
+			if(cum_diag && (model.mode == INF || model.mode == EXT)){
+				ss << "<TRANSDISTPROB>" << endl;
+					
+				for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+					ss << replace_arrow(sp.tra_gl[tr].name) << ":";
+					for(auto i = 0u; i < H_BIN; i++){
+						if(i != 0) ss << "|";
+						ss << ssp.cum_prob_dist[tr][i];
+					}
+					ss << endl;
 				}
 				ss << endl;
 			}
-			ss << endl;
 		}
 	}
 	
@@ -2222,8 +2278,8 @@ void Output::end(string file, unsigned int total_cpu)
 		cout << "<<OUTPUT FILE>>" << endl;
 		if(mpi.core == 0){
 			cout << "# PROCESSED USING BICI " << bici_version << endl;
-			for(auto li : lines_raw){
-				cout << li << endl;
+			for(const auto &lr : lines_raw){
+				cout << lr.st << endl;
 			}
 		}
 	}
@@ -2234,124 +2290,128 @@ void Output::end(string file, unsigned int total_cpu)
 		fout.open(file);
 
 		fout << "# PROCESSED USING BICI " << bici_version << endl;
-		for(auto li : lines_raw){
-			fout << li << endl;
+		for(const auto &lr : lines_raw){
+			fout << lr.st << endl;
 		}
 	}
 	
-	auto nchain = model.details.nchain;
+	if(!model.data_mode()){
+		auto nchain = model.details.nchain;
 
-	vector < vector < vector < vector <double> > > > param_samp;
-	param_samp.resize(nchain);
+		vector < vector < vector < vector <double> > > > param_samp;
+		param_samp.resize(nchain);
 
-	for(auto ch = 0u; ch < nchain; ch++){
-		auto frac = double(ch)/nchain;
-		percentage(frac*25,100);
-		
-		auto part = get_part_chain(ch,param_store);
-		
-#ifdef USE_MPI	
-		mpi.transfer_particle(part);
-#endif
-	
-		if(op() && part.size() > 0){
-			number_part(part);
-			output_trace(ch,part,param_samp,fout);
-		}
-	}
-
-	vector <string> final_warning;
-
-	output_rate_warning(total_cpu,50,100,final_warning);
-		
-	auto trans_diag_on = false; 
-	if(model.mode == INF || model.mode == EXT) trans_diag_on = true;
-	
-	for(auto ch = 0u; ch < model.details.nchain; ch++){
-		auto trans_diag = trans_diag_init(); 
-	
-		auto frac = double(ch)/nchain;
-		percentage(25+frac*25,100);
-
-		auto part = get_part_chain(ch,state_store);
-
-#ifdef USE_MPI	
-		mpi.transfer_particle(part);
-#endif
-
-		if(op() && part.size() > 0){
-			number_part(part);
-			if(trans_diag_on){
-				trans_diag_add(trans_diag,part); 
-				output_trans_diag(ch,trans_diag,fout);
-			}
+		for(auto ch = 0u; ch < nchain; ch++){
+			auto frac = double(ch)/nchain;
+			percentage(frac*25,100);
 			
-			output_state(ch,part,fout);
-		}
-	}
-
-#ifdef USE_MPI	
-	mpi.transfer_terminal_info(terminal_info);
-#endif
-
-	if(op() && model.mode == INF){
-		output_prop_info(fout);
-	}
-
-	auto alg = model.details.algorithm;
-	if(alg == PAS_MCMC || alg == ABC_SMC_ALG){
-		auto part = get_part_chain(GEN_PLOT,param_store);
+			auto part = get_part_chain(ch,param_store);
+			
+	#ifdef USE_MPI	
+			mpi.transfer_particle(part);
+	#endif
 		
-#ifdef USE_MPI	
-		mpi.transfer_particle(part);
-#endif
-		
-		if(op() && part.size() > 0){
-			output_generation(part,fout);
-		}
-	}
-
-	auto alg_warn_flag = false;
-	
-	if(model.details.diagnostics_on){
-		auto diagnostic = diagnostic_store;
-	
-#ifdef USE_MPI	
-		mpi.transfer_diagnostic(diagnostic);
-#endif
-
-		if(op() && diagnostic.size() > 0){
-			output_diagnostic(diagnostic,alg_warn_flag,fout);
-		}
-	}
-
-	if(op() && (model.mode == INF || model.mode == EXT) && com_op == false){
-		output_param_statistics(param_samp,fout,final_warning);
-	}
-	
-	output_add_ind_warning(final_warning);
-
-	output_spline_out_warning(final_warning);
-
-	for(const auto &der : model.derive){
-		auto st = der.func.warn; 
-		if(der.func.on && st != "") final_warning.push_back(st);
-	}
-
-	if(mpi.core == 0){ // Warnings for data out of range
-		for(const auto &sp : model.species){
-			for(auto warn : sp.data_warning){
-				auto wa = warn;
-				if(model.species.size() > 1) wa += "For species '"+sp.name+"': "+wa;
-				final_warning.push_back(wa);
+			if(op() && part.size() > 0){
+				number_part(part);
+				output_trace(ch,part,param_samp,fout);
 			}
 		}
+
+		vector <string> final_warning;
+
+		output_rate_warning(total_cpu,50,100,final_warning);
+			
+		auto trans_diag_on = false; 
+		if(model.mode == INF || model.mode == EXT) trans_diag_on = true;
+		
+		for(auto ch = 0u; ch < model.details.nchain; ch++){
+			auto trans_diag = trans_diag_init(); 
+		
+			auto frac = double(ch)/nchain;
+			percentage(25+frac*25,100);
+
+			auto part = get_part_chain(ch,state_store);
+
+	#ifdef USE_MPI	
+			mpi.transfer_particle(part);
+	#endif
+
+			if(op() && part.size() > 0){
+				number_part(part);
+				if(trans_diag_on){
+					trans_diag_add(trans_diag,part); 
+					output_trans_diag(ch,trans_diag,fout);
+				}
+				
+				output_state(ch,part,fout);
+			}
+		}
+
+	#ifdef USE_MPI	
+		mpi.transfer_terminal_info(terminal_info);
+	#endif
+
+		if(op() && model.mode == INF){
+			output_prop_info(fout);
+		}
+
+		auto alg = model.details.algorithm;
+		if(alg == PAS_MCMC || alg == ABC_SMC_ALG){
+			auto part = get_part_chain(GEN_PLOT,param_store);
+			
+	#ifdef USE_MPI	
+			mpi.transfer_particle(part);
+	#endif
+			
+			if(op() && part.size() > 0){
+				output_generation(part,fout);
+			}
+		}
+
+		auto alg_warn_flag = false;
+		
+		if(model.details.diagnostics_on){
+			auto diagnostic = diagnostic_store;
+		
+	#ifdef USE_MPI	
+			mpi.transfer_diagnostic(diagnostic);
+	#endif
+
+			if(op() && diagnostic.size() > 0){
+				output_diagnostic(diagnostic,alg_warn_flag,fout);
+			}
+		}
+
+		if(op() && (model.mode == INF || model.mode == EXT) && com_op == false){
+			output_param_statistics(param_samp,fout,final_warning);
+		}
+		
+		output_add_ind_warning(final_warning);
+
+		output_spline_out_warning(final_warning);
+
+		for(const auto &der : model.derive){
+			auto st = der.func.warn; 
+			if(der.func.on && st != "") final_warning.push_back(st);
+		}
+
+		if(mpi.core == 0){ // Warnings for data out of range
+			for(const auto &sp : model.species){
+				for(auto warn : sp.data_warning){
+					auto wa = warn;
+					if(model.species.size() > 1) wa += "For species '"+sp.name+"': "+wa;
+					final_warning.push_back(wa);
+				}
+			}
+		}
+		
+		if(op()){
+			for(auto te : final_warning) add_warning(te,fout);
+			if(alg_warn_flag) add_warning("This run has generated algorithm warnings. Please check the diagnostic file(s) for details",fout);
+		}
 	}
 	
-	if(op()){
-		for(auto te : final_warning) add_warning(te,fout);
-		if(alg_warn_flag) add_warning("This run has generated algorithm warnings. Please check the diagnostic file(s) for details",fout);
-	}
+	percentage_end();
 	
 	if(com_op == true) cout << "<<END>>" << endl;
 }
@@ -2685,6 +2745,8 @@ void Output::output_prop_info(ofstream &fout) const
 {
 	auto nchain = model.details.nchain;
 	
+	if(prop_info_list.size() != prop_info_str.size()) emsg("String size not right");
+	
 	for(auto ch = 0u; ch < model.details.nchain; ch++){
 		auto j = 0u; while(j < terminal_info.size() && terminal_info[j].ch != ch) j++;
 		if(j != terminal_info.size()){
@@ -2818,7 +2880,7 @@ void Output::output_trans_diag(unsigned int ch, const vector <TransDiagSpecies> 
 	auto T = model.details.T;
 	for(auto p = 0u; p < model.nspecies; p++){
 		const auto &sp = model.species[p];
-		if(sp.tra_gl.size() > 0){
+		if(sp.type != DETERMINISTIC && sp.tra_gl.size() > 0){
 			if(model.nspecies > 1) sstd << "<SPECIES \"" << sp.name << "\">" << endl;
 			const auto &exp_num = trans_diag[p].exp_num;
 			auto n = trans_diag[p].n;
@@ -2838,8 +2900,7 @@ void Output::output_trans_diag(unsigned int ch, const vector <TransDiagSpecies> 
 	
 	if(sampledir != ""){
 		trans_diag_out_file = get_file_name("diagnostic/trans_diag",ch,nchain,".txt");  
-		
-
+	
 		ofstream pout(sampledir+"/"+trans_diag_out_file);
 		check_open(pout,trans_diag_out_file);
 		pout << trans_diag_out;
@@ -2868,7 +2929,7 @@ void Output::add_warning(string err_msg, ofstream &fout) const
 	case SIM: line = "warning-sim"; break;
 	case INF: case EXT: line = "warning-inf"; break;
 	case PPC: line = "warning-post-sim"; break;
-	case MODE_UNSET: emsg("op problem"); break;
+	default: emsg("op problem"); break;
 	}
 	
 	line += " text=\"[["+endli;
@@ -3185,14 +3246,15 @@ void Output::trans_diag_add(vector <TransDiagSpecies> &trans_diag, const vector 
 	for(const auto &pa : part){
 		for(auto p = 0u; p < model.nspecies; p++){
 			const auto &sp = model.species[p];
-		
-			const auto &exp_num = pa.species[p].exp_num; 
-			auto &exp_num_add = trans_diag[p].exp_num;
-					
-			trans_diag[p].n++;
-			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
-				for(auto ti = 0u; ti < T; ti++){
-					exp_num_add[tr][ti] += exp_num[tr][ti];
+			if(sp.type != DETERMINISTIC){
+				const auto &exp_num = pa.species[p].exp_num; 
+				auto &exp_num_add = trans_diag[p].exp_num;
+						
+				trans_diag[p].n++;
+				for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+					for(auto ti = 0u; ti < T; ti++){
+						exp_num_add[tr][ti] += exp_num[tr][ti];
+					}
 				}
 			}
 		}
@@ -3342,5 +3404,143 @@ void Output::final_memory_usage() const
 		auto per = (unsigned int)(100*mem/total_memory());
 		cout << "Total memory consumption: " << mem_print(mem);
 		cout << " (" << per << "% of computer)" << endl;
+	}
+}
+
+
+/// Inserts a new command into the BICI-script
+void Output::insert_command(string name, unsigned int p, string insert_pl, string insert_bef, string line, string content, string file)
+{
+	// Saves file
+	if(datadir != ""){
+		ofstream pout(datadir+"/"+file);
+		check_open(pout,file);
+		pout << content;
+	}
+	else{  // Embeds output into file
+		line +=" file=\"[["+endli+content+"]]\"";
+	}
+	
+	// Finds where to insert
+	auto li = UNSET;
+	
+	const auto &sp = model.species[p];
+	for(const auto &so : sp.source){
+		if(so.name == name && so.cname == so.cname_raw){
+			li = lr_find(so.line_num);
+		
+			auto res = model.question("This will replace exisiting data. Is that OK?");
+			
+			if(res == false){
+				cout << "Terminated" << endl; 
+				exit (EXIT_FAILURE);
+			}
+		
+			erase_command(li);
+			break;
+		}
+	}
+
+	if(li == UNSET){
+		li = 0; 
+		while(li < lines_raw.size() && !begin_str(lines_raw[li].st,insert_pl)) li++;
+		if(li == lines_raw.size()){
+			li = 0; 
+			while(li < lines_raw.size() && !begin_str(lines_raw[li].st,insert_bef)) li++;
+			
+			if(li < lines_raw.size()){
+				if(li > 0) li--;
+				if(li > 0 && trim(lines_raw[li-1].st) != ""){
+					lines_raw.insert(lines_raw.begin()+li,new_lr(""));
+					li++;
+				}
+				lines_raw.insert(lines_raw.begin()+li,new_lr(insert_pl));
+				li++;
+			}
+			else lines_raw.push_back(new_lr(insert_pl));
+
+			//lines_raw.insert(lines_raw.begin()+li,new_lr(""));	
+			//li++;
+		}
+		else li++;
+		
+		if(!(li+1 < lines_raw.size() && trim(lines_raw[li].st) == "" && trim(lines_raw[li+1].st) == "")){	
+			lines_raw.insert(lines_raw.begin()+li,new_lr(""));
+		}
+		li++;
+	}
+	
+	if(li < lines_raw.size() && trim(lines_raw[li].st) != ""){
+		lines_raw.insert(lines_raw.begin()+li,new_lr(""));
+	}		
+	
+	lines_raw.insert(lines_raw.begin()+li,new_lr(line));
+}
+
+
+/// Deletes a command at a particular location
+void Output::delete_command(string name, unsigned int li, bool check)
+{
+	if(check){
+		auto res = model.question("Delete '"+name+"'?");
+		if(res == false){
+			cout << "Terminated" << endl; 
+			exit (EXIT_FAILURE);
+		}
+	}
+	
+	erase_command(lr_find(li));
+}
+
+
+// Deletes commands
+void Output::delete_commands(string type, const vector <string> &list)
+{
+	vector <unsigned int> lines;
+	
+	for(const auto &lr : lines_raw){
+		for(const auto &li : list){
+			if(begin_str(lr.st,li+" ")){
+				lines.push_back(lr.li);
+				break;
+			}	
+		}
+	}
+	
+	if(lines.size()	== 0){
+		cout << "There is no data to clear." << endl; 
+		exit (EXIT_FAILURE);
+	}
+	else{
+		auto res = model.question("Are you sure you would like to clear "+type+" data?");
+		if(res == false){
+			cout << "Terminated" << endl; 
+			exit (EXIT_FAILURE);
+		}
+		
+		for(auto li : lines){
+			erase_command(lr_find(li));
+		}
+	}
+}
+
+
+// Deletes commands
+void Output::delete_lines(const vector <string> &list)
+{
+	vector <unsigned int> lines;
+	
+	for(const auto &lr : lines_raw){
+		for(const auto &li : list){
+			if(lr.st == li){
+				lines.push_back(lr.li);
+				break;
+			}	
+		}
+	}
+	
+	for(auto li : lines){
+		auto i = lr_find(li);
+		lines_raw.erase(lines_raw.begin()+i);
 	}
 }

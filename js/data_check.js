@@ -202,13 +202,15 @@ function data_source_check_error(out_type,so)
 	}
 
 	if(sp){
-		if(sp.type == "Population"){
+		switch(sp.type){
+		case "Population": case "Deterministic":
 			switch(so.type){
 			case "Add Ind.":case "Move Ind.":  case "Remove Ind.": case "Compartment":
 			case "Transition": case "Diag. Test": case "Genetic": case "Ind. Eff.": case "Ind. Group":
 				data_error("Individual-based data '"+so.type+"' cannot be added to a population-based model",out_type,so);
 				break;
 			}
+			break;
 		}
 		
 		if(sp.type == "Individual"){

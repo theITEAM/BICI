@@ -619,6 +619,7 @@ void Chain::update_init()
 		if(model.param_vec[i].prop_pos){
 			vector <unsigned int> vec;
 			vec.push_back(i);
+			
 			add_parameter_prop(vec);
 		}
 	}
@@ -788,6 +789,9 @@ void Chain::update_init()
 			}
 		}
 	}
+	
+	// Does proposals which change parameter and resimulate 
+	
 	
 	// Makes poposals in init cont which change initial condition fractions
 	for(auto p = 0u; p < model.nspecies; p++){
@@ -991,6 +995,12 @@ bool Chain::is_markov_pop(const AffectLike &al) const
 /// Adds a parameter 
 void Chain::add_parameter_prop(const vector <unsigned int> &vec)
 {
+	if(model.species[0].type == DETERMINISTIC){
+		Proposal pp(PARAM_DET_PROP,vec,model,output,1,burn_info);
+		proposal.push_back(pp);
+		return;
+	}
+	
 	Proposal pp(PARAM_PROP,vec,model,output,1,burn_info);
 	proposal.push_back(pp);
 
@@ -1084,7 +1094,7 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 			sum_prop += t;
 			
 			switch(pro.type){
-			case PARAM_PROP:
+			case PARAM_PROP: case PARAM_DET_PROP:
 			case INIT_COND_FRAC_PROP: case IE_PROP: case IE_VAR_PROP:
 			case IE_COVAR_PROP: case IE_VAR_CV_PROP:
 				sum_param_prop += t;
@@ -1367,7 +1377,7 @@ void Chain::check_join_proposal()
 	vector <bool> on_st;
 	for(auto &prop : proposal){	
 		on_st.push_back(prop.on);
-		if(prop.param_list.size() > 1 && (prop.type == PARAM_PROP || prop.type == MBP_PROP)){
+		if(prop.param_list.size() > 1 && (prop.type == PARAM_PROP || prop.type == PARAM_DET_PROP || prop.type == MBP_PROP)){
 			prop.on = false;
 		}
 	}
@@ -1378,7 +1388,7 @@ void Chain::check_join_proposal()
 		auto fl = false;
 		for(auto i = 0u; i < proposal.size(); i++){
 			auto &prop = proposal[i];
-			if(prop.type == PARAM_PROP || prop.type == MBP_PROP){
+			if(prop.type == PARAM_PROP || prop.type == PARAM_DET_PROP || prop.type == MBP_PROP){
 				if(equal_vec(prop.param_list,par_list[j])){
 					fl = true;
 					prop.on = true;

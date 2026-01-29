@@ -95,6 +95,9 @@ let inter=                                         // Dynamic variables related 
 	child:[],                                        // Stores the c++ process 
 	core:[],                                         // Stores information as it is proccessed
 	
+	section:[],                                      // Stores information about sections
+	section_sel:undefined,                           // Stores selected section
+
 	figure:[],                                       // Stores letters used on figures           
 	
 	worker_mess:{active:false}                       // Used to send messages to the worker
@@ -109,7 +112,7 @@ let map_store = [];
 
 let data = new Data();
 
-let edit_source={};                                   // Allow for a data source to be editted
+let edit_source={};                                // Allow for a data source to be editted
 
 let cv;                                            // Used for plotting to working  anvas       
 

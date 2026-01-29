@@ -106,7 +106,7 @@ void State::post_sim(const PV &param_value, const Sample &samp)
 			ssp.activate_initial_state(t_start,popnum_t);
 			break;
 			
-		case POPULATION:
+		case POPULATION: case DETERMINISTIC:
 			ssp.set_tnum_mean(ti_start,popnum_t);
 			ssp.cpop = ssp.cpop_st[ti_start];
 			ssp.cpop_st.pop_back();
@@ -135,10 +135,10 @@ void State::load_samp(const PV &param_value, const Sample &samp)
 	
 	for(auto p = 0u; p < nspecies; p++){
 		auto &ssp = species[p];
-		if(ssp.type == POPULATION) ssp.set_tnum_mean(T,popnum_t);
+		if(ssp.type == POPULATION || ssp.type == DETERMINISTIC) ssp.set_tnum_mean(T,popnum_t);
 	}
 
-	likelihood_from_scratch();
+	if(!model.data_mode()) likelihood_from_scratch();
 }
 
 
@@ -189,8 +189,12 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 				ssp.update_individual_based(ti,pop_ind,popnum_t,ss.val_fast);
 				break;
 				
-			case POPULATION: 
-				ssp.update_population_based(ti,model.details.stochastic,pop,ss.val_fast);
+			case POPULATION:
+				ssp.update_population_based(ti,true,pop,ss.val_fast);
+				break;
+			
+			case DETERMINISTIC:
+				ssp.update_population_based(ti,false,pop,ss.val_fast);
 				break;
 			}
 			timer[SIM_UPDATE] += clock();	
@@ -353,7 +357,7 @@ vector <double> State::calculate_df(const DerFunc &df) const
 	for(auto i = 0u; i < N; i++) evec[i] = ran();
 		
 	auto cpop = ssp.cpop_st;
-	if(sp.type != POPULATION) cpop = ssp.ibm_cpop_st();
+	if(sp.type == INDIVIDUAL) cpop = ssp.ibm_cpop_st();
 		
 	auto type = df.type;
 	
@@ -737,9 +741,10 @@ void State::calculate_likelihood()
 			break;
 			
 		case POPULATION:
-			{	
-				if(model.details.stochastic == true) ssp.likelihood_pop(popnum_t);
-			}
+			ssp.likelihood_pop(popnum_t);
+			break;
+			
+		case DETERMINISTIC:
 			break;
 		}
 		
@@ -815,6 +820,9 @@ void State::calculate_like()
 			
 		case POPULATION:
 			like.markov += sum(ssp.Li_markov_pop);
+			break;
+			
+		case DETERMINISTIC:
 			break;
 		}
 	}
@@ -1375,6 +1383,9 @@ void State::likelihood_from_scratch()
 			ssp.Li_markov_pop.resize(sp.tra_gl.size());
 			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++) ssp.Li_markov_pop[tr].resize(T,0);
 			break;
+		
+		case DETERMINISTIC:
+			break;
 		}
 		
 		ssp.Li_init_cond = 0.0;
@@ -1510,6 +1521,7 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 	if(dir_fl) part.dir_out = derive_calculate(store_state);
 	
 	for(auto p = 0u; p < species.size(); p++){
+		const auto &sp = model.species[p];
 		auto &ssp = species[p];
 		ParticleSpecies part_sp;
 		part_sp.init_cond_val = ssp.init_cond_val;
@@ -1519,8 +1531,10 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 			
 			part_sp.individual = ssp.individual;
 			
-			if(cum_diag && (model.mode == INF || model.mode == EXT)){
-				ssp.calc_trans_diag(part_sp,popnum_t);
+			if(sp.type != DETERMINISTIC){
+				if(cum_diag && (model.mode == INF || model.mode == EXT)){
+					ssp.calc_trans_diag(part_sp,popnum_t);
+				}
 			}
 		}
 
@@ -1579,7 +1593,7 @@ void State::set_particle(const Particle &part, bool calc_like)
 		ssp.init_cond_val = part_sp.init_cond_val;
 		ssp.trans_num = part_sp.trans_num;
 		ssp.individual = part_sp.individual;
-		if(ssp.type == POPULATION) ssp.set_cpop_st();
+		if(ssp.type == POPULATION || ssp.type == DETERMINISTIC) ssp.set_cpop_st();
 	}
 	
 	if(model.genetic_data.on){
@@ -1901,7 +1915,7 @@ vector <double> State::calculate_popnum() const
 	for(auto i = 0u; i < model.pop.size(); i++){            // Calculates population based on cpop
 		const auto &po = model.pop[i];
 		const auto &ssp = species[po.sp_p];
-		if(ssp.type == POPULATION){
+		if(ssp.type == POPULATION || ssp.type == DETERMINISTIC){
 			auto sum = 0.0;
 			for(auto &te : po.term) sum += ssp.cpop[te.c]*te.w;
 			popnum[i] = sum;
@@ -1948,7 +1962,7 @@ vector < vector <double> > State::calculate_popnum_t(unsigned int ti_end)
 			auto &ssp = species[p];
 			switch(ssp.type){
 			case INDIVIDUAL: ssp.set_ind_sim_c(ti); break;
-			case POPULATION: ssp.cpop = ssp.cpop_st[ti]; break;
+			case POPULATION: case DETERMINISTIC: ssp.cpop = ssp.cpop_st[ti]; break;
 			}
 		}
 

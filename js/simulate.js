@@ -1071,6 +1071,12 @@ function check_memory(ans)
 			run_mem += T_st[p]*TS*8;      // tnum_mean_st_f
 			run_mem += C_st[p]*TS*8;      // cpop_st_f
 			break;
+		
+		case "Deterministic":
+			run_mem += T_st[p]*TS*8;      // trans_num
+			run_mem += T_st[p]*TS*8;      // tnum_mean_st
+			run_mem += C_st[p]*TS*8;      // cpop_st
+			break;
 		}
 	}
 	if(temp_mem > run_mem) run_mem == temp_mem;

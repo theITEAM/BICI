@@ -1,0 +1,60 @@
+
+###################### DATA DIRECTORY ######################
+
+data-dir folder="EX_M4-3-data-files"
+
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5 nchain=3
+
+post-sim start=0 end=100
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
+
+species name="Animal" type="individual"
+
+# SPECIES MODEL
+
+class name="Alive" index="p"
+
+comp name="N" color="#0000bb" x=0 y=0
+
+trans name="N->-" x=9 y=0 value="exp(rate:μ_a)"
+
+class name="Age" index="a"
+
+comp name="A0" color="#dddddd" x=-15 y=5
+comp name="A1" color="#bbbbbb" x=-5 y=5
+comp name="A4" color="#888888" x=5 y=5
+comp name="A10+" color="#000000" x=16 y=5
+
+trans name="A0->A1" value="period(time:1)"
+trans name="A1->A4" value="period(time:3)"
+trans name="A4->A10+" value="period(time:6)"
+trans name="+->A0" x=-26 y=5 value="exp(rate:α×{N}×max(1-{N}/κ|0))"
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" file="init-pop-sim-Animal.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="α" value="0.3" prior="inverse(0.01,1)"
+
+param name="κ" value="200" prior="uniform(100,300)"
+
+param name="μ_a" value="value-mu.csv" prior="inverse(0.01,1)"
+
+
+

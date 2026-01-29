@@ -16,6 +16,8 @@ class Model                                // Stores information about the model
 	public:
 		SampType samp_type;                    // Used to change individual sampling
 	
+		bool no_question;                      // If questions are asked (data-sim) 
+	
 		bool sync_on;                          // Determines if sychronisation of proposals is done
 		
 		vector <Species> species;              // Compartmental model /data for different species
@@ -93,7 +95,7 @@ class Model                                // Stores information about the model
 		vector <unsigned int> param_vec_ref;   // Stores where param are on precalc
 		vector <unsigned int> spline_ref;      // Stores where spline is on precalc
 	
-		Model(Operation mode_, ExtFactor ext_factor_);
+		Model(Operation mode_, ExtFactor ext_factor_, bool no_question_);
 		void add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv = UNSET);
 		void param_val_init(PV &param_val) const;
 		PV param_sample() const;
@@ -170,6 +172,15 @@ class Model                                // Stores information about the model
 		unsigned int get_end_bracket(string &te, unsigned int i);
 		bool in_integral(unsigned int i, const vector <SumRange> &int_range) const;
 		vector <string> equation_dep(string te, string &warn);
+		unsigned int find_p(string name) const;
+		unsigned int find_cl(unsigned int p, string name) const;
+		bool data_mode() const;
+		bool no_process() const;
+		bool question(string st) const;
+		unsigned int get_cl_from_trans(string name, unsigned int p) const;
+		unsigned int get_cl_from_comp(string name, unsigned int p) const;
+		double calculate_equation_zero_one(string te, double tdiv, string &err);
+		double calculate_equation(string te, double tdiv, string &err);
 		
 	private:
 		Hash hash_all_ind;                     // Stores individuals in a hash table

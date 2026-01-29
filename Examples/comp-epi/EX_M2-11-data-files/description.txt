@@ -1,0 +1,16 @@
+﻿# Model 2.11: Simple disease transmission experiment
+
+## Objective
+- Introduce the concept of a disease transmission experiment.
+- These are used to identify factors which affects how readily disease transmits between individuals.
+- This example considers the effect of vaccination on susceptibility to disease.
+
+## Model
+- A single individual-based species 'Animal' is created.
+- This contains classifications 'DS', which stands for 'disease status', and 'Vaccination'.
+- 'DS' contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- 'Vaccination' contains two compartments: 'Vacc' and 'Unvac' which represent vaccinated and unvaccinated individuals.
+- A transmission rate $β_v$ determines the rate at which individuals with vaccination status $v$ become infected.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

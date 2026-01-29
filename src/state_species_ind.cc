@@ -1118,8 +1118,8 @@ unsigned int StateSpecies::add_individual(IndType ind_type, string name)
 	
 	if(i < sp.nindividual_in) ind.init_c_set = sp.individual[i].init_c_set;
 	else ind.init_c_set = false;
-
-	switch(type){
+  
+	switch(ind_type){
 	case UNOBSERVED_IND:
 		if(sp.fix_effect.size() > 0) run_error("Cannot have fixed affects with unobserved individuals");
 		break;

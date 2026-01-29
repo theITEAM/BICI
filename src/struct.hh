@@ -484,7 +484,6 @@ struct Details {                   // Stores details about simulation/inference/
 	double kernelsize;               // The size of the kernel distribution (ABC-SMC)
 	unsigned int individual_max;     // The maximum number of individuals (individual-based models)  
  	Algorithm algorithm;             // The algorithm used for simulation / inference
-	bool stochastic;                 // Detemines if stochastic
 	double burnin_frac;              // The fraction of samples used for burnin
 	AnnealType anneal_type;          // The type of annealing performed
 	double anneal_power;             // The power (if power annealing is used)
@@ -499,8 +498,8 @@ struct Details {                   // Stores details about simulation/inference/
 };
 
 struct FilterCla {                 // Used to filter a classification
-	vector <string> comp_prob_str;   // Sring giving the probability of being in compartment
-	FilterClaType type;              // Type of filter e.g. all comps, n file or specified by comp 
+	vector <string> comp_prob_str;   // String giving the probability of being in compartment
+	FilterClaType type;              // Type of filter e.g. all comps, in file or specified by comp 
 };
 
 struct Filter {                    // Used to filter populations etc.
@@ -550,10 +549,21 @@ struct CompRef {                   // References a particular compartment
 	string error;                    // Error message
 };
 
+struct Tag {                       // Stores information about a single tag in a command line
+	string name;
+	unsigned int pos;
+	unsigned int pos_end;
+	string value;
+	unsigned int done;
+};
+
 struct DataSource {                // Stores information about a data source
 	string name;                     // The name of the data source 
 	unsigned int index;              // Index within vector
 	Command cname;                   // The name of the command
+	Command cname_raw;               // The name before INIT_POP_SIM -> INIT_POP
+	vector <Tag> tags;               // Stores tags when DATA_SIM mode
+	string command_name;             // The name of the bici-command
 	Table table;                     // The table which stores the data
 	unsigned int focal_cl;           // The focal classification (for init_pop data only)
 	unsigned int p;                  // The species number
@@ -571,6 +581,12 @@ struct DataSource {                // Stores information about a data source
 	string seq_var_str;              // The initial sequence variation (used in GENETIC_DATA)
 	vector <LoadCol> load_col;       // Stores information about the loaded columns
 	unsigned int line_num;           // The line number which loads up the data source
+	bool active;                     // Determines if active or not
+};
+
+struct LinesRaw {                  // Stores the string and line number
+	string st;                       // Stores string
+	unsigned int li;                 // Stores original line number
 };
 
 struct IslandRef {                 // References an island (a group of connected compartments)
@@ -1960,5 +1976,32 @@ struct SpecPrecalcTime {           // Stores information about
 struct CubicSpline {               // Stores information about a segment in a cubic spline
 	vector <double> x,a,b,c,d;       // Parameters which defined cubic polynomial
 	SplineType type;                 // Type cubic of cubic +ve
+};
+
+struct Fragment {                          // A fragment of an input line 
+	string text;                             // Text in fragment
+	unsigned int pos, pos_end;               // Position of fragment
+	unsigned int quote;                      
+};
+
+struct CommandLine {                       // Stores a command line instruction
+	Command command;
+	string command_name;
+	unsigned int type_pos;
+	vector <Tag> tags;
+	unsigned int line_num;
+	string emsg;
+	bool fatal;
+};
+
+struct DataRef {                           // References a given data source 
+	DataSourceType type;                     // Whether coming from sim, inf, or post-sim
+	unsigned int p;                          // The species number
+	unsigned int i;                          // Index in source
+};
+
+struct Stratify {                          // Used when simulation stratified data
+	vector <unsigned int> cl_list;           // List of classification
+	vector < vector <unsigned int> > comb;   // List of combinations
 };
 

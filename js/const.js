@@ -6,13 +6,13 @@
 // 59127 lines of code (16/15/25)
 // 62667 lines of code (17/09/25)
 
-let ver="windows";         // Determines platform
-//let ver="linux";
+//let ver="windows";         // Determines platform
+let ver="linux";
 //let ver="mac";
 
 let mac_temp_dir = "/tmp/BICI_files/";
 
-let win_linux = false;                            // When working on win running linux 
+let win_linux = true;//false;                            // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
@@ -405,7 +405,7 @@ const FE_COL = DORANGE;
 const PARAM_COL = DRED;
 const SUM_COL = DPURPLE;
 
-const TI_DIV_MAX = 10000;                          // Maximum number of time divisions
+const TI_DIV_MAX = 1000000;                        // Maximum number of time divisions
 const DISPLAY_FILE_LEN_MAX = 100;
 const KEY_LINE_MAX = 100;                          // Maximum number of key lines on a graph   
 const KEY_MAX = 20;                                // Maximum number of elements on key

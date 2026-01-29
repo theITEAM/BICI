@@ -40,7 +40,8 @@ void StateSpecies::initialise_arrays()
 {	
 	auto G = sp.tra_gl.size();
 
-	if(sp.type == POPULATION){
+	switch(sp.type){
+	case POPULATION:
 		trans_num.resize(G);
 		tnum_mean_st.resize(G);
 		trans_num_f.resize(G);
@@ -51,9 +52,12 @@ void StateSpecies::initialise_arrays()
 			trans_num_f[tr].resize(T);
 			tnum_mean_st_f[tr].resize(T);
 		}
-	}		
+		break;
 	
-	if(sp.type == INDIVIDUAL){
+	case DETERMINISTIC:
+		break;
+		
+	case INDIVIDUAL:
 		nm_trans_ev_ref.resize(sp.nm_trans.size());
 		for(auto m = 0u; m < sp.nm_trans.size(); m++){
 			nm_trans_ev_ref[m].resize(T);
@@ -63,6 +67,7 @@ void StateSpecies::initialise_arrays()
 		for(auto n = 0u; n < sp.nm_trans_incomp.size(); n++){
 			nm_trans_incomp_ref[n].resize(T);
 		}
+		break;
 	}
 	
 	Li_ie.resize(sp.ind_eff_group.size());
@@ -322,7 +327,7 @@ void StateSpecies::simulate_individual_init()
 	const auto &precalc = param_val.precalc;
 	
 	switch(type){
-	case POPULATION:
+	case POPULATION: case DETERMINISTIC:
 		{
 			for(auto c = 0u; c < C; c++){
 				cpop[c] = double(init_cond_val.cnum[c]);
@@ -764,7 +769,7 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 		}
 		break;
 	
-	case POPULATION:
+	case POPULATION: case DETERMINISTIC:
 		{
 			const auto &tab = samp_sp.cpop_init_tab;
 			auto C = sp.comp_gl.size();
@@ -2056,8 +2061,11 @@ void StateSpecies::make_consistent(vector <Event> &event) const
 /// Sets cpop_st for population-based models (based on initial condition and trans_num)
 void StateSpecies::set_cpop_st()
 {	
-	if(sp.type != POPULATION) emsg("cpop_st only defined for population-based model");
-		
+	switch(sp.type){
+	case POPULATION: case DETERMINISTIC: break;
+	default: emsg("cpop_st only defined for population-based model"); break;
+	}
+
 	auto C = sp.comp_gl.size();
 	vector <double> cpop(C);
 	

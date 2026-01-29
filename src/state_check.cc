@@ -20,7 +20,7 @@ void State::check_trans_num(string ref)
 	for(auto p = 0u; p < model.species.size(); p++){	
 		const auto &sp = model.species[p]; 
 		auto &ssp = species[p];
-		if(sp.type == POPULATION){
+		if(sp.type == POPULATION || sp.type == DETERMINISTIC){
 			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 				for(auto ti = 0u; ti < T; ti++){
 					if(ssp.trans_num[tr][ti] < 0) emsg("trans_num has become negative"+ref);
@@ -167,6 +167,9 @@ void State::check(string ref)
 			
 		case POPULATION:
 			check_pop_like(p,ref);
+			break;
+		
+		case DETERMINISTIC:
 			break;
 		}
 		
@@ -758,7 +761,7 @@ void State::check_para_speedup(unsigned int p, string ref)
 		}
 		break;
 	
-	case POPULATION:	
+	case POPULATION: case DETERMINISTIC: 
 		{
 			auto dt = model.details.dt;
 			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
@@ -1120,7 +1123,7 @@ void State::check_cpop_st(string ref)
 			}
 			break;
 			
-		case POPULATION:
+		case POPULATION: case DETERMINISTIC:
 			{
 				auto cpop_st_st = ssp.cpop_st;
 				ssp.set_cpop_st();
@@ -1251,10 +1254,13 @@ void State::check_maps(string ref)
 			}
 			break;
 		
-		case POPULATION: 
+		case POPULATION:
 			for(auto i = 0u; i < model.species[p].tra_gl.size(); i++){
 				if(trans_map[p][i] != false) emsg("prob");
 			}
+			break;
+			
+		case DETERMINISTIC:
 			break;
 		}
 	}

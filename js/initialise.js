@@ -10,6 +10,8 @@ function initialise_BICI()
 
 	inter.graph = new Graph();
 
+	initialise_section();
+
 	initialise_pages();
 
 	inter.canvas = ById("myCanvas");
@@ -126,7 +128,7 @@ function load_pictures()
 {
 	let file_name = ["logo_big","speech","newmod","manual","paper","warn","warn_black","desc","zoomin","zoomout","desc","settings","copy_icon",
 	// These are pictures for homepage
-	"IBM","POP","SI","SIR","SIRErlang","SIRgamma","SIRD","SIRD_IBM","SIRD_IBM2","SIR_sex","SIR_sex2","scotland","SIS","SEIR","SIRwaning","world","uk","farm","farm2","carry","carryage","predprey","grid","dte","group","groupQG","envpathogen","covid","covidage","UK_grid","stop"
+	"IBM","POP","SI","SIR","SIRErlang","SIRgamma","SIRD","SIRD_IBM","SIRD_IBM2","SIR_sex","SIR_sex2","scotland","SIS","SEIR","SIRwaning","world","uk","farm","farm2","carry","carryage","predprey","grid","dte","group","groupQG","envpathogen","covid","covidage","UK_grid","stop","data","sim","SIind","SIindgroup","branchie","ecoage"
 	];
 
 	inter.npicloaded = 0;

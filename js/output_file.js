@@ -32,6 +32,8 @@ function create_output_file(save_type,one_file,map_store)
 	
 	check_integral_bounds(save_type);
 	
+	model.check_det_species(save_type);
+	
 	percent(45);
 	
 	for(let p = 0; p < model.species.length; p++){
@@ -434,8 +436,12 @@ function create_output_compartments(p,file_list,map_store,one_file)
 				add_warning({mess:"Transition problem.", mess2:"The value for '"+err_fl+"' is not specified", p:p, cl:cl, i:j, warn_type:"TransMistake"});
 			}
 			
-			if(sp.type == "Population" && nm_flag){ 		
-				add_warning({mess:"Transition problem.", mess2:"Transition '"+tr.name+"' cannot have a '"+tra_type+"' distribution because '"+sp.name+"' uses a population-based model.", p:p, cl:cl, i:j, warn_type:"TransMistake"});
+			if(nm_flag){
+				switch(sp.type){
+				case "Population": case "Deterministic":
+					add_warning({mess:"Transition problem.", mess2:"Transition '"+tr.name+"' cannot have a '"+tra_type+"' distribution because '"+sp.name+"' uses a population-based model.", p:p, cl:cl, i:j, warn_type:"TransMistake"});
+					break;
+				}
 			}
 			
 			let bp_te;
@@ -1191,6 +1197,8 @@ function create_output_ind_eff(p,file_list,one_file)
 			if(j > 0) ie += ",";
 			ie += ieg.ie_list[j].name;
 		}
+		
+		let name = ieg.name;
 			
 		te += 'ind-effect name="'+ieg.name+'" ie="'+ie+'"';
 		
@@ -2349,7 +2357,7 @@ function output_check(save_type)
 			}
 
 			switch(sp.type){
-			case "Population":
+			case "Population": case "Deterministic":
 				if(ninitpop == 0 && naddpop == 0 && model.source_exist(p) == false){
 					add_warning({mess:"No individuals", mess2:"Either 'Init. Pop.' or 'Add Pop.' must be set for species '"+sp.name+"'", warn_type:"InfPopulationProb", p:p});
 				}

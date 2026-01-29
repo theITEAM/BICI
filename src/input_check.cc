@@ -47,7 +47,7 @@ void Input::check_initial_pop_error(bool end)
 			
 			if(end == true){
 				switch(sp.type){
-				case POPULATION:
+				case POPULATION: case DETERMINISTIC:
 					if(ninitpop == 0 && naddpop == 0 && !sp.contains_source){
 						alert_import("Either 'Init. Pop.' or 'Add Pop.' must be set for species '"+name+"'");
 						return;
@@ -65,6 +65,9 @@ void Input::check_initial_pop_error(bool end)
 			break;
 		
 		case PPC:
+			break;
+			
+	 case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR:
 			break;
 			
 		default: alert_emsg_input("Should not be default3a"); return;
@@ -388,7 +391,7 @@ void Input::check_import_correct()
 		}
 		
 		// Checks that non-Markovian transitions not used for population models
-		if(sp.type == POPULATION){
+		if(sp.type == POPULATION || sp.type == DETERMINISTIC){
 			for(auto cl = 0u; cl < sp.ncla; cl++){
 				const auto &claa = sp.cla[cl];
 				for(const auto &tr : claa.tra){

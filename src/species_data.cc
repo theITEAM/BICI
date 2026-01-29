@@ -18,7 +18,7 @@ void Species::initialise_data(Operation mode)
 	T = details.T;
 	
 	init_cond.type = INIT_POP_NONE;
-	
+		
 	Hash hash_pop_filter; 
 	Hash hash_pop_trans_filter; 
 	
@@ -27,21 +27,23 @@ void Species::initialise_data(Operation mode)
 	for(const auto &so : source){
 		print_diag("load "+so.name);
 		
-		switch(so.cname){
-		case INIT_POP: init_pop_data(so); break;
-		case ADD_POP: add_pop_data(so,1); break;
-		case REMOVE_POP: add_pop_data(so,-1); break;
-		case ADD_IND: add_ind_data(so); break;
-		case REMOVE_IND: remove_ind_data(so); break;
-		case MOVE_IND: move_ind_data(so); break;
-		case COMP_DATA: comp_data(so); break;
-		case TEST_DATA: test_data(so); break;
-		case POP_DATA: population_data(so,hash_pop_filter); break;
-		case TRANS_DATA: trans_data(so); break;
-		case POP_TRANS_DATA: popu_trans_data(so,hash_pop_trans_filter); break;
-		case GENETIC_DATA: genetic_data(so); break;
-		default:
-			emsg_input("data type not added:"); break;
+		if(so.active){
+			switch(so.cname){
+			case INIT_POP: init_pop_data(so); break;
+			case ADD_POP: add_pop_data(so,1); break;
+			case REMOVE_POP: add_pop_data(so,-1); break;
+			case ADD_IND: add_ind_data(so); break;
+			case REMOVE_IND: remove_ind_data(so); break;
+			case MOVE_IND: move_ind_data(so); break;
+			case COMP_DATA: comp_data(so); break;
+			case TEST_DATA: test_data(so); break;
+			case POP_DATA: population_data(so,hash_pop_filter); break;
+			case TRANS_DATA: trans_data(so); break;
+			case POP_TRANS_DATA: popu_trans_data(so,hash_pop_trans_filter); break;
+			case GENETIC_DATA: genetic_data(so); break;
+			default:
+				emsg_input("data type not added:"); break;
+			}
 		}
 	}
 
@@ -107,7 +109,7 @@ void Species::init_pop_data(const DataSource &so)
 	
 	init_cond.type = so.init_pop_type;
 	init_cond.focal_cl = foc_cl;
-	
+
 	const auto &comp = comp_gl;
 	switch(init_cond.type){
 	case INIT_POP_FIXED:
@@ -923,7 +925,7 @@ void Species::population_data(const DataSource &so, Hash &hash_pop_filter)
 		auto time_str = tab.ele[j][0];
 		auto t = number(time_str);
 		if(t == UNSET){
-			alert_source("The time '"+time_str+"' is not a number4",so,0,j);
+			alert_source("The time '"+time_str+"' is not a number",so,0,j);
 			return;
 		}
 		
@@ -1433,6 +1435,19 @@ void Species::order_data_events()
 /// Given a string (e.g. "Sex=M,Loc=file") this constructs the filter
 Filter Species::set_comp_filt(string te, unsigned int cl_not_allow, BoundType bound, const DataSource &so)
 {
+	string err;
+	auto filt = set_comp_filt_raw(te,cl_not_allow,bound,err);
+	if(err != ""){
+		alert_source(err,so); 
+	}
+	
+	return filt;
+}
+
+
+/// Given a string (e.g. "Sex=M,Loc=file") this constructs the filter
+Filter Species::set_comp_filt_raw(string te, unsigned int cl_not_allow, BoundType bound, string &err) const
+{
 	Filter filt;
 	
 	filt.cla.resize(ncla);
@@ -1453,23 +1468,23 @@ Filter Species::set_comp_filt(string te, unsigned int cl_not_allow, BoundType bo
 		for(auto j = 0u; j < spl.size(); j++){
 			auto spl2 = split(spl[j],'=');
 			if(spl2.size() != 2){ 
-				alert_source("In 'filter' the expression '"+spl[j]+"' must contain an equals sign",so); 
+				err = "In 'filter' the expression '"+spl[j]+"' must contain an equals sign";
 				return filt;
 			}
 			
 			if(spl2[0] == ""){
-				alert_source("In 'filter' the value '"+spl[j]+"' does not specify a classification",so);
+				err = "In 'filter' the value '"+spl[j]+"' does not specify a classification";
 				return filt;
 			}
 			
 			auto cl = find_cl(spl2[0]);
 			if(cl == UNSET){ 
-				alert_source("In 'filter' the value '"+spl2[0]+"' is not a classification",so); 
+				err = "In 'filter' the value '"+spl2[0]+"' is not a classification"; 
 				return filt;
 			}
 			
 			if(cl == cl_not_allow){ 
-				alert_source("In 'filter' the value '"+spl2[0]+"' cannot be the same as the transition classification",so); 
+				err = "In 'filter' the value '"+spl2[0]+"' cannot be the same as the transition classification";
 				return filt;
 			}
 						
@@ -1481,7 +1496,7 @@ Filter Species::set_comp_filt(string te, unsigned int cl_not_allow, BoundType bo
 				string emsg;
 				filt.cla[cl].comp_prob_str = find_comp_prob_str(cl,spl2[1],bound,emsg);
 				if(emsg != ""){
-					alert_source(emsg,so); 
+					err = emsg;
 				}
 			}
 		}
@@ -1611,8 +1626,14 @@ string Species::add_bound(string te, BoundType bound) const
 {
 	stringstream ss;
 	switch(bound){
-	case LOWER_BOUND: ss << "max(" << te << "|" << LOW_BOUND << ")"; break;
-	case LOWER_UPPER_BOUND: ss << "min(max(" << te << "|" << LOW_BOUND << ")|" << UP_BOUND<< ")"; break;
+	case LOWER_BOUND:
+		ss << "max(" << te << "|" << LOW_BOUND << ")"; 
+		break;
+		
+	case LOWER_UPPER_BOUND: 
+		ss << "min(max(" << te << "|" << LOW_BOUND << ")|" << UP_BOUND<< ")";
+		break;
+
 	default: emsg_input("Bound not reconginsed"); break;
 	}
 	return ss.str();

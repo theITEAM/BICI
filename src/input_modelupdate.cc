@@ -18,13 +18,13 @@ void Input::add_species(string name, SpeciesType type, bool trans_tree)
 {
 	check_name_input(name,"Species name",true);
 	
-	auto p = find_p(name);
+	auto p = model.find_p(name);
 	if(p != UNSET){ alert_import("There is already a species with the name '"+name+"'"); return;}
 	
 	for(auto p = 0u; p < model.nspecies; p++){
 		const auto &sp = model.species[p];
 		
-		auto cl = find_cl(p,name);
+		auto cl = model.find_cl(p,name);
 		if(cl != UNSET){ alert_import("Cannot have the same name as classification '"+sp.cla[cl].name+"' "); return;}
 			
 		cl = find_cl_index(p,name);
@@ -60,7 +60,7 @@ void Input::add_classification(unsigned int p, string name, string index, Coord 
 		return;
 	}
 	
-	auto cl = find_cl(p,name);
+	auto cl = model.find_cl(p,name);
 	if(cl != UNSET){ alert_import("There is already a classification with the name '"+name+"'"); return;}
 	
 	if(name == index){ alert_import("Name and index must be different"); return;}
@@ -168,7 +168,7 @@ bool Input::add_transition(unsigned int p, unsigned int cl, unsigned int i, unsi
 		else{ tr.variety = NORMAL; tr.name = claa.comp[i].name+"→"+claa.comp[f].name;}
 	}
 	
-	if(sp.type == POPULATION){
+	if(sp.type == POPULATION || sp.type == DETERMINISTIC){
 		string type = "";
 		switch(tr.type){
 		case GAMMA: type = "gamma"; break;
@@ -420,7 +420,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 
 	for(auto p = 0u; p < model.species.size(); p++){
 		const auto &sp = model.species[p];
-		if(sp.type == POPULATION){
+		if(sp.type == POPULATION || sp.type == DETERMINISTIC){
 			if(sp.ind_effect.size() > 0){
 				const auto &ie = sp.ind_effect[0];
 				alert_line("A population-based model cannot have individual effects such as '["+ie.name+"]'",ie.line_num); 
@@ -869,7 +869,7 @@ void Input::create_markov_eqn_pop_ref()
 			}
 			break;
 			
-		case POPULATION:
+		case POPULATION: case DETERMINISTIC:
 			{
 				for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 					const auto &tra = sp.tra_gl[tr];
@@ -1421,7 +1421,7 @@ void Input::create_population_erlang()
 {
 	for(auto p = 0u; p < model.nspecies; p++){
 		auto &sp = model.species[p];
-		if(sp.type == POPULATION){
+		if(sp.type == POPULATION || sp.type == DETERMINISTIC){
 			for(auto cl = 0u; cl < sp.ncla; cl++){
 				auto &claa = sp.cla[cl];
 				auto tr = 0u;
@@ -4844,7 +4844,7 @@ void Input::setup_der_func_eqn()
 			switch(df.type){
 			case RNC: case GTC:
 				calc = true; 
-				if(sp.type == POPULATION){
+				if(sp.type == POPULATION || sp.type == DETERMINISTIC){
 					alert_line("'"+df.name+"' cannot be calculated for a population-based model.",der.line_num,true);
 				}
 				break;
@@ -5092,3 +5092,87 @@ void Input::set_param_state_output()
 	}
 }
   
+
+/// Loads state samples (either for post-sim, extend or data-sim)
+void Input::load_state_samples(unsigned int ch, string file)
+{
+	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
+	if(i == files.size()){
+		alert_import("Could not find the file '"+file+"'");
+		return;
+	}
+
+	const auto &flines = files[i].lines;	
+	
+	auto li = 0u;
+	
+	// Reads in individual key
+	vector <string> ind_key;
+	{
+		string warn = "Problem loading state file";
+		
+		while(li < flines.size() && trim(flines[li]) != "{") li++;
+		if(li == flines.size()) alert_import(warn);
+		li++;
+		
+		auto li_st = li;
+		
+		while(li < flines.size() && trim(flines[li]) != "}") li++;
+		if(li == flines.size()) alert_import(warn);
+		
+		for(auto i = li_st; i < li; i++){
+			auto st = trim(flines[i]);
+			if(st.length() > 0 && !begin_str(st,"#")){
+				if(begin_str(st,"timepoint")){
+				}
+				else{
+					if(begin_str(st,"spline-out")){
+						auto spl = split(st,' ');
+						if(spl.size() != 3){ alert_import(warn); return;}
+						
+						auto name = spl[1];
+						auto th = 0u;
+						while(th < model.param.size() && model.param[th].name != name) th++;
+						if(th == model.param.size()){ alert_import(warn); return;}
+						
+						auto &par = model.param[th];
+						if(!par.time_dep){ alert_import(warn); return;}
+						
+						if(!par.spline_out.on){
+							par.spline_out.on = true;
+							par.spline_out.list = split(spl[2],',');
+						}
+					}
+					else{
+						auto spl = split(st,':');
+						if(spl.size() != 2) alert_import(warn);
+						auto num = number(spl[0]);
+						auto name = spl[1];
+						if(num >= ind_key.size()) ind_key.resize(num+1);
+						ind_key[num] = name;
+					}
+				}
+			}
+		}
+		
+		while(li < flines.size() && !begin_str(flines[li],"<<")) li++;
+		if(li == flines.size()) alert_import(warn);
+	}
+	
+	vector <string> lines; 
+	
+	while(li < flines.size()){	
+		auto lin = trim(flines[li]);
+		if(lin.length() > 2 && lin.substr(0,2) == "<<"){
+			if(lines.size() > 0){
+				read_state_sample(ch,lines,ind_key);
+				if(model.mode == DATA_SIM) return;
+			}
+			lines.clear();
+		}
+		lines.push_back(lin);
+		li++;
+	}
+
+	if(lines.size() > 0) read_state_sample(ch,lines,ind_key);
+}

@@ -1,0 +1,16 @@
+# Model A1: No data 
+
+## Objective
+- This demonstrates the simplest possible data scenario, that in which only the initial conditions are specified. It is observed that the parameter follows the prior and the state maps out the same distribution as if directly simulating from the model (albeit in a much less computationally efficient way due to correlations inherent in MCMC). 
+
+## Data
+- None
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

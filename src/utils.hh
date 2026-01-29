@@ -57,6 +57,7 @@ double beta_probability(const double x, const double alpha, const double beta, s
 unsigned int poisson_sample(const double lam, string &warn);
 double poisson_probability(const int i, const double lam);
 double poisson_upper_probability_no_log(const int imin, const double lam);
+unsigned int neg_binommial_sample(double mean, double p, string &warn);
 double neg_binomial_probability(const int i, const double mean, const double p);
 unsigned int bernoulli_sample(const double p, string &warn);
 double bernoulli_probability(unsigned int x, const double p);
@@ -198,6 +199,7 @@ void calculate_cubic_spline_precalc(vector <double> &precalc, unsigned int i, co
 string prop_type_str(PropType type);
 void term_out(string te);
 string sig_fig(double num, unsigned int fig);
+string precision(double num, unsigned int dig);
 
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);
@@ -206,6 +208,10 @@ unsigned int der_func_check(unsigned int i, string te, string name, string &warn
 string basic_equation_check(string &te, EqnType eqn_type);
 string check_brackets_match(string te);
 string check_chnotallowed(string te);
+CommandLine get_command_tags(string trr, unsigned int line_num);
+CommandLine syntax_error(string emsg);
+void get_default_name(string &name, Command cname);
+
 unsigned int param_end(const string &st, unsigned int i, string &emsg);
 Poss sample_possibility(const vector <Poss> &pos);
 double sample_probability(unsigned int i, const vector <Poss> &pos);

@@ -712,6 +712,31 @@ double poisson_upper_probability_no_log(const int imin, const double lam)
 }
 
 
+/// Draws a sample from a negative binomial distribution
+unsigned int neg_binommial_sample(double mean, double p, string &warn)
+{
+	auto r = (unsigned int)(0.5+(mean*p/(1-p)));
+	if(r < 1) r = 1;
+	
+	if(mean > 100){ // Normal approximation
+		auto sd = sqrt(r*(1-p)/(p*p));
+		
+		double val;
+		do{
+			val = (unsigned int)(normal_sample(mean,sd,warn)+0.5);
+		}while(val < 0);
+		return val;
+	}
+	
+	auto nfail = 0u, nsuc = 0u; 
+	do{
+		if(ran() < p) nsuc++;
+		else nfail++;
+	}while(nsuc < r);
+	return nfail;
+}
+
+
 /// The log probability of the negative binomial distribution
 double neg_binomial_probability(const int k, const double mean, const double p)
 {	
@@ -3825,6 +3850,7 @@ string prop_type_str(PropType type)
 {
 	switch(type){
 	case PARAM_PROP: return "param";
+	case PARAM_DET_PROP: return "param-det";
 	case IND_EVENT_TIME_PROP: return "ind-event-time";
 	case IND_MULTI_EVENT_PROP: return "ind-multi-event";
 	case IND_EVENT_ALL_PROP: return "ind-event-all";
@@ -3893,4 +3919,13 @@ string sig_fig(double num, unsigned int fig)
 	auto ans = pow(10,log10(ro)+sh);
 	
 	return tstr(ans);
+}
+
+
+/// Sets the precision of a number
+string precision(double num, unsigned int dig)
+{
+	stringstream ss;
+	ss << std::setprecision(dig) << num;
+	return ss.str();	
 }

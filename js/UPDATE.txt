@@ -1,10 +1,3 @@
-Hi Grant,
-
-So I've finally sorted out your issues. There were two problems: (1) you were trying to do something that wasn't possible (although perfectly sensible) and (2) I hadn't added the error checking code to tell the user this wasn't possible. 
-
-Basically there is a distinction between time-varying parameters and time-varying equations. So for example the equation "{I}" represents a time varying equation (it tracks the population in compartment I over time). But a time-varying parameter has to have a time-varying spline defined, and so this has restrictions associated with it.
-
-So to do what you are wanting to do, I've come up with a new way to define parameters through the "define" command. This is available both in the interface and in BICI-script. Basically it allows the user to substitute a parameter with an equation and in doing so the parameter itself is removed from the model. 
 
 
 
@@ -12,10 +5,13 @@ JAMIE
 
  
 GRANT
-- Correct issue with exporting files
-- Introduced 'define' command. This allows for equation expressions to be simplified by spliting them up into managable pieces.
+
 
 
 CHRIS
-- Tried to add in some error checking for reparameterisation, defining and derived quantities, both in the interfact and core code.
+- I've increased the maximum number of timesteps from 10000 to 1000000 (this was a request from Laura, which is 
+- I've added a paragraph about the potential for populations to become negative in population-based models.
+- Corrected problem with margin disapparing when stretched vertically.
+- Allows for a lot of the data on graphs to be exported as a .csv (useful for anyone wanting to create graphs in another package).
+- Corrected issue with trying to export parameters and state samples
 

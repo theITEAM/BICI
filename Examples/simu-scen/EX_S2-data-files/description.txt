@@ -1,0 +1,18 @@
+﻿# Example S2: Uncertain initial conditions for PBM (single classification)
+
+## Objective
+- Introduce uncertainty in the initial population for a population-based model.
+- This considers the case of a model with just a single classification.
+- On the 'Simulation→Population' page the initial population is set as a distribution (rather than fixed).
+
+- 100 simulations are performed to see stochastic variation.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+
+## Population
+- The initial population in the $S$ compartment is sampled uniformly in the range between 900 and 1100.
+- The initial population in the $I$ compartment is sampled uniformly in the range between 0 and 50.

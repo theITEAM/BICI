@@ -19,33 +19,12 @@ struct TransDef {                          // Transition reference
 	bool set;
 };
 
-struct Fragment {                          // A fragment of an input line 
-	string text;                             // Text in fragment
-	unsigned int pos, pos_end;               // Position of fragment
-	unsigned int quote;                      
-};
-
 struct FileStore {                         // Used to store a fi;e
 	string name;                             // Filename
 	char sep;                                // Seperator
 	vector <string> lines;                   // Lines in file
 };
 
-struct Tag {                               // Stores information about a single tag in a command line
-	string name;
-	unsigned int pos;
-	unsigned int pos_end;
-	string value;
-	unsigned int done;
-};
-
-struct CommandLine {                       // Stores a command line instruction
-	Command command;
-	string command_name;
-	unsigned int type_pos;
-	vector <Tag> tags;
-	unsigned int line_num;
-};
 
 struct DataTemplate {                      // Used to store information about loading data columns
 	DataTemplate(Command cna, vector <string> co){ cname = cna; cols = co;};
@@ -111,8 +90,8 @@ class Input                                // Stores information about the model
 		vector <CommandLine> extract_command_line(vector <string> lines);
 		void load_data_files(vector <CommandLine> &command_line);
 		string remove_escape_char(string te);
-		CommandLine get_command_tags(string trr, unsigned int line_num);
-		CommandLine syntax_error() const;
+		//CommandLine get_command_tags(string trr, unsigned int line_num);
+		//CommandLine syntax_error() const;
 		void alert(string st);
 		void add_error_mess(unsigned int line_num, string st, ErrorType type);
 		void alert_import(string st, bool fatal=false);  
@@ -166,10 +145,11 @@ class Input                                // Stores information about the model
 		bool post_sim_command();
 		void ind_effect_command();
 		void fixed_effect_command();
-		void import_data_table_command(Command cname);
+		void import_data_table_command(const CommandLine &cline, bool active);
 		void map_command();
 		void inf_param_command();
 		void inf_state_command();
+		void sim_state_command();
 		void warning_command();
 		void dummy_file_command();
 		
@@ -253,10 +233,10 @@ class Input                                // Stores information about the model
 		void setup_der_func(DerFuncType df_type, string te, DerFunc &df);
 		void setup_der_func_eqn();
 		void set_param_state_output();
+		void load_state_samples(unsigned int ch, string file);
 		
 		// In 'input_utils.cc'
-		unsigned int find_p(string name) const;
-		unsigned int find_cl(unsigned int p, string name) const;
+		
 		unsigned int find_cl_index(unsigned int p, string index) const;
 		unsigned int find_c(unsigned int p, unsigned int cl, string name) const;
 		bool check_claa_error();
@@ -265,8 +245,6 @@ class Input                                // Stores information about the model
 		bool check_comp_exist(string name, unsigned int p);
 		Table load_table(const string file, string desc="");
 		Table get_subtable(const Table &tab, const vector <string> &col_name, string desc="");
-		unsigned int get_cl_from_comp(string name, unsigned int p) const;
-		unsigned int get_cl_from_trans(string name, unsigned int p) const;
 		unsigned int find_string_in(const vector <string> &arr, string val) const;
 		bool set_loadcol(Command cname, DataSource &ds);
 		void set_SNP_columns(const Table &tab, DataSource &ds);

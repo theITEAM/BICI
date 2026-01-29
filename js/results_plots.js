@@ -165,6 +165,8 @@ function graph_pop_calculate(result,rpf,burn,p)
 
 			let co = tab.ncol-1;
 
+			let key_na = "Data";
+			
 			for(let j = 0; j < tab.nrow; j++){
 				let t = Number(tab.ele[j][0]);
 				
@@ -236,10 +238,10 @@ function graph_pop_calculate(result,rpf,burn,p)
 						}
 					}
 					
-					data.push({type:"Cross", x:t, y:val_data, col:RED});	
+					data.push({key_na:key_na, type:"Cross", x:t, y:val_data, col:RED});	
 				}
 			}
-			key.push({type:"Cross", te:"Data", col:RED});
+			key.push({type:"Cross", te:key_na, col:RED});
 		}
 	}
 	else{
@@ -367,23 +369,26 @@ function graph_pop_calculate(result,rpf,burn,p)
 				
 					switch(view){
 					case "Graph": case "Graph (all)": case "Graph (split)": case "Graph (lines)":
-					
-						for(let j = 0; j < line.length; j++){
-							data.push({point:line[j], col:claa.comp[c].col, view:view, type:"Line"});
-							
-							if(view == "Graph (lines)" && data.length > GRAPH_LINE_MAX){
-								line_max = true; break;
+						{
+							let key_na = claa.comp[c].name;
+							for(let j = 0; j < line.length; j++){
+								data.push({point:line[j], col:claa.comp[c].col, view:view, key_na:key_na, type:"Line"});
+								
+								if(view == "Graph (lines)" && data.length > GRAPH_LINE_MAX){
+									line_max = true; break;
+								}
 							}
+							
+							key.push({type:"Line", te:key_na, col:col, c:c});
 						}
-						
-						key.push({type:"Line", te:claa.comp[c].name, col:col, c:c});
 						break;
 						
 					case "Graph (CI)": case "Data":
 						{
 							let line_stats = get_line_stats(line);
-							data.push({point:line_stats, col:col, type:"Line CI"});
-							key.push({type:"Line", te:claa.comp[c].name, col:col, c:c});
+							let key_na = claa.comp[c].name;
+							data.push({point:line_stats, col:col, key_na:key_na, type:"Line CI"});
+							key.push({type:"Line", te:key_na, col:col, c:c});
 						}
 						break;
 						
@@ -642,7 +647,8 @@ function graph_trans_calculate(result,rpf,burn,p)
 	if(!sp.tr_tra_gl_ref) set_tr_tra_gl_ref(sp);
 
 	let step = rpf.sel_timestep.i;
-
+	if(rpf2.type == "Deterministic") step = 1;
+	
 	let data = [];
 
 	let key = [];
@@ -729,6 +735,7 @@ function graph_trans_calculate(result,rpf,burn,p)
 					line_post.push(point);
 				}
 			}
+			
 			add_line(view,line_post,BLUE,posterior_name(result),data,key);
 			
 			for(let t = 0; t < T; t++) line_mean[t] /= nline_mean;
@@ -944,6 +951,7 @@ function graph_trans_expect_calculate(result,rpf,burn,p,type)
 {
 	// Sets classification
 	let rpf2 = rpf.species[p];
+	
 	let cl = rpf2.sel_class.cl;
 
 	// Incorprates filters
@@ -990,6 +998,8 @@ function graph_trans_expect_calculate(result,rpf,burn,p,type)
 	}
 	
 	let col_line = get_col_trans(claa);
+	
+	let key_na = "Expected";
 	
 	let stepp = get_percent_step(claa.ntra);
 	for(let j = 0; j < claa.ntra; j++){
@@ -1090,11 +1100,11 @@ function graph_trans_expect_calculate(result,rpf,burn,p,type)
 			}				
 				
 			let col_sh = shift_colour(col,0.6);
-			data.push({point:point, col:col_sh, view:view, type:"Line", dash:TRANS_EXP_DASH, thick:TRANS_EXP_THICK});
+			data.push({point:point, col:col_sh, view:view, type:"Line", dash:TRANS_EXP_DASH, thick:TRANS_EXP_THICK, key_na:key_na});
 		}
 	}
 	
-	key.push({type:"Line", te:"Expected", col:BLACK, dash:TRANS_EXP_DASH, thick:TRANS_EXP_THICK});
+	key.push({type:"Line", te:key_na, col:BLACK, dash:TRANS_EXP_DASH, thick:TRANS_EXP_THICK});
 	
 	post({type:"Graph define", variety:"Transition", view:view, data:data, op:{ def_xrange:time_range(result.details), x_label:"Time", y_label:"Transition rate", key:key, line_max:line_max}});
 }
@@ -1170,7 +1180,7 @@ function graph_trans_hbin_calculate(result,rpf,burn,p,type)
 				let name = (b/H_BIN)+"-"+((b+1)/H_BIN);
 				let stat = get_statistic(hbin[b]);
 				data.push({type:"Bar", name:name, x:b+0.5, y:stat.mean, thick:bar_thick, col:GREY});
-				data.push({type:"ErrorBar", x:b+0.5, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
+				data.push({key_na:"Bar", name:name, type:"ErrorBar", x:b+0.5, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
 			}
 			
 			post({type:"Graph define", variety:"Histogram", view:"Histogram", data:data, op:{x_label:"Probability distribution", x_param:false, y_label:"Frequency"}});
@@ -1190,7 +1200,7 @@ function graph_trans_hbin_calculate(result,rpf,burn,p,type)
 		
 			let col_line = get_col_trans(claa);
 			
-			let view = rpf.sel_diag_view.te;
+			let view = rpf2.sel_diag_view.te;
 			
 			for(let j = 0; j < claa.ntra; j++){	
 				if(line_filt == undefined || line_filt[j].check == true){		
@@ -1255,8 +1265,9 @@ function graph_trans_hbin_calculate(result,rpf,burn,p,type)
 				
 					let stat = get_statistic(vec);
 				
-					data.push({type:"Bar", name:claa.tra[j].name, x:j+0.5, y:stat.mean, thick:bar_thick, col:col_line[j]});
-					data.push({type:"ErrorBar", x:j+0.5, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
+					let na = claa.tra[j].name;
+					data.push({type:"Bar", name:na, x:j+0.5, y:stat.mean, thick:bar_thick, col:col_line[j]});
+					data.push({key_na:"Bar", name:na, key_na:"Error bar", type:"ErrorBar", x:j+0.5, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
 				}
 			}
 			
@@ -1296,7 +1307,7 @@ function add_line(view,line,col,name,data,key)
 	switch(view){
 	case "Graph": case "Graph (all)": case "Graph (split)": case "Graph (lines)":
 		for(let j = 0; j < line.length; j++){
-			data.push({point:line[j], col:col, view:view, type:"Line"});
+			data.push({point:line[j], col:col, view:view, key_na:name, type:"Line"});
 		}
 		key.push({type:"Line", te:name, col:col});
 		break;
@@ -1304,7 +1315,7 @@ function add_line(view,line,col,name,data,key)
 	case "Graph (CI)": case "Data":
 		{
 			let line_stats = get_line_stats(line);
-			data.push({point:line_stats, col:col, type:"Line CI"});
+			data.push({point:line_stats, col:col, key_na:name, type:"Line CI"});
 			key.push({type:"Line", te:name, col:col});
 		}
 		break;
@@ -1371,10 +1382,12 @@ function add_individual_buts(res,lay)
 	// Sets species
 	let p = model.get_p();
 	
-	if(rpf.species[p].type == "Population"){
+	switch(rpf.species[p].type){
+	case "Population": case "Deterministic":
 		inter.graph.no_graph(cx,cy,graph_width-right_menu_width,29,lay,"No individual data for a population model.");
 		inter.graph.init = "no data";
 		return;
+		break;
 	}
 
 	cy += 1;
@@ -1429,7 +1442,10 @@ function add_diagnostic_buts(res,lay)
 	
 	let rpf = res.plot_filter;
 	
-	let view = rpf.sel_diag_view.te;
+	let p = model.get_p();
+	let rpf2 = rpf.species[p];
+			
+	let view = rpf2.sel_diag_view.te;
 
 	switch(view){
 	case "Proposals":
@@ -2042,8 +2058,9 @@ function graph_ind_sing_calculate(ind_sel,result,rpf,burn,p)
 				{
 					let line_stats = get_line_stats(line);
 		
-					data.push({point:line_stats, col:col, type:"Line CI"});
-					key.push({type:"Line", te:claa.comp[c].name, col:col, c:c});
+					let key_na = claa.comp[c].name;
+					data.push({point:line_stats, col:col, key_na:key_na, type:"Line CI"});
+					key.push({type:"Line", te:key_na, col:col, c:c});
 					if(key.length > KEY_LINE_MAX){ line_max = true; break;}
 				}
 				break;
@@ -3294,8 +3311,9 @@ function add_first_inf_ind(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 			if(j < fa.length){
 				let stat = get_statistic(fa);
 				
-				data.push({type:"Bar", name:ind.name, x:x+0.5, y:stat.mean, thick:bar_thick, col:DGREY});
-				data.push({type:"ErrorBar", x:x+0.5, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
+				let na = ind.name;
+				data.push({type:"Bar", name:na, x:x+0.5, y:stat.mean, thick:bar_thick, col:DGREY});
+				data.push({key_na:"Bar", name:na, type:"ErrorBar", x:x+0.5, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
 				x++;
 			}
 		}
@@ -3350,7 +3368,7 @@ function add_first_inf_comp(imin,imax,tmin,tmax,chsel,result,rpf,burn,p,cl)
 	let x = 0;
 	for(let c = 0; c < claa.comp.length; c++){
 		if(dist[c] > 0){
-			data.push({type:"Bar", name:claa.comp[c].name, x:x+0.5, y:dist[c], thick:bar_thick, col:DGREY});
+			data.push({key_na:"Bar", type:"Bar", name:claa.comp[c].name, x:x+0.5, y:dist[c], thick:bar_thick, col:DGREY});
 			x += 1;
 		}
 	}
@@ -3792,17 +3810,30 @@ function add_line_to_data(view,name,col,line,key,data)
 {
 	switch(view){
 	case "Graph": case "Graph (all)": case "Graph (split)": case "Graph (lines)": 
-		for(let k = 0; k < line.length; k++){
-			data.push({point:line[k], col:col, view:view, type:"Line"});
+		if(name == ""){
+			for(let k = 0; k < line.length; k++){
+				data.push({point:line[k], col:col, view:view, type:"Line"});
+			}
 		}
-		if(name != "") key.push({type:"Line", te:name, col:col});
+		else{
+			for(let k = 0; k < line.length; k++){
+				data.push({point:line[k], col:col, view:view, key_na:name, type:"Line"});
+			}
+			key.push({type:"Line", te:name, col:col});
+		}
 		break;
 		
 	case "Graph (CI)": case "Data":
 		{
 			let line_stats = get_line_stats(line);
-			data.push({point:line_stats, col:col, type:"Line CI"});
-			if(name != "") key.push({type:"Line", te:name, col:col});
+			
+			if(namr == ""){
+				data.push({point:line_stats, col:col, type:"Line CI"});
+			}
+			else{
+				data.push({point:line_stats, col:col, key_na:name, type:"Line CI"});
+				key.push({type:"Line", te:name, col:col});
+			}
 		}
 		break;
 
@@ -3822,9 +3853,9 @@ function test_graph(lay)
 		if(inter.graph.init != true){
 			inter.graph.init = true;
 			let data = [];
-			data.push({type:"Bar", name:"A", x:0.5, y:3, thick:0.7, col:RED});
+			data.push({key_na:"Bar", type:"Bar", name:"A", x:0.5, y:3, thick:0.7, col:RED});
 			data.push({type:"ErrorBar", x:0.5, ymin:2, y:3, ymax:5, col:BLACK});
-			data.push({type:"Bar", name:"B", x:1.5, y:10, thick:0.7, col:GREEN});
+			data.push({key_na:"Bar", type:"Bar", name:"B", x:1.5, y:10, thick:0.7, col:GREEN});
 			
 			inter.graph.define("Histogram","Histogram",data,{x_label:"Category", y_label:"Value"});
 		}
@@ -4079,10 +4110,14 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 						}
 			
 						let col = col_list[i];
-						data.push({point:point, col:col, type:type});
+						
 						if(name != "" && view != "Graph (split)"){
+							data.push({point:point, col:col, key_na:name, type:type});
 							key.push({type:"Line", te:name, col:col});
 							if(key.length > KEY_LINE_MAX){ line_max = true; break;}
+						}
+						else{
+							data.push({point:point, col:col, type:type});
 						}
 						
 						// Adds in simuation values
@@ -4215,10 +4250,15 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 					for(let i = 0; i < vec.length; i++){
 						let ind = [i]; 
 						
-						data.push({type:"Bar", name:par.list[0][i], x:i+0.5, y:value[i], thick:bar_thick, col:col_list[i]});
-						
+						let na = par.list[0][i];
 						if(CImin != undefined){
-							data.push({type:"ErrorBar", x:i+0.5, ymin:CImin[i], y:value[i], ymax:CImax[i], col:BLACK});
+							
+							data.push({type:"Bar", name:na, x:i+0.5, y:value[i], thick:bar_thick, col:col_list[i]});
+						
+							data.push({key_na:"Bar", name:na, type:"ErrorBar", x:i+0.5, ymin:CImin[i], y:value[i], ymax:CImax[i], col:BLACK});
+						}
+						else{
+							data.push({key_na:"Bar", type:"Bar", name:na, x:i+0.5, y:value[i], thick:bar_thick, col:col_list[i]});
 						}
 						
 						if(sim_val_on){
@@ -4704,9 +4744,8 @@ function graph_param_calculate(result,rpf,burn)
 						
 						let col = get_colour(ch-chmin);
 						
-						data.push({point:point, col:col, type:"Line"});
-					
-						let lab = "Sample"; if(result.chains.length > 1) lab = "Chain "+cha;
+						let lab = "Sample"; if(result.chains.length > 1) lab = "Chain "+cha;	
+						data.push({point:point, col:col, key_na:lab, type:"Line"});
 						key.push({type:"Line", te:lab, col:col});
 					}
 					
@@ -4853,11 +4892,18 @@ function graph_generation_calculate(result,rpf,burn)
 		}
 	}
 										
-	data.push({point:pmean, col:GENRATION_COL, type:"Line"});
-	data.push({point:pCImin, col:GENRATION_CI_COL, type:"Line", dash:GENRATION_DASH});
-	data.push({point:pCImax, col:GENRATION_CI_COL, type:"Line", dash:GENRATION_DASH});			
-	key.push({type:"Line", te:"Mean", thick:GENRATION_THICK, col:GENRATION_COL});
-	key.push({type:"Line", te:"95% CI", thick:GENRATION_THICK, dash:GENRATION_DASH, col:GENRATION_CI_COL});
+	{
+		let key_na = "Mean";
+		data.push({point:pmean, col:GENRATION_COL, key_na:key_na, type:"Line"});
+		key.push({type:"Line", te:key_na, thick:GENRATION_THICK, col:GENRATION_COL});
+	}
+	
+	{
+		let key_na = "95% CI";
+		data.push({point:pCImin, col:GENRATION_CI_COL, key_na:key_na, type:"Line", dash:GENRATION_DASH});
+		data.push({point:pCImax, col:GENRATION_CI_COL, key_na:key_na, type:"Line", dash:GENRATION_DASH});			
+		key.push({type:"Line", te:key_na, thick:GENRATION_THICK, dash:GENRATION_DASH, col:GENRATION_CI_COL});
+	}
 	
 	let sample = result.par_sample;
 	if(par.type == "derive_param" && par.time_dep) sample = result.sample;
@@ -4875,8 +4921,9 @@ function graph_generation_calculate(result,rpf,burn)
 	if(vec.length > 0){
 		let stat = get_statistic(vec);
 	
-		data.push({type:"ErrorBar", x:end, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
-		key.push({type:"ErrBar", te:posterior_name(result), thick:GENRATION_THICK, col:BLACK});
+		let key_na = posterior_name(result);
+		data.push({key_na:key_na, type:"ErrorBar", x:end, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
+		key.push({type:"ErrBar", te:key_na, thick:GENRATION_THICK, col:BLACK});
 	}
 	
 	if(rpf.sim_val.check == true){
@@ -5403,9 +5450,9 @@ function setup_distribution(result,rpf,burn)
 		}
 		
 		if(point.length > 0){
-			data.push({point:point, col:BLACK, thick:1, type:"PriorLine"});
-		
-			key.push({type:"Line", te:"Prior", thick:1, col:BLACK, dash:0});
+			let key_na = "Prior";
+			data.push({point:point, col:BLACK, thick:1, key_na:key_na, type:"PriorLine"});
+			key.push({type:"Line", te:key_na, thick:1, col:BLACK, dash:0});
 		}
 	}
 
@@ -5583,9 +5630,13 @@ function distribution_add_data_line(vec,name,col,data,key,rpf,show_mean,clip_min
 		data.push({te:"Mean", col:BLACK, thick:1, x:stat.mean, type:"VertLine"});
 	}
 	
-	data.push({point:point, col:col, CImin:stat.CImin, CImax:stat.CImax, type:"Distribution"});
-	
-	if(name != "") key.push({type:"Line", te:name, col:col});
+	if(name == ""){
+		data.push({point:point, col:col, CImin:stat.CImin, CImax:stat.CImax, type:"Distribution"});
+	}
+	else{
+		data.push({point:point, col:col, CImin:stat.CImin, CImax:stat.CImax, key_na:name, type:"Distribution"});
+		key.push({type:"Line", te:name, col:col});
+	}
 }
 
 

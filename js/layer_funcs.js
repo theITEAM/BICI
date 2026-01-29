@@ -40,8 +40,9 @@ function generate_screen(update)
 	let wid_show = Math.round(height*ratio);
 	let hei_show = height;
 	
-	if(wid_show > width){
-		wid_show = width; hei_show = Math.round(wid_show/ratio);
+	let mar = 22;
+	if(wid_show > width-mar){
+		wid_show = width-mar; hei_show = Math.round(wid_show/ratio);
 	}
 
 	inter.sca = wid_show/page_char_wid;
@@ -671,8 +672,13 @@ function add_screen_buts(lay)
 				
 				switch(tree[2]){
 				case "Diagnostics":
-					switch(rpf.sel_diag_view.te){
-					case "Trans. (dist.)": right_mid = "with key"; break;
+					{
+						let p = model.get_p();
+						let rpf2 = rpf.species[p];
+						
+						switch(rpf2.sel_diag_view.te){
+						case "Trans. (dist.)": right_mid = "with key"; break;
+						}
 					}
 					break;
 					

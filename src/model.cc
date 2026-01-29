@@ -14,10 +14,11 @@ using namespace std;
 #include "matrix.hh"
 
 /// Initialises the model 
-Model::Model(Operation mode_, ExtFactor ext_factor_) : precalc_eqn(species_simp,spline,param_vec,pop,constant,timepoint,details)
+Model::Model(Operation mode_, ExtFactor ext_factor_, bool no_question_) : precalc_eqn(species_simp,spline,param_vec,pop,constant,timepoint,details)
 {
 	mode = mode_; 
 	ext_factor = ext_factor_;	
+	no_question = no_question_;
 	sync_on = true;
 	nspecies = 0;
 };
@@ -2371,7 +2372,7 @@ void Model::precalc_affect()
 			}
 			break;
 			
-		case POPULATION:
+		case POPULATION: case DETERMINISTIC:
 			{
 				map_me[p].resize(sp.tra_gl.size(),false);
 				for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
@@ -2671,6 +2672,9 @@ void Model::add_affect_like(unsigned int i, unsigned int i2, const vector <bool>
 				param_vec_add_affect(pvec.affect_like,al);
 				map_me[p][e] = false;
 			}
+			break;
+			
+		case DETERMINISTIC:
 			break;
 		}
 	}
@@ -3263,4 +3267,169 @@ vector <string> Model::equation_dep(string te, string &warn)
 		
 	return dep;
 }
+
+
+/// Returns the species number from its name
+unsigned int Model::find_p(string name) const 
+{
+	for(auto p = 0u; p < nspecies; p++){
+		if(toLower(species[p].name) == toLower(name)) return p;
+	}
+	return UNSET;
+}
+
+
+/// Returns the classification number from its name
+unsigned int Model::find_cl(unsigned int p, string name) const 
+{
+	const auto &sp = species[p];
+	for(auto cl = 0u; cl < sp.ncla; cl++){
+		if(toLower(sp.cla[cl].name) == toLower(name)) return cl;
+	}
+	return UNSET;
+}
+
+
+/// Determines if in a data mode
+bool Model::data_mode() const 
+{
+	switch(mode){
+	case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: return true;
+	default: break;
+	}
+	
+	return false;
+}
+
+
+/// Determines if model doesn't need to be processed
+bool Model::no_process() const 
+{
+	switch(mode){
+	case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: return true;
+	default: break;
+	}
+	
+	return false;
+}
+
+
+/// Asks a question
+bool Model::question(string st) const 
+{
+	if(no_question) return true;
+	
+	char type;
+	do{
+		cout << st << " [y/n]" << endl;
+		cin >> type;
+		if(type == 'y' || type == 'Y') return true;
+		if(type == 'n' || type == 'N') return false;
+	}while( !cin.fail());
+	return false;
+}
+
+/// Gets the classification from the trans name (or if formated using S->E|E->I or S->E:0.5|E->I:1) 
+unsigned int Model::get_cl_from_trans(string name, unsigned int p) const
+{
+	const auto &sp = species[p];
+	
+	name = replace(name,"->","→");
+
+	auto spl = split_with_bracket(name,'|');
+	
+	if(spl.size() == 1){	
+		auto spl2 = split(name,':');
+		for(auto cl = 0u; cl < sp.ncla; cl++){
+			const auto &claa = sp.cla[cl];
+			for(auto c = 0u; c < claa.ntra; c++){
+				if(claa.tra[c].name == spl2[0]) return cl;
+			}
+		}
+	}
+	else{
+		auto cl_st = UNSET;
+		for(auto i = 0u; i < spl.size(); i++){
+			auto cl = get_cl_from_trans(spl[i],p);
+			if(cl_st == UNSET) cl_st = cl;
+			else{
+				if(cl_st != cl) return UNSET;
+			}
+		}
+		return cl_st;
+	}
+	
+	return UNSET;
+}
+
+
+/// Gets the classification from the compartment name (or if formated using S|E or S:0.5|E:1) 
+unsigned int Model::get_cl_from_comp(string name, unsigned int p) const
+{
+	const auto &sp = species[p];
+
+	auto spl = split_with_bracket(name,'|');
+	
+	if(spl.size() == 1){	
+		auto spl2 = split(name,':');
+		for(auto cl = 0u; cl < sp.ncla; cl++){
+			const auto &claa = sp.cla[cl];
+			for(auto c = 0u; c < claa.ncomp; c++){
+				if(claa.comp[c].name == spl2[0]) return cl;
+			}
+		}
+	}
+	else{
+		auto cl_st = UNSET;
+		for(auto i = 0u; i < spl.size(); i++){
+			auto cl = get_cl_from_comp(spl[i],p);
+			if(cl_st == UNSET) cl_st = cl;
+			else{
+				if(cl_st != cl) return UNSET;
+			}
+		}
+		return cl_st;
+	}
+	
+	return UNSET;
+}
+
+
+/// Calculate the equation for a string
+double Model::calculate_equation_zero_one(string te, double tdiv, string &err) 
+{
+	auto val = calculate_equation(te,tdiv,err);
+	if(err == ""){
+		if(val < 0 || val > 1) err = "Fraction must be between zero and one.";
+	}
+	
+	return val;
+}
+
+
+/// Calculate the equation for a string
+double Model::calculate_equation(string te, double tdiv, string &err) 
+{
+	auto ti = get_ti(tdiv);
+	
+	auto p = UNSET, cl = UNSET;
+	
+	auto eqi = add_equation_info(te,MODEL_CALC,p,cl);
+	if(eqi.error){
+		err = eqi.emsg;
+		return UNSET;
+	}
+	
+	Equation eq(eqi.te,eqi.type,eqi.p,eqi.cl,eqi.infection_trans,ti,UNSET,species_simp,param,prior,derive,spline,param_vec,density,pop,hash_pop,constant,timepoint,details,define);
+	
+	if(eq.warn != ""){
+		err = eq.warn;
+		return UNSET;
+	}
+	else{
+		vector <double> precalc;
+		return eq.calculate_no_popnum(ti,precalc);
+	}
+}
+
 

@@ -605,7 +605,10 @@ function button_action(bu,action_type)
 	case "Dropdown":
 		if(inter.dropdown.source == bu.source) inter.dropdown = {};
 		else{
-			if(inter.bubble && inter.bubble.lay_name == "Frame") close_bubble();
+			let bub = inter.bubble;
+			if(bub && bub.lay_name == "Frame"){
+				close_bubble();
+			}
 			inter.dropdown = {source:bu.source, style:bu.style};
 		}
 		break;
@@ -2307,6 +2310,31 @@ function button_action(bu,action_type)
 	case "ExportMatrixTable":
 		close_bubble();
 		saving_dialogue("",".csv","Export matrix table");
+		break;
+		
+	case "SelectDataLine":
+		inter.bubble.line_radio = {value:0, noupdate:true};
+		change_bubble_mode("SelectLine");
+		break;
+	
+	case "ExportDataLine":
+		inter.dg_sel = 0;
+		close_bubble();
+		saving_dialogue("",".csv","Export line");
+		break;
+		
+	case "ExportLine":
+		inter.dg_sel = inter.bubble.line_radio.value;
+		close_bubble();
+		saving_dialogue("",".csv","Export line");
+		break;
+		
+	case "Section":
+		inter.section_sel = bu.i;
+		break;
+		
+	case "BackSection":
+		inter.section_sel = undefined;
 		break;
 		
 	case "CopyData":

@@ -530,7 +530,7 @@ function add_data_buts(lay,siminf)
 			}
 			
 			switch(sp.type){
-			case "Population":
+			case "Population": case "Deterministic":
 				{
 					let te = add_pop_text, ti = "Add Population";
 					if(siminf == "gen"){ te = sim_add_pop_text; ti = "Generate added population data";}

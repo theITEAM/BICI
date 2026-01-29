@@ -91,6 +91,10 @@ function save_file(filename,type)
 		export_matrix_table(filename);
 		return;
 		
+	case "Export line":
+		export_line(filename);
+		return;
+		
 	default: error("Option not recognised 63"); break;
 	}
 }
@@ -174,30 +178,35 @@ function export_table(filename)
 	let tab = inter.layer[l].op.table;
 
 	let te = "";
-	for(let i = 0; i < tab.heading.length; i++){
-		if(i != 0) te += ",";
-		te += add_quote(tab.heading[i].name);
-	}
-	te += endl;
-		
-	for(let j = 0; j < tab.content.length; j++){
-		let ele =  tab.content[j];
-		for(let i = 0; i < ele.length; i++){
+	
+	if(typeof tab == 'string') te = tab;
+	else{
+		for(let i = 0; i < tab.heading.length; i++){
 			if(i != 0) te += ",";
-			let val = ele[i].te;
-			if(typeof val == 'string'){
-				if(val.includes(" ")) te += add_quote(val);
-				else te += val;
-			}
-			else te += val;
+			te += add_quote(tab.heading[i].name);
 		}
 		te += endl;
-	}
+			
+		for(let j = 0; j < tab.content.length; j++){
+			let ele =  tab.content[j];
+			for(let i = 0; i < ele.length; i++){
+				if(i != 0) te += ",";
+				let val = ele[i].te;
+				if(val == "Source Name" && ele[i].so) val = ele[i].so.name;
+				if(typeof val == 'string'){
+					if(val.includes(" ")) te += add_quote(val);
+					else te += val;
+				}
+				else te += val;
+			}
+			te += endl;
+		}
 
-	te = add_escape_char(te);
-	te = te.replace(/—/g,"-");
-	te = te.replace(/⟨/g,"<");
-	te = te.replace(/⟩/g,">");
+		te = add_escape_char(te);
+		te = te.replace(/—/g,"-");
+		te = te.replace(/⟨/g,"<");
+		te = te.replace(/⟩/g,">");
+	}
 	
 	write_file_async(te,filename,"export");
 }
@@ -333,6 +342,89 @@ function export_matrix_table(filename)
 	}
 
 	write_file_async(te,filename,"export");
+}
+
+
+/// Exports the matrix table in csv format
+function export_line(filename)
+{
+	if(!inter.graph){ error("Should be graph"); return;}
+	
+	let dg = inter.graph.data_group[inter.dg_sel];
+	
+	let st = "";
+	
+	switch(dg.type){
+	case "point":
+		{
+			st += add_escape_char(inter.graph.op.x_label);
+			for(let i = 0; i < dg.list.length; i++){
+				let da = inter.graph.data[dg.list[i]];
+				let na = add_escape_char(da.key_na);
+				st += ","+na;
+				
+				if(da.point.length > 0){
+					if(da.point[0].CImin != undefined){
+						st += ","+na+" (95% CI min)";
+						st += ","+na+" (95% CI max)";
+					}
+				}
+				
+			}
+			st += endl;
+			
+			let po_init = inter.graph.data[dg.list[0]].point;
+			
+			for(let j = 0; j < po_init.length; j++){
+				st += po_init[j].x;
+				for(let i = 0; i < dg.list.length; i++){
+					let po = inter.graph.data[dg.list[i]].point[j];
+					st += ","+po.y;
+					if(po.CImin != undefined){
+						st += ","+po.CImin+","+po.CImax;
+					}
+				}
+				st += endl;
+			}
+		}
+		break;
+	
+	case "cross":
+		{
+			st += add_escape_char(inter.graph.op.x_label);
+			st += ","+dg.key[0]+endl;
+			
+			for(let i = 0; i < dg.list.length; i++){
+				let da = inter.graph.data[dg.list[i]];
+				st += da.x+","+da.y+endl;
+			}
+		}
+		break;
+		
+	case "bar": case "errbar":
+		{
+			st += add_escape_char(inter.graph.op.x_label);
+			st += ",";
+			st += add_escape_char(inter.graph.op.y_label)
+			if(dg.list.length > 0){
+				if(inter.graph.data[dg.list[0]].ymin != undefined);
+				st +=  ",95% CI min,95% CI max";
+			}
+			st += endl;
+			
+			for(let i = 0; i < dg.list.length; i++){
+				let da = inter.graph.data[dg.list[i]];
+				if(dg.type == "errbar") st += da.x;
+				else st += da.name;
+				st += ","+da.y;
+				if(da.ymin) st += ","+da.ymin+","+da.ymax;
+				st += endl;
+			}
+		}
+		break;
+	}
+	
+	write_file_async(st,filename,"export");
 }
 
 /// Writes a file asynchronously

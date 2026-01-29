@@ -1307,6 +1307,7 @@ function add_species_bubble(cont)
 	
 	bubble_addradio(cont,2.3,"Population","Population-based",bub.radio);
 	bubble_addradio(cont,2.3,"Individual","Individual-based",bub.radio);
+	//bubble_addradio(cont,2.3,"Deterministic","Deterministic",bub.radio);
 	cont.y += 0.2;
 	
 	if(bub.radio.value == "Individual"){
@@ -2449,6 +2450,10 @@ function get_dist_pos()
 {
 	let dist = dist_pos;
 	let p = model.get_p();
-	if(model.species[p].type == "Population") dist = exp_dist_pos;
+	
+	switch(model.species[p].type){
+	case "Population": case "Deterministic": dist = exp_dist_pos; break;
+	}
+	
 	return dist;
 }

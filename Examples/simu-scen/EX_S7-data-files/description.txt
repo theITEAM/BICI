@@ -1,0 +1,18 @@
+﻿# Example S7: Add / remove indiviuduals from population-based model
+
+## Objective
+- Introduce adding and/or removing populations after the initial conditions are set.
+- Data source in the 'Simulation→Population' page show how the additions and removals are defined.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains classifications 'DS', which stands for 'disease status', and 'Sex'.
+- 'DS' contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- 'Sex' contains the compartments $M$ and $F$ for male and female.
+- A transmission rate $β_s$ determines the rate at which individuals with sex $s$ become infected.
+- A recovery rate $γ_s$ determines the rate at which individuals recover with sex $s$.
+- $N$ is the total number of individuals (this model assumes frequency dependent transmission).
+
+## Population
+- This consists of 10000 initially susceptible individuals and 2 infected.
+- There is a 50/50 split between males and females.

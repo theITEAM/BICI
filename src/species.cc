@@ -796,7 +796,7 @@ void Species::sim_linear_speedup_init(const vector <Equation> &eqn)
 			}
 			break;
 			
-		case POPULATION:
+		case POPULATION: case DETERMINISTIC:
 			for(auto tr = 0u; tr < tra_gl.size(); tr++){
 				sim_linear_speedup.calc.push_back(tr);
 			}
@@ -823,7 +823,7 @@ void Species::sim_linear_speedup_init(const vector <Equation> &eqn)
 		}
 		break;
 		
-	case POPULATION:
+	case POPULATION: case DETERMINISTIC:
 		for(auto tr = 0u; tr < tra_gl.size(); tr++){
 			const auto &tra = tra_gl[tr];
 			auto e = tra.dist_param[0].eq_ref;

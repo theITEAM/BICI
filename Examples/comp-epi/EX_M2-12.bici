@@ -1,0 +1,58 @@
+
+###################### DATA DIRECTORY ######################
+
+data-dir folder="EX_M2-12-data-files"
+
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5 nchain=3
+
+post-sim start=0 end=100
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
+
+species name="Animal" type="individual"
+
+# SPECIES MODEL
+
+class name="DS" index="a"
+
+comp name="S" color="#009900" x=-10 y=0
+comp name="I" color="#ff2222" x=9 y=0
+
+trans name="S->I" value="exp(rate:β_v×Σ_v' (f_v'×{I,v',g}/N))"
+
+class name="Vaccination" index="v"
+
+comp name="Vac" color="#888888" x=-10 y=0
+comp name="Unvac" color="#aa00aa" x=10 y=0
+
+class name="Group" index="g"
+
+comp-all color="#005500" fix="true" file="comp-Group.csv"
+
+# SIMULATION INITIAL CONDITIONS
+
+add-ind-sim file="add-ind-sim.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="N" constant="10"
+
+param name="f_v" factor="true" value="value-f.csv" prior="mdir(0.5)"
+
+param name="β_v" value="value-beta.csv" prior="inverse(0.01,1)"
+
+
+

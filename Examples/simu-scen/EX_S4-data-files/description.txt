@@ -1,0 +1,22 @@
+﻿# Example S4: Uncertain initial conditions for PBM (without focal classification)
+
+## Objective
+- Introduce specification of uncertainty in the initial population for a population-based model when there is more than one classification.
+- The initial population is given on the 'Simulation→Population' page.
+- In this case a prior is placed on the total population.
+- A Dirichlet distribution is placed on all compartmental combinations.
+- 100 simulations are performed to see stochastic variation.
+
+
+## Model
+- A single population-based species 'People' is created.
+- This contains classifications 'DS', which stands for 'disease status', and 'Sex'.
+- 'DS' contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- 'Sex' contains the compartments $M$ and $F$ for male and female.
+- A transmission rate $β_s$ determines the rate at which individuals with sex $s$ become infected.
+- A recovery rate $γ_s$ determines the rate at which individuals recover with sex $s$.
+- $N$ is the total number of individuals (this model assumes frequency dependent transmission).
+
+## Population
+- The initial population is sampled from a uniform distribution between 9000 and 11000.
+- A Dirichlet distribution is used to sample the compartmental composition of the initial state (with most individuals in the $S$ compartment).

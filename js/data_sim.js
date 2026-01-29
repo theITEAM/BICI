@@ -460,7 +460,7 @@ function simulate_data(so)
 						}
 						break;
 						
-					case "Population":
+					case "Population": case "Deterministic":
 						{
 							let ti = Math.floor((t-t_start)/timestep);
 							for(let c = 0; c < sp.comp_gl.length; c++) popc[c] = cpop[c][ti];
@@ -551,7 +551,7 @@ function simulate_data(so)
 					}
 					break;
 					
-				case "Population":
+				case "Population": case "Deterministic":
 					{
 						for(let ti = 0; ti < tp.length-1; ti++){
 							let d = div_ref[ti];

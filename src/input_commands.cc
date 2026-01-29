@@ -15,8 +15,10 @@ using namespace std;
 #include "matrix.hh"
 
 /// Imports a data-table 
-void Input::import_data_table_command(Command cname)
+void Input::import_data_table_command(const CommandLine &cline, bool active)
 {
+	auto cname = cline.command;
+	
 	if(model.mode == PPC){                       // If doing PPC then ignore data
 		switch(cname){
 		case COMP_DATA: case TRANS_DATA: case TEST_DATA: case POP_DATA:
@@ -49,24 +51,21 @@ void Input::import_data_table_command(Command cname)
 	}
 	
 	auto name = get_tag_value("name"); 
-	if(name == ""){ 
-		switch(cname){
-		case INIT_POP: name = "Initial population"; break;
-		case ADD_IND: name = "Added individuals"; break;
-		case REMOVE_IND: name = "Removed individuals"; break;
-		case ADD_POP: name = "Added populations"; break;
-		case REMOVE_POP: name = "Removed populations"; break;
-		default: cannot_find_tag(); return;
-		}
-	}
+	if(name == "") get_default_name(name,cname);
+	if(name == "") cannot_find_tag(); 
 	
 	DataSource ds;
 	ds.name = name;
 	ds.line_num = line_num;
 	ds.p = p; ds.cl = UNSET;
-	ds.cname = cname; ds.focal_cl = UNSET;
+	ds.cname = cname; 
+	ds.cname_raw = cline.command;
+	if(model.mode == DATA_SIM) ds.tags = cline.tags;
+	ds.command_name = cline.command_name;
+	ds.focal_cl = UNSET;
 	ds.time_range = ALL_TIME; ds.time_start = UNSET; ds.time_end = UNSET;
 	ds.focal_cl = UNSET;
+	ds.active = active;
 
 	auto &om = ds.obs_model;
 
@@ -76,7 +75,7 @@ void Input::import_data_table_command(Command cname)
 			auto focal = get_tag_value("focal");
 		
 			if(focal != ""){
-				ds.focal_cl = find_cl(p,focal); 
+				ds.focal_cl = model.find_cl(p,focal); 
 				if(ds.focal_cl == UNSET){
 					alert_import("The focal classification '"+focal+"' not recognised");
 					return;
@@ -112,9 +111,14 @@ void Input::import_data_table_command(Command cname)
 		
 	case MOVE_IND:
 		{
-			auto name = get_tag_value("class"); if(name == ""){ cannot_find_tag(); return;}
+			auto name = get_tag_value("class");
+			if(name == ""){ 
+				const auto &sp = model.species[p];
+				if(sp.ncla == 1) name = sp.cla[0].name;
+				else{ cannot_find_tag(); return;}
+			}
 			
-			ds.cl = find_cl(p,name);
+			ds.cl = model.find_cl(p,name);
 			if(ds.cl == UNSET){ 
 				alert_import("For 'class' the value '"+name+"' is not a classification");
 				return;
@@ -124,9 +128,15 @@ void Input::import_data_table_command(Command cname)
 	
 	case COMP_DATA:
 		{
-			auto name = get_tag_value("class"); if(name == ""){ cannot_find_tag(); return;}
+			auto name = get_tag_value("class"); 
 			
-			ds.cl = find_cl(p,name);
+			if(name == ""){
+				const auto &sp = model.species[p];
+				if(sp.ncla == 1) name = sp.cla[0].name;
+				else{ cannot_find_tag(); return;}
+			}
+			
+			ds.cl = model.find_cl(p,name);
 		
 			if(ds.cl == UNSET){
 				alert_import("For 'class' the value '"+name+"' is not a classification");
@@ -147,7 +157,7 @@ void Input::import_data_table_command(Command cname)
 			if(pos == "") pos = "1";
 			
 			auto neg = get_tag_value("neg");
-			if(neg == "") pos = "0";
+			if(neg == "") neg = "0";
 			
 			if(pos == neg){ 
 				alert_import("'pos' and 'neg' cannot both have the same value"); 
@@ -160,7 +170,7 @@ void Input::import_data_table_command(Command cname)
 		
 			auto spl = split(comp,',');
 			
-			auto cl = get_cl_from_comp(spl[0],p);
+			auto cl = model.get_cl_from_comp(spl[0],p);
 			if(cl == UNSET){ 
 				alert_import("Value '"+spl[0]+"' is not a compartment");
 				return;
@@ -194,7 +204,7 @@ void Input::import_data_table_command(Command cname)
 			auto trans = get_tag_value("trans");
 			ds.filter_trans_str = trans;
 		
-			auto cl_sel = get_cl_from_trans(trans,p);
+			auto cl_sel = model.get_cl_from_trans(trans,p);
 		
 			if(cl_sel == UNSET){
 				alert_import("For 'trans' the value '"+trans+"' is not recognised");
@@ -204,7 +214,7 @@ void Input::import_data_table_command(Command cname)
 			ds.cl = cl_sel;
 			
 			auto obsran = toLower(get_tag_value("obsrange"));
-			if(obsran == ""){ cannot_find_tag(); return;}
+			if(obsran == "") obsran = "all";
 	
 			ds.time_range = TimeRange(option_error("obsrange",obsran,{"all","specify","file"},{ ALL_TIME, SPEC_TIME, FILE_TIME }));
 			if(ds.time_range == UNSET) return;
@@ -240,7 +250,7 @@ void Input::import_data_table_command(Command cname)
 			auto trans = get_tag_value("trans");
 			ds.filter_trans_str = trans;
 			
-			auto cl_sel = get_cl_from_trans(trans,p);
+			auto cl_sel = model.get_cl_from_trans(trans,p);
 		
 			if(cl_sel == UNSET){
 				alert_import("For 'trans' the value '"+trans+"' is not recognised");
@@ -277,7 +287,7 @@ void Input::import_data_table_command(Command cname)
 		
 	default: alert_emsg_input("Should not be default2"); return;
 	}
-	
+
 	if(set_loadcol(cname,ds) == false) return;
 	
 	if(cname == GENETIC_DATA){
@@ -311,9 +321,9 @@ void Input::import_data_table_command(Command cname)
 		
 		col_name = spl;
 	}
-	
+
 	ds.table = get_subtable(tab,col_name); if(ds.table.error == true) return;
-	
+
 	if(cname == TRANS_DATA){ // Removes "no" entries
 		auto &tab = ds.table;
 		auto r = 0u;
@@ -350,7 +360,7 @@ bool Input::species_command(unsigned int loop)
 	auto type = toLower(get_tag_value("type"));
 	if(type == ""){ cannot_find_tag(); return false;}
 	
-	auto sp_type = SpeciesType(option_error("type",type,{"population","individual"},{ POPULATION, INDIVIDUAL}));
+	auto sp_type = SpeciesType(option_error("type",type,{"population","individual","deterministic"},{ POPULATION, INDIVIDUAL, DETERMINISTIC}));
 	if(sp_type == UNSET) return false;
 
 	auto trans_tree = false;
@@ -367,13 +377,23 @@ bool Input::species_command(unsigned int loop)
 		}
 	}
 
-	if(loop == 2){
+	if(loop == 2){	
 		auto nsp = model.nspecies;
 		add_species(name,sp_type,trans_tree);
 		if(model.nspecies != nsp) p_current = model.nspecies-1;		
+		
+		auto det = false, not_det = false;
+		for(const auto &sp : model.species){
+			if(sp.type == DETERMINISTIC) det = true;
+			else not_det = true;
+		}
+		
+		if(det && not_det){
+			alert_import("Cannot have a mixture of deterministic and non-deterministic species.");
+		}			
 	}
 	else{
-		p_current = find_p(name);
+		p_current = model.find_p(name);
 		if(p_current == UNSET){
 			alert_import("Problem finding species '"+name+"'"); 
 			return false;
@@ -403,13 +423,13 @@ bool Input::classification_command(unsigned int loop)
 	auto clone = get_tag_value("clone");
 	if(clone != ""){ // Clones a classification from another species
 		if(loop == 2){
-			auto p2 = find_p(clone);
+			auto p2 = model.find_p(clone);
 			if(p2 == UNSET){
 				alert_import("For 'clone' cannot find the species '"+clone+"'");
 				return false;
 			}
 			
-			auto cl2 = find_cl(p2,name);
+			auto cl2 = model.find_cl(p2,name);
 			
 			if(cl2 == UNSET){
 				alert_import("In clone species '"+clone+"' cannot find the classification '"+name+"'");
@@ -421,7 +441,7 @@ bool Input::classification_command(unsigned int loop)
 			if(ncl != sp.ncla) cl_current = sp.ncla-1;		
 		}
 		else{
-			cl_current = find_cl(p,name);
+			cl_current = model.find_cl(p,name);
 			if(cl_current == UNSET){
 				alert_import("Problem finding classification '"+name+"'"); 
 				return false;
@@ -476,7 +496,7 @@ bool Input::classification_command(unsigned int loop)
 			if(sp.ncla != ncl) cl_current = sp.ncla-1;		
 		}
 		else{
-			cl_current = find_cl(p,name);
+			cl_current = model.find_cl(p,name);
 			if(cl_current == UNSET){ 
 				alert_import("Problem finding classification '"+name+"'"); 
 				return false;
@@ -588,7 +608,7 @@ void Input::set_command()
 	auto p = p_current;
 	auto sp = get_tag_value("species");
 	if(sp != ""){
-		p_current = find_p(sp);
+		p_current = model.find_p(sp);
 		if(p_current == UNSET){
 			alert_import("Cannot set the species '"+sp+"' as this does not exist"); 
 			return;
@@ -602,7 +622,7 @@ void Input::set_command()
 			return;
 		}
 	
-		cl_current = find_cl(p,name);
+		cl_current = model.find_cl(p,name);
 		if(cl_current == UNSET){
 			alert_import("Cannot set the classification '"+name+"'"); 
 			return;
@@ -1277,7 +1297,7 @@ void Input::param_command()
 		value = "";
 		break;
 		
-	case SIM: 
+	case SIM: case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR:
 		prior = ""; prior_split = "";
 		if(par.sim_sample == false){ dist = ""; dist_split = "";}
 		break;
@@ -1582,8 +1602,11 @@ void Input::param_command()
 				alert_import("A prior should be set for parameter '"+par.full_name+"'");
 				break;
 	
-			case SIM: 
+			case SIM: case DATA_SIM: case DATA_SHOW: case DATA_DEL: 
 				alert_warning("A value has not been set for parameter '"+par.full_name+"'. Ignore this warning if this parameter is used in the observation process.");
+				break;
+				
+			case DATA_CLEAR:
 				break;
 				
 			default: emsg("option he"); break;
@@ -1753,7 +1776,6 @@ bool Input::simulation_command()
 	if(!is_positive(dt_str,"timestep")) return false;
 	
 	details.dt = number(dt_str);
-	details.stochastic = true;
 	details.individual_max = check_pos_integer("ind-max",INDMAX_DEFAULT);
 	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
 	details.anneal_type = ANNEAL_NONE;
@@ -1915,8 +1937,6 @@ bool Input::inference_command()
 		}
 	}
 	
-	model.details.stochastic = true;
-
 	details.burnin_frac = 20;
 	details.anneal_type = ANNEAL_NONE;
 	details.anneal_rate = ANNEAL_RATE_DEFAULT;
@@ -2551,83 +2571,19 @@ void Input::inf_state_command()
 	if(model.mode == EXT && mpi.core != ch/model.details.num_per_core) return;
 	
 	//term_out("load chain"+tstr(ch));
-		
-	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
-	if(i == files.size()){
-		alert_import("Could not find the file '"+file+"'");
-		return;
-	}
+	
+	load_state_samples(ch,file);
+}
 
-	const auto &flines = files[i].lines;	
-	
-	auto li = 0u;
-	
-	// Reads in individual key
-	vector <string> ind_key;
-	{
-		string warn = "Problem loading state file";
-		
-		while(li < flines.size() && trim(flines[li]) != "{") li++;
-		if(li == flines.size()) alert_import(warn);
-		li++;
-		
-		auto li_st = li;
-		
-		while(li < flines.size() && trim(flines[li]) != "}") li++;
-		if(li == flines.size()) alert_import(warn);
-		
-		for(auto i = li_st; i < li; i++){
-			auto st = trim(flines[i]);
-			if(st.length() > 0 && !begin_str(st,"#")){
-				if(begin_str(st,"timepoint")){
-				}
-				else{
-					if(begin_str(st,"spline-out")){
-						auto spl = split(st,' ');
-						if(spl.size() != 3){ alert_import(warn); return;}
-						
-						auto name = spl[1];
-						auto th = 0u;
-						while(th < model.param.size() && model.param[th].name != name) th++;
-						if(th == model.param.size()){ alert_import(warn); return;}
-						
-						auto &par = model.param[th];
-						if(!par.time_dep){ alert_import(warn); return;}
-						
-						if(!par.spline_out.on){
-							par.spline_out.on = true;
-							par.spline_out.list = split(spl[2],',');
-						}
-					}
-					else{
-						auto spl = split(st,':');
-						if(spl.size() != 2) alert_import(warn);
-						auto num = number(spl[0]);
-						auto name = spl[1];
-						if(num >= ind_key.size()) ind_key.resize(num+1);
-						ind_key[num] = name;
-					}
-				}
-			}
-		}
-		
-		while(li < flines.size() && !begin_str(flines[li],"<<")) li++;
-		if(li == flines.size()) alert_import(warn);
-	}
-	
-	vector <string> lines; 
-	
-	while(li < flines.size()){	
-		auto lin = trim(flines[li]);
-		if(lin.length() > 2 && lin.substr(0,2) == "<<"){
-			if(lines.size() > 0) read_state_sample(ch,lines,ind_key);
-			lines.clear();
-		}
-		lines.push_back(lin);
-		li++;
-	}
 
-	if(lines.size() > 0) read_state_sample(ch,lines,ind_key);
+/// Loads simulation states into the model (for data-sim)
+void Input::sim_state_command()
+{
+	auto file = get_tag_value("file");
+	
+	if(model.mode != DATA_SIM) return;
+	
+	load_state_samples(UNSET,file);
 }
 
 

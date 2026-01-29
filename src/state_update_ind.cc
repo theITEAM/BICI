@@ -171,7 +171,7 @@ void State::update_pop_change(unsigned int ti, unsigned int ti_next, const vecto
 	// Updates transitions in population species as a result of population change in size
 	for(const auto &mtf : trans_list){
 		auto pp = mtf.p, tr = mtf.tr;
-		if(model.species[pp].type != POPULATION) emsg("must be ind");
+		if(model.species[pp].type != POPULATION) emsg("must be pop");
 		
 		species[pp].likelihood_pop_section(tr,ti,ti_next,popnum_t,pop_change,like_ch);
 		
@@ -239,8 +239,15 @@ void State::initialise_update_ind_maps()
 	trans_map.resize(model.nspecies);
 	for(auto p = 0u; p < model.nspecies; p++){
 		switch(model.species[p].type){
-		case INDIVIDUAL: markov_eqn_map[p].resize(model.species[p].markov_eqn.size(),false); break;
-		case POPULATION: trans_map[p].resize(model.species[p].tra_gl.size(),false);
+		case INDIVIDUAL: 
+			markov_eqn_map[p].resize(model.species[p].markov_eqn.size(),false); 
+			break;
+		case POPULATION: 
+			trans_map[p].resize(model.species[p].tra_gl.size(),false); 
+			break;
+		case DETERMINISTIC:
+			//emsg("det prob");
+			break;
 		}
 	}
 	

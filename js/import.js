@@ -1500,7 +1500,8 @@ function check_import_correct()
 		}
 		
 		// Checks that non-Markovian transitions not used for population models
-		if(sp.type == "population"){
+		switch(sp.type){
+		case "Population": case "Deterministic":
 			for(let cl = 0; cl < sp.ncla; cl++){
 				let claa = sp.cla[cl];
 				for(let i = 0; i < claa.ntra; i++){
@@ -1511,6 +1512,7 @@ function check_import_correct()
 					}						
 				}
 			}
+			break;
 		}
 	}
 }

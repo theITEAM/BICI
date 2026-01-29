@@ -3396,4 +3396,24 @@ class Model
 			res.run_warning_show = true;
 		}
 	}
+	
+	
+	/// Check determinisitc species not mixed with other type
+	check_det_species(out_type)
+	{
+		if(out_type != "sim" && out_type != "inf") return;
+
+		let det = false;
+		for(let p = 0; p < this.species.length; p++){
+			if(this.species[p].type == "Deterministic") det = true;
+		}
+		
+		if(det){
+			for(let p = 0; p < this.species.length; p++){
+				if(this.species[p].type != "Deterministic"){
+					add_warning({mess:"Cannot mix species types", mess2:"Cannot have a mixture of deterministic and non-deterministic species.", warn_type:"Species", p:p});
+				}
+			}			
+		}
+	}
 }

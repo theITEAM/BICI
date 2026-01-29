@@ -17,6 +17,7 @@ using namespace std;
 class Output                               // Stores information about the data
 {
 	public:
+		string datadir;                        // The data directory
 		string diagdir;                        // The diagnostics directory (within data folder)
 		string sampledir;                      // The samples directory (within data folder)
 		string sampledir_rel;                  // The samples directory relative to data folder
@@ -31,6 +32,13 @@ class Output                               // Stores information about the data
 		void prop_summary(string te) const;
 		string print_affect_like(const AffectLike &al) const;
 		void data_summary(const Model &model) const;
+		void remove_double_space();
+		void erase_command(unsigned int i);
+		void delete_command(string name, unsigned int li, bool check);
+		void delete_commands(string type, const vector <string> &list);
+		void delete_lines(const vector <string> &list);
+		LinesRaw new_lr(string st) const;
+		unsigned int lr_find(unsigned int line_num) const;
 		void ensure_directory(const string &path) const;
 		void print_initc(const vector <InitCondValue> &initc) const;
 		//void updated_file(string file);
@@ -55,6 +63,7 @@ class Output                               // Stores information about the data
 		void print_individuals(unsigned int N, unsigned int p, const State &state) const;
 		void final_time(long sec, long op_sec) const;
 		void final_memory_usage() const;
+		void insert_command(string name, unsigned int p, string insert_pl, string insert_bef, string line, string content, string file);
 	
 	private:
 		vector < vector <double> > param_value_from_vec(const Particle &pa) const;
@@ -84,7 +93,7 @@ class Output                               // Stores information about the data
 		Stat get_statistic(vector <double> &vec) const;
 		string generation_average(string head, string content) const;
 		
-		vector <string> lines_raw;    
+		vector <LinesRaw> lines_raw;    
 	
 		vector <Particle> param_store;
 		vector <Particle> state_store;

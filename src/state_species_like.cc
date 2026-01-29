@@ -2452,6 +2452,10 @@ void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <d
 		}
 		break;
 		
+	case DETERMINISTIC:
+		emsg("No diagnostic for deterministic");
+		break;
+		
 	case INDIVIDUAL:
 		{
 			en.resize(sp.tra_gl.size());

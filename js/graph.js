@@ -20,6 +20,7 @@ class Graph
 	density_info = {};                               // Information used to make density plots
 	tick = {value:[], wmax:0, x:[], y:[]};           // Potential tick marks
 	table_width = [];                                // Table width for statistics tables
+	data_group = [];
 	bf_store;                                        // Stores information about Bayes factor
 	warn;                                            // Any warning to show why the graph could not be plotted
 	
@@ -77,6 +78,8 @@ class Graph
 		
 		this.initialise_axes();
 		this.range_default = copy(this.range);
+		
+		this.create_data_group();
 	}
 	
 	
@@ -3140,6 +3143,83 @@ class Graph
 		this.bf_store = { te:te, val:val, post_int:post_int, prior_int:prior_int};
 		
 		change_bubble_mode("bf");
+	}
+	
+	
+	// Creates a group of object that can be exported as .csv 
+	create_data_group()
+	{  
+		this.data_group=[]; 
+		let dg = this.data_group;
+		let data = this.data;
+		
+		for(let i = 0; i < data.length; i++){
+			let da = data[i];
+			if(da.key_na != undefined){
+				let type;
+				if(da.point != undefined) type = "point";
+				else{
+					switch(da.type){
+					case "Cross": type = "cross"; break;
+					case "ErrorBar": type = "errbar"; break;
+					case "Bar": type = "bar"; break;
+					default: error("type not rec"); break;
+					}
+				}
+				
+				if(type){
+					let te = da.key_na;
+						
+					let add = false;
+					
+					for(let j = 0; j < dg.length; j++){
+						if(dg[j].type == type){
+							switch(type){
+							case "point":
+								{
+									let po = data[dg[j].list[0]].point;
+									if(po.length == da.point.length){
+										let j = 0; while(j < po.length && po[j].x == da.point[j].x) j++;
+										if(j == po.length){
+											add = true;
+										}
+									}
+								}
+								break;
+								
+							case "errbar": case "cross": case "bar":
+								if(dg[j].key[0] == te) add = true;
+								break;
+							}
+						}
+				
+						if(add == true){
+							if(find_in(dg[j].key,te) == undefined){
+								dg[j].key.push(te);
+							}
+							dg[j].list.push(i);
+							break;
+						}
+					}
+			
+					if(!add){
+						let key=[]; key.push(te);
+						let list=[]; list.push(i);
+						dg.push({type:type, key:key, list:list});
+					}
+				}
+			}
+		}
+		
+		for(let i = 0; i < dg.length; i++){
+			let ke = dg[i].key;
+			let te = "";
+			for(let j = 0; j < ke.length; j++){
+				if(j != 0) te += ",";
+				te += ke[j];
+			}
+			dg[i].name = te;
+		}
 	}
 }
 

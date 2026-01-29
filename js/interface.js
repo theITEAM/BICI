@@ -1471,6 +1471,10 @@ function view_warning(i)
 		press_button_prop("Menu","PageSubSub",["val"],warn.p);	
 		break;
 	
+	case "Species":
+		change_page({pa:"Model", su:"Compartments", susu:warn.p});
+		break;
+		
 	case "ModelClass":
 		change_page({pa:"Model", su:"Compartments", susu:warn.p, sususu:warn.cl});
 		break;

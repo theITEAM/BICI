@@ -107,6 +107,7 @@ class StateSpecies                         // Stores information about the state
 		void generate_A();
 		void check_precalc_num(unsigned int n);
 		void mbp(double sim_prob, vector < vector <double> > &popnum_t, const MBPfast &mbp_value_linear);
+		void resim(vector < vector <double> > &popnum_t, const MBPfast &mbp_fast);
 		void val_fast_update(unsigned int ti, vector <double> &val_fast, const vector < vector <double> > &popnum_t, const vector < vector <double> > &pop_grad, const LinearForm &lin_form) const;
 		void factor_nopop_change(const vector <unsigned int> &list, vector < vector <double> > &val_store, const LinearForm &lin_form, bool &set) const;
 		void linear_form_calculate(vector < vector <double> > &val_store, const vector <unsigned int> &list, const LinearForm &lin_form, const vector < vector <double> > &popnum_t) const;

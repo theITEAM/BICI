@@ -181,6 +181,7 @@ class Species   	                         // Stores details of a species
 		void initialise_data(Operation mode);
 		void order_data_events();
 		Filter set_comp_filt(string te, unsigned int cl_not_allow, BoundType bound, const DataSource &so);
+		Filter set_comp_filt_raw(string te, unsigned int cl_not_allow, BoundType bound, string &err) const;
 		void init_pop_trans_ref();
 		void init_pop_data_ref();
 		vector <unsigned int> obs_eqn_add_vec(vector <EquationInfo> &eqn_info);
@@ -199,6 +200,7 @@ class Species   	                         // Stores details of a species
 		vector <unsigned int> get_vec_tr_swap_mid(unsigned int st, unsigned int num, const vector <EventCl> &timeline) const;
 		vector < vector <double> > calc_nm_rate(bool calc_bp, const vector <double> &precalc, const vector < vector <double> > &popnum_t, const vector <Equation> &eqn, vector < vector <double> > &bp_store) const;
 		void set_ob_trans_ev(const vector <Equation> &eqn);
+		vector <string> set_trans_filt(unsigned int cl, string te, BoundType bound, string &emsg) const;
 
  	private:
 		void set_ind_tmin_tmax();
@@ -226,7 +228,6 @@ class Species   	                         // Stores details of a species
 		void generate_data() const;
 		void alert_source(string st, const DataSource &so, unsigned int c = UNSET, unsigned int r = UNSET);
 		vector <string> find_comp_prob_str(unsigned int cl, string te, BoundType bound, string &emsg) const;
-		vector <string> set_trans_filt(unsigned int cl, string te, BoundType bound, string &emsg) const;
 		string add_bound(string te, BoundType bound) const;
 		vector <EquationInfo> create_eqn_vector(const vector <string> &vec, EqnType type, const DataSource &so);
 		unsigned int find_cl(string name) const; 

@@ -251,7 +251,6 @@ function load_table(te,head,sep,filename)
 {
 	let file_simp = cut_path(filename);
 	
-	
 	let lines = te.split("\n");
 	
 	while(lines.length > 0 && (begin_str(lines[0].trim(),"#") || lines[0].trim() == "")){
@@ -899,10 +898,10 @@ function read_state_sample(te,chain,result,warning)
 						let sp = result.species[p];
 						
 						switch(sp.type){
-						case "Population": 
+						case "Population": case "Deterministic": 
 							sample.species[p] = {type:"Population", cpop_init:[], transnum_tl:[]}; 
 							break;
-							
+						
 						case "Individual": 
 							sample.species[p] = {type:"Individual", individual:[], cpop_init:[]};
 							break;
@@ -910,7 +909,7 @@ function read_state_sample(te,chain,result,warning)
 						default: error("PROBLEM"); break;
 						}
 					
-						if(true){
+						if(sp.type != "Deterministic"){
 							sample.species[p].trans_hbin = [];
 							for(let tr = 0; tr < sp.tra_gl.length; tr++){
 								sample.species[p].trans_hbin[tr] = [];
@@ -1273,7 +1272,7 @@ function read_trans_diag(ch,file,result)
 	if(file.name == "inline") warning = "Problem loading transition diagnostics";
 	
 	let line = file.te.split("\n");
-	
+
 	let T = result.timepoint.length-1;
 	
 	let res = {chain:ch, species:[]};
@@ -1669,7 +1668,7 @@ function get_result(name)
 /// Extracts information from the input text
 function extract_text_samples(siminf,type,result)
 {
-	let com = siminf+"-"+type;
+	let com = type+"-"+siminf;
 	
 	let nchain = 1; if(result.chains) nchain = result.chains.length;
 	
@@ -1679,6 +1678,7 @@ function extract_text_samples(siminf,type,result)
 	let te="";
 	for(let i = 0; i < pro.processed.length; i++){
 		let command = pro.processed[i];
+		
 		if(command.type == com){
 			let ch = 0;
 			for(let k = 0; k < command.tags.length; k++){

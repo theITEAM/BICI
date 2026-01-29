@@ -1,0 +1,15 @@
+# Example M6.1: Individual effect applied to a transition
+
+## Objective
+- Example of a random individual effect affecting the susceptibility of individuals.
+
+## Model
+- A single individual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- An individual effect [g] allows for susceptibility variation across individuals.
+- The strength of this variation is determined through variance $Ω^gg$.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

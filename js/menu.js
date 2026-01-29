@@ -395,6 +395,28 @@ function add_frame_buts(lay)
 function drop_menu(cont,lay)
 {
 	let bub = inter.bubble;
+	
+	let graph_show = false;
+	if(find(inter.layer,"name","GraphContent") != undefined) graph_show = true; 
+	
+	if(bub.mode == "SelectLine"){
+		let dx = 8, dy = 1.2;
+		cont.dx = dx;
+		bubble_addtitle(cont,"Export data",{title:"Select line", te:exportline_text});
+	
+		let dg = inter.graph.data_group;
+	
+		cont.y += 0.2;
+		
+		for(let i = 0; i < dg.length; i++){
+			bubble_addradio(cont,0,i,dg[i].name,inter.bubble.line_radio); 
+		}			
+		cont.y += 0.2;
+	
+		add_end_button(cont,"Export","ExportLine");
+	
+		return;
+	}
 		
 	if(bub.mode == "Video"){
 		let dx = 8, dy = 1.2;
@@ -450,13 +472,13 @@ function drop_menu(cont,lay)
 	
 	{
 		let sub = [];
-		let active = false; 
 		
 		{
 			sub.push({te:"Script", ac:"ExportScript", active:active_mod});
 		}
 		
-		if(inter.graph.type) active = true;
+		let active = false; 
+		if(graph_show) active = true;
 		if(model.get_show_model()) active = true;
 		
 		sub.push({te:"Print", ac:"PrintGraph", active:active});
@@ -483,9 +505,17 @@ function drop_menu(cont,lay)
 			}
 		}
 	
-		if(inter.graph.type == "Matrix"){
-			active = true;
-			ac = "ExportMatrixTable";
+		if(graph_show){
+			if(inter.graph.type == "Matrix"){
+				active = true;
+				ac = "ExportMatrixTable";
+			}
+					
+			switch(inter.graph.data_group.length){
+			case 0: break;
+			case 1: active = true; ac = "ExportDataLine"; break;
+			default: active = true; ac = "SelectDataLine"; break;
+			}				
 		}
 		
 		sub.push({te:"Table (.csv)", ac:ac, active:active});

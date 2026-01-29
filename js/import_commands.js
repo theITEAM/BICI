@@ -81,8 +81,12 @@ function import_data_table_command(cname)
 	
 	case "Move Ind.":
 		{
-			let name = get_tag_value("class"); if(name == "") cannot_find_tag();
-		
+			let name = get_tag_value("class");
+			if(name == ""){
+				if(sp.ncla == 1) name = sp.cla[0].name;
+				else cannot_find_tag();
+			}
+			
 			let cl = find_nocase(sp.cla,"name",name);
 			if(cl == undefined){
 				alert_import("For 'class' the value '"+name+"' is not a classification"); 
@@ -110,7 +114,10 @@ function import_data_table_command(cname)
 	case "Compartment":
 		{
 			let name = get_tag_value("class");
-			if(name == "") cannot_find_tag();
+			if(name == ""){
+				if(sp.ncla == 1) name = sp.cla[0].name;
+				else cannot_find_tag();
+			}
 			
 			let cl = find_nocase(sp.cla,"name",name);
 			if(cl == undefined){
@@ -143,7 +150,7 @@ function import_data_table_command(cname)
 			spec = {cl_drop:{te:claa_sel.name}, filter:filt};
 
 			let or = get_tag_value("obsrange").toLowerCase();
-			if(or == "") cannot_find_tag();
+			if(or == "") or = "all";
 			
 			if(option_error("obsrange",or,["all","specify"]) == true) return;
 			
@@ -393,7 +400,7 @@ function species_command(loop)
 	let type = get_tag_value("type").toLowerCase();
 	if(type == "") cannot_find_tag();
 	
-	if(option_error("type",type,["individual","population"]) == true) return;
+	if(option_error("type",type,["individual","population","deterministic"]) == true) return;
 
 	let trans_tree = false; 
 	if(type == "individual"){

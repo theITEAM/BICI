@@ -1,0 +1,17 @@
+# Example M6.3: Correlated individual effect applied to a transition using a pedigree
+
+## Objective
+- Example of a random individual effect affecting the susceptibility of individuals.
+- The individual effects between individuals are correlated through an **A** relationship matrix. Unlike M6.2, this relationship is defined through a pedigree.
+
+## Model
+- A single individual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- An individual effect [g] allows for susceptibility variation across individuals.
+- The strength of this variation is determined through variance $Ω^gg$.
+
+## Population
+- 60 sires and dams in the base population, with each couple having 10 progeny. 
+- Only the 600 progeny are incorporated into the compartmental model, with 598 initially susceptible individuals and two infected (note, individual effects for sires and dam not in the system are also estimated).

@@ -819,10 +819,20 @@ Layer.prototype.plot_button = function (bu,ov)
 		break;
 		
 	case "NewModel":
-		fill_rectangle(x,y,dx,dy,WHITE);
-		if(ov) cv.globalAlpha = 0.3;
-		draw_image(find_pic("newmod"),x,y,dx,dy);
-		if(ov) cv.globalAlpha = 1;
+		{
+			fill_rectangle(x,y,dx,dy,WHITE);
+			
+			if(ov){
+				let mar = 0.05;
+				draw_round_rectangle(x+mar,y+mar,dx-2*mar,dy-2*mar,0.3,LLBLUE,LLBLUE);  
+			}
+			
+			let si = 0.9;
+			let font = get_font(si);
+
+			draw_plus(x+0.6,y+dy/2-0.03,0.35,BLACK,WHITE);
+			plot_text("Create model",x+1.2,y+dy/2+0.4*si,font,BLACK);
+		}
 		break;
 		
 	case "Pdf":
@@ -839,6 +849,56 @@ Layer.prototype.plot_button = function (bu,ov)
 		if(ov) cv.globalAlpha = 1;
 		break;
 	
+	case "Section":
+		{
+			fill_rectangle(x,y,dx,dy,WHITE);
+			
+			let col = LLBLUE;
+			if(bu.shade) col = LGREY;
+			
+			if(bu.pic != undefined){
+				let W = 0.8*dx;
+				let H = 0.7*dy;
+				
+				let w = bu.pic.width;
+				let h = bu.pic.height;
+				
+				if(w/h > W/H){
+					let HH = W*(h/w);
+					draw_image(bu.pic,x+dx/2-W/2,y+dy/2-HH/2,W,HH);
+				}
+				else{
+					let WW = H*(w/h);
+					draw_image(bu.pic,x+dx/2-WW/2,y+dy/2-H/2,WW,H);
+				}
+			}
+			
+			let mar = 0.3;
+		
+			if(ov){
+				let col = LLBLUE, col2 = DBLUE;
+				if(bu.shade){ col = LGREY; col2 = BLACK;}
+				cv.globalAlpha = 0.3;
+				draw_round_rectangle(x+mar,y+mar,dx-2*mar,dy-2*mar,1.4,col,col2,7);  
+				cv.globalAlpha = 1;
+			}
+			else{
+				draw_round_rectangle(x+mar,y+mar,dx-2*mar,dy-2*mar,1.4,"no_fill",col,7);  
+			}
+			
+			//center_text(te,x+dx/2,y+2,get_font(1.3,"bold","times"),LBLUE);
+center_text(te,x+dx/2,y+2,get_font(1.3,"bold","times"),DDGREY);
+
+			let word = bu.word;
+			
+			for(let i = 0; i < word.length; i++){
+				let wo = word[i];
+				let col = wo.col; if(bu.sel) col = DRED;
+				plot_text(wo.te,x+wo.x,y+wo.y,wo.font,col);
+			}
+		}
+		break;
+				
 	case "Example":
 		{
 			fill_rectangle(x,y,dx,dy,WHITE); 
@@ -909,7 +969,7 @@ Layer.prototype.plot_button = function (bu,ov)
 				let TY = TX*bu.mod_ty.height/bu.mod_ty.width;
 				draw_image(bu.mod_ty2,x+W-TX-ma,y+ma+1.7,TX,TY);
 			}
-			
+			//zz
 			let word = bu.word;
 			
 			for(let i = 0; i < word.length; i++){

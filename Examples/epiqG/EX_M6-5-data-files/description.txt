@@ -1,0 +1,20 @@
+# Example M6.5: Individual effect applied to a branching probability
+
+## Objective
+- Individual variation is incorporated into branching through an individual effect.
+- Branching factors are used.
+
+## Model
+- A single individual-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains four compartments: susceptible $S$, infected $I$, recovered $R$ and dead $D$. Together they are known as the “SIRD model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- The *relative× probability of dying is given by b[g].
+- The *relative× probability of recovering is given by 1.
+- Mean $m^R$ and coefficient of variation $c^R$ specify the log-normally distributed period to recovery.
+- Mean $m^D$ and coefficient of variation $c^D$ specify the gamma distributed period to death.
+- The variance of the individual effect is determined by $Ω^gg$.
+- Individual effects are correlated through a relationship matrix **A**.
+
+## Population
+- 60 sires each have 10 progeny. These 600 progeny are used in the system (of which 2 are initial infected).

@@ -1,4 +1,4 @@
-﻿/// Stores constant values used and enumerated types
+/// Stores constant values used and enumerated types
 
 #pragma once
 
@@ -26,7 +26,7 @@ const string default_file = "Execute/init.bici";     // This is used for windows
 
 #define USE_MPI                                    // Sets if code can run in parallel
 
-const string bici_version = "v0.80";                 // Sets the BICI version
+const string bici_version = "v0.82";                 // Sets the BICI version
 
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
 const bool testing = true;                           // Set to true for additional testing
@@ -73,13 +73,13 @@ enum Algorithm { GILLESPIE, TAU, DA_MCMC, PAS_MCMC, MFA_ALG, ABC_ALG, ABC_SMC_AL
 enum FeatureType { POLYGON, MULTI_POLYGON, NO_FEATURE };
 
 // Different types of equation
-enum EqnType { SE, SP, COMP_PROB, TRANS_PROB, BP, SOURCE_RATE, SOURCE_MEAN, TRANS_RATE, TRANS_MEAN, TRANS_NM_RATE, TRANS_NM_MEAN, TRANS_SHAPE, TRANS_SCALE, TRANS_CV, REPARAM, REPARAM_EQN, DIST, DERIVE_PARAM, DERIVE_EQN, DEFINE_EQN, SEQ_VAR, CONST_EQN, MUT_RATE };
+enum EqnType { SE, SP, COMP_PROB, TRANS_PROB, BP, SOURCE_RATE, SOURCE_MEAN, TRANS_RATE, TRANS_MEAN, TRANS_NM_RATE, TRANS_NM_MEAN, TRANS_SHAPE, TRANS_SCALE, TRANS_CV, REPARAM, REPARAM_EQN, DIST, DERIVE_PARAM, DERIVE_EQN, DEFINE_EQN, SEQ_VAR, CONST_EQN, MUT_RATE, MODEL_CALC };
 
 // Differetn restrictions placeed on equarions
 enum EqnMode { PARAM_ONLY, PARAM_WITH_DEP, ALL, DERIVE_PARAM_MODE, DERIVE_MODE };
 
 // Different types of species model
-enum SpeciesType { POPULATION, INDIVIDUAL };  
+enum SpeciesType { POPULATION, INDIVIDUAL, DETERMINISTIC };  
 
 // Determines if a compartment is infected or not
 enum CompInfected { COMP_INFECTED, COMP_UNINFECTED, COMP_INFECTED_UNSET };
@@ -100,13 +100,13 @@ enum IndFacRateType { IND_EFF_MULT, IND_EFF_DIV, FIX_EFF_MULT, FIX_EFF_DIV };
 enum TransVariety { NORMAL, SOURCE_TRANS, SINK_TRANS };
 
 // Different modes of operation
-enum Operation { SIM, INF, PPC, EXT, MODE_UNSET };
+enum Operation { SIM, INF, PPC, EXT, DATA_SIM, DATA_SHOW, DATA_DEL, DATA_CLEAR, MODE_UNSET };
 
 // Different prior possibilities
 enum PriorPos { INVERSE_PR, UNIFORM_PR, POWER_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, DIRICHLET_PR, MDIR_PR, MVN_JEF_PR, MVN_UNIFORM_PR, MVN_COR_PR, UNSET_PR };
  
 // Different possible command types
-enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, DEFINE, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, PROPOSAL_INFO, INF_PARAM_STATS, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, SIM_WARNING, INF_WARNING, PPC_WARNING,
+enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, DEFINE, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, IC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, PROPOSAL_INFO, INF_PARAM_STATS, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, SIM_WARNING, INF_WARNING, PPC_WARNING,
 
 // These are not commands but varient used when loading data
 TRANS_TIMERANGE_DATA,
@@ -163,7 +163,7 @@ enum ObsType { OBS_SOURCE_EV, OBS_TRANS_EV, OBS_SINK_EV, OBS_COMP_EV, OBS_TEST_E
 enum AffectType { SPLINE_PRIOR_AFFECT, IEG_PRIOR_AFFECT, PRIOR_AFFECT, DIST_AFFECT, EXP_FE_AFFECT, DIV_VALUE_AFFECT, DIV_VALUE_NOPOP_AFFECT, DIV_VALUE_LINEAR_AFFECT, MARKOV_LIKE_AFFECT, POP_AFFECT, NM_TRANS_AFFECT, NM_TRANS_BP_AFFECT, NM_TRANS_INCOMP_AFFECT, OMEGA_AFFECT, EXP_IE_AFFECT, LIKE_IE_AFFECT, INDFAC_INT_AFFECT, MARKOV_POP_AFFECT, MARKOV_POP_NOPOP_AFFECT, MARKOV_POP_LINEAR_AFFECT, LIKE_OBS_IND_AFFECT, LIKE_OBS_POP_AFFECT, LIKE_OBS_POP_TRANS_AFFECT, OBS_EQN_AFFECT, LIKE_UNOBS_TRANS_AFFECT, POP_DATA_CGL_TGL_AFFECT, LIKE_INIT_COND_AFFECT, PRIOR_INIT_COND_AFFECT, LIKE_GENETIC_PROCESS_AFFECT, GENETIC_VALUE_AFFECT, LIKE_GENETIC_OBS_AFFECT, IIF_W_AFFECT, POPNUM_IND_W_AFFECT, AFFECT_MAX };
 
 // Different proposal types
-enum PropType { PARAM_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT_PROP, IND_EVENT_ALL_PROP, IND_OBS_SAMP_PROP, IND_OBS_RESIM_PROP, IND_OBS_RESIM_SINGLE_PROP, IND_UNOBS_RESIM_PROP, IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, IE_VAR_CV_PROP, TRANS_TREE_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP, IND_OBS_SWITCH_LEAVE_SINK_PROP };
+enum PropType { PARAM_PROP, PARAM_DET_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT_PROP, IND_EVENT_ALL_PROP, IND_OBS_SAMP_PROP, IND_OBS_RESIM_PROP, IND_OBS_RESIM_SINGLE_PROP, IND_UNOBS_RESIM_PROP, IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, IE_VAR_CV_PROP, TRANS_TREE_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP, IND_OBS_SWITCH_LEAVE_SINK_PROP };
 
 // Different types of annealing stratregy
 enum AnnealType { ANNEAL_NONE, ANNEAL_SCAN, ANNEAL_POWERAUTO, ANNEAL_LOGAUTO, ANNEAL_POWER };
@@ -292,9 +292,11 @@ enum PrecalcAddType { PRECALC_ALL, PRECALC_STOP_COMBINE_MULT, PRECALC_PARAM_ONLY
 // Different quantities which can be loaded into a parameter
 enum LoadParamType { VALUE_LOAD, PRIOR_SPLIT_LOAD, DIST_SPLIT_LOAD, FACW_LOAD};
 
-
 // Different results from MCMC proposal;
 enum PropResult { ACCEPT, ACCEPT50, REJECT, ACCEPT_SMALL, ACCEPT50_SMALL, REJECT_SMALL};
+
+//Different type of data
+enum DataSourceType { SIM_DATA, INF_DATA, POST_SIM_DATA};
 	
 /************************** Numeric constants ******************************/
 
@@ -350,6 +352,7 @@ const auto UPDATE_RATE_FAC = 0.9;                 // Determines how quickly rate
 const auto IND_LOCAL_TRANS_MAX = 2u;              // Max number of transition local change
 const auto LI_WRONG = -100.0;                     // Likelihood penalty for wrong observation
 const auto GEN_OBS_WRONG = -1000.0;               // Likelihood penalty genetic obs not made
+const auto COMP_NOISY_MAX = 10u;                  // When simulating noisy compartmental observations gives max number
 const auto LOCAL_SMOOTH = 0.1;                    // Smoothing of transitions rate in local props
 const auto PROP_SIM_NAC_INIT = 10;                // Initial value for nac for ind sim prob 
 const auto PROP_SIM_PROB_FADE = 0.98;             // Used for time fading of sim prob
@@ -425,7 +428,7 @@ const auto ALG_DEFAULT = DA_MCMC;                 // Default inference algorithm
 const unsigned int SEED_DEFAULT = 0;              // The default seed
 const double ANNEAL_POWER_DEFAULT = 4;            // Default annealing power
 const double ANNEAL_RATE_DEFAULT = 0.01;          // Rate at which annealing is done
-const unsigned int TI_DIV_MAX = 10000;            // Maximum number of time divisions
+const unsigned int TI_DIV_MAX = 1000000;          // Maximum number of time divisions
 
 const unsigned int PARAM_OUTPUT_MAX_DEFAULT = 1000;// The default maximum number of tensor elements to be output
 const auto INDMAX_DEFAULT = 20000u;               // The default maximum number of individuals
@@ -487,6 +490,12 @@ const string GTE_name = "GTE";                    // The effective generation ti
 const string GTC_name = "GTC";                    // The computational generation time function
 const string ALG_WARN = "ALGORITHM WARNINGS";
 
+const string OUT_SIM_BANNER = "# OUTPUT SIMULATION";
+const string OUT_INF_BANNER = "# OUTPUT INFERENCE";
+const string OUT_POST_SIM_BANNER = "# OUTPUT POSTERIOR SIMULATION";
+const string INF_BANNER = "# INFERENCE DATA";
+const string PARAM_BANNER = "######################## PARAMETERS";
+
 const vector < vector <string> > reserved_param = {{"t","time"},
 												{dist_matrix_name,"the distance matrix"},
 												{iden_matrix_name,"the identity matrix"},
@@ -517,9 +526,10 @@ const vector <string> must_term_str = { "simulation","sim","inference","inf","po
 const vector< vector <string> > escape_char {{"\\alpha","α"},{"\\beta","β"},{"\\gamma","γ"},{"\\Gamma","Γ"},{"\\delta","δ"},{"\\Delta","Δ"},{"\\epsilon","ε"},{"\\zeta","ζ"},{"\\eta","η"},{"\\Eta","Η"},{"\\theta","θ"},{"\\Theta","Θ"},{"\\iota","ι"},{"\\kappa","κ"},{"\\lambda","λ"},{"\\Lambda","Λ"},{"\\mu","μ"},{"\\nu","ν"},{"\\xi","ξ"},{"\\Xi","Ξ"},{"\\omicron","ο"},{"\\pi","π"},{"\\Pi","Π"},{"\\rho","ρ"},{"\\sigma","σ"},{"\\tau","τ"},{"\\upsilon","υ"},{"\\phi","φ"},{"\\Phi","Φ"},{"\\chi","χ"},{"\\psi","ψ"},{"\\Psi","Ψ"},{"\\omega","ω"},{"\\Omega","Ω"},{"\\sum","Σ"},{"\\int","∫"}};
 	
 // These lists are used to read and write proposal information
-const vector <PropType> prop_info_list = { PARAM_PROP,MBP_PROP,MBPII_PROP,MBP_IC_POP_PROP,MBP_IC_POPTOTAL_PROP,MBP_IC_RESAMP_PROP,IND_ADD_REM_PROP,IE_PROP,IE_VAR_PROP,IE_COVAR_PROP,IE_VAR_CV_PROP,POP_ADD_REM_LOCAL_PROP,POP_IC_LOCAL_PROP,POP_END_LOCAL_PROP,POP_SINGLE_LOCAL_PROP,POP_IC_PROP,POP_IC_SWAP_PROP,TRANS_TREE_MUT_LOCAL_PROP,IND_EVENT_TIME_PROP,IND_MULTI_EVENT_PROP,IND_EVENT_ALL_PROP,IND_OBS_RESIM_PROP,IND_OBS_SAMP_PROP,IND_OBS_RESIM_SINGLE_PROP};
+const vector <PropType> prop_info_list = { PARAM_PROP,PARAM_DET_PROP,MBP_PROP,MBPII_PROP,MBP_IC_POP_PROP,MBP_IC_POPTOTAL_PROP,MBP_IC_RESAMP_PROP,IND_ADD_REM_PROP,IE_PROP,IE_VAR_PROP,IE_COVAR_PROP,IE_VAR_CV_PROP,POP_ADD_REM_LOCAL_PROP,POP_IC_LOCAL_PROP,POP_END_LOCAL_PROP,POP_SINGLE_LOCAL_PROP,POP_IC_PROP,POP_IC_SWAP_PROP,TRANS_TREE_MUT_LOCAL_PROP,IND_EVENT_TIME_PROP,IND_MULTI_EVENT_PROP,IND_EVENT_ALL_PROP,IND_OBS_RESIM_PROP,IND_OBS_SAMP_PROP,IND_OBS_RESIM_SINGLE_PROP};
 
-const vector <string> prop_info_str = {"param","mbp","mbpII","mbp_ic_pop","mbp_ic_poptot","mbp_ic_resamp","ind_add_rem","ie","ie_var","ie_covar","ie_var_cv","pop_add_rem_local","pop_ic_local","pop_end_local","pop_single_local","pop_ic","pop_ic_swap","trans_tree_mut_local","ind_event_time","ind_multi_event","ind_event_all","ind_obs_resim","ind_obs_samp","ind_obs_resim_single"};
+// This must match prop_info_list
+const vector <string> prop_info_str = {"param","param (determinisitic)","mbp","mbpII","mbp_ic_pop","mbp_ic_poptot","mbp_ic_resamp","ind_add_rem","ie","ie_var","ie_covar","ie_var_cv","pop_add_rem_local","pop_ic_local","pop_end_local","pop_single_local","pop_ic","pop_ic_swap","trans_tree_mut_local","ind_event_time","ind_multi_event","ind_event_all","ind_obs_resim","ind_obs_samp","ind_obs_resim_single"};
  
 	
 /************************** Object constants ******************************/
@@ -552,5 +562,6 @@ EqnInfo(REPARAM,PARAM_ONLY,false),
 EqnInfo(DIST,PARAM_ONLY,false),
 EqnInfo(DERIVE_EQN,DERIVE_MODE,false),
 EqnInfo(DEFINE_EQN,ALL,false),
-EqnInfo(REPARAM_EQN,ALL,false)
+EqnInfo(REPARAM_EQN,ALL,false),
+EqnInfo(MODEL_CALC,PARAM_ONLY,true)
 };

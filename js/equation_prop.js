@@ -265,7 +265,7 @@ function der_func_check(i,lin2,name,eqn)
 		let sp = model.species[0];
 		
 		if(name == "RNC" || name == "GTC"){
-			if(sp.type == "Population"){
+			if(sp.type != "Individual"){
 				eqn.warn.push({te:"'"+name+"' can only be used for an individual-based model.", cur:ist, len:name.length});
 			}
 		}

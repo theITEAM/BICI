@@ -20,6 +20,7 @@ class Proposal                             // Implements a proposal
 		
 		string print_info() const;
 		void MH(State &state);
+		void param_det(State &state);
 		
 		unsigned int plot_index;
 		

@@ -152,7 +152,7 @@ double StateSpecies::calculate_pop_num(unsigned int i, double t, const vector <u
 {
 	auto num = 0.0;	
 	switch(type){
-	case POPULATION:
+	case POPULATION: case DETERMINISTIC:
 		{
 			auto ti = get_ti(t);
 			if(ti == T) ti--;
@@ -241,7 +241,7 @@ vector <double> StateSpecies::calculate_pop_data_cgl_trgl()
 	}
 	
 	switch(type){
-	case POPULATION:
+	case POPULATION: case DETERMINISTIC:
 		for(auto ti = 0u; ti < T; ti++){
 			for(auto trg = 0u; trg < sp.tra_gl.size(); trg++){
 				auto num = trans_num[trg][ti];

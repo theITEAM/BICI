@@ -1255,17 +1255,25 @@ function initialise_plot_filters(result,source)
 	rpf.pos_view = pos_view;
 	
 	// Possibilities for viewing disgnostics
-	let pos_diag_view = [];
-	pos_diag_view.push({te:"Trans. (exp.)"});	
+	for(let p = 0; p < result.species.length; p++){
+		let rpf2 = rpf.species[p];
+		let sp = result.species[p];
 	
-	pos_diag_view.push({te:"Trans. (dist.)"});	
+		let pos_diag_view = [];
+		if(sp.type != "Deterministic"){
+			pos_diag_view.push({te:"Trans. (exp.)"});	
+			pos_diag_view.push({te:"Trans. (dist.)"});	
+			pos_diag_view.push({te:"Trans. (bias)"});
+			pos_diag_view.push({te:"Trans. (p-val.)"});
+		}
+		if(result.prop_diag_on) pos_diag_view.push({te:"Proposals"});
+		
+		rpf2.pos_diag_view = pos_diag_view;
+		if(pos_diag_view.length > 0){
+			rpf2.sel_diag_view = copy(pos_diag_view[0]);
+		}
+	}
 	
-	pos_diag_view.push({te:"Trans. (bias)"});
-	pos_diag_view.push({te:"Trans. (p-val.)"});
-	if(result.prop_diag_on) pos_diag_view.push({te:"Proposals"});
-	rpf.pos_diag_view = pos_diag_view;
-	rpf.sel_diag_view = copy(pos_diag_view[0]);
-
 	let pos_bias_view = [];
 	pos_bias_view.push({te:"Histogram"});	
 	//pos_bias_view.push({te:"Compartment"});	

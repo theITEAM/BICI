@@ -15,26 +15,6 @@ using json = nlohmann::json;
 #include "utils.hh"
 #include "matrix.hh"
 
-/// Returns the species number from its name
-unsigned int Input::find_p(string name) const 
-{
-	for(auto p = 0u; p < model.nspecies; p++){
-		if(toLower(model.species[p].name) == toLower(name)) return p;
-	}
-	return UNSET;
-}
-
-
-/// Returns the classification number from its name
-unsigned int Input::find_cl(unsigned int p, string name) const 
-{
-	const auto &sp = model.species[p];
-	for(auto cl = 0u; cl < sp.ncla; cl++){
-		if(toLower(sp.cla[cl].name) == toLower(name)) return cl;
-	}
-	return UNSET;
-}
-
 
 /// Returns the classification number from its index
 unsigned int Input::find_cl_index(unsigned int p, string index) const
@@ -155,7 +135,7 @@ string Input::in_file_text(string te, string desc) const
 Table Input::load_table(const string file, string desc)
 {
 	Table tab; tab.error = false;
-	
+
 	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
 	
 	if(i == files.size()){
@@ -174,7 +154,13 @@ Table Input::load_table(const string file, string desc)
 
 	auto j = 0u;
 	while(j < lines.size() && (begin_str(trim(lines[j]),"#") || trim(lines[j]) == "")) j++;
-
+	
+	if(j == lines.size()){
+		alert_import(in_file_text(file,desc)+" doesn't contain any headings");
+		tab.error = true; 
+		return tab;
+	}
+	
 	remove_cr(lines[j]);
 	
 	tab.heading = split(lines[j],sep);
@@ -246,72 +232,6 @@ Table Input::get_subtable(const Table &tab, const vector <string> &col_name, str
 	return table;
 }
  
-
-/// Gets the classification from the compartment name (or if formated using S|E or S:0.5|E:1) 
-unsigned int Input::get_cl_from_comp(string name, unsigned int p) const
-{
-	const auto &sp = model.species[p];
-
-	auto spl = split_with_bracket(name,'|');
-	
-	if(spl.size() == 1){	
-		auto spl2 = split(name,':');
-		for(auto cl = 0u; cl < sp.ncla; cl++){
-			const auto &claa = sp.cla[cl];
-			for(auto c = 0u; c < claa.ncomp; c++){
-				if(claa.comp[c].name == spl2[0]) return cl;
-			}
-		}
-	}
-	else{
-		auto cl_st = UNSET;
-		for(auto i = 0u; i < spl.size(); i++){
-			auto cl = get_cl_from_comp(spl[i],p);
-			if(cl_st == UNSET) cl_st = cl;
-			else{
-				if(cl_st != cl) return UNSET;
-			}
-		}
-		return cl_st;
-	}
-	
-	return UNSET;
-}
-
-
-/// Gets the classification from the trans name (or if formated using S->E|E->I or S->E:0.5|E->I:1) 
-unsigned int Input::get_cl_from_trans(string name, unsigned int p) const
-{
-	const auto &sp = model.species[p];
-	
-	name = replace(name,"->","→");
-
-	auto spl = split_with_bracket(name,'|');
-	
-	if(spl.size() == 1){	
-		auto spl2 = split(name,':');
-		for(auto cl = 0u; cl < sp.ncla; cl++){
-			const auto &claa = sp.cla[cl];
-			for(auto c = 0u; c < claa.ntra; c++){
-				if(claa.tra[c].name == spl2[0]) return cl;
-			}
-		}
-	}
-	else{
-		auto cl_st = UNSET;
-		for(auto i = 0u; i < spl.size(); i++){
-			auto cl = get_cl_from_trans(spl[i],p);
-			if(cl_st == UNSET) cl_st = cl;
-			else{
-				if(cl_st != cl) return UNSET;
-			}
-		}
-		return cl_st;
-	}
-	
-	return UNSET;
-}
-
 
 /// Finds a value in list of strings (case-independent)
 unsigned int Input::find_string_in(const vector <string> &arr, string val) const 
@@ -1199,7 +1119,12 @@ void Input::read_state_sample(unsigned int ch, const vector <string> &lines, con
 					
 				if(va == "INDIVIDUALS"){
 					if(p == UNSET) alert_sample(warn,10);
-					if(model.species[p].type == POPULATION) alert_sample(warn,11);
+					
+					switch(model.species[p].type){
+					case POPULATION: case DETERMINISTIC: alert_sample(warn,11); break;
+					default: break;
+					}
+					
 					mode = MODE_INDIVIDUAL;
 				}
 					
@@ -2076,10 +2001,9 @@ unsigned int Input::get_chain()
 	if(ch == UNSET){
 		alert_import("Chain '"+chain+"' must be a number");
 	}
-	if(ch < 1 || ch > model.details.nchain) alert_import("Chain '"+chain+"' out of range");
+	if(ch < 1 || ch > model.details.nchain){
+		if(!model.data_mode()) alert_import("Chain '"+chain+"' out of range");
+	}
 	
 	return ch-1;
 }
-
-
-				

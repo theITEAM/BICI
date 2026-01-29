@@ -480,3 +480,243 @@ unsigned int param_end(const string &st, unsigned int i, string &emg)
 
 	return i;
 }			
+
+
+/// Returns a syntax error for a line
+CommandLine syntax_error(string emsg, bool fatal)
+{
+	CommandLine cline; 
+	cline.command = EMPTY; 
+	cline.emsg = emsg;
+	cline.fatal = fatal;
+	return cline;
+}
+
+
+/// Gets all the command tags from a given line
+CommandLine get_command_tags(string trr, unsigned int line_num)
+{
+	auto spl = split(trr,' ');
+	
+	auto type = spl[0];
+	
+	Command com = EMPTY;
+	if(type == "species") com = SPECIES;
+	if(type == "classification" || type == "class") com = CLASS;
+	if(type == "set") com = SET;
+	if(type == "camera" || type == "view") com = CAMERA;
+	if(type == "compartment" || type == "comp") com = COMP;
+	if(type == "compartment-all" || type == "comp-all") com = COMP_ALL;
+	if(type == "transition" || type == "trans") com = TRANS;
+	if(type == "transition-all" || type == "trans-all") com = TRANS_ALL;
+	if(type == "data-dir") com = DATA_DIR;
+	if(type == "description" || type == "desc") com = DESC;
+	if(type == "label") com = LABEL;
+	if(type == "box") com = BOX;
+	if(type == "parameter" || type == "param") com = PARAM;
+	if(type == "define") com = DEFINE;
+	if(type == "derived" || type == "der") com = DERIVED;
+	if(type == "init-pop-inf") com = INIT_POP;
+	if(type == "add-pop-inf") com = ADD_POP;
+	if(type == "remove-pop-inf") com = REMOVE_POP;
+	if(type == "add-ind-inf") com = ADD_IND;
+	if(type == "remove-ind-inf") com = REMOVE_IND;
+	if(type == "move-ind-inf") com = MOVE_IND;
+	if(type == "init-pop-sim") com = INIT_POP_SIM;
+	if(type == "add-pop-sim") com = ADD_POP_SIM;
+	if(type == "remove-pop-sim") com = REMOVE_POP_SIM;
+	if(type == "add-ind-sim") com = ADD_IND_SIM;
+	if(type == "remove-ind-sim") com = REMOVE_IND_SIM;
+	if(type == "move-ind-sim") com = MOVE_IND_SIM;
+	if(type == "add-pop-post-sim") com = ADD_POP_POST_SIM;
+	if(type == "remove-pop-post-sim") com = REMOVE_POP_POST_SIM;
+	if(type == "add-ind-post-sim") com = ADD_IND_POST_SIM;
+	if(type == "remove-ind-post-sim") com = REMOVE_IND_POST_SIM;
+	if(type == "move-ind-post-sim") com = MOVE_IND_POST_SIM;
+	if(type == "comp-data") com = COMP_DATA;
+	if(type == "trans-data") com = TRANS_DATA;
+	if(type == "test-data") com = TEST_DATA;
+	if(type == "pop-data") com = POP_DATA;
+	if(type == "pop-trans-data") com = POP_TRANS_DATA;
+	if(type == "ind-effect-data") com = IND_EFFECT_DATA;
+	if(type == "ind-group-data") com = IND_GROUP_DATA;
+	if(type == "genetic-data") com = GENETIC_DATA;
+	if(type == "simulation" || type == "sim") com = SIMULATION;
+	if(type == "inference" || type == "inf") com = INFERENCE; 
+	if(type == "posterior-simulation" || type == "post-sim") com = POST_SIM;
+	if(type == "ind-effect") com = IND_EFFECT;
+	if(type == "fixed-effect") com = FIXED_EFFECT;
+	if(type == "param-sim") com = SIM_PARAM;
+	if(type == "state-sim") com = SIM_STATE;
+	if(type == "param-inf") com = INF_PARAM;
+	if(type == "param-stats-inf") com = INF_PARAM_STATS;
+	if(type == "generation-inf") com = INF_GEN;
+	if(type == "state-inf") com = INF_STATE;
+	if(type == "param-post-sim") com = POST_SIM_PARAM;
+	if(type == "state-post-sim") com = POST_SIM_STATE;
+	if(type == "diagnostics-inf") com = INF_DIAGNOSTICS;
+	if(type == "map") com = MAP;
+	if(type == "post-sim" || type == "post-simulation" ) com = POST_SIM;
+	
+	if(type == "param-mult") com = PARAM_MULT;
+	
+	if(type == "proposal-inf") com = PROPOSAL_INFO;
+	
+	if(type == "trans-diag-inf") com = TRANS_DIAG;
+	
+	if(type == "warning-sim") com = SIM_WARNING;
+	
+	if(type == "warning-inf") com = INF_WARNING;
+	
+	if(type == "warning-post-sim") com = PPC_WARNING;
+	
+	if(type == "ic") com = IC_DATA;
+	
+	if(com == EMPTY){
+		return syntax_error("Command '"+type+"' not recognised.",true);
+	}
+	
+	auto must_term = false; if(find_in(must_term_str,type) != UNSET) must_term = true;
+		
+	auto num_quote = 0u;
+	vector <unsigned int> quote_pos;
+			
+	for(auto i = 0u; i < trr.length(); i++){
+		if(trr.substr(i,1) == "\""){ num_quote++; quote_pos.push_back(i);}
+	}
+	
+	if(num_quote%2 != 0) return syntax_error("Syntax error: Quotes do not match up.",true);
+	
+	for(auto i = 0u; i < num_quote; i += 2){
+		if(quote_pos[i]+1 == quote_pos[i+1]){
+			return syntax_error("Syntax error: No content within the quotation marks.",true);
+		}
+	}
+
+	vector <Fragment> frag; 
+	
+	auto i = 0u; 
+	auto quote = 0u;
+	auto after_eq = false;
+	
+	do{
+		auto ist = i; i++;
+		
+		while(i < trr.length() && !(trr.substr(i,1) == "=" && quote == 0) && 
+				!(quote == 0 && trr.substr(i,1) == "\"")&& 
+				!(quote == 1 && trr.substr(i,1) == "\"") && 
+				!(quote == 0 && trr.substr(i,1) == " ") &&
+				!(quote == 0 && after_eq == true)){
+			i++;
+		}
+
+		after_eq = false;
+		if(trr.substr(i,1) == "=") after_eq = true;
+		
+		auto te = trr.substr(ist,i-ist);
+		while(te.substr(0,1) == endli) te = te.substr(1);
+		while(te.substr(te.length()-1,1) == endli) te = te.substr(0,te.length()-1);
+
+		te = trim(te); if(quote == 0) te = toLower(te);
+
+		if(te != ""){
+			auto pos = ist; while(pos < i && trr.substr(pos,1) == " ") pos++;
+			Fragment fr; fr.text = trim(trr.substr(ist,i-ist)); fr.pos = pos; fr.pos_end = i; fr.quote = quote;
+			frag.push_back(fr);
+		}
+		
+		while(i < trr.length() && quote == 0 && trr.substr(i,1) == " ") i++;
+		if(i < trr.length()){
+			if(trr.substr(i,1) == "\""){ 
+				quote = 1-quote; i++;
+			}
+		}
+	}while(i < trr.length());
+	
+	if(frag.size() == 0) return syntax_error("Does not contain any content",true);
+	
+	if(frag[0].quote == 1) return syntax_error("Should not start with quotes",true);
+	
+	auto num = double(frag.size()-1)/3;
+	auto numi = (unsigned int)(num);
+
+	for(auto n = 0u; n < num; n++){
+		auto ii = 1+n*3;
+		if(frag[ii].text == "="){
+			return syntax_error("An equals sign '=' is misplaced.",must_term);
+		}
+	}
+	
+	for(auto n = 0u; n < num; n++){
+		auto ii = 1+n*3;
+
+		if(ii+2 >= frag.size()){
+			if(ii+1 < frag.size() && frag[ii+1].text == "="){
+				return syntax_error("The tag '"+frag[ii].text+"' is unset",must_term);
+			}
+			else{
+				return syntax_error("The text '"+frag[ii].text+"' cannot be understood",must_term);
+			}
+		}
+		
+		if(frag[ii+1].text != "="){
+			return syntax_error("The tag '"+frag[ii].text+"' is missing an equals sign",must_term);
+		}
+		
+		if(ii+2 < frag.size() && frag[ii+2].text == "="){
+			return syntax_error("The tag '"+frag[ii].text+"' cannot be followed by '=='",must_term);
+		}
+		
+		if(ii+3 < frag.size() && frag[ii+3].text == "="){
+			return syntax_error("The tag '"+frag[ii].text+"' is unset",must_term);
+		}
+	}
+
+	if(num != numi) return syntax_error("Syntax error",must_term);
+	
+	vector <Tag> tags;
+
+	for(auto n = 0u; n < num; n++){
+		if(frag[1+3*n+0].quote != 0) return syntax_error("Syntax error",must_term);
+		if(frag[1+3*n+1].text != "=") return syntax_error("Syntax error",must_term); 
+		if(frag[1+3*n+0].text == "") return syntax_error("Syntax error: Tag name not specified",must_term); 
+		if(frag[1+3*n+2].text == "") return syntax_error("Tag "+frag[1+3*n+0].text+" must have content",must_term); 
+		
+		const auto &fr = frag[1+3*n+0];
+		
+		Tag tag; 
+		tag.name = fr.text; tag.pos = fr.pos; tag.pos_end = fr.pos_end; 
+		tag.value = frag[1+3*n+2].text; tag.done = 0;
+		tags.push_back(tag);
+	}
+	
+	if(tags.size() > 0){
+		for(auto n = 0u; n < tags.size()-1; n++){
+			for(auto nn = n+1; nn < tags.size(); nn++){
+				if(tags[n].name == tags[nn].name){
+					return syntax_error("The tag '"+tags[n].name+"' is set more than once",must_term);
+				}
+			}
+		}
+	}
+		
+	CommandLine cline; 
+	cline.command = com; cline.command_name = type; cline.type_pos = frag[0].pos; cline.tags = tags;
+	cline.line_num = line_num;
+	
+	return cline;
+}
+
+
+/// Gets a default name for a data source
+void get_default_name(string &name, Command cname)
+{
+	switch(cname){
+	case INIT_POP: name = "Initial population"; break;
+	case ADD_IND: name = "Added individuals"; break;
+	case REMOVE_IND: name = "Removed individuals"; break;
+	case ADD_POP: name = "Added populations"; break;
+	case REMOVE_POP: name = "Removed populations"; break;
+	default: break;
+	}
+}

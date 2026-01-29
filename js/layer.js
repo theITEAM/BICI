@@ -1252,6 +1252,7 @@ class Layer
 		case "AddCompartment": model.add_compartment_new_buts(this); break;
 		case "AddLabel": model.add_addlabel_buts(this); break;
 		case "Examples": add_examples_buts(this); break;
+		case "Sections": add_sections_buts(this); break;
 		case "Frame": add_frame_buts(this); break;
 		case "Xscroll": this.add_xscroll_buts(); break;
 		case "Yscroll": this.add_yscroll_buts(); break;

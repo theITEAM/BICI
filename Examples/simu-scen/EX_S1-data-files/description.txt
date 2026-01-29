@@ -1,0 +1,15 @@
+﻿# Example S1: Multiple simulations
+
+## Objective
+- On the 'Simulation→Run' page the number of simulations is set to 100 (instead of the usual 1).
+- When run, the simulated outputs exhibit a range of system dynamics reflecting the inherent stochasticity within the system.
+- Shaded regions in the population plots show the envelope containing 95% of simulations.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

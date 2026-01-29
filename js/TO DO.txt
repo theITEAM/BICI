@@ -1,6 +1,17 @@
-// working on windows
+// working on linux 22/01/26
 
 TO DO
+-- Get determinisitc solver working
+-- Simulates genetic data and group data ( using  wildcard from js version)
+- Simulate 'add-ind-inf' data from simulation
+-- Table output for graphs
+-- Can Oli's equations be implemented?
+-- Differential equation solverin BICI?
+-- Raise limit on number of time steps and email Laura
+-- Mention in manual about negative population problem
+-- Work out what is taking lots of memory in Grants model
+-- Event times the same... throw error?
+
 -- HPAI_SML_update using lots of cpu on ind-update population
 -- E4 expected rate is off
 -- Installing mpi on windows... How to check if there... change functionality

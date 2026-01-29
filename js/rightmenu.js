@@ -60,7 +60,10 @@ function right_menu_buts(lay)
 			}
 			
 			if(rpf.pos_timestep.length > 1){
-				y = add_filter("Time-step",y,rpf.sel_timestep,rpf.pos_timestep,lay);
+				let p = model.get_p();
+				if(rpf.species[p].type != "Deterministic"){
+					y = add_filter("Time-step",y,rpf.sel_timestep,rpf.pos_timestep,lay);
+				}
 			}
 		}
 		break;
@@ -199,9 +202,14 @@ function right_menu_buts(lay)
 		
 	case "Diagnostics":
 		{
-			y = add_filter("View",y,rpf.sel_diag_view,rpf.pos_diag_view,lay);
+			let p = model.get_p();
+			let rpf2 = rpf.species[p];
+				
+			if(rpf2.pos_diag_view.length > 1){
+				y = add_filter("View",y,rpf2.sel_diag_view,rpf2.pos_diag_view,lay);
+			}
 			
-			let sdv = rpf.sel_diag_view;
+			let sdv = rpf2.sel_diag_view;
 			
 			switch(sdv.te){
 			case "Trans. (exp.)":
@@ -536,9 +544,10 @@ function rightmid_menu_buts(lay)
 		switch(subsubtab_name()){
 		case "Diagnostics":
 			{
-				let seldv = rpf.sel_diag_view;
 				let p = model.get_p();
 				let rpf2 = rpf.species[p];
+				let seldv = rpf2.sel_diag_view;
+				
 				let cl = rpf2.sel_class.cl;
 				let sel = rpf2.cla[cl].sel;
 	

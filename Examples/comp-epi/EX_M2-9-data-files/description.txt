@@ -1,0 +1,16 @@
+﻿# Model 2.9: A model of Covid-19
+
+## Objective
+- Show a possible model of Covid-19.
+- Here additional compartments are used to not only more accurately model the disease, but such that the model aligns with publicly available data.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains seven compartments: susceptible $S$, exposed $E$, infected $I$, recovered $R$, asymptomatic $A$, hospitalised $H$ and dead $D$.
+- An external force of infection is controlled by parameter $η$ (in reality this could be a spline estimated from raw case data and flight information).
+- The transmission rate $β(t)$ is time varying to capture the influence of lockdown measures and vaccination.
+- Parameter $f^A$ determines the relative infectiousness of asymptomatic $A$ individuals (comparted with infected $I$ individuals).
+
+## Population
+- This consists of the UK population which is initially susceptible.
