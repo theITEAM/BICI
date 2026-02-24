@@ -886,26 +886,50 @@ void Species::test_data(const DataSource &so)
 		}
 		else{
 			ObsData ob; 
-			ob.type = OBS_TEST_EV;
 			ob.so = so.index;
-			ob.cl = so.cl;
-			ob.tdiv = calc_tdiv(t,details);
+			ob.type = OBS_COMP_EV;
+			ob.c_exact = UNSET;
 			ob.not_alive = false;
-			ob.time_vari = false;
-			ob.Se_eqn = he(add_equation_info(so.obs_model.Se_str,SE),so);
-			ob.Sp_eqn = he(add_equation_info(so.obs_model.Sp_str,SP),so);
 			
+			bool test_res;
 			auto res = tab.ele[j][2];
-			if(res == so.obs_model.diag_pos) ob.test_res = true;
+			if(res == so.obs_model.diag_pos) test_res = true;
 			else{
-				if(res == so.obs_model.diag_neg) ob.test_res = false;
+				if(res == so.obs_model.diag_neg) test_res = false;
 				else{
 					alert_source("Value '"+res+"' is not a positive or negative test result",so,2,j);
 					return;
 				}
 			}
-		
-			ind.obs.push_back(ob);
+			
+			const auto &om = so.obs_model;
+			const auto &dts = om.diag_test_sens;
+			if(so.cl != dts.cl) emsg("Test cl does not agree");
+			
+			auto Sp = om.Sp_str; 
+			
+			vector <string> prob_str;
+			const auto &claa = cla[so.cl];
+			if(dts.comp.size() != claa.ncomp) emsg("comp size wrong");
+			for(auto c = 0u; c < claa.ncomp; c++){ 
+				auto Se = dts.comp[c].Se_str;
+			
+				if(dts.comp[c].on){  // Compartment is test sensitive
+					if(test_res) prob_str.push_back(Se);
+					else prob_str.push_back("1-("+Se+")");
+				}
+				else{
+					if(!test_res) prob_str.push_back(Sp);
+					else prob_str.push_back("1-("+Sp+")");
+				}
+			}
+			
+			ob.c_obs_prob_eqn = create_eqn_vector(prob_str,COMP_PROB,so);
+			
+			ob.cl = so.cl;
+			ob.tdiv = calc_tdiv(t,details);
+			ob.time_vari = false;
+			ind.obs.push_back(ob);	
 		}
 	}		
 	
@@ -982,6 +1006,8 @@ void Species::population_data(const DataSource &so, Hash &hash_pop_filter)
 			pd.obs_mod_val = set_obs_mod_val(value,j,col,so.obs_model,tab,so);
 			pd.time_vari = false;
 			pop_data.push_back(pd);
+			
+			pop_data_exist = true;
 		}
 	}		
 	
@@ -1102,6 +1128,7 @@ void Species::trans_data(const DataSource &so)
 			ob.so = so.index;
 			ob.ref = obs_trans.size();
 			ob.type = OBS_TRANS_EV;
+			ob.c_exact = UNSET;
 			ob.cl = so.cl;
 			ob.tdiv = calc_tdiv(t,details);
 			ob.time_vari = false;
@@ -1294,7 +1321,7 @@ unsigned int Species::find_individual(string name, bool create)
 	if(i == UNSET && create){
 		i = individual.size();
 		if(i >= details.individual_max){
-			alert_input("The number of individuals exceeds the limit of "+to_string(details.individual_max)+".");
+			alert_input("The number of individuals exceeds the limit of "+to_string(details.individual_max)+". Consider increasing this limit using the 'ind-max' tag in the 'inference' command.");
 		}
 		
 		hash_ind.add(i,vec);
@@ -1656,6 +1683,8 @@ vector <EquationInfo> Species::create_eqn_vector(const vector <string> &vec, Eqn
 /// For each time div and global transition references any transition data associated with it
 void Species::init_pop_trans_ref()
 {
+	if(!pop_trans_data_exist) return;
+	
 	T = details.T;
 	
 	pop_trans_ref.resize(T);
@@ -1682,6 +1711,8 @@ void Species::init_pop_trans_ref()
 /// For each time div and global transition references any population data associated with it
 void Species::init_pop_data_ref()
 {
+	if(!pop_data_exist) return;
+	
 	T = details.T;
 	
 	pop_data_ref.resize(T);

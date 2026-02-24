@@ -24,9 +24,9 @@ const string default_file = "/tmp/init.bici";        // This is used for Mac
 const string default_file = "Execute/init.bici";     // This is used for windows / linux
 #endif
 
-#define USE_MPI                                    // Sets if code can run in parallel
+//#define USE_MPI                                    // Sets if code can run in parallel
 
-const string bici_version = "v0.82";                 // Sets the BICI version
+const string bici_version = "v0.83";                 // Sets the BICI version
 
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
 const bool testing = true;                           // Set to true for additional testing
@@ -36,6 +36,7 @@ const bool check_swap = false;                       // Used to check if new swa
 const bool use_ind_key = true;                       // Determines if indindividual key
 const bool print_diag_on = false;                    // Prints diagnostic statements to terminal
 const bool cum_diag = true;                          // Cumulative probability diagnostic
+const bool profiling = false;                        // Determines if memory profiling is done
 
 const bool sim_linearise_speedup = true;             // Speeds up simulation
 // Takes advantage of lineared equations with no time dependence
@@ -157,7 +158,7 @@ enum SimTrigEventType { ENTER_SIM_EV, LEAVE_SIM_EV, MOVE_SIM_EV, NM_TRANS_SIM_EV
 enum TrigEventType { TRIG_OBS_TRANS_EV, TRIG_MOVE_EV, TRIG_LEAVE_EV };
 
 // Different types of observation
-enum ObsType { OBS_SOURCE_EV, OBS_TRANS_EV, OBS_SINK_EV, OBS_COMP_EV, OBS_TEST_EV };
+enum ObsType { OBS_SOURCE_EV, OBS_TRANS_EV, OBS_SINK_EV, OBS_COMP_EV };
 
 // Different ways a parameter can affect likelihoods
 enum AffectType { SPLINE_PRIOR_AFFECT, IEG_PRIOR_AFFECT, PRIOR_AFFECT, DIST_AFFECT, EXP_FE_AFFECT, DIV_VALUE_AFFECT, DIV_VALUE_NOPOP_AFFECT, DIV_VALUE_LINEAR_AFFECT, MARKOV_LIKE_AFFECT, POP_AFFECT, NM_TRANS_AFFECT, NM_TRANS_BP_AFFECT, NM_TRANS_INCOMP_AFFECT, OMEGA_AFFECT, EXP_IE_AFFECT, LIKE_IE_AFFECT, INDFAC_INT_AFFECT, MARKOV_POP_AFFECT, MARKOV_POP_NOPOP_AFFECT, MARKOV_POP_LINEAR_AFFECT, LIKE_OBS_IND_AFFECT, LIKE_OBS_POP_AFFECT, LIKE_OBS_POP_TRANS_AFFECT, OBS_EQN_AFFECT, LIKE_UNOBS_TRANS_AFFECT, POP_DATA_CGL_TGL_AFFECT, LIKE_INIT_COND_AFFECT, PRIOR_INIT_COND_AFFECT, LIKE_GENETIC_PROCESS_AFFECT, GENETIC_VALUE_AFFECT, LIKE_GENETIC_OBS_AFFECT, IIF_W_AFFECT, POPNUM_IND_W_AFFECT, AFFECT_MAX };
@@ -281,7 +282,7 @@ enum PercentType { LOAD_PER, INIT_PER, RUN_PER, RUN_GEN_PER, ANNEAL_PER, OUTPUT_
 enum DerFuncType { RN, RNE, RNC, GT, GTE, GTC, DF_UNSET};
  
 // Equation types 
-enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAMETER, PARAMVEC, SPLINE, SPLINEREF, CONSTSPLINEREF, POPNUM, POPTIMENUM, TIME, IE, ONE, ZERO, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, TINT, INTEGRAL, DERIVE, REG_FAC, REG_PRECALC, REG_PRECALC_TIME, SINGLE, NOOP};
+enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAM_INDEX, PARAMETER, PARAMVEC, SPLINE, SPLINEREF, CONSTSPLINEREF, POP_INDEX, POPNUM, POPTIMENUM, TIME, IE, ONE, ZERO, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, TINT, INTEGRAL, DERIVE, REG_FAC, REG_PRECALC, REG_PRECALC_TIME, SINGLE, SUM, NOOP};
 
 // Different types of spline
 enum SplineType { LINEAR_SPL, SQUARE_SPL, CUBICPOS_SPL, CUBIC_SPL};
@@ -298,6 +299,14 @@ enum PropResult { ACCEPT, ACCEPT50, REJECT, ACCEPT_SMALL, ACCEPT50_SMALL, REJECT
 //Different type of data
 enum DataSourceType { SIM_DATA, INF_DATA, POST_SIM_DATA};
 	
+// Different types of optimisation
+enum Optimise { SPEED, MEMORY, AUTO_OPTIMISE};
+
+// Different types of parameter
+enum ParamType { PARAM_NORMAL, PARAM_DERIVE, PARAM_PRESET};
+	
+enum Compress { ALWAYS_COMPRESS, NEVER_COMPRESS, AUTO_COMPRESS};
+
 /************************** Numeric constants ******************************/
 
 const auto ERR_MSG_MAX = 5u;                     // The maximum number of error messages
@@ -305,12 +314,24 @@ const auto ERR_MSG_MAX = 5u;                     // The maximum number of error 
 const auto CODE = 99999989u;                      // Value above which is a non-numeric number
 const auto UNSET = 99999990u;                     // Indicates an unset number
 const auto USINT_MAX = 4294967295u;               // Largest number of unsigned int
+const auto HASH_MULT = 7919u;                     // Number used to randomise hash table 
+const auto HASH_NUM_MAX = 100000001u;             // The maximum number a hash number can go up to 
+const auto HASH_ENLARGE_SIZE = 4u;                // Factor hash table enlarges 
+const auto HASH_OCC_THRESH = 0.5;                 // Threshold above which hash table enlarges
 const auto UNSET_LIST = USINT_MAX-1;              // Used in operator lists 
 const auto CUT_LIST = USINT_MAX-2;                // Used to represent cut out of list
 const auto OP_MAX = USINT_MAX-10;                 // Maximum number of operators
+
 const auto UNSET_WILD = 99999980.0;               // Indicates an unset wildcard "*"
 const auto UNSET_F = 99999990.0;                  // Floating point unset
-const auto TIME_VAR = 99999991u;                  // Indicates time variable t (used in eqnations)
+
+const auto ALL_TIME_STEP = 99999970u;             // Used to represent all time steps
+const auto TIME_VAR = 99999971u;                  // Indicates time variable t (used in eqnations)
+const auto DIST_MATRIX = 99999972u;               // Distance matrix
+const auto IDEN_MATRIX = 99999973u;               // Identity matrix
+const auto DEN_VEC = 99999974u;                   // Density vector
+const auto RDEN_VEC = 99999975u;                  // Relative density vector
+
 const auto OUTSIDE_INF = 99999992u;               // Stands for outside infection
 const auto ENTER_INF = 99999993u;                 // Stands for entering infection
 const auto BP_FROM_OTHERS = 99999994u;            // Branch probability is calculated from others

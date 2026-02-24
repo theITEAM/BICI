@@ -1097,8 +1097,18 @@ void Input::check_param_define(const EquationInfo &ei)
 					}
 					
 					for(auto &der : model.derive){
-						if(der.name == name){
-							if(check_dep_without_prime_error(der.dep,pp.dep)){
+						if(der.name == name){	
+							auto dep = pp.dep;
+							if(der.time_dep){
+								if(!(dep.size() > 0 && dep[dep.size()-1] == "t")){
+									alert_line("The value '"+cont+"' doesn't have the same dependency as the definition '"+der.full_name+"'",line_num,true);
+								}
+								else{
+									dep.pop_back();
+								}
+							}
+							
+							if(check_dep_without_prime_error(der.dep,dep)){
 								alert_line("The value '"+cont+"' doesn't have the same dependency as the definition '"+der.full_name+"'",line_num,true);
 							}
 							fl = true;

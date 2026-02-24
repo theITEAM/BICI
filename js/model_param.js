@@ -903,6 +903,7 @@ function param_details_scrollable(lay)
 	let eq_app = lay.op.eqn_appear;
 	
 	let too_big = false;
+	if(eq_app == undefined) return cy;
 	
 	for(let i = 0; i < eq_app.length; i++){
 		let eq = eq_app[i];
@@ -978,7 +979,7 @@ function param_details_scrollable(lay)
 				te = "Defined";
 				if(eq.eqn_info != undefined){
 					let name = get_full_parameter_name(eq.eqn_info.par_name);
-					te = "Definition of <e>"+name+"</e>";
+					te = "Definition of "+name;
 					ac = "SelectDefine";
 				}
 			}
@@ -1000,8 +1001,15 @@ function param_details_scrollable(lay)
 		
 		if(find_in(store,te) == undefined){
 			lay.add_button({te:"View", x:dx-3.8, y:cy-0.2, dx:3.5, dy:1.2, ac:ac, type:"GreyView", eqn_info:eq.eqn_info});
-			cy = lay.add_paragraph("<b>"+te+"</b>",dx-4,cx,cy,BLACK,warn_si,warn_lh);
-		
+			
+			if(begin_str(te,"Transition ")){
+				lay.add_button({te:"• "+te, x:cx+0.5, y:cy-0.2, dx:dx-4.5, dy:1.2, type:"TransLabel"});
+				cy += 1;
+			}
+			else{
+				cy = lay.add_paragraph("• "+te+"",dx-4.5,cx+0.5,cy,BLACK,warn_si,warn_lh);
+			}
+			
 			cy += 0.5;
 		
 			store.push(te);

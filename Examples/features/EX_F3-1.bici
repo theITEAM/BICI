@@ -1,0 +1,71 @@
+
+###################### DATA DIRECTORY ######################
+
+data-dir folder="EX_F3-1-data-files"
+
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+simulation start=0 end=100 timestep=0.1
+
+inference start=0 end=100 timestep=0.1 nchain=3
+
+post-sim start=0 end=100
+
+
+########## DEFINE MODEL AND DATA FOR SPECIES FARM ##########
+
+species name="Farm" type="individual"
+
+# SPECIES MODEL
+
+class name="DS" index="d"
+
+comp name="S" color="#009900" x=-16 y=0
+comp name="I" color="#ff2222" x=0 y=0
+comp name="R" color="#4444ff" x=15 y=0
+
+trans name="S->I" value="exp(rate:βΣ_l'[l,30] (M_l,l'×{I,l'}))"
+trans name="I->R" value="gamma(mean:m, cv:c)"
+
+class name="Location" index="l"
+
+comp-all color="#000099" fix="true" file="comp-Location.csv"
+
+# SIMULATION INITIAL CONDITIONS
+
+add-ind-sim file="add-ind-sim.csv"
+
+
+# INFERENCE DATA
+
+add-ind-inf file="add-ind.csv"
+
+trans-data name="Infections" trans="S->I" obsrange="all" file="trans-data.csv"
+
+trans-data name="Recoveries" trans="I->R" obsrange="all" file="trans-data-2.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="c" value="0.3" prior="power(0.01,1,-2)"
+
+param name="m" value="12" prior="inverse(1,20)"
+
+param name="α" value="2.5" prior="uniform(1,5)"
+
+param name="β" value="1.8" prior="inverse(1,5)"
+
+param name="Δ" value="5" prior="uniform(3,7)"
+
+
+param name="M_l,l'" reparam="1/(1+pow(D_l,l'/Δ|α))"
+
+
+

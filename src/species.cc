@@ -22,6 +22,7 @@ Species::Species(unsigned int p, const vector <double> &timepoint, const Details
 	obs_trans_exist = false;
 	add_rem_pop_on = false;
 	pop_trans_data_exist = false;
+	pop_data_exist = false;
 };
 
 
@@ -878,7 +879,7 @@ void Species::set_linear_form(LinearForm &lin_form, const vector <LinearFormInit
 			for(auto i = 0u; i < eq.pop_ref.size(); i++){
 				auto po = eq.pop_ref[i];
 							
-				{ // turn off
+				if(false){ // turn off
 					auto k = 0u; while(k < lin_form.pop_affect.size() && lin_form.pop_affect[k].po != po) k++;
 					if(k == lin_form.pop_affect.size()) k = UNSET;
 					if(k != lin_form.hash_po.find(po)) emsg("lf prob");

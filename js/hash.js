@@ -39,6 +39,15 @@ class Hash
 	{
 		return hash_find(this.store,ref);
 	}
+
+	
+	/// Adds a vector 
+	create_vec(list)
+	{
+		for(let i = 0; i < list.length; i++){
+			hash_add(this.store,list[i],i);
+		}
+	}
 	
 	
 	/// Adds a reference to the hash table
@@ -48,7 +57,7 @@ class Hash
 	}
 	
 	
-	/// Removes a reference to th hash table
+	/// Removes a reference to the hash table
 	remove(ref)
 	{
 		hash_remove(this.store,ref);
@@ -304,6 +313,8 @@ function hash_add(store,ref,num)
 	if(store[code] == undefined) store[code]=[];
 	
 	let vec = store[code];
+	
+	//if(vec.length > 10) pr(vec.length+" hash si");
 	for(let k = 0; k < vec.length; k++){
 		if(vec[k].ref == ref){
 			if(vec[k].num != num) error("hash num is wrong");

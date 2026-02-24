@@ -518,6 +518,8 @@ function add_data_buts(lay,siminf)
 		}
 	}
 
+	//data_ty = "Individual"; prr("Enfore data type");
+
 	switch(data_ty){
 	case "Init. Cond.":
 		{
@@ -1399,10 +1401,12 @@ function add_source_description(so)
 				if(val[c].check == true){
 					if(sen != "") sen += ",";
 					sen += val[c].comp_name_store;
+					
+					sen += "[Se:"+val[c].Se_eqn.te+"]";
 				}
 			}
 					
-			desc = spec.cl_drop.te+" "+sen+" Se="+spec.Se_eqn.te+" Sp="+spec.Sp_eqn.te;
+			desc = spec.cl_drop.te+" "+sen+" Sp:"+spec.Sp_eqn.te;
 			
 			num = so.table.nrow;
 		}
@@ -1417,8 +1421,14 @@ function add_source_description(so)
 		
 	case "Ind. Group":
 		{
-			desc = spec.gname;
-			num = so.table.nrow;
+			desc = "Ind.: ";
+			let tab = so.table;
+			for(let i = 0; i < tab.nrow; i++){
+				if(i != 0) desc += ",";
+				desc += tab.ele[i][0];
+				if(desc.length > 100) break;
+			}
+			num = tab.nrow;
 		}
 		break;
 	
@@ -1778,3 +1788,4 @@ function check_eqn_valid(te)
 	
 	return success();
 }
+

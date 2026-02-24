@@ -42,11 +42,11 @@ class Model
 		this.param_factor = [];
 		this.derive = [];   
 		
-		this.sim_details = { t_start:"", t_end:"", timestep:"", indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, algorithm:{value:"gillespie"}, number:SIM_NUM_DEFAULT, run_local:{value:"Yes"}, run_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT };    
+		this.sim_details = { t_start:"", t_end:"", timestep:"", indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, algorithm:{value:"gillespie"}, number:SIM_NUM_DEFAULT, run_local:{value:"Yes"}, run_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, optimise:{value:"auto"}, compress:{value:"auto"}};    
 		
-		this.inf_details = { t_start:"", t_end:"", timestep:"", abcsample:String(ABC_SAMPLE_DEFAULT), sample:String(MCMC_SAMPLE_DEFAULT), output_param :String(MCMC_OP_PARAM_DEFAULT), output_state:String(MCMC_OP_STATE_DEFAULT), accfrac:String(ABC_ACFRAC_DEFAULT), accfracsmc:String(ABCSMC_ACFRAC_DEFAULT), numgen:String(ABCSMC_GEN_DEFAULT), kernelsize:String(ABCSMC_KERNEL_DEFAULT), indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, nchain:String(MCMC_CHAIN_DEFAULT), algorithm:{value:ALG_DEFAULT}, run_local:{value:"Yes"}, run_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, sync_on:{value:"On"}, burnin_frac:BURNIN_FRAC_DEFAULT, anneal_type:{te:ANNEAL_DEFAULT}, anneal_rate:ANNEAL_RATE_DEFAULT, anneal_power:ANNEAL_POWER_DEFAULT, npart:String(PAS_PART_DEFAULT), gen_update:String(PAS_GEN_UPDATE_DEFAULT), cha_per_core:String(MCMC_CHAIN_PER_CORE_DEFAULT), part_per_core:String(PAS_PART_PER_CORE_DEFAULT) };
+		this.inf_details = { t_start:"", t_end:"", timestep:"", abcsample:String(ABC_SAMPLE_DEFAULT), sample:String(MCMC_SAMPLE_DEFAULT), output_param :String(MCMC_OP_PARAM_DEFAULT), output_state:String(MCMC_OP_STATE_DEFAULT), accfrac:String(ABC_ACFRAC_DEFAULT), accfracsmc:String(ABCSMC_ACFRAC_DEFAULT), numgen:String(ABCSMC_GEN_DEFAULT), kernelsize:String(ABCSMC_KERNEL_DEFAULT), indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, nchain:String(MCMC_CHAIN_DEFAULT), algorithm:{value:ALG_DEFAULT}, run_local:{value:"Yes"}, run_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, sync_on:{value:"On"}, burnin_frac:BURNIN_FRAC_DEFAULT, anneal_type:{te:ANNEAL_DEFAULT}, anneal_rate:ANNEAL_RATE_DEFAULT, anneal_power:ANNEAL_POWER_DEFAULT, npart:String(PAS_PART_DEFAULT), gen_update:String(PAS_GEN_UPDATE_DEFAULT), cha_per_core:String(MCMC_CHAIN_PER_CORE_DEFAULT), part_per_core:String(PAS_PART_PER_CORE_DEFAULT), optimise:{value:"auto"}, compress:{value:"auto"} };
 		
-		this.ppc_details = {  ppc_t_start:"", ppc_t_end:"", t_start:"", t_end:"", algorithm:{value:"gillespie"}, number:PPC_NUM_DEFAULT, run_local:{value:"Yes"}, run_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT};    
+		this.ppc_details = {  ppc_t_start:"", ppc_t_end:"", t_start:"", t_end:"", algorithm:{value:"gillespie"}, number:PPC_NUM_DEFAULT, run_local:{value:"Yes"}, run_inf_model:{value:"Yes"},srun_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, optimise:{value:"auto"}, compress:{value:"auto"}};    
 			
 		this.start = true;
 		this.filename = "";
@@ -2092,32 +2092,39 @@ class Model
 	{	
 		let old_name = this.species[p].name;
 		if(new_name == old_name) return;
-
+	
 		let eq_list = this.find_equation_list();
 		
-		let len = old_name.length;
-		let dif = new_name.length - old_name.length;
-		
 		for(let i = 0; i < eq_list.length; i++){
-			let eqn = eq_list[i];
-			extract_equation_properties(eqn);
-			if(eqn.p_name == old_name) eqn.p_name = new_name;
-			
-			let te = eqn.te;
-			for(let j = 0; j < eqn.sp_name_list.length; j++){
-				let ch = eqn.sp_name_list[j];
-				if(ch.p_name == old_name){
-					te = te.substr(0,ch.icur)+new_name+te.substr(ch.icur+len);
-					for(let jj = j+1; jj < eqn.sp_name_list.length; jj++){
-						eqn.sp_name_list[jj].icur += dif;
-					}
-				}
-			}
-			eqn.te = te;
+			let eqn = eq_list[i];	
+			this.rename_species_eqn(eqn,old_name,new_name);
 		}
 	
-		this.species[p].name = new_name;
+		// Updates any reparameterised equations
+		for(let th = 0; th < this.param.length; th++){
+			let par = this.param[th];
+
+			switch(par.variety){
+			case "reparam":
+				if(par.reparam_eqn_on){
+					let eqn = create_equation(par.reparam_eqn,"reparam_eqn");
+					this.rename_species_eqn(eqn,old_name,new_name);
+					par.reparam_eqn = eqn.te;
+				}
+				break;
+			 
+			case "define":
+				{
+					let eqn = create_equation(par.define_eqn,"define_eqn");
+					this.rename_species_eqn(eqn,old_name,new_name);
+					par.define_eqn = eqn.te;
+				}
+				break;					
+			}
+		}
 		
+		this.species[p].name = new_name;
+	
 		this.rename_ob(model,"model","p_name",old_name,new_name);
 	
 		this.update_pline_all();
@@ -2137,63 +2144,129 @@ class Model
 	
 	
 	/// Renames an index on a classification
-	rename_index(new_name,p,cl,include_clone)
+	rename_index(new_name,p,cl)
 	{
 		let claa = this.species[p].cla[cl];
 		
 		let old_name = claa.index;
 		if(new_name == old_name) return success();
 		
-		if(include_clone == true){ 
-			for(let i = 0; i < this.param.length; i++){
-				let par = this.param[i];
-				for(let d = 0; d < par.dep.length; d++){
-					let de = par.dep[d];
-					let de_remove = remove_prime(de)
-					if(de_remove == old_name){
-						par.dep[d] = new_name+de.substr(de_remove.length);
-						par.full_name = param_name(par);
-					}
+		for(let i = 0; i < this.param.length; i++){
+			let par = this.param[i];
+			for(let d = 0; d < par.dep.length; d++){
+				let de = par.dep[d];
+				let de_remove = remove_prime(de)
+				if(de_remove == old_name){
+					par.dep[d] = new_name+de.substr(de_remove.length);
+					par.full_name = param_name(par);
 				}
 			}
 		}
+ 
+		let eq_list = this.find_equation_list();
 		
-		if(include_clone == true){ 
-			let eq_list = this.find_equation_list();
-			
-			for(let i = 0; i < eq_list.length; i++){
-				let eqn = eq_list[i];
-				extract_equation_properties(eqn);
-				
-				let te = eqn.te;
-				for(let j = 0; j < eqn.index_name_list.length; j++){
-					let ind = eqn.index_name_list[j];
-					if(ind.index_name == old_name){
-						ind.index_name = new_name;
-						te = te.substr(0,ind.icur)+new_name+te.substr(ind.icur+1);
-					}
-				}
-				eqn.te = te;
-				
-				extract_equation_properties(eqn);
-			}
-	
-			let list = this.find_clones(p,cl);
-		
-			for(let li of list){
-				this.rename_index(new_name,li.p,li.cl,false);
-			}
-			
-			claa.index = new_name;
-	
-			if(debug == true) this.check_consistent();  
-		
-			this.update_pline_all();
+		for(let i = 0; i < eq_list.length; i++){
+			let eqn = eq_list[i];	
+			this.rename_index_eqn(eqn,old_name,new_name);
+			extract_equation_properties(eqn);
 		}
+
+		let list = this.find_clones(p,cl);
+	
+		for(let li of list){
+			this.species[li.p].cla[li.cl].index = new_name;
+		}
+				
+		// Updates any reparameterised equations
+		for(let th = 0; th < this.param.length; th++){
+			let par = this.param[th];
+
+			switch(par.variety){
+			case "reparam":
+				if(par.reparam_eqn_on){
+					let eqn = create_equation(par.reparam_eqn,"reparam_eqn");
+					this.rename_index_eqn(eqn,old_name,new_name);
+					par.reparam_eqn = eqn.te;
+				}
+				break;
+			 
+			case "define":
+				{
+					let eqn = create_equation(par.define_eqn,"define_eqn");
+					this.rename_index_eqn(eqn,old_name,new_name);
+					par.define_eqn = eqn.te;
+				}
+				break;					
+			}
+		}
+
+		claa.index = new_name;
+
+		if(debug == true) this.check_consistent();  
+	
+		this.update_pline_all();
 		
 		return success();
 	}
 
+	
+	/// Renames an index in an equation
+	rename_index_eqn(eqn,old_name,new_name)
+	{
+		extract_equation_properties(eqn);
+		
+		let te = eqn.te;
+		for(let j = 0; j < eqn.index_name_list.length; j++){
+			let ind = eqn.index_name_list[j];
+			if(ind.index_name == old_name){
+				let ii = ind.icur;
+				while(ii < te.length && te.substr(ii,1) == " ") ii++;
+				if(ii == te.length) error("Could not find index");
+				else{
+					if(te.substr(ii,1) != ind.index_name) error("icur is wrong");
+					else{
+						te = te.substr(0,ii)+new_name+te.substr(ii+1);				
+					}
+				}
+			}
+		}
+		eqn.te = te;
+	}
+
+	
+	/// Renames a species within an equation
+	rename_species_eqn(eqn,old_name,new_name)
+	{
+		let len = old_name.length;
+		let dif = new_name.length - old_name.length;
+	
+		extract_equation_properties(eqn);
+			
+		if(eqn.p_name == old_name) eqn.p_name = new_name;
+		
+		let te = eqn.te;
+		for(let j = 0; j < eqn.sp_name_list.length; j++){
+			let ch = eqn.sp_name_list[j];
+		
+			if(ch.p_name == old_name){
+				let ii = ch.icur;
+				while(ii < te.length && te.substr(ii,1) == " ") ii++;
+				if(ii == te.length) error("Could not find species name");
+				else{
+					if(te.substr(ii,len) != old_name) error("icur is wrong");
+					else{
+						te = te.substr(0,ii)+new_name+te.substr(ii+len);
+						for(let jj = j+1; jj < eqn.sp_name_list.length; jj++){
+							eqn.sp_name_list[jj].icur += dif;
+						}
+					}
+				}
+			}
+		}
+		
+		eqn.te = te;
+	}
+	
 
 	/// Renames a property within the model
 	rename_ob(ob,root,prop,old_name,new_name)
@@ -2340,6 +2413,8 @@ class Model
 				let eqn_info = {p:p, i:i};
 					
 				if(so.type=="Diag. Test"){
+					// TO DO NOW
+					//pr("SPEC"); pr(so.spec);
 					this.add_equation_to_list(eqn_list,so.spec.Se_eqn,eqn_info);
 					this.add_equation_to_list(eqn_list,so.spec.Sp_eqn,eqn_info);
 				}
@@ -2348,7 +2423,6 @@ class Model
 					let tab = so.table;
 					for(let r = 0; r < tab.nrow; r++){
 						let te = tab.ele[r][2];
-						//let spl = te.split("|");
 						let spl = split_with_bracket(te,"|");
 						
 						for(let k = 0; k < spl.length; k++){
@@ -2480,6 +2554,8 @@ class Model
 		cy += 0.5;
 		
 		add_layer("WarningContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{});
+		
+		lay.add_corner_button([["Close","Grey","CloseWarn"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy},{});
 	}
 	
 	
@@ -2499,11 +2575,11 @@ class Model
 				
 			lay.add_button({te:"View", x:dx-5, y:y+0.9, dx:4, dy:1.5, ac:"ViewModelError", type:"GreyView", i:i});
 	
-			y = lay.add_paragraph("<b>"+warn[i].mess+"</b>",dx-8,x+3,y+0.4,BLACK,para_si,para_lh);
+			y = lay.add_paragraph("<b>"+warn[i].mess+"</b>",dx-10,x+3,y+0.4,BLACK,para_si,para_lh);
 			
 			let yy = y; if(warn[i].mess == "") yy -= 0.4;
 		
-			y = lay.add_paragraph(warn[i].mess2,dx-8,x+3,yy,BLACK,warn_si,warn_lh);
+			y = lay.add_paragraph(warn[i].mess2,dx-10,x+3,yy,BLACK,warn_si,warn_lh);
 			
 			y += 0.5;
 		}
@@ -3415,5 +3491,132 @@ class Model
 				}
 			}			
 		}
+	}
+	
+	
+	/// Gets a value from a transition
+	get_trans_value(tr)
+	{
+		let tra_type = tr.type.toLowerCase();
+		let nm_flag = false;
+		let err_fl;
+		
+		let te;
+		switch(tra_type){
+		case "exp(rate)": 
+			{
+				let rate = esc(tr.value.rate_eqn.te); if(rate == "") err_fl = "rate";
+				te = "exp(rate:"+rate+")";
+			}
+			break;
+			
+		case "exp(mean)": 
+			{
+				let mean = esc(tr.value.mean_eqn.te); if(mean == "") err_fl = "mean";
+				te = "exp(mean:"+mean+")";
+			}
+			break;
+			
+		case "gamma":
+			{
+				let mean = esc(tr.value.mean_eqn.te); if(mean == "") err_fl = "mean";
+				let cv = esc(tr.value.cv_eqn.te); if(cv == "") err_fl = "cv";
+				te = "gamma(mean:"+mean+", cv:"+cv+")";
+				nm_flag = true;
+			}
+			break;
+			
+		case "erlang":
+			{
+				let mean = esc(tr.value.mean_eqn.te); if(mean == "") err_fl = "mean";
+				let sh = esc(tr.value.shape_erlang.te); if(sh == "") err_fl = "shape";
+				te = "erlang(mean:"+mean+", shape:"+sh+")";
+			}
+			break;
+			
+		case "log-normal": 
+			{
+				let mean = esc(tr.value.mean_eqn.te); if(mean == "") err_fl = "mean";
+				let cv = esc(tr.value.cv_eqn.te); if(cv == "") err_fl = "cv";
+				te = "log-normal(mean:"+mean+", cv:"+cv+")";
+				nm_flag = true;
+			}
+			break;
+			
+		case "weibull":
+			{
+				let sc = esc(tr.value.scale_eqn.te); if(sc == "") err_fl = "scale";
+				let sh = esc(tr.value.shape_eqn.te); if(sh == "") err_fl = "shape";
+				te = "weibull(scale:"+sc+", shape:"+sh+")";
+				nm_flag = true;
+			}
+			break;
+
+		case "period": 
+			{
+				let time = esc(tr.value.mean_eqn.te); if(time == "") err_fl = "time";
+				te = "period(time:"+time+")";
+				nm_flag = true;
+			}
+			break;
+		
+		default: error("Option not recognised 114"); break;
+		}
+		
+		return { te:te, tra_type:tra_type, nm_flag:nm_flag, err_fl:err_fl};
+	}
+	
+	
+	/// Reduces the number of location by a certain factor (used for testing Grant's model)
+	factor_reduce(p,cl,fac)
+	{
+		let sp = this.species[p];
+		let claa = sp.cla[cl];
+		
+		let step = Number(fac);
+	
+		let comp_new = [];
+		for(let i = 0; i < claa.comp.length; i += step){
+			comp_new.push(claa.comp[i]);
+		}
+		claa.comp = comp_new;
+		claa.ncomp = claa.comp.length;
+		hash_redo(claa.hash_comp,claa.comp);
+		
+		for(let th = 0; th < this.param.length; th++){
+			let par = this.param[th];
+			let list_old = par.list;
+			let list = par_find_list(par);
+			
+			if(par.dep.length > 0 && par.value && par.value.length > 0){
+				let map=[];
+				for(let d = 0; d < list.length; d++){
+					map[d]=[];
+					for(let i = 0; i < list[d].length; i++){
+						map[d].push(find_in(list_old[d],list[d][i]));
+					}
+				}
+				
+				let temp = par_find_template(list);
+				let co_list = generate_co_list(list);
+				
+				for(let j = 0; j < co_list.length; j++){
+					let index = co_list[j].index;
+					
+					let ind_old=[];
+					for(let d = 0; d < list.length; d++){
+						ind_old.push(map[d][index[d]]);
+					}
+					
+					let val = get_element(par.value,ind_old);
+					set_element(temp,index,val);
+				}
+			}
+			
+			par.list = list;
+		}
+		
+		sp.sim_source = [];
+		sp.inf_source = [];
 	}
 }

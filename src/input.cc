@@ -17,6 +17,8 @@ using namespace std;
 Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(model), mpi(mpi)
 {
 	datadir = "";
+	
+	print_diag("start import");
 
 	terminate = false;
 	
@@ -51,13 +53,17 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 		}while(true);
 	}
 	
+	print_diag("start process");
+	
 #ifdef USE_MPI 
 	mpi.bcast(lines);
 	mpi.bcast(lines_raw);
 #endif
 
+	if(model.mode == DATA_CLEAR) return;
+
 	auto command_line = extract_command_line(lines); // Converts from text lines to command lines
-	
+
 	load_data_files(command_line);
 		
 	// Import happens in three stages:
@@ -80,6 +86,11 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 			if(model.species[p_current].ncla == 1) cl_current = 0;
 		}
 	
+		// Determines if using simulation initial conditions
+		auto use_sim_ic = true;
+		if(model.mode == INF || model.mode == EXT) use_sim_ic = false;
+		if(model.mode == PPC && !model.details.param_only) use_sim_ic = false;
+		
 		auto num_sim = 0u, num_inf = 0u, num_ppc = 0u;
 		
 		for(const auto &line : command_line){
@@ -99,7 +110,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 					break;
 				
 				case INFERENCE:
-					if(model.mode != INF && model.mode != PPC && model.mode != EXT){
+					if(model.mode != INF && model.mode != PPC && model.mode != EXT && model.mode != DATA_SHOW){
 						process = false; 
 					}
 					else{
@@ -153,12 +164,12 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 					break;
 				
 				case ADD_POP: case REMOVE_POP: case ADD_IND: 
-					if(model.mode == SIM) process = false;
+					if(use_sim_ic) process = false;
 					break;
 					
 				case ADD_POP_SIM: case REMOVE_POP_SIM: case ADD_IND_SIM:
 				case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: case ADD_IND_POST_SIM:
-					if(model.mode == INF || model.mode == EXT) process = false;
+					if(!use_sim_ic) process = false;
 					break;
 			
 				default: process = false; break;
@@ -180,23 +191,27 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 					break;
 					
 				case INIT_POP_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM:
-					if(model.mode == INF || model.mode == EXT) process = false;
+					if(!use_sim_ic) process = false;
 					break;
 					
 				case INIT_POP: case REMOVE_IND: case MOVE_IND:
 				case COMP_DATA: case TRANS_DATA: case TEST_DATA: case POP_DATA: case POP_TRANS_DATA:
-					if(model.mode == SIM) process = false;
+					//if(model.mode == SIM) process = false;
+					if(use_sim_ic) process = false;
 					break;
 				
 				default: break;
 				}
 			}
-			
+				
 			if(model.mode == PPC){ // If PPC then do not load any data
 				switch(cname){
 				case INIT_POP_SIM: 
 				case ADD_POP_SIM: case REMOVE_POP_SIM: case ADD_IND_SIM:
 				case REMOVE_IND_SIM: case MOVE_IND_SIM:
+					if(!use_sim_ic) process = false;
+					break;
+					
 				case COMP_DATA: case TRANS_DATA: case TEST_DATA:
 				case POP_DATA: case POP_TRANS_DATA: case IND_EFFECT_DATA:
 				case IND_GROUP_DATA: case GENETIC_DATA:
@@ -206,9 +221,9 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 				default: break;
 				}	
 			}
-			
+				
 			if(process == true){
-				process_command(line,loop);
+				process_command(line,loop,use_sim_ic);
 			
 				if(terminate == true){
 					output_error_messages(err_mess,true);
@@ -356,7 +371,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	percentage(70,100);
 	
 	print_diag("h1b");
-		
+	
 	for(auto &sp : model.species){     // Classifies observed transitons as trans, source, or sink
 		sp.set_ob_trans_ev(model.eqn);
 	}
@@ -472,7 +487,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	set_sink_exist();                  // Determines if a sink exists
 	
 	set_eqn_ind_eff_exist();           // Sets if ind_eff exist in equations
-	
+
 	//set_pop_speedup();                 // Sets speedup for update_ind when population is changed
  	
 	print_diag("h15");
@@ -535,10 +550,16 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	print_diag("h18");
 	
-	for(auto &sp : model.species){
+	for(auto &sp : model.species){	
 		sp.create_markov_tree();         // Creates sampler used to sample Markov events
-		sp.init_pop_trans_ref();         // Initialises reference from global transition to obs         
+		print_diag("create markov tree");
+	
+		sp.init_pop_trans_ref();         // Initialises reference from global transition to obs   
+		print_diag("init_pop_trans");
+		
 		sp.init_pop_data_ref();          // Initialises reference from global compartment to obs         
+		print_diag("ipop data ref");
+		
 		for(const auto &wa : sp.warn) alert_line(wa.te,wa.line_num);    
 	}
 	
@@ -562,7 +583,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	set_precalc_nm_rate();                     // Determines if nm_rate can be precalculated
 	
 	set_tr_enter();                            // Sets transitions entering compartment
- 	               
+ 	  
 	if(inf) set_joint_param_event();           // Sets any joint parameter and event proposals
 	
 	set_init_c_set();                          // Determines if initial compartment is set
@@ -611,10 +632,16 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	percentage(100,100);
 	
 	output_error_messages(err_mess,true);
-
+   
 	print_diag("Finish");
 	
 	check_memory_too_large();
+	  
+	reduce_memory();                       // Looks at removing things not needed
+	
+	print_diag("Reduce memory");
+	
+	if(profiling) profile_memory();
 	
 	//if(true) param_eqn_mem();
 	//wait();
@@ -650,8 +677,10 @@ vector <CommandLine> Input::extract_command_line(vector <string> lines)
 					file_lines.push_back(te);
 					j++;
 				}
+				
 				if(j == lines.size()){
 					alert_import("Cannot find line with ']]\"' to specify end of file");
+					break;
 				}
 				
 				FileStore file_st;
@@ -930,7 +959,7 @@ void Input::output_error_messages(string te, bool end) const
 
 
 /// Processes a given command
-void Input::process_command(const CommandLine &cline, unsigned int loop)
+void Input::process_command(const CommandLine &cline, unsigned int loop, bool use_sim_ic)
 {
 	cline_store = cline;
 	all_row = UNSET;
@@ -971,13 +1000,13 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 	case INIT_POP_SIM:
 	case ADD_POP_SIM: case REMOVE_POP_SIM: 
 	case ADD_IND_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM: 
-		if(model.mode == SIM || model.data_mode()) import_data_table_command(cline,true);
+		if(use_sim_ic || model.data_mode()) import_data_table_command(cline,true);
 		else alert_warning("Line ignored because not need for simulation");
 		break;
 	
 	case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: 
-	case ADD_IND_POST_SIM: case REMOVE_IND_POST_SIM: case MOVE_IND_POST_SIM: 
-		if(model.mode == PPC) import_data_table_command(cline,true);
+	case ADD_IND_POST_SIM: case REMOVE_IND_POST_SIM: case MOVE_IND_POST_SIM:
+		if(model.mode == PPC && !use_sim_ic) import_data_table_command(cline,true);
 		else{
 			if(model.data_mode()) import_data_table_command(cline,false);
 			else alert_warning("Line ignored because not need for simulation");
@@ -990,7 +1019,7 @@ void Input::process_command(const CommandLine &cline, unsigned int loop)
 	case COMP_DATA: case TRANS_DATA:
 	case TEST_DATA: case POP_DATA: case POP_TRANS_DATA: 
 	case GENETIC_DATA:
-		if(model.mode != SIM && !model.data_mode()) import_data_table_command(cline,true);
+		if(!use_sim_ic && !model.data_mode()) import_data_table_command(cline,true);
 		else{
 			if(model.data_mode()) import_data_table_command(cline,false);
 			else{
@@ -1089,7 +1118,7 @@ void Input::cannot_find_tag(bool fatal)
 unsigned int Input::option_error(string na, string te, const vector <string> &pos, const vector <unsigned int> &conv)
 {
 	if(pos.size() != conv.size()){ 
-		alert_import("Options do not match up"); return UNSET;
+		alert_import("Options do not match up",true); return UNSET;
 	}
 	
 	auto k = find_in(pos,te);
@@ -1104,7 +1133,7 @@ unsigned int Input::option_error(string na, string te, const vector <string> &po
 		st += "'"+pos[i]+"'";
 	}
 	
-	alert_import(st);
+	alert_import(st,true);
 	return UNSET;
 }
 
@@ -1526,8 +1555,8 @@ void Input::create_pop_ref()
 		for(auto i = 0u; i < pop.term.size(); i++){
 			const auto &te = pop.term[i];
 			PopRef pr; pr.po = po; pr.index = i;
-			model.species[pop.sp_p].comp_gl[te.c].pop_ref.push_back(pr);
-			model.species[pop.sp_p].comp_gl[te.c].pop_ref_simp.push_back(po);
+			model.species[pop.p].comp_gl[te.c].pop_ref.push_back(pr);
+			model.species[pop.p].comp_gl[te.c].pop_ref_simp.push_back(po);
 		}
 	}
 }
@@ -1579,4 +1608,45 @@ void Input::further_simplify_equations(unsigned int per_start, unsigned int per_
 		}
 		first = false;
 	}while(flag_global == true);
+}
+
+
+/// Gets information about optimisation
+void Input::get_optimise(Details &details)
+{
+	auto optimise = get_tag_value("optimise");
+	if(optimise == "") optimise = "auto";
+	details.optimise = Optimise(option_error("optimise",optimise,{"speed","memory","auto"},{ SPEED, MEMORY, AUTO_OPTIMISE}));
+}
+
+
+/// Gets information about optimisation
+void Input::get_compress(Details &details)
+{
+	auto compress = get_tag_value("compress");
+	if(compress == "") compress = "auto";
+	//if(compress == "") compress = "always"; // CHANGE
+	//if(compress == "") compress = "never"; // CHANGE
+	if(com_op) compress = "never";
+
+	details.compress = Compress(option_error("compress",compress,{"always","never","auto"},{ ALWAYS_COMPRESS, NEVER_COMPRESS, AUTO_COMPRESS}));
+}
+
+
+/// Determines if file is encoded
+bool Input::get_encode()
+{
+	auto enc = false;
+	auto encode = toLower(get_tag_value("compress")); 
+	
+	if(encode != ""){
+		if(encode == "true") enc = true;
+		else{
+			if(encode != "false"){
+				alert_import("The tag 'compress' can only takes the values 'true' or 'false'.");
+			}
+		}
+	}
+	
+	return enc;
 }

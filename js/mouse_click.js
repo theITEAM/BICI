@@ -988,10 +988,51 @@ function button_action(bu,action_type)
 		break;
 		
 	case "AddIndividuals":
-		start_data_source("Add Ind.",{},bu.op.info);
-		file_add_datatable();
+		if(subtab_name() == "Generate Data"){
+			start_data_source("Add Ind.",{},bu.op.info);
+			file_add_datatable();
+		}
+		else{
+			select_bubble_over();
+			inter.bubble.radio = {value:"File"};
+		}
 		break;
-
+		
+	case "AddIndividuals2":
+		if(inter.bubble.radio.value == "File"){
+			start_data_source("Add Ind.",{},inter.bubble.bu.op.info);
+			close_bubble();
+			file_add_datatable();
+		}
+		else{
+			change_bubble_mode("AddFarmInd");
+			let p = model.get_p();
+			let pos=[];
+			let sp = model.species[p];
+			for(let cl = 0; cl < sp.ncla; cl++) pos.push({te:sp.cla[cl].name, cl:cl});
+			
+			let cla=[];
+			for(let cl = 0; cl < sp.ncla; cl++){ 	
+				let claa = sp.cla[cl];
+			
+				let posc=[];
+				for(let c = 0; c < claa.comp.length; c++) posc.push({te:claa.comp[c].name, c:c});
+				
+				cla[cl] = {te:select_drop_str, posc:posc}; 
+			}
+			
+			inter.bubble.drop = {te:select_drop_str, pos:pos, cla:cla}; 
+			
+			inter.bubble.prefix = "Ind-";
+		}
+		break;
+		
+	case "AddIndividuals3":
+		start_data_source("Add Ind.",{},inter.bubble.bu.op.info);
+		start_worker("Add ind single",{so:edit_source, drop:inter.bubble.drop, prefix:inter.bubble.prefix });	
+		close_bubble();
+		break;
+		
 	case "RemIndividuals":
 		start_data_source("Remove Ind.",{},bu.op.info);
 		file_add_datatable();
@@ -1145,7 +1186,7 @@ function button_action(bu,action_type)
 		change_bubble_mode("Delete");
 		break;
 		
-	case "TableEditOn":
+	case "TableEditOn":	
 		edit_source.table.edit = true;
 		break;
 		
@@ -1519,10 +1560,7 @@ function button_action(bu,action_type)
 		{
 			let par = model.param[bu.i];
 			par.variety = "define";
-			//par.define_eqn = "";
-			
 			press_button_prop("ModelParamContent","DefineElement",["name"],par.name);
-			//}
 		}
 		break;
 		
@@ -1534,7 +1572,10 @@ function button_action(bu,action_type)
 			par.reparam_eqn_on = false;
 			if(inter.bubble.radio.value == "equation") par.reparam_eqn_on = true;
 			close_bubble();	
-			if(par.reparam_eqn_on) par_in_view("ReparamEqn",th);
+			if(par.reparam_eqn_on){
+				press_button_prop("ModelParamContent","ReparamEqn",["name"],par.name);
+				//par_in_view("ReparamEqn",th);
+			}
 			else par_in_view("ReparamElement",th);
 		}
 		break;
@@ -1826,6 +1867,9 @@ function button_action(bu,action_type)
 		
 			let de = model.ppc_details;
 			
+			let use_inf = false;
+			if(de.run_inf_model == "Yes") use_inf = true;
+				
 			let ill = false;
 			if(Number(de.ppc_t_start) >= Number(de.ppc_t_end)){
 				alertp("The start time '"+de.ppc_t_start+"' must be before the end time '"+de.ppc_t_end+"'.");
@@ -1837,21 +1881,23 @@ function button_action(bu,action_type)
 				ill = true;
 			}
 			
-			if(Number(de.ppc_t_start) > Number(de.inf_t_end)){
-				alertp("The start time '"+de.ppc_t_start+"' cannot be after the inference end time '"+de.inf_t_end+"'");
-				ill = true;	
-			}
+			if(use_inf){
+				if(Number(de.ppc_t_start) > Number(de.inf_t_end)){
+					alertp("The start time '"+de.ppc_t_start+"' cannot be after the inference end time '"+de.inf_t_end+"'");
+					ill = true;	
+				}
 			
-			if(Number(de.ppc_t_end) < Number(de.inf_t_end)){
-				alertp("The end time '"+de.ppc_t_end+"' cannot be before the inference end time '"+de.inf_t_end+"'");
-				ill = true;	
+				if(Number(de.ppc_t_end) < Number(de.inf_t_end)){
+					alertp("The end time '"+de.ppc_t_end+"' cannot be before the inference end time '"+de.inf_t_end+"'");
+					ill = true;	
+				}
 			}
 				
 			if(ill == false){
 				if(check_time_error() == false){	
 					switch(model.ppc_details.run_local.value){
 					case "Yes":
-						start_worker("StartPPC",{save_type:"ppc", map_store:map_store, ver:ver});
+						start_worker("StartPPC",{save_type:"ppc", map_store:map_store, ver:ver, use_inf:use_inf});
 						break;
 						
 					case "No":
@@ -1984,7 +2030,7 @@ function button_action(bu,action_type)
 				break;
 				
 			case "const": case "reparam": case "dist":
-				select_bubble_param(par);
+				select_bubble_param(par.name);
 				break;
 					
 			default: error("sel op error"); break;
@@ -2307,6 +2353,22 @@ function button_action(bu,action_type)
 		saving_dialogue("",".csv","Export table content");
 		break;
 		
+	case "ExportTableModel":
+	  inter.bubble.radio = {value:"Compartments"};
+		change_bubble_mode("ExportModel");
+		break;
+		
+	case "ExportTableModel2":
+		{
+			let ty;
+			if(inter.bubble.radio.value == "Compartments") ty = "comp";
+			else ty = "trans";
+				
+			close_bubble();
+			saving_dialogue("",".csv","Export "+ty+" table");
+		}
+		break;
+		
 	case "ExportMatrixTable":
 		close_bubble();
 		saving_dialogue("",".csv","Export matrix table");
@@ -2355,6 +2417,10 @@ function button_action(bu,action_type)
 		
 	case "Options":
 		inter.options = true;
+		break;
+		
+	case "AdOptions":
+		inter.options = "advanced";
 		break;
 		
 	case "OptionsDone":
@@ -2509,6 +2575,10 @@ function button_action(bu,action_type)
 		inter.bubble.source = bu.source; 
 		break;
 	
+	case "CloseWarn":
+		model.warn_view = false;
+		break;
+		
 	default:
 		error(ac+" Action not recognised"); 
 		break;

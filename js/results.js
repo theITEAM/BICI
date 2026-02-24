@@ -17,7 +17,9 @@ function results_add_model(result,details,siminf)
 	result.sample = [];
 	result.par_sample = [];
 	result.hash_ref = new Hash(); 
-
+	result.hash_all_ind = new Hash();
+	result.all_ind_list = [];
+	
 	let alg = details.algorithm.value;
 	
 	if(alg == "PAS-MCMC" || alg == "ABC-SMC") result.generation = [];
@@ -236,6 +238,8 @@ function calculate_burnin(result,source)
 function get_param_value(i,source,lines,result,warn,mode)
 {
 	let param = result.param;
+	
+	let ist = i;
 	
 	let spl = comma_split(lines[i]);
 	let name = remove_quote(spl[0].replace(/->/g,"→"));
@@ -493,7 +497,7 @@ function generate_transnum_from_ind(result,sample)
 				for(let ti = 0; ti < T; ti++) transnum[k][ti] = 0;
 			}
 			
-			let dpop = ssp.dpop;
+			let dpop_list = ssp.dpop_list;
 			
 			let tim = result.timepoint;
 			let dt = 1;
@@ -523,20 +527,20 @@ function generate_transnum_from_ind(result,sample)
 						break;
 						
 					case EV_ENTER:
-						dpop[ev.c][ti]++;
+						dpop_list[ti].push({c:ev.c,val:1});
 						if(c != OUT) error("Should be out");
 						c = ev.c;
 						break;
 						
 					case EV_LEAVE:
 						if(e != ind.ev.length-1) error("Leave should be last event");
-						dpop[c][ti]--;
+						dpop_list[ti].push({c:c,val:-1});
 						break;
 						
 					case EV_MOVE:
 						if(ev.ci != c) error("move c is not consistent");
-						dpop[ev.ci][ti]--;
-						dpop[ev.cf][ti]++;
+						dpop_list[ti].push({c:ev.ci,val:-1});
+						dpop_list[ti].push({c:ev.cf,val:1});
 						c = ev.cf;
 						break;
 						
@@ -636,7 +640,14 @@ function get_timeline(vec,result)
 	}
 	v.push(val); n.push(num);
 	
-	// Looks in hash table
+	return get_timeline2(v,n,result);
+}
+
+
+
+function get_timeline2(v,n,result)
+{
+	// Looks in hash table	
 	let hash_tl = result.hash_tl;
 	let tl_store = result.tl_store;
 	
@@ -645,13 +656,10 @@ function get_timeline(vec,result)
 	let j = hash_tl.find(H);
 	if(j != undefined){
 		let tl = tl_store[j];
-		if(!equal_vec(tl.v,v)){ 
-			j = undefined; error("ERROR vec not equal1");
-		}
+		if(!equal_vec(tl.v,v)){ j = undefined; error("ERROR vec not equal1");}
 		if(!equal_vec(tl.n,n)){ j = undefined; error("ERROR vec not equal2");}
 	}
-	
-	if(j == undefined){
+	else{
 		j = tl_store.length;
 		let tls = {v:v, n:n};
 		tl_store.push(tls);
@@ -669,39 +677,167 @@ function get_timeline(vec,result)
 /// Generates cpop using global transitions specified in transnum
 function generate_cpop_from_transnum(result,sample)
 {
+	let T = result.timepoint.length-1;
+	
 	for(let p = 0; p < sample.species.length; p++){
 		let sp = result.species[p];
 		let ssp = sample.species[p];
 
-		let dpop = ssp.dpop;
-		let transnum = reconstruct_timeline_vec(ssp.transnum_tl,result);
-	
-		let cpop=[];
-		for(let c = 0; c < sp.comp_gl.length; c++){
-			cpop[c]=[];
-			cpop[c].push(ssp.cpop_init[c]);
-		}
-
-		for(let ti = 0; ti < result.timepoint.length-1; ti++){
-			let cp=[];
-			for(let c = 0; c < sp.comp_gl.length; c++){
-				cp[c] = cpop[c][ti] + dpop[c][ti];
-			}
-				
-			for(let j = 0; j < sp.tra_gl.length; j++){
-				let tra = sp.tra_gl[j];
-				let num = transnum[j][ti];
-				let i = tra.i, f = tra.f;
-				if(i != SOURCE) cp[i] -= num;
-				if(f != SINK) cp[f] += num;
+		let dpop_list = ssp.dpop_list;
+		
+		if(true){   // This is a faster way to do the same thing
+			let tr_list=[], va_list=[];
+			for(let ti = 0; ti < T; ti++){
+				tr_list[ti]=[]; va_list[ti]=[];
 			}
 			
-			for(let c = 0; c < sp.comp_gl.length; c++) cpop[c].push(cp[c]);
-		}
+			let trans = ssp.transnum_tl;
+			for(let tr = 0; tr < trans.length; tr++){
+				let tl = result.tl_store[trans[tr]];
+				let v = tl.v, n = tl.n;
+				
+				let ti = 0;
+				for(let j = 0; j < v.length; j++){
+					let va = v[j], num = n[j];
+					if(va == 0) ti += num;
+					else{
+						for(let k = 0; k < num; k++){
+							tr_list[ti].push(tr);
+							va_list[ti].push(va);
+							ti++;
+						}
+					}
+				}
+			}
+			
+			let ncomp = sp.comp_gl.length;
+			
+			let cpop=[];
+			let cp=[];
+			for(let c = 0; c < ncomp; c++){
+				cpop[c]=[];
+				cp[c] = ssp.cpop_init[c];
+				cpop[c].push(cp[c]);
+			}
+			
+			let comp_vec=[];
+			let cfl=[];
+			for(let c = 0; c < ncomp; c++){
+				comp_vec[c] = {n:[], v:[], val:ssp.cpop_init[c], ti:-1};
+				cfl[c] = false;
+			}
+				
+			for(let ti = 0; ti < T; ti++){
+				let dpl = dpop_list[ti];
+				for(let k = 0; k < dpl.length; k++){
+					let dp = dpl[k];
+					cp[dp.c] += dp.val;
+				}
+				
+				let clist=[];
+				for(let k = 0; k < tr_list[ti].length; k++){
+					let tra = sp.tra_gl[tr_list[ti][k]];
+					let num = va_list[ti][k];
+					let i = tra.i, f = tra.f;
+					if(i != SOURCE){
+						cp[i] -= num;
+						if(cfl[i] == false){ cfl[i] = true; clist.push(i);}
+					}
+					if(f != SINK){
+						cp[f] += num;
+						if(cfl[f] == false){ cfl[f] = true; clist.push(f);}
+					}
+				}
+				
+				for(let k = 0; k < clist.length; k++){
+					let c = clist[k];
+					cfl[c] = false;
+					let val = cp[c];
+					let cv = comp_vec[c];
+					if(cv.val != val){
+						cv.v.push(cv.val); cv.n.push(ti-cv.ti);
+						cv.val = val;
+						cv.ti = ti;
+					}
+				}
+				
+				for(let c = 0; c < ncomp; c++) cpop[c].push(cp[c]);
+			}
 		
-		ssp.cpop_tl=[];
-		for(let c = 0; c < sp.comp_gl.length; c++){
-			ssp.cpop_tl[c] = get_timeline(cpop[c],result);
+			// End time point
+			for(let c = 0; c < ncomp; c++){
+				let cv = comp_vec[c];
+				let tii = cv.ti;
+				if(tii < T){
+					cv.v.push(cv.val); cv.n.push(T-tii);
+				}
+			}
+			
+			if(false){ // Used for checking
+				for(let c = 0; c < ncomp; c++){
+					let vec = cpop[c];
+					
+					let val=vec[0], num=1;
+					let v=[], n=[];
+					for(let i = 1; i < vec.length; i++){
+						let va = vec[i];
+						if(va != val){ 
+							v.push(val); n.push(num);
+							val = va; num = 1;
+						}
+						else num++;
+					}
+					v.push(val); n.push(num);
+				
+					let cv = comp_vec[c];
+				
+					if(!equal_vec(v,cv.v)) prr("not equal v");
+					if(!equal_vec(n,cv.n)) prr("not equal n");
+				}
+			}
+			
+			ssp.cpop_tl=[];
+			for(let c = 0; c < ncomp; c++){
+				let cv = comp_vec[c];
+				ssp.cpop_tl[c] = get_timeline2(cv.v,cv.n,result);
+			}
+		}
+		else{
+			let transnum = reconstruct_timeline_vec(ssp.transnum_tl,result);
+	
+			let cpop=[];
+			for(let c = 0; c < sp.comp_gl.length; c++){
+				cpop[c]=[];
+				cpop[c].push(ssp.cpop_init[c]);
+			}
+
+			for(let ti = 0; ti < result.timepoint.length-1; ti++){
+				let cp=[];
+				for(let c = 0; c < sp.comp_gl.length; c++){
+					cp[c] = cpop[c][ti];
+				}
+				
+				let dpl = dpop_list[ti];
+				for(let k = 0; k < dpl.length; k++){
+					let dp = dpl[k];
+					cp[dp.c] += dp.val;
+				}
+					
+				for(let j = 0; j < sp.tra_gl.length; j++){
+					let tra = sp.tra_gl[j];
+					let num = transnum[j][ti];
+					let i = tra.i, f = tra.f;
+					if(i != SOURCE) cp[i] -= num;
+					if(f != SINK) cp[f] += num;
+				}
+				
+				for(let c = 0; c < sp.comp_gl.length; c++) cpop[c].push(cp[c]);
+			}
+		
+			ssp.cpop_tl=[];
+			for(let c = 0; c < sp.comp_gl.length; c++){
+				ssp.cpop_tl[c] = get_timeline(cpop[c],result);
+			}
 		}
 	}
 }
@@ -1336,7 +1472,7 @@ function initialise_plot_filters(result,source)
 				for(let j = 0; j < ele.length; j++){
 					name_list.push(ele[j][0]);
 				}
-				pos.push({te:is.spec.gname, name_list:name_list});
+				pos.push({te:is.name, name_list:name_list});
 			}
 		}
 		

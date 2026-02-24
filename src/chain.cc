@@ -42,6 +42,8 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 		
 	update_init();
 	
+	print_diag("start init_chain");
+	
 	if(model.mode == EXT){    // Loads initial state
 		if(model.sample.size() == 0) emsg("Must be a sample");
 	
@@ -613,6 +615,8 @@ void Chain::update(unsigned int s)
 /// Initialises proposal distributions
 void Chain::update_init()
 {	
+	print_diag("update_init 1");
+	
 	cor_matrix.init();
 
 	for(auto i = 0u; i < model.nparam_vec; i++){     // Univariate distributions
@@ -623,6 +627,8 @@ void Chain::update_init()
 			add_parameter_prop(vec);
 		}
 	}
+	
+	print_diag("update_init 2");
 	
 	// Proposals on individual effects
 	for(auto p = 0u; p < model.nspecies; p++){
@@ -683,6 +689,8 @@ void Chain::update_init()
 		}
 	}
 	
+	print_diag("update_init 3");
+	
 	// Adds MBPs which don't change parameters
 	for(auto loop = 0u; loop < 1; loop++){
 		for(auto p = 0u; p < model.nspecies; p++){
@@ -695,6 +703,8 @@ void Chain::update_init()
 			}
 		}
 	}
+	
+	print_diag("update_init 4");
 	
 	// Adds MBPs which change initial conditions
 	for(auto loop = 0u; loop < 1; loop++){
@@ -738,6 +748,8 @@ void Chain::update_init()
 			}
 		}
 	}
+	
+	print_diag("update_init 5");
 	
 	// Makes proposals which make local changes to population-based model
 	for(auto p = 0u; p < model.nspecies; p++){
@@ -790,6 +802,8 @@ void Chain::update_init()
 		}
 	}
 	
+	print_diag("update_init 6");
+	
 	// Does proposals which change parameter and resimulate 
 	
 	
@@ -803,6 +817,8 @@ void Chain::update_init()
 			proposal.push_back(pp);
 		}
 	}
+	
+	print_diag("update_init 7");
 	
 	if(true){ // Event changes 
 		for(auto p = 0u; p < model.nspecies; p++){
@@ -875,6 +891,8 @@ void Chain::update_init()
 			}
 		}
 	}
+
+	print_diag("update_init 8");	
 
 	if(false){
 		// Joint proposals on events and parameters
@@ -961,6 +979,8 @@ void Chain::update_init()
 		}
 	}				
 	 
+	print_diag("update_init 9");
+	 
 	if(model.mode != EXT){
 		for(auto i = 0u; i < 50; i++){
 			auto param_val = model.param_sample();
@@ -976,6 +996,8 @@ void Chain::update_init()
 		for(auto &pro : proposal) te += pro.print_info();
 		output.prop_summary(te);
 	}
+	
+	print_diag("update_init end");
 }
 
 
@@ -1180,7 +1202,7 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 		}
 		ss << endl << endl;
 		
-		ss <<  "Total CPU time: " << tstr(total_time/CLOCKS_PER_SEC,2) << " seconds" << endl;
+		ss <<  "Total CPU time: " << get_cpu_time(total_time) << endl;
 	
 		ss << endl << endl;
 	}

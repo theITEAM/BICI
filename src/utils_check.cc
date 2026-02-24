@@ -1284,3 +1284,290 @@ void mvn_jeffreys_check()
 	cout << si << " " << si2 << " jj" << endl;
 }
 	
+
+/// Memory requirement
+double mem(const vector < vector < vector <unsigned int> > > &ten)
+{
+	auto sum = 0.0;
+	sum += sizeof(vector < vector < vector <unsigned int> > >);
+	for(auto i = 0u; i < ten.size(); i++){
+		sum += sizeof(vector < vector <unsigned int> >);
+		for(auto j = 0u; j < ten[i].size(); j++){
+			sum += sizeof(vector <unsigned int>);
+			sum += ten[i][j].size()*sizeof(unsigned int);
+		}
+	}
+	
+	return sum;
+}
+
+
+/// Memory requirement
+double mem(const vector < vector <unsigned int> > &ten)
+{
+	auto sum = 0.0;
+	sum += sizeof(vector < vector <unsigned int> >);
+	for(auto i = 0u; i < ten.size(); i++){
+		sum += sizeof(vector <unsigned int>);
+		sum += ten[i].size()*sizeof(unsigned int);
+	}
+	
+	return sum;
+}
+
+
+/// Memory requirement
+double mem(const vector < vector <int> > &ten)
+{
+	auto sum = 0.0;
+	sum += sizeof(vector < vector <int> >);
+	for(auto i = 0u; i < ten.size(); i++){
+		sum += sizeof(vector <int>);
+		sum += ten[i].size()*sizeof(int);
+	}
+	
+	return sum;
+}
+
+
+/// Memory requirement
+double mem(const vector <double> &ten)
+{
+	return sizeof(vector <double>) + ten.size()*sizeof(double);
+}
+
+
+/// Memory requirement
+double mem(const vector < vector <double> > &ten)
+{
+	auto sum = 0.0;
+	for(const auto &va : ten) sum += mem(va);
+	return sum;
+}
+
+
+/// Memory requirement
+double mem(const vector <unsigned int> &ten)
+{
+	return sizeof(vector <unsigned int>) + ten.size()*sizeof(unsigned int);
+}
+
+
+/// Works out memory 
+double mem(const vector <Calculation> &calc) 
+{
+	auto sum = 0.0;
+	
+	sum += sizeof(vector <Calculation>);
+	for(auto i = 0u; i < calc.size(); i++){
+		const auto &ca = calc[i];
+		sum += sizeof(Calculation);
+		sum += ca.item.size()*sizeof(EqItem);
+	}
+	
+	return sum;
+}
+
+double mem(const PopAffect &pa) 
+{
+	auto sum = 0.0;
+	sum += sizeof(PopAffect) + pa.pop_grad_ref.size()*sizeof(GradRef);
+	return sum;
+}
+
+double mem(const LinearForm &lf) 
+{
+	auto sum = 0.0;
+	sum += sizeof(LinearForm);
+	sum += lf.list.size()*sizeof(LinearFormItem);
+	sum += mem(lf.sum_e);
+	for(const auto &va : lf.pop_affect) sum += mem(va);
+	sum += mem(lf.hash_po);
+	return sum;
+}
+
+
+/// Works out memory 
+double mem(const vector <AffectLike> &vec) 
+{
+	auto sum = 0.0;
+	for(const auto &va : vec){
+		sum += va.map.size()*sizeof(bool);
+		sum += mem(va.list);
+		sum += mem(va.lin_form);
+		sum += mem(va.eq_nopop.list);
+	}
+	return sum;
+}
+
+
+/// Works out memory 
+double mem(const HashSimp &hash)
+{
+	const auto &tab = hash.table;
+	
+	vector < vector <HashSimpValue> > table;
+	auto sum = 0.0;
+	sum += sizeof(vector < vector <HashSimpValue> >);
+	for(auto i = 0u; i < tab.size(); i++){
+		sum += sizeof(vector <HashSimpValue>);
+		sum += tab[i].size()*sizeof(HashSimpValue);
+	}
+	
+	return sum;
+}
+
+
+/// Works out memory 
+double mem(const SpecPrecalc &spp)
+{
+	HashSimp hash;
+	auto sum = 0.0;
+	sum += spp.info.size()*sizeof(PrecalcInfo); // info
+	sum += mem(spp.list_time);
+	sum += mem(spp.hash);
+	sum += mem(spp.hash_time);
+	return sum;
+}
+
+double mem(const string st)
+{
+	return sizeof(string)+st.length();
+}
+
+double mem(const vector <string> &vec)
+{
+	auto sum = 0.0;
+	sum += sizeof(vector <string>);
+	for(const auto &va : vec) sum += mem(va);
+	
+	return sum;
+}
+
+
+double mem(const Table &tab)
+{
+	auto sum = 0.0;
+	sum += mem(tab.heading);
+	for(const auto &row : tab.ele) sum += mem(row);
+	return sum;
+}
+
+
+double mem(const PropInfo &pi)
+{
+	auto sum = sizeof(PropInfo);
+	sum += mem(pi.id);
+	sum += mem(pi.vec);
+	return sum;
+}
+
+
+double mem(const EquationInfo &ei)
+{
+	return sizeof(EquationInfo) + mem(ei.te)+mem(ei.te_raw)+mem(ei.emsg);
+}
+
+
+double mem(const ObsModel &val)
+{
+	auto sum = 0.0;
+	
+	sum += sizeof(ObsModel);
+	sum += mem(val.Sp_str);
+	sum += mem(val.diag_pos)+mem(val.diag_neg);
+	for(const auto &ts : val.diag_test_sens.comp){
+		sum += sizeof(TestComp)+mem(ts.Se_str);
+	}
+	
+	return sum;
+}
+		
+
+double mem(const vector <EquationInfo> &vec)
+{
+	auto sum = 0.0;
+	sum += sizeof(vector <EquationInfo>);
+	for(const auto &ei : vec) sum += mem(ei);
+	return sum;
+}
+
+
+double mem(const Prior &pr)
+{
+	auto sum = 0.0;
+	sum += sizeof(Prior)+sizeof(pr.name)+sizeof(pr.in)+sizeof(pr.error);
+	for(const auto &va : pr.dist_param) sum += mem(va);
+
+	return sum;
+}
+
+
+double mem(const vector <bool> &vec)
+{
+	auto sum = 0.0;
+	sum += vec.size()*sizeof(bool);
+	return sum;
+}
+
+
+double mem(const vector < vector <bool> > &mat)
+{
+	auto sum = 0.0;
+	for(const auto &val : mat){
+		sum += val.size()*sizeof(bool);
+	}
+	return sum;
+}
+
+
+double mem(const vector <Sample> &vec)
+{
+	auto sum = 0.0;
+	for(const auto &sa : vec){
+		sum += sizeof(Sample);
+		sum += mem(sa.param_value);
+		for(const auto &sp : sa.species){
+			sum += mem(sp.ind_tab);
+			sum += mem(sp.trans_num_tab);
+			sum += mem(sp.cpop_init_tab);
+		}
+	}
+	return sum;
+}
+
+
+double mem(const Dependency &de)
+{
+	return mem(de.index)+mem(de.index_with_prime)+mem(de.list)+mem(de.list_out)
+	+de.hash_list.mem()+de.hash_list_out.mem();
+};
+
+/// Works out memory 
+double mem(const SwapResult &sr)
+{
+	auto sum = 0.0;
+	sum += sizeof(SwapResult);
+	sum += sr.done.size()*sizeof(bool);
+	for(const auto &st : sr.swap_temp){
+		sum += sizeof(SwapTemp)+sizeof(st.te);
+	}
+	return sum;
+};
+
+
+/// Works out memory 
+double mem(const Spline &spl)
+{
+	auto sum = 0.0;
+	sum += sizeof(Spline);
+	
+	sum += sizeof(spl.name);
+	sum += spl.param_ref.size()*sizeof(ElementRef);
+	sum += spl.div.size()*sizeof(SplineDiv);
+	sum += spl.cubic_div.size()*sizeof(CubicDiv);
+	sum += spl.const_val.size()*sizeof(double);
+	sum += spl.markov_eqn_ref.size()*sizeof(PopMarkovEqnRef);
+	sum += mem(spl.hash_trans_ref);
+	return sum;
+}

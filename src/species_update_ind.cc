@@ -141,14 +141,6 @@ vector <unsigned int>  StateSpecies::update_ind(unsigned int i, vector <Event> &
 					}
 				}
 				break;
-				
-			case OBS_TEST_EV:
-				{
-					if(c_new != c_old){
-						dLi_obs_ind += like_diag_test(c_new,ob) - like_diag_test(c_old,ob);
-					}
-				}
-				break;
 			}
 			
 			m++;
@@ -1511,17 +1503,19 @@ void StateSpecies::restore_back()
 				break;
 				
 			case POP_TRANS_DATA_TGL:
-				{
+				if(sp.pop_trans_data_exist){
 					auto ti = ba.i, tr = ba.index;
 					auto sign = ba.value;
-					for(auto ref : sp.pop_trans_ref[ti][tr]){
-						pop_trans_data_tgl[ref][tr] -= sign;
+					if(sp.pop_trans_data_exist){
+						for(auto ref : sp.pop_trans_ref[ti][tr]){
+							pop_trans_data_tgl[ref][tr] -= sign;
+						}
 					}
 				}
 				break;
 				
 			case POP_TRANS_DATA_NUM:
-				{
+				if(sp.pop_trans_data_exist){
 					const auto &vec = ba.vec;
 					auto sign = ba.value;
 					auto tr_gl = ba.index;
@@ -1538,7 +1532,7 @@ void StateSpecies::restore_back()
 				break;
 				
 			case LI_OBS_POP_TRANS:
-				{
+				if(sp.pop_trans_data_exist){
 					const auto &vec = ba.vec;
 					auto k = 0u;
 					for(auto ref : sp.pop_trans_ref[ba.i][ba.index]){

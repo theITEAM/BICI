@@ -32,6 +32,7 @@ class SourceSampler {
 		Event sample(double &probif) const;
 		double sample_prob(const Event &ev) const;
 		string print() const;
+		double get_mem() const;
 	
 	private:
 		const vector <MarkovEqn> &markov_eqn;

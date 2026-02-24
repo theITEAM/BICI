@@ -118,13 +118,13 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		}
 
 		param_list = vec;
-	
+		
 		initialise_variables();                 // Initialises the basic sampling variables
 	
 		get_dependency();                       // Gets how other parameter and priors are affect by change
 	
 		calculate_spec_precalc();               // Finds how precalculation is updated 
-	
+
 		get_affect_like();                      // Gets how the likelihood is altered under the change
 		break;
 		
@@ -690,6 +690,8 @@ void Proposal::MH(State &state)
 /// Performs a parameter change in a determinisitic model
 void Proposal::param_det(State &state)
 {	
+	if(false)  cout << state.T;
+
 	/*
 	auto pl = false;
 
@@ -1256,8 +1258,6 @@ void Proposal::MH_ind_local(State &state)
 	auto cl = cl_prop;
 		
 	auto &ssp = state.species[p_prop];
-		
-	//const auto &individual = ssp.individual;
 		
 	vector <LocalIndChange> licha;
 	

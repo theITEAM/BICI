@@ -1,0 +1,54 @@
+
+###################### DATA DIRECTORY ######################
+
+data-dir folder="EX_SEC1-2-data-files"
+
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+simulation start=0 end=400 timestep=0.25
+
+inference start=0 end=400 timestep=0.5 nchain=3
+
+post-sim start=0 end=400
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
+
+species name="Animal" type="population"
+
+# SPECIES MODEL
+
+class name="Alive" index="a"
+
+comp name="Prey" color="#888888" x=0 y=-5
+comp name="Pred" color="#974500" x=0 y=5
+
+trans name="+->Prey" x=-19 y=-5 value="exp(rate:α×{Prey})"
+trans name="Prey->-" x=16 y=-5 value="exp(rate:β×{Pred})"
+trans name="+->Pred" x=-19 y=5 value="exp(rate:φ×{Prey}×{Pred})"
+trans name="Pred->-" x=16 y=5 value="exp(rate:γ)"
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="Alive" file="init-pop-sim-Animal.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="α" value="0.1" prior="inverse(0.01,1)"
+
+param name="β" value="0.0004" prior="inverse(0.0001,0.01)"
+
+param name="γ" value="0.05" prior="inverse(0.01,0.1)"
+
+param name="φ" value="0.00005" prior="inverse(0.00001,0.0001)"
+
+
+

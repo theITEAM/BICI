@@ -79,8 +79,26 @@ struct ParamRef {                  // Used to reference parameter
 	unsigned int index;              // The index where to find 
 };
 
+struct IndexNotSet {
+	string index;
+	unsigned int i;
+};
+
+struct ParamIndex {                // Used to reference parameter
+	ParamIndex(){ th = UNSET; sp_p = UNSET; cl = UNSET;}
+	ParamType type;                  // Determines if normal or derived
+	unsigned int name_ref;           // Stores the name
+	unsigned int th;                 // The number of the parameter
+	vector <unsigned int> dep;       // Sets the dependency
+	vector <IndexNotSet> index_not_set; // Determines indices yet to be set
+	unsigned int sp_p;               // The species and classification (used for distance etc...)
+	unsigned int cl; 
+	double den_r;                    // Density radius
+};
+
 struct DeriveRef {                 // Used to reference derived quantities
 	DeriveRef(){ i = UNSET; index = UNSET; ti = UNSET;}
+	
 	unsigned int i;                  // The number of the parameter
 	unsigned int index;              // The index where to find 
 	unsigned int ti;                 // The time step
@@ -208,9 +226,30 @@ struct PopChange {                 // Stores the change in population
 	double num;                      // The change
 };
 
+struct PopDef {                    // Used to define the population
+	unsigned int cl;                 // The classification
+	vector <unsigned int> list;      // List of compartments allowed
+};
+
+struct PopDep {                    // Used as a place holder for a dependency
+	unsigned int cl;                 // The classification
+	string index;                    // The index (may have prime)
+};
+
+struct PopIndex {
+	unsigned int name_ref;           // Stores the name
+	unsigned int p;                  // The species number
+	unsigned int ti;                 // Time of population
+	bool ind_variation;              // Set if ind_eff_mult or fix_eff_mult are set
+	vector <unsigned int> ind_eff_mult; // Individual effect which multiplies weight (if appropriate) 
+	vector <unsigned int> fix_eff_mult; // Any fixed effects which modify weight
+	vector <PopDef> define;          // Used to defined the population
+	vector <PopDep> dep;             // Determines indices yet to be set
+};
+
 struct Population {                // Stores a population (used in an equation)
 	string name;                     // The name of the population
-	unsigned int sp_p;               // The species number
+	unsigned int p;                  // The species number
 	bool ind_variation;              // Set if ind_eff_mult or fix_eff_mult are set
 	vector <unsigned int> ind_eff_mult; // Individual effect which multiplies weight (if appropriate) 
 	vector <unsigned int> fix_eff_mult; // Any fixed effects which modify weight
@@ -272,10 +311,12 @@ struct Spline {                    // Stores an individual spline
 	HashSimp hash_trans_ref;
 };
 
-
 struct CompPos {                   // Used to go through comparmtental possibilities
-	vector <string> list;            // Stores a list of compartmental possibilities
+	vector <unsigned int> list;      // Stores a list of compartmental possibilities
 	unsigned int index;              // Stores which of these possibilities currently looked at
+	unsigned int p;                  // The species
+	unsigned int cl;                 // The classification
+	bool found;                      // Determines if found or not
 }; 
 
 struct DepInfo {                   // Stores dependency info froman equation
@@ -408,12 +449,13 @@ struct IEGref {                    // References and individual effect group
 
 struct PrecalcInfo {                  // Specified which i and time 
 	unsigned int i;
-	unsigned int tlist;
+	unsigned int tlist;                 // This references which list_time to use  
 };
 
-struct SpecPrecalc {                  // Specifies a precalculation
-	vector <PrecalcInfo> info;
-	vector < vector <unsigned int > > list_time;
+struct SpecPrecalc {                  // Specifies which elements in precalc_ref need to be evaluated
+	vector <PrecalcInfo> info;          // Provides information about which i need updating
+	vector < vector <unsigned int > > list_time; // Provides list of time
+	HashSimp hash_time;
 	HashSimp hash;
 };
 
@@ -494,7 +536,10 @@ struct Details {                   // Stores details about simulation/inference/
 	unsigned int seed;               // Seed used to initialise RNG
 	unsigned int nchain;             // The number of chains / particles
 	unsigned int num_per_core;       // The number of samples / chains / particles per core
+	bool param_only;                 // Use simulation model instead of inference model
 	bool diagnostics_on;             // Determines if MCMC diagnostics printed
+	Optimise optimise;               // Determines how optimised (memory or performance)
+	Compress compress;               // Determines compress options for samples and parameter
 };
 
 struct FilterCla {                 // Used to filter a classification
@@ -515,14 +560,18 @@ struct Table {                     // Loads a table
 	bool error;                      // Set if there is a problem loading the table
 };
 
+struct TestComp {                  // Stores information about a test compartment
+ 	bool on;                         // Determines if compartment is test sensitive
+	string Se_str;                   // Sensitivity
+};
+
 struct DiagTestSens {              // Determines compartments test sensitive to 
 	unsigned int cl;                 // The classification
-	vector <bool> comp;              // The compartments the test is sensitve to are set to true
+	vector <TestComp> comp;          // Compartment
 };
 
 struct ObsModel {                  // Stores the observation model assocaited with data
 	ObsModelType type;               // The type of obsevation model
-	string Se_str;                   // Gives the sensitivity of the test
 	string Sp_str;                   // Gives the specigivity of the test
 	string diag_pos;                 // The string for a positive diagnostic test (for diagnostic test data)
 	string diag_neg;                 // The string for a negative diagnostic test (for diagnostic test data)
@@ -869,8 +918,6 @@ struct Classification {            // Stores details of a species classification
 	// ci=C and cf=C are used to represent UNSET
 	vector < vector <bool> > tr_swap_possible;          // [ci][cf]
 	
-	//vector < vector < vector < vector <TrSwap> > > > tr_swap; 
-	
 	Hash hash_swap;                  // Allows to find local individual proposals
 	vector <Swap> swap;              // Allows for local individual proposals
 	vector <SwapRep> swap_rep;       // Allows for local individual proposals
@@ -1140,7 +1187,8 @@ struct EventData {                 // Stores individual data
 };
 
 struct ObsData {
-	ObsData(){ so = UNSET; ref = UNSET; cl = UNSET; test_res = UNSET; tdiv = UNSET;}
+	ObsData(){ so = UNSET; ref = UNSET; cl = UNSET; tdiv = UNSET;}
+	// test_res = UNSET;
 	
 	ObsType type;                    // The type of the observation
 	unsigned int so;                 // References the data source
@@ -1151,11 +1199,11 @@ struct ObsData {
 	bool not_alive;                  // Set to true if compartmental observation is not alive
 	vector <unsigned int> obs_eqn_ref;// References the observation equation
 	unsigned int cl;                 // The classification
-	EquationInfo Se_eqn;             // Stores the Se observation equation
-	EquationInfo Sp_eqn;             // Stores the Sp observation equation
-	unsigned int Se_obs_eqn_ref;     // References Se in obs_eqn
-	unsigned int Sp_obs_eqn_ref;     // References Sp in obs_eqn
-	bool test_res;                   // The result of a diagnostic test
+	//EquationInfo Se_eqn;             // Stores the Se observation equation
+	//EquationInfo Sp_eqn;             // Stores the Sp observation equation
+	//unsigned int Se_obs_eqn_ref;     // References Se in obs_eqn
+	//unsigned int Sp_obs_eqn_ref;     // References Sp in obs_eqn
+	//bool test_res;                   // The result of a diagnostic test
 	double tdiv;                     // The time at which observation occurs
 	bool time_vari;                  // Determines if time variation
 };
@@ -1457,8 +1505,8 @@ struct ObsMut {                    // Used to store genetic observation (used in
 };
 
 struct InfNode {                   // Stores information about an infection events
-	double tdiv_start;                  // The time the infection start
-	double tdiv_rec;                    // The time the individual recovers
+	double tdiv_start;               // The time the infection starts
+	double tdiv_rec;                 // The time the individual recovers
 	unsigned int p;                  // The species of infected individual
 	unsigned int i;                  // Individual number of infected individual
 	unsigned int e;                  // The event number
@@ -1928,6 +1976,7 @@ struct PreCalc {                   // Stores a precalculation (made up of operat
 	bool time_dep;
 };
 
+
 struct EqItemTime {                // An individual operation in a calculation
 	EqItemTime(){ num = UNSET;}
 	
@@ -1951,7 +2000,7 @@ struct ParamChange {               // Stores change to parameter
 };
 */
 
-struct PV {                         // Stores parameter values along with precalculation
+struct PV {                        // Stores parameter values along with precalculation
 	vector <double> value;           // The value of paramvec
 	vector <double> precalc;         // The array of precaclulated quantities
 	vector <double> value_old;       // The value of paramvec before 
@@ -1966,7 +2015,6 @@ struct PV {                         // Stores parameter values along with precal
 	void clear();	
 	void check();
 };
-
 
 struct SpecPrecalcTime {           // Stores information about 
 	vector <unsigned int> pv;        // The parameter vector elements
@@ -2003,5 +2051,10 @@ struct DataRef {                           // References a given data source
 struct Stratify {                          // Used when simulation stratified data
 	vector <unsigned int> cl_list;           // List of classification
 	vector < vector <unsigned int> > comb;   // List of combinations
+};
+
+struct IndList {                           // Stores individuals in a list
+	unsigned int p;
+	unsigned int i;
 };
 

@@ -13,6 +13,7 @@ using namespace std;
 #include "input.hh"
 #include "utils.hh"
 #include "matrix.hh"
+#include "lzw.hh"
 
 /// Imports a data-table 
 void Input::import_data_table_command(const CommandLine &cline, bool active)
@@ -86,6 +87,12 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 			ds.init_pop_type = InitPopType(option_error("type",type,{"fixed","dist"},{ INIT_POP_FIXED, INIT_POP_DIST}));
 			if(ds.init_pop_type == UNSET) return;
 			
+			if(model.mode == INF && ds.init_pop_type == INIT_POP_FIXED){
+				if(model.species[p].type == INDIVIDUAL){
+					alert_import("Fixed initial populations cannot be used with individual-based models under inference. Either a population distribution is used, or the initial state of individuals is specified using 'add-ind' (which can be used to capture the any initial uncertainty)."); 
+				}
+			}
+			
 			if(ds.init_pop_type == INIT_POP_DIST){
 				if(ds.focal_cl == UNSET){
 					auto prior = get_tag_value("prior"); 
@@ -147,9 +154,6 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 	
 	case TEST_DATA:
 		{
-			auto Se = get_tag_value("Se"); if(Se == ""){ cannot_find_tag(); return;}
-			om.Se_str = Se;
-			
 			auto Sp = get_tag_value("Sp"); if(Sp == ""){ cannot_find_tag(); return;}
 			om.Sp_str = Sp;
 			
@@ -168,24 +172,12 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 				
 			auto comp = get_tag_value("comp"); if(comp == ""){ cannot_find_tag(); return;}
 		
-			auto spl = split(comp,',');
+			string warn;
+			auto dts = model.get_diag_test_sens(comp,p,warn);
+			if(warn != ""){ alert_import(warn); return;}
 			
-			auto cl = model.get_cl_from_comp(spl[0],p);
-			if(cl == UNSET){ 
-				alert_import("Value '"+spl[0]+"' is not a compartment");
-				return;
-			}
-			
-			om.diag_test_sens.cl = cl;
-			ds.cl = cl;
-			
-			const auto &claa = model.species[p].cla[cl];
-			om.diag_test_sens.comp.resize(claa.ncomp,false);
-			
-			for(auto c = 0u; c < claa.ncomp; c++){
-				auto name = claa.comp[c].name;
-				if(find_in(spl,name) != UNSET) om.diag_test_sens.comp[c] = true;
-			}
+			ds.cl = dts.cl;
+			om.diag_test_sens = dts;
 		}
 		break;
 	
@@ -519,10 +511,15 @@ void Input::proposal_info_command()
 		return;
 	}
 
+	auto enc = get_encode();
+	if(enc) decode_lines(files[i].lines);
+
 	auto ch = get_chain();
 
+	if(model.mode != EXT) return;
+
 	// For ext in -core mode only need to load states for that core
-	if(model.mode == EXT && mpi.core != ch/model.details.num_per_core) return;
+	if(mpi.core != ch/model.details.num_per_core) return;
 	
 	auto err = model.load_prop_info(ch,files[i].lines);
 	
@@ -1735,6 +1732,9 @@ bool Input::simulation_command()
 {
 	auto &details = model.details;
 	
+	get_optimise(details);
+	get_compress(details);
+	
 	auto start = get_tag_value("start"); 
 	if(start == ""){ cannot_find_tag(); return false;}
 	if(!is_number(start,"start")) return false;
@@ -1782,6 +1782,7 @@ bool Input::simulation_command()
 	details.anneal_rate = UNSET;
 	details.anneal_power = UNSET;
 	details.diagnostics_on = false;
+	details.param_only = false;
 	
 	if(check_dt(details) == false) return false;
 	
@@ -1793,6 +1794,9 @@ bool Input::simulation_command()
 bool Input::inference_command()
 {
 	auto &details = model.details;
+
+	get_optimise(details);
+	get_compress(details);
 
 	auto start = get_tag_value("start"); 
 	if(start == ""){ cannot_find_tag(); return false;}
@@ -1836,6 +1840,7 @@ bool Input::inference_command()
 	
 	details.individual_max = check_pos_integer("ind-max",INDMAX_DEFAULT);
 	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
+	details.param_only = false;
 
 	auto algo = details.algorithm;
 	
@@ -2033,6 +2038,9 @@ bool Input::post_sim_command()
 {
 	auto &details = model.details;
 	
+	get_optimise(details);
+	get_compress(details);
+	
 	auto start = get_tag_value("start"); 
 	if(start == ""){ cannot_find_tag(); return false;}
 	if(!is_number(start,"start")) return false;
@@ -2088,6 +2096,19 @@ bool Input::post_sim_command()
 	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
 	
 	details.seed = get_seed();
+	
+	details.param_only = false;
+	
+	auto upio = toLower(get_tag_value("param-only"));
+	if(upio != ""){
+		if(upio == "true") details.param_only = true;
+		else{
+			if(upio == "false") details.param_only = false;
+			else{
+				alert_import("The tag 'param-only' must be 'true' or 'false'");
+			}
+		}
+	}
 	
 	details.ppc_resample = get_tag_value("resample");
 	details.diagnostics_on = false;
@@ -2536,6 +2557,8 @@ void Input::inf_param_command()
 	auto file = get_tag_value("file");
 	auto ch = get_chain();
 	
+	auto enc = get_encode();
+
 	if(find_in(inf_state_list,ch) != UNSET){
 		alert_import("There are multiple 'state-inf' commands for chain "+tstr(ch+1)+"'.");
 	}
@@ -2544,7 +2567,7 @@ void Input::inf_param_command()
 	// Only loads parameter samples for the output core
 	if(!op() || model.mode != EXT) return; 
 	
-	auto tab = load_table(file); if(tab.error == true) return;
+	auto tab = load_table(file,"",enc); if(tab.error == true) return;
 
 	if(model.param_samp_store.size() == 0){
 		model.param_samp_store.resize(model.details.nchain);
@@ -2560,19 +2583,21 @@ void Input::inf_state_command()
 	auto file = get_tag_value("file");
 	auto ch = get_chain();
 
+	auto enc = get_encode();
+
 	if(find_in(inf_state_list,ch) != UNSET){
 		alert_import("There are multiple 'param-inf' commands for chain "+tstr(ch+1)+"'.");
 	}
 	inf_state_list.push_back(ch);
 
 	if(model.mode != PPC && model.mode != EXT) return;
-		
+
 	// For ext in -core mode only need to load states for that core
 	if(model.mode == EXT && mpi.core != ch/model.details.num_per_core) return;
 	
 	//term_out("load chain"+tstr(ch));
 	
-	load_state_samples(ch,file);
+	load_state_samples(ch,file,enc);
 }
 
 
@@ -2581,9 +2606,11 @@ void Input::sim_state_command()
 {
 	auto file = get_tag_value("file");
 	
+	auto enc = get_encode();
+
 	if(model.mode != DATA_SIM) return;
 	
-	load_state_samples(UNSET,file);
+	load_state_samples(UNSET,file,enc);
 }
 
 
@@ -2599,6 +2626,8 @@ void Input::dummy_file_command()
 {
 	auto file = get_tag_value("file"); 
 	auto chain = get_tag_value("chain"); 
-	if(false) cout << file << " " << chain << endl;
+	auto encode = get_tag_value("compress");
+	
+	if(false) cout << file << " " << chain << " " << encode << endl;
 }
 

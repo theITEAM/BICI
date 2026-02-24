@@ -50,8 +50,7 @@ void Equation::calculate_linearise()
 						const auto &pc = lin_it.pop_calc[k];
 						auto po = pc.po;
 						
-						// turn off testing
-						if(true){
+						if(false){ 	// turn off testing
 							auto mm = 0u; while(mm < lin.pop_calc.size() && lin.pop_calc[mm].po != po) mm++;
 							if(mm == lin.pop_calc.size()) mm = UNSET;
 							if(mm != lin.hash_simp.find(po)) emsg("not agree");
@@ -193,7 +192,7 @@ void Equation::calculate_linearise()
 		auto k = lc_final.hash_simp.find(po);
 		if(k == UNSET) emsg_input("Could not find population");
 		
-		{// turn off testing
+		if(false){// turn off testing
 			auto k = 0u; while(k < Npop && lc_final.pop_calc[k].po != po) k++;
 			if(k != lc_final.hash_simp.find(po)) emsg("not agree");
 		}

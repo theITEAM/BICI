@@ -167,9 +167,16 @@ function close_param_source()
 function key_press(e)
 {
 	if(false) error(e.keyCode+" code");
-	
+
 	let code = e.keyCode;	
 	//prr(code+"code");
+
+	if(code == 36){ // Home
+		prr("Turn off shrink");
+		let fac = prompt("Factor to reduce?");
+		start_worker("Factor reduce",{p:model.get_p(), cl:model.get_cl(), fac:fac});
+		return;		
+	}
 	
 	if(code == 223 && tab_name() == "Inference" && testing){
 		start_worker("CopyValue");
@@ -1465,6 +1472,7 @@ function view_warning(i)
 	model.warn_view = false;
 
 	//error(warn.warn_type+" warn");
+	
 	switch(warn.warn_type){
 	case "TransTreeInf":
 		change_page({pa:"Model", su:"Compartments", susu:warn.p});
@@ -1605,6 +1613,7 @@ function view_warning(i)
 				break;
 			
 			case "reparam_eqn":
+				select_reparam_equation(model.param[info.i].name);
 				break;
 				
 			case "Se": case "Sp":
@@ -1942,7 +1951,7 @@ function cursor_paste(paste)
 		let i = 0; 
 		while(i < paste.length){
 			let ch = paste.charCodeAt(i);
-			if(ch == 13){
+			if(ch == 13 || ch == 10){
 				if(inter.layer[cur.l].name == "TextBox"){
 					paste = paste.substr(0,i)+"\n"+paste.substr(i+1);
 				}

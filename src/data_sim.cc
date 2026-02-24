@@ -10,11 +10,16 @@
 // ./bici-para Execute/init.bici data-sim 'remove-ind-inf'
 // ./bici-para Execute/init.bici data-sim 'comp-data name="comp" class="DS" dt="10"'
 // ./bici-para Execute/init.bici data-sim 'trans-data name="trans" trans="I->R"'
-// ./bici-para Execute/init.bici data-sim 'test-data name="test" Se=1 Sp=1 comp="I" dt="10"'
+// ./bici-para Execute/init.bici data-sim 'test-data comp="I[Se:1]" name="test" Sp=1 dt="10"'
 // ./bici-para Execute/init.bici data-sim 'pop-data name="pop" filter="DS=file" dt=10 error="poisson"'
 // ./bici-para Execute/init.bici data-sim 'pop-trans-data name="poptrans"  trans="I->R"  filter="Sex=file" dt=10 error="normal:1"'
 // ./bici-para Execute/init.bici data-sim 'ind-effect-data name="iedata" ie="g"'
 // ./bici-para Execute/init.bici data-sim 'pop-trans-data name="poptrans"  trans="I->R"  filter="DS=file" dt=10 error="poisson"'
+// ./bici-para Execute/init.bici data-sim 'pop-trans-data name="poptrans"  trans="I->R"  filter="DS=file" dt=10 error="poisson"'
+// ./bici-para Execute/init.bici data-sim 'ind-group-data name="Progeny" id="sire*" '
+// ./bici-para Execute/init.bici data-sim 'genetic-data name="Genetic data" type="snp" mut-rate="1.5" seq-var="3.2" dt=10 root="SNP" '
+// ./bici-para Execute/init.bici data-sim 'genetic-data name="Genetic data" type="matrix" mut-rate="1.5" seq-var="3.2" dt=10  '
+
 // gdb ./bici-para Execute/init.bici data-sim 'comp-data'
 // run  Execute/init.bici data-sim 'comp-data'
 // valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s  ./bici-para Execute/init.bici data-sim 'ic'
@@ -69,7 +74,7 @@ void DataSim::run(string data_sim_line)
 		
 	const auto &samp = model.sample[0];	
 	auto param_val = model.post_param(samp);	
-		
+	
 	state.load_samp(param_val,samp);
 		
 	auto p = UNSET;
@@ -211,7 +216,7 @@ void DataSim::run(string data_sim_line)
 				tags.erase(tags.begin()+i);
 			}
 			else{
-				if(ta.name != "dt" && ta.name != "times" && ta.name != "frac" && ta.name != "ac"){
+				if(ta.name != "dt" && ta.name != "times" && ta.name != "frac" && ta.name != "ac" && ta.name != "id"){
 					st += " "+ta.name+"=\""+ta.value+"\"";
 				}
 				i++;
@@ -359,7 +364,7 @@ void DataSim::show() const
 							auto desc = source_description(sp,so);
 							cout << "(" << k+1 << ") " << so.name;
 							if(desc != "") cout << " (" << desc << ")";
-							cout << " active: " << so.active;
+							//cout << " active: " << so.active;
 							cout << endl;
 						}
 					}
@@ -649,10 +654,13 @@ string DataSim::source_description(const Species &sp, const DataSource &so) cons
 		
 			string sens;
 			for(auto i = 0u; i < dts.comp.size(); i++){
-				if(i != 0) sens += ",";
-				sens += sp.cla[dts.cl].comp[dts.comp[i]].name;
+				if(dts.comp[i].on){
+					if(sens != "") sens += ",";
+					sens += sp.cla[dts.cl].comp[i].name;
+					sens += "[Se:"+dts.comp[i].Se_str+"]";
+				}
 			}
-			desc = sp.cla[dts.cl].name+" "+sens+" Se="+om.Se_str+" Sp="+om.Sp_str;
+			desc = sp.cla[dts.cl].name+" "+sens+" Sp:"+om.Sp_str;
 		}
 		break;
 	
@@ -1371,7 +1379,6 @@ void DataSim::test_data_sim(unsigned int p, const State &state, Table &tab)
 {
 	const auto &sp = model.species[p];
 	
-	auto Se_str = get_tag_value("Se"); if(Se_str == "") cannot_find_tag();	
 	auto Sp_str = get_tag_value("Sp"); if(Sp_str == "") cannot_find_tag(); 
 		
 	auto pos = get_tag_value("pos");
@@ -1385,21 +1392,12 @@ void DataSim::test_data_sim(unsigned int p, const State &state, Table &tab)
 	}
 					
 	auto comp = get_tag_value("comp"); if(comp == "") cannot_find_tag(); 
-		
-	auto spl = split(comp,',');
-			
-	auto cl = model.get_cl_from_comp(spl[0],p);
-	if(cl == UNSET){ 
-		error("For 'comp' value '"+spl[0]+"' is not a compartment");
-	}
-			
-	const auto &claa = model.species[p].cla[cl];
-	vector <bool> diag_test_sens(claa.ncomp,false);
-			
-	for(auto c = 0u; c < claa.ncomp; c++){
-		auto name = claa.comp[c].name;
-		if(find_in(spl,name) != UNSET) diag_test_sens[c] = true;
-	}
+	
+	string warn;
+	auto dts = model.get_diag_test_sens(comp,p,warn);
+	if(warn != ""){ error(warn); return;}
+	
+	auto cl = dts.cl;
 			
 	auto fr = get_frac();
 	
@@ -1430,9 +1428,11 @@ void DataSim::test_data_sim(unsigned int p, const State &state, Table &tab)
 
 					string res;
 					
-					if(diag_test_sens[ci]){
+					if(dts.comp[ci].on){
 						string err;
+						auto Se_str = dts.comp[ci].Se_str;
 						auto Se = model.calculate_equation(Se_str,tdiv,err);
+					
 						if(err != "") error("Problem with sensitivity '"+Se_str+"': "+err);
 							
 						if(ran() < Se) res = pos; else res = neg;
@@ -1697,30 +1697,560 @@ void DataSim::ind_effect_data_sim(unsigned int p, const State &state, Table &tab
 /// Simulates individual effect data
 void DataSim::ind_group_data_sim(unsigned int p, const State &state, Table &tab)
 {
+	auto id = get_tag_value("id"); if(id == "") cannot_find_tag(); 
+	
+	const auto &sp = model.species[p];
+	
+	tab.heading.push_back("ID");
+	for(auto i = 0u; i < sp.nindividual_obs; i++){
+		const auto &ind = sp.individual[i];
+		if(wildcard_match(ind.name,id)){
+			vector <string> row;
+			row.push_back(ind.name); 
+			tab.ele.push_back(row);
+		}
+	}
 }
 
 
 /// Simulates genetic data
 void DataSim::genetic_data_sim(unsigned int p, const State &state, Table &tab)
 {
-	error("Simulation of genetic data hasn't been implemneted in BICI yet");
+	error("Genetic data not yet implemented");
 	auto type = get_tag_value("type"); if(type == ""){ cannot_find_tag(); return;}
 			
-			/*
-			ds.gen_data_type = GenDataType(option_error("type",type,{"snp","matrix"},{ SNP_DATA, MATRIX_DATA}));
-			if(ds.gen_data_type == UNSET) return;
-			
-			auto root = get_tag_value("root");
+	auto gen_data_type = GenDataType(option_error("type",type,{"snp","matrix"},{ SNP_DATA, MATRIX_DATA}));
+	if(gen_data_type == UNSET) return;
+	
+	auto root = get_tag_value("root");
+	if(type == "snp"){
+		if(root == ""){ cannot_find_tag(); return;}
+	}
+	auto SNP_root = root;
+	
+	auto mut_rate_str = get_tag_value("mut-rate"); if(mut_rate_str == ""){ cannot_find_tag(); return;}
+	auto mut_rate = number(mut_rate_str);
+	if(mut_rate == UNSET || mut_rate < 0) error("The mutation rate must be a non-negative number");
 
-			if(type == "snp"){
-				if(root == ""){ cannot_find_tag(); return;}
+	auto seq_var_str = get_tag_value("seq-var"); if(seq_var_str == ""){ cannot_find_tag(); return;}
+	auto seq_var = number(seq_var_str);
+	if(seq_var == UNSET || seq_var < 0) error("The sequence variation must be a non-negative number");
+
+	switch(gen_data_type){
+	case SNP_DATA: simulate_genetic_snp(mut_rate,seq_var,SNP_root,state,tab); break;
+	case MATRIX_DATA: simulate_genetic_matrix(mut_rate,seq_var,state,tab); break;
+	}
+}
+
+
+/// Simulates genetic snp data 
+void DataSim::simulate_genetic_snp(double mut_rate, double seq_var, string SNP_root, const State &state, Table &tab) const
+{
+	/*
+	let result = sim_result;
+	
+	let mu = so.spec.mut_rate_eqn.te;
+	if(isNaN(mu)){ alert_help("The mutation rate must be a number"); return;}
+	mu = Number(mu);
+	
+	let seq_var = so.spec.seq_var_eqn.te;
+	if(isNaN(seq_var) ){ alert_help("The sequence variation must be a non-negative number"); return;}
+	seq_var = Number(seq_var);
+	if(seq_var < 0){ alert_help("The sequence variation must be a non-negative number"); return;}
+	
+	let N = so.numbp;
+	let f = so.frac_obs;
+
+	head.push("ID");
+	head.push("t");
+	for(let i = 0; i < N; i++) head.push(so.spec.snp_root+(i+1));
+	
+	let samp = result.sample[0];
+
+	// Makes a hash table of individuals
+	let hash = new Hash();
+	
+	let ind_list = [];
+	for(let p = 0; p < samp.species.length; p++){
+		let sosp = samp.species[p];
+		for(let i = 0; i < sosp.individual.length; i++){
+			let ind = sosp.individual[i];
+	
+			let name = ind.name;
+			let j = hash.find(name);
+			if(j == undefined){
+				j = ind_list.length;
+				hash.add(name,ind_list.length);
+				ind_list.push({name:name, p:p, i:i});
 			}
-			ds.SNP_root = root;
+		}
+	}
+	
+	let ind_times = get_ind_times(t_start,t_end,so,samp,hash,ind_list);
+	
+	let ref_seq = [];
+	for(let j = 0; j < N; j++){
+		ref_seq.push(Math.floor(4*Math.random()));
+	}
+	
+	// Generates timelines in which an individual infects another 
+	let ind_infect=[];
+	for(let p = 0; p < samp.species.length; p++){
+		ind_infect[p]=[];
+		let indi = samp.species[p].individual;
+		for(let i = 0; i < indi.length; i++){
+			ind_infect[p][i]=[];
+		}
+	}
+	
+	// Makes a list of when infection enters from outside the system
+	let inf_enter = [];
+	for(let p = 0; p < samp.species.length; p++){
+		let sp = result.species[p];
+		let indi = samp.species[p].individual;
+		for(let i = 0; i < indi.length; i++){
+			let ind = indi[i];
+			let c = ind.cinit;
+			if(c != OUT && c != SOURCE && sp.comp_gl[c].infected == true){
+				inf_enter.push({p:p, i:i, t:t_start});
+			}
+		}
+	}
+
+	for(let p = 0; p < samp.species.length; p++){	
+		let indi = samp.species[p].individual;
+		
+		let sp = result.species[p];
+		let tra_gl = sp.tra_gl;
+		let comp_gl = sp.comp_gl;
+		
+		for(let i = 0; i < indi.length; i++){
+			let ev = indi[i].ev;
+			let c = indi[i].cinit; 
+			let inf_flag = false;
+			if(c != OUT && c != SOURCE && comp_gl[c].infected == true) inf_flag = true;
+				
+			for(let e = 0; e < ev.length; e++){
+				c = c_after_event(ev[e],sp);
+				let infe = ev[e].infection;
+				if(infe){
+					if(comp_gl[c].infected != true) error("Should be infected");
+					if(inf_flag != false) error("Already infected");
+					inf_flag = true;	
+					
+					if(infe.p == OUTSIDE_INF){
+						inf_enter.push({p:p, i:i, t:ev[e].t});
+					}
+					else{
+						ind_infect[p][i].push({type:"infected", t:ev[e].t});  
+					
+						ind_infect[infe.p][infe.i].push({type:"infect", t:ev[e].t, p:p, i:i}); 
+					}
+				}
+				else{
+					if(inf_flag == true){		
+						if(c == OUT || c == SOURCE || c == SINK || comp_gl[c].infected != true){ 
+							ind_infect[p][i].push({type:"recovery", t:ev[e].t});  
+							inf_flag = false;
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	// Orders ind_infect
+	for(let p = 0; p < samp.species.length; p++){
+		for(let i = 0; i < ind_infect[p].length; i++){
+			ind_infect[p][i].sort( function(a, b){ return a.t-b.t});
+		}
+	}
+	
+	let node_list = [];
+	
+	// Adds new infections to the system
+	for(let i = 0; i < inf_enter.length; i++){
+		let ie = inf_enter[i];
+		
+		let new_seq = copy(ref_seq);
+		let num = poisson_sample(seq_var+(ie.t-t_start)*mu);
+		mutate_seq(num,new_seq);
+		
+		seq_sim_ind(ie.p,ie.i,new_seq,ie.t,ind_infect,ele,mu,f,ind_times,samp,node_list);
+	}
+	
+	node_list.sort( function(a, b){ return a.i-b.i});
+	
+	let te = "";
+	for(let r = 0; r < node_list.length; r++){
+		let no = node_list[r];
+		
+		te += no.i+" "+no.t+"  ";
+		for(let j = 0; j < no.inf_ev.length; j++){
+			te += no.inf_ev[j].t+" "+no.inf_ev[j].type+" "
+			if(no.inf_ev[j].type == "infect") te += no.inf_ev[j].infi+" ";
+			te += no.inf_ev[j].mut_num+",  ";
+		}	
+		te += endli;
+	}
+	
+	ele.sort( function(a, b){ 
+		let tea = a[0].toLowerCase();
+		let teb = b[0].toLowerCase();
+		if(tea > teb) return 1;
+		else{
+			if(tea < teb) return -1;
+			else return a[1].t-b[1].t;
+		}		
+	});
+	*/
+}
+
+
+/// Simulates matrix of genetic differences
+void DataSim::simulate_genetic_matrix(double mut_rate, double seq_var, const State &state, Table &tab)
+{
+	//zz
+	auto fr = get_frac();
+	cout << fr;
+	auto tims = get_times();
+	
+	for(auto va: tims) cout << va << " ti";
+	
+	const auto &gv = state.genetic_value;
+	
+	auto &inf_node = gv.inf_node;
+	
+	//if(!samp.inf_node_store) samp.inf_node_store = copy(inf_node);
+	//else inf_node = copy(samp.inf_node_store);
+	
+	// Makes a list of all individuals
+	
+	//Hash hash;
+	
+	vector <IndList> ind_list;
+	for(auto p = 0u; p < model.species.size(); p++){
+		const auto &sp = model.species[p];
+		for(auto i = 0u; i < sp.nindividual_obs; i++){
+			const auto &ind = sp.individual[i];
+			cout << ind.name;
+			//IndList il; il.name = ind.name; il.p = p; il.i = i;
+			IndList il;il.p = p; il.i = i;
 			
-			auto mut_rate = get_tag_value("mut-rate"); if(mut_rate == ""){ cannot_find_tag(); return;}
-			ds.mut_rate_str = mut_rate;
+			//hash.add(ind.name,ind_list);
+			ind_list.push_back(il);
+		}
+	}
+
+	auto ind_times = get_ind_times(tims,ind_list);
+	
+	
+	// Adds in observations
+	//vector <GenObs> obs;
+	for(auto n = 0u; n < inf_node.size(); n++){
+		//const auto &infn = inf_node[n];
+		
+		//auto p = infn.p;
+		//auto i = infn.i;
+		///const auto &ind = model.species[p].individual[i];
+		//const auto &indd = state.species[p].individual[i];
+		
+		//let j = hash.find(infn.ind);
+		//let il = ind_list[j];
+		//let p = il.p;
+		
+		//const auto &ev = indd.ev;
+		
+		//auto t = infn.tdiv_start;
+		//zz
+	//cout << infn.inf_ev.size() << "Num";
+		/*
+		// Works out the time when the individual is no longer in the infectious state
+		let e = 0;
+	
+		if(infn.from == "ENT" || infn.from == "OUT"){
+			infn.num = poisson_sample(seq_var+(t-t_start)*mu);
+		}
+		else{
+			while(e < ev.length && ev[e].t != t) e++;
+			if(e == ev.length) alertp("Could not find event");
+		}
+		
+		let sp = result.species[p];
+		
+		let tmax = t_end;
+		while(e < ev.length){
+			let c = c_after_event(ev[e],sp);
+			if(c == OUT || c == SOURCE || c == SINK || sp.comp_gl[c].infected != true){
+				tmax = ev[e].t;
+				break;
+			}
+			e++;
+		}
+
+		let ti_list = ind_times[p][il.i];
+		for(let k = 0; k < ti_list.length; k++){
+			let tt = ti_list[k];
+			if(tt > t && tt < tmax){
+				if(Math.random() < f){
+					infn.inf_ev.push({ty: "OBS", i:obs.length, t:tt, num:UNSET});
+					obs.push({name:"Obs-"+(obs.length+1), n:n, ind:ind.name, t:tt});
+				}
+			}					
+		}
+		
+		infn.inf_ev.sort( function(a, b){ return a.t-b.t});
+		
+		for(let k = 0; k < infn.inf_ev.length; k++){
+			let tt = infn.inf_ev[k].t;
+			infn.inf_ev[k].num = poisson_sample(mu*(tt-t));
+			t = tt;
+		}
+		*/
+	}	
+	/*
+	
+	// Corrects inf_node.num (because observations have been added)
+	for(let n = 0; n < inf_node.length; n++){
+		let infn = inf_node[n];
+		if(infn.from != "ENT" && infn.from != "OUT"){
+			let nn = infn.from;
+			let infe = inf_node[nn].inf_ev;
+			let num = infn.num;
+			let ninf = 0;
+			let e = 0; 
+			for(e = 0; e < infe.length; e++){
+				if(infe[e].ty == "INF"){
+					if(ninf == num){ infn.num = e; break;}
+					ninf++;
+				}
+			}
 			
-			auto seq_var = get_tag_value("seq-var"); if(seq_var == ""){ cannot_find_tag(); return;}
-			ds.seq_var_str = seq_var;
-			*/
+			if(e == infe.length){
+				alertp("Could not correct");
+			}
+		}
+	}
+	
+	// Calculates matrix of observations
+	let mat = [];
+	for(let j = 0; j < obs.length; j++) mat[j]=[];
+	
+	let obs_visit=[];
+	let obs_infev=[];
+	for(let n = 0; n < inf_node.length; n++){
+		obs_visit[n]=[];
+		obs_infev[n]=[];
+		let inf_ev = inf_node[n].inf_ev;
+		for(let e = 0; e < inf_ev.length; e++){
+			obs_infev[n][e]=[];
+			if(inf_ev[e].ty == "OBS"){
+				obs_infev[n][e].push({m:inf_ev[e].i, sum:0});
+			}
+		}
+	}
+		
+	for(let n = 0; n < inf_node.length; n++){
+		let inf_ev = inf_node[n].inf_ev;
+		for(let k = 0; k < inf_ev.length; k++){
+			let ie = inf_ev[k];
+			if(ie.ty == "OBS"){
+				let m = ie.i;
+				let kk = k, nn = n;
+				let sum = 0;
+				do{
+					let infn = inf_node[nn];
+					
+					let oie = obs_infev[nn][kk];
+					for(let j = 0; j < oie.length; j++){
+						//if(infn.inf_ev[kk].ty == "OBS"){
+						//let mm = infn.inf_ev[kk].i;
+						let mm = oie[j].m;
+						if(mat[m][mm] == undefined){
+							let summ = oie[j].sum;
+							mat[m][mm] = sum+summ;
+							mat[mm][m] = sum+summ;
+						}
+					}
+					oie.push({m:m, sum:sum});
+							
+					sum += infn.inf_ev[kk].num;
+				
+					kk--;
+					if(kk == -1){ // Goes up the node
+						if(inf_node[nn].from == "ENT" || inf_node[nn].from == "OUT"){
+							obs_visit[nn].push({m:m,sum:sum});
+							break;
+						}					
+						kk = inf_node[nn].num;
+						nn = inf_node[nn].from;
+					}
+				}while(true);
+			}
+		}
+	}
+	
+	let enter_list = [];
+	for(let n = 0; n < inf_node.length; n++){
+		if(inf_node[n].from == "ENT" || inf_node[n].from == "OUT"){
+			if(obs_visit[n].length > 0){
+				enter_list.push(n);
+			}
+		}
+	}
+	
+	// Accounts for differences between observations on different origins
+	if(enter_list.length > 1){
+		for(let j = 0; j < enter_list.length; j++){
+			let n = enter_list[j];
+			let ov = obs_visit[n];
+			let num = inf_node[n].num;
+			for(let k = 0; k < ov.length; k++){
+				let m = ov[k].m;
+				let sum_k = ov[k].sum;
+				for(let jj = j+1; jj < enter_list.length; jj++){
+					let nn = enter_list[jj];
+					let ovv = obs_visit[nn];
+					let numm = inf_node[nn].num;
+					for(let kk = 0; kk < ovv.length; kk++){
+						let mm = ovv[kk].m;
+						let sum_kk = ovv[kk].sum;
+					
+						if(mat[m][mm] != undefined)	alertp("Should not be defined");
+						mat[m][mm] = sum_k + sum_kk+ num + numm;
+						mat[mm][m] = mat[m][mm];
+					}
+				}
+			}
+		}
+	}
+	
+	head.push("ID");
+	head.push("t");
+	head.push("Obs");
+	for(let i = 0; i < obs.length; i++){
+		head.push(obs[i].name);
+	}
+	
+	for(let r = 0; r < obs.length; r++){
+		let ob = obs[r];
+		let row=[];
+		row.push(ob.ind);
+		row.push(ob.t);
+		row.push(ob.name);
+		for(let i = 0; i < obs.length; i++){
+			row.push(mat[r][i]);
+		}
+		ele.push(row);
+	}
+
+	set_genetic_matrix_columns(ele,so);
+	*/
+}
+
+
+/// Determines if a string matchs a wildcard
+bool DataSim::wildcard_match(const string &name, string filt) const 
+{
+	auto spl = split(filt,'*');
+
+	return wildcard_match2(name,spl,true);
+}
+
+
+/// In text name looks for spl[0]
+bool DataSim::wildcard_match2(const string &name, const vector <string> &spl, bool root) const
+{
+	auto te = toLower(spl[0]);
+	auto len = te.length();
+
+	if(name.length() >= len){
+		if(spl.size() == 1){
+			if(len == 0) return true;
+			if(toLower(name) == te) return true;
+		}
+		else{
+			auto imax = name.length()-len;
+			if(root) imax = 0;
+			for(auto i = 0u; i <= imax; i++){
+				if(toLower(name.substr(i,len)) == te){
+					if(spl.size() == 1) return true;
+					else{
+						auto name_next = name.substr(i+len);
+						vector <string> spl_next;
+						for(auto k = 1u; k < spl.size(); k++) spl_next.push_back(spl[k]);
+						auto res = wildcard_match2(name_next,spl_next,false);
+						if(res == true) return true;
+					}
+				}
+			}
+		}
+	}
+	
+	return false;
+}
+
+
+/// Gets timepoints specified in the bubble
+vector < vector < vector <double> > > DataSim::get_ind_times(const vector <double> &tims, const vector <IndList> &ind_list) const
+{
+	vector < vector < vector <double> > > ind_times;
+	
+	ind_times.resize(model.nspecies);
+	
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];
+		ind_times[p].resize(sp.nindividual_obs);
+		
+		for(auto i = 0u; i < sp.nindividual_obs; i++){
+			ind_times[p][i] = tims;
+		}
+	}
+	
+	/*	
+	case "Data":
+		{
+			let sel = so.sel_data;
+			let gen_so = model.sim_res.plot_filter.species[sel.p].gen_source[sel.i];
+			
+			switch(gen_so.type){
+			case "Compartment": case "Transition": case "Diag. Test":
+				{
+					let ele = gen_so.table.ele;
+					for(let r = 0; r < ele.length; r++){
+						let ro = ele[r];
+						let id = ro[0];
+						let t = ro[1];
+						
+						let j = hash.find(id);
+						if(j == undefined) alertp("Should not be undefined");
+						else{
+							let il = ind_list[j];
+							let tf = Number(t);
+							if(isNaN(tf)){
+								if(t == "start") tf = t_start;
+								else{
+									if(t == "end") tf = t_end;
+									else{
+										alertp("Not a number");
+									}
+								}
+							}
+							if(gen_so.type == "Transition") tf += TINY;
+							ind_times[il.p][il.i].push(tf);
+						}
+					}
+				}
+				break;
+				
+			default:
+				alert_help("Cannot used this data source");
+				break;
+			}
+		}			
+		break;	
+	}
+	*/
+	
+	return ind_times;
 }

@@ -38,7 +38,7 @@ void State::init()
 	for(auto p = 0u; p < nspecies; p++){
 		vector <unsigned int> pop_affect;               // Lists populations affect by species
 		for(auto po = 0u; po < model.pop.size(); po++){
-			if(model.pop[po].sp_p == p) pop_affect.push_back(po);
+			if(model.pop[po].p == p) pop_affect.push_back(po);
 		}
 			
 		StateSpecies ss(param_val,model.eqn,model.species[p],model,pop_affect,model.mode,dif_thresh);
@@ -181,6 +181,7 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 			
 			const auto &lin_form = sp.sim_linear_speedup.lin_form;
 			auto &ss = sim_speed[p];
+	
 			if(ti == ti_start) ss.val_fast = ssp.calc_val_fast_init(lin_form,ss.pop_grad,pop);
 			else ssp.val_fast_update(ti,ss.val_fast,popnum_t,ss.pop_grad,lin_form);
 			
@@ -1914,7 +1915,7 @@ vector <double> State::calculate_popnum() const
 	
 	for(auto i = 0u; i < model.pop.size(); i++){            // Calculates population based on cpop
 		const auto &po = model.pop[i];
-		const auto &ssp = species[po.sp_p];
+		const auto &ssp = species[po.p];
 		if(ssp.type == POPULATION || ssp.type == DETERMINISTIC){
 			auto sum = 0.0;
 			for(auto &te : po.term) sum += ssp.cpop[te.c]*te.w;

@@ -399,40 +399,63 @@ function drop_menu(cont,lay)
 	let graph_show = false;
 	if(find(inter.layer,"name","GraphContent") != undefined) graph_show = true; 
 	
-	if(bub.mode == "SelectLine"){
-		let dx = 8, dy = 1.2;
-		cont.dx = dx;
-		bubble_addtitle(cont,"Export data",{title:"Select line", te:exportline_text});
+	let table_show = false;
+	if(find(inter.layer,"name","TableContent") != undefined) table_show = true; 
 	
-		let dg = inter.graph.data_group;
-	
-		cont.y += 0.2;
+	switch(bub.mode){
+	case "SelectLine":
+		{
+			let dx = 8, dy = 1.2;
+			cont.dx = dx;
+			bubble_addtitle(cont,"Export data",{title:"Select line", te:exportline_text});
 		
-		for(let i = 0; i < dg.length; i++){
-			bubble_addradio(cont,0,i,dg[i].name,inter.bubble.line_radio); 
-		}			
-		cont.y += 0.2;
-	
-		add_end_button(cont,"Export","ExportLine");
-	
-		return;
-	}
+			let dg = inter.graph.data_group;
 		
-	if(bub.mode == "Video"){
-		let dx = 8, dy = 1.2;
-		cont.dx = dx;
+			cont.y += 0.2;
+			
+			for(let i = 0; i < dg.length; i++){
+				bubble_addradio(cont,0,i,dg[i].name,inter.bubble.line_radio); 
+			}			
+			cont.y += 0.2;
 		
-		bubble_addtitle(cont,"Export Video",{title:"Export video", te:exportvideo_text});
+			add_end_button(cont,"Export","ExportLine");
+		
+			return;
+		}
+		break;
+		
+	case "Video":
+		{
+			let dx = 8, dy = 1.2;
+			cont.dx = dx;
+			
+			bubble_addtitle(cont,"Export Video",{title:"Export video", te:exportvideo_text});
+		
+			bubble_add_minititle(cont,"Quality:");
+			cont.y -= 0.4;
+			bubble_addradio(cont,0,"Low","Low quality",inter.mp4quality_radio);
+			bubble_addradio(cont,0,"Medium","Medium quality",inter.mp4quality_radio); 
+			bubble_addradio(cont,0,"High","High quality",inter.mp4quality_radio);
+			cont.y += 0.3;
+			bubble_input(cont,"Frames per second:",{type:"fps"});
+			add_end_button(cont,"Export","ExportVideo2");
+			return;
+		}
+		break;
 	
-		bubble_add_minititle(cont,"Quality:");
-		cont.y -= 0.4;
-		bubble_addradio(cont,0,"Low","Low quality",inter.mp4quality_radio);
-		bubble_addradio(cont,0,"Medium","Medium quality",inter.mp4quality_radio); 
-		bubble_addradio(cont,0,"High","High quality",inter.mp4quality_radio);
-		cont.y += 0.3;
-		bubble_input(cont,"Frames per second:",{type:"fps"});
-		add_end_button(cont,"Export","ExportVideo2");
-		return;
+	case "ExportModel":
+		{
+			let dx = 8, dy = 1.2;
+			cont.dx = dx;
+			
+			bubble_addtitle(cont,"Export",{te:export_model_text});
+				
+			bubble_addradio(cont,0,"Compartments","Compartments",bub.radio);
+			bubble_addradio(cont,0,"Transitions","Transitions",bub.radio);
+			add_end_button(cont,"Export","ExportTableModel2");
+			return;
+		}
+		break;
 	}
 		
 	let dx = 6.5, dy = 1.2;
@@ -478,7 +501,7 @@ function drop_menu(cont,lay)
 		}
 		
 		let active = false; 
-		if(graph_show) active = true;
+		if(graph_show || table_show) active = true;
 		if(model.get_show_model()) active = true;
 		
 		sub.push({te:"Print", ac:"PrintGraph", active:active});
@@ -505,6 +528,11 @@ function drop_menu(cont,lay)
 			}
 		}
 	
+		if(model.get_show_model()){
+			active = true;
+			ac = "ExportTableModel";
+		}
+		
 		if(graph_show){
 			if(inter.graph.type == "Matrix"){
 				active = true;

@@ -913,7 +913,7 @@ function graph_trans_calculate(result,rpf,burn,p)
 						line.push(point);
 					}
 				}
-				add_line(view,line,col,tr.name,data,key);
+				add_line(view,line,col,tr.name,data,key,"trans");
 				
 				if(key.length > KEY_LINE_MAX){ line_max = true; break;}
 			}
@@ -1065,7 +1065,7 @@ function graph_trans_expect_calculate(result,rpf,burn,p,type)
 				}
 			}
 		
-			add_line(view,line,col,tr.name,data,key);
+			add_line(view,line,col,tr.name,data,key,"trans");
 			
 			// Adds in line for expected transition number
 			let list=[];
@@ -1302,21 +1302,21 @@ function graph_trans_hbin_calculate(result,rpf,burn,p,type)
 	
 	
 /// Adds a line to the graph
-function add_line(view,line,col,name,data,key)
+function add_line(view,line,col,name,data,key,op)
 {
 	switch(view){
 	case "Graph": case "Graph (all)": case "Graph (split)": case "Graph (lines)":
 		for(let j = 0; j < line.length; j++){
 			data.push({point:line[j], col:col, view:view, key_na:name, type:"Line"});
 		}
-		key.push({type:"Line", te:name, col:col});
+		key.push({type:"Line", te:name, col:col, op:op});
 		break;
 		
 	case "Graph (CI)": case "Data":
 		{
 			let line_stats = get_line_stats(line);
 			data.push({point:line_stats, col:col, key_na:name, type:"Line CI"});
-			key.push({type:"Line", te:name, col:col});
+			key.push({type:"Line", te:name, col:col, op:op});
 		}
 		break;
 	
@@ -1567,6 +1567,8 @@ function graph_ind_calculate(result,rpf,burn,p)
 	if(result.graph_ind_store == undefined) result.graph_ind_store={};
 	let gs = result.graph_ind_store;
 	
+	let all_ind_list = result.all_ind_list;
+	
 	if(gs.gfilt == gfilt){ 
 		ind_list = gs.ind_list; ind_max = gs.ind_max;
 	}
@@ -1594,7 +1596,8 @@ function graph_ind_calculate(result,rpf,burn,p)
 				for(let i = 0; i < imax; i++){
 					let ind = sa.individual[i];
 					
-					let name = ind.name;
+					//let name = ind.name;
+					let name = all_ind_list[ind.name_ref].name;
 					if(hash_filt == undefined || hash_filt.find(name) != undefined){
 						let j = hash.find(name);
 						if(j == undefined){

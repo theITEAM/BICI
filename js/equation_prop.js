@@ -561,6 +561,8 @@ function check_sum(tex,icur,lin,i_bra,eqn)
 		// Adds dependency to list
 		let de=[]; de.push(spl[0]);	
 		add_eqn_dep(eqn,de,[],icur);
+		
+		eqn.index_name_list.push({ index_name:remove_prime(spl[0]), icur:icur+ik+1});	
 	}
 	
 		
@@ -1003,6 +1005,7 @@ function remove_bracket(te)
 /// Checks that parameter is correctly defined			
 function check_population(te,icur,eqn) 
 {
+	let icur_st = icur;
 	let p_name = eqn.p_name;
 	
 	let p; if(p_name != undefined) p = find(model.species,"name",p_name);
@@ -1010,7 +1013,7 @@ function check_population(te,icur,eqn)
 	// Removes species filter
 	let i = 0; while(i < te.length && te.substr(i,1) != ":") i++;
 	if(i < te.length){
-		p_name = te.substr(0,i);
+		p_name = te.substr(0,i).trim();
 		eqn.sp_name_list.push({ p_name:p_name, icur:icur});
 		
 		p = find(model.species,"name",p_name);
@@ -1158,6 +1161,7 @@ function check_population(te,icur,eqn)
 	
 	// Goes through compartment names
 	let icur3 = icur;
+	
 	if(te_comp != "" && te_comp.trim().toLowerCase() != "all"){
 		let spl = te_comp.split(",");
 		
@@ -1221,7 +1225,7 @@ function check_population(te,icur,eqn)
 				cl_ref[cl_sp] = icur3;
 			}
 			
-			icur3 += te_comp.length+1;
+			icur3 += spl[i].length+1;
 		}
 	}
 	
@@ -1263,7 +1267,7 @@ function check_ie(te,p_name_filter,icur,eqn,in_pop)
 	}
 
 	if(eqn_source(eqn)){
-		eqn.warn.push({te:"Source cannot contain an individual effect"});
+		//eqn.warn.push({te:"Source cannot contain an individual effect"});
 	}	
 }
 

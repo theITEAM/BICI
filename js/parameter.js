@@ -20,7 +20,7 @@ function update_model()
 	update_model_ind_eff(ielist);                    // Updates individual effect groupings in model
 	
 	update_model_fix_eff(felist);                    // Updates fixed effects in model 
-	
+
 	add_param_ppc_factor(par_list);                  // Adds any parameter for ppc factors
 
 	add_ind_eff_param(par_list);                     // Adds individual effect parameters (i.e. variances) to model
@@ -1654,6 +1654,9 @@ function check_reparam(te,th)
 		}
 	}
 	
+	if(eqn.fix_eff.length > 0) return err("Cannot contain fixed effect");
+	if(eqn.ind_eff.length > 0) return err("Cannot contain individual effect");
+
 	return success();
 }
 		
@@ -2231,8 +2234,17 @@ function find_equation_list(all_param)
 				
 				switch(so.type){
 				case "Diag. Test":
-					add_equation_to_list(eqn_list,so.spec.Se_eqn,eqn_info);
-					add_equation_to_list(eqn_list,so.spec.Sp_eqn,eqn_info);
+					{
+						let cb = so.spec.check_box.value; 
+						for(let ci = 0; ci < cb.length; ci++){
+							if(cb[ci].check){
+								let Se = cb[ci].Se_eqn.te;
+								add_equation_to_list(eqn_list,cb[ci].Se_eqn,eqn_info);
+							}
+						}
+		
+						add_equation_to_list(eqn_list,so.spec.Sp_eqn,eqn_info);
+					}
 					break;
 				
 				case "Population":

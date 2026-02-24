@@ -72,6 +72,21 @@ function generate_screen(update)
 	start_cursor_flash();
 	
 	plot_screen();
+	
+	process_after_load();
+}
+
+
+/// Processes any operation after loading a page
+function process_after_load()
+{
+	let al = copy(inter.after_load);
+	if(al.type){
+		if(!lay_exist("LoadingSymbol")){		
+			inter.after_load = {};
+			select_param_element(al);
+		}
+	}
 }
 
 
@@ -985,6 +1000,14 @@ function mask_plot(lay)
 }
 
 
+/// Determines if a layer exist
+function lay_exist(te)
+{
+	if(find(inter.layer,"name",te) == undefined) return false;
+	return true;
+}
+
+
 /// Returns a layer based on the layer name
 function get_lay(te)
 {
@@ -1176,6 +1199,7 @@ function copy_back_to_source2(tbs)
 	case "compartment": inter.rename_compartment = te; break;
 	case "add_species_name": inter.bubble.species_name = te; break;
 	case "add_classification_name": inter.bubble.classification_name = te; break;
+	case "prefix": inter.bubble.prefix = te; break;
 	case "classification_name": inter.rename_classification = te; break;
 	case "species_name": inter.rename_species = te; break;
 	case "init_population": edit_source.cla[so.cl].comp_init_pop[so.c].pop = Number(te); break;
@@ -1429,7 +1453,7 @@ function copy_back_to_source2(tbs)
 	case "alpha_val": inter.bubble.alpha_val = te; break;
 	case "BF_val": inter.bubble.BF_val = te; break;
 	case "fps": inter.fps = te; break;
-	case "group_name": edit_source.spec.gname = te; break;
+	case "group_name": edit_source.name = te; break;
 	case "slice_time": inter.bubble.slice_time = te; break;
 	case "suffix": inter.bubble.suffix = te; break;
 	case "dataname": inter.bubble.dataso.name = te; break;
@@ -1638,6 +1662,9 @@ function check_error_textbox2(tbs)
 				}
 				break;
 				
+			case "prefix":
+				break;
+				
 			case "classification_name":
 				{
 					let list = model.find_clones(source.p,source.cl);	
@@ -1815,11 +1842,13 @@ function check_error_textbox2(tbs)
 				break;
 				
 			case "Se": case "Sp":
-				warn = check_param_or_number(te,"zeroone");
+				if(sim_options()) warn = check_zeroone(te);
+				else warn = check_param_or_number(te,"zeroone");
 				break;
 			
 			case "mut_rate": case "seq_var":
-				warn = check_param_or_number(te,"pos");
+				if(sim_options()) warn = check_posnumber(te);
+				else warn = check_param_or_number(te,"pos");
 				break;
 			
 			case "snp_root": 

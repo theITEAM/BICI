@@ -8,7 +8,6 @@ using namespace std;
 #include "equation.hh"
 #include "precalc.hh"
 #include "species.hh"
-//#include "state_species.hh"
 #include "hash.hh"
 
 class Model                                // Stores information about the model
@@ -43,6 +42,7 @@ class Model                                // Stores information about the model
 		bool contains_tvreparam;               // Set if model contains some tvreparam
 		
 		vector < vector < vector <unsigned int> > > pop_reparam_th; // Sets reference from pop to th [po][ti][#]
+		bool pop_reparam_th_on;                // Determines if on
 		
 		vector <Population> pop;               // Stores information about populations of interest
 		
@@ -89,14 +89,16 @@ class Model                                // Stores information about the model
 		SpecPrecalc spec_precalc_derive;       // Stores list for precalcultion of derived (for integrals)
 		SpecPrecalc spec_precalc_sample;       // Collects all the precalc to calculate after sample        
 		SpecPrecalc spec_precalc_all;          // Collects all the precalc         
-		vector <SpecPrecalcTime> spec_precalc_time; // Precalculation at different times
+		//vector <SpecPrecalcTime> spec_precalc_time; // Precalculation at different times
+		vector <unsigned int> spec_precalc_time_ref;  // References spec_precalc_list
+		vector <SpecPrecalcTime> spec_precalc_list;   // Stores a time-dependent spec_precalc
 		vector <double> precalc_init;          // Initial value for precalc
 		
 		vector <unsigned int> param_vec_ref;   // Stores where param are on precalc
 		vector <unsigned int> spline_ref;      // Stores where spline is on precalc
 	
 		Model(Operation mode_, ExtFactor ext_factor_, bool no_question_);
-		void add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv = UNSET);
+		void add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv = UNSET, bool keep_te = false);
 		void param_val_init(PV &param_val) const;
 		PV param_sample() const;
 		void param_spec_precalc_time(unsigned int ti, const vector < vector <double> > &popnum_t, PV &param_val, bool store) const;
@@ -148,6 +150,7 @@ class Model                                // Stores information about the model
 		double calc_tdiv(double t) const; 
 		double calc_t(double tdiv) const;
 		void create_precalc_equation();
+		SpecPrecalcTime& get_spec_precalc_time(unsigned int ti);
 		void set_precalc_init();
 		void set_spec_precalc_sample();
 		void set_spec_precalc_all();
@@ -181,6 +184,7 @@ class Model                                // Stores information about the model
 		unsigned int get_cl_from_comp(string name, unsigned int p) const;
 		double calculate_equation_zero_one(string te, double tdiv, string &err);
 		double calculate_equation(string te, double tdiv, string &err);
+		DiagTestSens get_diag_test_sens(string comp, unsigned int p, string &warn) const;
 		
 	private:
 		Hash hash_all_ind;                     // Stores individuals in a hash table

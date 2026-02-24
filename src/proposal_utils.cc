@@ -102,7 +102,7 @@ void Proposal::get_affect_like()
 			param_vec_add_affect(affect_like,al);
 		}
 	}
-	
+
 	switch(type){
 	case IE_COVAR_PROP:
 		{
@@ -121,19 +121,19 @@ void Proposal::get_affect_like()
 	}
 
 	model.add_iif_w_affect(affect_like);
-		
+
 	model.add_popnum_ind_w_affect(affect_like);
 
 	if(nopop_speedup && type == PARAM_PROP){   
 		model.affect_nopop_speedup(affect_like,param_list,dependent,spec_precalc_after);
 	}
-	
+
 	model.order_affect(affect_like);
-	
+
 	if(linearise_speedup){
 		model.affect_linearise_speedup(affect_like);
 	}
-	
+
 	if(linearise_factor_nopop_speedup && type == PARAM_PROP){ 
 		model.set_factor_nopop_only(affect_like,param_list,dependent,spec_precalc_after);
 	}

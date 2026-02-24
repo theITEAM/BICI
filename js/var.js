@@ -100,6 +100,8 @@ let inter=                                         // Dynamic variables related 
 
 	figure:[],                                       // Stores letters used on figures           
 	
+	after_load:{},                                   // Stores action after loading a page
+	
 	worker_mess:{active:false}                       // Used to send messages to the worker
 }
 

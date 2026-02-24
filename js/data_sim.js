@@ -62,7 +62,9 @@ function simulate_data(so)
 	let cpop = reconstruct_timeline_vec(sim.cpop_tl,result);
 	
 	let spec = so.spec;
-		
+	
+	let all_ind_list = result.all_ind_list;
+	
 	let head = [];
 	let ele = [];
 
@@ -95,34 +97,31 @@ function simulate_data(so)
 	
 	case "Add Pop.": case "Remove Pop.":
 		{
-			if(sim.add_rem_pop_change){
-				let sign = 1; if(so.type == "Remove Pop.") sign = -1;
-				let T = tp.length-1;
-		
-				head.push("t");
-				for(let cl = 0; cl < sp.ncla; cl++) head.push(sp.cla[cl].name);
-				head.push("Population");
-				
-				for(let ti = 0; ti < T; ti++){	
-					if(sim.add_rem_pop_change[ti]){	
-						let arpc = sim.add_rem_pop_change[ti];
-						for(let k = 0; k < arpc.length; k++){
-							let val = arpc[k].dpop*sign;
-							if(val > 0){
-								let c = arpc[k].c;
-								let cgl = sp.comp_gl[c];
-								
-								let row = [];
-								row.push(t_start+ti*timestep);
-							
-								for(let cl = 0; cl < sp.ncla; cl++){
-									row.push(sp.cla[cl].comp[cgl.cla_comp[cl]].name);
-								}
-								
-								row.push(val);
-								ele.push(row);
-							}
+			let sign = 1; if(so.type == "Remove Pop.") sign = -1;
+			let T = tp.length-1;
+	
+			head.push("t");
+			for(let cl = 0; cl < sp.ncla; cl++) head.push(sp.cla[cl].name);
+			head.push("Population");
+			
+			for(let ti = 0; ti < T; ti++){	
+				let dpl = sim.dpop_list[ti];
+				for(let k = 0; k < dpl.length; k++){
+					let dp = dpl[k];
+					let val = dp.val*sign;
+					if(val > 0){
+						let c = dp.c;
+						let cgl = sp.comp_gl[c];
+						
+						let row = [];
+						row.push(t_start+ti*timestep);
+					
+						for(let cl = 0; cl < sp.ncla; cl++){
+							row.push(sp.cla[cl].comp[cgl.cla_comp[cl]].name);
 						}
+						
+						row.push(val);
+						ele.push(row);
 					}
 				}
 			}
@@ -139,7 +138,8 @@ function simulate_data(so)
 				let ind = sim.individual[i];
 				if(ind.obs){	
 					let row = [];
-					row.push(ind.name);
+					//row.push(ind.name);
+					row.push(all_ind_list[ind.name_ref].name);
 					
 					let cinit = ind.cinit
 					if(cinit != SOURCE){ 
@@ -170,7 +170,8 @@ function simulate_data(so)
 				let ind = sim.individual[i];
 				if(ind.obs){	
 					let row = [];
-					row.push(ind.name);
+					//row.push(ind.name);
+					row.push(all_ind_list[ind.name_ref].name);
 					
 					if(ind.ev.length > 0){
 						let ev = ind.ev[ind.ev.length-1];
@@ -199,7 +200,8 @@ function simulate_data(so)
 						let ev = ind.ev[e];
 						if(ev.type == EV_MOVE && ev.cl == cl_sel){
 							let row = [];
-							row.push(ind.name);
+							//row.push(ind.name);
+							row.push(all_ind_list[ind.name_ref].name);
 							row.push(ev.t);
 							let cgl = sp.comp_gl[ev.cf];
 							row.push(sp.cla[cl_sel].comp[cgl.cla_comp[cl_sel]].name);
@@ -247,7 +249,8 @@ function simulate_data(so)
 							let te;
 						
 							let row = [];	
-							row.push(ind.name);
+							//row.push(ind.name);
+							row.push(all_ind_list[ind.name_ref].name);
 							row.push(t);
 							
 							if(c == SOURCE || c == SINK || c == OUT){
@@ -340,7 +343,8 @@ function simulate_data(so)
 
 								if(Math.random() < prob){
 									let row = [];
-									row.push(ind.name);
+									//row.push(ind.name);
+									row.push(all_ind_list[ind.name_ref].name);
 									row.push(ev.t);
 									ele.push(row);
 								}
@@ -364,11 +368,20 @@ function simulate_data(so)
 			head.push("t");
 			head.push("Result");
 
-			let Se = get_equation_value(spec.Se_eqn);
+			let Se=[];
+			
+			let claa = sp.cla[cl_sel];
+			for(let c = 0; c < claa.comp.length; c++){
+				let val = spec.check_box.value[c]; 
+				if(val.check == true){
+					Se[c] = get_equation_value(val.Se_eqn);
+				}
+			}
+		
 			let Sp = get_equation_value(spec.Sp_eqn);
 			let neg = spec.neg_result;
 			let pos = spec.pos_result;
-		
+	
 			let f = so.frac_obs;
 		
 			for(let i = 0; i < sim.individual.length; i++){
@@ -391,14 +404,15 @@ function simulate_data(so)
 
 								let res;
 								if(spec.check_box.value[ci].check == true){
-									if(Math.random() < Se) res = pos; else res = neg;
+									if(Math.random() < Se[ci]) res = pos; else res = neg;
 								}
 								else{
 									if(Math.random() < Sp) res = neg; else res = pos;
 								}
 								
 								let row = [];
-								row.push(ind.name);
+								//row.push(ind.name);
+								row.push(all_ind_list[ind.name_ref].name);
 								row.push(t);
 								row.push(res);
 								ele.push(row);
@@ -617,7 +631,8 @@ function simulate_data(so)
 			for(let i = 0; i < sim.individual.length; i++){
 				let ind = sim.individual[i];
 				let row = [];
-				row.push(ind.name); 
+				//row.push(ind.name); 
+				row.push(all_ind_list[ind.name_ref].name);
 				row.push(ind.ie[e]);
 				ele.push(row);
 			}
@@ -634,6 +649,45 @@ function simulate_data(so)
 	}
 	
 	post({ type:input.type, head:head, ele:ele});
+}
+
+
+
+/// Adds a single individual per compartment
+function add_sing_ind_per_comp(info)
+{
+	let so = info.so;
+	let drop = info.drop;
+	let prefix = info.prefix;
+	
+	let spec = so.spec;
+	let p = so.info.p;
+	
+	let sp = model.species[p];
+	
+	let head = [];
+	let ele = [];
+	
+	head.push("ID");
+	head.push("t");
+	for(let cl = 0; cl < sp.ncla; cl++) head.push(sp.cla[cl].name);
+	
+	let claa = sp.cla[drop.cl];
+	for(let c = 0; c < claa.comp.length; c++){
+		let na = claa.comp[c].name;
+		
+		let row = [];
+		row.push(prefix+na);
+		row.push("start");
+		for(let cl = 0; cl < sp.ncla; cl++){
+			if(cl == drop.cl) row.push(na);
+			else row.push(drop.cla[cl].te);
+		}	
+		
+		ele.push(row);
+	}
+	
+	post({ head:head, ele:ele});
 }
 
 
@@ -1132,6 +1186,8 @@ function simulate_genetic_snp(t_start,t_end,ele,head,so)
 	
 	let samp = result.sample[0];
 
+	let all_ind_list = result.all_ind_list;
+	
 	// Makes a hash table of individuals
 	let hash = new Hash();
 	
@@ -1141,7 +1197,9 @@ function simulate_genetic_snp(t_start,t_end,ele,head,so)
 		for(let i = 0; i < sosp.individual.length; i++){
 			let ind = sosp.individual[i];
 	
-			let name = ind.name;
+			//let name = ind.name;
+			let name = all_ind_list[ind.name_ref].name;
+	
 			let j = hash.find(name);
 			if(j == undefined){
 				j = ind_list.length;
@@ -1152,9 +1210,6 @@ function simulate_genetic_snp(t_start,t_end,ele,head,so)
 	}
 	
 	let ind_times = get_ind_times(t_start,t_end,so,samp,hash,ind_list);
-	
-	//let times = get_timepoints(t_start,t_end,so);
-	//if(typeof times == 'string'){ alert_help("Problem with times",times); return;}
 	
 	let ref_seq = [];
 	for(let j = 0; j < N; j++){
@@ -1244,7 +1299,7 @@ function simulate_genetic_snp(t_start,t_end,ele,head,so)
 		let num = poisson_sample(seq_var+(ie.t-t_start)*mu);
 		mutate_seq(num,new_seq);
 		
-		seq_sim_ind(ie.p,ie.i,new_seq,ie.t,ind_infect,ele,mu,f,ind_times,samp,node_list);
+		seq_sim_ind(ie.p,ie.i,new_seq,ie.t,ind_infect,ele,mu,f,ind_times,samp,node_list,all_ind_list);
 	}
 	
 	node_list.sort( function(a, b){ return a.i-b.i});
@@ -1297,6 +1352,8 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 	if(!samp.inf_node_store) samp.inf_node_store = copy(inf_node);
 	else inf_node = copy(samp.inf_node_store);
 	
+	let all_ind_list = result.all_ind_list;
+	
 	// Makes a hash table of individuals
 	let hash = new Hash();
 	
@@ -1306,7 +1363,8 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 		for(let i = 0; i < sosp.individual.length; i++){
 			let ind = sosp.individual[i];
 	
-			let name = ind.name;
+			//let name = ind.name;
+			let name = all_ind_list[ind.name_ref].name;
 			let j = hash.find(name);
 			if(j == undefined){
 				j = ind_list.length;
@@ -1359,7 +1417,9 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 			if(tt > t && tt < tmax){
 				if(Math.random() < f){
 					infn.inf_ev.push({ty: "OBS", i:obs.length, t:tt, num:UNSET});
-					obs.push({name:"Obs-"+(obs.length+1), n:n, ind:ind.name, t:tt});
+					
+					let na = all_ind_list[ind.name_ref].name;
+					obs.push({name:"Obs-"+(obs.length+1), n:n, ind:na, t:tt});
 				}
 			}					
 		}
@@ -1512,7 +1572,7 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 
 
 /// Sets sequence for individual and evolves in time
-function seq_sim_ind(p,i,new_seq,t,ind_infect,ele,mu,f,ind_times,samp,node_list)
+function seq_sim_ind(p,i,new_seq,t,ind_infect,ele,mu,f,ind_times,samp,node_list,all_ind_list)
 {
 	let ind_inf = ind_infect[p][i];
 	let node = {t:t, p:p, i:i, inf_ev:[]};
@@ -1547,7 +1607,9 @@ function seq_sim_ind(p,i,new_seq,t,ind_infect,ele,mu,f,ind_times,samp,node_list)
 				node.inf_ev.push({type:"obs", t:t, mut_num:num});
 			
 				let row=[];
-				row.push(samp.species[p].individual[i].name);
+				
+				let ind = samp.species[p].individual[i];
+				row.push(all_ind_list[ind.name_ref].name);
 				row.push(t);
 				for(let j = 0; j < new_seq.length; j++){
 					let ch;
@@ -1571,7 +1633,7 @@ function seq_sim_ind(p,i,new_seq,t,ind_infect,ele,mu,f,ind_times,samp,node_list)
 			else{
 				if(indinf.type == "infect"){
 					node.inf_ev.push({type:"infect", t:t, infi:indinf.i, mut_num:num});
-					seq_sim_ind(indinf.p,indinf.i,copy(new_seq),t,ind_infect,ele,mu,f,ind_times,samp,node_list);
+					seq_sim_ind(indinf.p,indinf.i,copy(new_seq),t,ind_infect,ele,mu,f,ind_times,samp,node_list,all_ind_list);
 				}
 				else{
 					if(indinf.type != "recovery") error("Option not recognised");

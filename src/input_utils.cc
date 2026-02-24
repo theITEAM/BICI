@@ -14,7 +14,7 @@ using json = nlohmann::json;
 #include "input.hh"
 #include "utils.hh"
 #include "matrix.hh"
-
+#include "lzw.hh"
 
 /// Returns the classification number from its index
 unsigned int Input::find_cl_index(unsigned int p, string index) const
@@ -132,7 +132,7 @@ string Input::in_file_text(string te, string desc) const
 
 
 /// Loads a table from a file
-Table Input::load_table(const string file, string desc)
+Table Input::load_table(const string file, string desc, bool enc)
 {
 	Table tab; tab.error = false;
 
@@ -151,6 +151,8 @@ Table Input::load_table(const string file, string desc)
 	tab.file = fs.name;
 	
 	auto lines = fs.lines;
+	
+	if(enc) decode_lines(lines);
 
 	auto j = 0u;
 	while(j < lines.size() && (begin_str(trim(lines[j]),"#") || trim(lines[j]) == "")) j++;
@@ -1474,6 +1476,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 				if(ind[i] == UNSET){ 
 					fl = true;
 					
+					// turn off
 					if(par.dep[i].hash_list_out.find(ele) == UNSET){	
 						alert_import(desc+" the element '"+ele+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
 						return;
@@ -1761,7 +1764,7 @@ void Input::set_spline(SplineType type, string knot_times_str, string smooth, ve
 	//tdiv.resize(k+1);
 	if(kmin > 0 || kmax < times.size()){
 		par.spline_outside = true;
-		
+				
 		auto times_old = times;
 		auto knot_times_old = knot_times;
 		times.clear();

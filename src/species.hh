@@ -121,15 +121,16 @@ class Species   	                         // Stores details of a species
 		vector <PopFilter> pop_filter;         // Filters used for population data
 		
 		vector <PopData> pop_data;             // Stores population data
+		bool pop_data_exist;                   // If population data exists (determines if pop_data_ref)
 		
 		vector < vector < vector <unsigned int> > > pop_data_ref; // References population transition data [ti][cgl]
 		
 		vector <PopTransFilter> pop_trans_filter; // Filters used for pop trans data  
 		
 		vector <PopTransData> pop_trans_data;  // Stores population transition data
-		bool pop_trans_data_exist;
+		bool pop_trans_data_exist;             // This determines if pop_trans_ref is set (to save memory)
 		
-		vector < vector < vector <unsigned int> > > pop_trans_ref; // References population transition [ti][tr]
+		vector < vector < vector <unsigned int> > > pop_trans_ref; // References population transition [ti][tr][#]
 		
 		vector <ParEventJointProp> par_event_joint;// Information about joint parameter event proposal
 		
@@ -140,9 +141,6 @@ class Species   	                         // Stores details of a species
 		unsigned int T;                        // The maximum time
 		
 		unsigned int line_num;                 // Stores the import line (for diagnostic error messages)
-		
-		// Determines if global transitions are connected [tr_from][tr_to]
-		//vector < vector <bool> > tr_connected; 
 		
 		// List all potential transitions after tr [tr][#]
 		vector < vector <unsigned int> > tr_after;

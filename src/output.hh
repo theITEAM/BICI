@@ -26,7 +26,8 @@ class Output                               // Stores information about the data
 		
 		vector <double> timer;                 // General purpose timers
 		
-		Output(const Model &model, const Input &input, Mpi &mpi);
+		Output(const Model &model, Mpi &mpi);
+		void init(const Input &input);
 		void check_open(ofstream &fout, string file) const;
 		void summary(const Model &model) const;
 		void prop_summary(string te) const;
@@ -61,7 +62,7 @@ class Output                               // Stores information about the data
 		void clear_part(Particle &pa) const;
 		string print_obs_data(unsigned int p, const vector <ObsData> &obs) const;
 		void print_individuals(unsigned int N, unsigned int p, const State &state) const;
-		void final_time(long sec, long op_sec) const;
+		void final_time(unsigned int cpu_time, unsigned int op_cpu_time) const;
 		void final_memory_usage() const;
 		void insert_command(string name, unsigned int p, string insert_pl, string insert_bef, string line, string content, string file);
 	
@@ -81,6 +82,7 @@ class Output                               // Stores information about the data
 		void output_param_statistics(const vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout, vector <string> &final_warning) const;
 		void output_prop_info(ofstream &fout) const;
 		void output_state(unsigned int ch, const vector <Particle> &part, ofstream &fout) const;
+		string compress_content(string &content) const;
 		void output_trans_diag(unsigned int ch, const vector <TransDiagSpecies> &trans_diag, ofstream &fout) const;
 		void add_warning(string err_msg, ofstream &fout) const;
 		void output_add_ind_warning(vector <string> &final_warning) const;

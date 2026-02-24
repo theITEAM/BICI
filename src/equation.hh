@@ -15,18 +15,21 @@ struct EqItemList {                         // Allows for a list of equation ite
 	unsigned int next;
 };
 
-
-
 struct PopRefFromPo {                      // Used to get pop_ref from population number
 	unsigned int i;                          // Index on pop_ref
 	unsigned int po;                         // Population number
 };
 
-
 struct Integral {                          // Stores the calculation within an integral
 	vector <Calculation> calc;    
 	unsigned int ti_min;
 	unsigned int ti_max;
+};
+
+struct SumInfo {                           // Stores information about a sum
+	vector <string> dep;                     // Indices on sum
+	string comp_max;                         // The compartment over which distance is measured
+	double distmax;                          // The distance over which the sum acts
 };
 
 struct PopCalculation                      // Used to describe a population calculation
@@ -81,6 +84,14 @@ class Equation                             // Stores information about an equati
 
 		vector <Integral> integral;            // Calculation for integral
 
+		vector <SumInfo> sum_info;             // Information about sums
+
+		vector <string> name_store;            // Used to store names of parameters and populations
+		
+		vector <ParamIndex> param_index;       // Information about parameter in index form
+		
+		vector <PopIndex> pop_index;           // Information about popualtion in index form
+		
 		vector <ParamRef> param_ref;           // Stores the parameters used in the equation
 		
 		vector <DeriveRef> derive_ref;         // Stores derived used in the equation
@@ -129,7 +140,7 @@ class Equation                             // Stores information about an equati
 		
 		Linearise linearise;                   // Used for accelerated likelihood calculation
 		
-		Equation(string tex, EqnType ty, unsigned int p, unsigned int cl, bool inf_trans, unsigned int tif, unsigned int li_num, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details, const vector <Define> &define);
+		Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details, const vector <Define> &define);
 		
 		void print_calculation() const;
 		void print_item(const EqItem &it) const;
@@ -152,13 +163,13 @@ class Equation                             // Stores information about an equati
 		vector <unsigned int> getallcomp(string st);
 		void print_operations(const vector <EqItem> &op) const;
 		
-		vector <string> find_list_from_index(string ind, double dist_max, string comp_max) const;
-		vector <unsigned int> get_all_comp(unsigned int p, string te);
+		CompPos find_list_from_index(string ind, double dist_max, string comp_max) const;
+		vector <unsigned int> get_all_comp(const PopIndex &pind);
 		double get_float(unsigned int i, unsigned int &raend) const;
-		ParamRef get_param_name(unsigned int i, double &dist, unsigned int &raend);
-		bool is_density_name(string name) const;
+		ParamIndex get_param_name(unsigned int i, unsigned int &raend);
 		DeriveRef get_derive_name(unsigned int i, unsigned int &raend);
-		PopTimeRef get_pop(unsigned int i, unsigned int &raend);
+		PopIndex get_pop(unsigned int i, unsigned int &raend);
+		bool pind_cl_exist(unsigned int cl, const PopIndex &pind) const;
 		unsigned int get_ie(unsigned int i, unsigned int &raend);
 		unsigned int get_fe(unsigned int i, unsigned int &raend);
 		bool pop_combine(const vector <EqItem> &op, unsigned int i,	unsigned int &popcomb, double &popcombnum) const;
@@ -170,10 +181,17 @@ class Equation                             // Stores information about an equati
 		bool optypel(const vector <EqItemList> &opl, unsigned int i, EqItemType type) const;
 		int prio(const vector <EqItem> &op, int i) const;
 		int priol(const vector <EqItemList> &opl, unsigned int i) const;
-		void unravel_sum();
+		void unravel_sum(vector <EqItem> &op);
 		void minus_sign_adjust();
 		vector <EqItem> extract_operations();
+		unsigned int get_other_bracket(unsigned int i, const vector <EqItem> &op) const;
 		unsigned int get_integral_bound(string st);
+		void simplify_operations(vector <EqItem> &op);
+		void convert_param_index(vector <EqItem> &op);
+		void convert_pop_index(vector <EqItem> &op);
+		vector <unsigned int>	get_pop_hash_vec(const PopIndex &pind) const;
+		string get_pop_name(const PopIndex &pind) const;
+		unsigned int extract_sum(const string &te, unsigned int i, vector <EqItem> &op);
 		unsigned int extract_integral(const string &te, unsigned int i, vector <EqItem> &op);
 		void combine_populations(vector <EqItem> &op) const;
 		vector <EqItemList> create_opl(const vector <EqItem> &op) const;
@@ -187,25 +205,29 @@ class Equation                             // Stores information about an equati
 		void extract_fix_eff();
 		CompRef find_comp_from_name(unsigned int p, string te) const;
 		void replace_reg(const vector <EqItem> &reg_replace, vector <Calculation> &calc, const vector <bool> &calc_on, bool pl);
+		void bracket_check(string st, const vector <EqItem> &op) const;
 		void setup_comp_pref_convert();
 		void check();
 		void check_opl(const vector <EqItemList> &opl) const;
+		double numeric_one_function(double con, EqItemType ty);
+		double numeric_two_function(double con1, double con2, EqItemType ty);
 		void remove_unused(vector <Calculation> &calc, vector <bool> &calc_on);
 		unsigned int add_const(EqItem item1, EqItem item2);
 		unsigned int mult_const(EqItem item1, EqItem item2);
 		void set_time_vari();
 		double find_dist(unsigned int c, unsigned int cc, const vector <Compartment> &comp, Coord coord) const;
 		double geo_dist(double lat1, double lng1, double lat2, double lng2) const;
-		double get_distance(const ParamProp &pp);
-		double get_identity(const ParamProp &pp);
+		double get_distance(const ParamIndex &pind);
+		double get_identity(const ParamIndex &pind);
 		vector <double> set_density(unsigned int p, unsigned int cl, double r, bool rel_den) const;
-		double get_density(const ParamProp &pp);
+		double get_density(const ParamIndex &pind, bool rel_den);
 		string op_name(EqItemType type) const;
 		void check_repeated_operator(const vector <EqItem> &op);
 		void time_integral(vector <EqItem> &op);
 		void replace_minus(vector <EqItem> &op);
 		unsigned int add_param_ref(const ParamRef &pref);
 		void substitute_define(const vector <Define> &define);
+		bool model_type() const;
 					
 		const vector <SpeciesSimp> &species;       // References the species from the model
 		unsigned int nspecies;

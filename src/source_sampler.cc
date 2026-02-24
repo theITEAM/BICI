@@ -266,3 +266,11 @@ string SourceSampler::print() const
 	
 	return ss.str();
 }
+
+
+/// Works out memory consumtion
+double SourceSampler::get_mem() const
+{
+	return mem(enter_prob)+mem(enter_prob_sum)+mem(rate)
+			      +mem(rate_sum)+mem(margin_sum)+mem(me_list)+mem(me_map);
+}

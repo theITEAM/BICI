@@ -10,7 +10,7 @@
 // one_file deterines if a a single file is generated or a file and directory are made
 
 /// Creates the ouytput file from the model
-function create_output_file(save_type,one_file,map_store)
+function create_output_file(save_type,one_file,map_store,extra)
 {
 	let file_list=[];  // Used to make sure that files to not share the same name
 	
@@ -54,6 +54,7 @@ function create_output_file(save_type,one_file,map_store)
 	
 	percent(70);
 	
+	if(extra != undefined) te += extra;
 	//check_comp_structure();
 
 	percent(80);
@@ -364,71 +365,12 @@ function create_output_compartments(p,file_list,map_store,one_file)
 				}
 			}
 		
-			let tra_type = tr.type.toLowerCase();
-			let nm_flag = false;
-			let err_fl;
-			
-			let te;
-			switch(tra_type){
-			case "exp(rate)": 
-				{
-					let rate = esc(tr.value.rate_eqn.te); if(rate == "") err_fl = "rate";
-					te = "exp(rate:"+rate+")";
-				}
-				break;
-				
-			case "exp(mean)": 
-				{
-					let mean = esc(tr.value.mean_eqn.te); if(mean == "") err_fl = "mean";
-					te = "exp(mean:"+mean+")";
-				}
-				break;
-				
-			case "gamma":
-				{
-					let mean = esc(tr.value.mean_eqn.te); if(mean == "") err_fl = "mean";
-					let cv = esc(tr.value.cv_eqn.te); if(cv == "") err_fl = "cv";
-					te = "gamma(mean:"+mean+", cv:"+cv+")";
-					nm_flag = true;
-				}
-				break;
-				
-			case "erlang":
-				{
-					let mean = esc(tr.value.mean_eqn.te); if(mean == "") err_fl = "mean";
-					let sh = esc(tr.value.shape_erlang.te); if(sh == "") err_fl = "shape";
-					te = "erlang(mean:"+mean+", shape:"+sh+")";
-				}
-				break;
-				
-			case "log-normal": 
-				{
-					let mean = esc(tr.value.mean_eqn.te); if(mean == "") err_fl = "mean";
-					let cv = esc(tr.value.cv_eqn.te); if(cv == "") err_fl = "cv";
-					te = "log-normal(mean:"+mean+", cv:"+cv+")";
-					nm_flag = true;
-				}
-				break;
-				
-			case "weibull":
-				{
-					let sc = esc(tr.value.scale_eqn.te); if(sc == "") err_fl = "scale";
-					let sh = esc(tr.value.shape_eqn.te); if(sh == "") err_fl = "shape";
-					te = "weibull(scale:"+sc+", shape:"+sh+")";
-					nm_flag = true;
-				}
-				break;
-
-			case "period": 
-				{
-					let time = esc(tr.value.mean_eqn.te); if(time == "") err_fl = "time";
-					te = "period(time:"+time+")";
-					nm_flag = true;
-				}
-				break;
-			
-			default: error("Option not recognised 114"); break;
-			}
+			let value = model.get_trans_value(tr);
+	
+			let tra_type = value.tra_type;
+			let nm_flag = value.nm_flag;
+			let err_fl = value.err_gl;
+			let te = value.te;
 			
 			labs.push({tag:"value", val:te});
 			
@@ -562,7 +504,7 @@ function create_output_compartments(p,file_list,map_store,one_file)
 	return te;
 }
 
-
+	
 /// Gets string for coordinates
 function output_coords(x,y,cam)
 {
@@ -1406,6 +1348,10 @@ function create_output_siminf(save_type)
 			te += " param-output-max="+details.param_output_max;
 		}
 		
+		if(details.optimise.value != "auto") te += ' optimise="'+details.optimise.value+'"';
+		
+		if(details.compress.value != "auto") te += ' compress="'+details.compress.value+'"';
+		
 		te += endl;
 		te += endl;
 	}
@@ -1552,6 +1498,10 @@ function create_output_siminf(save_type)
 			break;
 		}
 		
+		if(details.optimise.value != "auto") te += ' optimise="'+details.optimise.value+'"';
+		
+		if(details.compress.value != "auto") te += ' compress="'+details.compress.value+'"';
+		
 		te += endl;
 		te += endl;
 	}
@@ -1598,6 +1548,8 @@ function get_ppc_command(save_type)
 	}
 	
 	if(details.seed_on.value == "Yes") te += " seed="+Number(details.seed);
+	
+	if(details.run_inf_model.value == "No") te += ' param-only="true"';
 	
 	let cbl = details.check_box_list;
 
@@ -1982,24 +1934,6 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 		{
 			let err_fl;
 			
-			let Se = esc(so.spec.Se_eqn.te); if(Se == "") err_fl = "Se";
-			te += 'Se="'+Se+'" ';
-			
-			let Sp = esc(so.spec.Sp_eqn.te); if(Sp == "") err_fl = "Sp";
-			te += 'Sp="'+Sp+'" ';
-			
-			let pos = esc(so.spec.pos_result); if(pos == "") err_fl = "positive value";
-			te += 'pos="'+pos+'" ';
-			
-			let neg = esc(so.spec.neg_result); if(neg == "") err_fl = "negative value";
-			te += 'neg="'+neg+'" ';
-			
-			if(err_fl != undefined){
-				add_warning({mess:"Problem with diagnostic test data", mess2:"The value for '"+eff_fl+"' is not set", warn_type:"SourceProb", p:p, ind:index});
-		
-			
-			}
-			
 			te += 'comp="';
 			let flag = false;
 			
@@ -2012,10 +1946,24 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 				if(cb.value[i].check == true){
 					if(flag == true) te += ',';
 					te += claa.comp[i].name;
+					te += "[Se:"+cb.value[i].Se_eqn.te+"]";
 					flag = true;
 				}
 			}
 			te += '" ';
+			
+			let Sp = esc(so.spec.Sp_eqn.te); if(Sp == "") err_fl = "Sp";
+			te += 'Sp="'+Sp+'" ';
+			
+			let pos = esc(so.spec.pos_result); if(pos == "") err_fl = "positive value";
+			te += 'pos="'+pos+'" ';
+			
+			let neg = esc(so.spec.neg_result); if(neg == "") err_fl = "negative value";
+			te += 'neg="'+neg+'" ';
+			
+			if(err_fl != undefined){
+				add_warning({mess:"Problem with diagnostic test data", mess2:"The value for '"+eff_fl+"' is not set", warn_type:"SourceProb", p:p, ind:index});
+			}
 		}
 		break;
 		
@@ -2027,7 +1975,6 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 		
 	case "Ind. Group":
 		{
-			//te += 'name="'+so.spec.gname+'" ';
 		}
 		break;
 		
@@ -2328,13 +2275,15 @@ function output_check(save_type)
 		default: error("Option not recognised 125"); break;
 		}
 		
-		let ninitpop = 0, naddind = 0, naddpop = 0;
+		let ninitpop = 0, ninitpop_fix = 0, naddind = 0, naddpop = 0;
+		//if(so.init_pop_type == INIT_POP_FIXED) ninitpop_fix++; 
+
 		
 		for(let i = 0; i < source.length; i++){
 			let so = source[i];
-			
+	
 			switch(so.type){
-			case "Init. Pop.": ninitpop++; break;
+			case "Init. Pop.": ninitpop++; if(so.spec.radio_dist.value == 'Fixed') ninitpop_fix++; break;
 			case "Add Ind.": naddind++; break;
 			case "Add Pop.": naddpop++; break;
 			}
@@ -2352,6 +2301,10 @@ function output_check(save_type)
 			break;
 		
 		case "inf":
+			if(ninitpop_fix > 0 && sp.type == "Individual"){
+				add_warning({mess:"Initial population", mess2:"Fixed initial populations cannot be used with individual-based models for species '"+sp.name+"'. Either a population distribution is used, or the initial state of individuals is specified using 'add-ind' (which can be used to capture the any initial uncertainty).", warn_type:"InfPopulationProb", p:p});
+			}
+		
 			if(ninitpop > 1){
 				add_warning({mess:"Initial population", mess2:"Only one initial population should be set for species '"+sp.name+"'", warn_type:"InfPopulationProb", p:p});
 			}
@@ -2443,15 +2396,6 @@ function check_comp_structure()
 }
 
 
-/// Ensures that line breaks are escaped 
-function esc(st)
-{
-	st = st.replace(/\n/g,"");
-	st = st.trim();
-	return st;
-}
-
-
 /// Removes specified commands from a file
 function remove_command(te,com)
 {
@@ -2497,6 +2441,56 @@ function remove_command(te,com)
 }
 
 
+/// Extracts a particular command type from the 
+function extract_command(te,com)
+{
+	let pos = com.split(",");
+	
+	let lines = te.split("\n");
+	
+	let te_new = "";
+	
+	for(let li = 0; li < lines.length; li++){
+		let line = lines[li];
+		
+		let fl = false;
+			
+		let i = 0; while(i < line.length && line.substr(i,1) == " ") i++;
+	
+		for(let j = 0; j < pos.length; j++){
+			if(i+pos[j].length <= line.length && line.substr(i,pos[j].length) == pos[j]){
+				if(i+pos[j].length < line.length){
+					if(line.substr(i+pos[j].length,1) == " ") fl = true;
+				}
+				else fl = true;
+			}
+		}
+	
+		let li_st = li;
+		let tri = line.trim();
+		if(tri.length > 3 && tri.substr(tri.length-3,3) == '"[['){
+			while(li < lines.length){
+				let tri = lines[li].trim();
+			
+				if(tri.length >= 3 && tri.substr(0,3) == ']]"'){
+					if(tri.substr(tri.length-3,3) != '"[[') break;
+				}
+				li++;
+			}
+		}
+		
+		if(fl == true){
+			for(let i = li_st; i <= li; i++){
+				te_new += lines[i]+endl;
+			}
+			te_new += endl;
+		}		
+	}
+	
+	return te_new;
+}	
+
+
 /// Tidys the code
 function tidy_code(te)
 {
@@ -2526,9 +2520,20 @@ function tidy_code(te)
 
  
 /// Creates a file to start a posterior simulation
-function create_ppc_file()
+function create_ppc_file(info)
 {
 	let te = inf_result.import_te;
+	
+	if(!info.use_inf){
+		let extra = "# OUTPUT INFERENCE"+endl+endl;
+		extra += extract_command(te,"param-inf,state-inf,param-stats-inf,diagnostics-inf,generation-inf,trans-diag-inf,proposal-inf,warning-inf");
+		
+		let one_file = true;
+		create_output_file(info.save_type,one_file,info.map_store,extra);
+	
+		return;
+	}		
+		
 	
 	let file_list=[];
 	
@@ -2574,40 +2579,7 @@ function create_ext_file()
 	let te = inf_result.import_te;
 
 	let file_list=[];
-/*	
-	
-	
-	te = remove_command(te,"post-sim,posterior-simulation,add-pop-post-sim,remove-pop-post-sim,add-ind-post-sim,remove-ind-post-sim,move-ind-post-sim,param-mult,# MODIFICATION DATA");
-	te += endl+get_ppc_command("ppc")+endl+endl;
 
-	for(let p = 0; p < inf_result.species.length; p++){
-		let sp = inf_result.species[p];
-		if(inf_result.species.length > 1) te += 'set species="'+sp.name+'"'+endl;
-		te += create_output_sim_inf_source(p,"ppc",file_list,true);
-	}
-	
-	let pfac_list=[];
-	for(let th = 0; th < model.param.length; th++){
-		let par = model.param[th];
-		if(par.type == "param factor") pfac_list.push(th);
-	}
-	
-	if(pfac_list.length > 0){
-		te += mini_banner("PARAMETER MULTIPLIERS");
-		for(let k = 0; k < pfac_list.length; k++){
-			let par = model.param[pfac_list[k]];
-			if(par.type == "param factor"){
-				te += output_param(par,"ppc",file_list,true);
-			}
-		}
-		te += endl;
-	}
- 
-	te = tidy_code(te);
-	
-	if(model.warn.length > 0) err_warning();
-	*/
-	
 	write_file_store(te,"bicifile",file_list,"bicifile");
 
 	post({save_type:"ext", file_list:file_list, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});

@@ -42,7 +42,10 @@ function create_files(file_list,file,dir,type)
 	for(let i = 0; i < file_list.length; i++){
 		let finfo = file_list[i]
 		if(finfo.type == "bicifile"){
-			write_file_async(finfo.data,file);
+			if(ver == "mac" && dir == mac_temp_dir) write_file_async(finfo.data,dir+"/"+file);
+			else write_file_async(finfo.data,file);
+
+			//write_file_async(finfo.data,file);
 			//if(dir == undefined) write_file_async(finfo.data,file);
 			//else write_file_async(finfo.data,dir+"/"+file);
 		}
@@ -134,7 +137,7 @@ function startspawn(co,ncore,siminf)
 	let li = [];
 	li.push("default.bici");
 	li.push(do_com);
-	if(do_com == "ext")  li.push(inter.inf_extend);
+	if(do_com == "ext") li.push(inter.inf_extend);
 	li.push("-core="+co);
 	if(seed_not_set != undefined) li.push("-seed="+seed_not_set);
 
@@ -149,6 +152,9 @@ function funct(chi,co)                             // Gathers output of C++ file
 {
 	chi.stdout.on('data', function (data) {
 		let cha = inter.core[co];
+		//pr("data");
+		//pr(data);
+		
 		let st = cha.leftover + data;
 
 		let lines = st.split('\n');
@@ -360,42 +366,74 @@ function add_sim_start_buts(lay)
 		
 		lay.add_corner_button([["Start","Grey","StartSimulation"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
-	else{
+	
+	if(inter.options == true){
 		let te = "Further simulation options";
 		cy = lay.add_title(te,cx,cy,{te:further_sim_text});
 		
-		cy += 2;
+		cy += 1;
 		
-		let gap = 2;
-		
-		{
-			cy = lay.add_subtitle("Individual max",cx,cy,WHITE,{te:indmax_text});
-		
-			cy = lay.add_paragraph("Maximum number of individuals (for individual-based models)",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
-	
-			let yy = cy-2.5;
-			add_right_input_field(yy,"Maximum",{type:"sim_indmax",update:true},lay);
-		}
-		
-		cy += gap;
-		
-		{
-			cy = lay.add_subtitle("Parameter outputs",cx,cy,WHITE,{te:paramoutputmax_text});
-				
-			cy = lay.add_paragraph("Threshold number of tensor elements above which tensor not output.",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
-	
-			let yy = cy-2.5;
-			add_right_input_field(yy,"Maximum",{type:"sim_paramout",update:true},lay);
-		}
-		
-		cy += gap;
+		let gap = 1.8;
 		
 		cy = set_seed(cx,cy,"sim_seed",model.sim_details,lay);
 	
 		cy += gap;
 		
+		add_corner_link("> Advanced options","AdOptions",lay);
+		
 		lay.add_corner_button([["Done","Grey","OptionsDone"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
+	
+	if(inter.options == "advanced") output_advanced_options("sim",lay);
+}
+
+
+/// This shows the advanced options 
+function output_advanced_options(type,lay)
+{
+	let te = "Advanced options";
+	
+	let gap = 1.8;
+		
+	let cx = corner.x;
+	let cy = corner.y;
+	
+	cy = lay.add_title(te,cx,cy,{te:advanced_options_text});
+	
+	cy += 1;
+	
+	cy = lay.add_subtitle("Individual maximum",cx,cy,WHITE,{te:indmax_text});
+					
+	cy = lay.add_paragraph("Maximum number of individuals (for individual-based models):",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+
+	let yy = cy-2.5;
+	add_right_input_field(yy,"Maximum",{type:type+"_indmax",update:true},lay);
+
+	cy += gap;
+	
+	cy = lay.add_subtitle("Parameter outputs",cx,cy,WHITE,{te:paramoutputmax_text});
+			
+	cy = lay.add_paragraph("Threshold number of tensor elements above which tensor not output:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+
+	yy = cy-2.5;
+	add_right_input_field(yy,"Maximum",{type:type+"_paramout",update:true},lay);
+
+	cy += gap;
+	
+	let details;
+	switch(type){
+	case "sim": details = model.sim_details; break;
+	case "inf": details = model.inf_details; break;
+	case "ppc": details = model.ppc_details; break;
+	}
+	
+	cy = set_compress(cx,cy,details,lay);
+	cy += gap;
+	
+	cy = set_optimise(cx,cy,details,lay);
+	cy += gap;
+		
+	lay.add_corner_button([["Done","Grey","OptionsDone"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 }
 
 
@@ -436,6 +474,20 @@ function run_local_simple(cx,cy,details,lay)
 }
 		
 		
+/// Sets button if running locally
+function ppc_use_inf_or_sim(cx,cy,details,lay)
+{
+	cy = lay.add_subtitle("Model and state",cx,cy,WHITE,{te:model_and_state_text});
+		
+	let xx = 3, gap = 0.5;
+	xx = lay.add_radio(xx,cy+0.1,"Yes","Inference model",details.run_inf_model,{back_col:WHITE});
+	xx += gap;
+	xx = lay.add_radio(xx,cy+0.1,"No","Simulation model",details.run_inf_model,{back_col:WHITE});		
+	
+	return cy;
+}
+
+		
 /// Sets the seed option
 function set_seed(cx,cy,ref,details,lay)
 {
@@ -462,14 +514,52 @@ function set_sync(cx,cy,details,lay)
 {
 	cy = lay.add_subtitle("Proposal synchronisation",cx,cy,WHITE,{te:sync_text});
 	
-	//cy -= 1.5;
-	
 	let xx = 3, gap = 0.5;
 	xx = lay.add_radio(xx,cy+0.1,"On","On",details.sync_on,{back_col:WHITE});
 	xx += gap;
-	xx = lay.add_radio(xx,cy+0.1,"Off","Off",details.sync_on,{back_col:WHITE});		
+	xx = lay.add_radio(xx,cy+0.1,"Off","Off",details.sync_on,{back_col:WHITE});	
+
+	cy += 2;
+	
+	return cy;	
 }
 	
+	
+/// Sets the optimisation options
+function set_optimise(cx,cy,details,lay)
+{
+	cy = lay.add_subtitle("Optimisation",cx,cy,WHITE,{te:optimise_text});
+	
+	let xx = 3, gap = 0.5;
+	xx = lay.add_radio(xx,cy+0.1,"memory","Memory",details.optimise,{back_col:WHITE});
+	xx += gap;
+	xx = lay.add_radio(xx,cy+0.1,"speed","Speed",details.optimise,{back_col:WHITE});		
+	xx += gap;
+	xx = lay.add_radio(xx,cy+0.1,"auto","Auto",details.optimise,{back_col:WHITE});		
+	
+	cy += 1.8;
+	
+	return cy;
+}
+
+
+/// Sets the compression options
+function set_compress(cx,cy,details,lay)
+{
+	cy = lay.add_subtitle("File compression",cx,cy,WHITE,{te:compress_text});
+	
+	let xx = 3, gap = 0.5;
+	xx = lay.add_radio(xx,cy+0.1,"always","Always",details.compress,{back_col:WHITE});
+	xx += gap;
+	xx = lay.add_radio(xx,cy+0.1,"never","Never",details.compress,{back_col:WHITE});		
+	xx += gap;
+	xx = lay.add_radio(xx,cy+0.1,"auto","Auto",details.compress,{back_col:WHITE});		
+	
+	cy += 1.8;
+	
+	return cy;
+}
+
 
 /// Adds buttons to start a posterior predictive check
 function add_ppc_start_buts(lay)
@@ -504,6 +594,10 @@ function add_ppc_start_buts(lay)
 		add_right_input_field(yy,"Number",{type:"ppc_number",update:true},lay);
 		
 		cy += 2;
+	
+		cy = ppc_use_inf_or_sim(cx,cy,model.ppc_details,lay);
+	
+		cy += 3;
 	
 		cy = run_local_simple(cx,cy,model.ppc_details,lay);
 	

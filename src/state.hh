@@ -228,7 +228,11 @@ class State                                // Stores information about the state
 		void check_add_move_rem(string ref);
 		void check_effect_out_of_range();
 		void output_dump() const;
-			
+	
+	// In state_profiler.cc
+	public:
+		void profile_memory() const;
+	
 	private:
 		const Model &model;
 };

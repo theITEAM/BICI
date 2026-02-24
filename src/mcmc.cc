@@ -64,6 +64,14 @@ void MCMC::run()
 	percentage_start(RUN_PER);
 	
 	long time_start = clock();
+
+	for(auto ind : model.species[0].individual){
+		for(auto ob : ind.obs){
+			
+			//obs_eqn_value[ob.obs_eqn_ref[sp.comp_gl[c].cla_comp[ob.cl]]];
+			
+		}
+	}
 	
 	for(auto s = 0u; s < nsample; s++){
 		percentage(s,nsample);
@@ -99,6 +107,8 @@ void MCMC::run()
 	}
 	
 	percentage_end();
+	
+	if(profiling) chain[0].state.profile_memory();
 }
 
 

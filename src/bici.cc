@@ -9,9 +9,12 @@
 
 // ssh gaia.bioss.ac.uk  
 
+//valgrind --tool=massif --exit-on-first-error=yes --error-exitcode=1 -s ./bici-para Execute/init.bici sim
+
 // tar -xzf foo.tgz
 
 // Load mpi: module load mpi/openmpi-x86_64
+// ./bici-core.exe ../big2.bici sim
 // mpirun -n 1 ./bici-para file.bici sim
 // mpirun -n 1 ./bici-para Execute/init.bici sim
 // mpirun --output :raw -n 1 ./bici-para Execute/init.bici sim
@@ -32,8 +35,8 @@
 
 // ./bici-core Execute/init.bici inf
 
-//valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici data-show
 //valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici sim
+
 //valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici inf
 
 // nohup mpirun -n 16 ./bici-para Jamie/scen-1-1.bici inf > ddddd.txt&
@@ -107,12 +110,19 @@ bool com_op = false;                                 // Set to true for command 
 #include "pas.hh"
 #include "extend.hh"
 #include "mpi.hh"
+#include "lzw.hh"
 
 vector <BICITag> get_tags(int argc, char** argv, Operation &mode, ExtFactor &ext_factor,string &file, string &data_sim_line, bool &no_question);
 
 int main(int argc, char** argv)
 {	
+	//string te = "α this"; encode(te); return 0;
+
+	//test(); return 0;
+
 	auto total_time = clock();
+	
+	print_diag("start bici");
 	
 	//mvn_jeffreys_check(); return 0; 
 	
@@ -120,6 +130,8 @@ int main(int argc, char** argv)
   MPI_Init(&argc,&argv);       	
 #endif
 
+	print_diag("start sum");
+	
 	init_log_sum();
 	
 	//test_jeffreys(); return 0;
@@ -138,6 +150,8 @@ int main(int argc, char** argv)
 	auto no_question = false;
 	
 	auto tags = get_tags(argc,argv,mode,ext_factor,file,data_sim_line,no_question);
+	
+	print_diag("start model");
 	
 	Model model(mode,ext_factor,no_question);     // Used to store the model structure 
 	
@@ -172,11 +186,26 @@ int main(int argc, char** argv)
 	
 	Mpi mpi(core_spec,model);               // Sets up mpi
 
-	Input input(model,file,seed,mpi);// Imports information from input file into model
+	print_diag("start input");
 
-	Output output(model,input,mpi);         // Sets up the class for model outputs
+	Output output(model,mpi);               // Sets up the class for model outputs
 
+	{
+		Input input(model,file,seed,mpi);     // Imports information from input into model
+		output.init(input);
+	}
+	
+	if(false){
+		auto total_cpu = clock()-total_time;
+		auto op_cpu = 0u;
+		if(op() && !com_op) output.final_time(total_cpu+op_cpu,op_cpu);
+		
+		if(!com_op) output.final_memory_usage();
+		//return 0; 
+	}
+	
 	if(false && op()){
+		cout << " turn off data summary" << endl;
 		output.summary(model);                // Outputs a text file sumarising the model
 
 		output.data_summary(model);           // Outputs a text file sumarising the data
@@ -283,11 +312,11 @@ int main(int argc, char** argv)
 	}
 	
 	if(model.mode != DATA_SHOW){
-		auto total_cpu = (clock()-total_time)/CLOCKS_PER_SEC;
+		auto total_cpu = clock()-total_time;
 		
 		auto op_time = clock();
 		output.end(file,total_cpu);
-		auto op_cpu = (clock()-op_time)/CLOCKS_PER_SEC;
+		auto op_cpu = clock()-op_time;
 		
 		if(!model.data_mode()){
 			if(op() && !com_op) output.final_time(total_cpu+op_cpu,op_cpu);

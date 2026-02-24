@@ -604,7 +604,7 @@ function comp_data_bubble(cont,type)
 		cl_drop.te = cl_pos[0].te;
 	}
 		
-	bubble_addparagraph(cont,"Select the classification on which measurements are made.",0,cont.dx+2); 
+	bubble_addparagraph(cont,"Select classification on which measurements are made.",0,cont.dx+2); 
 	cont.y += 0.2;
 
 	bubble_adddropdown_text(cont,"Classification:",5.5,wmax,cl_drop,cl_pos); 
@@ -767,12 +767,13 @@ function trans_data(bu)
 function diagtest_data_bubble(cont,type)
 {
 	inter.bubble.check = "checkbox";
+	inter.bubble.check_Se = true; 
 	
 	let cl_pos = get_cl_pos();
 
 	let wmax = get_w_drop(cl_pos);
 
-	cont.dx = 16.5;
+	cont.dx = 11;
 
 	let spec = edit_source.spec;
 	let cl_drop = spec.cl_drop;
@@ -785,8 +786,8 @@ function diagtest_data_bubble(cont,type)
 							
 	bubble_addtitle(cont,"Diagnostic tests",{title:ti, te:te});
 	
-	bubble_addparagraph(cont,"Select the classification the test is sensitive to:",0,cont.dx);
-	cont.y += 0.2;
+	//bubble_addparagraph(cont,"Select classification test sensitive to:",0,cont.dx);
+	//cont.y += 0.2;
 	bubble_adddropdown_text(cont,"Classification:",5.5,wmax,cl_drop,cl_pos); 
 	
 	cont.y += 0.2;
@@ -796,9 +797,9 @@ function diagtest_data_bubble(cont,type)
 		let p = pcl.p, cl = pcl.cl;
 		
 		cont.y += 0.4;
-		bubble_addparagraph(cont,"Select the compartments the test is positive to:",0,cont.dx);
+		bubble_addparagraph(cont,"Test positive compartment(s):",0,cont.dx);
 	
-		bubble_addscrollable(cont,{type:"comp list", p:p, cl:cl, ymax:bubblescroll_dymax}); 
+		bubble_addscrollable(cont,{type:"test list", p:p, cl:cl, ymax:bubblescroll_dymax}); 
 		
 		cont.y += 0.3;
 		
@@ -811,13 +812,11 @@ function diagtest_data_bubble(cont,type)
 		
 		let eqn_on = true;
 		if(sim_options()) eqn_on = false;
-			
-		bubble_addparagraph(cont,"Sensitivity and specificity of the diagnostic test:",0,cont.dx); 
-		bubble_double_input(cont,"Sensitivity:",{type:"Se", eqn:eqn_on },
-														 "Specificity:",{type:"Sp", eqn:eqn_on });
-		
+	
+		bubble_input(cont,"Specificity:",{type:"Sp", eqn:eqn_on });
+	
 		cont.y += 0.4;
-		bubble_addparagraph(cont,"Set the text used to represent test results:",0,cont.dx); 
+		bubble_addparagraph(cont,"Text representing test results:",0,cont.dx); 
 		bubble_double_input(cont,"Positive text:",{type:"pos_result"},
 														 "Negative text:",{type:"neg_result"});
 														 
@@ -828,10 +827,13 @@ function diagtest_data_bubble(cont,type)
 		}
 	}	
 	else{ 
-		bubble_input(cont,"Sensitivity:",{hidden:true, type:"Se", eqn:true});
+		//bubble_input(cont,"Sensitivity:",{hidden:true, type:"Se", eqn:true});
 		bubble_input(cont,"Specificity:",{hidden:true, type:"Sp", eqn:true});
 		bubble_input(cont,"Positive text:",{hidden:true, type:"pos_result"});
 		bubble_input(cont,"Negative text:",{hidden:true, type:"neg_result"});
+		if(sim_options()){
+			bubble_input(cont,"Fraction observed:",{hidden:true, type:"frac_obs"});
+		}		
 		cont.y += 0.4;
 	}
 
@@ -854,14 +856,44 @@ function diagtest_scrollable(lay)
 	
 	let p = op.p, cl = op.cl;
 	let claa = model.species[p].cla[cl];
+	
 	let cb = edit_source.spec.check_box;
 	if(cb.name != claa.name){
 		cb.name = claa.name;
-		for(let c = 0; c < claa.comp.length; c++) cb.value[c] = { comp_name_store:claa.comp[c].name, check:false};
+		for(let c = 0; c < claa.comp.length; c++){
+			let Se_eqn = create_equation("1","Se");
+			cb.value[c] = { comp_name_store:claa.comp[c].name, check:false, Se_eqn:Se_eqn};
+		}
 	}
 
-	cy = add_checkbox_list(lay,claa.comp,"name",cb.value,cy,dx);
+	let list = claa.comp;
+	let so = cb.value;
 	
+	if(list.length == 0){
+		cy = lay.add_paragraph("There are no options.",dx,0.5,cy,BLACK,para_si,para_lh);
+		return cy;
+	}
+	
+	let Sedx = 5;
+	let mar = 0.5, mar2 = lay.dx-Sedx;
+	
+	cy += 0.2;
+	for(let c = 0; c < list.length; c++){
+		let te = list[c].name;
+		lay.add_checkbox(mar,cy,te,te,so[c],BUBBLE_COL,{w:mar2-mar});
+		
+		let dy = 1.2;
+		let fo = get_font(1.0,"","times");
+			
+		if(so[c].check){		
+			lay.add_button({te:"Se="+so[c].Se_eqn.te, x:mar2, y:cy-0.05, dx:Sedx, dy:dy, eqn:so[c].Se_eqn, ac:"ProbEqn", type:"ProbEqn", si:si_radio, font:fo, col:BLACK});
+		}
+		
+		cy += 1.2;
+	}
+	
+	lay.add_button({x:0, y:cy, dx:0, dy:0, type:"Empty"});
+		
 	return cy;
 }
 		
@@ -869,10 +901,8 @@ function diagtest_scrollable(lay)
 /// Initialises the diagtest bubble	
 function diagtest_data(bu)
 {
-	let Se_eqn = create_equation("1","Se");
 	let Sp_eqn = create_equation("1","Sp");
-	
-	start_data_source("Diag. Test",{cl_drop:{te:select_drop_str},check_box:{ name:"",value:[]},Se_eqn:Se_eqn,Sp_eqn:Sp_eqn,pos_result:"+",neg_result:"-"},bu.op.info);
+	start_data_source("Diag. Test",{cl_drop:{te:select_drop_str},check_box:{ name:"",value:[]},Sp_eqn:Sp_eqn,pos_result:"+",neg_result:"-"},bu.op.info);
 	select_bubble_over();
 	
 	edit_source.time_radio = {value:"Periodic"};
@@ -1644,7 +1674,7 @@ function ind_group_data(bu)
 	bub.ind_group_radio = {value:"Specify"};
 	bub.wildcard = "";
 	
-	start_data_source("Ind. Group",{p:model.get_p(),gname:""},bu.op.info);
+	start_data_source("Ind. Group",{p:model.get_p()},bu.op.info);
 	
 	let ty = "generate"; if(tab_name() == "Inference") ty = "data"; 
 		
@@ -1671,6 +1701,8 @@ function individual_scrollable(lay)
 /// Loads up the individual group data bubble
 function ind_group_data2(name_list)
 {
+	pr("na");
+	pr(name_list);
 	let bub = inter.bubble;
 	bub.name_list = name_list;
 	
@@ -1693,6 +1725,8 @@ function select_ind_wildcard()
 	bub.ind_group_radio.value = "Specify";
 	
 	let name_list = bub.name_list;
+pr("N");
+pr(name_list);
 
 	let cb = bub.check_box;
 	for(let i = 0; i < name_list.length; i++){
@@ -1709,12 +1743,12 @@ function wildcard_match(name,filt)
 {
 	let spl = filt.split("*");
 
-	return wildcard_match2(name,spl);
+	return wildcard_match2(name,spl,true);
 }
 
 
 /// In text name looks for spl[0]
-function wildcard_match2(name,spl)
+function wildcard_match2(name,spl,root)
 {
 	let te = spl[0].toLowerCase(), len = te.length;
 
@@ -1725,6 +1759,7 @@ function wildcard_match2(name,spl)
 		}
 		else{
 			let imax = name.length-len;
+			if(root) imax = 0;
 			for(let i = 0; i <= imax; i++){
 				if(name.substr(i,len).toLowerCase() == te){
 					if(spl.length == 1) return true;
@@ -1732,7 +1767,7 @@ function wildcard_match2(name,spl)
 						let name_next = name.substr(i+len);
 						let spl_next=[];
 						for(let k = 1; k < spl.length; k++) spl_next.push(spl[k]);
-						let res = wildcard_match2(name_next,spl_next);
+						let res = wildcard_match2(name_next,spl_next,false);
 						if(res == true) return true;
 					}
 				}

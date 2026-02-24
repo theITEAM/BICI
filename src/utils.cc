@@ -239,6 +239,23 @@ vector<string> split(const string &s, char delimiter, bool notrim)
 }
 
 
+/// Does a basic split
+vector<string> split_basic(const string &s, char delimiter)
+{
+	vector<string> splits;                       
+ 
+	auto j = 0u;
+	for(auto i = 0u; i < s.length(); i++){
+		if(s.at(i) == delimiter){
+			splits.push_back(s.substr(j,i-j)); j = i+1; 
+		}
+	}
+	splits.push_back(s.substr(j,s.length()-j));
+	
+	return splits;       
+}
+
+
 /// Split up a string accounting for brackets and quotation marks
 vector<string> split_with_bracket(const string &s, char delimiter)
 {                              
@@ -980,7 +997,6 @@ bool equal_vec(const vector <bool> &vec1, const vector <bool> &vec2)
 }
 
 
-/*
 /// Gets a list up to a number
 vector <unsigned int> get_list(unsigned int num)
 {
@@ -989,7 +1005,7 @@ vector <unsigned int> get_list(unsigned int num)
 	
 	return list;
 }
-*/
+
 
 /// Write an vector as a string
 string stringify(const vector <string> &arr)
@@ -1839,19 +1855,19 @@ double sum(const vector <double> &vec)
 }
 
 
-/// Sums up the values in a matrix
-double sum(const vector < vector <double> > &mat)
-{
-	auto su = 0.0; for(const auto &vec : mat) su += sum(vec);
-	return su;
-}
-
-
 /// Sums up the values in a vector
 unsigned int sum(const vector <unsigned int> &vec)
 {
 	auto sum = 0u; for(auto val : vec) sum += val;
 	return sum;
+}
+
+
+/// Sums up the values in a matrix
+double sum(const vector < vector <double> > &mat)
+{
+	auto su = 0.0; for(const auto &vec : mat) su += sum(vec);
+	return su;
 }
 
 
@@ -2944,7 +2960,11 @@ unsigned int get_core()
 void print_diag(string te)
 {
 	if(print_diag_on && !com_op && op()) cout << te << endl;
-	//cout <<  te << endl;    
+	if(false){
+		cout <<  te << " ";
+		if(profiling) cout <<  (unsigned int)(10000*double(memory_usage())/total_memory());
+		cout << endl;    
+	}
 }
 
 
@@ -3929,3 +3949,36 @@ string precision(double num, unsigned int dig)
 	ss << std::setprecision(dig) << num;
 	return ss.str();	
 }
+
+
+/// Gets CPU time from number of ticks
+string get_cpu_time(unsigned int tics)
+{
+	stringstream ss;
+	ss << std::fixed;
+  ss << setprecision(1);
+		
+	auto sec = double(tics)/CLOCKS_PER_SEC;
+	if(true || sec < 60){
+		ss << sec << " seconds";
+	}
+	else{
+		auto min = sec/60.0;
+		if(min < 60){
+			ss << min << " minutes";
+		}
+		else{
+			auto hour = min/60.0;
+			if(hour < 24){
+				ss << hour << " hours";
+			}
+			else{
+				auto day = hour/24.0;
+				ss << day << " days";
+			}
+		}
+	}
+	
+	return ss.str();
+}
+

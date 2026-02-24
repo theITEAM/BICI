@@ -668,7 +668,7 @@ function change_spline_knot(par,knot)
 }
 
 
-/// CHecks that parameters are valid
+/// Checks that parameters are valid
 function check_param_valid(type)
 {
 	for(let i = 0; i < model.param.length; i++){
@@ -686,24 +686,6 @@ function check_param_valid(type)
 				}
 			}
 		}
-		/*
-		if(par.variety == "reparam"){
-			if(par.dep.length == 0){
-				if(!isNaN(par.value)){
-					add_warning({mess:"Reparameterisation error", mess2:"The reparameterisation of '"+par.full_name+"' does not contain any parameters", warn_type:"reparam", siminf:type, name:par.name});
-				}
-			}
-			else{
-				if(par.reparam_eqn_on){
-				}
-				else{
-					if(par.reparam_param_list.length == 0){
-						add_warning({mess:"Reparameterisation error", mess2:"The reparameterisation of '"+par.full_name+"' does not contain any parameters", warn_type:"reparam", siminf:type, name:par.name});
-					}
-				}
-			}
-		}
-		*/
 	}
 }
 

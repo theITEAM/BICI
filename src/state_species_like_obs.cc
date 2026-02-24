@@ -66,7 +66,6 @@ vector <double> StateSpecies::likelihood_obs_ind(const vector <unsigned int> &li
 					}
 					break;	
 				case OBS_COMP_EV: Li += like_comp_obs(c,ob); break;
-				case OBS_TEST_EV: Li += like_diag_test(c,ob); break;
 				}
 				
 				m++;
@@ -242,12 +241,14 @@ vector <double> StateSpecies::calculate_pop_data_cgl_trgl()
 	
 	switch(type){
 	case POPULATION: case DETERMINISTIC:
-		for(auto ti = 0u; ti < T; ti++){
-			for(auto trg = 0u; trg < sp.tra_gl.size(); trg++){
-				auto num = trans_num[trg][ti];
-				if(num > 0){
-					for(auto ref : sp.pop_trans_ref[ti][trg]){
-						pop_trans_data_tgl[ref][trg] += num;
+		if(sp.pop_trans_data_exist){
+			for(auto ti = 0u; ti < T; ti++){
+				for(auto trg = 0u; trg < sp.tra_gl.size(); trg++){
+					auto num = trans_num[trg][ti];
+					if(num > 0){
+						for(auto ref : sp.pop_trans_ref[ti][trg]){
+							pop_trans_data_tgl[ref][trg] += num;
+						}
 					}
 				}
 			}
@@ -273,12 +274,14 @@ vector <double> StateSpecies::calculate_pop_data_cgl_trgl()
 					while(index[i] < ev.size() && ev[index[i]].tdiv < t){
 						const auto &e = ev[index[i]];
 					
-						if(e.type == M_TRANS_EV || e.type == NM_TRANS_EV){
-							auto ti = get_ti(e.tdiv);
-							auto tr_gl = e.tr_gl;
-					
-							for(auto ref : sp.pop_trans_ref[ti][tr_gl]){
-								pop_trans_data_tgl[ref][tr_gl]++;
+						if(sp.pop_trans_data_exist){
+							if(e.type == M_TRANS_EV || e.type == NM_TRANS_EV){
+								auto ti = get_ti(e.tdiv);
+								auto tr_gl = e.tr_gl;
+						
+								for(auto ref : sp.pop_trans_ref[ti][tr_gl]){
+									pop_trans_data_tgl[ref][tr_gl]++;
+								}
 							}
 						}
 									
@@ -333,6 +336,7 @@ void StateSpecies::restore_pop_data_cgl_trgl(const vector <double> &store)
 }
 
 
+/*
 /// Gets the probability of a diagnostic test
 double StateSpecies::like_diag_test(unsigned int c, const ObsData &ob) const
 {
@@ -354,6 +358,7 @@ double StateSpecies::like_diag_test(unsigned int c, const ObsData &ob) const
 		}
 	}
 }
+*/
 
 /// Gets the observation likelihood of transition probability observation
 double StateSpecies::like_trans_prob_obs(unsigned int tr, const ObsData &ob) const
@@ -450,35 +455,37 @@ double StateSpecies::update_pop_trans_data2(unsigned int ti, unsigned int tr_gl,
 	vector <double> back_vec, Li_vec;
 	
 	double val;
-	for(auto ref : sp.pop_trans_ref[ti][tr_gl]){
-		const auto &ptd = sp.pop_trans_data[ref];
+	if(sp.pop_trans_data_exist){
+		for(auto ref : sp.pop_trans_ref[ti][tr_gl]){
+			const auto &ptd = sp.pop_trans_data[ref];
+			
+			//if(ptd.eqn_zero[tr_gl] == true) emsg("Should not be zero");			
 		
-		//if(ptd.eqn_zero[tr_gl] == true) emsg("Should not be zero");			
-	
-		auto dL = -obs_mod_probability(pop_trans_data_num[ref],ptd.type,ptd.value,ptd.obs_mod_val);
-		//auto dL = -normal_probability(pop_trans_data_num[ref],ptd.value,ptd.sd);
-	
-		if(ptd.time_vari){
-			val = sign*obs_eqn_value[ptd.trans_obs_mod_ref[tr_gl]];
+			auto dL = -obs_mod_probability(pop_trans_data_num[ref],ptd.type,ptd.value,ptd.obs_mod_val);
+			//auto dL = -normal_probability(pop_trans_data_num[ref],ptd.value,ptd.sd);
+		
+			if(ptd.time_vari){
+				val = sign*obs_eqn_value[ptd.trans_obs_mod_ref[tr_gl]];
+			}
+			else{
+				const auto &ptf = sp.pop_trans_filter[ptd.ref];
+				val = sign*obs_eqn_value[ptf.trans_obs_mod_ref[tr_gl]];
+			}
+			
+			back_vec.push_back(val);
+		
+			pop_trans_data_tgl[ref][tr_gl] += sign;	
+			pop_trans_data_num[ref] += val;
+			
+			dL += obs_mod_probability(pop_trans_data_num[ref],ptd.type,ptd.value,ptd.obs_mod_val);
+		
+			//dL += normal_probability(pop_trans_data_num[ref],ptd.value,ptd.sd);
+			
+			Li_obs_pop_trans[ref] += dL;
+			Li_vec.push_back(dL);
+			
+			dLi += dL;
 		}
-		else{
-			const auto &ptf = sp.pop_trans_filter[ptd.ref];
-			val = sign*obs_eqn_value[ptf.trans_obs_mod_ref[tr_gl]];
-		}
-		
-		back_vec.push_back(val);
-	
-		pop_trans_data_tgl[ref][tr_gl] += sign;	
-		pop_trans_data_num[ref] += val;
-		
-		dL += obs_mod_probability(pop_trans_data_num[ref],ptd.type,ptd.value,ptd.obs_mod_val);
-	
-		//dL += normal_probability(pop_trans_data_num[ref],ptd.value,ptd.sd);
-		
-		Li_obs_pop_trans[ref] += dL;
-		Li_vec.push_back(dL);
-		
-		dLi += dL;
 	}
 
 	back.push_back(Back(POP_TRANS_DATA_NUM,ti,tr_gl,sign,back_vec));

@@ -1350,6 +1350,7 @@ class Layer
 			break;
 			
 		case "add_species_name": te = ""; break;
+		case "prefix": te = inter.bubble.prefix; break;
 		case "add_classification_name": te = ""; break;
 		case "classification_name": te = model.species[so.p].cla[so.cl].name; break;
 		case "species_name": te = model.species[so.p].name; break;
@@ -1489,7 +1490,7 @@ class Layer
 		case "alpha_val": te = String(inter.bubble.alpha_val); break;
 		case "BF_val": te = String(inter.bubble.BF_val); break;
 		case "fps": te = String(inter.fps); break;
-		case "group_name": te = String(edit_source.spec.gname); break;
+		case "group_name": te = String(edit_source.name); break;
 		case "slice_time": te = String(inter.bubble.slice_time); break;
 		case "suffix": te = String(inter.bubble.suffix); break;
 		case "dataname": te = String(inter.bubble.dataso.name); break;

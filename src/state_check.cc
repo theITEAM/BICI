@@ -204,8 +204,9 @@ void State::check_precalc_eqn(string ref)
 	const auto &precalc = param_val.precalc;
 	const auto &value = param_val.value;
 	
-	const auto &calcu = model.precalc_eqn.calcu; 
-	auto n = calcu.size();
+	const auto &pcalcu_ref = model.precalc_eqn.pcalcu_ref; 
+	const auto &pcalcu = model.precalc_eqn.pcalcu; 
+	auto n = pcalcu_ref.size();
 	if(precalc.size() != n){
 		emsg("precalc size problem"+ref);
 	}
@@ -213,7 +214,9 @@ void State::check_precalc_eqn(string ref)
 	vector <bool> derive_fl(n,false);
 	for(const auto &in : model.spec_precalc_derive.info){
 		auto i = in.i;
-		const auto &ca = calcu[i];
+		
+		auto re = pcalcu_ref[i]; if(re == UNSET) emsg("unset prob4");
+		const auto &ca = pcalcu[re];
 		if(ca.time_dep){
 			for(auto ti = 0u; ti < T; ti++) derive_fl[i+ti] = true;
 		}
@@ -311,19 +314,22 @@ void State::check_dependent_param(string ref)
 	}
 	
 	for(auto ti = 0u; ti < T; ti++){
-		const auto &upt = model.spec_precalc_time[ti];
+		auto ref = model.spec_precalc_time_ref[ti];
+		if(ref != UNSET){
+			const auto &upt = model.spec_precalc_list[ref];
 		
-		for(auto th : upt.pv){
-			const auto &pv = model.param_vec[th];
-			if(pv.reparam_time_dep != true) emsg("reparam_time_dep problem");
+			for(auto th : upt.pv){
+				const auto &pv = model.param_vec[th];
+				if(pv.reparam_time_dep != true) emsg("reparam_time_dep problem");
 
-			auto re = model.param[pv.th].get_eq_ref(pv.index);
-			if(re == UNSET) emsg("Reparam is not set");	
-				
-			auto value = model.eqn[re].calculate_all_time(ti,popnum_t,precalc);
-			if(dif(value,param_val.value[th],dif_thresh)){
-				cout << th << " " << value << " " << param_val.value[th] << "compare" << endl;
-				emsg("Reparam value different "+ref);
+				auto re = model.param[pv.th].get_eq_ref(pv.index);
+				if(re == UNSET) emsg("Reparam is not set");	
+					
+				auto value = model.eqn[re].calculate_all_time(ti,popnum_t,precalc);
+				if(dif(value,param_val.value[th],dif_thresh)){
+					cout << th << " " << value << " " << param_val.value[th] << "compare" << endl;
+					emsg("Reparam value different "+ref);
+				}
 			}
 		}
 	}
@@ -1658,7 +1664,7 @@ void State::check_genetic_value(string ref)
 										emsg("pref and po not consistent");
 									}
 									
-									if(iif.p != model.pop[iif.po].sp_p){
+									if(iif.p != model.pop[iif.po].p){
 										emsg("iif species is not right");
 									}
 									
@@ -2176,7 +2182,7 @@ void State::check_popnum_ind(string ref)
 	// Checks popnum_ind reference is correct
 	for(auto ti = 0u; ti < T; ti++){
 		for(auto po = 0u; po < model.pop.size(); po++){
-			auto p = model.pop[po].sp_p;
+			auto p = model.pop[po].p;
 			for(auto j = 0u; j < popnum_ind[ti][po].size(); j++){
 				const auto &pir = popnum_ind[ti][po][j];
 				const auto &pnir = species[p].individual[pir.i].popnum_ind_ref[pir.index];

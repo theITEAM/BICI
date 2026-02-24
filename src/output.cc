@@ -13,10 +13,16 @@ using namespace std;
 
 #include "output.hh"
 #include "utils.hh"
-
+#include "lzw.hh"
 
 /// Initialises the output 
-Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model), mpi(mpi)
+Output::Output(const Model &model, Mpi &mpi) : model(model), mpi(mpi)
+{
+};
+
+
+/// Initialises outputs
+void Output::init(const Input &input)
 {
 	timer.resize(OUTTIMER_MAX); for(auto &ti : timer) ti = 0;
 	
@@ -105,7 +111,7 @@ Output::Output(const Model &model, const Input &input, Mpi &mpi) : model(model),
 		}
 		lines_raw.push_back(new_lr(""));
 	}
-};
+}
 
 
 /// Removes more than double space
@@ -196,6 +202,7 @@ void Output::summary(const Model &model) const
 {
 	if(diagdir == "") return;
 	auto file = diagdir+"/model.txt";
+
 	ofstream fout(file);
 	check_open(fout,file);
 
@@ -463,7 +470,7 @@ void Output::summary(const Model &model) const
 	
 	fout << "POPULATIONS:" << endl;
 	for(const auto &po : model.pop){
-		const auto &sp = model.species[po.sp_p];
+		const auto &sp = model.species[po.p];
 		
 		fout << po.name << " in " << sp.name << ": ";
 		for(auto k = 0u; k < po.ind_eff_mult.size(); k++){
@@ -524,13 +531,7 @@ void Output::summary(const Model &model) const
 							}
 						}
 						break;
-						
-					case OBS_TEST_EV:
-						fout << ob.test_res << " ";
-						fout << "Se=" << model.eqn[sp.obs_eqn[ob.Se_obs_eqn_ref]].te_raw << ", ";
-						fout << "Sp=" << model.eqn[sp.obs_eqn[ob.Sp_obs_eqn_ref]].te_raw << ", ";
-						break;
-						
+					
 					default: emsg("Model output error 4"); break;
 					}
 					fout << endl;
@@ -1934,6 +1935,7 @@ string Output::generate_state_head(const vector <string> &ind_key) const
 				if(par.spline_outside){
 					ss << "  spline-out " << par.name << " ";
 					const auto &dep = par.dep;
+					
 					const auto &list = dep[dep.size()-1].list;
 					for(auto k = 0u; k < list.size(); k++){
 						if(k != 0) ss << ",";
@@ -2219,17 +2221,6 @@ string Output::print_obs_data(unsigned int p, const vector <ObsData> &obs) const
 			}
 			break;
 			
-		case OBS_TEST_EV:
-			{
-				ss << "OBS_TEST_EV res=";
-				if(ob.test_res == true) ss << "+ve"; else ss << "-ve";
-				//const auto &ds = sp.source[ob.so];
-				
-				
-				ss << "  Se=" << ob.Se_eqn.te << "  Sp=" << ob.Sp_eqn.te;
-			}
-			break;
-			
 		default: emsg("event data not right:"+ob.type); break;
 		}
 		ss << "   ";
@@ -2463,6 +2454,8 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 		param_out += param_output(pa,value);
 	}
 	
+	auto enc = compress_content(param_out);
+	
 	string param_out_file;
 
 	if(sampledir != ""){
@@ -2481,15 +2474,15 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 	stringstream ss;
 	switch(model.mode){
 	case SIM:
-		ss << "param-sim file=\"" << param_out_file << "\"" << endl;
+		ss << "param-sim " << enc << "file=\"" << param_out_file << "\"" << endl;
 		break;
 
 	case INF: case EXT:
-		ss << "param-inf chain=" << (ch+1) << " file=\""+param_out_file+"\"" << endl;
+		ss << "param-inf chain=" << (ch+1) << " " << enc << " file=\""+param_out_file+"\"" << endl;
 		break;
 	
 	case PPC:
-		ss << "param-post-sim file=\"" << param_out_file << "\"" <<  endl;
+		ss << "param-post-sim " << enc << " file=\"" << param_out_file << "\"" <<  endl;
 		break;
 	
 	default: emsg("Should not be default12"); break;
@@ -2706,8 +2699,6 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 			ss << "An estimated " << sig_fig(sa,2) << " updates are required. ";
 		}
 		
-		//ss << endl;
-		
 		if(ESS_warn.size() > 0){
 			string pte;
 			for(const auto &wa : ESS_warn){
@@ -2792,7 +2783,11 @@ void Output::output_prop_info(ofstream &fout) const
 				}
 				ss << endl;
 			}
-				
+	
+			auto content = ss.str();
+			
+			auto enc = compress_content(content);
+	
 			string file;
 				
 			if(sampledir != ""){
@@ -2800,16 +2795,16 @@ void Output::output_prop_info(ofstream &fout) const
 		
 				ofstream pout(sampledir+"/"+file);
 				check_open(pout,file);
-				pout << ss.str();
+				pout << content;
 
 				file = sampledir_rel+"/"+file;
 			}
 			else{  // Embeds output into file
-				file = "[["+endli+ss.str()+"]]";
+				file = "[["+endli+content+"]]";
 			}
 
 			stringstream ss2;
-			ss2 << "proposal-inf chain=" << (ch+1) << " file=\"" << file << "\"" << endl;
+			ss2 << "proposal-inf chain=" << (ch+1) << " " << enc << "file=\"" << file << "\"" << endl;
 			ss2 << endl;
 			
 			if(com_op == true) cout << ss2.str();
@@ -2834,31 +2829,35 @@ void Output::output_state(unsigned int ch, const vector <Particle> &part, ofstre
 	
 	string state_out_file;
 
+	auto content = state_head+state_out;
+	
+	auto enc = compress_content(content);
+	
 	if(sampledir != ""){
 		state_out_file = get_file_name("state",ch,nchain,".txt"); 
 		
 		ofstream pout(sampledir+"/"+state_out_file);
 		check_open(pout,state_out_file);
-		pout << state_head << state_out;
+		pout << content;
 
 		state_out_file = sampledir_rel+"/"+state_out_file;
 	}
 	else{  // Embeds output into file
-		state_out_file = "[["+endli+state_head+state_out+"]]";
+		state_out_file = "[["+endli+content+"]]";
 	}
 
 	stringstream ss;
 	switch(model.mode){
 	case SIM:
-		ss << "state-sim file=\"" << state_out_file << "\"" << endl;
+		ss << "state-sim " << enc << "file=\"" << state_out_file << "\"" << endl;
 		break;
 
 	case INF: case EXT:
-		ss << "state-inf chain=" << (ch+1) << " file=\""+state_out_file+"\"" << endl;
+		ss << "state-inf chain=" << (ch+1) << " " << enc << "file=\""+state_out_file+"\"" << endl;
 		break;
 	
 	case PPC:
-		ss << "state-post-sim file=\"" << state_out_file << "\"" <<  endl;
+		ss << "state-post-sim " << enc << "file=\"" << state_out_file << "\"" <<  endl;
 		break;
 	
 	default: emsg("Should not be default12"); break;
@@ -2867,6 +2866,18 @@ void Output::output_state(unsigned int ch, const vector <Particle> &part, ofstre
 	
 	if(com_op == true) cout << ss.str();
 	else fout << ss.str();
+}
+
+
+/// Compresses output content
+string Output::compress_content(string &content) const
+{ 
+	auto comp = model.details.compress;
+	if(comp == ALWAYS_COMPRESS || (comp == AUTO_COMPRESS && sizeof(string)+content.length() > 1024*1024)){
+		content = encode(content);
+		return "compress=\"true\" ";
+	}
+	return "";
 }
 
 	
@@ -2896,6 +2907,9 @@ void Output::output_trans_diag(unsigned int ch, const vector <TransDiagSpecies> 
 	}
 	
 	auto trans_diag_out = sstd.str();
+	
+	auto enc = compress_content(trans_diag_out);
+	
 	string trans_diag_out_file;
 	
 	if(sampledir != ""){
@@ -2912,7 +2926,7 @@ void Output::output_trans_diag(unsigned int ch, const vector <TransDiagSpecies> 
 	}
 
 	stringstream ss;
-	ss << "trans-diag-inf chain=" << (ch+1) << " file=\"" << trans_diag_out_file << "\"" << endl;
+	ss << "trans-diag-inf chain=" << (ch+1) << " " << enc << "file=\"" << trans_diag_out_file << "\"" << endl;
 	ss << endl;
 	
 	if(com_op == true) cout << ss.str();
@@ -3158,6 +3172,8 @@ void Output::output_generation(const vector <Particle> &part, ofstream &fout) co
 	}
 	param_out += generation_average(trace_init(),content);
 
+	auto enc = compress_content(param_out);
+
 	string param_out_file;
 
 	if(sampledir != ""){
@@ -3174,7 +3190,7 @@ void Output::output_generation(const vector <Particle> &part, ofstream &fout) co
 	}
 
 	stringstream ss;
-	ss << "generation-inf file=\""+param_out_file+"\"" << endl;
+	ss << "generation-inf " << enc << "file=\""+param_out_file+"\"" << endl;
 	ss << endl;
 	
 	if(com_op == true) cout << ss.str();
@@ -3186,7 +3202,11 @@ void Output::output_generation(const vector <Particle> &part, ofstream &fout) co
 void Output::output_diagnostic(const vector <Diagnostic> &diagnostic, bool &alg_warn_flag, ofstream &fout) const
 {
 	for(const auto &di :  diagnostic){
-		if(begin_str(di.te,ALG_WARN)) alg_warn_flag = true;
+		auto content = di.te;
+		
+		if(begin_str(content,ALG_WARN)) alg_warn_flag = true;
+		
+		auto enc = compress_content(content);
 		
 		string diag_out_file;
 	
@@ -3197,16 +3217,16 @@ void Output::output_diagnostic(const vector <Diagnostic> &diagnostic, bool &alg_
 
 			ofstream pout(diagdir+"/"+diag_out_file);
 			check_open(pout,diag_out_file);
-			pout << di.te;
+			pout << content;
 
 			diag_out_file = sampledir_rel+"/diagnostic/"+diag_out_file;
 		}
 		else{  // Embeds output into file
-			diag_out_file = "[["+endli+di.te+"]]";
+			diag_out_file = "[["+endli+content+"]]";
 		}
 		
 		stringstream ss;
-		ss << "diagnostics-inf chain=" << (di.ch+1) << " file=\""+diag_out_file+"\"" << endl;
+		ss << "diagnostics-inf chain=" << (di.ch+1) << " " << enc << "file=\""+diag_out_file+"\"" << endl;
 		ss << endl;
 		
 		if(com_op == true) cout << ss.str();
@@ -3360,34 +3380,11 @@ void Output::number_part(vector <Particle> &part) const
 
 
 /// Outputs the final cpu time
-void Output::final_time(long sec, long op_sec) const 
+void Output::final_time(unsigned int cpu_time, unsigned int op_cpu_time) const 
 {
-	auto op_st = " ("+tstr((int)((op_sec*100)/(sec+TINY)))+"% outputting)";
+	auto op_st = " ("+tstr((int)((op_cpu_time*100)/(cpu_time+TINY)))+"% outputting)";
 	
-	cout << endl << "Total CPU time: ";
-	
-	if(sec < 60){
-		cout << sec << " seconds" << op_st << endl;
-		return;
-	}
-	
-	cout << std::fixed;
-  cout << setprecision(1);
-		
-	auto min = sec/60.0;
-	if(min < 60){
-		cout << min << " minutes" << op_st << endl;
-		return;
-	}
-	
-	auto hour = min/60.0;
-	if(hour < 24){
-		cout << hour << " hours" << op_st << endl;
-		return;
-	}
-	
-	auto day = hour/24.0;
-	cout << day << " days" << op_st << endl;
+	cout << endl << "Total CPU time: " << get_cpu_time(cpu_time) << op_st << endl;
 }
 
 
@@ -3508,11 +3505,11 @@ void Output::delete_commands(string type, const vector <string> &list)
 	}
 	
 	if(lines.size()	== 0){
-		cout << "There is no data to clear." << endl; 
+		cout << "There is no state or parameter information to clear." << endl; 
 		exit (EXIT_FAILURE);
 	}
 	else{
-		auto res = model.question("Are you sure you would like to clear "+type+" data?");
+		auto res = model.question("Are you sure you would like to clear "+type+" state and parameter information?");
 		if(res == false){
 			cout << "Terminated" << endl; 
 			exit (EXIT_FAILURE);

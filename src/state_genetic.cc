@@ -368,7 +368,7 @@ double State::sample_infection_source(Event &ev, unsigned int p) const
 				iif.w = pi_sel.w;
 			}
 		
-			iif.p = pop.sp_p;
+			iif.p = pop.p;
 			
 			iif.pref = j;
 			iif.po = pr;
@@ -1292,7 +1292,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 									
 								const auto &po = model.pop[pr];
 							
-								auto p = po.sp_p;
+								auto p = po.p;
 								
 								ii_prop.p = p;
 								ii_prop.pref = k_prop;
@@ -3349,7 +3349,7 @@ vector <double> State::recalculate_popnum_ind_w(unsigned int po)
 
 	const auto &pop = model.pop[po];
 	
-	const auto &individual = species[pop.sp_p].individual;
+	const auto &individual = species[pop.p].individual;
 	
 	for(auto ti = 0u; ti < T; ti++){
 		for(auto &pir : popnum_ind[ti][po]){
@@ -3643,7 +3643,7 @@ void State::update_popnum_ind(unsigned int p, unsigned int i)
 		if(k+1 < pi.size()){
 			auto &pi_end = pi[pi.size()-1];
 			pi[k] = pi_end;
-			auto pp = model.pop[pir.po].sp_p;
+			auto pp = model.pop[pir.po].p;
 			species[pp].individual[pi_end.i].popnum_ind_ref[pi_end.index].index = k;
 		}		 
 		pi.pop_back();	

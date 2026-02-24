@@ -17,7 +17,17 @@ using namespace std;
 
 Precalc::Precalc(const vector <SpeciesSimp> &species, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, Constant &constant, const vector <double> &timepoint, const Details &details) : species(species), spline(spline), param_vec(param_vec), pop(pop), constant(constant), timepoint(timepoint), details(details)
 {
+	//clear_timer();
+	num = 0;
 }
+
+
+/// Clears the timer (used for diagnostic purposes)
+void Precalc::clear_timer()
+{
+	timer.clear(); timer.resize(20,0);
+}
+
 
 /// Adds an equation onto the precalculated equation calculation
 bool Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref, SpecPrecalc &spec_precalc, PrecalcAddType add_type)
@@ -31,7 +41,6 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 			case PARAMVEC: 
 				it.type = REG_PRECALC; 
 				it.num = param_vec_ref[it.num];
-				//list_precalc.push_back(it.num);
 				break;
 				
 			case SPLINEREF: 
@@ -43,7 +52,6 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 					else{
 						it.type = REG_PRECALC_TIME; 
 						it.num = spline_ref[it.num];
-						//list_precalc.push_back(it.num);
 					}
 				}
 				break;
@@ -185,7 +193,7 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 					if(it.type == REG && become_Rrecalc[it.num] != UNSET){
 						it.type = REG_PRECALC; 
 						it.num = become_Rrecalc[it.num];
-						if(calcu[it.num].time_dep) it.type = REG_PRECALC_TIME; 
+						if(pcalcu[pcalcu_ref[it.num]].time_dep) it.type = REG_PRECALC_TIME; 
 						if(it.num == USINT_MAX) emsg("Problem used");
 						fl = true;
 					}
@@ -193,7 +201,7 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 			}
 		}
 	}while(fl == true);
-	
+
 	// Removes become_Rfac
 
 	auto calc_old = calc;
@@ -237,14 +245,24 @@ unsigned int Precalc::add_param(unsigned int th)
 	
 	auto j = hash_ca.existing(vec);
 	if(j == UNSET){
-		j = calcu.size();
-		//list_precalc.push_back(j);
-		
-		calcu.push_back(ca);
+		j = pcalcu_ref.size();
+		calcu_add(ca);
 		hash_ca.add(j,vec);
 	}
 
 	return j;
+}
+
+
+/// Adds a calculation to the list
+void Precalc::calcu_add(const PreCalc &ca)
+{
+	if(ca.op == NOOP) pcalcu_ref.push_back(UNSET);
+	else{
+		//calcu.push_back(ca);
+		pcalcu_ref.push_back(pcalcu.size());
+		pcalcu.push_back(ca);
+	}
 }
 
 
@@ -280,9 +298,8 @@ unsigned int Precalc::add_spline(unsigned int s, SpecPrecalc &spec_precalc)
 	
 	auto j = hash_ca.existing(vec);
 	if(j == UNSET){
-		j = calcu.size();
-		
-		calcu.push_back(ca);
+		j = pcalcu_ref.size();
+		calcu_add(ca);
 		
 		sp_add(spec_precalc,j,all_time);
 		
@@ -292,7 +309,7 @@ unsigned int Precalc::add_spline(unsigned int s, SpecPrecalc &spec_precalc)
 			PreCalc ca;	
 			ca.op = NOOP;
 			ca.time_dep = true;
-			calcu.push_back(ca);
+			calcu_add(ca);
 		}
 	}
 	
@@ -319,18 +336,19 @@ EqItem Precalc::add(PreCalc &pcalc, SpecPrecalc &spec_precalc)
 						
 	auto j = hash_ca.existing(vec);
 	if(j == UNSET){
-		j = calcu.size();
+		j = pcalcu_ref.size();
 		
 		hash_ca.add(j,vec);
-		
-		calcu.push_back(pcalc);	
-		
+		calcu_add(pcalc);
+	
+		num++;
+	
 		sp_add(spec_precalc,j,all_time);
 		
 		if(pcalc.time_dep == true){
 			PreCalc ca2; ca2.op = NOOP; ca2.time_dep = true;
 			auto T = details.T;
-			for(auto ti = 1u; ti < T; ti++) calcu.push_back(ca2);
+			for(auto ti = 1u; ti < T; ti++) calcu_add(ca2);
 		}
 	}	
 	
@@ -365,19 +383,20 @@ void Precalc::print_calc() const
 	cout << "PRE-CALCULATION:" << endl;
 	
 	auto T = details.T;
-	auto imax = calcu.size(); 
+	auto imax = pcalcu_ref.size(); 
 	auto imax_lim = LARGE;
 	//auto imax_lim = 1000;
 	if(imax > imax_lim) imax = imax_lim;
   for(auto i = 0u; i < imax; i++){
-		const auto &ca = calcu[i];
+		auto re = pcalcu_ref[i]; if(re == UNSET) emsg("no calculation");
+		const auto &ca = pcalcu[re];
 		print_ca(i,ca);
 		cout << endl;
-		
+	
 		if(ca.time_dep == true) i += T-1;
   }
 	
-	if(imax < calcu.size()) cout << "...";
+	if(imax < pcalcu_ref.size()) cout << "...";
 
   cout << endl << endl;
 }
@@ -426,13 +445,14 @@ void Precalc::calc_spline_const(PV &param_val, const vector <unsigned int> &spli
 /// Calculates the value for an equation
 vector <double> Precalc::calculate_precalc_init(const SpecPrecalc &spec_precalc) const 
 {
-	vector <double> precalc(calcu.size(),UNSET);
+	vector <double> precalc(pcalcu_ref.size(),UNSET);
 	const auto &cval = constant.value;
 	
 	for(const auto &in : spec_precalc.info){
 		auto i = in.i;
 		
-		const auto &ca = calcu[i];
+		auto re = pcalcu_ref[i]; if(re == UNSET) emsg("problem unset");
+		const auto &ca = pcalcu[re];
 		
 		if(ca.op == SINGLE){
 			const auto &it = ca.item[0];
@@ -548,6 +568,14 @@ vector <double> Precalc::calculate_precalc_init(const SpecPrecalc &spec_precalc)
 }
 
 
+/// Gets a list_time from a spec precalculation
+const vector <unsigned int>&	Precalc::get_list_time(unsigned int cit, const SpecPrecalc &spec) const
+{
+	if(cit == ALL_TIME_STEP) return all_time;
+	return spec.list_time[cit];
+}					
+						
+
 /// Calculates the value for an equation
 void Precalc::calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store) const 
 {
@@ -561,11 +589,13 @@ void Precalc::calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store)
 	for(const auto &ci : info){
 		auto i = ci.i;
 
-		const auto &ca = calcu[i];
+		auto re = pcalcu_ref[i]; if(re == UNSET) emsg("problem unset"); 
+		const auto &ca = pcalcu[re];
 		
 		if(store){
 			if(ca.time_dep){ 
-				for(auto ti : spec_calc.list_time[ci.tlist]) param_val.precalc_change(i+ti);
+				const auto &list_time = get_list_time(ci.tlist,spec_calc);
+				for(auto ti : list_time) param_val.precalc_change(i+ti);
 			}
 			else{
 				param_val.precalc_change(i);
@@ -583,8 +613,8 @@ void Precalc::calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store)
 				{
 					const auto &spl = spline[it.num];
 					if(!spl.constant){
-						const auto &list_time = spec_calc.list_time[ci.tlist];
-						
+						const auto &list_time = get_list_time(ci.tlist,spec_calc);
+				
 						switch(spl.type){
 						case LINEAR_SPL:
 							for(auto ti : list_time){
@@ -633,8 +663,8 @@ void Precalc::calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store)
 			vector <double> num(N);
 			
 			if(ca.time_dep){
-				const auto &list_time = spec_calc.list_time[ci.tlist];
-						
+				const auto &list_time = get_list_time(ci.tlist,spec_calc);
+				
 				for(auto ti : list_time){
 					for(auto j = 0u; j < N; j++){
 						const auto &it = item[j];
@@ -810,31 +840,59 @@ void Precalc::print_ca(unsigned int i, const PreCalc &ca) const
 }
  
 
+/// Adds a new list_list to a specprecalc
+unsigned int Precalc::add_list_time(SpecPrecalc &sprec, const vector <unsigned int> &ltime) const 
+{
+	if(ltime.size() == details.T) return ALL_TIME_STEP;
+	
+	auto &list_time = sprec.list_time;
+
+	auto val	= sum(ltime);
+	
+	auto j = sprec.hash_time.find(val);
+	if(j == UNSET){
+		j = list_time.size();
+		sprec.hash_time.add(j,val);
+		list_time.push_back(ltime);
+		return j;
+	}
+	else{
+		if(equal_vec(ltime,list_time[j])) return j;
+		
+		j = 0;
+		while(j < list_time.size() && !equal_vec(ltime,list_time[j])) j++;	
+		if(j == list_time.size()) list_time.push_back(ltime);
+	}
+	
+	return j;
+}
+
+		
 /// Adds an element to a precalculation
 void Precalc::sp_add(SpecPrecalc &sprec, unsigned int i, const vector <unsigned int> &ltime) const 
 {
 	auto &list_time = sprec.list_time;
-			
+	auto re = pcalcu_ref[i]; if(re == UNSET) emsg("prob unset");
+	
 	auto k = sprec.hash.find(i);
 	if(k != UNSET){ // Already exists
-		emsg("already");
 		auto &in = sprec.info[k];
 		
-		if(calcu[i].time_dep){
-			if(!equal_vec(list_time[in.tlist],ltime)){
-				emsg("create new");
+		if(pcalcu[re].time_dep){
+			if(in.tlist != ALL_TIME_STEP){  // Need to combine together two timelines
+				const auto &ltime_now = list_time[in.tlist];
+				if(!equal_vec(ltime_now,ltime)){
+					auto ltime_new = combine_list_time(ltime_now,ltime);
+					in.tlist = add_list_time(sprec,ltime_new);
+				}
 			}
 		}
 	}
 	else{
 		PrecalcInfo pi; pi.i = i; 
 		
-		if(calcu[i].time_dep){
-			auto j = 0u;
-			while(j < list_time.size() && !equal_vec(ltime,list_time[j])) j++;
-			if(j == list_time.size()) list_time.push_back(ltime);
-		
-			pi.tlist = j;
+		if(pcalcu[re].time_dep){
+			pi.tlist = add_list_time(sprec,ltime);
 		}
 		else{
 			pi.tlist = UNSET;
@@ -846,35 +904,40 @@ void Precalc::sp_add(SpecPrecalc &sprec, unsigned int i, const vector <unsigned 
 }
 
 
+/// Combines together two lists;
+vector <unsigned int> Precalc::combine_list_time(const vector <unsigned int> &lt1,const vector <unsigned int> &lt2) const 
+{
+	auto T = details.T;
+	vector <bool> map(T,false);
+	for(auto i : lt1) map[i] = true;
+	for(auto i : lt2) map[i] = true;
+	
+	vector <unsigned int> list;
+	for(auto i = 0u; i < T; i++){
+		if(map[i]) list.push_back(i);
+	}
+	
+	for(auto i : lt1) cout << i << ","; 
+	cout << "lt1" << endl;
+	for(auto i : lt2) cout << i << ","; 
+	cout << "lt2" << endl;
+	for(auto i : list) cout << i << ",";
+	cout << "list" << endl;
+	emsg(" This is just testing if this part is working correctly");
+	return list;
+}
+
+ 
 /// Adds a list of elements to a precalculation
 void Precalc::sp_add(SpecPrecalc &sprec, const vector <unsigned int> &i_list, const vector <unsigned int> &ltime) const
 {
 	if(i_list.size() == 0) return;
 	
 	for(auto i : i_list) sp_add(sprec,i,ltime);
-	
-/*
-	auto &list_time = sprec.list_time;
-		
-	auto j = 0u;
-	while(j < list_time.size() && !equal_vec(ltime,sprec.list_time[j])) j++;
-	if(j == list_time.size()) list_time.push_back(ltime);
-
-	for(auto i : i_list){
-		if(calcu[i].time_dep){
-			PrecalcInfo pi; pi.i = i; pi.tlist = j;
-			sprec.info.push_back(pi);
-		}
-		else{
-			PrecalcInfo pi; pi.i = i; pi.tlist = UNSET;
-			sprec.info.push_back(pi);
-		}
-	}
-	*/
 }
 
 
-/// Sets up a spec precalc bu combining several together
+/// Sets up a spec precalc by combining several together
 SpecPrecalc Precalc::combine_spec_precalc(const vector <unsigned int> &param_list_tot) const 
 {
 	auto C = param_list_tot.size();
@@ -899,7 +962,8 @@ SpecPrecalc Precalc::combine_spec_precalc(const vector <unsigned int> &param_lis
 			
 		if(imin == LARGE) break;
 		
-		if(calcu[imin].time_dep == false){	
+		auto re = pcalcu_ref[imin]; if(re == UNSET) emsg("unset problem3");
+		if(pcalcu[re].time_dep == false){	
 			sp_add(spre,imin,all_time); 
 		}
 		else{
@@ -909,7 +973,9 @@ SpecPrecalc Precalc::combine_spec_precalc(const vector <unsigned int> &param_lis
 				const auto &spa = param_vec[param_list_tot[j]].spec_precalc_after;
 				const auto &in = spa.info[index[j]];
 				if(in.i == imin){
-					for(auto ti : spa.list_time[in.tlist]) map_ti[ti] = true;
+					const auto &list_time = get_list_time(in.tlist,spa);
+					for(auto ti : list_time) map_ti[ti] = true;
+					//for(auto ti : spa.list_time[in.tlist]) map_ti[ti] = true;
 				}
 			}
 			
@@ -967,14 +1033,14 @@ void Precalc::set_param(SpecPrecalc &set_param_spec_precalc, SpecPrecalc &spec_p
 	auto &info = spec_precalc_after.info;
 
 	if(info.size() == 0) emsg("zero size");
-	const auto &list_time = spec_precalc_after.list_time;
+	
 	set_param_spec_precalc.info.push_back(info[0]);
 	info.erase(info.begin());
 
 	// Transfers the spline (if it exists)
 	if(spl_fl){
-		const auto &in = info[0];
-		sp_add(set_param_spec_precalc,in.i,list_time[in.tlist]);
+		const auto &in = info[0];	
+		sp_add(set_param_spec_precalc,in.i,get_list_time(in.tlist,spec_precalc_after));
 		info.erase(info.begin());
 	}
 	
@@ -1000,7 +1066,7 @@ void Precalc::set_param(SpecPrecalc &set_param_spec_precalc, SpecPrecalc &spec_p
 // Sets precalculation to be done after sampling 
 SpecPrecalc Precalc::calculate_spec_precalc_sample(const SpecPrecalc &spec_precalc) const
 {
-	auto C = calcu.size();
+	auto C = pcalcu_ref.size();
 	vector <bool> map(C,false);
 	
 	for(auto &in : spec_precalc.info) map[in.i] = true;
@@ -1015,12 +1081,14 @@ SpecPrecalc Precalc::calculate_spec_precalc_sample(const SpecPrecalc &spec_preca
 	}
 	
 	SpecPrecalc spec;
-	spec.list_time.push_back(all_time);
+	auto j = add_list_time(spec,all_time);
 	
 	for(auto i = 0u; i < C; i++){
 		if(map[i]){
 			PrecalcInfo pi; pi.i = i;
-			if(calcu[i].time_dep) pi.tlist = 0;
+			
+			auto re = pcalcu_ref[i]; if(re == UNSET) emsg("unset problem");
+			if(pcalcu[re].time_dep) pi.tlist = j;
 			else pi.tlist = UNSET;	
 			spec.info.push_back(pi);			
 		}
@@ -1033,7 +1101,7 @@ SpecPrecalc Precalc::calculate_spec_precalc_sample(const SpecPrecalc &spec_preca
 // Sets all precalculation to be done (apart from derived)
 SpecPrecalc Precalc::calculate_spec_precalc_all(const SpecPrecalc &spec_precalc) const
 {
-	auto C = calcu.size();
+	auto C = pcalcu_ref.size();
 	vector <bool> map(C,false);
 	
 	for(auto &in : spec_precalc.info) map[in.i] = true;
@@ -1048,12 +1116,12 @@ SpecPrecalc Precalc::calculate_spec_precalc_all(const SpecPrecalc &spec_precalc)
 	}
 	
 	SpecPrecalc spec;
-	spec.list_time.push_back(all_time);
-	
+	auto j = add_list_time(spec,all_time);
 	for(auto i = 0u; i < C; i++){
 		if(map[i]){
 			PrecalcInfo pi; pi.i = i;
-			if(calcu[i].time_dep) pi.tlist = 0;
+			auto re = pcalcu_ref[i]; if(re == UNSET) emsg("unset prob");
+			if(pcalcu[re].time_dep) pi.tlist = j;
 			else pi.tlist = UNSET;	
 			spec.info.push_back(pi);			
 		}
@@ -1067,5 +1135,19 @@ SpecPrecalc Precalc::calculate_spec_precalc_all(const SpecPrecalc &spec_precalc)
 void Precalc::set_all_time()
 {
 	all_time = seq_vec(details.T);
+}
+
+
+/// Returns memory of hash_ca
+double Precalc::hash_ca_mem() const
+{
+	return hash_ca.mem();	
+}
+
+
+/// Switches off hash table
+void Precalc::hash_off()
+{
+	hash_ca.off();
 }
 

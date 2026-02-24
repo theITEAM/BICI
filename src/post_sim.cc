@@ -42,7 +42,13 @@ void PostSim::run()
 		
 		if(false) model.print_param(param_val);
 
-		state.post_sim(param_val,samp);
+		if(model.details.param_only){
+			auto initc_val = model.initc_sample(param_val);
+			state.simulate(param_val,initc_val);
+		}
+		else{
+			state.post_sim(param_val,samp);
+		}
 		
 		state.check("Check state");
 	

@@ -495,7 +495,7 @@ function rightbot_menu_buts(lay)
 			
 			switch(ke.type){
 			case "Line": 
-				lay.add_button({te:ke.te, x:0, y:y, dx:lay.dx-0.8, dy:dy, dash:ke.dash, thick:ke.thick, col:ke.col, type:"Key"}); 
+				lay.add_button({te:ke.te,  x:0, y:y, dx:lay.dx-0.8, dy:dy, dash:ke.dash, thick:ke.thick, col:ke.col, op:ke.op, type:"Key"}); 
 				break;
 			
 			case "Rect": 

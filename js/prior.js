@@ -252,7 +252,6 @@ function convert_text_to_prior(te,pri_pos,dist)
 	if(!pri_pos) error("prior pos is not set!");
 	
 	if(find_in(pri_pos,type) == undefined){
-		l
 		if(find_in(prior_pos,type) == undefined && find_in(prior_factor_pos,type) == undefined ){
 			return err(start+"the distribution '"+type+"' is not recognised");
 		}

@@ -12,6 +12,7 @@ using namespace std;
 
 #include "input.hh"
 #include "utils.hh"
+#include "lzw.hh"
 
 /// Adds a new species to the model
 void Input::add_species(string name, SpeciesType type, bool trans_tree)
@@ -94,7 +95,7 @@ bool Input::add_compartment(string name, unsigned int p, unsigned int cl, double
 		co.erlang_hidden = true;
 		//auto cc = 0u; while(cc < claa.comp.size() && claa.comp[cc].name != erlang_source) cc++;
 		//if(cc == claa.comp.size()) alert_emsg_input("Erlang source problem");
-		{ // turn off
+		if(false){ // turn off
 			auto cc = 0u; while(cc < claa.comp.size() && claa.comp[cc].name != erlang_source) cc++;
 			if(cc != claa.hash_comp.find(erlang_source)) emsg("cc wrong");
 		}
@@ -297,7 +298,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 		for(auto &pf : sp.pop_filter){                     // Population filter   
 			pf.time_vari = false;
 			for(auto &cpe : pf.comp_prob_eqn){		
-				model.add_eq_ref(cpe,hash_eqn);
+				model.add_eq_ref(cpe,hash_eqn,UNSET,true);
 				const auto &eq = model.eqn[cpe.eq_ref];
 				if(eq.time_vari == true) pf.time_vari = true;
 			}
@@ -312,15 +313,17 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 			auto &pf = sp.pop_filter[pd.ref];
 			pd.time_vari = pf.time_vari;
 			if(pd.time_vari){
-				for(auto &cpe : pf.comp_prob_eqn) model.add_eq_ref(cpe,hash_eqn,pd.tdiv);
+				for(auto &cpe : pf.comp_prob_eqn){
+					model.add_eq_ref(cpe,hash_eqn,pd.tdiv,true);
+				}
 				pd.comp_obs_mod_ref = sp.obs_eqn_add_vec(pf.comp_prob_eqn);
 			}
 		}
 		
 		for(auto &ptf : sp.pop_trans_filter){              // Population transition filter   
 			ptf.time_vari = false;
-			for(auto &tpe : ptf.trans_prob_eqn){		
-				model.add_eq_ref(tpe,hash_eqn);
+			for(auto &tpe : ptf.trans_prob_eqn){	
+				model.add_eq_ref(tpe,hash_eqn,UNSET,true);
 				const auto &eq = model.eqn[tpe.eq_ref];
 				if(eq.time_vari == true) ptf.time_vari = true;
 			}
@@ -330,18 +333,18 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 			ptf.eqn_zero = set_eqn_zero(ptf.trans_prob_eqn);
 			ptf.tr_nonzero = false_list(ptf.eqn_zero);
 		}
-	
+
 		for(auto &ptd : sp.pop_trans_data){                // Population transition data
 			auto &ptf = sp.pop_trans_filter[ptd.ref];
 			ptd.time_vari = ptf.time_vari;
 			if(ptd.time_vari){
 				for(auto &tpe : ptf.trans_prob_eqn){		
-					model.add_eq_ref(tpe,hash_eqn,0.5*(ptd.tdivmin+ptd.tdivmax));
+					model.add_eq_ref(tpe,hash_eqn,0.5*(ptd.tdivmin+ptd.tdivmax),true);
 				}
 				ptd.trans_obs_mod_ref = sp.obs_eqn_add_vec(ptf.trans_prob_eqn);
 			}
 		}
-		
+
 		for(auto &ecp : sp.enter){                         // Equations for entering probability
 			if(ecp.c_set == UNSET){
 				for(auto cl = 0u; cl < sp.ncla; cl++){
@@ -358,8 +361,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 		for(auto &ot : sp.obs_trans){                      // Observed transition data 
 			ot.time_vari = false;
 			for(auto &tpe : ot.tra_prob_eqn){
-				model.add_eq_ref(tpe,hash_eqn);
-				
+				model.add_eq_ref(tpe,hash_eqn,UNSET,true);	
 				const auto &eq = model.eqn[tpe.eq_ref];
 				if(eq.time_vari == true) ot.time_vari = true;
 			}
@@ -381,9 +383,8 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 							if(ob.time_vari == true){
 								auto tra_prob_eqn = ot.tra_prob_eqn;
 								for(auto &tpe : tra_prob_eqn){
-									model.add_eq_ref(tpe,hash_eqn,ob.tdiv);
+									model.add_eq_ref(tpe,hash_eqn,ob.tdiv,true);
 								}
-								
 								ob.obs_eqn_ref = sp.obs_eqn_add_vec(tra_prob_eqn);
 							}
 						}
@@ -399,14 +400,6 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 						ob.obs_eqn_ref = sp.obs_eqn_add_vec(ob.c_obs_prob_eqn);
 						ob.eqn_zero = set_eqn_zero(ob.c_obs_prob_eqn);
 					}
-					break;
-					
-				case OBS_TEST_EV:                              // Ind. test
-					model.add_eq_ref(ob.Se_eqn,hash_eqn,ob.tdiv);
-					ob.Se_obs_eqn_ref = add_to_vec(sp.obs_eqn,ob.Se_eqn.eq_ref,sp.hash_obs_eqn);
-					
-					model.add_eq_ref(ob.Sp_eqn,hash_eqn,ob.tdiv);
-					ob.Sp_obs_eqn_ref = add_to_vec(sp.obs_eqn,ob.Sp_eqn.eq_ref,sp.hash_obs_eqn);
 					break;
 				}
 			}
@@ -494,6 +487,22 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 			alert_line(ss.str(),eq.line_num);
 		}
 	}
+	
+	if(false && profiling){  // Used for timings within equations
+		vector <double> timer(20,0);
+		
+		for(const auto &eqn : model.eqn){
+			for(auto i = 0u; i < 20; i++) timer[i] += eqn.timer[i];
+		}			
+		
+		cout << "Equation times:" << endl;
+		auto sum = 0.0;
+		for(auto i = 0u; i < 14; i++) sum +=  timer[i];
+		for(auto i = 0u; i < 20; i++){
+			cout << i << " " << timer[i]/sum << " " <<  timer[i] << endl;
+		}			
+		cout << get_cpu_time(sum)  << " total time" << endl;
+	}
 }
 
 
@@ -547,7 +556,7 @@ void Input::combine_populations()
 							auto po_new = pop[po];
 							po_new.name = name;
 							
-							auto p = po_new.sp_p;
+							auto p = po_new.p;
 					
 							for(auto j : list){
 								for(const auto &te : pop[item[j].num].term){
@@ -652,7 +661,7 @@ void Input::combine_populations()
 /// Determines if two populations are equal, apart from term
 bool Input::equal_pop(const Population &popA, const Population &popB) const
 {
-	if(popA.sp_p != popB.sp_p) return false;
+	if(popA.p != popB.p) return false;
 	if(popA.ind_variation != popB.ind_variation) return false;
 	if(!equal_vec(popA.ind_eff_mult,popB.ind_eff_mult)) return false;
 	if(!equal_vec(popA.fix_eff_mult,popB.fix_eff_mult)) return false;
@@ -1114,14 +1123,14 @@ void Input::global_comp_trans_init()
 	}
 	
 	// Calculates "tform" 
-	// This allows for transtions o be changed based on a transition in another cl
+	// This allows for transtions to be changed based on a transition in another cl
 	// Either the initial of final compartment can be used for the transformation
 	// If memory requirement is too high, this is not used
 	for(auto &sp : model.species){
 		sp.tform_set = false;
 		if(sp.type == INDIVIDUAL){
-			//if(1 == 0 && sp.tra_gl.size()*sp.comp_gl.size() < TFORM_MAX){ // TURN OFF
-			if(1 == 1){
+			auto op = model.details.optimise;
+			if(op == SPEED || (op == AUTO_OPTIMISE && sp.comp_gl.size() < 1000)){
 				sp.tform_set = true;
 				
 				for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
@@ -1323,7 +1332,7 @@ void Input::set_precalc_nm_rate()
 			{		
 				const auto &eq = model.eqn[nmt.dist_param_eq_ref[0]];
 				for(auto pr : eq.pop_ref){
-					if(model.pop[pr].sp_p == p){ 
+					if(model.pop[pr].p == p){ 
 						alert_import("Non-Markovian transitions cannot depend on a population in the same species");
 					}
 				}
@@ -1336,7 +1345,7 @@ void Input::set_precalc_nm_rate()
 						const auto &eq = model.eqn[e];
 						
 						for(auto pr : eq.pop_ref){
-							if(model.pop[pr].sp_p == p){ 
+							if(model.pop[pr].p == p){ 
 								alert_import("Non-Markovian transitions cannot depend on a population in the same species");
 							}
 						}
@@ -1395,7 +1404,7 @@ void Input::check_nm_pop()
 					const auto &eq = model.eqn[dp.eq_ref];
 					for(auto &pop : eq.pop_ref){
 						const auto &po = model.pop[pop];
-						if(po.sp_p == p){
+						if(po.p == p){
 							alert_import("Non-Markovian parameters cannot depend on population from the same species.");
 						}
 					}
@@ -1405,7 +1414,7 @@ void Input::check_nm_pop()
 					const auto &eq = model.eqn[tr.bp.eq_ref];
 					for(auto &pop : eq.pop_ref){
 						const auto &po = model.pop[pop];
-						if(po.sp_p == p){
+						if(po.p == p){
 							alert_import("Branching probabilities cannot depend on a population from the same species.");
 						}
 					}
@@ -1545,7 +1554,7 @@ unsigned int Input::get_spline_i(const ParamRef &pr)
 	auto i = model.hash_spline.existing(vec);
 	if(i == UNSET) alert_emsg_input("Spline could not be found");
 
-	{	 // turn off
+	if(false){	 // turn off
 		auto ii = 0u; while(ii < spl.size() && !(spl[ii].th == th && spl[ii].index == index)) ii++;
 		if(ii != i) emsg("spline prob");
 	}
@@ -2168,13 +2177,13 @@ void Input::ind_fix_eff_pop_ref()
 	for(auto k = 0u; k < model.pop.size(); k++){
 		const auto &pop = model.pop[k];
 		for(auto ie : pop.ind_eff_mult){
-			auto &sp = model.species[pop.sp_p];
+			auto &sp = model.species[pop.p];
 			auto &inde = sp.ind_effect[ie];
 			add_to_vec(inde.pop_ref,k,inde.hash_pop_ref);
 		}
 		
 		for(auto fe : pop.fix_eff_mult){
-			auto &sp = model.species[pop.sp_p];
+			auto &sp = model.species[pop.p];
 			auto &fixe = sp.fix_effect[fe];
 			add_to_vec(fixe.pop_ref,k,fixe.hash_pop_ref);
 		}
@@ -2241,7 +2250,7 @@ void Input::create_island()
 						
 						unsigned int isl1, j = UNSET; 
 						for(isl1 = 0u; isl1 < island.size(); isl1++){
-							{ // turn off
+							if(false){ // turn off
 								const auto &co = island[isl1].comp;
 								auto jj = 0u; while(jj < co.size() && co[jj].c != c1) jj++;
 								if(jj < co.size()){
@@ -2268,7 +2277,7 @@ void Input::create_island()
 						auto isl2 = UNSET;
 						if(c2 != UNSET){
 							for(isl2 = 0u; isl2 < island.size(); isl2++){
-								{ // turn off
+								if(false){ // turn off
 									const auto &co = island[isl2].comp;
 									auto jj = 0u; while(jj < co.size() && co[jj].c != c2) jj++;
 									if(jj < co.size()){
@@ -2278,9 +2287,6 @@ void Input::create_island()
 									
 								j = island[isl2].hash_comp.find(c2);
 								if(j != UNSET) break;
-								//const auto &co = island[isl2].comp;
-								//j = 0; while(j < co.size() && co[j].c != c2) j++;
-								//if(j < co.size()) break;
 							}
 							if(isl2 == island.size()) alert_emsg_input("Cannot find island2");
 						}
@@ -2308,7 +2314,7 @@ void Input::create_island()
 							// Sets cf which gives the final
 							auto f = tra.f;
 							
-							{ // turn off
+							if(false){ // turn off
 								auto jj = 0u; while(jj < isl.comp.size() && isl.comp[jj].c != f) jj++;
 								if(jj != isl.hash_comp.find(f)) emsg("prob");
 							}
@@ -2445,7 +2451,7 @@ void Input::param_affect_likelihood()
 			auto s = model.hash_spline.existing(vec);
 			if(s == UNSET) alert_emsg_input("Cannot find spline");
 		
-			{ // turn off
+			if(false){ // turn off
 				auto ss = 0u;
 				while(ss < model.spline.size() && !(th == model.spline[ss].th && ind/nknot == model.spline[ss].index)) ss++;
 				if(s != ss) emsg("s problem");
@@ -2574,7 +2580,7 @@ void Input::param_affect_likelihood()
 	// Looks at the effect of fixed effects in populations
 	for(auto po = 0u; po < model.pop.size(); po++){
 		const auto &pop = model.pop[po];
-		auto p = pop.sp_p;
+		auto p = pop.p;
 		const auto &sp = model.species[p];
 		
 		if(sp.type == INDIVIDUAL){
@@ -2763,15 +2769,6 @@ void Input::param_affect_likelihood()
 						for(auto c = 0u; c < ob.c_obs_prob_eqn.size(); c++){
 							auto eq = ob.c_obs_prob_eqn[c].eq_ref;
 							if(eq == UNSET) alert_emsg_input("Equation is not set");
-							add_to_map(eq,i,map,spline_map);
-						}
-						break;
-						
-					case OBS_TEST_EV:
-						{
-							auto eq = ob.Se_eqn.eq_ref;
-							add_to_map(eq,i,map,spline_map);
-							eq = ob.Sp_eqn.eq_ref;
 							add_to_map(eq,i,map,spline_map);
 						}
 						break;
@@ -3026,9 +3023,7 @@ void Input::add_to_map(unsigned int eq, unsigned int i, vector < vector <bool> >
 				
 				for(auto j = 0u; j < nknot; j++){
 					if(k+j >= spline_map.size()) alert_emsg_input("Prob0");
-					if(ti >= spline_map[k+j].size()){
-						alert_emsg_input("Prob-1");
-					}
+					if(ti >= spline_map[k+j].size()) alert_emsg_input("Prob-1");
 					if(spline_map[k+j][ti] == true){
 						if(k+j >= map.size()) alert_emsg_input("Prob1");
 						if(i >= map[k+j].size()) alert_emsg_input("Prob2");
@@ -5094,7 +5089,7 @@ void Input::set_param_state_output()
   
 
 /// Loads state samples (either for post-sim, extend or data-sim)
-void Input::load_state_samples(unsigned int ch, string file)
+void Input::load_state_samples(unsigned int ch, string file, bool enc)
 {
 	auto i = 0u; while(i < files.size() && files[i].name != file) i++;
 	if(i == files.size()){
@@ -5102,7 +5097,9 @@ void Input::load_state_samples(unsigned int ch, string file)
 		return;
 	}
 
-	const auto &flines = files[i].lines;	
+	auto &flines = files[i].lines;	
+	
+	if(enc) decode_lines(flines);
 	
 	auto li = 0u;
 	

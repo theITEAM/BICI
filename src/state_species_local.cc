@@ -477,30 +477,6 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 					
 					case OBS_TRANS_EV: case OBS_SOURCE_EV: case OBS_SINK_EV:
 						break;
-					
-					case OBS_TEST_EV:
-						{
-							const auto &om = sp.source[ob.so].obs_model;
-							auto tsens_old = om.diag_test_sens.comp[sp.comp_gl[c_old].cla_comp[cl]];
-							auto tsens_new = om.diag_test_sens.comp[sp.comp_gl[c_new].cla_comp[cl]];
-							
-							if(tsens_old != tsens_new){
-								auto Se = obs_eqn_value[ob.Se_obs_eqn_ref];
-								auto Sp = obs_eqn_value[ob.Sp_obs_eqn_ref];
-								
-								if(ob.test_res == true){
-									if(tsens_new == true) prob_try *= (Se+LOG_THRESH)/(1-Sp+LOG_THRESH);
-									else prob_try *= (1-Sp+LOG_THRESH)/(Se+LOG_THRESH);
-								}
-								else{
-									if(tsens_new == true) prob_try *= (1-Se+LOG_THRESH)/(Sp+LOG_THRESH);
-									else prob_try *= (Sp+LOG_THRESH)/(1-Se+LOG_THRESH);
-								}
-								
-								if(prob_try == 0) return 0;
-							}
-						}
-						break;
 					}
 				}
 				

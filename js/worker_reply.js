@@ -137,6 +137,8 @@ worker.onmessage = function (e)
 		case "Rename Species":
 			model.species = ans.species;
 			update_param();
+			model.param	= ans.param;
+			model.get_label_info_all();
 			close_bubble();
 			initialise_pages();
 			generate_screen();
@@ -304,7 +306,7 @@ worker.onmessage = function (e)
 			map_store=[];
 			break;
 			
-		case "Sim data":
+		case "Sim data": case "Add ind single":
 			{	
 				close_bubble();
 				add_gen_data(ans.head,ans.ele);
@@ -322,6 +324,9 @@ worker.onmessage = function (e)
 		
 		case "Load Example":
 			model.load(ans);
+			//prr("turn off");
+			//change_page({pa:"Simulation", su:"Run"});
+			//change_page({pa:"Inference", su:"Run"});
 			break;
 		
 		case "Import model files":
@@ -360,6 +365,8 @@ worker.onmessage = function (e)
 		
 		case "Import output": case "Import output2": case "Load Default": 
 			model.load(ans);
+			//prr("Load Change Page");
+			//change_page({pa:"Inference", su:"Run"});
 			break;
 		
 		case "Add comp map":

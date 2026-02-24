@@ -1,13 +1,40 @@
 // working on linux 22/01/26
+// working on windows 29/01/26
+// working on linux 29/01/26
+// working on linux 16/02/26
+
+// Input::mem(const string st)
+// CHANGE
+
+In model.js // TO DO NOW
+
+
+// time sheet
 
 TO DO
--- Get determinisitc solver working
+-- F1.8 3*warnings
+-- D3.4 not working
+-- D2.6 not working
+-- GE1.1 not working
+-- Generate data - use wildcard not working
+-- Extendable hash tables in interface
+-- Improve loading symbol for import (use file sizes?)
 -- Simulates genetic data and group data ( using  wildcard from js version)
-- Simulate 'add-ind-inf' data from simulation
+-- Get posterior simulation from system of different size
+-- Laura error message
+
+
+-- Simulate population structure
+-- A^C->B^D not appearing correctly in interface
+
+-- should not have uniform priors for covariance matrix. for some reason jefreys was not coming up
+-- Get determinisitc solver working
+
+-- Simulate 'add-ind-inf' data from simulation
 -- Table output for graphs
 -- Can Oli's equations be implemented?
 -- Differential equation solverin BICI?
--- Raise limit on number of time steps and email Laura
+
 -- Mention in manual about negative population problem
 -- Work out what is taking lots of memory in Grants model
 -- Event times the same... throw error?
@@ -60,6 +87,13 @@ FUTURE THINGS TO GET SORTED
 
 
 DONE
+-- Raise limit on number of time steps and email Laura
+-- Grant's problems
+-- Laura's problem
+-- Ability to export compartments and transition from model screen
+-- In example 6.6 change index on group and the equation did not change right
+-- random l in prior.js if(find_in(pri_pos,type) == undefined){
+-- When adding ind group data the name was not adding correctly
 -- allow for restart of inference
 -- Mareks diagnostic expected transition rate not right
 -- annealing too fast?

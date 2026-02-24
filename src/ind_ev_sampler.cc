@@ -300,30 +300,6 @@ void IndEvSampler::generate_ind_obs_timeline()
 					}
 				}
 				break;
-				
-			case OBS_TEST_EV:
-				if(ob.cl == cl_store){
-					const auto &om = sp.source[ob.so].obs_model;
-					auto Se = obs_eqn_value[ob.Se_obs_eqn_ref];
-					auto Sp = obs_eqn_value[ob.Sp_obs_eqn_ref];
-				
-					for(auto c = 0u; c < C; c++){
-						const auto &co = comp[c];
-						
-						double val;
-						if(om.diag_test_sens.comp[co.c] == true){ // Truely infected
-							if(ob.test_res == true) val = Se; 
-							else val = 1-Se;
-						}
-						else{
-							if(ob.test_res == false) val = Sp; 
-							else val = 1-Sp;
-						}
-						if(val < OBS_COMP_MIN) val = OBS_COMP_MIN;
-						iop[c] *= val; 
-					}					
-				}
-				break;
 			}
 			oi--;
 			
@@ -541,30 +517,6 @@ cout << endl;
 						cout << endl;
 					
 					}
-				}
-				break;
-				
-			case OBS_TEST_EV:
-				if(ob.cl == cl_store){
-					const auto &om = sp.source[ob.so].obs_model;
-					auto Se = obs_eqn_value[ob.Se_obs_eqn_ref];
-					auto Sp = obs_eqn_value[ob.Sp_obs_eqn_ref];
-				
-					for(auto c = 0u; c < C; c++){
-						const auto &co = comp[c];
-						
-						double val;
-						if(om.diag_test_sens.comp[co.c] == true){ // Truely infected
-							if(ob.test_res == true) val = Se; 
-							else val = 1-Se;
-						}
-						else{
-							if(ob.test_res == false) val = Sp; 
-							else val = 1-Sp;
-						}
-						if(val < OBS_COMP_MIN) val = OBS_COMP_MIN;
-						iop[c] *= val; 
-					}					
 				}
 				break;
 			}

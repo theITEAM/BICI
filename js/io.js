@@ -90,6 +90,14 @@ function save_file(filename,type)
 	case "Export matrix table":
 		export_matrix_table(filename);
 		return;
+	
+	case "Export comp table":
+		export_compartment_table(filename);
+		return;
+		
+	case "Export trans table":
+		export_transition_table(filename);
+		return;
 		
 	case "Export line":
 		export_line(filename);
@@ -341,6 +349,64 @@ function export_matrix_table(filename)
 		te += endl;
 	}
 
+	write_file_async(te,filename,"export");
+}
+
+
+/// Export the model as a table of compartments
+function export_compartment_table(filename)
+{
+	let p = model.get_p();
+	let cl = model.get_cl();
+	let claa = model.species[p].cla[cl];
+	
+	let coord = claa.camera.coord;
+	
+	let te = "Name";
+	if(coord == "cartesian") te += ",x,y";
+	else te += ",Lat,Lng";
+	te += ",Color"+endl;
+	
+	for(let c = 0; c < claa.comp.length; c++){
+		let co = claa.comp[c];
+		te += '"'+co.name+'"';
+		if(coord == "cartesian") te += ","+co.x+","+co.y;
+		else{
+			if(co.type == "boundary"){
+				let p = transform_latlng_inv(co.xmid,co.ymid);
+				te += ","+precision(p.lat)+","+precision(p.lng);
+			}
+			else{
+				let p = transform_latlng_inv(co.x,co.y);
+				te += ","+precision(p.lat)+","+precision(p.lng);
+			}
+		}
+		te += ","+co.col+endl;
+	}
+	
+	write_file_async(te,filename,"export");
+}
+
+
+/// Export the model as a table of transitions
+function export_transition_table(filename)
+{
+	let p = model.get_p();
+	let cl = model.get_cl();
+	let claa = model.species[p].cla[cl];
+
+	let te = "From,To,Value"+endl;
+	
+	for(let c = 0; c < claa.ntra; c++){
+		let tr = claa.tra[c];
+		
+		let value = model.get_trans_value(tr);
+		
+		let name = tr.name.replace(/→/g,"->")
+		let splna = name.split("->");
+		te += '"'+splna[0]+'","'+splna[1]+'","'+add_escape_char(value.te)+'"'+endl;
+	}
+	
 	write_file_async(te,filename,"export");
 }
 

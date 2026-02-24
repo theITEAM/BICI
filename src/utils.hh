@@ -21,6 +21,7 @@ string remove_prime(string te);
 string remove_quote(string te);
 vector <string> split(const string &s, char delimiter, bool notrim = false);
 vector <string> split_with_bracket(const string &s, char delimiter);
+vector<string> split_basic(const string &s, char delimiter);
 
 string toLower(string st);
 string toUpper(string st);
@@ -81,6 +82,7 @@ bool equal_vec(const vector <string> &vec1, const vector <string> &vec2);
 bool equal_vec(const vector <unsigned int> &vec1, const vector <unsigned int> &vec2);
 bool equal_vec(const vector <bool> &vec1, const vector <bool> &vec2);
 
+vector <unsigned int> get_list(unsigned int num);
 string stringify(const vector <string> &arr);
 string stringify(const vector <EquationInfo> &value, const vector <Dependency> &dep);
 bool includes(string st, string ch);
@@ -200,6 +202,7 @@ string prop_type_str(PropType type);
 void term_out(string te);
 string sig_fig(double num, unsigned int fig);
 string precision(double num, unsigned int dig);
+string get_cpu_time(unsigned int tics);
 
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);
@@ -231,3 +234,30 @@ void generate_data();
 void simulate_trans_exp();
 void test_incomplete_distribution();
 void mvn_jeffreys_check();
+double mem(const vector < vector < vector <unsigned int> > > &ten);
+double mem(const vector < vector <unsigned int> > &ten);
+double mem(const vector <double> &ten);
+double mem(const vector < vector <double> > &ten);
+double mem(const vector <unsigned int> &ten);
+double mem(const SwapResult &sr);
+double mem(const Table &tab);
+double mem(const PropInfo &pi);
+double mem(const vector <Calculation> &calc);
+double mem(const vector < vector <int> > &ten);
+double mem(const vector <Sample> &vec);
+double mem(const HashSimp &hash);
+double mem(const SpecPrecalc &spp);
+double mem(const vector < vector <bool> > &mat);
+double mem(const vector <bool> &vec);
+double mem(const ObsModel &val);
+double mem(const Spline &spl);
+double mem(const vector <string> &vec);
+double mem(const Dependency &de);
+double mem(const Prior &vec);
+double mem(const string st);
+double mem(const EquationInfo &ei);
+double mem(const vector <EquationInfo> &vec);
+double mem(const PopAffect &pa);
+double mem(const LinearForm &lf);
+double mem(const vector <AffectLike> &vec);
+

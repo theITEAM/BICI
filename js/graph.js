@@ -1684,13 +1684,19 @@ class Graph
 		cv.lineTo(xp,ro(y+dy));
 		
 		let w = da.thick; if(inter.printing) w *= print_line_factor;
+		if(big_eqn) w *= 2;
+		
 		cv.lineWidth = w;
 		cv.strokeStyle = da.col;
 		cv.stroke();	
 		
 		let fo = get_font(0.8);
+		if(big_eqn) fo = get_font(1.5);
+		
 		let wid = text_width(da.te,fo);
-		vert_text(da.te,xx-0.3,y+wid+0.2,fo,da.col,10); 
+
+		if(big_eqn) vert_text(da.te,xx-0.3,y+wid+0.2,fo,da.col,12); 
+		else vert_text(da.te,xx-0.3,y+wid+0.2,fo,da.col,10); 
 	}
 	
 	/// Draws a verticle line with text the other side
@@ -1857,6 +1863,7 @@ class Graph
 		let ra = this.range;
 		
 		let col = BLACK; if(ov) col = DGREY;
+		
 		if(x_lab){
 			let wid = (dx-mar.left-mar.right)/x_lab.length;
 			
@@ -1884,7 +1891,8 @@ class Graph
 			let ti = this.tick.x;
 			for(let i = 0; i < ti.length; i++){
 				let xx = x+mar.left + (dx-mar.left-mar.right)*(ti[i].value-ra.xmin)/(ra.xmax-ra.xmin);
-				center_text(ti[i].te,xx,y+0.6,fo,col);  
+				let sh = 0.6; if(big_eqn) sh *= 1.5;
+				center_text(ti[i].te,xx,y+sh,fo,col);  
 			}
 		}
 	}
@@ -1954,6 +1962,7 @@ class Graph
 		let x_param = lay.op.x_param;
 			
 		let yl = lay.dy-mar.bottom;
+		
 		if(x_lab){
 			let dy = 0.8; 
 			if(x_vert == true){ yl += 0.3; dy = mar.bottom-2.3;} 
@@ -1996,7 +2005,7 @@ class Graph
 		}
 		
 		lay.add_button({te:this.op.x_label, x:mar.left, y:lay.dy-si_graph_label-0.21, dx:lay.dx-mar.left-mar.right, dy:si_graph_label+0.1, mar:mar, param:this.op.x_param, italic:this.op.italic, type:"x-label"});
-	
+		
 		lay.add_button({x:mar.left, y:0, dx:0, dy:lay.dy-mar.bottom, param:this.op.param, italic:this.op.italic, type:"y-axis"});
 		
 		let y_lab = lay.op.y_label;
@@ -2340,7 +2349,7 @@ class Graph
 		if(timepoint && anim.playing == false){
 			let si = 1.2;
 				
-			lay.add_button({te:"t="+precision(timepoint[anim.playframe],3), x:lay.dx/2-3, y:0.3, dx:6, dy:si, type:"CenterText", font:get_font(si)}); 
+			lay.add_button({te:"t="+precision(timepoint[anim.playframe],4), x:lay.dx/2-3, y:0.3, dx:6, dy:si, type:"CenterText", font:get_font(si)}); 
 		}
 	}
 

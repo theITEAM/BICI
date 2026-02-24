@@ -10,19 +10,29 @@ using namespace std;
 class Precalc                             // Stores information about the model
 {
 	public:
-		vector <PreCalc> calcu;             // Stores precalculation
+		vector <unsigned int> pcalcu_ref;     // References calculation
+		vector <PreCalc> pcalcu;              // Stores precalculation
+		
+		unsigned int num;
+		//vector <double> hash_code;            // Hash codes used for encoding hash numbers
+		
+		vector <double> timer;                // Used for profiling
 		
 		Precalc(const vector <SpeciesSimp> &species, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, Constant &constant, const vector <double> &timepoint, const Details &details);
 		
-		//void calculate_all(const vector <unsigned int> &list_recalc, PV &param_val) const;
+		void clear_timer();
 		double get_splineval(const ElementRef &er, const vector <double> &value, const vector <double> &cval) const;
-		//void calc_spline_const(PV &param_val, const vector <unsigned int> &spline_ref) const;
 		vector <double> calculate_precalc_init(const SpecPrecalc &spec_precalc) const;
+		const vector <unsigned int>& get_list_time(unsigned int cit, const SpecPrecalc &spec) const;
 		void calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store) const;
 		bool add_eqn(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref, SpecPrecalc &spec_precalc, PrecalcAddType add_type=PRECALC_ALL);
 		unsigned int add_param(unsigned int th);
+		void calcu_add(const PreCalc &ca);
 		unsigned int add_spline(unsigned int th, SpecPrecalc &spec_precalc);
 		EqItem add(PreCalc &pcalc, SpecPrecalc &spec_precalc);
+		unsigned int add_list_time(SpecPrecalc &sprec, const vector <unsigned int> &ltime) const;
+		vector <unsigned int> combine_list_time(const vector <unsigned int> &lt1,const vector <unsigned int> &lt2) const;
+		void sp_add_test(SpecPrecalc &sprec, unsigned int i, const vector <unsigned int> &ltime, vector <double> &timer) const;
 		void sp_add(SpecPrecalc &sprec, unsigned int i, const vector <unsigned int> &ltime) const;
 		void sp_add(SpecPrecalc &sprec, const vector <unsigned int> &i_list, const vector <unsigned int> &ltime) const;
 		void print_calc() const;
@@ -32,6 +42,8 @@ class Precalc                             // Stores information about the model
 		SpecPrecalc calculate_spec_precalc_sample(const SpecPrecalc &spec_precalc) const;
 		void set_all_time();
 		SpecPrecalc calculate_spec_precalc_all(const SpecPrecalc &spec_precalc) const;
+		double hash_ca_mem() const;
+		void hash_off();
 		
 	private:
 		vector <unsigned int> get_vec(const PreCalc &ca) const;

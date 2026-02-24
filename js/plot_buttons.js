@@ -730,8 +730,20 @@ Layer.prototype.plot_button = function (bu,ov)
 	case "ProbEqn":
 		{
 			let col = BUBBLE_COL; if(ov) col = LLBLUE;
-			fill_rectangle(x,y,dx,dy,col);
-			plot_text(te,x+0.3,y+0.7*dy,bu.font,BLUE,dx-0.5);
+			fill_rectangle(x,y,dx,dy,col);	
+			let tsa = text_sup_anno(te,1,dx-0.3,"times");
+		
+			let sh = 0.4; if(dy < 1.3) sh = 0.3;
+			plot_text_tsa(tsa,x+0.3,y+dy/2+sh,BLUE);
+		}
+		break;
+		
+	case "TransLabel":
+		{
+			let col = BUBBLE_COL; 
+			fill_rectangle(x,y,dx,dy,col);	
+			let tsa = text_sup_anno(te,warn_si,dx-(x+0.3),"times");
+			plot_text_tsa(tsa,x+0.3,y+dy/2+0.3,BLACK);
 		}
 		break;
 		
@@ -854,7 +866,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			fill_rectangle(x,y,dx,dy,WHITE);
 			
 			let col = LLBLUE;
-			if(bu.shade) col = LGREY;
+			if(bu.shade) col = GREY;
 			
 			if(bu.pic != undefined){
 				let W = 0.8*dx;
@@ -886,8 +898,7 @@ Layer.prototype.plot_button = function (bu,ov)
 				draw_round_rectangle(x+mar,y+mar,dx-2*mar,dy-2*mar,1.4,"no_fill",col,7);  
 			}
 			
-			//center_text(te,x+dx/2,y+2,get_font(1.3,"bold","times"),LBLUE);
-center_text(te,x+dx/2,y+2,get_font(1.3,"bold","times"),DDGREY);
+			center_text(te,x+dx/2,y+2,get_font(1.3,"bold","times"),DDGREY);
 
 			let word = bu.word;
 			
@@ -1795,6 +1806,9 @@ center_text(te,x+dx/2,y+2,get_font(1.3,"bold","times"),DDGREY);
 		}
 		break;
 
+	case "Empty":
+		break;
+		
 	case "CheckboxButton":
 		{
 			if(bu.back_col != undefined) fill_rectangle(x,y,dx,dy,bu.back_col);
@@ -2234,7 +2248,11 @@ center_text(te,x+dx/2,y+2,get_font(1.3,"bold","times"),DDGREY);
 		break;
 	
 	case "x-tick-label":
-		inter.graph.draw_xtick_label(x,y,dx,dy,bu.mar,bu.x_lab,bu.x_vert,bu.x_param,bu.x_si,ov);
+		{
+			let si = bu.x_si;
+			if(big_eqn) si *= 1.5;
+			inter.graph.draw_xtick_label(x,y,dx,dy,bu.mar,bu.x_lab,bu.x_vert,bu.x_param,si,ov);
+		}
 		break;
 		
 	case "x-label":
@@ -2336,7 +2354,14 @@ center_text(te,x+dx/2,y+2,get_font(1.3,"bold","times"),DDGREY);
 			clear_rectangle(x,y,dx,dy);
 			let th = THICKLINE; if(bu.thick) th = bu.thick;
 			draw_line(x+0.8,y+dy/2,x+2.5,y+dy/2,bu.col,th,bu.dash); 
-			plot_equation(te,x+3,y+dy/2+0.4,1,dx-(x+3));
+			
+			if(bu.op == "trans"){
+				let tsa = text_sup_anno(te,1,dx-(x+3),"arial");
+				plot_text_tsa(tsa,x+3,y+dy/2+0.4,BLACK);
+			}
+			else{
+				plot_equation(te,x+3,y+dy/2+0.4,1,dx-(x+3));
+			}
 		}
 		break;
 		

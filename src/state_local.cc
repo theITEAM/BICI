@@ -169,18 +169,21 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 			auto ma = cmap[c];
 			if(ma != 0){
 				ssp.cpop_st_update(ti,ti_next,c,ma);
-				for(auto tii = ti; tii < ti_next; tii++){
-					double val;
-					for(auto ref : pop_data_ref[tii][c]){
-						const auto &pd = pop_data[ref];			
+				
+				if(sp.pop_data_exist){ 
+					for(auto tii = ti; tii < ti_next; tii++){
+						double val;
+						for(auto ref : pop_data_ref[tii][c]){
+							const auto &pd = pop_data[ref];			
+							
+							if(pd.time_vari == true) val = ma*obs_eqn_value[pd.comp_obs_mod_ref[c]];
+							else val = ma*obs_eqn_value[pop_filter[pd.ref].comp_obs_mod_ref[c]];
 						
-						if(pd.time_vari == true) val = ma*obs_eqn_value[pd.comp_obs_mod_ref[c]];
-						else val = ma*obs_eqn_value[pop_filter[pd.ref].comp_obs_mod_ref[c]];
-					
-						if(pdmap[ref] == UNSET){ pd_ref_list.push_back(ref); pdmap[ref] = val;}
-						else pdmap[ref] += val;
-					}
-				}	
+							if(pdmap[ref] == UNSET){ pd_ref_list.push_back(ref); pdmap[ref] = val;}
+							else pdmap[ref] += val;
+						}
+					}	
+				}
 				
 				like_ch.markov += ssp.Li_update_c(c,ma,ti,ti_next,popnum_t);
 			}
@@ -239,20 +242,22 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 			double val;
 			ssp.back.push_back(Back(POP_TRANS_DATA_TGL,ti,tr,sign));
 			
-			for(auto ref : pop_trans_ref[ti][tr]){
-				const auto &ptd = pop_trans_data[ref];
-			
-				pop_trans_data_tgl[ref][tr] += sign;
-					
-				if(ptd.time_vari == true){
-					val = sign*obs_eqn_value[ptd.trans_obs_mod_ref[tr]];
-				}
-				else{
-					val = sign*obs_eqn_value[pop_trans_filter[ptd.ref].trans_obs_mod_ref[tr]];
-				}
+			if(sp.pop_trans_data_exist){
+				for(auto ref : pop_trans_ref[ti][tr]){
+					const auto &ptd = pop_trans_data[ref];
 				
-				if(pmap[ref] == UNSET){ ref_list.push_back(ref); pmap[ref] = val;}
-				else pmap[ref] += val;
+					pop_trans_data_tgl[ref][tr] += sign;
+						
+					if(ptd.time_vari == true){
+						val = sign*obs_eqn_value[ptd.trans_obs_mod_ref[tr]];
+					}
+					else{
+						val = sign*obs_eqn_value[pop_trans_filter[ptd.ref].trans_obs_mod_ref[tr]];
+					}
+					
+					if(pmap[ref] == UNSET){ ref_list.push_back(ref); pmap[ref] = val;}
+					else pmap[ref] += val;
+				}
 			}
 		}
 	}

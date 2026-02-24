@@ -101,7 +101,7 @@ class Input                                // Stores information about the model
 		void alert_warning(string st);  
 		void alert_warning_line(string st, unsigned int line);
 		bool fatal_error() const;
-		void process_command(const CommandLine &cline, unsigned int loop);
+		void process_command(const CommandLine &cline, unsigned int loop, bool use_sim_ic);
 		string get_tag_value(string st);
 		string get_tag_val(string st, vector <Tag> &tags);
 		void cannot_find_tag(bool fatal=false);
@@ -117,6 +117,9 @@ class Input                                // Stores information about the model
 		void create_param_vector();
 		void create_pop_ref();
 		void further_simplify_equations(unsigned int per_start, unsigned int per_end);
+		void get_optimise(Details &details);
+		void get_compress(Details &details);
+		bool get_encode();
 		
 		// In 'input_commands.cc' 
 		bool species_command(unsigned int loop);
@@ -233,7 +236,7 @@ class Input                                // Stores information about the model
 		void setup_der_func(DerFuncType df_type, string te, DerFunc &df);
 		void setup_der_func_eqn();
 		void set_param_state_output();
-		void load_state_samples(unsigned int ch, string file);
+		void load_state_samples(unsigned int ch, string file, bool enc);
 		
 		// In 'input_utils.cc'
 		
@@ -243,7 +246,7 @@ class Input                                // Stores information about the model
 		Classification& get_claa();
 		bool check_char_allowed(string st, string not_allowed);
 		bool check_comp_exist(string name, unsigned int p);
-		Table load_table(const string file, string desc="");
+		Table load_table(const string file, string desc="", bool enc=false);
 		Table get_subtable(const Table &tab, const vector <string> &col_name, string desc="");
 		unsigned int find_string_in(const vector <string> &arr, string val) const;
 		bool set_loadcol(Command cname, DataSource &ds);
@@ -318,5 +321,15 @@ class Input                                // Stores information about the model
 		void check_param_define_all();
 		void check_param_define(const EquationInfo &ei);
 		string check_reserved_name(string name) const;
+		
+	// input_profiler.cc
+		void profile_memory() const;
+		void reduce_memory();
+		void hash_off(SpecPrecalc &spre) const;
+		void clear_dep(Dependency &dep);
+		double precalc_profile() const;
+		double species_profile() const;
+		double equation_profile() const;
+		double model_profile() const;
 };
 

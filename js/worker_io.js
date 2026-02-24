@@ -23,24 +23,6 @@ function new_model()
 }
 
 
-/// Sets up filters 
-function initialise_filters_setup()
-{
-	if(sim_result.on == true) initialise_plot_filters_setup(sim_result,model.sim_res);
-	if(inf_result.on == true) initialise_plot_filters_setup(inf_result,model.inf_res);
-	if(ppc_result.on == true) initialise_plot_filters_setup(ppc_result,model.ppc_res);
-}
-
-
-/// Initialises filters for output plots 
-function initialise_filters()
-{
-	if(sim_result.on == true) initialise_plot_filters(sim_result,model.sim_res);
-	if(inf_result.on == true) initialise_plot_filters(inf_result,model.inf_res);
-	if(ppc_result.on == true) initialise_plot_filters(ppc_result,model.ppc_res);
-}
-
-
 /// Restores model if import has failed
 function restore_model()
 {
@@ -348,7 +330,7 @@ function load_table(te,head,sep,filename)
 /// Reads parameter samples from a file 
 function read_param_samples_file(chain,file,result)
 {
-	let te = file.te;
+	let te = decode(file);
 
 	let warn = "Problem loading file '"+file.name+"'";
 	if(file.name == "inline") warn = "Problem loading parameter sample";
@@ -668,8 +650,8 @@ function read_param_samples(chain,te,result,warn)
 /// Reads in state samples from a file
 function read_state_samples_file(chain,file,result)
 {	
-	let te = file.te;
-	
+	let te = decode(file);
+
 	let warn = "Problem loading file '"+file.name+"'";
 	if(file.name == "inline") warn = "Problem loading state sample";
 	
@@ -698,7 +680,7 @@ function read_state_samples(chain,te,result,warn)
 		return;
 	}
 	
-	load_state_sample_header(te.substr(i_st,i),result,warn);
+	let ind_key = load_state_sample_header(te.substr(i_st,i),result,warn);
 	i++;
 	
 	te = te.substr(i);
@@ -706,7 +688,7 @@ function read_state_samples(chain,te,result,warn)
 	let sec = te.split("<<");
 
 	for(let s = 1; s < sec.length; s++){
-		read_state_sample("<<"+sec[s],chain,result,warn);
+		read_state_sample("<<"+sec[s],chain,result,warn,ind_key);
 	}	
 }
 
@@ -724,7 +706,7 @@ function load_state_sample_header(te,result,warn)
 				let spl2 = spl[1].split(":");
 				
 				if(spl2.length != 3) alert_sample(warn,29);
-				let t_start = Number(spl2[0]); if(isNaN(t_start)) alert_sample(warn,30);
+				let t_start = Number(spl2[0]); if(isNaN(t_start)) alert_sample(warn,300);
 				let dt = Number(spl2[1]); if(isNaN(dt)) alert_sample(warn,31);
 				let t_end = Number(spl2[2]); if(isNaN(t_end)) alert_sample(warn,32);
 				
@@ -738,7 +720,7 @@ function load_state_sample_header(te,result,warn)
 			else{
 				if(begin_str(st,"spline-out ")){
 					let spl = st.split(" ");
-					if(spl.length != 3) alert_sample(warn,30);
+					if(spl.length != 3) alert_sample(warn,301);
 					
 					let name = spl[1];
 					let th = find(result.param,"name",name);
@@ -764,8 +746,9 @@ function load_state_sample_header(te,result,warn)
 		}		
 	}		
 
-	result.ind_key = ind_key;
 	if(result.timepoint == undefined) alert_sample(warn,29);
+	
+	return ind_key;
 }
 
 
@@ -830,7 +813,7 @@ function create_compartment_hash(result)
 
 
 /// Reads a state file from text
-function read_state_sample(te,chain,result,warning)
+function read_state_sample(te,chain,result,warning,ind_key)
 {
 	create_compartment_hash(result);
 
@@ -850,7 +833,9 @@ function read_state_sample(te,chain,result,warning)
 	
 	let get_inf_from = [];
 	
-	let ind_key = result.ind_key;
+	let hash_all_ind = result.hash_all_ind;
+	
+	let all_ind_list = result.all_ind_list;
 	
 	let timepoint = result.timepoint;
 	
@@ -916,12 +901,10 @@ function read_state_sample(te,chain,result,warning)
 							}
 						}
 						
-						let dpop=[];
-						for(let c = 0; c < sp.comp_gl.length; c++){
-							dpop[c]=[];
-							for(let ti = 0; ti < timepoint.length-1; ti++) dpop[c][ti] = 0;
-						}	
-						sample.species[p].dpop = dpop;
+						let T = timepoint.length-1;
+						let dpop_list=[];
+						for(let ti = 0; ti < T; ti++) dpop_list[ti] = [];
+						sample.species[p].dpop_list = dpop_list;
 					}						
 					break;
 				
@@ -1045,10 +1028,8 @@ function read_state_sample(te,chain,result,warning)
 							
 							let samp_sp = sample.species[p];
 							let ti = Number(tp);
-							samp_sp.dpop[c][ti] += Number(change);
-							if(!samp_sp.add_rem_pop_change) samp_sp.add_rem_pop_change=[];
-							if(!samp_sp.add_rem_pop_change[ti]) samp_sp.add_rem_pop_change[ti] = [];
-							samp_sp.add_rem_pop_change[ti].push({c:c,dpop:Number(change)});
+							
+							samp_sp.dpop_list[ti].push({c:c,val:Number(change)});
 						}
 					}
 					break;
@@ -1110,6 +1091,7 @@ function read_state_sample(te,chain,result,warning)
 							}
 							
 							if(vec.length != timepoint.length-1){
+								pr(vec.length +" "+(timepoint.length-1)+" kk");
 								alert_sample(warn,128);
 							}
 							
@@ -1130,7 +1112,7 @@ function read_state_sample(te,chain,result,warning)
 							for(let k = 2; k < spl.length-1; k++) sp.ind_effect.push(spl[k]);	
 						}
 						else{	
-							if(spl.length != 3+sp.ind_effect.length) alert_sample(warn,30);
+							if(spl.length != 3+sp.ind_effect.length) alert_sample(warn,302);
 							
 							let name = spl[0].trim();
 							name = ind_key[name];
@@ -1230,7 +1212,15 @@ function read_state_sample(te,chain,result,warning)
 								}
 							}
 							
-							let ind = {name:name, cinit:cinit, ev:ev, ie:ie, obs:obs};
+							let ref = hash_all_ind.find(name);
+							if(ref == undefined){
+								ref = all_ind_list.length;
+								all_ind_list.push({name:name});
+								hash_all_ind.add(name,ref);
+							}
+								
+							//let ind = {name_ref:ref, name:name, cinit:cinit, ev:ev, ie:ie, obs:obs};
+							let ind = {name_ref:ref, cinit:cinit, ev:ev, ie:ie, obs:obs};
 							
 							ssp.individual.push(ind);
 						}
@@ -1242,19 +1232,19 @@ function read_state_sample(te,chain,result,warning)
 			}
 		}
 	}
-
+	
 	generate_trans_tree(get_inf_from,result,sample);
 
 	generate_cpop_init_from_ind(result,sample);
 
 	generate_transnum_from_ind(result,sample);
 
-	generate_cpop_from_transnum(result,sample); // SLOW
+	generate_cpop_from_transnum(result,sample); 
 
 	update_average(result,sample);
 
-	remove_dpop(sample);
-	
+	if(result.siminf != "sim") remove_dpop_list(sample);
+
 	result.state_memory += obj_memory(sample);
 	if(result.state_memory > mem_state_sample_max*bytes_in_GB) out_of_state_memory(result);
 
@@ -1271,7 +1261,9 @@ function read_trans_diag(ch,file,result)
 	let warning = "Problem loading file '"+file.name+"'";
 	if(file.name == "inline") warning = "Problem loading transition diagnostics";
 	
-	let line = file.te.split("\n");
+	let te = decode(file);
+	
+	let line = te.split("\n");
 
 	let T = result.timepoint.length-1;
 	
@@ -1397,10 +1389,10 @@ function update_average(result,sample)
 
 
 /// Removes dpop information (because no longer needed)
-function remove_dpop(result)
+function remove_dpop_list(result)
 {
 	for(let p = 0; p < result.species.length; p++){
-		delete result.species[p].dpop;
+		delete result.species[p].dpop_list;
 	}
 }
 

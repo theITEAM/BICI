@@ -242,24 +242,22 @@ function add_quantity_content_buts(lay)
 				
 			case "all":
 				{
-					let p = eqn.origin.p;
+					let cla_list = get_cla_list(eqn);
 					let cl_view = eqn.origin.cl;
-			
-					let sp = model.species[p];
-					let ncla = sp.cla.length;
-					if(ncla > 1){
+					if(cla_list.length > 1){
 						lay.add_button({te:"DEPENDENCY:", x:x, y:y, dx: marleft, dy:dy, type:"Text", col:WHITE, si:0.8, font:get_font(0.8)});
 					
 						x = marleft;
 						
-						for(let cl = 0; cl < ncla; cl++){
-							if(cl != cl_view){
-								let name = sp.cla[cl].name;
+						for(let k = 0; k < cla_list.length; k++){
+							let cli = cla_list[k];
+							if(cli.cl != cl_view){
+								let name = model.species[cli.p].cla[cli.cl].name;
 						
 								let w = 1.6+text_width(name,get_font(si_radio))+1;
 								if(x+w > lay.inner_dx){ x = marleft; y += 1.4;}
 						
-								lay.add_checkbox_white(x,y,name,name,eqn.cla_check[cl]);
+								lay.add_checkbox_white(x,y,name,name,eqn.cla_check[k]);
 								x += w;
 							}
 						}
@@ -275,9 +273,6 @@ function add_quantity_content_buts(lay)
 		
 	case "Add tensor": 
 		{	
-			let p = eqn.origin.p;
-			let cl_view = eqn.origin.cl;
-			
 			let marleft = 6;
 			
 			lay.add_button({te:"VARIATION:", x:0, y:y, dx: marleft, dy:dy, type:"Text", col:WHITE, si:0.8, font:get_font(0.8)});
@@ -304,9 +299,6 @@ function add_quantity_content_buts(lay)
 		
 	case "Add sum": 
 		{	
-			let p = eqn.origin.p;
-			let cl_view = eqn.origin.cl;
-			
 			let marleft = 6;
 			let ml = 4;
 			
@@ -408,18 +400,18 @@ function add_quantity_content_buts(lay)
 	case "Add time": break;
 	case "Add distance":
 		{
-			
 			let marleft = 7;
 			
-			let p = eqn.origin.p;
-			let sp = model.species[p];
-			let ncla = sp.cla.length;
+			let cla_list = get_cla_list(eqn);
+				
 			lay.add_button({te:"CLASSIFICATION:", x:x, y:y+0.1, dx: marleft, dy:dy, type:"Text", col:WHITE, si:0.8, font:get_font(0.8)});
 					
 			x = marleft;
 						
-			for(let cl = 0; cl < ncla; cl++){
-				let name = sp.cla[cl].name;
+			for(let k = 0; k < cla_list.length; k++){
+				let cli = cla_list[k];
+				
+				let name = model.species[cli.p].cla[cli.cl].name;
 		
 				let w = 1.6+text_width(name,get_font(si_radio))+1;
 				if(x+w > lay.inner_dx){ x = marleft; y += 1.4;}
@@ -613,11 +605,10 @@ function initialise_toolbar(type)
 			}
 			
 			if(eqn.mode == "all"){
-				let p = eqn.origin.p;
-				
+				let cla_list = get_cla_list(eqn);
+			
 				eqn.cla_check = [];
-				let sp = model.species[p];
-				for(let cl = 0; cl < sp.ncla; cl++){
+				for(let k = 0; k < cla_list.length; k++){
 					eqn.cla_check.push({check:false});
 				}
 			}
@@ -699,9 +690,11 @@ function initialise_toolbar(type)
 	case "Add time": break;
 	case "Add distance": 
 		{
-			let p = eqn.origin.p;	
-			let sp = model.species[p];
-			eqn.cla_radio = {value:sp.cla[0].name};
+			let cla_list = get_cla_list(eqn);
+			if(cla_list.length > 0){
+				let cli = cla_list[0];
+				eqn.cla_radio = {value:model.species[cli.p].cla[cli.cl].name};
+			}
 		}
 		break;
 
@@ -710,6 +703,28 @@ function initialise_toolbar(type)
 }
 
 
+/// Gets a list of potential classification that can be selected from
+function get_cla_list(eqn)
+{
+	let list=[];
+	
+	let pmin = 0, pmax = model.species.length;
+	
+	let p = eqn.origin.p;
+	if(p != undefined){ pmin = p; pmax = p+1;}
+		
+	for(let p = pmin; p < pmax; p++){
+		let sp = model.species[p];
+		for(let cl = 0; cl < sp.ncla; cl++){
+			let na = sp.cla[cl].name;
+			if(!find(list,"name",na)) list.push({name:na, p:p, cl:cl});
+		}
+	}	
+	
+	return list;
+}
+
+				
 /// Starts the editing of an equation
 function start_equation(te,eqn,origin_source,i)
 {
@@ -762,16 +777,14 @@ function equation_add_parameter()
 		
 	case "all":
 		{
-			let p = eqn.origin.p;
-			if(p != undefined){
-				let cl_view = eqn.origin.cl;
-					
-				let sp = model.species[p];
-				for(let cl = 0; cl < sp.ncla; cl++){
-					if(cl != cl_view && eqn.cla_check[cl].check == true){
-						if(dep != "") dep += ",";
-						dep += sp.cla[cl].index;
-					}
+			let cla_list = get_cla_list(eqn);
+			let cl_view = eqn.origin.cl;
+			
+			for(let k = 0; k < cla_list.length; k++){
+				let cli = cla_list[k];
+				if(cli.cl != cl_view && eqn.cla_check[k].check == true){
+					if(dep != "") dep += ",";
+					dep += model.species[cli.p].cla[cli.cl].index;
 				}
 			}
 		}
@@ -866,7 +879,7 @@ function equation_add_sum()
 	}
 	
 	let paste = "Σ";
-	if(eqn.dist_radio.value == "Yes") paste += "^max:";
+	if(eqn.dist_radio.value == "Yes") paste += "^[,]";
 	paste += eqn.letter;
 	
 	let dep = "";
@@ -1035,13 +1048,17 @@ function equation_add_distance()
 	}
 	
 	let val = eqn.cla_radio.value;
-	let p = eqn.origin.p;
-	let sp = model.species[p];
-	let cl = 0; while(cl < sp.cla.length && sp.cla[cl].name != val) cl++;
-	if(cl == sp.cla.length) error("Could not find index");
-	let index = sp.cla[cl].index;
+	let cla_list = get_cla_list(eqn);
 	
-	let paste = "D_"+index+","+index+"′";
+	let ind;
+	for(let k = 0; k < cla_list.length; k++){
+		let cli = cla_list[k];
+		let claa = model.species[cli.p].cla[cli.cl];
+		if(claa.name == val) ind = claa.index;
+	}
+	if(ind == undefined) error("Could not find index");
+	
+	let paste = "D_"+ind+","+ind+"′";
 	
 	cursor_paste_with_space(paste);
 	delete inter.equation.toolbar;

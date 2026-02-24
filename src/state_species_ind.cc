@@ -755,6 +755,7 @@ void StateSpecies::markov_eqn_recalc_fast(unsigned int ti, const vector <double>
 	const auto &lin_form = sp.sim_linear_speedup.lin_form;
 	const auto &eq_temp = eqn[0];
 
+	// These are equations that can be sped up due to linearity in populations
 	for(const auto &lf : lin_form.list){
 		auto val = eq_temp.calculate_item(lf.factor_precalc,ti,precalc)*val_fast[lf.sum_e_ref] + 
 		           eq_temp.calculate_item(lf.no_pop_precalc,ti,precalc);
@@ -781,6 +782,7 @@ void StateSpecies::markov_eqn_recalc_fast(unsigned int ti, const vector <double>
 		}
 	}
 	
+	// These are equations that cannot be linearly speeded up
 	for(auto e : sp.sim_linear_speedup.calc) markov_eqn_recalc(e,ti,popnum);	
 }
 
@@ -790,7 +792,7 @@ void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vecto
 {
 	markov_eqn_recalc_fast(ti,popnum_t[ti],val_fast);
 		
-	if(true){
+	if(false){ // Used to check values
 		for(auto e = 0u; e < sp.markov_eqn.size(); e++){
 			auto &me_vari = markov_eqn_vari[e];
 			auto num = me_vari.value;
@@ -874,7 +876,7 @@ void StateSpecies::sample_infecting_ind(unsigned int i, double t, unsigned int t
 		}
 		else{
 			auto pr = eq.pop_ref[j];
-			inf_from.p = model.pop[pr].sp_p;
+			inf_from.p = model.pop[pr].p;
 			
 			auto pos = sample_possibility(pop_ind[pr]);		
 			inf_from.i = pos.i;

@@ -166,3 +166,58 @@ function print_row_col(tab)
 	
 	return te;
 }
+
+
+/// Looks at how memory is being used
+function profiling()
+{
+	prr(mem(model)+" model");
+	prr(mem(model_store)+" model_store");
+	prr(mem(sim_result)+" sim_result");
+	prr(mem(inf_result)+" inf_result");
+	prr(mem(ppc_result)+" ppc_result");
+	prr(mem(sim_result_import)+" sim_result_import");
+	prr(mem(inf_result_import)+" inf_result_import");
+	prr(mem(ppc_result_import)+" ppc_result_import");
+	prr(mem(import_te)+" import_te");
+	prr(mem(edit_source)+" edit_source");
+	prr(mem(input)+" input");
+	
+	
+	//mem_split(inf_result,"inf_result");
+	
+	//mem_split(sim_result,"sim_result");
+	
+	//mem_split(sim_result.sample[0],"sim_result -> sample");
+	
+	//mem_split(sim_result.sample[0].species[0],"sim_result -> sample -> species");
+	
+	//mem_split(sim_result.sample[0].species[0].individual[0],"sim_result -> sample -> species -> individual");
+	//mem_split(sim_result.sample[0].species[0].individual[0].ev[0],"sim_result -> sample -> species -> individual");
+}
+
+
+/// Estimates memory used for an object
+function mem(ob)
+{
+	if(ob == undefined) return 0;
+	
+	//return roughSizeOfObject(ob);
+	//obj_memory(ob)
+	
+	return JSON.stringify(ob).length;	
+}
+
+
+/// Estimates memory used for an object
+function mem_split(ob,te)
+{
+	prr("\nSPLIT OBJECT: "+te);
+	prr(ob);
+	for (var key in ob) {
+		prr(key+": "+mem(ob[key])+" "+typeof(ob[key]));
+	}
+	prr("SPLIT DONE");
+	prr("");
+}
+

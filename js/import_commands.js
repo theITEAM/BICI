@@ -22,7 +22,7 @@ function import_data_table_command(cname)
 	
 	let i = find(convert,"command",cname);
 	if(i == undefined){
-		error("Counld not not import data table: "+cname);
+		error("Could not not import data table: "+cname);
 		return;
 	}
 	
@@ -64,7 +64,13 @@ function import_data_table_command(cname)
 			
 			let type = get_tag_value("type"); if(type == "") type = "fixed";
 			if(option_error("type",type,["fixed","dist"]) == true) return;
-				
+			
+			if(siminf == "inf" && type == "fixed"){
+				if(sp.type == "Individual"){
+					alert_import("Fixed initial populations cannot be used with individual-based models under inference. Either a population distribution is used, or the initial state of individuals is specified using 'add-ind' (which can be used to capture the any initial uncertainty)."); 
+				}
+			}
+			
 			if(type == "fixed") spec.radio_dist = {value:"Fixed"};
 			else spec.radio_dist = {value:"Dist"};
 		}	
@@ -106,8 +112,7 @@ function import_data_table_command(cname)
 		
 	case "Ind. Group":
 		{
-			let name = get_tag_value("name"); if(name == "") cannot_find_tag();
-			spec = { gname:name};
+			spec = {};
 		}
 		break;
 	
@@ -189,10 +194,10 @@ function import_data_table_command(cname)
 		
 	case "Diag. Test":
 		{
-			let Se = get_tag_value("Se");
-			if(Se == "") cannot_find_tag();
+			//let Se = get_tag_value("Se");
+			//if(Se == "") cannot_find_tag();
 			
-			output_error(is_eqn(Se,"Se",{zero_one_range:true}));
+			//output_error(is_eqn(Se,"Se",{zero_one_range:true}));
 			
 			let Sp = get_tag_value("Sp");
 			if(Sp == "") cannot_find_tag();
@@ -212,27 +217,69 @@ function import_data_table_command(cname)
 			let comp = get_tag_value("comp");
 			if(comp == "") cannot_find_tag();
 		
+			let comp_sen=[];
+			let cl_sel;
+		
 			let spl = comp.split(",");
+			for(let i = 0; i < spl.length; i++){
+				let spl2 = spl[i].split("[");				
+				let co, Se;
+				if(spl2.length == 2){
+					co = spl2[0];
+					let bra = spl2[1].trim();
+					if(bra.length > 0){
+						let len = bra.length;
+						if(bra.substr(len-1,1) == "]"){
+							bra = bra.substr(0,len-1);
+							let spl3 = bra.split(":");
+							if(spl3.length == 2){
+								if(spl3[0].trim() == "Se"){
+									Se = spl3[1].trim();
+								}
+							}
+						}
+					}						
+				}
+					
+				if(co == undefined || Se == undefined){	
+					alert_import("In 'comp' the value '"+spl[i]+"' should be in the format 'compartment[Se:sensitivity]'");
+				}
+				else{
+					let cl = get_cl_from_comp(co,p);
+					if(cl == undefined){
+						alert_import("Value '"+co+"' is not a compartment");
+					}
+					
+					if(cl_sel == undefined) cl_sel = cl;
+					else{
+						if(cl != cl_sel) alert_import("In 'comp' cannot have compartments from different classifications.");
+					}
 			
-			let cl = get_cl_from_comp(spl[0],p);
-			if(cl == undefined){
-				alert_import("Value '"+spl[0]+"' is not a compartment");
+					comp_sen.push({co:co, Se:Se});
+				}
 			}
 			
-			let claa = model.species[p].cla[cl];
+			let claa = model.species[p].cla[cl_sel];
 			
 			let cb = {name:claa.name, value:[]};
 			
 			for(let c = 0; c < claa.ncomp; c++){
 				let name = claa.comp[c].name;
-				if(find_in(spl,name) != undefined) cb.value[c] = {comp_name_store:name, check:true};
-				else cb.value[c] = {comp_name_store:name, check:false};
+				let k = 0; while(k < comp_sen.length && comp_sen[k].co != name) k++;
+				
+				if(k < comp_sen.length){
+					let Se_eqn = create_equation(comp_sen[k].Se,"Se");
+					cb.value[c] = {comp_name_store:name, check:true, Se_eqn:Se_eqn};
+				}
+				else{
+					let Se_eqn = create_equation("1","Se");
+					cb.value[c] = {comp_name_store:name, check:false, Se_eqn:Se_eqn};
+				}
 			}
 	
-			let Se_eqn = create_equation(Se,"Se");
 			let Sp_eqn = create_equation(Sp,"Sp");
 			
-			spec = {cl_drop:{te:claa.name}, Se_eqn:Se_eqn, Sp_eqn:Sp_eqn, pos_result:pos, neg_result:neg, check_box:cb};
+			spec = {cl_drop:{te:claa.name}, Sp_eqn:Sp_eqn, pos_result:pos, neg_result:neg, check_box:cb};
 		}
 		break;
 		
@@ -694,7 +741,8 @@ function compartment_all_command()
 
 	let tags_list = get_tags_list(file);
 	
-	for(let i = 0; i < tags_list.length; i++){
+	let imax = tags_list.length;
+	for(let i = 0; i < imax; i++){
 		let tags = tags_list[i];
 		imp.all_row = "(line "+(i+2)+" in file)";
 		compartment_command2(tags);
@@ -1498,7 +1546,7 @@ function param_command2(full_name,per_start,per_end,op)
 		}
 	}
 	else{
-		if(value != "" || cons != "" || reparam != ""){
+		if(value != "" || cons != "" || reparam != ""){	
 			set_default_value(par);
 			
 			let desc = "For 'value'";
@@ -1696,6 +1744,10 @@ function simulation_command()
 	details.indmax = check_pos_integer("ind-max",INDMAX_DEFAULT);
 	
 	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
+	
+	set_optimise_option(details);
+	
+	set_compress_option(details);
 }
 
 
@@ -1840,6 +1892,10 @@ function inference_command()
 		if(sync == "off") details.sync_on.value = "Off";
 	}
 	
+	set_optimise_option(details);
+	
+	set_compress_option(details);
+	
 	let det_ppc = model.ppc_details;
 	if(det_ppc.ppc_t_start == ""){
 		det_ppc.ppc_t_start = details.t_start;
@@ -1851,6 +1907,7 @@ function inference_command()
 		if(option_error("diagnostics",diag,["on","off"]) == true) return;
 	}
 }
+
 
 
 /// Applies the post-sim command
@@ -1893,6 +1950,19 @@ function post_sim_command()
 	if(seed != ""){ details.seed = seed; details.seed_on.value = "Yes";}
 	
 	let alg = "gillespie";
+	
+	details.run_inf_model = {value:"Yes"};
+	
+	let upio = get_tag_value("param-only").toLowerCase();
+	if(upio != ""){
+		if(upio == "true") details.run_inf_model.value = "No";
+		else{
+			if(upio == "false") details.run_inf_model.value = "Yes";
+			else{
+				alert_import("The tag 'param-only' must be 'true' or 'false'");
+			}
+		}
+	}
 	
 	if(option_error("algorithm",alg,sim_alg_list) == true) return;
 	details.algorithm.value = alg;	
@@ -2502,7 +2572,7 @@ function sim_param_command()
 	if(file == "") cannot_find_tag();
 	let fi = get_fi(file);
 	
-	read_param_samples_file(0,fi,sim_result);
+	read_param_samples_file(0,fi,sim_result_import);
 }
 
 
@@ -2526,7 +2596,7 @@ function inf_param_command()
 	
 	let chain = get_chain_value();
 
-	read_param_samples_file(chain,fi,inf_result);
+	read_param_samples_file(chain,fi,inf_result_import);
 }
 
 
@@ -2537,7 +2607,7 @@ function inf_generation_command()
 	if(file == "") cannot_find_tag();
 	let fi = get_fi(file);
 	
-	read_param_samples_file("gen-plot",fi,inf_result);
+	read_param_samples_file("gen-plot",fi,inf_result_import);
 }
 
 
@@ -2550,9 +2620,11 @@ function inf_diagnostics_command()
 	
 	let chain = get_chain_value();
 	
-	let te = fi.te.replace(/\r/g,"");
-	inf_result.diagnostics[chain] = te;
-	inf_result.prop_diag_on = true;
+	let te = decode(fi);
+	
+	te = te.replace(/\r/g,"");
+	inf_result_import.diagnostics[chain] = te;
+	inf_result_import.prop_diag_on = true;
 }
 
 
@@ -2563,7 +2635,7 @@ function post_sim_param_command()
 	if(file == "") cannot_find_tag();
 	let fi = get_fi(file);
 	
-	read_param_samples_file(0,fi,ppc_result);
+	read_param_samples_file(0,fi,ppc_result_import);
 }
 
 
@@ -2574,15 +2646,17 @@ function sim_state_command()
 	if(file == "") cannot_find_tag();
 	let fi = get_fi(file);
 	
-	read_state_samples_file(0,fi,sim_result);
+	read_state_samples_file(0,fi,sim_result_import);
 }
 
 
-/// Reads in proposal informatio
+/// Reads in proposal information
 function proposal_inf_command()
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
+	
+	let compress = get_tag_value("compress");
 	
 	let ch = get_chain_value();
 }
@@ -2597,7 +2671,7 @@ function inf_state_command()
 	
 	let chain = get_chain_value();
 
-	read_state_samples_file(chain,fi,inf_result);
+	read_state_samples_file(chain,fi,inf_result_import);
 }
 
 
@@ -2608,7 +2682,7 @@ function post_sim_state_command()
 	if(file == "") cannot_find_tag();
 	let fi = get_fi(file);
 	
-	read_state_samples_file(0,fi,ppc_result);
+	read_state_samples_file(0,fi,ppc_result_import);
 }
 
 
@@ -2621,7 +2695,7 @@ function trans_diag_command()
 	
 	let ch = get_chain_value();
 	
-	read_trans_diag(ch,fi,inf_result);
+	read_trans_diag(ch,fi,inf_result_import);
 }
 
 

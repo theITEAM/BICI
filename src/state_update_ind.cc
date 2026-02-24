@@ -142,7 +142,7 @@ void State::change_population(unsigned int ti, unsigned int ti_next, unsigned in
 		}
 	}
 
-	if(model.contains_tvreparam){
+	if(model.pop_reparam_th_on){
 		const auto &prt = model.pop_reparam_th[k];
 		for(auto tii = ti; tii < ti_next; tii++){
 			for(auto th : prt[tii]){

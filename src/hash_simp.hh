@@ -4,7 +4,7 @@
 
 using namespace std;
 
-const auto HASH_SIMP_NUM = 50;             // How bit the hash code is
+const auto HASH_SIMP_NUM_DEF = 11;        // Default size for hash code 
 
 struct HashSimpValue
 {
@@ -16,8 +16,14 @@ class HashSimp                                 // Stores information about the m
 {
 public:
 	HashSimp();
+	
+	void off();
 	unsigned int find(unsigned int val) const;
+	void enlarge();
 	void add(unsigned int num, unsigned int val); 
 	
+	bool on;
+	double n;             // Number of elements
+	unsigned int size;    // Size of hash table
 	vector < vector <HashSimpValue> > table;
 };

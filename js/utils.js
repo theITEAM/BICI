@@ -302,7 +302,7 @@ function precision(x,digit)
 	
 	let mod = x; if(mod < 0) mod = -mod; 
 	
-	let digit_min = Math.floor(1+Math.log10(mod));
+	let digit_min = Math.floor(1+Math.log10(mod)+0.1);
 	if(digit_min < 1) digit_min = 1;
 
 	if(digit < digit_min) digit = digit_min;
@@ -310,9 +310,10 @@ function precision(x,digit)
 	let val = Number(x).toPrecision(digit);
 	for(let j = digit-1; j >= digit_min; j--){
 		let val2 = x.toPrecision(j);
-		if(Number(val) == Number(val2)) val = val2; else break;
+		if(Number(val) == Number(val2)) val = val2; 
+		else break;
 	}
- 
+
 	return val;
 }
 
@@ -1219,5 +1220,14 @@ function check_reserved_name(name,op)
 	}
 	
 	return "";
+}
+
+
+/// Ensures that line breaks are escaped 
+function esc(st)
+{
+	st = st.replace(/\n/g,"");
+	st = st.trim();
+	return st;
 }
 

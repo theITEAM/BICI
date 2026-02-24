@@ -39,6 +39,10 @@ let sim_result = {siminf:"sim"};                  // Stores results from simulat
 let inf_result = {siminf:"inf"};                  // Stores results from inference
 let ppc_result = {siminf:"ppc"};                  // Stores results from ppc
 
+let sim_result_import = {siminf:"sim"};           // Creates on import and copies once done
+let inf_result_import = {siminf:"inf"};
+let ppc_result_import = {siminf:"ppc"};
+
 let import_te;                                    // The text used to import the file
 
 let edit_source;                                  // Used when editting a data source
@@ -106,6 +110,11 @@ function process(e)
 	
 	//prr(input.type+" type");
 	switch(input.type){
+	case "Factor reduce":
+		model.factor_reduce(info.p,info.cl,info.fac);
+		update_mod = true;
+		break;
+		
 	case "Add A pedigree":
 		{
 			let so = info.edit_source;
@@ -293,7 +302,7 @@ function process(e)
 		break;
 		
 	case "StartPPC":
-		create_ppc_file();
+		create_ppc_file(info);
 		break;
 		
 	case "StartEXT":
@@ -324,7 +333,7 @@ function process(e)
 	case "Rename Species":
 		model.rename_species(info.species_new,info.p); 
 		model.check_ob_string_exist(model,"model",info.species_old);
-		post({species:strip_heavy(model.species)});
+		post({species:strip_heavy(model.species), param:strip_heavy(model.param),});
 		break;
 		
 	case "Rename Classification":
@@ -335,7 +344,7 @@ function process(e)
 		break;
 		
 	case "Rename Index":
-		model.rename_index(info.index_new,info.p,info.cl,true);			
+		model.rename_index(info.index_new,info.p,info.cl);			
 		post({index_old:info.index_old, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
 		break;
 		
@@ -604,6 +613,12 @@ function process(e)
 		}
 		break;
 		
+	case "Add ind single":
+		{
+			add_sing_ind_per_comp(info);
+		}
+		break;
+		
 	case "Graph spline":
 		{
 			let res = info;
@@ -742,7 +757,7 @@ function process(e)
 				{
 					let indi = sim_result.sample[0].species[info.p].individual;
 					for(let i = 0; i < indi.length; i++){
-						name_list.push({name:indi[i].name});
+						name_list.push({name:sim_result.all_ind_list[indi[i].name_ref].name});
 					}
 				}
 				break;

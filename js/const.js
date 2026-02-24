@@ -6,13 +6,13 @@
 // 59127 lines of code (16/15/25)
 // 62667 lines of code (17/09/25)
 
-//let ver="windows";         // Determines platform
-let ver="linux";
+let ver="windows";         // Determines platform
+//let ver="linux";
 //let ver="mac";
 
 let mac_temp_dir = "/tmp/BICI_files/";
 
-let win_linux = true;//false;                            // When working on win running linux 
+let win_linux = false;                            // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
@@ -21,7 +21,7 @@ let testing = false;                              // Used logo to load up result
 let load_map_fast = false;                        // If loads up world map from local computer
 let make_one_chain = false;                       // Make into one chain (for diagnostic purposes)
 
-if(win_linux || false){ testing = true; debug = true; load_map_fast = true;}
+if(win_linux || true){ testing = true; debug = true; load_map_fast = true;}
 //testing = true;
 //if(win_linux){ testing = true; debug = true; load_map_fast = true;}
 //if(true){ testing = true; debug = true;};
@@ -191,10 +191,13 @@ const si_drop = 0.8;                               // The font size used for dro
 const si_toolbut = 0.9;                            // Size of text on toolbar buttons
 const si_clatab = 0.8;                             // Size of font in classification tab
 const si_claindextab = 1;                          // Size of font in classification tab for index
-const si_graph_label = 1.2;                        // Size of font for axis labels
-const si_graph_param_label = 1.2;                  // Size of font for axis labels- (when parameter)
-const si_graph_tick = 0.9;                         // Size of font for ticks
-const tick_si = 0.4;                               // Size of tick marks
+let  si_graph_label = 1.2;                         // Size of font for axis labels
+if(big_eqn) si_graph_label *= 1.5
+let si_graph_param_label = 1.2;                    // Size of font for axis labels- (when parameter)
+if(big_eqn) si_graph_param_label *= 1.5;
+let si_graph_tick = 0.9;                           // Size of font for ticks
+if(big_eqn) si_graph_tick *= 1.5;
+let tick_si = 0.4;                                 // Size of tick marks
 const yaxisgap = 0.5;                              // the extra size on the y-axis tick marks
 const width_table_max = 10;                        // The maximum width for table elements
 const si_big = 1.4;                                // Used for displaying variable names
@@ -527,6 +530,9 @@ const like_name = ["L^markov","L^non-markov","L^ie","L^dist","L^obs","L^genetic-
 
 const trans_tree_name = ["N^origin","N^infected","N^mut-tree","N^mut-origin","N^unobs","t^root"];
 
+const dic_list = [" ","!","\"","#","$","%","&","'","(",")","*","+",",","-",".","/","0","1","2","3","4","5","6","7","8","9",":",";","<","=",">","?","@","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","[","\\","]","^","_","`","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","{","|","}","~","\t","\n","\r","α","β","γ","Γ","δ","Δ","ε","ζ","η","Η","θ","Θ","ι","κ","λ","Λ","μ","ν","ξ","Ξ","ο","π","Π","ρ","σ","τ","υ","φ","Φ","χ","ψ","Ψ","ω","Ω","Σ","∫","→","〈","〉"];
+
+
 // Numeric constants
 
 const UNSET = 99999999;                            // Deotes unset
@@ -552,6 +558,8 @@ const ANNEAL_RATE_DEFAULT = "0.01";                // Rate at which annealing is
 const COORD_DEFAULT = "cartesian";                 // Default coordinate system
 const INTERNAL_ERROR = " This is an internal error to BICI and not something you have done wrong! Please send the BICI script to Chris for diagnosis.";
 
+const COMPRESS_NUM_MAX = 16000;                    // The maximum number used for compression
+const COMPRESS_DIC_MAX = 512000000;                // The maximum number of dictionary items  
 const PARAM_OUTPUT_MAX_DEFAULT = 1000;             // The default maximum number of tensor elements to be output
 const INDMAX_DEFAULT = 20000;                      // The default maximum number of individuals
 const BURNIN_FRAC_DEFAULT = 30;                    // The default percentage burnin

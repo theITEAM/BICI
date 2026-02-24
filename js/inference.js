@@ -347,10 +347,6 @@ function add_inf_start_buts(lay)
 		
 		cy = lay.add_subtitle("Algorithm",cx,cy,WHITE,{te:inf_algorithm});
 
-		//cy = lay.add_paragraph("Set the algorithm used to perform inference:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
-			
-		//cy += 0.5;
-		
 		let xx = 3, gap = 0.5;
 		xx = lay.add_radio(xx,cy+0.1,"DA-MCMC","DA-MCMC",model.inf_details.algorithm,{back_col:WHITE});
 		xx += gap;
@@ -488,8 +484,10 @@ function add_inf_start_buts(lay)
 		
 		lay.add_corner_button([["Start","Grey","StartInference"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
-	else{
-		let alg = model.inf_details.algorithm.value;
+	
+	let alg = model.inf_details.algorithm.value;
+	
+	if(inter.options == true){
 		let te = "Further options for the "+alg+" algorithm";
 		
 		cy = lay.add_title(te,cx,cy,{te:further_inf_text});
@@ -497,9 +495,7 @@ function add_inf_start_buts(lay)
 		cy += 1;
 		
 		let gap = 1.8;
-		if(alg =="DA-MCMC") gap = 0.7;
-		if(alg =="PAS-MCMC") gap = 1.0;
-		
+	
 		switch(alg){
 		case "DA-MCMC": case "PAS-MCMC": 
 			{
@@ -566,23 +562,7 @@ function add_inf_start_buts(lay)
 			break;
 		}
 		
-		cy = lay.add_subtitle("Individual maximum",cx,cy,WHITE,{te:indmax_text});
-				
-		cy = lay.add_paragraph("Maximum number of individuals (for individual-based models):",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
-	
-		let yy = cy-2.5;
-		add_right_input_field(yy,"Maximum",{type:"inf_indmax",update:true},lay);
-	
-		cy += gap;
-		
-		cy = lay.add_subtitle("Parameter outputs",cx,cy,WHITE,{te:paramoutputmax_text});
-				
-		cy = lay.add_paragraph("Threshold number of tensor elements above which tensor not output:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
-	
-		yy = cy-2.5;
-		add_right_input_field(yy,"Maximum",{type:"inf_paramout",update:true},lay);
-	
-		cy += gap;
+		//cy += gap;
 	
 		switch(alg){
 		case "DA-MCMC":
@@ -648,16 +628,20 @@ function add_inf_start_buts(lay)
 			break;
 		}
 		
-		cy = set_seed(cx,cy,"inf_seed",model.inf_details,lay);
-		
 		switch(alg){
 		case "DA-MCMC": case "PAS-MCMC":
 			cy = set_sync(cx,cy,model.inf_details,lay);
 			break;
 		}
 		
+		cy = set_seed(cx,cy,"inf_seed",model.inf_details,lay);
+	
+		add_corner_link("> Advanced options","AdOptions",lay);
+		
 		lay.add_corner_button([["Done","Grey","OptionsDone"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
+	
+	if(inter.options == "advanced") output_advanced_options("inf",lay);
 }
 
 

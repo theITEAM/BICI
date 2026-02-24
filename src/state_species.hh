@@ -289,7 +289,7 @@ class StateSpecies                         // Stores information about the state
 		vector <double> calculate_pop_data_cgl_trgl();
 		void restore_pop_data_cgl_trgl(const vector <double> &store);
 		void likelihood_observation_restore(const vector <double> &store);
-		double like_diag_test(unsigned int c, const ObsData &ob) const;
+		//double like_diag_test(unsigned int c, const ObsData &ob) const;
 		double like_trans_prob_obs(unsigned int tr, const ObsData &ob) const;
 		double like_comp_obs(unsigned int c, const ObsData &ob) const;
 		double like_ind_init_obs(unsigned int c, unsigned int entref) const;

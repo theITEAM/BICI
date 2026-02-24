@@ -69,9 +69,9 @@ let imp = {};                                      // Stores information as impo
 
 /// Import a script to define (or partially define) model and data 
 function import_file(te,file,clear_results)                                
-{		
+{	
 	import_te = te;
-
+	
 	percent(0);
 
 	//te = te.replace(/\r/g,"");
@@ -92,7 +92,9 @@ function import_file(te,file,clear_results)
 
 	let data_file_list = get_data_file_list(pro,10,15);
 
-	if(model != undefined) model_store = copy(model);
+	if(model != undefined){
+		model_store = copy(model);
+	}
 	
 	init_result(pro,clear_results);
 
@@ -125,11 +127,12 @@ function load_local(data_file_list,per_start,per_end)
 /// Continues importing after all files have been loaded
 function import_file2(data_file_list)
 {
+	let ts = clock();
 	loading_mess("Processing...");
 	
 	let pro = imp.pro;
 	imp.data_file_list = data_file_list;
-	
+
 	model = new Model();	 
 	model.start_new();
 	
@@ -177,11 +180,11 @@ function import_file2(data_file_list)
 
 			com_ti_sum += 0.1*import_frac_pro; per = show_percent(com_ti_sum,per,per_start,per_end);
 			
-			if(sim_result.load) results_add_model(sim_result,model.sim_details,"sim");
-			if(inf_result.load) results_add_model(inf_result,model.inf_details,"inf");
-			if(ppc_result.load) results_add_model(ppc_result,model.ppc_details,"ppc");
+			if(sim_result_import.load) results_add_model(sim_result_import,model.sim_details,"sim");
+			if(inf_result_import.load) results_add_model(inf_result_import,model.inf_details,"inf");
+			if(ppc_result_import.load) results_add_model(ppc_result_import,model.ppc_details,"ppc");
 		
-			if(inf_result.load) inf_result.diagnostics_on = true;
+			if(inf_result_import.load) inf_result_import.diagnostics_on = true;
 			
 			com_ti_sum += 0.5*import_frac_pro; per = show_percent(com_ti_sum,per,per_start,per_end);
 		
@@ -307,9 +310,9 @@ function import_file2(data_file_list)
 		}
 	}
 	
-	if(sim_result.load) results_finalise(sim_result);
-	if(inf_result.load) results_finalise(inf_result);
-	if(ppc_result.load) results_finalise(ppc_result);
+	if(sim_result_import.load) results_finalise(sim_result_import);
+	if(inf_result_import.load) results_finalise(inf_result_import);
+	if(ppc_result_import.load) results_finalise(ppc_result_import);
 
 	percent(90);
 	
@@ -328,13 +331,26 @@ function import_file2(data_file_list)
 	if(input.type == "Load Example") model.example = input.info;
 
 	let ans = { model:strip_heavy(model), info:in2, map_store:map_store};
-	if(sim_result.load) ans.sim_load = true;
-	if(inf_result.load) ans.inf_load = true;
-	if(ppc_result.load) ans.ppc_load = true;
+	
+	if(!imp.warn){
+		if(sim_result_import.load){ sim_result = sim_result_import; ans.sim_load = true;}
+		if(inf_result_import.load){ inf_result = inf_result_import; ans.inf_load = true;}
+		if(ppc_result_import.load){ ppc_result = ppc_result_import; ans.ppc_load = true;}
+	}
 	
 	import_post_mess(ans);
 	
+	sim_result_import = {siminf:"sim"};  
+	inf_result_import = {siminf:"inf"};
+	ppc_result_import = {siminf:"ppc"};
+	
 	map_store = [];
+	
+	imp = {};  // Removes to save memory	
+	
+	//profiling();  // Looks at where memory is being used
+	
+	//pr("Processing time: "+(clock()-ts)/1000);
 }
 
 
@@ -342,7 +358,7 @@ function import_file2(data_file_list)
 function show_percent(com_ti_sum,per,per_start,per_end)
 {
 	let per_new = Math.floor(per_start+(per_end-per_start)*com_ti_sum);
-	if(per_new != per)percent(per_new);
+	if(per_new != per) percent(per_new);
 	return per_new;
 }
 
@@ -351,23 +367,23 @@ function show_percent(com_ti_sum,per,per_start,per_end)
 function init_result(pro,clear_results)
 {
 	if(clear_results){
-		sim_result = {siminf:"sim"};                    // Stores results from simulation
-		inf_result = {siminf:"inf"};                  // Stores results from inference
-		ppc_result = {siminf:"ppc"};
+		sim_result_import = {siminf:"sim"};                    // Stores results from simulation
+		inf_result_import = {siminf:"inf"};                  // Stores results from inference
+		ppc_result_import = {siminf:"ppc"};
 	}
-	
-	sim_result.load = false;
-	inf_result.load = false;
-	ppc_result.load = false;
+		
+	sim_result_import.load = false;
+	inf_result_import.load = false;
+	ppc_result_import.load = false;
 
 	for(let m = 0; m < pro.processed.length; m++){
 		let line = pro.processed[m];
 		let cname = line.type;
 		
 		switch(cname){
-		case "param-sim": case "state-sim": turn_result_on(sim_result,"sim"); break;
-		case "param-inf": case "state-inf": turn_result_on(inf_result,"inf"); break;
-		case "param-post-sim": case "state-post-sim": turn_result_on(ppc_result,"ppc"); break;
+		case "param-sim": case "state-sim": turn_result_on(sim_result_import,"sim"); break;
+		case "param-inf": case "state-inf": turn_result_on(inf_result_import,"inf"); break;
+		case "param-post-sim": case "state-post-sim": turn_result_on(ppc_result_import,"ppc"); break;
 		default: break;
 		}
 	}
@@ -445,6 +461,8 @@ function load_default_map()
 /// Processes a given command
 function process_command(cname,tags,loop,per_start,per_end)
 {
+	//prr("process"); prr(cname); prr(tags);
+	
 	imp.tags = tags;
 	imp.cname = cname;
 	imp.all_row = "";
@@ -1566,11 +1584,20 @@ function import_post_mess(mess)
 /// Gets file text from a given tag
 function get_fi(file)
 {
-	if(file.te != undefined) return file;
-	if(file.ref != undefined) return imp.data_file_list[file.ref];
-	error("Problem getting file");
+	let fi;
+	if(file.te != undefined) fi = file;
+	else{
+		if(file.ref != undefined) fi = imp.data_file_list[file.ref];
+	}
+	
+	if(fi == undefined) error("Problem getting file");
+	else{
+		let enc = get_tag_value("compress");
+		if(enc.toLowerCase() == "true") fi.encode = true;
+	}
+	
+	return fi;
 }
-
 
 
 /// If text from file then extracts
@@ -1596,7 +1623,7 @@ function load_param_value(par,value,head_col,valu,desc)
 	for(let k = 0; k < ele_list.length; k++){
 		set_element(value,ele_list[k],"0");
 	}
-	
+
 	let fi = get_fi(valu);
 	
 	let tab = load_table(fi.te,true,fi.sep,fi.name);
@@ -1648,15 +1675,25 @@ function load_param_value(par,value,head_col,valu,desc)
 		{
 			let ncol = subtab.ncol;
 
+			let hash_vec = [];
+			for(let i = 0; i < ncol-1; i++){ 
+				hash_vec[i] = new Hash();
+				
+				hash_vec[i].create_vec(par.list[i]);
+			}
+			
 			for(let r = 0; r < subtab.nrow; r++){
+				let eler = subtab.ele[r];
+				
 				let ind = [];
 				for(let i = 0; i < ncol-1; i++){
-					ind[i] = find_in(par.list[i],subtab.ele[r][i]);
+					ind[i] = hash_vec[i].find(eler[i]);
 					if(ind[i] == undefined){
-						alert_import(desc+" the element '"+subtab.ele[r][i]+"' is not valid (column '"+subtab.heading[i]+"', row "+(r+2)+")");
+						alert_import(desc+" the element '"+eler[i]+"' is not valid (column '"+subtab.heading[i]+"', row "+(r+2)+")");
 					}
 				}
-				let ele = subtab.ele[r][ncol-1];
+				
+				let ele = eler[ncol-1];
 				
 				let val = get_val_from_ele(ele,par,head_col,desc,r,subtab.heading[ncol-1]);
 				
@@ -1745,4 +1782,122 @@ function get_val_from_ele(ele,par,head_col,desc,r,col)
 	
 	return val;
 }
+
+
+/// Sets up filters 
+function initialise_filters_setup()
+{
+	if(sim_result_import.on == true) initialise_plot_filters_setup(sim_result_import,model.sim_res);
+	if(inf_result_import.on == true) initialise_plot_filters_setup(inf_result_import,model.inf_res);
+	if(ppc_result_import.on == true) initialise_plot_filters_setup(ppc_result_import,model.ppc_res);
+}
 	
+	
+/// Initialises filters for output plots 
+function initialise_filters()
+{
+	if(sim_result_import.on == true) initialise_plot_filters(sim_result_import,model.sim_res);
+	if(inf_result_import.on == true) initialise_plot_filters(inf_result_import,model.inf_res);
+	if(ppc_result_import.on == true) initialise_plot_filters(ppc_result_import,model.ppc_res);
+}
+
+
+/// Compresses a string using the LZW algorithm
+function decode(fi)
+{
+	if(fi.encode != true) return fi.te;
+
+	let output=[];
+	
+	let te = fi.te;
+	for(let i = 0; i < te.length; i++){ 	
+		let c = te.charCodeAt(i);
+		if(c >= COMPRESS_NUM_MAX){
+			i++;
+			let c2 = te.charCodeAt(i);
+			if(c2 > 92) c2--;
+			c += COMPRESS_NUM_MAX*(c2-35);
+		}
+		
+		if(c != 10){
+			if(c > 92) c--;
+			output.push(c-35);
+		}
+	}		
+	
+	let imax = output.length;
+
+	let dic=[];
+	
+	for(let i = 0; i < dic_list.length; i++){
+		dic.push(dic_list[i]);
+	}
+	
+	te="";
+
+	let prev="";
+	for(let i = 0; i < imax; i++){
+		let val = output[i];
+		let W;
+		if(val < dic.length) W = dic[val];
+		else W = prev +prev[0];
+		
+		te += W;
+		if(prev != ""){
+			let st = prev + W[0];
+			
+			if(dic.length < COMPRESS_DIC_MAX) dic.push(st);
+		}
+		prev = W;
+	}
+	
+	// Adds in any repeated lines
+	{
+		let fl = false;
+		let lines = te.split('\n');
+		for(let li = 0; li < lines.length; li++){
+			if(lines[li].length > 1){
+				if(lines[li].substr(0,1) == "@"){
+					let num = Number(lines[li].substr(1));
+					if(!isNaN(num)){
+						lines[li] = lines[li-num];
+						fl = true;
+					}
+				}
+			}
+		}		
+		
+		if(fl == true){
+			te = "";
+			for(let li = 0; li < lines.length; li++){
+				te += lines[li];
+				if(li+1 < lines.length) te += endl;
+			}
+		}
+	}
+	return te;
+}
+
+
+/// Sets the optimise options
+function set_optimise_option(details)
+{
+	let optimise = get_tag_value("optimise").toLowerCase();
+	if(optimise == "") optimise = "auto";
+	
+	if(option_error("optimise",optimise,["speed","memory","auto"]) == true) return;
+	
+	details.optimise.value = optimise;
+}
+
+
+/// Sets the optimise options
+function set_compress_option(details)
+{
+	let compress = get_tag_value("compress").toLowerCase();
+	if(compress == "") compress = "auto";
+	
+	if(option_error("compress",compress,["always","never","auto"]) == true) return;
+	
+	details.compress.value = compress;
+}

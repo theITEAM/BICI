@@ -55,7 +55,6 @@ function add_bubble_buts(lay)
 			break;
 			
 		default:
-			
 			bubble_input(cont,"Value:",{type:"BF_val"});
 			add_end_button(cont,"Calculate","CalculateBF",{});	
 		}
@@ -534,6 +533,57 @@ function add_bubble_buts(lay)
 	case "AddButton":
 		{	
 			switch(bu.ac){
+			case "AddIndividuals":
+				{
+					cont.dx = 11;
+					
+					let ac;
+				
+					switch(bub.mode){
+					case "AddFarmInd":
+						bubble_addtitle(cont,"One ind. per comp.",{te:add_ind_farm_text2, title:"One individual per compartment"});
+				
+						bubble_addtext(cont,"Classification:",0);
+						cont.y -= 0.5;
+						bubble_adddropdown(cont,0,11,bub.drop,bub.drop.pos);
+						cont.y += 0.3;
+						
+						let set = true;
+						if(bub.drop.te == select_drop_str) set = false;
+						else{
+							let p = model.get_p();
+							let sp = model.species[p];
+							for(let cl = 0; cl < sp.ncla; cl++){
+								let claa = sp.cla[cl];
+								if(claa.name != bub.drop.te){
+									bubble_addtext(cont,claa.name+":",0);
+									cont.y -= 0.5;
+									if(bub.drop.cla[cl].te == select_drop_str) set = false;
+
+									bubble_adddropdown(cont,0,11,bub.drop.cla[cl],bub.drop.cla[cl].posc);
+									cont.y += 0.3;
+								}
+							}
+						}
+						
+						bubble_input(cont,"Prefix:",{type:"prefix", w:11});
+						
+						if(set) ac = "AddIndividuals3";
+						break;
+						
+					default:
+						bubble_addtitle(cont,"Add indiviudals",{te:add_ind_farm_text});
+				
+						bubble_addradio(cont,0,"File","Load from file",bub.radio);
+						bubble_addradio(cont,0,"Farm","One ind. per comp.",bub.radio);
+						ac = "AddIndividuals2";
+						break;
+					}
+				
+					add_end_button(cont,"Add",ac);
+				}
+				break;
+				
 			case "AddClassification": 
 				switch(bub.mode){
 				case "clone":
@@ -1424,7 +1474,7 @@ function press_button_prop(lay_name,type,info,value,op)
 		print_layer();
 		return;
 	}
-	
+
 	for(let i = 0; i < lay.but.length; i++){
 		let bu = lay.but[i];
 		if(bu.type == type){
@@ -1664,7 +1714,7 @@ function add_bubble_scrollable_buts(lay)
 
 	switch(lay.op.type){
 	case "filterpos": cy = filterpos_scrollable(lay); break;
-	case "comp list": cy = diagtest_scrollable(lay); break;
+	case "test list": cy = diagtest_scrollable(lay); break;
 	case "ind list": cy = individual_scrollable(lay); break;
 	case "pop list": cy = population_scrollable(lay); break;
 	case "poptrans list": cy = poptrans_scrollable(lay); break;
@@ -1796,6 +1846,26 @@ function bubble_check_error()
 				bub.check_warning = "At least one must be selected";
 				return true;
 			}				
+			
+			for(let i = 0; i < cb.length; i++){
+				if(cb[i].check){
+					let Se = cb[i].Se_eqn.te;
+					if(isNaN(Se)){
+						if(sim_options()){
+							bub.check_warning = "Se must be a number";
+							return true;
+						}
+					}
+					else{
+						let num = Number(Se);	
+						if(num < 0 || num > 1){
+							bub.check_warning = "Se must be between 0 and 1";
+							return true;
+						}
+					}
+				}
+			}
+		
 			delete bub.check_warning;
 		}
 		break;
@@ -2266,121 +2336,111 @@ function select_bubble_sim_data_element(p,i,r,c)
 /// Selects a reparameterisation element with parameter name and index
 function select_reparam_element(par_name,index)
 {
-	goto_param_page();
+	goto_param_page({type:"select_reparam_element", par_name:par_name, index:index});
+}
 	
-	let lay_name = "ModelParamContent";
-	let lay = get_lay(lay_name);
 	
-	let bu = lay.but;
-
-	let i = find(model.param,"name",par_name);
-	if(i == undefined){ error("Problem selecting6"); return;}
-
-	let j = 0;
-	while(j < bu.length && !(bu[j].ac	== "EditReparamValue" && bu[j].i == i)) j++;
-	if(j == bu.length){ error("Problem selecting5"); return;}
-	
-	activate_button(lay,j); 
-	
-	if(index != undefined) select_param_element(index);
+/// Selects a reparameterisation element with parameter name and index
+function select_reparam_equation(par_name)
+{
+	goto_param_page({type:"select_reparam_equation", par_name:par_name});
 }
 
 
-/// Selects a 
+/// Selects a specific element 
 function select_define_element(par_name,index)
 {
-	goto_param_page();
-	
-	let lay_name = "ModelParamContent";
-	let lay = get_lay(lay_name);
-	
-	let bu = lay.but;
-
-	let i = find(model.param,"name",par_name);
-	if(i == undefined){ error("Problem selecting6"); return;}
-
-	let j = 0;
-	while(j < bu.length && !(bu[j].ac	== "EditDefineValue" && bu[j].i == i)) j++;
-	if(j == bu.length){ error("Problem selecting5"); return;}
-	
-	activate_button(lay,j); 
-	
-	if(index != undefined) select_param_element(index);
+	goto_param_page({type:"select_define_element", par_name:par_name, index:index});
 }
 
 
 /// Selects a distribution element with parameter name and index
 function select_dist_element(par_name,index)
 {
-	goto_param_page();
-	
-	let lay_name = "ModelParamContent";
-	let lay = get_lay(lay_name);
-	
-	let bu = lay.but;
-
-	let i = find(model.param,"name",par_name);
-	if(i == undefined){ error("Problem selecting6"); return;}
-
-	let j = 0;
-	while(j < bu.length && !((bu[j].ac	== "EditPriorElement" || bu[j].ac	== "EditDistSplitValue") && bu[j].i == i)) j++;
-	if(j == bu.length){ error("Problem selecting5"); return;}
-	
-	activate_button(lay,j);
-	if(index != undefined) select_param_element(index);
-}
-
-
-/// Goes to the parameter page but ensures that warning are turned off
-function goto_param_page()
-{
-	change_page({pa:"Model",su:"Parameters"});
+	goto_param_page({type:"select_dist_element", par_name:par_name, index:index});
 }
 
 
 /// Selects the bubble for a derived quantitiy
 function select_bubble_derived(i)
 {
-	goto_param_page();
-
-	let lay_name = "ModelParamContent";
-	let lay = get_lay(lay_name);
-	
-	let bu = lay.but;
-
-	let j = 0;
-	while(j < bu.length && !(bu[j].ac	== "EditDerive" && bu[j].val == i)) j++;
-	if(j == bu.length){ error("Problem selecting4"); return;}
-	
-	activate_button(lay,j); 
+	let eqn1 = model.derive[i].eqn1;
+	if(eqn1.param.length > 0){
+		goto_param_page({type:"select_derived_element", par_name:eqn1.param[0].name});
+	}
 }	
 
 
 /// Selects the bubble for a derived quantitiy
-function select_bubble_param(par)
+function select_bubble_param(par_name)
 {
-	goto_param_page();
+	goto_param_page({type:"select_param", par_name:par_name});
+}	
 
+
+/// Selects a parameter element
+function select_param_element(op)
+{
 	let lay_name = "ModelParamContent";
 	let lay = get_lay(lay_name);
-	
+	if(!lay){ error("Could not find ModelParamContent"); return;}
+		
 	let bu = lay.but;
 
-	let i = find(model.param,"name",par.name);
-	
-	let ac, ac2;
-	switch(par.variety){
-	case "const": ac = "EditSimValue"; break;
-	case "reparam": ac = "EditReparamValue"; break;
-	case "dist": ac = "EditPriorElement"; ac2 = "EditDistSplitValue"; break;
-	}		
-	
+	let i = find(model.param,"name",op.par_name);
+	if(i == undefined){ error("Problem selecting6"); return;}
+
 	let j = 0;
-	while(j < bu.length && !((bu[j].ac	== ac || bu[j].ac	== ac2) && bu[j].i == i)) j++;
-	if(j == bu.length){ error("Problem selecting7"); return;}
+	
+	switch(op.type){
+	case "select_reparam_element":
+		while(j < bu.length && !(bu[j].ac	== "EditReparamValue" && bu[j].i == i)) j++;
+		break;
+	
+	case "select_define_element":
+		while(j < bu.length && !(bu[j].ac	== "EditDefineValue" && bu[j].i == i)) j++;
+		break;
+		
+	case "select_dist_element":
+		while(j < bu.length && !((bu[j].ac	== "EditPriorElement" || bu[j].ac	== "EditDistSplitValue") && bu[j].i == i)) j++;
+		break;
+		
+	case "select_derived_element":
+		while(j < bu.length && !(bu[j].ac	== "EditDerive" && bu[j].par.name == op.par_name)) j++;
+		break;
+	
+	case "select_param":
+		{
+			let ac, ac2;
+			let par = model.param[i];
+			switch(par.variety){
+			case "const": ac = "EditSimValue"; break;
+			case "reparam": ac = "EditReparamValue"; break;
+			case "dist": ac = "EditPriorElement"; ac2 = "EditDistSplitValue"; break;
+			}		
+
+			while(j < bu.length && !((bu[j].ac	== ac || bu[j].ac	== ac2) && bu[j].i == i)) j++;
+		}
+		break;
+		
+	case "select_reparam_equation":
+		while(j < bu.length && !(bu[j].ac	== "EditReparamValue" && bu[j].i == i)) j++;
+		break;
+	}
+	
+	if(j == bu.length){ error("Problem selecting5"); return;}
 	
 	activate_button(lay,j); 
-}	
+	if(op.index != undefined) select_param_element(op.index);
+}
+
+
+/// Goes to the parameter page but ensures that warning are turned off
+function goto_param_page(op)
+{
+	inter.after_load = op;
+	change_page({pa:"Model",su:"Parameters"});
+}
 
 
 /// Selects a given transition in the model
