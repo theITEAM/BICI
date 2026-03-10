@@ -254,8 +254,7 @@ void State::check_precalc_eqn(string ref)
 		
 		if(dif(value_st[th],value[th],dif_thresh)){
 			cout << model.param_vec[th].name << " " << value_st[th] << " " << value[th] << " wrong" << endl;
-		
-		
+
 			const auto &pv = model.param_vec[th];
 			const auto &par = model.param[pv.th];
 			auto eq_ref = par.get_eq_ref(pv.index);
@@ -281,6 +280,13 @@ void State::check_precalc_eqn(string ref)
 		
 		if(dif(precalc_st[i],precalc[i],dif_thresh)){
 			cout << i << " " << precalc.size() << " " << precalc_st[i] << " " << precalc[i] << endl;
+			
+			auto re = model.precalc_eqn.pcalcu_ref[i]; 
+			if(re == UNSET) emsg("no calculation");
+			const auto &ca = model.precalc_eqn.pcalcu[re];
+		
+			model.precalc_eqn.print_ca(i,ca);
+			
 			emsg("precalc problem"+ref);
 		}
 	}
@@ -2532,4 +2538,32 @@ void State::check_precalc_dif(string ref)
 	value = value_st;
 	
 	check_timer[CHECK_PRECALC_DIF] += clock();
+}
+
+
+/// Print iif (for diagnostic purposes)
+void State::print_iif() const
+{
+	cout << "PRINT IIF" << endl;
+	for(auto &ssp : species){
+		for(auto &ind : ssp.individual){
+			for(auto &ev : ind.ev){
+				const auto &iif = ev.ind_inf_from;
+				if(iif.p != UNSET){
+					cout << ind.name << ": ";
+					if(iif.i == UNSET){
+						if(iif.p == ENTER_INF) cout << "ENTER_INF";
+						else{
+							if(iif.p == OUTSIDE_INF) cout << "OUTSIDE_INF";
+							else emsg("Not recog");
+						}
+					}
+					else{
+						cout << "From: " << species[iif.p].individual[iif.i].name;
+					}
+					cout << "pref: " << iif.pref << " po: " << iif.po << " w: " << iif.w << endl;
+				}
+			}
+		}
+	}
 }

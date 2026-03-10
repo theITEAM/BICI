@@ -497,8 +497,32 @@ void StateSpecies::error_load_sample(unsigned int num) const
 }
 
 
+/// Extracts any infection information
+IndInfFrom StateSpecies::extract_infection_info(string &st) const 
+{
+	IndInfFrom iif;
+	
+	if(st.substr(st.length()-1,1) == "]"){
+		auto spl = split(st,'[');
+		if(spl.size() != 2) error_load_sample(18);
+		st = spl[0];
+		auto te = spl[1].substr(0,spl[1].size()-1);
+		if(te == "ENT_INF") iif.p = ENTER_INF;
+		else{
+			if(te == "OUT_INF") iif.p = OUTSIDE_INF;
+			else{
+				iif.i = number(te);
+				if(iif.i == UNSET) emsg("Should be number");
+			}
+		}
+	}
+	
+	return iif;
+}
+
+			
 /// Initialises based on a posterior sample
-void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies &samp_sp)
+void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies &samp_sp, const vector <string> &ind_key)
 {
 	double t_end = ti_end;
 	
@@ -547,7 +571,10 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 			for(auto r = 0u; r < ind_tab.nrow; r++){
 				const auto &row = ind_tab.ele[r];
 					
-				auto name = row[0];
+				auto n = number(row[0]);
+				if(n == UNSET) emsg("Cannot find ind_key");
+				
+				auto name = ind_key[n];
 				
 				unsigned int i;
 				if(name == sp.name+"-"+unobserved_str){
@@ -603,10 +630,15 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 						
 						if(t <= t_end){
 							if(c == UNSET && source == false){
-								c = hash_compgl.find(tspl[0]);
-								if(c == UNSET) error_load_sample(5);
+								auto co = tspl[0];
+								
+								auto inf_from = extract_infection_info(co);
+					
+								c = hash_compgl.find(co);
+								if(c == UNSET){
+									error_load_sample(5);
+								}
 							
-								IndInfFrom inf_from;
 								add_event(ENTER_EV,i,UNSET,UNSET,UNSET,c,t,inf_from);
 							}
 							else{
@@ -614,8 +646,12 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 						
 								tr = replace(tr,"->","→");
 							
-									auto trr = hash_tra.find(tr);
-								if(trr == UNSET) error_load_sample(8);
+								auto inf_from = extract_infection_info(tr);
+						
+								auto trr = hash_tra.find(tr);
+								if(trr == UNSET){
+									error_load_sample(8);
+								}
 								
 								const auto &tref = trans_ref[trr];
 								
@@ -628,8 +664,6 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 								auto ty = M_TRANS_EV;
 								if(trgl.nm_trans_ref != UNSET) ty = NM_TRANS_EV;
 								c = trgl.f;
-								
-								IndInfFrom inf_from;
 
 								add_event(ty,i,trg,UNSET,UNSET,c,t,inf_from);				
 							}

@@ -152,9 +152,7 @@ function funct(chi,co)                             // Gathers output of C++ file
 {
 	chi.stdout.on('data', function (data) {
 		let cha = inter.core[co];
-		//pr("data");
-		//pr(data);
-		
+	
 		let st = cha.leftover + data;
 
 		let lines = st.split('\n');

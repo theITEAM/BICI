@@ -3,9 +3,8 @@
 
 class Hash
 {
-	store=[];
+	store=init_hash();
 	num=[];
-	list=[];
 	ran=[];
 	ran2=[];
 	ran_base;
@@ -90,25 +89,27 @@ class Hash
 	/// Adds an object with a counter to the hash table
 	add_phylo_ori(ref,t_vec,mnum_vec,arr)
 	{
-		let code = hash_get_code(ref);
+		let hcode = hash_get_code(ref);
+		let code = hcode%this.store.si;
 	
-		if(this.store[code] == undefined){
-			this.list.push(code);
-			this.store[code]=[];
+		let tab = this.store.table;
+		if(tab[code] == undefined){
+			this.store.list.push(code);
+			tab[code]=[];
 		}
 		
-		for(let k = 0; k < this.store[code].length; k++){
-			if(this.store[code][k].ref == ref){
-				this.store[code][k].num++;
+		for(let k = 0; k < tab[code].length; k++){
+			if(tab[code][k].ref == ref){
+			 tab[code][k].num++;
 				for(let ii = 0; ii < t_vec.length; ii++){
-					this.store[code][k].t_sum[ii] += t_vec[ii];
-					this.store[code][k].mnum_sum[ii] += mnum_vec[ii];
+					tab[code][k].t_sum[ii] += t_vec[ii];
+					tab[code][k].mnum_sum[ii] += mnum_vec[ii];
 				}
 				return;
 			}
 		}
 		
-		this.store[code].push({ref:ref, t_sum:t_vec, mnum_sum:mnum_vec, arr:arr, num:1});
+		tab[code].push({ref:ref, t_sum:t_vec, mnum_sum:mnum_vec, arr:arr, num:1, hcode:hcode});
 	}
 
 	
@@ -118,8 +119,11 @@ class Hash
 		let num_tot = 0;
 		let num_max = 0;
 		let st_max;
-		for(let k = 0; k < this.list.length; k++){
-			let st = this.store[this.list[k]];
+		
+		let tab = this.store.table;
+		let list = this.store.list;
+		for(let k = 0; k < list.length; k++){
+			let st = tab[list[k]];
 			for(let j = 0; j < st.length; j++){
 				let stt = st[j];	
 				if(stt.num > num_max){ num_max = stt.num; st_max = stt;}
@@ -143,25 +147,27 @@ class Hash
 	/// Adds an object with a counter to the hash table
 	add_phylo_br(ref,ob)
 	{
-		let code = hash_get_code(ref);
+		let hcode = hash_get_code(ref);
+		let code = hcode%this.store.si;
 	
-		if(this.store[code] == undefined){
-			this.list.push(code);
-			this.store[code]=[];
+		let tab = this.store.table;
+		if(tab[code] == undefined){
+			this.store.list.push(code);
+			tab[code]=[];
 		}
 		
 		let k;
-		for(k = 0; k < this.store[code].length; k++){
-			if(this.store[code][k].ref == ref){
+		for(k = 0; k < tab[code].length; k++){
+			if(tab[code][k].ref == ref){
 				break;
 			}
 		}
 		
-		if(k == this.store[code].length){
-			this.store[code].push({ref:ref, pos:[]});
+		if(k == tab[code].length){
+			tab[code].push({ref:ref, pos:[], hcode:hcode});
 		}
 		
-		let pos = this.store[code][k].pos;
+		let pos = tab[code][k].pos;
 	
 		switch(ob.ty){
 		case "OBS":
@@ -174,13 +180,13 @@ class Hash
 					po.t_sum += ob.t;
 					po.mnum_sum += ob.mnum;
 					let ii = 0; 
-					while(ii < po.ind_list.length && po.ind_list[ii].ind != ob.ind) ii++;
+					while(ii < po.ind_list.length && po.ind_list[ii].all_ind_ref != ob.all_ind_ref) ii++;
 					if(ii < po.ind_list.length) po.ind_list[ii].num++;
-					else po.ind_list.push({num:1,ind:ob.ind});
+					else po.ind_list.push({num:1,all_ind_ref:ob.all_ind_ref});
 				}
 				else{
 					let add = {ty:"OBS", m:ob.m, num:1, t_sum:ob.t, mnum_sum:ob.mnum, ind_list:[]};
-					add.ind_list.push({num:1,ind:ob.ind});
+					add.ind_list.push({num:1,all_ind_ref:ob.all_ind_ref});
 					pos.push(add);
 				}
 			}
@@ -197,13 +203,13 @@ class Hash
 					po.t_sum += ob.t;
 					po.mnum_sum += ob.mnum;
 					let ii = 0; 
-					while(ii < po.ind_list.length && po.ind_list[ii].ind != ob.ind) ii++;
+					while(ii < po.ind_list.length && po.ind_list[ii].all_ind_ref != ob.all_ind_ref) ii++;
 					if(ii < po.ind_list.length) po.ind_list[ii].num++;
-					else po.ind_list.push({num:1,ind:ob.ind});
+					else po.ind_list.push({num:1,all_ind_ref:ob.all_ind_ref});
 				}
 				else{
 					let add = {ty:"SPLIT", code_br:ob.code_br, list_br:ob.list_br, list_br2:ob.list_br2, num:1, t_sum:ob.t, mnum_sum:ob.mnum, ind_list:[]};
-					add.ind_list.push({num:1,ind:ob.ind});
+					add.ind_list.push({num:1,all_ind_ref:ob.all_ind_ref});
 					pos.push(add);
 				}
 			}
@@ -218,20 +224,22 @@ class Hash
 		let code_tot = this.get_phylo_code(obs_list);
 		let ref = String(code_tot);
 		
-		let code = hash_get_code(ref);
-		
-		if(this.store[code] == undefined) return;
+		let hcode = hash_get_code(ref);
+		let code = hcode%this.store.si;
+	
+		let tab = this.store.table;
+		if(tab[code] == undefined) return;
 		
 		let k;
-		for(k = 0; k < this.store[code].length; k++){
-			if(this.store[code][k].ref == ref){
+		for(k = 0; k < tab[code].length; k++){
+			if(tab[code][k].ref == ref){
 				break;
 			}
 		}
 		
-		if(k == this.store[code].length) return; 
+		if(k == tab[code].length) return; 
 		
-		let pos = this.store[code][k].pos;
+		let pos = tab[code][k].pos;
 	
 		let max = 0;
 		let pos_sel;
@@ -255,9 +263,11 @@ class Hash
 	/// Prints the possible values for splitting
 	print_pos()
 	{
-		error(this.list.length+" len");
-		for(let i = 0; i < this.list.length; i++){
-			let st = this.store[this.list[i]];
+		let list = this.store.list;
+		let tab = this.store.table;
+		error(list.length+" len");
+		for(let i = 0; i < list.length; i++){
+			let st = tab[list[i]];
 			for(let j = 0; j < st.length; j++){
 				let stt = st[j];
 				error("SPLIT");
@@ -274,7 +284,7 @@ class Hash
 
 // Hash functions used to find compartments and transitions
 
-/// Converts from a reference to a code which is between zero and HASH_MAX
+/// Converts from a reference to a positive integer code
 function hash_get_code(ref)
 {
 	let hash = 0;
@@ -289,18 +299,25 @@ function hash_get_code(ref)
 
 	if(hash < 0) hash = -hash;
 	
-	return hash%HASH_MAX;
+	return hash;
 }
 	
 	
 /// Given a references finds an element
 function hash_find(store,ref)
 {
-	let code = hash_get_code(ref);
-	if(store[code] != undefined){
-		let sto = store[code];
+	let hcode = hash_get_code(ref);
+	let code = hcode%store.si;
+	
+	let tab = store.table;
+	if(tab[code] != undefined){
+		let sto = tab[code];
 		for(let i = 0; i < sto.length; i++){
-			if(sto[i].ref == ref) return sto[i].num;
+			if(hcode == sto[i].hcode){
+				if(sto[i].ref == ref){
+					return sto[i].num;
+				}	
+			}
 		}
 	}
 }
@@ -309,32 +326,43 @@ function hash_find(store,ref)
 /// Adds a reference to the hash table
 function hash_add(store,ref,num)
 {
-	let code = hash_get_code(ref);
-	if(store[code] == undefined) store[code]=[];
+	let hcode = hash_get_code(ref);
+	let code = hcode%store.si;
 	
-	let vec = store[code];
+	store.n++;
 	
-	//if(vec.length > 10) pr(vec.length+" hash si");
+	let tab = store.table;
+	if(tab[code] == undefined) tab[code]=[];
+	
+	let vec = tab[code];
+	
 	for(let k = 0; k < vec.length; k++){
-		if(vec[k].ref == ref){
-			if(vec[k].num != num) error("hash num is wrong");
-			return;
+		if(vec[k].hcode == hcode){
+			if(vec[k].ref == ref){
+				if(vec[k].num != num) error("hash num is wrong");
+				return;
+			}
 		}
 	}
+	tab[code].push({ref:ref,num:num,hcode:hcode});
 	
-	store[code].push({ref:ref,num:num});
+	if(store.n/store.si > HASH_OCC_THRESH) hash_enlarge(store);
 }
 	
 	
-/// Removes a reference to the hash table
+/// Removes a reference from the hash table
 function hash_remove(store,ref)
 {
-	let code = hash_get_code(ref);
-	if(store[code] == undefined) store[code]=[];
+	let hcode = hash_get_code(ref);
+	let code = hcode%store.si;
 	
-	let vec = store[code];
+	let tab = store.table;
+	if(tab[code] == undefined) tab[code]=[];
+	
+	let vec = tab[code];
 	for(let k = 0; k < vec.length; k++){
-		if(vec[k].ref == ref){
+		if(vec[k].hcode == hcode){
+			store.n--;
 			vec.splice(k,1);
 			return;
 		}
@@ -343,10 +371,52 @@ function hash_remove(store,ref)
 
 
 /// Redos hash table
-function hash_redo(hash,comp)
+function hash_redo(store,comp)
 {
-	hash.length = 0;
+	store = init_hash();
 	for(let c = 0; c < comp.length; c++){
-		hash_add(hash,comp[c].name,c);
+		hash_add(store,comp[c].name,c);
 	}
 }
+
+
+/// Resizes a hash table
+function hash_enlarge(store)
+{
+	let si = store.si;
+	let si_new = si*HASH_ENLARGE_SIZE;
+	
+	let tab_st = copy(store.table);
+	
+	let list_on = false;
+	if(store.list.length > 0){
+		store.list = [];
+		list_on = true;
+	}
+	
+	store.table = [];
+	let tab = store.table;
+	for(let i = 0; i < si; i++){
+		if(tab_st[i] != undefined){
+			for(let j = 0; j < tab_st[i].length; j++){
+				let hv = tab_st[i][j];
+				let k = hv.hcode%si_new;
+				if(tab[k] == undefined){
+					tab[k] = [];
+					if(list_on) store.list.push(k);
+				}
+				tab[k].push(hv);
+			}
+		}
+	}
+	
+	store.si = si_new;
+}
+
+
+/// Returns the initial state for a hash table
+function init_hash()
+{
+	return { n:0, si:HASH_INIT, table:[], list:[]};
+}
+

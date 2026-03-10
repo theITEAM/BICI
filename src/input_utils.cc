@@ -1056,9 +1056,10 @@ void Input::alert_sample(string warn, unsigned int num)
 
 
 /// Reads a state file from text
-void Input::read_state_sample(unsigned int ch, const vector <string> &lines, const vector <string> &ind_key)
+void Input::read_state_sample(unsigned int ch, const vector <string> &lines, unsigned int ind_key_ref)
 {
 	Sample samp;
+	samp.ind_key_ref = ind_key_ref;
 	samp.ch = ch;
 	samp.param_value.resize(model.param.size());
 	
@@ -1211,7 +1212,7 @@ void Input::read_state_sample(unsigned int ch, const vector <string> &lines, con
 						else{
 							auto num = number(spl[0]);
 							if(num == UNSET) alert_sample(warn,26);
-							spl[0] = ind_key[num];
+							//spl[0] = ind_key[num];
 							ind_tab.ele.push_back(spl);
 							ind_tab.nrow++;
 						}
@@ -1225,6 +1226,13 @@ void Input::read_state_sample(unsigned int ch, const vector <string> &lines, con
 			}
 		}
 	}
+	
+	/*
+	cout << "Load ind" << endl;
+	for(auto sp : samp.species){
+		print_table(sp.ind_tab);
+	}
+	*/
 	
 	// Check to see if all parameters have been loaded
 	for(auto th = 0u; th < model.param.size(); th++){
@@ -2009,4 +2017,38 @@ unsigned int Input::get_chain()
 	}
 	
 	return ch-1;
+}
+
+
+/// Returns a reference to model details
+Details& Input::get_details()
+{
+	if(model.mode == TORNADO_SETUP || model.mode == SCAN_SETUP) return model.inf_details;
+	return model.details;
+}
+
+
+/// Gets the data type
+DataSourceType Input::get_data_type(Command cname) const
+{
+	switch(cname){
+	case ADD_POP_SIM: case REMOVE_POP_SIM: case ADD_IND_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM:
+	case INIT_POP_SIM:
+		return SIM_DATA;
+		
+	case ADD_POP: case REMOVE_POP: case ADD_IND: case REMOVE_IND: case MOVE_IND:
+	case INIT_POP:
+	case COMP_DATA: case TRANS_DATA: case TEST_DATA: case POP_DATA: 
+	case POP_TRANS_DATA: case IND_EFFECT_DATA: case IND_GROUP_DATA: case GENETIC_DATA: case IC_DATA:
+		return INF_DATA;
+		
+	case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: case ADD_IND_POST_SIM:
+	case REMOVE_IND_POST_SIM: case MOVE_IND_POST_SIM:
+		return POST_SIM_DATA;
+	
+	default: break;
+	}
+	emsg("SHould not be here");
+	
+	return INF_DATA;
 }

@@ -21,6 +21,7 @@ class Precalc                             // Stores information about the model
 		Precalc(const vector <SpeciesSimp> &species, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, Constant &constant, const vector <double> &timepoint, const Details &details);
 		
 		void clear_timer();
+		void print_spec_precalc(string file, const SpecPrecalc &spec) const;
 		double get_splineval(const ElementRef &er, const vector <double> &value, const vector <double> &cval) const;
 		vector <double> calculate_precalc_init(const SpecPrecalc &spec_precalc) const;
 		const vector <unsigned int>& get_list_time(unsigned int cit, const SpecPrecalc &spec) const;
@@ -39,16 +40,17 @@ class Precalc                             // Stores information about the model
 		SpecPrecalc combine_spec_precalc(const vector <unsigned int> &param_list_tot) const;
 		SpecPrecalc shrink_sprec(const vector <unsigned int> &lt, SpecPrecalc spre) const;
 		void set_param(SpecPrecalc &set_param_spec_precalc, SpecPrecalc &spec_precalc_after, bool spl_fl) const;
+		vector <bool> calculate_map_reparam_time_dep() const;
 		SpecPrecalc calculate_spec_precalc_sample(const SpecPrecalc &spec_precalc) const;
 		void set_all_time();
 		SpecPrecalc calculate_spec_precalc_all(const SpecPrecalc &spec_precalc) const;
 		double hash_ca_mem() const;
 		void hash_off();
-		
+		string print_ca(unsigned int i, const PreCalc &ca) const;
+	
 	private:
 		vector <unsigned int> get_vec(const PreCalc &ca) const;
-		void print_ca(unsigned int i, const PreCalc &ca) const;
-	
+		
 		Hash hash_ca;
 	
 		vector <unsigned int> all_time;

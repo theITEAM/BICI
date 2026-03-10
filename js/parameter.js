@@ -437,15 +437,10 @@ function get_element_list(ob,dim,dim_used)
 	if(ndim > 0){
 		let flag;
 		do{
-			ele_list.push(copy(index));
+			let ind = [];
+			for(let i = 0; i < ndim; i++) ind.push(index[i]);
+			ele_list.push(ind);
 			
-			/*
-			let i = 0; 
-			do{
-				flag = false;
-				index[i]++; if(index[i] >= dim[i]){ index[i] = 0; i++; flag = true;}
-			}while(i < ndim && flag == true);
-			*/
 			let i = ndim-1; 
 			do{
 				flag = false;

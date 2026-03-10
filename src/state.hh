@@ -89,6 +89,7 @@ class State                                // Stores information about the state
 		vector <double> calculate_popnum() const;
 		vector < vector <double> > calculate_popnum_t(unsigned int ti_end = UNSET);
 		vector <double> recalculate_population(const vector <unsigned int> &list);
+		void set_ind_inf_from(const vector <string> &ind_key);
 		void recalculate_population_restore(vector < vector <double> > &popnum_t, const vector <unsigned int> &list, const vector <double> &vec) const;
 		
 	// In state_update_ind.cc
@@ -118,6 +119,7 @@ class State                                // Stores information about the state
 	public:	
 		GenChange update_tree(unsigned int p, unsigned int i, vector <Event> &ev_new);
 		double sample_infection_source(Event &ev, unsigned int p) const;
+		bool set_iif(unsigned int p, unsigned int i, unsigned int e, IndInfFrom &iif, double t, const Event &ev, const Species &sp) const;
 		bool trg_contains_outside(unsigned int p, unsigned int tr_gl) const;
 		double prob_infection_source(const Event &ev, unsigned int p) const;
 		NodeRef pass_down(const NodeRef &nr, double t, double &probif) const;
@@ -228,6 +230,7 @@ class State                                // Stores information about the state
 		void check_add_move_rem(string ref);
 		void check_effect_out_of_range();
 		void output_dump() const;
+		void print_iif() const;
 	
 	// In state_profiler.cc
 	public:

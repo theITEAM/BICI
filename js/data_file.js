@@ -1701,8 +1701,6 @@ function individual_scrollable(lay)
 /// Loads up the individual group data bubble
 function ind_group_data2(name_list)
 {
-	pr("na");
-	pr(name_list);
 	let bub = inter.bubble;
 	bub.name_list = name_list;
 	
@@ -1721,19 +1719,24 @@ function select_ind_wildcard()
 	let bub = inter.bubble;
 	
 	let filt = bub.wildcard;
-	
-	bub.ind_group_radio.value = "Specify";
-	
+		
 	let name_list = bub.name_list;
-pr("N");
-pr(name_list);
 
+	let fl = false;
 	let cb = bub.check_box;
 	for(let i = 0; i < name_list.length; i++){
 		cb.value[i].check = false;
 		if(wildcard_match(name_list[i].name,filt) == true){
 			cb.value[i].check = true;
+			fl = true;
 		}
+	}
+
+	if(fl == false){
+		alert_help("No individuals selected","This filter string doesn't contain any individuals.");
+	}
+	else{
+		bub.ind_group_radio.value = "Specify";
 	}
 }
 
@@ -1797,6 +1800,9 @@ function add_ind_group_data()
 		}
 	}
 	
-	add_gen_data(head,ele);		
-	generate_screen();
+	if(ele.length == 0) alert_help("No individuals selected","At least one individual must be selected to generate this data type.");
+	else{
+		add_gen_data(head,ele);		
+		generate_screen();
+	}
 }

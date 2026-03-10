@@ -77,6 +77,7 @@
 // 51000 lines of code (18/12/24)
 // 56000 lines of code (16/05/25)
 // 65634 lines of code (17/09/25)
+// 81002 lines of code (25/02/26)
 
 #include <iostream>
 #include <sstream>
@@ -111,11 +112,20 @@ bool com_op = false;                                 // Set to true for command 
 #include "extend.hh"
 #include "mpi.hh"
 #include "lzw.hh"
+#include "validation.hh"
 
-vector <BICITag> get_tags(int argc, char** argv, Operation &mode, ExtFactor &ext_factor,string &file, string &data_sim_line, bool &no_question);
+vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_factor, string &file, vector <string> &data_sim_lines, bool &no_question, bool &test, string &scan_info);
 
 int main(int argc, char** argv)
 {	
+#ifdef USE_MPI                            // This is for the parallel version of the code 
+  //MPI_Init(&argc,&argv);       	
+	 MPI_Init(NULL, NULL);
+#endif
+	
+	vector <string> sec;
+	for(auto i = 1u; i < (unsigned int)argc; i++) sec.push_back(argv[i]);
+	
 	//string te = "α this"; encode(te); return 0;
 
 	//test(); return 0;
@@ -125,10 +135,7 @@ int main(int argc, char** argv)
 	print_diag("start bici");
 	
 	//mvn_jeffreys_check(); return 0; 
-	
-#ifdef USE_MPI                            // This is for the parallel version of the code 
-  MPI_Init(&argc,&argv);       	
-#endif
+
 
 	print_diag("start sum");
 	
@@ -146,12 +153,47 @@ int main(int argc, char** argv)
 	auto mode = MODE_UNSET;
 	
 	ExtFactor ext_factor;
-	string file="",data_sim_line="";
+	string file;
+	vector <string> data_sim_lines;
 	auto no_question = false;
+	auto test = false;
+	string scan_info;
 	
-	auto tags = get_tags(argc,argv,mode,ext_factor,file,data_sim_line,no_question);
+	auto tags = get_tags(sec,mode,ext_factor,file,data_sim_lines,no_question,test,scan_info);
 	
 	print_diag("start model");
+	
+	switch(mode){
+	case TORNADO_SETUP:
+		{
+			Validation valid;
+			valid.tornado_setup(mode,ext_factor,no_question,file,data_sim_lines,test);
+		}
+		return 0;
+		
+	case TORNADO_RESULT:
+		{
+			Validation valid;
+			valid.tornado_result(mode,ext_factor,no_question,file);
+		}
+		return 0;
+		
+	case SCAN_SETUP:
+		{
+			Validation valid;
+			valid.scan_setup(scan_info,mode,ext_factor,no_question,file,data_sim_lines,test);
+		}
+		return 0;
+		
+	case SCAN_RESULT:
+		{
+			Validation valid;
+			valid.scan_result(scan_info,mode,ext_factor,no_question,file);
+		}
+		return 0;
+	
+	default: break;
+	}
 	
 	Model model(mode,ext_factor,no_question);     // Used to store the model structure 
 	
@@ -281,7 +323,9 @@ int main(int argc, char** argv)
 	case DATA_SIM:                          // Simulates some data and adds to 
 		{
 			DataSim data_sim(model,output);
-			data_sim.run(data_sim_line);
+			for(int i = data_sim_lines.size()-1; i >= 0; i--){
+				data_sim.run(data_sim_lines[i]);
+			}
 		}
 		break;
 		
@@ -295,17 +339,26 @@ int main(int argc, char** argv)
 	case DATA_DEL:                          // Deletes data sources
 		{
 			DataSim data_sim(model,output);
-			data_sim.del(data_sim_line);
+			for(const auto &ds : data_sim_lines){
+				data_sim.del(ds);
+			}
 		}
 		break;
 		
 	case DATA_CLEAR:                          // Clear sim/inf/post-sim results
 		{
 			DataSim data_sim(model,output);
-			data_sim.clear(data_sim_line);
+			for(const auto &ds : data_sim_lines){
+				data_sim.clear(ds);
+			}
 		}
 		break;
 		
+	case TORNADO_RESULT: case TORNADO_SETUP: 
+	case SCAN_RESULT: case SCAN_SETUP: 
+		emsg("Should not be here");
+		break;
+
 	case MODE_UNSET:
 		alert_input("The mode is unset");
 		break;
@@ -332,134 +385,186 @@ int main(int argc, char** argv)
 
 
 /// Gets values for tags when BICI is run
-vector <BICITag> get_tags(int argc, char** argv, Operation &mode, ExtFactor &ext_factor, string &file, string &data_sim_line, bool &no_question)
+vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_factor, string &file, vector <string> &data_sim_lines, bool &no_question, bool &test, string &scan_info)
 {
 	vector <BICITag> tags;
 	
-	auto N = (unsigned int)argc;
-	for(auto i = 1u; i < N; i++){
-		string te = argv[i];
-		if(te.substr(0,1) != "-"){
-			auto mode_new = MODE_UNSET;
-			string file_new = "";
-			if(te == "sim" || te == "simulate") mode_new = SIM;
-		
-			if(te == "inf" || te == "inference") mode_new = INF;
+	// Extracts tags first
 	
-			if(te == "post-sim" || te == "posterior-simulation") mode_new = PPC;
-				
-			if(te == "ext" || te == "extend"){
-				mode_new = EXT;
-				
-				if(i+1 == N) alert_input("There must be a value after 'ext'.");
-				else{
-					auto spl = split(argv[i+1],'%');
-					auto val = number(spl[0]);
-				
-					if(val == UNSET){
-						alert_input("'"+spl[0]+"' must be a number.");
-					}
-					else{
-						ext_factor.value = val;
-					
-						if(spl.size() == 1){
-							ext_factor.percent = false;
-						}
-						else{
-							ext_factor.percent = true;
-							
-							if(val <= 100){
-								alert_input("'"+te+"' must have a percentage greater than 100%.");	
-							}
-						}								
-					}
-				}
-				i++;
-			}
-			
-			if(te == "data-sim"){
-				mode_new = DATA_SIM;
-				if(i+1 == N) alert_input("There must be an expression after 'data-sim'.");
-				else{ i++; data_sim_line = argv[i];}
-			} 
-			
-			if(te == "data-show") mode_new = DATA_SHOW;
-			
-			if(te == "data-del"){
-				mode_new = DATA_DEL;
-				if(i+1 == N) alert_input("There must be an expression after 'data-del'.");
-				else{ i++; data_sim_line = argv[i];}
-			}
-			
-			if(te == "clear"){
-				mode_new = DATA_CLEAR;
-				if(i+1 == N) alert_input("There must be an expression after 'clear'.");
-				else{ i++; data_sim_line = argv[i];}
-			}
-			
-			if(end_str(te,".bici")){
-				file_new = te;
-			}
-			
-			if(mode_new == MODE_UNSET && file_new == ""){
-				alert_input("Tag '"+te+"' is not recognised");
-			}
-			else{	
-				if(mode_new != MODE_UNSET){
-					if(mode != MODE_UNSET){
-						alert_input("Cannot set multiple operations (sim/inf/post-sim/ext/data-sim/data-show/data-del/clear)");
-					}
-					else{
-						mode = mode_new;
-					}
-				}
-				
-				if(file_new != ""){
-					if(file != ""){
-						alert_input("Cannot define multiple '.bici' files");
-					}
-					else{
-						file = file_new;
-					}
-				}
-			}
-		}
-		else{
+	auto i = 0u;
+	while(i < sec.size()){         // Removes tags first
+		auto te = sec[i];
+		
+		if(begin_str(te,"-")){
 			BICITag tag; tag.type = TAG_UNSET; tag.processed = false;
 		
 			if(te == "-no-question"){
 				no_question = true;
 			}
 			else{
-				auto spl = split(te.substr(1),'=');
+				if(te == "-test"){
+					test = true;
+				}
+				else{
+					auto spl = split(te.substr(1),'=');
+			
+					if(spl.size() != 2) alert_input("Tag '"+te+"' is not recognised");
+					
+					if(spl[0] == "co" || spl[0] == "core"){
+						tag.type = CORE;
+						tag.value = number(spl[1]);
+					}
+					
+					if(spl[0] == "seed"){
+						tag.type = SEED;
+						tag.value = number(spl[1])+1;
+					}
+					
+					if(spl[0] == "op" || spl[0] == "output"){
+						tag.type = OP;
+						tag.te = spl[1];
+					}
+				
+					if(spl[0] == "samp"){
+						tag.type = SAMP_TYPE;
+						tag.value = number(spl[1]);
+					}
+					
+					if(tag.type == TAG_UNSET){
+						alert_input("Tag '"+te+"' is not recognised");
+					}
+				
+					tags.push_back(tag);
+				}
+			}
+			
+			sec.erase(sec.begin()+i);
+		}
+		else{
+			i++;
+		}
+	}
+	
+	auto N = sec.size();
+	for(auto i = 0u; i < N; i++){  // Processes non-tags
+		auto te = sec[i];
 		
-				if(spl.size() != 2) alert_input("Tag '"+te+"' is not recognised");
-				
-				if(spl[0] == "co" || spl[0] == "core"){
-					tag.type = CORE;
-					tag.value = number(spl[1]);
-				}
-				
-				if(spl[0] == "seed"){
-					tag.type = SEED;
-					tag.value = number(spl[1]);
-				}
-				
-				if(spl[0] == "op" || spl[0] == "output"){
-					tag.type = OP;
-					tag.te = spl[1];
-				}
+		auto mode_new = MODE_UNSET;
+		string file_new = "";
+		if(te == "sim" || te == "simulate") mode_new = SIM;
+	
+		if(te == "inf" || te == "inference") mode_new = INF;
+
+		if(te == "post-sim" || te == "posterior-simulation") mode_new = PPC;
 			
-				if(spl[0] == "samp"){
-					tag.type = SAMP_TYPE;
-					tag.value = number(spl[1]);
-				}
-				
-				if(tag.type == TAG_UNSET){
-					alert_input("Tag '"+te+"' is not recognised");
-				}
+		if(te == "ext" || te == "extend"){
+			mode_new = EXT;
 			
-				tags.push_back(tag);
+			if(i+1 == N) alert_input("There must be a value after 'ext'.");
+			else{
+				auto spl = split(sec[i+1],'%');
+				auto val = number(spl[0]);
+			
+				if(val == UNSET){
+					alert_input("'"+spl[0]+"' must be a number.");
+				}
+				else{
+					ext_factor.value = val;
+				
+					if(spl.size() == 1){
+						ext_factor.percent = false;
+					}
+					else{
+						ext_factor.percent = true;
+						
+						if(val <= 100){
+							alert_input("'"+te+"' must have a percentage greater than 100%.");	
+						}
+					}								
+				}
+			}
+			i++;
+		}
+		
+		if(te == "data-sim"){
+			mode_new = DATA_SIM;
+			if(i+1 == N) alert_input("There must be an expression after 'data-sim'.");
+			else{
+				i++; 
+				while(i < N){ data_sim_lines.push_back(sec[i]); i++;}
+			}
+		} 
+		
+		if(te == "data-show") mode_new = DATA_SHOW;
+		
+		if(te == "data-del"){
+			mode_new = DATA_DEL;
+			if(i+1 == N) alert_input("There must be an expression after 'data-del'.");
+			else{ 
+				i++;
+				while(i < N){ data_sim_lines.push_back(sec[i]); i++;}
+			}
+		}
+		
+		if(te == "clear"){
+			mode_new = DATA_CLEAR;
+			if(i+1 == N) alert_input("There must be an expression after 'clear'.");
+			else{
+				i++;
+				while(i < N){ data_sim_lines.push_back(sec[i]); i++;}
+			}
+		}
+		
+		if(te == "tornado"){
+			mode_new = TORNADO_SETUP;
+			if(i+1 == N) alert_input("There must be an expression (or expressions) after 'torndo' that specify the data.");
+			else{
+				i++;
+				while(i < N){ data_sim_lines.push_back(sec[i]); i++;}
+			}
+		}
+			
+		if(te == "tornado-res") mode_new = TORNADO_RESULT;
+	
+		if(begin_str(te,"scan:")){
+			mode_new = SCAN_SETUP;
+			if(i+1 == N) alert_input("There must be an expression (or expressions) after 'scan' that specify the data.");
+			else{
+				i++;
+				while(i < N){ data_sim_lines.push_back(sec[i]); i++;}
+			}
+			scan_info = te.substr(5);
+		}
+		
+		if(begin_str(te,"scan-res:")){
+			mode_new = SCAN_RESULT;
+			scan_info = te.substr(9);
+		}
+		
+		if(end_str(te,".bici")){
+			file_new = te;
+		}
+		
+		if(mode_new == MODE_UNSET && file_new == ""){
+			alert_input("Tag '"+te+"' is not recognised");
+		}
+		else{	
+			if(mode_new != MODE_UNSET){
+				if(mode != MODE_UNSET){
+					alert_input("Cannot set multiple operations (sim/inf/post-sim/ext/data-sim/data-show/data-del/clear)");
+				}
+				else{
+					mode = mode_new;
+				}
+			}
+			
+			if(file_new != ""){
+				if(file != ""){
+					alert_input("Cannot define multiple '.bici' files");
+				}
+				else{
+					file = file_new;
+				}
 			}
 		}
 	}

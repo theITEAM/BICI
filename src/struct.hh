@@ -454,7 +454,7 @@ struct PrecalcInfo {                  // Specified which i and time
 
 struct SpecPrecalc {                  // Specifies which elements in precalc_ref need to be evaluated
 	vector <PrecalcInfo> info;          // Provides information about which i need updating
-	vector < vector <unsigned int > > list_time; // Provides list of time
+	vector < vector <unsigned int > > list_time; // Provides list of times
 	HashSimp hash_time;
 	HashSimp hash;
 };
@@ -629,6 +629,7 @@ struct DataSource {                // Stores information about a data source
 	string mut_rate_str;             // The genetic mutation rate (used in GENETIC_DATA)
 	string seq_var_str;              // The initial sequence variation (used in GENETIC_DATA)
 	vector <LoadCol> load_col;       // Stores information about the loaded columns
+	DataSourceType type;             // Whether coming from sim, inf, or post-sim
 	unsigned int line_num;           // The line number which loads up the data source
 	bool active;                     // Determines if active or not
 };
@@ -1882,6 +1883,7 @@ struct SampleSpecies {             // Used to store information about a posterio
 struct Sample {                    // Stores posterior sample (for PPC)
 	unsigned int ch;                 // The chain number
 	unsigned int num;                // The sample number    
+	unsigned int ind_key_ref;        // References which ind_key to  use
 	vector < vector <double> > param_value; // The parameter sample
 	vector <SampleSpecies> species;  // The state sample
 };
@@ -2058,3 +2060,20 @@ struct IndList {                           // Stores individuals in a list
 	unsigned int i;
 };
 
+struct ScanInfo {
+	bool log_on;
+	string param_name;
+	vector <double> value_sim;
+};
+
+struct TagRange {
+	unsigned int start_li;
+	unsigned int starti;
+	unsigned int end_li;
+	unsigned int endi;
+};
+
+struct ObsVisit {          // Used for construting genetic matrix data
+	unsigned int m;
+	unsigned int sum;
+};

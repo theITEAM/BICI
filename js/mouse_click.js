@@ -531,6 +531,7 @@ function button_action(bu,action_type)
 		
 	case "RadioButton":
 		if(inter.bubble.check_radio_press == false){
+			turn_off_cursor();
 			inter.bubble.check_radio_press = true;
 		}
 		
@@ -1248,7 +1249,11 @@ function button_action(bu,action_type)
 	case "IndWildcard": 
 		if(bubble_check_error() == false){
 			copy_back_to_source();
-			select_ind_wildcard(); 
+			
+			let bub = inter.bubble;
+			let filt = bub.wildcard;
+			let name_list = bub.name_list;
+			select_ind_wildcard();	
 		}
 		break;
 

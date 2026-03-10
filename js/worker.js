@@ -593,16 +593,6 @@ function process(e)
 		data_source(info.type,info.edit_source,info.info);
 		break;
 	
-	/*
-	case "Load map":
-		{
-			let te = load_file_http(info);
-			let map = load_annotation_map(te);	
-			post({ feature:map.feature, box:map.box, info:info});
-		}
-		break;
-	*/
-	
 	case "New model":
 		new_model();
 		break;
@@ -757,7 +747,7 @@ function process(e)
 				{
 					let indi = sim_result.sample[0].species[info.p].individual;
 					for(let i = 0; i < indi.length; i++){
-						name_list.push({name:sim_result.all_ind_list[indi[i].name_ref].name});
+						name_list.push({name:sim_result.all_ind_list[indi[i].all_ind_ref].name});
 					}
 				}
 				break;

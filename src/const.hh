@@ -24,9 +24,9 @@ const string default_file = "/tmp/init.bici";        // This is used for Mac
 const string default_file = "Execute/init.bici";     // This is used for windows / linux
 #endif
 
-//#define USE_MPI                                    // Sets if code can run in parallel
+#define USE_MPI                                    // Sets if code can run in parallel
 
-const string bici_version = "v0.83";                 // Sets the BICI version
+const string bici_version = "v0.84";                 // Sets the BICI version
 
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
 const bool testing = true;                           // Set to true for additional testing
@@ -101,7 +101,7 @@ enum IndFacRateType { IND_EFF_MULT, IND_EFF_DIV, FIX_EFF_MULT, FIX_EFF_DIV };
 enum TransVariety { NORMAL, SOURCE_TRANS, SINK_TRANS };
 
 // Different modes of operation
-enum Operation { SIM, INF, PPC, EXT, DATA_SIM, DATA_SHOW, DATA_DEL, DATA_CLEAR, MODE_UNSET };
+enum Operation { SIM, INF, PPC, EXT, DATA_SIM, DATA_SHOW, DATA_DEL, DATA_CLEAR, TORNADO_SETUP, TORNADO_RESULT, SCAN_SETUP, SCAN_RESULT, MODE_UNSET };
 
 // Different prior possibilities
 enum PriorPos { INVERSE_PR, UNIFORM_PR, POWER_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, DIRICHLET_PR, MDIR_PR, MVN_JEF_PR, MVN_UNIFORM_PR, MVN_COR_PR, UNSET_PR };
@@ -276,7 +276,7 @@ enum DistText { NORM_TE, LOGNORM_TE, WEIBULL_TE, GAMMA_TE, BETA_TE, NEGBINO_TE, 
 enum DistQuant { SD_QU, CV_QU, MEAN_QU, NORM_MEAN_QU, SHAPE_QU, SCALE_QU, ALPHA_QU, BETA_QU, P_QU, BERNP_QU, RATE_QU, EXP_MEAN_QU, POIS_QU, TIME_QU};
 
 // Different percentage measures
-enum PercentType { LOAD_PER, INIT_PER, RUN_PER, RUN_GEN_PER, ANNEAL_PER, OUTPUT_PER};
+enum PercentType { LOAD_PER, INIT_PER, RUN_PER, RUN_GEN_PER, ANNEAL_PER, OUTPUT_PER, SIM_PER, GEN_DATA_PER};
 
 // Different types of derived function
 enum DerFuncType { RN, RNE, RNC, GT, GTE, GTC, DF_UNSET};
@@ -322,6 +322,7 @@ const auto UNSET_LIST = USINT_MAX-1;              // Used in operator lists
 const auto CUT_LIST = USINT_MAX-2;                // Used to represent cut out of list
 const auto OP_MAX = USINT_MAX-10;                 // Maximum number of operators
 
+const auto TORNADO_NUM = 20u;                     // Number of simulation done for tornado plot
 const auto UNSET_WILD = 99999980.0;               // Indicates an unset wildcard "*"
 const auto UNSET_F = 99999990.0;                  // Floating point unset
 

@@ -15,7 +15,7 @@ Mpi::Mpi(unsigned int core_spec, const Model &model): model(model)
 	if(core_spec != UNSET) emsg("Core should not be specified");
 	int num;
 	MPI_Comm_size(MPI_COMM_WORLD,&num); ncore = (unsigned int) num;
-  MPI_Comm_rank(MPI_COMM_WORLD,&num); core = (unsigned int) num;
+	MPI_Comm_rank(MPI_COMM_WORLD,&num); core = (unsigned int) num;
 #else
 	ncore = 1;
 	core = 0;

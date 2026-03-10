@@ -330,6 +330,18 @@ void print_matrix(string name, const vector < vector <double> > &M)
 }
 
 
+/// Prints a matrix
+void print_matrix(string name, const vector < vector <unsigned int> > &M)
+{
+	cout << name << ":" << endl;
+	for(auto j = 0u; j < M.size(); j++){
+		cout << "   ";
+		for(auto i = 0u; i < M[j].size(); i++) cout << M[j][i] << " ";
+		cout << endl;
+	}
+}
+
+
 /// Prints a vector
 void print_vector(string name, const vector <double> &v)
 {

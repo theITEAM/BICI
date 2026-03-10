@@ -1,36 +1,25 @@
 GRANT
-- Tried to reduce memory usage as much as possible in the core-code.
-- Tried to reduce file sizes as much as possible (I've had to code up a LZW compression algorithm to compress output files from BICI - this helps to reduce large files by roughly a factor of 10). Under the new "advanced options" there is the option to "always" compress, "never", or "auto" (which does compression for large files).
-- Added an options for optimisation: "speed", "memory" or "auto" (see advanced options).
-- Made substantial improvment in speed at which large models are set up (a lot of code had to be changed, so this has the possibility of breaking things).
-- Made some improvements in how fast large models load into interface.
-- Tables can now be exported as .png.
-- The error associated with "Error.bici" has been fixed.
-- There is now the possibility of doing posterior simulation on a different model to the one used for inference (this will be required when inferring using the clustered farms and posterior simulation on the full model). See manual 5.3.
-- Speed up of simulation for individual-based models that linearly depend on populations.
+- Got 'Gaussian' model to work.
+- Correct bug when clicking on individual timelines under inference.
 
 LAURA
-- Allow for different sensitivities for different compartments when using diagnostic test information.
-- Increased the number of potential time divisions (it used to have a maximum of 10000).
 
 CHRIS
-- The examples have been rearranged in a lore logical manner. "exp-epi" has been created for disease transmission experiments (this will go with Marek's second paper). "gen-epi" for pathogen genetics in analyses. "features" for various BICI features.
-- Bugs fixed related to changing index in interface.
-- Bugs fixed related to changing species name in interface.
-- Bugs fixed related to classification name in interface.
-- Bug fixed related to individual group data name.
-- Set errors if individual or fixed effect put into parameter definitions
-- Corrected errors in equation editor for define/reparam
-- Corrected error in interface related to compartments having superscripts
-- Single individuals can now automatically be created within compartments within the interface. This is useful when working with farm-based models (here the individual captures the disease status of the farm).
-- The user can now export compartments and transitions from the BICI interface as a table
-- Corrected problem related to results getting delete when import of bici file was not successful.
-- Improvement to how times are output from core-code.
-- Correction to transion labels with superscripts
-- Inprovements to the speed at which the interface can load up large models (utilising the fact that transitions in farm-based models are infrequent) 
+- Got simulation of genetic data in core code working. 
+- Corrected bug that made all splines types the same in the interface.
+- Corrected problem with visualisation of timelines in interface.
+- Corrected problem with source description with transitions names with superscripts.
+- Improved speed to unescaping charaters in interface.
+- Made the loading percentage in the interface more "smooth" when loading BICI files.
+- Stop multiple warning message when running multiple chains in interface.
+- Corrected examples (not working in v0.83): D3.4, D2.6, GE1.1
+- Error message when trying to simulation initial population for individual-based models.
+- Correction to wildcard filtering of individuals.
+- Made hash tables in interface faster and extendable (to reduce memory footprint).
+- Resized inteface to show all examples (if screen large enough)
 
 JAMIE
-- Nothing this time
+
  
 
 

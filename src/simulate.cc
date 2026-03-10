@@ -14,8 +14,9 @@ using namespace std;
 #include "utils.hh"
 
 /// Initilaises the simulation
-Simulate::Simulate(const Model &model, Output &output, Mpi &mpi) : model(model), output(output), mpi(mpi), state(model)
+Simulate::Simulate(const Model &model, Output &output, Mpi &mpi, bool sup_) : model(model), output(output), mpi(mpi), state(model)
 {	
+	sup = sup_;
 	state.init();
 }
 
@@ -23,11 +24,11 @@ Simulate::Simulate(const Model &model, Output &output, Mpi &mpi) : model(model),
 /// Performs simulation
 void Simulate::run()
 {
-	percentage_start(RUN_PER);
+	percentage_start(RUN_PER,sup);
 	
 	auto smax = model.details.num_per_core;
 	for(auto s = 0u; s < smax; s++){
-		percentage(s,smax);
+		percentage(s,smax,sup);
 	
 		auto param_val = model.param_sample();
 		auto initc_val = model.initc_sample(param_val);
@@ -66,5 +67,5 @@ void Simulate::run()
 	mpi.barrier();
 #endif
 
-	percentage_end();
+	percentage_end(sup);
 }

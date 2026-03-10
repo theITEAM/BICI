@@ -29,6 +29,8 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 		}
 	}
 	
+	auto data_type = get_data_type(cname);
+	
 	switch(cname){
 	case ADD_POP_SIM: case ADD_POP_POST_SIM: cname = ADD_POP; break;
 	case REMOVE_POP_SIM: case REMOVE_POP_POST_SIM: cname = REMOVE_POP; break;
@@ -56,6 +58,7 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 	if(name == "") cannot_find_tag(); 
 	
 	DataSource ds;
+	ds.type = data_type;
 	ds.name = name;
 	ds.line_num = line_num;
 	ds.p = p; ds.cl = UNSET;
@@ -1290,14 +1293,15 @@ void Input::param_command()
 	}
 	
 	switch(mode){
-	case INF: case PPC: case EXT:
+	case INF: case PPC: case EXT: case TORNADO_RESULT: case SCAN_RESULT:
 		value = "";
 		break;
 		
-	case SIM: case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR:
+	case SIM: case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: case TORNADO_SETUP: case SCAN_SETUP:
 		prior = ""; prior_split = "";
 		if(par.sim_sample == false){ dist = ""; dist_split = "";}
 		break;
+	
 	default: break;
 	}
 	
@@ -1595,11 +1599,11 @@ void Input::param_command()
 	if(par.variety == UNSET_PARAM){
 		if(par.not_set){
 			switch(model.mode){	
-			case INF: case PPC: case EXT:
+			case INF: case PPC: case EXT: case TORNADO_RESULT: case SCAN_RESULT:
 				alert_import("A prior should be set for parameter '"+par.full_name+"'");
 				break;
 	
-			case SIM: case DATA_SIM: case DATA_SHOW: case DATA_DEL: 
+			case SIM: case DATA_SIM: case DATA_SHOW: case DATA_DEL: case TORNADO_SETUP: case SCAN_SETUP:
 				alert_warning("A value has not been set for parameter '"+par.full_name+"'. Ignore this warning if this parameter is used in the observation process.");
 				break;
 				
@@ -1793,8 +1797,8 @@ bool Input::simulation_command()
 /// Applies the inference command
 bool Input::inference_command()
 {
-	auto &details = model.details;
-
+	auto &details = get_details();
+	
 	get_optimise(details);
 	get_compress(details);
 
@@ -2548,6 +2552,17 @@ void Input::fixed_effect_command()
 void Input::map_command()
 {
 	auto file = get_tag_value("file"); 
+}
+
+
+/// Loads up parameter stats (this is used for tornado plots)
+void Input::inf_param_stats()
+{
+	auto file = get_tag_value("file"); 
+
+	auto tab = load_table(file); if(tab.error == true) run_error("Could not load parameter statistics");
+
+	model.inf_param_stats = tab;
 }
 
 

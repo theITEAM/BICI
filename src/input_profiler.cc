@@ -31,7 +31,11 @@ void Input::profile_memory() const
 void Input::reduce_memory()
 {
 	switch(model.mode){
-	case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: return;
+	case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: 
+	case TORNADO_SETUP: case TORNADO_RESULT:
+	case SCAN_SETUP: case SCAN_RESULT:
+		return;
+	
 	default: break;
 	}
 	//return;

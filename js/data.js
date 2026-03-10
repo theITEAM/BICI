@@ -1459,15 +1459,15 @@ function add_source_description(so)
 							let pro = trz[j].prob_eqn.te.trim();
 							
 							if(pro != "0"){
-								if(st != "") st += "|";
-								st += tra[j].name+":"+pro;
+								if(st != "") st += " | ";
+								st += tra[j].name+" : "+pro;
 							}
 						}
 						break;
 					
 					case "off":
 						if(trz[j].check == true){
-							if(st != "") st += "|";
+							if(st != "") st += " | ";
 							st += tra[j].name;
 						}
 						break;
@@ -1509,6 +1509,7 @@ function add_source_description(so)
 		if(desc == "") desc = "-";
 		so.desc = desc;
 	}
+
 	so.num = num;
 }
 

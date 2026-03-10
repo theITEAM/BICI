@@ -2,23 +2,17 @@
 // working on windows 29/01/26
 // working on linux 29/01/26
 // working on linux 16/02/26
+// working on linux 02/03/26
 
 // Input::mem(const string st)
 // CHANGE
 
 In model.js // TO DO NOW
 
-
-// time sheet
-
 TO DO
--- F1.8 3*warnings
--- D3.4 not working
--- D2.6 not working
--- GE1.1 not working
--- Generate data - use wildcard not working
--- Extendable hash tables in interface
--- Improve loading symbol for import (use file sizes?)
+
+
+-- GWAS
 -- Simulates genetic data and group data ( using  wildcard from js version)
 -- Get posterior simulation from system of different size
 -- Laura error message
@@ -170,3 +164,11 @@ auto k = 0u; while(k < sum_store.size() && z > sum_store[k]) k++;
 k = 0u; while(k < B && z > sum_store[k]) k++;
 auto k = 0u; while(k < sum_store.size() && z > sum_store[k]) k++;
 auto k = 0u; while(k < trig_event.size() && trig_event[k].tdiv != eve.tdiv) k++;
+
+DONE NEW
+-- Generate data - use wildcard not working
+-- GE1.1 not working
+-- D2.6 not working
+-- D3.4 not working
+-- F1.8 3*warnings
+-- Improve loading symbol for import (use file sizes?)

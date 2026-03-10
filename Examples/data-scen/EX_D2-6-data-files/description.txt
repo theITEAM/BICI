@@ -1,4 +1,4 @@
-﻿# Example D2.6: Time-series population obesrvations for IBM
+# Example D2.6: Time-series population obesrvations for IBM
 
 ## Objective
 - Introduce population-based data incorporated into an IBMs.

@@ -960,39 +960,75 @@ function char_replace(te)
 }
 
 
-/// Remove text escape characters
-function remove_escape_char(te)
+/// This is used to create ec_ref (in const.js). This creates a way to get escape string faster
+function create_escape_search_tree()
 {
 	let escape_char = [];
 	for(let i = 0; i < greek_latex.length; i++){
-		escape_char.push(["\\"+greek_latex[i][0],greek_latex[i][1]]);
+		escape_char.push({str:greek_latex[i][0],letter:greek_latex[i][1]});
 	}
-	escape_char.push(["\\sum","Σ"]);
-	escape_char.push(["\\int","∫"]);
+	escape_char.push({str:"sum",letter:"Σ"});
+	escape_char.push({str:"int",letter:"∫"});
 	
-	let i = 0;
+	let cc=[]
+	for(let i = 0; i < escape_char.length; i++){
+		let num = escape_char[i].str.charCodeAt(0);
+		if(cc[num] == undefined) cc[num] = [];
+		cc[num].push(escape_char[i]);
+	}
+	
+	let te = "let ec_ref=[";
+	for(let i = 0; i < cc.length; i++){
+		if(i != 0) te += ",";
+		let cci = cc[i];
+		if(cci != undefined){
+			te += "[";
+			for(let j = 0; j < cci.length; j++){
+				if(j != 0) te += ",";
+				te += "{str:\""+cci[j].str+"\",letter:\""+cci[j].letter+"\"}";
+			}
+			te += "]";
+		}
+	}
+	te += "]";
+
+	prr(te);
+}
+
+
+/// Remove text escape characters
+function remove_escape_char(te)
+{
+	//create_escape_search_tree();
 
 	let te_new="";
 	
-	while(i < te.length){
-		//if(i%1000 == 0) prr(i+" "+te.length);
-		let ch = te.substr(i,1); 
-		if(ch == "\\"){
-			let j = 0; 
-			while(j < escape_char.length && te.substr(i,escape_char[j][0].length) != escape_char[j][0]) j++;
-			if(j < escape_char.length){
-				te_new += escape_char[j][1];
-				i += escape_char[j][0].length;
-				//te = te.substr(0,i)+escape_char[j][1]+te.substr(i+escape_char[j][0].length);
-			}
-			else{
-				te_new += ch;
-				i++;
-			}
+	let i = 0, imax = te.length;
+	let ist = 0;
+	while(i < imax){
+		while(i < imax && te.charCodeAt(i) != 92) i++;
+		
+		if(i == imax){
+			if(te_new == "") return te;
+			te_new += te.substr(ist,i-ist);
 		}
 		else{
-			te_new += ch;
 			i++;
+			let fl = false;
+			if(i < imax){
+				let num = te.charCodeAt(i);
+				let ecr = ec_ref[num];
+				if(ecr != undefined){
+					let j = 0; 
+					while(j < ecr.length && te.substr(i,ecr[j].str.length) != ecr[j].str) j++;
+					if(j < ecr.length){
+						te_new += te.substr(ist,i-1-ist);
+						te_new += ecr[j].letter;
+						i += ecr[j].str.length;
+						ist = i;
+					}
+				}
+			}
 		}
 	}
 	

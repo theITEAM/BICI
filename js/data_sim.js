@@ -79,6 +79,10 @@ function simulate_data(so)
 		
 	case "Init. Pop.":
 		{
+			if(sp.type == "Individual"){
+				alert_help("Data type cannot be used","Individual-based models cannot currently specify a fixed initial population under inference. Two possibilities exist:\n• <b>Add Ind.</b> – This adds individuals to the system (whose initial state can be specified). This is appropriate if all the individuals in the system are known.\n• <b>Initial distribution</b> – Here a distribution for the initional population is specified. This is specified in the “Inference→Data” tab and by clicking on the “Init. Pop.” button.");
+			}
+			
 			for(let cl = 0; cl < sp.ncla; cl++) head.push(sp.cla[cl].name);
 			head.push("Population");
 
@@ -138,8 +142,7 @@ function simulate_data(so)
 				let ind = sim.individual[i];
 				if(ind.obs){	
 					let row = [];
-					//row.push(ind.name);
-					row.push(all_ind_list[ind.name_ref].name);
+					row.push(all_ind_list[ind.all_ind_ref].name);
 					
 					let cinit = ind.cinit
 					if(cinit != SOURCE){ 
@@ -170,8 +173,7 @@ function simulate_data(so)
 				let ind = sim.individual[i];
 				if(ind.obs){	
 					let row = [];
-					//row.push(ind.name);
-					row.push(all_ind_list[ind.name_ref].name);
+					row.push(all_ind_list[ind.all_ind_ref].name);
 					
 					if(ind.ev.length > 0){
 						let ev = ind.ev[ind.ev.length-1];
@@ -200,8 +202,7 @@ function simulate_data(so)
 						let ev = ind.ev[e];
 						if(ev.type == EV_MOVE && ev.cl == cl_sel){
 							let row = [];
-							//row.push(ind.name);
-							row.push(all_ind_list[ind.name_ref].name);
+							row.push(all_ind_list[ind.all_ind_ref].name);
 							row.push(ev.t);
 							let cgl = sp.comp_gl[ev.cf];
 							row.push(sp.cla[cl_sel].comp[cgl.cla_comp[cl_sel]].name);
@@ -249,8 +250,7 @@ function simulate_data(so)
 							let te;
 						
 							let row = [];	
-							//row.push(ind.name);
-							row.push(all_ind_list[ind.name_ref].name);
+							row.push(all_ind_list[ind.all_ind_ref].name);
 							row.push(t);
 							
 							if(c == SOURCE || c == SINK || c == OUT){
@@ -343,8 +343,7 @@ function simulate_data(so)
 
 								if(Math.random() < prob){
 									let row = [];
-									//row.push(ind.name);
-									row.push(all_ind_list[ind.name_ref].name);
+									row.push(all_ind_list[ind.all_ind_ref].name);
 									row.push(ev.t);
 									ele.push(row);
 								}
@@ -411,8 +410,7 @@ function simulate_data(so)
 								}
 								
 								let row = [];
-								//row.push(ind.name);
-								row.push(all_ind_list[ind.name_ref].name);
+								row.push(all_ind_list[ind.all_ind_ref].name);
 								row.push(t);
 								row.push(res);
 								ele.push(row);
@@ -631,8 +629,7 @@ function simulate_data(so)
 			for(let i = 0; i < sim.individual.length; i++){
 				let ind = sim.individual[i];
 				let row = [];
-				//row.push(ind.name); 
-				row.push(all_ind_list[ind.name_ref].name);
+				row.push(all_ind_list[ind.all_ind_ref].name);
 				row.push(ind.ie[e]);
 				ele.push(row);
 			}
@@ -1197,8 +1194,7 @@ function simulate_genetic_snp(t_start,t_end,ele,head,so)
 		for(let i = 0; i < sosp.individual.length; i++){
 			let ind = sosp.individual[i];
 	
-			//let name = ind.name;
-			let name = all_ind_list[ind.name_ref].name;
+			let name = all_ind_list[ind.all_ind_ref].name;
 	
 			let j = hash.find(name);
 			if(j == undefined){
@@ -1363,8 +1359,7 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 		for(let i = 0; i < sosp.individual.length; i++){
 			let ind = sosp.individual[i];
 	
-			//let name = ind.name;
-			let name = all_ind_list[ind.name_ref].name;
+			let name = all_ind_list[ind.all_ind_ref].name;
 			let j = hash.find(name);
 			if(j == undefined){
 				j = ind_list.length;
@@ -1381,7 +1376,9 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 	for(let n = 0; n < inf_node.length; n++){
 		let infn = inf_node[n];
 		
-		let j = hash.find(infn.ind);
+		let name = all_ind_list[infn.all_ind_ref].name;
+		let j = hash.find(name);
+		
 		let il = ind_list[j];
 		let p = il.p;
 		let ind = samp.species[p].individual[il.i];
@@ -1391,7 +1388,7 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 		// Works out the time when the individual is no longer in the infectious state
 		let e = 0;
 	
-		if(infn.from == "ENT" || infn.from == "OUT"){
+		if(infn.from == INFN_ENT || infn.from == INFN_OUT){
 			infn.num = poisson_sample(seq_var+(t-t_start)*mu);
 		}
 		else{
@@ -1418,8 +1415,9 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 				if(Math.random() < f){
 					infn.inf_ev.push({ty: "OBS", i:obs.length, t:tt, num:UNSET});
 					
-					let na = all_ind_list[ind.name_ref].name;
-					obs.push({name:"Obs-"+(obs.length+1), n:n, ind:na, t:tt});
+					//let na = all_ind_list[ind.all_ind_ref].name;
+					//obs.push({name:"Obs-"+(obs.length+1), n:n, ind:na, t:tt});
+					obs.push({name:"Obs-"+(obs.length+1), n:n, all_ind_ref:ind.all_ind_ref, t:tt});
 				}
 			}					
 		}
@@ -1436,7 +1434,7 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 	// Corrects inf_node.num (because observations have been added)
 	for(let n = 0; n < inf_node.length; n++){
 		let infn = inf_node[n];
-		if(infn.from != "ENT" && infn.from != "OUT"){
+		if(infn.from != INFN_ENT && infn.from != INFN_OUT){
 			let nn = infn.from;
 			let infe = inf_node[nn].inf_ev;
 			let num = infn.num;
@@ -1501,7 +1499,7 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 				
 					kk--;
 					if(kk == -1){ // Goes up the node
-						if(inf_node[nn].from == "ENT" || inf_node[nn].from == "OUT"){
+						if(inf_node[nn].from == INFN_ENT || inf_node[nn].from == INFN_OUT){
 							obs_visit[nn].push({m:m,sum:sum});
 							break;
 						}					
@@ -1515,7 +1513,7 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 	
 	let enter_list = [];
 	for(let n = 0; n < inf_node.length; n++){
-		if(inf_node[n].from == "ENT" || inf_node[n].from == "OUT"){
+		if(inf_node[n].from == INFN_ENT || inf_node[n].from == INFN_OUT){
 			if(obs_visit[n].length > 0){
 				enter_list.push(n);
 			}
@@ -1557,8 +1555,9 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 	
 	for(let r = 0; r < obs.length; r++){
 		let ob = obs[r];
+		let air = ob.all_ind_ref;
 		let row=[];
-		row.push(ob.ind);
+		row.push(result.all_ind_list[air].name);
 		row.push(ob.t);
 		row.push(ob.name);
 		for(let i = 0; i < obs.length; i++){
@@ -1609,7 +1608,7 @@ function seq_sim_ind(p,i,new_seq,t,ind_infect,ele,mu,f,ind_times,samp,node_list,
 				let row=[];
 				
 				let ind = samp.species[p].individual[i];
-				row.push(all_ind_list[ind.name_ref].name);
+				row.push(all_ind_list[ind.all_ind_ref].name);
 				row.push(t);
 				for(let j = 0; j < new_seq.length; j++){
 					let ch;

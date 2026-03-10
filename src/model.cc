@@ -82,6 +82,7 @@ PV Model::param_sample() const
 	
 	for(auto th = 0u; th < nparam_vec; th++){
 		const auto &pv = param_vec[th];
+	
 		precalc_eqn.calculate(pv.spec_precalc_before,param_val,false);
 	
 		const auto &par = param[pv.th];
@@ -117,7 +118,6 @@ PV Model::param_sample() const
 	
 	//precalc_eqn.calculate(spec_precalc,param_val,false);
 	precalc_eqn.calculate(spec_precalc_sample,param_val,false);
-	
 	
 	//print_param(param_val);
 	
@@ -261,15 +261,19 @@ void Model::param_spec_precalc_time(unsigned int ti, const vector < vector <doub
 			const auto &par = param[pv.th];
 			auto eq_ref = par.get_eq_ref(pv.index);
 			if(eq_ref == UNSET) emsg("eq_ref should be set");
-				
+			
 			precalc_eqn.calculate(pv.spec_precalc_before,param_val,false);
 		
 			if(store) param_val.value_change(th);
 			value[th] = eqn[eq_ref].calculate_all_time(ti,popnum_t,precalc);
 			
+			//precalc_eqn.print_spec_precalc("after"+tstr(th)+".txt",pv.set_param_spec_precalc);
+			
 			precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,store);
 		}
 	}
+	
+	//precalc_eqn.print_spec_precalc("sp.txt",upt.spec_precalc);
 	
 	precalc_eqn.calculate(upt.spec_precalc,param_val,store);
 }
@@ -2020,6 +2024,8 @@ double Model::calc_tdiv(double t) const
 }
 
 
+
+
 /// Calculates t from tdiv
 double Model::calc_t(double tdiv) const 
 {
@@ -2108,6 +2114,12 @@ print_diag("h15a3");
 	
 	print_diag("h15a5");
 }
+
+
+/// Used to order genetic data
+bool Info_ord (const PrecalcInfo &in1, const PrecalcInfo &in2)
+{ return (in1.i < in2.i); };  
+
 
 
 /// Sets update in precalc at different times (this allows for populations in reparameterised eqns)
@@ -2251,6 +2263,12 @@ void Model::set_spec_precalc_time()
 		}
 	}
 
+	// Orders results in i
+	for(auto &spl : spec_precalc_list){
+		auto &info = spl.spec_precalc.info;
+		sort(info.begin(),info.end(),Info_ord);
+	}
+	
 	// Removes those in spec_precalc_time from list_precalc
 	auto M = precalc_eqn.pcalcu_ref.size();
 	vector <bool> map(M,false);
@@ -2332,6 +2350,8 @@ void Model::set_spec_precalc_sample()
 void Model::set_spec_precalc_all()
 {
 	spec_precalc_all = precalc_eqn.calculate_spec_precalc_all(spec_precalc);
+	
+	//precalc_eqn.print_spec_precalc("all",spec_precalc_all);
 }
 
 	

@@ -48,6 +48,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 		
 		auto tf = t + dtdiv;
 		
+		/*
 		if(tf < tnext){
 			
 			if(false){
@@ -59,6 +60,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 				}
 			}
 		}
+		*/
 		
 		if(i_trig < tri_ev.size() && tf > tri_ev[i_trig].tdiv){ // Trigger event
 			const auto &trig = tri_ev[i_trig];
@@ -124,7 +126,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 				timer[ITER] += clock();	
 				return;
 			}
-			
+		
 			auto num = ran()*R;
 		
 			auto e = nnode-1;                             // Randomly selects an equation

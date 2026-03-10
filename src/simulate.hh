@@ -12,13 +12,15 @@ using namespace std;
 class Simulate                             // Simulates from the model
 {
 	public:
-		Simulate(const Model &model, Output &output, Mpi &mpi);
+		Simulate(const Model &model, Output &output, Mpi &mpi, bool sup=false);
 		void run();
 		
 	private:
 		const Model &model;
 		Output &output;
 		Mpi &mpi;
+		
+		bool sup;                              // Determines if output is supressed
 		
 		State state;
 };

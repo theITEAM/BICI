@@ -813,7 +813,7 @@ class Model
 		let dmap = false; if(coord == "latlng" && op.default_map == true) dmap = "loading"; 
 		if(coord == "latlng") cam.ruler = default_ruler;
 		
-		this.species[p].cla.push({ name:name, index:index, tra:[], ntra:0, hash_tra:[], comp:[], ncomp:0, hash_comp:[], nsource:0, nsink:0, annotation:[], default_map:dmap, camera:cam});
+		this.species[p].cla.push({ name:name, index:index, tra:[], ntra:0, hash_tra:init_hash(), comp:[], ncomp:0, hash_comp:init_hash(), nsource:0, nsink:0, annotation:[], default_map:dmap, camera:cam});
 		this.species[p].ncla++;
 		
 		data_update_add_classification(p);

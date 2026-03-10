@@ -26,7 +26,8 @@ class Output                               // Stores information about the data
 		
 		vector <double> timer;                 // General purpose timers
 		
-		Output(const Model &model, Mpi &mpi);
+		
+		Output(const Model &model, Mpi &mpi, bool sup = false);
 		void init(const Input &input);
 		void check_open(ofstream &fout, string file) const;
 		void summary(const Model &model) const;
@@ -40,6 +41,7 @@ class Output                               // Stores information about the data
 		void delete_lines(const vector <string> &list);
 		LinesRaw new_lr(string st) const;
 		unsigned int lr_find(unsigned int line_num) const;
+		bool directory_exist(const string &path) const;
 		void ensure_directory(const string &path) const;
 		void print_initc(const vector <InitCondValue> &initc) const;
 		//void updated_file(string file);
@@ -52,11 +54,13 @@ class Output                               // Stores information about the data
 		void state_sample(unsigned int s, unsigned int chain, State &state);
 		void state_sample(const Particle &part);
 		string state_output(const Particle &part,	vector <string> &ind_key, Hash &hash_ind) const;
+		string get_ind_name(const Individual &ind, vector <string> &ind_key, Hash &hash_ind) const;
 		string trace_init() const;
 		string ic_output_head() const;
 		string ic_output(const Particle &part) const;
 		void set_inference_prop(double value, string tag, double def);
 		void set_diagnostics(unsigned int ch, string diag);
+		void copy(string file);
 		void end(string file, unsigned int total_cpu);
 		vector <Particle> get_part_chain(unsigned int chain, vector <Particle> &part) const;
 		void clear_part(Particle &pa) const;
@@ -65,10 +69,14 @@ class Output                               // Stores information about the data
 		void final_time(unsigned int cpu_time, unsigned int op_cpu_time) const;
 		void final_memory_usage() const;
 		void insert_command(string name, unsigned int p, string insert_pl, string insert_bef, string line, string content, string file);
-	
+		string get_effective_sample_size(vector <double> vec) const;
+		string get_Gelman_Rubin_statistic(const vector < vector <double> > &cha) const;
+		Stat get_statistic(vector <double> &vec) const;
+		void change_sim_value(string param_name, double value);
+		
 	private:
 		vector < vector <double> > param_value_from_vec(const Particle &pa) const;
-		void infection_info(const IndInfFrom &iif, unsigned int p, const Particle &part, stringstream &ss) const;
+		void infection_info(const IndInfFrom &iif, unsigned int p, const Particle &part, stringstream &ss,	vector <string> &ind_key, Hash &hash_ind) const;
 		string generate_state_head(const vector <string> &ind_key) const;
 		string output_param(const vector < vector <double> > &value) const;
 		vector < vector <double> > param_value_from_value() const;
@@ -76,8 +84,6 @@ class Output                               // Stores information about the data
 		void number_part(vector <Particle> &part) const;
 		void output_trace(unsigned int ch, const vector <Particle> &part, vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout) const;
 		string get_file_name(string root, unsigned int ch, unsigned int nchain, string end) const;
-		string get_effective_sample_size(vector <double> vec) const;
-		string get_Gelman_Rubin_statistic(const vector < vector <double> > &cha) const;
 		string param_stat(unsigned int th, unsigned int i, const vector < vector < vector < vector <double> > > > &param_samp, vector <Warn> &ESS_warn, vector <Warn> &GR_warn) const;
 		void output_param_statistics(const vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout, vector <string> &final_warning) const;
 		void output_prop_info(ofstream &fout) const;
@@ -92,8 +98,9 @@ class Output                               // Stores information about the data
 		void output_diagnostic(const vector <Diagnostic> &diagnostic, bool &alg_warn_flag,ofstream &fout) const;
 		vector <TransDiagSpecies> trans_diag_init() const;
 		void trans_diag_add(vector <TransDiagSpecies> &trans_diag, const vector <Particle> &part) const;
-		Stat get_statistic(vector <double> &vec) const;
 		string generation_average(string head, string content) const;
+		string get_tag_value(const TagRange &tag) const;
+		TagRange get_next_tag(unsigned int i, string tag) const;
 		
 		vector <LinesRaw> lines_raw;    
 	
@@ -101,6 +108,8 @@ class Output                               // Stores information about the data
 		vector <Particle> state_store;
 		vector <Diagnostic> diagnostic_store;
 	
+		bool sup;                              // Determines if output is supressed
+		
 		const Model &model;	
 		Mpi &mpi;	
 };

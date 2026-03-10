@@ -72,7 +72,10 @@ class Model                                // Stores information about the model
 		
 		vector <Table> param_samp_store;       // Stores parameter samples (used for EXT);
 		
-		vector <Sample> sample;                // Stores inferred state (used for PPC/EXT)
+		Table inf_param_stats;                 // Stores parameter stats (used in tornado)
+		
+		vector < vector <string> > ind_key_store; // Converts from number to name
+		vector <Sample> sample;                // Stores inferred state (used for PPC/EXT/DATA_SIM)
 		
 		vector <TerminalInfo> terminal_info;   // Loaded proposal information [chain]
 		
@@ -82,6 +85,8 @@ class Model                                // Stores information about the model
 		
 		Details details;                       // Details for simulation/inference
 		
+		Details inf_details;                   // Details for inference (used in tornado plot 
+		
 		Constant constant;                     // Stores all the contants in the model
 		
 		Precalc precalc_eqn;                   // The equation which precalculates quantities
@@ -89,7 +94,6 @@ class Model                                // Stores information about the model
 		SpecPrecalc spec_precalc_derive;       // Stores list for precalcultion of derived (for integrals)
 		SpecPrecalc spec_precalc_sample;       // Collects all the precalc to calculate after sample        
 		SpecPrecalc spec_precalc_all;          // Collects all the precalc         
-		//vector <SpecPrecalcTime> spec_precalc_time; // Precalculation at different times
 		vector <unsigned int> spec_precalc_time_ref;  // References spec_precalc_list
 		vector <SpecPrecalcTime> spec_precalc_list;   // Stores a time-dependent spec_precalc
 		vector <double> precalc_init;          // Initial value for precalc

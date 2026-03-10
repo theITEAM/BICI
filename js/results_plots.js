@@ -28,13 +28,26 @@ function add_pop_buts(res,lay)
 		return;
 	}
 
+	let dy = scalable_dy(cy,lay);
+
 	switch(plot_variety(inter.graph.type)){
-	case "Line plot": inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); break;
+	case "Line plot": inter.graph.create(cx,cy,graph_width-right_menu_width,dy,lay); break;
 	case "Comp plot": inter.graph.create(1,cy-1,graph_width-right_menu_width+0.5,lay.dy-cy,lay); break;
 	case "Density plot": inter.graph.create(1,cy-1,graph_width-right_menu_width+0.5,lay.dy-cy,lay); break;
-	case "No graph plot": inter.graph.no_graph(cx,cy,graph_width-right_menu_width,29,lay); break;
+	case "No graph plot": inter.graph.no_graph(cx,cy,graph_width-right_menu_width,dy,lay); break;
 	default: error("No graph option"); break;
 	}
+}
+
+
+/// Works out the vertical size of a graph
+function scalable_dy(cy,lay)
+{
+	let dy = lay.dy-cy-2;
+	if(dy > 40) dy = 40;
+	if(dy < 29) dy = 29;
+	
+	return dy;
 }
 
 
@@ -591,7 +604,9 @@ function add_trans_buts(res,lay)
 		return;
 	}
 	
-	inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); 
+	let dy = scalable_dy(cy,lay);
+	
+	inter.graph.create(cx,cy,graph_width-right_menu_width,dy,lay); 
 }
 
 
@@ -1344,7 +1359,9 @@ function add_individual_buts(res,lay)
 			return;
 		}
 		
-		inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay);
+		let dy = scalable_dy(cy,lay);
+		
+		inter.graph.create(cx,cy,graph_width-right_menu_width,dy,lay);
 		
 		lay.add_corner_button([["Back","Grey","CancelViewInd"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 		return;
@@ -1400,12 +1417,14 @@ function add_individual_buts(res,lay)
 	
 	let vari = plot_variety(inter.graph.type);
 	
+	let dy = scalable_dy(cy,lay);
+	
 	switch(vari){
-	case "Line plot": inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); break;
-	case "Stat table plot": inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); break;
+	case "Line plot": inter.graph.create(cx,cy,graph_width-right_menu_width,dy,lay); break;
+	case "Stat table plot": inter.graph.create(cx,cy,graph_width-right_menu_width,dy,lay); break;
 	case "Scatter plot": 
 		{
-			let x = cx, w = graph_width-right_menu_width, h = 29;
+			let x = cx, w = graph_width-right_menu_width, h = dy;
 			if(false){                                   // Makes square
 				let tw = inter.graph.tick.wmax;
 				let ww = w-graph_mar.right-graph_mar.left-tw;
@@ -1419,12 +1438,12 @@ function add_individual_buts(res,lay)
 		}
 		break;
 	case "Individual plot":
-		inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); 
+		inter.graph.create(0,cy,graph_width+2-right_menu_width,dy,lay); 
 		break;
-	case "TransTree plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); break;
-	case "PhyloTree plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); break;
-	case "Histogram plot": inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); break;
-	case "No graph plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,29,lay); break;
+	case "TransTree plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,dy,lay); break;
+	case "PhyloTree plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,dy,lay); break;
+	case "Histogram plot": inter.graph.create(cx,cy,graph_width-right_menu_width,dy,lay); break;
+	case "No graph plot": inter.graph.create(0,cy,graph_width+2-right_menu_width,dy,lay); break;
 	default: error("Graph not plotting"+vari); break;
 	}
 }
@@ -1488,7 +1507,9 @@ function add_diagnostic_buts(res,lay)
 		return;
 	}
 	
-	inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); 
+	let dy = scalable_dy(cy,lay);
+	
+	inter.graph.create(cx,cy,graph_width-right_menu_width,dy,lay); 
 }
 
 
@@ -1596,8 +1617,8 @@ function graph_ind_calculate(result,rpf,burn,p)
 				for(let i = 0; i < imax; i++){
 					let ind = sa.individual[i];
 					
-					//let name = ind.name;
-					let name = all_ind_list[ind.name_ref].name;
+					let name = all_ind_list[ind.all_ind_ref].name;
+					
 					if(hash_filt == undefined || hash_filt.find(name) != undefined){
 						let j = hash.find(name);
 						if(j == undefined){
@@ -1610,7 +1631,7 @@ function graph_ind_calculate(result,rpf,burn,p)
 				}
 			}
 		}
-			
+				
 		/// Filters individuals based on a population filter
 		if(popfilt && popfilt.length > 0){
 			let g_filt = get_g_filt(popfilt,sp);
@@ -1986,16 +2007,23 @@ function graph_ind_sing_calculate(ind_sel,result,rpf,burn,p)
 	// Constructs a global filter 
 	let g_filt = get_g_filt(popfilt,sp);
 	
+	let all_ind_list = result.all_ind_list;
+	
 	// Gets the individual number
 	let i_store = [];
 	let i_ind;
 	for(let samp = imin; samp < imax; samp++){
 		let sampl = result.sample[samp];
+	
 		if(sampl.num >= burn && !(chsel != "All" && sampl.chain != chsel)){		
 			let sa = sampl.species[p];
-			
-			if(i_ind == undefined || i_ind >= sa.individual.length || sa.individual[i_ind].name != ind_sel){ 	
-				i_ind = find(sa.individual,"name",ind_sel);
+			let indiv = sa.individual;
+
+			if(i_ind == undefined || i_ind >= sa.individual.length || all_ind_list[indiv[i_ind].all_ind_ref].name != ind_sel){ 	
+				i_ind = undefined;
+				for(let i = 0; i < indiv.length; i++){
+					if(all_ind_list[indiv[i].all_ind_ref].name == ind_sel){ i_ind = i; break;}
+				}
 			}
 			
 			i_store[samp] = i_ind;
@@ -2770,7 +2798,6 @@ function add_timelines(ind_list,tmin,tmax,p,cl,result,data,key,ind_max)
 		let nalive = 0;
 	
 		let nsamp = comb_ind.sa_ref.length;
-		
 		let col_timeline = [];
 			
 		let cla_ev = [];
@@ -2786,7 +2813,7 @@ function add_timelines(ind_list,tmin,tmax,p,cl,result,data,key,ind_max)
 				c = cgl.cla_comp[cl];
 				cpop[c]++;
 			}
-			
+		
 			for(let e = 0; e < ind.ev.length; e++){
 				let ev = ind.ev[e];
 			
@@ -2837,7 +2864,7 @@ function add_timelines(ind_list,tmin,tmax,p,cl,result,data,key,ind_max)
 				let cf = clev.cf; if(cf == OUT) nalive--; else cpop[cf]++;
 				
 				let tt_new = clev.t;
-				if(k == kmax-1 || (tt_new-tt > dtmin && tt_new < cla_ev[k+1].t)){
+				if(k == kmax-1 || (cla_ev[k+1].t > tt + dtmin)){
 					tt = tt_new;
 					col_timeline.push({t:tt, col:get_mix_colour(comp_col,cpop), alpha:nalive/nsamp});
 				}
@@ -2909,7 +2936,7 @@ function add_trans_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 				
 				for(let i = 0; i < imax; i++){
 					let ind = sa.individual[i];
-					let name = ind.name;		
+					let name = result.all_ind_list[ind.all_ind_ref].name;		
 					
 					let j = hash.find(name);
 					if(j == undefined){
@@ -3314,7 +3341,7 @@ function add_first_inf_ind(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 			if(j < fa.length){
 				let stat = get_statistic(fa);
 				
-				let na = ind.name;
+				let na = result.all_ind_list[ind.all_ind_ref].name;
 				data.push({type:"Bar", name:na, x:x+0.5, y:stat.mean, thick:bar_thick, col:DGREY});
 				data.push({key_na:"Bar", name:na, type:"ErrorBar", x:x+0.5, ymin:stat.CImin, y:stat.mean, ymax:stat.CImax, col:BLACK});
 				x++;
@@ -3422,7 +3449,7 @@ function add_phylo_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 					iev.obs_list = [];
 				}
 			}				
-			
+		
 			for(let n = 0; n < nmax; n++){
 				let ino = inf_node[n];
 				for(let k = 0; k < ino.inf_ev.length; k++){
@@ -3441,7 +3468,7 @@ function add_phylo_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 								ino2.obs_list_root.push(m);
 								
 								let fr = ino2.from;
-								if(fr == "ENT" || fr == "OUT") break;
+								if(fr == INFN_ENT || fr == INFN_OUT) break;
 								else{
 									nn = fr; kk = ino2.num;
 								}
@@ -3461,7 +3488,7 @@ function add_phylo_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 				let ino = inf_node[n];
 				
 				let fr = ino.from;
-				if(fr == "ENT" || fr == "OUT"){
+				if(fr == INFN_ENT || fr == INFN_OUT){
 					code_list.push(hash_ori.get_phylo_code(ino.obs_list_root));
 					arr.push(ino.obs_list_root);
 					t_vec.push(ino.t);
@@ -3475,8 +3502,8 @@ function add_phylo_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 			// Adds branching point to hash table
 			for(let n = 0; n < nmax; n++){
 				let ino = inf_node[n];
-				let ind = ino.ind;
-				
+				let all_ind_ref = ino.all_ind_ref;
+			
 				for(let k = 0; k < ino.inf_ev.length; k++){
 					let iev = ino.inf_ev[k];
 					let obs_list = iev.obs_list;
@@ -3486,7 +3513,7 @@ function add_phylo_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 					switch(iev.ty){
 					case "OBS":
 						{
-							ob = {ty:"OBS", t:iev.t, m:iev.i, mnum:iev.num, ind:ind};
+							ob = {ty:"OBS", t:iev.t, m:iev.i, mnum:iev.num, all_ind_ref:all_ind_ref};
 						}	
 						break;
 						
@@ -3502,7 +3529,7 @@ function add_phylo_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 							}
 							
 							let code_br = hash_bra.get_phylo_code(list_br);	
-							ob = {ty:"SPLIT", t:iev.t, code_br:code_br, list_br:list_br, list_br2:list_br2, mnum:iev.num, ind:ind};
+							ob = {ty:"SPLIT", t:iev.t, code_br:code_br, list_br:list_br, list_br2:list_br2, mnum:iev.num, all_ind_ref:all_ind_ref};
 						}
 						break;
 					}				
@@ -3550,7 +3577,10 @@ function add_phylo_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 		let max = 0, tot = 0;
 		let iname;
 		for(let j = 0; j < ind_list.length; j++){
-			if(ind_list[j].num > max){ iname = ind_list[j].ind; max = ind_list[j].num;}
+			if(ind_list[j].num > max){ 
+				iname = result.all_ind_list[ind_list[j].all_ind_ref].name;
+				max = ind_list[j].num;
+			}
 			tot += ind_list[j].num;
 		}		
 		if(max != tot) iname += "("+Math.floor((max*100)/tot)+"%)";
@@ -3674,30 +3704,6 @@ function get_mix_colour(comp_col,cpop)
 	
 	return Math.floor(rsum/sum)+","+Math.floor(gsum/sum)+","+Math.floor(bsum/sum);
 }
-
-
-/*
-/// Adds buttons associated with a spline plot
-function add_spline_buts(res,lay)
-{
-	if(inter.graph.init == "loading") return;
-	
-	let cx = corner.x;
-	let cy = corner.y;
-	
-	cy = lay.add_title("Time varying derived quantities",cx,cy,{te:derived_plot_text});
-	
-	cy += 1;
-
-	if(inter.graph.init != true){
-		inter.graph.init = "loading"; 
-		start_worker("Graph spline",res_worker(res));
-		return;
-	}
-	
-	inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay); 
-}
-*/
 
 
 /// Calculates spline information
@@ -3863,7 +3869,9 @@ function test_graph(lay)
 			inter.graph.define("Histogram","Histogram",data,{x_label:"Category", y_label:"Value"});
 		}
 		
-		inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay);
+		let dy = scalable_dy(cy,lay);
+		
+		inter.graph.create(cx,cy,graph_width-right_menu_width,dy,lay);
 	}
 	
 	cy = lay.add_title("Matrix",cx,cy,{te:""});
@@ -3883,7 +3891,9 @@ function test_graph(lay)
 		inter.graph.define("Matrix","Matrix",data,{x_label:"Category", y_label:"Value"});
 	}
 	
-	inter.graph.create(cx,cy,graph_width-right_menu_width,29,lay);
+	let dy = scalable_dy(cy,lay);
+	
+	inter.graph.create(cx,cy,graph_width-right_menu_width,dy,lay);
 }
 
 
@@ -3914,7 +3924,8 @@ function create_view_graph(lay)
 		return;
 	}
 	
-	inter.graph.create(cx,cy,graph_width-right_menu_width,30,lay); 
+	let dy = scalable_dy(cy,lay)+1;
+	inter.graph.create(cx,cy,graph_width-right_menu_width,dy,lay); 
 	
 	lay.add_corner_button([["Back","Grey","CancelViewGraph"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 }
@@ -4492,9 +4503,9 @@ function add_parameter_buts(res,lay)
 	
 	let x = cx, y = cy;
 	let w = graph_width-right_menu_width;
-	let h = 29;
+	let dy = scalable_dy(y,lay);
 	
-	inter.graph.create(x,y,w,h,lay);
+	inter.graph.create(x,y,w,dy,lay);
 }
 
 
@@ -4526,9 +4537,9 @@ function add_generation_buts(res,lay)
 	
 	let x = cx, y = cy;
 	let w = graph_width-right_menu_width;
-	let h = 29;
+	let dy = scalable_dy(y,lay);
 	
-	inter.graph.create(x,y,w,h,lay);
+	inter.graph.create(x,y,w,dy,lay);
 }
 
 

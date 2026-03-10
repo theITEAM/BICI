@@ -171,7 +171,7 @@ function key_press(e)
 	let code = e.keyCode;	
 	//prr(code+"code");
 
-	if(code == 36){ // Home
+	if(code == 36 && debug){ // Home
 		prr("Turn off shrink");
 		let fac = prompt("Factor to reduce?");
 		start_worker("Factor reduce",{p:model.get_p(), cl:model.get_cl(), fac:fac});

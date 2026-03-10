@@ -72,6 +72,8 @@ void State::simulate(const PV &param_value, const vector <InitCondValue> &initc_
 	}
 
 	simulate_iterate(0,T);
+	
+	//print_iif();
 }
 
 
@@ -86,11 +88,15 @@ void State::post_sim(const PV &param_value, const Sample &samp)
 	auto ti_start = get_ti(t_start);
 	auto ti_end = get_ti(t_end);
 
+	const auto &ind_key = model.ind_key_store[samp.ind_key_ref];
+
 	for(auto p = 0u; p < model.species.size(); p++){
 		auto &ssp = species[p];
 		ssp.simulate_init();
-		ssp.simulate_sample_init(ti_start,samp.species[p]);
+		ssp.simulate_sample_init(ti_start,samp.species[p],ind_key);
 	}
+	
+	set_ind_inf_from(ind_key);
 	
 	popnum_t = calculate_popnum_t(ti_start+1);
 	popnum_t.resize(T);
@@ -123,11 +129,15 @@ void State::load_samp(const PV &param_value, const Sample &samp)
 {
 	param_val = param_value;
 	
+	const auto &ind_key = model.ind_key_store[samp.ind_key_ref];
+	
 	for(auto p = 0u; p < model.species.size(); p++){
 		auto &ssp = species[p];
 		ssp.simulate_init();
-		ssp.simulate_sample_init(T,samp.species[p]);
+		ssp.simulate_sample_init(T,samp.species[p],ind_key);
 	}
+	
+	set_ind_inf_from(ind_key);
 	
 	popnum_t = calculate_popnum_t(T);
 
@@ -138,7 +148,8 @@ void State::load_samp(const PV &param_value, const Sample &samp)
 		if(ssp.type == POPULATION || ssp.type == DETERMINISTIC) ssp.set_tnum_mean(T,popnum_t);
 	}
 
-	if(!model.data_mode()) likelihood_from_scratch();
+	//if(!model.data_mode()) 
+	likelihood_from_scratch();
 }
 
 
@@ -169,7 +180,7 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 		timer[SIM_PRECALC] -= clock();
 		model.param_spec_precalc_time(ti,popnum_t,param_val,false);
 		timer[SIM_PRECALC] += clock();
-
+		
 		timer[SIM_POPIND] -= clock();	
 		auto pop_ind = calculate_pop_ind(); 
 		timer[SIM_POPIND] += clock();
@@ -208,7 +219,7 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 			}
 		}
 	}
-
+	
 	if(model.mode == INF || model.mode == EXT) ensure_all_ind_event();
 
 	if(false){
@@ -694,13 +705,13 @@ void State::calculate_likelihood()
 	spline_prior = model.spline_prior(param_val);
 	
 	auto all_time = seq_vec(T);
-	
+
 	for(auto p = 0u; p < nspecies; p++){
 		const auto &sp = model.species[p];
 		auto &ssp = species[p];
 
 		ssp.calculate_obs_eqn(seq_vec(sp.obs_eqn.size()));
-		
+
 		switch(ssp.type){
 		case INDIVIDUAL:
 			{
@@ -708,12 +719,12 @@ void State::calculate_likelihood()
 					auto temp = 0.0;
 					ssp.likelihood_unobs_trans(m,all_time,temp);
 				}
-					
+
 				for(auto g = 0u; g < ssp.ind_eff_group_sampler.size(); g++){
 					auto temp = 0.0;
 					ssp.likelihood_indeff_group(g,temp);
 				}
-			
+
 				ssp.Li_markov.resize(ssp.N);
 				for(auto e = 0u; e < ssp.N; e++){
 					auto &me_vari = ssp.markov_eqn_vari[e];
@@ -722,7 +733,6 @@ void State::calculate_likelihood()
 					auto list = seq_vec(me_vari.div.size());
 					ssp.likelihood_markov(e,list,temp);
 				}
-			
 			
 				for(auto i = 0u; i < sp.nm_trans.size(); i++){
 					auto temp = 0.0;
@@ -734,7 +744,7 @@ void State::calculate_likelihood()
 					auto temp = 0.0;
 					ssp.likelihood_nm_trans_incomp(i,all_time,popnum_t,temp);
 				}
-				
+
 				ssp.Li_obs_ind.resize(sp.nindividual_in);	
 				auto temp = 0.0;
 				ssp.likelihood_obs_ind(seq_vec(sp.nindividual_in),temp);
@@ -748,7 +758,7 @@ void State::calculate_likelihood()
 		case DETERMINISTIC:
 			break;
 		}
-		
+
 		ssp.calculate_pop_data_cgl_trgl();
 		
 		auto temp = 0.0;
@@ -1353,9 +1363,9 @@ void State::likelihood_from_scratch()
 		ssp.setup_nm_trans(popnum_t);
 		ssp.calculate_obs_trans_eqn_num();
 	}
-	
+
 	calculate_popnum_ind();
-	
+
 	// Initialises markov_eqn with value calculated and inffac_int set to zero
 	for(auto p = 0u; p < species.size(); p++){
 		auto &sp = model.species[p];
@@ -1398,7 +1408,7 @@ void State::likelihood_from_scratch()
 		set_genetic_param();
 		sample_genetic_value();
 	}
-	
+
 	calculate_likelihood();
 }
 
@@ -2058,4 +2068,51 @@ void State::recalculate_population_restore(vector < vector <double> > &popnum_t,
 			popnum_t[t][k] = vec[j]; j++; 
 		}
 	}
+}
+
+
+/// If transmission tree this sets ind_inf_from for individual events
+void State::set_ind_inf_from(const vector <string> &ind_key)
+{
+	auto p = 0u; while(p < model.nspecies && model.species[p].trans_tree == false) p++;
+	if(p == model.nspecies) return;
+	
+	auto N = ind_key.size();
+	vector <IndRef> ind_ref(N);
+	for(auto i = 0u; i < N; i++) ind_ref[i].p = UNSET;
+	
+	Hash hash;
+	for(auto i = 0u; i < N; i++) hash.add(i,ind_key[i]);
+	
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &ssp = species[p];
+		for(auto i = 0u; i < ssp.individual.size(); i++){
+			const auto &ind = ssp.individual[i];
+			auto k = hash.find(ind.name);
+			if(k == UNSET) emsg("Could not find ind");
+			
+			ind_ref[k].p = p; ind_ref[k].i = i; 
+		}			
+	}
+	
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp =  model.species[p];
+		auto &ssp = species[p];
+		for(auto &ind : ssp.individual){
+			for(auto &ev : ind.ev){
+				auto &iif = ev.ind_inf_from;
+				if(iif.p == UNSET && iif.i != UNSET){
+					const auto &ir = ind_ref[iif.i];
+					iif.p = ir.p; iif.i = ir.i;
+					
+					if(!set_iif(ir.p,iif.i,0,iif,ev.tdiv,ev,sp)){
+						emsg("Could not set iif");
+					}
+				}
+			}
+		}
+	}		
+	
+	//print_iif();
+	//emsg("do");
 }

@@ -328,14 +328,14 @@ function load_table(te,head,sep,filename)
  
  
 /// Reads parameter samples from a file 
-function read_param_samples_file(chain,file,result)
+function read_param_samples_file(chain,file,result,line)
 {
 	let te = decode(file);
 
 	let warn = "Problem loading file '"+file.name+"'";
 	if(file.name == "inline") warn = "Problem loading parameter sample";
 	
-	read_param_samples(chain,te,result,warn)
+	read_param_samples(chain,te,result,warn,line)
 }
 
 
@@ -362,7 +362,7 @@ function is_correlation(name,result)
 
 
 /// Reads in a parameter samples from a file
-function read_param_samples(chain,te,result,warn)
+function read_param_samples(chain,te,result,warn,line)
 {
 	// Makes sure there aren't multiple instances for param sample files files 
 	if(result.param_sample_chain == undefined) result.param_sample_chain=[];
@@ -381,21 +381,24 @@ function read_param_samples(chain,te,result,warn)
 
 	let J = spl.length;
 
+	let fpt = line.pt/(J-1);
+	line.pt = 0;
+	
 	let hash_ref = result.hash_ref;
 	
 	let ref = [];
 	ref.push({});
 	for(let i = 1; i < J; i++){
+		add_proc_time(fpt);
+		
 		let name = remove_quote(spl[i]).replace(/->/g,"→");
 		name = name.replace(/\|/g,",");
 		name = remove_escape_char(name);
-		
 		
 		if(begin_str(name,"ω")){
 			if(is_correlation(name,result)) name = "Ω"+name.substr(1);
 		}
 	
-		
 		let ref_add = hash_ref.find(name)
 		if(ref_add == undefined){
 			if(find_in(like_name,name) != undefined){
@@ -648,19 +651,19 @@ function read_param_samples(chain,te,result,warn)
 
 
 /// Reads in state samples from a file
-function read_state_samples_file(chain,file,result)
+function read_state_samples_file(chain,file,result,line)
 {	
 	let te = decode(file);
 
 	let warn = "Problem loading file '"+file.name+"'";
 	if(file.name == "inline") warn = "Problem loading state sample";
 	
-	read_state_samples(chain,te,result,warn);
+	read_state_samples(chain,te,result,warn,line);
 }
 	
 
 /// Reads in state samples from text
-function read_state_samples(chain,te,result,warn)
+function read_state_samples(chain,te,result,warn,line)
 {
 	// Makes sure there aren't multiple instances for state sample files files 
 	if(result.state_sample_chain == undefined) result.state_sample_chain=[];
@@ -686,8 +689,14 @@ function read_state_samples(chain,te,result,warn)
 	te = te.substr(i);
 
 	let sec = te.split("<<");
-
-	for(let s = 1; s < sec.length; s++){
+	let smax =  sec.length;
+	
+	let fpt = line.pt/(smax-1);
+	line.pt = 0;
+	
+	for(let s = 1; s < smax; s++){
+		add_proc_time(fpt);
+			
 		read_state_sample("<<"+sec[s],chain,result,warn,ind_key);
 	}	
 }
@@ -951,9 +960,20 @@ function read_state_sample(te,chain,result,warning,ind_key)
 						let spl2 = spl[0].split("|");
 						if(spl2.length != 4) alert_sample(warn,129); 
 						let fr = spl2[2];
-						if(fr != "ENT" && fr != "OUT") fr = Number(fr);
+						if(fr == "ENT") fr = INFN_ENT;
+						else{
+							if(fr == "OUT") fr = INFN_OUT;
+							else fr = Number(fr);
+						}
+						
 						let num = spl2[3]; if(num == "NA") num = UNSET; 
-						let ino = {ind:spl2[0], t:Number(spl2[1]), from:fr, num:Number(num), inf_ev:[]}
+						//let ino = {ind:spl2[0], t:Number(spl2[1]), from:fr, num:Number(num), inf_ev:[]}
+						
+						let name = ind_key[Number(spl2[0])];
+						let ref = hash_all_ind.find(name);
+						if(ref == undefined) alert_sample(warn,122);
+						
+						let ino = {all_ind_ref:ref, t:Number(spl2[1]), from:fr, num:Number(num), inf_ev:[]}
 						
 						for(let k = 1; k < spl.length; k++){
 							let spl2 = spl[k].split("|");
@@ -963,6 +983,7 @@ function read_state_sample(te,chain,result,warning,ind_key)
 							let iev = {ty:spl2[0], i:Number(spl2[1]), t:Number(spl2[2]), num:Number(num)};
 							ino.inf_ev.push(iev);
 						}
+					
 						sample.inf_node.push(ino);
 						sample.phytree = true;
 					}
@@ -1091,7 +1112,6 @@ function read_state_sample(te,chain,result,warning,ind_key)
 							}
 							
 							if(vec.length != timepoint.length-1){
-								pr(vec.length +" "+(timepoint.length-1)+" kk");
 								alert_sample(warn,128);
 							}
 							
@@ -1115,7 +1135,7 @@ function read_state_sample(te,chain,result,warning,ind_key)
 							if(spl.length != 3+sp.ind_effect.length) alert_sample(warn,302);
 							
 							let name = spl[0].trim();
-							name = ind_key[name];
+							name = ind_key[Number(name)];
 							let so_str = spl[1].trim();
 							
 							let cinit;
@@ -1219,8 +1239,7 @@ function read_state_sample(te,chain,result,warning,ind_key)
 								hash_all_ind.add(name,ref);
 							}
 								
-							//let ind = {name_ref:ref, name:name, cinit:cinit, ev:ev, ie:ie, obs:obs};
-							let ind = {name_ref:ref, cinit:cinit, ev:ev, ie:ie, obs:obs};
+							let ind = {all_ind_ref:ref, cinit:cinit, ev:ev, ie:ie, obs:obs};
 							
 							ssp.individual.push(ind);
 						}
@@ -1233,7 +1252,7 @@ function read_state_sample(te,chain,result,warning,ind_key)
 		}
 	}
 	
-	generate_trans_tree(get_inf_from,result,sample);
+	generate_trans_tree(get_inf_from,result,sample,ind_key);
 
 	generate_cpop_init_from_ind(result,sample);
 
@@ -1254,7 +1273,7 @@ function read_state_sample(te,chain,result,warning,ind_key)
 
 
 /// Reads in  information about transition diagnostics
-function read_trans_diag(ch,file,result)
+function read_trans_diag(ch,file,result,linep)
 {
 	create_compartment_hash(result);
 	
@@ -1272,9 +1291,14 @@ function read_trans_diag(ch,file,result)
 		res.species[p] = {exp_num:[]};
 	}
 	
+	let fpt = linep.pt/line.length;
+	linep.pt = 0;
+	
 	let p = 0;
 	
 	for(let i = 0; i < line.length; i++){
+		add_proc_time(fpt);
+		
 		let li = line[i];
 		
 		if(li != ""){
@@ -1438,7 +1462,7 @@ function extract_infection_info(tr,get_inf_from,p,ev,ssp)
 
 
 /// Finds which individuals infect which other ones
-function generate_trans_tree(get_inf_from,result,sample)
+function generate_trans_tree(get_inf_from,result,sample,ind_key)
 {
 	let trans_tree = [];
 	
@@ -1456,7 +1480,8 @@ function generate_trans_tree(get_inf_from,result,sample)
 		hash_vec[p] = new Hash();
 		let sp = sample.species[p];
 		for(let i = 0; i < sp.individual.length; i++){
-			hash_vec[p].add(sp.individual[i].name,i);
+			let ind = sp.individual[i];
+			hash_vec[p].add(result.all_ind_list[ind.all_ind_ref].name,i);
 		}
 	}
 	
@@ -1479,6 +1504,8 @@ function generate_trans_tree(get_inf_from,result,sample)
 				if(p_from == undefined) alert_import("Could not find species '"+spl[0]+"'");
 				te = spl[1];
 			}
+			
+			te = ind_key[Number(te)];
 			
 			i_from = hash_vec[p_from].find(te);
 			if(i_from == undefined) alert_import("Could not find individual '"+te+"'");

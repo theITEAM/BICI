@@ -310,7 +310,7 @@ function restrict_width(te,font,width)
 				te = te.substr(0,te.length-num);
 			}
 				
-			if(te == "") error("Space is too small"+" "+te_start+" "+ width_st +"  "+font+" "+width);
+			//if(te == "") error("Space is too small"+" "+te_start+" "+ width_st +"  "+font+" "+width);
 			te += "⋯";
 		}
 	}	

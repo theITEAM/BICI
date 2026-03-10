@@ -5,6 +5,7 @@
 // 50018 lines of code (18/11/24)
 // 59127 lines of code (16/15/25)
 // 62667 lines of code (17/09/25)
+// 67000 lines of code (25/02/26)
 
 let ver="windows";         // Determines platform
 //let ver="linux";
@@ -12,7 +13,7 @@ let ver="windows";         // Determines platform
 
 let mac_temp_dir = "/tmp/BICI_files/";
 
-let win_linux = false;                            // When working on win running linux 
+let win_linux = false;//true;                             // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
@@ -21,7 +22,7 @@ let testing = false;                              // Used logo to load up result
 let load_map_fast = false;                        // If loads up world map from local computer
 let make_one_chain = false;                       // Make into one chain (for diagnostic purposes)
 
-if(win_linux || true){ testing = true; debug = true; load_map_fast = true;}
+if(win_linux || false){ testing = true; debug = true; load_map_fast = true;}
 //testing = true;
 //if(win_linux){ testing = true; debug = true; load_map_fast = true;}
 //if(true){ testing = true; debug = true;};
@@ -430,6 +431,8 @@ const DEN_X = 200;                                 // Resolution of density p;ot
 const SR_MIN = 5;                                  // Determines if DEN_X must be increased
 const COMPARTMENT_CURVE = 0.25;                    // Determines the curvature put around compartments
 
+const INFN_ENT = 99999980;                         // Denotes enter for an infection node
+const INFN_OUT = 99999980;                         // Denotes out for an infection node
 const NORMAL = 99999989;                           // Denotes dot a source or sink
 const SOURCE = 99999990;                           // Denotes source 
 const SINK = 99999991;                             // Denotes sink
@@ -522,6 +525,7 @@ const greek = ["\u03B1","\u03B2","\u03B3","\u03B4","\u03B5","\u03B6","\u03B7","\
 const greek_latex = [["alpha","α"],["beta","β"],["gamma","γ"],["Gamma","Γ"],["delta","δ"],["Delta","Δ"],["epsilon","ε"],["zeta","ζ"],["eta","η"],["Eta","Η"],["theta","θ"],["Theta","Θ"],["iota","ι"],["kappa","κ"],["lambda","λ"],["Lambda","Λ"],["mu","μ"],["nu","ν"],["xi","ξ"],["Xi","Ξ"],["omicron","ο"],["pi","π"],["Pi","Π"],["rho","ρ"],["sigma","σ"],["tau","τ"],["upsilon","υ"],["phi","φ"],["Phi","Φ"],["chi","χ"],["psi","ψ"],["Psi","Ψ"],["omega","ω"],["Omega","Ω"],["sum","Σ"],["int","∫"]];
 //["Sigma","Σ"],
 
+
 const greek_capital = ["A","B","Γ","Δ","E","Z","H","Θ","I","K","Λ","M","N","Ξ","O","Π","P","Σ","T","Y","Φ","X","Ψ","Ω"];
 
 const alphabet = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"];
@@ -532,6 +536,7 @@ const trans_tree_name = ["N^origin","N^infected","N^mut-tree","N^mut-origin","N^
 
 const dic_list = [" ","!","\"","#","$","%","&","'","(",")","*","+",",","-",".","/","0","1","2","3","4","5","6","7","8","9",":",";","<","=",">","?","@","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","[","\\","]","^","_","`","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","{","|","}","~","\t","\n","\r","α","β","γ","Γ","δ","Δ","ε","ζ","η","Η","θ","Θ","ι","κ","λ","Λ","μ","ν","ξ","Ξ","ο","π","Π","ρ","σ","τ","υ","φ","Φ","χ","ψ","Ψ","ω","Ω","Σ","∫","→","〈","〉"];
 
+let ec_ref=[,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,[{str:"Delta",letter:"Δ"}],[{str:"Eta",letter:"Η"}],,[{str:"Gamma",letter:"Γ"}],,,,,[{str:"Lambda",letter:"Λ"}],,,[{str:"Omega",letter:"Ω"}],[{str:"Pi",letter:"Π"},{str:"Phi",letter:"Φ"},{str:"Psi",letter:"Ψ"}],,,,[{str:"Theta",letter:"Θ"}],,,,[{str:"Xi",letter:"Ξ"}],,,,,,,,,[{str:"alpha",letter:"α"}],[{str:"beta",letter:"β"}],[{str:"chi",letter:"χ"}],[{str:"delta",letter:"δ"}],[{str:"epsilon",letter:"ε"},{str:"eta",letter:"η"}],,[{str:"gamma",letter:"γ"}],,[{str:"iota",letter:"ι"},{str:"int",letter:"∫"},{str:"int",letter:"∫"}],,[{str:"kappa",letter:"κ"}],[{str:"lambda",letter:"λ"}],[{str:"mu",letter:"μ"}],[{str:"nu",letter:"ν"}],[{str:"omicron",letter:"ο"},{str:"omega",letter:"ω"}],[{str:"pi",letter:"π"},{str:"phi",letter:"φ"},{str:"psi",letter:"ψ"}],,[{str:"rho",letter:"ρ"}],[{str:"sigma",letter:"σ"},{str:"sum",letter:"Σ"},{str:"sum",letter:"Σ"}],[{str:"theta",letter:"θ"},{str:"tau",letter:"τ"}],[{str:"upsilon",letter:"υ"}],,,[{str:"xi",letter:"ξ"}],,[{str:"zeta",letter:"ζ"}]];
 
 // Numeric constants
 
@@ -543,7 +548,9 @@ const VTINY = 0.00000000000001;                    // A very tiny number
 const ALMOST_ONE = 0.9999999;                      // Denotes almost one
 const ELEMENT_MAX = 1000;                          // The maximum number of elements which can be displayed
 const PARAM_LIST_MAX = 1000;                       // The maximum number of parameters on list
-const HASH_MAX = 10000;                            // The value used for the hash tables
+const HASH_INIT = 10;//000;                           // The value used for the hash tables
+const HASH_ENLARGE_SIZE = 4;                       // Factor hash table enlarges 
+const HASH_OCC_THRESH = 0.5;                       // Threshold above which hash table enlarges
 const H_BIN = 10;                                  // Used for distributions in cumulative prob
 
 const COR_MAX = 0.9;                               // Maximum correlation for individual effects
@@ -583,8 +590,8 @@ const COMP_NOISY_MAX = 10;                         // When simulating noisy comp
 const si_anno = 1.4;
 const size_annotation_default = 10;                // Default size of annotation text
 const annotation_col_default = BLACK;              // Default colour for labels
-const import_frac_pro = 0.5;
-
+const frac_proc = 0.7;                             // The fraction of time spent processing import
+	
 // Different line thicknesses
 const NOLINE = 0, THINLINE = 0.5, NORMLINE = 1, MEDIUMLINE = 1.5, THICKLINE = 2, MTHICKLINE = 3, VTHICKLINE = 4;
 

@@ -1,8 +1,15 @@
 // Simulates data from state
 
+//./bici-core.exe Execute/init.bici data-sim 'ic' 'trans-data name="trans" trans="S->I"' 'genetic-data name="Genetic data" type="matrix" mut-rate="1.5" seq-var="1.2" dt=20 '
+
+// run Execute/init.bici data-sim 'genetic-data name="Genetic data" type="matrix" mut-rate="1.5" seq-var="1.2" dt=10 '
+// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s 
+
+
 // ./bici-para Execute/init.bici data-sim 'init-pop-inf'
 // ./bici-para Execute/init.bici data-show
 // ./bici-para Execute/init.bici data-sim ic
+// ./bici-para Execute/init_0.bici data-sim 'ic' 'pop-data name="pop" filter="DS=file" dt=10 error="poisson"'
 // ./bici-para Execute/init.bici data-sim 'init-pop-inf'
 // ./bici-para Execute/init.bici data-sim 'remove-pop-inf'
 // ./bici-para Execute/init.bici data-sim 'add-pop-inf'
@@ -24,7 +31,6 @@
 // run  Execute/init.bici data-sim 'comp-data'
 // valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s  ./bici-para Execute/init.bici data-sim 'ic'
 
-
 #include <iostream>
 #include <fstream>
 #include <algorithm>
@@ -35,11 +41,13 @@ using namespace std;
 
 #include "data_sim.hh"
 #include "state.hh"
+#include "matrix.hh"
 #include "utils.hh"
 
 /// Initilaises the simulation
-DataSim::DataSim(Model &model, Output &output) : model(model), output(output)
+DataSim::DataSim(Model &model, Output &output, bool sup_) : model(model), output(output)
 {	
+	sup = sup_;
 }
 
 
@@ -55,7 +63,6 @@ void DataSim::run(string data_sim_line)
 	if(line.emsg != "") error(line.emsg);
 	
 	auto cname = line.command;
-	
 	switch(cname){
 	case IC_DATA:
 	case INIT_POP: case ADD_POP: case REMOVE_POP: 
@@ -149,24 +156,39 @@ void DataSim::run(string data_sim_line)
 			case ADD_IND_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM:
 				{
 					string name;
-					switch(so.cname_raw){
-					case INIT_POP_SIM: name = "init-pop-inf"; break;
-					case ADD_POP_SIM: name = "add-pop-inf"; break;
-					case REMOVE_POP_SIM: name = "remove-pop-inf"; break;
-					case ADD_IND_SIM: name = "add-ind-inf"; break;
-					case REMOVE_IND_SIM: name = "remove-ind-inf"; break;
-					case MOVE_IND_SIM: name = "move-ind-inf"; break;
-					default: break;
-					}
-			
-					auto st = name;
-					for(const auto &ta : so.tags){
-						if(ta.name != "file"){
-							st += " "+ta.name+"=\""+ta.value+"\"";
+					if(so.cname_raw == INIT_POP_SIM && sp.type == INDIVIDUAL){
+						// If individual-based then uses add ind for initial conditions
+						get_default_name(name,ADD_IND);
+						Table tab;
+						add_ind_sim(p,state,tab);
+						
+						auto st = "add-ind-inf";
+						
+						if(tab.ele.size() > 0){
+							output.insert_command(name,p,INF_BANNER,PARAM_BANNER,st,output_table(tab),file); 
 						}
 					}
-					
-					output.insert_command("",p,INF_BANNER,PARAM_BANNER,st,output_table(so.table),file); 
+					else{
+						string name;
+						switch(so.cname_raw){
+						case INIT_POP_SIM: name = "init-pop-inf"; break;
+						case ADD_POP_SIM: name = "add-pop-inf"; break;
+						case REMOVE_POP_SIM: name = "remove-pop-inf"; break;
+						case ADD_IND_SIM: name = "add-ind-inf"; break;
+						case REMOVE_IND_SIM: name = "remove-ind-inf"; break;
+						case MOVE_IND_SIM: name = "move-ind-inf"; break;
+						default: break;
+						}
+				
+						auto st = name;
+						for(const auto &ta : so.tags){
+							if(ta.name != "file"){
+								st += " "+ta.name+"=\""+ta.value+"\"";
+							}
+						}
+						
+						output.insert_command("",p,INF_BANNER,PARAM_BANNER,st,output_table(so.table),file); 
+					}
 				}
 				break;
 			default: break;
@@ -196,8 +218,8 @@ void DataSim::run(string data_sim_line)
 		case POP_DATA: pop_data_sim(p,state,tab); break; 
 		case POP_TRANS_DATA: pop_trans_data_sim(p,state,tab); break; 
 		case IND_EFFECT_DATA: ind_effect_data_sim(p,state,tab); break; 
-		case IND_GROUP_DATA: ind_group_data_sim(p,state,tab); break; 
-		case GENETIC_DATA: genetic_data_sim(p,state,tab); break;
+		case IND_GROUP_DATA: ind_group_data_sim(p,tab); break; 
+		case GENETIC_DATA: genetic_data_sim(state,tab); break;
 		default: emsg("Simulation prob"); break;
 		}
 
@@ -459,7 +481,7 @@ void DataSim::del(string data_sim_line)
 		
 		if(list.size() == 0) error("There was no inference data to delete");
 		else{
-			auto res = model.question("TAre you sure you want to delete all inference data?");
+			auto res = model.question("Are you sure you want to delete all inference data?");
 			
 			if(res == false){
 				cout << "Terminated" << endl; 
@@ -1695,7 +1717,7 @@ void DataSim::ind_effect_data_sim(unsigned int p, const State &state, Table &tab
 
 
 /// Simulates individual effect data
-void DataSim::ind_group_data_sim(unsigned int p, const State &state, Table &tab)
+void DataSim::ind_group_data_sim(unsigned int p, Table &tab)
 {
 	auto id = get_tag_value("id"); if(id == "") cannot_find_tag(); 
 	
@@ -1714,12 +1736,13 @@ void DataSim::ind_group_data_sim(unsigned int p, const State &state, Table &tab)
 
 
 /// Simulates genetic data
-void DataSim::genetic_data_sim(unsigned int p, const State &state, Table &tab)
+void DataSim::genetic_data_sim(const State &state, Table &tab)
 {
-	error("Genetic data not yet implemented");
+	//error("Genetic data not yet implemented");
 	auto type = get_tag_value("type"); if(type == ""){ cannot_find_tag(); return;}
 			
 	auto gen_data_type = GenDataType(option_error("type",type,{"snp","matrix"},{ SNP_DATA, MATRIX_DATA}));
+
 	if(gen_data_type == UNSET) return;
 	
 	auto root = get_tag_value("root");
@@ -1731,6 +1754,7 @@ void DataSim::genetic_data_sim(unsigned int p, const State &state, Table &tab)
 	auto mut_rate_str = get_tag_value("mut-rate"); if(mut_rate_str == ""){ cannot_find_tag(); return;}
 	auto mut_rate = number(mut_rate_str);
 	if(mut_rate == UNSET || mut_rate < 0) error("The mutation rate must be a non-negative number");
+	mut_rate *= model.details.dt;
 
 	auto seq_var_str = get_tag_value("seq-var"); if(seq_var_str == ""){ cannot_find_tag(); return;}
 	auto seq_var = number(seq_var_str);
@@ -1746,6 +1770,7 @@ void DataSim::genetic_data_sim(unsigned int p, const State &state, Table &tab)
 /// Simulates genetic snp data 
 void DataSim::simulate_genetic_snp(double mut_rate, double seq_var, string SNP_root, const State &state, Table &tab) const
 {
+	cout << mut_rate << seq_var <<" " << SNP_root << state.T << " " << tab.nrow << endl;
 	/*
 	let result = sim_result;
 	
@@ -1910,213 +1935,205 @@ void DataSim::simulate_genetic_snp(double mut_rate, double seq_var, string SNP_r
 /// Simulates matrix of genetic differences
 void DataSim::simulate_genetic_matrix(double mut_rate, double seq_var, const State &state, Table &tab)
 {
-	//zz
 	auto fr = get_frac();
-	cout << fr;
 	auto tims = get_times();
+	for(auto &va : tims) va = model.calc_tdiv(va);
 	
-	for(auto va: tims) cout << va << " ti";
+	auto t_start = model.calc_tdiv(model.details.t_start);
+	auto t_end = model.calc_tdiv(model.details.t_end);
 	
-	const auto &gv = state.genetic_value;
+	auto gv = state.genetic_value;
 	
 	auto &inf_node = gv.inf_node;
 	
-	//if(!samp.inf_node_store) samp.inf_node_store = copy(inf_node);
-	//else inf_node = copy(samp.inf_node_store);
-	
+
 	// Makes a list of all individuals
-	
-	//Hash hash;
-	
 	vector <IndList> ind_list;
 	for(auto p = 0u; p < model.species.size(); p++){
-		const auto &sp = model.species[p];
-		for(auto i = 0u; i < sp.nindividual_obs; i++){
-			const auto &ind = sp.individual[i];
-			cout << ind.name;
-			//IndList il; il.name = ind.name; il.p = p; il.i = i;
-			IndList il;il.p = p; il.i = i;
-			
-			//hash.add(ind.name,ind_list);
+		const auto &ssp = state.species[p];
+		
+		for(auto i = 0u; i < ssp.individual.size(); i++){
+			IndList il; il.p = p; il.i = i;
 			ind_list.push_back(il);
 		}
 	}
 
-	auto ind_times = get_ind_times(tims,ind_list);
-	
+	auto ind_times = get_ind_times(tims,ind_list,state);
 	
 	// Adds in observations
-	//vector <GenObs> obs;
-	for(auto n = 0u; n < inf_node.size(); n++){
-		//const auto &infn = inf_node[n];
-		
-		//auto p = infn.p;
-		//auto i = infn.i;
-		///const auto &ind = model.species[p].individual[i];
-		//const auto &indd = state.species[p].individual[i];
-		
-		//let j = hash.find(infn.ind);
-		//let il = ind_list[j];
-		//let p = il.p;
-		
-		//const auto &ev = indd.ev;
-		
-		//auto t = infn.tdiv_start;
-		//zz
-	//cout << infn.inf_ev.size() << "Num";
-		/*
-		// Works out the time when the individual is no longer in the infectious state
-		let e = 0;
+	vector <ObsGeneticData> obs;
 	
-		if(infn.from == "ENT" || infn.from == "OUT"){
-			infn.num = poisson_sample(seq_var+(t-t_start)*mu);
+	auto N = inf_node.size();
+	for(auto n = 0u; n < N; n++){
+		auto &infn = inf_node[n];
+		
+		auto p = infn.p;
+		auto i = infn.i;
+		const auto &ind = state.species[p].individual[i];
+		
+		const auto &ev = ind.ev;
+		
+		auto t = infn.tdiv_start;
+		
+		// Works out the time when the individual is no longer in the infectious state
+		auto e = 0u;
+	
+		const auto &from = infn.from;
+		if(from.node == ENTER_INF || from.node == OUTSIDE_INF){
+			auto &io = gv.inf_origin[from.index];
+			string warn;
+			io.mut_num = poisson_sample(seq_var+(t-t_start)*mut_rate,warn);
+			if(warn != "") run_error("Problem with sampling mutation events: "+warn);
 		}
 		else{
-			while(e < ev.length && ev[e].t != t) e++;
-			if(e == ev.length) alertp("Could not find event");
+			while(e < ev.size() && ev[e].tdiv != t) e++;
+			if(e == ev.size()) emsg("Could not find event");
 		}
 		
-		let sp = result.species[p];
+		const auto &sp = model.species[p];
 		
-		let tmax = t_end;
-		while(e < ev.length){
-			let c = c_after_event(ev[e],sp);
-			if(c == OUT || c == SOURCE || c == SINK || sp.comp_gl[c].infected != true){
-				tmax = ev[e].t;
+		auto tmax = t_end;
+		while(e < ev.size()){
+			auto c = ev[e].c_after;
+			if(c == UNSET || sp.comp_gl[c].infected != true){
+				tmax = ev[e].tdiv;
 				break;
 			}
 			e++;
 		}
 
-		let ti_list = ind_times[p][il.i];
-		for(let k = 0; k < ti_list.length; k++){
-			let tt = ti_list[k];
+		const auto &ti_list = ind_times[p][i];
+		for(auto k = 0u; k < ti_list.size(); k++){
+			auto tt = ti_list[k];
 			if(tt > t && tt < tmax){
-				if(Math.random() < f){
-					infn.inf_ev.push({ty: "OBS", i:obs.length, t:tt, num:UNSET});
-					obs.push({name:"Obs-"+(obs.length+1), n:n, ind:ind.name, t:tt});
+				if(ran() < fr){   // Inserts an observation
+					auto k = 0u; while(k < infn.inf_ev.size() && tt > infn.inf_ev[k].tdiv) k++;
+					for(auto kk = k; kk < infn.inf_ev.size(); kk++){
+						const auto &ie = infn.inf_ev[kk];
+						if(ie.type == INFECT_OTHER){
+							auto &infn2 = inf_node[ie.index];
+							if(infn2.from.index != kk) emsg("kk wrong");
+							infn2.from.index++;
+						}
+					}
+				
+					InfEvent ie_new;
+					ie_new.tdiv = tt; 
+					ie_new.type = GENETIC_OBS;
+					ie_new.index = obs.size();
+					ie_new.mut_num = UNSET;
+					
+					infn.inf_ev.insert(infn.inf_ev.begin()+k,ie_new);
+				
+					ObsGeneticData ob;
+					ob.name = ind.name;
+					ob.p = p;
+					ob.i = i;
+					ob.r = UNSET;
+					ob.tdiv = tt;
+					
+					obs.push_back(ob);
 				}
 			}					
 		}
-		
-		infn.inf_ev.sort( function(a, b){ return a.t-b.t});
-		
-		for(let k = 0; k < infn.inf_ev.length; k++){
-			let tt = infn.inf_ev[k].t;
-			infn.inf_ev[k].num = poisson_sample(mu*(tt-t));
+
+		for(auto k = 0u; k < infn.inf_ev.size(); k++){
+			auto tt = infn.inf_ev[k].tdiv;
+			string warn;
+			infn.inf_ev[k].mut_num = poisson_sample(mut_rate*(tt-t),warn);
+			if(warn != "") run_error("Problem with sampling mutation events: "+warn);
 			t = tt;
 		}
-		*/
 	}	
-	/*
-	
-	// Corrects inf_node.num (because observations have been added)
-	for(let n = 0; n < inf_node.length; n++){
-		let infn = inf_node[n];
-		if(infn.from != "ENT" && infn.from != "OUT"){
-			let nn = infn.from;
-			let infe = inf_node[nn].inf_ev;
-			let num = infn.num;
-			let ninf = 0;
-			let e = 0; 
-			for(e = 0; e < infe.length; e++){
-				if(infe[e].ty == "INF"){
-					if(ninf == num){ infn.num = e; break;}
-					ninf++;
-				}
-			}
-			
-			if(e == infe.length){
-				alertp("Could not correct");
-			}
-		}
-	}
-	
+
+	print_inf_node(inf_node,state);
+
 	// Calculates matrix of observations
-	let mat = [];
-	for(let j = 0; j < obs.length; j++) mat[j]=[];
+	vector < vector <unsigned int> > mat;
+	auto M = obs.size();
+	mat.resize(M);
+	for(auto j = 0u; j < M; j++) mat[j].resize(M,UNSET);
 	
-	let obs_visit=[];
-	let obs_infev=[];
-	for(let n = 0; n < inf_node.length; n++){
-		obs_visit[n]=[];
-		obs_infev[n]=[];
-		let inf_ev = inf_node[n].inf_ev;
-		for(let e = 0; e < inf_ev.length; e++){
-			obs_infev[n][e]=[];
-			if(inf_ev[e].ty == "OBS"){
-				obs_infev[n][e].push({m:inf_ev[e].i, sum:0});
+	vector < vector <ObsVisit> > obs_visit;
+	vector < vector < vector <ObsVisit> > > obs_infev;
+	
+	obs_visit.resize(N);
+	obs_infev.resize(N);
+	for(auto n = 0u; n < N; n++){
+		const auto &inf_ev = inf_node[n].inf_ev;
+		obs_infev[n].resize(inf_ev.size());
+		for(auto e = 0u; e < inf_ev.size(); e++){
+			const auto &ie = inf_ev[e];
+			if(ie.type == GENETIC_OBS){			
+				ObsVisit ov; ov.m = inf_ev[e].index; ov.sum = 0;
+				obs_infev[n][e].push_back(ov);
 			}
 		}
 	}
 		
-	for(let n = 0; n < inf_node.length; n++){
-		let inf_ev = inf_node[n].inf_ev;
-		for(let k = 0; k < inf_ev.length; k++){
-			let ie = inf_ev[k];
-			if(ie.ty == "OBS"){
-				let m = ie.i;
-				let kk = k, nn = n;
-				let sum = 0;
+	for(auto n = 0u; n < N; n++){
+		const auto &inf_ev = inf_node[n].inf_ev;
+		for(auto k = 0u; k < inf_ev.size(); k++){
+			const auto &ie = inf_ev[k];
+			if(ie.type == GENETIC_OBS){	
+				auto m = ie.index;
+				int kk = k;
+				auto nn = n;
+				auto sum = 0u;
 				do{
-					let infn = inf_node[nn];
+					const auto &infn = inf_node[nn];
 					
-					let oie = obs_infev[nn][kk];
-					for(let j = 0; j < oie.length; j++){
-						//if(infn.inf_ev[kk].ty == "OBS"){
-						//let mm = infn.inf_ev[kk].i;
-						let mm = oie[j].m;
-						if(mat[m][mm] == undefined){
-							let summ = oie[j].sum;
+					auto &oie = obs_infev[nn][kk];
+					for(auto j = 0u; j < oie.size(); j++){
+						auto mm = oie[j].m;
+						if(mat[m][mm] == UNSET){
+							auto summ = oie[j].sum;
 							mat[m][mm] = sum+summ;
 							mat[mm][m] = sum+summ;
 						}
 					}
-					oie.push({m:m, sum:sum});
+					
+					ObsVisit ov; ov.m = m; ov.sum = sum;
+					oie.push_back(ov);
 							
-					sum += infn.inf_ev[kk].num;
+					sum += infn.inf_ev[kk].mut_num;
 				
 					kk--;
 					if(kk == -1){ // Goes up the node
-						if(inf_node[nn].from == "ENT" || inf_node[nn].from == "OUT"){
-							obs_visit[nn].push({m:m,sum:sum});
+						if(inf_node[nn].from.node == ENTER_INF || inf_node[nn].from.node == OUTSIDE_INF){
+							ObsVisit ov; ov.m = m; ov.sum = sum;
+							obs_visit[nn].push_back(ov);
 							break;
 						}					
-						kk = inf_node[nn].num;
-						nn = inf_node[nn].from;
+						kk = inf_node[nn].from.index;
+						nn = inf_node[nn].from.node;
 					}
 				}while(true);
 			}
 		}
 	}
 	
-	let enter_list = [];
-	for(let n = 0; n < inf_node.length; n++){
-		if(inf_node[n].from == "ENT" || inf_node[n].from == "OUT"){
-			if(obs_visit[n].length > 0){
-				enter_list.push(n);
-			}
-		}
-	}
-	
 	// Accounts for differences between observations on different origins
-	if(enter_list.length > 1){
-		for(let j = 0; j < enter_list.length; j++){
-			let n = enter_list[j];
-			let ov = obs_visit[n];
-			let num = inf_node[n].num;
-			for(let k = 0; k < ov.length; k++){
-				let m = ov[k].m;
-				let sum_k = ov[k].sum;
-				for(let jj = j+1; jj < enter_list.length; jj++){
-					let nn = enter_list[jj];
-					let ovv = obs_visit[nn];
-					let numm = inf_node[nn].num;
-					for(let kk = 0; kk < ovv.length; kk++){
-						let mm = ovv[kk].m;
-						let sum_kk = ovv[kk].sum;
+	const auto &inf_origin = gv.inf_origin;
+	if(gv.inf_origin.size() > 1){
+		for(auto j = 0u; j < inf_origin.size(); j++){
+			const auto &io = inf_origin[j];
+			auto n = io.node;
+			const auto &ov = obs_visit[n];
+			auto num = io.mut_num;
+			for(auto k = 0u; k < ov.size(); k++){
+				auto m = ov[k].m; 
+				auto sum_k = ov[k].sum;
+				for(auto jj = j+1; jj < inf_origin.size(); jj++){
+					const auto &io2 = inf_origin[jj];
+					auto nn = io2.node;
+					const auto &ovv = obs_visit[nn];
+					auto numm = io2.mut_num;
+					for(auto kk = 0u; kk < ovv.size(); kk++){
+						auto mm = ovv[kk].m;
+						auto sum_kk = ovv[kk].sum;
 					
-						if(mat[m][mm] != undefined)	alertp("Should not be defined");
+						if(mat[m][mm] != UNSET)	emsg("Should not be defined");
 						mat[m][mm] = sum_k + sum_kk+ num + numm;
 						mat[mm][m] = mat[m][mm];
 					}
@@ -2125,27 +2142,33 @@ void DataSim::simulate_genetic_matrix(double mut_rate, double seq_var, const Sta
 		}
 	}
 	
-	head.push("ID");
-	head.push("t");
-	head.push("Obs");
-	for(let i = 0; i < obs.length; i++){
-		head.push(obs[i].name);
+	/*
+		print_matrix("M",mat);
+	
+		for(auto io : gv.inf_origin){
+			cout << io.node << " " << io.mut_num << " origin" << endl;
+		}
+	*/
+		
+	
+	tab.heading.push_back("ID");
+	tab.heading.push_back("t");
+	tab.heading.push_back("Obs");
+	for(auto i = 0u; i < M; i++){
+		tab.heading.push_back(obs[i].name);
 	}
 	
-	for(let r = 0; r < obs.length; r++){
-		let ob = obs[r];
-		let row=[];
-		row.push(ob.ind);
-		row.push(ob.t);
-		row.push(ob.name);
-		for(let i = 0; i < obs.length; i++){
-			row.push(mat[r][i]);
+	for(auto r = 0u; r < M; r++){
+		const auto &ob = obs[r];
+		vector <string> row;
+		row.push_back(state.species[ob.p].individual[ob.i].name);
+		row.push_back(tstr(model.calc_t(ob.tdiv)));
+		row.push_back(ob.name);
+		for(auto i = 0u; i < M; i++){
+			row.push_back(tstr(mat[r][i]));
 		}
-		ele.push(row);
+		tab.ele.push_back(row);
 	}
-
-	set_genetic_matrix_columns(ele,so);
-	*/
 }
 
 
@@ -2191,18 +2214,18 @@ bool DataSim::wildcard_match2(const string &name, const vector <string> &spl, bo
 }
 
 
-/// Gets timepoints specified in the bubble
-vector < vector < vector <double> > > DataSim::get_ind_times(const vector <double> &tims, const vector <IndList> &ind_list) const
+/// Gets timepoints 
+vector < vector < vector <double> > > DataSim::get_ind_times(const vector <double> &tims, const vector <IndList> &ind_list, const State &state) const
 {
 	vector < vector < vector <double> > > ind_times;
 	
 	ind_times.resize(model.nspecies);
 	
 	for(auto p = 0u; p < model.nspecies; p++){
-		const auto &sp = model.species[p];
-		ind_times[p].resize(sp.nindividual_obs);
+		const auto &ssp = state.species[p];
+		ind_times[p].resize(ssp.individual.size());
 		
-		for(auto i = 0u; i < sp.nindividual_obs; i++){
+		for(auto i = 0u; i < ssp.individual.size(); i++){
 			ind_times[p][i] = tims;
 		}
 	}
@@ -2253,4 +2276,30 @@ vector < vector < vector <double> > > DataSim::get_ind_times(const vector <doubl
 	*/
 	
 	return ind_times;
+}
+
+
+/// Prints infection nodes (for diagnostic purposes)
+void DataSim::print_inf_node(const vector <InfNode> &inf_node, const State &state) const
+{
+	for(auto n = 0u; n < inf_node.size(); n++){
+		const auto &in = inf_node[n];
+		cout << endl << "Node " << n << ":" << endl;
+		cout << "tstart:" << in.tdiv_start << " trec:" << in.tdiv_rec;
+		cout << " p:" << in.p << " i:" << in.i << " e:" << in.e;
+		cout << " name:" << state.species[in.p].individual[in.i].name << endl;
+		cout << " from:" << in.from.node << " " << in.from.index << endl;
+		cout << " inf_ev:";
+		for(auto k = 0u; k < in.inf_ev.size(); k++){
+			const auto &ie = in.inf_ev[k];
+			cout << k << ": " << ie.tdiv << " " ;
+			if(ie.type == INFECT_OTHER) cout << "OTH";
+			else{
+				if(ie.type == GENETIC_OBS) cout << "OBS";
+				else emsg("prob");
+			}
+			cout << " " << ie.index <<  " "<< ie.mut_num << "  ";
+		}
+		cout << endl;
+	}   
 }

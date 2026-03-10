@@ -70,12 +70,16 @@ let imp = {};                                      // Stores information as impo
 /// Import a script to define (or partially define) model and data 
 function import_file(te,file,clear_results)                                
 {	
-	import_te = te;
-	
+	loading_mess("Processing...");
+
 	percent(0);
+	
+	import_te = te;
 
 	//te = te.replace(/\r/g,"");
 	te = remove_escape_char(te);
+
+	percent(1);
 	
 	let	lines = te.split('\n');
 	
@@ -85,12 +89,12 @@ function import_file(te,file,clear_results)
 	if(jmax > SCRIPT_LINE_MAX){ fl = true; jmax = SCRIPT_LINE_MAX;}
 	for(let j = 0; j < jmax; j++) imp.script.push({line:j, te:lines[j]});
 	if(fl) imp.script.push({line:jmax, te:(lines.length-jmax)+" more lines (too long to show)"});
-	
-	let pro = process_lines(lines,file,0,10);
+		
+	let pro = process_lines(lines,file,2,15);
 	
 	percent(10);
 
-	let data_file_list = get_data_file_list(pro,10,15);
+	let data_file_list = get_data_file_list(pro,15,20);
 
 	if(model != undefined){
 		model_store = copy(model);
@@ -102,7 +106,7 @@ function import_file(te,file,clear_results)
 	imp = { pro:pro, lines:lines, clear_results:clear_results, script:pro.formatted, previous_loaded_table:[], warn:false}; 
 
 	if(data_file_list.length > 0){
-		if(begin_str(data_file_list[0].full_name,"..")) load_local(data_file_list,15,30);
+		if(begin_str(data_file_list[0].full_name,"..")) load_local(data_file_list,0,100);
 		else post({type:"Import model files", data_file_list:data_file_list});
 	}
 	else{
@@ -114,6 +118,8 @@ function import_file(te,file,clear_results)
 /// Loads up files locally
 function load_local(data_file_list,per_start,per_end)
 {
+	loading_mess("Loading...");
+
 	for(let i = 0; i < data_file_list.length; i++){
 		percent(per_start+((i+0.5)/data_file_list.length)*(per_end-per_start));
 		let dfl = data_file_list[i];
@@ -127,6 +133,7 @@ function load_local(data_file_list,per_start,per_end)
 /// Continues importing after all files have been loaded
 function import_file2(data_file_list)
 {
+
 	let ts = clock();
 	loading_mess("Processing...");
 	
@@ -136,10 +143,8 @@ function import_file2(data_file_list)
 	model = new Model();	 
 	model.start_new();
 	
-	percent(0);
+	let total_pt = assign_processing_time();    // Estimates how long each command will take
 	
-	let per_start = 0, per_end = 70, com_ti_sum = 0;
-	let per = per_start;
 	for(let loop = 0; loop <= 4; loop++){ 
 		// Import happens in four stages:
 		// (0) Load species and classification information
@@ -162,13 +167,13 @@ function import_file2(data_file_list)
 			// Checks information about all parameters have been loaded correctly			
 			check_param_complete(); 
 
-			com_ti_sum += 0.1*import_frac_pro; per = show_percent(com_ti_sum,per,per_start,per_end);
-		
+			add_non_proc_time(0.1);
+			
 			let warn = check_initial_pop_error(true);
 			if(warn != undefined) alert_import(warn);
 
-			com_ti_sum += 0.1*import_frac_pro; per = show_percent(com_ti_sum,per,per_start,per_end);
-		
+			add_non_proc_time(0.1);
+			
 			check_import_correct();
 			model_set_auto_positions();
 			setup_camera();
@@ -178,7 +183,7 @@ function import_file2(data_file_list)
 			
 			model.update_pline_all();
 
-			com_ti_sum += 0.1*import_frac_pro; per = show_percent(com_ti_sum,per,per_start,per_end);
+			add_non_proc_time(0.1);
 			
 			if(sim_result_import.load) results_add_model(sim_result_import,model.sim_details,"sim");
 			if(inf_result_import.load) results_add_model(inf_result_import,model.inf_details,"inf");
@@ -186,11 +191,11 @@ function import_file2(data_file_list)
 		
 			if(inf_result_import.load) inf_result_import.diagnostics_on = true;
 			
-			com_ti_sum += 0.5*import_frac_pro; per = show_percent(com_ti_sum,per,per_start,per_end);
-		
+			add_non_proc_time(0.5);
+			
 			initialise_filters_setup();
 			
-			com_ti_sum += 0.2*import_frac_pro; per = show_percent(com_ti_sum,per,per_start,per_end);
+			add_non_proc_time(0.2);
 		}
 		
 		for(let m = 0; m < pro.processed.length; m++){
@@ -288,16 +293,7 @@ function import_file2(data_file_list)
 			if(cname == "param-stats-inf") process = false;
 			
 			if(process == true){	
-				com_ti_sum += line.com_ti; line.com_ti = 0;
-				
-				let per_new = Math.floor(per_start+(per_end-per_start)*com_ti_sum);
-				
-				process_command(cname,line.tags,loop,per,per_new);
-				
-				if(per_new != per){
-					percent(per_new);
-					per = per_new;
-				}
+				process_command(cname,loop,line);
 				
 				for(let n = 0; n < line.tags.length; n++){
 					if(line.tags[n].done != 1){ 
@@ -308,6 +304,10 @@ function import_file2(data_file_list)
 		
 			if(imp.warn == true) return;
 		}
+	}
+		
+	if(dif(imp.pro.proc_time.pt_sum,1)){
+		prr("PTSUM NOT MATCH"+imp.pro.proc_time.pt_sum);
 	}
 	
 	if(sim_result_import.load) results_finalise(sim_result_import);
@@ -350,16 +350,81 @@ function import_file2(data_file_list)
 	
 	//profiling();  // Looks at where memory is being used
 	
-	//pr("Processing time: "+(clock()-ts)/1000);
+	//prr("Processing time: "+(clock()-ts)/1000);
+}
+
+
+/// Estimates how long each command will take
+function assign_processing_time()
+{
+	let pro = imp.pro;
+	
+	let total_pt = 0;
+	/// Estimates time taken to process each command (based on file size) 
+	for(let i = 0; i < pro.processed.length; i++){
+		let pc = pro.processed[i];
+		pc.pt = 1;
+		for(let j = 0; j < pc.tags.length; j++){
+			let tag = pc.tags[j];
+			if(tag.need_pt){
+				if(tag.value != undefined && tag.value.te != undefined){
+					let fac = 1;
+					
+					switch(pc.type){
+					case "comp-all": fac = 10; break;
+					case "param-stats-inf": pc.pt = 0; fac = 0; break;
+					}
+					
+					pc.pt += 0.1*tag.value.te.length*fac;
+				}
+			}
+		}
+		total_pt += pc.pt;
+	}
+	
+	for(let i = 0; i < pro.processed.length; i++){
+		let pc = pro.processed[i];
+		pc.pt = frac_proc*(pc.pt/total_pt);
+	}
+	
+	pro.proc_time = {per_start:20, per_end:90, per:0, pt_sum:0, frac_no_proc:1-frac_proc};
+}
+
+
+/// Adds non_processing 
+function add_non_proc_time(fr)
+{
+	let pro = imp.pro;
+	pro.proc_time.pt_sum += fr*pro.proc_time.frac_no_proc;
+	show_proc_percent(pro);
+}
+
+
+/// Adds non_processing 
+function add_proc_time(num)
+{
+	let pro = imp.pro;
+	pro.proc_time.pt_sum += num;
+	show_proc_percent(pro);
+}
+
+
+/// Gets current percentage
+function get_percent()
+{
+	let pro = imp.pro;
+	let pt = pro.proc_time;
+	return pt.per_start+(pt.per_end-pt.per_start)*(pt.pt_sum);
 }
 
 
 /// Shows percent during the initialisation phase 
-function show_percent(com_ti_sum,per,per_start,per_end)
+function show_proc_percent()
 {
-	let per_new = Math.floor(per_start+(per_end-per_start)*com_ti_sum);
-	if(per_new != per) percent(per_new);
-	return per_new;
+	let pro = imp.pro;
+	let pt = pro.proc_time;
+	let per_new = Math.floor(get_percent());
+	if(per_new != pt.per){ percent(per_new); pt.per = per_new;}
 }
 
 
@@ -459,14 +524,28 @@ function load_default_map()
 	
 
 /// Processes a given command
-function process_command(cname,tags,loop,per_start,per_end)
+function process_command(cname,loop,line)
 {
-	//prr("process"); prr(cname); prr(tags);
-	
+	let tags = line.tags;
+	//prr("PROCESS "+line.pt+" "+cname); 	
 	imp.tags = tags;
 	imp.cname = cname;
 	imp.all_row = "";
 
+	/*
+	switch(cname){
+	case "param-sim": case "state-sim": case "param-inf": case "state-inf":
+	case "param-post-sim": case "state-post-sim": case "diagnostics-inf":
+	//case "generation-inf":
+	//case "trans-diag-inf": 
+	case "proposal-inf": 
+
+		add_proc_time(line.pt);
+		line.pt = 0;
+		break;
+	}
+	*/
+	
 	switch(cname){
 	case "species": species_command(loop); break;
 	case "classification": classification_command(loop); break;
@@ -476,7 +555,7 @@ function process_command(cname,tags,loop,per_start,per_end)
 	case "warning-inf": warning_command("inf"); break;
 	case "warning-post-sim": warning_command("ppc"); break;
 	case "compartment": compartment_command(); break;
-	case "compartment-all": compartment_all_command(); break;
+	case "compartment-all": compartment_all_command(line); break;
 	case "transition": transition_command(); break;
 	case "transition-all": transition_all_command(); break;
 	case "data-dir": datadir_command(); break;
@@ -484,24 +563,24 @@ function process_command(cname,tags,loop,per_start,per_end)
 	case "label": label_command(); break;
 	case "box": box_command(); break;
 	case "map": map_command(); break;
-	case "define": define_command(per_start,per_end); break;
-	case "param": param_command(per_start,per_end); break;
-	case "param-mult": param_mult_command(per_start,per_end); break;
+	case "define": define_command(); break;
+	case "param": param_command(line); break;
+	case "param-mult": param_mult_command(line); break;
 	case "derived": derived_command(); break;
 	case "simulation": simulation_command(); break;
 	case "inference": inference_command(); break;
 	case "post-sim": post_sim_command(); break;
 	case "ind-effect": ind_effect_command(); break;
 	case "fixed-effect": fixed_effect_command(); break;
-	case "param-sim": sim_param_command(); break;
-	case "state-sim": sim_state_command(); break;
-	case "param-inf": inf_param_command(); break;
-	case "state-inf": inf_state_command(); break;
-	case "param-post-sim": post_sim_param_command(); break;
-	case "state-post-sim": post_sim_state_command(); break;
+	case "param-sim": sim_param_command(line); break;
+	case "state-sim": sim_state_command(line); break;
+	case "param-inf": inf_param_command(line); break;
+	case "state-inf": inf_state_command(line); break;
+	case "param-post-sim": post_sim_param_command(line); break;
+	case "state-post-sim": post_sim_state_command(line); break;
 	case "diagnostics-inf": inf_diagnostics_command(); break;
-	case "generation-inf": inf_generation_command(); break;
-	case "trans-diag-inf": trans_diag_command(); break;
+	case "generation-inf": inf_generation_command(line); break;
+	case "trans-diag-inf": trans_diag_command(line); break;
 	case "proposal-inf": proposal_inf_command(); break;
 	
 	default: 
@@ -517,6 +596,11 @@ function process_command(cname,tags,loop,per_start,per_end)
 	
 	let warn = check_initial_pop_error(false);
 	if(warn != undefined) alert_import(warn);
+	
+	if(line.pt != 0){
+		add_proc_time(line.pt);
+		line.pt = 0;
+	}
 }
 
 
@@ -663,11 +747,9 @@ function get_command_tags(trr)
 	case "post-sim-warning": type = "warning-post-sim"; break;
 	}
 	
-	let com_ti;
 	let k = find(command_list,"na",type);
 	if(k == undefined) alert_import("Command '"+type+"' not recognised.");
-	com_ti = command_list[k].ti;
-	
+		
 	let num = (frag.length-1)/3;
 	let numi = Math.floor(num);
 
@@ -727,7 +809,7 @@ function get_command_tags(trr)
 		}
 	}
 	
-	return {type:type, type_pos:type_pos, tags:tags, com_ti:com_ti};
+	return {type:type, type_pos:type_pos, tags:tags};
 }
 
 
@@ -750,6 +832,18 @@ function get_tag_value(st)
 		if(tags[i].name == st){ tags[i].done = 1; return tags[i].value;}
 	}
 	return "";
+}
+
+
+/// Gets the process time used for a given tag
+function get_tag_pt(st)                                   
+{
+	let tags = imp.tags; 
+	imp.tagst = st; 
+	for(let i = 0; i < tags.length; i++){
+		if(tags[i].name == st){ tags[i].done = 1; return tags[i].pt;}
+	}
+	return 0;
 }
 
 
@@ -1029,12 +1123,6 @@ function process_lines(lines,file,per_start,per_end)
 		j++;
 	}
 
-	// Normalises com_ti
-	let sum = 0;
-	for(let i = 0; i < processed.length; i++) sum += processed[i].com_ti;
-	sum /= (1-import_frac_pro);
-	for(let i = 0; i < processed.length; i++) processed[i].com_ti /= sum;
-	
 	return {formatted:formatted, processed:processed, data_dir:data_dir};
 }
 
@@ -1051,6 +1139,7 @@ function get_data_file_list(pro,per_start,per_end)
 			let file = tag.value;
 			switch(tag.name){
 			case "value": case "constant": case "reparam": case "text":  // May or may not be a file
+				tag.need_pt = true;
 				if(typeof file == 'string' && is_file(file)){
 					load_list.push({j:j, k:k});
 				}
@@ -1061,6 +1150,7 @@ function get_data_file_list(pro,per_start,per_end)
 			case "A": case "Ainv": case "A-sparse": case "pedigree": case "X": 
 			case "ind-list": case"factor-weight":
 				{
+					tag.need_pt = true;
 					if(typeof file == 'string' && is_file(file)){
 						load_list.push({j:j, k:k});
 					}
@@ -1091,7 +1181,6 @@ function get_data_file_list(pro,per_start,per_end)
 	}
 
 	let data_file_list = [];
-
 	let per = per_start;
 	for(let i = 0; i < load_list.length; i++){
 		let per_new = per_start + Math.floor((per_end-per_start)*i/load_list.length);
@@ -1120,9 +1209,11 @@ function get_data_file_list(pro,per_start,per_end)
 			
 			let sep = "comma"; if(file.substr(file.length-4,4) == ".tsv") sep = "tab";
 			
-			data_file_list.push({name:file, full_name:full_name, sep:sep,});
+			data_file_list.push({name:file, full_name:full_name, sep:sep});
 		}
 	}
+	
+	percent(per_end);
 	
 	return data_file_list;
 }
@@ -1614,19 +1705,27 @@ function text_from_file(te)
 
 
 /// Loads up parameter values from a file
-function load_param_value(par,value,head_col,valu,desc)
+function load_param_value(par,value,head_col,valu,desc,dpt)
 {
 	let dim = get_dimensions(value);
+	
 	let ele_list = get_element_list(value,dim);
+	
+	add_proc_time(0.2*dpt);
 		
 	// Sets a default value of zero
 	for(let k = 0; k < ele_list.length; k++){
 		set_element(value,ele_list[k],"0");
 	}
+	
+	add_proc_time(0.2*dpt);
 
 	let fi = get_fi(valu);
 	
 	let tab = load_table(fi.te,true,fi.sep,fi.name);
+	
+	add_proc_time(0.1*dpt);
+	
 	if(typeof tab == 'string') alert_import(tab);
 
 	let load_type = "normal";
@@ -1649,7 +1748,9 @@ function load_param_value(par,value,head_col,valu,desc)
 	case "matrix":    // Loads using a matrix format
 		{
 			let sym = is_symmetric(par);
+			let fpt = 0.5*dpt/par.list[0].length;
 			for(let j = 0; j < par.list[0].length; j++){
+				add_proc_time(fpt);
 				for(let i = 0; i < par.list[1].length; i++){
 					let ind=[]; ind[0] = j; ind[1] = i;
 					let ele = subtab.ele[j][i];
@@ -1682,7 +1783,10 @@ function load_param_value(par,value,head_col,valu,desc)
 				hash_vec[i].create_vec(par.list[i]);
 			}
 			
+			let fpt = 0.5*dpt/subtab.nrow;
 			for(let r = 0; r < subtab.nrow; r++){
+				add_proc_time(fpt);
+				
 				let eler = subtab.ele[r];
 				
 				let ind = [];

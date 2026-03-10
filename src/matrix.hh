@@ -10,6 +10,7 @@ vector < vector <double> > invert_matrix(const vector <vector <double> > &Mst);
 vector < vector <double> > invert_matrix_square_root(const vector < vector <double> > &M);
 vector < vector <double> > invert_matrix_sparse(vector <vector <double> > M);
 void print_matrix(string name, const vector < vector <double> > &M);
+void print_matrix(string name, const vector < vector <unsigned int> > &M);
 void print_vector(string name, const vector <double> &v);
 vector <double> matrix_mult(const vector < vector <double> > &M, const vector <double> &vec);
 vector <double> matrix_mult(const vector <double> &vec, const vector < vector <double> > &M);

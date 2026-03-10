@@ -16,8 +16,9 @@ using namespace std;
 #include "lzw.hh"
 
 /// Initialises the output 
-Output::Output(const Model &model, Mpi &mpi) : model(model), mpi(mpi)
+Output::Output(const Model &model, Mpi &mpi, bool sup_) : model(model), mpi(mpi)
 {
+	sup = sup_;
 };
 
 
@@ -37,6 +38,15 @@ void Output::init(const Input &input)
 		case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: 
 			sampledir_rel = "output-sim";
 			break;
+	
+		case TORNADO_SETUP: case SCAN_SETUP:
+			sampledir_rel = "output-sim";
+			break;
+	
+		case TORNADO_RESULT: case SCAN_RESULT:
+			sampledir_rel = "output-inf";
+			break;
+	
 		case MODE_UNSET: emsg("Option not recognised"); break;
 		}
 		
@@ -107,6 +117,8 @@ void Output::init(const Input &input)
 		case INF: case EXT: lines_raw.push_back(new_lr(OUT_INF_BANNER)); break;
 		case PPC: lines_raw.push_back(new_lr(OUT_POST_SIM_BANNER)); break;
 		case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: break;
+		case TORNADO_SETUP: case TORNADO_RESULT: break;
+		case SCAN_SETUP: case SCAN_RESULT: break;
 		case MODE_UNSET: break;
 		}
 		lines_raw.push_back(new_lr(""));
@@ -166,6 +178,15 @@ unsigned int Output::lr_find(unsigned int line_num) const
 		if(lines_raw[i].li == line_num) return i;
 	}
 	return UNSET;
+}
+
+
+/// Determines if a directory exists
+bool Output::directory_exist(const string &path) const
+{
+	struct stat st;
+	if(stat(path.c_str(), &st) == -1) return false;
+	return true;
 }
 
 
@@ -621,6 +642,12 @@ void Output::summary(const Model &model) const
 		case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR:
 			break;
 
+		case TORNADO_SETUP: case TORNADO_RESULT:
+			break;
+			
+		case SCAN_SETUP: case SCAN_RESULT:
+			break;
+		
 		default:  emsg("Model output error10"); break;
 		}
 		
@@ -1698,21 +1725,9 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 				for(auto i = 0u; i < ssp.individual.size(); i++){
 					const auto &ind = ssp.individual[i];
 	
-					auto name = ind.name;
+					auto name = get_ind_name(ind,ind_key,hash_ind);
 					
-					if(use_ind_key){
-						auto vec = hash_ind.get_vec_string(name);
-						auto id = hash_ind.existing(vec);
-						if(id == UNSET){
-							id = ind_key.size();
-							ind_key.push_back(name);
-							hash_ind.add(id,vec);
-						}
-						ss << id << ",";
-					}
-					else{
-						ss << name << ",";
-					}
+					ss << name << ",";
 					
 					if(i >= sp.nindividual_in && i < sp.nindividual_obs){
 						ss << "no";
@@ -1754,7 +1769,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 									if(c != UNSET) emsg("Inconsistent");
 									cnew = ev.c_after; 
 									ss << sp.comp_gl[cnew].name;
-									infection_info(ev.ind_inf_from,p,part,ss);
+									infection_info(ev.ind_inf_from,p,part,ss,ind_key,hash_ind);
 								}
 								break;
 
@@ -1768,7 +1783,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 									auto cl = ev.cl;
 									cnew = sp.update_c_comp(c,cl,ev.move_c);
 									ss << "move->" << sp.cla[cl].comp[ev.move_c].name;
-									infection_info(ev.ind_inf_from,p,part,ss);
+									infection_info(ev.ind_inf_from,p,part,ss,ind_key,hash_ind);
 								}
 								break;
 								
@@ -1781,7 +1796,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 										ss << replace_arrow(tr.name);
 									}
 									
-									infection_info(ev.ind_inf_from,p,part,ss);
+									infection_info(ev.ind_inf_from,p,part,ss,ind_key,hash_ind);
 									
 									if(c != trg.i) emsg("Inconsist");
 									cnew = trg.f;
@@ -1862,7 +1877,9 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 		ss << "<TRANSTREE>" << endl;
 		//if(part.inf_node.size() == 0) emsg(" zero");
 		for(const auto &in : part.inf_node){
-			ss << part.species[in.p].individual[in.i].name  << "|" << model.calc_t(in.tdiv_start) << "|";	
+			auto name = get_ind_name(part.species[in.p].individual[in.i],ind_key,hash_ind);
+			
+			ss << name << "|" << model.calc_t(in.tdiv_start) << "|";	
 			
 			auto n_from = in.from.node;
 			if(n_from == ENTER_INF || n_from == OUTSIDE_INF){
@@ -1896,8 +1913,27 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 }
 
 
+/// Gets the name of an individual 
+string Output::get_ind_name(const Individual &ind, vector <string> &ind_key, Hash &hash_ind) const
+{
+	auto name = ind.name;
+	if(use_ind_key){
+		auto vec = hash_ind.get_vec_string(name);
+		auto id = hash_ind.existing(vec);
+		if(id == UNSET){
+			id = ind_key.size();
+			ind_key.push_back(name);
+			hash_ind.add(id,vec);
+		}
+		name = tstr(id);
+	}
+	
+	return name;
+}
+
+
 /// Generate test to indicate an infection
-void Output::infection_info(const IndInfFrom &iif, unsigned int p, const Particle &part, stringstream &ss) const
+void Output::infection_info(const IndInfFrom &iif, unsigned int p, const Particle &part, stringstream &ss, vector <string> &ind_key, Hash &hash_ind) const
 {
 	if(iif.p != UNSET){
 		ss << "[";
@@ -1908,7 +1944,7 @@ void Output::infection_info(const IndInfFrom &iif, unsigned int p, const Particl
 			{
 				auto pp = iif.p;
 				if(pp != p) ss << model.species[pp].name << "|";
-				ss << part.species[pp].individual[iif.i].name;
+				ss << get_ind_name(part.species[pp].individual[iif.i],ind_key,hash_ind);
 			}
 			break;
 		}
@@ -2259,9 +2295,19 @@ void Output::set_diagnostics(unsigned int ch, string diag)
 
 
 /// Generates the final outputs
+void Output::copy(string file)
+{
+	ofstream fout(file);
+	for(const auto &lr : lines_raw){
+		fout << lr.st << endl;
+	}
+}
+
+	
+/// Generates the final outputs
 void Output::end(string file, unsigned int total_cpu)
 {
-	percentage_start(OUTPUT_PER);
+	percentage_start(OUTPUT_PER,sup);
 		
 	if(com_op) cout << "<OUTPUTTING>" << endl;
 	
@@ -2294,7 +2340,7 @@ void Output::end(string file, unsigned int total_cpu)
 
 		for(auto ch = 0u; ch < nchain; ch++){
 			auto frac = double(ch)/nchain;
-			percentage(frac*25,100);
+			percentage(frac*25,100,sup);
 			
 			auto part = get_part_chain(ch,param_store);
 			
@@ -2319,7 +2365,7 @@ void Output::end(string file, unsigned int total_cpu)
 			auto trans_diag = trans_diag_init(); 
 		
 			auto frac = double(ch)/nchain;
-			percentage(25+frac*25,100);
+			percentage(25+frac*25,100,sup);
 
 			auto part = get_part_chain(ch,state_store);
 
@@ -2395,14 +2441,16 @@ void Output::end(string file, unsigned int total_cpu)
 				}
 			}
 		}
-		
-		if(op()){
-			for(auto te : final_warning) add_warning(te,fout);
-			if(alg_warn_flag) add_warning("This run has generated algorithm warnings. Please check the diagnostic file(s) for details",fout);
+	
+		if(op() && !(com_op && mpi.core != 0)){ // Stops repeated messages
+			if(!sup){	
+				for(auto te : final_warning) add_warning(te,fout);
+				if(alg_warn_flag) add_warning("This run has generated algorithm warnings. Please check the diagnostic file(s) for details",fout);
+			}
 		}
 	}
 	
-	percentage_end();
+	percentage_end(sup);
 	
 	if(com_op == true) cout << "<<END>>" << endl;
 }
@@ -3018,7 +3066,7 @@ void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start,
 	auto rmax = 0.0;
 	for(auto k = 0u; k < state_store.size(); k += step){
 		auto frac = double(k)/state_store.size();
-		percentage(per_start+frac*(per_end-per_start),100);
+		percentage(per_start+frac*(per_end-per_start),100,sup);
 		
 		const auto &pa = state_store[k];
 	
@@ -3043,7 +3091,7 @@ void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start,
 	mpi.sum(nrate_sum);
 #endif
 
-	percentage_end();
+	percentage_end(sup);
 
 	if(op()){
 		auto rate_thresh = RATE_RECOMMEND/dt;
@@ -3540,4 +3588,129 @@ void Output::delete_lines(const vector <string> &list)
 		auto i = lr_find(li);
 		lines_raw.erase(lines_raw.begin()+i);
 	}
+}
+
+
+/// Gets the position of the next instance of a tag
+TagRange Output::get_next_tag(unsigned int i, string tag) const
+{
+	auto len = tag.length();
+	
+	auto li = lines_raw[i].st;
+	auto j=0u; 
+	
+	while(j < li.length()){
+		while(j < li.length() && li.substr(j,len) != tag) j++;
+		if(j < li.length()){
+			j += len;
+			while(j < li.length() && li.substr(j,1) == " ") j++;
+			if(j < li.length()){
+				if(li.substr(j,1) == "="){
+					j++;
+					while(j < li.length() && li.substr(j,1) == " ") j++;
+					if(j < li.length()){
+						if(li.substr(j,1) == "\""){
+							j++;
+							if(li.substr(j,2) == "[["){ // Multiline value
+								auto i_end = i+1;
+								while(i_end < lines_raw.size() && !(lines_raw[i_end].st.length() >= 3 && lines_raw[i_end].st.substr(0,3) == "]]\"")) i_end++;
+								if(i_end == lines_raw.size()) emsg("Problem getting end bracket");
+								TagRange tr;
+								tr.start_li = i+1;
+								tr.starti = 0;
+								tr.end_li = i_end;
+								tr.starti = 0;
+								return tr;
+							}
+							else{        // Single value
+								TagRange tr;
+								tr.start_li = i;
+								tr.starti = j;
+								while(j < li.length() && li.substr(j,1) != "\"") j++;
+								if(j < li.length()){
+									tr.end_li = i;
+									tr.endi = j;
+									return tr;
+								}
+							}
+						}
+						else{  // Single value without quotation marks
+							TagRange tr;
+							tr.start_li = i;
+							tr.starti = j;
+							while(j < li.length() && li.substr(j,1) != " ") j++;
+							tr.end_li = i;
+							tr.endi = j;
+							return tr;
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	TagRange tr;
+	tr.start_li = UNSET;
+	return tr;
+}
+
+
+/// Gets the value for a tag
+string Output::get_tag_value(const TagRange &tag) const
+{
+	if(tag.start_li != tag.end_li) emsg("multi line");
+	auto st = lines_raw[tag.start_li].st;	
+	return st.substr(tag.starti,tag.endi-tag.starti);
+}
+
+
+/// Changes the value in the file
+void Output::change_sim_value(string param_name, double value)
+{
+	auto prop = get_param_prop(param_name);
+	auto na = add_escape_char(prop.name);
+	
+	for(auto i = 0u; i < lines_raw.size(); i++){
+		auto line = lines_raw[i].st;
+		if(begin_str(trim(line),"param ") || begin_str(trim(line),"parameter ")){
+			auto tag = get_next_tag(i,"name");
+	
+			if(tag.start_li == UNSET) emsg("Could not find parameter name");
+			
+			auto val = get_tag_value(tag);
+			
+			auto prop2 = get_param_prop(val);
+			if(na == add_escape_char(prop2.name)){
+				if(prop.dep.size() != prop2.dep.size()){
+					run_error("Dependence on parameter '"+na+"' does not agree");
+				}
+		
+				auto vtag = get_next_tag(i,"value");
+				if(vtag.start_li == UNSET) vtag = get_next_tag(i,"constant");
+				if(vtag.start_li == UNSET) emsg("Could not find value for parameter '"+na+"'");
+					
+				if(prop.dep.size() == 0){
+					if(vtag.start_li != vtag.end_li) emsg("Parameter value should not be multiline");
+					
+					auto &st = lines_raw[vtag.start_li].st;
+					st = st.substr(0,vtag.starti)+tstr(value)+st.substr(vtag.endi);
+					return;
+				}
+				else{
+					if(vtag.start_li == vtag.end_li) emsg("Parameter value should be multiline");
+					for(auto i = vtag.start_li+1; i < vtag.end_li; i++){
+						auto spl = split(lines_raw[i].st,',');
+						auto d = 0u; while(d < prop.dep.size() && prop.dep[d] == remove_quote(spl[d])) d++;
+						if(d == prop.dep.size()){
+							spl[spl.size()-1] = "\""+tstr(value)+"\"";
+							lines_raw[i].st = stringify(spl);
+							return;
+						}						
+					}
+				}
+			}
+		}
+	}
+	
+	run_error("There was a problem changing the parameter value");
 }

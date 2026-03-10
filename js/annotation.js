@@ -277,8 +277,8 @@ function add_compartment_map(col,so)
 function clear_classification(p,cl,op)
 {
 	let claa = model.species[p].cla[cl];
-	claa.comp=[]; claa.ncomp=0; claa.hash_comp=[];
-	claa.tra=[]; claa.ntra = 0; claa.hash_tra=[];
+	claa.comp=[]; claa.ncomp=0; claa.hash_comp=init_hash();
+	claa.tra=[]; claa.ntra = 0; claa.hash_tra=init_hash();
 	claa.nsource = 0; claa.nsink = 0;
 	
 	if(op == undefined){

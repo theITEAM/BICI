@@ -70,6 +70,12 @@ void Input::check_initial_pop_error(bool end)
 	 case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR:
 			break;
 			
+		case TORNADO_SETUP: case TORNADO_RESULT:
+			break;
+			
+		case SCAN_SETUP: case SCAN_RESULT:
+			break;
+			
 		default: alert_emsg_input("Should not be default3a"); return;
 		}
 	}
@@ -79,8 +85,10 @@ void Input::check_initial_pop_error(bool end)
 /// Before adding a data source check that everything is correct
 void Input::data_source_check_error(const DataSource &ds)
 {
-	const auto &tab = ds.table;
+	if(model.mode == DATA_DEL) return;
 	
+	const auto &tab = ds.table;
+
 	if(tab.file != ""){
 		// Checks that elements are correctly specified
 		for(auto c = 0u; c < tab.ncol; c++){

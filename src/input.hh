@@ -55,7 +55,7 @@ class Input                                // Stores information about the model
 		string datadir;                        // The data directory 
 		vector <string> lines_raw;             // Stores the raw text lines of the input file
 		
-		Input(Model &model, string file, unsigned int seed, Mpi &mpi);
+		Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup = false);
 	
 	private:
 		unsigned int p_current, cl_current;    // Stores the current species and classification 
@@ -84,6 +84,8 @@ class Input                                // Stores information about the model
 		
 		Hash hash_eqn;                         // Stores a hash take for equations
 	
+		bool sup;                              // Determines if output is supressed
+		
 		Model &model;                          // References model such that it can be updated
 		Mpi &mpi;                              // Stores information about mpi
 		
@@ -150,6 +152,7 @@ class Input                                // Stores information about the model
 		void fixed_effect_command();
 		void import_data_table_command(const CommandLine &cline, bool active);
 		void map_command();
+		void inf_param_stats();
 		void inf_param_command();
 		void inf_state_command();
 		void sim_state_command();
@@ -272,7 +275,7 @@ class Input                                // Stores information about the model
 		string in_data_source(const DataSource &ds) const;
 		string in_file_text(string te, string desc="") const;
 		void alert_sample(string warn, unsigned int num);
-		void read_state_sample(unsigned int ch, const vector <string> &lines, const vector <string> &ind_key);
+		void read_state_sample(unsigned int ch, const vector <string> &lines, unsigned int ind_key_ref);
 		unsigned int get_param_value(vector < vector <double> > &param_value, unsigned int i, const vector <string> &lines, string warn);
 		void load_param_value(const ParamProp &pp, string valu, Param &par, string desc, LoadParamType type);
 		void set_val_from_ele(string ele, const vector <unsigned int> &ind, Param &par, string desc, unsigned int r, string col, LoadParamType type);
@@ -285,7 +288,8 @@ class Input                                // Stores information about the model
 		bool add_reparam_eqn(Param &par, Hash &hash_eqn);
 		string get_data_dir(string data_dir);
 		unsigned int get_chain();
-		//unsigned int add_cons(double val);
+		Details& get_details();
+		DataSourceType get_data_type(Command cname) const;
 		
 		// In 'input_check.cc'
 		void check_initial_pop_error(bool end);

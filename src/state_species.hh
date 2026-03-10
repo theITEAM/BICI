@@ -96,7 +96,8 @@ class StateSpecies                         // Stores information about the state
 		void add_ind_source(unsigned int i, const vector <SourceSamp> &source_samp);
 		TRange source_time_range(const IndData &ind) const;
 		void error_load_sample(unsigned int num) const;
-		void simulate_sample_init(unsigned int ti, const SampleSpecies &samp_sp);
+		IndInfFrom extract_infection_info(string &te) const;
+		void simulate_sample_init(unsigned int ti, const SampleSpecies &samp_sp, const vector <string> &ind_key);
 		void set_tnum_mean(unsigned int ti_end, const vector < vector <double> > &popnum_t);
 		void update_population_based(unsigned int ti, bool stoc, const vector <double> &popnum, const vector <double> &val_fast);
 		vector <double> set_exp_fe(unsigned int f);

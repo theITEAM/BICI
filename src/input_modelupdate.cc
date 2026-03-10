@@ -265,7 +265,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 		for(auto i = 0u; i < sp.tra_gl.size(); i++){
 			auto &tr_gl = sp.tra_gl[i];
 				
-			if(i%100 == 0) percentage(per_st+fr*i,100);
+			if(i%100 == 0) percentage(per_st+fr*i,100,sup);
 			if(tr_gl.branch == true && tr_gl.bp_set == BP_SET){
 				model.add_eq_ref(tr_gl.bp,hash_eqn);
 			}
@@ -695,7 +695,7 @@ void Input::linearise_eqn(unsigned int per_start, unsigned int per_end)
 		for(auto e = 0u; e < sp.markov_eqn.size(); e++){
 			const auto &me = sp.markov_eqn[e];
 		
-			if(e%100 == 0) percentage(per_st+fr*e,100);
+			if(e%100 == 0) percentage(per_st+fr*e,100,sup);
 			model.eqn[me.eqn_ref].calculate_linearise();    
 		}			
 	}
@@ -5100,12 +5100,13 @@ void Input::load_state_samples(unsigned int ch, string file, bool enc)
 	auto &flines = files[i].lines;	
 	
 	if(enc) decode_lines(flines);
-	
+
 	auto li = 0u;
 	
 	// Reads in individual key
-	vector <string> ind_key;
+	auto ind_key_ref = 0u; 
 	{
+		vector <string> ind_key;
 		string warn = "Problem loading state file";
 		
 		while(li < flines.size() && trim(flines[li]) != "{") li++;
@@ -5154,6 +5155,11 @@ void Input::load_state_samples(unsigned int ch, string file, bool enc)
 		
 		while(li < flines.size() && !begin_str(flines[li],"<<")) li++;
 		if(li == flines.size()) alert_import(warn);
+		
+		auto &iks = model.ind_key_store;
+	
+		while(ind_key_ref < iks.size() && !equal_vec(ind_key,iks[ind_key_ref])) ind_key_ref++;
+		if(ind_key_ref == iks.size()) iks.push_back(ind_key);
 	}
 	
 	vector <string> lines; 
@@ -5162,7 +5168,7 @@ void Input::load_state_samples(unsigned int ch, string file, bool enc)
 		auto lin = trim(flines[li]);
 		if(lin.length() > 2 && lin.substr(0,2) == "<<"){
 			if(lines.size() > 0){
-				read_state_sample(ch,lines,ind_key);
+				read_state_sample(ch,lines,ind_key_ref);
 				if(model.mode == DATA_SIM) return;
 			}
 			lines.clear();
@@ -5171,5 +5177,5 @@ void Input::load_state_samples(unsigned int ch, string file, bool enc)
 		li++;
 	}
 
-	if(lines.size() > 0) read_state_sample(ch,lines,ind_key);
+	if(lines.size() > 0) read_state_sample(ch,lines,ind_key_ref);
 }

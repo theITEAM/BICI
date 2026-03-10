@@ -3222,8 +3222,9 @@ string pad(string te, unsigned int len)
 
 
 /// Resets the percentage
-void percentage_start(PercentType type, unsigned int gen)
+void percentage_start(PercentType type, bool sup, unsigned int gen)
 {
+	if(sup) return;
 	if(!op()) return;
 	
 	if(com_op){
@@ -3234,6 +3235,7 @@ void percentage_start(PercentType type, unsigned int gen)
 		case RUN_GEN_PER: cout << "<RUNGEN>" << gen << endl; break;
 		case ANNEAL_PER: cout << "<ANNEALING>" << endl; break;
 		case OUTPUT_PER: cout << "<OUTPUTTING>" << endl; break;
+		default: emsg("Should not be here"); break;
 		}
 	}
 	else{
@@ -3247,30 +3249,12 @@ void percentage_start(PercentType type, unsigned int gen)
 			case RUN_GEN_PER:	te = pad("Gen. "+tstr(gen),pad_len); break;
 			case ANNEAL_PER: te =  pad("Anneal",pad_len); break;
 			case OUTPUT_PER: te = pad("Output",pad_len); break;
+			case SIM_PER: te = pad("Sim.",pad_len); break;
+			case GEN_DATA_PER: te = pad("Data",pad_len); break;
+			default: emsg("Should not be here"); break;
 		}
 		cout << te;
 		cout.flush();
-		
-		/*
-		string te;
-		switch(type){
-		case LOAD_PER: te = "Loading..."; break;
-		case INIT_PER: te = "Initialising..."; break;
-		case RUN_PER: te = "Running..."; break;
-		case RUN_GEN_PER: te = "Generation "+tstr(gen)+"..."; break;
-		case ANNEAL_PER: te = "Annealing..."; break;
-		case OUTPUT_PER: te = "Outputting..."; break;
-		}
-		cout << te << endl;
-		cout.flush();
-		*/
-		
-		/*
-		if(progress_on){ 
-			progress << te << endl;
-			progress.flush();
-		}
-		*/
 	}
 	
 	percent_done = UNSET;
@@ -3279,15 +3263,17 @@ void percentage_start(PercentType type, unsigned int gen)
 
 
 /// Ends the percentage
-void percentage_end()
+void percentage_end(bool sup)
 {
+	if(sup) return;
 	percentage(1,1);
 }
 
 
 /// Prints percentage done
-void percentage(double val, double val2)
+void percentage(double val, double val2, bool sup)
 {		
+	if(sup) return;
 	if(!op()) return;
 	
 	if(!com_op && percent_done != LARGE){		

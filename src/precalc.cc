@@ -380,25 +380,48 @@ vector <unsigned int> Precalc::get_vec(const PreCalc &ca) const
 /// Prints steps used for a calculation
 void Precalc::print_calc() const   
 {
-	cout << "PRE-CALCULATION:" << endl;
+	stringstream ss;
+	ss << "PRE-CALCULATION:" << endl;
 	
 	auto T = details.T;
 	auto imax = pcalcu_ref.size(); 
-	auto imax_lim = LARGE;
+	//auto imax_lim = LARGE;
 	//auto imax_lim = 1000;
+	auto imax_lim = 16947442u;
+	
 	if(imax > imax_lim) imax = imax_lim;
   for(auto i = 0u; i < imax; i++){
 		auto re = pcalcu_ref[i]; if(re == UNSET) emsg("no calculation");
 		const auto &ca = pcalcu[re];
-		print_ca(i,ca);
-		cout << endl;
+		ss << print_ca(i,ca);
+		ss << endl;
 	
 		if(ca.time_dep == true) i += T-1;
   }
 	
-	if(imax < pcalcu_ref.size()) cout << "...";
+	if(imax < pcalcu_ref.size()) ss << "...";
 
-  cout << endl << endl;
+  ss << endl << endl;
+	
+	cout << "TURN OFF PRECALC" << endl;
+	ofstream fout("precalc.txt");
+	fout << ss.str();
+}
+
+
+/// Prints a SpecPrecalc to a file
+void Precalc::print_spec_precalc(string file, const SpecPrecalc &spec) const 
+{
+	cout << "Output file " << file << endl;
+	ofstream fout(file);
+	for(const auto &va : spec.info){
+		fout << va.i << " " << va.tlist << endl;
+	}
+	fout << "Time lines" << endl;
+	for(const auto &tl : spec.list_time){
+		for(auto ti : tl) fout << ti << ",";
+		fout << endl;		
+	}
 }
 
 
@@ -441,7 +464,7 @@ void Precalc::calc_spline_const(PV &param_val, const vector <unsigned int> &spli
 */
 
 
-/// Calulcates initial value for precalc (using any constant values_)
+/// Calculcates initial value for precalc (using any constant values_)
 /// Calculates the value for an equation
 vector <double> Precalc::calculate_precalc_init(const SpecPrecalc &spec_precalc) const 
 {
@@ -670,8 +693,20 @@ void Precalc::calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store)
 						const auto &it = item[j];
 						
 						switch(it.type){
-							case REG_PRECALC: num[j] = precalc[it.num]; break;
-							case REG_PRECALC_TIME: num[j] = precalc[it.num+ti]; break;							
+							case REG_PRECALC: 
+								num[j] = precalc[it.num]; 
+								if(num[j] == UNSET){ // Just needed for checking
+									cout << it.num << endl; 
+									emsg("Reg Precalc unset");
+								}
+								break;
+							case REG_PRECALC_TIME:
+								num[j] = precalc[it.num+ti]; 
+								if(num[j] == UNSET){  // Just needed for checking
+									cout << i << " " << it.num << " " << ti << endl; 
+									emsg("Regt Precalc unset");
+								}
+								break;							
 							case ONE: num[j] = 1; break;
 							case NUMERIC: num[j] = constant.value[it.num]; break;
 							case CONSTSPLINEREF: num[j] = spline[it.num].const_val[ti]; break;
@@ -692,6 +727,8 @@ void Precalc::calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store)
 						case NUMERIC: num[j] = cval[it.num]; break;
 						default: eqn_type_error(it.type,8); break;
 					}
+					
+					if(num[j] == UNSET) emsg("Precalc unset2");
 				}
 
 					
@@ -703,22 +740,24 @@ void Precalc::calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store)
 
 
 /// Prints the calculation from a specific calculation
-void Precalc::print_ca(unsigned int i, const PreCalc &ca) const
-{  
+string Precalc::print_ca(unsigned int i, const PreCalc &ca) const
+{ 
+	stringstream ss;
+	
 	switch(ca.op){
-	case EXPFUNC: cout <<  "exp("; break;
-	case SINFUNC: cout <<  "sin("; break;
-	case COSFUNC: cout <<  "cos("; break;
-	case LOGFUNC: cout <<  "log("; break;
-	case STEPFUNC: cout <<  "step("; break;
-	case POWERFUNC: cout <<  "power("; break;
-	case THRESHFUNC: cout <<  "thresh("; break;
-	case UBOUNDFUNC: cout <<  "ubound("; break;
-	case MAXFUNC: cout << "max("; break; 
-	case MINFUNC: cout << "min("; break; 
-	case ABSFUNC: cout << "abs("; break;
-	case SQRTFUNC: cout << "sqrt("; break;
-	case SIGFUNC: cout << "sigmoid("; break;
+	case EXPFUNC: ss <<  "exp("; break;
+	case SINFUNC: ss <<  "sin("; break;
+	case COSFUNC: ss <<  "cos("; break;
+	case LOGFUNC: ss <<  "log("; break;
+	case STEPFUNC: ss <<  "step("; break;
+	case POWERFUNC: ss <<  "power("; break;
+	case THRESHFUNC: ss <<  "thresh("; break;
+	case UBOUNDFUNC: ss <<  "ubound("; break;
+	case MAXFUNC: ss << "max("; break; 
+	case MINFUNC: ss << "min("; break; 
+	case ABSFUNC: ss << "abs("; break;
+	case SQRTFUNC: ss << "sqrt("; break;
+	case SIGFUNC: ss << "sigmoid("; break;
 	case ADD: break;
 	case TAKE: break;
 	case MULTIPLY: break;
@@ -733,11 +772,11 @@ void Precalc::print_ca(unsigned int i, const PreCalc &ca) const
 		const auto &it = item[0];
 		switch(it.type){
 		case SPLINEREF:
-			cout << "Spline " << spline[it.num].name; 
+			ss << "Spline " << spline[it.num].name; 
 			break;
 		
 		case CONSTSPLINEREF:
-			cout << "Const Spline " << spline[it.num].name; 
+			ss << "Const Spline " << spline[it.num].name; 
 			break;
 			
 		default:
@@ -757,7 +796,7 @@ void Precalc::print_ca(unsigned int i, const PreCalc &ca) const
 				break;
 				
 			case PARAMVEC: 
-				cout << param_vec[it.num].name;
+				ss << param_vec[it.num].name;
 				break;
 			
 			case SPLINE: 
@@ -765,11 +804,11 @@ void Precalc::print_ca(unsigned int i, const PreCalc &ca) const
 				break;
 				
 			case SPLINEREF:
-				cout << "Spline " << spline[it.num].name; 
+				ss << "Spline " << spline[it.num].name; 
 				break;
 			
 			case CONSTSPLINEREF:
-				cout << "Const Spline " << spline[it.num].name; 
+				ss << "Const Spline " << spline[it.num].name; 
 				break;
 				
 			case DERIVE: 
@@ -777,7 +816,7 @@ void Precalc::print_ca(unsigned int i, const PreCalc &ca) const
 				break;
 					
 			case POPNUM: 
-				cout << "'" << pop[it.num].name << "'";
+				ss << "'" << pop[it.num].name << "'";
 				break;
 				
 			case POPTIMENUM: 
@@ -785,38 +824,38 @@ void Precalc::print_ca(unsigned int i, const PreCalc &ca) const
 				break;
 				
 			case IE: emsg("SHould not be ie"); break;
-			case ONE: cout << "1"; break;
+			case ONE: ss << "1"; break;
 			case FE: emsg("SHould not be fe"); break;
-			case REG: cout << "R" << it.num; break;
-			case REG_FAC: cout << "Rfac" << it.num; break;
-			case REG_PRECALC: cout << "Rpre" << it.num; break;
-			case REG_PRECALC_TIME: cout << "Rpretime" << it.num; break;
+			case REG: ss << "R" << it.num; break;
+			case REG_FAC: ss << "Rfac" << it.num; break;
+			case REG_PRECALC: ss << "Rpre" << it.num; break;
+			case REG_PRECALC_TIME: ss << "Rpretime" << it.num; break;
 			case NUMERIC: 
 				{
 					auto val = constant.value[it.num];
-					if(val == INFY) cout << "INFY";
+					if(val == INFY) ss << "INFY";
 					else{
-						if(val == UNDEF) cout << "UNDEF";
-						else cout << val; 
+						if(val == UNDEF) ss << "UNDEF";
+						else ss << val; 
 					}
 				}
 				break;
-			case TIME: cout << "time"; break;
-			default: cout << it.type << endl; emsg_input("Precalc Eq "); break;
+			case TIME: ss << "time"; break;
+			default: ss << it.type << endl; emsg_input("Precalc Eq "); break;
 			}
 			
 			if(j != item.size()-1){
 				switch(ca.op){
-				case ADD: cout <<  "+"; break;
-				case TAKE: cout <<  "-"; break;
-				case MULTIPLY: cout << "*"; break;
-				case SINGLE: cout <<  ""; break;
-				case DIVIDE: cout <<  "/"; break;
-				case POWERFUNC: cout << "|"; break;
-				case THRESHFUNC: cout << "|"; break;
-				case UBOUNDFUNC: cout << "|"; break;
-				case MAXFUNC: cout << "|"; break;
-				case MINFUNC: cout << "|"; break;
+				case ADD: ss <<  "+"; break;
+				case TAKE: ss <<  "-"; break;
+				case MULTIPLY: ss << "*"; break;
+				case SINGLE: ss <<  ""; break;
+				case DIVIDE: ss <<  "/"; break;
+				case POWERFUNC: ss << "|"; break;
+				case THRESHFUNC: ss << "|"; break;
+				case UBOUNDFUNC: ss << "|"; break;
+				case MAXFUNC: ss << "|"; break;
+				case MINFUNC: ss << "|"; break;
 			
 				default: break;
 				}
@@ -827,16 +866,18 @@ void Precalc::print_ca(unsigned int i, const PreCalc &ca) const
 		case EXPFUNC: case SINFUNC: case COSFUNC: case LOGFUNC: case STEPFUNC: case POWERFUNC: 
 		case THRESHFUNC: case UBOUNDFUNC: case MAXFUNC: case MINFUNC: case ABSFUNC: case SQRTFUNC:
 		case SIGFUNC:
-			cout << ")"; 
+			ss << ")"; 
 			break;
 		default: break;
 		}
 	}
 		
-	cout <<  " > ";
-	cout <<  "Rpre" << i;
+	ss <<  " > ";
+	ss <<  "Rpre" << i;
 	
-	if(ca.time_dep) cout << " Time dep";
+	if(ca.time_dep) ss << " Time dep";
+	
+	return ss.str();
 }
  
 
@@ -1026,10 +1067,10 @@ SpecPrecalc Precalc::shrink_sprec(const vector <unsigned int> &lt, SpecPrecalc s
 }
 
 
-/// 
+/// Sets parameter in precalculation
 void Precalc::set_param(SpecPrecalc &set_param_spec_precalc, SpecPrecalc &spec_precalc_after, bool spl_fl) const
 {
-	// Transfers over parameter
+	// zz Transfers over parameter
 	auto &info = spec_precalc_after.info;
 
 	if(info.size() == 0) emsg("zero size");
@@ -1063,16 +1104,34 @@ void Precalc::set_param(SpecPrecalc &set_param_spec_precalc, SpecPrecalc &spec_p
 }
 
 
+/// Calculate map that omits time-varying reparameterised quantities
+vector <bool> Precalc::calculate_map_reparam_time_dep() const
+{
+	auto C = pcalcu_ref.size();
+	
+	vector <bool> map_reparam_time_dep(C,false); // Determines all i that are updated by 
+	for(const auto &pv : param_vec){
+		if(pv.reparam_time_dep){
+			for(auto &in : pv.spec_precalc_after.info) map_reparam_time_dep[in.i] = true;
+		}
+	}
+	
+	return map_reparam_time_dep;
+}
+
+
 // Sets precalculation to be done after sampling 
 SpecPrecalc Precalc::calculate_spec_precalc_sample(const SpecPrecalc &spec_precalc) const
 {
+	auto map_reparam_time_dep = calculate_map_reparam_time_dep();
+	
 	auto C = pcalcu_ref.size();
+	
 	vector <bool> map(C,false);
 	
 	for(auto &in : spec_precalc.info) map[in.i] = true;
 	
 	for(const auto &pv : param_vec){
-		
 		for(auto &in : pv.spec_precalc_before.info) map[in.i] = true;
 		
 		if(!pv.reparam_time_dep){
@@ -1081,10 +1140,10 @@ SpecPrecalc Precalc::calculate_spec_precalc_sample(const SpecPrecalc &spec_preca
 	}
 	
 	SpecPrecalc spec;
-	auto j = add_list_time(spec,all_time);
+	auto j = ALL_TIME_STEP;//add_list_time(spec,all_time);
 	
 	for(auto i = 0u; i < C; i++){
-		if(map[i]){
+		if(map[i] && !map_reparam_time_dep[i]){
 			PrecalcInfo pi; pi.i = i;
 			
 			auto re = pcalcu_ref[i]; if(re == UNSET) emsg("unset problem");
@@ -1101,6 +1160,8 @@ SpecPrecalc Precalc::calculate_spec_precalc_sample(const SpecPrecalc &spec_preca
 // Sets all precalculation to be done (apart from derived)
 SpecPrecalc Precalc::calculate_spec_precalc_all(const SpecPrecalc &spec_precalc) const
 {
+	auto map_reparam_time_dep = calculate_map_reparam_time_dep();
+	
 	auto C = pcalcu_ref.size();
 	vector <bool> map(C,false);
 	
@@ -1116,9 +1177,9 @@ SpecPrecalc Precalc::calculate_spec_precalc_all(const SpecPrecalc &spec_precalc)
 	}
 	
 	SpecPrecalc spec;
-	auto j = add_list_time(spec,all_time);
+	auto j = ALL_TIME_STEP;//add_list_time(spec,all_time);
 	for(auto i = 0u; i < C; i++){
-		if(map[i]){
+		if(map[i] && !map_reparam_time_dep[i]){
 			PrecalcInfo pi; pi.i = i;
 			auto re = pcalcu_ref[i]; if(re == UNSET) emsg("unset prob");
 			if(pcalcu[re].time_dep) pi.tlist = j;

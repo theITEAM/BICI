@@ -208,32 +208,9 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 						
 						auto pp = in_new.p;
 						
-						iif_prop.p = pp;
-						iif_prop.i = in_new.i;
-					
-						// Get the c of new infecting individual
-						auto t_inf = round_down(t_new);
-						const auto &ev_inf = species[in_new.p].individual[in_new.i].ev;
-						
-						auto e = in_new.e;
-						
-						auto c = UNSET;
-						while(e < ev_inf.size() && ev_inf[e].tdiv <= t_inf){ c = ev_inf[e].c_after; e++;}
-						if(c == UNSET) return GenChange(GENCHA_FAIL);
-						
-						// Works out pref from c
-						
-						const auto &tra = sp.tra_gl[ev.tr_gl];
-						auto m = tra.markov_eqn_ref;
-						const auto &me = sp.markov_eqn[m];
-						const auto &eq = model.eqn[me.eqn_ref];
-						auto pref = eq.comp_pref_convert[pp][c];
-						if(pref == UNSET) return GenChange(GENCHA_FAIL);
-						//if(pref == UNSET) emsg("Could not get pref"); 
-						
-						iif_prop.pref = pref;
-						iif_prop.po = eq.pop_ref[pref];
-						iif_prop.w = get_w_from_indinffrom(iif_prop);
+						if(!set_iif(pp,in_new.i,in_new.e,iif_prop,t_new,ev,sp)){
+							return GenChange(GENCHA_FAIL);
+						}
 					}
 					ev.ind_inf_from = iif_prop;
 					ev.inf_node_ref = n;
@@ -251,6 +228,37 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 	}
 	
 	return GenChange(GENCHA_FAIL);
+}
+
+
+/// Calculcate extra properties of ind_inf_from
+bool State::set_iif(unsigned int p, unsigned int i, unsigned int e, IndInfFrom &iif, double t, const Event &ev, const Species &sp) const 
+{
+	iif.p = p;
+	iif.i = i;
+					
+	// Get the c of new infecting individual
+	auto t_inf = round_down(t);
+	const auto &ev_inf = species[p].individual[i].ev;
+	
+	auto c = UNSET;
+	while(e < ev_inf.size() && ev_inf[e].tdiv <= t_inf){ c = ev_inf[e].c_after; e++;}
+	if(c == UNSET) return false;
+	
+	// Works out pref from c
+	
+	const auto &tra = sp.tra_gl[ev.tr_gl];
+	auto m = tra.markov_eqn_ref;
+	const auto &me = sp.markov_eqn[m];
+	const auto &eq = model.eqn[me.eqn_ref];
+	auto pref = eq.comp_pref_convert[p][c];
+	if(pref == UNSET) return false;
+	
+	iif.pref = pref;
+	iif.po = eq.pop_ref[pref];
+	iif.w = get_w_from_indinffrom(iif);
+	
+	return true;
 }
 
 

@@ -735,19 +735,23 @@ function compartment_command()
 
 
 /// Adds compartments to the model
-function compartment_all_command()
+function compartment_all_command(line)
 {
 	let file = get_tag_value("file"); if(file == "") cannot_find_tag();
 
 	let tags_list = get_tags_list(file);
 	
 	let imax = tags_list.length;
+	let pt_add = line.pt/imax;
 	for(let i = 0; i < imax; i++){
 		let tags = tags_list[i];
 		imp.all_row = "(line "+(i+2)+" in file)";
 		compartment_command2(tags);
 		check_tags_used(i,tags);
+		
+		add_proc_time(pt_add);
 	}
+	line.pt = 0;
 	
 	for(let m = 0; m < imp.tags.length; m++) imp.tags[m].done = 1; 
 	
@@ -1326,7 +1330,7 @@ function map_command()
 
 	
 /// Sets param_mult
-function param_mult_command(per_start,per_end)
+function param_mult_command(line)
 {
 	let full_name = get_tag_value("name"); if(full_name == "") cannot_find_tag();
 	
@@ -1337,12 +1341,12 @@ function param_mult_command(per_start,per_end)
 
 	model.param_factor.push({f_param:f_par, param:{name:par.name,dep:copy(par.dep), full_name:par.full_name}});
 
-	param_command2(remove_eq_quote(f_par.full_name),per_start,per_end,"mult");
+	param_command2(remove_eq_quote(f_par.full_name),line,"mult");
 }
 
 
 /// Sets the value for a parameter in the model
-function define_command(per_start,per_end)
+function define_command(line)
 {
 	let full_name = get_tag_value("name"); if(full_name == "") cannot_find_tag();
 	let value = get_tag_value("value"); if(value == "") cannot_find_tag();
@@ -1376,19 +1380,26 @@ function define_command(per_start,per_end)
 
 
 /// Sets the value for a parameter in the model
-function param_command(per_start,per_end)
+function param_command(line)
 {
 	let full_name = get_tag_value("name"); if(full_name == "") cannot_find_tag();
-	param_command2(full_name,per_start,per_end);
+	param_command2(full_name,line);
 }
 
 
 /// Processes param / param-mult command
-function param_command2(full_name,per_start,per_end,op)
+function param_command2(full_name,line,op)
 {
+	let dpt = line.pt/100;
+	line.pt = 0;
+	
+	let load_dpt = 40*dpt;
+	
 	let pp = get_param_prop(full_name);
 
 	let par = create_new_param(pp,"normal");
+
+	add_proc_time(10*dpt);
 	
 	if(begin(par.name,"Ω")) par.pri_pos = prior_cv_pos;
 	
@@ -1430,17 +1441,17 @@ function param_command2(full_name,per_start,per_end,op)
 			par.spline.smooth.value = val;
 		}
 		
-		par.spline.spline_radio = spline_radio_pos[0];
+		par.spline.spline_radio = copy(spline_radio_pos[0]);
 		let sptype = get_tag_value("spline-type").toLowerCase().trim();
 		
 		if(sptype != ""){
 			if(option_error("spline-type",sptype,["linear","square","cubic +ve","cubic"]) == true) return;
 		
 			switch(sptype){
-			case "linear": par.spline.spline_radio = spline_radio_pos[0]; break;
-			case "square": par.spline.spline_radio = spline_radio_pos[1]; break;
-			case "cubic +ve": par.spline.spline_radio = spline_radio_pos[2]; break;
-			case "cubic": par.spline.spline_radio = spline_radio_pos[3]; break;
+			case "linear": par.spline.spline_radio = copy(spline_radio_pos[0]); break;
+			case "square": par.spline.spline_radio = copy(spline_radio_pos[1]); break;
+			case "cubic +ve": par.spline.spline_radio = copy(spline_radio_pos[2]); break;
+			case "cubic": par.spline.spline_radio = copy(spline_radio_pos[3]); break;
 			}
 		}
 	}
@@ -1460,7 +1471,18 @@ function param_command2(full_name,per_start,per_end,op)
 	}
 	
 	par.factor_weight_on = {check:false};
+	
+	add_proc_time(10*dpt);
+
+	let cons = get_tag_value("constant"); 
+	let dist = get_tag_value("dist");	
+	let dist_split = get_tag_value("dist-split");
+	let value = get_tag_value("value");
+	let reparam = get_tag_value("reparam"); 
+	let prior = get_tag_value("prior"); 
+	let prior_split = get_tag_value("prior-split"); 
 	let fw = get_tag_value("factor-weight");
+	
 	if(fw != ""){
 		if(par.factor == false){
 			alert_import("'factor-weight' can only be set if 'factor' is set to 'true'"); 
@@ -1471,16 +1493,9 @@ function param_command2(full_name,per_start,per_end,op)
 		set_default_factor_weight(par);
 		
 		let desc = "For 'factor-weight'";
-		load_param_value(par,par.factor_weight,"Value",fw,desc);
+		load_param_value(par,par.factor_weight,"Value",fw,desc,load_dpt);
+		load_dpt = 0;
 	}
-	
-	let cons = get_tag_value("constant"); 
-	let dist = get_tag_value("dist");	
-	let dist_split = get_tag_value("dist-split");
-	let value = get_tag_value("value");
-	let reparam = get_tag_value("reparam"); 
-	let prior = get_tag_value("prior"); 
-	let prior_split = get_tag_value("prior-split"); 
 	
 	let param_tag = [];
 	param_tag.push({val:cons, tag:"constant"});
@@ -1585,7 +1600,8 @@ function param_command2(full_name,per_start,per_end,op)
 					}
 				}
 				else{
-					load_param_value(par,par.value,"Value",valu,desc);
+					load_param_value(par,par.value,"Value",valu,desc,load_dpt);
+					load_dpt = 0;
 				}
 				
 				let err = check_param_value("Set Param",par,par.value);
@@ -1595,6 +1611,8 @@ function param_command2(full_name,per_start,per_end,op)
 		}
 	}
 
+	add_proc_time(20*dpt);
+	
 	if(prior != ""){
 		let pri = convert_text_to_prior(prior,par.pri_pos);
 		if(pri.err == true){
@@ -1621,9 +1639,10 @@ function param_command2(full_name,per_start,per_end,op)
 		}
 		
 		let desc = "For 'prior-split'";
-		load_param_value(par,par.prior_split,"Prior",prior_split,desc);
+		load_param_value(par,par.prior_split,"Prior",prior_split,desc,load_dpt);
+		load_dpt = 0;
 	}
-	
+
 	if(dist != ""){
 		let pri = convert_text_to_prior(dist,par.pri_pos,true);
 		if(pri.err == true){
@@ -1646,7 +1665,8 @@ function param_command2(full_name,per_start,per_end,op)
 		}
 		
 		let desc = "For 'dist-split'";
-		load_param_value(par,par.prior_split,"Dist",dist_split,desc);
+		load_param_value(par,par.prior_split,"Dist",dist_split,desc,load_dpt);
+		load_dpt = 0;
 	}
 	
 	let sim_sample = get_tag_value("sim-sample").toLowerCase(); 
@@ -1665,11 +1685,15 @@ function param_command2(full_name,per_start,per_end,op)
 	
 	par.full_name = param_name(par);
 
+	add_proc_time(20*dpt);
+
 	get_reparam_param_list(par);
 	
 	get_prior_param_list(par);
 	
 	model.param.push(par);
+	
+	if(load_dpt != 0) add_proc_time(load_dpt);
 }
 
 
@@ -2566,13 +2590,13 @@ function set_get_tra_filt_from_str(claa_sel,filt,name)
 
 
 /// Reads in parameter samples into sim_results
-function sim_param_command()
+function sim_param_command(line)
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
 	let fi = get_fi(file);
 	
-	read_param_samples_file(0,fi,sim_result_import);
+	read_param_samples_file(0,fi,sim_result_import,line);
 }
 
 
@@ -2588,7 +2612,7 @@ function get_chain_value()
 
 
 /// Reads in parameter samples into inf_results
-function inf_param_command()
+function inf_param_command(line)
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
@@ -2596,18 +2620,18 @@ function inf_param_command()
 	
 	let chain = get_chain_value();
 
-	read_param_samples_file(chain,fi,inf_result_import);
+	read_param_samples_file(chain,fi,inf_result_import,line);
 }
 
 
 /// Reads in parameter samples into inf_results
-function inf_generation_command()
+function inf_generation_command(line)
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
 	let fi = get_fi(file);
 	
-	read_param_samples_file("gen-plot",fi,inf_result_import);
+	read_param_samples_file("gen-plot",fi,inf_result_import,line);
 }
 
 
@@ -2629,29 +2653,29 @@ function inf_diagnostics_command()
 
 
 /// Reads in parameter samples into ppc_results
-function post_sim_param_command()
+function post_sim_param_command(line)
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
 	let fi = get_fi(file);
 	
-	read_param_samples_file(0,fi,ppc_result_import);
+	read_param_samples_file(0,fi,ppc_result_import,line);
 }
 
 
 /// Reads in state samples into sim_results
-function sim_state_command()
+function sim_state_command(line)
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
 	let fi = get_fi(file);
 	
-	read_state_samples_file(0,fi,sim_result_import);
+	read_state_samples_file(0,fi,sim_result_import,line);
 }
 
 
 /// Reads in proposal information
-function proposal_inf_command()
+function proposal_inf_command(line)
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
@@ -2663,7 +2687,7 @@ function proposal_inf_command()
 
 
 /// Reads in state samples into inf_results
-function inf_state_command()
+function inf_state_command(line)
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
@@ -2671,23 +2695,23 @@ function inf_state_command()
 	
 	let chain = get_chain_value();
 
-	read_state_samples_file(chain,fi,inf_result_import);
+	read_state_samples_file(chain,fi,inf_result_import,line);
 }
 
 
 /// Reads in state samples into sim_results
-function post_sim_state_command()
+function post_sim_state_command(line)
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
 	let fi = get_fi(file);
 	
-	read_state_samples_file(0,fi,ppc_result_import);
+	read_state_samples_file(0,fi,ppc_result_import,line);
 }
 
 
 /// Reads in transition diagnostic information
-function trans_diag_command()
+function trans_diag_command(line)
 {
 	let file = get_tag_value("file");
 	if(file == "") cannot_find_tag();
@@ -2695,7 +2719,7 @@ function trans_diag_command()
 	
 	let ch = get_chain_value();
 	
-	read_trans_diag(ch,fi,inf_result_import);
+	read_trans_diag(ch,fi,inf_result_import,line);
 }
 
 

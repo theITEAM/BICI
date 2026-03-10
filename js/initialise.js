@@ -6,6 +6,10 @@ function initialise_BICI()
 {
 	document.onselectstart = function() { return false; };
 	
+	let ah = window.screen.availHeight;  // Resizes to show all examples (of room);
+	let wo = window.outerWidth;
+	if(ah > 705) window.resizeTo(wo,705);
+	
 	if(debug == true) require('nw.gui').Window.get().showDevTools();
 
 	inter.graph = new Graph();

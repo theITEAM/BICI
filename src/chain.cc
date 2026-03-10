@@ -15,7 +15,7 @@ using namespace std;
 #include "matrix.hh"
 #include "synchronise.hh"
 
-Chain::Chain(unsigned int nburnin_, unsigned int nsample_, const Model &model, Output &output) : state(model), cor_matrix(model), model(model),  output(output)
+Chain::Chain(unsigned int nburnin_, unsigned int nsample_, const Model &model, Output &output) : state(model), cor_matrix(model), model(model), output(output)
 {
 	nburnin = nburnin_;
 	nsample = nsample_;
@@ -83,6 +83,8 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 		
 			print_diag("simulate");
 			
+			//cout << "switch off" << endl; model.precalc_eqn.print_calc(); 
+	
 			state.simulate(param_val,initc_val);
 
 			print_diag("simulate done");
@@ -109,6 +111,7 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 				part = state.generate_particle(UNSET,UNSET,true,false);
 			}
 		
+			print_diag("resampled after");
 			//state.check("after resample");
 		}
 		if(Lmax == -LARGE) run_error("Could not find initial state");
@@ -117,6 +120,7 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 	}
 	
 	//state.check("init");
+	print_diag("done");
 }
 
 

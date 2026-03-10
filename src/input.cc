@@ -14,8 +14,9 @@ using namespace std;
 #include "utils.hh"
 
 /// Initialises the model 
-Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(model), mpi(mpi)
+Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) : model(model), mpi(mpi)
 {
+	sup = sup_;
 	datadir = "";
 	
 	print_diag("start import");
@@ -27,9 +28,9 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	input_file = file;
 	
 	if(!no_proc){
-		percentage_start(LOAD_PER);
+		percentage_start(LOAD_PER,sup);
 	
-		percentage(0,100);
+		percentage(0,100,sup);
 	}
 	
 	if(op()){
@@ -87,9 +88,13 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 		}
 	
 		// Determines if using simulation initial conditions
-		auto use_sim_ic = true;
-		if(model.mode == INF || model.mode == EXT) use_sim_ic = false;
-		if(model.mode == PPC && !model.details.param_only) use_sim_ic = false;
+		auto use_sim_ic = false;
+		switch(model.mode){
+		case SIM: use_sim_ic = true; break;
+		case PPC: if(model.details.param_only) use_sim_ic = true; break;
+		case DATA_SIM: use_sim_ic = true; break;
+		default: break;
+		}
 		
 		auto num_sim = 0u, num_inf = 0u, num_ppc = 0u;
 		
@@ -102,7 +107,9 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 			case 1:  // Gets simulation or inference details
 				switch(cname){
 				case SIMULATION: 
-					if(model.mode != SIM && model.mode != DATA_SIM) process = false; 
+					if(model.mode != SIM && model.mode != DATA_SIM && model.mode != TORNADO_SETUP && model.mode != SCAN_SETUP){
+						process = false; 
+					}
 					else{
 						num_sim++;
 						if(num_sim > 1) alert_import("The 'simulation' command can only be specified once.");
@@ -110,7 +117,9 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 					break;
 				
 				case INFERENCE:
-					if(model.mode != INF && model.mode != PPC && model.mode != EXT && model.mode != DATA_SHOW){
+					if(model.mode != INF && model.mode != PPC && model.mode != EXT 
+					 && model.mode != DATA_SHOW && model.mode != TORNADO_SETUP && model.mode != TORNADO_RESULT
+					                            && model.mode != SCAN_SETUP && model.mode != SCAN_RESULT){
 						process = false; 
 					}
 					else{
@@ -252,6 +261,10 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 			
 			case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: break;
 			
+			case TORNADO_SETUP: case TORNADO_RESULT: break;
+			
+			case SCAN_SETUP: case SCAN_RESULT: break;
+			
 			case MODE_UNSET:
 				break;
 			}
@@ -274,7 +287,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	output_error_messages(err_mess);
 	
-	percentage(5,100);
+	percentage(5,100,sup);
 	
 	auto inf = false; if(model.mode == INF || model.mode == EXT) inf = true;
 	
@@ -286,7 +299,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	create_population_erlang();        // If a population-based model convert erlang to rate
 	
-	percentage(10,100);
+	percentage(10,100,sup);
 	
 	print_diag("loaded1");
 	
@@ -301,7 +314,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	markov_bp_convert();               // If all branches are rates then removes branching
 
 	print_diag("loaded4");
-	percentage(15,100);
+	percentage(15,100,sup);
 	
 	//population_bp_rate_combine();      // Combines branching probabilities with rates in population model
 	
@@ -314,7 +327,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	check_import_correct();            // Checks import has been successfully acheived
 
 	print_diag("loaded7");
-	percentage(20,100);
+	percentage(20,100,sup);
 
 	global_comp_trans_init();          // Creates global compartments and transitions
 	
@@ -326,7 +339,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 		for(const auto &wa : sp.warn) alert_line(wa.te,wa.line_num);    
 	}
 	
-	percentage(25,100);
+	percentage(25,100,sup);
 	
 	print_diag("loaded9");
 	
@@ -340,7 +353,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	print_diag("h1");
 
-	percentage(30,100);
+	percentage(30,100,sup);
 	
 	model.convert_fix_pr_const();      // Converts any fixed priors to constants
 	
@@ -362,13 +375,13 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 
 	check_memory_too_large();          // Checks if the memory requirement is too large
 
-	percentage(60,100);
+	percentage(60,100,sup);
 	
 	print_diag("h1a");
 	
 	further_simplify_equations(60,70); // Simplifies equations as much as possible
 
-	percentage(70,100);
+	percentage(70,100,sup);
 	
 	print_diag("h1b");
 	
@@ -492,7 +505,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
  	
 	print_diag("h15");
 	
-	percentage(75,100);
+	percentage(75,100,sup);
 
 	model.create_precalc_equation();    // Extracts precalculations (for non-population parts of equations)
 	
@@ -536,7 +549,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	check_memory_too_large();
 	
-	percentage(85,100);
+	percentage(85,100,sup);
 	
 	if(inf) param_affect_likelihood(); // Works out how changes to parameters affect likelihoods
 	
@@ -546,7 +559,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	check_param_used();                // Checks all defined parameters used in the model (and vice versa)
 	
-	percentage(90,100);
+	percentage(90,100,sup);
 	
 	print_diag("h18");
 	
@@ -563,7 +576,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 		for(const auto &wa : sp.warn) alert_line(wa.te,wa.line_num);    
 	}
 	
-	percentage(95,100);
+	percentage(95,100,sup);
 	
 	print_diag("h19");
 	
@@ -629,7 +642,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi) : model(mod
 	
 	set_seed(mpi.core,model.details,seed);     // Sets the psuedo random nunber generator 
 	
-	percentage(100,100);
+	percentage(100,100,sup);
 	
 	output_error_messages(err_mess,true);
    
@@ -1023,7 +1036,9 @@ void Input::process_command(const CommandLine &cline, unsigned int loop, bool us
 		else{
 			if(model.data_mode()) import_data_table_command(cline,false);
 			else{
-				alert_warning("Line ignored because not need for inference");
+				string ty = "simulation"; if(model.mode == INF) ty = "inference";
+				
+				alert_warning("Line ignored because not need for "+ty);
 				for(auto &ta : cline_store.tags) ta.done = 1;
 			}
 		}
@@ -1043,7 +1058,7 @@ void Input::process_command(const CommandLine &cline, unsigned int loop, bool us
 	case SIM_PARAM: dummy_file_command(); break;
 	case SIM_STATE: sim_state_command(); break;
 	case POST_SIM_PARAM: case POST_SIM_STATE: dummy_file_command(); break;
-	case INF_PARAM_STATS: dummy_file_command(); break;
+	case INF_PARAM_STATS: inf_param_stats(); break;
 	case SIM_WARNING: case INF_WARNING: case PPC_WARNING: warning_command(); break;
 	case INF_DIAGNOSTICS: dummy_file_command(); break;
 	case INF_GEN: dummy_file_command(); break;
@@ -1575,7 +1590,7 @@ void Input::further_simplify_equations(unsigned int per_start, unsigned int per_
 			
 		// If a reparameterised parameter is used and it is constant then substitutes 
 		for(auto e = 0u; e < model.eqn.size(); e++){
-			if(first) percentage(per_start+double((per_end-per_start))*e/model.eqn.size(),100);
+			if(first) percentage(per_start+double((per_end-per_start))*e/model.eqn.size(),100,sup);
 			auto &eq = model.eqn[e];
 		
 			auto flag = false;
@@ -1625,8 +1640,8 @@ void Input::get_compress(Details &details)
 {
 	auto compress = get_tag_value("compress");
 	if(compress == "") compress = "auto";
-	//if(compress == "") compress = "always"; // CHANGE
-	//if(compress == "") compress = "never"; // CHANGE
+	//if(compress == "") compress = "always";
+	//if(compress == "") compress = "never";
 	if(com_op) compress = "never";
 
 	details.compress = Compress(option_error("compress",compress,{"always","never","auto"},{ ALWAYS_COMPRESS, NEVER_COMPRESS, AUTO_COMPRESS}));
