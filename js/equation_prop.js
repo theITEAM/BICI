@@ -1305,7 +1305,7 @@ function check_fe(te,p_name_filter,icur,eqn,in_pop)
 		eqn.fix_eff.push({name:te, p_name_filter:p_name_filter});
 	}
 	else{
-		if(eqn.ind_eff[i].p_name_filter != p_name_filter){
+		if(eqn.fix_eff[i].p_name_filter != p_name_filter){
 			eqn.warn.push({te:"Species filters for fixed effect "+te+" do not match up"});
 		}
 	}

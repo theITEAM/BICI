@@ -726,7 +726,38 @@ void test_distribution()
 /// Generates synthetic data
 void generate_data()
 {	
-	ofstream fout("Examples/loc.csv");	
+	{
+		auto d = 100;
+		ofstream fout("farms.csv");
+		fout << "ID,x,y,col" << endl;
+		for(auto i = 0u; i < 100; i++){
+			fout << "F-" << (i+1) << "," << ran()*d << "," << ran()*d << ",#cccccc" << endl;
+		}
+	}
+	
+	{
+		auto d = 100;
+		ofstream fout("cattle.csv");
+		fout << "ID,x,y,col" << endl;
+		for(auto i = 0u; i < 100; i++){
+			fout << "C-" << (i+1) << "," << ran()*d << "," << ran()*d << ",#cccccc" << endl;
+		}
+	}
+	
+	{
+		auto d = 100;
+		ofstream fout("badgers.csv");
+		fout << "ID,x,y,col" << endl;
+		for(auto i = 0u; i < 100; i++){
+			fout << "B-" << (i+1) << "," << ran()*d << "," << ran()*d << ",#888888" << endl;
+		}
+	}
+	
+	
+	
+	return;
+	
+
 	{
 		auto d = 11;
 		ofstream fout("Examples/loc.csv");
@@ -1102,6 +1133,225 @@ vector < vector <double> > M_from_K(vector < vector <double> > &K)
 }
 
 
+/// Gets C from K
+vector < vector <double> > C_from_K(vector < vector <double> > &K)
+{
+	auto C = K;	
+	
+	auto N = C.size();
+	for(auto j = 0u; j < N; j++){
+		for(auto i = 0u; i < N; i++){
+			if(j == i) C[j][i] = 1;
+		}
+	}
+	
+	return C;
+}
+
+
+/// Checks different mvn priors
+void mvn_prior_check()
+{
+	auto N = 1u;
+	
+	string warn;
+
+	auto var_min = 0.5, var_max = 4.0;
+	//auto var_min = 0.1, var_max = 4.0;
+	//auto det_min = N*log(var_min);
+
+	auto smax = 1000000u;
+
+	vector < vector <double> > K;
+
+	K.resize(N);
+	for(auto j = 0u; j < N; j++){
+		K[j].resize(N);
+		for(auto i = 0u; i < N; i++){
+			if(j == i) K[j][i] = 1;
+			else K[j][i] = 0;
+		}
+	}
+	
+	auto M = M_from_K(K);
+	auto C = C_from_K(K);
+	
+	auto det = determinant_fast(M);
+	auto diag = diag_log_sum(M);
+	auto Minv = invert_matrix(M);
+	auto tr = diag_sum(Minv);
+	auto detC = determinant_fast(C);
+	
+	ofstream fout2("cor.txt");
+	
+	fout2 << "State";
+	for(auto j = 0u; j < N; j++){
+		for(auto i = 0u; i <= j; i++){
+			fout2 << "\tM" << j << i;
+		}
+	}
+	fout2 << "\t" << det << endl;
+
+	auto si = 1.0, si2 = 1.0;
+	
+	auto S = 2.0;
+	auto nu = N+2;
+	
+	auto burn = smax/10;
+	
+	vector < vector <double> > nacc, ntrr;
+	nacc.resize(N); ntrr.resize(N);
+	for(auto j = 0u; j < N; j++){
+		nacc[j].resize(N,0); ntrr[j].resize(N,0);
+	}
+	
+	auto eta = 2.0;
+	
+	for(auto s = 0u;  s < smax; s++){
+		if(s%100000==0) cout <<s << endl;
+		if(s%1000 == 0){
+			fout2 << s;
+			for(auto j = 0u; j < N; j++){
+				for(auto i = 0u; i <= j; i++){
+					fout2 << "\t" << K[j][i];
+				}
+			}			
+			fout2 << "\t" << det << endl;
+		}
+		
+		for(auto j = 0u; j < N; j++){
+			for(auto i = 0u; i <= j; i++){
+				double d;
+				if(i == j) d = normal_sample(0,si,warn);
+				else d = normal_sample(0,si2,warn);
+				
+				auto Kold = K[j][i];
+				
+				K[j][i] += d; K[i][j] += d;
+				M = M_from_K(K);
+				C = C_from_K(K);
+	
+				auto det_new = determinant_fast(M);
+				auto diag_new = diag_log_sum(M);
+				auto Minv = invert_matrix(M);
+				auto tr_new = diag_sum(Minv);
+				auto detC_new = determinant_fast(C);
+				
+				ntrr[j][i]++;
+				
+				auto ill = false;
+				
+				if(det_new == UNSET) ill = true;
+				
+				if(ill == false){
+					// Checks to see if correlation is within limits  
+					for(auto jj = 0u; jj < N; jj++){
+						if(K[jj][jj] <= 0) ill = true;
+						for(auto ii = 0u; ii < jj; ii++){
+							auto cor = K[jj][ii];
+							if(cor >= 1 || cor <= -1) ill = true;
+						}					
+					}
+				}
+				
+				auto al = 0.0;
+				if(ill == false){
+					switch(2){
+					case 0:  // Uniform
+						if(i == j && (M[i][i] < var_min || M[i][i] > var_max)) ill = true;
+						else al = 1;
+						break;
+						
+					case 1:  // Jeffreys
+						//if(det_new < det_min || (i == j && M[i][i] > var_max)) ill = true;
+						if(i == j && (M[i][i] < var_min || M[i][i] > var_max)) ill = true;
+						else{
+							//al = exp(-(0.5*N+0.5)*(det_new-det));
+							al = exp((0.5*N-0.5)*(diag_new-diag) - (0.5*N+0.5)*(det_new-det));
+						}
+						break;
+						
+					case 2: // Inverse wishart
+						{
+							if(i == j && (M[i][i] < VAR_MIN || M[i][i] > VAR_MAX)) ill = true;
+							else{
+								//al = exp((0.5*N-0.5)*(diag_new-diag) - 0.5*(nu+N+1)*(det_new-det) - 0.5*(tr_new-tr));
+								al = exp((0.5*N-0.5)*(diag_new-diag) - 0.5*(nu+N+1)*(det_new-det) - 0.5*S*(tr_new-tr));
+							}
+						}
+						break;
+					
+					case 3: // LKJ half normal
+						{
+							auto S = 2;
+							if(i == j){
+								al = exp(normal_probability(K[i][i],0,S)-normal_probability(Kold,0,S));
+							}
+							else{
+								//al = exp((0.5*N-0.5)*(diag_new-diag) - 0.5*(nu+N+1)*(det_new-det) - 0.5*(tr_new-tr));
+								al = exp((eta-1)*(detC_new-detC));
+							}
+						}
+						break;
+					}
+				}	
+					
+				if(ill == false && ran() < al){
+					nacc[j][i]++;
+					det = det_new;
+					diag = diag_new;
+					tr = tr_new;
+					detC = detC_new;
+					if(s < burn){
+						if(i == j) si *= 1.001;
+						else si2 *= 1.001;
+					}
+				}
+				else{
+					K[j][i] -= d; K[i][j] -= d;
+					if(s < burn){
+						if(i == j) si *= 0.999;
+						else si2 *= 0.999;
+					}
+				}
+			}
+		}
+	}		
+	//cout	<< nac/ntr << " acc" << endl;
+	
+	for(auto j = 0u; j < N; j++){
+		for(auto i = 0u; i < N; i++){
+			cout << nacc[j][i]/ntrr[j][i] << ",";
+		}
+		cout << endl;
+	}
+	cout << si << " " << si2 << " jj" << endl;
+	
+	ofstream fout3("sample.txt");
+	
+	fout3 << "State";
+	for(auto j = 0u; j < N; j++){
+		for(auto i = 0u; i <= j; i++){
+			fout3 << "\tM" << j << i;
+		}
+	}
+	fout3 << "\tdet" << endl;
+	
+	for(auto s = 0u; s < 1000; s++){
+		//auto R = LKJ_sample(eta,N);
+		auto R = inv_wishart_sample(S,nu,N);
+		fout3 << s;
+		for(auto j = 0u; j < N; j++){
+			for(auto i = 0u; i <= j; i++){
+				fout3 << "\t" << R[j][i];
+			}
+		}			
+		fout3 << "\t0" << endl;
+	}
+	
+}
+	
+	
 /// Checks the mvn jeffreys prior
 void mvn_jeffreys_check()
 {
@@ -1143,12 +1393,13 @@ void mvn_jeffreys_check()
 	auto smax = 1000000u;
 
 	for(auto s = 0u;  s < smax; s++){
+		if(s%100000 ==0) cout<< s << endl;
 		if(s%1000 == 0){
 			fout << s;
 			for(auto j = 0u; j < N; j++){
 				for(auto i = 0u; i <= j; i++){
 					if(j == i) fout << "\t" << M[j][i];
-					else fout << "\t" << M[j][i]/sqrt(M[i][i]* M[j][j]);
+					else fout << "\t" << M[j][i]/sqrt(M[i][i]*M[j][j]);
 				}
 			}			
 			fout << "\t" << det << endl;

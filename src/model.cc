@@ -164,72 +164,140 @@ void Model::sample_ieg_cv(PV &param_val) const
 			const auto &par = param[ieg.th];
 			if(par.variety == PRIOR_PARAM){
 				const auto &pri = prior[ieg.prior_ref];
-				if(pri.type != MVN_JEF_PR && pri.type != MVN_UNIFORM_PR){
-					emsg("Should be mvn-jeffreys or mvn-uniform");
+				switch(pri.type){
+				case MVN_DEFAULT_PR: case MVN_NORM_LKJ_PR: case MVN_UNIFORM_LKJ_PR:
+				case MVN_INV_WISH_PR: case MVN_JEF_PR: case MVN_UNIFORM_PR:
+					break;
+					
+				default:
+					run_error("Should be a covariance prior");
+					break;
 				}
 				
 				auto N = ieg.list.size();
 				
-				auto loop = 0u, loopmax = 1000u;
-				for(loop = 0; loop < loopmax; loop++){
-					if(sbound){
-						emsg("To do");
-						auto det = 0.0;
-						auto det_min = exp(ieg.log_det_min);
-						//auto det_max = exp(  ieg.log_det_max);
-						auto det_max = UNSET;//exp(  ieg.log_det_max);
-				
-						switch(pri.type){
-						case MVN_UNIFORM_PR:
-							det = det_min+ran()*(det_max-det_min);
-							break;
-							
-						case MVN_JEF_PR:
-							if(N == 1) det = det_min*exp(ran()*log(det_max/det_min));
+				switch(pri.type){
+				case MVN_DEFAULT_PR: case MVN_NORM_LKJ_PR: case MVN_UNIFORM_LKJ_PR:
+					{
+						string warn;
+						for(auto j = 0u; j < N; j++){
+							double val;
+							if(pri.type == MVN_UNIFORM_LKJ_PR){
+								val = ieg.var_min + ran()*(ieg.var_max-ieg.var_min);
+							}
 							else{
-								auto power = -0.5*N-0.5;				
-								det = pow(pow(det_min,power+1)+ran()*(pow(det_max,power+1)-pow(det_min,power+1)),1.0/(power+1));
+								val = normal_sample(0,ieg.lkj_sd,warn);
+								if(warn != "") emsg("Problem with sampling covariance matrix");
+								if(val < 0) val *= -1;
 							}
-							break;
 							
-						default: emsg("op er"); break;
+							auto th = ieg.omega_pv[j][j];
+							param_val.value[th] = val;
+							precalc_eqn.calculate(param_vec[th].set_param_spec_precalc,param_val,false);
 						}
-						
-						auto var = pow(det,1.0/N);
+
+						auto R = LKJ_sample(ieg.lkj_eta,N);
 						
 						for(auto j = 0u; j < N; j++){
-							for(auto i = 0u; i < N; i++){
-								auto valu = 0.0; if(i == j) valu = var;
-								
+							for(auto i = 0u; i < j; i++){
 								auto th = ieg.omega_pv[j][i];
-								param_val.value[th] = valu;
+								param_val.value[th] = R[j][i];
 								precalc_eqn.calculate(param_vec[th].set_param_spec_precalc,param_val,false);
 							}
 						}
+					
+						auto omega = sp.calculate_omega_basic(g,param_val,param);
+						auto det = determinant_fast(omega);
+						if(det == UNSET) emsg("Sampling determinant problem");
 					}
-					else{
+					break;
+					
+				case MVN_INV_WISH_PR:
+					{
+						auto M = inv_wishart_sample(ieg.inv_wish_S,ieg.inv_wish_nu,N);
 						for(auto j = 0u; j < N; j++){
-							for(auto i = 0u; i < N; i++){
-								auto valu = 0.0; 
-								if(i == j) valu = ran()*(ieg.var_max);
-								else valu = COR_MAX*(2*ran()-1);
-									
+							for(auto i = 0u; i <= j; i++){
 								auto th = ieg.omega_pv[j][i];
-								param_val.value[th] = valu;
-								
+								auto val = M[j][i];
+								if(j != i) val /= sqrt(M[j][j]*M[i][i]);
+								param_val.value[th] = val;
 								precalc_eqn.calculate(param_vec[th].set_param_spec_precalc,param_val,false);
 							}
 						}
+					
+						auto omega = sp.calculate_omega_basic(g,param_val,param);
+						auto det = determinant_fast(omega);
+						if(det == UNSET) emsg("Sampling determinant problem");
 					}
-					
-					auto omega = sp.calculate_omega_basic(g,param_val,param);
-					
-					auto det = determinant_fast(omega);
-					if(det != UNSET && det > ieg.log_det_min) break;
-				}
+					break;
 				
-				if(loop == loopmax){
-					run_error("Could not sample a covariance matrix.");
+				case MVN_JEF_PR: case MVN_UNIFORM_PR:
+					{
+						auto loop = 0u, loopmax = 1000u;
+						for(loop = 0; loop < loopmax; loop++){
+							if(sbound){
+								emsg("To do");
+								auto det = 0.0;
+								auto det_min = exp(ieg.log_det_min);
+								//auto det_max = exp(  ieg.log_det_max);
+								auto det_max = UNSET;//exp(  ieg.log_det_max);
+						
+								switch(pri.type){
+								case MVN_UNIFORM_PR:
+									det = det_min+ran()*(det_max-det_min);
+									break;
+									
+								case MVN_JEF_PR:
+									if(N == 1) det = det_min*exp(ran()*log(det_max/det_min));
+									else{
+										auto power = -0.5*N-0.5;				
+										det = pow(pow(det_min,power+1)+ran()*(pow(det_max,power+1)-pow(det_min,power+1)),1.0/(power+1));
+									}
+									break;
+									
+								default: emsg("op er"); break;
+								}
+								
+								auto var = pow(det,1.0/N);
+								
+								for(auto j = 0u; j < N; j++){
+									for(auto i = 0u; i < N; i++){
+										auto valu = 0.0; if(i == j) valu = var;
+										
+										auto th = ieg.omega_pv[j][i];
+										param_val.value[th] = valu;
+										precalc_eqn.calculate(param_vec[th].set_param_spec_precalc,param_val,false);
+									}
+								}
+							}
+							else{
+								for(auto j = 0u; j < N; j++){
+									for(auto i = 0u; i < N; i++){
+										auto valu = 0.0; 
+										if(i == j) valu = ran()*(ieg.var_max);
+										else valu = COR_MAX*(2*ran()-1);
+											
+										auto th = ieg.omega_pv[j][i];
+										param_val.value[th] = valu;
+										
+										precalc_eqn.calculate(param_vec[th].set_param_spec_precalc,param_val,false);
+									}
+								}
+							}
+							
+							auto omega = sp.calculate_omega_basic(g,param_val,param);
+							
+							auto det = determinant_fast(omega);
+							if(det != UNSET && det > ieg.log_det_min) break;
+						}
+						
+						if(loop == loopmax){
+							run_error("Could not sample a covariance matrix.");
+						}
+					}
+					break;
+					
+				default: emsg("wrong distribution"); break;
 				}
 			}			
 		}
@@ -471,27 +539,66 @@ double Model::prior_ieg_calculate(const IEGref &iegr, const PV &param_val) const
 	if(par.variety == CONST_PARAM) return UNSET;
 	
 	auto omega = sp.calculate_omega_basic(iegr.i,param_val,param);
-	
-	for(auto i = 0u; i < omega.size(); i++){
-		if(omega[i][i] > ieg.var_max) return -LARGE;
-	}
-	
+
 	auto N = ieg.list.size();
 
-	auto log_det = determinant_fast(omega);
-	
-	if(log_det == UNSET) return -LARGE;
-	if(log_det < ieg.log_det_min) return -LARGE;
+	for(auto j = 0u; j < N; j++){
+		auto val = omega[j][j];
+		if(val < VAR_MIN || val > VAR_MAX) return -LARGE;
+	}	
 		
+	auto log_det = determinant_fast(omega);
+	if(log_det == UNSET) return -LARGE;
+	
 	const auto &pri = prior[ieg.prior_ref];
 	
 	switch(pri.type){
+	case MVN_DEFAULT_PR:
+	case MVN_NORM_LKJ_PR:
+	case MVN_UNIFORM_LKJ_PR:
+		{
+			auto sum = 0.0;
+			for(auto j = 0u; j < N; j++){
+				auto val = omega[j][j];	
+				if(pri.type == MVN_UNIFORM_LKJ_PR){
+					if(val < ieg.var_min || omega[j][j] > ieg.var_max) return -LARGE;
+				}
+				else{
+					sum += normal_probability(val,0,ieg.lkj_sd);
+				}	
+			}
+
+			auto R = sp.calculate_R(iegr.i,param_val,param);
+			auto log_det = determinant_fast(R);
+			if(log_det == UNSET) return -LARGE;
+			sum += log_det*(ieg.lkj_eta-1);
+			return sum;
+		}
+	
+	case MVN_INV_WISH_PR:
+		{
+			auto omega_inv = invert_matrix(omega);
+			auto tr = diag_sum(omega_inv);
+			return (0.5*N-0.5)*diag_log_sum(omega) - 0.5*(ieg.inv_wish_nu+N+1)*log_det - 0.5*ieg.inv_wish_S*tr;
+		}
+	
 	case MVN_JEF_PR: 
 		{
+			for(auto i = 0u; i < omega.size(); i++){
+				auto val = omega[i][i];
+				if(val > ieg.var_max) return -LARGE;
+			}
+			if(log_det < ieg.log_det_min) return -LARGE;
 			return (0.5*N-0.5)*diag_log_sum(omega)-(0.5*N+0.5)*log_det;
 		}
 		
-	case MVN_UNIFORM_PR: return 0;
+	case MVN_UNIFORM_PR: 
+		for(auto i = 0u; i < omega.size(); i++){
+			auto val = omega[i][i];
+			if(val < ieg.var_min || val > ieg.var_max) return -LARGE;
+		}
+		return 0;
+		
 	default: emsg("opp prob"); break;
 	}
 
@@ -546,25 +653,88 @@ void Model::set_omega_pv()
 			
 			const auto &pri = prior[ieg.prior_ref];
 	
-			auto min = eqn[pri.dist_param[0].eq_ref].calculate_constant();
-			auto max = eqn[pri.dist_param[1].eq_ref].calculate_constant();
+			ieg.log_det_min = UNSET;
+			ieg.lkj_eta = ETA_DEFAULT;
+			ieg.lkj_sd = SD_DEFAULT;
+			ieg.var_min = UNSET;
+			ieg.var_max = UNSET;
+			ieg.inv_wish_S = UNSET;
+			ieg.inv_wish_nu = UNSET;
+			
+			switch(pri.type){
+			case MVN_DEFAULT_PR:
+				break;
+			
+			case MVN_NORM_LKJ_PR:
+				ieg.lkj_sd = eqn[pri.dist_param[0].eq_ref].calculate_constant();
+				ieg.lkj_eta = eqn[pri.dist_param[1].eq_ref].calculate_constant();
+				break;
+			
+			case MVN_UNIFORM_LKJ_PR:
+				ieg.var_min = eqn[pri.dist_param[0].eq_ref].calculate_constant();
+				ieg.var_max = eqn[pri.dist_param[1].eq_ref].calculate_constant();
+				ieg.lkj_eta = eqn[pri.dist_param[2].eq_ref].calculate_constant();
+				break;
+	
+			case MVN_INV_WISH_PR:
+				ieg.inv_wish_S = eqn[pri.dist_param[0].eq_ref].calculate_constant();
+				ieg.inv_wish_nu = eqn[pri.dist_param[1].eq_ref].calculate_constant();
+				break;
 
-			if(min <= 0) alert_input("For the prior '"+pri.name+"' the minumum value '"+tstr(min)+"' must be positive.");
-			
-			if(max <= 0) alert_input("For the prior '"+pri.name+"' the maximum value '"+tstr(max)+"' must be positive.");
-			
-			if(min >= max){
-				alert_input("For the prior '"+pri.name+"' the minumum value '"+tstr(min)+"' is larger than the maximum value '"+tstr(max)+"'.");
+			case MVN_JEF_PR:
+				ieg.log_det_min = eqn[pri.dist_param[0].eq_ref].calculate_constant();
+				ieg.var_max = eqn[pri.dist_param[1].eq_ref].calculate_constant();
+				break;
+				
+			case MVN_UNIFORM_PR:
+				ieg.var_min = eqn[pri.dist_param[0].eq_ref].calculate_constant();
+				ieg.var_max = eqn[pri.dist_param[1].eq_ref].calculate_constant();
+				break;
+				
+			default:
+				emsg("Prior not regonised");
+				break;
+			}
+				 
+			if(ieg.var_min != UNSET){
+				if(ieg.var_min <= 0){
+					alert_input("For the prior '"+pri.name+"' the minumum value '"+tstr(ieg.var_min)+"' must be positive.");
+				}
 			}
 			
-			ieg.log_det_min = N*log(min);
-			ieg.var_max = max;
+			if(ieg.var_max != UNSET){
+				if(ieg.var_max <= 0){
+					alert_input("For the prior '"+pri.name+"' the maximum value '"+tstr(ieg.var_max)+"' must be positive.");
+				}
+			}
+			
+			if(ieg.var_min != UNSET){
+				if(ieg.var_min >= ieg.var_max){
+					alert_input("For the prior '"+pri.name+"' the minumum value '"+tstr(ieg.var_min)+"' is larger than the maximum value '"+tstr(ieg.var_max)+"'.");
+				}
+			}
+			
+			if(ieg.lkj_sd != UNSET){
+				if(ieg.lkj_sd <= 0) alert_input("For the prior '"+pri.name+"' the standard deviation '"+tstr(ieg.lkj_sd)+"' must be positive.");
+			}
+			
+			if(ieg.lkj_eta != UNSET){
+				if(ieg.lkj_eta < 1) alert_input("For the prior '"+pri.name+"' eta '"+tstr(ieg.lkj_eta)+"' must not be less than one.");
+			}
+			
+			if(ieg.inv_wish_S != UNSET){
+				if(ieg.inv_wish_S <= 0) alert_input("For the prior '"+pri.name+"' the scale S '"+tstr(ieg.inv_wish_S)+"' must be positive.");
+			}
+			
+			if(ieg.inv_wish_nu != UNSET){
+				if(ieg.inv_wish_nu <= N+1) alert_input("For the prior '"+pri.name+"' the degrees of freedom '"+tstr(ieg.inv_wish_nu)+"' must be greater than the number of dimentions of the matrix plus one.");
+			}
 			
 			ieg.omega_pv.resize(N);
 			for(auto j = 0u; j < N; j++){
 				ieg.omega_pv[j].resize(N);
 				for(auto i = 0u; i < N; i++){
-					auto val =  par.get_param_vec(j*N+i);
+					auto val = par.get_param_vec(j*N+i);
 					if(j > i) val = par.get_param_vec(i*N+j);
 					if(val == UNSET) emsg("Problem with omega matrix");
 					ieg.omega_pv[j][i] = val;
@@ -1467,6 +1637,7 @@ double Model::prior_sample(const Prior &pri, const vector <double> &precalc) con
 	string warn;
 	
 	switch(pri.type){
+	case MVN_DEFAULT_PR: case MVN_NORM_LKJ_PR: case MVN_UNIFORM_LKJ_PR: case MVN_INV_WISH_PR:
 	case MVN_JEF_PR: case MVN_UNIFORM_PR: case MVN_COR_PR:  // Sampling for this is done collectively
 		return UNSET;
 	
@@ -1643,7 +1814,7 @@ void Model::set_hash_all_ind()
 bool Model::ieg_check_prior_error(const IEGref &iegr, const PV &param_val) const
 {
 	const auto &sp = species[iegr.p];
-	
+
 	const auto &ieg = sp.ind_eff_group[iegr.i];
 	
 	const auto &par = param[ieg.th];
@@ -1652,37 +1823,61 @@ bool Model::ieg_check_prior_error(const IEGref &iegr, const PV &param_val) const
 	
 	auto omega = sp.calculate_omega_basic(iegr.i,param_val,param);
 	
-	auto L = omega.size();
-	for(auto j = 0u; j < L; j++){
-		auto val = omega[j][j]; 
-		if(val > ieg.var_max) return true;
-	}
+	auto N = omega.size();
 	
-	auto det = determinant_fast(omega);
-
-	if(det == UNSET) return true;
-	if(det < ieg.log_det_min) return true;
+	for(auto j = 0u; j < N; j++){
+		auto val = omega[j][j];
+		if(val < VAR_MIN || val > VAR_MAX) return true;
+	}	
+		
+	auto log_det = determinant_fast(omega);
+	if(log_det == UNSET) return true;
 	
-	return false;
-}
+	const auto &pri = prior[ieg.prior_ref];
+	
+	switch(pri.type){
+	case MVN_DEFAULT_PR:
+	case MVN_NORM_LKJ_PR:
+	case MVN_UNIFORM_LKJ_PR:
+		{
+			for(auto j = 0u; j < N; j++){
+				auto val = omega[j][j];
+				if(pri.type == MVN_UNIFORM_LKJ_PR){
+					if(val < ieg.var_min || omega[j][j] > ieg.var_max) return true;
+				}
+			}
 
-/*
-/// Checks that the cholesky matrices can all be specified
-bool Model::ie_cholesky_error(const PV &param_val) const
-{
-	for(auto p = 0u; p < species.size(); p++){
-		const auto &sp = species[p];
-		for(auto g = 0u; g < sp.ind_eff_group.size(); g++){
-			auto omega = sp.calculate_omega_basic(g,param_val,param);
-			auto illegal = false;
-			calculate_cholesky(omega,illegal);
-			if(illegal) return true;
+			auto R = sp.calculate_R(iegr.i,param_val,param);
+			auto log_det = determinant_fast(R);
+			if(log_det == UNSET) return true;
 		}
+		break;
+	
+	case MVN_INV_WISH_PR:
+		break;
+		
+	case MVN_JEF_PR: 
+		{
+			for(auto i = 0u; i < omega.size(); i++){
+				auto val = omega[i][i];
+				if(val > ieg.var_max) return true;
+			}
+			if(log_det < ieg.log_det_min) return true;
+		}
+		break;
+		
+	case MVN_UNIFORM_PR: 
+		for(auto i = 0u; i < omega.size(); i++){
+			auto val = omega[i][i];
+			if(val < ieg.var_min || val > ieg.var_max) return true;
+		}
+		break;
+		
+	default: emsg("opp prob"); break;
 	}
-
+	
 	return false;
 }
-*/
 
 
 /// Prints a set of parameters
@@ -2776,7 +2971,12 @@ bool Model::in_bounds(double x, unsigned int j, const vector <double> &precalc) 
 	case DIST_PARAM: case PRIOR_PARAM:
 		{
 			const auto &pri = prior[pv.prior_ref];
+		
 			switch(pri.type){
+			case MVN_DEFAULT_PR: case MVN_NORM_LKJ_PR: case MVN_UNIFORM_LKJ_PR: case MVN_INV_WISH_PR:
+				if(x < VAR_MIN || x > VAR_MAX) return false;
+				return true;
+				
 			case MVN_JEF_PR: case MVN_UNIFORM_PR: 
 				if(x < TINY) return false;
 				break;
@@ -2886,6 +3086,7 @@ bool Model::is_prior_bounded(unsigned int th) const
 	if(pref == UNSET) return false;
 	
 	switch(prior[param_vec[th].prior_ref].type){
+		// SORT
 	case INVERSE_PR: case UNIFORM_PR: case POWER_PR: case MVN_JEF_PR: case MVN_UNIFORM_PR:
 		return true;	
 		
@@ -3341,7 +3542,7 @@ vector <string> Model::equation_dep(string te, string &warn)
 		cout << te << " Equation" << endl;
 		for(auto de : dep) cout << "," << de;
 		cout << endl;
-		emsg("do");
+		emsg("eqdo");
 	}
 		
 	return dep;

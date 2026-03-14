@@ -31,7 +31,7 @@ Validation::Validation()
 }
 
 /// Sets up a tornado run
-void Validation::tornado_setup(Operation mode, ExtFactor ext_factor, bool no_question, string file, const vector <string> &data_sim_lines, bool test) 
+void Validation::tornado_setup(Operation mode, ExtFactor ext_factor, string file, const vector <string> &data_sim_lines, bool test) 
 {
 	auto nc = num_core();
 	if(nc != 1) run_error("Setup requires only one core");
@@ -347,7 +347,7 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 
 
 /// Sets up a parameter scan
-void Validation::scan_setup(string scan_info, Operation mode, ExtFactor ext_factor, bool no_question, string file, const vector <string> &data_sim_lines, bool test) 
+void Validation::scan_setup(string scan_info, Operation mode, ExtFactor ext_factor, string file, const vector <string> &data_sim_lines, bool test) 
 {
 	auto nc = num_core();
 	if(nc != 1) run_error("Setup requires only one core");

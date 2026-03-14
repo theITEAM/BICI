@@ -2071,8 +2071,12 @@ Prior convert_text_to_prior(string te, unsigned int line_num, string in, bool di
 	if(type == "uniform"){ pri.type = UNIFORM_PR; fl = true;}
 	if(type == "inverse"){ pri.type = INVERSE_PR; fl = true;}
 	if(type == "power"){ pri.type = POWER_PR; fl = true;}
-	if(type == "mvn-jeffreys"){ pri.type = MVN_JEF_PR; fl = true;}
-	if(type == "mvn-uniform"){ pri.type = MVN_UNIFORM_PR; fl = true;}
+	if(type == "covar-default"){ pri.type = MVN_DEFAULT_PR; fl = true;}
+	if(type == "covar-normal-lkj"){ pri.type = MVN_NORM_LKJ_PR; fl = true;}
+	if(type == "covar-uniform-lkj"){ pri.type = MVN_UNIFORM_LKJ_PR; fl = true;}
+	if(type == "covar-inv-wishart"){ pri.type = MVN_INV_WISH_PR; fl = true;}
+	if(type == "covar-jeffreys"){ pri.type = MVN_JEF_PR; fl = true;}
+	if(type == "covar-uniform"){ pri.type = MVN_UNIFORM_PR; fl = true;}
 	if(type == "exp"){ pri.type = EXP_PR; fl = true;}
 	if(type == "normal"){ pri.type = NORMAL_PR; fl = true;}
 	if(type == "gamma"){ pri.type = GAMMA_PR; fl = true;}
@@ -2092,6 +2096,90 @@ Prior convert_text_to_prior(string te, unsigned int line_num, string in, bool di
 
 	switch(pri.type){
 	case MVN_COR_PR: emsg("Correlation not defined"); break;
+	
+	case MVN_DEFAULT_PR:
+		if(!(spl2.size() == 1 && spl2[0] == "")){ pri.error = "Expected no value in the brackets"; return pri;}
+		break;
+		
+	case MVN_NORM_LKJ_PR:
+		{
+			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
+			
+			if(number(spl2[0]) == UNSET){
+				pri.error = "The value '"+spl2[0]+"' must be a number"; return pri;
+			}
+			if(number(spl2[1]) == UNSET){ 
+				pri.error = "The value '"+spl2[1]+"' must be a number"; return pri;
+			}
+			if(number(spl2[0]) < SD_VAR_MIN){  
+				pri.error = "sd cannot be less than "+tstr(SD_VAR_MIN); return pri;
+			}
+			if(number(spl2[0]) > SD_VAR_MAX){  
+				pri.error = "sd cannot be more than "+tstr(SD_VAR_MAX); return pri;
+			}
+			if(number(spl2[1]) < 1){  
+				pri.error = "eta cannot be less than one"; return pri;
+			}
+			if(number(spl2[1]) > ETA_MAX){  
+				pri.error = "eta cannot be more than "+tstr(ETA_MAX); return pri;
+			}
+		}
+		break;
+		
+	case MVN_UNIFORM_LKJ_PR:
+		{
+			if(spl2.size() != 3){ pri.error = "Expected three values in the brackets"; return pri;}
+			
+			if(number(spl2[0]) == UNSET){
+				pri.error = "The value '"+spl2[0]+"' must be a number"; return pri;
+			}
+			if(number(spl2[1]) == UNSET){ 
+				pri.error = "The value '"+spl2[1]+"' must be a number"; return pri;
+			}
+			if(number(spl2[2]) == UNSET){ 
+				pri.error = "The value '"+spl2[2]+"' must be a number"; return pri;
+			}
+			if(number(spl2[0]) < VAR_MIN){  
+				pri.error = "Minimum cannot be less than "+tstr(VAR_MIN); return pri;
+			}
+			if(number(spl2[1]) > VAR_MAX){  
+				pri.error = "Maximum cannot be more than "+tstr(VAR_MAX); return pri;
+			}
+			if(number(spl2[0]) >= number(spl2[1])){  
+				pri.error = "Minimum must be smaller than maximum"; return pri;
+			}
+			if(number(spl2[2]) < 1){  
+				pri.error = "eta cannot be less than one"; return pri;
+			}
+			if(number(spl2[2]) > ETA_MAX){  
+				pri.error = "eta cannot be more than "+tstr(ETA_MAX); return pri;
+			}
+		}
+		break;
+		
+	case MVN_INV_WISH_PR:
+		{
+			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
+			
+			if(number(spl2[0]) == UNSET){
+				pri.error = "The value '"+spl2[0]+"' must be a number"; return pri;
+			}
+			if(number(spl2[1]) == UNSET){ 
+				pri.error = "The value '"+spl2[1]+"' must be a number"; return pri;
+			}
+			if(number(spl2[0]) <= 0){  
+				pri.error = "S must be a positive number"; return pri;
+			}
+			auto num = number(spl2[1]);
+			if(num < 1){  
+				pri.error = "nu cannot be less than one"; return pri;
+			}
+			if(num != (unsigned int)num){
+				pri.error = "nu must be an integer"; return pri;
+			}
+		}
+		break;
+			
 	case INVERSE_PR: case MVN_JEF_PR: case MVN_UNIFORM_PR:
 		{
 			if(spl2.size() != 2){ pri.error = "Expected two values in the brackets"; return pri;}
@@ -2352,7 +2440,10 @@ Prior convert_text_to_prior(string te, unsigned int line_num, string in, bool di
 	case UNSET_PR: emsg("Should not be unset"); break;
 	}
 
+	if(spl2.size() == 1 && spl2[0] == "") return pri;
+
 	for(auto i = 0u; i < spl2.size(); i++){
+		
 		auto ei = add_equation_info(spl2[i],DIST,line_num);
 		if(ei.error){
 			pri.error = ei.emsg;
@@ -2370,11 +2461,24 @@ string get_prior_string(Prior prior)
 {
 	switch(prior.type){
 	case MVN_COR_PR: emsg("Prior not defined"); break;
+	
+	case MVN_DEFAULT_PR:
+		return "covar-default()";
+
+	case MVN_NORM_LKJ_PR:
+		return "covar-normal-lkj("+prior.dist_param[0].te_raw+","+prior.dist_param[1].te_raw+")";
+		
+	case MVN_UNIFORM_LKJ_PR:
+		return "covar-uniform-lkj("+prior.dist_param[0].te_raw+","+prior.dist_param[1].te_raw+","+prior.dist_param[2].te_raw+")";
+		
+	case MVN_INV_WISH_PR:
+		return "covar-inv-wishart-lkj("+prior.dist_param[0].te_raw+","+prior.dist_param[1].te_raw+")";
+		
 	case MVN_JEF_PR:
-		return "mvn-jeffreys("+prior.dist_param[0].te_raw+","+prior.dist_param[1].te_raw+")";
+		return "covar-jeffreys("+prior.dist_param[0].te_raw+","+prior.dist_param[1].te_raw+")";
 	
 	case MVN_UNIFORM_PR:
-		return "mvn-uniform("+prior.dist_param[0].te_raw+","+prior.dist_param[1].te_raw+")";
+		return "covar-uniform("+prior.dist_param[0].te_raw+","+prior.dist_param[1].te_raw+")";
 	
 	case INVERSE_PR:
 		return "inverse("+prior.dist_param[0].te_raw+","+prior.dist_param[1].te_raw+")";
@@ -2715,7 +2819,9 @@ double nm_trans_like(TransType type, double dtdiv, double dt, const vector <doub
 double prior_probability(double x, const Prior &pri, const vector <double> &precalc, const vector <Equation> &eqn)
 {				
 	switch(pri.type){
-	case MVN_JEF_PR: case MVN_UNIFORM_PR: case MVN_COR_PR: // This is done collectively
+	case MVN_DEFAULT_PR: case MVN_NORM_LKJ_PR:  // This is done collectively
+	case MVN_UNIFORM_LKJ_PR: case MVN_INV_WISH_PR:
+	case MVN_JEF_PR: case MVN_UNIFORM_PR: case MVN_COR_PR: 
 		return 0;
 		
 	case INVERSE_PR: 

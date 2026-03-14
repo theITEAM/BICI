@@ -1054,7 +1054,7 @@ function get_prior_output(save_type,pri,variety,par)
 	if(save_type == "inf" && par){	
 		let dist = true; if(variety == "prior") dist = false;
 		let pri = convert_text_to_prior(st,par.pri_pos,dist);
-		
+	
 		if(pri.err == true){
 			add_warning({mess:"Error for "+variety, mess2:"The "+variety+" for parameter "+par.full_name+" has an error: "+pri.msg, warn_type:"ErrorPriorValue", name:par.name});
 		}

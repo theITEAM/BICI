@@ -69,9 +69,9 @@ param name="μ^w" value="0.2" prior="uniform(-0.5,0.5)"
 
 param name="β_s" value="value-beta.csv" prior="uniform(0,1)"
 
-param name="Ω^env_z,z'" value="value-Omega^env.csv" prior="mvn-uniform(0.01,4)"
+param name="Ω^env_z,z'" value="value-Omega^env.csv" prior="covar-default()"
 
-param name="Ω^gen_z,z'" value="value-Omega^gen.csv" prior="mvn-uniform(0.01,4)"
+param name="Ω^gen_z,z'" value="value-Omega^gen.csv" prior="covar-default()"
 
 
 

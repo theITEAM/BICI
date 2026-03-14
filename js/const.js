@@ -13,7 +13,7 @@ let ver="windows";         // Determines platform
 
 let mac_temp_dir = "/tmp/BICI_files/";
 
-let win_linux = false;//true;                             // When working on win running linux 
+let win_linux = true;                             // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
@@ -23,15 +23,13 @@ let load_map_fast = false;                        // If loads up world map from 
 let make_one_chain = false;                       // Make into one chain (for diagnostic purposes)
 
 if(win_linux || false){ testing = true; debug = true; load_map_fast = true;}
-//testing = true;
-//if(win_linux){ testing = true; debug = true; load_map_fast = true;}
-//if(true){ testing = true; debug = true;};
 
 let make_file = false;                            // Determines if makes file or runs
 let thick_line = false;                           // Used for making figures
 let big_eqn = false;
 const graph_dia = false;                          // Used to diagnose problems with graphs
 const test_comment = false;                       // Used when checking help comments are correct 
+
 const make_fig = false;                           // Sets editor to make figures for manual
 // Here the leters A-H are pressed to add letters to the screen.
 // "Home" is used to print the page
@@ -268,7 +266,8 @@ const exp_dist_pos = ["exp(rate)","exp(mean)","erlang"];
 const source_dist_pos = ["exp(rate)","exp(mean)"];
 const prior_pos = ["inverse","uniform","power","exp","normal","gamma","log-normal","beta","bernoulli","fix"];
 const prior_factor_pos = ["mdir"];
-const prior_cv_pos = ["mvn-jeffreys","mvn-uniform"];
+const prior_cv_pos = ["covar-default","covar-normal-lkj","covar-uniform-lkj","covar-inv-wishart"];
+//,"covar-jeffreys","covar-uniform"
 const prior_pos_positive = ["inverse","uniform","power","exp","gamma","log-normal","fix"];
 
 const data_types = ["Init. Cond.", "Individual", "Population", "Additional"];
@@ -424,6 +423,11 @@ const PARAM_STAT_MAX = 1000;                       // Maximum number of paramete
 const NODE_PLOT_MAX = 1000;                        // Maximum number nodes is phylogenetic tree
 const SCRIPT_LINE_MAX = 1000;                      // The maximum number of script lines to show
 
+const VAR_MAX = 5.0;                               // Maximum variance for individual effect matrix
+const VAR_MIN = 0.0001;                            // Maximum variance for individual effect matrix
+const ETA_DEFAULT = 1.2;                           // Default value for eta (in LKJ distribution)
+const SD_DEFAULT = 2;                              // Default value for SD (in LKJ distribution)
+
 const ELE_REDUCE_FAC = 0.7;                        // Factor reduction when too many elements
 const TABLE_ROW_MAX = 10000;                       // The maximum number of rows displayed on a table
 
@@ -548,12 +552,12 @@ const VTINY = 0.00000000000001;                    // A very tiny number
 const ALMOST_ONE = 0.9999999;                      // Denotes almost one
 const ELEMENT_MAX = 1000;                          // The maximum number of elements which can be displayed
 const PARAM_LIST_MAX = 1000;                       // The maximum number of parameters on list
-const HASH_INIT = 10;//000;                           // The value used for the hash tables
+const HASH_INIT = 10;                              // The value used for the hash tables
 const HASH_ENLARGE_SIZE = 4;                       // Factor hash table enlarges 
 const HASH_OCC_THRESH = 0.5;                       // Threshold above which hash table enlarges
 const H_BIN = 10;                                  // Used for distributions in cumulative prob
 
-const COR_MAX = 0.9;                               // Maximum correlation for individual effects
+const COR_MAX = 0.99;                              // Maximum correlation for individual effects
 
 const SIM_NUM_DEFAULT = 1;                         // The default simulation number
 const PPC_NUM_DEFAULT = 200;                       // The default number of ppc simulation
@@ -597,6 +601,9 @@ const NOLINE = 0, THINLINE = 0.5, NORMLINE = 1, MEDIUMLINE = 1.5, THICKLINE = 2,
 
 const SD_MIN = TINY;                         // The minimum value for sd
 const SD_MAX = LARGE;                        // The maximum value for sd
+const SD_VAR_MIN = VAR_MIN;                  // The minimum value for sd for covar matrix
+const SD_VAR_MAX = 3;                        // The maximum value for sd for covar matrix
+const ETA_MAX = 100;                         // The maximum value for eta in LKJ
 const CV_MIN = 0.01;                         // The minimum value for cv
 const CV_MAX = 10.0;                         // The maximum value for cv
 const MEAN_MIN = VTINY;                      // The minimum for dist mean

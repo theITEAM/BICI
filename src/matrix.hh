@@ -17,6 +17,7 @@ vector <double> matrix_mult(const vector <double> &vec, const vector < vector <d
 vector < vector <double> > matrix_mult(const vector < vector <double> > &M1, const vector < vector <double> > &M2);
 vector < vector <double> > calculate_cholesky(const vector < vector <double> > &M, bool &illegal);
 double diag_log_sum(const vector < vector <double> > &a);
+double diag_sum(const vector < vector <double> > &a);
 double determinant_fast(const vector < vector <double> > &a);
 double determinant_sparse(const vector < vector <double> > &a);
 void add_mat_element(unsigned int i, vector <double> &Mjj, vector <unsigned int> &M_elejj,  vector <unsigned int> &M_mapjj);
@@ -29,4 +30,6 @@ vector <double> sample_mvn(const vector < vector <double> > &Z);
 void tidy(vector < vector <double> > &M);
 vector < vector <double> > create_two_by_two(const vector < vector <double> > &M, unsigned int i, unsigned int j);
 double largest_eigenvalue(const vector < vector <double> > &M, vector <double> &vec);
+vector < vector <double> > inv_wishart_sample(double S, unsigned int nu, unsigned int N);
+vector < vector <double> > LKJ_sample(double eta, unsigned int N);;
 

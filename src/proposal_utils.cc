@@ -207,6 +207,7 @@ void Proposal::update_sampler(const CorMatrix &cor_matrix)
 	}
 }
 
+
 /// Samples from the covariance matrix
 double Proposal::param_resample(PV &param_val, const vector < vector <double> > &popnum_t)
 {
@@ -218,7 +219,6 @@ double Proposal::param_resample(PV &param_val, const vector < vector <double> > 
 	auto &precalc = param_val.precalc;
 	
 	auto ps_fac = 0.0;
-	
 	for(auto i = 0u; i < N; i++){
 		auto j = param_list[i];
 		param_val.value_change(j);
@@ -235,7 +235,6 @@ double Proposal::param_resample(PV &param_val, const vector < vector <double> > 
 			switch(pri.type){
 			case INVERSE_PR: 
 			case POWER_PR:
-			// case MVN_JEF_PR: case MVN_UNIFORM_PR:
 				{
 					ps_fac += dv;
 					value[j] *= exp(dv);
@@ -292,6 +291,7 @@ double Proposal::param_resample(PV &param_val, const vector < vector <double> > 
 		if(model.ieg_check_prior_error(ieg_ref,param_val)){
 			param_val.restore(); 
 			timer[PARAM_RESAMPLE_TIMER] += clock();
+			
 			return UNSET;
 		}
 	}

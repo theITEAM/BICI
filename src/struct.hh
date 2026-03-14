@@ -392,7 +392,12 @@ struct IEgroup {                   // Stores information about a group of indivi
 	unsigned int prior_ref;          // References the prior forMVN distribution 
 	vector < vector <unsigned int> > omega_pv;// Matrix of param_vec values 
 	double log_det_min;              // The minimum for the determinant
-	double var_max;                  // The Maximum for the variance
+	double lkj_eta;                  // Used for LKJ distribution
+	double lkj_sd;                   // Standard deviation used for half-normal distribution    
+	double var_min;                  // The minimum for the variance
+	double var_max;                  // The maximum for the variance
+	double inv_wish_S;               // S for inv-Wishart
+	double inv_wish_nu;              // nu for inv-Wishart
 	unsigned int line_num;           // Stores the line number the equation comes from
 	bool ppc_resample;               // Determines if individual effects resampled 
 	vector <unsigned int> markov_eqn_ref;  // Indexes any Markov equations involving ies
@@ -2073,7 +2078,20 @@ struct TagRange {
 	unsigned int endi;
 };
 
-struct ObsVisit {          // Used for construting genetic matrix data
+struct ObsVisit {                        // Used for construting genetic matrix data
 	unsigned int m;
 	unsigned int sum;
+};
+
+struct IndInfect {                       // Used for generating genetic data      
+	IndInfectType type;
+	double t;
+	unsigned int p;
+	unsigned int i;
+};
+
+struct InfEnter {                        // Used for generating genetic data    
+	unsigned int p;
+	unsigned int i;
+	double t;
 };

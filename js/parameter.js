@@ -972,7 +972,23 @@ function add_distribution_eqn(dist,vari,par_list,eqn_info,warn,op)
 		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn,op);
 		break;
 		
-	case "mvn-jeffreys": case "mvn-uniform":
+	case "covar-normal-lkj": 
+		add_ele_param(val.sd_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.eta_eqn.te,vari,par_list,eqn_info,warn,op);
+		break;
+		
+	case "covar-uniform-lkj": 
+		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.eta_eqn.te,vari,par_list,eqn_info,warn,op);
+		break;
+		
+	case "covar-inv-wishart":
+		add_ele_param(val.S_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.nu_eqn.te,vari,par_list,eqn_info,warn,op);
+		break;
+		
+	case "covar-jeffreys": case "covar-uniform":
 		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn,op);
 		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn,op);
 		break;
@@ -1508,7 +1524,7 @@ function generate_co_list(list)
 function unset_prior(par_type)
 {
 	var eb = {te:"", type:"prior", mode:"param only"};
-	var value = {min_eqn:copy(eb), max_eqn:copy(eb), mean_eqn:copy(eb), power_eqn:copy(eb), shape_eqn:copy(eb), cv_eqn:copy(eb), sd_eqn:copy(eb), alpha_eqn:copy(eb), beta_eqn:copy(eb), sigma_eqn:copy(eb)};
+	var value = {min_eqn:copy(eb), max_eqn:copy(eb), mean_eqn:copy(eb), power_eqn:copy(eb), shape_eqn:copy(eb), cv_eqn:copy(eb), sd_eqn:copy(eb), alpha_eqn:copy(eb), beta_eqn:copy(eb), sigma_eqn:copy(eb), eta_eqn:{te:"1", type:"prior",  mode:"param only"}, S_eqn:{te:"1", type:"prior", mode:"param only"}, nu_eqn:copy(eb)};
 	
 	let te = select_str;
 	

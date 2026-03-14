@@ -976,12 +976,17 @@ function add_bubble_buts(lay)
 				ac = "DoneCompPrior";
 			}
 			else{
+				pp = model.param[bu.i].pri_pos;
+				
 				switch(bu.type){
 				case "PriorElement": case "PriorSplitElement":
 					{
 						ac = "DonePrior";
 						let te = editprior_text;
-					
+						if(bu.type == "PriorElement" && pp[0] == "covar-default"){
+							te = editcovarprior_text;
+						}
+						
 						bubble_addtitle(cont,"Edit prior",{te:te});
 						
 						if(bu.type == "PriorSplitElement") ac = "DonePriorSplit";
@@ -997,8 +1002,6 @@ function add_bubble_buts(lay)
 				
 				default: error("Option not recognised 1A"); break;
 				}
-
-				pp = model.param[bu.i].pri_pos;
 			}
 			
 			let pos=[]; 
@@ -1014,6 +1017,8 @@ function add_bubble_buts(lay)
 			
 			let min_fl = false, max_fl = false, mean_fl = false;
 			let sd_fl = false, cv_fl = false, alpha_fl = false, beta_fl = false; 
+			let eta_fl = false;              // Used for LKJ
+			let S_fl = false, nu_fl = false; // Used for Wishart
 		
 			cont.y += 0.2;
 			switch(inter.bubble.prior.type.te){
@@ -1022,15 +1027,37 @@ function add_bubble_buts(lay)
 				mean_fl = true; 
 				break;
 			
-			case "mvn-jeffreys":		
-				bubble_input(cont,"Min:",{type:str+"min", val:bu.i, eqn:ae});
-				bubble_input(cont,"Max:",{type:str+"max", val:bu.i, eqn:ae});
+			case "covar-default":
+				break;
+				
+			case "covar-normal-lkj":
+				bubble_input(cont,"sd:",{type:str+"sd_covar", val:bu.i, eqn:ae});
+				bubble_input(cont,"eta:",{type:str+"eta", val:bu.i, eqn:ae});
+				sd_fl = true; eta_fl = true; 
+				break;
+				
+			case "covar-uniform-lkj":
+				bubble_input(cont,"min:",{type:str+"min_covar", val:bu.i, eqn:ae});
+				bubble_input(cont,"max:",{type:str+"max_covar", val:bu.i, eqn:ae});
+				bubble_input(cont,"eta:",{type:str+"eta", val:bu.i, eqn:ae});
+				min_fl = true; max_fl = true; eta_fl = true; 
+				break;
+				
+			case "covar-inv-wishart":
+				bubble_input(cont,"S:",{type:str+"S", val:bu.i, eqn:ae});
+				bubble_input(cont,"nu:",{type:str+"nu", val:bu.i, eqn:ae});
+				S_fl = true; nu_fl = true;
+				break;
+				
+			case "covar-jeffreys":		
+				bubble_input(cont,"Determinant min:",{type:str+"min", val:bu.i, eqn:ae});
+				bubble_input(cont,"Variance max:",{type:str+"max", val:bu.i, eqn:ae});
 				min_fl = true; max_fl = true; 
 				break;
 				
-			case "mvn-uniform":		
-				bubble_input(cont,"Min:",{type:str+"min", val:bu.i, eqn:ae});
-				bubble_input(cont,"Max:",{type:str+"max", val:bu.i, eqn:ae});
+			case "covar-uniform":		
+				bubble_input(cont,"Variance min:",{type:str+"min", val:bu.i, eqn:ae});
+				bubble_input(cont,"Variance max:",{type:str+"max", val:bu.i, eqn:ae});
 				min_fl = true; max_fl = true; 
 				break;
 			
@@ -1131,6 +1158,10 @@ function add_bubble_buts(lay)
 			
 			if(beta_fl == false){
 				bubble_input(cont,"",{hidden:true, type:str+"beta", val:bu.i, eqn:ae});
+			}
+			
+			if(eta_fl == false){
+				bubble_input(cont,"",{hidden:true, type:str+"eta", val:bu.i, eqn:ae});
 			}
 			
 			add_end_button(cont,"Done",ac);	

@@ -415,7 +415,7 @@ function data_update_rename_compartment(p,cl,old_name,new_name)
 						let cl_sel = find(sp.cla,"name",so.spec.cl_drop.te);
 						let filt = so.spec.filter;
 						if(cl_sel == cl){
-							for(let j = 0; j < claa.ntra; j++){
+							for(let j = 0; j < filt.tra.length; j++){
 								let tr_name = filt.tra[j].tra_name_store;
 								tr_name = convert_transition_name(tr_name,old_name,new_name);
 								filt.tra[j].tra_name_store = tr_name;

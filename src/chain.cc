@@ -494,23 +494,26 @@ void BurnInfo::set_phi()
 	prior_bounded = phi;
 	spline_prior = 1;
 	dist = 1;
-	//markov = phi;
 	markov = 1;
-	//nm_trans = phi;	
 	nm_trans = 1;
-	//genetic_process = phi;
 	genetic_process = 1;
 	genetic_obs = phi;
-	ie = 1;//phi;
+	ie = 1;
 	
-	/*
-	if(s < nburnin){
-		auto fr = 1.2*double(s)/nburnin;
-		if(fr > 1) fr = 1;
-		genetic_obs = pow(fr,4);
+	if(false){
+		init_cond = 0;
+		init_cond_prior = 0;
+		obs = 0;
+		prior = 1;
+		prior_bounded = 1;
+		spline_prior = 1;
+		dist = 0;
+		markov = 0;
+		nm_trans = 0;
+		genetic_process = 0;
+		genetic_obs = 0;
+		ie = 1;
 	}
-	else genetic_obs = 1;
-	*/
 }
 
 

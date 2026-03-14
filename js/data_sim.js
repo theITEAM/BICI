@@ -1043,44 +1043,63 @@ function get_ind_times(t_start,t_end,so,samp,hash,ind_list)
 	
 	case "Data":
 		{
-			let sel = so.sel_data;
-			let gen_so = model.sim_res.plot_filter.species[sel.p].gen_source[sel.i];
-			
-			switch(gen_so.type){
-			case "Compartment": case "Transition": case "Diag. Test":
-				{
-					let ele = gen_so.table.ele;
-					for(let r = 0; r < ele.length; r++){
-						let ro = ele[r];
-						let id = ro[0];
-						let t = ro[1];
+			// TURN OFF
+			if(true){ // SORT This just puts observations after events
+				for(let p = 0; p < samp.species.length; p++){
+					let sosp = samp.species[p];
+					for(let i = 0; i < sosp.individual.length; i++){
+						let ind = sosp.individual[i];
+						//pr("ind");
+						//pr(ind);
+						if(ind.cinit == 1) ind_times[p][i].push(TINY);
 						
-						let j = hash.find(id);
-						if(j == undefined) alertp("Should not be undefined");
-						else{
-							let il = ind_list[j];
-							let tf = Number(t);
-							if(isNaN(tf)){
-								if(t == "start") tf = t_start;
-								else{
-									if(t == "end") tf = t_end;
-									else{
-										alertp("Not a number");
-									}
-								}
-							}
-							if(gen_so.type == "Transition") tf += TINY;
-							ind_times[il.p][il.i].push(tf);
-						}
+						for(let e = 0; e < ind.ev.length; e++){
+							ind_times[p][i].push(ind.ev[e].t+TINY);
+							break;
+						}						
 					}
 				}
-				break;
-				
-			default:
-				alert_help("Cannot used this data source");
-				break;
 			}
-		}			
+			else{
+				let sel = so.sel_data;
+				let gen_so = model.sim_res.plot_filter.species[sel.p].gen_source[sel.i];
+			
+				switch(gen_so.type){
+				case "Compartment": case "Transition": case "Diag. Test":
+					{
+						let ele = gen_so.table.ele;
+						for(let r = 0; r < ele.length; r++){
+							let ro = ele[r];
+							let id = ro[0];
+							let t = ro[1];
+							
+							let j = hash.find(id);
+							if(j == undefined) alertp("Should not be undefined");
+							else{
+								let il = ind_list[j];
+								let tf = Number(t);
+								if(isNaN(tf)){
+									if(t == "start") tf = t_start;
+									else{
+										if(t == "end") tf = t_end;
+										else{
+											alertp("Not a number");
+										}
+									}
+								}
+								if(gen_so.type == "Transition") tf += TINY;
+								ind_times[il.p][il.i].push(tf);
+							}
+						}
+					}
+					break;
+					
+				default:
+					alert_help("Cannot used this data source");
+					break;
+				}
+			}			
+		}
 		break;	
 	}
 	

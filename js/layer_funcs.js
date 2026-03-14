@@ -1364,11 +1364,20 @@ function copy_back_to_source2(tbs)
 	case "label_size": inter.bubble.label.size = te; break;
 	case "label_anno": model.species[so.p].cla[so.cl].annotation[so.i].te = te; break;
 	case "label_anno_size": model.species[so.p].cla[so.cl].annotation[so.i].size = te; break;
-	case "prior_min": case "prior_dist_min": 
+	case "prior_min": case "prior_min_covar": case "prior_dist_min": 
 		inter.bubble.prior.value.min_eqn.te = te; 
 		break;
-	case "prior_max": case "prior_dist_max": 
+	case "prior_max": case "prior_max_covar": case "prior_dist_max": 
 		inter.bubble.prior.value.max_eqn.te = te; 
+		break;
+	case "prior_eta": 
+		inter.bubble.prior.value.eta_eqn.te = te; 
+		break;
+	case "prior_S": 
+		inter.bubble.prior.value.S_eqn.te = te; 
+		break;
+	case "prior_nu": 
+		inter.bubble.prior.value.nu_eqn.te = te; 
 		break;
 	case "prior_power": case "prior_dist_power": 
 		inter.bubble.prior.value.power_eqn.te = te; 
@@ -1379,7 +1388,7 @@ function copy_back_to_source2(tbs)
 	case "prior_shape": case "prior_dist_shape": 
 		inter.bubble.prior.value.shape_eqn.te = te; 
 		break;
-	case "prior_sd": case "prior_dist_sd": 
+	case "prior_sd": case "prior_dist_sd": case "prior_sd_covar":
 		inter.bubble.prior.value.sd_eqn.te = te; 
 		break;
 	case "prior_cv": case "prior_dist_cv": 
@@ -1570,6 +1579,11 @@ function check_param_or_number(te,type)
 		
 	if(!isNaN(te)){
 		let val = Number(te);
+			
+		if(type == "gtone"){
+			if(val < 1) warn = "Cannot be less than one."; 
+		}
+		
 		if(type == "zeroone"){
 			if(val < 0 || val > 1) return "Value must be in the range 0 to 1";
 		}
@@ -1954,21 +1968,53 @@ function check_error_textbox2(tbs)
 				warn = check_posinteger(te);
 				break;
 			
-			case "prior_min": case "prior_max": case "prior_mean": case "prior_max":
+			case "prior_min": case "prior_max": case "prior_mean":
 				switch(bub.prior.type.te){
 				case "exp": case "gamma": case "log-normal": warn = check_posnumber(te); break;
 				case "normal": warn = check_number(te); break;
 				case "uniform": warn = check_number(te); break;
 				case "inverse": warn = check_posnumber(te); break;
 				case "power": warn = check_posnumber(te); break;
-				case "mvn-jeffreys": warn = check_posnumber(te); break;
-				case "mvn-uniform": warn = check_posnumber(te); break;
+				case "covar-uniform-lkj": warn = check_posnumber(te); break;
+				case "covar-jeffreys": warn = check_posnumber(te); break;
+				case "covar-uniform": warn = check_posnumber(te); break;
 				case "fix": warn = check_number(te); break;
 				case "bernoulli": warn = check_zeroone(te); break;
 				default: error("option problem"); break;
 				}
 				break;
 			
+			case "prior_min_covar":
+				warn = check_posnumber(te);
+				if(warn == ""){
+					if(Number(te) < VAR_MIN) warn = "Cannot be less than "+VAR_MIN;
+				}
+				break;
+				
+			case "prior_max_covar": 
+				warn = check_posnumber(te);
+				if(warn == ""){
+					if(Number(te) > VAR_MAX) warn = "Cannot be more than "+VAR_MAX;
+				}
+				break;
+				
+			case "prior_eta":
+				warn = check_posnumber(te);
+				if(!isNaN(te)){
+					let num = Number(te);
+					if(num < 1) warn = "Cannot be less than one."; 
+					if(num > ETA_MAX) warn = "Cannot be greater than one."; 
+				}
+				break;
+				
+			case "prior_S":
+				warn = check_posnumber(te);
+				break;
+				
+			case "prior_nu":
+				warn = check_posinteger(te);
+				break;
+				
 			case "prior_alpha": warn = check_posnumber(te); break;
 
 			case "prior_beta": warn = check_posnumber(te); break;
@@ -1979,10 +2025,19 @@ function check_error_textbox2(tbs)
 				warn = check_posnumber(te);
 				break;
 				
+			case "prior_sd_covar":
+				if(isNaN(te)) warn = "Not a number";
+				else{
+					let num = Number(te);
+					if(num < SD_VAR_MIN) warn = "Cannot be less than "+SD_VAR_MIN;
+					if(num > SD_VAR_MAX) warn = "Cannot be more than "+SD_VAR_MAX;
+				}
+				break;
+				
 			case "prior_dist_min": case "prior_dist_max": case "prior_dist_power": 
 				warn = check_param_or_number(te);			
 				break;
-				
+			
 			case "prior_dist_mean":
 				warn = check_param_or_number(te);			
 				break;

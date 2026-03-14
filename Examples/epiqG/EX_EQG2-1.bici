@@ -56,12 +56,12 @@ param name="Ω^gen_z,z'" value="[[
 fa,ga
 2,0.3
 .,1
-]]" prior="mvn-jeffreys(0.01,3)"
+]]" prior="covar-default()"
 
 param name="Ω^env_z,z'" value="[[
 fe,ge
 1,0.4
 .,1
-]]" prior="mvn-jeffreys(0.01,3)"
+]]" prior="covar-default()"
 
 

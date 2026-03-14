@@ -728,6 +728,36 @@ vector < vector <double> > Species::calculate_omega_basic(unsigned int g, const 
 }	
 
 
+/// Calculate the R matrix for LKJ distribution
+vector < vector <double> > Species::calculate_R(unsigned int g, const PV &param_val, const vector <Param> &param) const
+{
+	const auto &ieg = ind_eff_group[g];		
+	const auto &par = param[ieg.th];
+	vector < vector <double> > R;
+	
+	if(par.variety == CONST_PARAM) emsg("Should not be constant");
+	
+	auto N = ieg.list.size();
+
+	const auto &value = param_val.value;
+
+	R.resize(N);
+	for(auto j = 0u; j < N; j++) R[j].resize(N);
+
+	for(auto j = 0u; j < N; j++){
+		for(auto i = 0u; i < N; i++){
+			if(i == j) R[j][i] = 1;
+			else R[j][i] = value[ieg.omega_pv[j][i]];
+		}
+	}
+
+	//print_matrix("R",R);
+	//emsg("do");
+	
+	return R;
+}	
+
+
 /// Converts correlations to variances
 void Species::convert_cor_var(vector < vector <double> > &omega) const
 {

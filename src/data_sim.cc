@@ -1738,7 +1738,6 @@ void DataSim::ind_group_data_sim(unsigned int p, Table &tab)
 /// Simulates genetic data
 void DataSim::genetic_data_sim(const State &state, Table &tab)
 {
-	//error("Genetic data not yet implemented");
 	auto type = get_tag_value("type"); if(type == ""){ cannot_find_tag(); return;}
 			
 	auto gen_data_type = GenDataType(option_error("type",type,{"snp","matrix"},{ SNP_DATA, MATRIX_DATA}));
@@ -1751,131 +1750,134 @@ void DataSim::genetic_data_sim(const State &state, Table &tab)
 	}
 	auto SNP_root = root;
 	
+	auto nbp_str = get_tag_value("nbp"); 
+	if(type == "snp"){
+		if(nbp_str == ""){ cannot_find_tag(); return;}
+	}
+	auto nbp = number(nbp_str);
+	if(nbp == UNSET || nbp < 0 || nbp != (int)(nbp)){
+		error("'nbp' must be a non-negative integer");
+	}
+	
 	auto mut_rate_str = get_tag_value("mut-rate"); if(mut_rate_str == ""){ cannot_find_tag(); return;}
 	auto mut_rate = number(mut_rate_str);
-	if(mut_rate == UNSET || mut_rate < 0) error("The mutation rate must be a non-negative number");
+	if(mut_rate == UNSET || mut_rate < 0) error("'mut-rate' must be a non-negative number");
 	mut_rate *= model.details.dt;
 
 	auto seq_var_str = get_tag_value("seq-var"); if(seq_var_str == ""){ cannot_find_tag(); return;}
 	auto seq_var = number(seq_var_str);
-	if(seq_var == UNSET || seq_var < 0) error("The sequence variation must be a non-negative number");
-
+	if(seq_var == UNSET || seq_var < 0) error("'seq-var' must be a non-negative number");
+	
+	auto fr = get_frac();
+	auto tims = get_times();
+	for(auto &va : tims) va = model.calc_tdiv(va);
+	
+	auto ind_times = get_ind_times(tims,state);
+	
 	switch(gen_data_type){
-	case SNP_DATA: simulate_genetic_snp(mut_rate,seq_var,SNP_root,state,tab); break;
-	case MATRIX_DATA: simulate_genetic_matrix(mut_rate,seq_var,state,tab); break;
+	case SNP_DATA: simulate_genetic_snp(fr,mut_rate,seq_var,nbp,SNP_root,ind_times,state,tab); break;
+	case MATRIX_DATA: simulate_genetic_matrix(fr,mut_rate,seq_var,ind_times,state,tab); break;
 	}
 }
 
 
 /// Simulates genetic snp data 
-void DataSim::simulate_genetic_snp(double mut_rate, double seq_var, string SNP_root, const State &state, Table &tab) const
+void DataSim::simulate_genetic_snp(double fr, double mut_rate, double seq_var, unsigned int N, string SNP_root, const vector < vector < vector <double> > > &ind_times, const State &state, Table &tab)
 {
-	cout << mut_rate << seq_var <<" " << SNP_root << state.T << " " << tab.nrow << endl;
-	/*
-	let result = sim_result;
+	cout << mut_rate << seq_var <<" " << N << " " <<  SNP_root << " " << state.T << " " << tab.nrow << endl;
 	
-	let mu = so.spec.mut_rate_eqn.te;
-	if(isNaN(mu)){ alert_help("The mutation rate must be a number"); return;}
-	mu = Number(mu);
+	tab.heading.push_back("ID");
+	tab.heading.push_back("t");
+	for(auto i = 0u; i < N; i++) tab.heading.push_back(SNP_root+tstr(i+1));
 	
-	let seq_var = so.spec.seq_var_eqn.te;
-	if(isNaN(seq_var) ){ alert_help("The sequence variation must be a non-negative number"); return;}
-	seq_var = Number(seq_var);
-	if(seq_var < 0){ alert_help("The sequence variation must be a non-negative number"); return;}
-	
-	let N = so.numbp;
-	let f = so.frac_obs;
-
-	head.push("ID");
-	head.push("t");
-	for(let i = 0; i < N; i++) head.push(so.spec.snp_root+(i+1));
-	
-	let samp = result.sample[0];
-
-	// Makes a hash table of individuals
-	let hash = new Hash();
-	
-	let ind_list = [];
-	for(let p = 0; p < samp.species.length; p++){
-		let sosp = samp.species[p];
-		for(let i = 0; i < sosp.individual.length; i++){
-			let ind = sosp.individual[i];
-	
-			let name = ind.name;
-			let j = hash.find(name);
-			if(j == undefined){
-				j = ind_list.length;
-				hash.add(name,ind_list.length);
-				ind_list.push({name:name, p:p, i:i});
-			}
-		}
-	}
-	
-	let ind_times = get_ind_times(t_start,t_end,so,samp,hash,ind_list);
-	
-	let ref_seq = [];
-	for(let j = 0; j < N; j++){
-		ref_seq.push(Math.floor(4*Math.random()));
+	vector <unsigned int> ref_seq;
+	for(auto j = 0u; j < N; j++){
+		ref_seq.push_back((unsigned int)(4*ran()));
 	}
 	
 	// Generates timelines in which an individual infects another 
-	let ind_infect=[];
-	for(let p = 0; p < samp.species.length; p++){
-		ind_infect[p]=[];
-		let indi = samp.species[p].individual;
-		for(let i = 0; i < indi.length; i++){
-			ind_infect[p][i]=[];
-		}
+	vector < vector < vector <IndInfect> > > ind_infect;
+	ind_infect.resize(model.species.size());
+	for(auto p = 0u; p < model.species.size(); p++){
+		const auto &indi = state.species[p].individual;
+		ind_infect[p].resize(indi.size());
 	}
 	
+	
 	// Makes a list of when infection enters from outside the system
-	let inf_enter = [];
-	for(let p = 0; p < samp.species.length; p++){
-		let sp = result.species[p];
-		let indi = samp.species[p].individual;
-		for(let i = 0; i < indi.length; i++){
-			let ind = indi[i];
-			let c = ind.cinit;
-			if(c != OUT && c != SOURCE && sp.comp_gl[c].infected == true){
-				inf_enter.push({p:p, i:i, t:t_start});
-			}
+	vector <InfEnter> inf_enter;
+	/*
+	for(auto p = 0u; p < model.species.size(); p++){
+		const auto &ssp = state.species[p];
+		const auto &indi = state.species[p].individual;
+		for(auto i = 0u; i < indi.size(); i++){
+			const auto &ind = indi[i];
+			const auto &ev = ind.ev[0];
+
+
+			//ind_inf_from
+			//auto c = ind.cinit;
+			//if(c != OUT && c != SOURCE && sp.comp_gl[c].infected == true){
+				//inf_enter.push({p:p, i:i, t:t_start});
+			//}
 		}
 	}
+	*/
 
-	for(let p = 0; p < samp.species.length; p++){	
-		let indi = samp.species[p].individual;
+/*
+	for(auto p = 0u; p < model.species.size(); p++){	
+		const auto &indi = state.species[p].individual;
 		
-		let sp = result.species[p];
-		let tra_gl = sp.tra_gl;
-		let comp_gl = sp.comp_gl;
+		const auto &sp = model.species[p];
+		const auto &tra_gl = sp.tra_gl;
+		const auto &comp_gl = sp.comp_gl;
 		
-		for(let i = 0; i < indi.length; i++){
-			let ev = indi[i].ev;
-			let c = indi[i].cinit; 
-			let inf_flag = false;
-			if(c != OUT && c != SOURCE && comp_gl[c].infected == true) inf_flag = true;
-				
-			for(let e = 0; e < ev.length; e++){
-				c = c_after_event(ev[e],sp);
-				let infe = ev[e].infection;
+		for(auto i = 0u; i < indi.size(); i++){
+			const auto &ev = indi[i].ev;
+			auto c = UNSET; 
+			auto inf_flag = false;
+			
+			for(auto e = 0u; e < ev.size(); e++){
+				c = ev[e].c_after;
+				auto infe = ev[e].infection;
 				if(infe){
 					if(comp_gl[c].infected != true) error("Should be infected");
 					if(inf_flag != false) error("Already infected");
 					inf_flag = true;	
 					
 					if(infe.p == OUTSIDE_INF){
-						inf_enter.push({p:p, i:i, t:ev[e].t});
+						InfEnter ie; ie.p = p; ie.i = i; ie.t = ev[e].tdiv;
+						inf_enter.push_back(ie);
 					}
 					else{
-						ind_infect[p][i].push({type:"infected", t:ev[e].t});  
+						{
+							IndInfect ii;
+							ii.type = IND_INFECTED;
+							ii.t = ev[e].tdiv;
+							ii.p = UNSET;
+							ii.i = UNSET;
+							ind_infect[p][i].push(ii);  
+						}
 					
-						ind_infect[infe.p][infe.i].push({type:"infect", t:ev[e].t, p:p, i:i}); 
+						{
+							IndInfect ii;
+							ii.type = IND_INFECT;
+							ii.t = ev[e].t;
+							ii.p = p;
+							ii.i = i;
+							ind_infect[infe.p][infe.i].push_back(ii); 
+						}
 					}
 				}
 				else{
 					if(inf_flag == true){		
-						if(c == OUT || c == SOURCE || c == SINK || comp_gl[c].infected != true){ 
-							ind_infect[p][i].push({type:"recovery", t:ev[e].t});  
+						if(c == UNSET || comp_gl[c].infected != true){ 
+							IndInfect ii;
+							ii.type = IND_RECOVERY;
+							ii.t = ev[e].tdiv;
+							ii.p = UNSET;
+							ii.i = UNSET;
+							ind_infect[p][i].push_back(ii);  
 							inf_flag = false;
 						}
 					}
@@ -1883,7 +1885,8 @@ void DataSim::simulate_genetic_snp(double mut_rate, double seq_var, string SNP_r
 			}
 		}
 	}
-	
+	*/
+	/*
 	// Orders ind_infect
 	for(let p = 0; p < samp.species.length; p++){
 		for(let i = 0; i < ind_infect[p].length; i++){
@@ -1933,33 +1936,15 @@ void DataSim::simulate_genetic_snp(double mut_rate, double seq_var, string SNP_r
 
 
 /// Simulates matrix of genetic differences
-void DataSim::simulate_genetic_matrix(double mut_rate, double seq_var, const State &state, Table &tab)
-{
-	auto fr = get_frac();
-	auto tims = get_times();
-	for(auto &va : tims) va = model.calc_tdiv(va);
-	
+void DataSim::simulate_genetic_matrix(double fr, double mut_rate, double seq_var, const vector < vector < vector <double> > > &ind_times, const State &state, Table &tab)
+{	
 	auto t_start = model.calc_tdiv(model.details.t_start);
 	auto t_end = model.calc_tdiv(model.details.t_end);
 	
 	auto gv = state.genetic_value;
 	
 	auto &inf_node = gv.inf_node;
-	
 
-	// Makes a list of all individuals
-	vector <IndList> ind_list;
-	for(auto p = 0u; p < model.species.size(); p++){
-		const auto &ssp = state.species[p];
-		
-		for(auto i = 0u; i < ssp.individual.size(); i++){
-			IndList il; il.p = p; il.i = i;
-			ind_list.push_back(il);
-		}
-	}
-
-	auto ind_times = get_ind_times(tims,ind_list,state);
-	
 	// Adds in observations
 	vector <ObsGeneticData> obs;
 	
@@ -2215,8 +2200,19 @@ bool DataSim::wildcard_match2(const string &name, const vector <string> &spl, bo
 
 
 /// Gets timepoints 
-vector < vector < vector <double> > > DataSim::get_ind_times(const vector <double> &tims, const vector <IndList> &ind_list, const State &state) const
+vector < vector < vector <double> > > DataSim::get_ind_times(const vector <double> &tims, const State &state) const
 {
+	// Makes a list of all individuals
+	vector <IndList> ind_list;
+	for(auto p = 0u; p < model.species.size(); p++){
+		const auto &ssp = state.species[p];
+		
+		for(auto i = 0u; i < ssp.individual.size(); i++){
+			IndList il; il.p = p; il.i = i;
+			ind_list.push_back(il);
+		}
+	}
+
 	vector < vector < vector <double> > > ind_times;
 	
 	ind_times.resize(model.nspecies);

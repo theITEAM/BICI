@@ -479,6 +479,16 @@ double diag_log_sum(const vector < vector <double> > &a)
 }
 
 
+/// Sums up the log of the diagonal elements
+double diag_sum(const vector < vector <double> > &a)
+{
+	auto sum = 0.0;
+	for(auto i = 0u; i < a.size(); i++) sum += a[i][i];
+	return sum;
+}
+
+
+
 /// Performs LU decomposition to return the log of the determinant
 // LU decomposition converts into a lower and an upper triagular matrix
 double determinant_fast(const vector < vector <double> > &a)
@@ -751,3 +761,131 @@ double largest_eigenvalue(const vector < vector <double> > &M, vector <double> &
 	return ev;
 }
 
+/// Samples from the chi-squared distribution
+double chi_squared_sample(unsigned int n)
+{
+	string warn;
+	
+	vector <double> vec;
+	for(auto i = 0u; i < n; i++){
+		vec.push_back(normal_sample(0,1,warn));
+	}
+	auto mean = sum(vec)/n;
+
+	auto v = 0.0;
+	for(auto i = 0u; i < n; i++){
+		v += (vec[i]-mean)*(vec[i]-mean);
+	}
+	
+	return v;
+}
+
+
+/// Samples from the inverse wishart 
+vector < vector <double> > inv_wishart_sample(double S, unsigned int nu, unsigned int N)
+{
+	auto loopmax = 1000u;
+	for(auto loop = 0u; loop < loopmax; loop++){
+		vector < vector <double> > A;
+	
+		A.resize(N);
+		for(auto i = 0u; i < N; i++) A[i].resize(N,0);
+		
+		string warn;
+		for(auto j = 0u; j < N; j++){
+			A[j][j] = sqrt(chi_squared_sample(nu-j+1));
+			for(auto i = 0u; i < j; i++){
+				A[j][i] = normal_sample(0,1,warn);
+			}
+		}
+		
+		auto AT = transpose(A);
+		
+		auto M = matrix_mult(A,AT);
+		
+		//print_matrix("M",M);
+		
+		auto invM = invert_matrix(M);
+		
+		auto ill = false;
+		for(auto j = 0u; j < N; j++){
+			for(auto i = 0u; i < N; i++){
+				invM[j][i] *= S;
+			}
+			if(invM[j][j] < VAR_MIN || invM[j][j] > VAR_MAX){
+				ill = true;
+			}
+		}
+		
+		if(ill == false) return invM;
+	}
+	
+	run_error("The Wishart distribution could not be sampled from");
+	vector < vector <double> > A;
+	return A;
+}
+	
+	
+/// Samples from the LKJ distribution
+// This is taken from 3.2 in https://www.sciencedirect.com/science/article/pii/S0047259X09000876#sec3
+vector < vector <double> > LKJ_sample(double eta, unsigned int N)
+{
+	vector < vector <double> > r;
+	r.resize(N);
+	for(auto j = 0u; j < N; j++) r[j].resize(N,0);
+	
+	if(N == 1){
+		r[0][0] = 1;
+		return r;
+	}
+	
+	string warn;
+	
+	auto beta = eta+(N-2)/2.0;
+	auto u = beta_sample(beta,beta,warn);
+	auto r12 = 2*u-1;
+	r[0][0] = 1; r[0][1] = r12;
+	r[1][0] = r12; r[1][1] = 1;
+	
+	for(auto k = 2u; k < N; k++){
+		beta = beta-0.5;
+		auto y = beta_sample(0.5*k,beta,warn);
+		
+		vector <double> u(k);
+		auto sum = 0.0;
+		for(auto j = 0u; j < k; j++){
+			u[j] = normal_sample(0,1,warn);
+			sum += u[j]*u[j];
+		}
+		sum = sqrt(sum);
+		for(auto j = 0u; j < k; j++) u[j] /= sum;
+			
+		auto v = sqrt(y);
+		auto w = u;
+		for(auto j = 0u; j < k; j++) w[j] *= v;
+		
+		bool illegal = false;
+		
+		vector < vector <double> > B;
+		B.resize(k);
+		for(auto j = 0u; j < k; j++){
+			B[j].resize(k);
+			for(auto i = 0u; i < k; i++){
+				B[j][i] = r[j][i];
+			}
+		}
+		
+		auto A = calculate_cholesky(B,illegal);
+		if(illegal) emsg("Problem with LKJ sampling");
+		
+		auto z = matrix_mult(A,w);
+	
+		r[k][k] = 1;
+		for(auto i = 0u; i < k; i++){
+			r[i][k] = z[i];
+			r[k][i] = z[i];
+		}
+	}
+	
+	return r;
+}

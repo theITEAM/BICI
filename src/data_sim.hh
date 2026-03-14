@@ -48,11 +48,11 @@ class DataSim                              // Simulates data from state
 		void ind_effect_data_sim(unsigned int p, const State &state, Table &tab);
 		void ind_group_data_sim(unsigned int p, Table &tab);
 		void genetic_data_sim(const State &state, Table &tab);
-		void simulate_genetic_snp(double mut_rate, double seq_var, string SNP_root, const State &state, Table &tab) const;
-		void simulate_genetic_matrix(double mut_rate, double seq_var, const State &state, Table &tab);
+		void simulate_genetic_snp(double fr, double mut_rate, double seq_var, unsigned int N, string SNP_root, const vector < vector < vector <double> > > &ind_times, const State &state, Table &tab);
+		void simulate_genetic_matrix(double fr, double mut_rate, double seq_var, const vector < vector < vector <double> > > &ind_times, const State &state, Table &tab);
 		bool wildcard_match(const string &name, string filt) const;
 		bool wildcard_match2(const string &name, const vector <string> &spl, bool root) const;
-		vector < vector < vector <double> > > get_ind_times(const vector <double> &tims, const vector <IndList> &ind_list, const State &state) const;
+		vector < vector < vector <double> > > get_ind_times(const vector <double> &tims, const State &state) const;
 		void print_inf_node(const vector <InfNode> &inf_node, const State &state) const;
 		
 		bool sup;                              // Determines if output is supressed

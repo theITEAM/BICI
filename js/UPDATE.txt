@@ -1,24 +1,14 @@
 GRANT
-- Got 'Gaussian' model to work.
-- Correct bug when clicking on individual timelines under inference.
 
 LAURA
 
 CHRIS
-- Got simulation of genetic data in core code working. 
-- Corrected bug that made all splines types the same in the interface.
-- Corrected problem with visualisation of timelines in interface.
-- Corrected problem with source description with transitions names with superscripts.
-- Improved speed to unescaping charaters in interface.
-- Made the loading percentage in the interface more "smooth" when loading BICI files.
-- Stop multiple warning message when running multiple chains in interface.
-- Corrected examples (not working in v0.83): D3.4, D2.6, GE1.1
-- Error message when trying to simulation initial population for individual-based models.
-- Correction to wildcard filtering of individuals.
-- Made hash tables in interface faster and extendable (to reduce memory footprint).
-- Resized inteface to show all examples (if screen large enough)
+- Corrected bug when loading multiple instances of fixed effect in model
 
 JAMIE
+
+- Updated Appendix F with a description of the new covariance priors
+- Updated help files in the software
 
  
 

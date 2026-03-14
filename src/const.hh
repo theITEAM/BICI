@@ -1,4 +1,4 @@
-/// Stores constant values used and enumerated types
+﻿/// Stores constant values used and enumerated types
 
 #pragma once
 
@@ -104,7 +104,7 @@ enum TransVariety { NORMAL, SOURCE_TRANS, SINK_TRANS };
 enum Operation { SIM, INF, PPC, EXT, DATA_SIM, DATA_SHOW, DATA_DEL, DATA_CLEAR, TORNADO_SETUP, TORNADO_RESULT, SCAN_SETUP, SCAN_RESULT, MODE_UNSET };
 
 // Different prior possibilities
-enum PriorPos { INVERSE_PR, UNIFORM_PR, POWER_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, DIRICHLET_PR, MDIR_PR, MVN_JEF_PR, MVN_UNIFORM_PR, MVN_COR_PR, UNSET_PR };
+enum PriorPos { INVERSE_PR, UNIFORM_PR, POWER_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, DIRICHLET_PR, MDIR_PR, MVN_DEFAULT_PR, MVN_NORM_LKJ_PR, MVN_UNIFORM_LKJ_PR, MVN_INV_WISH_PR, MVN_JEF_PR, MVN_UNIFORM_PR, MVN_COR_PR, UNSET_PR };
  
 // Different possible command types
 enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, DEFINE, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, IC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, PROPOSAL_INFO, INF_PARAM_STATS, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, SIM_WARNING, INF_WARNING, PPC_WARNING,
@@ -307,6 +307,8 @@ enum ParamType { PARAM_NORMAL, PARAM_DERIVE, PARAM_PRESET};
 	
 enum Compress { ALWAYS_COMPRESS, NEVER_COMPRESS, AUTO_COMPRESS};
 
+enum IndInfectType { IND_INFECT, IND_INFECTED, IND_RECOVERY};
+	
 /************************** Numeric constants ******************************/
 
 const auto ERR_MSG_MAX = 5u;                     // The maximum number of error messages
@@ -390,7 +392,15 @@ const double DIF_THRESH = 0.0000001;              // The threshold for a differe
 const double THRESH_EXPAND = 100;                 // Expand threshold for certain quantities
 const double DIF_THRESH_BURNIN = 0.001;           // The threshold during burnin
 const unsigned int RANGE_MIN = 50;                // Minimum number to calc M
-const double COR_MAX = 0.9;                       // Maximum correlation for individual effects
+const double COR_MAX = 0.99;                       // Maximum correlation for individual effects
+const double VAR_MAX = 5.0;                       // Maximum variance for individual effect matrix
+const double VAR_MIN = 0.0001;                    // Maximum variance for individual effect matrix
+const double ETA_DEFAULT = 1.2;                   // Default value for eta (in LKJ distribution)
+const double SD_DEFAULT = 2;                      // Default value for SD (in LKJ distribution)
+const double SD_VAR_MIN = VAR_MIN;                // The minimum value for sd for covar matrix
+const double SD_VAR_MAX = 3;                      // The maximum value for sd for covar matrix
+const double ETA_MAX = 10;                        // The maximum value for eta in LKJ
+
 
 const unsigned int H_BIN = 10;                    // Used for distributions in cumulative prob
 

@@ -98,11 +98,23 @@ function get_prior_string(prior)
 	case "uniform":
 		return "uniform("+prior.value.min_eqn.te+","+prior.value.max_eqn.te+")";
 	
-	case "mvn-jeffreys":
-		return "mvn-jeffreys("+prior.value.min_eqn.te+","+prior.value.max_eqn.te+")";
+	case "covar-default":
+		return "covar-default()";
 	
-	case "mvn-uniform":
-		return "mvn-uniform("+prior.value.min_eqn.te+","+prior.value.max_eqn.te+")";
+	case "covar-normal-lkj":
+		return "covar-normal-lkj("+prior.value.sd_eqn.te+","+prior.value.eta_eqn.te+")";
+	
+	case "covar-uniform-lkj":
+		return "covar-uniform-lkj("+prior.value.min_eqn.te+","+prior.value.max_eqn.te+","+prior.value.eta_eqn.te+")";
+	
+	case "covar-inv-wishart":
+		return "covar-inv-wishart("+prior.value.S_eqn.te+","+prior.value.nu_eqn.te+")";
+	
+	case "covar-jeffreys":
+		return "covar-jeffreys("+prior.value.min_eqn.te+","+prior.value.max_eqn.te+")";
+	
+	case "covar-uniform":
+		return "covar-uniform("+prior.value.min_eqn.te+","+prior.value.max_eqn.te+")";
 	
 	case "inverse":
 		return "inverse("+prior.value.min_eqn.te+","+prior.value.max_eqn.te+")";
@@ -308,9 +320,73 @@ function convert_text_to_prior(te,pri_pos,dist)
 		}
 		break;
 	
-	case "mvn-jeffreys":
+	case "covar-default":
 		{
-			let wa = ". The multivariate Jeffreys prior should have the format 'mvn-jeffreys(min,max)'";
+			let wa = ". This prior should have the format 'covar-default()'";
+			if(!(spl2.length == 1 && spl2[0] == "")) return err(start+"expected no values in the brackets"+wa);
+		}
+		break;
+		
+	case "covar-normal-lkj":
+		{
+			let wa = ". This should have the format 'covar-normal-lkj(sd,eta)'";
+			
+			if(spl2.length != 2) return err(start+"expected two values in the brackets"+wa);
+		
+			if(isNaN(spl2[0])) return err(start+"'"+spl2[0]+"' is not a number"+wa);
+			if(isNaN(spl2[1])) return err(start+"'"+spl2[1]+"' is not a number"+wa);
+			if(Number(spl2[0]) < SD_VAR_MIN) return err(start+"sd cannot be less than "+SD_VAR_MIN+wa);
+			if(Number(spl2[0]) > SD_VAR_MAX) return err(start+"sd cannot be more than "+SD_VAR_MAX+wa);
+			if(Number(spl2[1]) < 1) return err(start+"eta cannot be less than one"+wa);
+			if(Number(spl2[1]) > ETA_MAX) return err(start+"eta cannot be more than "+ETA_MAX+wa);
+			
+			pri.value.sd_eqn.te = spl2[0];
+			pri.value.eta_eqn.te = spl2[1];
+		}
+		break;
+		
+	case "covar-uniform-lkj":
+		{
+			let wa = ". The multivariate uniform LKJ prior should have the format 'covar-uniform-lkj(min,max,eta)'";
+			
+			if(spl2.length != 3) return err(start+"expected three values in the brackets"+wa);
+			
+			if(isNaN(spl2[0])) return err(start+"'"+spl2[0]+"' is not a number"+wa);
+			if(isNaN(spl2[1])) return err(start+"'"+spl2[1]+"' is not a number"+wa);
+			if(isNaN(spl2[2])) return err(start+"'"+spl2[2]+"' is not a number"+wa);
+			if(Number(spl2[0]) < VAR_MIN) return err(start+"minimum cannot be less than "+VAR_MIN+wa);
+			if(Number(spl2[1]) > VAR_MAX) return err(start+"maximum cannot be more than "+VAR_MAX+wa);
+			if(Number(spl2[0]) >= Number(spl2[1])) return err(start+"minimum must be smaller than maximum"+wa);
+			if(Number(spl2[2]) < 1) return err(start+"eta cannot be less than one"+wa);
+			if(Number(spl2[2]) > ETA_MAX) return err(start+"eta cannot be more than "+ETA_MAX+wa);
+	
+			pri.value.min_eqn.te = spl2[0];
+			pri.value.max_eqn.te = spl2[1];
+			pri.value.eta_eqn.te = spl2[2];
+		}
+		break;
+		
+	case "covar-inv-wishart":
+		{
+			let wa = ". This should have the format 'covar-inv-wishart(sd,eta)'";
+			
+			if(spl2.length != 2) return err(start+"expected two values in the brackets"+wa);
+			
+			if(isNaN(spl2[0])) return err(start+"'"+spl2[0]+"' is not a number"+wa);
+			if(isNaN(spl2[1])) return err(start+"'"+spl2[1]+"' is not a number"+wa);
+			if(Number(spl2[0]) <= 0) return err(start+"S must be positive"+wa);
+			
+			let num = Number(spl2[1]);
+			if(num <= 0) return err(start+"nu must be positive"+wa);
+			if(num != Math.floor(num)) err(start+"nu must be an integer"+wa);
+			pri.value.S_eqn.te = spl2[0];
+			pri.value.nu_eqn.te = spl2[1];
+		}
+		break;
+		
+	case "covar-jeffreys":
+		{
+			let wa = ". The multivariate Jeffreys prior should have the format 'covar-jeffreys(min,max)'";
 			
 			if(spl2.length != 2) return err(start+"expected two values in the brackets"+wa);
 			if(dist == true){
@@ -339,9 +415,9 @@ function convert_text_to_prior(te,pri_pos,dist)
 		}
 		break;
 		
-	case "mvn-uniform":
+	case "covar-uniform":
 		{
-			let wa = ". The multivariate uniform prior should have the format 'mvn-uniform(min,max)'";
+			let wa = ". The multivariate uniform prior should have the format 'covar-uniform(min,max)'";
 			
 			if(spl2.length != 2) return err(start+"expected two values in the brackets"+wa);
 			if(dist == true){
@@ -655,7 +731,8 @@ function invalid_prior()
 	let bubpri = inter.bubble.prior;
 
 	switch(bubpri.type.te){
-	case "uniform": case "inverse": case "power": case "mvn-jeffreys": case "mvn-uniform":
+	case "uniform": case "inverse": case "power": 
+	case "covar-jeffreys": case "covar-uniform-lkj": case "covar-uniform":
 		if(Number(bubpri.value.max_eqn.te) <= (Number(bubpri.value.min_eqn.te))){
 			set_warning("Must be larger than minimum value",["prior_max","prior_dist_max"]);
 			return true;

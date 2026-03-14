@@ -49,7 +49,6 @@ void CorMatrix::add_sample(vector <double> param_val_pr, unsigned int range)
 			switch(pri.type){
 			case INVERSE_PR:
 			case POWER_PR: 
-			//case MVN_JEF_PR: case MVN_UNIFORM_PR: 
 				param_val_pr[i] = log(param_val_pr[i]);
 				break;
 			default: break;

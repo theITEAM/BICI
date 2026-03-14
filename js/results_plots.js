@@ -5265,7 +5265,7 @@ function setup_distribution(result,rpf,burn)
 		if(line.length > 1) show_mean = false;
 
 		let clip = get_prior_clip(par,ind);
-		
+	
 		distribution_add_data_line(vec,line[li].name,col,data,key,rpf,show_mean,clip.min,clip.max);
 		if(key.length > KEY_LINE_MAX){ line_max = true; break;}
 	}
@@ -5300,9 +5300,65 @@ function setup_distribution(result,rpf,burn)
 			}
 			break;
 		
-		case "mvn-jeffreys": case "mvn-uniform":
+		case "covar-jeffreys": case "covar-uniform": case "covar-inv-wishart":
 			break;
+		
+		case "covar-default": case "covar-normal-lkj": case "covar-uniform-lkj": 
+			if(ind[0] == ind[1]){ // Diagonal element
+				if(pri.type.te == "covar-uniform-lkj"){
+					let min = Number(pri.value.min_eqn.te);
+					let max = Number(pri.value.max_eqn.te);
+					point.push({x:min, y:0});
+					point.push({x:min, y:1.0/(max-min)});
+					point.push({x:max, y:1.0/(max-min)});
+					point.push({x:max, y:0});
+				}
+				else{
+					let mean = 0;
+					let sd;
+					if(pri.type.te == "covar-default") sd = SD_DEFAULT;
+					else sd = Number(pri.value.sd_eqn.te);
+					
+					let min = 0;
+					let max = mean + 5*sd;
+					if(max > VAR_MAX) max = VAR_MAX;
+					
+					point.push({x:min, y:0});
+					for(let i = 0; i <= N; i++){
+						let x = min + i*(max-min)/N;
+						let prob = 2*Math.exp(-0.5*Math.log(2*Math.PI*sd*sd) - (x-mean)*(x-mean)/(2*sd*sd));
+						point.push({x:x, y:prob});
+					}
+					if(max == VAR_MAX) point.push({x:max, y:0});
+				}
+			}
+			else{  // Non-diagonal elements	
+				let eta = Number(pri.value.eta_eqn.te);
 			
+				let alpha = eta-1+0.5*par.dim[0];
+				let beta = alpha;
+			
+				let d = 1-COR_MAX;
+				let min = 0+d/2, max = 1-d/2;
+				let min2 = -1+d, max2 = 1-d;
+					
+				let sum = 0.0;
+				let prob = [];
+				for(let i = 0; i < N; i++){
+					let x = min + (i+0.5)*(max-min)/N;
+					
+					prob[i] = Math.exp((alpha-1)*Math.log(x) + (beta-1)*Math.log(1-x));
+			
+					sum += prob[i];
+				}
+				let fac = sum*(max2-min2)/N;
+				
+				point.push({x:min2, y:0});
+				for(let i = 0; i < N; i++) point.push({x:min2 + (i+0.5)*(max2-min2)/N, y:prob[i]/fac});	
+				point.push({x:max2, y:0});
+			}
+			break;
+		
 		case "inverse":
 			{	
 				let min = Number(pri.value.min_eqn.te);
@@ -5476,9 +5532,7 @@ function setup_distribution(result,rpf,burn)
 
 /// Gets clipped edges based on a parameter prior
 function get_prior_clip(par,ind)
-{
-	let clip_min, clip_max;
-		
+{//zz	
 	if(par.variety != "reparam" && par.variety != "define" && par.variety != "likelihood" && par.prior){
 		let pri;
 		if(par.dep.length > 0 && par.prior_split_set == true) pri = get_element(par.prior_split,ind);
@@ -5487,9 +5541,17 @@ function get_prior_clip(par,ind)
 		switch(pri.type.te){
 		case "uniform": 
 			return {min:Number(pri.value.min_eqn.te), max: Number(pri.value.max_eqn.te)};
+		
+		case "covar-default": case "covar-normal-lkj": case "covar-inv-wishart":
+			if(ind[0] == ind[1]) return {min:0, max:VAR_MAX};
+			return {min:-COR_MAX, max:COR_MAX};
+		
+		case "covar-uniform-lkj":
+			if(ind[0] == ind[1]) return {min:Number(pri.value.min_eqn.te), max: Number(pri.value.max_eqn.te)};
+			return {min:-COR_MAX, max:COR_MAX};
 			
-		case "mvn-jeffreys": case "mvn-uniform":
-			return {min:undefined, max:undefined};
+		case "covar-jeffreys": case "covar-uniform":
+			return {min:0, max:VAR_MAX};
 		
 		case "inverse": case "power":
 			return {min:Number(pri.value.min_eqn.te), max: Number(pri.value.max_eqn.te)};

@@ -166,6 +166,7 @@ class Species   	                         // Stores details of a species
 		vector <unsigned int> get_cv_list(unsigned int ie, const vector <Param> &param, const vector <Equation> &eqn) const;
 		vector < vector <double> > calculate_omega_const(unsigned int g, const vector <Param> &param) const;
 		vector < vector <double> > calculate_omega_basic(unsigned int g, const PV &param_val, const vector <Param> &param) const;
+		vector < vector <double> > calculate_R(unsigned int g, const PV &param_val, const vector <Param> &param) const;
 		void convert_cor_var(vector < vector <double> > &omega) const;
 		unsigned int tr_trans(unsigned int trg, unsigned int c) const;
 		unsigned int get_comp_global_convert(unsigned int cgl, unsigned int cl, unsigned int c) const;

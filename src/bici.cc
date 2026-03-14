@@ -134,13 +134,13 @@ int main(int argc, char** argv)
 	
 	print_diag("start bici");
 	
-	//mvn_jeffreys_check(); return 0; 
-
-
+	
 	print_diag("start sum");
 	
 	init_log_sum();
 	
+	//mvn_prior_check(); return 0;
+	//mvn_jeffreys_check(); return 0; 
 	//test_jeffreys(); return 0;
 	//solve_cubic_spline_test(); return 0;
 	//test_distribution(); return 0; 
@@ -167,7 +167,7 @@ int main(int argc, char** argv)
 	case TORNADO_SETUP:
 		{
 			Validation valid;
-			valid.tornado_setup(mode,ext_factor,no_question,file,data_sim_lines,test);
+			valid.tornado_setup(mode,ext_factor,file,data_sim_lines,test);
 		}
 		return 0;
 		
@@ -181,7 +181,7 @@ int main(int argc, char** argv)
 	case SCAN_SETUP:
 		{
 			Validation valid;
-			valid.scan_setup(scan_info,mode,ext_factor,no_question,file,data_sim_lines,test);
+			valid.scan_setup(scan_info,mode,ext_factor,file,data_sim_lines,test);
 		}
 		return 0;
 		

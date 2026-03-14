@@ -12,9 +12,9 @@ class Validation                                // Stores information about the 
 {
 	public:
 		Validation();
-		void tornado_setup(Operation mode, ExtFactor ext_factor, bool no_question, string file, const vector <string> &data_sim_lines, bool test);
+		void tornado_setup(Operation mode, ExtFactor ext_factor, string file, const vector <string> &data_sim_lines, bool test);
 		void tornado_result(Operation mode, ExtFactor ext_factor, bool no_question, string file);
-		void scan_setup(string scan_info, Operation mode, ExtFactor ext_factor, bool no_question, string file, const vector <string> &data_sim_lines, bool test);
+		void scan_setup(string scan_info, Operation mode, ExtFactor ext_factor, string file, const vector <string> &data_sim_lines, bool test);
 		void scan_result(string scan_info, Operation mode, ExtFactor ext_factor, bool no_question, string file);
 		
 	private:
