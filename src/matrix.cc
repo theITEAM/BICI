@@ -812,7 +812,7 @@ vector < vector <double> > inv_wishart_sample(double S, unsigned int nu, unsigne
 			for(auto i = 0u; i < N; i++){
 				invM[j][i] *= S;
 			}
-			if(invM[j][j] < VAR_MIN || invM[j][j] > VAR_MAX){
+			if(invM[j][j] <= VAR_MIN || invM[j][j] > VAR_MAX){
 				ill = true;
 			}
 		}

@@ -21,6 +21,7 @@ Model::Model(Operation mode_, ExtFactor ext_factor_, bool no_question_) : precal
 	no_question = no_question_;
 	sync_on = true;
 	nspecies = 0;
+	genetic_data.on = false;
 };
 
 
@@ -406,6 +407,58 @@ PV Model::post_param(const Sample &samp) const
 }
 
 
+/// Create a store for ie effects
+IEstore Model::post_ie_store(const Sample &samp) const
+{
+	IEstore ie_store;
+	
+	const auto &ind_key = ind_key_store[samp.ind_key_ref];
+	
+	for(auto p = 0u; p < nspecies; p++){
+		const auto &sp = species[p];
+		
+		IEstoreSpecies iess;
+		iess.on = true;
+		const auto &tab = samp.species[p].ind_tab;
+		auto N = tab.nrow;
+		auto nie = sp.ind_effect.size();
+		
+		iess.ie_value.resize(N);
+		for(auto i = 0u; i < N; i++){
+			iess.ie_value[i].resize(nie,UNSET);
+		}
+	
+		vector <unsigned int> ie_col;
+		for(auto i = 0u; i < sp.ind_effect.size(); i++){
+			ie_col.push_back(find_in(tab.heading,sp.ind_effect[i].name));
+		}
+		
+		for(auto r = 0u; r < N; r++){
+			const auto &row = tab.ele[r];
+			
+			auto n = number(row[0]);
+			if(n == UNSET) emsg("Cannot find ind_key");
+				
+			auto name = ind_key[n];
+			iess.hash.add(r,name);
+			
+			for(auto i = 0u; i < nie; i++){
+				auto c = ie_col[i];
+				if(c != UNSET){
+					auto n = number(row[c]);
+					if(n == UNSET) emsg("IE is not a number");
+					iess.ie_value[r][i] = n;
+				}
+			}
+		}
+		
+		ie_store.species.push_back(iess);
+	}
+	
+	return ie_store;
+}
+
+
 /// Determines if a set of parameters is within the bounds of the prior
 bool Model::inbounds(const PV &param_val) const
 {
@@ -544,7 +597,7 @@ double Model::prior_ieg_calculate(const IEGref &iegr, const PV &param_val) const
 
 	for(auto j = 0u; j < N; j++){
 		auto val = omega[j][j];
-		if(val < VAR_MIN || val > VAR_MAX) return -LARGE;
+		if(val <= VAR_MIN || val > VAR_MAX) return -LARGE;
 	}	
 		
 	auto log_det = determinant_fast(omega);
@@ -1827,7 +1880,7 @@ bool Model::ieg_check_prior_error(const IEGref &iegr, const PV &param_val) const
 	
 	for(auto j = 0u; j < N; j++){
 		auto val = omega[j][j];
-		if(val < VAR_MIN || val > VAR_MAX) return true;
+		if(val <= VAR_MIN || val > VAR_MAX) return true;
 	}	
 		
 	auto log_det = determinant_fast(omega);
@@ -2974,7 +3027,7 @@ bool Model::in_bounds(double x, unsigned int j, const vector <double> &precalc) 
 		
 			switch(pri.type){
 			case MVN_DEFAULT_PR: case MVN_NORM_LKJ_PR: case MVN_UNIFORM_LKJ_PR: case MVN_INV_WISH_PR:
-				if(x < VAR_MIN || x > VAR_MAX) return false;
+				if(x <= VAR_MIN || x > VAR_MAX) return false;
 				return true;
 				
 			case MVN_JEF_PR: case MVN_UNIFORM_PR: 
@@ -3574,7 +3627,9 @@ unsigned int Model::find_cl(unsigned int p, string name) const
 bool Model::data_mode() const 
 {
 	switch(mode){
-	case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: return true;
+	case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: 
+	case COMPRESS: case DECOMPRESS:
+		return true;
 	default: break;
 	}
 	
@@ -3586,7 +3641,9 @@ bool Model::data_mode() const
 bool Model::no_process() const 
 {
 	switch(mode){
-	case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: return true;
+	case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: 
+	case COMPRESS: case DECOMPRESS:
+		return true;
 	default: break;
 	}
 	

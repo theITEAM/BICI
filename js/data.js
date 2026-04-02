@@ -627,6 +627,19 @@ function add_data_buts(lay,siminf)
 		break;
 
 	case "Additional":
+		if(siminf == "gen"){	
+			let param = model.sim_res.param; 
+			let active = false;
+			for(let i = 0; i < model.param.length; i++){
+				let par = model.param[i];
+				if(param_pos(par,"priorconst")) active = true;
+			}
+	
+			let te = const_prior_text, ti = "Create constant prior";
+			w = model.add_object_button(lay,"Const. Prior",x,y,"ConstPriorData",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
+			x += w+gap;
+		}
+		
 		active = true; if(sp.type != "Individual") active = false;	
 		
 		{

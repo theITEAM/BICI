@@ -627,7 +627,7 @@ function camera_command()
 	claa.camera.set = true;
 	
 	claa.camera.scale = scale;
-
+	
 	switch(claa.camera.coord){
 	case "cartesian":
 		let x = get_tag_value("x"); if(x == "") cannot_find_tag();
@@ -1481,6 +1481,7 @@ function param_command2(full_name,line,op)
 	let reparam = get_tag_value("reparam"); 
 	let prior = get_tag_value("prior"); 
 	let prior_split = get_tag_value("prior-split"); 
+	let prior_const = get_tag_value("prior-const"); 
 	let fw = get_tag_value("factor-weight");
 	
 	if(fw != ""){
@@ -1505,14 +1506,17 @@ function param_command2(full_name,line,op)
 	param_tag.push({val:reparam, tag:"reparam"});
 	param_tag.push({val:prior, tag:"prior"});
 	param_tag.push({val:prior_split, tag:"prior-split"});
+	param_tag.push({val:prior_const, tag:"prior-const"});
 	
 	for(let j = 0; j < param_tag.length; j++){
 		for(let i = j+1; i < param_tag.length; i++){
 			let ptvj = param_tag[j];
 			let ptvi = param_tag[i];
 			if(ptvj.val != "" && ptvi.val != ""){
-				if(!(ptvj.tag == "value" && (ptvi.tag == "prior" || ptvi.tag == "prior-split" ||
-   				ptvi.tag == "dist" || ptvi.tag == "dist-split"))){
+				if(!(ptvj.tag == "value" && (ptvi.tag == "prior" || ptvi.tag == "prior-split" || ptvi.tag == "prior-const" || ptvi.tag == "dist" || ptvi.tag == "dist-split")) && 
+				   !(ptvi.tag == "value" && (ptvj.tag == "prior" || ptvj.tag == "prior-split" || ptvj.tag == "prior-const" || ptvj.tag == "dist" || ptvj.tag == "dist-split")) && 
+					 ptvi.tag != "prior-const" && ptvj.tag != "prior-const"   
+					 ){
 					alert_import("'"+ptvj.tag+"' and '"+ptvi.tag+"' cannot both be set"); 
 				}
 			}
@@ -1667,6 +1671,21 @@ function param_command2(full_name,line,op)
 		let desc = "For 'dist-split'";
 		load_param_value(par,par.prior_split,"Dist",dist_split,desc,load_dpt);
 		load_dpt = 0;
+	}
+	
+	if(prior_const != ""){
+		par.prior_const_on = true;
+		
+		if(par.dep.length == 0){
+			par.prior_const = prior_const;
+		}
+		else{
+			par.prior_const = param_blank(par);
+			
+			let desc = "For 'prior-const'";
+			load_param_value(par,par.prior_const,"Value",prior_const,desc,load_dpt);
+			par.prior_const_set = true;
+		}
 	}
 	
 	let sim_sample = get_tag_value("sim-sample").toLowerCase(); 
@@ -1996,6 +2015,8 @@ function post_sim_command()
 		details.resample = resample.split(","); 		
 		details.line = imp.line;	
 	}
+	
+	set_compress_option(details);
 }
 
 

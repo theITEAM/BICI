@@ -17,14 +17,23 @@ function create_edit_param(lay)
 	let	load_title = "Load tensor values", load_te = load_tensor_text;
 	let load_ac = "LoadTensor";
 	
-	if(inter.edit_param.type == "weight"){
+	switch(inter.edit_param.type){
+	case "PriorConst":
+		title = "Edit constant prior values";
+		help = editpriorconst_text;
+		doneac = "EditPriorConstDone";
+		load_title = "Load const values";
+		load_te = load_prior_const_text;
+		break;
+		
+	case "weight":
 		title = "Edit tensor weights";
 		help = edittensorweight_text;
 		doneac = "EditWeightDone";
 		load_title = "Load weight values";
 		load_te = load_weight_text;
+		break;
 	}
-	
 	
 	let par = model.param[inter.edit_param.i];
 	
@@ -142,7 +151,7 @@ function add_create_edit_param_buts(lay)
 		ele_type = "ParamWeightConst";
 		break;
 		
-	case "Value":
+	case "Value": case "PriorConst":
 		ele_type = "ParamElementConst";
 		if(par.factor) ele_type = "ParamFactorConst";
 		break;

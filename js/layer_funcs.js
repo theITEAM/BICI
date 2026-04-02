@@ -36,13 +36,16 @@ function generate_screen(update)
 		inter.canvas.height = height;
 	}
 	
+	page_char_hei = page_char_hei_aim;
 	let ratio = page_char_wid/page_char_hei;
 	let wid_show = Math.round(height*ratio);
 	let hei_show = height;
 	
 	let mar = 22;
 	if(wid_show > width-mar){
-		wid_show = width-mar; hei_show = Math.round(wid_show/ratio);
+		wid_show = width-mar; 
+		ratio = wid_show/height;
+		page_char_hei = page_char_wid/ratio;
 	}
 
 	inter.sca = wid_show/page_char_wid;
@@ -64,9 +67,9 @@ function generate_screen(update)
 	purge_textbox_store();
 	
 	inter.over = get_button_over(inter.mx,inter.my);
-
+	
 	for(let l = 0; l < inter.layer.length; l++){
-		inter.layer[l].plot_buttons() 
+		inter.layer[l].plot_buttons();
 	}
 	
 	start_cursor_flash();
@@ -774,7 +777,7 @@ function add_screen_buts(lay)
 				break;
 				
 			case "split":
-				{
+				if(inter.loading_symbol.on != true){
 					let lay = get_lay("Main");
 					if(lay){
 						let si = 0.8;
@@ -1360,6 +1363,14 @@ function copy_back_to_source2(tbs)
 	case "num_basep": edit_source.numbp = Number(te); break;
 	case "frac_obs": edit_source.frac_obs = Number(te); break;
 	case "param_val":	model.param[so.val].value = te; update_param(); break; 
+	case "param_prior_const":
+		{
+			let par = model.param[so.val];
+			par.prior_const = te;
+			par.prior_const_set = true;
+			update_param(); 
+		}
+		break; 
 	case "label": inter.bubble.label.te = te; break;
 	case "label_size": inter.bubble.label.size = te; break;
 	case "label_anno": model.species[so.p].cla[so.cl].annotation[so.i].te = te; break;
@@ -1425,6 +1436,8 @@ function copy_back_to_source2(tbs)
 	case "ppc_t_end": model.ppc_details.ppc_t_end = te; break;
 	case "ppc_number": model.ppc_details.number = te; break;
 	case "ppc_seed": model.ppc_details.seed = te; break;
+	case "ppc_indmax": model.ppc_details.indmax = te; break;	
+	case "ppc_paramout": model.ppc_details.param_output_max = te; break;
 	case "inf_t_start": model.inf_details.t_start = te; break;
 	case "inf_t_end": model.inf_details.t_end = te; break;
 	case "inf_timestep": model.inf_details.timestep = te; break;
@@ -1815,12 +1828,8 @@ function check_error_textbox2(tbs)
 			case "inf_kernelsize":
 				warn = check_posnumber(te);
 				break;
-				
-			case "inf_indmax":
-				warn = check_posinteger(te);
-				break;
-				
-			case "sim_indmax":
+			
+			case "sim_indmax": case "inf_indmax": case "ppc_indmax":
 				warn = check_posinteger(te);
 				break;
 				
@@ -1842,11 +1851,7 @@ function check_error_textbox2(tbs)
 				}
 				break;
 				
-			case "inf_paramout":
-				warn = check_posinteger(te);
-				break;
-				
-			case "sim_paramout":
+			case "sim_paramout": case "inf_paramout": case "ppc_paramout":
 				warn = check_posinteger(te);
 				break;
 				
@@ -1896,6 +1901,10 @@ function check_error_textbox2(tbs)
 				break;
 			
 			case "param_val":
+				warn = check_number(te);
+				break;
+				
+			case "param_prior_const":
 				warn = check_number(te);
 				break;
 			

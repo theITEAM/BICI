@@ -512,7 +512,6 @@ function read_param_samples(chain,te,result,warn,line)
 					}
 				
 					if(th == undefined){
-						
 						alert_param_sample(warn,-2);
 						return;
 					}
@@ -545,23 +544,28 @@ function read_param_samples(chain,te,result,warn,line)
 	
 	for(let th = 0; th < result.param.length; th++){
 		let par = result.param[th];
-
+		
 		let value; 
 		if(par.output == false) value = "No output";
 		else{
-			if(par.variety == "const"){
-				value = "const";
+			if(result.siminf == "inf" && par.prior_const_on == true){
+				value = "priorconst";
 			}
 			else{
-				if(par.dep.length == 0){
-					value = "unset";
+				if(par.variety == "const"){
+					value = "const";
 				}
 				else{
-					if(par.type == "derive_param" && par.time_dep) value = "derived";
+					if(par.dep.length == 0){
+						value = "unset";
+					}
 					else{
-						if(par.output){
-							let list = par_find_list(par);
-							value = par_find_template(list);
+						if(par.type == "derive_param" && par.time_dep) value = "derived";
+						else{
+							if(par.output){
+								let list = par_find_list(par);
+								value = par_find_template(list);
+							}
 						}
 					}
 				}
@@ -652,7 +656,7 @@ function read_param_samples(chain,te,result,warn,line)
 
 /// Reads in state samples from a file
 function read_state_samples_file(chain,file,result,line)
-{	
+{
 	let te = decode(file);
 
 	let warn = "Problem loading file '"+file.name+"'";
@@ -682,10 +686,10 @@ function read_state_samples(chain,te,result,warn,line)
 		alert_sample("Error loading sample",1);
 		return;
 	}
-	
+
 	let ind_key = load_state_sample_header(te.substr(i_st,i),result,warn);
 	i++;
-	
+
 	te = te.substr(i);
 
 	let sec = te.split("<<");
@@ -872,6 +876,17 @@ function read_state_sample(te,chain,result,warning,ind_key)
 					
 				case "TRANSDISTPROB":
 					mode = "transdiag"; 
+					
+					if(p == undefined) error("Species is not set");
+					{
+						let sp = result.species[p];
+						if(sample.species[p].trans_hbin == undefined){
+							sample.species[p].trans_hbin = [];
+							for(let tr = 0; tr < sp.tra_gl.length; tr++){
+								sample.species[p].trans_hbin[tr] = [];
+							}
+						}
+					}
 					break;
 					
 				case "PARAMETERS":
@@ -893,27 +908,24 @@ function read_state_sample(te,chain,result,warning,ind_key)
 						
 						switch(sp.type){
 						case "Population": case "Deterministic": 
-							sample.species[p] = {type:"Population", cpop_init:[], transnum_tl:[]}; 
+							sample.species[p] = {type:"Population", cpop_init:[], transnum:[], dpop_list:[]}; 
 							break;
 						
 						case "Individual": 
-							sample.species[p] = {type:"Individual", individual:[], cpop_init:[]};
+							sample.species[p] = {type:"Individual", individual:[], dpop_list:[]};
 							break;
 							
 						default: error("PROBLEM"); break;
 						}
 					
+						/*
 						if(sp.type != "Deterministic"){
 							sample.species[p].trans_hbin = [];
 							for(let tr = 0; tr < sp.tra_gl.length; tr++){
 								sample.species[p].trans_hbin[tr] = [];
 							}
 						}
-						
-						let T = timepoint.length-1;
-						let dpop_list=[];
-						for(let ti = 0; ti < T; ti++) dpop_list[ti] = [];
-						sample.species[p].dpop_list = dpop_list;
+						*/
 					}						
 					break;
 				
@@ -1050,7 +1062,9 @@ function read_state_sample(te,chain,result,warning,ind_key)
 							let samp_sp = sample.species[p];
 							let ti = Number(tp);
 							
-							samp_sp.dpop_list[ti].push({c:c,val:Number(change)});
+							let dpl = samp_sp.dpop_list;
+							if(dpl[ti] == undefined) dpl[ti] = [];
+							dpl[ti].push({c:c,val:Number(change)});
 						}
 					}
 					break;
@@ -1110,12 +1124,13 @@ function read_state_sample(te,chain,result,warning,ind_key)
 									vec.push(num);
 								}
 							}
-							
+						
 							if(vec.length != timepoint.length-1){
 								alert_sample(warn,128);
 							}
 							
-							ssp.transnum_tl[trg] = get_timeline(vec,result);
+							ssp.transnum[trg] = vec;
+							//ssp.transnum_tl[trg] = get_timeline(vec,result);
 						}
 					}
 					break;
@@ -1253,20 +1268,27 @@ function read_state_sample(te,chain,result,warning,ind_key)
 	}
 	
 	generate_trans_tree(get_inf_from,result,sample,ind_key);
+	
+	generate_marg_plot(result,sample);
+	
+	//generate_cpop_init_from_ind(result,sample);
+	
+	//generate_transnum_from_ind(result,sample);
+	
+	//generate_cpop_from_transnum(result,sample); 
 
-	generate_cpop_init_from_ind(result,sample);
-
-	generate_transnum_from_ind(result,sample);
-
-	generate_cpop_from_transnum(result,sample); 
-
-	update_average(result,sample);
-
-	if(result.siminf != "sim") remove_dpop_list(sample);
-
-	result.state_memory += obj_memory(sample);
-	if(result.state_memory > mem_state_sample_max*bytes_in_GB) out_of_state_memory(result);
-
+	//if(result.siminf != "sim") remove_dpop_list(sample);
+	
+	/*
+	prr(obj_memory(sample)+" mem");
+	obj_split_memory(sample);
+	
+	obj_split_memory(sample.species[0]);
+	*/
+	
+	//result.state_memory += obj_memory(sample);
+	//if(result.state_memory > mem_state_sample_max*bytes_in_GB) out_of_state_memory(result);
+	
 	result.sample.push(sample);
 	if(result.on != true) result.on = true;
 }
@@ -1288,9 +1310,18 @@ function read_trans_diag(ch,file,result,linep)
 	
 	let res = {chain:ch, species:[]};
 	for(let p = 0; p < result.species.length; p++){
-		res.species[p] = {exp_num:[]};
+		let sp = result.species[p];
+		let NT = sp.marg_plot.NT;
+		let exp_num=[];
+		for(let i = 0; i < NT; i++){
+			let vec=[];
+			for(let t = 0; t < T; t++) vec[t] = 0;
+			exp_num[i]=vec;
+		}
+		
+		res.species[p] = {exp_num:exp_num};
 	}
-	
+
 	let fpt = linep.pt/line.length;
 	linep.pt = 0;
 	
@@ -1335,20 +1366,21 @@ function read_trans_diag(ch,file,result,linep)
 					let trg = hash_tragl[p].find(name);
 					if(trg == undefined) alert_sample(warn,130);
 					
+					let mp = result.species[p].marg_plot;
+					
 					let spl2 = spl[1].split(",");
 					if(spl2.length != T) alert_sample(warn,28);
-					let exp_num=[];
+					let en = res.species[p].exp_num[mp.trgl_marg_conv[trg]];
 					for(let ti = 0; ti < T; ti++){
-						if(isNaN(spl2[ti])) alert_sample(warn,28);
-						exp_num[ti] = Number(spl2[ti]);
+						let val = spl2[ti];
+						if(isNaN(val)) alert_sample(warn,28);
+						en[ti] += Number(val);
 					}
-					
-					res.species[p].exp_num[trg] = exp_num;
 				}
 			}				
 		}
 	}
-	
+
 	if(!result.td_res) result.td_res = [];
 	result.td_res.push(res);	
 }
@@ -1370,83 +1402,253 @@ function out_of_state_memory(result)
 }
 		
 
+/// Sets up a (potentially) reduced set of compartments that marginalise some compartments
+function marg_plot_setup(result)
+{
+	let spec=[];
+	
+	for(let p = 0; p < result.species.length; p++){
+		let sp = result.species[p];
+		
+		// Decides which classification to marginalise
+		let cl_marg=[];
+		for(let cl = 0; cl < sp.ncla; cl++) cl_marg[cl] = false;
+		
+		// If too many compartments then marginalises
+		let NC = sp.comp_gl.length;
+		while(NC > COMP_MARG_MAX){
+			let max = 0;
+			let cl_sel;
+			for(let cl = 0; cl < sp.ncla; cl++){
+				if(cl_marg[cl] == false){
+					if(sp.cla[cl].comp.length > max){ max = sp.cla[cl].comp.length; cl_sel = cl;}
+				}
+			}
+			
+			cl_marg[cl_sel] = true; NC /= max;
+		}
+	
+		// Constructs marginalised compartments				
+		let cl_list=[];		
+		let comp_mult=[];
+		let N = 1;
+		for(let cl = 0; cl < sp.ncla; cl++){
+			if(cl_marg[cl] == false){
+				cl_list.push(cl);
+				comp_mult[cl] = N;
+				N *= sp.cla[cl].comp.length;
+			}
+		}
+		
+		// Constructs marginal compartments
+		let comp_marg=[];
+		for(let c = 0; c < N; c++){
+			let cla_comp = [];
+			for(let k = 0; k < cl_list.length; k++){
+				let cl = cl_list[k];
+				cla_comp[cl] = Math.floor(c/comp_mult[cl])%sp.cla[cl].comp.length;
+			}
+			comp_marg.push({cla_comp:cla_comp});
+		}
+			
+		// Conversion from cgl to cgl_marg
+		let cgl_marg_conv = [];
+		for(let c = 0; c < sp.comp_gl.length; c++){
+			let cgl = sp.comp_gl[c];
+			
+			let k = 0; 
+			for(let i = 0; i < cl_list.length; i++){
+				let cl = cl_list[i];
+				k += cgl.cla_comp[cl]*comp_mult[cl];
+			}
+			cgl_marg_conv[c] = k; 
+		}
+		
+		// Constructs marginalised transitions	
+		let trgl_marg_conv = [];		
+		let hash = new Hash();
+		let tra_marg=[];
+		for(let k = 0; k < sp.tra_gl.length; k++){
+			let trg = sp.tra_gl[k];
+			let cl = trg.cl;
+			let tr = trg.tr;
+			let vec=[];
+			vec.push(cl);
+			vec.push(tr);
+			let ci = trg.i; if(ci != SOURCE) ci = cgl_marg_conv[ci];
+			let cf = trg.f; if(cf != SINK) cf = cgl_marg_conv[cf];
+			
+			let c = ci; if(c == SOURCE) c = cf;
+			vec.push(c);
+			let name = JSON.stringify(vec);
+			
+			let j = hash.find(name);
+			if(j == undefined){
+				j = tra_marg.length;
+				hash.add(name,j);
+				tra_marg.push({name:name, tr:tr, cl:cl, i:ci, f:cf});
+			}
+			trgl_marg_conv[k] = j;
+		}			
+		
+		// Constracts tr_tra_gl_ref (used in trans plots)
+		let tr_tra_gl_ref = [];
+		for(let cl = 0; cl < sp.ncla; cl++) tr_tra_gl_ref[cl]=[];
+		
+		for(let j = 0; j < tra_marg.length; j++){
+			let tm = tra_marg[j];
+			let tr = tm.tr;
+			let cl = tm.cl;
+			if(tr_tra_gl_ref[cl][tr] == undefined) tr_tra_gl_ref[cl][tr]=[];
+			tr_tra_gl_ref[cl][tr].push(j);
+		}
+		
+		
+		sp.marg_plot = { cl_marg:cl_marg, cl_list:cl_list, cgl_marg_conv:cgl_marg_conv, comp_mult:comp_mult, comp_marg:comp_marg, N:N, tra_marg:tra_marg, NT:tra_marg.length, trgl_marg_conv:trgl_marg_conv, tr_tra_gl_ref:tr_tra_gl_ref};
+	}
+}
+
+
 /// Initialises average values (used for fast plotting and saving memory)
 function average_init(result)
 {
-	result.average = [];
-	result.average[0] = { species:[], num:LARGE, numav:0};
-}
-	
-	
-/// Updates average values (used for fast plotting and saving memory)
-function update_average(result,sample)
-{
-	let T = result.timepoint.length-1;
-
+	let species = [];
 	for(let p = 0; p < result.species.length; p++){
-		let ssp = sample.species[p];
+		let sp = result.species[p];
+		let cpop_init = [];
+		for(let c = 0; c < sp.comp_gl.length; c++) cpop_init[c] = 0;
 		
-		let transnum = reconstruct_timeline_vec(ssp.transnum_tl,result);
-		
-		let av = result.average[0];
-		if(av.numav == 0){
-			let transnum = reconstruct_timeline_vec(ssp.transnum_tl,result);
-			let cpop = reconstruct_timeline_vec(ssp.cpop_tl,result);
-			av.species[p] = {transnum:transnum, cpop:cpop};
-		}
-		else{
-			let transnum = av.species[p].transnum;
-			
-			for(let i = 0; i < ssp.transnum_tl.length; i++){
-				add_tl(transnum[i],ssp.transnum_tl[i],result);
-			}
-			
-			let cpop = av.species[p].cpop;
-			for(let i = 0; i < ssp.cpop_tl.length; i++){
-				add_tl(cpop[i],ssp.cpop_tl[i],result);
-			}
-		}
+		species[p] = { cpop_init:cpop_init, transnum:[]};
 	}
 	
-	result.average[0].numav++;
+	result.average = { species:species, numav:0};
 }
 
 
 /// Removes dpop information (because no longer needed)
-function remove_dpop_list(result)
+function remove_dpop_list(sample)
 {
-	for(let p = 0; p < result.species.length; p++){
-		delete result.species[p].dpop_list;
+	for(let i = 0; i < sample.length; i++){
+		let sa = sample[i];
+		for(let p = 0; p < sa.species.length; p++){
+			delete sa.species[p].dpop_list;
+		}
 	}
 }
 
 
-/// Rescales average values (used for fast plotting and saving memory)
-function average_rescale(result)
+/// Adds information to cpop_cmp
+function add_cmp(cpop_cmp,i,ti,val)
+{
+	if(cpop_cmp[i] == undefined) cpop_cmp[i] = [];
+	let cc = cpop_cmp[i];
+	let len = cc.length;
+	if(cc.length > 2 && cc[len-2] == ti){
+		cc[len-1] += val;
+	}
+	else{
+		cc.push(ti);
+		cc.push(val);
+	}
+}
+
+
+/// Calculates the average behaviour (such that compartment plots are faster
+function average_finalise(result,per_start,per_end)
+{
+	let dper = per_end-per_start;
+	percent(per_start);
+
+	let T = result.timepoint.length-1;
+	
+	let average = result.average;
+	let sample = result.sample;
+
+	let numav = average.numav;
+	for(let p = 0; p < result.species.length; p++){
+		let sp = result.species[p];
+		
+		let as = average.species[p];
+		let transnum = as.transnum;
+		for(let k = 0; k < transnum.length; k++){
+			if(transnum[k] != undefined){ 	
+				let tn = transnum[k];
+				for(let ti = 0; ti < T; ti++){
+					if(tn[ti] != undefined) tn[ti] /= numav;
+				}
+			}
+		}
+		
+		let cpop_init = as.cpop_init;
+		for(let c = 0; c < cpop_init.length; c++) cpop_init[c] /= numav;
+	}
+	
+	calculate_cpop_cmp(average,"average",result,per_start+dper*0.2,per_start+dper*0.9);
+	if(result.sim_state != undefined){
+		calculate_cpop_cmp(result.sim_state,"sim_state",result,per_start+dper*0.9,per_start+dper*1);
+	}
+
+	if(result.siminf != "sim") remove_dpop_list(sample);
+	percent(per_end);
+	
+	if(false){
+		//obj_split_memory(result.average.species[0]);
+		//obj_split_memory(result);
+		//obj_split_memory(result.sample.species[0]);
+	}
+}
+
+
+/// Calculates cpop_cmp from cpop_init, transnum and dpop_list
+function calculate_cpop_cmp(average,op,result,per_start,per_end)
 {
 	let T = result.timepoint.length-1;
 	
-	let numav = result.average[0].numav;
+	let dper = (per_end-per_start)/(result.species.length*T);
+	
+	let sample = result.sample;
 	for(let p = 0; p < result.species.length; p++){
-		let as = result.average[0].species[p];
+		let sp = result.species[p];
+		let as = average.species[p];
 		let transnum = as.transnum;
-		as.transnum_tl = [];
-		for(let k = 0; k < transnum.length; k++){
-			for(let ti = 0; ti < T; ti++) transnum[k][ti] /= numav;
-			as.transnum_tl[k] = get_timeline(transnum[k],result);
-		}
-		delete as.transnum;
 		
-		let cpop = as.cpop;
-		as.cpop_tl = [];
-		for(let k = 0; k < cpop.length; k++){
-			for(let ti = 0; ti <= T; ti++) cpop[k][ti] /= numav;
-			as.cpop_tl[k] = get_timeline(cpop[k],result);
+		let N = sp.comp_gl.length;
+		let NT = sp.tra_gl.length;
+		
+		let cpop_cmp=[];
+
+		let kmax = sample.length;
+		if(op == "sim_state") kmax = 1;
+
+		for(let ti = 0; ti < T; ti++){
+			if(ti%10 == 0) percent(per_start+(p*T+ti)*dper);
+			for(let k = 0; k < kmax; k++){
+				let dpl = sample[k].species[p].dpop_list[ti];
+				if(dpl != undefined){
+					for(let k = 0; k < dpl.length; k++){
+						let dp = dpl[k];
+						add_cmp(cpop_cmp,dp.c,ti,dp.val);
+					}
+				}
+			}
+			
+			for(let j = 0; j < NT; j++){
+				let tn = transnum[j];
+				if(tn != undefined){
+					let num = transnum[j][ti];
+					if(num != undefined && num != 0){
+						let tra = sp.tra_gl[j];
+						let i = tra.i, f = tra.f;
+						if(i != SOURCE) add_cmp(cpop_cmp,i,ti,-num);
+						if(f != SINK) add_cmp(cpop_cmp,f,ti,num);
+					}
+				}
+			}
 		}
-		delete as.cpop;
+		as.cpop_cmp = cpop_cmp;
 	}
 }
-	
+
 	
 /// Extracts any infection information
 function extract_infection_info(tr,get_inf_from,p,ev,ssp)
@@ -1582,6 +1784,34 @@ function load_file_local(file,type)
 	
 	return xhr.responseText;
 }
+
+
+function load_file_nonlocal(file,type)
+{
+	const xhr = new XMLHttpRequest();
+	
+	if(ver=="windows") file = file.replace(/\//g,"\\");
+	
+  xhr.open("GET",file,false); // synchronous request
+	
+	let fl = false;
+	
+	try{
+		xhr.send();
+	}catch(e){
+		restore_model();
+		fl = true;
+	}
+	
+	if(xhr.responseText == "") fl = true;
+
+	if(fl == true && type != "import"){
+		alertp("The file '"+file+"' does not exist or is empty.");
+	}
+	
+	return xhr.responseText;
+}
+
 
 
 /// Strips file from path

@@ -144,6 +144,7 @@ function text_sup_anno(tex,si,width,fo_type)
 				
 				anno.push({te:te_add, fo:fo, x:x, y:0});
 				x += w;
+				if(fl == true) break; 
 			}
 		}
 	}
@@ -1673,9 +1674,7 @@ function label_convert(te,si,wmax)
 					tex = te.substr(i_store+1,i-i_store-2);
 				}
 				tex = tex.trim();
-				
 			
-				
 				if(type == "param" || pair == "("){
 					let sub = "", sup = "", time = "";
 				
@@ -1790,11 +1789,16 @@ function label_convert(te,si,wmax)
 						for(let j = 0; j < spl.length; j++){
 							if(j != 0) x = add_frag(",",col,x,0*si,gap,fo,frag);
 							
-							let val = spl[j];
-							let spl2 = val.split("^");
-							x = add_frag(spl2[0],col,x,0*si,gap,fo,frag);
-							for(let k = 1; k < spl2.length; k++){
-								x = add_frag(spl2[k],col,x,-0.45*si,gap,sup_fo,frag);
+							let spl_div = spl[j].split("|");
+							for(let m = 0; m < spl_div.length; m++){
+								if(m != 0) x = add_frag("|",col,x,0*si,gap,fo,frag);
+								
+								let val = spl_div[m];
+								let spl2 = val.split("^");
+								x = add_frag(spl2[0],col,x,0*si,gap,fo,frag);
+								for(let k = 1; k < spl2.length; k++){
+									x = add_frag(spl2[k],col,x,-0.45*si,gap,sup_fo,frag);
+								}
 							}
 						}
 						x = add_frag("}",col,x,0*si,gap,fo,frag);
@@ -1811,6 +1815,7 @@ function label_convert(te,si,wmax)
 						frag.push({ te:tex, col:col, x:x, y:0*si, fo:fo});
 						x += text_width(tex,fo)+gap;  
 					}
+					
 				}
 			}
 		}

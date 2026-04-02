@@ -64,6 +64,29 @@ let timer = new Timer();                          // Stores timers (for diagnost
 	
 let run_chain = [];
 
+/*
+let test_ch={testtest:[]};
+for(let i = 0; i< 10000000; i++){
+	test_ch.testtest[i] = Math.random();
+}
+*/
+/*
+for(let i = 0; i< 1000000; i++){
+	let arr =[];
+	for(let j = 0; j < 100; j++){
+		arr[j] = Math.random();
+	}
+	//21 217 016
+	 149 217 016
+
+	test_ch.testtest[i] =arr;
+}
+*/
+
+//let test_ch=
+//5 216 972
+//5 216 884
+
 let fileReader = new FileReader();
 
 onmessage = function(e) 
@@ -155,6 +178,14 @@ function process(e)
 		
 	case "Create SIRE":
 		create_sire();
+		break;
+		
+	case "DeleteParamPriorConst":
+		{
+			let par = model.param[info.i];
+			par.prior_const_on = false;
+			update_mod = true;
+		}
 		break;
 		
 	case "DeleteParamDist":
@@ -496,6 +527,23 @@ function process(e)
 		}
 		break;
 		
+	case "View Prior Const":
+		{	
+			let par = model.param[info.i];
+			
+			info.value = par.prior_const;
+			
+			let dim = get_dimensions(par.prior_const);
+		
+			for(let i = 0; i < dim.length; i++){
+				if(dim[i] != par.list[i].length){
+					alert_help("Too large to plot");
+				}
+			}
+			post({ info:info});
+		}
+		break;
+		
 	case "Edit Param": case "Edit Reparam": 
 		{
 			let par = model.param[info.i];
@@ -520,6 +568,21 @@ function process(e)
 					}
 				}
 			}
+			
+			post({ info:info});
+		}
+		break;
+		
+	case "Edit Prior Const":
+		{
+			let par = model.param[info.i];
+		
+			info.value = par.prior_const;	
+			if(info.value == undefined) info.value = param_blank(par);
+			
+			info.list = par.list;
+			
+			if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
 			
 			post({ info:info});
 		}
@@ -551,6 +614,22 @@ function process(e)
 			get_reparam_param_list(par);
 			
 			post({ i:i, value_desc:get_value_desc(par)});
+		}
+		break;
+		
+	case "Set Prior Const": 
+		{
+			let i = info.i;
+			let par = model.param[i];
+			let err = check_param_value(input.type,par,info.value);
+			if(typeof err == 'string') alert_help("Problem updating",err);
+			
+			par.prior_const = info.value;
+			par.prior_const_set = true;
+	
+			//get_reparam_param_list(par);
+			
+			post({ i:i, prior_const_desc:get_prior_const_desc(par)});
 		}
 		break;
 		
@@ -598,15 +677,15 @@ function process(e)
 		break;
 		
 	case "Sim data":
-		{
-			simulate_data(info);
-		}
+		simulate_data(info);
 		break;
-		
+	
+	case "Generate const prior":
+		generate_const_prior(info.th);
+		break;
+	
 	case "Add ind single":
-		{
-			add_sing_ind_per_comp(info);
-		}
+		add_sing_ind_per_comp(info);
 		break;
 		
 	case "Graph spline":
@@ -704,7 +783,7 @@ function process(e)
 		break;
 	
 	case "Graph view":
-		create_view_graph_calculate(info.name,info.sel_view,info.so);
+		create_view_graph_calculate(info.name,info.prior_const,info.sel_view,info.so);
 		break;
 	
 	case "Load File":

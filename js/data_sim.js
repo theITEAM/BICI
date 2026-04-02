@@ -52,14 +52,24 @@ function simulate_data(so)
 	
 	let sp = result.species[p];
 
-	let samp = result.sample[0];
+	let samp = result.sim_state;
+	if(samp == undefined){
+		samp = result.average;
+		if(samp.numav != 1) error("Average should be one");
+	}
 
 	let tp = result.timepoint;
+	let T = tp.length;
 	
 	let sim = samp.species[p];
-
-	let transnum = reconstruct_timeline_vec(sim.transnum_tl,result);
-	let cpop = reconstruct_timeline_vec(sim.cpop_tl,result);
+	let sim_ind = result.sample[0].species[p].individual;
+	
+	//let transnum = reconstruct_timeline_vec(sim.transnum_tl,result);
+	//let cpop = reconstruct_timeline_vec(sim.cpop_tl,result);
+	let transnum = sim.transnum;
+	let cpop_init = sim.cpop_init;
+	let cpop_cmp = sim.cpop_cmp;
+	let dpop_list = result.sample[0].species[p].dpop_list;
 	
 	let spec = so.spec;
 	
@@ -109,23 +119,25 @@ function simulate_data(so)
 			head.push("Population");
 			
 			for(let ti = 0; ti < T; ti++){	
-				let dpl = sim.dpop_list[ti];
-				for(let k = 0; k < dpl.length; k++){
-					let dp = dpl[k];
-					let val = dp.val*sign;
-					if(val > 0){
-						let c = dp.c;
-						let cgl = sp.comp_gl[c];
+				let dpl = dpop_list[ti];
+				if(dpl != undefined){
+					for(let k = 0; k < dpl.length; k++){
+						let dp = dpl[k];
+						let val = dp.val*sign;
+						if(val > 0){
+							let c = dp.c;
+							let cgl = sp.comp_gl[c];
+							
+							let row = [];
+							row.push(t_start+ti*timestep);
 						
-						let row = [];
-						row.push(t_start+ti*timestep);
-					
-						for(let cl = 0; cl < sp.ncla; cl++){
-							row.push(sp.cla[cl].comp[cgl.cla_comp[cl]].name);
+							for(let cl = 0; cl < sp.ncla; cl++){
+								row.push(sp.cla[cl].comp[cgl.cla_comp[cl]].name);
+							}
+							
+							row.push(val);
+							ele.push(row);
 						}
-						
-						row.push(val);
-						ele.push(row);
 					}
 				}
 			}
@@ -138,8 +150,8 @@ function simulate_data(so)
 			head.push("t");
 			for(let cl = 0; cl < sp.ncla; cl++) head.push(sp.cla[cl].name);
 			
-			for(let i = 0; i < sim.individual.length; i++){
-				let ind = sim.individual[i];
+			for(let i = 0; i < sim_ind.length; i++){
+				let ind = sim_ind[i];
 				if(ind.obs){	
 					let row = [];
 					row.push(all_ind_list[ind.all_ind_ref].name);
@@ -169,8 +181,8 @@ function simulate_data(so)
 			head.push("ID");
 			head.push("t");
 		
-			for(let i = 0; i < sim.individual.length; i++){
-				let ind = sim.individual[i];
+			for(let i = 0; i < sim_ind.length; i++){
+				let ind = sim_ind[i];
 				if(ind.obs){	
 					let row = [];
 					row.push(all_ind_list[ind.all_ind_ref].name);
@@ -195,8 +207,8 @@ function simulate_data(so)
 			head.push(cl_drop.te);
 			let cl_sel = cl_drop.i;
 			
-			for(let i = 0; i < sim.individual.length; i++){
-				let ind = sim.individual[i];
+			for(let i = 0; i < sim_ind.length; i++){
+				let ind = sim_ind[i];
 				if(ind.obs){	
 					for(let e = 0; e < ind.ev.length; e++){
 						let ev = ind.ev[e];
@@ -233,8 +245,8 @@ function simulate_data(so)
 			
 			let cl_sel = find(sp.cla,"name",cl_drop.te);
 			
-			for(let i = 0; i < sim.individual.length; i++){
-				let ind = sim.individual[i];
+			for(let i = 0; i < sim_ind.length; i++){
+				let ind = sim_ind[i];
 				if(ind.obs){	
 					for(let k = 0; k < times.length; k++){
 						if(Math.random() < f){	
@@ -332,8 +344,8 @@ function simulate_data(so)
 			head.push("ID");
 			head.push("t");
 		
-			for(let i = 0; i < sim.individual.length; i++){
-				let ind = sim.individual[i];
+			for(let i = 0; i < sim_ind.length; i++){
+				let ind = sim_ind[i];
 				if(ind.obs){	
 					for(let e = 0; e < ind.ev.length; e++){
 						let ev = ind.ev[e];
@@ -383,8 +395,8 @@ function simulate_data(so)
 	
 			let f = so.frac_obs;
 		
-			for(let i = 0; i < sim.individual.length; i++){
-				let ind = sim.individual[i];
+			for(let i = 0; i < sim_ind.length; i++){
+				let ind = sim_ind[i];
 				if(ind.obs){	
 					for(let k = 0; k < times.length; k++){
 						if(Math.random() < f){	
@@ -449,8 +461,8 @@ function simulate_data(so)
 						if(posg[c] < 0){ alert_help("Problem with observation model","The observation model has become negative"); return;}
 					}
 				
-					let popc = [];
-					
+				
+					/*
 					switch(sp.type){
 					case "Individual":
 						{
@@ -475,11 +487,22 @@ function simulate_data(so)
 					case "Population": case "Deterministic":
 						{
 							let ti = Math.floor((t-t_start)/timestep);
-							for(let c = 0; c < sp.comp_gl.length; c++) popc[c] = cpop[c][ti];
+							for(let c = 0; c < sp.comp_gl.length; c++){
+								if(posg[c] == 0) popc[c] = 0;
+								else popc[c] = pop_cmp_ti(ti,c,T,sim);
+							}
 						}
 						break;
 					}
+					*/
 					
+					let popc = [];
+					let ti = Math.floor((t-t_start)/timestep);
+					for(let c = 0; c < sp.comp_gl.length; c++){
+						if(posg[c] == 0) popc[c] = 0;
+						else popc[c] = pop_cmp_ti(ti,c,T,sim);
+					}
+							
 					let row = [];
 					row.push(t);
 					
@@ -545,6 +568,7 @@ function simulate_data(so)
 					}
 				}
 
+				/*
 				switch(sp.type){
 				case "Individual":
 					{
@@ -573,6 +597,14 @@ function simulate_data(so)
 						}
 					}
 					break;
+				}
+				*/
+				
+				for(let ti = 0; ti < tp.length-1; ti++){
+					let d = div_ref[ti];
+					for(let trg = 0; trg < sp.tra_gl.length; trg++){
+						res[d][trg] += transnum[trg][ti];
+					}
 				}
 					
 				for(let d = 0; d < ndiv; d++){
@@ -626,8 +658,8 @@ function simulate_data(so)
 			if(e == undefined) alertp("Cannot find individual effect");
 			head.push("ID");
 			head.push("Value");
-			for(let i = 0; i < sim.individual.length; i++){
-				let ind = sim.individual[i];
+			for(let i = 0; i < sim_ind.length; i++){
+				let ind = sim_ind[i];
 				let row = [];
 				row.push(all_ind_list[ind.all_ind_ref].name);
 				row.push(ind.ie[e]);
@@ -648,6 +680,23 @@ function simulate_data(so)
 	post({ type:input.type, head:head, ele:ele});
 }
 
+
+/// Converts from parameter to const prior
+function generate_const_prior(th)
+{
+	let par = model.param[th];
+	
+	let result = sim_result;
+
+	let i = find(result.param,"name",par.name);
+	if(i == undefined) alert_help("Parameter '"+par.name+"' does not exist in the simulation.");
+
+	par.prior_const_on = true;
+	par.prior_const_set = true;
+	par.prior_const = result.sample[0].param[i];
+	
+	post({ i:th, prior_const_desc:get_prior_const_desc(par)});
+}
 
 
 /// Adds a single individual per compartment
@@ -1017,7 +1066,7 @@ function get_timepoints(t_start,t_end,so)
 
 
 /// Gets timepoints specified in the bubble
-function get_ind_times(t_start,t_end,so,samp,hash,ind_list)
+function get_ind_times(t_start,t_end,so,samp,hash,ind_list,result)
 {
 	let ind_times = [];
 	
@@ -1042,65 +1091,88 @@ function get_ind_times(t_start,t_end,so,samp,hash,ind_list)
 		break;
 	
 	case "Data":
-		{
-			// TURN OFF
-			if(true){ // SORT This just puts observations after events
-				for(let p = 0; p < samp.species.length; p++){
-					let sosp = samp.species[p];
-					for(let i = 0; i < sosp.individual.length; i++){
-						let ind = sosp.individual[i];
-						//pr("ind");
-						//pr(ind);
-						if(ind.cinit == 1) ind_times[p][i].push(TINY);
-						
-						for(let e = 0; e < ind.ev.length; e++){
-							ind_times[p][i].push(ind.ev[e].t+TINY);
-							break;
-						}						
-					}
-				}
-			}
-			else{
-				let sel = so.sel_data;
-				let gen_so = model.sim_res.plot_filter.species[sel.p].gen_source[sel.i];
+		{	
+			let data_list = [];
+			for(let i = 0; i < so.check_list.length; i++){
+				if(so.check_list[i].check == true) data_list.push(so.data_list[i]);
+			}				
 			
-				switch(gen_so.type){
-				case "Compartment": case "Transition": case "Diag. Test":
-					{
-						let ele = gen_so.table.ele;
-						for(let r = 0; r < ele.length; r++){
-							let ro = ele[r];
-							let id = ro[0];
-							let t = ro[1];
-							
-							let j = hash.find(id);
-							if(j == undefined) alertp("Should not be undefined");
+			for(let k = 0; k < data_list.length; k++){
+				let dl = data_list[k];
+				let gen_so = model.sim_res.plot_filter.species[dl.p].gen_source[dl.i];
+
+				let ele = gen_so.table.ele;
+				for(let r = 0; r < ele.length; r++){
+					let ro = ele[r];
+					let id = ro[0];
+					let t = ro[1];
+					
+					let j = hash.find(id);
+					if(j == undefined) alertp("Should not be undefined");
+					else{
+						let il = ind_list[j];
+						let tf = Number(t);
+						if(isNaN(tf)){
+							if(t == "start") tf = t_start;
 							else{
-								let il = ind_list[j];
-								let tf = Number(t);
-								if(isNaN(tf)){
-									if(t == "start") tf = t_start;
-									else{
-										if(t == "end") tf = t_end;
-										else{
-											alertp("Not a number");
-										}
-									}
+								if(t == "end") tf = t_end;
+								else{
+									alertp("Not a number");
 								}
-								if(gen_so.type == "Transition") tf += TINY;
-								ind_times[il.p][il.i].push(tf);
 							}
 						}
+						
+						// Shifts time to ensure that time is within the infection period
+						let ind = samp.species[il.p].individual[il.i];
+						let sp = result.species[il.p]; 
+						
+						let c = ind.cinit;
+		
+						let e = 0;
+						while(e < ind.ev.length && ind.ev[e].t < tf){
+							c = c_after_event(ind.ev[e],sp);
+							e++;
+						}
+						
+						let dd = 0.001;
+
+						if(c == OUT || c == SOURCE || sp.comp_gl[c].infected != true){
+							if(e < ind.ev.length && !dif_thresh(ind.ev[e].t,tf,dd)){
+								c = c_after_event(ind.ev[e],sp);
+								if(sp.comp_gl[c].infected == true){
+									tf = round(ind.ev[e].t + dd);
+								}
+							}
+							else{
+								if(e > 1 && !dif_thresh(ind.ev[e-1].t,tf,dd)){
+									c = ind.ev[e-2].c_after;
+									if(sp.comp_gl[c].infected == true){
+										tf = round(ind.ev[e-1].t - dd);
+									}
+								}
+							}
+						}
+						else{
+							if(e < ind.ev.length && ind.ev[e].t == tf) tf = round(tf-dd);
+						}
+							
+						if(c == OUT || c == SOURCE || sp.comp_gl[c].infected != true){
+						}
+						else{
+							ind_times[il.p][il.i].push(tf);
+						}
 					}
-					break;
-					
-				default:
-					alert_help("Cannot used this data source");
-					break;
 				}
-			}			
+			}		
 		}
 		break;	
+	}
+		
+	// Ensures that times are sorted
+	for(let p = 0; p < ind_times.length; p++){
+		for(let i = 0; i < ind_times[p].length; i++){
+			ind_times[p][i].sort( function(a, b){ return a.i-b.i});
+		}
 	}
 	
 	return ind_times;
@@ -1224,7 +1296,7 @@ function simulate_genetic_snp(t_start,t_end,ele,head,so)
 		}
 	}
 	
-	let ind_times = get_ind_times(t_start,t_end,so,samp,hash,ind_list);
+	let ind_times = get_ind_times(t_start,t_end,so,samp,hash,ind_list,result);
 	
 	let ref_seq = [];
 	for(let j = 0; j < N; j++){
@@ -1388,7 +1460,7 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 		}
 	}
 	
-	let ind_times = get_ind_times(t_start,t_end,so,samp,hash,ind_list);
+	let ind_times = get_ind_times(t_start,t_end,so,samp,hash,ind_list,result);
 	
 	// Adds in observations
 	let obs = [];
@@ -1673,4 +1745,19 @@ function mutate_seq(num,seq)
 		let i = Math.floor(seq.length*Math.random());
 		seq[i] = (seq[i]+1+Math.floor(3*Math.random()))%4;
 	}
+}
+
+
+// The scrollable box which allows the used to specify population filter
+function data_sources_scrollable(lay)
+{
+	let cx = 0.5, cy = 0.3;
+	let dx = lay.dx;
+	let op = lay.op;
+	
+	cy = add_checkbox_list(lay,op.so.data_list,"name",op.so.check_list,cy,dx);
+	
+	cy = lay.add_gap(cy,0.1);
+	
+	return cy;
 }

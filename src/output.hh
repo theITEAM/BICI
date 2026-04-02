@@ -66,7 +66,7 @@ class Output                               // Stores information about the data
 		void clear_part(Particle &pa) const;
 		string print_obs_data(unsigned int p, const vector <ObsData> &obs) const;
 		void print_individuals(unsigned int N, unsigned int p, const State &state) const;
-		void final_time(unsigned int cpu_time, unsigned int op_cpu_time) const;
+		void final_time(double cpu_time, double op_cpu_time) const;
 		void final_memory_usage() const;
 		void insert_command(string name, unsigned int p, string insert_pl, string insert_bef, string line, string content, string file);
 		string get_effective_sample_size(vector <double> vec) const;
@@ -92,7 +92,6 @@ class Output                               // Stores information about the data
 		void output_trans_diag(unsigned int ch, const vector <TransDiagSpecies> &trans_diag, ofstream &fout) const;
 		void add_warning(string err_msg, ofstream &fout) const;
 		void output_add_ind_warning(vector <string> &final_warning) const;
-		void output_rate_warning(unsigned int total_cpu, unsigned int per_start, unsigned int per_end, vector <string> &final_warning) const;
 		void output_spline_out_warning(vector <string> &final_warning) const;
 		void output_generation(const vector <Particle> &part, ofstream &fout) const;
 		void output_diagnostic(const vector <Diagnostic> &diagnostic, bool &alg_warn_flag,ofstream &fout) const;

@@ -673,18 +673,11 @@ function add_timepoint_data_options(cont)
 	bubble_addradio(cont,10.1,"Data","Data",so.time_radio);
 
 	if(so.time_radio.value == "Data"){
-		let wmax = get_w_drop(so.sel_data_pos);
-		if(wmax < 8) wmax = 8;
-		if(wmax > 12.5) wmax = 12.5;
-		
-		cont.y += 0.2;
-		if(so.sel_data_pos.length == 0){
-			bubble_addparagraph(cont,"No data sources",1,10); 
+		bubble_addscrollable(cont,{type:"data sources", so:so, ymax:bubblescroll_dymax});
+		for(let i = 0; i < so.check_list.length; i++){
+			if(so.check_list[i].check == true) return true;
 		}
-		else{
-			bubble_adddropdown(cont,1.5,wmax,so.sel_data,so.sel_data_pos);
-		}
-		cont.y += 0.2;
+		return false;
 	}
 	else{
 		let name;
@@ -1501,6 +1494,10 @@ function sequence_data_bubble(cont,type)
 		}
 	}
 	
+	let ac, bt;
+	if(type == "view"){ bt = "Done"; ac = "DataTableBack";}
+	else{ bt = "Next"; ac = "AddDataTable";}
+		
 	if(sim_options()){
 		if(spec.type_radio.value == "snp"){
 			bubble_input(cont,"Base-pairs:",{type:"num_basep"});
@@ -1508,11 +1505,10 @@ function sequence_data_bubble(cont,type)
 		
 		bubble_input(cont,"Fraction observed:",{type:"frac_obs"});
 		
-		add_timepoint_data_options(cont);
+		if(add_timepoint_data_options(cont) == false) ac = undefined;
 	}
 	
-	if(type == "view") add_end_button(cont,"Done","DataTableBack");
-	else add_end_button(cont,"Next","AddDataTable");
+	add_end_button(cont,bt,ac);
 }
 
 
@@ -1537,25 +1533,25 @@ function sequence_data(bu)
 	edit_source.time_radio = {value:"Periodic"};
 	edit_source.time_gen = "";
 	
-	let pos = [];
+	let data_list=[];
+	let check_list = [];
 	let p	= model.get_p();
 	let gen_so = model.sim_res.plot_filter.species[p].gen_source;
 	
 	for(let i = 0; i < gen_so.length; i++){
 		switch(gen_so[i].type){
 		case "Compartment": case "Transition": case "Diag. Test":
-			{
-				let te = gen_so[i].title;
-				if(model.species.length > 1) te = model.species[p].name+": "+te;
-				pos.push({te:te, p:p, i:i});
-			}
+			check_list.push({ check:false}); 
+			data_list.push({ name:gen_so[i].name, p:p, i:i}); 
 			break;
 		}
 	}
 	
-	edit_source.sel_data_pos = pos; 		
-	edit_source.sel_data = {te:select_str};
-
+	if(check_list.length == 1) check_list[0].check = true;
+	
+	edit_source.check_list = check_list; 		
+	edit_source.data_list = data_list; 		
+	
 	edit_source.numbp = 1000;
 	edit_source.frac_obs = 1;
 }

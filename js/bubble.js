@@ -129,7 +129,7 @@ function add_bubble_buts(lay)
 		add_end_button(cont,"Done","Done",{});	
 		break;
 		
-	case "CompGraph": case "CompGraph2": case "CompLatLngGraph": case "CompMapGraph": 
+	case "CompGraph": case "CompGraph2": case "CompLatLngGraph": case "CompLatLngGraph2": case "CompMapGraph": 
 		{
 			cont.dx = 9.3;
 			bubble_addtitle(cont,"Compartment",{});
@@ -796,6 +796,8 @@ function add_bubble_buts(lay)
 			case "IndEffData": ind_eff_data_bubble(cont,"add"); break;
 			case "IndGroupData": ind_group_data_bubble(cont,"add"); break;
 			case "SetConstant": set_constant_bubble(cont); break;
+			case "SetPriorConst": set_prior_const_bubble(cont,"Set","AddPriorConstParam"); break;
+			case "ConstPriorData": set_prior_const_bubble(cont,"Generate","GenPriorConstParam"); break;
 			case "SetFactor": set_factor_bubble(cont); break;
 			case "SetReparam": set_reparam_bubble(cont); break;
 			case "SetDefine": set_define_bubble(cont); break;
@@ -932,7 +934,7 @@ function add_bubble_buts(lay)
 		add_end_button(cont,"Done","DoneReparamEquation");	
 		break;
 		
-	case "DefineElement":
+	case "DefineEqn":
 		cont.dx = 15;
 		bubble_addtitle(cont,"Edit equation",{te:editdefine_eqn_text});	
 		bubble_input(cont,"Equation:",{type:"define_eqn", eqn:true});
@@ -957,6 +959,13 @@ function add_bubble_buts(lay)
 		cont.dx = 10;
 		bubble_addtitle(cont,"Edit value",{te:editsimparam_text});
 		bubble_input(cont,"Value:",{type:"param_val", val:bu.i});
+		add_end_button(cont,"Done","Done");	
+		break;
+		
+	case "ParamPriConElement": 
+		cont.dx = 10;
+		bubble_addtitle(cont,"Edit value",{te:editpriconparam_text});
+		bubble_input(cont,"Value:",{type:"param_prior_const", val:bu.i});
 		add_end_button(cont,"Done","Done");	
 		break;
 		
@@ -1744,6 +1753,7 @@ function add_bubble_scrollable_buts(lay)
 	lay.background = BUBBLE_COL;
 
 	switch(lay.op.type){
+	case "data sources": cy = data_sources_scrollable(lay); break;
 	case "filterpos": cy = filterpos_scrollable(lay); break;
 	case "test list": cy = diagtest_scrollable(lay); break;
 	case "ind list": cy = individual_scrollable(lay); break;
@@ -1751,6 +1761,7 @@ function add_bubble_scrollable_buts(lay)
 	case "poptrans list": cy = poptrans_scrollable(lay); break;
 	case "annotation": cy = annotation_scrollable(lay); break;
 	case "const param sel": cy = param_sel_scrollable(lay,"const"); break;
+	case "prior const param sel": cy = param_sel_scrollable(lay,"priorconst"); break;
 	case "reparam param sel": cy = param_sel_scrollable(lay,"reparam"); break;
 	case "dist param sel": cy = param_sel_scrollable(lay,"dist"); break;
 	case "fac param sel": cy = param_sel_scrollable(lay,"fac"); break;
@@ -2090,20 +2101,18 @@ function setup_bubble_back(cont)
 	lay.dy = box.ymax+0.1;
 	lay.inner_dx = lay.dx;
 	lay.inner_dy = lay.dy;
-	
+
 	let bx = bu_lay.x + bux, by = bu_lay.y + buy;
 	let bw = budx, bh = budy;
 	
 	let gapx = nearest_pixel(1.5), gapy = nearest_pixel(1.6), gap = nearest_pixel(1);
 	let marx = nearest_pixel(0.6), mary = nearest_pixel(0.6);
 	
-	let w_right = distance(bu_lay.x+bux+budx+gap+0.5*lay.dx+marx,bu_lay.y+buy+0.5*budy);
-
-	let w_left = distance(bu_lay.x+bux-gap-0.5*lay.dx-marx,bu_lay.y+buy+0.5*budy);
+	let w_right = distance(bx+budx+gap+0.5*lay.dx+marx,by+0.5*budy);
+	let w_left = distance(bx-gap-0.5*lay.dx-marx,by+0.5*budy);
+	let w_top = distance(bx+0.5*budx,by-gap-0.5*lay.dy-mary);
+	let w_bottom = distance(bx+0.5*budx,by+budy+gap+0.5*lay.dy+mary);
 	
-	let w_top = distance(bu_lay.x+bux+0.5*budx,bu_lay.y+buy-gap-0.5*lay.dy-mary);
-	let w_bottom = distance(bu_lay.x+bux+0.5*budx,bu_lay.y+buy+budy+gap+0.5*lay.dy+mary);
-		
 	let overlap_red = 30;
 	
 	let bubwid = lay.dx+2*marx;
@@ -2227,6 +2236,7 @@ function setup_bubble_back(cont)
 	
 	let mar_l = 1.5, mar_r = 0.5;
 	let mar_u = 1.3, mar_d = 1.3;
+	
 	if(lay.x-mar_l < menu_width) shift_bubble(menu_width-(lay.x-mar_l),0,lay,pa,pb,pc);
 	if(lay.x+lay.dx+mar_r > page_char_wid) shift_bubble(page_char_wid-(lay.x+lay.dx+mar_r),0,lay,pa,pb,pc);
 	if(lay.y-mar_u < 0) shift_bubble(0,-(lay.y-mar_u),lay,pa,pb,pc);

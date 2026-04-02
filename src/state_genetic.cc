@@ -1142,12 +1142,13 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 	vector < vector <unsigned int> > pop_ind;
 	pop_ind.resize(model.pop.size());
 	
+	auto dt = model.details.dt;
+	
 	auto egl = 0u;
 	for(auto ti = 0u; ti < T; ti++){
 		if(pl) cout << ti << "ti" << endl;
 	
 		// Updates populations
-		//while(egl < glob_ev.size() && glob_ev[egl].tdiv <= tdiv){
 		while(egl < glob_ev.size() && glob_ev[egl].tdiv <= ti){
 			const auto &ge = glob_ev[egl];
 			auto p = ge.p;
@@ -1173,7 +1174,9 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 						pop_ind[po][ind] = ii;
 						
 						auto &iip = ind_pop[p][ii];
+						
 						auto k = 0u; while(k < iip.pop_ref.size() && !(iip.pop_ref[k].po == po && iip.pop_ref[k].index == N-1)) k++;
+							
 						if(k == iip.pop_ref.size()) emsg("cannot find");
 						
 						iip.pop_ref[k].index = ind;
@@ -1242,17 +1245,15 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 				
 					{
 						auto k_from = ii_from.pref;
-						
-						if(lin.multi_source){ 	
+						if(lin.multi_source){ 			
 							if(k_from == UNSET){
 								auto val = eq.calculate_no_pop(ti,precalc);	
-								probfi += log(val/mev.div[ti].value);
+								probfi += log(val*dt/mev.div[ti].value);
 							}
 							else{
 								auto pr = pop_ref[k_from];
 								auto val = eq.calculate_pop_grad(k_from,ti,precalc);
-							
-								probfi += log(val*popnum[pr]/mev.div[ti].value);
+								probfi += log(val*popnum[pr]*dt/mev.div[ti].value);
 							}
 						}
 						
@@ -1284,7 +1285,6 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 							auto ss = eq.setup_source_sampler(ti,popnum,param_val);
 
 							k_prop = ss.sample_inf_source();
-							//if(k_prop == UNSET) emsg("Cannot sample source");
 							probif += ss.prob_inf_source(k_prop);
 						}
 						
@@ -1339,7 +1339,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 					}
 					
 					auto dlike_markov = probif - probfi;
-		
+					
 					if(probif != -LARGE && (ii_from.i != ii_prop.i || ii_from.p != ii_prop.p || ii_from.pref != ii_prop.pref)){
 						auto n = ev.inf_node_ref;
 					
@@ -1349,7 +1349,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 									+ burn_info.genetic_process*gc.dlike_genetic_process
 									+ burn_info.genetic_obs*gc.dlike_genetic_obs
 									+ probfi-probif+gc.probfi-gc.probif);
-						
+					
 						if(pl) cout << al << " al" << endl;
 						
 						ntr++;

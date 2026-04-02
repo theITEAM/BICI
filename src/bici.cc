@@ -9,7 +9,7 @@
 
 // ssh gaia.bioss.ac.uk  
 
-//valgrind --tool=massif --exit-on-first-error=yes --error-exitcode=1 -s ./bici-para Execute/init.bici sim
+//valgrind --tool=massif --exit-on-first-error=yes --error-exitcode=1 -s ./bici-para Execute/init.bici inf
 
 // tar -xzf foo.tgz
 
@@ -237,15 +237,6 @@ int main(int argc, char** argv)
 		output.init(input);
 	}
 	
-	if(false){
-		auto total_cpu = clock()-total_time;
-		auto op_cpu = 0u;
-		if(op() && !com_op) output.final_time(total_cpu+op_cpu,op_cpu);
-		
-		if(!com_op) output.final_memory_usage();
-		//return 0; 
-	}
-	
 	if(false && op()){
 		cout << " turn off data summary" << endl;
 		output.summary(model);                // Outputs a text file sumarising the model
@@ -323,8 +314,8 @@ int main(int argc, char** argv)
 	case DATA_SIM:                          // Simulates some data and adds to 
 		{
 			DataSim data_sim(model,output);
-			for(int i = data_sim_lines.size()-1; i >= 0; i--){
-				data_sim.run(data_sim_lines[i]);
+			for(const auto &va : data_sim_lines){
+				data_sim.run(va);
 			}
 		}
 		break;
@@ -354,6 +345,20 @@ int main(int argc, char** argv)
 		}
 		break;
 		
+	case COMPRESS:
+		{
+			DataSim data_sim(model,output);
+			data_sim.compress();
+		}
+		break;
+		
+	case DECOMPRESS:
+		{
+			DataSim data_sim(model,output);
+			data_sim.decompress();
+		}
+		break;
+		
 	case TORNADO_RESULT: case TORNADO_SETUP: 
 	case SCAN_RESULT: case SCAN_SETUP: 
 		emsg("Should not be here");
@@ -364,9 +369,9 @@ int main(int argc, char** argv)
 		break;
 	}
 	
-	if(model.mode != DATA_SHOW){
+	if(model.mode != DATA_SHOW){	
 		auto total_cpu = clock()-total_time;
-		
+	
 		auto op_time = clock();
 		output.end(file,total_cpu);
 		auto op_cpu = clock()-op_time;
@@ -526,6 +531,14 @@ vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_
 			
 		if(te == "tornado-res") mode_new = TORNADO_RESULT;
 	
+		if(te == "compress" || te == "comp"){
+			mode_new = COMPRESS;
+		}
+		
+		if(te == "decompress" || te == "decomp"){
+			mode_new = DECOMPRESS;
+		}
+		
 		if(begin_str(te,"scan:")){
 			mode_new = SCAN_SETUP;
 			if(i+1 == N) alert_input("There must be an expression (or expressions) after 'scan' that specify the data.");

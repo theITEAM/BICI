@@ -207,12 +207,6 @@ void Equation::calculate_linearise()
 		*/
 	}
 
-	linearise.multi_source = false;
-	
-	auto num = linearise.pop_grad_calc_store.size();
-	if(linearise.no_pop_calc_store.size() > 0) num++;
-	if(num > 1) linearise.multi_source = true; 
-	
 	linearise.on = true;
 	
 	linearise.init_pop_ref_from_po(pop_ref);
@@ -223,7 +217,12 @@ void Equation::calculate_linearise()
 	
 	simplify(linearise.no_pop_calc_store);
 	for(auto &ca : linearise.pop_grad_calc_store) simplify(ca);
-	
+
+	linearise.multi_source = false;	
+	auto num = linearise.pop_grad_calc_store.size();
+	if(!zero_eqn(linearise.no_pop_calc_store)) num++;
+	if(num > 1) linearise.multi_source = true; 
+
 	if(false){
 		print_calculation();
 		cout << endl << "AFTER LINEARISE" << endl;
@@ -233,7 +232,7 @@ void Equation::calculate_linearise()
 		for(auto k = 0u; k < linearise.pop_grad_calc_store.size(); k++){
 			print_calc(pop[pop_ref[k]].name,linearise.pop_grad_calc_store[k]);	
 		}
-		//emsg_input("Linear done");
+		emsg_input("Linear done");
 	}
 	
 	get_pop_grad_calc_factorise();
@@ -260,7 +259,21 @@ void Equation::calculate_linearise()
 	}
 }
 
-	
+
+/// Detemines if an equation is zero
+bool Equation::zero_eqn(const vector <Calculation> &calc) const
+{
+	if(calc.size() == 0) return true;
+	if(calc.size() == 1){
+		const auto &ca = calc[0];
+		if((ca.op == ADD || ca.op == MULTIPLY) && ca.item.size() == 1){
+			if(ca.item[0].type == ZERO) return true;
+		}
+	}
+	return false;
+}
+
+
 /// Prints the calculation and the linear final version (for diagnostics)
 void Equation::print_linear_final() const
 {

@@ -1070,7 +1070,7 @@ SpecPrecalc Precalc::shrink_sprec(const vector <unsigned int> &lt, SpecPrecalc s
 /// Sets parameter in precalculation
 void Precalc::set_param(SpecPrecalc &set_param_spec_precalc, SpecPrecalc &spec_precalc_after, bool spl_fl) const
 {
-	// zz Transfers over parameter
+	// Transfers over parameter
 	auto &info = spec_precalc_after.info;
 
 	if(info.size() == 0) emsg("zero size");

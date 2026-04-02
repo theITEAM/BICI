@@ -767,14 +767,6 @@ function output_param(par,save_type,file_list,one_file)
 						}
 						
 						if(file != undefined){
-							let err = check_param_value("Set Param",par,par.value);
-							if(err){
-								let wt = "MissingSimValue"; if(par.variety == "reparam") wt = "ReparamValue";
-								
-								add_warning({mess:"Problem with "+par.full_name+" value", mess2:err, warn_type:wt, name:par.name});
-								return;
-							}
-						
 							file = output_value_table(par,par.value,"Value",file,file_list,one_file,"value",save_type);
 							te2 += '"'+file+'"';
 						}
@@ -785,19 +777,24 @@ function output_param(par,save_type,file_list,one_file)
 				}
 			}
 			
-			if(par.variety != "const" && par.variety != "reparam"){
-				switch(par.variety){
-				case "normal":
-					te2 += output_add_prior_distribution(save_type,par,"prior",file_list,one_file);
-					break;
-					
-				case "dist":
-					if(dist_done == false){
-						te2 += output_add_prior_distribution(save_type,par,"dist",file_list,one_file);
+			if(par.prior_const_on == true && par.prior_const_set == true){
+				te2 += output_add_prior_const(save_type,par,file_list,one_file);
+			}
+			else{
+				if(par.variety != "const" && par.variety != "reparam"){
+					switch(par.variety){
+					case "normal":
+						te2 += output_add_prior_distribution(save_type,par,"prior",file_list,one_file);
+						break;
+						
+					case "dist":
+						if(dist_done == false){
+							te2 += output_add_prior_distribution(save_type,par,"dist",file_list,one_file);
+						}
+						break;
+						
+					default: error("Option not recognised 1B"+par.variety); break;
 					}
-					break;
-					
-				default: error("Option not recognised 1B"+par.variety); break;
 				}
 			}
 			
@@ -856,7 +853,6 @@ function output_param(par,save_type,file_list,one_file)
 			}
 		}
 		
-		
 		if(par.sim_sample && par.sim_sample.check == false){
 			te1 += ' sim-sample="false"';
 		}
@@ -896,6 +892,11 @@ function output_value_table(par,value,head_col,file,file_list,one_file,key,save_
 			
 		case "Value":
 			wt = "MissingSimValue";
+			if(save_type != "sim" && save_type != "inf") return; 	
+			break;
+			
+		case "ValueInf":
+			wt = "MissingPriorConst";
 			if(save_type != "sim" && save_type != "inf") return; 	
 			break;
 		}
@@ -1036,6 +1037,36 @@ function output_add_prior_distribution(save_type,par,variety,file_list,one_file)
 	}
 		
 	return st;
+}
+
+
+/// Adds a prior constant
+function output_add_prior_const(save_type,par,file_list,one_file)
+{
+	let te = ' prior-const=';
+		
+	let file;				
+	if(par.dep.length > 0){
+		file = get_unique_file("prior-const-"+par.name,file_list,'.csv');
+	}
+	
+	if(file != undefined){
+		let err = check_param_value("Set Param",par,par.prior_const);
+		if(err){
+			let wt = "MissingSimValue"; if(par.variety == "reparam") wt = "ReparamValue";
+			
+			add_warning({mess:"Problem with "+par.full_name+" value", mess2:err, warn_type:wt, name:par.name});
+			return;
+		}
+	
+		file = output_value_table(par,par.prior_const,"Value",file,file_list,one_file,"value",save_type);
+		te += '"'+file+'"';
+	}
+	else{
+		te += JSON.stringify(par.prior_const); 
+	}
+	
+	return te;
 }
 
 
@@ -1549,6 +1580,10 @@ function get_ppc_command(save_type)
 	
 	if(details.seed_on.value == "Yes") te += " seed="+Number(details.seed);
 	
+	if(details.optimise.value != "auto") te += ' optimise="'+details.optimise.value+'"';
+		
+	if(details.compress.value != "auto") te += ' compress="'+details.compress.value+'"';
+			
 	if(details.run_inf_model.value == "No") te += ' param-only="true"';
 	
 	let cbl = details.check_box_list;

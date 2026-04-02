@@ -660,12 +660,12 @@ Layer.prototype.plot_button = function (bu,ov)
 	case "ParamElement": case "ParamElementConst": case "ParamElementEq": 
 	case "ParamFactorConst": case "ParamWeightConst":
 	case "PriorSplitElement": case "DistSplitElement":
-	case "ParamSimElement": case "DistSimElement": 
+	case "ParamSimElement": case "ParamPriConElement": case "DistSimElement": 
 	case "IEGroupName":
 	case "ReparamElement": case "ReparamTableElement":  
-	case "DefineElement": 
 	case "PriorElement": case "DistElement": case "SplineKnots": 
 	case "SmoothValue": case "Amatrix": case "Xvector": case "AmatrixElement": case "XvectorElement":
+		te = String(te);
 		if(bu.ac == undefined && (bu.type == "ParamElement" || bu.type == "ReparamElement" || bu.type == "ParamElementConst")){
 			let d = 0.4, d2 = 0.2;
 			fill_rectangle(x+d2,y+d2,dx-2*d2,dy-2*d2,LLLGREY);
@@ -717,13 +717,13 @@ Layer.prototype.plot_button = function (bu,ov)
 		plot_text(String(te),x+0.3,y+0.7*dy,bu.font,BLACK,dx-0.5);
 		break;
 	
-	case "ReparamEqn":
+	case "ReparamEqn": case "DefineEqn":
 		{	
 			let col = WHITE; if(ov) col = LLBLUE;	
 			if(selected(bu)) col = LLRED;
 			fill_rectangle(x,y,dx,dy,col);
 			let si = 1.3;		
-			plot_equation(bu.te,x+0.3,y+dy/2+0.3*si,si,x+dx-0.6,BLUE);
+			plot_equation(bu.te,x+0.3,y+dy/2+0.3*si,si,dx-0.6,BLUE);
 		}
 		break;
 		
@@ -980,7 +980,7 @@ Layer.prototype.plot_button = function (bu,ov)
 				let TY = TX*bu.mod_ty.height/bu.mod_ty.width;
 				draw_image(bu.mod_ty2,x+W-TX-ma,y+ma+1.7,TX,TY);
 			}
-			//zz
+			
 			let word = bu.word;
 			
 			for(let i = 0; i < word.length; i++){
@@ -1566,7 +1566,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			plot_text("=",bu.x_eq,y+dy/2+0.35*si,get_font(si),BLACK);
 			
 			si = 1.4;
-			plot_equation(bu.te_eqn2,bu.x_eq+1.6,y+dy/2+0.3*si,si,x+dx-(bu.x_eq+1.6),tcol);
+			plot_equation(bu.te_eqn2,bu.x_eq+1.6,y+dy/2+0.3*si,si,x+dx-(bu.x_eq+1.6+0.3),tcol);
 		}
 		break;
 		
@@ -1608,7 +1608,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			let col = WHITE; if(ov) col = LLBLUE;
 			if(selected(bu)) col = LLRED;
 			fill_rectangle(x,y,dx,dy,col); 
-			plot_equation(bu.te,x+0.3,y+dy/2+0.3*bu.si,bu.si);
+			plot_equation(bu.te,x+0.3,y+dy/2+0.3*bu.si,bu.si,dx-0.6);
 		}
 		break;
 		
@@ -1640,7 +1640,7 @@ Layer.prototype.plot_button = function (bu,ov)
 		{
 			if(bu.op.back == undefined)	clear_rectangle(x,y,dx,dy);
 			else draw_round_rectangle(x+0.1,y+0.1,dx-0.2,dy-0.2,0.3,bu.op.back,bu.op.back);
-		
+			
 			let si = 0.8;
 			
 			let col = BLACK;
@@ -2002,7 +2002,9 @@ Layer.prototype.plot_button = function (bu,ov)
 			
 			let si = si_drop;
 			let font = get_font(si);
-			plot_text(te,x+0.5,y+dy/2+0.4*si,font,col3,dx-2);
+	
+			let tsa = text_sup_anno(te,si,dx-2,"arial");
+			plot_text_tsa(tsa,x+0.5,y+dy/2+0.4*si,col3);
 		}
 		break;
 		
@@ -2360,7 +2362,7 @@ Layer.prototype.plot_button = function (bu,ov)
 				plot_text_tsa(tsa,x+3,y+dy/2+0.4,BLACK);
 			}
 			else{
-				plot_equation(te,x+3,y+dy/2+0.4,1,dx-(x+3));
+				plot_equation(te,x+3,y+dy/2+0.4,1,dx-3.3);
 			}
 		}
 		break;
@@ -2370,7 +2372,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			clear_rectangle(x,y,dx,dy);
 			let ddy = 0.7; 
 			fill_rectangle(x+0.8,y+dy/2-ddy/2,1.7,ddy,bu.col); 
-			plot_equation(te,x+3,y+dy/2+0.35,1,dx-(x+3));
+			plot_equation(te,x+3,y+dy/2+0.35,1,dx-3.3);
 		}
 		break;
 		
@@ -2382,7 +2384,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			draw_line(xx-dxx,y+mar,xx+dxx,y+mar,bu.col,NORMLINE,bu.dash); 
 			draw_line(xx-0.5*dxx,y+dy/2,xx+0.5*dxx,y+dy/2,bu.col,NORMLINE,bu.dash); 
 			draw_line(xx-dxx,y+dy-mar,xx+dxx,y+dy-mar,bu.col,NORMLINE,bu.dash); 
-			plot_equation(te,x+3,y+dy/2+0.4,1,dx-(x+3));
+			plot_equation(te,x+3,y+dy/2+0.4,1,dx-3.3);
 		}
 		break;
 		

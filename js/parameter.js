@@ -44,6 +44,7 @@ function update_desc()
 			par.value_desc = get_value_desc(par);
 			par.weight_desc = get_weight_desc(par);
 			par.prior_split_desc = get_prior_split_desc(par);
+			par.prior_const_desc = get_prior_const_desc(par);
 			par.dim = get_value_dim(par);
 		}
 	}
@@ -310,10 +311,10 @@ function add_par_to_list(par,list,eqn,mess)
 		let parlist = list[j];
 		
 		if(par.name == parlist.name){
-			if(par.type != "derived" && parlist.type != "derived" && 
+			if(parlist.variety != "const" && par.type != "derived" && parlist.type != "derived" && 
 				 par.type != "define_eqn" && parlist.type != "define_eqn"){					 
 				if(par.type != parlist.type && par.type != "define_eqn" && parlist.type != "define_eqn"){
-					model.warn.push({mess:"The parameter '"+par.name+"' has contrasting types in different parts of the model", mess2:"This parameter is used "+param_eqn_desc(eqn), eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
+					model.warn.push({mess:"Non-constant parameter '"+par.name+"' has contrasting types", mess2:"This parameter is used "+param_eqn_desc(eqn), eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
 					
 					let eqn2 = parlist.eqn_appear[parlist.eqn_appear.length-1];
 				
@@ -322,12 +323,12 @@ function add_par_to_list(par,list,eqn,mess)
 				}
 		
 				if(par.p_name != parlist.p_name){
-					model.warn.push({mess:mess, mess2:"The parameter '"+par.name+"' appears in the transitions of two species", eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
+					model.warn.push({mess:mess, mess2:"Non-constant parameter '"+par.name+"' appears in the transitions of two species", eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
 					break;
 				}
 			
 				if(par.cl_name != parlist.cl_name){
-					model.warn.push({mess:mess, mess2:"The parameter '"+par.name+"' appears in two different classifications", eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
+					model.warn.push({mess:mess, mess2:"Non-constant parameter '"+par.name+"' appears in two different classifications", eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
 					break;
 				}
 			}
@@ -365,6 +366,7 @@ function param_eqn_desc(eqn)
 	case "trans_scale": return "in a transition scale";
 	case "trans_cv": return "in a transition coefficient of variation";
 	case "comp_prob": case "sim_comp_prob": return "in a compartmental probability";
+	case "reparam_eqn": return "in a reparameterised equation";
 	case "reparam": return "in a reparametersation";
 	case "define_eqn": return "in a definition";
 	case "derive_param": return "in a derived parameter";
@@ -521,6 +523,41 @@ function get_value_desc(par)
 	if(par.value != undefined){
 		if(tot < 10){
 			te = JSON.stringify(par.value);
+			te = te.replace(/\"/g," ")
+			te = te.replace(/null/g,"Unset");
+		}
+	}
+	else te = "Unset "+te;
+	
+	return te;
+}
+
+
+/// Gets a description of prior_const to send back to inferface
+function get_prior_const_desc(par)
+{
+	let te;
+	
+	let dim = [];
+	for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
+		
+	switch(dim.length){
+	case 1: te = "Vector("; break;
+	case 2: te = "Matrix("; break;
+	default: te = "Tensor("; break;
+	}
+		
+	let tot = 1; 
+	for(let k = 0; k < dim.length; k++){
+		if(k != 0) te += ",";
+		te += dim[k];
+		tot *= dim[k];
+	}
+	te += ")";
+	
+	if(par.prior_const != undefined){
+		if(tot < 10){
+			te = JSON.stringify(par.prior_const);
 			te = te.replace(/\"/g," ")
 			te = te.replace(/null/g,"Unset");
 		}
@@ -1181,11 +1218,13 @@ function par_set_default(par)
 	
 	if(par.dep.length == 0){
 		par.value = set_str;
+		par.prior_const = set_str;
 		if(par.list){
 			delete par.list;
 			delete par.prior_split; delete par.prior_split_set; delete par.prior_split_check;
 			delete par.factor_weight;
 			delete par.set;
+			delete par.prior_const_set;
 		}
 	}
 	else{
@@ -1200,8 +1239,9 @@ function par_set_default(par)
 		par.list = par_find_list(par);
 		par.prior_split_check = {check:false};
 		par.set = false;
+		par.prior_const_set = false;
 	}
-	
+	par.prior_const_on = false;
 	par.reparam_param_list = [];
 	par.reparam_warn = [];
 	par.prior_param_list = [];
@@ -1222,6 +1262,7 @@ function dist_set_default(par)
 	par.dist_mat = true;
 	par.iden_mat = false;
 	par.den_vec = false;
+	par.prior_const_set = false;
 	par.set = false;
 }
 
@@ -1237,6 +1278,7 @@ function density_set_default(par)
 	par.den_vec = true;
 	par.dist_mat = false;
 	par.iden_mat = false;
+	par.prior_const_set = false;
 	par.set = false;
 }
 
@@ -1254,6 +1296,7 @@ function iden_set_default(par)
 	par.dist_mat = false;	
 	par.iden_mat = true;
 	par.den_vec = false;
+	par.prior_const_set = false;
 	par.set = false;
 }
 
@@ -1311,6 +1354,8 @@ function copy_param_info(par,old)
 	par.sim_sample = old.sim_sample;
 	par.label_info = old.label_info;
 	par.set = old.set;
+	par.prior_const_set = old.prior_const_set;
+	par.prior_const_on = old.prior_const_on;
 	par.import_line = old.import_line;
 	par.reparam_param_list = old.reparam_param_list;
 	par.reparam_warn = old.reparam_warn;
@@ -1333,10 +1378,11 @@ function copy_param_info(par,old)
 	
 	if(par.name == iden_matrix_name || par.name == iden_matrix_name2){ iden_set_default(par); return par;}
 	
-	if(par.variety == "reparam" && par.reparam_eqn_on){ reparam_eqn_set_default(par); return par;}
+	if(par.variety == "reparam" && par.reparam_eqn_on) reparam_eqn_set_default(par); 
 	
 	if(par.dep.length == 0){	
 		par.value = old.value;
+		par.prior_const = old.prior_const;
 	}
 	else{
 		let list = par_find_list(par);
@@ -1347,10 +1393,11 @@ function copy_param_info(par,old)
 		let dif = false;
 		
 		let val_set = false; if(old.value != undefined) val_set = true;
+		let prc_set = false; if(old.prior_const != undefined) prc_set = true;
 		let pri_set = false; if(old.prior_split != undefined) pri_set = true;
 		let wei_set = false; if(old.factor_weight != undefined) wei_set = true;
 		
-		if(val_set || pri_set || wei_set){
+		if(val_set || prc_set || pri_set || wei_set){
 			if(!list_old) dif = "unset";
 			else{
 				if(list.length != list_old.length) dif = true;
@@ -1371,6 +1418,7 @@ function copy_param_info(par,old)
 				let co_list = generate_co_list(list);
 			
 				let value; if(val_set) value = copy(temp);
+				let prior_const; if(prc_set) prior_const = copy(temp);
 				let prior_split; if(pri_set) prior_split = copy(temp);
 				let weight; if(wei_set) weight = copy(temp);
 			
@@ -1403,7 +1451,7 @@ function copy_param_info(par,old)
 					for(let k = 0; k < ele_list.length; k++){
 						let ind = ele_list[k];
 						
-						let val, pr_sp, wei;
+						let val, pr_co, pr_sp, wei;
 						
 						let ind_old=[];
 						let ii;
@@ -1415,30 +1463,38 @@ function copy_param_info(par,old)
 						if(ii == par.dep.length){
 							old_fl = true;
 							if(val_set) val = get_element(old.value,ind_old);
+							if(prc_set) pr_co = get_element(old.prior_const,ind_old);
 							if(pri_set) pr_sp = get_element(old.prior_split,ind_old);
 							if(wei_set) wei = get_element(old.factor_weight,ind_old);
 						}
 						else{
 							if(val_set) val = undefined;
+							if(prc_set) pr_co = undefined;
 							if(pri_set) pr_sp = unset_prior(par.type);
 							if(wei_set) wei = 1;
 						}
 						
 						if(val_set) set_element(value,ind,val);
-						if(pri_set) set_element(prior_split,ele_list[k],pr_sp);
-						if(wei_set) set_element(weight,ele_list[k],wei);
+						if(prc_set) set_element(prior_const,ind,pr_co);
+						if(pri_set) set_element(prior_split,ind,pr_sp);
+						if(wei_set) set_element(weight,ind,wei);
 					}
 				}
 				
 				par.list = list;
 				if(val_set) par.value = value;
+				if(prc_set) par.prior_const = prior_const;
 				if(pri_set) par.prior_split = prior_split;
 				if(wei_set) par.factor_weight = weight;
-				if(old_fl == false) par.set = false;
+				if(old_fl == false){
+					par.set = false;
+					par.prior_const_set = false;
+				}
 			}
 			else{
 				par.list = old.list;
 				if(val_set) par.value = old.value;
+				if(prc_set) par.prior_const = old.prior_const;
 				if(pri_set) par.prior_split = old.prior_split;
 				if(wei_set) par.factor_weight = old.factor_weight;
 			}

@@ -172,7 +172,7 @@ class Proposal                             // Implements a proposal
 		void set_sampler2D_info(const vector <double> &vec, Sampler2D &sa) const;
 		string print_ac(unsigned int nac, unsigned int ntr) const;
 		string print_fa(unsigned int nfa, unsigned int ntr) const;
-		string print_range(string te, const vector <double> &list) const;
+		string print_range(string te, const vector <double> &list, bool float_num) const;
 
 	// Used in proposal_local.cc
 	private:

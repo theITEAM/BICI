@@ -36,6 +36,7 @@ void Output::init(const Input &input)
 		case INF: case EXT: sampledir_rel = "output-inf"; break;
 		case PPC: sampledir_rel = "output-post-sim"; break;
 		case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: 
+		case COMPRESS: case DECOMPRESS:
 			sampledir_rel = "output-sim";
 			break;
 	
@@ -118,10 +119,12 @@ void Output::init(const Input &input)
 		case PPC: lines_raw.push_back(new_lr(OUT_POST_SIM_BANNER)); break;
 		case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: break;
 		case TORNADO_SETUP: case TORNADO_RESULT: break;
+		case COMPRESS: case DECOMPRESS: break;
 		case SCAN_SETUP: case SCAN_RESULT: break;
 		case MODE_UNSET: break;
 		}
 		lines_raw.push_back(new_lr(""));
+		
 	}
 }
 
@@ -636,7 +639,7 @@ void Output::summary(const Model &model) const
 			*/
 			break;
 
-		case INF: case PPC:
+		case INF: case EXT: case PPC:
 			break;
 			
 		case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR:
@@ -648,6 +651,9 @@ void Output::summary(const Model &model) const
 		case SCAN_SETUP: case SCAN_RESULT:
 			break;
 		
+		case COMPRESS: case DECOMPRESS:
+			break;
+			
 		default:  emsg("Model output error10"); break;
 		}
 		
@@ -1420,8 +1426,10 @@ void Output::set_inference_prop(double value, string tag, double def)
 	auto len = te.length();
 	
 	for(auto j = 0u; j < lines_raw.size(); j++){
-		auto st = lines_raw[j].st;
+		auto st = trim(lines_raw[j].st);
+		
 		auto spl = split(st,' ');
+
 		if(spl[0] == "inference"){
 			auto k = 0u; while(k < st.length()-len && st.substr(k,len) != te) k++;
 			if(k < st.length()-len){ 
@@ -1620,7 +1628,9 @@ string Output::param_output(const Particle &part, const vector < vector <double>
 void Output::state_sample(unsigned int s, unsigned int chain, State &state)
 {
 	timer[STATE_OUTPUT] -= clock();
+
 	state.check_final_li_wrong();
+
 	auto part = state.generate_particle(s,chain,true);
 	state_store.push_back(part);
 	timer[STATE_OUTPUT] += clock();
@@ -2308,8 +2318,12 @@ void Output::copy(string file)
 void Output::end(string file, unsigned int total_cpu)
 {
 	percentage_start(OUTPUT_PER,sup);
-		
+	
 	if(com_op) cout << "<OUTPUTTING>" << endl;
+	
+	// Ensures one blank line at the end
+	while(lines_raw.size() > 0 && lines_raw[lines_raw.size()-1].st == "") lines_raw.pop_back();
+	lines_raw.push_back(new_lr(""));
 	
 	if(com_op == true){
 		cout << "<<OUTPUT FILE>>" << endl;
@@ -2320,7 +2334,7 @@ void Output::end(string file, unsigned int total_cpu)
 			}
 		}
 	}
-	
+
 	ofstream fout;
 	
 	if(com_op == false && op()){
@@ -2331,7 +2345,7 @@ void Output::end(string file, unsigned int total_cpu)
 			fout << lr.st << endl;
 		}
 	}
-	
+
 	if(!model.data_mode()){
 		auto nchain = model.details.nchain;
 
@@ -2343,29 +2357,32 @@ void Output::end(string file, unsigned int total_cpu)
 			percentage(frac*25,100,sup);
 			
 			auto part = get_part_chain(ch,param_store);
-			
+		
 	#ifdef USE_MPI	
 			mpi.transfer_particle(part);
 	#endif
 		
 			if(op() && part.size() > 0){
 				number_part(part);
+			
 				output_trace(ch,part,param_samp,fout);
 			}
 		}
-
+		percentage(25,100,sup);
+		
 		vector <string> final_warning;
 
-		output_rate_warning(total_cpu,50,100,final_warning);
-			
 		auto trans_diag_on = false; 
 		if(model.mode == INF || model.mode == EXT) trans_diag_on = true;
+	
+		vector <string> trans_prob_name;
+		double dt_max_est_min = LARGE;
 		
 		for(auto ch = 0u; ch < model.details.nchain; ch++){
 			auto trans_diag = trans_diag_init(); 
 		
 			auto frac = double(ch)/nchain;
-			percentage(25+frac*25,100,sup);
+			percentage(25+frac*50,100,sup);
 
 			auto part = get_part_chain(ch,state_store);
 
@@ -2374,6 +2391,20 @@ void Output::end(string file, unsigned int total_cpu)
 	#endif
 
 			if(op() && part.size() > 0){
+				for(const auto &pa : part){
+					for(auto p = 0u; p < model.nspecies; p++){
+						const auto &psp = pa.species[p];
+						auto dt = psp.dt_max_est;
+						if(dt < dt_max_est_min) dt_max_est_min = dt;
+						
+						for(const auto &tp : psp.trans_prob){
+							auto name = model.species[p].cla[tp.cl].tra[tp.tr].name;
+							if(trans_prob_name.size() >= TRANS_PROB_MAX) break;
+							add_to_vec(trans_prob_name,name);
+						}						
+					}
+				}
+				
 				number_part(part);
 				if(trans_diag_on){
 					trans_diag_add(trans_diag,part); 
@@ -2383,6 +2414,26 @@ void Output::end(string file, unsigned int total_cpu)
 				output_state(ch,part,fout);
 			}
 		}
+		
+		if(op()){		
+			string err_msg;
+			if(trans_prob_name.size() > 0){
+				err_msg = "High transition rates mean that there is a potential for a finite time-step discretisation error. It is recommended that this model is run with a time-step below '"+tstr(dt_max_est_min,2)+"'. The following transitions are affected: ";
+				err_msg += stringify(trans_prob_name);
+				if(trans_prob_name.size() >= TRANS_PROB_MAX) err_msg += "...";
+			}
+		
+			if(total_cpu >= 100 && dt_max_est_min > 5*model.details.dt){
+				auto tmax = model.details.t_end-model.details.t_start;
+				auto dt = dt_max_est_min;
+				if(dt > tmax/10) dt = tmax/10;
+				
+				err_msg = "This is being run with a relatively small time-step. Analysis suggests it could be reliably run up to a time-step '"+tstr(dt,2)+"'.";
+			}
+			
+			if(err_msg != "") final_warning.push_back(err_msg);
+		}
+		percentage(75,100,sup);
 
 	#ifdef USE_MPI	
 		mpi.transfer_terminal_info(terminal_info);
@@ -2391,6 +2442,7 @@ void Output::end(string file, unsigned int total_cpu)
 		if(op() && model.mode == INF){
 			output_prop_info(fout);
 		}
+		percentage(85,100,sup);
 
 		auto alg = model.details.algorithm;
 		if(alg == PAS_MCMC || alg == ABC_SMC_ALG){
@@ -2404,6 +2456,7 @@ void Output::end(string file, unsigned int total_cpu)
 				output_generation(part,fout);
 			}
 		}
+		percentage(90,100,sup);
 
 		auto alg_warn_flag = false;
 		
@@ -2418,7 +2471,7 @@ void Output::end(string file, unsigned int total_cpu)
 				output_diagnostic(diagnostic,alg_warn_flag,fout);
 			}
 		}
-
+	
 		if(op() && (model.mode == INF || model.mode == EXT) && com_op == false){
 			output_param_statistics(param_samp,fout,final_warning);
 		}
@@ -2426,7 +2479,7 @@ void Output::end(string file, unsigned int total_cpu)
 		output_add_ind_warning(final_warning);
 
 		output_spline_out_warning(final_warning);
-
+	
 		for(const auto &der : model.derive){
 			auto st = der.func.warn; 
 			if(der.func.on && st != "") final_warning.push_back(st);
@@ -2441,7 +2494,9 @@ void Output::end(string file, unsigned int total_cpu)
 				}
 			}
 		}
-	
+		
+		percentage_end(sup);
+		
 		if(op() && !(com_op && mpi.core != 0)){ // Stops repeated messages
 			if(!sup){	
 				for(auto te : final_warning) add_warning(te,fout);
@@ -2449,8 +2504,9 @@ void Output::end(string file, unsigned int total_cpu)
 			}
 		}
 	}
-	
-	percentage_end(sup);
+	else{
+		percentage_end(sup);
+	}
 	
 	if(com_op == true) cout << "<<END>>" << endl;
 }
@@ -3036,160 +3092,6 @@ void Output::output_add_ind_warning(vector <string> &final_warning) const
 	}
 }
 		
-			
-/// Works out if time-step is too small
-void Output::output_rate_warning(unsigned int total_cpu, unsigned int per_start, unsigned int per_end, vector <string> &final_warning) const 
-{
-	State state(model);
-	state.init();
-	
-	vector < vector < vector <double> > > rate_sum;
-	double nrate_sum = 0;
-	
-	auto T = state.T;
-	auto dt = model.details.dt;
-
-	rate_sum.resize(model.nspecies); 
-	for(auto p = 0u; p < model.nspecies; p++){
-		const auto &sp = model.species[p];	
-		rate_sum[p].resize(sp.tra_gl.size()); 
-		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
-			rate_sum[p][tr].resize(T,0); 
-		}
-	}
-	
-	// Randomly selects around 10 state samples on which estimate are made
-	auto samp_tot = state_store.size()*mpi.ncore;
-	auto step = samp_tot/10;
-	if(step == 0) step = 1;
-	
-	auto rmax = 0.0;
-	for(auto k = 0u; k < state_store.size(); k += step){
-		auto frac = double(k)/state_store.size();
-		percentage(per_start+frac*(per_end-per_start),100,sup);
-		
-		const auto &pa = state_store[k];
-	
-		state.set_particle(pa,false);
-		for(auto p = 0u; p < model.nspecies; p++){
-			const auto &sp = model.species[p];
-			auto rate = state.get_population_rates(p);
-			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
-				for(auto ti = 0u; ti < T; ti++){
-					rate_sum[p][tr][ti] += rate[tr][ti];
-				}
-			}
-		}
-		nrate_sum++;
-	}
-	
-
-#ifdef USE_MPI	
-	for(auto p = 0u; p < model.nspecies; p++){
-		mpi.sum(rate_sum[p]);
-	}
-	mpi.sum(nrate_sum);
-#endif
-
-	percentage_end(sup);
-
-	if(op()){
-		auto rate_thresh = RATE_RECOMMEND/dt;
-
-		string err_msg = "";
-		for(auto p = 0u; p < model.nspecies; p++){		
-			const auto &sp = model.species[p];
-	
-			auto K = sp.ncla;
-		
-			vector < vector < vector <unsigned int> > > tra_good, tra_bad;
-			tra_good.resize(K); tra_bad.resize(K); 
-			for(auto cl = 0u; cl < K; cl++){
-				const auto &claa = sp.cla[cl];
-				tra_good[cl].resize(claa.ntra); tra_bad[cl].resize(claa.ntra); 
-			}
-
-			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
-				const auto &tra = sp.tra_gl[tr];
-				
-				auto fl = false;
-				if(tra.i == UNSET){ // Source transition
-					
-				}
-				else{
-					for(auto ti = 0u; ti < T; ti++){
-						auto val = rate_sum[p][tr][ti]/nrate_sum;
-
-						if(val > rmax) rmax = val;
-						if(val > rate_thresh) fl = true;
-					}
-				}
-				if(fl == false) tra_good[tra.cl][tra.tr].push_back(tr);
-				else tra_bad[tra.cl][tra.tr].push_back(tr);
-			}
-			
-			string err = "";
-			for(auto cl = 0u; cl < K; cl++){
-				const auto &claa = sp.cla[cl];
-				for(auto tr = 0u; tr < claa.ntra; tr++){
-					const auto &tbad = tra_bad[cl][tr];
-					const auto &tgood = tra_good[cl][tr];
-					if(tbad.size() > 0){
-						if(err != "") err += ", ";
-						err += claa.tra[tr].name;
-						if(tgood.size() != 0){
-							string filt = "";
-							for(auto k = 0u; k < tbad.size(); k++){
-								const auto &trg = sp.tra_gl[tbad[k]];
-								auto c = trg.i; if(c == UNSET) c = trg.f;
-								const auto &co = sp.comp_gl[c];
-								
-								string pst = "";
-								for(auto cl2 = 0u; cl2 < K; cl2++){
-									if(cl2 != cl){
-										if(pst != "") pst += "|";
-										pst += sp.cla[cl2].comp[co.cla_comp[cl2]].name;
-									}
-								}
-								if(filt != "") filt += ", ";
-								filt += pst;
-							}
-							filt = trunc(filt,40);
-							err += " (for "+filt+")";
-						}
-					}
-				}
-			}
-			
-			if(err != ""){
-				if(model.nspecies > 1) err_msg += "For species '"+sp.name+"': ";
-				err_msg += err+". ";
-			}
-		}
-	
-		if(err_msg != ""){
-			err_msg = "High transition rates mean that there is a potential for a finite time-step discretisation error. It is recommended that this model is run with a time-step below '"+tstr(RATE_RECOMMEND/rmax,2)+"'. The following transitions are affected: "+err_msg;
-		}
-		else{
-			if(total_cpu >= 100 && rmax != 0 && rmax < 0.1*rate_thresh){
-				auto tmax = model.details.t_end-model.details.t_start;
-				auto dt = RATE_RECOMMEND/rmax;
-				if(dt > tmax/10) dt = tmax/10;
-				
-				err_msg = "This is being run with a relatively small time-step. Analysis suggests it could be reliably run up to a time-step '"+tstr(dt,2)+"'.";
-			}
-		}
-		
-		if(err_msg != ""){
-			err_msg = trunc(trim(err_msg),300);
-			
-			if(final_warning.size()== 0){		
-				final_warning.push_back(err_msg);
-			}
-		}
-	}
-}
-
 
 /// Outputs a warning if a spline is outside time range
 void Output::output_spline_out_warning(vector <string> &final_warning) const
@@ -3428,7 +3330,7 @@ void Output::number_part(vector <Particle> &part) const
 
 
 /// Outputs the final cpu time
-void Output::final_time(unsigned int cpu_time, unsigned int op_cpu_time) const 
+void Output::final_time(double cpu_time, double op_cpu_time) const 
 {
 	auto op_st = " ("+tstr((int)((op_cpu_time*100)/(cpu_time+TINY)))+"% outputting)";
 	
@@ -3452,7 +3354,7 @@ void Output::final_memory_usage() const
 	}
 }
 
-
+	
 /// Inserts a new command into the BICI-script
 void Output::insert_command(string name, unsigned int p, string insert_pl, string insert_bef, string line, string content, string file)
 {
@@ -3492,7 +3394,6 @@ void Output::insert_command(string name, unsigned int p, string insert_pl, strin
 		if(li == lines_raw.size()){
 			li = 0; 
 			while(li < lines_raw.size() && !begin_str(lines_raw[li].st,insert_bef)) li++;
-			
 			if(li < lines_raw.size()){
 				if(li > 0) li--;
 				if(li > 0 && trim(lines_raw[li-1].st) != ""){
@@ -3507,9 +3408,24 @@ void Output::insert_command(string name, unsigned int p, string insert_pl, strin
 			//lines_raw.insert(lines_raw.begin()+li,new_lr(""));	
 			//li++;
 		}
-		else li++;
+		else{
+			auto li2 = li;
+			while(li2 < lines_raw.size() && !begin_str(lines_raw[li2].st,insert_bef)) li2++;
+			if(li2 < lines_raw.size()){
+				li = li2;
+				if(li > 0) li--;
+				
+				if(trim(lines_raw[li].st) == ""){
+					while(li > 0 && trim(lines_raw[li].st) == "") li--;
+					li++;
+				}
+			}
+			else{
+				li++;
+			}
+		}
 		
-		if(!(li+1 < lines_raw.size() && trim(lines_raw[li].st) == "" && trim(lines_raw[li+1].st) == "")){	
+		if(!(li+1 < lines_raw.size() && trim(lines_raw[li].st) == "" && trim(lines_raw[li+1].st) == "")){			
 			lines_raw.insert(lines_raw.begin()+li,new_lr(""));
 		}
 		li++;

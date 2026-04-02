@@ -34,7 +34,7 @@ function right_menu_buts(lay)
 			
 			if(rpf.sel_view.te == "Data"){		
 				y = add_filter("Data sources",y,rpf.sel_popdata,rpf.pos_popdata,lay);
-				if(!rpf.plot_average) y = chain_sample_filt(y,rpf,lay);
+				y = chain_sample_filt(y,rpf,lay);
 			}
 			else{
 				y = stand_filt(y,rpf,lay,"pop");
@@ -52,7 +52,7 @@ function right_menu_buts(lay)
 			
 			if(rpf.sel_trans_view.te == "Data"){		
 				y = add_filter("Data sources",y,rpf.sel_poptransdata,rpf.pos_poptransdata,lay);
-				if(!rpf.plot_average) y = chain_sample_filt(y,rpf,lay);
+				y = chain_sample_filt(y,rpf,lay);
 			}
 			else{
 				y = stand_filt(y,rpf,lay,"trans");
@@ -254,9 +254,7 @@ function stand_filt(y,rpf,lay,op)
 		y = add_filter("Classification",y,rpf2.sel_class,rpf2.pos_class,lay);
 	}
 	
-	if(!(rpf.plot_average && (op == "pop" || op == "trans")) && op != "trans-diag-inf"){
-		y = chain_sample_filt(y,rpf,lay);
-	}
+	y = chain_sample_filt(y,rpf,lay);
 	
 	return y;
 }
@@ -265,6 +263,8 @@ function stand_filt(y,rpf,lay,op)
 /// Filters chain and sample
 function chain_sample_filt(y,rpf,lay)
 {
+	if(inter.graph.op.average_plot == true) return y;
+
 	if(rpf.pos_chain.length > 1){
 		y = add_filter("Chain",y,rpf.sel_chain,rpf.pos_chain,lay);
 	}

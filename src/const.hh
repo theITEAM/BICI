@@ -26,7 +26,7 @@ const string default_file = "Execute/init.bici";     // This is used for windows
 
 #define USE_MPI                                    // Sets if code can run in parallel
 
-const string bici_version = "v0.84";                 // Sets the BICI version
+const string bici_version = "v0.85";                 // Sets the BICI version
 
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
 const bool testing = true;                           // Set to true for additional testing
@@ -101,7 +101,7 @@ enum IndFacRateType { IND_EFF_MULT, IND_EFF_DIV, FIX_EFF_MULT, FIX_EFF_DIV };
 enum TransVariety { NORMAL, SOURCE_TRANS, SINK_TRANS };
 
 // Different modes of operation
-enum Operation { SIM, INF, PPC, EXT, DATA_SIM, DATA_SHOW, DATA_DEL, DATA_CLEAR, TORNADO_SETUP, TORNADO_RESULT, SCAN_SETUP, SCAN_RESULT, MODE_UNSET };
+enum Operation { SIM, INF, PPC, EXT, DATA_SIM, DATA_SHOW, DATA_DEL, DATA_CLEAR, TORNADO_SETUP, TORNADO_RESULT, SCAN_SETUP, SCAN_RESULT, COMPRESS, DECOMPRESS, MODE_UNSET };
 
 // Different prior possibilities
 enum PriorPos { INVERSE_PR, UNIFORM_PR, POWER_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, DIRICHLET_PR, MDIR_PR, MVN_DEFAULT_PR, MVN_NORM_LKJ_PR, MVN_UNIFORM_LKJ_PR, MVN_INV_WISH_PR, MVN_JEF_PR, MVN_UNIFORM_PR, MVN_COR_PR, UNSET_PR };
@@ -170,7 +170,7 @@ enum PropType { PARAM_PROP, PARAM_DET_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT
 enum AnnealType { ANNEAL_NONE, ANNEAL_SCAN, ANNEAL_POWERAUTO, ANNEAL_LOGAUTO, ANNEAL_POWER };
 
 // Different state timers
-enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER, DERIVE_TIMER,DERIVE_PRECALC_TIMER, SIM_CALC_POPNUM, SIM_PRECALC, SIM_POPIND, SIM_UPDATE, SIM_CHECK,  TIMER_MAX };
+enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER, DERIVE_TIMER,DERIVE_PRECALC_TIMER, SIM_CALC_POPNUM, SIM_PRECALC, SIM_POPIND, SIM_UPDATE, SIM_UPDATE2, SIM_CHECK, SIM_TEMP1, SIM_TEMP2, TIMER_MAX };
 
 // Different output timers
 enum OutTimer { PARAM_OUTPUT, STATE_OUTPUT, OUTTIMER_MAX };
@@ -359,6 +359,7 @@ const auto EQ_POP_REF = 20u;                      // Store reference for populat
 const auto IC_NUM_OPTIMUM = 100u;                 // Optimum number of events for IC local range
 const auto RATE_RECOMMEND = 0.25;                 // Sets recommented wait (for warning)
 const auto ADDREM_NUM_OPTIMUM = 5u;               // The optimum number for add/rem local
+const auto TRANS_PROB_MAX = 4u;                   // Maximum number of trans time warnings
 const auto WIN_UPDATE_ADAPT = 0.99;               // Rate of adaptation for win (local proposals)
 const auto END_LOCAL_ADAPT = 0.99;                // Controls the rate of adaptation for end local
 const auto LOOP_ADD_REM_LOCAL = 10u;              // Number of add/rem local changes
@@ -392,9 +393,9 @@ const double DIF_THRESH = 0.0000001;              // The threshold for a differe
 const double THRESH_EXPAND = 100;                 // Expand threshold for certain quantities
 const double DIF_THRESH_BURNIN = 0.001;           // The threshold during burnin
 const unsigned int RANGE_MIN = 50;                // Minimum number to calc M
-const double COR_MAX = 0.99;                       // Maximum correlation for individual effects
+const double COR_MAX = 0.99;                      // Maximum correlation for individual effects
 const double VAR_MAX = 5.0;                       // Maximum variance for individual effect matrix
-const double VAR_MIN = 0.0001;                    // Maximum variance for individual effect matrix
+const double VAR_MIN = 0.0;                       // Minimum variance for individual effect matrix
 const double ETA_DEFAULT = 1.2;                   // Default value for eta (in LKJ distribution)
 const double SD_DEFAULT = 2;                      // Default value for SD (in LKJ distribution)
 const double SD_VAR_MIN = VAR_MIN;                // The minimum value for sd for covar matrix

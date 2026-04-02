@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <cmath>
+#include <sys/stat.h>
 #include "json.hpp" // This is a JSON parser from https://github.com/nlohmann/json
 
 using namespace std;
@@ -930,12 +931,20 @@ EquationInfo Input::he(EquationInfo eqn_inf, unsigned int lnum)
 }	
 
 
+/// Determines if file is inline
+bool Input::is_inline(string te) const
+{
+	if(te.length() > 4 && te.substr(0,3) == "[[$" && te.substr(te.length()-3,3) == "&]]") return true;
+	return false;
+}
+
+
 /// Determines if text string is for a file
 bool Input::is_file(string te) const
 {
 	if(te.length() < 4) return false;
 	
-	if(te.substr(0,3) == "[[$" && te.substr(te.length()-3,3) == "&]]")	return true;
+	if(is_inline(te))	return true;
 	
 	int k = te.length()-1;
 	int kmin = k-10;
@@ -1604,11 +1613,14 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 	
 	if(false){
 		for(auto i = 0u; i < par.N; i++){
-			auto ref = par.element_ref[i].index;
+			const auto &el = par.element_ref[i];
+			auto ref = el.index;
 			if(ref == UNSET) alert_emsg_input("ref should not be unset"); 
 			
-			auto &ele = par.element[ref];
-			cout << i << " " << ele.value.te << " val" << endl;
+			cout << i << " ";
+			if(el.cons) cout << model.constant.value[ref];
+			else par.element[ref].value.te;
+			cout << " val" << endl;
 		}
 	}
 }
@@ -2051,4 +2063,158 @@ DataSourceType Input::get_data_type(Command cname) const
 	emsg("SHould not be here");
 	
 	return INF_DATA;
+}
+
+
+/// Gets the data directory
+void Input::set_data_directory(const vector <CommandLine> &command_line)
+{
+	datadir = "";
+	for(auto j = 0u; j < command_line.size(); j++){
+		if(command_line[j].command == DATA_DIR){
+			const auto &tags = command_line[j].tags;
+			auto k = 0u; while(k < tags.size() && tags[k].name != "folder") k++;
+			if(k == tags.size()){
+				string te = "Cannot find the 'folder' tag for 'data-dir'";
+				alert_import(te,true);
+			}
+			else{
+				datadir = get_data_dir(tags[k].value);
+
+				if(check_char_allowed(datadir,"<>\"|?*") == false) return;
+
+				struct stat st;
+				if (stat(datadir.c_str(), &st) == -1){  
+					alert_import("The data folder '"+datadir+"' does not exist");
+					return;
+				}
+			}
+		}
+	}
+}
+
+
+/// Compresses all lines
+void Input::compress_command_lines(const vector <CommandLine> &command_line, vector <string> &lines_raw, bool decomp)
+{	
+	auto comp_fl = false;
+	auto comp_fl2 = false;
+
+	string comp_str = "compress"; if(decomp) comp_str = "decompress";
+	
+	vector <string> lines_new;
+	auto li = 0u;
+	for(auto i = 0u; i < command_line.size(); i++){
+		const auto &cl = command_line[i];
+		
+		auto li_next = lines_raw.size();
+		if(i+1 < command_line.size()) li_next = command_line[i+1].line_num;
+				
+		switch(cl.command){
+		case SIM_PARAM: case SIM_STATE:
+		case INF_PARAM: case INF_STATE:
+		case POST_SIM_STATE: case POST_SIM_PARAM:
+		case PROPOSAL_INFO: case INF_PARAM_STATS: case INF_DIAGNOSTICS:
+		case INF_GEN: case TRANS_DIAG:
+			{
+				comp_fl = true;
+				
+				auto tags = cl.tags;
+				
+				auto fl = true;
+				auto fl2 = false;
+				for(auto j = 0u; j < tags.size(); j++){
+					auto &ta = tags[j];
+					if(ta.name == "compress"){
+						fl2 = true;
+						if(decomp == false){
+							if(toLower(ta.value) != "true") ta.value = "true";
+							else fl = false;
+						}
+						else{
+							if(toLower(ta.value) != "false") ta.value = "false";
+							else fl = false;
+						}
+					}
+				}
+				
+				if(fl == true){
+					auto te = cl.command_name;
+					auto fi_tag = UNSET;
+					for(auto j = 0u; j < tags.size(); j++){
+						const auto &ta = tags[j];
+						if(ta.name == "file") fi_tag = j;
+						else{
+							if(!(ta.name == "compress" && ta.value == "false")){	
+								if(ta.name == "chain") te += " "+ta.name+"="+ta.value;
+								else te += " "+ta.name+"=\""+ta.value+"\"";
+							}
+						}
+					}
+					
+					if(!fl2){
+						if(!decomp) te += " compress=\"true\"";
+					}
+					
+					if(fi_tag == UNSET){
+						run_error("There is no file to be "+comp_str+"ed");
+					}
+					
+					auto file = tags[fi_tag].value;
+					
+					auto i = 0u; while(i < files.size() && files[i].name != file) i++;
+					if(i == files.size()){
+						alert_import("Could not find the file '"+file+"'");
+						return;
+					}
+
+					auto flines = files[i].lines;
+				
+					string value;
+					if(!decomp){
+						string tef;
+						for(const auto &va : flines) tef += va+endli;
+						value = encode(tef);
+					}
+					else{		
+						decode_lines(flines);
+						for(const auto &va : flines) value += va+endli;
+					}
+					
+					auto len = value.length();
+					if(len >=	2 && value.substr(len-2,2) == endli+endli) value.pop_back();
+					
+					if(is_inline(file)){
+						te += " file=\"[["+endli+value+"]]\""+endli;
+					}
+					else{
+						auto full_name = datadir+"/"+file; 		
+						te += " file=\""+file+"\""+endli;
+						ofstream fout(full_name);
+						fout << value;
+					}
+					
+					lines_new.push_back(te);
+					
+					comp_fl2 = true;
+				}
+				
+				li = li_next;
+			}
+			break;
+			
+		default: 
+			while(li < li_next){
+				lines_new.push_back(lines_raw[li]);
+				li++;
+			}
+			break;
+		}
+	}
+
+	if(comp_fl == false) run_end("No files are found to "+comp_str+" (only BICI output files can be compressed).");
+	
+	if(comp_fl2 == false) run_end("Files are already "+comp_str+"ed.");
+	
+	lines_raw = lines_new;
 }

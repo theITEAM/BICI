@@ -566,20 +566,19 @@ function add_ppc_start_buts(lay)
 	
 	let cx = corner.x;
 	let cy = corner.y;
-	inter.options = false;
 	if(inter.options == false){
 		cy = lay.add_title("Start posterior predictive check",cx,cy,{te:start_sim_text});
 		
-		cy += 2;
+		cy += 1;
 		
 		cy = lay.add_subtitle("Time range",cx,cy,WHITE,{te:time_range_text});
-		cy = lay.add_paragraph("Set the time range over which simulation is performed:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+		cy = lay.add_paragraph("Set the time range over which posterior simulation is performed:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 		
 		let yy = cy-2.5;
 		add_right_input_field(yy,"Start time",{type:"ppc_t_start",update:true},lay);
 		add_right_input_field(yy+4,"End time",{type:"ppc_t_end",update:true},lay);
 
-		cy += 6;
+		cy += 4;
 		
 		let xx = 33;
 		
@@ -595,13 +594,13 @@ function add_ppc_start_buts(lay)
 	
 		cy = ppc_use_inf_or_sim(cx,cy,model.ppc_details,lay);
 	
-		cy += 3;
+		cy += 2;
 	
 		cy = run_local_simple(cx,cy,model.ppc_details,lay);
 	
 		if(model.ppc_details.check_box_list){
 			if(model.ppc_details.check_box_list.length > 0){
-				cy += 3;
+				cy += 2;
 				cy = lay.add_subtitle("Resampling",cx,cy,WHITE,{te:ppc_num_text});
 				cy = lay.add_paragraph("Select which parameter or individual effect gets resampled:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
 				
@@ -611,18 +610,27 @@ function add_ppc_start_buts(lay)
 			}
 		}
 		
+		add_corner_link("> Further options","Options",lay);
+		
 		lay.add_corner_button([["Start","Grey","StartPPC"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
-	else{
+	
+	if(inter.options == true){
 		let te = "Further posterior simulation options";
 		cy = lay.add_title(te,cx,cy,{te:further_post_sim_text});
 		
-		cy += 2;
+		cy += 1;
 		
 		let gap = 2;
-			
-		cy = set_seed(cx,cy,"PPC_seed",model.ppc_details,lay);
+		
+		cy = set_seed(cx,cy,"ppc_seed",model.ppc_details,lay);
+		
+		add_corner_link("> Advanced options","AdOptions",lay);
+		
+		lay.add_corner_button([["Done","Grey","OptionsDone"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
+
+	if(inter.options == "advanced") output_advanced_options("ppc",lay);
 }
 
 
@@ -711,23 +719,30 @@ function get_param_cat(filt_list,filt_type)
 	param_cat.push({name:"Parameter tensors", sim_te:sim_tensor_text, inf_te:inf_tensor_text, list:[]});
 	param_cat.push({name:"Individual effects", sim_te:sim_ie_variance_text, inf_te:inf_ie_variance_text, list:[]});
 	param_cat.push({name:"Fixed effects", sim_te:fixed_eff_text, inf_te:fixed_eff_text, list:[]});
+	param_cat.push({name:"Constant prior", inf_te:prior_const_text, list:[]});
 	
 	for(let i = 0; i < param.length; i++){
-		if(find_in(filt_list,param[i].type) == undefined && 
-		!(filt_type == "only normal" && param[i].variety != "normal") &&
-		!(filt_type == "for sim" && param[i].variety == "const") &&
-		!(filt_type == "for sim" && param[i].variety == "reparam") && 
-		!(filt_type == "for sim" && param[i].variety == "define") &&
-		param[i].type != "param factor"
-		){
-			if(param[i].type == "fixed effect"){
-				 param_cat[5].list.push(i);
-			}
-			else{
-				if(param[i].type == "variance") param_cat[4].list.push(i);
+		let par = param[i];
+		if(filt_type == "only normal" && par.prior_const_on == true){
+			param_cat[6].list.push(i);
+		}
+		else{
+			if(find_in(filt_list,par.type) == undefined && 
+			!(filt_type == "only normal" && param[i].variety != "normal") &&
+			!(filt_type == "for sim" && par.variety == "const") &&
+			!(filt_type == "for sim" && par.variety == "reparam") && 
+			!(filt_type == "for sim" && par.variety == "define") &&
+			par.type != "param factor"
+			){
+				if(param[i].type == "fixed effect"){
+					 param_cat[5].list.push(i);
+				}
 				else{
-					let n = param[i].dep.length; if(n > 3) n = 3;
-					param_cat[n].list.push(i);
+					if(param[i].type == "variance") param_cat[4].list.push(i);
+					else{
+						let n = param[i].dep.length; if(n > 3) n = 3;
+						param_cat[n].list.push(i);
+					}
 				}
 			}
 		}
@@ -868,6 +883,33 @@ function display_constant(i,x,y,lay,w,allow_edit,source)
 }
 
 
+/// Displays a row allowing a variable constant to be set
+function display_prior_const(i,x,y,lay,w,allow_edit,source)
+{
+	if(source == undefined) source = model;
+	let par = source.param[i];
+	
+	lay.display_param(x-par.label_info.dx-0.7,y-0.1,par.label_info);
+
+	let si = 1.5;
+	lay.add_button({te:"=", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
+	
+	let te="";
+	if(par.dep.length == 0){
+		te = par.prior_const;
+	}
+	else{			
+		te += par.prior_const_desc;
+	}
+	
+	let fo = get_font(1.1,"","times");
+		
+	let ac; if(allow_edit != false) ac = "EditPriorConst";
+	
+	lay.add_button({te:te, x:x+1.6, y:y+0., dx:w-x-1.6, dy:1.6, type:"ParamPriConElement", source:source, font:fo, ac:ac, i:i, name:par.name, label_info:par.label_info});
+}
+
+
 /// Displays a row allowing a variable factor to be set
 function display_factor(i,x,y,lay,w,allow_edit,source)
 {
@@ -936,7 +978,7 @@ function display_define(i,x,y,lay,w)
 	let si = 1.5;
 	lay.add_button({te:"=", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
 	
-	let ac = "EditDefineValue", type = "DefineElement";
+	let ac = "EditDefineValue", type = "DefineEqn";
 	let te = par.define_eqn;
 	if(te == "") te = "Unset";
 	
@@ -956,6 +998,20 @@ function edit_sim_value(th,lay_name,i,source)
 	}
 	else{
 		start_worker("Edit Param",{type:"Value", source:source, label_info:par.label_info, i:th});
+	}
+}
+
+
+/// Click to edit simulation value
+function edit_prior_const(th,lay_name,i,source)
+{
+	let par = source.param[th];
+
+	if(par.dep.length == 0){
+		select_bubble(lay_name,i,{});
+	}
+	else{
+		start_worker("Edit Prior Const",{type:"PriorConst", source:source, label_info:par.label_info, i:th});
 	}
 }
 
@@ -1014,6 +1070,19 @@ function add_view_button(par,x,y,i,lay,source)
 	}
 	
 	return false;
+}
+
+
+
+function add_prior_const_view_button(par,x,y,i,lay,source)
+{
+	if(par.prior_const_set == false) return false;
+	
+	let pos_view = get_par_pos_view(par,source);
+	if(pos_view.length > 0){
+		lay.add_button({te:"View", source:source, x:x, y:y+0.2, dx:3.5, dy:1.2, ac:"ViewPriorConst", type:"GreyView", i:i, pos_view:pos_view});
+		return true;
+	}
 }
 
 
@@ -1084,6 +1153,7 @@ function check_memory(ans)
 	let TS = (t_end-t_start)/timestep;
 	
 	let state_mem = (C_total + T_total)*TS*10*8/bytes_in_GB;
+	state_mem = 0;// The way the state is store in the interface has changed
 	
 	let NE_max = details.param_output_max;
 	
@@ -1137,7 +1207,7 @@ function check_memory(ans)
 				
 			//run_mem += C_st[p]*C_st[p]*4; // comp_global_convert
 
-			tm = T_st[p]*T_st[p];   // tr_connected (only temporary)
+			tm = T_st[p]*T_st[p];           // tr_connected (only temporary)
 			if(tm > temp_mem) temp_mem = tm;
 		}
 	
@@ -1190,7 +1260,7 @@ function check_memory(ans)
 	}
 	
 	if(run_mem > 0.5*RAM){
-		warn.push("BICI may have difficulty running due to insufficent memory on this computer ("+precision(run_mem,2)+" GB are required and this computer has only "+RAM+" GB)."); 
+		warn.push("BICI may have difficulty running due to insufficent memory on this computer ("+precision(run_mem,2)+" GB are required and this computer has as estiamted "+RAM+" GB)."); 
 		
 		sug.push("Run the output file on a computer with more memory.");
 		if(nchain > 1){

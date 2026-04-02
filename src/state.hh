@@ -53,10 +53,11 @@ class State                                // Stores information about the state
 		
 		State(const Model &model);
 		void init();
-		void simulate(const PV &param_value, const vector <InitCondValue> &initc_val);
+		void simulate(const PV &param_value, const vector <InitCondValue> &initc_val, IEstore ie_store= IEstore(), double val=UNSET, double val2=UNSET, bool sup=false);
 		void post_sim(const PV &param_value, const Sample &samp);
 		void load_samp(const PV &param_value, const Sample &samp);
-		void simulate_iterate(unsigned int ti_start, unsigned int ti_end);
+		void simulate_iterate(unsigned int ti_start, unsigned int ti_end, double val=UNSET, double val2=UNSET, bool sup=false);
+		void markov_vari_value_calc_fast();
 		void ensure_all_ind_event();
 		vector <DeriveOutput> derive_calculate(bool store_state);
 		void calculate_likelihood();
@@ -67,7 +68,7 @@ class State                                // Stores information about the state
 		void change_add();
 		Like update_param(const vector <AffectLike> &affect_like);
 		void restore(const vector <AffectLike> &affect_like);
-		void likelihood_from_scratch();
+		void likelihood_from_scratch(bool calc_me_value=true);
 		void resample_ind(bool if_wrong);
 		Particle generate_particle(unsigned int s, unsigned int chain, bool store_state, bool dir_fl = true);
 		void set_particle(const Particle &part, bool calc_like=true);
@@ -78,8 +79,10 @@ class State                                // Stores information about the state
 		void restore_back();
 		vector <double> get_param_val_prop() const;
 		vector <double> get_trans_rate_est_para(const vector <unsigned int> &list, unsigned int p, unsigned int tr) const;
-		vector < vector <double> > get_population_rates(unsigned int p) const;
+		//vector < vector <double> > get_population_rates(unsigned int p) const;
 		void init_cor_matrix(); 
+		void set_ie_from_samp(const IEstore &ie_store);
+		void ie_finalise();
 	
 	private:
 		vector <double> calculate_df(const DerFunc &df) const;

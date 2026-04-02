@@ -51,7 +51,7 @@ void State::init()
 
 
 /// Simulate the state from parameter values, individual effects and initial conditions
-void State::simulate(const PV &param_value, const vector <InitCondValue> &initc_val) 
+void State::simulate(const PV &param_value, const vector <InitCondValue> &initc_val, IEstore ie_store, double val, double val2, bool sup) 
 {
 	param_val = param_value;
 
@@ -62,6 +62,10 @@ void State::simulate(const PV &param_value, const vector <InitCondValue> &initc_
 		ssp.simulate_individual_init();
 	}
 
+	set_ie_from_samp(ie_store);
+	
+	ie_finalise();
+	
 	popnum_t[0] = calculate_popnum();  
 
 	for(auto p = 0u; p < nspecies; p++){
@@ -71,7 +75,7 @@ void State::simulate(const PV &param_value, const vector <InitCondValue> &initc_
 		}
 	}
 
-	simulate_iterate(0,T);
+	simulate_iterate(0,T,val,val2,sup);
 	
 	//print_iif();
 }
@@ -95,6 +99,11 @@ void State::post_sim(const PV &param_value, const Sample &samp)
 		ssp.simulate_init();
 		ssp.simulate_sample_init(ti_start,samp.species[p],ind_key);
 	}
+	
+	auto ie_store = model.post_ie_store(samp);
+	set_ie_from_samp(ie_store);
+	
+	ie_finalise();
 	
 	set_ind_inf_from(ind_key);
 	
@@ -137,6 +146,11 @@ void State::load_samp(const PV &param_value, const Sample &samp)
 		ssp.simulate_sample_init(T,samp.species[p],ind_key);
 	}
 	
+	auto ie_store = model.post_ie_store(samp);
+	set_ie_from_samp(ie_store);
+	
+	ie_finalise();
+	
 	set_ind_inf_from(ind_key);
 	
 	popnum_t = calculate_popnum_t(T);
@@ -153,8 +167,49 @@ void State::load_samp(const PV &param_value, const Sample &samp)
 }
 
 
+/// Calculates markov_vari_value as fast as possible
+void State::markov_vari_value_calc_fast()
+{
+	{
+		auto p = 0u; 
+		while(p < nspecies && model.species[p].type != INDIVIDUAL) p++;
+		if(p == nspecies) return;
+	}
+	
+	vector <SimSpeed> sim_speed(nspecies);
+	
+	// Initialises speedup
+	for(auto p = 0u; p < nspecies; p++){
+		const auto &ssp = species[p];
+		const auto &sp = model.species[p];
+		sim_speed[p].pop_grad = ssp.pop_grad_calc(sp.sim_linear_speedup.lin_form);
+	}
+	
+	vector <double> val_fast;
+	
+	for(auto ti = 0u; ti < T; ti++){	
+		const auto &pop = popnum_t[ti];
+	
+		for(auto p = 0u; p < nspecies; p++){
+			const auto &sp = model.species[p];
+			auto &ssp = species[p];
+			
+			const auto &lin_form = sp.sim_linear_speedup.lin_form;
+			auto &ss = sim_speed[p];
+	
+			timer[SIM_UPDATE2] -= clock();	
+			if(ti == 0) ss.val_fast = ssp.calc_val_fast_init(lin_form,ss.pop_grad,pop);
+			else ssp.val_fast_update(ti,ss.val_fast,popnum_t,ss.pop_grad,lin_form);
+			timer[SIM_UPDATE2] += clock();	
+
+			ssp.set_markov_vari_value(ti,popnum_t,ss.val_fast);
+		}
+	}
+}
+
+
 /// Once a simulation is setup this iterates equations
-void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end) 
+void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end, double val, double val2, bool sup) 
 {
 	vector <SimSpeed> sim_speed(nspecies);
 	
@@ -168,9 +223,12 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 	vector <double> val_fast;
 	
 	for(auto ti = ti_start; ti < ti_end; ti++){	
-		//if(true && ti%op_step == 0) print_cpop(ti);		
-		//cout << ti << " ti sim" << endl;  
+		if(val != UNSET){
+			auto fr = double(ti-ti_start)/(ti_end-ti_start);
+			percentage(val+fr,val2,sup);
+		}
 		
+		//if(true && ti%op_step == 0) print_cpop(ti);			
 		auto &pop = popnum_t[ti];
 	
 		timer[SIM_CALC_POPNUM] -= clock();
@@ -185,7 +243,6 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 		auto pop_ind = calculate_pop_ind(); 
 		timer[SIM_POPIND] += clock();
 
-		timer[SIM_UPDATE] -= clock();	
 		for(auto p = 0u; p < nspecies; p++){
 			const auto &sp = model.species[p];
 			auto &ssp = species[p];
@@ -193,9 +250,12 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 			const auto &lin_form = sp.sim_linear_speedup.lin_form;
 			auto &ss = sim_speed[p];
 	
+			timer[SIM_UPDATE2] -= clock();	
 			if(ti == ti_start) ss.val_fast = ssp.calc_val_fast_init(lin_form,ss.pop_grad,pop);
 			else ssp.val_fast_update(ti,ss.val_fast,popnum_t,ss.pop_grad,lin_form);
-			
+			timer[SIM_UPDATE2] += clock();	
+
+			timer[SIM_UPDATE] -= clock();				
 			switch(ssp.type){
 			case INDIVIDUAL:
 				ssp.update_individual_based(ti,pop_ind,popnum_t,ss.val_fast);
@@ -239,8 +299,22 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end)
 		for(const auto &ssp : species) prob_sum += ssp.prob_trans_tree;
 		if(prob_sum != 0) cout << "Probability trans tree = " << prob_sum << endl;
 	}
+	
+	if(false){
+		auto sum = 0.0;
+		for(auto i = 0u; i < TIMER_MAX; i++) sum += timer[i];
+			
+		for(auto i = 0u; i < TIMER_MAX; i++){
+			cout << i << " " << 100*timer[i]/sum << " timer" << endl;
+		}
+	
+		cout << 100*species[0].timer[UP_MARKOV]/sum << " UP_MARKOV" << endl;
+		cout << 100*species[0].timer[SORT]/sum << " SORT" << endl;
+		cout << 100*species[0].timer[ITER]/sum << " ITER" << endl;
+		cout << 100*species[0].timer[CHECK]/sum << " CHECK" << endl;
+	}
 
-	likelihood_from_scratch();
+	likelihood_from_scratch(false);
 }
 
 
@@ -1013,7 +1087,7 @@ Like State::update_param(const vector <AffectLike> &affect_like)
 		case DIV_VALUE_AFFECT:   // Updates div.value on Markov transition
 			{
 				auto p = alike.num, e = alike.num2;
-				change_add(species[p].likelihood_markov_value(e,alike.list,popnum_t));
+				change_add(species[p].markov_value_calc(e,alike.list,popnum_t));
 			} 
 			break;
 			
@@ -1021,14 +1095,14 @@ Like State::update_param(const vector <AffectLike> &affect_like)
 			{
 				auto p = alike.num;
 				const auto &me_list = alike.eq_nopop.list;
-				change_add(species[p].likelihood_markov_value_nopop(me_list,alike.list,popnum_t,param_val));
+				change_add(species[p].markov_value_nopop_calc(me_list,alike.list,popnum_t,param_val));
 			}
 			break;
 			
 		case DIV_VALUE_LINEAR_AFFECT:   // Updates div.value on Markov transition
 			{
 				auto p = alike.num;
-				change_add(species[p].likelihood_markov_value_linear(alike.list,alike.lin_form,popnum_t));
+				change_add(species[p].markov_value_linear_calc(alike.list,alike.lin_form,popnum_t));
 			}
 			break;
 		
@@ -1268,14 +1342,14 @@ void State::restore(const vector <AffectLike> &affect_like)
 			{
 				auto p = alike.num;
 				const auto &me_list = alike.eq_nopop.list;
-				species[p].likelihood_markov_value_nopop_restore(me_list,alike.list,vec);
+				species[p].markov_value_nopop_restore(me_list,alike.list,vec);
 			}
 			break;
 			
 		case DIV_VALUE_LINEAR_AFFECT:   // Restore div.value on Markov transition
 			{
 				auto p = alike.num;
-				species[p].likelihood_markov_value_linear_restore(alike.list,alike.lin_form,vec);
+				species[p].markov_value_linear_restore(alike.list,alike.lin_form,vec);
 			}
 			break;
 			
@@ -1355,7 +1429,7 @@ void State::change_add()
 
 
 /// Sets up everything needed to represent the Markov likelihood
-void State::likelihood_from_scratch()
+void State::likelihood_from_scratch(bool calc_me_value)
 {
 	// Sets up non-markovian transitions
 	for(auto p = 0u; p < nspecies; p++){ 
@@ -1365,6 +1439,8 @@ void State::likelihood_from_scratch()
 	}
 
 	calculate_popnum_ind();
+
+	if(calc_me_value) markov_vari_value_calc_fast();
 
 	// Initialises markov_eqn with value calculated and inffac_int set to zero
 	for(auto p = 0u; p < species.size(); p++){
@@ -1383,10 +1459,12 @@ void State::likelihood_from_scratch()
 			
 			ssp.likelihood_indfac_int();
 			ssp.likelihood_ind_trans();
+			/*
 			for(auto e = 0u; e < ssp.N; e++){
 				auto list = seq_vec(ssp.markov_eqn_vari[e].div.size());
-				ssp.likelihood_markov_value(e,list,popnum_t);
+				ssp.markov_value_calc(e,list,popnum_t);
 			}
+			*/
 			break;
 			
 		case POPULATION:
@@ -1522,38 +1600,40 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 {
 	Particle part;
 	part.s = s; part.chain = chain;
-	
+
 	part.param_val_prop = model.get_param_val_prop(param_val);
-	
+
 	part.param_val_tvreparam = model.get_param_val_tvreparam(param_val);
-	
+
 	part.like = like;
 	
 	if(dir_fl) part.dir_out = derive_calculate(store_state);
-	
+
 	for(auto p = 0u; p < species.size(); p++){
 		const auto &sp = model.species[p];
 		auto &ssp = species[p];
 		ParticleSpecies part_sp;
 		part_sp.init_cond_val = ssp.init_cond_val;
-		
+
 		if(store_state){
 			part_sp.trans_num = ssp.trans_num;
 			
 			part_sp.individual = ssp.individual;
-			
+
 			if(sp.type != DETERMINISTIC){
 				if(cum_diag && (model.mode == INF || model.mode == EXT)){
 					ssp.calc_trans_diag(part_sp,popnum_t);
 				}
 			}
+
+			ssp.get_rate_warning(part_sp);
 		}
 
 		part_sp.nindividual = ssp.individual.size();
 		
 		part.species.push_back(part_sp);
 	}
-		
+
 	if(model.trans_tree){ 
 		part.inf_origin = genetic_value.inf_origin;
 		part.inf_node = genetic_value.inf_node;
@@ -1770,6 +1850,7 @@ vector <double> State::get_trans_rate_est_para(const vector <unsigned int> &list
 }
 	
 			
+/*
 /// Gets transition rates  
 vector < vector <double> > State::get_population_rates(unsigned int p) const
 {
@@ -1802,6 +1883,7 @@ vector < vector <double> > State::get_population_rates(unsigned int p) const
 	
 	return rate;
 }
+*/
 
 
 /// Calculates the individuals which are associated with a population
@@ -2115,4 +2197,72 @@ void State::set_ind_inf_from(const vector <string> &ind_key)
 	
 	//print_iif();
 	//emsg("do");
+}
+
+
+/// Sets individual effects based on sample values
+void State::set_ie_from_samp(const IEstore &ie_store)
+{
+	if(model.mode != PPC) return;
+	
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];
+		auto &ssp = species[p];
+		const auto &iess = ie_store.species[p];
+		const auto &indeff = sp.ind_effect;
+		for(auto i = 0u; i < sp.ind_eff_group.size(); i++){
+			const auto &ieg = sp.ind_eff_group[i];
+			const auto &iegs = ssp.ind_eff_group_sampler[i];
+			
+			if(ieg.ppc_resample == false){
+				if(iess.on == false){
+					run_error("Cannot get values for individual effect group '"+ieg.name+"'. Perhaps this needs to be sampled?");				
+				}
+			
+				const auto &hash = iess.hash;
+				for(auto &ind : ssp.individual){
+					auto r = hash.find(ind.name);
+					
+					auto fl = false;
+					if(r == UNSET) fl = true;
+					else{
+						for(const auto &li : ieg.list){
+							auto e = li.index;
+							const auto &ie = indeff[e];
+							auto var = iegs.omega[ie.num][ie.num];
+							auto num = iess.ie_value[r][e];
+				
+							if(num == UNSET) fl = true;
+							else ind.ie[e] = 0.5*var+log(num);
+							
+							//cout << ind.ie[e] << " "<< 0.5*var+log(num) << " replace\n";
+						}
+					}
+					
+					if(fl){
+						run_error("Cannot get value for '"+ind.name+"' for individual effect group '"+ieg.name+"'. Perhaps this needs to be sampled?");
+					}
+				}
+			}
+		}
+	}
+}
+
+
+/// Finalises individual effects
+void State::ie_finalise()
+{	
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];
+		if(sp.type == INDIVIDUAL){
+			auto &ssp = species[p];
+		
+			for(auto &ind : ssp.individual){		
+				for(auto i = 0u; i < sp.ind_effect.size(); i++){
+					if(ind.ie[i] == UNSET) emsg("Should be set1");
+				}
+				ssp.set_exp_ie(ind);
+			}
+		}
+	}
 }

@@ -76,6 +76,8 @@ void Input::check_initial_pop_error(bool end)
 		case SCAN_SETUP: case SCAN_RESULT:
 			break;
 			
+		case COMPRESS: case DECOMPRESS: break;
+		
 		default: alert_emsg_input("Should not be default3a"); return;
 		}
 	}

@@ -353,6 +353,9 @@ void Mpi::pack(const Particle &pa)
 
 		pack_item(sp_val.exp_num);
 		pack_item(sp_val.cum_prob_dist);
+		
+		pack_item(sp_val.dt_max_est);
+		pack(sp_val.trans_prob);
 	}
 	
 	pack_num(pa.dir_out.size());
@@ -505,7 +508,10 @@ void Mpi::unpack(Particle &pa)
 		
 		unpack_item(sp_val.exp_num);
 		unpack_item(sp_val.cum_prob_dist);
-
+		
+		unpack_item(sp_val.dt_max_est);
+		unpack(sp_val.trans_prob);
+		
 		pa.species.push_back(sp_val);
 	}
 	
@@ -704,6 +710,25 @@ void Mpi::unpack_item(vector<T> &vec)
 	}
 }
 
+void Mpi::pack(const vector <TransProb> &vec)
+{
+	pack_item(vec.size());
+	for (auto &item : vec) {
+		pack_item(item.cl);
+		pack_item(item.tr);
+	}
+}
+
+void Mpi::unpack(vector <TransProb> &vec)
+{
+	unsigned int size;
+	unpack_item(size);
+	vec.resize(size);
+	for (auto &item : vec) {
+		unpack_item(item.cl);
+		unpack_item(item.tr);
+	}
+}
 
 
 void Mpi::pack(const vector <string> &vec_str)

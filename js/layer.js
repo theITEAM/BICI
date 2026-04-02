@@ -1415,6 +1415,7 @@ class Layer
 		case "sd": te = edit_source.spec.sd; break;
 		case "p": te = edit_source.spec.p; break;
 		case "param_val": te = model.param[so.val].value; break; 
+		case "param_prior_const": te = model.param[so.val].prior_const; break; 
 		case "label": te = inter.bubble.label.te; break;
 		case "label_size": te = String(inter.bubble.label.size); break;
 		case "label_anno": te = model.species[so.p].cla[so.cl].annotation[so.i].te; break;
@@ -1456,6 +1457,8 @@ class Layer
 		case "ppc_t_end": te = String(model.ppc_details.ppc_t_end); break;
 		case "ppc_number": te = String(model.ppc_details.number); break;
 		case "ppc_seed": te = String(model.ppc_details.seed); break;
+		case "ppc_indmax": te = String(model.ppc_details.indmax); break;
+		case "ppc_paramout": te = String(model.ppc_details.param_output_max); break;
 		case "inf_t_start": te = String(model.inf_details.t_start); break;
 		case "inf_t_end": te = String(model.inf_details.t_end); break;
 		case "inf_timestep": te = String(model.inf_details.timestep); break;

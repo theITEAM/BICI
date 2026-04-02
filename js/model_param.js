@@ -7,13 +7,10 @@ function add_model_param_buts(lay)
 	let cx = corner.x;
 	let cy = corner.y;
 	
-	
 	cy = lay.add_title("Model parameters",cx,cy,{te:modelparam_text});
 
 	let active = true;
-	if(model.param.length == 0){
-		active = false;
-	}
+	if(model.param.length == 0) active = false;
 	
 	cy += 0.5;
 
@@ -37,7 +34,7 @@ function add_model_param_buts(lay)
 	w = model.add_object_button(lay,"Derived",x,y,"SetDerived",{ back:WHITE, active:active, info:{}, title:"Derived", te:derived_text}); 
 	x += w+gap;
 	
-	w = model.add_object_button(lay,"Factor",x,y,"SetFactor",{ back:WHITE, active:active, info:{}, title:"Facto", te:factor_text}); 
+	w = model.add_object_button(lay,"Factor",x,y,"SetFactor",{ back:WHITE, active:active, info:{}, title:"Factor", te:factor_text}); 
 	x += w+gap;
 }
 
@@ -498,7 +495,7 @@ function set_constant_bubble(cont)
 		cont.dx = 20;
 		bubble_addtitle(cont,"Set constant");
 
-		bubble_addparagraph(cont,"Select parameter which is going to be set as a constant:",0,cont.dx);
+		bubble_addparagraph(cont,"Select parameter that is going to be set as constant:",0,cont.dx);
 		cont.y += 0.2;
 	
 		bubble_addscrollable(cont,{type:"const param sel", ymax:10, ac:"AddConstParam"}); 
@@ -510,6 +507,32 @@ function set_constant_bubble(cont)
 		bubble_addtitle(cont,"Set constant");
 
 		bubble_addparagraph(cont,"There are currently no free parameters to set.",0,cont.dx); 
+	}
+}
+
+
+/// Bubble which allows user to select a const inf parameter
+function set_prior_const_bubble(cont,type,ac)
+{	
+	cont.dx = 20;
+	bubble_addtitle(cont,type+" constant prior")
+	
+	let fl = false;
+	for(let i = 0; i < model.param.length; i++){
+		let par = model.param[i];
+		if(param_pos(par,"priorconst")) fl = true;
+	}
+	
+	if(fl){
+		bubble_addparagraph(cont,"Select parameter that is going to be set as constant under inference:",0,cont.dx);
+		cont.y += 0.2;
+	
+		bubble_addscrollable(cont,{type:"prior const param sel", ymax:10, ac:ac}); 
+		
+		add_bubble_end(cont);
+	}
+	else{
+		bubble_addparagraph(cont,"There are currently no parameters to set.",0,cont.dx); 
 	}
 }
 
@@ -721,6 +744,10 @@ function param_pos(par,op)
 	if(par.name == "δ" || par.name == "\\delta") return false; // Does not allow delta function
 	
 	switch(op){
+	case "priorconst":
+		if(par.variety == "const") return false;
+		return true;
+		
 	case "const":
 		if(par.variety != "normal") return false;
 		break;

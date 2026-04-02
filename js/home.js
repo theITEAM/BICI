@@ -264,6 +264,8 @@ function initialise_section()
 		
 		ex_mod.push({te:"F1.8: Time-varying covariate affecting branching probability", mod:"CE1.2", link:true, mod_type:"IBM"}); 
 	
+		ex_mod.push({te:"F1.9: Time-varying disease intervention measure", mod:"SE1.3", link:true, mod_type:"POP"}); 
+	
 		ex_mod.push({te:"2) Individual-based variation",help:"These examples look at how individual-based variation can be incorporated into the model"+mod_mess, gap:gap});
 		ex_mod.push({te:"F2.1: Individual fixed effect applied to a transition", mod:"SE1.2", link:true, mod_type:"IBM"}); 
 		ex_mod.push({te:"F2.2: Individual fixed effect applied to a population", link:true, mod_type:"IBM"}); 
@@ -459,7 +461,7 @@ function add_examples_buts(lay)
 			
 				lay.add_help_button(x+w,cy+si-0.2+0.2,{title:te, te:ex.help});
 				
-				cy += 0.8;
+				cy += 1;
 				if(ex.gap) cy += ex.gap;
 			}
 		}

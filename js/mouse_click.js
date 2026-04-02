@@ -39,6 +39,10 @@ function activate_button(lay,i)
 /// The action generated when a button is clicked
 function button_action(bu,action_type)                                  
 {
+	let overlay_on = false; // Determines if some sort of overlay (bubble, menu dropdown 
+	if(inter.bubble.bu != undefined) overlay_on = true;
+	if(inter.dropdown.source != undefined) overlay_on = true;
+	
 	let x = Math.round(bu.x), y = Math.round(bu.y);
 	let dx = Math.round(bu.dx), dy = Math.round(bu.dy);
 	let te = bu.te;
@@ -73,7 +77,7 @@ function button_action(bu,action_type)
 	update_edit_source(bu);
 	
 	pr(ac+" ac");
-
+	
 	switch(ac){
 	case "Tab":		
 		change_page({pa:val});
@@ -422,7 +426,11 @@ function button_action(bu,action_type)
 		break;
 		
 	case "ClassificationBack": case "ClassGraphBack":
+		set_arrow_icon();
 		if(double_click == true) zoom_double_click(bu.p,bu.cl);
+		else{
+			if(overlay_on == false) return;
+		}
 		break;
 		
 	case "MessageClose":
@@ -1271,6 +1279,8 @@ function button_action(bu,action_type)
 	case "TableSlider": case "TableSlider2": break;
 	case "CloneClassInit": clone_class_init(bu.op.p);	break;
 	
+	case "ConstPriorData": select_bubble_over(); break;
+	
 	case "CloneClass":
 		{
 			let drop = inter.bubble.drop;
@@ -1453,6 +1463,13 @@ function button_action(bu,action_type)
 		}
 		break;
 		
+	case "EditPriorConstDone":
+		if(edit_param_check_error() == false){
+			let ep = inter.edit_param;
+			start_worker("Set Prior Const",{i:ep.i, value:ep.value});
+		}
+		break;
+		
 	case "EditWeightDone":
 		if(edit_param_check_error() == false){
 			inter.edit_source = false;
@@ -1520,7 +1537,7 @@ function button_action(bu,action_type)
 		start_worker("Load PriorSplit",{ep:inter.edit_param, source:edit_source, dist:true});	
 		break;
 		
-	case "SetConstant": case "SetReparam": case "SetDefine":
+	case "SetConstant": case "SetReparam": case "SetDefine": case "SetPriorConst": 
 		select_bubble_over();
 		inter.bubble.set_reparam_type = false;
 		break;
@@ -1532,6 +1549,19 @@ function button_action(bu,action_type)
 			close_bubble();
 			par_in_view("ParamSimElement",th);
 		}
+		break;
+		
+	case "AddPriorConstParam":
+		{
+			let th = bu.i;
+			model.param[th].prior_const_on = true;
+			close_bubble();
+			par_in_view("ParamSimElement",th);
+		}
+		break;
+		
+	case "GenPriorConstParam":
+		start_worker("Generate const prior",{th:bu.i});	
 		break;
 		
 	case "AddFactorParam":
@@ -1565,7 +1595,7 @@ function button_action(bu,action_type)
 		{
 			let par = model.param[bu.i];
 			par.variety = "define";
-			press_button_prop("ModelParamContent","DefineElement",["name"],par.name);
+			press_button_prop("ModelParamContent","DefineEqn",["name"],par.name);
 		}
 		break;
 		
@@ -1647,6 +1677,18 @@ function button_action(bu,action_type)
 			close_help();
 		}
 		break;
+		
+	case "DeleteParamPriorConst":
+		inter.help = {title: "Delete constant prior", te: "Are you sure you want to delete this definition?", i:bu.i, ok:"DeleteParamPriorConstConfirm"};
+		break;
+	
+	case "DeleteParamPriorConstConfirm":
+		{
+			let he = inter.help;
+			start_worker("DeleteParamPriorConst",{ i:he.i});
+			close_help();
+		}
+		break;
 	
 	case "SetDerived":
 		{
@@ -1725,6 +1767,10 @@ function button_action(bu,action_type)
 		
 	case "EditSimValue":
 		edit_sim_value(bu.i,inter.layer[inter.over.layer].name,inter.over.i,bu.source);
+		break;
+		
+	case "EditPriorConst":
+		edit_prior_const(bu.i,inter.layer[inter.over.layer].name,inter.over.i,bu.source);
 		break;
 		
 	case "EditWeightValue":
@@ -2266,6 +2312,13 @@ function button_action(bu,action_type)
 		{
 			let par = bu.source.param[bu.i];
 			start_worker("View Param",{i:bu.i, par:par, source:bu.source, pos_view:bu.pos_view, sel_view:copy(bu.pos_view[0])});
+		}
+		break;
+		
+	case "ViewPriorConst":
+		{
+			let par = bu.source.param[bu.i];
+			start_worker("View Prior Const",{i:bu.i, prior_const:true, par:par, source:bu.source, pos_view:bu.pos_view, sel_view:copy(bu.pos_view[0])});
 		}
 		break;
 		

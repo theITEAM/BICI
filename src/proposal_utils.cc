@@ -1257,15 +1257,18 @@ string Proposal::print_fa(unsigned int nfa, unsigned int ntr) const
 
 
 /// Outputs a range or values
-string Proposal::print_range(string te, const vector <double> &list) const
+string Proposal::print_range(string te, const vector <double> &list, bool float_num) const
 {
 	auto me = mean(list);
-	
-	
+
 	if(on){
 		if(te == "Acceptance" && me < 20) term_out(name+" "+tstr(me)+" too low");
 		if(te == "Acceptance" && me > 90) term_out(name+" "+tstr(me)+" too high");
 	}
 	
-	return " "+te+": "+tstr(me)+"("+tstr(min(list))+" - "+tstr(max(list))+")  ";
+	if(float_num){
+		return " "+te+": "+tstr(me,3)+"("+tstr(min(list),3)+" - "+tstr(max(list),3)+")  ";
+	}
+	
+	return " "+te+": "+tstr(int(me))+"("+tstr(int(min(list)))+" - "+tstr(int(max(list)))+")  ";
 }

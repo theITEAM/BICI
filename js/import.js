@@ -13,7 +13,9 @@
 	compartment / comp
 	compartment-all / comp-all
 	comp-data
+	compress / comp
 	data-dir
+	decompress / decomp
 	define
 	derived / der
 	description /desc
@@ -105,7 +107,8 @@ function import_file(te,file,clear_results)
 	// Keeps track of the current species and classification 
 	imp = { pro:pro, lines:lines, clear_results:clear_results, script:pro.formatted, previous_loaded_table:[], warn:false}; 
 
-	if(data_file_list.length > 0){
+	if(data_file_list.length > 0){	
+		// Potentially load_file_nonlocal could be used, but does this work on a Mac?
 		if(begin_str(data_file_list[0].full_name,"..")) load_local(data_file_list,0,100);
 		else post({type:"Import model files", data_file_list:data_file_list});
 	}
@@ -124,6 +127,7 @@ function load_local(data_file_list,per_start,per_end)
 		percent(per_start+((i+0.5)/data_file_list.length)*(per_end-per_start));
 		let dfl = data_file_list[i];
 		dfl.te = load_file_local(dfl.full_name);
+		//dfl.te = load_file_nonlocal(dfl.full_name);
 	}
 	
 	import_file2(data_file_list);
@@ -133,7 +137,6 @@ function load_local(data_file_list,per_start,per_end)
 /// Continues importing after all files have been loaded
 function import_file2(data_file_list)
 {
-
 	let ts = clock();
 	loading_mess("Processing...");
 	
@@ -305,26 +308,20 @@ function import_file2(data_file_list)
 			if(imp.warn == true) return;
 		}
 	}
-		
+	
 	if(dif(imp.pro.proc_time.pt_sum,1)){
 		prr("PTSUM NOT MATCH"+imp.pro.proc_time.pt_sum);
 	}
 	
-	if(sim_result_import.load) results_finalise(sim_result_import);
-	if(inf_result_import.load) results_finalise(inf_result_import);
-	if(ppc_result_import.load) results_finalise(ppc_result_import);
-
-	percent(90);
+	finalise(80,94);
 	
 	load_default_map();
 	
-	percent(95);
-	
-	//ppc_add_ind();
-	
-	percent(99);
+	percent(97);
 	
 	initialise_filters();
+
+	percent(99);
 
 	let in2; if(input.info) in2 = input.info.type;
 
@@ -349,11 +346,28 @@ function import_file2(data_file_list)
 	imp = {};  // Removes to save memory	
 	
 	//profiling();  // Looks at where memory is being used
-	
+
 	//prr("Processing time: "+(clock()-ts)/1000);
 }
 
 
+/// Finalises any results
+function finalise(per_start,per_end)
+{
+	let num = 0;
+	if(sim_result_import.load) num++;
+	if(inf_result_import.load) num++;
+	if(ppc_result_import.load) num++;
+	
+	let dper = (per_end-per_start)/num;
+	
+	let per = per_start;
+	if(sim_result_import.load){ results_finalise(sim_result_import,per,per+dper); per += dper;}
+	if(inf_result_import.load){ results_finalise(inf_result_import,per,per+dper); per += dper;}
+	if(ppc_result_import.load){ results_finalise(ppc_result_import,per,per+dper); per += dper;}
+}
+
+	
 /// Estimates how long each command will take
 function assign_processing_time()
 {
@@ -387,7 +401,7 @@ function assign_processing_time()
 		pc.pt = frac_proc*(pc.pt/total_pt);
 	}
 	
-	pro.proc_time = {per_start:20, per_end:90, per:0, pt_sum:0, frac_no_proc:1-frac_proc};
+	pro.proc_time = {per_start:20, per_end:80, per:0, pt_sum:0, frac_no_proc:1-frac_proc};
 }
 
 
@@ -1138,7 +1152,7 @@ function get_data_file_list(pro,per_start,per_end)
 			
 			let file = tag.value;
 			switch(tag.name){
-			case "value": case "constant": case "reparam": case "text":  // May or may not be a file
+			case "value": case "prior-const": case "constant": case "reparam": case "text":  // May or may not be a file
 				tag.need_pt = true;
 				if(typeof file == 'string' && is_file(file)){
 					load_list.push({j:j, k:k});
@@ -1914,6 +1928,16 @@ function decode(fi)
 	let output=[];
 	
 	let te = fi.te;
+	
+	// Remove \r
+	let len = te.length; 
+	if(len >= 2){
+		if(te.charCodeAt(len-2) == 13 && te.charCodeAt(len-1) == 10){
+			te = te.substr(0,len-2);
+			te += "\n";
+		}
+	}
+	
 	for(let i = 0; i < te.length; i++){ 	
 		let c = te.charCodeAt(i);
 		if(c >= COMPRESS_NUM_MAX){
@@ -1942,6 +1966,7 @@ function decode(fi)
 	let prev="";
 	for(let i = 0; i < imax; i++){
 		let val = output[i];
+		
 		let W;
 		if(val < dic.length) W = dic[val];
 		else W = prev +prev[0];
@@ -1979,6 +2004,7 @@ function decode(fi)
 			}
 		}
 	}
+
 	return te;
 }
 

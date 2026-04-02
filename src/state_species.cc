@@ -557,6 +557,7 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 			
 			const auto &ind_tab = samp_sp.ind_tab;
 			
+			/*
 			// Checks individual effects are correct
 			if(ind_tab.ncol-3 != sp.ind_effect.size()){
 				error_load_sample(1);
@@ -567,6 +568,7 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 					error_load_sample(2);
 				}
 			}
+			*/
 			
 			for(auto r = 0u; r < ind_tab.nrow; r++){
 				const auto &row = ind_tab.ele[r];
@@ -589,31 +591,10 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 					}			
 				}					
 			
-				auto &ind = individual[i];
+				//auto &ind = individual[i];
 				
 				auto source = false;
 				if(row[1] == "yes") source = true;
-				
-				if(ind_tab.ncol != ind.ie.size()+3) error_load_sample(21);
-				else{
-					for(const auto &ieg : sp.ind_eff_group){
-						if(ieg.ppc_resample == false){
-							const auto &indeff = sp.ind_effect;
-							const auto &iegs = ind_eff_group_sampler;
-	
-							for(const auto &li : ieg.list){
-								auto e = li.index;
-								
-								const auto &ie = indeff[e];
-								auto var = iegs[ie.index].omega[ie.num][ie.num];
-								
-								ind.ie[e] = 0.5*var+log(number(row[2+e]));
-							}
-						}
-					}
-				}
-				
-				set_exp_ie(ind);
 				
 				auto ev_text = row[row.size()-1];
 				if(ev_text != "unobserved"){
@@ -784,6 +765,7 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 			for(auto f = 0u; f < sp.fix_effect.size(); f++) set_exp_fe(f);
 		
 			ie_Amatrix_sampler_init();
+
 			sample_ie_Amatrix();	
 			
 			auto C = sp.comp_gl.size();
@@ -1240,7 +1222,6 @@ vector <double> StateSpecies::sample_ie() const
 /// Samples the individual effects with A matrix
 void StateSpecies::sample_ie_Amatrix()
 {
-	//auto flag = false;
 	string warn;
 	for(auto i = 0u; i < sp.ind_eff_group.size(); i++){
 		const auto &ieg = sp.ind_eff_group[i];
@@ -1248,12 +1229,13 @@ void StateSpecies::sample_ie_Amatrix()
 		const auto &iegs = ind_eff_group_sampler[i];
 
 		if(ieg.A_matrix.set == true){
-			//flag = true;
+			auto N = ieg.list.size();
+			auto I = individual.size();
+				
 			if(mode == PPC && ieg.ppc_resample == false){
+				// This is dealt with in set_ie_from_samp
 			}
 			else{
-				auto N = ieg.list.size();
-				auto I = individual.size();
 				auto M = N*I;
 				
 				vector <double> vec(M);
@@ -1275,15 +1257,6 @@ void StateSpecies::sample_ie_Amatrix()
 				}			
 			}				
 		}
-	}
-	
-	for(auto &ind : individual){		
-		set_exp_ie(ind);
-		for(auto i = 0u; i < sp.ind_effect.size(); i++){
-			if(ind.ie[i] == UNSET) emsg("Should be set1");
-		}
-
-		//if(flag == true) set_exp_ie(ind);
 	}
 }
 
@@ -2566,4 +2539,90 @@ void StateSpecies::fit_obs_trans(double t_end)
 			}
 		}
 	}
+}
+
+
+/// Gets any rate warning associated with rates being too high
+void StateSpecies::get_rate_warning(ParticleSpecies &part_sp) const
+{
+	auto rate_thresh = RATE_RECOMMEND/dt;
+
+	auto K = sp.ncla;
+	double dt_max_est = LARGE;
+	
+	vector < vector <bool> > tra_prob;
+	tra_prob.resize(K);
+	for(auto cl = 0u; cl < K; cl++){
+		const auto &claa = sp.cla[cl];
+		tra_prob[cl].resize(claa.ntra,false);  
+	}
+
+	// Works out maximum rates for different Markov equations
+	vector <double> rmax_st;
+	if(sp.type == INDIVIDUAL){
+		for(auto m = 0u; m < sp.markov_eqn.size(); m++){
+			auto rmax = 0.0; 
+		
+			const auto &mev = markov_eqn_vari[m];
+		
+			for(const auto &di : mev.div){
+				auto val = di.value;
+				if(val > rmax) rmax = val;
+			}
+			rmax_st.push_back(rmax);
+		}
+	}
+
+	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+		const auto &tra = sp.tra_gl[tr];
+		
+		if(tra.i == UNSET){ // Source transition
+		}
+		else{
+			double rate = UNSET;
+			if(sp.type == INDIVIDUAL){
+				auto m = tra.markov_eqn_ref;
+				if(m != UNSET) rate = rmax_st[m]/dt;
+			}
+			else{
+				auto max = 0.0; 
+				const auto &tms = tnum_mean_st[tr];	
+				auto c = tra.i;
+				for(auto ti = 0u; ti < T; ti++){
+					auto pop = cpop_st[ti][c];
+					if(pop > 0){
+						auto ra = tms[ti]/pop;
+						if(ra > max) max = ra;
+					}
+				}
+				rate = max/dt;
+			}
+		
+			if(rate != UNSET){
+				if(rate > rate_thresh){
+					tra_prob[tra.cl][tra.tr] = true;
+				}
+			
+				auto dtmax = RATE_RECOMMEND/rate;
+				if(dtmax < dt_max_est) dt_max_est = dtmax;
+			}
+		}
+	}
+
+	if(dt_max_est < dt){
+		auto &trans_prob = part_sp.trans_prob;
+		for(auto cl = 0u; cl < sp.ncla; cl++){
+			const auto &claa = sp.cla[cl];
+			for(auto tr = 0u; tr < claa.ntra; tr++){
+				if(tra_prob[cl][tr]){
+					TransProb tp; tp.cl = cl; tp.tr = tr;
+					trans_prob.push_back(tp);
+					if(trans_prob.size() >= TRANS_PROB_MAX) break;
+				}
+			}
+			if(trans_prob.size() >= TRANS_PROB_MAX) break;
+		}
+	}
+
+	part_sp.dt_max_est = dt_max_est;
 }

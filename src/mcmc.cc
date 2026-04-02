@@ -65,24 +65,24 @@ void MCMC::run()
 	
 	long time_start = clock();
 
+	/*
 	for(auto ind : model.species[0].individual){
 		for(auto ob : ind.obs){
-			
 			//obs_eqn_value[ob.obs_eqn_ref[sp.comp_gl[c].cla_comp[ob.cl]]];
-			
 		}
 	}
+	*/
 	
 	for(auto s = 0u; s < nsample; s++){
 		percentage(s,nsample);
 	
 		if(model.sync_on) synchronise_proposal(s,chain,mpi);
-		
+
 		for(auto &ch : chain){
 			ch.burn_update(s);
 			ch.update(s);
 		}		
-		
+	
 		sample_op(s);
 
 #ifdef USE_MPI

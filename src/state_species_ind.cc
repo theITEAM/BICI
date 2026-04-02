@@ -13,11 +13,22 @@ using namespace std;
 #include "utils.hh"
 #include "matrix.hh"
 
+void StateSpecies::set_markov_vari_value(unsigned int ti, const vector < vector <double> > &popnum_t, const vector <double> &val_fast)
+{
+	timer[UP_MARKOV] -= clock();	
+	update_markov_eqn_value(ti,popnum_t,val_fast);
+	markov_vari_value_copy(ti);
+	timer[UP_MARKOV] += clock();
+}
+
+	
 /// Updates the individuals in the system (using a modified Gillespie algorithm)
 void StateSpecies::update_individual_based(unsigned int ti, const vector < vector <Poss> > &pop_ind, const vector < vector <double> > &popnum_t, const vector <double> &val_fast)
 {
 	timer[UP_MARKOV] -= clock();	
 	update_markov_eqn_value(ti,popnum_t,val_fast);
+	markov_vari_value_copy(ti);
+	set_markov_tree_rate();
 	timer[UP_MARKOV] += clock();	
 
 	timer[SORT] -= clock();	
@@ -788,12 +799,25 @@ void StateSpecies::markov_eqn_recalc_fast(unsigned int ti, const vector <double>
 	for(auto e : sp.sim_linear_speedup.calc) markov_eqn_recalc(e,ti,popnum);	
 }
 
-		
+
+/// Copies values from markov value into dit
+void StateSpecies::markov_vari_value_copy(unsigned int ti)
+{
+	for(auto e = 0u; e < sp.markov_eqn.size(); e++){
+		auto &me_vari = markov_eqn_vari[e];
+		auto &div =  me_vari.div;
+		if(ti < div.size()){
+			div[ti].value = me_vari.value*dt;
+		}
+	}
+}
+
+
 /// Updates the value of the markov equations
 void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vector <double> > &popnum_t, const vector <double> &val_fast)
 {
 	markov_eqn_recalc_fast(ti,popnum_t[ti],val_fast);
-		
+	
 	if(false){ // Used to check values
 		for(auto e = 0u; e < sp.markov_eqn.size(); e++){
 			auto &me_vari = markov_eqn_vari[e];
@@ -805,8 +829,6 @@ void StateSpecies::update_markov_eqn_value(unsigned int ti, const vector < vecto
 			}
 		}
 	}
-
-	set_markov_tree_rate();
 }
 
 

@@ -1378,20 +1378,6 @@ function drag_rightmenu_slider(x)
 }
 
 
-/// Rounds a number to reduce the number of decimal places
-function round(num)
-{
-	let n = Number(num);
-	let i;
-	for(i = 0; i < 10; i++){
-		let dif = n- Math.round(n);
-		if(dif > -TINY && dif < TINY) break;	
-		n *= 10; 
-	}
-	return num.toFixed(i);
-}
-
-
 /// Gets an element in DOM
 function ById(a){
 	return document.getElementById(a);
@@ -1542,6 +1528,11 @@ function view_warning(i)
 		press_button_prop("ParamValueContent","ParamSimElement",["name"],warn.name);
 		break;
 		
+	case "MissingPriorConst":
+		change_page({pa:"Model", su:"Parameters"});
+		press_button_prop("ParamValueContent","ParamPriConElement",["name"],warn.name);
+		break;
+		
 	case "ReparamValue":
 		change_page({pa:"Model", su:"Parameters"});
 		press_button_prop("ModelParamContent","ReparamElement",["name"],warn.name);
@@ -1613,7 +1604,7 @@ function view_warning(i)
 				break;
 			
 			case "reparam_eqn":
-				select_reparam_equation(model.param[info.i].name);
+				select_reparam_equation(info.par_name);
 				break;
 				
 			case "Se": case "Sp":

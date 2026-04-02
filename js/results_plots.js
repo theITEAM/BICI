@@ -58,6 +58,103 @@ function output_percent(stepp,i,N)
 }
 
 
+/// Plots the data
+function data_plot(line_post,data,key,so,sp,strat_filt,timepoint)
+{                                              // Data
+	let line_mean = get_line_mean(line_post);
+	
+	let line = [];
+	let tab = so.table;
+
+	let spec = so.spec;
+	let dist = spec.obs_error_dist.value;
+	let ty = spec.obs_error.value;
+
+	let col = BLACK;
+
+	let co = tab.ncol-1;
+
+	let key_na = "Data";
+	
+	for(let j = 0; j < tab.nrow; j++){
+		let t = Number(tab.ele[j][0]);
+		
+		let dfilt=[];
+		for(let k = 0; k < so.load_col.length; k++){
+			let cl = so.load_col[k].cl;
+			if(cl != undefined){
+				let co = tab.ele[j][k];
+				let c = hash_find(sp.cla[cl].hash_comp,co);
+				if(c == undefined) error("Could not find "+co);
+				dfilt[cl] = c;					
+			}
+		}
+				
+		let cl = 0; while(cl < sp.ncla && dfilt[cl] == strat_filt[cl]) cl++;
+		
+		if(cl == sp.ncla){
+			let m = find(so.load_col,"heading","Population");
+			if(m == undefined) error("Cannot find population");
+			
+			let val_data = Number(tab.ele[j][m]);
+				
+			// Generate error bar on posterior
+			let ti = get_ti(t,timepoint);
+			if(ti != undefined){
+				let val = line_mean[ti]; 
+				
+				let sd;
+				switch(dist){
+				case "Normal": 
+					switch(ty){
+					case "percent": sd = Number(spec.percent)*val/100; break;
+					case "sd": sd = Number(spec.sd); break;
+					case "file":
+						{
+							let m = find(so.load_col,"heading","sd");
+							if(m == undefined) error("Cannot find sd");
+							sd = Number(tab.ele[j][m]); break;
+						}
+						break;
+					}
+					break;
+					
+				case "Poisson":
+					sd = Math.sqrt(val);
+					break;
+
+				case "Negative binomial":
+					{
+						let p;
+						switch(spec.obs_error_p.value){
+						case "p": p = Number(spec.p); break;
+						case "file":
+							{
+								let m = find(so.load_col,"heading","p");
+								if(m == undefined) error("Cannot find p");
+								p = Number(tab.ele[j][m]); break;
+							}
+							break;
+						}
+						sd = Math.sqrt(val/p);
+					}
+					break;
+				}
+				
+				if(!isNaN(t) && !isNaN(val) && !isNaN(sd)){	
+					let ymin = val-sd; if(ymin < 0) ymin = 0;
+					data.push({type:"ErrorBar", x:t, ymin:ymin, y:val, ymax:val+sd, col:col});
+				}
+			}
+			
+			data.push({key_na:key_na, type:"Cross", x:t, y:val_data, col:RED});	
+		}
+	}
+	key.push({type:"Cross", te:key_na, col:RED});
+}
+
+
+	
 /// Calculates quantities needed for the graph
 function graph_pop_calculate(result,rpf,burn,p)
 {
@@ -83,12 +180,6 @@ function graph_pop_calculate(result,rpf,burn,p)
 	let isel = get_isel(rpf); if(isel != "All"){ imin = isel; imax = isel+1; burn = 0;}
 
 	let view = rpf.sel_view.te;
-
-	if(result.plot_average || ((view == "Compartment" || view == "Density") && isel == "All" && chsel == "All")){
-		imin = 0; imax = 1;
-		isel = "All";
-		sample = result.average;
-	}			
 	
 	let data = [];
 	
@@ -110,336 +201,521 @@ function graph_pop_calculate(result,rpf,burn,p)
 		}
 	}
 	
-	if(view == "Data"){                              // If data is viewed 
-		let seldata = rpf.sel_popdata;
-		
-		let so = result.species[seldata.p].inf_source[seldata.i];
-	
-		let strat_filt = seldata.strat_filt;
+	let mp = sp.marg_plot;
 
-		// Works out which transitions apply to data
-		let gfilt = [];	
-		for(let c = 0; c < sp.comp_gl.length; c++){
-			let cgl = sp.comp_gl[c];
-			
-			let flag = false;
-			
-			let cl2;
-			for(cl2 = 0; cl2 < sp.ncla; cl2++){
-				let filt = so.spec.filter.cla[cl2];
-				let cc = cgl.cla_comp[cl2];
-			
-				if(!(filt.radio.value == "All" || (filt.radio.value == "ObsMod" && filt.comp[cc].prob_eqn.te != "0") ||
-        				filt.comp[cc].check == true || strat_filt[cl2] == cc)) break;
-			}
-			if(cl2 == sp.ncla) flag = true;
-			gfilt.push(flag);
-		}
+	let average_plot = calc_average_plot(cl,filter,sp);
 	
-		let line_post = [];
-		{                                              // Posterior
+	if(!average_plot){  // This makes use of the marginalised representation
+		if(view == "Data"){                              // If data is viewed 
+			let seldata = rpf.sel_popdata;
 			
-			for(let i = imin; i < imax; i++){
-				let samp = sample[i];
-				if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
-					let sa = samp.species[p];
-					
-					let point = [];
+			let so = result.species[seldata.p].inf_source[seldata.i];
+		
+			let strat_filt = seldata.strat_filt;
+
+			// Works out which transitions apply to data
+			let gfilt = [];	
+			for(let c = 0; c < mp.N; c++){
+				let cma = mp.comp_marg[c];
 				
-					let y=[];
-					for(let t = 0; t < T; t++) y[t] = 0;
+				let flag = false;
+				
+				let j;
+				for(j = 0; j < mp.cl_list.length; j++){
+					let cl2 = mp.cl_list[j];
 					
-					for(let k = 0; k < sp.comp_gl.length; k++){
-						if(gfilt[k] == true) add_tl(y,sa.cpop_tl[k],result);
-					}
-					
-					for(let t = 0; t < T; t++){					
-						point.push({x:timepoint[t], y:y[t]});
-					}
-					
-					line_post.push(point);
+					let filt = so.spec.filter.cla[cl2];
+					let cc = cma.cla_comp[cl2];
+				
+					if(!(filt.radio.value == "All" || (filt.radio.value == "ObsMod" && filt.comp[cc].prob_eqn.te != "0") ||
+									filt.comp[cc].check == true || strat_filt[cl2] == cc)) break;
 				}
+				if(j == mp.cl_list.length) flag = true;
+				gfilt.push(flag);
 			}
 		
-			add_line(view,line_post,BLUE,posterior_name(result),data,key);
-		}
-		
-		{                                              // Data
-			let line_mean = get_line_mean(line_post);
-			
-			let line = [];
-			let tab = so.table;
-		
-			let spec = so.spec;
-			let dist = spec.obs_error_dist.value;
-			let ty = spec.obs_error.value;
-		
-			let col = BLACK;
-
-			let co = tab.ncol-1;
-
-			let key_na = "Data";
-			
-			for(let j = 0; j < tab.nrow; j++){
-				let t = Number(tab.ele[j][0]);
-				
-				let dfilt=[];
-				for(let k = 0; k < so.load_col.length; k++){
-					let cl = so.load_col[k].cl;
-					if(cl != undefined){
-						let co = tab.ele[j][k];
-						let c = hash_find(sp.cla[cl].hash_comp,co);
-						if(c == undefined) error("Could not find "+co);
-						dfilt[cl] = c;					
-					}
-				}
+			let line_post = [];
+			{                                              // Posterior
+				for(let i = imin; i < imax; i++){
+					let samp = sample[i];
+					if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
+						let sa = samp.species[p].marg_plot;
 						
-				let cl = 0; while(cl < sp.ncla && dfilt[cl] == strat_filt[cl]) cl++;
-				
-				if(cl == sp.ncla){
-					let m = find(so.load_col,"heading","Population");
-					if(m == undefined) error("Cannot find population");
+						let point = [];
 					
-					let val_data = Number(tab.ele[j][m]);
+						let y=[];
+						for(let t = 0; t < T; t++) y[t] = 0;
 						
-					// Generate error bar on posterior
-					let ti = get_ti(t,timepoint);
-					if(ti != undefined){
-						let val = line_mean[ti]; 
-						
-						let sd;
-						switch(dist){
-						case "Normal": 
-							switch(ty){
-							case "percent": sd = Number(spec.percent)*val/100; break;
-							case "sd": sd = Number(spec.sd); break;
-							case "file":
-								{
-									let m = find(so.load_col,"heading","sd");
-									if(m == undefined) error("Cannot find sd");
-									sd = Number(tab.ele[j][m]); break;
-								}
-								break;
+						for(let c = 0; c < mp.N; c++){
+							if(gfilt[c] == true){
+								let cp = sa.cpop[c];
+								for(let t = 0; t < T; t++) y[t] += cp[t];
 							}
-							break;
+						}
+						
+						for(let t = 0; t < T; t++){					
+							point.push({x:timepoint[t], y:y[t]});
+						}
+						
+						line_post.push(point);
+					}
+				}
+			
+				add_line(view,line_post,BLUE,posterior_name(result),data,key);
+			}
+			
+			data_plot(line_post,data,key,so,sp,strat_filt,timepoint);
+		}
+		else{
+			let stepp = get_percent_step(claa.ncomp);
+			
+			let c_list_rel = get_clist_rel_marg(cl,popfilt,sp);
+			let fraction = get_fraction(filter);
+			let fraction_cl = fraction_in_cl(cl,filter);
+			
+			let c_list_rel_denom;
+			let pos_op;
+			if(fraction){
+				pos_op = "positive";
+				let popfilt_denom = get_popfilt(rpf2,"Populations","denom");
+				let op; if(fraction_cl) op = "all";
+				c_list_rel_denom = get_clist_rel_marg(cl,popfilt_denom,sp,op);
+			}
+			
+			for(let c = 0; c < claa.ncomp; c++){
+				output_percent(stepp,c,claa.ncomp);
+				
+				if(!(popfilt[cl] != undefined && popfilt[cl][c] == false)){
+					let col = claa.comp[c].col;
+					
+					let sh = c*mp.comp_mult[cl];
+				
+					let c_list = [];
+					for(let k = 0; k < c_list_rel.length; k++){
+						c_list.push(c_list_rel[k]+sh);
+					}
+					
+					let c_list_denom = [];
+					if(fraction){
+						if(fraction_cl) sh = 0;
+						for(let k = 0; k < c_list_rel_denom.length; k++){
+							c_list_denom.push(c_list_rel_denom[k]+sh);
+						}
+					}
+					
+					let line = [];
+				
+					if(view == "Slice"){
+						let t = Number(rpf.slice_time);
+						
+						let vec = [];
+						
+						let ti = get_ti(t,timepoint);
+						if(ti != undefined){
+							for(let i = imin; i < imax; i++){
+								let samp = sample[i];
+								if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
+									let sa = samp.species[p].marg_plot;
+								
+									let pop = 0;
+									for(let ij = 0; ij < c_list.length; ij++) pop += sa.cpop[c_list[ij]][ti];
+									
+									if(fraction){
+										let pop_denom = 0;
+										for(let ij = 0; ij < c_list_denom.length; ij++){			
+											pop += sa.cpop[c_list_denom[ij]][ti];
+										}
 							
-						case "Poisson":
-							sd = Math.sqrt(val);
-							break;
-		
-						case "Negative binomial":
-							{
-								let p;
-								switch(spec.obs_error_p.value){
-								case "p": p = Number(spec.p); break;
-								case "file":
-									{
-										let m = find(so.load_col,"heading","p");
-										if(m == undefined) error("Cannot find p");
-										p = Number(tab.ele[j][m]); break;
+										if(pop_denom == 0) pop = 1;
+										else pop /= pop_denom;
 									}
-									break;
+									
+									vec.push(pop);
 								}
-								sd = Math.sqrt(val/p);
 							}
-							break;
+
+							//key.push({type:"Line", te:claa.comp[c].name, col:col, c:c});
 						}
 						
-						if(!isNaN(t) && !isNaN(val) && !isNaN(sd)){	
-							let ymin = val-sd; if(ymin < 0) ymin = 0;
-							data.push({type:"ErrorBar", x:t, ymin:ymin, y:val, ymax:val+sd, col:col});
+						let show_mean = rpf.dist_settings.show_mean.check;
+						if(vec.length > 0){
+							let int_req, max = LARGE; 
+							if(!fraction) int_req = "integer";
+							else max = 1;
+							distribution_add_data_line(vec,claa.comp[c].name,col,data,key,rpf,show_mean,0,max,int_req);
 						}
 					}
-					
-					data.push({key_na:key_na, type:"Cross", x:t, y:val_data, col:RED});	
-				}
-			}
-			key.push({type:"Cross", te:key_na, col:RED});
-		}
-	}
-	else{
-		let stepp = get_percent_step(claa.ncomp);
-		
-		let c_list_rel = get_clist_rel(cl,popfilt,sp);
-	
-		let fraction = get_fraction(filter);
-		let fraction_cl = fraction_in_cl(cl,filter);
-		
-		let c_list_rel_denom;
-		let pos_op;
-		if(fraction){
-			pos_op = "positive";
-			let popfilt_denom = get_popfilt(rpf2,"Populations","denom");
-		
-			let op; if(fraction_cl) op = "all";
-		
-			c_list_rel_denom = get_clist_rel(cl,popfilt_denom,sp,op);
-		}
-		
-		for(let c = 0; c < claa.ncomp; c++){
-			output_percent(stepp,c,claa.ncomp);
-			
-			if(!(popfilt[cl] != undefined && popfilt[cl][c] == false)){
-				let col = claa.comp[c].col;
-				
-				let sh = c*sp.comp_mult[cl];
-			
-				let c_list = [];
-				for(let k = 0; k < c_list_rel.length; k++){
-					c_list.push(c_list_rel[k]+sh);
-				}
-				
-				let c_list_denom = [];
-				if(fraction){
-					if(fraction_cl) sh = 0;
-					for(let k = 0; k < c_list_rel_denom.length; k++){
-						c_list_denom.push(c_list_rel_denom[k]+sh);
-					}
-				}
-				
-				let line = [];
-			
-				if(view == "Slice"){
-					let t = Number(rpf.slice_time);
-					
-					let vec = [];
-					
-					let ti = get_ti(t,timepoint);
-					if(ti != undefined){
+					else{
 						for(let i = imin; i < imax; i++){
 							let samp = sample[i];
-							if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
-								let sa = samp.species[p];
 							
-								let pop = 0;
+							if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
+								let sa = samp.species[p].marg_plot;
+								
+								let point = [];
+								
+								let y=[];
+								for(let t = 0; t < T; t++) y[t] = 0;
+								
 								for(let ij = 0; ij < c_list.length; ij++){
-									pop += get_val_tl(ti,sa.cpop_tl[c_list[ij]],result,pos_op);
+									let cp = sa.cpop[c_list[ij]]
+									for(let t = 0; t < T; t++) y[t] += cp[t]; 
 								}
 								
 								if(fraction){
-									let pop_denom = 0;
+									let y_denom=[];
+									for(let t = 0; t < T; t++) y_denom[t] = 0;
+							
 									for(let ij = 0; ij < c_list_denom.length; ij++){			
-										pop_denom += get_val_tl(ti,sa.cpop_tl[c_list_denom[ij]],result,pos_op);
+										let cp = sa.cpop[c_list_denom[ij]]
+										for(let t = 0; t < T; t++) y_denom[t] += cp[t]; 
 									}
-						
-									if(pop_denom == 0) pop = 1;
-									else pop /= pop_denom;
+									
+									for(let t = 0; t < T; t++){
+										let st = y[t];
+										if(y_denom[t] == 0) y[t] = 1;
+										else y[t] /= y_denom[t];
+									}
 								}
 								
-								vec.push(pop);
+								for(let t = 0; t < T; t++){ 
+									point.push({x:timepoint[t], y:y[t]});
+								}
+								
+								line.push(point);
 							}
 						}
-
-						//key.push({type:"Line", te:claa.comp[c].name, col:col, c:c});
-					}
 					
-					let show_mean = rpf.dist_settings.show_mean.check;
-					if(vec.length > 0){
-						let int_req, max = LARGE; 
-						if(!fraction) int_req = "integer";
-						else max = 1;
-						distribution_add_data_line(vec,claa.comp[c].name,col,data,key,rpf,show_mean,0,max,int_req);
+						switch(view){
+						case "Graph": case "Graph (all)": case "Graph (split)": case "Graph (lines)":
+							{
+								let key_na = claa.comp[c].name;
+								for(let j = 0; j < line.length; j++){
+									data.push({point:line[j], col:claa.comp[c].col, view:view, key_na:key_na, type:"Line"});
+									
+									if(view == "Graph (lines)" && data.length > GRAPH_LINE_MAX){
+										line_max = true; break;
+									}
+								}
+								
+								key.push({type:"Line", te:key_na, col:col, c:c});
+							}
+							break;
+							
+						case "Graph (CI)": case "Data":
+							{
+								let line_stats = get_line_stats(line);
+								let key_na = claa.comp[c].name;
+								data.push({point:line_stats, col:col, key_na:key_na, type:"Line CI"});
+								key.push({type:"Line", te:key_na, col:col, c:c});
+							}
+							break;
+							
+						case "Compartment": case "Density":
+							{
+								let line_stats = get_line_mean(line);
+								data.push({y_vec:line_stats, col:col, c:c, type:"Comp Video"});
+							}
+							break;
+							
+						default: error("view option error1"); break;
+						}
 					}
 				}
-				else{
-					for(let i = imin; i < imax; i++){
-						let samp = sample[i];
+				
+				if(key.length > KEY_LINE_MAX){ line_max = true; break;}
+			}
+		}
+	}
+	else{	 // This uses the average to plot results
+		if(view == "Data"){                              // If data is viewed
+			let seldata = rpf.sel_popdata;
+			
+			let so = result.species[seldata.p].inf_source[seldata.i];
+		
+			let strat_filt = seldata.strat_filt;
+
+			// Works out which transitions apply to data
+			let gfilt = [];	
+			for(let c = 0; c < sp.comp_gl.length; c++){
+				let cgl = sp.comp_gl[c];
+				
+				let flag = false;
+				
+				let cl2;
+				for(cl2 = 0; cl2 < sp.ncla; cl2++){
+					let filt = so.spec.filter.cla[cl2];
+					let cc = cgl.cla_comp[cl2];
+				
+					if(!(filt.radio.value == "All" || (filt.radio.value == "ObsMod" && filt.comp[cc].prob_eqn.te != "0") ||
+									filt.comp[cc].check == true || strat_filt[cl2] == cc)) break;
+				}
+				if(cl2 == sp.ncla) flag = true;
+				gfilt.push(flag);
+			}
+		
+			let line_post = [];
+			{                                              // Posterior
+				let sa = result.average.species[p];
+			
+				let point = [];
+			
+				let y=[];
+				for(let t = 0; t < T; t++) y[t] = 0;
+				
+				for(let k = 0; k < sp.comp_gl.length; k++){
+					if(gfilt[k] == true){	
+						for(let ij = 0; ij < c_list.length; ij++){
+							add_pop_cmp(k,y,T,sa);
+						}
+					}
+				}
+				
+				for(let t = 0; t < T; t++){					
+					point.push({x:timepoint[t], y:y[t]});
+				}
+				
+				line_post.push(point);
+				
+				add_line(view,line_post,BLUE,posterior_name(result),data,key);
+			}
+			
+			data_plot(line_post,data,key,so,sp,strat_filt,timepoint);
+		}
+		else{
+			let stepp = get_percent_step(claa.ncomp);
+			
+			let c_list_rel = get_clist_rel(cl,popfilt,sp);
+		
+			let fraction = get_fraction(filter);
+			let fraction_cl = fraction_in_cl(cl,filter);
+			
+			let c_list_rel_denom;
+			let pos_op;
+			if(fraction){
+				pos_op = "positive";
+				let popfilt_denom = get_popfilt(rpf2,"Populations","denom");
+			
+				let op; if(fraction_cl) op = "all";
+			
+				c_list_rel_denom = get_clist_rel(cl,popfilt_denom,sp,op);
+			}
+			
+			for(let c = 0; c < claa.ncomp; c++){
+				output_percent(stepp,c,claa.ncomp);
+				
+				if(!(popfilt[cl] != undefined && popfilt[cl][c] == false)){
+					let col = claa.comp[c].col;
+					
+					let sh = c*sp.comp_mult[cl];
+				
+					let c_list = [];
+					for(let k = 0; k < c_list_rel.length; k++){
+						c_list.push(c_list_rel[k]+sh);
+					}
+					
+					let c_list_denom = [];
+					if(fraction){
+						if(fraction_cl) sh = 0;
+						for(let k = 0; k < c_list_rel_denom.length; k++){
+							c_list_denom.push(c_list_rel_denom[k]+sh);
+						}
+					}
+					
+					let line = [];
+				
+					if(view == "Slice"){
+						let t = Number(rpf.slice_time);
 						
-						if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
-							let sa = samp.species[p];
+						let vec = [];
+						
+						let ti = get_ti(t,timepoint);
+						if(ti != undefined){
+							let sa = result.average.species[p];
 							
-							let point = [];
-							
-							let y=[];
-							for(let t = 0; t < T; t++) y[t] = 0;
-							
+							let pop = 0;
 							for(let ij = 0; ij < c_list.length; ij++){
-								add_tl(y,sa.cpop_tl[c_list[ij]],result,pos_op);
+								pop += pop_cmp_ti(ti,c_list[ij],T,sa);
 							}
 							
 							if(fraction){
-								let y_denom=[];
-								for(let t = 0; t < T; t++) y_denom[t] = 0;
+								let pop_denom = 0;
+								for(let ij = 0; ij < c_list_denom.length; ij++){	
+									pop += pop_cmp_ti(ti,c_list_denom[ij],T,sa);						
+								}
+					
+								if(pop_denom == 0) pop = 1;
+								else pop /= pop_denom;
+							}
+							
+							vec.push(pop);
+							//key.push({type:"Line", te:claa.comp[c].name, col:col, c:c});
+						}
 						
-								for(let ij = 0; ij < c_list_denom.length; ij++){			
-									add_tl(y_denom,sa.cpop_tl[c_list_denom[ij]],result,pos_op);
-								}
-								
-								for(let t = 0; t < T; t++){
-									let st = y[t];
-									if(y_denom[t] == 0) y[t] = 1;
-									else y[t] /= y_denom[t];
-								}
-							}
-							
-							for(let t = 0; t < T; t++){ 
-								point.push({x:timepoint[t], y:y[t]});
-							}
-							
-							line.push(point);
+						let show_mean = rpf.dist_settings.show_mean.check;
+						if(vec.length > 0){
+							let int_req, max = LARGE; 
+							if(!fraction) int_req = "integer";
+							else max = 1;
+							distribution_add_data_line(vec,claa.comp[c].name,col,data,key,rpf,show_mean,0,max,int_req);
 						}
 					}
-				
-					switch(view){
-					case "Graph": case "Graph (all)": case "Graph (split)": case "Graph (lines)":
-						{
-							let key_na = claa.comp[c].name;
-							for(let j = 0; j < line.length; j++){
-								data.push({point:line[j], col:claa.comp[c].col, view:view, key_na:key_na, type:"Line"});
+					else{
+						let sa = result.average.species[p];
 								
-								if(view == "Graph (lines)" && data.length > GRAPH_LINE_MAX){
-									line_max = true; break;
-								}
+						let point = [];
+					
+						let y=[];
+						for(let t = 0; t < T; t++) y[t] = 0;
+						
+						for(let ij = 0; ij < c_list.length; ij++){
+							add_pop_cmp(c_list[ij],y,T,sa);
+						}
+						
+						if(fraction){
+							let y_denom=[];
+							for(let t = 0; t < T; t++) y_denom[t] = 0;
+					
+							for(let ij = 0; ij < c_list_denom.length; ij++){	
+								add_pop_cmp(c_list_denom[ij],y_denom,T,sa);
 							}
 							
-							key.push({type:"Line", te:key_na, col:col, c:c});
+							for(let t = 0; t < T; t++){
+								let st = y[t];
+								if(y_denom[t] == 0) y[t] = 1;
+								else y[t] /= y_denom[t];
+							}
 						}
-						break;
 						
-					case "Graph (CI)": case "Data":
-						{
-							let line_stats = get_line_stats(line);
-							let key_na = claa.comp[c].name;
-							data.push({point:line_stats, col:col, key_na:key_na, type:"Line CI"});
-							key.push({type:"Line", te:key_na, col:col, c:c});
+						for(let t = 0; t < T; t++){ 
+							point.push({x:timepoint[t], y:y[t]});
 						}
-						break;
 						
-					case "Compartment": case "Density":
-						{
-							let line_stats = get_line_mean(line);
-							data.push({y_vec:line_stats, col:col, c:c, type:"Comp Video"});
+						line.push(point);
+					
+						switch(view){
+						case "Graph": case "Graph (all)": case "Graph (split)": case "Graph (lines)":
+							{
+								let key_na = claa.comp[c].name;
+								for(let j = 0; j < line.length; j++){
+									data.push({point:line[j], col:claa.comp[c].col, view:view, key_na:key_na, type:"Line"});
+									
+									if(view == "Graph (lines)" && data.length > GRAPH_LINE_MAX){
+										line_max = true; break;
+									}
+								}
+								
+								key.push({type:"Line", te:key_na, col:col, c:c});
+							}
+							break;
+							
+						case "Graph (CI)": case "Data":
+							{
+								let line_stats = get_line_stats(line);
+								let key_na = claa.comp[c].name;
+								data.push({point:line_stats, col:col, key_na:key_na, type:"Line CI"});
+								key.push({type:"Line", te:key_na, col:col, c:c});
+							}
+							break;
+							
+						case "Compartment": case "Density":
+							{
+								let line_stats = get_line_mean(line);
+								data.push({y_vec:line_stats, col:col, c:c, type:"Comp Video"});
+							}
+							break;
+							
+						default: error("view option error1"); break;
 						}
-						break;
-						
-					default: error("view option error1"); break;
 					}
 				}
+				
+				if(key.length > KEY_LINE_MAX){ line_max = true; break;}
 			}
-			
-			if(key.length > KEY_LINE_MAX){ line_max = true; break;}
 		}
 	}
 			
 	switch(view){
 	case "Graph": case "Graph (all)": case "Graph (split)": 
 	case "Graph (lines)": case "Graph (CI)": case "Data":
-		post({type:"Graph define", variety:"Population", view:view, data:data, op:{ def_xrange:time_range(result.details), x_label:"Time", y_label:"Population", key:key, line_max:line_max}});
+		post({type:"Graph define", variety:"Population", view:view, data:data, op:{ def_xrange:time_range(result.details), x_label:"Time", y_label:"Population", key:key, line_max:line_max, average_plot:show_av_warn(average_plot,result)}});
 		break;
 		
 	case "Compartment": case "Density": 
-		post({type:"Graph define", variety:"Population", view:view, data:data, op:{p:p, cl:cl, timepoint:result.timepoint, number_comp:true}});
+		post({type:"Graph define", variety:"Population", view:view, data:data, op:{p:p, cl:cl, timepoint:result.timepoint, number_comp:true, average_plot:show_av_warn(average_plot,result)}});
 		break;
 		
 	case "Slice":
-		post({type:"Graph define", variety:"Distribution", view:"Graph", data:data, op:{x_label:"Population", x_param:true, y_label:"Probability", key:key, line_max:line_max, yaxis:false}});
+		post({type:"Graph define", variety:"Distribution", view:"Graph", data:data, op:{x_label:"Population", x_param:true, y_label:"Probability", key:key, line_max:line_max, yaxis:false, average_plot:show_av_warn(average_plot,result)}});
 		break;
 		
 	default: error("Type not recognised"); break;
 	}
 }
 
+
+/// Calcualtes if an average plot is shown or not
+function calc_average_plot(cl,filter,sp)
+{
+	let mp = sp.marg_plot;
+
+	if(mp.cl_marg[cl] == true) return true;
+	else{
+		for(let i = 0; i < filter.length; i++){
+			let fi = filter[i];
+		
+			if(mp.cl_marg[fi.cl] == true) return true;
+		}
+	}
 	
+	return false;
+}
+
+	
+/// Adds a compressed compartment to a vector
+function add_pop_cmp(c,y,T,sa)
+{	
+	let val = sa.cpop_init[c];
+	let vec = sa.cpop_cmp[c];
+	
+	if(vec == undefined){
+		if(val != 0){
+			for(let t = 0; t < T; t++) y[t] += val;
+		}
+	}
+	else{
+		let t = 0;
+		let imax = vec.length;
+		for(let i = 0; i < imax; i+=2){
+			let tt = vec[i];
+			while(t <= tt){ y[t] += val; t++;}
+			val += vec[i+1];
+		}
+		while(t < T){ y[t] += val; t++;}
+	}
+}
+
+	
+/// Adds a compressed compartment to a vector
+function pop_cmp_ti(ti,c,T,sa)
+{	
+	let val = sa.cpop_init[c];
+	let vec = sa.cpop_cmp[c];
+	
+	if(vec == undefined){
+		return val;
+	}
+	else{
+		let imax = vec.length;
+		for(let i = 0; i < imax; i+=2){
+			if(ti <= vec[i]) return val; 
+			val += vec[i+1];
+		}
+		return val;
+	}
+}
+
+
 /// Gets name which is posterior under inference
 function posterior_name(result)
 {
@@ -559,6 +835,35 @@ function get_clist_rel(cl,popfilt,sp,op)
 	return clist_rel;
 }
 
+
+/// Based on a population filter gets relative position of all comartments allowed (using the marginal representation)
+function get_clist_rel_marg(cl,popfilt,sp,op)
+{
+	let mp = sp.marg_plot;
+	let N = mp.N;
+	
+	let clist_rel = [];
+	for(let k = 0; k < N; k++){
+		let co = mp.comp_marg[k];
+		let j;
+		for(j = 0; j < mp.cl_list.length; j++){
+			let cl2 = mp.cl_list[j];
+			
+			if(cl2 == cl){
+				if(op != "all" && co.cla_comp[cl2] != 0) break;
+			}
+			else{
+				if(popfilt[cl2] != undefined){
+					if(popfilt[cl2][co.cla_comp[cl2]] == false) break;
+				}
+			}
+		}
+				
+		if(j == mp.cl_list.length) clist_rel.push(k);
+	}
+	return clist_rel;
+}
+
 	
 /// Converts from a filter in different classifications to a global filter
 function global_convert(filt,sp)
@@ -628,13 +933,116 @@ function set_tr_tra_gl_ref(sp)
 	}
 }
 
+
+/// Plots transition data	
+function trans_data_plot(line_post,data,key,so,sp,strat_filt,timepoint,line_mean,view)
+{              
+	let line = [];
+	let tab = so.table;
+				
+	let spec = so.spec;
+	let dist = spec.obs_error_dist.value;
+	let ty = spec.obs_error.value;
+
+	let col = BLACK;
 	
+	let point = [];		
+	for(let j = 0; j < tab.nrow; j++){
+		let t = Number(tab.ele[j][0]);
+		let t2 = Number(tab.ele[j][1]);
+		let dtdata = t2 - t;
+	
+		let dfilt=[];
+		for(let k = 0; k < so.load_col.length; k++){
+			let cl = so.load_col[k].cl;
+			if(cl != undefined){
+				let co = tab.ele[j][k];
+				let c = hash_find(sp.cla[cl].hash_comp,co);
+				if(c == undefined) error("Could not find "+co);
+				dfilt[cl] = c;					
+			}
+		}
+		
+		let cl = 0; while(cl < sp.ncla && dfilt[cl] == strat_filt[cl]) cl++;
+		
+		if(cl == sp.ncla){	
+			let m = find(so.load_col,"heading","Number");
+			if(m == undefined) error("Cannot find Number");
+			
+			let val_data = Number(tab.ele[j][m]);
+				
+			// Generate error bar on posterior
+			let ti = get_ti(t,timepoint);
+			let ti2 = get_ti(t2,timepoint);
+			if(ti != undefined && ti2 != undefined && ti != ti2){
+				let val = ((timepoint[ti+1]-t)/(timepoint[ti+1]-timepoint[ti]))*line_mean[ti];
+				for(let ii = ti+1; ii < ti2; ii++){
+					if(ii < line_mean.length) val += line_mean[ii];
+				}							
+				if(ti2 < line_mean.length) val += ((t2-timepoint[ti2])/(timepoint[ti2+1]-timepoint[ti]))*line_mean[ti2];
+			
+				let sd;
+				switch(dist){
+				case "Normal": 
+					switch(ty){
+					case "percent": sd = Number(spec.percent)*val/100; break;
+					case "sd": sd = Number(spec.sd); break;
+					case "file":
+						{
+							let m = find(so.load_col,"heading","sd");
+							if(m == undefined) error("Cannot find sd");
+							sd = Number(tab.ele[j][m]); break;
+						}
+						break;
+					}
+					break;
+					
+				case "Poisson":
+					sd = Math.sqrt(val);
+					break;
+
+				case "Negative binomial":
+					{
+						let p;
+						switch(spec.obs_error_p.value){
+						case "p": p = Number(spec.p); break;
+						case "file":
+							{
+								let m = find(so.load_col,"heading","p");
+								if(m == undefined) error("Cannot find p");
+								p = Number(tab.ele[j][m]); break;
+							}
+							break;
+						}
+						sd = Math.sqrt(val/p);
+					}
+					break;
+				}
+				
+				if(!isNaN(t) && !isNaN(val) && !isNaN(sd)){	
+					let ymin = (val-sd)/dtdata; if(ymin < 0) ymin = 0;
+					data.push({type:"ErrorBar", x:t+dtdata/2, ymin:ymin, y:val/dtdata, ymax:(val+sd)/dtdata, col:col});
+				}
+			}
+			
+			if(!isNaN(t) && !isNaN(val_data)){
+				point.push({x:t, y:val_data/dtdata});
+				point.push({x:t+dtdata, y:val_data/dtdata});
+			}
+		}
+	}
+	line.push(point);
+	add_line(view,line,RED,"Data",data,key);
+}
+			
+			
 /// Calculates quantities needed for the graph
 function graph_trans_calculate(result,rpf,burn,p)
 {
 	// Sets classification
 	let rpf2 = rpf.species[p];
 	let cl = rpf2.sel_class.cl;
+	let filter = rpf2.filter;
 
 	// Incorprates filters
 	let popfilt = get_popfilt(rpf2,"Transitions");
@@ -649,12 +1057,6 @@ function graph_trans_calculate(result,rpf,burn,p)
 	let isel = get_isel(rpf); if(isel != "All"){ imin = isel; imax = isel+1; burn = 0;}
 
 	let view = rpf.sel_trans_view.te;
-
-	if(result.plot_average || ((view == "Compartment" || view == "Density") && isel == "All" && chsel == "All")){
-		imin = 0; imax = 1;
-		isel = "All";
-		sample = result.average;
-	}		
 	
 	let sp = result.species[p];
 	let claa = sp.cla[cl];
@@ -672,232 +1074,65 @@ function graph_trans_calculate(result,rpf,burn,p)
 	
 	let timepoint = result.timepoint;
 	
-	let T = timepoint.length-1;
-						
-	if(view == "Data"){                              // If data is viewed 
-		let seldata = rpf.sel_poptransdata;
-		let so = result.species[seldata.p].inf_source[seldata.i];
+	let T = timepoint.length-1;	
 	
-		let strat_filt = seldata.strat_filt;
+	let mp = sp.marg_plot;
+	
+	let average_plot = calc_average_plot(cl,filter,sp);
+	
+	if(!average_plot){  // This makes use of the marginalised representation
+		if(view == "Data"){                              // If data is viewed 
+			let seldata = rpf.sel_poptransdata;
+			let so = result.species[seldata.p].inf_source[seldata.i];
+		
+			let strat_filt = seldata.strat_filt;
 
-		let cl = find(sp.cla,"name",so.spec.cl_drop.te);
-		
-		// Works out which transitions apply to data
-		let gfilt = [];	
-		for(let tr = 0; tr < sp.tra_gl.length; tr++){
-			let trg = sp.tra_gl[tr];
+			let cl = find(sp.cla,"name",so.spec.cl_drop.te);
 			
-			let flag = false;
-			if(trg.cl == cl){
-				let c = trg.i; if(c == SOURCE) c = trg.f;
-				
-				let cgl = sp.comp_gl[c];
-				
-				let cl2;
-				for(cl2 = 0; cl2 < sp.ncla; cl2++){
-					if(cl == cl2){
-						if(so.spec.filter.tra[trg.tr].check != true) break;
-					}
-					else{
-						let filt = so.spec.filter.cla[cl2];
-						let cc = cgl.cla_comp[cl2];
-						
-						if(!(filt.radio.value == "All" || (filt.radio.value == "ObsMod" && filt.comp[cc].prob_eqn.te != "0") ||
-        				filt.comp[cc].check == true || strat_filt[cl2] == cc)) break;
-					}
-				}
-				if(cl2 == sp.ncla) flag = true;
-			}
-			gfilt.push(flag);
-		}
-		
-		let line_post = [];
-		let line_mean = [];
-		for(let t = 0; t < T; t++) line_mean[t] = 0;
-		let nline_mean = 0;
-		{                                              // Posterior
-			let tr_list = [];
-			for(let k = 0; k < sp.tra_gl.length; k++){
-				if(gfilt[k] == true) tr_list.push(k);
-			}
-			
-			for(let i = imin; i < imax; i++){
-				let samp = sample[i];
-				if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
-					let sa = samp.species[p];
+			// Works out which transitions apply to data
+			let gfilt = [];	
+			for(let tr = 0; tr < mp.NT; tr++){
+				let trma = mp.tra_marg[tr];
 					
-					let point = [];
+				let flag = false;
+				if(trma.cl == cl){
+					let c = trma.i; if(c == SOURCE) c = trma.f;
 					
-					let y=[];
-					for(let t = 0; t < T; t++) y[t] = 0;
+					let cma = mp.comp_marg[c];
 					
-					for(let ij = 0; ij < tr_list.length; ij++){
-						add_tl(y,sa.transnum_tl[tr_list[ij]],result);
-					}
-					
-					for(let t = 0; t < T; t++) line_mean[t] += y[t];
-					nline_mean++;
-					
-					for(let t = 0; t < T; t += step){
-						let step_max = t + step; if(step_max > T) step_max = T;
-						let dt = timepoint[step_max] - timepoint[t];
-						let num = 0;
-						for(let tt = t; tt < step_max; tt++) num += y[tt];	
-				
-						point.push({x:timepoint[t] + dt/2, y:num/dt});
-					}
-
-					line_post.push(point);
-				}
-			}
-			
-			add_line(view,line_post,BLUE,posterior_name(result),data,key);
-			
-			for(let t = 0; t < T; t++) line_mean[t] /= nline_mean;
-		}
-		
-		{                                              // Data
-			let line = [];
-			let tab = so.table;
-						
-			let spec = so.spec;
-			let dist = spec.obs_error_dist.value;
-			let ty = spec.obs_error.value;
-		
-			let col = BLACK;
-			
-			let point = [];		
-			for(let j = 0; j < tab.nrow; j++){
-				let t = Number(tab.ele[j][0]);
-				let t2 = Number(tab.ele[j][1]);
-				let dtdata = t2 - t;
-			
-				let dfilt=[];
-				for(let k = 0; k < so.load_col.length; k++){
-					let cl = so.load_col[k].cl;
-					if(cl != undefined){
-						let co = tab.ele[j][k];
-						let c = hash_find(sp.cla[cl].hash_comp,co);
-						if(c == undefined) error("Could not find "+co);
-						dfilt[cl] = c;					
-					}
-				}
-				
-				let cl = 0; while(cl < sp.ncla && dfilt[cl] == strat_filt[cl]) cl++;
-				
-				if(cl == sp.ncla){	
-					let m = find(so.load_col,"heading","Number");
-					if(m == undefined) error("Cannot find Number");
-					
-					let val_data = Number(tab.ele[j][m]);
-						
-					// Generate error bar on posterior
-					let ti = get_ti(t,timepoint);
-					let ti2 = get_ti(t2,timepoint);
-					if(ti != undefined && ti2 != undefined && ti != ti2){
-						let val = ((timepoint[ti+1]-t)/(timepoint[ti+1]-timepoint[ti]))*line_mean[ti];
-						for(let ii = ti+1; ii < ti2; ii++){
-							if(ii < line_mean.length) val += line_mean[ii];
-						}							
-						if(ti2 < line_mean.length) val += ((t2-timepoint[ti2])/(timepoint[ti2+1]-timepoint[ti]))*line_mean[ti2];
-					
-						let sd;
-						switch(dist){
-						case "Normal": 
-							switch(ty){
-							case "percent": sd = Number(spec.percent)*val/100; break;
-							case "sd": sd = Number(spec.sd); break;
-							case "file":
-								{
-									let m = find(so.load_col,"heading","sd");
-									if(m == undefined) error("Cannot find sd");
-									sd = Number(tab.ele[j][m]); break;
-								}
-								break;
-							}
-							break;
+					let j;
+					for(j = 0; j < mp.cl_list.length; j++){
+						let cl2 = mp.cl_list[j];
+						if(cl == cl2){
+							if(so.spec.filter.tra[trma.tr].check != true) break;
+						}
+						else{
+							let filt = so.spec.filter.cla[cl2];
+							let cc = cma.cla_comp[cl2];
 							
-						case "Poisson":
-							sd = Math.sqrt(val);
-							break;
-		
-						case "Negative binomial":
-							{
-								let p;
-								switch(spec.obs_error_p.value){
-								case "p": p = Number(spec.p); break;
-								case "file":
-									{
-										let m = find(so.load_col,"heading","p");
-										if(m == undefined) error("Cannot find p");
-										p = Number(tab.ele[j][m]); break;
-									}
-									break;
-								}
-								sd = Math.sqrt(val/p);
-							}
-							break;
-						}
-						
-						if(!isNaN(t) && !isNaN(val) && !isNaN(sd)){	
-							let ymin = (val-sd)/dtdata; if(ymin < 0) ymin = 0;
-							data.push({type:"ErrorBar", x:t+dtdata/2, ymin:ymin, y:val/dtdata, ymax:(val+sd)/dtdata, col:col});
+							if(!(filt.radio.value == "All" || (filt.radio.value == "ObsMod" && filt.comp[cc].prob_eqn.te != "0") ||
+									filt.comp[cc].check == true || strat_filt[cl2] == cc)) break;
 						}
 					}
-					
-					if(!isNaN(t) && !isNaN(val_data)){
-						point.push({x:t, y:val_data/dtdata});
-						point.push({x:t+dtdata, y:val_data/dtdata});
-					}
+					if(j == mp.cl_list.length) flag = true;
 				}
+				gfilt.push(flag);
 			}
-			line.push(point);
-			add_line(view,line,RED,"Data",data,key);
-		}
-	}
-	else{                                            // General transitions are observed
-		// Potentially only shows some lines
-		let line_filt;
-		for(let i = 0; i < rpf2.filter.length; i++){
-			let rpf3 = rpf2.filter[i];
-			if(rpf3.type == "trans_filt" && rpf3.cl == cl){ line_filt = rpf3.tra_filt; break;}
-		}
 		
-		let col_line = get_col_trans(claa);
-		
-		let stepp = get_percent_step(claa.ntra);
-		for(let j = 0; j < claa.ntra; j++){
-			output_percent(stepp,j,claa.ntra);
-				
-			if(line_filt == undefined || line_filt[j].check == true){
-				let tr = claa.tra[j];
-				
-				let col = col_line[j];
-			
-				let line = [];
-			
-				let ttgr = sp.tr_tra_gl_ref[cl][j];
-				
-				// Makes a list of a transitions to be included
-				let tr_list=[];
-				for(let ij = 0; ij < ttgr.length; ij++){
-					let k = ttgr[ij];
-					let tr = sp.tra_gl[k];
-			
-					let cc = tr.i; if(cc == SOURCE) cc = tr.f;
-						
-					let co = sp.comp_gl[cc];
-						
-					let cl2 = 0; 
-					while(cl2 < sp.ncla && (popfilt[cl2] == undefined || popfilt[cl2][co.cla_comp[cl2]] == true)) cl2++;
-				
-					if(cl2 == sp.ncla) tr_list.push(k);
+			let line_post = [];
+			let line_mean = [];
+			for(let t = 0; t < T; t++) line_mean[t] = 0;
+			let nline_mean = 0;
+			{                                              // Posterior
+				let tr_list = [];
+				for(let k = 0; k < mp.NT; k++){
+					if(gfilt[k] == true) tr_list.push(k);
 				}
 				
 				for(let i = imin; i < imax; i++){
 					let samp = sample[i];
 					if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
-						let sa = samp.species[p];
+						let sa = samp.species[p].marg_plot;
 						
 						let point = [];
 						
@@ -905,39 +1140,299 @@ function graph_trans_calculate(result,rpf,burn,p)
 						for(let t = 0; t < T; t++) y[t] = 0;
 						
 						for(let ij = 0; ij < tr_list.length; ij++){
-							add_tl(y,sa.transnum_tl[tr_list[ij]],result);
+							let tn = sa.transnum[tr_list[ij]];
+							for(let t = 0; t < T; t++) y[t] += tn[t];
 						}
-							
+						
+						for(let t = 0; t < T; t++) line_mean[t] += y[t];
+						nline_mean++;
+						
 						for(let t = 0; t < T; t += step){
 							let step_max = t + step; if(step_max > T) step_max = T;
-						
 							let dt = timepoint[step_max] - timepoint[t];
-							
 							let num = 0;
-							for(let tt = t; tt < step_max; tt++) num += y[tt]
-							
-							if(T <= step){
-								point.push({x:timepoint[t], y:num/dt});
-								point.push({x:timepoint[t] + dt, y:num/dt});
-							}
-							else{
-								point.push({x:timepoint[t] + dt/2, y:num/dt});
-							}	
-						}							
+							for(let tt = t; tt < step_max; tt++) num += y[tt];	
 					
-						line.push(point);
+							point.push({x:timepoint[t] + dt/2, y:num/dt});
+						}
+
+						line_post.push(point);
 					}
 				}
-				add_line(view,line,col,tr.name,data,key,"trans");
 				
-				if(key.length > KEY_LINE_MAX){ line_max = true; break;}
+				add_line(view,line_post,BLUE,posterior_name(result),data,key);
+				
+				for(let t = 0; t < T; t++) line_mean[t] /= nline_mean;
+			}
+			
+			trans_data_plot(line_post,data,key,so,sp,strat_filt,timepoint,line_mean,view);
+		}
+		else{                                            // General transitions are observed
+			// Potentially only shows some lines
+			let line_filt;
+			for(let i = 0; i < rpf2.filter.length; i++){
+				let rpf3 = rpf2.filter[i];
+				if(rpf3.type == "trans_filt" && rpf3.cl == cl){ line_filt = rpf3.tra_filt; break;}
+			}
+			
+			let col_line = get_col_trans(claa);
+			
+			let stepp = get_percent_step(claa.ntra);
+			for(let j = 0; j < claa.ntra; j++){
+				output_percent(stepp,j,claa.ntra);
+					
+				if(line_filt == undefined || line_filt[j].check == true){
+					let tr = claa.tra[j];
+					
+					let col = col_line[j];
+				
+					let line = [];
+				
+					let ttgr = mp.tr_tra_gl_ref[cl][j];
+					
+					// Makes a list of a transitions to be included
+					let tr_list=[];
+					for(let ij = 0; ij < ttgr.length; ij++){
+						let k = ttgr[ij];
+						let tr = mp.tra_marg[k];
+				
+						let cc = tr.i; if(cc == SOURCE) cc = tr.f;
+						let co = mp.comp_marg[cc];
+							
+						let m;
+						for(m = 0; m < mp.cl_list.length; m++){
+							let cl2 = mp.cl_list[m];
+							if(popfilt[cl2] != undefined && popfilt[cl2][co.cla_comp[cl2]] != true) break;
+						}
+						if(m == mp.cl_list.length) tr_list.push(k);
+					}
+					
+					for(let i = imin; i < imax; i++){
+						let samp = sample[i];
+						if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
+							let sa = samp.species[p].marg_plot;
+							
+							let point = [];
+							
+							let y=[];
+							for(let t = 0; t < T; t++) y[t] = 0;
+							
+							for(let ij = 0; ij < tr_list.length; ij++){
+								let tn = sa.transnum[tr_list[ij]];
+								for(let t = 0; t < T; t++) y[t] += tn[t];
+							}
+								
+							for(let t = 0; t < T; t += step){
+								let step_max = t + step; if(step_max > T) step_max = T;
+							
+								let dt = timepoint[step_max] - timepoint[t];
+								
+								let num = 0;
+								for(let tt = t; tt < step_max; tt++) num += y[tt]
+								
+								if(T <= step){
+									point.push({x:timepoint[t], y:num/dt});
+									point.push({x:timepoint[t] + dt, y:num/dt});
+								}
+								else{
+									point.push({x:timepoint[t] + dt/2, y:num/dt});
+								}	
+							}							
+						
+							line.push(point);
+						}
+					}
+					add_line(view,line,col,tr.name,data,key,"trans");
+					
+					if(key.length > KEY_LINE_MAX){ line_max = true; break;}
+				}
+			}
+		}
+	}
+	else{ // Uses average sample to generate plot
+		if(view == "Data"){                              // If data is viewed 
+			let seldata = rpf.sel_poptransdata;
+			let so = result.species[seldata.p].inf_source[seldata.i];
+		
+			let strat_filt = seldata.strat_filt;
+
+			let cl = find(sp.cla,"name",so.spec.cl_drop.te);
+			
+			// Works out which transitions apply to data
+			let gfilt = [];	
+			for(let tr = 0; tr < sp.tra_gl.length; tr++){
+				let trg = sp.tra_gl[tr];
+				
+				let flag = false;
+				if(trg.cl == cl){
+					let c = trg.i; if(c == SOURCE) c = trg.f;
+					
+					let cgl = sp.comp_gl[c];
+					
+					let cl2;
+					for(cl2 = 0; cl2 < sp.ncla; cl2++){
+						if(cl == cl2){
+							if(so.spec.filter.tra[trg.tr].check != true) break;
+						}
+						else{
+							let filt = so.spec.filter.cla[cl2];
+							let cc = cgl.cla_comp[cl2];
+							
+							if(!(filt.radio.value == "All" || (filt.radio.value == "ObsMod" && filt.comp[cc].prob_eqn.te != "0") ||
+									filt.comp[cc].check == true || strat_filt[cl2] == cc)) break;
+						}
+					}
+					if(cl2 == sp.ncla) flag = true;
+				}
+				gfilt.push(flag);
+			}
+			
+			let line_post = [];
+			let line_mean = [];
+			for(let t = 0; t < T; t++) line_mean[t] = 0;
+			let nline_mean = 0;
+			{                                              // Posterior
+				let tr_list = [];
+				for(let k = 0; k < sp.tra_gl.length; k++){
+					if(gfilt[k] == true) tr_list.push(k);
+				}
+				
+				let sa = result.average.species[p];
+					
+				let point = [];
+				
+				let y=[];
+				for(let t = 0; t < T; t++) y[t] = 0;
+				
+				for(let ij = 0; ij < tr_list.length; ij++){
+					let tl = sa.transnum[tr_list[ij]];
+					if(tl != undefined){
+						for(let t = 0; t < T; t++){
+							let val = tl[t];
+							if(val != undefined) y[t] += val;
+						}
+					}
+				}
+				
+				for(let t = 0; t < T; t++) line_mean[t] += y[t];
+				nline_mean++;
+				
+				for(let t = 0; t < T; t += step){
+					let step_max = t + step; if(step_max > T) step_max = T;
+					let dt = timepoint[step_max] - timepoint[t];
+					let num = 0;
+					for(let tt = t; tt < step_max; tt++) num += y[tt];	
+			
+					point.push({x:timepoint[t] + dt/2, y:num/dt});
+				}
+
+				line_post.push(point);
+				
+				add_line(view,line_post,BLUE,posterior_name(result),data,key);
+				
+				for(let t = 0; t < T; t++) line_mean[t] /= nline_mean;
+			}
+			
+			trans_data_plot(line_post,data,key,so,sp,strat_filt,timepoint,line_mean,view);
+		}
+		else{                                            // General transitions are observed
+			// Potentially only shows some lines
+			let line_filt;
+			for(let i = 0; i < rpf2.filter.length; i++){
+				let rpf3 = rpf2.filter[i];
+				if(rpf3.type == "trans_filt" && rpf3.cl == cl){ line_filt = rpf3.tra_filt; break;}
+			}
+			
+			let col_line = get_col_trans(claa);
+			
+			let stepp = get_percent_step(claa.ntra);
+			for(let j = 0; j < claa.ntra; j++){
+				output_percent(stepp,j,claa.ntra);
+					
+				if(line_filt == undefined || line_filt[j].check == true){
+					let tr = claa.tra[j];
+					
+					let col = col_line[j];
+				
+					let line = [];
+				
+					let ttgr = sp.tr_tra_gl_ref[cl][j];
+					
+					// Makes a list of a transitions to be included
+					let tr_list=[];
+					for(let ij = 0; ij < ttgr.length; ij++){
+						let k = ttgr[ij];
+						let tr = sp.tra_gl[k];
+				
+						let cc = tr.i; if(cc == SOURCE) cc = tr.f;
+							
+						let co = sp.comp_gl[cc];
+							
+						let cl2 = 0; 
+						while(cl2 < sp.ncla && (popfilt[cl2] == undefined || popfilt[cl2][co.cla_comp[cl2]] == true)) cl2++;
+					
+						if(cl2 == sp.ncla) tr_list.push(k);
+					}
+					
+					let sa = result.average.species[p];
+				
+					let point = [];
+					
+					let y=[];
+					for(let t = 0; t < T; t++) y[t] = 0;
+					
+					for(let ij = 0; ij < tr_list.length; ij++){
+						let tl = sa.transnum[tr_list[ij]];
+						if(tl != undefined){
+							for(let t = 0; t < T; t++){
+								let val = tl[t];
+								if(val != undefined) y[t] += val;
+							}
+						}
+					}
+						
+					for(let t = 0; t < T; t += step){
+						let step_max = t + step; if(step_max > T) step_max = T;
+					
+						let dt = timepoint[step_max] - timepoint[t];
+						
+						let num = 0;
+						for(let tt = t; tt < step_max; tt++) num += y[tt]
+						
+						if(T <= step){
+							point.push({x:timepoint[t], y:num/dt});
+							point.push({x:timepoint[t] + dt, y:num/dt});
+						}
+						else{
+							point.push({x:timepoint[t] + dt/2, y:num/dt});
+						}	
+					}							
+				
+					line.push(point);
+					
+					add_line(view,line,col,tr.name,data,key,"trans");
+					
+					if(key.length > KEY_LINE_MAX){ line_max = true; break;}
+				}
 			}
 		}
 	}
 	
-	post({type:"Graph define", variety:"Transition", view:view, data:data, op:{ def_xrange:time_range(result.details), x_label:"Time", y_label:"Transition rate", key:key, line_max:line_max}});
+	
+	post({type:"Graph define", variety:"Transition", view:view, data:data, op:{ def_xrange:time_range(result.details), x_label:"Time", y_label:"Transition rate", key:key, line_max:line_max, average_plot:show_av_warn(average_plot,result)}});
 }
  
+
+/// Determines if average warning is shown
+function show_av_warn(average_plot,result)
+{
+	if(average_plot == true){
+		if(result.sample.length == 1) return false;
+		return true;
+	}
+	return false;
+}
+
 
 /// Gets colours for transitions
 function get_col_trans(claa)
@@ -966,6 +1461,7 @@ function graph_trans_expect_calculate(result,rpf,burn,p,type)
 {
 	// Sets classification
 	let rpf2 = rpf.species[p];
+	let filter = rpf2.filter;
 	
 	let cl = rpf2.sel_class.cl;
 
@@ -982,12 +1478,6 @@ function graph_trans_expect_calculate(result,rpf,burn,p,type)
 	let isel = get_isel(rpf); if(isel != "All"){ imin = isel; imax = isel+1; burn = 0;}
 
 	let view = "Graph (CI)";
-	
-	if(result.plot_average || ((view == "Compartment" || view == "Density") && isel == "All" && chsel == "All")){
-		imin = 0; imax = 1;
-		isel = "All";
-		sample = result.average;
-	}		
 	
 	let sp = result.species[p];
 	let claa = sp.cla[cl];
@@ -1016,6 +1506,8 @@ function graph_trans_expect_calculate(result,rpf,burn,p,type)
 	
 	let key_na = "Expected";
 	
+	let average_plot = calc_average_plot(cl,filter,sp);
+
 	let stepp = get_percent_step(claa.ntra);
 	for(let j = 0; j < claa.ntra; j++){
 		output_percent(stepp,j,claa.ntra);
@@ -1027,101 +1519,161 @@ function graph_trans_expect_calculate(result,rpf,burn,p,type)
 		
 			let line = [];
 		
-			let ttgr = sp.tr_tra_gl_ref[cl][j];
+			let mp = sp.marg_plot;
 			
-			// Makes a list of a transitions to be included
-			let tr_list=[];
-			for(let ij = 0; ij < ttgr.length; ij++){
-				let k = ttgr[ij];
-				let tr = sp.tra_gl[k];
-		
-				let cc = tr.i; if(cc == SOURCE) cc = tr.f;
+			if(!average_plot){  // This makes use of the marginalised representation
+				let ttgr = mp.tr_tra_gl_ref[cl][j];
 					
-				let co = sp.comp_gl[cc];
-					
-				let cl2 = 0; 
-				while(cl2 < sp.ncla && (popfilt[cl2] == undefined || popfilt[cl2][co.cla_comp[cl2]] == true)) cl2++;
+				// Makes a list of a transitions to be included
+				let tr_list=[];
+				for(let ij = 0; ij < ttgr.length; ij++){
+					let k = ttgr[ij];
+					let tr = mp.tra_marg[k];
 			
-				if(cl2 == sp.ncla) tr_list.push(k);
-			}
-			
-			for(let i = imin; i < imax; i++){
-				let samp = sample[i];
-				if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
-					let sa = samp.species[p];
-					
-					let point = [];
-					
-					let y=[];
-					for(let t = 0; t < T; t++) y[t] = 0;
-					
-					for(let ij = 0; ij < tr_list.length; ij++){
-						add_tl(y,sa.transnum_tl[tr_list[ij]],result);
+					let cc = tr.i; if(cc == SOURCE) cc = tr.f;
+					let co = mp.comp_marg[cc];
+						
+					let m;
+					for(m = 0; m < mp.cl_list.length; m++){
+						let cl2 = mp.cl_list[m];
+						if(popfilt[cl2] != undefined && popfilt[cl2][co.cla_comp[cl2]] != true) break;
 					}
+					if(m == mp.cl_list.length) tr_list.push(k);
+				}
+			
+				for(let i = imin; i < imax; i++){
+					let samp = sample[i];
+					if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
+						let sa = samp.species[p].marg_plot;
 						
-					for(let t = 0; t < T; t += step){
-						let step_max = t + step; if(step_max > T) step_max = T;
-					
-						let dt = timepoint[step_max] - timepoint[t];
+						let point = [];
+							
+						let y=[];
+						for(let t = 0; t < T; t++) y[t] = 0;
 						
-						let num = 0;
-						for(let tt = t; tt < step_max; tt++) num += y[tt]
-						
-						if(T <= step){
-							point.push({x:timepoint[t], y:num/dt});
-							point.push({x:timepoint[t] + dt, y:num/dt});
+						for(let ij = 0; ij < tr_list.length; ij++){
+							let tn = sa.transnum[tr_list[ij]];
+							for(let t = 0; t < T; t++) y[t] += tn[t];
 						}
-						else{
-							point.push({x:timepoint[t] + dt/2, y:num/dt});
-						}	
-					}							
-				
-					line.push(point);
-				}
-			}
-		
-			add_line(view,line,col,tr.name,data,key,"trans");
-			
-			// Adds in line for expected transition number
-			let list=[];
-			for(let i = 0; i < result.td_res.length; i++){
-				if(result.td_res[i].chain == chsel || chsel == "All") list.push(i);
-			}
-			let kmax = list.length;
-			
-			let point=[];
-			for(let t = 0; t < T; t += step){
-				let step_max = t + step; if(step_max > T) step_max = T;
+							
+						for(let t = 0; t < T; t += step){
+							let step_max = t + step; if(step_max > T) step_max = T;
+						
+							let dt = timepoint[step_max] - timepoint[t];
+							
+							let num = 0;
+							for(let tt = t; tt < step_max; tt++) num += y[tt]
+							
+							if(T <= step){
+								point.push({x:timepoint[t], y:num/dt});
+								point.push({x:timepoint[t] + dt, y:num/dt});
+							}
+							else{
+								point.push({x:timepoint[t] + dt/2, y:num/dt});
+							}	
+						}							
 					
-				let dt = timepoint[step_max] - timepoint[t];
-								
-				let num = 0;
-				for(let k = 0; k < kmax; k++){
-					let en = result.td_res[list[k]].species[p].exp_num;
-					for(let ij = 0; ij < tr_list.length; ij++){
-						let exp_num = en[tr_list[ij]];
-						for(let tt = t; tt < step_max; tt++) num += exp_num[tt];
+						line.push(point);
 					}
 				}
-				num /= kmax;
-		
-				if(T <= step){
-					point.push({x:timepoint[t], y:num/dt});
-					point.push({x:timepoint[t] + dt, y:num/dt});
+				add_line(view,line,col,tr.name,data,key,"trans");
+			
+				// Adds in line for expected transition number
+				let list=[];
+				for(let i = 0; i < result.td_res.length; i++){
+					if(result.td_res[i].chain == chsel || chsel == "All") list.push(i);
 				}
-				else{
-					point.push({x:timepoint[t] + dt/2, y:num/dt});
-				}	
-			}				
+				let kmax = list.length;
 				
-			let col_sh = shift_colour(col,0.6);
-			data.push({point:point, col:col_sh, view:view, type:"Line", dash:TRANS_EXP_DASH, thick:TRANS_EXP_THICK, key_na:key_na});
+				let point=[];
+				for(let t = 0; t < T; t += step){
+					let step_max = t + step; if(step_max > T) step_max = T;
+						
+					let dt = timepoint[step_max] - timepoint[t];
+									
+					let num = 0;
+					for(let k = 0; k < kmax; k++){
+						let en = result.td_res[list[k]].species[p].exp_num;
+						for(let ij = 0; ij < tr_list.length; ij++){
+							let exp_num = en[tr_list[ij]];
+							for(let tt = t; tt < step_max; tt++) num += exp_num[tt];
+						}
+					}
+					num /= kmax;
+			
+					if(T <= step){
+						point.push({x:timepoint[t], y:num/dt});
+						point.push({x:timepoint[t] + dt, y:num/dt});
+					}
+					else{
+						point.push({x:timepoint[t] + dt/2, y:num/dt});
+					}	
+				}				
+				let col_sh = shift_colour(col,0.6);
+				data.push({point:point, col:col_sh, view:view, type:"Line", dash:TRANS_EXP_DASH, thick:TRANS_EXP_THICK, key_na:key_na});
+			}
+			else{
+				let ttgr = sp.tr_tra_gl_ref[cl][j];
+					
+				// Makes a list of a transitions to be included
+				let tr_list=[];
+				for(let ij = 0; ij < ttgr.length; ij++){
+					let k = ttgr[ij];
+					let tr = sp.tra_gl[k];
+			
+					let cc = tr.i; if(cc == SOURCE) cc = tr.f;
+						
+					let co = sp.comp_gl[cc];
+						
+					let cl2 = 0; 
+					while(cl2 < sp.ncla && (popfilt[cl2] == undefined || popfilt[cl2][co.cla_comp[cl2]] == true)) cl2++;
+				
+					if(cl2 == sp.ncla) tr_list.push(k);
+				}
+				
+				let sa = result.average.species[p];
+				
+				let point = [];
+				
+				let y=[];
+				for(let t = 0; t < T; t++) y[t] = 0;
+				
+				for(let ij = 0; ij < tr_list.length; ij++){
+					let tl = sa.transnum[tr_list[ij]];
+					if(tl != undefined){
+						for(let t = 0; t < T; t++){
+							let val = tl[t];
+							if(val != undefined) y[t] += val;
+						}
+					}
+				}
+					
+				for(let t = 0; t < T; t += step){
+					let step_max = t + step; if(step_max > T) step_max = T;
+				
+					let dt = timepoint[step_max] - timepoint[t];
+					
+					let num = 0;
+					for(let tt = t; tt < step_max; tt++) num += y[tt]
+					
+					if(T <= step){
+						point.push({x:timepoint[t], y:num/dt});
+						point.push({x:timepoint[t] + dt, y:num/dt});
+					}
+					else{
+						point.push({x:timepoint[t] + dt/2, y:num/dt});
+					}	
+				}							
+			
+				line.push(point);
+				add_line(view,line,col,tr.name,data,key,"trans");
+			}
 		}
 	}
 	
 	key.push({type:"Line", te:key_na, col:BLACK, dash:TRANS_EXP_DASH, thick:TRANS_EXP_THICK});
 	
-	post({type:"Graph define", variety:"Transition", view:view, data:data, op:{ def_xrange:time_range(result.details), x_label:"Time", y_label:"Transition rate", key:key, line_max:line_max}});
+	post({type:"Graph define", variety:"Transition", view:view, data:data, op:{ def_xrange:time_range(result.details), x_label:"Time", y_label:"Transition rate", key:key, line_max:line_max, diag_not_pos:average_plot}});
 }
 
 
@@ -1395,7 +1947,6 @@ function add_individual_buts(res,lay)
 
 	cy = lay.add_title(title,cx,cy,{te:he});
 	
-
 	// Sets species
 	let p = model.get_p();
 	
@@ -3919,8 +4470,7 @@ function create_view_graph(lay)
 	
 	if(gr.init != true){
 		inter.graph.init = "loading"; 
-		
-		start_worker("Graph view",{name:par.name, sel_view:sel_view, so:so});
+		start_worker("Graph view",{name:par.name, prior_const:vg.prior_const, sel_view:sel_view, so:so});
 		return;
 	}
 	
@@ -3932,7 +4482,7 @@ function create_view_graph(lay)
 
 
 /// Calculates a graph view
-function create_view_graph_calculate(name,sel_view,so)
+function create_view_graph_calculate(name,prior_const,sel_view,so)
 {
 	let i = 0; while(i < model.param.length && name != model.param[i].name) i++;
 	
@@ -3943,7 +4493,10 @@ function create_view_graph_calculate(name,sel_view,so)
 	let det = so.sim_details;
 	if(par.type == "param factor") det = so.ppc_details;
 	
-	post(define_parameter_plot("view_graph",par,par.value,undefined,undefined,sel_view,det,so));
+	let value = par.value;
+	if(prior_const == true) value = par.prior_const;
+	
+	post(define_parameter_plot("view_graph",par,value,undefined,undefined,sel_view,det,so));
 }
 
 
@@ -4996,6 +5549,7 @@ function multivariate_param_plot(result,rpf,burn)
 			if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
 				let samp_val = samp.param[li.th];
 				if(samp_val == "const") samp_val = result.param[li.th].value;
+				if(samp_val == "priorconst") samp_val = result.param[li.th].prior_const;
 			
 				if(pviewtype.type == "Timevary"){ 
 					let res = construct_spline_timevariation(par,samp_val,result.details);
@@ -5188,7 +5742,9 @@ function get_param_stats(th,index,result,rpf,burn)
 /// Gets a parameter value
 function get_param_val(index,spar,par)
 {
-	if(par.variety == "const") return get_element(par.value,index);
+	if(par.variety == "const") return Number(get_element(par.value,index));
+	if(spar == "priorconst") return Number(get_element(par.prior_const,index));
+	
 	return get_element(spar,index);
 }
 			
@@ -5280,32 +5836,18 @@ function setup_distribution(result,rpf,burn)
 	
 	// Draws the prior
 	if(result.siminf != "sim" && rpf.dist_settings.show_prior.check == true && par.variety != "reparam" && par.variety != "define" && par.variety != "likelihood" && par.prior && par.type != "derive_param"){
-		let N = 200;                                   // The number of points
-		
-		let pri;
-		if(par.dep.length > 0 && par.prior_split_set == true) pri = get_element(par.prior_split,ind);
-		else pri = par.prior;
-		
-		let point = [];
+		if(!(result.siminf == "inf" && par.prior_const_on == true)){
+			let N = 200;                                   // The number of points
 			
-		switch(pri.type.te){
-		case "uniform":
-			{
-				let min = Number(pri.value.min_eqn.te);
-				let max = Number(pri.value.max_eqn.te);
-				point.push({x:min, y:0});
-				point.push({x:min, y:1.0/(max-min)});
-				point.push({x:max, y:1.0/(max-min)});
-				point.push({x:max, y:0});
-			}
-			break;
-		
-		case "covar-jeffreys": case "covar-uniform": case "covar-inv-wishart":
-			break;
-		
-		case "covar-default": case "covar-normal-lkj": case "covar-uniform-lkj": 
-			if(ind[0] == ind[1]){ // Diagonal element
-				if(pri.type.te == "covar-uniform-lkj"){
+			let pri;
+			if(par.dep.length > 0 && par.prior_split_set == true) pri = get_element(par.prior_split,ind);
+			else pri = par.prior;
+			
+			let point = [];
+				
+			switch(pri.type.te){
+			case "uniform":
+				{
 					let min = Number(pri.value.min_eqn.te);
 					let max = Number(pri.value.max_eqn.te);
 					point.push({x:min, y:0});
@@ -5313,216 +5855,232 @@ function setup_distribution(result,rpf,burn)
 					point.push({x:max, y:1.0/(max-min)});
 					point.push({x:max, y:0});
 				}
-				else{
-					let mean = 0;
-					let sd;
-					if(pri.type.te == "covar-default") sd = SD_DEFAULT;
-					else sd = Number(pri.value.sd_eqn.te);
+				break;
+			
+			case "covar-jeffreys": case "covar-uniform": case "covar-inv-wishart":
+				break;
+			
+			case "covar-default": case "covar-normal-lkj": case "covar-uniform-lkj": 
+				if(ind[0] == ind[1]){ // Diagonal element
+					if(pri.type.te == "covar-uniform-lkj"){
+						let min = Number(pri.value.min_eqn.te);
+						let max = Number(pri.value.max_eqn.te);
+						point.push({x:min, y:0});
+						point.push({x:min, y:1.0/(max-min)});
+						point.push({x:max, y:1.0/(max-min)});
+						point.push({x:max, y:0});
+					}
+					else{
+						let mean = 0;
+						let sd;
+						if(pri.type.te == "covar-default") sd = SD_DEFAULT;
+						else sd = Number(pri.value.sd_eqn.te);
+						
+						let min = 0;
+						let max = mean + 5*sd;
+						if(max > VAR_MAX) max = VAR_MAX;
+						
+						point.push({x:min, y:0});
+						for(let i = 0; i <= N; i++){
+							let x = min + i*(max-min)/N;
+							let prob = 2*Math.exp(-0.5*Math.log(2*Math.PI*sd*sd) - (x-mean)*(x-mean)/(2*sd*sd));
+							point.push({x:x, y:prob});
+						}
+						if(max == VAR_MAX) point.push({x:max, y:0});
+					}
+				}
+				else{  // Non-diagonal elements	
+					let eta = Number(pri.value.eta_eqn.te);
+				
+					let alpha = eta-1+0.5*par.dim[0];
+					let beta = alpha;
+				
+					let d = 1-COR_MAX;
+					let min = 0+d/2, max = 1-d/2;
+					let min2 = -1+d, max2 = 1-d;
+						
+					let sum = 0.0;
+					let prob = [];
+					for(let i = 0; i < N; i++){
+						let x = min + (i+0.5)*(max-min)/N;
+						
+						prob[i] = Math.exp((alpha-1)*Math.log(x) + (beta-1)*Math.log(1-x));
+				
+						sum += prob[i];
+					}
+					let fac = sum*(max2-min2)/N;
 					
-					let min = 0;
-					let max = mean + 5*sd;
-					if(max > VAR_MAX) max = VAR_MAX;
+					point.push({x:min2, y:0});
+					for(let i = 0; i < N; i++) point.push({x:min2 + (i+0.5)*(max2-min2)/N, y:prob[i]/fac});	
+					point.push({x:max2, y:0});
+				}
+				break;
+			
+			case "inverse":
+				{	
+					let min = Number(pri.value.min_eqn.te);
+					let max = Number(pri.value.max_eqn.te);
+				
+					let fac = 1/Math.log(max/min);
 					
 					point.push({x:min, y:0});
 					for(let i = 0; i <= N; i++){
 						let x = min + i*(max-min)/N;
-						let prob = 2*Math.exp(-0.5*Math.log(2*Math.PI*sd*sd) - (x-mean)*(x-mean)/(2*sd*sd));
+						let prob = fac/x;
 						point.push({x:x, y:prob});
 					}
-					if(max == VAR_MAX) point.push({x:max, y:0});
+					point.push({x:max, y:0});
 				}
-			}
-			else{  // Non-diagonal elements	
-				let eta = Number(pri.value.eta_eqn.te);
-			
-				let alpha = eta-1+0.5*par.dim[0];
-				let beta = alpha;
-			
-				let d = 1-COR_MAX;
-				let min = 0+d/2, max = 1-d/2;
-				let min2 = -1+d, max2 = 1-d;
+				break;
+				
+			case "power":
+				{	
+					let min = Number(pri.value.min_eqn.te);
+					let max = Number(pri.value.max_eqn.te);
+					let power = Number(pri.value.power_eqn.te);
 					
-				let sum = 0.0;
-				let prob = [];
-				for(let i = 0; i < N; i++){
-					let x = min + (i+0.5)*(max-min)/N;
+					let fac;
+					if(power == -1) fac = 1/Math.log(max/min);
+					else fac = (power+1)/(Math.pow(max,power+1)-Math.pow(min,power+1));
+			
+					if(fac < 0) fac = -fac;
 					
-					prob[i] = Math.exp((alpha-1)*Math.log(x) + (beta-1)*Math.log(1-x));
-			
-					sum += prob[i];
+					point.push({x:min, y:0});
+					for(let i = 0; i <= N; i++){
+						let x = min + i*(max-min)/N;
+						let prob;
+						if(power == -1) prob = fac/x;
+						else prob = fac*Math.pow(x,power);
+						point.push({x:x, y:prob});
+					}
+					point.push({x:max, y:0});
 				}
-				let fac = sum*(max2-min2)/N;
+				break;
 				
-				point.push({x:min2, y:0});
-				for(let i = 0; i < N; i++) point.push({x:min2 + (i+0.5)*(max2-min2)/N, y:prob[i]/fac});	
-				point.push({x:max2, y:0});
-			}
-			break;
-		
-		case "inverse":
-			{	
-				let min = Number(pri.value.min_eqn.te);
-				let max = Number(pri.value.max_eqn.te);
+			case "exp":
+				{	
+					let mean = Number(pri.value.mean_eqn.te);
+					let vec = [];
+					for(let i = 0; i < result.par_sample.length; i++){
+						let samp = result.par_sample[i]
+						if(samp.num >= burn){
+							vec.push(samp.param[th]);
+						}
+					}
 			
-				let fac = 1/Math.log(max/min);
+					let range = extend_range(get_range(vec),0.4);
+					if(range.min > 0) range.min = 0;
+					if(range.max < 10*mean) range.max = 10*mean;
 				
-				point.push({x:min, y:0});
-				for(let i = 0; i <= N; i++){
-					let x = min + i*(max-min)/N;
-					let prob = fac/x;
-					point.push({x:x, y:prob});
-				}
-				point.push({x:max, y:0});
-			}
-			break;
-			
-		case "power":
-			{	
-				let min = Number(pri.value.min_eqn.te);
-				let max = Number(pri.value.max_eqn.te);
-				let power = Number(pri.value.power_eqn.te);
-				
-				let fac;
-				if(power == -1) fac = 1/Math.log(max/min);
-				else fac = (power+1)/(Math.pow(max,power+1)-Math.pow(min,power+1));
-		
-				if(fac < 0) fac = -fac;
-				
-				point.push({x:min, y:0});
-				for(let i = 0; i <= N; i++){
-					let x = min + i*(max-min)/N;
-					let prob;
-					if(power == -1) prob = fac/x;
-					else prob = fac*Math.pow(x,power);
-					point.push({x:x, y:prob});
-				}
-				point.push({x:max, y:0});
-			}
-			break;
-			
-		case "exp":
-			{	
-				let mean = Number(pri.value.mean_eqn.te);
-				let vec = [];
-				for(let i = 0; i < result.par_sample.length; i++){
-					let samp = result.par_sample[i]
-					if(samp.num >= burn){
-						vec.push(samp.param[th]);
+					let dx = range.max-range.max
+					for(let i = 0; i <= N; i++){
+						let x = range.min + i*(range.max-range.min)/N;
+						let prob = Math.exp(-x/mean)/mean;
+						point.push({x:x, y:prob});
 					}
 				}
-		
-				let range = extend_range(get_range(vec),0.4);
-				if(range.min > 0) range.min = 0;
-				if(range.max < 10*mean) range.max = 10*mean;
-			
-				let dx = range.max-range.max
-				for(let i = 0; i <= N; i++){
-					let x = range.min + i*(range.max-range.min)/N;
-					let prob = Math.exp(-x/mean)/mean;
-					point.push({x:x, y:prob});
-				}
-			}
-			break;
-			
-		case "normal":
-			{
-				let mean = Number(pri.value.mean_eqn.te);
-				let sd = Number(pri.value.sd_eqn.te);
+				break;
 				
-				let min = mean - 5*sd;
-				let max = mean + 5*sd;
-				
-				for(let i = 0; i <= N; i++){
-					let x = min + i*(max-min)/N;
-					let prob = Math.exp(-0.5*Math.log(2*Math.PI*sd*sd) - (x-mean)*(x-mean)/(2*sd*sd));
-					point.push({x:x, y:prob});
-				}
-			}
-			break;
-			
-		case "gamma":
-			{
-				let mean = Number(pri.value.mean_eqn.te);
-				let cv = Number(pri.value.cv_eqn.te);
-				let sd = mean*cv;
-				let min = 0;
-				let max = mean + 5*sd;
-				
-				let shape = 1.0/(cv*cv);
-				let b = shape/mean;
- 
-				let sum = 0.0;
-				let prob = [];
-				for(let i = 0; i < N; i++){
-					let x = min + (i+0.5)*(max-min)/N;
+			case "normal":
+				{
+					let mean = Number(pri.value.mean_eqn.te);
+					let sd = Number(pri.value.sd_eqn.te);
 					
-					prob[i] = Math.exp((shape-1)*Math.log(x) - b*x + shape*Math.log(b));
-					sum += prob[i];
-				}
-				let fac = sum*(max-min)/N;
-				
-				for(let i = 0; i < N; i++) point.push({x:min + (i+0.5)*(max-min)/N, y:prob[i]/fac});
-			}
-			break;
-			
-		case "log-normal":
-			{
-				let mean = Number(pri.value.mean_eqn.te);
-				let cv = Number(pri.value.cv_eqn.te);
-				let sd = mean*cv;
+					let min = mean - 5*sd;
+					let max = mean + 5*sd;
 					
-				let min = 0;
-				let max = mean + 5*sd;
-				
-				let vari = Math.log(1+cv*cv);             // Works out variables on log scale
-				let mu = Math.log(mean)-vari/2;
-		
-				for(let i = 0; i < N; i++){
-					let x = min + (i+0.5)*(max-min)/N;
-					let logx = Math.log(x);
-					let prob = Math.exp(-0.5*Math.log(2*Math.PI*vari*x*x) - (logx-mu)*(logx-mu)/(2*vari));
-					point.push({x:x, y:prob});
+					for(let i = 0; i <= N; i++){
+						let x = min + i*(max-min)/N;
+						let prob = Math.exp(-0.5*Math.log(2*Math.PI*sd*sd) - (x-mean)*(x-mean)/(2*sd*sd));
+						point.push({x:x, y:prob});
+					}
 				}
-			}
-			break;
-			
-		case "beta":
-			{
-				let alpha = Number(pri.value.alpha_eqn.te);
-				let beta = Number(pri.value.beta_eqn.te);
-			
-				let min = 0, max = 1;
+				break;
 				
-				let sum = 0.0;
-				let prob = [];
-				for(let i = 0; i < N; i++){
-					let x = min + (i+0.5)*(max-min)/N;
+			case "gamma":
+				{
+					let mean = Number(pri.value.mean_eqn.te);
+					let cv = Number(pri.value.cv_eqn.te);
+					let sd = mean*cv;
+					let min = 0;
+					let max = mean + 5*sd;
 					
-					prob[i] = Math.exp((alpha-1)*Math.log(x) + (beta-1)*Math.log(1-x));
-					sum += prob[i];
+					let shape = 1.0/(cv*cv);
+					let b = shape/mean;
+	 
+					let sum = 0.0;
+					let prob = [];
+					for(let i = 0; i < N; i++){
+						let x = min + (i+0.5)*(max-min)/N;
+						
+						prob[i] = Math.exp((shape-1)*Math.log(x) - b*x + shape*Math.log(b));
+						sum += prob[i];
+					}
+					let fac = sum*(max-min)/N;
+					
+					for(let i = 0; i < N; i++) point.push({x:min + (i+0.5)*(max-min)/N, y:prob[i]/fac});
 				}
-				let fac = sum*(max-min)/N;
+				break;
 				
-				for(let i = 0; i < N; i++) point.push({x:min + (i+0.5)*(max-min)/N, y:prob[i]/fac});	
+			case "log-normal":
+				{
+					let mean = Number(pri.value.mean_eqn.te);
+					let cv = Number(pri.value.cv_eqn.te);
+					let sd = mean*cv;
+						
+					let min = 0;
+					let max = mean + 5*sd;
+					
+					let vari = Math.log(1+cv*cv);             // Works out variables on log scale
+					let mu = Math.log(mean)-vari/2;
+			
+					for(let i = 0; i < N; i++){
+						let x = min + (i+0.5)*(max-min)/N;
+						let logx = Math.log(x);
+						let prob = Math.exp(-0.5*Math.log(2*Math.PI*vari*x*x) - (logx-mu)*(logx-mu)/(2*vari));
+						point.push({x:x, y:prob});
+					}
+				}
+				break;
+				
+			case "beta":
+				{
+					let alpha = Number(pri.value.alpha_eqn.te);
+					let beta = Number(pri.value.beta_eqn.te);
+				
+					let min = 0, max = 1;
+					
+					let sum = 0.0;
+					let prob = [];
+					for(let i = 0; i < N; i++){
+						let x = min + (i+0.5)*(max-min)/N;
+						
+						prob[i] = Math.exp((alpha-1)*Math.log(x) + (beta-1)*Math.log(1-x));
+						sum += prob[i];
+					}
+					let fac = sum*(max-min)/N;
+					
+					for(let i = 0; i < N; i++) point.push({x:min + (i+0.5)*(max-min)/N, y:prob[i]/fac});	
+				}
+				break;
+				
+			case "bernoulli":
+				break;
+				
+			case "fix":
+				break;
+			
+			case "mdir":
+				break;
+				
+			default: error("prior type not recognised: "+pri.type.te); break; 
 			}
-			break;
 			
-		case "bernoulli":
-			break;
-			
-		case "fix":
-			break;
-		
-		case "mdir":
-			break;
-			
-		default: error("prior type not recognised: "+pri.type.te); break; 
-		}
-		
-		if(point.length > 0){
-			let key_na = "Prior";
-			data.push({point:point, col:BLACK, thick:1, key_na:key_na, type:"PriorLine"});
-			key.push({type:"Line", te:key_na, thick:1, col:BLACK, dash:0});
+			if(point.length > 0){
+				let key_na = "Prior";
+				data.push({point:point, col:BLACK, thick:1, key_na:key_na, type:"PriorLine"});
+				key.push({type:"Line", te:key_na, thick:1, col:BLACK, dash:0});
+			}
 		}
 	}
 
@@ -5532,7 +6090,7 @@ function setup_distribution(result,rpf,burn)
 
 /// Gets clipped edges based on a parameter prior
 function get_prior_clip(par,ind)
-{//zz	
+{
 	if(par.variety != "reparam" && par.variety != "define" && par.variety != "likelihood" && par.prior){
 		let pri;
 		if(par.dep.length > 0 && par.prior_split_set == true) pri = get_element(par.prior_split,ind);
@@ -5640,21 +6198,21 @@ function distribution_add_data_line(vec,name,col,data,key,rpf,show_mean,clip_min
 				mi = Math.floor(mi);
 				ma = 1+Math.floor(ma);
 			}
-			
+
 			if(clip_min != undefined && mi < clip_min) mi = clip_min;
 			if(clip_max != undefined && ma > clip_max) ma = clip_max;
-		
+
 			let nbin = Math.floor(5/h); 
 			if(nbin < 100) nbin = 100; if(nbin > 500) nbin = 500;
 			
 			if(op == "integer"){ // nbin must be some multiple
 				let step = Math.floor((ma-mi)/nbin);
 				if(step <= 1) nbin = ma-mi;
-				else ma = mi*step;
+				else ma = mi+step*nbin;
 			}
 			
 			let dd = ma-mi;	
-			
+
 			let db = dd/nbin;
 			
 			let hb = Math.floor(1+d*h/db);

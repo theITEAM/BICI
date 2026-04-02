@@ -1,0 +1,22 @@
+# Model F1.9: Time-varying disease intervention measure
+
+## Objective
+- Introduce a simple implementation of disease intervention.
+- Under simulation a time varying reparameterised parameter is used to represent if a disease intervention is being implemented or not (it takes the values 1/0 depending on whether the disease prevalence is above or below a 5% threshold).
+- Under inference this reparameterised parameter is converted to a fixed vector (using the “Const. Prior” option on the “Inference→Prior” page). This is because in reality disease intervention times would usually be known.
+
+## Data
+- Time series population estimates.
+
+## Model
+- A single individual-based species “People” is created.
+- This contains a classification “DS”, which stands for “disease status”.
+- DS contains three compartments: susceptible S, infected I and recovered R.
+- A transmission rate β determines the rate at which individuals become infected.
+- A square spline $f(t)$ (with knot times at 14 day intervals) characterises disease intervention. 
+- Under simulation it is modelled as $f(t)=step({I}/N-0.05)$.
+- Parameter $a$ characterises the strength of the disease intervention. 
+- Recovery rate $γ$.
+
+## Population
+- 10000 initially susceptible individuals and one infected.

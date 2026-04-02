@@ -246,6 +246,7 @@ class Equation                             // Stores information about an equati
 	// In equation_linearise.cc
 	public:
 		void calculate_linearise();
+		bool zero_eqn(const vector <Calculation> &calc) const;
 		void print_linear_final() const;
 		void remove_unused_param_ref();
 		void calculate_pop_ref();

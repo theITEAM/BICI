@@ -19,8 +19,8 @@ using namespace std;
 void Input::import_data_table_command(const CommandLine &cline, bool active)
 {
 	auto cname = cline.command;
-	
-	if(model.mode == PPC){                       // If doing PPC then ignore data
+	 // If not doing INF or EXT then ignore data
+	if(model.mode != INF && model.mode != EXT && model.mode != DATA_SHOW && model.mode != DATA_DEL && model.mode != DATA_SIM){ 
 		switch(cname){
 		case COMP_DATA: case TRANS_DATA: case TEST_DATA: case POP_DATA:
 		case POP_TRANS_DATA: case IND_EFFECT_DATA: case IND_GROUP_DATA: case GENETIC_DATA:
@@ -90,7 +90,7 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 			ds.init_pop_type = InitPopType(option_error("type",type,{"fixed","dist"},{ INIT_POP_FIXED, INIT_POP_DIST}));
 			if(ds.init_pop_type == UNSET) return;
 			
-			if(model.mode == INF && ds.init_pop_type == INIT_POP_FIXED){
+			if((model.mode == INF || model.mode == EXT) && ds.init_pop_type == INIT_POP_FIXED){
 				if(model.species[p].type == INDIVIDUAL){
 					alert_import("Fixed initial populations cannot be used with individual-based models under inference. Either a population distribution is used, or the initial state of individuals is specified using 'add-ind' (which can be used to capture the any initial uncertainty)."); 
 				}
@@ -1124,20 +1124,10 @@ bool Input::transition_command2(vector <Tag> &tags)
 }
 
 
-/// Sets the data directory
+/// This is now dealt with in set_data_directory(_
 void Input::datadir_command()
 {
-	datadir = get_tag_value("folder"); if(datadir == ""){ cannot_find_tag(); return;}
-
-	datadir = get_data_dir(datadir);
-
-	if(check_char_allowed(datadir,"<>\"|?*") == false) return;
-
-	struct stat st;
-	if (stat(datadir.c_str(), &st) == -1){  
-		alert_import("The data folder '"+datadir+"' does not exist");
-		return;
-	}
+	auto te = get_tag_value("folder"); if(te == ""){ cannot_find_tag(); return;}
 }
 
 
@@ -1271,7 +1261,8 @@ void Input::param_command()
 	auto reparam = get_tag_value("reparam"); 
 	auto prior = get_tag_value("prior"); 
 	auto prior_split = get_tag_value("prior-split"); 
-
+	auto prior_const = get_tag_value("prior-const"); 
+	
 	auto mode = model.mode;
 
 	auto sim_sample = toLower(get_tag_value("sim-sample")); 
@@ -1293,12 +1284,19 @@ void Input::param_command()
 	}
 	
 	switch(mode){
-	case INF: case PPC: case EXT: case TORNADO_RESULT: case SCAN_RESULT:
+	case INF: case EXT:
+		value = "";
+		if(prior_const != ""){ cons = ""; reparam = "";}
+		break;
+		
+	case PPC: case TORNADO_RESULT: case SCAN_RESULT:
 		value = "";
 		break;
 		
-	case SIM: case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: case TORNADO_SETUP: case SCAN_SETUP:
-		prior = ""; prior_split = "";
+	case SIM: case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: 
+	case TORNADO_SETUP: case SCAN_SETUP:
+	case COMPRESS: case DECOMPRESS:
+		prior = ""; prior_split = ""; prior_const = "";
 		if(par.sim_sample == false){ dist = ""; dist_split = "";}
 		break;
 	
@@ -1314,6 +1312,7 @@ void Input::param_command()
 	pt.val = reparam; pt.tag = "reparam"; param_tag.push_back(pt);
 	pt.val = prior; pt.tag = "prior"; param_tag.push_back(pt);
 	pt.val = prior_split; pt.tag = "prior-split"; param_tag.push_back(pt);
+	pt.val = prior_const; pt.tag = "prior-const"; param_tag.push_back(pt);
 	
 	for(auto j = 0u; j < param_tag.size(); j++){
 		for(auto i = j+1; i < param_tag.size(); i++){
@@ -1322,6 +1321,10 @@ void Input::param_command()
 				return;
 			}
 		}
+	}
+	
+	if((mode == INF || mode == EXT) && prior_const != ""){
+		cons = prior_const;
 	}
 	
 	par.not_set = false;
@@ -1461,7 +1464,7 @@ void Input::param_command()
 						alert_import(desc+" '"+valu+"' is not a number");
 						return;
 					}
-						
+					
 					ElementRef er; er.index = par.add_cons(val); er.cons = true;
 					for(auto k = 0u; k < mult; k++){
 						par.element_ref[k] = er;

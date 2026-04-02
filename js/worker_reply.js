@@ -249,7 +249,7 @@ worker.onmessage = function (e)
 			generate_screen();
 			break;
 			
-		case "View Param":
+		case "View Param": case "View Prior Const":
 			{
 				inter.view_graph = ans.info;	
 				let pos_view = inter.view_graph.pos_view;
@@ -262,7 +262,7 @@ worker.onmessage = function (e)
 			}
 			break;
 			
-		case "Edit Param": case "Edit Reparam": case "Edit Weight":
+		case "Edit Param": case "Edit Reparam": case "Edit Weight": case "Edit Prior Const":
 			inter.edit_param = ans.info;
 			generate_screen();
 			break;
@@ -276,6 +276,26 @@ worker.onmessage = function (e)
 			model.param[ans.i].set = true;
 			if(ans.type == "Set Reparam") update_param();
 			generate_screen();
+			break;
+			
+		case "Set Prior Const": 
+			inter.edit_source = false;
+			close_bubble();
+			close_param_source();
+			model.param[ans.i].prior_const_desc = ans.prior_const_desc;
+			model.param[ans.i].prior_const_set = true;
+			generate_screen();
+			break;
+			
+		case "Generate const prior":
+			{
+				close_bubble();
+				let par = model.param[ans.i];
+				par.prior_const_desc = ans.prior_const_desc;
+				par.prior_const_on = true;
+				par.prior_const_set = true;
+				change_page({pa:"Inference", su:"Prior"});
+			}
 			break;
 			
 		case "Set Weight": 
@@ -365,8 +385,7 @@ worker.onmessage = function (e)
 		
 		case "Import output": case "Import output2": case "Load Default": 
 			model.load(ans);
-			//prr("Load Change Page");
-			//change_page({pa:"Inference", su:"Run"});
+			//prr("Load Change Page"); change_page({pa:"Inference", su:"Prior"});
 			break;
 		
 		case "Add comp map":

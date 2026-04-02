@@ -3,9 +3,9 @@
 
 
 /// Finalises after the import file has been loaded
-function results_finalise(result)
+function results_finalise(result,per_start,per_end)
 {
-	average_rescale(result);
+	average_finalise(result,per_start,per_end);
 	
 	delete result.hash_tl;
 }
@@ -23,7 +23,7 @@ function results_add_model(result,details,siminf)
 	let alg = details.algorithm.value;
 	
 	if(alg == "PAS-MCMC" || alg == "ABC-SMC") result.generation = [];
-	result.plot_average = false;
+	
 	result.diagnostics = [];
 	result.diagnostics_on = false;
 	
@@ -42,13 +42,15 @@ function results_add_model(result,details,siminf)
 	
 	result.species = copy(model.species);
 
+	global_comp_trans_init(result.species);
+
+	marg_plot_setup(result);
+
 	average_init(result);
 
-	global_comp_trans_init(result.species);
-	
 	result.param = copy(model.param);
-	
-	set_par_output(result.param,details.param_output_max);
+
+	set_par_output(result.param,details.param_output_max,result.siminf);
 
 	create_param_const(result,siminf);            // Creates constant values for non-variable parameters 
 
@@ -59,16 +61,21 @@ function results_add_model(result,details,siminf)
 
 
 /// Sets whether a parameter is output or not
-function set_par_output(param,max)
+function set_par_output(param,max,siminf)
 {
 	for(let th = 0; th < param.length; th++){
 		let par = param[th];
 		par.output = false;
-		if(par.variety == "const"){
+		if(siminf == "inf" && par.prior_const_on == true){
 			if(param_num_element(par) < max) par.output = true;
 		}
-		if(par.type == "derive_param"){
-			par.output = true;
+		else{
+			if(par.variety == "const"){
+				if(param_num_element(par) < max) par.output = true;
+			}
+			if(par.type == "derive_param"){
+				par.output = true;
+			}
 		}
 	}
 }
@@ -455,106 +462,194 @@ function update_c_comp(sp,c,cl,c_comp)
 }
 
 
-/// Generates cpop_init from individuals
-function generate_cpop_init_from_ind(result,sample)
+/// Generates quantities that get used in population and transition plotting
+function generate_marg_plot(result,sample)
 {
-	for(let p = 0; p < sample.species.length; p++){
-		let sp = result.species[p];
-		let ssp = sample.species[p];
-		
-		if(ssp.type == "Individual"){
-			let cpop = [];
-			for(let c = 0; c < sp.comp_gl.length; c++) cpop[c] = 0;
-			
-			for(let i = 0; i < ssp.individual.length; i++){
-				let ind = ssp.individual[i];
-				let c = ind.cinit; 
-				if(c != OUT && c != SOURCE){
-					if(c < 0 || c >= sp.comp_gl.length) error("Out of range"+c);
-					cpop[c]++;
-				}
-			}
-			ssp.cpop_init = cpop;
-		}
+	if(result.sample.length == 1){ // Stores state in case needed for simulation
+		if(result.siminf == "sim") result.sim_state = copy(result.average);
 	}
-}
 
-
-/// Generates transnum from individuals
-function generate_transnum_from_ind(result,sample)
-{
+	let timepoint = result.timepoint;
+	let T = timepoint.length-1;
+		
+	let dt = result.details.timestep;
+	let t_start = timepoint[0];
+	
+	let average = result.average;
+	
 	for(let p = 0; p < sample.species.length; p++){
 		let sp = result.species[p];
+		let mp = sp.marg_plot;
+		let cconv = mp.cgl_marg_conv;
+		let tconv = mp.trgl_marg_conv;
+		let NT = mp.tra_marg.length;
+		let N = mp.N;
+		
 		let ssp = sample.species[p];
 		
-		if(ssp.type == "Individual"){
-			let timepoint = result.timepoint;
-			let T = timepoint.length-1;
+		let avsp = average.species[p];
 		
-			let transnum=[];
-			for(let k = 0; k < sp.tra_gl.length; k++){
-				transnum[k] = [];
-				for(let ti = 0; ti < T; ti++) transnum[k][ti] = 0;
-			}
-			
-			let dpop_list = ssp.dpop_list;
-			
-			let tim = result.timepoint;
-			let dt = 1;
-			if(tim.length > 1) dt = tim[1]-tim[0];
-			let t_start = tim[0];
+		let cpop_init_av = avsp.cpop_init;	
+		let transnum_av = avsp.transnum;
+		
+		let cpop=[];
+		
+		// This generates cpop_init for marginal set
+		let cpop_init = [];
+		for(let c = 0; c < N; c++) cpop_init[c] = 0;
+				
+		let transnum=[];
+		for(let k = 0; k < NT; k++){
+			transnum[k] = [];
+			for(let ti = 0; ti < T; ti++) transnum[k][ti] = 0;
+		}
 	
-			for(let i = 0; i < ssp.individual.length; i++){
-				let ind = ssp.individual[i];
+		let dpop_list = ssp.dpop_list;
+		
+		switch(ssp.type){
+		case "Individual":
+			{ // Sets up cpop_init
 				
-				let c = ind.cinit;
-				
-				for(let e = 0; e < ind.ev.length; e++){
-					let ev = ind.ev[e];
-					let t = ev.t;
-				
-					let ti = Math.floor(ALMOST_ONE*(t-t_start)/dt);
-					if(ti < 0 || ti >= T) error("Out of range");
-				
-					switch(ev.type){
-					case EV_TRANS:
-						let tra = sp.tra_gl[ev.trg];
-						if(tra.i != c){
-							error("c is not consistent");
-						}
-						c = tra.f;
-						transnum[ev.trg][ti]++;
-						break;
+				for(let i = 0; i < ssp.individual.length; i++){
+					let ind = ssp.individual[i];
+					let c = ind.cinit; 
+					if(c != OUT && c != SOURCE){
+						if(c < 0 || c >= sp.comp_gl.length) error("Out of range"+c);
 						
-					case EV_ENTER:
-						dpop_list[ti].push({c:ev.c,val:1});
-						if(c != OUT) error("Should be out");
-						c = ev.c;
-						break;
-						
-					case EV_LEAVE:
-						if(e != ind.ev.length-1) error("Leave should be last event");
-						dpop_list[ti].push({c:c,val:-1});
-						break;
-						
-					case EV_MOVE:
-						if(ev.ci != c) error("move c is not consistent");
-						dpop_list[ti].push({c:ev.ci,val:-1});
-						dpop_list[ti].push({c:ev.cf,val:1});
-						c = ev.cf;
-						break;
-						
-					default: error("event type not recognised:"+ev.type); break;
+						cpop_init_av[c]++;
+						cpop_init[cconv[c]]++;
 					}
 				}
 			}
 			
-			sample.species[p].transnum_tl = [];
-			for(let k = 0; k < sp.tra_gl.length; k++){
-				sample.species[p].transnum_tl[k] = get_timeline(transnum[k],result);
+			{ // Sets up transnum		
+				for(let i = 0; i < ssp.individual.length; i++){
+					let ind = ssp.individual[i];
+					
+					let c = ind.cinit;
+					
+					for(let e = 0; e < ind.ev.length; e++){
+						let ev = ind.ev[e];
+						let t = ev.t;
+					
+						let ti = Math.floor(ALMOST_ONE*(t-t_start)/dt);
+						if(ti < 0 || ti >= T) error("Out of range");
+					
+						switch(ev.type){
+						case EV_TRANS:
+							{
+								let k = ev.trg;
+								let tra = sp.tra_gl[k];
+								if(tra.i != c) error("c is not consistent");
+								c = tra.f;
+								
+								if(transnum_av[k] == undefined) transnum_av[k]=[];
+								if(transnum_av[k][ti] == undefined) transnum_av[k][ti] = 1;
+								else transnum_av[k][ti]++;
+								
+								transnum[tconv[k]][ti]++;
+							}
+							break;
+							
+						case EV_ENTER:
+							if(dpop_list[ti] == undefined) dpop_list[ti]=[];
+							dpop_list[ti].push({c:ev.c,val:1});
+							if(c != OUT) error("Should be out");
+							c = ev.c;
+							break;
+							
+						case EV_LEAVE:
+							if(e != ind.ev.length-1) error("Leave should be last event");
+							if(dpop_list[ti] == undefined) dpop_list[ti]=[];
+							dpop_list[ti].push({c:c,val:-1});
+							break;
+							
+						case EV_MOVE:
+							if(ev.ci != c) error("move c is not consistent");
+							if(dpop_list[ti] == undefined) dpop_list[ti]=[];
+							dpop_list[ti].push({c:ev.ci,val:-1});
+							dpop_list[ti].push({c:ev.cf,val:1});
+							c = ev.cf;
+							break;
+							
+						default: error("event type not recognised:"+ev.type); break;
+						}
+					}
+				}
+			}
+			break;
+			
+		case "Population": case "Determinisitic":
+			{
+				let ci = ssp.cpop_init;
+				for(let c = 0; c < sp.comp_gl.length; c++){
+					let val = ci[c];
+					cpop_init[cconv[c]] += val;
+					cpop_init_av[c] += val;
+				}
+			
+				for(let k = 0; k < sp.tra_gl.length; k++){  // Marginalises		
+					let tn = transnum[tconv[k]];
+					let tn2 = ssp.transnum[k];
+					if(transnum_av[k] == undefined){
+						transnum_av[k]=[];
+						let ta = transnum_av[k];
+						for(let t = 0; t < T; t++) ta[t] = 0; 
+					}
+					
+					let tnav = transnum_av[k];
+					for(let ti = 0; ti < T; ti++){
+						let val = tn2[ti]; 
+						tn[ti] += val;
+						tnav[ti] += val;
+					}
+				}
+			}
+			
+			delete ssp.cpop_init;
+			delete ssp.transnum;
+			break;
+		}
+		
+		
+		{  // Creates variation in compartments
+			for(let c = 0; c < N; c++){
+				cpop[c]=[];
+				cpop[c].push(cpop_init[c]);
+			}
+		
+			for(let ti = 0; ti < T; ti++){
+				let cp=[];
+				for(let c = 0; c < N; c++){
+					cp[c] = cpop[c][ti];
+				}
+				
+				let dpl = dpop_list[ti];
+				if(dpl != undefined){
+					for(let k = 0; k < dpl.length; k++){
+						let dp = dpl[k];
+						cp[cconv[dp.c]] += dp.val;
+					}
+				}
+				
+				for(let j = 0; j < NT; j++){
+					let num = transnum[j][ti];
+					if(num != 0){
+						let tra = mp.tra_marg[j];
+						let i = tra.i, f = tra.f;
+						if(i != SOURCE) cp[i] -= num;
+						if(f != SINK) cp[f] += num;
+					}
+				}
+				
+				for(let c = 0; c < N; c++) cpop[c].push(cp[c]);
 			}
 		}
+	
+		ssp.marg_plot = { cpop_init:cpop_init, transnum:transnum, cpop:cpop, dpop_list:dpop_list};
 	}
+	
+	average.numav++;
 }
 
 
@@ -674,6 +769,7 @@ function get_timeline2(v,n,result)
 }
 
 
+/*
 /// Generates cpop using global transitions specified in transnum
 function generate_cpop_from_transnum(result,sample)
 {
@@ -841,6 +937,7 @@ function generate_cpop_from_transnum(result,sample)
 		}
 	}
 }
+*/
 
 
 /// Initialises global compartments and transitions
@@ -965,7 +1062,6 @@ function initialise_plot_filters_setup(result,source)
 	source.plot_filter = {};
 	let rpf = source.plot_filter;
 	
-	rpf.plot_average = result.plot_average;
 	rpf.siminf = result.siminf;
 	rpf.details = result.details;
 	rpf.diagnostics_on = result.diagnostics_on;
@@ -974,7 +1070,7 @@ function initialise_plot_filters_setup(result,source)
 	rpf.species = [];
 	for(let p = 0; p < result.species.length; p++){
 		let sp = result.species[p];
-		
+
 		let pos_class = [];
 		for(let cl = 0; cl < sp.ncla; cl++){
 			pos_class.push({te:sp.cla[cl].name, siminf:rpf.siminf, p:p, cl:cl, check_filter:true});
@@ -998,7 +1094,7 @@ function initialise_plot_filters_setup(result,source)
 			cla_red[cl].sel = {radio:{value:0, param:false}, list:list};
 		}
 		
-		rpf.species[p] = { sel_class:copy(pos_class[0]), pos_class:pos_class, cla:cla_red, ncla:sp.ncla, name:sp.name, type:sp.type, trans_tree:sp.trans_tree, filter:[]};
+		rpf.species[p] = { sel_class:copy(pos_class[0]), pos_class:pos_class, cla:cla_red, ncla:sp.ncla, name:sp.name, type:sp.type, trans_tree:sp.trans_tree, filter:[], cl_marg:sp.marg_plot.cl_marg};
 		
 		switch(rpf.siminf){
 		case "sim": rpf.species[p].gen_source=[]; break;
@@ -2022,7 +2118,12 @@ function add_pop_filter(rpf,cl)
 	let rpf2 = rpf.species[p];
 	
 	let claa = sp.cla[cl];
-		
+
+	if(rpf2.cl_marg[cl] == true){
+		 alert_help("Filter not possible","Due to a lack of memory this plot shows the average over all samples. Unfortunately, this filter cannot be applied."); 
+		 return;
+	}
+	
 	if(claa.comp_too_large){ alert_help("Too many compartments to filter"); return;}
 	
 	let comp_filt = [];

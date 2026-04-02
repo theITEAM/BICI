@@ -8,12 +8,12 @@
 // 67000 lines of code (25/02/26)
 
 let ver="windows";         // Determines platform
-//let ver="linux";
+//let ver="linux";         // Use this if working on linux
 //let ver="mac";
 
 let mac_temp_dir = "/tmp/BICI_files/";
 
-let win_linux = true;                             // When working on win running linux 
+let win_linux = false;                             // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
@@ -150,8 +150,8 @@ const graph_but_not_print = ["Settings","ZoomIn",  // Buttons which are not prin
 	
 const mask_size = 100;                             // Size to make comp. map mask
 
-const mem_state_sample_max = 1;                    // The memory (GB) allowed for state samples
-const mem_param_sample_max = 0.25;                 // The memory (GB) allowed for parameter samples
+const mem_state_sample_max = 2;                    // The memory (GB) allowed for state samples
+const mem_param_sample_max = 1;                    // The memory (GB) allowed for parameter samples
 
 const bytes_in_GB = 1073741824;                    // Bytes in a GB
 
@@ -237,7 +237,8 @@ const playbar_mar = 2;                             // The margins around the pla
 const loading_si = 2.7;                            // The size of the loading button
 const index_max = 6;                               // The maximum number of indices for a tensor 
 const page_char_wid = 60;                          // The total page width in characters
-const page_char_hei = 35;                          // The total page height in characters
+const page_char_hei_aim = 35;                      // The total page height in characters that is aimed for
+let page_char_hei;                                 // The true page_char height
 const key_gap = 3;                                 // Gap from bottom of page for key
 const scroll_width = 1;                            // The width of the scroll bar
 const corner = {x:2, y:1.5};                       // The position of the title button
@@ -267,7 +268,6 @@ const source_dist_pos = ["exp(rate)","exp(mean)"];
 const prior_pos = ["inverse","uniform","power","exp","normal","gamma","log-normal","beta","bernoulli","fix"];
 const prior_factor_pos = ["mdir"];
 const prior_cv_pos = ["covar-default","covar-normal-lkj","covar-uniform-lkj","covar-inv-wishart"];
-//,"covar-jeffreys","covar-uniform"
 const prior_pos_positive = ["inverse","uniform","power","exp","gamma","log-normal","fix"];
 
 const data_types = ["Init. Cond.", "Individual", "Population", "Additional"];
@@ -276,7 +276,7 @@ const data_types = ["Init. Cond.", "Individual", "Population", "Additional"];
 let chnotallowed = "\"$&~#\\→";
 let notparam_list = "+-*×/0123456789.{}<>〈〉()|\n\r Σ∫′→;";// Sets not a parameter character
 let paramend_list = "+-*×/|.{}<>〈〉[]$\n\r Σ∫";	            // Sets characters which end parameter
-let name_notallow = "|\"*×_ {}<>〈〉[]()=Σ∫′→;$&#\\";       // Character not allowed in species, class or comp names
+let name_notallow = "|\"*×_ {}<>〈〉[]()=Σ∫′→;,$&#\\";       // Character not allowed in species, class or comp names
 let name_ch_max = 40;                                   // The maximum number of characters allowed for strings
 let invalid_name = ["Compartment","Population","Alpha","Distribution","file"];
 
@@ -414,7 +414,7 @@ const KEY_LINE_MAX = 100;                          // Maximum number of key line
 const KEY_MAX = 20;                                // Maximum number of elements on key
 const RIGHT_MENU_DY = 1.8; 
 const GRAPH_LINE_MAX = 1000;                       // Maximum number of lines on graph    
-const IND_PLOT_MAX = 20000;                        // Manimum number of individuals plotted
+const IND_PLOT_MAX = 10000;                        // Manimum number of individuals plotted
 const MATRIX_PLOT_MAX = 40000;                     // The maximim number of nodes plotted
 const MATRIX_COMP_MAX = 200;                       // The maximum comparments for MatrixAnim
 const HISTO_PLOT_MAX = 100;                        // Maximum number of bars in histogram
@@ -423,8 +423,10 @@ const PARAM_STAT_MAX = 1000;                       // Maximum number of paramete
 const NODE_PLOT_MAX = 1000;                        // Maximum number nodes is phylogenetic tree
 const SCRIPT_LINE_MAX = 1000;                      // The maximum number of script lines to show
 
+const COMP_MARG_MAX = 1000;                        // The maximum number of compartments above which marginalisation occurs
+
 const VAR_MAX = 5.0;                               // Maximum variance for individual effect matrix
-const VAR_MIN = 0.0001;                            // Maximum variance for individual effect matrix
+const VAR_MIN = 0.0   ;                            // Maximum variance for individual effect matrix
 const ETA_DEFAULT = 1.2;                           // Default value for eta (in LKJ distribution)
 const SD_DEFAULT = 2;                              // Default value for SD (in LKJ distribution)
 

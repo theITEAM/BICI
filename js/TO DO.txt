@@ -7,16 +7,25 @@
 
 // SORT is used to show areas of code that need sorting.
 
-TO DO
+TO DO GENTIC
 -- get bad cat working
--- get spatial 
--- In model.js // TO DO NOW
--- Click here to add a compartemnt
--- SI model inference with trans tree no working
+-- get spatial working
+
+TO DO
+- For calculating R0... I think running "trans-tree" should now work under simulation and posterior simulation (but not inference, but anyway you don't need this. To get this to work you need to run 'species' with 'trans-tree="on"' 
+
+
+-- Jamie's suggestion of "sample=median"
+-- Get transmission tree with individual effects working (e.g. Jamie Data -> trans_tree
+
 -- Get posterior simulation from system of different size
+
+-- test maximum step time warning
+-- derived integral not working
+-- interface simulate with parameter in observation model
+-- In model.js // TO DO NOW
 -- should not have uniform priors for covariance matrix. for some reason jefreys was not coming up
--- Mention in manual about negative population problem
--- Event times the same... throw error?
+
 -- Do testing of genetic part
 -- For initial conditions view as table or as compartment (good when there are a lot of compartments)
 -- Sort out fixed initial population for individual and population-based models (perhaps convert to Dirichlet?)
@@ -29,6 +38,7 @@ TO DO
 -- mac memory
 -- memory assessment in window (after changes made in v0.83)
 
+
 NEXT
 -- Installing mpi on windows... How to check if there... change functionality
 -- Get determinisitc solver working
@@ -39,6 +49,7 @@ NEXT
 FUTURE THINGS TO GET SORTED
 -- Model evidence
 -- MC3
+-- emulation method
 
 
 DONE
@@ -92,7 +103,7 @@ Is output using too much memory?
 -- warnigns for memory
 spline
 manual
-correct zzz
+correct 
 jamie error message
 grant integral problem
 nonpop speed up
@@ -128,6 +139,17 @@ auto k = 0u; while(k < sum_store.size() && z > sum_store[k]) k++;
 auto k = 0u; while(k < trig_event.size() && trig_event[k].tdiv != eve.tdiv) k++;
 
 DONE NEW
+-- Event times the same... throw error?
+-- get a way to have constant values for tensors in inferace and different for sim
+-- limited computational resources message
+-- results -> populations click on farm not working
+-- results -> populations sample option not working
+-- double click on map not working
+-- "decompress" command
+-- review of paper
+-- When exporting image of graph there is too much border
+-- SI model inference with trans tree not working
+-- Click here to add a compartemnt
 -- HPAI_SML_update using lots of cpu on ind-update population
 -- E4 expected rate is off
 -- Work out what is taking lots of memory in Grants model

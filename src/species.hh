@@ -178,6 +178,7 @@ class Species   	                         // Stores details of a species
 	// In 'species_data.cc':
 	public: 
 		void initialise_data(Operation mode);
+		void check_obs_trans_times_same();
 		void order_data_events();
 		Filter set_comp_filt(string te, unsigned int cl_not_allow, BoundType bound, const DataSource &so);
 		Filter set_comp_filt_raw(string te, unsigned int cl_not_allow, BoundType bound, string &err) const;

@@ -3436,6 +3436,8 @@ bool ObsGenRef_ord (const ObsGenRef &ogr1, const ObsGenRef &ogr2)
 /// Adds genetic data to the model (this is potentially multi-species)
 void Input::add_genetic_data()
 {
+	if(model.mode != INF && model.mode != EXT) return;
+	
 	auto &gd = model.genetic_data;
 				
 	gd.on = false;

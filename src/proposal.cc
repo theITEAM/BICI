@@ -1423,7 +1423,7 @@ void Proposal::MH_ind_local(State &state)
 }
 
 	
-/// Performs a transmission tree proposal
+/// Performs a transmission tree proposal (swaping the individual causing an infection
 void Proposal::trans_tree(State &state)
 {
 	//if(skip_proposal(0.9)) return;
@@ -3034,9 +3034,9 @@ string Proposal::diagnostics(double total_time) const
 						if(ac_list[cl][tr].size() > 0){
 							
 							ss << replace_arrow(tra.name) << "   ";
-							ss << print_range("Acceptance",ac_list[cl][tr]);
-							ss << print_range("Fail",fa_list[cl][tr]);
-							ss << print_range("Size",si_list[cl][tr]);
+							ss << print_range("Acceptance",ac_list[cl][tr],false);
+							ss << print_range("Fail",fa_list[cl][tr],false);
+							ss << print_range("Size",si_list[cl][tr],true);
 							ss << endl;
 						}
 					}
@@ -3066,9 +3066,9 @@ string Proposal::diagnostics(double total_time) const
 		
 			if(ntot == 0) ss << "No proposals" << endl;
 			else{
-				ss << print_range("Acceptance",ac_list);
-				ss << print_range("Fail",fa_list);
-				ss << print_range("Size",si_list);
+				ss << print_range("Acceptance",ac_list,false);
+				ss << print_range("Fail",fa_list,false);
+				ss << print_range("Size",si_list,true);
 				ss << endl;
 			}
 		}

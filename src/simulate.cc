@@ -33,12 +33,19 @@ void Simulate::run()
 		auto param_val = model.param_sample();
 		auto initc_val = model.initc_sample(param_val);
 
-		state.simulate(param_val,initc_val);
+		state.simulate(param_val,initc_val,IEstore(),s,smax,sup);
 
-		state.check("Check state");
+		if(slow_check) state.check("Check state");
 
 		output.param_sample(UNSET,0,state);
 		output.state_sample(UNSET,0,state);
+		
+		/*
+		for(auto i = 0u; i< 10; i++){
+			output.param_sample(UNSET,0,state);
+			output.state_sample(UNSET,0,state);
+		}
+		*/
 		
 #ifdef USE_MPI
 		mpi.sample_barrier(s,smax);

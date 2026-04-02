@@ -8,6 +8,13 @@ function pr(te)
 	console.log(copy(te));
 }
 
+/// Prints to the console
+function pr_raw(te)
+{ 
+	if(te == undefined){ prr("UNDEFINED"); return;}
+	console.log(te);
+}
+
 
 /// Prints to the console
 function prr(te)
@@ -483,6 +490,9 @@ function copy_strip(source,dest)
 		case "value": 	
 			if(!Array.isArray(source.value)) dest.value = source.value;
 			break;
+		case "prior_const": 	
+			if(!Array.isArray(source.prior_const)) dest.prior_const = source.prior_const;
+			break;
 		case "prior_split":	break;
 		case "table": case "A_value": case "X_value": case "ind_list":
 		case "list": case "reparam_param_list": case "prior_param_list":
@@ -701,6 +711,15 @@ function dif(a,b)
 }
 
 
+/// Calculates if two numbers is different (subject to numerical noise) 
+function dif_thresh(a,b,d)
+{
+	let dif = a-b; if(dif < 0) dif = -dif;
+	if(dif > d) return true;
+	return false;
+}
+
+
 /// Determines if string beg is at the begining of te
 function begin(te,beg)
 {
@@ -846,16 +865,40 @@ function check_nsource_nsink()
 
 
 /// Returns the size of an object
+function obj_split_memory(obj)
+{
+	var objClass = Object.prototype.toString.call(obj).slice(8, -1);
+	if (objClass != "Object"){ error("should be object"); return;}
+	
+	let mem_tot = 0;
+	let list=[];
+	for (var key in obj) {
+		let mem = obj_memory(obj[key]);
+		list.push({name:key, mem:mem});
+		mem_tot += mem;
+	}
+	
+	prr("SPLIT OBJECT MEMORY: "+mem_tot);
+
+	for(let i = 0; i < list.length; i++){
+		prr(list[i].name+": "+Math.floor(100*list[i].mem/mem_tot)+"%");
+	}
+
+	prr(obj);
+}
+
+
+/// Returns the size of an object
 function obj_memory(obj)
 {
 	var bytes = 0;
 	if(obj !== null && obj !== undefined) {
 		switch (typeof obj) {
 			case "number":
-				bytes += 8;
+				bytes += 12;
 				break;
 			case "string":
-				bytes += obj.length * 2;
+				bytes += 5.2+obj.length * 2.5;
 				break;
 			case "boolean":
 				bytes += 4;
@@ -863,13 +906,23 @@ function obj_memory(obj)
 			case "object":
 				var objClass = Object.prototype.toString.call(obj).slice(8, -1);
 				if (objClass === "Object" || objClass === "Array") {
+					//if(objClass === "Object") bytes += 56;
+					//else  bytes += 32;
+					if(objClass === "Object") bytes += 33;
+					else  bytes += 21;
+					
 					for (var key in obj) {
 						if (!obj.hasOwnProperty(key)) continue;
 						//prr("insde");
 						//prr(obj[key]);
 						bytes += obj_memory(obj[key]);
 					}
-				} else bytes += obj.toString().length * 2;
+				}
+				else bytes += obj.toString().length * 2;
+				break;
+			
+			default:
+				error("Not recognised");
 				break;
 		}
 	}
@@ -1265,5 +1318,19 @@ function esc(st)
 	st = st.replace(/\n/g,"");
 	st = st.trim();
 	return st;
+}
+
+
+/// Rounds a number to reduce the number of decimal places
+function round(num)
+{
+	let n = Number(num);
+	let i;
+	for(i = 0; i < 10; i++){
+		let dif = n- Math.round(n);
+		if(dif > -TINY && dif < TINY) break;	
+		n *= 10; 
+	}
+	return num.toFixed(i);
 }
 

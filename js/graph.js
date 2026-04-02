@@ -285,7 +285,7 @@ class Graph
 				break;
 			}
 		}
-	
+		
 		if(xmax < xmin+TINY) xmax = xmin;
 		
 		if(xmin == xmax){                              // Ensures thay xmin and xmax are not the same
@@ -334,7 +334,8 @@ class Graph
 		switch(this.variety){
 		case "TransBias": ymin = -1; ymax = 1; break;
 		}
-		
+	
+
 		this.range = {xmin:xmin, ymin:ymin, xmax:xmax, ymax:ymax};
 	}
 	
@@ -2608,6 +2609,12 @@ class Graph
 		if(this.op.ind_max) warn = "Too many individuals";
 		if(this.op.point_max) warn = "Too many points";
 		if(this.op.param_max){ warn = "Too many parameters to calculate"; warn_upper = true;}
+		if(this.op.average_plot){
+			if(this.type != "Compartment" && this.type != "Density"){
+				warn = "Only average shown due to lack of memory";
+			}
+		}
+		if(this.op.diag_not_pos){ warn = "Expected not shown due to lack of memory";}
 		
 		switch(vari){
 		case "Line plot":
@@ -2935,6 +2942,7 @@ class Graph
 		if(list.length == 0){ error("Could not find a source"); return;}
 		
 		let mar = 1;
+		
 		let w = ro(xmax-xmin+2*mar);
 		let h = ro(ymax-ymin+2*mar);
 		
@@ -2960,13 +2968,102 @@ class Graph
 			}
 		}
 
+		let outcant = this.trim_image(outcv,outcan);
+		
 		inter.export_image = false;
 		
 		inter.printing = false;
 		generate_screen();
 		
-		if(filename) save_image(outcan,filename);
-		else print_image(outcan)
+		if(filename){
+			save_image(outcant,filename);
+		}
+		else{
+			let outcvt = outcant.getContext('2d');
+			print_image(outcvt);
+		}
+	}
+	
+	
+	/// Trims an image so there is a consistent white space
+	trim_image(outcv,outcan)
+	{
+		let w = outcan.width;
+		let h = outcan.height;
+
+		let data = outcv.getImageData(0,0,w,h).data;
+		
+		let xmin=0, xmax=w, ymin=0, ymax=h;
+
+		{			
+			let i = 0;
+			while(i < w){
+				let fl = false;
+				for(let j = 0; j < h; j++){
+					var p = 4*(j*w+i);
+					if(!(data[p] == 255 && data[p+1] == 255 && data[p+2] == 255 )){ fl = true; break;}
+				}					
+				if(fl == true){ xmin = i; break;}
+				i++;
+			}
+		}
+		
+		{			
+			let i = w-1;
+			while(i >= 0){
+				let fl = false;
+				for(let j = 0; j < h; j++){
+					var p = 4*(j*w+i);
+					if(!(data[p] == 255 && data[p+1] == 255 && data[p+2] == 255 )){ fl = true; break;}
+				}					
+				if(fl == true){ xmax = i; break;}
+				i--;
+			}
+		}
+		
+		{			
+			let j = 0;
+			while(j < h){
+				let fl = false;
+				for(let i = 0; i < w; i++){
+					var p = 4*(j*w+i);
+					if(!(data[p] == 255 && data[p+1] == 255 && data[p+2] == 255 )){ fl = true; break;}
+				}					
+				if(fl == true){ ymin = j; break;}
+				j++;
+			}
+		}
+		
+		{			
+			let j = h-1;
+			while(j >= 0){
+				let fl = false;
+				for(let i = 0; i < w; i++){
+					var p = 4*(j*w+i);
+					if(!(data[p] == 255 && data[p+1] == 255 && data[p+2] == 255 )){ fl = true; break;}
+				}					
+				if(fl == true){ ymax = j; break;}
+				j--;
+			}
+		}
+		
+		let mar = 50;
+		xmin -= mar; if(xmin < 0) xmin = 0;
+		xmax += mar; if(xmax > w) xmax = w;
+		ymin -= mar; if(ymin < 0) ymin = 0;
+		ymax += mar; if(ymax > h) ymax = h;
+		
+		let wt = xmax-xmin;
+		let ht = ymax-ymin;
+		
+		let outcant = document.createElement('canvas');
+		outcant.width = wt;
+		outcant.height = ht;
+		let outcvt = outcant.getContext('2d');
+	
+		outcvt.drawImage(outcan,xmin,ymin,wt,ht,0,0,wt,ht);
+	
+		return outcant;
 	}
 	
 	

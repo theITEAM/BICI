@@ -39,7 +39,7 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 
 	auto inf_trans = eqi.infection_trans;
 	type = eqi.type; 
-	te_raw = trunc(eqi.te_raw,20); 
+	te_raw = trunc(eqi.te_raw,20);
 	sp_p = eqi.p; 
 	sp_cl = eqi.cl; 
 	

@@ -614,7 +614,6 @@ void Chain::update(unsigned int s)
 	if(burn_info.on) state.resample_ind(true);   
 	
 	//if(testing == true && s%10 == 0) state.check("check");
-
 	if(testing == true && s%CHECK_THIN == CHECK_THIN-1) state.check("end");
 }
 

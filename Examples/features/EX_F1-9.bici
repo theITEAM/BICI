@@ -1,0 +1,62 @@
+
+###################### DATA DIRECTORY ######################
+
+data-dir folder="EX_F1-9-data-files"
+
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+
+######################### DETAILS ##########################
+
+simulation start=0 end=200 timestep=0.5
+
+inference start=0 end=200 timestep=0.5 nchain=3
+
+post-sim start=0 end=100
+
+
+######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
+
+species name="People" type="population"
+
+# SPECIES MODEL
+
+class name="DS" index="a"
+
+comp name="S" color="#009900" x=-10 y=0
+comp name="I" color="#ff2222" x=10 y=0
+comp name="R" color="#4444ff" x=22 y=0
+
+trans name="S->I" value="exp(rate:(β/N)×exp(-a×f(t))×{I})"
+trans name="I->R" value="exp(rate:γ)"
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
+
+
+# INFERENCE DATA
+
+init-pop-inf type="fixed" file="init-pop-inf-People.csv"
+
+pop-data name="Pop. data" filter="DS=file" error="poisson" file="pop-data.csv"
+
+
+
+######################## PARAMETERS ########################
+
+param name="a" value="2" prior="uniform(1,3)"
+
+param name="N" constant="10000"
+
+param name="β" value="0.3" prior="uniform(0.1,1)"
+
+param name="γ" value="0.1" prior="uniform(0.05,0.2)"
+
+param name="f(t)" reparam="step({I}/N-0.05)" prior-const="prior-const-f.csv" knot-times="start,14,28,42,56,70,84,98,112,126,140,154,168,182,196" spline-type="square"
+
+
+

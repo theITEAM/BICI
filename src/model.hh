@@ -112,6 +112,7 @@ class Model                                // Stores information about the model
 		//void param_spec_precalc_before(unsigned int th, PV &param_val, bool store) const;
 		//void param_spec_precalc_after(unsigned int th, PV &param_val, bool store) const;
 		PV post_param(const Sample &samp) const;
+		IEstore post_ie_store(const Sample &samp) const;
 		vector <double> prior_prob(const PV &param_val) const;
 		vector <double> dist_prob(const PV &param_val) const;
 		double recalculate_ieg_prior(unsigned int j, vector <double> &prior_ieg, const PV &param_val, double &like_ch) const;

@@ -218,7 +218,7 @@ struct Poss {                      // A possiblity used for sampling
 
 struct IndPop {
 	unsigned int c;                  // The compartment for individual
-	vector <PopRef> pop_ref;         // Stores when on the population index
+	vector <PopRef> pop_ref;         // Stores where on the population index
 };
 
 struct PopChange {                 // Stores the change in population
@@ -1205,11 +1205,6 @@ struct ObsData {
 	bool not_alive;                  // Set to true if compartmental observation is not alive
 	vector <unsigned int> obs_eqn_ref;// References the observation equation
 	unsigned int cl;                 // The classification
-	//EquationInfo Se_eqn;             // Stores the Se observation equation
-	//EquationInfo Sp_eqn;             // Stores the Sp observation equation
-	//unsigned int Se_obs_eqn_ref;     // References Se in obs_eqn
-	//unsigned int Sp_obs_eqn_ref;     // References Sp in obs_eqn
-	//bool test_res;                   // The result of a diagnostic test
 	double tdiv;                     // The time at which observation occurs
 	bool time_vari;                  // Determines if time variation
 };
@@ -1404,6 +1399,11 @@ struct TransDiagSpecies {          // Stores expected number of transitions base
 	unsigned int n;                  // The number which have been added
 };
 
+struct TransProb {                 // Stores problematic transitions (rates too large)
+ unsigned int cl;
+ unsigned int tr;
+};
+
 struct ParticleSpecies {           // Store the species state is a particle     
 	InitCondValue init_cond_val;     // The initial state
 	vector < vector <double> > trans_num; // Transition numbers (for population-based)
@@ -1411,7 +1411,10 @@ struct ParticleSpecies {           // Store the species state is a particle
 	unsigned int nindividual;        // The number of individuals (used for trace plots)
 	vector < vector <double> > exp_num;// Expected number of transitions [trg][ti]
 	vector < vector <unsigned int> > cum_prob_dist;// Cumulative probability distribution [trg][b]
+	double dt_max_est;               // The estimated maximum timestep
+	vector <TransProb> trans_prob;   // Stores transitions above maximum rate
 };
+
 
 struct TransTreeStats {            // Stores statistics about transmission tree
 	TransTreeStats(){ N_origin = UNSET; N_inf = UNSET; N_mut_tree = UNSET; N_mut_origin = UNSET; N_unobs = UNSET; t_root = UNSET;}
@@ -1997,16 +2000,6 @@ struct CalcTime {                  // Stores a calculation (made up of operation
 	EqItemType op;                   // The operator used in the calculation
 };
 
-/*
-struct ParamChange {               // Stores change to parameter
-	ParamChange(unsigned int index_, double value_){
-		index = index_; value = value_;
-	};
-	unsigned int index;              // Index of change
-	double value;                    // Stores old value            
-};
-*/
-
 struct PV {                        // Stores parameter values along with precalculation
 	vector <double> value;           // The value of paramvec
 	vector <double> precalc;         // The array of precaclulated quantities
@@ -2094,4 +2087,15 @@ struct InfEnter {                        // Used for generating genetic data
 	unsigned int p;
 	unsigned int i;
 	double t;
+};
+
+struct IEstoreSpecies {                     // Used to store ie values 
+	IEstoreSpecies(){ on = false;}
+	bool on;
+	Hash hash;
+	vector < vector <double> > ie_value;      // Stores matrix of hash values 
+};
+
+struct IEstore {                            // Used to store ie values 
+	vector <IEstoreSpecies> species;
 };

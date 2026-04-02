@@ -48,7 +48,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 		
 			lines_raw.push_back(line);
 			
-			line = remove_escape_char(line);
+			//line = remove_escape_char(line);
+			replace_tri_brac(line);
 		
 			lines.push_back(line);
 		}while(true);
@@ -66,7 +67,11 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	auto command_line = extract_command_line(lines); // Converts from text lines to command lines
 
 	load_data_files(command_line);
-		
+
+	if(model.mode == COMPRESS){ compress_command_lines(command_line,lines_raw,false); return;}
+	
+	if(model.mode == DECOMPRESS){ compress_command_lines(command_line,lines_raw,true); return;}
+			
 	// Import happens in three stages:
 	// (0) Determines if simulation, inference or post_sim
 	// (1) Simulation or inference details
@@ -200,7 +205,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 					break;
 					
 				case INIT_POP_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM:
-					if(!use_sim_ic) process = false;
+					if(!use_sim_ic && model.mode != DATA_SHOW && model.mode != DATA_DEL) process = false;
 					break;
 					
 				case INIT_POP: case REMOVE_IND: case MOVE_IND:
@@ -264,6 +269,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 			case TORNADO_SETUP: case TORNADO_RESULT: break;
 			
 			case SCAN_SETUP: case SCAN_RESULT: break;
+			
+			case COMPRESS: case DECOMPRESS: break;
 			
 			case MODE_UNSET:
 				break;
@@ -682,12 +689,13 @@ vector <CommandLine> Input::extract_command_line(vector <string> lines)
 				vector <string> file_lines;
 				string file_name = "$FILE"+to_string(files.size())+"&";
 				while(j < lines.size()){
-					auto te = trim(lines[j]);
+					const auto &li = lines[j];
+					auto te = trim(li);
 					if(te.length() >= 3 && te.substr(0,3) == "]]\""){
 						trr += file_name+te;
 						break;
 					}
-					file_lines.push_back(te);
+					file_lines.push_back(li);
 					j++;
 				}
 				
@@ -719,15 +727,7 @@ vector <CommandLine> Input::extract_command_line(vector <string> lines)
 /// Loads up any data files
 void Input::load_data_files(vector <CommandLine> &command_line)
 {
-	string data_dir = "";
-	for(auto j = 0u; j < command_line.size(); j++){
-		if(command_line[j].command == DATA_DIR){
-			for(auto k = 0u; k < command_line[j].tags.size(); k++){
-				const auto &tag = command_line[j].tags[k];
-				if(tag.name == "folder") data_dir = get_data_dir(tag.value);
-			}
-		}
-	}
+	set_data_directory(command_line);
 	
 	for(auto j = 0u; j < command_line.size(); j++){
 		const auto &cl = command_line[j];
@@ -739,8 +739,9 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 			
 			auto ty = 0u;
 			
-			if(na == "value" || na == "constant" || na == "reparam" || na == "text") ty = 1;
-		
+			if(na == "value" || na == "prior-const" || na == "constant" || na == "reparam" || na == "text"){ 	ty = 1;
+			}
+			
 			if(na == "file" || na == "boundary" || na == "prior-split" || na == "dist-split" || 
 		   na == "A" || na == "Ainv" || na == "A-sparse" || na == "pedigree" || na == "X" || 
 			 na == "ind-list" || na == "factor-weight") ty = 2;
@@ -766,9 +767,9 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 				if(is_file(file)){
 					auto k = 0u; while(k < files.size() && files[k].name != file) k++;
 					if(k == files.size()){
-						if(data_dir == "") alert_import("The 'data-dir' command must be set");
+						if(datadir == "") alert_import("The 'data-dir' command must be set");
 							
-						auto full_name = data_dir+"/"+file; 
+						auto full_name = datadir+"/"+file; 
 						ifstream fin(full_name);
 						if(!fin) alert_input("File '"+full_name+"' could not be loaded");
 						
@@ -799,6 +800,14 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 			}
 		}
 	}
+}
+
+
+/// Replaces any triangular brackets
+void Input::replace_tri_brac(string &te) const
+{
+	te = replace(te,"〈","<");
+	te = replace(te,"〉",">");
 }
 
 
@@ -1036,7 +1045,7 @@ void Input::process_command(const CommandLine &cline, unsigned int loop, bool us
 		else{
 			if(model.data_mode()) import_data_table_command(cline,false);
 			else{
-				string ty = "simulation"; if(model.mode == INF) ty = "inference";
+				string ty = "simulation"; if(model.mode == INF || model.mode == EXT) ty = "inference";
 				
 				alert_warning("Line ignored because not need for "+ty);
 				for(auto &ta : cline_store.tags) ta.done = 1;

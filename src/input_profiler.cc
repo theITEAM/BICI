@@ -34,6 +34,7 @@ void Input::reduce_memory()
 	case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: 
 	case TORNADO_SETUP: case TORNADO_RESULT:
 	case SCAN_SETUP: case SCAN_RESULT:
+	case COMPRESS: case DECOMPRESS:
 		return;
 	
 	default: break;

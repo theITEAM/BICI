@@ -390,7 +390,7 @@ function set_ruler(p,cl)
 			// This sets default ruller size to 2 unit on final page
 		
 			let num = claa.ncomp; if(num == 0) num = 1;
-			let area_per_comp = (page_char_wid-menu_width)*page_char_hei/num;
+			let area_per_comp = (page_char_wid-menu_width)*page_char_hei_aim/num;
 			
 			let dist = 0.1*Math.sqrt(area_per_comp);
 			
@@ -568,7 +568,7 @@ function get_model_box(p,cl)
 		let scalex = 0.7*(page_char_wid-menu_width)/(xmax-xmin); 
 		if(cam.coord == "cartesian" && scalex > 1) scalex = 1;
 		
-		let scaley = 0.7*page_char_hei/(ymax-ymin);
+		let scaley = 0.7*page_char_hei_aim/(ymax-ymin);
 		if(cam.coord == "cartesian" && scaley > 1) scaley = 1;
 
 		if(scalex < scaley) scale = scalex;

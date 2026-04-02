@@ -11,7 +11,16 @@ function add_param_prior_buts(lay)
 	
 	cy += 0.5;
 		
-	add_layer("ParamPriorContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-2,{});	
+	add_layer("ParamPriorContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{});	
+	
+	let active = true;
+	if(model.param.length == 0) active = false;
+	
+	let x = 1.2, y = lay.dy-1.6;
+	let gap = 3.5;
+	
+	let w = model.add_object_button(lay,"Const. Prior",x,y,"SetPriorConst",{ back:WHITE, active:active, info:{}, title:"Constant under inference", te:prior_const_text}); 
+	x += w+gap;
 }
 
 
@@ -38,20 +47,43 @@ function add_param_prior_content(lay)
 			
 				let w = wright2;
 				
-				if(par.dep.length > 0 && !par.factor && !is_symmetric(par)){
-					w -= 4.5;
-					lay.add_checkbox(w,y+0.4,"Split","Split",par.prior_split_check,WHITE);
-				}
-				
-				if(par.dep.length == 0 || par.prior_split_check.check == false || par.factor){
-					display_distribution(i,x,y,lay,true,true,w);
-				}
-				else{
-					if(par.prior_split_desc == no_elements){
-						display_no_element(par,x,y,lay,w);
+				if(par.prior_const_on == true){
+					w -= 1.5;
+					
+					if(par.dep.length == 0){
+						display_prior_const(i,x,y,lay,w);
 					}
 					else{
-						display_distribution_split(i,x,y,lay,true,true,"prior",w);
+						if(par.prior_const_desc == no_elements){
+							display_no_element(par,x,y,lay,w);
+						}
+						else{
+							if(add_prior_const_view_button(par,w-4,y,i,lay,model)) w -= 4.5;
+							
+							display_prior_const(i,x,y,lay,w);
+						}
+					}
+					
+					let del_x = lay.dx - 2.5;
+					let del_dx = 1.3;
+					lay.add_button({x:del_x, y:y+0.05, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamPriorConst"});
+				}
+				else{
+					if(par.dep.length > 0 && !par.factor && !is_symmetric(par)){
+						w -= 4.5;
+						lay.add_checkbox(w,y+0.4,"Split","Split",par.prior_split_check,WHITE);
+					}
+					
+					if(par.dep.length == 0 || par.prior_split_check.check == false || par.factor){
+						display_distribution(i,x,y,lay,true,true,w);
+					}
+					else{
+						if(par.prior_split_desc == no_elements){
+							display_no_element(par,x,y,lay,w);
+						}
+						else{
+							display_distribution_split(i,x,y,lay,true,true,"prior",w);
+						}
 					}
 				}
 				

@@ -49,6 +49,8 @@ void Species::initialise_data(Operation mode)
 
 	print_diag("load data end");
 	
+	check_obs_trans_times_same();
+	
 	if(type == INDIVIDUAL) jiggle_data(mode);
 	
 	nindividual_in = individual.size();
@@ -67,17 +69,89 @@ void Species::initialise_data(Operation mode)
 }
 
 
+/// Checks if transitions times are at the same time
+void Species::check_obs_trans_times_same()
+{
+	string enter_err, leave_err, time_err;
+	auto enter_num = 0u, leave_num = 0u, time_num = 0u;
+	
+	for(const auto &ind : individual){
+		vector <double> move_ev;
+		
+		double tenter = 0.0, tleave = T;
+		for(const auto &ev : ind.ev){
+			switch(ev.type){
+			case ENTER_EV: tenter = ev.tdiv; break;
+			case LEAVE_EV: tleave = ev.tdiv; break;
+			case MOVE_EV: move_ev.push_back(ev.tdiv); break;
+			default: emsg("wrong"); break;
+			}
+		}
+		
+		string te = "For individual '"+ind.name+"': ";
+		
+		for(auto e = 0u; e < ind.obs.size(); e++){
+			const auto &ob = ind.obs[e];
+			auto name = source[ob.so].name;
+			
+			auto tdiv = ob.tdiv;
+			if(tdiv < tenter){
+				if(enter_err == "") enter_err = te+"The time "+tstr(calc_t(tdiv,details))+" from data source '"+name+"' is before the time "+tstr(calc_t(tenter,details))+" the individual enters the system.";
+				enter_num++;
+			}
+			
+			if(tdiv > tleave){
+				if(leave_err == "") leave_err = te+"The time "+tstr(calc_t(tdiv,details))+" from data source '"+name+"' is after the time "+tstr(calc_t(tleave,details))+" the individual leaves the system.";
+				leave_num++;
+			}
+			
+			if(ob.type == OBS_SOURCE_EV || ob.type == OBS_TRANS_EV || ob.type == OBS_SINK_EV){					
+				for(auto e2 = e+1; e2 < ind.obs.size(); e2++){
+					const auto &ob2 = ind.obs[e2];
+					auto name2 = source[ob2.so].name;
+					if(ob.tdiv == ob2.tdiv){
+						if(ob2.type == OBS_SOURCE_EV || ob2.type == OBS_TRANS_EV || ob2.type == OBS_SINK_EV){
+							if(time_err == "") time_err = te+"The transition time "+tstr(calc_t(tdiv,details))+" is the same in data sources '"+name+"' and '"+name2+"'. Transition times cannot be defined the same in multiple data sources.";
+							time_num++;
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	string err;
+	auto num = 0u;
+	if(enter_err != ""){ err = enter_err; num = enter_num;}
+	else{	
+		if(leave_err != ""){ err = leave_err; num = leave_num;}
+		else{
+			if(time_err != ""){ err = time_err; num = time_num;}
+		}
+	}
+	
+	if(err != ""){
+		if(num > 1) err += " There are "+tstr(num-1)+" other instances of this error";
+		//alert_input(err);
+	}
+}
+
+
 /// Sets the timerange over which measurements are made on individuals
 void Species::set_ind_tmin_tmax()
 {
 	for(auto &ind : individual){
 		auto tmin = LARGE;
 		auto tmax = -LARGE;
+		auto leave_fl = false;
 		for(const auto &ev : ind.ev){
 			auto t = ev.tdiv;
 			if(t < tmin) tmin = t;
 			if(t > tmax) tmax = t;
+			
+			if(ev.type == LEAVE_EV) leave_fl = true;
 		}
+		if(leave_fl == false) tmax = T;
 			
 		for(const auto &ob : ind.obs){
 			if(!(ob.type == OBS_COMP_EV && ob.not_alive)){
@@ -86,11 +160,10 @@ void Species::set_ind_tmin_tmax()
 				if(t > tmax) tmax = t;
 			}
 		}
-		 
+	
 		ind.tdivmin = tmin; ind.tdivmax = tmax;
 	}
 }
-
 
 
 /// Used to order genetic data

@@ -58,7 +58,7 @@ param name="N" constant="10"
 
 param name="β" value="0.2" prior="inverse(0.01,1)"
 
-param name="Ω^inf" value="1.5" prior="mvn-jeffreys(0.01,4)"
+param name="Ω^inf" value="1.5" prior="covar-default()"
 
 
 

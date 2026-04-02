@@ -682,7 +682,7 @@ void State::check_markov_trans(unsigned int p, string ref)
 		auto Li_markov_store = ssp.Li_markov[e];
 		
 		auto list = seq_vec(ssp.markov_eqn_vari[e].div.size());
-		ssp.likelihood_markov_value(e,list,popnum_t);
+		ssp.markov_value_calc(e,list,popnum_t);
 		auto temp = 0.0;
 		ssp.likelihood_markov(e,list,temp);
 			
@@ -811,7 +811,7 @@ void State::check_markov_div_value(unsigned int p, string ref)
 		auto Li_markov_store = ssp.Li_markov[e];
 		
 		auto list = seq_vec(ssp.markov_eqn_vari[e].div.size());
-		ssp.likelihood_markov_value(e,list,popnum_t);
+		ssp.markov_value_calc(e,list,popnum_t);
 		auto temp = 0.0;
 		ssp.likelihood_markov(e,list,temp);
 			
@@ -2308,45 +2308,6 @@ void State::print_ev_data(string te, const vector <EventData> &event_data, unsig
 	cout << endl;
 }
 
-/*
-/// Scans a variable and plots the variation in likelihood
-void State::scan_variable(string name, double min, double max) 
-{
-	const auto imax = 100u;
-	const auto &vec = model.param_vec;
-	auto th = 0u; while(th < vec.size() && vec[th].name != name) th++;
-	if(th == vec.size()) emsg("Could not find");
-
-	ofstream scan("Output/scan.txt");
-	for(auto i = 0u; i < imax; i++){
-		cout << i << " scan" << endl;
-		auto val = min+(max-min)*double(i)/imax;
-	
-		auto param_store = param_val;
-		
-		param_val[th] = val;
-		
-		popnum_t = model.calculate_popnum_t();
-		likelihood_from_scratch();
-		
-		auto Li = like.init_cond+
-		like.init_cond_prior+
-		like.obs+
-		like.prior+ 
-		like.prior_bounded+ 
-		like.spline_prior+ 
-		like.dist+
-		like.markov+ 
-		like.nm_trans+
-		like.genetic_process+
-		like.genetic_obs+
-		like.ie;
-		
-		scan << val << " " << Li << endl;
-	}
-}
-*/
-
 
 /// Checks if individual or fixed effect are too large or small
 void State::check_effect_out_of_range()
@@ -2416,17 +2377,29 @@ void State::check_neg_rate(string name)
 	for(auto p = 0u; p < species.size(); p++){
 		const auto &sp = model.species[p];
 		const auto &ssp = species[p];
-		for(auto e = 0u; e < sp.markov_eqn.size(); e++){
-			//auto &me = sp.markov_eqn[e];
-			auto &me_vari = ssp.markov_eqn_vari[e];
-			for(auto ti = 0u; ti <  me_vari.div.size(); ti++){
-				auto &div =	me_vari.div[ti];
-				auto val = div.value;
-				if(val < -SMALL){
-					add_alg_warn("Negative problem. After proposal:"+name+" val="+tstr(val));
-				}				
+		switch(sp.type){
+		case INDIVIDUAL:
+			for(auto e = 0u; e < sp.markov_eqn.size(); e++){
+				//auto &me = sp.markov_eqn[e];
+				auto &me_vari = ssp.markov_eqn_vari[e];
+				for(auto ti = 0u; ti <  me_vari.div.size(); ti++){
+					auto &div =	me_vari.div[ti];
+					auto val = div.value;
+					if(val < -SMALL){
+						add_alg_warn("Negative problem. After proposal:"+name+" val="+tstr(val));
+					}				
+				}
+			}	
+			break;
+			
+		case POPULATION: case DETERMINISTIC:
+			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+				for(auto ti = 0u; ti < T; ti++){
+					if(ssp.tnum_mean_st[tr][ti] < 0) emsg("Negative equation: "+name);
+				}
 			}
-		}	
+			break;
+		}
 	}
 }
 

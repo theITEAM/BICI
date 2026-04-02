@@ -54,7 +54,7 @@ ind-effect-data name="Sus. true ind. eff" ie="g" file="ind-effect-data.csv"
 
 param name="β" value="0.0005" prior="inverse(0.0001,0.01)"
 
-param name="Ω^var" value="1" prior="mvn-jeffreys(0.01,2)"
+param name="Ω^var" value="1" prior="covar-default()"
 
 
 

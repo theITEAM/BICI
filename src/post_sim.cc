@@ -38,13 +38,15 @@ void PostSim::run()
 		//const auto &samp = model.sample[0];
 
 		auto param_val = model.post_param(samp);
+	
 		//model.print_param(param_val);
 		
 		if(false) model.print_param(param_val);
 
 		if(model.details.param_only){
+			auto ie_store = model.post_ie_store(samp);
 			auto initc_val = model.initc_sample(param_val);
-			state.simulate(param_val,initc_val);
+			state.simulate(param_val,initc_val,ie_store);
 		}
 		else{
 			state.post_sim(param_val,samp);

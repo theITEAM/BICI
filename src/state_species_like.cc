@@ -109,7 +109,7 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 
 
 /// Calculate the value of a markov equation
-vector <double> StateSpecies::likelihood_markov_value(unsigned int e, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t)
+vector <double> StateSpecies::markov_value_calc(unsigned int e, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t)
 {
 	auto &me = sp.markov_eqn[e];
 	auto &me_vari = markov_eqn_vari[e];
@@ -173,7 +173,7 @@ vector <double> StateSpecies::likelihood_markov_value(unsigned int e, const vect
 
 /// Calculate the value of a markov equation 
 // This is the case when only the non-population part of the equation changes
-vector <double> StateSpecies::likelihood_markov_value_nopop(const vector <unsigned int> &me_list, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const PV &param_val)
+vector <double> StateSpecies::markov_value_nopop_calc(const vector <unsigned int> &me_list, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const PV &param_val)
 {
 	auto e_first = me_list[0];
 	auto &me = sp.markov_eqn[e_first];
@@ -238,7 +238,7 @@ vector <double> StateSpecies::likelihood_markov_value_nopop(const vector <unsign
 
 
 /// Restores values for 
-void StateSpecies::likelihood_markov_value_nopop_restore(const vector <unsigned int> &me_list, const vector <unsigned int> &list, const vector<double> &store)
+void StateSpecies::markov_value_nopop_restore(const vector <unsigned int> &me_list, const vector <unsigned int> &list, const vector<double> &store)
 {
 	auto m = 0u;
 	for(auto ti : list){	
@@ -255,7 +255,7 @@ void StateSpecies::likelihood_markov_value_nopop_restore(const vector <unsigned 
 /// Calculate the value of a series of markov equation
 // Equations are in the form: factor(t)*(pop_grad1*{pop1}+pop_grad2*{pop2}+...)+non_pop_eqn_val(t)
 // val is used to keep track of: pop_grad1*{pop1}+pop_grad2*{pop2}+...
-vector <double> StateSpecies::likelihood_markov_value_linear(const vector <unsigned int> &list, const LinearForm &lin_form, const vector < vector <double> > &popnum_t)
+vector <double> StateSpecies::markov_value_linear_calc(const vector <unsigned int> &list, const LinearForm &lin_form, const vector < vector <double> > &popnum_t)
 {
 	vector <double> store;
 
@@ -323,7 +323,7 @@ vector <double> StateSpecies::likelihood_markov_value_linear(const vector <unsig
 
 
 /// Restores values for DIV_VALUE_NOPOP_AFFECT
-void StateSpecies::likelihood_markov_value_linear_restore(const vector <unsigned int> &list, const LinearForm &lin_form, const vector<double> &store)
+void StateSpecies::markov_value_linear_restore(const vector <unsigned int> &list, const LinearForm &lin_form, const vector<double> &store)
 {
 	const auto &lf_list = lin_form.list; 	
 	auto imax = lf_list.size();
@@ -2432,15 +2432,16 @@ void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <d
 	switch(type){
 	case POPULATION:
 		en = tnum_mean_st;
-		
+
 		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 			auto &tn = trans_num[tr];
 			auto &tnm = tnum_mean_st[tr];
 			for(auto ti = 0u; ti < T; ti++){
 				auto n = tn[ti];
 				auto lam = tnm[ti];
+
 				auto pr = 1-(ran()*exp(poisson_probability(n,lam)) + poisson_upper_probability_no_log(n,lam));
-				
+
 				auto b = (unsigned int)(pr*H_BIN);
 				if(b >= H_BIN){
 					if(b == H_BIN) b--;

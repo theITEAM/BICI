@@ -92,6 +92,7 @@ class Input                                // Stores information about the model
 		vector <CommandLine> extract_command_line(vector <string> lines);
 		void load_data_files(vector <CommandLine> &command_line);
 		string remove_escape_char(string te);
+		void replace_tri_brac(string &te) const;
 		//CommandLine get_command_tags(string trr, unsigned int line_num);
 		//CommandLine syntax_error() const;
 		void alert(string st);
@@ -268,6 +269,7 @@ class Input                                // Stores information about the model
 		//void add_to_list(vector <ParamRef> &list, const ParamRef &pr) const;
 		unsigned int get_dependency(vector <Dependency> &dep, const ParamProp &pp, const vector <string> &knot_times, const vector <string> &knot_times_out);
 		EquationInfo he(EquationInfo eqn_inf, unsigned int lnum = UNSET);
+		bool is_inline(string te) const;
 		bool is_file(string te) const;
 		vector <unsigned int> find_index(unsigned int i, const vector <Dependency> &depend) const;
 		TransDef extract_trans_def(string value) const;
@@ -288,6 +290,9 @@ class Input                                // Stores information about the model
 		bool add_reparam_eqn(Param &par, Hash &hash_eqn);
 		string get_data_dir(string data_dir);
 		unsigned int get_chain();
+		void set_data_directory(const vector <CommandLine> &command_line);
+		void compress_command_lines(const vector <CommandLine> &command_line, vector <string> &lines_raw, bool decomp);
+		
 		Details& get_details();
 		DataSourceType get_data_type(Command cname) const;
 		

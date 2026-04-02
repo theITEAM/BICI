@@ -64,7 +64,10 @@ private:
 	void unpack_item(vector<T>& vec);
 	void unpack_item(string &vec);
 	
-	void pack(const vector <string> &vec_str);                    // Specific pack/unpack commands
+	// Specific pack/unpack commands
+	void pack(const vector <TransProb> &vec);
+	void unpack(vector <TransProb> &vec);
+	void pack(const vector <string> &vec_str);                    
 	void unpack(vector <string> &vec_str);
 	void pack(const Particle &pa);
 	void unpack(Particle &pa);

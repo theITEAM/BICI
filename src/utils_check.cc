@@ -1273,7 +1273,7 @@ void mvn_prior_check()
 						
 					case 2: // Inverse wishart
 						{
-							if(i == j && (M[i][i] < VAR_MIN || M[i][i] > VAR_MAX)) ill = true;
+							if(i == j && (M[i][i] <= VAR_MIN || M[i][i] > VAR_MAX)) ill = true;
 							else{
 								//al = exp((0.5*N-0.5)*(diag_new-diag) - 0.5*(nu+N+1)*(det_new-det) - 0.5*(tr_new-tr));
 								al = exp((0.5*N-0.5)*(diag_new-diag) - 0.5*(nu+N+1)*(det_new-det) - 0.5*S*(tr_new-tr));

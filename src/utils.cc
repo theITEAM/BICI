@@ -116,6 +116,17 @@ void run_error(const string &msg)
 }
 
 
+/// Displays a human readable error message and kill s other mpi process
+void run_end(const string &msg)
+{
+	if(false) throw(std::runtime_error(msg));
+	if(op()) display_terminate(msg);
+	if(false) raise(SIGABRT);
+
+	exit (EXIT_FAILURE);
+}
+
+
 /// Displays an error message for internal problem (this only exits when all core reach it)
 void emsg_input(const string &msg)
 {
@@ -170,6 +181,23 @@ void display_warning(string msg)
 	else{
 		cout << "\033[35m";
 		cout << "WARNING: ";
+		cout << "\033[0m";
+		cout << add_escape_char(msg);
+		cout << endl;
+	}
+}
+
+
+/// Display a warning message
+void display_terminate(string msg)
+{
+	add_full_stop(msg);
+	
+	if(com_op == true){
+	}
+	else{
+		cout << "\033[35m";
+		cout << "FINISH: ";
 		cout << "\033[0m";
 		cout << add_escape_char(msg);
 		cout << endl;
@@ -1345,6 +1373,16 @@ ParamProp get_param_prop(string st)
 
 /// Adds a value to a vector (if it doesn't already exist)
 unsigned int add_to_vec(vector <unsigned int> &vec, unsigned int val)
+{
+	auto i = find_in(vec,val);
+	if(i == UNSET){ i = vec.size(); vec.push_back(val);}
+
+	return i;
+}
+
+
+/// Adds a value to a vector (if it doesn't already exist)
+unsigned int add_to_vec(vector <string> &vec, string val)
 {
 	auto i = find_in(vec,val);
 	if(i == UNSET){ i = vec.size(); vec.push_back(val);}
@@ -3296,6 +3334,10 @@ string add_escape_char(string te)
 	
 		te = replace(te,"×","*");
 		te = replace(te,"→","->");
+		te = replace(te,"〈","<");
+		te = replace(te,"〉",">");
+		te = replace(te,"〈","<");
+		te = replace(te,"〉",">");
 	}
 	
 	return te;
@@ -4051,7 +4093,7 @@ string get_cpu_time(unsigned int tics)
   ss << setprecision(1);
 		
 	auto sec = double(tics)/CLOCKS_PER_SEC;
-	if(true || sec < 60){
+	if(sec < 60){
 		ss << sec << " seconds";
 	}
 	else{
