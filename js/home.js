@@ -128,23 +128,23 @@ function initialise_section()
 
 		ex_mod.push({te:"Applications for individual effect",help:"These examples look at different ways in which individual effects can be incorporated into models."+mod_mess});
 
-		ex_mod.push({mod:"EQG1.1", te:"Individual effect applied to a transition",file:"EX_EQG1-1",mod_type:"IBM", pic:"SIind"});
+		ex_mod.push({mod:"QGE1.1", te:"Individual effect applied to a transition",file:"EX_QGE1-1",mod_type:"IBM", pic:"SIind"});
 	
-		ex_mod.push({mod:"EQG1.2", te:"Correlated individual effect applied to a transition",file:"EX_EQG1-2",mod_type:"IBM", pic:"SIind"});
+		ex_mod.push({mod:"QGE1.2", te:"Correlated individual effect applied to a transition",file:"EX_QGE1-2",mod_type:"IBM", pic:"SIind"});
 		
-		ex_mod.push({mod:"EQG1.3", te:"Correlated individual effect applied to a transition with pedigree",file:"EX_EQG1-3",mod_type:"IBM", pic:"SIind"});
+		ex_mod.push({mod:"QGE1.3", te:"Correlated individual effect applied to a transition with pedigree",file:"EX_QGE1-3",mod_type:"IBM", pic:"SIind"});
 			
-		ex_mod.push({mod:"EQG1.4", te:"Correlated individual effect applied to a population",file:"EX_EQG1-4",mod_type:"IBM", pic:"SIindgroup"});
+		ex_mod.push({mod:"QGE1.4", te:"Correlated individual effect applied to a population",file:"EX_QGE1-4",mod_type:"IBM", pic:"SIindgroup"});
 		
-		ex_mod.push({mod:"EQG1.5", te:"Individual effect applied to a branching probability ",file:"EX_EQG1-5",mod_type:"IBM", pic:"branchie"});
+		ex_mod.push({mod:"QGE1.5", te:"Individual effect applied to a branching probability ",file:"EX_QGE1-5",mod_type:"IBM", pic:"branchie"});
 		
 		ex_mod.push({te:"Complete models",help:"These examples incorporate multiple individual/fixed effects, as would typically be done in a real analysis."+mod_mess});
 
-		ex_mod.push({mod:"EQG2.1", te:"Quantitative genetics model for susc./inf.",file:"EX_EQG2-1",mod_type:"IBM", pic:"groupQG"});
+		ex_mod.push({mod:"QGE2.1", te:"Quantitative genetics model for susc./inf.",file:"EX_QGE2-1",mod_type:"IBM", pic:"groupQG"});
 
-		ex_mod.push({mod:"EQG2.2", te:"Quantitative genetics model for susc./inf./rec.",file:"EX_EQG2-2",mod_type:"IBM", pic:"qgSEIR"});
+		ex_mod.push({mod:"QGE2.2", te:"Quantitative genetics model for susc./inf./rec.",file:"EX_QGE2-2",mod_type:"IBM", pic:"qgSEIR"});
 		
-		let sec = { name:"epiqG", desc:"Quantitative genetics in epidemiology", pic:"groupQG", ex_mod:ex_mod, help:epiqg_text+mod_mess};
+		let sec = { name:"qg-epi", desc:"Quantitative genetics in epidemiology", pic:"groupQG", ex_mod:ex_mod, help:qg_epi_text+mod_mess};
 		
 		inter.section.push(sec);
 	}
@@ -269,13 +269,13 @@ function initialise_section()
 		ex_mod.push({te:"2) Individual-based variation",help:"These examples look at how individual-based variation can be incorporated into the model"+mod_mess, gap:gap});
 		ex_mod.push({te:"F2.1: Individual fixed effect applied to a transition", mod:"SE1.2", link:true, mod_type:"IBM"}); 
 		ex_mod.push({te:"F2.2: Individual fixed effect applied to a population", link:true, mod_type:"IBM"}); 
-		ex_mod.push({te:"F2.3: Individual effect applied to a transition", mod:"EQG1.1", link:true, mod_type:"IBM"}); 
-		ex_mod.push({te:"F2.4: Correlated individual effect applied to a transition", mod:"EQG1.2", link:true, mod_type:"IBM"});
-		ex_mod.push({te:"F2.5: Correlated individual effect applied to a population", mod:"EQG1.4", link:true, mod_type:"IBM"});
+		ex_mod.push({te:"F2.3: Individual effect applied to a transition", mod:"QGE1.1", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"F2.4: Correlated individual effect applied to a transition", mod:"QGE1.2", link:true, mod_type:"IBM"});
+		ex_mod.push({te:"F2.5: Correlated individual effect applied to a population", mod:"QGE1.4", link:true, mod_type:"IBM"});
 		ex_mod.push({te:"F2.6: Individual fixed effect applied to a branching probability", mod:"CE1.3", link:true, mod_type:"IBM"}); 
 		
-		ex_mod.push({te:"F2.7: Individual effect applied to a branching probability", mod:"EQG1.5", link:true, mod_type:"IBM"}); 
-		ex_mod.push({te:"F2.8: Correlated individual effect applied to a transition with pedigree", mod:"EQG1.2", link:true, mod_type:"IBM"});
+		ex_mod.push({te:"F2.7: Individual effect applied to a branching probability", mod:"QGE1.5", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"F2.8: Correlated individual effect applied to a transition with pedigree", mod:"QGE1.2", link:true, mod_type:"IBM"});
 	
 		ex_mod.push({te:"3) Parameter definitions",help:"These examples look at how parameters can be reparameterised, set to distributions or derived from other quantities"+mod_mess, gap:gap});
 		ex_mod.push({te:"F3.1: Reparameterisation", mod:"SPE2.1", link:true, mod_type:"IBM"}); 

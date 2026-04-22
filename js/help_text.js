@@ -130,7 +130,7 @@ const spatial_epi_text = "Models incorporating spatial stratification in differe
 
 const exp_epi_text = "Examples looking at disease transmission experiments.";
 
-const epiqg_text = "Different ways in which quantitative genetics can be incorporated into epidemiological models.";
+const qg_epi_text = "Different ways in which quantitative genetics can be incorporated into epidemiological models.";
 
 const gen_epi_text = "Adds pathogen genetic information to analyses.";
 
@@ -144,7 +144,7 @@ const data_scen_text = "Different types of data that can be used in analysis.";
 
 const features_text = "Different model features such as time variation, individual variation and parameterisation.";
 
-const welcome_text = "BICI stands for 'Bayesian individual-based compartmental inference'.\nTo get started:\n• Click on '+ Create model' (right).\n• Load up a previous analysis from the menu (top right).\n• Click on one of the example sections below.\nIf you get stuck, clicking on the [?] icons can provide help (or if all else fails, consult the manual).\n\nEXAMPLE SECTIONS:\n• <b>simp-epi</b> – "+simp_epi_text+"\n• <b>comp-epi</b> – "+comp_epi_text+"\n• <b>spatial-epi</b> – "+spatial_epi_text+"\n• <b>exp-epi</b> – "+exp_epi_text+"\n• <b>gen-epi</b> – "+gen_epi_text+"\n• <b>epiqG</b> – "+epiqg_text+"\n• <b>simp-eco</b> – "+simp_eco_text+"\n• <b>spatial-eco</b> – "+spatial_eco_text+"\n• <b>sim-scen</b> – "+sim_scen_text+"\n• <b>data-scen</b> – "+data_scen_text+"\n• <b>features</b> – "+features_text; 
+const welcome_text = "BICI stands for 'Bayesian individual-based compartmental inference'.\nTo get started:\n• Click on '+ Create model' (right).\n• Load up a previous analysis from the menu (top right).\n• Click on one of the example sections below.\nIf you get stuck, clicking on the [?] icons can provide help (or if all else fails, consult the manual).\n\nEXAMPLE SECTIONS:\n• <b>simp-epi</b> – "+simp_epi_text+"\n• <b>comp-epi</b> – "+comp_epi_text+"\n• <b>spatial-epi</b> – "+spatial_epi_text+"\n• <b>exp-epi</b> – "+exp_epi_text+"\n• <b>gen-epi</b> – "+gen_epi_text+"\n• <b>qg-epi</b> – "+qg_epi_text+"\n• <b>simp-eco</b> – "+simp_eco_text+"\n• <b>spatial-eco</b> – "+spatial_eco_text+"\n• <b>sim-scen</b> – "+sim_scen_text+"\n• <b>data-scen</b> – "+data_scen_text+"\n• <b>features</b> – "+features_text; 
 
 const ie_group_name_text = "This name provides a short description of what the individual effects. For example, 'gen' for genetic and 'env' for environmental. The default text 'CM' stands for covariance matrix.";
 
