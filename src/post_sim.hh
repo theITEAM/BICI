@@ -16,6 +16,8 @@ class PostSim                              // Simulates from the model
 		void run();
 		
 	private:
+		PV calculate_param_av() const;
+	
 		const Model &model;
 		Output &output;
 		Mpi &mpi;

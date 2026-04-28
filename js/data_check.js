@@ -483,6 +483,7 @@ function data_source_check_error(out_type,so)
 
 		case "Remove Ind.": break;
 		case "Genetic": break;	
+		case "Test-and-cull": break;
 
 		default: error("Source not checked error: "+so.type); break;
 		}
@@ -558,7 +559,8 @@ function check_data_time(out_type)
 		for(let k = 0; k < source.length; k++){
 			let so = source[k];
 			let tab = so.table;
-			if(tab){
+			
+			if(tab && so.load_col){
 				for(let c = 0; c < so.load_col.length; c++){
 					if(so.load_col[c].type == "time_float"){
 						for(let r = 0; r < tab.nrow; r++){

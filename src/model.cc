@@ -407,6 +407,59 @@ PV Model::post_param(const Sample &samp) const
 }
 
 
+/// Gather a parameter set from a posterior sample
+PV Model::post_param_av(const vector <double> &value_av) const
+{
+	PV param_val;
+	param_val_init(param_val);
+	auto &value = param_val.value;
+	auto &precalc = param_val.precalc;
+	
+	/*
+	for(auto th = 0u; th < nparam_vec; th++){
+		const auto &pv = param_vec[th];	
+		const auto &par = param[pv.th];
+		cout << par.name << " " << samp.param_value[pv.th][pv.index] << endl;
+	}
+	*/
+	
+	for(auto th = 0u; th < nparam_vec; th++){
+		const auto &pv = param_vec[th];	
+		const auto &par = param[pv.th];
+		
+		precalc_eqn.calculate(pv.spec_precalc_before,param_val,false);
+			
+		switch(par.variety){
+		case CONST_PARAM:
+			value[th] = par.get_value(pv.index);
+			precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,false);
+			break;
+			
+		case REPARAM_PARAM:
+			if(pv.reparam_time_dep == false){
+				auto eq_ref = par.get_eq_ref(pv.index);
+				if(eq_ref == UNSET) emsg("eq_ref should be set");
+			
+				value[th] = eqn[eq_ref].calculate_param(precalc);
+				precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,false);
+			}
+			break;
+			
+		case DIST_PARAM: case PRIOR_PARAM:	
+			value[th] = value_av[th];
+			precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,false);
+			break;
+			
+		case UNSET_PARAM: emsg("error param"); break;
+		}
+	}
+	
+	precalc_eqn.calculate(spec_precalc,param_val,false);
+	
+	return param_val;
+}
+
+
 /// Create a store for ie effects
 IEstore Model::post_ie_store(const Sample &samp) const
 {
@@ -2609,9 +2662,11 @@ void Model::create_precalc_derive()
 	for(auto &eq : eqn){
 		if(eq.precalc_done == false && eq.type == DERIVE_EQN){	
 			precalc_eqn.add_eqn(eq.calcu,param_vec_ref,spline_ref,spec_precalc_derive);
+			//precalc_eqn.add_eqn_simp(eq.calcu,param_vec_ref,spline_ref);
 		
 			for(auto &inte : eq.integral){		
 				precalc_eqn.add_eqn(inte.calc,param_vec_ref,spline_ref,spec_precalc_derive);
+				//precalc_eqn.add_eqn_simp(inte.calc,param_vec_ref,spline_ref);
 			}
 			
 			eq.precalc_done = true;
@@ -3597,7 +3652,7 @@ vector <string> Model::equation_dep(string te, string &warn)
 		cout << endl;
 		emsg("eqdo");
 	}
-		
+	
 	return dep;
 }
 
@@ -3843,3 +3898,4 @@ DiagTestSens Model::get_diag_test_sens(string comp, unsigned int p, string &warn
 		
 	return dts;
 }
+

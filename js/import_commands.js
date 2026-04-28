@@ -18,6 +18,7 @@ function import_data_table_command(cname)
 	case "add-ind-post-sim": cname = "add-ind-inf"; siminf = "ppc"; break;
 	case "remove-ind-post-sim": cname = "remove-ind-inf"; siminf = "ppc"; break;
 	case "move-ind-post-sim": cname = "move-ind-inf"; siminf = "ppc"; break;
+	case "test-and-cull-sim": siminf = "sim"; break;	
 	}
 	
 	let i = find(convert,"command",cname);
@@ -27,16 +28,20 @@ function import_data_table_command(cname)
 	}
 	
 	let type = convert[i].type;
-	
-	let file = get_tag_value("file"); if(file == "") cannot_find_tag(); 
+		
+	let tab, cols, cols_split;
+	if(cname != "test-and-cull-sim"){
+		let file = get_tag_value("file"); if(file == "") cannot_find_tag(); 
 
-	let fi = get_fi(file);
+		let fi = get_fi(file);
 	
-	let tab = load_table(fi.te,true,fi.sep,fi.name);
-	if(typeof tab == 'string') alert_import(tab);
+		tab = load_table(fi.te,true,fi.sep,fi.name);
+		if(typeof tab == 'string') alert_import(tab);
 	
-	let cols = get_tag_value("cols");
-	let cols_split = cols.split(",");
+		cols = get_tag_value("cols");
+		cols_split = cols.split(",");
+	}
+	
 	
 	let p = imp.p;
 	if(p == undefined){
@@ -192,13 +197,8 @@ function import_data_table_command(cname)
 		}
 		break;
 		
-	case "Diag. Test":
-		{
-			//let Se = get_tag_value("Se");
-			//if(Se == "") cannot_find_tag();
-			
-			//output_error(is_eqn(Se,"Se",{zero_one_range:true}));
-			
+	case "Diag. Test": case "Test-and-cull":
+		{	
 			let Sp = get_tag_value("Sp");
 			if(Sp == "") cannot_find_tag();
 			
@@ -213,6 +213,26 @@ function import_data_table_command(cname)
 			if(pos == neg){
 				alert_import("'pos' and 'neg' cannot both have the same value");
 			}
+			
+			
+			/*
+			let cull = {check:false, time_gap:""};
+			let cull_str = get_tag_value("cull").toLowerCase();
+			if(cull_str != ""){
+				if(cull_str == "true"){
+					cull.check = true;
+					let time_gap = get_tag_value("time-gap");
+					if(time_gap == "") cannot_find_tag();
+					is_positive(time_gap,"time-gap");
+					cull.time_gap = time_gap;
+				}
+				else{
+					if(cull_str != "false"){
+						alert_import("'cull' must be 'true' or 'false'");
+					}
+				}
+			}
+			*/
 			
 			let comp = get_tag_value("comp");
 			if(comp == "") cannot_find_tag();
@@ -337,10 +357,38 @@ function import_data_table_command(cname)
 		}
 		break;
 	}
-	
+
 	start_data_source(type,spec,info);
-	
+		
 	let so = edit_source;
+	
+	if(type == "Test-and-cull"){
+		let time_gap = get_tag_value("time-gap");
+		if(time_gap == "") cannot_find_tag();
+		is_positive(time_gap,"time-gap");
+		spec.time_gap = time_gap;
+		
+		let frac_obs = get_tag_value("frac");
+		if(frac_obs == "") frac_obs = "1";
+		is_zeroone(frac_obs,"frac");
+		so.frac_obs = frac_obs;
+		
+		so.time_radio = {value:"Periodic"};
+		
+		let dt = get_tag_value("dt");
+		if(dt != ""){
+			is_positive(dt,"dt");
+			so.time_radio = {value:"Periodic"};
+			so.time_gen = dt;
+		}	
+		else{
+			let times = get_tag_value("times");
+			if(times != ""){
+				so.time_radio = {value:"Specified"};
+				so.time_gen = times;
+			}
+		}			
+	}
 	
 	let name = get_tag_value("name"); 
 	if(name == ""){ 
@@ -362,51 +410,59 @@ function import_data_table_command(cname)
 		}
 	}
 	
-	// Determines if dates need to be converted to times
-	so.time_format = "float";
-	for(let c = 0; c < so.load_col.length; c++){
-		if(so.load_col[c].heading == "t"){
-			let date = get_tag_value("date");
-				
-			if(date != ""){
-				if(option_error("date",date,["dd/mm/yyyy","dd/mm/yy","dd.mm.yyyy","yyyy-mm-dd","mm/dd/yyyy","mm/dd/yy"]) == true) return;
-				
-				so.time_format = date;
+	if(tab != undefined){
+		// Determines if dates need to be converted to times
+		so.time_format = "float";
+		for(let c = 0; c < so.load_col.length; c++){
+			if(so.load_col[c].heading == "t"){
+				let date = get_tag_value("date");
+					
+				if(date != ""){
+					if(option_error("date",date,["dd/mm/yyyy","dd/mm/yy","dd.mm.yyyy","yyyy-mm-dd","mm/dd/yyyy","mm/dd/yy"]) == true) return;
+					
+					so.time_format = date;
+				}
 			}
 		}
 	}
 	
 	so.data_table_use = "not loaded";
 	
-	let col_name = [];
-	for(let c = 0; c < so.load_col.length; c++){
-		col_name.push(so.load_col[c].heading);
-	}
-	
-	if(cols != ""){
-		let spl = cols.split(",");
-
-		if(spl.length != col_name.length){
-			alert_import("'cols' does not have the correct number of entries (expected something in the order '"+stringify(col_name)+"')"); 
+	if(tab != undefined){
+		let col_name = [];
+		for(let c = 0; c < so.load_col.length; c++){
+			col_name.push(so.load_col[c].heading);
 		}
 		
-		for(let i = 0; i < spl.length; i++){
-			for(let j = 0; j < col_name.length; j++){
-				if(spl[i] == col_name[j] && i != j){
-					alert_import("'cols' does not have the correct order (expected something in the order '"+stringify(col_name)+"')"); 
+		if(cols != ""){
+			let spl = cols.split(",");
+
+			if(spl.length != col_name.length){
+				alert_import("'cols' does not have the correct number of entries (expected something in the order '"+stringify(col_name)+"')"); 
+			}
+			
+			for(let i = 0; i < spl.length; i++){
+				for(let j = 0; j < col_name.length; j++){
+					if(spl[i] == col_name[j] && i != j){
+						alert_import("'cols' does not have the correct order (expected something in the order '"+stringify(col_name)+"')"); 
+					}
 				}
 			}
+			
+			col_name = spl;
 		}
-		
-		col_name = spl;
+
+		so.table = get_subtable(tab,col_name);	
+		if(so.table.error != "") alert_import("File problem – "+so.table.error);
+
+		convert_date_time(so);
+
+		so.table_loaded = true;
 	}
-
-	so.table = get_subtable(tab,col_name);	
-	if(so.table.error != "") alert_import("File problem – "+so.table.error);
-
-	convert_date_time(so);
-
-	so.table_loaded = true;
+	else{
+		so.table_loaded = false;
+	}
+	
 	so.table.edit = true;
 
 	switch(type){                                    // Adds prior for information for total population
@@ -430,7 +486,7 @@ function import_data_table_command(cname)
 	} 
 	
 	data_source_check_error("import",so)
-	
+
 	edit_source.info.imp = true;
 	data_source("Add",edit_source);
 }
@@ -2007,6 +2063,17 @@ function post_sim_command()
 		}
 	}
 	
+	let parsamp = get_tag_value("param-sample").toLowerCase();
+	if(parsamp == "") parsamp = "sample";
+	
+	if(option_error("param-sample",parsamp,["sample","mean","median"]) == true) return;
+	
+	switch(parsamp){
+	case "sample": details.run_post = {value:"postsample"}; break;
+	case "mean": details.run_post = {value:"postmean"}; break;
+	case "median": details.run_post = {value:"postmedian"}; break;
+	}
+
 	if(option_error("algorithm",alg,sim_alg_list) == true) return;
 	details.algorithm.value = alg;	
 

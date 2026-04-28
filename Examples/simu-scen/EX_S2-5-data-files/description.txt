@@ -2,7 +2,7 @@
 
 ## Objective
 - Introduce uncertainty in the initial population for an individual-based model.
-- On the 'Simulation→Initial Conditions' page a population distribution is specified as an initial condition. 
+- On the 'Simulation→Setup' page a population distribution is specified as an initial condition. 
 - Compared to example S2.4, this allows for greater flexibility.
 - 100 simulations are performed to see stochastic variation.
 

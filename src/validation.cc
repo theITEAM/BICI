@@ -123,7 +123,7 @@ void Validation::run_sim_data(string name, string op_dir, bool test, vector <str
 			
 			DataSim data_sim(model,output);
 			for(auto &ds : data_sim_lines){
-				data_sim.run(ds);
+				data_sim.run(ds,1);
 			}
 			
 			output.end(fi,UNSET);

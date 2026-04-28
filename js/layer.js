@@ -84,9 +84,9 @@ class Layer
 		
 		case "Simulation":
 			switch(tree[1]){
-			//case "Population": add_data_buts(this,"sim"); break;
-			//case "Initial Conditions": add_init_cont_buts(this,"sim"); break;
-			case "Initial Conditions": add_data_buts(this,"sim"); break;
+			case "Setup": 
+				add_data_buts(this,"sim"); 
+				break;
 			
 			case "Parameters":
 				add_param_value_buts(this); 
@@ -114,13 +114,14 @@ class Layer
 				}
 				break;
 				
-			case "Generate Data": add_data_buts(this,"gen"); break;
+			case "Generate Data": 
+				add_data_buts(this,"gen"); 
+				break;
 			}
 			break;
 			
 		case "Inference":
 			switch(tree[1]){
-			case "Initial Conditions": add_data_buts(this,"infic"); break;
 			case "Data": add_data_buts(this,"inf"); break;
 			case "Prior":
 				add_param_prior_buts(this); 
@@ -1403,6 +1404,7 @@ class Layer
 		case "time_end": te = edit_source.spec.time_end; break;
 		case "Se": eqn = edit_source.spec.Se_eqn; break;
 		case "Sp": eqn = edit_source.spec.Sp_eqn; break;
+		case "time_gap": te = edit_source.spec.time_gap; break;
 		case "mut_rate": eqn = edit_source.spec.mut_rate_eqn; break;
 		case "seq_var": eqn = edit_source.spec.seq_var_eqn; break;
 		case "snp_root": te = edit_source.spec.snp_root; break;

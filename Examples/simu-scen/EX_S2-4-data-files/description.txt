@@ -2,7 +2,7 @@
 
 ## Objective
 - Introduce uncertainty in the initial population for an individual-based model.
-- On the 'Simulation→Initial Conditions' page the individuals added to system have uncertainty regarding their initial state.
+- On the 'Simulation→Setup' page the individuals added to system have uncertainty regarding their initial state.
 
 - 100 simulations are performed to see stochastic variation.
 

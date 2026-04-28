@@ -840,6 +840,10 @@ function process(e)
 		}
 		break;
 		
+	case "Gen. test-and-cull":
+		generate_test_and_cull(info.p,info.i,info.sel_sim);
+		break;
+		
 	case "UpdateModel":
 		update_mod = true;
 		break;
@@ -850,6 +854,14 @@ function process(e)
 		break;
 		
 	case "Stop":
+		break;
+		
+	case "PosteriorMean":
+		sim_param_post_mean();
+		break;
+	
+	default:
+		error("WORKER PROBLEM:"+input.type);
 		break;
 	}
 	

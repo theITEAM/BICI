@@ -79,6 +79,10 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 			auto i = trig.i;
 			
 			switch(trig.type){
+			case INTERVENTION_SIM_EV:
+				implement_test_and_cull(trig.i,trig.tdiv);
+				break;
+			
 			case ENTER_SIM_EV:
 				{
 					IndInfFrom iif;
@@ -250,6 +254,62 @@ bool StateSpecies::allow_event(double t, const IndTransRef &itr) const
 	if(ran() < prob_ac) return true;
 	
 	return false;
+}
+
+
+/// Implements a test-and-cull policy
+void StateSpecies::implement_test_and_cull(unsigned int index, double tdiv)
+{
+	const auto &inter = sp.intervention[index]; 
+	auto cl = inter.cl;
+	const auto &dts = inter.diag_test_sens;
+	auto pos = inter.diag_pos;
+	auto neg = inter.diag_neg;
+	auto dt = inter.time_gap/model.details.dt;
+	
+	for(auto i = 0u; i < individual.size(); i++){
+		auto c = ind_sim_c[i];
+		
+		if(c != UNSET){
+			const auto &cgl = sp.comp_gl[c];
+			auto ci = cgl.cla_comp[cl];
+
+			auto res = 0u;
+					
+			if(dts.comp[ci].on){
+				string err;
+				auto Se_str = dts.comp[ci].Se_str;
+			
+				auto Se = number(Se_str);
+				if(Se == UNSET) run_error("Problem with sensitivity '"+Se_str+"'.");
+			
+				if(ran() < Se) res = 1; else res = 0;
+			}
+			else{
+				auto Sp = number(inter.Sp_str);
+				if(Sp == UNSET) run_error("Problem with specificity '"+inter.Sp_str+"'.");
+				
+				if(ran() < Sp) res = 0; else res = 1;
+			}
+			
+			vector <double> row;
+			row.push_back(i);
+			row.push_back(model.calc_t(tdiv));
+			row.push_back(res);
+			inter_data[index].data.push_back(row);
+		
+			if(res == 1){
+				SimTrigEvent trig;
+				trig.type = LEAVE_SIM_EV;
+				trig.i = i;
+				trig.tdiv = tdiv+dt;
+				trig.c = UNSET;
+				trig.trg = UNSET;
+				
+				insert_trigger_event(trig);
+			}
+		}
+	}
 }
 
 

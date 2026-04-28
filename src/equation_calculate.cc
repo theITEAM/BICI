@@ -119,6 +119,7 @@ double Equation::calculate_integral(unsigned int i, const vector < vector <doubl
 	else{
 		for(auto ti = inte.ti_min; ti < inte.ti_max; ti++){
 			auto val = calculate_calc(inte.calc,ti,popnum_t[ti],precalc,derive_val);
+			//print_working(inte.calc,ti,popnum_t[ti],precalc,derive_val);
 			su += val;
 		}		
 	}
@@ -335,6 +336,66 @@ double Equation::calculate_calc(const vector <Calculation> &calc, unsigned int t
 		}
 		
     regcalc[i] = calculate_operation(ca.op,num);
+  }
+
+	return regcalc[C-1];
+}
+
+
+/// Calculates the value for an equation
+double Equation::print_working(const vector <Calculation> &calc, unsigned int ti, const vector <double> &popnum, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const
+{
+	auto C = calc.size();
+ 	vector <double> regcalc(C);
+
+	const auto &cval = constant.value;
+
+	auto imax = C; if(imax > 100) imax = 100;
+	
+  for(auto i = 0u; i < imax; i++){
+		const auto &ca = calc[i];
+		
+		const auto &item = ca.item;
+		const auto N = item.size();
+		
+		vector <double> num(N);
+		
+		for(auto j = 0u; j < N; j++){
+			const auto &it = item[j];
+			
+			switch(it.type){
+				case DERIVE:
+					{
+						const auto &dr = derive_ref[it.num];
+						const auto &dv = derive_val[dr.i][dr.index];
+						if(dv.size() == 1) num[j] = dv[0];  // Not time dependent
+						else{
+							if(dr.ti != UNSET) num[j] = dv[dr.ti];
+							else{
+								if(ti != UNSET) num[j] = dv[ti];
+								else emsg("Derive problem");
+							}
+						}
+					}
+					break;
+						
+				case ONE: num[j] = 1; break;
+				case POPNUM: num[j] = rectify(popnum[it.num]); break;
+				case POPTIMENUM: emsg("Cannot calculate poptimenum"); break;
+				case REG: num[j] = regcalc[it.num]; break;
+				case REG_PRECALC: num[j] = precalc[it.num]; break;
+				case REG_PRECALC_TIME: num[j] = precalc[it.num+ti]; break;
+				case NUMERIC: num[j] = cval[it.num]; break;
+				case CONSTSPLINEREF: num[j] = spline[it.num].const_val[ti]; break;
+				case TIME: num[j] = timepoint[ti]; break;
+				default: eqn_type_error(it.type,17); break;
+			}
+		}
+		
+    regcalc[i] = calculate_operation(ca.op,num);
+		
+		print_ca(i,ca); 
+		cout << " = " << regcalc[i] << " ca" <<  endl;
   }
 
 	return regcalc[C-1];

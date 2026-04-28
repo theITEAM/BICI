@@ -335,6 +335,7 @@ struct SwapResult {                // Stores the result of doing a substitution 
 	string warn;                     // Stores the warning message
 	vector <bool> done;              // Registers true if a swap has been performed
 	vector <SwapTemp> swap_temp;     // The template for swapping
+	vector <string> sum_index;       // Sum indices cannot be swapped
 };
 
 struct DepConv {                   // Used to convert dependencies from index to value
@@ -545,6 +546,7 @@ struct Details {                   // Stores details about simulation/inference/
 	bool diagnostics_on;             // Determines if MCMC diagnostics printed
 	Optimise optimise;               // Determines how optimised (memory or performance)
 	Compress compress;               // Determines compress options for samples and parameter
+	PostSimParamType ps_type;        // Sets how parameters are generated under posterior simulation 
 };
 
 struct FilterCla {                 // Used to filter a classification
@@ -583,7 +585,7 @@ struct ObsModel {                  // Stores the observation model assocaited wi
 	DiagTestSens diag_test_sens;     // Determines compartments test sensitive to (for diagnostic test data)
 	double percent;                  // percent value when 'error' normal obs model used 
 	double sd;                       // sd value when 'error' normal obs model used 
-	double p;                        // p value when 'error' neg-binomial obs model used 
+	double p;                        // p value when 'error' neg-binomial obs model used                
 };
 
 struct LoadCol {                   // Used to store information about loading data columns
@@ -1278,7 +1280,7 @@ struct ParamTag {                  // Used to check tags on parameters specified
 struct Derive {                    // Stores derived parameters
 	string name;                     // The name of the derived quantity
 	string full_name;                // Full name including dependency   
-	EquationInfo eq_raw;             // Stores equation before substitutions       
+	EquationInfo eq_raw;             // Stores equation before substitutions   
 	bool time_dep;                   // Time dependency
 	vector <Dependency> dep;         // Dependency for derived quantity (excluding time)
 	vector <EquationInfo> eq;        // The equations for each quantity
@@ -1404,11 +1406,17 @@ struct TransProb {                 // Stores problematic transitions (rates too 
  unsigned int tr;
 };
 
+struct InterData {                          // Stores data from an intervention
+	vector < vector <double> > data; 
+};
+
 struct ParticleSpecies {           // Store the species state is a particle     
 	InitCondValue init_cond_val;     // The initial state
 	vector < vector <double> > trans_num; // Transition numbers (for population-based)
 	vector <Individual> individual;  // Individuals (for individual-based)
 	unsigned int nindividual;        // The number of individuals (used for trace plots)
+	vector <InterData> inter_data;   // Data from interventions
+	
 	vector < vector <double> > exp_num;// Expected number of transitions [trg][ti]
 	vector < vector <unsigned int> > cum_prob_dist;// Cumulative probability distribution [trg][b]
 	double dt_max_est;               // The estimated maximum timestep
@@ -2096,6 +2104,19 @@ struct IEstoreSpecies {                     // Used to store ie values
 	vector < vector <double> > ie_value;      // Stores matrix of hash values 
 };
 
-struct IEstore {                            // Used to store ie values 
+struct IEstore {                   // Used to store ie values 
 	vector <IEstoreSpecies> species;
+};
+
+struct Intervention {              // Stores an intervention
+	InterventionType type;           // The type of intervention
+	string name;                     // The name of the intervention
+	vector <double> times;           // The times of the intervention
+	double frac;                     // The fraction of individuals tested
+	double time_gap;                 // The time individual is culled after positive test
+	unsigned int cl;                 // The classification for the test
+	string Sp_str;                   // Gives the specigivity of the test
+	string diag_pos;                 // The string for a positive diagnostic test (for diagnostic test data)
+	string diag_neg;                 // The string for a negative diagnostic test (for diagnostic test data)
+	DiagTestSens diag_test_sens;     // Determines compartments test sensitive to (for diagnostic test data)
 };

@@ -42,7 +42,6 @@ using namespace std;
 #include "const.hh"
 #include "utils.hh"
 
-
 #ifdef WINDOWS
 #include "windows.h"
 #include "psapi.h"
@@ -1224,7 +1223,18 @@ SwapResult swap_template(string te, const vector <DepConv> &dep_conv)
 
 			string type = "";
 			if(in_text(te,i,"Σ")){  // Changes in a sum max
+				while(i < te.length() && te.substr(i,1) != "[" && te.substr(i,1) != "(" && te.substr(i,1) != "_") i++;
+				
+				if(i < te.length() && te.substr(i,1) == "_") i++;
+				
+				auto ist = i;
 				while(i < te.length() && te.substr(i,1) != "[" && te.substr(i,1) != "(") i++;
+				
+				if(i != ist){
+					auto spl = split(te.substr(ist,i-ist),',');
+					for(const auto &va : spl) res.sum_index.push_back(va);
+				}
+				
 				if(i < te.length() && te.substr(i,1) == "["){
 					type = "sum";
 					i++;
@@ -1311,12 +1321,22 @@ SwapResult swap_template(string te, const vector <DepConv> &dep_conv)
 
 
 /// Swaps index using a template
-string swap_index_temp(const vector <DepConv> &dep_conv, const SwapResult &temp)
+string swap_index_temp(const vector <DepConv> &dep_conv, const SwapResult &temp, string &warn)
 {
 	string te = "";
 	for(const auto &swt : temp.swap_temp){
 		te += swt.te;
-		if(swt.num != UNSET) te += dep_conv[swt.num].after;
+		if(swt.num != UNSET){
+			auto af = dep_conv[swt.num].after;	
+			auto i = af.length();  // Checks to see if value being swapped is within sum
+			if(i > 0 && af.substr(i-1,1) == "'"){
+				if(find_in(temp.sum_index,af) != UNSET){
+					warn = "Cannot replace index "+dep_conv[swt.num].before+" with "+af+" because this is used within sum.";
+				}
+			}
+		
+			te += af;
+		}
 	}
 	
 	return te;
@@ -4116,3 +4136,14 @@ string get_cpu_time(unsigned int tics)
 	return ss.str();
 }
 
+
+/// Gets the median value of a list
+double median(vector <double> vec)
+{
+	auto N = vec.size();
+	if(N == 0) return UNSET;
+	sort(vec.begin(),vec.end());
+	auto mid = N/2;
+	if(vec.size()%2 == 1) return vec[mid];
+	return (vec[mid]+vec[mid-1])/2;
+}

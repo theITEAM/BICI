@@ -83,7 +83,9 @@ class StateSpecies                         // Stores information about the state
 		vector <unsigned int> ind_sim_c;       // Under simulation stores compartment state
 	
 		vector <SimTrigEventDiv> trig_div;     // Stores future non-Markovian events
-
+	
+		vector <InterData> inter_data;         // Stores data from an intervention
+		
 		vector <double> timer;                 // General purpose timers
 		
 		vector <AlgWarn> alg_warn;             // Stores any algorithm warnings
@@ -175,6 +177,7 @@ class StateSpecies                         // Stores information about the state
 		Event get_event(EventType type, unsigned int i, unsigned int tr_gl, unsigned int move_c, unsigned int cl, unsigned int c_after, double t, const IndInfFrom &inf_from);
 	
 	private:
+		void implement_test_and_cull(unsigned int index, double tdiv);
 		void add_data_event(unsigned int i, double t, const vector <SimTrigEvent> &trig_vec, const vector < vector <double> > &popnum_t, const vector < vector <Poss> > &pop_ind);
 		bool allow_event(double t, const IndTransRef &itr) const;
 		void ie_sampler_init();

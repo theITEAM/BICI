@@ -371,7 +371,7 @@ vector <DeriveOutput> State::derive_calculate(bool store_state)
 	timer[DERIVE_PRECALC_TIMER] += clock();
 	
 	timer[DERIVE_TIMER] -= clock();
-	
+
 	for(const auto &der : model.derive){
 		DeriveOutput op;
 		vector < vector <double> > d_value;
@@ -1620,6 +1620,8 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 			
 			part_sp.individual = ssp.individual;
 
+			part_sp.inter_data = ssp.inter_data;
+
 			if(sp.type != DETERMINISTIC){
 				if(cum_diag && (model.mode == INF || model.mode == EXT)){
 					ssp.calc_trans_diag(part_sp,popnum_t);
@@ -2234,8 +2236,6 @@ void State::set_ie_from_samp(const IEstore &ie_store)
 				
 							if(num == UNSET) fl = true;
 							else ind.ie[e] = 0.5*var+log(num);
-							
-							//cout << ind.ie[e] << " "<< 0.5*var+log(num) << " replace\n";
 						}
 					}
 					

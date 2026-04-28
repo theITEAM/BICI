@@ -29,6 +29,39 @@ void Precalc::clear_timer()
 }
 
 
+/// Adds an equation onto the precalculated equation but only for param and spline
+void Precalc::add_eqn_simp(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref)
+{
+	// Removes any reference to parameter and spline 
+	for(auto &ca : calc){
+		for(auto &it : ca.item){
+			switch(it.type){
+			case PARAMVEC: 
+				it.type = REG_PRECALC; 
+				it.num = param_vec_ref[it.num];
+				break;
+				
+			case SPLINEREF: 
+				{
+					auto &spl = spline[it.num];
+					if(spl.constant == true){
+						it.type = CONSTSPLINEREF;
+					}
+					else{
+						it.type = REG_PRECALC_TIME; 
+						it.num = spline_ref[it.num];
+					}
+				}
+				break;
+			
+			default:
+				break;
+			}
+		}
+	}
+}
+
+
 /// Adds an equation onto the precalculated equation calculation
 bool Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref, SpecPrecalc &spec_precalc, PrecalcAddType add_type)
 {

@@ -12,11 +12,16 @@ TO DO GENTIC
 -- get spatial working
 
 TO DO
+
+
+
+- Save single file / with directory for inference / post sim results
+- Look at epi-phlyo paper andrea sent (in papers tp read -> new)
 - For calculating R0... I think running "trans-tree" should now work under simulation and posterior simulation (but not inference, but anyway you don't need this. To get this to work you need to run 'species' with 'trans-tree="on"' 
 
-- test-and-cull form of control suggetion from Laura
 
--- Jamie's suggestion of "sample=median"
+
+
 -- Get transmission tree with individual effects working (e.g. Jamie Data -> trans_tree
 
 -- Get posterior simulation from system of different size
@@ -140,6 +145,9 @@ auto k = 0u; while(k < sum_store.size() && z > sum_store[k]) k++;
 auto k = 0u; while(k < trig_event.size() && trig_event[k].tdiv != eve.tdiv) k++;
 
 DONE NEW
+-- Jamie's suggestion of "sample=median"
+- test-and-cull form of control suggetion from Laura
+- Simulate from different samples when multiple simulations
 -- Event times the same... throw error?
 -- get a way to have constant values for tensors in inferace and different for sim
 -- limited computational resources message

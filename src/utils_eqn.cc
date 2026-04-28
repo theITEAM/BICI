@@ -528,6 +528,7 @@ CommandLine get_command_tags(string trr, unsigned int line_num)
 	if(type == "add-ind-sim") com = ADD_IND_SIM;
 	if(type == "remove-ind-sim") com = REMOVE_IND_SIM;
 	if(type == "move-ind-sim") com = MOVE_IND_SIM;
+	if(type == "test-and-cull-sim") com = TEST_AND_CULL_SIM;
 	if(type == "add-pop-post-sim") com = ADD_POP_POST_SIM;
 	if(type == "remove-pop-post-sim") com = REMOVE_POP_POST_SIM;
 	if(type == "add-ind-post-sim") com = ADD_IND_POST_SIM;

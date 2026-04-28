@@ -250,6 +250,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 	model.create_species_simp();
 
 	Hash hash_eqn;
+
 	for(auto &der : model.derive){                       // Derived quantities
 		for(auto &eq : der.eq){
 			model.add_eq_ref(eq,hash_eqn);
@@ -1062,7 +1063,10 @@ void Input::global_comp_trans_init()
 							for(auto &dp : tr_gl.dist_param) dp.infection_trans = true;
 						}
 						
-						tr_gl.bp.te = swap_index_temp(dep_conv,bp_swap_temp);
+						string warn;
+						tr_gl.bp.te = swap_index_temp(dep_conv,bp_swap_temp,warn);
+						if(warn != "") emsg("Problem with transition");
+						
 						if(check_swap){
 							auto te_ch = tr.bp.te;
 							auto res = swap_index(te_ch,dep_conv); 
@@ -1071,7 +1075,10 @@ void Input::global_comp_trans_init()
 						}
 						
 						for(auto i = 0u; i < tr_gl.dist_param.size(); i++){
-							tr_gl.dist_param[i].te = swap_index_temp(dep_conv,dist_swap_temp[i]);
+							string warn;
+							tr_gl.dist_param[i].te = swap_index_temp(dep_conv,dist_swap_temp[i],warn);
+							if(warn != "") emsg("Problem with transition");
+							
 							if(check_swap){
 								auto te_ch = tr.dist_param[i].te;
 								auto res = swap_index(te_ch,dep_conv); 	
@@ -5171,7 +5178,7 @@ void Input::load_state_samples(unsigned int ch, string file, bool enc)
 		if(lin.length() > 2 && lin.substr(0,2) == "<<"){
 			if(lines.size() > 0){
 				read_state_sample(ch,lines,ind_key_ref);
-				if(model.mode == DATA_SIM) return;
+				//if(model.mode == DATA_SIM) return;
 			}
 			lines.clear();
 		}
@@ -5180,4 +5187,51 @@ void Input::load_state_samples(unsigned int ch, string file, bool enc)
 	}
 
 	if(lines.size() > 0) read_state_sample(ch,lines,ind_key_ref);
+}
+
+
+/// Gets times for observations
+vector <double> Input::get_times()
+{
+	auto dt = get_tag_value("dt"); 
+	
+	auto times = get_tag_value("times"); 
+	
+	if(dt == "" && times == "") alert_import("Either 'dt' or 'times' must be set");
+	if(dt != "" && times != "") alert_import("'dt' and 'times' cannot both be set");
+	
+	auto t_start = model.details.t_start;
+	auto t_end = model.details.t_end;
+	
+	vector <double> tims;
+	
+	if(dt != ""){
+		auto ddt = number(dt);
+		if(ddt == UNSET || ddt <= 0){
+			alert_import("In 'dt' the value '"+dt+"' must be a positive number");
+		}
+
+		for(auto t = t_start; t <= t_end; t += ddt){
+			tims.push_back(t);
+		}
+	}
+	else{
+		auto spl = split(times,',');
+		for(auto i = 0u; i < spl.size(); i++){
+			auto val = spl[i];
+			auto num = number(val);
+			if(num == UNSET){
+				alert_import("In 'times' the value '"+val+"' is not a number");
+			}
+			else{
+				if(num < t_start || num > t_end){
+					alert_import("In 'times' the value "+val+" is not between the start and end times");
+				}
+				
+				tims.push_back(num);
+			}
+		}
+	}
+	
+	return tims;
 }

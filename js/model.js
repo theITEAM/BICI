@@ -46,7 +46,7 @@ class Model
 		
 		this.inf_details = { t_start:"", t_end:"", timestep:"", abcsample:String(ABC_SAMPLE_DEFAULT), sample:String(MCMC_SAMPLE_DEFAULT), output_param :String(MCMC_OP_PARAM_DEFAULT), output_state:String(MCMC_OP_STATE_DEFAULT), accfrac:String(ABC_ACFRAC_DEFAULT), accfracsmc:String(ABCSMC_ACFRAC_DEFAULT), numgen:String(ABCSMC_GEN_DEFAULT), kernelsize:String(ABCSMC_KERNEL_DEFAULT), indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, nchain:String(MCMC_CHAIN_DEFAULT), algorithm:{value:ALG_DEFAULT}, run_local:{value:"Yes"}, run_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, sync_on:{value:"On"}, burnin_frac:BURNIN_FRAC_DEFAULT, anneal_type:{te:ANNEAL_DEFAULT}, anneal_rate:ANNEAL_RATE_DEFAULT, anneal_power:ANNEAL_POWER_DEFAULT, npart:String(PAS_PART_DEFAULT), gen_update:String(PAS_GEN_UPDATE_DEFAULT), cha_per_core:String(MCMC_CHAIN_PER_CORE_DEFAULT), part_per_core:String(PAS_PART_PER_CORE_DEFAULT), optimise:{value:"auto"}, compress:{value:"auto"} };
 		
-		this.ppc_details = {  ppc_t_start:"", ppc_t_end:"", t_start:"", t_end:"", algorithm:{value:"gillespie"}, number:PPC_NUM_DEFAULT, indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, run_local:{value:"Yes"}, run_inf_model:{value:"Yes"},srun_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, optimise:{value:"auto"}, compress:{value:"auto"}};    
+		this.ppc_details = {  ppc_t_start:"", ppc_t_end:"", t_start:"", t_end:"", algorithm:{value:"gillespie"}, number:PPC_NUM_DEFAULT, indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, run_local:{value:"Yes"}, run_inf_model:{value:"Yes"}, run_post:{value:"postsample"},srun_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, optimise:{value:"auto"}, compress:{value:"auto"}};    
 			
 		this.start = true;
 		this.filename = "";
@@ -85,9 +85,8 @@ class Model
 			}
 		}
 		else{
-			if(!(pag.name =="Simulation" && sub.name == "Initial Conditions") &&
+			if(!(pag.name =="Simulation" && sub.name == "Setup") &&
 				!(pag.name =="Simulation" && sub.name == "Generate Data") &&
-				!(pag.name =="Inference" && sub.name == "Initial Conditions") &&
 				!(pag.name =="Inference" && sub.name == "Data") &&
 				!(pag.name =="Post. Simulation" && sub.name == "Population Mod.") &&
 				!(pag.name =="Model" && sub.name == "Compartments")){

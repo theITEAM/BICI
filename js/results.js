@@ -1057,7 +1057,7 @@ function plot_variety(view)
 
 /// Initialise plot filters
 function initialise_plot_filters_setup(result,source)
-{
+{	
 	source.on = true;
 	source.plot_filter = {};
 	let rpf = source.plot_filter;
@@ -1096,10 +1096,24 @@ function initialise_plot_filters_setup(result,source)
 		
 		rpf.species[p] = { sel_class:copy(pos_class[0]), pos_class:pos_class, cla:cla_red, ncla:sp.ncla, name:sp.name, type:sp.type, trans_tree:sp.trans_tree, filter:[], cl_marg:sp.marg_plot.cl_marg};
 		
+		if(rpf.siminf == "sim"){ // Sets up selection for test and cull
+			let pos_test_and_cull=[];
+			for(let i = 0; i < sp.sim_source.length; i++){
+				let ss = sp.sim_source[i];
+				if(ss.type == "Test-and-cull"){
+					pos_test_and_cull.push({te:ss.name, i:i});
+				}
+			}
+			if(pos_test_and_cull.length > 0){
+				rpf.species[p].pos_test_and_cull = pos_test_and_cull;
+				rpf.species[p].sel_test_and_cull = copy(pos_test_and_cull[0]);
+			}
+		}
+		
 		switch(rpf.siminf){
 		case "sim": rpf.species[p].gen_source=[]; break;
 		case "inf": rpf.species[p].ppc_source=[]; break;
-		}
+		}	
 	}
 }
 
@@ -1369,6 +1383,16 @@ function initialise_plot_filters(result,source)
 		}
 	}
 	*/
+	
+	// Possibilities for simulation 
+	if(rpf.siminf == "sim"){
+		let pos_sim = [];
+		for(let i = 0; i < result.sample.length; i++){
+			pos_sim.push({te:"Sim. "+result.sample[i].num, i:i});
+		}
+		rpf.sel_sim = copy(pos_sim[0]);
+		rpf.pos_sim = pos_sim;
+	}
 	
 	// Possibilities for sample
 	let pos_sample = [];

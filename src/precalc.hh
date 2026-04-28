@@ -27,6 +27,7 @@ class Precalc                             // Stores information about the model
 		const vector <unsigned int>& get_list_time(unsigned int cit, const SpecPrecalc &spec) const;
 		void calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store) const;
 		bool add_eqn(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref, SpecPrecalc &spec_precalc, PrecalcAddType add_type=PRECALC_ALL);
+		void add_eqn_simp(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref);
 		unsigned int add_param(unsigned int th);
 		void calcu_add(const PreCalc &ca);
 		unsigned int add_spline(unsigned int th, SpecPrecalc &spec_precalc);

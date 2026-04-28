@@ -5,21 +5,28 @@
 function right_menu_buts(lay)
 {	
 	let type = lay.op.type;
-
-	if(type != "Diagnostics" && inter.graph.init != true && inter.graph.init != "no data") return;
-
-	let dygap = 0;//0.2;
+	
+	let dygap = 0;
 	
 	let rpf; if(type != "GraphView") rpf = get_inf_res().plot_filter;
 
 	let y = 0.1;
+
+	/*
+	if(type == "Generate Data"){
+		y = add_filter("Simulation",y,rpf.sel_sim,rpf.pos_sim,lay);
+		return;
+	}
+	*/
+	
+	if(type != "Diagnostics" && inter.graph.init != true && inter.graph.init != "no data") return;
 
 	if(inter.graph.init == "no data"){
 		y = stand_filt(y,rpf,lay);
 		return;
 	}
 
-	switch(type){
+	switch(type){		
 	case "Populations":
 		{
 			if(rpf.pos_view.length > 1){

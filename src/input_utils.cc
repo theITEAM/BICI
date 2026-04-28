@@ -1970,7 +1970,10 @@ bool Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 				}
 				
 				auto eqn = eqn_raw;
-				eqn.te = swap_index_temp(dep_conv,swap_temp);
+				
+				string warn;
+				eqn.te = swap_index_temp(dep_conv,swap_temp,warn);
+				if(warn != "") alert_import("Problem with '"+par.name+"': "+warn);
 				
 				if(check_swap){
 					auto te_st = eqn.te;

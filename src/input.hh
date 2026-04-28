@@ -157,6 +157,7 @@ class Input                                // Stores information about the model
 		void inf_param_command();
 		void inf_state_command();
 		void sim_state_command();
+		void test_and_cull_command();
 		void warning_command();
 		void dummy_file_command();
 		
@@ -241,6 +242,7 @@ class Input                                // Stores information about the model
 		void setup_der_func_eqn();
 		void set_param_state_output();
 		void load_state_samples(unsigned int ch, string file, bool enc);
+		vector <double> get_times();
 		
 		// In 'input_utils.cc'
 		

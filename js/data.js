@@ -36,6 +36,7 @@ function start_data_source(type,spec,info)
 	case "Compartment": name = "Compartment data"; break;
 	case "Transition": name = "Transition data"; break;
 	case "Diag. Test": name = "Diagnostic test data"; break;
+	case "Test-and-cull": name = "Test and cull"; break;
 	case "Population": name = "Pop. data"; break;
 	case "Pop. Trans.": name = "Pop. trans. data"; break;
 	case "Genetic": name = "Genetic data"; break;
@@ -63,7 +64,7 @@ function start_data_source(type,spec,info)
 			let source;
 			switch(siminf){
 			case "sim": source = sp.sim_source; break;
-			case "inf": case "infic": source = sp.inf_source; break;
+			case "inf": source = sp.inf_source; break;
 			case "ppc": source = sp.ppc_source; break;
 			case "gen": source = sp.gen_source; break;
 			}
@@ -79,8 +80,12 @@ function start_data_source(type,spec,info)
 		}
 	}
 	
+	if(type == 'Test-and-cull' && spec.time_gap == undefined){
+		spec.time_gap = "";
+	}
+	
 	edit_source = { name:name, type:type, table_loaded:false, load_datatable:true, table:{filename:"",heading:[], col_used:[], ele:[], ncol:0, nrow:0, edit:false}, spec:spec, info:info};
-
+	
 	set_loadcol();
 }
 
@@ -109,7 +114,7 @@ function add_init_cont_buts(lay,siminf)
 	
 	let title, te;
 	switch(siminf){
-	case "sim": title = "Initial conditions"; te = initcond_text; break;
+	case "sim": title = "Simulation setup"; te = initcond_text; break;
 	//case "inf": title = "Data"; te = data_text; break;
 	//case "ppc": title = "Population modification"; te = modification_text; break;
 	//case "gen": title = "Simulated data"; te = data_text; break;
@@ -414,8 +419,7 @@ function add_data_buts(lay,siminf)
 	
 	let title, te;
 	switch(siminf){
-	case "sim": title = "Initial conditions"; te = initcond_text; break;
-	case "infic": title = "Initial conditions"; te = initcond_text; break;
+	case "sim": title = "Simulation setup"; te = initcond_text; break;
 	case "inf": title = "Data"; te = data_text; break;
 	case "ppc": title = "Population modification"; te = modification_text; break;
 	case "gen": title = "Simulated data"; te = data_text; break;
@@ -440,7 +444,7 @@ function add_data_buts(lay,siminf)
 	let source;
 	switch(siminf){
 	case "sim": source = sp.sim_source; break;
-	case "inf": case "infic": source = sp.inf_source; break;
+	case "inf": source = sp.inf_source; break;
 	case "ppc": source = sp.ppc_source; break;
 	case "gen": source = sp.gen_source; break;
 	}
@@ -467,8 +471,12 @@ function add_data_buts(lay,siminf)
 			switch(so.type){
 			case "Add Ind.": case "Remove Ind.": case "Move Ind.":
 			case "Add Pop.": case "Remove Pop.": 
-			case "Ind. Group": //case "Parameter Mult.":
+			case "Ind. Group":
 				view_ob.ac = undefined;
+				break;
+			
+			case "Test-and-cull":
+				edit_ob.ac = undefined;
 				break;
 			}
 			
@@ -490,22 +498,39 @@ function add_data_buts(lay,siminf)
 	let info = {siminf:siminf};
 	
 	let w;
-
-	if(inter.data_type == undefined) inter.data_type = {te:data_types[0]}; // Default data type
-	let pos = []; for(let i = 0; i < data_types.length; i++) pos.push({te:data_types[i]});
-
+	
 	let data_ty;
 
 	switch(siminf){
-	case "sim": case "ppc": case "infic":
-		data_ty = "Init. Cond."; 
+	case "sim": case "ppc": 
+		{
+			if(inter.data_type_sim == undefined) inter.data_type_sim = {te:data_types_sim[0]}; // Default data type
+			let pos = []; for(let i = 0; i < data_types_sim.length; i++) pos.push({te:data_types_sim[i]});		
+
+			data_ty = inter.data_type_sim.te;
+			lay.add_dropdown(x,y-0.15,6.4,10,inter.data_type_sim,pos);
+			x += 7.4;
+		}
 		break;
 
 	case "inf": case "gen":
-		data_ty = inter.data_type.te;
-		lay.add_dropdown(x,y-0.15,6,10,inter.data_type,pos);
-		x += 7;
+		{
+			if(inter.data_type == undefined) inter.data_type = {te:data_types[0]}; // Default data type
+			let pos = []; for(let i = 0; i < data_types.length; i++) pos.push({te:data_types[i]});
+		
+			data_ty = inter.data_type.te;
+			lay.add_dropdown(x,y-0.15,6.4,10,inter.data_type,pos);
+			x += 7.4;
+		}
 		break;
+	}
+	
+	if(siminf == "gen"){
+		let rpf = model.sim_res.plot_filter;;
+		if(rpf.pos_sim.length > 1){
+			lay.add_dropdown(x,y-0.15,6,10,rpf.sel_sim,rpf.pos_sim);
+			x += 7;
+		}
 	}
 	
 	if(siminf == "gen"){
@@ -521,6 +546,15 @@ function add_data_buts(lay,siminf)
 	//data_ty = "Individual"; prr("Enfore data type");
 
 	switch(data_ty){
+	case "Dynamic Int.":
+		{
+			let te = test_and_cull_text, ti = "Implement test-and-cull";
+						
+			w = model.add_object_button(lay,"Test-and-cull",x,y,"TestAndCull",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
+			x += w+gap;
+		}
+		break;
+	
 	case "Init. Cond.":
 		{
 			active = true; 
@@ -596,6 +630,18 @@ function add_data_buts(lay,siminf)
 				if(siminf == "gen"){ te = sim_diag_test_data_text; ti = "Generate individual diagnostic test data";}			
 				w = model.add_object_button(lay,"Diag. Test",x,y,"DiagTestData",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
 				x += w+gap;
+			}
+			
+			{
+				if(siminf == "gen"){
+					let rpfsp = model.sim_res.plot_filter.species[p];
+	
+					if(rpfsp.pos_test_and_cull != undefined){
+						let te = test_and_cull_data_text, ti = "Test-and cull diagnostic test data";
+						w = model.add_object_button(lay,"Test-and-cull",x,y,"TestAndCullData",{ back:WHITE, active:true, info:info, title:ti, te:te, siminf:siminf}); 
+						x += w+gap;
+					}
+				}
 			}
 			
 			{
@@ -1268,7 +1314,7 @@ function data_source(type,edit_source,info)
 		
 	default: error("Option not recognised 21b"+info.siminf); break;
 	}
-	
+
 	if(info.imp == true) return;
 	
 	if(type == "Edit"){
@@ -1404,7 +1450,7 @@ function add_source_description(so)
 		}
 		break;
 		
-	case "Diag. Test":
+	case "Diag. Test": case "Test-and-cull":
 		{
 			let cl_se = find(sp.cla,"name",spec.cl_drop.te);
 			
@@ -1421,7 +1467,8 @@ function add_source_description(so)
 					
 			desc = spec.cl_drop.te+" "+sen+" Sp:"+spec.Sp_eqn.te;
 			
-			num = so.table.nrow;
+			if(so.type == "Test-and-cull");// desc += " (gap="+spec.time_gap+")";
+			else num = so.table.nrow;
 		}
 		break;
 		
@@ -1512,7 +1559,6 @@ function add_source_description(so)
 	case "APed":
 		num = so.table.nrow;
 		break;
-	
 	
 	default: error(so.type+" DESC NOT ADDED"); break;
 	}

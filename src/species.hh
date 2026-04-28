@@ -82,6 +82,8 @@ class Species   	                         // Stores details of a species
 			
 		vector <Enter> enter;                  // Stores probability distribution for entering
 		
+		vector <Intervention> intervention;    // Stores any interventions
+		
 		vector <DataSource> source;            // Sources of data
 		InitCond init_cond;                    // Stores infomation about the initial conditions
 		

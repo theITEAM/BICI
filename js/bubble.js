@@ -790,6 +790,8 @@ function add_bubble_buts(lay)
 			case "SourceData": trans_data_bubble(cont,"add","SourceVar"); break;
 			case "SinkData": trans_data_bubble(cont,"add","SinkVar"); break;
 			case "DiagTestData": diagtest_data_bubble(cont,"add"); break;
+			case "TestAndCullData": select_test_and_cull_bubble(cont); break;
+			case "TestAndCull": diagtest_data_bubble(cont,"add","cull"); break;
 			case "PopulationData": population_data_bubble(cont,"add"); break;
 			case "PopTransData": poptrans_data_bubble(cont,"add"); break;
 			case "SeqData": sequence_data_bubble(cont,"add"); break;
@@ -818,6 +820,7 @@ function add_bubble_buts(lay)
 			case "Compartment": comp_data_bubble(cont,"view"); break;
 			case "Transition": trans_data_bubble(cont,"view","TransVar"); break;
 			case "Diag. Test": diagtest_data_bubble(cont,"view"); break;
+			case "Test-and-cull": diagtest_data_bubble(cont,"view","cull"); break;
 			case "Ind. Eff.": ind_eff_data_bubble(cont,"view"); break;
 			case "Ind. Group": ind_group_data_bubble(cont,"view"); break;
 			case "Genetic": sequence_data_bubble(cont,"view"); break;
@@ -2358,7 +2361,7 @@ function select_bubble_data_element(p,i,r,c)
 /// Selects the simulation data table element
 function select_bubble_sim_data_element(p,i,r,c)
 {
-	change_page({pa:"Simulation",su:"Initial Conditions",susu:p});
+	change_page({pa:"Simulation",su:"Setup",susu:p});
 	
 	let lay_name = "TableContent";
 	let lay = get_lay(lay_name);

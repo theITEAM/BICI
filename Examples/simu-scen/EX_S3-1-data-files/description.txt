@@ -2,7 +2,7 @@
 
 ## Objective
 - Introduce adding and/or removing populations after the initial conditions are set.
-- Data source in the 'Simulation→Population' page show how the additions and removals are defined.
+- Data source in the 'Simulation→Setup' page show how the additions and removals are defined.
 
 ## Model
 - A single population-based species 'People' is created.

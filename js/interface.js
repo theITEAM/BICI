@@ -171,7 +171,7 @@ function key_press(e)
 	let code = e.keyCode;	
 	//prr(code+"code");
 
-	if(code == 36 && debug){ // Home
+	if(code == 36 && debug && true){ // Home
 		prr("Turn off shrink");
 		let fac = prompt("Factor to reduce?");
 		start_worker("Factor reduce",{p:model.get_p(), cl:model.get_cl(), fac:fac});
@@ -1489,7 +1489,7 @@ function view_warning(i)
 	case "Init_pop": 
 		switch(inter.page[warn.pa].name){
 		case "Simulation":
-			change_page({pa:"Simulation", su:"Initial Conditions", susu:warn.p}); 
+			change_page({pa:"Simulation", su:"Setup", susu:warn.p}); 
 			break;
 		case "Inference": 
 			change_page({pa:"Inference", su:"Data", susu:warn.p});
@@ -1563,7 +1563,7 @@ function view_warning(i)
 		break;
 		
 	case "SimPopulationProb":
-		change_page({pa:"Simulation", su:"Initial Conditions", susu:warn.p});
+		change_page({pa:"Simulation", su:"Setup", susu:warn.p});
 		break;
 
 	case "SourceProb": 
@@ -1641,7 +1641,7 @@ function view_warning(i)
 		break;
 		
 	case "DataProblem": 
-		if(warn.siminf == "sim") change_page({pa:"Simulation", su:"Initial Conditions", susu:warn.p});
+		if(warn.siminf == "sim") change_page({pa:"Simulation", su:"Setup", susu:warn.p});
 		else change_page({pa:"Inference", su:"Data", susu:warn.p});
 		break;
 	

@@ -218,6 +218,10 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 				}
 			}
 				
+			if(model.mode != SIM){ 
+				if(cname == TEST_AND_CULL_SIM) process = false;
+			}
+				
 			if(model.mode == PPC){ // If PPC then do not load any data
 				switch(cname){
 				case INIT_POP_SIM: 
@@ -1035,6 +1039,8 @@ void Input::process_command(const CommandLine &cline, unsigned int loop, bool us
 		}
 		break;
 		
+	case TEST_AND_CULL_SIM: test_and_cull_command(); break;
+	
 	case INIT_POP: 
 	case ADD_POP: case REMOVE_POP:
 	case ADD_IND: case REMOVE_IND: case MOVE_IND: 

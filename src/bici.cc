@@ -9,7 +9,7 @@
 
 // ssh gaia.bioss.ac.uk  
 
-//valgrind --tool=massif --exit-on-first-error=yes --error-exitcode=1 -s ./bici-para Execute/init.bici inf
+//valgrind --tool=massif --exit-on-first-error=yes --error-exitcode=1 -s ./bici-para Execute/init.bici sim
 
 // tar -xzf foo.tgz
 
@@ -64,6 +64,7 @@
 // -co=0 / -core=0                            Runs the zeroth core
 // -samp=0                                    Sets how sampling is done (for diagnostic purposes)
 // -seed=100                                  This overides seed set in bici file 
+// -sim=1                                     Selects a particular simulation when creating data
 
 // When running in parallel then load mpi using: module load mpi/openmpi-x86_64
 
@@ -134,7 +135,6 @@ int main(int argc, char** argv)
 	
 	print_diag("start bici");
 	
-	
 	print_diag("start sum");
 	
 	init_log_sum();
@@ -150,6 +150,7 @@ int main(int argc, char** argv)
 	
 	auto core_spec = UNSET;
 	auto seed = UNSET;
+	auto sim_sel = 1u;
 	auto mode = MODE_UNSET;
 	
 	ExtFactor ext_factor;
@@ -203,6 +204,10 @@ int main(int argc, char** argv)
 		switch(tag.type){
 		case CORE: core_spec = tag.value; break;  
 		case SEED: seed = tag.value; break;  
+		case SIM_SEL: 
+			if(model.mode != DATA_SIM) alert_input("The 'sim' tag can only be used with 'data-sim'.");
+			sim_sel = tag.value; 
+			break;  
 		case OP: file = tag.te; break;
 		case SAMP_TYPE:
 			switch(tag.value){
@@ -315,7 +320,7 @@ int main(int argc, char** argv)
 		{
 			DataSim data_sim(model,output);
 			for(const auto &va : data_sim_lines){
-				data_sim.run(va);
+				data_sim.run(va,sim_sel);
 			}
 		}
 		break;
@@ -430,6 +435,12 @@ vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_
 						tag.te = spl[1];
 					}
 				
+					if(spl[0] == "sim" || spl[0] == "simulation"){
+						tag.type = SIM_SEL;
+						tag.value = number(spl[1]);
+					}
+					
+					
 					if(spl[0] == "samp"){
 						tag.type = SAMP_TYPE;
 						tag.value = number(spl[1]);

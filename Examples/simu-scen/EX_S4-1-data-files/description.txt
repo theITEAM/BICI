@@ -1,0 +1,18 @@
+# Model S4.1: Test-and-cull
+
+## Objective
+- Introduce the test-and-cull protocol used to reduce disease prevalence. 
+- This is a method in which the disease status of individuals are periodically checked with a disease diagnostic test, and positive individuals are removed from the population.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS' which stands for 'disease status'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A recovery rate $γ$ determines the rate at which individuals recover.
+- The disease diagnostic test has a sensitivity $Se=0.5$ and specificity $Sp=0.99$.
+- Checks are periodically taken every 10 time units.
+- Individuals are removed 1 time unit after a positive test.
+
+## Population
+- This consists of 100 initially susceptible individuals and one infected.

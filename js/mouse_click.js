@@ -59,7 +59,7 @@ function button_action(bu,action_type)
 
 		switch(na){
 		case "Bubble": case "BubbleBack": case "BubbleScrollable": 
-		case"Dropdown": case "DropdownOptions":
+		case "Dropdown": case "DropdownOptions":
 		case "Expand": case "Equation": 
 		case "EquationBackground": case "EquationAddQuantity":
 		case "Help": case "HelpBackground": case "Yscroll": case "Xscroll":
@@ -895,6 +895,16 @@ function button_action(bu,action_type)
 		start_worker("Data Source",{type:"Add", edit_source:edit_source});
 		break;
 		
+	case "AddDynInt":
+		if(bubble_check_error() == false){
+			scroll_to_top();
+			copy_back_to_source();
+			close_bubble();
+			inter.edit_source = false;
+			start_worker("Data Source",{type:"Add", edit_source:edit_source});
+		}
+		break;
+		
 	case "InitPopAdd":
 		start_worker("Init pop convert",edit_source);
 		//inter.edit_source = false;
@@ -1271,6 +1281,10 @@ function button_action(bu,action_type)
 	case "SourceData": trans_data(bu,"Source"); break;	
 	case "SinkData": trans_data(bu,"Sink"); break;	
 	case "DiagTestData": diagtest_data(bu); break;
+	case "TestAndCullData": select_bubble_over(); break;
+	case "AddTestAndCullData": add_test_and_cull(); break;
+	
+	case "TestAndCull": diagtest_data(bu,"cull"); break;
 	case "SeqData": sequence_data(bu); break;
 	case "IndEffData": ind_eff_data(bu); break;
 	case "IndGroupData": ind_group_data(bu); break;
@@ -2635,6 +2649,14 @@ function button_action(bu,action_type)
 	
 	case "CloseWarn":
 		model.warn_view = false;
+		break;
+	
+	case "PosteriorMean":
+		inter.help = {title: "Replace parameter values", te: "Are you sure you want to replace parameter values with posterior mean?", ok: "PosteriorMeanConfirm"};
+		break;
+	
+	case "PosteriorMeanConfirm":
+		start_worker("PosteriorMean");
 		break;
 		
 	default:

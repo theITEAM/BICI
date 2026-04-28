@@ -718,4 +718,98 @@ function par_in_view(type,th)
 		}
 	}
 }
+
+/// Determines if a value needs to be set for a parameter
+function sim_value_required(par)
+{
+	if(par.variety != "const" && par.variety != "reparam" &&  par.variety != "define"){
+		if(!find_in(sim_param_not_needed,par.type)) return true;
+	}
 	
+	return false;
+}
+
+
+/// Replaces parameter values with posterior mean
+function sim_param_post_mean()
+{
+	let param = model.param;
+	let inf_param = inf_result.param;
+	let details = inf_result.details;
+	let burnin = model.inf_res.burnin
+
+	let ps = inf_result.par_sample;
+	
+	let not_found = [];
+	for(let th = 0; th < param.length; th++){
+		let par = param[th];
+	
+		if(sim_value_required(par)){
+			let th2 = find(inf_param,"name",par.name);
+		
+			let fl = false;
+			
+			if(th2 == undefined) fl = true;
+			else{
+				let inf_par = inf_param[th2];
+				if(!equal_vec(par.dep,inf_par.dep)) fl = true;
+				else{
+					if(par.dep.length == 0){
+						let av = 0, nav = 0;
+						for(let i = 0; i < ps.length; i++){
+							if(ps[i].num >= burnin){
+								av += Number(ps[i].param[th2]);
+								nav++;
+							}
+						}							
+						if(nav == 0) fl = true;
+						else par.value = precision(av/nav,5);
+					}
+					else{
+						for(let d = 0; d < par.dep.length; d++){
+							if(!equal_vec(par.list[d],inf_par.list[d])) fl = true;
+						}
+
+						if(fl == false){
+							let co_list = generate_co_list(par.list);
+							
+							par.value = par_find_template(par.list);
+							for(let k = 0; k < co_list.length; k++){
+								let ind = co_list[k].index;
+								
+								let av = 0, nav = 0;
+								for(let i = 0; i < ps.length; i++){
+									if(ps[i].num >= burnin){
+										let val = Number(get_element(ps[i].param[th2],ind));
+										av += val;
+										nav++;
+									}
+								}
+							
+								if(nav == 0) fl = true;
+								else set_element(par.value,ind,precision(av/nav,5));
+							}
+						}							
+					
+						par.value_desc = get_value_desc(par);
+						par.set = true;
+					}
+				}				
+			}
+			
+			if(fl) not_found.push(par.full_name);
+		}
+	}
+	
+	let st;
+	if(not_found.length > 0){
+		st = "Parameters not set: ";
+		for(let i = 0; i < not_found.length; i++){
+			if(i != 0) st += ", ";
+			st += not_found[i]; 
+		}			
+	}
+	
+	post({ param:strip_heavy(model.param), comment:st});
+}
+

@@ -351,6 +351,11 @@ void Mpi::pack(const Particle &pa)
 			pack_item(ind.init_c_set);
 		}
 
+		pack_num(sp_val.inter_data.size());
+		for(auto i = 0u; i < sp_val.inter_data.size(); i++){
+			pack_item(sp_val.inter_data[i].data);
+		}
+		
 		pack_item(sp_val.exp_num);
 		pack_item(sp_val.cum_prob_dist);
 		
@@ -504,6 +509,13 @@ void Mpi::unpack(Particle &pa)
 			unpack_item(ind.init_c_set);
 			
 			sp_val.individual.push_back(ind);
+		}
+		
+		auto NID = unpack_num(); 
+		for(auto i = 0u; i < NID; i++){
+			InterData id;
+			unpack_item(id.data);
+			sp_val.inter_data.push_back(id);
 		}
 		
 		unpack_item(sp_val.exp_num);

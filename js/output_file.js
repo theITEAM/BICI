@@ -1586,6 +1586,13 @@ function get_ppc_command(save_type)
 			
 	if(details.run_inf_model.value == "No") te += ' param-only="true"';
 	
+	switch(details.run_post.value){
+	case "postsample": break;
+	case "postmean": te += ' param-sample="mean"'; break;
+	case "postmedian": te += ' param-sample="median"'; break;
+	default: error("Problem with option"); break;
+	}
+	
 	let cbl = details.check_box_list;
 
 	if(cbl){
@@ -1858,6 +1865,7 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 		case "remove-ind-inf": com = "remove-ind-sim"; break;
 		case "move-ind-inf": com = "move-ind-sim"; break;
 		case "init-pop-inf": com = "init-pop-sim"; break;
+		case "test-and-cull": com = "test-and-cull-sim"; break;
 		}
 	}
 	
@@ -1879,21 +1887,21 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 	
 	switch(so.type){                                // Adds information dependent on data source
 	case "Init. Pop.":
-		if(so.spec.radio2.value == "Focal"){
-			te +=  'focal="'+so.spec.focal.te+'" ';
+		if(spec.radio2.value == "Focal"){
+			te +=  'focal="'+spec.focal.te+'" ';
 		}
 		break;
 	
 	case "Move Ind.":
 		{
-			let cl_name = so.spec.cl_drop.te;
+			let cl_name = spec.cl_drop.te;
 			te += 'class="'+cl_name+'" ';
 		}
 		break;
 		
 	case "Compartment":
 		{
-			let cl_name = so.spec.cl_drop.te;
+			let cl_name = spec.cl_drop.te;
 			te += 'class="'+cl_name+'" ';
 			file += '-'+cl_name.replace(/ /g,"-");
 		}
@@ -1965,14 +1973,14 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 		}
 		break;
 
-	case "Diag. Test":
+	case "Diag. Test": case "Test-and-cull":
 		{
 			let err_fl;
 			
 			te += 'comp="';
 			let flag = false;
 			
-			let cb = so.spec.check_box;
+			let cb = spec.check_box;
 			
 			let pcl = get_p_cl_from_claname(cb.name);
 			let claa = model.species[pcl.p].cla[pcl.cl];
@@ -1987,14 +1995,29 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 			}
 			te += '" ';
 			
-			let Sp = esc(so.spec.Sp_eqn.te); if(Sp == "") err_fl = "Sp";
+			let Sp = esc(spec.Sp_eqn.te); if(Sp == "") err_fl = "Sp";
 			te += 'Sp="'+Sp+'" ';
 			
-			let pos = esc(so.spec.pos_result); if(pos == "") err_fl = "positive value";
+			let pos = esc(spec.pos_result); if(pos == "") err_fl = "positive value";
 			te += 'pos="'+pos+'" ';
 			
-			let neg = esc(so.spec.neg_result); if(neg == "") err_fl = "negative value";
+			let neg = esc(spec.neg_result); if(neg == "") err_fl = "negative value";
 			te += 'neg="'+neg+'" ';
+			
+			if(so.type == "Test-and-cull"){
+				te += 'time-gap="'+spec.time_gap+'" ';
+				
+				let fr = so.frac_obs;
+				if(Number(fr) != 1){
+					te += 'frac='+fr+' ';
+				}
+				
+				switch(so.time_radio.value){
+				case "Periodic": te += 'dt='+so.time_gen+' '; break;
+				case "Specified": te += 'times="'+so.time_gen+'" '; break;
+				default: error("time_radio val"); break;
+				}				
+			}
 			
 			if(err_fl != undefined){
 				add_warning({mess:"Problem with diagnostic test data", mess2:"The value for '"+eff_fl+"' is not set", warn_type:"SourceProb", p:p, ind:index});
@@ -2004,7 +2027,7 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 		
 	case "Ind. Eff.":
 		{
-			te += 'ie="'+so.spec.drop.te+'" ';
+			te += 'ie="'+spec.drop.te+'" ';
 		}
 		break;
 		
@@ -2025,7 +2048,7 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 		break;
 		
 	case "Genetic":
-		switch(so.spec.type_radio.value){
+		switch(spec.type_radio.value){
 		case "matrix": 
 			te += 'type="matrix" '; 
 			break;
@@ -2042,12 +2065,14 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 	default: break;	
 	}
 
-	file = get_unique_file(file,file_list,'.csv');
-	
-	output_table_file(file,tab,file_list);
-	if(one_file) file = get_one_file(file_list);
-	
-	te += 'file="'+file+'"'+endl;
+	if(so.type != "Test-and-cull"){
+		file = get_unique_file(file,file_list,'.csv');
+		
+		output_table_file(file,tab,file_list);
+		if(one_file) file = get_one_file(file_list);
+		
+		te += 'file="'+file+'"'+endl;
+	}
 	
 	return te;
 }

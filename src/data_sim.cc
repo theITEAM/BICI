@@ -64,7 +64,7 @@ DataSim::DataSim(Model &model, Output &output, bool sup_) : model(model), output
 
 
 /// Performs a simulation of a data source
-void DataSim::run(string data_sim_line)
+void DataSim::run(string data_sim_line, unsigned int sim_sel)
 {
 
 	data_sim_line_store = data_sim_line;
@@ -91,8 +91,13 @@ void DataSim::run(string data_sim_line)
 	}
 		
 	if(model.sample.size() == 0) error("No simulated samples exist (run BICI using 'sim')");
-		
-	const auto &samp = model.sample[0];	
+	
+	if(sim_sel == 0 || sim_sel > model.sample.size()){
+		if(model.sample.size() == 1) error("The 'sim' tag must be set to 1 (or omitted)");
+		else error("The 'sim' tag must be set between 1 and "+tstr(model.sample.size()));
+	}
+
+	const auto &samp = model.sample[sim_sel-1];	
 	auto param_val = model.post_param(samp);	
 	
 	state.load_samp(param_val,samp);

@@ -12,7 +12,7 @@ class DataSim                              // Simulates data from state
 {
 	public:
 		DataSim(Model &model, Output &output, bool sup_=false);
-		void run(string data_sim_line);
+		void run(string data_sim_line, unsigned int sim_sel);
 		void del(string data_sim_line);
 		void show() const;
 		void clear(string data_sim_line);

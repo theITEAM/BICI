@@ -852,6 +852,8 @@ function read_state_sample(te,chain,result,warning,ind_key)
 	
 	let timepoint = result.timepoint;
 	
+	let test_cull_name;
+	
 	let p;
 	for(let i = 0; i < lines.length; i++){ // SLOW
 		let li = lines[i];
@@ -863,8 +865,18 @@ function read_state_sample(te,chain,result,warning,ind_key)
 				if(li.substr(li.length-1,1) != ">") alert_sample(warn,100);
 				li = li.substr(1,li.length-2);
 			
-				let spl = li.split(" ");
-			
+				//let spl = li.split(" ");
+				let j = 0; while(j < li.length && li.substr(j,1) != " ") j++;
+				
+				let spl=[];
+				if(j == li.length){
+					spl.push(li);
+				}
+				else{
+					spl.push(li.substr(0,j));
+					spl.push(li.substr(j+1));
+				}
+				
 				switch(spl[0]){
 				case "<STATE":
 					{
@@ -912,7 +924,7 @@ function read_state_sample(te,chain,result,warning,ind_key)
 							break;
 						
 						case "Individual": 
-							sample.species[p] = {type:"Individual", individual:[], dpop_list:[]};
+							sample.species[p] = {type:"Individual", individual:[], dpop_list:[], inter_data:[]};
 							break;
 							
 						default: error("PROBLEM"); break;
@@ -959,6 +971,14 @@ function read_state_sample(te,chain,result,warning,ind_key)
 					
 				case "TRANSTREE":
 					mode = "phylo";
+					break;
+				
+				case "TEST-AND-CULL":
+					{
+						mode = "test-and-cull";
+						if(spl.length != 2) alert_sample(warn,2);
+						test_cull_name = remove_quote(spl[1]);
+					}
 					break;
 					
 				default: alert_sample(warn,12); return;
@@ -1260,13 +1280,38 @@ function read_state_sample(te,chain,result,warning,ind_key)
 						}
 					}
 					break;
+				
+				case "test-and-cull":
+					{
+						let sp = result.species[p];
+						let ssp = sample.species[p];
+		
+						let head = lines[i].split(",");
+						if(head.length != 3) alert_sample(warn,334);
+						if(head[0] != "ID") alert_sample(warn,335);
+						if(head[1] != "t") alert_sample(warn,335);
+						if(head[2] != "Result") alert_sample(warn,335);
+				
+						i++;
+						let ele = [];
+						while(i < lines.length && lines[i].trim() != ""){
+							let row = lines[i].split(",");
+							row[0] = ind_key[Number(row[0].trim())];
+							
+							if(row.length != 3) alert_sample(warn,336);
+							ele.push(row);
+							i++;
+						}							
+						ssp.inter_data.push({type:"test-and-cull", name:test_cull_name, heading:head, ele:ele});
+					}			
+					break;
 					
 				default: alert_sample(warn,40); return;
 				}
 			}
 		}
 	}
-	
+
 	generate_trans_tree(get_inf_from,result,sample,ind_key);
 	
 	generate_marg_plot(result,sample);

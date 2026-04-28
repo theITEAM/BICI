@@ -200,6 +200,10 @@ function initialise_section()
 		ex_mod.push({te:"S3.1: Add / remove individuals from PBM", mod:"CE3.1", link:true, mod_type:"POP"});
 		ex_mod.push({te:"S3.2: Add / move / remove individuals from IBM",link:true, mod_type:"IBM"});
 	
+		ex_mod.push({te:"4) Dynamic interventions",help:"Different types of dynamic intervention into the system behaviour are considered (usually with a view to reducing the effect of infectious diseases)."+mod_mess});
+	
+		ex_mod.push({te:"S4.1: Test-and-cull", mod:"SE1.3", link:true, mod_type:"IBM"});
+		
 		let sec = { name:"simu-scen", desc:"Simulation scenarios", pic:"sim", shade:true, ex_mod:ex_mod, help:sim_scen_text+mod_mess};
 		
 		inter.section.push(sec);

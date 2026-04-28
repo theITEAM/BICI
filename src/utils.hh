@@ -93,7 +93,7 @@ bool str_eq(const string &te, unsigned int i, const string &te2);
 SwapResult swap_index(string &te, const vector <DepConv> &dep_conv);
 bool in_text(const string &te, unsigned int i, string te2);
 SwapResult swap_template(string te, const vector <DepConv> &dep_conv);
-string swap_index_temp(const vector <DepConv> &dep_conv, const SwapResult &temp);
+string swap_index_temp(const vector <DepConv> &dep_conv, const SwapResult &temp, string &warn);
 ParamProp get_param_prop(string st);
 unsigned int add_to_vec(vector <unsigned int> &vec, unsigned int val);
 unsigned int add_to_vec(vector <string> &vec, string val);
@@ -206,6 +206,7 @@ void term_out(string te);
 string sig_fig(double num, unsigned int fig);
 string precision(double num, unsigned int dig);
 string get_cpu_time(unsigned int tics);
+double median(vector <double> vec);
 
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);

@@ -57,6 +57,7 @@
 	state-post-sim
 	state-sim
 	test-data
+	test-and-cull-sim
 	trans-data
 	trans-diag-inf
 	transition / trans
@@ -93,7 +94,7 @@ function import_file(te,file,clear_results)
 	if(fl) imp.script.push({line:jmax, te:(lines.length-jmax)+" more lines (too long to show)"});
 		
 	let pro = process_lines(lines,file,2,15);
-	
+
 	percent(10);
 
 	let data_file_list = get_data_file_list(pro,15,20);
@@ -147,7 +148,7 @@ function import_file2(data_file_list)
 	model.start_new();
 	
 	let total_pt = assign_processing_time();    // Estimates how long each command will take
-	
+
 	for(let loop = 0; loop <= 4; loop++){ 
 		// Import happens in four stages:
 		// (0) Load species and classification information

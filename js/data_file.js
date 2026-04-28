@@ -757,7 +757,7 @@ function trans_data(bu)
 
 ///////////////////// Disease diagnostic test
 
-function diagtest_data_bubble(cont,type)
+function diagtest_data_bubble(cont,type,op)
 {
 	inter.bubble.check = "checkbox";
 	inter.bubble.check_Se = true; 
@@ -775,9 +775,20 @@ function diagtest_data_bubble(cont,type)
 	if(type == "view") cl_pos = undefined;
 	
 	let te = diag_test_data_text, ti = "Diagnostic test data";
-	if(edit_source.info.siminf == "gen"){ te = sim_diag_test_data_text; ti = "Generate individual diagnostic test data";}			
+	if(edit_source.info.siminf == "gen"){ 
+		te = sim_diag_test_data_text; 
+		ti = "Generate individual diagnostic test data";
+	}
+	
+	let titl = "Diagnostic tests";
+	
+	if(op == "cull"){
+		titl = "Test-and-cull";
+		te = test_and_cull_detail_text; 
+		ti = "Implement test-and-cull";
+	}
 							
-	bubble_addtitle(cont,"Diagnostic tests",{title:ti, te:te});
+	bubble_addtitle(cont,titl,{title:ti, te:te});
 	
 	//bubble_addparagraph(cont,"Select classification test sensitive to:",0,cont.dx);
 	//cont.y += 0.2;
@@ -809,11 +820,14 @@ function diagtest_data_bubble(cont,type)
 		bubble_input(cont,"Specificity:",{type:"Sp", eqn:eqn_on });
 	
 		cont.y += 0.4;
-		bubble_addparagraph(cont,"Text representing test results:",0,cont.dx); 
 		bubble_double_input(cont,"Positive text:",{type:"pos_result"},
 														 "Negative text:",{type:"neg_result"});
-														 
-		if(sim_options()){
+		
+		if(op == "cull"){
+			bubble_input(cont,"Time-gap:",{type:"time_gap"});
+		}
+		
+		if(sim_options() || op == "cull"){
 			bubble_input(cont,"Fraction observed:",{type:"frac_obs"});
 		
 			add_timepoint_options(cont);
@@ -830,10 +844,19 @@ function diagtest_data_bubble(cont,type)
 		cont.y += 0.4;
 	}
 
-	let but_text = "Next"; if(type == "view") but_text = "Done";
+	let but_text = "Next"; 
+	if(type == "view") but_text = "Done";
+	else{
+		if(op == "cull") but_text = "Add";
+	}
+	
 	let ac; 
 	if(cl_sel != select_drop_str){
-		ac = "AddDataTable"; if(type == "view") ac = "DataTableBack";
+		ac = "AddDataTable"; 
+		if(type == "view") ac = "DataTableBack";
+		else{
+			if(op == "cull") ac = "AddDynInt";
+		}
 	}	
 	
 	add_end_button(cont,but_text,ac);
@@ -889,18 +912,22 @@ function diagtest_scrollable(lay)
 		
 	return cy;
 }
-		
-	
+
+
 /// Initialises the diagtest bubble	
-function diagtest_data(bu)
+function diagtest_data(bu,op)
 {
+	let type = "Diag. Test";
+	if(op == "cull") type = "Test-and-cull";
+	
 	let Sp_eqn = create_equation("1","Sp");
-	start_data_source("Diag. Test",{cl_drop:{te:select_drop_str},check_box:{ name:"",value:[]},Sp_eqn:Sp_eqn,pos_result:"+",neg_result:"-"},bu.op.info);
+	start_data_source(type,{cl_drop:{te:select_drop_str},check_box:{ name:"",value:[]},Sp_eqn:Sp_eqn,pos_result:"+",neg_result:"-"},bu.op.info);
 	select_bubble_over();
 	
 	edit_source.time_radio = {value:"Periodic"};
 	edit_source.time_gen = "";
 	edit_source.frac_obs = 1;
+	//if(op == "cull") edit_source.time_gap = "";
 }
 
 
@@ -1801,4 +1828,34 @@ function add_ind_group_data()
 		add_gen_data(head,ele);		
 		generate_screen();
 	}
+}
+
+
+// Test-and cull data
+function select_test_and_cull_bubble(cont)
+{
+	let p	= model.get_p();
+	cont.dx = 11;
+	
+	bubble_addtitle(cont,"Select test-and-cull",{te:sel_test_and_cull_data_text});
+	
+	let rpfsp = model.sim_res.plot_filter.species[p];
+	
+	bubble_adddropdown(cont,0,11,rpfsp.sel_test_and_cull,rpfsp.pos_test_and_cull);
+	cont.y += 0.3;
+	
+	add_end_button(cont,"Next","AddTestAndCullData");
+}
+
+
+/// Adds test and cull data
+function add_test_and_cull()
+{ 
+	let p	= model.get_p();
+	
+	let rpf = model.sim_res.plot_filter;
+	let rpfsp = model.sim_res.plot_filter.species[p];
+	let sel = rpfsp.sel_test_and_cull;
+	
+	start_worker("Gen. test-and-cull",{p:p,i:sel.i,sel_sim:rpf.sel_sim.i});	
 }

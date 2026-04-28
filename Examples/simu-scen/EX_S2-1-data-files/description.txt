@@ -3,7 +3,7 @@
 ## Objective
 - Introduce uncertainty in the initial population for a population-based model.
 - This considers the case of a model with just a single classification.
-- On the 'Simulation→Population' page the initial population is set as a distribution (rather than fixed).
+- On the 'Simulation→Setup' page the initial population is set as a distribution (rather than fixed).
 
 - 100 simulations are performed to see stochastic variation.
 

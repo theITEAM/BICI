@@ -1828,6 +1828,33 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 			break;
 		}
 		
+		for(auto i = 0u; i < sp.intervention.size(); i++){
+			const auto &inter = sp.intervention[i];
+			switch(inter.type){
+			case TEST_AND_CULL_INT:
+				{
+					ss << "<TEST-AND-CULL \""+inter.name << "\">" << endl;
+					ss << "ID,t,Result" << endl;
+					const auto &data = ssp.inter_data[i].data;
+					
+					for(auto &row : data){
+						auto &ind = ssp.individual[row[0]];
+						auto name = get_ind_name(ind,ind_key,hash_ind);
+						ss << name << "," << tstr(row[1]) << ",";
+						if(row[2] == 1) ss << inter.diag_pos;
+						else ss << inter.diag_neg;	
+						ss << endl;
+					}
+					ss << endl;
+				}
+				break;
+				
+			default:
+				emsg("intervention not here");
+				break;
+			}
+		}
+		
 		if(sp.type != DETERMINISTIC){
 			if(cum_diag && (model.mode == INF || model.mode == EXT)){
 				ss << "<TRANSDISTPROB>" << endl;

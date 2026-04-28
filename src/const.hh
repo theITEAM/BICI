@@ -26,7 +26,7 @@ const string default_file = "Execute/init.bici";     // This is used for windows
 
 #define USE_MPI                                    // Sets if code can run in parallel
 
-const string bici_version = "v0.85";                 // Sets the BICI version
+const string bici_version = "v0.86";                 // Sets the BICI version
 
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
 const bool testing = true;                           // Set to true for additional testing
@@ -64,7 +64,7 @@ const bool simplify_eqn = true;                      // Simplifies equations (to
 /************************** Enumerated values ******************************/
 
 // Information from tags when BICI is run
-enum TagType { CORE, OP, SAMP_TYPE, SEED, TAG_UNSET };
+enum TagType { CORE, OP, SAMP_TYPE, SEED, SIM_SEL, TAG_UNSET };
 
 
 // Different types of algorithm for simulation / inference
@@ -107,7 +107,7 @@ enum Operation { SIM, INF, PPC, EXT, DATA_SIM, DATA_SHOW, DATA_DEL, DATA_CLEAR, 
 enum PriorPos { INVERSE_PR, UNIFORM_PR, POWER_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, DIRICHLET_PR, MDIR_PR, MVN_DEFAULT_PR, MVN_NORM_LKJ_PR, MVN_UNIFORM_LKJ_PR, MVN_INV_WISH_PR, MVN_JEF_PR, MVN_UNIFORM_PR, MVN_COR_PR, UNSET_PR };
  
 // Different possible command types
-enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, DEFINE, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, IC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, PROPOSAL_INFO, INF_PARAM_STATS, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, SIM_WARNING, INF_WARNING, PPC_WARNING,
+enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, DEFINE, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, TEST_AND_CULL_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, IND_GROUP_DATA, GENETIC_DATA, IC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, PROPOSAL_INFO, INF_PARAM_STATS, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, SIM_WARNING, INF_WARNING, PPC_WARNING,
 
 // These are not commands but varient used when loading data
 TRANS_TIMERANGE_DATA,
@@ -152,7 +152,7 @@ enum TextType { NORMAL_TEXT, SUB_TEXT, SUP_TEXT };
 enum EventType { ENTER_EV, LEAVE_EV, MOVE_EV, NM_TRANS_EV, M_TRANS_EV };
 
 // Different types of trigger events
-enum SimTrigEventType { ENTER_SIM_EV, LEAVE_SIM_EV, MOVE_SIM_EV, NM_TRANS_SIM_EV, M_TRANS_SIM_EV, DATA_TRANS_SIM_EV, SOURCE_SIM_EV };
+enum SimTrigEventType { ENTER_SIM_EV, LEAVE_SIM_EV, MOVE_SIM_EV, NM_TRANS_SIM_EV, M_TRANS_SIM_EV, DATA_TRANS_SIM_EV, SOURCE_SIM_EV, INTERVENTION_SIM_EV };
 
 // Differnt types of event when doing simulation
 enum TrigEventType { TRIG_OBS_TRANS_EV, TRIG_MOVE_EV, TRIG_LEAVE_EV };
@@ -309,6 +309,10 @@ enum Compress { ALWAYS_COMPRESS, NEVER_COMPRESS, AUTO_COMPRESS};
 
 enum IndInfectType { IND_INFECT, IND_INFECTED, IND_RECOVERY};
 	
+enum InterventionType { TEST_AND_CULL_INT};
+
+enum PostSimParamType { PS_SAMPLE, PS_MEAN, PS_MEDIAN};
+
 /************************** Numeric constants ******************************/
 
 const auto ERR_MSG_MAX = 5u;                     // The maximum number of error messages

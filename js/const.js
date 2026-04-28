@@ -77,6 +77,7 @@ const command_list = [
 {na:"add-ind-post-sim",ti:0},
 {na:"remove-ind-post-sim",ti:0},
 {na:"move-ind-post-sim",ti:0},
+{na:"test-and-cull-sim",ti:0},
 {na:"comp-data",ti:0},
 {na:"trans-data",ti:0},
 {na:"test-data",ti:0},
@@ -114,7 +115,7 @@ const command_list = [
 ];
 
 // Lists all commands which need to load files
-const data_command_list = ["init-pop-inf", "add-pop-inf", "remove-pop-inf", "add-ind-inf", "remove-ind-inf", "move-ind-inf", "init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data","param-mult"];
+const data_command_list = ["init-pop-inf", "add-pop-inf", "remove-pop-inf", "add-ind-inf", "remove-ind-inf", "move-ind-inf", "init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", ,"test-and-cull-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data","param-mult"];
 
 const sim_alg_list = ["gillespie","tau"];
 const inf_alg_list = ["DA-MCMC","PAS-MCMC","MFA","ABC","ABC-SMC","ABC-MBP","PMCMC","HMC"];
@@ -271,6 +272,7 @@ const prior_cv_pos = ["covar-default","covar-normal-lkj","covar-uniform-lkj","co
 const prior_pos_positive = ["inverse","uniform","power","exp","gamma","log-normal","fix"];
 
 const data_types = ["Init. Cond.", "Individual", "Population", "Additional"];
+const data_types_sim = ["Init. Cond.", "Dynamic Int."];
 
 //let chnotallowed = "\"$&=~#\\→";
 let chnotallowed = "\"$&~#\\→";
@@ -291,6 +293,7 @@ const convert = [
 		{command:"comp-data", type:"Compartment"},
 		{command:"trans-data", type:"Transition"},
 		{command:"test-data", type:"Diag. Test"},	
+		{command:"test-and-cull-sim", type:"Test-and-cull"},	
 		{command:"ind-effect-data", type:"Ind. Eff."},
 		{command:"ind-group-data", type:"Ind. Group"},
 		{command:"genetic-data", type:"Genetic"},	
@@ -325,6 +328,8 @@ const data_template = [
 {type:"Trans. in time range", is_data:true, title:"Transition in time range data",  help:load_transition_text, cols:["ID","t,the time the individuals undergo the transition","start","end"]},
 
 {type:"Diag. Test", is_data:true, title:"Diagnostic test data", help:diag_test_data_text, cols:["ID","t,the time the individual's diagnostic test is taken","result"]},
+
+{type:"Test-and-cull", is_data:true, title:"Diagnostic test data", help:diag_test_data_text, cols:["ID","t,the time the individual's diagnostic test is taken","result"]},
 
 {type:"Population", is_data:true, title:"Population data", help:load_population_text, cols:["t,the time the population measurement is taken","filt_obspop"]},
 

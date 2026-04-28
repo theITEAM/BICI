@@ -10,7 +10,7 @@ function generate_screen(update)
 	
 		if((tree[0] == "Model" && tree[1] == "Parameters") ||
 			(tree[0] == "Simulation" && tree[1] == "Parameters") ||
-			(tree[0] == "Simulation" && tree[1] == "Initial Conditions") ||
+			(tree[0] == "Simulation" && tree[1] == "Setup") ||
 			(tree[0] == "Inference" && tree[1] == "Prior") ||
 			(tree[0] == "Inference" && tree[1] == "Data") ||
 			(tree[0] == "Post. Simulation" && tree[1] == "Parameter Mult.") ||
@@ -680,12 +680,16 @@ function add_screen_buts(lay)
 	switch(tree[0]){
 	case "Simulation": case "Inference": case "Post. Simulation":
 		switch(tree[1]){
+		//case "Generate Data":
+			//if(edit_source.table_loaded != true) right_menu = tree[1];
+			//break;
+			
 		case "Results": 
 			switch(tree[2]){
 			case "Populations": case "Transitions": case "Individuals": case "Derived":
-			case "Parameters": case "Generations": case "Diagnostics":
+			case "Parameters": case "Generations": case "Diagnostics": 
 				right_menu = tree[2];
-				
+			
 				let rpf = get_inf_res().plot_filter;
 				
 				switch(tree[2]){
@@ -1356,7 +1360,7 @@ function copy_back_to_source2(tbs)
 
 	case "Se": update(edit_source.spec.Se_eqn,te); break;
 	case "Sp": update(edit_source.spec.Sp_eqn,te); break;
-	
+	case "time_gap": edit_source.spec.time_gap = te; break;
 	case "mut_rate": update(edit_source.spec.mut_rate_eqn,te); break;
 	case "seq_var": update(edit_source.spec.seq_var_eqn,te); break;
 	case "snp_root": edit_source.spec.snp_root = te; break;
@@ -1863,6 +1867,10 @@ function check_error_textbox2(tbs)
 			case "Se": case "Sp":
 				if(sim_options()) warn = check_zeroone(te);
 				else warn = check_param_or_number(te,"zeroone");
+				break;
+			
+			case "time_gap":
+				warn = check_posinteger(te);
 				break;
 			
 			case "mut_rate": case "seq_var":

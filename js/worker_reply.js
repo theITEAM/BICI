@@ -333,7 +333,13 @@ worker.onmessage = function (e)
 				generate_screen();
 			}
 			break;
-				
+			
+		case "Gen. test-and-cull":
+			close_bubble();
+			edit_source = ans.edit_source;
+			generate_screen();
+			break;
+		
 		case "Graph define":
 			{
 				inter.graph.define(ans.variety,ans.view,ans.data,ans.op);
@@ -490,6 +496,16 @@ worker.onmessage = function (e)
 			ind_group_data2(ans.name_list);
 			break;
 		
+		case "PosteriorMean":
+			model.param = ans.param;
+			close_help();
+			generate_screen();
+			if(ans.comment != undefined){
+				alert_help(ans.comment);
+				generate_screen();
+			}	
+			break;
+			
 		case "Error":
 			error("Error: "+ans.te);
 			break;

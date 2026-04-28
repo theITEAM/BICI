@@ -1746,7 +1746,7 @@ void State::check_genetic_value(string ref)
 					if(iif.i != in.i) emsg("check i not agree");
 					if(iif.pref != inf_c.pref){
 						const auto &eq = model.eqn[inf_c.eq_ref];
-						for(auto j = 0u; j <eq.pop_ref.size(); j++){
+						for(auto j = 0u; j < eq.pop_ref.size(); j++){
 							cout << j << " " <<model.pop[eq.pop_ref[j]].name << "pop ref" << endl;
 						}
 						cout << iif.pref << " " << inf_c.pref <<" jj" << endl;

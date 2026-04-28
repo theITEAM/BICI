@@ -1185,6 +1185,7 @@ void Input::define_command()
 	if(mult == UNSET) return; 
 	
 	auto def_eqn_raw = he(add_equation_info(value,DEFINE_EQN));
+	
 	def.value = def_eqn_raw;
 	
 	string warn = "";
@@ -1710,8 +1711,13 @@ void Input::derived_command()
 			
 			auto der_eqn = der_eqn_raw;
 	
-			der_eqn.te = swap_index_temp(dep_conv,swap_temp);
+			string warn;
+			der_eqn.te = swap_index_temp(dep_conv,swap_temp,warn);
 			
+			if(warn != ""){
+				emsg_input("Error with derived quantity '"+der.name+"': "+warn);  
+			}
+						
 			if(check_swap){
 				auto te_ch = der_eqn_raw.te;
 				auto res = swap_index(te_ch,dep_conv);
@@ -2096,7 +2102,8 @@ bool Input::post_sim_command()
 	
 	if(details.number%mpi.ncore != 0 && model.mode == PPC){
 		alert_import("For 'number' the value '"+tstr(details.number)+"' must be a multiple of the number of cores");
-	}		 
+	}
+	
 	details.num_per_core = details.number/mpi.ncore;
 
 	details.individual_max = check_pos_integer("ind-max",INDMAX_DEFAULT);
@@ -2121,6 +2128,11 @@ bool Input::post_sim_command()
 	details.diagnostics_on = false;
 	
 	if(check_dt(details) == false) return false;
+	
+	auto parsamp = toLower(get_tag_value("param-sample"));
+	if(parsamp == "") parsamp = "sample";
+	
+	details.ps_type = PostSimParamType(option_error("param-sample",parsamp,{"sample","mean","median"},{ PS_SAMPLE, PS_MEAN, PS_MEDIAN }));
 	
 	return true;
 }
@@ -2629,6 +2641,61 @@ void Input::sim_state_command()
 	if(model.mode != DATA_SIM) return;
 	
 	load_state_samples(UNSET,file,enc);
+}
+
+
+/// Loads up a test and cull command
+void Input::test_and_cull_command()
+{
+	if(model.mode != SIM) emsg("Should be sim");
+	
+	auto p = p_current;
+	if(p == UNSET){ 
+		alert_import("To load the data file the species must be set"); 
+		return;
+	}
+	
+	auto name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
+	
+	auto time_gap = get_tag_value("time-gap"); if(time_gap == ""){ cannot_find_tag(); return;}
+	is_positive(time_gap,"time-gap");
+	
+	auto frac = get_tag_value("frac"); if(frac == "") frac = "1";
+	is_zeroone(frac,"frac");
+	
+	Intervention inter;
+	inter.type = TEST_AND_CULL_INT;
+	inter.name = name;
+	inter.times = get_times();
+	inter.time_gap = number(time_gap);
+	inter.frac = number(frac);
+	
+	auto Sp = get_tag_value("Sp"); if(Sp == ""){ cannot_find_tag(); return;}
+	inter.Sp_str = Sp;
+			
+	auto pos = get_tag_value("pos");
+	if(pos == "") pos = "1";
+			
+	auto neg = get_tag_value("neg");
+	if(neg == "") neg = "0";
+			
+	if(pos == neg){ 
+		alert_import("'pos' and 'neg' cannot both have the same value"); 
+		return;
+	}
+		
+	inter.diag_pos = pos; inter.diag_neg = neg;
+				
+	auto comp = get_tag_value("comp"); if(comp == ""){ cannot_find_tag(); return;}
+		
+	string warn;
+	auto dts = model.get_diag_test_sens(comp,p,warn);
+	if(warn != ""){ alert_import(warn); return;}
+			
+	inter.cl = dts.cl;
+	inter.diag_test_sens = dts;
+	
+	model.species[p].intervention.push_back(inter);
 }
 
 

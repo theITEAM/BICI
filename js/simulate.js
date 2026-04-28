@@ -472,7 +472,7 @@ function run_local_simple(cx,cy,details,lay)
 }
 		
 		
-/// Sets button if running locally
+/// Sets button if running using inference model ot simulation model
 function ppc_use_inf_or_sim(cx,cy,details,lay)
 {
 	cy = lay.add_subtitle("Model and state",cx,cy,WHITE,{te:model_and_state_text});
@@ -481,6 +481,22 @@ function ppc_use_inf_or_sim(cx,cy,details,lay)
 	xx = lay.add_radio(xx,cy+0.1,"Yes","Inference model",details.run_inf_model,{back_col:WHITE});
 	xx += gap;
 	xx = lay.add_radio(xx,cy+0.1,"No","Simulation model",details.run_inf_model,{back_col:WHITE});		
+	
+	return cy;
+}
+
+
+/// Sets button if running using inference model ot simulation model
+function posterior_mean_median(cx,cy,details,lay)
+{
+	cy = lay.add_subtitle("Parameter samples",cx,cy,WHITE,{te:post_samp_text});
+		
+	let xx = 3, gap = 0.5;
+	xx = lay.add_radio(xx,cy+0.1,"postsample","Posterior sample",details.run_post,{back_col:WHITE});
+	xx += gap;
+	xx = lay.add_radio(xx,cy+0.1,"postmean","Posterior mean",details.run_post,{back_col:WHITE});		
+	xx += gap;
+	xx = lay.add_radio(xx,cy+0.1,"postmedian","Posterior median",details.run_post,{back_col:WHITE});		
 	
 	return cy;
 }
@@ -590,11 +606,15 @@ function add_ppc_start_buts(lay)
 		yy = cy-2.5;
 		add_right_input_field(yy,"Number",{type:"ppc_number",update:true},lay);
 		
-		cy += 2;
+		cy += 2.5;
 	
 		cy = ppc_use_inf_or_sim(cx,cy,model.ppc_details,lay);
 	
-		cy += 2;
+		cy += 2.5;
+	
+		cy = posterior_mean_median(cx,cy,model.ppc_details,lay);
+	
+		cy += 2.5;
 	
 		cy = run_local_simple(cx,cy,model.ppc_details,lay);
 	
@@ -703,6 +723,14 @@ function add_param_value_buts(lay)
 	cy += 0.5;
 		
 	add_layer("ParamValueContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-2,{});	
+	
+	let x = 1.2, y = lay.dy-1.6;
+	let gap = 3.5;
+	
+	let active = false;
+	if(model.inf_res.on == true) active = true;
+		
+	let w = model.add_object_button(lay,"Posterior mean",x,y,"PosteriorMean",{ back:WHITE, active:active, info:{}, title:"Set simulation values to posterior mean", te:posterior_mean_text }); 
 }
 
 
@@ -750,8 +778,8 @@ function get_param_cat(filt_list,filt_type)
 	
 	return param_cat;
 }
-
-
+					
+					
 /// Adds a screen allowing simulation parameters to be edited
 function add_param_value_content(lay)
 {
@@ -780,40 +808,38 @@ function add_param_value_content(lay)
 				let i = pc.list[cati];
 				let par = param[i];
 			
-				if(par.variety != "const" && par.variety != "reparam" &&  par.variety != "define"){
-					if(!find_in(sim_param_not_needed,par.type)){
-						let w = wright2;
-					
-						if(par.value_desc == no_elements){
-							display_no_element(par,x,y,lay,w);
+				if(sim_value_required(par)){
+					let w = wright2;
+				
+					if(par.value_desc == no_elements){
+						display_no_element(par,x,y,lay,w);
+					}
+					else{
+						if(add_view_button(par,w-4,y,i,lay,model)) w -= 4.5;
+						
+						if(par.variety == "dist"){
+							w -= 4.5;
+							lay.add_checkbox(w,y+0.4,"Sample","Sample",par.sim_sample,WHITE);
 						}
-						else{
-							if(add_view_button(par,w-4,y,i,lay,model)) w -= 4.5;
-							
-							if(par.variety == "dist"){
-								w -= 4.5;
-								lay.add_checkbox(w,y+0.4,"Sample","Sample",par.sim_sample,WHITE);
-							}
-							
-							if(par.variety == "dist" && par.sim_sample.check == true){
-								if(par.dep.length == 0 || par.prior_split_check.check == false){
-									display_distribution(i,x,y,lay,true,false,w);
-								}
-								else{
-									if(par.prior_split_desc == no_elements){
-										display_no_element(par,x,y,lay,w);
-									}
-									else{
-										display_distribution_split(i,x,y,lay,true,false,"dist",w);
-									}
-								}
+						
+						if(par.variety == "dist" && par.sim_sample.check == true){
+							if(par.dep.length == 0 || par.prior_split_check.check == false){
+								display_distribution(i,x,y,lay,true,false,w);
 							}
 							else{
-								display_constant(i,x,y,lay,w);
+								if(par.prior_split_desc == no_elements){
+									display_no_element(par,x,y,lay,w);
+								}
+								else{
+									display_distribution_split(i,x,y,lay,true,false,"dist",w);
+								}
 							}
 						}
-						y += dy;
+						else{
+							display_constant(i,x,y,lay,w);
+						}
 					}
+					y += dy;
 				}
 			}
 		}

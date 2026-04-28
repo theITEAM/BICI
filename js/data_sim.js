@@ -4,6 +4,10 @@
 /// Simulate data
 function sim_data()
 {
+	let rpf = model.sim_res.plot_filter;
+
+	edit_source.sel_sim = rpf.sel_sim.i;
+
 	start_worker("Sim data",edit_source);	
 }
 
@@ -62,14 +66,17 @@ function simulate_data(so)
 	let T = tp.length;
 	
 	let sim = samp.species[p];
-	let sim_ind = result.sample[0].species[p].individual;
+
+	let res_sa = result.sample[so.sel_sim];
+	
+	let sim_ind = res_sa.species[p].individual;
 	
 	//let transnum = reconstruct_timeline_vec(sim.transnum_tl,result);
 	//let cpop = reconstruct_timeline_vec(sim.cpop_tl,result);
 	let transnum = sim.transnum;
 	let cpop_init = sim.cpop_init;
 	let cpop_cmp = sim.cpop_cmp;
-	let dpop_list = result.sample[0].species[p].dpop_list;
+	let dpop_list = res_sa.species[p].dpop_list;
 	
 	let spec = so.spec;
 	
@@ -1272,7 +1279,7 @@ function simulate_genetic_snp(t_start,t_end,ele,head,so)
 	head.push("t");
 	for(let i = 0; i < N; i++) head.push(so.spec.snp_root+(i+1));
 	
-	let samp = result.sample[0];
+	let samp = result.sample[so.sel_sim];
 
 	let all_ind_list = result.all_ind_list;
 	
@@ -1432,7 +1439,7 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 	
 	let f = so.frac_obs;
 
-	let samp = result.sample[0];
+	let samp = result.sample[so.sel_sim];
 	
 	let inf_node = samp.inf_node;
 	
@@ -1760,4 +1767,38 @@ function data_sources_scrollable(lay)
 	cy = lay.add_gap(cy,0.1);
 	
 	return cy;
+}
+
+
+/// Generates dianostic data from test and col
+function generate_test_and_cull(p,i,sel_sim)
+{
+	let result = sim_result;
+	
+	let res_sa = result.sample[sel_sim];
+	
+	let edit_source = copy(result.species[p].sim_source[i]);
+	
+	edit_source.table_loaded = true;
+
+	let inter_data = res_sa.species[p].inter_data;
+
+	let k = find(inter_data,"name",edit_source.name);	
+	if(k == undefined) alert_help("Could not find data source");
+	
+	let dat = inter_data[k];
+	
+	let tab = edit_source.table;
+	tab.heading = dat.heading;
+	tab.ele = dat.ele;
+	
+	tab.ncol = tab.heading.length;
+	tab.nrow = tab.ele.length;
+	
+	edit_source.table.edit = true;
+	edit_source.info.imp = false;
+	edit_source.info.siminf = "gen";
+	edit_source.type = "Diag. Test";
+	
+	post({ edit_source:edit_source});
 }

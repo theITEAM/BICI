@@ -39,10 +39,11 @@ function initialise_pages()
 	{
 		let sub = page[page.length-1].sub;
 	
-		sub.push({name:"Initial Conditions", sub:[]});
+		sub.push({name:"Setup", sub:[]});
 		add_species_options(sub,model.species);
 		
 		sub.push({name:"Parameters", sub:[]});
+		
 		sub.push({name:"Run", sub:[]});
 		
 		if(model.sim_res.on == true){
@@ -276,6 +277,7 @@ function add_menu_buts(lay)
 	let dby2 = nearest_pixel(1.1);
 	let dysub = nearest_pixel(1.6);
 	let dysubsub = nearest_pixel(1.3);
+	let dyback = nearest_pixel(0.5);
 	let xsub = nearest_pixel(0.5);
 	let xsubsub = nearest_pixel(1);
 	let xsubsubsub = nearest_pixel(1);
@@ -332,8 +334,8 @@ function add_menu_buts(lay)
 							}
 						}
 					}
-						
-					y += nearest_pixel(0.5);
+					
+					if(s != pag.sub.length-1)	y += nearest_pixel(0.5);
 				}
 				y += dby;
 			}

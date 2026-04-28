@@ -34,6 +34,7 @@ using namespace std;
 Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details, const vector <Define> &define) : species(species), param(param), prior(prior), derive(derive), spline(spline), param_vec(param_vec), density(density), pop(pop), hash_pop(hash_pop), constant(constant), timepoint(timepoint), details(details)
 {
 	te = eqi.te;
+
 	te = trim(te); 
 	if(te == ""){ warn = "There is no equation"; return;}
 
@@ -73,7 +74,7 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 	if(warn != "") return;
 
 	te = replace(te,"×","*");                        // Converts × to *
-
+	
 	if(warn != "") return;
 
 	auto op = extract_operations();                  // Extracts the operations in the 	expression
@@ -96,7 +97,7 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 	if(warn != "") return; 
 	
 	unravel_sum(op);                                 // Explicitly unravels any sums
-	
+
 	if(warn != "") return; 
 	
 	simplify_operations(op);                         // Simplifies based on numerical 
@@ -148,7 +149,12 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 	
 	set_time_vari();
 	
-	//print_calculation();
+	if(false){
+		print_calculation();
+		for(const auto &inte : integral){
+			print_calc("integral",inte.calc);
+		}
+	}
 }
 
 
@@ -697,8 +703,7 @@ void Equation::unravel_sum(vector <EqItem> &op)
 				}
 				if(ii == imax){ warn = "For sum bracket does not match"; return;}
 			
-				const auto &si = sum_info[op[i].num];
-				
+				auto si = sum_info[op[i].num];
 				vector <CompPos> comp_pos;
 	 
 				auto ndep = si.dep.size();
@@ -728,18 +733,24 @@ void Equation::unravel_sum(vector <EqItem> &op)
 					if(first == false){
 						EqItem it; it.type = ADD; op_new.push_back(it);
 					}
-					
+				
 					for(auto it : sec){
 						if(it.type == SUM){
-							auto &si2 = sum_info[it.num];
+							const auto &si2 = sum_info[it.num];
+							
+							auto d_sel = UNSET;
 							
 							for(auto d = 0u; d < ndep; d++){
-								if(si.dep[d] == si2.comp_max){
-									const auto &cp = comp_pos[d];
-									auto c = cp.list[cp.index];
-									si2.comp_max = species[cp.p].cla[cp.cl].comp[c].name;
-									break;
-								}
+								if(si.dep[d] == si2.comp_max) d_sel = d;
+							}
+							
+							if(d_sel != UNSET){
+								auto si_new = si2;
+								const auto &cp = comp_pos[d_sel];
+								auto c = cp.list[cp.index];
+								si_new.comp_max = species[cp.p].cla[cp.cl].comp[c].name;
+								it.num = sum_info.size();
+								sum_info.push_back(si_new);
 							}
 						}
 						
@@ -4447,6 +4458,7 @@ void Equation::substitute_define(const vector <Define> &define)
 				while(i < te.length() && te.substr(i,1) != "$") i++;
 				if(i < imax){
 					auto content = trim(te.substr(ist+1,i-ist-1));
+
 					auto pp = get_param_prop(content);
 					
 					auto k = 0u; while(k < define.size() && define[k].name != pp.name) k++;
@@ -4462,12 +4474,16 @@ void Equation::substitute_define(const vector <Define> &define)
 						vector <DepConv> dep_conv;
 						for(auto j = 0u; j < def.dep.size(); j++){
 							DepConv dc; 
-							dc.before = def.dep[j].index;
-							dc.after = pp.dep[j];
+							dc.before = def.dep[j].index_with_prime;
+							dc.after = pp.dep_with_prime[j];
 							dep_conv.push_back(dc);
 						}
 						
-						auto cont_new = swap_index_temp(dep_conv,def.swap_temp);
+						string warn;
+						auto cont_new = swap_index_temp(dep_conv,def.swap_temp,warn);
+						if(warn != ""){
+							emsg_input("Error for defined quantity '"+def.name+"': "+warn);  
+						}
 						
 						te_new += te.substr(icopy,ist-icopy)+"("+cont_new+")";
 						icopy = i+1;

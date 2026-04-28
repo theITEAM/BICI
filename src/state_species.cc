@@ -155,6 +155,26 @@ void StateSpecies::reset_arrays()
 	
 	ti_sort = UNSET;
 	
+	// Initialises intervention data
+	inter_data.clear();
+	inter_data.resize(sp.intervention.size());
+	
+	// Places interventions on the time line
+	for(auto i = 0u; i < sp.intervention.size(); i++){
+		const auto &inter = sp.intervention[i];
+		SimTrigEvent tri;
+		tri.type = INTERVENTION_SIM_EV;
+		tri.c = UNSET;
+		tri.trg = UNSET;
+		tri.i = i;
+		for(auto t : inter.times){
+			tri.tdiv = model.calc_tdiv(t)*ALMOST_ONE;
+			auto ti = get_ti(tri.tdiv);
+			trig_div[ti].ev.push_back(tri);
+		}
+	}
+	
+	//species[p].intervention.push_back(inter);
 	//sim_linear_speedup_init();
 }
 
