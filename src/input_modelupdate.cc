@@ -2594,7 +2594,10 @@ void Input::param_affect_likelihood()
 			for(auto f : pop.fix_eff_mult){		
 				const auto &fe = sp.fix_effect[f];
 				const auto &par = model.param[fe.th];
-				if(par.name != fe_char+"^"+fe.name) alert_emsg_input("names do not match");
+				if(par.name != fe_char+"^"+fe.name){
+					alert_emsg_input("names do not match");
+				}
+				
 				if(par.N != 1) alert_emsg_input("Should be univariate");
 				
 				if(par.variety != CONST_PARAM){
@@ -2950,7 +2953,10 @@ void Input::add_nm_trans_affect(unsigned int p, unsigned int i, unsigned int eq,
 	
 		const auto &par = model.param[fe.th];
 		
-		if(par.name != fe_char+"^"+fe.name) alert_emsg_input("names do not match");
+		if(par.name != fe_char+"^"+fe.name){
+			alert_emsg_input("names do not match");
+		}
+		
 		if(par.N != 1) alert_emsg_input("Should be univariate");
 		
 		if(par.variety != CONST_PARAM){

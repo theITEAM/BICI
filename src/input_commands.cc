@@ -1222,6 +1222,8 @@ void Input::param_command()
 {
 	auto full_name = get_tag_value("name"); if(full_name == ""){ cannot_find_tag(); return;}
 	
+	full_name = remove_escape_char(full_name);
+	
 	auto pp = get_param_prop(full_name);
 
 	Param par(model.constant); 

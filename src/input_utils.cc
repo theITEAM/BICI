@@ -852,7 +852,7 @@ unsigned int Input::get_dependency(vector <Dependency> &dep_alter, const ParamPr
 		else{
 			if(index == "z"){
 				auto name = pp.name;
-				if(!begin_str(name,"Ω")){
+				if(!param_omega(name)){
 					alert_import("Parameter '"+pp.name+"' cannot have index z, because this is reserved for covariance matrices.",true); 
 					return UNSET;
 				}

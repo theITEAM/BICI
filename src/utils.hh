@@ -207,6 +207,7 @@ string sig_fig(double num, unsigned int fig);
 string precision(double num, unsigned int dig);
 string get_cpu_time(unsigned int tics);
 double median(vector <double> vec);
+bool param_omega(string name);
 
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);

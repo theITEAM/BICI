@@ -3215,7 +3215,7 @@ bool Model::is_matrix(const Param &par) const
 /// Determines if parameter is symmetric
 bool Model::is_symmetric(const Param &par) const
 {
-	if(is_matrix(par) && begin_str(par.name,"Ω")) return true;
+	if(is_matrix(par) && param_omega(par.name)) return true;
 	return false;
 }
 

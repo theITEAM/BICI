@@ -4147,3 +4147,11 @@ double median(vector <double> vec)
 	if(vec.size()%2 == 1) return vec[mid];
 	return (vec[mid]+vec[mid-1])/2;
 }
+
+
+/// Determines if parameter is omega 
+bool param_omega(string name)
+{
+	if(begin_str(name,"Ω")) return true;
+	return false;
+}
