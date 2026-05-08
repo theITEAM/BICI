@@ -119,6 +119,8 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 		state.set_particle(part);
 	}
 	
+	for(const auto &ssp: state.species) ssp.check_obs_inconsitent();
+	
 	//state.check("init");
 	print_diag("done");
 }

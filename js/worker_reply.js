@@ -98,18 +98,28 @@ worker.onmessage = function (e)
 			break;
 			
 		case "Save BICI":	case "Export BICI": case "StartClusterSave": case "StartClusterExport":
-			inter.file_store.file_list = ans.file_list;
-			inter.file_store.save_type = ans.save_type;
+			{
+				inter.file_store.file_list = ans.file_list;
+				inter.file_store.save_type = ans.save_type;
+		
+				let fit = "BICI_file";
+				if(ans.type == "StartClusterSave" || ans.type == "StartClusterExport"){
+					fit = "BICI_file_cluster";
+				}
 			
-			if(inter.file_store.type == "Save") save_bici(inter.file_store.filename)
-			else saving_dialogue("",".bici","BICI_file");
-			model_updated(ans);
+				if(inter.file_store.type == "Save") save_bici(inter.file_store.filename)
+				else saving_dialogue("",".bici",fit);
+				model_updated(ans);
+			}
 			break;
 		
 		case "Save Sim": case "Save Inf": case "Save PPC":
+		case "Export Sim": case "Export Inf": case "Export PPC":
 			inter.file_store.file_list = ans.file_list;
 			inter.file_store.save_type = "save";
 			saving_dialogue("",".bici","BICI_file");
+			close_bubble();
+			generate_screen();
 			break;
 		
 		case "Output States": case "Output Params":
@@ -132,6 +142,7 @@ worker.onmessage = function (e)
 			data_source_reply(ans);
 			update_param();
 			generate_screen();
+			
 			break;
 		
 		case "Rename Species":

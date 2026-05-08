@@ -1428,7 +1428,7 @@ function define_command(line)
 	
 	get_prior_param_list(par);
 	
-	model.param.push(par);
+	add_param(par);
 	
 	let res = check_reparam(value,model.param.length-1);
 	if(res.err) alert_import(res.msg); 
@@ -1454,7 +1454,7 @@ function param_command2(full_name,line,op)
 	let pp = get_param_prop(full_name);
 
 	let par = create_new_param(pp,"normal");
-
+	
 	add_proc_time(10*dpt);
 	
 	if(begin(par.name,"Ω")) par.pri_pos = prior_cv_pos;
@@ -1766,9 +1766,20 @@ function param_command2(full_name,line,op)
 	
 	get_prior_param_list(par);
 	
-	model.param.push(par);
+	add_param(par);
 	
 	if(load_dpt != 0) add_proc_time(load_dpt);
+}
+
+
+/// Adds a parameter to the model
+function add_param(par)
+{
+	if(find(model.param,"name",par.name) != undefined){
+		alert_import("The parameter '"+par.name+"' is defined more than once");
+	}
+	
+	model.param.push(par);
 }
 
 
@@ -2156,6 +2167,9 @@ function ind_effect_command()
 	}
 		
 	let name = get_tag_value("name"); if(name == "") cannot_find_tag();
+	if(contains_space(name)){
+		alert_import("The individual effect name '"+name+"' must not contain a space");
+	}
 	
 	let ie = get_tag_value("ie"); if(ie == "") cannot_find_tag();
 	

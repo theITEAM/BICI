@@ -10,6 +10,8 @@ function data_source_check_error(out_type,so)
 
 	if(so.info.siminf == "gen") return;
 	
+	if(so.info.siminf == "ppc") return; // TO DO this should really be checked
+	
 	/*
 	if(so.info.siminf == "gen"){
 		
@@ -27,7 +29,6 @@ function data_source_check_error(out_type,so)
 	so.error = false;
 	
 	let tab = so.table;
-	
 	if(tab != undefined){                            // Checks that elements are correctly specified
 		/* // This was turned off becase it lead to error e.g. "E | I"
 		// If a compartment then corrects name (e.g. space -> "-") 
@@ -596,8 +597,28 @@ function check_data_time(out_type)
 /// Checks the value of an element is correct
 function check_element(te,c,so)
 {
+	let spec = get_species(so.info.siminf);
+	
+	if(so.info.siminf == "gen") return; 
+	if(so.info.siminf == "ppc") return; // TO DO this should really be checked but
+
 	let col = so.load_col[c];	
 	
+	if(col.p != undefined){
+		if(spec == undefined) return "Species is not set";
+		if(col.p >= spec.length){
+			return "The species references no longer exists";
+		}
+		else{
+			if(col.cl != undefined){
+				let claa = spec[col.p].cla;
+				if(col.cl >= claa.length){
+					return "The classification referenced no longer exists";
+				}
+			}
+		}
+	}
+
 	switch(col.type){
 	case "float":
 		{
@@ -688,8 +709,10 @@ function check_element(te,c,so)
 	
 	case "comptext":
 		if(te == "") return "Element empty";	
-		let compwarn = model.check_comp_name(te);
-		if(compwarn != undefined) return compwarn;
+		{
+			let compwarn = model.check_comp_name(te);
+			if(compwarn != undefined) return compwarn;
+		}
 		break;
 		
 	case "knot":
@@ -703,6 +726,7 @@ function check_element(te,c,so)
 		
 	case "compartment": 
 		{  // This allows 'S', 'E' etc...
+			
 			let claa = model.species[col.p].cla[col.cl];
 			if(hash_find(claa.hash_comp,te) == undefined){
 				return "Compartment '"+te+"' is not in classification '"+claa.name+"'";
@@ -987,14 +1011,7 @@ function check_data_valid_all(type)
 	for(let loop = 0; loop < list.length; loop++){
 		let siminf = list[loop];
 		
-		let spec;
-		if(siminf == "ppc"){
-			let pf = model.inf_res.plot_filter;
-			if(pf) spec = pf.species;
-		}
-		else{
-			spec = model.species;
-		}
+		let spec = get_species(siminf);
 		
 		if(spec){
 			for(let p = 0; p < spec.length; p++){
@@ -1015,5 +1032,30 @@ function check_data_valid_all(type)
 				}
 			}
 		}
+	}
+}
+
+
+/// Gets species for error checking
+function get_species(siminf)
+{
+	switch(siminf){
+	case "gen":	
+		{
+			let pf =  model.sim_res.plot_filter;
+			if(pf) return pf.species;
+		}
+		break;
+	
+	case "ppc":
+		{
+			let pf = model.inf_res.plot_filter;
+			if(pf) return pf.species;
+		}
+		break;
+	
+	default:
+		return model.species;
+		break;
 	}
 }

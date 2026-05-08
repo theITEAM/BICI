@@ -10,55 +10,17 @@
 // one_file deterines if a a single file is generated or a file and directory are made
 
 /// Creates the ouytput file from the model
-function create_output_file(save_type,one_file,map_store,extra)
-{
-	let file_list=[];  // Used to make sure that files to not share the same name
+function create_output_file(save_type,one_file,map_store,bscript_add)
+{	
+	let bscript = create_bscript(save_type,map_store);
 	
-	percent(0);
-
-	update_model();
-
-	percent(30);
-	
-	let te = create_output_details(save_type,file_list,one_file);
-
-	percent(40);
-
-	check_data_valid_all(save_type);
-	
-	check_data_time(save_type);
-	
-	check_param_valid(save_type);
-	
-	check_integral_bounds(save_type);
-	
-	model.check_det_species(save_type);
-	
-	percent(45);
-	
-	for(let p = 0; p < model.species.length; p++){
-		te += create_output_species(p,file_list,save_type,map_store,one_file);
+	if(bscript_add != undefined){
+		for(let i = 0; i < bscript_add.length; i++) bscript.push(bscript_add[i]);
 	}
-
-	percent(50);
-
-	te += create_output_param(save_type,file_list,one_file);
 	
-	percent(60);
+	let file_list=[];
+	let te = generate_text_from_bscript(bscript,file_list,one_file);
 	
-	te += create_output_derived();
-	
-	te += endl;
-		
-	if(model.warn.length > 0) err_warning();
-	
-	percent(70);
-	
-	if(extra != undefined) te += extra;
-	//check_comp_structure();
-
-	percent(80);
-
 	if(input.type == "View Code"){
 		te = remove_escape_char(te);	
 		let	lines = te.split('\n');
@@ -75,6 +37,278 @@ function create_output_file(save_type,one_file,map_store,extra)
 	}
 }
 
+
+/// Creates a bscript from the model
+function create_bscript(save_type,map_store)
+{
+	percent(0);
+
+	update_model();
+
+	percent(30);
+	
+	let bscript=[];
+	
+	create_output_details(save_type,bscript);
+
+	percent(40);
+
+	check_data_valid_all(save_type);
+	
+	check_data_time(save_type);
+	
+	check_param_valid(save_type);
+	
+	check_integral_bounds(save_type);
+	
+	model.check_det_species(save_type);
+	
+	percent(45);
+	
+	for(let p = 0; p < model.species.length; p++){
+		create_output_species(p,save_type,map_store,bscript);
+	}
+
+	percent(50);
+
+	create_output_param(save_type,bscript);
+	
+	percent(60);
+	
+	create_output_derived(bscript);
+	
+	if(model.warn.length > 0) err_warning();
+	
+	percent(70);
+	
+	percent(80);
+
+	return bscript;
+}
+
+
+/// Generates the final text file from the bscript
+function generate_text_from_bscript(bscript,file_list,one_file)
+{
+	let sampledir_rel_sim = "output-sim/";
+	let sampledir_rel_inf = "output-inf/";
+	let sampledir_rel_post_sim = "output-post-sim/";
+	
+	let te = "";
+	
+	let species_list=[];
+	let chain_list=[];
+	for(let i = 0; i < bscript.length; i++){ // Works out all the species 
+		let com = bscript[i];
+		if(com.type == "species"){	
+			let name = find_tag(com,"name");
+			if(find_in(species_list,name) == undefined) species_list.push(name);
+		}
+		if(tag_exist(com,"chain")){
+			let name = find_tag(com,"chain");
+			if(find_in(chain_list,name) == undefined) chain_list.push(name);
+		}			
+	}
+	let multi_species = false;
+	if(species_list.length > 1) multi_species = true;
+	let multi_chain = false;
+	if(chain_list.length > 1) multi_chain = true;
+	
+	let imin = 0;               // Puts process comment at beginning
+	if(bscript.length > 0){
+		let com = bscript[0];
+		if(com.type == "comment" && begin_str(com.te,"# PROCESSED USING BICI")){
+			te += com.te+endl+endl;
+			imin++;
+		}		
+	}
+	
+	if(!one_file){
+		te += banner_text("DATA DIRECTORY")+endl;
+		te += endl;
+		te += 'data-dir folder="."'+endl;
+		te += endl;
+	}
+	
+	let species_sel = "";
+	let cla_sel = "";
+	
+	for(let i = imin; i < bscript.length; i++){
+		let com = bscript[i];
+	
+		switch(com.type){  // Keeps track of which which
+		case "species": species_sel = find_tag(com,"name"); break;
+		case "class": cla_sel = find_tag(com,"name"); break;	
+		case "set":
+			{
+				if(tag_exist(com,"species")) species_sel = find_tag(com,"species");
+				if(tag_exist(com,"classification")) cla_sel = find_tag(com,"classification");
+			}
+			break;
+		}
+	
+		if(com.type == "comment") te += com.te;
+		else{
+			te += com.type;
+			for(let j = 0; j < com.tags.length; j++){
+				let ta = com.tags[j];
+				
+				te += " "+ta.name+"=";
+				let val = ta.value;
+				if(typeof val == 'object'){
+					if(val.name == "inline") val = val.te;
+					else error("problem gen bscript");
+				}
+
+				let is_file = false;
+				
+				switch(is_tag_name_file(ta.name)){
+				case "yes": 
+					is_file = true; 
+					break;
+					
+				case "maybe": 
+					if(val.indexOf("\n") != -1) is_file = true; 
+					break;
+				}
+				
+				if(is_file){
+					if(one_file || begin_str(com.type,"warning")){
+						te += '"[['+endl+val+']]"';
+					}
+					else{
+						let fi_name = com.type;
+						let end = '.csv';
+						switch(com.type){
+						case "param-sim": 
+							fi_name = sampledir_rel_sim+"param"+chain_num(com,multi_chain);
+							break;
+							
+						case "state-sim": 
+							fi_name = sampledir_rel_sim+"state"+chain_num(com,multi_chain);
+							end = ".txt";
+							break;
+							
+						case "param-inf": 
+							fi_name = sampledir_rel_inf+"param"+chain_num(com,multi_chain);
+							break;
+							
+						case "state-inf": 
+							fi_name = sampledir_rel_inf+"state"+chain_num(com,multi_chain);
+							end = ".txt";
+							break;
+							
+						case "trans-diag-inf":
+							fi_name = sampledir_rel_inf+"diagnostic/trans_diag"+chain_num(com,multi_chain);
+							end = ".txt";
+							break;
+							
+						case "proposal-inf":
+							fi_name = sampledir_rel_inf+"prop-info"+chain_num(com,multi_chain);
+							end = ".txt";
+							break;
+							
+						case "diagnostics-inf":
+							fi_name = sampledir_rel_inf+"diagnostic/info"+chain_num(com,multi_chain);
+							end = ".txt";
+							break;
+						
+						case "param-stats-inf":
+							fi_name = sampledir_rel_inf+"param-stats"+chain_num(com,multi_chain);
+							break;
+							
+						case "generation-inf":
+							fi_name = sampledir_rel_inf+"diagnostic/generation";
+							break;
+						
+						case "param-post-sim": 
+							fi_name = sampledir_rel_sim+"param"+chain_num(com,multi_chain);
+							break;
+							
+						case "state-post-sim": 
+							fi_name = sampledir_rel_sim+"state"+chain_num(com,multi_chain);
+							end = ".txt";
+							break;
+							
+						case "map": end = '.geojson'; break;
+						
+						case "comp":
+							if(ta.name == "boundary"){
+								let name = find_tag(com,"name");	
+								fi_name = name+"_boundary"; end = '.geojson';
+							}
+							break;
+						
+						case "comp-all":
+							fi_name = "comp_"+cla_sel;
+							break;
+							
+						case "param": 
+							{
+								let name = find_tag(com,"name");
+								let spl = name.split("_");
+								fi_name = spl[0]+"_"+ta.name;
+							}
+							break;
+						
+						case "ind-effect":
+							fi_name = find_tag(com,"name")+"_"+ta.name;
+							break;
+							
+						case "fixed-effect":
+							fi_name = find_tag(com,"name")+"_"+ta.name;
+							break;
+							
+						case "description": 
+							end = ".txt";
+							break;
+						}		
+
+						let file = get_unique_file(fi_name,file_list,end)
+						write_file_store(val,file,file_list);
+						
+						te += '"'+file+'"';
+					}
+				}
+				else{
+					if(isNaN(val)) te += '"'+val+'"';
+					else te += val;
+				}
+			}
+		}
+		te += endl+endl;
+	}
+
+	return te;
+}
+
+
+/// Gets the chain number if needed
+function chain_num(com,multi_chain)
+{
+	if(multi_chain == true && tag_exist(com,"chain") != undefined){
+		return "_"+find_tag(com,"chain");
+	}
+	return "";
+}
+
+
+/// Determines if a tag exists or not
+function tag_exist(com,na)
+{
+	if(find(com.tags,"name",na) != undefined) return true;
+	return false;
+}
+
+
+/// Finds the value of a tag
+function find_tag(com,na)
+{
+	let k = find(com.tags,"name",na);
+	if(k == undefined) return "file";
+	
+	return com.tags[k].value;
+}
 
 /// If there are error then display
 function err_warning()
@@ -105,113 +339,89 @@ function err_warning()
 
 
 /// Creates a banner for the output file
-function banner(name)
+function banner(name,bscript)
 {
-	let num = 58;
-	let num2 = num - name.length;
-	let num3 = Math.floor(num2/2);
-	
-	let te = endl;
-	for(let i = 0; i < num3; i++) te += "#";
-	te += " "+name+" ";
-	for(let i = 0; i < num2-num3; i++) te += "#";
-	te += endl+endl;
-	
-	return te;
+	bscript.push({type:"comment", tags:[], te:banner_text(name)});
 }
 
 
 /// Creates a banner for the output file
-function mini_banner(name)
+function mini_banner(name,bscript)
 {
-	return "# "+name+endl+endl;
+	bscript.push({type:"comment", tags:[], te:"# "+name});
 }
 
 
 /// Generates details
-function create_output_details(save_type,file_list,one_file)
+function create_output_details(save_type,bscript)
 {
-	let te = "";
+	banner("DESCRIPTION",bscript);
+	add_bscript("description",[{name:"text", value:model.description.te}],bscript);
 
-	if(!one_file){
-		te += banner("DATA DIRECTORY");
-		te += 'data-dir folder="."'+endl;
-		te += endl;
-	}
-	
-	te += banner("DESCRIPTION");
-	
-	let desc = model.description.te;
-	let j = desc.length-1;
-	while(j >= 0 && (desc.substr(j,1) == "\n" || desc.substr(j,1) == "\r")) j--;
-	desc = desc.substr(0,j+1);
-	desc += endl;
-	
-	let file = get_unique_file("description",file_list,'.txt');
-	write_file_store(desc,file,file_list);
-	
-	//output_table_simp_file(file,head,row,file_list);
-	if(one_file) file = get_one_file(file_list);
-							
-	//te += 'description text="[['+endl+desc+endl+']]"'+endl;
-	te += 'description text="'+file+'"'+endl;
-	te += endl;
-	
-	te += banner("DETAILS");
-	
-	te += create_output_siminf(save_type);
-
-	return te;
+	banner("DETAILS",bscript);
+	create_output_siminf(save_type,bscript);
 }
 	
 	
+/// Adds a command to the bscript
+function add_bscript(name,tags,bscript)
+{
+	bscript.push({type:name, tags:tags});
+}
+	
+
+/// Adds a tag to a vector of tags
+function add_tag(name,value,tags)
+{
+	tags.push({name:name, value:value});
+}
+
+	
 /// Outputs all the results for a given species
-function create_output_species(p,file_list,save_type,map_store,one_file)
+function create_output_species(p,save_type,map_store,bscript)
 {
 	let sp = model.species[p];
 		
-	let te = banner("DEFINE MODEL AND DATA FOR SPECIES "+sp.name.toUpperCase());
+	banner("DEFINE MODEL AND DATA FOR SPECIES "+sp.name.toUpperCase(),bscript);
 	
-	let ty = sp.type.toLowerCase();
-	
-	te += 'species name="'+sp.name+'" type="'+ty+'"';
-
-	if(ty == "individual"){
-		if(sp.trans_tree.check == true){
-			te += ' trans-tree="';
-			if(sp.trans_tree.check == true) te += 'on';
-			else te += 'off';
-			te += '"';
+	{
+		let ty = sp.type.toLowerCase();
+		
+		let tags=[];
+		
+		add_tag("name",sp.name,tags);
+		add_tag("type",ty,tags);
+		
+		if(ty == "individual"){
+			if(sp.trans_tree.check == true) add_tag("trans-tree","on",tags);
 		}
+		
+		add_bscript("species",tags,bscript);
 	}
 	
-	te += endl+endl;
-	
-	te += create_output_compartments(p,file_list,map_store,one_file);
-	
-	te += create_output_ind_eff(p,file_list,one_file);
+	create_output_compartments(p,map_store,bscript);
 
-	te += create_output_fix_eff(p,file_list,save_type,one_file);
+	create_output_ind_eff(p,bscript);
 
-	te += create_output_sim_inf_source(p,"sim",file_list,one_file);
+	create_output_fix_eff(p,save_type,bscript);
+
+	create_output_sim_inf_source(p,"sim",bscript);
 	if(save_type == "sim") output_check("sim");	
 
-	te += create_output_sim_inf_source(p,"inf",file_list,one_file);
+	create_output_sim_inf_source(p,"inf",bscript);
 	if(save_type == "inf") output_check("inf");	
 	
 	if(model.inf_res.on == true){
-		te += create_output_sim_inf_source(p,"ppc",file_list,one_file);
+		create_output_sim_inf_source(p,"ppc",bscript);
 		if(save_type == "ppc") output_check("ppc");	
 	}
-
-	return te;
 }
 
 
 /// Creates output for all the compartments and transitions in the model
-function create_output_compartments(p,file_list,map_store,one_file)
+function create_output_compartments(p,map_store,bscript)
 {
-	let te = mini_banner("SPECIES MODEL");
+	mini_banner("SPECIES MODEL",bscript);
 		
 	let sp = model.species[p];
 	
@@ -237,219 +447,216 @@ function create_output_compartments(p,file_list,map_store,one_file)
 		let claa = sp.cla[cl];
 		let cam = claa.camera;
 		
-		te += 'class name="'+claa.name+'"';
+		{
+			let tags=[];
+			add_tag("name",claa.name,tags);
 		
-		if(claa.default_map == true) te += ' map="load"'; 
-		
-		let clp = clone_p(p,cl);
+			if(claa.default_map == true) add_tag("map","load",tags);
+			
+			let clp = clone_p(p,cl);
 
-		if(clp != undefined) te += ' clone="'+model.species[clp].name+'"'+endl+endl;
-		else{
-			te += ' index="'+claa.index+'"';
-			if(cam.coord != COORD_DEFAULT) te += ' coord="'+cam.coord+'"';
-			
-			te += endl+endl;
-		
-			if(one_file || cam.coord == "latlng"){
-				te += 'view '+output_coords(cam.x,cam.y,cam);
-				
-				if(cam.grid == "on"){
-					te += ' grid="on"'; 
-				}
-				
-				if(cam.slider.value != 0){
-					te += ' comp-scale='+Math.exp(cam.slider.value).toPrecision(2);
-				}
-				
-				te += ' scale='+precision(cam.scale);
-				te += endl+endl;
+			if(clp != undefined) add_tag("clone",model.species[clp].name,tags);
+			else{
+				add_tag("index",claa.index,tags);
+				if(cam.coord != COORD_DEFAULT) add_tag("coord",cam.coord,tags);
 			}
+			add_bscript("class",tags,bscript);
+		
+			if(clp == undefined){
+				if(cam.grid == "on" || cam.slider.value != 0 || cam.coord == "latlng"){
+					let tags=[];
+					output_coords(cam.x,cam.y,cam,tags);
+							
+					if(cam.grid == "on") add_tag("grid","on",tags);
+					
+					if(cam.slider.value != 0) add_tag("comp-scale",Math.exp(cam.slider.value).toPrecision(2),tags);
+					
+					add_tag("scale",precision(cam.scale),tags);
+						
+					add_bscript("view",tags,bscript);			
+				}
+	
+				let store=[];
+				for(let c = 0; c < claa.ncomp; c++){
+					let labs=[];
+					
+					let co = claa.comp[c];
+					
+					labs.push({tag:"name", val:co.name});
+					
+					labs.push({tag:"color", val:co.col});
+					
+					labs.push({tag:"fix", val:String(co.fixed.check)});
 			
+					if(sp.type == "Individual" && sp.trans_tree.check == true){
+						if(sp.infection_cl.te == sp.cla[cl].name && co.infected.check != undefined){
+							labs.push({tag:"infected", val:String(co.infected.check)});
+						}
+					}
+						
+					if(co.choose_branch == true){
+						if(co.branch == true) labs.push({tag:"branch-prob", val:"true"});
+						else labs.push({tag:"branch-prob", val:"false"});
+					}
+					
+					switch(cam.coord){
+					case "cartesian": 
+						labs.push({tag:"x", val:precision(co.x/import_scale_factor)});
+						labs.push({tag:"y", val:precision(co.y/import_scale_factor)});
+						break;
+						
+					case "latlng":
+						if(co.type == "boundary"){
+							let k = find(map_store,"name",co.map_ref); 
+							if(k == undefined) error("Cannot find feature");
+		
+							let map_da = { crs:{},features:[],type:"FeatureCollection"};
+							map_da.features.push(generate_JSON_feature(co.name,map_store[k].feature));
+							
+							let file = JSON.stringify(map_da)+"\n";
+							
+							labs.push({tag:"boundary", val:file});
+						}
+						else{
+							let p = transform_latlng_inv(co.x,co.y);
+							labs.push({tag:"lat", val:precision(p.lat)});
+							labs.push({tag:"lng", val:precision(p.lng)});
+						}
+						break;
+
+					default: error("Option not recognised 111"); break;
+					}
+					
+					store.push(labs);
+				}
+				
+				if(store.length > 0){
+					output_command_list("comp",claa.name,store,bscript);
+				}
+			}
+		}
+			
+		{
 			let store=[];
-			for(let c = 0; c < claa.ncomp; c++){
+			for(let j = 0; j < claa.ntra; j++){
 				let labs=[];
 				
-				let co = claa.comp[c];
+				let tr = claa.tra[j];
 				
-				labs.push({tag:"name", val:co.name});
+				let mid_start = 0, mid_end = tr.midp.length;
+				let i_sel;
 				
-				labs.push({tag:"color", val:co.col});
-				
-				labs.push({tag:"fix", val:co.fixed.check});
+				let name = tr.name.replace(/→/g,"->")
 			
-				if(sp.type == "Individual" && sp.trans_tree.check == true){
-					if(sp.infection_cl.te == sp.cla[cl].name && co.infected.check != undefined){
-						labs.push({tag:"infected", val:co.infected.check});
+				let splna = name.split("->");
+				if(splna[0] == "+"){ i_sel = 0; mid_start++;}
+				if(splna[1] == "-"){ i_sel = mid_end-1; mid_end--;}
+				
+				labs.push({tag:"name", val:name});
+				
+				if(i_sel != undefined){
+					switch(cam.coord){
+					case "cartesian":
+						labs.push({tag:"x", val:precision(tr.midp[i_sel].x/import_scale_factor)});
+						labs.push({tag:"y", val:precision(tr.midp[i_sel].y/import_scale_factor)});
+						break;
+					
+					case "latlng":
+						{
+							let p = transform_latlng_inv(tr.midp[i_sel].x,tr.midp[i_sel].y);
+							labs.push({tag:"lat", val:precision(p.lat)});
+							labs.push({tag:"lng", val:precision(p.lng)});
+						}
+						break;
+
+					default: error("Option not recognised 113"); break;
 					}
 				}
-					
-				if(co.choose_branch == true){
-					if(co.branch == true) labs.push({tag:"branch-prob", val:"true"});
-					else labs.push({tag:"branch-prob", val:"false"});
+			
+				let value = model.get_trans_value(tr);
+		
+				let tra_type = value.tra_type;
+				let nm_flag = value.nm_flag;
+				let err_fl = value.err_gl;
+				let te = value.te;
+				
+				labs.push({tag:"value", val:te});
+				
+				if(err_fl != undefined){
+					add_warning({mess:"Transition problem.", mess2:"The value for '"+err_fl+"' is not specified", p:p, cl:cl, i:j, warn_type:"TransMistake"});
+				}
+				
+				if(nm_flag){
+					switch(sp.type){
+					case "Population": case "Deterministic":
+						add_warning({mess:"Transition problem.", mess2:"Transition '"+tr.name+"' cannot have a '"+tra_type+"' distribution because '"+sp.name+"' uses a population-based model.", p:p, cl:cl, i:j, warn_type:"TransMistake"});
+						break;
+					}
+				}
+				
+				let bp_te;
+				
+				if(tr.branch == true){
+					if(tr.all_branches == true) bp_te = esc(tr.value.bp_eqn.te);
+					else{
+						if(tr.branch_select == true) bp_te = esc(tr.value.bp_eqn.te);
+						else bp_te = "*";
+					}
+				}
+				
+				if(bp_te != undefined){
+					if(bp_te == ""){
+						add_warning({mess:"Branching problem", mess2:"Transition '"+tr.name+"' must have a branching probability assocaited with it.", p:p, cl:cl, i:j, warn_type:"TransMistake"});
+					}
+					else{
+						labs.push({tag:"bp", val:bp_te});
+					}
 				}
 				
 				switch(cam.coord){
-				case "cartesian": 
-					labs.push({tag:"x", val:precision(co.x/import_scale_factor)});
-					labs.push({tag:"y", val:precision(co.y/import_scale_factor)});
+				case "cartesian":
+					let xlist = '', ylist = '';
+					
+					for(let i = mid_start; i < mid_end; i++){
+						if(i != mid_start){ xlist += ','; ylist += ',';}
+						
+						xlist += precision(tr.midp[i].x/import_scale_factor);
+						ylist += precision(tr.midp[i].y/import_scale_factor);
+					}
+					
+					if(xlist != ''){
+						labs.push({tag:"mid-x", val:xlist});
+						labs.push({tag:"mid-y", val:ylist});
+					}
 					break;
 					
 				case "latlng":
-					if(co.type == "boundary"){
-						let file = get_unique_file(co.name+"_boundary",file_list,'.geojson');
+					let latlist = '', lnglist = '';
 					
-						let k = find(map_store,"name",co.map_ref); 
-						if(k == undefined) error("Cannot find feature");
-	
-						let map_da = { crs:{},features:[],type:"FeatureCollection"};
-						map_da.features.push(generate_JSON_feature(co.name,map_store[k].feature));
+					for(let i = mid_start; i < mid_end; i++){
+						if(i != mid_start){ latlist += ','; lnglist += ',';}
 						
-						write_file_store(JSON.stringify(map_da)+"\n",file,file_list);
-						
-						if(one_file) file = get_one_file(file_list);
-						
-						labs.push({tag:"boundary", val:file});
+						let p = transform_latlng_inv(tr.midp[i].x,tr.midp[i].y);
+
+						latlist += precision(p.lat);
+						lnglist += precision(p.lng);
 					}
-					else{
-						let p = transform_latlng_inv(co.x,co.y);
-						labs.push({tag:"lat", val:precision(p.lat)});
-						labs.push({tag:"lng", val:precision(p.lng)});
+					
+					if(latlist != ''){
+						labs.push({tag:"mid-lat", val:latlist});
+						labs.push({tag:"mid-lng", val:lnglist});
 					}
 					break;
 
-				default: error("Option not recognised 111"); break;
+				default: error("Option not recognised 115"); break;
 				}
 				
 				store.push(labs);
 			}
 			
 			if(store.length > 0){
-				te += output_command_list("comp",claa.name,store,file_list,one_file);
-				te += endl;	
+				output_command_list("trans",claa.name,store,bscript);
 			}
-		}
-
-		let store=[];
-		for(let j = 0; j < claa.ntra; j++){
-			let labs=[];
-			
-			let tr = claa.tra[j];
-			
-			let mid_start = 0, mid_end = tr.midp.length;
-			let i_sel;
-			
-			let name = tr.name.replace(/→/g,"->")
-		
-			let splna = name.split("->");
-			if(splna[0] == "+"){ i_sel = 0; mid_start++;}
-			if(splna[1] == "-"){ i_sel = mid_end-1; mid_end--;}
-			
-			labs.push({tag:"name", val:name});
-			
-			if(i_sel != undefined){
-				switch(cam.coord){
-				case "cartesian":
-					labs.push({tag:"x", val:precision(tr.midp[i_sel].x/import_scale_factor)});
-					labs.push({tag:"y", val:precision(tr.midp[i_sel].y/import_scale_factor)});
-					break;
-				
-				case "latlng":
-					{
-						let p = transform_latlng_inv(tr.midp[i_sel].x,tr.midp[i_sel].y);
-						labs.push({tag:"lat", val:precision(p.lat)});
-						labs.push({tag:"lng", val:precision(p.lng)});
-					}
-					break;
-
-				default: error("Option not recognised 113"); break;
-				}
-			}
-		
-			let value = model.get_trans_value(tr);
-	
-			let tra_type = value.tra_type;
-			let nm_flag = value.nm_flag;
-			let err_fl = value.err_gl;
-			let te = value.te;
-			
-			labs.push({tag:"value", val:te});
-			
-			if(err_fl != undefined){
-				add_warning({mess:"Transition problem.", mess2:"The value for '"+err_fl+"' is not specified", p:p, cl:cl, i:j, warn_type:"TransMistake"});
-			}
-			
-			if(nm_flag){
-				switch(sp.type){
-				case "Population": case "Deterministic":
-					add_warning({mess:"Transition problem.", mess2:"Transition '"+tr.name+"' cannot have a '"+tra_type+"' distribution because '"+sp.name+"' uses a population-based model.", p:p, cl:cl, i:j, warn_type:"TransMistake"});
-					break;
-				}
-			}
-			
-			let bp_te;
-			
-			if(tr.branch == true){
-				if(tr.all_branches == true) bp_te = esc(tr.value.bp_eqn.te);
-				else{
-					if(tr.branch_select == true) bp_te = esc(tr.value.bp_eqn.te);
-					else bp_te = "*";
-				}
-			}
-			
-			if(bp_te != undefined){
-				if(bp_te == ""){
-					add_warning({mess:"Branching problem", mess2:"Transition '"+tr.name+"' must have a branching probability assocaited with it.", p:p, cl:cl, i:j, warn_type:"TransMistake"});
-				}
-				else{
-					labs.push({tag:"bp", val:bp_te});
-				}
-			}
-			
-			switch(cam.coord){
-			case "cartesian":
-				let xlist = '', ylist = '';
-				
-				for(let i = mid_start; i < mid_end; i++){
-					if(i != mid_start){ xlist += ','; ylist += ',';}
-					
-					xlist += precision(tr.midp[i].x/import_scale_factor);
-					ylist += precision(tr.midp[i].y/import_scale_factor);
-				}
-				
-				if(xlist != ''){
-					labs.push({tag:"mid-x", val:xlist});
-					labs.push({tag:"mid-y", val:ylist});
-				}
-				break;
-				
-			case "latlng":
-				let latlist = '', lnglist = '';
-				
-				for(let i = mid_start; i < mid_end; i++){
-					if(i != mid_start){ latlist += ','; lnglist += ',';}
-					
-					let p = transform_latlng_inv(tr.midp[i].x,tr.midp[i].y);
-
-					latlist += precision(p.lat);
-					lnglist += precision(p.lng);
-				}
-				
-				if(latlist != ''){
-					labs.push({tag:"mid-lat", val:latlist});
-					labs.push({tag:"mid-lng", val:lnglist});
-				}
-				break;
-
-			default: error("Option not recognised 115"); break;
-			}
-			
-			store.push(labs);
-		}
-		
-		if(store.length > 0){
-			te += output_command_list("trans",claa.name,store,file_list,one_file);
-		
-			te += endl;
 		}
 		
 		if(claa.annotation.length > 0){
@@ -457,27 +664,37 @@ function create_output_compartments(p,file_list,map_store,one_file)
 				let anno = claa.annotation[i];
 				switch(anno.type){
 				case "box":
-					te += 'box text="'+anno.te+'" comps="';
-					for(let k = 0; k < anno.comps.length; k++){
-						if(k != 0) te += ",";
-						te += anno.comps[k];
-					}						
-					te += '"'
-					if(anno.color != annotation_col_default) te += ' color="'+anno.color+'"';
-					if(anno.size != size_annotation_default) te += ' text-size='+anno.size;
-					te += endl;
+					{
+						let tags=[];
+						
+						let st = "";
+						for(let k = 0; k < anno.comps.length; k++){
+							if(k != 0) st += ",";
+							st += anno.comps[k];
+						}						
+						add_tag("comps",st,tags);
+						
+						if(anno.color != annotation_col_default) add_tag("color",anno.color,tags); 
+						if(anno.size != size_annotation_default) add_tag("text-size",anno.size,tags);  
+						
+						add_bscript("box",tags,bscript);
+					}
 					break;
 					
 				case "text":
-					te += 'label text="'+anno.te+'" '+output_coords(anno.x,anno.y,cam);
-					if(anno.color != annotation_col_default) te += ' color="'+anno.color+'"';
-					if(anno.size != size_annotation_default) te += ' text-size='+anno.size;
-					te += endl;
+					{
+						let tags=[];
+						add_tag("text",anno.te,tags);
+						output_coords(anno.x,anno.y,cam,tags);
+						if(anno.color != annotation_col_default) add_tag("color",anno.color,tags);
+						if(anno.size != size_annotation_default) add_tag("text-size",anno.size,tags);
+					
+						add_bscript("label",tags,bscript);
+					}
 					break;
 					
 				case "map":
 					if(anno.default_map != true){
-						let file = get_unique_file("map",file_list,'.geojson');
 						let k = find(map_store,"name",anno.map_ref);
 						if(k == undefined) error("map undefined");
 						else{
@@ -486,9 +703,11 @@ function create_output_compartments(p,file_list,map_store,one_file)
 								map_da.features.push(generate_JSON_feature("Feature"+k,map_store[k].feature[j]));
 							}
 						
-							write_file_store(JSON.stringify(map_da)+"\n",file,file_list);
-							if(one_file) file = get_one_file(file_list);
-							te += 'map file="' +file+'"' + endl;
+							let file = JSON.stringify(map_da)+"\n";
+							
+							let tags=[];
+							add_tag("file",file,tags);
+							add_bscript("map",tags,bscript);
 						}
 					}
 					break;
@@ -497,40 +716,34 @@ function create_output_compartments(p,file_list,map_store,one_file)
 					break;
 				}
 			}
-			te += endl;
 		}
 	}
-
-	return te;
 }
 
 	
 /// Gets string for coordinates
-function output_coords(x,y,cam)
+function output_coords(x,y,cam,tags)
 {
-	let te = "";
 	switch(cam.coord){
 	case "cartesian": 
-		te += 'x='+precision(x)+' y='+precision(y); 
+		add_tag("x",precision(x),tags);
+		add_tag("y",precision(y),tags);
 		break;
 		
 	case "latlng": 
 		let p = transform_latlng_inv(x,y);
-		te += 'lat='+precision(p.lat)+' lng='+precision(p.lng); 
+		add_tag("lat",precision(p.lat),tags);
+		add_tag("lng",precision(p.lng),tags);
 		break;
 
 	default: error("Option not recognised 110"); break;
 	}
-	
-	return te;
 }
 
 	
 /// Outputs a list of commands either seperately or in a file (for comps-all and trans-all)
-function output_command_list(type,claa_name,store,file_list,one_file)
+function output_command_list(type,claa_name,store,bscript)
 {
-	let te = "";
-	
 	let fl = false;
 	if(store.length >= 10){
 		fl = true;
@@ -568,7 +781,7 @@ function output_command_list(type,claa_name,store,file_list,one_file)
 			row.push(ro);
 		}
 		
-		te += type+'-all';
+		let tags=[];
 		
 		// Looks to remove tags which are all the same
 		let i = 0;
@@ -578,9 +791,7 @@ function output_command_list(type,claa_name,store,file_list,one_file)
 			let j = 1; while(j < store.length && row[j][i] == row[0][i]) j++;
 			
 			if(j == store.length){
-				te += " "+head[i]+"=";
-				if(is_nan(val)) te += '"'+val+'"';
-				else te += val;
+				add_tag(head[i],val,tags);
 				
 				head.splice(i,1);
 				for(let j = 0; j < store.length; j++){
@@ -591,30 +802,24 @@ function output_command_list(type,claa_name,store,file_list,one_file)
 			else i++;
 		}
 		
-		let file = get_unique_file(type+"-"+claa_name,file_list,'.csv');
-
-		output_table_simp_file(file,head,row,file_list);
-		if(one_file) file = get_one_file(file_list);
-		
-		te += ' file="'+file+'"'+endl;
+		add_tag("file",output_table_simp_file(head,row),tags);
+	
+		add_bscript(type+"-all",tags,bscript);
 	}	
 	else{		
 		for(let j = 0; j < store.length; j++){
 			let labs = store[j];
-			te += type;
+
+			let tags=[];
 			for(let k = 0; k < labs.length; k++){
-				if(!(labs[k].tag == "fix" && labs[k].val == false)){
-					te += " "+labs[k].tag+"=";
-					let val = labs[k].val;
-					if(is_nan(val)) te += '"'+val+'"';
-					else te += val;
+				if(!(labs[k].tag == "fix" && labs[k].val == "false")){
+					add_tag(labs[k].tag,labs[k].val,tags);
 				}
 			}
-			te += endl;
+			
+			add_bscript(type,tags,bscript);
 		}
 	}
-	
-	return te;
 }
 
 
@@ -662,49 +867,50 @@ function clone_p(p,cl)
  
 
 /// Create output of parameters
-function create_output_param(save_type,file_list,one_file)
+function create_output_param(save_type,bscript)
 {
 	if(model.param.length == 0) return "";
 	
-	let te = banner("PARAMETERS");
+	banner("PARAMETERS",bscript);
 	
 	for(let th = 0; th < model.param.length; th++){
 		let par = model.param[th];
-		if(par.variety == "define") te += output_define(par)
+		if(par.variety == "define") output_define(par,bscript)
 	}
 	
 	for(let th = 0; th < model.param.length; th++){
 		let par = model.param[th];
-		if(par.variety != "define") te += output_param(model.param[th],save_type,file_list,one_file);
+		if(par.variety != "define"){
+			output_param(model.param[th],save_type,bscript);
+		}
 	}
-	
-	te += endl;
-
-	return te;
 }
 
 
 /// Outputs any parameter definitions
-function output_define(par)
+function output_define(par,bscript)
 {
 	if(par.variety != "define") error("Equation should be define");
 	
-	let te = 'define name="'+remove_eq_quote(par.full_name)+'" value="'+par.define_eqn.trim()+'"'+endl+endl;
-	
-	return te;
+	let tags=[];
+	add_tag("name",remove_eq_quote(par.full_name),tags);
+	add_tag("value",par.define_eqn.trim(),tags);
+
+	add_bscript("define",tags,bscript);
 }
 		
 		
 /// Outputs a single parameter
-function output_param(par,save_type,file_list,one_file)
+function output_param(par,save_type,bscript)
 {
-	let te = "";
 	let dist_done = false;
 
+	let tags=[];
+	
 	if(par.type != "derive_param"){		
 		let num_warn = model.warn.length;
 	
-		let te1 = "param";
+		let com = "param";
 		if(par.type == "param factor"){
 			let pfac = model.param_factor;
 		
@@ -713,13 +919,13 @@ function output_param(par,save_type,file_list,one_file)
 			while(k < kmax && pfac[k].f_param.full_name != par.full_name) k++;
 			if(k == kmax) alert_help("Problem loading param factor");
 	
-			te1 += '-mult name="'+remove_eq_quote(pfac[k].param.full_name)+'"';
+			com += "-mult";
+			add_tag("name",remove_eq_quote(pfac[k].param.full_name),tags);
 		}
 		else{
-			te1 += ' name="'+remove_eq_quote(par.full_name)+'"';
+			add_tag("name",remove_eq_quote(par.full_name),tags);
 		}
 		
-		let te2 = "";
 		let display = false;
 		
 		if(par.dist_mat || par.iden_mat || par.den_vec){
@@ -729,7 +935,7 @@ function output_param(par,save_type,file_list,one_file)
 			// Constants and simulation parameters
 			if(par.variety == "reparam" && par.reparam_eqn_on){	
 				if(par.reparam_eqn.trim() != ""){
-					te1 += ' reparam="'+par.reparam_eqn+'"';
+					add_tag("reparam",par.reparam_eqn,tags);
 				}
 				display = true;
 			}
@@ -747,49 +953,47 @@ function output_param(par,save_type,file_list,one_file)
 				}
 				else{
 					if(par.variety == "dist" && par.sim_sample.check == true){
-						te2 += output_add_prior_distribution(save_type,par,"dist",file_list,one_file);
+						output_add_prior_distribution(save_type,par,"dist",tags);
+						display = true;
 						dist_done = true;
 					}
 					else{
 						let exp = "value";
-						if(par.variety == "const"){
-							exp = 'constant';
-						}
+						if(par.variety == "const") exp = 'constant';
 						else{
 							if(par.variety == "reparam") exp = 'reparam';
 						}
 									
-						te2 += ' '+exp+'=';
-					
-						let file;				
+						let value;
 						if(par.dep.length > 0){
-							file = get_unique_file(exp+"-"+par.name,file_list,'.csv');
-						}
-						
-						if(file != undefined){
-							file = output_value_table(par,par.value,"Value",file,file_list,one_file,"value",save_type);
-							te2 += '"'+file+'"';
+							value = output_value_table(par,par.value,"Value","value",save_type);
 						}
 						else{
-							te2 += JSON.stringify(par.value); 
+							value = par.value;
 						}
+					
+						add_tag(exp,value,tags);
+						display = true;
 					}	
 				}
 			}
 			
 			if(par.prior_const_on == true && par.prior_const_set == true){
-				te2 += output_add_prior_const(save_type,par,file_list,one_file);
+				output_add_prior_const(save_type,par,tags);
+				display = true;
 			}
 			else{
 				if(par.variety != "const" && par.variety != "reparam"){
 					switch(par.variety){
 					case "normal":
-						te2 += output_add_prior_distribution(save_type,par,"prior",file_list,one_file);
+						output_add_prior_distribution(save_type,par,"prior",tags);
+						display = true;
 						break;
 						
 					case "dist":
 						if(dist_done == false){
-							te2 += output_add_prior_distribution(save_type,par,"dist",file_list,one_file);
+							output_add_prior_distribution(save_type,par,"dist",tags);
+							display = true;
 						}
 						break;
 						
@@ -797,8 +1001,6 @@ function output_param(par,save_type,file_list,one_file)
 					}
 				}
 			}
-			
-			if(te2 != "") display = true;
 			
 			if(par.spline.on == true){
 				if(par.spline.knot.length == 0) error("There should be knot times specified");
@@ -823,42 +1025,36 @@ function output_param(par,save_type,file_list,one_file)
 					}
 				}
 					
-				te2 += ' knot-times="'+stringify(par.spline.knot)+'"';
+				add_tag("knot-times",stringify(par.spline.knot),tags);
 				
 				let sm = par.spline.smooth;
 				if(sm.check == true){
-					te2 += ' smooth="'+sm.type.value.toLowerCase()+'('+sm.value+')"';
+					add_tag("smooth",sm.type.value.toLowerCase()+'('+sm.value+')',tags);
 				}
 				
 				let sel = par.spline.spline_radio.value;
 
 				if(sel != "Linear"){
-					switch(sel){
-					case "Linear": te2 += ' spline-type="linear"'; break;
-					case "Square": te2 += ' spline-type="square"'; break;
-					case "Cubic +ve": te2 += ' spline-type="cubic +ve"'; break;
-					case "Cubic": te2 += ' spline-type="cubic"'; break;
-					}
+					add_tag("spline-type",sel.toLowerCase(),tags); 
 				}
 			}
 		}
 		
 		if(par.factor){
-			te1 += ' factor="true"';
-			
+			add_tag("factor","true",tags);
+		
 			if(par.factor_weight_on.check == true){
-				let file = get_unique_file("weight-"+par.name,file_list,'.csv');
-				file = output_value_table(par,par.factor_weight,"Value",file,file_list,one_file,"value",save_type);
-				te1 += ' factor-weight="'+file+'"';
+				let file = output_value_table(par,par.factor_weight,"Value","value",save_type);
+				add_tag("factor-weight",file,tags);
 			}
 		}
 		
 		if(par.sim_sample && par.sim_sample.check == false){
-			te1 += ' sim-sample="false"';
+			add_tag("sim-sample","false",tags);
 		}
 				
 		if(!par.dist_mat && !par.iden_mat && !par.den_vec){
-			te += te1+te2+endl+endl;
+			add_bscript(com,tags,bscript);
 		}
 		
 		if(display == false && (save_type == "sim" || save_type == "inf")){
@@ -867,13 +1063,11 @@ function output_param(par,save_type,file_list,one_file)
 			}
 		}
 	}
-	
-	return te;
 }
 	
 	
 /// Outputs the value of a table
-function output_value_table(par,value,head_col,file,file_list,one_file,key,save_type)
+function output_value_table(par,value,head_col,key,save_type)
 {
 	let list = par.list;
 	
@@ -909,7 +1103,7 @@ function output_value_table(par,value,head_col,file,file_list,one_file,key,save_
 	if(is_matrix(par)){   // Matrix format
 		for(let i = 0; i < list[1].length; i++){
 			if(i != 0) data += ",";
-			data += list[1][i];
+			data += '"'+list[1][i]+'"';
 		}
 		data += endl;
 		
@@ -921,7 +1115,9 @@ function output_value_table(par,value,head_col,file,file_list,one_file,key,save_
 				let el = get_element(value,index);
 				if(el == undefined){ param_undefined(par,index); return;}
 					
-				data += '"'+get_op_val(el,head_col,par)+'"';
+				let val = get_op_val(el,head_col,par);
+				if(isNaN(val)) data += '"'+val+'"';
+				else data += val;
 			}
 			data += endl;
 		}
@@ -930,7 +1126,7 @@ function output_value_table(par,value,head_col,file,file_list,one_file,key,save_
 		for(let d = 0; d < par.dep.length; d++){	
 			data += '"'+par.dep[d]+'",';
 		}
-		data += head_col + endl;
+		data += '"'+head_col+'"'+endl;
 
 		let co_list = generate_co_list(par.list);
 		for(let i = 0; i < co_list.length; i++){
@@ -942,15 +1138,16 @@ function output_value_table(par,value,head_col,file,file_list,one_file,key,save_
 				for(let d = 0; d < par.dep.length; d++){
 					data += '"'+list[d][comb.index[d]]+'",';
 				}
-				data += '"'+get_op_val(el,head_col,par)+'"'+endl;
+				
+				let val = get_op_val(el,head_col,par);
+				if(isNaN(val)) data += '"'+val+'"';
+				else data += val;
+				data += endl;
 			}
 		}
 	}
 
-	write_file_store(data,file,file_list);
-	if(one_file) file = get_one_file(file_list);
-	
-	return file;
+	return data;
 }
 
 
@@ -985,10 +1182,8 @@ function param_undefined(par,index)
 
 
 /// Adds text associated with adding a distribution
-function output_add_prior_distribution(save_type,par,variety,file_list,one_file)
+function output_add_prior_distribution(save_type,par,variety,tags)
 {
-	let st="";
-
 	let key;
 	switch(variety){
 	case "dist": key = "distribution"; break;
@@ -1007,18 +1202,17 @@ function output_add_prior_distribution(save_type,par,variety,file_list,one_file)
 			add_warning({mess:"Missing "+key+" distribution information", mess2:"The "+key+" for parameter "+par.full_name+" must be set.", warn_type:warn_type, name:par.name});
 		}
 		else{
-			let file = get_unique_file(key+"-"+par.name,file_list,'.csv');
-			
-			let head_col;
+			let ta, head_col;
 			switch(variety){
-			case "dist": st += ' dist-split'; head_col = 'Dist'; break;
-			case "prior": st += ' prior-split'; head_col = 'Prior'; break;
+			case "dist": ta = "dist-split"; head_col = "Dist"; break;
+			case "prior": ta = "prior-split"; head_col = "Prior"; break;
 			default: error("option prob"); break;
 			}
 			
-			file = output_value_table(par,par.prior_split,head_col,file,file_list,one_file,key,save_type);
+			let file = output_value_table(par,par.prior_split,head_col,key,save_type);
 			if(file == undefined) return "";
-			st += '="'+file+'"';
+			
+			add_tag(ta,file,tags);
 		}
 	}
 	else{
@@ -1027,30 +1221,25 @@ function output_add_prior_distribution(save_type,par,variety,file_list,one_file)
 		let prior_string = get_prior_output(save_type,par.prior,variety,par);
 		if(prior_string == "") return "";
 	
+		let ta;
 		switch(variety){ 
-		case "dist": st += ' dist'; break;
-		case "prior": st += ' prior'; break;
+		case "dist": ta = "dist"; break;
+		case "prior": ta = "prior"; break;
 		default: error("option prob"); break;
 		}
 		
-		st += '='+prior_string;
+		add_tag(ta,prior_string,tags);
 	}
-		
-	return st;
 }
 
 
 /// Adds a prior constant
-function output_add_prior_const(save_type,par,file_list,one_file)
+function output_add_prior_const(save_type,par,tags)
 {
 	let te = ' prior-const=';
 		
-	let file;				
+	let value;
 	if(par.dep.length > 0){
-		file = get_unique_file("prior-const-"+par.name,file_list,'.csv');
-	}
-	
-	if(file != undefined){
 		let err = check_param_value("Set Param",par,par.prior_const);
 		if(err){
 			let wt = "MissingSimValue"; if(par.variety == "reparam") wt = "ReparamValue";
@@ -1059,14 +1248,13 @@ function output_add_prior_const(save_type,par,file_list,one_file)
 			return;
 		}
 	
-		file = output_value_table(par,par.prior_const,"Value",file,file_list,one_file,"value",save_type);
-		te += '"'+file+'"';
+		value = output_value_table(par,par.prior_const,"Value","value",save_type);
 	}
 	else{
-		te += JSON.stringify(par.prior_const); 
+		value = JSON.stringify(par.prior_const); 
 	}
 	
-	return te;
+	add_tag("prior-const",value,tags);
 }
 
 
@@ -1091,7 +1279,7 @@ function get_prior_output(save_type,pri,variety,par)
 		}
 	}
 	
-	return '"'+st+'"';
+	return st;
 }
 
 
@@ -1131,13 +1319,13 @@ function check_prior_val(val,variety,par,op)
 
 	
 /// Create output of derived quantities
-function create_output_derived()
+function create_output_derived(bscript)
 {
 	let derive = model.derive;
 
 	if(derive.length == 0) return "";
 
-	let te = mini_banner("DERIVED");
+	mini_banner("DERIVED",bscript);
 
 	for(let i = 0; i < derive.length; i++){
 		let der = derive[i];
@@ -1145,23 +1333,24 @@ function create_output_derived()
 		if(der.eqn1.param.length != 1) error("problem with derived");
 		else{
 			let name = remove_eq_quote(der.eqn1.param[0].full_name);	
-			te += 'derived name="'+name+'" eqn="'+der.eqn2.te+'"'+endl;
+			
+			let tags=[];
+			add_tag("name",name,tags);
+			add_tag("eqn",der.eqn2.te,tags);
+			add_bscript("derived",tags,bscript);
 		}
 	}
-	te += endl;
-
-	return te;
 }
 
 
 /// Create output of individual effects
-function create_output_ind_eff(p,file_list,one_file)
+function create_output_ind_eff(p,bscript)
 {
 	let iegs = model.species[p].ind_eff_group;
 		
 	if(iegs.length == 0) return "";
 	
-	let te = mini_banner("INDIVIDUAL EFFECTS");
+	mini_banner("INDIVIDUAL EFFECTS",bscript);
 
 	for(let i = 0; i < iegs.length; i++){
 		let ieg = iegs[i];
@@ -1172,8 +1361,11 @@ function create_output_ind_eff(p,file_list,one_file)
 		}
 		
 		let name = ieg.name;
-			
-		te += 'ind-effect name="'+ieg.name+'" ie="'+ie+'"';
+		
+		let tags=[];
+		
+		add_tag("name",ieg.name,tags);
+		add_tag("ie",ie,tags);
 		
 		let mat = ieg.A_matrix;
 		
@@ -1185,37 +1377,26 @@ function create_output_ind_eff(p,file_list,one_file)
 				switch(mat.type){
 				case "pedigree":
 					{
-						let file = get_unique_file("pedigree-"+name,file_list,'.csv');
-						
 						let data = 'ID,sire,dam'+endl;
-						
 						for(let c = 0; c < mat.ind_list.length; c++){ 
 							data += '"'+mat.ind_list[c]+'"'+",";
 							data += '"'+mat.sire_list[c]+'"'+",";
 							data += '"'+mat.dam_list[c]+'"'+endl;
 						}
 							
-						write_file_store(data,file,file_list);
-						if(one_file) file = get_one_file(file_list);
-						te += ' pedigree="'+file+'"';
+						add_tag("pedigree",data,tags);
 					}
 					break;
 					
 				case "A": 
-					{
-						let file = get_unique_file("A-matrix-"+name,file_list,'.csv');
-						
+					{	
 						if(true){                                   // Sparse representation
-							let file_ind = get_unique_file("ind-list-"+name,file_list,'.csv');
-						
 							let data_ind = 'Individual'+endl;
 							for(let c = 0; c < mat.ind_list.length; c++){ 
 								data_ind += '"'+mat.ind_list[c]+'"'+endl;
 							}
 						
-							write_file_store(data_ind,file_ind,file_list);
-							if(one_file) file_ind = get_one_file(file_list);
-							te += ' ind-list="'+file_ind+'"';
+							add_tag("ind-list",data_ind,tags);
 							
 							let data = 'j,i,value'+endl;
 							for(let r = 0; r <  mat.ind_list.length; r++){
@@ -1226,9 +1407,7 @@ function create_output_ind_eff(p,file_list,one_file)
 								}
 							}
 				
-							write_file_store(data,file,file_list);
-							if(one_file) file = get_one_file(file_list);
-							te += ' A-sparse="'+file+'"';
+							add_tag("A-sparse",data,tags);
 						}
 						else{	
 							let data = '';
@@ -1246,17 +1425,13 @@ function create_output_ind_eff(p,file_list,one_file)
 								data += endl;
 							}
 				
-							write_file_store(data,file,file_list);
-							if(one_file) file = get_one_file(file_list);
-							te += ' A="'+file+'"';
+							add_tag("A",data,tags);
 						}
 					}
 					break;
 					
 				case "Ainv": 
 					{
-						let file = get_unique_file("Ainv-matrix-"+name,file_list,'.csv');
-					
 						let data = '';
 						for(let c = 0; c < mat.ind_list.length; c++){ 
 							if(c != 0) data += ',';
@@ -1272,37 +1447,34 @@ function create_output_ind_eff(p,file_list,one_file)
 							data += endl;
 						}
 				
-						write_file_store(data,file,file_list);
-						if(one_file) file = get_one_file(file_list);
-						te += ' Ainv="'+file+'"';
+						add_tag("Ainv",data,tags);
 					}
 					break;
 				}
 			}
-		}		
-		te += endl;
+		}	
+
+		add_bscript("ind-effect",tags,bscript);
 	}
-
-	te += endl;
-
-	return te;
 }
 
 
 /// Create output of fixed effects
-function create_output_fix_eff(p,file_list,save_type,one_file)
+function create_output_fix_eff(p,save_type,bscript)
 {
 	let fegs = model.species[p].fix_eff;
 	
 	if(fegs.length == 0) return "";
 	
-	let te = mini_banner("FIXED EFFECTS");
+	mini_banner("FIXED EFFECTS",bscript);
 
 	for(let i = 0; i < fegs.length; i++){
 		let feg = fegs[i];
 		let name = feg.name;
 		
-		te += 'fixed-effect name="'+feg.name+'"';
+		let tags=[];
+		
+		add_tag("name",feg.name,tags);
 		
 		let vec = feg.X_vector;
 		if(vec.loaded == false){
@@ -1311,30 +1483,21 @@ function create_output_fix_eff(p,file_list,save_type,one_file)
 			}
 		}
 		else{
-			let file = get_unique_file("X-vector-"+name,file_list,'.csv');
-
 			let data = 'ID,value'+endl;
 			for(let c = 0; c < vec.ind_list.length; c++){ 
 				data += '"'+vec.ind_list[c]+'",'+vec.X_value[c]+endl;
 			}
-			write_file_store(data,file,file_list);
-			if(one_file) file = get_one_file(file_list);
-			te += ' X="'+file+'"';
+			add_tag("X",data,tags);
 		}
-		te += endl;
+		
+		add_bscript("fixed-effect",tags,bscript);
 	}
-
-	te += endl;
-
-	return te;
 }
 
 	
-/// Creates information about simulation or inference
-function create_output_siminf(save_type)
+/// Creates information about simulation, inference or posterior simulation
+function create_output_siminf(save_type,bscript)
 {
-	let te = "";
-
 	{                                                // Deals with sim details
 		let details = model.sim_details;
 		
@@ -1358,33 +1521,30 @@ function create_output_siminf(save_type)
 			}
 		}
 		
-		te += "simulation";
-		if(details.t_start != "") te +=" start="+details.t_start;
-		if(details.t_end != "") te += " end="+details.t_end;
+		let tags=[];
+		if(details.t_start != "") add_tag("start",details.t_start,tags);
+		if(details.t_end != "") add_tag("end",details.t_end,tags);
 		
 		if(details.number != ""){
 			let num = Number(details.number);
-			if(num != SIM_NUM_DEFAULT) te += " number="+num;
+			if(num != SIM_NUM_DEFAULT) add_tag("number",num,tags);
 		}
 		
-		if(details.timestep != "") te += " timestep="+details.timestep; 
+		if(details.timestep != "") add_tag("timestep",details.timestep,tags); 
 		
-		if(details.seed_on.value == "Yes") te += " seed="+Number(details.seed);
+		if(details.seed_on.value == "Yes") add_tag("seed",details.seed,tags); 
 		 
-		if(details.indmax != INDMAX_DEFAULT){
-			te += " ind-max="+details.indmax;
-		}
+		if(details.indmax != INDMAX_DEFAULT) add_tag("ind-max",details.indmax,tags); 
 		
 		if(details.param_output_max != PARAM_OUTPUT_MAX_DEFAULT){
-			te += " param-output-max="+details.param_output_max;
+			add_tag("param-output-max",details.param_output_max,tags); 
 		}
 		
-		if(details.optimise.value != "auto") te += ' optimise="'+details.optimise.value+'"';
+		if(details.optimise.value != "auto") add_tag("optimise",details.optimise.value,tags); 
 		
-		if(details.compress.value != "auto") te += ' compress="'+details.compress.value+'"';
+		if(details.compress.value != "auto") add_tag("compress",details.compress.value,tags); 
 		
-		te += endl;
-		te += endl;
+		add_bscript("simulation",tags,bscript);
 	}
 
 	{                                                // Deals with inf details
@@ -1405,12 +1565,13 @@ function create_output_siminf(save_type)
 			}
 		}
 		
-		te += "inference";
-		if(details.t_start != "") te +=" start="+details.t_start;
-		if(details.t_end != "") te += " end="+details.t_end;
-		if(details.timestep != "") te += " timestep="+details.timestep; 
+		let tags=[];
 		
-		if(details.seed_on.value == "Yes") te += " seed="+Number(details.seed);
+		if(details.t_start != "") add_tag("start",details.t_start,tags); 
+		if(details.t_end != "") add_tag("end",details.t_end,tags);
+		if(details.timestep != "") add_tag("timestep",details.timestep,tags); 
+		
+		if(details.seed_on.value == "Yes") add_tag("seed",details.seed,tags);
 		
 		let alg = details.algorithm.value;
 		
@@ -1418,26 +1579,18 @@ function create_output_siminf(save_type)
 		case "DA-MCMC": case "PAS-MCMC":
 			{
 				let num_samp = Number(details.sample);
-				if(num_samp != MCMC_SAMPLE_DEFAULT){
-					te += " update="+num_samp;
-				}
+				if(num_samp != MCMC_SAMPLE_DEFAULT) add_tag("update",num_samp,tags); 
 				
 				let num_param = Number(details.output_param);
-				if(num_param != MCMC_OP_PARAM_DEFAULT){
-					te += " param-output="+num_param;
-				}
-				
+				if(num_param != MCMC_OP_PARAM_DEFAULT) add_tag("param-output",num_param,tags); 
+			
 				let num_state = Number(details.output_state);
-				if(num_state != MCMC_OP_STATE_DEFAULT){
-					te += " state-output="+num_state;
-				}
-				
+				if(num_state != MCMC_OP_STATE_DEFAULT) add_tag("state-output",num_state,tags); 
+			
 				if(alg == "DA-MCMC"){
 					let cha_per_core = Number(details.cha_per_core);
-					if(cha_per_core != MCMC_CHAIN_PER_CORE_DEFAULT){
-						te += " chain-per-core="+cha_per_core;
-					}
-					
+					if(cha_per_core != MCMC_CHAIN_PER_CORE_DEFAULT) add_tag("chain-per-core",cha_per_core,tags); 
+				
 					if(Number(details.nchain)%cha_per_core != 0){
 						add_warning({mess:"Error with chain number", mess2:"The number of chains '"+details.nchain+"' must be a multiple of the number of chains per core '"+cha_per_core+"'", warn_type:"InfFurtherDetails"});
 					}
@@ -1445,110 +1598,89 @@ function create_output_siminf(save_type)
 				
 				if(alg == "PAS-MCMC"){
 					let part_per_core = Number(details.part_per_core);
-					if(part_per_core != PAS_PART_PER_CORE_DEFAULT){
-						te += " part-per-core="+part_per_core;
-					}
+					if(part_per_core != PAS_PART_PER_CORE_DEFAULT) add_tag("part-per-core",part_per_core,tags); 
 					
 					if(Number(details.npart)%part_per_core != 0){
 						add_warning({mess:"Error with particle number", mess2:"The number of particles '"+details.npart+"' must be a multiple of the number of particles per core '"+part_per_core+"'", warn_type:"InfFurtherDetails"});
 					}
 				}
-				
-				//if(debug){
-					//te += ' diagnostics="on"';
-				//}
 			}
 			break;
 		
 		case "ABC":
-			te += " sample="+details.abcsample;
-			te += " acc-frac="+details.accfrac;
+			add_tag("sample",details.abcsample,tags); 
+			add_tag("acc-frac",details.accfrac,tags); 
 			break;
 			
 		case "ABC-SMC":
-			te += " sample="+details.abcsample;
-			te += " acc-frac="+details.accfracsmc;
-			te += " gen="+details.numgen;
-			te += " kernel-size="+details.kernelsize;
+			add_tag("sample",details.abcsample,tags); 
+			add_tag("acc-frac",details.accfracsmc,tags); 
+			add_tag("gen",details.numgen,tags); 
+			add_tag("kernel-size",details.kernelsize,tags); 
 			break;
 		}
 		
-		if(details.indmax != INDMAX_DEFAULT){
-			te += " ind-max="+details.indmax;
-		}
+		if(details.indmax != INDMAX_DEFAULT) add_tag("ind-max",details.indmax,tags);
+			
+		let poutmax = Number(details.param_output_max);
+		if(poutmax != PARAM_OUTPUT_MAX_DEFAULT) add_tag("param-output-max",poutmax,tags); 
 		
-		if(details.param_output_max != PARAM_OUTPUT_MAX_DEFAULT){
-			te += " param-output-max="+details.param_output_max;
-		}
-		
-		if(details.algorithm.value != ALG_DEFAULT){
-			te += ' algorithm="'+details.algorithm.value+'"';
-		}
+		if(details.algorithm.value != ALG_DEFAULT) add_tag("algorithm",details.algorithm.value,tags); 
 		
 		switch(details.algorithm.value){
 		case "DA-MCMC":
 			{	
-				let nchain = Number(details.nchain);
-				te += " nchain="+nchain;
+				add_tag("nchain",details.nchain,tags); 
 				
 				let type = details.anneal_type.te;
 				
 				if(type != ANNEAL_DEFAULT){
-					te += ' anneal="' +type+'"';
+					add_tag("anneal",type,tags); 
 					switch(type){
-					case "scan":
-						te += ' rate="' +details.anneal_rate+'"';
-						break;
-						
-					case "power":
-						te += ' power="' +details.anneal_power+'"';
-						break;
+					case "scan": add_tag("rate",details.anneal_rate,tags); break;	
+					case "power": add_tag("power",details.anneal_power,tags); break;
 					}
 				}
 				
 				if(type != "scan"){
-					if(Number(details.burnin_frac) != BURNIN_FRAC_DEFAULT){
-						te += ' burnin-percent="' +details.burnin_frac+'"';
-					}
+					let nbf = Number(details.burnin_frac);
+					if(nbf != BURNIN_FRAC_DEFAULT) add_tag("burnin-percent",details.burnin_frac,tags);
 				}
 			}
 			break;
 				
 		case "PAS-MCMC":
-			te += " npart="+details.npart;
-			te += ' gen-percent=' +details.gen_update;
-			if(Number(details.burnin_frac) != BURNIN_FRAC_DEFAULT){
-				te += ' burnin-percent="' +details.burnin_frac+'"';
+			{
+				add_tag("npart",details.npart,tags); 
+				add_tag("gen-percent",details.gen_update,tags); 
+				let nbf = Number(details.burnin_frac);
+				if(nbf != BURNIN_FRAC_DEFAULT) add_tag("burnin-percent",details.burnin_frac,tags); 
 			}
 			break;
 		}
 	
 		switch(details.algorithm.value){
 		case "DA-MCMC": case "PAS-MCMC":
-			if(details.sync_on.value == "Off") te += ' sync="Off"';
+			if(details.sync_on.value == "Off") add_tag("sync","Off",tags);  
 			break;
 		}
 		
-		if(details.optimise.value != "auto") te += ' optimise="'+details.optimise.value+'"';
+		if(details.optimise.value != "auto") add_tag("optimise",details.optimise.value,tags); 
 		
-		if(details.compress.value != "auto") te += ' compress="'+details.compress.value+'"';
+		if(details.compress.value != "auto") add_tag("compress",details.compress.value,tags); 
 		
-		te += endl;
-		te += endl;
+		add_bscript("inference",tags,bscript);
 	}
 	
 	{                                               // Deals with ppc details
-		te += get_ppc_command(save_type)
-		te += endl;
-		te += endl;
+		let tags = get_ppc_tags(save_type);
+		add_bscript("post-sim",tags,bscript);
 	}
-
-	return te;
 }
 
 
-/// Creates text for the ppc command
-function get_ppc_command(save_type)
+/// Creates tags for the ppc command
+function get_ppc_tags(save_type)
 {
 	let details = model.ppc_details;
 		
@@ -1567,29 +1699,28 @@ function get_ppc_command(save_type)
 		}
 	}
 	
-	let te = "post-sim";
-	if(details.ppc_t_start != "") te +=" start="+details.ppc_t_start;
-	if(details.ppc_t_end != "") te += " end="+details.ppc_t_end;
+	let tags=[];
+	
+	if(details.ppc_t_start != "") add_tag("start",details.ppc_t_start,tags);
+	if(details.ppc_t_end != "") add_tag("end",details.ppc_t_end,tags);
 	
 	if(details.number != ""){
 		let num = Number(details.number);
-		if(num != PPC_NUM_DEFAULT){
-			te += " number="+details.number;
-		}
+		if(num != PPC_NUM_DEFAULT) add_tag("number",details.number,tags);
 	}
 	
-	if(details.seed_on.value == "Yes") te += " seed="+Number(details.seed);
+	if(details.seed_on.value == "Yes") add_tag("seed",details.seed,tags);
 	
-	if(details.optimise.value != "auto") te += ' optimise="'+details.optimise.value+'"';
+	if(details.optimise.value != "auto") add_tag("optimise",details.optimise.value,tags);
 		
-	if(details.compress.value != "auto") te += ' compress="'+details.compress.value+'"';
-			
-	if(details.run_inf_model.value == "No") te += ' param-only="true"';
+	if(details.compress.value != "auto") add_tag("compress",details.compress.value,tags);
+	
+	if(details.run_inf_model.value == "No") add_tag("param-only","true",tags);
 	
 	switch(details.run_post.value){
 	case "postsample": break;
-	case "postmean": te += ' param-sample="mean"'; break;
-	case "postmedian": te += ' param-sample="median"'; break;
+	case "postmean": add_tag("param-sample","mean",tags); break;
+	case "postmedian": add_tag("param-sample","median",tags); break;
 	default: error("Problem with option"); break;
 	}
 	
@@ -1606,37 +1737,46 @@ function get_ppc_command(save_type)
 			}
 		}		
 		
-		if(fl){
-			te += ' resample="'+st+'"';	
-		}
+		if(fl) add_tag("resample",st,tags);
 	}
 	
-	return te;
+	return tags;
 }
 
 
 /// Adds information about simulation and inference
-function create_output_sim_inf_source(p,sim_or_inf,file_list,one_file)
+function create_output_sim_inf_source(p,sim_or_inf,bscript)
 {
-	let te = "";
-	
 	let sp = model.species[p];
 	if(sim_or_inf == "ppc"){
-		if(!model.inf_res.plot_filter) return te;
+		if(!model.inf_res.plot_filter) return;
 		sp = model.inf_res.plot_filter.species[p];
-		if(!sp) return te;
+		if(!sp) return;
 	}
 	
 	let source, pa;
 	
 	switch(sim_or_inf){
-	case "sim": pa = "Simulation"; source = sp.sim_source; te += mini_banner("SIMULATION INITIAL CONDITIONS"); break;
-	case "inf": pa = "Inference"; source = sp.inf_source; te += mini_banner("INFERENCE DATA"); break;
-	case "ppc": pa = "Population Mod."; source = sp.ppc_source; te += mini_banner("MODIFICATION DATA"); break;
+	case "sim": 
+		pa = "Simulation"; 
+		source = sp.sim_source; if(source.length == 0) return "";
+		mini_banner("SIMULATION INITIAL CONDITIONS",bscript); 
+		break;
+		
+	case "inf": 
+		pa = "Inference"; 
+		source = sp.inf_source; if(source.length == 0) return "";
+		mini_banner("INFERENCE DATA",bscript); 
+		break;
+		
+	case "ppc": 
+		pa = "Population Mod."; 
+		source = sp.ppc_source; if(source.length == 0) return ""; 
+		mini_banner("MODIFICATION DATA",bscript); 
+		break;
+		
 	default: error("Option not recognised 116"+sim_or_inf); break;
 	}
-	
-	if(source.length == 0) return "";
 
 	for(let i = 0; i < source.length; i++){
 		let so = source[i];
@@ -1660,11 +1800,11 @@ function create_output_sim_inf_source(p,sim_or_inf,file_list,one_file)
 					let head = [];
 					let row = [];
 					
-					te += com;
+					let tags=[];
 					
 					switch(ic_type){
-					case "Fixed": te += ' type="fixed"'; break;
-					case "Dist": te += ' type="dist"'; break;
+					case "Fixed": add_tag("type","fixed",tags); break;
+					case "Dist": add_tag("type","dist",tags); break;
 					}
 					
 					switch(so.spec.radio2.value){
@@ -1742,17 +1882,16 @@ function create_output_sim_inf_source(p,sim_or_inf,file_list,one_file)
 								}
 							}
 							
-							let file = get_unique_file(com+"-"+sp.name,file_list,'.csv');
-							output_table_simp_file(file,head,row,file_list);
-							if(one_file) file = get_one_file(file_list);
-							te += ' focal="'+so.spec.focal.te+'" file="'+file+'"'+endl;
+							add_tag("focal",so.spec.focal.te,tags);
 							
+							let tab = output_table_simp_file(head,row);
+							add_tag("file",tab,tags);
 						}
 						break;
 							
 					case "All":
 						if(so.spec.radio_dist.value == "Dist"){
-							te += " prior="+get_prior_output(sim_or_inf,so.pop_dist,"prior",undefined);
+							add_tag("prior",get_prior_output(sim_or_inf,so.pop_dist,"prior",undefined),tags);
 						}
 						
 						for(let cl = 0; cl < sp.ncla; cl++) head.push(sp.cla[cl].name);
@@ -1779,13 +1918,12 @@ function create_output_sim_inf_source(p,sim_or_inf,file_list,one_file)
 							row.push(ele);
 						}
 					
-						let file = get_unique_file(com+"-"+sp.name,file_list,'.csv');
-
-						output_table_simp_file(file,head,row,file_list);
-						if(one_file) file = get_one_file(file_list);
-						te += ' file="'+file+'"'+endl;
+						let tab = output_table_simp_file(head,row);
+						add_tag("file",tab,tags);
 						break;
 					}
+					
+					add_bscript(com,tags,bscript);
 				}
 				break;
 
@@ -1824,30 +1962,16 @@ function create_output_sim_inf_source(p,sim_or_inf,file_list,one_file)
 				break;
 			}
 			
-			if(add_flag == true){
-				te += add_data_table(so.type,so.table,so,p,i,file_list,sim_or_inf,one_file);
+			if(add_flag == true){	
+				add_data_table(so.type,so.table,so,p,i,sim_or_inf,bscript);
 			}
 		}
-		te += endl;
 	}
-	te += endl;
-
-	return te;
-}
-
-
-/// Gets that last thing added to file_list and outputs directly into the file
-function get_one_file(file_list)
-{
-	if(file_list.length == 0) alert_help("Problem with file");
-	let te = file_list[file_list.length-1].data;
-	file_list.pop();
-	return "[[\n"+te+"]]";
 }
 
 
 /// Generates a data-table and command from a data source
-function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
+function add_data_table(type,tab,so,p,index,sim_or_inf,bscript)
 {
 	let i = find(convert,"type",type);
 	if(i == undefined){
@@ -1881,32 +2005,24 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 	
 	let file = com;
 	
-	let te = com+' name=\"'+so.name+'\" ';
+	let tags=[];
+	
+	add_tag("name",so.name,tags);
 	
 	let spec = so.spec;
 	
 	switch(so.type){                                // Adds information dependent on data source
 	case "Init. Pop.":
-		if(spec.radio2.value == "Focal"){
-			te +=  'focal="'+spec.focal.te+'" ';
-		}
+		if(spec.radio2.value == "Focal") add_tag("focal",spec.focal.te,tags);
 		break;
 	
 	case "Move Ind.":
-		{
-			let cl_name = spec.cl_drop.te;
-			te += 'class="'+cl_name+'" ';
-		}
+		add_tag("class",spec.cl_drop.te,tags);
 		break;
 		
 	case "Compartment":
-		{
-			let cl_name = spec.cl_drop.te;
-			te += 'class="'+cl_name+'" ';
-			file += '-'+cl_name.replace(/ /g,"-");
-		}
+		add_tag("class",spec.cl_drop.te,tags); 
 		break;
-		
 	
 	case "Transition": 
 		{
@@ -1915,10 +2031,10 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 			let cl = find(sp.cla,"name",spec.cl_drop.te);
 
 			let trans_fi = output_add_trans_filt(spec.filter,p,cl,so,index);
-			if(trans_fi != "") te += 'trans="'+trans_fi+'" ';
+			if(trans_fi != "") add_tag("trans",trans_fi,tags);
 			
 			let filt = output_add_comp_filt(spec,sp,cl,p,so,index);
-			if(filt != "") te += 'filter="'+filt+'" ';
+			if(filt != "") add_tag("filter",filt,tags);
 
 			let obsrange = spec.time_radio.value.toLowerCase();
 			
@@ -1930,7 +2046,8 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 			}
 			
 			let ty = so.type;
-			te += 'obsrange="'+obsrange+'" ';
+			add_tag("obsrange",obsrange,tags); 
+		
 			switch(obsrange){
 			case "all": break;
 			case "specify":
@@ -1945,12 +2062,13 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 						add_warning({mess:ty+" data", mess2:"The end time for the "+ty.toLowerCase()+" data must be set to a number", warn_type:"TransDataSpecProb", ind:index});
 					}
 					
-					te += 'start="'+start+'" ';
-					te += 'end="'+end+'" ';
+					add_tag("start",start,tags);
+					add_tag("end",end,tags);
 				}
 				break;
 
-			case "file": break;
+			case "file":
+				break;
 
 			default: error("Option not recognised 121"+obsrange); break;
 			}
@@ -1964,12 +2082,12 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 			let cl = find(sp.cla,"name",spec.cl_drop.te);
 
 			let trans_fi = output_add_trans_filt(spec.filter,p,cl,so,index);
-			if(trans_fi != "") te += 'trans="'+trans_fi+'" ';
+			if(trans_fi != "") add_tag("trans",trans_fi,tags);
 			
 			let filt = output_add_comp_filt(spec,sp,cl,p,so,index);
-			if(filt != "") te += 'filter="'+filt+'" ';
+			if(filt != "") add_tag("filter",filt,tags);
 
-			te += add_obs_model(spec);
+			add_obs_model(spec,tags);
 		}
 		break;
 
@@ -1977,7 +2095,6 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 		{
 			let err_fl;
 			
-			te += 'comp="';
 			let flag = false;
 			
 			let cb = spec.check_box;
@@ -1985,36 +2102,35 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 			let pcl = get_p_cl_from_claname(cb.name);
 			let claa = model.species[pcl.p].cla[pcl.cl];
 			
+			let st = "";
 			for(let i = 0; i < cb.value.length; i++){
 				if(cb.value[i].check == true){
-					if(flag == true) te += ',';
-					te += claa.comp[i].name;
-					te += "[Se:"+cb.value[i].Se_eqn.te+"]";
+					if(flag == true) st += ',';
+					st += claa.comp[i].name;
+					st += "[Se:"+cb.value[i].Se_eqn.te+"]";
 					flag = true;
 				}
 			}
-			te += '" ';
+			add_tag("comp",st,tags);
 			
 			let Sp = esc(spec.Sp_eqn.te); if(Sp == "") err_fl = "Sp";
-			te += 'Sp="'+Sp+'" ';
+			add_tag("Sp",Sp,tags);
 			
 			let pos = esc(spec.pos_result); if(pos == "") err_fl = "positive value";
-			te += 'pos="'+pos+'" ';
+			add_tag("pos",pos,tags);
 			
 			let neg = esc(spec.neg_result); if(neg == "") err_fl = "negative value";
-			te += 'neg="'+neg+'" ';
+			add_tag("neg",neg,tags);
 			
 			if(so.type == "Test-and-cull"){
-				te += 'time-gap="'+spec.time_gap+'" ';
+				add_tag("time-gap",spec.time_gap,tags);
 				
 				let fr = so.frac_obs;
-				if(Number(fr) != 1){
-					te += 'frac='+fr+' ';
-				}
+				if(Number(fr) != 1) add_tag("frac",fr,tags);
 				
 				switch(so.time_radio.value){
-				case "Periodic": te += 'dt='+so.time_gen+' '; break;
-				case "Specified": te += 'times="'+so.time_gen+'" '; break;
+				case "Periodic": add_tag("dt",so.time_gen,tags); break;
+				case "Specified": add_tag("times",so.time_gen,tags); break;
 				default: error("time_radio val"); break;
 				}				
 			}
@@ -2026,14 +2142,10 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 		break;
 		
 	case "Ind. Eff.":
-		{
-			te += 'ie="'+spec.drop.te+'" ';
-		}
+		add_tag("ie",spec.drop.te,tags);
 		break;
 		
 	case "Ind. Group":
-		{
-		}
 		break;
 		
 	case "Population": 
@@ -2041,40 +2153,34 @@ function add_data_table(type,tab,so,p,index,file_list,sim_or_inf,one_file)
 			let sp = model.species[p];
 		
 			let filt = output_add_comp_filt(spec,sp,undefined,p,so,index);
-			if(filt != "") te += 'filter="'+filt+'" ';
-
-			te += add_obs_model(spec);
+			if(filt != "") add_tag("filter",filt,tags);
+			add_obs_model(spec,tags);
 		}
 		break;
 		
 	case "Genetic":
 		switch(spec.type_radio.value){
 		case "matrix": 
-			te += 'type="matrix" '; 
+			add_tag("type","matrix",tags);
 			break;
 			
 		case "snp":	
-			te += 'type="snp" ';
-			te += 'root="'+spec.snp_root+'" ';
+			add_tag("type","snp",tags);
+			add_tag("root",spec.snp_root,tags);
 			break;
 		}
-		te += 'mut-rate="'+spec.mut_rate_eqn.te+'" ';
-		te += 'seq-var="'+spec.seq_var_eqn.te+'" ';
+		add_tag("mut-rate",spec.mut_rate_eqn.te,tags);
+		add_tag("seq-var",spec.seq_var_eqn.te,tags);
 		break;
 
 	default: break;	
 	}
 
 	if(so.type != "Test-and-cull"){
-		file = get_unique_file(file,file_list,'.csv');
-		
-		output_table_file(file,tab,file_list);
-		if(one_file) file = get_one_file(file_list);
-		
-		te += 'file="'+file+'"'+endl;
+		add_tag("file",output_table_file(tab),tags);
 	}
 	
-	return te;
+	add_bscript(com,tags,bscript);
 }
 
 
@@ -2187,18 +2293,10 @@ function output_add_trans_filt(tfilt,p,cl,so,index)
 // Ensures that all file names are unique 
 function get_unique_file(file,file_list,end)
 {	
-	// Converts any greek letters to word version
-	for(let i = 0; i < file.length; i++){
-		let ch = file.substr(i,1);
-		for(let j = 0; j < greek_latex.length; j++){
-			if(greek_latex[j][1] == ch){
-				file = file.substr(0,i)+greek_latex[j][0]+file.substr(i+1);
-			}
-		}
-		
-		if(ch == "→") file = file.substr(0,i)+"-"+file.substr(i+1);
-	}
-	
+	file = add_escape_char(file);
+	file = file.replace(/ /g,"-");	
+	file = file.replace(/\\/g,"");
+
 	let file_not_same;
 	let num = 1;
 	do{
@@ -2220,36 +2318,42 @@ function write_file_store(data,file,file_list,type)
 }
 
 
-function add_obs_model(spec)
+/// Adds on an observation model to tags
+function add_obs_model(spec,tags)
 {
+	let val;
+	
 	switch(spec.obs_error_dist.value){
 	case "Normal":		
 		switch(spec.obs_error.value){
-		case "percent": return 'error="normal:'+spec.percent+'%" ';	
-		case "sd": return 'error="normal:'+spec.sd+'" ';
-		case "file": return 'error="normal:file" ';
+		case "percent": val = "normal:"+spec.percent+"%"; break;
+		case "sd": val = "normal:"+spec.sd; break;
+		case "file": val = "normal:file"; break;
 		default: error("Option not recognised 123"); break;
 		}
 		break;
 	
 	case "Poisson":		
-		return 'error="poisson" ';
+		val = "poisson";
+		break;
 		
 	case "Negative binomial":	 
 		switch(spec.obs_error_p.value){
-		case "p": return 'error="neg-binomial:'+spec.p+'" ';	
-		case "file": return 'error="neg-binomial:file" ';
+		case "p": val = "neg-binomial:"+spec.p;	break;
+		case "file": val = "neg-binomial:file";
 		default: error("Option not recognised 123"); break;
 		}
 		break;
 		
 	default: error("obs dist not found"); break;
 	}
+	
+	add_tag("error",val,tags);
 }
 
 
 /// Outputs a table 
-function output_table_file(file,tab,file_list)
+function output_table_file(tab)
 {
 	var st = '';
 
@@ -2268,18 +2372,19 @@ function output_table_file(file,tab,file_list)
 		for(let i = 0; i < el.length; i++){
 			if(i != 0) st += ',';
 			
-			if(isNaN(el[i])) st += '"'+el[i]+'"';
-			else st += el[i];
+			let val = el[i];
+			if(isNaN(val)) st += '"'+val+'"';
+			else st += val;
 		}
 		st += endl;
 	}
 	
-	write_file_store(st,file,file_list);
+	return st;
 }
 
 
 /// Outputs a simple table 
-function output_table_simp_file(file,head,row,file_list)
+function output_table_simp_file(head,row) 
 {
 	var st = '';
 	for(let i = 0; i < head.length; i++){
@@ -2296,13 +2401,14 @@ function output_table_simp_file(file,head,row,file_list)
 
 		for(let i = 0; i < ele.length; i++){
 			if(i != 0) st += ',';
-			if(isNaN(ele[i])) st += '"'+ele[i]+'"';
-			else st += ele[i];
+			let val = ele[i];
+			if(isNaN(val)) st += '"'+val+'"';
+			else st += val;
 		}
 		st += endl;
 	}
 	
-	write_file_store(st,file,file_list);
+	return st;
 }
 							
 
@@ -2457,154 +2563,75 @@ function check_comp_structure()
 
 
 /// Removes specified commands from a file
-function remove_command(te,com)
+function remove_command(bscript,com) 
 {
 	let pos = com.split(",");
 	
-	let lines = te.split("\n");
-	
-	let te_new = "";
-	
-	for(let li = 0; li < lines.length; li++){
-		let line = lines[li];
-		
-		let fl = false;
-			
-		let i = 0; while(i < line.length && line.substr(i,1) == " ") i++;
-	
-		for(let j = 0; j < pos.length; j++){
-			if(i+pos[j].length <= line.length && line.substr(i,pos[j].length) == pos[j]){
-				if(i+pos[j].length < line.length){
-					if(line.substr(i+pos[j].length,1) == " ") fl = true;
-				}
-				else fl = true;
-			}
+	let i = 0;
+	while(i < bscript.length){
+		let com = bscript[i];
+		if(find_in(pos,com.type) != undefined || com.type == "comment" && find_in(pos,com.te)){
+			bscript.splice(i,1);
 		}
-	
-		if(fl == false) te_new += line+endl;
-		else{
-			let tri = line.trim();
-			if(tri.length > 3 && tri.substr(tri.length-3,3) == '"[['){
-				while(li < lines.length){
-					let tri = lines[li].trim();
-				
-					if(tri.length >= 3 && tri.substr(0,3) == ']]"'){
-						if(tri.substr(tri.length-3,3) != '"[[') break;
-					}
-					li++;
-				}
-			}
-		}
+		else i++;
 	}
-	
-	return te_new;
 }
 
 
 /// Extracts a particular command type from the 
-function extract_command(te,com)
+function extract_command(bscript,bscript_add,com) // TO DO is this needed?
 {
 	let pos = com.split(",");
 	
-	let lines = te.split("\n");
-	
-	let te_new = "";
-	
-	for(let li = 0; li < lines.length; li++){
-		let line = lines[li];
-		
-		let fl = false;
-			
-		let i = 0; while(i < line.length && line.substr(i,1) == " ") i++;
-	
-		for(let j = 0; j < pos.length; j++){
-			if(i+pos[j].length <= line.length && line.substr(i,pos[j].length) == pos[j]){
-				if(i+pos[j].length < line.length){
-					if(line.substr(i+pos[j].length,1) == " ") fl = true;
-				}
-				else fl = true;
-			}
-		}
-	
-		let li_st = li;
-		let tri = line.trim();
-		if(tri.length > 3 && tri.substr(tri.length-3,3) == '"[['){
-			while(li < lines.length){
-				let tri = lines[li].trim();
-			
-				if(tri.length >= 3 && tri.substr(0,3) == ']]"'){
-					if(tri.substr(tri.length-3,3) != '"[[') break;
-				}
-				li++;
-			}
-		}
-		
-		if(fl == true){
-			for(let i = li_st; i <= li; i++){
-				te_new += lines[i]+endl;
-			}
-			te_new += endl;
-		}		
+	for(let i = 0; i < bscript.length; i++){
+		let com = bscript[i];
+		if(find_in(pos,com.type) != undefined) bscript_add.push(com);
 	}
-	
-	return te_new;
 }	
-
-
-/// Tidys the code
-function tidy_code(te)
-{
-	let spl = te.split("\n");
-	
-	// Trims lines
-	for(let li = 0; li < spl.length; li++){
-		spl[li]= spl[li].trim();
-	}
-	
-	// Gets rid of double spaces
-	let li = 0;
-	while(li < spl.length-1){
-		if(spl[li] == "" && spl[li+1] == ""){
-			spl.splice(li,1);
-		}
-		else li++;
-	}
-	
-	let te_new="";
-	for(let li = 0; li < spl.length; li++){
-		te_new += spl[li]+endl;
-	}
-	
-	return te_new;
-}
 
  
 /// Creates a file to start a posterior simulation
-function create_ppc_file(info)
+function create_ppc_file(info,one_file)
 {
-	let te = inf_result.import_te;
+	let bscript = copy(inf_result.bscript);
 	
-	if(!info.use_inf){
-		let extra = "# OUTPUT INFERENCE"+endl+endl;
-		extra += extract_command(te,"param-inf,state-inf,param-stats-inf,diagnostics-inf,generation-inf,trans-diag-inf,proposal-inf,warning-inf");
+	if(info.use_inf == undefined) error("Use inf should be defined");
+	
+	if(info.use_inf == false){
+		let bscript_add=[];
+		mini_banner("OUTPUT INFERENCE",bscript_add);
 		
-		let one_file = true;
-		create_output_file(info.save_type,one_file,info.map_store,extra);
-	
+		extract_command(bscript,bscript_add,"param-inf,state-inf,param-stats-inf,diagnostics-inf,generation-inf,trans-diag-inf,proposal-inf,warning-inf");
+		
+		create_output_file(info.save_type,one_file,info.map_store,bscript_add);
 		return;
 	}		
-		
-	
-	let file_list=[];
-	
-	te = remove_command(te,"post-sim,posterior-simulation,add-pop-post-sim,remove-pop-post-sim,add-ind-post-sim,remove-ind-post-sim,move-ind-post-sim,param-mult,# MODIFICATION DATA");
-	te += endl+get_ppc_command("ppc")+endl+endl;
 
+	remove_ppc_command(bscript,true);
+	
+	// Alters post-sim command
+	let i = find(bscript,"type","post-sim");
+	if(i == undefined) i = find(bscript,"type","posterior-simulation");
+	
+	let tags = get_ppc_tags(info.save_type);
+	
+	if(i == undefined){
+		add_bscript("post-sim",tags,bscript);
+	}
+	else{
+		bscript[i].tags = tags;
+	}
+	
 	for(let p = 0; p < inf_result.species.length; p++){
 		let sp = inf_result.species[p];
-		if(inf_result.species.length > 1) te += 'set species="'+sp.name+'"'+endl;
-		te += create_output_sim_inf_source(p,"ppc",file_list,true);
+		if(inf_result.species.length > 1){
+			let tags=[];
+			add_tag("species","sp.name",tags);
+			add_bscript("set",tags,bscript);
+		}
+		create_output_sim_inf_source(p,"ppc",bscript);
 	}
+	
 	
 	let pfac_list=[];
 	for(let th = 0; th < model.param.length; th++){
@@ -2613,33 +2640,48 @@ function create_ppc_file(info)
 	}
 	
 	if(pfac_list.length > 0){
-		te += mini_banner("PARAMETER MULTIPLIERS");
+		mini_banner("PARAMETER MULTIPLIERS",bscript);
 		for(let k = 0; k < pfac_list.length; k++){
 			let par = model.param[pfac_list[k]];
 			if(par.type == "param factor"){
-				te += output_param(par,"ppc",file_list,true);
+				output_param(par,"ppc",bscript);
 			}
 		}
-		te += endl;
 	}
  
-	te = tidy_code(te);
-	
 	if(model.warn.length > 0) err_warning();
 	
+	let file_list=[];
+	let te = generate_text_from_bscript(bscript,file_list,one_file);
+
 	write_file_store(te,"bicifile",file_list,"bicifile");
 
 	post({save_type:"ppc", file_list:file_list, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
 }
 
 
-/// Creates a file to start extension
-function create_ext_file()
+/// Removes all commands associated with ppc
+function remove_ppc_command(bscript,rem_data)
 {
-	let te = inf_result.import_te;
+	
+	remove_command(bscript,"param-post-sim,state-post-sim,warning-post-sim,# OUTPUT POSTERIOR SIMULATION"); 
+	
+	if(rem_data){
+		remove_command(bscript,"param-mult,add-pop-post-sim,remove-pop-post-sim,add-ind-post-sim,remove-ind-post-sim,move-ind-post-sim,# MODIFICATION DATA,# PARAMETER MULTIPLIERS");
+	}
+}
 
+
+/// Creates a file to start extension
+function create_ext_file(one_file)
+{
+	let bscript = copy(inf_result.bscript);
+	
+	remove_ppc_command(bscript,true);
+	
 	let file_list=[];
-
+	let te = generate_text_from_bscript(bscript,file_list,one_file);
+	
 	write_file_store(te,"bicifile",file_list,"bicifile");
 
 	post({save_type:"ext", file_list:file_list, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});

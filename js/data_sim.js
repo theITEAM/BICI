@@ -1189,7 +1189,7 @@ function get_ind_times(t_start,t_end,so,samp,hash,ind_list,result)
 /// Adds a data source onto the generate data
 function add_gen_data(head,ele)
 {
-	let tab = { filename:"Simulated data", heading:head, ele:ele, ncol:head.length, nrow:ele.length};
+	let tab = { filename:"Simulated data", sim_data:true, heading:head, ele:ele, ncol:head.length, nrow:ele.length};
 
 	data.table.push(tab);
 	edit_source.data_table_use = data.table.length-1;

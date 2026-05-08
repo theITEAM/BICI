@@ -367,3 +367,62 @@ void StateSpecies::add_alg_warn(string te)
 	add_alg_warning(te,UNSET,alg_warn);
 }
 
+
+
+/// Looks for any inconsistencies in the the data 
+void StateSpecies::check_obs_inconsitent() const
+{
+	for(const auto &ind : sp.individual){
+		for(auto i = 0u; i < ind.obs.size(); i++){
+			const auto &ob = ind.obs[i];
+			for(auto j = i+1; j < ind.obs.size(); j++){
+				const auto &ob2 = ind.obs[j];
+				if(ob.tdiv_before_jiggle == ob2.tdiv_before_jiggle){
+					if(ob.type == ob2.type){
+						switch(ob.type){
+						case OBS_SOURCE_EV: case OBS_TRANS_EV: case OBS_SINK_EV: // Transition observations
+							{
+								auto fl = false;
+								for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+									if(get_trans_obs_prob(tr,ob) != 0 && get_trans_obs_prob(tr,ob2) != 0){ fl = true; break;}
+								}
+								
+								if(fl == false){
+									auto t = tstr(model.calc_t(ob.tdiv_before_jiggle));
+									run_error("For individual '"+ind.name+"' the observed transition time "+t+" coming from "+data_sources_desc(ob,ob2)+" is identical (which is logically impossible according to the model). Please change the observed transition times (e.g. a small time gap could be added to the later transition).");
+								}
+							}
+							break;
+
+						case OBS_COMP_EV:
+							if(ob.cl == ob2.cl){	
+								auto fl = false;
+								const auto &claa = sp.cla[ob.cl];
+								for(auto c = 0u; c < claa.ncomp; c++){ 	
+									if(get_comp_obs_prob(c,ob) != 0 && get_comp_obs_prob(c,ob2) != 0){ fl = true; break;}
+								}
+								
+								if(fl == false){
+									auto t = tstr(model.calc_t(ob.tdiv_before_jiggle));
+									run_error("For individual '"+ind.name+"' the observed time "+t+" coming from "+data_sources_desc(ob,ob2)+" is identical, but the compartmental observations are inconsistent.");
+								}
+							}
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
+/// Describes data sources 
+string StateSpecies::data_sources_desc(const ObsData &ob, const ObsData &ob2) const
+{
+	auto so = sp.source[ob.so].name;
+	auto so2 = sp.source[ob2.so].name;
+
+	if(ob.so == ob2.so) return "multiple entries in data source '"+so+"'";
+	return "data sources '"+so+"' and '"+so2+"'";
+}

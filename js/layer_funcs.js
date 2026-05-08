@@ -2167,6 +2167,7 @@ function check_error_textbox2(tbs)
 				break;
 				
 			case "iegrname":
+				if(contains_space(te)) warn = "Cannot contain space";
 				char_lim = 10;
 				break;
 				

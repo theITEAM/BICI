@@ -598,7 +598,7 @@ void Input::param_mult_command()
 	auto file = get_tag_value("constant"); if(file == ""){ cannot_find_tag(); return;}
 	load_param_value(pp,file,par,"In 'file'",VALUE_LOAD);
 
-	model.param.push_back(par);
+	add_param(par);
 };
 
 
@@ -1630,7 +1630,7 @@ void Input::param_command()
 			add_param_cat_factor(par);
 		}
 		
-		model.param.push_back(par);
+		add_param(par);
 	}
 
 	if(par.variety == REPARAM_PARAM){	
@@ -1638,6 +1638,18 @@ void Input::param_command()
 			he(ele.value);
 		}
 	}
+}
+
+
+/// Adds a parameter to the model
+void Input::add_param(const Param &par)
+{
+	auto th = 0u; while(th < model.param.size() && model.param[th].name != par.name) th++;
+	if(th < model.param.size()){
+		alert_import("Parameter '"+par.name+"' is defined more than once");
+	}
+	
+	model.param.push_back(par);
 }
 
 
@@ -2206,6 +2218,10 @@ void Input::ind_effect_command()
 	}
 	
 	auto name = get_tag_value("name"); if(name == ""){ cannot_find_tag(); return;}
+	
+	if(contains_space(name)){
+		alert_import("The individual effect name '"+name+"' must not contain a space");
+	}
 	
 	auto ie = get_tag_value("ie"); if(ie == ""){ cannot_find_tag(); return;}
 	

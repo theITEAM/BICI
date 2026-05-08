@@ -144,6 +144,7 @@ class Input                                // Stores information about the model
 		void label_command();
 		void box_command();
 		void param_command();
+		void add_param(const Param &par);
 		void derived_command();
 		void define_command();
 		bool simulation_command();

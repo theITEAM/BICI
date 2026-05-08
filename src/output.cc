@@ -2791,7 +2791,7 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 	string stat_out_file;
 	
 	if(sampledir != ""){
-		stat_out_file = "param-stats-inf.csv";
+		stat_out_file = "param-stats.csv";
 
 		ofstream pout(sampledir+"/"+stat_out_file);
 		check_open(pout,stat_out_file);

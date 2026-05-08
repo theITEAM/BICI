@@ -176,121 +176,126 @@ function data_update_add_classification(p)
 /// Updates data based on a classification changing name
 function data_update_delete_classification(p,cl,name,comp_list)
 {
-	for(let loop = 0; loop < 2; loop++){
-		let sp = model.species[p];
+	let sp = model.species[p];
 		
+	for(let loop = 0; loop < 2; loop++){
 		let source;
 		switch(loop){
 		case 0: source = sp.sim_source; break;
 		case 1: source = sp.inf_source; break;
 		}
 
-		for(let i = 0; i < source.length; i++){
-			let so = source[i];
-			
-			if(so.error != true){	
-				let tab = so.table;
+		if(sp.ncla == 0){
+			for(let i = 0; i < source.length; i++) source[i].error = true;
+		}
+		else{
+			for(let i = 0; i < source.length; i++){
+				let so = source[i];
+				
+				if(so.error != true){	
+					let tab = so.table;
+						
+					switch(so.type){
+					case "Init. Pop.":
+						{	
+							switch(so.spec.radio.value){
+							case "Graphical":
+								switch(so.spec.radio2.value){
+								case "Focal": 
+									let focal = so.spec.focal.te;
+									let cl2 = find(sp.cla,"name",focal);
+									if(cl2 != undefined) so.cla.splice(cl,1);
+									break;
+
+								case "All":
+									let glob_comp = get_glob_comp(p);
+									for(let j = 0; j < glob_comp.length; j++){
+										let gc = glob_comp[j].cla;
+
+										let sum = 0;
+										for(let jj = 0; jj < so.glob_comp.length; jj++){
+											let gc2 = so.glob_comp[jj].cla;
+
+											let cl2;
+											for(cl2 = 0; cl2 < sp.ncla; cl2++){
+												let cl3 = cl2; if(cl3 >= cl) cl3++;
+												if(gc[cl2] != gc2[cl3]) break;
+											}
+											if(cl2 == sp.ncla) sum += Number(so.glob_comp[jj].pop);
+										}
+										glob_comp[j].pop = sum;
+									}
+									so.glob_comp = glob_comp;
+									break;
+								}
+								break;
+
+							case "File":
+								switch(so.spec.radio2.value){
+								case "Focal":
+									let focal = so.spec.focal.te;
+									let cl2 = find(sp.cla,"name",focal);
+									if(cl2 != cl){
+										let r = 0;
+										while(r < tab.nrow){
+											if(find_in(comp_list,tab.ele[r][0]) != undefined){
+												tab.ele.splice(r,1);
+												tab.nrow--;
+											}
+											else r++;
+										}
+									}
+									break;
+
+								case "All":
+									let ncla = sp.ncla+1;
+									for(let r = 0; r < tab.nrow; r++){
+										let rr = r+1;
+										while(rr < tab.nrow){
+											let cl2 = 0; 
+											while(cl2 < ncla && 
+												(tab.ele[r][cl2] == tab.ele[rr][cl2] || cl2 == cl)) cl2++;
+
+											if(cl2 == ncla){
+												tab.ele[r][ncla] = Number(tab.ele[r][ncla])+Number(tab.ele[rr][ncla]);
+												tab.ele.splice(rr,1);
+												tab.nrow--;
+											}
+											else rr++;
+										}
+										tab.ele[r].splice(cl,1);
+									}
+									if(tab.col_used != undefined) tab.col_used.splice(cl,1);
+									tab.heading.splice(cl,1);
+									tab.ncol--;
+									break;
+								}
+								break;
+							}
+						}
+						break;
 					
-				switch(so.type){
-				case "Init. Pop.":
-					{	
-						switch(so.spec.radio.value){
-						case "Graphical":
-							switch(so.spec.radio2.value){
-							case "Focal": 
-								let focal = so.spec.focal.te;
-								let cl2 = find(sp.cla,"name",focal);
-								if(cl2 != undefined) so.cla.splice(cl,1);
-								break;
-
-							case "All":
-								let glob_comp = get_glob_comp(p);
-								for(let j = 0; j < glob_comp.length; j++){
-									let gc = glob_comp[j].cla;
-
-									let sum = 0;
-									for(let jj = 0; jj < so.glob_comp.length; jj++){
-										let gc2 = so.glob_comp[jj].cla;
-
-										let cl2;
-										for(cl2 = 0; cl2 < sp.ncla; cl2++){
-											let cl3 = cl2; if(cl3 >= cl) cl3++;
-											if(gc[cl2] != gc2[cl3]) break;
-										}
-										if(cl2 == sp.ncla) sum += Number(so.glob_comp[jj].pop);
-									}
-									glob_comp[j].pop = sum;
-								}
-								so.glob_comp = glob_comp;
-								break;
-							}
-							break;
-
-						case "File":
-							switch(so.spec.radio2.value){
-							case "Focal":
-								let focal = so.spec.focal.te;
-								let cl2 = find(sp.cla,"name",focal);
-								if(cl2 != cl){
-									let r = 0;
-									while(r < tab.nrow){
-										if(find_in(comp_list,tab.ele[r][0]) != undefined){
-											tab.ele.splice(r,1);
-											tab.nrow--;
-										}
-										else r++;
-									}
-								}
-								break;
-
-							case "All":
-								let ncla = sp.ncla+1;
+					default:
+						{
+							let c = find_in(tab.heading,name);
+							if(c != undefined){
 								for(let r = 0; r < tab.nrow; r++){
-									let rr = r+1;
-									while(rr < tab.nrow){
-										let cl2 = 0; 
-										while(cl2 < ncla && 
-											(tab.ele[r][cl2] == tab.ele[rr][cl2] || cl2 == cl)) cl2++;
-
-										if(cl2 == ncla){
-											tab.ele[r][ncla] = Number(tab.ele[r][ncla])+Number(tab.ele[rr][ncla]);
-											tab.ele.splice(rr,1);
-											tab.nrow--;
-										}
-										else rr++;
-									}
-									tab.ele[r].splice(cl,1);
+									tab.ele[r].splice(c,1);
 								}
-								if(tab.col_used != undefined) tab.col_used.splice(cl,1);
-								tab.heading.splice(cl,1);
+								tab.heading.splice(c,1);
 								tab.ncol--;
-								break;
+								so.load_col.splice(c,1);		
 							}
-							break;
 						}
+						break;
 					}
-					break;
-				
-				default:
-					{
-						let c = find_in(tab.heading,name);
-						if(c != undefined){
-							for(let r = 0; r < tab.nrow; r++){
-								tab.ele[r].splice(c,1);
+					
+					if(so.load_col){
+						for(let k = 0; k < so.load_col.length; k++){
+							let co = so.load_col[k];
+							if(co.cl){
+								if(co.cl > cl) co.cl--;
 							}
-							tab.heading.splice(c,1);
-							tab.ncol--;
-							so.load_col.splice(c,1);		
-						}
-					}
-					break;
-				}
-				
-				if(so.load_col){
-					for(let k = 0; k < so.load_col.length; k++){
-						let co = so.load_col[k];
-						if(co.cl){
-							if(co.cl > cl) co.cl--;
 						}
 					}
 				}

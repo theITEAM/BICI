@@ -1,49 +1,23 @@
-Dear All,
 
-It's time for a BICI update v0.86:
-https://github.com/theITEAM/BICI
-
-
-I've been trying (and failing) to keep up with people requests, but I thought I would send an updated to sort out some of your issues...
- 
-Grant, I've started to put in some "dynamic intervention" elements to the simulation. For Laura there is the test-and-cull (see below), which is definiately a good addition. However, when I get time I'd like to put in various other things in properly, e.g. simple models for how lockdown intervention measures might dynamically be added and removed (e.g. in COVID) or the AI housing orders in your model. I think this one element BICI is lacking. If you could have a bit of a think on how best we could do this (or what sorts of models to include) that would be great.  
-
-Jamie, I've had a go as simulating from "scen-8-1.bici" with the transmission tree (see attached).
-Note trans-tree="on" in the species:
-species name="Fish" type="individual" trans-tree="on"
-and infected="true" in comp:
-comp name="E" color="#ff9900" infected="true" x=9.0 y=0
-
-It the <STATE> sample from the output files you get things like:
-5,no,1.52563,0.548926,0.747769,0.516719,0.755429,1.4875,S|Tr1|Rec|1:0 S->E[6]:26.7731 E->I:29.4236 I->D:30.5531 D->R:41.6353
-
-Here the square brackets [6] show which individuals has caused the infection. These can be used for calculating the average estimate for Rt.
-
-Please keep all the problems coming in... I will just tick them off as fast as I can!
-
-CHeers,
-
-Chris
 
 UPDATES:
 
-
 GRANT
-- Bug in derived quantities with nested sums has been fixed.
-- In the interface when multiple simulation have been done, the one used for data simulation can now be selected on the bottom left hand corner. From the terminal the 'sim' tag (e.g. -sim=3) is used to select the simulation when using 'data-sim'.
+- I've made some changes to how BICI saves related to the whole single file vs data directory. So previously after a simulation, inf or post-sim was performed it wasn't possible to interchange between these. Now these restrictions no longer apply.
+- Generate errors if different transition times occur at the same time point (which is logically impossible according to the model).
+
 
 LAURA
-- To get the test-and-cull working I've had to make quite a few changes. Basically this sort of adaptive intervention wasn't really in BICI. Under the "Simulation->Setup" page, "Dynamic Int." can now be selected in the bottom left-hand-corner and from this "Test-and-cull" can be selected. This implements a protocol which tests indidividuals and culls positives.
+
 
 JAMIE
-- The "param-sample" option is now avaialbe under posterior simulation to allow for the posterior mean or median to be used for parameters (instead of posterior samples).
-- So I've tried the previous file "scen-8-1.bici", but I don't get the message "cannot have index z, because this is reserved for covariance matrices." I'm a bit confused! Could you send the specific file that causes the problem!
-- I've just tried to 
 
 CHRIS
-- Change to left menu so it doesn't go out of bounds.
-- A "Posterior mean" button in the interface has been added to the "Simulation->Parameters" page to allow for the parameter values to be set to the posterior mean.
-- The title "Simulation->Initial conditions" has be changed to "Simulation->Setup" (because it now include dynamic interventions (such as test-and-cull).
-- Example S4.1 has need added to the simulation scenarios page. This illustrates test-and-cull.
-- Corrected issue using different indices for defined quantities.
-- The "parameter samples" options are available now under posterior simulation.
+- I've put in error checking to make sure that individual effect names do not contain spaces 
+- Corrected buy whereby simulation model was always being used
+- Various bugs in the interface have been corrected related to testing lots of sim, inf, post-sim and ext options.
+- Corrected bug where simulation results disappearing after loading inference results
+- Made some changes in how data tables are loaded (got rid of no heading option and stopped simulated data being added).
+- Corrected some errors with data checking when the model is removed
+- Created an error if compartmental observations clash with transition observations
+- Generate error if inconsistent compartmental observations

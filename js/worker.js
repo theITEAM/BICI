@@ -43,8 +43,6 @@ let sim_result_import = {siminf:"sim"};           // Creates on import and copie
 let inf_result_import = {siminf:"inf"};
 let ppc_result_import = {siminf:"ppc"};
 
-let import_te;                                    // The text used to import the file
-
 let edit_source;                                  // Used when editting a data source
 
 let input;                                        // Stores the input into the worker
@@ -313,31 +311,48 @@ function process(e)
 	case "StartClusterSave": case "StartClusterExport":
 		{
 			let one_file = true; if(input.type == "StartClusterExport") one_file = false;
-			if(info.save_type == "ppc") create_ppc_file();
-			else create_output_file(info.save_type,one_file,info.map_store);
+		
+			switch(info.save_type){
+			case "ext": create_ext_file(one_file); break;
+			case "ppc": create_ppc_file(info,one_file); break;
+			default: create_output_file(info.save_type,one_file,info.map_store); break;
+			}
 		}
 		break;
 		
-	case"Save Sim": case"Save Inf": case"Save PPC":
+	case "Save Sim": case "Save Inf": case "Save PPC":
+	case "Export Sim": case "Export Inf": case "Export PPC":
 		{
-			let file_list=[];
-			let te;
-			switch(input.type){
-			case"Save Sim": te = sim_result.import_te; break;
-			case"Save Inf": te = inf_result.import_te; break;
-			case"Save PPC": te = ppc_result.import_te; break;
+			let spl = input.type.split(" ");
+			let one_file = true; if(begin_str(input.type,"Export")) one_file = false;
+			
+			let res;
+			switch(spl[1]){
+			case "Sim": res = sim_result; break;
+			case "Inf": res = inf_result; break;
+			case "PPC": res = ppc_result; break;
+			default: error("op problem"); break;
 			}
+		
+			let bscr = copy(res.bscript);
+
+			if(spl[1] == "Inf") remove_ppc_command(bscr,false);
+		
+			let file_list=[];
+			let te = generate_text_from_bscript(bscr,file_list,one_file);
+	
 			write_file_store(te,"bicifile",file_list,"bicifile");
+			
 			post({file_list:file_list});
 		}
 		break;
 		
 	case "StartPPC":
-		create_ppc_file(info);
+		create_ppc_file(info,true);
 		break;
 		
 	case "StartEXT":
-		create_ext_file();
+		create_ext_file(true);
 		break;
 
 	case "Import2":
@@ -353,6 +368,7 @@ function process(e)
 		break;
 		
 	case "Load Example": 
+		if(model) model.clear_res();
 		load_bici("../Examples/"+info+".bici");
 		break;
 		
@@ -881,10 +897,7 @@ function create_invalid_message(mess)
 		
 		for(let loop = 0; loop < 3; loop++){
 			let spec;
-			if(loop == 2){
-				let pf = model.inf_res.plot_filter;
-				if(pf) spec = pf.species;
-			}
+			if(loop == 2) spec = get_species("ppc");
 			else spec = model.species;
 			
 			if(spec){
@@ -898,6 +911,17 @@ function create_invalid_message(mess)
 					case 2: source = sp.ppc_source; type = "Population Mod."; break;
 					}
 					
+					let j = 0; 
+					while(j < source.length){
+						let so = source[j];
+						if(so.error == true){
+							list.push("• <b>"+type+"</b> - "+so.name);
+							source.splice(j,1);
+						}
+						else j++;
+					}
+						
+						/*
 					for(let j = source.length-1; j >= 0; j--){
 						let so = source[j];
 						if(so.error == true){
@@ -906,6 +930,7 @@ function create_invalid_message(mess)
 							source.splice(j,1);
 						}
 					}
+					*/
 				}
 			}
 		}

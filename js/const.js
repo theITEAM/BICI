@@ -3,7 +3,7 @@
 
 // 53754 lines of code (16/11/24)
 // 50018 lines of code (18/11/24)
-// 59127 lines of code (16/15/25)
+// 59127 lines of code (16/05/25)
 // 62667 lines of code (17/09/25)
 // 67000 lines of code (25/02/26)
 
@@ -13,7 +13,7 @@ let ver="windows";         // Determines platform
 
 let mac_temp_dir = "/tmp/BICI_files/";
 
-let win_linux = false;                             // When working on win running linux 
+let win_linux = false;//true;                             // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)

@@ -32,6 +32,17 @@ class Model
 	}
 
 
+	/// Clears any previously loaded results
+	clear_res()
+	{
+		this.sim_res = { siminf:"sim"};                       // Filter used to plot sim results
+		this.inf_res = { siminf:"inf"};                       // Filter used to plot inf results
+		this.ppc_res = { siminf:"ppc"};   
+	
+		//if(this.sim_res && this.sim_res.on == true) this.sim_res.on = false;
+		//if(this.inf_res && this.inf_res.on == true) this.inf_res.on = false;
+	}
+	
 	///	Starts a new model
 	start_new(op)
 	{
@@ -46,7 +57,7 @@ class Model
 		
 		this.inf_details = { t_start:"", t_end:"", timestep:"", abcsample:String(ABC_SAMPLE_DEFAULT), sample:String(MCMC_SAMPLE_DEFAULT), output_param :String(MCMC_OP_PARAM_DEFAULT), output_state:String(MCMC_OP_STATE_DEFAULT), accfrac:String(ABC_ACFRAC_DEFAULT), accfracsmc:String(ABCSMC_ACFRAC_DEFAULT), numgen:String(ABCSMC_GEN_DEFAULT), kernelsize:String(ABCSMC_KERNEL_DEFAULT), indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, nchain:String(MCMC_CHAIN_DEFAULT), algorithm:{value:ALG_DEFAULT}, run_local:{value:"Yes"}, run_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, sync_on:{value:"On"}, burnin_frac:BURNIN_FRAC_DEFAULT, anneal_type:{te:ANNEAL_DEFAULT}, anneal_rate:ANNEAL_RATE_DEFAULT, anneal_power:ANNEAL_POWER_DEFAULT, npart:String(PAS_PART_DEFAULT), gen_update:String(PAS_GEN_UPDATE_DEFAULT), cha_per_core:String(MCMC_CHAIN_PER_CORE_DEFAULT), part_per_core:String(PAS_PART_PER_CORE_DEFAULT), optimise:{value:"auto"}, compress:{value:"auto"} };
 		
-		this.ppc_details = {  ppc_t_start:"", ppc_t_end:"", t_start:"", t_end:"", algorithm:{value:"gillespie"}, number:PPC_NUM_DEFAULT, indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, run_local:{value:"Yes"}, run_inf_model:{value:"Yes"}, run_post:{value:"postsample"},srun_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, optimise:{value:"auto"}, compress:{value:"auto"}};    
+		this.ppc_details = {  ppc_t_start:"", ppc_t_end:"", t_start:"", t_end:"", algorithm:{value:"gillespie"}, number:PPC_NUM_DEFAULT, indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, run_local:{value:"Yes"}, run_save_type:{value:"Save"}, run_inf_model:{value:"Yes"}, run_post:{value:"postsample"},srun_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, optimise:{value:"auto"}, compress:{value:"auto"}};    
 			
 		this.start = true;
 		this.filename = "";
@@ -3023,6 +3034,9 @@ class Model
 	/// Loads up a new model based on information from a webworker
 	load(ans,not_zero_page)
 	{
+		if(ans.file_store) inter.file_store = ans.file_store;
+		if(ans.save_type_radio) inter.save_type_radio = ans.save_type_radio;
+	
 		let exa_store;
 		
 		if(this.example && not_zero_page) exa_store = this.example;

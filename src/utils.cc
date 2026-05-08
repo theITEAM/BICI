@@ -4155,3 +4155,14 @@ bool param_omega(string name)
 	if(begin_str(name,"Ω")) return true;
 	return false;
 }
+
+
+
+/// Determines if a string contains a space
+bool contains_space(string te)
+{
+	for(auto i = 0u; i < te.length(); i++){
+		if(te.substr(i,1) == " ") return true;
+	}
+	return false;
+}

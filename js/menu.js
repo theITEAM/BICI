@@ -405,6 +405,62 @@ function drop_menu(cont,lay)
 	if(find(inter.layer,"name","TableContent") != undefined) table_show = true; 
 	
 	switch(bub.mode){
+	case "SaveOptions":
+		{
+			let dx = 10, dy = 1.2;
+			cont.dx = dx;
+			bubble_addtitle(cont,"Save type",{title:"Save type", te:saveoptions_text});
+		
+			bubble_addradio(cont,0,"single","Single file",inter.save_type_radio); 
+			bubble_addradio(cont,0,"datadir","File + data directory",inter.save_type_radio); 
+		
+			add_end_button(cont,"Save","SaveBICIFile");
+			return;
+		}
+		break;
+		
+	case "SaveSimOptions":
+		{
+			let dx = 10, dy = 1.2;
+			cont.dx = dx;
+			bubble_addtitle(cont,"Save simulation",{title:"Save simulation results", te:savesimoptions_text});
+		
+			bubble_addradio(cont,0,"single","Single file",inter.save_type_radio); 
+			bubble_addradio(cont,0,"datadir","File + data directory",inter.save_type_radio); 
+		
+			add_end_button(cont,"Save","SaveSimBICIFile");
+			return;
+		}
+		break;
+		
+	case "SaveInfOptions":
+		{
+			let dx = 10, dy = 1.2;
+			cont.dx = dx;
+			bubble_addtitle(cont,"Save inference",{title:"Save inference results", te: saveinfoptions_text});
+		
+			bubble_addradio(cont,0,"single","Single file",inter.save_type_radio); 
+			bubble_addradio(cont,0,"datadir","File + data directory",inter.save_type_radio); 
+		
+			add_end_button(cont,"Save","SaveInfBICIFile");
+			return;
+		}
+		break;
+	
+	case "SavePPCOptions":
+		{
+			let dx = 10, dy = 1.2;
+			cont.dx = dx;
+			bubble_addtitle(cont,"Save post-sim",{title:"Save posterior simulation results", te: savepostsimoptions_text});
+		
+			bubble_addradio(cont,0,"single","Single file",inter.save_type_radio); 
+			bubble_addradio(cont,0,"datadir","File + data directory",inter.save_type_radio); 
+		
+			add_end_button(cont,"Save","SavePPCBICIFile");
+			return;
+		}
+		break;
+		
 	case "SelectLine":
 		{
 			let dx = 8, dy = 1.2;
@@ -498,9 +554,11 @@ function drop_menu(cont,lay)
 	{
 		let sub = [];
 		
+		/*
 		{
 			sub.push({te:"Script", ac:"ExportScript", active:active_mod});
 		}
+		*/
 		
 		let active = false; 
 		if(graph_show || table_show) active = true;

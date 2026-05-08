@@ -182,10 +182,16 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 					break;
 					
 				case ADD_POP_SIM: case REMOVE_POP_SIM: case ADD_IND_SIM:
-				case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: case ADD_IND_POST_SIM:
 					if(!use_sim_ic) process = false;
 					break;
-			
+				
+				case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: case ADD_IND_POST_SIM:
+					if(model.mode != PPC) process = false;
+					else{
+						//if(model.details.param_only) process = false;
+					}
+					break;
+					
 				default: process = false; break;
 				}
 				break;

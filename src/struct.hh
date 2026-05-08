@@ -1200,7 +1200,7 @@ struct ObsData {
 	
 	ObsType type;                    // The type of the observation
 	unsigned int so;                 // References the data source
-	unsigned int ref;                // References population or trans pop data
+	unsigned int ref;                // References obs_trans or population or trans pop data
 	unsigned int c_exact;            // The value of c (if known precisely)
 	vector <EquationInfo> c_obs_prob_eqn; // Equation giving the probability of being in compartment
 	vector <bool> eqn_zero;          // Set to true if the equation is zero
@@ -1208,6 +1208,7 @@ struct ObsData {
 	vector <unsigned int> obs_eqn_ref;// References the observation equation
 	unsigned int cl;                 // The classification
 	double tdiv;                     // The time at which observation occurs
+	double tdiv_before_jiggle;       // Stores the original times before events are jiggled
 	bool time_vari;                  // Determines if time variation
 };
 

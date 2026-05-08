@@ -40,9 +40,12 @@ function add_help_buts(lay)
 	let dx = lay.dx;
 
 	let dx_cont = dx-2*marx-2*marx2-0.3;
-	add_layer("HelpContent",lay.x+marx+marx2,0,dx_cont,0,{ymax:20.7, help_type:help_type});	
+	let yy = 0;
+	if(help_type == "datatable") yy += 1;
+	add_layer("HelpContent",lay.x+marx+marx2,yy,dx_cont,0,{ymax:20.7, help_type:help_type});	
 	
 	let hei = inter.layer[l_store].dy;
+
 	let sh = 0.3;
 	let hei_import_text = 0;
 	
@@ -68,7 +71,7 @@ function add_help_buts(lay)
 		break;
 	
 	case "datatable":
-		hei += 7; sh = 0.6;
+		hei += 5.5; sh = 0.6;
 		break;
 
 	case "normal":
@@ -117,21 +120,18 @@ function add_help_buts(lay)
 
 	case "datatable":
 		{
+			lay.add_button({te:"Previously loaded:", x:1.3, y:cy, dx:10, dy:1.3, col:WHITE, type:"SubTitle"});
+			
 			let ma = 1.5;
-			lay.add_button({x:ma, y:cy+0.4, dx:dx-2*ma, dy:inter.layer[l_store].dy+0.5, type:"Outline", back_col:WHITE, col:WHITE}); 
+			lay.add_button({x:ma, y:cy+1.4, dx:dx-2*ma, dy:inter.layer[l_store].dy+0.5, type:"Outline", back_col:WHITE, col:WHITE}); 
 			
-			let y = cy+hei-5.5;
+			let y = cy+hei-5.5+2.3;
 		
-			lay.add_button({te:"Upload a new data table", x:1.3, y:y, dx:10, dy:1.3, col:WHITE, type:"SubTitle"});
+			lay.add_button({te:"Upload a new data table:", x:1.3, y:y, dx:10, dy:1.3, col:WHITE, type:"SubTitle"});
 			y += 1.8;
 			
-			lay.add_paragraph("Table heading:",dx_cont,1.3,y,WHITE,para_si,para_lh);
-			y += 0.15;
-			lay.add_radio_white(8.5,y,"Yes","Yes",inter.radio_heading,{back_col:BLUE_BACK});
-			lay.add_radio_white(12.5,y,"No","No",inter.radio_heading,{back_col:BLUE_BACK});
-			y += 1.8;
-			lay.add_paragraph("File format:",dx_cont,1.3,y,WHITE,para_si,para_lh);
-			y += 0.15;
+			lay.add_paragraph("File format:",dx_cont,1.3,y,WHITE,bub_si,para_lh);
+			y += 0.05;
 			lay.add_radio_white(6.8,y,"csv","Comma separated (.csv)",inter.radio_format,{back_col:BLUE_BACK});
 			lay.add_radio_white(18.3,y,"tsv","Tab separated (.txt,.tsv)",inter.radio_format,{back_col:BLUE_BACK});
 		}
@@ -191,7 +191,7 @@ function add_script_width(script)
 function add_help_content_buts(lay)
 {	
 	let cx = 0.5, cy = 0;
-	
+
 	let type = lay.op.help_type;
 	switch(type){
 	case "normal": case "warning": case "testing":
@@ -291,6 +291,8 @@ function add_help_content_buts(lay)
 	case "datatable":
 		{
 			let table = { width:data.table_width, heading:[{name:""},{name:"File"},{name:"# cols"},{name:"# rows"},{name:""}], content:[]};
+	
+			remove_simulate_data_table();
 	
 			if(data.table.length == 0) table = "There are currently no data tables loaded.";
 

@@ -11,23 +11,23 @@ TO DO GENTIC
 -- get bad cat working
 -- get spatial working
 
-TO DO
-
-
-
-- Save single file / with directory for inference / post sim results
+WORK TO DO
 - Look at epi-phlyo paper andrea sent (in papers tp read -> new)
 - For calculating R0... I think running "trans-tree" should now work under simulation and posterior simulation (but not inference, but anyway you don't need this. To get this to work you need to run 'species' with 'trans-tree="on"' 
 
+TO DO
+- Check Jamies reordering
+- Checks for transition and compartment data at the same times
+- checks for compartment information simultaneous
+- Transition data memory intensive for Grants models?
+- Check elements for ppc  if(so.info.siminf == "ppc") return; // TO DO  
 
+- Dynamic changes to parameters
 
-
--- Get transmission tree with individual effects working (e.g. Jamie Data -> trans_tree
-
+- Save single file / with directory for inference / post sim results
 -- Get posterior simulation from system of different size
-
 -- test maximum step time warning
--- derived integral not working
+
 -- interface simulate with parameter in observation model
 -- In model.js // TO DO NOW
 -- should not have uniform priors for covariance matrix. for some reason jefreys was not coming up
@@ -145,6 +145,8 @@ auto k = 0u; while(k < sum_store.size() && z > sum_store[k]) k++;
 auto k = 0u; while(k < trig_event.size() && trig_event[k].tdiv != eve.tdiv) k++;
 
 DONE NEW
+-- derived integral not working
+-- Get transmission tree with individual effects working (e.g. Jamie Data -> trans_tree
 -- Jamie's suggestion of "sample=median"
 - test-and-cull form of control suggetion from Laura
 - Simulate from different samples when multiple simulations

@@ -2174,6 +2174,19 @@ double StateSpecies::get_trans_obs_prob(unsigned int trg, const ObsData &ob) con
 }
 
 
+/// Gets the observation probability on an observation for a transition
+double StateSpecies::get_comp_obs_prob(unsigned int c, const ObsData &ob) const
+{
+	auto c_exact = ob.c_exact; 
+	if(c_exact != UNSET){
+		if(c == c_exact) return 1;
+		return 0;
+	}
+
+	return obs_eqn_value[ob.obs_eqn_ref[c]];
+}
+
+
 /// Compares a covariance matrix with one from individual effects
 void StateSpecies::compare_covar(string te, const vector < vector <double> > &omega, unsigned int g) const
 {

@@ -68,12 +68,14 @@ function add_param_mult_content(lay)
 {
 	let y = 0.5;
 	let mar = 2;
-	let dy = 4;
+	let dy = 6;
 	let col_round = LLLBLUE, col_text = DDBLUE;
 	
 	let x = maximim_label_width() + 4;
 	let del_x = lay.dx - 4.5;
 	let del_dx = 1.3;
+
+	let te_si = 0.8, te_fo = get_font(te_si,"","times");
 
 	for(let i = 0; i < model.param.length; i++){
 		let par = model.param[i];
@@ -83,15 +85,16 @@ function add_param_mult_content(lay)
 			
 			let si = 1.0, fo = get_font(si,"","times");
 			let xx = x-par.label_info.dx-0.7-1.8;
-			lay.add_button({te:"Knots =", x:xx+1.8, y:y+0.3, dy:si, si:si, font:fo, type:"Text", col:BLACK});
-			
+		
 			let spl = par.spline;
-			let te = stringify(spl.knot);
-					
 			let w = wright;
-				
-			lay.add_button({te:te, x:xx+5.6, y:y+0., dx:w-xx-5.6, dy:1.6, type:"SplineKnots", font: get_font(1.1,"","times"), ac:"EditSplineKnots", i:i});
 			
+			add_knot_times(x,y,w,lay,spl,i,te_si,te_fo);
+					
+			y += dy_spline_fac*2;
+					
+			add_spline_options(x,y,lay,spl,te_si,te_fo);
+					
 			y += 2;
 		
 			if(add_view_button(par,w-4,y,i,lay,model)) w -= 4.5;
@@ -272,35 +275,26 @@ function add_model_param_content(lay)
 			lay.add_button({te:"Splines", x:1, y:y, dx:lay.dx-3, dy:dy*num+1.5+1, col:col_round, col2:col_text, type:"CurvedOutline"});
 			y += 1.4;
 			
+			let te_si = 0.8, te_fo = get_font(te_si,"","times");
+
 			for(let k = 0; k < th_list.length; k++){
 				let i = th_list[k];
 				let par = model.param[i];
 				let spl = par.spline;
 				if(spl.on == true && par.type != "derive_param" && par.type != "param factor"){
 					lay.display_param(x-par.label_info.dx-0.7,y-0.1,par.label_info);
-				
-					let te_si = 0.8, te_fo = get_font(te_si,"","times");
-					lay.add_button({te:"KNOTS:", x:x+1.8, y:y+0.45, dy:te_si, si:te_si, font:te_fo, type:"Text", col:BLACK});
-					
-					let te = stringify(spl.knot);
 					
 					let w = wright;
 					
 					lay.add_checkbox(w-4,y+0.3,"Smooth","Smooth",spl.smooth,WHITE,{title:"Smoothing", te:smoothing_text});
 					w -= 4;
 					
-					lay.add_button({te:te, x:x+5.4, y:y+0., dx:w-x-5.4, dy:1.6, type:"SplineKnots", font: get_font(1.1,"","times"), spline_radio:spl.spline_radio, ac:"EditSplineKnots", i:i});
-				
+					add_knot_times(x,y,w,lay,spl,i,te_si,te_fo);
+					
 					y += dy_spline_fac*dy;
 					
-					lay.add_button({te:"TYPE:", x:x+1.8, y:y+0.3, dy:te_si, si:te_si, font:te_fo, type:"Text", col:BLACK});
-					
-					let xx = x+5;
-					lay.add_radio(xx,y,"Linear","Linear",spl.spline_radio); xx += 7;
-					lay.add_radio(xx,y,"Square","Square",spl.spline_radio); xx += 7;
-					lay.add_radio(xx,y,"Cubic +ve","Cubic +ve",spl.spline_radio); xx += 7;
-					lay.add_radio(xx,y,"Cubic","Cubic",spl.spline_radio); xx += 7;
-					
+					add_spline_options(x,y,lay,spl,te_si,te_fo);
+				
 					y += dy_spline_fac2*dy;
 					
 					if(spl.smooth.check == true){
@@ -488,6 +482,32 @@ function add_model_param_content(lay)
 }
 
 
+/// Adds button for knot  times
+function add_knot_times(x,y,w,lay,spl,i,te_si,te_fo)
+{
+	lay.add_button({te:"KNOTS:", x:x+1.8, y:y+0.45, dy:te_si, si:te_si, font:te_fo, type:"Text", col:BLACK});
+	
+	let te = stringify(spl.knot);
+	
+	lay.add_button({te:te, x:x+5.4, y:y+0., dx:w-x-5.4, dy:1.6, type:"SplineKnots", font: get_font(1.1,"","times"), spline_radio:spl.spline_radio, ac:"EditSplineKnots", i:i});
+}
+				
+				
+/// Adds spline options radio
+function add_spline_options(x,y,lay,spl,te_si,te_fo)
+{//zz
+	let rad = spl.spline_radio;
+	
+	lay.add_button({te:"TYPE:", x:x+1.8, y:y+0.3, dy:te_si, si:te_si, font:te_fo, type:"Text", col:BLACK});
+	
+	let xx = x+5;
+	lay.add_radio(xx,y,"Linear","Linear",rad); xx += 7;
+	lay.add_radio(xx,y,"Square","Square",rad); xx += 7;
+	lay.add_radio(xx,y,"Cubic +ve","Cubic +ve",rad); xx += 7;
+	lay.add_radio(xx,y,"Cubic","Cubic",rad); xx += 7;
+}
+
+					
 /// Bubble which allows user to select a constant parameter
 function set_constant_bubble(cont)
 {	

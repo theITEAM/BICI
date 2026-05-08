@@ -309,11 +309,10 @@ function precision(x,digit)
 	
 	let mod = x; if(mod < 0) mod = -mod; 
 	
-	let digit_min = Math.floor(1+Math.log10(mod)+0.1);
+	let digit_min = Math.floor(1+Math.log10(mod));
 	if(digit_min < 1) digit_min = 1;
-
-	if(digit < digit_min) digit = digit_min;
 	
+	if(digit < digit_min) digit = digit_min;
 	let val = Number(x).toPrecision(digit);
 	for(let j = digit-1; j >= digit_min; j--){
 		let val2 = x.toPrecision(j);
@@ -1334,3 +1333,104 @@ function round(num)
 	return num.toFixed(i);
 }
 
+
+/// Replaces the folder in data-dir
+function replace_data_dir_folder(te,dir)
+{
+	let na= 'data-dir folder="';
+	let i = te.indexOf(na);
+	let istart = i;
+	if(i == -1){
+		i = 0; 
+		while(i < te.length && te.substr(i,8) != "data-dir") i++;
+		if(i == te.length){ error("cannot find 'data-dir'"); return te;}
+		
+		istart = i;
+		i += 8;
+		while(i < te.length && te.substr(i,1) == " ") i++;
+	}
+	else i += na.length;
+
+	let ist = i; while(i < te.length && te.substr(i,1) != '"') i++;
+	if(i == te.length){ error("cannot find 'data-dir'"); return te;}
+	
+	if(dir == ""){  // Removes command
+		//while(istart > 0 && te.substr(istart 
+		return te.substr(0,istart)+te.substr(i+1);
+	}
+	
+	return te.substr(0,ist)+dir+te.substr(i);
+}
+
+
+
+/// The actual text for banner
+function banner_text(name)
+{
+	let num = 58;
+	let num2 = num - name.length;
+	let num3 = Math.floor(num2/2);
+	
+	let te="";
+	for(let i = 0; i < num3; i++) te += "#";
+	te += " "+name+" ";
+	for(let i = 0; i < num2-num3; i++) te += "#";
+	return te;
+}
+
+
+/// Removes a banner with a particular name
+function remove_banner(te,name)
+{
+	let ban = banner_text(name);
+	let regex = new RegExp(ban,"g"); 
+	
+	return te.replace(regex,"");
+}
+
+
+/// Determines if a tag is a file
+function is_tag_name_file(name)
+{
+	switch(name){
+	case "value": case "prior-const": case "constant": case "reparam": case "text": 
+		return "maybe";
+			
+	case "file": case "boundary": 
+	case "prior-split": case "dist-split": 
+	case "A": case "Ainv": case "A-sparse": case "pedigree": case "X": 
+	case "ind-list": case"factor-weight":
+		return "yes";
+		
+	default: 
+		return "no";
+	}
+}
+
+
+/// Determines if a string contains a space
+function contains_space(te)
+{
+	if(te.indexOf(" ") != -1) return true;
+	return false;
+}
+
+
+/// Removes path from filename
+function cut_path(filename)
+{
+	let j = filename.length-1;
+	while(j >= 0 && filename.substr(j,1) != "/" && filename.substr(j,1) != "\\") j--;
+	return filename.substr(j+1);
+}
+
+
+/// Removes any simulated results from data table
+function remove_simulate_data_table()
+{
+	let i = 0;
+	while(i < data.table.length){
+		if(data.table[i].sim_data == true) data.table.splice(i,1);
+		else i++;
+	}
+}

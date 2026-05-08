@@ -870,6 +870,7 @@ void Species::comp_data(const DataSource &so)
 				}
 				ob.cl = so.cl;
 				ob.tdiv = calc_tdiv(t,details);
+				ob.tdiv_before_jiggle = ob.tdiv;
 				ob.time_vari = false;
 				ind.obs.push_back(ob);		
 			}
@@ -927,6 +928,7 @@ void Species::genetic_data(const DataSource &so)
 				ob.c_obs_prob_eqn = p_eqn;
 				ob.cl = infection_cl;
 				ob.tdiv = calc_tdiv(t,details);
+				ob.tdiv_before_jiggle = ob.tdiv;
 				ob.time_vari = false;
 				ind.obs.push_back(ob);	
 			}				
@@ -1001,6 +1003,7 @@ void Species::test_data(const DataSource &so)
 			
 			ob.cl = so.cl;
 			ob.tdiv = calc_tdiv(t,details);
+			ob.tdiv_before_jiggle = ob.tdiv;
 			ob.time_vari = false;
 			ind.obs.push_back(ob);	
 		}
@@ -1204,6 +1207,7 @@ void Species::trans_data(const DataSource &so)
 			ob.c_exact = UNSET;
 			ob.cl = so.cl;
 			ob.tdiv = calc_tdiv(t,details);
+			ob.tdiv_before_jiggle = ob.tdiv;
 			ob.time_vari = false;
 			ob.not_alive = false;
 			
@@ -1231,7 +1235,8 @@ void Species::trans_data(const DataSource &so)
 	ob_tr.tra_prob_eqn = create_eqn_vector(prob_str,TRANS_PROB,so);
 	ob_tr.ti_min = ti_min;
 	ob_tr.ti_max = ti_max;
-
+	ob_tr.single_trans = false;
+	
 	obs_trans.push_back(ob_tr);
 	
 	obs_trans_exist = true;
@@ -2005,6 +2010,7 @@ void Species::jiggle_data(Operation mode)
 		}
 	}
 	
+	return;//
 	for(auto &ind : individual){	
 		double t_enter = UNSET, t_leave = UNSET;
 		auto enter_so = UNSET, leave_so = UNSET;

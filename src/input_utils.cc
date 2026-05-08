@@ -1920,7 +1920,7 @@ void Input::add_param_cat_factor(Param &par)
 		par.set_value_eqn(i,he(add_equation_info(ss.str(),REPARAM)));
 	}
 	
-	model.param.push_back(par_basic);
+	add_param(par_basic);
 }
 
 

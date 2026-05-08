@@ -1767,15 +1767,6 @@ function generate_trans_tree(get_inf_from,result,sample,ind_key)
 }
 	
 
-/// Removes path from filename
-function cut_path(filename)
-{
-	let j = filename.length-1;
-	while(j >= 0 && filename.substr(j,1) != "/" && filename.substr(j,1) != "\\") j--;
-	return filename.substr(j+1);
-}
-
-
 /// Gets a subtable based on a series of column heading names
 function get_subtable(tab,col_name)
 {
@@ -1966,12 +1957,11 @@ function extract_text_samples(siminf,type,result)
 	
 	let nchain = 1; if(result.chains) nchain = result.chains.length;
 	
-	let lines = result.import_te.split("\n");
-	let pro = process_lines(lines,"");
+	let bscript = result.bscript;
 	
 	let te="";
-	for(let i = 0; i < pro.processed.length; i++){
-		let command = pro.processed[i];
+	for(let i = 0; i < bscript.length; i++){
+		let command = bscript[i];
 		
 		if(command.type == com){
 			let ch = 0;
@@ -1981,10 +1971,7 @@ function extract_text_samples(siminf,type,result)
 				if(tag.name == "file"){
 					switch(type){
 					case "state":
-						if(nchain > 1){
-							//te += "CHAIN "+(ch+1)+endl;
-							te += "CHAIN "+(ch)+endl;
-						}
+						if(nchain > 1) te += "CHAIN "+(ch)+endl;
 						te += tag.value.te;
 						break;
 						
@@ -2024,7 +2011,7 @@ function load_bici(file)
 {
 	let te = load_file_local(file);
 	loading_mess("Processing...");
-	import_file(te,file,true);
+	import_file(te,file,true,true);
 }
 
 
@@ -2041,4 +2028,3 @@ function copy_model_value()
 		}
 	}
 }
-

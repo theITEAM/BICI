@@ -793,24 +793,57 @@ function button_action(bu,action_type)
 		break;
 		
 	case "SaveAs":
-		close_bubble();
-		inter.file_store.type = "SaveAs";
-		start_worker("Save BICI",{save_type:"save", map_store:map_store});
+		change_bubble_mode("SaveOptions");
+		break;
+		
+	case "SaveBICIFile":
+		{
+			close_bubble();
+			inter.file_store.type = "SaveAs";
+			let st = "Save BICI";
+			if(inter.save_type_radio.value == "datadir") st = "Export BICI";
+			
+			start_worker(st,{save_type:"save", map_store:map_store});
+		}
 		break;
 		
 	case "SaveSim":
-		close_bubble();
-		start_worker("Save Sim");
+		change_bubble_mode("SaveSimOptions");
+		break;
+	
+	case "SaveSimBICIFile":
+		{
+			close_bubble();
+			let st = "Save Sim";
+			if(inter.save_type_radio.value == "datadir") st = "Export Sim";
+			start_worker(st);
+		}
 		break;
 	
 	case "SaveInf":
-		close_bubble();
-		start_worker("Save Inf");
+		change_bubble_mode("SaveInfOptions");
+		break;
+		
+	case "SaveInfBICIFile":
+		{
+			close_bubble();
+			let st = "Save Inf";
+			if(inter.save_type_radio.value == "datadir") st = "Export Inf";
+			start_worker(st);
+		}
 		break;
 		
 	case "SavePPC":
-		close_bubble();
-		start_worker("Save PPC");
+		change_bubble_mode("SavePPCOptions");
+		break;
+		
+	case "SavePPCBICIFile":
+		{
+			close_bubble();
+			let st = "Save PPC";
+			if(inter.save_type_radio.value == "datadir") st = "Export PPC";
+			start_worker(st);
+		}
 		break;
 	
 	case "Import":
@@ -893,6 +926,7 @@ function button_action(bu,action_type)
 	case "AddDataSource":
 		inter.edit_source = false;
 		start_worker("Data Source",{type:"Add", edit_source:edit_source});
+		remove_simulate_data_table();
 		break;
 		
 	case "AddDynInt":
@@ -1912,13 +1946,15 @@ function button_action(bu,action_type)
 			}
 			else{
 				if(check_time_error() == false){	
-					switch(model.sim_details.run_local.value){
+					let info = {save_type:"sim", map_store:map_store, ver:ver};
+					switch(de.run_local.value){
 					case "Yes":
-						start_worker("Start",{save_type:"sim", map_store:map_store, ver:ver});
+						start_worker("Start",info);
 						break;
 						
 					case "No":
-						run_cluster();
+						if(de.run_save_type.value == "Save") start_worker("StartClusterSave",info);
+						else start_worker("StartClusterExport",info);
 						break;
 					}
 				}
@@ -1933,7 +1969,7 @@ function button_action(bu,action_type)
 			let de = model.ppc_details;
 			
 			let use_inf = false;
-			if(de.run_inf_model == "Yes") use_inf = true;
+			if(de.run_inf_model.value == "Yes") use_inf = true;
 				
 			let ill = false;
 			if(Number(de.ppc_t_start) >= Number(de.ppc_t_end)){
@@ -1960,13 +1996,16 @@ function button_action(bu,action_type)
 				
 			if(ill == false){
 				if(check_time_error() == false){	
-					switch(model.ppc_details.run_local.value){
+					let info = {save_type:"ppc", map_store:map_store, ver:ver, use_inf:use_inf};
+
+					switch(de.run_local.value){
 					case "Yes":
-						start_worker("StartPPC",{save_type:"ppc", map_store:map_store, ver:ver, use_inf:use_inf});
+						start_worker("StartPPC",info);
 						break;
 						
 					case "No":
-						run_cluster_ppc();
+						if(de.run_save_type.value == "Save") start_worker("StartClusterSave",info);
+						else start_worker("StartClusterExport",info);
 						break;
 					}
 				}
@@ -1988,6 +2027,8 @@ function button_action(bu,action_type)
 				if(check_time_error() == false ){
 					let det = model.inf_details;
 				
+					let info = {save_type:"inf", map_store:map_store, ver:ver};
+					
 					switch(det.run_local.value){
 					case "Yes":
 						if(!win_linux && det.algorithm.value == "PAS-MCMC" && 
@@ -1995,12 +2036,13 @@ function button_action(bu,action_type)
 							alert_help("Problem starting...","The PAS-MCMC algorithm can only be run on a single core on the local machine.\nThis can be achieved by setting 'Particle per core' (under 'Further options') to the number of particles '"+det.npart+"'.");
 						}
 						else{
-							start_worker("Start",{save_type:"inf", map_store:map_store, ver:ver});
+							start_worker("Start",info);
 						}
 						break;
 					
 					case "No":
-						run_cluster();
+						if(det.run_save_type.value == "Save") start_worker("StartClusterSave",info);
+						else start_worker("StartClusterExport",info);
 						break;
 					}
 				}
@@ -2012,13 +2054,17 @@ function button_action(bu,action_type)
 		if(check_error_textbox() == false){
 			copy_back_to_source();
 		
-			switch(model.inf_details.run_local.value){
+			let de = model.inf_details;
+			let info = {save_type:"ext", map_store:map_store, ver:ver};
+			
+			switch(de.run_local.value){
 			case "Yes":
-				start_worker("StartEXT",{save_type:"ext", map_store:map_store, ver:ver});
+				start_worker("StartEXT",info);
 				break;
 				
 			case "No":
-				run_cluster_ext();
+				if(de.run_save_type.value == "Save") start_worker("StartClusterSave",info);
+				else start_worker("StartClusterExport",info);
 				break;
 			}
 		}
@@ -2037,7 +2083,7 @@ function button_action(bu,action_type)
 			let te = bu.info.substr(2);
 			inter.copied = te;
 			navigator.clipboard.writeText(te);
-			run_cluster();
+			run_cluster(inter.help.file);
 		}
 		break;
 
@@ -2060,12 +2106,6 @@ function button_action(bu,action_type)
 	case "Nothing":
 		break;
 	
-	case "ExportScript":
-		close_bubble();
-		inter.file_store.type = "SaveAs";
-		start_worker("Export BICI",{save_type:"save", map_store:map_store});
-		break;
-		
 	case "ParamInfo":
 		select_bubble_over();
 		break;

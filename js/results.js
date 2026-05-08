@@ -12,7 +12,7 @@ function results_finalise(result,per_start,per_end)
 
 
 /// Adds information about the model into the results (such that results can be plotted)
-function results_add_model(result,details,siminf)
+function results_add_model(result,details,siminf,bscript)
 {
 	result.sample = [];
 	result.par_sample = [];
@@ -36,8 +36,8 @@ function results_add_model(result,details,siminf)
 
 	result.siminf = siminf;
 
-	result.import_te = import_te;
-
+	result.bscript = bscript;
+	
 	result.details = copy(details);
 	
 	result.species = copy(model.species);

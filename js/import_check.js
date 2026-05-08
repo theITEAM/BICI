@@ -179,7 +179,7 @@ function profiling()
 	prr(mem(sim_result_import)+" sim_result_import");
 	prr(mem(inf_result_import)+" inf_result_import");
 	prr(mem(ppc_result_import)+" ppc_result_import");
-	prr(mem(import_te)+" import_te");
+	//prr(mem(import_bscript)+" import_bscript");
 	prr(mem(edit_source)+" edit_source");
 	prr(mem(input)+" input");
 	
@@ -219,5 +219,97 @@ function mem_split(ob,te)
 	}
 	prr("SPLIT DONE");
 	prr("");
+}
+
+
+/// Checks that bscript is properly defined
+function check_bscript(pro,map_store,data_file_list)
+{
+	prr("CHECK");
+
+	let bsc = create_bscript("sim",map_store);
+	let bsc2 = copy(pro.bscript);
+	bsc2.splice(0,2);
+	
+	if(bsc.length != bsc2.length){
+		prr("Not same length of commands");
+		
+		prr("bsc");
+		prr(bsc);
+		prr(bsc2);
+		for(let i = 0; i < bsc.length; i++){
+			if(bsc[i].type != bsc2[i].type){ prr(i+" wrong"); break;}
+		}
+		return;
+	}
+	
+	for(let i = 0; i < bsc.length; i++){
+		let sc = bsc[i];
+	
+		if(i>= bsc2.length){
+			error("length wrong");
+			return;
+		}
+		
+		let sc2 = bsc2[i];
+	
+		if(sc.type != sc2.type){
+			prr("Type is wrong:"+i+" "+sc.type+" "+sc2.type);
+			prr("bsc");
+			prr(bsc);
+			prr(bsc2);
+		}
+		
+		if(sc.tags.length != sc2.tags.length){
+			prr("# tags different");
+			prr(sc);
+			prr(sc2);
+		}
+		else{
+			for(let j = 0; j < sc.tags.length; j++){
+				let ta = sc.tags[j];
+				
+				let k = 0; while(k < sc2.tags.length && sc2.tags[k].name != ta.name) k++;
+				if(k == sc2.tags.length){
+					prr("Tag could not be found");
+					prr(ta);
+					prr( sc2.tags[j]);
+				}
+				else{
+					let ta2 = sc2.tags[k];
+				
+					let va = ta.value;
+					let va2 = ta2.value;
+					if(va2.ref != undefined){
+						va2 = data_file_list[va2.ref].te;
+					}
+					
+					if(va != va2){
+						if(!(!isNaN(va) && !isNaN(va2) && Number(va) == Number(va2))){ 
+							prr("tag value different");
+							prr(va);
+							prr(va2);
+							prr(ta);
+							prr(ta2);
+							prr(sc);
+							prr(sc2);
+							prr("bsc");
+							prr(bsc);
+							prr(bsc2);
+							if(typeof va == "string" && typeof va2 == "string"){
+								for(let i = 0; i < va.length; i++){
+									if(va.substr(i,1) != va2.substr(i,1)){
+										prr(i+" wrong");
+										prr(va.substr(0,i));
+										break;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 }
 

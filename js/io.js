@@ -34,7 +34,7 @@ function load_file()
 	ById("fileToLoad").value="";
 	
 	let op ={ file:fileToLoad, type:inter.file_type};
-	if(inter.radio_heading) op.heading = inter.radio_heading.value;
+	op.heading = "Yes";
 	if(inter.radio_format) op.format = inter.radio_format.value;
 	
 	if(inter.file_type == "A matrix" || inter.file_type == "Ainv matrix"){
@@ -61,6 +61,11 @@ function save_file(filename,type)
 	switch(type){
 	case "BICI_file":
 		save_bici(filename);
+		break;
+		
+	case "BICI_file_cluster":
+		save_bici(filename);
+		run_cluster(cut_path(filename));
 		break;
 	
 	case "Export script":
@@ -126,14 +131,8 @@ function save_bici(filename)
 		dir = dir.replace(/\\/g,"/");
 		
 		let te = file_list[file_list.length-1].data;
-		let na= 'data-dir folder="."';
-		let i = te.indexOf(na);
-		if(i == -1) error("cannot find 'data-dir'");
-		else{
-			i += na.length-2;
-			
-			file_list[file_list.length-1].data = te.substr(0,i)+dir+te.substr(i+1);
-		}
+		
+		file_list[file_list.length-1].data = replace_data_dir_folder(te,dir);
 		
 		root = root.replace(/\\/g,"/");
 		dir = root+dir;

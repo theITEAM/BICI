@@ -71,15 +71,12 @@
 let imp = {};                                      // Stores information as import is done
 
 /// Import a script to define (or partially define) model and data 
-function import_file(te,file,clear_results)                                
+function import_file(te,file,clear_results,example)                                
 {	
 	loading_mess("Processing...");
 
 	percent(0);
-	
-	import_te = te;
 
-	//te = te.replace(/\r/g,"");
 	te = remove_escape_char(te);
 
 	percent(1);
@@ -106,7 +103,7 @@ function import_file(te,file,clear_results)
 	init_result(pro,clear_results);
 
 	// Keeps track of the current species and classification 
-	imp = { pro:pro, lines:lines, clear_results:clear_results, script:pro.formatted, previous_loaded_table:[], warn:false}; 
+	imp = { pro:pro, file:file, example:example, lines:lines, clear_results:clear_results, script:pro.formatted, previous_loaded_table:[], warn:false}; 
 
 	if(data_file_list.length > 0){	
 		// Potentially load_file_nonlocal could be used, but does this work on a Mac?
@@ -123,7 +120,6 @@ function import_file(te,file,clear_results)
 function load_local(data_file_list,per_start,per_end)
 {
 	loading_mess("Loading...");
-
 	for(let i = 0; i < data_file_list.length; i++){
 		percent(per_start+((i+0.5)/data_file_list.length)*(per_end-per_start));
 		let dfl = data_file_list[i];
@@ -188,10 +184,26 @@ function import_file2(data_file_list)
 			model.update_pline_all();
 
 			add_non_proc_time(0.1);
+		
+			let bscript = embed_files(imp.pro.bscript,data_file_list);
+		
+			if(sim_result_import.load){
+				results_add_model(sim_result_import,model.sim_details,"sim",bscript);
+			}
+		
+			if(inf_result_import.load){
+				results_add_model(inf_result_import,model.inf_details,"inf",bscript);
+			}
 			
-			if(sim_result_import.load) results_add_model(sim_result_import,model.sim_details,"sim");
-			if(inf_result_import.load) results_add_model(inf_result_import,model.inf_details,"inf");
-			if(ppc_result_import.load) results_add_model(ppc_result_import,model.ppc_details,"ppc");
+			if(ppc_result_import.load){
+				results_add_model(ppc_result_import,model.ppc_details,"ppc",bscript);
+			}
+			
+			if(model_store != undefined){ // Copies any unloaded models
+				if(!sim_result_import.load && model_store.sim_res.on) model.sim_res = model_store.sim_res;
+				if(!inf_result_import.load && model_store.inf_res.on) model.inf_res = model_store.inf_res;
+				if(!ppc_result_import.load && model_store.ppc_res.on) model.ppc_res = model_store.ppc_res;
+			}
 		
 			if(inf_result_import.load) inf_result_import.diagnostics_on = true;
 			
@@ -202,8 +214,8 @@ function import_file2(data_file_list)
 			add_non_proc_time(0.2);
 		}
 		
-		for(let m = 0; m < pro.processed.length; m++){
-			let line = pro.processed[m];
+		for(let m = 0; m < pro.bscript.length; m++){
+			let line = pro.bscript[m];
 		
 			imp.line = line.line;
 			imp.typest = line.type;
@@ -336,18 +348,24 @@ function import_file2(data_file_list)
 		if(ppc_result_import.load){ ppc_result = ppc_result_import; ans.ppc_load = true;}
 	}
 	
+	if(imp.example != true){
+		if(data_file_list.length == 0) ans.save_type_radio = {value:"single"};
+		else ans.save_type_radio = {value:"datadir"};
+		ans.file_store = {filename:imp.file};
+	}
+	
 	import_post_mess(ans);
 	
 	sim_result_import = {siminf:"sim"};  
 	inf_result_import = {siminf:"inf"};
 	ppc_result_import = {siminf:"ppc"};
 	
-	map_store = [];
+	//check_bscript(pro,map_store,data_file_list);
 	
+	map_store = [];
 	imp = {};  // Removes to save memory	
 	
 	//profiling();  // Looks at where memory is being used
-
 	//prr("Processing time: "+(clock()-ts)/1000);
 }
 
@@ -368,7 +386,43 @@ function finalise(per_start,per_end)
 	if(ppc_result_import.load){ results_finalise(ppc_result_import,per,per+dper); per += dper;}
 }
 
+
+/// Embeds any files into the bscript
+function embed_files(bscript,data_file_list)
+{
+	let bscr = copy(bscript);
 	
+	let ban = banner_text("DATA DIRECTORY");
+	
+	let i = 0;  // Removes any references to data directory
+	while(i < bscr.length){
+		let fl = false;
+		let com = bscr[i];
+		switch(com.type){
+		case "data-dir": fl = true; break;
+		case "comment": if(com.te == ban) fl = true; break;
+		}
+		
+		if(fl) bscr.splice(i,1);
+		else i++;
+	}
+	
+	for(let i = 0; i < bscr.length; i++){
+		let com = bscr[i];
+		for(let j = 0; j < com.tags.length; j++){
+			let val = com.tags[j].value;
+			if(typeof val == 'object'){
+				if(val.ref != undefined){
+					com.tags[j].value = data_file_list[val.ref].te;
+				}
+			}
+		}
+	}
+
+	return bscr;
+}
+
+
 /// Estimates how long each command will take
 function assign_processing_time()
 {
@@ -376,8 +430,8 @@ function assign_processing_time()
 	
 	let total_pt = 0;
 	/// Estimates time taken to process each command (based on file size) 
-	for(let i = 0; i < pro.processed.length; i++){
-		let pc = pro.processed[i];
+	for(let i = 0; i < pro.bscript.length; i++){
+		let pc = pro.bscript[i];
 		pc.pt = 1;
 		for(let j = 0; j < pc.tags.length; j++){
 			let tag = pc.tags[j];
@@ -397,8 +451,8 @@ function assign_processing_time()
 		total_pt += pc.pt;
 	}
 	
-	for(let i = 0; i < pro.processed.length; i++){
-		let pc = pro.processed[i];
+	for(let i = 0; i < pro.bscript.length; i++){
+		let pc = pro.bscript[i];
 		pc.pt = frac_proc*(pc.pt/total_pt);
 	}
 	
@@ -447,8 +501,8 @@ function show_proc_percent()
 function init_result(pro,clear_results)
 {
 	if(clear_results){
-		sim_result_import = {siminf:"sim"};                    // Stores results from simulation
-		inf_result_import = {siminf:"inf"};                  // Stores results from inference
+		sim_result_import = {siminf:"sim"};       
+		inf_result_import = {siminf:"inf"};     
 		ppc_result_import = {siminf:"ppc"};
 	}
 		
@@ -456,8 +510,8 @@ function init_result(pro,clear_results)
 	inf_result_import.load = false;
 	ppc_result_import.load = false;
 
-	for(let m = 0; m < pro.processed.length; m++){
-		let line = pro.processed[m];
+	for(let m = 0; m < pro.bscript.length; m++){
+		let line = pro.bscript[m];
 		let cname = line.type;
 		
 		switch(cname){
@@ -562,6 +616,7 @@ function process_command(cname,loop,line)
 	*/
 	
 	switch(cname){
+	case "comment": break;
 	case "species": species_command(loop); break;
 	case "classification": classification_command(loop); break;
 	case "set": set_command(); break;
@@ -1019,7 +1074,7 @@ function get_claa()
 function process_lines(lines,file,per_start,per_end)
 {
 	let formatted=[];
-	let processed=[];
+	let bscript=[];
 	
 	let data_dir;
 	
@@ -1047,14 +1102,18 @@ function process_lines(lines,file,per_start,per_end)
 		}
 	
 		let flag = false;                              // Ignores line if empty or commented out
+		let com = false;
 		if(trr.length == 0) flag = true;
-		if(trr.length >= 2 && trr.substr(0,2) == "//") flag = true;
-		if(trr.length >= 1 && trr.substr(0,1) == "#") flag = true;
+		if(trr.length >= 2 && trr.substr(0,2) == "//") com = true;
+		if(trr.length >= 1 && trr.substr(0,1) == "#") com = true;
 			
 		let command_line; 
 		let flag_file = false;
 			
-		if(flag == true) trr = "<g>"+trr+"</g>";
+		if(flag == true || com == true){
+			if(com == true) command_line = {type:"comment", tags:[], te:trr};
+			trr = "<g>"+trr+"</g>";
+		}
 		else{	
 			let files = [];
 		
@@ -1132,13 +1191,13 @@ function process_lines(lines,file,per_start,per_end)
 	
 		if(command_line != undefined){
 			command_line.line = imp.line;
-			processed.push(command_line);
+			bscript.push(command_line);
 		}		
 			
 		j++;
 	}
 
-	return {formatted:formatted, processed:processed, data_dir:data_dir};
+	return {formatted:formatted, bscript:bscript, data_dir:data_dir};
 }
 
 
@@ -1146,24 +1205,24 @@ function process_lines(lines,file,per_start,per_end)
 function get_data_file_list(pro,per_start,per_end)
 {
 	let load_list=[];
-	for(let j = 0; j < pro.processed.length; j++){
-		let cl = pro.processed[j];
+	for(let j = 0; j < pro.bscript.length; j++){
+		let cl = pro.bscript[j];
 		for(let k = 0; k < cl.tags.length; k++){		
 			let tag = cl.tags[k];
 			
 			let file = tag.value;
-			switch(tag.name){
-			case "value": case "prior-const": case "constant": case "reparam": case "text":  // May or may not be a file
+			
+			let tag_fi = is_tag_name_file(tag.name);
+		
+			switch(tag_fi){
+			case "maybe":
 				tag.need_pt = true;
 				if(typeof file == 'string' && is_file(file)){
 					load_list.push({j:j, k:k});
 				}
 				break;
 					
-			case "file": case "boundary": 
-			case "prior-split": case "dist-split": 
-			case "A": case "Ainv": case "A-sparse": case "pedigree": case "X": 
-			case "ind-list": case"factor-weight":
+			case "yes":
 				{
 					tag.need_pt = true;
 					if(typeof file == 'string' && is_file(file)){
@@ -1177,7 +1236,7 @@ function get_data_file_list(pro,per_start,per_end)
 				}
 				break;
 				
-			default:
+			case "no":
 				if(typeof(file) == "object" || (typeof file == 'string' && is_file(file))){
 					let extra="";
 					switch(tag.name){
@@ -1191,6 +1250,8 @@ function get_data_file_list(pro,per_start,per_end)
 					alert_line("A data table was not expected for '"+tag.name+"'."+extra,cl.line);
 				}
 				break;
+				
+			default: error("SHould not be here"); break;
 			}
 		}	
 	}
@@ -1206,7 +1267,7 @@ function get_data_file_list(pro,per_start,per_end)
 		
 		let j = load_list[i].j, k = load_list[i].k;
 	
-		let cl = pro.processed[j];
+		let cl = pro.bscript[j];
 		let tag = cl.tags[k];
 			
 		let file = tag.value;

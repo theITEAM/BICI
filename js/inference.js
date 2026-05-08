@@ -2,107 +2,74 @@
 // Functions related to inference
 
 /// Starts inference on a linux cluster
-function run_cluster()
+function run_cluster(file)
 {
 	let siminf;
 	let details;
 	switch(tab_name()){
 	case "Simulation": siminf = "sim"; details = model.sim_details; break;
-	case "Inference": siminf = "inf"; details = model.inf_details; break;
+	case "Inference":
+		siminf = "inf"; details = model.inf_details; 
+		if(subsubtab_name() == "Extend"){
+			siminf = "ext";
+			details = model.inf_res.plot_filter.details;
+		}
+		break;
+		
+	case "Post. Simulation": 
+		siminf = "ppc";
+		details = model.inf_res.plot_filter.details;
+		break;
+		
 	default: error("OPtion problem"); break;
 	}
 	
 	let ncore;
-	if(siminf == "inf"){
-		switch(model.inf_details.algorithm.value){
+	switch(siminf){
+	case "sim":
+		ncore = Number(details.number);
+		break;
+		
+	case "inf": case "ext":
+		switch(details.algorithm.value){
 		case "DA-MCMC":
-			ncore = Number(model.inf_details.nchain)/Number(model.inf_details.cha_per_core);
+			ncore = Number(details.nchain)/Number(details.cha_per_core);
 			break;
 		case "PAS-MCMC":
-			ncore = Number(model.inf_details.npart)/Number(model.inf_details.part_per_core);
+			ncore = Number(details.npart)/Number(details.part_per_core);
 			break;
 		default: break;
 		}
+		break;
 	}
-	
-	let line1 = "module load mpi/openmpi-x86_64";
 	
 	let line2="";
 	if(ncore != 1){
 		line2 += "mpirun -n ";
 		if(ncore != undefined) line2 += ncore+" "; else line2 += "[cores] ";
 	}		
-	line2 += "./bici-para ";
-	if(true) line2 += "[file.bici]";
-	else line2 += "Execute/init.bici";
-
+	line2 += "./bici-para root/"+file;
+	
 	switch(siminf){
 	case "sim": line2 += " sim"; break;
 	case "inf": line2 += " inf"; break;
-	}
-	
-	let te = "To run BICI on a Linux cluster the following steps must be followed:\n• <b>Create BICI file</b> – Click on the 'Save' button below to create and save the initialisation BICI file. Copy this to the cluster where you want BICI to run.\n• <b>Executable</b> – The executable 'bici-para' must also be copied from the BICI main folder to the cluster (<i>e.g.</i> this could be in the same directory as the BICI file).\n";
-	
-	//te += "• <b>Load MPI</b> – MPI will need to be installed on the cluster. Once installed , it can be loaded using:\n]>'<b>"+line1+"</b>' ["+butte+",'CopyText|BB"+line1+"'] \n";
-
-	let butte = "'⟨⟨COPY⟩⟩'"; if(line2 == inter.copied) butte = "'⟨⟨COPIED⟩⟩'";
-	te += "• <b>Run</b> – BICI is run using:\n]><b>'"+line2+"</b>' ["+butte+",'CopyText|BB"+line2+"']\n>>(where ";
-	if(ncore == undefined) te += "'[core]' is the number of CPU cores and ";
-	te += "'[file.bici]' is replaced by the name of the BICI file you created). ";
-
-	butte = "'⟨⟨COPY⟩⟩'"; if(line1 == inter.copied) butte = "'⟨⟨COPIED⟩⟩'";
-	te += "Note, if the error “mpirun: command not found...” is encountered, MPI can be loaded with the terminal command:\n]>'<b>"+line1+"</b>' ["+butte+",'CopyText|BB"+line1+"']\n• <b>Visualise</b> – Once BICI has run it puts its results into the script file. Copy this back to your local computer and load into the interface.";
-	
-	let sa = "StartClusterSave";
-	if(details.run_save_type.value == "Export") sa = "StartClusterExport";
-	
-	inter.help = { title:"Run BICI on Linux cluster", te:te, run_save_type:details.run_save_type.value, siminf:siminf, save:sa};  
-	inter.copied = undefined;	
-}			
-
-
-/// Starts ppc on a linux cluster
-function run_cluster_ppc()
-{
-	let siminf;
-	let details;
-	switch(tab_name()){
-	case "Post. Simulation": siminf = "ppc"; details = model.ppc_details; break;
-	default: error("OPtion problem"); break;
-	}
-	
-	let ncore;
-	
-	let line1 = "module load mpi/openmpi-x86_64";
-	
-	let line2="";
-	if(ncore != 1){
-		line2 += "mpirun -n ";
-		if(ncore != undefined) line2 += ncore+" "; else line2 += "[cores] ";
-	}		
-	line2 += "./bici-para ";
-	if(true) line2 += "[file.bici]";
-	else line2 += "Execute/init.bici";
-
-	switch(siminf){
 	case "ppc": line2 += " post-sim"; break;
+	case "ext": line2 += " ext "+inter.inf_extend; break; 
 	}
 	
-	let te = "To run posterior simulation on a Linux cluster the following steps must be followed:\n• <b>Save</b> – Click on the 'Save' button to replace the BICI file used to run the inference.\n";
-	
 	let butte = "'⟨⟨COPY⟩⟩'"; if(line2 == inter.copied) butte = "'⟨⟨COPIED⟩⟩'";
-	te += "• <b>Run</b> – Using:\n]><b>'"+line2+"</b>' ["+butte+",'CopyText|BB"+line2+"']\n>>(where ";
-	if(ncore == undefined) te += "'[core]' is the number of CPU cores and ";
-	te += "'[file.bici]' is replaced by the name of the BICI file you created). ";
+	
+	let te="";
+	
+	te += "• <b>Run</b> – Execute the saved BICI-script on a Linux cluster using:\n]><b>'"+line2+"</b>' ["+butte+",'CopyText|BB"+line2+"']\n";
+	if(ncore == undefined) te += ">>(where '[cores]' is the number of CPU cores).\n";
 
-	butte = "'⟨⟨COPY⟩⟩'"; if(line1 == inter.copied) butte = "'⟨⟨COPIED⟩⟩'";
-	te += "\n• <b>Visualise</b> – Once BICI has run it puts its results into the script file. Copy this back to your local computer and load into the interface.";
+	te += "• <b>Visualise</b> – Once BICI has run it puts its results into the script file. Copy this back to your local computer and load into the interface.";
 	
-	let sa = "StartClusterSave";
-	if(details.run_save_type.value == "Export") sa = "StartClusterExport";
-	
-	inter.help = { title:"Posterior simulation on Linux cluster", te:te, run_save_type:details.run_save_type.value, siminf:siminf, save:sa};  
+	inter.help = { title:"Run BICI on Linux cluster", te:te, file:file};  
 	inter.copied = undefined;	
+	
+	generate_screen();
 }			
 
 
@@ -133,7 +100,7 @@ function run_cluster_ext()
 	case "ppc": line2 += " post-sim"; break;
 	}
 	
-	let te = "Extending inference can be done by a simple alteration to the command used to run BICI-script. Instead of 'inf' used for inference, 'ext <i>x</i>' tells BICI to generate more MCMC updates (on top of those already generated). Here <i>x</i> can either be a final number of updates or a percentage relative to the current update number.\n";
+//let te = "Extending inference can be done by a simple alteration to the command used to run BICI-script. Instead of 'inf' used for inference, 'ext <i>x</i>' tells BICI to generate more MCMC updates (on top of those already generated). Here <i>x</i> can either be a final number of updates or a percentage relative to the current update number.\n";
 	
 	let rpf = get_inf_res().plot_filter;
 	let de = rpf.details;
@@ -482,7 +449,10 @@ function add_inf_start_buts(lay)
 		
 		add_corner_link("> Further options","Options",lay);
 		
-		lay.add_corner_button([["Start","Grey","StartInference"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
+		let but = "Start";
+		if(model.inf_details.run_local.value != "Yes") but = "Save";
+		
+		lay.add_corner_button([[but,"Grey","StartInference"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
 	
 	let alg = model.inf_details.algorithm.value;
@@ -669,7 +639,7 @@ function add_extend_start_buts(lay)
 	
 	cy += gapop;	
 	
-	cy = run_local_simple(cx,cy,model.inf_details,lay);
+	cy = run_local(cx,cy,model.inf_details,lay);
 	
 	cy += gapop;	
 	

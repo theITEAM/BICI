@@ -77,6 +77,8 @@ let inter=                                         // Dynamic variables related 
 	
 	file_store:{filename:""},                        // Temporarily stores files before saving
 	
+	save_type_radio:{value:"single"},                // The type of save
+	
 	export_image:false,                              // Set to true when image is being exported
 	
 	options:false,                                   // Determines if options on the start inference page are shown

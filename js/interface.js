@@ -461,7 +461,6 @@ function mouse_position(canvas, evt)
 /// Loads a data table into the data source
 function load_data_table_initialise()
 {
-	inter.radio_heading = {value:"Yes"};
 	inter.radio_format = {value:"csv"};
 	
 	inter.help = { title:"Data tables", te:"", show_datatable:true, upload:"UploadDataTable"};

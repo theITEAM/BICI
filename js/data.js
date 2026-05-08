@@ -413,9 +413,9 @@ function add_data_buts(lay,siminf)
 	
 	let p	= model.get_p();
 	
-	let sp = model.species[p];
-	if(siminf == "gen") sp = model.sim_res.plot_filter.species[p];
-	if(siminf == "ppc") sp = model.inf_res.plot_filter.species[p];
+	let spec = get_species(siminf);
+	
+	let sp = spec[p];
 	
 	let title, te;
 	switch(siminf){
@@ -425,21 +425,20 @@ function add_data_buts(lay,siminf)
 	case "gen": title = "Simulated data"; te = data_text; break;
 	}
 
-	if(model.species.length > 1) title += " for species '"+sp.name+"'";
+	if(spec.length > 1) title += " for species '"+sp.name+"'";
 		
 	cy = lay.add_title(title,cx,cy,{te:te});
 	
 	let table;
-	if(model.species.length == 0){
+	if(spec.length == 0){
 		center_message("A species needs to be added to the model.",lay);
 		return;
 	}
 	
-	if(siminf == "gen" && model.species[p].generate_pos == false){
+	if(siminf == "gen" && (p >= model.species.length || model.species[p].generate_pos == false)){
 		center_message("The model has been changed so data cannot be simulated.",lay);
 		return;
 	}
-	
 	
 	let source;
 	switch(siminf){
@@ -450,8 +449,8 @@ function add_data_buts(lay,siminf)
 	}
 
 	if(source.length == 0){
-		table = "There are currently no data sources added.";
-		if(siminf == "sim") table = "There is currently no initial condition information.";
+		table = "No data sources added.";
+		if(siminf == "sim") table = "No setup information.";
 	}
 	else{
 		table = { width:data.source_width, heading:[{name:"Name"},{name:"Type"},{name:"Details"},{name:"Number"},{name:"Spec."},{name:"Table"},{name:""}], content:[]};
@@ -493,7 +492,7 @@ function add_data_buts(lay,siminf)
 	let x = 1.2, y = lay.dy-1.6;
 	let gap = 3.4;
 
-	let active = true; if(model.species.length == 0) active = false;
+	let active = true; if(spec.length == 0) active = false;
 
 	let info = {siminf:siminf};
 	
@@ -526,7 +525,7 @@ function add_data_buts(lay,siminf)
 	}
 	
 	if(siminf == "gen"){
-		let rpf = model.sim_res.plot_filter;;
+		let rpf = model.sim_res.plot_filter;
 		if(rpf.pos_sim.length > 1){
 			lay.add_dropdown(x,y-0.15,6,10,rpf.sel_sim,rpf.pos_sim);
 			x += 7;
@@ -634,7 +633,7 @@ function add_data_buts(lay,siminf)
 			
 			{
 				if(siminf == "gen"){
-					let rpfsp = model.sim_res.plot_filter.species[p];
+					let rpfsp = spec[p];
 	
 					if(rpfsp.pos_test_and_cull != undefined){
 						let te = test_and_cull_data_text, ti = "Test-and cull diagnostic test data";

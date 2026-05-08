@@ -51,6 +51,20 @@ function create_files(file_list,file,dir,type)
 		}
 		else{
 			if(dir == undefined) error("dir should be defined");
+			
+			let file = finfo.file;
+			
+			const fs = require("fs"); // Or `import fs from "fs";` with ESM
+	
+			let i = file.length-1;  // Creates subdirectory if it doesn't exist
+			while(i > 0 && file.substr(i,1) != "/") i--;
+			if(i > 0){
+				let subdir = dir+"/"+file.substr(0,i);
+				if (!fs.existsSync(subdir)) {
+					fs.mkdirSync(subdir);
+				}
+			}
+ 	
 			write_file_async(finfo.data,dir+"/"+finfo.file);
 		}
 	}
@@ -362,7 +376,10 @@ function add_sim_start_buts(lay)
 		
 		add_corner_link("> Further options","Options",lay);
 		
-		lay.add_corner_button([["Start","Grey","StartSimulation"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
+		let but = "Start";
+		if(model.sim_details.run_local.value != "Yes") but = "Save";
+		
+		lay.add_corner_button([[but,"Grey","StartSimulation"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
 	
 	if(inter.options == true){
@@ -458,6 +475,7 @@ function run_local(cx,cy,details,lay)
 }
 
 
+/*
 /// Sets button if running locally
 function run_local_simple(cx,cy,details,lay)
 {
@@ -470,7 +488,8 @@ function run_local_simple(cx,cy,details,lay)
 	
 	return cy;
 }
-		
+*/
+
 		
 /// Sets button if running using inference model ot simulation model
 function ppc_use_inf_or_sim(cx,cy,details,lay)
@@ -616,7 +635,7 @@ function add_ppc_start_buts(lay)
 	
 		cy += 2.5;
 	
-		cy = run_local_simple(cx,cy,model.ppc_details,lay);
+		cy = run_local(cx,cy,model.ppc_details,lay);
 	
 		if(model.ppc_details.check_box_list){
 			if(model.ppc_details.check_box_list.length > 0){
@@ -632,7 +651,10 @@ function add_ppc_start_buts(lay)
 		
 		add_corner_link("> Further options","Options",lay);
 		
-		lay.add_corner_button([["Start","Grey","StartPPC"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
+		let but = "Start";
+		if(model.ppc_details.run_local.value != "Yes") but = "Save";
+		
+		lay.add_corner_button([[but,"Grey","StartPPC"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
 	
 	if(inter.options == true){

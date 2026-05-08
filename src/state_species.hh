@@ -123,6 +123,7 @@ class StateSpecies                         // Stores information about the state
 		void set_cpop_st();
 		vector < vector <double> > ibm_cpop_st() const;
 		double get_trans_obs_prob(unsigned int trg, const ObsData &ob) const;
+		double get_comp_obs_prob(unsigned int c, const ObsData &ob) const;
 		void compare_covar(string te, const vector < vector <double> > &omega, unsigned int g) const;
 		ListMove get_ev_link_listmove(unsigned int e, const vector <Event> &event, const Individual &ind, const vector < vector <double> > &popnum_t) const;
 		TRange ev_link_trange(const ListMove &lm, const vector <Event> &event) const;
@@ -212,6 +213,7 @@ class StateSpecies                         // Stores information about the state
 		void check_cl_ev(Individual ind) const;
 		void set_ind_sim_c(unsigned int ti);
 		bool all_events_correct(unsigned int i, unsigned int cl);
+		void check_obs_inconsitent() const;
 		
 	private:
 		void check_markov_eqn_ref() const;
@@ -224,6 +226,7 @@ class StateSpecies                         // Stores information about the state
 		void check_trans_num_neg() const;
 		void add_alg_warn(string te);
 		string check_prior(const Equation &eq) const;
+		string data_sources_desc(const ObsData &ob, const ObsData &ob2) const;
 		
 		PV &param_val;            // Quantities reference from state
 		const vector <Equation> &eqn;
