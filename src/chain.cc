@@ -557,7 +557,7 @@ void Chain::update(unsigned int s)
 	
 	for(auto &pro : proposal){ 
 		//state.check_markov_value_dif();
-		//cout << pro.name << endl;
+		//cout << pro.name  << endl;
 	
 		if(pro.on){
 			//if(op()) state.check_markov_value_dif();

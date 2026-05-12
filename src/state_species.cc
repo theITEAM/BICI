@@ -1050,6 +1050,20 @@ vector <double> StateSpecies::set_exp_ie(Individual &ind) const
 }
 
 
+/// Sets ind.ie based in fixed value for ind.exp_ie
+void StateSpecies::set_IE_ie(unsigned int i, unsigned int e)
+{
+	const auto &indd = sp.individual[i];
+	auto &ind = individual[i];
+	const auto &ie = sp.ind_effect[e];
+	auto var = ind_eff_group_sampler[ie.index].omega[ie.num][ie.num];
+		
+	auto val = indd.set_IE[e]; if(val == UNSET) emsg("Should not be unset");
+
+	ind.ie[e]	= log(val)+0.5*var;
+}
+
+
 /// Recalcualted exp_ie for a given individual effect
 vector <double> StateSpecies::recalculate_exp_ie(unsigned int ie)
 {
@@ -1483,7 +1497,7 @@ double StateSpecies::calculate_tnum_mean(unsigned int ti, unsigned int i, const 
 		{
 			rate = eq.calculate(ti,popnum,precalc);
 			if(rate < 0){	
-				eq.print_calculation();
+				//eq.print_calculation();
 				run_error("The transition rate for '"+tr.name+"' through equation '"+eq.te_raw+"' has become negative."+check_prior(eq));
 			}
 		}
@@ -1534,7 +1548,7 @@ void StateSpecies::calculate_tnum_mean_para(vector <double> &tnum_mean, vector <
 	case EXP_RATE: 
 		for(auto &ra : rate){
 			if(ra < 0){	
-				eq.print_calculation();
+				//eq.print_calculation();
 				run_error("The transition rate for '"+tr.name+"' through equation '"+eq.te_raw+"' has become negative."+check_prior(eq));
 			}
 		}
@@ -1961,6 +1975,13 @@ void StateSpecies::linear_form_calculate(vector < vector <double> > &val_store, 
 					for(auto k = 0u; k < L; k++) val_store[k][i] += va;
 				}
 			}
+		}
+	}
+	
+	for(auto k = 0u; k < L; k++){
+		auto &val_st = val_store[k];
+		for(auto &val : val_st){
+			if(val < 0 && val > -TINY) val = 0;
 		}
 	}
 }

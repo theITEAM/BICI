@@ -2011,7 +2011,7 @@ vector <double> StateSpecies::likelihood_pop_change_linear(const vector <unsigne
 		for(auto k = 0u; k < L; k++){
 			auto &ra = val_store[k][i];
 			if(ra < 0){	
-				eq.print_calculation();
+				//eq.print_calculation();
 				run_error("The transition rate for '"+tra.name+"' through equation '"+eq.te_raw+"' has become negative."+check_prior(eq));
 			}
 		}

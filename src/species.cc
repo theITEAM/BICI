@@ -23,6 +23,7 @@ Species::Species(unsigned int p, const vector <double> &timepoint, const Details
 	add_rem_pop_on = false;
 	pop_trans_data_exist = false;
 	pop_data_exist = false;
+	set_IE_exist = false;
 };
 
 

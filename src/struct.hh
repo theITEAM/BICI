@@ -624,6 +624,7 @@ struct DataSource {                // Stores information about a data source
 	unsigned int focal_cl;           // The focal classification (for init_pop data only)
 	unsigned int p;                  // The species number
 	unsigned int cl;                 // The classification number (for MOVE_IND, TRANS_DATA)
+	string ie;                       // The individual effect (for SET_IND_EFFECT)
 	InitPopType init_pop_type;       // Used to specifed the type of initial population
 	Prior pop_prior;                 // The total population prior (INIT_POP) 
 	TimeRange time_range;            // Determines what time range is used (used in TRANS_DATA)
@@ -1240,6 +1241,7 @@ struct IndData {                   // Stores data on individuals
 	bool init_c_set;                 // Determines if the init individual compartment set
 	double tdivmin;                  // The minimum time for data
 	double tdivmax;                  // The maximim time for data
+	vector <double> set_IE;          // Set the individual effect
 };
 
 struct WarnData {                  // Stores warning messages

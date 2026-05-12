@@ -41,12 +41,13 @@ void Species::initialise_data(Operation mode)
 			case TRANS_DATA: trans_data(so); break;
 			case POP_TRANS_DATA: popu_trans_data(so,hash_pop_trans_filter); break;
 			case GENETIC_DATA: genetic_data(so); break;
+			case SET_IND_EFFECT_SIM: break; // This is done in set_ie_data()
 			default:
 				emsg_input("data type not added:"); break;
 			}
 		}
 	}
-
+	
 	print_diag("load data end");
 	
 	check_obs_trans_times_same();
@@ -69,11 +70,47 @@ void Species::initialise_data(Operation mode)
 }
 
 
+/// Sets any individual effect data 
+void Species::set_ie_data()
+{
+	for(const auto &so : source){
+		if(so.cname == SET_IND_EFFECT_SIM){
+			auto e = 0u; while(e < ind_effect.size() && ind_effect[e].name != so.ie) e++;
+			if(e == ind_effect.size()){
+				alert_source("Cannot find individual effect ["+so.ie+"] in the model",so);
+			}
+			
+			const auto &tab = so.table;
+			for(auto r = 0u; r < tab.nrow; r++){
+				const auto &row = tab.ele[r]; 
+				auto id = trim(row[0]);
+				auto val = number(row[1]);
+				
+				auto i = hash_ind.find(id);
+				if(i == UNSET){
+					alert_source("Cannot find individual '"+id+"'",so,0,r);
+				}
+				else{
+					auto &ind = individual[i];
+					if(ind.set_IE.size() == 0){
+						ind.set_IE.resize(ind_effect.size(),UNSET);
+					}				
+					if(ind.set_IE[e] != UNSET){
+						alert_source("Cannot set individual effect ["+so.ie+"] for '"+id+"' more than once",so,0,r);
+					}
+					ind.set_IE[e] = val;
+				}
+			}
+		}
+	}
+}
+	
+
 /// Checks if transitions times are at the same time
 void Species::check_obs_trans_times_same()
 {
-	string enter_err, leave_err, time_err;
-	auto enter_num = 0u, leave_num = 0u, time_num = 0u;
+	string enter_err, leave_err, time_err, trans_comp_err;
+	auto enter_num = 0u, leave_num = 0u, time_num = 0u, trans_comp_num = 0u;
 	
 	for(const auto &ind : individual){
 		vector <double> move_ev;
@@ -117,6 +154,19 @@ void Species::check_obs_trans_times_same()
 					}
 				}
 			}
+			
+			if(ob.type == OBS_SOURCE_EV || ob.type == OBS_TRANS_EV || ob.type == OBS_SINK_EV){					
+				for(auto e2 = 0u; e2 < ind.obs.size(); e2++){
+					const auto &ob2 = ind.obs[e2];
+					auto name2 = source[ob2.so].name;
+					if(ob2.type == OBS_COMP_EV){
+						if(ob.tdiv == ob2.tdiv){
+							if(trans_comp_err == "") trans_comp_err = te+"Due to being ill defined, the transition time "+tstr(calc_t(tdiv,details))+" in data source '"+name+"' cannot be at the same time as the compartmental observation in data source '"+name2+"'.";
+							trans_comp_num++;
+						}
+					}
+				}
+			}
 		}
 	}
 	
@@ -127,12 +177,15 @@ void Species::check_obs_trans_times_same()
 		if(leave_err != ""){ err = leave_err; num = leave_num;}
 		else{
 			if(time_err != ""){ err = time_err; num = time_num;}
+			else{
+				if(trans_comp_err != ""){ err = trans_comp_err; num = trans_comp_num;}
+			}
 		}
 	}
 	
 	if(err != ""){
 		if(num > 1) err += " There are "+tstr(num-1)+" other instances of this error";
-		//alert_input(err);
+		alert_input(err);
 	}
 }
 
@@ -1874,6 +1927,7 @@ void Species::set_default_enter()
 }
 
 
+ 
 /// Handles any error message
 EquationInfo Species::he(EquationInfo eqn_inf, const DataSource &so)
 {

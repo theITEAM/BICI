@@ -38,6 +38,7 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 	case REMOVE_IND_SIM: case REMOVE_IND_POST_SIM: cname = REMOVE_IND; break;
 	case MOVE_IND_SIM: case MOVE_IND_POST_SIM: cname = MOVE_IND; break;
 	case INIT_POP_SIM: cname = INIT_POP; break;
+	case SET_IND_EFFECT_INF: case SET_IND_EFFECT_POST_SIM: cname = SET_IND_EFFECT_SIM; break;
 	default: break;
 	}
 	
@@ -45,8 +46,6 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 
 	auto tab = load_table(file); if(tab.error == true) return;
 
-	auto cols = get_tag_value("cols");
-	
 	auto p = p_current;
 	if(p == UNSET){ 
 		alert_import("To load the data file the species must be set"); 
@@ -280,6 +279,14 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 		}
 		break;
 		
+	case SET_IND_EFFECT_SIM: 
+		{
+			auto ie = get_tag_value("ie"); if(ie == ""){ cannot_find_tag(); return;}
+			ds.ie = ie;
+			model.species[p].set_IE_exist = true;
+		}
+		break;
+		
 	default: alert_emsg_input("Should not be default2"); return;
 	}
 
@@ -297,26 +304,8 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 		col_name.push_back(ds.load_col[c].heading);
 	}
 	
-	if(cols != ""){
-		auto spl = split(cols,',');
-
-		if(spl.size() != col_name.size()){
-			alert_import("'cols' does not have the correct number of entries (expected a table with headings in the order '"+stringify(col_name)+"')"); 
-			return;
-		}
-		
-		for(auto i = 0u; i < spl.size(); i++){
-			for(auto j = 0u; j < col_name.size(); j++){
-				if(spl[i] == col_name[j] && i != j){
-					alert_import("'cols' does not have the correct order (expected a table with headings in the order '"+stringify(col_name)+"')"); 
-					return;
-				}
-			}
-		}
-		
-		col_name = spl;
-	}
-
+	get_cols(col_name);
+	
 	ds.table = get_subtable(tab,col_name); if(ds.table.error == true) return;
 
 	if(cname == TRANS_DATA){ // Removes "no" entries
@@ -2239,7 +2228,7 @@ void Input::ind_effect_command()
 	auto A_sparse = get_tag_value("A-sparse"); 
 	auto A_inv = get_tag_value("Ainv"); 
 	auto pedigree = get_tag_value("pedigree");
-	
+
 	auto num = 0u;
 	if(A != "") num++;
 	if(A_inv != "") num++;
@@ -2436,7 +2425,7 @@ void Input::ind_effect_command()
 			A_matrix.set = true;
 			auto tab = load_table(A_inv);
 			if(tab.error == true) return;
-		
+	
 			for(auto i = 0u; i < tab.heading.size(); i++){
 				auto id = tab.heading[i];
 				auto k = A_matrix.hash_ind_list.find(id);
@@ -2467,7 +2456,7 @@ void Input::ind_effect_command()
 					val[r][c] = ele;
 				}
 			}
-			
+
 			auto val_inv = invert_matrix(val);
 			A_matrix.value = val_inv;
 		}
@@ -2502,7 +2491,7 @@ void Input::ind_effect_command()
 		A_matrix.sparsity = num/(M*M);
 	}
 	else A_matrix.sparsity = UNSET; 
-	
+
 	IEgroup ieg; 
 	ieg.name = name;
 	ieg.list = list; 
@@ -2539,7 +2528,9 @@ void Input::fixed_effect_command()
 	
 	vector <string> col_name; 
 	col_name.push_back("ID");
-	col_name.push_back("value"); 
+	col_name.push_back("Value"); 
+	
+	get_cols(col_name);
 	
 	auto subtab = get_subtable(tab,col_name); if(subtab.error == true) return;
 	

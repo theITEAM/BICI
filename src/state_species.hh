@@ -105,6 +105,7 @@ class StateSpecies                         // Stores information about the state
 		vector <double> set_exp_fe(unsigned int f);
 		void set_exp_fe_restore(unsigned int f, const vector <double> &store);
 		vector <double> set_exp_ie(Individual &ind) const;
+		void set_IE_ie(unsigned int i, unsigned int e);
 		vector <double> recalculate_exp_ie(unsigned int ie);
 		void recalculate_exp_ie_restore(unsigned int ie, const vector <double> &store);
 		void generate_A();

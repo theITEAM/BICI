@@ -47,6 +47,7 @@ DataTemplate(TEST_DATA,{"ID","t,the time the individual's diagnostic test is tak
 DataTemplate(POP_DATA,{"t,the time the population measurement is taken","filt_obspop"}),
 DataTemplate(POP_TRANS_DATA,{"tstart","tend","filt_obspoptrans"}),
 DataTemplate(GENETIC_DATA,{"ID","t,the time the genetic measurement is taken","snp,the first SNP column"}),
+DataTemplate(SET_IND_EFFECT_SIM,{"ID","pos_value"}),
 };
 	
 class Input                                // Stores information about the model
@@ -295,6 +296,7 @@ class Input                                // Stores information about the model
 		unsigned int get_chain();
 		void set_data_directory(const vector <CommandLine> &command_line);
 		void compress_command_lines(const vector <CommandLine> &command_line, vector <string> &lines_raw, bool decomp);
+		void get_cols(vector <string> &col_name);
 		
 		Details& get_details();
 		DataSourceType get_data_type(Command cname) const;

@@ -1664,6 +1664,20 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 	
 	ss << endl;
 	
+	// First extracts individual names and puts them in the key (otherwise reordering with trans-tree)
+	vector < vector <string> > key_name;
+	key_name.resize(model.nspecies);
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];
+		const auto &ssp = part.species[p];
+		if(sp.type == INDIVIDUAL){
+			for(auto i = 0u; i < ssp.individual.size(); i++){
+				const auto &ind = ssp.individual[i];
+				key_name[p].push_back(get_ind_name(ind,ind_key,hash_ind));
+			}
+		}
+	}
+	
 	for(auto p = 0u; p < model.nspecies; p++){
 		const auto &sp = model.species[p];
 		const auto &ssp = part.species[p];
@@ -1735,9 +1749,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 				for(auto i = 0u; i < ssp.individual.size(); i++){
 					const auto &ind = ssp.individual[i];
 	
-					auto name = get_ind_name(ind,ind_key,hash_ind);
-					
-					ss << name << ",";
+					ss << key_name[p][i] << ",";
 					
 					if(i >= sp.nindividual_in && i < sp.nindividual_obs){
 						ss << "no";

@@ -256,7 +256,6 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 	}
 	
 	auto i = 0u; while(i < data_template.size() && data_template[i].cname != cname) i++;
-	
 	if(i == data_template.size()){ alert_emsg_input("Cannot find command"); return false;}
 	
 	auto cols = data_template[i].cols;
@@ -264,7 +263,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 	for(auto c = 0u; c < cols.size(); c++){
 		vector <string> spl = split(cols[c],',');
 		
-		auto type = ColumnType(option_error("cols",spl[0],{"ID","t","tstart","tend","snp","cl_prob","cl_all","cl_all_prob","from","to","init_pop","add_pop","rem_pop","start","end","result","filt_obspop","filt_obspoptrans","comp_name","start_comp","end_comp",},{ ID_COL, T_COL, TSTART_COL, TEND_COL, SNP_COL, CL_PROB_COL, CL_ALL_COL, CL_ALL_PROB_COL, FROM_COL, TO_COL, INIT_POP_COL, ADD_POP_COL, REM_POP_COL, START_COL, END_COL, RESULT_COL, FILT_OBSPOP_COL, FILT_OBSPOPTRANS_COL, COMP_NAME_COL, START_COMP_COL, END_COMP_COL,  }));
+		auto type = ColumnType(option_error("cols",spl[0],{"ID","t","tstart","tend","snp","cl_prob","cl_all","cl_all_prob","from","to","init_pop","add_pop","rem_pop","start","end","result","filt_obspop","filt_obspoptrans","comp_name","start_comp","end_comp","pos_value"},{ ID_COL, T_COL, TSTART_COL, TEND_COL, SNP_COL, CL_PROB_COL, CL_ALL_COL, CL_ALL_PROB_COL, FROM_COL, TO_COL, INIT_POP_COL, ADD_POP_COL, REM_POP_COL, START_COL, END_COL, RESULT_COL, FILT_OBSPOP_COL, FILT_OBSPOPTRANS_COL, COMP_NAME_COL, START_COMP_COL, END_COMP_COL, POS_FLOAT_COL  }));
 		if(type == UNSET) return false;
 		
 		if(type == SNP_COL && ds.gen_data_type == MATRIX_DATA) type = GENOBS_COL;
@@ -480,6 +479,10 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 				
 			case END_COMP_COL:
 				load_col.push_back(LoadCol("To","the compartment to which individuals move",TEXT_EL));
+				break;
+				
+			case POS_FLOAT_COL:
+				load_col.push_back(LoadCol("Value","the individual effect value",POS_FLOAT_EL));
 				break;
 		}
 	}
@@ -2049,16 +2052,19 @@ DataSourceType Input::get_data_type(Command cname) const
 	switch(cname){
 	case ADD_POP_SIM: case REMOVE_POP_SIM: case ADD_IND_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM:
 	case INIT_POP_SIM:
+	case SET_IND_EFFECT_SIM:
 		return SIM_DATA;
 		
 	case ADD_POP: case REMOVE_POP: case ADD_IND: case REMOVE_IND: case MOVE_IND:
 	case INIT_POP:
 	case COMP_DATA: case TRANS_DATA: case TEST_DATA: case POP_DATA: 
 	case POP_TRANS_DATA: case IND_EFFECT_DATA: case IND_GROUP_DATA: case GENETIC_DATA: case IC_DATA:
+	case SET_IND_EFFECT_INF: 
 		return INF_DATA;
 		
 	case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: case ADD_IND_POST_SIM:
 	case REMOVE_IND_POST_SIM: case MOVE_IND_POST_SIM:
+	case SET_IND_EFFECT_POST_SIM:
 		return POST_SIM_DATA;
 	
 	default: break;
@@ -2221,3 +2227,31 @@ void Input::compress_command_lines(const vector <CommandLine> &command_line, vec
 	
 	lines_raw = lines_new;
 }
+
+/// If alternative column names then substitute
+void Input::get_cols(vector <string> &col_name)
+{
+	auto cols = get_tag_value("cols");
+	
+	if(cols != ""){
+		auto spl = split(cols,',');
+
+		if(spl.size() != col_name.size()){
+			alert_import("'cols' does not have the correct number of entries (expected a table with headings in the order '"+stringify(col_name)+"')"); 
+			return;
+		}
+		
+		for(auto i = 0u; i < spl.size(); i++){
+			for(auto j = 0u; j < col_name.size(); j++){
+				if(spl[i] == col_name[j] && i != j){
+					alert_import("'cols' does not have the correct order (expected a table with headings in the order '"+stringify(col_name)+"')"); 
+					return;
+				}
+			}
+		}
+		
+		col_name = spl;
+	}
+}
+
+

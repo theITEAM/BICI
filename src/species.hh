@@ -114,6 +114,8 @@ class Species   	                         // Stores details of a species
 		
 		bool obs_trans_exist;                  // Set if there are observed transitons
 		
+		bool set_IE_exist;                     // Set if at least some IE are fixed
+		
 		bool period_exist;                     // Set if a period transition exits
 		
 		bool add_rem_pop_on;                   // Set if there is any addition or removal
@@ -180,6 +182,7 @@ class Species   	                         // Stores details of a species
 	// In 'species_data.cc':
 	public: 
 		void initialise_data(Operation mode);
+		void set_ie_data();
 		void check_obs_trans_times_same();
 		void order_data_events();
 		Filter set_comp_filt(string te, unsigned int cl_not_allow, BoundType bound, const DataSource &so);

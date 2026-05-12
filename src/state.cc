@@ -61,9 +61,11 @@ void State::simulate(const PV &param_value, const vector <InitCondValue> &initc_
 		ssp.simulate_init();
 		ssp.simulate_individual_init();
 	}
-
-	set_ie_from_samp(ie_store);
 	
+	set_ie_from_samp(ie_store);  // Sets IEs from posterior samples
+	
+	set_ie_from_data();          // Sets IEs if set-ind-effect is used
+
 	ie_finalise();
 	
 	popnum_t[0] = calculate_popnum();  
@@ -103,6 +105,8 @@ void State::post_sim(const PV &param_value, const Sample &samp)
 	auto ie_store = model.post_ie_store(samp);
 	set_ie_from_samp(ie_store);
 	
+	set_ie_from_data();          // Sets IEs if set-ind-effect is used
+
 	ie_finalise();
 	
 	set_ind_inf_from(ind_key);
@@ -149,6 +153,8 @@ void State::load_samp(const PV &param_value, const Sample &samp)
 	auto ie_store = model.post_ie_store(samp);
 	set_ie_from_samp(ie_store);
 	
+	set_ie_from_data();          // Sets IEs if set-ind-effect is used
+
 	ie_finalise();
 	
 	set_ind_inf_from(ind_key);
@@ -2249,6 +2255,24 @@ void State::set_ie_from_samp(const IEstore &ie_store)
 }
 
 
+/// Sets IEs from data (set-ind-effect-sim)
+void State::set_ie_from_data()
+{
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];
+		if(sp.set_IE_exist){
+			auto &ssp = species[p];
+			for(auto i = 0u; i < sp.individual.size(); i++){
+				const auto &indd = sp.individual[i];
+				for(auto e = 0u; e < indd.set_IE.size(); e++){
+					if(indd.set_IE[e] != UNSET) ssp.set_IE_ie(i,e);
+				}
+			}
+		}
+	}
+}
+
+	
 /// Finalises individual effects
 void State::ie_finalise()
 {	

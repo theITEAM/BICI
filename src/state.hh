@@ -82,6 +82,7 @@ class State                                // Stores information about the state
 		//vector < vector <double> > get_population_rates(unsigned int p) const;
 		void init_cor_matrix(); 
 		void set_ie_from_samp(const IEstore &ie_store);
+		void set_ie_from_data();
 		void ie_finalise();
 	
 	private:

@@ -540,6 +540,9 @@ CommandLine get_command_tags(string trr, unsigned int line_num)
 	if(type == "pop-data") com = POP_DATA;
 	if(type == "pop-trans-data") com = POP_TRANS_DATA;
 	if(type == "ind-effect-data") com = IND_EFFECT_DATA;
+	if(type == "set-ind-effect-sim") com = SET_IND_EFFECT_SIM;
+	if(type == "set-ind-effect-inf") com = SET_IND_EFFECT_INF;
+	if(type == "set-ind-effect-post-sim") com = SET_IND_EFFECT_POST_SIM;
 	if(type == "ind-group-data") com = IND_GROUP_DATA;
 	if(type == "genetic-data") com = GENETIC_DATA;
 	if(type == "simulation" || type == "sim") com = SIMULATION;

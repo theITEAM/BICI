@@ -178,10 +178,12 @@ void display_warning(string msg)
 	if(com_op == true){
 	}
 	else{
+		auto msg_conv = add_escape_char(msg);
 		cout << "\033[35m";
-		cout << "WARNING: ";
+		cout << "WARNING:";
 		cout << "\033[0m";
-		cout << add_escape_char(msg);
+		cout << " ";
+		cout << msg_conv;
 		cout << endl;
 	}
 }
@@ -195,10 +197,12 @@ void display_terminate(string msg)
 	if(com_op == true){
 	}
 	else{
+		auto msg_conv = add_escape_char(msg);
 		cout << "\033[35m";
-		cout << "FINISH: ";
+		cout << "FINISH:";
 		cout << "\033[0m";
-		cout << add_escape_char(msg);
+		cout << " ";
+		cout << msg_conv;
 		cout << endl;
 	}
 }

@@ -352,7 +352,6 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 
 	for(auto &sp : model.species){	
 		sp.initialise_data(model.mode);            // Extracts data structures from data sources
-	
 		for(const auto &wa : sp.warn) alert_line(wa.te,wa.line_num);    
 	}
 	
@@ -590,6 +589,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 		sp.init_pop_data_ref();          // Initialises reference from global compartment to obs         
 		print_diag("ipop data ref");
 		
+		sp.set_ie_data();                // Sets any individual effect data
+	
 		for(const auto &wa : sp.warn) alert_line(wa.te,wa.line_num);    
 	}
 	
@@ -636,7 +637,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	//set_omega_fl();                            // Sets a flag if param in in omega
 	
 	if(model.trans_tree){
-		set_inf_cause();                         // Reference to see the population which causes infection 
+		set_inf_cause();                           // Ref to see the population which causes infection 
 	}
 	
 	if(model.mode == PPC && model.sample.size() == 0){
@@ -1032,12 +1033,14 @@ void Input::process_command(const CommandLine &cline, unsigned int loop, bool us
 	case INIT_POP_SIM:
 	case ADD_POP_SIM: case REMOVE_POP_SIM: 
 	case ADD_IND_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM: 
+	case SET_IND_EFFECT_SIM:
 		if(use_sim_ic || model.data_mode()) import_data_table_command(cline,true);
 		else alert_warning("Line ignored because not need for simulation");
 		break;
 	
 	case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: 
 	case ADD_IND_POST_SIM: case REMOVE_IND_POST_SIM: case MOVE_IND_POST_SIM:
+	case SET_IND_EFFECT_POST_SIM:
 		if(model.mode == PPC && !use_sim_ic) import_data_table_command(cline,true);
 		else{
 			if(model.data_mode()) import_data_table_command(cline,false);
@@ -1053,6 +1056,7 @@ void Input::process_command(const CommandLine &cline, unsigned int loop, bool us
 	case COMP_DATA: case TRANS_DATA:
 	case TEST_DATA: case POP_DATA: case POP_TRANS_DATA: 
 	case GENETIC_DATA:
+	case SET_IND_EFFECT_INF:
 		if(!use_sim_ic && !model.data_mode()) import_data_table_command(cline,true);
 		else{
 			if(model.data_mode()) import_data_table_command(cline,false);
@@ -1069,11 +1073,13 @@ void Input::process_command(const CommandLine &cline, unsigned int loop, bool us
 		get_tag_value("name"); 
 		get_tag_value("ie"); 
 		get_tag_value("file"); 
+		get_tag_value("cols"); 
 		break;
 		
 	case IND_GROUP_DATA:
 		get_tag_value("name"); 
 		get_tag_value("file"); 
+		get_tag_value("cols"); 
 		break;
 	
 	case SIM_PARAM: dummy_file_command(); break;

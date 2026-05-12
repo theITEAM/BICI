@@ -645,10 +645,10 @@ void Proposal::MH(State &state)
 	auto &param_val = state.param_val;
 
 	ntr++; 
-	
+
 	auto ps_fac = param_resample(param_val,state.popnum_t);
 	if(ps_fac == UNSET){ update_si(REJECT);	return;}
-	
+
 	if(pl){     
 		cout << endl << endl;
 		for(auto i : param_val.value_ch){
