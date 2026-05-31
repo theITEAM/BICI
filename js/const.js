@@ -7,13 +7,15 @@
 // 62667 lines of code (17/09/25)
 // 67000 lines of code (25/02/26)
 
-let ver="windows";         // Determines platform
-//let ver="linux";         // Use this if working on linux
+let bici_version = "v0.89";                       // Sets the BICI version
+
+let ver="windows";                                // Determines platform
+//let ver="linux";                                // Use this if working on linux
 //let ver="mac";
 
 let mac_temp_dir = "/tmp/BICI_files/";
 
-let win_linux = false;//true;                             // When working on win running linux 
+let win_linux = false;                             // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
@@ -21,6 +23,7 @@ let debug = false;                                // Determines if debugger used
 let testing = false;                              // Used logo to load up results (false)
 let load_map_fast = false;                        // If loads up world map from local computer
 let make_one_chain = false;                       // Make into one chain (for diagnostic purposes)
+let inf_leave_one_chain = false;                  // Cuts all but one chain (memory diagnostic)
 
 if(win_linux || false){ testing = true; debug = true; load_map_fast = true;}
 
@@ -66,6 +69,7 @@ const command_list = [
 {na:"add-ind-inf",ti:0},
 {na:"remove-ind-inf",ti:0},
 {na:"move-ind-inf",ti:0},
+{na:"set-ind-effect-inf",ti:0},
 {na:"init-pop-sim",ti:0},
 {na:"add-pop-sim",ti:0},
 {na:"remove-pop-sim",ti:0},
@@ -75,8 +79,10 @@ const command_list = [
 {na:"add-pop-post-sim",ti:0},
 {na:"remove-pop-post-sim",ti:0},
 {na:"add-ind-post-sim",ti:0},
+{na:"set-ind-effect-sim",ti:0},
 {na:"remove-ind-post-sim",ti:0},
 {na:"move-ind-post-sim",ti:0},
+{na:"set-ind-effect-post-sim",ti:0},
 {na:"test-and-cull-sim",ti:0},
 {na:"comp-data",ti:0},
 {na:"trans-data",ti:0},
@@ -100,6 +106,7 @@ const command_list = [
 {na:"warning-sim",ti:0},
 {na:"param-inf",ti:5},
 {na:"param-stats-inf",ti:1},
+{na:"pred-acc-inf",ti:1},
 {na:"generation-inf",ti:1},
 {na:"state-inf",ti:10},
 {na:"warning-inf",ti:0},
@@ -115,33 +122,43 @@ const command_list = [
 ];
 
 // Lists all commands which need to load files
-const data_command_list = ["init-pop-inf", "add-pop-inf", "remove-pop-inf", "add-ind-inf", "remove-ind-inf", "move-ind-inf", "init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", ,"test-and-cull-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data","param-mult"];
+const data_command_list = ["init-pop-inf", "add-pop-inf", "remove-pop-inf", "add-ind-inf", "remove-ind-inf", "move-ind-inf", "init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", ,"test-and-cull-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data","param-mult","set-ind-effect-sim","set-ind-effect-inf","set-ind-effect-post-sim"];
 
 const sim_alg_list = ["gillespie","tau"];
 const inf_alg_list = ["DA-MCMC","PAS-MCMC","MFA","ABC","ABC-SMC","ABC-MBP","PMCMC","HMC"];
 
 // Possible types of equation
 const eqn_types = [
-{name:"Se", mode:"param only", obs_model:true},
-{name:"Sp", mode:"param only", obs_model:true},
-{name:"mut_rate", mode:"param only", obs_model:true},
-{name:"seq_var", mode:"param only", obs_model:true},
-{name:"comp_prob",mode:"param only", obs_model:true},
-{name:"trans_prob",mode:"param only", obs_model:true},
-{name:"sim_comp_prob",mode:"param only"},
-{name:"trans_bp", mode:"param with dep"},
-{name:"trans_mean", mode:"all"},
-{name:"trans_rate", mode:"all"},
-{name:"trans_shape", mode:"all"},
-{name:"trans_scale", mode:"all"},
-{name:"trans_cv", mode:"all"},
-{name:"reparam", mode:"param only"},
-{name:"reparam_eqn", mode:"all"},
-{name:"define_eqn", mode:"all"},
-{name:"dist", mode:"param only"},
-{name:"derive_param", mode:"derive_param"},
-{name:"derive_eqn", mode:"derive"},
-{name:"test", mode:"param only"}
+{name:"trans_bp", mode:"all", range:"zeroone"},
+{name:"trans_mean", mode:"all", range:"pos"},
+{name:"trans_rate", mode:"all", range:"pos"},
+{name:"trans_shape", mode:"all", range:"pos"},
+{name:"trans_scale", mode:"all", range:"pos"},
+{name:"trans_cv", mode:"all", range:"pos"},
+{name:"Se", mode:"param time", range:"zeroone", obs_model:true},
+{name:"Sp", mode:"param time", range:"zeroone", obs_model:true},
+{name:"SeTC", mode:"param time", range:"zeroone", obs_model:true},
+{name:"SpTC", mode:"param time", range:"zeroone", obs_model:true},
+{name:"mut_rate", mode:"param only", range:"pos", obs_model:true},
+{name:"seq_var", mode:"param only", range:"pos", obs_model:true},
+{name:"comp_prob", mode:"param time", range:"zeroone", obs_model:true},
+{name:"trans_prob", mode:"param time", range:"zeroone", obs_model:true},
+{name:"sim_comp_prob", mode:"param time", range:"zeroone"},
+{name:"dist", mode:"param only", range:"all"},
+{name:"reparam_ele", mode:"defrep ele", range:"all"},
+{name:"reparam_eqn", mode:"defrep eq", range:"all"},
+{name:"define_ele", mode:"defrep ele", range:"all"},
+{name:"define_eqn", mode:"defrep eq", range:"all"},
+{name:"reparam_ele_notime", mode:"defrep ele notime", range:"all"},
+{name:"reparam_eqn_notime", mode:"defrep eq notime", range:"all"},
+{name:"define_ele_notime", mode:"defrep ele notime", range:"all"},
+{name:"define_eqn_notime", mode:"defrep eq notime", range:"all"},
+{name:"derive_param", mode:"derive param", range:"all"},
+{name:"derive_eqn", mode:"derive eqn", range:"all"},
+{name:"norm", mode:"param only", range:"all"},
+{name:"pos", mode:"param only", range:"pos"},
+{name:"zeroone", mode:"param only", range:"zeroone"},
+{name:"etarange", mode:"param only", range:"etarange"}
 ];
 
 const param_type = ["normal","const","dist","reparam"]; // Different varieties of parameter
@@ -259,17 +276,13 @@ const mp4_factor_high = 3;                         // For medium quality scale f
 let print_scale_factor;                            // Increase is screen size for print
 let print_line_factor;                             // Increase in line thickness print
 
-// Lists parameter types not needed for simulation
-const sim_param_not_needed = ["Se","Sp","mut_rate","seq_var","trans_prob","comp_prob","derive_param"];
-const inf_param_not_needed = ["derive_param"];
-
 const dist_pos = ["exp(rate)","exp(mean)","gamma","erlang","log-normal","weibull","period"];
 const exp_dist_pos = ["exp(rate)","exp(mean)","erlang"];
 const source_dist_pos = ["exp(rate)","exp(mean)"];
-const prior_pos = ["inverse","uniform","power","exp","normal","gamma","log-normal","beta","bernoulli","fix"];
+const prior_pos = ["inverse","uniform","normal","gamma","log-normal","exp","power","beta","bernoulli","fix"];
 const prior_factor_pos = ["mdir"];
 const prior_cv_pos = ["covar-default","covar-normal-lkj","covar-uniform-lkj","covar-inv-wishart"];
-const prior_pos_positive = ["inverse","uniform","power","exp","gamma","log-normal","fix"];
+const prior_pos_positive = ["inverse","uniform","gamma","log-normal","power","exp","fix"];
 
 const data_types = ["Init. Cond.", "Individual", "Population", "Additional"];
 const data_types_sim = ["Init. Cond.", "Dynamic Int."];
@@ -295,6 +308,9 @@ const convert = [
 		{command:"test-data", type:"Diag. Test"},	
 		{command:"test-and-cull-sim", type:"Test-and-cull"},	
 		{command:"ind-effect-data", type:"Ind. Eff."},
+		{command:"set-ind-effect-sim", type:"Set IE"},
+		{command:"set-ind-effect-inf", type:"Set IE"},
+		{command:"set-ind-effect-post-sim", type:"Set IE"},
 		{command:"ind-group-data", type:"Ind. Group"},
 		{command:"genetic-data", type:"Genetic"},	
 		{command:"pop-data", type:"Population"},	
@@ -316,7 +332,9 @@ const data_template = [
 
 {type:"Move Ind.", is_data:true, title:"Move individuals", help:move_ind_text, cols:["ID","t,the time the individuals are moved","to"]},
 
-{type:"Ind. Eff.", is_data:true, title:"Individual effect values", help:ind_eff_data_text, cols:["ID","value"]},
+{type:"Ind. Eff.", is_data:true, title:"Individual effect values", help:ind_eff_data_text, cols:["ID","pos_value"]},
+
+{type:"Set IE", is_data:true, title:"Set individual effect", help:fix_IE_text, cols:["ID","pos_value"]},
 
 {type:"Ind. Group", is_data:true, title:"Individual group", help:ind_group_data_text , cols:["ID"]},
 
@@ -359,7 +377,10 @@ const data_template = [
 {type:"LoadTensor", title:"Load tensor", cols:["dep","value"]},
 
 // Loading tensor of values for reparameterisation
-{type:"LoadReparam", title:"Load reparameterisation", help:load_reparam_text2, cols:["dep","eqn"]},
+{type:"LoadReparam", title:"Load reparameterisation", help:load_reparam_text2, cols:["dep","reparam_ele"]},
+
+// Loading tensor of values for define
+{type:"LoadDefine", title:"Load definition", help:load_define_text2, cols:["dep","define_ele"]},
 
 // Loading tensor of values for priors
 {type:"LoadPriorSplit", title:"Load priors", help:load_priorsplit_text2, cols:["dep","prior"]},
@@ -375,7 +396,6 @@ const data_template = [
 
 // Loads the pedigree into and individual effect group
 {type:"APed", title:"Pedigree", cols:["ID","sire","dam"]},
-
 
 // Load compartment map
 {type:"KnotTimes", title:"Load spline knot times", cols:["t,the knot times"]},
@@ -437,6 +457,7 @@ const SD_DEFAULT = 2;                              // Default value for SD (in L
 
 const ELE_REDUCE_FAC = 0.7;                        // Factor reduction when too many elements
 const TABLE_ROW_MAX = 10000;                       // The maximum number of rows displayed on a table
+const WITHIN_MAX = 10;                             // Store maximum number within equation
 
 const DEN_X = 200;                                 // Resolution of density p;ots
 const SR_MIN = 5;                                  // Determines if DEN_X must be increased
@@ -480,6 +501,7 @@ const select_drop_str = "Select";                  // String prompt to set dropd
 const unset_type = "unset_type";                   // Denotes unset type
 const no_elements = "No elements";                 // Message if no elements in array
 const data_invalid = "Data source is invalid";     // Invalid data source message
+const mixed_p_name = "mixed_p_name";               // SHows if param. has multiple species
 
 const dist_matrix_name = "D";                      // The name of a distance matrix
 const iden_matrix_name = "δ";                      // The name of identity matrix

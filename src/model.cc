@@ -237,7 +237,7 @@ void Model::sample_ieg_cv(PV &param_val) const
 						auto loop = 0u, loopmax = 1000u;
 						for(loop = 0; loop < loopmax; loop++){
 							if(sbound){
-								emsg("To do");
+								emsg("Jeffreys problem");
 								auto det = 0.0;
 								auto det_min = exp(ieg.log_det_min);
 								//auto det_max = exp(  ieg.log_det_max);
@@ -2114,6 +2114,73 @@ PV Model::get_param_val(const Particle &pa) const
 	return param_val;
 }
 
+
+/// Sets PV from a set of parameter valuesparam_val
+PV Model::set_param_val(const vector <double> &value_set) const
+{
+	PV param_val;
+	param_val_init(param_val);
+	auto &value = param_val.value;
+	auto &precalc = param_val.precalc;
+
+	for(auto &va : value) va = UNSET;
+	
+	for(auto i = 0u; i < nparam_vec_prop; i++){
+		auto th = param_vec_prop[i];
+	
+		value[th] = value_set[th];
+	
+		precalc_eqn.calculate(param_vec[th].set_param_spec_precalc,param_val,false);
+	}
+
+	for(auto th = 0u; th < nparam_vec; th++){
+		const auto &pv = param_vec[th];
+		
+		precalc_eqn.calculate(pv.spec_precalc_before,param_val,false);
+	
+		if(value[th] == UNSET){
+			const auto &par = param[pv.th];
+				
+			switch(par.variety){
+			case PRIOR_PARAM: case DIST_PARAM:
+				{
+					const auto &pri = prior[par.get_prior_ref(pv.index)];
+					if(pri.type != FIX_PR) emsg("Prior should be fixed");
+					
+					value[th] = prior_sample(pri,precalc);
+					precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,false);
+				}
+				break;
+				
+			case REPARAM_PARAM:
+				if(pv.reparam_time_dep == false){
+					auto eq_ref = par.get_eq_ref(pv.index);
+					if(eq_ref == UNSET) emsg("eq_ref should be set");
+					
+					value[th] = eqn[eq_ref].calculate_param(precalc);
+					precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,false);
+				}
+				break;
+			
+			default: emsg("Option prob"); break;
+			}
+		}
+	}
+	
+	precalc_eqn.calculate(spec_precalc,param_val,false);
+
+	if(false){
+		for(auto val: param_val.value) cout << val << ","; 	
+		cout << " value" << endl;
+		for(auto val: param_val.precalc) cout << val << ","; 	
+		cout << " precalc" << endl;
+		emsg("get param val");
+	}
+	
+	return param_val;
+}
+
+
 Param::Param(Constant &constant) : constant(constant) 
 {
 }
@@ -3635,7 +3702,7 @@ vector <string> Model::equation_dep(string te, string &warn)
 						auto k = 0u; 
 						while(k < sum_range.size() && !(i > sum_range[k].i_start && i < sum_range[k].i_end && sum_range[k].index == de)) k++;
 						
-						if(k == sum_range.size()) dep.push_back(de);
+						if(k == sum_range.size()) add_to_vec(dep,de);
 					}
 				}
 				i = di.iend;

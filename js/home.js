@@ -9,7 +9,7 @@ function add_home_page_buts(lay)
 	
 	let sel = inter.section_sel;
 	if(sel == undefined){
-		cy = lay.add_title("Welcome to BICI!",cx,cy,{te:welcome_text});
+		cy = lay.add_title("Welcome to BICI!",cx,cy,{title:"Welcome to BICI "+bici_version, te:welcome_text});
 	}
 	else{
 		let sec = inter.section[sel];
@@ -282,11 +282,14 @@ function initialise_section()
 		ex_mod.push({te:"F2.8: Correlated individual effect applied to a transition with pedigree", mod:"QGE1.2", link:true, mod_type:"IBM"});
 	
 		ex_mod.push({te:"3) Parameter definitions",help:"These examples look at how parameters can be reparameterised, set to distributions or derived from other quantities"+mod_mess, gap:gap});
-		ex_mod.push({te:"F3.1: Reparameterisation", mod:"SPE2.1", link:true, mod_type:"IBM"}); 
-		ex_mod.push({te:"F3.2: Parameter distribution", mod:"EE1.2", link:true, mod_type:"IBM"}); 
-		ex_mod.push({te:"F3.3: Derived quantities", mod:"SE1.3", link:true, mod_type:"IBM"}); 
-		ex_mod.push({te:"F3.4: Factor", mod:"CE3.1", link:true, mod_type:"PBP"}); 
-		ex_mod.push({te:"F3.5: Spline reparameterisation", mod:"SPE2.1", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"F3.1: Parameter reparameterisation by equation", mod:"SPE2.1", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"F3.2: Parameter reparameterisation by element", mod:"CE3.2", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"F3.3: Parameter definition by equation", mod:"CE3.3", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"F3.4: Parameter definition by element", mod:"CE3.1", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"F3.5: Parameter distribution", mod:"EE1.2", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"F3.6: Derived quantities", mod:"SE1.3", link:true, mod_type:"IBM"}); 
+		ex_mod.push({te:"F3.7: Factor", mod:"CE3.1", link:true, mod_type:"PBP"}); 
+		ex_mod.push({te:"F3.8: Spline reparameterisation", mod:"SPE2.1", link:true, mod_type:"IBM"}); 
 		
 		let sec = { name:"features", desc:"BICI features", pic:"features", shade:true, ex_mod:ex_mod, help:features_text+mod_mess};
 		

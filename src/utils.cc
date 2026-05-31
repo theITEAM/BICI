@@ -1756,14 +1756,16 @@ string replace(string st, string st1, string st2)
 	
 	string st_new = "";
 	
+	auto len1 = st1.length();
+	
 	auto fl = false;
 	auto i_start = 0u;
 	auto i = 0u;
-	while(i <= st.length()-st1.length()){
-		if(st.substr(i,st1.length()) == st1){
+	while(i <= st.length()-len1){
+		if(st.substr(i,len1) == st1){
 			if(i != i_start) st_new += st.substr(i_start,i-i_start);
 			st_new += st2;
-			i += st1.length();
+			i += len1;
 			i_start = i;
 			fl = true;
 		}
@@ -4170,3 +4172,70 @@ bool contains_space(string te)
 	}
 	return false;
 }
+
+
+/// Outputs a simple table 
+string output_table(const Table &tab) 
+{
+	string st = "";
+	for(auto i = 0u; i < tab.heading.size(); i++){
+		if(i != 0) st += ",";
+		st += "\""+tab.heading[i]+"\"";
+	}
+	st += endli;
+
+	for(auto r = 0u; r < tab.ele.size(); r++){
+		auto ele = tab.ele[r];
+		if(ele.size() != tab.heading.size()) emsg("Output columns to not match"); 
+
+		for(auto i = 0u; i < ele.size(); i++){
+			if(i != 0) st += ',';
+			if(number(ele[i]) == UNSET) st += "\""+ele[i]+"\"";
+			else st += ele[i];
+		}
+		st += endli;
+	}
+	
+	return st;
+}
+
+
+/// Gets statistics from a vector
+Stat get_statistic(vector <double> &vec)
+{
+	auto n = vec.size();
+	if(n == 0) emsg("Zero vector size");
+	
+	Stat stat;
+	
+	auto sum = 0.0, sum2 = 0.0;
+	for(auto i = 0u; i < vec.size(); i++) {
+		sum += vec[i];
+		sum2 += vec[i]*vec[i];
+	}
+	sum /= n;
+	sum2 /= n;
+
+	stat.mean = sum;
+	auto var = sum2 - sum*sum; if(var < 0) var = 0;
+	stat.sd = sqrt(var);
+	
+	sort(vec.begin(),vec.end());
+
+	if(n >= 2) {
+		auto i = floor_int((n-1)*0.025);
+		auto f = (n-1)*0.025 - i;
+		stat.CImin = vec[i]*(1-f) + vec[i+1]*f;
+
+		i = floor_int((n-1)*0.975);
+		f = (n-1)*0.975 - i;
+		stat.CImax = vec[i]*(1-f) + vec[i+1]*f;
+	} 
+	else{
+		stat.CImin = vec[0];
+		stat.CImax = vec[0];
+	}
+
+	return stat;
+}
+

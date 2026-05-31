@@ -31,10 +31,10 @@ function add_model_param_buts(lay)
 	w = model.add_object_button(lay,"Distribution",x,y,"SetDistribution",{ back:WHITE, active:active, info:{}, title:"Distribution", te:distribution_text}); 
 	x += w+gap;
 	
-	w = model.add_object_button(lay,"Derived",x,y,"SetDerived",{ back:WHITE, active:active, info:{}, title:"Derived", te:derived_text}); 
+	w = model.add_object_button(lay,"Factor",x,y,"SetFactor",{ back:WHITE, active:active, info:{}, title:"Factor", te:factor_text}); 
 	x += w+gap;
 	
-	w = model.add_object_button(lay,"Factor",x,y,"SetFactor",{ back:WHITE, active:active, info:{}, title:"Factor", te:factor_text}); 
+	w = model.add_object_button(lay,"Derived",x,y,"SetDerived",{ back:WHITE, active:active, info:{}, title:"Derived", te:derived_text}); 
 	x += w+gap;
 }
 
@@ -79,7 +79,7 @@ function add_param_mult_content(lay)
 
 	for(let i = 0; i < model.param.length; i++){
 		let par = model.param[i];
-		if(par.type == "param factor"){
+		if(par.param_fac){
 			lay.add_button({te:"Parameter factor", x:1, y:y, dx:lay.dx-3, dy:dy+1.5, col:col_round, col2:col_text, type:"CurvedOutline"});
 			y += 1.4;
 			
@@ -125,7 +125,7 @@ function add_model_param_content(lay)
 	
 	let depnum = -1;
 	
-	let param_cat = get_param_cat([],"");
+	let param_cat = get_param_cat("all","");
 	
 	if(no_param(param_cat)) center_message("No parameters are in the model.",lay);
 	
@@ -142,7 +142,7 @@ function add_model_param_content(lay)
 			
 				if(x+info.dx+1 >= lay.inner_dx){ x = mar; y += dy_param;}
 		
-				lay.add_button({x:x, y:y, dx:info.dx+1, dy:1.4*si_big, type:"ParamLabel2", info:info, col:BLACK, i:i, eqn_appear:par.eqn_appear, ac:"ParamInfo", back_col:WHITE});
+				lay.add_button({x:x, y:y, dx:info.dx+1, dy:1.4*si_big, type:"ParamLabel2", info:info, col:BLACK, i:i, within:par.within, ac:"ParamInfo", back_col:WHITE});
 				
 				x += info.dx+1+gap_param;
 			}
@@ -264,7 +264,7 @@ function add_model_param_content(lay)
 		for(let i = 0; i < model.param.length; i++){
 			let par = model.param[i];
 			
-			if(par.spline.on == true && par.type != "derive_param" && par.type != "param factor" && par.variety != "define"){
+			if(par.spline.on == true && par.derive != true && par.param_fac != true && par.variety != "define"){
 				th_list.push(i);
 				num += dy_spline_fac+dy_spline_fac2; 
 				if(model.param[i].spline.smooth.check == true) num += dy_spline_fac2;
@@ -281,7 +281,7 @@ function add_model_param_content(lay)
 				let i = th_list[k];
 				let par = model.param[i];
 				let spl = par.spline;
-				if(spl.on == true && par.type != "derive_param" && par.type != "param factor"){
+				if(spl.on == true && par.derive != true && par.param_fac != true){
 					lay.display_param(x-par.label_info.dx-0.7,y-0.1,par.label_info);
 					
 					let w = wright;
@@ -322,7 +322,7 @@ function add_model_param_content(lay)
 		let num = 0;
 		for(let i = 0; i < model.param.length; i++){
 			let par = model.param[i];
-			if(par.variety == "const" && par.type != "param factor") num++;
+			if(par.variety == "const" && par.param_fac != true) num++;
 		}
 				
 		if(num > 0){
@@ -331,7 +331,7 @@ function add_model_param_content(lay)
 		
 			for(let i = 0; i < model.param.length; i++){
 				let par = model.param[i];
-				if(par.variety == "const" && par.type != "param factor"){
+				if(par.variety == "const" && par.param_fac != true){
 					let w = wright;
 					
 					if(par.value_desc == no_elements && !den_vec){
@@ -436,12 +436,12 @@ function add_model_param_content(lay)
 				if(par.variety == "dist"){
 					let w = wright;
 					
-					if(par.dep.length > 0){
+					if(par.ndep_cont > 0){
 						lay.add_checkbox(w-4,y+0.4,"Split","Split",par.prior_split_check,WHITE);
 						w -= 4;
 					}
 		
-					if(par.dep.length == 0 || par.prior_split_check.check == false){
+					if(par.ndep_cont == 0 || par.prior_split_check.check == false){
 						display_distribution(i,x,y,lay,true,true,w);
 					}
 					else{
@@ -495,7 +495,7 @@ function add_knot_times(x,y,w,lay,spl,i,te_si,te_fo)
 				
 /// Adds spline options radio
 function add_spline_options(x,y,lay,spl,te_si,te_fo)
-{//zz
+{
 	let rad = spl.spline_radio;
 	
 	lay.add_button({te:"TYPE:", x:x+1.8, y:y+0.3, dy:te_si, si:te_si, font:te_fo, type:"Text", col:BLACK});
@@ -544,7 +544,7 @@ function set_prior_const_bubble(cont,type,ac)
 	}
 	
 	if(fl){
-		bubble_addparagraph(cont,"Select parameter that is going to be set as constant under inference:",0,cont.dx);
+		bubble_addparagraph(cont,"Select parameter that is going to be set as constant under inferences:",0,cont.dx);
 		cont.y += 0.2;
 	
 		bubble_addscrollable(cont,{type:"prior const param sel", ymax:10, ac:ac}); 
@@ -626,6 +626,15 @@ function set_reparam_bubble2(cont)
 function set_define_bubble(cont)
 {	
 	let bub = inter.bubble;
+	if(bub.set_define_type){
+		cont.dx = 15;
+		bubble_addtitle(cont,"Define parameter");
+		bubble_addparagraph(cont,"Set via an equation or split into elements:",0,cont.dx); 
+		bubble_addradio(cont,0,"equation","Equation",bub.radio);
+		bubble_addradio(cont,0,"split","Split",bub.radio);	
+		add_end_button(cont,"Done","AddDefineParam2");		
+		return;
+	}
 	
 	if(check_param_free("define") == true){
 		cont.dx = 20;
@@ -757,7 +766,9 @@ function check_param_free(op)
 /// Determines if possible to select parameter
 function param_pos(par,op)
 {
-	if(par.type == "derive_param") return false;
+	if(par.derive) return false;
+	
+	if(par.ndep_cont == 0 && op == "priorconst") return false;
 	
 	if(par.name == "D") return false; // Does not allow distance matrix
 	
@@ -765,7 +776,7 @@ function param_pos(par,op)
 	
 	switch(op){
 	case "priorconst":
-		if(par.variety == "const") return false;
+		if(par.prior_const_on == true) return false;
 		return true;
 		
 	case "const":
@@ -785,19 +796,19 @@ function param_pos(par,op)
 	case "dist":
 		if(par.variety != "normal") return false;
 		if(par.factor) return false;
-		if(par.dep.length == 0) return false;
+		if(par.ndep_cont == 0) return false;
 		break;
 	
 	case "fac":
 		if(par.factor) return false;
 		if(par.time_dep) return false;
 		if(par.variety != "normal" && par.variety != "const") return false;
-		if(par.dep.length == 0) return false;
+		if(par.ndep_cont == 0) return false;
 		break;
 		
 	case "trans":
 		if(par.variety != "normal") return false;
-		if(par.type != "trans_rate") return false;
+		//if(par.type != "trans_rate") return false;
 		break;
 	}
 
@@ -867,11 +878,11 @@ function display_derive(j,x,y,lay,edit,w)
 
 
 /// Displays bubble which is selected on model parameter page
-function set_paramselect_bubble(cont,eqn_appear)
+function set_paramselect_bubble(cont,within)
 {
 	cont.dx = 17;
 		
-	bubble_addtitle(cont,"Parameter",{te:derived_text});
+	bubble_addtitle(cont,"Parameter");
 	
 	let par = model.param[cont.bu.i];
 
@@ -880,15 +891,21 @@ function set_paramselect_bubble(cont,eqn_appear)
 
 	switch(par.variety){
 	case "normal":
-		if(par.type == "fixed effect"){ te = "This parameter is a fixed effect."; fl = true;}
-		if(par.type == "derive_param") te = "This parameter is derived."; 
-		if(par.type == "variance"){
-			let info = par.eqn_appear[0];
+		if(par.fixed_effect){ 
+			te = "This parameter is for fixed effect ⟨"+par.sup+"⟩.";
+			fl = true;
+		}
+		
+		if(par.derive) te = "This parameter is derived."; 
+		
+		if(par.variance == true){
+			let wi = par.within[0];
+			let info = wi.eqn_info;
 			let ieg = model.species[info.p].ind_eff_group[info.ieg];
 			fl = true;
 
 			if(ieg.ie_list.length == 1){
-				te = "This is the variance for individual effect <e>"+ieg.ie_list[0].name+"</e>.";
+				te = "This is the variance for individual effect ["+ieg.ie_list[0].name+"].";
 			}
 			else{
 				let na = "";
@@ -909,6 +926,7 @@ function set_paramselect_bubble(cont,eqn_appear)
 	case "reparam": te = "This parameter is reparameterised."; break;
 	case "const": te = "This parameter is set to a constant."; break;
 	case "dist": te = "This parameter is sampled."; break;
+	case "define": te = "This parameter is defined."; break;
 	default: error("var option error"); break;
 	}
 
@@ -925,11 +943,16 @@ function set_paramselect_bubble(cont,eqn_appear)
 		te2 = "It appears in:";
 	}
 
-	if(par.type != "derive_param" && par.type != "variance"){
-		bubble_addparagraph(cont,te2,0,cont.dx);
-	
-		cont.y += 0.2;
-		bubble_addscrollable(cont,{type:"param details", eqn_appear:eqn_appear, ymax:10});
+	if(par.derive != true && par.variance != true && par.fixed_effect != true){
+		if(within == undefined || within.length == 0){
+			bubble_addparagraph(cont,"It doesn't appear in the model.",0,cont.dx);
+		}
+		else{
+			bubble_addparagraph(cont,te2,0,cont.dx);
+		
+			cont.y += 0.2;
+			bubble_addscrollable(cont,{type:"param details", within:within, ymax:10});
+		}
 	}
 	
 	add_bubble_end(cont);	
@@ -947,21 +970,29 @@ function param_details_scrollable(lay)
 	
 	let store = [];
 	
-	let eq_app = lay.op.eqn_appear;
-	
-	let too_big = false;
-	if(eq_app == undefined) return cy;
-	
-	for(let i = 0; i < eq_app.length; i++){
-		let eq = eq_app[i];
+	let within = lay.op.within;
 
+	if(within == undefined) return cy;
+
+	let too_big = false;
+	
+	let imax = within.length;
+	if(imax == WITHIN_MAX){
+		imax = WITHIN_MAX-1;
+		too_big = true;
+	}
+		
+	for(let i = 0; i < imax; i++){
+		let wi = within[i];
+		let info = wi.eqn_info;
+	
 		let te, ac;
 	
-		switch(eq.type){
+		switch(wi.type){
 		case "trans_mean": case "trans_rate": case "trans_shape":
 		case "trans_scale": case "trans_cv":
 			{
-				let tr = model.species[eq.eqn_info.p].cla[eq.eqn_info.cl].tra[eq.eqn_info.i];
+				let tr = model.species[info.p].cla[info.cl].tra[info.i];
 				let spl = tr.name.split("→");
 				
 				te = "Transition "+tr.name;		
@@ -973,7 +1004,7 @@ function param_details_scrollable(lay)
 			
 		case "trans_bp":
 			{
-				let tr = model.species[eq.eqn_info.p].cla[eq.eqn_info.cl].tra[eq.eqn_info.i];
+				let tr = model.species[info.p].cla[info.cl].tra[info.i];
 			
 				te = "Branching prob. for "+tr.name;
 				ac = "SelectTransEqn";
@@ -982,6 +1013,11 @@ function param_details_scrollable(lay)
 			
 		case "Se": case "Sp":
 			te = "Diagnostic test data";
+			ac = "SelectDataSpec";
+			break;
+			
+		case "SeTC": case "SpTC":
+			te = "Test-and-cull data";
 			ac = "SelectDataSpec";
 			break;
 			
@@ -1010,22 +1046,23 @@ function param_details_scrollable(lay)
 			ac = "SelectDataSpec";
 			break;
 		
-		case "reparam":
+		case "reparam_ele": case "reparam_eqn":
 			{
 				te = "Reparameterisation";
-				if(eq.eqn_info != undefined){
-					let name = get_full_parameter_name(eq.eqn_info.par_name);
+				if(info != undefined){
+					let name = get_full_parameter_name(info.par_name);
 					te = "Reparameterisation of <e>"+name+"</e>";
 					ac = "SelectReparam";
 				}
 			}
 			break;
-			
-		case "define_eqn":
+
+		
+		case "define_ele": case "define_eqn":
 			{
 				te = "Defined";
-				if(eq.eqn_info != undefined){
-					let name = get_full_parameter_name(eq.eqn_info.par_name);
+				if(info != undefined){
+					let name = get_full_parameter_name(info.par_name);
 					te = "Definition of "+name;
 					ac = "SelectDefine";
 				}
@@ -1034,7 +1071,7 @@ function param_details_scrollable(lay)
 			
 		case "prior": case "dist":
 			{
-				let name = get_full_parameter_name(eq.eqn_info.par_name);
+				let name = get_full_parameter_name(info.par_name);
 				te = "Distribution for <e>"+name+"</e>";
 				ac = "SelectDist";
 			}
@@ -1043,11 +1080,11 @@ function param_details_scrollable(lay)
 		case "derive_param":
 			break;
 		
-		default: error("Option could not be recognised: "+eq.type); break;
+		default: error("Option could not be recognised: "+wi.type); break;
 		}
 		
 		if(find_in(store,te) == undefined){
-			lay.add_button({te:"View", x:dx-3.8, y:cy-0.2, dx:3.5, dy:1.2, ac:ac, type:"GreyView", eqn_info:eq.eqn_info});
+			lay.add_button({te:"Go", x:dx-3.1, y:cy-0.1, dx:2.8, dy:1.0, ac:ac, type:"GoBut", eqn_info:info});
 			
 			if(begin_str(te,"Transition ")){
 				lay.add_button({te:"• "+te, x:cx+0.5, y:cy-0.2, dx:dx-4.5, dy:1.2, type:"TransLabel"});
@@ -1065,6 +1102,10 @@ function param_details_scrollable(lay)
 				break;
 			}
 		}
+	}
+	
+	if(too_big){
+		cy = lay.add_paragraph("+ more",dx-4.5,cx+0.5,cy,BLACK,warn_si,warn_lh);
 	}
 	
 	return cy;

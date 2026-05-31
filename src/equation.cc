@@ -31,10 +31,9 @@ using namespace std;
 // sig(val)              The sigmoidal function
 		
 /// Initialises the equation 
-Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details, const vector <Define> &define) : species(species), param(param), prior(prior), derive(derive), spline(spline), param_vec(param_vec), density(density), pop(pop), hash_pop(hash_pop), constant(constant), timepoint(timepoint), details(details)
+Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details, vector <Define> &define) : species(species), param(param), prior(prior), derive(derive), define(define), spline(spline), param_vec(param_vec), density(density), pop(pop), hash_pop(hash_pop), constant(constant), timepoint(timepoint), details(details)
 {
 	te = eqi.te;
-
 	te = trim(te); 
 	if(te == ""){ warn = "There is no equation"; return;}
 
@@ -43,6 +42,8 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 	te_raw = trunc(eqi.te_raw,20);
 	sp_p = eqi.p; 
 	sp_cl = eqi.cl; 
+	
+	linearise.on = false;
 	
 	{ // For observations at the end shifts the evaluation to the last time step
 		auto T = timepoint.size()-1;
@@ -69,14 +70,12 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 	
 	if(warn != "") return;
 
-	substitute_define(define);
-
-	if(warn != "") return;
-
 	te = replace(te,"×","*");                        // Converts × to *
-	
+
 	if(warn != "") return;
 
+	if(eqi.type == DEFINE_EQN) return;  
+	
 	auto op = extract_operations();                  // Extracts the operations in the 	expression
 	if(warn != "") return;
 	
@@ -93,7 +92,7 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 	if(warn != "") return; 
 	
 	simplify_operations(op);                         // Simplifies based on numerical 
-
+	
 	if(warn != "") return; 
 	
 	unravel_sum(op);                                 // Explicitly unravels any sums
@@ -137,8 +136,6 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 	check();
 
 	if(plfl == true) print_calculation();
- 
-	linearise.on = false;
 
 	ind_eff = false; 
 	if(ind_eff_mult.size() > 0 || fix_eff_mult.size() > 0) ind_eff = true;
@@ -155,6 +152,37 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 			print_calc("integral",inte.calc);
 		}
 	}
+}
+
+
+/// Gets operations to be store in define  
+DefineOpStore Equation::get_define_op_store()
+{
+	DefineOpStore dos;
+	
+	auto op = extract_operations();                  // Extracts the operations in the 	expression
+	if(warn != "") return dos;
+	
+	te = "";
+
+	check_repeated_operator(op);                     // Checks for repeated operators e.g. "**"
+
+	if(warn != "") return dos; 
+	
+	replace_minus(op);                               // Replaces minums sign with (-1)*
+
+	if(warn != "") return dos; 
+	
+	simplify_operations(op);                         // Simplifies based on numerical 
+	
+	if(warn != "") return dos; 
+	
+	dos.op = op;
+	dos.sum_info = sum_info;
+	dos.param_index = param_index;
+	dos.pop_index = pop_index;
+
+	return dos;
 }
 
 
@@ -197,7 +225,7 @@ void Equation::setup_comp_pref_convert()
 		}
 	}
 	
-	if(warn == "") te_raw = ""; 
+	//if(warn == "") te_raw = ""; 
 }
 
 
@@ -325,11 +353,15 @@ void Equation::print_operations(const vector <EqItem> &op) const
 					cout << "PI";
 					switch(pind.type){
 					case PARAM_NORMAL:
-						cout <<param[pind.th].name;
+						cout << add_escape_char(param[pind.th].name);
 						break;
 						
 					case PARAM_DERIVE:
-						cout << "[der]" << derive[pind.th].name;
+						cout << "[der]" << add_escape_char(derive[pind.th].name);
+						break;
+						
+					case PARAM_DEFINE:
+						cout << "[define]" << add_escape_char(define[pind.th].name);
 						break;
 						
 					case PARAM_PRESET:
@@ -369,7 +401,7 @@ void Equation::print_operations(const vector <EqItem> &op) const
 			case POP_INDEX:
 				{
 					const auto &pind = pop_index[op[i].num];
-					cout << "PI{";
+					cout << "{";
 					cout << pind.p << ":";
 					for(auto k = 0u; k < pind.define.size(); k++){
 						if(k != 0) cout << ",";
@@ -668,10 +700,12 @@ void Equation::print_item(const EqItem &it) const
 /// Unravels all the sums in the equation
 void Equation::unravel_sum(vector <EqItem> &op)
 {
-	bool nested;
-	
+	bool pass_again;
+
 	do{
-		nested = false;
+		pass_again = false;
+		
+		substitute_define(op,pass_again);
 		
 		auto sum_in = false;
 		
@@ -684,13 +718,14 @@ void Equation::unravel_sum(vector <EqItem> &op)
 				if(i+1 == imax) emsg("cannot have sum at end");
 				if(op[i+1].type != LEFTBRACKET) emsg("Cannot find left bracket");
 				
+				pass_again = true;
+				
 				vector <EqItem> sec;
 				
 				auto ii = i+1;
 				auto num = 0u;
 				while(ii < imax){
 					sec.push_back(op[ii]);
-					if(op[ii].type == SUM) nested = true;
 					
 					if(op[ii].type == LEFTBRACKET) num++;
 					else{
@@ -734,90 +769,16 @@ void Equation::unravel_sum(vector <EqItem> &op)
 						EqItem it; it.type = ADD; op_new.push_back(it);
 					}
 				
-					for(auto it : sec){
-						if(it.type == SUM){
-							const auto &si2 = sum_info[it.num];
-							
-							auto d_sel = UNSET;
-							
-							for(auto d = 0u; d < ndep; d++){
-								if(si.dep[d] == si2.comp_max) d_sel = d;
-							}
-							
-							if(d_sel != UNSET){
-								auto si_new = si2;
-								const auto &cp = comp_pos[d_sel];
-								auto c = cp.list[cp.index];
-								si_new.comp_max = species[cp.p].cla[cp.cl].comp[c].name;
-								it.num = sum_info.size();
-								sum_info.push_back(si_new);
-							}
-						}
-						
-						if(it.type == PARAM_INDEX){
-							auto &pind = param_index[it.num];
-						
-							auto pind2 = pind;
-							
-							auto ins_vec = pind2.index_not_set;
-							pind2.index_not_set.clear();
-							
-							auto change = false;
-							for(const auto &ins : ins_vec){
-								auto sub = false;
-								for(auto d = 0u; d < ndep; d++){
-									if(si.dep[d] == ins.index){
-										pind2.dep[ins.i] = comp_pos[d].list[comp_pos[d].index];
-										sub = true;
-										change = true;
-										break;
-									}
-								}
-								
-								if(sub == false) pind2.index_not_set.push_back(ins);
-							}
-							
-							if(change == true){
-								it.num = param_index.size();
-								param_index.push_back(pind2);
-							}
-						}
-						
-						if(it.type == POP_INDEX){
-							auto &pind = pop_index[it.num];
-						
-							auto pind2 = pind;
-							
-							auto dep_vec = pind2.dep;
-							pind2.dep.clear();
-							
-							auto change = false;
-							for(const auto &de : dep_vec){
-								auto sub = false;
-								for(auto d = 0u; d < ndep; d++){
-									if(si.dep[d] == de.index){
-										PopDef pd;
-										pd.cl = de.cl; 
-										pd.list.push_back(comp_pos[d].list[comp_pos[d].index]);
-										pind2.define.push_back(pd);
-										sub = true;
-										change = true;
-										break;
-									}
-								}
-								
-								if(sub == false) pind2.dep.push_back(de);
-							}
-							
-							if(change == true){
-								it.num = pop_index.size();
-								pop_index.push_back(pind2);
-							}
-						}
-					
-						op_new.push_back(it);
+					vector <Substitution> sub;
+					for(auto d = 0u; d < ndep; d++){
+						Substitution su;
+						su.index = si.dep[d];
+						su.i = comp_pos[d].list[comp_pos[d].index];
+						sub.push_back(su);
 					}
-			
+				
+					copy_op(op_new,sec,sum_info,param_index,pop_index,sub);
+					
 					first = false;
 					
 					auto k = 0u;
@@ -845,11 +806,243 @@ void Equation::unravel_sum(vector <EqItem> &op)
 		}
 		
 		if(sum_in) op = op_new;
-	}while(nested);
+	}while(pass_again);
 	
+	if(testing){
+		for(auto &it : op){
+			if(it.type == PARAM_INDEX && param_index[it.num].type == PARAM_DEFINE){
+				emsg("Should be no define");
+			}
+		}
+	}
+			
 	sum_info.clear();
 }
+
+
+/// Substitutes any defined quantities	
+void Equation::substitute_define(vector <EqItem> &op, bool &pass_again)
+{
+	// Determines if substitution is needed
+	auto fl = false;
+	vector <bool> change;
+	for(const auto &it : op){
+		auto ch = false;
+		if(it.type == PARAM_INDEX){
+			const auto &pind = param_index[it.num];
+			if(pind.type == PARAM_DEFINE){
+				if(pind.index_not_set.size() == 0) ch = true;
+			}
+		}
+		
+		if(ch == true) fl = true;
+		change.push_back(ch);
+	}
 	
+	if(fl == false) return;	
+	
+	pass_again = true;
+	
+	vector <EqItem> op_new;
+	for(auto i = 0u; i < op.size(); i++){
+		if(change[i]){
+			{
+				EqItem op; op.type = LEFTBRACKET;
+				op_new.push_back(op);
+			}
+			
+			const auto &pind = param_index[op[i].num];
+			auto &def = define[pind.th];
+			
+			def.used = true;
+			
+			if(pind.dep.size() != def.dep.size()) emsg("dep wrong size");
+			
+			vector <Substitution> sub;
+		
+			if(def.eqn_on){	
+				for(auto d = 0u; d < def.dep.size(); d++){
+					Substitution su;
+					su.index = def.dep[d].index_with_prime;
+					su.i = pind.dep[d];
+					sub.push_back(su);
+				}
+	
+				const auto &op_st = def.op_store[0];
+				copy_op(op_new,op_st.op,op_st.sum_info,op_st.param_index,op_st.pop_index,sub);
+			}
+			else{
+				auto ind = 0u;
+				for(auto d = 0u; d < pind.dep.size(); d++) ind += pind.dep[d]*def.dep[d].mult;
+				
+				const auto &op_st = def.op_store[ind];
+				copy_op(op_new,op_st.op,op_st.sum_info,op_st.param_index,op_st.pop_index,sub);
+			}
+			
+			{
+				EqItem op; op.type = RIGHTBRACKET;
+				op_new.push_back(op);
+			}
+		}
+		else{
+			op_new.push_back(op[i]);
+		}
+	}
+	
+	op = op_new;
+}
+
+
+/// Sets any unset dependencies
+void Equation::set_dep(vector <unsigned int> &dep, vector <IndexNotSet> &index_not_set, const vector <Substitution> &sub, const vector <string> &sum_index) const
+{
+	auto i = 0u;
+	while(i < index_not_set.size()){
+		const auto &ins = index_not_set[i];
+		auto index = ins.index;
+		if(find_in(sum_index,index) == UNSET){
+			
+			auto j = 0u; while(j < sub.size() && sub[j].index != index) j++;
+			if(j == sub.size()) emsg("Cannot find substitution");
+		
+			dep[ins.i] = sub[j].i;
+			
+			index_not_set.erase(index_not_set.begin()+i);
+		}
+		else i++;
+	}
+}
+
+
+/// Sets population index
+void Equation::set_pop_dep(PopIndex &pi, const vector <Substitution> &sub, const vector <string> &sum_index) const
+{
+	auto &dep = pi.dep;
+	
+	auto d = 0u;
+	while(d < dep.size()){
+		auto index = dep[d].index;
+		
+		if(find_in(sum_index,index) == UNSET){
+			auto j = 0u; while(j < sub.size() && sub[j].index != index) j++;
+			if(j == sub.size()) emsg("Cannot find substitution pop");
+				
+			PopDef pd;
+			pd.cl = dep[d].cl; 
+			pd.list.push_back(sub[j].i);
+		
+			pi.define.push_back(pd);
+			
+			dep.erase(dep.begin()+d);
+		}
+		else d++;
+	}
+}
+
+
+/// Copies operations from define 
+void Equation::copy_op(vector <EqItem> &op_new, const	vector <EqItem> &op_st, const vector <SumInfo> &sum_info_st, const vector <ParamIndex> &param_index_st, const vector <PopIndex> &pop_index_st, const vector <Substitution> &sub)
+{
+	vector <string> sum_index;
+	vector <unsigned int> nbrac_store;
+	vector <unsigned int> sum_index_store;
+				
+	auto nbrac = 0u;
+	
+	for(auto op : op_st){ // Copies operations from define 
+		auto num = op.num;
+		switch(op.type){	
+		case SUM: 
+			{
+				op.num = sum_info.size();
+				auto sum = sum_info_st[num];
+				
+				if(sum.distmax != UNSET){ // This changes maximum value from index to specific value
+					auto comp_max = sum.comp_max;
+					if(find_in(sum_index,comp_max) == UNSET){
+						auto j = 0u; while(j < sub.size() && sub[j].index != comp_max) j++;
+						if(j < sub.size()){
+							auto ind = remove_prime(comp_max);
+							
+							auto fl = false;
+							for(auto p = 0u; p < species.size(); p++){
+								const auto &sp = species[p];
+								for(auto cl = 0u; cl < sp.cla.size(); cl++){
+									const auto &claa = sp.cla[cl];
+									if(claa.index == ind){
+										sum.comp_max = claa.comp[sub[j].i].name;
+										fl = true; break;
+									}
+								}
+								if(fl) break;
+							}
+							if(fl == false) emsg("Could not find index");
+						}
+					}
+				}
+				
+				nbrac_store.push_back(nbrac);
+				sum_index_store.push_back(sum_index.size());
+				for(const auto &va : sum.dep) sum_index.push_back(va);
+				
+				sum_info.push_back(sum); 
+			}
+			break;
+			
+		case PARAM_INDEX: 
+			{
+				op.num = param_index.size(); 
+				auto pind = param_index_st[num];
+				set_dep(pind.dep,pind.index_not_set,sub,sum_index);   
+				param_index.push_back(pind); 
+			}
+			break;
+			
+		case POP_INDEX:
+			{
+				op.num = pop_index.size(); 
+				auto pind = pop_index_st[num];
+				set_pop_dep(pind,sub,sum_index);   
+				pop_index.push_back(pind);
+			}
+			break; 
+		
+		case INTEGRAL: emsg("Should not be integral"); break;
+		case PARAMETER: emsg("Should not be parameter"); break; 
+		case SPLINE: emsg("SHould not be spline"); break;
+		case POPTIMENUM: emsg("Should not be poptimenum"); break;
+		case DERIVE: emsg("Should not be derive"); break;
+			
+		case LEFTBRACKET: 
+			nbrac++; 
+			break;
+			
+		case RIGHTBRACKET: 
+			{
+				if(nbrac == 0) emsg("Bracket problem");
+				nbrac--;
+				
+				auto num = nbrac_store.size();
+				if(num > 0){
+					if(nbrac_store[num-1] == nbrac){
+						sum_index.resize(sum_index_store[num-1]);
+						nbrac_store.pop_back();
+						sum_index_store.pop_back();
+					}
+				}
+			}
+			break;
+		
+		default: break;
+		}
+		
+		op_new.push_back(op);
+	}
+	
+	if(nbrac_store.size() != 0) emsg("nbrac_store prob");
+	if(sum_index_store.size() != 0) emsg("sum_index_store prob");
+}
+			
 
 /// Finds the list of compartments from a given index
 CompPos Equation::find_list_from_index(string ind, double dist_max, string comp_max) const
@@ -973,26 +1166,71 @@ ParamIndex Equation::get_param_name(unsigned int i, unsigned int &raend)
 		auto pp = get_param_prop(content);
 		
 		auto name = pp.name;
-		auto th = 0u; while(th < param.size() && param[th].name != name) th++;
-		if(th < param.size()){   // This is a parameter
-			pind.type = PARAM_NORMAL;
-			pind.th = th;
-			
-			const auto &par = param[th];
-			
-			if(pp.time_dep != par.time_dep){ 
-				warn = "The time dependency in the equation does not agree with the definition for parameter '"+par.name+"'."; 
-				return pind;
-			}
-			
-			if(pp.dep.size() != par.dep.size()){
-				warn = "The dependency in the equation does not agree with the definition for parameter '"+par.name+"'."; 
-				return pind;
-			}
 		
-			for(auto de = 0u; de < par.dep.size(); de++){
-				if(!(par.time_dep == true && de == par.dep.size()-1)){
-					if(pp.dep[de] == par.dep[de].index){ // Index
+		{
+			auto th = 0u; while(th < param.size() && param[th].name != name) th++;
+			if(th < param.size()){   // This is a parameter
+				pind.type = PARAM_NORMAL;
+				pind.th = th;
+				
+				const auto &par = param[th];
+				
+				if(pp.time_dep != par.time_dep){ 
+					warn = "The time dependency in the equation does not agree with the definition for parameter '"+par.name+"'."; 
+					return pind;
+				}
+				
+				if(pp.dep.size() != par.dep.size()){
+					warn = "The dependency in the equation does not agree with the definition for parameter '"+par.name+"'."; 
+					return pind;
+				}
+			
+				for(auto de = 0u; de < par.dep.size(); de++){
+					if(!(par.time_dep == true && de == par.dep.size()-1)){
+						if(pp.dep[de] == par.dep[de].index){ // Index
+							pind.dep.push_back(UNSET);
+							
+							IndexNotSet ins;
+							ins.index = pp.dep_with_prime[de];
+							ins.i = de;
+							pind.index_not_set.push_back(ins);
+						}
+						else{				
+							auto j = par.dep[de].hash_list.find(remove_prime(pp.dep[de]));
+							if(j == UNSET){
+								warn = "'"+content+"' does not agree with the definition '"+par.full_name+"'.";
+								return pind;
+							}
+							pind.dep.push_back(j);
+						}
+					}
+				}
+				return pind;
+			}
+		}
+		
+		{
+			auto th = 0u; while(th < define.size() && define[th].name != name) th++;
+			if(th < define.size()){   // This is a defined quantity
+				pind.type = PARAM_DEFINE;
+				pind.th = th;
+				
+				const auto &def = define[th];
+				
+				if(pp.time_dep != def.time_dep){ 
+					warn = "The time dependency in the equation does not agree with the definition '"+def.name+"'."; 
+					return pind;
+				}
+				
+				auto dep = pp.dep; if(pp.time_dep) dep.pop_back();
+				
+				if(dep.size() != def.dep.size()){
+					warn = "The dependency in the equation does not agree with the definition '"+def.name+"'."; 
+					return pind;
+				}
+			
+				for(auto de = 0u; de < def.dep.size(); de++){
+					if(pp.dep[de] == def.dep[de].index){ // Index
 						pind.dep.push_back(UNSET);
 						
 						IndexNotSet ins;
@@ -1001,70 +1239,73 @@ ParamIndex Equation::get_param_name(unsigned int i, unsigned int &raend)
 						pind.index_not_set.push_back(ins);
 					}
 					else{				
-						auto j = par.dep[de].hash_list.find(remove_prime(pp.dep[de]));
+						auto j = def.dep[de].hash_list.find(remove_prime(pp.dep[de]));
 						if(j == UNSET){
-							warn = "'"+content+"' does not agree with the definition '"+par.full_name+"'.";
+							warn = "'"+content+"' does not agree with the definition '"+def.full_name+"'.";
 							return pind;
 						}
 						pind.dep.push_back(j);
 					}
 				}
+
+				return pind;
 			}
-			return pind;
 		}
 		
-		auto d = 0u; while(d < derive.size() && derive[d].name != name) d++;	
-		if(d < derive.size()){
-			const auto &der = derive[d];
-			
-			if(type != DERIVE_EQN){
-				warn = "Derived quantity '"+der.full_name+"' cannot be in a non-derived equation."; 
-				return pind;
-			}
-								
-			pind.type = PARAM_DERIVE;
-			pind.th = d;
-			
-			if(pp.time_dep != der.time_dep){ 
-				warn = "The time dependency in the equation does not agree with the definition for parameter '"+der.name+"'."; 
-				return pind;
-			}
-			
-			auto dep = pp.dep;
-			if(der.time_dep){
-				if(!(dep.size() > 0 && dep[dep.size()-1] == "t")){
-					warn = "The value '"+content+"' doesn't have the same dependency as the definition '"+der.full_name+"'";
+		{
+			auto d = 0u; while(d < derive.size() && derive[d].name != name) d++;	
+			if(d < derive.size()){
+				const auto &der = derive[d];
+				
+				if(type != DERIVE_EQN){
+					warn = "Derived quantity '"+der.full_name+"' cannot be in a non-derived equation."; 
 					return pind;
 				}
-				else{
-					dep.pop_back();
+									
+				pind.type = PARAM_DERIVE;
+				pind.th = d;
+				
+				if(pp.time_dep != der.time_dep){ 
+					warn = "The time dependency in the equation does not agree with the definition for parameter '"+der.name+"'."; 
+					return pind;
 				}
-			}
-			
-			if(dep.size() != der.dep.size()){
-				warn = "The dependency in the equation does not agree with the definition for parameter '"+der.name+"'."; 
-				return pind;
-			}
-		
-			for(auto de = 0u; de < der.dep.size(); de++){
-				if(dep[de] == der.dep[de].index){ // Index
-					pind.dep.push_back(UNSET);
-					
-					IndexNotSet ins;
-					ins.index = pp.dep_with_prime[de];
-					ins.i = de;
-					pind.index_not_set.push_back(ins);
-				}
-				else{				
-					auto j = der.dep[de].hash_list.find(remove_prime(pp.dep[de]));
-					if(j == UNSET){
-						warn = "'"+content+"' does not agree with the definition '"+der.full_name+"'.";
+				
+				auto dep = pp.dep;
+				if(der.time_dep){
+					if(!(dep.size() > 0 && dep[dep.size()-1] == "t")){
+						warn = "The value '"+content+"' doesn't have the same dependency as the definition '"+der.full_name+"'";
 						return pind;
 					}
-					pind.dep.push_back(j);
+					else{
+						dep.pop_back();
+					}
 				}
+				
+				if(dep.size() != der.dep.size()){
+					warn = "The dependency in the equation does not agree with the definition for parameter '"+der.name+"'."; 
+					return pind;
+				}
+			
+				for(auto de = 0u; de < der.dep.size(); de++){
+					if(dep[de] == der.dep[de].index){ // Index
+						pind.dep.push_back(UNSET);
+						
+						IndexNotSet ins;
+						ins.index = pp.dep_with_prime[de];
+						ins.i = de;
+						pind.index_not_set.push_back(ins);
+					}
+					else{				
+						auto j = der.dep[de].hash_list.find(remove_prime(pp.dep[de]));
+						if(j == UNSET){
+							warn = "'"+content+"' does not agree with the definition '"+der.full_name+"'.";
+							return pind;
+						}
+						pind.dep.push_back(j);
+					}
+				}
+				return pind;
 			}
-			return pind;
 		}
 		
 		pind.type = PARAM_PRESET;
@@ -2364,6 +2605,10 @@ void Equation::convert_param_index(vector <EqItem> &op)
 					
 					par.used = true;
 				}
+				break;
+			
+			case PARAM_DEFINE:
+				emsg("Should not be here");
 				break;
 			
 			case PARAM_DERIVE:
@@ -4434,70 +4679,6 @@ double Equation::get_calc_hash_num(const vector <Calculation> &calc) const
 	}
 	
 	return val;
-}
-
-
-/// Substitutes in any definitions
-void Equation::substitute_define(const vector <Define> &define)
-{
-	if(define.size() == 0) return;
-
-	bool fl;
-	do{
-		fl = false;
-		
-		auto i = 0u;
-		auto imax = te.size();
-
-		string te_new;
-		auto icopy = 0u;
-		while(i < imax){
-			while(i < imax && te.substr(i,1) != "%") i++;
-			if(i < imax){
-				auto ist = i;
-				while(i < te.length() && te.substr(i,1) != "$") i++;
-				if(i < imax){
-					auto content = trim(te.substr(ist+1,i-ist-1));
-
-					auto pp = get_param_prop(content);
-					
-					auto k = 0u; while(k < define.size() && define[k].name != pp.name) k++;
-					
-					if(k < define.size()){
-						const auto &def = define[k];
-						
-						if(pp.dep.size() != def.dep.size()){
-							warn = "The dependency is different between '"+content+"' and '"+def.full_name+"'.";
-							return;
-						}
-						
-						vector <DepConv> dep_conv;
-						for(auto j = 0u; j < def.dep.size(); j++){
-							DepConv dc; 
-							dc.before = def.dep[j].index_with_prime;
-							dc.after = pp.dep_with_prime[j];
-							dep_conv.push_back(dc);
-						}
-						
-						string warn;
-						auto cont_new = swap_index_temp(dep_conv,def.swap_temp,warn);
-						if(warn != ""){
-							emsg_input("Error for defined quantity '"+def.name+"': "+warn);  
-						}
-						
-						te_new += te.substr(icopy,ist-icopy)+"("+cont_new+")";
-						icopy = i+1;
-					}
-				}
-			}
-		}
-		
-		if(icopy != 0){
-			te_new += te.substr(icopy,imax-icopy);
-			te = te_new;
-			fl = true;
-		}
-	}while(fl);
 }
 
 

@@ -426,3 +426,20 @@ string StateSpecies::data_sources_desc(const ObsData &ob, const ObsData &ob2) co
 	if(ob.so == ob2.so) return "multiple entries in data source '"+so+"'";
 	return "data sources '"+so+"' and '"+so2+"'";
 }
+
+/// This is used for diagnostic purporses
+void StateSpecies::print_likelihood_markov()
+{
+	auto sum = 0.0, dt_sum = 0.0, sum2 = 0.0;
+	for(auto e = 0u; e < sp.markov_eqn.size()-1; e++){
+		//auto &me = sp.markov_eqn[e];
+		auto &me_vari = markov_eqn_vari[e];
+		auto &Li_mark = Li_markov[e];
+		sum += me_vari.div[0].value;
+		auto dt = me_vari.div[0].indfac_int;
+		dt_sum += dt;
+		sum2 += Li_mark[0];
+	}
+	cout << sum << "sum" << endl;
+	emsg("Print likelihood");
+}

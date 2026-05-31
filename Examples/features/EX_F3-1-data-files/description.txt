@@ -1,4 +1,4 @@
-﻿# Example 3.1: Reparameterisation
+# Example 3.1: Parameter reparameterisation by equation
 
 ## Objective
 - Here we introduce a farm-based model with reparameterisation.

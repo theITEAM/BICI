@@ -244,6 +244,16 @@ void Input::clone_class(unsigned int p_to, unsigned int p_from, unsigned int cl_
 }
 
 
+/// Adds op_store
+void Input::add_op_store(Define &def, unsigned int eq_ref)
+{			
+	auto &eqn = model.eqn[eq_ref];
+
+	def.op_store.push_back(eqn.get_define_op_store());
+	if(eqn.warn != "") alert_import("Problem with equation '"+eqn.te_raw+"': "+eqn.warn);
+}
+
+		
 /// Creates equations based on EquationInfo specifications
 void Input::create_equations(unsigned int per_start, unsigned int per_end)
 {
@@ -251,12 +261,25 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 
 	Hash hash_eqn;
 
+	for(auto &def : model.define){                       // Derived quantities
+		if(def.eqn_on){
+			model.add_eq_ref(def.eqn,hash_eqn);
+			add_op_store(def,def.eqn.eq_ref);
+		}
+		else{
+			for(auto &vl : def.value_list){
+				model.add_eq_ref(vl,hash_eqn);
+				add_op_store(def,vl.eq_ref);
+			}
+		}
+	}
+	
 	for(auto &der : model.derive){                       // Derived quantities
 		for(auto &eq : der.eq){
 			model.add_eq_ref(eq,hash_eqn);
 		}
 	}
-
+	
 	auto dper = double(per_end-per_start)/model.species.size();
 	for(auto p = 0u; p < model.species.size(); p++){    // Transitions
 		auto &sp = model.species[p];  
@@ -295,6 +318,20 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 		}
 	}
 
+	for(auto &sp : model.species){                       // Parameters associated with interventions
+		for(auto &inter : sp.intervention){
+			switch(inter.type){
+			case TEST_AND_CULL_INT: 
+				model.add_eq_ref(inter.Sp,hash_eqn);
+				for(auto &sec : inter.Se_comp){
+					if(sec.on) model.add_eq_ref(sec.Se,hash_eqn);
+				}
+				break;
+				
+			}
+		}
+	}
+	
 	for(auto &sp : model.species){                       // Observation model
 		for(auto &pf : sp.pop_filter){                     // Population filter   
 			pf.time_vari = false;
@@ -3213,6 +3250,26 @@ void Input::setup_obs_trans()
 			}
 		}
 	}
+	
+	if(false){
+		for(auto &sp : model.species){
+			for(auto i = 0u; i < sp.obs_trans.size(); i++){
+				auto &ot = sp.obs_trans[i];
+				cout << ot.ti_min << " "<< ot.ti_max << "min max" << endl;
+			}
+			
+			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+				for(auto ti = 0u; ti < sp.T; ti++){
+					for(auto ref : sp.obs_trans_eqn_ref[tr][ti]){
+						auto eq = sp.obs_trans_eqn[ref];
+						cout << model.eqn[eq].te_raw << " na" << endl;					
+					}
+				}
+			}	
+		}
+			
+		emsg("obs_trans_is_one");
+	}
 }
 
 
@@ -4395,8 +4452,9 @@ void Input::set_ppc_resample()
 	
 	auto spl = split(st,',');
 	for(auto i = 0u; i < spl.size(); i++){
-		auto name = remove_escape_char(spl[i]);		
-		
+		//auto name = remove_escape_char(spl[i]);		
+		auto name = spl[i];
+			
 		auto spl = split(name,'_');
 		if(spl.size() > 1) name = spl[0];
 		
@@ -5115,6 +5173,8 @@ void Input::load_state_samples(unsigned int ch, string file, bool enc)
 	auto &flines = files[i].lines;	
 	
 	if(enc) decode_lines(flines);
+
+	remove_escape_char_lines(flines);
 
 	auto li = 0u;
 	

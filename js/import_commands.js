@@ -6,6 +6,8 @@ function import_data_table_command(cname)
 {
 	let siminf = "inf";
 
+	let cname_st = cname;
+	
 	switch(cname){
 	case "add-pop-sim": cname = "add-pop-inf"; siminf = "sim"; break;
 	case "remove-pop-sim": cname = "remove-pop-inf"; siminf = "sim"; break;	
@@ -19,6 +21,9 @@ function import_data_table_command(cname)
 	case "remove-ind-post-sim": cname = "remove-ind-inf"; siminf = "ppc"; break;
 	case "move-ind-post-sim": cname = "move-ind-inf"; siminf = "ppc"; break;
 	case "test-and-cull-sim": siminf = "sim"; break;	
+	case "set-ind-effect-sim": siminf = "sim"; break;	
+	case "set-ind-effect-inf": cname = "set-ind-effect-sim"; siminf = "inf"; break;
+	case "set-ind-effect-post-sim": cname = "set-ind-effect-sim"; siminf = "ppc"; break;
 	}
 	
 	let i = find(convert,"command",cname);
@@ -29,7 +34,7 @@ function import_data_table_command(cname)
 	
 	let type = convert[i].type;
 		
-	let tab, cols, cols_split;
+	let tab;
 	if(cname != "test-and-cull-sim"){
 		let file = get_tag_value("file"); if(file == "") cannot_find_tag(); 
 
@@ -37,11 +42,7 @@ function import_data_table_command(cname)
 	
 		tab = load_table(fi.te,true,fi.sep,fi.name);
 		if(typeof tab == 'string') alert_import(tab);
-	
-		cols = get_tag_value("cols");
-		cols_split = cols.split(",");
 	}
-	
 	
 	let p = imp.p;
 	if(p == undefined){
@@ -107,7 +108,7 @@ function import_data_table_command(cname)
 		}
 		break;
 		
-	case "Ind. Eff.":
+	case "Ind. Eff.": case "Set IE":
 		{
 			let ie = get_tag_value("ie"); if(ie == "") cannot_find_tag();
 		
@@ -202,7 +203,7 @@ function import_data_table_command(cname)
 			let Sp = get_tag_value("Sp");
 			if(Sp == "") cannot_find_tag();
 			
-			output_error(is_eqn(Sp,"Sp",{zero_one_range:true}));
+			output_error(is_eqn(Sp,"Sp","Sp"));
 			
 			let pos = get_tag_value("pos");
 			if(pos == "") pos = "1";
@@ -213,26 +214,6 @@ function import_data_table_command(cname)
 			if(pos == neg){
 				alert_import("'pos' and 'neg' cannot both have the same value");
 			}
-			
-			
-			/*
-			let cull = {check:false, time_gap:""};
-			let cull_str = get_tag_value("cull").toLowerCase();
-			if(cull_str != ""){
-				if(cull_str == "true"){
-					cull.check = true;
-					let time_gap = get_tag_value("time-gap");
-					if(time_gap == "") cannot_find_tag();
-					is_positive(time_gap,"time-gap");
-					cull.time_gap = time_gap;
-				}
-				else{
-					if(cull_str != "false"){
-						alert_import("'cull' must be 'true' or 'false'");
-					}
-				}
-			}
-			*/
 			
 			let comp = get_tag_value("comp");
 			if(comp == "") cannot_find_tag();
@@ -283,21 +264,24 @@ function import_data_table_command(cname)
 			
 			let cb = {name:claa.name, value:[]};
 			
+			let Se_ty = "Se", Sp_ty = "Sp";
+			if(type == "Test-and-cull"){ Se_ty = "SeTC", Sp_ty = "SpTC";}
+			
 			for(let c = 0; c < claa.ncomp; c++){
 				let name = claa.comp[c].name;
 				let k = 0; while(k < comp_sen.length && comp_sen[k].co != name) k++;
 				
 				if(k < comp_sen.length){
-					let Se_eqn = create_equation(comp_sen[k].Se,"Se");
+					let Se_eqn = create_equation(comp_sen[k].Se,Se_ty);
 					cb.value[c] = {comp_name_store:name, check:true, Se_eqn:Se_eqn};
 				}
 				else{
-					let Se_eqn = create_equation("1","Se");
+					let Se_eqn = create_equation("1",Se_ty);
 					cb.value[c] = {comp_name_store:name, check:false, Se_eqn:Se_eqn};
 				}
 			}
 	
-			let Sp_eqn = create_equation(Sp,"Sp");
+			let Sp_eqn = create_equation(Sp,Sp_ty);
 			
 			spec = {cl_drop:{te:claa.name}, Sp_eqn:Sp_eqn, pos_result:pos, neg_result:neg, check_box:cb};
 		}
@@ -358,6 +342,12 @@ function import_data_table_command(cname)
 		break;
 	}
 
+	if(siminf == "ppc"){
+		if(model.inf_res.plot_filter == undefined){
+			alert_import("The command '"+cname_st+"' cannot be loaded because there is no inference information");
+		}
+	}
+	
 	start_data_source(type,spec,info);
 		
 	let so = edit_source;
@@ -434,25 +424,10 @@ function import_data_table_command(cname)
 			col_name.push(so.load_col[c].heading);
 		}
 		
-		if(cols != ""){
-			let spl = cols.split(",");
+		let cols_head = get_cols_head(col_name);
 
-			if(spl.length != col_name.length){
-				alert_import("'cols' does not have the correct number of entries (expected something in the order '"+stringify(col_name)+"')"); 
-			}
-			
-			for(let i = 0; i < spl.length; i++){
-				for(let j = 0; j < col_name.length; j++){
-					if(spl[i] == col_name[j] && i != j){
-						alert_import("'cols' does not have the correct order (expected something in the order '"+stringify(col_name)+"')"); 
-					}
-				}
-			}
-			
-			col_name = spl;
-		}
+		so.table = get_subtable(tab,col_name,cols_head);	
 
-		so.table = get_subtable(tab,col_name);	
 		if(so.table.error != "") alert_import("File problem – "+so.table.error);
 
 		convert_date_time(so);
@@ -471,7 +446,7 @@ function import_data_table_command(cname)
 			init_pop_convert_to_graphical(so,true);
 
 			if(so.spec.radio_dist.value == "Dist" && so.spec.radio2.value == "All"){
-				so.pop_dist = unset_prior("pop_prior");
+				so.pop_dist = unset_prior();
 				
 				let prior = get_tag_value("prior").toLowerCase(); 
 				let pri = convert_text_to_prior(prior,prior_pos);
@@ -485,7 +460,7 @@ function import_data_table_command(cname)
 		break;
 	} 
 	
-	data_source_check_error("import",so)
+	//data_source_check_error("import",so)
 
 	edit_source.info.imp = true;
 	data_source("Add",edit_source);
@@ -589,7 +564,7 @@ function classification_command(loop)
 			alert_import("Index '"+index+"' must be from the lowercase alphabet");
 		}
 		
-		let op = {};
+		let op = {imp:true};
 		
 		let coord = get_tag_value("coord");
 		if(coord != ""){
@@ -996,7 +971,7 @@ function description_command()
 	let te = get_tag_value("text"); if(te == "") cannot_find_tag();
 	te = text_from_file(te);
 	
-	model.description.te = te;
+	model.description.te = remove_escape_char(te);
 }
 	
 	
@@ -1371,7 +1346,7 @@ function map_command()
 	let p = imp.p;
 	let cl = imp.cl;
 	
-	let file = get_tag_value("file"); if(filev == "") cannot_find_tag();
+	let file = get_tag_value("file"); if(file == "") cannot_find_tag();
 	
 	let fi = get_fi(file);
 	
@@ -1404,34 +1379,58 @@ function param_mult_command(line)
 /// Sets the value for a parameter in the model
 function define_command(line)
 {
+	let dpt = line.pt/100;
+	line.pt = 0;
+	let load_dpt = 0*dpt;
+		
 	let full_name = get_tag_value("name"); if(full_name == "") cannot_find_tag();
 	let value = get_tag_value("value"); if(value == "") cannot_find_tag();
 	
 	let pp = get_param_prop(full_name);
 
-	let par = create_new_param(pp,"normal");
+	let par = create_new_param(pp,"define");
 	
 	par.import_line = imp.line;
 	par_set_default(par);
 	
-	if(par.dep.length > 0){
+	if(par.ndep_cont > 0){
 		par.list = par_find_list(par);
 	}
+
+	par.define_eqn = "";
 	
-	par.define_eqn = value;
-	par.variety = "define";
-	par.type = "define_parameter";
+	if(is_file(value) == false){
+		par.define_eqn = value;
+		par.define_eqn_on = true;
+	}
+	else{		
+		par.value = param_blank(par);
 	
+		let desc = "For 'value'";
+	
+		load_param_value(par,par.value,"Value",value,desc,load_dpt);
+		load_dpt = 0;
+		
+		let err = check_param_value("Set Param",par,par.value);
+		if(typeof err == 'string') alert_import(desc+": "+err);
+	
+		par.set = true;
+	}
+	
+	add_proc_time(100*dpt);
+		
 	par.full_name = param_name(par);
 
-	get_reparam_param_list(par);
+	get_defrep_param_list(par);
 	
 	get_prior_param_list(par);
 	
 	add_param(par);
 	
-	let res = check_reparam(value,model.param.length-1);
-	if(res.err) alert_import(res.msg); 
+	if(par.define_eqn_on){
+		let res = define_reparam_eqn_check(value,model.param.length-1);
+		if(res.err) alert_import(res.msg);
+	}		
 }
 
 
@@ -1512,7 +1511,7 @@ function param_command2(full_name,line,op)
 		}
 	}
 
-	if(par.dep.length > 0){
+	if(par.ndep_cont > 0){
 		par.list = par_find_list(par);
 	}
 	
@@ -1583,36 +1582,23 @@ function param_command2(full_name,line,op)
 	
 	let warn = check_reserved_name(par.name);
 	if(warn != "") alert_import(warn);
-		
-	/*
-	if(par.dist_mat){
-		alert_import("The distance matrix '"+dist_matrix_name+"' cannot be set"); 
-	}
-	
-	if(par.den_vec){
-		if(relative_den(par.name)) alert_import("The relative density vector '"+rdensity_name+"' cannot be set"); 
-		else alert_import("The density vector '"+density_name+"' cannot be set"); 
-	}
-	
-	if(par.iden_mat){
-		alert_import("The identity matrix '"+iden_matrix_name+"' cannot be set"); 
-	}
-	*/
-	
+
 	par.reparam_eqn = "";
-	par.reparam_eqn_on = false;
+	par.reparam_eqn_on = false; if(par.ndep_cont == 0) par.reparam_eqn_on = true;
 
 	par.define_eqn = "";
+	par.define_eqn_on = false; if(par.ndep_cont == 0) par.define_eqn_on = true;
 
-	if(par.dep.length == 0){
+	if(par.ndep_cont == 0){
 		if(value != ""){
 			par.value = value;
 			par.variety = "normal";
 		}
 		
 		if(reparam != ""){
-			par.value = reparam;
+			par.reparam_eqn = reparam;
 			par.variety = "reparam";
+			par.reparam_eqn_on = true;
 		}
 		
 		if(cons != ""){
@@ -1643,7 +1629,7 @@ function param_command2(full_name,line,op)
 			if(reparam != "" && is_file(valu) == false){
 				if(par.time_dep){
 					if(par.spline.spline_radio.value != "Square"){
-						alert_import("A square spline must be used for time-varying reparameterised parameter '"+par.full_name+"'."); 
+						alert_import("A square spline must be used for time-varying reparameterised parameter "+par.full_name+"."); 
 					}
 				}
 				par.reparam_eqn = reparam;
@@ -1686,7 +1672,7 @@ function param_command2(full_name,line,op)
 		par.prior_split_check = {check:true};
 		par.prior_split_set = true;
 		par.prior_split = param_blank(par);
-		if(par.dep.length == 0){
+		if(par.ndep_cont == 0){
 			alert_import("'prior-split' can only be used if the parameter has a dependency.");  
 		}
 	
@@ -1720,7 +1706,7 @@ function param_command2(full_name,line,op)
 		par.prior_split = param_blank(par);
 		
 		par.prior_split_check = {check:true};
-		if(par.dep.length == 0){
+		if(par.ndep_cont == 0){
 			alert_import("'dist-split' can only be used if the parameter has a dependency.");  
 		}
 		
@@ -1732,7 +1718,7 @@ function param_command2(full_name,line,op)
 	if(prior_const != ""){
 		par.prior_const_on = true;
 		
-		if(par.dep.length == 0){
+		if(par.ndep_cont == 0){
 			par.prior_const = prior_const;
 		}
 		else{
@@ -1762,7 +1748,7 @@ function param_command2(full_name,line,op)
 
 	add_proc_time(20*dpt);
 
-	get_reparam_param_list(par);
+	get_defrep_param_list(par);
 	
 	get_prior_param_list(par);
 	
@@ -2368,8 +2354,11 @@ function fixed_effect_command()
 		let tab = load_table(fi.te,true,fi.sep,fi.name);		
 		if(typeof tab == 'string') alert_import(tab);
 		
-		let col_name = ["ID","value"]; 
-		let subtab = get_subtable(tab,col_name);
+		let col_name = ["ID","Value"]; 
+		
+		let cols_head = get_cols_head(col_name);
+
+		let subtab = get_subtable(tab,col_name,cols_head);
 		if(subtab.error != "") alert_import(subtab.error);
 		
 		for(let r = 0; r < subtab.nrow; r++){
@@ -2828,7 +2817,8 @@ function trans_diag_command(line)
 /// Determines if importing from a file
 function loading_from_file()
 {
-	if(input.type == "Load File" || input.type == "Load Example" || input.type == "Import output"){
+	switch(input.type){
+	case "Import2": case "Load File": case "Load Example": case "Import output":
 		return true;
 	}
 	

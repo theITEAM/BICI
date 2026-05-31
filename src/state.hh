@@ -84,6 +84,7 @@ class State                                // Stores information about the state
 		void set_ie_from_samp(const IEstore &ie_store);
 		void set_ie_from_data();
 		void ie_finalise();
+		double calculate(const EquationInfo &ei, unsigned int ti) const;
 	
 	private:
 		vector <double> calculate_df(const DerFunc &df) const;
@@ -209,7 +210,8 @@ class State                                // Stores information about the state
 		void add_alg_warn(string te);
 		void check_precalc_dif(string ref);
 		void check_markov_div_value(unsigned int p, string ref);
-		
+		void scan_param();
+				
 	private:
 		void check_dependent_param(string ref);
 		void check_ref(unsigned int p, string ref);

@@ -53,7 +53,7 @@ function create_bscript(save_type,map_store)
 
 	percent(40);
 
-	check_data_valid_all(save_type);
+	check_data_valid_all(save_type,"warn");
 	
 	check_data_time(save_type);
 	
@@ -96,7 +96,7 @@ function generate_text_from_bscript(bscript,file_list,one_file)
 	
 	let te = "";
 	
-	let species_list=[];
+	let species_list=[]; 
 	let chain_list=[];
 	for(let i = 0; i < bscript.length; i++){ // Works out all the species 
 		let com = bscript[i];
@@ -150,6 +150,13 @@ function generate_text_from_bscript(bscript,file_list,one_file)
 		if(com.type == "comment") te += com.te;
 		else{
 			te += com.type;
+			
+			let enc = false;
+			for(let j = 0; j < com.tags.length; j++){
+				let ta = com.tags[j];
+				if(ta.name == "compress" && ta.value == "true") enc = true;
+			}
+	
 			for(let j = 0; j < com.tags.length; j++){
 				let ta = com.tags[j];
 				
@@ -159,9 +166,8 @@ function generate_text_from_bscript(bscript,file_list,one_file)
 					if(val.name == "inline") val = val.te;
 					else error("problem gen bscript");
 				}
-
+			
 				let is_file = false;
-				
 				switch(is_tag_name_file(ta.name)){
 				case "yes": 
 					is_file = true; 
@@ -173,6 +179,8 @@ function generate_text_from_bscript(bscript,file_list,one_file)
 				}
 				
 				if(is_file){
+					if(com.type != "description" && enc == false) val = add_escape_char(val);
+
 					if(one_file || begin_str(com.type,"warning")){
 						te += '"[['+endl+val+']]"';
 					}
@@ -180,6 +188,13 @@ function generate_text_from_bscript(bscript,file_list,one_file)
 						let fi_name = com.type;
 						let end = '.csv';
 						switch(com.type){
+						case "set-ind-effect-sim":
+							{
+								let ie = find_tag(com,"ie");	
+								fi_name = fi_name = ie+"_"+fi_name;
+							}
+							break;
+							
 						case "param-sim": 
 							fi_name = sampledir_rel_sim+"param"+chain_num(com,multi_chain);
 							break;
@@ -214,7 +229,11 @@ function generate_text_from_bscript(bscript,file_list,one_file)
 							break;
 						
 						case "param-stats-inf":
-							fi_name = sampledir_rel_inf+"param-stats"+chain_num(com,multi_chain);
+							fi_name = sampledir_rel_inf+"param-stats";
+							break;
+							
+						case "pred-acc-inf":
+							fi_name = sampledir_rel_inf+"pred-acc";
 							break;
 							
 						case "generation-inf":
@@ -411,10 +430,12 @@ function create_output_species(p,save_type,map_store,bscript)
 	create_output_sim_inf_source(p,"inf",bscript);
 	if(save_type == "inf") output_check("inf");	
 	
+	/*
 	if(model.inf_res.on == true){
 		create_output_sim_inf_source(p,"ppc",bscript);
 		if(save_type == "ppc") output_check("ppc");	
 	}
+	*/
 }
 
 
@@ -667,6 +688,8 @@ function create_output_compartments(p,map_store,bscript)
 					{
 						let tags=[];
 						
+						add_tag("text",anno.te,tags); 
+							
 						let st = "";
 						for(let k = 0; k < anno.comps.length; k++){
 							if(k != 0) st += ",";
@@ -875,7 +898,7 @@ function create_output_param(save_type,bscript)
 	
 	for(let th = 0; th < model.param.length; th++){
 		let par = model.param[th];
-		if(par.variety == "define") output_define(par,bscript)
+		if(par.variety == "define") output_define(par,save_type,bscript)
 	}
 	
 	for(let th = 0; th < model.param.length; th++){
@@ -888,13 +911,34 @@ function create_output_param(save_type,bscript)
 
 
 /// Outputs any parameter definitions
-function output_define(par,bscript)
+function output_define(par,save_type,bscript)
 {
 	if(par.variety != "define") error("Equation should be define");
 	
 	let tags=[];
-	add_tag("name",remove_eq_quote(par.full_name),tags);
-	add_tag("value",par.define_eqn.trim(),tags);
+	let nam = remove_eq_quote(par.full_name);
+	
+	add_tag("name",nam,tags);
+	
+	if(par.define_eqn_on){
+		let te = par.define_eqn.trim();
+		if(te == ""){
+			let na = par.full_name; if(par.time_dep) na += "(t)";
+			add_warning({mess:"Missing equation definition", mess2:"The definition for "+na+" must be set.", warn_type:"DefEqnValue", name:par.name});
+		}
+		
+		add_tag("value",te,tags);
+	}
+	else{
+		let value = output_value_table(par,par.value,"Value","value",save_type);
+		
+		if(value == undefined){
+			let na = par.full_name; 
+			add_warning({mess:"Missing equation definition", mess2:"The definition for "+na+" must be set.", warn_type:"DefValue", name:par.name});
+		}
+		
+		add_tag("value",value,tags);
+	}
 
 	add_bscript("define",tags,bscript);
 }
@@ -907,11 +951,11 @@ function output_param(par,save_type,bscript)
 
 	let tags=[];
 	
-	if(par.type != "derive_param"){		
+	if(par.derive != true){		
 		let num_warn = model.warn.length;
 	
 		let com = "param";
-		if(par.type == "param factor"){
+		if(par.param_fac){
 			let pfac = model.param_factor;
 		
 			let k = 0, kmax = pfac.length; 
@@ -937,18 +981,33 @@ function output_param(par,save_type,bscript)
 				if(par.reparam_eqn.trim() != ""){
 					add_tag("reparam",par.reparam_eqn,tags);
 				}
+				else{
+					add_warning({mess:"Missing reparameterisation", mess2:"The reparameterisation for parameter "+par.full_name+" must be set.", warn_type:"RepEqValue", name:par.name});
+				}
 				display = true;
 			}
 			else{
-				if((par.dep.length == 0 && par.value == set_str) || (par.set == false && !(par.variety == "dist" && par.sim_sample.check == true))){
+				if((par.ndep_cont == 0 && par.value == set_str) || (par.set == false && !(par.variety == "dist" && par.sim_sample.check == true))){
 					if(save_type == "sim"){
-						if(find_in(sim_param_not_needed,par.type) == undefined){
-							add_warning({mess:"A value for parameter "+par.full_name+" must be set.", mess2:"Parameter values must be set before simulation can be perfomed", warn_type:"MissingSimValue", name:par.name});
+						if(param_needed(par,"sim")){
+							add_warning({mess:"A value for parameter "+par.full_name+" must be set.", mess2:"Parameter values must be set before simulation can be perfomed", warn_type:"SimValue", name:par.name});
+							return;
 						}
 					}
 					
 					if(save_type == "ppc"){
-						add_warning({mess:"A value for parameter multiplier "+par.full_name+" must be set.", mess2:"Parameter multiplier values must be set before posterior simulation can be perfomed", warn_type:"MissingParamMultValue", name:par.name});
+						add_warning({mess:"A value for parameter multiplier "+par.full_name+" must be set.", mess2:"Parameter multiplier values must be set before posterior simulation can be perfomed", warn_type:"ParamMultValue", name:par.name});
+						return;
+					}
+				
+					switch(par.variety){
+					case "const":
+						add_warning({mess:"Missing constant value", mess2:"The constant parameter "+par.full_name+" must be set.", warn_type:"ConstValue", name:par.name});
+						break;
+					
+					case "reparam":
+						add_warning({mess:"Missing reparameterisation", mess2:"The reparameterisation for parameter "+par.full_name+" must be set.", warn_type:"RepValue", name:par.name});
+						break;
 					}
 				}
 				else{
@@ -965,7 +1024,7 @@ function output_param(par,save_type,bscript)
 						}
 									
 						let value;
-						if(par.dep.length > 0){
+						if(par.ndep_cont > 0){
 							value = output_value_table(par,par.value,"Value","value",save_type);
 						}
 						else{
@@ -1045,6 +1104,12 @@ function output_param(par,save_type,bscript)
 		
 			if(par.factor_weight_on.check == true){
 				let file = output_value_table(par,par.factor_weight,"Value","value",save_type);
+				
+				if(file == undefined){
+					add_warning({mess:"Missing weigth information", mess2:"The weight for parameter "+par.full_name+" must be set.", warn_type:"WeightValue", name:par.name});
+					return;
+				}
+				
 				add_tag("factor-weight",file,tags);
 			}
 		}
@@ -1075,22 +1140,22 @@ function output_value_table(par,value,head_col,key,save_type)
 		let wt, ty;
 		switch(head_col){
 		case "Dist": 
-			wt = "MissingDistValue"; 
+			wt = "DistValue"; 
 			if(save_type != "sim" && save_type != "inf") return; 	
 			break;
 			
 		case "Prior":
-			wt = "MissingPriorSplitValue"; 
+			wt = "PriorSplitValue"; 
 			if(save_type != "inf") return; 	
 			break;
 			
 		case "Value":
-			wt = "MissingSimValue";
+			wt = "SimValue";
 			if(save_type != "sim" && save_type != "inf") return; 	
 			break;
 			
 		case "ValueInf":
-			wt = "MissingPriorConst";
+			wt = "PriorConst";
 			if(save_type != "sim" && save_type != "inf") return; 	
 			break;
 		}
@@ -1123,19 +1188,19 @@ function output_value_table(par,value,head_col,key,save_type)
 		}
 	}
 	else{
-		for(let d = 0; d < par.dep.length; d++){	
+		for(let d = 0; d < par.ndep_cont; d++){	
 			data += '"'+par.dep[d]+'",';
 		}
 		data += '"'+head_col+'"'+endl;
 
-		let co_list = generate_co_list(par.list);
+		let co_list = generate_co_list(par.list,par.ndep_cont);
 		for(let i = 0; i < co_list.length; i++){
 			let comb = co_list[i];
 			let el = get_element(value,comb.index);
 			if(el == undefined){ param_undefined(par,comb.index); return;}
 			
 			if(el != 0){	
-				for(let d = 0; d < par.dep.length; d++){
+				for(let d = 0; d < par.ndep_cont; d++){
 					data += '"'+list[d][comb.index[d]]+'",';
 				}
 				
@@ -1156,7 +1221,7 @@ function get_op_val(el,head_col,par)
 {
 	if(head_col == "Dist" || head_col == "Prior"){
 		if(el.type.te == select_str){
-			add_warning({mess:"Missing "+key, mess2:"The "+key+" for "+par.full_name+" must be set.", warn_type:"MissingPriorSplitValue", name:par.name});
+			add_warning({mess:"Missing "+key, mess2:"The "+key+" for "+par.full_name+" must be set.", warn_type:"PriorSplitValue", name:par.name});
 			return "";
 		}
 	
@@ -1171,13 +1236,13 @@ function get_op_val(el,head_col,par)
 function param_undefined(par,index)
 {
 	let me = "A value for parameter "+par.full_name+" is undefined (";
-	for(let j = 0; j < par.dep.length; j++){
+	for(let j = 0; j < par.ndep_cont; j++){
 		if(j != 0) me += ",";
-		me += list[j][index[j]];
+		me += par.list[j][index[j]];
 	}
 	me += ").";
 				
-	add_warning({mess:"Parameter value is undefined", mess2:me, warn_type:"ParamValueProblem", par:par});
+	add_warning({mess:"Parameter value is undefined", mess2:me, warn_type:"ParamValueProblem", par:par, index:index});
 }
 
 
@@ -1190,37 +1255,56 @@ function output_add_prior_distribution(save_type,par,variety,tags)
 	case "prior": key = "prior"; break;
 	}
 		
-	if(par.dep.length > 0 && par.prior_split_check.check == true && !par.factor){  /// Prior split up
+	if(par.ndep_cont > 0 && par.prior_split_check.check == true && !par.factor){  /// Prior split up
 		let warn_type;
 		switch(variety){
-		case "dist": key = "distribution"; warn_type = "MissingDistValue"; break;
-		case "prior": key = "prior"; warn_type = "MissingPriorValue";  break;
+		case "dist": key = "distribution"; warn_type = "DistSplitValue"; break;
+		case "prior": key = "prior"; warn_type = "PriorSplitValue";  break;
 		default: error("option prob"); break;
 		}
 			
-		if(par.prior_split_set == false){
+		if(variety == "dist" && par.prior_split_set == false){
 			add_warning({mess:"Missing "+key+" distribution information", mess2:"The "+key+" for parameter "+par.full_name+" must be set.", warn_type:warn_type, name:par.name});
+			return "";
 		}
-		else{
-			let ta, head_col;
-			switch(variety){
-			case "dist": ta = "dist-split"; head_col = "Dist"; break;
-			case "prior": ta = "prior-split"; head_col = "Prior"; break;
-			default: error("option prob"); break;
+		
+		let ta, head_col;
+		switch(variety){
+		case "dist": ta = "dist-split"; head_col = "Dist"; break;
+		case "prior": ta = "prior-split"; head_col = "Prior"; break;
+		default: error("option prob"); break;
+		}
+		
+		let file = output_value_table(par,par.prior_split,head_col,key,save_type);
+		
+		if(file == undefined){
+			if(variety == "dist"){
+				add_warning({mess:"Missing "+key+" information", mess2:"The "+key+" for parameter "+par.full_name+" must be set.", warn_type:warn_type, name:par.name});
 			}
-			
-			let file = output_value_table(par,par.prior_split,head_col,key,save_type);
-			if(file == undefined) return "";
-			
-			add_tag(ta,file,tags);
+			return "";
 		}
+		
+		add_tag(ta,file,tags);
 	}
 	else{
+		let warn_type;
+		switch(variety){
+		case "dist": key = "distribution"; warn_type = "DistValue"; break;
+		case "prior": key = "prior"; warn_type = "PriorValue";  break;
+		default: error("option prob"); break;
+		}
+		
 		let pri = par.prior;
 		
 		let prior_string = get_prior_output(save_type,par.prior,variety,par);
-		if(prior_string == "") return "";
-	
+		
+		if(prior_string == ""){
+			if(par.variety == "dist"){
+				add_warning({mess:"Missing "+key+" information", mess2:"The "+key+" for parameter "+par.full_name+" must be set.", warn_type:warn_type, name:par.name});
+			}
+			return "";
+		}
+		
 		let ta;
 		switch(variety){ 
 		case "dist": ta = "dist"; break;
@@ -1239,10 +1323,10 @@ function output_add_prior_const(save_type,par,tags)
 	let te = ' prior-const=';
 		
 	let value;
-	if(par.dep.length > 0){
+	if(par.ndep_cont > 0){
 		let err = check_param_value("Set Param",par,par.prior_const);
 		if(err){
-			let wt = "MissingSimValue"; if(par.variety == "reparam") wt = "ReparamValue";
+			let wt = "SimValue"; if(par.variety == "reparam") wt = "RepValue";
 			
 			add_warning({mess:"Problem with "+par.full_name+" value", mess2:err, warn_type:wt, name:par.name});
 			return;
@@ -1264,7 +1348,7 @@ function get_prior_output(save_type,pri,variety,par)
 	let tex = pri.type.te;
 	if(tex == select_str){
 		if(save_type == "inf"){	
-			add_warning({mess:"Missing "+variety, mess2:"The "+variety+" for parameter "+par.full_name+" must be set.", warn_type:"MissingPriorValue", name:par.name});
+			add_warning({mess:"Missing "+variety, mess2:"The "+variety+" for parameter "+par.full_name+" must be set.", warn_type:"PriorValue", name:par.name});
 		}
 		return "";
 	}
@@ -1275,46 +1359,11 @@ function get_prior_output(save_type,pri,variety,par)
 		let pri = convert_text_to_prior(st,par.pri_pos,dist);
 	
 		if(pri.err == true){
-			add_warning({mess:"Error for "+variety, mess2:"The "+variety+" for parameter "+par.full_name+" has an error: "+pri.msg, warn_type:"ErrorPriorValue", name:par.name});
+			add_warning({mess:"Error for "+variety, mess2:"The "+variety+" for parameter "+par.full_name+" has an error: "+pri.msg, warn_type:"PriorValue", name:par.name});
 		}
 	}
 	
 	return st;
-}
-
-
-/// Checks that an output for a 
-function check_prior_val(val,variety,par,op)
-{
-	let key, warn_type, warn_text;
-
-	switch(variety){
-	case "prior":
-		key = "prior"; 
-		warn_type = "MissingPriorValue"; 
-	
-		if(isNaN(val)) warn_text = "Not a value";
-		else{
-			if(op.positive == true){
-				if(Number(val) <= 0) warn_text = "Must be positive2";
-			}
-		}
-		break;
-
-	case "dist":
-		{
-			key = "distribution"; warn_type = "MissingDistValue"; 
-			let res = is_eqn(val,"min",op);
-			if(res.err == true) warn_text = "'"+val+"' is not valid.";
-		}
-		break;
-		
-	default: error("not op"); break;
-	}
-
-	if(warn_text != undefined){
-		add_warning({mess:"Error in "+key+" for "+par.full_name, mess2:warn_text, warn_type:warn_type, name:par.name});
-	}
 }
 
 	
@@ -1483,7 +1532,7 @@ function create_output_fix_eff(p,save_type,bscript)
 			}
 		}
 		else{
-			let data = 'ID,value'+endl;
+			let data = 'ID,Value'+endl;
 			for(let c = 0; c < vec.ind_list.length; c++){ 
 				data += '"'+vec.ind_list[c]+'",'+vec.X_value[c]+endl;
 			}
@@ -1747,31 +1796,24 @@ function get_ppc_tags(save_type)
 /// Adds information about simulation and inference
 function create_output_sim_inf_source(p,sim_or_inf,bscript)
 {
-	let sp = model.species[p];
-	if(sim_or_inf == "ppc"){
-		if(!model.inf_res.plot_filter) return;
-		sp = model.inf_res.plot_filter.species[p];
-		if(!sp) return;
-	}
+	let sp = get_so_sp(sim_or_inf,p);
+	let source = get_source(sim_or_inf,p);
+	if(source.length == 0) return "";
 	
-	let source, pa;
-	
+	let pa;
 	switch(sim_or_inf){
 	case "sim": 
 		pa = "Simulation"; 
-		source = sp.sim_source; if(source.length == 0) return "";
 		mini_banner("SIMULATION INITIAL CONDITIONS",bscript); 
 		break;
 		
 	case "inf": 
 		pa = "Inference"; 
-		source = sp.inf_source; if(source.length == 0) return "";
 		mini_banner("INFERENCE DATA",bscript); 
 		break;
 		
 	case "ppc": 
 		pa = "Population Mod."; 
-		source = sp.ppc_source; if(source.length == 0) return ""; 
 		mini_banner("MODIFICATION DATA",bscript); 
 		break;
 		
@@ -2026,7 +2068,7 @@ function add_data_table(type,tab,so,p,index,sim_or_inf,bscript)
 	
 	case "Transition": 
 		{
-			let sp = model.species[p];
+			let sp = get_so_sp(so.info.siminf,p);
 		
 			let cl = find(sp.cla,"name",spec.cl_drop.te);
 
@@ -2077,7 +2119,7 @@ function add_data_table(type,tab,so,p,index,sim_or_inf,bscript)
 		
 	case "Pop. Trans.":
 		{
-			let sp = model.species[p];
+			let sp = get_so_sp(so.info.siminf,p);
 		
 			let cl = find(sp.cla,"name",spec.cl_drop.te);
 
@@ -2099,8 +2141,10 @@ function add_data_table(type,tab,so,p,index,sim_or_inf,bscript)
 			
 			let cb = spec.check_box;
 			
-			let pcl = get_p_cl_from_claname(cb.name);
-			let claa = model.species[pcl.p].cla[pcl.cl];
+			let mod = model.get_mod_siminf(so.info.siminf);
+			
+			let pcl = get_p_cl_from_claname(cb.name,mod);
+			let claa = mod.species[pcl.p].cla[pcl.cl];
 			
 			let st = "";
 			for(let i = 0; i < cb.value.length; i++){
@@ -2141,7 +2185,7 @@ function add_data_table(type,tab,so,p,index,sim_or_inf,bscript)
 		}
 		break;
 		
-	case "Ind. Eff.":
+	case "Ind. Eff.": case "Set IE":
 		add_tag("ie",spec.drop.te,tags);
 		break;
 		
@@ -2150,7 +2194,7 @@ function add_data_table(type,tab,so,p,index,sim_or_inf,bscript)
 		
 	case "Population": 
 		{
-			let sp = model.species[p];
+			let sp = get_so_sp(so.info.siminf,p);
 		
 			let filt = output_add_comp_filt(spec,sp,undefined,p,so,index);
 			if(filt != "") add_tag("filter",filt,tags);
@@ -2244,7 +2288,7 @@ function output_add_comp_filt(spec,sp,cl_sel,p,so,index)
 /// Adds the text for 'name' in pop-trans-data
 function output_add_trans_filt(tfilt,p,cl,so,index)
 {
-	let sp = model.species[p];
+	let sp = get_so_sp(so.info.siminf,p);
 	let claa = sp.cla[cl];
 	let tra = claa.tra;	
 	let trz = tfilt.tra;
@@ -2415,35 +2459,25 @@ function output_table_simp_file(head,row)
 /// Checks the model is correctly specified
 function output_check(save_type)
 {
-	// Checks to make sure initial population is set correctly
-	let spec;
-	if(save_type == "ppc"){
-		let pf = model.inf_res.plot_filter;
-		if(pf){
-			spec = pf.species;
-		}
-	}
-	else{
-		spec = model.species;
-	}
+	let mod = model.get_mod_siminf(save_type);
+	if(!mod) return;
 	
-	if(!spec) return;
+	let nsp = get_so_nsp(save_type);
 	
-	for(let p = 0; p < spec.length; p++){
-		let sp = spec[p];
+	for(let p = 0; p < nsp; p++){
+		let sp = get_so_sp(save_type,p);
+		let source = get_source(save_type,p);
 		
-		let source, pa;
+		let pa;
 		
 		switch(save_type){
-		case "sim": pa = "Simulation"; source = sp.sim_source; break;
-		case "inf": pa = "Inference"; source = sp.inf_source; break;
-		case "ppc": pa = "Modification"; source = sp.ppc_source; break;
+		case "sim": pa = "Simulation"; break;
+		case "inf": pa = "Inference"; break;
+		case "ppc": pa = "Modification"; break;
 		default: error("Option not recognised 125"); break;
 		}
 		
 		let ninitpop = 0, ninitpop_fix = 0, naddind = 0, naddpop = 0;
-		//if(so.init_pop_type == INIT_POP_FIXED) ninitpop_fix++; 
-
 		
 		for(let i = 0; i < source.length; i++){
 			let so = source[i];
@@ -2579,7 +2613,7 @@ function remove_command(bscript,com)
 
 
 /// Extracts a particular command type from the 
-function extract_command(bscript,bscript_add,com) // TO DO is this needed?
+function extract_command(bscript,bscript_add,com)
 {
 	let pos = com.split(",");
 	
@@ -2601,7 +2635,7 @@ function create_ppc_file(info,one_file)
 		let bscript_add=[];
 		mini_banner("OUTPUT INFERENCE",bscript_add);
 		
-		extract_command(bscript,bscript_add,"param-inf,state-inf,param-stats-inf,diagnostics-inf,generation-inf,trans-diag-inf,proposal-inf,warning-inf");
+		extract_command(bscript,bscript_add,"param-inf,state-inf,param-stats-inf,pred-acc-inf,diagnostics-inf,generation-inf,trans-diag-inf,proposal-inf,warning-inf");
 		
 		create_output_file(info.save_type,one_file,info.map_store,bscript_add);
 		return;
@@ -2636,14 +2670,14 @@ function create_ppc_file(info,one_file)
 	let pfac_list=[];
 	for(let th = 0; th < model.param.length; th++){
 		let par = model.param[th];
-		if(par.type == "param factor") pfac_list.push(th);
+		if(par.param_fac) pfac_list.push(th);
 	}
 	
 	if(pfac_list.length > 0){
 		mini_banner("PARAMETER MULTIPLIERS",bscript);
 		for(let k = 0; k < pfac_list.length; k++){
 			let par = model.param[pfac_list[k]];
-			if(par.type == "param factor"){
+			if(par.param_fac){
 				output_param(par,"ppc",bscript);
 			}
 		}

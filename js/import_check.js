@@ -21,12 +21,9 @@ function check_initial_pop_error(end)
 		for(let loop = 0; loop < 2; loop++){
 			let sp = model.species[p];
 		
-			let source, type;
-			switch(loop){
-			case 0: source = sp.sim_source; type = "sim"; break;
-			case 1: source = sp.inf_source; type = "inf"; break;
-			}
-			
+			let type = get_siminf(loop);
+			let source = get_source(type,p); 
+		
 			let ninitpop = 0;
 			for(let i = 0; i < source.length; i++){
 				let so = source[i];
@@ -95,14 +92,10 @@ function check_param_complete()
 	
 	for(let th = 0; th < model.param.length; th++){
 		let par = model.param[th];
-		if(flag[th] != true && !is_in_obsmodel(par) && par.type != "derive_param"){
+		if(flag[th] != true && !is_in_obsmodel(par) && par.derive != true){
 			if(!par.dist_mat && !par.iden_mat && !par.den_vec){
 				alert_noline("Parameter "+par.full_name+" is not specified as a 'param'");
 			}
-		}
-	
-		if(par.type == unset_type){
-			alert_noline("Parameter "+par.full_name+" does not have a type")   
 		}
 	}
 }
@@ -184,7 +177,13 @@ function profiling()
 	prr(mem(input)+" input");
 	
 	
-	//mem_split(inf_result,"inf_result");
+	mem_split(inf_result,"inf_result");
+	
+	mem_split(inf_result.bscript,"inf_result->bscript");
+	
+	mem_split(inf_result.sample[0],"inf_result->sample[0]");
+	
+	mem_split(inf_result.sample[0].species[0],"inf_result->sample[0]->species[0]");
 	
 	//mem_split(sim_result,"sim_result");
 	
@@ -204,7 +203,7 @@ function mem(ob)
 	
 	//return roughSizeOfObject(ob);
 	//obj_memory(ob)
-	
+
 	return JSON.stringify(ob).length;	
 }
 
@@ -214,9 +213,18 @@ function mem_split(ob,te)
 {
 	prr("\nSPLIT OBJECT: "+te);
 	prr(ob);
-	for (var key in ob) {
-		prr(key+": "+mem(ob[key])+" "+typeof(ob[key]));
+	let mem_list=[];
+	for (var key in ob){
+		mem_list.push({name:key, mem:mem(ob[key]), type:typeof(ob[key])});
 	}
+	
+	mem_list.sort( function(a, b){ return b.mem-a.mem});
+	
+	for(let j = 0; j < mem_list.length; j++){
+		let ml = mem_list[j];
+		prr(ml.name+": "+ml.mem+" "+ml.type);
+	}
+
 	prr("SPLIT DONE");
 	prr("");
 }
@@ -313,3 +321,19 @@ function check_bscript(pro,map_store,data_file_list)
 	}
 }
 
+
+/// Removes all but one chain
+function leave_only_one_chain(pro)
+{
+	let bnew=[];
+	for(let i = 0; i < pro.bscript.length; i++){
+		let fl = false;
+		let li = pro.bscript[i];
+		for(let j = 0; j < li.tags.length; j++){
+			//if(li.tags[j].name == "chain" && li.tags[j].value != "1") fl = true;
+			if(li.tags[j].name == "chain" && li.tags[j].value != "1" && Number(li.tags[j].value) > 6) fl = true;
+		}
+		if(fl == false) bnew.push(li);
+	}
+	pro.bscript = bnew;
+}

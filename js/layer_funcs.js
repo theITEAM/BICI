@@ -85,11 +85,18 @@ function process_after_load()
 {
 	let al = copy(inter.after_load);
 	if(al.type){
-		if(!lay_exist("LoadingSymbol")){		
+		if(!lay_exist("LoadingSymbol")){	
 			inter.after_load = {};
-			select_param_element(al);
+			select_page_button(al);
 		}
 	}
+}
+
+
+/// Updates the model and then does some action
+function update_do_after(op)
+{
+	start_worker("UpdateModel",op);
 }
 
 
@@ -1021,6 +1028,8 @@ function get_lay(te)
 	for(let l = 0; l < inter.layer.length; l++){
 		if(inter.layer[l].name == te) return inter.layer[l];
 	}
+	
+	print_layer();
 	error("Cannot find layer3 "+te);
 }
 
@@ -1056,7 +1065,6 @@ function add_ref(source)
 	if(source.val2 != undefined) ref += "_"+source.val2;
 	source.ref = ref;
 }
-
 
 
 /// Replots the loading symbol
@@ -1232,8 +1240,17 @@ function copy_back_to_source2(tbs)
 			set_element(inter.edit_param.value,so.pindex,val);
 		}
 		break;
-		
-	case "element_eqn": 
+	
+	case "define_eqn": 
+		{
+			let val = te; 
+			let th = find(model.param,"name",inter.bubble.par_name);
+			if(th == undefined) error("Cannot find th");
+			model.change_param(th,"define_eqn",val);
+		}
+		break;
+	
+	case "define_element_eqn": 
 		{
 			let val = Number(te); if(isNaN(val)) val = te; 
 			set_element(inter.edit_param.value,so.pindex,val);
@@ -1243,24 +1260,18 @@ function copy_back_to_source2(tbs)
 	case "reparam_eqn": 
 		{
 			let val = te; 
-			model.change_param(inter.bubble.th,"value",val);
+			let th = find(model.param,"name",inter.bubble.par_name);
+			if(th == undefined) error("Cannot find th");
+			model.change_param(th,"reparam_eqn",val);
 		}
 		break;
-		
-	case "reparam_equation": 
+	
+	case "reparam_element_eqn": 
 		{
-			let val = te; 
-			model.change_param(inter.bubble.th,"reparam_eqn",val);
+			let val = Number(te); if(isNaN(val)) val = te; 
+			set_element(inter.edit_param.value,so.pindex,val);
 		}
 		break;
-		
-	case "define_eqn": 
-		{
-			let val = te; 
-			model.change_param(inter.bubble.th,"define_eqn",val);
-		}
-		break;
-		
 	case "element_param_const": case "element_weight_const": 
 		{
 			let val = Number(te);
@@ -1385,7 +1396,7 @@ function copy_back_to_source2(tbs)
 	case "prior_max": case "prior_max_covar": case "prior_dist_max": 
 		inter.bubble.prior.value.max_eqn.te = te; 
 		break;
-	case "prior_eta": 
+	case "prior_eta": case "prior_dist_eta": 
 		inter.bubble.prior.value.eta_eqn.te = te; 
 		break;
 	case "prior_S": 
@@ -1576,43 +1587,6 @@ function check_percent(te)
 }
 
 
-/// Checks is an equation is valid
-function check_eqn(te)
-{
-	let eqn = create_equation(te,"test");		
-	if(eqn.warn.length > 0) return eqn.warn[0].te;
-	return "";
-}
-
-
-/// Checks that a string is either a single parameter or value in range 0-1
-function check_param_or_number(te,type)
-{
-	let eqn = create_equation(te,"test");
-	if(eqn.warn.length > 0) return eqn.warn[0].te;
-	
-	if(eqn.ind_eff.length > 0) return "Cannot contain individual effects"; 
-	if(eqn.param.length > 1) return "Can only be constant or contain one parameter"; 
-		
-	if(!isNaN(te)){
-		let val = Number(te);
-			
-		if(type == "gtone"){
-			if(val < 1) warn = "Cannot be less than one."; 
-		}
-		
-		if(type == "zeroone"){
-			if(val < 0 || val > 1) return "Value must be in the range 0 to 1";
-		}
-		
-		if(type == "pos"){
-			if(val <= 0) return "Value must be positive";
-		}
-	}
-	return "";
-}
-
-
 /// Checks that a string is a non-negative integer
 function check_integer(te)
 {
@@ -1663,8 +1637,10 @@ function check_error_textbox2(tbs)
 		
 		let char_lim = 20;
 
-		if(warn == ""){		
-			switch(source.type){ 			
+		if(warn == ""){	
+			let type = source.type;
+
+			switch(type){ 			
 			case "compartment":
 				{
 					let warn_comp = model.check_comp_name(te);
@@ -1865,8 +1841,8 @@ function check_error_textbox2(tbs)
 				break;
 				
 			case "Se": case "Sp":
-				if(sim_options()) warn = check_zeroone(te);
-				else warn = check_param_or_number(te,"zeroone");
+				//if(sim_options()) warn = check_zeroone(te);
+				//else warn = check_param_or_number(te,"zeroone");
 				break;
 			
 			case "time_gap":
@@ -1874,8 +1850,8 @@ function check_error_textbox2(tbs)
 				break;
 			
 			case "mut_rate": case "seq_var":
-				if(sim_options()) warn = check_posnumber(te);
-				else warn = check_param_or_number(te,"pos");
+				//if(sim_options()) warn = check_posnumber(te);
+				//else warn = check_param_or_number(te,"pos");
 				break;
 			
 			case "snp_root": 
@@ -1919,14 +1895,30 @@ function check_error_textbox2(tbs)
 			case "element_param":
 				break;
 
-			case "element_eqn":
-				break;
-			
-			case "define_eqn": case "reparam_eqn": case "reparam_equation":
+			case "define_eqn":
 				{
-					let res = check_reparam(te,inter.bubble.th);
+					let th = find(model.param,"name",inter.bubble.par_name);
+					if(th == undefined) error("Cannot find th");
+					let res = define_reparam_eqn_check(te,th);
 					if(res.err == true) warn = res.msg;
 				}
+				break;
+			
+			case "define_element_eqn":
+				warn = define_reparam_element_check(te,true,inter.edit_param.time_dep);
+				break;
+			
+			case "reparam_eqn": 
+				{
+					let th = find(model.param,"name",inter.bubble.par_name);
+					if(th == undefined) error("Cannot find th");
+					let res = define_reparam_eqn_check(te,th);
+					if(res.err == true) warn = res.msg;
+				}
+				break;
+				
+			case "reparam_element_eqn":
+				warn = define_reparam_element_check(te,false,inter.edit_param.time_dep);
 				break;
 				
 			case "element_param_const": 
@@ -2020,7 +2012,7 @@ function check_error_textbox2(tbs)
 				if(!isNaN(te)){
 					let num = Number(te);
 					if(num < 1) warn = "Cannot be less than one."; 
-					if(num > ETA_MAX) warn = "Cannot be greater than one."; 
+					if(num > ETA_MAX) warn = "Cannot be greater than "+ETA_MAX+"."; 
 				}
 				break;
 				
@@ -2051,18 +2043,13 @@ function check_error_textbox2(tbs)
 				}
 				break;
 				
-			case "prior_dist_min": case "prior_dist_max": case "prior_dist_power": 
-				warn = check_param_or_number(te);			
-				break;
-			
-			case "prior_dist_mean":
-				warn = check_param_or_number(te);			
-				break;
-				
+			case "prior_dist_min": case "prior_dist_max":  // These all checked in equations later
+			case "prior_dist_power": case "prior_dist_mean":
 			case "prior_dist_shape": case "prior_dist_sd": case "prior_dist_cv": 
-				warn = check_param_or_number(te,"pos");		
+			case "prior_dist_alpha": case "prior_dist_beta":
+			case "prior_dist_eta":		
 				break;
-					
+
 			case "knot_times":
 				warn = check_knot_times(te);
 				char_lim = 100000;
@@ -2189,15 +2176,16 @@ function check_error_textbox2(tbs)
 		}
 		
 		if(source.eqn == true && warn == ""){
-			let eqn = tbs.eqn;
+			tbs.eqn.te = te;
 			
-			eqn.te = te;
-			
+			let eqn = copy(tbs.eqn);
+		
+			eqn.type = change_prior_type(eqn,source.type);
+			set_mode_range(eqn);
+	
 			extract_equation_properties(eqn);
-			
-			if(eqn.warn.length > 0){
-				warn = eqn.warn[0].te;
-			}
+	
+			if(eqn.warn.length > 0) warn = eqn.warn[0].te;
 			else{
 				if(source.type == "derive_eqn"){
 					if(source.val != undefined){
@@ -2208,16 +2196,6 @@ function check_error_textbox2(tbs)
 						}
 					}
 				}
-				
-				if(eqn.mode == "derive_param"){
-					if(eqn.param.length == 0) warn = "Must contain a parameter";
-					if(eqn.param.length > 1) warn = "Must contain just a single parameter";
-					if(eqn.ind_eff.length > 0) warn = "Cannot contain individual effects";
-				}		
-				
-				if(eqn.mode == "param_only"){
-					if(eqn.ind_eff.length > 0) warn = "Cannot contain individual effects";
-				}
 			}
 		}
 	}
@@ -2225,6 +2203,43 @@ function check_error_textbox2(tbs)
 	tbs.warning = warn;
 	if(warn != "") return true;
 	return false;
+}
+
+
+/// Specifies types for prior
+function change_prior_type(eqn,stype)
+{
+	switch(stype){
+	case "prior_dist_min": case "prior_dist_max": case "prior_dist_mean": 
+		switch(inter.bubble.prior.type.te){
+		case "exp": case "gamma": case "log-normal": 
+		case "inverse": case "power": case "covar-uniform-lkj": case "covar-jeffreys": 
+		case "covar-uniform": 
+			return "pos";	
+		
+		case "mean":
+			return "norm";	
+		
+		case "bernoulli": 
+			return "zeroone";	
+			
+		default:
+			return "norm";	
+		}
+		break;
+			
+	case "prior_dist_power": 
+		return "norm";	
+				
+	case "prior_dist_shape": case "prior_dist_sd": case "prior_dist_cv": 
+	case "prior_dist_alpha": case "prior_dist_beta":
+		return "pos";		
+	
+	case "prior_dist_eta":
+		return "etarange";
+	}
+	
+	return eqn.type;
 }
 
 

@@ -129,9 +129,9 @@ function check_disable()
 	switch(alg){
 	case "ABC": case "ABC-SMC":
 		for(let p = 0; p < model.species.length; p++){
-			let so = model.species[p].inf_source;
-			for(let j = 0; j < so.length; j++){
-				switch(so[j].type){
+			let source = get_source("inf",p);
+			for(let j = 0; j < source.length; j++){
+				switch(source[j].type){
 				case "Compartment": case "Transition": 			
 				case "Diag. Test":
 					alertp("Individual-level data cannot be handled by the "+alg+" algorithm");

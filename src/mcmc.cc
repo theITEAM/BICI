@@ -65,6 +65,8 @@ void MCMC::run()
 	
 	long time_start = clock();
 
+	//chain[0].state.scan_param();
+	
 	for(auto s = 0u; s < nsample; s++){
 		percentage(s,nsample);
 	

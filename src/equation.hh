@@ -8,71 +8,6 @@ using namespace std;
 #include "hash_simp.hh"
 #include "const.hh"
 
-struct EqItemList {                         // Allows for a list of equation items
-	EqItemType type;
-	unsigned int num;
-	unsigned int prev;
-	unsigned int next;
-};
-
-struct PopRefFromPo {                      // Used to get pop_ref from population number
-	unsigned int i;                          // Index on pop_ref
-	unsigned int po;                         // Population number
-};
-
-struct Integral {                          // Stores the calculation within an integral
-	vector <Calculation> calc;    
-	unsigned int ti_min;
-	unsigned int ti_max;
-};
-
-struct SumInfo {                           // Stores information about a sum
-	vector <string> dep;                     // Indices on sum
-	string comp_max;                         // The compartment over which distance is measured
-	double distmax;                          // The distance over which the sum acts
-};
-
-struct PopCalculation                      // Used to describe a population calculation
-{
-	vector <Calculation> calc;               // A calculation
-	unsigned int po;                         // The population which multiplies calculation 
-};
-
-	
-struct LinearCalculation                   // Stores a linear calculation
-{
-	PopCalculation no_pop_calc;              // Calculates non-population part
-	vector <PopCalculation> pop_calc;        // Calculates parts multiplying populations
-	HashSimp hash_simp;                      // Simple hash table for population
-};
-
-struct Linearise {                         // Information about linearising an equation 
-	bool on;                                 // Determines if linearisation is possible
-	
-	vector <Calculation> no_pop_calc_store;  // Stores no pop calculation
-	
-	vector < vector <Calculation> > pop_grad_calc_store;  // Stores no pop calculation
-	
-	vector <Calculation> factor_calc;        // Quantities multiplied together for the factor 
-
-	EqItem no_pop_precalc;                   // Stores no_pop precalc number 
-	
-	vector <EqItem> pop_grad_precalc;        // Stores calculation precalc for gradients
-	
-	EqItem factor_precalc;                   // Quantities multiplied together for the factor 
-	
-	bool no_pop_calc_time_dep;               // Determines if time dependent
-	bool factor_time_dep;                    // Set if the factor is time dependent
-	bool pop_grad_time_dep;                  // Set if population gradient is dependent
-	
-	vector < vector <PopRefFromPo> > pop_ref_from_po; // Gets pop_ref from population	
-		
-	bool multi_source;                       // Detemines if comes from multiple sources (used in transmission trees)
-	
-	void init_pop_ref_from_po(const vector <unsigned int> &pop_ref);
-	unsigned int get_pop_ref(unsigned int po) const;	
-};
-
 class Equation                             // Stores information about an equation
 {
 	public:
@@ -140,8 +75,10 @@ class Equation                             // Stores information about an equati
 		
 		Linearise linearise;                   // Used for accelerated likelihood calculation
 		
-		Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details, const vector <Define> &define);
+		Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details, vector <Define> &define);
 		
+		
+		DefineOpStore get_define_op_store();
 		void print_calculation() const;
 		void print_item(const EqItem &it) const;
 		void print_ca(unsigned int i, const Calculation &ca) const;
@@ -163,6 +100,10 @@ class Equation                             // Stores information about an equati
 		vector <unsigned int> getallcomp(string st);
 		void print_operations(const vector <EqItem> &op) const;
 		
+		void substitute_define(vector <EqItem> &op, bool &pass_again);
+		void set_dep(vector <unsigned int> &dep, vector <IndexNotSet> &index_not_set, const vector <Substitution> &sub, const vector <string> &sum_index) const;
+		void set_pop_dep(PopIndex &pi, const vector <Substitution> &sub, const vector <string> &sum_index) const;
+		void copy_op(vector <EqItem> &op_new, const	vector <EqItem> &op_st, const vector <SumInfo> &sum_info_st, const vector <ParamIndex> &param_index_st, const vector <PopIndex> &pop_index_st, const vector <Substitution> &sub);
 		CompPos find_list_from_index(string ind, double dist_max, string comp_max) const;
 		vector <unsigned int> get_all_comp(const PopIndex &pind);
 		double get_float(unsigned int i, unsigned int &raend) const;
@@ -226,7 +167,6 @@ class Equation                             // Stores information about an equati
 		void time_integral(vector <EqItem> &op);
 		void replace_minus(vector <EqItem> &op);
 		unsigned int add_param_ref(const ParamRef &pref);
-		void substitute_define(const vector <Define> &define);
 		bool model_type() const;
 					
 		const vector <SpeciesSimp> &species;       // References the species from the model
@@ -234,6 +174,7 @@ class Equation                             // Stores information about an equati
 		vector <Param> &param;               // References the parameters from the model
 		vector <Prior> &prior;               // References the priors in the model
 		const vector <Derive> &derive;       // Reference derived quantities in the model
+		vector <Define> &define;             // References defined quantities
 		const vector <Spline> &spline;             // References splines from the model
 		const vector <ParamVecEle> &param_vec;     // References the param_vec from the model
 		vector <Density> &density;           // Used for the DEN and RDEN functions 

@@ -26,7 +26,7 @@ const string default_file = "Execute/init.bici";     // This is used for windows
 
 #define USE_MPI                                    // Sets if code can run in parallel
 
-const string bici_version = "v0.88";                 // Sets the BICI version
+const string bici_version = "v0.89";                 // Sets the BICI version
 
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
 const bool testing = true;                           // Set to true for additional testing
@@ -74,7 +74,7 @@ enum Algorithm { GILLESPIE, TAU, DA_MCMC, PAS_MCMC, MFA_ALG, ABC_ALG, ABC_SMC_AL
 enum FeatureType { POLYGON, MULTI_POLYGON, NO_FEATURE };
 
 // Different types of equation
-enum EqnType { SE, SP, COMP_PROB, TRANS_PROB, BP, SOURCE_RATE, SOURCE_MEAN, TRANS_RATE, TRANS_MEAN, TRANS_NM_RATE, TRANS_NM_MEAN, TRANS_SHAPE, TRANS_SCALE, TRANS_CV, REPARAM, REPARAM_EQN, DIST, DERIVE_PARAM, DERIVE_EQN, DEFINE_EQN, SEQ_VAR, CONST_EQN, MUT_RATE, MODEL_CALC };
+enum EqnType { SE, SP, SE_TEST_AND_CULL, SP_TEST_AND_CULL, COMP_PROB, TRANS_PROB, BP, SOURCE_RATE, SOURCE_MEAN, TRANS_RATE, TRANS_MEAN, TRANS_NM_RATE, TRANS_NM_MEAN, TRANS_SHAPE, TRANS_SCALE, TRANS_CV, REPARAM, REPARAM_EQN, DIST, DERIVE_PARAM, DERIVE_EQN, DEFINE_EQN, SEQ_VAR, CONST_EQN, MUT_RATE, MODEL_CALC };
 
 // Differetn restrictions placeed on equarions
 enum EqnMode { PARAM_ONLY, PARAM_WITH_DEP, ALL, DERIVE_PARAM_MODE, DERIVE_MODE };
@@ -107,7 +107,7 @@ enum Operation { SIM, INF, PPC, EXT, DATA_SIM, DATA_SHOW, DATA_DEL, DATA_CLEAR, 
 enum PriorPos { INVERSE_PR, UNIFORM_PR, POWER_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, DIRICHLET_PR, MDIR_PR, MVN_DEFAULT_PR, MVN_NORM_LKJ_PR, MVN_UNIFORM_LKJ_PR, MVN_INV_WISH_PR, MVN_JEF_PR, MVN_UNIFORM_PR, MVN_COR_PR, UNSET_PR };
  
 // Different possible command types
-enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, DEFINE, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, TEST_AND_CULL_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, SET_IND_EFFECT_SIM, SET_IND_EFFECT_INF, SET_IND_EFFECT_POST_SIM, IND_GROUP_DATA, GENETIC_DATA, IC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, PROPOSAL_INFO, INF_PARAM_STATS, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, SIM_WARNING, INF_WARNING, PPC_WARNING,
+enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, DEFINE, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, TEST_AND_CULL_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, SET_IND_EFFECT_SIM, SET_IND_EFFECT_INF, SET_IND_EFFECT_POST_SIM, IND_GROUP_DATA, GENETIC_DATA, IC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, PROPOSAL_INFO, INF_PARAM_STATS, INF_PRED_ACC, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, SIM_WARNING, INF_WARNING, PPC_WARNING,
 
 // These are not commands but varient used when loading data
 TRANS_TIMERANGE_DATA,
@@ -303,7 +303,7 @@ enum DataSourceType { SIM_DATA, INF_DATA, POST_SIM_DATA};
 enum Optimise { SPEED, MEMORY, AUTO_OPTIMISE};
 
 // Different types of parameter
-enum ParamType { PARAM_NORMAL, PARAM_DERIVE, PARAM_PRESET};
+enum ParamType { PARAM_NORMAL, PARAM_DERIVE, PARAM_DEFINE, PARAM_PRESET};
 	
 enum Compress { ALWAYS_COMPRESS, NEVER_COMPRESS, AUTO_COMPRESS};
 
@@ -409,7 +409,7 @@ const double ETA_MAX = 10;                        // The maximum value for eta i
 
 const unsigned int H_BIN = 10;                    // Used for distributions in cumulative prob
 
-const double SMALLISH = 0.01;                     // Used to represent quite a small number
+const double SMALLISH = 0.00001;                  // Used to represent quite a small number
 const double SMALL = 0.00001;                     // Used to represent a small number
 const double LARGE = 1000000000;                  // Used to represent a big number
 const double LARGISH = 10000.0;                   // Used to represent a pretty large number 
@@ -418,7 +418,7 @@ const int LARGE_INT = 1000000000;                 // Used to represent a big int
 const double INFY = 1000000001;                   // Used to represent infinity
 const double UNDEF = 1000000002;                  // Used to represent undefined
 const double ALMOST_ONE = 0.9999999999999;        // Almost one   
-const double LOG_THRESH = 0.00001;                // The threshold below which logs not calculated
+const double LOG_THRESH = 0.000000000000000000000001; // The threshold below which logs not calculated
 const double PROB_MOD = 0.001;                    // Avoids zero probability in local event props
 const double LOW_BOUND = 0;                       // The lower bound for observation probability
 const double UP_BOUND = 1;                        // The lower bound for observation probability

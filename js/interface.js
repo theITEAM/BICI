@@ -250,7 +250,7 @@ function key_press(e)
 			}
 			else{
 				if(bubble_on() == true && 
-					(lay_name == "ParamValueContent" || lay_name == "ModelParamContent" || lay_name =="CreateEditParamContent" || lay_name == "CreateEditAmatrixContent" || lay_name == "InitialPopulationContent")){
+					(lay_name == "ParamValueContent" || lay_name == "ModelParamContent" || lay_name =="CreateEditParamContent" || lay_name == "CreateEditAmatrixContent" || lay_name == "InitialPopulationContent" || lay_name == "CreateEditParamContent")){
 					if(bubble_check_error() == false){
 						let bub = inter.bubble;
 					
@@ -258,8 +258,10 @@ function key_press(e)
 					
 						copy_back_to_source();
 						
-						if(bub.bu.type == "DistSplitElement" || bub.bu.type == "PriorSplitElement") update_prior_split();
-				
+						if(bub.bu.type == "DistSplitElement" || bub.bu.type == "PriorSplitElement"){
+							update_prior_split();
+						}
+						
 						close_bubble();
 					
 						generate_screen(false);	
@@ -271,15 +273,15 @@ function key_press(e)
 								let bu = lay.but[i];
 								
 								if(bu.ac != undefined){
-									if(bu.type == "ParamSimElement" || bu.type == "DistSimElement" ||  bu.type == "PriorElement" ||
-										bu.type == "DistElement" || bu.ac == "EditDerive" ||
-										bu.type == "ParamElement" || bu.type == "ReparamElement" ||
-										bu.type == "ParamElementConst" || 
-										bu.type == "ParamFactorConst" || 
-										bu.type == "ParamWeightConst" || 
-										bu.type == "PriorSplitElement" || 
-										bu.type == "DistSplitElement" || 
-										bu.type == "CompPop"){
+									//if(bu.ac == "EditDerive") 
+									switch(bu.type){
+									case "ParamSimElement": case "DistSimElement":  
+									case "PriorElement": case "DistElement": 
+									case "ParamElement": case "ReparamElement":
+									case "ParamElementConst": case "ParamFactorConst":
+									case "ParamWeightConst": case "PriorSplitElement": 
+									case "DistSplitElement": case "CompPop":
+									case "DefineTableElement": case "ReparamTableElement":
 										activate_button(lay,i);
 										return;
 									}
@@ -476,7 +478,7 @@ function create_edit_table(lay)
 	let cy = corner.y;
 	
 	let so = edit_source;
-		
+					
 	let tab_source = data.table[so.data_table_use];
 	let tab_dest = so.table
 
@@ -515,6 +517,7 @@ function create_edit_table(lay)
 				case "Sink": type = "sink transition"; break;
 				case "LoadTensor": type = "constant"; break;
 				case "LoadReparam": type = "reparameterisation"; break;
+				case "LoadDefine": type = "definition"; break;
 				case "LoadPriorSplit": type = "prior"; break;
 				case "LoadDistSplit": type = "distribution"; break;
 				default: error("Option not recognised 60"+so.info.load_file); break;
@@ -545,6 +548,7 @@ function create_edit_table(lay)
 			case "LoadPriorSplit": ac = "LoadPriorSplitDone"; break;
 			case "LoadDistSplit": ac = "LoadDistSplitDone"; break;
 			case "LoadReparam": ac = "LoadReparamDone"; break;	
+			case "LoadDefine": ac = "LoadDefineDone"; break;	
 			case "Fixed Effect": ac = "LoadXvector2"; break;
 			case "Init. Pop.": ac = "InitPopAdd"; break;
 			case "APed": ac = "APedAdd"; break;
@@ -560,6 +564,7 @@ function create_edit_table(lay)
 	}
 	else{
 		let col = so.load_col[tab_dest.ncol];
+	
 		te = "Select column '<b>"+col.heading+"</b>' for "+col.desc+":";
 		
 		let teri, teri2;
@@ -569,8 +574,10 @@ function create_edit_table(lay)
 			teri2 = "(click here to add a constant)";
 		}		
 		else{
-			if(col.type == "compartment" && model.species[col.p].cla[col.cl].ncomp == 1){
-				let claa = model.species[col.p].cla[col.cl];
+			let sp = get_so_sp(so.info.siminf,col.p);
+	
+			if(col.type == "compartment" && sp.cla[col.cl].ncomp == 1){
+				let claa = sp.cla[col.cl];
 				let name = claa.comp[0].name;
 				teri = "(click ['here','AddConstantColumn|"+name+"'] to add '"+name+"')";
 				teri2 = "(click here to add '"+name+"')";
@@ -860,7 +867,7 @@ function done_search()
 	}
 	else{
 		if(row_find.length > 0){
-			select_table_elelent(row_find[0],c);
+			select_table_element(row_find[0],c);
 		}
 		inter.bubble.row_find = row_find;
 		inter.bubble.search_select = 0;
@@ -970,7 +977,7 @@ function done_delete_rows()
 
 	close_bubble();
 	generate_screen();
-	select_table_elelent(undefined,c);
+	select_table_element(undefined,c);
 
 	inter.bubble.num = num;
 	change_bubble_mode("DeleteRowsResult");
@@ -995,7 +1002,7 @@ function search_back()
 	let bub = copy(inter.bubble);
 	bub.search_select--;
 	if(bub.search_select < 0) bub.search_select = bub.row_find.length-1;
-	select_table_elelent(bub.row_find[bub.search_select],inter.bubble.bu.c);
+	select_table_element(bub.row_find[bub.search_select],inter.bubble.bu.c);
 	inter.bubble.mode = bub.mode;
 	inter.bubble.search_select = bub.search_select;
 	inter.bubble.row_find = bub.row_find;
@@ -1010,7 +1017,7 @@ function search_next()
 	bub.search_select++;
 	if(bub.search_select == bub.row_find.length) bub.search_select = 0;
 
-	select_table_elelent(bub.row_find[bub.search_select],inter.bubble.bu.c);
+	select_table_element(bub.row_find[bub.search_select],inter.bubble.bu.c);
 	inter.bubble.mode = bub.mode;
 	inter.bubble.search_select = bub.search_select;
 	inter.bubble.row_find = bub.row_find;
@@ -1047,7 +1054,7 @@ function done_order()
 
 
 /// Selects a specified table element
-function select_table_elelent(r,c)
+function select_table_element(r,c)
 {
 	close_bubble();
 	
@@ -1067,11 +1074,14 @@ function select_table_elelent(r,c)
 	reset_text_box();
 	
 	shift_button_in_view(l,i);
+	
+	generate_screen();
 }
 
 
+/*
 /// Selects a specified table element
-function select_param_element(index)
+function select_param_element2(index)
 {
 	close_bubble();
 	
@@ -1092,6 +1102,7 @@ function select_param_element(index)
 	
 	shift_button_in_view(l,i);
 }
+*/
 
 
 /// Makes sure that button i can be viewed
@@ -1456,14 +1467,16 @@ function view_warning(i)
 
 	model.warn_view = false;
 
-	//error(warn.warn_type+" warn");
-	
 	switch(warn.warn_type){
 	case "TransTreeInf":
 		change_page({pa:"Model", su:"Compartments", susu:warn.p});
 		press_button_prop("Menu","PageSubSub",["val"],warn.p);	
 		break;
 	
+	case "ParamPage":
+		change_page({pa:"Model", su:"Parameters"});
+		break;
+		
 	case "Species":
 		change_page({pa:"Model", su:"Compartments", susu:warn.p});
 		break;
@@ -1518,18 +1531,57 @@ function view_warning(i)
 		select_bubble_transition(warn.p,warn.cl,warn.i);
 		break;
 		
-	case "MissingParamMultValue":
+	case "ParamMultValue":
 		change_page({pa:"Post. Simulation", su:"Parameter Mult."});
 		break;
 		
-	case "MissingSimValue":
+	case "SimValue":
 		change_page({pa:"Simulation", su:"Parameters"});
 		press_button_prop("ParamValueContent","ParamSimElement",["name"],warn.name);
 		break;
 		
-	case "MissingPriorConst":
+	case "ConstValue":
+		change_page({pa:"Model", su:"Parameters"});
+		press_button_prop("ModelParamContent","ParamSimElement",["name"],warn.name);
+		break;
+		
+	case "WeightValue":
+		change_page({pa:"Model", su:"Parameters"});
+		press_button_prop("ModelParamContent","ParamSimElement",["name"],warn.name);
+		break;
+		
+	case "PriorConst":
 		change_page({pa:"Model", su:"Parameters"});
 		press_button_prop("ParamValueContent","ParamPriConElement",["name"],warn.name);
+		break;
+		
+	case "PriorValue":
+		change_page({pa:"Inference", su:"Prior"});
+		press_button_prop("ParamPriorContent","PriorElement",["name"],warn.name);
+		break;
+		
+	case "PriorSplitValue":
+		change_page({pa:"Inference", su:"Prior"});
+		press_button_prop("ParamPriorContent","ParamSimElement",["name"],warn.name);
+		break;
+		
+	case "DistValue":
+		change_page({pa:"Model", su:"Parameters"});
+		press_button_prop("ModelParamContent","DistElement",["name"],warn.name);
+		break;
+		
+	case "DistSplitValue":
+		change_page({pa:"Model", su:"Parameters"});
+		press_button_prop("ModelParamContent","DistSimElement",["name"],warn.name);
+		break;
+		
+	case "DefEqnValue":
+		change_page({pa:"Model", su:"Parameters"});
+		press_button_prop("ModelParamContent","DefineEqn",["name"],warn.name);
+		break;
+		
+	case "ParamPage":
+		change_page({pa:"Model", su:"Parameters"});
 		break;
 		
 	case "ReparamValue":
@@ -1537,28 +1589,19 @@ function view_warning(i)
 		press_button_prop("ModelParamContent","ReparamElement",["name"],warn.name);
 		break;
 		
-	case "MissingPriorValue": case "ErrorPriorValue":
-		change_page({pa:"Inference", su:"Prior"});
-		press_button_prop("ParamPriorContent","PriorElement",["name"],warn.name);
-		break;
-		
-	case "MissingPriorSplitValue":
-		change_page({pa:"Inference", su:"Prior"});
-		press_button_prop("ParamPriorContent","ParamSimElement",["name"],warn.name);
-		break;
-		
-	case "MissingDistValue":
-		change_page({pa:"Model", su:"Parameters"});
-		press_button_prop("ModelParamContent","DistElement",["name"],warn.name);
-		break;
-		
-	case "reparam":
+	case "RepValue":
 		change_page({pa:"Model", su:"Parameters"});
 		press_button_prop("ModelParamContent","ReparamElement",["name"],warn.name);
+		break;
+		
+	case "RepEqValue":
+		change_page({pa:"Model", su:"Parameters"});
+		press_button_prop("ModelParamContent","ReparamEqn",["name"],warn.name);
 		break;
 	
 	case "ReparamSquareSpline":
 		change_page({pa:"Model", su:"Parameters"});
+		view_section("Splines");
 		break;
 		
 	case "SimPopulationProb":
@@ -1598,7 +1641,15 @@ function view_warning(i)
 				select_bubble_data_element(info.p,info.i,info.r,info.c);
 				break;
 			
-			case "reparam":
+			case "define_ele":
+				select_define_element(info.par_name, info.index);
+				break;
+			
+			case "define_eqn":
+				select_define_equation(info.par_name);
+				break;
+				
+			case "reparam_ele":
 				select_reparam_element(info.par_name, info.index);
 				break;
 			
@@ -1606,8 +1657,8 @@ function view_warning(i)
 				select_reparam_equation(info.par_name);
 				break;
 				
-			case "Se": case "Sp":
-				select_bubble_data_spec(info.p,info.i);
+			case "Se": case "Sp": case "SeTC": case "SpTC":
+				select_bubble_data_spec(info);
 				break;
 			
 			case "trans_mean": case "trans_rate":
@@ -1633,10 +1684,12 @@ function view_warning(i)
 	
 	case "A matrix":
 		change_page({pa:"Model", su:"Parameters"});
+		view_section("Individual effects");
 		break;
 		
 	case "X vector":
 		change_page({pa:"Model", su:"Parameters"});
+		view_section("Fixed effects");
 		break;
 		
 	case "DataProblem": 
@@ -1650,27 +1703,51 @@ function view_warning(i)
 		
 	case "KnotProblem":
 		change_page({pa:"Model", su:"Parameters"});
+		view_section("Splines");
 		break;
 		
-	case "ParamValueProblem":
-		if(warn.par.type == "param factor"){
-			change_page({pa:"Post. Simulation", su:"Parameter Mult."});
+	case "DefValue":
+		change_page({pa:"Model", su:"Parameters"});
+		press_button_prop("ModelParamContent","ReparamElement",["name"],warn.name);
+		break;
+		
+	case "ParamValueProblem": 
+		if(warn.par.param_fac){
+			select_post_sim_element(warn.par.name, warn.index);
 		}
-		else{				
+		else{		
 			switch(warn.par.variety){
-			case "normal": change_page({pa:"Simulation", su:"Parameters"}); break;
-			default: change_page({pa:"Model", su:"Parameters"}); break;
+			case "normal": 
+				select_sim_element(warn.par.name, warn.index);
+				break;
+				
+			case "define":
+				select_define_element(warn.par.name, warn.index);
+				break;
+				
+			case "reparam":
+				select_reparam_element(warn.par.name, warn.index);
+				break;
+				
+			default: 
+				change_page({pa:"Model", su:"Parameters"});
+				break;
 			}
 		}
 		break;
 		
 	case "KnotTimeProblem":
-		if(warn.par.type == "param factor"){
+		if(warn.par.param_fac){
 			change_page({pa:"Post. Simulation", su:"Parameter Mult."});
 		}
 		else{				
 			change_page({pa:"Model", su:"Parameters"}); 
+			view_section("Splines");
 		}	
+		break;
+		
+	default:
+		error(warn.warn_type+" warn type not here");
 		break;
 	}
 }
@@ -2057,4 +2134,23 @@ function select_box()
 	}
 	
 	return box;
+}
+
+
+/// Gets siminf from the interface
+function get_siminf_int()
+{
+	switch(tab_name()){
+	case "Simulation": 
+		switch(subtab_name()){
+		case "Generate Data": return "gen";
+		default: return "sim";
+		}
+	case "Inference":
+		return "inf";
+	case "Post. Simulation":
+		return "ppc";
+	}
+	
+	error("Cannot find siminf");
 }

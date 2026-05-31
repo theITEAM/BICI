@@ -74,6 +74,8 @@ class Model                                // Stores information about the model
 		
 		Table inf_param_stats;                 // Stores parameter stats (used in tornado)
 		
+		Table inf_pred_acc;                    // Stores prediction accuracy (used in tornado)
+		
 		vector < vector <string> > ind_key_store; // Converts from number to name
 		vector <Sample> sample;                // Stores inferred state (used for PPC/EXT/DATA_SIM)
 		
@@ -153,6 +155,7 @@ class Model                                // Stores information about the model
 		vector <double> get_param_val_tvreparam(const PV &param_val) const;
 		void add_tvreparam(PV &param_val, const vector <double> &param_val_tvreparam) const;
 		PV get_param_val(const Particle &pa) const;
+		PV set_param_val(const vector <double> &value_set) const;
 		double calc_tdiv(double t) const; 
 		double calc_t(double tdiv) const;
 		void create_precalc_equation();

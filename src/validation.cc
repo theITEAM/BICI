@@ -31,7 +31,7 @@ Validation::Validation()
 }
 
 /// Sets up a tornado run
-void Validation::tornado_setup(Operation mode, ExtFactor ext_factor, string file, const vector <string> &data_sim_lines, bool test) 
+void Validation::tornado_setup(string add_info, Operation mode, ExtFactor ext_factor, string file, const vector <string> &data_sim_lines) 
 {
 	auto nc = num_core();
 	if(nc != 1) run_error("Setup requires only one core");
@@ -46,7 +46,31 @@ void Validation::tornado_setup(Operation mode, ExtFactor ext_factor, string file
 	
 	auto ncore_inf = 1u;
 	
-	auto file_rep = get_file_rep(TORNADO_NUM,run_dir);
+	auto nrun = TORNADO_NUM;
+	auto para_run = true;
+	
+	if(add_info.length() > 0){
+		add_info = remove_quote(add_info);
+		auto spl = split(add_info,' ');
+		
+		for(const auto &va: spl){
+			if(begin_str(va,"n=")){
+				nrun = number(va.substr(2));
+				if(nrun == UNSET) alert_input("After 'tornado' the value "+va+" should set a number");
+			}
+			else{
+				if(va == "para") para_run = true;
+				else{
+					if(va == "series") para_run = false;
+					else{
+						alert_input("After 'tornado' the value "+va+" is not understood");
+					}
+				}
+			}
+		}
+	}
+	
+	auto file_rep = get_file_rep(nrun,run_dir);
 
 	{                                        // Removes data and copies into 
 		Model model(mode,ext_factor,true); 
@@ -70,12 +94,17 @@ void Validation::tornado_setup(Operation mode, ExtFactor ext_factor, string file
 		output.ensure_directory(run_dir);
 		output.ensure_directory(op_dir);
 		
+		{
+			ofstream fout(tor_dir+"info.txt");
+			fout << "nrun=" << file_rep.size() << endl;
+		}
+		
 		for(auto r = 0u; r < file_rep.size(); r++){
 			output.copy(file_rep[r]);
 		}
 	}
 	
-	run_sim_data(name,op_dir,test,file_rep,ncore_inf,ext_factor,data_sim_lines,file,"tornado-res");
+	run_sim_data(name,op_dir,para_run,file_rep,ncore_inf,ext_factor,data_sim_lines,file,"tornado-res");
 }
 
 
@@ -93,7 +122,7 @@ vector <string> Validation::get_file_rep(unsigned int n, string run_dir) const
 
 	
 /// Runs simulates and generates data
-void Validation::run_sim_data(string name, string op_dir, bool test, vector <string> file_rep, unsigned int ncore_inf, ExtFactor ext_factor, const vector <string> &data_sim_lines, string file, string com) const
+void Validation::run_sim_data(string name, string op_dir, bool para_run, vector <string> file_rep, unsigned int ncore_inf, ExtFactor ext_factor, const vector <string> &data_sim_lines, string file, string com) const
 {
 	percentage_start(RUN_PER);
 	for(auto r = 0u; r < file_rep.size(); r++){  
@@ -140,10 +169,10 @@ void Validation::run_sim_data(string name, string op_dir, bool test, vector <str
 		auto fi = file_rep[r]; 
 		
 		fout << "echo 'Run " << fi << "'" << endl;
-		if(!test) fout << "nohup ";
+		if(para_run) fout << "nohup ";
 		if(ncore_inf > 1) fout << "mpirun -n " << ncore_inf << " "; 
 		fout << "./bici-para " << fi << " -seed=" << r << " inf";
-		if(!test) fout << " > " << op_dir << "inf_" << r << ".txt 2>&1&";
+		if(para_run) fout << " > " << op_dir << "inf_" << r << ".txt 2>&1&";
 		fout << endl << endl;
 	}
 	
@@ -176,10 +205,23 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 	
 	auto tor_dir = name+"_tornado/";
 	auto run_dir = tor_dir+"run/";
+	auto op_dir = tor_dir+"op/";
 	
-	auto file_rep = get_file_rep(TORNADO_NUM,run_dir);
+	auto nrun = TORNADO_NUM;
+	
+	{
+		string info;
+		ifstream fin(tor_dir+"info.txt");
+		getline (fin,info);
+		if(!begin_str(info,"nrun=")) emsg("Problem with loading number of runs");
+		nrun = number(info.substr(5));
+		if(nrun == UNSET) emsg("Problem with loading number of runs");
+	}
+	
+	auto file_rep = get_file_rep(nrun,run_dir);
 		
 	vector <Table> param_stats;
+	vector <Table> pred_acc_stats;
 		
 	percentage_start(RUN_PER);
 	for(auto r = 0u; r < file_rep.size(); r++){
@@ -192,162 +234,225 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 		Output output(model,mpi,true);           
 		Input input(model,fi,UNSET,mpi,true);    
 		
-		const auto &tab = model.inf_param_stats;
-		if(tab.heading.size() == 0) run_error("Parameter statistics could not be found. Have you run the script?");
+		{
+			const auto &tab = model.inf_param_stats;
+			if(tab.heading.size() == 0) run_error("Parameter statistics could not be found. Have you run the script?");
 		
-		param_stats.push_back(tab);
+			param_stats.push_back(tab);
+		}
+		
+		{
+			const auto &tab = model.inf_pred_acc;
+			if(tab.heading.size() > 0){
+				pred_acc_stats.push_back(tab);
+			}
+		}
 	}
 	percentage_end();
 	
-	auto R = param_stats.size(); 
-	
-	const auto &tab0 = param_stats[0];
-	auto N = tab0.nrow;
-	
-	vector <double> value;
-	{ // Works out the true value for the parameter
-		for(auto i = 0u; i < N; i++){
-			auto na = tab0.ele[i][0];
-			auto val = get_param_value(na,model_base);
-			value.push_back(val);
-		}
-	}
-	
-	vector < vector <Stat> > stat;
-	stat.resize(N);
-	
-	{	
-		ofstream fout(tor_dir+"ESS.csv");
-		fout << "Run";
-		for(auto i = 0u; i < N; i++) fout << ",\"" << add_escape_char(tab0.ele[i][0]) << " ESS\"";
-		fout << endl;
+	{
+		auto R = param_stats.size(); 
 		
-		for(auto r = 0u; r < R; r++){
-			const auto &tab = param_stats[r];
-			
-			fout << (r+1);
+		const auto &tab0 = param_stats[0];
+		auto N = tab0.nrow;
+		
+		vector <double> value;
+		{ // Works out the true value for the parameter
 			for(auto i = 0u; i < N; i++){
-				Stat st; 
-				st.mean = number(tab.ele[i][1]);
-				st.sd = number(tab.ele[i][2]);
-				st.CImin = number(tab.ele[i][3]);
-				st.CImax = number(tab.ele[i][4]);
-				stat[i].push_back(st);
+				auto na = tab0.ele[i][0];
+				auto val = get_param_value(na,model_base);
+				value.push_back(val);
+			}
+		}
+		
+		vector < vector <Stat> > stat;
+		stat.resize(N);
+		
+		{	
+			ofstream fout(tor_dir+"ESS.csv");
+			fout << "Run";
+			for(auto i = 0u; i < N; i++) fout << ",\"" << add_escape_char(tab0.ele[i][0]) << " ESS\"";
+			fout << endl;
+			
+			for(auto r = 0u; r < R; r++){
+				const auto &tab = param_stats[r];
 				
-				fout << "," << tab.ele[i][5];
-			}				
-			fout << endl;
+				fout << (r+1);
+				for(auto i = 0u; i < N; i++){
+					Stat st; 
+					st.mean = number(tab.ele[i][1]);
+					st.sd = number(tab.ele[i][2]);
+					st.CImin = number(tab.ele[i][3]);
+					st.CImax = number(tab.ele[i][4]);
+					stat[i].push_back(st);
+					
+					fout << "," << tab.ele[i][5];
+				}				
+				fout << endl;
+			}
 		}
-	}
-	
-	{	
-		ofstream fout(tor_dir+"GR.csv");
-		fout << "Run";
-		for(auto i = 0u; i < N; i++) fout << ",\"" << add_escape_char(tab0.ele[i][0]) << " GR\"";
-		fout << endl;
 		
-		for(auto r = 0u; r < R; r++){
-			const auto &tab = param_stats[r];
-			
-			fout << (r+1);
-			for(auto i = 0u; i < N; i++) fout << "," << tab.ele[i][6];
+		{	
+			ofstream fout(tor_dir+"GR.csv");
+			fout << "Run";
+			for(auto i = 0u; i < N; i++) fout << ",\"" << add_escape_char(tab0.ele[i][0]) << " GR\"";
 			fout << endl;
-		}
-	}
-	
-	auto tname = "result.csv";
-	{	
-		ofstream fout(tor_dir+tname);
-		fout << "Sorted Run";
-		for(auto i = 0u; i < N; i++){
-			auto na = add_escape_char(tab0.ele[i][0]);
-			fout << ",\"" << na << " value\"" << ",\"" << na << " (post. mean)\"" << ",\"" << na << " (CI min)\"" << ",\"" << na << " (CI max)\"";
-		}
-		fout << endl;
-		
-		for(auto i = 0u; i < N; i++){
-			sort(stat[i].begin(),stat[i].end(),Stat_ord);
-		}
 			
-		for(auto r = 0u; r < R; r++){
-			fout << (r+1);
+			for(auto r = 0u; r < R; r++){
+				const auto &tab = param_stats[r];
+				
+				fout << (r+1);
+				for(auto i = 0u; i < N; i++) fout << "," << tab.ele[i][6];
+				fout << endl;
+			}
+		}
+		
+		auto tname = "result.csv";
+		{	
+			ofstream fout(tor_dir+tname);
+			fout << "Sorted Run";
 			for(auto i = 0u; i < N; i++){
-				fout << "," << value[i] << "," << stat[i][r].mean << "," << stat[i][r].CImin << "," << stat[i][r].CImax;
+				auto na = add_escape_char(tab0.ele[i][0]);
+				fout << ",\"" << na << " value\"" << ",\"" << na << " (post. mean)\"" << ",\"" << na << " (CI min)\"" << ",\"" << na << " (CI max)\"";
 			}
 			fout << endl;
+			
+			for(auto i = 0u; i < N; i++){
+				sort(stat[i].begin(),stat[i].end(),Stat_ord);
+			}
+				
+			for(auto r = 0u; r < R; r++){
+				fout << (r+1);
+				for(auto i = 0u; i < N; i++){
+					fout << "," << value[i] << "," << stat[i][r].mean << "," << stat[i][r].CImin << "," << stat[i][r].CImax;
+				}
+				fout << endl;
+			}
+		}
+		
+		auto un_name = "uncertainty.csv";
+		{	
+			ofstream fout(tor_dir+un_name);
+			for(auto i = 0u; i < N; i++){
+				auto na = add_escape_char(tab0.ele[i][0]);
+				if(i != 0) fout << ",";
+				fout << "\"" << na << "\"";
+			}
+			fout << endl;
+		
+			for(auto i = 0u; i < N; i++){
+				if(i != 0) fout << ",";
+				
+				auto sd_av = 0.0, mean_av = 0.0;
+				for(auto r = 0u; r < R; r++){
+					mean_av += stat[i][r].mean;
+					sd_av += stat[i][r].sd;
+				}
+				mean_av /= R;
+				sd_av /= R;
+			
+				fout << sd_av/mean_av;
+			}		
+			fout << endl;
+		}
+		
+		auto gp = tor_dir+"gp/";
+		op.ensure_directory(gp);
+
+		{ // Creates lines for true value
+			ofstream fout(gp+"true_value.csv");
+			fout << "y";
+			for(auto i = 0u; i < N; i++){
+				auto na = add_escape_char(tab0.ele[i][0]);
+				fout << ",\"" << na << " value\"";
+			}
+			fout << endl;
+			fout << 0;
+			for(auto i = 0u; i < N; i++) fout << "," << value[i];
+			fout << endl;
+			fout << nrun+1;
+			for(auto i = 0u; i < N; i++) fout << "," << value[i];
+			fout << endl;
+		}
+		
+		{  // Creates gp scripts
+			ofstream fout(gp+"gp_single.txt");
+		
+			fout << gp_header();
+				
+			fout << "set yrange [0:" << nrun+1 << "]" << endl;
+			fout << "unset ytics" << endl;
+
+			for(auto i = 0u; i < N; i++){
+				auto name = add_escape_char(tab0.ele[i][0]);
+				
+				name = convert_label(name);
+				
+				fout << "set xlabel '"+name+"' font ',30'" << endl;
+				fout << "unset ylabel" << endl;
+
+				fout << "plot '../" << tname << "' using " << 3+4*i << ":1 ps 1 lw 4 lc '#000000' notitle,\\" << endl;
+				fout << "'../" << tname << "' using " << 3+4*i << ":1:" << 3+4*i+1 << ":" << 3+4*i+2 << " with xerrorbars ls 1 lw 4 notitle,\\" << endl;
+				fout << "'true_value.csv' using " << 2+i << ":1 with lines ls 2 notitle" << endl;
+			}
+		}
+		
+		{  // Creates gp scripts
+			ofstream fout(gp+"gp.txt");
+		
+			fout << gp_header_multi();
+				
+			fout << "set yrange [0:" << nrun+1 << "]" << endl;
+			fout << "unset ytics" << endl;
+
+			for(auto i = 0u; i < N; i++){
+				auto name = add_escape_char(tab0.ele[i][0]);
+				
+				name = convert_label(name);
+				
+				fout << "set xlabel '"+name+"' font ',15'" << endl;
+				fout << "unset ylabel" << endl;
+
+				fout << "plot '../" << tname << "' using " << 3+4*i << ":1 ps 1 lw 2 lc '#000000' notitle,\\" << endl;
+				fout << "'../" << tname << "' using " << 3+4*i << ":1:" << 3+4*i+1 << ":" << 3+4*i+2 << " with xerrorbars ls 1 lw 2 notitle,\\" << endl;
+				fout << "'true_value.csv' using " << 2+i << ":1 with lines ls 2 lw 2 notitle" << endl;
+			}
 		}
 	}
 	
-	auto gp = tor_dir+"gp/";
-	op.ensure_directory(gp);
-
-	{ // Creates lines for true value
-		ofstream fout(gp+"true_value.csv");
-		fout << "y";
-		for(auto i = 0u; i < N; i++){
-			auto na = add_escape_char(tab0.ele[i][0]);
-			fout << ",\"" << na << " value\"";
+	{
+		auto R = pred_acc_stats.size(); 
+		
+		auto tab0 = pred_acc_stats[0];
+		for(auto r = 0u; r < tab0.nrow; r++){
+			vector <double> vec;
+			for(auto j = 0u; j < R; j++){
+				auto val = number(pred_acc_stats[j].ele[r][1]);
+				if(val == UNSET) emsg("Prediction accuracy not a number");
+				vec.push_back(val);
+			}
+			
+			auto stat = get_statistic(vec);
+			
+			stringstream ss;
+			ss << stat.mean << " (" << stat.CImin << " - " << stat.CImax << ")";
+			tab0.ele[r][1] = ss.str();
 		}
-		fout << endl;
-		fout << 0;
-		for(auto i = 0u; i < N; i++) fout << "," << value[i];
-		fout << endl;
-		fout << 21;
-		for(auto i = 0u; i < N; i++) fout << "," << value[i];
-		fout << endl;
+		
+		auto tname = "pred_acc.csv";
+		ofstream fout(tor_dir+tname);
+		fout << output_table(tab0);
 	}
-	
-	{  // Creates gp scripts
-		ofstream fout(gp+"gp_single.txt");
-	
-		fout << gp_header();
-			
-		fout << "set yrange [0:21]" << endl;
-		fout << "unset ytics" << endl;
 
-		for(auto i = 0u; i < N; i++){
-			auto name = add_escape_char(tab0.ele[i][0]);
-			
-			name = convert_label(name);
-			
-			fout << "set xlabel '"+name+"' font ',30'" << endl;
-			fout << "unset ylabel" << endl;
-
-			fout << "plot '../" << tname << "' using " << 3+4*i << ":1 ps 1 lw 4 lc '#000000' notitle,\\" << endl;
-			fout << "'../" << tname << "' using " << 3+4*i << ":1:" << 3+4*i+1 << ":" << 3+4*i+2 << " with xerrorbars ls 1 lw 4 notitle,\\" << endl;
-			fout << "'true_value.csv' using " << 2+i << ":1 with lines ls 2 notitle" << endl;
-		}
-	}
-	
-	{  // Creates gp scripts
-		ofstream fout(gp+"gp.txt");
-	
-		fout << gp_header_multi();
-			
-		fout << "set yrange [0:21]" << endl;
-		fout << "unset ytics" << endl;
-
-		for(auto i = 0u; i < N; i++){
-			auto name = add_escape_char(tab0.ele[i][0]);
-			
-			name = convert_label(name);
-			
-			fout << "set xlabel '"+name+"' font ',15'" << endl;
-			fout << "unset ylabel" << endl;
-
-			fout << "plot '../" << tname << "' using " << 3+4*i << ":1 ps 1 lw 2 lc '#000000' notitle,\\" << endl;
-			fout << "'../" << tname << "' using " << 3+4*i << ":1:" << 3+4*i+1 << ":" << 3+4*i+2 << " with xerrorbars ls 1 lw 2 notitle,\\" << endl;
-			fout << "'true_value.csv' using " << 2+i << ":1 with lines ls 2 lw 2 notitle" << endl;
-		}
-	}
-	
 	cout << endl << "RESULTS: In directory '" << tor_dir << "'." << endl;
-	cout << "PLOT: Gnuplot can be used to plot results. Go to the 'gp' sub-directory and type 'gnuplot gp.txt' to generate graphs and 'ps2pdf gp.ps gp.pdf' to convert to pdf." << endl;
+	//cout << "PLOT: Gnuplot can be used to plot results. Go to the 'gp' sub-directory and type 'gnuplot gp.txt' to generate graphs and 'ps2pdf gp.ps gp.pdf' to convert to pdf." << endl;
+	
+	cout << "PLOT: Gnuplot can be used to plot results. Go to the 'gp' sub-directory and type 'gnuplot gp_single.txt' to generate graphs and 'ps2pdf gp_single.ps gp.pdf' to convert to pdf." << endl;
 }
 
 
 /// Sets up a parameter scan
-void Validation::scan_setup(string scan_info, Operation mode, ExtFactor ext_factor, string file, const vector <string> &data_sim_lines, bool test) 
+void Validation::scan_setup(string add_info, Operation mode, ExtFactor ext_factor, string file, const vector <string> &data_sim_lines, bool test) 
 {
 	auto nc = num_core();
 	if(nc != 1) run_error("Setup requires only one core");
@@ -372,7 +477,7 @@ void Validation::scan_setup(string scan_info, Operation mode, ExtFactor ext_fact
 
 		output.init(input);
 
-		si = get_scan_info(scan_info,model);
+		si = get_scan_info(add_info,model);
 
 		auto pr = get_param_ref(si.param_name,model);
 		if(pr.th == UNSET || pr.index == UNSET){
@@ -410,7 +515,7 @@ void Validation::scan_setup(string scan_info, Operation mode, ExtFactor ext_fact
 	
 	{
 		ofstream fout(tor_dir+"info.txt");
-		fout << scan_info << endl;
+		fout << add_info << endl;
 	}
 	
 	run_sim_data(name+"_"+na,op_dir,test,file_rep,ncore_inf,ext_factor,data_sim_lines,file,"scan-res:'"+si.param_name+"'");
@@ -692,6 +797,10 @@ string Validation::convert_label(string name) const
 	name = replace(name,"\\chi","{/Symbol c}"); 
 	name = replace(name,"\\Chi","{/Symbol C}"); 
 	
+	auto spl = split(name,'^');
+	if(spl.size() == 2){
+		name = spl[0]+"^{"+spl[1]+"}";
+	}
 	return name;
 }
 

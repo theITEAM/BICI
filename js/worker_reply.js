@@ -6,6 +6,7 @@ worker.onmessage = function (e)
 	let ans = e.data;
 	
 	//prr("Worker ans"); prr(ans);
+	//prr("REPLY: "+ans.type);
 	
 	if(ans.type == "Percent"){
 		let mem = performance.memory;
@@ -21,7 +22,9 @@ worker.onmessage = function (e)
 	if(false){ prr("Worker reply: "+ans.type); prr("ans"); prr(ans);}
 
 	if(inter.worker_mess.active != "stop"){
-		if(ans.type != "Start" && ans.type != "StartPPC" && ans.type != "StartEXT" && ans.type != "Import model files") stop_loading_symbol();
+		if(ans.type != "Start" && ans.type != "StartPPC" && ans.type != "StartEXT" && ans.type != "Import model files"){
+			stop_loading_symbol();
+		}
 		
 		switch(ans.type){		
 		case "EditAPed":
@@ -68,7 +71,7 @@ worker.onmessage = function (e)
 			
 		case "Select Element":
 			generate_screen();
-			select_table_elelent(ans.r,ans.c);
+			select_table_element(ans.r,ans.c);
 			inter.bubble.error_warning = ans.warn;
 			generate_screen();
 			break;
@@ -142,7 +145,6 @@ worker.onmessage = function (e)
 			data_source_reply(ans);
 			update_param();
 			generate_screen();
-			
 			break;
 		
 		case "Rename Species":
@@ -217,7 +219,7 @@ worker.onmessage = function (e)
 			generate_screen();
 			break;
 		
-	 case "Load Reparam": case "Load Tensor":
+	 case "Load Reparam": case "Load Define": case "Load Tensor":
 			{
 				let ep = ans.ep;
 				inter.edit_param = ep;
@@ -232,7 +234,7 @@ worker.onmessage = function (e)
 					inter.edit_source = false;
 					close_bubble();
 					close_param_source();
-					if(ans.type == "Load Reparam") update_param();
+					if(ans.type == "Load Reparam" || ans.type == "Load Define") update_param();
 				}
 				generate_screen();
 			}
@@ -255,6 +257,8 @@ worker.onmessage = function (e)
 			}
 			break;
 			
+		case "Edit Param": case "Edit Reparam": case "Edit Define":
+		case "Edit Weight": case "Edit Prior Const":
 		case "Edit PriorSplit": case "Edit DistSplit":
 			inter.edit_param = ans.info;
 			generate_screen();
@@ -273,20 +277,18 @@ worker.onmessage = function (e)
 			}
 			break;
 			
-		case "Edit Param": case "Edit Reparam": case "Edit Weight": case "Edit Prior Const":
-			inter.edit_param = ans.info;
-			generate_screen();
-			break;
+		case "Set Param": case "Set Reparam": case "Set Define":
+			{
+				inter.edit_source = false;
+				close_bubble();
+				close_param_source();
 			
-		case "Set Param": case "Set Reparam":
-			inter.edit_source = false;
-			close_bubble();
-			close_param_source();
-			
-			model.param[ans.i].value_desc = ans.value_desc;
-			model.param[ans.i].set = true;
-			if(ans.type == "Set Reparam") update_param();
-			generate_screen();
+				model.param	= ans.param;
+				model.species	= ans.species;
+				
+				par_in_view(ans.par_name);
+				generate_screen();
+			}
 			break;
 			
 		case "Set Prior Const": 
@@ -428,6 +430,7 @@ worker.onmessage = function (e)
 			set_camera(ans.p,ans.cl);
 			update_param();
 			close_data_source();
+			if(ans.warning && ans.warning != "") alert_help("Warning",ans.warning);
 			generate_screen();
 			break;
 			
@@ -442,6 +445,7 @@ worker.onmessage = function (e)
 			
 		case "UpdateModel":
 			model_updated(ans);
+			do_after(ans);
 			break;
 			
 		case "Start": case "StartPPC":  case "StartEXT":
@@ -551,4 +555,29 @@ function model_updated(ans)
 	model.warn_view = true;
 	model.get_label_info_all();	
 	generate_screen();
+}
+
+
+/// Does actions after model update
+function do_after(ans)
+{
+	let do_af = ans.do_after;
+	if(do_af == undefined) return;
+	
+	generate_screen();
+	
+	switch(do_af.type){
+	case "press_but_prop":
+		press_button_prop(do_af.lay_name,do_af.ty,["name"],do_af.name);
+		break;
+	
+	case "par_in_view":
+		{
+			par_in_view(do_af.name);
+			generate_screen();
+		}
+		break;
+		
+	default: error("do after not recognised"); break;
+	}
 }

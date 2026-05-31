@@ -115,7 +115,7 @@ bool com_op = false;                                 // Set to true for command 
 #include "lzw.hh"
 #include "validation.hh"
 
-vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_factor, string &file, vector <string> &data_sim_lines, bool &no_question, bool &test, string &scan_info);
+vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_factor, string &file, vector <string> &data_sim_lines, bool &no_question, bool &test, string &add_info);
 
 int main(int argc, char** argv)
 {	
@@ -158,9 +158,9 @@ int main(int argc, char** argv)
 	vector <string> data_sim_lines;
 	auto no_question = false;
 	auto test = false;
-	string scan_info;
+	string add_info;
 	
-	auto tags = get_tags(sec,mode,ext_factor,file,data_sim_lines,no_question,test,scan_info);
+	auto tags = get_tags(sec,mode,ext_factor,file,data_sim_lines,no_question,test,add_info);
 	
 	print_diag("start model");
 	
@@ -168,7 +168,7 @@ int main(int argc, char** argv)
 	case TORNADO_SETUP:
 		{
 			Validation valid;
-			valid.tornado_setup(mode,ext_factor,file,data_sim_lines,test);
+			valid.tornado_setup(add_info,mode,ext_factor,file,data_sim_lines);
 		}
 		return 0;
 		
@@ -182,14 +182,14 @@ int main(int argc, char** argv)
 	case SCAN_SETUP:
 		{
 			Validation valid;
-			valid.scan_setup(scan_info,mode,ext_factor,file,data_sim_lines,test);
+			valid.scan_setup(add_info,mode,ext_factor,file,data_sim_lines,test);
 		}
 		return 0;
 		
 	case SCAN_RESULT:
 		{
 			Validation valid;
-			valid.scan_result(scan_info,mode,ext_factor,no_question,file);
+			valid.scan_result(add_info,mode,ext_factor,no_question,file);
 		}
 		return 0;
 	
@@ -345,7 +345,7 @@ int main(int argc, char** argv)
 		{
 			DataSim data_sim(model,output);
 			for(const auto &ds : data_sim_lines){
-				data_sim.clear(ds);
+				data_sim.clear(ds,false);
 			}
 		}
 		break;
@@ -395,7 +395,7 @@ int main(int argc, char** argv)
 
 
 /// Gets values for tags when BICI is run
-vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_factor, string &file, vector <string> &data_sim_lines, bool &no_question, bool &test, string &scan_info)
+vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_factor, string &file, vector <string> &data_sim_lines, bool &no_question, bool &test, string &add_info)
 {
 	vector <BICITag> tags;
 	
@@ -515,7 +515,9 @@ vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_
 		
 		if(te == "data-del"){
 			mode_new = DATA_DEL;
-			if(i+1 == N) alert_input("There must be an expression after 'data-del'.");
+			if(i+1 == N){
+				data_sim_lines.push_back("all");
+			}
 			else{ 
 				i++;
 				while(i < N){ data_sim_lines.push_back(sec[i]); i++;}
@@ -524,15 +526,19 @@ vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_
 		
 		if(te == "clear"){
 			mode_new = DATA_CLEAR;
-			if(i+1 == N) alert_input("There must be an expression after 'clear'.");
+			if(i+1 == N){
+				data_sim_lines.push_back("all");
+			}
 			else{
 				i++;
 				while(i < N){ data_sim_lines.push_back(sec[i]); i++;}
 			}
 		}
 		
-		if(te == "tornado"){
+		if(te == "tornado" || begin_str(te,"tornado:")){
 			mode_new = TORNADO_SETUP;
+			if(begin_str(te,"tornado:")) add_info = te.substr(8);
+			
 			if(i+1 == N) alert_input("There must be an expression (or expressions) after 'torndo' that specify the data.");
 			else{
 				i++;
@@ -557,12 +563,12 @@ vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_
 				i++;
 				while(i < N){ data_sim_lines.push_back(sec[i]); i++;}
 			}
-			scan_info = te.substr(5);
+			add_info = te.substr(5);
 		}
 		
 		if(begin_str(te,"scan-res:")){
 			mode_new = SCAN_RESULT;
-			scan_info = te.substr(9);
+			add_info = te.substr(9);
 		}
 		
 		if(end_str(te,".bici")){

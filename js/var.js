@@ -120,4 +120,6 @@ let edit_source={};                                // Allow for a data source to
 
 let cv;                                            // Used for plotting to working  anvas       
 
+let is_interface = true;                           // Shows not the interface
+
 let worker = new Worker('js/worker.js');           // Stores the worker

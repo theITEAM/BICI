@@ -84,7 +84,7 @@ void Output::init(const Input &input)
 				if(model.mode == SIM) flag = true;
 			}
 			
-			if(command == "param-inf" || command == "param-stats-inf" || command == "state-inf" || 
+			if(command == "param-inf" || command == "param-stats-inf" || command == "pred-acc-inf" || command == "state-inf" || 
 			   command == "diagnostics-inf" || 
 				 command == "trans-diag-inf" || command == "warning-inf" || st == OUT_INF_BANNER){
 				if(model.mode == INF || model.mode == EXT){
@@ -2352,7 +2352,49 @@ void Output::copy(string file)
 	}
 }
 
+
+/// Sets up a store for the average of individual effects (used for prediction accuracies)
+vector < vector < vector <Average> > > Output::setup_ie_average(bool &pred_acc_on) const
+{
+	vector < vector < vector <Average> > > ie_average;
 	
+	if(!(model.mode == INF || model.mode == EXT)) return ie_average;
+	
+	pred_acc_on = true;
+	
+	ie_average.resize(model.nspecies);
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];
+		ie_average[p].resize(sp.nindividual_obs);
+		for(auto i = 0u; i < sp.nindividual_obs; i++){
+			ie_average[p][i].resize(sp.ind_effect.size());
+		}
+	}
+	
+	return ie_average;
+}
+
+
+/// Updates individual effect average
+void Output::update_ie_average(vector < vector < vector <Average> > > &ie_average, const vector <Particle> &part) const
+{
+	for(const auto &pa : part){
+		for(auto p = 0u; p < model.nspecies; p++){
+			const auto &sp = model.species[p];
+			const auto &psp = pa.species[p];
+			for(auto i = 0u; i < sp.nindividual_obs; i++){
+				const auto &ind = psp.individual[i];
+				for(auto e = 0u; e < sp.ind_effect.size(); e++){
+					auto &iea = ie_average[p][i][e];
+					iea.av += ind.ie[e];
+					iea.nav++;
+				}
+			}
+		}
+	}
+}
+
+		
 /// Generates the final outputs
 void Output::end(string file, unsigned int total_cpu)
 {
@@ -2391,6 +2433,9 @@ void Output::end(string file, unsigned int total_cpu)
 		vector < vector < vector < vector <double> > > > param_samp;
 		param_samp.resize(nchain);
 
+		auto pred_acc_on = false;
+		auto ie_average = setup_ie_average(pred_acc_on);
+		
 		for(auto ch = 0u; ch < nchain; ch++){
 			auto frac = double(ch)/nchain;
 			percentage(frac*25,100,sup);
@@ -2450,6 +2495,8 @@ void Output::end(string file, unsigned int total_cpu)
 					output_trans_diag(ch,trans_diag,fout);
 				}
 				
+				if(pred_acc_on) update_ie_average(ie_average,part);
+								
 				output_state(ch,part,fout);
 			}
 		}
@@ -2513,6 +2560,10 @@ void Output::end(string file, unsigned int total_cpu)
 	
 		if(op() && (model.mode == INF || model.mode == EXT) && com_op == false){
 			output_param_statistics(param_samp,fout,final_warning);
+		}
+		
+		if(pred_acc_on && op() && com_op == false){
+			output_pred_acc(ie_average,fout);
 		}
 		
 		output_add_ind_warning(final_warning);
@@ -2764,6 +2815,29 @@ string Output::param_stat(unsigned int th, unsigned int i, const vector < vector
 }
 
 
+/// Gets the Pearson correlation coefficient between two sets of measurements
+double Output::get_correlation(const vector <double> &vecA, const vector <double> &vecB) const
+{
+	if(vecA.size() != vecB.size()) emsg("Cannot get correlation");
+	
+	auto avA = 0.0, avA2 = 0.0, avB = 0.0, avB2 = 0.0, avAB = 0.0;
+	auto N = vecA.size();
+	for(auto i = 0u; i < N; i++){
+		auto valA = vecA[i], valB = vecB[i];
+		avA += valA; avA2 += valA*valA;
+		avB += valB; avB2 += valB*valB;
+		avAB += valA*valB;
+	}
+	
+	auto varA = avA2/N - (avA/N)*(avA/N);
+	auto varB = avB2/N - (avB/N)*(avB/N);
+	
+	if(varA < TINY || varB < TINY) return 0;
+	
+	return (avAB/N - (avA/N)*(avB/N))/sqrt(varA*varB);
+}
+
+
 /// Outputs a table of parameter statistics
 void Output::output_param_statistics(const vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout, vector <string> &final_warning) const
 {
@@ -2872,6 +2946,111 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 		final_warning.push_back(trim(ss.str()));
 	}
 }
+
+
+/// Outputs a table of prediction accuracies
+void Output::output_pred_acc(const vector < vector < vector <Average> > > &ie_average, ofstream &fout) const
+{
+	stringstream sss;
+
+	sss << "\"IE\",\"Pred. acc.\",\"Individuals\"" << endl;
+	
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];
+		auto N = sp.nindividual_obs;
+		
+		vector < vector <unsigned int> > group;
+		vector <string> group_name;
+		
+		{
+			auto vec = get_list(N);
+			group.push_back(vec);
+			group_name.push_back("All ("+tstr(N)+")");
+		}
+		
+		Hash hash;
+		for(auto i = 0u; i < N; i++) hash.add(i,sp.individual[i].name);
+				
+		for(const auto &so : sp.source){
+			if(so.cname == IND_GROUP_DATA){
+				vector <unsigned int> vec;
+				
+				const auto &tab = so.table;
+				for(auto r = 0u; r < tab.nrow; r++){
+					auto i = hash.find(tab.ele[r][0]);
+					if(i != UNSET) vec.push_back(i);
+				}	
+				
+				if(vec.size() > 0){
+					group.push_back(vec);
+					group_name.push_back(so.name+" ("+tstr(vec.size())+")");
+				}
+			}
+		}
+				
+		for(const auto &so : sp.source){
+			if(so.cname == IND_EFFECT_DATA){
+				
+				auto e = 0u; while(e < sp.ind_effect.size() && sp.ind_effect[e].name != so.ie) e++;
+				if(e == sp.ind_effect.size()){
+					emsg("Cannot find individual effect");
+				}
+				
+				vector <double> ie_true(N,UNSET);
+			
+				const auto &tab = so.table;
+				for(auto r = 0u; r < tab.nrow; r++){
+					auto i = hash.find(tab.ele[r][0]);
+					if(i != UNSET){
+						auto val = number(tab.ele[r][1]);
+						if(val == UNSET) emsg("Problem with individual effect value '"+tab.ele[r][1]+"'");
+						ie_true[i] = val;
+					}
+				}
+				
+				for(auto j = 0u; j < group_name.size(); j++){
+					vector <double> vecA, vecB;
+					for(auto i : group[j]){
+						if(ie_true[i] != UNSET){
+							const auto &iea = ie_average[p][i][e];
+							if(ie_true[i] <= 0) emsg("IE must be positive");
+							vecA.push_back(log(ie_true[i]));
+							vecB.push_back(iea.av/iea.nav);
+						}
+					}
+					
+					auto pa = get_correlation(vecA,vecB);
+					
+					sss << so.ie << "," << pa << ",\"" << group_name[j] << "\"" << endl;
+				}
+			}
+		}
+	}
+	
+	auto stat_table = sss.str();
+
+	string stat_out_file;
+	
+	if(sampledir != ""){
+		stat_out_file = "pred-acc.csv";
+
+		ofstream pout(sampledir+"/"+stat_out_file);
+		check_open(pout,stat_out_file);
+		pout << stat_table;
+
+		stat_out_file = sampledir_rel+"/"+stat_out_file;
+	}
+	else{  // Embeds output into file
+		stat_out_file = "[["+endli+stat_table+"]]";
+	}
+	
+	stringstream ss;
+	ss << "pred-acc-inf file=\""+stat_out_file+"\"" << endl;
+	ss << endl;
+	
+	if(com_op == true) cout << ss.str();
+	else fout << ss.str();
+}
 	
 
 /// Outputs proposal information
@@ -2973,6 +3152,8 @@ void Output::output_state(unsigned int ch, const vector <Particle> &part, ofstre
 	string state_out_file;
 
 	auto content = state_head+state_out;
+	
+	auto content_st = content;
 	
 	auto enc = compress_content(content);
 	
@@ -3271,46 +3452,6 @@ void Output::trans_diag_add(vector <TransDiagSpecies> &trans_diag, const vector 
 }	
 
 
-/// Gets statistics from a vector
-Stat Output::get_statistic(vector <double> &vec) const 
-{
-	auto n = vec.size();
-	if(n == 0) emsg("Zero vector size");
-	
-	Stat stat;
-	
-	auto sum = 0.0, sum2 = 0.0;
-	for(auto i = 0u; i < vec.size(); i++) {
-		sum += vec[i];
-		sum2 += vec[i]*vec[i];
-	}
-	sum /= n;
-	sum2 /= n;
-
-	stat.mean = sum;
-	auto var = sum2 - sum*sum; if(var < 0) var = 0;
-	stat.sd = sqrt(var);
-	
-	sort(vec.begin(),vec.end());
-
-	if(n >= 2) {
-		auto i = floor_int((n-1)*0.025);
-		auto f = (n-1)*0.025 - i;
-		stat.CImin = vec[i]*(1-f) + vec[i+1]*f;
-
-		i = floor_int((n-1)*0.975);
-		f = (n-1)*0.975 - i;
-		stat.CImax = vec[i]*(1-f) + vec[i+1]*f;
-	} 
-	else{
-		stat.CImin = vec[0];
-		stat.CImax = vec[0];
-	}
-
-	return stat;
-}
-
-
 /// Takes an average for each generation
 string Output::generation_average(string head, string content) const
 {
@@ -3494,7 +3635,7 @@ void Output::delete_command(string name, unsigned int li, bool check)
 
 
 // Deletes commands
-void Output::delete_commands(string type, const vector <string> &list)
+void Output::delete_commands(string type, const vector <string> &list, bool no_question)
 {
 	vector <unsigned int> lines;
 	
@@ -3508,14 +3649,18 @@ void Output::delete_commands(string type, const vector <string> &list)
 	}
 	
 	if(lines.size()	== 0){
-		cout << "There is no state or parameter information to clear." << endl; 
-		exit (EXIT_FAILURE);
+		if(!no_question){
+			cout << "There is no state or parameter information to clear." << endl; 
+			exit (EXIT_FAILURE);
+		}
 	}
 	else{
-		auto res = model.question("Are you sure you would like to clear "+type+" state and parameter information?");
-		if(res == false){
-			cout << "Terminated" << endl; 
-			exit (EXIT_FAILURE);
+		if(!no_question){
+			auto res = model.question("Are you sure you would like to clear "+type+" state and parameter information?");
+			if(res == false){
+				cout << "Terminated" << endl; 
+				exit (EXIT_FAILURE);
+			}
 		}
 		
 		for(auto li : lines){

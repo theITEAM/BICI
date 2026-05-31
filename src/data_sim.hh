@@ -9,13 +9,14 @@ using namespace std;
 #include "output.hh"
 
 class DataSim                              // Simulates data from state
-{
+{	
 	public:
 		DataSim(Model &model, Output &output, bool sup_=false);
 		void run(string data_sim_line, unsigned int sim_sel);
 		void del(string data_sim_line);
 		void show() const;
-		void clear(string data_sim_line);
+		void clear(string data_sim_line, bool no_question);
+		//void clear_inf_data();
 		void compress();
 		void decompress();
 		
@@ -29,7 +30,6 @@ class DataSim                              // Simulates data from state
 		void error(string msg) const;
 		unsigned int option_error(string na, string te, const vector <string> &pos, const vector <unsigned int> &conv) const;
 		void init_pop_sim(unsigned int p, const State &state, Table &tab);
-		string output_table(const Table &tab) const;
 		string source_description(const Species &sp, const DataSource &so) const;
 		vector <DataRef> get_data_list() const;
 		vector <double> get_times();

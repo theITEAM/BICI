@@ -435,20 +435,29 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 /// Determines if individual samplers are needed (i.e. if all transitions are known)
 void Species::set_ind_samp_needed(const vector <Equation> &eqn)
 {
+	// Determines which transition are observed exactly
+	vector < vector <bool> > tra_is_obs;   // [trg][ti]
+	tra_is_obs.resize(tra_gl.size());
+	for(auto trg = 0u; trg < tra_gl.size(); trg++){
+		tra_is_obs[trg].resize(T,false);
+	}
+	
+	for(const auto &ot : obs_trans){
+		for(auto trg = 0u; trg < tra_gl.size(); trg++){
+			if(ot.is_one[trg] && ot.single_trans){
+				for(auto ti = ot.ti_min; ti < ot.ti_max; ti++){
+					tra_is_obs[trg][ti] = true;
+				}
+			}
+		}		
+	}
+	
 	// Determines if transition is not observed at any point over the entire time period
 	vector <bool> tra_not_obs(tra_gl.size(),false);
 	for(auto trg = 0u; trg < tra_gl.size(); trg++){
-		auto not_obs = false;
 		for(auto ti = 0u; ti < T; ti++){
-			auto fl = false;
-			for(auto ter : obs_trans_eqn_ref[trg][ti]){
-				const auto &ot = obs_trans[ter];
-				if(ot.is_one[trg] && ot.single_trans){ fl = true; break;}
-			}
-			
-			if(fl == false){ not_obs = true; break;}
+			if(tra_is_obs[trg][ti] == false) tra_not_obs[trg] = true;
 		}
-		tra_not_obs[trg] = not_obs;
 	}
 	
 	if(false){
@@ -595,6 +604,17 @@ void Species::set_ind_samp_needed(const vector <Equation> &eqn)
 			ind.simulation_needed = false;
 			ind.move_needed = false;
 		}
+	}
+	
+	if(false){
+		for(auto i = 0u; i < individual.size(); i++){
+			auto &ind = individual[i];
+			cout << ind.name << " "<< ind.simulation_needed << " " << ind.move_needed << "  sam[";
+			for(auto va : ind.sample_needed) cout << va << " ";
+			cout << endl;
+			
+		}
+		emsg("done");
 	}
 }
 

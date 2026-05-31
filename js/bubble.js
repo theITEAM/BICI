@@ -37,9 +37,9 @@ function add_bubble_buts(lay)
 		case "LoadAMatrix":
 			cont.dx = 9;
 			bubble_addtitle(cont,"Load options",{te:load_options_text});
+			bubble_addradio(cont,0,"pedigree","Pedigree",bub.type_radio); 
 			bubble_addradio(cont,0,"A","A matrix",bub.type_radio);
 			bubble_addradio(cont,0,"Ainv","Inverse of A matrix",bub.type_radio);
-			bubble_addradio(cont,0,"pedigree","Pedigree",bub.type_radio); 
 			add_end_button(cont,"Done","LoadAMatrix2",{p:bu.p,i:bu.i});	
 			break;
 		}
@@ -718,7 +718,7 @@ function add_bubble_buts(lay)
 
 					default:
 						cont.dx = 10;
-						bubble_addtitle(cont,"Import",{te:label_text});
+						bubble_addtitle(cont,"Import",{te:import_text});
 						bubble_addradio(cont,0,"Compartments","Compartments",inter.bubble.radio); 
 						let claa = model.get_cla();
 						if(claa.camera.coord == "latlng"){
@@ -796,6 +796,7 @@ function add_bubble_buts(lay)
 			case "PopTransData": poptrans_data_bubble(cont,"add"); break;
 			case "SeqData": sequence_data_bubble(cont,"add"); break;
 			case "IndEffData": ind_eff_data_bubble(cont,"add"); break;
+			case "SetIE": set_ind_eff_bubble(cont,"add"); break;
 			case "IndGroupData": ind_group_data_bubble(cont,"add"); break;
 			case "SetConstant": set_constant_bubble(cont); break;
 			case "SetPriorConst": set_prior_const_bubble(cont,"Set","AddPriorConstParam"); break;
@@ -822,6 +823,7 @@ function add_bubble_buts(lay)
 			case "Diag. Test": diagtest_data_bubble(cont,"view"); break;
 			case "Test-and-cull": diagtest_data_bubble(cont,"view","cull"); break;
 			case "Ind. Eff.": ind_eff_data_bubble(cont,"view"); break;
+			case "Set IE": set_ind_eff_bubble(cont,"view"); break;
 			case "Ind. Group": ind_group_data_bubble(cont,"view"); break;
 			case "Genetic": sequence_data_bubble(cont,"view"); break;
 			case "Population": population_data_bubble(cont,"view"); break;
@@ -929,14 +931,7 @@ function add_bubble_buts(lay)
 		bubble_input(cont,"Value:",{type:"element_Xvector", i:bu.i, j:bu.j});
 		add_end_button(cont,"Done","Done");	
 		break;
-	
-	case "ReparamElement":
-		cont.dx = 15;
-		bubble_addtitle(cont,"Edit equation",{te:editreparam_eqn_text});	
-		bubble_input(cont,"Equation:",{type:"reparam_eqn", eqn:true});
-		add_end_button(cont,"Done","DoneReparamEquation");	
-		break;
-		
+
 	case "DefineEqn":
 		cont.dx = 15;
 		bubble_addtitle(cont,"Edit equation",{te:editdefine_eqn_text});	
@@ -944,17 +939,31 @@ function add_bubble_buts(lay)
 		add_end_button(cont,"Done","DoneDefineEquation");	
 		break;
 		
+	case "DefineTableElement":
+		cont.dx = 15;
+		bubble_addtitle(cont,"Edit equation",{te:editdefine_eqn_text});	
+		bubble_input(cont,"Equation:",{type:"define_element_eqn", eqn:true, pindex:bu.pindex});
+		add_end_button(cont,"Done","Done");	
+		break;
+	
 	case "ReparamEqn":
 		cont.dx = 15;
 		bubble_addtitle(cont,"Edit equation",{te:editreparam_eqn_text});	
-		bubble_input(cont,"Equation:",{type:"reparam_equation", eqn:true});
+		bubble_input(cont,"Equation:",{type:"reparam_eqn", eqn:true});
+		add_end_button(cont,"Done","DoneReparamEquation");	
+		break;
+		
+	case "ReparamElement":
+		cont.dx = 15;
+		bubble_addtitle(cont,"Edit equation",{te:editreparam_eqn_text});	
+		bubble_input(cont,"Equation:",{type:"reparam_element_eqn", eqn:true});
 		add_end_button(cont,"Done","DoneReparamEquation");	
 		break;
 		
 	case "ReparamTableElement":
 		cont.dx = 15;
 		bubble_addtitle(cont,"Edit equation",{te:editreparam_eqn_text});	
-		bubble_input(cont,"Equation:",{type:"element_eqn", eqn:true, pindex:bu.pindex});
+		bubble_input(cont,"Equation:",{type:"reparam_element_eqn", eqn:true, pindex:bu.pindex});
 		add_end_button(cont,"Done","Done");	
 		break;
 	
@@ -1370,7 +1379,7 @@ function add_bubble_buts(lay)
 		break;
 		
 	case "ParamLabel2":
-		set_paramselect_bubble(cont,bu.eqn_appear);
+		set_paramselect_bubble(cont,bu.within);
 		break;
 	
 	case "PopSlice":
@@ -1499,7 +1508,7 @@ function press_bubble_OK()
 		}
 	}
 	
-	error("Could not find2");
+	error("Could not find3");
 }
 
 
@@ -1528,8 +1537,10 @@ function press_button_prop(lay_name,type,info,value,op)
 			}
 		}
 	}
-	
-	error("Could not find '"+type+"'");
+
+	error("Could not find2 '"+type+"'");
+	prr(type);
+	prr(lay.but);
 }
 	
 	
@@ -1881,7 +1892,7 @@ function bubble_addbutton(cont,te,x,y,dx,dy,type,ac,op)
 function bubble_check_error()
 {
 	let bub = inter.bubble;
-	
+
 	switch(bub.check){
 	case "checkbox":
 		{
@@ -2001,7 +2012,7 @@ function bubble_check_error()
 	}
 
 	if(check_error_textbox() == false && inter.bubble.warning == false) return false;
-	
+
 	inter.bubble.show_warning = true;
 	return true;
 }
@@ -2322,9 +2333,16 @@ function select_bubble_transition(p,cl,i)
 
 
 /// Selects the specification bubble for a data source
-function select_bubble_data_spec(p,i)
+function select_bubble_data_spec(info)
 {
-	change_page({pa:"Inference",su:"Data",susu:p});
+	let p = info.p;
+	let i = info.i;
+	
+	switch(info.eso){
+	case "sim": change_page({pa:"Simulation",su:"Setup",susu:p}); break;
+	case "inf": change_page({pa:"Inference",su:"Data",susu:p}); break;
+	default: error("eso problem"+info.eso); break;
+	}
 	
 	let lay_name = "TableContent";
 	let lay = get_lay(lay_name);
@@ -2354,7 +2372,7 @@ function select_bubble_data_element(p,i,r,c)
 	if(j == bu.length){ error("Problem selecting3"); return;}
 	
 	activate_button(lay,j); 
-	select_table_elelent(r,c);
+	inter.after_load = {type:"table_element", r:r, c:c};
 }	
 
 
@@ -2373,7 +2391,7 @@ function select_bubble_sim_data_element(p,i,r,c)
 	if(j == bu.length){ error("Problem selecting3"); return;}
 	
 	activate_button(lay,j); 
-	select_table_elelent(r,c);
+	inter.after_load = {type:"table_element", r:r, c:c};
 }	
 
 
@@ -2384,7 +2402,7 @@ function select_reparam_element(par_name,index)
 }
 	
 	
-/// Selects a reparameterisation element with parameter name and index
+/// Selects a reparameterisation equation with parameter name
 function select_reparam_equation(par_name)
 {
 	goto_param_page({type:"select_reparam_equation", par_name:par_name});
@@ -2395,6 +2413,27 @@ function select_reparam_equation(par_name)
 function select_define_element(par_name,index)
 {
 	goto_param_page({type:"select_define_element", par_name:par_name, index:index});
+}
+
+
+/// Selects a specific element 
+function select_sim_element(par_name,index)
+{
+	goto_sim_page({type:"select_sim_element", par_name:par_name, index:index});
+}
+
+
+/// Selects a specific element 
+function select_post_sim_element(par_name,index)
+{
+	goto_post_sim_page({type:"select_post_sim_element", par_name:par_name, index:index});
+}
+
+
+/// Selects a definition equation with parameter name
+function select_define_equation(par_name)
+{
+	goto_param_page({type:"select_define_equation", par_name:par_name});
 }
 
 
@@ -2422,12 +2461,46 @@ function select_bubble_param(par_name)
 }	
 
 
-/// Selects a parameter element
-function select_param_element(op)
+/// Selects a button on the page
+function select_page_button(op)
 {
+	if(op.type == "table_element"){
+		select_table_element(op.r,op.c);
+		return;
+	}
+	
+	if(op.type == "param_element"){
+		let lay_name = "CreateEditParamContent";
+
+		let l = 0; while(l < inter.layer.length && inter.layer[l].name != lay_name) l++;
+		if(l == inter.layer.length){ error("Cannot find layer2 "+lay_name); return;}
+
+		let lay = inter.layer[l];
+		
+		let index = op.index;
+		
+		let bu = lay.but;
+	
+		let j;
+		for(j = 0; j < bu.length; j++){
+			let but = bu[j];
+			if(but.pindex && vec_equal(but.pindex,index)){
+				activate_button(lay,j); 
+				shift_button_in_view(l,j);
+				return;
+			}			
+		}
+		return;
+	}
+	
 	let lay_name = "ModelParamContent";
+	switch(op.type){
+	case "select_sim_element": lay_name = "ParamValueContent"; break;
+	case "select_post_sim_element": lay_name = "ParamMultContent"; break;
+	}
+	
 	let lay = get_lay(lay_name);
-	if(!lay){ error("Could not find ModelParamContent"); return;}
+	if(!lay){ error("Could not find:"+lay_name); return;}
 		
 	let bu = lay.but;
 
@@ -2443,6 +2516,22 @@ function select_param_element(op)
 	
 	case "select_define_element":
 		while(j < bu.length && !(bu[j].ac	== "EditDefineValue" && bu[j].i == i)) j++;
+		break;
+		
+	case "select_sim_element":
+		while(j < bu.length && !(bu[j].ac	== "EditSimValue" && bu[j].i == i)) j++;
+		break;
+	
+	case "select_post_sim_element":
+		while(j < bu.length && !(bu[j].ac	== "EditSimValue" && bu[j].i == i)) j++;
+		break;
+		
+	case "select_reparam_equation":
+		while(j < bu.length && !(bu[j].ac	== "EditReparamValue" && bu[j].i == i)) j++;
+		break;
+		
+	case "select_define_equation":
+		while(j < bu.length && !(bu[j].ac	== "EditReparamValue" && bu[j].i == i)) j++;
 		break;
 		
 	case "select_dist_element":
@@ -2461,29 +2550,45 @@ function select_param_element(op)
 			case "const": ac = "EditSimValue"; break;
 			case "reparam": ac = "EditReparamValue"; break;
 			case "dist": ac = "EditPriorElement"; ac2 = "EditDistSplitValue"; break;
+			case "define": ac ="EditDefineValue"; break;
 			}		
 
 			while(j < bu.length && !((bu[j].ac	== ac || bu[j].ac	== ac2) && bu[j].i == i)) j++;
 		}
 		break;
-		
-	case "select_reparam_equation":
-		while(j < bu.length && !(bu[j].ac	== "EditReparamValue" && bu[j].i == i)) j++;
-		break;
 	}
 	
-	if(j == bu.length){ error("Problem selecting5"); return;}
+	if(j == bu.length){ error("Problem selecting5:"+op.type); return;}
 	
 	activate_button(lay,j); 
-	if(op.index != undefined) select_param_element(op.index);
+
+	if(op.index != undefined){
+		inter.after_load = {type:"param_element", index:op.index};
+	}
 }
 
 
 /// Goes to the parameter page but ensures that warning are turned off
 function goto_param_page(op)
 {
-	inter.after_load = op;
 	change_page({pa:"Model",su:"Parameters"});
+	inter.after_load = op;
+}
+
+
+/// Goes to the simulation page but ensures that warning are turned off
+function goto_sim_page(op)
+{
+	change_page({pa:"Simulation", su:"Parameters"});
+	inter.after_load = op;
+}
+
+
+/// Goes to the posterior simulation page but ensures that warning are turned off
+function goto_post_sim_page(op)
+{
+	change_page({pa:"Post. Simulation", su:"Parameter Mult."});
+	inter.after_load = op;
 }
 
 

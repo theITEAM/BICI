@@ -4,12 +4,15 @@
 // Different equation modes determine what properties the equation can have.
 // These are now automatically generated when an equation is created
 // "all" - Used generally for transition. No restrictions
-// "param_only" - Allows only for a constant or single parameter 
-// "derive" - Used in a derived formula. Can only involve existing parameters in the model or populations 
-// "derive_param" - A derived parameter (cannot already be in the model). Must just be a parameter (with potentially some dependencies which agree with 'derive' expression).
+// "param time" - Allows for parameters and time (no population, ie, fe)
+// "param only" - Allows only for a constant or single parameter no dep (no population, ie, fe)
+// "defrep ele" - Allows param (with no dep), time, pop (no ie, fe)
+// "defrep eq" - Allows param, time, pop (no ie, fe)
+// "defrep ele notime" - As above, but not allowing time 
+// "defrep eq notime" - As above, but not allowing time 
+// "derive param" - Allows a single parameter (this is used for 
+// "derive eqn" - Allows for everting apart from ie and fe
 
-// Setting positive:true means if equation is a number it must be positive
-// Setting zero_one_range:true means if equation is a number it must be in range 0 - 1
 
 /// Adds background to edit equation page
 function add_equation_background_buts(lay)
@@ -478,37 +481,26 @@ function equation_calulator(lay,cx,cy,width,source,warn,mode)
 	let pad = 1.1;
 	let gap4 = 0.5;
 	
-	let model_param_fl = false, param_fl = false, pop_fl = false;
+	let model_param_fl = false, param_fl = false, pop_fl = false, t_fl = true;
 	let indeff_fl = false, sum_fl = false, tensor_fl = false;
 	
 	let eqn = inter.equation;
 
+	sum_fl = true; tensor_fl = true;
+
 	switch(eqn.mode){
-	case "all": 
-		param_fl = true; pop_fl = true; indeff_fl = true; sum_fl = true, tensor_fl = true;
-		break;
-		
-	case "derive_param": 
-		param_fl = true; 
-		break;
-	
-	case "derive": 
-		model_param_fl = true; pop_fl = true; sum_fl = true; 
-		break;
-	
-	case "param only": 
-		param_fl = true; 
-		break; 
-		
-	case "param with dep":
-		param_fl = true; 
-		break;
-	
-	default:
-		error("option prob 100"+eqn.mode); 
-		break;
+	case "all": param_fl = true; pop_fl = true; indeff_fl = true; break;
+	case "param time": param_fl = true; break; 
+	case "param only": param_fl = true; sum_fl = false; tensor_fl = false; t_fl = false; break; 
+	case "defrep ele": param_fl = true; pop_fl = true; break;
+	case "defrep eq": param_fl = true; pop_fl = true; break;
+	case "defrep ele notime": param_fl = true; t_fl = false; break;
+	case "defrep eq notime": param_fl = true; t_fl = false; break;
+	case "derive param": param_fl = true; um_fl = false; tensor_fl = false; t_fl = false; break;
+	case "derive eq": model_param_fl = true; pop_fl = true; break;
+	default: error("option prob 100"+eqn.mode); break;
 	}
-	
+
 	let ac = "AddToolbar";	
 	
 	if(model_param_fl == true){
@@ -529,7 +521,7 @@ function equation_calulator(lay,cx,cy,width,source,warn,mode)
 		x += w+gap4;
 	}
 	
-	if(param_fl == true){
+	if(t_fl == true){
 		let te = "t", w = text_width(te,font)+pad;
 		lay.add_button({te:te, te2:"Add time", x:x, y:cy, dx:w, dy:dy, ac:ac, type:"Toolbar_But"});
 		x += w+gap4;
@@ -1135,10 +1127,11 @@ function equation_done()
 }
 
 
-/// Creates a new equation with a text string and a type. p and cl are available for transitions
-function create_equation(te,type,p,cl)
+/// Sets the mode and range for the equation
+function set_mode_range(eqn)
 {
-	te = char_replace(te);
+	let type = eqn.type;
+	if(type == undefined){ error("type not set"); return;}
 	
 	let i = find(eqn_types,"name",type);
 	if(i == undefined){
@@ -1146,13 +1139,25 @@ function create_equation(te,type,p,cl)
 		return;
 	}		
 	
-	let eqn = {te:te, type:type, mode:eqn_types[i].mode};
+	eqn.mode = eqn_types[i].mode;
+	eqn.range = eqn_types[i].range;
+}
+	
+	
+/// Creates a new equation with a text string and a type. p and cl are available for transitions
+function create_equation(te,type,p,cl)
+{
+	te = char_replace(te);
+	
+	let eqn = {te:te, type:type};
+	
+	set_mode_range(eqn);
 	
 	if(p != undefined) eqn.p_name = model.species[p].name;
 	if(cl != undefined) eqn.cl_name = model.species[p].cla[cl].name;
 
 	extract_equation_properties(eqn);
-	
+
 	return eqn;
 }
 
@@ -1165,43 +1170,20 @@ function contains_population(te)
 }
 
 
-/// Checks if a string is an equation with a single parameter or a number
-function is_eqn(te,tag,op)
+/// Checks that a string is either a single parameter or value
+function eqn_warning(te,type)
 {
-	let eqn = create_equation(te,"test");
-	
-	if(eqn.warn.length > 0) return err("For '"+tag+"' — "+eqn.warn[0].te); 
-	
-	if(eqn.mode == "param_only"){
-		if(eqn.ind_eff.length > 0){
-			return err("'"+tag+"' cannot contain individual effects"); 
-		}
-		
-		if(eqn.param.length > 1){
-			return err("'"+tag+"' can only be constant or contain one parameter"); 
-		}
-	}
-	
-	if(eqn.param.length == 0){
-		if(op.positive == true){
-			if(Number(te) <= 0){
-				return err("'"+tag+"' must be a positive number"); 
-			}
-		}
-		
-		if(op.zero_positive == true){
-			if(Number(te) < 0){
-				return err("'"+tag+"' must be a non-negative number"); 
-			}
-		}
-		
-		if(op.zero_one_range == true){
-			if(Number(te) < 0 || Number(te) > 1){
-				return err("'"+tag+"' must be in the range 0 - 1"); 
-			}
-		}
-	}
-	
+	let eqn = create_equation(te,type);
+	if(eqn.warn.length > 0) return eqn.warn[0].te;
+	return "";
+}
+
+
+/// Checks if a string is an equation with a single parameter or a number
+function is_eqn(te,tag,type)
+{
+	let warn = eqn_warning(te,type);
+	if(warn != "") return err("For '"+tag+"' — "+warn); 
 	return success();
 }
 
@@ -1212,7 +1194,8 @@ function equation_rename_compartment(p,cl,old_name,new_name)
 	let sp = model.species[p];
 	let cl_name = sp.cla[cl].name;
 		
-	let eq_list = model.find_equation_list();
+	//let eq_list = model.find_eqn_list();
+	let eq_list = find_equation_list();
 	
 	let len = old_name.length;
 	let dif = new_name.length - old_name.length;

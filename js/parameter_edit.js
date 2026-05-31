@@ -41,6 +41,11 @@ function create_edit_param(lay)
 	if(inter.edit_param.too_big == true) too_big = true;
 	
 	switch(lay.op.type){
+	case "Const":
+		title = "Edit constant tensor values";
+		load_te = load_const_tensor_text;
+		break;
+		
 	case "Value":
 		title = "Edit tensor values";
 		break;
@@ -53,6 +58,14 @@ function create_edit_param(lay)
 		load_ac = "LoadReparam";
 		break;
 	
+	case "Define":
+		title = "Edit definition";
+		help = editdefine_text;
+		doneac = "EditDefineDone";
+		load_title = "Load definition", load_te = load_define_text; 
+		load_ac = "LoadDefine";
+		break;
+		
 	case "PriorSplit":
 		title = "Edit priors";
 		help = editpriorsplit_text; 
@@ -70,7 +83,7 @@ function create_edit_param(lay)
 		break;
 	}
 
-	let dim = par.dep.length;
+	let dim = par.ndep_cont;
 	
 	title = convert_tensor_text(title,dim);
 	help = convert_tensor_text(help,dim);
@@ -138,8 +151,8 @@ function add_create_edit_param_buts(lay)
 	let eparam = inter.edit_param;
 	let i = eparam.i;
 
-	let par = model.param[i];
-
+	let par = eparam.par_st; if(par == undefined) par = model.param[i];
+	
 	let action = "EditParamElement";
 		
 	let dx_table_param = 7;
@@ -151,7 +164,7 @@ function add_create_edit_param_buts(lay)
 		ele_type = "ParamWeightConst";
 		break;
 		
-	case "Value": case "PriorConst":
+	case "Const": case "Value": case "PriorConst":
 		ele_type = "ParamElementConst";
 		if(par.factor) ele_type = "ParamFactorConst";
 		break;
@@ -160,7 +173,12 @@ function add_create_edit_param_buts(lay)
 		ele_type = "ReparamTableElement"; 
 		dx_table_param = 12;
 		break;
-	
+		
+ case "Define":
+		ele_type = "DefineTableElement"; 
+		dx_table_param = 12;
+		break;
+		
 	case "PriorSplit": 
 		ele_type = "PriorSplitElement";
 		action = "EditPriorSplitElement";
@@ -185,6 +203,7 @@ function add_create_edit_param_buts(lay)
 	let list = eparam.list;
 	
 	let dep = par.dep;
+	let ndep = par.ndep_cont;
 	
 	let si_mar = 1;
 	let fo_mar = get_font(si_mar);
@@ -198,7 +217,7 @@ function add_create_edit_param_buts(lay)
 	let sym = is_symmetric(par);
 	
 	let w_dep = [];
-	for(let i = 0; i < dep.length; i++){
+	for(let i = 0; i < ndep; i++){
 		let wmax = 0;
 		
 		for(let j = 0; j < list[i].length; j++){
@@ -211,7 +230,7 @@ function add_create_edit_param_buts(lay)
 		w_dep[i] = wmax+1;
 	}
 		
-	if(dep.length == 2){                             // Case of matrix	 
+	if(ndep == 2){                             // Case of matrix	 
 		let ch = 0;
 		let longest;
 		for(let j = 0; j < list[0].length; j++){
@@ -307,7 +326,7 @@ function add_create_edit_param_buts(lay)
 		let ele_list = get_element_list(value,dim);
 	
 		let cx = 2;
-		for(let j = 0; j < dep.length; j++){
+		for(let j = 0; j < ndep; j++){
 			lay.add_button({te:dep[j], x:cx, y:cy, dx:w_dep[j], dy:dy_table_param, type:"Text", si:si_mar, font:fo_head, col:mar_col});
 			cx += w_dep[j];
 		} 
@@ -322,7 +341,7 @@ function add_create_edit_param_buts(lay)
 		
 		for(let k = 0; k < ele_list.length; k++){
 			let cx = 2;
-			for(let j = 0; j < dep.length; j++){
+			for(let j = 0; j < ndep; j++){
 				lay.add_button({te:list[j][ele_list[k][j]], x:cx, y:cy, dx:w_dep[j], dy:dy_table_param, type:"Text", si:si_mar, font:fo_mar, col:mar_col});
 				cx += w_dep[j];
 			}
@@ -341,7 +360,7 @@ function add_create_edit_param_buts(lay)
 		
 		if(eparam.too_big == true){
 			let cx = 2+gap;
-			for(let j = 0; j < dep.length; j++) cx += w_dep[j];
+			for(let j = 0; j < ndep; j++) cx += w_dep[j];
 			lay.add_button({te:"⋮", x:cx+dx_table_param/2-0.3, y:cy, dx:dx_table_param, dy:dy_table_param, type:ele_type, font:fo_table, i:i, ac:action});
 		}
 	}
@@ -364,11 +383,11 @@ function load_tensor(ep,source)
 	let par = model.param[ep.i];
 	
 	let dep = par.dep;
+	let ndep = par.ndep_cont;
+	
 	let list = par.list;
 	if(ep.too_big){
 		ep.list = copy(list);
-		//if(ep.type == "Weight") ep.weight = par_find_template(list);
-		//else ep.value = par_find_template(list);
 		ep.value = par_find_template(list);
 	}
 	let ep_value = ep.value;
@@ -381,7 +400,7 @@ function load_tensor(ep,source)
 
 	for(let r = 0; r < tab.nrow; r++){
 		let ind=[];
-		for(let i = 0; i < dep.length; i++){
+		for(let i = 0; i < ndep; i++){
 			let te = tab.ele[r][i].trim();
 		
 			let te2 = te;
@@ -392,7 +411,7 @@ function load_tensor(ep,source)
 			else ind[i] = k;
 		}
 		
-		let va = tab.ele[r][dep.length];
+		let va = tab.ele[r][ndep];
 		
 		if(par.factor == true && va == "*") set_element(ep_value,ind,va);
 		else{
@@ -438,9 +457,11 @@ function set_zero(value)
 /// Loads reparameterised values
 function load_reparam(ep,source)
 {
-	let par = model.param[ep.i];
-
+	let par = ep.par_st;
+	
 	let dep = par.dep;
+	let ndep = par.ndep_cont;
+	
 	let list = par.list;
 	
 	if(ep.too_big){
@@ -457,7 +478,7 @@ function load_reparam(ep,source)
 	
 	for(let r = 0; r < tab.nrow; r++){
 		let ind=[];
-		for(let i = 0; i < dep.length; i++){
+		for(let i = 0; i < ndep; i++){
 			let te = tab.ele[r][i].trim();
 			
 			let te2 = te;
@@ -468,7 +489,7 @@ function load_reparam(ep,source)
 			else ind[i] = k;
 		}
 		
-		let val = tab.ele[r][dep.length];
+		let val = tab.ele[r][ndep];
 		if(!isNaN(val)) val = Number(val);
 		set_element(ep_value,ind,val);
 	}
@@ -477,7 +498,7 @@ function load_reparam(ep,source)
 		par.value = copy(ep_value);
 		reduce_size(ep,par);
 		par.set = true;
-		get_reparam_param_list(par);
+		get_defrep_param_list(par);
 	
 		ep.value_desc = get_value_desc(par);
 		par.value_desc = get_value_desc(par);
@@ -509,6 +530,8 @@ function load_priorsplit(ep,source,dist)
 {
 	let par = model.param[ep.i];
 	let dep = par.dep;
+	let ndep = par.ndep_cont;
+	
 	let list = par.list;
 	
 	if(ep.too_big){
@@ -525,7 +548,7 @@ function load_priorsplit(ep,source,dist)
 	
 	for(let r = 0; r < tab.nrow; r++){
 		let ind=[];
-		for(let i = 0; i < dep.length; i++){
+		for(let i = 0; i < ndep; i++){
 			let te = tab.ele[r][i].trim();
 			
 			let te2 = te;
@@ -536,11 +559,11 @@ function load_priorsplit(ep,source,dist)
 			else ind[i] = k;
 		}
 	
-		let ele = tab.ele[r][dep.length];
+		let ele = tab.ele[r][ndep];
 	
 		let pri = convert_text_to_prior(ele,par.pri_pos,dist);
 		if(pri.err == true){
-			alertp("Problem loading the element '"+ele+"' (col "+(dep.length+1)+", row "+(r+1)+"): "+pri.msg+" .");
+			alertp("Problem loading the element '"+ele+"' (col "+(ndep+1)+", row "+(r+1)+"): "+pri.msg+" .");
 		}
 		
 		set_element(prior_split,ind,pri);
@@ -555,7 +578,7 @@ function load_priorsplit(ep,source,dist)
 			let el = get_element(prior_split,ele_list[k]);
 			if(el == undefined){
 				let te = "Not all elements in the tensor could be loaded (e.g. '";
-				for(let i = 0; i < dep.length; i++){
+				for(let i = 0; i < ndep; i++){
 					if(i != 0) te += ", ";
 					te += "'"+list[i][ele_list[k][i]]+"'";
 				}
@@ -588,13 +611,12 @@ function update_prior_split()
 
 
 /// Finds the lists for the dependencies
-function par_find_list(par,op)
+function par_find_list(par,mod)
 {
 	let dep = par.dep;
 	let ndep = dep.length;
 	
 	if(ndep == 0) return;
-	if(par.type == "ind_eff") return;
 	
 	var list = [];
 	
@@ -604,11 +626,11 @@ function par_find_list(par,op)
 		}
 		else{
 			if(remove_prime(dep[i]) == "z"){
-				list[i] = find_ieg_list(par);
+				list[i] = find_ieg_list(par,mod);
 				if(list.length == 0) error("Cannot find ie list");
 			}
 			else{
-				list[i] = find_comp_from_index(dep[i]);
+				list[i] = find_comp_from_index(dep[i],mod);
 				if(list.length == 0) error("Cannot find compartments from index");
 			}
 		}
@@ -685,13 +707,13 @@ function check_param_valid(type)
 			
 		let warn = check_reserved_name(par.name,"par_allow");
 		if(warn != ""){
-			add_warning({mess:"Parameter name error", mess2:warn, warn_type:"reparam", siminf:type, name:par.name});
+			add_warning({mess:"Parameter name error", mess2:warn, warn_type:"ParamPage", siminf:type, name:par.name});
 		}
 	
 		if(par.variety == "reparam"){
 			if(par.time_dep){
 				if(par.spline.spline_radio.value != "Square"){
-					add_warning({mess:"Reparameterisation error", mess2:"A square spline must be used for time-varying reparameterised parameter '"+par.full_name+"'.", warn_type:"reparam", siminf:type, name:par.name});
+					add_warning({mess:"Reparameterisation error", mess2:"A square spline must be used for time-varying reparameterised parameter "+par.full_name+".", warn_type:"ReparamSquareSpline", name:par.name});
 				}
 			}
 		}
@@ -700,30 +722,40 @@ function check_param_valid(type)
 
 
 /// This ensures that a parameter is in view when it is altered on model->param page (e.g. reparamerisation)
-function par_in_view(type,th)
+function par_in_view(name)
 {
 	generate_screen();
-		
-	// Scrolls so can be viewed
 	
 	let l = find(inter.layer,"name","ModelParamContent");
 	if(l == undefined) return;
+
+	let th = find(model.param,"name",name);
+	if(th == undefined){ error("Could not find par view"); return;}
 	
 	let lay = inter.layer[l];
 	for(let i = 0; i < lay.but.length; i++){
 		let bu = lay.but[i];
-		if(bu.type == type && bu.i == th){
-			shift_button_in_view(l,i);
-			return;
+		if(bu.i == th){
+			switch(bu.type){
+			case "ParamSimElement": case "FactorElement": 
+			case "ReparamElement":
+			case "ReparamEqn": case "DefineEqn":
+				shift_button_in_view(l,i);
+				return;
+			}
 		}
 	}
+	
+	prr("Could not find to shift");
+	prr(th);
+	prr(lay.but);
 }
 
 /// Determines if a value needs to be set for a parameter
 function sim_value_required(par)
 {
 	if(par.variety != "const" && par.variety != "reparam" &&  par.variety != "define"){
-		if(!find_in(sim_param_not_needed,par.type)) return true;
+		if(param_needed(par,"sim")) return true;
 	}
 	
 	return false;
@@ -754,7 +786,7 @@ function sim_param_post_mean()
 				let inf_par = inf_param[th2];
 				if(!equal_vec(par.dep,inf_par.dep)) fl = true;
 				else{
-					if(par.dep.length == 0){
+					if(par.ndep_cont == 0){
 						let av = 0, nav = 0;
 						for(let i = 0; i < ps.length; i++){
 							if(ps[i].num >= burnin){
@@ -813,3 +845,30 @@ function sim_param_post_mean()
 	post({ param:strip_heavy(model.param), comment:st});
 }
 
+
+/// On the model parameter page ensures that a section is viewable
+function view_section(sec)
+{
+	let l = find(inter.layer,"name","ModelParamContent");
+	if(l == undefined) return;
+	
+	let but = inter.layer[l].but;
+		
+	let i = 0; 
+	while(i < but.length && !(but[i].te == sec && but[i].type == "CurvedOutline")) i++;
+	if(i < but.length) shift_button_in_view(l,i);
+	else prr("prob view sec");
+}
+
+
+/// Sets ndep_cont property
+function set_ndep_cont(par)
+{
+	par.ndep_cont = par.dep.length;
+	
+	if(par.variety == "define" && par.time_dep){
+		if(par.dep.length > 0 && par.dep[par.dep.length-1] == "t"){
+			par.ndep_cont--;
+		}
+	}
+}

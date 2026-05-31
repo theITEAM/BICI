@@ -62,6 +62,8 @@ let timer = new Timer();                          // Stores timers (for diagnost
 	
 let run_chain = [];
 
+let is_interface = false;                         // Shows not the interface
+
 /*
 let test_ch={testtest:[]};
 for(let i = 0; i< 10000000; i++){
@@ -129,8 +131,9 @@ function process(e)
 		if(model.warn.length > 0) update_mod = true;
 	}
 	
-	//prr(input.type+" type");
-	switch(input.type){
+	let itype = input.type;
+	//prr(itype+" type");
+	switch(itype){
 	case "Factor reduce":
 		model.factor_reduce(info.p,info.cl,info.fac);
 		update_mod = true;
@@ -195,7 +198,13 @@ function process(e)
 				par.set = false;
 			}
 			par.variety = "normal";
-			par.reparam_param_list=[];
+			par.prior = unset_prior();
+			par.prior_split_check = {check:false};
+			par.defrep_param_list=[];
+			par.defrep_ie_list=[];
+			par.defrep_fe_list=[];
+			par.defrep_warn=[];
+			set_ndep_cont(par);
 			update_mod = true;
 		}
 		break;
@@ -288,7 +297,7 @@ function process(e)
 			let so = info;
 			data_source_check_error("worker",so);
 			model.add_file_transition(so.info.p,so.info.cl,so.table,so.type);
-			post({ p:so.info.p, cl:so.info.cl, species:strip_heavy(model.species)});
+			post({ p:so.info.p, cl:so.info.cl, species:strip_heavy(model.species), warning:so.warning});
 		}
 		break;
 
@@ -368,7 +377,9 @@ function process(e)
 		break;
 		
 	case "Load Example": 
-		if(model) model.clear_res();
+		if(model){
+			model.clear_res();
+		}
 		load_bici("../Examples/"+info+".bici");
 		break;
 		
@@ -506,7 +517,7 @@ function process(e)
 				let ele_list = get_element_list(prior_split,dim);
 		
 				for(let k = 0; k < ele_list.length; k++){	
-					let pr_sp = unset_prior(par.type);	
+					let pr_sp = unset_prior();	
 					set_element(prior_split,ele_list[k],pr_sp);
 				}
 				
@@ -560,25 +571,23 @@ function process(e)
 		}
 		break;
 		
-	case "Edit Param": case "Edit Reparam": 
+	case "Edit Param": case "Edit Reparam": case "Edit Define": 
 		{
-			let par = model.param[info.i];
-		
-			info.value = par.value;	
+			let par = info.par_st;
+			let parm = model.param[info.i];
+			par.list = parm.list;
+			
+			info.value = parm.value;	
 			if(info.value == undefined) info.value = param_blank(par);
 			
-			info.list = par.list;
-			if(par.dist_mat){
-				set_dist(info,par);
-			}
+			info.time_dep = par.time_dep;
+			
+			info.list = parm.list;
+			if(par.dist_mat) set_dist(info,par);
 			else{
-				if(par.iden_mat){
-					set_iden(info,par);
-				}
+				if(par.iden_mat) set_iden(info,par);
 				else{
-					if(par.den_vec){
-						set_density(info,par);
-					}
+					if(par.den_vec) set_density(info,par);
 					else{
 						if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
 					}
@@ -618,18 +627,26 @@ function process(e)
 		}
 		break;
 		
-	case "Set Param": case "Set Reparam":
+	case "Set Param": case "Set Reparam": case "Set Define":
 		{
 			let i = info.i;
-			let par = model.param[i];
+			let par = info.par_st;	
+			
+			if(info.vari_new != undefined) par.variety = info.vari_new;
+			par.set = true;
+			
 			let err = check_param_value(input.type,par,info.value);
 			if(typeof err == 'string') alert_help("Problem updating",err);
+		
+			unescape_param_value(input.type,par,info.value);
 			
 			par.value = info.value;
-			par.set = true;
-			get_reparam_param_list(par);
+		
+			get_defrep_param_list(par);
+			model.param[i] = par;
 			
-			post({ i:i, value_desc:get_value_desc(par)});
+			update_model();
+			post({ par_name:par.name, param:strip_heavy(model.param), species:strip_heavy(model.species)});
 		}
 		break;
 		
@@ -643,7 +660,7 @@ function process(e)
 			par.prior_const = info.value;
 			par.prior_const_set = true;
 	
-			//get_reparam_param_list(par);
+			//get_defrep_param_list(par);
 			
 			post({ i:i, prior_const_desc:get_prior_const_desc(par)});
 		}
@@ -661,7 +678,7 @@ function process(e)
 		}
 		break;
 		
-	case "Load Reparam":
+	case "Load Reparam": case "Load Define":
 		{
 			let ep = info.ep;
 			data_source_check_error("worker",info.source);
@@ -884,7 +901,10 @@ function process(e)
 	if(update_mod == true){
 		update_model();
 
-		post({ type:"UpdateModel", param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
+		let do_after;
+		if(input.type == "UpdateModel") do_after = input.info;
+
+		post({ type:"UpdateModel", do_after:do_after, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
 	}
 }
 
@@ -896,19 +916,16 @@ function create_invalid_message(mess)
 		let list = [];
 		
 		for(let loop = 0; loop < 3; loop++){
-			let spec;
-			if(loop == 2) spec = get_species("ppc");
-			else spec = model.species;
-			
-			if(spec){
-				for(let p = 0; p < spec.length; p++){	
-					let sp = spec[p];
-	
-					let source, type;
+			let siminf = get_siminf(loop);
+			let nsp = get_so_nsp(siminf);
+			if(nsp != undefined){
+				for(let p = 0; p < nsp; p++){	
+					let source = get_source(siminf,p);
+					let type;
 					switch(loop){
-					case 0: source = sp.sim_source; type = "Population"; break;
-					case 1: source = sp.inf_source; type = "Data"; break;
-					case 2: source = sp.ppc_source; type = "Population Mod."; break;
+					case 0: type = "Population"; break;
+					case 1: type = "Data"; break;
+					case 2: type = "Population Mod."; break;
 					}
 					
 					let j = 0; 
@@ -920,17 +937,6 @@ function create_invalid_message(mess)
 						}
 						else j++;
 					}
-						
-						/*
-					for(let j = source.length-1; j >= 0; j--){
-						let so = source[j];
-						if(so.error == true){
-							//list.push("• <b>"+type+"</b> - "+so.type+": "+so.desc);
-							list.push("• <b>"+type+"</b> - "+so.name);
-							source.splice(j,1);
-						}
-					}
-					*/
 				}
 			}
 		}

@@ -366,10 +366,14 @@ function mouse_up(xx,yy)
 		{
 			let mo = inter.mode;
 			let p = mo.p, cl = mo.cl;
-			add_box();
-			mode_off();
-			
-			model.select_button_bubble("Annotation","Box",p,cl,model.species[p].cla[cl].annotation.length-1);
+			if(add_box()){	
+				mode_off();			
+				model.select_button_bubble("Annotation","Box",p,cl,model.species[p].cla[cl].annotation.length-1);
+			}
+			else{
+				mode_off();			
+				generate_screen();
+			}
 		}
 		break;
 	}

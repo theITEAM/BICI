@@ -1,13 +1,10 @@
-
 ###################### DATA DIRECTORY ######################
 
 data-dir folder="EX_F3-2-data-files"
 
-
 ####################### DESCRIPTION ########################
 
 description text="description.txt"
-
 
 ######################### DETAILS ##########################
 
@@ -17,51 +14,45 @@ inference start=0 end=100 timestep=0.5 nchain=3
 
 post-sim start=0 end=100
 
+######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
 
-######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
-
-species name="Animal" type="individual"
+species name="People" type="population"
 
 # SPECIES MODEL
 
-class name="DS" index="a"
+class name="DS" index="d"
 
-comp name="S" color="#009900" x=-10 y=0
-comp name="I" color="#ff2222" x=10 y=0
+comp name="S" color="#009900" x=-15 y=0
 
-trans name="S->I" value="exp(rate:β_v×exp(G_g)×{I,g}/N)"
+comp name="I" color="#ff2222" x=0 y=0
 
-class name="Vaccination" index="v"
+comp name="R" color="#4444ff" x=15 y=0
 
-comp name="Vac" color="#888888" x=-10 y=0
-comp name="Unvac" color="#aa00aa" x=10 y=0
+trans name="S->I" value="exp(rate:Σ_s' (β_s,s'×{I,s'})/N)"
 
-class name="Group" index="g"
+trans name="I->R" value="exp(rate:γ_s)"
 
-comp-all color="#005500" fix="true" file="comp-Group.csv"
+class name="Sex" index="s"
+
+comp name="M" color="#cb6a00" x=-10 y=0
+
+comp name="F" color="#aa00aa" x=10 y=0
 
 # SIMULATION INITIAL CONDITIONS
 
-add-ind-sim file="add-ind-sim.csv"
-
-
-# INFERENCE DATA
-
-add-ind-inf file="add-ind.csv"
-
-trans-data name="Infections" trans="S->I" obsrange="all" file="trans-data.csv"
-
-
+init-pop-sim type="fixed" focal="DS" file="init-pop-sim.csv"
 
 ######################## PARAMETERS ########################
 
-param name="N" constant="10"
+param name="N" constant=10000
 
-param name="σ^G" value="0.5" prior="inverse(0.01,2)"
+param name="β^FF" value=0.4
 
-param name="G_g" dist="normal(0,σ^G)"
+param name="β^FM" value=0.3
 
-param name="β_v" value="value-beta.csv" prior="inverse(0.01,1)"
+param name="β^MM" value=0.2
 
+param name="γ_s" value="gamma_value.csv" prior="inverse(0.01,1)"
 
+param name="β_s,s'" reparam="beta_reparam.csv"
 

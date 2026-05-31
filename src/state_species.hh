@@ -141,6 +141,7 @@ class StateSpecies                         // Stores information about the state
 		void update_ind_basic(const vector < vector <Event> > &ev_new);
 		void calculate_tnum_mean_para(vector <double> &tnum_mean, vector <unsigned int> list, unsigned int i, const vector < vector <double> > &popnum_t, const vector < vector <double> > &cpop_t, double dt) const;
 		double calculate_tnum_mean(unsigned int ti, unsigned int tr, const vector <double> &popnum, const vector <double> &cpop, double dt) const;
+		double calculate(const EquationInfo &ei, unsigned int ti, const vector < vector <double> > &popnum_t) const;
 		
 	private:	
 		unsigned int ti_sort;                  // Trigger events which have been sorted
@@ -179,7 +180,7 @@ class StateSpecies                         // Stores information about the state
 		Event get_event(EventType type, unsigned int i, unsigned int tr_gl, unsigned int move_c, unsigned int cl, unsigned int c_after, double t, const IndInfFrom &inf_from);
 	
 	private:
-		void implement_test_and_cull(unsigned int index, double tdiv);
+		void implement_test_and_cull(unsigned int index, double tdiv, const vector < vector <double> > &popnum_t);
 		void add_data_event(unsigned int i, double t, const vector <SimTrigEvent> &trig_vec, const vector < vector <double> > &popnum_t, const vector < vector <Poss> > &pop_ind);
 		bool allow_event(double t, const IndTransRef &itr) const;
 		void ie_sampler_init();
@@ -240,6 +241,7 @@ class StateSpecies                         // Stores information about the state
 		
 	// In 'state_species_like.cc'
 	public:
+	void print_likelihood_markov();
 		vector <double> likelihood_markov(unsigned int e, const vector <unsigned int> &list, double &like_ch);
 		vector <double> likelihood_nm_trans(unsigned int m, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, double &like_ch);
 		void likelihood_nm_trans_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> store);

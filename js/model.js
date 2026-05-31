@@ -23,6 +23,7 @@ class Model
 	ppc_res = { siminf:"ppc"};                       // Filter used to plot post-sim results
 	
 	update_model_needed = false;                     // Determines if init parameter is needed
+	
 	warn_view = true;                                // Determines if warning are shown on main page
 	
 	constructor()
@@ -111,9 +112,39 @@ class Model
 	
 	
 	/// Gets the species currently being viewed
+	get_mod()
+	{
+		let siminf = get_siminf_int();
+	
+		switch(siminf){
+		case "sim": return this; 
+		case "inf": return this; 
+		case "gen": return this.sim_res.plot_filter;
+		case "ppc": return this.inf_res.plot_filter;
+		}
+		error("Cannot get species:"+siminf);
+	}
+	
+	
+	/// Gets the species currently being viewed
+	get_mod_siminf(siminf)
+	{
+		switch(siminf){
+		case "sim": return this; 
+		case "inf": return this; 
+		case "gen": return this.sim_res.plot_filter;
+		case "ppc": return this.inf_res.plot_filter;
+		}
+		error("Cannot get species:"+siminf);
+	}
+	
+	
+	/// Gets the species currently being viewed
 	get_sp()
 	{
-		return this.species[this.get_p()];
+		let mod = this.get_mod();
+		let p = this.get_p();
+		return mod.species[p]; 
 	}
 	
 	
@@ -826,7 +857,7 @@ class Model
 		this.species[p].cla.push({ name:name, index:index, tra:[], ntra:0, hash_tra:init_hash(), comp:[], ncomp:0, hash_comp:init_hash(), nsource:0, nsink:0, annotation:[], default_map:dmap, camera:cam});
 		this.species[p].ncla++;
 		
-		data_update_add_classification(p);
+		if(op.imp != true) data_update_add_classification(p);
 		
 		if(debug == true) this.check_consistent();  
 		
@@ -1211,11 +1242,14 @@ class Model
 	
 	
 	/// Checks reparameterised eqaution
-	check_reparam()
+	check_defrep()
 	{
-		let th = inter.bubble.th;
+		let th = find(model.param,"name",inter.bubble.par_name);
+		if(th == undefined) error("Cannot find th");
 		let par = model.param[th];
-		let res = check_reparam(par.reparam_eqn,th);
+		let eq;
+		if(par.variety == "define") eq = par.define_eqn; else eq = par.reparam_eqn;
+		let res = define_reparam_eqn_check(eq,th);
 		if(res.err == true) return res;
 	
 		update_param();
@@ -1223,12 +1257,14 @@ class Model
 		return success();
 	}
 	
+	
 	/// Adds a defined equaation
 	check_define()
 	{
-		let th = inter.bubble.th;
+		let th = find(model.param,"name",inter.bubble.par_name);
+		if(th == undefined) error("Cannot find th");
 		let par = model.param[th];
-		let res = check_reparam(par.define_eqn,th);
+		let res = define_reparam_eqn_check(par.define_eqn,th);
 		if(res.err == true) return res;
 	
 		update_param();
@@ -1242,7 +1278,7 @@ class Model
 	{
 		extract_equation_properties(ob.eqn1);
 		extract_equation_properties(ob.eqn2);
-		
+	
 		let par = ob.eqn1.param;
 		if(par.length != 1){ 
 			if(par.length == 0)	return err("Does not contain a parameter");
@@ -2064,7 +2100,7 @@ class Model
 		let old_name = claa.name
 		if(new_name == old_name) return;
 
-		let eq_list = this.find_equation_list();
+		let eq_list = this.find_eqn_list();
 		
 		let len = old_name.length;
 		let dif = new_name.length - old_name.length;
@@ -2103,7 +2139,7 @@ class Model
 		let old_name = this.species[p].name;
 		if(new_name == old_name) return;
 	
-		let eq_list = this.find_equation_list();
+		let eq_list = this.find_eqn_list();
 		
 		for(let i = 0; i < eq_list.length; i++){
 			let eqn = eq_list[i];	
@@ -2124,7 +2160,7 @@ class Model
 				break;
 			 
 			case "define":
-				{
+				if(par.define_eqn_on){
 					let eqn = create_equation(par.define_eqn,"define_eqn");
 					this.rename_species_eqn(eqn,old_name,new_name);
 					par.define_eqn = eqn.te;
@@ -2173,7 +2209,7 @@ class Model
 			}
 		}
  
-		let eq_list = this.find_equation_list();
+		let eq_list = this.find_eqn_list();
 		
 		for(let i = 0; i < eq_list.length; i++){
 			let eqn = eq_list[i];	
@@ -2201,7 +2237,7 @@ class Model
 				break;
 			 
 			case "define":
-				{
+				if(par.define_eqn_on){
 					let eqn = create_equation(par.define_eqn,"define_eqn");
 					this.rename_index_eqn(eqn,old_name,new_name);
 					par.define_eqn = eqn.te;
@@ -2289,7 +2325,7 @@ class Model
 			}
 			else{	
 				switch(ele){
-				case "eqn_appear": break;
+				case "within": break;
 				default:
 					{
 						let ob2 = ob[ele];
@@ -2314,7 +2350,7 @@ class Model
 		if(name == "") return;
 		
 		for(let ele in ob){
-			if(ele != "eqn_appear"){ 
+			if(ele != "within"){ 
 				let ob2 = ob[ele];
 				if(ob2 == name){
 					error("'"+name+"' found here: "+root);
@@ -2366,8 +2402,11 @@ class Model
 	
 	
 	/// Finds a list of all the equations in the model
-	find_equation_list(all_param)
+	find_eqn_list()
 	{
+		return find_eqn_list();
+		
+		/*
 		let eqn_list = [];
 		for(let p = 0; p < this.species.length; p++){
 			let sp = this.species[p];
@@ -2380,53 +2419,62 @@ class Model
 				
 					let val = traa.value;
 					if(val.bp_eqn != undefined){
-						if(all_param == true || traa.branch == true){
+						if(traa.branch == true){
 							this.add_equation_to_list(eqn_list,val.bp_eqn,eqn_info);
 						}
 					}
 					
 					if(val.mean_eqn != undefined){
-						if(all_param == true || traa.type == "exp(mean)" || traa.type == "gamma" || traa.type == "erlang" || traa.type == "log-normal"){
+						if(traa.type == "exp(mean)" || traa.type == "gamma" || traa.type == "erlang" || traa.type == "log-normal"){
 							this.add_equation_to_list(eqn_list,val.mean_eqn,eqn_info);
 						}
 					}
 					
 					if(val.rate_eqn != undefined){
-						if(all_param == true || traa.type == "exp(rate)"){
+						if(traa.type == "exp(rate)"){
 							this.add_equation_to_list(eqn_list,val.rate_eqn,eqn_info);
 						}
 					}
 					
 					if(val.scale_eqn != undefined){
-						if(all_param == true || traa.type == "weibull"){
+						if(traa.type == "weibull"){
 							this.add_equation_to_list(eqn_list,val.scale_eqn,eqn_info);
 						}
 					}
 					
 					if(val.shape_eqn != undefined){
-						if(all_param == true || traa.type == "weibull"){
+						if(traa.type == "weibull"){
 							this.add_equation_to_list(eqn_list,val.shape_eqn,eqn_info);
 						}
 					}
 						
 					if(val.cv_eqn != undefined){
-						if(all_param == true || traa.type == "gamma" || traa.type == "log-normal"){
+						if(traa.type == "gamma" || traa.type == "log-normal"){
 							this.add_equation_to_list(eqn_list,val.cv_eqn,eqn_info);
 						}
 					}
 				}
 			}
 			
-			for(let i = 0; i < sp.inf_source.length; i++){
-				let so = sp.inf_source[i];
+			let source = get_source("inf",p);
+			for(let i = 0; i < source.length; i++){
+				let so = source[i];
 				
 				let eqn_info = {p:p, i:i};
 					
-				if(so.type=="Diag. Test"){
-					// TO DO NOW
-					//pr("SPEC"); pr(so.spec);
-					this.add_equation_to_list(eqn_list,so.spec.Se_eqn,eqn_info);
+				if(so.type=="Diag. Test" || so.type=="Test-and-cull"){
+					let cb = so.spec.check_box.value; 
+					for(let ci = 0; ci < cb.length; ci++){
+						if(cb[ci].check){
+							let Se = cb[ci].Se_eqn.te;
+							this.add_equation_to_list(eqn_list,cb[ci].Se_eqn,eqn_info);
+						}
+					}
 					this.add_equation_to_list(eqn_list,so.spec.Sp_eqn,eqn_info);
+					
+					//add_equation_to_list(eqn_list,so.spec.Sp_eqn,eqn_info);
+					
+					//this.add_equation_to_list(eqn_list,so.spec.Se_eqn,eqn_info);
 				}
 				
 				if(so.type == "Compartment"){
@@ -2463,6 +2511,7 @@ class Model
 		}
 		
 		return eqn_list;
+		*/
 	}
 	
 	
@@ -2600,12 +2649,20 @@ class Model
 	add_file_compartment(p,cl,tab,col)
 	{
 		percent(0);
-		
+	
 		this.remove_repeated(tab,0);
 		
 		clear_classification(p,cl);
 		
 		let claa = this.species[p].cla[cl];	
+		
+		// Removes any box annotations
+		let i = 0;
+		while(i < claa.annotation.length){
+			if(claa.annotation[i].type == "box") claa.annotation.splice(i,1);
+			else i++;
+		}
+		
 		let cam = claa.camera;
 
 		let pos_x=[], pos_y=[];
@@ -2622,7 +2679,7 @@ class Model
 			
 			let gapx = 4, gapy = 4;
 			
-			let ratio = (page_char_wid-menu_width)/page_char_hei;
+			let ratio = (page_char_wid-menu_width)/page_char_hei_aim;
 			
 			ratio *= (compartment_height+gapy)/(w_max+gapx);
 			
@@ -2724,7 +2781,7 @@ class Model
 	add_file_transition(p,cl,tab,so_type)
 	{
 		let claa = this.species[p].cla[cl];	
-		claa.tra=[]; claa.ntra = 0; claa.hash_tra=[] 
+		claa.tra=[]; claa.ntra = 0; claa.hash_tra=init_hash();
 		claa.nsource = 0; claa.nsink = 0;
 		
 		let cam = claa.camera;
@@ -3088,9 +3145,9 @@ class Model
 		
 		let list=[];
 		
-		let inf_source = model.species[p].inf_source;
-		for(let i = 0; i < inf_source.length; i++){
-			let so = inf_source[i];
+		let source = get_source("inf",p);
+		for(let i = 0; i < source.length; i++){
+			let so = source[i];
 			switch(so.type){
 			case "Add Pop.": case "Remove Pop.": 
 			case "Add Ind.": case "Remove Ind.": case "Move Ind.": 
@@ -3472,12 +3529,12 @@ class Model
 		let wa = res.run_warning;
 		if(wa.length > 0){
 			if(wa.length == 1){
-				alert_help("Run time warning",wa[0]);
+				alert_help("Run time warning",add_full_stop(wa[0]));
 			}
 			else{
 				let te="";
 				for(let i = 0; i < wa.length; i++){
-					te += "• "+wa[i]+endl;
+					te += "• "+add_full_stop(wa[i])+endl;
 				}
 				alert_help("Run time warnings",te);
 			}

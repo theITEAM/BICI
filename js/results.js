@@ -12,8 +12,9 @@ function results_finalise(result,per_start,per_end)
 
 
 /// Adds information about the model into the results (such that results can be plotted)
-function results_add_model(result,details,siminf,bscript)
+function results_add_model(result,details,siminf,bscript,low_mem)
 {
+	result.low_mem = low_mem;
 	result.sample = [];
 	result.par_sample = [];
 	result.hash_ref = new Hash(); 
@@ -73,7 +74,7 @@ function set_par_output(param,max,siminf)
 			if(par.variety == "const"){
 				if(param_num_element(par) < max) par.output = true;
 			}
-			if(par.type == "derive_param"){
+			if(par.derive){
 				par.output = true;
 			}
 		}
@@ -144,9 +145,9 @@ function set_genetic_data(result)
 {
 	if(result.siminf == "inf"){
 		for(let p = 0; p < result.species.length; p++){
-			let sp = result.species[p];
-			for(let i = 0; i < sp.inf_source.length; i++){
-				let is = sp.inf_source[i];
+			let source = get_source("inf",p);
+			for(let i = 0; i < source.length; i++){
+				let is = source[i];
 				if(is.type == "Genetic"){				
 					result.genetic_data = copy(is.table.ele);
 				}
@@ -163,8 +164,8 @@ function create_param_const(result,siminf)
 	if(siminf == "sim"){ 
 		let th = 0;
 		while(th < result.param.length){
-			if(find_in(sim_param_not_needed,result.param[th].type) == undefined ||
-				result.param[th].type =="derive_param"){
+			let par = result.param[th];
+			if(param_needed(par,"sim") || par.derive){
 				th++;
 			}
 			else result.param.splice(th,1);
@@ -250,7 +251,7 @@ function get_param_value(i,source,lines,result,warn,mode)
 	
 	let spl = comma_split(lines[i]);
 	let name = remove_quote(spl[0].replace(/->/g,"→"));
-	name = remove_escape_char(name);
+	//name = remove_escape_char(name);
 
 	let th = find(result.param,"name",name);
 	if(th == undefined){
@@ -320,7 +321,7 @@ function get_param_value(i,source,lines,result,warn,mode)
 				
 				let dep = par.dep;
 				
-				let ndep = dep.length;
+				let ndep = par.dep.length;
 			
 				if(spl_head.length != ndep+1){
 					alert_sample(warn,14);
@@ -1058,6 +1059,8 @@ function plot_variety(view)
 /// Initialise plot filters
 function initialise_plot_filters_setup(result,source)
 {	
+	if(result.low_mem) source.run_warning.push("Due to a lack of memory this is loaded in 'low memory mode'");
+		
 	source.on = true;
 	source.plot_filter = {};
 	let rpf = source.plot_filter;
@@ -1082,8 +1085,12 @@ function initialise_plot_filters_setup(result,source)
 			
 			cla_red[cl] = { name:claa.name, index:claa.index};
 			if(claa.ncomp > COMP_FILTER_MAX) cla_red[cl].comp_too_large = true;
-			else{ cla_red[cl].comp = claa.comp; cla_red[cl].ncomp = claa.ncomp;} 
-			
+			else{ 
+				cla_red[cl].hash_comp = claa.hash_comp; 
+				cla_red[cl].comp = claa.comp; 
+				cla_red[cl].ncomp = claa.ncomp;
+			} 
+		
 			if(claa.ntra > TRANS_FILTER_MAX) cla_red[cl].tra_too_large = true;
 			else{ cla_red[cl].tra = claa.tra; cla_red[cl].ntra = claa.ntra;} 
 
@@ -1094,12 +1101,19 @@ function initialise_plot_filters_setup(result,source)
 			cla_red[cl].sel = {radio:{value:0, param:false}, list:list};
 		}
 		
-		rpf.species[p] = { sel_class:copy(pos_class[0]), pos_class:pos_class, cla:cla_red, ncla:sp.ncla, name:sp.name, type:sp.type, trans_tree:sp.trans_tree, filter:[], cl_marg:sp.marg_plot.cl_marg};
+		let ind_eff_group_red = [];
+		for(let i = 0; i < sp.ind_eff_group.length; i++){
+			let ieg = sp.ind_eff_group[i];
+			ind_eff_group_red.push({ie_list:ieg.ie_list, name:ieg.name});
+		}
+
+		rpf.species[p] = { sel_class:copy(pos_class[0]), pos_class:pos_class, cla:cla_red, ncla:sp.ncla, name:sp.name, type:sp.type, trans_tree:sp.trans_tree, filter:[], cl_marg:sp.marg_plot.cl_marg, ind_eff_group:ind_eff_group_red};
 		
 		if(rpf.siminf == "sim"){ // Sets up selection for test and cull
 			let pos_test_and_cull=[];
-			for(let i = 0; i < sp.sim_source.length; i++){
-				let ss = sp.sim_source[i];
+			let source = get_source(rpf.siminf,p);
+			for(let i = 0; i < source.length; i++){
+				let ss = source[i];
 				if(ss.type == "Test-and-cull"){
 					pos_test_and_cull.push({te:ss.name, i:i});
 				}
@@ -1123,6 +1137,8 @@ function initialise_plot_filters(result,source)
 {
 	let rpf = source.plot_filter;
 
+	rpf.low_mem = result.low_mem;
+	
 	// Initialises distribution plots
 	let pos_bin = [];
 	pos_bin.push({te:10}); pos_bin.push({te:20}); pos_bin.push({te:50}); 
@@ -1155,12 +1171,14 @@ function initialise_plot_filters(result,source)
 	rpf.sel_chain = copy(rpf.pos_chain[0]);	
 
 	// Possibilities for viewing diagnostic information
-	rpf.pos_diag_chain = [];
-	for(let i = 0; i < result.chains.length; i++){
-		rpf.pos_diag_chain.push({te:"Chain "+result.chains[i], i:i});
+	if(result.chains.length > 0){
+		rpf.pos_diag_chain = [];
+		for(let i = 0; i < result.chains.length; i++){
+			rpf.pos_diag_chain.push({te:"Chain "+result.chains[i], i:i});
+		}
+		rpf.sel_diag_chain = copy(rpf.pos_diag_chain[0]);	
 	}
-	rpf.sel_diag_chain = copy(rpf.pos_diag_chain[0]);	
-
+	
 	// Possibilities for chain distribution 
 	rpf.pos_distchain = [];
 	rpf.pos_distchain.push({te:"Combine", i:"Combine"});
@@ -1252,8 +1270,9 @@ function initialise_plot_filters(result,source)
 			}
 			
 			if(rpf.siminf == "inf" || rpf.siminf == "ppc"){
-				for(let k = 0; k < sp.inf_source.length; k++){
-					let so = sp.inf_source[k];
+				let source = get_source("inf",p);
+				for(let k = 0; k < source.length; k++){
+					let so = source[k];
 					if(so.type == "Ind. Eff."){
 						list_data.push({name:"["+so.spec.drop.te+"]"});
 						so_fl = true;
@@ -1428,8 +1447,10 @@ function initialise_plot_filters(result,source)
 	if(result.siminf == "inf" || result.siminf == "ppc"){
 		for(let p = 0; p < result.species.length; p++){
 			let sp = result.species[p];
-			for(let i = 0; i < sp.inf_source.length; i++){
-				let so = sp.inf_source[i];
+			
+			let source = get_source("inf",p);
+			for(let i = 0; i < source.length; i++){
+				let so = source[i];
 			
 				switch(so.type){
 				case "Population": case "Pop. Trans.": 
@@ -1516,7 +1537,7 @@ function initialise_plot_filters(result,source)
 		let sp = result.species[p];
 	
 		let pos_diag_view = [];
-		if(sp.type != "Deterministic"){
+		if(sp.type != "Deterministic" && result.low_mem == false){
 			pos_diag_view.push({te:"Trans. (exp.)"});	
 			pos_diag_view.push({te:"Trans. (dist.)"});	
 			pos_diag_view.push({te:"Trans. (bias)"});
@@ -1583,9 +1604,10 @@ function initialise_plot_filters(result,source)
 	for(let p = 0; p < result.species.length; p++){
 		let pos = [];
 		pos.push({te:"All"});
-		let inf_so = result.species[p].inf_source;
-		for(let i = 0; i < inf_so.length; i++){
-			let is = inf_so[i];
+		let source = get_source("inf",p);
+		
+		for(let i = 0; i < source.length; i++){
+			let is = source[i];
 			if(is.type == "Ind. Group"){
 				let ele = is.table.ele;
 				let name_list = [];
@@ -1650,7 +1672,7 @@ function get_par_pos_view(par,so)
 	let name = par.full_name;
 	
 	if(par.spline && par.spline.on == true){ // Possible views for splines
-		if(par.dep.length > 1){
+		if(par.ndep_cont > 1){
 			pos_view.push({te:"Graph (all)", title:"Spline profile "+name, type:"Timevary"});
 			pos_view.push({te:"Graph (split)", title:"Spline profile "+name, type:"Timevary"});
 		}
@@ -1659,7 +1681,7 @@ function get_par_pos_view(par,so)
 		}
 		
 		let title = "Time variation in "+name;
-		switch(par.dep.length){
+		switch(par.ndep_cont){
 		case 2:
 			{
 				let index = remove_prime(par.dep[0]);
@@ -1689,7 +1711,7 @@ function get_par_pos_view(par,so)
 		}
 	}
 	else{
-		if(par.dep.length == 1){                       // Possible views for vectors
+		if(par.ndep_cont == 1){                       // Possible views for vectors
 			let title = "Vector "+name;
 		
 			pos_view.push({te:"Histogram", title:title, type:"Vector"});
@@ -1702,7 +1724,7 @@ function get_par_pos_view(par,so)
 			}
 		}
 		
-		if(par.dep.length == 2){                       // Possible views for matrices
+		if(par.ndep_cont == 2){                       // Possible views for matrices
 			let title = "Matrix "+name;
 			
 			pos_view.push({te:"Matrix", title:title, type:"Matrix"});
@@ -1776,8 +1798,8 @@ function add_univariate(name,result,total_param_list,pos_paramview,pos_genview,d
 	for(let th = 0; th < result.param.length; th++){
 		let par = result.param[th];		
 		if(par.variety != "define"){
-			if((par.type == "derive_param" && der_fl) || (par.type != "derive_param" && !der_fl)){
-				if(par.output == true && par.dep.length == 0 && par.selop == undefined){
+			if((par.derive && der_fl) || (par.derive != true && !der_fl)){
+				if(par.output == true && par.ndep_cont == 0 && par.selop == undefined){
 					if(par.variety != "const"){
 						list.push({th:th, index:[], name:param_name_index(par,[])});
 					
@@ -1803,8 +1825,8 @@ function add_multivariate(result,total_param_list,pos_paramview,pos_genview,der_
 		let par = result.param[th];
 	
 		if(par.variety != "define"){
-			if((par.type == "derive_param" && der_fl) || (par.type != "derive_param" && !der_fl)){
-				if(par.dep.length > 0 && par.type != "param factor" && !par.dist_mat && !par.iden_mat && !par.den_vec){
+			if((par.derive && der_fl) || (par.derive != true && !der_fl)){
+				if(par.ndep_cont > 0 && par.param_fac != true && !par.dist_mat && !par.iden_mat && !par.den_vec){
 					let list = [];
 					let list_split = [];
 					let para = true;

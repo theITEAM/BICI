@@ -5,6 +5,9 @@
 // working on linux 02/03/26
 // working on windows 11/03/26
 
+CURRENTLY
+run from windows
+
 // SORT is used to show areas of code that need sorting.
 
 TO DO GENTIC
@@ -15,34 +18,35 @@ WORK TO DO
 - Look at epi-phlyo paper andrea sent (in papers tp read -> new)
 - For calculating R0... I think running "trans-tree" should now work under simulation and posterior simulation (but not inference, but anyway you don't need this. To get this to work you need to run 'species' with 'trans-tree="on"' 
 
-TO DO
-- Check Jamies reordering
-- Checks for transition and compartment data at the same times
-- checks for compartment information simultaneous
-- Transition data memory intensive for Grants models?
-- Check elements for ppc  if(so.info.siminf == "ppc") return; // TO DO  
-
-- Dynamic changes to parameters
-
-- Save single file / with directory for inference / post sim results
--- Get posterior simulation from system of different size
--- test maximum step time warning
-
--- interface simulate with parameter in observation model
--- In model.js // TO DO NOW
--- should not have uniform priors for covariance matrix. for some reason jefreys was not coming up
-
+TESTING
 -- Do testing of genetic part
+-- Get posterior simulation from system of different size
+-- test proposals using initial state
+-- test trans-tree proposals using initial state
+
+GRANT
+- Grant problem AI (OP problem)
+- Grant FMD model (not in sharepoint)
+- Grant noticed filters not working
+
+TO DO
+- Can grants problem matched_local_10km be made to run faster? slow because not linear in populations... need to keep track of linear combinations of populations
+- Add compress option in interface
+- When doing tornado plots set permissions directly for executable
+- Add filters for compartmental and test data when simulating
+- Dynamic changes to parameters
+- Reduce state parameter sample in low memory mode
+- set-ind-effect-sim has been added, but how about set-ind-effect-inf and set-ind-effect-post-sim
+-- test maximum step time warning
+-- interface simulate with parameter in observation model
 -- For initial conditions view as table or as compartment (good when there are a lot of compartments)
 -- Sort out fixed initial population for individual and population-based models (perhaps convert to Dirichlet?)
 -- individual sampler improvement
 -- Sort out how partially observed transitions affect ind sampler... 
 -- Stop file read from loading when one file cannot be loaded
 -- get_calc_hash_num(  does this need to be improved?
--- test proposals using initial state
--- test trans-tree proposals using initial state
 -- mac memory
--- memory assessment in window (after changes made in v0.83)
+-- cannot add midpoints when uploading transitions into interface
 
 
 NEXT
@@ -145,6 +149,16 @@ auto k = 0u; while(k < sum_store.size() && z > sum_store[k]) k++;
 auto k = 0u; while(k < trig_event.size() && trig_event[k].tdiv != eve.tdiv) k++;
 
 DONE NEW
+- Grant problem with defined
+- "*1" did not work in interface- for wildcard individual group
+- individual effect in population should be allowed in parameter define
+- ability to "define" different elements (useful in aeronn problem)
+- Add link to BICI website
+- Save single file / with directory for inference / post sim results
+- Allow for \eta greek characters when loading up reparameterisation
+- Checks for transition and compartment data at the same times
+- checks for compartment information simultaneous
+-- Check Jamies reordering
 -- derived integral not working
 -- Get transmission tree with individual effects working (e.g. Jamie Data -> trans_tree
 -- Jamie's suggestion of "sample=median"

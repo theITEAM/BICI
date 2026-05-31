@@ -2540,3 +2540,19 @@ void State::print_iif() const
 		}
 	}
 }
+
+
+/// Diagnostic scans a parameter to check if likelihood is correct
+void State::scan_param()
+{
+	auto value = param_val.value;
+	for(auto val = 0.000001; val < 0.0001; val += 0.000001){
+		value[0] = val;
+		param_val = model.set_param_val(value);
+		likelihood_from_scratch();
+		
+		cout << like.markov << " Likelihood" << endl;
+	}
+
+	emsg("Scan parameter");
+}

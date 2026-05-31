@@ -76,7 +76,7 @@ function button_action(bu,action_type)
 
 	update_edit_source(bu);
 	
-	pr(ac+" ac");
+	prr(ac+" ac");
 	
 	switch(ac){
 	case "Tab":		
@@ -884,21 +884,13 @@ function button_action(bu,action_type)
 		}
 		break;
 		
-	case "DoneReparamEquation": 
+	case "DoneReparamEquation": case "DoneDefineEquation": 
 		if(bubble_check_error() == false){
 			copy_back_to_source();
 			
-			let res = model.check_reparam()
+			let res = model.check_defrep();
 			if(res.err == false) close_bubble();
 			else output_help(res);
-		}
-		break;
-		
-	case "DoneDefineEquation": 
-		if(bubble_check_error() == false){
-			copy_back_to_source();
-			close_bubble();
-			update_param();
 		}
 		break;
 		
@@ -957,13 +949,8 @@ function button_action(bu,action_type)
 			let p = info.p; 
 			if(p == undefined){ error("Data source does not have p"); return}
 
-			let sp = model.species[p];
-			switch(bu.info.siminf){
-			case "sim": edit_source = sp.sim_source[info.i]; break;
-			case "inf": edit_source = sp.inf_source[info.i]; break;
-			case "ppc": edit_source = model.inf_res.plot_filter.species[p].ppc_source[info.i]; break;
-			case "gen": edit_source = model.sim_res.plot_filter.species[p].gen_source[info.i]; break;
-			}
+			let source = get_source(bu.info.siminf,p)
+			edit_source = source[info.i];
 			edit_source.info_store = info;
 		}
 		edit_source.edit_spec = true;
@@ -1093,6 +1080,10 @@ function button_action(bu,action_type)
 
 	case "MoveIndividuals": 
 		move_data(bu); 
+		break;
+		
+	case "SetIE": 
+		set_ind_eff(bu);
 		break;
 	
 	case "FixedEffect": 
@@ -1505,21 +1496,21 @@ function button_action(bu,action_type)
 		break;
 		
 	case "EditParamDone":
-		if(edit_param_check_error() == false){
+		{
 			let ep = inter.edit_param;
-			start_worker("Set Param",{i:ep.i, value:ep.value});
+			start_worker("Set Param",{i:ep.i, value:ep.value, vari_new:ep.vari_new, par_st:ep.par_st});
 		}
 		break;
 		
 	case "EditPriorConstDone":
-		if(edit_param_check_error() == false){
+		{
 			let ep = inter.edit_param;
 			start_worker("Set Prior Const",{i:ep.i, value:ep.value});
 		}
 		break;
 		
 	case "EditWeightDone":
-		if(edit_param_check_error() == false){
+		{
 			inter.edit_source = false;
 			let ep = inter.edit_param;
 			
@@ -1529,16 +1520,23 @@ function button_action(bu,action_type)
 		break;
 		
 	case "EditPriorSplitDone": case "EditDistSplitDone": 
-		if(edit_param_check_error() == false){
+		{
 			let ep = inter.edit_param;
 			start_worker("Set PriorSplit",{i:ep.i, prior_split:ep.prior_split});	
 		}
 		break;
 		
 	case "EditReparamDone":
-		if(edit_param_check_error() == false){
+		{
 			let ep = inter.edit_param;
-			start_worker("Set Reparam",{i:ep.i, value:ep.value});
+			start_worker("Set Reparam",{i:ep.i, value:ep.value, vari_new:ep.vari_new, par_st:ep.par_st});
+		}
+		break;
+		
+	case "EditDefineDone":
+		{
+			let ep = inter.edit_param;
+			start_worker("Set Define",{i:ep.i, value:ep.value, vari_new:ep.vari_new, par_st:ep.par_st});
 		}
 		break;
 		
@@ -1556,6 +1554,11 @@ function button_action(bu,action_type)
 		
 	case "LoadReparam": 
 		start_data_source(ac,{},{load_file:"LoadReparam"});
+		file_add_datatable(); 	
+		break;
+		
+	case "LoadDefine": 
+		start_data_source(ac,{},{load_file:"LoadDefine"});
 		file_add_datatable(); 	
 		break;
 	
@@ -1577,6 +1580,10 @@ function button_action(bu,action_type)
 		start_worker("Load Reparam",{ep:inter.edit_param, source:edit_source});	
 		break;
 		
+	case "LoadDefineDone":
+		start_worker("Load Define",{ep:inter.edit_param, source:edit_source});	
+		break;
+		
 	case "LoadPriorSplitDone": 
 		start_worker("Load PriorSplit",{ep:inter.edit_param, source:edit_source});	
 		break;
@@ -1593,18 +1600,26 @@ function button_action(bu,action_type)
 	case "AddConstParam":
 		{
 			let th = bu.i;
-			model.param[th].variety = "const";
+			let par = model.param[th];
 			close_bubble();
-			par_in_view("ParamSimElement",th);
+			
+			if(par.ndep_cont == 0){
+				par.variety = "const";
+				press_button_prop("ModelParamContent","ParamSimElement",["name"],par.name);
+			}
+			else{
+				start_worker("Edit Param",{type:"Const", vari_new:"const", par_st:par, source:model, label_info:par.label_info, i:th});
+			}
 		}
 		break;
 		
 	case "AddPriorConstParam":
 		{
 			let th = bu.i;
-			model.param[th].prior_const_on = true;
+			let par = model.param[th];
+			par.prior_const_on = true;
 			close_bubble();
-			par_in_view("ParamSimElement",th);
+			par_in_view(par.name);
 		}
 		break;
 		
@@ -1619,47 +1634,81 @@ function button_action(bu,action_type)
 			par.factor = true;
 			par.pri_pos = prior_factor_pos;
 			close_bubble();
-			par_in_view("FactorElement",th);
-		}
-		break;
-		
-	case "AddReparamParam":
-		{
-			let par = model.param[bu.i];
-			if(par.dep.length > 0){
-				inter.bubble.set_reparam_type = true;
-				inter.bubble.k = bu.i;
-				inter.bubble.radio = {value:"equation"};
-			}
-			else{
-				par.variety = "reparam";
-				par.reparam_eqn_on = false;
-				press_button_prop("ModelParamContent","ReparamElement",["name"],par.name);
-			}
+			par_in_view(par.name);
 		}
 		break;
 		
 	case "AddDefineParam":
 		{
 			let par = model.param[bu.i];
-			par.variety = "define";
-			press_button_prop("ModelParamContent","DefineEqn",["name"],par.name);
+			let ndep = par.dep.length; if(par.time_dep) ndep--;
+			if(ndep > 0){
+				inter.bubble.set_define_type = true;
+				inter.bubble.k = bu.i;
+				inter.bubble.radio = {value:"equation"};
+			}
+			else{
+				par = create_new_param(par,"define");
+				press_button_prop("ModelParamContent","DefineEqn",["name"],par.name);
+			}
+		}
+		break;
+	
+	case "AddDefineParam2":
+		{
+			let th = inter.bubble.k;
+			let par = copy(model.param[th]);
+			
+			create_new_param(par,"define");
+		
+			par.define_eqn_on = false; 
+			if(inter.bubble.radio.value == "equation") par.define_eqn_on = true;
+	
+			close_bubble();	
+			
+			if(par.define_eqn_on){
+				model.param[th] = par;
+				update_do_after({type:"press_but_prop", lay_name:"ModelParamContent", ty:"DefineEqn", name:par.name});
+			}
+			else{
+				start_worker("Edit Define",{type:"Define", par_st:par, vari_new:"define", source:model, label_info:par.label_info, i:th});
+			}
+		}
+		break;
+		
+	case "AddReparamParam":
+		{
+			let par = model.param[bu.i];
+			if(par.ndep_cont > 0){
+				inter.bubble.set_reparam_type = true;
+				inter.bubble.k = bu.i;
+				inter.bubble.radio = {value:"equation"};
+			}
+			else{
+				par.variety = "reparam";
+				press_button_prop("ModelParamContent","ReparamEqn",["name"],par.name);
+			}
 		}
 		break;
 		
 	case "AddReparamParam2":
 		{
 			let th = inter.bubble.k;
-			let par = model.param[th];
-			par.variety = "reparam";
-			par.reparam_eqn_on = false;
+			let par = copy(model.param[th]);
+			
+			par.reparam_eqn_on = false; 
 			if(inter.bubble.radio.value == "equation") par.reparam_eqn_on = true;
+	
 			close_bubble();	
+			
 			if(par.reparam_eqn_on){
-				press_button_prop("ModelParamContent","ReparamEqn",["name"],par.name);
-				//par_in_view("ReparamEqn",th);
+				par.variety = "reparam";
+				model.param[th] = par;
+				update_do_after({type:"press_but_prop", lay_name:"ModelParamContent", ty:"ReparamEqn", name:par.name});
 			}
-			else par_in_view("ReparamElement",th);
+			else{
+				start_worker("Edit Reparam",{type:"Reparam", par_st:par, vari_new:"reparam", source:model, label_info:par.label_info, i:th});
+			}
 		}
 		break;
 		
@@ -1769,7 +1818,9 @@ function button_action(bu,action_type)
 			select_bubble_over();
 		
 			let Amat = model.species[bu.p].ind_eff_group[bu.i].A_matrix;
-			inter.bubble.type_radio = {value:Amat.type};
+			let val = Amat.type;
+			if(val == undefined) val = "pedigree";
+			inter.bubble.type_radio = {value:val};
 		}
 		break;
 	
@@ -1844,6 +1895,7 @@ function button_action(bu,action_type)
 		{
 			let th = bu.i;
 			let par = model.param[th];		
+			//par_st:ep.par_st, 
 		
 			start_worker("Edit DistSplit",{type:"DistSplit", source:bu.source, label_info:par.label_info, i:th})
 		}
@@ -1854,8 +1906,7 @@ function button_action(bu,action_type)
 		break;
 		
 	case "EditDefineValue":
-		select_bubble_over();
-		inter.bubble.th = bu.i;
+		edit_define_value(bu.i,inter.layer[inter.over.layer].name,inter.over.i,bu.source);
 		break;
 		
 	case "EditAlpha":
@@ -2116,7 +2167,7 @@ function button_action(bu,action_type)
 		
 			switch(par.variety){
 			case "normal":
-				if(par.type == "derive_param"){
+				if(par.derive){
 					let der = model.derive;
 					
 					let fl = false;
@@ -2134,11 +2185,11 @@ function button_action(bu,action_type)
 				}
 				break;
 				
-			case "const": case "reparam": case "dist":
+			case "const": case "reparam": case "dist": case "define":
 				select_bubble_param(par.name);
 				break;
-					
-			default: error("sel op error"); break;
+		
+			default: error("sel op error"+par.variety); break;
 			}
 		}
 		break;
@@ -2153,7 +2204,7 @@ function button_action(bu,action_type)
 	case "SelectDataSpec":
 		{
 			let info = bu.eqn_info;
-			select_bubble_data_spec(info.p,info.i);
+			select_bubble_data_spec(info);
 		}
 		break;
 		

@@ -1,13 +1,10 @@
-
 ###################### DATA DIRECTORY ######################
 
 data-dir folder="EX_F3-5-data-files"
 
-
 ####################### DESCRIPTION ########################
 
 description text="description.txt"
-
 
 ######################### DETAILS ##########################
 
@@ -17,50 +14,47 @@ inference start=0 end=100 timestep=0.5 nchain=3
 
 post-sim start=0 end=100
 
+######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
 
-########## DEFINE MODEL AND DATA FOR SPECIES FARM ##########
-
-species name="Farm" type="individual"
+species name="Animal" type="individual"
 
 # SPECIES MODEL
 
-class name="DS" index="d"
+class name="DS" index="a"
 
-comp name="S" color="#009900" x=-16 y=0
-comp name="I" color="#ff2222" x=0 y=0
-comp name="R" color="#4444ff" x=16 y=0
+comp name="S" color="#009900" x=-10 y=0
 
-trans name="S->I" value="exp(rate:β×f_l(t))"
-trans name="I->R" value="gamma(mean:m, cv:c)"
+comp name="I" color="#ff2222" x=10 y=0
 
-class name="Location" index="l"
+trans name="S->I" value="exp(rate:β_v×exp(G_g)×{I,g}/N)"
 
-comp-all color="#000099" fix="true" file="comp-Location.csv"
+class name="Vaccination" index="v"
+
+comp name="Vac" color="#888888" x=-10 y=0
+
+comp name="Unvac" color="#aa00aa" x=10 y=0
+
+class name="Group" index="g"
+
+comp-all color="#005500" fix="true" file="comp_Group.csv"
 
 # SIMULATION INITIAL CONDITIONS
 
 add-ind-sim name="Added individuals" file="add-ind-sim.csv"
 
-
 # INFERENCE DATA
 
 add-ind-inf name="Added individuals" file="add-ind-inf.csv"
 
-trans-data name="Transition data" trans="S->I" obsrange="all" file="trans-data.csv"
-
-trans-data name="Transition data2" trans="I->R" obsrange="all" file="trans-data-2.csv"
-
-
+trans-data name="Infections" trans="S->I" obsrange="all" file="trans-data.csv"
 
 ######################## PARAMETERS ########################
 
-param name="c" value="0.3" prior="uniform(0.01,1)"
+param name="N" constant=10
 
-param name="m" value="10" prior="uniform(0,20)"
+param name="σ^G" value=0.5 prior="inverse(0.01,2)"
 
-param name="β" value="10" prior="uniform(0,20)"
+param name="G_g" dist="normal(0,σ^G)"
 
-param name="f_l(t)" reparam="reparam-f.csv" knot-times="start,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99" spline-type="square"
-
-
+param name="β_v" value="beta_value.csv" prior="inverse(0.01,1)"
 

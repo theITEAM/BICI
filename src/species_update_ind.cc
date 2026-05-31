@@ -1298,7 +1298,7 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 		}
 				
 		if(value < 0){
-			if(value > -SMALL) value = 0;
+			if(value > -TINY) value = 0;
 			else{
 				emsg("Markov equation has become negative2");
 			}

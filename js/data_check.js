@@ -6,52 +6,17 @@ function data_source_check_error(out_type,so)
 {	
 	let p = so.info.p;
 	
-	let sp = model.species[p];
-
-	if(so.info.siminf == "gen") return;
-	
-	if(so.info.siminf == "ppc") return; // TO DO this should really be checked
-	
-	/*
-	if(so.info.siminf == "gen"){
-		
-		sp = model.sim_res.plot_filter.species[p];	
-		for(let cl = 0; cl < sp.cla.length; cl++){
-			let claa = sp.cla[cl];
-			if(claa.hash_comp == undefined){
-				claa.hash_comp=[];	
-				hash_redo(claa.hash_comp,claa.comp);
-			}
-		}
-	}
-	*/
-	
+	let sp = get_so_sp(so.info.siminf,p);
+			
 	so.error = false;
 	
 	let tab = so.table;
 	if(tab != undefined){                            // Checks that elements are correctly specified
-		/* // This was turned off becase it lead to error e.g. "E | I"
-		// If a compartment then corrects name (e.g. space -> "-") 
-		if(so.load_col){
-			for(let c = 0; c < so.load_col.length; c++){
-				switch(so.load_col[c].type){
-				case "compartment": case "comp_all": 
-				case "compartment_prob": case "compartment_prob_na":
-				case "comp_source_sink": case "comptext":
-					for(let r = 0; r < tab.nrow; r++){	
-						tab.ele[r][c] = make_comp_name(tab.ele[r][c]);
-					}
-					break;
-				}
-			}
-		}
-		*/
-	
 		for(let c = 0; c < tab.ncol; c++){
 			for(let r = 0; r < tab.nrow; r++){
 				let el = tab.ele[r][c];
 				if(el != "*"){
-					let warn = check_element(el,c,so);		
+					let warn = check_element(el,c,so);	
 					if(warn != "") data_error(warn,out_type,so,{r:r,c:c});
 				}
 			}
@@ -108,6 +73,19 @@ function data_source_check_error(out_type,so)
 		break;
 		
 	case "Trans File": case "Trans File Pos":
+		{		 
+			// Checks to see if compartments have the same name
+			let list = []
+			for(let r = 0; r < tab.nrow; r++){	
+				list.push(tab.ele[r][0]+"→"+tab.ele[r][1]);
+			}
+	
+			let repeat = check_repeat(list);
+	
+			if(repeat != ""){
+				so.warning = "Note, repeated transition definitions are ignored: "+repeat+".";
+			}
+		}
 		break;
 
 	case "Add Pop.": case "Remove Pop.":
@@ -207,7 +185,8 @@ function data_source_check_error(out_type,so)
 		case "Population": case "Deterministic":
 			switch(so.type){
 			case "Add Ind.":case "Move Ind.":  case "Remove Ind.": case "Compartment":
-			case "Transition": case "Diag. Test": case "Genetic": case "Ind. Eff.": case "Ind. Group":
+			case "Transition": case "Diag. Test": case "Genetic": 
+			case "Ind. Eff.":  case "Set IE": case "Ind. Group":
 				data_error("Individual-based data '"+so.type+"' cannot be added to a population-based model",out_type,so);
 				break;
 			}
@@ -384,7 +363,7 @@ function data_source_check_error(out_type,so)
 			}
 			break;
 			
-		case "Ind. Eff.":
+		case "Ind. Eff.": case "Set IE":
 			{
 				let tab = so.table;
 				for(let r = 0; r < tab.nrow; r++){
@@ -495,7 +474,9 @@ function data_source_check_error(out_type,so)
 /// This converts from a string to one of the knot time possibilities (e.g. "0.0" becomes "start" "1.0" -> "1"
 function convert_knottime(te,pos)
 {
-	if(te == "start" || te == "end") return te;
+	let te_lower = te.toLowerCase();
+	
+	if(te_lower == "start" || te_lower == "end") return te_lower;
 	
 	if(find_in(pos,te) != undefined) return te;
 	
@@ -549,13 +530,7 @@ function check_data_time(out_type)
 	let mess_def = "Data source time is invalid";
 
 	for(let p = 0; p < model.species.length; p++){
-		let sp = model.species[p];
-		
-		let source;
-		switch(out_type){
-		case "sim": source = sp.sim_source; break;
-		case "inf": source = sp.inf_source; break;
-		}
+		let source = get_source(out_type,p);
 		
 		for(let k = 0; k < source.length; k++){
 			let so = source[k];
@@ -597,24 +572,19 @@ function check_data_time(out_type)
 /// Checks the value of an element is correct
 function check_element(te,c,so)
 {
-	let spec = get_species(so.info.siminf);
-	
-	if(so.info.siminf == "gen") return; 
-	if(so.info.siminf == "ppc") return; // TO DO this should really be checked but
-
 	let col = so.load_col[c];	
+		
+	let sp;
+	if(col.p != undefined){
+		sp = get_so_sp(so.info.siminf,col.p);
+		if(sp == undefined) return "The species references no longer exists";
+	}
 	
 	if(col.p != undefined){
-		if(spec == undefined) return "Species is not set";
-		if(col.p >= spec.length){
-			return "The species references no longer exists";
-		}
-		else{
-			if(col.cl != undefined){
-				let claa = spec[col.p].cla;
-				if(col.cl >= claa.length){
-					return "The classification referenced no longer exists";
-				}
+		if(col.cl != undefined){
+			let claa = sp.cla;
+			if(col.cl >= claa.length){
+				return "The classification referenced no longer exists";
 			}
 		}
 	}
@@ -726,8 +696,7 @@ function check_element(te,c,so)
 		
 	case "compartment": 
 		{  // This allows 'S', 'E' etc...
-			
-			let claa = model.species[col.p].cla[col.cl];
+			let claa = sp.cla[col.cl];
 			if(hash_find(claa.hash_comp,te) == undefined){
 				return "Compartment '"+te+"' is not in classification '"+claa.name+"'";
 			}
@@ -736,14 +705,14 @@ function check_element(te,c,so)
 		
 	case "comp_all":
 		{
-			let result = find_comp_from_name(te,model.species[col.p].name);
+			let result = find_comp_from_name(te,sp.name);
 			if(typeof result == 'string') return result;
 		}
 		break;
 		
 	case "comp_source_sink": 
 		{  // Allows for compartment as well as potentially source or sink
-			let claa = model.species[col.p].cla[col.cl];
+			let claa = sp.cla[col.cl];
 			te = te.trim();
 			if(te != "+" && te != "-"){
 				if(hash_find(claa.hash_comp,te) == undefined){
@@ -758,7 +727,7 @@ function check_element(te,c,so)
 			// This allows 'S', 'E', 'S|E', 'S:0.4|E:0.6' etc...
 			// "compartment_prob_na" also allow '!' for "not alive"
 			if(te != missing_str && !(col.type == "compartment_prob_na" && te == not_alive_str)){
-				let claa = model.species[col.p].cla[col.cl];
+				let claa = sp.cla[col.cl];
 				let hash_comp = claa.hash_comp;
 			
 				let spl = split_with_bracket(te,"|");
@@ -791,9 +760,9 @@ function check_element(te,c,so)
 							colon_flag = true; 
 							if(spl2[1] == ""){ syntax_error = true; break;}
 							
-							let valid = check_eqn_valid(spl2[1]);
-							if(valid.err == true){
-								return "In table element '"+te+"', error with equation '"+spl2[1]+"': "+valid.msg;
+							let warn = eqn_warning(spl2[1],"norm");
+							if(warn != ""){
+								return "In table element '"+te+"', error with equation '"+spl2[1]+"': "+warn;
 							}
 						}
 						
@@ -819,17 +788,17 @@ function check_element(te,c,so)
 		break;
 	
 	case "colour":
-		if(isColor(te) == false) return "The value '"+te+"' is not a colour";
+		if(isColor(te) == false) return "The value '"+te+"' is not a colour (e.g. '#ff45ae' or 'rgb(34,59,255)')";
 		break;
 		
 	case "trans_value":
 		{
 			let trans_def = extract_trans_def(te);
-			if(trans_def == undefined) return "Problem extracing transition information from '"+te+"' (e.g. should have a a format similar to 'exp(rate:r)')";
+			if(trans_def == undefined) return "Problem extracting transition information from '"+te+"' (e.g. should have a a format similar to 'exp(rate:r)')";
 		}
 		break;
 		
-	case "eqn":
+	case "eqn": 
 		{
 			let p = col.p;
 			let cl = col.cl;
@@ -837,7 +806,21 @@ function check_element(te,c,so)
 			if(eqn.warn.length > 0) return eqn.warn[0].te;
 		}
 		break;
-	
+		
+	case "define_ele": 
+		{
+			let eqn = create_equation(te,"define_ele");
+			if(eqn.warn.length > 0) return eqn.warn[0].te;
+		}
+		break;
+		
+	case "reparam_ele": 
+		{
+			let eqn = create_equation(te,"reparam_ele");
+			if(eqn.warn.length > 0) return eqn.warn[0].te;
+		}
+		break;
+		
 	case "lng":
 		{
 			let num = Number(te);
@@ -943,31 +926,14 @@ function data_error(warn,out_type,so,op)
 	if(op != undefined && op.minor) minor_warn = true;
 	else so.error = true;
 	
-	warn = "For '"+so.name+"': "+warn;
-	
-	/*
-	if(out_type == "warn"){
-		let de = so.type;
-		if(so.desc != undefined) de += " "+so.desc;
-	
-		if(de.length > 20) de = de.substr(0,20)+"...";
-	
-		warn = "For '"+de+"': "+warn;
-	}
-	else{
-		if(so.table != undefined){
-			warn = in_file_text(so.table.filename)+": "+warn;
-		}
-	}
-	*/
-	
+	if(so.name != "Data") warn = "For '"+so.name+"': "+warn;
 	
 	if(warn.substr(warn.length-1,1) == ".") warn = warn.substr(0,warn.length-1);	
 	if(op != undefined && op.r != undefined){
 		let tab = so.table;
 		warn += " (";
 		if(op.c) warn += "col '"+tab.heading[op.c]+"', ";
-		warn += "row "+(op.r+2)+").";
+		warn += "row "+(op.r+1)+").";
 	}
 			
 	switch(out_type){
@@ -1001,7 +967,7 @@ function data_error(warn,out_type,so,op)
 
 
 /// Goes through all data soruces and check if valid given the current model
-function check_data_valid_all(type)
+function check_data_valid_all(type,out_type)
 {
 	let list = [];
 	if(type == "sim" || type == "siminf") list.push("sim");
@@ -1011,51 +977,16 @@ function check_data_valid_all(type)
 	for(let loop = 0; loop < list.length; loop++){
 		let siminf = list[loop];
 		
-		let spec = get_species(siminf);
-		
-		if(spec){
-			for(let p = 0; p < spec.length; p++){
-				let sp = spec[p];
-		
-				let source;
-				switch(siminf){
-				case "sim": source = sp.sim_source; break;
-				case "inf": source = sp.inf_source; break;
-				case "ppc": source = sp.ppc_source; break;
-				}
+		let nsp = get_so_nsp(siminf);
+		for(let p = 0; p < nsp; p++){
+			let source = get_source(siminf,p);
 
-				for(let i = 0; i < source.length; i++){
-					let so = source[i];
-					so.check_info = {siminf:list[loop], p:p, i:i}; 
-					data_source_check_error("warn",so);
-					if(so.error != true) add_source_description(so);
-				}
+			for(let i = 0; i < source.length; i++){
+				let so = source[i];
+				so.check_info = {siminf:list[loop], p:p, i:i}; 
+				data_source_check_error(out_type,so);
+				if(so.error != true) add_source_description(so);
 			}
 		}
-	}
-}
-
-
-/// Gets species for error checking
-function get_species(siminf)
-{
-	switch(siminf){
-	case "gen":	
-		{
-			let pf =  model.sim_res.plot_filter;
-			if(pf) return pf.species;
-		}
-		break;
-	
-	case "ppc":
-		{
-			let pf = model.inf_res.plot_filter;
-			if(pf) return pf.species;
-		}
-		break;
-	
-	default:
-		return model.species;
-		break;
 	}
 }

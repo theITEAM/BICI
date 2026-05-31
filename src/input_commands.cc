@@ -19,8 +19,9 @@ using namespace std;
 void Input::import_data_table_command(const CommandLine &cline, bool active)
 {
 	auto cname = cline.command;
-	 // If not doing INF or EXT then ignore data
-	if(model.mode != INF && model.mode != EXT && model.mode != DATA_SHOW && model.mode != DATA_DEL && model.mode != DATA_SIM){ 
+
+	// If not doing INF or EXT then ignore data
+	if(model.mode != INF && model.mode != EXT && model.mode != DATA_SHOW && model.mode != DATA_DEL && model.mode != DATA_SIM && model.mode != TORNADO_SETUP && model.mode != SCAN_SETUP){ 
 		switch(cname){
 		case COMP_DATA: case TRANS_DATA: case TEST_DATA: case POP_DATA:
 		case POP_TRANS_DATA: case IND_EFFECT_DATA: case IND_GROUP_DATA: case GENETIC_DATA:
@@ -73,6 +74,16 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 	auto &om = ds.obs_model;
 
 	switch(cname){  // Modifies specification dependent on data source
+	case IND_EFFECT_DATA:
+		{
+			auto ie = get_tag_value("ie"); if(ie == ""){ cannot_find_tag(); return;}
+			ds.ie = ie;
+		}
+		break;
+		
+	case IND_GROUP_DATA: 
+		break;
+	
 	case INIT_POP:
 		{
 			auto focal = get_tag_value("focal");
@@ -504,7 +515,10 @@ void Input::proposal_info_command()
 	}
 
 	auto enc = get_encode();
+
 	if(enc) decode_lines(files[i].lines);
+
+	remove_escape_char_lines(files[i].lines);
 
 	auto ch = get_chain();
 
@@ -584,7 +598,7 @@ void Input::param_mult_command()
 	par.N = mult;
 	par.trace_output = false;
 	
-	auto file = get_tag_value("constant"); if(file == ""){ cannot_find_tag(); return;}
+	auto file = get_tag_value("value"); if(file == ""){ cannot_find_tag(); return;}
 	load_param_value(pp,file,par,"In 'file'",VALUE_LOAD);
 
 	add_param(par);
@@ -1165,42 +1179,37 @@ void Input::define_command()
 	
 	Define def;
 	def.name = pp.name;
-
 	def.line_num = line_num;
 	def.full_name = full_name;
 	def.time_dep = pp.time_dep;
+	def.used = false;
+	
+	if(pp.time_dep){
+		pp.dep.pop_back();
+		pp.dep_with_prime.pop_back();
+	}
 	
 	auto mult = get_dependency(def.dep,pp,vector <string> (),vector <string> ()); 
 	if(mult == UNSET) return; 
 	
-	auto def_eqn_raw = he(add_equation_info(value,DEFINE_EQN));
+	if(is_file(value) == false){	
+		def.eqn_on = true;
 	
-	def.value = def_eqn_raw;
-	
-	string warn = "";
-	auto eq_dep = model.equation_dep(def_eqn_raw.te,warn);
-	if(warn != ""){ alert_import(warn,true); return;}
-	
-	auto res = dep_agree(full_name,def.dep,eq_dep);
-	if(res != ""){ alert_import(res,true); return;}
+		def.eqn = he(add_equation_info(value,DEFINE_EQN));
 		
-	const auto &depend = def.dep;
+		string warn = "";
+		auto eq_dep = model.equation_dep(def.eqn.te,warn);
+		if(warn != ""){ alert_import(warn,true); return;}
 		
-	vector <DepConv> dep_conv;
-	for(auto d = 0u; d < depend.size(); d++){
-		const auto &dep = depend[d];
-		DepConv dc; 
-		dc.before = dep.index_with_prime;
-		dep_conv.push_back(dc);
+		if(eq_dep.size() > 0 && eq_dep[eq_dep.size()-1] == "t") eq_dep.pop_back();
+		
+		auto res = dep_agree(full_name,pp.dep_with_prime,eq_dep);
+		if(res != ""){ alert_import(res,true); return;}
 	}
-	
-	auto swap_temp = swap_template(def_eqn_raw.te,dep_conv);
-	if(swap_temp.warn != ""){ 
-		alert_import(swap_temp.warn); 
-		return;
+	else{
+		def.eqn_on = false;
+		load_define_value(pp,value,def,mult);
 	}
-	
-	def.swap_temp = swap_temp;
 	
 	model.define.push_back(def);
 }
@@ -1210,8 +1219,6 @@ void Input::define_command()
 void Input::param_command()
 {
 	auto full_name = get_tag_value("name"); if(full_name == ""){ cannot_find_tag(); return;}
-	
-	full_name = remove_escape_char(full_name);
 	
 	auto pp = get_param_prop(full_name);
 
@@ -2590,6 +2597,17 @@ void Input::inf_param_stats()
 }
 
 
+/// Loads up prediction accuracy stats (this is used for tornado plots)
+void Input::inf_pred_acc()
+{
+	auto file = get_tag_value("file"); 
+
+	auto tab = load_table(file); if(tab.error == true) run_error("Could not load parameter statistics");
+
+	model.inf_pred_acc = tab;
+}
+
+
 /// Loads inference parameter into the model (for EXT)
 void Input::inf_param_command()
 {
@@ -2680,7 +2698,8 @@ void Input::test_and_cull_command()
 	inter.frac = number(frac);
 	
 	auto Sp = get_tag_value("Sp"); if(Sp == ""){ cannot_find_tag(); return;}
-	inter.Sp_str = Sp;
+	
+	inter.Sp = he(add_equation_info(Sp,SP_TEST_AND_CULL));
 			
 	auto pos = get_tag_value("pos");
 	if(pos == "") pos = "1";
@@ -2700,9 +2719,15 @@ void Input::test_and_cull_command()
 	string warn;
 	auto dts = model.get_diag_test_sens(comp,p,warn);
 	if(warn != ""){ alert_import(warn); return;}
-			
+		
 	inter.cl = dts.cl;
-	inter.diag_test_sens = dts;
+	
+	for(auto &co : dts.comp){
+		TestCompInter tci;
+		tci.on = co.on;
+		tci.Se = he(add_equation_info(co.Se_str,SE_TEST_AND_CULL));
+		inter.Se_comp.push_back(tci);
+	}
 	
 	model.species[p].intervention.push_back(inter);
 }

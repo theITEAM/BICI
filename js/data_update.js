@@ -3,24 +3,24 @@
 
 ///////// CHANGES TO CLASSIFICATION /////////////
 
+/// Gets siminf when looping over
+function get_siminf(loop)
+{
+	switch(loop){
+	case 0: return "sim"; 
+	case 1: return "inf"; 
+	case 2: return "ppc"; 
+	case 3: return "gen";
+	}
+	error("get siminf problem");
+}
+
 /// Updates data based on a classification changing name
 function data_update_rename_classification(p,cl,old_name,new_name)
 {
 	for(let loop = 0; loop < 3; loop++){
-		let source;
-		switch(loop){
-		case 0: source = model.species[p].sim_source; break;
-		case 1: source = model.species[p].inf_source; break;
-		case 2:
-			{		
-				let pf = model.inf_res.plot_filter;
-				if(pf){
-					let sp = pf.species[p];
-					if(sp) source = sp.ppc_source;
-				}
-			}
-			break;
-		}
+		let siminf = get_siminf(loop);
+		let source = get_source(siminf,p);
 
 		if(source){
 			for(let i = 0; i < source.length; i++){
@@ -117,18 +117,15 @@ function data_update_rename_classification(p,cl,old_name,new_name)
 /// Updates data based on a classification being added 
 function data_update_add_classification(p)
 {
-	for(let loop = 0; loop < 2; loop++){
-		let sp = model.species[p];
+	let sp = model.species[p];
 	
+	for(let loop = 0; loop < 2; loop++){
 		let cl = sp.ncla-1;
 		let claa = sp.cla[cl];
 		
-		let source;
-		switch(loop){
-		case 0: source = sp.sim_source; break;
-		case 1: source = sp.inf_source; break;
-		}
-
+		let siminf = get_siminf(loop);
+		let source = get_source(siminf,p);
+		
 		for(let i = 0; i < source.length; i++){
 			let so = source[i];
 			if(so.error != true){
@@ -177,14 +174,11 @@ function data_update_add_classification(p)
 function data_update_delete_classification(p,cl,name,comp_list)
 {
 	let sp = model.species[p];
-		
+	
 	for(let loop = 0; loop < 2; loop++){
-		let source;
-		switch(loop){
-		case 0: source = sp.sim_source; break;
-		case 1: source = sp.inf_source; break;
-		}
-
+		let siminf = get_siminf(loop);
+		let source = get_source(siminf,p);
+		
 		if(sp.ncla == 0){
 			for(let i = 0; i < source.length; i++) source[i].error = true;
 		}
@@ -311,17 +305,11 @@ function data_update_delete_classification(p,cl,name,comp_list)
 function data_update_rename_compartment(p,cl,old_name,new_name)
 {
 	let sp = model.species[p];
-	
+	let claa = sp.cla[cl];
+		
 	for(let loop = 0; loop < 2; loop++){
-		let sp = model.species[p];
-	
-		let claa = sp.cla[cl];
-
-		let source;
-		switch(loop){
-		case 0: source = sp.sim_source; break;
-		case 1: source = sp.inf_source; break;
-		}
+		let siminf = get_siminf(loop);
+		let source = get_source(siminf,p);
 
 		for(let i = 0; i < source.length; i++){
 			let so = source[i];
@@ -459,25 +447,12 @@ function convert_transition_name(tr_name,old_name,new_name)
 /// Ensures that the data sources have the correct value for p
 function reset_info_p()
 {
-	for(let p = 0; p < model.species.length; p++){
-		let sp = model.species[p];
-	
-		for(let i = 0; i < sp.sim_source.length; i++){
-			sp.sim_source[i].info.p = p;
-		}
-		
-		for(let i = 0; i < sp.inf_source.length; i++){
-			sp.inf_source[i].info.p = p;
-		}
-	}
-	
-	let pf = model.inf_res.plot_filter;
-	if(pf){
-		for(let p = 0; p < pf.species.length; p++){
-			let sp = pf.species[p];
-			for(let i = 0; i < sp.ppc_source.length; i++){
-				sp.ppc_source[i].info.p = p;
-			}
+	for(let loop = 0; loop < 3; loop++){
+		let siminf = get_siminf(loop);
+		let nsp = get_so_nsp(siminf);	
+		for(let p = 0; p < nsp; p++){
+			let source = get_source(siminf,p);
+			for(let i = 0; i < source.length; i++) source[i].info.p = p;
 		}
 	}
 }

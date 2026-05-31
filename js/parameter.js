@@ -7,31 +7,25 @@ function update_model()
 {
 	model.warn = [];
 
-	check_data_valid_all("siminf");
+	check_data_valid_all("siminf","warn");
 
 	let lists = generate_parameter_list();           // Generates a list of all model parameters
 
 	if(false){ prr("lists"); prr(lists);}
-
-	let ielist = lists.ind_eff_list;       
-  let felist = lists.fix_eff_list;       
-	let par_list = lists.par_list;
 	
-	update_model_ind_eff(ielist);                    // Updates individual effect groupings in model
-	
-	update_model_fix_eff(felist);                    // Updates fixed effects in model 
-
-	add_param_ppc_factor(par_list);                  // Adds any parameter for ppc factors
-
-	add_ind_eff_param(par_list);                     // Adds individual effect parameters (i.e. variances) to model
-
-	update_model_param(par_list);                    // Updates the model parameters
+	update_model_param(lists);                    // Updates the model parameters
 
 	set_generate_pos();                              // Sets if possible to generate results
 	
 	update_desc();                                   // Updates descriptions of parameter
 
 	if(model.warn.length > 0) err_warning();
+	
+	for(let th = 0; th < model.param.length; th++){
+		let par = model.param[th];
+		if(par.type != undefined) error("par type should not be set");
+		if(par.ndep_cont == undefined) error("ndep_cont should be set"); 
+	}
 }
 
 
@@ -40,7 +34,7 @@ function update_desc()
 {
 	for(let i = 0; i < model.param.length; i++){
 		let par = model.param[i];
-		if(par.dep.length > 0){
+		if(par.ndep_cont > 0){
 			par.value_desc = get_value_desc(par);
 			par.weight_desc = get_weight_desc(par);
 			par.prior_split_desc = get_prior_split_desc(par);
@@ -108,6 +102,32 @@ function set_generate_pos()
 }
 
 
+/// Adds information about where parameter comes from 
+function add_within(par,eqn)
+{
+	let wi = {type:eqn.type, eqn_info:eqn.eqn_info};
+	add_wi(par,wi);
+}
+
+
+/// Adds within 
+function add_wi(par,wi)
+{
+	if(par.within == undefined) return;
+	if(par.within.length == WITHIN_MAX) return;
+
+	let i;
+	for(i = 0; i < par.within.length; i++){
+		let wi2 = par.within[i];
+		if(wi2.type == wi.type && wi2.p == wi2.p && wi2.cl == wi2.cl && wi2.i == wi2.i && 
+		  wi2.r == wi2.r && wi2.c == wi2.c && wi2.eso == wi2.eso && wi2.ieg == wi2.ieg && 
+			wi2.ie == wi2.ie) break;
+	}
+	
+	if(i == par.within.length) par.within.push(wi);
+}
+
+
 /// Genrates a list of all model parameters
 function generate_parameter_list()
 {
@@ -123,17 +143,20 @@ function generate_parameter_list()
 		let sp = model.species[p];
 		for(let cl = 0; cl < sp.ncla; cl++){
 			let claa = sp.cla[cl];
+			/*
 			if(claa.ncomp == 0){
-				model.warn.push({mess:"Classification problem", mess2:"Classification '"+claa.name+"' does not contain any compartments", p:p, cl:cl, warn_type:"NoClaComp"});
+				add_warning({mess:"Classification problem", mess2:"Classification '"+claa.name+"' does not contain any compartments", p:p, cl:cl, warn_type:"NoClaComp"});
 			}
+			*/
+			
 			for(let c = 0; c < claa.ncomp; c++){
 				let co = claa.comp[c];
 				if(co.name == ""){
-					model.warn.push({mess:"Missing compartment name", mess2:"Name has not been specified in classification '"+claa.name+"'", p:p, cl:cl, c:c, warn_type:"MissingComp"});
+					add_warning({mess:"Missing compartment name", mess2:"Name has not been specified in classification '"+claa.name+"'", p:p, cl:cl, c:c, warn_type:"MissingComp"});
 				}
 				else{
 					if(co.col == "#FFFFFF"){
-						model.warn.push({mess:"Compartment colour not set", mess2:"In compartment '"+co.name+"' classification '"+claa.name+"'", p:p, cl:cl, c:c, warn_type:"MissingColour"});
+						add_warning({mess:"Compartment colour not set", mess2:"In compartment '"+co.name+"' classification '"+claa.name+"'", p:p, cl:cl, c:c, warn_type:"MissingColour"});
 					}
 				}
 			}
@@ -143,7 +166,7 @@ function generate_parameter_list()
 				switch(anno.type){
 				case "box":
 					if(anno.te == ""){
-						model.warn.push({mess:"Missing bounding box name", mess2:"Bounding box name has not been specified in classification '"+claa.name+"'", p:p, cl:cl, k:k, warn_type:"MissingBox"});
+						add_warning({mess:"Missing bounding box name", mess2:"Bounding box name has not been specified in classification '"+claa.name+"'", p:p, cl:cl, k:k, warn_type:"MissingBox"});
 					}
 					break;
 				}
@@ -191,6 +214,14 @@ function generate_parameter_list()
 			mess = "For a disease diagnostic test specificity";
 			break;
 			
+		case "SeTC": 
+			mess = "For test-and-cull diagnostic test sensitivity"; 
+			break;
+
+		case "SpTC": 
+			mess = "For test-and-cull diagnostic test specificity";
+			break;
+			
 		case "mut_rate": 
 			mess = "For a genetic mutation rate";
 			break;
@@ -207,7 +238,7 @@ function generate_parameter_list()
 			mess = "For a transition probability";
 			break;
 						
-		case "reparam":
+		case "reparam_ele":
 			mess = "For reparameterisation of <e>"+get_full_parameter_name(info.par_name)+"</e>";
 			break;
 			
@@ -225,16 +256,12 @@ function generate_parameter_list()
 		}
 			
 		if(eqn.warn.length > 0){		
-			model.warn.push({mess:mess, mess2:eqn.warn[0].te, eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
+			add_warning({mess:mess, mess2:eqn.warn[0].te, eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
 		}
 		
 		for(let i = 0; i < eqn.param.length; i++){
 			let par = copy(eqn.param[i]);
-			add_par_to_list(par,list,copy(eqn),mess);
-		}
-		
-		for(let i = 0; i < eqn.fix_eff.length; i++){
-			let par = { name:fe_char+"^"+eqn.fix_eff[i].name, time_dep: false, dep:[], eqn_appear:[], type: "fixed effect"};
+			if(eqn.type == "derive_param") par.derive = true;
 			add_par_to_list(par,list,copy(eqn),mess);
 		}
 		
@@ -242,25 +269,24 @@ function generate_parameter_list()
 			let ief = eqn.ind_eff[i]; 
 			
 			let p_name = eqn.p_name;
-			if(ief.p_name_filter != "") p_name = ief.p_name_filter;
 			
 			let name = eqn.ind_eff[i].name;
 			
 			let j;
 			for(j = 0; j < ind_eff_list.length; j++){
-				let ielist = ind_eff_list[j];
-				if(ielist.name == name){
-					if(ielist.p_name != p_name){
-						model.warn.push({mess:mess, mess2:"The individual effect '"+name+"' appears in the transitions of two species", eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
+				let ie_list = ind_eff_list[j];
+				if(ie_list.name == name){
+					if(ie_list.p_name != p_name){
+						add_warning({mess:mess, mess2:"The individual effect '"+name+"' appears in the transitions of two species", eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
 						break;
 					}
 				}
 			}
 			
 			if(j == ind_eff_list.length){
-				ind_eff_list.push({name:name, p_name:p_name, eqn_appear:[]});
+				ind_eff_list.push({name:name, p_name:p_name, within:[]});
 			}
-			ind_eff_list[j].eqn_appear.push(copy(eqn));
+			add_within(ind_eff_list[j],eqn);
 		}
 		
 		for(let i = 0; i < eqn.fix_eff.length; i++){
@@ -268,23 +294,22 @@ function generate_parameter_list()
 			let name = fe.name;
 			
 			let p_name = eqn.p_name;
-			if(fe.p_name_filter != "") p_name = fe.p_name_filter;
 			
 			let j;
 			for(j = 0; j < fix_eff_list.length; j++){
-				let felist = fix_eff_list[j];
-				if(felist.name == name){
-					if(felist.p_name != p_name){
-						model.warn.push({mess:mess, mess2:"The fixed effect '"+name+"' appears in the transitions of two species", eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
+				let fe_list = fix_eff_list[j];
+				if(fe_list.name == name){
+					if(fe_list.p_name != p_name){
+						add_warning({mess:mess, mess2:"The fixed effect '"+name+"' appears in the transitions of two species", eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
 						break;
 					}
 				}
 			}
 			
 			if(j == fix_eff_list.length){
-				fix_eff_list.push({name:name, p_name:p_name, eqn_appear:[]});
+				fix_eff_list.push({name:name, p_name:p_name, within:[]});
 			}
-			fix_eff_list[j].eqn_appear.push(copy(eqn));
+			add_within(fix_eff_list[j],eqn);
 		}
 	}
 	
@@ -311,42 +336,27 @@ function add_par_to_list(par,list,eqn,mess)
 		let parlist = list[j];
 		
 		if(par.name == parlist.name){
-			if(parlist.variety != "const" && par.type != "derived" && parlist.type != "derived" && 
-				 par.type != "define_eqn" && parlist.type != "define_eqn"){					 
-				if(par.type != parlist.type && par.type != "define_eqn" && parlist.type != "define_eqn"){
-					model.warn.push({mess:"Non-constant parameter '"+par.name+"' has contrasting types", mess2:"This parameter is used "+param_eqn_desc(eqn), eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
-					
-					let eqn2 = parlist.eqn_appear[parlist.eqn_appear.length-1];
-				
-					model.warn.push({mess:"", mess2:"And also "+param_eqn_desc(eqn2), eqn_info:eqn2.eqn_info, eqn_type:eqn2.type, warn_type:"Equation"});
-					break;
-				}
-		
-				if(par.p_name != parlist.p_name){
-					model.warn.push({mess:mess, mess2:"Non-constant parameter '"+par.name+"' appears in the transitions of two species", eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
-					break;
-				}
-			
-				if(par.cl_name != parlist.cl_name){
-					model.warn.push({mess:mess, mess2:"Non-constant parameter '"+par.name+"' appears in two different classifications", eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
-					break;
+			if(par.p_name != undefined){
+				if(parlist.p_name == undefined) parlist.p_name = par.p_name;
+				else{
+					if(parlist.p_name != par.p_name){
+						parlist.p_name = mixed_p_name;
+					}
 				}
 			}
 			
-			if(par.dep.length != parlist.dep.length){	
-				model.warn.push({mess:mess, mess2:"The parameter '"+par.name+"' has different dependencies in different parts of the model", warn_type:"Equation", eqn:eqn, eqn_type:eqn.type});
-				break;
-			}
+			check_if_param_same(par,parlist);
 			break;		
 		}
 	}
+
 	if(j == list.length){
-		par.eqn_appear=[];
+		par.within=[];
 		list.push(par);
 	}
 	
 	if(eqn != undefined){
-		list[j].eqn_appear.push(eqn);
+		add_within(list[j],eqn);
 	}
 }
 
@@ -357,6 +367,8 @@ function param_eqn_desc(eqn)
 	switch(eqn.type){
 	case "Se": return "as a diagnostic test sensitivity";
 	case "Sp": return "as a diagnostic test specificity";
+	case "SeTC": return "as a test-and-cull test sensitivity";
+	case "SpTC": return "as a test-and-cull test specificity";
 	case "mut_rate": return "as a genetic mutation rate";
 	case "seq_var": return "as a genetic sequence variation";
 	case "trans_bp": return "as a branching probability";
@@ -367,8 +379,9 @@ function param_eqn_desc(eqn)
 	case "trans_cv": return "in a transition coefficient of variation";
 	case "comp_prob": case "sim_comp_prob": return "in a compartmental probability";
 	case "reparam_eqn": return "in a reparameterised equation";
-	case "reparam": return "in a reparametersation";
-	case "define_eqn": return "in a definition";
+	case "reparam_ele": return "in a reparametersation";
+	case "define_eqn": return "in a definition equation";
+	case "define_ele": return "in a definition";
 	case "derive_param": return "in a derived parameter";
 	case "derive_eqn": return "in a derived equation";
 	default: error("option not pos:"+eqn.type); break;	
@@ -377,9 +390,10 @@ function param_eqn_desc(eqn)
 
 
 /// Finds the tensor template for a parameter (this is a multi-dimensional tensor with unset elements)
-function par_find_template(list)
+function par_find_template(list,ndep_cont)
 {
 	let ndep = list.length;
+	if(ndep_cont != undefined) ndep = ndep_cont;
 	
 	let list_len = [];
 	for(let d = 0; d < ndep; d++){
@@ -504,7 +518,7 @@ function get_value_desc(par)
 	let te;
 	
 	let dim = [];
-	for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
+	for(let d = 0; d < par.ndep_cont; d++) dim.push(par.list[d].length);
 		
 	switch(dim.length){
 	case 1: te = "Vector("; break;
@@ -539,6 +553,7 @@ function get_prior_const_desc(par)
 	let te;
 	
 	let dim = [];
+	
 	for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
 		
 	switch(dim.length){
@@ -617,12 +632,14 @@ function get_dimensions(ob)
 
 
 /// Given the name of an index this gets a list of the possible compartments
-function find_comp_from_index(index)
+function find_comp_from_index(index,mod)
 {
+	if(mod == undefined) mod = model;
+	
 	let list = [];
 	index = remove_prime(index);
-	for(let p = 0; p < model.species.length; p++){
-		let sp = model.species[p];
+	for(let p = 0; p < mod.species.length; p++){
+		let sp = mod.species[p];
 		for(let cl = 0; cl < sp.ncla; cl++){
 			let claa = sp.cla[cl];
 			if(claa.index == index){
@@ -638,17 +655,19 @@ function find_comp_from_index(index)
 
 
 /// Finds the individual effect in a ind effect group from the parameter make
-function find_ieg_list(par)
+function find_ieg_list(par,mod)
 {
 	let list = [];
+	
+	if(mod == undefined) mod = model;
 	
 	let spl = par.name.split("^");
 	if(spl.length != 2){ error("Spl should be 2"); return;}
 	if(spl[0] != "Ω"){ error("Should be Ω"); return;}
 	
 	let name = spl[1];
-	for(let p = 0; p < model.species.length; p++){
-		let sp = model.species[p];
+	for(let p = 0; p < mod.species.length; p++){
+		let sp = mod.species[p];
 		for(let j = 0; j < sp.ind_eff_group.length; j++){
 			let ieg = sp.ind_eff_group[j];
 			if(ieg.name == name){
@@ -692,8 +711,19 @@ function find_index_from_comp(p_name,name)
 	
 	
 /// Updates individual effect groups stored in model
-function update_model_ind_eff(ielist)
+function update_model_ind_eff(ie_list)
 {
+	for(let i = 0; i < ie_list.length; i++){
+		let ie = ie_list[i];
+		
+		// Checks that all the species are correctly identified
+		if(ie.p_name == mixed_p_name){
+			//add_warning({mess:"Parameter issue", mess2:"Parameter features in multiple species and individual effect cannot be specified", eqn_info:eqn.eqn_info, eqn_type:eqn.type, warn_type:"Equation"});
+			
+			add_warning({mess:"Individual effect problem", mess2:"Cannot allocate the species for individual effect '["+ie.name+"]'", warn_type:"Equation"});
+		}
+	}
+	
 	for(let p = 0; p < model.species.length; p++){
 		let sp = model.species[p];
 		
@@ -702,8 +732,8 @@ function update_model_ind_eff(ielist)
 			for(let j = 0; j < ieg.ie_list.length; j++) ieg.ie_list[j].used = false;
 		}
 	
-		for(let k = 0; k < ielist.length; k++){
-			let ie = ielist[k];
+		for(let k = 0; k < ie_list.length; k++){
+			let ie = ie_list[k];
 			let flag = false;
 			
 			if(ie.p_name == sp.name){
@@ -750,7 +780,7 @@ function update_model_ind_eff(ielist)
 			case "Population": case "Deterministic":
 				{
 					let name = sp.ind_eff_group[0].ie_list[0].name;
-					model.warn.push({mess:"Cannot have individual effects", mess2:"A population-based model cannot have individual effects such as '["+name+"]'", warn_type:"Equation"});
+					add_warning({mess:"Cannot have individual effects", mess2:"A population-based model cannot have individual effects such as '["+name+"]'", warn_type:"Equation"});
 				}
 				break;
 			}
@@ -780,7 +810,7 @@ function generate_iegroup_name()
 
 
 /// Updates fixed effects stored in model
-function update_model_fix_eff(felist)
+function update_model_fix_eff(fe_list)
 {
 	for(let p = 0; p < model.species.length; p++){
 		let sp = model.species[p];
@@ -789,8 +819,8 @@ function update_model_fix_eff(felist)
 			sp.fix_eff[i].used = false;
 		}
 	
-		for(let k = 0; k < felist.length; k++){
-			let fe = felist[k];
+		for(let k = 0; k < fe_list.length; k++){
+			let fe = fe_list[k];
 	
 			let flag = false;
 			if(fe.p_name == sp.name){
@@ -824,7 +854,7 @@ function update_model_fix_eff(felist)
 			case "Population": case "Deterministic":
 				{
 					let name = sp.fix_eff[0].name;
-					model.warn.push({mess:"Cannot have fixed effects", mess2:"A population-based model cannot have fixed effects such as '〈"+name+"〉'", warn_type:"Equation"});
+					add_warning({mess:"Cannot have fixed effects", mess2:"A population-based model cannot have fixed effects such as '〈"+name+"〉'", warn_type:"Equation"});
 				}
 				break;
 			}
@@ -834,7 +864,7 @@ function update_model_fix_eff(felist)
 
 
 /// Adds individual effect parameters (i.e. variances) to model
-function add_ind_eff_param(par_list)
+function add_ind_eff_param(par_list,param)
 {
 	for(let p = 0; p < model.species.length; p++){
 		let sp = model.species[p];
@@ -843,28 +873,54 @@ function add_ind_eff_param(par_list)
 			let ieg = sp.ind_eff_group[i];
 			
 			let name = "Ω^"+ieg.name;
-			if(ieg.ie_list.length == 1){
-				let par = { name:name, time_dep:false, dep:[], eqn_appear:[], type: "variance"};
-				par.full_name = param_name(par);			
-				add_par_to_list(par,par_list,{p:p, ieg:i},"Individual effect variance");
-			}
-			else{
-				let dep = ["z","z'"];
-				let par = { name:name, time_dep:false, dep:dep, eqn_appear:[], type: "variance"};
-				par.full_name = param_name(par);			
-				par_find_list(par);
-				add_par_to_list(par,par_list,{p:p, ieg:i, ie:ieg.ie_list[0].name},"Individual effect variance");
+			
+			if(find(param,"name",name) == undefined){
+				if(ieg.ie_list.length == 1){
+					let par = { name:name, time_dep:false, dep:[], within:[], variance:true};
+					par.full_name = param_name(par);	
+				
+					add_par_to_list(par,par_list,{eqn_info:{p:p, ieg:i, eso:"model"}},"Individual effect variance");
+				}
+				else{
+					let dep = ["z","z'"];
+					let par = { name:name, time_dep:false, dep:dep, within:[], variance:true};
+					par.full_name = param_name(par);			
+					par_find_list(par);
+					add_par_to_list(par,par_list,{eqn_info:{p:p, ieg:i, ie:ieg.ie_list[0].name, eso:"model"}},"Individual effect variance");
+				}
 			}
 		}
 	}
 } 	
 
 
-/// Updates the model parameters
-function update_model_param(par_list)
-{
-	//check_derived_param_all(model.param);
+/// Adds individual effect parameters (i.e. variances) to model
+function add_fix_eff_param(par_list,param)
+{	
+	for(let p = 0; p < model.species.length; p++){
+		let sp = model.species[p];
+	
+		for(let i = 0; i < sp.fix_eff.length; i++){
+			let fe = sp.fix_eff[i];
+			let name = fe_char+"^"+fe.name;
+			if(find(param,"name",name) == undefined){
+				let par = { name:name, time_dep: false, dep:[], within:[], fixed_effect:true};
+				add_par_to_list(par,par_list,{eqn_info:{p:p, i:i, eso:"model"}},"Fixed effect parameter");
+			}
+		}
+	}
+}
 
+
+/// Updates the model parameters
+function update_model_param(lists)
+{ 
+	let par_list = lists.par_list;
+	let ie_list = lists.ind_eff_list;       
+  let fe_list = lists.fix_eff_list;      
+	
+	add_param_ppc_factor(par_list);                  // Adds any parameter for ppc factors
+	
 	if(model.warn.length > 0) err_warning();
 	
 	let param_old = model.param;
@@ -873,16 +929,51 @@ function update_model_param(par_list)
 	for(let th = 0; th < param_old.length; th++){
 		let par = param_old[th];
 		if(par.variety == "define"){
-			let i = 0; while(i < par_list.length && par_list[i].name != par.name) i++;
-			if(i == par_list.length){
-				par_list.push(par);
-			}
+			if(find(par_list,"name",par.name) == undefined) par_list.push(par);
 		}
 	}
 	
 	let param=[];
+
+	param_add_par_list(param,param_old,par_list,ie_list,fe_list);
+
+	update_model_ind_eff(ie_list);                    // Updates individual effect groupings in model
+	
+	update_model_fix_eff(fe_list);                    // Updates fixed effects in model 
+
+	{
+		var var_par_list = [];
+		add_ind_eff_param(var_par_list,param);          // Adds ind. effect parameters to model
+		add_fix_eff_param(var_par_list,param);          // Adds fixed effect parameters to model
+	
+		param_add_par_list(param,param_old,var_par_list,ie_list,fe_list);
+	}
+
+	param.sort( function(a, b){                      // Alphabetically sorts parameters
+		if(a.ndep_cont > b.ndep_cont) return 1; 
+		if(a.ndep_cont == b.ndep_cont){
+			if(a.name.toLowerCase() > b.name.toLowerCase()) return 1;
+			else return -1;	
+		}
+		return -1;});
+	
+	if(model.warn.length > 0) err_warning();
+	
+	model.param = param;
+	
+	check_derived_param_all(model.param);
+	check_reparam_all(model.param);
+	check_define_all(model.param);
+}
+
+
+/// Adds the elements of par_list to param
+function param_add_par_list(param,param_old,par_list,ie_list,fe_list)
+{
 	for(let i = 0; i < par_list.length; i++){
 		let par = par_list[i];
+		
+		if(find(param,"name",par.name) != undefined) error("param should not exist"); 
 		
 		let j;                                         // Determines if parameter already exists
 		for(j = 0; j < param_old.length; j++){
@@ -902,72 +993,83 @@ function update_model_param(par_list)
 		
 		if(j < param_old.length){                      // Copies information from existing parameter definition	
 			param.push(copy_param_info(par,param_old[j]));
-			add_dependent_param(param,par_list);
+		
+			add_dependent_param(param,par_list,ie_list,fe_list);
 		}
 		else{                                          // Create new parameter
 			param.push(create_new_param(par,"normal"));
 		}
 	}
-
-	param.sort( function(a, b){                      // Alphabetically sorts parameters
-		if(a.dep.length > b.dep.length) return 1; 
-		if(a.dep.length == b.dep.length){
-			if(a.name.toLowerCase() > b.name.toLowerCase()) return 1;
-			else return -1;	
-		}
-		return -1;});
-	
-	if(model.warn.length > 0) err_warning();
-	
-	model.param = param;
-	
-	check_derived_param_all(model.param);
-	check_reparam_all(model.param);
 }
 
 
-/// Goes through reparameterisation and distribution and adds to parameter list
-function add_dependent_param(param,par_list)
+/// Goes through reparameterisation, definition and distribution and adds to parameter list
+function add_dependent_param(param,par_list,ie_list,fe_list)
 {
 	let par = param[param.length-1];
-	
-	let eqn_info = {par_name:par.name};
+	let p_name = par.p_name;
+
+	let eqn_info = {par_name:par.name, eso:"dep"};
 	
 	let vari = par.variety;
 	
+	let wtype;
 	let warn =[];
 	
 	switch(vari){
 	case "reparam":
-		if(par.dep.length == 0){
-			add_ele_param(par.value,vari,par_list,eqn_info,warn);
+		if(par.reparam_eqn_on){
+			wtype = "RepEqValue";
+			add_ele_param_ie_fe(par.name,par.reparam_eqn,"reparam_eqn",par_list,ie_list,fe_list,eqn_info,warn,p_name);
 		}
 		else{
-			if(par.reparam_eqn_on) add_ele_param(par.reparam_eqn,"reparam_eqn",par_list,eqn_info,warn);
-			else{
-				for(let k = 0; k < par.reparam_warn.length; k++) warn.push(par.reparam_warn[k]);
-			}
+			wtype = "RepValue";
+			for(let k = 0; k < par.defrep_warn.length; k++) warn.push(par.defrep_warn[k]);
+
+			add_to_par_list(par.name,par.defrep_param_list,par_list);
+			add_to_ie_list(par.defrep_ie_list,ie_list,p_name);
+			add_to_fe_list(par.defrep_fe_list,fe_list,p_name);
 		}
 
-		add_to_par_list(par.reparam_param_list,par_list);
-		
 		if(warn.length > 0){
-			add_warning({mess:"Reparameterisation error", mess2:"The reparameterisation of '"+par.full_name+"': "+warn[0], warn_type:"reparam", name:par.name});
+			add_warning({mess:"Reparameterisation error", mess2:"The reparameterisation of '"+par.full_name+"': "+warn[0], warn_type:wtype, name:par.name});
 		}
 		break;
 	
 	case "define":
-		add_ele_param(par.define_eqn,"define_eqn",par_list,eqn_info,warn);
+		if(par.define_eqn_on){
+			wtype = "DefEqValue";
+			add_ele_param_ie_fe(par.name,par.define_eqn,"define_eqn",par_list,ie_list,fe_list,eqn_info,warn,p_name);
+		}
+		else{
+			wtype = "DefValue";
+			for(let k = 0; k < par.defrep_warn.length; k++) warn.push(par.defrep_warn[k]);
+			
+			add_to_par_list(par.name,par.defrep_param_list,par_list);
+			add_to_ie_list(par.defrep_ie_list,ie_list,p_name);
+			add_to_fe_list(par.defrep_fe_list,fe_list,p_name);
+		}
+		
+		if(warn.length > 0){
+			add_warning({mess:"Definition error", mess2:"The definition of '"+par.full_name+"': "+warn[0], warn_type:wtype, name:par.name});
+		}
 		break;
 		
 	case "dist":
 		{
-			if(par.dep.length == 0 || par.prior_split_check.check == false){	
+			if(par.ndep_cont == 0 || par.prior_split_check.check == false){	
+				wtype = "DistValue";
 				add_distribution_eqn(par.prior,vari,par_list,eqn_info,warn);	
 			}
 			else{
+				wtype = "DistSplitValue";
 				for(let k = 0; k < par.prior_warn.length; k++) warn.push(par.prior_warn[k]);
-				add_to_par_list(par.prior_param_list,par_list);
+			
+				add_to_par_list(par.name,par.prior_param_list,par_list);
+			}
+			
+			if(warn.length > 0){
+				add_warning({mess:"Distribution error", mess2:"The distribution of '"+par.full_name+"': "+warn[0], warn_type:wtype, name:par.name});
 			}
 		}
 		break;
@@ -978,99 +1080,171 @@ function add_dependent_param(param,par_list)
 
 
 /// Adds parameters defined in reparameterisation or priors
-function add_to_par_list(add_param_list,par_list)
+function add_to_par_list(par_name,add_param_list,par_list)
 {
 	for(let i = 0; i < add_param_list.length; i++){
 		let par_add = add_param_list[i]; 
 
-		let j = 0; while(j < par_list.length && par_list[j].name != par_add.name) j++;
-		if(j == par_list.length) par_list.push(par_add);
+		let j = find(par_list,"name",par_add.name)
+		
+		if(j == undefined){
+			par_list.push(par_add);
+		}
 		else{
-			for(let k = 0; k < par_add.eqn_appear.length; k++){
-				par_list[j].eqn_appear.push(par_add.eqn_appear[k]);
+			check_if_param_same(par_add,par_list[j]);
+
+			for(let k = 0; k < par_add.within.length; k++){
+				let wi = par_add.within[k];
+				add_wi(par_list[j],wi);
 			}
 		}
+		
+		check_nested(par_name,par_add);
 	}
 }
+
+
+/// Throws a warning if a parameter is within itself
+function check_nested(par_name,par)
+{
+	if(par.name != par_name) return;
+	
+	let te = "The parameter "+par.full_name+" cannot be contained within itself.";
+	
+	if(par.within != undefined && par.within.length > 0){
+		let wi = par.within[0];
+		add_warning({mess:"Parameter problem", mess2:te, eqn_type: wi.type, eqn_info:wi.eqn_info, warn_type:"Equation"});
+	}
+	else{
+		add_warning({mess:"Parameter problem", mess2:te, warn_type:"ParamPage"});
+	}
+}
+
+
+/// Throws a warning if two parameters are different 
+function check_if_param_same(par1,par2)
+{
+	if(par_same(par1,par2)) return;
+	
+	let line;
+	if(par1.import_line != undefined) line = par1.import_line;
+	if(par2.import_line != undefined) line = par2.import_line;
+
+	let te = "The parameter "+par1.name+" has different dependencies (with "+par1.full_name+" in one place and "+par2.full_name+" in another).";
+	
+	if(par1.within != undefined && par1.within.length > 0){
+		let wi = par1.within[0];
+		add_warning({mess:"Model inconsistency", mess2:te, eqn_type:wi.type, eqn_info:wi.eqn_info, line:line, warn_type:"Equation"});
+	}
+	else{
+		add_warning({mess:"Model inconsistency", mess2:te, line:line, warn_type:"ParamPage"});
+	}
+}
+	
+
+/// Adds individual effects onto list
+function add_to_ie_list(add_ie_list,ie_list,p_name)
+{
+	for(let i = 0; i < add_ie_list.length; i++){
+		let ie = add_ie_list[i];
+		let j = find(ie_list,"name",ie.name);
+		if(j == undefined){ j = ie_list.length; ie_list.push(ie);}
 		
+		if(ie_list[j].p_name == undefined) ie_list[j].p_name = p_name;
+	}
+}
+
+
+/// Adds individual effects onto list
+function add_to_fe_list(add_fe_list,fe_list,p_name)
+{
+	for(let i = 0; i < add_fe_list.length; i++){
+		let fe = add_fe_list[i];
+		let j = find(fe_list,"name",fe.name);
+		if(j == undefined){ j = fe_list.length; fe_list.push(fe);}
+		
+		if(fe_list[j].p_name == undefined) fe_list[j].p_name = p_name;
+	}
+}
+	
 
 /// Adds any parameters from a distribution to the list of equations
-function add_distribution_eqn(dist,vari,par_list,eqn_info,warn,op)
+function add_distribution_eqn(dist,vari,par_list,eqn_info,warn)
 {
 	let val = dist.value;
 	
 	switch(dist.type.te){
 	case "fix": 
-		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 		
 	case "uniform":
-		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn,op);
-		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn);
+		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 		
 	case "covar-normal-lkj": 
-		add_ele_param(val.sd_eqn.te,vari,par_list,eqn_info,warn,op);
-		add_ele_param(val.eta_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.sd_eqn.te,vari,par_list,eqn_info,warn);
+		add_ele_param(val.eta_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 		
 	case "covar-uniform-lkj": 
-		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn,op);
-		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn,op);
-		add_ele_param(val.eta_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn);
+		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn);
+		add_ele_param(val.eta_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 		
 	case "covar-inv-wishart":
-		add_ele_param(val.S_eqn.te,vari,par_list,eqn_info,warn,op);
-		add_ele_param(val.nu_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.S_eqn.te,vari,par_list,eqn_info,warn);
+		add_ele_param(val.nu_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 		
 	case "covar-jeffreys": case "covar-uniform":
-		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn,op);
-		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn);
+		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 		
 	case "inverse":
-		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn,op);
-		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn);
+		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 		
 	case "power":
-		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn,op);
-		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn,op);
-		add_ele_param(val.power_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.min_eqn.te,vari,par_list,eqn_info,warn);
+		add_ele_param(val.max_eqn.te,vari,par_list,eqn_info,warn);
+		add_ele_param(val.power_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 		
 	case "exp": 
-		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 		
 	case "normal": 
-		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,warn,op);
-		add_ele_param(val.sd_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,warn);
+		add_ele_param(val.sd_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 	
 	case "log-normal": 
-		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,warn,op);
-		add_ele_param(val.cv_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,warn);
+		add_ele_param(val.cv_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 		
 	case "gamma":
-		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,warn,op);
-		add_ele_param(val.cv_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,warn);
+		add_ele_param(val.cv_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 		
 	case "bernoulli":
-		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.mean_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 					
 	case "beta":
-		add_ele_param(val.alpha_eqn.te,vari,par_list,eqn_info,warn,op);
-		add_ele_param(val.beta_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.alpha_eqn.te,vari,par_list,eqn_info,warn);
+		add_ele_param(val.beta_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 	
 	case "mdir":
-		add_ele_param(val.sigma_eqn.te,vari,par_list,eqn_info,warn,op);
+		add_ele_param(val.sigma_eqn.te,vari,par_list,eqn_info,warn);
 		break;
 		
 	case select_str:
@@ -1081,60 +1255,121 @@ function add_distribution_eqn(dist,vari,par_list,eqn_info,warn,op)
 }
 
 
+/// Gets the type of equation fro 
+function get_type_from_vari(vari,time_dep)
+{
+	switch(vari){
+	case "define": 
+		if(time_dep == true) return "define_ele";
+		return "define_ele_notime";
+		
+	case "reparam": 
+		if(time_dep == true) return "reparam_ele";
+		return "reparam_ele_notime";
+	
+	case "dist": 
+		return "dist";
+	
+	default: error("Which ty from vari:"+vari); break;
+	}
+}
+
+		
 /// Adds any parameters from a text element to the parameter list
-function add_ele_param(ele,variety,par_list,eqn_info,warn,op)
+function add_ele_param(ele,vari,par_list,eqn_info,warn,p_name)
 {
 	if(isNaN(ele)){
-		let eqn = create_equation(ele,variety);
+		let p;
+		if(p_name != undefined && p_name != mixed_p_name){
+			p = find(model.species,"name",p_name);
+			if(p == undefined) error("Still can't find species");
+		}
+		
+		let eqn = create_equation(ele,get_type_from_vari(vari,false),p);
 		eqn.eqn_info = eqn_info;
 		
 		if(eqn.warn.length > 0){
 			warn.push(eqn.warn[0].te);
 		}
 	
-		if(op == "single eqn_appear"){  // In this case only want one eqn_appear 
-			for(let i = 0; i < eqn.param.length; i++){
-				let par = eqn.param[i];
-				let j = 0; while(j < par_list.length && par_list[j].name != par.name) j++;
-				
-				if(j == par_list.length){
-					add_par_to_list(par,par_list,copy(eqn),"Reparameterisation");
-				}
-			}
+		for(let i = 0; i < eqn.param.length; i++){
+			let par = eqn.param[i];
+			par.p_name = p_name;
+			add_par_to_list(par,par_list,copy(eqn),"Reparameterisation");
 		}
-		else{
-			for(let i = 0; i < eqn.param.length; i++){
-				add_par_to_list(eqn.param[i],par_list,copy(eqn),"Reparameterisation");
-			}
+	}
+}
+
+
+/// Adds any parameters, ie or fe from a text element to lists
+function add_ele_param_ie_fe(par_name,ele,eq_type,par_list,ie_list,fe_list,eqn_info,warn,p_name)
+{
+	if(isNaN(ele)){
+		let p;
+		if(p_name != undefined && p_name != mixed_p_name){
+			p = find(model.species,"name",p_name);
+			if(p == undefined) error("Still can't find species");
+		}
+	
+		let eqn = create_equation(ele,eq_type,p);
+		eqn.eqn_info = eqn_info;
+		
+		if(eqn.warn.length > 0){
+			warn.push(eqn.warn[0].te);
+		}
+		
+		for(let i = 0; i < eqn.ind_eff.length; i++){
+			let ie = eqn.ind_eff[i];
+			if(find(ie_list,"name",ie.name) == undefined) ie_list.push(ie);
+		}
+		
+		for(let i = 0; i < eqn.fix_eff.length; i++){
+			let fe = eqn.fix_eff[i];
+			if(find(fe_list,"name",fe.name) == undefined) fe_list.push(fe);
+		}
+	
+		for(let i = 0; i < eqn.param.length; i++){
+			let par = eqn.param[i];	
+			par.p_name = p_name;
+			add_par_to_list(par,par_list,copy(eqn),"Reparameterisation");
+			check_nested(par_name,par);	
 		}
 	}
 }
 
 
 /// Gets a list of all parameters in a reparameterisation
-function get_reparam_param_list(par) 
+function get_defrep_param_list(par) 
 {
-	par.reparam_param_list=[];
-	par.reparam_warn=[];
-	if(par.variety == "reparam" && par.reparam_eqn_on != true){
-		let eqn_info = {par_name:par.name};
+	par.defrep_param_list=[];
+	par.defrep_ie_list=[];
+	par.defrep_fe_list=[];
+	par.defrep_warn=[];
+	if((par.variety == "reparam" && par.reparam_eqn_on != true) || 
+		 (par.variety == "define" && par.define_eqn_on != true)){
+		let eq_type = get_type_from_vari(par.variety,par.time_dep);
+			 
+		let eqn_info = {type:eq_type, par_name:par.name, eso:"rep"};
 		let par_list = [];
-		let vari = par.variety;
+		let ie_list = [];
+		let fe_list = [];
 		
-		if(par.dep.length == 0){
-			add_ele_param(par.value,vari,par_list,eqn_info,par.reparam_warn,"single eqn_appear");
-		}
-		else{
-			let co_list = generate_co_list(par.list);
-			for(let i = 0; i < co_list.length; i++){
-				let comb = co_list[i];
-				let ele = get_element(par.value,comb.index);
-				eqn_info.index = comb.index;
-				add_ele_param(ele,vari,par_list,eqn_info,par.reparam_warn,"single eqn_appear");
-			}
+		let ndep = par.ndep_cont;
+		
+		if(ndep == 0) error("Should not be here");
+		
+		let co_list = generate_co_list(par.list,ndep);
+		for(let i = 0; i < co_list.length; i++){
+			let comb = co_list[i];
+			let ele = get_element(par.value,comb.index);
+			eqn_info.index = comb.index;	
+			add_ele_param_ie_fe(par.name,ele,eq_type,par_list,ie_list,fe_list,eqn_info,par.defrep_warn);
 		}
 	
-		par.reparam_param_list = par_list;
+		par.defrep_param_list = par_list;
+		
+		par.defrep_ie_list = ie_list;
+		par.defrep_fe_list = fe_list;
 	}
 }
 
@@ -1144,8 +1379,8 @@ function get_prior_param_list(par)
 {
 	par.prior_param_list=[];
 	par.prior_warn=[];
-	if(par.dep.length > 0 && par.prior_split_check.check == true){
-		let eqn_info = {par_name:par.name};
+	if(par.ndep_cont > 0 && par.prior_split_check.check == true){
+		let eqn_info = {par_name:par.name, eso:"pri"};
 		let par_list = [];
 		let vari = par.variety;
 		
@@ -1154,7 +1389,7 @@ function get_prior_param_list(par)
 			let comb = co_list[i];
 			let ele = get_element(par.prior_split,comb.index);
 				
-			add_distribution_eqn(ele,vari,par_list,eqn_info,par.prior_warn,"single eqn_appear");	
+			add_distribution_eqn(ele,vari,par_list,eqn_info,par.prior_warn);	
 		}
 
 		par.prior_param_list = par_list;
@@ -1163,21 +1398,26 @@ function get_prior_param_list(par)
 
 
 /// Creates a new parameter
-// par must have the properties: name, dep, type, time_dep, (optionally eqn_appear)
+// par must have the properties: name, dep, type, time_dep, (optionally within)
 // On top of these new properties are added: 
 // list: shows the potential values for the dependencies
 function create_new_param(par,variety)
 {
 	if(par.name == undefined) error("Parameter name must be set");
 	if(par.dep == undefined) error("Parameter dependency must be set");
-	if(par.type == undefined) error("Parameter type must be set");
 	if(par.time_dep == undefined) error("Parameter time dependency must be set");
-	if(par.type == "param factor") variety = "const"; 
-
+	
 	par.variety = variety;
 	
-	par.pri_pos = set_pri_pos(par.type,false);
+	if(par.variance == undefined) par.variance = false;
+	if(par.derive == undefined) par.derive = false;
+	if(par.param_fac == undefined) par.param_fac = false;
+	if(par.fixed_effect == undefined) par.fixed_effect = false;
+	
+	par.pri_pos = set_pri_pos(par.variance,false);
 
+	set_ndep_cont(par);
+	
 	let knot = ["start","end"];                      // Initialises a spline
 	
 	let on = false;
@@ -1187,17 +1427,20 @@ function create_new_param(par,variety)
 		
 	par.sim_sample = {check:true};
 		 
-	par.prior = unset_prior(par.type);
+	par.prior = unset_prior();
 	
-	par.reparam_eqn_on = false;
+	par.reparam_eqn_on = false; if(par.ndep_cont == 0) par.reparam_eqn_on = true;
 	par.reparam_eqn = "";
 	
+	par.define_eqn_on = false; if(par.ndep_cont == 0) par.define_eqn_on = true;
 	par.define_eqn = "";
 	
 	par_set_default(par);
 
 	par.full_name = param_name(par);
 
+	if(par.variance == true) par.prior.type.te = "covar-default";
+	
 	return par;
 }
 
@@ -1216,7 +1459,7 @@ function par_set_default(par)
 	par.iden_mat = false;
 	par.den_vec = false;
 	
-	if(par.dep.length == 0){
+	if(par.ndep_cont == 0){
 		par.value = set_str;
 		par.prior_const = set_str;
 		if(par.list){
@@ -1234,16 +1477,21 @@ function par_set_default(par)
 		
 		if(par.name == iden_matrix_name || par.name == iden_matrix_name2){ iden_set_default(par); return;}
 	
-		if(par.variety == "reparam" && par.reparam_eqn_on){ reparam_eqn_set_default(par); return;}
-		
+		if((par.variety == "reparam" && par.reparam_eqn_on) || 
+			(par.variety == "define" && par.define_eqn_on)){
+			reparam_eqn_set_default(par); return;
+		}
+	
 		par.list = par_find_list(par);
 		par.prior_split_check = {check:false};
 		par.set = false;
 		par.prior_const_set = false;
 	}
 	par.prior_const_on = false;
-	par.reparam_param_list = [];
-	par.reparam_warn = [];
+	par.defrep_param_list = [];
+	par.defrep_ie_list=[];
+	par.defrep_fe_list=[];
+	par.defrep_warn = [];
 	par.prior_param_list = [];
 	par.prior_warn = [];
 	par.factor = false;
@@ -1305,12 +1553,9 @@ function iden_set_default(par)
 function reparam_eqn_set_default(par)
 {
 	par.list = par_find_list(par);
-	//par.value = [];
-	//par.prior_split = [];
 	if(par.prior_split) delete par.prior_split;
 	if(par.value) delete par.value;
 	par.prior_split_check = {check:false};
-	par.variety = "reparam";	
 	par.set = false;
 }
 
@@ -1349,6 +1594,15 @@ function set_default_factor_weight(par)
 function copy_param_info(par,old)
 {
 	par.variety = old.variety;
+	
+	/*
+	par.variance = old.variance;
+	par.derive = old.derive;
+	par.param_fac = old.param_fac;
+	par.fixed_effect = old.fixed_effect;
+	*/
+	set_ndep_cont(par);
+	
 	par.spline = old.spline;
 	par.prior = old.prior;
 	par.sim_sample = old.sim_sample;
@@ -1357,12 +1611,15 @@ function copy_param_info(par,old)
 	par.prior_const_set = old.prior_const_set;
 	par.prior_const_on = old.prior_const_on;
 	par.import_line = old.import_line;
-	par.reparam_param_list = old.reparam_param_list;
-	par.reparam_warn = old.reparam_warn;
+	par.defrep_param_list = old.defrep_param_list;
+	par.defrep_ie_list = old.defrep_ie_list;
+	par.defrep_fe_list = old.defrep_fe_list;
+	par.defrep_warn = old.defrep_warn;
 	par.prior_warn = old.prior_warn;
 	par.prior_param_list = old.prior_param_list;
 	par.reparam_eqn_on = old.reparam_eqn_on;
 	par.reparam_eqn = old.reparam_eqn;
+	par.define_eqn_on = old.define_eqn_on;
 	par.define_eqn = old.define_eqn;
 	par.dist_mat = false;
 	par.iden_mat = false;
@@ -1370,7 +1627,7 @@ function copy_param_info(par,old)
 	par.factor = old.factor;
 	par.factor_weight_on = old.factor_weight_on;
 	
-	par.pri_pos = set_pri_pos(par.type,par.factor);
+	par.pri_pos = set_pri_pos(par.variance,par.factor);
 	
 	if(is_density_name(par.name)){ density_set_default(par); return par;}
 		
@@ -1378,9 +1635,12 @@ function copy_param_info(par,old)
 	
 	if(par.name == iden_matrix_name || par.name == iden_matrix_name2){ iden_set_default(par); return par;}
 	
-	if(par.variety == "reparam" && par.reparam_eqn_on) reparam_eqn_set_default(par); 
+	if((par.variety == "reparam" && par.reparam_eqn_on) || 
+			(par.variety == "define" && par.define_eqn_on)){
+		reparam_eqn_set_default(par); 
+	}
 	
-	if(par.dep.length == 0){	
+	if(par.ndep_cont == 0){	
 		par.value = old.value;
 		par.prior_const = old.prior_const;
 	}
@@ -1388,7 +1648,7 @@ function copy_param_info(par,old)
 		let list = par_find_list(par);
 	
 		let list_old = old.list;
-		
+	
 		// Checks if list is the same as the old version
 		let dif = false;
 		
@@ -1414,6 +1674,7 @@ function copy_param_info(par,old)
 			}
 		
 			if(dif != false){
+				
 				let temp = par_find_template(list);
 				let co_list = generate_co_list(list);
 			
@@ -1429,7 +1690,7 @@ function copy_param_info(par,old)
 				// Attempts to copy across existing values
 				if(dif == true){
 					let map=[];
-					for(let k = 0; k < par.dep.length; k++){
+					for(let k = 0; k < par.ndep_cont; k++){
 						map[k]=[];
 						
 						let list_new = list[k];
@@ -1455,12 +1716,12 @@ function copy_param_info(par,old)
 						
 						let ind_old=[];
 						let ii;
-						for(ii = 0; ii < par.dep.length; ii++){
+						for(ii = 0; ii < par.ndep_cont; ii++){
 							ind_old[ii] = map[ii][ele_list[k][ii]];
 							if(ind_old[ii] == undefined) break;
 						}
 						
-						if(ii == par.dep.length){
+						if(ii == par.ndep_cont){
 							old_fl = true;
 							if(val_set) val = get_element(old.value,ind_old);
 							if(prc_set) pr_co = get_element(old.prior_const,ind_old);
@@ -1470,7 +1731,7 @@ function copy_param_info(par,old)
 						else{
 							if(val_set) val = undefined;
 							if(prc_set) pr_co = undefined;
-							if(pri_set) pr_sp = unset_prior(par.type);
+							if(pri_set) pr_sp = unset_prior();
 							if(wei_set) wei = 1;
 						}
 						
@@ -1521,20 +1782,22 @@ function is_density_name(name)
 
 
 /// Finds the possible set of priors for a parameter type
-function set_pri_pos(type,factor)
+function set_pri_pos(variance,factor)
 {
 	let pri_pos = prior_pos;  
 	if(factor) pri_pos = prior_factor_pos;
-	if(type == "variance") pri_pos = prior_cv_pos;
+	if(variance == true) pri_pos = prior_cv_pos;
 	
 	return pri_pos;
 }
 
 
 /// Given a list of dependencies this provides a list of cominations going through each
-function generate_co_list(list)
+function generate_co_list(list,ndep_cont)
 {
 	let ndep = list.length;
+	if(ndep_cont != undefined) ndep = ndep_cont;
+	
 	let co_list = [];
 	
 	let list_len = [];
@@ -1577,16 +1840,13 @@ function generate_co_list(list)
 
 
 /// Sets an unspecified prior
-function unset_prior(par_type)
+function unset_prior()
 {
 	var eb = {te:"", type:"prior", mode:"param only"};
 	var value = {min_eqn:copy(eb), max_eqn:copy(eb), mean_eqn:copy(eb), power_eqn:copy(eb), shape_eqn:copy(eb), cv_eqn:copy(eb), sd_eqn:copy(eb), alpha_eqn:copy(eb), beta_eqn:copy(eb), sigma_eqn:copy(eb), eta_eqn:{te:"1", type:"prior",  mode:"param only"}, S_eqn:{te:"1", type:"prior", mode:"param only"}, nu_eqn:copy(eb)};
 	
 	let te = select_str;
 	
-	switch(par_type){  // Loads up standard priors for some parameters
-	case "correlation": te = "uniform"; value.min_eqn.te = "-0.9"; value.max_eqn.te = "0.9"; break;
-	}	
 	value.sigma_eqn.te = "0.5";
 				
 	return {type:{te:te}, value:value};
@@ -1604,7 +1864,7 @@ function check_derived_param_all(param)
 		let res = check_derived_param(eqn2,eqn1,param);
 		
 		if(res.err == true){
-			model.warn.push({mess:"Error in derived expression", mess2:res.msg, warn_type:"Equation", eqn_info:{i:i}, eqn_type:eqn2.type, line:der.line});
+			add_warning({mess:"Error in derived expression", mess2:res.msg, warn_type:"Equation", eqn_info:{i:i}, eqn_type:eqn2.type, line:der.line});
 		}
 	}	
 }
@@ -1622,23 +1882,21 @@ function check_derived_param(eqn,eqn_param,param)
 	for(let i = 0; i < eqn.param.length; i++){
 		let par = eqn.param[i];
 		
-		let j = 0;
-		while(j < param.length && par_same(par,param[j]) == false) j++;
-		
-		if(j == param.length){
-			let k = find(param,"na[me",par.name);
-			if(k != undefined){
-				let par_exist = param[k];
+		let j = find(param,"name",par.name);
+	
+		if(j == undefined){
+			return err("Parameter '"+par.full_name+"' is not found in the model");
+		}
+		else{
+			if(par_same(par,param[j]) == false){
+				let par_exist = param[j];
 				return err("Parameter '"+par.full_name+"' should have the dependency '"+par_exist.full_name+"' from the model");
-			}
-			else{
-				return err("Parameter '"+par.full_name+"' is not found in the model");
 			}
 		}
 	}
 	
 	// Checks that the dependencies for a derived quantity agree with equation
-	if(eqn_param == undefined) return err("Should be defined");
+	if(eqn_param == undefined) return err("eqn_param Should be defined");
 	
 	extract_equation_properties(eqn_param);
 
@@ -1646,7 +1904,7 @@ function check_derived_param(eqn,eqn_param,param)
 		let par_param = eqn_param.param[0];
 		for(let i = 0; i < param.length; i++){
 			let par = param[i];
-			if(par.type != "derive_param"){
+			if(par.derive != true){
 				if(par_param.name == param[i].name){
 					return err("The model already contains a parameter with name '"+par_param.name+"'");
 				}
@@ -1685,44 +1943,59 @@ function check_derived_param(eqn,eqn_param,param)
 }
 
 
-/// Checks all the derived parameters
+/// Checks all the reparameterised parameters
 function check_reparam_all(param)
 {
 	for(let th = 0; th < param.length; th++){
 		let par = param[th];
 		if(par.variety == "reparam" && par.reparam_eqn_on){
-			let res = check_reparam(par.reparam_eqn,th);
+			let res = define_reparam_eqn_check(par.reparam_eqn,th);
 			
 			if(res.err == true){
-				model.warn.push({mess:"Error in reparameterised expression", mess2:res.msg, warn_type:"Equation", eqn_info:{i:th}, eqn_type:"reparam_eqn", line:par.import_line});
+				add_warning({mess:"Error in reparameterised expression", mess2:res.msg, warn_type:"Equation", eqn_info:{i:th}, eqn_type:"reparam_eqn", line:par.import_line});
 			}
 		}
 	}
 }
 
-/// Checks reparameterisation is correct
-function check_reparam(te,th)
+
+/// Checks all the defined parameters
+function check_define_all(param)
 {
-	let eqn = create_equation(te,"reparam_eqn",undefined,undefined);
-		
+	for(let th = 0; th < param.length; th++){
+		let par = param[th];
+		if(par.variety == "define" && par.define_eqn_on){
+			let res = define_reparam_eqn_check(par.define_eqn,th);
+			
+			if(res.err == true){
+				add_warning({mess:"Error in defined expression", mess2:res.msg, warn_type:"Equation", eqn_info:{i:th}, eqn_type:"reparam_eqn", line:par.import_line});
+			}
+		}
+	}
+}
+
+
+/// Checks reparameterisation is correct
+function define_reparam_eqn_check(te,th)
+{
+	let eqn = create_equation(te,"reparam_eqn");
+	
 	let par = model.param[th];
-		
+	
 	// Makes sure that all dependencies in equation are in the parameter
 	let fl = false;
 	for(let d = 0; d < eqn.dep.length; d++){
 		let de = eqn.dep[d];
 		if(find_in(par.dep,de) == undefined){
+			//if(!(par.variety == "define" && de == "t")){
 			let te = "Problem with dependency - The expression depends on ";
 			if(de == "t") te += "time";
 			else te += "index "+de;
 			te += ", but this isn't contained in parameter "+par.name;
-			
 			return err(te);
+			//}
 		}
 	}
-	
-	if(eqn.fix_eff.length > 0) return err("Cannot contain fixed effect");
-	if(eqn.ind_eff.length > 0) return err("Cannot contain individual effect");
 
 	return success();
 }
@@ -1925,7 +2198,7 @@ function set_dist(info,par)
 	
 	info.value = value;
 	let shrunk=[];
-	for(let d = 0; d < par.dep.length; d++){
+	for(let d = 0; d < par.ndep_cont; d++){
 		if(info.list.length < par.list[d].length) shrunk[d] = true;
 		else shrunk[d] = false;
 	}
@@ -2208,7 +2481,7 @@ function set_density(info,par,limit_on)
 		
 	info.value = value;
 	let shrunk=[];
-	for(let d = 0; d < par.dep.length; d++){
+	for(let d = 0; d < par.ndep_cont; d++){
 		if(info.list.length < par.list[d].length) shrunk[d] = true;
 		else shrunk[d] = false;
 	}
@@ -2217,7 +2490,7 @@ function set_density(info,par,limit_on)
 
 
 /// Finds a list of all the equations in the model
-function find_equation_list(all_param)
+function find_equation_list()
 {
 	let eqn_list = [];
 	for(let p = 0; p < model.species.length; p++){
@@ -2225,44 +2498,44 @@ function find_equation_list(all_param)
 		for(let cl = 0; cl < sp.ncla; cl++){
 			let claa = sp.cla[cl];
 			for(let i = 0; i < claa.ntra; i++){
-				let eqn_info = {p:p,cl:cl,i:i};
+				let eqn_info = {p:p, cl:cl, i:i, eso:"model"};
 				
 				let traa = claa.tra[i];
 			
 				let val = traa.value;
 			
 				if(val.bp_eqn != undefined){
-					if((traa.branch_select == true || traa.all_branches) && (all_param == true || traa.branch == true)){
+					if((traa.branch_select == true || traa.all_branches) && traa.branch == true){
 						add_equation_to_list(eqn_list,val.bp_eqn,eqn_info);
 					}
 				}
 				
 				if(val.mean_eqn != undefined){
-					if(all_param == true || traa.type == "exp(mean)" || traa.type == "gamma" || traa.type == "erlang" || traa.type == "log-normal" ||  traa.type == "period"){
+					if(traa.type == "exp(mean)" || traa.type == "gamma" || traa.type == "erlang" || traa.type == "log-normal" ||  traa.type == "period"){
 						add_equation_to_list(eqn_list,val.mean_eqn,eqn_info);
 					}
 				}
 				
 				if(val.rate_eqn != undefined){
-					if(all_param == true || traa.type == "exp(rate)"){
+					if(traa.type == "exp(rate)"){
 						add_equation_to_list(eqn_list,val.rate_eqn,eqn_info);
 					}
 				}
 				
 				if(val.scale_eqn != undefined){
-					if(all_param == true || traa.type == "weibull"){
+					if(traa.type == "weibull"){
 						add_equation_to_list(eqn_list,val.scale_eqn,eqn_info);
 					}
 				}
 				
 				if(val.shape_eqn != undefined){
-					if(all_param == true || traa.type == "weibull"){
+					if(traa.type == "weibull"){
 						add_equation_to_list(eqn_list,val.shape_eqn,eqn_info);
 					}
 				}
 					
 				if(val.cv_eqn != undefined){
-					if(all_param == true || traa.type == "gamma" || traa.type == "log-normal"){
+					if(traa.type == "gamma" || traa.type == "log-normal"){
 						add_equation_to_list(eqn_list,val.cv_eqn,eqn_info);
 					}
 				}
@@ -2274,8 +2547,8 @@ function find_equation_list(all_param)
 			let so = sp.sim_source[i];
 	
 			if(so.error != true){
-				let eqn_info = {p:p, i:i};
-				
+				let eqn_info = {p:p, i:i, eso:"sim"};
+			
 				switch(so.type){
 				case "Add Ind.":
 					{
@@ -2285,6 +2558,20 @@ function find_equation_list(all_param)
 								add_eqn_filter(tab.ele[r][c],"sim_comp_prob",p,i,2,r,eqn_list);
 							}
 						}	
+					}
+					break;
+					
+				case "Test-and-cull":
+					{
+						let cb = so.spec.check_box.value; 
+						for(let ci = 0; ci < cb.length; ci++){
+							if(cb[ci].check){
+								let Se = cb[ci].Se_eqn.te;
+								add_equation_to_list(eqn_list,cb[ci].Se_eqn,eqn_info);
+							}
+						}
+		
+						add_equation_to_list(eqn_list,so.spec.Sp_eqn,eqn_info);
 					}
 					break;
 				}
@@ -2297,10 +2584,10 @@ function find_equation_list(all_param)
 			let so = sp.inf_source[i];
 	
 			if(so.error != true){
-				let eqn_info = {p:p, i:i};
+				let eqn_info = {p:p, i:i, eso:"inf"};
 				
 				switch(so.type){
-				case "Diag. Test":
+				case "Diag. Test": case "Test-and-cull":
 					{
 						let cb = so.spec.check_box.value; 
 						for(let ci = 0; ci < cb.length; ci++){
@@ -2361,7 +2648,7 @@ function find_equation_list(all_param)
 	for(let i = 0; i < model.derive.length; i++){
 		let der = model.derive[i];
 		
-		let eqn_info = {i:i};
+		let eqn_info = {i:i, eso:"der"};
 		
 		add_equation_to_list(eqn_list,der.eqn1,eqn_info);		
 	}
@@ -2381,7 +2668,7 @@ function add_comp_filt_eqn_list(filt,eqn_list,i,p,so,cl_sel)
 				{
 					let comp = cla[cl].comp;
 					for(let c = 0; c < comp.length; c++){
-						let eqn_info2 = {p:p,i:i,cl:cl,c:c};
+						let eqn_info2 = {p:p,i:i,cl:cl,c:c, eso:"inf"};
 						add_equation_to_list(eqn_list,comp[c].prob_eqn,eqn_info2);
 					}
 				}
@@ -2408,7 +2695,7 @@ function add_trans_filt_eqn_list(filt,eqn_list,i,p,cl)
 {
 	if(filt.trans_obs_model.value == "on"){
 		for(let tr = 0; tr < filt.tra.length; tr++){
-			let eqn_info2 = {p:p,i:i,cl:cl,tr:tr};
+			let eqn_info2 = {p:p,i:i,cl:cl,tr:tr, eso:"inf"};
 			if(filt.tra[tr].prob_eqn){
 				add_equation_to_list(eqn_list,filt.tra[tr].prob_eqn,eqn_info2);
 			}
@@ -2447,22 +2734,15 @@ function param_update_rename_compartment(p,cl,c,old_name,new_name)
 	
 		if(par.list){
 			//let flag = false;
-			for(let j = 0; j < par.dep.length; j++){
+			for(let j = 0; j < par.ndep_cont; j++){
 				
 				if(index == remove_prime(par.dep[j])){
 					if(c < par.list[j].length){
 						if(par.list[j][c] != old_name) error("Old name not correct");
 						par.list[j][c] = new_name;
-						//flag = true;
 					}
 				}
 			}
-			
-			/*
-			if(flag == true){
-				par.co_list = generate_co_list(par.list);
-			}
-			*/
 		}
 	}
 }
@@ -2496,7 +2776,7 @@ function get_param_mult(par)
 	full_name += "(t)";
 	
 	full_name += "</e>";
-	return {name:name, full_name:full_name, dep:dep, time_dep:true, type:"param factor"};
+	return {name:name, full_name:full_name, dep:dep, time_dep:true, param_fac:true};
 }
 
 
@@ -2527,8 +2807,7 @@ function add_param_ppc_factor(par_list)
 /// Sets up a blank parameter specification
 function param_blank(par)
 {
-	let temp = par_find_template(par.list);
-	return temp;
+	return par_find_template(par.list,par.ndep_cont);
 }
 
 
@@ -2536,9 +2815,45 @@ function param_blank(par)
 function param_num_element(par)
 {
 	let num = 1; 
-	if(par.dep.length == 0) return num;
+	if(par.ndep_cont == 0) return num;
 	for(let i = 0; i < par.list.length; i++){
 		num *= par.list[i].length;
 	}
 	return num;
+}
+
+
+/// Determines if param is needed for simulation/inference
+function param_needed(par,siminf)
+{
+	if(siminf == "all") return true;
+
+	if(par.within == undefined) return false; // This can happen if defined quantities not used
+	
+	for(let i = 0; i < par.within.length; i++){
+		let wi = par.within[i];
+		
+		let eso = wi.eqn_info.eso;
+		switch(eso){
+		case "model": case "dep": case "rep":
+			return true;
+		
+		case "der":
+			return false;
+			
+		case "sim":
+			if(siminf == "sim") return true; 
+			break;
+			
+		case "inf":
+			if(siminf == "inf") return true; 
+			break;
+			
+		default: 
+			error("eso not found:"+eso);
+			break;
+		}
+	}
+	
+	return false;
 }

@@ -1941,7 +1941,6 @@ function add_individual_buts(res,lay)
 	case "First Inf. Time": title = "First infection time"; he = ind_first_inf_time_text; break;
 	case "First Inf. Ind.": title = "First infected individual"; he = ind_first_inf_ind_text; break;
 	case "First Inf. Comp.": title = "First infected compartment"; he = ind_first_inf_comp_text; break;
-	
 	default: break;
 	}
 
@@ -2230,7 +2229,7 @@ function graph_ind_calculate(result,rpf,burn,p)
 		}
 		
 		percent(10);
-
+		
 		// Looks to add actual values for individual effects from data
 		if(result.siminf == "inf" || result.siminf == "ppc"){   
 			for(let k = 0; k < sp.inf_source.length; k++){
@@ -2238,28 +2237,31 @@ function graph_ind_calculate(result,rpf,burn,p)
 				if(so.type == "Ind. Eff."){
 					let tab = so.table;
 					let ie = so.spec.drop.te;
-					for(let r = 0; r < tab.nrow; r++){
-						let j = hash.find(tab.ele[r][0]);
-						if(j != undefined){
-							ind_list[j][ie] = tab.ele[r][1];
+			
+					let e = find_in(sp.ind_effect,ie);
+					if(e == undefined) error("cannot find ie");
+
+					else{
+						for(let r = 0; r < tab.nrow; r++){
+							let j = hash.find(tab.ele[r][0]);
+							if(j != undefined){
+								let ind = ind_list[j];
+								if(ind.ie_true == undefined) ind.ie_true=[];
+								ind.ie_true[e] = Number(tab.ele[r][1]);
+							}
 						}
 					}
 				}
 			}
 		}
 		
-		switch(result.siminf){
-		case "sim": 
-			add_source_obs(sp.sim_source,claa,hash,result,ind_list);
-			break;
-		case "inf": 
-			add_source_obs(sp.inf_source,claa,hash,result,ind_list);
-			break;
-		case "ppc": 
-			add_source_obs(sp.inf_source,claa,hash,result,ind_list);
-			add_source_obs(model.inf_res.plot_filter.species[p].ppc_source,claa,hash,result,ind_list);
-			break;
+		if(result.siminf == "ppc"){
+			let source = get_source("inf",p);
+			add_source_obs(source,claa,hash,result,ind_list);
 		}
+		
+		let source = get_source(result.siminf,p);
+		add_source_obs(source,claa,hash,result,ind_list);
 		
 		// Genetic data could be places in any species
 		if(result.siminf == "inf" || result.siminf == "ppc"){     
@@ -2733,7 +2735,7 @@ function find_obs_colour(claa,st)
 function add_individual_table(ind_list,p,result,data,ind_max)
 {
 	let sp = result.species[p];
-	
+
 	let twid = [];
 	
 	let table = {width:twid, heading:[], content:[]};
@@ -2749,8 +2751,13 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 	
 	let nie = sp.ind_effect.length;
 	for(let e = 0; e < nie; e++){	
-		let flag = false;
-		
+		/// Determines if true value exists
+		let fl = false;
+		for(let i = 0; i < ind_list.length; i++){
+			let ind = ind_list[i];
+			if(ind.ie_true != undefined && ind.ie_true[e] != undefined) fl = true;
+		}
+			
 		{
 			let name = "["+sp.ind_effect[e]+"]";
 			
@@ -2767,6 +2774,24 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 			add_table_column(name,vec,table);
 		}
 		
+		{ // True ie values	
+			if(fl){
+				let name = "True ["+sp.ind_effect[e]+"]";
+				let vec=[];
+				for(let i = 0; i < ind_list.length; i++){
+					let ind = ind_list[i];
+					if(ind.ie_true != undefined && ind.ie_true[e] != undefined){
+						vec.push(ind.ie_true[e].toPrecision(pre));
+					}
+					else{
+						vec.push("");
+					}						
+				}	
+			
+				add_table_column(name,vec,table);
+			}
+		}
+		
 		{
 			let name = "log(["+sp.ind_effect[e]+"])";
 			let vec=[];
@@ -2776,19 +2801,27 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 				if(stat.CImin != stat.mean || stat.CImax != stat.mean){
 					te += " ("+stat.CImin.toPrecision(pre)+" — "+stat.CImax.toPrecision(pre)+")";
 				}
-				if(ind_list[i][name] != undefined) flag = true;
 				vec.push(te);
 			}
 			
 			add_table_column(name,vec,table);
-			
-			if(flag == true){ // True ie values exist
+		}
+		
+		{ // True ie values	
+			if(fl){
+				let name = "True log(["+sp.ind_effect[e]+"])";
 				let vec=[];
 				for(let i = 0; i < ind_list.length; i++){
-					if(ind_list[i][name] != undefined) vec.push(ind_list[i][name]);
-					else vec.push("-");
-				}
-				add_table_column("True "+name,vec,table);
+					let ind = ind_list[i];
+					if(ind.ie_true != undefined && ind.ie_true[e] != undefined){
+						vec.push(Math.log(ind.ie_true[e]).toPrecision(pre));
+					}
+					else{
+						vec.push("");
+					}						
+				}	
+			
+				add_table_column(name,vec,table);
 			}
 		}
 	}	
@@ -2839,12 +2872,8 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 			if(te != "") te += "|"; 
 			te += "t="+ob.tstr;
 			
-			let so;
-			switch(result.siminf){
-			case "sim": so = sp.sim_source[ob.i]; break;
-			case "inf": so = sp.inf_source[ob.i]; break;
-			default: break;
-			}
+			let source = get_source(result.siminf,p);
+			let so = source[ob.i];
 				
 			switch(ob.type){	
 			case "AddObs":
@@ -2880,12 +2909,17 @@ function add_individual_table(ind_list,p,result,data,ind_max)
 	}
 	
 	for(let j = 0; j < list.length; j++){
+		let source = get_source(result.siminf,p);
+		let so = source[list[j]];
+			
+		/*
 		let so;
 		switch(result.siminf){
 		case "sim": so = sp.sim_source[list[j]]; break;
 		case "inf": so = sp.inf_source[list[j]]; break;
 		default: break;
 		}
+		*/
 		
 		if(so != undefined){
 			let te = so.name;
@@ -3016,8 +3050,9 @@ function add_ind_eff_PA_scatter(ind_list,p,result,rpf,data,key,ind_max)
 	for(let i = 0; i < ind_list.length; i++){
 		if(i%100 == 0) percent(80+20*i/ind_list.length);
 		
-		if(ind_list[i][ie] != undefined){
-			let val = Math.log(Number(ind_list[i][ie]));
+		let ind = ind_list[i];
+		if(ind.ie_true != undefined && ind.ie_true[e] != undefined){
+			let val = Math.log(ind.ie_true[e]);
 			if(!isNaN(val)){
 				let stat = ind_list[i].log_ie_stat[e];
 	
@@ -3432,8 +3467,9 @@ function add_timelines(ind_list,tmin,tmax,p,cl,result,data,key,ind_max)
 			else info += "⟨"+name+"⟩";
 			info += "= "+comb_ind.ie_stat[e].mean.toPrecision(pre);
 			
-			if(comb_ind[name] != undefined){
-				info += " (True ="+Number(comb_ind[name]).toPrecision(pre)+")";
+			if(comb_ind.ie_true != undefined){
+				let val = comb_ind.ie_true[e];
+				if(val != undefined) info += " (True="+val.toPrecision(pre)+")";
 			}
 		}
 		
@@ -4334,7 +4370,9 @@ function get_col_list(dep,mod,N)
 		if(cla == undefined) error("Could not find classification2");
 		else{
 			let comp = cla.comp;
-			if(comp.length != N) error("col_list problem");
+			if(comp.length != N){
+				error("col_list problem");
+			}
 			for(let k = 0; k < comp.length; k++) col_list[k] = comp[k].col;
 		}
 	}
@@ -4491,7 +4529,7 @@ function create_view_graph_calculate(name,prior_const,sel_view,so)
 	let par = model.param[i];
 	
 	let det = so.sim_details;
-	if(par.type == "param factor") det = so.ppc_details;
+	if(par.param_fac) det = so.ppc_details;
 	
 	let value = par.value;
 	if(prior_const == true) value = par.prior_const;
@@ -4517,7 +4555,7 @@ function construct_spline_timevariation(par,value,details)
 	let val_spl = copy(value);
 	let type = par.spline.spline_radio.value;
 
-	switch(par.dep.length){
+	switch(par.ndep_cont){
 	case 1: 
 		val_spl = get_time_variation(val_spl,times,tp,type); 
 		break;
@@ -4572,8 +4610,8 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 					
 					let ntimes = times.length;
 				
-					let list = par_find_list(par);
-				
+					let list = par_find_list(par,so);
+			
 					if(list[list.length-1].length != ntimes) error("Should be same length");
 					list.pop();
 					
@@ -4688,7 +4726,7 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 						}
 						
 						// Adds in simuation values
-						if(par.variety != "const" && rpf && rpf.sim_val.check == true && rpf.siminf != "sim" && par.type != "derive_param"){	
+						if(par.variety != "const" && rpf && rpf.sim_val.check == true && rpf.siminf != "sim" && par.derive != true){	
 							let res = construct_spline_timevariation(par,par.value,so.details);
 							if(!res.err){ 
 								let vec_val = get_element(res.value,index);
@@ -4715,7 +4753,7 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 		
 			case "Matrix":
 				{
-					let list = par_find_list(par);
+					let list = par_find_list(par,so);
 					let vecy = list[0];
 					let vecx = list[1];
 
@@ -4754,7 +4792,7 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 						if(!res.err) val = res.value;
 					}
 					
-					if(par.dep.length == 3){
+					if(par.ndep_cont == 3){
 						if(comp.length > MATRIX_COMP_MAX){
 							return no_graph_msg("Too many lines to plot");
 						}
@@ -4800,7 +4838,8 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 			switch(view){
 			case "Histogram":
 				{
-					let list = par_find_list(par);
+					let list = par_find_list(par,so);
+				
 					let vec = list[0];
 					if(vec.length > HISTO_PLOT_MAX){
 						return no_graph_msg("Too many bars to plot");
@@ -4874,7 +4913,7 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 			switch(view){
 			case "Matrix":
 				{
-					let list = par_find_list(par);
+					let list = par_find_list(par,so);
 					let vecy = list[0];
 					let vecx = list[1];
 			
@@ -5276,14 +5315,14 @@ function graph_param_calculate(result,rpf,burn)
 						
 						let sample = result.par_sample;
 						
-						if(par.type == "derive_param" && par.time_dep) sample = result.sample;
+						if(par.derive && par.time_dep) sample = result.sample;
 						
 						let imin = 0;
 						while(imin < sample.length && sample[imin].chain != cha) imin++;
 						
 						let iburn = imin;
 						
-						if(vte == "Trace" && par.type != "derive_param"){
+						if(vte == "Trace" && par.derive != true){
 							while(iburn < sample.length && sample[iburn].num < burn) iburn++;
 							
 							if(iburn > imin){
@@ -5473,7 +5512,7 @@ function graph_generation_calculate(result,rpf,burn)
 	}
 	
 	let sample = result.par_sample;
-	if(par.type == "derive_param" && par.time_dep) sample = result.sample;
+	if(par.derive && par.time_dep) sample = result.sample;
 	
 	let vec = [];
 	for(let i = 0; i < sample.length; i++){
@@ -5534,7 +5573,7 @@ function multivariate_param_plot(result,rpf,burn)
 
 	let samp_val_list = []
 
-	if(par.type == "derive_param" && par.time_dep){
+	if(par.derive == true && par.time_dep){
 		for(let s = 0; s < result.sample.length; s++){
 			let samp = result.sample[s];
 			if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
@@ -5688,7 +5727,7 @@ function get_param_stats(th,index,result,rpf,burn)
 
 	let vec = []; 
 	
-	if(par.type == "derive_param" && par.time_dep){
+	if(par.derive == true && par.time_dep){
 		for(let s = 0; s < result.sample.length; s++){
 			let samp = result.sample[s];
 			if(samp.num >= burn && !(chsel != "All" && samp.chain != chsel)){
@@ -5806,7 +5845,7 @@ function setup_distribution(result,rpf,burn)
 		
 		let vec = [];
 		let sample = result.par_sample;
-		if(par.type == "derive_param" && par.time_dep) sample = result.sample;
+		if(par.derive == true && par.time_dep) sample = result.sample;
 		
 		for(let i = 0; i < sample.length; i++){
 			let samp = sample[i];
@@ -5835,12 +5874,12 @@ function setup_distribution(result,rpf,burn)
 	}
 	
 	// Draws the prior
-	if(result.siminf != "sim" && rpf.dist_settings.show_prior.check == true && par.variety != "reparam" && par.variety != "define" && par.variety != "likelihood" && par.prior && par.type != "derive_param"){
+	if(result.siminf != "sim" && rpf.dist_settings.show_prior.check == true && par.variety != "reparam" && par.variety != "define" && par.variety != "likelihood" && par.prior && par.derive != true){
 		if(!(result.siminf == "inf" && par.prior_const_on == true)){
 			let N = 200;                                   // The number of points
 			
 			let pri;
-			if(par.dep.length > 0 && par.prior_split_set == true) pri = get_element(par.prior_split,ind);
+			if(par.ndep_cont > 0 && par.prior_split_set == true) pri = get_element(par.prior_split,ind);
 			else pri = par.prior;
 			
 			let point = [];
@@ -6093,7 +6132,7 @@ function get_prior_clip(par,ind)
 {
 	if(par.variety != "reparam" && par.variety != "define" && par.variety != "likelihood" && par.prior){
 		let pri;
-		if(par.dep.length > 0 && par.prior_split_set == true) pri = get_element(par.prior_split,ind);
+		if(par.ndep_cont > 0 && par.prior_split_set == true) pri = get_element(par.prior_split,ind);
 		else pri = par.prior;
 		
 		switch(pri.type.te){

@@ -155,6 +155,8 @@ Table Input::load_table(const string file, string desc, bool enc)
 	
 	if(enc) decode_lines(lines);
 
+	remove_escape_char_lines(lines);
+
 	auto j = 0u;
 	while(j < lines.size() && (begin_str(trim(lines[j]),"#") || trim(lines[j]) == "")) j++;
 	
@@ -935,7 +937,7 @@ EquationInfo Input::he(EquationInfo eqn_inf, unsigned int lnum)
 
 
 /// Determines if file is inline
-bool Input::is_inline(string te) const
+bool Input::is_inline(const string &te) const
 {
 	if(te.length() > 4 && te.substr(0,3) == "[[$" && te.substr(te.length()-3,3) == "&]]") return true;
 	return false;
@@ -943,7 +945,7 @@ bool Input::is_inline(string te) const
 
 
 /// Determines if text string is for a file
-bool Input::is_file(string te) const
+bool Input::is_file(const string &te) const
 {
 	if(te.length() < 4) return false;
 	
@@ -1290,7 +1292,7 @@ unsigned int Input::get_param_value(vector < vector <double> > &param_value, uns
 	
 	auto spl = comma_split(lines[i]);
 	auto name = remove_quote(replace(spl[0],"->","→"));// remove_quote(spl[0].replace(/->/g,"→"));
-	name = remove_escape_char(name);
+	remove_escape_char(name);
 
 	if(find_in(not_param_list,name) != UNSET){
 		return i;
@@ -1625,6 +1627,68 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 			else par.element[ref].value.te;
 			cout << " val" << endl;
 		}
+	}
+}
+
+
+/// Loads parameter values from a file 
+void Input::load_define_value(ParamProp pp, string valu, Define &def, unsigned int mult)
+{ 
+	string desc = "For 'value'";
+	auto tab = load_table(valu,desc); if(tab.error == true) return;
+
+	auto ndep = def.dep.size();
+
+	vector <string> col_name;
+	for(auto d = 0u; d < ndep; d++) col_name.push_back(pp.dep_with_prime[d]);
+		
+	col_name.push_back("Value");
+	
+	auto subtab = get_subtable(tab,col_name,desc);
+	if(subtab.error == true) return;
+	
+	auto ncol = subtab.ncol;
+	
+	def.value_list_ref.resize(mult,UNSET);
+	
+	for(auto r = 0u; r < subtab.nrow; r++){
+		auto fl = false;
+		
+		vector <unsigned int> ind(ndep);
+		for(auto i = 0u; i < ndep; i++){
+			auto ele = subtab.ele[r][i];
+			ind[i] = def.dep[i].hash_list.find(ele);
+	
+			if(ind[i] == UNSET){ 
+				fl = true;
+				
+				if(def.dep[i].hash_list_out.find(ele) == UNSET){	
+					alert_import(desc+" the element '"+ele+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
+					return;
+				}
+			}
+		}
+		
+		if(fl == false){
+			auto sum = 0u; 
+			for(auto i = 0u; i < ndep; i++) sum += def.dep[i].mult*ind[i];
+			def.value_list_ref[sum] = def.value_list.size();
+			auto ele = subtab.ele[r][ncol-1];
+			auto eqn = he(add_equation_info(ele,DEFINE_EQN));		
+			def.value_list.push_back(eqn);
+		}
+	}
+	
+	if(false){
+		for(auto i = 0u; i < mult; i++){
+			cout << i << " " << def.value_list_ref[i] << " value_list_ref" << endl;
+		}
+		
+		for(auto i = 0u; i < def.value_list.size(); i++){
+			cout << i << def.value_list[i].te_raw << " value_list" << endl;
+		}
+		
+		emsg("set");
 	}
 }
 
@@ -2031,7 +2095,7 @@ unsigned int Input::get_chain()
 		alert_import("Chain '"+chain+"' must be a number");
 	}
 	if(ch < 1 || ch > model.details.nchain){
-		if(!model.data_mode()) alert_import("Chain '"+chain+"' out of range");
+		if(!model.data_mode() && model.mode != SIM) alert_import("Chain '"+chain+"' out of range");
 	}
 	
 	return ch-1;
@@ -2118,12 +2182,12 @@ void Input::compress_command_lines(const vector <CommandLine> &command_line, vec
 		
 		auto li_next = lines_raw.size();
 		if(i+1 < command_line.size()) li_next = command_line[i+1].line_num;
-				
+		
 		switch(cl.command){
 		case SIM_PARAM: case SIM_STATE:
 		case INF_PARAM: case INF_STATE:
 		case POST_SIM_STATE: case POST_SIM_PARAM:
-		case PROPOSAL_INFO: case INF_PARAM_STATS: case INF_DIAGNOSTICS:
+		case PROPOSAL_INFO: case INF_PARAM_STATS: case INF_PRED_ACC: case INF_DIAGNOSTICS:
 		case INF_GEN: case TRANS_DIAG:
 			{
 				comp_fl = true;
@@ -2131,7 +2195,8 @@ void Input::compress_command_lines(const vector <CommandLine> &command_line, vec
 				auto tags = cl.tags;
 				
 				auto fl = true;
-				auto fl2 = false;
+				if(decomp) fl = false;
+				auto fl2 = false; 
 				for(auto j = 0u; j < tags.size(); j++){
 					auto &ta = tags[j];
 					if(ta.name == "compress"){
@@ -2141,12 +2206,11 @@ void Input::compress_command_lines(const vector <CommandLine> &command_line, vec
 							else fl = false;
 						}
 						else{
-							if(toLower(ta.value) != "false") ta.value = "false";
-							else fl = false;
+							if(toLower(ta.value) != "false"){ ta.value = "false"; fl = true;}
 						}
 					}
 				}
-				
+			
 				if(fl == true){
 					auto te = cl.command_name;
 					auto fi_tag = UNSET;
@@ -2206,9 +2270,14 @@ void Input::compress_command_lines(const vector <CommandLine> &command_line, vec
 					lines_new.push_back(te);
 					
 					comp_fl2 = true;
+					li = li_next;
 				}
-				
-				li = li_next;
+				else{
+					while(li < li_next){
+						lines_new.push_back(lines_raw[li]);
+						li++;
+					}
+				}
 			}
 			break;
 			
@@ -2227,6 +2296,7 @@ void Input::compress_command_lines(const vector <CommandLine> &command_line, vec
 	
 	lines_raw = lines_new;
 }
+
 
 /// If alternative column names then substitute
 void Input::get_cols(vector <string> &col_name)

@@ -1055,7 +1055,12 @@ void Input::check_param_define_all()
 		if(der.eq_raw.te != "") check_param_define(der.eq_raw);
 	}
 	
-	for(const auto &def : model.define) check_param_define(def.value);
+	for(const auto &def : model.define){
+		if(def.eqn_on == true) check_param_define(def.eqn);
+		else{
+			for(const auto &eq : def.value_list) check_param_define_element(eq);
+		}
+	}
 	
 	for(const auto &par : model.param){
 		if(par.reparam_eqn.te != "") check_param_define(par.reparam_eqn);
@@ -1067,6 +1072,7 @@ void Input::check_param_define_all()
 void Input::check_param_define(const EquationInfo &ei)
 {
 	auto te = ei.te;	
+
 	auto line_num = ei.line_num;
 	
 	auto i = 0u;
@@ -1077,7 +1083,7 @@ void Input::check_param_define(const EquationInfo &ei)
 			while(i < te.length() && te.substr(i,1) != "$") i++;
 			if(i < te.length()){
 				auto cont = te.substr(ist+1,i-ist-1);
-				
+			
 				auto pp = get_param_prop(cont);
 				
 				auto name = pp.name;
@@ -1087,7 +1093,7 @@ void Input::check_param_define(const EquationInfo &ei)
 				if(k == reserved_param.size()){
 					auto fl = false; 
 					for(auto &par : model.param){
-						if(par.name == name){
+						if(par.name == name){	
 							if(check_dep_without_prime_error(par.dep,pp.dep)){
 								alert_line("The parameter '"+cont+"' doesn't have the same dependency as the parameter definition '"+par.full_name+"'",line_num,true);
 							}
@@ -1099,8 +1105,10 @@ void Input::check_param_define(const EquationInfo &ei)
 					
 					for(auto &def : model.define){
 						if(def.name == pp.name){
-							if(check_dep_without_prime_error(def.dep,pp.dep)){
-								alert_line("The value '"+cont+"' doesn't have the same dependency as the definition '"+def.full_name+"'",line_num,true);
+							auto dep = pp.dep;
+							if(def.time_dep) dep.pop_back();
+							if(check_dep_without_prime_error(def.dep,dep)){
+								alert_line("The value '"+cont+"' doesn't have the same dependency as the definition '"+def.full_name+"' 1",line_num,true);
 							}
 							fl = true;
 						}
@@ -1134,6 +1142,15 @@ void Input::check_param_define(const EquationInfo &ei)
 	}
 }
 
+
+/// Checks if expression only uses a parameter or a definition
+void Input::check_param_define_element(const EquationInfo &ei)
+{
+	// TO DO
+	if(false) cout << ei.te;
+}
+
+
 /// Checks that the parameter name is not a reserved name
 string Input::check_reserved_name(string name) const 
 {
@@ -1147,3 +1164,16 @@ string Input::check_reserved_name(string name) const
 	return "";
 }
 
+
+/// If extending then checks that inference results exist
+void Input::check_inference_done(const vector <CommandLine> &command_line)
+{
+	for(const auto &cl : command_line){
+		switch(cl.command){
+		case INF_PARAM: case INF_STATE: return; 	
+		default: break;
+		}
+	}
+	
+	alert_line("Inference must be performed before it can be extended",UNSET,true);
+}

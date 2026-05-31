@@ -13,7 +13,7 @@ class Data
 	
 	constructor()
 	{
-		this.source_width = [13,8,12,5,3.5,3,1.5]; 
+		this.source_width = [10,8,15,5,3.5,3,1.5]; 
 		this.table_width = [1,17.5,5,5,1.5];
 	}
 }
@@ -23,7 +23,7 @@ class Data
 function start_data_source(type,spec,info)
 {
 	if(info.p == undefined && type != "LoadTensor" &&
-		type != "LoadPriorSplit" && type != "LoadDistSplit" && type != "LoadReparam" && type != "LoadAmatrix" &&
+		type != "LoadPriorSplit" && type != "LoadDistSplit" && type != "LoadReparam" && type != "LoadDefine" && type != "LoadAmatrix" &&
 		type != "Fixed Effect"){
 		info.p = model.get_p();
 	}
@@ -40,7 +40,8 @@ function start_data_source(type,spec,info)
 	case "Population": name = "Pop. data"; break;
 	case "Pop. Trans.": name = "Pop. trans. data"; break;
 	case "Genetic": name = "Genetic data"; break;
-	case "Ind. Eff.": name = "True individual effects"; break;
+	case "Ind. Eff.": name = "True individual effect"; break;
+	case "Set IE": name = "Set individual effect"; break;
 	case "Ind. Group": name = "Group"; break;
 	case "Add Pop.": name = "Added populations"; break;
 	case "Remove Pop.": name = "Removed populations"; break;
@@ -57,17 +58,7 @@ function start_data_source(type,spec,info)
 		if(siminf != undefined){
 			let p = info.p;
 			
-			let sp = model.species[p];
-			if(siminf == "gen") sp = model.sim_res.plot_filter.species[p];
-			if(siminf == "ppc") sp = model.inf_res.plot_filter.species[p];
-			
-			let source;
-			switch(siminf){
-			case "sim": source = sp.sim_source; break;
-			case "inf": source = sp.inf_source; break;
-			case "ppc": source = sp.ppc_source; break;
-			case "gen": source = sp.gen_source; break;
-			}
+			let source = get_source(siminf,p);
 			
 			let num = 1;
 			do{
@@ -115,9 +106,6 @@ function add_init_cont_buts(lay,siminf)
 	let title, te;
 	switch(siminf){
 	case "sim": title = "Simulation setup"; te = initcond_text; break;
-	//case "inf": title = "Data"; te = data_text; break;
-	//case "ppc": title = "Population modification"; te = modification_text; break;
-	//case "gen": title = "Simulated data"; te = data_text; break;
 	}
 	
 	if(model.species.length > 1) title += " for species '"+sp.name+"'";
@@ -411,43 +399,35 @@ function add_data_buts(lay,siminf)
 	
 	let type = so.type;
 	
-	let p	= model.get_p();
-	
-	let spec = get_species(siminf);
-	
-	let sp = spec[p];
-	
+	let p	= model.get_p();	
+	let nsp = get_so_nsp(siminf);
+
 	let title, te;
 	switch(siminf){
 	case "sim": title = "Simulation setup"; te = initcond_text; break;
 	case "inf": title = "Data"; te = data_text; break;
 	case "ppc": title = "Population modification"; te = modification_text; break;
-	case "gen": title = "Simulated data"; te = data_text; break;
+	case "gen": title = "Simulated data"; te = data_sim_text; break;
 	}
-
-	if(spec.length > 1) title += " for species '"+sp.name+"'";
-		
+	
 	cy = lay.add_title(title,cx,cy,{te:te});
 	
 	let table;
-	if(spec.length == 0){
+	if(nsp == 0){
 		center_message("A species needs to be added to the model.",lay);
 		return;
 	}
 	
+	let sp = get_so_sp(siminf,p);
+	let source = get_source(siminf,p);
+	
+	if(nsp > 1) title += " for species '"+sp.name+"'";
+	
 	if(siminf == "gen" && (p >= model.species.length || model.species[p].generate_pos == false)){
-		center_message("The model has been changed so data cannot be simulated.",lay);
+		center_message("The model has changed, so data cannot be simulated.",lay);
 		return;
 	}
-	
-	let source;
-	switch(siminf){
-	case "sim": source = sp.sim_source; break;
-	case "inf": source = sp.inf_source; break;
-	case "ppc": source = sp.ppc_source; break;
-	case "gen": source = sp.gen_source; break;
-	}
-
+		
 	if(source.length == 0){
 		table = "No data sources added.";
 		if(siminf == "sim") table = "No setup information.";
@@ -492,7 +472,7 @@ function add_data_buts(lay,siminf)
 	let x = 1.2, y = lay.dy-1.6;
 	let gap = 3.4;
 
-	let active = true; if(spec.length == 0) active = false;
+	let active = true; if(nsp == 0) active = false;
 
 	let info = {siminf:siminf};
 	
@@ -601,6 +581,13 @@ function add_data_buts(lay,siminf)
 					if(siminf == "gen"){ te = sim_move_ind_text; ti = "Generate move individual data";}			
 					w = model.add_object_button(lay,"Move Ind.",x,y,"MoveIndividuals",{back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); x += w+gap;
 				}
+				
+				if(siminf == "sim"){
+					let active2 = active;
+					if(sp.ind_eff_group.length == 0) active2 = false;
+					let te = fix_IE_text, ti = "Set individual effect";
+					w = model.add_object_button(lay,"Set IE",x,y,"SetIE",{back:WHITE, active:active2, info:info, title:ti, te:te, siminf:siminf}); x += w+gap;
+				}
 				break;
 			}
 		}
@@ -631,15 +618,11 @@ function add_data_buts(lay,siminf)
 				x += w+gap;
 			}
 			
-			{
-				if(siminf == "gen"){
-					let rpfsp = spec[p];
-	
-					if(rpfsp.pos_test_and_cull != undefined){
-						let te = test_and_cull_data_text, ti = "Test-and cull diagnostic test data";
-						w = model.add_object_button(lay,"Test-and-cull",x,y,"TestAndCullData",{ back:WHITE, active:true, info:info, title:ti, te:te, siminf:siminf}); 
-						x += w+gap;
-					}
+			if(siminf == "gen"){
+				if(sp.pos_test_and_cull != undefined){
+					let te = test_and_cull_data_text, ti = "Test-and cull diagnostic test data";
+					w = model.add_object_button(lay,"Test-and-cull",x,y,"TestAndCullData",{ back:WHITE, active:true, info:info, title:ti, te:te, siminf:siminf}); 
+					x += w+gap;
 				}
 			}
 			
@@ -709,32 +692,87 @@ function add_data_buts(lay,siminf)
 }
 
 
+/// Gets the source of data
+function get_source(siminf,p)
+{
+	switch(siminf){
+	case "sim": return model.species[p].sim_source; 
+	case "inf": return model.species[p].inf_source; 
+	case "gen": return model.sim_res.plot_filter.species[p].gen_source;
+	case "ppc": return model.inf_res.plot_filter.species[p].ppc_source;
+	}
+	error("Cannot get source");
+}
+
+
+/// Gets the source of data
+function set_source(siminf,p,source)
+{
+	switch(siminf){
+	case "sim": model.species[p].sim_source = source; break;
+	case "inf": model.species[p].inf_source = source; break; 
+	case "gen": model.sim_res.plot_filter.species[p].gen_source = source; break;
+	case "ppc": model.inf_res.plot_filter.species[p].ppc_source = source; break;
+	default: error("Cannot set source:"+siminf); break;
+	}
+}
+
+
+/// Gets number of species for source
+function get_so_nsp(siminf)
+{
+	switch(siminf){
+	case "sim": return model.species.length; 
+	case "inf": return model.species.length; 
+	case "gen":
+		{
+			let pf = model.sim_res.plot_filter;
+			if(pf == undefined) return;
+			return pf.species.length;
+		}
+	case "ppc":
+		{
+			let pf = model.inf_res.plot_filter;
+			if(pf == undefined) return;
+			return pf.species.length;
+		}
+	}
+	error("Cannot get source species");
+}
+
+
+/// Gets model species for source
+function get_so_sp(siminf,p)
+{
+	if(siminf == undefined) return model.species[p]; 
+		
+	switch(siminf){
+	case "sim": return model.species[p]; 
+	case "inf": return model.species[p]; 
+	case "gen": 
+		if(is_interface || sim_result.species == undefined) return model.sim_res.plot_filter.species[p];
+		return sim_result.species[p];
+	case "ppc": 
+		if(is_interface || inf_result.species == undefined) return model.inf_res.plot_filter.species[p];
+		return inf_result.species[p];
+	}
+	error("Cannot get source species:"+siminf);
+}
+
+
 /// Based on the worker reply updates which data sources have an error
 function update_data_update_source_error(siminf,warn)
 {
 	for(let p = 0; p < model.species; p++){
-		let sp = model.species[p];
-		if(siminf == "ppc") sp = model.inf_res.plot_filter.species[p];
-		
-		let source;
-		switch(siminf){
-		case "sim": source = sp.sim_source; break;
-		case "inf": source = sp.inf_source; break;
-		case "ppc": source = sp.ppc_source; break;
-		}
-		
+		let source = get_source(siminf,p);
 		for(let i = 0; i < source.length; i++) source[i].error = false;
 	}
 	
 	for(let j = 0; j < warn.length; j++){
 		let wa = warn[j];
 		if(wa.mess == "Data error"){
-			let sp = model.species[wa.p];
-			switch(wa.siminf){
-			case "sim": sp.sim_source[wa.i].error = true; break;
-			case "inf": sp.inf_source[wa.i].error = true; break;
-			case "ppc": sp.ppc_source[wa.i].error = true; break;
-			}
+			let source = get_source(wa.siminf,wa.p);
+			source[wa.i].error = true; 
 		}
 	}		
 }
@@ -770,7 +808,8 @@ function set_loadcol()
 	let y_str = "y position", y_head = "y", y_type = "float";
 	
 	if(so.info.p != undefined && so.info.cl != undefined){
-		if(model.species[so.info.p].cla[so.info.cl].camera.coord == "latlng"){
+		let sp = get_so_sp(so.info.siminf,so.info.p);
+		if(sp.cla[so.info.cl].camera.coord == "latlng"){
 			x_str = "latitude"; x_head = "Lat"; x_type = "lat";
 			y_str = "longitude"; y_head = "Lng"; y_type = "lng";
 		}
@@ -807,7 +846,8 @@ function set_loadcol()
 			if(so.spec.type_radio.value == "matrix") spl[0] = "genobs";
 		}
 	
-		switch(spl[0]){
+		let cty = spl[0];
+		switch(cty){
 			case "ID":
 				load_col.push({heading:"ID", desc:"individual ID",type:"text"});
 				break;
@@ -849,7 +889,7 @@ function set_loadcol()
 					let p = so.info.p;
 					if(p == undefined){ error("p should be defined"); return;}
 						
-					let sp = model.species[p]; 
+					let sp = get_so_sp(so.info.siminf,p);
 					
 					let cl_drop = so.spec.cl_drop;
 					if(cl_drop.te != select_drop_str){
@@ -865,8 +905,8 @@ function set_loadcol()
 				{
 					let p = so.info.p;
 					if(p == undefined){ error("p should be defined"); return;}
-							
-					let sp = model.species[p];
+				
+					let sp = get_so_sp(so.info.siminf,p);
 					
 					switch(so.type){
 					case "Init. Pop.":
@@ -894,7 +934,8 @@ function set_loadcol()
 					let p = so.info.p;
 					if(p == undefined){ error("p should be defined"); return;}
 						
-					let sp = model.species[p];
+					let sp = get_so_sp(so.info.siminf,p);
+				
 					for(let cl = 0; cl < sp.ncla; cl++){
 						load_col.push({heading:sp.cla[cl].name, desc:"compartment individuals are added",type:"compartment_prob", p:p, cl:cl});
 					}
@@ -905,8 +946,10 @@ function set_loadcol()
 				{
 					let p = so.info.p;
 					if(p == undefined){ error("p should be defined"); return;}
+					let sp = get_so_sp(so.info.siminf,p);
+					
 					let cl_name = so.spec.cl_drop.te;
-					let cl = find_nocase(model.species[p].cla,"name",cl_name);
+					let cl = find_nocase(sp.cla,"name",cl_name);
 					
 					load_col.push({heading:"From", desc:"the compartment from which individuals come", type:"comp_source_sink", p:p, cl:cl});
 				}
@@ -916,8 +959,10 @@ function set_loadcol()
 				{
 					let p = so.info.p;
 					if(p == undefined){ error("p should be defined"); return;}
+					let sp = get_so_sp(so.info.siminf,p);
+					
 					let cl_name = so.spec.cl_drop.te;
-					let cl = find_nocase(model.species[p].cla,"name",cl_name);
+					let cl = find_nocase(sp.cla,"name",cl_name);
 					
 					load_col.push({heading:cl_name, desc:"the compartment in to which individuals go", type:"comp_source_sink", p:p, cl:cl});
 				}
@@ -976,7 +1021,7 @@ function set_loadcol()
 					let filt = spec.filter;
 					let p = so.info.p;
 
-					let sp = model.species[p];
+					let sp = get_so_sp(so.info.siminf,p);
 					
 					for(let cl = 0; cl < sp.ncla; cl++){
 						if(filt.cla[cl].radio.value == "File"){
@@ -1009,7 +1054,8 @@ function set_loadcol()
 						let filt = spec.filter;
 						
 						let p = so.info.p;
-						let sp = model.species[p];
+						let sp = get_so_sp(so.info.siminf,p);
+			
 						let cl = find(sp.cla,"name",cl_sel);
 
 						if(cl == undefined) error("Cannot find cl");
@@ -1131,12 +1177,14 @@ function set_loadcol()
 				
 			case "dep":
 				{
-					let par = model.param[inter.edit_param.i];	
+					let ep = inter.edit_param;
+					let par = ep.par_st; if(par == undefined) par = model.param[ep.i];
+					let ndep = par.ndep_cont;
 					let dep = par.dep;
 			
 					let desc = convert_tensor_text("the tensor");
 					desc += " index giving '";
-					for(let k = 0; k < dep.length; k++){
+					for(let k = 0; k < ndep; k++){
 						let de = remove_prime(dep[k]);
 						if(de == "t"){
 							load_col.push({heading:dep[k], desc:"knot times", knot:par.spline.knot, type:"knot"});
@@ -1145,7 +1193,9 @@ function set_loadcol()
 							let res = find_cla_from_index(de);
 						
 							if(res != undefined){
-								let claa = model.species[res.p].cla[res.cl];
+								let sp = get_so_sp(so.info.siminf,res.p);
+								
+								let claa = sp.cla[res.cl];
 								load_col.push({heading:dep[k], desc:desc+claa.name+"'", p:res.p, cl:res.cl, type:"compartment"});
 							}
 						}
@@ -1165,7 +1215,8 @@ function set_loadcol()
 							let res = find_cla_from_index(de);
 						
 							if(res != undefined){
-								let claa = model.species[res.p].cla[res.cl];
+								let sp = get_so_sp(so.info.siminf,res.p);
+								let claa = sp.cla[res.cl];
 								load_col.push({heading:dep[k], desc:desc+claa.name+"'", p:res.p, cl:res.cl, type:"compartment"});
 							}
 						}
@@ -1175,6 +1226,10 @@ function set_loadcol()
 				
 			case "value":
 				load_col.push({heading:"Value", desc:"the element value", type:"float"});
+				break;
+				
+			case "pos_value":
+				load_col.push({heading:"Value", desc:"the element value", type:"pos_float"});
 				break;
 			
 			case "prior":
@@ -1191,8 +1246,8 @@ function set_loadcol()
 				}
 				break;
 				
-			case "eqn":
-				load_col.push({heading:"Equation", desc:"the equation", type:"eqn"});
+			case "eqn": case "define_ele": case "reparam_ele": 
+				load_col.push({heading:"Equation", desc:"the equation", type:cty});
 				break;
 				
 			case "A":
@@ -1213,9 +1268,7 @@ function data_source(type,edit_source,info)
 	let p = info.p; 
 	if(p == undefined){ error("Data source does not have p"); return}
 
-	let sp = model.species[p];
-	if(info.siminf == "gen") sp = model.sim_res.plot_filter.species[p];
-	if(info.siminf == "ppc") sp = model.inf_res.plot_filter.species[p];
+	let source = get_source(info.siminf,p);
 	
 	let so;
 	switch(type){
@@ -1228,12 +1281,7 @@ function data_source(type,edit_source,info)
 		break;
 	
 	case "ReplaceView":
-		switch(info.siminf){
-		case "sim": so = sp.sim_source[info.i]; break;
-		case "inf": so = sp.inf_source[info.i]; break;
-		case "ppc": so = sp.ppc_source[info.i]; break;
-		case "gen": so = sp.gen_source[info.i]; break;
-		}
+		so = source[info.i];
 		so.spec = edit_source.spec;
 		add_source_description(so);
 		break;
@@ -1242,12 +1290,7 @@ function data_source(type,edit_source,info)
 		so = edit_source;
 		so.edit_spec = false;
 		if(so.table == undefined){ // When changing spec copies back table
-			switch(info.siminf){
-			case "sim": so.table = sp.sim_source[info.i].table; break;
-			case "inf": so.table = sp.inf_source[info.i].table; break;
-			case "ppc": so.table = sp.ppc_source[info.i].table; break;
-			case "gen": so.table = sp.gen_source[info.i].table; break;
-			}
+			so.table = source[info.i].table;
 		}
 		add_source_description(so);
 		break;
@@ -1258,18 +1301,19 @@ function data_source(type,edit_source,info)
 	default: error("Error option"); break;
 	}
 
+	switch(type){
+	case "Add": source.push(so); break;
+	case "Edit": so = source[info.i]; break;
+	case "Replace": source[info.i] = so; break;
+	case "ReplaceView": break;
+	case "Delete": source.splice(info.i,1); break; 
+	default: error("Error option"); break;
+	}
+	
+	/*
 	switch(info.siminf){
 	case "sim": 
-		switch(type){
-		case "Add": sp.sim_source.push(so); break;
-		case "Edit": so = sp.sim_source[info.i]; break;
-		case "Replace": sp.sim_source[info.i] = so; break;
-		case "ReplaceView": break;
-		case "Delete": 
-			sp.sim_source.splice(info.i,1); 
-			break; 
-		default: error("Error option"); break;
-		}
+		
 		break;
 		
 	case "inf": 
@@ -1313,6 +1357,7 @@ function data_source(type,edit_source,info)
 		
 	default: error("Option not recognised 21b"+info.siminf); break;
 	}
+	*/
 
 	if(info.imp == true) return;
 	
@@ -1324,12 +1369,7 @@ function data_source(type,edit_source,info)
 		return;
 	}
 	
-	switch(info.siminf){
-	case "sim": post({p:p, siminf:info.siminf, sim_source:strip_heavy(sp.sim_source)}); break;
-	case "inf": post({p:p, siminf:info.siminf, inf_source:strip_heavy(sp.inf_source)}); break;
-	case "ppc": post({p:p, siminf:info.siminf, ppc_source:strip_heavy(sp.ppc_source)}); break;
-	case "gen": post({p:p, siminf:info.siminf, gen_source:strip_heavy(sp.gen_source)}); break;
-	}
+	post({p:p, siminf:info.siminf, source:strip_heavy(source)});
 }
 
 
@@ -1338,13 +1378,15 @@ function data_source_reply(ans)
 {
 	close_data_source();
 	
+	let source = set_source(ans.siminf,ans.p,ans.source);
+	/*
 	switch(ans.siminf){
-	case "sim": model.species[ans.p].sim_source = ans.sim_source; break;
-	case "inf": model.species[ans.p].inf_source = ans.inf_source; break;
-	//case "ppc": model.species[ans.p].ppc_source = ans.ppc_source; break;
-	case "ppc": model.inf_res.plot_filter.species[ans.p].ppc_source = ans.ppc_source; break;
-	case "gen": model.sim_res.plot_filter.species[ans.p].gen_source = ans.gen_source; break;
+	case "sim": source = ans.sim_source; break;
+	case "inf": source = ans.inf_source; break;
+	case "ppc": source = ans.ppc_source; break;
+	case "gen": source = ans.gen_source; break;
 	}
+	*/
 }
 
 
@@ -1356,7 +1398,7 @@ function add_source_description(so)
 	let desc="";
 	let num="-";
 	
-	let sp = model.species[so.info.p];
+	let sp = get_so_sp(so.info.siminf,so.info.p);
 	let spec = so.spec;
 	
 	switch(so.type){
@@ -1471,9 +1513,9 @@ function add_source_description(so)
 		}
 		break;
 		
-	case "Ind. Eff.":
+	case "Ind. Eff.": case "Set IE":
 		{
-			desc = spec.drop.te;
+			desc = "["+spec.drop.te+"]";
 			num = so.table.nrow;
 		}
 		break;
@@ -1725,15 +1767,11 @@ function load_default_filt(p)
 }
 
 
-/// Checks that paramater is correctly specified
-function edit_param_check_error(error_mess_only)
-{
-	return false;
-}
-
 /// Checks to see if prior is correctly specified
 function check_prior_split(type,par,prior_split)
 {
+	let dist = false; if(par.variety == "dist") dist = true;
+		
 	let co_list = generate_co_list(par.list);
 	for(let i = 0; i < co_list.length; i++){
 		let comb = co_list[i];
@@ -1742,20 +1780,95 @@ function check_prior_split(type,par,prior_split)
 		if(!el) return "This contains unset elements";
 		if(!el.type) return "This contains unset elements";
 		if(el.type.te == select_str) return "This contains unset elements";
+		
+		let warn = check_prior(el,dist);
+		
+		if(warn != undefined){
+			let type = "prior"; if(dist) type = "distribution";
+			return element_error(par,comb.index,type,warn);
+		}
 	}
 }
 
+
+/// Generates an error for an element
+function element_error(par,index,type,warn)
+{
+	let te = "Problem with ";
 	
-/// CHecks to see if factor is correctly specified
+	te += " for parameter "+par.full_name+": ";
+	te += warn;
+	te += " (element ";
+
+	for(let i = 0; i < index.length; i++){
+		if(i != 0) te += ",";
+		te += par.list[i][index[i]];
+	}
+	te += ")";
+
+	return te;
+}
+
+	
+/// Checks a define or reparam element
+function define_reparam_element_check(el,is_define,time_dep)
+{
+	let ty;
+	if(time_dep){
+		if(is_define) ty = "define_ele"; else ty = "reparam_ele";
+	}
+	else{
+		if(is_define) ty = "define_ele_notime"; else ty = "reparam_ele_notime";
+	}
+	
+	let eqn = create_equation(String(el),ty);
+	if(eqn.warn.length > 0) return eqn.warn[0].te;
+	return "";
+}
+
+
+/// Checks parameter values
+function unescape_param_value(type,par,value)
+{
+	let co_list = generate_co_list(par.list,par.ndep_cont);
+	for(let i = 0; i < co_list.length; i++){
+		let comb = co_list[i];
+		let el = get_element(value,comb.index);
+		if(isNaN(el)){
+			el = remove_escape_char(el);
+			el = char_replace(el);
+			set_element(value,comb.index,el);
+		}
+	}
+}
+
+		
+/// Checks parameter values
 function check_param_value(type,par,value)
 {
-	let co_list = generate_co_list(par.list);
+	let co_list = generate_co_list(par.list,par.ndep_cont);
 	for(let i = 0; i < co_list.length; i++){
 		let comb = co_list[i];
 		let el = get_element(value,comb.index);
 		
 		if(el == undefined){
 			return "This contains unset elements";
+		}
+		
+		switch(par.variety){
+		case "define":
+			{
+				let warn = define_reparam_element_check(el,true,par.time_dep);
+				if(warn != "") return element_error(par,comb.index,"definition",warn);
+			}
+			break;
+			
+		case "reparam":
+			{
+				let warn = define_reparam_element_check(el,false,par.time_dep);
+				if(warn != "") return element_error(par,comb.index,"definition",warn);
+			}
+			break;
 		}
 	}
 	
@@ -1837,14 +1950,3 @@ function check_param_value(type,par,value)
 		break;
 	}
 }
-
-
-/// Checks is an equation is valid
-function check_eqn_valid(te)
-{
-	let eqn = create_equation(te,"test");		
-	if(eqn.warn.length > 0) return err(eqn.warn[0].te);
-	
-	return success();
-}
-

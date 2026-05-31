@@ -2680,3 +2680,12 @@ void StateSpecies::get_rate_warning(ParticleSpecies &part_sp) const
 
 	part_sp.dt_max_est = dt_max_est;
 }
+
+
+
+/// Calculate an equation (used in interventions)
+double StateSpecies::calculate(const EquationInfo &ei, unsigned int ti, const vector < vector <double> > &popnum_t) const
+{
+	return eqn[ei.eq_ref].calculate(ti,popnum_t[ti],param_val.precalc);						
+}
+

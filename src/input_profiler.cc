@@ -391,10 +391,12 @@ double Input::model_profile() const
 		auto sum = 0.0;
 		for(const auto &def : model.define){
 			sum += mem(def.name);
-			sum += mem(def.value);
+			sum += mem(def.eqn);
+			sum += mem(def.value_list);
+			sum += mem(def.value_list_ref);
 			sum += mem(def.full_name);
 			for(const auto &de : def.dep) sum += mem(de);
-			sum += mem(def.swap_temp);
+			//sum += mem(def.swap_temp);
 		}
 		sum_tot += sum;
 		if(sum > sum_min) cout << "define: " << (unsigned int)(sum*f) << endl;

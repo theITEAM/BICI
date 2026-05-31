@@ -48,7 +48,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 		double dtdiv;
 		auto R = 0.0; if(nnode > 0) R = markov_tree_rate[nnode-1];
 	
-		if(R > -SMALL && R < TINY) dtdiv = LARGE;
+		if(R > -TINY && R < TINY) dtdiv = LARGE;
 		else{
 			if(R < 0){		
 				emsg("Negative rate2");
@@ -80,7 +80,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 			
 			switch(trig.type){
 			case INTERVENTION_SIM_EV:
-				implement_test_and_cull(trig.i,trig.tdiv);
+				implement_test_and_cull(trig.i,trig.tdiv,popnum_t);
 				break;
 			
 			case ENTER_SIM_EV:
@@ -258,14 +258,25 @@ bool StateSpecies::allow_event(double t, const IndTransRef &itr) const
 
 
 /// Implements a test-and-cull policy
-void StateSpecies::implement_test_and_cull(unsigned int index, double tdiv)
+void StateSpecies::implement_test_and_cull(unsigned int index, double tdiv, const vector < vector <double> > &popnum_t)
 {
 	const auto &inter = sp.intervention[index]; 
+	auto ti = get_ti(tdiv);
 	auto cl = inter.cl;
-	const auto &dts = inter.diag_test_sens;
+	const auto &Sec = inter.Se_comp;
+	const auto &Spe = inter.Sp;
 	auto pos = inter.diag_pos;
 	auto neg = inter.diag_neg;
 	auto dt = inter.time_gap/model.details.dt;
+	
+	auto Sp = calculate(Spe,ti,popnum_t);
+	
+	const auto &claa = sp.cla[cl];
+	vector <double> Se;
+	for(auto ci = 0u; ci < claa.comp.size(); ci++){
+		if(Sec[ci].on) Se.push_back(calculate(Sec[ci].Se,ti,popnum_t));
+		else Se.push_back(UNSET);
+	}
 	
 	for(auto i = 0u; i < individual.size(); i++){
 		auto c = ind_sim_c[i];
@@ -276,19 +287,10 @@ void StateSpecies::implement_test_and_cull(unsigned int index, double tdiv)
 
 			auto res = 0u;
 					
-			if(dts.comp[ci].on){
-				string err;
-				auto Se_str = dts.comp[ci].Se_str;
-			
-				auto Se = number(Se_str);
-				if(Se == UNSET) run_error("Problem with sensitivity '"+Se_str+"'.");
-			
-				if(ran() < Se) res = 1; else res = 0;
+			if(Sec[ci].on){
+				if(ran() < Se[ci]) res = 1; else res = 0;
 			}
 			else{
-				auto Sp = number(inter.Sp_str);
-				if(Sp == UNSET) run_error("Problem with specificity '"+inter.Sp_str+"'.");
-				
 				if(ran() < Sp) res = 0; else res = 1;
 			}
 			

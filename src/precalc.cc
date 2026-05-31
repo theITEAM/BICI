@@ -213,6 +213,31 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 							}
 						}
 					}
+					
+					if(flag == false && nregderpop == 0){
+						
+						switch(ca.op){
+						case EXPFUNC: case SINFUNC: case COSFUNC: case LOGFUNC: 	// Single parameter functions
+						case STEPFUNC: case ABSFUNC: case SQRTFUNC: case SIGFUNC:
+						case POWERFUNC: case THRESHFUNC: case UBOUNDFUNC:         // Two parameter functions
+						case MAXFUNC: case MINFUNC:
+							{
+								PreCalc pcalc;
+								pcalc.op = ca.op;
+								pcalc.item = ca.item;
+							
+								auto inew = add(pcalc,spec_precalc);
+								
+								vector <EqItem> item_new;
+								item_new.push_back(inew);
+								ca.op = ADD;
+								ca.item = item_new;
+							}
+							break;
+					
+						default: break;
+						}
+					}
 				}
 			}
 		}

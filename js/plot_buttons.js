@@ -114,7 +114,9 @@ Layer.prototype.plot_button = function (bu,ov)
 		return;
 	}
 	
-	x = nearest_pixel(x); y = nearest_pixel(y); 
+	if(bu.type != "Column"){
+		x = nearest_pixel(x); y = nearest_pixel(y); 
+	}
 	dx = nearest_pixel(dx); dy = nearest_pixel(dy); 
 		
 	let val = bu.val, val2 = bu.val2, ac = bu.ac;
@@ -633,18 +635,23 @@ Layer.prototype.plot_button = function (bu,ov)
 		plot_text(te,x+dx-www-0.4,y+dy/2+0.35*bu.si,bu.font,bu.col);
 		break;
 
+	case "ColumnSel":
+		break;
+		
 	case "Column":
 		{
+			x = nearest_pixel(x); 
 			let col = WHITE; if(ov) col = LLBLUE;
 			fill_rectangle(x,y,dx,dy,col);
-				
+			
 			let space = bu.space;
 			plot_text(te[0],x+0.3,y+0.7*space, get_font(si_table,"bold"),BLACK,dx);
 			
 			let rmi = Math.floor((0-0.7*space-y)/space); if(rmi < 1) rmi = 1; 
 			let rma = Math.floor(2+(this.dy-0.7*space-y)/space); if(rma > te.length) rma = te.length;	
 			for(let r = rmi; r < rma; r++){
-				plot_text(te[r],x+0.3,y+r*space+0.7*space,get_font(si_table),BLACK,dx);
+				let yy = nearest_pixel(y+r*space); 
+				plot_text(te[r],x+0.3,yy+0.7*space,get_font(si_table),BLACK,dx);
 			}
 		}
 		break;
@@ -662,7 +669,7 @@ Layer.prototype.plot_button = function (bu,ov)
 	case "PriorSplitElement": case "DistSplitElement":
 	case "ParamSimElement": case "ParamPriConElement": case "DistSimElement": 
 	case "IEGroupName":
-	case "ReparamElement": case "ReparamTableElement":  
+	case "ReparamElement": case "ReparamTableElement": case "DefineTableElement":
 	case "PriorElement": case "DistElement": case "SplineKnots": 
 	case "SmoothValue": case "Amatrix": case "Xvector": case "AmatrixElement": case "XvectorElement":
 		te = String(te);
@@ -686,7 +693,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			let colte = BLACK; 
 			if(bu.type != "Element") colte = BLUE;
 			
-			if(ac == undefined){
+			if(ac == undefined && bu.notfade != true){
 				colte = GREY;			
 				if(bu.type == "ParamSimElement" && bu.source != model) colte = BLACK;
 			}
@@ -698,7 +705,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			}
 			else{
 				switch(bu.type){
-				case "ReparamElement": case "ReparamTableElement":  
+				case "ReparamElement": case "ReparamTableElement": case "DefineTableElement":
 					{
 						let tsa = text_sup_anno(te,si_table,dx-0.5);
 						plot_text_tsa(tsa,x+0.3,y+0.7*ddy,colte);
@@ -1134,6 +1141,17 @@ Layer.prototype.plot_button = function (bu,ov)
 		{ 
 			let col = DBLUE; if(ov) col = BLUE; if(bu.ac == undefined) col = LLGREY;
 			let si = 0.8;
+			let font = get_font(si,"bold");
+			
+			draw_round_rectangle(x,y,dx,dy,0.5*dy,col,col);
+			center_text(te,x+dx/2,y+dy/2+0.37*si,font,WHITE);
+		}
+		break;
+		
+	case "GoBut":
+		{ 
+			let col = BLACK; if(ov) col = DBLUE; if(bu.ac == undefined) col = LLGREY;
+			let si = 0.7;
 			let font = get_font(si,"bold");
 			
 			draw_round_rectangle(x,y,dx,dy,0.5*dy,col,col);
@@ -2210,21 +2228,23 @@ Layer.prototype.plot_button = function (bu,ov)
 			let co = BLACK; if(ov) co = DGREY;
 			let par = model.param[bu.i];
 	
+			/*
 			switch(par.variety){
 			case "normal":
-				if(par.type == "derive_param"){ co = RED; if(ov) co = LRED;} 
-				if(par.type == "fixed effect"){ co = DGREY; if(ov) co = GREY;} 
+				if(par.derive){ co = RED; if(ov) co = LRED;} 
+				if(par.fixed_effect){ co = DGREY; if(ov) co = GREY;} 
 				
 				let i = find(eqn_types,"name",par.type);
 				if(i != undefined){
 					if(eqn_types[i].obs_model == true){ co = DBROWN; if(ov) co = BROWN;}
 				}					
-				if(par.type == "variance"){ co = DCYAN; if(ov) co = CYAN;} 
+				if(par.variance == true){ co = DCYAN; if(ov) co = CYAN;} 
 				break;
 			case "const": co = DBLUE; if(ov) co = BLUE; break;
 			case "dist": co = DPURPLE; if(ov) co = PURPLE; break;
 			case "reparam": co = DGREEN; if(ov) co = "#66bb66"; break;
 			}
+			*/
 			
 			co = BLACK; if(ov) co = DGREY;
 			

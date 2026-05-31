@@ -356,32 +356,6 @@ unsigned int DataSim::option_error(string na, string te, const vector <string> &
 }
 
 
-/// Outputs a simple table 
-string DataSim::output_table(const Table &tab) const
-{
-	string st = "";
-	for(auto i = 0u; i < tab.heading.size(); i++){
-		if(i != 0) st += ",";
-		st += "\""+tab.heading[i]+"\"";
-	}
-	st += endli;
-
-	for(auto r = 0u; r < tab.ele.size(); r++){
-		auto ele = tab.ele[r];
-		if(ele.size() != tab.heading.size()) emsg("Output columns to not match"); 
-
-		for(auto i = 0u; i < ele.size(); i++){
-			if(i != 0) st += ',';
-			if(number(ele[i]) == UNSET) st += "\""+ele[i]+"\"";
-			else st += ele[i];
-		}
-		st += endli;
-	}
-	
-	return st;
-}
-
-
 /// Shows any loaded data
 void DataSim::show() const
 {
@@ -455,7 +429,7 @@ vector <DataRef> DataSim::get_data_list() const
 				case ADD_IND: case REMOVE_IND: case MOVE_IND: 
 				case COMP_DATA: case TRANS_DATA:
 				case TEST_DATA: case POP_DATA: case POP_TRANS_DATA: 
-				case GENETIC_DATA:
+				case GENETIC_DATA: case IND_GROUP_DATA: case IND_EFFECT_DATA:
 					if(type == INF_DATA) add = true;
 					break;
 	
@@ -586,7 +560,7 @@ void DataSim::del(string data_sim_line)
 
 
 /// Clears output data from sim/inf/post-sim
-void DataSim::clear(string data_sim_line)
+void DataSim::clear(string data_sim_line, bool no_question)
 {
 	data_sim_line_store = data_sim_line;
 	
@@ -610,6 +584,7 @@ void DataSim::clear(string data_sim_line)
 		list.push_back("proposal-inf"); 
 		list.push_back("diagnostics-inf"); 
 		list.push_back("param-stats-inf"); 
+		list.push_back("pred-acc-inf"); 
 		list.push_back("warning-inf"); 
 		banner.push_back(OUT_INF_BANNER);
 	}
@@ -624,10 +599,27 @@ void DataSim::clear(string data_sim_line)
 	
 	if(!fl) error("The value after 'clear' must be 'sim', 'inf', 'post-sim' or 'all'");
 	
-	output.delete_commands(data_sim_line,list);
+	output.delete_commands(data_sim_line,list,no_question);
 	output.delete_lines(banner);
 	output.remove_double_space();
 }
+
+
+/*
+/// Clears inference data
+void DataSim::clear_inf_data()
+{
+	vector <string> banner;
+	
+	vector <string> list = {"init-pop-inf","add-pop-inf","remove-pop-inf","add-ind-inf","remove-ind-inf","move-ind-inf","set-ind-effect-inf","comp-data","trans-data","test-data","pop-data","pop-trans-data","ind-effect-data","ind-group-data","genetic-data"};
+
+	//banner.push_back(OUT_SIM_BANNER);
+	
+	output.delete_commands("inf",list,true);
+	output.delete_lines(banner);
+	output.remove_double_space();
+}
+*/
 
 
 /// Gives a description of the data source
@@ -1741,7 +1733,7 @@ void DataSim::ind_effect_data_sim(unsigned int p, const State &state, Table &tab
 	for(const auto &ind : ssp.individual){
 		vector <string> row;
 		row.push_back(ind.name); 
-		row.push_back(tstr(ind.ie[e]));
+		row.push_back(tstr(ind.exp_ie[e]));
 		tab.ele.push_back(row);
 	}
 }
@@ -2133,7 +2125,7 @@ bool DataSim::wildcard_match2(const string &name, const vector <string> &spl, bo
 		}
 		else{
 			auto imax = name.length()-len;
-			if(root) imax = 0;
+			if(root && len == 0) imax = 0;
 			for(auto i = 0u; i <= imax; i++){
 				if(toLower(name.substr(i,len)) == te){
 					if(spl.size() == 1) return true;

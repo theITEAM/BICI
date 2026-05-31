@@ -499,7 +499,7 @@ CommandLine get_command_tags(string trr, unsigned int line_num)
 	auto spl = split(trr,' ');
 	
 	auto type = spl[0];
-	
+
 	Command com = EMPTY;
 	if(type == "species") com = SPECIES;
 	if(type == "classification" || type == "class") com = CLASS;
@@ -554,6 +554,7 @@ CommandLine get_command_tags(string trr, unsigned int line_num)
 	if(type == "state-sim") com = SIM_STATE;
 	if(type == "param-inf") com = INF_PARAM;
 	if(type == "param-stats-inf") com = INF_PARAM_STATS;
+	if(type == "pred-acc-inf") com = INF_PRED_ACC;
 	if(type == "generation-inf") com = INF_GEN;
 	if(type == "state-inf") com = INF_STATE;
 	if(type == "param-post-sim") com = POST_SIM_PARAM;

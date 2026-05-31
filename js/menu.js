@@ -425,10 +425,15 @@ function drop_menu(cont,lay)
 			cont.dx = dx;
 			bubble_addtitle(cont,"Save simulation",{title:"Save simulation results", te:savesimoptions_text});
 		
-			bubble_addradio(cont,0,"single","Single file",inter.save_type_radio); 
-			bubble_addradio(cont,0,"datadir","File + data directory",inter.save_type_radio); 
+			if(model.sim_res.plot_filter.low_mem){
+				bubble_addparagraph(cont,"Cannot save simulation results in low memory mode.",0,cont.dx);
+			}
+			else{
+				bubble_addradio(cont,0,"single","Single file",inter.save_type_radio); 
+				bubble_addradio(cont,0,"datadir","File + data directory",inter.save_type_radio); 
 		
-			add_end_button(cont,"Save","SaveSimBICIFile");
+				add_end_button(cont,"Save","SaveSimBICIFile");
+			}
 			return;
 		}
 		break;
@@ -439,10 +444,15 @@ function drop_menu(cont,lay)
 			cont.dx = dx;
 			bubble_addtitle(cont,"Save inference",{title:"Save inference results", te: saveinfoptions_text});
 		
-			bubble_addradio(cont,0,"single","Single file",inter.save_type_radio); 
-			bubble_addradio(cont,0,"datadir","File + data directory",inter.save_type_radio); 
+			if(model.inf_res.plot_filter.low_mem){
+				bubble_addparagraph(cont,"Cannot save inference results in low memory mode.",0,cont.dx);
+			}
+			else{
+				bubble_addradio(cont,0,"single","Single file",inter.save_type_radio); 
+				bubble_addradio(cont,0,"datadir","File + data directory",inter.save_type_radio); 
 		
-			add_end_button(cont,"Save","SaveInfBICIFile");
+				add_end_button(cont,"Save","SaveInfBICIFile");
+			}
 			return;
 		}
 		break;
@@ -453,10 +463,15 @@ function drop_menu(cont,lay)
 			cont.dx = dx;
 			bubble_addtitle(cont,"Save post-sim",{title:"Save posterior simulation results", te: savepostsimoptions_text});
 		
-			bubble_addradio(cont,0,"single","Single file",inter.save_type_radio); 
-			bubble_addradio(cont,0,"datadir","File + data directory",inter.save_type_radio); 
+			if(model.ppc_res.plot_filter.low_mem){
+				bubble_addparagraph(cont,"Cannot save post-sim results in low memory mode.",0,cont.dx);
+			}
+			else{
+				bubble_addradio(cont,0,"single","Single file",inter.save_type_radio); 
+				bubble_addradio(cont,0,"datadir","File + data directory",inter.save_type_radio); 
 		
-			add_end_button(cont,"Save","SavePPCBICIFile");
+				add_end_button(cont,"Save","SavePPCBICIFile");
+			}
 			return;
 		}
 		break;
@@ -553,12 +568,6 @@ function drop_menu(cont,lay)
 	
 	{
 		let sub = [];
-		
-		/*
-		{
-			sub.push({te:"Script", ac:"ExportScript", active:active_mod});
-		}
-		*/
 		
 		let active = false; 
 		if(graph_show || table_show) active = true;

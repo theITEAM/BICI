@@ -43,6 +43,7 @@
 	pop-trans-data
 	posterior-simulation/post-sim
 	param-post-sim
+	pred-acc-inf
 	proposal-inf
 	remove-ind-inf
 	remove-ind-post-sim
@@ -51,6 +52,9 @@
 	remove-pop-post-sim
 	remove-pop-sim
 	set
+	set-ind-effect-sim
+	set-ind-effect-inf
+	set-ind-effect-post-sim
 	simulation / sim
 	species
 	state-inf
@@ -77,10 +81,6 @@ function import_file(te,file,clear_results,example)
 
 	percent(0);
 
-	te = remove_escape_char(te);
-
-	percent(1);
-	
 	let	lines = te.split('\n');
 	
 	imp.script = [];
@@ -92,6 +92,10 @@ function import_file(te,file,clear_results,example)
 		
 	let pro = process_lines(lines,file,2,15);
 
+	remove_escape_command_line(pro.bscript);
+
+	if(inf_leave_one_chain) leave_only_one_chain(pro);
+	
 	percent(10);
 
 	let data_file_list = get_data_file_list(pro,15,20);
@@ -142,9 +146,11 @@ function import_file2(data_file_list)
 
 	model = new Model();	 
 	model.start_new();
-	
+
 	let total_pt = assign_processing_time();    // Estimates how long each command will take
 
+	let low_mem = false;                        // Determines if low memory mode is on
+	
 	for(let loop = 0; loop <= 4; loop++){ 
 		// Import happens in four stages:
 		// (0) Load species and classification information
@@ -161,7 +167,7 @@ function import_file2(data_file_list)
 		
 		if(loop == 3){
 			imp.line = undefined;
-			
+
 			model.determine_branching("set all_branches");
 
 			// Checks information about all parameters have been loaded correctly			
@@ -186,17 +192,20 @@ function import_file2(data_file_list)
 			add_non_proc_time(0.1);
 		
 			let bscript = embed_files(imp.pro.bscript,data_file_list);
+			low_mem = set_low_mem();
+			
+			if(low_mem) bscript = undefined;
 		
 			if(sim_result_import.load){
-				results_add_model(sim_result_import,model.sim_details,"sim",bscript);
+				results_add_model(sim_result_import,model.sim_details,"sim",bscript,low_mem);
 			}
 		
 			if(inf_result_import.load){
-				results_add_model(inf_result_import,model.inf_details,"inf",bscript);
+				results_add_model(inf_result_import,model.inf_details,"inf",bscript,low_mem);
 			}
 			
 			if(ppc_result_import.load){
-				results_add_model(ppc_result_import,model.ppc_details,"ppc",bscript);
+				results_add_model(ppc_result_import,model.ppc_details,"ppc",bscript,low_mem);
 			}
 			
 			if(model_store != undefined){ // Copies any unloaded models
@@ -306,7 +315,15 @@ function import_file2(data_file_list)
 				break;
 			}
 			
-			if(cname == "param-stats-inf") process = false;
+			if(cname == "param-stats-inf" || cname == "pred-acc-inf") process = false;
+			
+			if(low_mem && process){
+				if(cname =="trans-diag-inf"){
+					process = false;
+					add_proc_time(line.pt);
+					line.pt = 0;
+				}
+			}
 			
 			if(process == true){	
 				process_command(cname,loop,line);
@@ -316,14 +333,24 @@ function import_file2(data_file_list)
 						alert_import("Tag '"+line.tags[n].name+"' not used");
 					}
 				} 
+				
+				if(low_mem){ // If low on memory then removes diagnostic information from bscript
+					if(end_str(cname,"-inf") || end_str(cname,"-sim")){
+						pro.bscript[m].tags = undefined;
+					}
+				}
 			}
 		
 			if(imp.warn == true) return;
 		}
 	}
-	
+
 	if(dif(imp.pro.proc_time.pt_sum,1)){
 		prr("PTSUM NOT MATCH"+imp.pro.proc_time.pt_sum);
+		
+		for(let i = 0; i < pro.bscript.length; i++){
+			if(pro.bscript[i].pt != 0){ prr("Not zero:"); prr(pro.bscript[i]);}
+		}		
 	}
 	
 	finalise(80,94);
@@ -354,6 +381,8 @@ function import_file2(data_file_list)
 		ans.file_store = {filename:imp.file};
 	}
 	
+	check_data_valid_all("siminf","import");
+	
 	import_post_mess(ans);
 	
 	sim_result_import = {siminf:"sim"};  
@@ -362,8 +391,9 @@ function import_file2(data_file_list)
 	
 	//check_bscript(pro,map_store,data_file_list);
 	
-	map_store = [];
-	imp = {};  // Removes to save memory	
+	map_store = [];    // Removes to save memory	
+	imp = {}; 
+	model_store = undefined;
 	
 	//profiling();  // Looks at where memory is being used
 	//prr("Processing time: "+(clock()-ts)/1000);
@@ -423,6 +453,26 @@ function embed_files(bscript,data_file_list)
 }
 
 
+/// Assesses is low memory mode is needed
+function set_low_mem()
+{
+	let sum = 0;
+	
+	let pro = imp.pro;
+	for(let i = 0; i < pro.bscript.length; i++){
+		let pc = pro.bscript[i];
+		for(let j = 0; j < pc.tags.length; j++){
+			let tag = pc.tags[j];
+			let val = tag.value;
+			if(val != undefined && val.te != undefined) sum += val.te.length;
+		}
+	}		
+
+	if(sum > 50000000) return true;
+	return false;
+}
+
+
 /// Estimates how long each command will take
 function assign_processing_time()
 {
@@ -441,7 +491,7 @@ function assign_processing_time()
 					
 					switch(pc.type){
 					case "comp-all": fac = 10; break;
-					case "param-stats-inf": pc.pt = 0; fac = 0; break;
+					case "param-stats-inf": case "pred-acc-inf": pc.pt = 0; fac = 0; break;
 					}
 					
 					pc.pt += 0.1*tag.value.te.length*fac;
@@ -542,17 +592,17 @@ function turn_result_on(result,siminf)
 /// Adds add_ind, move_ind and remove_ind results to PPC
 function ppc_add_ind()
 {
-	for(let p = 0; p < model.species.length; p++){
-		let sp = model.species[p];
-		let sp_ppc = model.inf_res.plot_filter.species[p];
-		for(let j = 0; j < sp.inf_source.length; j++){
-			let so = sp.inf_source[j];
+	let nsp = get_so_nsp("ppc");
+	for(let p = 0; p < nsp; p++){
+		let source = get_source("ppc",p);
+		for(let j = 0; j < source.length; j++){
+			let so = source[j];
 			switch(so.type){
 			case "Add Ind.": case "Remove Ind.": case "Move Ind.":
 				{
 					let so_new = copy(so);
-					so_new.check_info.i = sp_ppc.ppc_source.length;
-					sp_ppc.ppc_source.push(so_new);
+					so_new.check_info.i = source.length;
+					source.push(so_new);
 				}
 				break;
 			}
@@ -633,7 +683,7 @@ function process_command(cname,loop,line)
 	case "label": label_command(); break;
 	case "box": box_command(); break;
 	case "map": map_command(); break;
-	case "define": define_command(); break;
+	case "define": define_command(line); break;
 	case "param": param_command(line); break;
 	case "param-mult": param_mult_command(line); break;
 	case "derived": derived_command(); break;
@@ -939,7 +989,8 @@ function cannot_find_tag()
 /// Error message for imported file (for specific line)
 function alert_import(st,line)                                     
 {
-	if(!line) line = imp.line;
+	if(line == undefined) line = imp.line;
+	if(line == undefined) alert_noline(st);
 	
 	let te;
 	if(line) te = "On line "+(line+1)+": "+st;
@@ -1093,12 +1144,26 @@ function process_lines(lines,file,per_start,per_end)
 		// Removes brackets for individual effects
 		let trr = lines[j].trim();
 		
-		for(let i = 0; i < trr.length; i++){
-			let ch = trr.substr(i,1);
-			if(ch == "<") trr = trr.substr(0,i)+"〈"+trr.substr(i+1);
-			if(ch == ">" && !(i > 0 && trr.substr(i-1,1)== "-")){
-				trr = trr.substr(0,i)+"〉"+trr.substr(i+1);
-			}			
+		if(trr.indexOf("<") != -1 || trr.indexOf(">") != -1){ 
+			let st="";
+			let ind = 0;
+			for(let i = 0; i < trr.length; i++){
+				let ch = trr.substr(i,1);
+				if(ch == "<"){
+					if(ind != i) st += trr.substr(ind,i-ind);
+					ind = i+1;
+					st += "〈";
+				}
+				else{
+					if(ch == ">" && !(i > 0 && trr.substr(i-1,1)== "-")){
+						if(ind != i) st += trr.substr(ind,i-ind);
+						ind = i+1;
+						st += "〉";
+					}
+				}
+			}
+			if(ind != trr.length) st += trr.substr(ind,trr.length-ind);
+			trr = st;
 		}
 	
 		let flag = false;                              // Ignores line if empty or commented out
@@ -1806,7 +1871,9 @@ function load_param_value(par,value,head_col,valu,desc,dpt)
 
 	let load_type = "normal";
 	
-	let col_name = copy(par.dep);
+	let col_name = [];
+	for(let d = 0; d < par.ndep_cont; d++) col_name.push(par.dep[d]);
+	
 	col_name.push(head_col);
 	
 	let subtab = get_subtable(tab,col_name);
@@ -1941,15 +2008,16 @@ function get_val_from_ele(ele,par,head_col,desc,r,col)
 			}
 			break;
 		
-		case "reparam":
+		case "reparam": case "define":
 			if(!isNaN(ele)) val = Number(ele);
 			else{
 				let conv_res = detect_greek(ele,0);
 				ele = conv_res.te;
 			
 				val = ele;
+				let ty = "reparam_ele"; if(par.variety == "define") ty = "define_ele";
 				
-				let res = is_eqn(val,"Table element",{});
+				let res = is_eqn(val,"Table element",ty);
 				if(res.err == true){
 					alert_import(desc+" the element '"+ele+"' is not a valid equation (column '"+col+"', row "+(r+2)+")");
 				}
@@ -1985,7 +2053,7 @@ function initialise_filters()
 /// Compresses a string using the LZW algorithm
 function decode(fi)
 {
-	if(fi.encode != true) return fi.te;
+	if(fi.encode != true) return remove_escape_char(fi.te);
 
 	let output=[];
 	
@@ -2067,7 +2135,7 @@ function decode(fi)
 		}
 	}
 
-	return te;
+	return remove_escape_char(te);
 }
 
 
@@ -2092,4 +2160,28 @@ function set_compress_option(details)
 	if(option_error("compress",compress,["always","never","auto"]) == true) return;
 	
 	details.compress.value = compress;
+}
+
+
+/// Gets headings from 'cols'
+function get_cols_head(col_name)
+{
+	let cols = get_tag_value("cols");
+	if(cols != ""){
+		let spl = cols.split(",");
+
+		if(spl.length != col_name.length){
+			alert_import("'cols' does not have the correct number of entries (expected something in the order '"+stringify(col_name)+"')"); 
+		}
+		
+		for(let i = 0; i < spl.length; i++){
+			for(let j = 0; j < col_name.length; j++){
+				if(spl[i] == col_name[j] && i != j){
+					alert_import("'cols' does not have the correct order (expected something in the order '"+stringify(col_name)+"')"); 
+				}
+			}
+		}
+		
+		return spl;
+	}
 }

@@ -573,7 +573,7 @@ void Chain::update(unsigned int s)
 			}
 			else{
 				switch(pro.type){
-				//case PARAM_PROP:
+				case PARAM_PROP:
 				//case MBP_PROP:
 				//case POP_ADD_REM_LOCAL_PROP: 
 				//case POP_SINGLE_LOCAL_PROP:

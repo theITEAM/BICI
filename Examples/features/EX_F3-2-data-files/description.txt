@@ -1,24 +1,19 @@
-﻿# Example 3.2: Parameter distribution
+# Model F3.2: Parameter reparameterisation by element
 
 ## Objective
-- In some instances, it is useful for a parameter to be sampled from a distribution.
-- An example is a random effect in a mixed model.
-- This is illustrated here with a disease transmission experiment.
-- The rate of transmission in different groups is modulated by a group-specific factor $G_g$.
-- The elements in parameter vector $G_g$ are assumed to be drawn from a normal distribution with mean zero and standard deviation $σ^G$.
-
-## Data
-- Known transition times.
+- Introduce a toy example, which features a reparameterisation in the transmission matrix between males and females.
+- This can be used to ensure this matrix is symmetric.
 
 ## Model
-- A single individual-based species 'Animal' is created.
-- This contains classifications 'DS', which stands for 'disease status', 'Vaccination' and 'Group'.
-- 'DS' contains two compartments: susceptible $S$ and infected $I$. Together they are known as the “SI model”.
-- 'Vaccination' contains two compartments: 'Vac' and 'Unvac' that represent vaccinated and unvaccinated individuals.
-- 'Group' contains 24 contact groups.
-- A transmission rate $β_v$ determines the susceptibility of individuals with vaccination status $v$ become infected.
-- A factor $f_v$ determines the relative infectiousness of individuals with vaccination status $v$
+- A single population-based species 'People' is created.
+- This contains a classification 'DS', which stands for 'disease status', and a classification 'Sex'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- A transmission rate $β_s,s'$ determines the rate at which individuals with sex $s$ become infected from individuals with sex $s'$.
+- This is reparameterised into a symmetric matrix with $β^MM$ and $β^FF$ along the diagonal and $β^FM$ off diagonal.
+- A recovery rate $γ_s$ determines the rate at which individuals recover with sex $s$.
+- $N$ is the total number of individuals (this model assumes frequency dependent transmission).
+- Classification 'Sex' contains the compartments $M$ and $F$ for male and female.
 
 ## Population
-- Each group consists of 10 individuals, half of which are infected.
-- The vaccination status of the infected and susceptibility individuals is permuted to create blocks of 4 which are replicated 6 times (to make 24 groups in total).
+- This consists of 10000 initially susceptible individuals and 2 infected.
+- There is a 50/50 split between males and females.

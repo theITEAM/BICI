@@ -48,8 +48,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 		
 			lines_raw.push_back(line);
 			
-			//line = remove_escape_char(line);
-			replace_tri_brac(line);
+			//remove_escape_char(line); This can't be done here because of encode
+			//replace_tri_brac(line);
 		
 			lines.push_back(line);
 		}while(true);
@@ -72,7 +72,11 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	
 	if(model.mode == DECOMPRESS){ compress_command_lines(command_line,lines_raw,true); return;}
 			
-	// Import happens in three stages:
+	remove_escape_command_line(command_line);
+			
+	if(model.mode == EXT) check_inference_done(command_line);
+	
+	// Import happens in seven stages:
 	// (0) Determines if simulation, inference or post_sim
 	// (1) Simulation or inference details
 	// (2) Load species, classification and compartment information
@@ -98,15 +102,17 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 		case SIM: use_sim_ic = true; break;
 		case PPC: if(model.details.param_only) use_sim_ic = true; break;
 		case DATA_SIM: use_sim_ic = true; break;
+		case TORNADO_RESULT: use_sim_ic = true; break;
+		case SCAN_RESULT: use_sim_ic = true; break;
 		default: break;
 		}
-		
+	
 		auto num_sim = 0u, num_inf = 0u, num_ppc = 0u;
 		
 		for(const auto &line : command_line){
 			line_num = line.line_num;
 			auto cname = line.command;
-			
+		
 			auto process = true;
 			switch(loop){
 			case 1:  // Gets simulation or inference details
@@ -216,7 +222,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 					
 				case INIT_POP: case REMOVE_IND: case MOVE_IND:
 				case COMP_DATA: case TRANS_DATA: case TEST_DATA: case POP_DATA: case POP_TRANS_DATA:
-					//if(model.mode == SIM) process = false;
+				case IND_EFFECT_DATA: case IND_GROUP_DATA:
 					if(use_sim_ic) process = false;
 					break;
 				
@@ -374,7 +380,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	model.convert_fix_pr_const();      // Converts any fixed priors to constants
 	
 	print_diag("h1a");
-	
+
 	create_equations(30,60);           // Creates equation calculations
 
 	print_diag("h1b");
@@ -385,27 +391,33 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 
 	combine_populations();             // Combines together populations which appear together
 	
+	print_diag("h1d");
+	
 	output_error_messages(err_mess);
 
+	print_diag("h1e");
+
 	check_derived_order();             // Checks to see if derived quantities do not use derived quanties yet to be calculated  
+
+	print_diag("h1f");
 
 	check_memory_too_large();          // Checks if the memory requirement is too large
 
 	percentage(60,100,sup);
 	
-	print_diag("h1a");
+	print_diag("h1g");
 	
 	further_simplify_equations(60,70); // Simplifies equations as much as possible
 
 	percentage(70,100,sup);
 	
-	print_diag("h1b");
+	print_diag("h1h");
 	
 	for(auto &sp : model.species){     // Classifies observed transitons as trans, source, or sink
 		sp.set_ob_trans_ev(model.eqn);
 	}
 
-	print_diag("h1c");
+	print_diag("h1i");
 	
 	for(auto &eqn : model.eqn){        // Sets up reference (pop_ref, param_ref) in equations
 		eqn.setup_references();
@@ -415,28 +427,28 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	
 	model.set_ieg_ref();               // Sets ieg_ref which references ind effect groups
 	
-	print_diag("h1d");
+	print_diag("h1j");
 	map_ind_effect();                  // Maps individual effects with groups
 
 	set_param_use();                   // Sets which parameters are used in the model
 	
-	print_diag("h1e");
+	print_diag("h1k");
 	
 	set_param_parent_child();          // Sets parent child relationships for parameters
 	
-	print_diag("h1f");
+	print_diag("h1l");
 	
 	//exp_nm_convert();                  // If doesn't contain a population then EXP_RATE -> EXP_RATE_NM
 	
-	print_diag("h1g");
+	print_diag("h1m");
 	
 	setup_obs_trans();                 // Sets up obs_trans
 	
-	print_diag("h1h");
+	print_diag("h1n");
 	
 	setup_obs_trans_is_one();          // Sets up obs_trans is_one
 	
-	print_diag("h1i");
+	print_diag("h1o");
 	
 	create_nm_trans();                 // Creates a list of possible non-Markovian transitions
 
@@ -822,9 +834,54 @@ void Input::replace_tri_brac(string &te) const
 }
 
 
+/// Removes escape within different command lines
+void Input::remove_escape_command_line(vector <CommandLine> &command_line) const 
+{	
+	for(auto &cl : command_line){
+		for(auto &ta : cl.tags){
+			if(is_file(ta.value) == false){
+				remove_escape_char(ta.value);
+			}
+		}
+	}
+	
+	if(false){
+		for(auto &cl : command_line){
+			cout << cl.command_name << endl;
+			for(auto ta : cl.tags){
+				cout << ta.name << " = " <<  ta.value << " tag" << endl;
+				if(is_file(ta.value) == false) cout << "not" << endl;
+			}
+		}
+	}
+}
+
 /// Adds text escape characters
-string Input::remove_escape_char(string te)
+void Input::remove_escape_char_lines(vector <string> &lines) const 
 {
+	for(auto &va : lines) remove_escape_char(va);
+}
+
+
+/// Adds text escape characters
+void Input::remove_escape_char(string &te) const
+{
+	string str = "〈";
+	vector <string> str_list;
+ 
+	str_list.push_back("〈");
+	str_list.push_back("〉");
+	str_list.push_back("\\");
+	
+	auto fl = false;
+	for(auto i = 0u; i < te.length(); i++){
+		for(const auto &str : str_list){
+			if(te.substr(i,str.length()) == str) fl = true;
+		}
+		if(fl) break;
+	}
+	if(fl == false) return;
+	
 	te = replace(te,"〈","<");
 	te = replace(te,"〉",">");
 	
@@ -845,8 +902,6 @@ string Input::remove_escape_char(string te)
 		}
 		else i++;
 	}
-	
-	return te;
 }
 
 
@@ -1057,6 +1112,8 @@ void Input::process_command(const CommandLine &cline, unsigned int loop, bool us
 	case TEST_DATA: case POP_DATA: case POP_TRANS_DATA: 
 	case GENETIC_DATA:
 	case SET_IND_EFFECT_INF:
+	case IND_EFFECT_DATA:
+	case IND_GROUP_DATA:
 		if(!use_sim_ic && !model.data_mode()) import_data_table_command(cline,true);
 		else{
 			if(model.data_mode()) import_data_table_command(cline,false);
@@ -1069,23 +1126,11 @@ void Input::process_command(const CommandLine &cline, unsigned int loop, bool us
 		}
 		break;
 	
-	case IND_EFFECT_DATA:
-		get_tag_value("name"); 
-		get_tag_value("ie"); 
-		get_tag_value("file"); 
-		get_tag_value("cols"); 
-		break;
-		
-	case IND_GROUP_DATA:
-		get_tag_value("name"); 
-		get_tag_value("file"); 
-		get_tag_value("cols"); 
-		break;
-	
 	case SIM_PARAM: dummy_file_command(); break;
 	case SIM_STATE: sim_state_command(); break;
 	case POST_SIM_PARAM: case POST_SIM_STATE: dummy_file_command(); break;
 	case INF_PARAM_STATS: inf_param_stats(); break;
+	case INF_PRED_ACC: inf_pred_acc(); break;
 	case SIM_WARNING: case INF_WARNING: case PPC_WARNING: warning_command(); break;
 	case INF_DIAGNOSTICS: dummy_file_command(); break;
 	case INF_GEN: dummy_file_command(); break;
@@ -1339,6 +1384,14 @@ void Input::check_param_used()
 		if(par.used == false){
 			if(model.mode != PPC){
 				alert_warning_line("Parameter '"+par.full_name+"' is not used in the model",par.line_num);
+			}
+		}
+	}
+	
+	for(const auto &def : model.define){
+		if(def.used == false){
+			if(model.mode != PPC){
+				alert_warning_line("Definition '"+def.full_name+"' is not used in the model",def.line_num);
 			}
 		}
 	}

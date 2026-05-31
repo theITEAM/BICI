@@ -21,11 +21,12 @@ function close_help()
 function add_help_buts(lay)
 {
 	let l_store = inter.layer.length;
+	let help = inter.help;
 
 	let help_type = "normal";
-	if(inter.help.script != undefined) help_type = "import";
-	if(inter.help.show_datatable == true) help_type = "datatable";
-	if(inter.help.warn != undefined) help_type = "warning";
+	if(help.script != undefined) help_type = "import";
+	if(help.show_datatable == true) help_type = "datatable";
+	if(help.warn != undefined) help_type = "warning";
 	if(test_comment) help_type = "testing";
 	
 	let marx = 1;
@@ -51,11 +52,11 @@ function add_help_buts(lay)
 	
 	switch(help_type){
 	case "import":
-		if(inter.help.scroll_to_line == true){
-			inter.help.scroll_to_line = false;
+		if(help.scroll_to_line == true){
+			help.scroll_to_line = false;
 			for(let ll = l_store+1; ll < inter.layer.length; ll++){
 				if(inter.layer[ll].name == "Yscroll"){
-					let y = inter.help.liney - 1.4*5; if(y < 0) y = 0; 
+					let y = help.liney - 1.4*5; if(y < 0) y = 0; 
 					change_scroll(y,inter.layer[ll].but[0],"page_set");
 					generate_screen();
 					return;
@@ -63,7 +64,7 @@ function add_help_buts(lay)
 			}
 		}
 	
-		let text_anno = text_convert_annotation(inter.help.te,1,1.4,dx_cont,"",BLACK);
+		let text_anno = text_convert_annotation(help.te,1,1.4,dx_cont,"",BLACK);
 		
 		hei_import_text = text_anno.height;
 		hei += hei_import_text+1.5;
@@ -91,9 +92,9 @@ function add_help_buts(lay)
 	let martop = 2.8, marbot = 2.8;
 	lay.add_button({x:0, y:cy-martop, dx:dx, dy:hei+martop+marbot, type:"HelpBack"});
 
-	let title = inter.help.title;
+	let title = help.title;
 	if(test_comment){
-		title = all_comments_name[inter.help.index]+" "+inter.help.index+" "+all_comments_name.length;
+		title = all_comments_name[help.index]+" "+help.index+" "+all_comments_name.length;
 	}
 	
 	lay.add_title(title,1.3,cy-martop + 0.9,{col:WHITE, col_line:WHITE});
@@ -112,8 +113,8 @@ function add_help_buts(lay)
 			let ma = 1.5;
 			lay.add_button({x:ma, y:cy+0.4, dx:dx-2*ma, dy:inter.layer[l_store].dy+0.5, type:"Outline", back_col:WHITE, col:WHITE}); 
 		
-			if(inter.help.te != ""){
-				lay.add_paragraph(inter.help.te,dx_cont,1.3,cy+hei+2.8-hei_import_text-2.8,WHITE,para_si,para_lh);
+			if(help.te != ""){
+				lay.add_paragraph(help.te,dx_cont,1.3,cy+hei+2.8-hei_import_text-2.8,WHITE,para_si,para_lh);
 			}
 		}
 		break;
@@ -149,8 +150,6 @@ function add_help_buts(lay)
 	default: error("Option not recognised 44"+help_type); break;
 	}
 	
-	let help = inter.help;
-
 	let widbut = but_width, heibut = but_height;
 	
 	if(help_type == "warning" && help.ok){
@@ -187,7 +186,7 @@ function add_script_width(script)
 }
 
 
-/// Sets up the buttons in the scrolable help page
+/// Sets up the buttons in the scrollable help page
 function add_help_content_buts(lay)
 {	
 	let cx = 0.5, cy = 0;

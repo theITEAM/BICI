@@ -289,13 +289,13 @@ function export_table_content(filename)
 			
 			let ele_list = get_element_list(value,dim);
 		
-			for(let j = 0; j < dep.length; j++) te += dep[j] + ",";
+			for(let j = 0; j < par.ndep_cont; j++) te += dep[j] + ",";
 			if(inter.edit_param.type == "PriorSplit") te += "prior";
 			else te += "value";
 			te += endl;
 		
 			for(let k = 0; k < ele_list.length; k++){
-				for(let j = 0; j < dep.length; j++) te += list[j][ele_list[k][j]]+",";
+				for(let j = 0; j < par.ndep_cont; j++) te += list[j][ele_list[k][j]]+",";
 				te += get_element(value,ele_list[k])+endl;
 			}
 		}
@@ -499,7 +499,12 @@ function write_file_async(te,filename,type)
 	
 	fs.writeFile(filename, te, function (err) {
 		if (err) {
-			setTimeout(function(){ alertp("There was an error attempting to save your data.");}, 10);
+			setTimeout(function(){ 
+				prr(err);
+				prr(filename);
+				prr(te.length);
+				alertp("There was an error attempting to save your data.");
+			}, 10);
 			return;
 		}
 		else{
@@ -543,9 +548,40 @@ function load_BICI_files(ans,per_start,per_end)
 			if(err){ 
 				setTimeout(function(){ 
 					stop_loading_symbol();
-					alert_help("Problem loading file","The following error occurred: "+err);
+					if(err.code =="ENOENT"){
+						let file = err.path;
+						
+						let fo = get_font(para_si);
+						let w = text_width(file,fo);
+						let wmax = 30;
+						if(w > wmax){
+							let spl = file.split("\\");
+							if(spl.length > 1){
+								let st="";
+								let line=spl[0];
+								for(let i = 1; i < spl.length; i++){
+									let add = "\\"+spl[i];
+									if(text_width(line+add,fo) < wmax){
+										line += add;
+									}
+									else{
+										if(st != "") st += endl;
+										st += line+"...";
+										line = add;
+									}
+								}
+								if(st != "") st += endl;
+								st += line;
+								file = st;
+							}
+						}
+						alert_help("Problem loading file","The following file could not be loaded: "+file);
+					}
+					else{
+						alert_help("Problem loading file","The following error occurred: "+err);
+					}
 					generate_screen();
-					}, 10);
+				}, 10);
 	
 				return;
 			}

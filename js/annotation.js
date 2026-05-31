@@ -860,7 +860,13 @@ function add_box()
 		}
 	}
 
-	claa.annotation.push({type:"box", te:"", size:size_annotation_default, comps:comps, color:annotation_col_default});
+	if(comps.length == 0){
+		alert_help("Bounding box","This selection doesn't contain any compartments.");
+		return false
+	}
+	
+	claa.annotation.push({type:"box", te:"text", size:size_annotation_default, comps:comps, color:annotation_col_default});
+	return true;
 }
 
 

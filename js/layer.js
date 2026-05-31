@@ -1369,34 +1369,45 @@ class Layer
 			break;
 		case "element_Amatrix": te = String(inter.edit_Amatrix.A_value[so.j][so.i]); break;
 		case "element_Xvector": te = String(inter.edit_Xvector.X_value[so.i]); break;
-		case "element_eqn":
+		
+		case "define_eqn": 
+			{
+				let th = find(model.param,"name",inter.bubble.par_name);
+				if(th == undefined) error("Cannot find th");
+				let par = model.param[th];
+				let val = par.define_eqn;
+				let st = ""; if(val != undefined) st = String(val);
+				let ty = "define_eqn"; if(par.time_dep == false) ty = "define_eqn_notime";
+				eqn = create_equation(st,ty); 
+			}
+			break;		
+			
+		case "define_element_eqn":
 			{
 				let val = get_element(inter.edit_param.value,so.pindex);
 				let st = ""; if(val != undefined) st = String(val);
-				eqn = create_equation(st,"reparam");
+				eqn = create_equation(st,"define_ele");
 			}
 			break;
+		
 		case "reparam_eqn": 
 			{
-				let val = model.param[inter.bubble.th].value;
-				let st = ""; if(val != undefined) st = String(val);
-				eqn = create_equation(st,"reparam"); 
-			}
-			break;		
-		case "define_eqn": 
-			{
-				let val = model.param[inter.bubble.th].define_eqn;
-				let st = ""; if(val != undefined) st = String(val);
-				eqn = create_equation(st,"define_eqn"); 
-			}
-			break;		
-		case "reparam_equation": 
-			{
-				let val = model.param[inter.bubble.th].reparam_eqn;
+				let th = find(model.param,"name",inter.bubble.par_name);
+				if(th == undefined) error("Cannot find th");
+				let val = model.param[th].reparam_eqn;
 				let st = ""; if(val != undefined) st = String(val);
 				eqn = create_equation(st,"reparam_eqn"); 
 			}
-			break;		
+			break;
+			
+		case "reparam_element_eqn":
+			{
+				let val = get_element(inter.edit_param.value,so.pindex);
+				let st = ""; if(val != undefined) st = String(val);
+				eqn = create_equation(st,"reparam_ele");
+			}
+			break;
+
 		case "find": te = String(inter.bubble.find); break;
 		case "burnin": te = String(inter.bubble.burnin); break;
 		case "replace": te = String(inter.bubble.replace); break;
@@ -1437,6 +1448,7 @@ class Layer
 		case "prior_sigma": te = inter.bubble.prior.value.sigma_eqn.te; break;
 		case "prior_dist_min": eqn = inter.bubble.prior.value.min_eqn; break;
 		case "prior_dist_max": eqn = inter.bubble.prior.value.max_eqn; break;
+		case "prior_dist_eta": eqn = inter.bubble.prior.value.eta_eqn; break;
 		case "prior_dist_power": eqn = inter.bubble.prior.value.power_eqn; break;
 		case "prior_dist_mean": eqn = inter.bubble.prior.value.mean_eqn; break;
 		case "prior_dist_shape": eqn = inter.bubble.prior.value.shape_eqn; break;

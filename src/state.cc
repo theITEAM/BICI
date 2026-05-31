@@ -151,6 +151,7 @@ void State::load_samp(const PV &param_value, const Sample &samp)
 	}
 	
 	auto ie_store = model.post_ie_store(samp);
+	
 	set_ie_from_samp(ie_store);
 	
 	set_ie_from_data();          // Sets IEs if set-ind-effect is used
@@ -2211,7 +2212,7 @@ void State::set_ind_inf_from(const vector <string> &ind_key)
 /// Sets individual effects based on sample values
 void State::set_ie_from_samp(const IEstore &ie_store)
 {
-	if(model.mode != PPC) return;
+	if(model.mode != PPC && model.mode != DATA_SIM) return;
 	
 	for(auto p = 0u; p < model.nspecies; p++){
 		const auto &sp = model.species[p];
@@ -2222,7 +2223,7 @@ void State::set_ie_from_samp(const IEstore &ie_store)
 			const auto &ieg = sp.ind_eff_group[i];
 			const auto &iegs = ssp.ind_eff_group_sampler[i];
 			
-			if(ieg.ppc_resample == false){
+			if(ieg.ppc_resample == false || model.mode == DATA_SIM){
 				if(iess.on == false){
 					run_error("Cannot get values for individual effect group '"+ieg.name+"'. Perhaps this needs to be sampled?");				
 				}
@@ -2289,4 +2290,11 @@ void State::ie_finalise()
 			}
 		}
 	}
+}
+
+
+/// Calculate an equation (used in data sim)
+double State::calculate(const EquationInfo &ei, unsigned int ti) const
+{
+	return model.eqn[ei.eq_ref].calculate(ti,popnum_t[ti],param_val.precalc);					
 }

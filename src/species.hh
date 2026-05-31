@@ -94,7 +94,7 @@ class Species   	                         // Stores details of a species
 		vector <unsigned int> obs_eqn;         // Lists observation equations
 		HashSimp hash_obs_eqn;
 		
-		// References observation transitions [trgl][ti][#]
+		// References obs_trans_eqn [trgl][ti][#]
 		vector < vector < vector <unsigned int> > > obs_trans_eqn_ref;
 		
 		unsigned int last_obs_trans_ti;        // Last ti point for obs_trans
@@ -211,8 +211,9 @@ class Species   	                         // Stores details of a species
 		void set_ind_tmin_tmax();
 		void init_pop_data(const DataSource &so);
 		vector < vector <double> > pop_get_percentage(const DataSource &so);
+		string generate_warn(string type, double t, const Details &details) const;
 		void add_pop_data(const DataSource &so, int sign);
-		void data_ignored(const DataSource &so);
+		void data_ignored(const DataSource &so, const vector <string> &warn_list);
 		void set_add_rem_pop_change();
 		void add_ind_data(const DataSource &so);
 		void remove_ind_data(const DataSource &so);

@@ -1,25 +1,21 @@
-﻿# Example 3.3: Derived quantities
+# Model F3.3: Parameter definition by equation
 
 ## Objective
-- Derived quantities are functionally dependent on model parameters or populations, but are not themselves within the model.
-- This example shows different derived expressions:
-(1) The basic reproduction number $R_0$ is calculated based on an user defined equation.
-(2) The time-varying reproduction number is calculated using the function RN(...), where the infected states are placed within the brackets.
-(3) The effective reproduction number is calculated using the function RNE(...).
-(4) The generation time is calculated using the function GT(...).
-(5) The estimated number of infections $NI$ is found by integrating over the force of infection multiplied by the number of susceptible.
-(6) The estimated number of recoveries $NR$ in the first 20 time units is derived.
-
-## Data
-- Known event times.
+- Introduce parameter definition specified through an equation.
+- This is the same as model CE3.3, but here the quantity $λ_s(t)$ is defined by the force of infection.
+- This can be a useful way to avoid unnecessarily long algebraic expressions shown on the model.
+- Unlike reparameterisation, defined quantities can depend on time-varying quantities such as populations, and don't use splines.
 
 ## Model
 - A single population-based species 'People' is created.
-- This contains a classification 'DS' which stands for 'disease status'.
+- This contains a classification 'DS' which stands for 'disease status' and a classification 'Sex'.
 - DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
-- A transmission rate $β$ determines the rate at which individuals become infected.
-- A recovery rate $γ$ determines the rate at which individuals recover.
-- $R_0$ is derived by equation $Nβ/γ$, where $N$ is the number of individuals.
+- A force of infection $λ_s(t)$ specifies the rate at which individuals become infected.
+- This is defined in terms of a transmission rate $β_s$ that determines the rate at which individuals with sex $s$ become infected.
+- A recovery rate $γ_s$ determines the rate at which individuals recover with sex $s$.
+- $N$ is the total number of individuals (this model assumes frequency dependent transmission).
+- Classification 'Sex' contains the compartments $M$ and $F$ for male and female.
 
 ## Population
-- This consists of 100 initially susceptible individuals and one infected.
+- This consists of 10000 initially susceptible individuals and 2 infected.
+- There is a 50/50 split between males and females.

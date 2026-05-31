@@ -256,7 +256,6 @@ struct Population {                // Stores a population (used in an equation)
 	vector <PopulationTerm> term;    // The global compartments which contribute to the popualtion
 	vector <PopMarkovEqnRef> markov_eqn_ref;// References Markov equations which include population
 	vector <PopTransRef> trans_ref;  // References transitions which include population
-	//vector <unsigned int> spline_update; // Stores any reparam which need updating
 	HashSimp hash_spline_update;
 };
 
@@ -1157,7 +1156,7 @@ struct DivIndRef {                 // References an individual event on a Markov
 struct MarkovEqnDiv {              // Division in Markov timeline
 	double value;                    // The value of the equation for the division
 	double indfac_int;               // The integral of individual factors across div
-	vector <DivIndRef> ind_trans;    // The individuals which undego transitions
+	vector <DivIndRef> ind_trans;    // The individuals which undergo transitions
 };
 
 struct MarkovEqn {                 // Stores information about the Markov equations
@@ -1288,16 +1287,6 @@ struct Derive {                    // Stores derived parameters
 	vector <Dependency> dep;         // Dependency for derived quantity (excluding time)
 	vector <EquationInfo> eq;        // The equations for each quantity
 	DerFunc func;                    // Stores information about derived function
-	unsigned int line_num;           // Stores the line number the equation comes from
-};
-
-struct Define {                    // Stores definition
-	string name;                     // The name of the derived quantity
-	EquationInfo value;              // Value for definition
-	string full_name;                // Full name including dependency        
-	bool time_dep;                   // Time dependency
-	vector <Dependency> dep;         // Dependency for derived quantity (excluding time)
-	SwapResult swap_temp;            // Swap result
 	unsigned int line_num;           // Stores the line number the equation comes from
 };
 
@@ -2111,6 +2100,17 @@ struct IEstore {                   // Used to store ie values
 	vector <IEstoreSpecies> species;
 };
 
+struct Average {
+	Average() {av = 0; nav = 0;}
+	double av;
+	double nav;
+};
+
+struct TestCompInter {             // Stores information about a test compartment
+ 	bool on;                         // Determines if compartment is test sensitive
+	EquationInfo Se;                 // Sensitivity
+};
+
 struct Intervention {              // Stores an intervention
 	InterventionType type;           // The type of intervention
 	string name;                     // The name of the intervention
@@ -2118,8 +2118,103 @@ struct Intervention {              // Stores an intervention
 	double frac;                     // The fraction of individuals tested
 	double time_gap;                 // The time individual is culled after positive test
 	unsigned int cl;                 // The classification for the test
-	string Sp_str;                   // Gives the specigivity of the test
+	EquationInfo Sp;                 // Gives the specificity of the test
+	vector <TestCompInter> Se_comp;  // Gives the sensitivity of the test
 	string diag_pos;                 // The string for a positive diagnostic test (for diagnostic test data)
 	string diag_neg;                 // The string for a negative diagnostic test (for diagnostic test data)
-	DiagTestSens diag_test_sens;     // Determines compartments test sensitive to (for diagnostic test data)
+};
+
+
+// STRUCTURES FOR EQUATIONS
+
+struct EqItemList {                         // Allows for a list of equation items
+	EqItemType type;
+	unsigned int num;
+	unsigned int prev;
+	unsigned int next;
+};
+
+struct PopRefFromPo {                      // Used to get pop_ref from population number
+	unsigned int i;                          // Index on pop_ref
+	unsigned int po;                         // Population number
+};
+
+struct Integral {                          // Stores the calculation within an integral
+	vector <Calculation> calc;    
+	unsigned int ti_min;
+	unsigned int ti_max;
+};
+
+struct SumInfo {                           // Stores information about a sum
+	vector <string> dep;                     // Indices on sum
+	string comp_max;                         // The compartment over which distance is measured
+	
+	double distmax;                          // The distance over which the sum acts
+};
+
+struct PopCalculation                      // Used to describe a population calculation
+{
+	vector <Calculation> calc;               // A calculation
+	unsigned int po;                         // The population which multiplies calculation 
+};
+
+	
+struct LinearCalculation                   // Stores a linear calculation
+{
+	PopCalculation no_pop_calc;              // Calculates non-population part
+	vector <PopCalculation> pop_calc;        // Calculates parts multiplying populations
+	HashSimp hash_simp;                      // Simple hash table for population
+};
+
+struct Linearise {                         // Information about linearising an equation 
+	bool on;                                 // Determines if linearisation is possible
+	
+	vector <Calculation> no_pop_calc_store;  // Stores no pop calculation
+	
+	vector < vector <Calculation> > pop_grad_calc_store;  // Stores no pop calculation
+	
+	vector <Calculation> factor_calc;        // Quantities multiplied together for the factor 
+
+	EqItem no_pop_precalc;                   // Stores no_pop precalc number 
+	
+	vector <EqItem> pop_grad_precalc;        // Stores calculation precalc for gradients
+	
+	EqItem factor_precalc;                   // Quantities multiplied together for the factor 
+	
+	bool no_pop_calc_time_dep;               // Determines if time dependent
+	bool factor_time_dep;                    // Set if the factor is time dependent
+	bool pop_grad_time_dep;                  // Set if population gradient is dependent
+	
+	vector < vector <PopRefFromPo> > pop_ref_from_po; // Gets pop_ref from population	
+		
+	bool multi_source;                       // Detemines if comes from multiple sources (used in transmission trees)
+	
+	void init_pop_ref_from_po(const vector <unsigned int> &pop_ref);
+	unsigned int get_pop_ref(unsigned int po) const;	
+};
+
+struct DefineOpStore {             // Stores operations from define
+	vector <EqItem> op;
+	vector <SumInfo> sum_info; 
+	vector <ParamIndex> param_index;
+	vector <PopIndex> pop_index;    
+};
+
+struct Define {                    // Stores definition
+	string name;                     // The name of the derived quantity
+	string full_name;                // Full name including dependency        
+	bool time_dep;                   // Time dependency
+	vector <Dependency> dep;         // Dependency for derived quantity 
+	bool eqn_on;                     // Determines if the equation is on
+	EquationInfo eqn;                // Sets equation (if equation is on)
+	vector <EquationInfo> value_list;// Sets value (if equation not on)  
+	vector <unsigned int> value_list_ref;// References value_list
+	vector <DefineOpStore> op_store; // Stores information from equations to be inserted
+	unsigned int line_num;           // Stores the line number the equation comes from
+	bool used;
+};
+
+struct Substitution {              // Used when substituting in defined quantities
+	string index;
+	unsigned int i;
 };

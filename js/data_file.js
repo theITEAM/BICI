@@ -155,7 +155,7 @@ function start_add_initial_population(so)
 
 					for(let c = 0; c < claa.ncomp; c++){
 						let co = claa.comp[c];
-						so.cla[cl].comp_init_dist[c] = { comp_name_store:co.name, dist:unset_prior("pop_prior"), alpha:1};
+						so.cla[cl].comp_init_dist[c] = { comp_name_store:co.name, dist:unset_prior(), alpha:1};
 					}
 				}
 				break;
@@ -174,7 +174,7 @@ function start_add_initial_population(so)
 			break;
 		
 		case "Dist":
-			so.pop_dist = unset_prior("pop_prior");
+			so.pop_dist = unset_prior();
 			for(let c = 0; c < so.glob_comp.length; c++){
 				so.glob_comp[c].alpha = 1;
 			}
@@ -591,7 +591,7 @@ function comp_data_bubble(cont,type)
 	let wmax = get_w_drop(cl_pos);
 	let cl_drop = edit_source.spec.cl_drop;
 
-	cont.dx = 10; if(cont.dx < wmax+5) cont.dx = wmax+5;
+	cont.dx = 11.5; if(cont.dx < wmax+5) cont.dx = wmax+5;
 
 	if(type == "view") cl_pos = undefined;
 	
@@ -603,14 +603,18 @@ function comp_data_bubble(cont,type)
 	if(cl_pos && cl_pos.length == 1){
 		cl_drop.te = cl_pos[0].te;
 	}
-		
-	bubble_addparagraph(cont,"Select classification on which measurements are made.",0,cont.dx+2); 
-	cont.y += 0.2;
-
+	
+	/*
+	if(cl_drop.te == select_drop_str){
+		bubble_addparagraph(cont,"Select classification on which measurements are made.",0,cont.dx+2); 
+		cont.y += 0.2;
+	}
+	*/
+	
 	bubble_adddropdown_text(cont,"Classification:",5.5,wmax,cl_drop,cl_pos); 
 	cont.y += 0.5;
 	
-	if(sim_options()){
+	if(cl_drop.te != select_drop_str && sim_options()){
 		bubble_input(cont,"Fraction observed:",{type:"frac_obs"});
 		
 		add_timepoint_options(cont);
@@ -797,7 +801,9 @@ function diagtest_data_bubble(cont,type,op)
 	cont.y += 0.2;
 	
 	if(cl_sel != select_drop_str){
-		let pcl = get_p_cl_from_claname(cl_sel);
+		let mod = model.get_mod();
+	
+		let pcl = get_p_cl_from_claname(cl_sel,mod);
 		let p = pcl.p, cl = pcl.cl;
 		
 		cont.y += 0.4;
@@ -834,7 +840,6 @@ function diagtest_data_bubble(cont,type,op)
 		}
 	}	
 	else{ 
-		//bubble_input(cont,"Sensitivity:",{hidden:true, type:"Se", eqn:true});
 		bubble_input(cont,"Specificity:",{hidden:true, type:"Sp", eqn:true});
 		bubble_input(cont,"Positive text:",{hidden:true, type:"pos_result"});
 		bubble_input(cont,"Negative text:",{hidden:true, type:"neg_result"});
@@ -871,7 +876,8 @@ function diagtest_scrollable(lay)
 	let op = lay.op;
 	
 	let p = op.p, cl = op.cl;
-	let claa = model.species[p].cla[cl];
+	let mod = model.get_mod();
+	let claa = mod.species[p].cla[cl];
 	
 	let cb = edit_source.spec.check_box;
 	if(cb.name != claa.name){
@@ -1638,6 +1644,59 @@ function ind_eff_data(bu)
 }
 
 
+/////////////////////// SET IND EFFECT 
+
+function set_ind_eff_bubble(cont,type)
+{
+	let sp = model.get_sp();
+	
+	let pos = [];
+	for(let g = 0; g < sp.ind_eff_group.length; g++){
+		let ieg = sp.ind_eff_group[g];
+		for(let j = 0; j < ieg.ie_list.length; j++){
+			pos.push({te:ieg.ie_list[j].name});
+		}
+	}
+	
+	let wmax = 7;
+
+	cont.dx = 4.2+wmax;
+
+	let te = set_ind_effect_text, ti = "Individual effect";
+
+	bubble_addtitle(cont,"Individual effect",{title:ti, te:te});
+	
+	let drop = edit_source.spec.drop;
+	
+	if(type != "view"){
+		if(pos.length == 0){
+			bubble_addparagraph(cont,"There are no individual effect in the model.",0,cont.dx); cont.y += 0.2;
+		}
+		else{
+			bubble_addparagraph(cont,"The fixed individual effect:",0,cont.dx);cont.y += 0.2;
+			
+			bubble_adddropdown(cont,0.5,wmax,drop,pos);
+			cont.y += 0.2;
+			
+			let ac; if(drop.te != select_drop_str) ac = "AddDataTable";
+		
+			add_end_button(cont,"Next",ac);	
+		}
+	}
+	else{
+		bubble_addparagraph(cont,"The fixed individual effect: <e>"+drop.te+"</e>",0,cont.dx); cont.y += 0.2;
+	}
+}
+
+
+/// Loads up the ind effect data bubble
+function set_ind_eff(bu)
+{
+	start_data_source("Set IE",{p:model.get_p(), drop:{te:select_drop_str}},bu.op.info);
+	select_bubble_over();
+}
+
+
 /////////////////////// IND GROUP DATA
 
 function ind_group_data_bubble(cont,type)
@@ -1768,7 +1827,7 @@ function select_ind_wildcard()
 function wildcard_match(name,filt)
 {
 	let spl = filt.split("*");
-
+	
 	return wildcard_match2(name,spl,true);
 }
 
@@ -1785,7 +1844,7 @@ function wildcard_match2(name,spl,root)
 		}
 		else{
 			let imax = name.length-len;
-			if(root) imax = 0;
+			if(root && len > 0) imax = 0;
 			for(let i = 0; i <= imax; i++){
 				if(name.substr(i,len).toLowerCase() == te){
 					if(spl.length == 1) return true;

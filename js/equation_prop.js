@@ -158,7 +158,7 @@ function extract_equation_properties(eqn)
 				if(tex == "t"){
 					eqn.time_vari = true;
 					
-					let dep=[]; dep.push("t"); 
+					let dep=[]; dep.push("timedep"); 
 					add_eqn_dep(eqn,dep,[],ist);
 				}
 				else{
@@ -177,8 +177,8 @@ function extract_equation_properties(eqn)
 					let icur3 = icur2+ist+1;
 					switch(type){
 					case "pop": check_population(tex,icur3,eqn); break; 
-					case "ie": check_ie(tex,"",icur3,eqn); break;  
-					case "fe": check_fe(tex,"",icur3,eqn); break;  
+					case "ie": check_ie(tex,"",icur3,eqn,false); break;  
+					case "fe": check_fe(tex,"",icur3,eqn,false); break;  
 					default: error("Option not recognised 40"); break;
 					}
 				}
@@ -190,38 +190,139 @@ function extract_equation_properties(eqn)
 		icur = lin.length+1;
 	}
 	
-	/*
-	for(let i = 0; i < eqn.pop.length; i++){
-		if(eqn.pop[i].t == undefined) eqn.time_vari = true;
-	}
-	*/
-	
 	if(eqn.pop.length > 0) eqn.time_vari = true;
 
 	for(let i = 0; i < eqn.param.length; i++){
 		if(eqn.param[i].time_dep == true) eqn.time_vari = true;
 	}
-
-	/*
-	if(eqn.type == "reparam" || eqn.type == "reparam_eqn"){
-		if(eqn.time_vari == true){
-			if(eqn.pop.length > 0){
-				eqn.warn.push({te:"Reparameterisation should not depend on populations."});
-			}
-			else{
-				eqn.warn.push({te:"Reparameterisation should not depend on time."});
-			}
-		}
-	}
-	*/
 	
-
 	check_sum_bracket(eqn);
 	
 	check_indexes_match(eqn);
+
+	let wa;
+	switch(eqn.mode){  // Works out if equation is valid given the mode
+	case "all":                  // Allows for anything
+		break;
+	
+	case "param time":           // Allows for parameters and time (no dep. no population, ie, fe)
+		if(eqn.pop.length > 0) wa = "Cannot contain populations"; 
+		if(eqn.ind_eff.length > 0) wa = "Cannot contain individual effects"; 
+		if(eqn.fix_eff.length > 0) wa = "Cannot contain fixed effects"; 
+		for(let i = 0; i < eqn.param.length; i++){	
+			if(par_dep(eqn.param[i])) wa = "Cannot contain parameter with dependency";
+		}
+		break;
+	
+	case "param only":          // Allows a constant or single parameter (no population, ie, fe)
+		if(eqn.ind_eff.length > 0) wa = "Cannot contain individual effects"; 
+		if(eqn.fix_eff.length > 0) wa = "Cannot contain fixed effects"; 
+		if(eqn.time_vari) wa = "Cannot be time varying"; 
+		if(eqn.pop.length > 0) wa = "Cannot contain populations"; 
+		if(eqn.param.length > 1) wa = "Can only be constant or contain one parameter"; 
+		if(eqn.param.length == 1){	
+			if(par_dep(eqn.param[0])) wa = "Cannot contain parameter with dependency";
+		}
+		break;
+	
+	case "defrep ele":           // Allows param (with no dep), time, pop (no ie, fe)
+		for(let i = 0; i < eqn.fix_eff.length; i++){
+			let fe = eqn.fix_eff[i];
+			if(fe.in_pop == false) wa = "Cannot contain fixed effects";
+		}
+	
+		for(let i = 0; i < eqn.ind_eff.length; i++){
+			let ie = eqn.ind_eff[i];
+			if(ie.in_pop == false) wa = "Cannot contain individual effects";
+		}
+	
+		for(let i = 0; i < eqn.param.length; i++){
+			if(par_dep(eqn.param[i])) wa = "Cannot contain parameter with dependency";
+		}
+		break;
+		
+	case "defrep eq":           // Allows param, time, pop (no ie, fe)
+		for(let i = 0; i < eqn.fix_eff.length; i++){
+			let fe = eqn.fix_eff[i];
+			if(fe.in_pop == false) wa = "Cannot contain fixed effects";
+		}
+	
+		for(let i = 0; i < eqn.ind_eff.length; i++){
+			let ie = eqn.ind_eff[i];
+			if(ie.in_pop == false) wa = "Cannot contain individual effects";
+		}
+		break;
+		
+	case "defrep ele notime":           // Allows param (with no dep), time, pop (no ie, fe)
+		if(eqn.ind_eff.length > 0) wa = "Cannot contain individual effects"; 
+		if(eqn.fix_eff.length > 0) wa = "Cannot contain fixed effects"; 
+		if(eqn.time_vari) wa = "Cannot be time varying"; 
+		if(eqn.pop.length > 0) wa = "Cannot contain populations"; 
+	
+		for(let i = 0; i < eqn.param.length; i++){
+			if(par_dep(eqn.param[i])) wa = "Cannot contain parameter with dependency";
+		}
+		break;
+		
+	case "defrep eq notime":           // Allows param, time, pop (no ie, fe)
+		if(eqn.ind_eff.length > 0) wa = "Cannot contain individual effects"; 
+		if(eqn.fix_eff.length > 0) wa = "Cannot contain fixed effects"; 
+		if(eqn.time_vari) wa = "Cannot be time varying"; 
+		if(eqn.pop.length > 0) wa = "Cannot contain populations"; 	
+		break;
+	
+	case "derive param":
+		if(eqn.ind_eff.length > 0) wa = "Cannot contain individual effects"; 
+		if(eqn.fix_eff.length > 0) wa = "Cannot contain fixed effects"; 
+		if(eqn.pop.length > 0) wa = "Cannot contain populations"; 
+		if(eqn.param.length == 0) wa = "Must contain a parameter"; 
+		if(eqn.param.length > 1) wa = "Must contain just a single parameter"; 
+		break;
+		
+	case "derive eqn":
+		for(let i = 0; i < eqn.fix_eff.length; i++){
+			let fe = eqn.fix_eff[i];
+			if(fe.in_pop == false) wa = "Cannot contain fixed effects";
+		}
+	
+		for(let i = 0; i < eqn.ind_eff.length; i++){
+			let ie = eqn.ind_eff[i];
+			if(ie.in_pop == false) wa = "Cannot contain individual effects";
+		}
+		break;
+		
+	default:
+		error("Do not recognise equation mode:"+eqn.mode);
+		break;
+	}
+	
+	if(wa == undefined){  // If numeric then checks the range
+		if(!isNaN(eqn.te)){
+			let num = Number(eqn.te);
+			switch(eqn.range){
+			case "all": break;
+			case "pos": if(num <= 0) wa = "Must be positive"; break;
+			case "zeroone": if(num < 0 || num > 1) wa = "Must be between zero and one"; break;
+			case "etarange": if(num < 1 || num > ETA_MAX) wa = "Must be between one and "+ETA_MAX; break;
+			default: error("equation range not recognised:"+eqn.range); break;
+			}
+		}
+	}
+	
+	if(wa != undefined) eqn.warn.push({te:wa});
 }
 
 
+/// Determines if there is a non-time dependency
+function par_dep(par)
+{
+	for(let j = 0; j < par.dep.length; j++){
+		if(par.dep[j] != "t") return true;
+	}
+	return false;
+}
+
+			
 /// Checks for derived function
 function der_func_check(i,lin2,name,eqn)
 {
@@ -246,7 +347,7 @@ function der_func_check(i,lin2,name,eqn)
 			eqn.warn.push({te:"Unexpected '"+after+"' at end of line.", cur:i+1, len:lin2.length-i-1});
 		}
 		
-		let dep=[]; dep.push("t");
+		let dep=[]; dep.push("timedep");
 		add_eqn_dep(eqn,dep,[],ist);
 		
 		if(eqn.type != "derive_eqn"){
@@ -380,14 +481,6 @@ function check_sum_bracket(eqn)
 				}
 				
 				let inside = lin.substr(ibeg,i-ibeg);
-			
-				/*
-				for(let k = 0; k < dep.length; k++){
-					if(!inside.includes(dep[k])){
-						eqn.warn.push({te:"The sum does not include the index '"+dep[k]+"'", cur:ibeg-1, len:i-ibeg+2}); 
-					}
-				}
-				*/
 			}
 		}
 	}
@@ -397,43 +490,50 @@ function check_sum_bracket(eqn)
 /// check that primed indexes match with those on populations or parameter
 function check_indexes_match(eqn)
 {
-	let list = [];
-	let used = [];
-	for(let i = 0; i < eqn.sum.length; i++){
-		let su = eqn.sum[i];
-		for(let j = 0; j < su.dep.length; j++){
-			let de = su.dep[j];
-			if(find_in(list,de) == undefined){ list.push(de); used.push(false);}
-		}
-	}
+	let dep_mod=[];
+	let fl = false;
 	
-	for(let i = 0; i < eqn.param.length; i++){
-		let par = eqn.param[i];
-	
-		for(let j = 0; j < par.dep.length; j++){
-			let ind = par.dep[j];
-			if(par.dep_used[j] != false && is_prime(ind)){
-				let k = find_in(list,ind);
-				if(k == undefined){
-					if(eqn.type != "reparam_eqn" && eqn.type != "derive_param" && eqn.type != "derive_eqn"){
-						eqn.warn.push({te:"Primed index '"+ind+"' for parameter '"+par.name+"' should be summed over"});
+	switch(eqn.type){
+	case "trans_mean": case "trans_rate": case "trans_shape":
+	case "trans_scale": case "trans_cv": case "trans_bp":
+		{
+			let p = find(model.species,"name",eqn.p_name);
+			if(p == undefined) prr("Cannot find p");
+			else{
+				let sp = model.species[p];
+				let cl = find(sp.cla,"name",eqn.cl_name);
+				if(cl == undefined) prr("Cannot find cl");
+				else{
+					for(let cl2 = 0; cl2 < sp.ncla; cl2++){
+						dep_mod.push(sp.cla[cl2].index);
 					}
-				}					
-				else used[k] = true;
+					dep_mod.push("t");
+				}
 			}
 		}
+		fl = true;
+		break;
+			
+	case "Se": case "Sp":
+	case "SeTC": case "SpTC":
+	case "mut_rate": case "seq_var":
+	case "sim_comp_prob":
+	case "comp_prob":
+	case "trans_prob":
+	case "prior": case "dist":
+		dep_mod.push("t");
+		fl = true;
+		break;
+		
+	case "derived": case "reparam_ele": case "define_eqn": case "derive_param":
+		break;
 	}
-
-	for(let i = 0; i < eqn.pop.length; i++){
-		let index = eqn.pop[i].index;
-		for(let j = 0; j < index.length; j++){
-			let ind = index[j];
-			if(is_prime(ind)){
-				let k = find_in(list,ind);
-				if(k == undefined){
-					eqn.warn.push({te:"Population primed index '"+ind+"' must be summed over", cur:0, len:0});
-				}					
-				else used[k] = true;
+	
+	if(fl){
+		for(let d = 0; d < eqn.dep.length; d++){
+			let de = eqn.dep[d];
+			if(find_in(dep_mod,de) == undefined){
+				eqn.warn.push({te:"The index '"+de+"' should not be here,"});
 			}
 		}
 	}
@@ -767,32 +867,14 @@ function check_parameter(te,icur,eqn)
 	
 	let name = spl[0];
 
-	check_valid_name(name,icur,eqn,"parameter");
-	
-	// Checks if compartment names in parameter name 
-	if(eqn.type == "trans"){
-		let spl = name.split("^");
-		if(spl.length == 2){
-			let icur2 = icur+spl[0].length+1;
-			let tex = spl[1];
-			let tex2 = remove_bracket(tex);
-			if(tex2.length < tex.length) icur2++; 
-			let spl2 = tex2.split("→");
-			
-			let p = find(model.species,"name",eqn.p_name);
-			let sp = model.species[p];
-			let cl = find(sp.cla,"name",eqn.cl_name);
-			let claa = sp.cla[cl];
-	
-			for(let i = 0; i < spl2.length; i++){
-				let c = hash_find(claa.hash_comp,spl2[i]);
-				if(c != undefined){
-					eqn.comp_name_list.push({ p_name:eqn.p_name, cl_name:eqn.cl_name, comp_name:spl2[i], icur:icur2});
-				}
-				icur2 += spl2[i].length+1;
-			}
+	if(name.length > 0){
+		let ch = name.substr(0,1);
+		if(chnotallowed.includes(ch) || name_notallow.includes(ch)){
+			eqn.warn.push({te:"The character '"+ch+"' was not expected", cur:icur, len:1});
 		}
 	}
+		
+	check_valid_name(name,icur,eqn,"parameter");
 	
 	if(spl.length == 2){
 		let icur2 = icur+name.length+1;
@@ -814,8 +896,10 @@ function check_parameter(te,icur,eqn)
 				let is_comp = false;
 				dep_used[i] = true;
 				
-				if(eqn.type != "derive_eqn" && eqn.type != "derive_param" && eqn.type != "reparam_eqn" && eqn.type != "define_eqn" && eqn.type != "test"){
-					if(sp == undefined) error("Should be defined");
+				if(eqn.mode == "all"){	
+					if(sp == undefined){
+						error("sp Should be defined");
+					}
 					let cl2; cl2 = find(sp.cla,"index",index);	
 					if(cl2 == undefined){
 						/// Looks for potential indices in other species
@@ -862,7 +946,7 @@ function check_parameter(te,icur,eqn)
 		}
 	}
 	
-	if(time_dep == true){ dep.push("t"); dep_used.push(true);}
+	if(time_dep == true){ dep.push("timedep"); dep_used.push(true);}
 	
 	add_eqn_dep(eqn,dep,dep_used,icur);
 	
@@ -899,7 +983,7 @@ function check_parameter(te,icur,eqn)
 		}
 	}
 
-	let par = { name:name, p_name:eqn.p_name, cl_name:eqn.cl_name, dep:dep, dep_used:dep_used, type:eqn.type, time_dep:time_dep};
+	let par = { name:name, p_name:eqn.p_name, cl_name:eqn.cl_name, dep:dep, dep_used:dep_used, time_dep:time_dep};
 
 	par.full_name = param_name(par);
 	
@@ -933,6 +1017,13 @@ function set_indep_index(dep,dep_used)
 /// Adds a dependency to the equation
 function add_eqn_dep(eqn,dep,dep_used,icur)
 {
+	for(let k = 0; k < dep.length; k++){
+		if(dep[k] == "t") eqn.warn.push({te:"Cannot use t as it's reserved for time", cur:icur, len:1});
+		if(dep[k] == "z") eqn.warn.push({te:"Cannot use z as it's reserved for individual effects", cur:icur, len:1});
+		
+		if(dep[k] == "timedep") dep[k] = "t";
+	}
+	
 	for(let k = 0; k < dep.length; k++){
 		let de = dep[k];
 		
@@ -1009,7 +1100,7 @@ function check_population(te,icur,eqn)
 	let p_name = eqn.p_name;
 	
 	let p; if(p_name != undefined) p = find(model.species,"name",p_name);
-	
+
 	// Removes species filter
 	let i = 0; while(i < te.length && te.substr(i,1) != ":") i++;
 	if(i < te.length){
@@ -1052,7 +1143,7 @@ function check_population(te,icur,eqn)
 				return;
 			}
 			
-			if(eqn.type != "reparam" && eqn.type != "test" && eqn.type != "derive_eqn"){
+			if(eqn.type != "reparam_ele" && eqn.type != "derive_eqn"){
 				eqn.warn.push({te:start+"Fixed times can only be used for derived quantities and reparameterised square splines", cur:icur, len:te.length});
 			}
 		
@@ -1230,7 +1321,7 @@ function check_population(te,icur,eqn)
 	}
 	
 	if(pop_ti == undefined){
-		dep.push("t");
+		dep.push("timedep");
 		add_eqn_dep(eqn,dep,[],icur);
 	
 		eqn.pop.push(pop);
@@ -1253,12 +1344,12 @@ function check_ie(te,p_name_filter,icur,eqn,in_pop)
 	
 	let i = find(eqn.ind_eff,"name",te);
 	if(i == undefined){
-		eqn.ind_eff.push({name:te, p_name_filter:p_name_filter});
+		eqn.ind_eff.push({name:te, in_pop:in_pop, p_name:p_name_filter});
 	}
 	else{
-		if(eqn.ind_eff[i].p_name_filter != p_name_filter){
-			if(eqn.ind_eff[i].p_name_filter == "" || p_name_filter == ""){
-				eqn.warn.push({te:"Individual effect "+te+" cannot act is a population as well as directly"});
+		if(eqn.ind_eff[i].p_name != p_name_filter){
+			if(eqn.ind_eff[i].p_name == "" || p_name_filter == ""){
+				eqn.warn.push({te:"Individual effect "+te+" cannot act in a population as well as directly"});
 			}
 			else{
 				eqn.warn.push({te:"Species filters for individual effect "+te+" do not match up"});
@@ -1302,10 +1393,10 @@ function check_fe(te,p_name_filter,icur,eqn,in_pop)
 		
 	let i = find(eqn.fix_eff,"name",te);
 	if(i == undefined){
-		eqn.fix_eff.push({name:te, p_name_filter:p_name_filter});
+		eqn.fix_eff.push({name:te, in_pop:in_pop, p_name:p_name_filter});
 	}
 	else{
-		if(eqn.fix_eff[i].p_name_filter != p_name_filter){
+		if(eqn.fix_eff[i].p_name != p_name_filter){
 			eqn.warn.push({te:"Species filters for fixed effect "+te+" do not match up"});
 		}
 	}
@@ -1350,9 +1441,6 @@ function find_comp_from_name(te,p_name)
 			}
 		}
 	}
-	return;
-	
-	//return { warn:"Could not find compartment '"+te+"'"};
 }
 
 
@@ -1419,7 +1507,7 @@ function get_param_prop(st)
 					
 	if(time_dep == true) dep.push("t");
 
-	return {name:name, name_raw:name_raw, dep:dep, sub:sub, sup:sup, time_dep:time_dep, type:unset_type};
+	return {name:name, name_raw:name_raw, dep:dep, sub:sub, sup:sup, time_dep:time_dep};
 }
 
 

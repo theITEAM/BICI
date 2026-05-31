@@ -27,7 +27,8 @@ function new_model()
 function restore_model()
 {
 	if(model_store != undefined){
-		model = model_store;	
+		model = new Model();	
+		for(let ele in model_store) model[ele] = model_store[ele];		
 	}
 }
 
@@ -132,7 +133,7 @@ function load_fi2(te,file,file_type,heading,format,op)
 			if(format == "tsv") sep = "tab"; 
 
 			let tab = load_table(te,head,sep,file.name);
-	
+			
 			if(typeof tab == 'string'){
 				alertp(tab);
 				return;
@@ -299,6 +300,7 @@ function load_table(te,head,sep,filename)
 					te = te.substr(1,te.length-2).trim();
 				}						 
 			}
+			te = remove_escape_char(te);
 			ele[r][c] = te;
 		}
 	}
@@ -560,7 +562,7 @@ function read_param_samples(chain,te,result,warn,line)
 						value = "unset";
 					}
 					else{
-						if(par.type == "derive_param" && par.time_dep) value = "derived";
+						if(par.derive && par.time_dep) value = "derived";
 						else{
 							if(par.output){
 								let list = par_find_list(par);
@@ -638,7 +640,7 @@ function read_param_samples(chain,te,result,warn,line)
 	for(let th = 0; th < result.param.length; th++){
 		let par = result.param[th];
 		
-		if(par.dist_mat || par.iden_mat || par.den_vec || (par.variety == "reparam" && par.reparam_eqn_on)){
+		if(par.dist_mat || par.iden_mat || par.den_vec || (par.variety == "reparam" && par.reparam_eqn_on) || (par.variety == "define" && par.define_eqn_on)){
 			if(par.value){
 				if(par.value.length != 0) error("Param error");
 			}
@@ -840,6 +842,8 @@ function read_state_sample(te,chain,result,warning,ind_key)
 	
 	let t_start = Number(result.details.t_start);
 	
+	let low_mem = result.low_mem;
+	
 	let mode = "none";
 	
 	let sample_num;
@@ -889,13 +893,15 @@ function read_state_sample(te,chain,result,warning,ind_key)
 				case "TRANSDISTPROB":
 					mode = "transdiag"; 
 					
-					if(p == undefined) error("Species is not set");
-					{
-						let sp = result.species[p];
-						if(sample.species[p].trans_hbin == undefined){
-							sample.species[p].trans_hbin = [];
-							for(let tr = 0; tr < sp.tra_gl.length; tr++){
-								sample.species[p].trans_hbin[tr] = [];
+					if(!low_mem){
+						if(p == undefined) error("Species is not set");
+						{
+							let sp = result.species[p];
+							if(sample.species[p].trans_hbin == undefined){
+								sample.species[p].trans_hbin = [];
+								for(let tr = 0; tr < sp.tra_gl.length; tr++){
+									sample.species[p].trans_hbin[tr] = [];
+								}
 							}
 						}
 					}
@@ -1090,7 +1096,7 @@ function read_state_sample(te,chain,result,warning,ind_key)
 					break;
 				
 				case "transdiag":
-					{
+					if(!low_mem){
 						let sp = result.species[p];
 							
 						let ssp = sample.species[p];
@@ -1598,7 +1604,7 @@ function add_cmp(cpop_cmp,i,ti,val)
 }
 
 
-/// Calculates the average behaviour (such that compartment plots are faster
+/// Calculates the average behaviour (such that compartment plots are faster)
 function average_finalise(result,per_start,per_end)
 {
 	let dper = per_end-per_start;
@@ -1768,13 +1774,15 @@ function generate_trans_tree(get_inf_from,result,sample,ind_key)
 	
 
 /// Gets a subtable based on a series of column heading names
-function get_subtable(tab,col_name)
+function get_subtable(tab,col_name,cols_head)
 {
+	if(cols_head == undefined) cols_head = col_name;
+	
 	let col = [];
 	for(let i = 0; i < col_name.length; i++){
-		let c = find_string_in(tab.heading,col_name[i]);
+		let c = find_string_in(tab.heading,cols_head[i]);
 		if(c == undefined){
-			return {error:in_file_text(tab.filename)+" cannot find heading '"+col_name[i]+"'"};
+			return {error:in_file_text(tab.filename)+" cannot find heading '"+cols_head[i]+"'"};
 		}
 		col.push(c);
 	}
@@ -1872,8 +1880,9 @@ function text_width_worker(te,si,bold)
 function reduce_size(info,par)
 {
 	let list_shrink=[];
+	let ndep = par.ndep_cont;
 	
-	if(par.dep.length == 2){ // For a matrix try to make square
+	if(ndep == 2){ // For a matrix try to make square
 		let n = ELE_REDUCE_FAC*Math.sqrt(ELEMENT_MAX);
 	
 		let nx = n, ny = n;
@@ -1895,8 +1904,8 @@ function reduce_size(info,par)
 		}
 	}
 	else{
-		let scale = ELE_REDUCE_FAC*Math.pow(ELEMENT_MAX/num_element(par),1.0/par.dep.length);
-		for(let d = 0; d < par.dep.length; d++){
+		let scale = ELE_REDUCE_FAC*Math.pow(ELEMENT_MAX/num_element(par),1.0/ndep);
+		for(let d = 0; d < ndep; d++){
 			let li=[];
 			let imax = Math.floor(scale*par.list[d].length);
 			if(imax < 0) imax = 1;
@@ -1927,7 +1936,7 @@ function reduce_size(info,par)
 	}
 	
 	let shrunk=[];
-	for(let d = 0; d < par.dep.length; d++){
+	for(let d = 0; d < ndep; d++){
 		if(list_shrink[d].length < par.list[d].length) shrunk[d] = true;
 		else shrunk[d] = false;
 	}

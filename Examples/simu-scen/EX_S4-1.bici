@@ -1,13 +1,10 @@
-
 ###################### DATA DIRECTORY ######################
 
 data-dir folder="EX_S4-1-data-files"
 
-
 ####################### DESCRIPTION ########################
 
 description text="description.txt"
-
 
 ######################### DETAILS ##########################
 
@@ -16,7 +13,6 @@ simulation start=0 end=100 timestep=0.5
 inference start=0 end=100 timestep=0.5 nchain=3
 
 post-sim start=0 end=100
-
 
 ######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
 
@@ -27,24 +23,24 @@ species name="People" type="individual"
 class name="DS" index="a"
 
 comp name="S" color="#009900" x=-13 y=0
+
 comp name="I" color="#ff2222" x=0 y=0
+
 comp name="R" color="#4444ff" x=13 y=0
 
 trans name="S->I" value="exp(rate:β×{I})"
+
 trans name="I->R" value="exp(rate:γ)"
 
 # SIMULATION INITIAL CONDITIONS
 
-init-pop-sim type="fixed" focal="DS" file="init-pop-sim-People.csv"
+init-pop-sim type="fixed" focal="DS" file="init-pop-sim.csv"
 
-test-and-cull-sim name="Test and cull" comp="I[Se:0.5]" Sp="0.99" pos="+" neg="-" time-gap="1" frac=0.8 dt=10 
-
+test-and-cull-sim name="Test and cull" comp="I[Se:0.5]" Sp=0.99 pos="+" neg="-" time-gap=1 frac=0.5 dt=10
 
 ######################## PARAMETERS ########################
 
-param name="β" value="0.003" prior="inverse(0.0001,0.01)"
+param name="β" value=0.003 prior="inverse(0.0001,0.01)"
 
-param name="γ" value="0.1" prior="inverse(0.01,1)"
-
-
+param name="γ" value=0.1 prior="inverse(0.01,1)"
 

@@ -71,9 +71,8 @@ function simulate_data(so)
 	
 	let sim_ind = res_sa.species[p].individual;
 	
-	//let transnum = reconstruct_timeline_vec(sim.transnum_tl,result);
-	//let cpop = reconstruct_timeline_vec(sim.cpop_tl,result);
 	let transnum = sim.transnum;
+
 	let cpop_init = sim.cpop_init;
 	let cpop_cmp = sim.cpop_cmp;
 	let dpop_list = res_sa.species[p].dpop_list;
@@ -575,42 +574,11 @@ function simulate_data(so)
 					}
 				}
 
-				/*
-				switch(sp.type){
-				case "Individual":
-					{
-						for(let i = 0; i < sim.individual.length; i++){
-							let ind = sim.individual[i];
-							if(ind.obs){	
-								for(let e = 0; e < ind.ev.length; e++){
-									let ev = ind.ev[e];
-									if(ev.type == EV_TRANS){
-										let k = Math.floor((ev.t-t_start)/timestep);
-										res[div_ref[k]][ev.trg]++;
-									}
-								}
-							}
-						}
-					}
-					break;
-					
-				case "Population": case "Deterministic":
-					{
-						for(let ti = 0; ti < tp.length-1; ti++){
-							let d = div_ref[ti];
-							for(let trg = 0; trg < sp.tra_gl.length; trg++){
-								res[d][trg] += transnum[trg][ti];
-							}
-						}
-					}
-					break;
-				}
-				*/
-				
 				for(let ti = 0; ti < tp.length-1; ti++){
 					let d = div_ref[ti];
 					for(let trg = 0; trg < sp.tra_gl.length; trg++){
-						res[d][trg] += transnum[trg][ti];
+						let val = transnum[trg][ti];
+						if(val != undefined) res[d][trg] += val;
 					}
 				}
 					
@@ -659,7 +627,7 @@ function simulate_data(so)
 		}
 		break;
 	
-	case "Ind. Eff.":
+	case "Ind. Eff.": case "Set IE":
 		{
 			let e = find_in(sp.ind_effect,so.spec.drop.te);
 			if(e == undefined) alertp("Cannot find individual effect");
@@ -1777,7 +1745,8 @@ function generate_test_and_cull(p,i,sel_sim)
 	
 	let res_sa = result.sample[sel_sim];
 	
-	let edit_source = copy(result.species[p].sim_source[i]);
+	let source = get_source("gen",p);
+	let edit_source = copy(source[i]);
 	
 	edit_source.table_loaded = true;
 

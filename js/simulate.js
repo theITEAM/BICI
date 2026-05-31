@@ -8,7 +8,7 @@ function make_dir(dir)
 {
 	const fs = require('fs');  // Creates the data directory
 	if (dir != undefined && !fs.existsSync(dir)) {
-		fs.mkdir(dir, function(err) {
+		fs.mkdirSync(dir, function(err) {
 			if(err) {
 				alertp("There was a problem creating the directory '"+dir+"'");
 			}
@@ -758,7 +758,7 @@ function add_param_value_buts(lay)
 
 
 /// Gets a list of categories from the parameter list
-function get_param_cat(filt_list,filt_type)
+function get_param_cat(siminf,filt_type)
 {
 	let param = model.param;
 	
@@ -770,6 +770,7 @@ function get_param_cat(filt_list,filt_type)
 	param_cat.push({name:"Individual effects", sim_te:sim_ie_variance_text, inf_te:inf_ie_variance_text, list:[]});
 	param_cat.push({name:"Fixed effects", sim_te:fixed_eff_text, inf_te:fixed_eff_text, list:[]});
 	param_cat.push({name:"Constant prior", inf_te:prior_const_text, list:[]});
+	param_cat.push({name:"Defined", sim_te:defined_text, list:[]});
 	
 	for(let i = 0; i < param.length; i++){
 		let par = param[i];
@@ -777,21 +778,26 @@ function get_param_cat(filt_list,filt_type)
 			param_cat[6].list.push(i);
 		}
 		else{
-			if(find_in(filt_list,par.type) == undefined && 
+			if(param_needed(par,siminf) &&
 			!(filt_type == "only normal" && param[i].variety != "normal") &&
 			!(filt_type == "for sim" && par.variety == "const") &&
 			!(filt_type == "for sim" && par.variety == "reparam") && 
 			!(filt_type == "for sim" && par.variety == "define") &&
-			par.type != "param factor"
+			par.param_fac != true
 			){
-				if(param[i].type == "fixed effect"){
-					 param_cat[5].list.push(i);
+				if(par.variety == "define"){
+					param_cat[7].list.push(i);
 				}
 				else{
-					if(param[i].type == "variance") param_cat[4].list.push(i);
+					if(param[i].fixed_effect){
+						 param_cat[5].list.push(i);
+					}
 					else{
-						let n = param[i].dep.length; if(n > 3) n = 3;
-						param_cat[n].list.push(i);
+						if(param[i].variance == true) param_cat[4].list.push(i);
+						else{
+							let n = param[i].ndep_cont; if(n > 3) n = 3;
+							param_cat[n].list.push(i);
+						}
 					}
 				}
 			}
@@ -817,7 +823,7 @@ function add_param_value_content(lay)
 
 	let param = model.param;
 	
-	let param_cat = get_param_cat(sim_param_not_needed,"for sim");
+	let param_cat = get_param_cat("sim","for sim");
 	
 	if(no_param(param_cat)) center_message("No parameters need to be set.",lay);
 		
@@ -845,7 +851,7 @@ function add_param_value_content(lay)
 						}
 						
 						if(par.variety == "dist" && par.sim_sample.check == true){
-							if(par.dep.length == 0 || par.prior_split_check.check == false){
+							if(par.ndep_cont == 0 || par.prior_split_check.check == false){
 								display_distribution(i,x,y,lay,true,false,w);
 							}
 							else{
@@ -905,7 +911,7 @@ function display_constant(i,x,y,lay,w,allow_edit,source)
 	lay.add_button({te:"=", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
 	
 	let te="";
-	if(par.dep.length == 0){
+	if(par.ndep_cont == 0){
 		te = par.value;
 		if(allow_edit == false && isNaN(te)) te = "Auto calculate"; 
 	}
@@ -943,7 +949,7 @@ function display_prior_const(i,x,y,lay,w,allow_edit,source)
 	lay.add_button({te:"=", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
 	
 	let te="";
-	if(par.dep.length == 0){
+	if(par.ndep_cont == 0){
 		te = par.prior_const;
 	}
 	else{			
@@ -996,18 +1002,14 @@ function display_reparam(i,x,y,lay,w)
 	lay.add_button({te:"=", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
 	
 	let te="", ac = "EditReparamValue", type = "ReparamElement";
-	if(par.dep.length == 0){
-		te = par.value;
+	
+	if(par.reparam_eqn_on == true){
+		te = par.reparam_eqn;
+		if(te == "") te = "Unset";
+		type = "ReparamEqn";
 	}
 	else{
-		if(par.reparam_eqn_on == true){
-		 te = par.reparam_eqn;
-		 if(te == "") te = "Unset";
-		 type = "ReparamEqn";
-		}
-		else{
-			te += par.value_desc;
-		}
+		te += par.value_desc;
 	}
 	
 	let fo = get_font(1.1,"","times");
@@ -1026,9 +1028,16 @@ function display_define(i,x,y,lay,w)
 	let si = 1.5;
 	lay.add_button({te:"=", x:x, y:y, dy:si, type:"Text", font:get_font(si), si:si, col:BLACK});
 	
-	let ac = "EditDefineValue", type = "DefineEqn";
-	let te = par.define_eqn;
-	if(te == "") te = "Unset";
+	let te = "", ac = "EditDefineValue", type = "ReparamElement";
+	
+	if(par.define_eqn_on == true){	
+		te = par.define_eqn;
+		if(te == "") te = "Unset";
+		type = "DefineEqn";
+	}
+	else{
+		te += par.value_desc;
+	}
 	
 	let fo = get_font(1.1,"","times");
 
@@ -1041,11 +1050,11 @@ function edit_sim_value(th,lay_name,i,source)
 {
 	let par = source.param[th];
 
-	if(par.dep.length == 0){
+	if(par.ndep_cont == 0){
 		select_bubble(lay_name,i,{});
 	}
 	else{
-		start_worker("Edit Param",{type:"Value", source:source, label_info:par.label_info, i:th});
+		start_worker("Edit Param",{type:"Value", par_st:par, source:source, label_info:par.label_info, i:th});
 	}
 }
 
@@ -1055,7 +1064,7 @@ function edit_prior_const(th,lay_name,i,source)
 {
 	let par = source.param[th];
 
-	if(par.dep.length == 0){
+	if(par.ndep_cont == 0){
 		select_bubble(lay_name,i,{});
 	}
 	else{
@@ -1069,18 +1078,27 @@ function edit_reparam_value(th,lay_name,i,source)
 {
 	let par = model.param[th];
 
-	if(par.dep.length == 0){
+	if(par.reparam_eqn_on == true){
 		select_bubble_over();
-		inter.bubble.th = th;
+		inter.bubble.par_name = par.name;
 	}
 	else{
-		if(par.reparam_eqn_on == true){
-			select_bubble_over();
-			inter.bubble.th = th;
-		}
-		else{
-			start_worker("Edit Reparam",{type:"Reparam", source:source, label_info:par.label_info, i:th});
-		}
+		start_worker("Edit Reparam",{type:"Reparam", par_st:par, source:source, label_info:par.label_info, i:th});
+	}
+}
+
+
+/// Click to edit reparameterised expressions
+function edit_define_value(th,lay_name,i,source)
+{
+	let par = model.param[th];
+	
+	if(par.define_eqn_on == true){
+		select_bubble_over();
+		inter.bubble.par_name = par.name;
+	}
+	else{
+		start_worker("Edit Define",{type:"Define", par_st:par, source:source, label_info:par.label_info, i:th});
 	}
 }
 
@@ -1208,7 +1226,7 @@ function check_memory(ans)
 	let param_ele_total = 0;
 	for(let k = 0; k < model.param.length; k++){
 		let par = model.param[k];
-		if(par.dep.length == 0) param_ele_total++;
+		if(par.ndep_cont == 0) param_ele_total++;
 		else{
 			let NE = 1; 
 			let dim = par.dim;

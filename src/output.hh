@@ -37,7 +37,7 @@ class Output                               // Stores information about the data
 		void remove_double_space();
 		void erase_command(unsigned int i);
 		void delete_command(string name, unsigned int li, bool check);
-		void delete_commands(string type, const vector <string> &list);
+		void delete_commands(string type, const vector <string> &list, bool no_question);
 		void delete_lines(const vector <string> &list);
 		LinesRaw new_lr(string st) const;
 		unsigned int lr_find(unsigned int line_num) const;
@@ -61,6 +61,8 @@ class Output                               // Stores information about the data
 		void set_inference_prop(double value, string tag, double def);
 		void set_diagnostics(unsigned int ch, string diag);
 		void copy(string file);
+		vector < vector < vector <Average> > > setup_ie_average(bool &pred_acc_on) const;
+		void update_ie_average(vector < vector < vector <Average> > > &ie_average, const vector <Particle> &part) const;
 		void end(string file, unsigned int total_cpu);
 		vector <Particle> get_part_chain(unsigned int chain, vector <Particle> &part) const;
 		void clear_part(Particle &pa) const;
@@ -71,9 +73,9 @@ class Output                               // Stores information about the data
 		void insert_command(string name, unsigned int p, string insert_pl, string insert_bef, string line, string content, string file);
 		string get_effective_sample_size(vector <double> vec) const;
 		string get_Gelman_Rubin_statistic(const vector < vector <double> > &cha) const;
-		Stat get_statistic(vector <double> &vec) const;
 		void change_sim_value(string param_name, double value);
-		
+		string table(const Table &tab) const;
+				
 	private:
 		vector < vector <double> > param_value_from_vec(const Particle &pa) const;
 		void infection_info(const IndInfFrom &iif, unsigned int p, const Particle &part, stringstream &ss,	vector <string> &ind_key, Hash &hash_ind) const;
@@ -85,7 +87,9 @@ class Output                               // Stores information about the data
 		void output_trace(unsigned int ch, const vector <Particle> &part, vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout) const;
 		string get_file_name(string root, unsigned int ch, unsigned int nchain, string end) const;
 		string param_stat(unsigned int th, unsigned int i, const vector < vector < vector < vector <double> > > > &param_samp, vector <Warn> &ESS_warn, vector <Warn> &GR_warn) const;
+		double get_correlation(const vector <double> &vecA, const vector <double> &vecB) const;
 		void output_param_statistics(const vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout, vector <string> &final_warning) const;
+		void output_pred_acc(const vector < vector < vector <Average> > > &ie_average, ofstream &fout) const;
 		void output_prop_info(ofstream &fout) const;
 		void output_state(unsigned int ch, const vector <Particle> &part, ofstream &fout) const;
 		string compress_content(string &content) const;

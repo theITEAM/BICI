@@ -146,7 +146,6 @@ function round_small(val)
 function par_same(par1,par2)
 {
 	if(par1.name != par2.name) return false;
-	
 	if(par1.dep.length != par2.dep.length) return false;
 	
 	for(let i = 0; i < par1.dep.length; i++){
@@ -288,10 +287,10 @@ function get_glob_comp(p)
 
 
 /// Given a classification name return species
-function get_p_cl_from_claname(name)
+function get_p_cl_from_claname(name,mod)
 {
-	for(let p = 0; p < model.species.length; p++){
-		let sp = model.species[p];
+	for(let p = 0; p < mod.species.length; p++){
+		let sp = mod.species[p];
 		for(let cl = 0; cl < sp.ncla; cl++){
 			if(sp.cla[cl].name == name) return {p:p, cl:cl};
 		}
@@ -494,7 +493,7 @@ function copy_strip(source,dest)
 			break;
 		case "prior_split":	break;
 		case "table": case "A_value": case "X_value": case "ind_list":
-		case "list": case "reparam_param_list": case "prior_param_list":
+		case "list": case "defrep_param_list": case "prior_param_list":
 			break;
 		
 		case "param": case "species": 
@@ -536,19 +535,47 @@ function strip_heavy(source)
 /// Determines if parameter is in the observation model
 function is_in_obsmodel(par)
 {
-	let i = find(eqn_types,"name",par.type);
-	if(i != undefined && eqn_types[i].obs_model == true) return true;
+	if(par.within == undefined) return false;
+	
+	for(let i = 0; i < par.within.length; i++){
+		let wi = par.within[i];
+		if(wi.eqn_info.eso == "sim" || wi.eqn_info.eso == "inf") return true;
+	}
+	
 	return false;
 }
 
 
 /// Determines if a string is a valid colour
-function isColor(strColor)
+function isColor(st)
 {
-	return true;
-	var s = new Option().style;
-	s.color = strColor;
-	return s.color.length > 0;
+	st = st.trim();
+	if(begin_str(st,"#")){
+		let allow = "0123456789ABCDEFabcdef";
+		if(st.length != 7) return false;
+		for(let i = 1; i < 7; i++){
+			if(find_in(allow,st.substr(i,1)) == undefined) return false;
+		}			
+		return true;
+	}
+	else{
+		if(begin_str(st,"rgb(") && end_str(st,")")){
+			let cont = st.substr(4,st.length-5);
+
+			let spl = cont.split(",");
+			if(spl.length != 3) return false;
+			for(let i = 0; i < 3; i++){
+				let te = spl[i];
+				if(isNaN(te)) return false;
+				let num = Number(te);
+				if(num != Math.floor(num)) return false;
+				if(num < 0 || num > 255) return false;
+			}
+		}
+		return true;
+	}
+	
+	return false;
 }
 
 
@@ -630,7 +657,7 @@ function get_prop(value,prop,end)
 				while(i2 > 0 && value.substr(i2,1) != ",") i2--;
 				if(i2 > 0){
 					let val = value.substr(i,i2-i).trim();
-					val = char_replace(val);
+					val = char_replace(val)
 					return remove_escape_char(val);
 				}
 			}
@@ -643,7 +670,7 @@ function get_prop(value,prop,end)
 function num_element(par)
 {
 	let num = 1;
-	for(let k = 0; k < par.dep.length; k++) num *= par.list[k].length;
+	for(let k = 0; k < par.ndep_cont; k++) num *= par.list[k].length;
 	
 	return num;
 }
@@ -947,6 +974,16 @@ function begin_str(st,st2)
 }
 
 
+/// Determines if a string ends with another string
+function end_str(st,st2)
+{
+	let tr = st.trim();
+	if(st.length < st2.length) return false;
+	if(st.substr(st.length-st2.length,st2.length) == st2) return true;
+	return false;
+}
+
+
 /// Checks if a name is invalid
 function check_invalid_name(name)
 {
@@ -1048,11 +1085,28 @@ function create_escape_search_tree()
 }
 
 
+/// Removes escape within different command lines
+function remove_escape_command_line(bscript)
+{	
+	for(let i = 0; i < bscript.length; i++){
+		let cl = bscript[i];
+		for(let j = 0; j < cl.tags.length; j++){
+			let ta = cl.tags[j]
+			if(is_file(ta.value) == false){
+				ta.value = remove_escape_char(ta.value);
+			}
+		}
+	}
+}
+
+
 /// Remove text escape characters
 function remove_escape_char(te)
 {
 	//create_escape_search_tree();
-
+	
+	if(te.indexOf("\\") == -1) return te;
+	
 	let te_new="";
 	
 	let i = 0, imax = te.length;

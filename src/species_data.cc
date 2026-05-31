@@ -42,6 +42,8 @@ void Species::initialise_data(Operation mode)
 			case POP_TRANS_DATA: popu_trans_data(so,hash_pop_trans_filter); break;
 			case GENETIC_DATA: genetic_data(so); break;
 			case SET_IND_EFFECT_SIM: break; // This is done in set_ie_data()
+			case IND_EFFECT_DATA: break;
+			case IND_GROUP_DATA: break;
 			default:
 				emsg_input("data type not added:"); break;
 			}
@@ -616,6 +618,16 @@ vector < vector <double> > Species::pop_get_percentage(const DataSource &so)
 }
 
 
+/// Generates a warning message
+string Species::generate_warn(string type, double t, const Details &details) const
+{
+	stringstream ss;
+	ss << type << " at time " << t;
+	if(t < details.t_start) ss << " is before the start time " << details.t_start;
+	return ss.str();
+}
+
+
 /// add-pop / remove-pop command
 void Species::add_pop_data(const DataSource &so, int sign) 
 {	
@@ -630,14 +642,14 @@ void Species::add_pop_data(const DataSource &so, int sign)
 	
 	add_rem_pop_on = true;
 	
-	auto warn = false;
+	vector <string> warn_list;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto t_str = tab.ele[j][0];
 		double t = number(t_str);
 		if(t_str == "start") t = details.t_start;
 		
 		if(t < details.t_start || t >= details.t_end){
-			warn = true;
+			warn_list.push_back(generate_warn("Population measurement",t,details)); 
 		}
 		else{
 			auto ti = get_ti(calc_tdiv(t,details)); 
@@ -665,7 +677,7 @@ void Species::add_pop_data(const DataSource &so, int sign)
 		}
 	}
 	
-	if(warn) data_ignored(so);
+	data_ignored(so,warn_list);
 	
 	if(false){
 		for(auto ti = 0u; ti < T; ti++){
@@ -679,9 +691,18 @@ void Species::add_pop_data(const DataSource &so, int sign)
 
 
 /// Creates warning mnessage if data is outside of time range
-void Species::data_ignored(const DataSource &so)
+void Species::data_ignored(const DataSource &so, const vector <string> &warn_list)
 {
-	data_warning.push_back("Data outside of time range is ignored in source '"+so.name+"'."); 
+	if(warn_list.size() == 0) return;
+	stringstream ss; 
+	ss << "Data outside of time range is ignored in source '"+so.name+"'";
+	if(warn_list.size() == 1) ss << " (" << warn_list[0] << ")";
+	else{
+		ss << " (" << warn_list.size() << " instances, e.g. " << warn_list[0] << ")";
+	}
+	ss << ".";	
+	
+	data_warning.push_back(ss.str()); 
 }
 
 
@@ -793,7 +814,7 @@ void Species::remove_ind_data(const DataSource &so)
 {
 	const auto &tab = so.table;
 	
-	auto warn = false;
+	vector <string> warn_list;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto i = find_individual(tab.ele[j][0]);
 		auto &ind = individual[i];
@@ -803,7 +824,7 @@ void Species::remove_ind_data(const DataSource &so)
 		if(t_str == "start") t = details.t_start;
 		
 		if(t < details.t_start || t >= details.t_end){
-			warn = true;
+			warn_list.push_back(generate_warn("Removed individual '"+ind.name+"'",t,details)); 
 		}
 		else{
 			if(tab.ncol != 2) emsg_input("Columns not right3");
@@ -818,7 +839,7 @@ void Species::remove_ind_data(const DataSource &so)
 		}
 	}		
 	
-	if(warn) data_ignored(so);
+	data_ignored(so,warn_list);
 }
 
 
@@ -838,7 +859,7 @@ void Species::move_ind_data(const DataSource &so)
 	}
 	
 	const auto &tab = so.table;
-	auto warn = false;
+	vector <string> warn_list;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto i = find_individual(tab.ele[j][0]);
 		auto &ind = individual[i];
@@ -848,7 +869,7 @@ void Species::move_ind_data(const DataSource &so)
 		if(t_str == "start") t = details.t_start;
 		
 		if(t <= details.t_start || t >= details.t_end){
-			warn = true;
+			warn_list.push_back(generate_warn("Moved individual '"+ind.name+"'",t,details)); 
 		}
 		else{
 			if(tab.ncol != 3) emsg_input("Columns not right4");
@@ -876,7 +897,7 @@ void Species::move_ind_data(const DataSource &so)
 		}
 	}		
 	
-	if(warn) data_ignored(so);
+	data_ignored(so,warn_list);
 }
 
 
@@ -885,7 +906,7 @@ void Species::comp_data(const DataSource &so)
 {
 	const auto &tab = so.table;
 	
-	auto warn = false;
+	vector <string> warn_list;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto i = find_individual(tab.ele[j][0]);
 		auto &ind = individual[i];
@@ -899,7 +920,7 @@ void Species::comp_data(const DataSource &so)
 		}
 		
 		if(t < details.t_start || t > details.t_end){
-			warn = true;
+			warn_list.push_back(generate_warn("Compartmental data on individual '"+ind.name+"'",t,details)); 
 		}
 		else{
 			auto cl = so.cl;
@@ -930,7 +951,7 @@ void Species::comp_data(const DataSource &so)
 		}
 	}
 
-	if(warn) data_ignored(so);
+	data_ignored(so,warn_list);
 }
 
 
@@ -956,7 +977,7 @@ void Species::genetic_data(const DataSource &so)
 		
 	auto p_eqn = create_eqn_vector(prob_str,COMP_PROB,so);
 	
-	auto warn = false;
+	vector <string> warn_list;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto i = find_individual(tab.ele[j][0],false);
 		if(i != UNSET){
@@ -970,7 +991,7 @@ void Species::genetic_data(const DataSource &so)
 			}
 			
 			if(t < details.t_start || t > details.t_end){
-				warn = true;
+				warn_list.push_back(generate_warn("Genetic data on individual '"+ind.name+"'",t,details)); 
 			}
 			else{
 				ObsData ob; 
@@ -988,7 +1009,7 @@ void Species::genetic_data(const DataSource &so)
 		}
 	}
 	
-	if(warn) data_ignored(so);
+	data_ignored(so,warn_list);
 }
 
 
@@ -997,7 +1018,7 @@ void Species::test_data(const DataSource &so)
 {
 	const auto &tab = so.table;
 	
-	auto warn = false;
+	vector <string> warn_list;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto i = find_individual(tab.ele[j][0]);
 		auto &ind = individual[i];
@@ -1010,7 +1031,7 @@ void Species::test_data(const DataSource &so)
 		}
 		
 		if(t < details.t_start || t > details.t_end){
-			warn = true;
+			warn_list.push_back(generate_warn("Test data on individual '"+ind.name+"'",t,details));
 		}
 		else{
 			ObsData ob; 
@@ -1062,7 +1083,7 @@ void Species::test_data(const DataSource &so)
 		}
 	}		
 	
-	if(warn) data_ignored(so);
+	data_ignored(so,warn_list);
 }
 
 
@@ -1073,7 +1094,7 @@ void Species::population_data(const DataSource &so, Hash &hash_pop_filter)
 	
 	auto cf = set_comp_filt(so.filter_str,UNSET,LOWER_BOUND,so);
 
-	auto warn = false;
+	vector <string> warn_list;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto time_str = tab.ele[j][0];
 		auto t = number(time_str);
@@ -1083,7 +1104,7 @@ void Species::population_data(const DataSource &so, Hash &hash_pop_filter)
 		}
 		
 		if(t < details.t_start || t > details.t_end){
-			warn = true;
+			warn_list.push_back(generate_warn("Population data",t,details));
 		}
 		else{
 			auto col = 1;
@@ -1140,7 +1161,7 @@ void Species::population_data(const DataSource &so, Hash &hash_pop_filter)
 		}
 	}		
 	
-	if(warn) data_ignored(so);
+	data_ignored(so,warn_list);
 }
 
 
@@ -1232,7 +1253,7 @@ void Species::trans_data(const DataSource &so)
 	}
 
 	// Adds the times of events
-	auto warn = false;
+	vector <string> warn_list;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto i = find_individual(tab.ele[j][0]);
 		auto &ind = individual[i];
@@ -1250,7 +1271,7 @@ void Species::trans_data(const DataSource &so)
 		}			
 		
 		if(t < details.t_start || t >= details.t_end){
-			warn = true;
+			warn_list.push_back(generate_warn("Transition data on individual '"+ind.name+"'",t,details));
 		}
 		else{
 			ObsData ob; 
@@ -1294,7 +1315,7 @@ void Species::trans_data(const DataSource &so)
 	
 	obs_trans_exist = true;
 	
-	if(warn) data_ignored(so);
+	data_ignored(so,warn_list);
 }
 
 
@@ -1351,7 +1372,7 @@ void Species::popu_trans_data(const DataSource &so, Hash &hash_pop_trans_filter)
 	auto trans_filt = set_trans_filt(so.cl,so.filter_trans_str,LOWER_BOUND,emg);
 	if(emg != ""){ alert_source(emg,so); return;}
 	
-	auto warn = false;
+	vector <string> warn_list;
 	for(auto j = 0u; j < tab.nrow; j++){
 		auto tstart_str = tab.ele[j][0];
 		auto tstart = number(tstart_str);
@@ -1368,7 +1389,8 @@ void Species::popu_trans_data(const DataSource &so, Hash &hash_pop_trans_filter)
 		}
 		
 		if(tstart < details.t_start || tend > details.t_end){
-			warn = true;
+			warn_list.push_back(generate_warn("Population transition data",tstart,details));
+			warn_list.push_back(generate_warn("Population transition data",tend,details));
 		}
 		else{
 			auto col = 2;
@@ -1429,7 +1451,7 @@ void Species::popu_trans_data(const DataSource &so, Hash &hash_pop_trans_filter)
 		}
 	}		
 	
-	if(warn) data_ignored(so);
+	data_ignored(so,warn_list);
 }
 
 

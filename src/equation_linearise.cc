@@ -620,12 +620,13 @@ bool Equation::single_param_func(Calculation ca, LinearCalculation &lin, const v
 		break;
 		
 	case PARAMVEC: case SPLINEREF: case CONSTSPLINEREF: case NUMERIC: case TIME: 
+	case REG_PRECALC_TIME:
 		lin.no_pop_calc.calc.push_back(ca);
 		break;
 		
 	case POPNUM: return false;
 	case IE: case ONE: case ZERO: case FE: emsg_input("Eq Lin should not be"); break;
-	default: emsg_input("Eq problem2"); break;
+	default: emsg_input("Eq problem6"); break;
 	}
 	
 	return true;
@@ -683,7 +684,7 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 			break;
 		case POPNUM: return false;
 		case IE: case ONE: case ZERO: case FE: emsg_input("Eq Lin should not be"); break;
-		default: emsg_input("Eq problem2"); break;
+		default: emsg_input("Eq problem3"); break;
 		}
 		break;
 		
@@ -706,12 +707,12 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 			break;
 		case POPNUM: return false;
 		case IE: case ONE: case ZERO: case FE: emsg_input("Eq Lin should not be"); break;
-		default: emsg_input("Eq problem2"); break;
+		default: emsg_input("Eq problem4"); break;
 		}
 		break;
 	case POPNUM: return false;
 	case IE: case ONE: case ZERO: case FE: emsg_input("Eq Lin should not be"); break;
-	default: emsg_input("Eq problem2"); break;
+	default: emsg_input("Eq problem5"); break;
 	}
 	
 	return true;
