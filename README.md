@@ -4,6 +4,7 @@
 
 Compartmental models have long been used as a means of understanding the collective dynamics of interacting agents, with notable applications in epidemiology, chemistry and ecology. BICI allows for arbitrary compartmental model specification and performs simulation, inference and posterior simulation.
 BICI can be run entirely using a point-and-click interface. Alternatively, a scripted language, referred to as “BICI-script”, can be used to construct, store, and export complex models and allow for them to be run on HPC (high performance computing).
+
 For inference BICI takes in a variety of individual and/or population-level data, and priors can be specified from a large range of possibilities. Posterior parameter outputs include trace plots, distributions, correlations, and summary statistics (means and 95% credible intervals) as well as diagnostics. State outputs include various visualisations for populations, transitions and individuals.
 
 ## Download
@@ -18,7 +19,8 @@ Once unzipped, BICI is run by clicking on the “BICI.app” icon (if the error 
 
 ## Documentation
 
-The following manual can be downloaded [here](BICI_Manual_v0.89.pdf)
+The manual can be downloaded [here](BICI_Manual_v0.89.pdf). This explains all the features within the software and well as comprehensive documentation for the BICI-script language.  
+
 ## Features
 
 * **Arbitrary compartmental models** — The interface allows for easy model specification and can accommodate an arbitrary number of compartments in multiple classifications (e.g. disease status, location and/or demographic grouping).
