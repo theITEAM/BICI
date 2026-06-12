@@ -53,7 +53,19 @@ class Species   	                         // Stores details of a species
 		vector < vector <bool> > tra_fe_affect;// Set if an fe affects a transition
 		
 		vector <MarkovEqn> markov_eqn;         // List Markovian equations
-			
+		
+		vector <unsigned int> markov_eqn_not_linear; // List mes not linear in popcomb
+		
+		vector < vector <bool> > markov_update_t;// Determines if markov must be updated as a function of time
+		
+		/*
+		vector <bool> markov_update_all;       // Determines if all markov equations are updated
+		
+		vector <unsigned int> markov_time_dep; // Lists all markov equation that are time dependent
+
+		vector < vector <unsigned int> > markov_param_change; // Lists all markov equations that change from param
+		*/
+		
 		MarkovTree markov_tree;                // Constructs a tree of nodes to sample markov equations
 			
 		vector <bool> cgl_begin_nm;            // Determines if glob comp starts nm 
@@ -178,7 +190,8 @@ class Species   	                         // Stores details of a species
 		void sim_linear_speedup_init(const vector <Equation> &eqn);
 		void set_linear_form(LinearForm &lin_form, const vector <LinearFormInit> &lfinit, const vector <Equation> &eqn) const;
 		bool item_equal(const EqItem &it1, const EqItem &it2) const;
-				
+		void set_markov_eqn_update(const vector <Equation> &eqn, const vector <Param> &param);
+		
 	// In 'species_data.cc':
 	public: 
 		void initialise_data(Operation mode);
@@ -203,7 +216,7 @@ class Species   	                         // Stores details of a species
 		string tr_swap_name(unsigned int cl, const vector <TrSwap> &tswa) const;
 		vector <unsigned int> get_vec_tr_swap(unsigned int c, const vector <TrSwap> &start) const;
 		vector <unsigned int> get_vec_tr_swap_mid(unsigned int st, unsigned int num, const vector <EventCl> &timeline) const;
-		vector < vector <double> > calc_nm_rate(bool calc_bp, const vector <double> &precalc, const vector < vector <double> > &popnum_t, const vector <Equation> &eqn, vector < vector <double> > &bp_store) const;
+		vector < vector <double> > calc_nm_rate(bool calc_bp, const vector <double> &precalc, const vector < vector <double> > &popcomb_t, const vector <Equation> &eqn, vector < vector <double> > &bp_store) const;
 		void set_ob_trans_ev(const vector <Equation> &eqn);
 		vector <string> set_trans_filt(unsigned int cl, string te, BoundType bound, string &emsg) const;
 

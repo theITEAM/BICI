@@ -646,7 +646,7 @@ void Proposal::MH(State &state)
 
 	ntr++; 
 
-	auto ps_fac = param_resample(param_val,state.popnum_t);
+	auto ps_fac = param_resample(param_val,state.popcomb_t);
 	if(ps_fac == UNSET){ update_si(REJECT);	return;}
 
 	if(pl){     
@@ -699,7 +699,7 @@ void Proposal::param_det(State &state)
 
 	ntr++; 
 	
-	auto ps_fac = param_resample(param_val,state.popnum_t);
+	auto ps_fac = param_resample(param_val,state.popcomb_t);
 	if(ps_fac == UNSET){ update_si(REJECT);	return;}
 	
 	if(pl){     
@@ -755,6 +755,7 @@ void Proposal::mbp(State &state)
 	ntr++;
 	
 	auto popnum_t_st = state.popnum_t;
+	auto popcomb_t_st = state.popcomb_t;
 
 	auto sim_prob = 0.0;
 	auto ps_fac = 0.0;
@@ -762,7 +763,7 @@ void Proposal::mbp(State &state)
 	switch(type){
 	case MBP_PROP: 
 		{
-			ps_fac = param_resample(state.param_val,state.popnum_t);
+			ps_fac = param_resample(state.param_val,state.popcomb_t);
 			if(ps_fac == UNSET){ update_si(REJECT); return;}
 			
 			if(pl){     
@@ -797,7 +798,7 @@ void Proposal::mbp(State &state)
 				return;
 			}
 			
-			state.update_popnum_t_init(p_prop,init_cond_store.cnum,ssp.init_cond_val.cnum);
+			state.update_pop_t_init(p_prop,init_cond_store.cnum,ssp.init_cond_val.cnum);
 		}
 		break;
 		
@@ -810,7 +811,7 @@ void Proposal::mbp(State &state)
 	auto tnum_mean_st_st = ssp.tnum_mean_st;
 	auto cpop_st_st = ssp.cpop_st;
 	
-	ssp.mbp(sim_prob,state.popnum_t,mbp_fast);
+	ssp.mbp(sim_prob,state.popnum_t,state.popcomb_t,mbp_fast);
 
 	auto like_ch = state.update_param(affect_like);
 	
@@ -837,6 +838,7 @@ void Proposal::mbp(State &state)
 	else{ 
 		if(pl) cout << "reject" << endl;
 		state.popnum_t = popnum_t_st;
+		state.popcomb_t = popcomb_t_st;
 		ssp.trans_num = trans_num_st;
 		ssp.tnum_mean_st = tnum_mean_st_st;
 		ssp.cpop_st = cpop_st_st;
@@ -976,7 +978,7 @@ void Proposal::MH_event(State &state)
 									if(pl) state.check("ind prop");
 	
 									if(pl){
-										state.check_popnum_t2("Pnum");
+										state.check_pop_t("Pnum");
 									}
 								}
 							}
@@ -1016,7 +1018,7 @@ void Proposal::MH_multi_event(State &state)
 				auto e = (unsigned int)(ran()*E);
 				if(e == E) emsg("event not in range");
 				
-				auto lm = ssp.get_ev_link_listmove(e,event,ind,state.popnum_t);
+				auto lm = ssp.get_ev_link_listmove(e,event,ind,state.popcomb_t);
 				if(lm.list.size() > 1){
 					auto trange = ssp.ev_link_trange(lm,event);
 					
@@ -1073,7 +1075,7 @@ void Proposal::MH_multi_event(State &state)
 						auto e_new = 0u; while(e_new < E && move_new[e_new] == false) e_new++;
 						if(e_new == E) emsg("Should not be E");
 						
-						auto lm_new = ssp.get_ev_link_listmove(e_new,ev_new,ind,state.popnum_t);
+						auto lm_new = ssp.get_ev_link_listmove(e_new,ev_new,ind,state.popcomb_t);
 						
 						if(lm.list.size() != lm_new.list.size())  ill = true;
 						else{
@@ -1236,7 +1238,7 @@ void Proposal::MH_event_all(State &state)
 						if(pl) state.check("ind event all prop");
 
 						if(pl){
-							state.check_popnum_t2("Pnum");
+							state.check_pop_t("Pnum");
 						}
 					}
 				}
@@ -1473,7 +1475,7 @@ void Proposal::sample_ind_obs(State &state)
 	const auto &sp = model.species[p_prop];
 	auto &ssp = state.species[p_prop];
 	
-	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popnum_t);
+	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popcomb_t);
 	
 	ind_ev_samp.setup_nm();
 	
@@ -1580,7 +1582,7 @@ void Proposal::resimulate_ind_obs(State &state)
 	
 	if(sp.nindividual_in == 0) return;
 
-	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popnum_t);
+	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popcomb_t);
 		
 	
 	for(auto i = 0u; i < sp.nindividual_in; i++){	
@@ -1691,7 +1693,7 @@ void Proposal::resimulate_single_ind_obs(State &state)
 	
 	if(sp.nindividual_in == 0) return;
 
-	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popnum_t);
+	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popcomb_t);
 	
 	for(auto i = 0u; i < sp.nindividual_in; i++){	
 		const auto &indd = sp.individual[i];
@@ -1789,7 +1791,7 @@ void Proposal::resimulate_ind_unobs(State &state)
 	
 	if(sp.nindividual_obs == ssp.individual.size()) return;
 
-	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popnum_t);
+	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popcomb_t);
 	
 	const auto &so_samp = ssp.source_sampler;
 	
@@ -1883,7 +1885,7 @@ void Proposal::add_rem_ind(State &state)
 	const auto &so_samp = ssp.source_sampler;
 	auto &inf_node = state.genetic_value.inf_node;
 	
-	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popnum_t);
+	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popcomb_t);
 	
 	vector <Event> ev_empty;
 	
@@ -2090,7 +2092,7 @@ void Proposal::add_rem_tt_ind(State &state)
 	auto &ssp = state.species[p_prop];
 	const auto &so_samp = ssp.source_sampler;
 	
-	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popnum_t);
+	IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,state.genetic_value.inf_node,state.param_val.precalc,state.popcomb_t);
 	
 	auto &inf_node = state.genetic_value.inf_node;
 	
@@ -2315,7 +2317,7 @@ void Proposal::MH_ie(State &state)
 		}
 		
 		if(in_nm == true){                 // If in a nm_trans then updates likelihood
-			update_nm = ssp.likelihood_ie_nm_trans_change(i,ie_prop,factor,state.popnum_t,like_ch.nm_trans);	
+			update_nm = ssp.likelihood_ie_nm_trans_change(i,ie_prop,factor,state.popcomb_t,like_ch.nm_trans);	
 		}
 		
 		if(in_transtree == true){
@@ -2377,7 +2379,7 @@ void Proposal::MH_ie_var(State &state)
 	auto th = param_list[0];
 	auto val_st = value[th];
 	
-	auto ps_fac = param_resample(param_val,state.popnum_t);
+	auto ps_fac = param_resample(param_val,state.popcomb_t);
 	
 	if(ps_fac == UNSET){ update_si(REJECT); return;}
 	
@@ -2420,7 +2422,7 @@ void Proposal::MH_ie_var_cv(State &state)
 	
 	auto val_st = value[th];
 	
-	auto ps_fac = param_resample(param_val,state.popnum_t);
+	auto ps_fac = param_resample(param_val,state.popcomb_t);
 	
 	if(ps_fac == UNSET){ update_si(REJECT); return;}
 	
@@ -2468,7 +2470,7 @@ void Proposal::MH_ie_covar(State &state)
 	
 	auto val_st = value[th];
 	
-	auto ps_fac = param_resample(param_val,state.popnum_t);
+	auto ps_fac = param_resample(param_val,state.popcomb_t);
 	
 	if(pl){     
 		cout << endl << endl;
@@ -2575,7 +2577,7 @@ void Proposal::param_event_joint(Direction dir, State &state)
 	
 	auto val_st = value[th];
 	
-	auto ps_fac = param_resample(param_val,state.popnum_t);
+	auto ps_fac = param_resample(param_val,state.popcomb_t);
 
 	if(ps_fac == UNSET){ nfa++; update_si(REJECT); return;}
 	

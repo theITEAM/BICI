@@ -272,7 +272,7 @@ bool State::trg_contains_outside(unsigned int p, unsigned int tr_gl) const
 	if(tra.infection.type != TRANS_INFECTION) emsg("Should be transition");
 	const auto &me = sp.markov_eqn[tra.markov_eqn_ref];
 	const auto &eq = model.eqn[me.eqn_ref];
-	const auto &lin = eq.linearise;
+	const auto &lin = eq.lin;
 	
 	if(lin.no_pop_precalc.type == ZERO) return false;
 	return true;
@@ -308,7 +308,7 @@ double State::sample_infection_source(Event &ev, unsigned int p) const
 
 		const auto &eq = model.eqn[me.eqn_ref];
 			
-		const auto &lin = eq.linearise;
+		const auto &lin = eq.lin;
 			
 		if(!lin.on) emsg("Linearisation should be on");
 			
@@ -319,7 +319,7 @@ double State::sample_infection_source(Event &ev, unsigned int p) const
 		auto j = UNSET;
 			
 		if(lin.multi_source){        // Samples from available sources (either populations of from outside)		
-			auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val);	
+			auto ss = eq.setup_source_sampler(ti,popcomb_t[ti],param_val);	
 			j = ss.sample_inf_source();
 			if(j == UNSET) return UNSET;
 			
@@ -410,7 +410,7 @@ double State::prob_infection_source(const Event &ev, unsigned int p) const
 		
 	const auto &precalc = param_val.precalc;
 	
-	const auto &lin = eq.linearise;
+	const auto &lin = eq.lin;
 		
 	if(!lin.on) emsg("Linearisation should be on");
 		
@@ -1232,7 +1232,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 
 					const auto &eq = model.eqn[me.eqn_ref];
 			
-					const auto &lin = eq.linearise;
+					const auto &lin = eq.lin;
 					if(!lin.on) emsg("Linearisation should be on");
 			
 					const auto &pop_ref = eq.pop_ref;

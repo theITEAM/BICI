@@ -138,7 +138,7 @@ class Proposal                             // Implements a proposal
 		void update_sampler(const CorMatrix &cor_matrix);
 		void mbp_population_affect();
 		void set_mvn(double si_, const CorMatrix &cor_matrix);
-		double param_resample(PV &param_val, const vector < vector <double> > &popnum_t);
+		double param_resample(PV &param_val, const vector < vector <double> > &popcomb_t);
 		double mvn_probability(const vector <double> &param_prop1, const vector <double> &param_prop2) const;
 		bool prop_info_on() const;
 		PropInfo get_prop_info() const;

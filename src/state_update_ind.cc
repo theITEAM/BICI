@@ -51,7 +51,7 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 	
 	vector <PopUpdate> pop_update;
 	
-	auto add_ev = ssp.update_ind(i,ev_ne,popnum_t,pop_update,like_ch);
+	auto add_ev = ssp.update_ind(i,ev_ne,popcomb_t,pop_update,like_ch);
 
 	timer[IND_POP_UPDATE_TIMER] -= clock();
 	
@@ -111,7 +111,7 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 	timer[IND_POP_UPDATE_TIMER] += clock();
 	
 	// Adds in new events
-	for(auto e : add_ev) ssp.add_event_ref(i,e,popnum_t,like_ch);
+	for(auto e : add_ev) ssp.add_event_ref(i,e,popcomb_t,like_ch);
 	
 	if(false) ssp.print_event("end",ind);
 	
@@ -122,6 +122,7 @@ Like State::update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, Up
 
 
 /// Changes a given population by a certain amount over a given time range
+// CHECKON
 void State::change_population(unsigned int ti, unsigned int ti_next, unsigned int k, double num)
 {
 	for(auto tii = ti; tii < ti_next; tii++) popnum_t[tii][k] += num;
@@ -163,7 +164,7 @@ void State::update_pop_change(unsigned int ti, unsigned int ti_next, const vecto
 	// Updates markov_eqn as a result of populations change in size
 	for(const auto &mef : markov_eqn_list){
 		auto pp = mef.p, ee = mef.e;
-		species[pp].recalc_markov_value(ee,ti,ti_next,popnum_t,pop_change,like_ch);
+		species[pp].recalc_markov_value(ee,ti,ti_next,popcomb_t,pop_change,like_ch);
 		markov_eqn_map[pp][ee] = false;
 	}
 	markov_eqn_list.clear();
@@ -173,7 +174,7 @@ void State::update_pop_change(unsigned int ti, unsigned int ti_next, const vecto
 		auto pp = mtf.p, tr = mtf.tr;
 		if(model.species[pp].type != POPULATION) emsg("must be pop");
 		
-		species[pp].likelihood_pop_section(tr,ti,ti_next,popnum_t,pop_change,like_ch);
+		species[pp].likelihood_pop_section(tr,ti,ti_next,popnum_t,popcomb_t,pop_change,like_ch);
 		
 		trans_map[pp][tr] = false;
 	}
@@ -196,7 +197,7 @@ void State::update_pop_change(unsigned int ti, unsigned int ti_next, const vecto
 						
 			param_val.value_change(th);
 
-			value[th] = model.eqn[eq_ref].calculate_all_time(ti,popnum_t,precalc);
+			value[th] = model.eqn[eq_ref].calculate_all_time(ti,popcomb_t,precalc);
 		
 			model.precalc_eqn.calculate(pv.set_param_spec_precalc,param_val,true);
 		
@@ -215,11 +216,11 @@ void State::update_pop_change(unsigned int ti, unsigned int ti_next, const vecto
 			const auto &spl = model.spline[pv.spline_ref];
 			
 			for(const auto &mer : spl.markov_eqn_ref){
-				species[mer.p].likelihood_ib_spline_section(mer.e,ti_start,ti_end,popnum_t,like_ch);
+				species[mer.p].likelihood_ib_spline_section(mer.e,ti_start,ti_end,popcomb_t,like_ch);
 			}
 			
 			for(const auto &trar : spl.trans_ref){	
-				species[trar.p].likelihood_pop_spline_section(trar.tr,ti_start,ti_end,popnum_t,like_ch);
+				species[trar.p].likelihood_pop_spline_section(trar.tr,ti_start,ti_end,popcomb_t,like_ch);
 			}
 		
 			reparamth_up_map[th] = false;
@@ -291,6 +292,7 @@ void State::update_ie_population(unsigned int p, unsigned int i, unsigned int ie
 						PopChange po_ch; po_ch.po = j; po_ch.num = num; 
 						pop_change.push_back(po_ch);
 				
+						// CHECKON
 						for(auto tii = ti; tii < ti_next; tii++) popnum_t[tii][j] += num;
 					
 						for(const auto &mef : po.markov_eqn_ref){

@@ -5,6 +5,7 @@
 using namespace std;
 
 #include "struct.hh"
+#include "precalc.hh"
 #include "hash_simp.hh"
 #include "const.hh"
 
@@ -71,14 +72,14 @@ class Equation                             // Stores information about an equati
 		vector <double> time;                  // Stores the times of the time points (such that t can be used)
 		
 		bool precalc_done;                     // Stores whether precalculation has been done
-		bool stop_combine_fl;                  // Sets if combining of multiplicative terms stopped
 		
-		Linearise linearise;                   // Used for accelerated likelihood calculation
+		Linearise lin;                         // Used for accelerated likelihood calculation
 		
-		Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, Constant &constant, const vector <double> &timepoint, const Details &details, vector <Define> &define);
+		Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, vector < vector <PopComb> > &popcomb, vector <PopCombWeight> &popcombw, Constant &constant, const vector <double> &timepoint, const Details &details, vector <Define> &define);
 		
 		
 		DefineOpStore get_define_op_store();
+		void print_info() const;
 		void print_calculation() const;
 		void print_item(const EqItem &it) const;
 		void print_ca(unsigned int i, const Calculation &ca) const;
@@ -89,8 +90,7 @@ class Equation                             // Stores information about an equati
 		double is_num() const;
 		bool is_zero() const;
 		bool is_one() const;
-		void insert_reg(vector <Calculation> &calc, vector <bool> &calc_on);
-		void simplify(vector <Calculation> &calc);
+		
 		vector < vector <unsigned int> > get_reg_used(const vector <Calculation> &calc) const;
 		void check_reg_used(const vector <Calculation> &calc, vector < vector <unsigned int> > &reg_used) const;
 		void setup_references();
@@ -125,6 +125,7 @@ class Equation                             // Stores information about an equati
 		void unravel_sum(vector <EqItem> &op);
 		void minus_sign_adjust();
 		vector <EqItem> extract_operations();
+
 		unsigned int get_other_bracket(unsigned int i, const vector <EqItem> &op) const;
 		unsigned int get_integral_bound(string st);
 		void simplify_operations(vector <EqItem> &op);
@@ -145,16 +146,14 @@ class Equation                             // Stores information about an equati
 		void extract_ind_eff();
 		void extract_fix_eff();
 		CompRef find_comp_from_name(unsigned int p, string te) const;
-		void replace_reg(const vector <EqItem> &reg_replace, vector <Calculation> &calc, const vector <bool> &calc_on, bool pl);
+	
 		void bracket_check(string st, const vector <EqItem> &op) const;
 		void setup_comp_pref_convert();
 		void check();
 		void check_opl(const vector <EqItemList> &opl) const;
-		double numeric_one_function(double con, EqItemType ty);
-		double numeric_two_function(double con1, double con2, EqItemType ty);
 		void remove_unused(vector <Calculation> &calc, vector <bool> &calc_on);
-		unsigned int add_const(EqItem item1, EqItem item2);
-		unsigned int mult_const(EqItem item1, EqItem item2);
+		
+		
 		void set_time_vari();
 		double find_dist(unsigned int c, unsigned int cc, const vector <Compartment> &comp, Coord coord) const;
 		double geo_dist(double lat1, double lng1, double lat2, double lng2) const;
@@ -168,7 +167,8 @@ class Equation                             // Stores information about an equati
 		void replace_minus(vector <EqItem> &op);
 		unsigned int add_param_ref(const ParamRef &pref);
 		bool model_type() const;
-					
+		bool not_time_vary(const EqItem &it) const;
+		
 		const vector <SpeciesSimp> &species;       // References the species from the model
 		unsigned int nspecies;
 		vector <Param> &param;               // References the parameters from the model
@@ -180,15 +180,17 @@ class Equation                             // Stores information about an equati
 		vector <Density> &density;           // Used for the DEN and RDEN functions 
 		vector <Population> &pop;            // References the populations from the model
 		Hash &hash_pop;                      // Hash table for pop
+		vector < vector <PopComb> > &popcomb; // References the populations from the model
+		vector <PopCombWeight> &popcombw;    // References the popcomb weights
 		Constant &constant;                  // Stores constants in the model
 		const vector <double> &timepoint;    // References time points
 		const Details &details;              // Details
 		
 	// In equation_linearise.cc
 	public:
-		void calculate_linearise();
+		void calculate_linearise(Precalc &precalc_eqn, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref, SpecPrecalc &spec_precalc);
 		bool zero_eqn(const vector <Calculation> &calc) const;
-		void print_linear_final() const;
+		void print_linear_final(const vector <Calculation> &no_pop_calc, const vector < vector <Calculation> > &popcomb_grad_calc, const vector <unsigned int> &popcomb_list) const;
 		void remove_unused_param_ref();
 		void calculate_pop_ref();
 		
@@ -207,29 +209,31 @@ class Equation                             // Stores information about an equati
 		bool item_time_dep(const vector <EqItem> item) const;
 		bool it_time_dep(const EqItem &it) const;
 		
-		double calculate_linearise_check(unsigned int ti, const vector <double> &popnum, const vector <double> &precalc) const;
+		double calculate_linearise_check(unsigned int ti, const vector <double> &popcomb, const vector <double> &precalc) const;
 		bool equal_calc(const vector <Calculation> &calc1, const vector <Calculation> &calc2) const;
 		
 		InfSourceSampler setup_source_sampler(unsigned int ti, const vector <double> &popnum, const PV &param_val) const;
-		void get_pop_grad_calc_factorise();
-		void set_precalc();
+		//void get_pop_grad_calc_factorise();
+		//void set_precalc();
 		EqItem get_precalc(const vector <Calculation> &calc) const;
 		
+	private:
+	
 	// In equation_calculate.cc
 	public:
 		double calculate_constant() const;
 		double calculate_param_ti_fix(const vector <double> &precalc) const;
-		double calculate(unsigned int ti, const vector <double> &popnum, const vector <double> &precalc) const;
-		double calculate_all_time(unsigned int ti, const vector < vector <double> > &popnum_t, const vector <double> &precalc) const;
-		double calculate_calc(const vector <Calculation> &calc, unsigned int ti, const vector <double> &popnum, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
-		double print_working(const vector <Calculation> &calc, unsigned int ti, const vector <double> &popnum, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
-		void test_calculate_para(const vector <Calculation> &calc, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val, string ref) const;
-		vector <double> calculate_para(const vector <Calculation> &calc, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
+		double calculate(unsigned int ti, const vector <double> &popcomb, const vector <double> &precalc) const;
+		double calculate_all_time(unsigned int ti, const vector < vector <double> > &popcomb_t, const vector <double> &precalc) const;
+		double calculate_calc(const vector <Calculation> &calc, unsigned int ti, const vector <double> &popcomb, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
+		double print_working(const vector <Calculation> &calc, unsigned int ti, const vector <double> &popcomb, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
+		void test_calculate_para(const vector <Calculation> &calc, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val, string ref) const;
+		vector <double> calculate_para(const vector <Calculation> &calc, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
 		double calculate_param(const vector <double> &precalc) const;
-		double calculate_no_popnum(unsigned int ti, const vector <double> &precalc) const; 
-		double calculate_integral(unsigned int i, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
-		double calculate_derive(unsigned int ti, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
-		double calculate_indfac(const Individual &ind, unsigned int ti, const vector <double> &popnum, const vector <double> &precalc) const;
+		double calculate_no_popcomb(unsigned int ti, const vector <double> &precalc) const; 
+		double calculate_integral(unsigned int i, const vector < vector <double> > &popcomb_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
+		double calculate_derive(unsigned int ti, const vector < vector <double> > &popcomb_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const;
+		double calculate_indfac(const Individual &ind, unsigned int ti, const vector <double> &popcomb, const vector <double> &precalc) const;
 		double calculate_pop_grad(unsigned int pref, unsigned int ti, const vector <double> &precalc) const;
 		double calculate_pop_grad_no_time(unsigned int pref, const vector <double> &precalc) const;
 		double calculate_pop_grad_without_factor_no_time(unsigned int pref, const vector <double> &precalc) const;
@@ -242,5 +246,31 @@ class Equation                             // Stores information about an equati
 		double calculate_item_old(const EqItem &it, unsigned int ti, const vector <double> &precalc, const vector <double> &precalc_old) const;
 		double calculate_item_old_no_time(const EqItem &it, const vector <double> &precalc, const vector <double> &precalc_old) const;
 	private:
+	
+	// In equation_simplify.cc
+	public:
+		void simplify(vector <Calculation> &calc);
+		void extract_popcomb(vector <Calculation> &calcu, Hash &hashw, Hash &hashpc, bool derive);
+		
+	private:
+		void add_it(EqItemType type, vector <EqItem> &op) const;
+		EqnRange get_element_from_end(unsigned int end, const vector <EqItem> &op) const;
+		EqnRange get_element_from_start(unsigned int start, const vector <EqItem> &op) const;
+		void print_eqn_range(const EqnRange &er, const vector <EqItem> &op) const;
+		bool contain_time(const EqnRange &er, const vector <EqItem> &op) const;
+		bool contain_ie_fe(const EqnRange &er, const vector <EqItem> &op) const;
+		bool contain_dep(const EqnRange &er, const vector <string> &dep, const vector <EqItem> &op) const;
+		bool contain_linear_pop(unsigned int start, unsigned int end, const vector <EqItem> &op) const;
+		vector <EqnRange> eqn_split_add(unsigned int start, unsigned int end, const vector <EqItem> &op) const;	
+		vector <EqnRange> eqn_split_mult(unsigned int start, unsigned int end, const vector <EqItem> &op) const;
+		void replace_reg(const vector <EqItem> &reg_replace, vector <Calculation> &calc, const vector <bool> &calc_on, bool pl);
+		void insert_reg(vector <Calculation> &calc, vector <bool> &calc_on);
+		double numeric_one_function(double con, EqItemType ty);
+		double numeric_two_function(double con1, double con2, EqItemType ty);
+		unsigned int add_const(EqItem item1, EqItem item2);
+		unsigned int mult_const(EqItem item1, EqItem item2);
+		void add_popcomb(unsigned int i, const vector <PopCombTemp> &pop_co_temp, vector <bool> &remove, const vector < vector <unsigned int> > &used, vector <Calculation> &calcu, Hash &hashw, Hash &hashpc, bool derive);
+		void add_popcomb_single(EqItem &item, Hash &hashw, Hash &hashpc, bool derive);
+		string popcomb_name(unsigned int i) const;
 		
 };

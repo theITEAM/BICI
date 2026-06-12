@@ -25,11 +25,21 @@ TESTING
 -- test trans-tree proposals using initial state
 
 GRANT
+- grant sent 4000G_C_PostInf.bici and 6000G_C_PreInf.bici
 - Grant problem AI (OP problem)
 - Grant FMD model (not in sharepoint)
 - Grant noticed filters not working
 
 TO DO
+- Add to profiling
+- Get example sorted for Hector
+- Sampling from symmetric matrix
+- only recaclulate needed transitions
+
+- M(pop+pop) SPE1.2 EE1.2
+- Read paper from ben swallow
+- Mac package content larger
+- For some reason initial gave erro "cant find /tmp/init.bici"
 - Can grants problem matched_local_10km be made to run faster? slow because not linear in populations... need to keep track of linear combinations of populations
 - Add compress option in interface
 - When doing tornado plots set permissions directly for executable
@@ -149,6 +159,8 @@ auto k = 0u; while(k < sum_store.size() && z > sum_store[k]) k++;
 auto k = 0u; while(k < trig_event.size() && trig_event[k].tdiv != eve.tdiv) k++;
 
 DONE NEW
+- derive with popcomb
+- simplify equations to leave linear combinations 
 - Grant problem with defined
 - "*1" did not work in interface- for wildcard individual group
 - individual effect in population should be allowed in parameter define

@@ -604,8 +604,8 @@ void Chain::update(unsigned int s)
 			}
 		
 			if(pl) state.check(" After prop check");
-			if(pl) state.check_popnum_t2("hhh");
-			
+			if(pl) state.check_pop_t("hhh");
+		
 			//state.check_precalc_eqn("up");
 			//state.check_neg_rate(pro.name);
 			//state.check_markov_div_value(0," after update");

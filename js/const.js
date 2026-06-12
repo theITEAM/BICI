@@ -7,7 +7,7 @@
 // 62667 lines of code (17/09/25)
 // 67000 lines of code (25/02/26)
 
-let bici_version = "v0.89";                       // Sets the BICI version
+let bici_version = "v0.90";                       // Sets the BICI version
 
 let ver="windows";                                // Determines platform
 //let ver="linux";                                // Use this if working on linux
@@ -15,7 +15,7 @@ let ver="windows";                                // Determines platform
 
 let mac_temp_dir = "/tmp/BICI_files/";
 
-let win_linux = false;                             // When working on win running linux 
+let win_linux = true;                             // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)

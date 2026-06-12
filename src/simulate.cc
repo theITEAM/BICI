@@ -54,20 +54,27 @@ void Simulate::run()
 		if(false) state.output_waifw("waifw.txt");
 	}
 
-	if(false){
-		auto tot = state.timer[SIM_CALC_POPNUM]+state.timer[SIM_PRECALC]+state.timer[SIM_POPIND]+state.timer[SIM_UPDATE]+state.timer[SIM_CHECK];
-		cout << cpu_percent(state.timer[SIM_CALC_POPNUM],tot) << "sim calc" << endl;
+	if(true){
+		auto tot = state.timer[SIM_ITERATE];
+		const auto &ssp = state.species[0];
+		
 		cout << cpu_percent(state.timer[SIM_PRECALC],tot) << "sim precalc" << endl;
 		cout << cpu_percent(state.timer[SIM_POPIND],tot) << "sim popind" << endl;
+		cout << cpu_percent(state.timer[SIM_MARKOV],tot) << "sim markov" << endl;
 		cout << cpu_percent(state.timer[SIM_UPDATE],tot) << "sim update" << endl;
+		cout << cpu_percent(state.timer[SIM_NEXTPOP],tot) << "sim nextpop" << endl;
+		cout << "  -> " << cpu_percent(ssp.timer[UP_MARKOV],tot) << "up markov" << endl;
+		cout << cpu_percent(state.timer[SIM_LIKE],tot) << "sim like" << endl;
 		cout << cpu_percent(state.timer[SIM_CHECK],tot) << "sim check" << endl;
+		cout << cpu_percent(state.timer[SIM_TEMP1],tot) << "sim check end" << endl;
 		
-		const auto &ssp = state.species[0];
-		auto up = state.timer[SIM_UPDATE];
-		cout <<  cpu_percent(ssp.timer[UP_MARKOV],up) << "up markov" << endl;
-		cout <<  cpu_percent(ssp.timer[SORT],up) << "sort" << endl;
-		cout <<  cpu_percent(ssp.timer[ITER],up) << "iter" << endl;
-		cout <<  cpu_percent(ssp.timer[CHECK],up) << "check" << endl;	
+		if(model.species[0].type == INDIVIDUAL){
+			auto up = state.timer[SIM_UPDATE];
+			cout << "Dividing up sim update:" << endl;
+			cout <<  cpu_percent(ssp.timer[SORT],up) << "sort" << endl;
+			cout <<  cpu_percent(ssp.timer[ITER],up) << "iter" << endl;
+			cout <<  cpu_percent(ssp.timer[CHECK],up) << "check" << endl;	
+		}
 	}
 	
 #ifdef USE_MPI

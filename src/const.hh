@@ -19,14 +19,14 @@ using namespace std;
 #endif
 
 #ifdef MAC
-const string default_file = "/tmp/init.bici";        // This is used for Mac
+const string default_file = "/tmp/BICI_files/init.bici";        // This is used for Mac
 #else
 const string default_file = "Execute/init.bici";     // This is used for windows / linux
 #endif
 
-#define USE_MPI                                    // Sets if code can run in parallel
+//#define USE_MPI                                    // Sets if code can run in parallel
 
-const string bici_version = "v0.89";                 // Sets the BICI version
+const string bici_version = "v0.90";                 // Sets the BICI version
 
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
 const bool testing = true;                           // Set to true for additional testing
@@ -38,16 +38,16 @@ const bool print_diag_on = false;                    // Prints diagnostic statem
 const bool cum_diag = true;                          // Cumulative probability diagnostic
 const bool profiling = false;                        // Determines if memory profiling is done
 
-const bool sim_linearise_speedup = true;             // Speeds up simulation
+const bool sim_linearise_speedup = false;//true;             // Speeds up simulation
 // Takes advantage of lineared equations with no time dependence
 
-const bool linearise_speedup = true;                 // Linearisation speed-up of div value calculation
+const bool linearise_speedup = false;// true;                 // Linearisation speed-up of div value calculation
 // This speeds up by taking account of linear population terms when calculation div values
 
-const bool linearise_factor_nopop_speedup = true;    // Linearisation speed-up of div value calculation
+const bool linearise_factor_nopop_speedup = false;//true;    // Linearisation speed-up of div value calculation
 // This speeds up making changes to the factor
 
-const bool nopop_speedup = true;                    // Linearisation speed-up likelihood
+const bool nopop_speedup = false;//true;                    // Linearisation speed-up likelihood
 // This speeds up making changes to non-population term when calculating div values
 
 const bool update_ind_linearise_speedup = true;      // Linearisation speed-up of likelihood
@@ -170,21 +170,21 @@ enum PropType { PARAM_PROP, PARAM_DET_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT
 enum AnnealType { ANNEAL_NONE, ANNEAL_SCAN, ANNEAL_POWERAUTO, ANNEAL_LOGAUTO, ANNEAL_POWER };
 
 // Different state timers
-enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER, DERIVE_TIMER,DERIVE_PRECALC_TIMER, SIM_CALC_POPNUM, SIM_PRECALC, SIM_POPIND, SIM_UPDATE, SIM_UPDATE2, SIM_CHECK, SIM_TEMP1, SIM_TEMP2, TIMER_MAX };
+enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER, DERIVE_TIMER,DERIVE_PRECALC_TIMER, SIM_CALC_POPNUM, SIM_PRECALC, SIM_POPIND, SIM_UPDATE, SIM_CHECK, SIM_NEXTPOP, SIM_MARKOV, SIM_LIKE, SIM_ITERATE, SIM_TEMP1, SIM_TEMP2, TIMER_MAX };
 
 // Different output timers
 enum OutTimer { PARAM_OUTPUT, STATE_OUTPUT, OUTTIMER_MAX };
 
 // Different check timers 
-enum CheckTimer { CHECK_TRANS_NUM, CHECK_DEP_PARAM, CHECK_REF, CHECK_MARKOV, CHECK_NM, CHECK_LIKE, CHECK_SPLINE, CHECK_PRIOR, CHECK_POP, CHECK_POP2, CHECK_CPOP, CHECK_IE, CHECK_POP_LIKE, CHECK_MAPS, CHECK_EV_OBS, CHECK_OBS_LIKE, CHECK_IC, CHECK_LIN, CHECK_GEN,CHECK_POP_IND, CHECK_ADD_REM, CHECK_RANGE, CHECK_SIMP, CHECK_POP_IND_GENTIC, CHECK_PRECALC, CHECK_FINAL_LI_WRONG, CHECK_PARA_SPEEDUP, CHECK_MARKOV_DIV, CHECK_MARKOV_VALUE_DIF, CHECK_PRECALC_DIF,CHECK_MAX};
+enum CheckTimer { CHECK_TRANS_NUM, CHECK_DEP_PARAM, CHECK_REF, CHECK_MARKOV, CHECK_NM, CHECK_LIKE, CHECK_SPLINE, CHECK_PRIOR, CHECK_POP, CHECK_POPCOMB, CHECK_CPOP, CHECK_IE, CHECK_POP_LIKE, CHECK_MAPS, CHECK_EV_OBS, CHECK_OBS_LIKE, CHECK_IC, CHECK_LIN, CHECK_GEN,CHECK_POP_IND, CHECK_ADD_REM, CHECK_RANGE, CHECK_SIMP, CHECK_POP_IND_GENTIC, CHECK_PRECALC, CHECK_FINAL_LI_WRONG, CHECK_PARA_SPEEDUP, CHECK_MARKOV_DIV, CHECK_MARKOV_VALUE_DIF, CHECK_PRECALC_DIF,CHECK_MAX};
 
-const vector <string> check_name = { "CHECK_TRANS_NUM", "CHECK_DEP_PARAM", "CHECK_REF", "CHECK_MARKOV", "CHECK_NM", "CHECK_LIKE", "CHECK_SPLINE", "CHECK_PRIOR", "CHECK_POP", "CHECK_POP2", "CHECK_CPOP", "CHECK_IE", "CHECK_POP_LIKE", "CHECK_MAPS", "CHECK_EV_OBS", "CHECK_OBS_LIKE", "CHECK_IC", "CHECK_LIN", "CHECK_GEN", "CHECK_POP_IND", "CHECK_ADD_REM", "CHECK_RANGE", "CHECK_SIMP", "CHECK_POP_IND_GENTIC", "CHECK_PRECALC", "CHECK_FINAL_LI_WRONG", "CHECK_PARA_SPEEDUP", "CHECK_MARKOV_DIV", "CHECK_MARKOV_VALUE_DIF", "CHECK_PRECALC_DIF", "CHECK_MAX"};
+const vector <string> check_name = { "CHECK_TRANS_NUM", "CHECK_DEP_PARAM", "CHECK_REF", "CHECK_MARKOV", "CHECK_NM", "CHECK_LIKE", "CHECK_SPLINE", "CHECK_PRIOR", "CHECK_POP", "CHECK_POPCOMB", "CHECK_CPOP", "CHECK_IE", "CHECK_POP_LIKE", "CHECK_MAPS", "CHECK_EV_OBS", "CHECK_OBS_LIKE", "CHECK_IC", "CHECK_LIN", "CHECK_GEN", "CHECK_POP_IND", "CHECK_ADD_REM", "CHECK_RANGE", "CHECK_SIMP", "CHECK_POP_IND_GENTIC", "CHECK_PRECALC", "CHECK_FINAL_LI_WRONG", "CHECK_PARA_SPEEDUP", "CHECK_MARKOV_DIV", "CHECK_MARKOV_VALUE_DIF", "CHECK_PRECALC_DIF", "CHECK_MAX"};
 
 // Different proposal timers
 enum PropTimer { PROP_TIMER, PARAM_RESAMPLE_TIMER, PROPTIMER_MAX };
 
 // Different state species timers
-enum StateSpeciesTimer { UP_MARKOV, SORT, ITER, CHECK, STSP_TIMER_MAX };
+enum StateSpeciesTimer { UP_MARKOV, SORT, ITER, CHECK, STSP_TIMER_MAX, SSP_TEMP1, SSP_TEMP2};
 
 // INIT_POP_FIXED means init pop has been specified in the data file
 // INIT_POP_DIST means a distribution has been specified in the data file
@@ -282,13 +282,13 @@ enum PercentType { LOAD_PER, INIT_PER, RUN_PER, RUN_GEN_PER, ANNEAL_PER, OUTPUT_
 enum DerFuncType { RN, RNE, RNC, GT, GTE, GTC, DF_UNSET};
  
 // Equation types 
-enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAM_INDEX, PARAMETER, PARAMVEC, SPLINE, SPLINEREF, CONSTSPLINEREF, POP_INDEX, POPNUM, POPTIMENUM, TIME, IE, ONE, ZERO, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, TINT, INTEGRAL, DERIVE, REG_FAC, REG_PRECALC, REG_PRECALC_TIME, SINGLE, SUM, NOOP};
+enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAM_INDEX, PARAMETER, PARAMVEC, SPLINE, SPLINEREF, CONSTSPLINEREF,  POP_INDEX, POPNUM, POPTIMENUM, TIME, IE, ONE, ZERO, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, TINT, INTEGRAL, DERIVE, REG_FAC, REG_PRECALC, REG_PRECALC_TIME, SINGLE, SUM, POPCOMB, POPCOMBTIME, NOOP};
 
 // Different types of spline
 enum SplineType { LINEAR_SPL, SQUARE_SPL, CUBICPOS_SPL, CUBIC_SPL};
 
 // Different ways in which equations are added to precalculation
-enum PrecalcAddType { PRECALC_ALL, PRECALC_STOP_COMBINE_MULT, PRECALC_PARAM_ONLY};
+//enum PrecalcAddType { PRECALC_ALL, PRECALC_STOP_COMBINE_MULT, PRECALC_PARAM_ONLY};
 
 // Different quantities which can be loaded into a parameter
 enum LoadParamType { VALUE_LOAD, PRIOR_SPLIT_LOAD, DIST_SPLIT_LOAD, FACW_LOAD};

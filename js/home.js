@@ -337,7 +337,6 @@ function initialise_section()
 		inter.section.push(sec);
 	}
 	
-	
 	// Puts in folder
 	for(let i = 0; i < inter.section.length; i++){
 		let sec = inter.section[i];
@@ -355,7 +354,6 @@ function add_sections_buts(lay)
 {
 	let cx = 0, cy = 0;
 
-	//let dx = 11, dy = 13.5, gap = 1.2;
 	let dx = 11, dy = 10.5, gap = 1.2;
 
 	for(let i = 0; i < inter.section.length; i++){

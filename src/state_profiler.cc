@@ -61,6 +61,12 @@ void State::profile_memory() const
 	}
 	
 	{
+		auto sum = mem(popcomb_t);
+		sum_tot += sum;
+		if(sum > sum_min) cout << "popcomb_t: " << (unsigned int)(sum*f) << endl;
+	}
+	
+	{
 		auto sum = 0.0;
 		for(auto i = 0u; i < popnum_ind.size(); i++){
 			for(auto j = 0u; j < popnum_ind[i].size(); j++){

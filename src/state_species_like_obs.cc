@@ -614,7 +614,7 @@ vector <double> StateSpecies::likelihood_unobs_trans(unsigned int e, const vecto
 	else{
 		auto num=0u;
 		for(auto ti : list){
-			auto val = 1 - eq.calculate_no_popnum(ti,precalc);	
+			auto val = 1 - eq.calculate_no_popcomb(ti,precalc);	
 		
 			if(val < TINY) log_val = LI_WRONG;
 			else{

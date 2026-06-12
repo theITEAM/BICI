@@ -9,8 +9,6 @@
 
 // ssh gaia.bioss.ac.uk  
 
-//valgrind --tool=massif --exit-on-first-error=yes --error-exitcode=1 -s ./bici-para Execute/init.bici sim
-
 // tar -xzf foo.tgz
 
 // Load mpi: module load mpi/openmpi-x86_64

@@ -734,12 +734,13 @@ void Input::linearise_eqn(unsigned int per_start, unsigned int per_end)
 			const auto &me = sp.markov_eqn[e];
 		
 			if(e%100 == 0) percentage(per_st+fr*e,100,sup);
-			model.eqn[me.eqn_ref].calculate_linearise();    
+			model.eqn[me.eqn_ref].calculate_linearise(model.precalc_eqn,model.param_vec_ref,model.spline_ref,model.spec_precalc);    
 		}			
 	}
 }
 
 
+/*
 /// References precalculation in linearisation
 void Input::linearise_precalc()
 {
@@ -747,6 +748,7 @@ void Input::linearise_precalc()
 		if(eq.linearise.on) eq.set_precalc();
 	}
 }
+*/
 
 
 /// Sets a vector which determines if an equation is zero
@@ -830,6 +832,7 @@ void Input::create_markov_eqn()
 				me.rate = true;	if(eqn.type == TRANS_MEAN || eqn.type == SOURCE_MEAN) me.rate = false;
 				me.time_vari = eqn.time_vari;
 				me.infection_trans = eqn.infection_trans;
+				me.always_recalc = true;
 				
 				const auto &eq = model.eqn[e];	
 				me.source = false; 
@@ -866,14 +869,27 @@ void Input::create_markov_eqn()
 		}
 	}
 
+	// Makes list of all markov equations which are not linear in 
+	for(auto p = 0u; p < model.species.size(); p++){
+		auto &sp = model.species[p];
+		for(auto e = 0u; e < sp.markov_eqn.size(); e++){
+			const auto &me = sp.markov_eqn[e];
+			const auto &eqn = model.eqn[me.eqn_ref];
+			if(eqn.lin.on == false){
+				sp.markov_eqn_not_linear.push_back(e);
+			}
+		}
+	}
+
 	if(false){
 		for(const auto &sp : model.species){ 
 			for(const auto &me : sp.markov_eqn){
-				cout << model.eqn[me.eqn_ref].te << "  infection trans:";
+				cout << model.eqn[me.eqn_ref].te_raw << "  infection trans:";
 				if(me.infection_trans) cout << "true"; else cout << "false";
 				cout << endl;
 			}
 		}
+		emsg("gg");
 	}
 }
 
@@ -884,20 +900,25 @@ void Input::create_markov_eqn_pop_ref()
 	for(auto p = 0u; p < model.species.size(); p++){
 		auto &sp = model.species[p];
 				
+		for(auto e = 0u; e < sp.markov_eqn.size(); e++){
+			auto eq = sp.markov_eqn[e].eqn_ref;
+			if(eq == UNSET) alert_emsg_input("Problem with ME");
+			const auto &eqn = model.eqn[eq];
+			
+			for(auto k : eqn.pop_ref){
+				PopMarkovEqnRef mer; mer.p = p; mer.e = e;
+				model.pop[k].markov_eqn_ref.push_back(mer);
+			}
+		}			
+				
 		switch(sp.type){
 		case INDIVIDUAL:
 			{
 				for(auto e = 0u; e < sp.markov_eqn.size(); e++){
 					auto eq = sp.markov_eqn[e].eqn_ref;
 					if(eq == UNSET) alert_emsg_input("Problem with ME");
-				
 					const auto &eqn = model.eqn[eq];
-					
-					for(auto k : eqn.pop_ref){
-						PopMarkovEqnRef mer; mer.p = p; mer.e = e;
-						model.pop[k].markov_eqn_ref.push_back(mer);
-					}
-					
+		
 					for(const auto &pr : eqn.param_ref){
 						const auto &par = model.param[pr.th];
 						if(par.variety == REPARAM_PARAM && par.time_dep){
@@ -3474,7 +3495,7 @@ void Input::setup_trans_infection()
 					alert_line("This infection transition must be Markovian.",tra.line_num);
 				}
 				const auto &eqn = model.eqn[tra.dist_param[0].eq_ref];
-				if(eqn.linearise.on != true){
+				if(eqn.lin.on != true){
 					alert_line("For transmission trees the rate must be linearly expressed in terms of populations.",tra.line_num);
 				}
 			}
@@ -4957,13 +4978,15 @@ void Input::setup_der_func_eqn()
 								
 								auto e = tr.dist_param[0].eq_ref;
 								const auto &eq = model.eqn[e];
-								const auto &lin = eq.linearise;
+								const auto &lin = eq.lin;
 								if(!lin.on) alert_line("'"+df.name+"' cannot be calculated because the equation '"+eq.te_raw+"' is not linearisable into populations.",der.line_num,true);
 							
-								if(lin.pop_grad_precalc.size() > 0){
+								if(lin.popcomb_grad_precalc.size() > 0){
 									inf_fl = true;
 								}
 								
+								emsg("sort22");
+								/*
 								for(auto i = 0u; i < lin.pop_grad_precalc.size(); i++){
 									const auto &po = model.pop[eq.pop_ref[i]];
 									if(calc == false && po.ind_eff_mult.size() > 0){
@@ -4992,6 +5015,7 @@ void Input::setup_der_func_eqn()
 										F_eq[cin][cc].push_back(fel);
 									}
 								}
+								*/
 							}
 							break;
 							
@@ -5108,7 +5132,8 @@ void Input::setup_der_func_eqn()
 					const auto &ref = Feq_ref[k];
 					const auto &eq = model.eqn[ref.e];
 					cout << "calc "+tstr(k);
-					eq.print_item(eq.linearise.pop_grad_precalc[ref.i]);
+					emsg("sort23");
+					//eq.print_item(eq.linearise.pop_grad_precalc[ref.i]);
 					cout << endl;
 				}
 				

@@ -3,62 +3,13 @@
 UPDATES:
 
 GRANT
-- Sorted out problem with large systems. Small constant added to rates in likelihood (for numerivcal stability reasons) was insufficiently small. 
-- As with reparameterisation, there is now the ability to "define" parameters as equations OR specify elements seperately. This has needed quite a lot of new code, so it would be good to check the new code against a model you have previously run to see if they give the same (or very similar) results. 
-- Corrected problem with missing "param-sim" file when "compress" is used.
-- Corrected problem with saving files from interface which are encoded.
-- I've had a look at the "OA problem" and can see anything obviously wrong to explain what you see. I'm going to have to have a bit more of a think.
-- Looking at the file "matched_local_10km.bici" I'm starting to understand why it runs slow. It's the usual problem of not being nicely linear in poulations (which you can often utilise to improve speed). However what I have noticed is that the infection process does contain pieces that are linear on populations. This makes me think I can alter the code to speeed things up quite a bit. I need to add another "layer" in the code which keeps track of linear combinations of populations.... I'll get to sorting this out next week (I think this would take a couple of days to implement, and would be perhaps two or three times faster for this sort of model).
-- Related to the problems with defining within defining (the example with define name="N^L" value="Σ_l (W_l)" you gave). I've try to create this issue but can't. However I've made loads of changes to how "define" is dealt with I may have inadvertently fixed this one. Please let me know if it still happens!
-- I was going to try to understand why "extend" wasn't working he FMD inference model (the ‘Proposal information could not be loaded: not 4’ error) but I couldn't find it in you Share directory (I guess I was too slow to download it!). 
-- Introduced "low memory mode" (see section 6.5 in manual). Basically, when it can't fit everything into memory rather than crashing it now makes some compromises: (1) Diagnostic information is not loaded on transitions (the seemed to be the most memory hungry part now), (2) it doesn't store the script file (so it can't then be saved after it has been loaded into the interface. After these two I'm planning to have (3) where the number of state samples loaded is limited, but I haven't implemented that yet.
-
-
-
-
 
 LAURA
 
 
 JAMIE
-- Individuals no longer reordered under 'trans-tree' option
-- Allow for "set-ind-effect-sim" data type which can set individual effects under simulation (entry added to manual). I’m also planning to do it under inference and posterior simulation, but that is proving harder to implement.
-- I've added 'cols' to 'ind-effect-data'. It should also be on every other data type, and I've also added it for X in 'fixed-effect' (to allow for all individual-level data to reference the same table).
+
 
 CHRIS
-- Generate error when observed transition and compartmental observations are at the same time (ill defined)
-- Only allow "prior const" for parameters with at least one index
-- Correct bug under "linear_form_calculate" where rates were becoming infinitesimaly negative
-- Corrected problem with simulation of transition data in interface
-- Corrected problem with loading tables in interface using "cols" option
-- Corrected space after "WARNING" in interface
-- Now showing IND_EFFECT_DATA and IND_GROUP_DATA as data sources under "data-show"
-- Add true IE when exporting individual table in interface
-- Under validation, allow for a specified number of runs in a tornado plot and also for serial and parallel implementations
-- Added code to allow for prediction accuracies to be calculated within the core code (with the new command "pred-acc-inf")
-- Under validation old inference data is removed for tornado plots 
-- Corrected bug with loading up compartments without locations
-- Corrected error wirh "decompress" command
-- Allow for escaped greek characters when loading up reparameterisation
-- Made a new "Defined" category on parameters page
-- Mades some changes to "precalc" to allow for functions.
-- Three new examples have been added looking at parameter definitions/reparameterisations through equations and elements.
-- Improved method of distiguisihing between simulation and inference parameters 
-- Added a link on "theITEAM" website and removed link for old software.
-- Corrected bugs in the parameter reference buttons on the "Model->Parameters" page
-- Set covariance matrix to "covar-default" by default (because this is the recommended option)
-- Corrected bug when selecting pedigree (radio button not initially selected)
-- Added comprehensive error checking within output file for interface.
-- Throw error in individual or fixed effects places into parameter definitions (apart from populations)
-- When loading reparameterisation files, get automatic unescaping
-- Added better warn in interface when the input file is not correct
-- Corrected issue with wildcard match starting with "*"
-- Added a version number to BICI interface
-- Sorted out problem with sometimes not saving (due to mkdir instead of mkdirSync)
-- Added warn about using "ext" if no inference results
-- Corrected bug when importing compartments with existing bounded boxes
-- Added error checking for importing comartmental colours
-- Sorted out bug loading transition from file (hash table problem)
-- Provided warning when trying to load multiple of the same transition
-- Made improvements to [?] help in interface
-- Sorted out issue with model not loading (due to error) and then becoming unresponsive
+- Corrected error in equation simiplifaction code
+- Made imrpovements to README

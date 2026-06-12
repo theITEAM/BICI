@@ -539,15 +539,18 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	
 	print_diag("h15a");
 	
+	Hash hashw, hashpc;
+	model.extract_popcomb(hashw,hashpc);// Extracts linear combinations of populations from equations
+	
 	linearise_eqn(75,85);               // Tries to linearise equations in terms of pops
-	//emsg("ll");
+	
 	print_diag("h15b");
 	
-	model.create_precalc_pop_grad();    // Shifts calculations in pop_grad into precalc
+	//model.create_precalc_pop_grad();    // Shifts calculations in pop_grad into precalc
 	
 	print_diag("h15c");
 	
-	linearise_precalc();                // References precalculation in linearisation
+	//linearise_precalc();                // References precalculation in linearisation
 	
 	print_diag("h15d");
 	
@@ -556,6 +559,10 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	print_diag("h15e");
 	
 	model.create_precalc_derive();      // Extracts precalculations for derived quantities
+	
+	model.extract_popcomb_derive(hashw,hashpc); // Extracts linear combinations for derived quantities
+	
+	//model.print_popcomb();
 	
 	print_diag("h15f");
 	
@@ -570,6 +577,10 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	model.set_spec_precalc_sample();    // Sets precalculation to be done after sampling 
 	
 	model.set_spec_precalc_all();       // Sets all precalculation to be done 
+	
+	for(auto &sp : model.species){      // Sets properties related to when Markov equations must be updated
+		sp.set_markov_eqn_update(model.eqn,model.param);      
+	}
 	
 	//model.print_precalc();            // Outputs pre-calculation (for diagnostic purposes)
 	
@@ -662,9 +673,11 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 
 	if(model.mode == PPC) set_ppc_resample();
 	
+	/*
 	for(auto &sp : model.species){
 		sp.sim_linear_speedup_init(model.eqn);  // Sets up quantities for fast simulation
 	}
+	*/
 	
 	check_markov_or_nm();                      // Checks that transition are either markovian or non-markovian
 		
@@ -686,6 +699,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	
 	if(profiling) profile_memory();
 	
+	model.check_all_linear();   // Use for diagnostics
 	//if(true) param_eqn_mem();
 	//wait();
 }

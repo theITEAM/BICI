@@ -13,7 +13,7 @@ using namespace std;
 #include "utils.hh"
 //#include "matrix.hh"
 
-IndEvSampler::IndEvSampler(vector <MarkovEqnVariation> &markov_eqn_vari, const vector <Individual> &individual, const Details &details, const Species &sp, vector <double> &obs_eqn_value, vector < vector <double> > &obs_trans_eqn_value, const vector <Equation> &eqn, const vector <InfNode> &inf_node, const vector <double> &precalc, vector < vector <double> > &popnum_t, bool no_ind_var) : markov_eqn_vari(markov_eqn_vari), individual(individual), details(details), sp(sp), obs_eqn_value(obs_eqn_value), obs_trans_eqn_value(obs_trans_eqn_value), eqn(eqn), inf_node(inf_node), precalc(precalc),popnum_t(popnum_t),nm_trans(sp.nm_trans)
+IndEvSampler::IndEvSampler(vector <MarkovEqnVariation> &markov_eqn_vari, const vector <Individual> &individual, const Details &details, const Species &sp, vector <double> &obs_eqn_value, vector < vector <double> > &obs_trans_eqn_value, const vector <Equation> &eqn, const vector <InfNode> &inf_node, const vector <double> &precalc, vector < vector <double> > &popcomb_t, bool no_ind_var) : markov_eqn_vari(markov_eqn_vari), individual(individual), details(details), sp(sp), obs_eqn_value(obs_eqn_value), obs_trans_eqn_value(obs_trans_eqn_value), eqn(eqn), inf_node(inf_node), precalc(precalc),popcomb_t(popcomb_t),nm_trans(sp.nm_trans)
 {
 	T = sp.T;
 	dt = details.dt;
@@ -1202,7 +1202,7 @@ double IndEvSampler::get_indfac(const Individual &ind, const MarkovEqn &mar_eqn)
 void IndEvSampler::setup_nm()
 {
 	vector<vector<double> > bp_store;// Note, this is not calculated
-	nm_rate = sp.calc_nm_rate(false,precalc,popnum_t,eqn,bp_store);
+	nm_rate = sp.calc_nm_rate(false,precalc,popcomb_t,eqn,bp_store);
 
 	rate_store_initialise();
 }
@@ -1257,15 +1257,15 @@ double IndEvSampler::calculate_nm_rate(const Individual &ind, unsigned int m, in
 	if(bp_eq != UNSET){
 		if(bp_eq == BP_FROM_OTHERS){
 			for(auto e : nmt.bp_other_eq){
-				bp -= eqn[e].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+				bp -= eqn[e].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 			}
 		}
 		else{
-			bp = eqn[bp_eq].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+			bp = eqn[bp_eq].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 			if(nmt.all_branches){
 				auto div = 0.0;
 				for(auto e : nmt.bp_all_eq){
-					div += eqn[e].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+					div += eqn[e].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 				}
 				bp /= div;
 			}
@@ -1279,28 +1279,28 @@ double IndEvSampler::calculate_nm_rate(const Individual &ind, unsigned int m, in
 	case GAMMA: case ERLANG: case LOG_NORMAL: case PERIOD: 
 		{
 			const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
-			return dt*bp/eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);
+			return dt*bp/eq.calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 		}
 		break;
 
 	case EXP_RATE_NM:
 		{
 			const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
-			return dt*bp*eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);
+			return dt*bp*eq.calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 		}
 		break;
 		
 	case EXP_MEAN_NM:
 		{
 			const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
-			return dt*bp/eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);
+			return dt*bp/eq.calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 		}
 		break;
 	
 	case WEIBULL:
 		{
 			const auto &eq = eqn[nmt.dist_param_eq_ref[0]];	
-			return dt*bp/eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);
+			return dt*bp/eq.calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 		}
 		break;
 		

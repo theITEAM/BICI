@@ -49,7 +49,7 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 			
 		if(me.infection_trans){ // If an infection transition then works out specific probability of specific individual
 			const auto &eq = eqn[me.eqn_ref];
-			const auto &lin = eq.linearise;
+			const auto &lin = eq.lin;
 			if(!lin.on) emsg("Linearisation should be on");
 			for(const auto &it : div.ind_trans){
 				const auto &ind = individual[it.i];
@@ -109,7 +109,7 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 
 
 /// Calculate the value of a markov equation
-vector <double> StateSpecies::markov_value_calc(unsigned int e, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t)
+vector <double> StateSpecies::markov_value_calc(unsigned int e, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t)
 {
 	auto &me = sp.markov_eqn[e];
 	auto &me_vari = markov_eqn_vari[e];
@@ -132,7 +132,7 @@ vector <double> StateSpecies::markov_value_calc(unsigned int e, const vector <un
 		if(calc_para_speedup){
 			vector < vector < vector <double> > > derive_val;
 			
-			auto vec = eq.calculate_para(eq.calcu,list,popnum_t,precalc,derive_val);
+			auto vec = eq.calculate_para(eq.calcu,list,popcomb_t,precalc,derive_val);
 				
 			if(me.rate){
 				for(auto k = 0u; k < list.size(); k++){
@@ -152,14 +152,14 @@ vector <double> StateSpecies::markov_value_calc(unsigned int e, const vector <un
 		else{
 			if(me.rate){
 				for(auto ti : list){	
-					auto value = dt*eq.calculate(ti,popnum_t[ti],precalc);
+					auto value = dt*eq.calculate(ti,popcomb_t[ti],precalc);
 					store.push_back(div[ti].value);
 					div[ti].value = value;
 				}
 			}
 			else{
 				for(auto ti : list){	
-					auto value = dt/eq.calculate(ti,popnum_t[ti],precalc);
+					auto value = dt/eq.calculate(ti,popcomb_t[ti],precalc);
 					store.push_back(div[ti].value);
 					div[ti].value = value;
 				}
@@ -171,9 +171,10 @@ vector <double> StateSpecies::markov_value_calc(unsigned int e, const vector <un
 }
 
 
+/* CHECKON delete?
 /// Calculate the value of a markov equation 
 // This is the case when only the non-population part of the equation changes
-vector <double> StateSpecies::markov_value_nopop_calc(const vector <unsigned int> &me_list, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const PV &param_val)
+vector <double> StateSpecies::markov_value_nopop_calc(const vector <unsigned int> &me_list, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, const PV &param_val)
 {
 	auto e_first = me_list[0];
 	auto &me = sp.markov_eqn[e_first];
@@ -222,7 +223,7 @@ vector <double> StateSpecies::markov_value_nopop_calc(const vector <unsigned int
 					auto &div = markov_eqn_vari[e].div;			
 					auto val = div[ti].value;
 					
-					auto value = eq.calculate(ti,popnum_t[ti],precalc)*dt;
+					auto value = eq.calculate(ti,popcomb_t[ti],precalc)*dt;
 					
 					if(dif(value,val,TINY)){
 						cout << val << " " << value << "ch" << endl;
@@ -235,6 +236,7 @@ vector <double> StateSpecies::markov_value_nopop_calc(const vector <unsigned int
 
 	return store;
 }
+*/
 
 
 /// Restores values for 
@@ -255,7 +257,8 @@ void StateSpecies::markov_value_nopop_restore(const vector <unsigned int> &me_li
 /// Calculate the value of a series of markov equation
 // Equations are in the form: factor(t)*(pop_grad1*{pop1}+pop_grad2*{pop2}+...)+non_pop_eqn_val(t)
 // val is used to keep track of: pop_grad1*{pop1}+pop_grad2*{pop2}+...
-vector <double> StateSpecies::markov_value_linear_calc(const vector <unsigned int> &list, const LinearForm &lin_form, const vector < vector <double> > &popnum_t)
+// CHECKON
+vector <double> StateSpecies::markov_value_linear_calc(const vector <unsigned int> &list, const LinearForm &lin_form, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t)
 {
 	vector <double> store;
 
@@ -293,7 +296,7 @@ vector <double> StateSpecies::markov_value_linear_calc(const vector <unsigned in
 
 			for(auto k = 0u; k < L; k++){
 				auto ti = list[k];
-				if(dif(val_store[k][i],eq.calculate(ti,popnum_t[ti],precalc),TINY)){
+				if(dif(val_store[k][i],eq.calculate(ti,popcomb_t[ti],precalc),TINY)){
 					emsg("Not agree"); 
 				}
 			}
@@ -734,7 +737,7 @@ void StateSpecies::likelihood_ind_trans()
 
 
 /// Calculate the likelihood of non-Markovian transitions
-vector <double> StateSpecies::likelihood_nm_trans(unsigned int m, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, double &like_ch)
+vector <double> StateSpecies::likelihood_nm_trans(unsigned int m, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, double &like_ch)
 {
 	vector <double> store;
 
@@ -765,11 +768,11 @@ vector <double> StateSpecies::likelihood_nm_trans(unsigned int m, const vector <
 		auto &nmt_er = nm_ref[ti];
 	
 		if(nmt_er.size() > 0){	
-			const auto &popnum = popnum_t[ti];
+			const auto &popcomb = popcomb_t[ti];
 				
 			if(update == UPDATE_TIME){
 				for(auto i = 0u; i < ref.size(); i++){
-					ref_val[i] = eqn[ref[i]].calculate(ti,popnum,precalc);
+					ref_val[i] = eqn[ref[i]].calculate(ti,popcomb,precalc);
 				}
 			}
 		
@@ -778,7 +781,7 @@ vector <double> StateSpecies::likelihood_nm_trans(unsigned int m, const vector <
 
 				if(update == UPDATE_IND){
 					for(auto i = 0u; i < ref.size(); i++){
-						ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popnum,precalc);
+						ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popcomb,precalc);
 					}
 				}
 			
@@ -826,7 +829,7 @@ void StateSpecies::likelihood_nm_trans_restore(unsigned int m, const vector <uns
 
 
 /// Calculate the likelihood of non-Markovian transitions
-vector <double> StateSpecies::likelihood_nm_trans_bp(unsigned int m, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, double &like_ch)
+vector <double> StateSpecies::likelihood_nm_trans_bp(unsigned int m, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, double &like_ch)
 {
 	vector <double> store;
 	
@@ -846,13 +849,13 @@ vector <double> StateSpecies::likelihood_nm_trans_bp(unsigned int m, const vecto
 			
 			for(auto ti : list){
 				if(nm_ref[ti].size() > 0){
-					const auto &popnum = popnum_t[ti];
+					const auto &popcomb = popcomb_t[ti];
 									
 					for(auto &nmti : nm_ref[ti]){
 						auto &ind = individual[nmti.i];
 						auto prob = 1.0;
 						for(auto e : nmt.bp_other_eq){
-							prob -= eqn[e].calculate_indfac(ind,ti,popnum,precalc);
+							prob -= eqn[e].calculate_indfac(ind,ti,popcomb,precalc);
 						}
 						auto &ev = ind.ev[nmti.e_end];
 					
@@ -903,18 +906,18 @@ vector <double> StateSpecies::likelihood_nm_trans_bp(unsigned int m, const vecto
 			
 			for(auto ti : list){
 				if(nmt_ref[ti].size() > 0){
-					const auto &popnum = popnum_t[ti];
+					const auto &popcomb = popcomb_t[ti];
 						
 					if(update == UPDATE_IND){
 						for(auto &nmti : nmt_ref[ti]){
 							auto &ind = individual[nmti.i];
 						
-							auto val = eq.calculate_indfac(ind,ti,popnum,precalc);
+							auto val = eq.calculate_indfac(ind,ti,popcomb,precalc);
 							
 							if(nmt.all_branches){
 								auto div = 0.0;
 								for(auto e : nmt.bp_all_eq){
-									div += eqn[e].calculate_indfac(ind,ti,popnum,precalc);
+									div += eqn[e].calculate_indfac(ind,ti,popcomb,precalc);
 								}
 								val /= div;
 							}
@@ -930,12 +933,12 @@ vector <double> StateSpecies::likelihood_nm_trans_bp(unsigned int m, const vecto
 					}
 					else{
 						if(update == UPDATE_TIME){
-							auto val = eq.calculate(ti,popnum,precalc);
+							auto val = eq.calculate(ti,popcomb,precalc);
 							
 							if(nmt.all_branches){
 								auto div = 0.0;
 								for(auto e : nmt.bp_all_eq){
-									div += eqn[e].calculate(ti,popnum,precalc);
+									div += eqn[e].calculate(ti,popcomb,precalc);
 								}
 								val /= div;
 							}
@@ -979,7 +982,7 @@ void StateSpecies::likelihood_nm_trans_bp_restore(unsigned int m, const vector <
 
 
 /// Calculate the likelihood of non-Markovian incomplete transitions
-vector <double> StateSpecies::likelihood_nm_trans_incomp(unsigned int n, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, double &like_ch)
+vector <double> StateSpecies::likelihood_nm_trans_incomp(unsigned int n, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, double &like_ch)
 {
 	vector <double> store;
 	
@@ -1068,14 +1071,14 @@ vector <double> StateSpecies::likelihood_nm_trans_incomp(unsigned int n, const v
 	for(auto ti : list){
 		auto &nmit_er = nm_incomp_ref[ti];
 	
-		const auto &popnum = popnum_t[ti];
+		const auto &popcomb = popcomb_t[ti];
 		
 		for(auto b = 0u; b < B; b++){
 			if(update[b] == UPDATE_TIME){
 				auto m = nmti.nmtrans_ref[b];
 				const auto &ref = sp.nm_trans[m].dist_param_eq_ref;
 				for(auto i = 0u; i < ref.size(); i++){
-					ref_val[b][i] = eqn[ref[i]].calculate(ti,popnum,precalc);
+					ref_val[b][i] = eqn[ref[i]].calculate(ti,popcomb,precalc);
 				}
 			}
 		}
@@ -1085,7 +1088,7 @@ vector <double> StateSpecies::likelihood_nm_trans_incomp(unsigned int n, const v
 				if(b != b_sel){
 					auto m = nmti.nmtrans_ref[b];			
 					auto bp_eq = sp.nm_trans[m].bp_eq;
-					bp_val[b] = eqn[bp_eq].calculate(ti,popnum,precalc);
+					bp_val[b] = eqn[bp_eq].calculate(ti,popcomb,precalc);
 				}
 			}
 			
@@ -1109,7 +1112,7 @@ vector <double> StateSpecies::likelihood_nm_trans_incomp(unsigned int n, const v
 					auto m = nmti.nmtrans_ref[b];
 					const auto &ref = sp.nm_trans[m].dist_param_eq_ref;
 					for(auto i = 0u; i < ref.size(); i++){
-						ref_val[b][i] = eqn[ref[i]].calculate_indfac(ind,ti,popnum,precalc);
+						ref_val[b][i] = eqn[ref[i]].calculate_indfac(ind,ti,popcomb,precalc);
 					}
 				}
 			}
@@ -1119,7 +1122,7 @@ vector <double> StateSpecies::likelihood_nm_trans_incomp(unsigned int n, const v
 					if(b != b_sel){
 						auto m = nmti.nmtrans_ref[b];			
 						auto bp_eq = sp.nm_trans[m].bp_eq;			
-						bp_val[b] = eqn[bp_eq].calculate_indfac(ind,ti,popnum,precalc);
+						bp_val[b] = eqn[bp_eq].calculate_indfac(ind,ti,popcomb,precalc);
 					}
 				}
 				
@@ -1267,7 +1270,7 @@ MeanSD StateSpecies::get_mean_sd(TransType type, const vector <double> &ref_val)
 
 
 /// Works out how nm_trans likelihood changes as a result of ie changing
-vector <NMupdate> StateSpecies::likelihood_ie_nm_trans_change(unsigned int i, unsigned int ie, double factor, const vector < vector <double> > &popnum_t, double &like_ch)
+vector <NMupdate> StateSpecies::likelihood_ie_nm_trans_change(unsigned int i, unsigned int ie, double factor, const vector < vector <double> > &popcomb_t, double &like_ch)
 {
 	vector <NMupdate> nm_update;
 	
@@ -1292,7 +1295,7 @@ vector <NMupdate> StateSpecies::likelihood_ie_nm_trans_change(unsigned int i, un
 				vector <double> ref_val(ref.size());
 				for(auto i = 0u; i < ref.size(); i++){
 					const auto &eq = eqn[ref[i]];
-					ref_val[i] = eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);	
+					ref_val[i] = eq.calculate_indfac(ind,ti,popcomb_t[ti],precalc);	
 					if(eq.ind_eff_exist[ie]) ref_val[i] *= factor;
 				}
 				
@@ -1310,21 +1313,21 @@ vector <NMupdate> StateSpecies::likelihood_ie_nm_trans_change(unsigned int i, un
 						bp = 1.0;
 						for(auto e : nmt.bp_other_eq){
 							const auto &eq = eqn[e];
-							auto value = eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);
+							auto value = eq.calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 							if(eq.ind_eff_exist[ie]) value *= factor;
 							bp -= value;
 						}
 					}
 					else{	
 						const auto &eq = eqn[bp_eq];
-						bp = eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);
+						bp = eq.calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 						if(eq.ind_eff_exist[ie]) bp *= factor;
 							
 						if(nmt.all_branches){
 							auto div = 0.0;
 							for(auto e: nmt.bp_all_eq){
 								const auto &eq = eqn[e];
-								auto val = eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);
+								auto val = eq.calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 								if(eq.ind_eff_exist[ie]) val *= factor;
 								div += val; 
 							}
@@ -1356,7 +1359,7 @@ vector <NMupdate> StateSpecies::likelihood_ie_nm_trans_change(unsigned int i, un
 			auto dtdiv = inmt.tdiv_end - event[inmt.e_begin].tdiv; 
 			if(dtdiv <= 0) emsg("zero time");
 
-			auto val = get_nm_incomp_val_ie_factor(ie,factor,nmt,ti,ind,popnum_t);
+			auto val = get_nm_incomp_val_ie_factor(ie,factor,nmt,ti,ind,popcomb_t);
 			
 			auto Li = nm_trans_incomp_full_like(nmt.nmtrans_ref,dtdiv,dt,val.ref_val,val.bp_val);
 		
@@ -1541,14 +1544,14 @@ double StateSpecies::likelihood_indeff_change(unsigned int i, unsigned int ie, d
 
 
 /// Calculates the likelihood for the population transition numbers
-void StateSpecies::likelihood_pop(const vector < vector <double> > &popnum_t)
+void StateSpecies::likelihood_pop(const vector < vector <double> > &popcomb_t)
 {
 	auto list = seq_vec(T);
 	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 		auto &Li = Li_markov_pop[tr];
 		auto &tn = trans_num[tr];
 		auto &tnm = tnum_mean_st[tr];
-		calculate_tnum_mean_para(tnm,list,tr,popnum_t,cpop_st,dt);
+		calculate_tnum_mean_para(tnm,list,tr,popcomb_t,cpop_st,dt);
 		
 		for(auto ti = 0u; ti < T; ti++){
 			Li[ti] = poisson_probability(tn[ti],tnm[ti]);
@@ -1557,8 +1560,9 @@ void StateSpecies::likelihood_pop(const vector < vector <double> > &popnum_t)
 }
 
 
+// CHECKON
 /// Updates a section of likelihood
-void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, unsigned int ti2, const vector < vector <double> > &popnum_t, const vector <PopChange> &pop_change, double &like_ch)
+void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, unsigned int ti2, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector <PopChange> &pop_change, double &like_ch)
 {
 	tnum_mean_st_back(tr,ti1,ti2);
 	
@@ -1568,7 +1572,7 @@ void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, uns
 	
 	const auto &tra = sp.tra_gl[tr];
 	const auto &eq = eqn[tra.dist_param[0].eq_ref];
-	const auto &lin = eq.linearise;
+	const auto &lin = eq.lin;
 
 	// Different type of update:
 	// RECALC This recalculates each time
@@ -1577,7 +1581,10 @@ void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, uns
 	// USE_POP_DIF_TIME This uses just the change in populations (when gradient time dependent)
 	
 	auto type = RECALC;
-	
+	for(auto ti = ti1; ti < ti2; ti++){
+		tnm[ti] = calculate_tnum_mean(ti,tr,popcomb_t[ti],cpop_st[ti],dt);
+	}
+	/* CHECKON could this be more efficient?	
 	if(update_ind_linearise_speedup && lin.on){
 		type = USE_POP_DIF;	
 		if(lin.pop_grad_time_dep) type = USE_POP_DIF_TIME;
@@ -1590,14 +1597,14 @@ void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, uns
 	switch(type){
 	case RECALC:
 		for(auto ti = ti1; ti < ti2; ti++){
-			tnm[ti] = calculate_tnum_mean(ti,tr,popnum_t[ti],cpop_st[ti],dt);
+			tnm[ti] = calculate_tnum_mean(ti,tr,popcomb_t[ti],cpop_st[ti],dt);
 		}
 		break;
 	
 	case RECALC_PARA: case USE_POP_DIF_TIME:
 		{	
 			auto list = seq_vec(ti1,ti2);
-			calculate_tnum_mean_para(tnm,list,tr,popnum_t,cpop_st,dt);
+			calculate_tnum_mean_para(tnm,list,tr,popcomb_t,cpop_st,dt);
 		}
 		break;
 		
@@ -1616,7 +1623,7 @@ void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, uns
 					auto dpop = po_ch.num;
 						
 					for(auto ti = ti1; ti < ti2; ti++){
-						auto pop = popnum_t[ti][po];
+						auto pop = popcomb_t[ti][po];
 						if(pop < 0 || pop-dpop < 0){ negfl = true; break;}
 					}
 					if(negfl) break;
@@ -1725,6 +1732,7 @@ void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, uns
 		}
 		break;
 	}
+	*/
 	
 	for(auto ti = ti1; ti < ti2; ti++){
 		like_ch -= Li[ti];
@@ -1735,7 +1743,7 @@ void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, uns
 
 
 /// For a population-based model updates a section of likelihood based on a change in spline
-void StateSpecies::likelihood_pop_spline_section(unsigned int tr, unsigned int ti1, unsigned int ti2, const vector < vector <double> > &popnum_t, double &like_ch)
+void StateSpecies::likelihood_pop_spline_section(unsigned int tr, unsigned int ti1, unsigned int ti2, const vector < vector <double> > &popcomb_t, double &like_ch)
 {
 	if(type != POPULATION) emsg("must be ind");
 	
@@ -1746,7 +1754,7 @@ void StateSpecies::likelihood_pop_spline_section(unsigned int tr, unsigned int t
 	auto &tnm = tnum_mean_st[tr];
 	
 	auto list = seq_vec(ti1,ti2);
-	calculate_tnum_mean_para(tnm,list,tr,popnum_t,cpop_st,dt);
+	calculate_tnum_mean_para(tnm,list,tr,popcomb_t,cpop_st,dt);
 	
 	for(auto ti = ti1; ti < ti2; ti++){
 		like_ch -= Li[ti];
@@ -1757,7 +1765,7 @@ void StateSpecies::likelihood_pop_spline_section(unsigned int tr, unsigned int t
 
 
 /// For a individual-based model updates a section of likelihood based on a change in spline
-void StateSpecies::likelihood_ib_spline_section(unsigned int ee, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popnum_t, double &like_ch)
+void StateSpecies::likelihood_ib_spline_section(unsigned int ee, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popcomb_t, double &like_ch)
 {
 	if(type != INDIVIDUAL) emsg("must be ind");
 	
@@ -1774,7 +1782,7 @@ void StateSpecies::likelihood_ib_spline_section(unsigned int ee, unsigned int ti
 	auto list = seq_vec(ti,ti_next);
 			
 	const vector < vector < vector <double> > > derive_val;
-	auto value_para = eq.calculate_para(eq.calcu,list,popnum_t,precalc,derive_val); 
+	auto value_para = eq.calculate_para(eq.calcu,list,popcomb_t,precalc,derive_val); 
 		
 	vector <double> dLi_store, value_store;
 
@@ -1785,7 +1793,7 @@ void StateSpecies::likelihood_ib_spline_section(unsigned int ee, unsigned int ti
 		auto value = dt*value_para[tii-ti];
 		
 		if(false){
-			auto val_ch = dt*eq.calculate(tii,popnum_t[tii],precalc);
+			auto val_ch = dt*eq.calculate(tii,popcomb_t[tii],precalc);
 			if(dif(value,val_ch,dif_thresh)){
 				emsg("problem with value");
 			}
@@ -1838,7 +1846,7 @@ double StateSpecies::Li_update_tn(unsigned int tr, unsigned int ti, int sign)
 
 
 /// Updates the likelihood from change in c
-double StateSpecies::Li_update_c(unsigned int c, int ma, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popnum_t)
+double StateSpecies::Li_update_c(unsigned int c, int ma, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popcomb_t)
 {
 	auto d = 0.0;
 	for(auto tr : sp.comp_gl[c].tr_leave){
@@ -1858,7 +1866,7 @@ double StateSpecies::Li_update_c(unsigned int c, int ma, unsigned int ti, unsign
 				tnmr *= cpop_st[tii][c]/c_bef;
 			}
 			else{
-				tnmr = calculate_tnum_mean(tii,tr,popnum_t[tii],cpop_st[tii],dt);
+				tnmr = calculate_tnum_mean(tii,tr,popcomb_t[tii],cpop_st[tii],dt);
 			}
 			
 			auto Li_new = poisson_probability(tn[tii],tnmr);	
@@ -1872,14 +1880,15 @@ double StateSpecies::Li_update_c(unsigned int c, int ma, unsigned int ti, unsign
 
 
 /// Works out the change in the likelihood due to population change
-vector <double> StateSpecies::likelihood_pop_change(unsigned int tr, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, double &like_ch)
+// CHECKON
+vector <double> StateSpecies::likelihood_pop_change(unsigned int tr, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, double &like_ch)
 {
 	vector <double> store;
 
 	auto &tnm = tnum_mean_st[tr];
 	for(auto ti : list) store.push_back(tnm[ti]);
 		
-	calculate_tnum_mean_para(tnm,list,tr,popnum_t,cpop_st,dt);
+	calculate_tnum_mean_para(tnm,list,tr,popcomb_t,cpop_st,dt);
 	
 	calculate_markov_Li(tr,list,like_ch,store);
 	
@@ -1928,7 +1937,7 @@ vector <double> StateSpecies::likelihood_pop_change_nopop(const vector <unsigned
 	
 	const auto &eq = eqn[tra.dist_param[0].eq_ref];
 	
-	const auto &lin = eq.linearise;
+	const auto &lin = eq.lin;
 	const auto &npp = lin.no_pop_precalc;
 	
 	const auto &precalc = param_val.precalc;
@@ -1982,6 +1991,7 @@ void StateSpecies::likelihood_pop_change_nopop_restore(const vector <unsigned in
 /// Calculate the value of a series of transitions (population-based models)
 // Equations are in the form: factor(t)*(pop_grad1*{pop1}+pop_grad2*{pop2}+...)+non_pop_eqn_val(t)
 // val is used to keep track of: pop_grad1*{pop1}+pop_grad2*{pop2}+...
+// CHECKON
 vector <double> StateSpecies::likelihood_pop_change_linear(const vector <unsigned int> &list, const LinearForm &lin_form, const vector < vector <double> > &popnum_t, double &like_ch)
 {
 	vector <double> store;
@@ -2046,6 +2056,8 @@ vector <double> StateSpecies::likelihood_pop_change_linear(const vector <unsigne
 /// This updates equations by making changes to factor or nopop part
 bool StateSpecies::likelihood_pop_change_linear_factor_nopop(const vector <unsigned int> &list, const LinearForm &lin_form, double &like_ch, vector <double> &store)
 {
+	emsg("sort2");
+	/*
 	auto L = list.size();
 	const auto &lf_list = lin_form.list; 	
 	auto imax = lf_list.size();
@@ -2120,6 +2132,7 @@ bool StateSpecies::likelihood_pop_change_linear_factor_nopop(const vector <unsig
 		
 		calculate_markov_Li(tr,list,like_ch,store);
 	}
+	*/
 	
 	return true;
 }
@@ -2191,7 +2204,7 @@ vector <double> StateSpecies::likelihood_init_cond(double &like_ch)
 
 
 /// Gets the values for the incomplete nm trans
-NMIncompVal StateSpecies::get_nm_incomp_val(const NMTransIncomp &nmti, unsigned int ti, const Individual &ind, const vector < vector <double> > &popnum_t) const
+NMIncompVal StateSpecies::get_nm_incomp_val(const NMTransIncomp &nmti, unsigned int ti, const Individual &ind, const vector < vector <double> > &popcomb_t) const
 {
 	const auto &nmtrans_ref = nmti.nmtrans_ref;
 	
@@ -2213,9 +2226,9 @@ NMIncompVal StateSpecies::get_nm_incomp_val(const NMTransIncomp &nmti, unsigned 
 		ref_val[b].resize(ref.size());
 		for(auto i = 0u; i < ref.size(); i++){
 			const auto &eq = eqn[ref[i]];
-			if(eq.ind_eff == true) ref_val[b][i] = eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);
+			if(eq.ind_eff == true) ref_val[b][i] = eq.calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 			else{
-				if(eq.time_vari) ref_val[b][i] = eq.calculate(ti,popnum_t[ti],precalc);
+				if(eq.time_vari) ref_val[b][i] = eq.calculate(ti,popcomb_t[ti],precalc);
 				else{
 					ref_val[b][i] = eq.calculate_param(precalc);
 				}
@@ -2227,9 +2240,9 @@ NMIncompVal StateSpecies::get_nm_incomp_val(const NMTransIncomp &nmti, unsigned 
 			if(bp_eq == BP_FROM_OTHERS) b_sel = b;
 			else{
 				const auto &eq = eqn[bp_eq];
-				if(eq.ind_eff == true) bp_val[b] = eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);
+				if(eq.ind_eff == true) bp_val[b] = eq.calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 				else{
-					if(eq.time_vari) bp_val[b] = eq.calculate(ti,popnum_t[ti],precalc);
+					if(eq.time_vari) bp_val[b] = eq.calculate(ti,popcomb_t[ti],precalc);
 					else bp_val[b] = eq.calculate_param(precalc);
 				}
 			}
@@ -2267,7 +2280,7 @@ void StateSpecies::print_incomp_val(string te, NMIncompVal value) const
 		
 
 /// Gets the values for the incomplete nm trans with individual effect changed by a factor
-NMIncompVal StateSpecies::get_nm_incomp_val_ie_factor(unsigned int ie, double factor, const NMTransIncomp &nmti, unsigned int ti, const Individual &ind, const vector < vector <double> > &popnum_t) const
+NMIncompVal StateSpecies::get_nm_incomp_val_ie_factor(unsigned int ie, double factor, const NMTransIncomp &nmti, unsigned int ti, const Individual &ind, const vector < vector <double> > &popcomb_t) const
 {
 	const auto &nmtrans_ref = nmti.nmtrans_ref;
 	 
@@ -2288,7 +2301,7 @@ NMIncompVal StateSpecies::get_nm_incomp_val_ie_factor(unsigned int ie, double fa
 		ref_val[b].resize(ref.size());
 		for(auto i = 0u; i < ref.size(); i++){
 			const auto &eq = eqn[ref[i]];
-			ref_val[b][i] = eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);
+			ref_val[b][i] = eq.calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 			if(eq.ind_eff_exist[ie]) ref_val[b][i] *= factor;
 		}
 	
@@ -2297,7 +2310,7 @@ NMIncompVal StateSpecies::get_nm_incomp_val_ie_factor(unsigned int ie, double fa
 			if(bp_eq == BP_FROM_OTHERS) b_sel = b;
 			else{
 				const auto &eq = eqn[bp_eq];
-				bp_val[b] = eq.calculate_indfac(ind,ti,popnum_t[ti],precalc);
+				bp_val[b] = eq.calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 				if(eq.ind_eff_exist[ie]) bp_val[b] *= factor;
 			}
 		}
@@ -2418,7 +2431,7 @@ double StateSpecies::sum_markov_prob(double t1, double t2, unsigned int c, unsig
 
 
 /// Calculates the estimated and actual number of transitions in each division for each global transition
-void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <double> > &popnum_t)
+void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <double> > &popcomb_t)
 {	
 	auto &cpd = ps.cum_prob_dist;
 	auto &en = ps.exp_num;
@@ -2504,8 +2517,8 @@ void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <d
 								tr_gl = sp.tr_trans(tr_gl,ev_or.c_after);
 							}
 							
-							add_nm_prob(tr_gl,ev_or.tdiv,ps,popnum_t,ind);
-							add_nm_cpd(tr_gl,ev_or.tdiv,ev.tdiv,ps,popnum_t,ind);
+							add_nm_prob(tr_gl,ev_or.tdiv,ps,popcomb_t,ind);
+							add_nm_cpd(tr_gl,ev_or.tdiv,ev.tdiv,ps,popcomb_t,ind);
 							
 							origin[cl] = e;
 						}
@@ -2592,8 +2605,8 @@ void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <d
 								auto t1 = ev_or.tdiv;
 								
 								if(B == 1){
-									add_nm_prob(tlg.tr_list[0],t1,ps,popnum_t,ind);
-									add_nm_cpd(tlg.tr_list[0],t1,UNSET,ps,popnum_t,ind);
+									add_nm_prob(tlg.tr_list[0],t1,ps,popcomb_t,ind);
+									add_nm_cpd(tlg.tr_list[0],t1,UNSET,ps,popcomb_t,ind);
 								}
 								else{
 									auto ti = get_ti(t1);
@@ -2616,10 +2629,10 @@ void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <d
 
 										vector <double> ref_val(ref.size());
 										for(auto i = 0u; i < ref.size(); i++){
-											ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+											ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 										}
 			
-										auto bp = eqn[tra.bp.eq_ref].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+										auto bp = eqn[tra.bp.eq_ref].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 										pr_st[b] = nm_trans_incomp_like_no_log(nmt.type,t_end-t1,dt,ref_val);
 											
 										sum += bp;
@@ -2634,7 +2647,7 @@ void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <d
 										auto z = sum*ran();
 										auto k = 0u; while(k < B && z > sum_store[k]) k++;
 										if(k == B) emsg("Should not be B");	
-										add_nm_prob(tlg.tr_list[k],t1,ps,popnum_t,ind);								
+										add_nm_prob(tlg.tr_list[k],t1,ps,popcomb_t,ind);								
 									}
 									
 									// For updating cumulative probability distribution, the branch must be 
@@ -2666,7 +2679,7 @@ void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <d
 
 
 /// Adds probabilities for a non-Markovian transition
-void StateSpecies::add_nm_prob(unsigned tr_gl_or, double t1, ParticleSpecies &ps, const vector < vector <double> > &popnum_t, const Individual &ind) const
+void StateSpecies::add_nm_prob(unsigned tr_gl_or, double t1, ParticleSpecies &ps, const vector < vector <double> > &popcomb_t, const Individual &ind) const
 {						
 	auto &en = ps.exp_num;
 	double t_end = T;
@@ -2681,7 +2694,7 @@ void StateSpecies::add_nm_prob(unsigned tr_gl_or, double t1, ParticleSpecies &ps
 	
 	vector <double> ref_val(ref.size());
 	for(auto i = 0u; i < ref.size(); i++){
-		ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+		ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 	}
 
 	if(nmt.type == PERIOD){
@@ -2739,7 +2752,7 @@ void StateSpecies::add_nm_prob(unsigned tr_gl_or, double t1, ParticleSpecies &ps
 
 
 /// Adds to cumulative probability distribution
-void StateSpecies::add_nm_cpd(unsigned tr_gl_or, double t1, double t2, ParticleSpecies &ps, const vector < vector <double> > &popnum_t, const Individual &ind) const
+void StateSpecies::add_nm_cpd(unsigned tr_gl_or, double t1, double t2, ParticleSpecies &ps, const vector < vector <double> > &popcomb_t, const Individual &ind) const
 {	
 	auto &cpd = ps.cum_prob_dist;
 	double t_end = T;
@@ -2754,7 +2767,7 @@ void StateSpecies::add_nm_cpd(unsigned tr_gl_or, double t1, double t2, ParticleS
 
 	vector <double> ref_val(ref.size());
 	for(auto i = 0u; i < ref.size(); i++){
-		ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+		ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 	}
 	
 	double pr;

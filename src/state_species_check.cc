@@ -12,17 +12,18 @@ using namespace std;
 #include "utils.hh"
 
 /// Check under simulation
-void StateSpecies::check(unsigned int ti, const vector < vector <double> > &popnum_t)
+void StateSpecies::check(unsigned int ti, const vector < vector <double> > &popcomb_t)
 {
-	const auto &popnum = popnum_t[ti];
+	const auto &popcomb = popcomb_t[ti];
 	
 	if(type == INDIVIDUAL){
 		check_markov_eqn_ref();
 		check_cpop();
-		check_markov_eqn(ti,popnum);
+		check_markov_eqn(ti,popcomb);
 		check_markov_tree_rate();
 	}
 	else{
+		check_markov_eqn(ti,popcomb);
 		check_trans_num_neg(); 
 	}
 	check_erlang();
@@ -106,7 +107,7 @@ void StateSpecies::check_cpop() const
 
 
 /// Checks that markov_eqn is correctly set
-void StateSpecies::check_markov_eqn(unsigned int ti, const vector <double> &popnum) const
+void StateSpecies::check_markov_eqn(unsigned int ti, const vector <double> &popcomb) const
 {
 	const auto &precalc = param_val.precalc;
 	
@@ -117,30 +118,35 @@ void StateSpecies::check_markov_eqn(unsigned int ti, const vector <double> &popn
 		
 		double value;
 		if(me.rate){
-			value = eqn[me.eqn_ref].calculate(ti,popnum,precalc);	
+			value = eqn[me.eqn_ref].calculate(ti,popcomb,precalc);	
 		}
 		else{
-			auto mean = eqn[me.eqn_ref].calculate(ti,popnum,precalc);
+			auto mean = eqn[me.eqn_ref].calculate(ti,popcomb,precalc);
 			value = 1.0/mean;
 		}
+		value *= dt;
 		
 		if(dif(value,me_vari.value,dif_thresh)){
 			emsg("value problem");
 		}
 		
-		auto sum = 0.0; 	
-		if(me.source == true) sum = me.source_tr_gl.size();
-		else{	
-			for(auto i = 0u; i < me_vari.ind_tra.size(); i++){
-				const auto &it = me_vari.ind_tra[i];
-				
-				const auto &ind = individual[it.i];
-				auto val = get_indfac(ind,me);
-				sum += val;
+		if(sp.type == INDIVIDUAL){
+			auto sum = 0.0; 	
+			if(me.source == true) sum = me.source_tr_gl.size();
+			else{	
+				for(auto i = 0u; i < me_vari.ind_tra.size(); i++){
+					const auto &it = me_vari.ind_tra[i];
+					
+					const auto &ind = individual[it.i];
+					auto val = get_indfac(ind,me);
+					sum += val;
+				}
+			}
+			
+			if(dif(me_vari.indfac_sum,sum,dif_thresh)){
+				emsg("indfac_sum problem");
 			}
 		}
-		
-		if(dif(me_vari.indfac_sum,sum,dif_thresh)) emsg("indfac_sum problem");
 	}
 };
 

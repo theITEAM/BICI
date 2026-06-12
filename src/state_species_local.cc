@@ -685,7 +685,7 @@ void StateSpecies::rate_store_init()
 
 
 /// Updates information which gives the rates of transition (for local proposals)
-void StateSpecies::update_rate_mean(const vector < vector <double> > &popnum_t)
+void StateSpecies::update_rate_mean(const vector < vector <double> > &popcomb_t)
 {	
 	auto fac = UPDATE_RATE_FAC;
 	if(rate_mean.first == true){ fac = 0; rate_mean.first = false;}
@@ -711,7 +711,7 @@ void StateSpecies::update_rate_mean(const vector < vector <double> > &popnum_t)
 	const auto &precalc = param_val.precalc;
 	
 	vector < vector <double> > bp_store;
-	auto nm_rate = sp.calc_nm_rate(true,precalc,popnum_t,eqn,bp_store);
+	auto nm_rate = sp.calc_nm_rate(true,precalc,popcomb_t,eqn,bp_store);
 	
 	for(auto m = 0u; m < sp.nm_trans.size(); m++){
 		auto &trate = rate_mean.tra_rate[M+m];

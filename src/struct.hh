@@ -149,7 +149,6 @@ struct LinearForm {                // Stores information for mbp speedup
 	HashSimp hash_po;
 };
 
-
 struct MBPfast {
 	vector <unsigned int> calc_tr;   // Transitions which must be calculated
 	LinearForm lin_form;
@@ -247,6 +246,11 @@ struct PopIndex {
 	vector <PopDep> dep;             // Determines indices yet to be set
 };
 
+struct PopCombRef {                // Refences popcombs that the population belongs to
+	unsigned int pcref;              // References popcomb
+	unsigned int wref;               // References weight	
+};
+
 struct Population {                // Stores a population (used in an equation)
 	string name;                     // The name of the population
 	unsigned int p;                  // The species number
@@ -256,7 +260,30 @@ struct Population {                // Stores a population (used in an equation)
 	vector <PopulationTerm> term;    // The global compartments which contribute to the popualtion
 	vector <PopMarkovEqnRef> markov_eqn_ref;// References Markov equations which include population
 	vector <PopTransRef> trans_ref;  // References transitions which include population
+	vector <PopCombRef> popcomb_ref; // References population combination  
 	HashSimp hash_spline_update;
+};
+
+struct PopComb {                   // Stores a population contribution
+	unsigned int po;                 // The population
+	unsigned int wref;               // References the weight
+};
+
+struct PopCombTemp {               // Temporarily stores information about popcomb
+	unsigned int po;
+	EqItem it;  
+	unsigned int r;
+	unsigned int j;
+};
+	
+struct PopCombIn {                 // References which popcomb the weight is in
+	unsigned int pc;                 // References which popcomb
+	unsigned index;                  // The index within the popcomb
+};
+
+struct PopCombWeight {             // Stores a weight used in a popcomb
+	EqItem it;                       // Item which gives the weight
+	vector <PopCombIn> pcref;        // References which popcomb the weight is in
 };
 
 struct ParamProp {                 // Stores properties of a parameter
@@ -1169,12 +1196,14 @@ struct MarkovEqn {                 // Stores information about the Markov equati
 	bool infection_trans;            // Determines if relates to an infection transition (used for trans tree likelihood)
 	vector <unsigned int> ind_eff_mult; // References an individual effect which multiplies equation
 	vector <unsigned int> fix_eff_mult; // References fixed effects whihc multiply equation
+	bool always_recalc;              // Determines if always needs to be recalculated (else use param_change)
+	vector <bool> param_change;      // Determines if parameter changes as a function of time
 };
 
 struct MarkovEqnVariation {        // Stores variation in Markov equations for a species
 	bool time_vari;                  // Determines if equation has time variation
 	vector <IndTransRef> ind_tra;    // The individual transtions associated with equation 
-	double dt;                      // The timestep used for divisions (set to UNSET for no time)
+	double dt;                       // The timestep used for divisions (set to UNSET for no time)
 	
 	// Used in simulation
 	double value;                    // The value
@@ -2152,38 +2181,40 @@ struct SumInfo {                           // Stores information about a sum
 	double distmax;                          // The distance over which the sum acts
 };
 
-struct PopCalculation                      // Used to describe a population calculation
+struct PopCombCalc                         // Used to describe a population calculation
 {
 	vector <Calculation> calc;               // A calculation
-	unsigned int po;                         // The population which multiplies calculation 
+	unsigned int pco;                        // The popcomb which multiplies calculation 
 };
 
 	
 struct LinearCalculation                   // Stores a linear calculation
 {
-	PopCalculation no_pop_calc;              // Calculates non-population part
-	vector <PopCalculation> pop_calc;        // Calculates parts multiplying populations
-	HashSimp hash_simp;                      // Simple hash table for population
+	PopCombCalc no_pop_calc;                 // Calculates non-population part
+	vector <PopCombCalc> popcomb_calc;       // Calculates parts multiplying popcombs
+	HashSimp hash_simp;                      // Simple hash table for popcombs
 };
 
 struct Linearise {                         // Information about linearising an equation 
 	bool on;                                 // Determines if linearisation is possible
 	
-	vector <Calculation> no_pop_calc_store;  // Stores no pop calculation
+	//vector <Calculation> no_pop_calc_store;  // Stores no pop calculation
 	
-	vector < vector <Calculation> > pop_grad_calc_store;  // Stores no pop calculation
+	//vector < vector <Calculation> > popcomb_grad_calc_store;  // Stores no pop calculation
 	
-	vector <Calculation> factor_calc;        // Quantities multiplied together for the factor 
+	vector <unsigned int> popcomb_list;        // Lists the population combinations
+	
+	//vector <Calculation> factor_calc;        // Quantities multiplied together for the factor 
 
 	EqItem no_pop_precalc;                   // Stores no_pop precalc number 
 	
-	vector <EqItem> pop_grad_precalc;        // Stores calculation precalc for gradients
+	vector <EqItem> popcomb_grad_precalc;        // Stores calculation precalc for gradients
 	
-	EqItem factor_precalc;                   // Quantities multiplied together for the factor 
+	//EqItem factor_precalc;                   // Quantities multiplied together for the factor 
 	
-	bool no_pop_calc_time_dep;               // Determines if time dependent
-	bool factor_time_dep;                    // Set if the factor is time dependent
-	bool pop_grad_time_dep;                  // Set if population gradient is dependent
+	//bool no_pop_calc_time_dep;               // Determines if time dependent
+	//bool factor_time_dep;                    // Set if the factor is time dependent
+	//bool pop_grad_time_dep;                  // Set if population gradient is dependent
 	
 	vector < vector <PopRefFromPo> > pop_ref_from_po; // Gets pop_ref from population	
 		
@@ -2217,4 +2248,9 @@ struct Define {                    // Stores definition
 struct Substitution {              // Used when substituting in defined quantities
 	string index;
 	unsigned int i;
+};
+
+struct EqnRange {                  // Stores a section of an equation
+	unsigned int start;
+	unsigned int end;
 };

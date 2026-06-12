@@ -209,7 +209,7 @@ void Proposal::update_sampler(const CorMatrix &cor_matrix)
 
 
 /// Samples from the covariance matrix
-double Proposal::param_resample(PV &param_val, const vector < vector <double> > &popnum_t)
+double Proposal::param_resample(PV &param_val, const vector < vector <double> > &popcomb_t)
 {
 	timer[PARAM_RESAMPLE_TIMER] -= clock();
 	
@@ -275,7 +275,7 @@ double Proposal::param_resample(PV &param_val, const vector < vector <double> > 
 		if(pv.reparam_time_dep == false) value[j] = model.eqn[ref].calculate_param(precalc);
 		else{
 			auto ti = pv.reparam_spl_ti;
-			value[j] = model.eqn[ref].calculate(ti,popnum_t[ti],precalc);
+			value[j] = model.eqn[ref].calculate(ti,popcomb_t[ti],precalc);
 		}
 	
 		if(model.in_bounds(value[j],j,precalc) == false){
@@ -735,6 +735,8 @@ void Proposal::ind_obs_prob_update(IndSimProb &isp) const
 /// Sets quantities used to speed up MBPs
 void Proposal::set_mbp_fast()
 {
+	emsg("sort3");
+	/*
 	const auto &sp = model.species[p_prop];
 	
 	vector <LinearFormInit> lfinit;
@@ -754,6 +756,7 @@ void Proposal::set_mbp_fast()
 	}
 	
 	model.species[p_prop].set_linear_form(mbp_fast.lin_form,lfinit,model.eqn);
+	*/
 }
 
 

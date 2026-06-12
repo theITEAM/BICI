@@ -671,13 +671,12 @@ void Input::eqn_mem_usage(string name, const vector <unsigned int> &vec) const
 		for(const auto &val : eqn.comp_pref_convert) comp_pref += vecsize+val.size();
 		time += vecsize+2*eqn.time.size();
 		
-		const auto &lin = eqn.linearise;
+		const auto &lin = eqn.lin;
 		
 		linear += 4;
 		//for(auto &ca : lin.no_pop_calc) linear += 2 + vecsize + 2*ca.item.size();
-		for(const auto &pgc : lin.pop_grad_calc_store){
-			linear += 2*pgc.size();
-		}
+		linear += 8 + vecsize + lin.popcomb_grad_precalc.size()*8;
+	
 		linear += vecsize; 
 		for(const auto &prfp : lin.pop_ref_from_po){
 			linear += vecsize + 2*prfp.size(); 

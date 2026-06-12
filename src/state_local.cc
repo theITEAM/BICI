@@ -185,7 +185,7 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 					}	
 				}
 				
-				like_ch.markov += ssp.Li_update_c(c,ma,ti,ti_next,popnum_t);
+				like_ch.markov += ssp.Li_update_c(c,ma,ti,ti_next,popcomb_t);
 			}
 		}
 		

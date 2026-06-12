@@ -26,7 +26,7 @@ class Precalc                             // Stores information about the model
 		vector <double> calculate_precalc_init(const SpecPrecalc &spec_precalc) const;
 		const vector <unsigned int>& get_list_time(unsigned int cit, const SpecPrecalc &spec) const;
 		void calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store) const;
-		bool add_eqn(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref, SpecPrecalc &spec_precalc, PrecalcAddType add_type=PRECALC_ALL);
+		void add_eqn(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref, SpecPrecalc &spec_precalc);
 		void add_eqn_simp(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref);
 		unsigned int add_param(unsigned int th);
 		void calcu_add(const PreCalc &ca);
@@ -48,6 +48,7 @@ class Precalc                             // Stores information about the model
 		double hash_ca_mem() const;
 		void hash_off();
 		string print_ca(unsigned int i, const PreCalc &ca) const;
+		bool combine_multiply_add(vector <Calculation> &calc, vector <unsigned int> &become_Rrecalc) const;
 	
 	private:
 		vector <unsigned int> get_vec(const PreCalc &ca) const;

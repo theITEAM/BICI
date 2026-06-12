@@ -155,11 +155,9 @@ double Input::equation_profile() const
 	{	
 		auto sum = 0.0;
 		for(const auto &eqn : model.eqn){
-			const auto &lin = eqn.linearise;
-			sum += mem(lin.no_pop_calc_store);
-			for(const auto &v : lin.pop_grad_calc_store) sum += mem(v);
-			sum += mem(lin.factor_calc);
-			sum += lin.pop_grad_precalc.size()*8;
+			const auto &lin = eqn.lin;
+			sum += 8;
+			sum += lin.popcomb_grad_precalc.size()*8;
 			
 			sum += sizeof(vector < vector <PopRefFromPo> >);
 			for(const auto &val : lin.pop_ref_from_po){

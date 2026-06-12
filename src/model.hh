@@ -46,6 +46,12 @@ class Model                                // Stores information about the model
 		
 		vector <Population> pop;               // Stores information about populations of interest
 		
+		vector < vector <PopComb> > popcomb;   // Population combination
+		unsigned int npopcomb;                 // Number of popcomb (excluding those used for derive)
+		
+		vector <PopCombWeight> popcombw;       // Stores weight used in popcomb
+		unsigned int npopcombw;                // Number of popcomb weights (excluding those used for derive)
+	
 		Hash hash_pop;                         // Hash table for populations
 	
 		GeneticData genetic_data;              // Stores genetic data
@@ -107,10 +113,10 @@ class Model                                // Stores information about the model
 		void add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv = UNSET, bool keep_te = false);
 		void param_val_init(PV &param_val) const;
 		PV param_sample() const;
-		void param_spec_precalc_time(unsigned int ti, const vector < vector <double> > &popnum_t, PV &param_val, bool store) const;
+		void param_spec_precalc_time(unsigned int ti, const vector < vector <double> > &popcomb_t, PV &param_val, bool store) const;
 		bool sample_bounded() const;
 		void sample_ieg_cv(PV &param_val) const;
-		void param_spec_precalc_time_all(const vector < vector <double> > &popnum_t, PV &param_val, bool store) const;
+		void param_spec_precalc_time_all(const vector < vector <double> > &popcomb_t, PV &param_val, bool store) const;
 		//void param_spec_precalc_before(unsigned int th, PV &param_val, bool store) const;
 		//void param_spec_precalc_after(unsigned int th, PV &param_val, bool store) const;
 		PV post_param(const Sample &samp) const;
@@ -194,6 +200,10 @@ class Model                                // Stores information about the model
 		double calculate_equation_zero_one(string te, double tdiv, string &err);
 		double calculate_equation(string te, double tdiv, string &err);
 		DiagTestSens get_diag_test_sens(string comp, unsigned int p, string &warn) const;
+		void extract_popcomb(Hash &hashw, Hash &hashpc);
+		void extract_popcomb_derive(Hash &hashw, Hash &hashpc);
+		void print_popcomb() const;
+		void check_all_linear() const;
 		
 	private:
 		Hash hash_all_ind;                     // Stores individuals in a hash table

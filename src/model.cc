@@ -46,10 +46,11 @@ void Model::add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv, bool keep
 		
 		hash_eqn.add(eqi.eq_ref,vec);
 	
-		Equation eq(eqi,ti,species_simp,param,prior,derive,spline,param_vec,density,pop,hash_pop,constant,timepoint,details,define);
+		Equation eq(eqi,ti,species_simp,param,prior,derive,spline,param_vec,density,pop,hash_pop,popcomb,popcombw,constant,timepoint,details,define);
 		
 		// turn off
-		if(false && eq.warn != ""){ cout << eq.warn << endl; emsg_input("warning");}
+		if(true && eq.warn != ""){ cout << eq.warn << endl; emsg_input("warning");}
+		
 		eqn.push_back(eq);
 	}
 	
@@ -306,16 +307,16 @@ void Model::sample_ieg_cv(PV &param_val) const
 }
 
 /// Updates precalc for all times
-void Model::param_spec_precalc_time_all(const vector < vector <double> > &popnum_t, PV &param_val, bool store) const
+void Model::param_spec_precalc_time_all(const vector < vector <double> > &popcomb_t, PV &param_val, bool store) const
 {
 	for(auto ti = 0u; ti < details.T; ti++){
-		param_spec_precalc_time(ti,popnum_t,param_val,store);
+		param_spec_precalc_time(ti,popcomb_t,param_val,store);
 	}
 }
 
 	
 /// Updates parameter precalculation at given time point
-void Model::param_spec_precalc_time(unsigned int ti, const vector < vector <double> > &popnum_t, PV &param_val, bool store) const
+void Model::param_spec_precalc_time(unsigned int ti, const vector < vector <double> > &popcomb_t, PV &param_val, bool store) const
 {
 	auto ref = spec_precalc_time_ref[ti];
 	if(ref == UNSET) return;
@@ -334,7 +335,7 @@ void Model::param_spec_precalc_time(unsigned int ti, const vector < vector <doub
 			precalc_eqn.calculate(pv.spec_precalc_before,param_val,false);
 		
 			if(store) param_val.value_change(th);
-			value[th] = eqn[eq_ref].calculate_all_time(ti,popnum_t,precalc);
+			value[th] = eqn[eq_ref].calculate_all_time(ti,popcomb_t,precalc);
 			
 			//precalc_eqn.print_spec_precalc("after"+tstr(th)+".txt",pv.set_param_spec_precalc);
 			
@@ -1062,6 +1063,8 @@ AffectMap Model::get_affect_map(vector <AffectLike> &vec, const vector <unsigned
 // Calculates changes in non-population term as a way to speed up div value calculation 
 void Model::affect_nopop_speedup(vector <AffectLike> &vec, const vector <unsigned int> &param_list, const vector <unsigned int> &dependent, const SpecPrecalc &spec_precalc_after) const
 {			
+	emsg("sort7");
+/*
 	auto affect_map = get_affect_map(vec,param_list,dependent,spec_precalc_after);
 	
 	// Generates a list of elements in vec which can be converted	
@@ -1174,6 +1177,7 @@ void Model::affect_nopop_speedup(vector <AffectLike> &vec, const vector <unsigne
 		if(remove[i] == false) vec_new.push_back(vec[i]);
 	}
 	vec = vec_new;
+	*/
 }
 
 
@@ -1181,6 +1185,8 @@ void Model::affect_nopop_speedup(vector <AffectLike> &vec, const vector <unsigne
 // Makes changes to factor or no-pop value 
 void Model::set_factor_nopop_only(vector <AffectLike> &vec, const vector <unsigned int> &param_list, const vector <unsigned int> &dependent, const SpecPrecalc &spec_precalc_after) const
 {				
+	emsg("sort8");
+	/*
 	auto affect_map = get_affect_map(vec,param_list,dependent,spec_precalc_after);
 	
 	for(auto i = 0u; i < vec.size(); i++){
@@ -1220,6 +1226,7 @@ void Model::set_factor_nopop_only(vector <AffectLike> &vec, const vector <unsign
 			}
 		}
 	}
+	*/
 }
 
 		
@@ -1229,6 +1236,8 @@ void Model::set_factor_nopop_only(vector <AffectLike> &vec, const vector <unsign
 // changes in populations each time step to update the entire Markov div values 
 void Model::affect_linearise_speedup(vector <AffectLike> &vec) const
 {
+	emsg("sort9");
+	/*
 	auto i = 0u; 
 	while(i < vec.size()){
 		while(i < vec.size()){
@@ -1321,6 +1330,7 @@ void Model::affect_linearise_speedup(vector <AffectLike> &vec) const
 			i++;
 		}
 	}
+	*/
 }
 
 	
@@ -2468,7 +2478,7 @@ print_diag("h15a3");
 	// Multipilier of populations are not combine to allow for pop gradient factor to be extracted
 	for(auto &eq : eqn){
 		if(eq.precalc_done == false && eq.type != DERIVE_EQN){
-			eq.stop_combine_fl = precalc_eqn.add_eqn(eq.calcu,param_vec_ref,spline_ref,spec_precalc,PRECALC_STOP_COMBINE_MULT);
+			precalc_eqn.add_eqn(eq.calcu,param_vec_ref,spline_ref,spec_precalc);
 			eq.precalc_done = true;
 		}
 	}
@@ -2729,11 +2739,9 @@ void Model::create_precalc_derive()
 	for(auto &eq : eqn){
 		if(eq.precalc_done == false && eq.type == DERIVE_EQN){	
 			precalc_eqn.add_eqn(eq.calcu,param_vec_ref,spline_ref,spec_precalc_derive);
-			//precalc_eqn.add_eqn_simp(eq.calcu,param_vec_ref,spline_ref);
 		
 			for(auto &inte : eq.integral){		
 				precalc_eqn.add_eqn(inte.calc,param_vec_ref,spline_ref,spec_precalc_derive);
-				//precalc_eqn.add_eqn_simp(inte.calc,param_vec_ref,spline_ref);
 			}
 			
 			eq.precalc_done = true;
@@ -2745,6 +2753,8 @@ void Model::create_precalc_derive()
 /// Shifts calculations in pop_grad into precalc	
 void Model::create_precalc_pop_grad()
 {
+	emsg("sort10");
+	/*
 	for(auto &eq : eqn){
 		if(eq.stop_combine_fl){
 			precalc_eqn.add_eqn(eq.calcu,param_vec_ref,spline_ref,spec_precalc);
@@ -2762,6 +2772,7 @@ void Model::create_precalc_pop_grad()
 			precalc_eqn.add_eqn(lin.no_pop_calc_store,param_vec_ref,spline_ref,spec_precalc);
 		}
 	}
+	*/
 }
 
 	
@@ -3879,7 +3890,7 @@ double Model::calculate_equation(string te, double tdiv, string &err)
 		return UNSET;
 	}
 	
-	Equation eq(eqi,ti,species_simp,param,prior,derive,spline,param_vec,density,pop,hash_pop,constant,timepoint,details,define);
+	Equation eq(eqi,ti,species_simp,param,prior,derive,spline,param_vec,density,pop,hash_pop,popcomb,popcombw,constant,timepoint,details,define);
 	
 	if(eq.warn != ""){
 		err = eq.warn;
@@ -3887,7 +3898,7 @@ double Model::calculate_equation(string te, double tdiv, string &err)
 	}
 	else{
 		vector <double> precalc;
-		return eq.calculate_no_popnum(ti,precalc);
+		return eq.calculate_no_popcomb(ti,precalc);
 	}
 }
 
@@ -3966,3 +3977,81 @@ DiagTestSens Model::get_diag_test_sens(string comp, unsigned int p, string &warn
 	return dts;
 }
 
+
+/// Extracts linear combinations of populations from equations
+void Model::extract_popcomb(Hash &hashw, Hash &hashpc)
+{
+	for(auto &eq : eqn){
+		if(eq.type != DERIVE_EQN) eq.extract_popcomb(eq.calcu,hashw,hashpc,false);
+	}
+	npopcomb = popcomb.size();
+	npopcombw = popcombw.size();
+}
+
+
+/// Prints information about popcombs
+void Model::print_popcomb() const
+{
+	cout << "POPCOMB" << endl;
+	for(auto i = 0u; i < popcomb.size(); i++){
+		if(i >= npopcomb) cout << "DERIVE";
+		cout << i << ": ";
+		const auto &popc = popcomb[i];
+		for(const auto &pc : popc){
+			cout << pop[pc.po].name << " w=" << pc.wref << ", ";
+		}				
+		cout << endl;
+	}
+	cout << "popcombw" << endl;
+	for(auto i = 0u; i < popcombw.size(); i++){
+		if(i >= npopcombw) cout << "DERIVE";
+		const auto &pcw = popcombw[i];
+		const auto &it = pcw.it;
+		cout << "w=" << i << ": ";
+		switch(it.type){
+		case NUMERIC: cout << constant.value[it.num]; break;
+		case REG_PRECALC: cout << "Rpre" << it.num; break;
+		case ONE: cout << "1"; break;
+		case ZERO: cout << "0"; break;
+		default: emsg("Cannot print: "+tstr(it.type)); break;	
+		}
+		cout << " ";
+		for(const auto &va : pcw.pcref) cout << va.pc << " " << va.index << ", ";
+		cout << endl;
+	}
+	emsg("popcombw");
+}
+
+
+/// Extracts linear combinations of populations from equations for derived quantities
+void Model::extract_popcomb_derive(Hash &hashw, Hash &hashpc)
+{	
+	for(auto &eq : eqn){
+		if(eq.type == DERIVE_EQN){	
+			eq.extract_popcomb(eq.calcu,hashw,hashpc,true);
+			
+			for(auto &inte : eq.integral){		
+				eq.extract_popcomb(inte.calc,hashw,hashpc,true);
+			}
+		}
+	}
+}
+
+
+/// Check that everything is linear and with only one popcomb
+void Model::check_all_linear() const
+{
+	for(const auto &eq : eqn){
+		auto num = 0u; 
+		for(const auto &ca : eq.calcu){
+			for(const auto &it : ca.item){
+				if(it.type == POPCOMB) num++;
+			}				
+		}
+		if(eq.markov_eqn_ref != UNSET && eq.lin.on != true){
+			cout << eq.te_raw << " eqn\n";
+			emsg("Equation not linear!");
+		}
+		if(num > 1) emsg("More than one popcomb");
+	}
+}

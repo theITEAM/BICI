@@ -16,7 +16,7 @@ struct InitStateProb {                     // Used for sampling the initial stat
 class IndEvSampler                         // Stores information about an individual event sampler
 {
 	public:
-		IndEvSampler(vector <MarkovEqnVariation> &markov_eqn_vari, const vector <Individual> &individual, const Details &details, const Species &sp, vector <double> &obs_eqn_value, vector < vector <double> > &obs_trans_eqn_value, const vector <Equation> &eqn, const vector <InfNode> &inf_node, const vector <double> &precalc, vector < vector <double> > &popnum_t, bool no_ind_var = false);
+		IndEvSampler(vector <MarkovEqnVariation> &markov_eqn_vari, const vector <Individual> &individual, const Details &details, const Species &sp, vector <double> &obs_eqn_value, vector < vector <double> > &obs_trans_eqn_value, const vector <Equation> &eqn, const vector <InfNode> &inf_node, const vector <double> &precalc, vector < vector <double> > &popcomb_t, bool no_ind_var = false);
 	
 		bool illegal;                          // Determines if there is a problem with the sampler
 		
@@ -78,7 +78,7 @@ class IndEvSampler                         // Stores information about an indivi
 		const vector <Equation> &eqn;
 		const vector <InfNode> &inf_node;
 		const vector <double> &precalc;
-		vector < vector <double> > &popnum_t;
+		vector < vector <double> > &popcomb_t;
 		const vector <NMTrans> &nm_trans;
 		
 	// In ind_ev_sampler_noobs.cc

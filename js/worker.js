@@ -830,7 +830,7 @@ function process(e)
 				fi = "C:/Users/cpooley/Desktop/BICI_release/BICI_v0.8_windows/Execute/init.bici";
 			}
 			if(ver =="mac"){
-				fi = "/tmp/init.bici";
+				fi = "/tmp/BICI_files/init.bici";
 			}
 			percent(2)
 			load_bici(fi);

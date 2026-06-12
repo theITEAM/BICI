@@ -1,4 +1,4 @@
-// This file deals with linearisation of equations (in terms of populations and splines).
+// This file deals with linearisation of equations (in terms of poplation combinations).
 // This was introduces as a way to speed up the farm-based models 
 
 #include <string>
@@ -16,9 +16,9 @@ using namespace std;
 
 /// Works out if possible to linearise the equation in terms of populations/spline/terms involving time 
 /// This is to help speed up likelihood calculation.
-void Equation::calculate_linearise()
+void Equation::calculate_linearise(Precalc &precalc_eqn, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref, SpecPrecalc &spec_precalc)
 {
-	if(linearise.on == true) return;
+	if(lin.on == true) return;
 
 	auto C = calcu.size();
 
@@ -46,24 +46,24 @@ void Equation::calculate_linearise()
 					if(pl){
 						print_calc("calcfin",lin.no_pop_calc.calc);
 					}
-					for(auto k = 0u; k < lin_it.pop_calc.size(); k++){
-						const auto &pc = lin_it.pop_calc[k];
-						auto po = pc.po;
+					for(auto k = 0u; k < lin_it.popcomb_calc.size(); k++){
+						const auto &pc = lin_it.popcomb_calc[k];
+						auto pco = pc.pco;
 						
 						if(false){ 	// turn off testing
-							auto mm = 0u; while(mm < lin.pop_calc.size() && lin.pop_calc[mm].po != po) mm++;
-							if(mm == lin.pop_calc.size()) mm = UNSET;
-							if(mm != lin.hash_simp.find(po)) emsg("not agree");
+							auto mm = 0u; while(mm < lin.popcomb_calc.size() && lin.popcomb_calc[mm].pco != pco) mm++;
+							if(mm == lin.popcomb_calc.size()) mm = UNSET;
+							if(mm != lin.hash_simp.find(pco)) emsg("not agree");
 						}
 						
-						auto m = lin.hash_simp.find(po);
+						auto m = lin.hash_simp.find(pco);
 						if(m == UNSET){
-							m = lin.pop_calc.size();
-							lin.hash_simp.add(m,po);
-							lin.pop_calc.push_back(pc);
+							m = lin.popcomb_calc.size();
+							lin.hash_simp.add(m,pco);
+							lin.popcomb_calc.push_back(pc);
 						}
 						else{
-							calc_add(lin.pop_calc[m].calc,lin_it.pop_calc[k].calc);
+							calc_add(lin.popcomb_calc[m].calc,lin_it.popcomb_calc[k].calc);
 						}
 					}
 				}
@@ -75,7 +75,7 @@ void Equation::calculate_linearise()
 				auto lin_it = convert_to_linear_calculation(ca.item[j],MULTIPLY,lin_calc);
 				if(j == 0) lin = lin_it;
 				else{		
-					if(lin.pop_calc.size() > 0 && lin_it.pop_calc.size() > 0){ 
+					if(lin.popcomb_calc.size() > 0 && lin_it.popcomb_calc.size() > 0){ 
 						return; // Stops quadratic terms in population
 					}
 					
@@ -85,17 +85,17 @@ void Equation::calculate_linearise()
 					}
 					
 					// Multiplies population terms in lin with non_pop in lin_it
-					for(auto k = 0u; k < lin.pop_calc.size(); k++){
-						auto &pc = lin.pop_calc[k];
+					for(auto k = 0u; k < lin.popcomb_calc.size(); k++){
+						auto &pc = lin.popcomb_calc[k];
 						calc_mult(pc.calc,lin_it.no_pop_calc.calc);
 					}
 					
 					// Multiplies population terms in lin_it with non_pop in lin
-					for(auto k = 0u; k < lin_it.pop_calc.size(); k++){
-						auto &pc = lin_it.pop_calc[k];
+					for(auto k = 0u; k < lin_it.popcomb_calc.size(); k++){
+						auto &pc = lin_it.popcomb_calc[k];
 						calc_mult(pc.calc,lin.no_pop_calc.calc);
-						lin.hash_simp.add(lin.pop_calc.size(),pc.po);
-						lin.pop_calc.push_back(pc);
+						lin.hash_simp.add(lin.popcomb_calc.size(),pc.pco);
+						lin.popcomb_calc.push_back(pc);
 					}
 					
 					// Multiplies non_pop in both
@@ -113,12 +113,12 @@ void Equation::calculate_linearise()
 			{
 				lin = convert_to_linear_calculation(ca.item[0],MULTIPLY,lin_calc);
 				auto lin_div = convert_to_linear_calculation(ca.item[1],MULTIPLY,lin_calc);
-				if(lin_div.pop_calc.size() > 0) return;
+				if(lin_div.popcomb_calc.size() > 0) return;
 				if(lin_div.no_pop_calc.calc.size() == 0) emsg_input("Problem with div");
 				
 				calc_div(lin.no_pop_calc.calc,lin_div.no_pop_calc.calc);
-				for(auto j = 0u; j < lin.pop_calc.size(); j++){
-					calc_div(lin.pop_calc[j].calc,lin_div.no_pop_calc.calc);
+				for(auto j = 0u; j < lin.popcomb_calc.size(); j++){
+					calc_div(lin.popcomb_calc[j].calc,lin_div.no_pop_calc.calc);
 				}
 				
 				if(false){
@@ -159,15 +159,15 @@ void Equation::calculate_linearise()
 		}
 	}
 
-	//auto lc_final = convert_to_linear_calculation(ans,ADD,lin_calc);
+	vector <Calculation> no_pop_calc;                   // Stores no pop calculation
+	vector < vector <Calculation> > popcomb_grad_calc;  // Stores no pop calculation
+	
 	auto lc_final = lin_calc[lin_calc.size()-1];
 	
-	{
-		//linearise.no_pop_calc.type = ZERO; 
-		
+	{                        // If no equation for no pop then sets up zero
 		auto &calc = lc_final.no_pop_calc.calc;
 		
-		if(calc.size() == 0){ // Sets up a zero sum
+		if(calc.size() == 0){
 			Calculation ca; ca.op = ADD;
 			EqItem it; it. type = ZERO; it.num = UNSET;
 			ca.item.push_back(it);
@@ -175,88 +175,46 @@ void Equation::calculate_linearise()
 		}
 		else simplify(calc); 
 		
-		linearise.no_pop_calc_store = calc;
-	}
-	
-	if(false) print_linear_final();
-	
-	auto Npop = pop_ref.size();
-	if(Npop != lc_final.pop_calc.size()){
-		emsg_input("Pop_calc problem");
-	}
-	
-	// Orders gradients in the same way as pop_ref
-	for(auto i = 0u; i < Npop; i++){
-		auto po = pop_ref[i];
-		
-		auto k = lc_final.hash_simp.find(po);
-		if(k == UNSET) emsg_input("Could not find population");
-		
-		if(false){// turn off testing
-			auto k = 0u; while(k < Npop && lc_final.pop_calc[k].po != po) k++;
-			if(k != lc_final.hash_simp.find(po)) emsg("not agree");
-		}
-		
-		auto &calc = lc_final.pop_calc[k].calc; 
-		linearise.pop_grad_calc_store.push_back(calc);
-		
-		/*
-		if(calc.size() != 1) return;
-		if(calc[0].op != MULTIPLY) return;
-		linearise.pop_grad_calc.push_back(calc[0].item);
-		*/
+		no_pop_calc = calc;
 	}
 
-	linearise.on = true;
-	
-	linearise.init_pop_ref_from_po(pop_ref);
-		
-	if(linearise.pop_grad_calc_store.size() != pop_ref.size()){
-		emsg_input("Population number does not agree");
+	vector <unsigned int> popcomb_list;
+	for(auto k = 0u; k < lc_final.popcomb_calc.size(); k++){
+		const auto &pcc = lc_final.popcomb_calc[k];
+		popcomb_grad_calc.push_back(pcc.calc);
+		popcomb_list.push_back(pcc.pco);
 	}
 	
-	simplify(linearise.no_pop_calc_store);
-	for(auto &ca : linearise.pop_grad_calc_store) simplify(ca);
+	if(true) print_linear_final(no_pop_calc,popcomb_grad_calc,popcomb_list);
 
-	linearise.multi_source = false;	
-	auto num = linearise.pop_grad_calc_store.size();
-	if(!zero_eqn(linearise.no_pop_calc_store)) num++;
-	if(num > 1) linearise.multi_source = true; 
+	simplify(no_pop_calc);
+	for(auto &ca : popcomb_grad_calc) simplify(ca);
 
-	if(false){
-		print_calculation();
-		cout << endl << "AFTER LINEARISE" << endl;
-		cout << endl << endl << te << ":" << endl;
-		print_calc("No pop dep: ",linearise.no_pop_calc_store);
+	// Extracts precalc information from equations to just leave a single quantity 
+	precalc_eqn.add_eqn(no_pop_calc,param_vec_ref,spline_ref,spec_precalc);
+	for(auto j = 0u; j < popcomb_grad_calc.size(); j++){
+		precalc_eqn.add_eqn(popcomb_grad_calc[j],param_vec_ref,spline_ref,spec_precalc);
+	}
+			
+	// The final single quantity results are stored
+	lin.no_pop_precalc = get_precalc(no_pop_calc);
+	for(auto i = 0u; i < popcomb_grad_calc.size(); i++){
+		lin.popcomb_grad_precalc.push_back(get_precalc(popcomb_grad_calc[i]));
+	}
 
-		for(auto k = 0u; k < linearise.pop_grad_calc_store.size(); k++){
-			print_calc(pop[pop_ref[k]].name,linearise.pop_grad_calc_store[k]);	
-		}
-		emsg_input("Linear done");
-	}
+	// Works out if there are multiple or a single population causing infection (used for transmission trees)
+	auto num = 0u;
+	for(auto i = 0u; i < popcomb_list.size(); i++) num += popcomb[popcomb_list[i]].size();
+	if(!zero_eqn(no_pop_calc)) num++;
 	
-	get_pop_grad_calc_factorise();
+	lin.multi_source = false;	
+	if(num > 1) lin.multi_source = true; 
+
+	lin.popcomb_list = popcomb_list;
+
+	// CHECKON need to initialise linearise.init_pop_ref_from_po(pop_ref);
 	
-	// Adds a one term if there is no term
-	for(auto &calc : linearise.pop_grad_calc_store){
-		if(calc.size() == 1){
-			auto &ca = calc[0];
-			if(ca.op == MULTIPLY && ca.item.size() == 0){
-				EqItem it; it.type = ONE; it.num = UNSET;
-				ca.item.push_back(it);
-			}
-		}
-	}
-	
-	if(false){
-		for(auto i = 0u; i < linearise.pop_grad_calc_store.size(); i++){
-			const auto &ca = linearise.pop_grad_calc_store[i];
-			if(ca.size() == 1 && ca[0].item.size() == 0){
-				//print_calculation();
-				emsg("Prob");
-			}
-		}
-	}
+	lin.on = true;
 }
 
 
@@ -275,17 +233,12 @@ bool Equation::zero_eqn(const vector <Calculation> &calc) const
 
 
 /// Prints the calculation and the linear final version (for diagnostics)
-void Equation::print_linear_final() const
+void Equation::print_linear_final(const vector <Calculation> &no_pop_calc, const vector < vector <Calculation> > &popcomb_grad_calc, const vector <unsigned int> &popcomb_list) const
 {
-	cout << te << " te" << endl;
 	print_calculation();
-	cout << endl << endl;
-
-	cout << endl << endl << te << ":" << endl;
-	print_calc("No pop dep: ",linearise.no_pop_calc_store);
-
-	for(auto k = 0u; k < linearise.pop_grad_calc_store.size(); k++){
-		print_calc(pop[pop_ref[k]].name,linearise.pop_grad_calc_store[k]);	
+	print_calc("no pop",no_pop_calc);
+	for(auto k = 0u; k < popcomb_grad_calc.size(); k++){
+		print_calc(popcomb_name(popcomb_list[k]),popcomb_grad_calc[k]);
 	}
 }
 	
@@ -296,7 +249,7 @@ LinearCalculation Equation::convert_to_linear_calculation(const EqItem &it, EqIt
 	LinearCalculation lin;
 	if(warn != "") return lin;
 	
-	lin.no_pop_calc.po = UNSET;
+	lin.no_pop_calc.pco = UNSET;
 	switch(it.type)
 	{
 		case REG: 
@@ -304,16 +257,24 @@ LinearCalculation Equation::convert_to_linear_calculation(const EqItem &it, EqIt
 			break;
 			
 		case POPNUM: 
+			emsg("Should not be popnum");
+			break;
+			
+		case POPCOMBTIME:
+			emsg("Should not be popnum");
+			break;
+			
+		case POPCOMB: 
 			{
 				Calculation ca; ca.op = op;
 				EqItem it2; it2.type = NUMERIC; it2.num = constant.add(1);
 				ca.item.push_back(it2);
 				
-				PopCalculation pop_c;
-				pop_c.po = it.num;
+				PopCombCalc pop_c;
+				pop_c.pco = it.num;
 				pop_c.calc.push_back(ca);
-				lin.hash_simp.add(lin.pop_calc.size(),it.num);
-				lin.pop_calc.push_back(pop_c);
+				lin.hash_simp.add(lin.popcomb_calc.size(),it.num);
+				lin.popcomb_calc.push_back(pop_c);
 			}
 			break;
 			
@@ -581,9 +542,9 @@ void Equation::print_linear_calc(string te, const LinearCalculation &lin) const
 	cout << te << ":" << endl;
 	print_calc("No pop dep",lin.no_pop_calc.calc);
 	
-	for(auto i = 0u; i < lin.pop_calc.size(); i++){
-		const auto &pc = lin.pop_calc[i];
-		print_calc("Pop "+pop[pc.po].name,pc.calc);
+	for(auto i = 0u; i < lin.popcomb_calc.size(); i++){
+		const auto &pc = lin.popcomb_calc[i];
+		print_calc(popcomb_name(pc.pco),pc.calc);
 	}
 }
 
@@ -610,7 +571,7 @@ bool Equation::single_param_func(Calculation ca, LinearCalculation &lin, const v
 	case REG:
 		{
 			lin = lin_calc[it.num];
-			if(lin.pop_calc.size() > 0) return false;
+			if(lin.popcomb_calc.size() > 0) return false;
 			auto &cal = lin.no_pop_calc.calc;
 			ca.item[0].num = cal.size()-1;
 			cal.push_back(ca);
@@ -624,7 +585,7 @@ bool Equation::single_param_func(Calculation ca, LinearCalculation &lin, const v
 		lin.no_pop_calc.calc.push_back(ca);
 		break;
 		
-	case POPNUM: return false;
+	case POPCOMB: return false;
 	case IE: case ONE: case ZERO: case FE: emsg_input("Eq Lin should not be"); break;
 	default: emsg_input("Eq problem6"); break;
 	}
@@ -645,10 +606,10 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 		case REG:
 			{		
 				lin = lin_calc[it1.num];
-				if(lin.pop_calc.size() > 0) return false;
+				if(lin.popcomb_calc.size() > 0) return false;
 				
 				const auto &lin2 = lin_calc[it2.num];
-				if(lin2.pop_calc.size() > 0) return false;
+				if(lin2.popcomb_calc.size() > 0) return false;
 				
 				auto &calc = lin.no_pop_calc.calc;
 				
@@ -676,13 +637,13 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 		case PARAMVEC: case SPLINEREF: case CONSTSPLINEREF: case NUMERIC: case TIME:
 			{		
 				lin = lin_calc[it1.num];
-				if(lin.pop_calc.size() > 0) return false;
+				if(lin.popcomb_calc.size() > 0) return false;
 				auto &cal = lin.no_pop_calc.calc;
 				it1.num = cal.size()-1;
 				cal.push_back(ca);
 			}
 			break;
-		case POPNUM: return false;
+		case POPCOMB: return false;
 		case IE: case ONE: case ZERO: case FE: emsg_input("Eq Lin should not be"); break;
 		default: emsg_input("Eq problem3"); break;
 		}
@@ -693,7 +654,7 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 		case REG:
 			{
 				lin = lin_calc[it2.num];
-				if(lin.pop_calc.size() > 0) return false;
+				if(lin.popcomb_calc.size() > 0) return false;
 				auto &cal = lin.no_pop_calc.calc;
 				it2.num = cal.size()-1;
 				cal.push_back(ca);
@@ -705,12 +666,12 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 				lin.no_pop_calc.calc.push_back(ca);
 			}
 			break;
-		case POPNUM: return false;
+		case POPCOMB: return false;
 		case IE: case ONE: case ZERO: case FE: emsg_input("Eq Lin should not be"); break;
 		default: emsg_input("Eq problem4"); break;
 		}
 		break;
-	case POPNUM: return false;
+	case POPCOMB: return false;
 	case IE: case ONE: case ZERO: case FE: emsg_input("Eq Lin should not be"); break;
 	default: emsg_input("Eq problem5"); break;
 	}
@@ -719,18 +680,22 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 }
 
 
+// CHECKON needed?
 /// Calculates the vector of gradients against population number
 vector <double> Equation::calculate_popnum_gradient_without_factor(const vector <double> &precalc) const
 {
-	vector <double> pop_grad;
+	emsg("sort20");
+	/*
+	vector <double> popcomb_grad;
 
-	const auto &pop_grad_precalc = linearise.pop_grad_precalc;
+	const auto &popcomb_grad_precalc = linearise.popcomb_grad_precalc;
 
-	for(auto i = 0u; i < pop_grad_precalc.size(); i++){
-		pop_grad.push_back(calculate_item_no_time(pop_grad_precalc[i],precalc));
+	for(auto i = 0u; i < popcomb_grad_precalc.size(); i++){
+		pop_grad.push_back(calculate_item_no_time(popcomb_grad_precalc[i],precalc));
 	}
 	
-	return pop_grad;
+	return popcomb_grad;
+	*/
 }
 
 
@@ -771,7 +736,7 @@ bool Equation::it_time_dep(const EqItem &it) const
 	case SPLINE: case SPLINEREF: case CONSTSPLINEREF:
 	case TIME: case REG_PRECALC_TIME:
 		return true;
-	case POPNUM: emsg_input("Should not have a population"); break;
+	case POPNUM: case POPCOMB: emsg_input("Should not have a population"); break;
 	default: emsg_input("Equation error8"); break;
 	}
 	
@@ -780,12 +745,11 @@ bool Equation::it_time_dep(const EqItem &it) const
 
 		
 /// Calculates the value for an equation using the linearised form (for diagnostic checking)
-double Equation::calculate_linearise_check(unsigned int ti, const vector <double> &popnum, const vector <double> &precalc) const 
+double Equation::calculate_linearise_check(unsigned int ti, const vector <double> &popcomb, const vector <double> &precalc) const 
 {
-	auto val = calculate_item(linearise.no_pop_precalc,ti,precalc);
-	auto factor = calculate_item(linearise.factor_precalc,ti,precalc);
-	for(auto j = 0u; j < pop_ref.size(); j++){
-		val += rectify(popnum[pop_ref[j]])*factor*calculate_item(linearise.pop_grad_precalc[j],ti,precalc);
+	auto val = calculate_item(lin.no_pop_precalc,ti,precalc);
+	for(auto j = 0u; j < lin.popcomb_list.size(); j++){
+		val +=  calculate_item(lin.popcomb_grad_precalc[j],ti,precalc)*popcomb[lin.popcomb_list[j]];
 	}
 	
 	return val;
@@ -897,9 +861,12 @@ unsigned int Linearise::get_pop_ref(unsigned int po) const
 }
 
 
+/*
 /// Tries to take any common factors from pop_grad_calc
 void Equation::get_pop_grad_calc_factorise()
 {	
+	emsg("sort22");
+	/*
 	auto &pgc = linearise.pop_grad_calc_store;
 	
 	Calculation fac_ca;
@@ -987,43 +954,47 @@ void Equation::get_pop_grad_calc_factorise()
 		print_calc("no pop",linearise.no_pop_calc_store);
 	}
 	//emsg("jj");
+	
 }
+*/
 
 
+/*
 /// References precalculation in linearisation
 void Equation::set_precalc()
 {	
 	linearise.no_pop_precalc = get_precalc(linearise.no_pop_calc_store);
 
-	for(auto i = 0u; i < linearise.pop_grad_calc_store.size(); i++){
-		linearise.pop_grad_precalc.push_back(get_precalc(linearise.pop_grad_calc_store[i]));
+	for(auto i = 0u; i < linearise.popcomb_grad_calc_store.size(); i++){
+		linearise.popcomb_grad_precalc.push_back(get_precalc(linearise.popcomb_grad_calc_store[i]));
 	}
 
-	linearise.factor_precalc = get_precalc(linearise.factor_calc);
+	//linearise.factor_precalc = get_precalc(linearise.factor_calc);
 
-	linearise.pop_grad_time_dep = false;
-	for(const auto &it : linearise.pop_grad_precalc){
-		if(it_time_dep(it)){ linearise.pop_grad_time_dep = true; break;}
-	}
+	//linearise.pop_grad_time_dep = false;
+	//for(const auto &it : linearise.pop_grad_precalc){
+	//if(it_time_dep(it)){ linearise.pop_grad_time_dep = true; break;}
+	//}
 	
-	linearise.factor_time_dep = it_time_dep(linearise.factor_precalc);
-	linearise.no_pop_calc_time_dep = it_time_dep(linearise.no_pop_precalc);
+	//linearise.factor_time_dep = it_time_dep(linearise.factor_precalc);
+	//linearise.no_pop_calc_time_dep = it_time_dep(linearise.no_pop_precalc);
 		
 	if(false){
 		cout << "LINEARISATION" << endl;
 		print_calculation();
 		cout << "no_pop: "; print_item(linearise.no_pop_precalc); cout << endl;
-		cout << "factor: "; print_item(linearise.factor_precalc); cout << endl;
-		for(const auto &it : linearise.pop_grad_precalc){
+		//cout << "factor: "; print_item(linearise.factor_precalc); cout << endl;
+		for(const auto &it : linearise.popcomb_grad_precalc){
 			cout << "grad: "; print_item(it); cout << endl;
 		}
 	}
 	
 	// Deletes calculations as they are no longer required
 	linearise.no_pop_calc_store.clear();
-	linearise.pop_grad_calc_store.clear();
-	linearise.factor_calc.clear();
+	linearise.popcomb_grad_calc_store.clear();
+	//linearise.factor_calc.clear();
 }
+*/
 
 
 /// Converts from a calculation to a precalc

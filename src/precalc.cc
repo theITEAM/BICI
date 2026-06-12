@@ -63,10 +63,8 @@ void Precalc::add_eqn_simp(vector <Calculation> &calc, const vector <unsigned in
 
 
 /// Adds an equation onto the precalculated equation calculation
-bool Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref, SpecPrecalc &spec_precalc, PrecalcAddType add_type)
+void Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref, SpecPrecalc &spec_precalc)
 {
-	vector <unsigned int> become_Rrecalc(calc.size(),UNSET);
-
 	// Removes any reference to parameter and spline 
 	for(auto &ca : calc){
 		for(auto &it : ca.item){
@@ -95,12 +93,16 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 		}
 	}
 	
-	auto stop_combine_fl = false;
+	//auto stop_combine_fl = false;
 	
-	if(add_type == PRECALC_PARAM_ONLY) return stop_combine_fl;
+	//if(add_type == PRECALC_PARAM_ONLY) return stop_combine_fl;
 	
+	vector <unsigned int> become_Rrecalc(calc.size(),UNSET);
+
 	bool fl;
 	do{
+		fl = combine_multiply_add(calc,become_Rrecalc); // Tries to simplty multiplications and additions
+		
 		for(auto i = 0u; i < calc.size(); i++){
 			if(become_Rrecalc[i] == UNSET){
 				auto &ca = calc[i];
@@ -189,28 +191,24 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 					
 					if(flag == false && (ca.op == MULTIPLY || ca.op == ADD)){
 						if(item.size() - nregderpop >= 2){
-							if(add_type == PRECALC_STOP_COMBINE_MULT && npop > 0){ // Stops being combined so we can get factor
-								stop_combine_fl = true;
-							}
-							else{
-								PreCalc pcalc;
-								pcalc.op = ca.op;
-								
-								vector <EqItem> item_new;
-								
-								for(auto j = 0u; j < item.size(); j++){
-									const auto &it = item[j];
-									switch(it.type){
-									case REG: case POPNUM: case DERIVE: case INTEGRAL: item_new.push_back(it); break;
-									default: pcalc.item.push_back(it); break;
-									}
+							PreCalc pcalc;
+							pcalc.op = ca.op;
+							
+							vector <EqItem> item_new;
+							
+							for(auto j = 0u; j < item.size(); j++){
+								const auto &it = item[j];
+								switch(it.type){
+								case REG: case POPNUM: case DERIVE: case INTEGRAL: item_new.push_back(it); break;
+								default: pcalc.item.push_back(it); break;
 								}
-						
-								auto inew = add(pcalc,spec_precalc);
-								item_new.push_back(inew);
-								
-								ca.item = item_new;
 							}
+					
+							auto inew = add(pcalc,spec_precalc);
+							item_new.push_back(inew);
+							
+							ca.item = item_new;
+							//}
 						}
 					}
 					
@@ -242,15 +240,14 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 			}
 		}
 	
-		fl = false;
-		// Replaces register with non_popcalc
-		
+		// Replaces register with non_popcalc	
 		for(auto i = 0u; i < calc.size(); i++){
 			if(become_Rrecalc[i] == UNSET){
 				for(auto &it : calc[i].item){
 					if(it.type == REG && become_Rrecalc[it.num] != UNSET){
 						it.type = REG_PRECALC; 
 						it.num = become_Rrecalc[it.num];
+						if(it.num == CODE) emsg("Should not be code");
 						if(pcalcu[pcalcu_ref[it.num]].time_dep) it.type = REG_PRECALC_TIME; 
 						if(it.num == USINT_MAX) emsg("Problem used");
 						fl = true;
@@ -283,7 +280,83 @@ bool Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 		}
 	}
 	
-	return stop_combine_fl;
+	//return stop_combine_fl;
+}
+
+
+/// Combines together multiplication and addition operations to simplify
+bool Precalc::combine_multiply_add(vector <Calculation> &calcu, vector <unsigned int> &become_Rrecalc) const 
+{
+	auto imax = calcu.size();
+	vector <unsigned int> used(imax,0);
+
+	auto fl = false;
+	
+	for(auto i = 0u; i < imax; i++){       // Determines how many times each resigter is used
+		if(become_Rrecalc[i] == UNSET){	
+			const auto &ca = calcu[i];
+			for(const auto &it : ca.item){
+				if(it.type == REG) used[it.num]++;
+			}
+		}
+	}
+	
+	for(auto i = 0u; i < imax; i++){
+		if(become_Rrecalc[i] == UNSET){	
+			auto &ca = calcu[i];
+			if(ca.op == MULTIPLY){
+				auto cont = false;
+				for(auto j = 0u; j < ca.item.size(); j++){
+					auto &it = ca.item[j];
+					if(it.type == REG && used[it.num] == 1 && calcu[it.num].op == MULTIPLY) cont = true;
+				}
+				
+				if(cont){
+					vector <EqItem> item;
+					for(auto j = 0u; j < ca.item.size(); j++){
+						auto &it = ca.item[j];
+						auto num = it.num;
+						if(it.type == REG && used[num] == 1 && calcu[num].op == MULTIPLY){
+							for(const auto &it_fr : calcu[num].item) item.push_back(it_fr);
+							become_Rrecalc[num] = CODE;
+						}
+						else{
+							item.push_back(it);
+						}
+					}
+					ca.item = item;
+					fl = true;
+				}
+			}
+			
+			if(ca.op == ADD){
+				auto cont = false;
+				for(auto j = 0u; j < ca.item.size(); j++){
+					auto &it = ca.item[j];
+					if(it.type == REG && used[it.num] == 1 && calcu[it.num].op == ADD) cont = true;
+				}
+				
+				if(cont){
+					vector <EqItem> item;
+					for(auto j = 0u; j < ca.item.size(); j++){
+						auto &it = ca.item[j];
+						auto num = it.num;
+						if(it.type == REG && used[num] == 1 && calcu[num].op == ADD){
+							for(const auto &it_fr : calcu[num].item) item.push_back(it_fr);
+							become_Rrecalc[num] = CODE;
+						}
+						else{
+							item.push_back(it);
+						}
+					}
+					ca.item = item;
+					fl = true;
+				}
+			}
+		}
+	}
+	
+	return fl;
 }
 
 

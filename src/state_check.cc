@@ -127,6 +127,7 @@ void State::check(string ref)
 	if(testing == false) return;
 	
 	//check_markov_value_dif();
+	check_dpop();
 	
 	timer[CHECK_TIMER] -= clock();
 
@@ -151,7 +152,7 @@ void State::check(string ref)
 	
 	check_cpop_st(ref);
 	
-	check_popnum_t(ref);
+	check_pop_t(ref);
 
 	for(auto p = 0u; p < nspecies; p++){
 		const auto &sp = model.species[p];
@@ -245,7 +246,7 @@ void State::check_precalc_eqn(string ref)
 	
 	//model.precalc_eqn.calculate_all(model.list_precalc,param_val);
 	
-	model.param_spec_precalc_time_all(popnum_t,param_val,false);
+	model.param_spec_precalc_time_all(popcomb_t,param_val,false);
 
 	for(auto th = 0u; th < value.size(); th++){
 		if(value_st[th] == UNSET){
@@ -265,7 +266,7 @@ void State::check_precalc_eqn(string ref)
 			
 			//if(store) param_val.value_change(th);
 			//auto ti = pv.reparam_spl_ti;
-			//auto val =  model.eqn[eq_ref].calculate(ti,popnum_t[ti],precalc);
+			//auto val =  model.eqn[eq_ref].calculate(ti,popcomb_t[ti],precalc);
 			//cout <<val << " cllll" << endl;
 			//model.eqn[eq_ref].print_calculation();
 		
@@ -331,7 +332,7 @@ void State::check_dependent_param(string ref)
 				auto re = model.param[pv.th].get_eq_ref(pv.index);
 				if(re == UNSET) emsg("Reparam is not set");	
 					
-				auto value = model.eqn[re].calculate_all_time(ti,popnum_t,precalc);
+				auto value = model.eqn[re].calculate_all_time(ti,popcomb_t,precalc);
 				if(dif(value,param_val.value[th],dif_thresh)){
 					cout << th << " " << value << " " << param_val.value[th] << "compare" << endl;
 					emsg("Reparam value different "+ref);
@@ -419,7 +420,7 @@ void State::check_ref(unsigned int p, string refst)
 			
 				vector <double> ref_val(ref.size());
 				for(auto i = 0u; i < ref.size(); i++){
-					ref_val[i] = model.eqn[ref[i]].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+					ref_val[i] = model.eqn[ref[i]].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 				}
 				
 				auto dtdiv = ev.tdiv - t;				
@@ -434,16 +435,16 @@ void State::check_ref(unsigned int p, string refst)
 					if(bp_eq == BP_FROM_OTHERS){
 						bp_val = 1.0;
 						for(auto e : nmt.bp_other_eq){
-							bp_val -=  model.eqn[e].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+							bp_val -=  model.eqn[e].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 						}
 					}
 					else{
-						bp_val = model.eqn[bp_eq].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+						bp_val = model.eqn[bp_eq].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 						
 						if(nmt.all_branches){
 							auto div = 0.0;
 							for(auto e : nmt.bp_all_eq){
-								div += model.eqn[e].calculate_indfac(ind,ti,popnum_t[ti],precalc);
+								div += model.eqn[e].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 							}
 							bp_val /= div;
 						}
@@ -476,7 +477,7 @@ void State::check_ref(unsigned int p, string refst)
 				
 					auto dtdiv = inmtr.tdiv_end - ind.ev[inmtr.e_begin].tdiv; if(dtdiv <= 0) emsg("zero time3");
 				
-					auto val = ssp.get_nm_incomp_val(nmt,inmtr.ti,ind,popnum_t);
+					auto val = ssp.get_nm_incomp_val(nmt,inmtr.ti,ind,popcomb_t);
 
 					auto Li_new = ssp.nm_trans_incomp_full_like(nmt.nmtrans_ref,dtdiv,dt,val.ref_val,val.bp_val);
 					if(dif(Li_new,inmtr.Li,dif_thresh)){
@@ -490,7 +491,7 @@ void State::check_ref(unsigned int p, string refst)
 			auto &ind = ssp.individual[i];
 			auto inmtr_store = ind.incomp_ref;
 			auto temp = 0.0;
-			ssp.set_incomp_ref(i,popnum_t,temp);
+			ssp.set_incomp_ref(i,popcomb_t,temp);
 			
 			for(auto cl = 0u; cl < sp.ncla; cl++){
 				auto it1 = inmtr_store[cl];
@@ -682,7 +683,7 @@ void State::check_markov_trans(unsigned int p, string ref)
 		auto Li_markov_store = ssp.Li_markov[e];
 		
 		auto list = seq_vec(ssp.markov_eqn_vari[e].div.size());
-		ssp.markov_value_calc(e,list,popnum_t);
+		ssp.markov_value_calc(e,list,popcomb_t);
 		auto temp = 0.0;
 		ssp.likelihood_markov(e,list,temp);
 			
@@ -768,7 +769,7 @@ void State::check_para_speedup(unsigned int p, string ref)
 			for(auto e = 0u; e < ssp.N; e++){			
 				auto &me = sp.markov_eqn[e];
 				const auto &eq = model.eqn[me.eqn_ref];
-				eq.test_calculate_para(eq.calcu,list,popnum_t,param_val.precalc,derive_val,ref);
+				eq.test_calculate_para(eq.calcu,list,popcomb_t,param_val.precalc,derive_val,ref);
 			}
 		}
 		break;
@@ -778,10 +779,10 @@ void State::check_para_speedup(unsigned int p, string ref)
 			auto dt = model.details.dt;
 			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 				vector <double> tnm_para(T,UNSET); 
-				ssp.calculate_tnum_mean_para(tnm_para,list,tr,popnum_t,ssp.cpop_st,dt);
+				ssp.calculate_tnum_mean_para(tnm_para,list,tr,popcomb_t,ssp.cpop_st,dt);
 				
 				for(auto ti = 0u; ti < T; ti++){
-					auto val = ssp.calculate_tnum_mean(ti,tr,popnum_t[ti],ssp.cpop_st[ti],dt);
+					auto val = ssp.calculate_tnum_mean(ti,tr,popcomb_t[ti],ssp.cpop_st[ti],dt);
 					if(dif(val,tnm_para[ti],DIF_THRESH)){
 						emsg("calculate_tnum_mean_para problem");
 					}
@@ -811,7 +812,7 @@ void State::check_markov_div_value(unsigned int p, string ref)
 		auto Li_markov_store = ssp.Li_markov[e];
 		
 		auto list = seq_vec(ssp.markov_eqn_vari[e].div.size());
-		ssp.markov_value_calc(e,list,popnum_t);
+		ssp.markov_value_calc(e,list,popcomb_t);
 		auto temp = 0.0;
 		ssp.likelihood_markov(e,list,temp);
 			
@@ -845,7 +846,7 @@ void State::check_nm_trans(unsigned int p, string ref)
 	auto ind_store = ssp.individual;
 	for(auto i = 0u; i < sp.nm_trans.size(); i++){
 		double temp;
-		ssp.likelihood_nm_trans(i,all_vec,popnum_t,temp);
+		ssp.likelihood_nm_trans(i,all_vec,popcomb_t,temp);
 	}
 	
 	for(auto i = 0u; i < ind_store.size(); i++){
@@ -865,7 +866,7 @@ void State::check_nm_trans(unsigned int p, string ref)
 		
 	for(auto i = 0u; i < sp.nm_trans_incomp.size(); i++){
 		double temp;
-		ssp.likelihood_nm_trans_incomp(i,all_vec,popnum_t,temp);
+		ssp.likelihood_nm_trans_incomp(i,all_vec,popcomb_t,temp);
 	}
 	
 	for(auto i = 0u; i < ind_store.size(); i++){
@@ -1039,8 +1040,8 @@ void State::check_prior(string ref)
 }
 
 
-/// Checks that popnum_t is correctly specified
-void State::check_popnum_t(string ref)
+/// Checks that popnum_t and popcomb_t are correctly specified
+void State::check_pop_t(string ref)
 {
 	check_timer[CHECK_POP] -= clock();
 	
@@ -1048,49 +1049,37 @@ void State::check_popnum_t(string ref)
 	
 	popnum_t = calculate_popnum_t();
 	
-	if(popnum_t.size() != T){
-		emsg("Wrong size2 "+ref);
-	}
+	if(popnum_t.size() != T) emsg("Wrong size2 "+ref);
 	
 	for(auto ti = 0u; ti < T; ti++){
 		if(popnum_t[ti].size() != model.pop.size()) emsg("Wrong size3");
 		for(auto k = 0u; k < model.pop.size(); k++){
-			if(dif(popnum_t[ti][k],popnum_t_store[ti][k],THRESH_EXPAND*dif_thresh)){	
+			if(dif(popnum_t[ti][k],popnum_t_store[ti][k],dif_thresh)){	
 				add_alg_warn("popnum_t problem"+ref);
 			}
 		}
 	}
 	
 	check_timer[CHECK_POP] += clock();
-}
-
-
-/// Checks that popnum_t is correctly specified
-void State::check_popnum_t2(string ref)
-{
-	check_timer[CHECK_POP2] -= clock();
 	
-	auto popnum_t_store = popnum_t;
+	check_timer[CHECK_POPCOMB] -= clock();
 	
-	popnum_t = calculate_popnum_t();
+	auto popcomb_t_store = popcomb_t;
 	
-	if(popnum_t.size() != T){
-		emsg("Wrong size2 "+ref);
-	}
+	popcomb_t = calculate_popcomb_t();
+	
+	if(popcomb_t.size() != T) emsg("Wrong size2 "+ref);
 	
 	for(auto ti = 0u; ti < T; ti++){
-		if(popnum_t[ti].size() != model.pop.size()) emsg("Wrong size3");
-		for(auto k = 0u; k < model.pop.size(); k++){
-			if(dif(popnum_t[ti][k],popnum_t_store[ti][k],dif_thresh)){
-				//output_dump();
-				//cout << core() << " " << popnum_t[ti][k] << " " << popnum_t_store[ti][k] << " popn" << endl;
-				add_alg_warn("popnum_t problem2"+ref);
+		if(popcomb_t[ti].size() != model.npopcomb) emsg("Wrong size4");
+		for(auto k = 0u; k < model.npopcomb; k++){
+			if(dif(popcomb_t[ti][k],popcomb_t_store[ti][k],dif_thresh)){	
+				add_alg_warn("popcomb_t problem"+ref);
 			}
 		}
 	}
-	popnum_t = popnum_t_store; 
 	
-	check_timer[CHECK_POP2] += clock();
+	check_timer[CHECK_POPCOMB] += clock();
 }
 
 
@@ -1209,7 +1198,7 @@ void State::check_pop_like(unsigned int p, string ref)
 	auto trans_num_store = ssp.trans_num;
 	auto tnum_mean_st_st = ssp.tnum_mean_st;
 	
-	ssp.likelihood_pop(popnum_t);
+	ssp.likelihood_pop(popcomb_t);
 	
 	auto thresh = dif_thresh;
 	thresh = TINY;
@@ -1550,13 +1539,13 @@ void State::check_linearise()
 	auto ti = (unsigned int)(ran()*T);
 
 	const auto &precalc = param_val.precalc;
-	const auto &popnum = popnum_t[ti];
+	const auto &popcomb = popcomb_t[ti];
 	
 	for(auto e = 0u; e < model.eqn.size(); e++){
 		const auto &eq = model.eqn[e];
-		if(eq.linearise.on){
-			auto val = eq.calculate(ti,popnum,precalc);
-			auto val2 = eq.calculate_linearise_check(ti,popnum,precalc);
+		if(eq.lin.on){
+			auto val = eq.calculate(ti,popcomb,precalc);
+			auto val2 = eq.calculate_linearise_check(ti,popcomb,precalc);
 			if(dif(val,val2,dif_thresh)){
 				//cout << ti << "ti" << endl;
 				//cout << eq.te << endl;
@@ -1663,7 +1652,7 @@ void State::check_genetic_value(string ref)
 									auto m = tra.markov_eqn_ref;
 									const auto &me = sp.markov_eqn[m];
 									const auto &eq = model.eqn[me.eqn_ref];
-									const auto &lin = eq.linearise;
+									const auto &lin = eq.lin;
 									if(!lin.on) emsg("Linearisation should be on");
 			
 									if(iif.po != eq.pop_ref[iif.pref]){
@@ -2017,7 +2006,7 @@ void State::check_genetic_value(string ref)
 								auto m = tra.markov_eqn_ref;
 								const auto &me = sp.markov_eqn[m];
 								const auto &eq = model.eqn[me.eqn_ref];
-								const auto &lin = eq.linearise;
+								const auto &lin = eq.lin;
 								if(!lin.on) emsg("Linearisation should be on");
 						
 								if(fr.p == UNSET) emsg("fr.p should not be unset");
@@ -2438,7 +2427,7 @@ void State::check_markov_value_dif()
 				
 				vector < vector < vector <double> > > derive_val;
 				
-				auto vec = eq.calculate_para(eq.calcu,list,popnum_t,precalc,derive_val);
+				auto vec = eq.calculate_para(eq.calcu,list,popcomb_t,precalc,derive_val);
 					
 				if(me.rate){
 					for(auto k = 0u; k < list.size(); k++){
@@ -2466,6 +2455,7 @@ void State::check_markov_value_dif()
 /// Adds an algorithm warning
 void State::add_alg_warn(string te)
 {
+	emsg(te+" ALG WARNING");  // CHECKON turn off
 	if(debugging) emsg(te+" ALG WARNING"); 
 	
 	add_alg_warning(te,sample,alg_warn);
@@ -2485,7 +2475,7 @@ void State::check_precalc_dif(string ref)
 	
 	model.precalc_eqn.calculate(model.spec_precalc_all,param_val,false);
 	
-	model.param_spec_precalc_time_all(popnum_t,param_val,false);
+	model.param_spec_precalc_time_all(popcomb_t,param_val,false);
 
 	auto dthmax = 0.0;
 	for(auto th = 0u; th < value.size(); th++){
@@ -2556,3 +2546,15 @@ void State::scan_param()
 
 	emsg("Scan parameter");
 }
+
+
+/// Checks that dpop is unset 
+void State::check_dpop() 
+{
+	if(dpop.size() != model.pop.size()) emsg("wrong size");
+	for(auto va : dpop){
+		if(va != UNSET) emsg("Should be unset2");
+	}
+	if(dpop_list.size() != 0) emsg("dpop_list prob");
+}
+

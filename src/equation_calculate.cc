@@ -65,7 +65,7 @@ double Equation::calculate_param_ti_fix(const vector <double> &precalc) const
 
 
 /// Calculates the value for an equation (but does not allow population number)
-double Equation::calculate_no_popnum(unsigned int ti, const vector <double> &precalc) const 
+double Equation::calculate_no_popcomb(unsigned int ti, const vector <double> &precalc) const 
 {
 	auto C = calcu.size();
  	vector <double> regcalc(C);
@@ -103,7 +103,7 @@ double Equation::calculate_no_popnum(unsigned int ti, const vector <double> &pre
 
 
 /// Calculate the value of an integral
-double Equation::calculate_integral(unsigned int i, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const
+double Equation::calculate_integral(unsigned int i, const vector < vector <double> > &popcomb_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const
 {
 	auto dt = details.dt;
 	const auto &inte = integral[i];
@@ -113,13 +113,13 @@ double Equation::calculate_integral(unsigned int i, const vector < vector <doubl
 		vector <unsigned int> list;
 		for(auto ti = inte.ti_min; ti < inte.ti_max; ti++) list.push_back(ti);
 
-		auto vec = calculate_para(inte.calc,list,popnum_t,precalc,derive_val);
+		auto vec = calculate_para(inte.calc,list,popcomb_t,precalc,derive_val);
 		su = sum(vec);  
 	}
 	else{
 		for(auto ti = inte.ti_min; ti < inte.ti_max; ti++){
-			auto val = calculate_calc(inte.calc,ti,popnum_t[ti],precalc,derive_val);
-			//print_working(inte.calc,ti,popnum_t[ti],precalc,derive_val);
+			auto val = calculate_calc(inte.calc,ti,popcomb_t[ti],precalc,derive_val);
+			//print_working(inte.calc,ti,popcomb_t[ti],precalc,derive_val);
 			su += val;
 		}		
 	}
@@ -129,7 +129,7 @@ double Equation::calculate_integral(unsigned int i, const vector < vector <doubl
 
 
 /// Calculates derived equations
-double Equation::calculate_derive(unsigned int ti, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const 
+double Equation::calculate_derive(unsigned int ti, const vector < vector <double> > &popcomb_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const 
 {
 	auto C = calcu.size();
  	vector <double> regcalc(C);
@@ -148,7 +148,7 @@ double Equation::calculate_derive(unsigned int ti, const vector < vector <double
 			
 			switch(it.type){
 				case INTEGRAL:
-					num[j] = calculate_integral(it.num,popnum_t,precalc,derive_val);
+					num[j] = calculate_integral(it.num,popcomb_t,precalc,derive_val);
 					break;
 				case DERIVE:
 					{
@@ -166,16 +166,16 @@ double Equation::calculate_derive(unsigned int ti, const vector < vector <double
 					break;
 					
 				case ONE: num[j] = 1; break;	
-				case POPNUM:
+				case POPCOMB:
 					{
 						if(ti == UNSET) emsg("ti should be set");
-						num[j] = rectify(popnum_t[ti][it.num]); 
+						num[j] = popcomb_t[ti][it.num]; 
 					}
 					break;
-				case POPTIMENUM:
+				case POPCOMBTIME:
 					{
 						const auto &ptr = pop_time_ref[it.num];
-						num[j] = rectify(popnum_t[ptr.ti][ptr.po]); 
+						num[j] = popcomb_t[ptr.ti][ptr.po]; 
 					}
 					break;
 				case REG: num[j] = regcalc[it.num]; break;
@@ -196,14 +196,14 @@ double Equation::calculate_derive(unsigned int ti, const vector < vector <double
 
 
 /// Calculates the value for an equation (including individual-based factor)
-double Equation::calculate_indfac(const Individual &ind, unsigned int ti, const vector <double> &popnum, const vector <double> &precalc) const 
+double Equation::calculate_indfac(const Individual &ind, unsigned int ti, const vector <double> &popcomb, const vector <double> &precalc) const 
 {	
-	return indfac(ind)*calculate(ti,popnum,precalc);
+	return indfac(ind)*calculate(ti,popcomb,precalc);
 }
 
 
 /// Calculates the value for an equation
-double Equation::calculate(unsigned int ti, const vector <double> &popnum, const vector <double> &precalc) const 
+double Equation::calculate(unsigned int ti, const vector <double> &popcomb, const vector <double> &precalc) const 
 {
 	auto C = calcu.size();
  	vector <double> regcalc(C);
@@ -223,8 +223,10 @@ double Equation::calculate(unsigned int ti, const vector <double> &popnum, const
 			
 			switch(it.type){
 				case ONE: num[j] = 1; break;
-				case POPNUM: num[j] = rectify(popnum[it.num]); break;
+				case POPNUM: emsg("pnum not possible"); break;
 				case POPTIMENUM: emsg("poptime num not possible"); break;
+				case POPCOMB: num[j] = popcomb[it.num]; break;				
+				case POPCOMBTIME: emsg("popcombtime num not possible"); break;
 				case REG: num[j] = regcalc[it.num]; break;
 				case REG_PRECALC: num[j] = precalc[it.num]; break;
 				case REG_PRECALC_TIME: num[j] = precalc[it.num+ti]; break;
@@ -243,7 +245,7 @@ double Equation::calculate(unsigned int ti, const vector <double> &popnum, const
 
 
 /// Calculates the value for an equation (but allows for other times for population to be accessed)
-double Equation::calculate_all_time(unsigned int ti, const vector < vector <double> > &popnum_t, const vector <double> &precalc) const 
+double Equation::calculate_all_time(unsigned int ti, const vector < vector <double> > &popcomb_t, const vector <double> &precalc) const 
 {
 	auto C = calcu.size();
  	vector <double> regcalc(C);
@@ -263,12 +265,11 @@ double Equation::calculate_all_time(unsigned int ti, const vector < vector <doub
 			
 			switch(it.type){
 				case ONE: num[j] = 1; break;
-				case POPNUM: num[j] = rectify(popnum_t[ti][it.num]); break;
-				case POPTIMENUM: 
+				case POPCOMB: num[j] = popcomb_t[ti][it.num]; break;
+				case POPCOMBTIME:
 					{
 						const auto &ptr = pop_time_ref[it.num];
-						if(ti < ptr.ti) emsg("Cannot calculate population time before it is set");
-						num[j] = rectify(popnum_t[ptr.ti][ptr.po]); 
+						num[j] = popcomb_t[ptr.ti][ptr.po]; 
 					}
 					break;
 				case REG: num[j] = regcalc[it.num]; break;
@@ -288,7 +289,7 @@ double Equation::calculate_all_time(unsigned int ti, const vector < vector <doub
 }
 
 /// Calculates the value for an equation
-double Equation::calculate_calc(const vector <Calculation> &calc, unsigned int ti, const vector <double> &popnum, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const
+double Equation::calculate_calc(const vector <Calculation> &calc, unsigned int ti, const vector <double> &popcomb, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const
 {
 	auto C = calc.size();
  	vector <double> regcalc(C);
@@ -323,8 +324,10 @@ double Equation::calculate_calc(const vector <Calculation> &calc, unsigned int t
 					break;
 						
 				case ONE: num[j] = 1; break;
-				case POPNUM: num[j] = rectify(popnum[it.num]); break;
+				case POPNUM: emsg("Cannot calculate pnum");  break;
 				case POPTIMENUM: emsg("Cannot calculate poptimenum"); break;
+				case POPCOMB: num[j] = popcomb[it.num]; break;
+				case POPCOMBTIME: emsg("Cannot calculate poptimenum"); break;
 				case REG: num[j] = regcalc[it.num]; break;
 				case REG_PRECALC: num[j] = precalc[it.num]; break;
 				case REG_PRECALC_TIME: num[j] = precalc[it.num+ti]; break;
@@ -343,7 +346,7 @@ double Equation::calculate_calc(const vector <Calculation> &calc, unsigned int t
 
 
 /// Calculates the value for an equation
-double Equation::print_working(const vector <Calculation> &calc, unsigned int ti, const vector <double> &popnum, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const
+double Equation::print_working(const vector <Calculation> &calc, unsigned int ti, const vector <double> &popcomb, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const
 {
 	auto C = calc.size();
  	vector <double> regcalc(C);
@@ -380,8 +383,10 @@ double Equation::print_working(const vector <Calculation> &calc, unsigned int ti
 					break;
 						
 				case ONE: num[j] = 1; break;
-				case POPNUM: num[j] = rectify(popnum[it.num]); break;
+				case POPNUM: emsg("Cannot calculate pnum"); break;
 				case POPTIMENUM: emsg("Cannot calculate poptimenum"); break;
+				case POPCOMB: num[j] = popcomb[it.num]; break;				
+				case POPCOMBTIME: emsg("popcombtime num not possible"); break;
 				case REG: num[j] = regcalc[it.num]; break;
 				case REG_PRECALC: num[j] = precalc[it.num]; break;
 				case REG_PRECALC_TIME: num[j] = precalc[it.num+ti]; break;
@@ -403,13 +408,13 @@ double Equation::print_working(const vector <Calculation> &calc, unsigned int ti
 
 
 /// Tests that equation_para is working
-void Equation::test_calculate_para(const vector <Calculation> &calc, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val, string ref) const
+void Equation::test_calculate_para(const vector <Calculation> &calc, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val, string ref) const
 {
-	auto vec = calculate_para(calc,list,popnum_t,precalc,derive_val);
+	auto vec = calculate_para(calc,list,popcomb_t,precalc,derive_val);
 	
 	auto j = 0u;
 	for(auto ti : list){
-		auto val = calculate_calc(calc,ti,popnum_t[ti],precalc,derive_val);
+		auto val = calculate_calc(calc,ti,popcomb_t[ti],precalc,derive_val);
 		if(dif(vec[j],val,DIF_THRESH)){
 			emsg("Calculate para problem"+ref);
 		}
@@ -419,7 +424,7 @@ void Equation::test_calculate_para(const vector <Calculation> &calc, const vecto
 
 
 /// Calculates the value for an equation in parallel across several times
-vector <double> Equation::calculate_para(const vector <Calculation> &calc, const vector <unsigned int> &list, const vector < vector <double> > &popnum_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const 
+vector <double> Equation::calculate_para(const vector <Calculation> &calc, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, const vector <double> &precalc, const vector < vector < vector <double> > > &derive_val) const 
 {
 	auto K = list.size();
 	auto C = calc.size();
@@ -465,7 +470,8 @@ vector <double> Equation::calculate_para(const vector <Calculation> &calc, const
 						
 						case NUMERIC: val *= cval[it.num]; break;
 						
-						case POPNUM: case POPTIMENUM: case REG: case REG_PRECALC_TIME: case CONSTSPLINEREF: case TIME: 
+						case POPCOMB: case POPCOMBTIME: 
+						case REG: case REG_PRECALC_TIME: case CONSTSPLINEREF: case TIME: 
 							tdj.push_back(j);
 							break;
 							
@@ -497,21 +503,23 @@ vector <double> Equation::calculate_para(const vector <Calculation> &calc, const
 							}								
 							break;
 							
-						case POPNUM: 
+						case POPNUM: case POPTIMENUM: emsg("should not be pnum"); break;
+						
+						case POPCOMB: 
 							{
 								auto itn = it.num;
 								if(fl){
-									if(val == 1){ for(auto k = 0u; k < K; k++) rc[k] = rectify(popnum_t[list[k]][itn]);}
-									else{ for(auto k = 0u; k < K; k++) rc[k] = val*rectify(popnum_t[list[k]][itn]);}
+									if(val == 1){ for(auto k = 0u; k < K; k++) rc[k] = popcomb_t[list[k]][itn];}
+									else{ for(auto k = 0u; k < K; k++) rc[k] = val*popcomb_t[list[k]][itn];}
 								}
-								else{ for(auto k = 0u; k < K; k++) rc[k] *= rectify(popnum_t[list[k]][itn]);}
+								else{ for(auto k = 0u; k < K; k++) rc[k] *= popcomb_t[list[k]][itn];}
 							}
 							break;
 							
-						case POPTIMENUM: 
+						case POPCOMBTIME: 
 							{
 								const auto &ptr = pop_time_ref[it.num];
-								auto value = rectify(popnum_t[ptr.ti][ptr.po]);
+								auto value = popcomb_t[ptr.ti][ptr.po];
 								if(fl){
 									if(val == 1){ for(auto k = 0u; k < K; k++) rc[k] = value;}
 									else{ for(auto k = 0u; k < K; k++) rc[k] = val*value;}
@@ -599,7 +607,10 @@ vector <double> Equation::calculate_para(const vector <Calculation> &calc, const
 						
 						case NUMERIC: val += cval[it.num]; break;
 						
-						case POPNUM: case POPTIMENUM: case REG: case REG_PRECALC_TIME: case CONSTSPLINEREF: case TIME: 
+						case POPNUM: case POPTIMENUM: emsg("not pn"); break;
+						
+						case POPCOMB: case POPCOMBTIME: 
+						case REG: case REG_PRECALC_TIME: case CONSTSPLINEREF: case TIME: 
 							tdj.push_back(j);
 							break;
 							
@@ -631,21 +642,23 @@ vector <double> Equation::calculate_para(const vector <Calculation> &calc, const
 							}								
 							break;
 							
-						case POPNUM: 
+						case POPNUM: case POPTIMENUM: emsg("not pn"); break;
+							
+						case POPCOMB: 
 							{
 								auto itn = it.num;
 								if(fl){
-									if(val == 0){ for(auto k = 0u; k < K; k++) rc[k] = rectify(popnum_t[list[k]][itn]);}
-									else{ for(auto k = 0u; k < K; k++) rc[k] = val+rectify(popnum_t[list[k]][itn]);}
+									if(val == 0){ for(auto k = 0u; k < K; k++) rc[k] = popcomb_t[list[k]][itn];}
+									else{ for(auto k = 0u; k < K; k++) rc[k] = val+popcomb_t[list[k]][itn];}
 								}
-								else{ for(auto k = 0u; k < K; k++) rc[k] += rectify(popnum_t[list[k]][itn]);}
+								else{ for(auto k = 0u; k < K; k++) rc[k] += popcomb_t[list[k]][itn];}
 							}
 							break;
 							
-						case POPTIMENUM: 
+						case POPCOMBTIME: 
 							{
 								const auto &ptr = pop_time_ref[it.num];
-								auto value = rectify(popnum_t[ptr.ti][ptr.po]);
+								auto value = popcomb_t[ptr.ti][ptr.po];
 								if(fl){
 									if(val == 1){ for(auto k = 0u; k < K; k++) rc[k] = value;}
 									else{ for(auto k = 0u; k < K; k++) rc[k] = val+value;}
@@ -734,19 +747,19 @@ vector <double> Equation::calculate_para(const vector <Calculation> &calc, const
 						case ONE: val = 1; break;
 						case REG_PRECALC: val = precalc[it.num]; break;
 						case NUMERIC: val = cval[it.num]; break;
-						
-						case POPNUM: 
+						case POPNUM: case POPTIMENUM: emsg("not pnptn"); break;
+						case POPCOMB: 
 							{
 								auto itn = it.num;
 								auto k = j;
-								for(auto ti : list){ num[k] = rectify(popnum_t[ti][itn]); k += N;}
+								for(auto ti : list){ num[k] = popcomb_t[ti][itn]; k += N;}
 							}
 							break;
 							
-						case POPTIMENUM: 
+						case POPCOMBTIME: 
 							{
 								const auto &ptr = pop_time_ref[it.num];
-								auto value = rectify(popnum_t[ptr.ti][ptr.po]);
+								auto value = popcomb_t[ptr.ti][ptr.po];
 								auto k = j;
 								for(auto ii = 0u; ii < list.size(); ii++){ num[k] = value; k += N;}
 								//for(auto ti : list){ num[k] = value; k += N;}
@@ -938,44 +951,51 @@ double Equation::calculate_param(const vector <double> &precalc) const
 /// Calculates a population gradient
 double Equation::calculate_pop_grad(unsigned int pref, unsigned int ti, const vector <double> &precalc) const
 {
-	return calculate_item(linearise.factor_precalc,ti,precalc)*
-	       calculate_item(linearise.pop_grad_precalc[pref],ti,precalc);	
+	emsg("sort11");
+	
+	//return calculate_item(linearise.factor_precalc,ti,precalc)*
+	  //     calculate_item(linearise.pop_grad_precalc[pref],ti,precalc);	
 }
 
 
 /// Calculates a population gradient
 double Equation::calculate_pop_grad_no_time(unsigned int pref, const vector <double> &precalc) const
 {
-	return calculate_item_no_time(linearise.factor_precalc,precalc)*
-	       calculate_item_no_time(linearise.pop_grad_precalc[pref],precalc);	
+	emsg("sort12");
+	//return calculate_item_no_time(linearise.factor_precalc,precalc)*
+	  //     calculate_item_no_time(linearise.pop_grad_precalc[pref],precalc);	
 }
 
 
 /// Calculates a population gradient without factor term
 double Equation::calculate_pop_grad_without_factor_no_time(unsigned int pref, const vector <double> &precalc) const
 {
-	return calculate_item_no_time(linearise.pop_grad_precalc[pref],precalc);	
+	emsg("sort12");
+	//return calculate_item_no_time(linearise.pop_grad_precalc[pref],precalc);	
 }
 
 
 /// Calculates factor part of population gradient
 double Equation::calculate_factor(unsigned int ti, const vector <double> &precalc) const
 {
-	return calculate_item(linearise.factor_precalc,ti,precalc);
+	emsg("sort13");
+	//return calculate_item(linearise.factor_precalc,ti,precalc);
 }
 
 
 /// Calculates a population gradient without factor term
 double Equation::calculate_pop_grad_without_factor(unsigned int pref, unsigned int ti, const vector <double> &precalc) const
 {
-	return  calculate_item(linearise.pop_grad_precalc[pref],ti,precalc);
+	emsg("sort16");
+//return  calculate_item(linearise.pop_grad_precalc[pref],ti,precalc);
 }
       
 
 /// Calculates the term with no population
 double Equation::calculate_no_pop(unsigned int ti, const vector <double> &precalc) const
 {
-	return calculate_item(linearise.no_pop_precalc,ti,precalc);
+	emsg("sort15");
+	//return calculate_item(linearise.no_pop_precalc,ti,precalc);
 }
 
 
@@ -1061,5 +1081,3 @@ double Equation::calculate_item_old_no_time(const EqItem &it, const vector <doub
 	
 	return UNSET;
 }
-
-

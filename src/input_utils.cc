@@ -1606,7 +1606,7 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 					auto val1 = par.get_value(j*N+i);
 					auto val2 = par.get_value(i*N+j);
 				
-					if(val1 != UNSET) emsg("Should be unset");
+					if(val1 != UNSET) emsg("Should be unset1");
 					
 					vector <unsigned int> ind; ind.push_back(j); ind.push_back(i);
 					set_const(par,ind,val2);
@@ -1627,6 +1627,8 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 			else par.element[ref].value.te;
 			cout << " val" << endl;
 		}
+		
+		
 	}
 }
 

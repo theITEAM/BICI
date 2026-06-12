@@ -3803,6 +3803,7 @@ void eqn_type_error(EqItemType type, unsigned int ref)
 	case POPNUM: st = "POPNUM"; break;
 	case POPTIMENUM: st = "POPTIMENUM"; break;
 	case TIME: st = "TIME"; break;
+	case POPCOMB: st = "POPCOMB"; break;
 	default: st = "DEFAULT"; break;
 	}
 	

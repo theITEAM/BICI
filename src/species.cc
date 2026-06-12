@@ -262,8 +262,8 @@ vector <unsigned int> Species::get_vec_tr_swap_mid(unsigned int st, unsigned int
 }
 
 
-/// Calcucalculate_no_popnum(lates non-Markovian rate
-vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <double> &precalc, const vector < vector <double> > &popnum_t, const vector <Equation> &eqn, vector < vector <double> > &bp_store) const
+/// Calculate non-Markovian rate
+vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <double> &precalc, const vector < vector <double> > &popcomb_t, const vector <Equation> &eqn, vector < vector <double> > &bp_store) const
 {
 	vector < vector <double> > nm_rate;
 	
@@ -290,10 +290,10 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 							
 					if(time_vari){
 						for(auto ti = 0u; ti < T; ti++){
-							const auto &popnum = popnum_t[ti];
+							const auto &popcomb = popcomb_t[ti];
 							auto bp_f = 1.0;
 							for(auto e : nmt.bp_other_eq){
-								bp_f -= eqn[e].calculate(ti,popnum,precalc);
+								bp_f -= eqn[e].calculate(ti,popcomb,precalc);
 							}
 							check_bp(bp_f);
 							bp[ti] = bp_f;
@@ -320,12 +320,12 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					const auto &eq = eqn[bp_eq];
 					if(update == UPDATE_TIME){
 						for(auto ti = 0u; ti < T; ti++){
-							const auto &popnum = popnum_t[ti];
-							auto bp_f = eq.calculate(ti,popnum,precalc);
+							const auto &popcomb	= popcomb_t[ti];
+							auto bp_f = eq.calculate(ti,popcomb,precalc);
 							if(nmt.all_branches){
 								auto div = 0.0;
 								for(auto e : nmt.bp_all_eq){
-									div += eqn[e].calculate(ti,popnum,precalc);
+									div += eqn[e].calculate(ti,popcomb,precalc);
 								}
 								bp_f /= div;
 							}
@@ -357,7 +357,7 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
 					if(eq.time_vari){
 						for(auto ti = 0u; ti < T; ti++){	
-							nm_rate[m][ti] = dt*bp[ti]/eq.calculate(ti,popnum_t[ti],precalc);
+							nm_rate[m][ti] = dt*bp[ti]/eq.calculate(ti,popcomb_t[ti],precalc);
 						}
 					}
 					else{
@@ -374,7 +374,7 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					const auto &eq = eqn[nmt.dist_param_eq_ref[0]];
 					if(eq.time_vari){
 						for(auto ti = 0u; ti < T; ti++){	
-							nm_rate[m][ti] = dt*bp[ti]*eq.calculate(ti,popnum_t[ti],precalc);
+							nm_rate[m][ti] = dt*bp[ti]*eq.calculate(ti,popcomb_t[ti],precalc);
 						}		
 					}
 					else{
@@ -392,7 +392,7 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					const auto &eq = eqn[nmt.dist_param_eq_ref[0]];	
 					if(eq.time_vari){
 						for(auto ti = 0u; ti < T; ti++){	
-							nm_rate[m][ti] = dt*bp[ti]/eq.calculate(ti,popnum_t[ti],precalc);
+							nm_rate[m][ti] = dt*bp[ti]/eq.calculate(ti,popcomb_t[ti],precalc);
 						}
 					}
 					else{
@@ -408,7 +408,7 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 					
 						if(eq.time_vari || eq_sh.time_vari){
 							for(auto ti = 0u; ti < T; ti++){
-								nm_rate[m][ti] = dt/eq.calculate_no_popnum(ti,precalc);
+								nm_rate[m][ti] = dt/eq.calculate_no_popcomb(ti,precalc);
 							}
 						}
 						else{
@@ -837,6 +837,7 @@ void Species::sampling_error(unsigned int trg, string warn) const
 }
 
 
+/*
 /// Works out how to update equations using changes in populations
 void Species::sim_linear_speedup_init(const vector <Equation> &eqn)
 {
@@ -865,13 +866,16 @@ void Species::sim_linear_speedup_init(const vector <Equation> &eqn)
 			const auto &me = markov_eqn[m];
 			auto e = me.eqn_ref;
 			const auto &eq = eqn[e]; 
-				if(eq.linearise.on && eq.linearise.pop_grad_time_dep == false){
+			emsg("sort25");
+			
+			if(eq.linearise.on && eq.linearise.pop_grad_time_dep == false){
 				LinearFormInit lfi; lfi.m = m; lfi.e = e;
 				lfinit.push_back(lfi);
 			}
 			else{
 				sim_linear_speedup.calc.push_back(m);
 			}
+			
 		}
 		break;
 		
@@ -881,6 +885,8 @@ void Species::sim_linear_speedup_init(const vector <Equation> &eqn)
 			auto e = tra.dist_param[0].eq_ref;
 			const auto &eq = eqn[e];
 			
+			emsg("sort27");
+			
 			if(eq.linearise.on && eq.linearise.pop_grad_time_dep == false){
 				LinearFormInit lfi; lfi.m = tr; lfi.e = e;
 				lfinit.push_back(lfi);
@@ -888,17 +894,21 @@ void Species::sim_linear_speedup_init(const vector <Equation> &eqn)
 			else{
 				sim_linear_speedup.calc.push_back(tr);
 			}
+			
 		}
 		break;
 	}
 	
 	set_linear_form(sim_linear_speedup.lin_form,lfinit,eqn);
 }
+*/
 
 
 /// Sets a linear form such that proposals can be made more quickly
 void Species::set_linear_form(LinearForm &lin_form, const vector <LinearFormInit> &lfinit, const vector <Equation> &eqn) const
 {
+	emsg("sort28");
+	/*
 	lin_form.factor_nopop_only = false;
 	
 	Hash hash;
@@ -987,16 +997,17 @@ void Species::set_linear_form(LinearForm &lin_form, const vector <LinearFormInit
 		cout << "calculate fast" << endl;
 		
 		cout << lin_form.list.size() << " " << lin_form.sum_e.size() << "num" << endl;
-		/*
+		
 		for(auto k = 0u; k < lin_form.pop_affect.size(); k++){
 			const auto &pa = lin_form.pop_affect[k];
 			cout << "  " << pa.po << ": ";
 			for(const auto &pgr : pa.pop_grad_ref) cout << pgr.ref << " " << pgr.index << ", ";
 			cout << "  grad ref" << endl;
 		}
-		*/
+		
 		emsg("mbp speed up");
 	}
+	*/
 }
 
 
@@ -1006,4 +1017,114 @@ bool Species::item_equal(const EqItem &it1, const EqItem &it2) const
 	if(it1.type != it2.type) return false;
 	if(it1.num != it2.num) return false;
 	return true;
+}
+
+
+/// Sets properties related to when Markov equations must be updated
+void Species::set_markov_eqn_update(const vector <Equation> &eqn, const vector <Param> &param)
+{
+	for(auto &me : markov_eqn){
+		if(me.time_vari == true){
+			auto all = false;
+			vector <ParamRef> pr_list;
+			
+			const auto &eq = eqn[me.eqn_ref];	
+			
+			for(const auto &pr : eq.param_ref){
+				const auto &par = param[pr.th];
+				const auto &si = par.spline_info;
+				if(par.time_dep && si.on){
+					if(si.type == SQUARE_SPL) pr_list.push_back(pr);
+					else all = true;
+				}
+			}
+			
+			if(!all){
+				for(const auto &ca : eq.calcu){
+					for(auto &it : ca.item){
+						switch(it.type){
+						case POPTIMENUM: case TIME: case REG_PRECALC_TIME: all = true; break;
+						default: break;
+						}
+					}
+				}					
+			}
+			
+			if(!all){
+				me.always_recalc = false;
+				
+				auto &pc = me.param_change;
+				pc.resize(T,false);
+				pc[0] = true;
+				
+				for(const auto &pr : pr_list){
+					const auto &par = param[pr.th];
+					const auto &si = par.spline_info;
+					for(auto tdiv : si.knot_tdiv){
+						auto ti = get_ti(tdiv);
+						pc[ti] = true;
+					}
+				}
+			}
+		}
+	}
+
+	markov_update_t.resize(T);
+	for(auto ti = 0u; ti < T; ti++){
+		auto &mu = markov_update_t[ti];
+		mu.resize(markov_eqn.size());
+		
+		for(auto e = 0u; e < markov_eqn.size(); e++){
+			const auto &me = markov_eqn[e];
+			if(me.always_recalc) mu[e] = true;
+			else mu[e] = me.param_change[ti];
+		}
+	}
+	
+	if(false){
+		for(auto ti = 0u; ti < T; ti++){
+			for(auto e = 0u; e < markov_eqn.size(); e++){
+				cout << markov_update_t[ti][e];
+			}
+			cout << endl;
+		}
+		emsg("markov_update_t");
+	}
+/*
+	markov_update_all.resize(T,false);
+	
+	for(auto e = 0u; e < markov_eqn.size(); e++){
+		if(markov_eqn[e].time_vari) markov_time_dep.push_back(e);
+	}
+	
+	markov_param_change.resize(T);
+	for(auto ti = 0u; ti < T; ti++){
+		for(auto e :  markov_time_dep){
+			const auto &me = markov_eqn[e];
+			if(me.always_recalc == true || me.param_change[ti]){
+				markov_param_change[ti].push_back(e);
+			}
+		}
+	}
+	
+	if(false){
+		for(auto &me : markov_eqn){
+			cout << eqn[me.eqn_ref].te_raw << ": ";
+			if(me.always_recalc) cout << "always";
+			else{
+				for(auto ti = 0u; ti < T; ti++) cout << me.param_change[ti] << " ";
+			}
+			cout << endl;
+		}
+		
+		for(auto ti = 0u; ti < T; ti++){
+			cout << ti << ": ";
+			for(auto e : markov_param_change[ti]) cout << e << " ";
+			cout << endl;
+		}	
+		
+		emsg("Param Change");
+		//markov_update_all // CHECKON need to set
+	}
+	*/
 }

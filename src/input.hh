@@ -181,7 +181,7 @@ class Input                                // Stores information about the model
 		bool equal_pop(const Population &popA, const Population &popB) const;
 		void linearise_eqn(unsigned int per_start, unsigned int per_end);
 		void add_eq_ref(EquationInfo &eqi);	
-		void linearise_precalc();
+		//void linearise_precalc();
 		vector <bool> set_eqn_zero(const vector <EquationInfo> &eq_info);
 		void add_parent_child(const EquationInfo eqi, unsigned int i, unsigned int th, Hash &hash);
 		void add_parent_child2(const ParamRef &parref, const ParamRef &pr, Hash &hash);
