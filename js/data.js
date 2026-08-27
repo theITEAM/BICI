@@ -24,7 +24,7 @@ function start_data_source(type,spec,info)
 {
 	if(info.p == undefined && type != "LoadTensor" &&
 		type != "LoadPriorSplit" && type != "LoadDistSplit" && type != "LoadReparam" && type != "LoadDefine" && type != "LoadAmatrix" &&
-		type != "Fixed Effect"){
+		type != "Fixed Effect" && type != "Region"){
 		info.p = model.get_p();
 	}
 	
@@ -429,8 +429,13 @@ function add_data_buts(lay,siminf)
 	}
 		
 	if(source.length == 0){
-		table = "No data sources added.";
-		if(siminf == "sim") table = "No setup information.";
+		let mess = "No data sources added.";
+		switch(siminf){
+		case "sim": mess = "No setup information."; break;
+		case "gen": mess = "No data sources generated."; break;
+		case "ppc": mess = "No population modifications."; break;
+		}
+		center_message(mess,lay);
 	}
 	else{
 		table = { width:data.source_width, heading:[{name:"Name"},{name:"Type"},{name:"Details"},{name:"Number"},{name:"Spec."},{name:"Table"},{name:""}], content:[]};
@@ -555,7 +560,7 @@ function add_data_buts(lay,siminf)
 				
 				{
 					let te = remove_pop_text, ti = "Remove Population";
-					if(siminf == "gen"){ te = sim_remove_pop_text; ti = "Generate remnoved population data";}
+					if(siminf == "gen"){ te = sim_remove_pop_text; ti = "Generate removed population data";}
 					w = model.add_object_button(lay,"Remove Pop.",x,y,"RemPop",{back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
 					x += w+gap;
 				}
@@ -688,7 +693,9 @@ function add_data_buts(lay,siminf)
 	default: error("Option not recognised 20"); break;		
 	}
 
-	add_layer("TableContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{table:table});
+	if(table != undefined){
+		add_layer("TableContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{table:table});
+	}
 }
 
 
@@ -1202,7 +1209,26 @@ function set_loadcol()
 					}
 				}
 				break;
+			
+			case "dynamic_index":
+				{
+					let ep = inter.edit_param;
 				
+					let di = model.param[so.info.i].dynamic_info;
+					let de = di.index_drop.te;
+					let res = find_cla_from_index(de);
+					if(res != undefined){
+						let sp = get_so_sp(so.info.siminf,res.p);
+						let claa = sp.cla[res.cl];
+						load_col.push({heading:de, desc:"'"+claa.name+"'", p:res.p, cl:res.cl, type:"compartment"});
+					}
+				}
+				break;
+			
+			case "region":
+				load_col.push({heading:"Region", desc:"the region value", type:"region"});
+				break;
+			
 			case "dep_index":
 				{
 					let name = so.spec.full_name;
@@ -1213,7 +1239,6 @@ function set_loadcol()
 						let de = remove_prime(dep[k]);
 						if(de != "t"){
 							let res = find_cla_from_index(de);
-						
 							if(res != undefined){
 								let sp = get_so_sp(so.info.siminf,res.p);
 								let claa = sp.cla[res.cl];
@@ -1669,9 +1694,11 @@ function comp_filter_desc(clz,sp)
 
 
 /// Gets a list of all possible classifications
-function get_cl_pos()
+function get_cl_pos(p)
 {
-	let sp = model.get_sp();
+	let sp;
+	if(p == undefined) sp = model.get_sp();
+	else sp = model.species[p];
 
 	let cl_pos = [];
 	for(let cl = 0; cl < sp.ncla; cl++){

@@ -11,6 +11,7 @@ using namespace std;
 
 #include "cor_matrix.hh"
 #include "utils.hh"
+#include "matrix.hh"
 
 /// Initialise the correlation matrix 			
 CorMatrix::CorMatrix(const Model &model) : model(model)
@@ -23,11 +24,24 @@ CorMatrix::CorMatrix(const Model &model) : model(model)
 void CorMatrix::init()
 {
 	av.clear(); av2.clear();
+	log_av.clear(); log_av2.clear();
 	n = 0;
 	n_start = 0;
 
+	strictly_positive.resize(N);	
+	str_pos_list.clear();
+	for(auto i = 0u; i < N; i++){ 
+		const auto &pv = model.param_vec[model.param_vec_prop[i]];
+		strictly_positive[i] = pv.strictly_positive;
+		if(strictly_positive[i]) str_pos_list.push_back(i);
+	}
+
 	av.resize(N,0);
 	av2.resize(N); for(auto i = 0u; i < N; i++) av2[i].resize(N,0);
+	
+	log_av.resize(N,0);
+	log_av2.resize(N); for(auto i = 0u; i < N; i++) log_av2[i].resize(N,0);
+	
 	samp.clear();
 }
 
@@ -36,26 +50,15 @@ void CorMatrix::init()
 void CorMatrix::add_sample(vector <double> param_val_pr, unsigned int range)
 {
 	// Shifting ensure that values are not constant
-	for(auto &val : param_val_pr){
-		val += ran()*SMALL;
-	}
-	
-	// Converts to log of value for quantities which are strictly positive
-	for(auto i = 0u; i < model.nparam_vec_prop; i++){
-		const auto &pv = model.param_vec[model.param_vec_prop[i]];
-		const auto &pri = model.prior[pv.prior_ref];
-		
-		if(model.details.algorithm != ABC_SMC_ALG){
-			switch(pri.type){
-			case INVERSE_PR:
-			case POWER_PR: 
-				param_val_pr[i] = log(param_val_pr[i]);
-				break;
-			default: break;
-			}
+	auto nn = get_n();
+	if(nn > 0){
+		for(auto i = 0u; i < N; i++){
+			auto &val = param_val_pr[i];
+			if(strictly_positive[i]) val *= exp((ran()-0.5)*SMALL);
+			else val += (ran()-0.5)*SMALL*av[i]/nn;
 		}
 	}
-
+	
 	add_sample2(param_val_pr,range);
 }
 
@@ -77,8 +80,20 @@ void CorMatrix::add_sample2(vector <double> param_val_pr, unsigned int range)
 		}
 	}
 
+	for(auto i : str_pos_list){
+		auto vali = log(param_val_pr[i]);
+		log_av[i] += vali;
+		for(auto j : str_pos_list){
+			if(j >= i){
+				auto valj = log(param_val_pr[j]);
+				log_av2[i][j] += vali*valj;
+			}
+		}
+	}
+		
 	while(n-n_start > range){
 		const auto &samp_val = samp[n_start];
+		
 		for(auto i = 0u; i < N; i++){
 			auto vali = samp_val[i];
 			av[i] -= vali;
@@ -87,6 +102,18 @@ void CorMatrix::add_sample2(vector <double> param_val_pr, unsigned int range)
 				av2[i][j] -= vali*valj;
 			}
 		}
+		
+		for(auto i : str_pos_list){
+			auto vali = log(samp_val[i]);
+			log_av[i] -= vali;
+			for(auto j : str_pos_list){
+				if(j >= i){
+					auto valj = log(samp_val[j]);
+					log_av2[i][j] -= vali*valj;
+				}
+			}
+		}
+		
 		n_start++;
 	}
 }
@@ -95,6 +122,8 @@ void CorMatrix::add_sample2(vector <double> param_val_pr, unsigned int range)
 /// Checks that correlation matrix is up-to-date
 void CorMatrix::check() const
 {
+	cout << "Check cor matrix" << endl;
+	
 	vector <double> ave(N,0);
 	vector < vector <double> > ave2;
 	ave2.resize(N);
@@ -110,10 +139,37 @@ void CorMatrix::check() const
 	}
 	
 	for(auto j = 0u; j < N; j++){
-		if(dif(ave[j],av[j],DIF_THRESH)) emsg("Different in av");
+		if(dif(ave[j],av[j],DIF_THRESH)){
+			emsg("Different in av");
+		}
 		for(auto k = j; k < N; k++){
 			if(dif(ave2[j][k],av2[j][k],DIF_THRESH)){
 				emsg("Different in av2");
+			}
+		}	
+	}
+	
+	vector <double> log_ave(N,0);
+	vector < vector <double> > log_ave2;
+	log_ave2.resize(N);
+	for(auto j = 0u; j < N; j++) log_ave2[j].resize(N,0);
+	
+	for(auto i = n_start; i < n; i++){
+		for(auto j : str_pos_list){
+			log_ave[j] += log(samp[i][j]);
+			for(auto k : str_pos_list){
+				if(k >= j){
+					log_ave2[j][k] += log(samp[i][j])*log(samp[i][k]);	
+				}
+			}
+		}
+	}
+	
+	for(auto j = 0u; j < N; j++){
+		if(dif(log_ave[j],log_av[j],DIF_THRESH)) emsg("Different in log_av");
+		for(auto k = j; k < N; k++){
+			if(dif(log_ave2[j][k],log_av2[j][k],DIF_THRESH)){
+				emsg("Different in log_av2");
 			}
 		}	
 	}
@@ -121,26 +177,45 @@ void CorMatrix::check() const
 
 
 /// Calculates the correlation matrix
-vector < vector <double> > CorMatrix::calculate_cor_matrix() const
+vector < vector <double> > CorMatrix::calculate_cor_matrix(bool log_trans) const
 {
 	auto nn = n-n_start;
 	
-	vector <double> mu(N);
-	for(auto i = 0u; i < N; i++) mu[i] = av[i]/nn;
-	
-	vector <double> var(N);
-	for(auto i = 0u; i < N; i++){
-		var[i] = av2[i][i]/nn - mu[i]*mu[i];
-		if(var[i] < TINY) var[i] = TINY;
-	}
-		
+	vector <double> mu(N,0);
 	vector < vector <double> > M;
-	M.resize(N); for(auto i = 0u; i < N; i++) M[i].resize(N);
+	M.resize(N); for(auto i = 0u; i < N; i++) M[i].resize(N,0);
+	vector <double> var(N);
 	
-	for(auto i = 0u; i < N; i++){
-		for(auto j = i; j < N; j++){
-			M[i][j] = (av2[i][j]/nn - mu[i]*mu[j])/sqrt(var[i]*var[j]);
-			M[j][i] = M[i][j]; 
+	if(log_trans){
+		for(auto i : str_pos_list) mu[i] = log_av[i]/nn;
+	
+		for(auto i : str_pos_list){
+			var[i] = log_av2[i][i]/nn - mu[i]*mu[i];
+			if(var[i] < VVTINY) var[i] = VVTINY;
+		}
+		
+		for(auto i : str_pos_list){
+			for(auto j : str_pos_list){
+				if(j >= i){
+					M[i][j] = (log_av2[i][j]/nn - mu[i]*mu[j])/sqrt(var[i]*var[j]);
+					M[j][i] = M[i][j]; 
+				}
+			}
+		}
+	}
+	else{
+		for(auto i = 0u; i < N; i++) mu[i] = av[i]/nn;
+		
+		for(auto i = 0u; i < N; i++){
+			var[i] = av2[i][i]/nn - mu[i]*mu[i];
+			if(var[i] < VVTINY) var[i] = VVTINY;
+		}
+			
+		for(auto i = 0u; i < N; i++){
+			for(auto j = i; j < N; j++){
+				M[i][j] = (av2[i][j]/nn - mu[i]*mu[j])/sqrt(var[i]*var[j]);
+				M[j][i] = M[i][j]; 
+			}
 		}
 	}
 	
@@ -159,7 +234,7 @@ void CorMatrix::set_mvn_from_particle(vector <Particle> &particle)
 
 
 /// Finds covariance matrix for a subset of parameters
-vector < vector <double> > CorMatrix::find_covar(const vector <unsigned int> &param_list) const
+vector < vector <double> > CorMatrix::find_covar(const vector <unsigned int> &param_list, bool log_trans) const
 {
 	vector <unsigned int> param_list_prop;
 	for(auto th : param_list){
@@ -173,24 +248,47 @@ vector < vector <double> > CorMatrix::find_covar(const vector <unsigned int> &pa
 	
 	vector < vector <double> > M;
 	M.resize(np); for(auto j = 0u; j < np; j++) M[j].resize(np);
-
+	
+	//print_vector("av",av);
+	//print_matrix("av2",av2);
+	
+	//print_vector("log_av",log_av);
+	//print_matrix("log_av2",log_av2);
+	
+	
 	for(auto j = 0u; j < np; j++){
 		auto th_j = param_list_prop[j];
 		double val;
 		for(auto i = j; i < np; i++){
 			auto th_i = param_list_prop[i];
-			if(th_j < th_i) val = av2[th_j][th_i]/nsum - (av[th_j]/nsum)*(av[th_i]/nsum);
-			else val = av2[th_i][th_j]/nsum - (av[th_j]/nsum)*(av[th_i]/nsum);
-	
+			
+			if(log_trans){
+				if(th_j < th_i) val = log_av2[th_j][th_i]/nsum - (log_av[th_j]/nsum)*(log_av[th_i]/nsum);
+				else val = log_av2[th_i][th_j]/nsum - (log_av[th_j]/nsum)*(log_av[th_i]/nsum);
+			}
+			else{
+				if(th_j < th_i) val = av2[th_j][th_i]/nsum - (av[th_j]/nsum)*(av[th_i]/nsum);
+				else val = av2[th_i][th_j]/nsum - (av[th_j]/nsum)*(av[th_i]/nsum);
+			}
+			
+			if(i == j){
+				if(val < -TINY){
+					emsg("Could not get covariance matrix");
+				}
+				else{
+					if(val < VVTINY) val = VVTINY;
+				}
+			}
+			
 			M[j][i] = val;
 			M[i][j] = val;
 		}
 	}
-	
+
 	return M;
 }
 
-
+	
 /// Returns the number of samples gathered
 unsigned int CorMatrix::get_n()
 {

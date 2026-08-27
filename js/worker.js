@@ -10,6 +10,7 @@ importScripts("equation_prop.js");
 importScripts("equation_calculate.js");
 importScripts("parameter.js");
 importScripts("parameter_edit.js");
+importScripts("param_dynamic.js");
 importScripts("prior.js");
 importScripts("worker_io.js");
 importScripts("model.js");
@@ -28,7 +29,11 @@ importScripts("results_plots.js");
 importScripts("statistics.js");
 importScripts("data_sim.js");
 importScripts("create_sire.js");
-		
+importScripts("proj4.js");
+importScripts("projections.js");
+
+//			<script src="js/proj4.js"></script>	
+			
 let xi_sq =	calc_xi_sq();
 
 let model;                                        // Stores the model
@@ -64,6 +69,10 @@ let run_chain = [];
 
 let is_interface = false;                         // Shows not the interface
 
+let too_big_value_store;                          // Temporarily stores values if they are too big
+
+let too_big_prior_split_store;                    // Temporarily stores distributions if they are too big
+
 /*
 let test_ch={testtest:[]};
 for(let i = 0; i< 10000000; i++){
@@ -82,10 +91,6 @@ for(let i = 0; i< 1000000; i++){
 	test_ch.testtest[i] =arr;
 }
 */
-
-//let test_ch=
-//5 216 972
-//5 216 884
 
 let fileReader = new FileReader();
 
@@ -111,7 +116,7 @@ onmessage = function(e)
 /// Processes new message
 function process(e)
 {
-	percent(1)
+	percent(10)
 	
 	input = e.data;
 	
@@ -128,12 +133,40 @@ function process(e)
 
 	if(model && input.model){
 		copy_strip(input.model,model);
+	
 		if(model.warn.length > 0) update_mod = true;
 	}
 	
 	let itype = input.type;
 	//prr(itype+" type");
 	switch(itype){
+	case "Delete derive":
+		{
+			let jsel;
+			for(let j = 0; j < model.derive.length; j++){
+				if(model.derive[j].eqn1.te == info.val){
+					jsel = j;
+				}
+			}
+			
+			if(jsel != undefined) model.derive.splice(jsel,1);
+			else error("Derived not set");
+			update_mod = true;
+		}
+		break;
+		
+	case "Get full param table":
+		post({table_te:get_param_table_output(info)});
+		break;
+		
+	case "Get full Amatrix table":
+		post({table_te:get_Amatrix_table_output(info)});
+		break;
+		
+	case "Get full Xvector table":
+		post({table_te:get_Xvector_table_output(info)});
+		break;
+	
 	case "Factor reduce":
 		model.factor_reduce(info.p,info.cl,info.fac);
 		update_mod = true;
@@ -193,11 +226,12 @@ function process(e)
 		{
 			let par = model.param[info.i];
 			if(par.variety != "const" && par.dep.length != 0){
-				let list = par_find_list(par);
+				
 				par.value = undefined;
 				par.set = false;
 			}
 			par.variety = "normal";
+			par.list = par_find_list(par);
 			par.prior = unset_prior();
 			par.prior_split_check = {check:false};
 			par.defrep_param_list=[];
@@ -205,6 +239,7 @@ function process(e)
 			par.defrep_fe_list=[];
 			par.defrep_warn=[];
 			set_ndep_cont(par);
+			
 			update_mod = true;
 		}
 		break;
@@ -289,6 +324,16 @@ function process(e)
 			data_source_check_error("worker",so);
 			add_compartment_map(so.col,so);
 			post({ p:so.info.p, cl:so.info.cl, species:strip_heavy(model.species), map_store:map_store});
+		}
+		break;
+		
+	case "Add comp point":
+		{
+			let so = info;
+			
+			data_source_check_error("worker",so);
+			model.add_file_comp_point(so.info.p,so.info.cl,so.table,so.col);
+			post({ type:"Add file comp", p:so.info.p, cl:so.info.cl, species:strip_heavy(model.species), map_store:map_store});
 		}
 		break;
 		
@@ -391,19 +436,22 @@ function process(e)
 	case "Rename Species":
 		model.rename_species(info.species_new,info.p); 
 		model.check_ob_string_exist(model,"model",info.species_old);
-		post({species:strip_heavy(model.species), param:strip_heavy(model.param),});
+		post({ ret_mod:true});
+		//post({species:strip_heavy(model.species), param:strip_heavy(model.param)});
 		break;
 		
 	case "Rename Classification":
 		model.rename_classification(info.new_name,info.p,info.cl); 
 		data_update_rename_classification(info.p,info.cl,info.old_name,info.new_name);
 		model.check_ob_string_exist(model,"model",info.old_name);
-		post({species:strip_heavy(model.species)});
+		//post({species:strip_heavy(model.species)});
+		post({ ret_mod:true});
 		break;
 		
 	case "Rename Index":
 		model.rename_index(info.index_new,info.p,info.cl);			
-		post({index_old:info.index_old, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
+		//post({index_old:info.index_old, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
+		post({ ret_mod:true});
 		break;
 		
 	case "Rename Compartment":
@@ -426,8 +474,37 @@ function process(e)
 	case "Edit Xvector":
 		{
 			let feg = model.species[info.p].fix_eff[info.i];
-			info.X_value = feg.X_vector.X_value;
-			info.ind_list = feg.X_vector.ind_list;
+			let X_value = feg.X_vector.X_value;
+			let ind_list = feg.X_vector.ind_list;
+			
+			if(ind_list.length > X_ELEMENT_MAX){
+				let ind_list_shrink=[], X_value_shrink=[];
+				for(let j = 0; j < X_ELEMENT_MAX; j++){
+					ind_list_shrink.push(ind_list[j]);
+					X_value_shrink.push(X_value[j]);
+				}
+				
+				info.X_value = X_value_shrink;
+				info.ind_list = ind_list_shrink;
+				info.too_big = true;
+			}
+			else{
+				info.X_value = X_value;
+				info.ind_list = ind_list;
+			}
+			
+			post({ info:info});
+		}
+		break;
+	
+	case "Edit Region":
+		{	
+			info.table = model.param[info.info.i].dynamic_info.region.table;
+			info.table_loaded = true;
+			info.load_datatable = true;
+			info.table.col_used = [0,1];
+			info.table.edit = true;
+			info.data_table_use = 0;
 			post({ info:info});
 		}
 		break;
@@ -438,6 +515,19 @@ function process(e)
 			data_source_check_error("worker",so);
 			inf_eff_load_X(so);
 			post({p:so.info.p, i:so.info.i});
+		}
+		break;
+		
+	case "Load Region":
+		{
+			let so = info.edit_source;
+			
+			data_source_check_error("worker",so);
+			let di = model.param[so.info.i].dynamic_info; 
+			di.region.table = so.table;
+			di.region.loaded = true;
+	
+			post({param:strip_heavy(model.param)});
 		}
 		break;
 		
@@ -456,8 +546,8 @@ function process(e)
 			let ind_list = ieg.A_matrix.ind_list;
 			let A_value = ieg.A_matrix.A_value;
 			
-			if(ind_list.length*ind_list.length > ELEMENT_MAX){
-				let max = Math.floor(Math.sqrt(ELEMENT_MAX));
+			if(ind_list.length*ind_list.length > A_ELEMENT_MAX){
+				let max = Math.floor(Math.sqrt(A_ELEMENT_MAX));
 				
 				let ind_list_shrink=[], A_value_shrink=[];
 				for(let j = 0; j < max; j++){
@@ -488,10 +578,13 @@ function process(e)
 			let i = info.i;
 			let par = model.param[i];
 			
-			let err = check_prior_split(input.type,par,info.prior_split);
+			let prior_split = info.prior_split;
+			if(info.too_big) prior_split = too_big_prior_split_store; 
+		
+			let err = check_prior_split(input.type,par,prior_split);
 			if(typeof err == 'string') alert_help("Problem updating",err);
 			
-			par.prior_split = info.prior_split;
+			par.prior_split = prior_split;
 			par.prior_split_set = true;
 			get_prior_param_list(par);
 			post({ i:i, prior_split_desc: get_prior_split_desc(par)});
@@ -510,9 +603,10 @@ function process(e)
 	case "Edit PriorSplit": case "Edit DistSplit":
 		{
 			let par = model.param[info.i];
-		
+			info.par_st.list = par.list;
+			
 			if(par.prior_split == undefined){
-				let prior_split = par_find_template(par.list);
+				let prior_split = par_find_template(par.list,par.ndep_cont);
 				let dim = get_dimensions(prior_split);
 				let ele_list = get_element_list(prior_split,dim);
 		
@@ -529,8 +623,15 @@ function process(e)
 			
 			info.list = par.list;
 			
-			if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
-		
+			set_too_big(info);
+			
+			if(info.too_big){
+				too_big_prior_split_store = info.prior_split;
+				too_big_value_store = info.value;
+				info.prior_split = undefined;
+				reduce_size(info,par);
+			}
+			
 			post({ info:info});
 		}
 		break;
@@ -539,8 +640,8 @@ function process(e)
 		{	
 			let par = model.param[info.i];
 			
-			if(par.den_vec){ set_density(info,par,false); par.value = info.value;}
-			else info.value = par.value;
+			if(par.den_vec){ info.list = par.list; set_density(info,par,false); par.value = info.value;}
+			info.value = par.value;
 			
 			let dim = get_dimensions(par.value);
 		
@@ -576,20 +677,26 @@ function process(e)
 			let par = info.par_st;
 			let parm = model.param[info.i];
 			par.list = parm.list;
-			
-			info.value = parm.value;	
-			if(info.value == undefined) info.value = param_blank(par);
-			
+		
+			if(info.vari_new != undefined || parm.value == undefined) info.value = param_blank(par);
+			else info.value = parm.value;	
+			 	
 			info.time_dep = par.time_dep;
 			
 			info.list = parm.list;
+			
+			set_too_big(info);
+			
 			if(par.dist_mat) set_dist(info,par);
 			else{
 				if(par.iden_mat) set_iden(info,par);
 				else{
 					if(par.den_vec) set_density(info,par);
 					else{
-						if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
+						if(info.too_big){
+							too_big_value_store = info.value;
+							reduce_size(info,par);
+						}
 					}
 				}
 			}
@@ -601,13 +708,20 @@ function process(e)
 	case "Edit Prior Const":
 		{
 			let par = model.param[info.i];
+			info.par_st.list = par.list;
 		
 			info.value = par.prior_const;	
+			
 			if(info.value == undefined) info.value = param_blank(par);
 			
 			info.list = par.list;
 			
-			if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
+			set_too_big(info);
+			
+			if(info.too_big){
+				too_big_value_store = info.value;
+				reduce_size(info,par);
+			}
 			
 			post({ info:info});
 		}
@@ -616,12 +730,20 @@ function process(e)
 	case "Edit Weight":
 		{
 			let par = model.param[info.i];
+			info.par_st.list = par.list;
 			
 			info.value = par.factor_weight;	
 			if(info.value == undefined) info.value = param_blank(par);
 			
 			info.list = par.list;
-			if(num_element(par) > ELEMENT_MAX) reduce_size(info,par);
+			
+			set_too_big(info);
+			
+			if(info.too_big){
+				too_big_value_store = info.value;
+				reduce_size(info,par);
+			}
+			
 			info.type = "weight";
 			post({ info:info});
 		}
@@ -630,38 +752,49 @@ function process(e)
 	case "Set Param": case "Set Reparam": case "Set Define":
 		{
 			let i = info.i;
-			let par = info.par_st;	
+		
+			let par = model.param[i];
 			
+			//let par = info.par_st;	
+		
 			if(info.vari_new != undefined) par.variety = info.vari_new;
 			par.set = true;
 			
-			let err = check_param_value(input.type,par,info.value);
+			let value = info.value;
+			if(info.too_big) value = too_big_value_store; 
+
+			let err = check_param_value(input.type,par,value);
 			if(typeof err == 'string') alert_help("Problem updating",err);
 		
-			unescape_param_value(input.type,par,info.value);
+			unescape_param_value(input.type,par,value);
 			
-			par.value = info.value;
+			par.value = value;
 		
 			get_defrep_param_list(par);
-			model.param[i] = par;
-			
+			//model.param[i] = par;
+		
 			update_model();
-			post({ par_name:par.name, param:strip_heavy(model.param), species:strip_heavy(model.species)});
+			//post({ par_name:par.name, param:strip_heavy(model.param), species:strip_heavy(model.species)});
+			post({ par_name:par.name, ret_mod:true});
 		}
 		break;
 		
 	case "Set Prior Const": 
 		{
 			let i = info.i;
-			let par = model.param[i];
-			let err = check_param_value(input.type,par,info.value);
+		
+			let par = info.par_st;	
+			
+			let value = info.value;
+			if(info.too_big) value = too_big_value_store; 
+
+			let err = check_param_value(input.type,par,value);
 			if(typeof err == 'string') alert_help("Problem updating",err);
 			
-			par.prior_const = info.value;
+			par.prior_const = value;
 			par.prior_const_set = true;
+			model.param[i] = par;
 	
-			//get_defrep_param_list(par);
-			
 			post({ i:i, prior_const_desc:get_prior_const_desc(par)});
 		}
 		break;
@@ -669,11 +802,15 @@ function process(e)
 	case "Set Weight": 
 		{
 			let i = info.i;
-			let par = model.param[i];
-			let err = check_param_value(input.type,par,info.value);
+			let par = model.param[i];			
+			let value = info.value;
+
+			if(info.too_big) value = too_big_value_store; 
+
+			let err = check_param_value(input.type,par,value);
 			if(typeof err == 'string') alert_help("Problem updating",err);
 			
-			par.factor_weight = info.value;
+			par.factor_weight = value;
 			post({ i:i, weight_desc:get_weight_desc(par)});
 		}
 		break;
@@ -825,14 +962,17 @@ function process(e)
 	
 	case "Import output":
 		{
-			let fi = "M:/Github/theITEAM/BICI/Execute/init.bici";
+			//let fi = "/nfs/home/cpooley/Github/theITEAM/BICI/Execute/init.bici";
+			//let fi = "~/Github/theITEAM/BICI/Execute/init.bici";
+			let fi = "Execute/init.bici";
 			if(ver =="windows"){
-				fi = "C:/Users/cpooley/Desktop/BICI_release/BICI_v0.8_windows/Execute/init.bici";
+				fi = "C:/BICI/BICI_v0.9_windows/Execute/init.bici";
 			}
 			if(ver =="mac"){
 				fi = "/tmp/BICI_files/init.bici";
 			}
-			percent(2)
+		
+			//percent(2)
 			load_bici(fi);
 		}
 		break;
@@ -899,12 +1039,13 @@ function process(e)
 	}
 	
 	if(update_mod == true){
-		update_model();
+		update_model(20,100);
 
 		let do_after;
 		if(input.type == "UpdateModel") do_after = input.info;
 
-		post({ type:"UpdateModel", do_after:do_after, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
+		post({ type:"UpdateModel", do_after:do_after, ret_mod:true});
+		//post({ type:"UpdateModel", do_after:do_after, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species), derive:model.derive});
 	}
 }
 
@@ -955,11 +1096,34 @@ function create_invalid_message(mess)
 
 /// Posts a message back to worker_reply
 function post(mess)
-{
-	if(mess.type == undefined) mess.type = input.type;
+{	
+	if(mess.type == undefined && input != undefined) mess.type = input.type;
+	
+	// Determines if model gets passed back
+	let fl;
+	for(let ele in mess){	
+		if(ele == "ret_mod") fl = true;
+	}
+	
+	if(fl){
+		mess.param_factor = strip_heavy(model.param_factor);
+		mess.param = strip_heavy(model.param);
+		mess.species = strip_heavy(model.species);
+		mess.derive = model.derive;
+	}
+ 
 	create_invalid_message(mess);
 		
 	postMessage(mess);
+}
+
+
+/// Outputs a percent given by a fraction of progress
+function percent_fr(fr,per_start,per_end)
+{	
+	if(per_end == undefined) return;
+	
+	percent(per_start+fr*(per_end-per_start));
 }
 
 

@@ -6,6 +6,7 @@
 // 59127 lines of code (16/05/25)
 // 62667 lines of code (17/09/25)
 // 67000 lines of code (25/02/26)
+// 71740 lines of code (01/07/26)
 
 let bici_version = "v0.90";                       // Sets the BICI version
 
@@ -15,17 +16,17 @@ let ver="windows";                                // Determines platform
 
 let mac_temp_dir = "/tmp/BICI_files/";
 
-let win_linux = true;                             // When working on win running linux 
+let win_linux = false;                             // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
 let debug = false;                                // Determines if debugger used (false)
 let testing = false;                              // Used logo to load up results (false)
 let load_map_fast = false;                        // If loads up world map from local computer
-let make_one_chain = false;                       // Make into one chain (for diagnostic purposes)
+let make_one_chain = false;                       // Make into one chain (for diagnostic purposes) CHECKON
 let inf_leave_one_chain = false;                  // Cuts all but one chain (memory diagnostic)
 
-if(win_linux || false){ testing = true; debug = true; load_map_fast = true;}
+if(win_linux || false){ testing = true; debug = true; if(ver == "linux") load_map_fast = true;}
 
 let make_file = false;                            // Determines if makes file or runs
 let thick_line = false;                           // Used for making figures
@@ -158,7 +159,8 @@ const eqn_types = [
 {name:"norm", mode:"param only", range:"all"},
 {name:"pos", mode:"param only", range:"pos"},
 {name:"zeroone", mode:"param only", range:"zeroone"},
-{name:"etarange", mode:"param only", range:"etarange"}
+{name:"etarange", mode:"param only", range:"etarange"},
+{name:"dynamic_weight", mode:"di_weight", range:"all"}
 ];
 
 const param_type = ["normal","const","dist","reparam"]; // Different varieties of parameter
@@ -295,6 +297,8 @@ let name_notallow = "|\"*×_ {}<>〈〉[]()=Σ∫′→;,$&#\\";       // Charac
 let name_ch_max = 40;                                   // The maximum number of characters allowed for strings
 let invalid_name = ["Compartment","Population","Alpha","Distribution","file"];
 
+let latitude_max = 84; // The maximum latitude for 
+
 const convert = [
 		{command:"add-pop-inf", type:"Add Pop."},
 		{command:"remove-pop-inf", type:"Remove Pop."},
@@ -359,6 +363,8 @@ const data_template = [
 // Loading directly into model
 {type:"Fixed Effect", title:"Design matrix for fixed effect", help:fixed_eff_text, cols:["ID","value"]},
 
+{type:"Region", title:"Region for dynamic parameter", help:region_text, cols:["dynamic_index","region"]},
+
 {type:"Comp File Pos", title:"Load compartments", help:load_comppos_text, cols:["comp_name","comp_x","comp_y"]},
 
 {type:"Comp File Pos Colour", title:"Load compartments", help:load_compposcol_text, cols:["comp_name","comp_x","comp_y","colour"]},
@@ -372,6 +378,9 @@ const data_template = [
 
 // Load compartment map
 {type:"CompMap", title:"Load compartment map", help:load_compmap_text, cols:["boundary","comp_name"]},
+
+// Load point map
+{type:"CompPoint", title:"Load compartment points", help:load_comppoint_text, cols:["comp_x","comp_y","comp_name"]},
 
 // Loading tensor of values for a parameter
 {type:"LoadTensor", title:"Load tensor", cols:["dep","value"]},
@@ -455,8 +464,6 @@ const VAR_MIN = 0.0   ;                            // Maximum variance for indiv
 const ETA_DEFAULT = 1.2;                           // Default value for eta (in LKJ distribution)
 const SD_DEFAULT = 2;                              // Default value for SD (in LKJ distribution)
 
-const ELE_REDUCE_FAC = 0.7;                        // Factor reduction when too many elements
-const TABLE_ROW_MAX = 10000;                       // The maximum number of rows displayed on a table
 const WITHIN_MAX = 10;                             // Store maximum number within equation
 
 const DEN_X = 200;                                 // Resolution of density p;ots
@@ -550,6 +557,10 @@ const opbut = ["_","^","+","-","\u00d7","\u2215","(",")","Σ","∫","'"];
 
 const spline_radio_pos = [{value:"Linear"},{value:"Square"},{value:"Cubic +ve"},{value:"Cubic"}];
 
+const param_dynamic_pos = [{te:"bin-thresh"},{te:"bin-min-max"},{te:"bin-thresh-eqn"},{te:"bin-min-max-eqn"}];
+
+const tensor_dynamic_pos = [{te:"bin-thresh"},{te:"bin-min-max"},{te:"bin-thresh-dist"},{te:"bin-min-max-dist"},{te:"bin-thresh-region"},{te:"bin-min-max-region"},{te:"bin-thresh-eqn"},{te:"bin-min-max-eqn"},{te:"bin-thresh-eqn"},{te:"bin-min-max-eqn"}];
+
 const numbut = ["0","1","2","3","4","5","6","7","8","9","."];
 
 const greek = ["\u03B1","\u03B2","\u03B3","\u03B4","\u03B5","\u03B6","\u03B7","\u03B8","\u03B9",
@@ -578,8 +589,15 @@ const LARGE = 10000000;                            // Denote a large quantity
 const VLARGE = 100000000000;                       // Denote a very large quantity
 const TINY = 0.000000001;                          // Denotes a tiny quantity
 const VTINY = 0.00000000000001;                    // A very tiny number
+const VVTINY = 0.0000000000000000001;              // A very very tiny number
 const ALMOST_ONE = 0.9999999;                      // Denotes almost one
+
+const ELE_REDUCE_FAC = 1;                          // Factor reduction when too many elements
+const TABLE_ROW_MAX = 10000;                       // The maximum number of rows displayed on a table
 const ELEMENT_MAX = 1000;                          // The maximum number of elements which can be displayed
+const X_ELEMENT_MAX = 1000;                        // The maximum number of elements in design matrix which can be displayed
+const A_ELEMENT_MAX = 1000;                        // The maximum number of elements which can be displayed for A matrix
+
 const PARAM_LIST_MAX = 1000;                       // The maximum number of parameters on list
 const HASH_INIT = 10;                              // The value used for the hash tables
 const HASH_ENLARGE_SIZE = 4;                       // Factor hash table enlarges 
@@ -588,6 +606,7 @@ const H_BIN = 10;                                  // Used for distributions in 
 
 const COR_MAX = 0.99;                              // Maximum correlation for individual effects
 
+const CHAIN_NSIMINIT_DEFAULT = 20;                 // The default number of simulation used to initialise chain 
 const SIM_NUM_DEFAULT = 1;                         // The default simulation number
 const PPC_NUM_DEFAULT = 200;                       // The default number of ppc simulation
 const ANNEAL_DEFAULT = "none";                     // Default annealing type

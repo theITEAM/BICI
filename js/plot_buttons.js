@@ -668,6 +668,7 @@ Layer.prototype.plot_button = function (bu,ov)
 	case "ParamFactorConst": case "ParamWeightConst":
 	case "PriorSplitElement": case "DistSplitElement":
 	case "ParamSimElement": case "ParamPriConElement": case "DistSimElement": 
+	case "ParamDynamic":
 	case "IEGroupName":
 	case "ReparamElement": case "ReparamTableElement": case "DefineTableElement":
 	case "PriorElement": case "DistElement": case "SplineKnots": 
@@ -1965,7 +1966,9 @@ Layer.prototype.plot_button = function (bu,ov)
 			if(bu.ac == undefined){ 
 				if(col == MAP_DEFAULT) col = LRED; else col = dark_colour(col);
 			}
+		
 			draw_feature(x,y,dx,dy,bu.polygon,col,WHITE,NORMLINE);
+			//draw_rectangle(x,y,dx,dy,BLACK,1);  
 		}
 		break;
 		

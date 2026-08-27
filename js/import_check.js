@@ -8,6 +8,7 @@ function import_eqn_value(eqn,te,op)
  
 	eqn.te = te;
 	extract_equation_properties(eqn);
+
 	if(eqn.warn.length > 0){
 		alert_import("Equation '"+te+"' – "+ eqn.warn[0].te);
 	}

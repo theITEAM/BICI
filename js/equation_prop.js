@@ -290,6 +290,25 @@ function extract_equation_properties(eqn)
 			if(ie.in_pop == false) wa = "Cannot contain individual effects";
 		}
 		break;
+	
+	case "di_weight":
+		{
+			if(eqn.p_name != undefined && eqn.cl_name != undefined){
+			
+				let p = find(model.species,"name",eqn.p_name);
+				let sp = model.species[p];
+				let cl = find(sp.cla,"name",eqn.cl_name);
+				let claa = sp.cla[cl];
+				let index = claa.index;
+				
+				if(eqn.dep.length > 1) wa = "Can only depend on index "+index;
+			
+				if(eqn.dep.length == 1){
+					if(eqn.dep[0] != index) wa = "Should depend on index "+index;
+				}
+			}
+		}
+		break;
 		
 	default:
 		error("Do not recognise equation mode:"+eqn.mode);
@@ -526,6 +545,7 @@ function check_indexes_match(eqn)
 		break;
 		
 	case "derived": case "reparam_ele": case "define_eqn": case "derive_param":
+	case "dynamic_weight":
 		break;
 	}
 	

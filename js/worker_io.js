@@ -81,8 +81,10 @@ function load_fi2(te,file,file_type,heading,format,op)
 {
 	loading_mess("Processing...");
 	
-	//let te = fileReader.readAsText(file,"UTF-8");
-
+	if(te.length == 0){
+		post({type:"AlertP", te:"No content loaded. Perhaps the file is too large? (>400MB)"});
+	}
+	
 	te = te.replace(/\r/g, "");
 
 	let error = false;
@@ -480,8 +482,10 @@ function read_param_samples(chain,te,result,warn,line)
 							}
 							if(time_dep) full += "(t)";
 							
-							let par = {name:pp.name, full_name:"<e>"+full+"</e>", dep:dep, time_dep:time_dep};
-				
+							let ndep_cont = dep.length; if(time_dep) ndep_cont--; 
+							let par = {name:pp.name, full_name:"<e>"+full+"</e>", dep:dep, ndep_cont:ndep_cont, time_dep:time_dep};
+							if(ndep_cont == 0) par.selop = "ic";
+								
 							/*
 							if(false){                             // Turned off because no time variables added 
 								if(time_dep){
@@ -509,6 +513,7 @@ function read_param_samples(chain,te,result,warn,line)
 						
 							par.list = par_find_list(par);
 							//par.co_list = generate_co_list(par.list);
+							
 							result.param.push(par);
 						}
 					}
@@ -566,7 +571,7 @@ function read_param_samples(chain,te,result,warn,line)
 						else{
 							if(par.output){
 								let list = par_find_list(par);
-								value = par_find_template(list);
+								value = par_find_template(list,par.ndep_cont);
 							}
 						}
 					}
@@ -612,8 +617,8 @@ function read_param_samples(chain,te,result,warn,line)
 				}
 
 				sa = { num:Number(spl[0]), mean:par_mean, CImin:par_CImin, CImax:par_CImax};
-			
-				result.generation.push(sa);
+	
+				result.generation.push(sa); // If this fails it probably means 'make_one_chain' is set
 			}
 			else{
 				for(let i = 1; i < J; i++){
@@ -1879,43 +1884,9 @@ function text_width_worker(te,si,bold)
 /// Reduces the size of a tensor returned from the worker
 function reduce_size(info,par)
 {
-	let list_shrink=[];
-	let ndep = par.ndep_cont;
-	
-	if(ndep == 2){ // For a matrix try to make square
-		let n = ELE_REDUCE_FAC*Math.sqrt(ELEMENT_MAX);
-	
-		let nx = n, ny = n;
-		let dy = par.list[0].length;
-		let dx = par.list[1].length;
-		if(nx > dx){ nx = dx; ny = n*n/nx;}
-		if(ny > dy){ ny = dy; nx = n*n/ny;}
-		
-		{
-			let li=[];
-			for(let i = 0; i < ny; i++) li[i] = par.list[0][i];
-			list_shrink.push(li);
-		}
-		
-		{
-			let li=[];
-			for(let i = 0; i < nx; i++) li[i] = par.list[1][i];
-			list_shrink.push(li);
-		}
-	}
-	else{
-		let scale = ELE_REDUCE_FAC*Math.pow(ELEMENT_MAX/num_element(par),1.0/ndep);
-		for(let d = 0; d < ndep; d++){
-			let li=[];
-			let imax = Math.floor(scale*par.list[d].length);
-			if(imax < 0) imax = 1;
-			
-			for(let i = 0; i < imax; i++) li[i] = par.list[d][i];
-			list_shrink.push(li);
-		}
-	}
+	let list_shrink = info.list_shrink;
 
-	let temp = par_find_template(list_shrink);
+	let temp = par_find_template(list_shrink,par.ndep_cont);
 	let co_list = generate_co_list(list_shrink);
 	
 	let value = info.value;
@@ -1925,26 +1896,7 @@ function reduce_size(info,par)
 		set_element(temp,ind,get_element(value,ind));
 	}
 	
-	if(info.type == "PriorSplit"){
-		let pr_split = info.prior_split;
-		let pr_temp = par_find_template(list_shrink);
-		for(let i = 0; i < co_list.length; i++){
-			let ind = co_list[i].index;
-			set_element(pr_temp,ind,get_element(pr_split,ind));
-		}
-		info.prior_split = pr_temp;
-	}
-	
-	let shrunk=[];
-	for(let d = 0; d < ndep; d++){
-		if(list_shrink[d].length < par.list[d].length) shrunk[d] = true;
-		else shrunk[d] = false;
-	}
-	
 	info.value = temp;
-	info.list = list_shrink;
-	info.too_big = true;
-	info.shrunk = shrunk;
 }
 
 
@@ -1962,6 +1914,7 @@ function get_result(name)
 /// Extracts information from the input text
 function extract_text_samples(siminf,type,result)
 {
+	if(siminf == "ppc") siminf = "post-sim";
 	let com = type+"-"+siminf;
 	
 	let nchain = 1; if(result.chains) nchain = result.chains.length;
@@ -1973,34 +1926,49 @@ function extract_text_samples(siminf,type,result)
 		let command = bscript[i];
 		
 		if(command.type == com){
-			let ch = 0;
+			let ch = 1;
 			for(let k = 0; k < command.tags.length; k++){
 				let tag = command.tags[k];
 				if(tag.name == "chain") ch = Number(tag.value);
 				if(tag.name == "file"){
-					switch(type){
-					case "state":
-						if(nchain > 1) te += "CHAIN "+(ch)+endl;
-						te += tag.value.te;
-						break;
-						
-					case "param":
-						{
-							let spl = tag.value.te.split("\n");
+					if(type == "state" || type == "param"){
+						let st = tag.value.te;
 							
-							if(te == "") te += spl[0];
-							if(nchain > 1) te += ",Chain";
-							te += endl;
-							
-							for(let i = 1; i < spl.length; i++){
-								if(spl[i] != ""){
-									te += spl[i];
-									if(nchain > 1) te += ","+(ch+1);
-									te += endl;
-								}
-							}								
+						let enc = false;
+						for(let kk = 0; kk < command.tags.length; kk++){
+							let ta = command.tags[kk];
+							if(ta.name == "compress" && ta.value == "true") enc = true;
 						}
-						break;
+						
+						if(enc){
+							let file = {encode:true,te:st};
+							st = decode(file);
+						}
+					
+						switch(type){
+						case "state":
+							if(nchain > 1) te += "CHAIN "+(ch)+endl;
+							te += st;
+							break;
+							
+						case "param":
+							{
+								let spl = st.split("\n");
+								
+								if(te == "") te += spl[0];
+								if(nchain > 1) te += ",Chain";
+								te += endl;
+								
+								for(let i = 1; i < spl.length; i++){
+									if(spl[i] != ""){
+										te += spl[i];
+										if(nchain > 1) te += ","+ch;
+										te += endl;
+									}
+								}								
+							}
+							break;
+						}
 					}
 				}
 			}
@@ -2036,4 +2004,90 @@ function copy_model_value()
 			}
 		}
 	}
+}
+
+
+/// Outputs parameter information in the form of a table
+function get_param_table_output(ep)
+{
+	let par = model.param[ep.i];
+
+	let value = ep.value;
+
+	if(ep.too_big){
+		if(par.dist_mat){ ep.too_big = false; set_dist(ep,par); value = ep.value; ep.too_big = true; set_dist(ep,par); }
+		else{
+			if(par.iden_mat){ ep.too_big = false; set_iden(ep,par); value = ep.value; ep.too_big = true; set_iden(ep,par); }
+			else{
+				if(par.den_vec){ ep.too_big = false; set_density(ep,par); value = ep.value; ep.too_big = true; set_density(ep,par); }
+				else{
+					value = too_big_value_store;
+				}
+			}
+		}
+	}
+	
+	let dim = get_dimensions(value);
+			
+	let ele_list = get_element_list(value,dim);
+		
+	let te = "";
+	for(let j = 0; j < dim.length; j++) te += par.dep[j] + ",";
+	
+	if(ep.type == "PriorSplit") te += "prior";
+	else te += "value";
+	te += endl;
+
+	for(let k = 0; k < ele_list.length; k++){
+		for(let j = 0; j < dim.length; j++) te += par.list[j][ele_list[k][j]]+",";
+		let val = get_element(value,ele_list[k]);
+		if(typeof val == "string" && val.indexOf(",") != -1) te += '"'+val+'"';
+		else te += val;
+		te += endl;
+	}
+	
+	return te;
+}
+
+
+/// Outputs parameter information in the form of a table
+function get_Amatrix_table_output(info)
+{
+	let ieg = model.species[info.p].ind_eff_group[info.i];
+
+	let A = ieg.A_matrix;
+	
+	let N = A.ind_list.length;
+
+	let te = "";
+	for(let i = 0; i < N; i++){
+		if(i != 0) te += ",";
+		te += A.ind_list[i];
+	}
+	te += endl;
+	
+	for(let j = 0; j < N; j++){
+		for(let i = 0; i < N; i++){
+			if(i != 0) te += ",";
+			te += A.A_value[j][i];
+		}
+		te += endl;
+	}
+
+	return te;
+}
+
+
+/// Outputs parameter information in the form of a table
+function get_Xvector_table_output(info)
+{
+	let feg = model.species[info.p].fix_eff[info.i];
+	let Xvec = feg.X_vector
+	
+	let te = "Individual,Value"+endl;
+	for(let j = 0; j < Xvec.ind_list.length; j++){
+		te += '"'+Xvec.ind_list[j]+'",'+Xvec.X_value[j]+endl;
+	}
+			
+	return te;
 }

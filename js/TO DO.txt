@@ -23,48 +23,56 @@ TESTING
 -- Get posterior simulation from system of different size
 -- test proposals using initial state
 -- test trans-tree proposals using initial state
+- get posterior simulation working
 
 GRANT
+- Extend extend error
 - grant sent 4000G_C_PostInf.bici and 6000G_C_PreInf.bici
 - Grant problem AI (OP problem)
 - Grant FMD model (not in sharepoint)
 - Grant noticed filters not working
 
-TO DO
-- Add to profiling
-- Get example sorted for Hector
-- Sampling from symmetric matrix
-- only recaclulate needed transitions
+Inference for estimating genetic and non-genetic effects underlying disease spread
 
-- M(pop+pop) SPE1.2 EE1.2
+TO DO NEXT
+- Make determinisitic/MBP with initial conditions more efficient (by accounting for correlations)
+- Get period distribution working
 - Read paper from ben swallow
-- Mac package content larger
-- For some reason initial gave erro "cant find /tmp/init.bici"
-- Can grants problem matched_local_10km be made to run faster? slow because not linear in populations... need to keep track of linear combinations of populations
-- Add compress option in interface
 - When doing tornado plots set permissions directly for executable
 - Add filters for compartmental and test data when simulating
-- Dynamic changes to parameters
-- Reduce state parameter sample in low memory mode
+-- cannot add midpoints when uploading transitions into interface
 - set-ind-effect-sim has been added, but how about set-ind-effect-inf and set-ind-effect-post-sim
--- test maximum step time warning
--- interface simulate with parameter in observation model
 -- For initial conditions view as table or as compartment (good when there are a lot of compartments)
 -- Sort out fixed initial population for individual and population-based models (perhaps convert to Dirichlet?)
--- individual sampler improvement
--- Sort out how partially observed transitions affect ind sampler... 
 -- Stop file read from loading when one file cannot be loaded
--- get_calc_hash_num(  does this need to be improved?
 -- mac memory
--- cannot add midpoints when uploading transitions into interface
-
-
-NEXT
+- Add hidden markov model example
 -- Installing mpi on windows... How to check if there... change functionality
--- Get determinisitc solver working
 -- Simulate population structure
 -- GWAS
 -- Delay differential equations 
+- Sampling from symmetric matrix
+- Do these exaples work α×{I;t=40}’ as described in the manual?
+
+TO DO
+
+
+
+TESTING
+change index
+rename species
+rename classification
+postsim
+extend
+
+
+
+Fixed?
+- Problem with extending twice
+- Loading percent seemed to not be right
+- Mac package content larger
+-- interface simulate with parameter in observation model
+
 
 FUTURE THINGS TO GET SORTED
 -- Model evidence
@@ -159,6 +167,11 @@ auto k = 0u; while(k < sum_store.size() && z > sum_store[k]) k++;
 auto k = 0u; while(k < trig_event.size() && trig_event[k].tdiv != eve.tdiv) k++;
 
 DONE NEW
+- Ex 3.8
+- Add to profiling pop_list
+- Improved efficiency of update algorithm by accounting by linearity in population combinations 
+- Make proposals that use parameters within splines more efficient (by only updating time window)
+- Create linux version of BICI
 - derive with popcomb
 - simplify equations to leave linear combinations 
 - Grant problem with defined

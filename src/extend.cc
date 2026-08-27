@@ -46,6 +46,8 @@ Extend::Extend(const Model &model, Output &output, Mpi &mpi) : model(model), out
 /// Performs a simulation
 void Extend::run()
 {	
+	auto time_init_start = clock();
+
 	percentage_start(INIT_PER);
 	
 	// Copies loaded states
@@ -96,6 +98,8 @@ void Extend::run()
 		cor_m.n_start = ti.n_start;
 		cor_m.av = ti.av;
 		cor_m.av2 = ti.av2;
+		cor_m.log_av = ti.log_av;
+		cor_m.log_av2 = ti.log_av2;
 		
 		cha.join_proposal_update();
 		cha.set_prop_info(ti.prop_info_store);
@@ -136,12 +140,11 @@ void Extend::run()
 	output.set_inference_prop(output_param+de.output_param,"param-output",MCMC_OP_PARAM_DEFAULT);
 	output.set_inference_prop(output_state+de.output_state,"state-output",MCMC_OP_STATE_DEFAULT);
 	
-	//output.terminal_info = chain[0].get_terminal_info();
-	
 	double time_total = (clock()-time_start)/num_per_core;
+	double init_time = (time_start-time_init_start)/num_per_core;
 	for(auto ch = 0u; ch < num_per_core; ch++){
 		const auto &cha = chain[ch];
-		auto diag = cha.diagnostics(time_total);
+		auto diag = cha.diagnostics(time_total,init_time);
 		output.set_diagnostics(mpi.core*num_per_core+ch,diag);
 	}
 	

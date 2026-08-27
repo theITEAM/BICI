@@ -10,6 +10,8 @@ function data_source_check_error(out_type,so)
 			
 	so.error = false;
 	
+	//if(make_table_name_valid(out_type,so)) return;
+
 	let tab = so.table;
 	if(tab != undefined){                            // Checks that elements are correctly specified
 		for(let c = 0; c < tab.ncol; c++){
@@ -860,7 +862,10 @@ function check_element(te,c,so)
 			if(pri.err == true) return pri.msg;
 		}
 		break;
-		
+
+	case "region":
+		break;
+			
 	default: error("Option not recognised 61"+col.type); break;
 	}
 	
@@ -988,5 +993,92 @@ function check_data_valid_all(type,out_type)
 				if(so.error != true) add_source_description(so);
 			}
 		}
+	}
+}
+
+
+/// Makes names valid
+function make_table_name_valid()
+{
+	let so = edit_source;
+
+	let tab = so.table;
+	let load_col = so.load_col;
+	
+	let conv_str="";
+	for(let j = 0; j < name_notallow.length; j++){
+		let ch = name_notallow.substr(j,1);
+		let rep = "-";
+		
+		let chreg = ch;
+		switch(ch){
+		case "&": rep = "and"; break;
+		case "*": rep = "times"; chreg = "\\*"; break;
+		case "×": rep = "times"; break;
+		case "=": rep = "equals"; break;
+		case "Σ": rep = "sum"; break;
+		case "∫": rep = "integral"; break;
+		case "[": chreg = "\\["; break;
+		case "]": chreg = "\\]"; break;
+		case "(": chreg = "\\("; break;
+		case ")": chreg = "\\)"; break;
+		case "$": chreg = "\\$"; break;
+		case "\\": chreg = "\\\\"; break;
+		}
+	
+		let re = new RegExp(chreg,"g");
+	
+		let fl = false;
+		
+		for(let i = 0; i < load_col.length; i++){
+			if(load_col[i].type == "comptext"){	
+				for(let r = 0; r < tab.nrow; r++){
+					let el = tab.ele[r];
+					if(el[i].includes(ch)){
+						el[i] = el[i].replace(re,rep);
+						fl = true;
+					}
+				}
+			}				
+		}
+		
+		if(fl){
+			if(conv_str != "") conv_str += ", ";
+			if(ch == " ") conv_str += "'space' → '"+rep+"'";
+			else conv_str += "'"+ch+"' → '"+rep+"'";
+		}
+	}
+
+	// If names are repeated then adds a number
+	let repeat_str="";
+	for(let i = 0; i < load_col.length; i++){
+		if(load_col[i].type == "comptext"){
+			let hash = new Hash();	
+			for(let r = 0; r < tab.nrow; r++){
+				let el = tab.ele[r][i];
+				let j = hash.find(el);
+				if(j != undefined){
+					let k = 2; while(hash.find(el+"-"+k) != undefined) k++;
+					if(repeat_str != "") repeat_str += ", ";
+					repeat_str += "'"+el+"' → ";
+					el += "-"+k;
+					repeat_str += "'"+el+"'";
+					tab.ele[r][i] = el;
+				}
+				hash.add(el,r);
+			}				
+		}
+	}
+			
+	if(conv_str != "" || repeat_str != ""){
+		let te = "";
+		if(conv_str != ""){
+			te += "To be imported the following character substitutions in compartment names needed to be made: "+conv_str+".";
+			if(repeat_str != "") te += endl;
+		}
+		
+		if(repeat_str != "") te += "Repeated names have been change: "+trunc(repeat_str,100)+".";
+		
+		alert_help("Conversion of compartment names",te);
 	}
 }

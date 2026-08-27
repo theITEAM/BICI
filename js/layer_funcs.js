@@ -24,13 +24,13 @@ function generate_screen(update)
 	
 	let w = window.innerWidth*factor;
 	let h = window.innerHeight*factor;
-	
+
 	let width = w, height = h;
 	inter.canw = width, inter.canh = height;
 
 	if(height < 538*factor) height = 538*factor; 
 	if(width < 917*factor) width = 917*factor;
-	
+
 	if(inter.canvas){
 		inter.canvas.width = width;
 		inter.canvas.height = height;
@@ -581,7 +581,7 @@ function add_screen_buts(lay)
 		if(inter.edit_param.type != undefined || inter.edit_Amatrix.i != undefined ||
 			inter.edit_Xvector.i != undefined || inter.view_graph.value != undefined ||
 			(type != undefined && so.table_loaded != false && so.edit_spec != true)){
-				
+			
 			if(so.type != undefined && so.table_loaded == undefined){
 				switch(so.type){
 				case "Init. Pop.": add_layer("EditInitPop",x2,y1,x3-x2,y2-y1,{}); break;
@@ -928,6 +928,7 @@ function loading_symbol_message(te)
 function set_loading_percent(per)
 {
 	inter.loading_symbol.percent = Math.floor(per);
+	//prr(inter.loading_symbol.message+" "+inter.loading_symbol.percent+" per");
 }
 
 
@@ -1279,7 +1280,7 @@ function copy_back_to_source2(tbs)
 		}
 		break;
 		
-	case "element_param_const_sym":
+	case "element_param_const_sym": case "element_param_const_covar": case "element_param_const_cor":
 		{
 			let val = Number(te);
 			set_element(inter.edit_param.value,so.pindex,val);
@@ -1472,6 +1473,7 @@ function copy_back_to_source2(tbs)
 	case "inf_gen_update": model.inf_details.gen_update = te; break;
 	case "inf_cha_per_core": model.inf_details.cha_per_core = te; break;
 	case "inf_part_per_core": model.inf_details.part_per_core = te; break;
+	case "chain_nsiminit": model.inf_details.chain_nsiminit = te; break;
 	case "anneal_rate": model.inf_details.anneal_rate = te; break;
 	case "anneal_power": model.inf_details.anneal_power = te; break;
 	case "burnin_frac": model.inf_details.burnin_frac = te; break;
@@ -1497,6 +1499,11 @@ function copy_back_to_source2(tbs)
 	case "iegrname": inter.bubble.source.name = te; break;
 	case "wild_card": inter.bubble.wildcard = te; break;
 	case "comp_acc": edit_source.comp_acc = te; break;
+	case "thresh": inter.bubble.dynamic_info.thresh = te; break;
+	case "threshmin": inter.bubble.dynamic_info.threshmin = te; break;
+	case "threshmax": inter.bubble.dynamic_info.threshmax = te; break;
+	case "dist": inter.bubble.dynamic_info.dist = te; break;
+	case "dynamic_weight": inter.bubble.dynamic_info.weight_eqn.te = te; break;
 	default: error("SOURCE PROBLEM: "+so.type); break;
 	}
 }
@@ -1813,6 +1820,10 @@ function check_error_textbox2(tbs)
 				warn = check_posinteger(te);
 				break;
 				
+			case "chain_nsiminit":
+				warn = check_posinteger(te);
+				break;
+				
 			case "anneal_rate":
 				warn = check_posnumber(te);
 				break;
@@ -1932,6 +1943,22 @@ function check_error_textbox2(tbs)
 				{
 					let num = Number(te);
 					if(isNaN(num)) warn = "Must be a number";
+				}
+				break;
+				
+			case "element_param_const_covar":
+				{
+					let num = Number(te);
+					if(isNaN(num)) warn = "Must be a number";
+					if(num <= 0) warn = "Must be positive";
+					if(num >= VAR_MAX) warn = "Must be less than "+VAR_MAX;
+				}
+				break;
+
+			case "element_param_const_cor":
+				{
+					let num = Number(te);
+					if(isNaN(num)) warn = "Must be a number";
 					if(num <= -COR_MAX) warn = "Must be greater than -"+COR_MAX;
 					if(num >= COR_MAX) warn = "Must be less than "+COR_MAX;
 				}
@@ -2024,6 +2051,10 @@ function check_error_textbox2(tbs)
 				warn = check_posinteger(te);
 				break;
 				
+			case "prior_power":
+				warn = check_number(te);
+				break;
+				
 			case "prior_alpha": warn = check_posnumber(te); break;
 
 			case "prior_beta": warn = check_posnumber(te); break;
@@ -2073,6 +2104,8 @@ function check_error_textbox2(tbs)
 			case "derive_eqn1": case "derive_eqn2": break;
 			case "derive_eqn": case "deriveparam_eqn": break;
 			
+			case "dynamic_weight": break;
+			
 			case "sim_number": case "ppc_number": 
 				if(isNaN(te)) warn = "Must be a number";
 				let num = Number(te);
@@ -2108,6 +2141,10 @@ function check_error_textbox2(tbs)
 			
 			case "comp_acc":
 				warn = check_zeroone(te);
+				break;
+				
+			case "thresh": case "threshmin": case "threshmax": case "dist":
+				warn = check_nonnegative(te);
 				break;
 			
 			case "time_step":

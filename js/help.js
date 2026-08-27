@@ -197,7 +197,7 @@ function add_help_content_buts(lay)
 		{
 			let dx = lay.inner_dx-2*cx;
 			let te = inter.help.te;
-		
+	
 			if(test_comment) te = all_comments[inter.help.index];
 
 			if(type == "warning"){

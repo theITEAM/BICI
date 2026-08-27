@@ -79,7 +79,7 @@ function import_file(te,file,clear_results,example)
 {	
 	loading_mess("Processing...");
 
-	percent(0);
+	percent(11);
 
 	let	lines = te.split('\n');
 	
@@ -90,15 +90,15 @@ function import_file(te,file,clear_results,example)
 	for(let j = 0; j < jmax; j++) imp.script.push({line:j, te:lines[j]});
 	if(fl) imp.script.push({line:jmax, te:(lines.length-jmax)+" more lines (too long to show)"});
 		
-	let pro = process_lines(lines,file,2,15);
+	let pro = process_lines(lines,file,12,20);
 
 	remove_escape_command_line(pro.bscript);
 
 	if(inf_leave_one_chain) leave_only_one_chain(pro);
 	
-	percent(10);
+	percent(20);
 
-	let data_file_list = get_data_file_list(pro,15,20);
+	let data_file_list = get_data_file_list(pro,20,25);
 
 	if(model != undefined){
 		model_store = copy(model);
@@ -125,7 +125,7 @@ function load_local(data_file_list,per_start,per_end)
 {
 	loading_mess("Loading...");
 	for(let i = 0; i < data_file_list.length; i++){
-		percent(per_start+((i+0.5)/data_file_list.length)*(per_end-per_start));
+		percent_fr((i+0.5)/data_file_list.length,per_start,per_end);
 		let dfl = data_file_list[i];
 		dfl.te = load_file_local(dfl.full_name);
 		//dfl.te = load_file_nonlocal(dfl.full_name);
@@ -506,7 +506,7 @@ function assign_processing_time()
 		pc.pt = frac_proc*(pc.pt/total_pt);
 	}
 	
-	pro.proc_time = {per_start:20, per_end:80, per:0, pt_sum:0, frac_no_proc:1-frac_proc};
+	pro.proc_time = {per_start:25, per_end:80, per:0, pt_sum:0, frac_no_proc:1-frac_proc};
 }
 
 
@@ -735,7 +735,9 @@ function import_geojson(file)
 	if(feature.length == 0){
 		return in_file_text(file)+" there are no features";
 	}	
-		
+	
+	if(feature[0].lng != undefined) return in_file_text(file)+" there are points instead of regions";
+	
 	let tab = get_feature_table(da,feature);
 	
 	return tab;
@@ -2050,7 +2052,7 @@ function initialise_filters()
 }
 
 
-/// Compresses a string using the LZW algorithm
+/// Decode a string using the LZW algorithm
 function decode(fi)
 {
 	if(fi.encode != true) return remove_escape_char(fi.te);

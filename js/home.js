@@ -203,6 +203,10 @@ function initialise_section()
 		ex_mod.push({te:"4) Dynamic interventions",help:"Different types of dynamic intervention into the system behaviour are considered (usually with a view to reducing the effect of infectious diseases)."+mod_mess});
 	
 		ex_mod.push({te:"S4.1: Test-and-cull", mod:"SE1.3", link:true, mod_type:"IBM"});
+		ex_mod.push({te:"S4.2: Dynamic parameter for disease intervention", link:true, mod_type:"POP"});
+		ex_mod.push({te:"S4.3: Dynamic parameter with maximum and minimum thresholds", link:true, mod_type:"POP"});
+		ex_mod.push({te:"S4.4: Dynamic parameter with distance effect", mod:"SPE2.1", link:true, mod_type:"IBM"});
+		ex_mod.push({te:"S4.5: Dynamic parameter with region effect", mod:"SPE2.1", link:true, mod_type:"IBM"});
 		
 		let sec = { name:"simu-scen", desc:"Simulation scenarios", pic:"sim", shade:true, ex_mod:ex_mod, help:sim_scen_text+mod_mess};
 		
@@ -288,7 +292,7 @@ function initialise_section()
 		ex_mod.push({te:"F3.4: Parameter definition by element", mod:"CE3.1", link:true, mod_type:"IBM"}); 
 		ex_mod.push({te:"F3.5: Parameter distribution", mod:"EE1.2", link:true, mod_type:"IBM"}); 
 		ex_mod.push({te:"F3.6: Derived quantities", mod:"SE1.3", link:true, mod_type:"IBM"}); 
-		ex_mod.push({te:"F3.7: Factor", mod:"CE3.1", link:true, mod_type:"PBP"}); 
+		ex_mod.push({te:"F3.7: Factor", mod:"CE3.1", link:true, mod_type:"POP"}); 
 		ex_mod.push({te:"F3.8: Spline reparameterisation", mod:"SPE2.1", link:true, mod_type:"IBM"}); 
 		
 		let sec = { name:"features", desc:"BICI features", pic:"features", shade:true, ex_mod:ex_mod, help:features_text+mod_mess};

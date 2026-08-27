@@ -40,25 +40,24 @@ void Simulate::run()
 		output.param_sample(UNSET,0,state);
 		output.state_sample(UNSET,0,state);
 		
-		/*
-		for(auto i = 0u; i< 10; i++){
-			output.param_sample(UNSET,0,state);
-			output.state_sample(UNSET,0,state);
-		}
-		*/
-		
 #ifdef USE_MPI
 		mpi.sample_barrier(s,smax);
 #endif
 
 		if(false) state.output_waifw("waifw.txt");
 	}
-
-	if(true){
+	
+	if(profiling) state.profile_memory();
+	//state.profile_memory();
+	
+	if(false){
 		auto tot = state.timer[SIM_ITERATE];
 		const auto &ssp = state.species[0];
 		
 		cout << cpu_percent(state.timer[SIM_PRECALC],tot) << "sim precalc" << endl;
+		cout << cpu_percent(state.timer[SIM_TEMP1],tot) << "sim temp1" << endl;
+		cout << cpu_percent(state.timer[SIM_TEMP2],tot) << "sim temp2" << endl;
+		
 		cout << cpu_percent(state.timer[SIM_POPIND],tot) << "sim popind" << endl;
 		cout << cpu_percent(state.timer[SIM_MARKOV],tot) << "sim markov" << endl;
 		cout << cpu_percent(state.timer[SIM_UPDATE],tot) << "sim update" << endl;
@@ -66,7 +65,6 @@ void Simulate::run()
 		cout << "  -> " << cpu_percent(ssp.timer[UP_MARKOV],tot) << "up markov" << endl;
 		cout << cpu_percent(state.timer[SIM_LIKE],tot) << "sim like" << endl;
 		cout << cpu_percent(state.timer[SIM_CHECK],tot) << "sim check" << endl;
-		cout << cpu_percent(state.timer[SIM_TEMP1],tot) << "sim check end" << endl;
 		
 		if(model.species[0].type == INDIVIDUAL){
 			auto up = state.timer[SIM_UPDATE];

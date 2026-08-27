@@ -53,6 +53,8 @@ MCMC::MCMC(const Model &model, Output &output, Mpi &mpi) : model(model), output(
 /// Runs MCMC
 void MCMC::run()
 {
+	auto time_init_start = clock();
+	
 	percentage_start(INIT_PER);
 	
 	for(auto ch = 0u; ch < chain.size(); ch++){
@@ -61,27 +63,37 @@ void MCMC::run()
 
 	percentage_end();
 	
+	auto time_start = clock();
+	
 	percentage_start(RUN_PER);
 	
-	long time_start = clock();
-
 	//chain[0].state.scan_param();
-	
-	for(auto s = 0u; s < nsample; s++){
+ 	for(auto s = 0u; s < nsample; s++){
 		percentage(s,nsample);
 	
-		if(model.sync_on) synchronise_proposal(s,chain,mpi);
+		//if(model.sync_on) synchronise_proposal(s,chain,mpi);
 
 		for(auto &ch : chain){
 			ch.burn_update(s);
+
 			ch.update(s);
 		}		
-	
-		sample_op(s);
+
+		sample_op(s);	
 
 #ifdef USE_MPI
 		mpi.sample_barrier(s,nsample);
 #endif
+	}
+	
+	//for(auto &ch : chain) ch.cor_matrix.check();
+	
+	if(false){
+		auto tot = chain[0].state.timer[TEMP1];
+		cout << cpu_percent(chain[0].state.timer[TEMP2],tot) << "mbp" << endl;
+		cout << cpu_percent(chain[0].state.timer[TEMP3],tot) << "update param" << endl;
+		cout << cpu_percent(chain[0].state.species[0].timer[SSP_TEMP1],tot) << "markov" << endl;
+		cout << cpu_percent(chain[0].state.species[0].timer[SSP_TEMP2],tot) << "mar calc" << endl;
 	}
 	
 #ifdef USE_MPI
@@ -91,11 +103,12 @@ void MCMC::run()
 	output.set_inference_prop(double(100.0*nburnin)/nsample,"burnin-percent",BURNIN_FRAC_DEFAULT);
 	
 	double time_total = (clock()-time_start)/num_per_core;
+	double init_time = (time_start-time_init_start)/num_per_core;
 	for(auto ch = 0u; ch < num_per_core; ch++){
 		auto ch_tot = mpi.core*num_per_core+ch;
 		
 		const auto &cha = chain[ch];
-		auto diag = cha.diagnostics(time_total);
+		auto diag = cha.diagnostics(time_total,init_time);
 		output.set_diagnostics(ch_tot,diag);
 		output.terminal_info.push_back(cha.get_terminal_info(ch_tot));
 	}

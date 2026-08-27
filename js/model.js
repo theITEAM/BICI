@@ -56,7 +56,7 @@ class Model
 		
 		this.sim_details = { t_start:"", t_end:"", timestep:"", indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, algorithm:{value:"gillespie"}, number:SIM_NUM_DEFAULT, run_local:{value:"Yes"}, run_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, optimise:{value:"auto"}, compress:{value:"auto"}};    
 		
-		this.inf_details = { t_start:"", t_end:"", timestep:"", abcsample:String(ABC_SAMPLE_DEFAULT), sample:String(MCMC_SAMPLE_DEFAULT), output_param :String(MCMC_OP_PARAM_DEFAULT), output_state:String(MCMC_OP_STATE_DEFAULT), accfrac:String(ABC_ACFRAC_DEFAULT), accfracsmc:String(ABCSMC_ACFRAC_DEFAULT), numgen:String(ABCSMC_GEN_DEFAULT), kernelsize:String(ABCSMC_KERNEL_DEFAULT), indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, nchain:String(MCMC_CHAIN_DEFAULT), algorithm:{value:ALG_DEFAULT}, run_local:{value:"Yes"}, run_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, sync_on:{value:"On"}, burnin_frac:BURNIN_FRAC_DEFAULT, anneal_type:{te:ANNEAL_DEFAULT}, anneal_rate:ANNEAL_RATE_DEFAULT, anneal_power:ANNEAL_POWER_DEFAULT, npart:String(PAS_PART_DEFAULT), gen_update:String(PAS_GEN_UPDATE_DEFAULT), cha_per_core:String(MCMC_CHAIN_PER_CORE_DEFAULT), part_per_core:String(PAS_PART_PER_CORE_DEFAULT), optimise:{value:"auto"}, compress:{value:"auto"} };
+		this.inf_details = { t_start:"", t_end:"", timestep:"", abcsample:String(ABC_SAMPLE_DEFAULT), sample:String(MCMC_SAMPLE_DEFAULT), output_param :String(MCMC_OP_PARAM_DEFAULT), output_state:String(MCMC_OP_STATE_DEFAULT), accfrac:String(ABC_ACFRAC_DEFAULT), accfracsmc:String(ABCSMC_ACFRAC_DEFAULT), numgen:String(ABCSMC_GEN_DEFAULT), kernelsize:String(ABCSMC_KERNEL_DEFAULT), indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, nchain:String(MCMC_CHAIN_DEFAULT), algorithm:{value:ALG_DEFAULT}, run_local:{value:"Yes"}, run_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, sync_on:{value:"On"}, burnin_frac:BURNIN_FRAC_DEFAULT, anneal_type:{te:ANNEAL_DEFAULT}, anneal_rate:ANNEAL_RATE_DEFAULT, anneal_power:ANNEAL_POWER_DEFAULT, npart:String(PAS_PART_DEFAULT), gen_update:String(PAS_GEN_UPDATE_DEFAULT), cha_per_core:String(MCMC_CHAIN_PER_CORE_DEFAULT), part_per_core:String(PAS_PART_PER_CORE_DEFAULT), optimise:{value:"auto"}, compress:{value:"auto"}, chain_nsiminit:CHAIN_NSIMINIT_DEFAULT };
 		
 		this.ppc_details = {  ppc_t_start:"", ppc_t_end:"", t_start:"", t_end:"", algorithm:{value:"gillespie"}, number:PPC_NUM_DEFAULT, indmax:INDMAX_DEFAULT, param_output_max:PARAM_OUTPUT_MAX_DEFAULT, run_local:{value:"Yes"}, run_save_type:{value:"Save"}, run_inf_model:{value:"Yes"}, run_post:{value:"postsample"},srun_save_type:{value:"Save"}, seed_on:{value:"No"}, seed:SEED_DEFAULT, optimise:{value:"auto"}, compress:{value:"auto"}};    
 			
@@ -2404,114 +2404,7 @@ class Model
 	/// Finds a list of all the equations in the model
 	find_eqn_list()
 	{
-		return find_eqn_list();
-		
-		/*
-		let eqn_list = [];
-		for(let p = 0; p < this.species.length; p++){
-			let sp = this.species[p];
-			for(let cl = 0; cl < sp.ncla; cl++){
-				let claa = sp.cla[cl];
-				for(let i = 0; i < claa.ntra; i++){
-					let eqn_info = {p:p,cl:cl,i:i};
-					
-					let traa = claa.tra[i];
-				
-					let val = traa.value;
-					if(val.bp_eqn != undefined){
-						if(traa.branch == true){
-							this.add_equation_to_list(eqn_list,val.bp_eqn,eqn_info);
-						}
-					}
-					
-					if(val.mean_eqn != undefined){
-						if(traa.type == "exp(mean)" || traa.type == "gamma" || traa.type == "erlang" || traa.type == "log-normal"){
-							this.add_equation_to_list(eqn_list,val.mean_eqn,eqn_info);
-						}
-					}
-					
-					if(val.rate_eqn != undefined){
-						if(traa.type == "exp(rate)"){
-							this.add_equation_to_list(eqn_list,val.rate_eqn,eqn_info);
-						}
-					}
-					
-					if(val.scale_eqn != undefined){
-						if(traa.type == "weibull"){
-							this.add_equation_to_list(eqn_list,val.scale_eqn,eqn_info);
-						}
-					}
-					
-					if(val.shape_eqn != undefined){
-						if(traa.type == "weibull"){
-							this.add_equation_to_list(eqn_list,val.shape_eqn,eqn_info);
-						}
-					}
-						
-					if(val.cv_eqn != undefined){
-						if(traa.type == "gamma" || traa.type == "log-normal"){
-							this.add_equation_to_list(eqn_list,val.cv_eqn,eqn_info);
-						}
-					}
-				}
-			}
-			
-			let source = get_source("inf",p);
-			for(let i = 0; i < source.length; i++){
-				let so = source[i];
-				
-				let eqn_info = {p:p, i:i};
-					
-				if(so.type=="Diag. Test" || so.type=="Test-and-cull"){
-					let cb = so.spec.check_box.value; 
-					for(let ci = 0; ci < cb.length; ci++){
-						if(cb[ci].check){
-							let Se = cb[ci].Se_eqn.te;
-							this.add_equation_to_list(eqn_list,cb[ci].Se_eqn,eqn_info);
-						}
-					}
-					this.add_equation_to_list(eqn_list,so.spec.Sp_eqn,eqn_info);
-					
-					//add_equation_to_list(eqn_list,so.spec.Sp_eqn,eqn_info);
-					
-					//this.add_equation_to_list(eqn_list,so.spec.Se_eqn,eqn_info);
-				}
-				
-				if(so.type == "Compartment"){
-					let tab = so.table;
-					for(let r = 0; r < tab.nrow; r++){
-						let te = tab.ele[r][2];
-						let spl = split_with_bracket(te,"|");
-						
-						for(let k = 0; k < spl.length; k++){
-							let spl2 = spl[k].split(":");
-							if(spl2.length == 2){
-								let te2 = spl2[1];
-								
-								if(isNaN(te2)){
-									let eqn_info2 = {p:p,i:i,r:r,c:2};
-									
-									let eqn = create_equation(te2,"comp_prob",p,undefined);  
-									this.add_equation_to_list(eqn_list,eqn,eqn_info2);
-								}
-							}
-						}
-					}
-				}
-			}		
-		}
-		
-		// Goes through derived parameters
-		for(let i = 0; i < this.derive.length; i++){
-			let der = this.derive[i];
-			
-			let eqn_info = {i:i};
-			
-			this.add_equation_to_list(eqn_list,der.eqn1,eqn_info);		
-		}
-		
-		return eqn_list;
-		*/
+		return find_equation_list();
 	}
 	
 	
@@ -2695,7 +2588,7 @@ class Model
 					let r = j*LX+i;
 					if(r < tab.nrow){
 						pos_x[r] = i*(w_max+gapx);
-						pos_y[r] = j*(compartment_height+gapy);
+						pos_y[r] = (LY-1-j)*(compartment_height+gapy);
 					}
 				}
 			}
@@ -2760,6 +2653,60 @@ class Model
 			}
 		}
 
+		if(debug == true) this.check_consistent();  
+	}
+	
+	
+	/// Adds compartments from a table
+	add_file_comp_point(p,cl,tab,col)
+	{
+		percent(0);
+	
+		this.remove_repeated(tab,2);
+		
+		clear_classification(p,cl);
+		
+		let claa = this.species[p].cla[cl];	
+		
+		// Removes any box annotations
+		let i = 0;
+		while(i < claa.annotation.length){
+			if(claa.annotation[i].type == "box") claa.annotation.splice(i,1);
+			else i++;
+		}
+		
+		let cam = claa.camera;
+
+		let pos_x=[], pos_y=[];
+	
+		for(let r = 0; r < tab.nrow; r++){
+			percent(100*r/tab.nrow);
+			
+			let lat = tab.ele[r][0];
+			let lng = tab.ele[r][1];
+			if(lat > latitude_max) lat = latitude_max;
+			if(lat < -latitude_max) lat = -latitude_max;
+	
+			let pt = transform_latlng(lng,lat);
+			pos_x[r] = pt.x; pos_y[r] = pt.y; 
+		}
+	
+		for(let r = 0; r < tab.nrow; r++){	
+			let name = tab.ele[r][2];
+
+			let x = pos_x[r], y = pos_y[r];
+		
+			let c = hash_find(claa.hash_comp,name);
+			if(c == undefined){
+				let res = this.add_latlng_compartment(name,p,cl,x,y,col,true,false);
+				output_help(res);
+			}
+			else{
+				let co = claa.comp[c];
+				co.x = x; co.y = y; co.col = col2;
+			}
+		}
+		
 		if(debug == true) this.check_consistent();  
 	}
 	
@@ -3667,7 +3614,7 @@ class Model
 					}
 				}
 				
-				let temp = par_find_template(list);
+				let temp = par_find_template(list,par.ndep_cont);
 				let co_list = generate_co_list(list);
 				
 				for(let j = 0; j < co_list.length; j++){

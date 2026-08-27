@@ -165,7 +165,7 @@ vector <InitStateProb> IndEvSampler::source_sampler(unsigned int i, const Event 
 				const auto &mev = markov_eqn_vari[tra.markov_eqn_ref];
 				auto tii = ti; if(mev.time_vari == false) tii = 0;
 			
-				prob = mev.div[tii].value;
+				prob = mev.value_t[tii];
 				
 				prob *= get_trans_obs_prob(tr,ob);
 				if(prob < 0) emsg("rate is negative");
@@ -184,7 +184,7 @@ vector <InitStateProb> IndEvSampler::source_sampler(unsigned int i, const Event 
 			if(tra.variety == SOURCE_TRANS){
 				const auto &mev = markov_eqn_vari[tra.markov_eqn_ref];
 				auto tii = ti; if(mev.time_vari == false) tii = 0;
-				prob = mev.div[tii].value;
+				prob = mev.value_t[tii];
 				if(prob < 0) emsg("rate is negative");
 				if(prob == 0) prob = TINY;
 				prob_sum += prob;

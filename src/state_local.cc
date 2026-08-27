@@ -17,7 +17,7 @@ void State::initialise_local_map()
 {
 	comp_local_map.resize(model.species.size());
 	pop_trans_map.resize(model.species.size());
-	pop_data_map.resize(model.species.size());
+	pop_data_map.resize(model.species.size()); 
 	for(auto p = 0u; p < model.species.size(); p++){
 		const auto &sp = model.species[p];
 	
@@ -62,19 +62,19 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 		for(auto &lc : local_change){
 			switch(lc.type){
 			case ADD_EVENT:
-				cout << "Add event " << sp.tra_gl[lc.tr].name << " " << lc.ti << endl; 
+				cout << "Add event " << add_escape_char(sp.tra_gl[lc.tr].name) << " " << lc.ti << endl; 
 				break;
 				
 			case REMOVE_EVENT:
-				cout << "Remove event " << sp.tra_gl[lc.tr].name << " " << lc.ti << endl; 
+				cout << "Remove event " << add_escape_char(sp.tra_gl[lc.tr].name) << " " << lc.ti << endl; 
 				break;
 				
 			case ADD_IC:
-				cout << "Add IC from transition" << sp.tra_gl[lc.tr].name << " " << lc.ti << endl; 
+				cout << "Add IC from transition" << add_escape_char(sp.tra_gl[lc.tr].name) << " " << lc.ti << endl; 
 				break;
 				
 			case REMOVE_IC:
-				cout << "Remove IC from trantision " << sp.tra_gl[lc.tr].name << " " << lc.ti << endl; 
+				cout << "Remove IC from trantision " << add_escape_char(sp.tra_gl[lc.tr].name) << " " << lc.ti << endl; 
 				break;
 				
 			case ADD_C_IC:
@@ -185,29 +185,24 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 					}	
 				}
 				
-				like_ch.markov += ssp.Li_update_c(c,ma,ti,ti_next,popcomb_t);
+				like_ch.markov += ssp.Li_update_c(c,ma,ti,ti_next);
 			}
 		}
 		
 		// Updates populations
 		auto fl = false;
 		
-		vector <PopChange> pop_change;
 		for(auto k : pop_list){
 			auto ma = pop_map[k];
-			//const auto &po = model.pop[k];
 			if(ma != 0){
 				back_pop.push_back(BackPop(POP_NUM_T,ti,ti_next,k,ma));
-
-				PopChange po_ch; po_ch.po = k; po_ch.num = ma; 
-				pop_change.push_back(po_ch);
 
 				change_population(ti,ti_next,k,ma);
 				fl = true;
 			}
 		}		
 		
-		if(fl == true) update_pop_change(ti,ti_next,pop_change,like_ch.markov);
+		if(fl == true) update_pop_change(ti,ti_next,like_ch.markov);
 	}
 	
 	for(auto k : pop_list) pop_map[k] = UNSET;

@@ -42,6 +42,8 @@ class StateSpecies                         // Stores information about the state
 		vector <Individual> individual;        // Provides information about individuals
 		//Hash hash_individual;
 		
+		bool inconsistent_ind;                 // Set if there are still inconsistent individuals
+		
 		// USED IN OBSERVATION MODELS
 		vector <double> pop_data_num;          // Values at pop data measurements ([pop meas])
 		vector <double> pop_trans_data_num;    // Values at pop trans data meas. ([pop trans meas])
@@ -72,7 +74,8 @@ class StateSpecies                         // Stores information about the state
 	
 		vector <MarkovEqnVariation> markov_eqn_vari; // Store variation in markov equations
 		
-		vector <bool> markov_update;           // Determines if markov is updated (used in simulation)
+		
+		//vector <MEUpdate> markov_update;       // Determines if markov is updated (used in simulation)
 	
 		SourceSampler source_sampler;          // Used to sampling add/rem ind 
 		
@@ -82,9 +85,13 @@ class StateSpecies                         // Stores information about the state
 		vector <Back> back;
 		
 		// USED TO SIMULATE INDIVIDUAL-BASED MODELS
+		vector <MEUpdate> markov_update;       // Set if there is a population change
+	
 		vector <unsigned int> ind_sim_c;       // Under simulation stores compartment state
 	
 		vector <SimTrigEventDiv> trig_div;     // Stores future non-Markovian events
+	
+		vector < vector <EventChange> > event_change_div;  // Used in regenerate 
 	
 		vector <InterData> inter_data;         // Stores data from an intervention
 		
@@ -92,34 +99,32 @@ class StateSpecies                         // Stores information about the state
 		
 		vector <AlgWarn> alg_warn;             // Stores any algorithm warnings
 		
-		StateSpecies(PV &param_val, const vector <Equation> &eqn, const Species &sp, const Model &model, const vector <unsigned int> &pop_affect_, Operation mode, const double &dif_thresh, vector <double> &dpop, vector <unsigned int> &dpop_list);
+		StateSpecies(PV &param_val, const vector <double> &popcombw_value, const vector <Equation> &eqn, const Species &sp, const Model &model, const vector <unsigned int> &pop_affect_, Operation mode, const double &dif_thresh, vector <double> &dpop, vector <unsigned int> &dpop_list);
 	
 		void simulate_init();
 		unsigned int get_cinit_to_use(vector <unsigned int> &cinit_to_use) const;
 		void simulate_individual_init();
+		void set_init_cpop();
 		void add_ind_source(unsigned int i, const vector <SourceSamp> &source_samp);
 		TRange source_time_range(const IndData &ind) const;
 		void error_load_sample(unsigned int num) const;
 		IndInfFrom extract_infection_info(string &te) const;
 		void simulate_sample_init(unsigned int ti, const SampleSpecies &samp_sp, const vector <string> &ind_key);
-		void set_tnum_mean(unsigned int ti_end, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t);
-		void update_population_based(unsigned int ti, bool stoc, const vector <double> &popcomb);
-		vector <double> set_exp_fe(unsigned int f);
-		void set_exp_fe_restore(unsigned int f, const vector <double> &store);
+		void dpop_clear();
+		void set_tnum_mean(unsigned int ti_end);
+		void update_population_based(unsigned int ti, bool stoc);
+		void regenerate_t(unsigned int ti, bool include_derive);
+		void set_exp_fe(unsigned int f);
+		//void set_exp_fe_restore(unsigned int f, const vector <double> &store);
 		vector <double> set_exp_ie(Individual &ind) const;
 		void set_IE_ie(unsigned int i, unsigned int e);
-		vector <double> recalculate_exp_ie(unsigned int ie);
-		void recalculate_exp_ie_restore(unsigned int ie, const vector <double> &store);
+		void recalculate_exp_ie(unsigned int ie);
+		//void recalculate_exp_ie_restore(unsigned int ie, const vector <double> &store);
 		void generate_A();
-		void check_precalc_num(unsigned int n);
-		void mbp(double sim_prob, vector < vector <double> > &popnum_t, vector < vector <double> > &popcomb_t, const MBPfast &mbp_value_linear);
-		void val_fast_update(unsigned int ti, vector <double> &val_fast, const vector < vector <double> > &popnum_t, const vector < vector <double> > &pop_grad, const LinearForm &lin_form) const;
-		void factor_nopop_change(const vector <unsigned int> &list, vector < vector <double> > &val_store, const LinearForm &lin_form, bool &set) const;
-		void linear_form_calculate(vector < vector <double> > &val_store, const vector <unsigned int> &list, const LinearForm &lin_form, const vector < vector <double> > &popnum_t) const;
-		vector < vector <double> > pop_grad_calc(const LinearForm &lin_form) const;
+		void check_precalc_num(unsigned long long n);
+		void mbp(double sim_prob, vector < vector <double> > &popnum_t, vector < vector <double> > &popcomb_t,const vector <double> &popcombw_value);
+		void update_quantities_mbp(unsigned int ti, vector < vector <double> > &popnum_t, vector < vector <double> > &popcomb_t, const vector <double> &popcombw_value);
 		void mbp_accept(double &like_ch);
-		vector <double> calc_val_fast_init(const LinearForm &lin_form, const vector < vector <double> > &pop_grad, const vector <double> &popnum) const;
-		void set_tnum_mean_st_f(vector < vector <double> > &tnum_mean_st_f, unsigned int ti, const vector <double> &popcomb, const vector <double> &cpop, double dt, const vector <double> &val_fast, const MBPfast &mbp_fast) const;
 		unsigned int move_event(vector <Event> &ev, unsigned int index, double t_new) const;
 		void make_consistent(vector <Event> &event) const;
 		void set_cpop_st();
@@ -140,9 +145,13 @@ class StateSpecies                         // Stores information about the state
 		
 		double get_indfac(const Individual &ind, const  MarkovEqn &mar_eqn) const;
 		void update_ind_basic(const vector < vector <Event> > &ev_new);
-		void calculate_tnum_mean_para(vector <double> &tnum_mean, vector <unsigned int> list, unsigned int i, const vector < vector <double> > &popcomb_t, const vector < vector <double> > &cpop_t, double dt) const;
-		double calculate_tnum_mean(unsigned int ti, unsigned int tr, const vector <double> &popcomb, const vector <double> &cpop, double dt) const;
+		void calculate_tnum_mean_para(vector <double> &tnum_mean, vector <unsigned int> list, unsigned int i, const vector < vector <double> > &cpop_t) const;
+		double calculate_tnum_mean(unsigned int ti, unsigned int tr, const vector <double> &cpop) const;
 		double calculate(const EquationInfo &ei, unsigned int ti, const vector < vector <double> > &popcomb_t) const;
+		vector <double> store_markov_eqn_vari() const;
+		void restore_markov_eqn_vari(const vector <double> &vec);
+		void set_event_change_div();
+		void add_trans_tree(vector <Individual> &individual, const vector < vector <double> > &popnum_t, const vector < vector < vector <Poss> > > &pop_ind) const;
 		
 	private:	
 		unsigned int ti_sort;                  // Trigger events which have been sorted
@@ -155,12 +164,10 @@ class StateSpecies                         // Stores information about the state
 		vector <double> sample_ie() const;
 		void sample_ie_Amatrix();
 		void ie_Amatrix_sampler_init();
-		vector <double> calculate_tnum_mean_all(unsigned int ti, const vector <double> &popcomb, const vector <double> &cpop, double dt) const;
-		vector <double> calculate_tnum_mean_fast(unsigned int ti, const vector <double> &popcomb, const vector <double> &cpop, double dt, const vector <double> &val_fast) const;
 		vector <double> sample_trans_num(const vector <double> &tnum_mean, bool stochastic) const;
-		void update_cpop(unsigned int ti, vector <double> &cpop, const vector <double> &tnum);
-		void update_dpop(unsigned int c, double num);
-		void update_dpop_ind(unsigned int c, double val, unsigned int i);
+		void update_cpop(unsigned int ti, vector <double> &cpop, const vector <double> &tnum, bool include_derive);
+		void update_dpop(unsigned int c, double num, bool include_derive);
+		void update_dpop_ind(unsigned int c, double val, unsigned int i, bool include_derive);
 		bool enter_flat_dist(const IndData &ind) const;
 		unsigned int ind_sample_init_c(const IndData &ind) const;
 		
@@ -168,8 +175,8 @@ class StateSpecies                         // Stores information about the state
 	public:
 		void activate_initial_state(double t,const vector < vector <double> > &popcomb_t);
 		void set_markov_vari_value(unsigned int ti, const vector < vector <double> > &popcomb_t);
-		void update_individual_based(unsigned int ti, const vector < vector <Poss> > &pop_ind, const vector < vector <double> > &popcomb_t);
-		vector <double> calculate_omega(unsigned int g);
+		void update_individual_based(unsigned int ti, const vector < vector <Poss> > &pop_ind, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t);
+		void calculate_omega(unsigned int g);
 		void calculate_omega_restore(unsigned int g, const vector <double> &store);
 		void remove_me_ev(const Event &ev);
 		vector <double> likelihood_indfac_int();
@@ -181,11 +188,11 @@ class StateSpecies                         // Stores information about the state
 		void calculate_N_unobs();
 		void calculate_indfac_sum();
 		Event get_event(EventType type, unsigned int i, unsigned int tr_gl, unsigned int move_c, unsigned int cl, unsigned int c_after, double t, const IndInfFrom &inf_from);
-		void update_markov_sim(unsigned int ti, const vector <double> &popcomb);
+		void update_markov_value(unsigned int ti, const vector <double> &popcomb);
 		
 	private:
 		void implement_test_and_cull(unsigned int index, double tdiv, const vector < vector <double> > &popcomb_t);
-		void add_data_event(unsigned int i, double t, const vector <SimTrigEvent> &trig_vec, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind);
+		void add_data_event(unsigned int i, double t, const vector <SimTrigEvent> &trig_vec, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind);
 		bool allow_event(double t, const IndTransRef &itr) const;
 		void ie_sampler_init();
 		void update_ind_c(unsigned int i, double t, unsigned int cl_trans, const vector < vector <double> > &popcomb_t);
@@ -194,12 +201,12 @@ class StateSpecies                         // Stores information about the state
 		bool try_insert_data_trans_event(double t, unsigned int cl, unsigned int i);
 		void add_markov_transition(unsigned int i, unsigned int tgl);
 		void markov_eqn_recalc(unsigned int e, unsigned int ti, const vector <double> &popcomb);
-		//void markov_eqn_recalc_fast(unsigned int ti, const vector <double> &popcomb, const vector <double> &val_fast);
+		void markov_eqn_recalc_sim(MEUpdate me_up, unsigned int e, unsigned int ti, const vector <double> &popcomb);
 		void markov_vari_value_copy(unsigned int ti);
 		void sort_trig_event(unsigned int ti);
-		void sample_infecting_ind(unsigned int i, double t, unsigned int tr_gl, IndInfFrom &inf_from, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind);
+		void sample_infecting_ind(unsigned int i, double t, unsigned int tr_gl, IndInfFrom &inf_from, const vector < vector <double> > &popnum_t, const vector < vector <Poss> > &pop_ind);
 		IndInfFrom get_waifw(unsigned int i, double t) const;
-		void update_ind_trans(double t, const IndTransRef &itr, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind);
+		void update_ind_trans(double t, const IndTransRef &itr, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind);
 		void remove_markov_trans(unsigned int i);
 		void update_ind_remove(unsigned int i, double t);
 		void update_ind_move(unsigned int i, double t, unsigned int c_comp, unsigned int cl, const vector < vector <double> > &popcomb_t);
@@ -219,7 +226,7 @@ class StateSpecies                         // Stores information about the state
 		void set_ind_sim_c(unsigned int ti);
 		bool all_events_correct(unsigned int i, unsigned int cl);
 		void check_obs_inconsitent() const;
-		
+	
 	private:
 		void check_markov_eqn_ref() const;
 		void check_cpop() const;
@@ -234,6 +241,7 @@ class StateSpecies                         // Stores information about the state
 		string data_sources_desc(const ObsData &ob, const ObsData &ob2) const;
 		
 		PV &param_val;            // Quantities reference from state
+		const vector <double> &popcombw_value;
 		const vector <Equation> &eqn;
 		const Species &sp;                     
 		const Model &model;
@@ -260,8 +268,6 @@ class StateSpecies                         // Stores information about the state
 		double nm_trans_incomp_like_no_log(TransType type, double dtdiv, double dt, const vector <double> &ref_val) const;
 		vector <double> markov_value_calc(unsigned int e, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t);
 		void markov_value_nopop_restore(const vector <unsigned int> &me_list, const vector <unsigned int> &list, const vector<double> &store);
-		vector <double> markov_value_linear_calc(const vector <unsigned int> &list, const LinearForm &lin_form, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t);
-		void markov_value_linear_restore(const vector <unsigned int> &list, const LinearForm &lin_form, const vector<double> &store);
 		MeanSD get_mean_sd(TransType type, const vector <double> &ref_val) const;
 		vector <NMupdate> likelihood_ie_nm_trans_change(unsigned int i, unsigned int ie, double factor, const vector < vector <double> > &popcomb_t, double &like_ch);
 		void likelihood_ie_nm_trans_update(const vector <NMupdate> &nm_st);
@@ -270,20 +276,15 @@ class StateSpecies                         // Stores information about the state
 		void update_indfac_int(unsigned int c, double ti, double tf, const Individual &ind, double sign, double &like_ch);
 		vector <double> likelihood_ie_change(unsigned int i, unsigned int ie, double factor, Like &like_ch);
 		void likelihood_ie_change_restore(unsigned int i, unsigned int ie, double factor, const vector <double> &store);
-		void likelihood_pop(const vector < vector <double> > &popcomb_t);	
-		void likelihood_pop_section(unsigned int tr, unsigned int ti1, unsigned int ti2, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector <PopChange> &pop_change, double &like_ch);
-		void likelihood_pop_spline_section(unsigned int tr, unsigned int ti1, unsigned int ti2, const vector < vector <double> > &popcomb_t, double &like_ch);
+		void likelihood_pop();	
+		void likelihood_pop_section(unsigned int tr, unsigned int ti1, unsigned int ti2, double &like_ch);
+		void likelihood_pop_spline_section(unsigned int tr, unsigned int ti1, unsigned int ti2, double &like_ch);
 		void likelihood_ib_spline_section(unsigned int ee, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popcomb_t, double &like_ch);
 		double Li_update_tn(unsigned int tr, unsigned int ti, int sign);
-		double Li_update_c(unsigned int c, int ma, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popcomb_t);
-		vector <double> likelihood_pop_change(unsigned int tr, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, double &like_ch);		
+		double Li_update_c(unsigned int c, int ma, unsigned int ti, unsigned int ti_next);
+		vector <double> likelihood_pop_change(unsigned int tr, const vector <unsigned int> &list, double &like_ch);		
 		void calculate_markov_Li(unsigned int tr, const vector <unsigned int> &list, double &like_ch, vector <double> &store);
 		void likelihood_pop_change_restore(unsigned int tr, const vector <unsigned int> &list, const vector <double> &vec);
-		vector <double> likelihood_pop_change_nopop(const vector <unsigned int> &list, const EqnNoPop &eq_nopop, double &like_ch);
-		void likelihood_pop_change_nopop_restore(const vector <unsigned int> &list, const EqnNoPop &eq_nopop, const vector<double> &store);
-		vector <double> likelihood_pop_change_linear(const vector <unsigned int> &list, const LinearForm &lin_form, const vector < vector <double> > &popnum_t, double &like_ch);
-		bool likelihood_pop_change_linear_factor_nopop(const vector <unsigned int> &list, const LinearForm &lin_form, double &like_ch, vector <double> &store);
-		void likelihood_pop_change_linear_restore(const vector <unsigned int> &list, const LinearForm &lin_form, const vector<double> &store);
 		vector <double> likelihood_init_cond(double &like_ch);
 		NMIncompVal get_nm_incomp_val(const NMTransIncomp &nmti, unsigned int ti, const Individual &ind, const vector < vector <double> > &popcomb_t) const;
 		void print_incomp_val(string te, NMIncompVal value) const;
@@ -292,14 +293,20 @@ class StateSpecies                         // Stores information about the state
 		double nm_single_obs_dprob(unsigned int cl, const Individual &ind) const;
 		
 		double sum_markov_prob(double t1, double t2, unsigned int c, unsigned int tr_gl, unsigned int i, vector < vector <double> > &en) const;
+		double frac_outside_CI(const vector < vector <double> > &popcomb_t) const;
 		void calc_trans_diag(ParticleSpecies &ps, const vector < vector <double> > &popcomb_t);
+		void pop_trans_stats(ParticleSpecies &ps) const;
+		double ind_trans_stats(ParticleSpecies &ps, const vector < vector <double> > &popcomb_t, bool CIprob);
 		void add_nm_prob(unsigned tr_gl_or, double t1, ParticleSpecies &ps, const vector < vector <double> > &popcomb_t, const Individual &ind) const;
+		double pr_nm_cpd(unsigned tr_gl_or, double t1, double t2, const vector < vector <double> > &popcomb_t, const Individual &ind) const;
 		void add_nm_cpd(unsigned tr_gl_or, double t1, double t2, ParticleSpecies &ps, const vector < vector <double> > &popcomb_t, const Individual &ind) const;
 	
 	// In 'state_species_like_obs.cc'
 	public:
 		vector <double> calculate_obs_eqn(const vector <unsigned int> &list);
 		vector <double> likelihood_obs_ind(const vector <unsigned int> &list, double &like_ch);
+		double likelihood_unobs_trans_ind(unsigned int i) const;
+		bool inconsistent(unsigned int i) const;
 		double obs_mod_probability(double num, ObsModelVariety type, double value, double obs_mod_val) const;
 		vector <double> likelihood_obs_pop(const vector <unsigned int> &list, double &like_ch);
 		double calculate_pop_num(unsigned int i, double t, const vector <unsigned int> &c_nonzero, const vector <unsigned int> &comp_obs_mod_ref) const;
@@ -328,6 +335,7 @@ class StateSpecies                         // Stores information about the state
 		vector <unsigned int> update_ind(unsigned int i, vector <Event> &event_new, const vector < vector <double> > &popcomb_t, vector <PopUpdate> &pop_update, Like &like_ch);	
 		void add_event_ref(unsigned int i, unsigned int ee,  const vector < vector <double> > &popcomb_t, Like &like_ch);
 		void set_m_ti_origin(vector <Event> &ev_new) const;
+		double log_thresh(double val) const;
 		void remove_event(Event &ev, const Individual &ind, Like &like_ch, unsigned int i, vector <Event> &event_old);
 		void remove_all_event_ref(const vector <unsigned int> &ind_list);
 		void add_all_event_ref(const vector <unsigned int> &ind_list, const vector < vector <Event> > &ev_new);
@@ -342,7 +350,7 @@ class StateSpecies                         // Stores information about the state
 		
 		void likelihood_init_cond_change(unsigned int c_enter_old, unsigned int c_enter_new, Like &like_ch);
 		void init_cond_change_back(unsigned int c_enter_old, unsigned int c_enter_new);
-		void recalc_markov_value(unsigned int ee, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popnum_t, const vector <PopChange> &pop_change, double &like_ch);
+		void recalc_markov_value(unsigned int ee, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popnum_t, double &like_ch);
 		void restore_back();
 		
 	// In state_species_local.cc

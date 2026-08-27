@@ -1,0 +1,19 @@
+# Model S4.2: Dynamic parameter for disease intervention 
+
+## Objective
+- Introduce a simple example of a dynamic parameter under simulation.
+- Here a square spline determines if a disease intervention measure is implemented or not (it takes the value of zero or one).
+- If the population metric (disease prevalence in this case) goes above a threshold, the spline is set to one, else zero.
+
+## Model
+- A single population-based species 'People' is created.
+- This contains a classification 'DS', which stands for 'disease status'.
+- DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
+- A transmission rate $β$ determines the rate at which individuals become infected.
+- A dynamic parameter $f(t)$ tracks if the disease intervension is implemented or not. The knot times determine when the intervention is decided upon (e.g. this could be weekly or daily) and in this example they are every 10 time units.
+- The threshold on the disease prevalence is 0.05.
+- The effectiveness of the intervention is captured by parameter $φ$. 
+- $N$ is the total number of individuals (this model assumes frequency dependent transmission).
+
+## Population
+- This consists of 10000 initially susceptible individuals and 2 infected.

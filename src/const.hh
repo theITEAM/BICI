@@ -24,10 +24,13 @@ const string default_file = "/tmp/BICI_files/init.bici";        // This is used 
 const string default_file = "Execute/init.bici";     // This is used for windows / linux
 #endif
 
-//#define USE_MPI                                    // Sets if code can run in parallel
+#define USE_MPI                                    // Sets if code can run in parallel
+
+const bool linear_markov_value_speedup = true;
 
 const string bici_version = "v0.90";                 // Sets the BICI version
 
+const bool equation_check = false;                   // This independently checks that equations are correct
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
 const bool testing = true;                           // Set to true for additional testing
 const bool slow_check = false;                       // Additional checks which are slow
@@ -38,24 +41,7 @@ const bool print_diag_on = false;                    // Prints diagnostic statem
 const bool cum_diag = true;                          // Cumulative probability diagnostic
 const bool profiling = false;                        // Determines if memory profiling is done
 
-const bool sim_linearise_speedup = false;//true;             // Speeds up simulation
-// Takes advantage of lineared equations with no time dependence
-
-const bool linearise_speedup = false;// true;                 // Linearisation speed-up of div value calculation
-// This speeds up by taking account of linear population terms when calculation div values
-
-const bool linearise_factor_nopop_speedup = false;//true;    // Linearisation speed-up of div value calculation
-// This speeds up making changes to the factor
-
-const bool nopop_speedup = false;//true;                    // Linearisation speed-up likelihood
-// This speeds up making changes to non-population term when calculating div values
-
-const bool update_ind_linearise_speedup = true;      // Linearisation speed-up of likelihood
-// This speeds up update_ind by updating value based on changes in population (good for sums)
-
 const bool calc_para_speedup = true;                 // Speeds up by paralising calculation over time
-
-const bool factor_speedup = true;                    // Speeds up by identifying equations which differ by a factor 
 
 const bool removeparamvec_speedup = true;            // Removes zeros from paramter vector
 
@@ -143,7 +129,7 @@ enum ErrorType { ERROR_FATAL, ERROR_WARNING };
 enum SmoothType { NORMAL_SMOOTH, LOG_NORMAL_SMOOTH };
 
 // Different varieties of parameter
-enum ParamVariety { PRIOR_PARAM, REPARAM_PARAM, DIST_PARAM, CONST_PARAM, UNSET_PARAM };
+enum ParamVariety { PRIOR_PARAM, REPARAM_PARAM, DIST_PARAM, CONST_PARAM, DYNAMIC_PARAM, UNSET_PARAM };
 
 // Different types of text
 enum TextType { NORMAL_TEXT, SUB_TEXT, SUP_TEXT };
@@ -161,16 +147,17 @@ enum TrigEventType { TRIG_OBS_TRANS_EV, TRIG_MOVE_EV, TRIG_LEAVE_EV };
 enum ObsType { OBS_SOURCE_EV, OBS_TRANS_EV, OBS_SINK_EV, OBS_COMP_EV };
 
 // Different ways a parameter can affect likelihoods
-enum AffectType { SPLINE_PRIOR_AFFECT, IEG_PRIOR_AFFECT, PRIOR_AFFECT, DIST_AFFECT, EXP_FE_AFFECT, DIV_VALUE_AFFECT, DIV_VALUE_NOPOP_AFFECT, DIV_VALUE_LINEAR_AFFECT, MARKOV_LIKE_AFFECT, POP_AFFECT, NM_TRANS_AFFECT, NM_TRANS_BP_AFFECT, NM_TRANS_INCOMP_AFFECT, OMEGA_AFFECT, EXP_IE_AFFECT, LIKE_IE_AFFECT, INDFAC_INT_AFFECT, MARKOV_POP_AFFECT, MARKOV_POP_NOPOP_AFFECT, MARKOV_POP_LINEAR_AFFECT, LIKE_OBS_IND_AFFECT, LIKE_OBS_POP_AFFECT, LIKE_OBS_POP_TRANS_AFFECT, OBS_EQN_AFFECT, LIKE_UNOBS_TRANS_AFFECT, POP_DATA_CGL_TGL_AFFECT, LIKE_INIT_COND_AFFECT, PRIOR_INIT_COND_AFFECT, LIKE_GENETIC_PROCESS_AFFECT, GENETIC_VALUE_AFFECT, LIKE_GENETIC_OBS_AFFECT, IIF_W_AFFECT, POPNUM_IND_W_AFFECT, AFFECT_MAX };
+enum AffectType { SPLINE_PRIOR_AFFECT, IEG_PRIOR_AFFECT, PRIOR_AFFECT, DIST_AFFECT, EXP_FE_AFFECT, MARKOV_VALUE_AFFECT, MARKOV_LIKE_AFFECT, NM_TRANS_AFFECT, NM_TRANS_BP_AFFECT, NM_TRANS_INCOMP_AFFECT, OMEGA_AFFECT, EXP_IE_AFFECT, LIKE_IE_AFFECT, INDFAC_INT_AFFECT, MARKOV_POP_AFFECT, LIKE_OBS_IND_AFFECT, LIKE_OBS_POP_AFFECT, LIKE_OBS_POP_TRANS_AFFECT, OBS_EQN_AFFECT, LIKE_UNOBS_TRANS_AFFECT, POP_DATA_CGL_TGL_AFFECT, LIKE_INIT_COND_AFFECT, PRIOR_INIT_COND_AFFECT, LIKE_GENETIC_PROCESS_AFFECT, GENETIC_VALUE_AFFECT, LIKE_GENETIC_OBS_AFFECT, IIF_W_AFFECT, POPNUM_IND_W_AFFECT, AFFECT_MAX };
+//POP_AFFECT,
 
-// Different proposal types
-enum PropType { PARAM_PROP, PARAM_DET_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT_PROP, IND_EVENT_ALL_PROP, IND_OBS_SAMP_PROP, IND_OBS_RESIM_PROP, IND_OBS_RESIM_SINGLE_PROP, IND_UNOBS_RESIM_PROP, IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, IE_VAR_CV_PROP, TRANS_TREE_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP, IND_OBS_SWITCH_LEAVE_SINK_PROP };
+// Different proposal types  
+enum PropType { PARAM_PROP, LOG_PARAM_PROP, BERNOULLI_PROP, DET_PARAM_PROP, DET_LOG_PARAM_PROP, DET_BERNOULLI_PROP, DET_IC_POP_PROP, DET_IC_POPTOTAL_PROP, DET_IC_RESAMP_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT_PROP, IND_EVENT_ALL_PROP, IND_OBS_SAMP_PROP, IND_OBS_RESIM_PROP, IND_OBS_RESIM_SINGLE_PROP, IND_UNOBS_RESIM_PROP, IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, LOG_MBP_PROP, MBP_BERNOULLI_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, IE_VAR_CV_PROP, TRANS_TREE_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP, IND_OBS_SWITCH_LEAVE_SINK_PROP };
 
 // Different types of annealing stratregy
 enum AnnealType { ANNEAL_NONE, ANNEAL_SCAN, ANNEAL_POWERAUTO, ANNEAL_LOGAUTO, ANNEAL_POWER };
 
 // Different state timers
-enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER, DERIVE_TIMER,DERIVE_PRECALC_TIMER, SIM_CALC_POPNUM, SIM_PRECALC, SIM_POPIND, SIM_UPDATE, SIM_CHECK, SIM_NEXTPOP, SIM_MARKOV, SIM_LIKE, SIM_ITERATE, SIM_TEMP1, SIM_TEMP2, TIMER_MAX };
+enum Timer { IND_TIMER, IND_POP_UPDATE_TIMER, UPDATE_SAMPLER_TIMER, CHECK_TIMER, DERIVE_TIMER,DERIVE_PRECALC_TIMER, SIM_CALC_POPNUM, SIM_PRECALC, SIM_POPIND, SIM_UPDATE, SIM_CHECK, SIM_NEXTPOP, SIM_MARKOV, SIM_LIKE, SIM_ITERATE, SIM_TEMP1, SIM_TEMP2, TEMP1, TEMP2, TEMP3, TIMER_MAX };
 
 // Different output timers
 enum OutTimer { PARAM_OUTPUT, STATE_OUTPUT, OUTTIMER_MAX };
@@ -181,10 +168,10 @@ enum CheckTimer { CHECK_TRANS_NUM, CHECK_DEP_PARAM, CHECK_REF, CHECK_MARKOV, CHE
 const vector <string> check_name = { "CHECK_TRANS_NUM", "CHECK_DEP_PARAM", "CHECK_REF", "CHECK_MARKOV", "CHECK_NM", "CHECK_LIKE", "CHECK_SPLINE", "CHECK_PRIOR", "CHECK_POP", "CHECK_POPCOMB", "CHECK_CPOP", "CHECK_IE", "CHECK_POP_LIKE", "CHECK_MAPS", "CHECK_EV_OBS", "CHECK_OBS_LIKE", "CHECK_IC", "CHECK_LIN", "CHECK_GEN", "CHECK_POP_IND", "CHECK_ADD_REM", "CHECK_RANGE", "CHECK_SIMP", "CHECK_POP_IND_GENTIC", "CHECK_PRECALC", "CHECK_FINAL_LI_WRONG", "CHECK_PARA_SPEEDUP", "CHECK_MARKOV_DIV", "CHECK_MARKOV_VALUE_DIF", "CHECK_PRECALC_DIF", "CHECK_MAX"};
 
 // Different proposal timers
-enum PropTimer { PROP_TIMER, PARAM_RESAMPLE_TIMER, PROPTIMER_MAX };
+enum PropTimer { PROP_TIMER, PARAM_RESAMPLE_TIMER, PARAM_IE_TIMER, PARAM_POP_TIMER, PARAM_TIMEDEP_TIMER, PARAM_CALC_TIMER, PROPTIMER_MAX };
 
 // Different state species timers
-enum StateSpeciesTimer { UP_MARKOV, SORT, ITER, CHECK, STSP_TIMER_MAX, SSP_TEMP1, SSP_TEMP2};
+enum StateSpeciesTimer { UP_MARKOV, SORT, ITER, CHECK, SSP_TEMP1, SSP_TEMP2, STSP_TIMER_MAX};
 
 // INIT_POP_FIXED means init pop has been specified in the data file
 // INIT_POP_DIST means a distribution has been specified in the data file
@@ -267,13 +254,13 @@ enum LocalDir { LOCAL_FORWARD, LOCAL_REVERSE };
 enum BoundType { LOWER_BOUND, LOWER_UPPER_BOUND };
 
 // Sets how markov equation is recalculated
-enum RecalcMarkovType { RECALC, RECALC_PARA, USE_POP_DIF, USE_POP_DIF_FAC, USE_POP_DIF_TIME};
+//enum RecalcMarkovType { RECALC, RECALC_PARA, USE_POP_DIF, USE_POP_DIF_FAC, USE_POP_DIF_TIME};
 
 // Sets diffent distribution for displaying text
-enum DistText { NORM_TE, LOGNORM_TE, WEIBULL_TE, GAMMA_TE, BETA_TE, NEGBINO_TE, BERN_TE, EXP_RATE_TE, EXP_MEAN_TE, POIS_TE, PERIOD_TE};
+enum DistText { NORM_TE, LOGNORM_TE, WEIBULL_TE, GAMMA_TE, BETA_TE, NEGBINO_TE, BERN_TE, EXP_RATE_TE, EXP_MEAN_TE, POIS_TE, PERIOD_TE, INVERSE_TE, UNIFORM_TE, POWER_TE};
 
 // Different quantities
-enum DistQuant { SD_QU, CV_QU, MEAN_QU, NORM_MEAN_QU, SHAPE_QU, SCALE_QU, ALPHA_QU, BETA_QU, P_QU, BERNP_QU, RATE_QU, EXP_MEAN_QU, POIS_QU, TIME_QU};
+enum DistQuant { SD_QU, CV_QU, MEAN_QU, NORM_MEAN_QU, SHAPE_QU, SCALE_QU, ALPHA_QU, BETA_QU, P_QU, BERNP_QU, RATE_QU, EXP_MEAN_QU, POIS_QU, TIME_QU, POS_MIN_QU, POS_MAX_QU};
 
 // Different percentage measures
 enum PercentType { LOAD_PER, INIT_PER, RUN_PER, RUN_GEN_PER, ANNEAL_PER, OUTPUT_PER, SIM_PER, GEN_DATA_PER};
@@ -282,7 +269,9 @@ enum PercentType { LOAD_PER, INIT_PER, RUN_PER, RUN_GEN_PER, ANNEAL_PER, OUTPUT_
 enum DerFuncType { RN, RNE, RNC, GT, GTE, GTC, DF_UNSET};
  
 // Equation types 
-enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAM_INDEX, PARAMETER, PARAMVEC, SPLINE, SPLINEREF, CONSTSPLINEREF,  POP_INDEX, POPNUM, POPTIMENUM, TIME, IE, ONE, ZERO, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, TINT, INTEGRAL, DERIVE, REG_FAC, REG_PRECALC, REG_PRECALC_TIME, SINGLE, SUM, POPCOMB, POPCOMBTIME, NOOP};
+enum EqItemType { LEFTBRACKET, RIGHTBRACKET, FUNCDIVIDE, ADD, TAKE, MULTIPLY, DIVIDE, REG, PARAM_INDEX, PARAMETER, SPLINE, POP_INDEX, POPNUM, POPNUMTIME, TIME, IE, ONE, ZERO, FE, NUMERIC, EXPFUNC, SINFUNC, COSFUNC, LOGFUNC, POWERFUNC, THRESHFUNC, UBOUNDFUNC, STEPFUNC, MAXFUNC, MINFUNC, ABSFUNC, SQRTFUNC, SIGFUNC, TINT, INTEGRAL, DERIVE, REG_FAC, REG_PRECALC, REG_PRECALC_TIME, SINGLE, SUM, POPCOMB, POPCOMBTIME, PARAMVEC, SPLINEREF, CONSTSPLINEREF, NOOP};
+
+enum PreEqItemType { PRE_PARAMVEC, PRE_SPLINEREF, PRE_CONSTSPLINEREF, PRE_REG, PRE_REGTIME, PRE_ONE, PRE_ZERO, PRE_NUMERIC, PRE_TIME};
 
 // Different types of spline
 enum SplineType { LINEAR_SPL, SQUARE_SPL, CUBICPOS_SPL, CUBIC_SPL};
@@ -313,6 +302,16 @@ enum InterventionType { TEST_AND_CULL_INT};
 
 enum PostSimParamType { PS_SAMPLE, PS_MEAN, PS_MEDIAN};
 
+enum MEUpdate { FULL_ME_UPDATE, NOPOP_ME_UPDATE, NO_ME_UPDATE};
+
+enum CalcError { NO_ERROR, DIV_BY_ZERO_ERROR, LOG_NEG_ERROR, SQRT_NEG_ERROR};
+
+enum DynamicType { BIN_THRESH, BIN_MIN_MAX, BIN_THRESH_DIST, BIN_MIN_MAX_DIST, BIN_THRESH_REGION, BIN_MIN_MAX_REGION, BIN_THRESH_EQN, BIN_MIN_MAX_EQN}; 
+
+enum StoreType { POPNUM_STORE, POPCOMBW_STORE, POPCOMB_STORE,EXP_FE_STORE, EXP_IE_STORE, OMEGA_STORE, IE_STORE, IE_COVAR_STORE};
+
+enum TotalObsType { EVENT_TOTAL, OBS_TOTAL, ILLEGAL_TRANS_TOTAL};
+
 /************************** Numeric constants ******************************/
 
 const auto ERR_MSG_MAX = 5u;                     // The maximum number of error messages
@@ -332,6 +331,7 @@ const auto TORNADO_NUM = 20u;                     // Number of simulation done f
 const auto UNSET_WILD = 99999980.0;               // Indicates an unset wildcard "*"
 const auto UNSET_F = 99999990.0;                  // Floating point unset
 
+//const auto NO_TIME_STEP = 99999969u;              // Used to represent no time steps
 const auto ALL_TIME_STEP = 99999970u;             // Used to represent all time steps
 const auto TIME_VAR = 99999971u;                  // Indicates time variable t (used in eqnations)
 const auto DIST_MATRIX = 99999972u;               // Distance matrix
@@ -353,6 +353,8 @@ const auto LINK_WEIBULL_SHAPE = 3.7;              // Shape thresh for linking fo
 
 const auto ESS_THRESH = 200;                      // Threshold for ESS statistic
 const auto GR_THRESH = 1.01;                      // Threshold for GR statistic
+
+const auto N_DISTGRID = 20u;                      // Determines how fine the distance grid should be
 
 const auto MEM_FRAC_MAX = 0.8;                    // Maximum fraction of memory usable
 const auto MEM_FREE_MIN = 0.1;                    // Minimum fraction of memory available
@@ -387,8 +389,9 @@ const auto PROP_SIM_NAC_INIT = 10;                // Initial value for nac for i
 const auto PROP_SIM_PROB_FADE = 0.98;             // Used for time fading of sim prob
 const auto PROP_SIM_PROB_MIN = 0.05;              // Minimum probability for ind sim proposal
 
-const double TINY = 0.000000001;                  // Used to represent a tiny number
+const double TINY = 0.00000000001;                // Used to represent a tiny number
 const double VTINY = 0.00000000000001;            // Used to represent a very tiny number
+const double VVTINY = 0.000000000000000000000001; // Used to represent a very tiny number
 const double EFFECT_MAX = 10000000;               // Sets maximum value for effect
 const double EFFECT_MIN = 0.0000001;              // Sets minimum value for effect
 const double CLIP_MIN = 0.99*log(EFFECT_MIN);     // Clips minimum 
@@ -418,12 +421,12 @@ const int LARGE_INT = 1000000000;                 // Used to represent a big int
 const double INFY = 1000000001;                   // Used to represent infinity
 const double UNDEF = 1000000002;                  // Used to represent undefined
 const double ALMOST_ONE = 0.9999999999999;        // Almost one   
-const double LOG_THRESH = 0.000000000000000000000001; // The threshold below which logs not calculated
+const double LOG_THRESH = 0.000000000000001; // The threshold below which logs not calculated
 const double PROB_MOD = 0.001;                    // Avoids zero probability in local event props
 const double LOW_BOUND = 0;                       // The lower bound for observation probability
 const double UP_BOUND = 1;                        // The lower bound for observation probability
 const double OBS_COMP_MIN = VTINY;                // Minimum value for observed compartment
-const double PROP_JOIN_COR_MIN = 0.8;             // The threshold corrlelation above which proposals join
+const double PROP_JOIN_COR_MIN = 0.7;             // The threshold corrlelation above which proposals join
 const unsigned int SEED_MAX = 10000;              // The maximum seed number
 
 const double UP_SI_SMALL = 0.0005;                       // Sets rate of adaptation for MCMC proposals
@@ -459,6 +462,7 @@ const auto RATE_MIN = TINY;                       // The minimum rate
 const auto P_MIN = TINY;                          // The minimum probability
 const auto P_MAX = 1-TINY;                        // The maximum probability
  
+const unsigned int CHAIN_NSIMINIT_DEFAULT = 20;   // The default number of simulation used to initialise chain 
 const unsigned int SIM_NUM_DEFAULT = 1;           // The default simulation number
 const unsigned int PPC_NUM_DEFAULT = 200;         // The default number of ppc simulations
 const auto ALG_DEFAULT = DA_MCMC;                 // Default inference algorithm
@@ -563,10 +567,10 @@ const vector <string> must_term_str = { "simulation","sim","inference","inf","po
 const vector< vector <string> > escape_char {{"\\alpha","α"},{"\\beta","β"},{"\\gamma","γ"},{"\\Gamma","Γ"},{"\\delta","δ"},{"\\Delta","Δ"},{"\\epsilon","ε"},{"\\zeta","ζ"},{"\\eta","η"},{"\\Eta","Η"},{"\\theta","θ"},{"\\Theta","Θ"},{"\\iota","ι"},{"\\kappa","κ"},{"\\lambda","λ"},{"\\Lambda","Λ"},{"\\mu","μ"},{"\\nu","ν"},{"\\xi","ξ"},{"\\Xi","Ξ"},{"\\omicron","ο"},{"\\pi","π"},{"\\Pi","Π"},{"\\rho","ρ"},{"\\sigma","σ"},{"\\tau","τ"},{"\\upsilon","υ"},{"\\phi","φ"},{"\\Phi","Φ"},{"\\chi","χ"},{"\\psi","ψ"},{"\\Psi","Ψ"},{"\\omega","ω"},{"\\Omega","Ω"},{"\\sum","Σ"},{"\\int","∫"}};
 	
 // These lists are used to read and write proposal information
-const vector <PropType> prop_info_list = { PARAM_PROP,PARAM_DET_PROP,MBP_PROP,MBPII_PROP,MBP_IC_POP_PROP,MBP_IC_POPTOTAL_PROP,MBP_IC_RESAMP_PROP,IND_ADD_REM_PROP,IE_PROP,IE_VAR_PROP,IE_COVAR_PROP,IE_VAR_CV_PROP,POP_ADD_REM_LOCAL_PROP,POP_IC_LOCAL_PROP,POP_END_LOCAL_PROP,POP_SINGLE_LOCAL_PROP,POP_IC_PROP,POP_IC_SWAP_PROP,TRANS_TREE_MUT_LOCAL_PROP,IND_EVENT_TIME_PROP,IND_MULTI_EVENT_PROP,IND_EVENT_ALL_PROP,IND_OBS_RESIM_PROP,IND_OBS_SAMP_PROP,IND_OBS_RESIM_SINGLE_PROP};
+const vector <PropType> prop_info_list = { PARAM_PROP,LOG_PARAM_PROP,BERNOULLI_PROP,DET_PARAM_PROP,DET_LOG_PARAM_PROP,DET_BERNOULLI_PROP,DET_IC_POP_PROP,DET_IC_POPTOTAL_PROP,DET_IC_RESAMP_PROP,MBP_PROP,LOG_MBP_PROP,MBP_BERNOULLI_PROP,MBPII_PROP,MBP_IC_POP_PROP,MBP_IC_POPTOTAL_PROP,MBP_IC_RESAMP_PROP,IND_ADD_REM_PROP,IE_PROP,IE_VAR_PROP,IE_COVAR_PROP,IE_VAR_CV_PROP,POP_ADD_REM_LOCAL_PROP,POP_IC_LOCAL_PROP,POP_END_LOCAL_PROP,POP_SINGLE_LOCAL_PROP,POP_IC_PROP,POP_IC_SWAP_PROP,TRANS_TREE_MUT_LOCAL_PROP,IND_EVENT_TIME_PROP,IND_MULTI_EVENT_PROP,IND_EVENT_ALL_PROP,IND_OBS_RESIM_PROP,IND_OBS_SAMP_PROP,IND_OBS_RESIM_SINGLE_PROP};
 
 // This must match prop_info_list
-const vector <string> prop_info_str = {"param","param (determinisitic)","mbp","mbpII","mbp_ic_pop","mbp_ic_poptot","mbp_ic_resamp","ind_add_rem","ie","ie_var","ie_covar","ie_var_cv","pop_add_rem_local","pop_ic_local","pop_end_local","pop_single_local","pop_ic","pop_ic_swap","trans_tree_mut_local","ind_event_time","ind_multi_event","ind_event_all","ind_obs_resim","ind_obs_samp","ind_obs_resim_single"};
+const vector <string> prop_info_str = {"param","log-param","bernoulli","param (determinisitic)","log-param (determinisitic)","bernoulli (determinisitic)","ic_pop (determinisitic)","ic_poptot (determinisitic)","ic_resamp (determinisitic)","mbp","log-mbp","bernoulli_mbp","mbpII","mbp_ic_pop","mbp_ic_poptot","mbp_ic_resamp","ind_add_rem","ie","ie_var","ie_covar","ie_var_cv","pop_add_rem_local","pop_ic_local","pop_end_local","pop_single_local","pop_ic","pop_ic_swap","trans_tree_mut_local","ind_event_time","ind_multi_event","ind_event_all","ind_obs_resim","ind_obs_samp","ind_obs_resim_single"};
  
 	
 /************************** Object constants ******************************/

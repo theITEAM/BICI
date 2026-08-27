@@ -319,7 +319,7 @@ double State::sample_infection_source(Event &ev, unsigned int p) const
 		auto j = UNSET;
 			
 		if(lin.multi_source){        // Samples from available sources (either populations of from outside)		
-			auto ss = eq.setup_source_sampler(ti,popcomb_t[ti],param_val);	
+			auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val,popcombw_value);	
 			j = ss.sample_inf_source();
 			if(j == UNSET) return UNSET;
 			
@@ -423,14 +423,14 @@ double State::prob_infection_source(const Event &ev, unsigned int p) const
 	//const auto &precalc = param_val.precalc;
 	
 	if(lin.multi_source){        // Prop from available sources (either populations or outside)		
-		auto value = mev.div[ti].value;
+		auto value = mev.value_t[ti];
 		if(value < TINY) probfi -= LARGE;
 		else{		
 			double val;
 			if(pref == UNSET) val = eq.calculate_no_pop(ti,precalc);
 			else{
 				auto pr = eq.pop_ref[pref];
-				val = popnum_t[ti][pr]*eq.calculate_pop_grad(pref,ti,precalc);
+				val = popnum_t[ti][pr]*eq.calculate_pop_grad(pref,ti,popcombw_value,precalc);
 			}
 			probfi += log(val/value);
 		}
@@ -1103,7 +1103,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 	if(pl) cout << "Start trans tree proposal" << endl;
 	
 	const auto &precalc = param_val.precalc;
-	
+
 	vector <GlobalEvent> glob_ev;
 	
 	for(auto p = 0u; p < model.species.size(); p++){
@@ -1140,7 +1140,8 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 	// Goes through time keeping track of which individuals are in which populations
 
 	vector < vector <unsigned int> > pop_ind;
-	pop_ind.resize(model.pop.size());
+	//pop_ind.resize(model.pop.size());
+	pop_ind.resize(model.npop);
 	
 	auto dt = model.details.dt;
 	
@@ -1248,12 +1249,12 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 						if(lin.multi_source){ 			
 							if(k_from == UNSET){
 								auto val = eq.calculate_no_pop(ti,precalc);	
-								probfi += log(val*dt/mev.div[ti].value);
+								probfi += log(val*dt/mev.value_t[ti]);
 							}
 							else{
 								auto pr = pop_ref[k_from];
-								auto val = eq.calculate_pop_grad(k_from,ti,precalc);
-								probfi += log(val*popnum[pr]*dt/mev.div[ti].value);
+								auto val = eq.calculate_pop_grad(k_from,ti,popcombw_value,precalc);
+								probfi += log(val*popnum[pr]*dt/mev.value_t[ti]);
 							}
 						}
 						
@@ -1282,7 +1283,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 						auto k_prop = 0u;
 					
 						if(lin.multi_source){ 	
-							auto ss = eq.setup_source_sampler(ti,popnum,param_val);
+							auto ss = eq.setup_source_sampler(ti,popnum,param_val,popcombw_value);
 
 							k_prop = ss.sample_inf_source();
 							probif += ss.prob_inf_source(k_prop);
@@ -1606,7 +1607,7 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 									if(inf_c_bef.po != iif_bef.po) emsg("po not agree");
 									
 									const auto &eq_bef = model.eqn[inf_c_bef.eq_ref];
-									auto va_bef = eq_bef.calculate_pop_grad(iif_bef.pref,ti,precalc);
+									auto va_bef = eq_bef.calculate_pop_grad(iif_bef.pref,ti,popcombw_value,precalc);
 									
 									iif_ch.Li_markov_bef = log(va_bef*iif_bef.w);
 									
@@ -1618,7 +1619,7 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 										//if(pref == UNSET) emsg("Should be p ref");
 								
 										const auto &eq_aft = model.eqn[inf_c_aft.eq_ref];
-										auto va_aft = eq_aft.calculate_pop_grad(pref,ti,precalc);
+										auto va_aft = eq_aft.calculate_pop_grad(pref,ti,popcombw_value,precalc);
 		
 										auto &iif_aft = iif_ch.ind_inf_from;
 										iif_aft.p = p_A;
@@ -2589,7 +2590,8 @@ void State::check_pop_ind(vector < vector <unsigned int> > pop_ind, const vector
 	check_timer[CHECK_POP_IND_GENTIC] -= clock();
 	
 	vector < vector <unsigned int> > pop_ind_compare;
-	pop_ind_compare.resize(model.pop.size());
+	//pop_ind_compare.resize(model.pop.size());
+	pop_ind_compare.resize(model.npop);
 	
 	for(auto p = 0u; p < model.species.size(); p++){
 		const auto &sp = model.species[p];
@@ -2605,7 +2607,8 @@ void State::check_pop_ind(vector < vector <unsigned int> > pop_ind, const vector
 		}
 	}
 	
-	for(auto po = 0u; po < model.pop.size(); po++){
+	//for(auto po = 0u; po < model.pop.size(); po++){
+	for(auto po = 0u; po < model.npop; po++){
 		sort(pop_ind[po].begin(),pop_ind[po].end());
 		sort(pop_ind_compare[po].begin(),pop_ind_compare[po].end());
 		
@@ -3582,7 +3585,8 @@ void State::calculate_popnum_ind()
 	popnum_ind.clear();
 	popnum_ind.resize(T);
 	for(auto ti = 0u; ti < T; ti++){
-		popnum_ind[ti].resize(model.pop.size());
+		//popnum_ind[ti].resize(model.pop.size());
+		popnum_ind[ti].resize(model.npop);
 	}
 	
 	for(auto p = 0u; p < model.species.size(); p++){

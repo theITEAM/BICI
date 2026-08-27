@@ -33,8 +33,13 @@ class Proposal                             // Implements a proposal
 		// PARAM_PROP
 		vector <unsigned int> param_list;      // Lists parameter used in proposals
 		
+		bool log_trans;                        // Determines if parameters are log-transformed
+		
 		vector <unsigned int> dependent;       // Lists parameters which are dependent (based on reparam)
 		
+		//vector <PopcombUpdate> popcomb_update_param; // Determines how popcomb should be updated
+		//vector <PopcombUpdate> popcomb_update_dep;   // Determines how popcomb should be updated
+	
 		unsigned int N;                        // The number of parameters
 		unsigned int ntr;                      // Number of times proposal has been performed
 		unsigned int nac;                      // Number of times proposal has been accepted
@@ -63,11 +68,16 @@ class Proposal                             // Implements a proposal
 		
 		vector <SwapProp> swap_info;           // Stores information about local swaps [#swap_rep]
 		
+		PopChangeInfo pop_change_info;
+		
+		//vector <unsigned int> mbp_popcombw_affect; // Stores how popcombw affected under mbp
+		
 		vector <AffectLike> affect_like;       // Stores how the likelihood is affected by proposal
 		
 		vector <SpecPrecalc> dependent_spec_precalc; // Works out update precalc for parameter sampling
 		
 		SpecPrecalc spec_precalc_after;        // Works out how to update precalculation
+		SpecPrecalc spec_precalc_tv_after;     // Works out how to update precalculation after timevary
 		
 		// IND_PROP
 		unsigned int p_prop;                   // The species for the proposals
@@ -86,8 +96,6 @@ class Proposal                             // Implements a proposal
 			
 		bool all_events_correct;               // Flag determining if all obs events correct
 	
-		MBPfast mbp_fast;                      // This is used to speed up calculation for MBPs
-		
 		void MH_event(State &state);
 		void MH_multi_event(State &state);
 		void MH_event_all(State &state);
@@ -100,7 +108,8 @@ class Proposal                             // Implements a proposal
 		void resimulate_ind_obs(State &state);
 		void resimulate_single_ind_obs(State &state);
 		void resimulate_ind_unobs(State &state);
-		
+		bool is_param_prop() const;
+				
 		// IE_PROP
 		unsigned int ie_prop;                 // The individual effect being changed
 		IndEffGroupRef ind_eff_group_ref;     // Reference an element in individual effect (for covar proposals)
@@ -138,7 +147,8 @@ class Proposal                             // Implements a proposal
 		void update_sampler(const CorMatrix &cor_matrix);
 		void mbp_population_affect();
 		void set_mvn(double si_, const CorMatrix &cor_matrix);
-		double param_resample(PV &param_val, const vector < vector <double> > &popcomb_t);
+		double param_resample(PV &param_val, State &state,  bool mbp=false, bool ie_shift=false);
+		Result update_prop_ie(double ratio, State &state);
 		double mvn_probability(const vector <double> &param_prop1, const vector <double> &param_prop2) const;
 		bool prop_info_on() const;
 		PropInfo get_prop_info() const;
@@ -164,7 +174,6 @@ class Proposal                             // Implements a proposal
 		//void set_omega_check();
 		bool event_dif(const vector <Event> &ev1, const vector <Event> &ev2) const;
 		void ind_obs_prob_update(IndSimProb &isp) const;
-		void set_mbp_fast();
 		double set_prop_prob();
 		void add_sampler_info(vector <double> &vec, const Sampler &sa) const;
 		void set_sampler_info(const vector <double> &vec, Sampler &sa) const;
@@ -173,6 +182,7 @@ class Proposal                             // Implements a proposal
 		string print_ac(unsigned int nac, unsigned int ntr) const;
 		string print_fa(unsigned int nfa, unsigned int ntr) const;
 		string print_range(string te, const vector <double> &list, bool float_num) const;
+		void conv_exp_fe_ie();
 
 	// Used in proposal_local.cc
 	private:

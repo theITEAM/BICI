@@ -54,6 +54,8 @@ PAS::PAS(const Model &model, Output &output, Mpi &mpi) : model(model), output(ou
 /// Runs PAS algorithm
 void PAS::run()
 {
+	auto time_init_start = clock();
+	
 	for(auto &ch : chain) ch.state.dif_thresh = DIF_THRESH_BURNIN;
 		
 	percentage_start(INIT_PER);	
@@ -100,12 +102,15 @@ void PAS::run()
 
 		if(phi == phi_final) break;
 		
+		//chain[0].cor_matrix.check_repeated("rs1",mpi.core);
+		//chain[0].cor_matrix.check_no_var("refbefore",mpi.core);
+		
 		bootstrap();
 		
 		if(model.sync_on) synchronise_proposal(UNSET,chain,mpi);
-		
 		g++;
 	}while(true);
+	
 	percentage_end();
 		
 	double time_anneal_end = clock();
@@ -117,7 +122,7 @@ void PAS::run()
 		percentage(s,nsample);
 	
 		if(model.sync_on) synchronise_proposal(s,chain,mpi);
-	
+		
 		for(auto &ch : chain){
 			ch.pas_burn_update_run(s);
 			ch.update(s);
@@ -139,7 +144,7 @@ void PAS::run()
 		auto ch_tot = mpi.core*num_per_core+ch;
 		const auto &cha = chain[ch];
 		
-		auto diag = cha.diagnostics(clock()-time_anneal_start,time_anneal_end-time_anneal_start);
+		auto diag = cha.diagnostics(clock()-time_anneal_start,time_anneal_start-time_init_start,time_anneal_end-time_anneal_start);
 		output.set_diagnostics(ch_tot,diag);
 		output.terminal_info.push_back(cha.get_terminal_info(ch_tot));
 	}
@@ -203,13 +208,15 @@ void PAS::bootstrap()
 	if(op()){
 		// Variance within chain
 		auto L_var_mean = mean(L_var_tot);
+		if(L_var_mean < VTINY) L_var_mean = VTINY;
 		
 		// Variance between chain
 		auto av = 0.0, av2 = 0.0, nav = 0.0; 
 		for(auto va : L_av){ av += va; av2 += va*va; nav++;}
 		auto L_var_bet = (av2/nav) - (av/nav)*(av/nav);
+		if(L_var_bet < VTINY) L_var_bet = VTINY;
 		
-		auto L_sd_mean = sqrt(L_var_mean+L_var_bet+TINY);
+		auto L_sd_mean = sqrt(L_var_mean+L_var_bet);
 		if(L_sd_mean == 0) L_sd_mean = 1;
 	
 	  auto dphi = quench_factor/L_sd_mean;   // Sets the increase in inverse temperature
@@ -347,7 +354,7 @@ void PAS::estimate_percentage() const
 		}
 		
 		auto frac_done = double(N)/x_final;
-		if(frac_done > 1) frac_done = 1;
+		if(frac_done > 0.99) frac_done = 0.99;
 		if(frac_done < 0.6){
 			auto Nstart = 10u;
 			if(N < Nstart){

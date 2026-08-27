@@ -429,11 +429,12 @@ vector < vector <double> > calculate_cholesky(const vector < vector <double> > &
 	for(auto i = 0u; i < nvar; i++){
 		for(auto j = 0u; j <= i; j++){
 			auto sum = 0.0;
-			for(auto k = 0u; k < j; k++) sum += CM[i][k] * CM[j][k];
+			for(auto k = 0u; k < j; k++) sum += CM[i][k]*CM[j][k];
 
 			if(i == j){
 				auto val = M[i][i] - sum;
-				if(val < -TINY){
+				//if(val < -TINY){
+				if(val < TINY){
 					illegal = true;
 					//CM[0][0] = UNSET;
 					return CM;
@@ -620,17 +621,14 @@ double determinant_sparse(const vector < vector <double> > &a)
 	}
 	
 	auto det = 0.0;
-	auto neg = 0u;
 	for(i = 0; i < n; i++){
 		auto valu = u[i][i];
 		if(valu < 0){
 			valu = -valu;
-			neg++;
 		}
 		auto vall = l[i][i];
 		if(vall < 0){
 			vall = -vall;
-			neg++;
 		}
 		det += log(valu * vall);
 	}

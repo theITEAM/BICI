@@ -42,13 +42,19 @@ comp name="F" color="#aa00aa" x=10 y=0
 
 init-pop-sim type="fixed" focal="DS" file="init-pop-sim.csv"
 
+# INFERENCE DATA
+
+add-ind-inf name="Added individuals" file="add-ind-inf.csv"
+
+comp-data name="Compartment data" class="DS" file="comp-data.csv"
+
 ######################## PARAMETERS ########################
 
 define name="λ_s(t)" value="β_s×{I}/N"
 
-param name="N" value=101
+param name="N" constant=101
 
-param name="β_s" value="beta_value.csv"
+param name="β_s" value="beta_value.csv" prior="inverse(0.01,1)"
 
 param name="γ_s" value="gamma_value.csv" prior="inverse(0.01,1)"
 

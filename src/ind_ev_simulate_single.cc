@@ -388,8 +388,8 @@ void IndEvSampler::get_trans_rate_single(unsigned int c, unsigned int cl, unsign
 			const auto &mev = markov_eqn_vari[m];
 			const auto &me = sp.markov_eqn[m];
 				
-			if(me.time_vari == true) r = mev.div[ti].value;
-			else r = mev.div[0].value;
+			if(me.time_vari == true) r = mev.value_t[ti];
+			else r = mev.value_t[0];
 			if(me.ind_variation) r *= get_indfac(ind,me);
 			if(r < TINY) r = 0;
 			else{
@@ -408,6 +408,4 @@ void IndEvSampler::get_trans_rate_single(unsigned int c, unsigned int cl, unsign
 		trans_rate[k] = r;
 		R += r;
 	}
-	
-	auto sum = 0.0; for(auto va : trans_rate) sum += va;
 }

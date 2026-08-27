@@ -54,8 +54,17 @@ function load_file()
 
 
 /// Saves an exported file
-function save_file(filename,type)                               
+function save_file(filename,type,pos)                               
 {
+	if(pos != undefined){
+		let spl = pos.split(",");
+		let i = 0; while(i < spl.length && !end_str(filename,spl[i])) i++;
+		if(i == spl.length){
+			alert("File name must end in '"+pos+"'");
+			return;
+		}
+	}
+	
 	close_bubble(); generate_screen();
 	
 	switch(type){
@@ -219,8 +228,8 @@ function export_table(filename)
 }
 
 
-/// Exports a table (type used when click "view" in csv format
-function export_table_content(filename)
+/// Returns the table type
+function get_table_type()
 {
 	let pos = ["TableContent","CreateEditXvectorContent","CreateEditTableContent",
 	           "CreateEditParamContent", "CreateEditAmatrixContent"];
@@ -230,10 +239,20 @@ function export_table_content(filename)
 	
 	if(loop == pos.length){ error("No layer found"); return;}
 	
-	let l = find(inter.layer,"name",pos[loop]);
+	return pos[loop];
+}
+
+
+/// Exports a table (type used when click "view" in csv format
+function export_table_content(filename)
+{
+	
+	let table_type = get_table_type();
+	
+	let l = find(inter.layer,"name",table_type);
 	
 	let te = "";
-
+	
 	switch(inter.layer[l].name){
 	case "TableContent":
 		export_table(filename);
@@ -266,58 +285,15 @@ function export_table_content(filename)
 		break;
 		
 	case "CreateEditXvectorContent":
-		{
-			let Xvec = inter.edit_Xvector;
-			te += "Individual,Value"+endl;
-			for(let j = 0; j < Xvec.ind_list.length; j++){
-				te += '"'+Xvec.ind_list[j]+'",'+Xvec.X_value[j]+endl;
-			}
-		}
+		te = inter.edit_Xvector.table_te;
 		break;
 
 	case "CreateEditParamContent":
-		{
-			let i = inter.edit_param.i;
-			
-			let par = model.param[i];
-			let dep = par.dep;
-			let list = par_find_list(par);
-			
-			let value = inter.edit_param.value;
-		
-			let dim = get_dimensions(value);
-			
-			let ele_list = get_element_list(value,dim);
-		
-			for(let j = 0; j < par.ndep_cont; j++) te += dep[j] + ",";
-			if(inter.edit_param.type == "PriorSplit") te += "prior";
-			else te += "value";
-			te += endl;
-		
-			for(let k = 0; k < ele_list.length; k++){
-				for(let j = 0; j < par.ndep_cont; j++) te += list[j][ele_list[k][j]]+",";
-				te += get_element(value,ele_list[k])+endl;
-			}
-		}
+		te = inter.edit_param.table_te;
 		break;
 	
 	case "CreateEditAmatrixContent":
-		{
-			let A = inter.edit_Amatrix;
-			for(let i = 0; i < A.ind_list.length; i++){
-				if(i != 0) te += ",";
-				te += A.ind_list[i];
-			}
-			te += endl;
-			
-			for(let j = 0; j < A.ind_list.length; j++){
-				for(let i = 0; i < A.ind_list.length; i++){
-					if(i != 0) te += ",";
-					te += A.A_value[j][i];
-				}
-				te += endl;
-			}
-		}
+		te = inter.edit_Amatrix.table_te;
 		break;
 		
 	default: 

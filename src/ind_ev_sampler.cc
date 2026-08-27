@@ -32,6 +32,34 @@ IndEvSampler::IndEvSampler(vector <MarkovEqnVariation> &markov_eqn_vari, const v
 	
 	if(no_ind_var) ind_variation = false;
 	else ind_variation = sp.ind_variation;
+	
+	obs_trans_exist = sp.obs_trans_exist;
+	
+	if(obs_trans_exist){  // Sets up an array which can be used to account for the probability of unobserved events
+		unobs_trans_prob.resize(T);
+		for(auto ti = 0u; ti < T; ti++) unobs_trans_prob[ti].resize(sp.tra_gl.size());
+		
+		auto exp_obs_trans_eqn_value = obs_trans_eqn_value;
+		for(auto &otev : exp_obs_trans_eqn_value){
+			for(auto &val : otev){
+				if(val == LI_WRONG) val = 0;//VVTINY;
+				else val = exp(val);
+			}
+		}
+		
+		for(auto trg = 0u; trg < sp.tra_gl.size(); trg++){
+			const auto &ote = sp.obs_trans_eqn_ref[trg];
+			
+			for(auto ti = 0u; ti < T; ti++){
+				auto num = 1.0;
+				for(auto m : ote[ti]) num *= exp_obs_trans_eqn_value[m][ti];
+				unobs_trans_prob[ti][trg] = num;
+			}
+		}
+	}
+	
+	//print_matrix("num",unobs_trans_prob);
+	//emsg("mat");
 }
 
 	
@@ -134,8 +162,8 @@ double IndEvSampler::get_trans_obs_prob(unsigned int trg, const ObsData &ob) con
 	if(ob.time_vari) return obs_eqn_value[ob.obs_eqn_ref[trg]];
 	else return obs_eqn_value[sp.obs_trans[ob.ref].obs_eqn_ref[trg]];
 }
-
-
+	
+	
 /// Generates a timeline giving the observation probability of an individual being in a state 
 void IndEvSampler::generate_ind_obs_timeline()
 {
@@ -197,15 +225,29 @@ void IndEvSampler::generate_ind_obs_timeline()
 				auto &rs = rate_store[tii][c];
 				double rate;
 				
-				for(auto l = 0u; l < lmax; l++){
-					const auto &le = co.leave[l];
-				
-					rate = calculate_rate(ind,le,ctime,tii);
-					rs[l]	= rate;
-					num[l] = rate;
-					sum += rate;
+				if(obs_trans_exist){  // This takes into account unobserved transitions
+					const auto &tft = sp.trg_from_tr[co.c][cl_store];
+					const auto &utp = unobs_trans_prob[tii];
+					for(auto l = 0u; l < lmax; l++){
+						const auto &le = co.leave[l];
+					
+						rate = calculate_rate(ind,le,ctime,tii);
+						rs[l]	= rate;
+						num[l] = rate*utp[tft[le.tr]];
+						sum += rate;
+					}
+				}	
+				else{
+					for(auto l = 0u; l < lmax; l++){
+						const auto &le = co.leave[l];
+					
+						rate = calculate_rate(ind,le,ctime,tii);
+						rs[l]	= rate;
+						num[l] = rate;
+						sum += rate;
+					}
 				}
-			
+	
 				if(sum > IND_SAMP_THRESH){
 					auto f = IND_SAMP_THRESH/sum;
 					sum *= f;
@@ -215,14 +257,13 @@ void IndEvSampler::generate_ind_obs_timeline()
 				iop[c] = (1-sum)*iop_next[c];
 				for(auto l = 0u; l < lmax; l++){
 					const auto &le = co.leave[l];
-				
 					auto val = num[l]*iop_next[le.cf];
 
 					iop[c] += val;
 				}
 			}
 		}
-			
+		
 		auto normalise = false;
 		
 		// Accounts for observation model	
@@ -420,6 +461,8 @@ void IndEvSampler::pr_generate_ind_obs_timeline()
 				
 					auto val = num[l]*iop_next[le.cf];
 
+				
+	
 					iop[c] += val;
 				}
 			}
@@ -586,7 +629,7 @@ void IndEvSampler::print_ind_obs_timeline() const
 	
 					const auto &mer = le.markov_eqn_ref[ti][ctime];
 					
-					cout << claa.tra[le.tr].name << " " << eqn[sp.markov_eqn[mer.e].eqn_ref].te_raw << "," << mer.ti << " "<< markov_eqn_vari[mer.e].div[mer.ti].value << "  |   ";
+					cout << claa.tra[le.tr].name << " " << eqn[sp.markov_eqn[mer.e].eqn_ref].te_raw << "," << mer.ti << " "<< markov_eqn_vari[mer.e].value_t[mer.ti] << "  |   ";
 				}
 				cout << endl;
 			}
@@ -713,17 +756,13 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 							if(ti < ti_end) num[l] = ddt*rate_store[ti][cisland][l];
 							else num[l] = ddt*calculate_rate(ind,le,ctime,ti);
 							
-							if(sp.obs_trans_exist){  // Accounts for observation probability on transition
-								auto tr_gl = sp.trg_from_tr[c][cl_store][le.tr];		
-								for(auto m : sp.obs_trans_eqn_ref[tr_gl][ti]){
-									auto va = obs_trans_eqn_value[m][ti];
-									if(va == LI_WRONG) num[l] = 0;
-									else num[l] *= exp(va);
-								}
+							sum += num[l];
+							
+							if(obs_trans_exist){  // Accounts for observation probability on transition
+								auto tr_gl = sp.trg_from_tr[c][cl_store][le.tr];	
+								num[l] *= unobs_trans_prob[ti][tr_gl];
 							}
 	
-							sum += num[l];
-						
 							num_op[l] = num[l]*iop[cf];
 							sum_op += num_op[l];
 						}
@@ -740,7 +779,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 						auto stay_op = (1-sum)*iop[cisland];
 						
 						auto total = stay_op+sum_op;
-						
+					
 						if(ran()*total < sum_op){    // An event happens and is added to timeline
 							pif *= sum_op/total;
 							
@@ -767,7 +806,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 							auto tr_gl = sp.trg_from_tr[c][cl_store][tr];
 							const auto &trg = sp.tra_gl[tr_gl];
 							if(trg.i != c){ 
-								cout << "Not consistent1" << endl; illegal = true; 
+								illegal = true; 
 								return ev_new;
 							}
 							if(trg.type == PERIOD){ illegal = true; return ev_new;}
@@ -877,7 +916,6 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 			t = t_next;
 			
 			if(k < ev.size()){                // Looks to copy events from the existing sequence 
-				
 				auto enew = ev[k];
 				
 				if(sp.correct_ev(c,enew) == true){ illegal = true; return ev_new;}
@@ -950,8 +988,8 @@ vector <InitStateProb> IndEvSampler::init_state_sampler_obs(unsigned int i, unsi
 			auto prob = 0.0;
 			if(tr != UNSET){
 				auto &mev = markov_eqn_vari[sp.tra_gl[tr].markov_eqn_ref];
-				if(mev.time_vari) prob = mev.div[ti].value;
-				else prob = mev.div[0].value;
+				if(mev.time_vari) prob = mev.value_t[ti];
+				else prob = mev.value_t[0];
 				if(prob < 0) emsg("Cannot be negative");
 				prob_sum += prob;
 			}
@@ -1068,17 +1106,13 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 								num[l] = ddt*calculate_rate(ind,le,ctime,ti);
 							}
 							
-							if(sp.obs_trans_exist){  // Accounts for observation probability on transition
-								auto tr_gl = sp.trg_from_tr[c][cl_store][le.tr];		
-								for(auto m : sp.obs_trans_eqn_ref[tr_gl][ti]){
-									auto va = obs_trans_eqn_value[m][ti];
-									if(va == LI_WRONG) num[l] = 0;
-									else num[l] *= exp(va);
-								}
-							}
-							
 							sum += num[l];
 					
+							if(obs_trans_exist){  // Accounts for observation probability on transition
+								auto tr_gl = sp.trg_from_tr[c][cl_store][le.tr];		
+								num[l] *= unobs_trans_prob[ti][tr_gl];
+							}
+							
 							num_op[l] = num[l]*iop[cf];
 							sum_op += num_op[l];
 						}
@@ -1238,7 +1272,7 @@ double IndEvSampler::calculate_rate(const Individual &ind, const IslandTrans &le
 	else{                   // Markovian transition
 		const auto &mer = le.markov_eqn_ref[tii][ctime];
 
-		auto rate = markov_eqn_vari[mer.e].div[mer.ti].value;
+		auto rate = markov_eqn_vari[mer.e].value_t[mer.ti];
 		if(rate < TINY) rate = TINY;
 		if(ind_variation == true) rate *= get_indfac(ind,sp.markov_eqn[mer.e]);
 		return rate;
@@ -1309,3 +1343,4 @@ double IndEvSampler::calculate_nm_rate(const Individual &ind, unsigned int m, in
 	
 	return UNSET;
 }
+

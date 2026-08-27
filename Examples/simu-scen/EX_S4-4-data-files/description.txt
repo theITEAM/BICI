@@ -1,0 +1,41 @@
+# Model S4.4: Dynamic parameter with distance effect 
+
+## Objective
+- Introduce a dynamic parameter that has a distance effect within a farm-based model.
+
+- This is here used to account for increased biosecurity within a certain radius of an infected farm.
+
+- A vector of square splines (at each location) determines if a disease intervention measure is implemented or not (they take the value of zero or one).
+
+- If the population metric (number of infected locations within a specified radius of a given farm) is greater than zero, the spline is set to one.
+
+## Model
+- In these models farms are represented as geographical points (either as compartments with x,y positions, or using longitudes and latitudes).
+
+- Each farm contains a single “individual” that is used to denote the disease status of that farm.
+
+- A spatial kernel allows for spread of disease between farms.
+
+- A single individual-based species “Farm” is created.
+
+- This contains classifications “DS”, which stands for “disease status”, and “Location”.
+
+- “DS” contains three compartments: susceptible farm S, infected farm I and recovered farm R.
+
+- “Location” contains 200 farm positions.
+
+- A transmission rate β determines the rate at which susceptible farms become infected due to surrounding infected farms.
+
+- A recovery rate γ determines how quickly farms recover.
+
+- A dynamic parameter f_l (t) tracks if the disease intervension is implemented or not. 
+
+- The knot times determine when the intervention is decided upon (e.g. this could be weekly or daily) and in this example they are every 10 time units.
+
+- The threshold is 0.05 and distance is 30 spatial units.
+
+- The effectiveness of the intervention is captured by parameter φ. 
+
+
+## Population
+- A single individual is added to each farm location. All farms are initially susceptible except for one infected.

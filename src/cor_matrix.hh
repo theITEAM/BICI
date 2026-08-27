@@ -17,15 +17,21 @@ public:
 	vector <double> av;              // The sum of parameter values 
 	vector < vector <double> > av2;  // The sum of param*param 
 	
+	vector <double> log_av;          // The sum of log transformed parameter values 
+	vector < vector <double> > log_av2;// The sum of log param* log param 
+	
 	vector < vector <double> > samp; // Stores historic parameter values
 
+	vector <bool> strictly_positive; // Determines which variables are strictly positive
+	vector <unsigned int> str_pos_list; // List of strictly positive
+	
 	void init();
 	void add_sample(vector <double> param_val_prop, unsigned int range);
 	void add_sample2(vector <double> param_val_pr, unsigned int range);
 	void check() const;
-	vector < vector <double> > calculate_cor_matrix() const;
+	vector < vector <double> > calculate_cor_matrix(bool log_trans) const;
 	void set_mvn_from_particle(vector <Particle> &particle);
-	vector < vector <double> > find_covar(const vector <unsigned int> &param_list) const;
+	vector < vector <double> > find_covar(const vector <unsigned int> &param_list, bool log_trans) const;
 	unsigned int get_n();
 	
 private:

@@ -1,0 +1,18 @@
+<<<<<<< prob: 1 deterministic initial population for species People for DS compartment S >>>>>>>
+<<Precalc dependent>>
+Update after: 
+Update tv after: 
+
+
+<<<<<<< prob: 1 deterministic initial population for species People for DS compartment I >>>>>>>
+<<Precalc dependent>>
+Update after: 
+Update tv after: 
+
+
+<<<<<<< prob: 1 Gibbs proposal for init_cond fractions People >>>>>>>
+<<Precalc dependent>>
+Update after: 
+Update tv after: 
+
+

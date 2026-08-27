@@ -299,6 +299,15 @@ unsigned int UTF8_to_int(unsigned int &i, const string &s)
 /// Test to see if working
 void test()
 {
+	{
+		ofstream fout("ind.csv");
+		fout << "ID,sire,dam" << endl;
+		for(auto i = 0u; i < 100; i++){
+			fout << "ind" << i << ",.,." << endl;
+		}
+		return;
+	}
+	
 	if(false){
 		for(auto i = 0u; i < 32000; i++){
 			auto s = int_to_UTF8(i);

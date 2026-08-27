@@ -225,13 +225,19 @@ function trans_point_rev(xx,yy,cam,lay)
 /// Loads up a map into the annotations
 function load_annotation_map(te)
 {			
+	percent(20);
 	let data = JSON.parse(te);
 
-	let feature = get_feature(data);
+	if(data.type == "Topology") data = convert_topoJSON(data,20,30);
+	
+	let feature = get_feature(data,30,99);
 	if(feature.length == 0){
 		alert_help("Error loading file","This map has no features");
 		return;
 	}	
+	
+	if(feature[0].lng != undefined) alert_help("Error loading file","This file contains points instead of regions");
+	
 	let box = get_map_bound_box(feature);
 	
 	return {type:"map", feature:feature, box:box}
@@ -241,17 +247,28 @@ function load_annotation_map(te)
 /// Loads up a map into compartments
 function load_compartment_map(te)
 {	
+	percent(20);
+	
 	let da = JSON.parse(te);
 
-	let feature = get_feature(da);
+	if(da.type == "Topology") da = convert_topoJSON(da,20,30);
+	
+	let feature = get_feature(da,30,99);
 	if(feature.length == 0){
 		alert_help("Error loading file","This map has no features");
 		return;
 	}	
-		
-	let tab = get_feature_table(da,feature);
 	
-	post({type:"Load Comp Map", tab:tab});
+	if(feature[0].lng != undefined){
+		let tab = get_point_table(da,feature);
+		
+		post({type:"Load Point Map", tab:tab});
+	}
+	else{
+		let tab = get_feature_table(da,feature);
+	
+		post({type:"Load Comp Map", tab:tab});
+	}
 }
 
 
@@ -595,80 +612,444 @@ function get_map_bound_box(feature)
 	return {xmin:xmin, xmax:xmax, ymin:ymin, ymax:ymax}; 
 }
 
-	
-/// Gets polygons from the data
-function get_feature(data) 
-{
-	let feature = [];
-	
-	for(let i = 0; i < data.features.length; i++){
-		let geo = data.features[i].geometry;
 
+/// Gets a projection
+function get_projection(crs)
+{
+	if(crs == undefined) return;
+	if(crs.type == undefined || crs.properties == undefined) return;
+		
+	let warn_fl = false;
+
+	let projection;
+
+	if(crs.type != "name") warn_fl = true;
+	else{
+		let na = crs.properties.name;
+		let spl = na.split("crs:");
+		
+		if(spl == 1) projection = na;
+		else{
+			if(spl.length == 2) projection = spl[1];
+			else warn_fl = true;
+		}
+		
+		if(!warn_fl){
+			switch(projection){
+			case "OGC:1.3:CRS84":
+				projection = undefined; 
+				break;
+		
+			case "EPSG::27700": case "OSGB36":
+				projection = "+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +units=m +no_defs +type=crs";
+				break;
+				
+			default:
+				if(begin_str(projection,"EPSG::")){
+					let val = "EPSG:"+projection.substr(6);
+					for(let ele in all_projections){
+						if(ele == val){
+							let info = all_projections[ele];
+							projection = info[1];
+						}
+					}
+				}
+				break;
+			}
+
+			try{
+				let val = proj4("WGS84",projection,[0,0]);
+			}
+			catch(e){
+				warn_fl = true;
+			}
+		}
+	}
+	
+	if(warn_fl) alert_help("Problem loading GeoJSON file","The coordinate system used in this GeoJSON file is not recognised.");
+	
+	return projection;
+}
+
+
+/// Cnverts from topoJSON to geoJSON
+function convert_topoJSON(data,per_start,per_end)
+{
+	let data_new = { type:"FeatureCollection", features:[]};
+	
+	let arcs = data.arcs;
+	
+	// Gets rid of delta encoding
+	for(let i = 0; i < arcs.length; i++){
+		let arc = arcs[i];
+		let x, y;
+		for(let j = 0; j < arc.length; j++){
+			let ar = arc[j];
+			if(j == 0){ x = ar[0]; y = ar[1];}
+			else{ x += ar[0]; y += ar[1];}
+			
+			ar[0] = x; ar[1] = y;
+		}
+	}
+	
+	// Transforms
+	if(data.transform != undefined){
+		let scale = data.transform.scale;
+		let trans = data.transform.translate;
+		
+		if(scale == undefined || trans == undefined){
+			alert_help("Problem loading GeoJSON file","The coordinate system used in this GeoJSON file is not recognised.");
+		}
+		
+		for(let i = 0; i < arcs.length; i++){
+			let arc = arcs[i];
+			for(let j = 0; j < arc.length; j++){
+				let ar = arc[j];
+				ar[0] = ar[0]*scale[0]+trans[0];
+				ar[1] = ar[1]*scale[1]+trans[1];
+			}
+		}
+	}
+
+	if(data.objects != undefined){
+		for(let ele in data.objects){
+			let ob = data.objects[ele];
+			
+			let projection = get_projection(ob.crs);
+			
+			if(ob.geometries != undefined){
+				for(let j = 0; j < ob.geometries.length; j++){
+					let geo = ob.geometries[j];
+					
+					if(geo.type == "Polygon"){
+						if(geo.coordinates == undefined && geo.arcs != undefined){
+							geo.coordinates = [];
+							for(let k = 0; k < geo.arcs.length; k++){
+								let arc = geo.arcs[k];
+								geo.coordinates[k] = [];
+							
+								let vec=[];
+								for(let m = 0; m < arc.length; m++){
+									let n = arc[m];
+									if(n >= 0){
+										for(let ii = 0; ii < arcs[n].length; ii++){
+											vec.push(copy(arcs[n][ii]));
+										}
+									}
+									else{
+										n = -n-1;
+										for(let ii = arcs[n].length-1; ii >= 0; ii--){
+											vec.push(copy(arcs[n][ii]));
+										}
+									}
+								}
+						
+								if(projection != undefined){
+									for(let ii = 0; ii < vec.length; ii++){
+										vec[ii] = proj4(projection,"WGS84",vec[ii]);
+									}
+								}
+						
+								geo.coordinates[k] = vec;
+							}
+						}
+						
+						data_new.features.push({type:"Feature", geometry:{type:geo.type, coordinates:geo.coordinates}, properties:geo.properties});
+					}			
+
+					if(geo.type == "MultiPolygon"){
+						if(geo.coordinates == undefined && geo.arcs != undefined){
+							geo.coordinates = [];
+							for(let k = 0; k < geo.arcs.length; k++){
+								let arc = geo.arcs[k];
+								geo.coordinates[k] = [];
+								for(let kk = 0; kk < arc.length; kk++){
+									let ar = arc[kk];
+					
+									let vec=[];
+									for(let m = 0; m < ar.length; m++){
+										let n = ar[m];
+										if(n >= 0){
+											for(let ii = 0; ii < arcs[n].length; ii++){
+												vec.push(copy(arcs[n][ii]));
+											}
+										}
+										else{
+											n = -n-1;
+											for(let ii = arcs[n].length-1; ii >= 0; ii--){
+												vec.push(copy(arcs[n][ii]));
+											}
+										}
+									}
+							
+									if(projection != undefined){
+										for(let ii = 0; ii < vec.length; ii++){
+											vec[ii] = proj4(projection,"WGS84",vec[ii]);
+										}
+									}
+							
+									geo.coordinates[k][kk] = vec;
+								}
+							}
+						}
+						
+						data_new.features.push({type:"Feature", geometry:{type:geo.type, coordinates:geo.coordinates}, properties:geo.properties});
+					}							
+				}
+			}
+		}
+	}
+	
+	return data_new;
+}
+
+
+/// Gets polygons from the data
+function get_feature(data,per_start,per_end) 
+{
+	let projection = get_projection(data.crs);
+	
+	let feature = [];
+
+	let per = per_start;
+
+	if(data.features == undefined){
+		alert_help("Problem loading GeoJSON file","No geographical features could be found in this GeoJSON file.");
+	}
+	
+	let fmax = data.features.length;
+
+	let poly_num = 0;
+	let point_num = 0;
+	
+	for(let f = 0; f < fmax; f++){
+		let geo = data.features[f].geometry;
 		let polygon = [];
 	
 		let cor = geo.coordinates;
 		
 		switch(geo.type){
-		case "Polygon":	
-			for(let j = 0; j < cor.length; j++){
-				polygon.push({cor:cor[j], foreground:true}); 
+		case "Polygon":	case "MultiPolygon": poly_num++; break;
+		case "Point": point_num++; break;
+		}
+	}
+	
+	let dcut;
+	if(fmax < 100) dcut = 0.005;
+	else{
+		if(fmax < 400) dcut = 0.01;
+		else dcut = 0.02;
+	}
+	let ddcut = dcut*dcut;
+	
+	if(poly_num == fmax){
+		for(let f = 0; f < fmax; f++){
+			if(per_start != undefined){
+				let per_new = per_start + Math.floor((per_end-per_start)*f/fmax);
+				if(per_new != per){
+					percent(per_new);
+					per = per_new;
+				}		
 			}
-			break;
 			
-		case "MultiPolygon":
-			for(let pn = 0; pn < cor.length; pn++){
-				let cor2 = cor[pn];
-				for(let j = 0; j < cor2.length; j++){
-					polygon.push({cor:cor2[j], foreground:true}); 
+			let geo = data.features[f].geometry;
+			let polygon = [];
+		
+			let cor = geo.coordinates;
+			
+			switch(geo.type){
+			case "Polygon":	
+				for(let j = 0; j < cor.length; j++){
+					polygon.push({cor:cor[j], foreground:true}); 
+				}
+				break;
+				
+			case "MultiPolygon":
+				for(let pn = 0; pn < cor.length; pn++){
+					let cor2 = cor[pn];
+					for(let j = 0; j < cor2.length; j++){
+						polygon.push({cor:cor2[j], foreground:true}); 
+					}
+				}
+				break;
+			}
+			
+			// Transforms lng lat to x y 
+			for(let i = 0; i < polygon.length; i++){
+				let points = polygon[i].cor;
+				for(let j = 0; j < points.length; j++){
+					coord_trans(points[j],projection,proj4);
 				}
 			}
-			break;
-			
-		default: error(geo[j].type+" Type not syported"); break;
-		}
-	
-		// Transforms lng lat to x y 
-		for(let i = 0; i < polygon.length; i++){
-			let points = polygon[i].cor;
-			for(let j = 0; j < points.length; j++){
-				let p = points[j];
-				let pt = transform_latlng(p[0],p[1]);
-				p[0] = pt.x; p[1] = pt.y; 
-			}
-		}
 
-		// Gets bounding box
-		let xmin = LARGE, xmax = -LARGE;
-		let ymin = LARGE, ymax = -LARGE;
-		
-		for(let i = 0; i < polygon.length; i++){
-			let points = polygon[i].cor;
-			for(let j = 0; j < points.length; j++){
-				let p = points[j];
-				if(p[0] < xmin) xmin = p[0];
-				if(p[0] > xmax) xmax = p[0];
-				if(p[1] < ymin) ymin = p[1];
-				if(p[1] > ymax) ymax = p[1];
-			} 
-		}
+			{   // Culls polygons a substantial distance away from the main polygon (this avoids overseas territories)
+				let max = 0;
+				let isel;
+				let pp_store=[];
+				for(let i = 0; i < polygon.length; i++){
+					let pp = get_polyprop(polygon[i]);
+					let ar = (pp.xmax-pp.xmin)*(pp.ymax-pp.ymin);
+					if(ar > max){ max = ar; isel = i;}
+					pp_store.push(pp);
+				}
+				
+				let poly_prop = pp_store[isel];
 			
-		// Scales points within the bounding box
-		if(xmin != xmax && ymin != ymax){	
+				let dx = poly_prop.xmax-poly_prop.xmin;
+				let dy = poly_prop.ymax-poly_prop.ymin;
+				let mindist = 1.25*(dx*dx+dy*dy);
+				let polygon_new = [];
+			
+				polygon_new.push(polygon[isel]);
+				
+				for(let i = 0; i < polygon.length; i++){
+					if(i != isel){
+						let pp = pp_store[i];
+						let dx = pp.xav-poly_prop.xav; 
+						while(dx > Math.PI) dx -= 2*Math.PI;
+						while(dx < -Math.PI) dx += 2*Math.PI;
+						let dy = pp.yav-poly_prop.yav;
+						
+						if(dx*dx+dy*dy < mindist) polygon_new.push(polygon[i]);
+					}
+				}
+			
+				polygon = polygon_new;
+			}
+			
+			// Gets bounding box
+			let xmin = LARGE, xmax = -LARGE;
+			let ymin = LARGE, ymax = -LARGE;
+			
 			for(let i = 0; i < polygon.length; i++){
 				let points = polygon[i].cor;
 				for(let j = 0; j < points.length; j++){
 					let p = points[j];
-					p[0] = (p[0] - xmin)/(xmax - xmin);
-					p[1] = (p[1] - ymin)/(ymax - ymin);
+					let x = p[0], y = p[1];
+					if(x < xmin) xmin = x;
+					if(x > xmax) xmax = x;
+					if(y < ymin) ymin = y;
+					if(y > ymax) ymax = y;
 				} 
 			}
+				
+			let polygon_new=[];
+				
+			// Scales points within the bounding box
+			if(xmin != xmax && ymin != ymax){	
+				for(let i = 0; i < polygon.length; i++){
+					let points = polygon[i].cor;
+					for(let j = 0; j < points.length; j++){
+						let p = points[j];
+						p[0] = (p[0] - xmin)/(xmax - xmin);
+						p[1] = (p[1] - ymin)/(ymax - ymin);
+					} 
+				}
+				
+				// Down sample
+				for(let i = 0; i < polygon.length; i++){
+					let points = polygon[i].cor;
+					
+					let points_new=[];
+					
+					let np = points.length;
+					
+					let j = 0;
+					while(j < np){
+						let p = points[j];
+						points_new.push(p);
+						
+						j++;
+						while(j < np){
+							let p2 = points[j];
+							let dx = p[0]-p2[0];
+							let dy = p[1]-p2[1];
+							if(dx*dx+dy*dy > ddcut) break;
+							j++;
+						}
+					}
+					
+					if(i == 0 || points_new.length >= 3){
+						polygon[i].cor = points_new;
+						polygon_new.push(polygon[i]);
+					}
+				}
+			}
+		
+			let box = {xmin:xmin, xmax:xmax, ymin:ymin, ymax:ymax};
+			feature.push({ name:"", polygon:polygon_new, box:box});
 		}
 		
-		let box = {xmin:xmin, xmax:xmax, ymin:ymin, ymax:ymax};
-		feature.push({ name:"", polygon:polygon, box:box});
+		return feature;
 	}
 	
-	return feature;
+	if(point_num == fmax){
+		for(let f = 0; f < fmax; f++){
+			if(per_start != undefined){
+				let per_new = per_start + Math.floor((per_end-per_start)*f/fmax);
+				if(per_new != per){
+					percent(per_new);
+					per = per_new;
+				}		
+			}
+			
+			let geo = data.features[f].geometry;
+			let polygon = [];
+		
+			let p = geo.coordinates;
+		
+			if(projection != undefined){
+				let pnew = proj4(projection,"WGS84",p);
+				p[0] = pnew[0];
+				p[1] = pnew[1];
+			}
+	
+			feature.push({lng:p[0],lat:p[1]});
+		}
+		
+		return feature;
+	}
+	
+	alert_help("Problem loading GeoJSON file","This file mixes points and shapes");
+}
+
+
+/// Transforms from geoJSON coordinates to x and y
+function coord_trans(p,projection,proj4)
+{
+	if(projection != undefined){
+		let pnew = proj4(projection,"WGS84",p);
+		p[0] = pnew[0];
+		p[1] = pnew[1];
+	}
+	
+	let lng = p[0];
+	let lat = p[1];
+	
+	if(lat > latitude_max) lat = latitude_max;
+	if(lat < -latitude_max) lat = -latitude_max;
+	
+	let pt = transform_latlng(lng,lat);
+	p[0] = pt.x; p[1] = pt.y; 
+}
+
+
+/// Gets properties of a polygon
+function get_polyprop(poly)
+{
+	let xmin = LARGE, xmax = -LARGE;
+	let ymin = LARGE, ymax = -LARGE;
+	let points = poly.cor;
+	for(let j = 0; j < points.length; j++){
+		let p = points[j];
+		let x = p[0], y = p[1];
+		if(x < xmin) xmin = x;
+		if(x > xmax) xmax = x;
+		if(y < ymin) ymin = y;
+		if(y > ymax) ymax = y;
+	} 
+
+	return {xmin:xmin, xmax:xmax, ymin:ymin, ymax:ymax, xav:(xmin+xmax)/2, yav:(ymin+ymax)/2} 
 }
 
 
@@ -676,10 +1057,7 @@ function get_feature(data)
 function get_feature_table(da,feature) 
 {
 	let nrow = da.features.length;
-	let geo = da.features[0].properties;
 	
-	let keys = Object.keys(geo);
-
 	let ele=[];
 	let heading=[];
 	heading.push("Boundary");
@@ -688,6 +1066,51 @@ function get_feature_table(da,feature)
 		ele[r].push(feature[r]);
 	}
 		
+	let geo = da.features[0].properties;
+	if(geo != undefined){
+		let keys = Object.keys(geo);
+
+		for(let i = 0; i < keys.length; i++){
+			let prop = keys[i];
+			let r = 0; while(r < nrow && da.features[r].properties[prop] != undefined) r++;
+			if(r == nrow){
+				heading.push(prop);
+				for(let r = 0; r < nrow; r++){
+					ele[r].push(da.features[r].properties[prop]);
+				}
+			}
+		}
+	}
+	
+	if(heading.length == 1){
+		heading.push("Region");
+		for(let r = 0; r < nrow; r++){
+			ele[r].push("Region-"+(r+1));
+		}
+	}
+
+	return {filename:"file", heading:heading, col_used:[], ele:ele, ncol:heading.length, nrow:nrow, edit:false};
+}
+
+
+/// Gets names for all the features
+function get_point_table(da,feature) 
+{
+	let nrow = da.features.length;
+	let geo = da.features[0].properties;
+	
+	let keys = Object.keys(geo);
+
+	let ele=[];
+	let heading=[];
+	heading.push("Lat");
+	heading.push("Lng");
+	for(let r = 0; r < nrow; r++){
+		ele[r]=[];
+		ele[r].push(feature[r].lat);
+		ele[r].push(feature[r].lng);
+	}
+	
 	for(let i = 0; i < keys.length; i++){
 		let prop = keys[i];
 		let r = 0; while(r < nrow && da.features[r].properties[prop] != undefined) r++;
@@ -702,7 +1125,7 @@ function get_feature_table(da,feature)
 	return {filename:"file", heading:heading, col_used:[], ele:ele, ncol:heading.length, nrow:nrow, edit:false};
 }
 
-	
+
 /// Sets up removal of annotation bubble
 function remove_annotation_init()
 {

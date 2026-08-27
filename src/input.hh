@@ -183,11 +183,15 @@ class Input                                // Stores information about the model
 		void add_eq_ref(EquationInfo &eqi);	
 		//void linearise_precalc();
 		vector <bool> set_eqn_zero(const vector <EquationInfo> &eq_info);
+		PrTimeRange get_pr_time_range(const ParamRef &pr) const;
 		void add_parent_child(const EquationInfo eqi, unsigned int i, unsigned int th, Hash &hash);
 		void add_parent_child2(const ParamRef &parref, const ParamRef &pr, Hash &hash);
 		void create_markov_eqn();
 		void create_markov_eqn_pop_ref();
+		void create_markov_eqn_popcomb_ref();
 		void global_comp_trans_init();
+		void add_markov_eqn_ref(vector <MarkovEqnRefList> &meref, unsigned int p, unsigned int e) const;
+		void add_trans_ref(vector <PopTransRef> &transref, unsigned int p, unsigned int tr) const;
 		void set_tr_leave_markov();
 		void set_multi_trans_cl();
 		void set_tr_connected();
@@ -251,6 +255,11 @@ class Input                                // Stores information about the model
 		void set_param_state_output();
 		void load_state_samples(unsigned int ch, string file, bool enc);
 		vector <double> get_times();
+		void set_trans_tree_output();
+		void check_reparam_spline();
+		string check_thresh_value(double num, string tag, bool frac);
+		void set_dynamic_info_from_text(string te, string region, Param &par);
+		void check_valid_population(string filt_str);
 		
 		// In 'input_utils.cc'
 		
@@ -298,7 +307,7 @@ class Input                                // Stores information about the model
 		bool check_dt(const Details &details);
 		void add_param_cat_factor(Param &par);
 		//void load_reparam_eqn(string te, Param &par);
-		bool add_reparam_eqn(Param &par, Hash &hash_eqn);
+		bool add_param_eqn(const EquationInfo &eqn_raw, Param &par, Hash &hash_eqn);
 		string get_data_dir(string data_dir);
 		unsigned int get_chain();
 		void set_data_directory(const vector <CommandLine> &command_line);

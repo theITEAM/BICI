@@ -693,15 +693,15 @@ void StateSpecies::update_rate_mean(const vector < vector <double> > &popcomb_t)
 	
 	for(auto e = 0u; e < sp.markov_eqn.size(); e++){
 		const auto &mev = markov_eqn_vari[e];
-		const auto &div = mev.div;
 		auto &value = rate_mean.tra_rate[e].value_raw;
+		const auto &val_t = mev.value_t;
 		if(mev.time_vari){
 			for(auto ti = 0u; ti < T; ti++){
-				value[ti] = fac*value[ti] + omf*div[ti].value;
+				value[ti] = fac*value[ti] + omf*val_t[ti];
 			}
 		}
 		else{
-			auto val = fac*value[0] + omf*div[0].value;
+			auto val = fac*value[0] + omf*val_t[0];
 			for(auto ti = 0u; ti < T; ti++) value[ti] = val;
 		}
 	}

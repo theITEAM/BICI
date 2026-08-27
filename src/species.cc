@@ -292,7 +292,7 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 						for(auto ti = 0u; ti < T; ti++){
 							const auto &popcomb = popcomb_t[ti];
 							auto bp_f = 1.0;
-							for(auto e : nmt.bp_other_eq){
+							for(auto e : nmt.bp_other_eq){ // paraspeedup
 								bp_f -= eqn[e].calculate(ti,popcomb,precalc);
 							}
 							check_bp(bp_f);
@@ -675,7 +675,7 @@ vector <unsigned int> Species::get_cv_list(unsigned int ie, const vector <Param>
 					else{
 						const auto &pr = cv_eqn.param_ref[0];
 						const auto &par = param[pr.th];
-						if(par.variety == CONST_PARAM) fl = false;
+						if(par.variety == CONST_PARAM || par.variety == DYNAMIC_PARAM) fl = false;
 						else{
 							auto th = par.get_param_vec(pr.index);	
 							if(th == UNSET) fl = false;
@@ -773,7 +773,6 @@ vector < vector <double> > Species::calculate_R(unsigned int g, const PV &param_
 	}
 
 	//print_matrix("R",R);
-	//emsg("do");
 	
 	return R;
 }	
@@ -837,180 +836,6 @@ void Species::sampling_error(unsigned int trg, string warn) const
 }
 
 
-/*
-/// Works out how to update equations using changes in populations
-void Species::sim_linear_speedup_init(const vector <Equation> &eqn)
-{
-	if(!sim_linearise_speedup){
-		switch(type){
-		case INDIVIDUAL:
-			for(auto m = 0u; m < markov_eqn.size(); m++){
-				sim_linear_speedup.calc.push_back(m);
-			}
-			break;
-			
-		case POPULATION: case DETERMINISTIC:
-			for(auto tr = 0u; tr < tra_gl.size(); tr++){
-				sim_linear_speedup.calc.push_back(tr);
-			}
-			break;
-		}
-		return;
-	}
-	
-	vector <LinearFormInit> lfinit;
-	
-	switch(type){
-	case INDIVIDUAL:
-		for(auto m = 0u; m < markov_eqn.size(); m++){
-			const auto &me = markov_eqn[m];
-			auto e = me.eqn_ref;
-			const auto &eq = eqn[e]; 
-			emsg("sort25");
-			
-			if(eq.linearise.on && eq.linearise.pop_grad_time_dep == false){
-				LinearFormInit lfi; lfi.m = m; lfi.e = e;
-				lfinit.push_back(lfi);
-			}
-			else{
-				sim_linear_speedup.calc.push_back(m);
-			}
-			
-		}
-		break;
-		
-	case POPULATION: case DETERMINISTIC:
-		for(auto tr = 0u; tr < tra_gl.size(); tr++){
-			const auto &tra = tra_gl[tr];
-			auto e = tra.dist_param[0].eq_ref;
-			const auto &eq = eqn[e];
-			
-			emsg("sort27");
-			
-			if(eq.linearise.on && eq.linearise.pop_grad_time_dep == false){
-				LinearFormInit lfi; lfi.m = tr; lfi.e = e;
-				lfinit.push_back(lfi);
-			}
-			else{
-				sim_linear_speedup.calc.push_back(tr);
-			}
-			
-		}
-		break;
-	}
-	
-	set_linear_form(sim_linear_speedup.lin_form,lfinit,eqn);
-}
-*/
-
-
-/// Sets a linear form such that proposals can be made more quickly
-void Species::set_linear_form(LinearForm &lin_form, const vector <LinearFormInit> &lfinit, const vector <Equation> &eqn) const
-{
-	emsg("sort28");
-	/*
-	lin_form.factor_nopop_only = false;
-	
-	Hash hash;
-	for(auto k = 0u; k < lfinit.size(); k++){
-		const auto &lfi = lfinit[k];
-		
-		auto e = lfi.e;
-		const auto &eq = eqn[e];
-		
-		auto &lin = eq.linearise;
-		
-		// Generates a hash vector
-		vector <unsigned int> vec;
-		if(lin.pop_grad_precalc.size() != eq.pop_ref.size()) emsg("pop_ref size not right");
-		
-		for(auto i = 0u; i < eq.pop_ref.size(); i++){
-			const auto &it = lin.pop_grad_precalc[i];
-			vec.push_back(it.type);
-			vec.push_back(it.num);
-			vec.push_back(eq.pop_ref[i]);
-		}
-		
-		auto n = hash.existing(vec);
-		if(n == UNSET){
-			n = lin_form.sum_e.size();
-			hash.add(n,vec);
-			lin_form.sum_e.push_back(e);
-			
-			for(auto i = 0u; i < eq.pop_ref.size(); i++){
-				auto po = eq.pop_ref[i];
-							
-				if(false){ // turn off
-					auto k = 0u; while(k < lin_form.pop_affect.size() && lin_form.pop_affect[k].po != po) k++;
-					if(k == lin_form.pop_affect.size()) k = UNSET;
-					if(k != lin_form.hash_po.find(po)) emsg("lf prob");
-				}
-				
-				auto k = lin_form.hash_po.find(po);
-				if(k == UNSET){
-					k = lin_form.pop_affect.size();
-					PopAffect pa; pa.po = po;
-					lin_form.hash_po.add(k,po);
-					lin_form.pop_affect.push_back(pa);
-				}
-			
-				GradRef gr; gr.ref = n; gr.index = i;
-				lin_form.pop_affect[k].pop_grad_ref.push_back(gr);
-			}
-		}
-		
-		LinearFormItem lf;
-		lf.m = lfi.m; lf.e = e; lf.sum_e_ref = n;
-		lf.factor_precalc = eq.linearise.factor_precalc;
-		lf.no_pop_precalc = eq.linearise.no_pop_precalc;
-
-		lin_form.list.push_back(lf);
-	}
-	
-	lin_form.nopop_same = true;
-	lin_form.factor_same = true;
-	
-	const auto &list = lin_form.list;
-	
-	if(list.size() > 0){
-		const auto &factor_precalc_fir = list[0].factor_precalc;
-		const auto &no_pop_precalc_fir = list[0].no_pop_precalc;
-
-		for(auto k = 1u; k < list.size(); k++){
-			if(!item_equal(factor_precalc_fir,list[k].factor_precalc)){
-				lin_form.factor_same = false;
-			}				
-			
-			if(!item_equal(no_pop_precalc_fir,list[k].no_pop_precalc)){
-				lin_form.nopop_same = false;
-			}				
-		}			
-	}
-	
-	if(false){
-		cout << lin_form.nopop_same << " nopop_same" << endl;
-		cout << lin_form.factor_same << " factor same" << endl;
-
-		for(const auto &lf : lin_form.list){
-			cout << tra_gl[lf.m].name << ", ";
-		}
-		cout << "calculate fast" << endl;
-		
-		cout << lin_form.list.size() << " " << lin_form.sum_e.size() << "num" << endl;
-		
-		for(auto k = 0u; k < lin_form.pop_affect.size(); k++){
-			const auto &pa = lin_form.pop_affect[k];
-			cout << "  " << pa.po << ": ";
-			for(const auto &pgr : pa.pop_grad_ref) cout << pgr.ref << " " << pgr.index << ", ";
-			cout << "  grad ref" << endl;
-		}
-		
-		emsg("mbp speed up");
-	}
-	*/
-}
-
-
 /// Determines if two equation items are equal
 bool Species::item_equal(const EqItem &it1, const EqItem &it2) const
 {
@@ -1024,12 +849,16 @@ bool Species::item_equal(const EqItem &it1, const EqItem &it2) const
 void Species::set_markov_eqn_update(const vector <Equation> &eqn, const vector <Param> &param)
 {
 	for(auto &me : markov_eqn){
+		const auto &eq = eqn[me.eqn_ref];	
+	
+		me.calc_list_full = seq_vec(eq.calcu.size());
+		
+		me.update_nopop = false;
+		
 		if(me.time_vari == true){
 			auto all = false;
 			vector <ParamRef> pr_list;
-			
-			const auto &eq = eqn[me.eqn_ref];	
-			
+				
 			for(const auto &pr : eq.param_ref){
 				const auto &par = param[pr.th];
 				const auto &si = par.spline_info;
@@ -1043,12 +872,32 @@ void Species::set_markov_eqn_update(const vector <Equation> &eqn, const vector <
 				for(const auto &ca : eq.calcu){
 					for(auto &it : ca.item){
 						switch(it.type){
-						case POPTIMENUM: case TIME: case REG_PRECALC_TIME: all = true; break;
+						case POPNUMTIME: case TIME: case REG_PRECALC_TIME: all = true; break;
 						default: break;
 						}
 					}
 				}					
 			}
+			
+			{  // Works out which elements of the equation need to be updated for a non-population change
+				vector <bool> map(eq.calcu.size());
+				for(auto r = 0u; r < eq.calcu.size(); r++){
+					const auto &ca =  eq.calcu[r]; 
+					for(auto &it : ca.item){
+						switch(it.type){
+						case REG: if(map[it.num]) map[r] = true; break;
+						case POPNUMTIME: case TIME: case REG_PRECALC_TIME: map[r] = true; break;
+						default: break;
+						}
+					}
+				}
+				
+				for(auto r = 0u; r < map.size(); r++){
+					if(map[r]) me.calc_list_nopop.push_back(r);
+				}
+			}
+			
+			if(me.calc_list_nopop.size() > 0) me.update_nopop = true;
 			
 			if(!all){
 				me.always_recalc = false;
@@ -1071,60 +920,43 @@ void Species::set_markov_eqn_update(const vector <Equation> &eqn, const vector <
 
 	markov_update_t.resize(T);
 	for(auto ti = 0u; ti < T; ti++){
-		auto &mu = markov_update_t[ti];
-		mu.resize(markov_eqn.size());
-		
+		markov_update_t[ti].resize(markov_eqn.size(),NO_ME_UPDATE);
 		for(auto e = 0u; e < markov_eqn.size(); e++){
-			const auto &me = markov_eqn[e];
-			if(me.always_recalc) mu[e] = true;
-			else mu[e] = me.param_change[ti];
+			auto &me = markov_eqn[e];
+			auto &ut = markov_update_t[ti][e];
+			
+			if(ti == 0) ut = FULL_ME_UPDATE;
+			else{
+				ut = NO_ME_UPDATE;
+			
+				if(me.always_recalc || me.param_change[ti]){
+					if(me.update_nopop) ut = NOPOP_ME_UPDATE;
+				}
+			}
 		}
 	}
 	
 	if(false){
 		for(auto ti = 0u; ti < T; ti++){
 			for(auto e = 0u; e < markov_eqn.size(); e++){
-				cout << markov_update_t[ti][e];
+				cout << markov_update_t[ti][e] << ",";
 			}
 			cout << endl;
 		}
 		emsg("markov_update_t");
 	}
-/*
-	markov_update_all.resize(T,false);
+}
+
+
+/// Determines if a given transition at a given time is illegal
+bool Species::trans_illegal(unsigned int tr, unsigned int ti, const vector < vector <bool> > &illegal_trans) const
+{
+	if(ti == UNSET || !obs_trans_exist) return false;
 	
-	for(auto e = 0u; e < markov_eqn.size(); e++){
-		if(markov_eqn[e].time_vari) markov_time_dep.push_back(e);
+	const auto &it = illegal_trans[ti];
+	for(auto m : obs_trans_eqn_ref[tr][ti]){
+		if(it[m]) return true;
 	}
 	
-	markov_param_change.resize(T);
-	for(auto ti = 0u; ti < T; ti++){
-		for(auto e :  markov_time_dep){
-			const auto &me = markov_eqn[e];
-			if(me.always_recalc == true || me.param_change[ti]){
-				markov_param_change[ti].push_back(e);
-			}
-		}
-	}
-	
-	if(false){
-		for(auto &me : markov_eqn){
-			cout << eqn[me.eqn_ref].te_raw << ": ";
-			if(me.always_recalc) cout << "always";
-			else{
-				for(auto ti = 0u; ti < T; ti++) cout << me.param_change[ti] << " ";
-			}
-			cout << endl;
-		}
-		
-		for(auto ti = 0u; ti < T; ti++){
-			cout << ti << ": ";
-			for(auto e : markov_param_change[ti]) cout << e << " ";
-			cout << endl;
-		}	
-		
-		emsg("Param Change");
-		//markov_update_all // CHECKON need to set
-	}
-	*/
+	return false;
 }

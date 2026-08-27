@@ -496,9 +496,7 @@ function check_prior(pri,dist)
 				if(isNaN(sd)) return "'"+sd+"' is not a number";
 				if(Number(sd) <= 0) return "standard deviation must be positive";
 			}
-			pr("sd");
-		pr(sd);
-		pr(er);
+	
 			er = check_thresh(NORM_TE,SD_QU,sd); if(er.err == true) return er.msg;
 			er = check_thresh(NORM_TE,NORM_MEAN_QU,mean); if(er.err == true) return er.msg;
 		}
@@ -559,7 +557,7 @@ function check_prior(pri,dist)
 				if(isNaN(al)) return "'"+al+"' is not a number";
 				if(isNaN(be)) return "'"+be+"' is not a number";
 				if(Number(al) <= 0) return "alpha value must be positive";
-				if(Number(bl) <= 0) return "beta must be positive";
+				if(Number(be) <= 0) return "beta must be positive";
 			}
 			
 			er = check_thresh(BETA_TE,BETA_QU,be); if(er.err == true) return er.msg;

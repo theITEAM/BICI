@@ -10,7 +10,7 @@ description text="description.txt"
 
 simulation start=0 end=1095 timestep=5
 
-inference start=0 end=100 timestep=0.5 nchain=3
+inference start=0 end=1095 timestep=5 nchain=3
 
 post-sim start=0 end=100
 
@@ -42,19 +42,25 @@ comp name="F" color="#aa00aa" x=10 y=0
 
 init-pop-sim type="fixed" focal="DS" file="init-pop-sim.csv"
 
+# INFERENCE DATA
+
+init-pop-inf type="fixed" file="init-pop-inf.csv"
+
+pop-data name="Pop. data" filter="DS=file,Sex=file" error="poisson" file="pop-data.csv"
+
 ######################## PARAMETERS ########################
 
 define name="λ_s(t)" value="define.csv"
 
-param name="N" value=10000
+param name="N" constant=10000
 
-param name="β^M" value=0.06
+param name="β^M" value=0.06 prior="uniform(0,0.1)"
 
-param name="Δ" value=0.9
+param name="Δ" value=0.9 prior="uniform(0,1)"
 
-param name="η" value=0.002
+param name="η" value=0.002 prior="uniform(0,0.1)"
 
-param name="φ" value=0.4
+param name="φ" value=0.4 prior="uniform(0,1)"
 
 param name="γ_s" value="gamma_value.csv" prior="inverse(0.01,1)"
 

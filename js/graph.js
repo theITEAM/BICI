@@ -451,6 +451,7 @@ class Graph
 		for(let i = 0; i < N; i++) p.push(model.comp_center(comp[i]));
 		
 		let val = this.data[0].value;
+
 		if(val.length != N){ error("Value wrong size"); return;}
 		if(val[0].length != N){ error("Value wrong size"); return;}
 		
@@ -500,8 +501,9 @@ class Graph
 				for(let j = 0; j < N; j++){
 					let x1 = p[j].x, y1 = p[j].y;
 					for(let i = j+1; i < N; i++){			
-						let va = Number(val[j][i]);
+						let va = val[j][i];
 						if(this.variety == "CompMatrixAnim") va = va[loop];
+						va = Number(va);
 						
 						if(va != 0){
 							let w = va/max;
@@ -567,7 +569,7 @@ class Graph
 			}
 			list.push(clink);
 		}
-	
+
 		this.complink = list;
 	}
 		
@@ -2347,9 +2349,9 @@ class Graph
 		
 		let timepoint = this.op.timepoint;
 		let anim = this.animation;
+
 		if(timepoint && anim.playing == false){
 			let si = 1.2;
-				
 			lay.add_button({te:"t="+precision(timepoint[anim.playframe],4), x:lay.dx/2-3, y:0.3, dx:6, dy:si, type:"CenterText", font:get_font(si)}); 
 		}
 	}
@@ -2643,7 +2645,6 @@ class Graph
 				let mar = { right:0, left:0, top:0, bottom:0};
 				add_layer("GraphAnnotations",lay.x+x+mar.left,lay.y+y+mar.top,w-mar.right-mar.left,h-mar.top-mar.bottom,{});
 				add_layer("GraphCompartments",lay.x+x+mar.left,lay.y+y+mar.top,w-mar.right-mar.left,h-mar.top-mar.bottom,{});
-		
 				add_layer("AnimControls",lay.x+anim_mar,lay.y+lay.dy-anim_mar_bot,lay.dx-right_menu_width-anim_mar,hei,{});		
 			}
 			break;
@@ -2979,8 +2980,7 @@ class Graph
 			save_image(outcant,filename);
 		}
 		else{
-			let outcvt = outcant.getContext('2d');
-			print_image(outcvt);
+			print_image(outcant);
 		}
 	}
 	
@@ -3070,7 +3070,6 @@ class Graph
 	/// Exports an image of the graph
 	export_video(filename)
 	{
-
 		let anim = this.animation;
 		
 		start_loading_symbol(0,"Creating");
@@ -3145,10 +3144,15 @@ class Graph
 			directory = mac_temp_dir+"frame";
 			exfi ="ffmpeg/ffmpeg";
 		}
+		if(ver=="linux"){
+			exfi ="ffmpeg_linux/bin/ffmpeg";
+		}
 		this.export_image(sc,directory+"/"+te+".png");
 		
 		generate_screen();
 		
+		if(!end_str(filename,".mp4")) filename += ".mp4";
+			
 		if(fr+1 <	anim.playframe_max){ 
 			setTimeout(function(){ inter.graph.export_video2(fr+1,filename);}, 10);
 		}

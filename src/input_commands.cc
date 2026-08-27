@@ -358,6 +358,8 @@ bool Input::species_command(unsigned int loop)
 	auto sp_type = SpeciesType(option_error("type",type,{"population","individual","deterministic"},{ POPULATION, INDIVIDUAL, DETERMINISTIC}));
 	if(sp_type == UNSET) return false;
 
+	if(sp_type == DETERMINISTIC) model.deterministic = true;
+	
 	auto trans_tree = false;
 	if(sp_type == INDIVIDUAL){
 		auto trans_tree_str = toLower(get_tag_value("trans-tree"));
@@ -552,6 +554,7 @@ void Input::param_mult_command()
 	Param par(model.constant); 
 	par.variety = CONST_PARAM;
 	par.time_dep = true;
+	par.reparam_time_dep = false;
 	par.spline_out.on = false;
 	par.spline_info.on = true;
 	par.spline_outside = false;
@@ -1188,7 +1191,7 @@ void Input::define_command()
 		pp.dep.pop_back();
 		pp.dep_with_prime.pop_back();
 	}
-	
+		
 	auto mult = get_dependency(def.dep,pp,vector <string> (),vector <string> ()); 
 	if(mult == UNSET) return; 
 	
@@ -1201,9 +1204,10 @@ void Input::define_command()
 		auto eq_dep = model.equation_dep(def.eqn.te,warn);
 		if(warn != ""){ alert_import(warn,true); return;}
 		
-		if(eq_dep.size() > 0 && eq_dep[eq_dep.size()-1] == "t") eq_dep.pop_back();
+		auto dep = pp.dep_with_prime;
+		if(pp.time_dep) dep.push_back("t");
 		
-		auto res = dep_agree(full_name,pp.dep_with_prime,eq_dep);
+		auto res = dep_agree(full_name,dep,eq_dep);
 		if(res != ""){ alert_import(res,true); return;}
 	}
 	else{
@@ -1227,6 +1231,7 @@ void Input::param_command()
 	par.name = pp.name;
 	par.full_name = full_name;
 	par.time_dep = pp.time_dep;
+	par.reparam_time_dep = false;
 	par.spline_out.on = false;
 	par.spline_info.on = false;
 	par.spline_outside = false;
@@ -1261,6 +1266,8 @@ void Input::param_command()
 	auto prior = get_tag_value("prior"); 
 	auto prior_split = get_tag_value("prior-split"); 
 	auto prior_const = get_tag_value("prior-const"); 
+	auto ds = get_tag_value("dynamic-sim");
+	auto region = get_tag_value("region");
 	
 	auto mode = model.mode;
 
@@ -1312,6 +1319,7 @@ void Input::param_command()
 	pt.val = prior; pt.tag = "prior"; param_tag.push_back(pt);
 	pt.val = prior_split; pt.tag = "prior-split"; param_tag.push_back(pt);
 	pt.val = prior_const; pt.tag = "prior-const"; param_tag.push_back(pt);
+	pt.val = ds; pt.tag = "dynamic-sim"; param_tag.push_back(pt);
 	
 	for(auto j = 0u; j < param_tag.size(); j++){
 		for(auto i = j+1; i < param_tag.size(); i++){
@@ -1399,78 +1407,83 @@ void Input::param_command()
 	
 	if(value == "auto") alert_emsg_input("auto no longer supported");
 		
-	if(pp.dep.size() == 0){
-		if(value != ""){
-			auto val = number(value);
-			if(val == UNSET){
-				alert_import(pre+"The value '"+value+"' must be a number"); 
-			}
-			
-			par.variety = CONST_PARAM;
-			par.set_cons(0,val);
-		}
-		
-		if(reparam != ""){
-			par.variety = REPARAM_PARAM;
-			auto eqn = he(add_equation_info(reparam,REPARAM_EQN));
-			par.reparam_eqn = eqn;
-		}
-		
-		if(cons != ""){
-			auto val = number(cons);
-			if(val == UNSET){
-				alert_import(pre+"The constant '"+cons+"' must be a number"); 
-			}
-			
-			par.variety = CONST_PARAM;
-			par.set_cons(0,val);
-		}
+	if(ds != ""){
+		set_dynamic_info_from_text(ds,region,par);
 	}
 	else{
-		if(value != "" || cons != "" || reparam != ""){
-			par.variety = CONST_PARAM;		
-			
-			string desc = pre+"For 'value'";
-			auto valu = value; 
-			if(valu == ""){
-				if(cons != ""){
-					valu = cons; desc = pre+"For 'const'";
+		if(pp.dep.size() == 0){
+			if(value != ""){
+				auto val = number(value);
+				if(val == UNSET){
+					alert_import(pre+"The value '"+value+"' must be a number"); 
 				}
-				else{
-					if(reparam != ""){
-						valu = reparam; desc = pre+"For 'reparam'";
-						par.variety = REPARAM_PARAM;		
-					}
-					else{ 
-						alert_emsg_input("Problem importing"); 
-						return;
-					}
-				}
+				
+				par.variety = CONST_PARAM;
+				par.set_cons(0,val);
 			}
 			
-			if(reparam != "" && is_file(valu) == false){
+			if(reparam != ""){
+				par.variety = REPARAM_PARAM;
 				auto eqn = he(add_equation_info(reparam,REPARAM_EQN));
-
 				par.reparam_eqn = eqn;
 			}
-			else{
-				if(is_file(valu) == false){
-					double val = number(valu);
-					
-					if(par.variety != CONST_PARAM) alert_emsg_input("Should be const");
+			
+			if(cons != ""){
+				auto val = number(cons);
+				if(val == UNSET){
+					alert_import(pre+"The constant '"+cons+"' must be a number"); 
+				}
 				
-					if(val == UNSET){
-						alert_import(desc+" '"+valu+"' is not a number");
-						return;
+				par.variety = CONST_PARAM;
+				par.set_cons(0,val);
+			}
+		}
+		else{
+			if(value != "" || cons != "" || reparam != ""){
+				par.variety = CONST_PARAM;		
+				
+				string desc = pre+"For 'value'";
+				auto valu = value; 
+				if(valu == ""){
+					if(cons != ""){
+						valu = cons; desc = pre+"For 'const'";
 					}
-					
-					ElementRef er; er.index = par.add_cons(val); er.cons = true;
-					for(auto k = 0u; k < mult; k++){
-						par.element_ref[k] = er;
+					else{
+						if(reparam != ""){
+							valu = reparam; desc = pre+"For 'reparam'";
+							par.variety = REPARAM_PARAM;		
+						}
+						else{ 
+							alert_emsg_input("Problem importing"); 
+							return;
+						}
 					}
 				}
+				
+				if(reparam != "" && is_file(valu) == false){
+					auto eqn = he(add_equation_info(reparam,REPARAM_EQN));
+
+					par.reparam_eqn = eqn;
+				}
 				else{
-					load_param_value(pp,valu,par,desc,VALUE_LOAD);
+					if(is_file(valu) == false){
+						double val = number(valu);
+						
+						if(par.variety != CONST_PARAM) alert_emsg_input("Should be const");
+					
+						if(val == UNSET){
+							alert_import(desc+" '"+valu+"' is not a number");
+							return;
+						}
+						
+						ElementRef er; er.index = par.add_cons(val); er.cons = true;
+						for(auto k = 0u; k < mult; k++){
+							par.element_ref[k] = er;
+						}
+					}
+					else{
+						load_param_value(pp,valu,par,desc,VALUE_LOAD);
+					}
 				}
 			}
 		}
@@ -1696,6 +1709,8 @@ void Input::derived_command()
 		auto eq_dep = model.equation_dep(der_eqn_raw.te,warn);
 		if(warn != ""){ alert_import(warn,true); return;}
 			
+		if(eq_dep.size() > 0 && eq_dep[eq_dep.size()-1] == "t") eq_dep.pop_back();
+		
 		auto res = dep_agree(full_name,dep_eqn,eq_dep);
 		if(res != ""){ alert_import(res,true); return;}
 						
@@ -1800,6 +1815,7 @@ bool Input::simulation_command()
 	
 	details.dt = number(dt_str);
 	details.individual_max = check_pos_integer("ind-max",INDMAX_DEFAULT);
+	details.chain_nsiminit = UNSET;
 	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
 	details.anneal_type = ANNEAL_NONE;
 	details.anneal_rate = UNSET;
@@ -1853,15 +1869,18 @@ bool Input::inference_command()
 	if(!is_positive(dt_str,"timestep")) return false;
 	
 	details.dt = number(dt_str);
-
+		
 	details.sample = MCMC_SAMPLE_DEFAULT;
 	details.output_param = MCMC_OP_PARAM_DEFAULT;
 	details.output_state = MCMC_OP_STATE_DEFAULT;
+	
+	details.output_param = MCMC_OP_PARAM_DEFAULT;
 	
 	details.nchain = 1;
 	details.gen_update = UNSET;
 	
 	details.individual_max = check_pos_integer("ind-max",INDMAX_DEFAULT);
+	details.chain_nsiminit = check_pos_integer("num-sim-init",CHAIN_NSIMINIT_DEFAULT);
 	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
 	details.param_only = false;
 
@@ -2117,6 +2136,7 @@ bool Input::post_sim_command()
 	details.num_per_core = details.number/mpi.ncore;
 
 	details.individual_max = check_pos_integer("ind-max",INDMAX_DEFAULT);
+	details.chain_nsiminit = UNSET;
 	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
 	
 	details.seed = get_seed();

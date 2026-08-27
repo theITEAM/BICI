@@ -1,0 +1,70 @@
+####################### DESCRIPTION ########################
+
+description text="# Model and analysis description."
+
+######################### DETAILS ##########################
+
+simulation start=0 end=100 timestep=1
+
+inference start=0 end=100 timestep=1 sample=1000 acc-frac=0.1 algorithm="ABC"
+
+post-sim
+
+######### DEFINE MODEL AND DATA FOR SPECIES ANIMAL #########
+
+species name="Animal" type="population"
+
+# SPECIES MODEL
+
+class name="DS" index="a"
+
+comp name="S" color="#009900" x=-15 y=0
+
+comp name="I" color="#ff2222" x=0 y=0
+
+comp name="R" color="#4444ff" x=15 y=0
+
+trans name="S->I" value="exp(rate:β×{I}/N)"
+
+trans name="I->R" value="exp(rate:γ)"
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="DS" file="[[
+"Compartment","Population"
+"S",1000
+"I",1
+"R",0
+]]"
+
+# INFERENCE DATA
+
+init-pop-inf type="fixed" focal="DS" file="[[
+"Compartment","Population"
+"S",1000
+"I",1
+"R",0
+]]"
+
+pop-data name="Pop. data" filter="DS=I" error="poisson" file="[[
+"t","Population"
+10,1
+20,26
+30,143
+40,336
+50,259
+60,151
+70,44
+80,26
+90,7
+100,1
+]]"
+
+######################## PARAMETERS ########################
+
+param name="N" value=1001 prior="fix(1001)"
+
+param name="β" value=0.3 prior="uniform(0,1)"
+
+param name="γ" value=0.1 prior="uniform(0,1)"
+

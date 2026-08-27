@@ -25,7 +25,7 @@ function display_ind_eff_group(p,i,x,y,lay,wmax)
 	
 	let fo = get_font(1.2,"","times");
 	
-	var si = 1.5;
+	let si = 1.5;
 	
 	if(ie_list.length == 0) error("Should contain IE");
 	
@@ -172,6 +172,8 @@ function add_ie_to_group(p,i1,i2)
 	let sp = model.species[p];
 	let ieg1 = sp.ind_eff_group[i1];
 	let ieg2 = sp.ind_eff_group[i2];
+	//if(ieg2.name != "") ieg2.name += ",";
+	//ieg2.name += ieg1.name;
 	for(let i = 0; i  < ieg1.ie_list.length; i++){
 		ieg2.ie_list.push({name:ieg1.ie_list[i].name});
 	}
@@ -185,12 +187,18 @@ function split_ie(p,i)
 {
 	let sp = model.species[p];
 	let ieg = sp.ind_eff_group[i];
+	//let spl = ieg.name.split(",");
 	for(let j = 0; j < ieg.ie_list.length; j++){
 		sp.ind_eff_group.push(copy(ieg));
 		let ieg2 = sp.ind_eff_group[sp.ind_eff_group.length-1];
 		ieg2.ie_list.length = 0;
 		ieg2.ie_list.push(copy(ieg.ie_list[j]));
-		if(j > 0) ieg2.name = generate_iegroup_name();
+		//if(spl.length == ieg.ie_list.length){
+			//ieg2.name = generate_iegroup_name(ieg2,spl[j]);
+		//}
+		//else{
+		if(j > 0) ieg2.name = generate_iegroup_name(ieg2);
+		//}
 	}
 	
 	sp.ind_eff_group.splice(i,1);
@@ -272,7 +280,7 @@ function add_Amatrix_buts(lay)
 	if(w_ele > dx) dx = w_ele;
 	if(dx > 8) dx = 8;
 	
-	let mar_col = DRED;
+	let mar_col = BLACK;
 	
 	let cx = 2+w_max+gap;
 	for(let i = 0; i < ind_list.length; i++){

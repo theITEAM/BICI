@@ -88,6 +88,37 @@ vector <double> StateSpecies::likelihood_obs_ind(const vector <unsigned int> &li
 }
 
 
+/// Gets likelihood from unobserved transitions (used to detemine inconsistent individuals)
+double StateSpecies::likelihood_unobs_trans_ind(unsigned int i) const
+{
+	if(!sp.obs_trans_exist) return 0;
+	
+	auto Li = 0.0;
+	
+	const auto &ind = individual[i];
+	for(const auto &ev : ind.ev){
+		if(!ev.observed){
+			auto ti = get_ti(ev.tdiv);
+			const auto &oter = sp.obs_trans_eqn_ref[ev.tr_gl][ti];
+			for(auto m : oter){
+				Li += obs_trans_eqn_value[m][ti];
+			}
+		}
+	}
+	
+	return Li;
+}
+
+
+/// Determines if the events for an individual are inconsistent with the observations
+bool StateSpecies::inconsistent(unsigned int i) const 
+{
+	auto Li = Li_obs_ind[i] + likelihood_unobs_trans_ind(i);
+	if(Li < LI_WRONG/2) return true;
+	return false;
+}
+
+
 /// Returns the observation model probability
 double StateSpecies::obs_mod_probability(double num, ObsModelVariety type, double value, double obs_mod_val) const
 {
@@ -335,30 +366,6 @@ void StateSpecies::restore_pop_data_cgl_trgl(const vector <double> &store)
 	}
 }
 
-
-/*
-/// Gets the probability of a diagnostic test
-double StateSpecies::like_diag_test(unsigned int c, const ObsData &ob) const
-{
-	if(c == UNSET) return LI_WRONG;
-	else{
-		const auto &om = sp.source[ob.so].obs_model;
-		const auto &cgl = sp.comp_gl[c];
-		
-		auto cl = om.diag_test_sens.cl;
-		if(om.diag_test_sens.comp[cgl.cla_comp[cl]] == true){ // Truely infected
-			auto Se = obs_eqn_value[ob.Se_obs_eqn_ref];
-			if(ob.test_res == true) return log(Se+LOG_THRESH); 
-			else return log(1-Se+LOG_THRESH);
-		}
-		else{
-			auto Sp = obs_eqn_value[ob.Sp_obs_eqn_ref];
-			if(ob.test_res == false) return log(Sp+LOG_THRESH); 
-			else return log(1-Sp+LOG_THRESH);
-		}
-	}
-}
-*/
 
 /// Gets the observation likelihood of transition probability observation
 double StateSpecies::like_trans_prob_obs(unsigned int tr, const ObsData &ob) const
@@ -612,7 +619,6 @@ vector <double> StateSpecies::likelihood_unobs_trans(unsigned int e, const vecto
 		}
 	}
 	else{
-		auto num=0u;
 		for(auto ti : list){
 			auto val = 1 - eq.calculate_no_popcomb(ti,precalc);	
 		
@@ -625,7 +631,6 @@ vector <double> StateSpecies::likelihood_unobs_trans(unsigned int e, const vecto
 			auto log_val_old = otev[ti];
 			store.push_back(log_val_old);
 			like_ch += (log_val-log_val_old)*oten[ti];
-			num+=oten[ti];
 			otev[ti] = log_val;
 		}
 	}
@@ -772,7 +777,7 @@ void StateSpecies::set_event_observed()
 		}
 	}
 	
-	if(testing){
+	if(false && testing){
 		auto num_obs = 0u;
 		auto i_sel = UNSET;
 		for(auto i = 0u; i < sp.nindividual_in; i++){
@@ -807,8 +812,10 @@ void StateSpecies::set_event_observed()
 			if(numi != numob) i_sel = i;
 		}
 		
-		if(num != num_obs && false){
+		if(num != num_obs){
 			cout << num << " / " << num_obs << "NUM OBS" << " Ind:" << sp.individual[i_sel].name << endl;
 		}
 	}
 }
+
+

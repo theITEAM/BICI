@@ -1,0 +1,42 @@
+####################### DESCRIPTION ########################
+
+description text="# Model and analysis description."
+
+######################### DETAILS ##########################
+
+simulation
+
+inference nchain=3
+
+post-sim
+
+########## DEFINE MODEL AND DATA FOR SPECIES FISH ##########
+
+species name="Fish" type="individual"
+
+# SPECIES MODEL
+
+class name="DS" index="a"
+
+class name="Tank" index="c"
+
+comp name="S^a" color="#00bb00" x=-15 y=5
+
+comp name="I^a" color="#bb0000" x=0 y=5
+
+comp name="S^b" color="#22ff22" x=-15 y=-3
+
+comp name="I^b" color="#ff2222" x=0 y=-3
+
+comp name="R" color="#4444ff" x=15 y=1
+
+trans name="S^a->I^a" value="exp(rate:β^a(f^a×{I^a}+{I^b})/N)"
+
+######################## PARAMETERS ########################
+
+param name="f^a"
+
+param name="N"
+
+param name="β^a"
+

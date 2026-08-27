@@ -34,8 +34,10 @@ function add_model_param_buts(lay)
 	w = model.add_object_button(lay,"Factor",x,y,"SetFactor",{ back:WHITE, active:active, info:{}, title:"Factor", te:factor_text}); 
 	x += w+gap;
 	
-	w = model.add_object_button(lay,"Derived",x,y,"SetDerived",{ back:WHITE, active:active, info:{}, title:"Derived", te:derived_text}); 
+	w = model.add_object_button(lay,"Dynamic-sim",x,y,"SetParamDynamic",{ back:WHITE, active:active, info:{}, title:"Dynamic update of parameter", te:param_dynamic_text });
 	x += w+gap;
+		
+	w = model.add_object_button(lay,"Derived",x,y,"SetDerived",{ back:WHITE, active:active, info:{}, title:"Derived", te:derived_text}); 
 }
 
 
@@ -107,9 +109,7 @@ function add_param_mult_content(lay)
 	}
 	
 	if(y == 0.5){
-		let si = 1;
-		let col = BLACK;
-		lay.add_button({te:"There are currently no parameter factors added to the model.", x:0.5, y:0, dx:lay.dx-5, dy:1.3, type:"Text", si:si, font:get_font(si), col:col}); 
+		center_message("No parameter factors added to the model",lay);
 	}		
 }
 
@@ -240,7 +240,6 @@ function add_model_param_content(lay)
 				let te = "Load <e>X^"+feg.name+"</e> vector", dx = 7; 
 				if(feg.X_vector.loaded == true){ te = "Reload <e>X^"+feg.name+"</e> vector"; dx = 8;}
 					
-				
 				let text_anno = text_convert_annotation(te,si,si,100,"",BLACK);
 
 				let xload = 4;
@@ -473,8 +472,69 @@ function add_model_param_content(lay)
 				
 				display_derive(i,x,y,lay,true,w);
 					
-				lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", val:i, ac:"DeleteDerive"});
+				lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", val:der[i].eqn1.te, ac:"DeleteDerive"});
 				y += dy;
+			}
+			y += 1;
+		}
+	}
+	
+	{ // Dynamic-sim
+		let dy_file = 1.5;
+		
+		let hh = 0;
+		for(let i = 0; i < model.param.length; i++){
+			let par = model.param[i];
+			if(par.variety == "dynamic"){
+				hh += dy;
+				let di = par.dynamic_info;
+				switch(di.type.te){
+				case "bin-thresh-region": case "bin-min-max-region": hh += dy_file; break;
+				}
+			}
+		}
+		
+		if(hh > 0){
+			lay.add_button({te:"Dynamic under simulation", x:1, y:y, dx:lay.dx-3, dy:hh+1.8, col:col_round, col2:col_text, type:"CurvedOutline"});
+			y += 1.6;
+
+			for(let i = 0; i < model.param.length; i++){
+				let par = model.param[i];
+				if(par.variety == "dynamic"){
+					let w = wright;
+					
+					display_dynamic(i,x,y,lay,w);
+					
+					lay.add_button({x:del_x, y:y+0.2, dx:del_dx, dy:del_dx, type:"Delete", i:i, ac:"DeleteParamReparam"});
+					
+					y += dy;
+						
+					let di = par.dynamic_info;
+					switch(di.type.te){
+					case "bin-thresh-region": case "bin-min-max-region":
+						{
+							y -= 0.1;
+							
+							let si = 0.9;
+							let te = "Load regions", dx = 7; 
+						
+							if(di.region.loaded == true){ te = "Reload regions"; dx = 8;}
+								
+							let text_anno = text_convert_annotation(te,si,si,100,"",BLACK);
+
+							let xload = 4;
+							let dxload = text_anno.wmax+0.5;
+								
+							lay.add_button({word:text_anno.word, x:xload, y:y+0.1, dx:dxload, dy:1.1, type:"LinkPara", ac:"LoadRegion", i:i});
+
+							if(di.region.loaded == true){
+								lay.add_button({te:"Edit", x:xload+dxload+0.3, y:y-0.1, dx:3.5, dy:1.2, ac:"EditRegion", type:"GreyView", i:i});
+							}
+							y += dy_file+0.1;
+						}
+						break;
+					}
+				}
 			}
 			y += 1;
 		}
@@ -530,7 +590,7 @@ function set_constant_bubble(cont)
 	}
 }
 
-
+		
 /// Bubble which allows user to select a const inf parameter
 function set_prior_const_bubble(cont,type,ac)
 {	
@@ -765,7 +825,7 @@ function check_param_free(op)
 
 /// Determines if possible to select parameter
 function param_pos(par,op)
-{
+{	
 	if(par.derive) return false;
 	
 	if(par.ndep_cont == 0 && op == "priorconst") return false;
@@ -775,6 +835,11 @@ function param_pos(par,op)
 	if(par.name == "δ" || par.name == "\\delta") return false; // Does not allow delta function
 	
 	switch(op){
+	case "param_dynamic":
+		if(par.variety != "normal") return false;
+		if(!par.time_dep) return false;
+		return true;
+		
 	case "priorconst":
 		if(par.prior_const_on == true) return false;
 		return true;
@@ -796,7 +861,7 @@ function param_pos(par,op)
 	case "dist":
 		if(par.variety != "normal") return false;
 		if(par.factor) return false;
-		if(par.ndep_cont == 0) return false;
+		//if(par.ndep_cont == 0) return false;
 		break;
 	
 	case "fac":

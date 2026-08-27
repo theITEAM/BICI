@@ -3,18 +3,24 @@
 
 /// Generates a list of all model parameters
 // Goes through the exisiting list and copies any info on values/priors
-function update_model()
+function update_model(per_start,per_end)
 {
 	model.warn = [];
 
 	check_data_valid_all("siminf","warn");
+	
+	percent_fr(0.1,per_start,per_end);
 
 	let lists = generate_parameter_list();           // Generates a list of all model parameters
 
-	if(false){ prr("lists"); prr(lists);}
-	
-	update_model_param(lists);                    // Updates the model parameters
+	percent_fr(0.4,per_start,per_end);
 
+	if(false){ prr("lists"); prr(lists);}
+
+	update_model_param(lists);                    // Updates the model parameters
+	
+	percent_fr(0.8,per_start,per_end);
+	
 	set_generate_pos();                              // Sets if possible to generate results
 	
 	update_desc();                                   // Updates descriptions of parameter
@@ -26,6 +32,8 @@ function update_model()
 		if(par.type != undefined) error("par type should not be set");
 		if(par.ndep_cont == undefined) error("ndep_cont should be set"); 
 	}
+	
+	percent_fr(1,per_start,per_end);
 }
 
 
@@ -106,6 +114,7 @@ function set_generate_pos()
 function add_within(par,eqn)
 {
 	let wi = {type:eqn.type, eqn_info:eqn.eqn_info};
+	
 	add_wi(par,wi);
 }
 
@@ -195,7 +204,7 @@ function generate_parameter_list()
 		case "derived":
 			{
 				let pd = model.derive[info.i];
-				mess = "For a derived expression for parameter <e>"+pd.eqn1.te+"</e>"
+				mess = "For derived expression for parameter <e>"+pd.eqn1.te+"</e>"
 			}
 			break;
 			
@@ -207,11 +216,11 @@ function generate_parameter_list()
 			break;
 			
 		case "Se": 
-			mess = "For a disease diagnostic test sensitivity"; 
+			mess = "For disease diagnostic test sensitivity"; 
 			break;
 
 		case "Sp": 
-			mess = "For a disease diagnostic test specificity";
+			mess = "For disease diagnostic test specificity";
 			break;
 			
 		case "SeTC": 
@@ -223,19 +232,19 @@ function generate_parameter_list()
 			break;
 			
 		case "mut_rate": 
-			mess = "For a genetic mutation rate";
+			mess = "For genetic mutation rate";
 			break;
 			
 		case "seq_var": 
-			mess = "For a genetic sequence variation";
+			mess = "For genetic sequence variation";
 			break;
 			
 		case "comp_prob": case "sim_comp_prob":
-			mess = "For a compartmental probability";
+			mess = "For compartmental probability";
 			break;
 		
 		case "trans_prob":
-			mess = "For a transition probability";
+			mess = "For transition probability";
 			break;
 						
 		case "reparam_ele":
@@ -247,7 +256,11 @@ function generate_parameter_list()
 			break;
 			
 		case "prior":
-			mess = "For a distribution";
+			mess = "For distribution";
+			break;
+		
+		case "dynamic_weight":
+			mess = "For weight on a dynamic parameter";
 			break;
 			
 		default: 
@@ -384,6 +397,7 @@ function param_eqn_desc(eqn)
 	case "define_ele": return "in a definition";
 	case "derive_param": return "in a derived parameter";
 	case "derive_eqn": return "in a derived equation";
+	case "dynamic_weight": return "in a dynamic parameter weight";
 	default: error("option not pos:"+eqn.type); break;	
 	}
 }
@@ -749,7 +763,9 @@ function update_model_ind_eff(ie_list)
 				}
 			
 				if(flag == false){
-					sp.ind_eff_group.push({name:generate_iegroup_name(), p_name:ie.p_name, A_matrix:{check:false, loaded:false, value:[], ind_list:[], pedigree:false, sire_list:[], dam_list:[]}, ie_list:[{name:ie.name}]});
+					let ieg = {p_name:ie.p_name, A_matrix:{check:false, loaded:false, value:[], ind_list:[], pedigree:false, sire_list:[], dam_list:[]}, ie_list:[{name:ie.name}]};
+					ieg.name = generate_iegroup_name(ieg);
+					sp.ind_eff_group.push(ieg);
 				}
 			}
 		}
@@ -790,7 +806,7 @@ function update_model_ind_eff(ie_list)
 
 
 /// Generates a unique iegroup name
-function generate_iegroup_name()
+function generate_iegroup_name(ieg,root)
 {
 	let list=[];
 	for(let p = 0; p < model.species.length; p++){
@@ -800,9 +816,21 @@ function generate_iegroup_name()
 		}
 	}
 
+	let name_root = "";
+	if(root != undefined) name_root = root;
+	else{
+		name_root = "var";
+		/*
+		for(let i = 0; i < ieg.ie_list.length; i++){
+			if(name_root != "") name_root += ",";
+			name_root += ieg.ie_list[i].name;
+		}
+		*/
+	}
+ 
 	let k = 1;
 	while(true){
-		let name = "CM"; if(k > 1) name += k;
+		let name = name_root; if(k > 1) name += k;
 		if(find_in(list,name) == undefined) return name;
 		k++;
 	}	
@@ -1095,6 +1123,7 @@ function add_to_par_list(par_name,add_param_list,par_list)
 
 			for(let k = 0; k < par_add.within.length; k++){
 				let wi = par_add.within[k];
+			
 				add_wi(par_list[j],wi);
 			}
 		}
@@ -1439,9 +1468,96 @@ function create_new_param(par,variety)
 
 	par.full_name = param_name(par);
 
-	if(par.variance == true) par.prior.type.te = "covar-default";
+	if(par.variance == true) par.prior.type.te = "covar-default";		
+	
+	//set_too_big(par);
 	
 	return par;
+}
+
+
+
+/*
+/// Determines if a parameter is too large to be viewed
+function par_too_big(par,vari)
+{
+	if(param_num_element(par,vari) > ELEMENT_MAX) return true;
+	return false;
+}
+*/
+
+
+/// Returns the number of dependencies (removing time for define)
+function get_ndep_cont(par,vari)
+{
+	let ndep_cont = par.dep.length;
+
+	if(vari == "define" && par.time_dep){
+		if(par.dep.length > 0 && par.dep[par.dep.length-1] == "t"){
+			ndep_cont--;
+		}
+	}
+	
+	return ndep_cont;
+}
+
+
+/// Sets if too big to display
+function set_too_big(info)
+{
+	info.list_shrink = undefined;
+	info.too_big = false;
+
+	let par = info.par_st;
+	let vari = par.variety; if(info.vari_new != undefined) vari = info.vari_new;
+
+	if(param_num_element(par,vari) > ELEMENT_MAX){
+		info.too_big = true;
+
+		let list_shrink=[];
+		let ndep_cont = get_ndep_cont(par,vari);
+		
+		if(ndep_cont == 2){ // For a matrix try to make square
+			let n = ELE_REDUCE_FAC*Math.sqrt(ELEMENT_MAX);
+			
+			let nx = n, ny = n;
+			let dy = par.list[0].length;
+			let dx = par.list[1].length;
+			if(nx > dx){ nsx = dx; ny = n*n/nx;}
+			if(ny > dy){ ny = dy; nx = n*n/ny;}
+		
+			{
+				let li=[];
+				for(let i = 0; i < ny; i++) li[i] = par.list[0][i];
+				list_shrink.push(li);
+			}
+			
+			{
+				let li=[];
+				for(let i = 0; i < nx; i++) li[i] = par.list[1][i];
+				list_shrink.push(li);
+			}
+		}
+		else{
+			let scale = ELE_REDUCE_FAC*Math.pow(ELEMENT_MAX/param_num_element(par,vari),1.0/ndep_cont);
+			for(let d = 0; d < ndep_cont; d++){
+				let li=[];
+				let imax = Math.floor(scale*par.list[d].length);
+				if(imax < 1) imax = 1;
+				for(let i = 0; i < imax; i++) li[i] = par.list[d][i];
+				list_shrink.push(li);
+			}
+		}
+		
+		info.list_shrink = list_shrink;
+		
+		let shrunk=[];
+		for(let d = 0; d < list_shrink.length; d++){
+			if(list_shrink[d].length < par.list[d].length) shrunk[d] = true;
+			else shrunk[d] = false;
+		}
+		info.shrunk = shrunk;
+	}
 }
 
 
@@ -1594,20 +1710,16 @@ function set_default_factor_weight(par)
 function copy_param_info(par,old)
 {
 	par.variety = old.variety;
-	
-	/*
-	par.variance = old.variance;
-	par.derive = old.derive;
-	par.param_fac = old.param_fac;
-	par.fixed_effect = old.fixed_effect;
-	*/
+
 	set_ndep_cont(par);
 	
 	par.spline = old.spline;
 	par.prior = old.prior;
 	par.sim_sample = old.sim_sample;
 	par.label_info = old.label_info;
+	par.dynamic_info = old.dynamic_info;
 	par.set = old.set;
+	//par.prior_const = old.prior_const;
 	par.prior_const_set = old.prior_const_set;
 	par.prior_const_on = old.prior_const_on;
 	par.import_line = old.import_line;
@@ -1675,7 +1787,7 @@ function copy_param_info(par,old)
 		
 			if(dif != false){
 				
-				let temp = par_find_template(list);
+				let temp = par_find_template(list,par.ndep_cont);
 				let co_list = generate_co_list(list);
 			
 				let value; if(val_set) value = copy(temp);
@@ -1767,6 +1879,8 @@ function copy_param_info(par,old)
 		par.prior_split_set = old.prior_split_set;
 		par.prior_split_check = old.prior_split_check;
 	}
+	
+	//set_too_big(par);
 	
 	return par;
 }
@@ -2088,7 +2202,7 @@ function check_param()
 		}
 		
 		if(par.dep.length > 0){
-			let temp = par_find_template(par.list);
+			let temp = par_find_template(par.list,par.ndep_cont);
 		
 			let dim = get_dimensions(temp);
 	
@@ -2124,22 +2238,11 @@ function set_dist(info,par)
 	let claa = get_cla_from_index(model,par.dep[0]);
 	if(claa == undefined){ error("Classification is undefined"); return;}
 	
-	let N = claa.comp.length;
+	let list = info.list;
+	if(info.too_big) list = info.list_shrink;
 
-	// Works out if we need to calculate the full matrix
-	if(N*N > ELEMENT_MAX){
-		N = Math.floor(ELE_REDUCE_FAC*Math.sqrt(ELEMENT_MAX));
-		info.too_big = true;
-	}
-	
-	let li=[];
-	for(let i = 0; i < N; i++){
-		li.push(claa.comp[i].name);
-	}
-	
-	info.list[0] = li;
-	info.list[1] = li;
-	
+	let N = list[0].length;
+
 	let value = [];
 	for(let j = 0; j < N; j++) value[j]=[];
 				
@@ -2197,12 +2300,6 @@ function set_dist(info,par)
 	}
 	
 	info.value = value;
-	let shrunk=[];
-	for(let d = 0; d < par.ndep_cont; d++){
-		if(info.list.length < par.list[d].length) shrunk[d] = true;
-		else shrunk[d] = false;
-	}
-	info.shrunk = shrunk;
 }
 
 
@@ -2222,21 +2319,10 @@ function set_iden(info,par)
 	let claa = get_cla_from_index(model,par.dep[0]);
 	if(claa == undefined){ error("Classification is undefined"); return;}
 	
-	let N = claa.comp.length;
+	let list = info.list;
+	if(info.too_big) list = info.list_shrink;
 
-	// Works out if we need to calculate the full matrix
-	if(N*N > ELEMENT_MAX){
-		N = Math.floor(ELE_REDUCE_FAC*Math.sqrt(ELEMENT_MAX));
-		info.too_big = true;
-	}
-	
-	let li=[];
-	for(let i = 0; i < N; i++){
-		li.push(claa.comp[i].name);
-	}
-	
-	info.list[0] = li;
-	info.list[1] = li;
+	let N = list[0].length;
 	
 	let value = [];
 	for(let j = 0; j < N; j++){
@@ -2248,12 +2334,6 @@ function set_iden(info,par)
 	}
 	
 	info.value = value;
-	let shrunk=[];
-	for(let d = 0; d < par.dep.length; d++){
-		if(info.list.length < par.list[d].length) shrunk[d] = true;
-		else shrunk[d] = false;
-	}
-	info.shrunk = shrunk;
 }
 	
 
@@ -2265,25 +2345,14 @@ function set_density(info,par,limit_on)
 	
 	let claa = get_cla_from_index(model,par.dep[0]);
 	if(claa == undefined){ error("Classification is undefined"); return;}
+
+	let list = info.list;
 	
-	let N = claa.comp.length;
-	let N_tot = N;
+	if(info.too_big && limit_on != false) list = info.list_shrink;
+
+	let N = list[0].length;
 	
-	/*
-	// Works out if we need to calculate the full matrix
-	if(N > ELEMENT_MAX && limit_on != false){
-		N = ELEMENT_MAX;
-		info.too_big = true;
-	}
-	*/
-	
-	let li=[];
-	for(let i = 0; i < N; i++){
-		li.push(claa.comp[i].name);
-	}
-	
-	info.list=[];
-	info.list[0] = li;
+	let N_tot = claa.comp.length;
 	
 	let value = [];
 				
@@ -2480,12 +2549,6 @@ function set_density(info,par,limit_on)
 	for(let k = 0; k < N; k++) value[k] = precision(value[k],5);
 		
 	info.value = value;
-	let shrunk=[];
-	for(let d = 0; d < par.ndep_cont; d++){
-		if(info.list.length < par.list[d].length) shrunk[d] = true;
-		else shrunk[d] = false;
-	}
-	info.shrunk = shrunk;
 }
 
 
@@ -2653,6 +2716,17 @@ function find_equation_list()
 		add_equation_to_list(eqn_list,der.eqn1,eqn_info);		
 	}
 	
+	for(let i = 0; i < model.param.length; i++){
+		let par = model.param[i];
+		if(par.variety == "dynamic"){
+			let di = par.dynamic_info;
+			if(di.weight.check == true){
+				let eqn_info = {i:i, eso:"dwe"};
+				add_equation_to_list(eqn_list,di.weight_eqn,eqn_info);		
+			}
+		}
+	}
+
 	return eqn_list;
 }
 
@@ -2715,7 +2789,7 @@ function add_eqn_filter(te,type,p,i,c,r,eqn_list)
 			let te2 = spl2[1];
 			
 			if(isNaN(te2)){
-				let eqn_info2 = {p:p,i:i,r:r,c:c};
+				let eqn_info2 = {p:p,i:i,r:r,c:c,eso:"obs_prob"};
 				
 				let eqn = create_equation(te2,type,p,undefined);  
 				add_equation_to_list(eqn_list,eqn,eqn_info2);
@@ -2812,13 +2886,17 @@ function param_blank(par)
 
 
 /// Gets the number of elements in a parameter value
-function param_num_element(par)
+function param_num_element(par,vari)
 {
-	let num = 1; 
-	if(par.ndep_cont == 0) return num;
-	for(let i = 0; i < par.list.length; i++){
+	if(vari == undefined) vari = par.variety;
+	
+	let ndep_cont = get_ndep_cont(par,vari)
+
+	let num = 1;
+	for(let i = 0; i < par.ndep_cont; i++){
 		num *= par.list[i].length;
 	}
+	
 	return num;
 }
 
@@ -2838,6 +2916,10 @@ function param_needed(par,siminf)
 		case "model": case "dep": case "rep":
 			return true;
 		
+		case "obs_prob":
+			if(siminf == "inf") return true; 
+			break;
+			
 		case "der":
 			return false;
 			

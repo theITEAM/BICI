@@ -1788,11 +1788,11 @@ void Input::set_spline(SplineType type, string knot_times_str, string smooth, ve
 	vector <double> times;
 	
 	auto t_start = model.details.t_start;
-	if(model.mode == PPC && !use_inf_time) t_start = model.details.ppc_t_start; 
+	//if(model.mode == PPC && !use_inf_time) t_start = model.details.ppc_t_start; 
 	
 	auto t_end = model.details.t_end;
 	if(model.mode == PPC && use_inf_time) t_end = model.details.inf_t_end;
-		
+
 	knot_times = split(knot_times_str,',');
 	for(auto j = 0u; j < knot_times.size(); j++){
 		double num;
@@ -1871,6 +1871,17 @@ void Input::set_spline(SplineType type, string knot_times_str, string smooth, ve
 	
 	par.spline_info.knot_tdiv = times;
 	
+	vector <unsigned int> ti_list;
+	for(auto tdiv : times){
+		ti_list.push_back(get_ti(tdiv));
+	}
+	if(ti_list[ti_list.size()-1] != T) ti_list.push_back(T);
+	
+	for(auto i = 0u; i < ti_list.size()-1; i++){
+		PrTimeRange ptr; ptr.ti_min = ti_list[i]; ptr.ti_max = ti_list[i+1];
+		par.spline_segment.push_back(ptr);
+	}
+	
 	if(smooth == ""){
 		par.spline_info.smooth = false;
 	}
@@ -1940,6 +1951,7 @@ void Input::add_param_cat_factor(Param &par)
 	par_basic.full_name = pre+par_basic.full_name;  
 	par_basic.name = pre+par_basic.name;  
 	par_basic.trace_output = false;
+	par.reparam_time_dep = false;
 
 	auto N = par_basic.N;
 	const auto &pri = model.prior[par_basic.get_prior_ref(0)];
@@ -1994,17 +2006,22 @@ void Input::add_param_cat_factor(Param &par)
 
 
 /// Loads up a reparameterisation
-bool Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
+bool Input::add_param_eqn(const EquationInfo &eqn_raw, Param &par, Hash &hash_eqn)
 {
 	auto ch_flag = false;
 	
 	const auto &depend = par.dep;
-	const auto &eqn_raw = par.reparam_eqn;
+	//const auto &eqn_raw = par.reparam_eqn;
 	//par.reparam_eqn = "";
 	
 	if(par.time_dep){
 		if(par.spline_info.type != SQUARE_SPL){
-			alert_line("A square spline must be used for time-varying reparameterised parameter '"+par.full_name+"'.",par.line_num);
+			if(par.variety == DYNAMIC_PARAM){
+				alert_line("A square spline must be used for dynamic parameter '"+par.full_name+"'.",par.line_num);
+			}
+			else{
+				alert_line("A square spline must be used for time-varying reparameterised parameter '"+par.full_name+"'.",par.line_num);
+			}
 		}			
 	}
 	
@@ -2059,7 +2076,6 @@ bool Input::add_reparam_eqn(Param &par, Hash &hash_eqn)
 				}
 				
 				eqn.type = REPARAM;
-				
 				model.add_eq_ref(eqn,hash_eqn);
 				
 				const auto &eqq = model.eqn[eqn.eq_ref];

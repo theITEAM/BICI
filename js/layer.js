@@ -69,7 +69,10 @@ class Layer
 		if(loading_sym()) return;
 		
 		switch(tree[0]){
-		case "Home": add_home_page_buts(this); break;
+		case "Home":
+			add_home_page_buts(this); 
+			break;
+		
 		case "Model":
 			switch(tree[1]){
 			case "Compartments":
@@ -645,7 +648,7 @@ class Layer
 	
 		let ls = inter.loading_symbol;
 	
-			switch(ls.type){
+		switch(ls.type){
 		case "Spawn":
 		case "Start": case "StartPPC": case "StartEXT": case "Load File": case "Creating": case "mp4":
 			{
@@ -1359,7 +1362,7 @@ class Layer
 		case "init_per": te = String(edit_source.cla[so.cl].comp_init_pop[so.c].pop_per); break;
 		case "init_globpopulation": te = String(edit_source.glob_comp[so.c].pop);	break;
 		case "element": te = String(edit_source.table.ele[so.r][so.c]);	break;
-		case "element_param": case "element_param_const": case "element_param_const_sym":
+		case "element_param": case "element_param_const": case "element_param_const_sym": case "element_param_const_covar": case "element_param_const_cor":
 		case "element_factor_const": case "element_weight_const":
 			{
 				let ele = get_element(inter.edit_param.value,so.pindex);
@@ -1492,6 +1495,7 @@ class Layer
 		case "inf_gen_update": te = String(model.inf_details.gen_update); break;
 		case "inf_cha_per_core": te = String(model.inf_details.cha_per_core); break;
 		case "inf_part_per_core": te = String(model.inf_details.part_per_core); break;
+		case "chain_nsiminit": te = String(model.inf_details.chain_nsiminit); break;
 		case "anneal_rate": te = String(model.inf_details.anneal_rate); break;
 		case "anneal_power": te = String(model.inf_details.anneal_power); break;
 		case "burnin_frac": te = String(model.inf_details.burnin_frac); break;
@@ -1517,6 +1521,11 @@ class Layer
 		case "iegrname": te = String(inter.bubble.source.name); break;
 		case "wild_card": te = String(inter.bubble.wildcard); break;
 		case "comp_acc": te = String(edit_source.comp_acc); break;
+		case "thresh": te = String(inter.bubble.dynamic_info.thresh); break;
+		case "threshmin": te = String(inter.bubble.dynamic_info.threshmin); break;
+		case "threshmax": te = String(inter.bubble.dynamic_info.threshmax); break;
+		case "dist": te = String(inter.bubble.dynamic_info.dist); break;
+		case "dynamic_weight": eqn = inter.bubble.dynamic_info.weight_eqn; break;
 		default: error("SOURCE PROBLEM2: "+so.type); break;
 		}
 

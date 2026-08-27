@@ -226,7 +226,9 @@ string basic_equation_check(string &te, EqnType eqn_type)
 				
 						auto num = number(spl[1]);
 						if(num == UNSET || num < 0){
-							return "In the sum '"+tex+"', the distance '"+spl[1]+"' must be a positive number.";
+							if(!begin_str(spl[1],"region")){
+								return "In the sum '"+tex+"', the distance '"+spl[1]+"' must be a positive number.";
+							}
 						}
 					}
 
@@ -578,7 +580,7 @@ CommandLine get_command_tags(string trr, unsigned int line_num)
 	if(type == "ic") com = IC_DATA;
 	
 	if(com == EMPTY){
-		return syntax_error("Command '"+type+"' not recognised.",true);
+		return syntax_error("Command '"+type+"' not recognised2.",true);
 	}
 	
 	auto must_term = false; if(find_in(must_term_str,type) != UNSET) must_term = true;

@@ -535,6 +535,20 @@ function add_inf_start_buts(lay)
 		//cy += gap;
 	
 		switch(alg){
+		case "DA-MCMC": case "PAS-MCMC":
+			{
+				cy = lay.add_subtitle("Chain initialisation",cx,cy,WHITE,{te:chain_init_text});
+				
+				cy = lay.add_paragraph("Number of simulations used to generate chain initial state:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
+				
+				let yy = cy-2.5;
+				add_right_input_field(yy,"Simulation number",{type:"chain_nsiminit",update:true},lay);
+				cy += gap;
+			}
+			break;
+		}
+		
+		switch(alg){
 		case "DA-MCMC":
 			{
 				cy = lay.add_subtitle("Burn-in",cx,cy,WHITE,{te:burnin_text});

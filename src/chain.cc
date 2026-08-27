@@ -60,20 +60,31 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 		state.load_samp(param_val,samp);
 	}
 	else{                     // Simulates initial state
-		auto Lmax = -LARGE;
+		auto fit_max = -LARGE;
 	
 		print_diag("Finding initial state...");
 
+		// Determines which metric to use (likelihood of observation or resuidual method 
+		auto use_li_obs = true;
+		for(const auto &sp : model.species){ 
+			if(sp.type == INDIVIDUAL) use_li_obs = false;
+		}
+		
 		Particle part;
 
-		auto loop_max = 3u;
+		auto loop_max = model.details.chain_nsiminit;
+loop_max = 50u;
+
+		auto param_latin = model.param_latin_hypercube_prior_sample(loop_max);
+		
 		for(auto loop = 0u; loop < loop_max; loop++){ 
+			//cout << endl << loop << " loop" << endl;
 			print_diag(to_string(loop)+" Initial state");
 			
 			percentage(loop+ch*loop_max,loop_max*ch_max);
 			
-			auto param_val = model.param_sample();
-
+			auto param_val = model.param_latin_hypercube_sample(param_latin[loop]);
+			
 			auto initc_val = model.initc_sample(param_val);
 			
 			if(false){
@@ -89,39 +100,58 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 
 			print_diag("simulate done");
 		
-			state.check("First check");
+			//state.check("First check");
 		
 			print_diag("Checked");
 			
 			print_diag("resample");
-			
+			 	
 			state.resample_ind(false);    // Resamples individual such that fixed events become correct
 
+			state.force_consistent_solution();
+		
 			print_diag("resampled");
 
-			state.check("Resample check");
+			//state.check("Resample check");
 		
 			print_diag("resampled");
 			
 			auto L = like_total_obs();
 			burn_info.add_L(L); 
-			
-			if(L > Lmax){
-				Lmax = L;
+
+			double fit;
+			if(use_li_obs){  // This fit metric uses the log-likelihood of observations (good for population-based)
+				fit = L;
+			}
+			else{            // This fit metric uses the fit between the transitions and the model (good for individual-based data)
+				fit = -(state.frac_outside_CI()-0.1);
+				if(fit > 0) fit *= -1;
+			}
+		
+			if(fit > fit_max){
+				fit_max = fit;
 				part = state.generate_particle(UNSET,UNSET,true,false);
 			}
 		
+			if(false){
+				for(auto th : model.param_vec_latin){
+					cout << model.param_vec_name(th) << " " << param_val.value[th] << ",";
+				}
+				cout << fit << " fit   best:" << fit_max << endl;
+			}
+			
 			print_diag("resampled after");
 			//state.check("after resample");
 		}
-		if(Lmax == -LARGE) run_error("Could not find initial state");
+		if(fit_max == -LARGE) run_error("Could not find initial state");
 		
 		state.set_particle(part);
 	}
 	
 	for(const auto &ssp: state.species) ssp.check_obs_inconsitent();
 	
-	//state.check("init");
+	state.check("init");
+	
 	print_diag("done");
 }
 
@@ -143,7 +173,7 @@ void Chain::burn_update(unsigned int s)
 		}
 		
 		if(s != 0 && s%burn_info.prop_join_step == 0) check_join_proposal();
-
+		
 		//if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
 	}
 	else{
@@ -434,12 +464,12 @@ void BurnInfo::setup(unsigned int s, unsigned int &nburnin,  unsigned int &nsamp
 					}
 					
 					//auto dpower = log_ratio-log_ratio_av;
-					auto dpower = 0.0;
+					//auto dpower = 0.0;
 					auto dif = -(log_ratio-log_ratio_av)/50;
 					if(dif > 1) dif = 1;
 					if(dif < -1) dif = -1;
 					
-					dpower += dif;
+					//dpower += dif;
 						
 					if(power < 1) power = 1; 
 					if(power > 100) power = 100;
@@ -540,11 +570,9 @@ double Chain::like_total_obs() const
 {
 	const auto &like = state.like;
 	
-	
-	return like.init_cond + like.prior_bounded + like.obs + like.genetic_obs;
-				 
+	return like.init_cond + like.prior_bounded + like.obs + like.genetic_obs;		 
 	//return like.init_cond + like.prior_bounded + like.obs + like.markov + like.nm_trans + 
-	  //     like.genetic_process + like.genetic_obs;
+	//     like.genetic_process + like.genetic_obs;
 }	
 
 
@@ -557,28 +585,34 @@ void Chain::update(unsigned int s)
 	
 	for(auto &pro : proposal){ 
 		//state.check_markov_value_dif();
-		//cout << pro.name  << endl;
+		//if(core() == 4) cout << pro.name  << endl;
 	
 		if(pro.on){
 			//if(op()) state.check_markov_value_dif();
 				
-			//if(op()) cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
+			//if(op()) cout << s << " " << core() << " " << add_escape_char(pro.name) << " " <<  state.sample << " proposal" << endl;
 			
 			//cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
 			
 			if(true){
 				if(pl) cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
-			
+		
 				pro.update(state);
 			}
 			else{
 				switch(pro.type){
-				case PARAM_PROP:
+				case DET_IC_POP_PROP:
+				//case DET_IC_POPTOTAL_PROP:
+				//case DET_IC_RESAMP_PROP:
+				case INIT_COND_FRAC_PROP:
+					
+				//case PARAM_PROP:
 				//case MBP_PROP:
+				//case POP_SINGLE_LOCAL_PROP:
 				//case POP_ADD_REM_LOCAL_PROP: 
 				//case POP_SINGLE_LOCAL_PROP:
 				//case IND_ADD_REM_PROP:
-				case IND_EVENT_TIME_PROP:   
+				//case IND_EVENT_TIME_PROP:   
 				//case IND_MULTI_EVENT_PROP:
 				//case IND_EVENT_ALL_PROP:
 				//case IND_OBS_SAMP_PROP:
@@ -587,7 +621,7 @@ void Chain::update(unsigned int s)
 				//case IND_UNOBS_RESIM_PROP:
 				//case IND_LOCAL_PROP:
 				
-				//case PAR_EVENT_FORWARD_PROP:
+				case PAR_EVENT_FORWARD_PROP:
 				//case PAR_EVENT_FORWARD_SQ_PROP:
 				//case PAR_EVENT_BACKWARD_SQ_PROP:
 				//case IND_ADD_REM_PROP:
@@ -602,7 +636,10 @@ void Chain::update(unsigned int s)
 					break;
 				}
 			}
-		
+
+			//if(core() == 4) 
+			//state.check(" After prop check"); 
+		 
 			if(pl) state.check(" After prop check");
 			if(pl) state.check_pop_t("hhh");
 		
@@ -612,8 +649,14 @@ void Chain::update(unsigned int s)
 		}
 	}
 	
-	// This resamples to remove any indiviudals with LI_WROMG
-	if(burn_info.on) state.resample_ind(true);   
+	// This resamples to remove any inconsistent indiviudals 
+	if(burn_info.on){
+		auto fl = false;
+		for(const auto &ssp : state.species){
+			if(ssp.inconsistent_ind) fl = true;
+		}
+		if(fl) state.resample_ind(true);   
+	}
 	
 	//if(testing == true && s%10 == 0) state.check("check");
 	if(testing == true && s%CHECK_THIN == CHECK_THIN-1) state.check("end");
@@ -624,15 +667,18 @@ void Chain::update(unsigned int s)
 void Chain::update_init()
 {	
 	print_diag("update_init 1");
-	
+
 	cor_matrix.init();
 
 	for(auto i = 0u; i < model.nparam_vec; i++){     // Univariate distributions
-		if(model.param_vec[i].prop_pos){
+		const auto &pv = model.param_vec[i];
+		if(pv.prop_pos){
 			vector <unsigned int> vec;
 			vec.push_back(i);
 			
-			add_parameter_prop(vec);
+			add_parameter_prop(vec,false);
+			
+			if(pv.strictly_positive) add_parameter_prop(vec,true);
 		}
 	}
 	
@@ -658,7 +704,7 @@ void Chain::update_init()
 		for(auto i = 0u; i < sp.ind_eff_group.size(); i++){
 			auto &ieg = sp.ind_eff_group[i];
 			const auto &par = model.param[ieg.th];
-			if(par.variety != CONST_PARAM){
+			if(par.variety != CONST_PARAM && par.variety != DYNAMIC_PARAM){
 				for(auto j = 0u; j < ieg.list.size(); j++){	
 					auto ie = ieg.list[j].index;
 					vector <unsigned int> vec;
@@ -700,15 +746,13 @@ void Chain::update_init()
 	print_diag("update_init 3");
 	
 	// Adds MBPs which don't change parameters
-	for(auto loop = 0u; loop < 1; loop++){
-		for(auto p = 0u; p < model.nspecies; p++){
-			if(model.species[p].type == POPULATION){
-				vector <unsigned int> vec;
-				vec.push_back(p);
-				Proposal pp(MBPII_PROP,vec,model,output,PROP_MBPII_W,burn_info);
-				model.add_like_obs_affect(p,pp.affect_like);
-				proposal.push_back(pp);
-			}
+	for(auto p = 0u; p < model.nspecies; p++){
+		if(model.species[p].type == POPULATION){
+			vector <unsigned int> vec;
+			vec.push_back(p);
+			Proposal pp(MBPII_PROP,vec,model,output,PROP_MBPII_W,burn_info);
+			model.add_like_obs_affect(p,pp.affect_like);
+			proposal.push_back(pp);
 		}
 	}
 	
@@ -719,39 +763,84 @@ void Chain::update_init()
 		for(auto p = 0u; p < model.nspecies; p++){
 			const auto &sp = model.species[p];
 			const auto &ic = sp.init_cond;
-			if(sp.type == POPULATION && ic.type == INIT_POP_DIST){
-				if(sp.ncla > 1){
-					vector <unsigned int> vec;
-					vec.push_back(p);
-					Proposal pp(MBP_IC_RESAMP_PROP,vec,model,output,PROP_MBPII_W,burn_info);		
-					model.add_like_obs_affect(p,pp.affect_like);
-					proposal.push_back(pp);
-				}					
-					
-				auto foc_cl = ic.focal_cl;
-				if(foc_cl == UNSET){
-					vector <unsigned int> vec;
-					vec.push_back(p);
-					Proposal pp(MBP_IC_POPTOTAL_PROP,vec,model,output,PROP_MBPIC_W,burn_info);
-					AffectLike al; al.type = PRIOR_INIT_COND_AFFECT; al.num = UNSET; al.num2 = UNSET;
-					param_vec_add_affect(pp.affect_like,al);		
-					model.add_like_obs_affect(p,pp.affect_like);
-					proposal.push_back(pp);
-				}
-				else{
-					const auto &claa = sp.cla[foc_cl];
-					for(auto c = 0u; c < claa.comp.size(); c++){
-						if(!claa.comp[c].erlang_hidden){
+
+			if(ic.type == INIT_POP_DIST){
+				switch(sp.type){
+				case POPULATION:
+					{
+						if(sp.ncla > 1){
 							vector <unsigned int> vec;
-							vec.push_back(p); vec.push_back(foc_cl); vec.push_back(c);
+							vec.push_back(p);
 							
-							Proposal pp(MBP_IC_POP_PROP,vec,model,output,PROP_MBPIC_W,burn_info);
+							Proposal pp(MBP_IC_RESAMP_PROP,vec,model,output,PROP_MBPII_W,burn_info);		
+							model.add_like_obs_affect(p,pp.affect_like);
+							proposal.push_back(pp);
+						}					
+							
+						auto foc_cl = ic.focal_cl;
+						if(foc_cl == UNSET){
+							vector <unsigned int> vec;
+							vec.push_back(p);
+							
+							Proposal pp(MBP_IC_POPTOTAL_PROP,vec,model,output,PROP_MBPIC_W,burn_info);
 							AffectLike al; al.type = PRIOR_INIT_COND_AFFECT; al.num = UNSET; al.num2 = UNSET;
 							param_vec_add_affect(pp.affect_like,al);		
 							model.add_like_obs_affect(p,pp.affect_like);
 							proposal.push_back(pp);
 						}
+						else{
+							const auto &claa = sp.cla[foc_cl];
+							for(auto c = 0u; c < claa.comp.size(); c++){
+								if(!claa.comp[c].erlang_hidden){
+									vector <unsigned int> vec;
+									vec.push_back(p); vec.push_back(foc_cl); vec.push_back(c);
+									
+									Proposal pp(MBP_IC_POP_PROP,vec,model,output,PROP_MBPIC_W,burn_info);
+									AffectLike al; al.type = PRIOR_INIT_COND_AFFECT; al.num = UNSET; al.num2 = UNSET;
+									param_vec_add_affect(pp.affect_like,al);		
+									model.add_like_obs_affect(p,pp.affect_like);
+									proposal.push_back(pp);
+								}
+							}
+						}
 					}
+					break;
+					
+				case DETERMINISTIC:
+					{
+						if(sp.ncla > 1){
+							vector <unsigned int> vec;
+							vec.push_back(p);
+							
+							Proposal pp(DET_IC_RESAMP_PROP,vec,model,output,PROP_MBPII_W,burn_info);		
+							proposal.push_back(pp);
+						}					
+							
+						auto foc_cl = ic.focal_cl;
+						if(foc_cl == UNSET){
+							vector <unsigned int> vec;
+							vec.push_back(p);
+							
+							Proposal pp(DET_IC_POPTOTAL_PROP,vec,model,output,PROP_MBPIC_W,burn_info);
+							proposal.push_back(pp);
+						}
+						else{
+							const auto &claa = sp.cla[foc_cl];
+							for(auto c = 0u; c < claa.comp.size(); c++){
+								if(!claa.comp[c].erlang_hidden){
+									vector <unsigned int> vec;
+									vec.push_back(p); vec.push_back(foc_cl); vec.push_back(c);
+									
+									Proposal pp(DET_IC_POP_PROP,vec,model,output,PROP_MBPIC_W,burn_info);
+									proposal.push_back(pp);
+								}
+							}
+						}
+					}
+					break;
+					
+				case INDIVIDUAL:
+					break;
 				}
 			}
 		}
@@ -939,6 +1028,7 @@ void Chain::update_init()
 		}		
 	}
 	
+	
 	// Adds a transmission tree proposal
 	if(model.trans_tree){
 		vector <unsigned int> vec;
@@ -988,20 +1078,23 @@ void Chain::update_init()
 	}				
 	 
 	print_diag("update_init 9");
-	 
+
 	if(model.mode != EXT){
-		for(auto i = 0u; i < 50; i++){
-			auto param_val = model.param_sample();
+		for(auto i = 0u; i < 20; i++){
+			auto param_val = model.param_sample(true);
 			cor_matrix.add_sample(model.get_param_val_prop(param_val),LARGE);
 		}
 	}
-	 
+	
 	for(auto &pro : proposal) pro.update_sampler(cor_matrix);
+	
+	//print_diag("update_init 10");
 	
 	if(1 == 0) cout << "print_info_turned off in code" << endl;
 	else{
 		string te = "";
 		for(auto &pro : proposal) te += pro.print_info();
+
 		output.prop_summary(te);
 	}
 	
@@ -1013,7 +1106,7 @@ void Chain::update_init()
 bool Chain::is_markov_pop(const AffectLike &al) const
 {
 	switch(al.type){
-	case MARKOV_POP_AFFECT: case MARKOV_POP_NOPOP_AFFECT: case MARKOV_POP_LINEAR_AFFECT: 
+	case MARKOV_POP_AFFECT:
 		return true;
 	default: break;
 	}
@@ -1022,18 +1115,42 @@ bool Chain::is_markov_pop(const AffectLike &al) const
 }	
 
 
-/// Adds a parameter 
-void Chain::add_parameter_prop(const vector <unsigned int> &vec)
+/// Adds a parameter proposal
+void Chain::add_parameter_prop(const vector <unsigned int> &vec, bool log_trans)
 {
+	//cout << "LOG TRANS" << endl; if(log_trans) return; 
+	
+	auto bern_fl = false;
+	for(auto th : vec){
+		if(model.is_bernoulli(th)) bern_fl = true;
+	}
+	
 	if(model.species[0].type == DETERMINISTIC){
-		Proposal pp(PARAM_DET_PROP,vec,model,output,1,burn_info);
+		auto type = DET_PARAM_PROP;
+		if(log_trans) type = DET_LOG_PARAM_PROP;
+		if(bern_fl){
+			type = DET_BERNOULLI_PROP;
+			if(vec.size() != 1) emsg("Cannot update more than one bernoulli");
+		}
+	
+		Proposal pp(type,vec,model,output,1,burn_info);
+		//for(auto p = 0u; p < model.species.size(); p++){
+			//model.add_like_obs_affect(p,pp.affect_like);
+		//}
 		proposal.push_back(pp);
 		return;
 	}
-	
-	Proposal pp(PARAM_PROP,vec,model,output,1,burn_info);
-	proposal.push_back(pp);
 
+	auto type = PARAM_PROP;
+	if(log_trans) type = LOG_PARAM_PROP;
+	if(bern_fl){
+		type = BERNOULLI_PROP;
+		if(vec.size() != 1) emsg("Cannot update more than one bernoulli");
+	}
+	
+	Proposal pp(type,vec,model,output,1,burn_info);
+	proposal.push_back(pp);
+	
 	/// Looks at adding MBPs
 	vector <unsigned int> list;
 	HashSimp hash_list;
@@ -1045,22 +1162,39 @@ void Chain::add_parameter_prop(const vector <unsigned int> &vec)
 		auto pp2 = pp;
 		pp2.p_prop = list[k];
 		
-		auto j = 0u;                             // Removes MARKOV_POP_AFFECT from list
+		auto j = 0u;                             // Removes MARKOV_POP_AFFECT etc...
 		while(j < pp2.affect_like.size()){
 			auto al = pp2.affect_like[j];
-			if(is_markov_pop(al) && al.num == list[k]){
-				pp2.affect_like.erase(pp2.affect_like.begin()+j);
+			
+			auto fl = false;
+		
+			if(al.num == list[k]) fl = is_markov_pop(al);
+			
+			switch(al.type){
+			case MARKOV_VALUE_AFFECT: fl = true; break;
+			default: break;
 			}
+			
+			if(fl) pp2.affect_like.erase(pp2.affect_like.begin()+j);
 			else j++;
 		}
 
 		model.add_like_obs_affect(pp2.p_prop,pp2.affect_like);
 	
-		pp2.type = MBP_PROP;
-		pp2.name = "MBP "+pp2.name;
 		pp2.mbp_population_affect();
 	
-		proposal.push_back(pp2);
+		if(bern_fl){
+			if(vec.size() != 1) emsg("Cannot update more than one bernoulli");
+			pp2.type = MBP_BERNOULLI_PROP;
+			pp2.name = "MBP BERNOULLI "+pp2.name;
+			
+			proposal.push_back(pp2);
+		}
+		else{
+			pp2.type = MBP_PROP; if(log_trans) pp2.type = LOG_MBP_PROP;
+			pp2.name = "MBP "+pp2.name;
+			proposal.push_back(pp2);
+		}
 	}
 }
 
@@ -1087,7 +1221,7 @@ string Chain::banner(string te) const
 
 
 /// Outputs diagnostics about the proposals
-string Chain::diagnostics(double total_time, double anneal_time) const
+string Chain::diagnostics(double total_time, double init_time, double anneal_time) const
 {                    
 	stringstream ss;
 	
@@ -1117,17 +1251,32 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 	{	
 		auto sum_param_prop = 0.0, sum_event_prop = 0.0;
 		auto sum_joint_prop = 0.0, sum_tree_prop = 0.0;
+		auto sum_param_prop_precalc = 0.0, sum_event_prop_precalc = 0.0;
+		auto sum_joint_prop_precalc = 0.0, sum_tree_prop_precalc = 0.0;
 		auto sum_prop = 0.0;
 		
+		auto sum_resample = 0.0, sum_ie = 0.0, sum_pop = 0.0, sum_timedep = 0.0, sum_calc = 0.0, sum_t_precalc = 0.0;
 		for(auto &pro : proposal){
 			auto t = pro.timer[PROP_TIMER];
+			auto t_precalc = pro.timer[PARAM_RESAMPLE_TIMER]+pro.timer[PARAM_IE_TIMER]+pro.timer[PARAM_POP_TIMER]+pro.timer[PARAM_TIMEDEP_TIMER]+pro.timer[PARAM_CALC_TIMER];
+			
+			sum_resample += pro.timer[PARAM_RESAMPLE_TIMER];
+			sum_ie += pro.timer[PARAM_IE_TIMER];
+			sum_pop += pro.timer[PARAM_POP_TIMER];
+			sum_timedep += pro.timer[PARAM_TIMEDEP_TIMER];
+			sum_calc += pro.timer[PARAM_CALC_TIMER];
+			sum_t_precalc += t_precalc;
+		
 			sum_prop += t;
 			
 			switch(pro.type){
-			case PARAM_PROP: case PARAM_DET_PROP:
+			case PARAM_PROP: case LOG_PARAM_PROP: case BERNOULLI_PROP: 
+			case DET_PARAM_PROP: case DET_LOG_PARAM_PROP: case DET_BERNOULLI_PROP: 
+			case DET_IC_POP_PROP: case DET_IC_POPTOTAL_PROP: case DET_IC_RESAMP_PROP:
 			case INIT_COND_FRAC_PROP: case IE_PROP: case IE_VAR_PROP:
 			case IE_COVAR_PROP: case IE_VAR_CV_PROP:
 				sum_param_prop += t;
+				sum_param_prop_precalc += t_precalc;
 				break;
 			
 			case IND_EVENT_TIME_PROP: case IND_MULTI_EVENT_PROP: case IND_EVENT_ALL_PROP:
@@ -1138,20 +1287,23 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 			case POP_IC_SWAP_PROP:
 			case IND_LOCAL_PROP: case CORRECT_OBS_TRANS_PROP:
 			case IND_OBS_SWITCH_ENTER_SOURCE_PROP: case IND_OBS_SWITCH_LEAVE_SINK_PROP:
-			case MBPII_PROP:  case MBP_IC_POP_PROP:
+			case MBPII_PROP: case MBP_IC_POP_PROP:
 			case MBP_IC_POPTOTAL_PROP: case MBP_IC_RESAMP_PROP:
 				sum_event_prop += t;
+				sum_event_prop_precalc += t_precalc;
 				break;
 				
-			case MBP_PROP: 
+			case MBP_PROP: case LOG_MBP_PROP: case MBP_BERNOULLI_PROP: 
 			case PAR_EVENT_FORWARD_PROP: case PAR_EVENT_FORWARD_SQ_PROP:
 			case PAR_EVENT_BACKWARD_SQ_PROP:
-			 sum_joint_prop += t;
+				sum_joint_prop += t;
+				sum_joint_prop_precalc += t_precalc;
 				break;
 			
 			case TRANS_TREE_PROP: case TRANS_TREE_SWAP_INF_PROP: case TRANS_TREE_MUT_PROP:
 			case TRANS_TREE_MUT_LOCAL_PROP:
 				sum_tree_prop += t;
+				sum_tree_prop_precalc += t_precalc;
 				break;
 			}
 		}
@@ -1161,22 +1313,22 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 		ss << "Shows how run-time CPU time is distributed into different proposal types:" << endl << endl;
 			
 		if(sum_param_prop != 0){
-			ss << "Parameters - " << cpu_percent(sum_param_prop,total_time) << endl;
+			ss << "Parameters - " << cpu_percent(sum_param_prop,total_time) << " (" << cpu_percent(sum_param_prop_precalc,total_time) << " from sampling)" << endl;
 		}
 		
 		if(sum_event_prop != 0){
 			ss << "Events - " << cpu_percent(sum_event_prop,total_time);
 
-			ss << " (ind update:" << cpu_percent(state.timer[IND_TIMER],total_time) << " of which " << cpu_percent(state.timer[IND_POP_UPDATE_TIMER],total_time) << " is from population)" <<  endl;
+			ss << " (ind update:" << cpu_percent(state.timer[IND_TIMER],total_time) << " of which " << cpu_percent(state.timer[IND_POP_UPDATE_TIMER],total_time) << " is from population)" << " (" << cpu_percent(sum_event_prop_precalc,total_time) << " from sampling)" << endl;
 
 		}
 		
 		if(sum_joint_prop != 0){
-			ss << "Joint event/parameter - " << cpu_percent(sum_joint_prop,total_time) << endl;
+			ss << "Joint event/parameter - " << cpu_percent(sum_joint_prop,total_time) << " (" << cpu_percent(sum_joint_prop_precalc,total_time) << " from sampling)" << endl;
 		}
 
 		if(sum_tree_prop != 0){
-			ss << "Transmission tree - " << cpu_percent(sum_tree_prop,total_time) << endl;
+			ss << "Transmission tree - " << cpu_percent(sum_tree_prop,total_time) << " (" << cpu_percent(sum_tree_prop_precalc,total_time) << " from sampling)" << endl;
 		}
 		
 		auto other = double(total_time)-double(sum_prop);
@@ -1190,36 +1342,51 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 	
 		ss << ")" << endl;
 		
+		ss << "Initialisation percentage - " 
+				<< cpu_percent(init_time,init_time+total_time) << endl;
+				
 		if(anneal_time != UNSET){
 			ss << "Annealing percentage - " 
 				<< cpu_percent(anneal_time,total_time) << endl << endl;
 		}
 
-	  ss << endl;
-		ss << banner("CHECKING") << endl;
-		ss << "Shows how run-time CPU checking time is distributed:" << endl << endl;
-		auto ttot = state.timer[CHECK_TIMER];
-		auto fl = false;
-		for(auto j = 0u; j < CHECK_MAX-1; j++){
-			auto t = state.check_timer[j];
-			if(t >= 0.01*ttot){
-				if(fl == true) ss << ", ";
-				ss << check_name[j] << " "  << cpu_percent(t,ttot);
-				fl = true;
-			}
-		}
-		ss << endl << endl;
-		
-		ss <<  "Total CPU time: " << get_cpu_time(total_time) << endl;
+		ss << endl;
+		ss << "Sampling split - ";
+		ss << "resample " << cpu_percent(sum_resample,sum_t_precalc) << ", ";
+		ss << "ie " << cpu_percent(sum_ie,sum_t_precalc) << ", ";
+		ss << "pop " << cpu_percent(sum_pop,sum_t_precalc) << ", ";
+		ss << "timedep " << cpu_percent(sum_timedep,sum_t_precalc) << ", ";
+		ss << "calc " << cpu_percent(sum_calc,sum_t_precalc);
+		ss << endl;
 	
-		ss << endl << endl;
+		ss << endl;
+		ss <<  "Total CPU running time: " << get_cpu_time(total_time) << endl;
+	
+	  ss << endl;
+		
+		if(!model.deterministic){
+			ss << banner("CHECKING") << endl;
+			ss << "Shows how run-time CPU checking time is distributed:" << endl << endl;
+			auto ttot = state.timer[CHECK_TIMER];
+			auto fl = false;
+			for(auto j = 0u; j < CHECK_MAX-1; j++){
+				auto t = state.check_timer[j];
+				if(t >= 0.01*ttot){
+					if(fl == true) ss << ", ";
+					ss << check_name[j] << " "  << cpu_percent(t,ttot);
+					fl = true;
+				}
+			}
+
+			ss << endl << endl;
+		}
 	}
 	
 	{
 		ss << banner("PARAMETER UPDATE") << endl;
 		ss << "Determines which parts of parameter update use most CPU" << endl << endl;
 		
-		auto sum_update = 0.0, sum_restore = 0.0;
+		//auto sum_restore = 0.0;
 		for(auto i = 0u; i < AFFECT_MAX; i++){	
 			auto update_num = cpu_percent(state.update_timer[i],total_time);
 			auto restore_num = cpu_percent(state.restore_timer[i],total_time);
@@ -1231,11 +1398,9 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 				case IEG_PRIOR_AFFECT: ss << "IEG Prior"; break; 
 				case DIST_AFFECT: ss << "Distribution"; break; 
 				case EXP_FE_AFFECT: ss << "Exp FE"; break; 
-				case DIV_VALUE_AFFECT: ss << "Div value"; break; 
-				case DIV_VALUE_NOPOP_AFFECT: ss << "Div value nopop"; break; 
-				case DIV_VALUE_LINEAR_AFFECT: ss << "Div value linear"; break; 
+				case MARKOV_VALUE_AFFECT: ss << "Markov value"; break; 
 				case MARKOV_LIKE_AFFECT: ss << "Markov like"; break; 
-				case POP_AFFECT: ss << "Population"; break; 
+				//case POP_AFFECT: ss << "Population"; break; 
 				case NM_TRANS_AFFECT: ss << "NM trans"; break; 
 				case NM_TRANS_BP_AFFECT: ss << "NM trans bp"; break; 
 				case NM_TRANS_INCOMP_AFFECT: ss << "NM trans incomp"; break; 
@@ -1244,8 +1409,6 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 				case LIKE_IE_AFFECT: ss << "Like IE"; break; 
 				case INDFAC_INT_AFFECT: ss << "Individual factor"; break; 
 				case MARKOV_POP_AFFECT: ss << "Markov pop"; break; 
-				case MARKOV_POP_NOPOP_AFFECT: ss << "Markov pop nopop"; break; 
-				case MARKOV_POP_LINEAR_AFFECT: ss << "Markov pop linear"; break; 
 				case OBS_EQN_AFFECT: ss << "Obs Eqn"; break; 
 				case LIKE_OBS_IND_AFFECT: ss << "Like Obs Ind"; break; 
 				case LIKE_OBS_POP_AFFECT: ss << "Like Obs Pop"; break; 
@@ -1264,8 +1427,8 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 				ss << "restore - " << restore_num << endl;
 			}
 			
-			sum_update += state.update_timer[i];
-			sum_restore += state.restore_timer[i];
+			//sum_update += state.update_timer[i];
+			//sum_restore += state.restore_timer[i];
 		}
 		
 		ss << endl << endl;
@@ -1303,159 +1466,140 @@ string Chain::diagnostics(double total_time, double anneal_time) const
 }
 
 
-/// Used to order proposal speeds
-bool PS_ord (const PropSpeed &ps1, const PropSpeed &ps2)                      
-{ return (ps1.time_per_prop < ps2.time_per_prop); };  
-
-
-/*
-/// Sets the proposal probabilities based on the amount of CPU time taken 
-void Chain::set_proposal_prob()
-{
-	vector <PropSpeed> list;
-	for(auto i = 0u; i < proposal.size(); i++){
-		const auto &pro = proposal[i];
-		if(pro.number != 0){
-			PropSpeed ps; ps.i = i; ps.time_per_prop = pro.timer[PROP_TIMER]/pro.number;
-			list.push_back(ps);
-		}
-	}
-	
-	sort(list.begin(),list.end(),PS_ord);
-
-	// List all possible transitions which could have reduced probabilities
-	vector <PropType> pos = {POP_ADD_REM_LOCAL_PROP,POP_MOVE_LOCAL_PROP,POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP,IND_OBS_SAMP_PROP,IND_OBS_RESIM_PROP};
-	
-	auto jmin = list.size();
-
-	while(jmin > 0){
-		if(list[jmin-1].time_per_prop == 0) break;
-		
-		auto ty = proposal[list[jmin-1].i].type;
-		auto kmax = pos.size();
-		auto k = 0u; while(k < kmax && pos[k] != ty) k++;
-		if(k == kmax) break;
-		jmin--;
-	}
-
-	for(auto j = 0u; j < jmin; j++){
-		auto &pro = proposal[list[j].i];
-		pro.prop_prob = pro.prop_weight;
-	}
-	
-	if(jmin < list.size()){
-		auto ref = list[jmin].time_per_prop;
-		for(auto j = jmin; j < list.size(); j++){
-			auto &pro = proposal[list[j].i];
-			auto prob = (ref/list[j].time_per_prop)*pro.prop_weight;
-			if(prob < PROPOSAL_PROB_LIM) prob = PROPOSAL_PROB_LIM;
-			pro.prop_prob = prob;
-		}
-	}
-}
-*/
-
-
 /// Checks if new proposals are added which join parameters
 void Chain::check_join_proposal()
 {
 	auto pl = false;
 	
-	auto M = cor_matrix.calculate_cor_matrix();
-
-	if(pl) print_matrix("mat",M);
-	
 	auto n = cor_matrix.get_n();
 	auto f = exp(-(n/400.0));
 
 	auto thresh = f + (1-f)*PROP_JOIN_COR_MIN;
+ 
 	if(n < 50) thresh = LARGE;
-	
-	// Works out all multivariate proposals
-	vector < vector <unsigned int> > par_list;
-	for(auto i = 0u; i < model.nparam_vec_prop; i++){	
-		auto th = model.param_vec_prop[i];
-		vector <unsigned int> list;
-		list.push_back(th);
-		par_list.push_back(list);
-	}
-	
-	auto N = M.size();
-	for(auto j = 0u; j < N; j++){
-		for(auto i = j+1; i < N; i++){
-			if(M[j][i] > thresh || M[j][i] < -thresh){
-				auto th_j = model.param_vec_prop[j];
-				auto th_i = model.param_vec_prop[i];
-				
-				auto lj = find_which_list(th_j,par_list);
-				auto li = find_which_list(th_i,par_list);
-				if(lj != li){
-					for(auto va : par_list[lj]){
-						par_list[li].push_back(va);
-					}
-							
-					if(lj+1 != par_list.size()){
-						par_list[lj] = par_list[par_list.size()-1];
-					}
-					par_list.pop_back();
-				}
-			}
-		}
-	}
 	
 	// Switches off all multinomial proposals
 	vector <bool> on_st;
 	for(auto &prop : proposal){	
 		on_st.push_back(prop.on);
-		if(prop.param_list.size() > 1 && (prop.type == PARAM_PROP || prop.type == PARAM_DET_PROP || prop.type == MBP_PROP)){
+		if(prop.is_param_prop() && prop.param_list.size() > 1){
 			prop.on = false;
 		}
 	}
 	
-	// Switch on those which are in list
-	vector <unsigned int> add;
-	for(auto j = 0u; j < par_list.size(); j++){
-		auto fl = false;
-		for(auto i = 0u; i < proposal.size(); i++){
-			auto &prop = proposal[i];
-			if(prop.type == PARAM_PROP || prop.type == PARAM_DET_PROP || prop.type == MBP_PROP){
-				if(equal_vec(prop.param_list,par_list[j])){
-					fl = true;
-					prop.on = true;
-					if(on_st[i] == false){
-						if(pl) cout << "RE TURN ON: " << prop.name << endl;
-						prop.update_sampler(cor_matrix);
+	auto M_norm = cor_matrix.calculate_cor_matrix(false);
+	auto M_log_trans = cor_matrix.calculate_cor_matrix(true);
+	
+	{  // This looks for whatever has the most extreame correlation (log or normal) to construct multivariable proposals
+		const auto &list = cor_matrix.str_pos_list;
+		for(auto j : list){
+			for(auto i : list){
+				if(j != i){
+					auto cor1 = M_norm[j][i]; if(cor1 < 0) cor1 *= -1;
+					auto cor2 = M_log_trans[j][i]; if(cor2 < 0) cor2 *= -1;
+					if(cor1 > cor2) M_log_trans[j][i] = 0;
+					else M_norm[j][i] = 0;
+				}
+			}
+		}
+	}
+	
+	//print_matrix("M",M_norm);
+	//print_matrix("M_log",M_norm);
+
+	for(auto loop = 0u; loop < 2; loop++){ // Goes through normal then log transformmed
+		if(pl) cout << loop << " loop" << endl;	
+		auto log_trans = false; 
+		auto M = M_norm;
+		
+		if(loop == 1){ log_trans = true; M = M_log_trans;}
+		
+		// Works out all multivariate proposals
+		vector <unsigned int> pvp_list; // List of parameter to be considered
+		
+		vector < vector <unsigned int> > par_list;
+		for(auto i = 0u; i < model.nparam_vec_prop; i++){	
+			auto th = model.param_vec_prop[i];
+			if(!model.is_bernoulli(th)){
+				if(!(loop == 1 && !model.param_vec[th].strictly_positive)){
+					pvp_list.push_back(i);
+					
+					vector <unsigned int> list;
+					list.push_back(th);
+					par_list.push_back(list);
+				}
+			}
+		}
+		
+		for(auto j : pvp_list){
+			for(auto i: pvp_list){
+				if(i > j){
+					if(M[j][i] > thresh || M[j][i] < -thresh){
+						auto th_j = model.param_vec_prop[j];
+						auto th_i = model.param_vec_prop[i];
+						
+						auto lj = find_which_list(th_j,par_list);
+						auto li = find_which_list(th_i,par_list);
+						if(lj != li){
+							for(auto va : par_list[lj]){
+								par_list[li].push_back(va);
+							}
+									
+							if(lj+1 != par_list.size()){
+								par_list[lj] = par_list[par_list.size()-1];
+							}
+							par_list.pop_back();
+						}
 					}
 				}
 			}
 		}
 		
-		if(fl == false){
-			add.push_back(j);
+		// Switch on those which are in list
+		vector <unsigned int> add;
+		for(auto j = 0u; j < par_list.size(); j++){
+			auto fl = false;
+			for(auto i = 0u; i < proposal.size(); i++){ // Tries to re-turn on an existing proposal
+				auto &prop = proposal[i];
+				if(prop.is_param_prop()){
+					if(equal_vec(prop.param_list,par_list[j]) && prop.log_trans == log_trans){
+						fl = true;
+						prop.on = true;
+						if(on_st[i] == false){
+							if(pl) cout << "RE TURN ON: " << prop.name << endl;
+							prop.update_sampler(cor_matrix);
+						}
+					}
+				}
+			}
+			
+			if(fl == false){
+				add.push_back(j);
+			}
 		}
-	}
-	
-	for(auto i = 0u; i < proposal.size(); i++){
-		auto &prop = proposal[i];
-		if(on_st[i] && prop.on == false){
-			if(pl) cout << "REMOVE: " << prop.name << endl;
+		
+		for(auto i = 0u; i < proposal.size(); i++){
+			auto &prop = proposal[i];
+			if(on_st[i] && prop.on == false){
+				if(pl) cout << "REMOVE: " << prop.name << endl;
+			}
 		}
-	}
-	
-	// Adds any new proposals
-	auto pr_st = proposal.size();
-	for(auto j : add) add_parameter_prop(par_list[j]);
-	
-	for(auto j = pr_st; j < proposal.size(); j++){
-		auto &prop = proposal[j];
-		if(pl) cout << "JOIN ADD: " << prop.name << endl;
-		prop.update_sampler(cor_matrix);
-	}
-	
-	if(pl){
-		cout << "after" << endl;
-		for(auto &prop : proposal){	
-			cout << prop.name << " " << prop.on << endl;
+		
+		// Adds any new proposals
+		auto pr_st = proposal.size();
+		for(auto j : add) add_parameter_prop(par_list[j],log_trans);
+		
+		for(auto j = pr_st; j < proposal.size(); j++){
+			auto &prop = proposal[j];
+			if(pl) cout << "JOIN ADD: " << prop.name << endl;
+			prop.update_sampler(cor_matrix);
+		}
+		
+		if(pl){
+			cout << "after" << endl;
+			for(auto &prop : proposal){	
+				cout << prop.name << " " << prop.on << endl;
+			}
 		}
 	}
 }
@@ -1527,6 +1671,8 @@ TerminalInfo Chain::get_terminal_info(unsigned int ch_tot) const
 	ti.n_start = cor_matrix.n_start; 
 	ti.av = cor_matrix.av;
 	ti.av2 = cor_matrix.av2;
+	ti.log_av = cor_matrix.log_av;
+	ti.log_av2 = cor_matrix.log_av2;
 	
 	return ti;
 }

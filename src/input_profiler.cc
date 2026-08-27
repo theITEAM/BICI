@@ -24,6 +24,8 @@ void Input::profile_memory() const
 	
 	auto f = 100000.0/(1024*total_memory());
 	cout << "TOTAL MEMORY: " << (unsigned int)(sum_tot*f) << endl;
+	
+	cout << sum_tot/1000000000.0 << " sum_tot   TOTAL:" << total_memory()/1000000 << "GB" << endl;
 }
 
 
@@ -47,12 +49,12 @@ void Input::reduce_memory()
 	}
 	else{
 		for(auto &spl : model.spline){
-			spl.name.clear();
+			//spl.name.clear();
 			//spl.param_ref.clear();
 			spl.div.clear();
 			spl.const_val.clear();
-			spl.markov_eqn_ref.clear();
-			spl.hash_trans_ref.off();
+			//spl.markov_eqn_ref.clear();
+			for(auto &tref : spl.trans_ref) tref.hash.off();
 		}
 	}
 
@@ -60,9 +62,10 @@ void Input::reduce_memory()
 	model.hash_pop.off();
 	model.hash_spline.off();
 
+	model.comp_pos.clear();
+	model.hash_comp_pos.off();	
+	
 	for(auto &sp : model.species){
-		sp.sim_linear_speedup.lin_form.hash_po.off();
-		
 		for(auto &claa : sp.cla){
 			claa.hash_comp.off();
 			for(auto &isl : claa.island) isl.hash_comp.off();
@@ -105,18 +108,10 @@ void Input::reduce_memory()
 		}
 	}
 
-	for(auto &pv : model.param_vec){
-		for(auto &al : pv.affect_like){
-			al.lin_form.hash_po.off();
-			//al.map.clear();
-		}
-	}
-	
-	
 	hash_off(model.spec_precalc);
 	hash_off(model.spec_precalc_derive);
 	hash_off(model.spec_precalc_sample);
-	hash_off(model.spec_precalc_all);
+	//hash_off(model.spec_precalc_all);
 		
 	for(auto &spl : model.spec_precalc_list) hash_off(spl.spec_precalc);
 	for(auto &po : model.pop) po.hash_spline_update.off();
@@ -184,6 +179,7 @@ double Input::equation_profile() const
 			sum += eqn.derive_ref.size()*sizeof(DeriveRef);
 			sum += eqn.pop_time_ref.size()*sizeof(PopTimeRef);
 			sum += eqn.pop_ref.size()*sizeof(unsigned int);
+			sum += eqn.popcomb_ref.size()*sizeof(unsigned int);
 			sum += eqn.source_tr_gl.size()*sizeof(unsigned int);
 			sum += eqn.ind_eff_mult.size()*sizeof(unsigned int);
 			sum += eqn.ind_eff_exist.size()*sizeof(bool);
@@ -245,17 +241,18 @@ double Input::model_profile() const
 		auto sum = 0.0;
 		for(const auto &pv : model.param_vec){
 			sum += sizeof(ParamVecEle);
-			sum += mem(pv.name)+mem(pv.affect_like);
+			//sum += mem(pv.name)
+			sum += mem(pv.affect_like);
 			sum += mem(pv.spec_precalc_before);
 			sum += mem(pv.set_param_spec_precalc);
 			sum += mem(pv.spec_precalc_after);
 		}
 		sum_tot += sum;
-		
+	
 		auto m1 = 0.0, m2 = 0.0, m3 = 0.0, m4 = 0.0, m5 = 0.0, m6 = 0.0;
 		for(const auto &pv : model.param_vec){
 			m1 += sizeof(ParamVecEle);
-			m2 += mem(pv.name);
+			//m2 += mem(pv.name);
 			m6 += mem(pv.affect_like);
 			m3 += mem(pv.spec_precalc_before);
 			m4 += mem(pv.set_param_spec_precalc);
@@ -291,12 +288,46 @@ double Input::model_profile() const
 			sum += mem(po.ind_eff_mult);
 			sum += mem(po.fix_eff_mult);
 			sum += po.term.size()*sizeof(PopulationTerm);
-			sum += po.markov_eqn_ref.size()*sizeof(PopMarkovEqnRef);
+			sum += po.markov_eqn_ref.size()*sizeof(MarkovEqnRefList);
+			for(const auto &mer : po.markov_eqn_ref){
+				sum += mer.list.size()*sizeof(unsigned int);
+				sum += mem(mer.hash);
+			}
 			sum += po.trans_ref.size()*sizeof(PopTransRef);
+			for(const auto &mer : po.trans_ref){
+				sum += mer.tr_list.size()*sizeof(unsigned int);
+				sum += mem(mer.hash);
+			}
+			sum += po.popcomb_ref.size()*sizeof(PopCombRef);
 			sum += mem(po.hash_spline_update);
 		}
 		sum_tot += sum;
 		if(sum > sum_min) cout << "pop: " << (unsigned int)(sum*f) << endl;
+	}
+	
+	{
+		auto sum = 0.0;
+		for(const auto &pc : model.popcomb){
+			sum += sizeof(PopComb);
+			sum += mem(pc.name);
+			sum += pc.ele.size()*sizeof(pc.ele);
+			sum += pc.markov_eqn_ref.size()*sizeof(MarkovEqnRefList);
+			for(const auto &mer : pc.markov_eqn_ref){
+				sum += mer.list.size()*sizeof(unsigned int);
+				sum += mem(mer.hash);
+			}
+		}
+		sum_tot += sum;
+		if(sum > sum_min) cout << "popcomb: " << (unsigned int)(sum*f) << endl;
+	}
+	
+	{
+		auto sum = 0.0;
+		for(const auto &pcw : model.popcombw){
+			sum += sizeof(PopCombWeight);
+			sum += pcw.pcref.size()*sizeof(PopCombIn);
+		}
+		if(sum > sum_min) cout << "popcombw: " << (unsigned int)(sum*f) << endl;
 	}
 	
 	{
@@ -347,19 +378,6 @@ double Input::model_profile() const
 	{
 		auto sum = model.hash_spline.mem();
 		for(const auto &spl : model.spline) sum += mem(spl);
-		
-		auto sum1 = 0.0, sum2 = 0.0, sum3 = 0.0, sum4 = 0.0, sum5 = 0.0, sum6 = 0.0, sum7 = 0.0, sum8 = 0.0; 
-	
-		for(const auto &spl : model.spline){ 
-			sum1 += sizeof(Spline);
-			sum2 += sizeof(spl.name);
-			sum3 += spl.param_ref.size()*sizeof(ElementRef);
-			sum4 += spl.div.size()*sizeof(SplineDiv);
-			sum5 += spl.cubic_div.size()*sizeof(CubicDiv);
-			sum6 += spl.const_val.size()*sizeof(double);
-			sum7 += spl.markov_eqn_ref.size()*sizeof(PopMarkovEqnRef);
-			sum8 += mem(spl.hash_trans_ref);
-		}
 		
 		sum_tot += sum;
 		if(sum > sum_min) cout << "spline: " << (unsigned int)(sum*f) << endl;
@@ -432,6 +450,8 @@ double Input::model_profile() const
 			for(const auto &va : ti.prop_info_store) sum += mem(va);
 			sum += mem(ti.av);
 			sum += mem(ti.av2);
+			sum += mem(ti.log_av);
+			sum += mem(ti.log_av2);
 		}
 		sum_tot += sum;
 		cout << "terminal_info: " << (unsigned int)(sum*f) << endl;
@@ -444,15 +464,42 @@ double Input::model_profile() const
 	}
 	
 	{
-		auto sum = mem(model.param_vec_ref);
+		auto sum = mem(model.param_vec_refq);
 		sum_tot += sum;
-		if(sum > sum_min) cout << "param_vec_ref: " << (unsigned int)(sum*f) << endl;
+		if(sum > sum_min) cout << "param_vec_refq: " << (unsigned int)(sum*f) << endl;
 	}
 	
 	{
-		auto sum = mem(model.spline_ref);
+		auto sum = mem(model.param_vec_refi);
 		sum_tot += sum;
-		if(sum > sum_min) cout << "spline_ref: " << (unsigned int)(sum*f) << endl;
+		if(sum > sum_min) cout << "param_vec_refi: " << (unsigned int)(sum*f) << endl;
+	}
+	
+	{
+		auto sum = mem(model.spline_refq);
+		sum_tot += sum;
+		if(sum > sum_min) cout << "spline_refq: " << (unsigned int)(sum*f) << endl;
+	}
+	
+	{
+		auto sum = mem(model.spline_refi);
+		sum_tot += sum;
+		if(sum > sum_min) cout << "spline_refi: " << (unsigned int)(sum*f) << endl;
+	}
+	
+	{
+		auto sum = 0.0;
+		for(auto &cp : model.comp_pos){
+			sum += sizeof(CompPos)+mem(cp.list);	
+		}
+		sum_tot += sum;
+		if(sum > sum_min) cout << "comp_pos: " << (unsigned int)(sum*f) << endl;
+	}
+	
+	{
+		auto sum = model.hash_comp_pos.mem();
+		sum_tot += sum;
+		if(sum > sum_min) cout << "hash_comp_pos: " << (unsigned int)(sum*f) << endl;
 	}
 	
 	return sum_tot;
@@ -474,16 +521,10 @@ double Input::precalc_profile() const
 		sum += sizeof(vector <PreCalc>);
 		for(const auto &va : pe.pcalcu){
 			sum += sizeof(PreCalc);
-			sum += va.item.size()*sizeof(EqItem);
+			sum += va.pre_item.size()*sizeof(PreEqItem);
 		}
 		sum_tot += sum;
 		if(sum > sum_min) cout << "pcalcu: " << (unsigned int)(sum*f) << endl;
-	}
-	
-	{
-		auto sum = mem(model.precalc_eqn.pcalcu_ref);
-		sum_tot += sum;
-		if(sum > sum_min) cout << "pcalcu_ref: " << (unsigned int)(sum*f) << endl;
 	}
 	
 	{
@@ -510,11 +551,13 @@ double Input::precalc_profile() const
 		if(sum > sum_min) cout << "spec_precalc_sample: " << (unsigned int)(sum*f) << endl;
 	}
 	
+	/*
 	{
 		auto sum = mem(model.spec_precalc_all);
 		sum_tot += sum;
 		if(sum > sum_min) cout << "spec_precalc_all: " << (unsigned int)(sum*f) << endl;
 	}
+	*/
 	
 	{
 		auto sum = 0.0;
@@ -527,6 +570,8 @@ double Input::precalc_profile() const
 		auto sum = 0.0;
 		for(const auto &sp : model.spec_precalc_list){
 			sum += mem(sp.pv);
+			sum += sizeof(DynamicParamUpdate)*sp.dynamic_param_update.size();
+			
 			sum += mem(sp.spec_precalc);
 		}
 		sum_tot += sum;
@@ -555,7 +600,6 @@ double Input::species_profile() const
 		cout << sp.name << endl;
 		
 		{
-			
 			for(const auto &claa : sp.cla){
 				cout << "CLASSIFICATION " << claa.name << endl;
 				
@@ -725,6 +769,7 @@ double Input::species_profile() const
 				sum += mem(val.name);
 				sum += mem(val.cla_comp);
 				sum += val.pop_ref.size()*sizeof(PopRef);
+				sum += val.pop_ref_derive.size()*sizeof(PopRef);
 				sum += mem(val.pop_ref_simp);
 				sum += mem(val.tr_enter);
 				sum += mem(val.tr_leave);
@@ -795,6 +840,39 @@ double Input::species_profile() const
 			}
 			sum_tot += sum;
 			if(sum > sum_min) cout << "markov_eqn: " << (unsigned int)(sum*f) << endl;
+		}
+		
+		{
+			auto sum = mem(sp.markov_eqn_not_linear);
+			sum_tot += sum;
+			if(sum > sum_min) cout << "markov_eqn_not_linear: " << (unsigned int)(sum*f) << endl;
+		}
+		
+		{
+			auto sum = mem(sp.pop_list);
+			sum_tot += sum;
+			if(sum > sum_min) cout << "pop_list: " << (unsigned int)(sum*f) << endl;
+		}
+			
+		{
+			auto sum = mem(sp.popcomb_list);
+			sum_tot += sum;
+			if(sum > sum_min) cout << "popcomb_list: " << (unsigned int)(sum*f) << endl;
+		}
+		
+		{
+			auto sum = mem(sp.popcomb_list);
+			sum_tot += sum;
+			if(sum > sum_min) cout << "popcomb_list: " << (unsigned int)(sum*f) << endl;
+		}
+			
+		{
+			auto sum = 0.0;
+			for(const auto &mut : sp.markov_update_t){
+				sum += sizeof(MEUpdate)*mut.size();
+			}
+			sum_tot += sum;
+			if(sum > sum_min) cout << "markov_update_t: " << (unsigned int)(sum*f) << endl;
 		}
 		
 		{
@@ -1096,13 +1174,6 @@ double Input::species_profile() const
 				sum += mem(val.te);
 			}
 			if(sum > sum_min) cout << "warn: " << (unsigned int)(sum*f) << endl;
-		}
-		
-		{
-			auto sum = 0.0;
-			sum += mem(sp.sim_linear_speedup.calc);
-			sum += mem(sp.sim_linear_speedup.lin_form);
-			if(sum > sum_min) cout << "sim_linear_speedup: " << (unsigned int)(sum*f) << endl;
 		}
 	
 		{

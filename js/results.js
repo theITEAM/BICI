@@ -278,7 +278,7 @@ function get_param_value(i,source,lines,result,warn,mode)
 		{		
 			let list = par_find_list(par);	
 			
-			value = par_find_template(list);
+			value = par_find_template(list,par.ndep_cont);
 				
 			if(is_symmetric(par)){  // Loads covariance matrix
 				i++;
@@ -311,17 +311,22 @@ function get_param_value(i,source,lines,result,warn,mode)
 				}
 			}
 			else{
-				let co_list = generate_co_list(list);
-				
 				par.list = list;
-				par.co_list = co_list;
-			
-				i++;
-				let spl_head = comma_split(lines[i]);
 				
 				let dep = par.dep;
 				
 				let ndep = par.dep.length;
+				
+				let hash_dep=[];
+				for(let d = 0; d < ndep; d++){
+					hash_dep[d] = new Hash();	
+					for(let k = 0; k < list[d].length; k++){
+						hash_dep[d].add(list[d][k],k);
+					}
+				}
+				
+				i++;
+				let spl_head = comma_split(lines[i]);
 			
 				if(spl_head.length != ndep+1){
 					alert_sample(warn,14);
@@ -334,18 +339,16 @@ function get_param_value(i,source,lines,result,warn,mode)
 				}
 
 				if(spl_head[ndep] != "Value") alert_sample(warn,16); 
-					
-				i++;
-				for(let j = 0; j < co_list.length; j++){
-					let spl_row = lines[i].split(",");
 				
-					if(spl_row.length != ndep+1) alert_sample(warn,17);
+				i++;
+				while(true){
+					let spl_row = lines[i].split(",");
+					if(spl_row.length != ndep+1) break;
+					
 					let index=[];
 					for(let d = 0; d < ndep; d++){
-						let k = find_in(list[d], spl_row[d]);
-						if(k == undefined){
-							alert_sample(warn,18);
-						}
+						let k = hash_dep[d].find(spl_row[d]);
+						if(k == undefined) alert_sample(warn,18);
 						index.push(k);
 					}
 					let val = spl_row[ndep];
@@ -395,6 +398,7 @@ function get_param_value(i,source,lines,result,warn,mode)
 		//par.co_list = generate_co_list(list);
 	}
 	
+	/*
 	if(par.list != undefined){
 		if(is_symmetric(par) != true){
 			let co_list = generate_co_list(par.list);
@@ -403,7 +407,8 @@ function get_param_value(i,source,lines,result,warn,mode)
 			}
 		}
 	}
-			
+	*/
+	
 	source.param[th] = value;
 	
 	return i;
@@ -1109,6 +1114,8 @@ function initialise_plot_filters_setup(result,source)
 
 		rpf.species[p] = { sel_class:copy(pos_class[0]), pos_class:pos_class, cla:cla_red, ncla:sp.ncla, name:sp.name, type:sp.type, trans_tree:sp.trans_tree, filter:[], cl_marg:sp.marg_plot.cl_marg, ind_eff_group:ind_eff_group_red};
 		
+		let rpf2 = rpf.species[p];
+		
 		if(rpf.siminf == "sim"){ // Sets up selection for test and cull
 			let pos_test_and_cull=[];
 			let source = get_source(rpf.siminf,p);
@@ -1119,11 +1126,21 @@ function initialise_plot_filters_setup(result,source)
 				}
 			}
 			if(pos_test_and_cull.length > 0){
-				rpf.species[p].pos_test_and_cull = pos_test_and_cull;
-				rpf.species[p].sel_test_and_cull = copy(pos_test_and_cull[0]);
+				rpf2.pos_test_and_cull = pos_test_and_cull;
+				rpf2.sel_test_and_cull = copy(pos_test_and_cull[0]);
 			}
 		}
 		
+		if(rpf.siminf == "sim"){  // This store initial istribution such that it can be "generated" data
+			let msp = model.species[p];
+			for(let j = 0; j < sp.sim_source.length; j++){
+				let so = sp.sim_source[j];
+				if(so.type == "Init. Pop."){
+					if(so.spec.radio_dist.value == "Dist") rpf2.init_dist = so;	
+				}
+			}
+		}
+	
 		switch(rpf.siminf){
 		case "sim": rpf.species[p].gen_source=[]; break;
 		case "inf": rpf.species[p].ppc_source=[]; break;
@@ -1794,7 +1811,7 @@ function change_remove_filter(pos)
 function add_univariate(name,result,total_param_list,pos_paramview,pos_genview,der_fl)
 {                                              
 	let list = [];
-	
+
 	for(let th = 0; th < result.param.length; th++){
 		let par = result.param[th];		
 		if(par.variety != "define"){
@@ -1937,6 +1954,7 @@ function get_pos_paramview(result)
 	let list_trans = [], list_like = [], list_ic = [], list_indpop = [];
 	for(let th = 0; th < result.param.length; th++){
 		let par = result.param[th];
+		
 		switch(par.selop){
 		case "tree": list_trans.push({th:th, index:[], name:par.name}); break;
 		case "like": list_like.push({th:th, index:[], name:par.name}); break;
@@ -1970,6 +1988,8 @@ function get_pos_paramview(result)
 			pos_genview.push(ob);	
 		}
 	}
+
+	for(let k = 0; k < pos_paramview.length; k++) pos_paramview[k].select_first_view = true;
 
 	return {ppv:pos_paramview, pgv:pos_genview};
 }

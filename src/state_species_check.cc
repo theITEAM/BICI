@@ -99,7 +99,7 @@ void StateSpecies::check_cpop() const
 	
 	for(auto c = 0u; c < N; c++){
 		if(dif(cpop[c],cpop_check[c],dif_thresh)){
-			//cout << c << " " << cpop[c] << " "<< cpop_check[c] <<" dif" << endl;
+			cout << c << " " << cpop[c] << " "<< cpop_check[c] <<" dif" << endl;
 			emsg("cpop wrong");
 		}
 	}				
@@ -175,8 +175,7 @@ void StateSpecies::print_markov_eqn(unsigned int e) const
 	cout << "For Markov Equation: " << eqn[me.eqn_ref].te_raw << endl;
 	for(auto ti = 0u; ti < T; ti++){
 		cout << calc_t(ti,model.details) << " time" << endl;
-		const auto &div = me_vari.div[ti];
-		cout << "Value: " << div.value << "  indfac: "<< div.indfac_int << endl; 
+		cout << "Value: " << me_vari.value_t[ti] << "  indfac: "<<  me_vari.div[ti].indfac_int << endl; 
 		
 		cout << endl;
 	}
@@ -433,19 +432,18 @@ string StateSpecies::data_sources_desc(const ObsData &ob, const ObsData &ob2) co
 	return "data sources '"+so+"' and '"+so2+"'";
 }
 
+
 /// This is used for diagnostic purporses
 void StateSpecies::print_likelihood_markov()
 {
-	auto sum = 0.0, dt_sum = 0.0, sum2 = 0.0;
+	/*
+	auto sum = 0.0;
 	for(auto e = 0u; e < sp.markov_eqn.size()-1; e++){
-		//auto &me = sp.markov_eqn[e];
 		auto &me_vari = markov_eqn_vari[e];
-		auto &Li_mark = Li_markov[e];
-		sum += me_vari.div[0].value;
+		sum += me_vari.value_t[0];
 		auto dt = me_vari.div[0].indfac_int;
-		dt_sum += dt;
-		sum2 += Li_mark[0];
 	}
 	cout << sum << "sum" << endl;
+	*/
 	emsg("Print likelihood");
 }

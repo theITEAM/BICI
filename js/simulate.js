@@ -102,7 +102,7 @@ function start(siminf)
 		}, 10);
 		return;
 	}
-	
+
 	start_loading_symbol(0,"Spawn");
 
 	inter.running_status = true;
@@ -146,8 +146,8 @@ function startspawn(co,ncore,siminf)
 	let do_com = siminf; if(do_com == "ppc") do_com="post-sim";
 
 	let file = "bici-core.exe";
-	if(ver == "mac") file = "./bici-core";
-	
+	if(ver == "mac" || ver == "linux") file = "./bici-core";
+		
 	let li = [];
 	li.push("default.bici");
 	li.push(do_com);
@@ -602,7 +602,7 @@ function add_ppc_start_buts(lay)
 	let cx = corner.x;
 	let cy = corner.y;
 	if(inter.options == false){
-		cy = lay.add_title("Start posterior predictive check",cx,cy,{te:start_sim_text});
+		cy = lay.add_title("Start posterior simulation",cx,cy,{te:start_sim_text});
 		
 		cy += 1;
 		
@@ -611,13 +611,11 @@ function add_ppc_start_buts(lay)
 		
 		let yy = cy-2.5;
 		add_right_input_field(yy,"Start time",{type:"ppc_t_start",update:true},lay);
-		add_right_input_field(yy+4,"End time",{type:"ppc_t_end",update:true},lay);
+		add_right_input_field(yy+3.5,"End time",{type:"ppc_t_end",update:true},lay);
 
 		cy += 4;
 		
 		let xx = 33;
-		
-		cy += 2;
 		
 		cy = lay.add_subtitle("Simulation number",cx,cy,WHITE,{te:ppc_num_text});
 		cy = lay.add_paragraph("Set the number of simulations to be generated:",lay.inner_dx-2*cx,cx,cy,BLACK,para_si,para_lh);
@@ -625,7 +623,7 @@ function add_ppc_start_buts(lay)
 		yy = cy-2.5;
 		add_right_input_field(yy,"Number",{type:"ppc_number",update:true},lay);
 		
-		cy += 2.5;
+		cy += 1.5;
 	
 		cy = ppc_use_inf_or_sim(cx,cy,model.ppc_details,lay);
 	
@@ -747,7 +745,7 @@ function add_param_value_buts(lay)
 	add_layer("ParamValueContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-2,{});	
 	
 	let x = 1.2, y = lay.dy-1.6;
-	let gap = 3.5;
+	let gap = 3.4;
 	
 	let active = false;
 	if(model.inf_res.on == true) active = true;
@@ -772,17 +770,21 @@ function get_param_cat(siminf,filt_type)
 	param_cat.push({name:"Constant prior", inf_te:prior_const_text, list:[]});
 	param_cat.push({name:"Defined", sim_te:defined_text, list:[]});
 	
+	//param_cat.push({name:"Defined", sim_te:defined_text, list:[]});
+	
 	for(let i = 0; i < param.length; i++){
 		let par = param[i];
+	
 		if(filt_type == "only normal" && par.prior_const_on == true){
 			param_cat[6].list.push(i);
 		}
 		else{
 			if(param_needed(par,siminf) &&
-			!(filt_type == "only normal" && param[i].variety != "normal") &&
+			!(filt_type == "only normal" && param[i].variety != "normal" && param[i].variety != "dynamic") &&
 			!(filt_type == "for sim" && par.variety == "const") &&
 			!(filt_type == "for sim" && par.variety == "reparam") && 
 			!(filt_type == "for sim" && par.variety == "define") &&
+			!(filt_type == "for sim" && par.variety == "dynamic") &&
 			par.param_fac != true
 			){
 				if(par.variety == "define"){
@@ -1068,7 +1070,7 @@ function edit_prior_const(th,lay_name,i,source)
 		select_bubble(lay_name,i,{});
 	}
 	else{
-		start_worker("Edit Prior Const",{type:"PriorConst", source:source, label_info:par.label_info, i:th});
+		start_worker("Edit Prior Const",{type:"PriorConst", par_st:par, source:source, label_info:par.label_info, i:th});
 	}
 }
 
@@ -1092,7 +1094,7 @@ function edit_reparam_value(th,lay_name,i,source)
 function edit_define_value(th,lay_name,i,source)
 {
 	let par = model.param[th];
-	
+
 	if(par.define_eqn_on == true){
 		select_bubble_over();
 		inter.bubble.par_name = par.name;

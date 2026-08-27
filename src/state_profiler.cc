@@ -16,7 +16,7 @@ using namespace std;
 /// Works out where memory is being used in the state
 void State::profile_memory() const
 {
-	cout << "STATE" << endl;
+	cout << endl << "STATE PROFILE" << endl;
 	auto f = 100000.0/(1024*total_memory());
 	auto sum_min = 5.0/f;
 	
@@ -286,7 +286,7 @@ void State::profile_memory() const
 				sum += sizeof(MarkovEqnVariation);
 				sum += val.ind_tra.size()*sizeof(IndTransRef);
 				for(const auto &val2 : val.div){
-					sum += sizeof(MarkovEqnDiv)+val2.ind_trans.size()*sizeof(DivIndRef);
+					sum += sizeof(MEIndDiv)+val2.ind_trans.size()*sizeof(DivIndRef);
 				}
 			}
 			sum_tot += sum;
@@ -368,5 +368,7 @@ void State::profile_memory() const
 			if(sum > sum_min) cout << "alg_warn: " << (unsigned int)(sum*f) << endl;
 		}
 	}
+	
+	cout << sum_tot/1000000000.0 << " sum_tot   TOTAL:" << total_memory()/1000000 << "GB" << endl;
 }
 

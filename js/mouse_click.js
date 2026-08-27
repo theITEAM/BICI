@@ -656,6 +656,8 @@ function button_action(bu,action_type)
 				inter.bubble.find_focus = true;			
 			}
 		
+			if(bu.source.select_first_view == true) inter.graph.select_first_view = true;
+			
 			if(pos.noupdate != true) reset_graph();
 			
 			if(bu.source.bub_off) close_bubble();
@@ -877,6 +879,14 @@ function button_action(bu,action_type)
 		inter.help = { title:"Compartmental percentage", te:"This cannot be editted because it is set by requiring that all percentages add up to 100%"};
 		break;
 
+	case "DoneIEGroupName":
+		if(bubble_check_error() == false){
+			copy_back_to_source();
+			close_bubble();
+			update_param();
+		}
+		break;
+		
 	case "Done": 
 		if(bubble_check_error() == false){
 			copy_back_to_source();
@@ -1094,6 +1104,10 @@ function button_action(bu,action_type)
 		initpop_data(bu); 
 		break;
 	
+	case "AddInitialPopulationChoose":
+		initpop_choose_data();
+		break;
+	
 	case "AddInitialPopulation2": 
 		initpop_data2(); 
 		break;
@@ -1231,6 +1245,7 @@ function button_action(bu,action_type)
 		break;
 		
 	case "TableEditOn":	
+		make_table_name_valid();
 		edit_source.table.edit = true;
 		break;
 		
@@ -1478,6 +1493,11 @@ function button_action(bu,action_type)
 		edit_source.col = inter.selected_col;
 		start_worker("Add comp map",edit_source);
 		break;
+		
+	case "AddCompPoint":
+		edit_source.col = inter.selected_col;
+		start_worker("Add comp point",edit_source);
+		break;
 	
 	case "CancelEditParam":
 		inter.edit_source = false;
@@ -1498,14 +1518,14 @@ function button_action(bu,action_type)
 	case "EditParamDone":
 		{
 			let ep = inter.edit_param;
-			start_worker("Set Param",{i:ep.i, value:ep.value, vari_new:ep.vari_new, par_st:ep.par_st});
+			start_worker("Set Param",{i:ep.i, value:ep.value, vari_new:ep.vari_new, par_st:ep.par_st, too_big:ep.too_big});
 		}
 		break;
 		
 	case "EditPriorConstDone":
 		{
 			let ep = inter.edit_param;
-			start_worker("Set Prior Const",{i:ep.i, value:ep.value});
+			start_worker("Set Prior Const",{i:ep.i, value:ep.value, par_st:ep.par_st, too_big:ep.too_big});
 		}
 		break;
 		
@@ -1514,7 +1534,7 @@ function button_action(bu,action_type)
 			inter.edit_source = false;
 			let ep = inter.edit_param;
 			
-			start_worker("Set Weight",{i:ep.i, value:ep.value});
+			start_worker("Set Weight",{i:ep.i, value:ep.value, par_st:ep.par_st, too_big:ep.too_big});
 			close_bubble();
 		}
 		break;
@@ -1522,21 +1542,21 @@ function button_action(bu,action_type)
 	case "EditPriorSplitDone": case "EditDistSplitDone": 
 		{
 			let ep = inter.edit_param;
-			start_worker("Set PriorSplit",{i:ep.i, prior_split:ep.prior_split});	
+			start_worker("Set PriorSplit",{i:ep.i, prior_split:ep.prior_split, too_big:ep.too_big});	
 		}
 		break;
 		
 	case "EditReparamDone":
 		{
 			let ep = inter.edit_param;
-			start_worker("Set Reparam",{i:ep.i, value:ep.value, vari_new:ep.vari_new, par_st:ep.par_st});
+			start_worker("Set Reparam",{i:ep.i, value:ep.value, vari_new:ep.vari_new, par_st:ep.par_st, too_big:ep.too_big});
 		}
 		break;
 		
 	case "EditDefineDone":
 		{
 			let ep = inter.edit_param;
-			start_worker("Set Define",{i:ep.i, value:ep.value, vari_new:ep.vari_new, par_st:ep.par_st});
+			start_worker("Set Define",{i:ep.i, value:ep.value, vari_new:ep.vari_new, par_st:ep.par_st, too_big:ep.too_big});
 		}
 		break;
 		
@@ -1592,9 +1612,28 @@ function button_action(bu,action_type)
 		start_worker("Load PriorSplit",{ep:inter.edit_param, source:edit_source, dist:true});	
 		break;
 		
-	case "SetConstant": case "SetReparam": case "SetDefine": case "SetPriorConst": 
+	case "SetConstant": case "SetReparam": case "SetDefine": case "SetPriorConst": case "SetParamDynamic":
 		select_bubble_over();
 		inter.bubble.set_reparam_type = false;
+		break;
+		
+	case "AddParamDynamic":
+		{
+			let th = bu.i;
+			let par = model.param[th];
+			par.variety = "dynamic";
+			par.dynamic_info = set_init_dynamic_info();
+
+			close_bubble();
+			press_button_prop("ModelParamContent","ParamDynamic",["name"],par.name);
+		}
+		break;
+		
+	case "EditParamDynamic":
+		{
+			select_bubble_over();
+			inter.bubble.dynamic_info = copy(model.param[bu.i].dynamic_info);
+		}
 		break;
 		
 	case "AddConstParam":
@@ -1876,7 +1915,7 @@ function button_action(bu,action_type)
 		{
 			let th = bu.i;
 			let par = bu.source.param[th];
-			start_worker("Edit Weight",{type:"Value", source:bu.source, label_info:par.label_info, i:th});
+			start_worker("Edit Weight",{type:"Value", par_st:par, source:bu.source, label_info:par.label_info, i:th});
 		}
 		break;
 		
@@ -1884,7 +1923,7 @@ function button_action(bu,action_type)
 		{
 			let th = bu.i;
 			let par = model.param[th];
-			start_worker("Edit PriorSplit",{type:"PriorSplit", label_info:par.label_info, i:th});
+			start_worker("Edit PriorSplit",{type:"PriorSplit", label_info:par.label_info, par_st:par, i:th});
 		}
 		break;
 		
@@ -1895,9 +1934,8 @@ function button_action(bu,action_type)
 		{
 			let th = bu.i;
 			let par = model.param[th];		
-			//par_st:ep.par_st, 
 		
-			start_worker("Edit DistSplit",{type:"DistSplit", source:bu.source, label_info:par.label_info, i:th})
+			start_worker("Edit DistSplit",{type:"DistSplit", source:bu.source, par_st:par, label_info:par.label_info, i:th})
 		}
 		break;
 		
@@ -1940,7 +1978,11 @@ function button_action(bu,action_type)
 	case "DonePrior": case "DoneDist":
 		done_prior();
 		break;
-	
+		
+	case "DoneParamDynamic":
+		done_param_dynamic();
+		break;
+		
 	case "EditPriorSplitElement": case "EditDistSplitElement": 
 		{
 			select_bubble_over();
@@ -1979,13 +2021,9 @@ function button_action(bu,action_type)
 		break;
 	
 	case "DeleteDeriveConfirm":
-		{
-			let he = inter.help;
-			model.derive.splice(he.val,1);
-			update_param();
-			close_bubble();
-			close_help();
-		}
+		start_worker("Delete derive",{val:inter.help.val});	
+		close_bubble();
+		close_help();
 		break;
 	
 	case "StartSimulation":
@@ -2331,6 +2369,11 @@ function button_action(bu,action_type)
 		start_worker("Edit Xvector",{p:bu.p, i:bu.i});
 		break;
 		
+	case "EditRegion":
+		start_data_source("Region",{},{i:bu.i});
+		start_worker("Edit Region",edit_source);
+		break;
+		
 	case "DoneXvector":
 		{
 			let ea = inter.edit_Xvector;
@@ -2345,6 +2388,15 @@ function button_action(bu,action_type)
 	
 	case "LoadXvector2":
 		start_worker("Load Xvector",{edit_source:edit_source});
+		break;
+		
+	case "LoadRegion":
+		start_data_source("Region",{},{i:bu.i});
+		file_add_datatable(); 	
+		break;
+		
+	case "LoadRegion2":
+		start_worker("Load Region",{edit_source:edit_source});
 		break;
 		
 	case "AddFilter":
@@ -2513,7 +2565,13 @@ function button_action(bu,action_type)
 
 	case "ExportTableContent":
 		close_bubble();
-		saving_dialogue("",".csv","Export table content");
+		
+		switch(get_table_type()){
+		case "CreateEditParamContent": start_worker("Get full param table",inter.edit_param); break;
+		case "CreateEditAmatrixContent": start_worker("Get full Amatrix table",inter.edit_Amatrix); break;
+		case "CreateEditXvectorContent": start_worker("Get full Xvector table",inter.edit_Xvector); break;
+		default: saving_dialogue("",".csv","Export table content"); break;
+		}
 		break;
 		
 	case "ExportTableModel":

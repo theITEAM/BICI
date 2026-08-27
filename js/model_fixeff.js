@@ -33,7 +33,9 @@ function create_edit_Xvector(lay)
 	let cx = corner.x;
 	let cy = corner.y;
 	
-	cy = lay.add_title("Edit X vector",cx,cy,{te:editxvector_text});
+	let title = "Edit X vector"; if(inter.edit_Xvector.too_big) title = "X vector (too large to edit)";
+	
+	cy = lay.add_title(title,cx,cy,{te:editxvector_text});
 	
 	add_layer("CreateEditXvectorContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{type:lay.op.type});
 	
@@ -72,12 +74,24 @@ function add_Xvector_buts(lay)
 	let gap = 0.7;
 	let cy = 1;
 	let dx = 10;
-	let mar_col = DRED;
+	let mar_col = BLACK;
+	
+	let too_big = edit_X.too_big;
+	
+	let ele_type = "XvectorElement";
+	let action = "EditXvectorElement";
+	
+	if(too_big){ ele_type = "TooBigElement"; action = undefined;}
 	
 	let cx = 2+gap;
 	
+	let out_dx = dx+2*mar;
+	let out_dy = dy_table_param*ind_list.length+2*mar;
+		
+	if(too_big) out_dy += dy_table_param;
+	
 	cx = 2;
-	lay.add_button({x:cx+w_max+gap-mar, y:cy-mar, dx:dx+2*mar, dy:dy_table_param*ind_list.length+2*mar, type:"Outline", col:BLACK});
+	lay.add_button({x:cx+w_max+gap-mar, y:cy-mar, dx:out_dx, dy:out_dy, type:"Outline", col:BLACK});
 		
 	for(let j = 0; j < ind_list.length; j++){
 		let cx = 2;
@@ -86,9 +100,14 @@ function add_Xvector_buts(lay)
 		cx += w_max+gap;
 	
 		let val = edit_X.X_value[j];
-		lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:"XvectorElement", font:fo_table, i:j, ac:"EditXvectorElement"});
+		lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:ele_type, font:fo_table, i:j, ac:action});
 	
 		cy += dy_table_param;
+	}
+	
+	if(too_big == true){
+		let cx = 2+w_max+gap;
+		lay.add_button({te:"⋮", x:cx, y:cy, dx:dx, dy:dy_table_param, type:"CenterText", font:fo_mar});
 	}
 	
 	lay.add_button({x:0, y:cy, dx:0, dy:0.5, type:"Nothing"});	

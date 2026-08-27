@@ -19,6 +19,11 @@ function change_page(page_new)
 		return;
 	}
 	
+	if(editting_param()){
+		alert_help("Parameter changed","Click 'Update' to revise parameter otherwise 'Cancel'.");
+		return;
+	}
+	
 	let pa_new = page_new.pa;
 	if(pa_new != undefined){
 		if(isNaN(pa_new)){
@@ -544,12 +549,14 @@ function create_edit_table(lay)
 			switch(so.type){
 			case "KnotTimes": ac = "AddKnotTimes"; break;
 			case "CompMap": ac = "AddCompMap"; break;
+			case "CompPoint": ac = "AddCompPoint"; break;
 			case "LoadTensor": ac = "LoadTensorDone"; break;
 			case "LoadPriorSplit": ac = "LoadPriorSplitDone"; break;
 			case "LoadDistSplit": ac = "LoadDistSplitDone"; break;
 			case "LoadReparam": ac = "LoadReparamDone"; break;	
 			case "LoadDefine": ac = "LoadDefineDone"; break;	
 			case "Fixed Effect": ac = "LoadXvector2"; break;
+			case "Region": ac = "LoadRegion2"; break;
 			case "Init. Pop.": ac = "InitPopAdd"; break;
 			case "APed": ac = "APedAdd"; break;
 			default:
@@ -1061,13 +1068,13 @@ function select_table_element(r,c)
 	let lay_name = "CreateEditTableContent";
 	
 	let l = find(inter.layer,"name",lay_name);
-	if(l == undefined){ error("Cannot find layer1 "+lay_name); return;}
+	if(l == undefined){ error("Cannot find layer1 "+lay_name); return false;}
 	
 	let lay = inter.layer[l];
 	let but = lay.but;
 	
 	let i = 0; while(i < but.length && !(but[i].r == r && but[i].c == c)) i++;
-	if(i == but.length){ error("Button not found"); return;}
+	if(i == but.length){ error("Button not found"); return false;}
 	
 	inter.bubble = { lay_name:lay_name, bu:but[i], i:i, show_warning:false, warning:false, op:{}, find_focus:true};
 	
@@ -1136,15 +1143,15 @@ function transfer_column(c,all_snp_flag)
 	let tab_source = data.table[so.data_table_use];
 	let tab_dest = so.table;
 	
-	let replace_space = false;
-	if(so.load_col[tab_dest.ncol].type == "comptext") replace_space = true;
+	//let replace_space = false;
+	//if(so.load_col[tab_dest.ncol].type == "comptext") replace_space = true;
 	
 	tab_dest.filename = tab_source.filename;
 	for(let r = 0; r < tab_source.nrow; r++){
 		if(tab_dest.nrow == 0) tab_dest.ele[r]=[];
 		
 		let te = tab_source.ele[r][c];
-		if(replace_space) te = te.replace(/ /g,"-");
+		//if(replace_space) te = te.replace(/ /g,"-");
 		tab_dest.ele[r].push(te);
 	}
 
@@ -1519,6 +1526,18 @@ function view_warning(i)
 		change_page({pa:"Model", su:"Compartments", susu:warn.p, sususu:warn.cl});
 		break;
 	
+	case "NoSpecies":
+		change_page({pa:"Model", su:"Compartments"});
+		break;
+		
+	case "NoCla":
+		change_page({pa:"Model", su:"Compartments", susu:warn.p});
+		break;
+		
+	case "NoComp":
+		change_page({pa:"Model", su:"Compartments", susu:warn.p, sususu:warn.cl});
+		break;
+		
 	case "MissingComp": case "MissingColour":
 		select_bubble_compartment(warn.p,warn.cl,warn.c);
 		break;
@@ -1560,6 +1579,11 @@ function view_warning(i)
 		press_button_prop("ParamPriorContent","PriorElement",["name"],warn.name);
 		break;
 		
+	case "PriorConstValue":
+		change_page({pa:"Inference", su:"Prior"});
+		press_button_prop("ParamPriorContent","ParamPriConElement",["name"],warn.name);
+		break;
+		
 	case "PriorSplitValue":
 		change_page({pa:"Inference", su:"Prior"});
 		press_button_prop("ParamPriorContent","ParamSimElement",["name"],warn.name);
@@ -1597,6 +1621,11 @@ function view_warning(i)
 	case "RepEqValue":
 		change_page({pa:"Model", su:"Parameters"});
 		press_button_prop("ModelParamContent","ReparamEqn",["name"],warn.name);
+		break;
+		
+	case "ParamDynamic":
+		change_page({pa:"Model", su:"Parameters"});
+		press_button_prop("ModelParamContent","ParamDynamic",["name"],warn.name);
 		break;
 	
 	case "ReparamSquareSpline":
@@ -1637,6 +1666,10 @@ function view_warning(i)
 			let info = warn.eqn_info;
 	
 			switch(warn.eqn_type){
+			case "dynamic_weight":
+				error("Dynamic weight to do");
+				break;
+			
 			case "comp_prob": case "sim_comp_prob":
 				select_bubble_data_element(info.p,info.i,info.r,info.c);
 				break;

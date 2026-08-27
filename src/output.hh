@@ -75,6 +75,7 @@ class Output                               // Stores information about the data
 		string get_Gelman_Rubin_statistic(const vector < vector <double> > &cha) const;
 		void change_sim_value(string param_name, double value);
 		string table(const Table &tab) const;
+		void profile_memory() const;
 				
 	private:
 		vector < vector <double> > param_value_from_vec(const Particle &pa) const;

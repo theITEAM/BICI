@@ -42,6 +42,9 @@ class IndEvSampler                         // Stores information about an indivi
 		vector < vector <double> > ind_obs_prob;// The observation probability for an individual
 		vector <unsigned int> c_timeline;      // The timeline for global compartment number      
 	
+		vector < vector <double> > unobs_trans_prob; // Used to account for unobserved transitions
+		bool obs_trans_exist;                  // Determines if observed transitions exist
+	
 		vector < vector < vector <double> > > rate_store;// Stores expected number of events
 		
 		bool ind_variation;                    // Set if ind_effect or fix_effect 

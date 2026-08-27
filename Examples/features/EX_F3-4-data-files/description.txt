@@ -2,7 +2,7 @@
 
 ## Objective
 - Introduces the concept of stratifying parameter definitions.
-- In this toy example, different elements of the force of infection act different on males and females. 
+- In this toy example, different elements of the force of infection act different on males and females.
 
 ## Model
 - A single population-based species 'People' is created.
@@ -10,7 +10,7 @@
 - DS contains three compartments: susceptible $S$, infected $I$ and recovered $R$. Together they are known as the “SIR model”.
 - The defined parameter $λ_s(t)$ provides the force of infection.
 - For males this involves a transmission rate $β^M$.
-- For females this is a seasonal external term parameterised by $η$, $Δ$ and $φ$. 
+- For females this is a seasonal external term parameterised by $η$, $Δ$ and $φ$.
 - The recovery rate $γ_s$ determines the rate at which individuals recover with sex $s$.
 - $N$ is the total number of individuals (this model assumes frequency dependent transmission).
 - Classification 'Sex' contains the compartments $M$ and $F$ for male and female.

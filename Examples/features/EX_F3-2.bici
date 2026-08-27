@@ -42,15 +42,21 @@ comp name="F" color="#aa00aa" x=10 y=0
 
 init-pop-sim type="fixed" focal="DS" file="init-pop-sim.csv"
 
+# INFERENCE DATA
+
+init-pop-inf type="fixed" file="init-pop-inf.csv"
+
+pop-data name="Pop. data" filter="DS=file,Sex=file" error="poisson" file="pop-data.csv"
+
 ######################## PARAMETERS ########################
 
 param name="N" constant=10000
 
-param name="β^FF" value=0.4
+param name="β^FF" value=0.4 prior="uniform(0,1)"
 
-param name="β^FM" value=0.3
+param name="β^FM" value=0.3 prior="uniform(0,1)"
 
-param name="β^MM" value=0.2
+param name="β^MM" value=0.2 prior="uniform(0,1)"
 
 param name="γ_s" value="gamma_value.csv" prior="inverse(0.01,1)"
 

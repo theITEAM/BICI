@@ -22,7 +22,7 @@ function add_bubble_buts(lay)
 		cont.dx = 9;
 		bubble_addtitle(cont,"IE group name",{te:ie_group_name_text});
 		bubble_input(cont,"Name:",{type:"iegrname"});
-		add_end_button(cont,"Done","Done",{});	
+		add_end_button(cont,"Done","DoneIEGroupName",{});	
 		break;
 		
 	case "NameLink":
@@ -719,12 +719,12 @@ function add_bubble_buts(lay)
 					default:
 						cont.dx = 10;
 						bubble_addtitle(cont,"Import",{te:import_text});
-						bubble_addradio(cont,0,"Compartments","Compartments",inter.bubble.radio); 
+						bubble_addradio(cont,0,"Compartments","Compartments (.csv/.tsv)",inter.bubble.radio); 
 						let claa = model.get_cla();
 						if(claa.camera.coord == "latlng"){
-							bubble_addradio(cont,0,"Comp. Map","Comp. Map",inter.bubble.radio); 
+							bubble_addradio(cont,0,"Comp. Map","Comp. Map (.geojson)",inter.bubble.radio); 
 						}
-						bubble_addradio(cont,0,"Transitions","Transitions",inter.bubble.radio); 
+						bubble_addradio(cont,0,"Transitions","Transitions (.csv/.tsv)",inter.bubble.radio); 
 					
 						add_end_button(cont,"Next","ImportModelNext");	
 					}
@@ -782,7 +782,17 @@ function add_bubble_buts(lay)
 				}
 				break;
 				
-			case "AddInitialPopulation": initpop_data_bubble(cont,"add"); break;
+			case "AddInitialPopulation":
+				if(bub.mode == "use dist"){
+					cont.dx = 10;
+					bubble_addtitle(cont,"Initial population",{te:use_dist_text});
+					bubble_addradio(cont,0,"dist","Distribution",bub.type_radio); 
+					bubble_addradio(cont,0,"exact","Defined population",bub.type_radio); 
+					cont.y += 0.3;	
+					add_end_button(cont,"Add","AddInitialPopulationChoose");		
+				}
+				else initpop_data_bubble(cont,"add"); 
+				break;
 			case "AddInitPopPrior": initpopprior_data_bubble(cont,"add"); break;
 			case "MoveIndividuals": move_data_bubble(cont,"add"); break;
 			case "CompData": comp_data_bubble(cont,"add"); break;
@@ -799,6 +809,7 @@ function add_bubble_buts(lay)
 			case "SetIE": set_ind_eff_bubble(cont,"add"); break;
 			case "IndGroupData": ind_group_data_bubble(cont,"add"); break;
 			case "SetConstant": set_constant_bubble(cont); break;
+			case "SetParamDynamic": set_param_dynamic_bubble(cont); break;
 			case "SetPriorConst": set_prior_const_bubble(cont,"Set","AddPriorConstParam"); break;
 			case "ConstPriorData": set_prior_const_bubble(cont,"Generate","GenPriorConstParam"); break;
 			case "SetFactor": set_factor_bubble(cont); break;
@@ -898,7 +909,14 @@ function add_bubble_buts(lay)
 			cont.dx = 10;
 			bubble_addtitle(cont,"Edit constant",{te:editconstparam_text});
 			let ty = "element_param_const";
-			if(bu.sym == true) ty = "element_param_const_sym";
+			if(bu.is_cov){
+				if(bu.sym == true) ty = "element_param_const_cor";
+				else ty = "element_param_const_covar";
+			}
+			else{
+				if(bu.sym == true) ty = "element_param_const_sym";
+			}
+		
 			bubble_input(cont,"Value:",{type:ty, pindex:bu.pindex});
 			add_end_button(cont,"Done","Done");	
 		}
@@ -965,6 +983,10 @@ function add_bubble_buts(lay)
 		bubble_addtitle(cont,"Edit equation",{te:editreparam_eqn_text});	
 		bubble_input(cont,"Equation:",{type:"reparam_element_eqn", eqn:true, pindex:bu.pindex});
 		add_end_button(cont,"Done","Done");	
+		break;
+	
+	case "ParamDynamic":
+		param_dynamic_bubble(bu,cont);
 		break;
 	
 	case "ParamSimElement": case "DistSimElement":
@@ -1409,7 +1431,7 @@ function add_species_bubble(cont)
 	
 	bubble_addradio(cont,2.3,"Population","Population-based",bub.radio);
 	bubble_addradio(cont,2.3,"Individual","Individual-based",bub.radio);
-	//bubble_addradio(cont,2.3,"Deterministic","Deterministic",bub.radio);
+	bubble_addradio(cont,2.3,"Deterministic","Deterministic",bub.radio);
 	cont.y += 0.2;
 	
 	if(bub.radio.value == "Individual"){
@@ -1692,6 +1714,8 @@ function bubble_double_input(cont,te,op,te2,op2)
 		let warn = false, ywarn = -LARGE;
 		let x = 0, gap = 1;
 		let w = (cont.dx-gap)/2;
+		if(op.x != undefined){ x += op.x; w -= op.x /= 2;}
+		
 		for(let i = 0; i < 2; i++){
 			let tex = te, opp = op; if(i == 1){ tex = te2; opp = op2;}
 			cont.lay.add_button({te:tex, x:x, y:cont.y, dx:w, dy:0.8, type:"InputBoxName"});
@@ -1773,7 +1797,9 @@ function add_bubble_scrollable_buts(lay)
 	case "ind list": cy = individual_scrollable(lay); break;
 	case "pop list": cy = population_scrollable(lay); break;
 	case "poptrans list": cy = poptrans_scrollable(lay); break;
+	case "param_dynamic": cy = param_dynamic_scrollable(lay); break;
 	case "annotation": cy = annotation_scrollable(lay); break;
+	case "param dynamic sel": cy = param_sel_scrollable(lay,"param_dynamic"); break;
 	case "const param sel": cy = param_sel_scrollable(lay,"const"); break;
 	case "prior const param sel": cy = param_sel_scrollable(lay,"priorconst"); break;
 	case "reparam param sel": cy = param_sel_scrollable(lay,"reparam"); break;

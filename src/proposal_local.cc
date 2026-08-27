@@ -681,6 +681,8 @@ void Proposal::pop_single_local(State &state)
 	bool ill;
 
 	for(auto loop = 0u; loop < LOOP_IC_LOCAL; loop++){
+		if(pl) state.check("Proposal local before");
+		
 		if(sp.init_cond.type == INIT_POP_DIST && ran() < 0.5){  // Changes IC and add/rem event
 			if(ran() < 0.5){                               // Add event with initical condition change
 				auto dprob = 0.0;
@@ -699,7 +701,7 @@ void Proposal::pop_single_local(State &state)
 				
 					lc.type = ADD_EVENT; lc.tr = tr; lc.ti = ti;
 					local_change.push_back(lc);
-						
+					
 					auto like_ch = state.calculate_local_change(p_prop,local_change,ill);
 					
 					if(!ill){

@@ -401,7 +401,8 @@ void Input::check_import_correct()
 		}
 		
 		// Checks that non-Markovian transitions not used for population models
-		if(sp.type == POPULATION || sp.type == DETERMINISTIC){
+		switch(sp.type){
+		case POPULATION: case DETERMINISTIC:
 			for(auto cl = 0u; cl < sp.ncla; cl++){
 				const auto &claa = sp.cla[cl];
 				for(const auto &tr : claa.tra){
@@ -411,6 +412,9 @@ void Input::check_import_correct()
 					}						
 				}
 			}
+			break;
+			
+		case INDIVIDUAL: break;
 		}
 	}
 }
@@ -604,30 +608,23 @@ void Input::param_vec_mem_usage() const
 {
 	vector <double> ve;
 	auto vecsize = sizeof(ve)/4; 
-	string ss;
-	auto strsize = sizeof(ss)/4;
+	//string ss;
+	//auto strsize = sizeof(ss)/4;
 	
-	auto norm = 0.0, affect_like = 0.0,	affect_like_me_list = 0.0, affect_like_list = 0.0, affect_like_map = 0.0, affect_like_lin_form = 0.0;
+	auto norm = 0.0, affect_like = 0.0,	affect_like_me_list = 0.0, affect_like_list = 0.0, affect_like_map = 0.0;
 		
 	for(const auto &pele : model.param_vec){
-		norm += strsize+pele.name.length();
+		//norm += strsize+pele.name.length();
 		norm += 8;
 	
 		for(const auto &al : pele.affect_like){
 			affect_like += 4;
-			affect_like_me_list += vecsize + al.eq_nopop.list.size();
 			affect_like_list += vecsize + al.list.size();
 			affect_like_map += vecsize + al.map.size();
-			affect_like_lin_form += vecsize + al.lin_form.list.size()*8 + al.lin_form.sum_e.size();
-			
-			affect_like_lin_form += vecsize;
-			for(const auto &pa : al.lin_form.pop_affect){
-				affect_like_lin_form += 1 + vecsize + 2*pa.pop_grad_ref.size();
-			}
 		}
 	}
 	
-	auto sum = norm + affect_like + affect_like_me_list + affect_like_list + affect_like_map +affect_like_lin_form;
+	auto sum = norm + affect_like + affect_like_me_list + affect_like_list + affect_like_map;
 	
 	cout << "Param vec	memory usage = " << 4*sum/(1000000) << "(";
 	
@@ -636,7 +633,6 @@ void Input::param_vec_mem_usage() const
 	cout << "affect_like_me_list:" << int(100*affect_like_me_list/sum) << ")";
 	cout << "affect_like_list:" << int(100*affect_like_list/sum) << ")";
 	cout << "affect_like_map:" << int(100*affect_like_map/sum) << ")";
-	cout << "affect_like_lin_form:" << int(100*affect_like_lin_form/sum) << ")";
 	cout << endl << endl;
 }
 
@@ -939,7 +935,7 @@ void Input::check_eqn_fixed_time()
 	for(const auto &eq : model.eqn){
 		for(const auto &ca : eq.calcu){
 			for(const auto &it : ca.item){
-				if(it.type == POPTIMENUM){
+				if(it.type == POPNUMTIME){
 					const auto &ptr = eq.pop_time_ref[it.num];
 					if(eq.type != REPARAM && eq.type != DERIVE_EQN){
 						auto t1 = model.calc_t(ptr.ti);
@@ -1063,6 +1059,12 @@ void Input::check_param_define_all()
 	
 	for(const auto &par : model.param){
 		if(par.reparam_eqn.te != "") check_param_define(par.reparam_eqn);
+	}
+	
+	for(auto th = 0u; th < model.param.size(); th++){
+		if(model.param[th].variety == DYNAMIC_PARAM){
+			model.dynamic_param.push_back(th);
+		}
 	}
 }
 

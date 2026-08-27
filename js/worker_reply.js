@@ -26,7 +26,34 @@ worker.onmessage = function (e)
 			stop_loading_symbol();
 		}
 		
+		if(ans.ret_mod){
+			model_updated(ans);
+		}
+		
 		switch(ans.type){		
+		case "ConvertName":
+			alert_help("Conversion of compartment names",ans.te);
+			inter.edit_source = ans.so;
+			break;
+		
+		case "Get full param table": 
+			inter.edit_param.table_te = ans.table_te;
+			generate_screen();
+			saving_dialogue("",".csv","Export table content");	
+			break;
+		
+		case "Get full Amatrix table":
+			inter.edit_Amatrix.table_te = ans.table_te;
+			generate_screen();
+			saving_dialogue("",".csv","Export table content");	
+			break;
+			
+		case "Get full Xvector table":
+			inter.edit_Xvector.table_te = ans.table_te;
+			generate_screen();
+			saving_dialogue("",".csv","Export table content");	
+			break;
+		
 		case "EditAPed":
 			edit_A_pedigree(ans.Amat,ans.p,ans.i);
 			break;
@@ -71,8 +98,9 @@ worker.onmessage = function (e)
 			
 		case "Select Element":
 			generate_screen();
-			select_table_element(ans.r,ans.c);
-			inter.bubble.error_warning = ans.warn;
+			
+			if(select_table_element(ans.r,ans.c) == false) alert_help("A problem occurred...",ans.warn);
+			else inter.bubble.error_warning = ans.warn;
 			generate_screen();
 			break;
 			
@@ -92,11 +120,29 @@ worker.onmessage = function (e)
 				generate_screen();
 			}
 			break;
+		
+		case "Load Point Map":
+			{
+				let p = inter.p_cl_store.p, cl = inter.p_cl_store.cl;
+				start_data_source("CompPoint",{},{p:p, cl:cl});
+				data.table.push(ans.tab);
+
+				let so = edit_source;
+				so.table_loaded = true;
+				so.p = p; so.cl = cl;
+
+				so.data_table_use = data.table.length-1;
+
+				transfer_column(0);
+				transfer_column(1);
+				generate_screen();
+			}
+			break;
 			
 		case "View Code":
 			{
 				inter.help = { title:"Source code", te:"This shows the source code when exported in .bici format.", st:"", scroll_to_line:false, script:ans.formatted};
-				model_updated(ans);
+				generate_screen();
 			}
 			break;
 			
@@ -112,7 +158,6 @@ worker.onmessage = function (e)
 			
 				if(inter.file_store.type == "Save") save_bici(inter.file_store.filename)
 				else saving_dialogue("",".bici",fit);
-				model_updated(ans);
 			}
 			break;
 		
@@ -148,9 +193,9 @@ worker.onmessage = function (e)
 			break;
 		
 		case "Rename Species":
-			model.species = ans.species;
+			//model.species = ans.species;
 			update_param();
-			model.param	= ans.param;
+			//model.param	= ans.param;
 			model.get_label_info_all();
 			close_bubble();
 			initialise_pages();
@@ -158,7 +203,7 @@ worker.onmessage = function (e)
 			break;
 			
 		case "Rename Classification":
-			model.species = ans.species;
+			//model.species = ans.species;
 			update_param();
 			close_bubble();
 			initialise_pages();
@@ -166,8 +211,8 @@ worker.onmessage = function (e)
 			break;
 			
 		case "Rename Index":
-			model.species = ans.species;
-			model.param	= ans.param;
+			//model.species = ans.species;
+			//model.param	= ans.param;
 			model.get_label_info_all();
 			model.check_ob_string_exist(model,"model",ans.index_old);// Checks not in model
 			update_param();
@@ -193,8 +238,19 @@ worker.onmessage = function (e)
 			generate_screen();
 			break;
 			
+		case "Edit Region":
+			edit_source = ans.info;
+			generate_screen();
+			break;
+			
 		case "Load Xvector":
 			model.species[ans.p].fix_eff[ans.i].X_vector.loaded = true;
+			close_data_source();
+			generate_screen();
+			break;
+			
+		case "Load Region":
+			model.param	= ans.param;
 			close_data_source();
 			generate_screen();
 			break;
@@ -219,40 +275,12 @@ worker.onmessage = function (e)
 			generate_screen();
 			break;
 		
-	 case "Load Reparam": case "Load Define": case "Load Tensor":
+	 case "Load Reparam": case "Load Define": case "Load Tensor": case "Load PriorSplit":
 			{
 				let ep = ans.ep;
 				inter.edit_param = ep;
-				let par = model.param[ep.i];
-			
-				if(ep.type != "weight") par.set = ans.ep.set;
 				close_data_source();
-				
-				if(ans.ep.too_big){ 
-					if(ep.type == "weight") par.weight_desc = ep.weight_desc;	
-					else par.value_desc = ep.value_desc;	
-					inter.edit_source = false;
-					close_bubble();
-					close_param_source();
-					if(ans.type == "Load Reparam" || ans.type == "Load Define") update_param();
-				}
-				generate_screen();
-			}
-			break;
-			
-		case "Load PriorSplit":
-			{
-				inter.edit_param = ans.ep;
-				let par = model.param[ans.ep.i];
-				par.prior_split_set = ans.ep.prior_split_set;
-				close_data_source();
-				
-				if(ans.ep.too_big){ 
-					par.prior_split_desc = ans.ep.prior_split_desc;
-					inter.edit_source = false;
-					close_bubble();
-					close_param_source();
-				}
+				load_param_warning(ep);				
 				generate_screen();
 			}
 			break;
@@ -283,8 +311,8 @@ worker.onmessage = function (e)
 				close_bubble();
 				close_param_source();
 			
-				model.param	= ans.param;
-				model.species	= ans.species;
+				//model.param	= ans.param;
+				//model.species	= ans.species;
 				
 				par_in_view(ans.par_name);
 				generate_screen();
@@ -404,7 +432,7 @@ worker.onmessage = function (e)
 		
 		case "Import output": case "Import output2": case "Load Default": 
 			model.load(ans);
-			//prr("Load Change Page"); change_page({pa:"Inference", su:"Prior"});
+			//prr("Load Change Page"); change_page({pa:"Model", su:"Parameters"});
 			break;
 		
 		case "Add comp map":
@@ -444,14 +472,11 @@ worker.onmessage = function (e)
 			break;
 			
 		case "UpdateModel":
-			model_updated(ans);
 			do_after(ans);
 			break;
 			
 		case "Start": case "StartPPC":  case "StartEXT":
 			{
-				model_updated(ans);
-		
 				inter.save_type = ans.save_type;
 
 				if(check_memory(ans)){
@@ -464,6 +489,7 @@ worker.onmessage = function (e)
 			{	
 				if(ans.full_warn) model.warn_view = true;
 				model.warn = ans.warn;
+				model.param = ans.param;
 				model.species = ans.species;
 				close_help();
 				generate_screen();
@@ -551,6 +577,7 @@ function model_updated(ans)
 	model.param = ans.param;
 	model.param_factor = ans.param_factor;
 	model.species = ans.species;
+	if(ans.derive) model.derive = ans.derive;
 	model.warn.length = 0;
 	model.warn_view = true;
 	model.get_label_info_all();	

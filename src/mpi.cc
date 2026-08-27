@@ -197,6 +197,8 @@ void Mpi::transfer_terminal_info(vector <TerminalInfo> &term_info)
 			pack_item(ti.n_start);
 			pack_item(ti.av);
 			pack_item(ti.av2);
+			pack_item(ti.log_av);
+			pack_item(ti.log_av2);
 		}
 		pack_send(0);
 	}
@@ -217,6 +219,8 @@ void Mpi::transfer_terminal_info(vector <TerminalInfo> &term_info)
 				unpack_item(ti.n_start);
 				unpack_item(ti.av);
 				unpack_item(ti.av2);
+				unpack_item(ti.log_av);
+				unpack_item(ti.log_av2);
 				
 				term_info.push_back(ti);
 			}
@@ -274,6 +278,7 @@ void Mpi::pack(const Particle &pa)
 {
 	pack_item(pa.param_val_prop);
 	pack_item(pa.param_val_tvreparam);
+	pack_item(pa.param_val_dynamic);
 	
 	// Species
 	pack_num(pa.species.size());
@@ -429,6 +434,7 @@ void Mpi::unpack(Particle &pa)
 {
 	unpack_item(pa.param_val_prop);
 	unpack_item(pa.param_val_tvreparam);
+	unpack_item(pa.param_val_dynamic);
 
 	auto S = unpack_num();
 	for(auto sp = 0u; sp < S; sp++){

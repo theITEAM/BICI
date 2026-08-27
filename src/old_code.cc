@@ -507,3 +507,37 @@
 	}
 	*/
 	
+	
+	/*
+	cout << model.npopcomb << " "<< model.popcomb.size() << " jjj"; 
+	
+	for(auto &der : model.derive){
+		for(auto eqi : der.eq){
+			const auto &eq = model.eqn[eqi.eq_ref];
+ 			cout << eq.te_raw << " DERIVEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE\n";
+			eq.print_calculation();
+			
+			auto imax = eq.integral.size(); if(imax > 2) imax = 2;
+			for(auto i = 0u; i < imax; i++){
+				auto it = eq.integral[i];
+				eq.print_calc("integral",it.calc);
+			}
+			cout << "\n\n";
+		}
+		
+	}
+	emsg("derive print");
+	*/
+	
+	/*
+			for(auto ti = 0u; ti < ti_end; ti++){
+				vector <double> tnum(sp.tra_gl.size());
+				for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+					tnum[tr] = trans_num[tr][ti];
+				}
+			
+				cpop_st.push_back(cpop);
+				update_cpop(ti,cpop,tnum);
+			}
+			cpop_st.push_back(cpop);
+			*/

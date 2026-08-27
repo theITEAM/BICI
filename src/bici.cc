@@ -8,16 +8,21 @@
 // Run: ./bici 
 
 // ssh gaia.bioss.ac.uk  
+// cd "/c/BICI/BICI_v0.9_windows/src"
 
 // tar -xzf foo.tgz
 
 // Load mpi: module load mpi/openmpi-x86_64
 // ./bici-core.exe ../big2.bici sim
+// ../bici-core.exe ../Execute/init.bici inf
+
+// nohup mpirun -n 10 ./bici-para Execute/init.bici inf > op.txt&
+// mpirun -n 10 ./bici-para Execute/init.bici inf 
 // mpirun -n 1 ./bici-para file.bici sim
 // mpirun -n 1 ./bici-para Execute/init.bici sim
 // mpirun --output :raw -n 1 ./bici-para Execute/init.bici sim
 // mpirun -n 3 ./bici-para Execute/init.bici inf
-// mpirun -n 10 ./bici-para Execute/init.bici inf
+
 // mpirun -n 1 ./bici-para Examples/EX_A1.bici sim
 // mpirun -n 2 ./bici-para Execute/init.bici inf
 // mpirun -n 16 ./bici-para Jamie/scen-3-1.bici inf
@@ -33,9 +38,14 @@
 
 // ./bici-core Execute/init.bici inf
 
-//valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici sim
+// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici sim
 
-//valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici inf
+// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici inf
+
+// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici post-sim
+
+// ./bici-para Execute/year_varying.bici ext 26000
+// inference start=0 end=1094 timestep=1 update=25000 algorithm="PAS-MCMC" npart=10 gen-percent=1
 
 // nohup mpirun -n 16 ./bici-para Jamie/scen-1-1.bici inf > ddddd.txt&
 // 06d_New_Inf_500.bici
@@ -77,6 +87,7 @@
 // 56000 lines of code (16/05/25)
 // 65634 lines of code (17/09/25)
 // 81002 lines of code (25/02/26)
+// 87660 lines of code (01/07/26)
 
 #include <iostream>
 #include <sstream>
@@ -116,27 +127,25 @@ bool com_op = false;                                 // Set to true for command 
 vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_factor, string &file, vector <string> &data_sim_lines, bool &no_question, bool &test, string &add_info);
 
 int main(int argc, char** argv)
-{	
+{		
 #ifdef USE_MPI                            // This is for the parallel version of the code 
-  //MPI_Init(&argc,&argv);       	
-	 MPI_Init(NULL, NULL);
+  MPI_Init(&argc,&argv);       	
 #endif
 	
 	vector <string> sec;
 	for(auto i = 1u; i < (unsigned int)argc; i++) sec.push_back(argv[i]);
 	
-	//string te = "α this"; encode(te); return 0;
-
-	//test(); return 0;
-
 	auto total_time = clock();
 	
 	print_diag("start bici");
 	
-	print_diag("start sum");
-	
 	init_log_sum();
 	
+	// Various functions used to test functionality
+	//string te = "α this"; encode(te); return 0;
+	//test(); return 0;
+	//check_cdf_function(); return 0;
+	//check_nm_trans_incomp_like_no_log(); return 0;
 	//mvn_prior_check(); return 0;
 	//mvn_jeffreys_check(); return 0; 
 	//test_jeffreys(); return 0;
@@ -374,6 +383,9 @@ int main(int argc, char** argv)
 	
 	if(model.mode != DATA_SHOW){	
 		auto total_cpu = clock()-total_time;
+	
+		if(profiling) output.profile_memory();
+		//output.profile_memory();
 	
 		auto op_time = clock();
 		output.end(file,total_cpu);

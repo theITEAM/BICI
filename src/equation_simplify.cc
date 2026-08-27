@@ -17,12 +17,13 @@ using namespace std;
 /// Simplifies based on numerical 
 void Equation::simplify_operations(vector <EqItem> &op)
 {
-	auto loop = 0u;
-
+	if(!simplify_eqn) return;
+	
 	bool change, change2, change3;
 	do{
 		change = false;
 		// Combines numeric values
+		
 		if(true){
 			vector <EqItem> op_new;
 		
@@ -302,7 +303,7 @@ void Equation::simplify_operations(vector <EqItem> &op)
 						
 						// Removes brackets around numeric quantity
 						if(inew > 0 && op_new[inew-1].type == LEFTBRACKET && i < imax && op[i].type == RIGHTBRACKET){
-							if(!(inew > 1 && (op_new[inew-2].type == SUM || op_new[inew-2].type == TINT))){	
+							if(!(inew > 1 && is_func_sum_int(op_new,inew-2))){	
 								op_new.pop_back(); i++;
 							}
 						}
@@ -386,83 +387,114 @@ void Equation::simplify_operations(vector <EqItem> &op)
 			
 			if(change2) op = op_new;
 		}
-		
+	
 		change3 = false;
 		if(true){    // Looks to multiply out brackets a*(b+c) = (a*b+a*c). For popcomb
-			vector <EqItem> op_new;
-		
-			auto i = 0u;
+			// Works out which elements are within the sum
+			vector <bool> within_sum;
+			
 			auto imax = op.size(); 
+			auto i = 0u;
 			while(i < imax){
-				auto fl = false;
-					
-				const auto &it = op[i];
-				
-				// a*(b+c) = (a*b+a*c)
-				if(true && it.type == LEFTBRACKET && i > 1 && op[i-1].type == MULTIPLY){ 
-					auto iend = get_other_bracket(i,op);
-					if(iend != UNSET){
-						if(contain_linear_pop(i+1,iend,op)){
-							auto sec = eqn_split_add(i+1,iend,op);
-							if(sec.size() > 1){
-								auto ele = get_element_from_end(i-2,op);
-								if(ele.start != UNSET && !contain_time(ele,op) && !contain_ie_fe(ele,op)){
-									fl = true;
-									change3 = true;
-									
-									for(auto ii = ele.start; ii <= ele.end; ii++) op_new.pop_back();
-									
-									add_it(LEFTBRACKET,op_new);
-									
-									for(auto k = 0u; k < sec.size(); k++){
-										for(auto ii = ele.start; ii < ele.end; ii++) op_new.push_back(op[ii]);
-										
-										add_it(MULTIPLY,op_new);
-										
-										for(auto ii = sec[k].start; ii < sec[k].end; ii++) op_new.push_back(op[ii]);
-										
-										if(k+1 < sec.size()) add_it(ADD,op_new);
-									}
-									
-									add_it(RIGHTBRACKET,op_new);
-									
-									i = iend+1; 
-								}
+				if(op[i].type == SUM){
+					if(i+1 < imax){
+						auto iend = get_other_bracket(i+1,op);
+						if(iend != UNSET){
+							within_sum.push_back(false);
+							within_sum.push_back(false);
+							i += 2;
+							while(i < iend){
+								within_sum.push_back(true);
+								i++;
 							}
 						}
 					}
 				}
 				
-				// (b+c)*a = (a*b+a*c)
-				if(true && !fl && it.type == RIGHTBRACKET && i+2 < imax && op[i+1].type == MULTIPLY){ 
-					auto istart = get_other_bracket(i,op);
-					if(istart != UNSET){
-						if(contain_linear_pop(istart+1,i,op)){
-							auto sec = eqn_split_add(istart+1,i,op);
+				within_sum.push_back(false);
+				i++;
+			}
+			if(within_sum.size() != imax) emsg("within sum problem");
+			
+			//print_operations(op);
+			//for(auto va : within_sum) cout << va << " wi" << endl;
+			//emsg("kk");
+			
+			vector <EqItem> op_new;
+		
+			i = 0u;
+			while(i < imax){
+				auto fl = false;
 					
-							if(sec.size() > 1){
-								auto ele = get_element_from_start(i+2,op);
-								if(ele.end != UNSET && !contain_time(ele,op) && !contain_ie_fe(ele,op)){
-									fl = true;
-									change3 = true;
-									
-									for(auto ii = istart; ii < i; ii++) op_new.pop_back();
-									
-									add_it(LEFTBRACKET,op_new);
-									
-									for(auto k = 0u; k < sec.size(); k++){
-										for(auto ii = ele.start; ii < ele.end; ii++) op_new.push_back(op[ii]);
+				const auto &it = op[i];
+				
+				if(within_sum[i]){
+					// a*(b+c) = (a*b+a*c)
+					if(true && it.type == LEFTBRACKET && i > 1 && op[i-1].type == MULTIPLY){ 
+						auto iend = get_other_bracket(i,op);
+						if(iend != UNSET){
+							if(contain_linear_pop(i+1,iend,op)){
+								auto sec = eqn_split_add(i+1,iend,op);
+								if(sec.size() > 1){
+									auto ele = get_element_from_end(i-2,op);
+									if(ele.start != UNSET && !contain_time(ele,op) && !contain_ie_fe(ele,op)){
+										fl = true;
+										change3 = true;
 										
-										add_it(MULTIPLY,op_new);
+										for(auto ii = ele.start; ii <= ele.end; ii++) op_new.pop_back();
 										
-										for(auto ii = sec[k].start; ii < sec[k].end; ii++) op_new.push_back(op[ii]);
+										add_it(LEFTBRACKET,op_new);
 										
-										if(k+1 < sec.size()) add_it(ADD,op_new);
+										for(auto k = 0u; k < sec.size(); k++){
+											for(auto ii = ele.start; ii < ele.end; ii++) op_new.push_back(op[ii]);
+											
+											add_it(MULTIPLY,op_new);
+											
+											for(auto ii = sec[k].start; ii < sec[k].end; ii++) op_new.push_back(op[ii]);
+											
+											if(k+1 < sec.size()) add_it(ADD,op_new);
+										}
+										
+										add_it(RIGHTBRACKET,op_new);
+										
+										i = iend+1; 
 									}
-									
-									add_it(RIGHTBRACKET,op_new);
-									
-									i = ele.end; 
+								}
+							}
+						}
+					}
+					
+					// (b+c)*a = (a*b+a*c)
+					if(true && !fl && it.type == RIGHTBRACKET && i+2 < imax && op[i+1].type == MULTIPLY){ 
+						auto istart = get_other_bracket(i,op);
+						if(istart != UNSET){
+							if(contain_linear_pop(istart+1,i,op)){
+								auto sec = eqn_split_add(istart+1,i,op);
+						
+								if(sec.size() > 1){
+									auto ele = get_element_from_start(i+2,op);
+									if(ele.end != UNSET && !contain_time(ele,op) && !contain_ie_fe(ele,op)){
+										fl = true;
+										change3 = true;
+										
+										for(auto ii = istart; ii < i; ii++) op_new.pop_back();
+										
+										add_it(LEFTBRACKET,op_new);
+										
+										for(auto k = 0u; k < sec.size(); k++){
+											for(auto ii = ele.start; ii < ele.end; ii++) op_new.push_back(op[ii]);
+											
+											add_it(MULTIPLY,op_new);
+											
+											for(auto ii = sec[k].start; ii < sec[k].end; ii++) op_new.push_back(op[ii]);
+											
+											if(k+1 < sec.size()) add_it(ADD,op_new);
+										}
+										
+										add_it(RIGHTBRACKET,op_new);
+										
+										i = ele.end; 
+									}
 								}
 							}
 						}
@@ -496,10 +528,12 @@ void Equation::simplify_operations(vector <EqItem> &op)
 					if(iend != UNSET){
 						auto sec = eqn_split_mult(i+2,iend,op);
 						if(sec.size() > 0){
+							/*
 							for(auto se : sec){
 								print_eqn_range(se,op);
 								cout << endl;
 							}
+							*/
 							
 							vector <unsigned int> list, list_not;
 							for(auto k = 0u; k < sec.size(); k++){
@@ -523,7 +557,9 @@ void Equation::simplify_operations(vector <EqItem> &op)
 								
 								add_it(LEFTBRACKET,op_new);
 								if(list_not.size() == 0){
-									add_it(ONE,op_new);
+									EqItem it; it.type = NUMERIC; it.num = constant.add(1);
+									op_new.push_back(it);
+									//add_it(ONE,op_new);
 								}
 								else{
 									for(auto k = 0u; k < list_not.size(); k++){
@@ -534,7 +570,6 @@ void Equation::simplify_operations(vector <EqItem> &op)
 								}
 								add_it(RIGHTBRACKET,op_new);
 								
-								print_operations(op_new);
 								i = iend+1; 
 							}
 						}
@@ -549,12 +584,8 @@ void Equation::simplify_operations(vector <EqItem> &op)
 			
 			if(change3){
 				op = op_new;
-					print_operations(op_new);
-						//emsg("HH");
 			}
 		}
-	
-		loop++;
 	}while(change || change2 || change3);
 }
 
@@ -575,7 +606,7 @@ EqnRange Equation::get_element_from_end(unsigned int end, const vector <EqItem> 
 	
 	if(op[end].type == RIGHTBRACKET){
 		auto start = get_other_bracket(end,op);
-		if(start > 0 && is_func(op,start-1)) start--;
+		if(start > 0 && is_func_sum_int(op,start-1)) start--;
 		er.start = start;
 	}
 	else{	
@@ -590,7 +621,7 @@ EqnRange Equation::get_element_from_start(unsigned int start, const vector <EqIt
 {
 	EqnRange er;
 	er.start = start;
-	if(is_func(op,start)){
+	if(is_func_sum_int(op,start)){
 		if(start+1 >= op.size() || op[start+1].type != LEFTBRACKET) er.end = UNSET;
 		else{
 			auto iend = get_other_bracket(start+1,op);
@@ -628,7 +659,7 @@ bool Equation::contain_time(const EqnRange &er, const vector <EqItem> &op) const
 {
 	for(auto i = er.start; i < er.end; i++){
 		switch(op[i].type){
-		case POP_INDEX: case POPNUM: case POPTIMENUM: case TIME:
+		case POP_INDEX: case POPNUM: case POPNUMTIME: case TIME:
 		case SPLINE: case SPLINEREF: case CONSTSPLINEREF: case REG_PRECALC_TIME:
 		case POPCOMB: case POPCOMBTIME:
 			return true;
@@ -664,6 +695,13 @@ bool Equation::contain_dep(const EqnRange &er, const vector <string> &dep, const
 {
 	for(auto i = er.start; i < er.end; i++){
 		switch(op[i].type){
+		case SUM:
+			{
+				const auto &si = sum_info[op[i].num];
+				if(find_in(dep,si.comp_max) != UNSET) return true;
+			}
+			break;
+			
 		case POP_INDEX:
 			{
 				const auto &pind = pop_index[op[i].num];
@@ -737,14 +775,16 @@ vector <EqnRange> Equation::eqn_split_add(unsigned int start, unsigned int end, 
 }
 
 
-/// Splits an section into pieces that are added up 
+/// Splits a section into pieces that are multiplied
 vector <EqnRange> Equation::eqn_split_mult(unsigned int start, unsigned int end, const vector <EqItem> &op) const 
 {
+	/*
 	{
 		EqnRange er;
 		er.start = start; er.end = end;
 		print_eqn_range(er,op);
 	}
+	*/
 	
 	vector <EqnRange> sec;
 	
@@ -782,12 +822,94 @@ vector <EqnRange> Equation::eqn_split_mult(unsigned int start, unsigned int end,
 }
 
 
+// Does some simple simplification
+// (1) Combines together numerical values0 
+void Equation::simplify_calc(vector <Calculation> &calc) const 
+{
+	if(!simplify_eqn) return;
+	
+	for(auto &ca : calc){
+		switch(ca.op){
+		case ADD:
+			{
+				auto num = 0u;
+				for(auto &it : ca.item){
+					switch(it.type){
+					case NUMERIC: case ZERO: case ONE: num++; break;
+					default: break;
+					}
+				}
+				
+				if(num > 1){
+					auto sum = 0.0;
+					vector <EqItem> item_new;
+					for(auto &it : ca.item){
+						switch(it.type){
+						case NUMERIC: sum += constant.value[it.num]; break;
+						case ONE: sum += 1; break;
+						case ZERO: break;
+						default: item_new.push_back(it); break;
+						}
+					}
+				
+					if(sum != 0){
+						EqItem item; item.type = NUMERIC; item.num = constant.add(sum);
+						item_new.push_back(item);
+					}
+					
+					ca.item = item_new;
+				}
+			}
+			break;
+			
+		case MULTIPLY:
+			{
+				auto num = 0u;
+				for(auto &it : ca.item){
+					switch(it.type){
+					case NUMERIC: case ZERO: case ONE: num++; break;
+					default: break;
+					}
+				}
+				
+				if(num > 1){
+					auto prod = 1.0;
+					vector <EqItem> item_new;
+					for(auto &it : ca.item){
+						switch(it.type){
+						case NUMERIC: prod *= constant.value[it.num]; break;
+						case ONE: break;
+						case ZERO: prod = 0; break;
+						default: item_new.push_back(it); break;
+						}
+					}
+				
+					if(prod == 0) item_new.clear();
+					
+					if(prod != 1){
+						EqItem item; item.type = NUMERIC; item.num = constant.add(prod);
+						item_new.push_back(item);
+					}
+					
+					ca.item = item_new;
+				}
+			}
+			break;
+		
+		default: break;
+		}
+	}
+}
+
+
+/*
 /// Simplifies equations as much as possible (OLD CODE)
 // (1) By removing zeros
 // (2) Making used of infinity / undefined
 // (3) Combining together addition and multiplication terms 
 void Equation::simplify(vector <Calculation> &calc)
 {
+	if(!simplify_eqn) return;
 	return;
 	auto pl = false;
 	
@@ -1050,6 +1172,7 @@ void Equation::simplify(vector <Calculation> &calc)
 
 	if(false) print_calculation();
 }
+*/
 
 
 /// Removes any unused registers
@@ -1396,10 +1519,13 @@ unsigned int Equation::mult_const(EqItem item1, EqItem item2)
 	return constant.add(num);
 }
 
-/// Extracts a linear combination from 
+
+/// Extracts a linear combination from a calculation
 void Equation::extract_popcomb(vector <Calculation> &calcu, Hash &hashw, Hash &hashpc, bool derive)
 {
-	//cout << "EXTRACT\n"; print_calculation();
+	if(type != DEFINE_EQN && !derive){
+		//cout << "EXTRACT" << endl; print_calculation(); emsg("extract");
+	}
 	
 	bool lc_exist = false;
 	
@@ -1410,7 +1536,7 @@ void Equation::extract_popcomb(vector <Calculation> &calcu, Hash &hashw, Hash &h
 	vector <bool> fl(imax,false); 
 	vector <bool> remove(imax,false); 
 	
-	for(auto i = 0u; i < imax; i++){       // Determines how many times each resigter is used
+	for(auto i = 0u; i < imax; i++){       // Determines how many times each register is used
 		const auto &ca = calcu[i];
 		
 		vector <unsigned int> list;
@@ -1428,82 +1554,72 @@ void Equation::extract_popcomb(vector <Calculation> &calcu, Hash &hashw, Hash &h
 		for(auto num : list) fl[num] = false;
 	}
 	
-	for(auto i = 0u; i < imax; i++){ 
+	//print_calc("calc",calcu);
+
+	for(auto i = 0u; i < imax; i++){   // Converts summed population terms R0+R1+{P} -> POPCOMB
+	if(i >= calcu.size()) emsg("probk");
 		auto &ca = calcu[i];
 		
 		if(ca.op == ADD && ca.item.size() > 0){
-			// Determines which elements can be added
-			auto jmax = ca.item.size();
-		
-			vector <PopCombTemp> pop_co_temp;
-			for(auto j = 0u; j < jmax; j++){
-				const auto &it = ca.item[j];
-				switch(it.type){
-				case REG:
-					{
-						auto r = it.num;
-						if(used[r].size() == 1){
-							const auto &ca2 = calcu[r];
-							if(ca2.op == MULTIPLY && ca2.item.size() == 2){
-								const auto &it1 = ca2.item[0];
-								const auto &it2 = ca2.item[1];
-							
-								if(it2.type == POPNUM){
-									if(it1.type == NUMERIC || it2.type == REG_PRECALC){
-										PopCombTemp pct;
-										pct.po = it2.num;
-										pct.it = it1;
-										pct.r = r;
-										pct.j = j;
-										pop_co_temp.push_back(pct);
-									}
-								}
-								else{
-									if(it1.type == POPNUM){
-										if(it2.type == NUMERIC || it2.type == REG_PRECALC){
-											PopCombTemp pct;
-											pct.po = it1.num;
-											pct.it = it2;
-											pct.r = r;
-											pct.j = j;
-											pop_co_temp.push_back(pct);
-										}
-									}
-								}
-							}
+			for(auto p = 0u; p < species.size(); p++){
+				// Determines which elements can be added
+				auto jmax = ca.item.size();
+			
+				vector <PopCombTemp> pop_co_temp;
+				for(auto j = 0u; j < jmax; j++){
+					const auto &it = ca.item[j];
+					switch(it.type){
+					case REG:
+						{
+							auto r = it.num;
+							if(used[r].size() == 1) add_pop_co_temp(p,r,r,j,pop_co_temp,calcu);
 						}
+						break;
+						
+					case POPNUM:
+						if(pop[it.num].p == p){
+							PopCombTemp pct;
+							pct.po = it.num;
+							pct.it.type = ONE;
+							pct.r = UNSET;
+							pct.j = j;
+							pop_co_temp.push_back(pct);
+						}
+						break;
+						
+					case POP_INDEX: 
+						emsg("pop index");
+						break;
+						
+					default: break;
 					}
-					break;
-					
-				case POPNUM:
-					{
-						PopCombTemp pct;
-						pct.po = it.num;
-						pct.it.type = ONE;
-						pct.r = UNSET;
-						pct.j = j;
-						pop_co_temp.push_back(pct);
-					}
-					break;
-					
-				case POP_INDEX: 
-					emsg("pop index"); // CHECKON
-					break;
-					
-				default: break;
-				}
-			}	
+				}	
 
-			if(pop_co_temp.size() > 1){
-				add_popcomb(i,pop_co_temp,remove,used,calcu,hashw,hashpc,derive);
-				lc_exist = true;
-			}				
+				if(pop_co_temp.size() >= 1){
+					add_popcomb(i,p,pop_co_temp,remove,used,calcu,hashw,hashpc,derive,true);
+					lc_exist = true;
+				}				
+			}
 		}
 	}
 
+	for(auto i = 0u; i < imax; i++){ 
+		auto &ca = calcu[i];
+		if(remove[i] == false){
+			if(ca.op == MULTIPLY && ca.item.size() == 2){
+				for(auto p = 0u; p < species.size(); p++){
+					vector <PopCombTemp> pop_co_temp;
+					add_pop_co_temp(p,i,UNSET,UNSET,pop_co_temp,calcu);
+					if(pop_co_temp.size() == 1){
+						add_popcomb(i,p,pop_co_temp,remove,used,calcu,hashw,hashpc,derive,false);
+						lc_exist = true;
+					}
+				}
+			}
+		}
+	}
+	
 	if(lc_exist){
-		//print_calculation();
-		
 		// Removes unused registers
 		vector <unsigned int> reg_map(imax,UNSET);
 		
@@ -1534,19 +1650,62 @@ void Equation::extract_popcomb(vector <Calculation> &calcu, Hash &hashw, Hash &h
 		}
 	}
 	
-	//cout << " ex\n"; print_calculation();
-	//emsg("H");
+	// Converts any POPNUMTIME to POPCOMBTIME
+	for(auto &ca : calcu){
+		for(auto &it : ca.item){
+			if(it.type == POPNUMTIME){
+				add_popcomb_time(it,hashw,hashpc,derive);
+			}
+		}
+	}
+	
+	pop_time_ref.clear();
 }
 
+
+/// Adds a possibility for a popcombination
+void Equation::add_pop_co_temp(unsigned int p, unsigned int i, unsigned int r, unsigned int j, vector <PopCombTemp> &pop_co_temp, const vector <Calculation> &calcu) const
+{
+	const auto &ca2 = calcu[i];
+	if(ca2.op == MULTIPLY && ca2.item.size() == 2){
+		const auto &it1 = ca2.item[0];
+		const auto &it2 = ca2.item[1];
+
+		if(it2.type == POPNUM && pop[it2.num].p == p){
+			if(it1.type == NUMERIC || it1.type == REG_PRECALC){
+				PopCombTemp pct;
+				pct.po = it2.num;
+				pct.it = it1;
+				pct.r = r;
+				pct.j = j;
+				pop_co_temp.push_back(pct);
+			}
+		}
+		else{
+			if(it1.type == POPNUM && pop[it1.num].p == p){
+				if(it2.type == NUMERIC || it2.type == REG_PRECALC){
+					PopCombTemp pct;
+					pct.po = it1.num;
+					pct.it = it2;
+					pct.r = r;
+					pct.j = j;
+					pop_co_temp.push_back(pct);
+				}
+			}
+		}
+	}
+}
+
+									
 /// Adds a popcomb to the model
-void Equation::add_popcomb(unsigned int i, const vector <PopCombTemp> &pop_co_temp, vector <bool> &remove, const vector < vector <unsigned int> > &used, vector <Calculation> &calcu, Hash &hashw, Hash &hashpc, bool derive)
+void Equation::add_popcomb(unsigned int i, unsigned int p, const vector <PopCombTemp> &pop_co_temp, vector <bool> &remove, const vector < vector <unsigned int> > &used, vector <Calculation> &calcu, Hash &hashw, Hash &hashpc, bool derive, bool sum)
 {
 	auto &item = calcu[i].item;
 	
 	auto jmax = item.size();
 	vector <bool> jmap(jmax,false);
 	
-	vector <PopComb> pop_co;
+	vector <PopCombEle> pop_co;
 	vector <unsigned int> vecpc;
 	for(auto i = 0u; i < pop_co_temp.size(); i++){
 		const auto &pct = pop_co_temp[i];
@@ -1554,7 +1713,7 @@ void Equation::add_popcomb(unsigned int i, const vector <PopCombTemp> &pop_co_te
 		auto po = pct.po;
 		
 		if(pct.r != UNSET) remove[pct.r] = true;
-		jmap[pct.j] = true;
+		if(pct.j != UNSET) jmap[pct.j] = true;
 		
 		const auto &it = pct.it;
 		
@@ -1571,10 +1730,10 @@ void Equation::add_popcomb(unsigned int i, const vector <PopCombTemp> &pop_co_te
 			hashw.add(k,vec);
 		}
 			
-		PopComb pc;
-		pc.po = po;
-		pc.wref = k;
-		pop_co.push_back(pc);
+		PopCombEle pce;
+		pce.po = po;
+		pce.wref = k;
+		pop_co.push_back(pce);
 		
 		vecpc.push_back(po); vecpc.push_back(k); 
 	}
@@ -1582,15 +1741,16 @@ void Equation::add_popcomb(unsigned int i, const vector <PopCombTemp> &pop_co_te
 	auto pcnum = hashpc.existing(vecpc);
 	if(pcnum == UNSET){
 		pcnum = popcomb.size();
-		popcomb.push_back(pop_co);
+	
+		popcomb.push_back(create_popcomb(p,pop_co));
 		
 		hashpc.add(pcnum,vecpc);
 	
-		if(!derive){
-			for(auto i = 0u; i < pop_co.size(); i++){
-				auto po = pop_co[i].po;
-				auto k = pop_co[i].wref;
-				
+		for(auto i = 0u; i < pop_co.size(); i++){
+			auto po = pop_co[i].po;
+			auto k = pop_co[i].wref;
+			
+			if(!derive){
 				PopCombIn pci;
 				pci.pc = pcnum;
 				pci.index = i;
@@ -1601,12 +1761,21 @@ void Equation::add_popcomb(unsigned int i, const vector <PopCombTemp> &pop_co_te
 				pcr.wref = k;
 				pop[po].popcomb_ref.push_back(pcr);
 			}
+			else{
+				PopCombRef pcr; 
+				pcr.pcref = pcnum;
+				pcr.wref = k;
+				pop[po].popcomb_ref_derive.push_back(pcr);
+			}
 		}
 	}
+	popcomb_ref.push_back(pcnum);
 	
 	vector <EqItem> item_new;
-	for(auto j = 0u; j < jmax; j++){
-		if(jmap[j] == false) item_new.push_back(item[j]);
+	if(sum){
+		for(auto j = 0u; j < jmax; j++){
+			if(jmap[j] == false) item_new.push_back(item[j]);
+		}
 	}
 	
 	{
@@ -1632,7 +1801,7 @@ void Equation::add_popcomb(unsigned int i, const vector <PopCombTemp> &pop_co_te
 }
 
 
-/// Adds a popcomb to the model
+/// Replaces single popnum with popcomb
 void Equation::add_popcomb_single(EqItem &item, Hash &hashw, Hash &hashpc, bool derive)
 {
 	EqItem it; it.type = ONE; //it.num = constant.add(1);
@@ -1654,18 +1823,20 @@ void Equation::add_popcomb_single(EqItem &item, Hash &hashw, Hash &hashpc, bool 
 		hashw.add(k,vec);
 	}
 	
-	vector <PopComb> pop_co;
+	vector <PopCombEle> pop_co;
 	
-	PopComb pc;
-	pc.po = po;
-	pc.wref = k;
-	pop_co.push_back(pc);
+	PopCombEle pce;
+	pce.po = po;
+	pce.wref = k;
+	pop_co.push_back(pce);
 	vecpc.push_back(po); vecpc.push_back(k); 
 	
 	auto pcnum = hashpc.existing(vecpc);
 	if(pcnum == UNSET){
 		pcnum = popcomb.size();
-		popcomb.push_back(pop_co);
+		
+		popcomb.push_back(create_popcomb(pop[po].p,pop_co));
+		
 		hashpc.add(pcnum,vecpc);
 		
 		if(!derive){
@@ -1679,29 +1850,110 @@ void Equation::add_popcomb_single(EqItem &item, Hash &hashw, Hash &hashpc, bool 
 			pcr.wref = k;
 			pop[po].popcomb_ref.push_back(pcr);
 		}
+		else{
+			PopCombRef pcr; 
+			pcr.pcref = pcnum;
+			pcr.wref = k;
+			pop[po].popcomb_ref_derive.push_back(pcr);
+		}
 	}
+	popcomb_ref.push_back(pcnum);
 	
 	item.type = POPCOMB; item.num = pcnum;
 }
 
 
-/// Outputs popcomb name
-string Equation::popcomb_name(unsigned int i) const
+/// Replaces POPNUMTIME with POPCOMBTIME
+void Equation::add_popcomb_time(EqItem &item, Hash &hashw, Hash &hashpc, bool derive)
 {
+	EqItem it; it.type = ONE;
+
+	const auto &ptr = pop_time_ref[item.num];
+	
+	vector <unsigned int> vecpc;
+	
+	auto po = ptr.po;
+	
+	vector <unsigned int> vec;
+	vec.push_back(it.type); vec.push_back(it.num);
+
+	auto k = hashw.existing(vec);
+	if(k == UNSET){
+		k = popcombw.size();
+		PopCombWeight pcw; 
+		pcw.it = it;
+		popcombw.push_back(pcw);
+			
+		hashw.add(k,vec);
+	}
+	
+	vector <PopCombEle> pop_co;
+	
+	PopCombEle pce;
+	pce.po = po;
+	pce.wref = k;
+	pop_co.push_back(pce);
+	vecpc.push_back(po); vecpc.push_back(k); 
+	
+	auto pcnum = hashpc.existing(vecpc);
+	if(pcnum == UNSET){
+		pcnum = popcomb.size();
+		
+		popcomb.push_back(create_popcomb(pop[po].p,pop_co));
+		
+		hashpc.add(pcnum,vecpc);
+		
+		if(!derive){
+			PopCombIn pci;
+			pci.pc = pcnum;
+			pci.index = 0;
+			popcombw[k].pcref.push_back(pci);
+
+			PopCombRef pcr; 
+			pcr.pcref = pcnum;
+			pcr.wref = k;
+			pop[po].popcomb_ref.push_back(pcr);
+		}
+		else{
+			PopCombRef pcr; 
+			pcr.pcref = pcnum;
+			pcr.wref = k;
+			pop[po].popcomb_ref_derive.push_back(pcr);
+		}
+	}
+	popcomb_ref.push_back(pcnum);
+	
+	item.type = POPCOMBTIME; item.num = popcomb_time_ref.size();
+
+	PopcombTimeRef pctr;
+	pctr.pc = pcnum;
+	pctr.ti = ptr.ti;
+	
+	popcomb_time_ref.push_back(pctr);
+}
+
+
+/// Outputs popcomb name
+PopComb Equation::create_popcomb(unsigned int p, const vector <PopCombEle> &ele) const
+{
+	PopComb pc;
+	pc.ele = ele;
+	pc.p = p;
+		
 	stringstream ss;
 	ss << "POPCOMB["; 
-	const auto &pc = popcomb[i];
-	auto jmax = pc.size(); if(jmax > 3) jmax = 3;
+
+	auto jmax = ele.size(); if(jmax > 3) jmax = 3;
 	for(auto j = 0u; j < jmax; j++){
 		if(j != 0) ss << " + ";
-		//print_item(popcombw[pc[j].wref].it);
-		ss << "W" << pc[j].wref << "*";
-		ss << pop[pc[j].po].name;
+	
+		ss << "W" << ele[j].wref << "*";
+		ss << pop[ele[j].po].name;
 	}
 	if(jmax == 3) ss << "...";	
 	ss << "]";
 	
-	return ss.str();
+	pc.name = ss.str();
+	
+	return pc;
 }
-
-

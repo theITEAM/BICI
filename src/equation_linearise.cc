@@ -16,7 +16,7 @@ using namespace std;
 
 /// Works out if possible to linearise the equation in terms of populations/spline/terms involving time 
 /// This is to help speed up likelihood calculation.
-void Equation::calculate_linearise(Precalc &precalc_eqn, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref, SpecPrecalc &spec_precalc)
+void Equation::calculate_linearise(Precalc &precalc_eqn, const vector <unsigned int> &param_vec_refq, const vector <unsigned int> &spline_refq, SpecPrecalc &spec_precalc)
 {
 	if(lin.on == true) return;
 
@@ -173,7 +173,7 @@ void Equation::calculate_linearise(Precalc &precalc_eqn, const vector <unsigned 
 			ca.item.push_back(it);
 			calc.push_back(ca);
 		}
-		else simplify(calc); 
+		else simplify_calc(calc); 
 		
 		no_pop_calc = calc;
 	}
@@ -185,34 +185,37 @@ void Equation::calculate_linearise(Precalc &precalc_eqn, const vector <unsigned 
 		popcomb_list.push_back(pcc.pco);
 	}
 	
-	if(true) print_linear_final(no_pop_calc,popcomb_grad_calc,popcomb_list);
+	if(false) print_linear_final(no_pop_calc,popcomb_grad_calc,popcomb_list);
 
-	simplify(no_pop_calc);
-	for(auto &ca : popcomb_grad_calc) simplify(ca);
+	simplify_calc(no_pop_calc);
+	for(auto &ca : popcomb_grad_calc) simplify_calc(ca);
 
 	// Extracts precalc information from equations to just leave a single quantity 
-	precalc_eqn.add_eqn(no_pop_calc,param_vec_ref,spline_ref,spec_precalc);
+	precalc_eqn.add_eqn(no_pop_calc,param_vec_refq,spline_refq,spec_precalc);
 	for(auto j = 0u; j < popcomb_grad_calc.size(); j++){
-		precalc_eqn.add_eqn(popcomb_grad_calc[j],param_vec_ref,spline_ref,spec_precalc);
+		precalc_eqn.add_eqn(popcomb_grad_calc[j],param_vec_refq,spline_refq,spec_precalc);
 	}
 			
 	// The final single quantity results are stored
+	if(popcomb_list.size() != popcomb_ref.size()) emsg("popcomb size not right");
+	
 	lin.no_pop_precalc = get_precalc(no_pop_calc);
+	lin.popcomb_grad_precalc.resize(popcomb_ref.size());
 	for(auto i = 0u; i < popcomb_grad_calc.size(); i++){
-		lin.popcomb_grad_precalc.push_back(get_precalc(popcomb_grad_calc[i]));
+		auto j = find_in(popcomb_ref,popcomb_list[i]);
+		if(j == UNSET) emsg("Cannot get popcomb_ref");
+		lin.popcomb_grad_precalc[j] = get_precalc(popcomb_grad_calc[i]);
 	}
 
 	// Works out if there are multiple or a single population causing infection (used for transmission trees)
 	auto num = 0u;
-	for(auto i = 0u; i < popcomb_list.size(); i++) num += popcomb[popcomb_list[i]].size();
+	for(auto i = 0u; i < popcomb_list.size(); i++) num += popcomb[popcomb_list[i]].ele.size();
 	if(!zero_eqn(no_pop_calc)) num++;
 	
 	lin.multi_source = false;	
 	if(num > 1) lin.multi_source = true; 
 
-	lin.popcomb_list = popcomb_list;
-
-	// CHECKON need to initialise linearise.init_pop_ref_from_po(pop_ref);
+	lin.init_pop_ref_from_po(pop_ref);
 	
 	lin.on = true;
 }
@@ -238,7 +241,7 @@ void Equation::print_linear_final(const vector <Calculation> &no_pop_calc, const
 	print_calculation();
 	print_calc("no pop",no_pop_calc);
 	for(auto k = 0u; k < popcomb_grad_calc.size(); k++){
-		print_calc(popcomb_name(popcomb_list[k]),popcomb_grad_calc[k]);
+		print_calc(popcomb[popcomb_list[k]].name,popcomb_grad_calc[k]);
 	}
 }
 	
@@ -278,7 +281,7 @@ LinearCalculation Equation::convert_to_linear_calculation(const EqItem &it, EqIt
 			}
 			break;
 			
-		case POPTIMENUM:
+		case POPNUMTIME:
 			emsg("SHould not be in linear");
 			break;
 		
@@ -544,7 +547,7 @@ void Equation::print_linear_calc(string te, const LinearCalculation &lin) const
 	
 	for(auto i = 0u; i < lin.popcomb_calc.size(); i++){
 		const auto &pc = lin.popcomb_calc[i];
-		print_calc(popcomb_name(pc.pco),pc.calc);
+		print_calc(popcomb[pc.pco].name,pc.calc);
 	}
 }
 
@@ -552,12 +555,15 @@ void Equation::print_linear_calc(string te, const LinearCalculation &lin) const
 /// Prints a calculation
 void Equation::print_calc(string st, const vector <Calculation> &calc) const
 {
+	auto imax = calc.size();
+	if(imax > 10) imax = 10;
 	cout << st << ": "; 
-	for(auto i = 0u; i < calc.size(); i++){
+	for(auto i = 0u; i < imax; i++){
 		const auto &ca = calc[i];
 		print_ca(i,ca); 
 		cout << ",  ";
 	}
+	if(imax == 10) cout << "...";
 	cout << endl;
 }
 
@@ -680,25 +686,6 @@ bool Equation::two_param_func(Calculation ca, LinearCalculation &lin, const vect
 }
 
 
-// CHECKON needed?
-/// Calculates the vector of gradients against population number
-vector <double> Equation::calculate_popnum_gradient_without_factor(const vector <double> &precalc) const
-{
-	emsg("sort20");
-	/*
-	vector <double> popcomb_grad;
-
-	const auto &popcomb_grad_precalc = linearise.popcomb_grad_precalc;
-
-	for(auto i = 0u; i < popcomb_grad_precalc.size(); i++){
-		pop_grad.push_back(calculate_item_no_time(popcomb_grad_precalc[i],precalc));
-	}
-	
-	return popcomb_grad;
-	*/
-}
-
-
 /// Determines if an equation is time dependent
 bool Equation::calc_time_dep(const vector <Calculation> &calc) const
 {
@@ -733,7 +720,7 @@ bool Equation::it_time_dep(const EqItem &it) const
 	case PARAMETER: case PARAMVEC: case IE: case ONE: case ZERO: 
 	case FE:	case REG: case NUMERIC: case REG_PRECALC:
 		return false;
-	case SPLINE: case SPLINEREF: case CONSTSPLINEREF:
+	case SPLINE: case SPLINEREF: case CONSTSPLINEREF: 
 	case TIME: case REG_PRECALC_TIME:
 		return true;
 	case POPNUM: case POPCOMB: emsg_input("Should not have a population"); break;
@@ -748,8 +735,8 @@ bool Equation::it_time_dep(const EqItem &it) const
 double Equation::calculate_linearise_check(unsigned int ti, const vector <double> &popcomb, const vector <double> &precalc) const 
 {
 	auto val = calculate_item(lin.no_pop_precalc,ti,precalc);
-	for(auto j = 0u; j < lin.popcomb_list.size(); j++){
-		val +=  calculate_item(lin.popcomb_grad_precalc[j],ti,precalc)*popcomb[lin.popcomb_list[j]];
+	for(auto j = 0u; j < popcomb_ref.size(); j++){
+		val +=  calculate_item(lin.popcomb_grad_precalc[j],ti,precalc)*popcomb[popcomb_ref[j]];
 	}
 	
 	return val;
@@ -779,9 +766,10 @@ bool Equation::equal_calc(const vector <Calculation> &calc1, const vector <Calcu
 	
 				
 /// Creates a source sampler
-InfSourceSampler Equation::setup_source_sampler(unsigned int ti, const vector <double> &popnum, const PV &param_val) const 
+InfSourceSampler Equation::setup_source_sampler(unsigned int ti, const vector <double> &popnum, const PV &param_val, const vector <double> &popcombw_value) const 
 {
 	InfSourceSampler ss;
+
 	auto &val_store = ss.val_store;
 	auto &val_sum_store = ss.val_sum_store;
 	
@@ -789,13 +777,10 @@ InfSourceSampler Equation::setup_source_sampler(unsigned int ti, const vector <d
 
 	const auto &precalc = param_val.precalc;
 
-	auto factor = calculate_factor(ti,precalc); 
-	
 	auto val_sum = 0.0;
 	for(auto j = 0u; j < Npop; j++){
 		auto po = pop_ref[j];
-		auto val = popnum[po]*factor*calculate_pop_grad_without_factor(j,ti,precalc); 
-		
+		auto val = popnum[po]*calculate_pop_grad(j,ti,popcombw_value,precalc); 
 		val_sum += val;
 		val_store.push_back(val);
 		val_sum_store.push_back(val_sum);
@@ -810,7 +795,7 @@ InfSourceSampler Equation::setup_source_sampler(unsigned int ti, const vector <d
 	}
 	
 	ss.sum = val_sum;
-		
+	
 	return ss;
 }
 
@@ -837,6 +822,7 @@ double InfSourceSampler::prob_inf_source(unsigned int j) const
 	return log(val_store[j]/sum);
 }
 
+
 /// Gets the population reference from the population
 void Linearise::init_pop_ref_from_po(const vector <unsigned int> &pop_ref)
 {
@@ -861,142 +847,6 @@ unsigned int Linearise::get_pop_ref(unsigned int po) const
 }
 
 
-/*
-/// Tries to take any common factors from pop_grad_calc
-void Equation::get_pop_grad_calc_factorise()
-{	
-	emsg("sort22");
-	/*
-	auto &pgc = linearise.pop_grad_calc_store;
-	
-	Calculation fac_ca;
-	fac_ca.op = MULTIPLY;
-	
-	if(pgc.size() == 0){
-		if(fac_ca.item.size() == 0){
-			EqItem it; it.type = ONE; it.num = UNSET; fac_ca.item.push_back(it);
-		}
-		linearise.factor_calc.push_back(fac_ca);
-		return;
-	}
-	
-	const auto &fir = pgc[0][pgc[0].size()-1];
-	
-	if(fir.op == MULTIPLY || (fir.op == ADD && fir.item.size() == 1)){
-		auto j = 0u;
-		while(j < fir.item.size()){
-			const auto &it_fi = fir.item[j];
-			
-			switch(it_fi.type){
-			case ONE: case ZERO: case REG_PRECALC: case REG_PRECALC_TIME: 
-			case NUMERIC: case TIME: case CONSTSPLINEREF: 
-				{
-					auto fl = false;
-					
-					vector <unsigned int> list;
-					for(auto i = 0u; i < pgc.size(); i++){
-						const auto &ca = pgc[i][pgc[i].size()-1];
-						if(ca.op == MULTIPLY || (ca.op == ADD && ca.item.size() == 1)){						
-							const auto &item = ca.item;
-							
-							unsigned int k;
-							for(k = 0; k < item.size(); k++){
-								const auto &it = item[k];
-								if(it_fi.type == it.type && it_fi.num == it.num){
-									list.push_back(k);
-									break;
-								}
-							}
-							if(k == item.size()){ fl = true; break;}
-						}
-						else{
-							fl = true; break;
-						}
-					}
-					
-					if(fl == false){
-						fac_ca.item.push_back(it_fi);
-						for(auto i = 0u; i < pgc.size(); i++){
-							auto &ite = pgc[i][pgc[i].size()-1].item;
-							
-							auto k = list[i];
-							if(k >= ite.size()) emsg("wrong");
-							if(k+1 < ite.size()){
-								ite[k] = ite[ite.size()-1];
-							}
-							ite.pop_back();
-						}
-					}
-					else j++;
-				}
-				break;
-
-			default:
-				j++;
-				break;
-			}
-		}
-	}
-		
-	if(fac_ca.item.size() == 0){
-		EqItem it; it.type = ONE; it.num = UNSET; fac_ca.item.push_back(it);
-	}
-	linearise.factor_calc.push_back(fac_ca);
-	
-	if(false){
-		//print_calculation();
-	
-		cout << " AFTE FACTOR" << endl;
-		for(auto k = 0u; k < pgc.size(); k++){
-			print_calc(pop[pop_ref[k]].name,pgc[k]);	
-		}
-		print_calc("factor",linearise.factor_calc);
-		print_calc("no pop",linearise.no_pop_calc_store);
-	}
-	//emsg("jj");
-	
-}
-*/
-
-
-/*
-/// References precalculation in linearisation
-void Equation::set_precalc()
-{	
-	linearise.no_pop_precalc = get_precalc(linearise.no_pop_calc_store);
-
-	for(auto i = 0u; i < linearise.popcomb_grad_calc_store.size(); i++){
-		linearise.popcomb_grad_precalc.push_back(get_precalc(linearise.popcomb_grad_calc_store[i]));
-	}
-
-	//linearise.factor_precalc = get_precalc(linearise.factor_calc);
-
-	//linearise.pop_grad_time_dep = false;
-	//for(const auto &it : linearise.pop_grad_precalc){
-	//if(it_time_dep(it)){ linearise.pop_grad_time_dep = true; break;}
-	//}
-	
-	//linearise.factor_time_dep = it_time_dep(linearise.factor_precalc);
-	//linearise.no_pop_calc_time_dep = it_time_dep(linearise.no_pop_precalc);
-		
-	if(false){
-		cout << "LINEARISATION" << endl;
-		print_calculation();
-		cout << "no_pop: "; print_item(linearise.no_pop_precalc); cout << endl;
-		//cout << "factor: "; print_item(linearise.factor_precalc); cout << endl;
-		for(const auto &it : linearise.popcomb_grad_precalc){
-			cout << "grad: "; print_item(it); cout << endl;
-		}
-	}
-	
-	// Deletes calculations as they are no longer required
-	linearise.no_pop_calc_store.clear();
-	linearise.popcomb_grad_calc_store.clear();
-	//linearise.factor_calc.clear();
-}
-*/
-
-
 /// Converts from a calculation to a precalc
 EqItem Equation::get_precalc(const vector <Calculation> &calc) const
 {
@@ -1012,7 +862,7 @@ EqItem Equation::get_precalc(const vector <Calculation> &calc) const
 	const auto &it = ca.item[0];
 	switch(it.type){
 	case REG_PRECALC: case REG_PRECALC_TIME: case ONE: case ZERO: 
-	case NUMERIC: case TIME: case CONSTSPLINEREF:  
+	case NUMERIC: case TIME: case CONSTSPLINEREF:
 		break;
 	default: 
 		emsg("precalc should be reg"); 
@@ -1021,3 +871,4 @@ EqItem Equation::get_precalc(const vector <Calculation> &calc) const
 	
 	return it;
 }
+

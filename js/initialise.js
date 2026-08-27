@@ -8,9 +8,20 @@ function initialise_BICI()
 	
 	let ah = window.screen.availHeight;  // Resizes to show all examples (of room);
 	let wo = window.outerWidth;
-	if(ah > 705) window.resizeTo(wo,705);
+	
+	let ht = 705;
+	if(ver == "linux"){ 	 	 
+		let heightDiff = window.outerHeight - window.innerHeight;
+		if(heightDiff == 0) ht -= 39;
+	}
+	
+	if(ah > ht) window.resizeTo(wo,ht);
 	
 	if(debug == true) require('nw.gui').Window.get().showDevTools();
+
+	//var source = new Proj4js.Proj('WGS84'); 
+	
+	
 
 	inter.graph = new Graph();
 

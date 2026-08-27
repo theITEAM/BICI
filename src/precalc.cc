@@ -15,10 +15,11 @@ using namespace std;
 #include "precalc.hh"
 #include "utils.hh"
 
-Precalc::Precalc(const vector <SpeciesSimp> &species, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, Constant &constant, const vector <double> &timepoint, const Details &details) : species(species), spline(spline), param_vec(param_vec), pop(pop), constant(constant), timepoint(timepoint), details(details)
+Precalc::Precalc(const vector <SpeciesSimp> &species, const vector <Spline> &spline, const vector <Param> &param, const vector <ParamVecEle> &param_vec, const vector <Population> &pop, Constant &constant, const vector <double> &timepoint, const Details &details) : species(species), spline(spline), param(param), param_vec(param_vec), pop(pop), constant(constant), timepoint(timepoint), details(details)
 {
 	//clear_timer();
 	num = 0;
+	pcsize = 0;
 }
 
 
@@ -30,7 +31,7 @@ void Precalc::clear_timer()
 
 
 /// Adds an equation onto the precalculated equation but only for param and spline
-void Precalc::add_eqn_simp(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref)
+void Precalc::add_eqn_simp(vector <Calculation> &calc, const vector <unsigned int> &param_vec_refq, const vector <unsigned int> &spline_refq)
 {
 	// Removes any reference to parameter and spline 
 	for(auto &ca : calc){
@@ -38,20 +39,13 @@ void Precalc::add_eqn_simp(vector <Calculation> &calc, const vector <unsigned in
 			switch(it.type){
 			case PARAMVEC: 
 				it.type = REG_PRECALC; 
-				it.num = param_vec_ref[it.num];
+				it.num = param_vec_refq[it.num];
 				break;
 				
 			case SPLINEREF: 
-				{
-					auto &spl = spline[it.num];
-					if(spl.constant == true){
-						it.type = CONSTSPLINEREF;
-					}
-					else{
-						it.type = REG_PRECALC_TIME; 
-						it.num = spline_ref[it.num];
-					}
-				}
+				it.type = REG_PRECALC_TIME; 
+				it.num = spline_refq[it.num];
+				if(it.num == UNSET) emsg("spline_ref unset");
 				break;
 			
 			default:
@@ -63,27 +57,23 @@ void Precalc::add_eqn_simp(vector <Calculation> &calc, const vector <unsigned in
 
 
 /// Adds an equation onto the precalculated equation calculation
-void Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &param_vec_ref, const vector <unsigned int> &spline_ref, SpecPrecalc &spec_precalc)
+void Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &param_vec_refq, const vector <unsigned int> &spline_refq, SpecPrecalc &spec_precalc)
 {
 	// Removes any reference to parameter and spline 
 	for(auto &ca : calc){
-		for(auto &it : ca.item){
+		for(auto &it : ca.item){		
 			switch(it.type){
 			case PARAMVEC: 
 				it.type = REG_PRECALC; 
-				it.num = param_vec_ref[it.num];
+				it.num = param_vec_refq[it.num];
+				if(it.num == UNSET) emsg("param_vec_ref unset");
 				break;
 				
 			case SPLINEREF: 
 				{
-					auto &spl = spline[it.num];
-					if(spl.constant == true){
-						it.type = CONSTSPLINEREF;
-					}
-					else{
-						it.type = REG_PRECALC_TIME; 
-						it.num = spline_ref[it.num];
-					}
+					it.type = REG_PRECALC_TIME; 
+					it.num = spline_refq[it.num];
+					if(it.num == UNSET) emsg("spline_ref unset");
 				}
 				break;
 			
@@ -101,7 +91,8 @@ void Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 
 	bool fl;
 	do{
-		fl = combine_multiply_add(calc,become_Rrecalc); // Tries to simplty multiplications and additions
+		fl = combine_multiply_add(calc,become_Rrecalc); // Tries to simplify multiplications and additions
+		//fl = false;
 		
 		for(auto i = 0u; i < calc.size(); i++){
 			if(become_Rrecalc[i] == UNSET){
@@ -109,36 +100,38 @@ void Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 				
 				auto &item = ca.item;
 				
-				auto nregderpop = 0u, npop = 0u;
+				auto nregderpop = 0u;
 				for(auto j = 0u; j < item.size(); j++){
 					switch(item[j].type){
-					case REG: case DERIVE: case INTEGRAL: nregderpop++; break;
-					case POPNUM: nregderpop++; npop++; break;
+					case POPNUM: case REG: case DERIVE: case INTEGRAL: case POPNUMTIME: nregderpop++; break;
 					default: break;
 					}
 				}
 			
 				// This replaces calculation with that in non-pop 
 				if(nregderpop == 0 && i+1 != calc.size()){  	
-					PreCalc pc; pc.op = ca.op; pc.item = ca.item;
-					auto it = add(pc,spec_precalc);
+					auto it = add(ca,spec_precalc);
 					become_Rrecalc[i] = it.num;
 				}
 				else{ // Attempts to put part of calculation into non-pop
 					if(ca.op == DIVIDE){ // If dividing by something not 
 						auto &denom = item[1];
-						if(denom.type != REG && denom.type != POPNUM && 
-						   denom.type != DERIVE && denom.type != INTEGRAL){
-							ca.op = MULTIPLY;
-							
-							PreCalc pcalc;
-							pcalc.op = DIVIDE;
+						switch(denom.type){
+						case REG: case POPNUM: case DERIVE: case INTEGRAL: case POPNUMTIME: break;
+						default:
+							{
+								ca.op = MULTIPLY;
 								
-							EqItem one; one.type = ONE;
-							pcalc.item.push_back(one);	
-							pcalc.item.push_back(denom);
-							
-							denom = add(pcalc,spec_precalc);
+								Calculation calc;
+								calc.op = DIVIDE;
+									
+								EqItem one; one.type = ONE;
+								calc.item.push_back(one);	
+								calc.item.push_back(denom);
+								
+								denom = add(calc,spec_precalc);
+							}
+							break;
 						}
 					}
 					
@@ -150,40 +143,45 @@ void Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 							const auto &itdiv = ca_next.item;
 							if(itdiv[0].type == REG && itdiv[0].num == i){
 								auto &denom = itdiv[1];
-								if(denom.type != REG && denom.type != POPNUM && 
-								   denom.type != DERIVE && denom.type != INTEGRAL){
-									flag = true;
 								
-									PreCalc pcalc;
-									pcalc.op = DIVIDE;
+								switch(denom.type){
+								case REG: case POPNUM: case DERIVE: case INTEGRAL: case POPNUMTIME: break;
+								default:
+									{
+										flag = true;
+									
+										Calculation calc;
+										calc.op = DIVIDE;
+									
+										EqItem one; one.type = ONE;
+										calc.item.push_back(one);
+										calc.item.push_back(denom);
+										
+										auto inew = add(calc,spec_precalc);
+										
+										Calculation calc2;
+										calc2.op = MULTIPLY;
 								
-									EqItem one; one.type = ONE;
-									pcalc.item.push_back(one);
-									pcalc.item.push_back(denom);
-									
-									auto inew = add(pcalc,spec_precalc);
-									
-									PreCalc pcalc2;
-									pcalc2.op = MULTIPLY;
-							
-									vector <EqItem> item_new;
-							
-									for(auto j = 0u; j < item.size(); j++){
-										const auto &it = item[j];
-										switch(it.type){
-										case REG: case POPNUM: case DERIVE: case INTEGRAL: item_new.push_back(it); break;
-										default: pcalc2.item.push_back(it); break;
+										vector <EqItem> item_new;
+								
+										for(auto j = 0u; j < item.size(); j++){
+											const auto &it = item[j];
+											switch(it.type){
+											case REG: case POPNUM: case DERIVE: case INTEGRAL: case POPNUMTIME: item_new.push_back(it); break;
+											default: calc2.item.push_back(it); break;
+											}
 										}
+										calc2.item.push_back(inew);
+									
+										auto inew2 = add(calc2,spec_precalc);
+										item_new.push_back(inew2);
+										
+										ca_next.op = MULTIPLY;
+										ca_next.item = item_new;
+										
+										become_Rrecalc[i] = USINT_MAX;
 									}
-									pcalc2.item.push_back(inew);
-								
-									auto inew2 = add(pcalc2,spec_precalc);
-									item_new.push_back(inew2);
-									
-									ca_next.op = MULTIPLY;
-									ca_next.item = item_new;
-									
-									become_Rrecalc[i] = USINT_MAX;
+									break;
 								}
 							}
 						}
@@ -191,40 +189,39 @@ void Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 					
 					if(flag == false && (ca.op == MULTIPLY || ca.op == ADD)){
 						if(item.size() - nregderpop >= 2){
-							PreCalc pcalc;
-							pcalc.op = ca.op;
+							Calculation calc;
+							calc.op = ca.op;
 							
 							vector <EqItem> item_new;
 							
 							for(auto j = 0u; j < item.size(); j++){
 								const auto &it = item[j];
 								switch(it.type){
-								case REG: case POPNUM: case DERIVE: case INTEGRAL: item_new.push_back(it); break;
-								default: pcalc.item.push_back(it); break;
+								case REG: case POPNUM: case DERIVE: case INTEGRAL: case POPNUMTIME: item_new.push_back(it); break;
+								default: calc.item.push_back(it); break;
 								}
 							}
 					
-							auto inew = add(pcalc,spec_precalc);
+							auto inew = add(calc,spec_precalc);
 							item_new.push_back(inew);
 							
 							ca.item = item_new;
-							//}
 						}
 					}
 					
 					if(flag == false && nregderpop == 0){
-						
 						switch(ca.op){
 						case EXPFUNC: case SINFUNC: case COSFUNC: case LOGFUNC: 	// Single parameter functions
 						case STEPFUNC: case ABSFUNC: case SQRTFUNC: case SIGFUNC:
 						case POWERFUNC: case THRESHFUNC: case UBOUNDFUNC:         // Two parameter functions
 						case MAXFUNC: case MINFUNC:
 							{
-								PreCalc pcalc;
-								pcalc.op = ca.op;
-								pcalc.item = ca.item;
+								//Calculation calc;
+								//calc.op = ca.op;
+								//pcalc.item = ca.item;
 							
-								auto inew = add(pcalc,spec_precalc);
+								//auto inew = add(pcalc,spec_precalc);
+								auto inew = add(ca,spec_precalc);
 								
 								vector <EqItem> item_new;
 								item_new.push_back(inew);
@@ -248,7 +245,7 @@ void Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 						it.type = REG_PRECALC; 
 						it.num = become_Rrecalc[it.num];
 						if(it.num == CODE) emsg("Should not be code");
-						if(pcalcu[pcalcu_ref[it.num]].time_dep) it.type = REG_PRECALC_TIME; 
+						if(pcalcu[it.num].time_dep) it.type = REG_PRECALC_TIME; 
 						if(it.num == USINT_MAX) emsg("Problem used");
 						fl = true;
 					}
@@ -280,7 +277,7 @@ void Precalc::add_eqn(vector <Calculation> &calc, const vector <unsigned int> &p
 		}
 	}
 	
-	//return stop_combine_fl;
+	//print_calc_section(iii);
 }
 
 
@@ -367,32 +364,36 @@ unsigned int Precalc::add_param(unsigned int th)
 	ca.op = SINGLE;
 	ca.time_dep = false;
 	
-	EqItem it;
-	it.type = PARAMVEC;
+	PreEqItem it;
+	it.type = PRE_PARAMVEC;
 	it.num = th; if(th == UNSET) emsg("Parem vec problem");
-	ca.item.push_back(it);
+	ca.pre_item.push_back(it);
 
 	auto vec = get_vec(ca);
 	
-	auto j = hash_ca.existing(vec);
-	if(j == UNSET){
-		j = pcalcu_ref.size();
+	auto q = hash_ca.existing(vec);
+	if(q == UNSET){
+		q = pcalcu.size();
 		calcu_add(ca);
-		hash_ca.add(j,vec);
+		hash_ca.add(q,vec);
 	}
 
-	return j;
+	return q;
 }
 
 
 /// Adds a calculation to the list
-void Precalc::calcu_add(const PreCalc &ca)
+void Precalc::calcu_add(PreCalc &ca)
 {
-	if(ca.op == NOOP) pcalcu_ref.push_back(UNSET);
+	if(ca.op == NOOP){ 
+		emsg("SHould not add noop");
+	}
 	else{
-		//calcu.push_back(ca);
-		pcalcu_ref.push_back(pcalcu.size());
+		ca.iref = pcsize;
 		pcalcu.push_back(ca);
+		if(pcalcu.size() >= USINT_MAX) emsg("BICI ran out of memory");
+		if(ca.time_dep) pcsize += details.T;
+		else pcsize++;
 	}
 }
 
@@ -404,88 +405,76 @@ unsigned int Precalc::add_spline(unsigned int s, SpecPrecalc &spec_precalc)
 	ca.op = SINGLE;
 	ca.time_dep = true;
 	
-	EqItem it;
-	it.type = SPLINEREF;
+	PreEqItem it;
+	it.type = PRE_SPLINEREF;
 	it.num = s;
-	ca.item.push_back(it);
+	ca.pre_item.push_back(it);
 
-	const auto &spl = spline[s];
-	for(auto i = 0u; i < spl.param_ref.size(); i++){
-		const auto &pr = spl.param_ref[i];
-		if(pr.cons){
-			EqItem it;
-			it.type = NUMERIC;
-			it.num = pr.index;
-			ca.item.push_back(it);
-		}
-		else{
-			EqItem it;
-			it.type = PARAMVEC;
-			it.num = pr.index;
-			ca.item.push_back(it);
-		}
-	}
 	auto vec = get_vec(ca);
 	
-	auto j = hash_ca.existing(vec);
-	if(j == UNSET){
-		j = pcalcu_ref.size();
+	auto q = hash_ca.existing(vec);
+	if(q == UNSET){
+		q = pcalcu.size();
 		calcu_add(ca);
 		
-		sp_add(spec_precalc,j,all_time);
+		sp_add(spec_precalc,q,all_time);
 		
-		hash_ca.add(j,vec);
-		
-		for(auto ti = 1u; ti < details.T; ti++){
-			PreCalc ca;	
-			ca.op = NOOP;
-			ca.time_dep = true;
-			calcu_add(ca);
-		}
+		hash_ca.add(q,vec);
 	}
 	
-	return j;
+	return q;
 }
 
 
 /// Adds a calculation 
-EqItem Precalc::add(PreCalc &pcalc, SpecPrecalc &spec_precalc)
+EqItem Precalc::add(Calculation &ca, SpecPrecalc &spec_precalc)
 {
-	auto vec = get_vec(pcalc);
-	
-	// Determines if time dependent
+	PreCalc pcalc; pcalc.op = ca.op; 
 	pcalc.time_dep = false;
 	
-	for(auto &it : pcalc.item){
+	for(const auto &it : ca.item){
+		PreEqItem pi; pcalc.op = ca.op; 
 		switch(it.type){
-		case SPLINEREF: case CONSTSPLINEREF: case POPNUM: case TIME: case REG_PRECALC_TIME:
+		case PARAMVEC: pi.type = PRE_PARAMVEC; break;
+		case SPLINEREF: pi.type = PRE_SPLINEREF; break;
+		case CONSTSPLINEREF: pi.type = PRE_CONSTSPLINEREF; break;
+		case REG_PRECALC: pi.type = PRE_REG; break;
+		case REG_PRECALC_TIME: pi.type = PRE_REGTIME; break;
+		case ONE: pi.type = PRE_ONE; break;
+		case ZERO: pi.type = PRE_ZERO; break;
+		case NUMERIC: pi.type = PRE_NUMERIC; break;
+		case TIME: pi.type = PRE_TIME; break;
+		default: emsg("Type not recognised:"+tstr(it.type)); break;
+		}
+		pi.num = it.num;
+		pcalc.pre_item.push_back(pi);
+		
+		// Determines if time dependent
+		switch(pi.type){
+		case PRE_SPLINEREF: case PRE_CONSTSPLINEREF: case PRE_TIME: case PRE_REGTIME:
 			pcalc.time_dep = true; 
 			break;
 		default: break;
 		}
 	}
-						
-	auto j = hash_ca.existing(vec);
-	if(j == UNSET){
-		j = pcalcu_ref.size();
+
+	auto vec = get_vec(pcalc);
+			
+	auto q = hash_ca.existing(vec);
+	if(q == UNSET){
+		q = pcalcu.size();
 		
-		hash_ca.add(j,vec);
+		hash_ca.add(q,vec);
 		calcu_add(pcalc);
 	
 		num++;
 	
-		sp_add(spec_precalc,j,all_time);
-		
-		if(pcalc.time_dep == true){
-			PreCalc ca2; ca2.op = NOOP; ca2.time_dep = true;
-			auto T = details.T;
-			for(auto ti = 1u; ti < T; ti++) calcu_add(ca2);
-		}
+		sp_add(spec_precalc,q,all_time);
 	}	
 	
 	EqItem inew;
 	inew.type = REG_PRECALC; if(pcalc.time_dep == true) inew.type = REG_PRECALC_TIME;
-	inew.num = j;
+	inew.num = q;
 	
 	return inew;
 }
@@ -494,14 +483,14 @@ EqItem Precalc::add(PreCalc &pcalc, SpecPrecalc &spec_precalc)
 /// Gets a hash vector for a calulation item
 vector <unsigned int> Precalc::get_vec(const PreCalc &ca) const 
 {
-	const auto &item = ca.item;
+	const auto &pre_item = ca.pre_item;
 	
 	vector <unsigned int> vec;
 		
 	vec.push_back(ca.op);
-	for(auto j = 0u; j < item.size(); j++){
-		vec.push_back(item[j].type);
-		vec.push_back(item[j].num);
+	for(auto j = 0u; j < pre_item.size(); j++){
+		vec.push_back(pre_item[j].type);
+		vec.push_back(pre_item[j].num);
 	}
 
 	return vec;
@@ -514,23 +503,18 @@ void Precalc::print_calc() const
 	stringstream ss;
 	ss << "PRE-CALCULATION:" << endl;
 	
-	auto T = details.T;
-	auto imax = pcalcu_ref.size(); 
-	//auto imax_lim = LARGE;
-	//auto imax_lim = 1000;
-	auto imax_lim = 16947442u;
-	
-	if(imax > imax_lim) imax = imax_lim;
-  for(auto i = 0u; i < imax; i++){
-		auto re = pcalcu_ref[i]; if(re == UNSET) emsg("no calculation");
-		const auto &ca = pcalcu[re];
-		ss << print_ca(i,ca);
+	auto li = 0u, limax = 10000000u;
+  for(auto q = 0u; q < pcalcu.size(); q++){
+		const auto &ca = pcalcu[q];
+		ss << q << " " << "(i" << ca.iref << ")" << " ....";
+		ss << print_ca(q,ca);
 		ss << endl;
 	
-		if(ca.time_dep == true) i += T-1;
+		li++;
+		if(li > limax) break;
   }
 	
-	if(imax < pcalcu_ref.size()) ss << "...";
+	if(li > limax) ss << "...";
 
   ss << endl << endl;
 	
@@ -541,18 +525,34 @@ void Precalc::print_calc() const
 
 
 /// Prints a SpecPrecalc to a file
-void Precalc::print_spec_precalc(string file, const SpecPrecalc &spec) const 
+void Precalc::print_spec_precalc(string name, const SpecPrecalc &spec) const 
 {
-	cout << "Output file " << file << endl;
-	ofstream fout(file);
+	auto te = print_spec_precalc_str(name,spec);
+	
+	if(true){
+		cout << te;
+	}
+	else{
+		ofstream fout(name);
+		fout << te;
+	}
+}
+
+
+string Precalc::print_spec_precalc_str(string name, const SpecPrecalc &spec) const 
+{
+	stringstream ss;
+	cout << "Output " << name << ": " << endl;
 	for(const auto &va : spec.info){
-		fout << va.i << " " << va.tlist << endl;
+		ss << va.q << " " << va.tlist << endl;
 	}
-	fout << "Time lines" << endl;
+	ss << "Time lines" << endl;
 	for(const auto &tl : spec.list_time){
-		for(auto ti : tl) fout << ti << ",";
-		fout << endl;		
+		for(auto ti : tl) ss << ti << ",";
+		ss << endl;		
 	}
+	
+	return ss.str();
 }
 
 
@@ -599,27 +599,30 @@ void Precalc::calc_spline_const(PV &param_val, const vector <unsigned int> &spli
 /// Calculates the value for an equation
 vector <double> Precalc::calculate_precalc_init(const SpecPrecalc &spec_precalc) const 
 {
-	vector <double> precalc(pcalcu_ref.size(),UNSET);
+	vector <double> precalc(pcsize,UNSET);
 	const auto &cval = constant.value;
 	
+	auto calc_err = NO_ERROR;
+	
 	for(const auto &in : spec_precalc.info){
-		auto i = in.i;
+		auto q = in.q;
 		
-		auto re = pcalcu_ref[i]; if(re == UNSET) emsg("problem unset");
-		const auto &ca = pcalcu[re];
+		const auto &ca = pcalcu[q];
+		auto i = ca.iref;
 		
 		if(ca.op == SINGLE){
-			const auto &it = ca.item[0];
+			const auto &it = ca.pre_item[0];
 			switch(it.type){
-			case PARAMVEC: 
+			case PRE_PARAMVEC: 
 				break;
 			
-			case SPLINEREF:
+			case PRE_SPLINEREF:
 				{
 					const auto &spl = spline[it.num];
 					if(spl.constant){
 						for(auto ti : all_time){
-							precalc[i+ti] = spl.const_val[ti];
+							if(spl.dynamic) precalc[i+ti] = UNSET;
+							else precalc[i+ti] = spl.const_val[ti];
 						}
 					}
 					else{
@@ -674,8 +677,8 @@ vector <double> Precalc::calculate_precalc_init(const SpecPrecalc &spec_precalc)
 			}
 		}
 		else{
-			const auto &item = ca.item;
-			const auto N = item.size();
+			const auto &pre_item = ca.pre_item;
+			const auto N = pre_item.size();
 			
 			vector <double> num(N);
 			
@@ -683,41 +686,47 @@ vector <double> Precalc::calculate_precalc_init(const SpecPrecalc &spec_precalc)
 				for(auto ti : all_time){
 					auto fl = false;
 					for(auto j = 0u; j < N; j++){
-						const auto &it = item[j];
+						const auto &it = pre_item[j];
 						
 						switch(it.type){
-							case REG_PRECALC: num[j] = precalc[it.num]; break;
-							case REG_PRECALC_TIME: num[j] = precalc[it.num+ti]; break;							
-							case ONE: num[j] = 1; break;
-							case NUMERIC: num[j] = constant.value[it.num]; break;
-							case CONSTSPLINEREF: num[j] = spline[it.num].const_val[ti]; break;
-							case TIME: num[j] = timepoint[ti]; break;
+							case PRE_REG: num[j] = precalc[pcalcu[it.num].iref]; break;
+							case PRE_REGTIME: num[j] = precalc[pcalcu[it.num].iref+ti]; break;							
+							case PRE_ONE: num[j] = 1; break;
+							case PRE_NUMERIC: num[j] = constant.value[it.num]; break;
+							case PRE_CONSTSPLINEREF: 
+								{
+									const auto &spl = spline[it.num];
+									if(spl.dynamic) num[j] = UNSET;
+									else num[j] = spl.const_val[ti]; 
+								}
+								break;
+							case PRE_TIME: num[j] = timepoint[ti]; break;
 							default: eqn_type_error(it.type,6); break;
 						}
 						if(num[j] == UNSET){ fl = true; break;}
 					}
 
-					if(fl == false) precalc[i+ti] = calculate_operation(ca.op,num);
+					if(fl == false) precalc[i+ti] = calculate_operation(ca.op,num,calc_err);
 				}
 			}
 			else{			
 				auto fl = false;
 				for(auto j = 0u; j < N; j++){
-					const auto &it = item[j];	
+					const auto &it = pre_item[j];	
 					switch(it.type){	
-						case ONE: num[j] = 1; break;
-						case REG_PRECALC: num[j] = precalc[it.num]; break;
-						case NUMERIC: num[j] = cval[it.num]; break;
+						case PRE_ONE: num[j] = 1; break;
+						case PRE_REG: num[j] = precalc[pcalcu[it.num].iref]; break;
+						case PRE_NUMERIC: num[j] = cval[it.num]; break;
 						default: eqn_type_error(it.type,8); break;
 					}
 					if(num[j] == UNSET){ fl = true; break;}
 				}
 
-				if(fl == false) precalc[i] = calculate_operation(ca.op,num);
+				if(fl == false) precalc[i] = calculate_operation(ca.op,num,calc_err);
 			}
 		}
   }
-	
+
 	return precalc;
 }
 
@@ -740,11 +749,13 @@ void Precalc::calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store)
 	const auto &cval = constant.value;
 	auto &precalc = param_val.precalc;
 	
+	auto calc_err = NO_ERROR;
+	
 	for(const auto &ci : info){
-		auto i = ci.i;
-
-		auto re = pcalcu_ref[i]; if(re == UNSET) emsg("problem unset"); 
-		const auto &ca = pcalcu[re];
+		auto q = ci.q;
+	
+		const auto &ca = pcalcu[q];
+		auto i = ca.iref;
 		
 		if(store){
 			if(ca.time_dep){ 
@@ -757,13 +768,14 @@ void Precalc::calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store)
 		}
 		
 		if(ca.op == SINGLE){
-			const auto &it = ca.item[0];
+			const auto &it = ca.pre_item[0];
+		
 			switch(it.type){
-			case PARAMVEC: 
+			case PRE_PARAMVEC: 
 				precalc[i] = value[it.num];
 				break;
 			
-			case SPLINEREF:
+			case PRE_SPLINEREF:
 				{
 					const auto &spl = spline[it.num];
 					if(!spl.constant){
@@ -811,51 +823,22 @@ void Precalc::calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store)
 			}
 		}
 		else{
-			const auto &item = ca.item;
-			const auto N = item.size();
-			
-			vector <double> num(N);
-			
 			if(ca.time_dep){
-				const auto &list_time = get_list_time(ci.tlist,spec_calc);
-				
-				for(auto ti : list_time){
-					for(auto j = 0u; j < N; j++){
-						const auto &it = item[j];
-						
-						switch(it.type){
-							case REG_PRECALC: 
-								num[j] = precalc[it.num]; 
-								if(num[j] == UNSET){ // Just needed for checking
-									cout << it.num << endl; 
-									emsg("Reg Precalc unset");
-								}
-								break;
-							case REG_PRECALC_TIME:
-								num[j] = precalc[it.num+ti]; 
-								if(num[j] == UNSET){  // Just needed for checking
-									cout << i << " " << it.num << " " << ti << endl; 
-									emsg("Regt Precalc unset");
-								}
-								break;							
-							case ONE: num[j] = 1; break;
-							case NUMERIC: num[j] = constant.value[it.num]; break;
-							case CONSTSPLINEREF: num[j] = spline[it.num].const_val[ti]; break;
-							case TIME: num[j] = timepoint[ti]; break;
-							default: eqn_type_error(it.type,6); break;
-						}
-					}
-
-					precalc[i+ti] = calculate_operation(ca.op,num);
-				}
+				//calc_time_varying(i,ca,get_list_time(ci.tlist,spec_calc),precalc,calc_err);
+				calc_time_varying_fast(i,ca,get_list_time(ci.tlist,spec_calc),precalc,calc_err);
 			}
 			else{			
+				const auto &pre_item = ca.pre_item;
+				const auto N = pre_item.size();
+				
+				vector <double> num(N);
+			
 				for(auto j = 0u; j < N; j++){
-					const auto &it = item[j];	
+					const auto &it = pre_item[j];	
 					switch(it.type){	
-						case ONE: num[j] = 1; break;
-						case REG_PRECALC: num[j] = precalc[it.num]; break;
-						case NUMERIC: num[j] = cval[it.num]; break;
+						case PRE_ONE: num[j] = 1; break;
+						case PRE_REG: num[j] = precalc[pcalcu[it.num].iref]; break;
+						case PRE_NUMERIC: num[j] = cval[it.num]; break;
 						default: eqn_type_error(it.type,8); break;
 					}
 					
@@ -863,17 +846,803 @@ void Precalc::calculate(const SpecPrecalc &spec_calc, PV &param_val, bool store)
 				}
 
 					
-				precalc[i] = calculate_operation(ca.op,num);
+				precalc[i] = calculate_operation(ca.op,num,calc_err);
 			}
 		}
   }
+	
+	if(calc_err != NO_ERROR) calc_error(calc_err,"Within precalculation");
+}
+
+
+/// Calcuates time varying precalculation
+void Precalc::calc_time_varying(unsigned int i, const PreCalc &ca, const vector <unsigned int> &list_time, vector <double> &precalc, CalcError &calc_err) const
+{				
+	const auto &pre_item = ca.pre_item;
+	const auto N = pre_item.size();
+	
+	vector <double> num(N);
+	for(auto ti : list_time){
+		for(auto j = 0u; j < N; j++){
+			const auto &it = pre_item[j];
+			
+			switch(it.type){
+				case PRE_REG: 
+					num[j] = precalc[pcalcu[it.num].iref]; 
+					if(num[j] == UNSET){ // Just needed for checking
+						cout << it.num << endl; 
+						emsg("Reg Precalc unset");
+					}
+					break;
+				case PRE_REGTIME:
+					num[j] = precalc[pcalcu[it.num].iref+ti]; 
+					if(num[j] == UNSET){  // Just needed for checking
+						cout << it.num << " " << ti << endl; 
+						emsg("Regt Precalc unset");
+					}
+					break;							
+				case PRE_ONE: num[j] = 1; break;
+				case PRE_ZERO: num[j] = 0; break;
+				case PRE_NUMERIC: num[j] = constant.value[it.num]; break;
+				case PRE_CONSTSPLINEREF: num[j] = spline[it.num].const_val[ti]; break;
+				case PRE_TIME: num[j] = timepoint[ti]; break;
+				default: eqn_type_error(it.type,7); break;
+			}
+		}
+
+		precalc[i+ti] = calculate_operation(ca.op,num,calc_err);
+	}
+}
+
+
+/// Get a non-timevarying quantity
+double Precalc::get_val(const PreEqItem &it, const vector <double> &precalc) const 
+{
+	switch(it.type){
+	case PRE_REG: return precalc[pcalcu[it.num].iref]; 
+	case PRE_NUMERIC: return constant.value[it.num];
+	case PRE_ONE: return 1;
+	case PRE_ZERO: return 0;
+	default: return UNSET;
+	}
+}
+
+
+/// Calcuates time varying precalculation
+void Precalc::calc_time_varying_fast(unsigned int i, const PreCalc &ca, const vector <unsigned int> &list_time, vector <double> &precalc, CalcError &calc_err) const
+{				
+	const auto &item = ca.pre_item;
+	const auto N = item.size();
+	auto *prec = &precalc[i];
+	
+	switch(ca.op){
+	case ADD:
+		for(auto j = 0u; j < N; j++){
+			const auto &it = item[j];
+		
+			auto val = get_val(it,precalc);
+			if(val != UNSET){
+				if(j == 0){ for(auto ti : list_time) prec[ti] = val;}
+				else{ for(auto ti : list_time) prec[ti] += val;}
+			}
+			else{
+				auto num = it.num;
+				switch(it.type){
+				case PRE_REGTIME:
+					{
+						auto *prec2 = &precalc[pcalcu[num].iref];
+						if(j == 0){ for(auto ti : list_time) prec[ti] = prec2[ti];}
+						else{ for(auto ti : list_time) prec[ti] += prec2[ti];}
+					}
+					break;
+					
+				case PRE_CONSTSPLINEREF:
+					{
+						const auto &const_val = spline[num].const_val;
+						if(j == 0){ for(auto ti : list_time) prec[ti] = const_val[ti];}
+						else{ for(auto ti : list_time) prec[ti] += const_val[ti];}
+					}
+					break;
+					
+				case PRE_TIME: 
+					{
+						if(j == 0){ for(auto ti : list_time) prec[ti] = timepoint[ti];}
+						else{ for(auto ti : list_time) prec[ti] += timepoint[ti];}
+					}
+					break;
+					
+				default: emsg("calc_time_varying_fast problem"); break;
+				}
+			}
+		}
+		break;
+		
+	case MULTIPLY:
+		for(auto j = 0u; j < N; j++){
+			const auto &it = item[j];
+		
+			auto val = get_val(it,precalc);
+			if(val != UNSET){
+				if(j == 0){ for(auto ti : list_time) prec[ti] = val;}
+				else{ for(auto ti : list_time) prec[ti] *= val;}
+			}
+			else{
+				auto num = it.num;
+				switch(it.type){
+				case PRE_REGTIME:
+					{
+						auto *prec2 = &precalc[pcalcu[num].iref];
+						if(j == 0){ for(auto ti : list_time) prec[ti] = prec2[ti];}
+						else{ for(auto ti : list_time) prec[ti] *= prec2[ti];}
+					}
+					break;
+					
+				case PRE_CONSTSPLINEREF:
+					{
+						const auto &const_val = spline[num].const_val;
+						if(j == 0){ for(auto ti : list_time) prec[ti] = const_val[ti];}
+						else{ for(auto ti : list_time) prec[ti] *= const_val[ti];}
+					}
+					break;
+					
+				case PRE_TIME: 
+					{
+						if(j == 0){ for(auto ti : list_time) prec[ti] = timepoint[ti];}
+						else{ for(auto ti : list_time) prec[ti] *= timepoint[ti];}
+					}
+					break;
+					
+				default: emsg("calc_time_varying_fast problem"); break;
+				}
+			}
+		}
+		break;
+	
+	case TAKE:
+		emsg("Should not be take"); 
+		break;
+	
+	case DIVIDE:
+		for(auto j = 0u; j < 2; j++){
+			const auto &it = item[j];
+		
+			auto val = get_val(it,precalc);
+			if(val != UNSET){
+				if(j == 0){ for(auto ti : list_time) prec[ti] = val;}
+				else{ 
+					if(val <= 0){ calc_err = DIV_BY_ZERO_ERROR; val = TINY;}
+					for(auto ti : list_time) prec[ti] /= val;
+				}
+			}
+			else{
+				auto num = it.num;
+				switch(it.type){
+				case PRE_REGTIME:
+					{
+						auto *prec2 = &precalc[pcalcu[num].iref];
+						if(j == 0){ for(auto ti : list_time) prec[ti] = prec2[ti];}
+						else{ 
+							for(auto ti : list_time){
+								auto val = prec2[ti];
+								if(val <= 0){ calc_err = DIV_BY_ZERO_ERROR; val = TINY;}
+								prec[ti] /= val;
+							}
+						}
+					}
+					break;
+					
+				case PRE_CONSTSPLINEREF:
+					{
+						const auto &const_val = spline[num].const_val;
+						if(j == 0){ for(auto ti : list_time) prec[ti] = const_val[ti];}
+						else{ 
+							for(auto ti : list_time){
+								auto val = const_val[ti];
+								if(val <= 0){ calc_err = DIV_BY_ZERO_ERROR; val = TINY;}
+								prec[ti] /= val;
+							}
+						}
+					}
+					break;
+					
+				case PRE_TIME: 
+					{
+						if(j == 0){ for(auto ti : list_time) prec[ti] = timepoint[ti];}
+						else{ 
+							for(auto ti : list_time){
+								auto val = timepoint[ti];
+								if(val <= 0){ calc_err = DIV_BY_ZERO_ERROR; val = TINY;}
+								prec[ti] /= val;
+							}
+						}
+					}
+					break;
+					
+				default: emsg("calc_time_varying_fast problem"); break;
+				}
+			}
+		}
+		break;
+	
+	case EXPFUNC:
+		{
+			const auto &it = item[0];
+		
+			auto num = it.num;
+			switch(it.type){
+			case PRE_REGTIME:
+				{
+					auto *prec2 = &precalc[pcalcu[num].iref];
+					for(auto ti : list_time) prec[ti] = exp(prec2[ti]);
+				}
+				break;
+				
+			case PRE_CONSTSPLINEREF:
+				{
+					const auto &const_val = spline[num].const_val;
+					for(auto ti : list_time) prec[ti] = exp(const_val[ti]);
+				}
+				break;
+				
+			case PRE_TIME: 
+				{
+					for(auto ti : list_time) prec[ti] = exp(timepoint[ti]);
+				}
+				break;
+				
+			default: emsg("calc_time_varying_fast problem"); break;
+			}
+		}
+		break;
+		
+	case SINFUNC:
+		{
+			const auto &it = item[0];
+		
+			auto num = it.num;
+			switch(it.type){
+			case PRE_REGTIME:
+				{
+					auto *prec2 = &precalc[pcalcu[num].iref];
+					for(auto ti : list_time) prec[ti] = sin(prec2[ti]);
+				}
+				break;
+				
+			case PRE_CONSTSPLINEREF:
+				{
+					const auto &const_val = spline[num].const_val;
+					for(auto ti : list_time) prec[ti] = sin(const_val[ti]);
+				}
+				break;
+				
+			case PRE_TIME: 
+				{
+					for(auto ti : list_time) prec[ti] = sin(timepoint[ti]);
+				}
+				break;
+				
+			default: emsg("calc_time_varying_fast problem"); break;
+			}
+		}
+		break;
+		
+	case COSFUNC:
+		{
+			const auto &it = item[0];
+		
+			auto num = it.num;
+			switch(it.type){
+			case PRE_REGTIME:
+				{
+					auto *prec2 = &precalc[pcalcu[num].iref];
+					for(auto ti : list_time) prec[ti] = cos(prec2[ti]);
+				}
+				break;
+				
+			case PRE_CONSTSPLINEREF:
+				{
+					const auto &const_val = spline[num].const_val;
+					for(auto ti : list_time) prec[ti] = cos(const_val[ti]);
+				}
+				break;
+				
+			case PRE_TIME: 
+				{
+					for(auto ti : list_time) prec[ti] = cos(timepoint[ti]);
+				}
+				break;
+				
+			default: emsg("calc_time_varying_fast problem"); break;
+			}
+		}
+		break;
+		
+	case LOGFUNC:
+		{
+			const auto &it = item[0];
+		
+			auto num = it.num;
+			switch(it.type){
+			case PRE_REGTIME:
+				{
+					auto *prec2 = &precalc[pcalcu[num].iref];
+					for(auto ti : list_time){
+						auto val = prec2[ti]; if(val <= 0){ calc_err = LOG_NEG_ERROR; val = TINY;}
+						prec[ti] = log(val);
+					}
+				}
+				break;
+				
+			case PRE_CONSTSPLINEREF:
+				{
+					const auto &const_val = spline[num].const_val;
+					for(auto ti : list_time){
+						auto val = const_val[ti]; if(val <= 0){ calc_err = LOG_NEG_ERROR; val = TINY;}
+						prec[ti] = log(val);
+					}
+				}
+				break;
+				
+			case PRE_TIME: 
+				{
+					for(auto ti : list_time){
+						auto val = timepoint[ti]; if(val <= 0){ calc_err = LOG_NEG_ERROR; val = TINY;}
+						prec[ti] = log(val);
+					}
+				}
+				break;
+				
+			default: emsg("calc_time_varying_fast problem"); break;
+			}
+		}
+		break;
+	
+	case STEPFUNC:
+		{
+			const auto &it = item[0];
+		
+			auto num = it.num;
+			switch(it.type){
+			case PRE_REGTIME:
+				{
+					auto *prec2 = &precalc[pcalcu[num].iref];
+					for(auto ti : list_time){
+						if(prec2[ti] > 0) prec[ti] = 1; 
+						else prec[ti] = 0;
+					}
+				}
+				break;
+				
+			case PRE_CONSTSPLINEREF:
+				{
+					const auto &const_val = spline[num].const_val;
+					for(auto ti : list_time){
+						if(const_val[ti] > 0) prec[ti] = 1; 
+						else prec[ti] = 0;
+					}
+				}
+				break;
+				
+			case PRE_TIME: 
+				{
+					for(auto ti : list_time){
+						if(timepoint[ti] > 0) prec[ti] = 1; 
+						else prec[ti] = 0;
+					}
+				}
+				break;
+				
+			default: emsg("calc_time_varying_fast problem"); break;
+			}
+		}
+		break;
+	
+	case POWERFUNC:
+		for(auto j = 0u; j < 2; j++){
+			const auto &it = item[j];
+		
+			auto val = get_val(it,precalc);
+			if(val != UNSET){
+				if(j == 0){ for(auto ti : list_time) prec[ti] = val;}
+				else{ for(auto ti : list_time) prec[ti] = pow(prec[ti],val);}
+			}
+			else{
+				auto num = it.num;
+				switch(it.type){
+				case PRE_REGTIME:
+					{
+						auto *prec2 = &precalc[pcalcu[num].iref];
+						if(j == 0){ for(auto ti : list_time) prec[ti] = prec2[ti];}
+						else{ for(auto ti : list_time) prec[ti] = pow(prec[ti],prec2[ti]);}
+					}
+					break;
+					
+				case PRE_CONSTSPLINEREF:
+					{
+						const auto &const_val = spline[num].const_val;
+						if(j == 0){ for(auto ti : list_time) prec[ti] = const_val[ti];}
+						else{ for(auto ti : list_time) prec[ti] = pow(prec[ti],const_val[ti]);}
+					}
+					break;
+					
+				case PRE_TIME: 
+					{
+						if(j == 0){ for(auto ti : list_time) prec[ti] = timepoint[ti];}
+						else{ for(auto ti : list_time) prec[ti] = pow(prec[ti],timepoint[ti]);}
+					}
+					break;
+					
+				default: emsg("calc_time_varying_fast problem"); break;
+				}
+			}
+		}
+		break;
+		
+	case THRESHFUNC:
+		for(auto j = 0u; j < 2; j++){
+			const auto &it = item[j];
+		
+			auto val = get_val(it,precalc);
+			if(val != UNSET){
+				if(j == 0){ for(auto ti : list_time) prec[ti] = val;}
+				else{ 
+					for(auto ti : list_time){ 
+						if(prec[ti] < val) prec[ti] = 0;
+					}
+				}
+			}
+			else{
+				auto num = it.num;
+				switch(it.type){
+				case PRE_REGTIME:
+					{
+						auto *prec2 = &precalc[pcalcu[num].iref];
+						if(j == 0){ for(auto ti : list_time) prec[ti] = prec2[ti];}
+						else{ 
+							for(auto ti : list_time){
+								if(prec[ti] < prec2[ti]) prec[ti] = 0;
+							}
+						}
+					}
+					break;
+					
+				case PRE_CONSTSPLINEREF:
+					{
+						const auto &const_val = spline[num].const_val;
+						if(j == 0){ for(auto ti : list_time) prec[ti] = const_val[ti];}
+						else{ 
+							for(auto ti : list_time){
+								if(prec[ti] < const_val[ti]) prec[ti] = 0; 
+							}
+						}
+					}
+					break;
+					
+				case PRE_TIME: 
+					{
+						if(j == 0){ for(auto ti : list_time) prec[ti] = timepoint[ti];}
+						else{ 
+							for(auto ti : list_time){
+								if(prec[ti] < timepoint[ti]) prec[ti] = 0; 
+							}
+						}
+					}
+					break;
+					
+				default: emsg("calc_time_varying_fast problem"); break;
+				}
+			}
+		}
+		break;
+		
+	case UBOUNDFUNC:
+		for(auto j = 0u; j < 2; j++){
+			const auto &it = item[j];
+		
+			auto val = get_val(it,precalc);
+			if(val != UNSET){
+				if(j == 0){ for(auto ti : list_time) prec[ti] = val;}
+				else{ 
+					for(auto ti : list_time){ 
+						if(prec[ti] > val) prec[ti] = INFINITY;
+					}
+				}
+			}
+			else{
+				auto num = it.num;
+				switch(it.type){
+				case PRE_REGTIME:
+					{
+						auto *prec2 = &precalc[pcalcu[num].iref];
+						if(j == 0){ for(auto ti : list_time) prec[ti] = prec2[ti];}
+						else{ 
+							for(auto ti : list_time){
+								if(prec[ti] > prec2[ti]) prec[ti] = INFINITY;
+							}
+						}
+					}
+					break;
+					
+				case PRE_CONSTSPLINEREF:
+					{
+						const auto &const_val = spline[num].const_val;
+						if(j == 0){ for(auto ti : list_time) prec[ti] = const_val[ti];}
+						else{ 
+							for(auto ti : list_time){
+								if(prec[ti] > const_val[ti]) prec[ti] = INFINITY; 
+							}
+						}
+					}
+					break;
+					
+				case PRE_TIME: 
+					{
+						if(j == 0){ for(auto ti : list_time) prec[ti] = timepoint[ti];}
+						else{ 
+							for(auto ti : list_time){
+								if(prec[ti] > timepoint[ti]) prec[ti] = INFINITY; 
+							}
+						}
+					}
+					break;
+					
+				default: emsg("calc_time_varying_fast problem"); break;
+				}
+			}
+		}
+		break;
+		
+	case MAXFUNC:
+		for(auto j = 0u; j < 2; j++){
+			const auto &it = item[j];
+		
+			auto val = get_val(it,precalc);
+			if(val != UNSET){
+				if(j == 0){ for(auto ti : list_time) prec[ti] = val;}
+				else{ 
+					for(auto ti : list_time){ 
+						if(val > prec[ti]) prec[ti] = val;
+					}
+				}
+			}
+			else{
+				auto num = it.num;
+				switch(it.type){
+				case PRE_REGTIME:
+					{
+						auto *prec2 = &precalc[pcalcu[num].iref];
+						if(j == 0){ for(auto ti : list_time) prec[ti] = prec2[ti];}
+						else{ 
+							for(auto ti : list_time){
+								if(prec2[ti] > prec[ti]) prec[ti] = prec2[ti];
+							}
+						}
+					}
+					break;
+					
+				case PRE_CONSTSPLINEREF:
+					{
+						const auto &const_val = spline[num].const_val;
+						if(j == 0){ for(auto ti : list_time) prec[ti] = const_val[ti];}
+						else{ 
+							for(auto ti : list_time){
+								if(const_val[ti] > prec[ti]) prec[ti] = const_val[ti]; 
+							}
+						}
+					}
+					break;
+					
+				case PRE_TIME: 
+					{
+						if(j == 0){ for(auto ti : list_time) prec[ti] = timepoint[ti];}
+						else{ 
+							for(auto ti : list_time){
+								if(timepoint[ti] > prec[ti]) prec[ti] = timepoint[ti]; 
+							}
+						}
+					}
+					break;
+					
+				default: emsg("calc_time_varying_fast problem"); break;
+				}
+			}
+		}
+		break;
+		
+	case MINFUNC:
+		for(auto j = 0u; j < 2; j++){
+			const auto &it = item[j];
+		
+			auto val = get_val(it,precalc);
+			if(val != UNSET){
+				if(j == 0){ for(auto ti : list_time) prec[ti] = val;}
+				else{ 
+					for(auto ti : list_time){ 
+						if(val < prec[ti]) prec[ti] = val;
+					}
+				}
+			}
+			else{
+				auto num = it.num;
+				switch(it.type){
+				case PRE_REGTIME:
+					{
+						auto *prec2 = &precalc[pcalcu[num].iref];
+						if(j == 0){ for(auto ti : list_time) prec[ti] = prec2[ti];}
+						else{ 
+							for(auto ti : list_time){
+								if(prec2[ti] < prec[ti]) prec[ti] = prec2[ti];
+							}
+						}
+					}
+					break;
+					
+				case PRE_CONSTSPLINEREF:
+					{
+						const auto &const_val = spline[num].const_val;
+						if(j == 0){ for(auto ti : list_time) prec[ti] = const_val[ti];}
+						else{ 
+							for(auto ti : list_time){
+								if(const_val[ti] < prec[ti]) prec[ti] = const_val[ti]; 
+							}
+						}
+					}
+					break;
+					
+				case PRE_TIME: 
+					{
+						if(j == 0){ for(auto ti : list_time) prec[ti] = timepoint[ti];}
+						else{ 
+							for(auto ti : list_time){
+								if(timepoint[ti] < prec[ti]) prec[ti] = timepoint[ti]; 
+							}
+						}
+					}
+					break;
+					
+				default: emsg("calc_time_varying_fast problem"); break;
+				}
+			}
+		}
+		break;
+		
+	case ABSFUNC:
+		{
+			const auto &it = item[0];
+		
+			auto num = it.num;
+			switch(it.type){
+			case PRE_REGTIME:
+				{
+					auto *prec2 = &precalc[pcalcu[num].iref];
+					for(auto ti : list_time){
+						prec[ti] = prec2[ti];
+						if(prec[ti] < 0) prec[ti] = -prec[ti];
+					}
+				}
+				break;
+				
+			case PRE_CONSTSPLINEREF:
+				{
+					const auto &const_val = spline[num].const_val;
+					for(auto ti : list_time){
+						prec[ti] = const_val[ti];
+						if(prec[ti] < 0) prec[ti] = -prec[ti];
+					}
+				}
+				break;
+				
+			case PRE_TIME: 
+				{
+					for(auto ti : list_time){
+						prec[ti] = timepoint[ti];
+						if(prec[ti] < 0) prec[ti] = -prec[ti];
+					}
+				}
+				break;
+				
+			default: emsg("calc_time_varying_fast problem"); break;
+			}
+		}
+		break;
+		
+	case SQRTFUNC:
+		{
+			const auto &it = item[0];
+		
+			auto num = it.num;
+			switch(it.type){
+			case PRE_REGTIME:
+				{
+					auto *prec2 = &precalc[pcalcu[num].iref];
+					for(auto ti : list_time){
+						auto val = prec2[ti]; if(val < 0){ calc_err = SQRT_NEG_ERROR; val = TINY;}
+						prec[ti] = sqrt(val);
+					}
+				}
+				break;
+				
+			case PRE_CONSTSPLINEREF:
+				{
+					const auto &const_val = spline[num].const_val;
+					for(auto ti : list_time){
+						auto val = const_val[ti]; if(val < 0){ calc_err = SQRT_NEG_ERROR; val = TINY;}
+						prec[ti] = sqrt(val);
+					}
+				}
+				break;
+				
+			case PRE_TIME: 
+				{
+					for(auto ti : list_time){
+						auto val = timepoint[ti]; if(val < 0){ calc_err = SQRT_NEG_ERROR; val = TINY;}
+						prec[ti] = sqrt(val);
+					}
+				}
+				break;
+				
+			default: emsg("calc_time_varying_fast problem"); break;
+			}
+		}
+		break;
+		
+	case SIGFUNC:
+		{
+			const auto &it = item[0];
+		
+			auto num = it.num;
+			switch(it.type){
+			case PRE_REGTIME:
+				{
+					auto *prec2 = &precalc[pcalcu[num].iref];
+					for(auto ti : list_time) prec[ti] = 1/(1+exp(-prec2[ti]));
+				}
+				break;
+				
+			case PRE_CONSTSPLINEREF:
+				{
+					const auto &const_val = spline[num].const_val;
+					for(auto ti : list_time) prec[ti] = 1/(1+exp(-const_val[ti]));
+				}
+				break;
+				
+			case PRE_TIME: 
+				{
+					for(auto ti : list_time){
+						prec[ti] = 1/(1+exp(-timepoint[ti]));
+					}
+				}
+				break;
+				
+			default: emsg("calc_time_varying_fast problem"); break;
+			}
+		}
+		break;
+		
+	default:
+		emsg("fast problem");
+		break;
+	}
+	
+	if(false){ // Testing
+		cout << " test" << endl;
+		auto T = details.T;
+		vector <double> store;
+		for(auto ti = 0u; ti < T; ti++) store.push_back(precalc[i+ti]);
+		calc_time_varying(i,ca,list_time,precalc,calc_err);
+		for(auto ti = 0u; ti < T; ti++){
+			if(dif(precalc[i+ti],store[ti],TINY)) emsg("problem with precalcfast");
+		}
+	}
 }
 
 
 /// Prints the calculation from a specific calculation
-string Precalc::print_ca(unsigned int i, const PreCalc &ca) const
+string Precalc::print_ca(unsigned int q, const PreCalc &ca) const
 { 
 	stringstream ss;
+	
+	ss << q << ": ";
 	
 	switch(ca.op){
 	case EXPFUNC: ss <<  "exp("; break;
@@ -897,17 +1666,17 @@ string Precalc::print_ca(unsigned int i, const PreCalc &ca) const
 	default: emsg_input("Eq problem1"); break;
 	}
 		
-	const auto &item = ca.item;
+	const auto &item = ca.pre_item;
 	
-	if(item.size() > 0 && (item[0].type == SPLINEREF || item[0].type == CONSTSPLINEREF)){
+	if(item.size() > 0 && (item[0].type == PRE_SPLINEREF || item[0].type == PRE_CONSTSPLINEREF)){
 		const auto &it = item[0];
 		switch(it.type){
-		case SPLINEREF:
-			ss << "Spline " << spline[it.num].name; 
+		case PRE_SPLINEREF:
+			ss << "Pre Spline " << it.num;//spline[it.num].name; 
 			break;
 		
-		case CONSTSPLINEREF:
-			ss << "Const Spline " << spline[it.num].name; 
+		case PRE_CONSTSPLINEREF:
+			ss << "Pre Const Spline " << it.num;//spline[it.num].name; 
 			break;
 			
 		default:
@@ -917,51 +1686,31 @@ string Precalc::print_ca(unsigned int i, const PreCalc &ca) const
 	else{
 		for(auto j = 0u; j < item.size(); j++){
 			const auto &it = item[j];
+	
 			switch(it.type){
-			case INTEGRAL:
-				emsg("Should not have integral");
-				break;
-				
-			case PARAMETER: 
-				emsg("Should not be parameter");
-				break;
-				
-			case PARAMVEC: 
-				ss << param_vec[it.num].name;
+			case PRE_PARAMVEC:
+				{
+					const auto &pv = param_vec[it.num];
+					ss << add_escape_char(param[pv.th].name) << pv.index;
+				}
 				break;
 			
-			case SPLINE: 
-				emsg("Should not be spline");
-				break;
-				
-			case SPLINEREF:
-				ss << "Spline " << spline[it.num].name; 
+			case PRE_SPLINEREF:
+				{
+					const auto &spl = spline[it.num];
+					ss << "Pre Spline " << add_escape_char(param[spl.th].name) << it.num;
+				}
+				//ss << "Spline " << it.num; //spline[it.num].name; 
 				break;
 			
-			case CONSTSPLINEREF:
-				ss << "Const Spline " << spline[it.num].name; 
+			case PRE_CONSTSPLINEREF:
+				ss << "Pre Const Spline " << it.num;//spline[it.num].name; 
 				break;
-				
-			case DERIVE: 
-				emsg("Should not be derive");
-				break;
-					
-			case POPNUM: 
-				ss << "'" << pop[it.num].name << "'";
-				break;
-				
-			case POPTIMENUM: 
-				emsg("Should not be poptime num");
-				break;
-				
-			case IE: emsg("SHould not be ie"); break;
-			case ONE: ss << "1"; break;
-			case FE: emsg("SHould not be fe"); break;
-			case REG: ss << "R" << it.num; break;
-			case REG_FAC: ss << "Rfac" << it.num; break;
-			case REG_PRECALC: ss << "Rpre" << it.num; break;
-			case REG_PRECALC_TIME: ss << "Rpretime" << it.num; break;
-			case NUMERIC: 
+			
+			case PRE_ONE: ss << "1"; break;
+			case PRE_REG: ss << "Rpre" << it.num; break;
+			case PRE_REGTIME: ss << "Rpretime" << it.num; break;
+			case PRE_NUMERIC: 
 				{
 					auto val = constant.value[it.num];
 					if(val == INFY) ss << "INFY";
@@ -971,7 +1720,7 @@ string Precalc::print_ca(unsigned int i, const PreCalc &ca) const
 					}
 				}
 				break;
-			case TIME: ss << "time"; break;
+			case PRE_TIME: ss << "time"; break;
 			default: ss << it.type << endl; emsg_input("Precalc Eq "); break;
 			}
 			
@@ -1004,7 +1753,7 @@ string Precalc::print_ca(unsigned int i, const PreCalc &ca) const
 	}
 		
 	ss <<  " > ";
-	ss <<  "Rpre" << i;
+	ss <<  "Rpre" << q;
 	
 	if(ca.time_dep) ss << " Time dep";
 	
@@ -1019,7 +1768,7 @@ unsigned int Precalc::add_list_time(SpecPrecalc &sprec, const vector <unsigned i
 	
 	auto &list_time = sprec.list_time;
 
-	auto val	= sum(ltime);
+	auto val = sum(ltime);
 	
 	auto j = sprec.hash_time.find(val);
 	if(j == UNSET){
@@ -1039,18 +1788,187 @@ unsigned int Precalc::add_list_time(SpecPrecalc &sprec, const vector <unsigned i
 	return j;
 }
 
+
+/// Converts from a spec_precalc to a map
+vector <bool> Precalc::map_empty() const
+{
+	vector <bool> map(pcsize,false);
+	return map;
+}
+
+	
+/// Converts from a spec_precalc to a map
+vector <bool> Precalc::map_from_spec(const SpecPrecalc &spec) const
+{
+	auto T = details.T;
+	
+	vector <bool> map(pcsize,false);
+	for(const auto &inf : spec.info){
+		auto q = inf.q;
+		auto i = pcalcu[q].iref;
+		auto k = inf.tlist;
+		if(k == UNSET) map[i] = true;
+		else{
+			if(k == ALL_TIME_STEP){
+				for(auto ti = 0u; ti < T; ti++) map[i+ti] = true;
+			}
+			else{
+				for(auto ti : spec.list_time[k]) map[i+ti] = true;
+			}
+		}
+	}
+	
+	return map;
+}
+
+
+/// Adds spec_precalc to a map
+void Precalc::map_add_spec(vector <bool> &map, const SpecPrecalc &spec) const
+{
+	auto T = details.T;
+	
+	for(const auto &inf : spec.info){
+		auto q = inf.q;
+		auto i = pcalcu[q].iref;
+		auto k = inf.tlist;
+		if(k == UNSET) map[i] = true;
+		else{
+			if(k == ALL_TIME_STEP){
+				for(auto ti = 0u; ti < T; ti++) map[i+ti] = true;
+			}
+			else{
+				for(auto ti : spec.list_time[k]) map[i+ti] = true;
+			}
+		}
+	}
+}
+
+
+/// Converts from a spec_precalc to a map
+void Precalc::map_remove_spec(vector <bool> &map, const SpecPrecalc &spec) const
+{
+	auto T = details.T;
+	
+	for(const auto &inf : spec.info){
+		auto q = inf.q;
+		auto i = pcalcu[q].iref;
+		auto k = inf.tlist;
+		if(k == UNSET) map[i] = false;
+		else{
+			if(k == ALL_TIME_STEP){
+				for(auto ti = 0u; ti < T; ti++) map[i+ti] = false;
+			}
+			else{
+				for(auto ti : spec.list_time[k]) map[i+ti] = false;
+			}
+		}
+	}
+}
+
+
+/// Converts from a spec_precalc to a map
+const SpecPrecalc Precalc::spec_from_map(const vector <bool> &map) const
+{
+	SpecPrecalc spec;
+	spec.hash.off();
+	
+	auto T = details.T;
+	for(auto q = 0u; q < pcalcu.size(); q++){
+		const auto &ca = pcalcu[q];
+		auto i = ca.iref;
+		if(ca.time_dep){
+			vector <unsigned int> ltime;
+			for(auto ti = 0u; ti < T; ti++){
+				if(map[i+ti]) ltime.push_back(ti);
+			}
+			if(ltime.size() > 0){
+				PrecalcInfo pi; pi.q = q; pi.tlist = add_list_time(spec,ltime);
+				spec.info.push_back(pi);
+			}
+		}
+		else{
+			if(map[i]){
+				PrecalcInfo pi; pi.q = q; pi.tlist = UNSET;
+				spec.info.push_back(pi);
+			}
+		}
+	}
+	
+	return spec;
+}
+
+
+/// Converts from a spec_precalc to a map
+const SpecPrecalc Precalc::spec_from_ti_ref_list(vector <unsigned int> list, const vector < vector <unsigned int> > &ti_ref_list, const vector < vector <unsigned int> > &list_time) const
+{
+	auto T = details.T;
+	
+	SpecPrecalc spec;
+	
+	for(auto k = 0u; k < list.size(); k++){
+		auto q = list[k];
+		const auto &ca = pcalcu[q];
 		
+		if(ca.time_dep){
+			const auto &trlist = ti_ref_list[q];
+			switch(trlist.size()){
+			case 0: emsg("SHould not be zero"); break;
+			case 1:
+				{
+					auto j = trlist[0];
+					if(j == UNSET) emsg("isss");
+					if(j != ALL_TIME_STEP) j = add_list_time(spec,list_time[j]);
+					PrecalcInfo pi; pi.q = q; pi.tlist = j;
+					spec.hash.add(spec.info.size(),q);
+					spec.info.push_back(pi);
+				}
+				break;
+			
+			default: // Combines together multiple sections
+				{
+					vector <bool> map(T,false);
+					for(auto tr_ref : trlist){
+						if(tr_ref == ALL_TIME_STEP){
+							for(auto ti = 0u; ti < T; ti++) map[ti] = true;
+						}
+						else{
+							for(auto ti : list_time[tr_ref]) map[ti] = true;
+						}
+					}
+					
+					vector <unsigned int> ltime;
+					for(auto ti = 0u; ti < T; ti++){
+						if(map[ti]) ltime.push_back(ti);
+					}
+					
+					PrecalcInfo pi; pi.q = q; pi.tlist = add_list_time(spec,ltime);
+					spec.hash.add(spec.info.size(),q);
+					spec.info.push_back(pi);
+				}
+				break;
+			}
+		}		
+		else{
+			PrecalcInfo pi; pi.q = q; pi.tlist = UNSET;
+			spec.hash.add(spec.info.size(),q);
+			spec.info.push_back(pi);
+		}
+	}
+	
+	return spec;
+}
+
+	
 /// Adds an element to a precalculation
-void Precalc::sp_add(SpecPrecalc &sprec, unsigned int i, const vector <unsigned int> &ltime) const 
+void Precalc::sp_add(SpecPrecalc &sprec, unsigned int q, const vector <unsigned int> &ltime) const 
 {
 	auto &list_time = sprec.list_time;
-	auto re = pcalcu_ref[i]; if(re == UNSET) emsg("prob unset");
-	
-	auto k = sprec.hash.find(i);
+
+	auto k = sprec.hash.find(q);
 	if(k != UNSET){ // Already exists
 		auto &in = sprec.info[k];
 		
-		if(pcalcu[re].time_dep){
+		if(pcalcu[q].time_dep){
 			if(in.tlist != ALL_TIME_STEP){  // Need to combine together two timelines
 				const auto &ltime_now = list_time[in.tlist];
 				if(!equal_vec(ltime_now,ltime)){
@@ -1061,16 +1979,16 @@ void Precalc::sp_add(SpecPrecalc &sprec, unsigned int i, const vector <unsigned 
 		}
 	}
 	else{
-		PrecalcInfo pi; pi.i = i; 
+		PrecalcInfo pi; pi.q = q; 
 		
-		if(pcalcu[re].time_dep){
+		if(pcalcu[q].time_dep){
 			pi.tlist = add_list_time(sprec,ltime);
 		}
 		else{
 			pi.tlist = UNSET;
 		}
 		
-		sprec.hash.add(sprec.info.size(),i);
+		sprec.hash.add(sprec.info.size(),q);
 		sprec.info.push_back(pi);
 	}
 }
@@ -1099,76 +2017,281 @@ vector <unsigned int> Precalc::combine_list_time(const vector <unsigned int> &lt
 	return list;
 }
 
- 
+
+/* 
 /// Adds a list of elements to a precalculation
-void Precalc::sp_add(SpecPrecalc &sprec, const vector <unsigned int> &i_list, const vector <unsigned int> &ltime) const
+void Precalc::sp_add(SpecPrecalc &sprec, const vector <unsigned int> &q_list, const vector <unsigned int> &ltime) const
 {
-	if(i_list.size() == 0) return;
+	if(q_list.size() == 0) return;
 	
-	for(auto i : i_list) sp_add(sprec,i,ltime);
+	for(auto q : q_list) sp_add(sprec,q,ltime);
+}
+*/
+
+
+
+bool PrecalcInfo_ord (const PrecalcInfo &pi1, const PrecalcInfo &pi2)                      
+{ return (pi1.q < pi2.q); };
+
+
+/// Sets up a spec precalc by combining several param_vec together
+SpecPrecalc Precalc::combine_pv_spec_precalc(const vector <unsigned int> &param_list_tot) const 
+{
+	auto C = param_list_tot.size();
+	
+	if(C == 0){
+		SpecPrecalc spec; 
+		return spec;
+	}
+	
+	if(C == 1){
+		return param_vec[param_list_tot[0]].spec_precalc_after;
+	}
+	
+	vector <bool> time_map(details.T,false);  
+
+	// Combines all into a big list
+	vector <PrecalcInfo> info; 
+	vector < vector <unsigned int > > list_time; 
+	
+	for(auto k = 0u; k < C; k++){
+		const auto &spa = param_vec[param_list_tot[k]].spec_precalc_after;
+		
+		auto lt_start = list_time.size();
+		for(auto j = 0u; j < spa.list_time.size(); j++){
+			list_time.push_back(spa.list_time[j]);
+		}
+		
+		for(auto inf : spa.info){
+			if(lt_start > 0){
+				auto &k = inf.tlist;
+				if(k != UNSET && k != ALL_TIME_STEP) k += lt_start;
+			}
+			info.push_back(inf);
+		}
+	}
+	
+	sort(info.begin(),info.end(),PrecalcInfo_ord);
+		
+	SpecPrecalc spec;
+	auto jmax = info.size();
+	auto j = 0u;
+	while(j < jmax){
+		auto j_st = j;
+		auto inf = info[j];
+	
+		auto k = inf.tlist;
+		auto q = inf.q;
+		j++;
+		while(j < jmax && info[j].q == q) j++;
+		
+		if(k == UNSET){ // Not time dependent
+			for(auto jj = j_st+1; jj < j; jj++){
+				if(info[jj].tlist != UNSET) emsg("Should all be unset");
+			}
+		}
+		else{
+			auto fl = false;
+			for(auto jj = j_st; jj < j; jj++){
+				if(info[jj].tlist == ALL_TIME_STEP) fl = true;
+			}
+			
+			if(fl == true){ // At least one element shows all time
+				inf.tlist = ALL_TIME_STEP;
+			}
+			else{           
+				if(j == j_st+1){ // Only one timeline 
+					inf.tlist = add_list_time(spec,list_time[k]);
+				}
+				else{            // Combine multiple time lines
+					vector <unsigned int> time_list;
+		
+					for(auto jj = j_st; jj < j; jj++){
+						for(auto ti : list_time[info[jj].tlist]){
+							if(time_map[ti] == false){
+								time_map[ti] = true;
+								time_list.push_back(ti);
+							}
+						}	
+					}
+
+					sort(time_list.begin(),time_list.end());
+					inf.tlist = add_list_time(spec,time_list);
+					
+					for(auto ti : time_list) time_map[ti] = false;
+				}
+			}
+		}
+		
+		spec.info.push_back(inf);
+	}
+
+	//print_spec_precalc("after",spec);
+	
+	if(false){ // Checks if correct
+		cout << "check map spec" << endl;
+		for(auto ti = 0u; ti < details.T; ti++){
+			if(time_map[ti] != false) emsg("Should not be false");
+		}				
+
+		auto map = map_from_spec(spec);
+		
+		auto map_true = map_empty();
+		for(auto i = 0u; i < param_list_tot.size(); i++){
+			const auto &pv2 = param_vec[param_list_tot[i]];
+			map_add_spec(map_true,pv2.spec_precalc_after);
+		}
+		
+		if(map.size() != map_true.size()) emsg("map size wrong");
+		for(auto i = 0u; i < map.size(); i++){
+			if(map[i] != map_true[i]) emsg("map problem precalc");
+		}
+	}
+	
+	return spec;
 }
 
 
 /// Sets up a spec precalc by combining several together
-SpecPrecalc Precalc::combine_spec_precalc(const vector <unsigned int> &param_list_tot) const 
+SpecPrecalc Precalc::combine_spec_precalc(const vector <SpecPrecalc> &spec_list) const 
 {
-	auto C = param_list_tot.size();
+	auto S = spec_list.size();
 	
-	if(C == 1) return param_vec[param_list_tot[0]].spec_precalc_after;
+	if(S == 0){
+		SpecPrecalc spec; 
+		return spec;
+	}
 	
-	auto T = details.T;
+	if(S == 1){
+		return spec_list[0];
+	}
 	
-	SpecPrecalc spre;
+	vector <bool> time_map(details.T,false);  
 
-	vector <unsigned int> index(C,0);
-	
-	do{
-		auto imin = LARGE;
-		for(auto j = 0u; j < C; j++){
-			const auto &info = param_vec[param_list_tot[j]].spec_precalc_after.info;
-			if(index[j] < info.size()){
-				auto i = info[index[j]].i;
-				if(i < imin) imin = i;
-			}
+	// Combines all into a big list
+	vector <PrecalcInfo> info; 
+	vector < vector <unsigned int > > list_time; 
+
+	for(auto k = 0u; k < S; k++){
+		const auto &spa = spec_list[k];
+		auto lt_start = list_time.size();
+		for(auto j = 0u; j < spa.list_time.size(); j++){
+			list_time.push_back(spa.list_time[j]);
 		}
-			
-		if(imin == LARGE) break;
 		
-		auto re = pcalcu_ref[imin]; if(re == UNSET) emsg("unset problem3");
-		if(pcalcu[re].time_dep == false){	
-			sp_add(spre,imin,all_time); 
+		for(auto inf : spa.info){
+			if(lt_start > 0){
+				auto &k = inf.tlist;
+				if(k != UNSET && k != ALL_TIME_STEP) k += lt_start;
+			}
+			info.push_back(inf);
+		}
+	}
+
+	sort(info.begin(),info.end(),PrecalcInfo_ord);
+		
+	SpecPrecalc spec;
+	auto jmax = info.size();
+	auto j = 0u;
+	while(j < jmax){
+		auto j_st = j;
+		auto inf = info[j];
+	
+		auto k = inf.tlist;
+		auto q = inf.q;
+		j++;
+		while(j < jmax && info[j].q == q) j++;
+		
+		if(k == UNSET){ // Not time dependent
+			for(auto jj = j_st+1; jj < j; jj++){
+				if(info[jj].tlist != UNSET) emsg("Should all be unset");
+			}
 		}
 		else{
-			vector <bool> map_ti(T,false);
+			auto fl = false;
+			for(auto jj = j_st; jj < j; jj++){
+				if(info[jj].tlist == ALL_TIME_STEP) fl = true;
+			}
 			
-			for(auto j = 0u; j < C; j++){
-				const auto &spa = param_vec[param_list_tot[j]].spec_precalc_after;
-				const auto &in = spa.info[index[j]];
-				if(in.i == imin){
-					const auto &list_time = get_list_time(in.tlist,spa);
-					for(auto ti : list_time) map_ti[ti] = true;
-					//for(auto ti : spa.list_time[in.tlist]) map_ti[ti] = true;
+			if(fl == true){ // At least one element shows all time
+				inf.tlist = ALL_TIME_STEP;
+			}
+			else{           
+				if(j == j_st+1){ // Only one timeline 
+					inf.tlist = add_list_time(spec,list_time[k]);
+				}
+				else{            // Combine multiple time lines
+					vector <unsigned int> time_list;
+		
+					for(auto jj = j_st; jj < j; jj++){
+						for(auto ti : list_time[info[jj].tlist]){
+							if(time_map[ti] == false){
+								time_map[ti] = true;
+								time_list.push_back(ti);
+							}
+						}	
+					}
+
+					sort(time_list.begin(),time_list.end());
+					inf.tlist = add_list_time(spec,time_list);
+					
+					for(auto ti : time_list) time_map[ti] = false;
 				}
 			}
-			
-			vector <unsigned int> ti_vec;
-			for(auto ti = 0u; ti < T; ti++){
-				if(map_ti[ti]) ti_vec.push_back(ti);
-			}
-		
-			sp_add(spre,imin,ti_vec); 
 		}
 		
-		for(auto j = 0u; j < C; j++){
-			const auto &spa = param_vec[param_list_tot[j]].spec_precalc_after;
-			if(spa.info[index[j]].i == imin) index[j]++;
-		}
-	}while(true);
+		spec.info.push_back(inf);
+	}
+
+	//print_spec_precalc("after",spec);
+	
+	if(false){ // Checks if correct
+		cout << "spec check" << endl;
+		for(auto ti = 0u; ti < details.T; ti++){
+			if(time_map[ti] != false) emsg("Should not be false");
+		}				
+
+		auto map = map_from_spec(spec);
 		
-	return spre;
+		auto map_true = map_empty();
+		for(const auto &spec : spec_list){
+			map_add_spec(map_true,spec);
+		}
+		
+		if(map.size() != map_true.size()) emsg("map size wrong");
+		for(auto i = 0u; i < map.size(); i++){
+			if(map[i] != map_true[i]) emsg("map problem precalc");
+		}
+	}
+	
+	return spec;
+}
+
+	
+/// Sets up a spec precalc by combining several together and removing one
+SpecPrecalc Precalc::combine_pv_spec_precalc_remove(const vector <unsigned int> &param_list_tot, const SpecPrecalc &remove) const 
+{
+	auto C = param_list_tot.size();
+	if(C == 0){
+		SpecPrecalc spec; 
+		return spec;
+	}
+
+	const auto &pv = param_vec[param_list_tot[0]];
+	
+	auto map = map_from_spec(pv.spec_precalc_after);
+	for(auto i = 1u; i < param_list_tot.size(); i++){
+		const auto &pv2 = param_vec[param_list_tot[i]];
+		map_add_spec(map,pv2.spec_precalc_after);
+	}
+	
+	map_remove_spec(map,remove);
+	
+	return spec_from_map(map);
 }
 
 
+/*
 /// This shrinks a precalculation based on only being needed for a given time range
 SpecPrecalc Precalc::shrink_sprec(const vector <unsigned int> &lt, SpecPrecalc spre) const
 {
@@ -1196,130 +2319,70 @@ SpecPrecalc Precalc::shrink_sprec(const vector <unsigned int> &lt, SpecPrecalc s
 	
 	return spre;
 }
+*/
 
 
-/// Sets parameter in precalculation
+/// Shrinks to just a single time value (used for precalculation before reparameterise square spline
+SpecPrecalc Precalc::shrink_sprec(unsigned int ti, const SpecPrecalc &spre_old) const
+{
+	vector <unsigned int> ltime; ltime.push_back(ti);
+	
+	SpecPrecalc spec;
+	auto j = add_list_time(spec,ltime);
+	for(auto pi : spre_old.info){
+		if(pi.tlist != UNSET) pi.tlist = j;
+		
+		spec.hash.add(spec.info.size(),pi.q);
+		spec.info.push_back(pi);
+	}
+	
+	return spec;
+}
+
+
+/// Transfers parameter definition in precalc from spec_precalc_after into set_param_spec_precalc
 void Precalc::set_param(SpecPrecalc &set_param_spec_precalc, SpecPrecalc &spec_precalc_after, bool spl_fl) const
 {
 	// Transfers over parameter
 	auto &info = spec_precalc_after.info;
 
-	if(info.size() == 0) emsg("zero size");
+	if(info.size() == 0) emsg("zero size1");
 	
 	set_param_spec_precalc.info.push_back(info[0]);
 	info.erase(info.begin());
 
 	// Transfers the spline (if it exists)
 	if(spl_fl){
+		if(info.size() == 0) emsg("zero size2");
 		const auto &in = info[0];	
-		sp_add(set_param_spec_precalc,in.i,get_list_time(in.tlist,spec_precalc_after));
+		sp_add(set_param_spec_precalc,in.q,get_list_time(in.tlist,spec_precalc_after));
 		info.erase(info.begin());
 	}
-	
-	/*
-	// Transfers over parameter
-	auto &info = spec_precalc_after.info;
-
-	if(info.size() == 0) emsg("zero size");
-	const auto &list_time = spec_precalc_after.list_time;
-	set_param_spec_precalc.info.push_back(info[0]);
-	//info.erase(info.begin());
-
-	// Transfers the spline (if it exists)
-	if(spl_fl){
-		const auto &in = info[1];
-		sp_add(set_param_spec_precalc,in.i,list_time[in.tlist]);
-		//info.erase(info.begin());
-	}
-	*/
-}
-
-
-/// Calculate map that omits time-varying reparameterised quantities
-vector <bool> Precalc::calculate_map_reparam_time_dep() const
-{
-	auto C = pcalcu_ref.size();
-	
-	vector <bool> map_reparam_time_dep(C,false); // Determines all i that are updated by 
-	for(const auto &pv : param_vec){
-		if(pv.reparam_time_dep){
-			for(auto &in : pv.spec_precalc_after.info) map_reparam_time_dep[in.i] = true;
-		}
-	}
-	
-	return map_reparam_time_dep;
 }
 
 
 // Sets precalculation to be done after sampling 
 SpecPrecalc Precalc::calculate_spec_precalc_sample(const SpecPrecalc &spec_precalc) const
 {
-	auto map_reparam_time_dep = calculate_map_reparam_time_dep();
-	
-	auto C = pcalcu_ref.size();
-	
-	vector <bool> map(C,false);
-	
-	for(auto &in : spec_precalc.info) map[in.i] = true;
+	auto map = map_from_spec(spec_precalc);
 	
 	for(const auto &pv : param_vec){
-		for(auto &in : pv.spec_precalc_before.info) map[in.i] = true;
-		
-		if(!pv.reparam_time_dep){
-			for(auto &in : pv.spec_precalc_after.info) map[in.i] = true;
+		if(pv.reparam_time_dep){
+			map_remove_spec(map,pv.set_param_spec_precalc);
+			map_remove_spec(map,pv.spec_precalc_after);
 		}
 	}
 	
-	SpecPrecalc spec;
-	auto j = ALL_TIME_STEP;//add_list_time(spec,all_time);
-	
-	for(auto i = 0u; i < C; i++){
-		if(map[i] && !map_reparam_time_dep[i]){
-			PrecalcInfo pi; pi.i = i;
-			
-			auto re = pcalcu_ref[i]; if(re == UNSET) emsg("unset problem");
-			if(pcalcu[re].time_dep) pi.tlist = j;
-			else pi.tlist = UNSET;	
-			spec.info.push_back(pi);			
+	for(const auto &spl : spline){
+		if(spl.dynamic){
+			for(auto q : spl.dynamic_precalc){
+				auto i = pcalcu[q].iref;
+				for(auto ti : all_time) map[i+ti] = false;
+			}
 		}
 	}
 	
-	return spec;
-}
-
-
-// Sets all precalculation to be done (apart from derived)
-SpecPrecalc Precalc::calculate_spec_precalc_all(const SpecPrecalc &spec_precalc) const
-{
-	auto map_reparam_time_dep = calculate_map_reparam_time_dep();
-	
-	auto C = pcalcu_ref.size();
-	vector <bool> map(C,false);
-	
-	for(auto &in : spec_precalc.info) map[in.i] = true;
-	
-	for(const auto &pv : param_vec){
-		for(auto &in : pv.spec_precalc_before.info) map[in.i] = true;
-		
-		if(!pv.reparam_time_dep){
-			for(auto &in : pv.set_param_spec_precalc.info) map[in.i] = true;
-			for(auto &in : pv.spec_precalc_after.info) map[in.i] = true;
-		}
-	}
-	
-	SpecPrecalc spec;
-	auto j = ALL_TIME_STEP;//add_list_time(spec,all_time);
-	for(auto i = 0u; i < C; i++){
-		if(map[i] && !map_reparam_time_dep[i]){
-			PrecalcInfo pi; pi.i = i;
-			auto re = pcalcu_ref[i]; if(re == UNSET) emsg("unset prob");
-			if(pcalcu[re].time_dep) pi.tlist = j;
-			else pi.tlist = UNSET;	
-			spec.info.push_back(pi);			
-		}
-	}
-	
-	return spec;
+	return spec_from_map(map);
 }
 
 
@@ -1343,3 +2406,38 @@ void Precalc::hash_off()
 	hash_ca.off();
 }
 
+
+/// Gets a string output from an equation type
+void Precalc::eqn_type_error(PreEqItemType type, unsigned int ref) const
+{
+	string st;
+	switch(type){	
+	case PRE_PARAMVEC: st = "PRE_PARAMVEC"; break;
+	case PRE_SPLINEREF: st = "PRE_SPLINEREF"; break;
+	case PRE_CONSTSPLINEREF: st = "PRE_CONSTSPLINEREF"; break;
+	default: st = "DEFAULT"+tstr(type); break;
+	}
+	
+	emsg("EQN TYPE ERROR: "+st+" "+tstr(ref));
+}
+
+
+/// Sets the correct numbers for precalculation from q to i
+void Precalc::adjust_num(vector <Calculation> &calc) const 
+{
+	for(auto &ca : calc){
+		for(auto &it : ca.item) adjust_it(it);
+	}
+}
+
+
+/// Sets the correct numbers for precalculation from q to i
+void Precalc::adjust_it(EqItem &it) const 
+{
+	switch(it.type){
+	case REG_PRECALC: case REG_PRECALC_TIME:
+		it.num = pcalcu[it.num].iref;
+		break;
+	default: break;
+	}
+}

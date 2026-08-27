@@ -31,8 +31,15 @@ using namespace std;
 // sig(val)              The sigmoidal function
 		
 /// Initialises the equation 
-Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSimp> &species, vector <Param> &param, vector <Prior> &prior, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, vector < vector <PopComb> > &popcomb, vector <PopCombWeight> &popcombw, Constant &constant, const vector <double> &timepoint, const Details &details, vector <Define> &define) : species(species), param(param), prior(prior), derive(derive), define(define), spline(spline), param_vec(param_vec), density(density), pop(pop), hash_pop(hash_pop), popcomb(popcomb), popcombw(popcombw), constant(constant), timepoint(timepoint), details(details)
+Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSimp> &species, vector <CompPos> &comp_pos, Hash &hash_comp_pos, vector <Param> &param, vector <Prior> &prior, const vector < vector <string> > &region, const vector <Derive> &derive, const vector <Spline> &spline, const vector <ParamVecEle> &param_vec, vector <Density> &density, vector <Population> &pop, Hash &hash_pop, vector <PopComb> &popcomb, vector <PopCombWeight> &popcombw, Constant &constant, const vector <double> &timepoint, const Details &details, vector <Define> &define) : species(species), comp_pos(comp_pos), hash_comp_pos(hash_comp_pos), param(param), prior(prior), region(region), derive(derive), define(define), spline(spline), param_vec(param_vec), density(density), pop(pop), hash_pop(hash_pop), popcomb(popcomb), popcombw(popcombw), constant(constant), timepoint(timepoint), details(details)
 {
+	//cout << add_escape_char(eqi.te) << "start" << endl;
+	auto timer_on = false;
+
+	if(timer_on) timer.resize(20,0);	
+	
+	if(timer_on) timer[0] -= clock();
+		
 	te = eqi.te;
 	te = trim(te); 
 	if(te == ""){ warn = "There is no equation"; return;}
@@ -40,6 +47,7 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 	auto inf_trans = eqi.infection_trans;
 	type = eqi.type; 
 	te_raw = trunc(add_escape_char(eqi.te_raw),20);
+	//te_raw = add_escape_char(eqi.te_raw);
 	sp_p = eqi.p; 
 	sp_cl = eqi.cl; 
 	
@@ -66,6 +74,8 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 
 	nspecies = species.size();
 	infection_trans = inf_trans;
+	infection_trans_output = false;
+	
 	markov_eqn_ref = UNSET;
 	
 	if(warn != "") return;
@@ -74,10 +84,16 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 
 	if(warn != "") return;
 
+	if(timer_on) timer[0] += clock();
+	
 	if(eqi.type == DEFINE_EQN) return;  
-
+	
+	if(timer_on) timer[1] -= clock();
+	
 	auto op = extract_operations();                  // Extracts the operations in the 	expression
 	if(warn != "") return;
+	
+	//print_operations(op);
 	
 	te = "";
 
@@ -91,19 +107,35 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 
 	if(warn != "") return; 
 	
+	//cout << "before" <<  endl; print_operations(op);
+	if(timer_on) timer[1] += clock();
+	
+	if(timer_on) timer[2] -= clock();
 	simplify_operations(op);                         // Simplifies based on numerical 
-	
-	if(warn != "") return; 
-	
-	unravel_sum(op);                                 // Explicitly unravels any sums
-	
+	if(timer_on) timer[2] += clock();
+
 	if(warn != "") return; 
 
+	if(timer_on) timer[3] -= clock();
+	unravel_sum(op);                                 // Explicitly unravels any sums
+	if(timer_on) timer[3] += clock();
+
+	if(warn != "") return; 
+
+	if(timer_on) timer[4] -= clock();
 	convert_param_index(op);                         // Converts from param index to parameter
-	
+	if(timer_on) timer[4] += clock();
+
+	//if(type == DERIVE_EQN){ cout << "simp1" << endl; print_operations(op);}
+	 
+	if(timer_on) timer[5] -= clock();
 	simplify_operations(op);                         // Simplifies based on numerical 
+	if(timer_on) timer[5] += clock();
+
+	//if(type == DERIVE_EQN){cout << "simp2" ~<< endl; print_operations(op);}
 	
-	//print_operations(op);	
+	if(timer_on) timer[6] -= clock();
+		
 	//emsg("after simplify");
 	convert_pop_index(op);
 
@@ -111,19 +143,24 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 
 	if(warn != "") return; 
 	
+	//print_operations(op);
+	
 	if(plfl) print_operations(op);
+	if(timer_on) timer[6] += clock();
 
+	if(timer_on) timer[7] -= clock();
 	time_integral(op);                               // Incorporates time integral
 
 	if(warn != "") return; 
 	
 	calcu = create_calculation(op);                  // Works out the sequence of calculation to generate result
 
+
 	if(warn != "") return; 
 	
 	if(plfl == true) print_calculation();
 
-	if(simplify_eqn == true) simplify(calcu);        // Simplifies by combining constants
+	simplify_calc(calcu);                            // Simplifies by combining constants
 	
 	if(warn != "") return;  
 
@@ -154,7 +191,8 @@ Equation::Equation(EquationInfo &eqi, unsigned int tif, const vector <SpeciesSim
 			print_calc("integral",inte.calc);
 		}
 	}
-	
+	if(timer_on) timer[7] += clock();
+
 	//print_calculation();
 }
 
@@ -348,6 +386,9 @@ void Equation::print_operations(const vector <EqItem> &op) const
 					if(si.distmax != UNSET){
 						cout << "[" << si.comp_max << "," << si.distmax << "]";
 					}  
+					if(si.region_ref != UNSET){
+						cout << "[" << si.comp_max << ",region" << si.region_ref << "]";
+					}
 				}
 				break;
 				
@@ -361,8 +402,8 @@ void Equation::print_operations(const vector <EqItem> &op) const
 						cout << add_escape_char(param[pind.th].name);
 						break;
 						
-					case PARAM_DERIVE:
-						cout << "[der]" << add_escape_char(derive[pind.th].name);
+					case PARAM_DEFINE:
+						cout << "[def]" << add_escape_char(define[pind.th].name);
 						break;
 						
 					case PARAM_PRESET:
@@ -376,7 +417,7 @@ void Equation::print_operations(const vector <EqItem> &op) const
 						}
 						break;
 						
-					default: emsg("Not an option"); break;
+					default: emsg("Not an option:"+tstr(pind.type)); break;
 					}
 
 					if(pind.dep.size() > 0){
@@ -446,24 +487,13 @@ void Equation::print_operations(const vector <EqItem> &op) const
 				break;
 			
 			case POPCOMB:
-				{
-					cout << "POPCOMB: "; 
-					const auto &pc = popcomb[it.num];
-					auto jmax = pc.size(); if(jmax > 3) jmax = 3;
-					for(auto j = 0u; j < jmax; j++){
-						if(j != 0) cout << " + ";
-						print_item(popcombw[pc[j].wref].it);
-						cout << " * ";
-						cout << pop[pc[j].po].name;
-					}
-					if(jmax == 3) cout << "...";
-				}
+				cout << popcomb[it.num].name;	
 				break;
 			
 			case POPCOMBTIME:
 				{
-					cout << "POPCOMBTIME: "; 
-					emsg("to do");
+					const auto &ptr = popcomb_time_ref[it.num];
+					cout << popcomb[ptr.pc].name << "(t=" << ptr.ti << ")";
 				}
 				break;
 				
@@ -499,7 +529,7 @@ void Equation::print_operations(const vector <EqItem> &op) const
 			case ZERO: cout << "0"; break;
 			case FE: cout << species[sp_p].fix_effect[it.num].name; break;
       case POPNUM: cout << pop[it.num].name; break;
-      case POPTIMENUM:
+      case POPNUMTIME:
 				{		
 					const auto &ptr = pop_time_ref[it.num];
 					cout << pop[ptr.po].name << "(t=" << ptr.ti << ")";
@@ -545,8 +575,8 @@ void Equation::print_info() const
 	if(lin.on){
 		cout << "Linearise:" << endl;
 		cout << "no_pop: "; print_item(lin.no_pop_precalc); cout << endl;
-		for(auto k = 0u; k < lin.popcomb_list.size(); k++){
-			cout << popcomb_name(lin.popcomb_list[k]) << ": "; print_item(lin.popcomb_grad_precalc[k]); cout << endl;
+		for(auto k = 0u; k < popcomb_ref.size(); k++){
+			cout << popcomb[popcomb_ref[k]].name << ": "; print_item(lin.popcomb_grad_precalc[k]); cout << endl;
 		}
 	}
 }
@@ -557,7 +587,6 @@ void Equation::print_calculation() const
 {
 	cout << endl << "For equation '" << te_raw << "' calculation:" << endl;
 	auto imax = calcu.size();
-
 	//if(imax > 100) imax = 100;
   for(auto i = 0u; i < imax; i++){
 		const auto &ca = calcu[i];
@@ -639,6 +668,16 @@ void Equation::print_ca(unsigned int i, const Calculation &ca) const
 		
 	cout <<  " > ";
 	cout <<  "R" << i;
+	
+	for(const auto &it : item){
+		switch(it.type){	
+		case SPLINE: case SPLINEREF: case CONSTSPLINEREF:
+		case REG_PRECALC_TIME: case TIME:
+			cout << "  time dep"; 
+			break;
+		default: break;
+		}	
+	}
 }
  
  
@@ -661,7 +700,7 @@ void Equation::print_item(const EqItem &it) const
 	case INTEGRAL:
 		{
 			const auto &inte = integral[it.num];
-			cout << "\\int dt[" << inte.ti_min << "," << inte.ti_max << "]";
+			cout << "\\int dt[" << inte.ti_min << "," << inte.ti_max << "]" << "num=" << it.num;
 		}
 		break;
 		
@@ -679,8 +718,11 @@ void Equation::print_item(const EqItem &it) const
 		}
 		break;
 		
-	case PARAMVEC: 
-		cout << add_escape_char(param_vec[it.num].name);
+	case PARAMVEC:
+		{
+			const auto &pv = param_vec[it.num];
+			cout << param[pv.th].name << pv.index;
+		}
 		break;
 	
 	case SPLINE: 
@@ -692,11 +734,17 @@ void Equation::print_item(const EqItem &it) const
 		break;
 		
 	case SPLINEREF:
-		cout << "Spline " << spline[it.num].name; 
+		{
+			const auto &spl = spline[it.num];
+			cout << "Spline " << param[spl.th].name; 
+		}
 		break;
 		
 	case CONSTSPLINEREF:
-		cout << "Const Spline " << spline[it.num].name; 
+		{
+			const auto &spl = spline[it.num];
+			cout << "Const Spline " << param[spl.th].name; 
+		}
 		break;
 	
 	case DERIVE: 
@@ -711,7 +759,7 @@ void Equation::print_item(const EqItem &it) const
 		cout << "'" << pop[it.num].name << "'";
 		break;
 	
-	case POPTIMENUM:	
+	case POPNUMTIME:	
 		{		
 			const auto &ptr = pop_time_ref[it.num];
 			cout << pop[ptr.po].name << "(t=" << ptr.ti << ")";
@@ -719,7 +767,7 @@ void Equation::print_item(const EqItem &it) const
 		break;
 		
 	case POPCOMB:
-		cout << popcomb_name(it.num);
+		cout << popcomb[it.num].name;
 		break;
 		
 	case IE: cout << species[sp_p].ind_effect[it.num].name; break;
@@ -763,7 +811,7 @@ void Equation::unravel_sum(vector <EqItem> &op)
 		auto imax = op.size();
 		
 		while(i < imax){
-			if(op[i].type == SUM){
+			if(op[i].type == SUM){	
 				if(i+1 == imax) emsg("cannot have sum at end");
 				if(op[i+1].type != LEFTBRACKET) emsg("Cannot find left bracket");
 				
@@ -786,31 +834,34 @@ void Equation::unravel_sum(vector <EqItem> &op)
 					ii++;
 				}
 				if(ii == imax){ warn = "For sum bracket does not match"; return;}
-			
+		
 				auto si = sum_info[op[i].num];
-				vector <CompPos> comp_pos;
+				vector <unsigned int> comp_pos_ref;
 	 
 				auto ndep = si.dep.size();
 				auto distmax = si.distmax;
 				auto comp_max = si.comp_max;
-
+				auto region_ref = si.region_ref;
+	
 				for(auto j = 0u; j < ndep; j++){
 					auto ind = si.dep[j];
 					auto ind2 = remove_prime(ind);
 					
-					auto cp = find_list_from_index(ind2,distmax,comp_max);
-		
-					if(!cp.found){
+					auto ref = find_list_from_index(ind2,distmax,region_ref,comp_max);
+
+					if(ref == UNSET){
 						warn = "The index '"+ind2+"' is not found within the model"; return;
 					}
 					
-					comp_pos.push_back(cp);
+					comp_pos_ref.push_back(ref);
 				}
 				
 				{
 					EqItem it; it.type = LEFTBRACKET; op_new.push_back(it);
 				}
-					
+			
+				vector <unsigned int> index(ndep,0);
+				
 				bool first = true;
 				bool fl = false;
 				do{
@@ -822,7 +873,7 @@ void Equation::unravel_sum(vector <EqItem> &op)
 					for(auto d = 0u; d < ndep; d++){
 						Substitution su;
 						su.index = si.dep[d];
-						su.i = comp_pos[d].list[comp_pos[d].index];
+						su.i = comp_pos[comp_pos_ref[d]].list[index[d]];
 						sub.push_back(su);
 					}
 				
@@ -834,17 +885,17 @@ void Equation::unravel_sum(vector <EqItem> &op)
 					do{
 						fl = false;
 						
-						comp_pos[k].index++; 
-						if(comp_pos[k].index >= comp_pos[k].list.size()){ 
-							comp_pos[k].index = 0; k++; fl = true;
+						index[k]++; 
+						if(index[k] >= comp_pos[comp_pos_ref[k]].list.size()){ 
+							index[k] = 0; k++; fl = true;
 						}
 					}while(fl == true && k < ndep);
 				}while(fl == false);
-			
+		
 				{
 					EqItem it; it.type = RIGHTBRACKET; op_new.push_back(it);
 				}
-					
+				
 				sum_in = true;
 				i = ii;
 			}
@@ -854,10 +905,12 @@ void Equation::unravel_sum(vector <EqItem> &op)
 			i++;
 		}
 		
-		if(sum_in) op = op_new;
+		if(sum_in){
+			op = op_new;
+		}
 	}while(pass_again);
-	
-	if(testing){
+
+	if(slow_check){
 		for(auto &it : op){
 			if(it.type == PARAM_INDEX && param_index[it.num].type == PARAM_DEFINE){
 				emsg("Should be no define");
@@ -1006,7 +1059,8 @@ void Equation::copy_op(vector <EqItem> &op_new, const	vector <EqItem> &op_st, co
 				op.num = sum_info.size();
 				auto sum = sum_info_st[num];
 				
-				if(sum.distmax != UNSET){ // This changes maximum value from index to specific value
+				// This changes maximum value from index to specific value
+				if(sum.distmax != UNSET || sum.region_ref != UNSET){ 
 					auto comp_max = sum.comp_max;
 					if(find_in(sum_index,comp_max) == UNSET){
 						auto j = 0u; while(j < sub.size() && sub[j].index != comp_max) j++;
@@ -1059,7 +1113,7 @@ void Equation::copy_op(vector <EqItem> &op_new, const	vector <EqItem> &op_st, co
 		case INTEGRAL: emsg("Should not be integral"); break;
 		case PARAMETER: emsg("Should not be parameter"); break; 
 		case SPLINE: emsg("SHould not be spline"); break;
-		case POPTIMENUM: emsg("Should not be poptimenum"); break;
+		case POPNUMTIME: emsg("Should not be poptimenum"); break;
 		case DERIVE: emsg("Should not be derive"); break;
 			
 		case LEFTBRACKET: 
@@ -1094,14 +1148,8 @@ void Equation::copy_op(vector <EqItem> &op_new, const	vector <EqItem> &op_st, co
 			
 
 /// Finds the list of compartments from a given index
-CompPos Equation::find_list_from_index(string ind, double dist_max, string comp_max) const
+unsigned int Equation::find_list_from_index(string ind, double dist_max, unsigned int region_ref, string comp_max) const
 {
-	CompPos cp;
-	cp.index = 0;
-	cp.found = false;
-	
-	vector <unsigned int> vec;
-
 	if(dist_max != UNSET){
 		if(comp_max == ""){
 			emsg_input("Error with 'max' function. The compartment isn't specified");
@@ -1112,49 +1160,134 @@ CompPos Equation::find_list_from_index(string ind, double dist_max, string comp_
 			for(auto cl = 0u; cl < sp.cla.size(); cl++){
 				const auto &claa = sp.cla[cl];
 				if(claa.index == ind){
+					auto c = claa.hash_comp.find(comp_max);
+					if(c == UNSET) emsg_input("Could not find compartment '"+comp_max+"'");
+					
+					auto ve = hash_comp_pos.get_vec_double(dist_max);
+					ve.push_back(p);
+					ve.push_back(cl);
+					ve.push_back(c);
+			
+					auto i = hash_comp_pos.existing(ve);
+					if(i != UNSET) return i;
+				
+					vector <unsigned int> vec;
+			
 					const auto &comp = claa.comp;
-					
-					unsigned int c;
-					for(c = 0u; c < comp.size(); c++){
-						if(comp[c].name == comp_max) break;
+					if(claa.dist_grid.on){  // This is sped up using a distance grid
+						auto ci = comp[c].dist_grid_ref; if(ci == UNSET) emsg("Dist grid ref not set");
+						const auto &Mvec = claa.dist_grid.M[ci];
+						
+						for(auto cc = 0u; cc < comp.size(); cc++){
+							if(Mvec[comp[cc].dist_grid_ref] < dist_max){
+								auto d = find_dist(c,cc,comp,claa.coord); 
+								if(d < dist_max) vec.push_back(cc);
+							}
+						}
+						
+						if(false){ // Used for checking
+							vector <unsigned int> vec2;
+							for(auto cc = 0u; cc < comp.size(); cc++){
+								auto d = find_dist(c,cc,comp,claa.coord); 
+								if(d < dist_max) vec2.push_back(cc);
+							}
+							if(vec2.size() != vec.size()) emsg("wrong size");
+						}
 					}
-					if(c == comp.size()){
-						emsg_input("Could not find compartment '"+comp_max+"'");
+					else{
+						for(auto cc = 0u; cc < comp.size(); cc++){
+							auto d = find_dist(c,cc,comp,claa.coord); 
+							if(d < dist_max) vec.push_back(cc);
+						}
 					}
 					
-					for(auto cc = 0u; cc < comp.size(); cc++){
-						auto d = find_dist(c,cc,comp,claa.coord); 
-						if(d < dist_max) vec.push_back(cc);
-					}
-					
+					i = comp_pos.size();
+					CompPos cp;
 					cp.list = vec;
 					cp.p = p;
 					cp.cl = cl;  
-					cp.found = true;
-					return cp;
+					comp_pos.push_back(cp);
+					
+					hash_comp_pos.add(i,ve);
+					
+					return i;
 				}
 			}	
 		}
 		emsg_input("Could not find");
 	}
+		
+	if(region_ref != UNSET){
+		if(comp_max == ""){
+			emsg_input("Error with 'max' function. The compartment isn't specified");
+		}
+		
+		const auto &re = region[region_ref];
 					
+		for(auto p = 0u; p < species.size(); p++){
+			const auto &sp = species[p];
+			for(auto cl = 0u; cl < sp.cla.size(); cl++){
+				const auto &claa = sp.cla[cl];
+				if(claa.index == ind){
+					auto c = claa.hash_comp.find(comp_max);
+					if(c == UNSET) emsg_input("Could not find compartment '"+comp_max+"'");
+					
+					vector <unsigned int> ve;
+					ve.push_back(p);
+					ve.push_back(cl);
+					ve.push_back(c);
+			
+					auto i = hash_comp_pos.existing(ve);
+				
+					if(i != UNSET) return i;
+				
+					const auto &comp = claa.comp;
+					
+					vector <unsigned int> vec;
+					for(auto cc = 0u; cc < comp.size(); cc++){
+						if(re[c] == re[cc]) vec.push_back(cc);
+					}
+					
+					i = comp_pos.size();
+					CompPos cp;
+					cp.list = vec;
+					cp.p = p;
+					cp.cl = cl;  
+					comp_pos.push_back(cp);
+					
+					for(auto cc : vec){
+						vector <unsigned int> ve;
+						ve.push_back(p);
+						ve.push_back(cl);
+						ve.push_back(cc);
+						hash_comp_pos.add(i,ve);
+					}
+					
+					return i;
+				}
+			}	
+		}
+		emsg_input("Could not find");
+	}
+		
 	for(auto p = 0u; p < nspecies; p++){
 		const auto &sp = species[p];
 		for(auto cl = 0u; cl < sp.cla.size(); cl++){
 			const auto &claa = sp.cla[cl];
 			if(claa.index == ind){
-				for(auto c = 0u; c < claa.comp.size(); c++) vec.push_back(c);
-				
-				cp.list = vec;
+				auto i = comp_pos.size();
+				CompPos cp;
+				cp.list = seq_vec(claa.comp.size());
 				cp.p = p;
 				cp.cl = cl;  
-				cp.found = true;
-				return cp;
+				comp_pos.push_back(cp);
+					
+				return i;
 			}
 		}
 	}
 
-	return cp;
+	return UNSET;
 }
 
 
@@ -1804,11 +1937,11 @@ bool Equation::quant(const vector <EqItem> &op, int i) const
   if(i < 0 || i >= (int)op.size()) return false;
   switch(op[i].type){
 	case PARAM_INDEX: case POP_INDEX:
-	case PARAMETER: case PARAMVEC:
-	case SPLINE: case SPLINEREF: case CONSTSPLINEREF:
+	case PARAMETER: case PARAMVEC: 
+	case SPLINE: case SPLINEREF: case CONSTSPLINEREF: 
 	case DERIVE:
 	case INTEGRAL:
-	case POPNUM: case POPTIMENUM: case IE: case FE: case REG: case NUMERIC: case TIME: 
+	case POPNUM: case POPNUMTIME: case IE: case FE: case REG: case NUMERIC: case TIME: 
 	case ONE: case ZERO:
 		return true;
   default: return false;
@@ -1823,13 +1956,28 @@ bool Equation::quantl(const vector <EqItemList> &opl, unsigned int i) const
   switch(opl[i].type){	
 	case PARAM_INDEX: case POP_INDEX:
 	case PARAMETER: case PARAMVEC:
-	case SPLINE: case SPLINEREF: case CONSTSPLINEREF:
+	case SPLINE: case SPLINEREF: case CONSTSPLINEREF: 
 	case DERIVE:
 	case INTEGRAL:
-	case POPNUM: case POPTIMENUM: case IE: case FE: case REG: case NUMERIC: case TIME: 
+	case POPNUM: case POPNUMTIME: case IE: case FE: case REG: case NUMERIC: case TIME: 
 	case ONE: case ZERO:
 		return true;
   default: return false;
+	}
+}
+
+
+/// Determines if function 
+bool Equation::is_func_sum_int(const vector <EqItem> &op, int i) const
+{
+	if(i < 0 || i >= (int)op.size()) return false;
+  switch(op[i].type){
+	case EXPFUNC: case SINFUNC: case COSFUNC: case LOGFUNC: case POWERFUNC: 
+	case THRESHFUNC: case UBOUNDFUNC: case STEPFUNC: case MAXFUNC: case MINFUNC:
+	case ABSFUNC: case SQRTFUNC: case SIGFUNC:
+	case SUM: case TINT:
+		return true;
+	default: return false;
 	}
 }
 
@@ -2263,15 +2411,15 @@ unsigned int Equation::extract_integral(const string &te, unsigned int i, vector
 		}
 	}
 	
-	Integral inte;
+	IntegralInfo inte;
 	inte.ti_min = ti_min;
 	inte.ti_max = ti_max;
 
 	EqItem item;
 	item.type = TINT;
-	item.num = integral.size();
+	item.num = integral_info.size();
 	
-	integral.push_back(inte);
+	integral_info.push_back(inte);
 	op.push_back(item); 
 
 	return i;
@@ -2505,7 +2653,7 @@ void Equation::convert_pop_index(vector <EqItem> &op)
 				ptr.po = pi;
 				ptr.ti = pind.ti;
 				
-				it.type = POPTIMENUM; 
+				it.type = POPNUMTIME; 
 				it.num = pop_time_ref.size(); 
 				
 				pop_time_ref.push_back(ptr);		
@@ -2573,6 +2721,7 @@ unsigned int Equation::extract_sum(const string &te, unsigned int i, vector <EqI
 {
 	SumInfo si;
 	si.distmax = UNSET;
+	si.region_ref = UNSET;
 	
 	i += sigma.length();
 	if(i == te.length()){ warn = "The character '_' must follow the sum 'Σ'"; return i;}
@@ -2608,7 +2757,13 @@ unsigned int Equation::extract_sum(const string &te, unsigned int i, vector <EqI
 		if(spl.size() != 2) emsg_input("Split prob");
 		
 		si.comp_max = trim(spl[0]);			
-		si.distmax = number(spl[1]);
+		
+		if(begin_str(spl[1],"region")){
+			si.region_ref = number(spl[1].substr(6));
+		}
+		else{
+			si.distmax = number(spl[1]);
+		}
 	}
 	
 	EqItem item;
@@ -2621,7 +2776,7 @@ unsigned int Equation::extract_sum(const string &te, unsigned int i, vector <EqI
 	return ibra;
 }
 
-
+	
 /// Creates a list of operations (speeds up initialisation because doesn't need erase)
 vector <EqItemList> Equation::create_opl(const vector <EqItem> &op) const
 {
@@ -2727,8 +2882,6 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 
 	auto opl = create_opl(op);                       // Creates a list of operations
 	
-	auto loop = 0u;
-	
 	auto flag = false;
   do{                                             // Breaks down the equations into simple pieces
     flag = false;
@@ -2802,9 +2955,9 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 			case PARAMETER: case PARAMVEC:
 			case SINGLE:
 			case INTEGRAL:
-			case SPLINE: case SPLINEREF: case CONSTSPLINEREF:
+			case SPLINE: case SPLINEREF: case CONSTSPLINEREF: 
 			case DERIVE:
-			case POPNUM: case POPTIMENUM:
+			case POPNUM: case POPNUMTIME:
 			case IE: case FE: case REG: case NUMERIC: case TIME: 
 				if(optypel(opl,iprev,LEFTBRACKET) && optypel(opl,inext,RIGHTBRACKET) && !is_funcl(opl,iprev2)){
 					opl[iprev].type = opl[i].type;
@@ -2875,8 +3028,6 @@ vector <Calculation> Equation::create_calculation(vector <EqItem> &op)
 		}while(i != UNSET_LIST);
 
     if(plfl == true) print_operations(create_op_from_opl(opl));
-		
-		loop++;
   }while(flag == true);
 	
 	string wa = "";
@@ -3069,11 +3220,15 @@ void Equation::calculate_pop_ref()
 {				
 	pop_ref.clear();
 	HashSimp hash_pr;
+	
 	for(auto i = 0u; i < calcu.size(); i++){
 		const auto &ca = calcu[i];
 		for(const auto &it : ca.item){
-			if(it.type == POPNUM) add_to_vec(pop_ref,it.num,hash_pr);
-			if(it.type == POPTIMENUM)	add_to_vec(pop_ref,pop_time_ref[it.num].po,hash_pr);
+			switch(it.type){
+			case POPNUM: add_to_vec(pop_ref,it.num,hash_pr); break;
+			case POPNUMTIME: add_to_vec(pop_ref,pop_time_ref[it.num].po,hash_pr); break;
+			default: break;
+			}
 		}
 	}
 	
@@ -3082,8 +3237,11 @@ void Equation::calculate_pop_ref()
 		for(auto i = 0u; i < calc.size(); i++){
 			const auto &ca = calc[i];
 			for(const auto &it : ca.item){
-				if(it.type == POPNUM) add_to_vec(pop_ref,it.num,hash_pr);
-				if(it.type == POPTIMENUM)	add_to_vec(pop_ref,pop_time_ref[it.num].po,hash_pr);
+				switch(it.type){
+				case POPNUM: add_to_vec(pop_ref,it.num,hash_pr); break;
+				case POPNUMTIME: add_to_vec(pop_ref,pop_time_ref[it.num].po,hash_pr); break;
+				default: break;
+				}
 			}
 		}
 	}
@@ -3157,7 +3315,7 @@ void Equation::set_time_vari()
   for(const auto &ca : calcu){
 		for(const auto &it : ca.item){
 			switch(it.type){
-			case SPLINE: case SPLINEREF: case CONSTSPLINEREF: case POPNUM: case POPTIMENUM:
+			case SPLINE: case SPLINEREF: case CONSTSPLINEREF: case POPNUM: case POPNUMTIME:
 			case TIME:
 				time_vari = true;
 				break;
@@ -3179,7 +3337,7 @@ double Equation::indfac(const Individual &ind) const
 }
 
 
-/// Determines if equation is linear in a given parameter CHECKON Is this work keeping?
+/// Determines if equation is linear in a given parameter (this is no longer used)
 bool Equation::param_linear(unsigned int th) const
 {
 	if(false) cout << th << endl;
@@ -3357,17 +3515,6 @@ double Equation::find_dist(unsigned int c, unsigned int cc, const vector <Compar
 
 	emsg_input("Cannot find distance");
 	return UNSET;
-}
-
-
-/// Calculates geographical distance	
-double Equation::geo_dist(double lat1, double lng1, double lat2, double lng2) const
-{
-	auto r = 6371.0;
-	
-	auto si = sin(0.5*(lat2-lat1));
-	auto si2 = sin(0.5*(lng2-lng1));
-	return 2*r*asin(sqrt(si*si + cos(lat1)*cos(lat2)*si2*si2));
 }
 
 				
@@ -3713,7 +3860,7 @@ void Equation::time_integral(vector <EqItem> &op)
 	for(auto i = 0u; i < op.size(); i++){
 		if(op[i].type == TINT){
 			auto e = op[i].num;
-			auto &inte = integral[e];
+			auto &inte_info = integral_info[e];
 			
 			// Works out content of integral
 			auto ist = i+1;
@@ -3756,17 +3903,22 @@ void Equation::time_integral(vector <EqItem> &op)
 			}
 			
 			auto calc = create_calculation(op_mini);
-			if(simplify_eqn == true) simplify(calc);
+			if(simplify_eqn == true) simplify_calc(calc);
 			
+			Integral inte;
+			inte.ti_min = inte_info.ti_min;
+			inte.ti_max = inte_info.ti_max;
 			inte.calc = calc;
 			
 			i = j;
 				
-			// Adds intergal reference term
+			// Adds integral reference term
 			EqItem add;
 			add.type = INTEGRAL;
-			add.num = e;
+			add.num = integral.size();
 			op_new.push_back(add);
+		
+			integral.push_back(inte);
 		
 			if(type != DERIVE_EQN){
 				warn = "Time integrals can only appear in derived equations.";

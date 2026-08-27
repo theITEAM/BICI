@@ -21,18 +21,26 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 {	
 	timer.resize(PROPTIMER_MAX,0);
 
+	spec_precalc_after.hash.off();
+	spec_precalc_tv_after.hash.off();
+	
 	type = type_;
 	prop_weight = w;
 	number = 0;
 	
 	name = "PROPOSAL "+prop_type_str(type)+" ";
-	
+
 	auto win = (unsigned int)(model.details.T/10); if(win == 0) win = 1;
 	loc_samp.win = win;
 	
 	p_prop = UNSET;
 	cl_prop = UNSET; 
 	c_prop = UNSET;     
+
+	switch(type){
+	case LOG_PARAM_PROP: case LOG_MBP_PROP: log_trans = true; break;
+	default: log_trans = false; break;
+	}
 	
 	on = true;
 	
@@ -72,7 +80,7 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	
 		get_dependency();                       // Gets how other parameter and priors are affect by change
 	
-		calculate_spec_precalc();             // Finds how precalculation is updated 
+		calculate_spec_precalc();               // Finds how precalculation is updated 
 		
 		get_affect_like();                      // Gets how the likelihood is altered under the change
 	
@@ -95,7 +103,9 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		gen_mut_info.resize(GEN_UPDATE_MAX);
 		break;
 		
-	case PARAM_PROP: case PARAM_DET_PROP: case MBP_PROP:    // Parameter proposals
+	case PARAM_PROP: case LOG_PARAM_PROP: case BERNOULLI_PROP:   // Parameter proposals
+	case DET_PARAM_PROP: case DET_LOG_PARAM_PROP: case DET_BERNOULLI_PROP:
+	case MBP_PROP: case LOG_MBP_PROP: case MBP_BERNOULLI_PROP: 
 	case IE_VAR_PROP: case IE_COVAR_PROP: case IE_VAR_CV_PROP: 
 		if(type == IE_VAR_PROP){
 			if(vec.size() != 3) emsg("ert");
@@ -233,6 +243,28 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		mbp_population_affect();
 		break;
 		
+	case DET_IC_POP_PROP:
+		if(vec.size() != 3) emsg("error vec num");
+		p_prop = vec[0];
+		cl_prop = vec[1];
+		c_prop = vec[2];
+		ntr = 0; nac = 0; si = 10;
+		break;
+		
+	case DET_IC_POPTOTAL_PROP:
+		if(vec.size() != 1) emsg("error vec num");
+		p_prop = vec[0];
+		cl_prop = UNSET;
+		c_prop = UNSET;
+		ntr = 0; nac = 0; si = 10;
+		break;
+		
+	case DET_IC_RESAMP_PROP:
+		if(vec.size() != 1) emsg("error vec num");
+		p_prop = vec[0];
+		ntr = 0; nac = 0; si = 1;
+		break;
+		
 	case INIT_COND_FRAC_PROP:
 		if(vec.size() != 1) emsg("error vec num");
 		p_prop = vec[0];
@@ -327,7 +359,7 @@ void Proposal::initialise_variables()
 	name += " for: ";
 	for(auto j = 0u; j < N; j++){
 		if(j != 0) name += ",";
-		name += model.param_vec[param_list[j]].name;
+		name += model.param_vec_name(param_list[j]);
 	}
 	
 	ntr = 0; nac = 0; si = 1;
@@ -341,28 +373,26 @@ void Proposal::calculate_spec_precalc()
 {
 	auto param_list_tot = param_list;
 	
+	vector <unsigned int> pv_time_dep_list;
+	
 	// For dependent parameters
-	// This takes a simple approach (its possible it causes some overlap in calculation
 	dependent_spec_precalc.resize(dependent.size());
 	for(auto k = 0u; k < dependent.size(); k++){
 		auto th = dependent[k];
-		param_list_tot.push_back(th);
+		if(model.param_vec[th].reparam_time_dep) pv_time_dep_list.push_back(th);
+			
+		//param_list_tot.push_back(th);
 		dependent_spec_precalc[k] = model.param_vec[th].spec_precalc_before;
+		dependent_spec_precalc[k].hash.off();
 	}
 	
-	spec_precalc_after = model.precalc_eqn.combine_spec_precalc(param_list_tot);
+	spec_precalc_tv_after = model.precalc_eqn.combine_pv_spec_precalc(pv_time_dep_list);
+	
+	spec_precalc_after = model.precalc_eqn.combine_pv_spec_precalc_remove(param_list_tot,spec_precalc_tv_after);
 	
 	if(false){
 		cout << "PROPOSAL PRECALC " << name << endl;
-		
-		if(dependent.size() > 0){
-			for(auto k = 0u; k < dependent.size(); k++){
-				model.print_spec_precalc(model.param_vec[dependent[k]].name,dependent_spec_precalc[k]);
-			}
-		}
-		
 		model.print_spec_precalc("After",spec_precalc_after);
-		//emsg("do");
 	}
 }
 
@@ -407,25 +437,85 @@ string Proposal::print_info() const
 		ss << "TRANSMISSION TREE LOCAL MUTATION NUMBER SAMPLER";	
 		break;
 		
-	case PARAM_PROP: case PARAM_DET_PROP: case MBP_PROP: case IE_VAR_PROP: case IE_COVAR_PROP: case IE_VAR_CV_PROP: 
+	case PARAM_PROP: case LOG_PARAM_PROP: case BERNOULLI_PROP: 
+	case DET_PARAM_PROP: case DET_LOG_PARAM_PROP: case DET_BERNOULLI_PROP:
+	case MBP_PROP: case LOG_MBP_PROP: case MBP_BERNOULLI_PROP: 
+	case IE_VAR_PROP: case IE_COVAR_PROP: case IE_VAR_CV_PROP: 
 		{
-			if(type == PARAM_PROP) ss << "PARAMETER SAMPLER for ";
-			if(type == PARAM_DET_PROP) ss << "PARAMETER SAMPLER for ";
-			if(type == MBP_PROP) ss << "MBP SAMPLER for ";
-			if(type == IE_VAR_PROP) ss << "IE VAR SAMPLER for ";
-			if(type == IE_COVAR_PROP) ss << "IE COVAR SAMPLER for ";
-			if(type == IE_VAR_CV_PROP) ss << "IE VAR CV SAMPLER for ";
+			switch(type){
+			case PARAM_PROP: ss << "PARAMETER SAMPLER for "; break;
+			case LOG_PARAM_PROP: ss << "LOG-PARAMETER SAMPLER for "; break;
+			case BERNOULLI_PROP: ss << "BERNOULLI SAMPLER for "; break;
+			case DET_PARAM_PROP: ss << "DET-PARAMETER SAMPLER for "; break;
+			case DET_LOG_PARAM_PROP: ss << "LOG-DET-PARAMETER SAMPLER for "; break;
+			case DET_BERNOULLI_PROP: ss << "DET-BERNOULLI SAMPLER for "; break;
+			case MBP_PROP: ss << "MBP SAMPLER for "; break;
+			case LOG_MBP_PROP: ss << "LOG-MBP SAMPLER for "; break;
+			case MBP_BERNOULLI_PROP: ss << "MBP BERNOULLI SAMPLER for "; break;
+			case IE_VAR_PROP: ss << "IE VAR SAMPLER for "; break;
+			case IE_COVAR_PROP: ss << "IE COVAR SAMPLER for "; break;
+			case IE_VAR_CV_PROP: ss << "IE VAR CV SAMPLER for "; break;
+			default: emsg("Option error"); break;
+			}
 			
 			{
 				string str = ""; 
-				for(auto th : param_list) str +=  model.param_vec[th].name+", ";
+				for(auto th : param_list) str +=  model.param_vec_name(th)+", ";
 				ss << "param: " << trunc(str) << " ";
 			}
 			
 			if(dependent.size() > 0){
 				string str = ""; 
-				for(auto th : dependent) str += model.param_vec[th].name+", ";
-				ss << "dependent" << trunc(str);
+				for(auto th : dependent) str += model.param_vec_name(th)+", ";
+				ss << "dependent: " << trunc(str);
+			}
+			
+			if(pop_change_info.omega_affect.size() > 0){
+				ss << " omega: ";
+				for(const auto &omr : pop_change_info.omega_affect){
+					ss << model.species[omr.p].ind_eff_group[omr.g].name << ",";
+				}
+				ss << "  ";
+			}
+			
+			if(pop_change_info.exp_fe_ref.size() > 0){
+				ss << " exp_fe: ";
+				for(const auto &rf : pop_change_info.exp_fe_ref){
+					ss << model.species[rf.p].fix_effect[rf.f].name << ",";
+				}
+				ss << "  ";
+			}
+			
+			if(pop_change_info.exp_ie_ref.size() > 0){
+				ss << " exp_ie: ";
+				for(const auto &rf : pop_change_info.exp_ie_ref){
+					ss << model.species[rf.p].ind_effect[rf.e].name << ",";
+				}
+				ss << "  ";
+			}
+			
+			if(pop_change_info.pop_affect.size() > 0){
+				ss << " pop: ";
+				for(auto val : pop_change_info.pop_affect){
+					ss << val << ",";
+				}
+				ss << "  ";
+			}
+			
+			if(pop_change_info.popcombw_affect.size() > 0){
+				ss << " popcombw: ";
+				for(auto val : pop_change_info.popcombw_affect){
+					ss << val << ",";
+				}
+				ss << "  ";
+			}
+			
+			if(pop_change_info.popcomb_affect.size() > 0){
+				ss << " popcomb: ";
+				for(auto val : pop_change_info.popcomb_affect){
+					ss << val << ",";
+				}
+				ss << "  ";
 			}
 		}
 		break;
@@ -549,6 +639,28 @@ string Proposal::print_info() const
 		}
 		break;
 		
+	case DET_IC_POP_PROP:
+		{
+			const auto &sp = model.species[p_prop];
+			ss << "deterministic initial population for species "  << sp.name;
+			ss << " for " << sp.cla[cl_prop].name << " compartment " << sp.cla[cl_prop].comp[c_prop].name;
+		}
+		break;
+		
+	case DET_IC_POPTOTAL_PROP:
+		{
+			const auto &sp = model.species[p_prop];
+			ss << "deterministic for total initial population for species "  << sp.name;
+		}
+		break;
+		
+	case DET_IC_RESAMP_PROP:
+		{
+			const auto &sp = model.species[p_prop];
+			ss << "deterministic resampling init_cond for "  << sp.name;
+		}
+		break;
+		
 		case INIT_COND_FRAC_PROP:
 		{
 			const auto &sp = model.species[p_prop];
@@ -610,10 +722,18 @@ string Proposal::print_info() const
 	if(1 == 0) cout << "Affect like output is turned off in code" << endl;		
 	else{
 		auto imax = affect_like.size(); 
-		if(imax > 5) imax  = 5; 
+		//if(imax > 5) imax  = 5; 
 		for(auto i = 0u; i < imax; i++){
 			const auto &al = affect_like[i];
-			ss << output.print_affect_like(al) << endl;
+			ss << output.print_affect_like(al);
+				
+			auto num = 1u;
+			while(i+1 < imax && al.type == affect_like[i+1].type && equal_vec(al.list,affect_like[i+1].list)){
+				num++;
+				i++;
+			};  
+			if(num > 1) ss << "*" << num;
+			ss << endl;
 		}
 		if(imax < affect_like.size()) ss << "...+ more" << endl;
 	}
@@ -622,10 +742,10 @@ string Proposal::print_info() const
 	else{
 		ss << "<<Precalc dependent>>" << endl;
 		for(auto k = 0u; k < dependent.size(); k++){
-			ss << model.str_spec_precalc(model.param_vec[dependent[k]].name,dependent_spec_precalc[k]);
+			ss << model.str_spec_precalc(model.param_vec_name(dependent[k]),dependent_spec_precalc[k]);
 		}
-			
 		ss << model.str_spec_precalc("Update after",spec_precalc_after);
+		ss << model.str_spec_precalc("Update tv after",spec_precalc_tv_after);
 	}
 	
 	if(!on) ss << "Proposal switched off" << endl;
@@ -637,23 +757,24 @@ string Proposal::print_info() const
 }
 
 
-/// Performs a Metropolis-Hastings proposal update
+/// Performs a Metropolis-Hastings proposal update 
 void Proposal::MH(State &state)
 {	
 	auto pl = false;
-
+	
+	if(pl) state.check("mh before");
+	
 	auto &param_val = state.param_val;
 
 	ntr++; 
 
-	auto ps_fac = param_resample(param_val,state.popcomb_t);
-	if(ps_fac == UNSET){ update_si(REJECT);	return;}
-
+	auto ps_fac = param_resample(param_val,state);
+	if(ps_fac == UNSET){ update_si(REJECT); return;}
+	
 	if(pl){     
 		cout << endl << endl;
 		for(auto i : param_val.value_ch){
-			const auto &pv = model.param_vec[i];
-			cout << pv.name << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
+			cout << model.param_vec_name(i) << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
 		}
 		//for(auto val : param_val.precalc){
 			//cout << val << ",";
@@ -665,10 +786,8 @@ void Proposal::MH(State &state)
 	
 	auto al = calculate_al(like_ch,ps_fac);
 	
-	if(pl){ 
-		print_like(like_ch);
-	}
-	
+	if(pl) print_like(like_ch);
+
 	if(pl) cout << al << "al" << endl;
 	
 	if(ran() < al){ 
@@ -690,54 +809,98 @@ void Proposal::MH(State &state)
 /// Performs a parameter change in a determinisitic model
 void Proposal::param_det(State &state)
 {	
-	if(false)  cout << state.T;
+	if(!model.deterministic) emsg("must be determinisitic");
 
-	/*
 	auto pl = false;
-
-	auto &param_val = state.param_val;
-
-	ntr++; 
 	
-	auto ps_fac = param_resample(param_val,state.popcomb_t);
-	if(ps_fac == UNSET){ update_si(REJECT);	return;}
+	InitCondValue init_cond_store;
 	
-	if(pl){     
-		cout << endl << endl;
-		for(auto i : param_val.value_ch){
-			const auto &pv = model.param_vec[i];
-			cout << pv.name << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
+	ntr++;
+	
+	auto ps_fac = 0.0;
+	
+	switch(type){
+	case DET_PARAM_PROP: case DET_LOG_PARAM_PROP:
+		{
+			ps_fac = param_resample(state.param_val,state,true);
+			if(ps_fac == UNSET){
+				update_si(REJECT); 
+				return;
+			}
+
+			if(pl){     
+				cout << endl << endl;
+				const auto &param_val = state.param_val;
+				for(auto i : param_val.value_ch){
+					cout << model.param_vec_name(i) << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
+				}
+			}
 		}
-		//for(auto val : param_val.precalc){
-			//cout << val << ",";
-		//}
-		cout << "val" << endl;
-	}
+		break;
 	
-	auto like_ch = state.update_param(affect_like);
+	case DET_IC_POP_PROP: case DET_IC_POPTOTAL_PROP: case DET_IC_RESAMP_PROP:
+		{
+			auto &ssp = state.species[p_prop];
+			
+			init_cond_store = ssp.init_cond_val;
+
+			auto res = propose_init_cond(ssp.init_cond_val,state);
+			
+			if(res != IC_SUCCESS){
+				ssp.init_cond_val = init_cond_store;
+				if(res != IC_ZERO){
+					update_si(REJECT);
+					if(type == DET_IC_POP_PROP || type == DET_IC_POPTOTAL_PROP){
+						if(si < POP_SI_LIM) si = POP_SI_LIM;
+					}
+				}
+				return;
+			}
+		}
+		break;
+	
+	default: emsg("op err"); break;
+	}
+
+	auto like_st = state.like;
+	
+	state.determinisitic_resimulate();
+	
+	auto like_ch = state.get_like_ch(like_st);
 	
 	auto al = calculate_al(like_ch,ps_fac);
-	
-	if(pl){ 
-		print_like(like_ch);
+	if(pl){
+		cout << " " << al << " al" << endl; 
 	}
 	
-	if(pl) cout << al << "al" << endl;
-	
-	if(ran() < al){ 
-		if(pl) cout << "accept" << endl;
+	if(ran() < al){
+		if(pl) cout << "accept" << endl;	
 		nac++;
-		state.accept(like_ch);
-		update_si(ACCEPT);
+		state.param_val.clear();
+		state.popcomb_store.clear();
+		update_si(ACCEPT50); 
+		if(si > 1 && type == DET_IC_RESAMP_PROP) si = 1;
 	}
 	else{ 
 		if(pl) cout << "reject" << endl;
-		state.restore(affect_like);
-		update_si(REJECT); if(si > 3) si *= 0.75;
+		
+		switch(type){
+		case DET_IC_POP_PROP: case DET_IC_POPTOTAL_PROP: case DET_IC_RESAMP_PROP:
+			state.species[p_prop].init_cond_val = init_cond_store;
+			break;
+		default: break;
+		}
+		
+		state.param_val.restore();
+		
+		state.like = like_st;
+		
+		update_si(REJECT);
+
+		if(type == DET_IC_POP_PROP || type == DET_IC_POPTOTAL_PROP){
+			if(si < POP_SI_LIM) si = POP_SI_LIM;
+		}
 	}
-	
-	if(pl) state.check("mh after");
-	*/
 }
 
 
@@ -756,22 +919,27 @@ void Proposal::mbp(State &state)
 	
 	auto popnum_t_st = state.popnum_t;
 	auto popcomb_t_st = state.popcomb_t;
-
+	
+	vector <PopcombWStore> popcombw_store;
+	state.popcomb_store.clear();
+	
 	auto sim_prob = 0.0;
 	auto ps_fac = 0.0;
 	
 	switch(type){
-	case MBP_PROP: 
+	case MBP_PROP: case LOG_MBP_PROP: case MBP_BERNOULLI_PROP:
 		{
-			ps_fac = param_resample(state.param_val,state.popcomb_t);
-			if(ps_fac == UNSET){ update_si(REJECT); return;}
-			
+			ps_fac = param_resample(state.param_val,state,true);
+			if(ps_fac == UNSET){
+				update_si(REJECT); 
+				return;
+			}
+
 			if(pl){     
 				cout << endl << endl;
 				const auto &param_val = state.param_val;
 				for(auto i : param_val.value_ch){
-					const auto &pv = model.param_vec[i];
-					cout << pv.name << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
+					cout << model.param_vec_name(i) << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
 				}
 			}
 		}
@@ -805,18 +973,24 @@ void Proposal::mbp(State &state)
 	default: emsg("op err"); break;
 	}
 	
-	if(ssp.type != POPULATION && ssp.type != DETERMINISTIC) emsg("must be population");
+	state.mbp_update_initial_state(pop_change_info.popcombw_affect,popcombw_store);
+	
+	if(ssp.type != POPULATION) emsg("must be population");
 	
 	auto trans_num_st = ssp.trans_num;
 	auto tnum_mean_st_st = ssp.tnum_mean_st;
 	auto cpop_st_st = ssp.cpop_st;
+	auto markov_eqn_vari_st = ssp.store_markov_eqn_vari();
 	
-	ssp.mbp(sim_prob,state.popnum_t,state.popcomb_t,mbp_fast);
+	//state.timer[TEMP2] -= clock();
+	ssp.mbp(sim_prob,state.popnum_t,state.popcomb_t,state.popcombw_value);
+	//state.timer[TEMP2] += clock();
 
+	//state.timer[TEMP3] -= clock();
 	auto like_ch = state.update_param(affect_like);
+	//state.timer[TEMP3] += clock();
 	
 	auto al = calculate_al(like_ch,ps_fac);
-	
 	if(pl) cout << al << " al" << endl; 
 
 	if(ran() < al){
@@ -837,11 +1011,14 @@ void Proposal::mbp(State &state)
 	}
 	else{ 
 		if(pl) cout << "reject" << endl;
+		for(const auto &pcw : popcombw_store) state.popcombw_value[pcw.i] = pcw.value;
 		state.popnum_t = popnum_t_st;
 		state.popcomb_t = popcomb_t_st;
 		ssp.trans_num = trans_num_st;
 		ssp.tnum_mean_st = tnum_mean_st_st;
 		ssp.cpop_st = cpop_st_st;
+		ssp.restore_markov_eqn_vari(markov_eqn_vari_st);
+	
 		switch(type){
 		case MBP_IC_POP_PROP: case MBP_IC_POPTOTAL_PROP: case MBP_IC_RESAMP_PROP:
 			ssp.init_cond_val = init_cond_store;
@@ -860,6 +1037,8 @@ void Proposal::mbp(State &state)
 	if(pl) state.check_precalc_dif("AFTER");
 	
 	if(pl) state.check("mbp");
+	
+	//state.timer[TEMP1] += clock();
 }
 
 
@@ -1480,6 +1659,7 @@ void Proposal::sample_ind_obs(State &state)
 	ind_ev_samp.setup_nm();
 	
 	for(auto i = 0u; i < sp.nindividual_in; i++){
+		//for(auto i = 1u; i <2; i++){
 		auto &ind = ssp.individual[i];
 		
 		if(sp.individual[i].simulation_needed){
@@ -1494,7 +1674,8 @@ void Proposal::sample_ind_obs(State &state)
 							ntr++; if(burn) isp.ntr++;
 							
 							ind_ev_samp.generate_ind_obs_timeline();
-						
+							//ind_ev_samp.print_ind_obs_timeline();
+							
 							auto probif = 0.0;
 						
 							auto ev_new = ind_ev_samp.sample_events(probif);
@@ -1504,9 +1685,13 @@ void Proposal::sample_ind_obs(State &state)
 								cout << "old: "; ssp.print_event(ind.ev);
 								cout << "new: "; ssp.print_event(ev_new);
 								cout << ind_ev_samp.illegal << "illegal" << endl;
-								if(ind_ev_samp.illegal) emsg("stop");
-							}
 								
+								if(false && ind_ev_samp.illegal){
+									ind_ev_samp.print_ind_obs_timeline();
+									emsg("stop");
+								}
+							}
+					
 							if(ind_ev_samp.illegal == true) nfa++;
 							else{
 								if(testing == true){ // Diagnostic
@@ -1712,7 +1897,7 @@ void Proposal::resimulate_single_ind_obs(State &state)
 						cout << "older: "; ssp.print_event(ind.ev);
 						cout << cl << " cl" << endl;
 					}
-							
+					
 					auto ev_new = ind_ev_samp.simulate_single_events(i,cl,probif,trig);
 			
 					if(pl){
@@ -2272,7 +2457,10 @@ void Proposal::MH_ie(State &state)
 	if(sp.trans_tree){
 		for(auto po : inde.pop_ref){
 			for(const auto &pme : model.pop[po].markov_eqn_ref){
-				if(model.species[pme.p].markov_eqn[pme.e].infection_trans) in_transtree = true;
+				auto &sp2 = model.species[pme.p];
+				for(auto e : pme.list){
+					if(sp2.markov_eqn[e].infection_trans) in_transtree = true;
+				}
 			}
 		}
 	}
@@ -2374,25 +2562,17 @@ void Proposal::MH_ie_var(State &state)
 	auto pl = false;
 	
 	auto &param_val = state.param_val;
-	auto &value = param_val.value;
-	
-	auto th = param_list[0];
-	auto val_st = value[th];
-	
-	auto ps_fac = param_resample(param_val,state.popcomb_t);
+
+	auto ps_fac = param_resample(param_val,state,false,true);
 	
 	if(ps_fac == UNSET){ update_si(REJECT); return;}
-	
-	auto factor = sqrt(value[th]/val_st);
-
-	auto &ssp = state.species[p_prop];
-	for(auto &ind : ssp.individual) ind.ie[ie_prop] *= factor;
 	
 	auto like_ch = state.update_param(affect_like);
 
 	auto al = calculate_al(like_ch,ps_fac-like_ch.ie);
 	
 	if(pl) cout << al << " al" << endl;
+	
 	ntr++;
 	if(ran() < al){
 		if(pl) cout << "accept" << endl;
@@ -2402,7 +2582,6 @@ void Proposal::MH_ie_var(State &state)
 	}
 	else{ 
 		state.restore(affect_like);
-		for(auto &ind : ssp.individual) ind.ie[ie_prop] /= factor;
 		update_si(REJECT);
 	}
 	
@@ -2420,9 +2599,9 @@ void Proposal::MH_ie_var_cv(State &state)
 	
 	auto th = param_list[0];
 	
-	auto val_st = value[th];
+	//auto val_st = value[th];
 	
-	auto ps_fac = param_resample(param_val,state.popcomb_t);
+	auto ps_fac = param_resample(param_val,state,false,true);
 	
 	if(ps_fac == UNSET){ update_si(REJECT); return;}
 	
@@ -2430,11 +2609,6 @@ void Proposal::MH_ie_var_cv(State &state)
 		param_val.restore(); 
 		return;
 	}
-	
-	auto factor = sqrt(value[th]/val_st);
-
-	auto &ssp = state.species[p_prop];
-	for(auto &ind : ssp.individual) ind.ie[ie_prop] *= factor;
 	
 	auto like_ch = state.update_param(affect_like);
 
@@ -2450,7 +2624,6 @@ void Proposal::MH_ie_var_cv(State &state)
 	}
 	else{ 
 		state.restore(affect_like);
-		for(auto &ind : ssp.individual) ind.ie[ie_prop] /= factor;
 		update_si(REJECT);
 	}
 	
@@ -2464,81 +2637,20 @@ void Proposal::MH_ie_covar(State &state)
 	auto pl = false;
 
 	auto &param_val = state.param_val;
-	auto &value = param_val.value;
-	
-	auto th = param_list[0];
-	
-	auto val_st = value[th];
-	
-	auto ps_fac = param_resample(param_val,state.popcomb_t);
+		
+	auto ps_fac = param_resample(param_val,state,false,true);
 	
 	if(pl){     
 		cout << endl << endl;
 		for(auto i : param_val.value_ch){
-			const auto &pv = model.param_vec[i];
-			cout << pv.name << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
+			cout <<model.param_vec_name(i) << " " << param_val.value_old[i] << " -> " << param_val.value[i] << endl;
 		}
 	}
 	
 	if(ps_fac == UNSET){ update_si(REJECT); return;}
-	
-	auto g = ind_eff_group_ref.ieg;
-	
-	auto &ssp = state.species[p_prop];
-	const auto &iegs = ssp.ind_eff_group_sampler[g];
-	
-	const auto &sp = model.species[p_prop];
-	const auto &ieg = sp.ind_eff_group[ind_eff_group_ref.ieg];
-
-	auto E = ieg.list.size();
-	
-	auto fac = value[th]/val_st; 
-		
-	auto omega_bef = iegs.omega;
-	auto omega_aft = omega_bef;
-
-	{		
-		auto i = ind_eff_group_ref.i;
-		auto j = ind_eff_group_ref.j;
-		omega_aft[i][j] *= fac;
-		omega_aft[j][i] *= fac;
-	}
-	
-	auto illegal_aft = false;
-	auto Z_omega_aft = calculate_cholesky(omega_aft,illegal_aft);
-	if(illegal_aft){
-		param_val.restore(); 
-		update_si(REJECT);
-		return;
-	}
-	
-	auto illegal_bef = false;
-	auto Z_omega_bef = calculate_cholesky(omega_bef,illegal_bef);
-	if(illegal_bef) emsg("Should not have cholesky error");
-		
-	auto inv_Z_omega_bef = invert_matrix(Z_omega_bef);
-			
-	auto M = matrix_mult(Z_omega_aft,inv_Z_omega_bef);
-	
-	vector <unsigned int> index;
-	for(auto e = 0u; e < E; e++){
-		index.push_back(ieg.list[e].index);
-	}	
-	
-	vector <double> vec(E), vec_new(E);
-	vector < vector <double> > store;
-	for(auto i = 0u; i < ssp.individual.size(); i++){
-		auto &ie = ssp.individual[i].ie;
-		
-		for(auto e = 0u; e < E; e++) vec[e] = ie[index[e]];
-		store.push_back(vec);
-		
-		vec_new = matrix_mult(M,vec);
-		for(auto e = 0u; e < E; e++) ie[index[e]] = vec_new[e];
-	}
 
 	auto like_ch = state.update_param(affect_like);
-
+	
 	if(pl) print_like(like_ch);
 
 	auto al = calculate_al(like_ch,ps_fac-like_ch.ie);
@@ -2554,11 +2666,6 @@ void Proposal::MH_ie_covar(State &state)
 	}
 	else{ 
 		state.restore(affect_like);
-		
-		for(auto i = 0u; i < ssp.individual.size(); i++){
-			auto &ie = ssp.individual[i].ie;
-			for(auto e = 0u; e < E; e++) ie[index[e]] = store[i][e];
-		}
 		update_si(REJECT);
 	}
 	if(pl) state.check("uuu");
@@ -2577,7 +2684,7 @@ void Proposal::param_event_joint(Direction dir, State &state)
 	
 	auto val_st = value[th];
 	
-	auto ps_fac = param_resample(param_val,state.popcomb_t);
+	auto ps_fac = param_resample(param_val,state);
 
 	if(ps_fac == UNSET){ nfa++; update_si(REJECT); return;}
 	
@@ -2810,7 +2917,7 @@ void Proposal::init_cond_frac(State &state)
 		}
 			
 		for(auto cl = 0u; cl < sp.ncla; cl++){
-			if(cl != foc_cl){
+			if(cl != foc_cl){	
 				icv.frac_focal[cl] = dirichlet_sample(alp_focal[cl]);
 			}
 		}
@@ -2895,18 +3002,31 @@ string Proposal::diagnostics(double total_time) const
 		break;
 		
 		
-	case PARAM_PROP: case PARAM_DET_PROP:
+	case PARAM_PROP: case LOG_PARAM_PROP: 
+	case DET_PARAM_PROP: case DET_LOG_PARAM_PROP:
 		{
-			ss << "Parameter proposal: ";
+			if(type == LOG_PARAM_PROP || type == DET_LOG_PARAM_PROP) ss << "Log-parameter proposal: ";
+			else ss << "Parameter proposal: ";
 			for(auto i = 0u; i < param_list.size(); i++){
 				auto th = param_list[i];
 				if(i != 0) ss << ", ";
-				ss << model.param_vec[th].name; 
+				ss << model.param_vec_name(th); 
 			}
 			ss << endl;
 			if(ntr == 0) ss << "No proposals";
 			else{
 				ss << print_ac(nac,ntr) << " Size:" << si;
+			}
+			ss << endl;
+		}
+		break;
+		
+	case BERNOULLI_PROP: case DET_BERNOULLI_PROP: 
+		{
+			ss << "Bernoulli proposal: " << model.param_vec_name(param_list[0]) << endl;
+			if(ntr == 0) ss << "No proposals";
+			else{
+				ss << print_ac(nac,ntr);
 			}
 			ss << endl;
 		}
@@ -2925,7 +3045,7 @@ string Proposal::diagnostics(double total_time) const
 			for(auto i = 0u; i < param_list.size(); i++){
 				auto th = param_list[i];
 				if(i != 0) ss << ", ";
-				ss << model.param_vec[th].name; 
+				ss << model.param_vec_name(th); 
 			}
 			ss << endl;
 			if(ntr == 0) ss << "No proposals";
@@ -2936,17 +3056,29 @@ string Proposal::diagnostics(double total_time) const
 		}
 		break;
 		
-	case MBP_PROP:
+	case MBP_PROP: case LOG_MBP_PROP:
 		{
-			ss << "Type I MBP parameter proposal: ";
+			if(type == MBP_PROP) ss << "Type I MBP parameter proposal: ";
+			else ss << "Type I LOG-MBP parameter proposal: ";
 			for(auto i = 0u; i < param_list.size(); i++){
 				auto th =  param_list[i];
 				if(i != 0) ss << ", ";
-				ss << model.param_vec[th].name; 
+				ss << model.param_vec_name(th); 
 			}
 			ss << endl;
 			if(ntr == 0) ss << "No proposals";
 			else ss << print_ac(nac,ntr) << " Size:" << si;
+			ss << endl;
+		}
+		break;
+	
+	case MBP_BERNOULLI_PROP:
+		{
+			if(type == MBP_PROP) ss << "Type I MBP parameter proposal: ";
+			else ss << "Type I LOG-MBP parameter proposal: ";
+			ss << model.param_vec_name(param_list[0]) << endl;
+			if(ntr == 0) ss << "No proposals";
+			else ss << print_ac(nac,ntr);
 			ss << endl;
 		}
 		break;
@@ -2985,6 +3117,37 @@ string Proposal::diagnostics(double total_time) const
 		{
 			const auto &sp = model.species[p_prop];
 			ss << "MBP proposal for resampling init_cond for species " << sp.name << endl;
+			if(ntr == 0) ss << "No proposals";
+			else ss << print_ac(nac,ntr) << " Size:" << si;
+			ss << endl;
+		}
+		break;
+		
+		case DET_IC_POP_PROP:
+		{
+			const auto &sp = model.species[p_prop];
+			ss << "deterministic proposal initial population for species "  << sp.name;
+			ss << " for " << sp.cla[cl_prop].name << " compartment " << sp.cla[cl_prop].comp[c_prop].name << endl;
+			if(ntr == 0) ss << "No proposals";
+			else ss << print_ac(nac,ntr) << " Size:" << si;
+			ss << endl;
+		}
+		break;
+		
+	case DET_IC_POPTOTAL_PROP:
+		{
+			const auto &sp = model.species[p_prop];
+			ss << "deterministic proposal total initial population for species "  << sp.name << endl;
+			if(ntr == 0) ss << "No proposals";
+			else ss << print_ac(nac,ntr) << " Size:" << si;
+			ss << endl;
+		}
+		break;
+		
+	case DET_IC_RESAMP_PROP:
+		{
+			const auto &sp = model.species[p_prop];
+			ss << "deterministic proposal for resampling init_cond for species " << sp.name << endl;
 			if(ntr == 0) ss << "No proposals";
 			else ss << print_ac(nac,ntr) << " Size:" << si;
 			ss << endl;
@@ -3342,8 +3505,10 @@ string Proposal::diagnostics(double total_time) const
 	//ss << "CPU time: " << 100*double(timer[PROP_TIMER])/total_time; 
 	
 	{
-		auto per = cpu_percent(timer[PARAM_RESAMPLE_TIMER],total_time);
-		if(per != "0%") ss << " (" << per << " from precalc)";
+		auto t_precalc = timer[PARAM_RESAMPLE_TIMER]+timer[PARAM_IE_TIMER]+timer[PARAM_POP_TIMER]+timer[PARAM_TIMEDEP_TIMER]+timer[PARAM_CALC_TIMER];
+		auto per = cpu_percent(t_precalc,total_time);
+	
+		if(per != "0%") ss << " (" << per << " from sample)";
 	}
 	ss << endl;
 	
@@ -3821,11 +3986,23 @@ void Proposal::update(State &state)
 		trans_tree_mut_local(state); 
 		break;
 	case PARAM_PROP: MH(state); break;
-	case PARAM_DET_PROP: param_det(state); break;
+	case LOG_PARAM_PROP: MH(state); break;
+	case BERNOULLI_PROP: MH(state); break;
+	case DET_PARAM_PROP: param_det(state); break;
+	case DET_LOG_PARAM_PROP: param_det(state); break;
+	case DET_BERNOULLI_PROP: param_det(state); break;
+	case DET_IC_POP_PROP: param_det(state); break;
+	case DET_IC_POPTOTAL_PROP: param_det(state); break;
+	case DET_IC_RESAMP_PROP: param_det(state); break;
 	case PAR_EVENT_FORWARD_PROP: param_event_joint(FORWARD,state); break;
 	case PAR_EVENT_FORWARD_SQ_PROP: param_event_joint(FORWARD_SQ,state); break;
 	case PAR_EVENT_BACKWARD_SQ_PROP: param_event_joint(BACKWARD_SQ,state); break;
-	case IND_EVENT_TIME_PROP: 
+	case IND_OBS_SWITCH_ENTER_SOURCE_PROP: switch_enter_source(state); break;
+	case IND_OBS_SWITCH_LEAVE_SINK_PROP: switch_leave_sink(state); break;
+	case CORRECT_OBS_TRANS_PROP: 
+		//correct_obs_trans_events(state); 
+		break;
+	case IND_EVENT_TIME_PROP:  // Ind begin
 		MH_event(state); 
 		break;
 	case IND_MULTI_EVENT_PROP: 
@@ -3834,9 +4011,6 @@ void Proposal::update(State &state)
 	case IND_EVENT_ALL_PROP: 
 		MH_event_all(state); 
 		break;
-	case IND_OBS_SWITCH_ENTER_SOURCE_PROP: switch_enter_source(state); break;
-	case IND_OBS_SWITCH_LEAVE_SINK_PROP: switch_leave_sink(state); break;
-	case CORRECT_OBS_TRANS_PROP: correct_obs_trans_events(state); break;
 	case IND_LOCAL_PROP: 
 		MH_ind_local(state); 
 		break;
@@ -3849,10 +4023,14 @@ void Proposal::update(State &state)
 	case IND_OBS_RESIM_SINGLE_PROP: 
 		resimulate_single_ind_obs(state);
 		break;
-	case IND_UNOBS_RESIM_PROP: resimulate_ind_unobs(state); break;
+	case IND_UNOBS_RESIM_PROP:  // Ind end
+		resimulate_ind_unobs(state); 
+		break;
 	case IND_ADD_REM_PROP: add_rem_ind(state); break;
 	case IND_ADD_REM_TT_PROP: add_rem_tt_ind(state); break;
 	case MBP_PROP: mbp(state); break;
+	case LOG_MBP_PROP: mbp(state); break;
+	case MBP_BERNOULLI_PROP: mbp(state); break;
 	case MBPII_PROP: mbp(state); break;
 	case MBP_IC_POP_PROP: mbp(state); break;
 	case MBP_IC_POPTOTAL_PROP: mbp(state); break;
@@ -3873,3 +4051,19 @@ void Proposal::update(State &state)
 		 
 	timer[PROP_TIMER] += clock();
 }
+
+
+/// Determines if a parameter proposal
+bool Proposal::is_param_prop() const 
+{
+	switch(type){
+	case PARAM_PROP: case LOG_PARAM_PROP: case BERNOULLI_PROP: 
+	case DET_PARAM_PROP: case DET_LOG_PARAM_PROP: case DET_BERNOULLI_PROP: 
+	case MBP_PROP: case LOG_MBP_PROP: case MBP_BERNOULLI_PROP:
+		return true;
+	
+	default:
+		return false;
+	}
+}
+

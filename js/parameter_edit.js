@@ -37,8 +37,7 @@ function create_edit_param(lay)
 	
 	let par = model.param[inter.edit_param.i];
 	
-	let too_big = false;
-	if(inter.edit_param.too_big == true) too_big = true;
+	let too_big = inter.edit_param.too_big;
 	
 	switch(lay.op.type){
 	case "Const":
@@ -113,14 +112,16 @@ function create_edit_param(lay)
 
 	if(too_big){
 		if(fl) title += " (too large to show all)";
-		else title += " (too large to edit)";
+		else title += " (too large to edit, please load below)";
+		if(title.substr(0,4) == "Edit") title = title.substr(5,1).toUpperCase()+title.substr(6);
 	}
 	
 	cy = lay.add_title(title,cx,cy,{te:help});
 	
 	add_layer("CreateEditParamContent",lay.x+cx,lay.y+cy,lay.dx-2*cx,lay.dy-cy-3.5,{type:lay.op.type});
 	
-	if(too_big == true || par.dist_mat || par.iden_mat || par.den_vec){
+	//if(too_big == true || par.dist_mat || par.iden_mat || par.den_vec){
+	if(par.dist_mat || par.iden_mat || par.den_vec){
 		lay.add_corner_button([["Back","Grey","CancelEditParam"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
 	}
 	else{
@@ -137,6 +138,18 @@ function create_edit_param(lay)
 }
 
 
+/// Determines if a parameter is being editted
+function editting_param()
+{
+	let ep = inter.edit_param;
+	if(ep.i == undefined) return false;
+	
+	let par = model.param[inter.edit_param.i];
+	if(par.dist_mat || par.iden_mat || par.den_vec) return false;
+	return true;
+}
+
+
 /// Determines if relative density
 function relative_den(name)
 {
@@ -148,10 +161,13 @@ function relative_den(name)
 /// Plots vector/matrix to allow for values to be editted			
 function add_create_edit_param_buts(lay)
 {
-	let eparam = inter.edit_param;
-	let i = eparam.i;
+	let ep = inter.edit_param;
+	
+	let i = ep.i;
 
-	let par = eparam.par_st; if(par == undefined) par = model.param[i];
+	let par = ep.par_st; if(par == undefined) par = model.param[i];
+	
+	let vari = par.variety; if(ep.vari_new != undefined) vari = ep.vari_new;
 	
 	let action = "EditParamElement";
 		
@@ -194,16 +210,19 @@ function add_create_edit_param_buts(lay)
 	default: error(lay.op.type); error("option not recog"); break;
 	}
 	
-	if(eparam.too_big == true || par.dist_mat || par.iden_mat || par.den_vec){ 
+	let is_cov = is_covar(par);
+	
+	if(ep.too_big == true || par.dist_mat || par.iden_mat || par.den_vec){ 
 		ele_type = "TooBigElement"; action = undefined;
 	}
 	
-	let value = eparam.value;
+	let value = ep.value;
 	
-	let list = eparam.list;
+	let list = ep.list;
+	if(ep.list_shrink != undefined) list = ep.list_shrink;
 	
 	let dep = par.dep;
-	let ndep = par.ndep_cont;
+	let ndep = get_ndep_cont(par,vari); 
 	
 	let si_mar = 1;
 	let fo_mar = get_font(si_mar);
@@ -233,6 +252,7 @@ function add_create_edit_param_buts(lay)
 	if(ndep == 2){                             // Case of matrix	 
 		let ch = 0;
 		let longest;
+
 		for(let j = 0; j < list[0].length; j++){
 			for(let i = 0; i < list[1].length; i++){
 				let va = value[j][i];
@@ -259,7 +279,7 @@ function add_create_edit_param_buts(lay)
 		
 		let dx = w_dep[1];
 		if(welemax > dx) dx = welemax;
-  	if(dx < 5) dx = 5;
+		if(dx < 5) dx = 5;
 		
 		let cx = 2;
 		
@@ -279,9 +299,9 @@ function add_create_edit_param_buts(lay)
 		let out_dx = dx*list[1].length+2*mar;
 		let out_dy = dy_table_param*list[0].length+2*mar;
 		
-		if(eparam.too_big == true){
-			if(eparam.shrunk[1]) out_dx += 2; 
-			if(eparam.shrunk[0]) out_dy += dy_table_param;
+		if(ep.too_big == true){
+			if(ep.shrunk[1]) out_dx += 2; 
+			if(ep.shrunk[0]) out_dy += dy_table_param;
 		}
 		
 		cx = 2;
@@ -302,18 +322,18 @@ function add_create_edit_param_buts(lay)
 				}
 				else{
 					let sym2 = sym; if(i == j) sym2 = false;
-					lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:ele_type, font:fo_table, i:i, pindex:pindex, sym:sym2, ac:action});
+					lay.add_button({te:val, x:cx, y:cy, dx:dx, dy:dy_table_param, type:ele_type, font:fo_table, i:i, pindex:pindex, is_cov:is_cov, sym:sym2, ac:action});
 				}
 				cx += dx;
 			}
 			
-			if(eparam.too_big == true && eparam.shrunk[1]){
+			if(ep.too_big == true && ep.shrunk[1]){
 				lay.add_button({te:"...", x:cx, y:cy, dx:2, dy:dy_table_param, type:"Text", si:si_mar, font:fo_mar, col:mar_col});
 			}
 			cy += dy_table_param;
 		}
 		
-		if(eparam.too_big == true && eparam.shrunk[0]){
+		if(ep.too_big == true && ep.shrunk[0]){
 			let cx = 2+w_dep[0]+gap;
 			for(let i = 0; i < list[1].length; i++){
 				lay.add_button({te:"⋮", x:cx, y:cy, dx:2, dy:dy_table_param, type:"RightText", si:si_mar, font:fo_mar, col:mar_col});
@@ -325,6 +345,26 @@ function add_create_edit_param_buts(lay)
 		let dim = get_dimensions(value);
 		let ele_list = get_element_list(value,dim);
 	
+		let out_dx = dx_table_param+2*mar;
+		let out_dy = ele_list.length*dy_table_param+2*mar;
+		
+		let too_big_gap=[]
+		if(ep.too_big == true){
+			out_dy += dy_table_param;
+		
+			for(let k = 0; k < ele_list.length-1; k++){
+				let el1 = ele_list[k];
+				let el2 = ele_list[k+1];
+				for(let j = 0; j < el1.length; j++){
+					if(ep.shrunk[j] && el2[j] < el1[j]){
+						too_big_gap[k] = true; 
+						out_dy += dy_table_param;
+						break;
+					}
+				}
+			}
+		}
+			
 		let cx = 2;
 		for(let j = 0; j < ndep; j++){
 			lay.add_button({te:dep[j], x:cx, y:cy, dx:w_dep[j], dy:dy_table_param, type:"Text", si:si_mar, font:fo_head, col:mar_col});
@@ -332,13 +372,11 @@ function add_create_edit_param_buts(lay)
 		} 
 		cy += dy_table_param;
 			
-		let out_dx = dx_table_param+2*mar;
-		let out_dy = ele_list.length*dy_table_param+2*mar;
-		
-		if(eparam.too_big == true) out_dy += dy_table_param;
-		
 		lay.add_button({x:cx+gap-mar, y:cy-mar, dx:out_dx, dy:out_dy, type:"Outline", col:BLACK});
 		
+		let cx_dots = 2+gap;
+		for(let j = 0; j < ndep; j++) cx_dots += w_dep[j];
+			
 		for(let k = 0; k < ele_list.length; k++){
 			let cx = 2;
 			for(let j = 0; j < ndep; j++){
@@ -356,12 +394,15 @@ function add_create_edit_param_buts(lay)
 			lay.add_button({te:val, x:cx, y:cy, dx:dx_table_param, dy:dy_table_param, type:ele_type, font:fo_table, i:i, pindex:pindex, ac:action});
 			
 			cy += dy_table_param;
+			
+			if(too_big_gap[k]){
+				lay.add_button({te:"⋮", x:cx_dots+dx_table_param/2-0.3, y:cy, dx:dx_table_param, dy:dy_table_param, type:ele_type, font:fo_table, i:i, ac:action});
+				cy += dy_table_param;
+			}
 		}
 		
-		if(eparam.too_big == true){
-			let cx = 2+gap;
-			for(let j = 0; j < ndep; j++) cx += w_dep[j];
-			lay.add_button({te:"⋮", x:cx+dx_table_param/2-0.3, y:cy, dx:dx_table_param, dy:dy_table_param, type:ele_type, font:fo_table, i:i, ac:action});
+		if(ep.too_big == true){
+			lay.add_button({te:"⋮", x:cx_dots+dx_table_param/2-0.3, y:cy, dx:dx_table_param, dy:dy_table_param, type:ele_type, font:fo_table, i:i, ac:action});
 		}
 	}
 	
@@ -372,7 +413,7 @@ function add_create_edit_param_buts(lay)
 /// Determines if a parameter is a covariance matrix
 function is_symmetric(par)
 {
-	if(is_matrix(par) && begin(par.name,"Ω")) return true;
+	if(is_matrix(par) && is_covar(par)) return true;
 	return false;
 }
 
@@ -382,18 +423,19 @@ function load_tensor(ep,source)
 {
 	let par = model.param[ep.i];
 	
+	let dim = get_dimensions(ep.value);
+	
 	let dep = par.dep;
-	let ndep = par.ndep_cont;
+	let ndep = dim.length;
 	
-	let list = par.list;
-	if(ep.too_big){
-		ep.list = copy(list);
-		ep.value = par_find_template(list);
-	}
+	let list = [];
+	for(let d = 0; d < ndep; d++) list.push(par.list[d]);
+	
+	ep.list = list;
+	ep.value = par_find_template(list,par.ndep_cont);
+	
 	let ep_value = ep.value;
-	
-	set_zero(ep_value);
-	
+
 	let tab = source.table;
 
 	let hash_list = calc_hash_list(list);
@@ -417,40 +459,41 @@ function load_tensor(ep,source)
 		else{
 			if(isNaN(va)) alertp("Problem loading. The value '"+va+"' on line "+(r+1)+" is not a number");
 			let val = Number(va);
+			
+			let el = get_element(ep_value,ind);
+			if(el != undefined) ep.multi_set = true;
 			set_element(ep_value,ind,val);
 		}
 	}
 	
+	ep.set_zero = set_zero(ep_value);
+	
 	if(ep.too_big){ 
-		if(ep.type == "weight"){
-			par.factor_weight = copy(ep_value);
-			reduce_size(ep,par);
-			ep.weight_desc = get_weight_desc(par);
-			par.weight_desc = get_weight_desc(par);
-		}			
-		else{
-			par.value = copy(ep_value);
-			par.set = true;
-
-			reduce_size(ep,par);
-		
-			ep.value_desc = get_value_desc(par);
-			par.value_desc = get_value_desc(par);
-		}
+		too_big_value_store = ep.value;
+		reduce_size(ep,par);
 	}
-	if(ep.type != "weight") ep.set = par.set;
+	
+	//if(ep.type != "weight") ep.set = par.set;
+	if(ep.type != "weight") ep.set = true;
 }
 
 
-/// Sets all values to zero
+/// Sets any undefined values to zero
 function set_zero(value)
 {
 	let dim = get_dimensions(value);
 	let ele_list = get_element_list(value,dim);
 
+	let fl = false;
 	for(let k = 0; k < ele_list.length; k++){
-		set_element(value,ele_list[k],0);
+		let el = get_element(value,ele_list[k]);
+		if(el == undefined){
+			set_element(value,ele_list[k],0);
+			fl = true;
+		}
 	}
+	
+	return fl;
 }
 
 
@@ -459,23 +502,23 @@ function load_reparam(ep,source)
 {
 	let par = ep.par_st;
 	
+	let dim = get_dimensions(ep.value);
+	
 	let dep = par.dep;
-	let ndep = par.ndep_cont;
+	let ndep = dim.length;
 	
-	let list = par.list;
+	let list = [];
+	for(let d = 0; d < ndep; d++) list.push(par.list[d]);
 	
-	if(ep.too_big){
-		ep.list = copy(list);
-		ep.value = par_find_template(list);
-	}
+	ep.list = list;
+	ep.value = par_find_template(list,par.ndep_cont);
 	
 	let ep_value = ep.value;
 	let tab = source.table;
 	
-	set_zero(ep_value);
-	
 	let hash_list = calc_hash_list(list);
 	
+	ep.multi_set = false;
 	for(let r = 0; r < tab.nrow; r++){
 		let ind=[];
 		for(let i = 0; i < ndep; i++){
@@ -491,19 +534,20 @@ function load_reparam(ep,source)
 		
 		let val = tab.ele[r][ndep];
 		if(!isNaN(val)) val = Number(val);
+		
+		let el = get_element(ep_value,ind);
+		if(el != undefined) ep.multi_set = true;
 		set_element(ep_value,ind,val);
 	}
 	
-	if(ep.too_big){ 
-		par.value = copy(ep_value);
-		reduce_size(ep,par);
-		par.set = true;
-		get_defrep_param_list(par);
+	ep.set_zero = set_zero(ep_value);
 	
-		ep.value_desc = get_value_desc(par);
-		par.value_desc = get_value_desc(par);
+	if(ep.too_big){ 
+		too_big_value_store = ep.value;
+		reduce_size(ep,par);
 	}
-	ep.set = par.set;
+	
+	ep.set = true;
 }
 
 
@@ -536,8 +580,8 @@ function load_priorsplit(ep,source,dist)
 	
 	if(ep.too_big){
 		ep.list = copy(list);
-		ep.value = par_find_template(list);
-		ep.prior_split = par_find_template(list);
+		ep.value = par_find_template(list,par.ndep_cont);
+		ep.prior_split = par_find_template(list,par.ndep_cont);
 	}
 	
 	let prior_split = ep.prior_split;
@@ -571,27 +615,10 @@ function load_priorsplit(ep,source,dist)
 	}
 	
 	if(ep.too_big){ 
-		let dim = get_dimensions(prior_split);
-		let ele_list = get_element_list(prior_split,dim);
-
-		for(let k = 0; k < ele_list.length; k++){
-			let el = get_element(prior_split,ele_list[k]);
-			if(el == undefined){
-				let te = "Not all elements in the tensor could be loaded (e.g. '";
-				for(let i = 0; i < ndep; i++){
-					if(i != 0) te += ", ";
-					te += "'"+list[i][ele_list[k][i]]+"'";
-				}
-				te += "). For split priors all elements must be specified.";
-				alertp(te);
-			}
-		}
-	
-		par.prior_split = copy(prior_split);
-		par.prior_split_set = true;
+		too_big_prior_split_store = ep.prior_split;
+		too_big_value_store = ep.value;
+		ep.prior_split = undefined;
 		reduce_size(ep,par);
-		ep.prior_split_desc = get_prior_split_desc(par);
-		par.prior_split_desc = get_prior_split_desc(par);
 	}
 	ep.prior_split_set = par.prior_split_set;
 }
@@ -636,24 +663,15 @@ function par_find_list(par,mod)
 		}
 	}
 	
-	// In the case of the distance matrix truncates if too large
-	if(par.dist_mat || par.iden_mat){
-		let list_max = Math.floor(Math.sqrt(ELEMENT_MAX))+1;
-		
-		for(let k = list_max; k < list[0].length; k++){
-			list[0][k] = undefined;
-			list[1][k] = undefined;
-		}		
+	/*
+	if(par.too_big && (par.dist_mat || par.iden_mat || par.den_vec)){  // If too big then restricts the size of the list
+		for(let i = 0; i < ndep; i++){	
+			let list_max = par.list_shrink[i];
+			for(let k = list_max; k < list[i].length; k++) list[i][k] = undefined;	
+		}
 	}
-	
-	// In the case of the distance matrix truncates if too large
-	if(par.dist_mat || par.iden_mat || par.den_vec){
-		let list_max = ELEMENT_MAX;
-		for(let k = list_max; k < list[0].length; k++){
-			list[0][k] = undefined;
-		}		
-	}
-	
+	*/
+
 	return list;
 }
 
@@ -704,7 +722,7 @@ function check_param_valid(type)
 {
 	for(let i = 0; i < model.param.length; i++){
 		let par = model.param[i];
-			
+
 		let warn = check_reserved_name(par.name,"par_allow");
 		if(warn != ""){
 			add_warning({mess:"Parameter name error", mess2:warn, warn_type:"ParamPage", siminf:type, name:par.name});
@@ -714,6 +732,15 @@ function check_param_valid(type)
 			if(par.time_dep){
 				if(par.spline.spline_radio.value != "Square"){
 					add_warning({mess:"Reparameterisation error", mess2:"A square spline must be used for time-varying reparameterised parameter "+par.full_name+".", warn_type:"ReparamSquareSpline", name:par.name});
+				}
+				
+				if(par.reparam_eqn_on){				
+					let eqn = create_equation(par.reparam_eqn,"reparam_eqn");
+					for(let j = 0; j < eqn.param.length; j++){
+						if(eqn.param[j].time_dep){
+							add_warning({mess:"Reparameterisation error", mess2:"Parameter '"+par.full_name+"' cannot depend on time-varying parameter '"+eqn.param[j].full_name+"'.", warn_type:"RepEqValue", name:par.name});			
+						}
+					}
 				}
 			}
 		}
@@ -754,7 +781,7 @@ function par_in_view(name)
 /// Determines if a value needs to be set for a parameter
 function sim_value_required(par)
 {
-	if(par.variety != "const" && par.variety != "reparam" &&  par.variety != "define"){
+	if(par.variety != "const" && par.variety != "reparam" && par.variety != "define" && par.variety != "dynamic"){
 		if(param_needed(par,"sim")) return true;
 	}
 	
@@ -805,7 +832,7 @@ function sim_param_post_mean()
 						if(fl == false){
 							let co_list = generate_co_list(par.list);
 							
-							par.value = par_find_template(par.list);
+							par.value = par_find_template(par.list,par.ndep_cont);
 							for(let k = 0; k < co_list.length; k++){
 								let ind = co_list[k].index;
 								
@@ -869,6 +896,22 @@ function set_ndep_cont(par)
 	if(par.variety == "define" && par.time_dep){
 		if(par.dep.length > 0 && par.dep[par.dep.length-1] == "t"){
 			par.ndep_cont--;
+		}
+	}
+}
+
+
+/// Displays any warning after parameter information has been loaded
+function load_param_warning(ep)
+{
+	if(ep.multi_set){
+		alert_help("Parameter warning!","Parameter values set multiple times (the last allocation is the one used).");
+		ep.multi_set = false;
+	}
+	else{
+		if(ep.set_zero){
+			alert_help("Parameter warning!","Unset parameter values set to zero.");
+			ep.set_zero = false;
 		}
 	}
 }

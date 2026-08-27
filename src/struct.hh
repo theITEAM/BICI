@@ -109,54 +109,17 @@ struct GradRef {                   // References population gradient
 	unsigned index;                  // References a population in Markov equation
 };
 
-struct PopAffect {                 // Lists all populations which affect DIV_VALUE_LINEAR_AFFECT
-	unsigned int po;                 // Population number
-	vector <GradRef> pop_grad_ref;   // References population in Markov equation 
-};
-
-struct SimSpeed {                  // Stores quantities to speed up simulation
-	vector <double> val_fast;
-	vector < vector <double> > pop_grad;
-};
 
 struct EqItem {                    // An individual operation in a calculation
 	EqItem(){ num = UNSET;}
 	
 	EqItemType type;
+	unsigned long long num;
+};
+
+struct PreEqItem {                    // An individual operation in a calculation
+	PreEqItemType type;
 	unsigned int num;
-};
-
-struct LinearFormInit {
- 	unsigned int m;                  // Reference number
-	unsigned int e;                  // Equation number
-};
-
-struct LinearFormItem {            // Stores an item in LinearForm
-	unsigned int m;                  // Reference number
-	unsigned int e;                  // Equation number
-	unsigned int sum_e_ref;          // References which sum e
-	EqItem factor_precalc;           // Factor which pre-calculates equation
-	EqItem no_pop_precalc;           // Non-population part
-};
-	
-struct LinearForm {                // Stores information for mbp speedup
-	bool factor_nopop_only;          // Determines if only the factor is affected by the proposal
-	bool factor_same;                // Determines if factor is the same for all equations
-	bool nopop_same;                 // Determines if non-population part same for all equations
-	vector <LinearFormItem> list;    // Transitions which can be calculated fast
-	vector <unsigned int> sum_e;     // The equations for the sums 
-	vector <PopAffect> pop_affect;   // References populations which affect
-	HashSimp hash_po;
-};
-
-struct MBPfast {
-	vector <unsigned int> calc_tr;   // Transitions which must be calculated
-	LinearForm lin_form;
-};
-
-struct SimLinearSpeedup {          // Information for simulation speedup 
-	vector <unsigned int> calc;      // List of equations which have not been sped up
-	LinearForm lin_form;             // Stores the linear form
 };
 
 struct AffectMap {                 // Provides information about how a proposal affects quantities
@@ -165,19 +128,14 @@ struct AffectMap {                 // Provides information about how a proposal 
 	vector < vector <bool> > fe_map; // Fixed effects
 };
 
-struct EqnNoPop {                  // Information for DIV_VALUE_NOPOP_AFFECT / MARKOV_POP_NOPOP_AFFECT
-	vector <unsigned int> list;      // Stores list of Markov equantions / transitions
-};
-
 struct AffectLike {                // Determines how a parameter affects likelihoods
+	AffectLike(){ num = UNSET; num2 = UNSET;}
 	AffectType type;                 // The type of likelihood being affected
 	unsigned int num;                // The reference number
 	unsigned int num2;               // Another reference number
 	vector <bool> map;               // Maps all time elements which are affected
 	vector <unsigned int> list;      // Lists all map which is true
 	unsigned int order_num;          // Used to order terms by list priority
-	LinearForm lin_form;             // Information for DIV_VALUE_LINEAR_AFFECT / MARKOV_POP_LINEAR_AFFECT 
-	EqnNoPop eq_nopop;               // Information for DIV_VALUE_NOPOP_AFFECT / MARKOV_POP_NOPOP_AFFECT 
 };
 
 struct Listie {                    // Stores a list with equation number
@@ -185,10 +143,18 @@ struct Listie {                    // Stores a list with equation number
 	unsigned int e;
 };
 
+/*
 struct AffectME {                  // Determines if affects a Markov equation
 	unsigned int p;                  // Species
 	unsigned int e;                  // markov equation number 
 };
+
+struct AffectListME {
+	unsigned int p;                  // Species
+	unsigned int e;                  // markov equation number 
+	vector <bool> map_time;          // Which times are affected
+};
+*/
 
 struct PopulationTerm {            // A term in the population
 	unsigned int c;                  // Compartment
@@ -200,14 +166,16 @@ struct PopRef {                    // References a population
 	unsigned int index;              // The index
 };
 
-struct PopMarkovEqnRef {           // References a Markov equation from a population
+struct MarkovEqnRefList {          // References a Markov equation from a population
 	unsigned int p;                  // The species
-	unsigned int e;                  // The Markov eqn number
+	vector <unsigned int> list;      // The Markov eqn number
+	HashSimp hash;
 };
 
 struct PopTransRef {               // References transition from a population
 	unsigned int p;                  // The species
-	unsigned int tr;                 // The transition number
+	vector <unsigned int> tr_list;   // The transition number
+	HashSimp hash;
 };
 
 struct Poss {                      // A possiblity used for sampling
@@ -218,11 +186,6 @@ struct Poss {                      // A possiblity used for sampling
 struct IndPop {
 	unsigned int c;                  // The compartment for individual
 	vector <PopRef> pop_ref;         // Stores where on the population index
-};
-
-struct PopChange {                 // Stores the change in population
-	unsigned int po;                 // The population
-	double num;                      // The change
 };
 
 struct PopDef {                    // Used to define the population
@@ -258,15 +221,23 @@ struct Population {                // Stores a population (used in an equation)
 	vector <unsigned int> ind_eff_mult; // Individual effect which multiplies weight (if appropriate) 
 	vector <unsigned int> fix_eff_mult; // Any fixed effects which modify weight
 	vector <PopulationTerm> term;    // The global compartments which contribute to the popualtion
-	vector <PopMarkovEqnRef> markov_eqn_ref;// References Markov equations which include population
+	vector <MarkovEqnRefList> markov_eqn_ref;// References Markov equations which include population
 	vector <PopTransRef> trans_ref;  // References transitions which include population
 	vector <PopCombRef> popcomb_ref; // References population combination  
+	vector <PopCombRef> popcomb_ref_derive; // References population combination for derived quantities
 	HashSimp hash_spline_update;
 };
 
-struct PopComb {                   // Stores a population contribution
+struct PopCombEle {                // Stores a population contribution
 	unsigned int po;                 // The population
 	unsigned int wref;               // References the weight
+};
+
+struct PopComb {                   // Stores a population contribution
+	string name;                     // The name of the population combination
+	vector <PopCombEle> ele;         // Elements of the population combination
+	unsigned int p;                  // The species
+	vector <MarkovEqnRefList> markov_eqn_ref;// References Markov equations
 };
 
 struct PopCombTemp {               // Temporarily stores information about popcomb
@@ -285,6 +256,12 @@ struct PopCombWeight {             // Stores a weight used in a popcomb
 	EqItem it;                       // Item which gives the weight
 	vector <PopCombIn> pcref;        // References which popcomb the weight is in
 };
+
+struct PopcombWStore {             // Used to store popcombw values
+	unsigned int i;
+	double value;
+};
+
 
 struct ParamProp {                 // Stores properties of a parameter
 	string name;                     // The name (without the 
@@ -321,9 +298,11 @@ struct ElementRef {                // Stores an element reference
 };
 
 struct Spline {                    // Stores an individual spline
-	string name;                     // Name of the spline
+	//string name;                     // Name of the spline
 	SplineType type;                 // Type of spline (linear, square, cubic-pos, cubic) 	
 	bool constant;                   // Determines if spline is constant
+	bool dynamic;                    // Determines if comes from a dynamic parameter
+	vector <unsigned int> dynamic_precalc; // Lists all precalc which need updating when dynamic value added
 	unsigned int th;                 // The parameter
 	unsigned int index;              // The index giving the dependency
 	vector <ElementRef> param_ref;   // References the parameters along the spline (or constant)
@@ -331,18 +310,14 @@ struct Spline {                    // Stores an individual spline
 	vector <SplineDiv> div;          // A division within the spline
 	vector <CubicDiv> cubic_div;     // A division within a cubic spline
 	vector <double> const_val;       // If spline is constant then works out what value it should have
-	vector <PopMarkovEqnRef> markov_eqn_ref;// References Markov equations which include spline
-	HashSimp hash_markov_eqn_ref;
+	vector <MarkovEqnRefList> markov_eqn_ref;// References Markov equations which include spline
 	vector <PopTransRef> trans_ref;  // References transitions which include spline
-	HashSimp hash_trans_ref;
 };
 
 struct CompPos {                   // Used to go through comparmtental possibilities
 	vector <unsigned int> list;      // Stores a list of compartmental possibilities
-	unsigned int index;              // Stores which of these possibilities currently looked at
 	unsigned int p;                  // The species
 	unsigned int cl;                 // The classification
-	bool found;                      // Determines if found or not
 }; 
 
 struct DepInfo {                   // Stores dependency info froman equation
@@ -465,10 +440,11 @@ struct Dependency {                // A dependency in the model
 };
 
 struct Prior {                     // Defines a parameter prior
-	Prior(){ error = ""; type = UNSET_PR;}
+	Prior(){ error = ""; type = UNSET_PR; latin_sample = false;}
 	string name;                     // Stores text name
 	PriorPos type;                   // The type of prior
 	vector <EquationInfo> dist_param;// A list of equations to specify prior distribution parameters
+	bool latin_sample;               // Determines if a constant distribution for Latin hypercube sampling
 	string in;                       // Descript of what prior is in (e.g. name of parameter)
 	string error;                    // Stores error message if declared incorrectly
 };
@@ -479,40 +455,53 @@ struct IEGref {                    // References and individual effect group
 };
 
 
-struct PrecalcInfo {                  // Specified which i and time 
-	unsigned int i;
-	unsigned int tlist;                 // This references which list_time to use  
+struct PrecalcInfo {               // Specified which i and time 
+	unsigned int q;
+	unsigned int tlist;              // This references which list_time to use  
 };
 
-struct SpecPrecalc {                  // Specifies which elements in precalc_ref need to be evaluated
-	vector <PrecalcInfo> info;          // Provides information about which i need updating
+struct SpecPrecalc {               // Specifies which elements in precalc_ref need to be evaluated
+	vector <PrecalcInfo> info;       // Provides information about which i need updating
 	vector < vector <unsigned int > > list_time; // Provides list of times
 	HashSimp hash_time;
 	HashSimp hash;
 };
 
 struct ParamVecEle {               // Stores information about an element in param vec
-	string name;                     // The name of the parameter
+	//string name;                     // The name of the parameter
 	unsigned int th;                 // The number of the parameter
 	unsigned int index;              // The index where to find 
 	unsigned int prior_ref;          // References the prior
 	ParamVariety variety;            // The parameter variety (copied from param)
 	bool reparam_time_dep;           // Set if the parameter is a reparameterisation and time dependent
 	bool ppc_resample;               // Sets if parameter gets resampled for ppc
-	bool prop_pos;                   // Set if it is possible to do a proposal on this parameter
+	bool prop_pos;                   // Set if it is possible for a proposal on this parameter
+	bool latin_sample;               // Determines if latin hypercube is used
+	bool strictly_positive;          // Determines if value is strictly positive
 	vector <AffectLike> affect_like; // Determines how parameter affects likelihoods
 	
-	SpecPrecalc spec_precalc_before; // Precalculation which need to be done before parameter evaluated
-	SpecPrecalc set_param_spec_precalc; // Sets the parameter
+	vector <unsigned int> pop_affect;     // Sets which popcomb are affected
+	vector <unsigned int> popcomb_affect; // Sets which popcomb are affected
+	vector <unsigned int> popcombw_affect;// Sets which popcombw are affected
+	
+	SpecPrecalc spec_precalc_before; // Precalculation which need to be done before parameter evaluated (when reparam)
+	SpecPrecalc set_param_spec_precalc; // Sets the parameter/spline values within precalc
 	SpecPrecalc spec_precalc_after;  // Precalculation which need to be done after parameter
 	
 	unsigned int spline_ref;         // References the spline the parameter is on 
 	unsigned int reparam_spl_ti;     // If on a reparameterised spline this gives the time
+	unsigned int reparam_spl_ti_end; // If on a reparameterised spline this gives the end time
+	unsigned int ti_min, ti_max;     // Shows the extent over which parameter affects time
 	unsigned int ref;                // Reference param_vec_prop
 };
 
 struct PopTimeRef {                // References a population (and also a time, if appropriate)
 	unsigned int po;                 // Population
+	unsigned int ti;                 // Gets time population is evaluated
+};
+
+struct PopcombTimeRef {            // References a population (and also a time, if appropriate)
+	unsigned int pc;                 // Population combination
 	unsigned int ti;                 // Gets time population is evaluated
 };
 
@@ -568,6 +557,7 @@ struct Details {                   // Stores details about simulation/inference/
 	unsigned int seed;               // Seed used to initialise RNG
 	unsigned int nchain;             // The number of chains / particles
 	unsigned int num_per_core;       // The number of samples / chains / particles per core
+	unsigned int chain_nsiminit;     // The number of simulations used to initialise a chain
 	bool param_only;                 // Use simulation model instead of inference model
 	bool diagnostics_on;             // Determines if MCMC diagnostics printed
 	Optimise optimise;               // Determines how optimised (memory or performance)
@@ -693,6 +683,7 @@ struct Compartment {               // Information about a compartment
 	CompInfected infected;           // Determines if compartment is infected or not (or unset)
 	vector <unsigned int> tr_leave;  // Transitions leaving this compartment
 	vector <unsigned int> tr_enter;  // Transitions entering this compartment
+	unsigned int dist_grid_ref;      // Reference which dist grid the compartment is in
 };
 
 struct ParamElement {              // Stores information about a parameter element
@@ -718,6 +709,18 @@ struct Constant {                  // Stores all the constants in the model
 	unsigned int add(double val);
 };	
 
+struct DynamicInfo {               // Stores any dynamic-sim information
+	DynamicType type;                // Determines the type of dynamic update
+	double thresh;                   // The thresholds
+	double threshmin;                
+	double threshmax;
+};
+
+struct PrTimeRange {        // Gets the time range for a parameter reference
+	unsigned int ti_min;
+	unsigned int ti_max;
+};
+
 struct Param {                     // Stores a model parameter
 	Param(Constant &constant);      
 	
@@ -725,8 +728,12 @@ struct Param {                     // Stores a model parameter
 	string name;                     // The name after removing dependencies
 	vector <Dependency> dep;         // Dependency for parameter
 	bool time_dep;                   // Time dependency
+	bool reparam_time_dep;           // Set if the parameter is a reparameterisation and time dependent
+	//vector <unsigned int> reparam_time_precalc_affect; // Stores which precalc are affected (used for constants in reparam)
 	SplineInfo spline_info;          // Stores information about spline (if used)
-	SplineOut spline_out;                 // Determines if the spline is restricted
+	vector <PrTimeRange> spline_segment; // Stores the time range for segments of the spline
+	SplineOut spline_out;            // Determines if the spline is restricted
+	unsigned int spline_ref;         // References the first spline number
 	bool sim_sample;                 // Set to true if value sampled from the distribution (simulation)
 	ParamVariety variety;            // Determines the variety of parameter	
 	unsigned int N;                  // The number of elements in the parameter
@@ -754,6 +761,10 @@ struct Param {                     // Stores a model parameter
 	bool cat_factor_weight_on;       // Determines if there is a weight factor
 	
 	vector <IEGref> ieg_ref;         // References if parameter is for cov var in ind effect group
+	
+	//bool dynamic;                    // Determines if dynamic
+	DynamicInfo dynamic_info;        // Stores any dynamic-sim information
+	EquationInfo dynamic_eqn;        // Used to store eqn for dynamic update
 	
 	unsigned int get_param_vec(unsigned int i) const; 
 	const vector <ParamRef>& get_child(unsigned int i) const;
@@ -791,7 +802,8 @@ struct CompGlobal {                // A global compartment (combines all classif
 	unsigned int erlang_c_start;     // References the c compartment at the start of erlang
 	vector <unsigned int> cla_comp;  // References the classification compartment
 	vector <PopRef> pop_ref;         // References population and point on list
-	vector <unsigned int> pop_ref_simp;       // References just population 
+	vector <PopRef> pop_ref_derive;  // References population and point on list for derived populations
+	vector <unsigned int> pop_ref_simp;       // References population compartment belongs to
 	vector <unsigned int> tr_enter;           // Transitions entering compartment
 	vector <unsigned int> tr_leave;           // All the transitions leaving compartment 
 	vector <unsigned int> tr_leave_markov;    // All Markov transitions leaving compartment 
@@ -859,7 +871,7 @@ struct TransGlobal {               // A global transition (combines all classifi
 	unsigned int tr;                 // The transition number in the classifciation
 	unsigned int i;                  // The initial compartment (set to UNSET for source)
 	unsigned int f;                  // The final compartment (set to UNSET for sink)
-	TransInfection infection;        // Under trans-tree provides informatransition is associates with infection
+	TransInfection infection;        // Under trans-tree provides information about infection
 	bool erlang_hidden;              // Determines if hidden Erlang transitions
 	TransType type;                  // The type of the transition
 	EventType ev_type;               // NM_TRANS_EV or M_TRANS_EV
@@ -936,6 +948,11 @@ struct GeneticProp {               // Used for local genetic proposals to mutati
 	unsigned int nac;                // Number of times proposal has been accepted
 };
 
+struct DistGrid {
+	bool on;                         // Determines if distgrid is on
+	vector < vector <double> > M;    // The minimum distance between squares
+};
+
 struct Classification {            // Stores details of a species classification
 	string name;                     // The name of the classification
 	vector <Compartment> comp;       // Stores details of compartments
@@ -945,6 +962,7 @@ struct Classification {            // Stores details of a species classification
 	unsigned int ntra;               // The number of transitions
 	string index;                    // The mathematical index used to represent different compartments
 	vector <Island> island;          // Compartments are split into "island" which are unconnected
+	DistGrid dist_grid;              // Used to estimate the minimum distance between two points (to speed up eqn)
 	
 	// Alternative sequences between two classications [ci][cf][seqnum]
 	// ci=C and cf=C are used to represent UNSET
@@ -967,7 +985,7 @@ struct InitCondValue {             // Sampled initial condition used in the stat
 	vector <unsigned int> N_focal_unobs;         // The numnber of unobserved individuals
 	vector < vector <unsigned int> > cnum_reduce;// Population in reduced compartments
  	vector < vector <double> > frac_focal;       // The fraction in other classifications
-	vector <double> frac_comb;                   // The fraction combing all non-focal compartments
+	vector <double> frac_comb;                   // The fraction combining all non-focal compartments
 
 	// Without focal classification
 	unsigned int N_total;            // Total number of individuals entering
@@ -1059,6 +1077,12 @@ struct ExtFactor {                 // Stores an extend factor
 	ExtFactor(){ value = UNSET, percent =false;}
 	double value;                    // The 
 	bool percent;                    // Determines if a percent
+};
+
+struct EventChange {               // Stores an event change (used in regenereate)
+	unsigned int i;
+	unsigned int c_before;
+	unsigned int c_after; 
 };
 
 struct Event {                     // A transition event
@@ -1180,8 +1204,8 @@ struct DivIndRef {                 // References an individual event on a Markov
 	unsigned int index;              // Index the event number
 };
 
-struct MarkovEqnDiv {              // Division in Markov timeline
-	double value;                    // The value of the equation for the division
+struct MEIndDiv {                  // Division storing individual information on Markov timeline
+	//double value;                    // The value of the equation for the division
 	double indfac_int;               // The integral of individual factors across div
 	vector <DivIndRef> ind_trans;    // The individuals which undergo transitions
 };
@@ -1194,8 +1218,12 @@ struct MarkovEqn {                 // Stores information about the Markov equati
 	vector <unsigned> source_tr_gl;  // Global transition for source (if applicable)
 	bool ind_variation;              // Set to true if there is individual variation
 	bool infection_trans;            // Determines if relates to an infection transition (used for trans tree likelihood)
+	bool infection_trans_output;     // Set if infection transition applied only at output (models without genetic data run faster)
 	vector <unsigned int> ind_eff_mult; // References an individual effect which multiplies equation
 	vector <unsigned int> fix_eff_mult; // References fixed effects whihc multiply equation
+	vector <unsigned int> calc_list_full; // Sequential vector over all calculation
+	vector <unsigned int> calc_list_nopop;// Sequential vector over all non-population part
+	bool update_nopop;               // Determines if updated is required when there is no change in population
 	bool always_recalc;              // Determines if always needs to be recalculated (else use param_change)
 	vector <bool> param_change;      // Determines if parameter changes as a function of time
 };
@@ -1205,12 +1233,15 @@ struct MarkovEqnVariation {        // Stores variation in Markov equations for a
 	vector <IndTransRef> ind_tra;    // The individual transtions associated with equation 
 	double dt;                       // The timestep used for divisions (set to UNSET for no time)
 	
+	vector <double> value_t;         // The value of the equation for the division
+	
 	// Used in simulation
 	double value;                    // The value
 	double indfac_sum;               // The sum of the potential individual effect acting on equation
 	
 	// Used in inference
-	vector <MarkovEqnDiv> div;       // Information for each time division
+	vector <MEIndDiv> div;       // Information for each time division
+	vector <double> reg_store;       // Used during simulation
 };
 
 struct EventData {                 // Stores individual data
@@ -1290,6 +1321,7 @@ struct SpeciesSimp {               // A simplified version of species to pass to
 	{
 		name = name_;
 		trans_tree = trans_tree_;
+		trans_tree_output = false;
 	}
 
 	string name;                     // The name of the species
@@ -1300,6 +1332,7 @@ struct SpeciesSimp {               // A simplified version of species to pass to
 	const vector <CompGlobal> &comp_gl; // The global compartments
 	const vector <TransGlobal> &tra_gl; // The global transition
 	bool trans_tree;                 // Determines if the transmission tree is turned on
+	bool trans_tree_output;          // Determines if only implmeneted on output
 };
 
 struct ParamTag {                  // Used to check tags on parameters specified correctly
@@ -1613,7 +1646,8 @@ struct GeneticDataValue {          // Stores state values for genetic data
 
 struct Particle {                  // Stores information from state
 	vector <double> param_val_prop;  // The parameter value (without const or reparam)
-	vector <double> param_val_tvreparam;  // The parameter value for time varying reparams
+	vector <double> param_val_tvreparam;           // The parameter value for time varying reparams
+	vector < vector <double> > param_val_dynamic;  // Stores values for dynamic parameters
 	vector <ParticleSpecies> species;// Species state data
 	
 	vector <DeriveOutput> dir_out;   // Derived outputs
@@ -1727,11 +1761,6 @@ struct LocalSampler {              // Local sampler (for population-based models
 	Sampler comp_ic;                 // The probability of sampling compartment to change IC
 	Sampler2D tr_samp;               // The transition sampler for add/rem single events
 	double win;                      // The window size used for update
-};
-
-struct PropSpeed {                 // Stores proposals speeds
-	unsigned int i;                  // The proposal number
-	double time_per_prop;            // The time of a single proposal
 };
 
 struct IndEffGroupRef {            // References ind eff group element (for ie covar propoasls)
@@ -2001,6 +2030,8 @@ struct TerminalInfo {              // Stores info about the terminal state of ch
 	unsigned int n_start;
 	vector <double> av;              // The sum of parameter values 
 	vector < vector <double> > av2;  // The sum of param*param 
+	vector <double> log_av;              // The sum of parameter values 
+	vector < vector <double> > log_av2;  // The sum of param*param 
 };	
 				
 struct Calculation {               // Stores a calculation (made up of operations)
@@ -2008,9 +2039,9 @@ struct Calculation {               // Stores a calculation (made up of operation
 	EqItemType op;                   // The operator used in the calculation
 };
 
-
 struct PreCalc {                   // Stores a precalculation (made up of operations)
-	vector <EqItem> item;            // Items used to make the calculation
+	unsigned long long iref;         // References position on precalc
+	vector <PreEqItem> pre_item;     // Items used to make the calculation
 	EqItemType op;                   // The operator used in the calculation
 	bool time_dep;
 };
@@ -2045,9 +2076,17 @@ struct PV {                        // Stores parameter values along with precalc
 	void check();
 };
 
+struct DynamicParamUpdate {
+	unsigned int th;          // The parameter being updated
+	unsigned int i;           // The knot time
+	unsigned int ti;          // The time range
+	unsigned int ti_end;
+};
+
 struct SpecPrecalcTime {           // Stores information about 
 	vector <unsigned int> pv;        // The parameter vector elements
-	SpecPrecalc spec_precalc;        // Used to update precalc
+	vector <DynamicParamUpdate> dynamic_param_update; // Any dynamic parameters which need updating
+	SpecPrecalc spec_precalc;        // Used to update precalc (no hash)
 };
 
 struct CubicSpline {               // Stores information about a segment in a cubic spline
@@ -2168,6 +2207,11 @@ struct PopRefFromPo {                      // Used to get pop_ref from populatio
 	unsigned int po;                         // Population number
 };
 
+struct IntegralInfo {                      // Stores integral information
+	unsigned int ti_min;
+	unsigned int ti_max;
+};
+
 struct Integral {                          // Stores the calculation within an integral
 	vector <Calculation> calc;    
 	unsigned int ti_min;
@@ -2179,6 +2223,7 @@ struct SumInfo {                           // Stores information about a sum
 	string comp_max;                         // The compartment over which distance is measured
 	
 	double distmax;                          // The distance over which the sum acts
+	unsigned int region_ref;                 // Reference region in model
 };
 
 struct PopCombCalc                         // Used to describe a population calculation
@@ -2195,29 +2240,24 @@ struct LinearCalculation                   // Stores a linear calculation
 	HashSimp hash_simp;                      // Simple hash table for popcombs
 };
 
+struct PopGradRef {                        // Stores a population gradient reference
+	unsigned int wref;                       // The weight within the popcombw
+	EqItem popcomb_grad;
+};
+
 struct Linearise {                         // Information about linearising an equation 
 	bool on;                                 // Determines if linearisation is possible
 	
-	//vector <Calculation> no_pop_calc_store;  // Stores no pop calculation
+	//vector <unsigned int> popcomb_list;      // Lists the population combinations
 	
-	//vector < vector <Calculation> > popcomb_grad_calc_store;  // Stores no pop calculation
-	
-	vector <unsigned int> popcomb_list;        // Lists the population combinations
-	
-	//vector <Calculation> factor_calc;        // Quantities multiplied together for the factor 
-
 	EqItem no_pop_precalc;                   // Stores no_pop precalc number 
 	
-	vector <EqItem> popcomb_grad_precalc;        // Stores calculation precalc for gradients
-	
-	//EqItem factor_precalc;                   // Quantities multiplied together for the factor 
-	
-	//bool no_pop_calc_time_dep;               // Determines if time dependent
-	//bool factor_time_dep;                    // Set if the factor is time dependent
-	//bool pop_grad_time_dep;                  // Set if population gradient is dependent
+	vector <EqItem> popcomb_grad_precalc;    // Stores calculation precalc for gradients
 	
 	vector < vector <PopRefFromPo> > pop_ref_from_po; // Gets pop_ref from population	
-		
+	
+	vector < vector <PopGradRef> > pop_grad_ref; // Stores information so pop_grad can be calculated
+	
 	bool multi_source;                       // Detemines if comes from multiple sources (used in transmission trees)
 	
 	void init_pop_ref_from_po(const vector <unsigned int> &pop_ref);
@@ -2254,3 +2294,82 @@ struct EqnRange {                  // Stores a section of an equation
 	unsigned int start;
 	unsigned int end;
 };
+
+struct MemUsage {                  // Stores the memory usage
+	MemUsage(){ mem = 0;}
+	double mem;
+	string name;
+};
+
+struct AffectQ {
+	unsigned int q;           // The pcalcu number
+	unsigned int ti_set;      // Set if results only depend on a certain intial time
+	unsigned int ti_ref;      // References a certain time set
+};
+
+struct EqnCheck {           // Used to store equation information so it can be checked later        
+	vector <Calculation> calcu;   // Stores calculation
+	vector <Integral> integral;   // Information for integral
+	vector <ParamRef> param_ref;  // Parameter information
+	vector <DeriveRef> derive_ref;// Derive information
+};
+
+struct FixedEffectRef {         // References a fixed effect
+	unsigned int p;               // Species
+	unsigned int f;               // Fixed effect
+};
+
+struct IndEffectRef {           // References an individual effect
+	unsigned int p;               // Species
+	unsigned int e;               // Individual effect
+};
+
+struct OmegaRef {               // References an omega matrix
+	unsigned int p;               // Species
+	unsigned int g;               // Individual effect group
+};
+
+struct PopChangeInfo {          // Stores information related to change in population under a proposal
+	vector <OmegaRef> omega_affect;        // References recalculation of omega
+	vector <FixedEffectRef> exp_fe_ref;    // Reference recalculation of exp_fe
+	vector <IndEffectRef> exp_ie_ref;      // Reference recalculation of exp_ie
+	
+	vector <unsigned int> pop_affect;      // Which populations are affected by proposal
+	vector <unsigned int> popcombw_affect; // Which popcombw are affected by proposal
+	vector <unsigned int> popcomb_affect;  // Which popcomb are affected by proposal
+};
+
+struct ConsistTrans {                    // Store transition information in consistent.cc
+	unsigned int node;                     // The node
+	unsigned int trg;                      // The global transition
+};
+
+struct ConsistComp {                     // Store compartment information in consistent.cc
+	unsigned int node;                     // The node
+	unsigned int c;                        // The compartment
+	double prob;                           // The probability of being in compartment
+};
+
+struct ConsistNode {                     // Store node information in consistent.cc
+	unsigned int c;                        // The compartment 
+	double prob;                           // The probability of getting to node
+	vector <ConsistTrans> leave;           // Any transitions leaving node
+	vector <ConsistTrans> from;            // Any transition entering node
+};
+
+struct TotalObs {                        // Stores observation information in consistent.cc
+	TotalObsType type;                     // Type of observationEVENT_TOTAL, OBS_TOTAL, ILLEGAL_TRANS_TOTAL
+	unsigned int index;                    // The index in that type
+	double tdiv;                           // The time of observation
+	
+	bool pos_tr;                           // Set if there is a transition corresponding to observation
+	vector <ConsistNode> node;             // All the node show which compartents allowed
+	vector <ConsistTrans> pos_tr_list;     // The possible final transitions
+	vector <ConsistComp> pos_co_list;      // The possible final compartments
+};
+
+struct CompProb {                        // Stores a compartment along with a probability
+	unsigned int c;                        // Compartment
+	double prob;                           // Probability
+};
+

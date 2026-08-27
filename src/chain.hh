@@ -17,7 +17,7 @@ public:
 	void init(unsigned int ch, unsigned int ch_max);
 	void burn_update(unsigned int s);
 	void update(unsigned int s);
-	string diagnostics(double time, double anneal_time=UNSET) const;
+	string diagnostics(double time, double init_time, double anneal_time=UNSET) const;
 	void pas_burn_update(unsigned int s, unsigned int gen_update, double phi);
 	void join_proposal_update();
 	unsigned int get_nburnin();
@@ -45,7 +45,7 @@ private:
 		
 	void update_init();
 	bool is_markov_pop(const AffectLike &al) const;
-	void add_parameter_prop(const vector <unsigned int> &vec);
+	void add_parameter_prop(const vector <unsigned int> &vec, bool log_trans);
 	void set_proposal_prob();
 	void check_join_proposal();
 	unsigned int find_which_list(unsigned int j, const vector < vector <unsigned int> > &par_list) const;

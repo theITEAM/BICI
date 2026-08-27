@@ -380,16 +380,24 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	model.convert_fix_pr_const();      // Converts any fixed priors to constants
 	
 	print_diag("h1a");
-
+	
 	create_equations(30,60);           // Creates equation calculations
 
+	if(equation_check){                // This is used in debugging to independently check equations correct
+		model.create_equation_check();
+	}
+	
 	print_diag("h1b");
+
+	check_reparam_spline();            // Checks if reparameterised parameters contain splines
+	
+	print_diag("h1bb");
 
 	check_eqn_fixed_time();            // Checks when t=... are used in populations
 	
 	print_diag("h1c");
 
-	combine_populations();             // Combines together populations which appear together
+	//combine_populations();             // Combines together populations which appear together
 	
 	print_diag("h1d");
 	
@@ -418,6 +426,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	}
 
 	print_diag("h1i");
+	set_trans_tree_output();           // If no genetic data only apply trans tree at end
 	
 	for(auto &eqn : model.eqn){        // Sets up reference (pop_ref, param_ref) in equations
 		eqn.setup_references();
@@ -520,7 +529,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	for(auto &sp : model.species){     // Determines if individual sampler needed
 		if(inf) sp.set_ind_samp_needed(model.eqn);     
 	}
-	
+
 	set_comp_period();                 // Determines if compartemnt begins or ends a transition period
 	
 	set_comp_terminal();               // Determines if a compartment is terminal
@@ -536,25 +545,31 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	percentage(75,100,sup);
 
 	model.create_precalc_equation();    // Extracts precalculations (for non-population parts of equations)
-	
+
 	print_diag("h15a");
 	
 	Hash hashw, hashpc;
 	model.extract_popcomb(hashw,hashpc);// Extracts linear combinations of populations from equations
 	
+	create_markov_eqn_popcomb_ref();    // Works out which popcomb affects markov eqns 
+	
 	linearise_eqn(75,85);               // Tries to linearise equations in terms of pops
+	
+	model.set_pop_grad_ref();
 	
 	print_diag("h15b");
 	
-	//model.create_precalc_pop_grad();    // Shifts calculations in pop_grad into precalc
-	
 	print_diag("h15c");
 	
-	//linearise_precalc();                // References precalculation in linearisation
+	//linearise_precalc();              // References precalculation in linearisation
 	
 	print_diag("h15d");
 	
-	model.precalc_affect();             // Works out how precalculation is affected by changes in parameters
+	//model.precalc_eqn.print_calc();   // Print precalculation (for diagnostic purposes)
+	
+	//for(auto &eqn : model.eqn) eqn.print_calculation();
+	
+	model.precalc_affectQ();            // Works out how precalc affected by changes in parameters  
 	
 	print_diag("h15e");
 	
@@ -562,39 +577,61 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	
 	model.extract_popcomb_derive(hashw,hashpc); // Extracts linear combinations for derived quantities
 	
-	//model.print_popcomb();
-	
+	//model.print_popcomb();            //  Prints popcomb (for diagnostic purposes)
+
 	print_diag("h15f");
+	
+	model.set_eqn_precalcnum();       // Sets the correct numbers for precalculation
 	
 	model.set_precalc_init();           // Sets the initial value for precalc
 	
-	print_diag("h15g");
+	model.set_popcombw_not_const();     // Sets list of non-constant popcombw
 	
-	model.set_spec_precalc_time();      // Sets update for precalc at different times (for tv reparam)
+	print_diag("h15g");
 	
 	model.set_param_spec_precalc();     // Sets precalculation for parameter value
 	
+	print_diag("h16a");
+	
 	model.set_spec_precalc_sample();    // Sets precalculation to be done after sampling 
 	
-	model.set_spec_precalc_all();       // Sets all precalculation to be done 
+	print_diag("h16b");
+		
+	//model.set_spec_precalc_all();       // Sets all precalculation to be done 
+	
+	model.set_spec_precalc_time();      // Sets update for precalc at different times (for tv reparam)
+	
+	print_diag("h16c");
+		
+	model.set_pop_list();               // Sets population list within species
+
+	print_diag("h16d");
 	
 	for(auto &sp : model.species){      // Sets properties related to when Markov equations must be updated
 		sp.set_markov_eqn_update(model.eqn,model.param);      
 	}
 	
-	//model.print_precalc();            // Outputs pre-calculation (for diagnostic purposes)
+	print_diag("h16e");
+		
+	//model.print_precalc();              // Outputs pre-calculation (for diagnostic purposes)
 	
 	setup_der_func_eqn();               // Sets up equations for derived functions
+
+	print_diag("h16f");
 	
 	check_memory_too_large();
 	
+	print_diag("h16g");
+		
 	percentage(85,100,sup);
 	
 	if(inf) param_affect_likelihood(); // Works out how changes to parameters affect likelihoods
 	
+	print_diag("h16h");
+		
 	check_memory_too_large();
 	
-	print_diag("h16");
+	print_diag("h16i");
 	
 	check_param_used();                // Checks all defined parameters used in the model (and vice versa)
 	
@@ -673,12 +710,6 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 
 	if(model.mode == PPC) set_ppc_resample();
 	
-	/*
-	for(auto &sp : model.species){
-		sp.sim_linear_speedup_init(model.eqn);  // Sets up quantities for fast simulation
-	}
-	*/
-	
 	check_markov_or_nm();                      // Checks that transition are either markovian or non-markovian
 		
 	check_nm_pop();                            // Checks no population in species for nm trans	
@@ -696,12 +727,13 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	reduce_memory();                       // Looks at removing things not needed
 	
 	print_diag("Reduce memory");
-	
-	if(profiling) profile_memory();
-	
+		
 	model.check_all_linear();   // Use for diagnostics
 	//if(true) param_eqn_mem();
 	//wait();
+	
+	if(profiling) profile_memory();
+	//profile_memory();
 }
 
 
@@ -781,7 +813,7 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 			
 			if(na == "file" || na == "boundary" || na == "prior-split" || na == "dist-split" || 
 		   na == "A" || na == "Ainv" || na == "A-sparse" || na == "pedigree" || na == "X" || 
-			 na == "ind-list" || na == "factor-weight") ty = 2;
+			 na == "ind-list" || na == "factor-weight" || na == "region") ty = 2;
 			 
 			auto file = tag.value;
 			switch(ty){
@@ -1469,6 +1501,8 @@ void Input::create_param_vector()
 		}
 	}	
 	
+	print_diag("h8a");
+	
 	vector <bool> defined(N,false);
 	
 	vector <unsigned int> list;
@@ -1490,9 +1524,13 @@ void Input::create_param_vector()
 		}
 	}while(flag == true);
 	
+	print_diag("h8b");
+	
 	if(list.size() != N){
 		alert_import("Could not order parameters (e.g. cyclic dependencies exist such as A dependent on B and B dependent on A)");
 	}
+
+	auto T = model.details.T;
 
 	auto reparam_spl_fl = false;
 	
@@ -1501,8 +1539,8 @@ void Input::create_param_vector()
 	for(auto i = 0u; i < N; i++){
 		auto th = list[i];
 		auto &par = model.param[th];
-	
-		if(par.variety != CONST_PARAM){	
+		
+		if(par.variety != CONST_PARAM && par.variety != DYNAMIC_PARAM){	
 			vector <bool> allow;   // Accounts for symmetric maxtrix
 			auto sym_fl = false;
 			if(model.is_symmetric(par)){
@@ -1516,20 +1554,24 @@ void Input::create_param_vector()
 			}
 		
 			for(auto j = 0u; j < par.N; j++){
+				//if(j%100000== 0) cout << j << "/" << par.N << " jj" << endl;
 				const auto &er = par.element_ref[j];
 				auto ind = er.index;
 				if(ind != UNSET && !er.cons && !(sym_fl && !allow[j])){
 					auto &ele = par.element[ind];
-						
-					if(removeparamvec_speedup == false || ele.used == true || par.spline_info.on == true){
-						//ele.param_vec_ref = model.param_vec.size();
-						
+					if(removeparamvec_speedup == false || ele.used == true || par.spline_info.on == true){	
 						ParamVecEle pr; 
-						pr.name = get_param_name_with_dep(par,par.dep,j);
+						pr.spec_precalc_after.hash.off();
+				
 						pr.th = th; 
 						pr.index = j;
+						pr.latin_sample = false;
 						if(par.variety == PRIOR_PARAM || par.variety == DIST_PARAM){
 							pr.prior_ref = ele.prior_ref;
+							const auto &pri =  model.prior[pr.prior_ref];
+							pr.latin_sample = pri.latin_sample;	
+							if(pr.latin_sample) model.param_vec_latin.push_back(model.param_vec.size()); 
+							pr.strictly_positive = model.is_strictly_positive(pri);
 						}
 						else{
 							pr.prior_ref = UNSET;
@@ -1540,8 +1582,12 @@ void Input::create_param_vector()
 						if(pr.variety == REPARAM_PARAM && par.time_dep){
 							if(par.spline_info.type == SQUARE_SPL){
 								pr.reparam_time_dep = true;
+								par.reparam_time_dep = true;
 								const auto &kn = par.spline_info.knot_tdiv;
-								pr.reparam_spl_ti = (unsigned int)(kn[j%kn.size()]);
+								auto d = j%kn.size();
+								pr.reparam_spl_ti = (unsigned int)(kn[d]);
+								if(d+1 == kn.size()) pr.reparam_spl_ti_end = T;
+								else pr.reparam_spl_ti_end = (unsigned int)(kn[d+1]);
 								reparam_spl_fl = true;
 							}
 						}
@@ -1557,12 +1603,21 @@ void Input::create_param_vector()
 							}
 						}
 						
+						{ // Sets the time range for parameter vector
+							ParamRef pref; pref.th = th; pref.index = j;
+							auto tr = get_pr_time_range(pref);
+							pr.ti_min = tr.ti_min;
+							pr.ti_max = tr.ti_max;
+						}
+						
 						model.param_vec.push_back(pr);
 					}
 				}
 			}
 		}
 	}
+
+	print_diag("h8c");
 	
 	// Time orders parameters based on reparam_time_dep
 	if(reparam_spl_fl) sort(model.param_vec.begin(),model.param_vec.end(),param_vec_ord);
@@ -1607,12 +1662,14 @@ void Input::create_param_vector()
 		}
 	}
 	
+	print_diag("h8d");
 	
-	if(false){
-		for(const auto &pv : model.param_vec){
-			cout << pv.reparam_spl_ti << " " << pv.name << " na" << endl;
+	if(false){ 
+		for(auto th = 0u; th < model.param_vec.size(); th++){
+			const auto &pv = model.param_vec[th];
+			cout << pv.reparam_spl_ti << " " <<  model.param_vec_name(th) << " na" << endl;
 		}
-		emsg("dd");
+		emsg("param_vec");
 	}
 	
 	// Converts parameter references in equation to param_vec
@@ -1633,6 +1690,8 @@ void Input::create_param_vector()
 	}
 	model.nparam_vec_prop = model.param_vec_prop.size();
 
+	print_diag("h8e");
+
 	for(auto th = 0u; th < model.nparam_vec; th++){
 		const auto &pv = model.param_vec[th];
 		if(pv.reparam_time_dep){
@@ -1644,11 +1703,13 @@ void Input::create_param_vector()
 	model.contains_tvreparam = false;
 	if(model.nparam_vec_tvreparam > 0) model.contains_tvreparam = true;
 	
+	print_diag("h8f");
+	
 	if(false){
 		auto imax = model.nparam_vec;
-		if(imax > 100) imax = 100;
+		//if(imax > 100) imax = 100;
 		for(auto i = 0u; i < imax; i++){
-			cout << model.param_vec[i].name << " vec" << endl;
+			cout << model.param_vec_name(i) << " vec" << endl;
 		}
 		
 		alert_emsg_input("param vec");
@@ -1660,12 +1721,18 @@ void Input::create_param_vector()
 void Input::create_pop_ref() 
 {
 	for(auto po = 0u; po < model.pop.size(); po++){
+	//for(auto po = 0u; po < model.npop; po++){
 		const auto &pop = model.pop[po];
 		for(auto i = 0u; i < pop.term.size(); i++){
 			const auto &te = pop.term[i];
 			PopRef pr; pr.po = po; pr.index = i;
-			model.species[pop.p].comp_gl[te.c].pop_ref.push_back(pr);
-			model.species[pop.p].comp_gl[te.c].pop_ref_simp.push_back(po);
+			if(po < model.npop){	
+				model.species[pop.p].comp_gl[te.c].pop_ref.push_back(pr);
+				model.species[pop.p].comp_gl[te.c].pop_ref_simp.push_back(po);
+			}
+			else{
+				model.species[pop.p].comp_gl[te.c].pop_ref_derive.push_back(pr);
+			}
 		}
 	}
 }
@@ -1695,7 +1762,7 @@ void Input::further_simplify_equations(unsigned int per_start, unsigned int per_
 					if(it.type == PARAMETER){
 						const auto &pr = eq.param_ref[it.num];
 						
-						const auto &par = model.param[pr.th];
+						auto &par = model.param[pr.th];
 						if(par.variety == REPARAM_PARAM){
 							const auto &eqn = model.eqn[par.get_eq_ref(pr.index)];
 							
@@ -1703,6 +1770,10 @@ void Input::further_simplify_equations(unsigned int per_start, unsigned int per_
 							if(num != UNSET){
 								it.type = NUMERIC;
 								it.num = model.constant.add(num);
+								
+								auto &er = par.element_ref[pr.index];
+								er.cons = true;
+								er.index = it.num;
 								flag = true;
 							}
 						}
@@ -1711,7 +1782,7 @@ void Input::further_simplify_equations(unsigned int per_start, unsigned int per_
 			}
 			
 			if(flag == true){
-				eq.simplify(eq.calcu);
+				eq.simplify_calc(eq.calcu);
 				flag_global = true;
 			}
 		}

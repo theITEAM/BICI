@@ -35,6 +35,8 @@ class State                                // Stores information about the state
 		
 		vector < vector <double> > popcomb_t;  // Time variation in population combinations
 		
+		vector <double> popcomb_store;         // Stores results so can be undone
+	
 		vector < vector < vector <PopIndRef> > > popnum_ind;// Individuals associated with population (for trans tree)
 		
 		vector <StateSpecies> species;         // State information about species
@@ -59,17 +61,23 @@ class State                                // Stores information about the state
 		vector <double> dpop;                  // Stores change in population
 		vector <unsigned int> dpop_list;       // Lists changes
 		
+		vector <bool> map_pop;                 // Maps used in function popcomb_calc
+		vector <bool> map_popcomb;
+		
 		//vector <double> dpopcomb;              // Stores change in popcomb
 		//vector <unsigned int> dpopcomb_list;   // Lists changes in popcomb
 		
 		State(const Model &model);
 		void init();
 		void simulate(const PV &param_value, const vector <InitCondValue> &initc_val, IEstore ie_store= IEstore(), double val=UNSET, double val2=UNSET, bool sup=false);
+		void determinisitic_resimulate();
+		void individual_initial_state(double t);
 		void post_sim(const PV &param_value, const Sample &samp);
 		void load_samp(const PV &param_value, const Sample &samp);
 		void simulate_iterate(unsigned int ti_start, unsigned int ti_end, double val=UNSET, double val2=UNSET, bool sup=false);
+		void dpop_clear();
+		void update_quantities(unsigned int ti, unsigned int ti_start, bool calc_markov, bool calc_precalc, bool include_derive);
 		void ensure_all_ind_event();
-		void markov_vari_value_calc_fast();
 		vector <DeriveOutput> derive_calculate(bool store_state);
 		void calculate_likelihood();
 		void calculate_like();
@@ -79,10 +87,10 @@ class State                                // Stores information about the state
 		void change_add();
 		Like update_param(const vector <AffectLike> &affect_like);
 		void restore(const vector <AffectLike> &affect_like);
-		void likelihood_from_scratch(bool calc_me_value=true);
-		void resample_ind(bool if_wrong);
+		void likelihood_from_scratch();
 		Particle generate_particle(unsigned int s, unsigned int chain, bool store_state, bool dir_fl = true);
-		void set_particle(const Particle &part, bool calc_like=true);
+		void set_particle(const Particle &part);
+		void regenerate(unsigned int ti_end, bool calc_markov, bool calc_precalc, bool include_derive=false);
 		vector <double> prior_init_cond(double &like_ch);
 		void update_individual_sampler();
 		void update_pop_t_init(unsigned int p, vector <unsigned int> cnum_i, vector <unsigned int> cnum_f);
@@ -96,30 +104,42 @@ class State                                // Stores information about the state
 		void set_ie_from_data();
 		void ie_finalise();
 		double calculate(const EquationInfo &ei, unsigned int ti) const;
-		void calculate_popcombw_value();
+		//void popcombw_restore(const vector <unsigned int> &list, const vector <double> &vec);
+		//vector <double> popcombw_calc(const vector <unsigned int> &list);
+		void calculate_popcombw_value(bool include_derive);
+		//vector <double> popcomb_calc(const vector <unsigned int> &list);
+		//void popcomb_restore(const vector <unsigned int> &list, const vector <double> &vec);
 		double popcombw_calc(unsigned int i);
+		void mbp_update_initial_state(const vector <unsigned int> &mbp_popcombw_affect, vector <PopcombWStore> &popcombw_store);
+		void pop_recalc(const PopChangeInfo &pop_change_info);
+		void pop_restore();
+		double frac_outside_CI();
+		Like get_like_ch(const Like &like_st) const;
 	
 	private:
 		vector <double> calculate_df(const DerFunc &df) const;
 		string compact_vector(const vector <double> &value) const;
 		void spline_init();
 		void print_cpop(unsigned int ti) const;	
-		vector <double> calculate_popcomb(unsigned int ti) const;
-		void calculate_next_pop(unsigned int ti);
-		vector <double> calculate_popnum() const;
+		vector <double> calculate_popcomb(unsigned int ti, bool include_derive = false) const;
+		vector <double> calculate_popnum(bool include_derive = false) const;
+		void add_popnum(unsigned int c, vector <double> &popnum, const Individual &ind, const PopRef &pr) const;
 		vector < vector <double> > calculate_popnum_t(unsigned int ti_end = UNSET);
 		vector < vector <double> > calculate_popcomb_t(unsigned int ti_end = UNSET);
-		void calculate_popcomb_derive();
-		void calculate_popcomb_derive_end();
-		vector <double> recalculate_population(const vector <unsigned int> &list);
+		//void calculate_expand_pop_derive();
+		//void calculate_popcomb_derive_end();
+		void recalculate_population(const vector <unsigned int> &list);
+		void recalculate_popcomb(const vector <unsigned int> &popcomb_affect);
+		//void recalculate_population_restore(const vector <unsigned int> &list, const vector <double> &vec);
 		void set_ind_inf_from(const vector <string> &ind_key);
-		void recalculate_population_restore(vector < vector <double> > &popnum_t, const vector <unsigned int> &list, const vector <double> &vec) const;
+		
 		
 	// In state_update_ind.cc
 	public:
 		Like update_ind(unsigned int p, unsigned int i, vector <Event> &ev_new, UpdateType type);
+		void change_pop_t(unsigned int ti, unsigned int ti_next, unsigned int k, double num);
 		void change_population(unsigned int ti, unsigned int ti_next, unsigned int k, double num);
-		void update_pop_change(unsigned int ti, unsigned int ti_next, const vector <PopChange> &pop_change, double &like_ch);
+		void update_pop_change(unsigned int ti, unsigned int ti_next, double &like_ch);
 		void update_ie_population(unsigned int p, unsigned int i, unsigned int ie, double factor, double &like_ch);
 		void update_ie_trans_tree(unsigned int p, unsigned int i, unsigned int ie, double ratio, double &like_ch);
 		double get_w_from_indinffrom(const IndInfFrom &iif) const;
@@ -129,9 +149,9 @@ class State                                // Stores information about the state
 		vector <unsigned int> pop_list;        // Used in state_update_ind
 		vector <int> pop_map;
 		vector < vector <bool> > markov_eqn_map; 
-		vector <PopMarkovEqnRef> markov_eqn_list;
+		vector < vector <unsigned int> > markov_eqn_list;
 		vector < vector <bool> > trans_map; 
-		vector <PopTransRef> trans_list;
+		vector < vector <unsigned int> > trans_list;
 		//vector <bool> spline_up_map; 
 		//vector <unsigned int> spline_up_list;
 		vector <bool> reparamth_up_map; 
@@ -225,13 +245,14 @@ class State                                // Stores information about the state
 		void check_markov_value_dif();
 		void add_alg_warn(string te);
 		void check_precalc_dif(string ref);
-		void check_markov_div_value(unsigned int p, string ref);
 		void scan_param();
 		void check_dpop();
+		void check_regenerate(string ref);
 				
 	private:
 		void check_dependent_param(string ref);
 		void check_ref(unsigned int p, string ref);
+		void check_markov_div_value(unsigned int p, string ref);
 		void check_markov_trans(unsigned int p, string ref);
 		void check_nm_trans(unsigned int p, string ref);
 		void check_prior(string ref);
@@ -259,6 +280,16 @@ class State                                // Stores information about the state
 	public:
 		void profile_memory() const;
 	
+	// In consistent.cc	
+	public:
+		void force_consistent_solution();
+		void resample_ind(bool if_wrong);
+	private:
+		double calculate_basic_rate(unsigned int p, unsigned int tr, unsigned int ti) const;
+		CompProb comp_prob_sample(const vector <CompProb> &cp_pos) const;
+		ConsistTrans contr_sample(const vector <ConsistTrans> &list, const vector <ConsistNode> &node) const;
+		ConsistComp conco_sample(const vector <ConsistComp> &list, const vector <ConsistNode> &node) const;
+
 	private:
 		const Model &model;
 };

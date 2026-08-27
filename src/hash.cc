@@ -6,6 +6,7 @@
 #include <fstream>
 #include <cmath>
 #include <iomanip>    
+#include <cstring>
  
 using namespace std;
 
@@ -102,7 +103,7 @@ vector <unsigned int> Hash::get_vec_eqn(const string &te, unsigned int type, uns
 	vec.push_back(p);
 	vec.push_back(cl);
 	vec.push_back(ti);
-	if(infection_trans == 1) vec.push_back(1); else vec.push_back(0);
+	if(infection_trans == true) vec.push_back(1); else vec.push_back(0);
 	
 	return vec;
 }
@@ -114,12 +115,25 @@ vector <unsigned int> Hash::get_vec_string(const string &te) const
 	if(!on) emsg("Hash table turned off");
 	
 	vector <unsigned int> vec;
-	
+	auto num = 0u;
+	auto nb = 0;
 	for(auto i = 0u; i < te.length(); i++){
 		int ch = te.at(i);
 		if(ch < 0) ch += 256;
-		vec.push_back(ch);
+		
+		if(ch < 0 || ch >= 256) emsg("prob");
+		
+		if(nb < 4){
+			num = num*256+ch;
+			nb++;
+		}
+		else{
+			vec.push_back(num);
+			num = ch;
+			nb = 1;
+		}
 	}
+	if(nb > 0) vec.push_back(num);
 	
 	return vec;
 }
@@ -129,12 +143,19 @@ vector <unsigned int> Hash::get_vec_string(const string &te) const
 vector <unsigned int> Hash::get_vec_double(const double val) const
 {
 	if(!on) emsg("Hash table turned off");
+
+	auto si = sizeof(val); if(si != 8) emsg("si is wrong");
+	unsigned char by[si];
+	memcpy(&by,&val,si);
 	
-	stringstream ss;
-	ss << fixed << std::setprecision(16);
-	ss << val;
+	unsigned int nn = 256*(256*(256*by[3] + by[2])+ by[1])+ by[0];
+	unsigned int nn2 = 256*(256*(256*by[7] + by[6])+ by[5])+ by[4];
+
+	vector <unsigned int> vec;
+	vec.push_back(nn);
+	vec.push_back(nn2);
 	
-	return get_vec_string(ss.str());
+	return vec;
 }
 
 

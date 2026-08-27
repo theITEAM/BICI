@@ -29,25 +29,18 @@ void synchronise_proposal(unsigned int s, vector <Chain> &chain, Mpi &mpi)
 	
 	// Combines together the correlation matrices from all chains
 	
-	vector < vector <double> > all_samp;
-	
-	auto nchain = chain.size()*num_core();
+	auto nchain = chain.size()*num_core();	
 	auto n = chain[0].cor_matrix.n;
-
-	auto step = nchain;
-	if(step == 0) step = 1;
-	auto N = n/step;
-		
+	
+	// Stores all the samples together
+	vector < vector <double> > all_samp;
 	for(auto ch = 0u; ch < chain.size(); ch++){
 		const auto &cha = chain[ch];
 		const auto &cor_m = cha.cor_matrix;
 		
-		for(auto i = step-1; i < n; i += step){
+		for(auto i = 0u; i < n; i ++){
 			all_samp.push_back(cor_m.samp[i]);
 		}
-		
-		//auto M = cor_m.calculate_cor_matrix();
-		//print_matrix("mat before",M);
 	}
 
 #ifdef USE_MPI 
@@ -56,12 +49,10 @@ void synchronise_proposal(unsigned int s, vector <Chain> &chain, Mpi &mpi)
 		
 	vector < vector <double> > samp_new;
 
-	if(op()){
-		// Reorders in burning in sequence
-		for(auto i = 0u; i < N; i++){
-			for(auto ch = 0u; ch < nchain; ch++){
-				samp_new.push_back(all_samp[ch*N+i]);
-			}
+	if(op()){ // Randomly selects which chain the sample comes from
+		for(auto i = 0u; i < n; i++){
+			auto ch = (unsigned int)(ran()*nchain);
+			samp_new.push_back(all_samp[ch*n+i]);
 		}
 	}
 	
@@ -113,7 +104,7 @@ void synchronise_proposal(unsigned int s, vector <Chain> &chain, Mpi &mpi)
 				for(auto j = i+1; j < prop_info.size(); j++){
 					if(done[j] == false){
 						const auto &pi2 = prop_info[j];
-						if(pi2.type == pi.type && equal_vec(pi2.id,pi.id)){					
+						if(pi2.type == pi.type && equal_vec(pi2.id,pi.id)){		
 							av += pi2.value;
 							for(auto k = 0u; k < vec_av.size(); k++) vec_av[k] += pi2.vec[k];
 							done[j] = true;
@@ -144,8 +135,19 @@ void synchronise_proposal(unsigned int s, vector <Chain> &chain, Mpi &mpi)
 	for(auto &cha : chain){
 		cha.set_prop_info(prop_info_av);
 	}
-
-	//print_prop("AFTER PROP",chain);
+	
+	/*
+	if(op()){
+		cout << " after synchr";
+		for(const auto &pro : chain[0].proposal){
+			if(pro.param_list.size() > 0){
+				cout << pro.name << " name";
+				auto M = chain[0].cor_matrix.find_covar(pro.param_list);
+				print("A",M);
+			}
+		}
+	}
+	*/
 }
 
 				
@@ -179,7 +181,7 @@ string print_prop_info(const vector <PropInfo> &prop_info, const Model &model)
 		switch(pi.type){
 		case PARAM_PROP:
 			for(auto th : pi.id){
-				ss << model.param_vec[th].name << ",";
+				ss << model.param_vec_name(th) << ",";
 			}
 			break;
 			

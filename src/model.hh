@@ -24,6 +24,11 @@ class Model                                // Stores information about the model
 		
 		vector <SpeciesSimp> species_simp;     // A simplifies version passed to equation
 		
+		bool deterministic;                    // Set if the model is deterministic
+		
+		vector <CompPos> comp_pos;             // Stores compartment possibilities (to speed up 
+		Hash hash_comp_pos;
+		
 		vector <Prior> prior;                  // Vector of priors
 		
 		vector <Param> param;                  // Stores all the parameters in the model
@@ -33,6 +38,8 @@ class Model                                // Stores information about the model
 		
 		unsigned int nparam_vec;               // The total number of parameter
 		
+		vector <unsigned int> param_vec_latin; // Stores which parameter are latin hypercude
+		
 		vector <unsigned int> param_vec_prop;  // Vector of param_vec elements which undergo proposals
 		unsigned int nparam_vec_prop;          // Total number of parameters under proposal
 			
@@ -41,16 +48,23 @@ class Model                                // Stores information about the model
 		
 		bool contains_tvreparam;               // Set if model contains some tvreparam
 		
+		vector <unsigned int> dynamic_param;   // Stores list of dynamic parameters (used for output)
+		
 		vector < vector < vector <unsigned int> > > pop_reparam_th; // Sets reference from pop to th [po][ti][#]
 		bool pop_reparam_th_on;                // Determines if on
 		
 		vector <Population> pop;               // Stores information about populations of interest
+		unsigned int npop;                     // Number of pop (excluding those used for derive)
 		
-		vector < vector <PopComb> > popcomb;   // Population combination
+		vector <PopComb> popcomb;              // Population combination
 		unsigned int npopcomb;                 // Number of popcomb (excluding those used for derive)
 		
 		vector <PopCombWeight> popcombw;       // Stores weight used in popcomb
 		unsigned int npopcombw;                // Number of popcomb weights (excluding those used for derive)
+	
+		vector <unsigned int> popcombw_not_const; // Store all non constant popcombw
+	
+		//vector <PopcombUpdate> popcomb_update_sample; // Determines how popcomb should be updated
 	
 		Hash hash_pop;                         // Hash table for populations
 	
@@ -74,7 +88,12 @@ class Model                                // Stores information about the model
 	
 		vector <Equation> eqn;                 // Stores all the equations for the species
 	
+		vector <EqnCheck> eqn_check;           // Used to check that equations are correct
+		
+		vector < vector <string> > region;     // Stores any regions (used for dynamic-sim)
+		
 		bool trans_tree;                       // Set if trans_tree exists in the model
+		bool trans_tree_output;                // Set if trans_tree is only applied at output (because no genetic data)
 		
 		vector <Table> param_samp_store;       // Stores parameter samples (used for EXT);
 		
@@ -101,19 +120,24 @@ class Model                                // Stores information about the model
 		SpecPrecalc spec_precalc;              // Stores precalcultion
 		SpecPrecalc spec_precalc_derive;       // Stores list for precalcultion of derived (for integrals)
 		SpecPrecalc spec_precalc_sample;       // Collects all the precalc to calculate after sample        
-		SpecPrecalc spec_precalc_all;          // Collects all the precalc         
 		vector <unsigned int> spec_precalc_time_ref;  // References spec_precalc_list
 		vector <SpecPrecalcTime> spec_precalc_list;   // Stores a time-dependent spec_precalc
 		vector <double> precalc_init;          // Initial value for precalc
 		
-		vector <unsigned int> param_vec_ref;   // Stores where param are on precalc
-		vector <unsigned int> spline_ref;      // Stores where spline is on precalc
+		vector <unsigned int> param_vec_refq;   // Stores where param are on precalc (using q)
+		vector <unsigned int> spline_refq;      // Stores where spline is on precalc (using q)
+	
+		vector <unsigned long long> param_vec_refi;   // Stores where param are on precalc (using i)
+		vector <unsigned long long> spline_refi;      // Stores where spline is on precalc (using i)
 	
 		Model(Operation mode_, ExtFactor ext_factor_, bool no_question_);
 		void add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv = UNSET, bool keep_te = false);
 		void param_val_init(PV &param_val) const;
-		PV param_sample() const;
+		PV param_sample(bool no_precalc = false) const;
+		vector < vector <double> > param_latin_hypercube_prior_sample(unsigned int N) const;
+		PV param_latin_hypercube_sample(const vector <double> &prior_val) const;
 		void param_spec_precalc_time(unsigned int ti, const vector < vector <double> > &popcomb_t, PV &param_val, bool store) const;
+		//void dynamic_param_calc(unsigned int ti, const vector < vector <double> > &popcomb_t, PV &param_val, double &time, double &time2) const;
 		bool sample_bounded() const;
 		void sample_ieg_cv(PV &param_val) const;
 		void param_spec_precalc_time_all(const vector < vector <double> > &popcomb_t, PV &param_val, bool store) const;
@@ -135,11 +159,10 @@ class Model                                // Stores information about the model
 		vector <double> spline_prior(const PV &param_val) const;
 		double recalculate_spline_prior(unsigned int s, vector <double> &spline_prior, PV &param_val, double &like_ch) const;
 		void create_species_simp();
+		void setup_distgrid();
+		double grid_geo_dist(double xi, double yi, double xi2, double yi2, double xmin, double xmax, double ymin, double ymax);
 		void order_affect(vector <AffectLike> &vec) const;
-		void affect_linearise_speedup(vector <AffectLike> &vec) const;
-		AffectMap get_affect_map(vector <AffectLike> &vec, const vector <unsigned int> &param_list, const vector <unsigned int> &dependent, const SpecPrecalc &spec_precalc_after) const;
-		void affect_nopop_speedup(vector <AffectLike> &vec, const vector <unsigned int> &param_list, const vector <unsigned int> &dependent, const SpecPrecalc &spec_precalc_after) const;
-		void set_factor_nopop_only(vector <AffectLike> &vec, const vector <unsigned int> &param_list, const vector <unsigned int> &dependent, const SpecPrecalc &spec_precalc_after) const;
+		//AffectMap get_affect_map(vector <AffectLike> &vec, const vector <unsigned int> &param_list, const vector <unsigned int> &dependent, const SpecPrecalc &spec_precalc_after) const;
 		void add_iif_w_affect(vector <AffectLike> &vec) const;
 		void add_popnum_ind_w_affect(vector <AffectLike> &vec) const;
 		void joint_affect_like(PropType type, const vector <bool> &tr_change, unsigned int p, vector <AffectLike> &vec) const;
@@ -159,23 +182,32 @@ class Model                                // Stores information about the model
 		void print_param(const PV &param_val) const;
 		vector <double> get_param_val_prop(const PV &param_val) const;
 		vector <double> get_param_val_tvreparam(const PV &param_val) const;
+		vector < vector <double> > get_param_val_dynamic(const PV &param_val) const;
 		void add_tvreparam(PV &param_val, const vector <double> &param_val_tvreparam) const;
+		vector <double> compress_vec(const vector <double> &vec) const;
+		vector <double> decompress_vec(const vector <double> &vc) const;
 		PV get_param_val(const Particle &pa) const;
 		PV set_param_val(const vector <double> &value_set) const;
 		double calc_tdiv(double t) const; 
 		double calc_t(double tdiv) const;
 		void create_precalc_equation();
+		vector <SpecPrecalc> get_dynamic_spec_list(const SpecPrecalcTime &spt, vector <bool> &mapQ) const;
 		SpecPrecalcTime& get_spec_precalc_time(unsigned int ti);
 		void set_precalc_init();
+		void set_popcombw_not_const();
 		void set_spec_precalc_sample();
-		void set_spec_precalc_all();
+		//void set_spec_precalc_all();
 		void set_spec_precalc_time();
 		void create_precalc_derive();
-		void create_precalc_pop_grad();
-		void precalc_affect();
+		unsigned get_ti_ref(const vector <unsigned int> &list, vector < vector <unsigned int> > &list_time, Hash &hash_list_time) const;
+		void precalc_affectQ();
+		//vector <PopcombUpdate> get_popcomb_update(const vector <unsigned int> &list) const;
+		void add_dynamic_spline(const vector < vector <AffectQ> > &affectQ);
+		void add_affect_likeQ(unsigned int q, vector < vector <unsigned int> > &ti_ref_list, vector <bool> &map_pop, vector <bool> &map_popcombw, vector <bool> &map_popcomb, ParamVecEle &pvec, const vector <unsigned int> &affect_popcombw, const vector < vector < vector <unsigned int> > > &me_precalc, const vector < vector <AffectQ> > &affectQ, const vector < vector <unsigned int> > &list_time);
+		
 		void print_precalc() const;
 		vector <unsigned int> get_last_spline() const;
-		void add_affect_like(unsigned int i, unsigned int i2, const vector <bool> &map_time, vector <bool> &map_PC, vector < vector <bool> > &map_me, ParamVecEle &pvec, const vector < vector <unsigned int> > &affect, const vector < vector <AffectME> > &affect_me);
+		
 		bool in_bounds(double x, unsigned int j, const vector <double> &precalc) const;
 		bool is_prior_bounded(unsigned int th) const;
 		bool is_matrix(const Param &par) const;
@@ -190,6 +222,7 @@ class Model                                // Stores information about the model
 		unsigned int get_end_bracket(string &te, unsigned int i);
 		bool in_integral(unsigned int i, const vector <SumRange> &int_range) const;
 		vector <string> equation_dep(string te, string &warn);
+		bool time_specified_pop(unsigned int i, const string &te) const;
 		unsigned int find_p(string name) const;
 		unsigned int find_cl(unsigned int p, string name) const;
 		bool data_mode() const;
@@ -202,15 +235,29 @@ class Model                                // Stores information about the model
 		DiagTestSens get_diag_test_sens(string comp, unsigned int p, string &warn) const;
 		void extract_popcomb(Hash &hashw, Hash &hashpc);
 		void extract_popcomb_derive(Hash &hashw, Hash &hashpc);
+		string print_it(const EqItem &it) const;
 		void print_popcomb() const;
 		void check_all_linear() const;
-		
+		void set_pop_list();
+		void set_pop_grad_ref();
+		void precalc_calculate_all(PV &param_val, const vector < vector <double> > &popcomb_t) const;
+		void create_equation_check();
+		void check_equation_values(const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const PV &param_val, const vector < vector < vector <double> > > &derive_val) const;
+		string param_vec_name(unsigned int th) const;
+		string spline_name(unsigned int i) const;
+		void set_eqn_precalcnum();
+		bool par_ele_set(unsigned int th, unsigned int j) const;
+		bool is_bernoulli(unsigned int th) const;
+		bool is_strictly_positive(const Prior &pri) const;
+	
 	private:
 		Hash hash_all_ind;                     // Stores individuals in a hash table
 		
 		vector <AllInd> all_ind;               // Stores reference for all individuals
 	
 		double prior_sample(const Prior &pri, const vector <double> &precalc) const;
+		void prior_error(const Prior &pri, string warn) const;
+		vector <double> latin_prior_sample(const Prior &pri, unsigned int N) const;
 		long get_hash_number(const EquationInfo &eqi);	
 };
 

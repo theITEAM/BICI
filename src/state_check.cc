@@ -134,14 +134,28 @@ void State::check(string ref)
 	if(param_val.value_ch.size() != 0) emsg("Value_ch problem");
 	if(param_val.precalc_ch.size() != 0) emsg("precalc_ch problem");
 	
+	if(popcomb_store.size() != 0) emsg("popcomb_store not zero:"+ref);
+ 		
+	if(model.deterministic){
+		return;
+	}
+	
 	check_precalc_eqn(ref);
+
+	check_dependent_param(ref);
+	
+	check_prior(ref);
+	
+	check_like(ref);
+	
+	check_init_cond_prior(ref);
+		
+	check_cpop_st(ref);
 
 	check_trans_num(ref);
 
 	check_effect_out_of_range();
 
-	check_dependent_param(ref);
-	
 	check_simp(ref);
 
 	check_popnum_ind(ref);
@@ -150,12 +164,12 @@ void State::check(string ref)
 	
 	//check_spline_store(ref);
 	
-	check_cpop_st(ref);
-	
-	check_pop_t(ref);
+	check_regenerate(ref);
 
 	for(auto p = 0u; p < nspecies; p++){
 		const auto &sp = model.species[p];
+	
+		//check_markov_div_value(p,ref); // This has been replaced by regenerate
 		
 		switch(sp.type){
 		case INDIVIDUAL:
@@ -176,17 +190,11 @@ void State::check(string ref)
 		
 		check_obs_like(p,ref);
 		check_init_cond_like(p,ref);
-		if(calc_para_speedup) check_para_speedup(p,ref);
+		//if(calc_para_speedup) check_para_speedup(p,ref);
 	}
 	
-	check_init_cond_prior(ref);
-	
-	check_like(ref);
-	
 	//check_spline(ref);
-	
-	check_prior(ref);
-	
+
 	check_maps(ref);
 
 	check_add_move_rem(ref);
@@ -205,19 +213,17 @@ void State::check_precalc_eqn(string ref)
 	const auto &precalc = param_val.precalc;
 	const auto &value = param_val.value;
 	
-	const auto &pcalcu_ref = model.precalc_eqn.pcalcu_ref; 
 	const auto &pcalcu = model.precalc_eqn.pcalcu; 
-	auto n = pcalcu_ref.size();
+	auto n = model.precalc_eqn.pcsize;
 	if(precalc.size() != n){
 		emsg("precalc size problem"+ref);
 	}
 	
 	vector <bool> derive_fl(n,false);
 	for(const auto &in : model.spec_precalc_derive.info){
-		auto i = in.i;
-		
-		auto re = pcalcu_ref[i]; if(re == UNSET) emsg("unset prob4");
-		const auto &ca = pcalcu[re];
+		auto q = in.q;
+		const auto &ca = pcalcu[q];
+		auto i = ca.iref;
 		if(ca.time_dep){
 			for(auto ti = 0u; ti < T; ti++) derive_fl[i+ti] = true;
 		}
@@ -235,26 +241,22 @@ void State::check_precalc_eqn(string ref)
 		if(param_val.value_old[th] != UNSET) emsg("value_old");
 	}
 	
-	for(auto i = 0u; i < precalc.size(); i++){
+	for(unsigned long long i = 0; i < precalc.size(); i++){
 		if(param_val.precalc_old[i] != UNSET) emsg("precalc_old");
 	}
 	
 	auto precalc_st = precalc;
 	auto value_st = value;
 	
-	model.precalc_eqn.calculate(model.spec_precalc_all,param_val,false);
+	model.precalc_calculate_all(param_val,popcomb_t);
 	
-	//model.precalc_eqn.calculate_all(model.list_precalc,param_val);
-	
-	model.param_spec_precalc_time_all(popcomb_t,param_val,false);
-
 	for(auto th = 0u; th < value.size(); th++){
 		if(value_st[th] == UNSET){
 			emsg("Value should not be unset1 "+ref);
 		}
 		
 		if(dif(value_st[th],value[th],dif_thresh)){
-			cout << model.param_vec[th].name << " " << value_st[th] << " " << value[th] << " wrong" << endl;
+			cout << model.param_vec_name(th) << " " << value_st[th] << " " << value[th] << " wrong" << endl;
 
 			const auto &pv = model.param_vec[th];
 			const auto &par = model.param[pv.th];
@@ -274,20 +276,14 @@ void State::check_precalc_eqn(string ref)
 		}
 	}
 	
-	for(auto i = 0u; i < precalc.size(); i++){
+	//for(auto i = 0u; i < precalc.size(); i++) cout << i << " " << precalc[i] << " kk" << endl;
+	
+	for(unsigned long long i = 0; i < precalc.size(); i++){
 		if(precalc_st[i] == UNSET && !derive_fl[i]){
 			emsg("Precalc should not be unset1");
 		}
 		
 		if(dif(precalc_st[i],precalc[i],dif_thresh)){
-			cout << i << " " << precalc.size() << " " << precalc_st[i] << " " << precalc[i] << endl;
-			
-			auto re = model.precalc_eqn.pcalcu_ref[i]; 
-			if(re == UNSET) emsg("no calculation");
-			const auto &ca = model.precalc_eqn.pcalcu[re];
-		
-			model.precalc_eqn.print_ca(i,ca);
-			
 			emsg("precalc problem"+ref);
 		}
 	}
@@ -596,13 +592,35 @@ void State::check_final_li_wrong()
 		const auto &ssp = species[p];
 	
 		for(auto i = 0u; i < sp.nindividual_in; i++){
-			if(ssp.Li_obs_ind[i] < LI_WRONG/2){
+			if(ssp.inconsistent(i)){
 				add_alg_warn("Individual '"+sp.individual[i].name+"' does not agree with data");
 			}
 		}
 	}
 	
 	check_timer[CHECK_FINAL_LI_WRONG] += clock();
+}
+
+
+/// Checks the values for the markov equations are correct
+void State::check_markov_div_value(unsigned int p, string ref)
+{
+	check_timer[CHECK_MARKOV_DIV] -= clock();
+	
+	auto &ssp = species[p];
+	
+	auto markov_eqn_vari_store = ssp.markov_eqn_vari;
+	
+	// Checks that markov equations are correctly specified
+	for(auto e = 0u; e < ssp.N; e++){
+		auto list = seq_vec(ssp.markov_eqn_vari[e].div.size());
+		ssp.markov_value_calc(e,list,popcomb_t);
+		
+		if(dif(ssp.markov_eqn_vari[e].value_t,markov_eqn_vari_store[e].value_t,dif_thresh)){	
+			add_alg_warn("value error: "+ref);
+		}
+	}
+	check_timer[CHECK_MARKOV_DIV] += clock();
 }
 
 
@@ -683,7 +701,7 @@ void State::check_markov_trans(unsigned int p, string ref)
 		auto Li_markov_store = ssp.Li_markov[e];
 		
 		auto list = seq_vec(ssp.markov_eqn_vari[e].div.size());
-		ssp.markov_value_calc(e,list,popcomb_t);
+		//ssp.markov_value_calc(e,list,popcomb_t);
 		auto temp = 0.0;
 		ssp.likelihood_markov(e,list,temp);
 			
@@ -692,9 +710,9 @@ void State::check_markov_trans(unsigned int p, string ref)
 			auto &div = divi[ti];
 			const auto &divc = markov_eqn_vari_store[e].div[ti];
 				
-			if(dif(div.value,divc.value,dif_thresh)){	
-				add_alg_warn("value error");
-			}
+			//if(dif(div.value,divc.value,dif_thresh)){	
+				//add_alg_warn("value error");
+			//}
 			
 			if(dif(div.indfac_int,divc.indfac_int,THRESH_EXPAND*dif_thresh)){
 				add_alg_warn("indfac_int");
@@ -713,6 +731,8 @@ void State::check_markov_trans(unsigned int p, string ref)
 			}
 			
 			if(dif(ssp.Li_markov[e][ti],Li_markov_store[ti],THRESH_EXPAND*dif_thresh)){
+				cout << e << " " << ti << " " <<  ssp.Li_markov[e][ti] << " " << Li_markov_store[ti] << " dif" << endl;
+				emsg("Li_markov");
 				add_alg_warn("Li_markov error"+ref);
 			}
 		}
@@ -776,13 +796,12 @@ void State::check_para_speedup(unsigned int p, string ref)
 	
 	case POPULATION: case DETERMINISTIC: 
 		{
-			auto dt = model.details.dt;
 			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 				vector <double> tnm_para(T,UNSET); 
-				ssp.calculate_tnum_mean_para(tnm_para,list,tr,popcomb_t,ssp.cpop_st,dt);
+				ssp.calculate_tnum_mean_para(tnm_para,list,tr,ssp.cpop_st);
 				
 				for(auto ti = 0u; ti < T; ti++){
-					auto val = ssp.calculate_tnum_mean(ti,tr,popcomb_t[ti],ssp.cpop_st[ti],dt);
+					auto val = ssp.calculate_tnum_mean(ti,tr,ssp.cpop_st[ti]);
 					if(dif(val,tnm_para[ti],DIF_THRESH)){
 						emsg("calculate_tnum_mean_para problem");
 					}
@@ -796,7 +815,8 @@ void State::check_para_speedup(unsigned int p, string ref)
 }
 	
 	
-/// Checks the div value
+/*
+/// Checks the markov value
 void State::check_markov_div_value(unsigned int p, string ref)
 {
 	check_timer[CHECK_MARKOV_DIV] -= clock();
@@ -828,6 +848,7 @@ void State::check_markov_div_value(unsigned int p, string ref)
 	
 	check_timer[CHECK_MARKOV_DIV] += clock();
 }
+*/
 
 
 /// Checks likelihoods for non-Markovian transitions
@@ -1052,8 +1073,10 @@ void State::check_pop_t(string ref)
 	if(popnum_t.size() != T) emsg("Wrong size2 "+ref);
 	
 	for(auto ti = 0u; ti < T; ti++){
-		if(popnum_t[ti].size() != model.pop.size()) emsg("Wrong size3");
-		for(auto k = 0u; k < model.pop.size(); k++){
+		//if(popnum_t[ti].size() != model.pop.size()) emsg("Wrong size3");
+		if(popnum_t[ti].size() != model.npop) emsg("Wrong size3");
+		//for(auto k = 0u; k < model.pop.size(); k++){
+		for(auto k = 0u; k < model.npop; k++){
 			if(dif(popnum_t[ti][k],popnum_t_store[ti][k],dif_thresh)){	
 				add_alg_warn("popnum_t problem"+ref);
 			}
@@ -1198,7 +1221,7 @@ void State::check_pop_like(unsigned int p, string ref)
 	auto trans_num_store = ssp.trans_num;
 	auto tnum_mean_st_st = ssp.tnum_mean_st;
 	
-	ssp.likelihood_pop(popcomb_t);
+	ssp.likelihood_pop();
 	
 	auto thresh = dif_thresh;
 	thresh = TINY;
@@ -1213,6 +1236,13 @@ void State::check_pop_like(unsigned int p, string ref)
 			}
 			
 			if(dif(ssp.Li_markov_pop[tr][ti],Li_markov_pop_store[tr][ti],thresh)){
+				/*
+				for(auto tr = 0u; tr < ssp.Li_markov_pop.size(); tr++){
+					for(auto ti = 0u; ti < T; ti++){
+						cout << ssp.Li_markov_pop[tr][ti] << " " << Li_markov_pop_store[tr][ti] << "Jj" << endl;
+					}
+				}
+				*/
 				add_alg_warn("Li mark prob");
 			}
 		}
@@ -1228,10 +1258,15 @@ void State::check_maps(string ref)
 	check_timer[CHECK_MAPS] -= clock();
 	
 	if(pop_list.size() != 0) emsg("pop list"+ref);
-	if(markov_eqn_list.size() != 0) emsg("markov_eqn_list");
-	if(trans_list.size() != 0) emsg("trans_list");
-		
-	for(auto i = 0u; i < model.pop.size(); i++){
+	
+	for(auto p = 0u; p < species.size(); p++){
+		if(markov_eqn_list[p].size() != 0) emsg("markov_eqn_list");
+		if(trans_list[p].size() != 0) emsg("trans_list");
+	}
+	
+	if(pop_map.size() != model.npop) emsg("Should be npop");
+	//for(auto i = 0u; i < model.pop.size(); i++){
+	for(auto i = 0u; i < model.npop; i++){
 		if(pop_map[i] != UNSET) emsg("prob");
 	}
 		
@@ -1248,21 +1283,16 @@ void State::check_maps(string ref)
 			if(pop_data_map[p][r] != UNSET) emsg("pop_data_map");
 		}
 		
-		switch(model.species[p].type){
-		case INDIVIDUAL: 
-			for(auto i = 0u; i < model.species[p].markov_eqn.size(); i++){
-				if(markov_eqn_map[p][i] != false) emsg("prob");
-			}
-			break;
-		
-		case POPULATION:
+		for(auto i = 0u; i < model.species[p].markov_eqn.size(); i++){
+			if(markov_eqn_map[p][i] != false) emsg("prob");
+		}
+		if(markov_eqn_list[p].size() != 0) emsg("prob markov_eqn_list");
+			
+		if(model.species[p].type == POPULATION){
 			for(auto i = 0u; i < model.species[p].tra_gl.size(); i++){
 				if(trans_map[p][i] != false) emsg("prob");
 			}
-			break;
-			
-		case DETERMINISTIC:
-			break;
+			if(trans_list[p].size() != 0) emsg("prob trans_list");
 		}
 	}
 	
@@ -2151,7 +2181,8 @@ void State::check_popnum_ind(string ref)
 	
 	// Checks popnum_ind is the same
 	for(auto ti = 0u; ti < T; ti++){
-		for(auto po = 0u; po < model.pop.size(); po++){
+		//for(auto po = 0u; po < model.pop.size(); po++){
+		for(auto po = 0u; po < model.npop; po++){
 			if(popnum_ind[ti][po].size() != popnum_ind_store[ti][po].size()){
 				emsg("popnum_ind size wrong:"+ref);
 			}
@@ -2176,7 +2207,8 @@ void State::check_popnum_ind(string ref)
 	
 	// Checks popnum_ind reference is correct
 	for(auto ti = 0u; ti < T; ti++){
-		for(auto po = 0u; po < model.pop.size(); po++){
+		//for(auto po = 0u; po < model.pop.size(); po++){
+		for(auto po = 0u; po < model.npop; po++){
 			auto p = model.pop[po].p;
 			for(auto j = 0u; j < popnum_ind[ti][po].size(); j++){
 				const auto &pir = popnum_ind[ti][po][j];
@@ -2236,10 +2268,8 @@ void State::check_add_move_rem(string ref)
 				
 				auto fl = false;
 				if(indd.ev.size() != ed.size()){ 
-					// TO DO SORT OUT ERROR
-					
 					//cout << indd.ev.size() << " "<<ed.size() << "indd ev size wrong" << endl;
-					//fl = true;
+					fl = true;
 				}
 				else{
 					for(auto e = 0u; e < indd.ev.size(); e++){
@@ -2371,9 +2401,8 @@ void State::check_neg_rate(string name)
 			for(auto e = 0u; e < sp.markov_eqn.size(); e++){
 				//auto &me = sp.markov_eqn[e];
 				auto &me_vari = ssp.markov_eqn_vari[e];
-				for(auto ti = 0u; ti <  me_vari.div.size(); ti++){
-					auto &div =	me_vari.div[ti];
-					auto val = div.value;
+				for(auto ti = 0u; ti <  me_vari.value_t.size(); ti++){
+					auto val = me_vari.value_t[ti];
 					if(val < -SMALL){
 						add_alg_warn("Negative problem. After proposal:"+name+" val="+tstr(val));
 					}				
@@ -2393,7 +2422,7 @@ void State::check_neg_rate(string name)
 }
 
 
-/// CWorks out the difference between true markov value and one set
+/// Works out the difference between true markov value and one set
 void State::check_markov_value_dif()
 {
 	check_timer[CHECK_MARKOV_VALUE_DIF] -= clock();
@@ -2418,28 +2447,32 @@ void State::check_markov_value_dif()
 				auto value = model.eqn[me.eqn_ref].calculate_param(precalc);
 				if(!me.rate) value = 1.0/value;
 				
-				auto d = me_vari.div[0].value-value*dt;
+				auto d = me_vari.value_t[0]-value*dt;
 				if(d*d > dmax) dmax = d*d;
 			}		
 			else{
 				const auto &eq = model.eqn[me.eqn_ref];
-				auto &div = me_vari.div;
+				auto &val_t = me_vari.value_t;
 				
-				vector < vector < vector <double> > > derive_val;
+				vector <double> vec;
+
+				if(eq.lin.on) vec = eq.calculate_linear_list(list,popcomb_t,precalc);
+				else{				 
+					vector < vector < vector <double> > > derive_val;
+					vec = eq.calculate_para(eq.calcu,list,popcomb_t,precalc,derive_val);
+				}
 				
-				auto vec = eq.calculate_para(eq.calcu,list,popcomb_t,precalc,derive_val);
-					
 				if(me.rate){
 					for(auto k = 0u; k < list.size(); k++){
 						auto ti = list[k];
-						auto d = div[ti].value-dt*vec[k];
+						auto d = val_t[ti]-dt*vec[k];
 						if(d*d > dmax) dmax = d*d;
 					}
 				}
 				else{
 					for(auto k = 0u; k < list.size(); k++){
 						auto ti = list[k];
-						auto d = div[ti].value-dt/vec[k];
+						auto d = val_t[ti]-dt/vec[k];
 						if(d*d > dmax) dmax = d*d;
 					}
 				}
@@ -2455,7 +2488,10 @@ void State::check_markov_value_dif()
 /// Adds an algorithm warning
 void State::add_alg_warn(string te)
 {
-	emsg(te+" ALG WARNING");  // CHECKON turn off
+	if(false){
+		cout << "warning create termination" << endl;
+		emsg(te+" ALG WARNING"); 
+	}
 	if(debugging) emsg(te+" ALG WARNING"); 
 	
 	add_alg_warning(te,sample,alg_warn);
@@ -2473,10 +2509,8 @@ void State::check_precalc_dif(string ref)
 	auto precalc_st = precalc;
 	auto value_st = value;
 	
-	model.precalc_eqn.calculate(model.spec_precalc_all,param_val,false);
-	
-	model.param_spec_precalc_time_all(popcomb_t,param_val,false);
-
+	model.precalc_calculate_all(param_val,popcomb_t);
+		
 	auto dthmax = 0.0;
 	for(auto th = 0u; th < value.size(); th++){
 		if(value_st[th] == UNSET) emsg("Value should not be unset2");
@@ -2486,7 +2520,7 @@ void State::check_precalc_dif(string ref)
 	}
 	
 	auto dpmax = 0.0;
-	for(auto i = 0u; i < precalc.size(); i++){
+	for(unsigned long long i = 0; i < precalc.size(); i++){
 		if(precalc_st[i] == UNSET){
 			emsg("Precalc should not be unset2");
 		}
@@ -2539,6 +2573,7 @@ void State::scan_param()
 	for(auto val = 0.000001; val < 0.0001; val += 0.000001){
 		value[0] = val;
 		param_val = model.set_param_val(value);
+		regenerate(T,true,true);
 		likelihood_from_scratch();
 		
 		cout << like.markov << " Likelihood" << endl;
@@ -2556,5 +2591,109 @@ void State::check_dpop()
 		if(va != UNSET) emsg("Should be unset2");
 	}
 	if(dpop_list.size() != 0) emsg("dpop_list prob");
+}
+
+
+/// Checks that regeneration has been successful
+void State::check_regenerate(string ref)
+{
+	vector < vector <vector <double> > > cpop_st_store;
+	vector < vector <vector <double> > > div_value_store;
+	cpop_st_store.resize(model.nspecies);
+	div_value_store.resize(model.nspecies);
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];
+		const auto &ssp = species[p];
+		
+		if(sp.type == POPULATION || sp.type == DETERMINISTIC) cpop_st_store[p] = ssp.cpop_st;
+		div_value_store[p].resize(ssp.markov_eqn_vari.size());
+		for(auto e = 0u; e < ssp.markov_eqn_vari.size(); e++){
+			const auto &mev = ssp.markov_eqn_vari[e];
+			div_value_store[p][e].resize(mev.div.size());
+			for(auto ti = 0u; ti < mev.value_t.size(); ti++){
+				auto val = mev.value_t[ti];
+				if(val < 0 && val > -TINY) emsg("Value should not be negative: "+ref);
+				div_value_store[p][e][ti] = val;
+			}
+		}		
+	}
+	
+	auto popnum_t_store = popnum_t;
+	auto popcomb_t_store = popcomb_t;
+	auto popcombw_value_store = popcombw_value;
+
+	regenerate(T,true,true);
+	
+	if(dif(popnum_t,popnum_t_store,DIF_THRESH)){
+		for(auto ti = 0u; ti < T; ti++){
+			for(auto j = 0u; j < popnum_t[ti].size(); j++){
+				if(dif(popnum_t[ti][j],popnum_t_store[ti][j],DIF_THRESH)){
+					
+					cout << ti << " " << j << " jj" << endl;
+					cout << popnum_t[ti][j] << " " << popnum_t_store[ti][j] << " regen " << ref << endl;
+					/*
+					for(auto ti = 0u; ti < T; ti++){
+						cout << ti << " " <<  popnum_t[ti][j] << " " << popnum_t_store[ti][j] << "comp" << endl;
+					}
+					cout << model.pop[j].name << " pop nam" << endl;
+				 
+					species[0].print_event(species[0].individual[241].ev);
+					*/
+					emsg("dif popnum");
+				}
+			}
+		}
+		
+		//emsg("Difference in popnum: "+ref);
+	}
+	
+	if(dif(popcombw_value,popcombw_value_store,DIF_THRESH)){
+		for(auto i = 0u; i < popcombw_value.size(); i++){
+			if(dif(popcombw_value[i],popcombw_value_store[i],DIF_THRESH)){
+				cout << i << "i" << " " << popcombw_value[i]<< " " << popcombw_value_store[i] <<  endl;
+				emsg("Difference in popcombw_value: "+ref);
+			}
+		}
+		emsg("Difference in popcombw_value: "+ref);
+	}
+	
+	if(dif(popcomb_t,popcomb_t_store,DIF_THRESH)){
+		for(auto ti = 0u; ti < T; ti++){
+			for(auto j = 0u; j < popcomb_t[ti].size(); j++){
+				if(dif(popcomb_t[ti][j],popcomb_t_store[ti][j],DIF_THRESH)){
+					cout << ti << " " << j << " " << popcomb_t[ti][j] << " " << popcomb_t_store[ti][j] << endl;
+					emsg("popcomb dif");
+				}
+			}
+		}
+		
+		emsg("Difference in popcomb: "+ref);
+	}
+	
+	auto dmax = 0.0;
+	for(auto p = 0u; p < model.nspecies; p++){
+		const auto &sp = model.species[p];
+		const auto &ssp = species[p];
+		
+		if(sp.type == POPULATION || sp.type == DETERMINISTIC){
+			if(dif(species[p].cpop_st,cpop_st_store[p],DIF_THRESH)) emsg("Difference in cpop_st: "+ref);
+		}
+		
+		for(auto e = 0u; e < ssp.markov_eqn_vari.size(); e++){
+			const auto &mev = ssp.markov_eqn_vari[e];
+			for(auto ti = 0u; ti < mev.value_t.size(); ti++){
+				auto d = div_value_store[p][e][ti]-mev.value_t[ti];
+				if(d < 0) d = -d;
+				if(d > dmax) dmax = d;
+				
+				if(dif(div_value_store[p][e][ti],mev.value_t[ti],DIF_THRESH)){
+					cout << p << " " << e << " " << ti << " val" << endl;
+					
+					emsg("Difference in markov value: "+ref);
+				}
+			}
+		}		
+	}
+	//cout << dmax << " dmax" << endl;
 }
 

@@ -27,13 +27,13 @@ function create_output_file(save_type,one_file,map_store,bscript_add)
 		
 		let pro = process_lines(lines,"");
 		
-		post({formatted:pro.formatted, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
+		post({formatted:pro.formatted, ret_mod:true});
 	}
 	else{
 		percent(90);
 		write_file_store(te,"bicifile",file_list,"bicifile");
 		percent(100);
-		post({save_type:save_type, file_list:file_list, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
+		post({save_type:save_type, file_list:file_list, ret_mod:true});
 	}
 }
 
@@ -64,6 +64,10 @@ function create_bscript(save_type,map_store)
 	model.check_det_species(save_type);
 	
 	percent(45);
+	
+	if(model.species.length == 0 && (save_type == "sim" || save_type == "inf")){	
+		add_warning({mess:"Model problem", mess2:"At least one species must be added to the system", warn_type:"NoSpecies"});
+	}
 	
 	for(let p = 0; p < model.species.length; p++){
 		create_output_species(p,save_type,map_store,bscript);
@@ -162,6 +166,7 @@ function generate_text_from_bscript(bscript,file_list,one_file)
 				
 				te += " "+ta.name+"=";
 				let val = ta.value;
+			
 				if(typeof val == 'object'){
 					if(val.name == "inline") val = val.te;
 					else error("problem gen bscript");
@@ -351,7 +356,7 @@ function err_warning()
 		break;
 	}
 
-	let wa = {type:"Model warning", command_type:input.type, species:strip_heavy(model.species), warn:model.warn, full_warn:full_warn};
+	let wa = {type:"Model warning", command_type:input.type, warn:model.warn, full_warn:full_warn, ret_mod:true};
 	if(try_on == false) prr(wa);
 	else throw(wa);
 }
@@ -418,7 +423,7 @@ function create_output_species(p,save_type,map_store,bscript)
 		add_bscript("species",tags,bscript);
 	}
 	
-	create_output_compartments(p,map_store,bscript);
+	create_output_compartments(p,save_type,map_store,bscript);
 
 	create_output_ind_eff(p,bscript);
 
@@ -440,7 +445,7 @@ function create_output_species(p,save_type,map_store,bscript)
 
 
 /// Creates output for all the compartments and transitions in the model
-function create_output_compartments(p,map_store,bscript)
+function create_output_compartments(p,save_type,map_store,bscript)
 {
 	mini_banner("SPECIES MODEL",bscript);
 		
@@ -462,6 +467,10 @@ function create_output_compartments(p,map_store,bscript)
 				}
 			}
 		}
+	}
+	
+	if(sp.ncla == 0 && (save_type == "sim" || save_type == "inf")){
+		add_warning({mess:"Species problem", mess2:"At least one classification must be added to species '"+sp.name+"'", warn_type:"NoCla", p:p});
 	}
 	
 	for(let cl = 0; cl < sp.ncla; cl++){
@@ -495,6 +504,10 @@ function create_output_compartments(p,map_store,bscript)
 					add_tag("scale",precision(cam.scale),tags);
 						
 					add_bscript("view",tags,bscript);			
+				}
+	
+				if(claa.ncomp == 0 && (save_type == "sim" || save_type == "inf")){
+					add_warning({mess:"Classification problem", mess2:"At least one compartment must be added to classification '"+claa.name+"'", warn_type:"NoComp", p:p, cl:cl});
 				}
 	
 				let store=[];
@@ -977,74 +990,104 @@ function output_param(par,save_type,bscript)
 		}
 		else{
 			// Constants and simulation parameters
-			if(par.variety == "reparam" && par.reparam_eqn_on){	
-				if(par.reparam_eqn.trim() != ""){
-					add_tag("reparam",par.reparam_eqn,tags);
+			if(par.variety == "dynamic"){
+				let di = par.dynamic_info;
+				let res = dynamic_definition(di,par,true);
+				if(res.err != undefined){
+					add_warning({mess:"Problem with dynamic simulation", mess2:"For parameter "+par.full_name+": "+res.msg, warn_type:"ParamDynamic", name:par.name});
 				}
-				else{
-					add_warning({mess:"Missing reparameterisation", mess2:"The reparameterisation for parameter "+par.full_name+" must be set.", warn_type:"RepEqValue", name:par.name});
+				
+				add_tag("dynamic-sim",res,tags);
+				
+				switch(di.type.te){
+				case "bin-thresh-region": case "bin-min-max-region":
+					{
+						let tab = output_table_file(di.region.table);
+						add_tag("region",tab,tags);
+					}
+					break;
 				}
+				
 				display = true;
 			}
 			else{
-				if((par.ndep_cont == 0 && par.value == set_str) || (par.set == false && !(par.variety == "dist" && par.sim_sample.check == true))){
-					if(save_type == "sim"){
-						if(param_needed(par,"sim")){
-							add_warning({mess:"A value for parameter "+par.full_name+" must be set.", mess2:"Parameter values must be set before simulation can be perfomed", warn_type:"SimValue", name:par.name});
-							return;
-						}
-					}
-					
-					if(save_type == "ppc"){
-						add_warning({mess:"A value for parameter multiplier "+par.full_name+" must be set.", mess2:"Parameter multiplier values must be set before posterior simulation can be perfomed", warn_type:"ParamMultValue", name:par.name});
-						return;
-					}
-				
-					switch(par.variety){
-					case "const":
-						add_warning({mess:"Missing constant value", mess2:"The constant parameter "+par.full_name+" must be set.", warn_type:"ConstValue", name:par.name});
-						break;
-					
-					case "reparam":
-						add_warning({mess:"Missing reparameterisation", mess2:"The reparameterisation for parameter "+par.full_name+" must be set.", warn_type:"RepValue", name:par.name});
-						break;
-					}
-				}
-				else{
-					if(par.variety == "dist" && par.sim_sample.check == true){
-						output_add_prior_distribution(save_type,par,"dist",tags);
-						display = true;
-						dist_done = true;
+				if(par.variety == "reparam" && par.reparam_eqn_on){	
+					if(par.reparam_eqn.trim() != ""){
+						add_tag("reparam",par.reparam_eqn,tags);
 					}
 					else{
-						let exp = "value";
-						if(par.variety == "const") exp = 'constant';
-						else{
-							if(par.variety == "reparam") exp = 'reparam';
+						add_warning({mess:"Missing reparameterisation", mess2:"The reparameterisation for parameter "+par.full_name+" must be set.", warn_type:"RepEqValue", name:par.name});
+					}
+					display = true;
+				}
+				else{
+					if((par.ndep_cont == 0 && par.value == set_str) || (par.set == false && !(par.variety == "dist" && par.sim_sample.check == true))){
+						if(save_type == "sim"){
+							if(param_needed(par,"sim")){
+								add_warning({mess:"A value for parameter "+par.full_name+" must be set.", mess2:"Parameter values must be set before simulation can be perfomed", warn_type:"SimValue", name:par.name});
+								return;
+							}
 						}
-									
-						let value;
-						if(par.ndep_cont > 0){
-							value = output_value_table(par,par.value,"Value","value",save_type);
-						}
-						else{
-							value = par.value;
+						
+						if(save_type == "ppc"){
+							add_warning({mess:"A value for parameter multiplier "+par.full_name+" must be set.", mess2:"Parameter multiplier values must be set before posterior simulation can be perfomed", warn_type:"ParamMultValue", name:par.name});
+							return;
 						}
 					
-						add_tag(exp,value,tags);
-						display = true;
-					}	
+						switch(par.variety){
+						case "const":
+							add_warning({mess:"Missing constant value", mess2:"The constant parameter "+par.full_name+" must be set.", warn_type:"ConstValue", name:par.name});
+							break;
+						
+						case "reparam":
+							add_warning({mess:"Missing reparameterisation", mess2:"The reparameterisation for parameter "+par.full_name+" must be set.", warn_type:"RepValue", name:par.name});
+							break;
+						}
+					}
+					else{
+						if(par.variety == "dist" && par.sim_sample.check == true){
+							output_add_prior_distribution(save_type,par,"dist",tags);
+							display = true;
+							dist_done = true;
+						}
+						else{
+							let exp = "value";
+							if(par.variety == "const") exp = 'constant';
+							else{
+								if(par.variety == "reparam") exp = 'reparam';
+							}
+						
+							check_variance_positive(par);
+							
+							let value;
+							if(par.ndep_cont > 0){
+								value = output_value_table(par,par.value,"Value","value",save_type);
+							}
+							else{
+								value = par.value;
+							}
+						
+							add_tag(exp,value,tags);
+							display = true;
+						}	
+					}
 				}
 			}
 			
-			if(par.prior_const_on == true && par.prior_const_set == true){
-				output_add_prior_const(save_type,par,tags);
-				display = true;
+			if(par.prior_const_on == true){
+				if(par.prior_const_set != true){
+					add_warning({mess:"Constant prior", mess2:"Constant prior for "+par.full_name+" not set", warn_type:"PriorConstValue", name:par.name});
+					return;
+				}
+				else{					 
+					output_add_prior_const(save_type,par,tags);
+					display = true;
+				}
 			}
 			else{
 				if(par.variety != "const" && par.variety != "reparam"){
 					switch(par.variety){
-					case "normal":
+					case "normal": case "dynamic":
 						output_add_prior_distribution(save_type,par,"prior",tags);
 						display = true;
 						break;
@@ -1130,7 +1173,31 @@ function output_param(par,save_type,bscript)
 	}
 }
 	
-	
+
+/// Checks that variance value is positive
+function check_variance_positive(par)
+{
+	if(is_covar(par)){ // Determines if variances are set to zero
+		if(par.ndep_cont == 0){
+			let num = Number(par.value);
+			if(num == 0){
+				add_warning({mess:"Variance", mess2:"The value for the variance <e>"+par.name+"</e> must be positive", warn_type:"SimValue", name:par.name});
+			}
+		}
+		else{
+			for(let i = 0; i < par.value.length; i++){
+				let num = Number(par.value[i][i]);
+				if(num == 0){
+					let name = par.name;
+					if(par.list != undefined) name += "_"+par.list[0][i]+","+par.list[0][i];
+					add_warning({mess:"Variance", mess2:"The value for the variance <e>"+name+"</e> must be positive", warn_type:"SimValue", name:par.name});
+				}
+			}
+		}
+	}
+}
+
+
 /// Outputs the value of a table
 function output_value_table(par,value,head_col,key,save_type)
 {
@@ -1675,6 +1742,13 @@ function create_output_siminf(save_type,bscript)
 		if(poutmax != PARAM_OUTPUT_MAX_DEFAULT) add_tag("param-output-max",poutmax,tags); 
 		
 		if(details.algorithm.value != ALG_DEFAULT) add_tag("algorithm",details.algorithm.value,tags); 
+		
+		switch(details.algorithm.value){
+		case "DA-MCMC":	case "PAS-MCMC":
+			let nsim = Number(details.chain_nsiminit);
+			if(nsim != CHAIN_NSIMINIT_DEFAULT) add_tag("num-sim-init",nsim,tags); 
+			break;
+		}
 		
 		switch(details.algorithm.value){
 		case "DA-MCMC":
@@ -2498,6 +2572,23 @@ function output_check(save_type)
 			if(ninitpop > 1){
 				add_warning({mess:"Initial population", mess2:"Only one initial population should be set for species '"+sp.name+"'", warn_type:"SimPopulationProb", p:p});
 			}
+			
+			switch(sp.type){
+			case "Population": case "Deterministic":
+				if(ninitpop == 0 && naddpop == 0 && model.source_exist(p) == false){
+					add_warning({mess:"No individuals", mess2:"Either 'Init. Pop.' or 'Add Pop.' must be set for species '"+sp.name+"'", warn_type:"SimPopulationProb", p:p});
+				}
+				break;
+			
+			case "Individual":
+				if(ninitpop == 0 && naddind == 0 && model.source_exist(p) == false){
+					add_warning({mess:"No individuals", mess2:"Either 'Init. Pop.' or 'Add Ind' must be set for species '"+sp.name+"'", warn_type:"SimPopulationProb", p:p});
+				}
+				break;
+			
+			default: error("op prob"); break;	
+			}
+			
 			break;
 		
 		case "inf":
@@ -2690,7 +2781,7 @@ function create_ppc_file(info,one_file)
 
 	write_file_store(te,"bicifile",file_list,"bicifile");
 
-	post({save_type:"ppc", file_list:file_list, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
+	post({save_type:"ppc", file_list:file_list, ret_mod:true});
 }
 
 
@@ -2718,5 +2809,5 @@ function create_ext_file(one_file)
 	
 	write_file_store(te,"bicifile",file_list,"bicifile");
 
-	post({save_type:"ext", file_list:file_list, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
+	post({save_type:"ext", file_list:file_list, ret_mod:true});
 }

@@ -376,7 +376,15 @@ void StateSpecies::set_m_ti_origin(vector <Event> &ev_new) const
 		}
 	}
 }
-	
+
+
+/// Thresholds the log value	
+double StateSpecies::log_thresh(double val) const
+{
+	if(val > LOG_THRESH) return val;
+	return LOG_THRESH;
+}
+
 
 /// Removes event from old event sequence 
 void StateSpecies::remove_event(Event &ev, const Individual &ind, Like &like_ch, unsigned int i, vector <Event> &event_old)
@@ -458,17 +466,17 @@ void StateSpecies::remove_event(Event &ev, const Individual &ind, Like &like_ch,
 				switch(p){
 				case OUTSIDE_INF: va = eq.calculate_no_pop(ti,precalc); break;
 				case ENTER_INF: va = UNSET; emsg("Should not be ENTER_INF"); break;
-				default: va = eq.calculate_pop_grad(iif.pref,ti,precalc); break;
+				default: va = eq.calculate_pop_grad(iif.pref,ti,popcombw_value,precalc); break;
 				}
 				
 				if(me.ind_variation) va *= get_indfac(ind,me);
 				Li = log(va*iif.w);
 			}
 			else{			
-				auto val = markov_eqn_vari[e].div[ti].value;
+				auto val = markov_eqn_vari[e].value_t[ti];
 				
-				if(me.ind_variation) Li = log(get_indfac(ind,me)*(val+LOG_THRESH));
-				else Li = log(val+LOG_THRESH);
+				if(me.ind_variation) Li = log(get_indfac(ind,me)*(log_thresh(val)));
+				else Li = log(log_thresh(val));
 			}
 			
 			back.push_back(Back(REMOVE_LI_MARKOV,e,ti,Li));
@@ -501,9 +509,8 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee, const vector <
 			auto m = ev.m;
 			auto dtdiv = ev.tdiv - t; 
 			
-			if(dtdiv <= 0){
-				emsg("zero time1");
-			}
+			if(dtdiv <= 0) emsg("zero time1");
+	
 			const auto &tra = sp.tra_gl[ev.tr_gl];	
 			const auto &nmt = sp.nm_trans[m];
 			const auto &ref = nmt.dist_param_eq_ref;
@@ -595,7 +602,7 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee, const vector <
 					va = UNSET; emsg("Should not be ENTER_INFa"); 
 					break;
 				default: 
-					va = eq.calculate_pop_grad(iif.pref,ti,precalc); 
+					va = eq.calculate_pop_grad(iif.pref,ti,popcombw_value,precalc); 
 					break;
 				}
 				
@@ -604,9 +611,9 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee, const vector <
 				Li = log(va*iif.w);
 			}
 			else{
-				auto val = markov_eqn_vari[e].div[ti].value;	
-				if(me.ind_variation) Li = log(get_indfac(ind,me)*(val+LOG_THRESH));
-				else Li = log(val+LOG_THRESH);
+				auto val = markov_eqn_vari[e].value_t[ti];	
+				if(me.ind_variation) Li = log(get_indfac(ind,me)*log_thresh(val));
+				else Li = log(log_thresh(val));
 			}
 			
 			back.push_back(Back(ADD_LI_MARKOV,e,ti,Li));
@@ -1046,7 +1053,6 @@ void StateSpecies::likelihood_init_cond_change(unsigned int c_enter_old, unsigne
 	}
 	else{
 		auto dLi_init_cond = 0.0;
-		int dN = 0;
 		
 		if(c_enter_old != UNSET){ 
 			const auto &crr = ic.comp_reduce_ref[c_enter_old];
@@ -1071,7 +1077,6 @@ void StateSpecies::likelihood_init_cond_change(unsigned int c_enter_old, unsigne
 			auto fr = icv.frac_comb[cred];
 			if(fr < TINY) dLi_init_cond += LARGISH;
 			else dLi_init_cond -= log(fr);
-			dN--;
 		}
 		
 		if(c_enter_new != UNSET){ 
@@ -1098,7 +1103,6 @@ void StateSpecies::likelihood_init_cond_change(unsigned int c_enter_old, unsigne
 			auto fr = icv.frac_comb[cred];
 			if(fr < TINY) dLi_init_cond -= LARGISH;
 			else dLi_init_cond += log(fr);
-			dN++;
 		}
 	
 		back.push_back(Back(IND_COND_VAL,c_enter_old,c_enter_new,dLi_init_cond));
@@ -1136,8 +1140,6 @@ void StateSpecies::init_cond_change_back(unsigned int c_enter_old, unsigned int 
 		}
 	}
 	else{
-		int dN = 0;
-		
 		if(c_enter_old != UNSET){ 
 			const auto &crr = ic.comp_reduce_ref[c_enter_old];
 			auto c = crr.c;
@@ -1150,8 +1152,6 @@ void StateSpecies::init_cond_change_back(unsigned int c_enter_old, unsigned int 
 			if(sp.type == INDIVIDUAL){
 				icv.N_focal_unobs[c]--;
 			}
-	
-			dN--;
 		}
 		
 		if(c_enter_new != UNSET){ 
@@ -1163,165 +1163,88 @@ void StateSpecies::init_cond_change_back(unsigned int c_enter_old, unsigned int 
 			icv.cnum_reduce[c][cred]++;
 			icv.cnum[c_enter_new]++;
 			if(sp.type == INDIVIDUAL) icv.N_focal_unobs[c]++;
-			
-			dN++;
 		}
 	}
 }
 
 
 /// Recalulates the value of Markov equation (because population change)
-void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popcomb_t, const vector <PopChange> &pop_change, double &like_ch)
+void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popcomb_t, double &like_ch)
 {
-	if(type != INDIVIDUAL) emsg("must be ind");
-	
 	const auto &me = sp.markov_eqn[ee];
 	auto &me_vari = markov_eqn_vari[ee];
+	auto &div = me_vari.div;
+	auto &val_t = me_vari.value_t;
 
 	const auto &eq = eqn[me.eqn_ref];
-	const auto &lin = eq.lin;
 	const auto &precalc = param_val.precalc;
-	
-	auto &Li_m = Li_markov[ee];
 	
 	if(me_vari.time_vari == false) emsg("must have time variation");
 	
-	// Different type of update:
-	// RECALC This recalculates each time
-	// USE_POP_DIF This uses just the change in populations (when equation can be linearised)
-	// USE_POP_DIF_FAC This uses just the change in populations (when factor time dependent)
-	// USE_POP_DIF_TIME This uses just the change in populations (when gradient time dependent)
-	
-	emsg("sort25");
-	/*
-	auto type = RECALC;
-	
-	if(update_ind_linearise_speedup && lin.on){
-		type = USE_POP_DIF;	
-		if(lin.pop_grad_time_dep) type = USE_POP_DIF_TIME;
-		else{
-			if(lin.factor_time_dep) type = USE_POP_DIF_FAC;
-		}
-	}
-	if(type == RECALC && calc_para_speedup) type = RECALC_PARA;
-	
+	auto list = seq_vec(ti,ti_next);
+		
 	vector <double> value_para;
 	
-	vector <unsigned int> pr_store;
-	auto diff = 0.0;
-	switch(type){
-	case RECALC:              // If recalculating
-		break;
-		
-	case RECALC_PARA:         // Recalculates in parallel
+	if(eq.lin.on) value_para = eq.calculate_linear_list(list,popcomb_t,precalc);
+	else{
+		const vector < vector < vector <double> > > derive_val;
+		value_para = eq.calculate_para(eq.calcu,list,popcomb_t,precalc,derive_val); 
+	}
+	
+	auto N = list.size();
+	
+	switch(sp.type){
+	case POPULATION:	
 		{
-			vector <unsigned int> list;
-			for(auto tii = ti; tii < ti_next; tii++) list.push_back(tii);
-			
-			const vector < vector < vector <double> > > derive_val;
-			value_para = eq.calculate_para(eq.calcu,list,popcomb_t,precalc,derive_val); 
-		}
-		break;
-		
-	case USE_POP_DIF:         // If population gradient not time dependent
-		for(const auto &po_ch : pop_change){
-			auto pr = lin.get_pop_ref(po_ch.po);
-			if(pr != UNSET){
-				auto va = eq.calculate_pop_grad_no_time(pr,precalc);
-				diff += va*po_ch.num;
-			}
-		}
-		diff *= dt;
-		break;
-		
-	case USE_POP_DIF_FAC:      // If population gradient without factor not time dependent
-		for(const auto &po_ch : pop_change){
-			auto pr = lin.get_pop_ref(po_ch.po);
-			if(pr != UNSET){
-				auto va = eq.calculate_pop_grad_without_factor_no_time(pr,precalc);
-				diff += va*po_ch.num;
-			}
-		}
-		diff *= dt;
-		break;
-	
-	case USE_POP_DIF_TIME:         // If population gradient time dependent
-		// Makes a list of populations
-		for(auto k = 0u; k < pop_change.size(); k++){
-			auto pr = lin.get_pop_ref(pop_change[k].po);
-			if(pr != UNSET) pr_store.push_back(pr);
-		}
-		break;
-	}
-
-	vector <double> dLi_store, value_store;
-	double value;
-	for(auto tii = ti; tii < ti_next; tii++){
-		auto &div = me_vari.div[tii];
-		
-		auto val_old = div.value;
-	
-		switch(type){
-		case RECALC:
-			value = dt*eq.calculate(tii,popcomb_t[tii],precalc);	
-			break;
-		
-		case RECALC_PARA:
-			value = dt*value_para[tii-ti];
-			break;
-			
-		case USE_POP_DIF:
-			value = val_old+diff;
-			break;
-			
-		case USE_POP_DIF_FAC:
-			value = val_old+diff*eq.calculate_factor(tii,precalc);
-			break;
-			
-		case USE_POP_DIF_TIME:
-			{
-				value = val_old;
-				auto sum = 0.0;
-				for(auto k = 0u; k < pop_change.size(); k++){
-					const auto &po_ch = pop_change[k];
-					auto va = eq.calculate_pop_grad(pr_store[k],tii,precalc);
-					sum += va*po_ch.num;
+			vector <double> value_store;
+			for(auto i = 0u; i < N; i++){
+				auto value = dt*value_para[i];
+				if(value < 0){
+					if(value > -TINY) value = 0; 
+					else emsg("Markov equation has become negative");
 				}
-				value += dt*sum;
+				auto &val = val_t[list[i]];
+				value_store.push_back(val);
+				val = value;
 			}
-			break;
+			back.push_back(Back(VALUE_MARKOV,ee,ti,value_store));
 		}
-		
-		if(false){
-			auto val_ch = dt*eq.calculate(tii,popcomb_t[tii],precalc);
-			if(dif(value,val_ch,dif_thresh)){
-				emsg("problem with value");
-			}
-		}
+		break;
+
+	case INDIVIDUAL:
+		{
+			auto &Li_m = Li_markov[ee];
+			vector <double> value_store, dLi_store;
+			for(auto i = 0u; i < N; i++){
+				auto ti = list[i];
+				auto &di = div[ti]; 
+				auto &val = val_t[ti];
+				value_store.push_back(val);
+					
+				auto value = dt*value_para[i];
+				if(value < 0){
+					emsg("Markov equation has become negative2");
+				}
 				
-		if(value < 0){
-			if(value > -TINY) value = 0;
-			else{
-				emsg("Markov equation has become negative2");
+				auto dLi = -(value-val)*di.indfac_int;
+		
+				auto n = di.ind_trans.size();	
+				if(n > 0 && !me.infection_trans){
+					dLi += n*log(log_thresh(value)/log_thresh(val));
+				}
+				dLi_store.push_back(dLi); 
+		
+				Li_m[ti] += dLi;
+				like_ch += dLi;	
+				val = value;
 			}
+			back.push_back(Back(VALUE_MARKOV,ee,ti,value_store));
+			back.push_back(Back(LI_MARKOV,ee,ti,dLi_store));
 		}
+		break;
 	
-		auto dLi = -(value-val_old)*div.indfac_int;
-		
-		auto n = div.ind_trans.size();	
-		if(n > 0 && !me.infection_trans){
-			dLi += n*log((value+LOG_THRESH)/(val_old+LOG_THRESH));
-		}
-		dLi_store.push_back(dLi); value_store.push_back(div.value);
-		
-		Li_m[tii] += dLi;
-		like_ch += dLi;	
-		div.value = value;
+	default: emsg("type not set"); break;
 	}
-	
-	back.push_back(Back(LI_MARKOV,ee,ti,dLi_store));
-	back.push_back(Back(VALUE_MARKOV,ti_next,value_store));
-	*/
 }
 
 	
@@ -1566,23 +1489,6 @@ void StateSpecies::restore_back()
 				
 			case DLI_INDFAC: case DIF_INDFAC: break;
 			
-			case LI_MARKOV: 
-				{
-					auto e = ba.i, ti = ba.index, ti_next = back[b+1].i;
-					const auto &Li = ba.vec;
-					const auto &value = back[b+1].vec;
-					auto &Li_m = Li_markov[e];
-					auto &me_vari = markov_eqn_vari[e];
-
-					auto k = 0u;
-					for(auto tii = ti; tii < ti_next; tii++){
-						Li_m[tii] -= Li[k];
-						me_vari.div[tii].value = value[k];
-						k++;
-					}
-				}
-				break;
-				
 			case OBS_TRANS_EQN_NUM:
 				{
 					auto tr_gl = ba.i;
@@ -1596,7 +1502,29 @@ void StateSpecies::restore_back()
 				}
 				break;
 			
-			case VALUE_MARKOV: break;
+			case LI_MARKOV: 
+				{
+					auto ee = ba.i;
+					auto ti = ba.index;
+					const auto &vec = ba.vec;
+					auto &Li_m = Li_markov[ee];
+					for(auto i = 0u; i < vec.size(); i++){
+						Li_m[ti] -= vec[i]; ti++;
+					}
+				}
+				break;
+				
+			case VALUE_MARKOV:
+				{
+					auto ee = ba.i;
+					auto ti = ba.index;
+					const auto &vec = ba.vec;
+					auto &val_t = markov_eqn_vari[ee].value_t;
+					for(auto i = 0u; i < vec.size(); i++){
+						val_t[ti] = vec[i]; ti++;
+					}
+				}
+				break;
 		
 			case IND_COND_VAL:
 				Li_init_cond -= ba.value;

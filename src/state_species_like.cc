@@ -15,7 +15,7 @@ using namespace std;
 
 /// Markov likelihood for a specific equation
 vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <unsigned int> &list, double &like_ch)
-{
+{ 
 	auto &me = sp.markov_eqn[e];
 	auto &me_vari = markov_eqn_vari[e];
 	auto &Li_mark = Li_markov[e];
@@ -27,14 +27,14 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 	double va;
 	
 	auto &mvdiv = me_vari.div;
+	auto &val_t = me_vari.value_t;
 	
 	for(auto ti : list){
 		auto &div = mvdiv[ti];
 		
-		auto val = div.value;
+		auto &val = val_t[ti];
 		if(val < 0){
 			if(val > -SMALLISH){
-				div.value = 0;
 				val = 0;
 			}
 			else{
@@ -44,7 +44,7 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 		}
 		
 		auto Li = -val*div.indfac_int;
-	
+		
 		auto si = div.ind_trans.size();
 			
 		if(me.infection_trans){ // If an infection transition then works out specific probability of specific individual
@@ -67,7 +67,7 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 					break;
 					
 				default:
-					va = eq.calculate_pop_grad(iif.pref,ti,precalc);
+					va = eq.calculate_pop_grad(iif.pref,ti,popcombw_value,precalc);
 					break;
 				}
 				
@@ -82,10 +82,10 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 			
 			case 1:
 				if(me.ind_variation){
-					Li += log(get_indfac(individual[div.ind_trans[0].i],me)*(val+LOG_THRESH));	
+					Li += log(get_indfac(individual[div.ind_trans[0].i],me)*log_thresh(val));	
 				}
 				else{
-					Li += log(val+LOG_THRESH);	
+					Li += log(log_thresh(val));	
 				}
 				break;
 				
@@ -93,11 +93,11 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 				if(me.ind_variation){
 					for(const auto &it : div.ind_trans) Li += log(get_indfac(individual[it.i],me));
 				}
-				Li += si*log(val+LOG_THRESH);
+				Li += si*log(log_thresh(val));
 				break;
 			}
 		}
-		
+	
 		like_ch += Li-Li_mark[ti];
 		store.push_back(Li_mark[ti]);
 		
@@ -111,132 +111,66 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 /// Calculate the value of a markov equation
 vector <double> StateSpecies::markov_value_calc(unsigned int e, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t)
 {
-	auto &me = sp.markov_eqn[e];
-	auto &me_vari = markov_eqn_vari[e];
-
-	const auto &precalc = param_val.precalc;	
-		
 	vector <double> store;
-
+	
+	auto &me = sp.markov_eqn[e];
+	const auto &eq = eqn[me.eqn_ref];
+	auto &me_vari = markov_eqn_vari[e];
+	const auto &precalc = param_val.precalc;	
+	
 	if(me.time_vari == false){
-		auto value = eqn[me.eqn_ref].calculate_param(precalc);
+		auto value = eq.calculate_param(precalc);
 		if(!me.rate) value = 1.0/value;
 		
-		store.push_back(me_vari.div[0].value);
-		me_vari.div[0].value = value*dt;
+		store.push_back(me_vari.value_t[0]);
+		me_vari.value_t[0] = value*dt;
 	}		
 	else{
-		const auto &eq = eqn[me.eqn_ref];
-		auto &div = me_vari.div;
+		auto &val_t = me_vari.value_t;
+		const auto &lin = eq.lin;
+
+		vector <double> vec;
 		
-		if(calc_para_speedup){
-			vector < vector < vector <double> > > derive_val;
-			
-			auto vec = eq.calculate_para(eq.calcu,list,popcomb_t,precalc,derive_val);
+		if(lin.on){
+			vec = eq.calculate_linear_list(list,popcomb_t,precalc);
 				
-			if(me.rate){
-				for(auto k = 0u; k < list.size(); k++){
-					auto ti = list[k];
-					store.push_back(div[ti].value);
-					div[ti].value = dt*vec[k];
-				}
-			}
-			else{
-				for(auto k = 0u; k < list.size(); k++){
-					auto ti = list[k];
-					store.push_back(div[ti].value);
-					div[ti].value = dt/vec[k];
-				}
+			if(false){ 
+				vector < vector < vector <double> > > derive_val;
+				auto vec2 = eq.calculate_para(eq.calcu,list,popcomb_t,precalc,derive_val);
+				if(!equal_vec(vec,vec2)) emsg("Vectors are different");
 			}
 		}
 		else{
-			if(me.rate){
-				for(auto ti : list){	
-					auto value = dt*eq.calculate(ti,popcomb_t[ti],precalc);
-					store.push_back(div[ti].value);
-					div[ti].value = value;
-				}
+			if(calc_para_speedup){
+				vector < vector < vector <double> > > derive_val;
+				vec = eq.calculate_para(eq.calcu,list,popcomb_t,precalc,derive_val);
 			}
 			else{
 				for(auto ti : list){	
-					auto value = dt/eq.calculate(ti,popcomb_t[ti],precalc);
-					store.push_back(div[ti].value);
-					div[ti].value = value;
+					auto value = dt*eq.calculate(ti,popcomb_t[ti],precalc);
+					vec.push_back(value);
 				}
+			}
+		}
+		
+		if(me.rate){
+			for(auto k = 0u; k < list.size(); k++){
+				auto &val = val_t[list[k]];
+				store.push_back(val);
+				val = dt*vec[k];
+			}
+		}
+		else{
+			for(auto k = 0u; k < list.size(); k++){
+				auto &val = val_t[list[k]];
+				store.push_back(val);
+				val = dt/vec[k];
 			}
 		}
 	}
 	
 	return store;
 }
-
-
-/* CHECKON delete?
-/// Calculate the value of a markov equation 
-// This is the case when only the non-population part of the equation changes
-vector <double> StateSpecies::markov_value_nopop_calc(const vector <unsigned int> &me_list, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, const PV &param_val)
-{
-	auto e_first = me_list[0];
-	auto &me = sp.markov_eqn[e_first];
-	
-	vector <double> store;
-	
-	if(me.time_vari == false) emsg("time_vary should be true");
-	
-	const auto &eq = eqn[me.eqn_ref];
-	const auto &lin = eq.linearise;
-	const auto &npp = lin.no_pop_precalc;
-	
-	const auto &precalc = param_val.precalc;
-	const auto &precalc_old = param_val.precalc_old;
-		
-	if(lin.no_pop_calc_time_dep){ // Time dependent	
-		for(auto ti : list){	
-			auto d = dt*(eq.calculate_item(npp,ti,precalc) - eq.calculate_item_old(npp,ti,precalc,precalc_old));
-	
-			for(auto e : me_list){		
-				auto &div = markov_eqn_vari[e].div;			
-				auto val = div[ti].value;
-				store.push_back(val);
-				div[ti].value = val+d;
-			}
-		}
-	}
-	else{                                            // Not time dependent
-		auto d = dt*(eq.calculate_item_no_time(npp,precalc) - 
-		             eq.calculate_item_old_no_time(npp,precalc,precalc_old));
-
-		for(auto ti : list){		
-			for(auto e : me_list){		
-				auto &div = markov_eqn_vari[e].div;			
-				auto val = div[ti].value;
-				store.push_back(val);
-				div[ti].value = val+d;
-			}
-		}
-		
-		if(slow_check){
-			for(auto ti : list){		
-				for(auto e : me_list){
-					auto &me = sp.markov_eqn[e];
-					const auto &eq = eqn[me.eqn_ref];		
-					auto &div = markov_eqn_vari[e].div;			
-					auto val = div[ti].value;
-					
-					auto value = eq.calculate(ti,popcomb_t[ti],precalc)*dt;
-					
-					if(dif(value,val,TINY)){
-						cout << val << " " << value << "ch" << endl;
-						emsg("markov fast problem");
-					}
-				}
-			}
-		}
-	}
-
-	return store;
-}
-*/
 
 
 /// Restores values for 
@@ -245,101 +179,12 @@ void StateSpecies::markov_value_nopop_restore(const vector <unsigned int> &me_li
 	auto m = 0u;
 	for(auto ti : list){	
 		for(auto e : me_list){
-			markov_eqn_vari[e].div[ti].value = store[m];
+			markov_eqn_vari[e].value_t[ti] = store[m];
 			m++;
 		}
 	}
 	
 	if(m != store.size()) emsg("Store problem3");	
-}
-
-
-/// Calculate the value of a series of markov equation
-// Equations are in the form: factor(t)*(pop_grad1*{pop1}+pop_grad2*{pop2}+...)+non_pop_eqn_val(t)
-// val is used to keep track of: pop_grad1*{pop1}+pop_grad2*{pop2}+...
-// CHECKON
-vector <double> StateSpecies::markov_value_linear_calc(const vector <unsigned int> &list, const LinearForm &lin_form, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t)
-{
-	vector <double> store;
-
-	if(list.size() == 0) emsg("list should not be zero");
-	
-	auto L = list.size();
-	const auto &lf_list = lin_form.list; 	
-	auto imax = lf_list.size();
-	
-	vector < vector <double> > val_store;
-	
-	auto set = false;
-	if(lin_form.factor_nopop_only){
-		val_store.resize(L); for(auto k = 0u; k < L; k++) val_store[k].resize(imax);
-		
-		auto invdt = 1.0/dt;
-		for(auto i = 0u; i < imax; i++){
-			const auto &div = markov_eqn_vari[lf_list[i].m].div;
-			for(auto k = 0u; k < L; k++){
-				val_store[k][i] = div[list[k]].value*invdt;
-			}
-		}
-
-		factor_nopop_change(list,val_store,lin_form,set); 
-	}
-	
-	if(set == false) linear_form_calculate(val_store,list,lin_form,popnum_t);
-	
-	if(false || slow_check){
-		for(auto i = 0u; i < imax; i++){
-			const auto &lf = lf_list[i];
-			auto &me = sp.markov_eqn[lf.m];
-			const auto &eq = eqn[me.eqn_ref];
-			const auto &precalc = param_val.precalc;
-
-			for(auto k = 0u; k < L; k++){
-				auto ti = list[k];
-				if(dif(val_store[k][i],eq.calculate(ti,popcomb_t[ti],precalc),TINY)){
-					emsg("Not agree"); 
-				}
-			}
-		}
-	}
-	
-	for(auto i = 0u; i < imax; i++){
-		const auto &lf = lf_list[i];
-		
-		auto &div = markov_eqn_vari[lf.m].div;	
-		for(auto k = 0u; k < L; k++){
-			auto ti = list[k];
-			store.push_back(div[ti].value);
-			auto va = val_store[k][i]*dt;
-			if(va < 0){
-				if(va > -SMALL) va = 0;
-				else{
-					emsg("Value problem");
-				}
-			}
-			div[ti].value = va;
-		}
-	}
-	
-	return store;
-}
-
-
-/// Restores values for DIV_VALUE_NOPOP_AFFECT
-void StateSpecies::markov_value_linear_restore(const vector <unsigned int> &list, const LinearForm &lin_form, const vector<double> &store)
-{
-	const auto &lf_list = lin_form.list; 	
-	auto imax = lf_list.size();
-
-	auto i = 0u;
-	for(auto j = 0u; j < imax; j++){
-		auto &div = markov_eqn_vari[lf_list[j].m].div;	
-		for(auto ti : list){
-			div[ti].value = store[i]; i++;
-		}
-	}
-
-	if(i != store.size()) emsg("Store problem4");
 }
 
 
@@ -440,6 +285,7 @@ vector <double> StateSpecies::likelihood_ie_change(unsigned int i, unsigned int 
 					if(ie_me == ie){				
 						auto &mev = markov_eqn_vari[e];
 						auto &div = mev.div;
+						auto &val_t = mev.value_t;
 					
 						double indfac;
 						if(me.rate) indfac = (factor-1)*get_indfac(ind,me);
@@ -452,7 +298,7 @@ vector <double> StateSpecies::likelihood_ie_change(unsigned int i, unsigned int 
 						if(mev.time_vari == false){
 							va = (t_ev-t)*indfac;
 							div[0].indfac_int += va;
-							dLi = -va*div[0].value;
+							dLi = -va*val_t[0];
 							Li_mark[0] += dLi;
 							dLi_sum += dLi;
 							store.push_back(va);
@@ -463,7 +309,7 @@ vector <double> StateSpecies::likelihood_ie_change(unsigned int i, unsigned int 
 								if(ti < T){
 									va = (t_ev-t)*indfac;
 									div[ti].indfac_int += va;
-									dLi = -va*div[ti].value;
+									dLi = -va*val_t[ti];
 									Li_mark[ti] += dLi;
 									dLi_sum += dLi;
 									store.push_back(va);
@@ -473,7 +319,7 @@ vector <double> StateSpecies::likelihood_ie_change(unsigned int i, unsigned int 
 							else{
 								va = (ti+1-t)*indfac;
 								div[ti].indfac_int += va;
-								dLi = -va*div[ti].value;
+								dLi = -va*val_t[ti];
 								Li_mark[ti] += dLi; 
 								dLi_sum += dLi;
 								store.push_back(va);
@@ -482,7 +328,7 @@ vector <double> StateSpecies::likelihood_ie_change(unsigned int i, unsigned int 
 								for(auto j = ti+1; j < ti_new; j++){
 									va = indfac;
 									div[j].indfac_int += va;
-									dLi = -va*div[j].value;
+									dLi = -va*val_t[j];
 									Li_mark[j] += dLi;
 									dLi_sum += dLi;
 									store.push_back(va);
@@ -492,7 +338,7 @@ vector <double> StateSpecies::likelihood_ie_change(unsigned int i, unsigned int 
 								if(ti_new < T){
 									va = (t_ev-ti_new)*indfac;
 									div[ti_new].indfac_int += va;
-									dLi = -va*div[ti_new].value;
+									dLi = -va*val_t[ti_new];
 									Li_mark[ti_new] += dLi;
 									dLi_sum += dLi;
 									store.push_back(va);
@@ -630,7 +476,7 @@ void StateSpecies::update_indfac_int(unsigned int c, double t1, double t2, const
 			dif = (t2-t1)*indfac;
 			auto &div = mev.div[0];
 			div.indfac_int += dif;
-			dLi = -div.value*dif;
+			dLi = -mev.value_t[0]*dif;
 			ti_store.push_back(0); dif_store.push_back(dif); dLi_store.push_back(dLi);
 			Li_m[0] += dLi;
 			like_ch += dLi;
@@ -643,7 +489,7 @@ void StateSpecies::update_indfac_int(unsigned int c, double t1, double t2, const
 					dif = (t2-t1)*indfac;
 					auto &div = mev.div[ti];
 					div.indfac_int += dif;
-					dLi = -div.value*dif;
+					dLi = -mev.value_t[ti]*dif;
 					ti_store.push_back(ti); dif_store.push_back(dif); dLi_store.push_back(dLi);
 					Li_m[ti] += dLi;
 					like_ch += dLi;
@@ -653,7 +499,7 @@ void StateSpecies::update_indfac_int(unsigned int c, double t1, double t2, const
 				dif = (ti+1-t1)*indfac;
 				auto &div = mev.div[ti];
 				div.indfac_int += dif;
-				dLi = -div.value*dif;
+				dLi = -mev.value_t[ti]*dif;
 				ti_store.push_back(ti); dif_store.push_back(dif); dLi_store.push_back(dLi);
 				Li_m[ti] += dLi;
 				like_ch += dLi;
@@ -662,7 +508,7 @@ void StateSpecies::update_indfac_int(unsigned int c, double t1, double t2, const
 					dif = indfac;
 					auto &div = mev.div[j];
 					div.indfac_int += dif;
-					dLi = -div.value*dif;
+					dLi = -mev.value_t[j]*dif;
 					ti_store.push_back(j); dif_store.push_back(dif); dLi_store.push_back(dLi);
 					Li_m[j] += dLi;
 					like_ch += dLi;
@@ -672,7 +518,7 @@ void StateSpecies::update_indfac_int(unsigned int c, double t1, double t2, const
 					dif = (t2-ti_new)*indfac;
 					auto &div2 = mev.div[ti_new];
 					div2.indfac_int += dif;
-					dLi = -div2.value*dif;
+					dLi = -mev.value_t[ti_new]*dif;
 					ti_store.push_back(ti_new); dif_store.push_back(dif); dLi_store.push_back(dLi);
 					Li_m[ti_new] += dLi;
 					like_ch += dLi;
@@ -1544,14 +1390,14 @@ double StateSpecies::likelihood_indeff_change(unsigned int i, unsigned int ie, d
 
 
 /// Calculates the likelihood for the population transition numbers
-void StateSpecies::likelihood_pop(const vector < vector <double> > &popcomb_t)
+void StateSpecies::likelihood_pop()
 {
 	auto list = seq_vec(T);
 	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
 		auto &Li = Li_markov_pop[tr];
 		auto &tn = trans_num[tr];
 		auto &tnm = tnum_mean_st[tr];
-		calculate_tnum_mean_para(tnm,list,tr,popcomb_t,cpop_st,dt);
+		calculate_tnum_mean_para(tnm,list,tr,cpop_st);
 		
 		for(auto ti = 0u; ti < T; ti++){
 			Li[ti] = poisson_probability(tn[ti],tnm[ti]);
@@ -1560,9 +1406,8 @@ void StateSpecies::likelihood_pop(const vector < vector <double> > &popcomb_t)
 }
 
 
-// CHECKON
 /// Updates a section of likelihood
-void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, unsigned int ti2, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector <PopChange> &pop_change, double &like_ch)
+void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, unsigned int ti2, double &like_ch)
 {
 	tnum_mean_st_back(tr,ti1,ti2);
 	
@@ -1570,171 +1415,10 @@ void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, uns
 	auto &tn = trans_num[tr];
 	auto &tnm = tnum_mean_st[tr];
 	
-	const auto &tra = sp.tra_gl[tr];
-	const auto &eq = eqn[tra.dist_param[0].eq_ref];
-	const auto &lin = eq.lin;
+	auto list = seq_vec(ti1,ti2);
+	calculate_tnum_mean_para(tnm,list,tr,cpop_st);
 
-	// Different type of update:
-	// RECALC This recalculates each time
-	// USE_POP_DIF This uses just the change in populations (when equation can be linearised)
-	// USE_POP_DIF_FAC This uses just the change in populations (when factor time dependent)
-	// USE_POP_DIF_TIME This uses just the change in populations (when gradient time dependent)
-	
-	auto type = RECALC;
-	for(auto ti = ti1; ti < ti2; ti++){
-		tnm[ti] = calculate_tnum_mean(ti,tr,popcomb_t[ti],cpop_st[ti],dt);
-	}
-	/* CHECKON could this be more efficient?	
-	if(update_ind_linearise_speedup && lin.on){
-		type = USE_POP_DIF;	
-		if(lin.pop_grad_time_dep) type = USE_POP_DIF_TIME;
-		else{
-			if(lin.factor_time_dep) type = USE_POP_DIF_FAC;
-		}
-	}
-	if(type == RECALC && calc_para_speedup) type = RECALC_PARA;
-	
-	switch(type){
-	case RECALC:
-		for(auto ti = ti1; ti < ti2; ti++){
-			tnm[ti] = calculate_tnum_mean(ti,tr,popcomb_t[ti],cpop_st[ti],dt);
-		}
-		break;
-	
-	case RECALC_PARA: case USE_POP_DIF_TIME:
-		{	
-			auto list = seq_vec(ti1,ti2);
-			calculate_tnum_mean_para(tnm,list,tr,popcomb_t,cpop_st,dt);
-		}
-		break;
-		
-	case USE_POP_DIF:
-		{
-			const auto &precalc = param_val.precalc;
-			auto ci = tra.i;
-
-			auto negfl = false;
-	
-			auto diff = 0.0;
-			for(const auto &po_ch : pop_change){
-				auto po = po_ch.po;
-				auto pr = lin.get_pop_ref(po);
-				if(pr != UNSET){
-					auto dpop = po_ch.num;
-						
-					for(auto ti = ti1; ti < ti2; ti++){
-						auto pop = popcomb_t[ti][po];
-						if(pop < 0 || pop-dpop < 0){ negfl = true; break;}
-					}
-					if(negfl) break;
-					
-					auto va = eq.calculate_pop_grad_no_time(pr,precalc);
-					diff += va*dpop;
-				}
-			}
-
-			if(negfl){  // If one of the populations goes negative
-				for(const auto &po_ch : pop_change){
-					auto po = po_ch.po;
-					auto pr = lin.get_pop_ref(po);
-					if(pr != UNSET){
-						auto va = dt*eq.calculate_pop_grad_no_time(pr,precalc);
-						auto dpop = po_ch.num;
-						
-						for(auto ti = ti1; ti < ti2; ti++){
-							auto p1 = popnum_t[ti][po];
-							auto p2 = p1-dpop;
-							auto dift = va*(rectify(p1)-rectify(p2));
-							if(ci == UNSET) tnm[ti] += dift;
-							else{
-								auto pop = cpop_st[ti][ci]; 
-								if(pop > 0) tnm[ti] += pop*dift;
-							}
-						}
-					}
-				}
-			}	
-			else{			
-				diff *= dt;
-				
-				if(ci == UNSET){
-					for(auto ti = ti1; ti < ti2; ti++) tnm[ti] += diff;
-				}
-				else{
-					for(auto ti = ti1; ti < ti2; ti++){
-						auto pop = cpop_st[ti][ci]; 
-						if(pop > 0) tnm[ti] += pop*diff;
-					}
-				}
-			}
-		}
-		break;
-	
-	case USE_POP_DIF_FAC:
-		{
-			const auto &precalc = param_val.precalc;
-			auto ci = tra.i;
-
-			auto negfl = false;
-	
-			auto diff = 0.0;
-			for(const auto &po_ch : pop_change){
-				auto po = po_ch.po;
-				auto pr = lin.get_pop_ref(po);
-				if(pr != UNSET){
-					auto dpop = po_ch.num;
-			
-					for(auto ti = ti1; ti < ti2; ti++){
-						auto pop = popnum_t[ti][po];
-						if(pop < 0 || pop-dpop < 0){ negfl = true; break;}
-					}
-					if(negfl) break;
-					
-					auto va = eq.calculate_pop_grad_without_factor_no_time(pr,precalc);
-					diff += va*dpop;
-				}
-			}
-
-			if(negfl){  // If one of the populations goes negative
-				for(const auto &po_ch : pop_change){
-					auto po = po_ch.po;
-					auto pr = lin.get_pop_ref(po);
-					if(pr != UNSET){
-						auto va = dt*eq.calculate_pop_grad_without_factor_no_time(pr,precalc);
-						auto dpop = po_ch.num;
-						
-						for(auto ti = ti1; ti < ti2; ti++){
-							auto p1 = popnum_t[ti][po];
-							auto p2 = p1-dpop;
-							auto dift = va*(rectify(p1)-rectify(p2))*eq.calculate_factor(ti,precalc);
-							if(ci == UNSET) tnm[ti] += dift;
-							else{
-								auto pop = cpop_st[ti][ci]; 
-								if(pop > 0) tnm[ti] += pop*dift;
-							}
-						}
-					}
-				}
-			}	
-			else{			
-				diff *= dt;
-				
-				if(ci == UNSET){
-					for(auto ti = ti1; ti < ti2; ti++) tnm[ti] += diff*eq.calculate_factor(ti,precalc);
-				}
-				else{
-					for(auto ti = ti1; ti < ti2; ti++){
-						auto pop = cpop_st[ti][ci]; 
-						if(pop > 0) tnm[ti] += pop*diff*eq.calculate_factor(ti,precalc);
-					}
-				}
-			}
-		}
-		break;
-	}
-	*/
-	
-	for(auto ti = ti1; ti < ti2; ti++){
+	for(auto ti : list){
 		like_ch -= Li[ti];
 		Li[ti] = poisson_probability(tn[ti],tnm[ti]);
 		like_ch += Li[ti];
@@ -1743,7 +1427,7 @@ void StateSpecies::likelihood_pop_section(unsigned int tr, unsigned int ti1, uns
 
 
 /// For a population-based model updates a section of likelihood based on a change in spline
-void StateSpecies::likelihood_pop_spline_section(unsigned int tr, unsigned int ti1, unsigned int ti2, const vector < vector <double> > &popcomb_t, double &like_ch)
+void StateSpecies::likelihood_pop_spline_section(unsigned int tr, unsigned int ti1, unsigned int ti2, double &like_ch)
 {
 	if(type != POPULATION) emsg("must be ind");
 	
@@ -1754,9 +1438,9 @@ void StateSpecies::likelihood_pop_spline_section(unsigned int tr, unsigned int t
 	auto &tnm = tnum_mean_st[tr];
 	
 	auto list = seq_vec(ti1,ti2);
-	calculate_tnum_mean_para(tnm,list,tr,popcomb_t,cpop_st,dt);
+	calculate_tnum_mean_para(tnm,list,tr,cpop_st);
 	
-	for(auto ti = ti1; ti < ti2; ti++){
+	for(auto ti : list){
 		like_ch -= Li[ti];
 		Li[ti] = poisson_probability(tn[ti],tnm[ti]);
 		like_ch += Li[ti];
@@ -1780,16 +1464,21 @@ void StateSpecies::likelihood_ib_spline_section(unsigned int ee, unsigned int ti
 	if(me_vari.time_vari == false) emsg("must have time variation");
 	
 	auto list = seq_vec(ti,ti_next);
-			
-	const vector < vector < vector <double> > > derive_val;
-	auto value_para = eq.calculate_para(eq.calcu,list,popcomb_t,precalc,derive_val); 
-		
+	
+	vector <double> value_para;
+	
+	if(eq.lin.on) value_para = eq.calculate_linear_list(list,popcomb_t,precalc);
+	else{
+		const vector < vector < vector <double> > > derive_val;
+		value_para = eq.calculate_para(eq.calcu,list,popcomb_t,precalc,derive_val); 
+	}
+	
 	vector <double> dLi_store, value_store;
 
 	for(auto tii = ti; tii < ti_next; tii++){
 		auto &div = me_vari.div[tii];
+		auto &val_t = me_vari.value_t[tii];
 		
-		auto val_old = div.value;
 		auto value = dt*value_para[tii-ti];
 		
 		if(false){
@@ -1806,21 +1495,21 @@ void StateSpecies::likelihood_ib_spline_section(unsigned int ee, unsigned int ti
 			}
 		}
 	
-		auto dLi = -(value-val_old)*div.indfac_int;
+		auto dLi = -(value-val_t)*div.indfac_int;
 		
 		auto n = div.ind_trans.size();	
 		if(n > 0 && !me.infection_trans){
-			dLi += n*log((value+LOG_THRESH)/(val_old+LOG_THRESH));
+			dLi += n*log(log_thresh(value)/log_thresh(val_t));
 		}
-		dLi_store.push_back(dLi); value_store.push_back(div.value);
+		dLi_store.push_back(dLi); value_store.push_back(val_t);
 		
 		Li_m[tii] += dLi;
 		like_ch += dLi;	
-		div.value = value;
+		val_t = value;
 	}
 	
 	back.push_back(Back(LI_MARKOV,ee,ti,dLi_store));
-	back.push_back(Back(VALUE_MARKOV,ti_next,value_store));
+	back.push_back(Back(VALUE_MARKOV,ee,ti,value_store));
 }
 
 
@@ -1846,7 +1535,7 @@ double StateSpecies::Li_update_tn(unsigned int tr, unsigned int ti, int sign)
 
 
 /// Updates the likelihood from change in c
-double StateSpecies::Li_update_c(unsigned int c, int ma, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popcomb_t)
+double StateSpecies::Li_update_c(unsigned int c, int ma, unsigned int ti, unsigned int ti_next)
 {
 	auto d = 0.0;
 	for(auto tr : sp.comp_gl[c].tr_leave){
@@ -1866,7 +1555,7 @@ double StateSpecies::Li_update_c(unsigned int c, int ma, unsigned int ti, unsign
 				tnmr *= cpop_st[tii][c]/c_bef;
 			}
 			else{
-				tnmr = calculate_tnum_mean(tii,tr,popcomb_t[tii],cpop_st[tii],dt);
+				tnmr = calculate_tnum_mean(tii,tr,cpop_st[tii]);
 			}
 			
 			auto Li_new = poisson_probability(tn[tii],tnmr);	
@@ -1880,15 +1569,14 @@ double StateSpecies::Li_update_c(unsigned int c, int ma, unsigned int ti, unsign
 
 
 /// Works out the change in the likelihood due to population change
-// CHECKON
-vector <double> StateSpecies::likelihood_pop_change(unsigned int tr, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, double &like_ch)
+vector <double> StateSpecies::likelihood_pop_change(unsigned int tr, const vector <unsigned int> &list, double &like_ch)
 {
 	vector <double> store;
 
 	auto &tnm = tnum_mean_st[tr];
 	for(auto ti : list) store.push_back(tnm[ti]);
 		
-	calculate_tnum_mean_para(tnm,list,tr,popcomb_t,cpop_st,dt);
+	calculate_tnum_mean_para(tnm,list,tr,cpop_st);
 	
 	calculate_markov_Li(tr,list,like_ch,store);
 	
@@ -1922,235 +1610,6 @@ void StateSpecies::likelihood_pop_change_restore(unsigned int tr, const vector <
 	auto &tnm = tnum_mean_st[tr];
 	for(auto ti : list){ tnm[ti] = vec[j]; j++;}
 	for(auto ti : list){ Li[ti] = vec[j]; j++;}
-}
-
-
-/// Makes a change to the non-population part of the equation
-vector <double> StateSpecies::likelihood_pop_change_nopop(const vector <unsigned int> &list, const EqnNoPop &eq_nopop, double &like_ch)
-{
-	const auto &tr_list = eq_nopop.list;
-	
-	auto tr_first = tr_list[0];
-	auto &tra = sp.tra_gl[tr_first];
-	
-	vector <double> store;
-	
-	const auto &eq = eqn[tra.dist_param[0].eq_ref];
-	
-	const auto &lin = eq.lin;
-	const auto &npp = lin.no_pop_precalc;
-	
-	const auto &precalc = param_val.precalc;
-	const auto &precalc_old = param_val.precalc_old;
-	
-	for(auto tr : tr_list){	
-		const auto &tnm = tnum_mean_st[tr];
-		for(auto ti : list) store.push_back(tnm[ti]);
-	}
-	
-	for(auto ti : list){	
-		auto d = dt*(eq.calculate_item(npp,ti,precalc) - eq.calculate_item_old(npp,ti,precalc,precalc_old));
-		
-		for(auto tr : tr_list){
-			auto ci = sp.tra_gl[tr].i;
-			if(ci == UNSET) tnum_mean_st[tr][ti] += d;
-			else{
-				auto pop = cpop_st[ti][ci];
-				if(pop > 0) tnum_mean_st[tr][ti] += d*pop;
-			}
-		}
-	}
-	
-	for(auto tr : tr_list) calculate_markov_Li(tr,list,like_ch,store);
-	
-	return store;
-}
-
-
-/// Restores values for MARKOV_POP_LINEAR_AFFECT
-void StateSpecies::likelihood_pop_change_nopop_restore(const vector <unsigned int> &list, const EqnNoPop &eq_nopop, const vector<double> &store)
-{	
-	const auto &tr_list = eq_nopop.list;
-	
-	auto i = 0u;
-	
-	for(auto tr : tr_list){	
-		auto &tnm = tnum_mean_st[tr];
-		for(auto ti : list){ tnm[ti] = store[i]; i++;}
-	}
-	
-	for(auto tr : tr_list){	
-		auto &Li = Li_markov_pop[tr];
-		for(auto ti : list){ Li[ti] = store[i]; i++;}
-	}
-	
-	if(i != store.size()) emsg("Store problem1");	
-}
-
-
-/// Calculate the value of a series of transitions (population-based models)
-// Equations are in the form: factor(t)*(pop_grad1*{pop1}+pop_grad2*{pop2}+...)+non_pop_eqn_val(t)
-// val is used to keep track of: pop_grad1*{pop1}+pop_grad2*{pop2}+...
-// CHECKON
-vector <double> StateSpecies::likelihood_pop_change_linear(const vector <unsigned int> &list, const LinearForm &lin_form, const vector < vector <double> > &popnum_t, double &like_ch)
-{
-	vector <double> store;
-
-	if(list.size() == 0) emsg("list should not be zero");
-	
-	auto L = list.size();
-	const auto &lf_list = lin_form.list; 	
-	auto imax = lf_list.size();
-	
-	// If can make a change to factor or nopop part then do so
-	if(lin_form.factor_nopop_only){
-		if(likelihood_pop_change_linear_factor_nopop(list,lin_form,like_ch,store)) return store;
-	}	
-	
-	vector < vector <double> > val_store;
-	
-	linear_form_calculate(val_store,list,lin_form,popnum_t);
-		
-	for(auto i = 0u; i < imax; i++){
-		const auto &lf = lf_list[i];
-		
-		auto tr = lf.m;
-		const auto &tra = sp.tra_gl[tr];
-		const auto &eq = eqn[lf.e];
-		
-		for(auto k = 0u; k < L; k++){
-			auto &ra = val_store[k][i];
-			if(ra < 0){	
-				//eq.print_calculation();
-				run_error("The transition rate for '"+tra.name+"' through equation '"+eq.te_raw+"' has become negative."+check_prior(eq));
-			}
-		}
-		
-		auto &tnm = tnum_mean_st[tr];
-		
-		for(auto ti : list) store.push_back(tnm[ti]);
-		
-		auto ci = tra.i;
-		if(ci == UNSET){ 
-			for(auto k = 0u; k < L; k++){
-				auto ti = list[k];
-				tnm[ti] = val_store[k][i]*dt;
-			}
-		}
-		else{
-			for(auto k = 0u; k < L; k++){
-				auto ti = list[k];
-				auto pop = cpop_st[ti][ci]; 
-				if(pop <= 0) tnm[ti] = 0;
-				else tnm[ti] = val_store[k][i]*pop*dt;
-			}
-		}		
-		
-		calculate_markov_Li(tr,list,like_ch,store);
-	}
-	
-	return store;
-}
-
-
-/// This updates equations by making changes to factor or nopop part
-bool StateSpecies::likelihood_pop_change_linear_factor_nopop(const vector <unsigned int> &list, const LinearForm &lin_form, double &like_ch, vector <double> &store)
-{
-	emsg("sort2");
-	/*
-	auto L = list.size();
-	const auto &lf_list = lin_form.list; 	
-	auto imax = lf_list.size();
-	
-	const auto &precalc = param_val.precalc;
-	const auto &precalc_old = param_val.precalc_old;
-	
-	vector < vector <double> > fac_old;
-	fac_old.resize(imax);
-	for(auto i = 0u; i < imax; i++){
-		const auto &lf = lf_list[i];
-		const auto &eq = eqn[lf.e];
-		
-		const auto &factor_precalc = lf.factor_precalc;
-			
-		fac_old[i].resize(L);
-		auto &fo = fac_old[i];
-		for(auto k = 0u; k < L; k++){
-			auto ti = list[k];
-			auto factor_old = eq.calculate_item_old(factor_precalc,ti,precalc,precalc_old);
-			if(factor_old < TINY && factor_old > -TINY) return false;
-			fo[k] = factor_old; 
-		}
-	}
-
-	for(auto i = 0u; i < imax; i++){
-		const auto &lf = lf_list[i];
-		
-		auto tr = lf.m;
-		
-		auto &tnm = tnum_mean_st[tr];
-		
-		for(auto ti : list) store.push_back(tnm[ti]);
-	
-		const auto &tra = sp.tra_gl[tr];
-		const auto &eq = eqn[lf.e];
-		
-		const auto &factor_precalc = lf.factor_precalc;
-		const auto &no_pop_precalc = lf.no_pop_precalc;
-		
-		auto ci = tra.i;	
-
-		if(eq.linearise.factor_time_dep || eq.linearise.no_pop_calc_time_dep){
-			const auto &fo = fac_old[i];
-			for(auto k = 0u; k < L; k++){
-				auto ti = list[k];
-				auto fac = dt; 
-				if(ci != UNSET){ fac *= cpop_st[ti][ci]; if(fac < 0) fac = 0;}
-				
-				auto ratio = eq.calculate_item(factor_precalc,ti,precalc)/fo[k];
-				auto no_pop_old = fac*eq.calculate_item_old(no_pop_precalc,ti,precalc,precalc_old);
-				auto no_pop_new = fac*eq.calculate_item(no_pop_precalc,ti,precalc);
-			
-				auto &va = tnm[ti];
-				va = ratio*(va-no_pop_old)+no_pop_new;
-			}
-		}
-		else{
-			auto ratio = eq.calculate_item_no_time(factor_precalc,precalc)/fac_old[i][0];
-			auto no_pop_old = eq.calculate_item_old_no_time(no_pop_precalc,precalc,precalc_old);
-			auto no_pop_new = eq.calculate_item_no_time(no_pop_precalc,precalc);
-			
-			for(auto k = 0u; k < L; k++){
-				auto ti = list[k];
-				
-				auto fac = dt; 
-				if(ci != UNSET){ fac *= cpop_st[ti][ci]; if(fac < 0) fac = 0;}
-				auto &va = tnm[ti];
-				va = ratio*(va-fac*no_pop_old)+fac*no_pop_new;
-			}
-		}		
-		
-		calculate_markov_Li(tr,list,like_ch,store);
-	}
-	*/
-	
-	return true;
-}
-
-
-/// Restores values for MARKOV_POP_LINEAR_AFFECT
-void StateSpecies::likelihood_pop_change_linear_restore(const vector <unsigned int> &list, const LinearForm &lin_form, const vector<double> &store)
-{	
-	auto i = 0u;
-	for(const auto &lf : lin_form.list){
-		auto &tnm = tnum_mean_st[lf.m];
-		for(auto ti : list){ tnm[ti] = store[i]; i++;} 
-		
-		auto &Li = Li_markov_pop[lf.m];
-		for(auto ti : list){ Li[ti] = store[i]; i++;} 
-	}
-	
-	if(i != store.size()) emsg("Store problem2");	
 }
 
 
@@ -2382,11 +1841,10 @@ double StateSpecies::sum_markov_prob(double t1, double t2, unsigned int c, unsig
 			tr_gl_cor = sp.tr_trans(tr_gl,c);
 		}
 	}
+	if(tr_gl_cor == UNSET) return 0; // This was need for when move event
 
 	const auto &tra_cor = sp.tra_gl[tr_gl_cor];
-	
-	auto &entr = en[tr_gl_cor];
-	
+
 	if(tra_cor.ev_type != M_TRANS_EV) emsg("Should be exp_rate");
 	
 	auto e = tra_cor.markov_eqn_ref;
@@ -2398,7 +1856,8 @@ double StateSpecies::sum_markov_prob(double t1, double t2, unsigned int c, unsig
 
 	auto ti1 = get_ti(t1);
 	auto ti2 = get_ti(t2);
-	if(ti2 == entr.size()) ti2--;
+	if(ti2 == T) ti2--;
+	//if(ti2 == entr.size()) ti2--;
 	
 	auto fac = 1.0;
 	if(me.ind_variation){
@@ -2407,6 +1866,10 @@ double StateSpecies::sum_markov_prob(double t1, double t2, unsigned int c, unsig
 		for(auto fe : me.fix_eff_mult) fac *= ind.exp_fe[fe];
 	}
 	
+	auto en_on = false;
+	if(en.size() > 0) en_on = true;
+	
+	auto &val_t = mev.value_t;
 	for(auto ti = ti1; ti <= ti2; ti++){
 		auto dtdiv = 1.0;
 		if(ti == ti1) dtdiv = (ti+1) - t1;
@@ -2415,10 +1878,14 @@ double StateSpecies::sum_markov_prob(double t1, double t2, unsigned int c, unsig
 		}
 
 		auto tii = ti; if(!mev.time_vari) tii = 0;
-		auto val = fac*mev.div[tii].value*dtdiv;
-		if(ti >= entr.size()) emsg("Prob");
-
-		entr[ti] += val;
+		auto val = fac*val_t[tii]*dtdiv;
+		
+		if(en_on){
+			auto &entr = en[tr_gl_cor];
+			if(ti >= entr.size()) emsg("Prob");
+			entr[ti] += val;
+		}
+		
 		sum -= val;
 	}
 	
@@ -2433,239 +1900,309 @@ double StateSpecies::sum_markov_prob(double t1, double t2, unsigned int c, unsig
 /// Calculates the estimated and actual number of transitions in each division for each global transition
 void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <double> > &popcomb_t)
 {	
+	switch(type){
+	case POPULATION: pop_trans_stats(ps); break;
+	case DETERMINISTIC: emsg("No diagnostic for deterministic"); break;
+	case INDIVIDUAL: ind_trans_stats(ps,popcomb_t,false); break;
+	}
+}
+
+
+/// Gets population transition statistics
+void StateSpecies::pop_trans_stats(ParticleSpecies &ps) const
+{
+	auto &cpd = ps.cum_prob_dist;
+	auto &en = ps.exp_num;
+
+	cpd.resize(sp.tra_gl.size());
+	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++) cpd[tr].resize(H_BIN,0);
+
+	en = tnum_mean_st;
+
+	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+		auto &tn = trans_num[tr];
+		auto &tnm = tnum_mean_st[tr];
+		for(auto ti = 0u; ti < T; ti++){
+			auto n = tn[ti];
+			auto lam = tnm[ti];
+
+			auto pr = 1-(ran()*exp(poisson_probability(n,lam)) + poisson_upper_probability_no_log(n,lam));
+
+			auto b = (unsigned int)(pr*H_BIN);
+			if(b >= H_BIN){
+				if(b == H_BIN) b--;
+				else emsg("hbin range4");
+			}
+			
+			cpd[tr][b]++;
+		}
+	}
+}
+
+
+/// Gets individual transition statistics (or probability outside CI if CIprob is set)
+double StateSpecies::ind_trans_stats(ParticleSpecies &ps, const vector < vector <double> > &popcomb_t, bool CIprob)
+{	
+	const auto &precalc = param_val.precalc;
+	
 	auto &cpd = ps.cum_prob_dist;
 	auto &en = ps.exp_num;
 	double t_end = T;
 	
-	const auto &precalc = param_val.precalc;
-	
-	cpd.resize(sp.tra_gl.size());
-	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++) cpd[tr].resize(H_BIN,0);
-	
-	switch(type){
-	case POPULATION:
-		en = tnum_mean_st;
-
+	if(!CIprob){
+		en.resize(sp.tra_gl.size());
 		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
-			auto &tn = trans_num[tr];
-			auto &tnm = tnum_mean_st[tr];
-			for(auto ti = 0u; ti < T; ti++){
-				auto n = tn[ti];
-				auto lam = tnm[ti];
+			en[tr].resize(T,0);
+		}
+	
+		cpd.resize(sp.tra_gl.size());
+		for(auto tr = 0u; tr < sp.tra_gl.size(); tr++) cpd[tr].resize(H_BIN,0);
+	}
+	
+	auto ncla = sp.ncla;
 
-				auto pr = 1-(ran()*exp(poisson_probability(n,lam)) + poisson_upper_probability_no_log(n,lam));
-
-				auto b = (unsigned int)(pr*H_BIN);
-				if(b >= H_BIN){
-					if(b == H_BIN) b--;
-					else emsg("hbin range4");
+	if(CIprob){    // Accounts for sources
+		for(auto m = 0u; m < sp.markov_eqn.size(); m++){
+			const auto &me = sp.markov_eqn[m];
+			if(me.source){
+				const auto &mev = markov_eqn_vari[m];
+				auto &val_t = mev.value_t;
+				for(auto ti = 0u; ti < T; ti++){
+					auto tii = ti; if(mev.time_vari == false) tii = 0;
+					auto val = val_t[tii];
+					for(auto tr : me.source_tr_gl){
+						en[tr][ti] += val;
+					}
 				}
-				
-				cpd[tr][b]++;
 			}
 		}
-		break;
+	}
+	
+	auto num = 0.0, num_outside_CI = 0.0;
+	const auto per_low = 0.05, per_high = 0.95; // The percentile range
+	
+	for(auto i = 0u; i < individual.size(); i++){
+		vector <unsigned int> origin(ncla,0);
 		
-	case DETERMINISTIC:
-		emsg("No diagnostic for deterministic");
-		break;
+		vector <double> cum_pr;
 		
-	case INDIVIDUAL:
-		{
-			en.resize(sp.tra_gl.size());
-			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
-				en[tr].resize(T,0);
-			}
+		const auto &ind = individual[i];
+		
+		const auto &eve = ind.ev;
+		for(auto e = 0u; e < eve.size(); e++){
+			const auto &ev = eve[e];
 			
-			auto ncla = sp.ncla;
-
-			// Accounts for sources
-			for(auto m = 0u; m < sp.markov_eqn.size(); m++){
-				const auto &me = sp.markov_eqn[m];
-				if(me.source){
-					for(auto ti = 0u; ti < T; ti++){
-						const auto &mev = markov_eqn_vari[m];
-						auto tii = ti; if(mev.time_vari == false) tii = 0;
-						auto val = mev.div[tii].value;
-						for(auto tr : me.source_tr_gl){
-							en[tr][ti] += val;
-						}
+			switch(ev.type){
+			case NM_TRANS_EV:
+				{
+					auto cl = ev.cl;
+					auto tr_gl = ev.tr_gl;
+					if(ev.e_origin != origin[cl]) emsg("e_origin wrong");
+				
+					const auto &ev_or = eve[ev.e_origin];
+					if(sp.tra_gl[tr_gl].i != ev_or.c_after){
+						tr_gl = sp.tr_trans(tr_gl,ev_or.c_after);
 					}
-				}
-			}
-
-			for(auto i = 0u; i < individual.size(); i++){
-				vector <unsigned int> origin(ncla,0);
-				
-				vector <double> cum_pr;
-				
-				const auto &ind = individual[i];
-				
-				const auto &eve = ind.ev;
-				for(auto e = 0u; e < eve.size(); e++){
-					const auto &ev = eve[e];
 					
-					switch(ev.type){
-					case NM_TRANS_EV:
-						{
-							auto cl = ev.cl;
-							auto tr_gl = ev.tr_gl;
-							if(ev.e_origin != origin[cl]) emsg("e_origin wrong");
-						
-							const auto &ev_or = eve[ev.e_origin];
-							if(sp.tra_gl[tr_gl].i != ev_or.c_after){
-								tr_gl = sp.tr_trans(tr_gl,ev_or.c_after);
+					if(CIprob){
+						auto pr = pr_nm_cpd(tr_gl,ev_or.tdiv,ev.tdiv,popcomb_t,ind);
+						num++;
+						if(pr < per_low || pr > per_high) num_outside_CI++;
+					}
+					else{
+						add_nm_prob(tr_gl,ev_or.tdiv,ps,popcomb_t,ind);
+						add_nm_cpd(tr_gl,ev_or.tdiv,ev.tdiv,ps,popcomb_t,ind);
+					}
+					 
+					origin[cl] = e;
+				}
+				break;
+				
+			case M_TRANS_EV:
+				{
+					auto cl = ev.cl;
+					auto tr_gl = ev.tr_gl;
+					
+					auto sum = 0.0;
+					for(auto ee = origin[cl]; ee < e; ee++){
+						sum += sum_markov_prob(eve[ee].tdiv,eve[ee+1].tdiv,eve[ee].c_after,tr_gl,i,en);
+					}
+					
+					auto pr = exp(sum);
+					
+					if(CIprob){
+						num++;
+						if(pr < per_low || pr > per_high) num_outside_CI++;
+					}
+					else{
+						auto b = (unsigned int)(pr*H_BIN);
+						if(b >= H_BIN){
+							if(b == H_BIN) b--;
+							else{
+								stringstream ss; 
+								ss << "hbin range: ";
+								ss << ind.name << " " << sum << " " << pr << " || ";
+							
+								for(auto ee = origin[cl]; ee < e; ee++){
+									ss << "mar " << ee << "   " << eve[ee].tdiv << " " << eve[ee+1].tdiv << " " 
+											<< eve[ee].c_after << " " << tr_gl << " " << i << " ";
+									ss << sum_markov_prob(eve[ee].tdiv,eve[ee+1].tdiv,eve[ee].c_after,tr_gl,i,en);
+								}
+								ss << "Events: ";
+								for(auto e = 0u; e < eve.size(); e++){
+									ss << eve[e].tdiv << ", ";
+								}
+								
+								add_alg_warn(ss.str());
+								b = H_BIN-1;
 							}
-							
-							add_nm_prob(tr_gl,ev_or.tdiv,ps,popcomb_t,ind);
-							add_nm_cpd(tr_gl,ev_or.tdiv,ev.tdiv,ps,popcomb_t,ind);
-							
-							origin[cl] = e;
 						}
-						break;
 						
-					case M_TRANS_EV:
-						{
-							auto cl = ev.cl;
-							auto tr_gl = ev.tr_gl;
-							
+						cpd[tr_gl][b]++;
+					}
+					
+					origin[cl] = e;
+				}
+				break;
+	
+			default: break;
+			}
+		}
+		
+		if(eve.size() > 0){
+			// Works out when there is no event
+			for(auto cl = 0u; cl < ncla; cl++){
+				auto e_st = origin[cl];
+				const auto &ev_or = eve[e_st];
+				auto c = ev_or.c_after;
+				if(c != UNSET){
+					const auto &cgl = sp.comp_gl[c];
+					
+					const CompGlTransGroup &tlg = cgl.tra_leave_group[cl];
+					if(tlg.markov){
+						for(auto tr_gl : tlg.tr_list){
 							auto sum = 0.0;
-							for(auto ee = origin[cl]; ee < e; ee++){
-								sum += sum_markov_prob(eve[ee].tdiv,eve[ee+1].tdiv,eve[ee].c_after,tr_gl,i,en);
+						
+							for(auto ee = e_st; ee < eve.size(); ee++){
+								double tnext;
+								if(ee < eve.size()-1) tnext = eve[ee+1].tdiv;
+								else tnext = t_end;
+								
+								sum += sum_markov_prob(eve[ee].tdiv,tnext,eve[ee].c_after,tr_gl,i,en);
 							}
 							
-							auto pr = exp(sum);
-							auto b = (unsigned int)(pr*H_BIN);
-							if(b >= H_BIN){
-								if(b == H_BIN) b--;
-								else{
-									stringstream ss; 
-									ss << "hbin range: ";
-									ss << ind.name << " " << sum << " " << pr << " || ";
-									for(auto ee = origin[cl]; ee < e; ee++){
-										ss << "mar " << ee << "   " << eve[ee].tdiv << " " << eve[ee+1].tdiv << " " 
-												<< eve[ee].c_after << " " << tr_gl << " " << i << " ";
-										ss << sum_markov_prob(eve[ee].tdiv,eve[ee+1].tdiv,eve[ee].c_after,tr_gl,i,en);
-									}
-									ss << "Events: ";
-									for(auto e = 0u; e < eve.size(); e++){
-										ss << eve[e].tdiv << ", ";
-									}
+							auto pr_max = exp(sum);
+							if(CIprob){
+								num++;
+								if(pr_max > per_low){
+									num_outside_CI += per_low/pr_max;
+									if(pr_max > per_high) num_outside_CI += (pr_max-per_high)/pr_max;
+								}
+								else num_outside_CI++;
+							}
+							else{
+								auto pr = ran()*pr_max;
+						
+								auto b = (unsigned int)(pr*H_BIN);
+								if(b >= H_BIN){
+									if(b == H_BIN) b--;
+									else emsg("hbin range3");
+								}
+								
+								cpd[tr_gl][b]++;
+							}
+						}
+					}	
+					else{
+						const auto &tr_list = tlg.tr_list;
+						
+						auto B = tr_list.size();
+						auto t1 = ev_or.tdiv;
+						
+						if(B == 1){
+							if(CIprob){
+								auto pr = pr_nm_cpd(tlg.tr_list[0],t1,UNSET,popcomb_t,ind);
+								num++;
+								if(pr < per_low || pr > per_high) num_outside_CI++;
+							}
+							else{
+								add_nm_prob(tlg.tr_list[0],t1,ps,popcomb_t,ind);
+								add_nm_cpd(tlg.tr_list[0],t1,UNSET,ps,popcomb_t,ind);
+							}
+						}
+						else{
+							auto ti = get_ti(t1);
+	
+							auto sum = 0.0;
+							vector <double> sum_store;
+							
+							auto sum2 = 0.0;
+							vector <double> val_st;
+							vector <double> sum_store2;
+							
+							vector <double> pr_st(B);
+							
+							for(auto b = 0u; b < B; b++){
+								const auto &tra = sp.tra_gl[tr_list[b]];
+
+								auto m = tra.nm_trans_ref;
+								const auto &nmt = sp.nm_trans[m];
+								const auto &ref = nmt.dist_param_eq_ref;
+
+								vector <double> ref_val(ref.size());
+								for(auto i = 0u; i < ref.size(); i++){
+									ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
+								}
+	
+								auto bp = eqn[tra.bp.eq_ref].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
+								pr_st[b] = nm_trans_incomp_like_no_log(nmt.type,t_end-t1,dt,ref_val);
 									
-									add_alg_warn(ss.str());
-									b = H_BIN-1;
+								sum += bp;
+								sum_store.push_back(sum);
+								
+								auto va = bp*pr_st[b];
+								val_st.push_back(va);
+								sum2 += va;
+								sum_store2.push_back(sum2);
+							}
+		
+							if(CIprob){
+								num++;
+								for(auto b = 0u; b < B; b++){
+									auto pr_br = val_st[b]/sum2;
+									auto pr_max = pr_st[b];
+									
+									if(pr_max > per_low){
+										num_outside_CI += pr_br*per_low/pr_max;
+										if(pr_max > per_high) num_outside_CI += pr_br*(pr_max-per_high)/pr_max;
+									}
+									else num_outside_CI += pr_br;
 								}
 							}
-							
-							cpd[tr_gl][b]++;
-							
-							origin[cl] = e;
-						}
-						break;
-			
-					default: break;
-					}
-				}
-				
-				if(eve.size() > 0){
-					// Works out when there is no event
-					for(auto cl = 0u; cl < ncla; cl++){
-						auto e_st = origin[cl];
-						const auto &ev_or = eve[e_st];
-						auto c = ev_or.c_after;
-						if(c != UNSET){
-							const auto &cgl = sp.comp_gl[c];
-							
-							const CompGlTransGroup &tlg = cgl.tra_leave_group[cl];
-							if(tlg.markov){
-								for(auto tr_gl : tlg.tr_list){
-									auto sum = 0.0;
-									for(auto ee = e_st; ee < eve.size(); ee++){
-										double tnext;
-										if(ee < eve.size()-1) tnext = eve[ee+1].tdiv;
-										else tnext = t_end;
-										
-										sum += sum_markov_prob(eve[ee].tdiv,tnext,eve[ee].c_after,tr_gl,i,en);
-									}
+							else{
+								// For future predition of transions rate the branch is randomly selected 
+								{
+									auto z = sum*ran();
+									auto k = 0u; while(k < B && z > sum_store[k]) k++;
+									if(k == B) emsg("Should not be B");	
+									add_nm_prob(tlg.tr_list[k],t1,ps,popcomb_t,ind);								
+								}
+								
+								// For updating cumulative probability distribution, the branch must be 
+								// selected according to bp multiplied probability of being branch
+								{
+									auto z = sum2*ran();
+									auto k = 0u; while(k < B && z > sum_store2[k]) k++;
+									if(k == B) emsg("Should not be B");		
 									
-									auto pr = ran()*exp(sum);
+									auto pr = ran()*pr_st[k];
 									auto b = (unsigned int)(pr*H_BIN);
 									if(b >= H_BIN){
 										if(b == H_BIN) b--;
-										else emsg("hbin range3");
+										else emsg("hbin range1");
 									}
 									
-									cpd[tr_gl][b]++;
-								}
-							}	
-							else{
-								const auto &tr_list = tlg.tr_list;
-								
-								auto B = tr_list.size();
-								auto t1 = ev_or.tdiv;
-								
-								if(B == 1){
-									add_nm_prob(tlg.tr_list[0],t1,ps,popcomb_t,ind);
-									add_nm_cpd(tlg.tr_list[0],t1,UNSET,ps,popcomb_t,ind);
-								}
-								else{
-									auto ti = get_ti(t1);
-			
-									auto sum = 0.0;
-									vector <double> sum_store;
-									
-									auto sum2 = 0.0;
-									vector <double> sum_store2;
-									
-									vector <double> pr_st(B);
-									
-									for(auto b = 0u; b < B; b++){
-										const auto &tra = sp.tra_gl[tr_list[b]];
-			
-									
-										auto m = tra.nm_trans_ref;
-										const auto &nmt = sp.nm_trans[m];
-										const auto &ref = nmt.dist_param_eq_ref;
-
-										vector <double> ref_val(ref.size());
-										for(auto i = 0u; i < ref.size(); i++){
-											ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
-										}
-			
-										auto bp = eqn[tra.bp.eq_ref].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
-										pr_st[b] = nm_trans_incomp_like_no_log(nmt.type,t_end-t1,dt,ref_val);
-											
-										sum += bp;
-										sum_store.push_back(sum);
-										
-										sum2 += bp*pr_st[b];
-										sum_store2.push_back(sum2);
-									}
-				
-									// For future predition of transions rate the branch is randomly selected 
-									{
-										auto z = sum*ran();
-										auto k = 0u; while(k < B && z > sum_store[k]) k++;
-										if(k == B) emsg("Should not be B");	
-										add_nm_prob(tlg.tr_list[k],t1,ps,popcomb_t,ind);								
-									}
-									
-									// For updating cumulative probability distribution, the branch must be 
-									// selected according to bp multiplied probability of being branch
-									{
-										auto z = sum2*ran();
-										auto k = 0u; while(k < B && z > sum_store2[k]) k++;
-										if(k == B) emsg("Should not be B");		
-										
-										auto pr = ran()*pr_st[k];
-										auto b = (unsigned int)(pr*H_BIN);
-										if(b >= H_BIN){
-											if(b == H_BIN) b--;
-											else emsg("hbin range1");
-										}
-										
-										cpd[tlg.tr_list[k]][b]++;
-									}
+									cpd[tlg.tr_list[k]][b]++;
 								}
 							}
 						}
@@ -2673,10 +2210,12 @@ void StateSpecies::calc_trans_diag(ParticleSpecies &ps, const vector < vector <d
 				}
 			}
 		}
-		break;
 	}
-}
 
+	if(CIprob) return num_outside_CI/num;
+	return UNSET;
+}
+			
 
 /// Adds probabilities for a non-Markovian transition
 void StateSpecies::add_nm_prob(unsigned tr_gl_or, double t1, ParticleSpecies &ps, const vector < vector <double> > &popcomb_t, const Individual &ind) const
@@ -2724,7 +2263,6 @@ void StateSpecies::add_nm_prob(unsigned tr_gl_or, double t1, ParticleSpecies &ps
 	
 	// Does the first fraction of a division
 	auto prob = 1.0;
-	auto tot = 0.0;
 	bool first = true;
 	while(ti < ti_max){
 		unsigned int tii;
@@ -2741,7 +2279,6 @@ void StateSpecies::add_nm_prob(unsigned tr_gl_or, double t1, ParticleSpecies &ps
 		auto num = (prob-pr)/(tii-ti);
 	
 		while(ti < tii){
-			tot += num;
 			en[tr_gl_or][ti] += num;
 			ti++;
 		}
@@ -2751,10 +2288,9 @@ void StateSpecies::add_nm_prob(unsigned tr_gl_or, double t1, ParticleSpecies &ps
 }
 
 
-/// Adds to cumulative probability distribution
-void StateSpecies::add_nm_cpd(unsigned tr_gl_or, double t1, double t2, ParticleSpecies &ps, const vector < vector <double> > &popcomb_t, const Individual &ind) const
-{	
-	auto &cpd = ps.cum_prob_dist;
+/// Gets the probability of a non-Markovian 
+double StateSpecies::pr_nm_cpd(unsigned tr_gl_or, double t1, double t2, const vector < vector <double> > &popcomb_t, const Individual &ind) const 
+{
 	double t_end = T;
 	
 	auto m = sp.tra_gl[tr_gl_or].nm_trans_ref;
@@ -2770,13 +2306,21 @@ void StateSpecies::add_nm_cpd(unsigned tr_gl_or, double t1, double t2, ParticleS
 		ref_val[i] = eqn[ref[i]].calculate_indfac(ind,ti,popcomb_t[ti],precalc);
 	}
 	
-	double pr;
 	if(t2 != UNSET){
-		pr = nm_trans_incomp_like_no_log(nmt.type,t2-t1,dt,ref_val);
+		return nm_trans_incomp_like_no_log(nmt.type,t2-t1,dt,ref_val);
 	}
 	else{
-		pr = ran()*nm_trans_incomp_like_no_log(nmt.type,t_end-t1,dt,ref_val);
+		return ran()*nm_trans_incomp_like_no_log(nmt.type,t_end-t1,dt,ref_val);
 	}
+}
+
+
+/// Adds to cumulative probability distribution
+void StateSpecies::add_nm_cpd(unsigned tr_gl_or, double t1, double t2, ParticleSpecies &ps, const vector < vector <double> > &popcomb_t, const Individual &ind) const
+{	
+	auto &cpd = ps.cum_prob_dist;
+
+	auto pr = pr_nm_cpd(tr_gl_or,t1,t2,popcomb_t,ind);
 	
 	auto b = (unsigned int)(pr*H_BIN);
 	if(b >= H_BIN){

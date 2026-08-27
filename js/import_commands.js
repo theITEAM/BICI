@@ -480,6 +480,8 @@ function species_command(loop)
 	
 	if(option_error("type",type,["individual","population","deterministic"]) == true) return;
 
+	//if(make_one_chain) type = "deterministic";
+	
 	let trans_tree = false; 
 	if(type == "individual"){
 		let trans_tree_str = get_tag_value("trans-tree").toLowerCase();
@@ -1216,7 +1218,7 @@ function transition_command2(tags)
 				alert_import("For an Erlang distribution the shape parameter '"+shape+"' must be a positive integer");				
 			}
 			
-			import_eqn_value(val.shape_erlang,shape);
+			val.shape_erlang.te = String(shape);
 		}
 		break;
 		
@@ -1456,7 +1458,7 @@ function param_command2(full_name,line,op)
 	
 	add_proc_time(10*dpt);
 	
-	if(begin(par.name,"Ω")) par.pri_pos = prior_cv_pos;
+	if(is_covar(par)) par.pri_pos = prior_cv_pos;
 	
 	par.import_line = imp.line;
 
@@ -1538,7 +1540,9 @@ function param_command2(full_name,line,op)
 	let prior_split = get_tag_value("prior-split"); 
 	let prior_const = get_tag_value("prior-const"); 
 	let fw = get_tag_value("factor-weight");
-	
+	let ds = get_tag_value("dynamic-sim");
+	let region = get_tag_value("region");
+		
 	if(fw != ""){
 		if(par.factor == false){
 			alert_import("'factor-weight' can only be set if 'factor' is set to 'true'"); 
@@ -1562,6 +1566,7 @@ function param_command2(full_name,line,op)
 	param_tag.push({val:prior, tag:"prior"});
 	param_tag.push({val:prior_split, tag:"prior-split"});
 	param_tag.push({val:prior_const, tag:"prior-const"});
+	param_tag.push({val:ds, tag:"dynamic-sim"});
 	
 	for(let j = 0; j < param_tag.length; j++){
 		for(let i = j+1; i < param_tag.length; i++){
@@ -1589,71 +1594,98 @@ function param_command2(full_name,line,op)
 	par.define_eqn = "";
 	par.define_eqn_on = false; if(par.ndep_cont == 0) par.define_eqn_on = true;
 
-	if(par.ndep_cont == 0){
-		if(value != ""){
-			par.value = value;
-			par.variety = "normal";
+	if(ds != ""){
+		par.variety = "dynamic";
+		
+		let di = dynamic_info_from_text(ds,par);
+	
+		switch(di.type.te){
+		case "bin-thresh-region": case "bin-min-max-region":
+			if(region == "") alert_import("Cannot find the 'region' tag for '"+imp.typest+"'");
+			else{
+				di.region.table = load_table(region.te,true,region.sep,region.name);
+				di.region.loaded = true;
+			}
+			break;
+			
+		default:
+			if(region != "") alert_import("The 'region' tag for '"+imp.typest+"' should not be set");
+			break;
 		}
 		
-		if(reparam != ""){
-			par.reparam_eqn = reparam;
-			par.variety = "reparam";
-			par.reparam_eqn_on = true;
+		if(par.spline.spline_radio.value != "Square"){
+			alert_import("A square spline must be used for dynamic parameter "+par.full_name+"."); 
 		}
 		
-		if(cons != ""){
-			par.value = cons;
-			par.variety = "const";
-		}
+		par.dynamic_info = di;		
 	}
 	else{
-		if(value != "" || cons != "" || reparam != ""){	
-			set_default_value(par);
-			
-			let desc = "For 'value'";
-			let valu = value; 
-			if(valu == ""){
-				if(cons != ""){
-					valu = cons; desc = "For 'constant'";
-					par.variety = "const";		
-				}
-				else{
-					if(reparam != ""){
-						valu = reparam; desc = "For 'reparam'";
-						par.variety = "reparam";		
-					}
-					else error("Problem importing");
-				}
+		if(par.ndep_cont == 0){
+			if(value != ""){
+				par.value = value;
+				par.variety = "normal";
 			}
-		
-			if(reparam != "" && is_file(valu) == false){
-				if(par.time_dep){
-					if(par.spline.spline_radio.value != "Square"){
-						alert_import("A square spline must be used for time-varying reparameterised parameter "+par.full_name+"."); 
-					}
-				}
+			
+			if(reparam != ""){
 				par.reparam_eqn = reparam;
+				par.variety = "reparam";
 				par.reparam_eqn_on = true;
 			}
-			else{		
-				par.value = param_blank(par);
 			
-				if(is_file(valu) == false){ // Sets all elements to the same	
-					let dim = get_dimensions(par.value);
-					let ele_list = get_element_list(par.value,dim);
-					for(let k = 0; k < ele_list.length; k++){
-						set_element(par.value,ele_list[k],valu);
+			if(cons != ""){
+				par.value = cons;
+				par.variety = "const";
+			}
+		}
+		else{
+			if(value != "" || cons != "" || reparam != ""){	
+				set_default_value(par);
+				
+				let desc = "For 'value'";
+				let valu = value; 
+				if(valu == ""){
+					if(cons != ""){
+						valu = cons; desc = "For 'constant'";
+						par.variety = "const";		
+					}
+					else{
+						if(reparam != ""){
+							valu = reparam; desc = "For 'reparam'";
+							par.variety = "reparam";		
+						}
+						else error("Problem importing");
 					}
 				}
-				else{
-					load_param_value(par,par.value,"Value",valu,desc,load_dpt);
-					load_dpt = 0;
+			
+				if(reparam != "" && is_file(valu) == false){
+					if(par.time_dep){
+						if(par.spline.spline_radio.value != "Square"){
+							alert_import("A square spline must be used for time-varying reparameterised parameter "+par.full_name+"."); 
+						}
+					}
+					par.reparam_eqn = reparam;
+					par.reparam_eqn_on = true;
 				}
+				else{		
+					par.value = param_blank(par);
 				
-				let err = check_param_value("Set Param",par,par.value);
-				if(typeof err == 'string') alert_import(desc+": "+err);
+					if(is_file(valu) == false){ // Sets all elements to the same	
+						let dim = get_dimensions(par.value);
+						let ele_list = get_element_list(par.value,dim);
+						for(let k = 0; k < ele_list.length; k++){
+							set_element(par.value,ele_list[k],valu);
+						}
+					}
+					else{
+						load_param_value(par,par.value,"Value",valu,desc,load_dpt);
+						load_dpt = 0;
+					}
+					
+					let err = check_param_value("Set Param",par,par.value);
+					if(typeof err == 'string') alert_import(desc+": "+err);
+				}
+				par.set = true;
 			}
-			par.set = true;
 		}
 	}
 
@@ -1764,6 +1796,8 @@ function add_param(par)
 	if(find(model.param,"name",par.name) != undefined){
 		alert_import("The parameter '"+par.name+"' is defined more than once");
 	}
+	
+	//set_too_big(par);
 	
 	model.param.push(par);
 }
@@ -1887,10 +1921,13 @@ function inference_command()
 	
 	details.indmax = check_pos_integer("ind-max",INDMAX_DEFAULT);
 	
+	details.indmax = check_pos_integer("ind-max",INDMAX_DEFAULT);
+	
 	details.param_output_max = check_pos_integer("param-output-max",PARAM_OUTPUT_MAX_DEFAULT);
 
 	switch(alg){
 	case "DA-MCMC":
+		details.chain_nsiminit = check_pos_integer("num-sim-init",CHAIN_NSIMINIT_DEFAULT);
 		details.nchain = check_pos_integer("nchain",MCMC_CHAIN_DEFAULT);
 		details.sample = check_pos_integer("update",MCMC_SAMPLE_DEFAULT);
 		details.output_param = check_pos_integer("param-output",MCMC_OP_PARAM_DEFAULT);
@@ -1899,6 +1936,7 @@ function inference_command()
 		break;
 	
 	case "PAS-MCMC":
+		details.chain_nsiminit = check_pos_integer("num-sim-init",CHAIN_NSIMINIT_DEFAULT);
 		details.npart = check_pos_integer("npart",PAS_PART_DEFAULT);
 		details.gen_update = check_percent("gen-percent",PAS_GEN_UPDATE_DEFAULT);
 		if(details.gen_update == 0) alert_import("'gen-percent' cannot be 0");
@@ -1926,8 +1964,8 @@ function inference_command()
 	
 	if(make_one_chain){
 		details.nchain = 1;
-		//details.algorithm.value = "DA-MCMC";
-		//details.sample = 1000;
+		details.algorithm.value = "DA-MCMC";
+		details.sample = 2000;
 	}
 	
 	details.burnin_frac = BURNIN_FRAC_DEFAULT;

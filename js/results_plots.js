@@ -3990,7 +3990,7 @@ function add_first_inf_comp(imin,imax,tmin,tmax,chsel,result,rpf,burn,p,cl)
 		}
 	}
 		
-	post({type:"Graph define", variety:"Histogram", view:"Histogram", data:data, op:{x_label:"Individual", x_param:false, y_label:"Probability"}});
+	post({type:"Graph define", variety:"Histogram", view:"Histogram", data:data, op:{x_label:"Compartment", x_param:false, y_label:"Probability"}});
 }
 
 
@@ -4534,6 +4534,7 @@ function create_view_graph_calculate(name,prior_const,sel_view,so)
 	let value = par.value;
 	if(prior_const == true) value = par.prior_const;
 	
+	
 	post(define_parameter_plot("view_graph",par,value,undefined,undefined,sel_view,det,so));
 }
 
@@ -4591,7 +4592,7 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 	
 	switch(sel_view.type){
 	case "Timevary":
-		{			
+		{		
 			switch(view){
 			case "Graph": case "Graph (all)": case "Graph (split)":
 				{
@@ -4786,7 +4787,7 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 					let comp = claa.comp;
 					
 					let val = value;
-					
+
 					if(!CImin){
 						let res = construct_spline_timevariation(par,par.value,details);
 						if(!res.err) val = res.value;
@@ -4799,7 +4800,7 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 						
 						data.push({type:"CompMatrixAnim", value:val});
 		
-						return {type:"Graph define", variety:"CompMatrixAnim", view:"CompMatrixAnim", data:data, op:{p:p, cl:cl}};
+						return {type:"Graph define", variety:"CompMatrixAnim", view:"CompMatrixAnim", data:data, op:{p:p, cl:cl, timepoint:so.timepoint}};
 					}
 					else{
 						for(let c = 0; c < comp.length; c++){
@@ -4817,14 +4818,14 @@ function define_parameter_plot(from,par,value,CImin,CImax,sel_view,details,so,rp
 						
 						switch(view){
 						case "Compartment":	case "Density":
-							return {type:"Graph define", variety:"Population", view:view, data:data, op:{p:p, cl:cl}};
+							return {type:"Graph define", variety:"Population", view:view, data:data, op:{p:p, cl:cl, timepoint:so.timepoint}};
 							
 						case "Histogram":
 							if(comp.length > HISTO_PLOT_MAX){
 								return no_graph_msg("Too many bars to plot");
 							}
 						
-							return {type:"Graph define", variety:"HistoAnim", view:"HistoAnim", data:data, op:{x_label:claa.name, x_param:false, y_label:"Value", p:p, cl:cl}};
+							return {type:"Graph define", variety:"HistoAnim", view:"HistoAnim", data:data, op:{x_label:claa.name, x_param:false, y_label:"Value", p:p, cl:cl, timepoint:so.timepoint}};
 						}
 					}
 				}
@@ -4963,8 +4964,7 @@ function get_time_points(details)
 	if(isNaN(details.timestep) || dt == 0) dt = (tf-ti)/100;
 
 	let tp = [];
-	
-	for(let t = ti; t < tf; t += dt) tp.push(t);
+	for(let t = ti; t < tf-TINY; t += dt) tp.push(t);
 	tp.push(tf);
 	return tp;
 }
@@ -5081,14 +5081,15 @@ function add_parameter_buts(res,lay)
 			pvt.push({te:"Statistics"});
 		
 			// Works out if to keep the current view
-			if(!rpf.sel_paramviewtype) rpf.sel_paramviewtype = copy(pvt[0]);
+			if(!rpf.sel_paramviewtype || inter.graph.select_first_view) rpf.sel_paramviewtype = copy(pvt[0]);
 			else{
 				let k = find(rpf.pos_paramviewtype,"te",rpf.sel_paramviewtype.te);
 				if(k == undefined) rpf.sel_paramviewtype = copy(pvt[0]);
 				else rpf.sel_paramviewtype = copy(rpf.pos_paramviewtype[k]);
 			}
 		}
-
+		inter.graph.select_first_view = false;
+	
 		start_worker("Graph param",res_worker(res));
 		return;
 	}
@@ -5161,7 +5162,7 @@ function graph_param_calculate(result,rpf,burn)
 	if(graph_dia) prr("GRAPH DIA  graph_param_calculate: pview:"+pview.te);
 	
 	if(pview.param == "too big"){
-		post(no_graph_msg("This quantity is too large to output.\nThe threshold number of tensor elements can be altered under 'Further options'."));
+		post(no_graph_msg("This quantity is too large to output.\nThe threshold number of tensor elements can be altered under 'Advanced options'."));
 		return;
 	}
 
@@ -5268,7 +5269,7 @@ function graph_param_calculate(result,rpf,burn)
 			}
 			
 			let mat = get_correlation_matrix(list_plot,result,rpf,burn);
-		
+	
 			let vec = [];
 			for(let k = 0; k < list_plot.length; k++){
 				vec.push(result.total_param_list[list_plot[k]].name);
@@ -5467,7 +5468,7 @@ function graph_generation_calculate(result,rpf,burn)
 	if(graph_dia) prr("GRAPH DIA  graph_generation_calculate: pview:"+pview.te);
 	
 	if(pview.param == "too big"){
-		post(no_graph_msg("This quantity is too large to output.\nThe threshold number of tensor elements can be altered under 'Further options'."));
+		post(no_graph_msg("This quantity is too large to output.\nThe threshold number of tensor elements can be altered under 'Advanced options'."));
 		return;
 	}
 	
@@ -5596,7 +5597,7 @@ function multivariate_param_plot(result,rpf,burn)
 					if(res.err){ post(no_graph_msg(res.msg)); return;}
 					samp_val = res.value; 
 				}
-				
+		
 				samp_val_list.push(samp_val);
 			}
 		}
@@ -5686,7 +5687,7 @@ function get_correlation_matrix(list_plot,result,rpf,burn)
 	
 		let mean = sum/K;
 		let vari = sum2/K - mean*mean; if(vari < 0) vari = 0;
-		if(vari < TINY) unvar[j] = true;
+		if(vari < VVTINY) unvar[j] = true;
 		else{
 			let sd = Math.sqrt(vari);
 			for(let k = 0; k < K; k++) trace[j][k] = (trace[j][k]-mean)/sd;
@@ -6099,7 +6100,7 @@ function setup_distribution(result,rpf,burn)
 					}
 					let fac = sum*(max-min)/N;
 					
-					for(let i = 0; i < N; i++) point.push({x:min + (i+0.5)*(max-min)/N, y:prob[i]/fac});	
+					for(let i = 0; i < N; i++) point.push({x:min + (i+0.5)*(max-min)/N, y:prob[i]/fac});			
 				}
 				break;
 				

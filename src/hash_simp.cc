@@ -21,17 +21,6 @@ HashSimp::HashSimp()
 	on = true;
 }
 
-
-/*
-/// Initialises hash table with a given size
-void HashSimp::init(unsigned int num)
-{
-	size = num;
-	table.resize(num);
-}
-*/
-
-
 /// Turns off the hash table
 void HashSimp::off()
 {

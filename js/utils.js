@@ -666,15 +666,6 @@ function get_prop(value,prop,end)
 }
 
 
-/// Determines the total number of elements for parameter
-function num_element(par)
-{
-	let num = 1;
-	for(let k = 0; k < par.ndep_cont; k++) num *= par.list[k].length;
-	
-	return num;
-}
-
 // Use timer.start(0) to start timer.stop(0) to stop timer.print() to print
 
 /// Gets some timers()
@@ -787,6 +778,35 @@ function split_with_bracket(s,delimiter)
 	
 		if(letter == "(") num_brac++;
 		if(letter == ")") num_brac--;
+		
+		if(letter == delimiter && num_brac == 0 && quoteon == false){
+			splits.push(s.substr(j,i-j).trim()); j = i+1; 
+		}
+	}
+	splits.push(s.substr(j,s.length-j).trim());
+
+	return splits;                                           
+}
+
+
+/// Split up a string accounting for curly brackets and quotation marks
+function split_with_curly_bracket(s,delimiter)
+{                              
+ let splits=[];                       
+ 
+  let quoteon = false;
+	let num_brac = 0;
+	
+	let j = 0;
+	for(let i = 0; i < s.length; i++){
+		let letter = s.substr(i,1);
+		
+		if(letter == "\""){
+			if(quoteon == false) quoteon = true; else quoteon = false;
+		}
+	
+		if(letter == "{") num_brac++;
+		if(letter == "}") num_brac--;
 		
 		if(letter == delimiter && num_brac == 0 && quoteon == false){
 			splits.push(s.substr(j,i-j).trim()); j = i+1; 
@@ -1328,6 +1348,14 @@ function is_matrix(par)
 }
 
 
+/// Determines if a parameter is a covariance matrix
+function is_covar(par)
+{
+	if(begin(par.name,"Ω")) return true;
+	return false;
+}
+
+
 /// Determines the most frequent element in a list
 function most_freq(list)
 {
@@ -1454,6 +1482,7 @@ function is_tag_name_file(name)
 	case "prior-split": case "dist-split": 
 	case "A": case "Ainv": case "A-sparse": case "pedigree": case "X": 
 	case "ind-list": case"factor-weight":
+	case "region":
 		return "yes";
 		
 	default: 

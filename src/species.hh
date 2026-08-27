@@ -56,21 +56,18 @@ class Species   	                         // Stores details of a species
 		
 		vector <unsigned int> markov_eqn_not_linear; // List mes not linear in popcomb
 		
-		vector < vector <bool> > markov_update_t;// Determines if markov must be updated as a function of time
+		vector <unsigned int> pop_list;          // Lists all populations which belong to species
 		
-		/*
-		vector <bool> markov_update_all;       // Determines if all markov equations are updated
+		vector <unsigned int> popcomb_list;      // Lists all popcombs which belong to species
 		
-		vector <unsigned int> markov_time_dep; // Lists all markov equation that are time dependent
-
-		vector < vector <unsigned int> > markov_param_change; // Lists all markov equations that change from param
-		*/
-		
+		vector < vector <MEUpdate> > markov_update_t;      // Determines if markov must be recalculated as a function of time
+	
 		MarkovTree markov_tree;                // Constructs a tree of nodes to sample markov equations
 			
 		vector <bool> cgl_begin_nm;            // Determines if glob comp starts nm 
 		
 		bool trans_tree;                       // Determines if the transmission tree is turned on
+		bool trans_tree_output;                // Determines if only implemented on output 
 		
 		bool nm_flag;                          // Determines if non-Markovian transitions
 		
@@ -152,8 +149,6 @@ class Species   	                         // Stores details of a species
 		
 		vector <WarnData> warn;                // Stores any errors used to generate data
 
-		SimLinearSpeedup sim_linear_speedup;   // Stores information to speed up simulation
-		
 		unsigned int T;                        // The maximum time
 		
 		unsigned int line_num;                 // Stores the import line (for diagnostic error messages)
@@ -187,10 +182,9 @@ class Species   	                         // Stores details of a species
 		unsigned int tr_trans(unsigned int trg, unsigned int c) const;
 		unsigned int get_comp_global_convert(unsigned int cgl, unsigned int cl, unsigned int c) const;
 		void sampling_error(unsigned int trg, string warn) const;
-		void sim_linear_speedup_init(const vector <Equation> &eqn);
-		void set_linear_form(LinearForm &lin_form, const vector <LinearFormInit> &lfinit, const vector <Equation> &eqn) const;
 		bool item_equal(const EqItem &it1, const EqItem &it2) const;
 		void set_markov_eqn_update(const vector <Equation> &eqn, const vector <Param> &param);
+		bool trans_illegal(unsigned int tr, unsigned int ti, const vector < vector <bool> > &illegal_trans) const;
 		
 	// In 'species_data.cc':
 	public: 

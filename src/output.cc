@@ -14,6 +14,7 @@ using namespace std;
 #include "output.hh"
 #include "utils.hh"
 #include "lzw.hh"
+#include "matrix.hh"
 
 /// Initialises the output 
 Output::Output(const Model &model, Mpi &mpi, bool sup_) : model(model), mpi(mpi)
@@ -224,7 +225,8 @@ void Output::check_open(ofstream &fout, string file) const
 /// Outputs a summary of the model and data to a file
 void Output::summary(const Model &model) const
 {
-	if(diagdir == "") return;
+	if(diagdir == "") return; 
+	
 	auto file = diagdir+"/model.txt";
 
 	ofstream fout(file);
@@ -513,9 +515,11 @@ void Output::summary(const Model &model) const
 			fout << " ME: ";
 			for(const auto &mer : po.markov_eqn_ref){
 				const auto &sp = model.species[mer.p];
-				auto eq = sp.markov_eqn[mer.e].eqn_ref;
-				fout << model.eqn[eq].te_raw << "  ";
-			}
+				for(auto e : mer.list){
+					auto eq = sp.markov_eqn[e].eqn_ref;
+					fout << model.eqn[eq].te_raw << "  ";
+				}
+			}				
 		}
 		fout << endl;
 	}
@@ -578,6 +582,7 @@ void Output::summary(const Model &model) const
 		case REPARAM_PARAM: fout << "reparam"; break;
 		case DIST_PARAM: fout << "dist"; break;
 		case CONST_PARAM: fout << "const"; break;
+		case DYNAMIC_PARAM: fout << "dynamic"; break;
 		case UNSET_PARAM: emsg("Error"); break;
 		}
 		
@@ -663,13 +668,14 @@ void Output::summary(const Model &model) const
 	
 	if(false){
 		fout << "PARAMETER VECTOR:" << endl;
-		for(const auto &par : model.param_vec){
-			fout << par.name;
+		for(auto th = 0u; th < model.param_vec.size(); th++){
+			const auto &pv = model.param_vec[th];
+			fout << model.param_vec_name(th);
 		
 			if(false){
 			//if(true){
 				fout << "   affect: " << endl;
-				for(auto &al : par.affect_like){
+				for(auto &al : pv.affect_like){
 					fout << print_affect_like(al);
 				}
 			}
@@ -680,8 +686,8 @@ void Output::summary(const Model &model) const
 		
 	if(true){
 		fout << "SPLINES:" << endl;
-		for(const auto &spl : model.spline){
-			fout << spl.name << endl;
+		for(auto i = 0u; i < model.spline.size(); i++){
+			fout << model.spline_name(i) << endl;
 		}
 		fout << endl;
 	}
@@ -717,7 +723,8 @@ void Output::prop_summary(string te) const
 {
 	if(!op()) return;
 		
-	if(debugging){
+	if(debugging || false){
+		cout << "proposal.txt output" << endl;
 		auto file = "proposal.txt";
 		ofstream fout(file);
 		check_open(fout,file);
@@ -843,16 +850,18 @@ string Output::print_affect_like(const AffectLike &al) const
 			ss << "AFFECT Incomplete Nonmarkovian trans affect: " << nm.name << endl;	
 		}
 		break;
-		
+	
+	/*
 	case POP_AFFECT:
 		{
 			ss << "AFFECT Population affect" << endl;	
 		}
 		break;
-		
+	*/
+	
 	case SPLINE_PRIOR_AFFECT:
 		{
-			ss << "AFFECT Spline Prior affect " << model.spline[al.num].name << endl;	
+			ss << "AFFECT Spline Prior affect " << model.spline_name(al.num) << endl;	
 		}
 		break;
 		
@@ -865,66 +874,20 @@ string Output::print_affect_like(const AffectLike &al) const
 		
 	case PRIOR_AFFECT:
 		{
-			ss << "AFFECT Prior affect " << model.param_vec[al.num].name << endl;	
+			ss << "AFFECT Prior affect " << model.param_vec_name(al.num) << endl;	
 		}
 		break;
 	
 	case DIST_AFFECT:
 		{
-			ss << "AFFECT Distribution affect " << model.param_vec[al.num].name << endl;	
+			ss << "AFFECT Distribution affect " << model.param_vec_name(al.num) << endl;	
 		}
 		break;
-	
-	case DIV_VALUE_AFFECT:
+		
+	case MARKOV_VALUE_AFFECT:
 		{
 			auto eq = model.species[al.num].markov_eqn[al.num2].eqn_ref;
-			ss << "AFFECT Div Value " << model.eqn[eq].te_raw << endl;
-		}
-		break;
-		
-	case DIV_VALUE_NOPOP_AFFECT:
-		{
-			auto eq = model.species[al.num].markov_eqn[al.num2].eqn_ref;
-			ss << "AFFECT Div Value nopop" << model.eqn[eq].te_raw << endl;
-		}
-		break;
-		
-	case DIV_VALUE_LINEAR_AFFECT:
-		{
-			ss << "AFFECT Div Value Linear ";
-			{
-				if(al.lin_form.factor_nopop_only) ss << "[factor/no-pop] ";
-				else ss << "[full] ";
-				string str = "";	
-				for(const auto &lf : al.lin_form.list){
-					str += model.eqn[lf.e].te_raw +", ";
-				}
-				ss << trunc(str,1000);
-			}
-			ss << endl;
-		}
-		break;
-		
-	case MARKOV_POP_NOPOP_AFFECT:
-		{
-			auto eq = model.species[al.num].tra_gl[al.num2].dist_param[0].eq_ref;
-			ss << "AFFECT Markov pop nopop" << model.eqn[eq].te_raw << endl;
-		}
-		break;
-		
-	case MARKOV_POP_LINEAR_AFFECT:
-		{
-			ss << "AFFECT Markov pop linear ";
-			{
-				if(al.lin_form.factor_nopop_only) ss << "[factor/no-pop] ";
-				else ss << "[full] ";
-				string str = "";
-				for(const auto &lf : al.lin_form.list){
-					str += model.eqn[lf.e].te_raw +", ";
-				}
-				ss << trunc(str,1000);
-			}
-			ss << endl;
+			ss << "AFFECT Markov Value " << model.eqn[eq].te_raw << " " << al.num2 << endl;
 		}
 		break;
 		
@@ -979,10 +942,12 @@ string Output::print_affect_like(const AffectLike &al) const
 	
 	if(al.list.size() != 0){
 		switch(al.type){
+		/*
 		case POP_AFFECT:
 			ss << "   Populations affected: ";	
 			for(auto k : al.list) ss << model.pop[k].name << ","; 
 			break;
+		*/
 		
 		case OBS_EQN_AFFECT:
 			ss << "   Obs Eqn affected: ";	
@@ -1284,14 +1249,16 @@ string Output::trace_init() const
 				}
 				else{
 					for(auto j = 0u; j < par.N; j++){
-						ss << ",\"" << pn << "_";
-						for(auto k = 0u; k < par.dep.size(); k++){
-							const auto &dp = par.dep[k];
-							auto m = (unsigned int)(j/dp.mult)%dp.list.size();
-							if(k != 0) ss << ",";
-							ss << dp.list[m];
+						if(model.par_ele_set(th,j)){
+							ss << ",\"" << pn << "_";
+							for(auto k = 0u; k < par.dep.size(); k++){
+								const auto &dp = par.dep[k];
+								auto m = (unsigned int)(j/dp.mult)%dp.list.size();
+								if(k != 0) ss << ",";
+								ss << dp.list[m];
+							}
+							ss << "\"";
 						}
-						ss << "\"";
 					}
 				}
 			}
@@ -1319,6 +1286,7 @@ string Output::trace_init() const
 		}
 	}
 	
+	//if(model.trans_tree || model.trans_tree_output){
 	if(model.trans_tree){
 		ss << ",N^origin,N^infected,N^mut-tree,N^mut-origin,N^unobs,t^root";
 	}
@@ -1572,14 +1540,16 @@ string Output::param_output(const Particle &part, const vector < vector <double>
 			}
 			else{			
 				for(auto j = 0u; j < par.N; j++){
+					if(model.par_ele_set(th,j)){
 					if(th >= value.size()) emsg("r");
-					if(j >= value[th].size()) emsg("r2");
-					ss << "," << value[th][j];
+						if(j >= value[th].size()) emsg("r2");
+						ss << "," << value[th][j];
+					}
 				}
 			}
 		}
 	}
-		
+	
 	auto dir_out = part.dir_out;
 	for(auto i = 0u; i < model.derive.size(); i++){
 		const auto &der = model.derive[i];
@@ -1631,7 +1601,13 @@ void Output::state_sample(unsigned int s, unsigned int chain, State &state)
 
 	state.check_final_li_wrong();
 
-	auto part = state.generate_particle(s,chain,true);
+	auto store_state = true;
+	
+	if(model.deterministic){
+		state.determinisitic_resimulate();
+	}
+	
+	auto part = state.generate_particle(s,chain,store_state);
 	state_store.push_back(part);
 	timer[STATE_OUTPUT] += clock();
 }
@@ -2046,12 +2022,13 @@ string Output::generate_state_head(const vector <string> &ind_key) const
 /// Generates values from parameter vector
 vector < vector <double> > Output::param_value_from_vec(const Particle &pa) const 
 {
+
 	auto param_val = model.get_param_val(pa);
 	//cout << "PRINT" << endl;
 	//model.print_param(param_val);
 		
 	model.add_tvreparam(param_val,pa.param_val_tvreparam);
-	
+
 	const auto &val = param_val.value;
 	vector < vector <double> > value;
 	
@@ -2060,45 +2037,45 @@ vector < vector <double> > Output::param_value_from_vec(const Particle &pa) cons
 		const auto &par = model.param[th];
 		if(par.trace_output || par.state_output){
 			value[th].resize(par.N,UNSET);
-			if(par.variety != CONST_PARAM){
-				for(auto j = 0u; j < par.N; j++){
-					const auto &er = par.element_ref[j];
-					auto ind = er.index;
-					if(ind != UNSET){
-						if(er.cons){
-							value[th][j] = par.constant.value[ind];
-						}
-						else{
-							const auto &ele = par.element[ind];
-							auto k = ele.param_vec_ref;
-							if(k != UNSET) value[th][j] = val[k];
+			if(par.variety == DYNAMIC_PARAM){
+				auto j = find_in(model.dynamic_param,th);
+				if(j == UNSET) emsg("Could not find dynamic param");
+				value[th] = model.decompress_vec(pa.param_val_dynamic[j]);
+			}
+			else{
+				if(par.variety != CONST_PARAM){
+					for(auto j = 0u; j < par.N; j++){
+						const auto &er = par.element_ref[j];
+						auto ind = er.index;
+						if(ind != UNSET){
+							if(er.cons){
+								value[th][j] = par.constant.value[ind];
+							}
+							else{
+								const auto &ele = par.element[ind];
+								auto k = ele.param_vec_ref;
+								if(k != UNSET) value[th][j] = val[k];
+							}
 						}
 					}
 				}
 			}
 		}
 	}
-	
+
 	if(val.size() != model.param_vec.size()) emsg("param_val the wrong size");
-	
-	/*
-	for(auto i = 0u; i < model.param_vec.size(); i++){
-		const auto &mpv = model.param_vec[i];
-		auto th = mpv.th;
-		if(model.param[th].trace_output){
-			value[mpv.th][mpv.index] = val[i]; 
-		}
-	}
-	*/
 	
 	if(false){
 		for(auto th = 0u; th < model.param.size(); th++){
 			const auto &par = model.param[th];
 			cout << par.name << endl;
-			for(auto j = 0u; j < par.N; j++){
-				cout << value[th][j]  << ",";
+			if(value[th].size() == 0) cout << " Not value" << endl;
+			else{
+				for(auto j = 0u; j < par.N; j++){
+					cout << value[th][j]  << ",";
+				}
+				cout << " va" << endl;
 			}
-			cout << " va" << endl;
 		}
 	}
 	
@@ -2110,14 +2087,16 @@ vector < vector <double> > Output::param_value_from_vec(const Particle &pa) cons
 		if(par.trace_output){
 			for(auto j = 0u; j < par.N; j++){
 				if(value[th][j] == UNSET){	
-					auto val = par.get_value(j);
-					if(val != UNSET){
-						value[th][j] = val;
-					}
-					else{
-						auto eq = par.get_eq_ref(j);
-						if(eq != UNSET){			
-							value[th][j] = model.eqn[eq].calculate_param(precalc);
+					if(par.element_ref[j].index != UNSET){
+						auto val = par.get_value(j);
+						if(val != UNSET){
+							value[th][j] = val;
+						}
+						else{
+							auto eq = par.get_eq_ref(j);
+							if(eq != UNSET){		
+								value[th][j] = model.eqn[eq].calculate_param(precalc);
+							}
 						}
 					}
 				}
@@ -2191,14 +2170,16 @@ string Output::output_param(const vector < vector <double> > &value) const
 					ss << ",Value" << endl;
 						
 					for(auto j = 0u; j < value[th].size(); j++){
-						ss << "  ";
-						for(auto k = 0u; k < par.dep.size(); k++){
-							const auto &dp = par.dep[k];
-							auto m = (unsigned int)(j/dp.mult)%dp.list.size();
-							if(k != 0) ss << ",";
-							ss << dp.list[m];
+						if(model.par_ele_set(th,j)){
+							ss << "  ";
+							for(auto k = 0u; k < par.dep.size(); k++){
+								const auto &dp = par.dep[k];
+								auto m = (unsigned int)(j/dp.mult)%dp.list.size();
+								if(k != 0) ss << ",";
+								ss << dp.list[m];
+							}
+							ss << "," << value[th][j] << endl;
 						}
-						ss << "," << value[th][j] << endl;
 					}
 				}
 			}
@@ -2417,7 +2398,6 @@ void Output::end(string file, unsigned int total_cpu)
 	}
 
 	ofstream fout;
-	
 	if(com_op == false && op()){
 		fout.open(file);
 
@@ -2448,7 +2428,6 @@ void Output::end(string file, unsigned int total_cpu)
 		
 			if(op() && part.size() > 0){
 				number_part(part);
-			
 				output_trace(ch,part,param_samp,fout);
 			}
 		}
@@ -2475,17 +2454,19 @@ void Output::end(string file, unsigned int total_cpu)
 	#endif
 
 			if(op() && part.size() > 0){
-				for(const auto &pa : part){
-					for(auto p = 0u; p < model.nspecies; p++){
-						const auto &psp = pa.species[p];
-						auto dt = psp.dt_max_est;
-						if(dt < dt_max_est_min) dt_max_est_min = dt;
-						
-						for(const auto &tp : psp.trans_prob){
-							auto name = model.species[p].cla[tp.cl].tra[tp.tr].name;
-							if(trans_prob_name.size() >= TRANS_PROB_MAX) break;
-							add_to_vec(trans_prob_name,name);
-						}						
+				if(false){  // Turned off because timestep error message not reliable
+					for(const auto &pa : part){
+						for(auto p = 0u; p < model.nspecies; p++){
+							const auto &psp = pa.species[p];
+							auto dt = psp.dt_max_est;
+							if(dt < dt_max_est_min) dt_max_est_min = dt;
+							
+							for(const auto &tp : psp.trans_prob){
+								auto name = model.species[p].cla[tp.cl].tra[tp.tr].name;
+								if(trans_prob_name.size() >= TRANS_PROB_MAX) break;
+								add_to_vec(trans_prob_name,name);
+							}						
+						}
 					}
 				}
 				
@@ -2498,26 +2479,28 @@ void Output::end(string file, unsigned int total_cpu)
 				if(pred_acc_on) update_ie_average(ie_average,part);
 								
 				output_state(ch,part,fout);
-			}
+			} 
 		}
 		
-		if(op()){		
-			string err_msg;
-			if(trans_prob_name.size() > 0){
-				err_msg = "High transition rates mean that there is a potential for a finite time-step discretisation error. It is recommended that this model is run with a time-step below '"+tstr(dt_max_est_min,2)+"'. The following transitions are affected: ";
-				err_msg += stringify(trans_prob_name);
-				if(trans_prob_name.size() >= TRANS_PROB_MAX) err_msg += "...";
-			}
-		
-			if(total_cpu >= 100 && dt_max_est_min > 5*model.details.dt){
-				auto tmax = model.details.t_end-model.details.t_start;
-				auto dt = dt_max_est_min;
-				if(dt > tmax/10) dt = tmax/10;
-				
-				err_msg = "This is being run with a relatively small time-step. Analysis suggests it could be reliably run up to a time-step '"+tstr(dt,2)+"'.";
-			}
+		if(false){  // Turned off because timestep error message not reliable
+			if(op()){		
+				string err_msg;
+				if(trans_prob_name.size() > 0){
+					err_msg = "High transition rates mean that there is a potential for a finite time-step discretisation error. It is recommended that this model is run with a time-step below '"+tstr(dt_max_est_min,2)+"'. The following transitions are affected: ";
+					err_msg += stringify(trans_prob_name);
+					if(trans_prob_name.size() >= TRANS_PROB_MAX) err_msg += "...";
+				}
 			
-			if(err_msg != "") final_warning.push_back(err_msg);
+				if(total_cpu >= 100 && dt_max_est_min > 5*model.details.dt){
+					auto tmax = model.details.t_end-model.details.t_start;
+					auto dt = dt_max_est_min;
+					if(dt > tmax/10) dt = tmax/10;
+					
+					err_msg = "This is being run with a relatively small time-step. Analysis suggests it could be reliably run up to a time-step '"+tstr(dt,2)+"'.";
+				}
+				
+				if(err_msg != "") final_warning.push_back(err_msg);
+			}
 		}
 		percentage(75,100,sup);
 
@@ -2606,7 +2589,7 @@ void Output::end(string file, unsigned int total_cpu)
 void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector < vector < vector < vector <double> > > > &param_samp, ofstream &fout) const
 {
 	auto nchain = model.details.nchain;
-	
+
 	auto burn = 0u;
 	const auto &de = model.details;
 	switch(de.algorithm){
@@ -2638,7 +2621,7 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 			}
 		}
 	}
-	
+
 	for(const auto &pa : part){
 		auto value = param_value_from_vec(pa);
 
@@ -3070,19 +3053,44 @@ void Output::output_prop_info(ofstream &fout) const
 			ss << "|";
 			ss << ti.n << "|";
 			ss << ti.n_start << "|";
-			auto N = ti.av.size();
-			for(auto k = 0u; k < N; k++){
-				if(k != 0) ss << ",";
-				ss << ti.av[k];
+			auto num = ti.n-ti.n_start;
+			{
+				auto N = ti.av.size();
+				for(auto k = 0u; k < N; k++){
+					if(k != 0) ss << ",";
+					ss << ti.av[k]/num;
+				}
+				ss << "|";
+				for(auto j = 0u; j < N; j++){
+					for(auto k = 0u; k < N; k++){
+						if(!(j == 0 && k == 0)) ss << ",";
+						ss << ti.av2[j][k]/num - (ti.av[j]/num)*(ti.av[k]/num);
+					}
+				}
 			}
 			ss << "|";
-			for(auto j = 0u; j < N; j++){
+			{
+				auto N = ti.log_av.size();
 				for(auto k = 0u; k < N; k++){
-					if(!(j == 0 && k == 0)) ss << ",";
-					ss << ti.av2[j][k];
+					if(k != 0) ss << ",";
+					ss << ti.log_av[k]/num;
+				}
+				ss << "|";
+				for(auto j = 0u; j < N; j++){
+					for(auto k = 0u; k < N; k++){
+						if(!(j == 0 && k == 0)) ss << ",";
+						ss << ti.log_av2[j][k]/num - (ti.log_av[j]/num)*(ti.log_av[k]/num);
+					}
 				}
 			}
 			ss << endl;
+		
+			/*
+			print_vector("av",ti.av);
+			print_matrix("av2",ti.av2);
+			print_vector("logav",ti.log_av);
+			print_matrix("logav2",ti.log_av2);
+			*/
 			
 			for(const auto &pi : ti.prop_info_store){
 				auto j = 0u;
@@ -3511,17 +3519,19 @@ void Output::number_part(vector <Particle> &part) const
 
 /// Outputs the final cpu time
 void Output::final_time(double cpu_time, double op_cpu_time) const 
-{
+{ 
 	auto op_st = " ("+tstr((int)((op_cpu_time*100)/(cpu_time+TINY)))+"% outputting)";
 	
-	cout << endl << "Total CPU time: " << get_cpu_time(cpu_time) << op_st << endl;
+	cout << endl << "Total CPU execution time: " << get_cpu_time(cpu_time) << op_st << endl;
 }
 
 
 /// Outputs the memory usage
 void Output::final_memory_usage() const 
 {
-	auto mem = memory_usage();
+	auto mem_usage = get_mem_usage();
+	auto mem = mem_usage.mem;
+	//auto mem = memory_usage();
 
 #ifdef USE_MPI	
 	mpi.sum(mem);
@@ -3530,7 +3540,9 @@ void Output::final_memory_usage() const
 	if(op()){
 		auto per = (unsigned int)(100*mem/total_memory());
 		cout << "Total memory consumption: " << mem_print(mem);
-		cout << " (" << per << "% of computer)" << endl;
+		cout << " (" << per << "% of computer)";
+		//cout << " (peak in '" << mem_usage.name << "')";
+		cout << endl; 
 	}
 }
 
@@ -3814,3 +3826,45 @@ void Output::change_sim_value(string param_name, double value)
 	
 	run_error("There was a problem changing the parameter value");
 }
+
+
+/// Profiles the memory using in output
+void Output::profile_memory() const
+{
+	cout << "OUTPUT PROFILE" << endl;
+	auto f = 100000.0/(1024*total_memory());
+	//auto sum_min = 5.0/f;
+	
+	auto sum_tot = 0.0;
+	
+	{
+		auto sum = 0.0;
+		for(const auto &lr : lines_raw) sum += mem(lr.st)+sizeof(unsigned int);
+		sum_tot += sum;
+		cout << "lines_raw: " << (unsigned int)(sum*f) << endl;
+	}
+	
+	{
+		auto sum = 0.0;
+		for(const auto &ps : param_store) sum += mem(ps);
+		sum_tot += sum;
+		cout << "param_store: " << (unsigned int)(sum*f) << endl;
+	}
+	
+	{
+		auto sum = 0.0;
+		for(const auto &ps : state_store) sum += mem(ps);
+		sum_tot += sum;
+		cout << "state_store: " << (unsigned int)(sum*f) << endl;
+	}
+	
+	{
+		auto sum = 0.0;
+		for(const auto &ds : diagnostic_store) sum += mem(ds.te)+sizeof(unsigned int);
+		sum_tot += sum;      
+		cout << "diagnostic_store: " << (unsigned int)(sum*f) << endl;
+	}
+	
+	cout << sum_tot/1000000000.0 << " sum_tot   TOTAL:" << total_memory()/1000000 << "GB" << endl;
+}
+

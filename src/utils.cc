@@ -32,6 +32,8 @@
 #include <math.h>
 #include <algorithm>
 #include <boost/math/special_functions/gamma.hpp>
+#include <boost/math/special_functions/erf.hpp>
+#include <boost/math/special_functions/beta.hpp>
 #ifdef MAC
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -63,6 +65,10 @@ std::mt19937 gen(rd());
 
 vector <double> log_sum;
 vector <double> log_integer;
+
+MemUsage mem_usage;                     // Stores the memory usage
+
+double time_last;
 
 double percent_done;
 
@@ -323,6 +329,42 @@ vector<string> split_with_bracket(const string &s, char delimiter)
 }
 
 
+/// Split up a string accounting for brackets and quotation marks
+vector<string> split_with_curly_bracket(const string &s, char delimiter)
+{                              
+  vector<string> splits;                       
+ 
+  bool quoteon = false;
+	auto num_brac = 0;
+	
+	auto j = 0u;
+	for(auto i = 0u; i < s.length(); i++){
+		auto letter = s.substr(i,1);
+		
+		if(letter == "\""){
+			if(quoteon == false) quoteon = true; else quoteon = false;
+		}
+	
+		if(letter == "{") num_brac++;
+		if(letter == "}") num_brac--;
+		
+		if(s.at(i) == delimiter && num_brac == 0 && quoteon == false){
+			splits.push_back(s.substr(j,i-j)); j = i+1; 
+		}
+	}
+	splits.push_back(s.substr(j,s.length()-j));
+	for(auto &spl : splits) spl = trim(spl);
+	
+	if(false){
+		for(auto va : splits){
+			cout << va << " split" << endl;
+		}
+	}
+	
+	return splits;                                           
+}
+
+
 /// Coverts a string to lower case
 string toLower(string st)
 {	
@@ -479,8 +521,8 @@ void set_seed(const int core, const Details &details, unsigned int seed_tag)
 	// Seed from tag loading BICI overides seed from file
 	if(seed_tag != UNSET) seed = seed_tag;
 	
-	seed += 10000*core;
-
+	seed += 1+10000*core;
+	
 	generator.seed(seed);
 	srand(seed);
 }
@@ -499,14 +541,113 @@ double ran()
 }
 
 
+/// Samples from a uniform distribution with bounds
+double uniform_sample(double min, double max, string &warn) 
+{
+	if(min > max) warn = "Uniform prior minimum is greater than maximum.";
+	
+	return min+ran()*(max-min);
+}
+
+
+/// Returns a uniform sample from a cdf value
+double uniform_from_cdf(double p, double min, double max, string &warn)
+{
+	if(min > max) warn = "Uniform prior minimum is greater than maximum.";
+	
+	return min+p*(max-min);
+}
+
+
+/// Log-probability of sampling from the uniform distribution
+double uniform_probability(double min, double max)
+{
+	return log(1.0/(max-min));
+}
+	
+
+/// Samples from a power distributed number with bounds and a power
+double power_sample(double min, double max, double power, string &warn) 
+{
+	if(check_thresh(POWER_TE,POS_MIN_QU,min,warn)) return UNSET;
+	if(check_thresh(POWER_TE,POS_MAX_QU,max,warn)) return UNSET;
+	if(min > max) warn = "Power prior minimum is greater than maximum.";
+	
+	if(power == -1) return min*exp(ran()*log(max/min));
+	else return pow(pow(min,power+1)+ ran()*(pow(max,power+1)-pow(min,power+1)),1.0/(power+1));
+}
+
+
+/// Returns a power distribution sample from a cdf value
+double power_from_cdf(double p, double min, double max, double power, string &warn)
+{
+	if(check_thresh(POWER_TE,POS_MIN_QU,min,warn)) return UNSET;
+	if(check_thresh(POWER_TE,POS_MAX_QU,max,warn)) return UNSET;
+	if(min > max) warn = "Power prior minimum is greater than maximum.";
+	
+	if(power == -1) return min*exp(p*log(max/min));
+	else return pow(pow(min,power+1)+ p*(pow(max,power+1)-pow(min,power+1)),1.0/(power+1));
+}
+
+
+/// Log probability from the power distribution
+double power_probability(double x, double min, double max, double power)
+{
+	if(power == -1) return log(1.0/(x*log(max/min)));
+	else{
+		auto c = (power+1)/(pow(max,power+1)-pow(min,power+1));
+		return power*log(x)+log(c);
+	}
+}
+
+
+/// Samples from an inverse distributed number with bounds
+double inverse_sample(double min, double max, string &warn) 
+{
+	if(check_thresh(POWER_TE,POS_MIN_QU,min,warn)) return UNSET;
+	if(check_thresh(POWER_TE,POS_MAX_QU,max,warn)) return UNSET;
+	if(min > max) warn = "Inverse prior minimum is greater than maximum.";
+	
+	return min*exp(ran()*log(max/min));
+}
+
+
+/// Returns an inverse distribution sample from a cdf value
+double inverse_from_cdf(double p, double min, double max, string &warn)
+{
+	if(check_thresh(POWER_TE,POS_MIN_QU,min,warn)) return UNSET;
+	if(check_thresh(POWER_TE,POS_MAX_QU,max,warn)) return UNSET;
+	if(min > max) warn = "Inverse prior minimum is greater than maximum.";
+	
+	return min*exp(p*log(max/min));
+}
+
+
+/// Log probability from the inverse distribution
+double inverse_probability(double x, double min, double max)
+{
+	return log(1.0/(x*log(max/min)));
+}
+
+
 /// Draws a normally distributed number with mean mu and standard deviation sd
-double normal_sample(const double mean, const double sd, string &warn) 
+double normal_sample(double mean, double sd, string &warn) 
 {
 	if(check_thresh(NORM_TE,SD_QU,sd,warn)) return UNSET;
 	if(check_thresh(NORM_TE,NORM_MEAN_QU,mean,warn)) return UNSET;
 
 	normal_distribution<double> distribution(mean, sd);
 	return distribution(generator);
+}
+
+
+/// Returns a normal sample from a cdf value
+double normal_from_cdf(double p, double mean, double sd, string &warn)
+{
+	if(check_thresh(NORM_TE,SD_QU,sd,warn)) return UNSET;
+	if(check_thresh(NORM_TE,NORM_MEAN_QU,mean,warn)) return UNSET;
+
+	return mean - sd*sqrt(2)*boost::math::erfc_inv(2*p); 
 }
 
 
@@ -528,26 +669,8 @@ double normal_probability(const double x, const double mean, const double sd)
 }
 
 
-/*
-/// The log of the probability from the normal distribution
-double mvn_probability(const vector <double> x, const vector <double> mean, const vector < vector <double> > &covar)
-{
-	auto determinant_fast(const vector < vector <double> > &a)
-	auto var = sd*sd;
-	auto d = x.size();
-	auto sum = 0.0;
-	for(auto i = 0u; i < d; i++){
-		for(auto j = 0u; j < d; j++){
-			sum += (x[j]-mean[j])*covar[j][i]*(x[i]-mean[i]);
-		}
-	}
-  return -(d/2)*log(2*MM_PI) - (d/2)*determinant_fast(covar) - 0.5*sum;
-}
-*/
-
-
 /// Draws a log-normally distributed number with mean mu and standard deviation sd
-double lognormal_sample(const double mean, const double cv, string &warn) 
+double lognormal_sample(double mean, double cv, string &warn) 
 {
 	if(check_thresh(LOGNORM_TE,CV_QU,cv,warn)) return UNSET;
 	if(check_thresh(LOGNORM_TE,MEAN_QU,mean,warn)) return UNSET;
@@ -562,8 +685,24 @@ double lognormal_sample(const double mean, const double cv, string &warn)
 }
 
 
+/// Draws a log-normally distributed number using cdf
+double lognormal_from_cdf(double p, double mean, double cv, string &warn) 
+{
+	if(check_thresh(LOGNORM_TE,CV_QU,cv,warn)) return UNSET;
+	if(check_thresh(LOGNORM_TE,MEAN_QU,mean,warn)) return UNSET;
+
+	auto var = log(1+cv*cv);                // Works out variables on log scale
+	auto mu = log(mean)-var/2;
+	
+	auto v = normal_from_cdf(p,mu,sqrt(var),warn);	
+	auto val = exp(v);
+	if(val < TINY) return TINY;
+	return val;
+}
+
+
 /// Probability of log-normally distribution
-double lognormal_probability(const double x, const double mean, const double cv) 
+double lognormal_probability(double x, double mean, double cv) 
 {
 	if(mean < MEAN_MIN || cv < CV_MIN || cv > CV_MAX || x < TINY) return LI_WRONG;
 	
@@ -576,7 +715,7 @@ double lognormal_probability(const double x, const double mean, const double cv)
 
 
 /// The lognormal probability of being xmin or above
-double lognormal_upper_probability(const double xmin, const double mean, const double cv)
+double lognormal_upper_probability(double xmin, double mean, double cv)
 {
 	if(mean < MEAN_MIN || cv < CV_MIN || cv > CV_MAX || xmin < TINY) return LI_WRONG;
 	
@@ -590,7 +729,7 @@ double lognormal_upper_probability(const double xmin, const double mean, const d
 
 
 /// The lognormal probability of being xmin or above (with no log taken)
-double lognormal_upper_probability_no_log(const double xmin, const double mean, const double cv)
+double lognormal_upper_probability_no_log(double xmin, double mean, double cv)
 {
 	if(mean < MEAN_MIN || mean > MEAN_MAX || cv < CV_MIN || cv > CV_MAX) return TINY;
 	
@@ -604,7 +743,7 @@ double lognormal_upper_probability_no_log(const double xmin, const double mean, 
 
 
 /// Draws a Weibull distributed number with shape and scale parameters
-double weibull_sample(const double scale, const double shape, string &warn) 
+double weibull_sample(double scale, double shape, string &warn) 
 {
 	if(check_thresh(WEIBULL_TE,SCALE_QU,scale,warn)) return UNSET;
 	if(check_thresh(WEIBULL_TE,SHAPE_QU,shape,warn)) return UNSET;
@@ -617,7 +756,7 @@ double weibull_sample(const double scale, const double shape, string &warn)
 
 
 /// Probability of weibull sample
-double weibull_probability(const double x, const double scale, const double shape) 
+double weibull_probability(double x, double scale, double shape) 
 {
 	if(shape < SHAPE_MIN || shape > SHAPE_MAX || 
 	scale < SCALE_MIN || scale > SCALE_MAX) return LI_WRONG;
@@ -627,7 +766,7 @@ double weibull_probability(const double x, const double scale, const double shap
 
 
 /// Probability of weibull sample beign xmin or above
-double weibull_upper_probability(const double xmin, const double scale, const double shape) 
+double weibull_upper_probability(double xmin, double scale, double shape) 
 {
 	if(scale < SCALE_MIN || scale > SCALE_MAX || shape < SHAPE_MIN || shape > SHAPE_MAX) return  LI_WRONG;
 	
@@ -638,7 +777,7 @@ double weibull_upper_probability(const double xmin, const double scale, const do
 
 
 /// Probability of weibull sample beign xmin or above (with no log taken)
-double weibull_upper_probability_no_log(const double xmin, const double scale, const double shape) 
+double weibull_upper_probability_no_log(double xmin, double scale, double shape) 
 {
 	if(scale < SCALE_MIN || scale > SCALE_MAX || shape < SHAPE_MIN || shape > SHAPE_MAX) return TINY;
 	
@@ -649,20 +788,36 @@ double weibull_upper_probability_no_log(const double xmin, const double scale, c
 
 
 /// Draws a sample from the gamma distribution x^(a-1)*exp(-b*x)
-double gamma_sample(const double mean, const double cv, string &warn)
+double gamma_sample(double mean, double cv, string &warn)
 {
 	if(check_thresh(GAMMA_TE,CV_QU,cv,warn)) return UNSET;
 	if(check_thresh(GAMMA_TE,MEAN_QU,mean,warn)) return UNSET;
 
 	gamma_distribution<double> distribution(1.0/(cv*cv),mean*cv*cv);
 	auto val = distribution(generator);
+	
+	if(val < TINY) return TINY;
+	return val;
+}
+
+
+/// Draws a gamma distributed sample using cdf
+double gamma_from_cdf(double p, double mean, double cv, string &warn)
+{
+	if(check_thresh(GAMMA_TE,CV_QU,cv,warn)) return UNSET;
+	if(check_thresh(GAMMA_TE,MEAN_QU,mean,warn)) return UNSET;
+
+	auto k = 1.0/(cv*cv);
+	auto scale = mean/k;
+	auto val = scale*boost::math::gamma_p_inv(k,p); 
+	
 	if(val < TINY) return TINY;
 	return val;
 }
 
 
 /// The log of the probability from the gamma distribution
-double gamma_probability(const double x, const double mean, const double cv)
+double gamma_probability(double x, double mean, double cv)
 {
 	if(x < MEAN_MIN || mean < MEAN_MIN || cv < CV_MIN || cv > CV_MAX){
 		return LI_WRONG;
@@ -675,7 +830,7 @@ double gamma_probability(const double x, const double mean, const double cv)
 
 
 /// The gamma probability of being x or above
-double gamma_upper_probability(const double xmin, const double mean, const double cv)
+double gamma_upper_probability(double xmin, double mean, double cv)
 {
 	if(xmin < MEAN_MIN || mean < MEAN_MIN || cv < CV_MIN || cv > CV_MAX) return LI_WRONG;
 	
@@ -688,7 +843,7 @@ double gamma_upper_probability(const double xmin, const double mean, const doubl
 
 
 /// The gamma probability of being x or above (with no log taken)
-double gamma_upper_probability_no_log(const double xmin, const double mean, const double cv)
+double gamma_upper_probability_no_log(double xmin, double mean, double cv)
 {
 	if(xmin < MEAN_MIN || mean < MEAN_MIN || cv < CV_MIN || cv > CV_MAX) return TINY;
 	
@@ -701,7 +856,7 @@ double gamma_upper_probability_no_log(const double xmin, const double mean, cons
 
 
 /// Draws a sample from the beta distribution x^(a-1)*(1-x)^(b-1)
-double beta_sample(const double alpha, const double beta, string &warn)
+double beta_sample(double alpha, double beta, string &warn)
 {
 	if(check_thresh(BETA_TE,ALPHA_QU,alpha,warn)) return UNSET;
 	if(check_thresh(BETA_TE,BETA_QU,beta,warn)) return UNSET;
@@ -714,8 +869,18 @@ double beta_sample(const double alpha, const double beta, string &warn)
 }
 
 
+/// Draws a sample from the beta distribution x^(a-1)*(1-x)^(b-1)
+double beta_from_cdf(double p, double alpha, double beta, string &warn)
+{
+	if(check_thresh(BETA_TE,ALPHA_QU,alpha,warn)) return UNSET;
+	if(check_thresh(BETA_TE,BETA_QU,beta,warn)) return UNSET;
+
+	return boost::math::ibeta_inv(alpha,beta,p); 
+}
+
+
 /// The log of the probability from the beta distribution
-double beta_probability(const double x, const double alpha, const double beta)
+double beta_probability(double x, double alpha, double beta)
 {
 	if(x < TINY || x > 1-TINY) return LI_WRONG;
 	if(alpha < ALPBETA_MIN || beta < ALPBETA_MIN ||
@@ -726,7 +891,7 @@ double beta_probability(const double x, const double alpha, const double beta)
 
 
 /// Generates a sample from the Poisson distribution
-unsigned int poisson_sample(const double lam, string &warn)
+unsigned int poisson_sample(double lam, string &warn)
 {
 	if(check_thresh(POIS_TE,POIS_QU,lam,warn)) return UNSET;
 	
@@ -736,7 +901,7 @@ unsigned int poisson_sample(const double lam, string &warn)
 
 
 /// The log probability of the poisson distribution
-double poisson_probability(const int i, const double lam)
+double poisson_probability(int i, double lam)
 {
 	if(lam < LAM_MIN || lam > LAM_MAX) return LI_WRONG;
 	
@@ -754,7 +919,7 @@ double poisson_probability(const int i, const double lam)
 
 
 /// The probability for above imin
-double poisson_upper_probability_no_log(const int imin, const double lam)
+double poisson_upper_probability_no_log(int imin, double lam)
 {
 	return 1-boost::math::gamma_q(imin+1,lam);
 }
@@ -786,7 +951,7 @@ unsigned int neg_binommial_sample(double mean, double p, string &warn)
 
 
 /// The log probability of the negative binomial distribution
-double neg_binomial_probability(const int k, const double mean, const double p)
+double neg_binomial_probability(int k, double mean, double p)
 {	
 	if(mean < MEAN_MIN || mean > MEAN_MAX || p < P_MIN || p > P_MAX) return LI_WRONG;
 	
@@ -797,17 +962,27 @@ double neg_binomial_probability(const int k, const double mean, const double p)
 
 
 /// Generates a sample from the Bernoulli distribution
-unsigned int bernoulli_sample(const double p, string &warn)
+unsigned int bernoulli_sample(double z, string &warn)
 {
-	if(check_thresh(BERN_TE,BERNP_QU,p,warn)) return UNSET;
+	if(check_thresh(BERN_TE,BERNP_QU,z,warn)) return UNSET;
 	
-	if(ran() < p) return 1;
+	if(ran() < z) return 1;
+	return 0;
+}
+
+
+/// Generates a sample from the Bernoulli distribution using cdf
+unsigned int bernoulli_from_cdf(double p, double z, string &warn)
+{
+	if(check_thresh(BERN_TE,BERNP_QU,z,warn)) return UNSET;
+
+	if(p < z) return 1;
 	return 0;
 }
 
 
 /// The probability of a Bernoulli sample
-double bernoulli_probability(unsigned int x, const double p)
+double bernoulli_probability(unsigned int x, double p)
 {
 	if(x == 0){
 		if(p > 1-TINY) return LI_WRONG;
@@ -820,7 +995,7 @@ double bernoulli_probability(unsigned int x, const double p)
 
 
 /// Samples from the exponential distribution with specified rate
-double exp_rate_sample(const double rate, string &warn)
+double exp_rate_sample(double rate, string &warn)
 {
 	if(check_thresh(EXP_RATE_TE,RATE_QU,rate,warn)) return UNSET;
 	
@@ -831,7 +1006,7 @@ double exp_rate_sample(const double rate, string &warn)
 
 
 /// Probability of exponential distribution
-double exp_rate_probability(const double x, const double rate)
+double exp_rate_probability(double x, double rate)
 {
 	if(rate < RATE_MIN) return LI_WRONG;
 	 
@@ -840,14 +1015,14 @@ double exp_rate_probability(const double x, const double rate)
 
 
 /// Probability of exponential distribution above xmin
-double exp_rate_upper_probability(const double xmin, const double rate)
+double exp_rate_upper_probability(double xmin, double rate)
 {
 	return -rate*xmin;
 }
 
 
 /// Probability of exponential distribution above xmin (with no log taken)
-double exp_rate_upper_probability_no_log(const double xmin, const double rate)
+double exp_rate_upper_probability_no_log(double xmin, double rate)
 {
 	auto val = exp(-rate*xmin);
 	if(std::isnan(val) || val < TINY) return TINY;
@@ -856,7 +1031,7 @@ double exp_rate_upper_probability_no_log(const double xmin, const double rate)
 
 
 /// Samples from the exponential distribution with specified mean
-double exp_mean_sample(const double mean, string &warn)
+double exp_mean_sample(double mean, string &warn)
 {
 	if(check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean,warn)) return UNSET;
 	
@@ -864,8 +1039,18 @@ double exp_mean_sample(const double mean, string &warn)
 }
 
 
+/// Samples from the exponential distribution with specified mean
+double exp_mean_from_cdf(double p, double mean, string &warn)
+{
+	if(check_thresh(EXP_MEAN_TE,EXP_MEAN_QU,mean,warn)) return UNSET;
+	
+	return -log(1-p)*mean;
+}
+
+
+
 /// Probability of exponential distribution
-double exp_mean_probability(const double x, const double mean)
+double exp_mean_probability(double x, double mean)
 {
 	if(x < 0 || mean < EXP_MEAN_MIN) return LI_WRONG;
 	return -log(mean) - x/mean;
@@ -873,7 +1058,7 @@ double exp_mean_probability(const double x, const double mean)
 
 
 /// Probability of exponential distribution above xmin
-double exp_mean_upper_probability(const double xmin, const double mean)
+double exp_mean_upper_probability(double xmin, double mean)
 {
 	if(xmin < 0 || mean < EXP_MEAN_MIN) return LI_WRONG;
 	
@@ -882,7 +1067,7 @@ double exp_mean_upper_probability(const double xmin, const double mean)
 
 
 /// Probability of exponential distribution above xmin (with no log taken)
-double exp_mean_upper_probability_no_log(const double xmin, const double mean)
+double exp_mean_upper_probability_no_log(double xmin, double mean)
 {
 	if(xmin < 0 || mean < EXP_MEAN_MIN) return TINY;
 	
@@ -893,18 +1078,38 @@ double exp_mean_upper_probability_no_log(const double xmin, const double mean)
 
 
 /// Draws a sample from the gamma distribution x^(a-1)*exp(-x)
-double gamma_alpha_sample(const double alpha, string &warn)
+double gamma_alpha_sample(double alpha, string &warn)
 {
+	// This approximation is needed because initial population on dirichlet sample can be very large
+	if(alpha >= ALPBETA_MAX){
+		double val;
+		do{
+			val = normal_sample(alpha,sqrt(alpha),warn);
+		}while(val < 0);
+		return val;
+	}
+	
 	if(check_thresh(GAMMA_TE,ALPHA_QU,alpha,warn)) return UNSET;
 	
-	//if(alpha < TINY) emsg("Alpha must be positive");
 	gamma_distribution<double> distribution(alpha,1);
 	return distribution(generator);
 }
 
 
+/// Draws a sample from the gamma distribution x^(a-1)*exp(-x) using cdf
+double gamma_alpha_from_cdf(double p, double alpha, string &warn)
+{
+	if(check_thresh(GAMMA_TE,ALPHA_QU,alpha,warn)) return UNSET;
+	
+	auto val = boost::math::gamma_p_inv(alpha,p); 
+	
+	if(val < TINY) return TINY;
+	return val;
+}
+
+
 /// Draws a sample from the gamma distribution x^(a-1)*exp(-x)
-double gamma_alpha_probability(const double x, const double alpha)
+double gamma_alpha_probability(double x, double alpha)
 {
   if(x <= 0 || alpha < ALPBETA_MIN || alpha > ALPBETA_MAX) return LI_WRONG;
   return (alpha-1)*log(x) - x - lgamma(alpha);
@@ -955,7 +1160,7 @@ double binomial_probability(unsigned int num, double p, unsigned int n)
 
 
 /// Probability of period sample
-double period_sample(const double time, string &warn) 
+double period_sample(double time, string &warn) 
 {
 	if(check_thresh(PERIOD_TE,TIME_QU,time,warn)) return UNSET;
 	return time;
@@ -963,7 +1168,7 @@ double period_sample(const double time, string &warn)
 
 
 /// Probability of period sample (Uses a very sharp spike prior)
-double period_probability(const double x, const double time) 
+double period_probability(double x, double time) 
 {
 	if(time < TIME_MIN) return LI_WRONG;
 	auto dd = x - time;
@@ -973,7 +1178,7 @@ double period_probability(const double x, const double time)
 
 
 /// Probability of period sample (Uses a very sharp spike prior)
-double period_upper_probability(const double x, const double time) 
+double period_upper_probability(double x, double time) 
 {
 	if(x < time) return 0; 
 	return LI_WRONG;
@@ -1027,6 +1232,18 @@ bool equal_vec(const vector <bool> &vec1, const vector <bool> &vec2)
 	return true;
 }
 
+
+/// Compares two boolean vector to see if they are equal
+bool equal_vec(const vector <double> &vec1, const vector <double> &vec2)
+{
+	if(vec1.size() != vec2.size()) return false;
+	
+	for(auto i = 0u; i < vec1.size(); i++){
+		if(dif(vec1[i],vec2[i],TINY)) return false;
+	}
+	
+	return true;
+}
 
 /// Gets a list up to a number
 vector <unsigned int> get_list(unsigned int num)
@@ -1460,59 +1677,6 @@ unsigned int add_to_vec(vector <ParamRef> &vec, unsigned int th, unsigned int in
 
 
 /// Adds a value to a vector (if it doesn't already exist)
-unsigned int add_to_vec(vector <PopTransRef> &vec, unsigned int p, unsigned int tr, HashSimp &hash)
-{
-	auto v = tr*SPECIES_MAX+p; 
-	
-	auto i = hash.find(v);
-	if(i == UNSET){
-		i = vec.size();
-		hash.add(i,v);
-		
-		PopTransRef pref; pref.p = p; pref.tr = tr; 
-		vec.push_back(pref);
-	}	
-	
-	/* turn off
-	auto i = 0u; 
-	while(i < vec.size() && !(vec[i].p == p && vec[i].tr == tr)) i++;
-	if(i == vec.size()){
-		PopTransRef pref; pref.p = p; pref.tr = tr; 
-		vec.push_back(pref);
-	}	
-	*/
-	
-	return i;
-}
-
-
-/// Adds a value to a vector (if it doesn't already exist)
-unsigned int add_to_vec(vector <PopMarkovEqnRef> &vec, unsigned int p, unsigned int e, HashSimp &hash)
-{
-	auto v = e*SPECIES_MAX+p; 
-	//vector <unsigned int> v; v.push_back(p); v.push_back(e);
-	auto i = hash.find(v);
-	if(i == UNSET){
-		i = vec.size();
-		hash.add(i,v);
-		
-		PopMarkovEqnRef pref; pref.p = p; pref.e = e; 
-		vec.push_back(pref);
-	}
-	
-	/* turn off
-	auto i = 0u; 
-	while(i < vec.size() && !(vec[i].p == p && vec[i].e == e)) i++;
-	if(i == vec.size()){
-		PopMarkovEqnRef pref; pref.p = p; pref.e = e; 
-		vec.push_back(pref);
-	}	
-	*/
-	return i;
-}
-
-
-/// Adds a value to a vector (if it doesn't already exist)
 unsigned int add_to_vec(vector <IEGref> &vec, const IEGref &val, Hash &hash)
 {
 	vector <unsigned int> v; v.push_back(val.p); v.push_back(val.i);
@@ -1815,6 +1979,8 @@ bool is_percent(string val)
 /// Gets the name of a parameter along with a specified dependency
 string get_param_name_with_dep(const Param &par, const vector <Dependency> &dep, unsigned int index)
 {
+	return par.name+tstr(index);
+	
 	auto name = par.name;
 	if(dep.size() > 0){
 		name += "_";
@@ -1839,21 +2005,17 @@ string get_affect_name(AffectType type)
 	case LIKE_OBS_POP_AFFECT: return "LIKE_OBS_POP_AFFECT";
 	case LIKE_OBS_POP_TRANS_AFFECT: return "LIKE_OBS_POP_TRANS_AFFECT";
 	case MARKOV_POP_AFFECT: return "MARKOV_POP_AFFECT";
-	case MARKOV_POP_NOPOP_AFFECT: return "MARKOV_POP_NOPOP_AFFECT";
-	case MARKOV_POP_LINEAR_AFFECT: return "MARKOV_POP_LINEAR_AFFECT";
 	case LIKE_IE_AFFECT: return "LIKE_IE_AFFECT";
 	case EXP_IE_AFFECT: return "EXP_IE_AFFECT";
 	case OMEGA_AFFECT: return "OMEGA_AFFECT";
-	case POP_AFFECT: return "POP_AFFECT";
+	//case POP_AFFECT: return "POP_AFFECT";
 	case SPLINE_PRIOR_AFFECT: return "SPLINE_PRIOR_AFFECT";
 	case IEG_PRIOR_AFFECT: return "IEG PRIOR_AFFECT";
 	case PRIOR_AFFECT: return "PRIOR_AFFECT";
 	case DIST_AFFECT: return "DIST_AFFECT";
 	case EXP_FE_AFFECT: return "EXP_FE_AFFECT";
 	case INDFAC_INT_AFFECT: return "INDFAC_INT_AFFECT";
-	case DIV_VALUE_AFFECT: return "DIV_VALUE_AFFECT";
-	case DIV_VALUE_NOPOP_AFFECT: return "DIV_VALUE_NOPOP_AFFECT";
-	case DIV_VALUE_LINEAR_AFFECT: return "DIV_VALUE_LINEAR_AFFECT";
+	case MARKOV_VALUE_AFFECT: return "MARKOV_VALUE_AFFECT";
 	case MARKOV_LIKE_AFFECT: return "MARKOV_LIKE_AFFECT";
 	case NM_TRANS_AFFECT: return "NM_TRANS_AFFECT";
 	case NM_TRANS_BP_AFFECT: return "NM_TRANS_BP_AFFECT";
@@ -1876,10 +2038,10 @@ string get_affect_name(AffectType type)
 void param_vec_add_affect(vector <AffectLike> &vec, const AffectLike &al)
 {
 	switch(al.type){
-	case DIV_VALUE_AFFECT: case DIV_VALUE_NOPOP_AFFECT: 
-	case DIV_VALUE_LINEAR_AFFECT: 
-	case MARKOV_LIKE_AFFECT: case POP_AFFECT:
-	case MARKOV_POP_AFFECT: case MARKOV_POP_NOPOP_AFFECT: case MARKOV_POP_LINEAR_AFFECT:
+	case MARKOV_VALUE_AFFECT: 
+	case MARKOV_LIKE_AFFECT: 
+	//case POP_AFFECT:
+	case MARKOV_POP_AFFECT: 
 	case LIKE_OBS_IND_AFFECT: case LIKE_OBS_POP_AFFECT:
 	case LIKE_OBS_POP_TRANS_AFFECT: case OBS_EQN_AFFECT:
 	case LIKE_UNOBS_TRANS_AFFECT:
@@ -2647,6 +2809,7 @@ vector <double> dirichlet_sample(const vector <double> &alpha)
 		auto al = alpha[i];
 		if(al == ALPHA_ZERO) vec[i] = 0;
 		else{
+			//ALPBETA_MAX
 			auto val = gamma_alpha_sample(al,warn);
 			if(val == UNSET) emsg("Dirichlet distribution sampling error: "+warn); 
 			vec[i] = val;
@@ -2894,7 +3057,7 @@ double prior_probability(double x, const Prior &pri, const vector <double> &prec
 			auto max = eqn[pri.dist_param[1].eq_ref].calculate_param(precalc);
 			if(min <= 0 || max <= 0) return -LARGE;
 			if(x < min || x > max) return -LARGE;
-			return log(1.0/(x*log(max/min)));
+			return inverse_probability(x,min,max);
 		}
 		break;
 		
@@ -2905,11 +3068,7 @@ double prior_probability(double x, const Prior &pri, const vector <double> &prec
 			auto power = eqn[pri.dist_param[2].eq_ref].calculate_param(precalc);
 			if(min <= 0 || max <= 0) return -LARGE;
 			if(x < min || x > max) return -LARGE;
-			if(power == -1) return log(1.0/(x*log(max/min)));
-			else{
-				auto c = (power+1)/(pow(max,power+1)-pow(min,power+1));
-				return power*log(x)+log(c);
-			}
+			return power_probability(x,min,max,power);
 		}
 		break;
 		
@@ -2918,7 +3077,7 @@ double prior_probability(double x, const Prior &pri, const vector <double> &prec
 			auto min = eqn[pri.dist_param[0].eq_ref].calculate_param(precalc);
 			auto max = eqn[pri.dist_param[1].eq_ref].calculate_param(precalc);
 			if(x < min || x > max) return -LARGE;
-			return log(1.0/(max-min));
+			return uniform_probability(min,max);
 		}
 		break;
 		
@@ -3126,15 +3285,45 @@ unsigned int get_core()
 }
 
 
+/// Returns information about memory usage
+MemUsage get_mem_usage()
+{
+	return mem_usage;
+}
+
+
 /// Prints a diagnostic statement to terminal
 void print_diag(string te)
 {
 	if(print_diag_on && !com_op && op()) cout << te << endl;
-	if(false){
-		cout <<  te << " ";
-		if(profiling) cout <<  (unsigned int)(10000*double(memory_usage())/total_memory());
-		cout << endl;    
+	
+	//cout << "diag " << te << " "; print_random("random");
+ 
+	auto mem = memory_usage();
+	if(mem > mem_usage.mem){
+		mem_usage.mem = mem;
+		mem_usage.name = te;
 	}
+
+	if(false){
+		auto time = clock();
+		
+		cout <<  te << " ";
+		cout <<  (unsigned int)(double(mem));
+		cout << " time: "<< get_cpu_time(time-time_last) << endl;    
+		time_last = time;
+	}
+}
+
+
+/// Calculates geographical distance	
+double geo_dist(double lat1, double lng1, double lat2, double lng2)
+{
+	auto r = 6371.0;
+	
+	auto si = sin(0.5*(lat2-lat1));
+	auto si2 = sin(0.5*(lng2-lng1));
+	return 2*r*asin(sqrt(si*si + cos(lat1)*cos(lat2)*si2*si2));
 }
 
 
@@ -3290,6 +3479,11 @@ bool check_thresh(DistText dist, DistQuant dq, double val, string &err)
 		if(val < LAM_MIN) min_th = LAM_MIN;
 		if(val > LAM_MAX) max_th = LAM_MAX; 
 		break;
+		
+	case POS_MIN_QU: case POS_MAX_QU: 
+		if(val < MEAN_MIN) min_th = MEAN_MIN;
+		if(val > MEAN_MAX) max_th = MEAN_MAX; 
+		break;
 	}
 
 	string dist_te;
@@ -3306,6 +3500,9 @@ bool check_thresh(DistText dist, DistQuant dq, double val, string &err)
 		case EXP_MEAN_TE: dist_te = "Exponential"; break;
 		case POIS_TE: dist_te = "Poisson"; break;
 		case PERIOD_TE: dist_te = "Period"; break;
+		case INVERSE_TE: dist_te = "Inverse"; break;
+		case UNIFORM_TE: dist_te = "Uniform"; break;
+		case POWER_TE: dist_te = "Power"; break;
 		} 
 		
 		string quant;
@@ -3324,6 +3521,8 @@ bool check_thresh(DistText dist, DistQuant dq, double val, string &err)
 		case EXP_MEAN_QU: quant = "mean"; break;
 		case POIS_QU: quant = "mean"; break;
 		case TIME_QU: quant = "time"; break;
+		case POS_MIN_QU: quant = "minimum"; break;
+		case POS_MAX_QU: quant = "maximum"; break;
 		}		
 		
 		if(min_th != UNSET){
@@ -3581,6 +3780,7 @@ double memory_usage()
 	PROCESS_MEMORY_COUNTERS_EX pmc;
 	GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
 	SIZE_T virtualMemUsedByMe = pmc.PrivateUsage;
+
 	return virtualMemUsedByMe/1024.0;
 #endif
 
@@ -3731,10 +3931,8 @@ unsigned int get_ti_lower(double t)
 /// Gets next ti 
 unsigned int get_ti_next(double t_next, const Details &details)
 {
-	//auto ti_next = (unsigned int)(ALMOST_ONE+((t_next-t_start)/dt));
-	//if(ti_next > T) ti_next = T;
 	auto ti_next = (unsigned int)(t_next);
-	if(ti_next != t_next && ti_next < details.T) ti_next++;		
+	if(t_next != 0 && ti_next < details.T) ti_next++;		
 	
 	return ti_next;
 }
@@ -3787,7 +3985,6 @@ void add_alg_warning(string te, unsigned int sample, vector <AlgWarn> &alg_warn)
 }
 
 
-
 /// Gets a string output from an equation type
 void eqn_type_error(EqItemType type, unsigned int ref)
 {
@@ -3801,10 +3998,10 @@ void eqn_type_error(EqItemType type, unsigned int ref)
 	case IE: st = "IE"; break;
 	case FE: st = "FE"; break;
 	case POPNUM: st = "POPNUM"; break;
-	case POPTIMENUM: st = "POPTIMENUM"; break;
+	case POPNUMTIME: st = "POPNUMTIME"; break;
 	case TIME: st = "TIME"; break;
 	case POPCOMB: st = "POPCOMB"; break;
-	default: st = "DEFAULT"; break;
+	default: st = "DEFAULT"+tstr(type); break;
 	}
 	
 	emsg("EQN TYPE ERROR: "+st+" "+tstr(ref));
@@ -3812,7 +4009,7 @@ void eqn_type_error(EqItemType type, unsigned int ref)
 
 
 /// Performs an operation on a set of numbers 
-double calculate_operation(EqItemType op, vector <double> &num)
+double calculate_operation(EqItemType op, vector <double> &num, CalcError &calc_err)
 {
 	auto N = num.size();
 	
@@ -3839,7 +4036,8 @@ double calculate_operation(EqItemType op, vector <double> &num)
 		
 	case DIVIDE:
 		if(N != 2) emsg("For DIVIDE should be 2");
-		if(num[1] == 0) run_error("Equation caused a division by zero."); 
+		if(num[1] == 0){ calc_err = DIV_BY_ZERO_ERROR; return 0;}
+		
 		return num[0]/num[1]; 
 		
 	case EXPFUNC:
@@ -3856,7 +4054,7 @@ double calculate_operation(EqItemType op, vector <double> &num)
 		
 	case LOGFUNC: 
 		if(N != 1) emsg("For LOGFUNC should be 1");
-		if(num[0] <= 0) run_error("The quantity inside a log function became negative."); 
+		if(num[0] <= 0){ calc_err = LOG_NEG_ERROR; return 0;}
 		return log(num[0]);
 		
 	case STEPFUNC:
@@ -3895,7 +4093,7 @@ double calculate_operation(EqItemType op, vector <double> &num)
 		
 	case SQRTFUNC:
 		if(N != 1) emsg("For SQRTFUNC should be 1");
-		if(num[0] < 0) run_error("A square root of a negative number was found in an equation."); 
+		if(num[0] < 0){ calc_err = SQRT_NEG_ERROR; return 0;}
 		return sqrt(num[0]);
 		
 	case SIGFUNC:
@@ -3909,6 +4107,21 @@ double calculate_operation(EqItemType op, vector <double> &num)
 	}
 	
 	return 0;
+}
+
+
+/// Outputs a calculation error 
+void calc_error(CalcError err, string eq_text)
+{
+	string wa;
+	switch(err){
+	case NO_ERROR: emsg("Should be error"); break;
+	case DIV_BY_ZERO_ERROR: wa = "Equation caused a division by zero"; break;
+	case LOG_NEG_ERROR: wa = "The quantity inside a log function became negative."; break;
+	case SQRT_NEG_ERROR: wa = "A square root of a negative number was found in an equation."; break;
+	}
+	
+	run_error("In '"+eq_text+"': "+wa); 
 }
 
 
@@ -4031,7 +4244,11 @@ string prop_type_str(PropType type)
 {
 	switch(type){
 	case PARAM_PROP: return "param";
-	case PARAM_DET_PROP: return "param-det";
+	case LOG_PARAM_PROP: return "log-param";
+	case BERNOULLI_PROP: return "bernoulli";
+	case DET_PARAM_PROP: return "param-det";
+	case DET_LOG_PARAM_PROP: return "log-param-det";
+	case DET_BERNOULLI_PROP: return "bernoulli-det";
 	case IND_EVENT_TIME_PROP: return "ind-event-time";
 	case IND_MULTI_EVENT_PROP: return "ind-multi-event";
 	case IND_EVENT_ALL_PROP: return "ind-event-all";
@@ -4042,10 +4259,15 @@ string prop_type_str(PropType type)
 	case IND_ADD_REM_PROP: return "ind-add-rem";
 	case IND_ADD_REM_TT_PROP: return "ind-add-rem-tt";
 	case MBP_PROP: return "mbp";
+	case LOG_MBP_PROP: return "log-mbp";
+	case MBP_BERNOULLI_PROP: return "mbp-bernoulli";
 	case MBPII_PROP: return "mbpII";
 	case MBP_IC_POP_PROP: return "mbp-ic-pop";
 	case MBP_IC_POPTOTAL_PROP: return "mbp-ic-poptotal";
 	case MBP_IC_RESAMP_PROP: return "mbp-ic-resamp";
+	case DET_IC_POP_PROP: return "det-ic-pop";
+	case DET_IC_POPTOTAL_PROP: return "det-ic-poptotal";
+	case DET_IC_RESAMP_PROP: return "det-ic-resamp";
 	case INIT_COND_FRAC_PROP: return "init-cond-frac";
 	case IE_PROP: return "ie";
 	case IE_VAR_PROP: return "ie-var";
@@ -4113,13 +4335,13 @@ string precision(double num, unsigned int dig)
 
 
 /// Gets CPU time from number of ticks
-string get_cpu_time(unsigned int tics)
+string get_cpu_time(double tics)
 {
 	stringstream ss;
 	ss << std::fixed;
   ss << setprecision(1);
 		
-	auto sec = double(tics)/CLOCKS_PER_SEC;
+	auto sec = tics/CLOCKS_PER_SEC;
 	if(sec < 60){
 		ss << sec << " seconds";
 	}
@@ -4238,5 +4460,44 @@ Stat get_statistic(vector <double> &vec)
 	}
 
 	return stat;
+}
+
+
+/// Combines several lists into one
+vector <unsigned int> combine_lists(const vector < vector <unsigned int> > lists)
+{
+	vector <unsigned int> list;
+	if(lists.size() == 0) return list;
+	if(lists.size() == 1) return lists[0];
+
+	auto max = 0u;
+	for(const auto &li : lists){
+		for(auto va : li){
+			if(va > max) max = va;
+		}
+	}
+	
+	auto N = max+1;
+	vector <bool> map(N,false);
+	
+	for(const auto &li : lists){
+		for(auto va : li){
+			map[va] = true;
+		}
+	}
+	
+	for(auto i = 0u; i < N; i++){
+		if(map[i]) list.push_back(i);
+	}
+	
+	return list;
+}
+
+
+/// Prints a random number (used for diagnostic purposes
+void print_random(string te)
+{
+	string warn;
+	cout << ran() << " " << gamma_sample(1,0.1,warn) << " rand " << te << endl;
 }
 

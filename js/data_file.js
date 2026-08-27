@@ -79,16 +79,55 @@ function initpop_data(bu)
 	start_data_source("Init. Pop.",{radio_dist:{value:"Fixed"}, radio:{value:"Graphical"},radio2:{value:"Focal"}, focal:{te:"Select"}},bu.op.info);
 	
 	if(bu.op.siminf == "gen"){
-		let spec = edit_source.spec;
-		spec.radio_dist.value = "Fixed";
-		spec.radio.value = "File";
-		spec.radio2.value = "All";
-		set_loadcol();
-		sim_data(); 
+		let rpf = model.sim_res.plot_filter;
+		let p = model.get_p();
+		let rpf2 = rpf.species[p];
+		
+		if(rpf2.init_dist != undefined){
+			select_bubble_over();
+			change_bubble_mode("use dist");
+			inter.bubble.type_radio = {value:"dist"};
+		}
+		else sim_init_pop()
 	}
 	else select_bubble_over();
 }
 
+
+/// Determines if distribution is copied from simulated state or exact population
+function initpop_choose_data()
+{
+	switch(inter.bubble.type_radio.value){
+	case "dist": 
+		{
+			let rpf = model.sim_res.plot_filter;
+			let p = model.get_p();
+			let rpf2 = rpf.species[p]
+			rpf2.gen_source.push(rpf2.init_dist);
+		}
+		break;
+		
+	case "exact":
+		sim_init_pop();
+		break;
+		
+	default: error("Option not recognised"); break;
+	}
+	
+	close_bubble();
+}
+
+
+/// Simulate the initial population data
+function sim_init_pop()
+{
+	let spec = edit_source.spec;
+	spec.radio_dist.value = "Fixed";
+	spec.radio.value = "File";
+	spec.radio2.value = "All";
+	set_loadcol();
+	sim_data(); 
+}
 
 /// Sets up after click
 function initpop_data2()

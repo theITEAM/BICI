@@ -1604,6 +1604,13 @@ double mem(const vector <unsigned int> &ten)
 }
 
 
+/// Memory requirement
+double mem(const vector <unsigned long long> &ten)
+{
+	return sizeof(vector <unsigned long long>) + ten.size()*sizeof(unsigned long long);
+}
+
+
 /// Works out memory 
 double mem(const vector <Calculation> &calc) 
 {
@@ -1619,24 +1626,6 @@ double mem(const vector <Calculation> &calc)
 	return sum;
 }
 
-double mem(const PopAffect &pa) 
-{
-	auto sum = 0.0;
-	sum += sizeof(PopAffect) + pa.pop_grad_ref.size()*sizeof(GradRef);
-	return sum;
-}
-
-double mem(const LinearForm &lf) 
-{
-	auto sum = 0.0;
-	sum += sizeof(LinearForm);
-	sum += lf.list.size()*sizeof(LinearFormItem);
-	sum += mem(lf.sum_e);
-	for(const auto &va : lf.pop_affect) sum += mem(va);
-	sum += mem(lf.hash_po);
-	return sum;
-}
-
 
 /// Works out memory 
 double mem(const vector <AffectLike> &vec) 
@@ -1645,8 +1634,6 @@ double mem(const vector <AffectLike> &vec)
 	for(const auto &va : vec){
 		sum += va.map.size()*sizeof(bool);
 		sum += mem(va.list);
-		sum += mem(va.lin_form);
-		sum += mem(va.eq_nopop.list);
 	}
 	return sum;
 }
@@ -1657,12 +1644,48 @@ double mem(const HashSimp &hash)
 {
 	const auto &tab = hash.table;
 	
-	vector < vector <HashSimpValue> > table;
 	auto sum = 0.0;
 	sum += sizeof(vector < vector <HashSimpValue> >);
 	for(auto i = 0u; i < tab.size(); i++){
 		sum += sizeof(vector <HashSimpValue>);
 		sum += tab[i].size()*sizeof(HashSimpValue);
+	}
+	
+	return sum;
+}
+
+
+/// Works out memory 
+double mem(const Particle &pa)
+{
+	auto sum = 0.0;
+	sum += sizeof(Particle);
+	sum += mem(pa.param_val_prop)+mem(pa.param_val_dynamic);
+	for(const auto &sp : pa.species){
+		const auto &ic = sp.init_cond_val;
+		sum += sizeof(InitCondValue)+mem(ic.cnum)+mem(ic.N_focal)+mem(ic.N_focal_unobs)+
+		       mem(ic.cnum_reduce)+mem(ic.frac_focal)+mem(ic.frac_comb)+mem(ic.frac);
+			
+		sum += mem(sp.trans_num);
+		
+		for(const auto &ind : sp.individual){
+			sum += sizeof(Individual)+mem(ind.name)+ind.ev.size()*sizeof(Event)+mem(ind.ie)+mem(ind.exp_ie)+mem(ind.X)+mem(ind.exp_fe);
+			sum += ind.popnum_ind_ref.size()*sizeof(PopnumIndRef)+ind.incomp_ref.size()*sizeof(IncompNMTransRef);
+			sum += ind.markov_eqn_ref.size()*sizeof(MarkovEqnRef);
+		}
+	
+		for(const auto &id : sp.inter_data) sum += mem(id.data);
+		sum += mem(sp.exp_num)+mem(sp.cum_prob_dist)+sp.trans_prob.size()*sizeof(TransProb);
+	}
+	
+	for(const auto &dro : pa.dir_out){
+		for(const auto &st :dro.value_str) sum += mem(st);
+	}
+	
+	sum += pa.inf_origin.size()*sizeof(InfOrigin);
+	
+	for(const auto &in : pa.inf_node){
+		sum += sizeof(InfEvent) + in.inf_ev.size()*sizeof(InfEvent);
 	}
 	
 	return sum;
@@ -1678,6 +1701,7 @@ double mem(const SpecPrecalc &spp)
 	sum += mem(spp.list_time);
 	sum += mem(spp.hash);
 	sum += mem(spp.hash_time);
+
 	return sum;
 }
 
@@ -1813,12 +1837,105 @@ double mem(const Spline &spl)
 	auto sum = 0.0;
 	sum += sizeof(Spline);
 	
-	sum += sizeof(spl.name);
+	//sum += sizeof(spl.name);
 	sum += spl.param_ref.size()*sizeof(ElementRef);
 	sum += spl.div.size()*sizeof(SplineDiv);
 	sum += spl.cubic_div.size()*sizeof(CubicDiv);
 	sum += spl.const_val.size()*sizeof(double);
-	sum += spl.markov_eqn_ref.size()*sizeof(PopMarkovEqnRef);
-	sum += mem(spl.hash_trans_ref);
+	sum += spl.markov_eqn_ref.size()*sizeof(MarkovEqnRefList);
+	for(const auto &mer : spl.markov_eqn_ref) sum += mem(mer.hash);
+	for(const auto &mer : spl.trans_ref) sum += mem(mer.hash);
 	return sum;
+}
+
+
+/// Checks cumulative distributions 
+void check_cdf_function()
+{
+	{
+		string warn;
+		auto al = 10;
+		auto av = 0.0, av2 = 0.0, nav = 0.0;
+		auto bv = 0.0, bv2 = 0.0, nbv = 0.0;
+		for(auto i = 0u; i < 10000; i++){
+			auto val = gamma_alpha_sample(al,warn);
+			av += val; av2 += val*val; nav++;
+			auto val2 = normal_sample(al,sqrt(al),warn);
+			bv += val2; bv2 += val2*val2; nbv++;
+		}
+		cout << av/nav << " "<< av2/nav - (av/nav)*(av/nav) << "    "<< bv/nbv << " "<< bv2/nbv - (bv/nbv)*(bv/nbv) << " comp" << endl;
+		return;
+	}
+	 
+	auto mean = 10.0, sd = 3.0, cv = 0.5;
+	auto min = 3.0, max = 15.0;
+	auto power = -2.0;
+	auto alpha = 1.5, beta = 0.5;
+	auto z = 0.85;
+	
+	cout << mean << sd << min << max << power << cv << alpha << beta << z << endl;
+	string warn;
+	
+	auto N = 10u;
+	auto loopmax = 1000u;
+	auto av = 0.0, av2 = 0.0, nav = 0.0;
+	auto avb = 0.0, avb2 = 0.0, navb = 0.0;
+	for(auto i = 0u; i < N; i++){	
+		double xmin = LARGE, xmax = -LARGE;
+		for(auto loop = 0u; loop < loopmax; loop++){
+			auto p = (i+ran())/N;
+			//auto x = uniform_from_cdf(p,min,max,warn);
+			//auto x = power_from_cdf(p,min,max,power,warn);
+			//auto x = inverse_from_cdf(p,min,max,warn);
+			//auto x = normal_from_cdf(p,mean,sd,warn);
+			//auto x = lognormal_from_cdf(p,mean,cv,warn);
+			//auto x = gamma_from_cdf(p,mean,cv,warn);
+			//auto x = exp_mean_from_cdf(p,mean,warn);
+			//auto x = beta_from_cdf(p,alpha,beta,warn);
+			//auto x = bernoulli_from_cdf(p,z,warn);
+			auto x = gamma_alpha_from_cdf(p,alpha,warn);
+			
+			if(x < xmin) xmin = x;
+			if(x > xmax) xmax = x;
+			av += x; av2 += x*x; nav++;
+			
+			//auto y = uniform_sample(min,max,warn);
+			//auto y = power_sample(min,max,power,warn);
+			//auto y = inverse_sample(min,max,warn);
+			//auto y = normal_sample(mean,sd,warn);
+			//auto y = lognormal_sample(mean,cv,warn);
+			//auto y = gamma_sample(mean,cv,warn);
+			//auto y = exp_mean_sample(mean,warn);
+			//auto y = beta_sample(alpha,beta,warn);
+			//auto y = bernoulli_sample(z,warn);
+			auto y = gamma_alpha_sample(alpha,warn);
+			
+			avb += y; avb2 += y*y; navb++;
+		}
+		cout << i << " " << xmin << " - " << xmax << " min max" << endl;
+	}
+	
+	cout << av/nav << " " << sqrt(av2/nav - (av/nav)*(av/nav)) << " res" << endl;
+	cout << avb/navb << " " << sqrt(avb2/navb - (avb/navb)*(avb/navb)) << " res sample" << endl;
+}
+
+
+/// This checks that incomplete transition probability correctly calculated (diagnostics) 
+void check_nm_trans_incomp_like_no_log()
+{
+	auto mean = 1.0, cv = 0.5;
+	string warn;
+	
+	vector <double> ref_val;
+	ref_val.push_back(mean);
+	ref_val.push_back(cv);
+	
+	auto num = 0.0, num2 = 0.0;
+	for(auto i = 0u; i < 10000; i++){
+		auto dt = gamma_sample(mean,cv,warn);
+		auto pr = gamma_upper_probability_no_log(dt,ref_val[0],ref_val[1]);
+		num++;
+		if(pr < 0.05 || pr > 0.95) num2++;
+	}
+	cout << num2/num;
 }
