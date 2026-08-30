@@ -157,7 +157,6 @@ vector < vector <double> > Model::param_latin_hypercube_prior_sample(unsigned in
 	for(auto i = 0u; i < M; i++){
 		auto th = param_vec_latin[i];
 		const auto &pv = param_vec[th];
-	
 		par_samp.push_back(latin_prior_sample(prior[pv.prior_ref],N));
 	}
 	
@@ -2038,7 +2037,7 @@ vector <double> Model::latin_prior_sample(const Prior &pri, unsigned int N) cons
 	switch(pri.type){
 	case MVN_DEFAULT_PR: case MVN_NORM_LKJ_PR: case MVN_UNIFORM_LKJ_PR: case MVN_INV_WISH_PR:
 	case MVN_JEF_PR: case MVN_UNIFORM_PR: case MVN_COR_PR: 
-		emsg("Should not be here");
+		emsg("Should not be here9");
 		break;
 	
 	case INVERSE_PR:

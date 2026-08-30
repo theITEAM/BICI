@@ -1,6 +1,5 @@
-
-
 UPDATES:
+
 GRANT
 
 - Substantial changes to the code to speed up inference and simulation (by incorporation of a new data representation for linear combinations of populations).

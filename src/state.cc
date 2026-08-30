@@ -1114,14 +1114,14 @@ Like State::update_param(const vector <AffectLike> &affect_like)
 			
 		case EXP_IE_AFFECT:
 			{
-				emsg("Should not be here");
+				emsg("Should not be here13");
 				//change_add(species[alike.num].recalculate_exp_ie(alike.num2));
 			}
 			break;
 			
 		case OMEGA_AFFECT:
 			{
-				emsg("Should not be here");
+				emsg("Should not be here14");
 				//change_add(species[alike.num].calculate_omega(alike.num2));
 			}
 			break;
@@ -1193,7 +1193,7 @@ Like State::update_param(const vector <AffectLike> &affect_like)
 			
 		case EXP_FE_AFFECT:      // Updates exp_fe on individual
 			{
-				emsg("Should not be here");
+				emsg("Should not be here15");
 				//auto p = alike.num, f = alike.num2;
 				//change_add(species[p].set_exp_fe(f));
 			}
@@ -1337,14 +1337,14 @@ void State::restore(const vector <AffectLike> &affect_like)
 			
 		case EXP_IE_AFFECT:
 			{
-				emsg("Should not be here");
+				emsg("Should not be here16");
 				//species[alike.num].recalculate_exp_ie_restore(alike.num2,vec);
 			}
 			break;
 			
 		case OMEGA_AFFECT:
 			{
-				emsg("Should not be here");
+				emsg("Should not be here17");
 				//species[alike.num].calculate_omega_restore(alike.num2,vec);
 			}
 			break;
@@ -1416,7 +1416,7 @@ void State::restore(const vector <AffectLike> &affect_like)
 			
 		case EXP_FE_AFFECT:  
 			{
-				emsg("Should not be here");
+				emsg("Should not be here18");
 				//auto p = alike.num, f = alike.num2;
 				//species[p].set_exp_fe_restore(f,vec);
 			}

@@ -28,7 +28,7 @@ const string default_file = "Execute/init.bici";     // This is used for windows
 
 const bool linear_markov_value_speedup = true;
 
-const string bici_version = "v0.90";                 // Sets the BICI version
+const string bici_version = "v0.91";                 // Sets the BICI version
 
 const bool equation_check = false;                   // This independently checks that equations are correct
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)

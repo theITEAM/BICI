@@ -293,7 +293,7 @@ LinearCalculation Equation::convert_to_linear_calculation(const EqItem &it, EqIt
 			}
 			break;
 		
-		case IE: case FE: case ONE: case ZERO: emsg_input("Should not be here7"); break;			
+		case IE: case FE: case ONE: case ZERO: emsg_input("Should not be here4"); break;			
 		default: emsg_input("Equation error11"); break;
 	}
 	

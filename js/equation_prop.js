@@ -402,21 +402,19 @@ function der_func_check(i,lin2,name,eqn)
 			let fl = false;
 			for(let cl = 0; cl < sp.cla.length; cl++){
 				let claa = sp.cla[cl];
-				for(let c = 0; c < claa.comp.length; c++){
-					if(claa.comp[c].name == na){
-						if(cl_sel != undefined && cl_sel != cl){
-							eqn.warn.push({te:"Not all the compartments are from the same classification.", cur:ibra, len:i-ibra});
-						}
-						
-						let tr = 0; while(tr < claa.ntra && claa.tra[tr].i != c) tr++;
-						if(tr == claa.ntra){
-							eqn.warn.push({te:"'"+name+"' cannot be calculated because no transition leaving compartment '"+na+"'.", cur:ibra, len:i-ibra});
-						}
-					
-						cl_sel = cl;
-						fl = true;
-						break;
+				let c = hash_find(claa.hash_comp,na);
+				if(c != undefined){
+					if(cl_sel != undefined && cl_sel != cl){
+						eqn.warn.push({te:"Not all the compartments are from the same classification.", cur:ibra, len:i-ibra});
 					}
+					
+					let tr = 0; while(tr < claa.ntra && claa.tra[tr].i != c) tr++;
+					if(tr == claa.ntra){
+						eqn.warn.push({te:"'"+name+"' cannot be calculated because no transition leaving compartment '"+na+"'.", cur:ibra, len:i-ibra});
+					}
+				
+					cl_sel = cl;
+					fl = true;
 				}
 				if(fl == true) break;
 			}
@@ -545,7 +543,7 @@ function check_indexes_match(eqn)
 		break;
 		
 	case "derived": case "reparam_ele": case "define_eqn": case "derive_param":
-	case "dynamic_weight":
+	case "dynamic_weight": case "dynamic_eqn":
 		break;
 	}
 	
@@ -1003,7 +1001,8 @@ function check_parameter(te,icur,eqn)
 		}
 	}
 
-	let par = { name:name, p_name:eqn.p_name, cl_name:eqn.cl_name, dep:dep, dep_used:dep_used, time_dep:time_dep};
+	let par = { name:name, p_name:eqn.p_name, cl_name:eqn.cl_name, dep:dep, time_dep:time_dep};
+	//dep_used:dep_used, 
 
 	par.full_name = param_name(par);
 	
@@ -1278,7 +1277,7 @@ function check_population(te,icur,eqn)
 		
 		for(let i = 0; i < spl.length; i++){
 			let tex = spl[i].trim();
-			
+		
 			let index = remove_prime(tex);
 		
 			let cl_sp = find(sp.cla,"index",index);      // Detects if an index
@@ -1299,11 +1298,12 @@ function check_population(te,icur,eqn)
 				let cl_sp;
 				
 				let spl2 = tex.split("|");
-				
+
 				let icur4 = icur3;
 				for(let k = 0; k < spl2.length; k++){
 					let te2 = spl2[k];
 					let co = find_comp_from_name(te2,p_name);
+			
 					if(co == undefined){
 						warn = "Compartment '"+te2+"' not found";
 						if(index != tex) warn = "Index '"+te2+"' not found";
@@ -1315,7 +1315,7 @@ function check_population(te,icur,eqn)
 								
 							let comp_name = sp.cla[co.cl].comp[co.c].name;
 							eqn.comp_name_list.push({ p_name:p_name, cl_name:cl_name, comp_name:comp_name, icur:icur4});
-							
+						
 							if(cl_sp == undefined) cl_sp = co.cl;
 							else{
 								if(cl_sp != co.cl){
@@ -1438,10 +1438,9 @@ function find_comp_from_name(te,p_name)
 			let sp = model.species[p];
 			for(let cl = 0; cl < sp.ncla; cl++){
 				let claa = sp.cla[cl];
-				for(let c = 0; c < claa.ncomp; c++){
-					if(claa.comp[c].name == te){
-						return {p:p, cl:cl, c:c};
-					}
+				let c = hash_find(claa.hash_comp,te);
+				if(c != undefined){
+					return {p:p, cl:cl, c:c};
 				}
 			}
 		}
@@ -1454,10 +1453,9 @@ function find_comp_from_name(te,p_name)
 		
 		for(let cl = 0; cl < model.species[p].ncla; cl++){
 			let claa = model.species[p].cla[cl];
-			for(let c = 0; c < claa.ncomp; c++){
-				if(claa.comp[c].name == te){
-					return {p:p, cl:cl, c:c};
-				}
+			let c = hash_find(claa.hash_comp,te);
+			if(c != undefined){
+				return {p:p, cl:cl, c:c};
 			}
 		}
 	}

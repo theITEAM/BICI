@@ -3503,7 +3503,7 @@ void State::gen_change_update(const GenChange &gc)
 		
 	case NO_GENETIC_CHANGE: break;
 		
-	case GENCHA_FAIL: emsg("Should not be here"); break;
+	case GENCHA_FAIL: emsg("Should not be here20"); break;
 	}
 	
 	auto &gen_dif = genetic_value.gen_dif;

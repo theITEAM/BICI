@@ -55,6 +55,9 @@ TO DO NEXT
 - Do these exaples work α×{I;t=40}’ as described in the manual?
 
 TO DO
+- Turn back on and continue testing:  if(false) check_param(); // This is used fo
+- CHeck for values when param weight is added
+changes in compartment and index affecting model (split define etc..)
 
 
 

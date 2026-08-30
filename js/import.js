@@ -1386,9 +1386,11 @@ function get_cl_from_comp(name,p)
 		let spl2 = name.split(":");
 		for(let cl = 0; cl < sp.ncla; cl++){
 			let claa = sp.cla[cl];
-			for(let c = 0; c < claa.ncomp; c++){
-				if(claa.comp[c].name == spl2[0]) return cl;
-			}
+			let c = hash_find(claa.hash_comp,spl2[0]);
+			if(c != undefined) return cl;
+			//for(let c = 0; c < claa.ncomp; c++){
+			//	if(claa.comp[c].name == spl2[0]) return cl;
+			//}
 		}
 	}
 	else{
@@ -1416,9 +1418,11 @@ function get_cl_from_trans(name,p)
 		let spl2 = name.split(":");
 		for(let cl = 0; cl < sp.ncla; cl++){
 			let claa = sp.cla[cl];
-			for(let c = 0; c < claa.ntra; c++){
-				if(claa.tra[c].name == spl2[0]) return cl;
-			}
+			let c = hash_find(claa.hash_tra,spl2[0]);
+			if(c != undefined) return cl;
+			//for(let c = 0; c < claa.ntra; c++){
+				//if(claa.tra[c].name == spl2[0]) return cl;
+			//}
 		}
 	}
 	else{

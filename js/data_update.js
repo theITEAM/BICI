@@ -18,6 +18,7 @@ function get_siminf(loop)
 /// Updates data based on a classification changing name
 function data_update_rename_classification(p,cl,old_name,new_name)
 {
+	//for(let loop = 0; loop < 3; loop++){
 	for(let loop = 0; loop < 3; loop++){
 		let siminf = get_siminf(loop);
 		let source = get_source(siminf,p);
@@ -92,7 +93,7 @@ function data_update_rename_classification(p,cl,old_name,new_name)
 
 					case "Transition":
 						if(so.spec.cl_drop.te == old_name) so.spec.cl_drop.te = new_name;
-						if(so.spec.filter.te ==  old_name) so.spec.filter.te = new_name;
+						if(so.spec.filter.te == old_name) so.spec.filter.te = new_name;
 						break;
 						
 					case "Population":

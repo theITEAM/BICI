@@ -3608,7 +3608,7 @@ void percentage_start(PercentType type, bool sup, unsigned int gen)
 		case RUN_GEN_PER: cout << "<RUNGEN>" << gen << endl; break;
 		case ANNEAL_PER: cout << "<ANNEALING>" << endl; break;
 		case OUTPUT_PER: cout << "<OUTPUTTING>" << endl; break;
-		default: emsg("Should not be here"); break;
+		default: emsg("Should not be here24"); break;
 		}
 	}
 	else{
@@ -3624,7 +3624,7 @@ void percentage_start(PercentType type, bool sup, unsigned int gen)
 			case OUTPUT_PER: te = pad("Output",pad_len); break;
 			case SIM_PER: te = pad("Sim.",pad_len); break;
 			case GEN_DATA_PER: te = pad("Data",pad_len); break;
-			default: emsg("Should not be here"); break;
+			default: emsg("Should not be here25"); break;
 		}
 		cout << te;
 		cout.flush();

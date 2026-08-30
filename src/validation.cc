@@ -17,7 +17,7 @@
 #include <fstream>
 #include <cmath> 
 #include <algorithm> 
-#include <filesystem>
+
  
 using namespace std;
 
@@ -25,6 +25,10 @@ using namespace std;
 #include "simulate.hh"
 #include "data_sim.hh"
 #include "utils.hh"
+
+#ifndef MAC
+#include <filesystem>
+#endif
 
 Validation::Validation()
 {

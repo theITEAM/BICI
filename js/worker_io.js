@@ -646,9 +646,12 @@ function read_param_samples(chain,te,result,warn,line)
 		let par = result.param[th];
 		
 		if(par.dist_mat || par.iden_mat || par.den_vec || (par.variety == "reparam" && par.reparam_eqn_on) || (par.variety == "define" && par.define_eqn_on)){
-			if(par.value){
-				if(par.value.length != 0) error("Param error");
+			if(par.value && par.ndep_cont > 0){
+				if(par.value.length != 0){
+					error("Param error");
+				}
 			}
+			
 			if(par.prior_split){
 				if(par.prior_split.length != 0) error("Param error");
 			}

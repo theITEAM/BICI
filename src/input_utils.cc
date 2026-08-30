@@ -1674,10 +1674,29 @@ void Input::load_define_value(ParamProp pp, string valu, Define &def, unsigned i
 		if(fl == false){
 			auto sum = 0u; 
 			for(auto i = 0u; i < ndep; i++) sum += def.dep[i].mult*ind[i];
+		
 			def.value_list_ref[sum] = def.value_list.size();
 			auto ele = subtab.ele[r][ncol-1];
 			auto eqn = he(add_equation_info(ele,DEFINE_EQN));		
 			def.value_list.push_back(eqn);
+		}
+	}
+	
+	{  // Fills in a zero values
+		auto unset_fl = false;
+		for(auto i = 0u; i < mult; i++){
+			if(def.value_list_ref[i] == UNSET) unset_fl = true;
+		}
+		
+		if(unset_fl){
+			auto j = def.value_list.size();
+			
+			auto eqn = he(add_equation_info("0",DEFINE_EQN));		
+			def.value_list.push_back(eqn);
+		
+			for(auto i = 0u; i < mult; i++){
+				if(def.value_list_ref[i] == UNSET) def.value_list_ref[i] =j;
+			}
 		}
 	}
 	
@@ -2151,7 +2170,7 @@ DataSourceType Input::get_data_type(Command cname) const
 	
 	default: break;
 	}
-	emsg("SHould not be here");
+	emsg("SHould not be here8");
 	
 	return INF_DATA;
 }

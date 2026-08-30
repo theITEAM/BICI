@@ -66,9 +66,9 @@ worker.onmessage = function (e)
 			break;
 		
 		case "Delete Cla": case "Add Cla":
-		case "Delete Species": case "Delete Comp": case "Delete Trans":
+		case "Delete Species": case "Delete Comp": case "Delete Trans":	
 			model.species = ans.species;	
-		
+	
 			update_param();
 			close_bubble();
 			close_help();	
@@ -202,24 +202,17 @@ worker.onmessage = function (e)
 			generate_screen();
 			break;
 			
-		case "Rename Classification":
-			//model.species = ans.species;
+		case "Rename Classification Index":
+			if(ans.index_old != ans.index_new){
+				model.get_label_info_all();
+				//model.check_ob_string_exist(model,"model",ans.index_old);// Checks not in model
+			}
 			update_param();
 			close_bubble();
 			initialise_pages();
 			generate_screen();
 			break;
-			
-		case "Rename Index":
-			//model.species = ans.species;
-			//model.param	= ans.param;
-			model.get_label_info_all();
-			model.check_ob_string_exist(model,"model",ans.index_old);// Checks not in model
-			update_param();
-			close_bubble();
-			generate_screen();
-			break;
-			
+	
 		case "Rename Compartment":
 			model.species = ans.species;
 			update_param();
@@ -340,9 +333,31 @@ worker.onmessage = function (e)
 			break;
 			
 		case "Set Weight": 
-			model.param[ans.i].weight_desc = ans.weight_desc;
+			{
+				let par = model.param[ans.i];
+				par.factor_weight_desc = ans.factor_weight_desc;
+				par.factor_weight_set = true;
+			}
 			close_param_source();
 			generate_screen();
+			break;
+		
+		case "SetDefine":
+			{ 
+				let th = ans.th;
+				let par = model.param[th];
+				par.define_eqn_on = false; 
+				if(inter.bubble.radio.value == "equation") par.define_eqn_on = true;
+	
+				close_bubble();	
+			
+				if(par.define_eqn_on){
+					update_do_after({type:"press_but_prop", lay_name:"ModelParamContent", ty:"DefineEqn", name:par.name});
+				}
+				else{
+					start_worker("Edit Define",{type:"Define", par_st:par, vari_new:"define", source:model, label_info:par.label_info, i:th});
+				}
+			}
 			break;
 			
 		case "Close Data Source":
@@ -408,6 +423,7 @@ worker.onmessage = function (e)
 			switch(ans.info){
 			case "BICI_file": case "Import file":
 				model.load(ans);	
+				//prr("Loaded Change Page"); change_page({pa:"Model", su:"Parameters"});
 				break;
 			
 			case "Data file":
@@ -428,7 +444,6 @@ worker.onmessage = function (e)
 		
 		case "Spawn Output":
 			model.load(ans,true);	
-			break;
 		
 		case "Import output": case "Import output2": case "Load Default": 
 			model.load(ans);

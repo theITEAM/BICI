@@ -1076,8 +1076,9 @@ function output_param(par,save_type,bscript)
 			
 			if(par.prior_const_on == true){
 				if(par.prior_const_set != true){
-					add_warning({mess:"Constant prior", mess2:"Constant prior for "+par.full_name+" not set", warn_type:"PriorConstValue", name:par.name});
-					return;
+					if(save_type == "inf"){
+						add_warning({mess:"Constant prior", mess2:"Constant prior for "+par.full_name+" not set", warn_type:"PriorConstValue", name:par.name});
+					}
 				}
 				else{					 
 					output_add_prior_const(save_type,par,tags);
@@ -1149,7 +1150,7 @@ function output_param(par,save_type,bscript)
 				let file = output_value_table(par,par.factor_weight,"Value","value",save_type);
 				
 				if(file == undefined){
-					add_warning({mess:"Missing weigth information", mess2:"The weight for parameter "+par.full_name+" must be set.", warn_type:"WeightValue", name:par.name});
+					add_warning({mess:"Missing weight information", mess2:"The weight for parameter "+par.full_name+" must be set.", warn_type:"WeightValue", name:par.name});
 					return;
 				}
 				
@@ -1392,17 +1393,16 @@ function output_add_prior_const(save_type,par,tags)
 	let value;
 	if(par.ndep_cont > 0){
 		let err = check_param_value("Set Param",par,par.prior_const);
-		if(err){
-			let wt = "SimValue"; if(par.variety == "reparam") wt = "RepValue";
-			
-			add_warning({mess:"Problem with "+par.full_name+" value", mess2:err, warn_type:wt, name:par.name});
+		if(err){	
+			add_warning({mess:"Problem with "+par.full_name+" constant prior", mess2:err, warn_type:"PriorConstValue", name:par.name});
 			return;
 		}
 	
 		value = output_value_table(par,par.prior_const,"Value","value",save_type);
 	}
 	else{
-		value = JSON.stringify(par.prior_const); 
+		value = par.prior_const;
+		//value = JSON.stringify(par.prior_const); 
 	}
 	
 	add_tag("prior-const",value,tags);

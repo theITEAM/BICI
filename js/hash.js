@@ -371,11 +371,25 @@ function hash_remove(store,ref)
 
 
 /// Redos hash table
-function hash_redo(store,comp)
+function hash_redo(comp)
 {
-	store = init_hash();
+	let store = init_hash();
+		
 	for(let c = 0; c < comp.length; c++){
 		hash_add(store,comp[c].name,c);
+	}
+	
+	return store;
+}
+
+
+/// Checks to see if hash table is correct
+function hash_check(store,comp)
+{
+	if(store.n != comp.length) error("LENGTH WRONG");
+	for(let i = 0; i < comp.length; i++){
+		let ii = hash_find(store,comp[i].name);
+		if(ii != i) error("HASH PROBLEM");
 	}
 }
 

@@ -2813,7 +2813,7 @@ void Proposal::param_event_joint(Direction dir, State &state)
 			}
 			break;
 	
-		default: emsg("Should not be here");
+		default: emsg("Should not be here10");
 		}
 		
 		if(illegal) break;

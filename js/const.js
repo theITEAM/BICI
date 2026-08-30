@@ -8,7 +8,7 @@
 // 67000 lines of code (25/02/26)
 // 71740 lines of code (01/07/26)
 
-let bici_version = "v0.90";                       // Sets the BICI version
+let bici_version = "v0.91";                       // Sets the BICI version
 
 let ver="windows";                                // Determines platform
 //let ver="linux";                                // Use this if working on linux
@@ -16,7 +16,7 @@ let ver="windows";                                // Determines platform
 
 let mac_temp_dir = "/tmp/BICI_files/";
 
-let win_linux = false;                             // When working on win running linux 
+let win_linux = false;                            // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
@@ -160,7 +160,8 @@ const eqn_types = [
 {name:"pos", mode:"param only", range:"pos"},
 {name:"zeroone", mode:"param only", range:"zeroone"},
 {name:"etarange", mode:"param only", range:"etarange"},
-{name:"dynamic_weight", mode:"di_weight", range:"all"}
+{name:"dynamic_weight", mode:"di_weight", range:"all"},
+{name:"dynamic_eqn", mode:"all", range:"all"}
 ];
 
 const param_type = ["normal","const","dist","reparam"]; // Different varieties of parameter

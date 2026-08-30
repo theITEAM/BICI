@@ -87,10 +87,20 @@ function param_dynamic_bubble(bu,cont)
 			
 			let p = find(model.species,"name",sp_str);
 		
-			let disable = false;
-			bubble_addscrollable(cont,{type:"param_dynamic", p:p, index_sel, dynamic_info:dynamic_info, disable:disable, ymax:bubblescroll_dymax}); 
+			switch(type){
+			case "bin-thresh-eqn": case "bin-min-max-eqn":
+				bubble_input(cont,"Equation:",{type:"dynamic_eqn", eqn:true});
+				break;
 			
-			bubble_addcheckbox(cont,0,"Fraction",dynamic_info.fraction);
+			default:
+				{
+					let disable = false;
+					bubble_addscrollable(cont,{type:"param_dynamic", p:p, index_sel, dynamic_info:dynamic_info, disable:disable, ymax:bubblescroll_dymax}); 
+		
+					bubble_addcheckbox(cont,0,"Fraction",dynamic_info.fraction);
+				}
+				break;
+			}
 			
 			switch(type){
 			case "bin-thresh-dist": case "bin-thresh-region": case "bin-min-max-dist": case "bin-min-max-region":
@@ -172,7 +182,6 @@ function get_index_pos(par)
 /// The scrollable box which allows the used to specify compartments that make up population
 function param_dynamic_scrollable(lay)
 {
-	
 	let cy = 0;
 	let dx = lay.dx;
 	let w = dx;
@@ -260,29 +269,39 @@ function dynamic_definition(di,par,check)
 	let filt = di.filter;
 
 	let filt_te="";  // Generates the population filter text
-	if(model.species.length > 1){
-		filt_te += sp_drop.te+":";
-	}
 	
-	let fll = false;
-	for(let cl = 0; cl < filt.cla.length; cl++){
-		let fcl = filt.cla[cl];
-		if(fcl.radio.value == "Comp"){
-			let comp = fcl.comp;
-			let st = "";
-			for(let c = 0; c < comp.length; c++){
-				if(comp[c].check == true){
-					if(st != "") st += "|";
-					st += comp[c].comp_name_store;
+	switch(type){
+	case "bin-thresh-eqn": case "bin-min-max-eqn":
+		break;
+	
+	default:
+		{	 
+			if(model.species.length > 1){
+				filt_te += sp_drop.te+":";
+			}
+			
+			let fll = false;
+			for(let cl = 0; cl < filt.cla.length; cl++){
+				let fcl = filt.cla[cl];
+				if(fcl.radio.value == "Comp"){
+					let comp = fcl.comp;
+					let st = "";
+					for(let c = 0; c < comp.length; c++){
+						if(comp[c].check == true){
+							if(st != "") st += "|";
+							st += comp[c].comp_name_store;
+						}
+					}
+					if(fll == true) filt_te += ",";
+					filt_te += st;
+					fll = true;
 				}
 			}
-			if(fll == true) filt_te += ",";
-			filt_te += st;
-			fll = true;
-		}
-	}
 
-	if(di.fraction.check == true) vec.push("frac");
+			if(di.fraction.check == true) vec.push("frac");
+		}
+		break;
+	}
 	
 	let warn;
 	
@@ -307,20 +326,20 @@ function dynamic_definition(di,par,check)
 	
 	switch(type){
 	case "bin-thresh-dist": case "bin-min-max-dist": 
-		if(warn == undefined) warn = check_thresh_value(di.dist,"Distance",false);
+		if(warn == undefined) warn = check_thresh_value(di.dist,"Distance",false,type);
 		vec.push("dist:"+di.dist);	
 		break;
 	}
 	
 	switch(type){
 	case "bin-thresh": case "bin-thresh-dist": case "bin-thresh-region": case "bin-thresh-eqn":
-		if(warn == undefined) warn = check_thresh_value(di.thresh,"Threshold",di.fraction.check);
+		if(warn == undefined) warn = check_thresh_value(di.thresh,"Threshold",di.fraction.check,type);
 		vec.push("thresh:"+di.thresh);	
 		break;
 		
 	case "bin-min-max": case "bin-min-max-dist": 	case "bin-min-max-region": case "bin-min-max-eqn":
-		if(warn == undefined) warn = check_thresh_value(di.threshmin,"Minimum",di.fraction.check);
-		if(warn == undefined) warn = check_thresh_value(di.threshmax,"Maximum",di.fraction.check);
+		if(warn == undefined) warn = check_thresh_value(di.threshmin,"Minimum",di.fraction.check,type);
+		if(warn == undefined) warn = check_thresh_value(di.threshmax,"Maximum",di.fraction.check,type);
 		if(Number(di.threshmin) > Number(di.threshmax)) warn = "Minimum must be less than maximum";
 		vec.push("min:"+di.threshmin);	
 		vec.push("max:"+di.threshmax);	
@@ -329,7 +348,13 @@ function dynamic_definition(di,par,check)
 	default: error("dynamic-sim type problem"); break;
 	}
 	
-	let te = type+"({"+filt_te+"}";
+	let te = type+"(";
+	
+	switch(type){
+	case "bin-thresh-eqn": case "bin-min-max-eqn": te += di.eqn.te; break;
+	default: te += "{"+filt_te+"}";
+	}
+	
 	for(let i = 0; i < vec.length; i++) te += ", "+vec[i];
 	te += ")";
 	
@@ -340,8 +365,10 @@ function dynamic_definition(di,par,check)
 
 
 /// Checks that threshold value is suitable set
-function check_thresh_value(te,tag,frac)
+function check_thresh_value(te,tag,frac,type)
 {
+	if(type == "bin-thresh-eqn" || type == "bin-min-max-eqn") return;
+	
 	if(te.trim() == "") return tag+" must be set"; 
 	let num = Number(te);
 	if(isNaN(num)) return tag+" must be a number";
@@ -365,10 +392,11 @@ function dynamic_info_from_text(te,par)
 	let type;
 	
 	let vec;
-	let spl = te.split("(");
-	if(spl.length != 2) fl = true;
+	
+	let i = 0; while(i < te.length && te.substr(i,1) != "(") i++;
+	if(i == te.length) fl = true;
 	else{
-		type = spl[0];
+		type = te.substr(0,i);
 		
 		let pos = get_param_dynamic_pos(par);
 		let k = find(pos,"te",type);
@@ -376,10 +404,9 @@ function dynamic_info_from_text(te,par)
 		else{
 			di.type.te = type;
 			
-			let se = spl[1];
-			if(!end_str(se,")")) fl = true;
+			if(!end_str(te,")")) fl = true;
 			else{
-				vec = split_with_curly_bracket(se.substr(0,se.length-1),",");
+				vec = split_with_curly_bracket(te.substr(i+1,te.length-2-i),",");
 			}
 		}	
 	}
@@ -395,14 +422,31 @@ function dynamic_info_from_text(te,par)
 		case 1:
 			{
 				let val = spl[0].trim();
-				if(val == "frac") di.fraction.check = true;
-				else{
-					if(begin_str(val,"{")){
-						let res = get_pop_filt_from_text(val,di);
-						if(res.err) alert_import(res.msg); 
+				if(val == "frac"){
+					switch(type){
+					case "bin-thresh-eqn": case "bin-min-max-eqn": 
+						alert_import("Syntax error in 'dynamic-sim': 'frac' should not be set");
+						break;
+					default:
+						di.fraction.check = true;
+						break;
 					}
-					else{
-						alert_import("In '"+te+"' for 'dynamic-sim' the value '"+val+"' is not recognised"); 
+				}
+				else{
+					switch(type){
+					case "bin-thresh-eqn": case "bin-min-max-eqn": 
+						di.eqn.te = val;
+						break;
+					
+					default:
+						if(begin_str(val,"{")){
+							let res = get_pop_filt_from_text(val,di);
+							if(res.err) alert_import(res.msg); 
+						}
+						else{
+							alert_import("In '"+te+"' for 'dynamic-sim' the value '"+val+"' is not recognised"); 
+						}
+						break;
 					}
 				}
 			}
@@ -428,7 +472,7 @@ function dynamic_info_from_text(te,par)
 						}
 						
 						{
-							let warn = check_thresh_value(val,"Threshold",di.fraction.check);
+							let warn = check_thresh_value(val,"Threshold",di.fraction.check,type);
 							if(warn != undefined) alert_import("In '"+te+"' for 'dynamic-sim': "+warn); 
 						}
 						
@@ -443,7 +487,7 @@ function dynamic_info_from_text(te,par)
 						}
 						
 						{
-							let warn = check_thresh_value(val,"Minimum",di.fraction.check);
+							let warn = check_thresh_value(val,"Minimum",di.fraction.check,type);
 							if(warn != undefined) alert_import("In '"+te+"' for 'dynamic-sim': "+warn); 
 						}
 						
@@ -458,7 +502,7 @@ function dynamic_info_from_text(te,par)
 						}
 						
 						{
-							let warn = check_thresh_value(val,"Maximum",di.fraction.check);
+							let warn = check_thresh_value(val,"Maximum",di.fraction.check,type);
 							if(warn != undefined) alert_import("In '"+te+"' for 'dynamic-sim': "+warn); 
 						}
 						
@@ -473,7 +517,7 @@ function dynamic_info_from_text(te,par)
 						}
 						
 						{
-							let warn = check_thresh_value(val,"Distance",false);
+							let warn = check_thresh_value(val,"Distance",false,type);
 							if(warn != undefined) alert_import("In '"+te+"' for 'dynamic-sim': "+warn); 
 						}
 					
@@ -614,7 +658,7 @@ function set_init_dynamic_info()
 		sp_drop.te = model.species[0].name;
 	}
 			
-	return {type:{te:select_drop_str}, filter:filt, thresh:"", threshmin:"", threshmax:"", index_drop:{te:select_drop_str}, dist:"", fraction:{check:false}, sp_drop:sp_drop, region:{loaded:false, source:undefined}, weight:{check:false}, weight_eqn:create_equation("1","dynamic_weight")};
+	return {type:{te:select_drop_str}, filter:filt, thresh:"", threshmin:"", threshmax:"", index_drop:{te:select_drop_str}, dist:"", fraction:{check:false}, sp_drop:sp_drop, region:{loaded:false, source:undefined}, weight:{check:false}, weight_eqn:create_equation("1","dynamic_weight"), eqn:create_equation("","dynamic_eqn")};
 }
 			
 

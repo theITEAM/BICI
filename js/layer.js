@@ -1526,6 +1526,7 @@ class Layer
 		case "threshmax": te = String(inter.bubble.dynamic_info.threshmax); break;
 		case "dist": te = String(inter.bubble.dynamic_info.dist); break;
 		case "dynamic_weight": eqn = inter.bubble.dynamic_info.weight_eqn; break;
+		case "dynamic_eqn": eqn = inter.bubble.dynamic_info.eqn; break;
 		default: error("SOURCE PROBLEM2: "+so.type); break;
 		}
 

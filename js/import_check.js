@@ -234,7 +234,7 @@ function mem_split(ob,te)
 /// Checks that bscript is properly defined
 function check_bscript(pro,map_store,data_file_list)
 {
-	prr("CHECK");
+	prr("CHECK BSCRIPT");
 
 	let bsc = create_bscript("sim",map_store);
 	let bsc2 = copy(pro.bscript);

@@ -2437,10 +2437,11 @@ function add_source_obs(source,claa,hash,result,ind_list)
 						for(let loop = 0; loop < 2; loop++){
 							let na = spl[loop];
 							col[loop] = WHITE;
-					
-							for(let c = 0; c < claa.ncomp; c++){
-								if(claa.comp[c].name == na) col[loop] = claa.comp[c].col;
-							}
+							let c = hash_find(claa.hash_comp,na);
+							if(c != undefined) col[loop] = claa.comp[c].col;
+							//for(let c = 0; c < claa.ncomp; c++){
+							//if(claa.comp[c].name == na) col[loop] = claa.comp[c].col;
+							//}
 						}
 					}
 			

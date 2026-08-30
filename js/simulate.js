@@ -978,7 +978,7 @@ function display_factor(i,x,y,lay,w,allow_edit,source)
 	lay.add_button({te:"", x:x+5.9, y:y+0., dx:0, dy:1.6, type:"FactorElement", i:i});
 	
 	if(par.factor_weight_on.check){
-		let te = par.weight_desc;
+		let te = par.factor_weight_desc;
 	
 		let si = 1.0, fo_la = get_font(si,"","times");			
 		lay.add_button({te:"Weight =", x:x+1.8, y:y+0.3, dy:si, si:si, font:fo_la, type:"Text", col:BLACK});

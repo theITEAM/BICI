@@ -1,0 +1,50 @@
+###################### DATA DIRECTORY ######################
+
+data-dir folder="EX_S4-6-data-files"
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+######################### DETAILS ##########################
+
+simulation start=0 end=100 timestep=0.5
+
+inference start=0 end=100 timestep=0.5 update=1000 nchain=1
+
+post-sim start=0 end=100
+
+######### DEFINE MODEL AND DATA FOR SPECIES PEOPLE #########
+
+species name="People" type="individual"
+
+# SPECIES MODEL
+
+class name="DS" index="d"
+
+comp name="S" color="#009900" x=-18 y=0
+
+comp name="I" color="#ff2222" x=0 y=0
+
+comp name="R" color="#4444ff" x=18 y=0
+
+trans name="S->I" value="exp(rate:exp(-φ×f(t))×β×{I}/N)"
+
+trans name="I->R" value="exp(rate:γ)"
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="DS" file="init-pop-sim.csv"
+
+######################## PARAMETERS ########################
+
+param name="N" constant=10001
+
+param name="β" value=0.5
+
+param name="γ" value=0.2
+
+param name="φ" value=1.5
+
+param name="f(t)" dynamic-sim="bin-thresh-eqn(sqrt({I}), thresh:10)" knot-times="start,10,20,30,40,50,60,70,80,90" spline-type="square"
+

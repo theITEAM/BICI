@@ -230,7 +230,7 @@ Like State::calculate_local_change(unsigned int p, vector <LocalChange> &local_c
 			switch(lc.type){
 			case ADD_EVENT: sign = 1; break;
 			case REMOVE_EVENT: sign = -1; break;
-			case ADD_IC: case ADD_C_IC: case REMOVE_IC: case REMOVE_C_IC: emsg("Should not be here"); break;
+			case ADD_IC: case ADD_C_IC: case REMOVE_IC: case REMOVE_C_IC: emsg("Should not be here21"); break;
 			}
 			like_ch.markov += ssp.Li_update_tn(tr,ti,sign);
 			

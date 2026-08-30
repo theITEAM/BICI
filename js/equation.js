@@ -498,6 +498,7 @@ function equation_calulator(lay,cx,cy,width,source,warn,mode)
 	case "defrep eq notime": param_fl = true; t_fl = false; break;
 	case "derive param": param_fl = true; um_fl = false; tensor_fl = false; t_fl = false; break;
 	case "derive eq": model_param_fl = true; pop_fl = true; break;
+	case "di_weight": param_fl = true; break;
 	default: error("option prob 100"+eqn.mode); break;
 	}
 
@@ -1194,7 +1195,6 @@ function equation_rename_compartment(p,cl,old_name,new_name)
 	let sp = model.species[p];
 	let cl_name = sp.cla[cl].name;
 		
-	//let eq_list = model.find_eqn_list();
 	let eq_list = find_equation_list();
 	
 	let len = old_name.length;
@@ -1202,25 +1202,71 @@ function equation_rename_compartment(p,cl,old_name,new_name)
 	
 	for(let i = 0; i < eq_list.length; i++){
 		let eqn = eq_list[i];
-		extract_equation_properties(eqn);
+		eqn_rename_compartment(eqn,cl_name,old_name,new_name,len,dif);
+	}	
 	
-		let te = eqn.te;
-		for(let j = 0; j < eqn.comp_name_list.length; j++){
-			let ch = eqn.comp_name_list[j];
-		
-			if(ch.cl_name == cl_name && ch.comp_name == old_name){
-				te = te.substr(0,ch.icur)+new_name+te.substr(ch.icur+len);
-				for(let jj = j+1; jj < eqn.comp_name_list.length; jj++){
-					eqn.comp_name_list[jj].icur += dif;
+	// Adds any equations for parameter
+	for(let th = 0; th < model.param.length; th++){
+		let par = model.param[th];
+	
+		switch(par.variety){
+		case "reparam":
+			{
+				let eqn = create_equation(par.reparam_eqn,"reparam_eqn");
+				eqn_rename_compartment(eqn,cl_name,old_name,new_name,len,dif);
+				par.reparam_eqn = eqn.te;
+			}
+			break;
+			
+		case "define":
+			{
+				let eqn = create_equation(par.define_eqn,"reparam_eqn");
+				eqn_rename_compartment(eqn,cl_name,old_name,new_name,len,dif);
+				par.define_eqn = eqn.te;
+			}
+			break;
+			
+		case "dynamic":
+			{
+				let di = par.dynamic_info;
+				let type = di.type.te;
+				if(type == "bin-thresh-eqn" || type == "bin-min-max-eqn"){
+					eqn_rename_compartment(di.eqn,cl_name,old_name,new_name,len,dif);
 				}
 			}
+			break;
 		}
-		eqn.te = te;
-	}	
+	}
+
+
+	for(let i = 0; i < model.derive.length; i++){
+		let der = model.derive[i];
+		eqn_rename_compartment(der.eqn2,cl_name,old_name,new_name,len,dif);
+	}
 }
 
 
-/// CHecks the integrals are in bounds
+/// Renames a specific equation
+function eqn_rename_compartment(eqn,cl_name,old_name,new_name,len,dif)
+{
+	extract_equation_properties(eqn);
+	
+	let te = eqn.te;
+	for(let j = 0; j < eqn.comp_name_list.length; j++){
+		let ch = eqn.comp_name_list[j];
+	
+		if(ch.cl_name == cl_name && ch.comp_name == old_name){
+			te = te.substr(0,ch.icur)+new_name+te.substr(ch.icur+len);
+			for(let jj = j+1; jj < eqn.comp_name_list.length; jj++){
+				eqn.comp_name_list[jj].icur += dif;
+			}
+		}
+	}
+	eqn.te = te;
+}
+
+
+/// Checks the integrals are in bounds
 function check_integral_bounds(out_type)
 {
 	if(out_type != "sim" && out_type != "inf") return;

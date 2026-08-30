@@ -583,7 +583,7 @@ function set_constant_bubble(cont)
 		add_bubble_end(cont);
 	}
 	else{
-		cont.dx = 10;
+		cont.dx = 16;
 		bubble_addtitle(cont,"Set constant");
 
 		bubble_addparagraph(cont,"There are currently no free parameters to set.",0,cont.dx); 
@@ -612,7 +612,8 @@ function set_prior_const_bubble(cont,type,ac)
 		add_bubble_end(cont);
 	}
 	else{
-		bubble_addparagraph(cont,"There are currently no parameters to set.",0,cont.dx); 
+		cont.dx = 16;
+		bubble_addparagraph(cont,"There are currently no free parameters to set.",0,cont.dx); 
 	}
 }
 
@@ -632,10 +633,10 @@ function set_factor_bubble(cont)
 		add_bubble_end(cont);
 	}
 	else{
-		cont.dx = 10;
+		cont.dx = 16;
 		bubble_addtitle(cont,"Set factor");
 
-		bubble_addparagraph(cont,"There are currently no parameters to set as factors.",0,cont.dx); 
+		bubble_addparagraph(cont,"There are currently no free parameters to set.",0,cont.dx); 
 	}
 }
 
@@ -665,7 +666,7 @@ function set_reparam_bubble(cont)
 		add_bubble_end(cont);	
 	}
 	else{
-		cont.dx = 17;
+		cont.dx = 16;
 		bubble_addtitle(cont,"Set reparameterisation");
 
 		bubble_addparagraph(cont,"There are currently no free parameters to set.",0,cont.dx); 
@@ -707,7 +708,7 @@ function set_define_bubble(cont)
 		add_bubble_end(cont);	
 	}
 	else{
-		cont.dx = 17;
+		cont.dx = 16;
 		bubble_addtitle(cont,"Define");
 
 		bubble_addparagraph(cont,"There are currently no free parameters to set.",0,cont.dx); 
@@ -731,7 +732,7 @@ function set_distribution_bubble(cont)
 		//add_end_button(cont,"Set",ac);
 	}
 	else{
-		cont.dx = 10;
+		cont.dx = 16;
 		bubble_addtitle(cont,"Set distribution");
 
 		bubble_addparagraph(cont,"There are currently no free parameters to set.",0,cont.dx); 
@@ -828,7 +829,7 @@ function param_pos(par,op)
 {	
 	if(par.derive) return false;
 	
-	if(par.ndep_cont == 0 && op == "priorconst") return false;
+	//if(par.ndep_cont == 0 && op == "priorconst") return false;
 	
 	if(par.name == "D") return false; // Does not allow distance matrix
 	

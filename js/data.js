@@ -705,8 +705,12 @@ function get_source(siminf,p)
 	switch(siminf){
 	case "sim": return model.species[p].sim_source; 
 	case "inf": return model.species[p].inf_source; 
-	case "gen": return model.sim_res.plot_filter.species[p].gen_source;
-	case "ppc": return model.inf_res.plot_filter.species[p].ppc_source;
+	case "gen":
+		if(model.sim_res.plot_filter == undefined) return;
+		return model.sim_res.plot_filter.species[p].gen_source;
+	case "ppc":
+		if( model.inf_res.plot_filter == undefined) return;
+		return model.inf_res.plot_filter.species[p].ppc_source;
 	}
 	error("Cannot get source");
 }
@@ -1874,6 +1878,7 @@ function unescape_param_value(type,par,value)
 function check_param_value(type,par,value)
 {
 	let co_list = generate_co_list(par.list,par.ndep_cont);
+
 	for(let i = 0; i < co_list.length; i++){
 		let comb = co_list[i];
 		let el = get_element(value,comb.index);
@@ -1942,10 +1947,10 @@ function check_param_value(type,par,value)
 				let mean = round_small(sum/wsum);
 				if(dif(mean,1)){
 					if(!weight){ 	
-						return "The mean of elements is "+mean+" and it should be 1";
+						return "The mean of elements is "+mean+" and it should be 1. One element should be set to '*'.";
 					}
 					else{
-						return "The weighted mean of elements is "+mean+" and it should be 1";
+						return "The weighted mean of elements is "+mean+" and it should be 1. One element should be set to '*'.";
 					}
 				}
 			}

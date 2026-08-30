@@ -1308,7 +1308,7 @@ double IndEvSampler::calculate_nm_rate(const Individual &ind, unsigned int m, in
 	}
 	
 	switch(nmt.type){
-	case EXP_RATE: case EXP_MEAN: emsg("Should not be here"); break;
+	case EXP_RATE: case EXP_MEAN: emsg("Should not be here5"); break;
 
 	case GAMMA: case ERLANG: case LOG_NORMAL: case PERIOD: 
 		{

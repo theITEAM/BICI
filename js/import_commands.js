@@ -1393,7 +1393,7 @@ function define_command(line)
 	let par = create_new_param(pp,"define");
 	
 	par.import_line = imp.line;
-	par_set_default(par);
+	//par_set_default(par);
 	
 	if(par.ndep_cont > 0){
 		par.list = par_find_list(par);
@@ -1454,21 +1454,20 @@ function param_command2(full_name,line,op)
 	
 	let pp = get_param_prop(full_name);
 
-	let par = create_new_param(pp,"normal");
-	
 	add_proc_time(10*dpt);
 	
-	if(is_covar(par)) par.pri_pos = prior_cv_pos;
+	let par = create_new_param(pp,"normal");
 	
 	par.import_line = imp.line;
 
 	if(par.time_dep == true){
+		//par_set_default(par);
+		
 		let knot_times = get_tag_value("knot-times"); if(knot_times == "") cannot_find_tag();
 		let warn = check_knot_times(knot_times);
 		if(warn != "") alert_import(warn);
 		
 		change_spline_knot(par,knot_times.split(","));
-		par_set_default(par);
 		
 		let smooth = get_tag_value("smooth").toLowerCase().trim();
 		
@@ -1512,7 +1511,7 @@ function param_command2(full_name,line,op)
 			}
 		}
 	}
-
+	
 	if(par.ndep_cont > 0){
 		par.list = par_find_list(par);
 	}
@@ -1521,11 +1520,12 @@ function param_command2(full_name,line,op)
 	let fact = get_tag_value("factor");
 	if(fact != ""){
 		if(option_error("factor",fact,["true","false"]) == true) return;
-		if(fact == "true"){
-			par.factor = true;
-			par.pri_pos = prior_factor_pos;
-		}
+		if(fact == "true") par.factor = true;
 	}
+	
+	if(is_covar(par)) par.variance = true;
+		
+	par.pri_pos = set_pri_pos(par);
 	
 	par.factor_weight_on = {check:false};
 	
@@ -1624,6 +1624,7 @@ function param_command2(full_name,line,op)
 			if(value != ""){
 				par.value = value;
 				par.variety = "normal";
+				par.set = true;
 			}
 			
 			if(reparam != ""){
@@ -1635,6 +1636,7 @@ function param_command2(full_name,line,op)
 			if(cons != ""){
 				par.value = cons;
 				par.variety = "const";
+				par.set = true;
 			}
 		}
 		else{
@@ -1668,6 +1670,7 @@ function param_command2(full_name,line,op)
 				}
 				else{		
 					par.value = param_blank(par);
+					par.set = true;
 				
 					if(is_file(valu) == false){ // Sets all elements to the same	
 						let dim = get_dimensions(par.value);
@@ -1684,7 +1687,6 @@ function param_command2(full_name,line,op)
 					let err = check_param_value("Set Param",par,par.value);
 					if(typeof err == 'string') alert_import(desc+": "+err);
 				}
-				par.set = true;
 			}
 		}
 	}
@@ -1758,8 +1760,8 @@ function param_command2(full_name,line,op)
 			
 			let desc = "For 'prior-const'";
 			load_param_value(par,par.prior_const,"Value",prior_const,desc,load_dpt);
-			par.prior_const_set = true;
 		}
+		par.prior_const_set = true;
 	}
 	
 	let sim_sample = get_tag_value("sim-sample").toLowerCase(); 
@@ -1810,11 +1812,13 @@ function derived_command()
 	let eqn_name = get_tag_value("eqn"); if(eqn_name == "") cannot_find_tag();
 	
 	let eqn1 = create_equation(full_name,"derive_param");
+
 	if(eqn1.warn.length > 0) alert_import("For 'name': "+eqn1.warn[0].te);
 	if(eqn1.param.length != 1){
 		alert_import("'name' must contain a single paramter");
 	}
 	else{
+		//eqn1.param[0].import_line = imp.line;
 		let warn = check_reserved_name(eqn1.param[0].name);
 		if(warn != "") alert_import(warn);
 	}

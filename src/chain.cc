@@ -44,6 +44,8 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 	
 	print_diag("start init_chain");
 	
+	vector < vector <IndRef> > not_possible;
+	
 	if(model.mode == EXT){    // Loads initial state
 		if(model.sample.size() == 0) emsg("Must be a sample");
 	
@@ -73,7 +75,6 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 		Particle part;
 
 		auto loop_max = model.details.chain_nsiminit;
-loop_max = 50u;
 
 		auto param_latin = model.param_latin_hypercube_prior_sample(loop_max);
 		
@@ -108,43 +109,49 @@ loop_max = 50u;
 			 	
 			state.resample_ind(false);    // Resamples individual such that fixed events become correct
 
-			state.force_consistent_solution();
+			auto np = state.force_consistent_solution();
 		
-			print_diag("resampled");
+			if(np.size() > 0){  // Some individuals are not possible
+				not_possible.push_back(np);
+			}
+			else{
+				print_diag("resampled");
 
-			//state.check("Resample check");
-		
-			print_diag("resampled");
+				//state.check("Resample check");
 			
-			auto L = like_total_obs();
-			burn_info.add_L(L); 
+				print_diag("resampled");
+				
+				auto L = like_total_obs();
+				burn_info.add_L(L); 
 
-			double fit;
-			if(use_li_obs){  // This fit metric uses the log-likelihood of observations (good for population-based)
-				fit = L;
-			}
-			else{            // This fit metric uses the fit between the transitions and the model (good for individual-based data)
-				fit = -(state.frac_outside_CI()-0.1);
-				if(fit > 0) fit *= -1;
-			}
-		
-			if(fit > fit_max){
-				fit_max = fit;
-				part = state.generate_particle(UNSET,UNSET,true,false);
-			}
-		
-			if(false){
-				for(auto th : model.param_vec_latin){
-					cout << model.param_vec_name(th) << " " << param_val.value[th] << ",";
+				double fit;
+				if(use_li_obs){  // This fit metric uses the log-likelihood of observations (good for population-based)
+					fit = L;
 				}
-				cout << fit << " fit   best:" << fit_max << endl;
-			}
+				else{            // This fit metric uses the fit between the transitions and the model (good for individual-based data)
+					fit = -(state.frac_outside_CI()-0.1);
+					if(fit > 0) fit *= -1;
+				}
 			
-			print_diag("resampled after");
-			//state.check("after resample");
+				if(fit > fit_max){
+					fit_max = fit;
+					part = state.generate_particle(UNSET,UNSET,true,false);
+				}
+			
+				if(false){
+					for(auto th : model.param_vec_latin){
+						cout << model.param_vec_name(th) << " " << param_val.value[th] << ",";
+					}
+					cout << fit << " fit   best:" << fit_max << endl;
+				}
+				
+				print_diag("resampled after");
+				//state.check("after resample");
+			}
 		}
-		if(fit_max == -LARGE) run_error("Could not find initial state");
 		
+		if(fit_max == -LARGE) state.no_valid_state(not_possible);
+
 		state.set_particle(part);
 	}
 	

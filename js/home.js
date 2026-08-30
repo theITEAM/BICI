@@ -207,6 +207,7 @@ function initialise_section()
 		ex_mod.push({te:"S4.3: Dynamic parameter with maximum and minimum thresholds", link:true, mod_type:"POP"});
 		ex_mod.push({te:"S4.4: Dynamic parameter with distance effect", mod:"SPE2.1", link:true, mod_type:"IBM"});
 		ex_mod.push({te:"S4.5: Dynamic parameter with region effect", mod:"SPE2.1", link:true, mod_type:"IBM"});
+		ex_mod.push({te:"S4.6: Dynamic parameter with user-defined metric", link:true, mod_type:"POP"});
 		
 		let sec = { name:"simu-scen", desc:"Simulation scenarios", pic:"sim", shade:true, ex_mod:ex_mod, help:sim_scen_text+mod_mess};
 		

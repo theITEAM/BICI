@@ -956,7 +956,7 @@ void Equation::substitute_define(vector <EqItem> &op, bool &pass_again)
 			const auto &pind = param_index[op[i].num];
 			auto &def = define[pind.th];
 			
-			def.used = true;
+			def.used = true;  
 			
 			if(pind.dep.size() != def.dep.size()) emsg("dep wrong size");
 			
@@ -2522,7 +2522,7 @@ void Equation::convert_param_index(vector <EqItem> &op)
 				break;
 			
 			case PARAM_DEFINE:
-				emsg("Should not be here");
+				emsg("Should not be here3");
 				break;
 			
 			case PARAM_DERIVE:

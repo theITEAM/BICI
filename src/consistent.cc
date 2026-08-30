@@ -19,9 +19,11 @@ bool total_obs_ord(const TotalObs &to1, const TotalObs &to2)
 
 
 /// This forces a solution for an individual
-void State::force_consistent_solution()
+vector <IndRef> State::force_consistent_solution()
 {
 	auto pl = false;
+
+	vector <IndRef> not_possible_list;
 
 	string warn;
 	
@@ -48,8 +50,6 @@ void State::force_consistent_solution()
 				ssp.inconsistent_ind = false;
 			}
 			else{
-				vector <unsigned int> not_possible_list;
-				
 				// Works out regions where certain transitions are surpressed
 				
 				vector <unsigned int> apply_illegal_trans;
@@ -217,8 +217,7 @@ void State::force_consistent_solution()
 						if(k == 0){   // Works out possiblities for compartment individual could enter
 							for(const auto &cp : c_enter_pos){
 								auto c = cp.c;
-								//map_co[c] = node.size();
-								
+							
 								ConsistNode no;
 								no.c = c;
 								no.prob = cp.prob;
@@ -252,7 +251,7 @@ void State::force_consistent_solution()
 							else{
 								for(const auto &pc : to_last.pos_co_list){
 									auto c = pc.c;
-								
+				
 									auto prob_new = pc.prob;
 									
 									auto nn = map_co[c];
@@ -500,13 +499,14 @@ void State::force_consistent_solution()
 							cinit = node[n].c;
 						}
 					}
-					
-					if(cinit == UNSET) emsg("cinit should be set");
-					
+						
 					if(not_possible){
-						not_possible_list.push_back(i);
+						IndRef ir; ir.p = p; ir.i = i;
+						not_possible_list.push_back(ir);
 					}
 					else{
+						if(cinit == UNSET) emsg("cinit should be set");
+				
 						vector <Event> ev_new;
 						
 						{  // Adds start event
@@ -602,7 +602,7 @@ void State::force_consistent_solution()
 										break;
 										
 									default:
-										emsg("SHould not be here");
+										emsg("SHould not be here2");
 										break;
 									}
 								}
@@ -730,17 +730,7 @@ void State::force_consistent_solution()
 						}
 					}
 				}
-				
-				if(not_possible_list.size() > 0){
-					string te="";
-					for(auto j = 0u; j < not_possible_list.size(); j++){
-						if(j != 0) te += ", ";
-						te += sp.individual[not_possible_list[j]].name;
-					}
-					
-					run_error("Could not find consistent solution for the following individuals (please check individual-based data): "+te);
-				}
-				
+			
 				if(testing){
 					for(auto va : map_co){
 						if(va != UNSET) emsg("Problem with map_co");
@@ -749,9 +739,9 @@ void State::force_consistent_solution()
 			}
 		}
 	}
+	
+	return not_possible_list;
 }
-
-
 
 
 /// Calculates the characteristic transition time for a given transition
@@ -973,4 +963,53 @@ ConsistComp State::conco_sample(const vector <ConsistComp> &list, const vector <
 	return list[j];
 }
 
+struct IndNum {
+	string name;
+	unsigned int num;
+};
 
+
+/// Used to order genetic data
+bool IndNum_ord (const IndNum &in1, const IndNum &in2)
+{ return (in1.num > in2.num); };
+
+
+/// This gets called if there is not valid starting condition for the chain
+void State::no_valid_state(const vector < vector <IndRef> > &not_possible) const
+{
+	if(not_possible.size() > 0){ // Looks for individuals that consistently fail
+		vector <IndNum> ind_num;
+		
+		Hash hash;
+		for(auto i = 0u; i < not_possible.size(); i++){
+			for(const auto &np : not_possible[i]){
+				auto name = model.species[np.p].individual[np.i].name;
+				auto j = hash.find(name);
+				if(j == UNSET){
+					hash.add(ind_num.size(),name);
+					IndNum in;
+					in.name = name;
+					in.num = 1;
+					ind_num.push_back(in);
+				}
+				else{
+					ind_num[j].num++;
+				}
+			}
+		}
+		
+		sort(ind_num.begin(),ind_num.end(),IndNum_ord);
+		
+		auto max_len = 100u;
+		string prob_ind;
+		for(auto &in : ind_num){
+			if(prob_ind != "") prob_ind += ", ";
+			prob_ind += in.name;
+			if(prob_ind.length() > max_len) break;
+		}
+		
+		run_error("Could not find consistent initial state for the following individuals (please check individual-based data): "+trunc(prob_ind,max_len));
+	}
+	
+	run_error("Could not find consistent initial state");	
+}

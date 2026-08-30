@@ -329,7 +329,7 @@ double IndEvSampler::simulate_single_events_prob(unsigned int i, unsigned int cl
 						case NM_TRANS_EV:  // A non-markovian event
 							break;
 							
-						default: emsg("Should not be here"); break;
+						default: emsg("Should not be here7"); break;
 						}
 					}
 				}

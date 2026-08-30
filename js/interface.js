@@ -1612,7 +1612,7 @@ function view_warning(i)
 		change_page({pa:"Model", su:"Parameters"});
 		press_button_prop("ModelParamContent","ReparamElement",["name"],warn.name);
 		break;
-		
+
 	case "RepValue":
 		change_page({pa:"Model", su:"Parameters"});
 		press_button_prop("ModelParamContent","ReparamElement",["name"],warn.name);
@@ -1666,6 +1666,10 @@ function view_warning(i)
 			let info = warn.eqn_info;
 	
 			switch(warn.eqn_type){
+			case "dynamic_eqn":
+				error("Dynamic eqn to do");
+				break;
+				
 			case "dynamic_weight":
 				error("Dynamic weight to do");
 				break;
@@ -1917,7 +1921,7 @@ function disactivated(te)
 /// Starts the worker doing a job
 function start_worker(type,info)
 {
-	if(false) error("start work: "+type+" "+info);
+	if(false) prr("start work: "+type+" "+info);
 	
 	start_loading_symbol(0,type);
 	
@@ -2044,7 +2048,8 @@ function cursor_paste(paste)
 		paste = paste.replace(/</g,"〈");
 		paste = paste.replace(/>/g,"〉");
 		if(subtab_name() != "Description") paste = paste.replace(/\*/g,"×");
-				
+		paste = remove_escape_char(paste);
+		
 		let cur = inter.cursor;
 		if(cur.i == undefined) return;
 

@@ -579,12 +579,8 @@ function button_action(bu,action_type)
 			let claa = model.species[bu.p].cla[bu.cl];
 				
 			let te = inter.rename_classification;
-			if(claa.name != te){
-				start_worker("Rename Classification",{p:bu.p, cl:bu.cl, old_name:claa.name, new_name:te});	
-			}
-			
-			if(index_new != claa.index){
-				start_worker("Rename Index",{p:bu.p, cl:bu.cl, index_old:claa.index, index_new:index_new});	
+			if(claa.name != te || index_new != claa.index){
+				start_worker("Rename Classification Index",{p:bu.p, cl:bu.cl, old_name:claa.name, new_name:te, index_old:claa.index, index_new:index_new});	
 			}
 			else close_bubble();
 		}
@@ -1671,7 +1667,7 @@ function button_action(bu,action_type)
 			let th = bu.i;
 			let par = model.param[bu.i];
 			par.factor = true;
-			par.pri_pos = prior_factor_pos;
+			reset_prior(par);
 			close_bubble();
 			par_in_view(par.name);
 		}
@@ -1699,22 +1695,11 @@ function button_action(bu,action_type)
 			let par = copy(model.param[th]);
 			
 			create_new_param(par,"define");
-		
-			par.define_eqn_on = false; 
-			if(inter.bubble.radio.value == "equation") par.define_eqn_on = true;
-	
-			close_bubble();	
 			
-			if(par.define_eqn_on){
-				model.param[th] = par;
-				update_do_after({type:"press_but_prop", lay_name:"ModelParamContent", ty:"DefineEqn", name:par.name});
-			}
-			else{
-				start_worker("Edit Define",{type:"Define", par_st:par, vari_new:"define", source:model, label_info:par.label_info, i:th});
-			}
+			start_worker("SetDefine",{par_name:model.param[th].name});
 		}
 		break;
-		
+	
 	case "AddReparamParam":
 		{
 			let par = model.param[bu.i];
@@ -1767,11 +1752,11 @@ function button_action(bu,action_type)
 		break;
 		
 	case "DeleteParamConst":
-		inter.help = {title: "Delete constant", te: "Are you sure you want to delete this constant definition?", i:bu.i, ok:"DeleteParamDistConfirm"};
+		inter.help = {title: "Delete constant", te: "Are you sure you want to delete this constant definition?", i:bu.i, ok:"ParamNormalReturn"};
 		break;
 		
 	case "DeleteParamFactor":
-		inter.help = {title: "Delete factor", te: "Are you sure you want to stop this parameter from becoming a factor", i:bu.i, ok:"DeleteParamFactorConfirm"};
+		inter.help = {title: "Delete factor", te: "Are you sure you want to stop this parameter from becoming a factor", i:bu.i, ok:"ParamNormalReturn"};
 		break;
 		
 	case "DeleteParamMult":
@@ -1779,33 +1764,25 @@ function button_action(bu,action_type)
 		break;
 		
 	case "DeleteParamReparam":
-		inter.help = {title: "Delete reparameterisation", te: "Are you sure you want to delete this reparameterisation?", i:bu.i, ok:"DeleteParamDistConfirm"};
+		inter.help = {title: "Delete reparameterisation", te: "Are you sure you want to delete this reparameterisation?", i:bu.i, ok:"ParamNormalReturn"};
 		break;
 		
 	case "DeleteParamDefine":
-		inter.help = {title: "Delete parameter definition", te: "Are you sure you want to delete this definition?", i:bu.i, ok:"DeleteParamDistConfirm"};
+		inter.help = {title: "Delete parameter definition", te: "Are you sure you want to delete this definition?", i:bu.i, ok:"ParamNormalReturn"};
 		break;
 		
 	case "DeleteParamDist":
-		inter.help = {title: "Delete parameter distribution", te: "Are you sure you want to delete this parameter distribution?", i:bu.i, ok:"DeleteParamDistConfirm"};
+		inter.help = {title: "Delete parameter distribution", te: "Are you sure you want to delete this parameter distribution?", i:bu.i, ok:"ParamNormalReturn"};
 		break;
 	
-	case "DeleteParamDistConfirm":
+	case "ParamNormalReturn":
 		{
 			let he = inter.help;
-			start_worker("DeleteParamDist",{ i:he.i});
+			start_worker("ParamNormalReturn",{ i:he.i});
 			close_help();
 		}
 		break;
-		
-	case "DeleteParamFactorConfirm":
-		{
-			let he = inter.help;
-			start_worker("DeleteParamFactor",{ i:he.i});
-			close_help();
-		}
-		break;
-		
+	
 	case "DeleteParamMultConfirm":
 		{
 			let he = inter.help;
@@ -1815,7 +1792,7 @@ function button_action(bu,action_type)
 		break;
 		
 	case "DeleteParamPriorConst":
-		inter.help = {title: "Delete constant prior", te: "Are you sure you want to delete this definition?", i:bu.i, ok:"DeleteParamPriorConstConfirm"};
+		inter.help = {title: "Delete constant prior", te: "Are you sure you want to delete this constant prior?", i:bu.i, ok:"DeleteParamPriorConstConfirm"};
 		break;
 	
 	case "DeleteParamPriorConstConfirm":

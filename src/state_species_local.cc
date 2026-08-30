@@ -484,7 +484,7 @@ double StateSpecies::create_local_change(double &timefac, const LocalIndChange &
 			}		
 			break;
 			
-		case DO_NOTHING_LOC: emsg("Should not be here"); break;
+		case DO_NOTHING_LOC: emsg("Should not be here23"); break;
 		}
 	}while(true);
 	

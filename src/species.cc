@@ -350,7 +350,7 @@ vector < vector <double> > Species::calc_nm_rate(bool calc_bp, const vector <dou
 			if(calc_bp) bp_store.push_back(bp);
 			
 			switch(nmt.type){
-			case EXP_RATE: case EXP_MEAN: emsg("Should not be here"); break;
+			case EXP_RATE: case EXP_MEAN: emsg("Should not be here12"); break;
 
 			case GAMMA: case ERLANG: case LOG_NORMAL: case PERIOD: case EXP_MEAN_NM:
 				{

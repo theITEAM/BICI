@@ -11,7 +11,7 @@ For inference BICI takes in a variety of individual and/or population-level data
 
 BICI can be working for you in just a few clicks! The following pre-compiled versions can be downloaded:
 
-* **Windows:** [BICI_v0.90_windows.zip](https://github.com/theITEAM/BICI/releases/download/v0.90/BICI_v0.90_windows.zip). Once unzipped BICI is run by clicking on the “BICI.exe” icon (if the error message “Windows protected your PC” appears, click on “More info” and “Run”).
+* **Windows:** [BICI_v0.90_windows.zip](https://github.com/theITEAM/BICI/releases/download/v0.90/BICI_v0.90_windows.zip). Once unzipped BICI is run by clicking on the “BICI.exe” icon. If the error message “Windows protected your PC” appears, click on “More info” and “Run” (if this still doesn’t work then open a command prompt within the BICI folder, e.g. by typing “cmd” into the Windows File Explorer address bar, and then execute the command ‘bici’).
 
 * **Mac:** 
 [BICI_v0.89_mac.zip](https://github.com/theITEAM/BICI/releases/download/v0.89/BICI_v0.89_mac.zip).

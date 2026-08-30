@@ -643,9 +643,9 @@ function par_find_list(par,mod)
 	let dep = par.dep;
 	let ndep = dep.length;
 	
-	if(ndep == 0) return;
-	
 	var list = [];
+	
+	//if(ndep == 0) return;
 	
 	for(let i = 0; i < ndep; i++){	
 		if(dep[i] == "t"){

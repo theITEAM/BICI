@@ -188,6 +188,8 @@ function get_prior_split_desc(par)
 {
 	let te;
 	
+	if(par.ndep_cont == 0) return "No dep";
+	
 	let dim = [];
 	for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
 	

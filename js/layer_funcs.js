@@ -1378,7 +1378,14 @@ function copy_back_to_source2(tbs)
 	case "snp_root": edit_source.spec.snp_root = te; break;
 	case "num_basep": edit_source.numbp = Number(te); break;
 	case "frac_obs": edit_source.frac_obs = Number(te); break;
-	case "param_val":	model.param[so.val].value = te; update_param(); break; 
+	case "param_val":	
+		{
+			let par = model.param[so.val];
+			par.value = te; 
+			par.set = true;
+			update_param(); 
+		}
+		break; 
 	case "param_prior_const":
 		{
 			let par = model.param[so.val];
@@ -1504,6 +1511,7 @@ function copy_back_to_source2(tbs)
 	case "threshmax": inter.bubble.dynamic_info.threshmax = te; break;
 	case "dist": inter.bubble.dynamic_info.dist = te; break;
 	case "dynamic_weight": inter.bubble.dynamic_info.weight_eqn.te = te; break;
+	case "dynamic_eqn": inter.bubble.dynamic_info.eqn.te = te; break;
 	default: error("SOURCE PROBLEM: "+so.type); break;
 	}
 }
@@ -2105,6 +2113,7 @@ function check_error_textbox2(tbs)
 			case "derive_eqn": case "deriveparam_eqn": break;
 			
 			case "dynamic_weight": break;
+			case "dynamic_eqn": break;
 			
 			case "sim_number": case "ppc_number": 
 				if(isNaN(te)) warn = "Must be a number";

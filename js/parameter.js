@@ -1,6 +1,85 @@
 "use strict";
 // Functions relating to parameters
 
+/* Properties of param
+// Main
+variety - Sets the type of parameter "normal", "const", "define", "reparam", "dist", "dynamic" (missing are factor and derive)
+name - The name for the parameter (without dependency)
+full_name - The name (including dependency)
+dep - Stores the dependency
+ndep_cont - Gives the number of dependencies (except "define", where time is removed")
+dim - Gives the dimension of the parameter
+time_dep - Set if there is time dependency
+dist_mat - Set if parameter is a distance matrix
+iden_mat - Set if parameter is the identity matrix
+den_vec - Set if parameter is a density vector
+variance - Set if the parameter is a variance
+fixed_effect - Set if parameter a fixed effect
+list - Lists possible values for compartments 
+dim - The dimentions of the parameter
+label_info - How parameter is displayed in inferface
+dynamic_info - Information for dynamic parameter
+import_line - The line in input file
+
+// Value
+value - Value (for simulation or when set as a const/reparam/define)
+value_desc - A description of value
+set - Determines if value has been set
+
+// Prior
+prior - Store prior
+prior_split - Stores prior split for different elements
+prior_split_desc - A description of prior_split
+prior_split_set - Determines if prior_split has been set
+prior_split_check - Checkbox of prior split is used
+pri_pos - Possible values for prior
+prior_const_on - Set if prior const is used
+prior_param_list - Stores parameters used in prior
+prior_warn - Any warnings
+prior_const - Stores prior const information
+prior_const_desc - A discription of prior_const
+prior_const_set - Determines if prior-const has been set
+sim_sample - Determines if distribution is sampled or not
+
+// Reparameterisation
+reparam_eqn - Sets a reparameterisation equation
+reparam_eqn_on - Determines if on (otherwise set in value)
+define_eqn - Sets a defined equation
+define_eqn_on - Determines if on (otherwise set in value)
+defrep_param_list - Stores parameters coming from the parameter
+defrep_ie_list - Stores individual effects coming from the parameter
+defrep_fe_list - Stores fixed effects coming from the parameter
+defrep_warn - Warnings about parameters
+
+// Derive
+derive - Set if the parameter is derived
+
+// Factor
+factor - Set if the parameter is a factor
+factor_weight - Stores factor weight
+factor_weight_set - Determines if factor_weight is set
+factor_weight_desc - Description of factor weight
+factor_weight_on - Determines if weight is used
+
+// Param factor
+param_fac - Set if a parameter factor (used in post-sim)
+
+// Spline
+spline - Stores any spline information
+
+// Additional
+within - Stores which equation parameter appears in
+p_name - Stores the species (if parameter is on a transition)
+cl_name - Stores the classification (if parameter is on a transition)
+name_raw - The name without superscript (used in interface)
+name_raw_w - Width of raw name (used in interface)
+sub_w - The width fo subscript (used in interface)
+sup_w - The width fo subscript (used in interface)
+sub - The subscript (used in interface)
+sup - The subscript (used in interface)
+*/
+
+	
 /// Generates a list of all model parameters
 // Goes through the exisiting list and copies any info on values/priors
 function update_model(per_start,per_end)
@@ -33,6 +112,8 @@ function update_model(per_start,per_end)
 		if(par.ndep_cont == undefined) error("ndep_cont should be set"); 
 	}
 	
+	if(false) check_param(); // This is used for testing paramter definition
+	
 	percent_fr(1,per_start,per_end);
 }
 
@@ -42,13 +123,11 @@ function update_desc()
 {
 	for(let i = 0; i < model.param.length; i++){
 		let par = model.param[i];
-		if(par.ndep_cont > 0){
-			par.value_desc = get_value_desc(par);
-			par.weight_desc = get_weight_desc(par);
-			par.prior_split_desc = get_prior_split_desc(par);
-			par.prior_const_desc = get_prior_const_desc(par);
-			par.dim = get_value_dim(par);
-		}
+	
+		par.value_desc = get_value_desc(par);
+		par.factor_weight_desc = get_factor_weight_desc(par);
+		par.prior_split_desc = get_prior_split_desc(par);
+		par.prior_const_desc = get_prior_const_desc(par);
 	}
 }
 
@@ -182,7 +261,7 @@ function generate_parameter_list()
 			}
 		}
 	}
-	
+
 	for(let eq = 0; eq < eq_list.length; eq++){
 		let eqn = eq_list[eq];
 
@@ -261,6 +340,10 @@ function generate_parameter_list()
 		
 		case "dynamic_weight":
 			mess = "For weight on a dynamic parameter";
+			break;
+			
+		case "dynamic_eqn":
+			mess = "For equation on a dynamic parameter";
 			break;
 			
 		default: 
@@ -398,6 +481,7 @@ function param_eqn_desc(eqn)
 	case "derive_param": return "in a derived parameter";
 	case "derive_eqn": return "in a derived equation";
 	case "dynamic_weight": return "in a dynamic parameter weight";
+	case "dynamic_eqn": return "in a dynamic parameter equation";
 	default: error("option not pos:"+eqn.type); break;	
 	}
 }
@@ -531,6 +615,8 @@ function get_value_desc(par)
 {
 	let te;
 	
+	if(par.ndep_cont == 0) return "No dep";
+		
 	let dim = [];
 	for(let d = 0; d < par.ndep_cont; d++) dim.push(par.list[d].length);
 		
@@ -566,6 +652,8 @@ function get_prior_const_desc(par)
 {
 	let te;
 	
+	if(par.ndep_cont == 0) return "No dep";
+	
 	let dim = [];
 	
 	for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
@@ -598,9 +686,11 @@ function get_prior_const_desc(par)
 
 
 /// Gets a description of weight factor to send back to inferface
-function get_weight_desc(par)
+function get_factor_weight_desc(par)
 {
 	let te;
+	
+	if(par.ndep_cont == 0) return "No dep";
 	
 	let dim = [];
 	for(let d = 0; d < par.list.length; d++) dim.push(par.list[d].length);
@@ -905,15 +995,16 @@ function add_ind_eff_param(par_list,param)
 			if(find(param,"name",name) == undefined){
 				if(ieg.ie_list.length == 1){
 					let par = { name:name, time_dep:false, dep:[], within:[], variance:true};
-					par.full_name = param_name(par);	
+					create_new_param(par,"normal");
 				
 					add_par_to_list(par,par_list,{eqn_info:{p:p, ieg:i, eso:"model"}},"Individual effect variance");
 				}
 				else{
 					let dep = ["z","z'"];
 					let par = { name:name, time_dep:false, dep:dep, within:[], variance:true};
-					par.full_name = param_name(par);			
-					par_find_list(par);
+					create_new_param(par,"normal");
+					//par.full_name = param_name(par);			
+					//par_find_list(par);
 					add_par_to_list(par,par_list,{eqn_info:{p:p, ieg:i, ie:ieg.ie_list[0].name, eso:"model"}},"Individual effect variance");
 				}
 			}
@@ -932,7 +1023,8 @@ function add_fix_eff_param(par_list,param)
 			let fe = sp.fix_eff[i];
 			let name = fe_char+"^"+fe.name;
 			if(find(param,"name",name) == undefined){
-				let par = { name:name, time_dep: false, dep:[], within:[], fixed_effect:true};
+				let par = { name:name, time_dep:false, dep:[], within:[], fixed_effect:true};
+				create_new_param(par,"normal");
 				add_par_to_list(par,par_list,{eqn_info:{p:p, i:i, eso:"model"}},"Fixed effect parameter");
 			}
 		}
@@ -1409,7 +1501,8 @@ function get_prior_param_list(par)
 	par.prior_param_list=[];
 	par.prior_warn=[];
 	if(par.ndep_cont > 0 && par.prior_split_check.check == true){
-		let eqn_info = {par_name:par.name, eso:"pri"};
+		let eqn_info = {par_name:par.name, eso:"dist"};
+			
 		let par_list = [];
 		let vari = par.variety;
 		
@@ -1424,67 +1517,6 @@ function get_prior_param_list(par)
 		par.prior_param_list = par_list;
 	}
 }
-
-
-/// Creates a new parameter
-// par must have the properties: name, dep, type, time_dep, (optionally within)
-// On top of these new properties are added: 
-// list: shows the potential values for the dependencies
-function create_new_param(par,variety)
-{
-	if(par.name == undefined) error("Parameter name must be set");
-	if(par.dep == undefined) error("Parameter dependency must be set");
-	if(par.time_dep == undefined) error("Parameter time dependency must be set");
-	
-	par.variety = variety;
-	
-	if(par.variance == undefined) par.variance = false;
-	if(par.derive == undefined) par.derive = false;
-	if(par.param_fac == undefined) par.param_fac = false;
-	if(par.fixed_effect == undefined) par.fixed_effect = false;
-	
-	par.pri_pos = set_pri_pos(par.variance,false);
-
-	set_ndep_cont(par);
-	
-	let knot = ["start","end"];                      // Initialises a spline
-	
-	let on = false;
-	if(par.time_dep == true) on = true;
-	
-	par.spline = { on:on, smooth:default_smooth(), spline_radio:spline_radio_pos[0], time_dep:par.time_dep, knot:knot}; 
-		
-	par.sim_sample = {check:true};
-		 
-	par.prior = unset_prior();
-	
-	par.reparam_eqn_on = false; if(par.ndep_cont == 0) par.reparam_eqn_on = true;
-	par.reparam_eqn = "";
-	
-	par.define_eqn_on = false; if(par.ndep_cont == 0) par.define_eqn_on = true;
-	par.define_eqn = "";
-	
-	par_set_default(par);
-
-	par.full_name = param_name(par);
-
-	if(par.variance == true) par.prior.type.te = "covar-default";		
-	
-	//set_too_big(par);
-	
-	return par;
-}
-
-
-
-/*
-/// Determines if a parameter is too large to be viewed
-function par_too_big(par,vari)
-{
-	if(param_num_element(par,vari) > ELEMENT_MAX) return true;
-	return false;
-}
-*/
 
 
 /// Returns the number of dependencies (removing time for define)
@@ -1568,53 +1600,7 @@ function default_smooth()
 }
 
 
-/// Sets default values for value and prior_split
-function par_set_default(par)
-{
-	par.dist_mat = false;
-	par.iden_mat = false;
-	par.den_vec = false;
-	
-	if(par.ndep_cont == 0){
-		par.value = set_str;
-		par.prior_const = set_str;
-		if(par.list){
-			delete par.list;
-			delete par.prior_split; delete par.prior_split_set; delete par.prior_split_check;
-			delete par.factor_weight;
-			delete par.set;
-			delete par.prior_const_set;
-		}
-	}
-	else{
-		if(is_density_name(par.name)){ density_set_default(par); return;}
-		
-		if(par.name == dist_matrix_name){ dist_set_default(par); return;}
-		
-		if(par.name == iden_matrix_name || par.name == iden_matrix_name2){ iden_set_default(par); return;}
-	
-		if((par.variety == "reparam" && par.reparam_eqn_on) || 
-			(par.variety == "define" && par.define_eqn_on)){
-			reparam_eqn_set_default(par); return;
-		}
-	
-		par.list = par_find_list(par);
-		par.prior_split_check = {check:false};
-		par.set = false;
-		par.prior_const_set = false;
-	}
-	par.prior_const_on = false;
-	par.defrep_param_list = [];
-	par.defrep_ie_list=[];
-	par.defrep_fe_list=[];
-	par.defrep_warn = [];
-	par.prior_param_list = [];
-	par.prior_warn = [];
-	par.factor = false;
-	par.factor_weight_on = {check:false};
-}
-
-
+/*
 /// Sets default values for distance matrix
 function dist_set_default(par)
 {
@@ -1629,8 +1615,10 @@ function dist_set_default(par)
 	par.prior_const_set = false;
 	par.set = false;
 }
+*/
 
 
+/*
 /// Sets default values for distance matrix
 function density_set_default(par)
 {
@@ -1645,8 +1633,10 @@ function density_set_default(par)
 	par.prior_const_set = false;
 	par.set = false;
 }
+*/
 
 
+/*
 /// Sets default values for identity matrix
 function iden_set_default(par)
 {
@@ -1663,8 +1653,9 @@ function iden_set_default(par)
 	par.prior_const_set = false;
 	par.set = false;
 }
+*/
 
-
+/*
 /// Sets default values for distance matrix
 function reparam_eqn_set_default(par)
 {
@@ -1674,6 +1665,7 @@ function reparam_eqn_set_default(par)
 	par.prior_split_check = {check:false};
 	par.set = false;
 }
+*/
 
 
 /// Sets default values for tensor
@@ -1709,54 +1701,74 @@ function set_default_factor_weight(par)
 /// Copies infomation from old parameter definition to new 		
 function copy_param_info(par,old)
 {
-	par.variety = old.variety;
+	// Things already set: name, full-name, dep,time_dep, list
 
+	// Main
+	par.variety = old.variety;
 	set_ndep_cont(par);
-	
-	par.spline = old.spline;
-	par.prior = old.prior;
-	par.sim_sample = old.sim_sample;
+	par.dist_mat = old.dist_mat;
+	par.iden_mat = old.iden_mat;
+	par.den_vec =  old.den_vec;
+	par.variance = old.variance;
+	par.fixed_effect = old.fixed_effect;
 	par.label_info = old.label_info;
 	par.dynamic_info = old.dynamic_info;
-	par.set = old.set;
-	//par.prior_const = old.prior_const;
-	par.prior_const_set = old.prior_const_set;
-	par.prior_const_on = old.prior_const_on;
 	par.import_line = old.import_line;
+	
+	// Value
+	par.set = old.set;
+
+	// Factor
+	par.factor = old.factor
+	par.factor_weight_set = old.factor_weight_set;
+	par.factor_weight_on = old.factor_weight_on;
+
+	// Prior
+	par.prior = old.prior;
+	par.prior_split_set = old.prior_split_set;
+	par.prior_split_check = old.prior_split_check;
+	par.pri_pos = set_pri_pos(par);
+	par.prior_const_on = old.prior_const_on;
+	par.prior_param_list = old.prior_param_list;
+	par.prior_warn = old.prior_warn;
+	par.prior_const_set = old.prior_const_set;
+	par.sim_sample = old.sim_sample;
+	
+	// Reparameterisation
+	par.reparam_eqn = old.reparam_eqn;
+	par.reparam_eqn_on = old.reparam_eqn_on;
+	par.define_eqn = old.define_eqn;
+	par.define_eqn_on = old.define_eqn_on;
 	par.defrep_param_list = old.defrep_param_list;
 	par.defrep_ie_list = old.defrep_ie_list;
 	par.defrep_fe_list = old.defrep_fe_list;
 	par.defrep_warn = old.defrep_warn;
-	par.prior_warn = old.prior_warn;
-	par.prior_param_list = old.prior_param_list;
-	par.reparam_eqn_on = old.reparam_eqn_on;
-	par.reparam_eqn = old.reparam_eqn;
-	par.define_eqn_on = old.define_eqn_on;
-	par.define_eqn = old.define_eqn;
-	par.dist_mat = false;
-	par.iden_mat = false;
-	par.den_vec = false;
-	par.factor = old.factor;
-	par.factor_weight_on = old.factor_weight_on;
 	
-	par.pri_pos = set_pri_pos(par.variance,par.factor);
+	// Derive
+	par.derive = old.derive; // Is this needed?
 	
-	if(is_density_name(par.name)){ density_set_default(par); return par;}
-		
-	if(par.name == dist_matrix_name){ dist_set_default(par); return par;}
+	// Param factor
 	
-	if(par.name == iden_matrix_name || par.name == iden_matrix_name2){ iden_set_default(par); return par;}
-	
+	par.param_fac = old.param_fac;
+
+	// Spline
+	par.spline = old.spline;
+
+	/*	
 	if((par.variety == "reparam" && par.reparam_eqn_on) || 
 			(par.variety == "define" && par.define_eqn_on)){
 		reparam_eqn_set_default(par); 
 	}
+	*/
 	
 	if(par.ndep_cont == 0){	
 		par.value = old.value;
 		par.prior_const = old.prior_const;
+		par.list = old.list;
 	}
 	else{
+		// Quantities set: value, prior_split, factor_weight
+		
 		let list = par_find_list(par);
 	
 		let list_old = old.list;
@@ -1875,11 +1887,9 @@ function copy_param_info(par,old)
 		else{
 			par.list = list;
 		}
-			
-		par.prior_split_set = old.prior_split_set;
-		par.prior_split_check = old.prior_split_check;
 	}
 	
+	par.dim = get_par_dim(par);
 	//set_too_big(par);
 	
 	return par;
@@ -1896,11 +1906,11 @@ function is_density_name(name)
 
 
 /// Finds the possible set of priors for a parameter type
-function set_pri_pos(variance,factor)
+function set_pri_pos(par)
 {
 	let pri_pos = prior_pos;  
-	if(factor) pri_pos = prior_factor_pos;
-	if(variance == true) pri_pos = prior_cv_pos;
+	if(par.factor) pri_pos = prior_factor_pos;
+	if(par.variance == true) pri_pos = prior_cv_pos;
 	
 	return pri_pos;
 }
@@ -2178,41 +2188,6 @@ function equal_ob(ob1, ob2)
 {
 	if(JSON.stringify(ob1) != JSON.stringify(ob2)) return false;
 	return true;
-}
-
-
-/// Checks that parameters are correctly specified
-function check_param()
-{
-	for(let i = 0; i < model.param.length; i++){
-		let par = model.param[i];
-		
-		if(par.dep.length > 0){
-			if(equal_ob(par.list,par_find_list(par)) == false) error("List not correct");
-			//if(equal_ob(par.co_list,generate_co_list(par.list)) == false) error("Co list not correct");
-		}
-		
-		if(par.dep.length == 0){
-			if(par.list != undefined){ error("List should not be specified");}
-			//if(par.co_list != undefined) error("co_list should not be specified");
-			if(par.prior_split != undefined) error("prior_split should not be specified");
-			if(par.prior_split_check != undefined) error("prior_split_check should not be specified");
-			if(par.factor_weight != undefined) error("factor_weight should not be specified");
-			if(par.set != undefined) error("Set should not be specified");
-		}
-		
-		if(par.dep.length > 0){
-			let temp = par_find_template(par.list,par.ndep_cont);
-		
-			let dim = get_dimensions(temp);
-	
-			if(equal_vec(dim,get_dimensions(par.value)) == false){
-				error("Problem with value dimension");
-			}
-		
-			if(equal_vec(dim,get_dimensions(par.prior_split)) == false) error("Problem with prior_split dimension");
-		}
-	}
 }
 
 
@@ -2930,6 +2905,9 @@ function param_needed(par,siminf)
 		case "inf":
 			if(siminf == "inf") return true; 
 			break;
+		
+		case "dist":
+			return true;
 			
 		default: 
 			error("eso not found:"+eso);
@@ -2938,4 +2916,350 @@ function param_needed(par,siminf)
 	}
 	
 	return false;
+}
+
+
+/// Gets the dimension of the parameter
+function get_par_dim(par)
+{
+	let dim=[];
+	for(let i = 0; i < par.ndep_cont; i++) dim.push(par.list[i].length);
+	
+	return dim;
+}
+
+
+/// Creates a new parameter
+// par must have the properties: name, dep, time_dep, (optionally within)
+// On top of these new properties are added: 
+// list: shows the potential values for the dependencies
+function create_new_param(par,variety)
+{
+	if(par.name == undefined) error("Parameter name must be set");
+	if(par.dep == undefined) error("Parameter dependency must be set");
+	if(par.time_dep == undefined) error("Parameter time dependency must be set");
+	
+	par.variety = variety;
+	
+	// Spline information
+	let knot = ["start","end"];                      // Initialises a spline
+	if(par.spline == undefined){
+		let on = false;
+		if(par.time_dep == true) on = true;
+		par.spline = { on:on, smooth:default_smooth(), spline_radio:spline_radio_pos[0], time_dep:par.time_dep, knot:knot}; 
+	}
+	
+	// Main information
+	par.full_name = param_name(par);
+	set_ndep_cont(par);
+	par.list = par_find_list(par);
+	par.dim = get_par_dim(par);
+	par.dist_mat = false;	if(par.name == dist_matrix_name){ par.variety = "const";	par.dist_mat = true;}
+	par.iden_mat = false; if(par.name == iden_matrix_name || par.name == iden_matrix_name2){ par.variety = "const";	par.iden_mat = true;}
+	par.den_vec = false; if(is_density_name(par.name)){ par.variety = "const";	par.den_vec = true;}
+	if(par.variance == undefined) par.variance = false;
+	if(par.derive == undefined) par.derive = false;
+	if(par.param_fac == undefined) par.param_fac = false;
+	if(par.fixed_effect == undefined) par.fixed_effect = false;
+	
+	// Value information
+	par.set = false;
+	if(par.ndep_cont == 0) par.value = set_str;
+	else{
+		if(par.value) delete par.value;
+	}
+	
+	// Factor information
+	par.factor = false;
+	if(par.factor_weight) delete par.factor_weight;
+	par.factor_weight_set = false;
+	par.factor_weight_on = {check:false};
+	
+	// Prior information
+	par.prior = unset_prior();
+	if(par.prior_split) delete par.prior_split;
+	par.prior_split_check = {check:false};
+	par.prior_split_set = false;
+	par.prior_const_on = false;
+	par.prior_const_set = false;
+	if(par.prior_const) delete par.prior_const;
+	if(par.variance == true) par.prior.type.te = "covar-default";		
+	par.pri_pos = set_pri_pos(par);
+	if(par.ndep_cont == 0) par.prior_const = set_str;
+	par.prior_param_list = [];
+	par.prior_warn = [];
+	
+	// Distribution information
+	par.sim_sample = {check:true};
+	
+	// Reparam information
+	par.reparam_eqn_on = false; if(par.ndep_cont == 0) par.reparam_eqn_on = true;
+	par.reparam_eqn = "";
+	par.define_eqn_on = false; if(par.ndep_cont == 0) par.define_eqn_on = true;
+	par.define_eqn = "";
+	par.defrep_param_list = [];
+	par.defrep_ie_list=[];
+	par.defrep_fe_list=[];
+	par.defrep_warn = [];
+	
+	
+	// These quantities not set by default (to save memory) value, prior_const, prior_split, factor_weight
+
+	return par;
+}
+
+
+/// Returns a parameter to normal
+function par_normal_return(par)
+{
+	let variety_from = par.variety;
+	let factor_from = par.factor;
+		
+	par.variety = "normal";
+	
+	set_ndep_cont(par);
+	par.list = par_find_list(par);
+	par.dim = get_par_dim(par);
+	par.dist_mat = false;	if(par.name == dist_matrix_name){ par.variety = "const";	par.dist_mat = true;}
+	par.iden_mat = false; if(par.name == iden_matrix_name || par.name == iden_matrix_name2){ par.variety = "const";	par.iden_mat = true;}
+	par.den_vec = false; if(is_density_name(par.name)){ par.variety = "const";	par.den_vec = true;}
+	
+	// Value information
+	if(variety_from != "const"){
+		par.set = false;
+		if(par.ndep_cont == 0) par.value = set_str;
+		else{
+			delete par.value; 
+		}
+	}
+	
+	// Factor information
+	par.factor = false;
+	par.factor_weight_set = false;
+	par.factor_weight_on = {check:false};
+	if(par.factor_weight) delete par.factor_weight;
+		
+	// Distribution information
+	par.sim_sample = {check:true};
+	
+	// Reparam information
+	par.reparam_eqn_on = false; if(par.ndep_cont == 0) par.reparam_eqn_on = true;
+	par.reparam_eqn = "";
+	par.define_eqn_on = false; if(par.ndep_cont == 0) par.define_eqn_on = true;
+	par.define_eqn = "";
+	par.defrep_param_list = [];
+	par.defrep_ie_list=[];
+	par.defrep_fe_list=[];
+	par.defrep_warn = [];
+	
+	if(variety_from == "dist" || factor_from == true) reset_prior(par);
+}
+
+
+/// Resets prior information
+function reset_prior(par)
+{
+	par.prior = unset_prior();
+	par.prior_split_check = {check:false};
+	par.prior_split_set = false;
+	if(par.prior_split) delete par.prior_split;
+	par.prior_const_on = false;
+	par.prior_const_set = false;
+	if(par.prior_const) delete par.prior_const;
+	if(par.variance == true) par.prior.type.te = "covar-default";		
+	par.pri_pos = set_pri_pos(par);
+	if(par.ndep_cont == 0) par.prior_const = set_str;
+	par.prior_param_list = [];
+	par.prior_warn = [];
+}
+
+			
+/// Checks that parameters are 
+function check_param()
+{
+	prr("CHECK PARAM");
+	let prop_list = [
+		// Main
+		"variety","name","full_name","dep","ndep_cont","time_dep","dist_mat","iden_mat",
+		"den_vec","variance","fixed_effect","list","dim","label_info","dynamic_info","import_line",
+		// Value
+		"value","set","value_desc",
+		// Prior
+		"prior","prior_split","prior_split_set","prior_split_check","prior_split_desc","pri_pos","prior_const","prior_const_on","prior_const_desc",
+		"prior_param_list","prior_warn","prior_const_set","sim_sample",
+		// Reparameterisation
+		"reparam_eqn","reparam_eqn_on","define_eqn","define_eqn_on","defrep_param_list",
+		"defrep_ie_list","defrep_fe_list","defrep_warn",
+		// Derive
+		"derive",
+		// Factor
+		"factor","factor_weight","factor_weight_set","factor_weight_on","factor_weight_desc",
+		// Param factor
+		"param_fac",
+		// Spline
+		"spline",
+		// Additional
+		"within","p_name","cl_name","name_raw","name_raw_w","sub_w","sup_w","sub","sup"
+	];
+	
+	for(let th = 0; th < model.param.length; th++){
+		let par = model.param[th];
+		
+		let dim;
+		if(par.ndep_cont > 0){
+			let temp = par_find_template(par.list,par.ndep_cont);		
+			dim = get_dimensions(temp);
+		}
+	
+		for(let i = 0; i < prop_list.length; i++){
+			let pro = prop_list[i];
+			let va = par[pro];
+			if(va == undefined){
+				let fl = false;
+				switch(pro){
+				case "value":
+					if(par.set == false) fl = true;
+					break;
+						
+				case "factor_weight":
+					//if(par.factor == false || par.factor_weight_on.check == false || par.factor_weight_set == false) fl = true;
+					if(par.factor == false || par.factor_weight_set == false) fl = true;
+					break;	
+					
+				case "prior_split":
+					//if(par.prior_split_check.check == false || par.prior_split_set == false) fl = true;
+					if(par.prior_split_set == false) fl = true;
+					break;
+					
+				case "prior_const":
+					if(par.prior_const_on == false || par.prior_const_set == false) fl = true;
+					break;
+					
+				case "dynamic_info":
+					if(par.variety != "dynamic") fl = true;
+					break;
+					
+				case "import_line":
+					//if(par.dist_mat || par.iden_mat || par.den_vec || par.derive) fl = true;
+					fl = true;
+					break;
+					
+				case "label_info": case "p_name": case "cl_name":
+				case "name_raw": case "name_raw_w": case "sub_w": case "sup_w": case "sub": case "sup":
+				case "within":
+					fl = true;
+					break;
+				}
+				
+				if(fl == false){
+					prr(par);
+					error("Property not included:"+pro);
+				}
+			}
+			else{		
+				let fl = false;
+				switch(pro){
+				case "pri_pos":
+					if(!equal_vec(par.pri_pos,set_pri_pos(par))) fl = true;
+					break;
+					
+				case "value_desc": 
+					if(par.value_desc != get_value_desc(par)) fl = true;
+					break;
+					
+				case "factor_weight_desc":
+					if(par.factor_weight_desc != get_factor_weight_desc(par)) fl = true;
+					break;
+					
+				case "prior_split_desc":
+					if(par.prior_split_desc != get_prior_split_desc(par)) fl = true;
+					break;
+					
+				case "prior_const_desc":
+					if(par.prior_const_desc != get_prior_const_desc(par)) fl = true;
+					break;
+				
+				case "list":
+					if(equal_ob(par.list,par_find_list(par)) == false) fl = true;
+					break;
+				
+				case "dim":
+					if(equal_ob(par.dim,get_par_dim(par)) == false) fl = true;
+					break;
+				
+				case "value":
+					{
+						if(par.ndep_cont == 0){
+							if(typeof par.value != "string"){ fl = true; error("not an object");}
+							if(par.value == set_str){
+								if(par.set != false){ fl = true; error("not set");}
+							}
+							else{
+								if(par.set == false){ fl = true; error("is set");}
+							}
+						}
+						else{
+							if(par.set == false){ fl = true; error("not set2");}
+							if(equal_vec(dim,get_dimensions(par.value)) == false){ error("Problem with value dimension"); fl= true;}
+						}
+					}
+					break;
+		
+				case "prior_const":
+					{
+						if(par.ndep_cont == 0){
+							if(typeof par.value != "string") fl = true;
+							if(par.prior_const == set_str){
+								if(par.prior_const_set != false) fl = true;
+							}
+							else{
+								if(par.prior_const_set == false) fl = true;
+							}
+						}
+						else{
+							if(!(par.prior_const_on == true && par.prior_const_set == true)) fl = true;
+							
+							if(equal_vec(dim,get_dimensions(par.prior_const)) == false){ error("Problem with prior_const dimension"); fl= true;}
+						}
+					}
+					break;
+					
+				case "factor_weight":
+					{
+						//if(!(par.factor == true && par.factor_weight_on.check == true && par.factor_weight_set == true)) fl = true;
+						if(!(par.factor == true && par.factor_weight_set == true)) fl = true;
+						if(equal_vec(dim,get_dimensions(par.factor_weight)) == false) error("Problem with factor_weight dimension");
+					}
+					break;	
+					
+				case "prior_split":
+					{
+						//if(!(par.prior_split_check.check == true && par.prior_split_set == true)) fl = true;
+						if(par.prior_split_set != true) fl = true;
+						if(equal_vec(dim,get_dimensions(par.prior_split)) == false) error("Problem with prior_split dimension");
+					}
+					break;
+					
+				case "dynamic_info":
+					if(par.variety != "dynamic") fl = true;
+					break;
+					
+				case "label_info": case "name_raw": case "name_raw_w": case "sub_w": case "sup_w": case "sub": case "sup":
+					break;
+				}
+				
+				if(fl){
+					prr(par);
+					error("There was a problem with this property: "+pro);
+				}
+			}
+		}
+		
+		for(let ele in par){ 
+			if(find_in(prop_list,ele) == undefined){
+				prr(par);
+				error("Property not found on list: "+ele);
+			}
+		}		
+	}
 }

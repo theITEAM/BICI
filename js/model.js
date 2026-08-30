@@ -431,7 +431,8 @@ class Model
 				}					 
 				else i++;
 			}
-			hash_redo(claa.hash_tra,claa.tra);
+			
+			claa.hash_tra = hash_redo(claa.tra);
 
 			for(let c = claa.ncomp-1; c >= 0; c--){
 				if(map_c[c] == true){
@@ -439,7 +440,8 @@ class Model
 					claa.ncomp--;
 				}
 			}	
-			hash_redo(claa.hash_comp,claa.comp);
+			
+			claa.hash_comp = hash_redo(claa.comp);
 			
 			this.update_pline(claa);
 		}
@@ -1971,7 +1973,7 @@ class Model
 		claa.comp.splice(i,1);
 		claa.ncomp--;
 
-		hash_redo(claa.hash_comp,claa.comp);
+		claa.hash_comp = hash_redo(claa.comp);
 	
 		for(let	tr = 0; tr < claa.ntra; tr++){
 			let traa = claa.tra[tr];
@@ -2009,7 +2011,7 @@ class Model
 		claa.tra.splice(i,1);
 		claa.ntra--;
 		
-		hash_redo(claa.hash_tra,claa.tra);
+		claa.hash_tra = hash_redo(claa.tra);
 		
 		this.determine_branching();
 		this.update_pline(claa); 
@@ -2056,16 +2058,16 @@ class Model
 			for(let cl = 0; cl < sp.ncla; cl++){
 				let claa = sp.cla[cl];
 				if(claa.name == cl_name){
-					for(let c = 0; c < claa.ncomp; c++){
+					let c = hash_find(claa.hash_comp,old_name);
+					if(c == undefined) error("Problem getting c");
+					else{
 						let co = claa.comp[c];
-						if(co.name == old_name){
-							hash_remove(claa.hash_comp,old_name);
-							hash_add(claa.hash_comp,new_name,c);
+						hash_remove(claa.hash_comp,old_name);
+						hash_add(claa.hash_comp,new_name,c);
 						
-							co.name = new_name;
-							this.set_compartment_size(co);
-							this.update_pline(claa);
-						}
+						co.name = new_name;
+						this.set_compartment_size(co);
+						this.update_pline(claa);
 					}
 				}
 			}
@@ -2447,7 +2449,7 @@ class Model
 			let j = find_in(par.dep,index);
 			if(j != undefined){
 				par.dep.splice(j,1);
-				par_set_default(par);
+				//par_set_default(par);
 			}
 		}
 		
@@ -2923,9 +2925,11 @@ class Model
 						let claa = sp.cla[cl];
 						
 						if(claa.index == ch) flag = true;
-						for(let c = 0; c < claa.ncomp; c++){
-							if(claa.comp[c].name == ch) flag = true;
-						}
+						let c = hash_find(claa.hash_comp,ch);
+						if(c != undefined) flag= true;
+						//for(let c = 0; c < claa.ncomp; c++){
+						//	if(claa.comp[c].name == ch) flag = true;
+						//}
 					}
 				}
 			}
@@ -3598,7 +3602,7 @@ class Model
 		}
 		claa.comp = comp_new;
 		claa.ncomp = claa.comp.length;
-		hash_redo(claa.hash_comp,claa.comp);
+		claa.hash_comp = hash_redo(claa.comp);
 		
 		for(let th = 0; th < this.param.length; th++){
 			let par = this.param[th];

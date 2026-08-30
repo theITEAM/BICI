@@ -1508,9 +1508,15 @@ Layer.prototype.plot_button = function (bu,ov)
 	case "Transition":
 		{
 			let col = BLACK; 
-			if(ov){
-				if(inter.mode.type != "Drag_TransitionPoint") col = DGREY;
+
+			let sel = false;
+			let bub_bu = inter.bubble.bu;
+			if(bub_bu != undefined){
+				if(bub_bu.ac== "Transition"){
+					if(bub_bu.p == bu.p && bub_bu.cl == bu.cl && bub_bu.i == bu.i) sel = true;
+				}
 			}
+			
 			
 			let cam = bu.cam;
 			
@@ -1521,6 +1527,21 @@ Layer.prototype.plot_button = function (bu,ov)
 			let len = 0;
 			
 			let liw = MEDIUMLINE;
+			
+			let si_lab = 2.5*si;
+			
+			if(sel){ liw = THICKLINE; si *= 1.5;}
+			else{
+				if(ov){
+					if(inter.mode.type != "Drag_TransitionPoint"){
+						liw = THICKLINE; si *= 1.5;
+						//col = GREY;
+					}
+				}
+			}
+	
+			//liw = THICKLINE;
+			
 			if(big_eqn){ liw = THICKLINE; si *= 1.5;}
 			
 			for(let i = 0; i < bu.points.length - 1; i++){
@@ -1541,7 +1562,7 @@ Layer.prototype.plot_button = function (bu,ov)
 			}
 		
 		
-			let si_lab = 2.5*si;
+			
 			if(si_lab >  si_limit_label){
 				let label = bu.tr.label;
 		

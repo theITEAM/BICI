@@ -347,7 +347,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 	}
 	
 	print_diag("Created interventions");
-	
+		
 	for(auto &sp : model.species){                       // Observation model
 		for(auto &pf : sp.pop_filter){                     // Population filter   
 			pf.time_vari = false;
@@ -439,7 +439,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 								for(auto &tpe : tra_prob_eqn){
 									model.add_eq_ref(tpe,hash_eqn,ob.tdiv,true);
 								}
-								ob.obs_eqn_ref = sp.obs_eqn_add_vec(tra_prob_eqn);
+								ob.obs_eqn_ref = sp.obs_eqn_add_vec(tra_prob_eqn);			
 							}
 						}
 					}
@@ -459,7 +459,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 			}
 		}
 	}
-	
+
 	print_diag("Created observations");
 
 	if(model.genetic_data.on){                  // Genetic data
@@ -561,14 +561,23 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 	for(auto &pri : model.prior){                             // Sets if Latin Hypercube used
 		vector <double> value;
 	
-		if(pri.type != MDIR_PR){
-			auto fl = false;
-			for(const auto &dp : pri.dist_param){
-				auto val = model.eqn[dp.eq_ref].is_num();
-				value.push_back(val);
-				if(val == UNSET) fl = true;
+		switch(pri.type){
+		case MDIR_PR:
+		case MVN_DEFAULT_PR: case MVN_NORM_LKJ_PR: case MVN_UNIFORM_LKJ_PR: case MVN_INV_WISH_PR:
+		case MVN_JEF_PR: case MVN_UNIFORM_PR: case MVN_COR_PR: 
+			break;
+			
+		default:
+			{
+				auto fl = false;
+				for(const auto &dp : pri.dist_param){
+					auto val = model.eqn[dp.eq_ref].is_num();
+					value.push_back(val);
+					if(val == UNSET) fl = true;
+				}
+				if(!fl) pri.latin_sample = true;
 			}
-			if(!fl) pri.latin_sample = true;
+			break;
 		}
 	}
 	
@@ -2130,7 +2139,7 @@ void Input::create_nm_trans()
 				
 				// Finds how individual factor alter the rate (used in individual sampling)
 				switch(type){
-				case EXP_RATE: case EXP_MEAN: alert_emsg_input("Should not be here"); break;
+				case EXP_RATE: case EXP_MEAN: alert_emsg_input("Should not be here8"); break;
 				
 				case GAMMA: case ERLANG: case LOG_NORMAL: case PERIOD: case WEIBULL:
 				case EXP_MEAN_NM:
@@ -5551,16 +5560,16 @@ void Input::set_dynamic_info_from_text(string te, string region, Param &par)
 	di.threshmin = UNSET;
 	di.threshmax = UNSET;
 
-	string filt_str, index_str, weight_str;
+	string filt_str, index_str, weight_str, eqn_str;
 	double dist = UNSET;
 	auto frac = false;
 	
 	vector <string> vec;
 	
-	auto spl = split(te,'(');
-	if(spl.size() != 2) fl = true;
+	auto i = 0u; while(i < te.length() && te.substr(i,1) != "(") i++;
+	if(i == te.length()) fl = true;
 	else{
-		di.type = DynamicType(option_error("dynamic-sim",spl[0],{"bin-thresh","bin-min-max","bin-thresh-dist","bin-min-max-dist","bin-thresh-region","bin-min-max-region","bin-thresh-eqn","bin-min-max-eqn"},{ BIN_THRESH, BIN_MIN_MAX, BIN_THRESH_DIST, BIN_MIN_MAX_DIST, BIN_THRESH_REGION, BIN_MIN_MAX_REGION, BIN_THRESH_EQN, BIN_MIN_MAX_EQN}));
+		di.type = DynamicType(option_error("dynamic-sim",te.substr(0,i),{"bin-thresh","bin-min-max","bin-thresh-dist","bin-min-max-dist","bin-thresh-region","bin-min-max-region","bin-thresh-eqn","bin-min-max-eqn"},{ BIN_THRESH, BIN_MIN_MAX, BIN_THRESH_DIST, BIN_MIN_MAX_DIST, BIN_THRESH_REGION, BIN_MIN_MAX_REGION, BIN_THRESH_EQN, BIN_MIN_MAX_EQN}));
 
 		if(par.dep.size() == 1){
 			string ty = "";
@@ -5574,10 +5583,9 @@ void Input::set_dynamic_info_from_text(string te, string region, Param &par)
 			if(ty != "") alert_import("In 'dynamic-sim' the type '"+ty+"' cannot be used."); 
 		}
 	
-		auto se = spl[1];
-		if(!end_str(se,")")) fl = true;
+		if(!end_str(te,")")) fl = true;
 		else{
-			vec = split_with_curly_bracket(se.substr(0,se.length()-1),',');
+			vec = split_with_curly_bracket(te.substr(i+1,te.length()-2-i),',');
 		}
 	}
 	
@@ -5592,13 +5600,30 @@ void Input::set_dynamic_info_from_text(string te, string region, Param &par)
 		case 1:
 			{
 				auto val = trim(spl[0]);
-				if(val == "frac") frac = true;
-				else{
-					if(begin_str(val,"{")){
-						filt_str = val;
+				if(val == "frac"){
+					switch(di.type){
+					case BIN_THRESH_EQN: case BIN_MIN_MAX_EQN:
+						alert_import("Syntax error in 'dynamic-sim': 'frac' should not be set");
+						break;
+					default:
+						frac = true;
+						break;
 					}
-					else{
-						alert_import("In '"+te+"' for 'dynamic-sim' the value '"+val+"' is not recognised"); 
+				}
+				else{
+					switch(di.type){
+					case BIN_THRESH_EQN: case BIN_MIN_MAX_EQN:
+						eqn_str = val;
+						break;
+						
+					default:
+						if(begin_str(val,"{")){
+							filt_str = val;
+						}
+						else{
+							alert_import("In '"+te+"' for 'dynamic-sim' the value '"+val+"' is not recognised"); 
+						}
+						break;
 					}
 				}
 			}
@@ -5763,9 +5788,8 @@ void Input::set_dynamic_info_from_text(string te, string region, Param &par)
 		break;
 	}
 	
-	//par.variety = REPARAM_PARAM;
 	par.variety = DYNAMIC_PARAM;
-	//par.dynamic = true;
+	
 	par.dynamic_info = di;
 	
 	if(di.type != BIN_MIN_MAX && di.type != BIN_MIN_MAX_EQN){
@@ -5832,7 +5856,7 @@ void Input::set_dynamic_info_from_text(string te, string region, Param &par)
 		
 	case BIN_THRESH_EQN: case BIN_MIN_MAX_EQN:
 		{
-			eq_te = filt_str;
+			eq_te = eqn_str;
 		}
 		break;
 	}

@@ -282,8 +282,10 @@ class State                                // Stores information about the state
 	
 	// In consistent.cc	
 	public:
-		void force_consistent_solution();
+		vector <IndRef> force_consistent_solution();
 		void resample_ind(bool if_wrong);
+		void no_valid_state(const vector < vector <IndRef> > &not_possible) const;
+		
 	private:
 		double calculate_basic_rate(unsigned int p, unsigned int tr, unsigned int ti) const;
 		CompProb comp_prob_sample(const vector <CompProb> &cp_pos) const;

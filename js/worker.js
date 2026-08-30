@@ -137,6 +137,8 @@ function process(e)
 		if(model.warn.length > 0) update_mod = true;
 	}
 	
+	check_model();
+	
 	let itype = input.type;
 	//prr(itype+" type");
 	switch(itype){
@@ -217,29 +219,21 @@ function process(e)
 	case "DeleteParamPriorConst":
 		{
 			let par = model.param[info.i];
-			par.prior_const_on = false;
+			par.prior_const_on = false;				
+			par.prior_const_set = false;
+			if(par.ndep_cont == 0) par.prior_const = set_str;
+			else{
+				delete par.prior_const;
+			}
 			update_mod = true;
 		}
 		break;
 		
-	case "DeleteParamDist":
+	case "ParamNormalReturn":
 		{
 			let par = model.param[info.i];
-			if(par.variety != "const" && par.dep.length != 0){
-				
-				par.value = undefined;
-				par.set = false;
-			}
-			par.variety = "normal";
-			par.list = par_find_list(par);
-			par.prior = unset_prior();
-			par.prior_split_check = {check:false};
-			par.defrep_param_list=[];
-			par.defrep_ie_list=[];
-			par.defrep_fe_list=[];
-			par.defrep_warn=[];
-			set_ndep_cont(par);
-			
+			par_normal_return(par);
+		
 			update_mod = true;
 		}
 		break;
@@ -266,7 +260,17 @@ function process(e)
 			update_mod = true;
 		}
 		break;
-		
+	
+	case "SetDefine":
+		{
+			let th = find(model.param,"name",info.par_name);
+			if(th != undefined){
+				create_new_param(model.param[th],"define");
+			}
+			post({ th:th, ret_mod:true});
+		}
+		break;
+	
 	case "Add Cla":
 		{
 			let p = info.p;
@@ -306,6 +310,7 @@ function process(e)
 		
 	case "Delete Trans":
 		model.delete_transition(info.p,info.cl,info.i);
+
 		post({ species:strip_heavy(model.species)});
 		break;
 		
@@ -440,27 +445,31 @@ function process(e)
 		//post({species:strip_heavy(model.species), param:strip_heavy(model.param)});
 		break;
 		
-	case "Rename Classification":
-		model.rename_classification(info.new_name,info.p,info.cl); 
-		data_update_rename_classification(info.p,info.cl,info.old_name,info.new_name);
-		model.check_ob_string_exist(model,"model",info.old_name);
-		//post({species:strip_heavy(model.species)});
-		post({ ret_mod:true});
-		break;
+	case "Rename Classification Index":
+		{
+			if(info.new_name != info.old_name){
+				model.rename_classification(info.new_name,info.p,info.cl); 
+				data_update_rename_classification(info.p,info.cl,info.old_name,info.new_name);
+				model.check_ob_string_exist(model,"model",info.old_name);
+			}
+			
+			if(info.index_new != info.index_old){
+				model.rename_index(info.index_new,info.p,info.cl);		
+			}
+		}
 		
-	case "Rename Index":
-		model.rename_index(info.index_new,info.p,info.cl);			
-		//post({index_old:info.index_old, param_factor:strip_heavy(model.param_factor), param:strip_heavy(model.param), species:strip_heavy(model.species)});
-		post({ ret_mod:true});
+		post({ ret_mod:true, index_new:info.index_new, index_old:info.index_old});
 		break;
-		
+	
 	case "Rename Compartment":
-		model.rename_compartment(info.p,info.cl,info.c,info.new_name); 
 		equation_rename_compartment(info.p,info.cl,info.old_name,info.new_name);
 		param_update_rename_compartment(info.p,info.cl,info.c,info.old_name,info.new_name);
 		data_update_rename_compartment(info.p,info.cl,info.old_name,info.new_name);
-		model.check_ob_string_exist(model,"model",info.old_name); // Checks not in model
-		post({species:strip_heavy(model.species)});
+
+		model.rename_compartment(info.p,info.cl,info.c,info.new_name); 
+		//model.check_ob_string_exist(model,"model",info.old_name); // Checks not in model
+		//post({ret_mod:true, species:strip_heavy(model.species)});
+		post({ret_mod:true});
 		break;
 	
 	case "Set Xvector":
@@ -677,10 +686,11 @@ function process(e)
 			let par = info.par_st;
 			let parm = model.param[info.i];
 			par.list = parm.list;
-		
-			if(info.vari_new != undefined || parm.value == undefined) info.value = param_blank(par);
-			else info.value = parm.value;	
-			 	
+	
+			//if(info.vari_new == "const" && parm.value != undefined) info.value = parm.value;	
+			if(parm.value != undefined) info.value = parm.value;	
+			else info.value = param_blank(par);
+	
 			info.time_dep = par.time_dep;
 			
 			info.list = parm.list;
@@ -811,7 +821,7 @@ function process(e)
 			if(typeof err == 'string') alert_help("Problem updating",err);
 			
 			par.factor_weight = value;
-			post({ i:i, weight_desc:get_weight_desc(par)});
+			post({ i:i, factor_weight_desc:get_factor_weight_desc(par)});
 		}
 		break;
 		
@@ -1138,4 +1148,20 @@ function percent(per)
 function loading_mess(te)
 {
 	post({ type:"LoadMess", info:te});
+}
+
+
+/// Checks model is beign correcly updated
+function check_model()
+{
+	if(model == undefined) return;
+	prr("CHECK MODEL");
+	for(let p = 0; p < model.species.length; p++){
+		let sp = model.species[p];
+		for(let cl = 0; cl < sp.cla.length; cl++){
+			let claa = sp.cla[cl];
+			hash_check(claa.hash_comp,claa.comp);
+			hash_check(claa.hash_tra,claa.tra);
+		}
+	}
 }

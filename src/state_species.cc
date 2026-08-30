@@ -1894,7 +1894,7 @@ double StateSpecies::get_trans_obs_prob(unsigned int trg, const ObsData &ob) con
 }
 
 
-/// Gets the observation probability on an observation for a transition
+/// Gets the observation probability on an observation for a compartment
 double StateSpecies::get_comp_obs_prob(unsigned int c, const ObsData &ob) const
 {
 	auto c_exact = ob.c_exact; 
