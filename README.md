@@ -17,7 +17,7 @@ BICI can be working for you in just a few clicks! The following pre-compiled ver
 [BICI_v0.91_mac.zip](https://github.com/theITEAM/BICI/releases/download/v0.91/BICI_v0.91_mac.zip). Once unzipped, BICI is run by clicking on the “BICI.app” icon (if the error message “BICI can’t be opened because it is from an unidentified developer…” appears, right click on “BICI.app” and select “Open” to give the option to run).
 
 * **Linux:** 
-[BICI_v0.92_linux.tar.gz](https://github.com/theITEAM/BICI/releases/download/v0.92/BICI_v0.92_linux.tar.gz). Once downloaded, this file can be extracted by using the terminal command “tar -zxvf BICI_v0.90_linux.tar.gz”. The code is executed using “./BICI”.
+[BICI_v0.92_linux.tar.gz](https://github.com/theITEAM/BICI/releases/download/v0.92/BICI_v0.92_linux.tar.gz). Once downloaded, this file can be extracted by using the terminal command “tar -zxvf BICI_v0.92_linux.tar.gz”. The code is executed using “./BICI”.
 
 ## Documentation
 
