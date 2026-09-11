@@ -5,23 +5,19 @@
 function initialise_BICI()                                         
 {
 	document.onselectstart = function() { return false; };
-	
+
 	let ah = window.screen.availHeight;  // Resizes to show all examples (of room);
+	let aw = window.screen.availWidth;
 	let wo = window.outerWidth;
+	let ho = window.outerHeight;
 	
-	let ht = 705;
-	if(ver == "linux"){ 	 	 
-		let heightDiff = window.outerHeight - window.innerHeight;
-		if(heightDiff == 0) ht -= 39;
-	}
+	let fl = false;
+	if(wo > aw){ wo = aw; fl = true;}
+	if(ho > ah){ ho = ah; fl = true;}
 	
-	if(ah > ht) window.resizeTo(wo,ht);
+	if(fl) window.resizeTo(wo,ho);
 	
 	if(debug == true) require('nw.gui').Window.get().showDevTools();
-
-	//var source = new Proj4js.Proj('WGS84'); 
-	
-	
 
 	inter.graph = new Graph();
 

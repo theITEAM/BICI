@@ -28,45 +28,56 @@ Species::Species(unsigned int p, const vector <double> &timepoint, const Details
 
 
 /// Creates a node tree used to sample Markovian events (used during simulation)
-void Species::create_markov_tree()
+void Species::create_tra_markov_tree()
 {
-	for(auto i = 0u; i < markov_eqn.size(); i++){
-		MarkovNode mn; mn.parent = UNSET;
-		markov_tree.node.push_back(mn);
+	for(auto i = 0u; i < tra_gl.size(); i++){
+		auto &trg = tra_gl[i];
+		if(trg.markov_eqn_ref != UNSET){
+			trg.tra_markov_tree_ref = tra_markov_tree.node.size();
+			
+			TraMarkovNode mn; 
+			mn.parent = UNSET;
+			mn.tra_gl = i;
+			tra_markov_tree.node.push_back(mn);
+		}
 	}
+	
+	ntranode = tra_markov_tree.node.size();
 	
 	do{
 		vector <unsigned int> list;
-		for(auto i = 0u; i < markov_tree.node.size(); i++){
-			if(markov_tree.node[i].parent == UNSET) list.push_back(i);
+		for(auto i = 0u; i < tra_markov_tree.node.size(); i++){
+			if(tra_markov_tree.node[i].parent == UNSET) list.push_back(i);
 		}
 		
 		if(list.size() <= 1) break;
 		for(auto j = 0u; j < list.size(); j += 2){	
-			MarkovNode mn; 
+			TraMarkovNode mn; 
 			mn.parent = UNSET;
+			mn.tra_gl = UNSET;
 			
 			auto i = list[j];
-			markov_tree.node[i].parent = markov_tree.node.size();
+			tra_markov_tree.node[i].parent = tra_markov_tree.node.size();
 			mn.child.push_back(i);
 			
 			if(j+1 < list.size()){
 				i = list[j+1];
-				markov_tree.node[i].parent = markov_tree.node.size();
+				tra_markov_tree.node[i].parent = tra_markov_tree.node.size();
 				mn.child.push_back(i);
 			}
 			
-			markov_tree.node.push_back(mn);
+			tra_markov_tree.node.push_back(mn);
 		}
 	}while(true);
 	
 	if(false){
-		for(auto i = 0u; i < markov_tree.node.size(); i++){
-			const auto &no = markov_tree.node[i];
-			cout << "Node " << i << ": parent " << no.parent << "  ";
+		for(auto i = 0u; i < tra_markov_tree.node.size(); i++){
+			const auto &no = tra_markov_tree.node[i];
+			cout << "Node " << i << ": parent " << no.parent << "  tra_gl " << no.tra_gl << "   ";
 			cout << "child "; for(auto j : no.child) cout << j << ", ";
 			cout << endl;		
 		}
+		emsg("tra_markov_tree");
 	}
 }
 

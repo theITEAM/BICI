@@ -63,7 +63,11 @@ void PAS::run()
 		chain[ch].init(ch,chain.size());
 	}
 	percentage_end();
-	
+
+#ifdef USE_MPI
+	mpi.barrier();
+#endif
+
 	percentage_start(ANNEAL_PER);	
 	
 	double time_anneal_start = clock();

@@ -640,7 +640,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	print_diag("h18");
 	
 	for(auto &sp : model.species){	
-		sp.create_markov_tree();         // Creates sampler used to sample Markov events
+		sp.create_tra_markov_tree();     // Creates sampler used to sample Markov events
 		print_diag("create markov tree");
 	
 		sp.init_pop_trans_ref();         // Initialises reference from global transition to obs   

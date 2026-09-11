@@ -123,12 +123,12 @@ function param_dynamic_bubble(bu,cont)
 			// Select threshold
 			switch(type){
 			case "bin-thresh": case "bin-thresh-dist": case "bin-thresh-region": case "bin-thresh-eqn":
-				bubble_input(cont,"Threshold:",{type:"thresh"});
+				bubble_input(cont,"Threshold:",{type:"thresh", eqn:true});
 				break;
 				
 			case "bin-min-max": case "bin-min-max-dist": case "bin-min-max-region": case "bin-min-max-eqn":
-				bubble_input(cont,"Min:",{type:"threshmin"});	
-				bubble_input(cont,"Max:",{type:"threshmax"});
+				bubble_input(cont,"Min:",{type:"threshmin", eqn:true});	
+				bubble_input(cont,"Max:",{type:"threshmax", eqn:true});
 				break;
 			}
 		}
@@ -333,16 +333,21 @@ function dynamic_definition(di,par,check)
 	
 	switch(type){
 	case "bin-thresh": case "bin-thresh-dist": case "bin-thresh-region": case "bin-thresh-eqn":
-		if(warn == undefined) warn = check_thresh_value(di.thresh,"Threshold",di.fraction.check,type);
-		vec.push("thresh:"+di.thresh);	
+		if(warn == undefined) warn = check_thresh_value(di.thresh.te,"Threshold",di.fraction.check,type);
+		vec.push("thresh:"+di.thresh.te);	
 		break;
 		
 	case "bin-min-max": case "bin-min-max-dist": 	case "bin-min-max-region": case "bin-min-max-eqn":
-		if(warn == undefined) warn = check_thresh_value(di.threshmin,"Minimum",di.fraction.check,type);
-		if(warn == undefined) warn = check_thresh_value(di.threshmax,"Maximum",di.fraction.check,type);
-		if(Number(di.threshmin) > Number(di.threshmax)) warn = "Minimum must be less than maximum";
-		vec.push("min:"+di.threshmin);	
-		vec.push("max:"+di.threshmax);	
+		{
+			if(warn == undefined) warn = check_thresh_value(di.threshmin.te,"Minimum",di.fraction.check,type);
+			if(warn == undefined) warn = check_thresh_value(di.threshmax.te,"Maximum",di.fraction.check,type);
+		
+			let min = Number(di.threshmin.te);
+			let max = Number(di.threshmax.te);
+			if(!isNaN(min) && !isNaN(max) && min > max) warn = "Minimum must be less than maximum";
+			vec.push("min:"+di.threshmin.te);	
+			vec.push("max:"+di.threshmax.te);	
+		}
 		break;
 	
 	default: error("dynamic-sim type problem"); break;
@@ -371,7 +376,8 @@ function check_thresh_value(te,tag,frac,type)
 	
 	if(te.trim() == "") return tag+" must be set"; 
 	let num = Number(te);
-	if(isNaN(num)) return tag+" must be a number";
+	//if(isNaN(num)) return tag+" must be a number";
+	if(isNaN(num)) return;
 	else{
 		if(num < 0) return tag+" must be non-negative";
 		if(frac){
@@ -476,7 +482,7 @@ function dynamic_info_from_text(te,par)
 							if(warn != undefined) alert_import("In '"+te+"' for 'dynamic-sim': "+warn); 
 						}
 						
-						di.thresh = val;
+						di.thresh.te = val;
 					}
 					break;
 					
@@ -491,7 +497,7 @@ function dynamic_info_from_text(te,par)
 							if(warn != undefined) alert_import("In '"+te+"' for 'dynamic-sim': "+warn); 
 						}
 						
-						di.threshmin = val;
+						di.threshmin.te = val;
 					}
 					break;
 					
@@ -506,7 +512,7 @@ function dynamic_info_from_text(te,par)
 							if(warn != undefined) alert_import("In '"+te+"' for 'dynamic-sim': "+warn); 
 						}
 						
-						di.threshmax = val;
+						di.threshmax.te = val;
 					}
 					break;
 					
@@ -561,8 +567,12 @@ function dynamic_info_from_text(te,par)
 	
 	switch(di.type.te){
 	case "bin-min-max": case "bin-min-max-dist": case "bin-min-max-region":
-		if(Number(di.threshmin) > Number(di.threshmax)){
-			alert_import("For 'dynamic-sim' the minimum must be less than or equal to maximum value");
+		{
+			let min = Number(di.threshmin.te);
+			let max = Number(di.threshmax.te);
+			if(!isNaN(min) && !isNaN(max) && min > max){
+				alert_import("For 'dynamic-sim' the minimum must be less than or equal to maximum value");
+			}
 		}
 		break;
 	}
@@ -658,7 +668,7 @@ function set_init_dynamic_info()
 		sp_drop.te = model.species[0].name;
 	}
 			
-	return {type:{te:select_drop_str}, filter:filt, thresh:"", threshmin:"", threshmax:"", index_drop:{te:select_drop_str}, dist:"", fraction:{check:false}, sp_drop:sp_drop, region:{loaded:false, source:undefined}, weight:{check:false}, weight_eqn:create_equation("1","dynamic_weight"), eqn:create_equation("","dynamic_eqn")};
+	return {type:{te:select_drop_str}, filter:filt, thresh:create_equation("","thresh"), threshmin:create_equation("","thresh"), threshmax:create_equation("","thresh"), index_drop:{te:select_drop_str}, dist:"", fraction:{check:false}, sp_drop:sp_drop, region:{loaded:false, source:undefined}, weight:{check:false}, weight_eqn:create_equation("1","dynamic_weight"), eqn:create_equation("","dynamic_eqn")};
 }
 			
 
@@ -674,9 +684,13 @@ function done_param_dynamic()
 		let fl = false;
 		switch(di.type.te){
 		case "bin-min-max": case "bin-min-max-dist": case "bin-min-max-region":
-			if(Number(di.threshmin) > Number(di.threshmax)){
-				set_warning("Must be less than or equal to maximum value",["threshmin","threshmax"]);
-				fl = true;
+			{
+				let min = Number(di.threshmin.te);
+				let max = Number(di.threshmax.te);
+				if(!isNaN(min) && !isNaN(max) && min > max){		
+					set_warning("Must be less than or equal to maximum value",["threshmin","threshmax"]);
+					fl = true;
+				}
 			}
 			break;
 		}

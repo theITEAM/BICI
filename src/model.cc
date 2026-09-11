@@ -508,25 +508,47 @@ void Model::param_spec_precalc_time(unsigned int ti, const vector < vector <doub
 				const auto &di = par.dynamic_info;
 				switch(di.type){
 				case BIN_THRESH: case BIN_THRESH_DIST: case BIN_THRESH_REGION: case BIN_THRESH_EQN:
-					if(val > di.thresh) val = 1;
-					else val = 0;
+					{
+						auto thresh = eqn[di.thresh.eq_ref].calculate_all_time(ti,popcomb_t,precalc);
+						if(thresh < 0){
+							run_error("For dynamic parameter '"+par.full_name+"' the threshold has become negative.");
+						}
+						
+						if(val > thresh) val = 1;
+						else val = 0;
+					}
 					break;
 					
 				case BIN_MIN_MAX: case BIN_MIN_MAX_DIST: case BIN_MIN_MAX_REGION: case BIN_MIN_MAX_EQN:
 					{
+						auto threshmin = eqn[di.threshmin.eq_ref].calculate_all_time(ti,popcomb_t,precalc);
+						auto threshmax = eqn[di.threshmax.eq_ref].calculate_all_time(ti,popcomb_t,precalc);
+					
+						if(threshmin < 0){
+							run_error("For dynamic parameter '"+par.full_name+"' the minimum threshold has become negative.");
+						}
+						
+						if(threshmax < 0){
+							run_error("For dynamic parameter '"+par.full_name+"' the maximum threshold has become negative.");
+						}
+						
+						if(threshmin > threshmax){
+							run_error("For dynamic parameter '"+par.full_name+"' the minimum threshold has become larger than the maximum threshold.");
+						}
+					
 						if(ti == 0){ // At the start use a simple threshold model
-							if(val > di.threshmax) val = 1;
+							if(val > threshmax) val = 1;
 							else val = 0;
 						}
 						else{ // Otherwise use previous value 
 							auto val_last = precalc[i+ti-1];
 							if(val_last == 0){
-								if(val > di.threshmax) val = 1;
+								if(val > threshmax) val = 1;
 								else val = 0;
 							}
 							else{
 								if(val_last == 1){
-									if(val <= di.threshmin) val = 0;
+									if(val <= threshmin) val = 0;
 									else val = 1;
 								}
 								else{
@@ -5257,3 +5279,5 @@ bool Model::is_strictly_positive(const Prior &pri) const
 	
 	return false;
 }
+
+

@@ -532,9 +532,13 @@ function add_data_buts(lay,siminf)
 	switch(data_ty){
 	case "Dynamic Int.":
 		{
+			let active2 = active;
+			if(sp.type != "Individual") active2 = false;
+			active2 = true;
+			
 			let te = test_and_cull_text, ti = "Implement test-and-cull";
 						
-			w = model.add_object_button(lay,"Test-and-cull",x,y,"TestAndCull",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
+			w = model.add_object_button(lay,"Test-and-cull",x,y,"TestAndCull",{ back:WHITE, active:active2, info:info, title:ti, te:te, siminf:siminf}); 
 			x += w+gap;
 		}
 		break;

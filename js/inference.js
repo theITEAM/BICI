@@ -465,7 +465,8 @@ function add_inf_start_buts(lay)
 		cy += 1;
 		
 		let gap = 1.8;
-	
+		if(alg == "DA-MCMC" || alg == "PAS-MCMC") gap = 1;
+		
 		switch(alg){
 		case "DA-MCMC": case "PAS-MCMC": 
 			{

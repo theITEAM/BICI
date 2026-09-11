@@ -851,8 +851,8 @@ function sim_param_post_mean()
 						}							
 					
 						par.value_desc = get_value_desc(par);
-						par.set = true;
 					}
+					par.set = true;
 				}				
 			}
 			

@@ -483,13 +483,16 @@ function species_command(loop)
 	//if(make_one_chain) type = "deterministic";
 	
 	let trans_tree = false; 
-	if(type == "individual"){
-		let trans_tree_str = get_tag_value("trans-tree").toLowerCase();
-		if(trans_tree_str != ""){
+	let trans_tree_str = get_tag_value("trans-tree").toLowerCase();
+	if(trans_tree_str != ""){
+		if(type == "individual"){
 			if(trans_tree_str == "on") trans_tree = true;
 			else{
 				if(trans_tree_str != "off"){ alert_import("'trans-tree' must be either 'off' or 'on'"); return;}
 			}
+		}
+		else{
+			alert_import("'trans-tree' can only be on for an individual-based species."); 	
 		}
 	}
 	

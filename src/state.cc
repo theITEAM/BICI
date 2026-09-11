@@ -114,7 +114,7 @@ void State::determinisitic_resimulate()
 }
 
 
-/// Initialises individuals in the initial state (for IBM
+/// Initialises individuals in the initial state (for IBM)
 void State::individual_initial_state(double t)
 {
 	auto fl = false;
@@ -201,8 +201,8 @@ void State::load_samp(const PV &param_value, const Sample &samp)
 void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end, double val, double val2, bool sup) 
 {
 	timer[SIM_ITERATE] -= clock();
-	print_diag("Start sim init"); 
-
+	print_diag("Start sim iterate"); 
+	
 	for(auto ti = ti_start; ti < ti_end; ti++){	
 		//cout << endl << ti << " ti" <<  endl;
 		//if(true && ti%op_step == 0) print_cpop(ti);	
@@ -216,12 +216,13 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end, double 
 		}
 		
 		update_quantities(ti,ti_start,true,true,false);
-
+	
 		// For transmission trees calculates population of individuals
 		timer[SIM_POPIND] -= clock();	
+	
 		auto pop_ind = calculate_pop_ind(); 
 		timer[SIM_POPIND] += clock();
-	
+			
 		if(ti+1 == ti_end){
 			timer[SIM_CHECK] -= clock();	
 			for(auto &ssp : species){
@@ -250,6 +251,8 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end, double 
 	}
 	dpop_clear();
 	
+	print_diag("Ensure all"); 
+		
 	if(model.mode == INF || model.mode == EXT) ensure_all_ind_event();
 
 	if(false){
@@ -296,10 +299,6 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end, double 
 	timer[SIM_LIKE] -= clock();
 	likelihood_from_scratch();
 	timer[SIM_LIKE] += clock();
-
-	//timer[SIM_TEMP1] -= clock();	
-	//check("after sim");
-	//timer[SIM_TEMP1] += clock();	
 
 	timer[SIM_ITERATE] += clock();
 	//emsg("sim done");
@@ -354,7 +353,7 @@ void State::update_quantities(unsigned int ti, unsigned int ti_start, bool calc_
 				species[p].markov_update = model.species[p].markov_update_t[ti];
 			}
 		}
-		
+	
 		for(auto po : dpop_list){
 			auto p1 = pop[po];
 			pop[po] += dpop[po];
@@ -371,7 +370,7 @@ void State::update_quantities(unsigned int ti, unsigned int ti_start, bool calc_
 			if(p1 < 0) p1 = 0;
 			if(p2 < 0) p2 = 0;
 			auto dp = p2-p1;
-			
+		
 			for(const auto &pcr : model.pop[po].popcomb_ref){
 				popcomb[pcr.pcref] += dp*popcombw_value[pcr.wref];
 			}
@@ -1589,6 +1588,7 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 			const auto &sp = model.species[p];
 			if(sp.trans_tree_output) species[p].add_trans_tree(part.species[p].individual,popnum_t,pop_ind);
 		}		
+		create_inf_node();
 	}
 
 	if(model.trans_tree){ 
@@ -2794,5 +2794,104 @@ Like State::get_like_ch(const Like &like_st) const
 	like_ch.ie = like.ie - like_st.ie;
 	
 	return like_ch;
+}
+
+
+// When trans_tree_output is set this 
+void State::create_inf_node()
+{
+	/*
+for(auto &ind : individual){
+		for(auto &ev : ind.ev){
+			auto &iif = ev.ind_inf_from;
+			auto c = ev.c_after;
+			
+			switch(ev.type){
+			case ENTER_EV:
+				if(sp.comp_gl[c].infected) iif.p = ENTER_INF;
+				break;
+			
+			case M_TRANS_EV: 
+				{
+					const auto &trg = sp.tra_gl[ev.tr_gl];
+					if(trg.infection.type == TRANS_INFECTION){
+						auto e = trg.markov_eqn_ref;
+						if(e == UNSET) emsg("me not set");
+
+						const auto &me = sp.markov_eqn[e];
+						auto ti = get_ti(ev.tdiv);
+						
+						const auto &eq = eqn[me.eqn_ref];
+						
+						const auto &lin = eq.lin;
+						if(!lin.on) emsg("The equation must be linear");
+
+						auto Npop = eq.pop_ref.size();
+		
+						auto j = UNSET;
+						
+						if(lin.multi_source){ // Samples from available sources (either populations of fro outside)		
+							auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val,popcombw_value);
+					
+							j = ss.sample_inf_source();
+						}
+						else{
+							if(testing){
+								if(Npop > 1) emsg("Npop wrong");
+								if(Npop == 1 && lin.no_pop_precalc.type != ZERO) emsg("Npop wrong");
+							}
+							j = 0;
+						}
+
+						if(j == Npop){   // Selects no population
+							iif.p = OUTSIDE_INF;
+						}
+						else{
+							auto po = eq.pop_ref[j];
+							
+							const auto &pop = model.pop[po];
+							auto p_inf = pop.p;
+							
+							const auto &list = pop_ind[ti][po];
+							if(list.size() == 0) emsg("No individual in pop");
+							
+							unsigned int i;
+							if(pop.ind_variation){
+								auto pos = sample_possibility(list);		
+								i = pos.i;
+								
+								if(testing){
+									auto sum = 0.0;
+									for(const auto &pos : list)	sum += pos.weight;
+									if(dif(sum,popnum_t[ti][po],TINY)) emsg("Population wrong");
+								}
+							}
+							else{
+								auto k = (unsigned int)(ran()*list.size());
+								i = list[k].i;
+								
+								if(testing){
+									if(dif(list.size(),popnum_t[ti][po],TINY)) emsg("Population wrong");
+								}
+							}
+							
+							iif.p = p_inf;
+							iif.i = i;
+						}
+					}
+				}
+				break;
+			
+			case NM_TRANS_EV:
+				{
+					const auto &trg = sp.tra_gl[ev.tr_gl];
+					if(trg.infection.type == TRANS_INFECTION) emsg("Non-Markovian transition cannot be used for infection");
+				}
+				break;
+			default: break;
+			}
+		}
+	}
+	*/
 }
 

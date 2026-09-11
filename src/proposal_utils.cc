@@ -106,9 +106,47 @@ void Proposal::get_affect_like()
 	auto vec = param_list;
 	for(auto th : dependent) vec.push_back(th);
 	
+	for(auto i = 0u; i < vec.size(); i++){
+		auto th = vec[i];
+		for(const auto &al : model.param_vec[th].affect_like){
+			param_vec_add_affect(affect_like,al);
+		}
+	}
+
+	// These store extra populations that change as a result of individual effect change
+	vector <unsigned int> po_from_ie, pc_from_ie; 
+	
+	switch(type){
+	case IE_COVAR_PROP:
+		{
+			const auto &ieg = model.species[p_prop].ind_eff_group[ind_eff_group_ref.ieg];
+			for(const auto &li : ieg.list){
+				auto ie = li.index;
+				model.add_ie_affect(p_prop,ie,affect_like);
+				
+				for(auto po : model.species[p_prop].ind_effect[ie].pop_ref){
+					po_from_ie.push_back(po);
+					for(const auto &pcr : model.pop[po].popcomb_ref) pc_from_ie.push_back(pcr.pcref);
+				}	
+			}
+			
+			po_from_ie = remove_repeated(po_from_ie);
+			pc_from_ie = remove_repeated(pc_from_ie);
+		}
+		break;
+		
+	case PAR_EVENT_FORWARD_PROP: case PAR_EVENT_FORWARD_SQ_PROP: 
+	case PAR_EVENT_BACKWARD_SQ_PROP: 
+		model.joint_affect_like(type,tr_change,p_prop,affect_like);
+		break;
+		
+	default: break;
+	}
+
 	{ // Works out how to update pop
 		vector < vector <unsigned int> > lists;
 		for(auto th : vec) lists.push_back(model.param_vec[th].pop_affect);
+		if(po_from_ie.size() != 0) lists.push_back(po_from_ie);
 		pop_change_info.pop_affect = combine_lists(lists);
 	}
 	
@@ -121,34 +159,11 @@ void Proposal::get_affect_like()
 	{ // Works out how to update popcomb
 		vector < vector <unsigned int> > lists;
 		for(auto th : vec) lists.push_back(model.param_vec[th].popcomb_affect);
+		if(pc_from_ie.size() != 0) lists.push_back(pc_from_ie);
 		pop_change_info.popcomb_affect = combine_lists(lists);
 	}
 	
-	for(auto i = 0u; i < vec.size(); i++){
-		auto th = vec[i];
-		for(const auto &al : model.param_vec[th].affect_like){
-			param_vec_add_affect(affect_like,al);
-		}
-	}
-
-	switch(type){
-	case IE_COVAR_PROP:
-		{
-			const auto &ieg = model.species[p_prop].ind_eff_group[ind_eff_group_ref.ieg];
-			for(const auto &li : ieg.list){
-				model.add_ie_affect(p_prop,li.index,affect_like);
-			}
-		}
-		break;
-		
-	case PAR_EVENT_FORWARD_PROP: case PAR_EVENT_FORWARD_SQ_PROP: 
-	case PAR_EVENT_BACKWARD_SQ_PROP: 
-		model.joint_affect_like(type,tr_change,p_prop,affect_like);
-		break;
-		
-	default: break;
-	}
-
+	
 	model.add_iif_w_affect(affect_like);
 
 	model.add_popnum_ind_w_affect(affect_like);
@@ -350,6 +365,7 @@ double Proposal::param_resample(PV &param_val, State &state, bool mbp, bool ie_s
 	else state.popcomb_store.push_back(UNSET);
 	
 	if(timer_on) timer[PARAM_POP_TIMER] -= clock();
+	
 	state.pop_recalc(pop_change_info);
 	if(timer_on) timer[PARAM_POP_TIMER] += clock();
 	

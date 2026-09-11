@@ -62,8 +62,10 @@ class Species   	                         // Stores details of a species
 		
 		vector < vector <MEUpdate> > markov_update_t;      // Determines if markov must be recalculated as a function of time
 	
-		MarkovTree markov_tree;                // Constructs a tree of nodes to sample markov equations
-			
+		//MarkovTree markov_tree;                // Constructs a tree of nodes to sample markov equations 
+		TraMarkovTree tra_markov_tree;         // Constructs a tree of nodes to sample markovian transitions
+		unsigned int ntranode;                 // Number of nodes which are for transitions
+		
 		vector <bool> cgl_begin_nm;            // Determines if glob comp starts nm 
 		
 		bool trans_tree;                       // Determines if the transmission tree is turned on
@@ -165,7 +167,7 @@ class Species   	                         // Stores details of a species
 
 		vector <string> data_warning;          // Warning about data outside of range 
 		
-		void create_markov_tree();
+		void create_tra_markov_tree();
 		unsigned int find_c(unsigned int cl, string name) const;
 		unsigned int update_c_comp(unsigned int c, unsigned int cl, unsigned int c_comp) const;
 		void ind_ev_sampler_not_needed();

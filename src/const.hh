@@ -28,7 +28,7 @@ const string default_file = "Execute/init.bici";     // This is used for windows
 
 const bool linear_markov_value_speedup = true;
 
-const string bici_version = "v0.91";                 // Sets the BICI version
+const string bici_version = "v0.94";                 // Sets the BICI version
 
 const bool equation_check = false;                   // This independently checks that equations are correct
 const bool debugging = false;                        // This turns on diagnostics (proposal.txt)
@@ -60,7 +60,7 @@ enum Algorithm { GILLESPIE, TAU, DA_MCMC, PAS_MCMC, MFA_ALG, ABC_ALG, ABC_SMC_AL
 enum FeatureType { POLYGON, MULTI_POLYGON, NO_FEATURE };
 
 // Different types of equation
-enum EqnType { SE, SP, SE_TEST_AND_CULL, SP_TEST_AND_CULL, COMP_PROB, TRANS_PROB, BP, SOURCE_RATE, SOURCE_MEAN, TRANS_RATE, TRANS_MEAN, TRANS_NM_RATE, TRANS_NM_MEAN, TRANS_SHAPE, TRANS_SCALE, TRANS_CV, REPARAM, REPARAM_EQN, DIST, DERIVE_PARAM, DERIVE_EQN, DEFINE_EQN, SEQ_VAR, CONST_EQN, MUT_RATE, MODEL_CALC };
+enum EqnType { SE, SP, THRESH, SE_TEST_AND_CULL, SP_TEST_AND_CULL, COMP_PROB, TRANS_PROB, BP, SOURCE_RATE, SOURCE_MEAN, TRANS_RATE, TRANS_MEAN, TRANS_NM_RATE, TRANS_NM_MEAN, TRANS_SHAPE, TRANS_SCALE, TRANS_CV, REPARAM, REPARAM_EQN, DIST, DERIVE_PARAM, DERIVE_EQN, DEFINE_EQN, SEQ_VAR, CONST_EQN, MUT_RATE, MODEL_CALC };
 
 // Differetn restrictions placeed on equarions
 enum EqnMode { PARAM_ONLY, PARAM_WITH_DEP, ALL, DERIVE_PARAM_MODE, DERIVE_MODE };
@@ -392,6 +392,9 @@ const auto PROP_SIM_PROB_MIN = 0.05;              // Minimum probability for ind
 const double TINY = 0.00000000001;                // Used to represent a tiny number
 const double VTINY = 0.00000000000001;            // Used to represent a very tiny number
 const double VVTINY = 0.000000000000000000000001; // Used to represent a very tiny number
+
+const auto TRA_IND_SECTION = 20u;                 // Number of sections used in tra_ind
+const auto TRA_IND_SEC_OFFSET = 10u;                 // Number of sections used in tra_ind
 const double EFFECT_MAX = 10000000;               // Sets maximum value for effect
 const double EFFECT_MIN = 0.0000001;              // Sets minimum value for effect
 const double CLIP_MIN = 0.99*log(EFFECT_MIN);     // Clips minimum 
@@ -426,6 +429,7 @@ const double PROB_MOD = 0.001;                    // Avoids zero probability in 
 const double LOW_BOUND = 0;                       // The lower bound for observation probability
 const double UP_BOUND = 1;                        // The lower bound for observation probability
 const double OBS_COMP_MIN = VTINY;                // Minimum value for observed compartment
+const unsigned int INF_INIT_NPARAM_SAMPLE = 20;   // Number of parameter samples to set correlation matrix
 const double PROP_JOIN_COR_MIN = 0.7;             // The threshold corrlelation above which proposals join
 const unsigned int SEED_MAX = 10000;              // The maximum seed number
 

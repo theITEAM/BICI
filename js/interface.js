@@ -92,6 +92,8 @@ function change_page(page_new)
 	inter.page_name = na;
 
 	inter.options = false;
+	
+	clear_graph_anim();
 	clear_comp_select();
 	close_help();
 	close_bubble();
@@ -144,6 +146,14 @@ function update_edit_source(bu)
 }
 
 
+/// Clears any animations
+function clear_graph_anim()
+{
+	let id = inter.graph.plot_timeout;
+	if(id != undefined) clearInterval(id);
+}
+	
+	
 /// Clears any selected compartments
 function clear_comp_select()
 {
@@ -174,6 +184,7 @@ function key_press(e)
 	if(false) error(e.keyCode+" code");
 
 	let code = e.keyCode;	
+	
 	//prr(code+"code");
 
 	if(code == 36 && debug && true){ // Home

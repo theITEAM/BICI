@@ -659,7 +659,7 @@ vector <double> StateSpecies::likelihood_nm_trans(unsigned int m, const vector <
 
 
 /// Restores nm_trans likelihood values
-void StateSpecies::likelihood_nm_trans_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> store) 
+void StateSpecies::likelihood_nm_trans_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> &store) 
 {
 	auto k = 0u;
 	auto &nm_ref = nm_trans_ev_ref[m];
@@ -812,7 +812,7 @@ vector <double> StateSpecies::likelihood_nm_trans_bp(unsigned int m, const vecto
 
 
 /// Restores Li_bp
-void StateSpecies::likelihood_nm_trans_bp_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> store)
+void StateSpecies::likelihood_nm_trans_bp_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> &store)
 {
 	auto k = 0u;
 	auto &nm_ref = nm_trans_ev_ref[m];
@@ -1010,7 +1010,7 @@ vector <double> StateSpecies::likelihood_nm_trans_incomp(unsigned int n, const v
 
 
 /// Restores nm_trans incomplete likelihood values
-void StateSpecies::likelihood_nm_trans_incomp_restore(unsigned int n, const vector <unsigned int> &list, const vector <double> store) 
+void StateSpecies::likelihood_nm_trans_incomp_restore(unsigned int n, const vector <unsigned int> &list, const vector <double> &store) 
 {
 	const auto &nmti = sp.nm_trans_incomp[n];
 	

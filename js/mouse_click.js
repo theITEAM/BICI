@@ -622,6 +622,7 @@ function button_action(bu,action_type)
 		{
 			let source = bu.source
 			let pos = bu.pos;
+		
 			source.te = pos.te;
 		
 			if(pos.check_filter == true) change_remove_filter(pos);
@@ -641,8 +642,11 @@ function button_action(bu,action_type)
 			if(pos.type != undefined) source.type = pos.type;
 			if(pos.name_list != undefined) source.name_list = pos.name_list;
 			if(pos.strat_filt != undefined) source.strat_filt = pos.strat_filt;
+			if(pos.bub_off != undefined) source.bub_off = pos.bub_off;
 			if(pos.createviewflag != undefined) source.createviewflag = pos.createviewflag;
 			else source.createviewflag = undefined;
+			
+			if(bu.source.bub_off) close_bubble();
 			
 			if(source == inter.data_type) close_bubble();			
 			inter.dropdown = {};
@@ -655,8 +659,6 @@ function button_action(bu,action_type)
 			if(bu.source.select_first_view == true) inter.graph.select_first_view = true;
 			
 			if(pos.noupdate != true) reset_graph();
-			
-			if(bu.source.bub_off) close_bubble();
 		}
 		break;
 		

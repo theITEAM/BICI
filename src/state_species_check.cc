@@ -14,13 +14,15 @@ using namespace std;
 /// Check under simulation
 void StateSpecies::check(unsigned int ti, const vector < vector <double> > &popcomb_t)
 {
+	//cout << ti << "check";
+	
 	const auto &popcomb = popcomb_t[ti];
 	
 	if(type == INDIVIDUAL){
-		check_markov_eqn_ref();
+		check_tra_ind_ref();
 		check_cpop();
 		check_markov_eqn(ti,popcomb);
-		check_markov_tree_rate();
+		check_tra_markov_tree_rate(ti);
 	}
 	else{
 		check_markov_eqn(ti,popcomb);
@@ -30,51 +32,75 @@ void StateSpecies::check(unsigned int ti, const vector < vector <double> > &popc
 }
 
 
-/// Checks that markov_eqn_ref correctly references individuals in markov_eqn
-void StateSpecies::check_markov_eqn_ref() const
+/// Checks that tra_ind_ref correctly references individuals in markov_eqn
+void StateSpecies::check_tra_ind_ref() const
 {  
-	vector <vector <bool> > done;
-	done.resize(N);
-	for(auto e = 0u; e < N; e++){
-		done[e].resize(markov_eqn_vari[e].ind_tra.size(),false);
+	vector < vector <vector <bool> > > done;
+	done.resize(sp.tra_gl.size());
+	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+		const auto &section = tra_ind[tr].section;
+		done[tr].resize(TRA_IND_SECTION);
+		for(auto i = 0u; i < TRA_IND_SECTION; i++){
+			done[tr][i].resize(section[i].ind_tra.size(),false);
+		}
 	}
 	
 	for(auto i = 0u; i < individual.size(); i++){
 		const auto &ind = individual[i];
-		for(auto j = 0u; j < ind.markov_eqn_ref.size(); j++){
-			const auto &mer = ind.markov_eqn_ref[j];
-			auto e = mer.e; auto index = mer.index;
-			if(index >= markov_eqn_vari[e].ind_tra.size()) emsg("Out of range6");
-			const auto &mit = markov_eqn_vari[e].ind_tra[index];
-			if(mit.i != i) emsg("individual does not agree");	
-			if(mit.index != j) emsg("individual index does not agree");
-			done[e][index] = true;
+		for(auto j = 0u; j < ind.tra_ind_ref.size(); j++){
+			const auto &tir = ind.tra_ind_ref[j];
+		
+			auto tr = tir.tra_gl; 
+			auto s = tir.section;
+			auto index = tir.index;
+			const auto &sec = tra_ind[tr].section[s]; 
+			if(index >= sec.ind_tra.size()) emsg("Out of range6");
+			const auto &itr = sec.ind_tra[index];
+			if(itr.i != i) emsg("individual does not agree");	
+			if(itr.index != j) emsg("individual index does not agree");
+			done[tr][s][index] = true;
 		}
 	}
-	 
-	for(auto e = 0u; e < N; e++){
-		const auto &me = sp.markov_eqn[e];
-		auto &me_vari = markov_eqn_vari[e];
+	
+	// Check tra_ind
+	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+		const auto &trg = sp.tra_gl[tr];
 		
-		const auto &ind_tra = me_vari.ind_tra;
+		const auto &tri = tra_ind[tr];
+		for(auto s = 0u; s < TRA_IND_SECTION; s++){
+			const auto &ind_tra = tri.section[s].ind_tra;
 		
-		for(auto i = 0u; i < ind_tra.size(); i++){
-			if(done[e][i] != true) emsg("Markov equation problem");
-		}
-		
-		auto sum = 0.0; 
-		if(me.source == true) sum = me.source_tr_gl.size();
-		else{
 			for(auto i = 0u; i < ind_tra.size(); i++){
-				const auto &it = ind_tra[i];
-				
-				const auto &ind = individual[it.i];
-				auto val = get_indfac(ind,me);
-				sum += val;
+				if(done[tr][s][i] != true) emsg("Markov equation problem");
 			}
 		}
 		
-		if(dif(me_vari.indfac_sum,sum,dif_thresh)){
+		const auto &me = sp.markov_eqn[trg.markov_eqn_ref];
+			
+		auto sum = 0.0; 
+		if(trg.i == UNSET) sum = 1; // If source transition
+		else{
+			for(auto s = 0u; s < TRA_IND_SECTION; s++){
+				const auto &sec = tri.section[s];
+				const auto &ind_tra = sec.ind_tra;
+				auto sum_sec = 0.0;
+				auto max = 0.0;
+				for(auto i = 0u; i < ind_tra.size(); i++){
+					const auto &it = ind_tra[i];
+				
+					const auto &ind = individual[it.i];
+					auto val = get_indfac(ind,me);
+					if(dif(val,it.indfac,dif_thresh)) emsg("indfac problem");
+					if(val > max) max = val;
+					sum_sec += val;
+				}
+				if(dif(sum_sec,sec.indfac_sum,dif_thresh)) emsg("indfac_sum problem");
+				if(dif(max,sec.max,dif_thresh)) emsg("max problem");
+				sum += sum_sec;
+			}
+		}
+		
+		if(dif(tri.indfac_sum,sum,dif_thresh)){
 			emsg("Problem with ie_sum");
 		}
 	}
@@ -125,42 +151,24 @@ void StateSpecies::check_markov_eqn(unsigned int ti, const vector <double> &popc
 			value = 1.0/mean;
 		}
 		value *= dt;
-		
+	
 		if(dif(value,me_vari.value,dif_thresh)){
 			emsg("value problem");
-		}
-		
-		if(sp.type == INDIVIDUAL){
-			auto sum = 0.0; 	
-			if(me.source == true) sum = me.source_tr_gl.size();
-			else{	
-				for(auto i = 0u; i < me_vari.ind_tra.size(); i++){
-					const auto &it = me_vari.ind_tra[i];
-					
-					const auto &ind = individual[it.i];
-					auto val = get_indfac(ind,me);
-					sum += val;
-				}
-			}
-			
-			if(dif(me_vari.indfac_sum,sum,dif_thresh)){
-				emsg("indfac_sum problem");
-			}
 		}
 	}
 };
 
 
 /// Checks that markov_tree_rate is correctly set
-void StateSpecies::check_markov_tree_rate()
+void StateSpecies::check_tra_markov_tree_rate(unsigned int ti)
 {
-	auto markov_tree_rate_store = markov_tree_rate;
+	auto tra_markov_tree_rate_store = tra_markov_tree_rate;
 	
-	set_markov_tree_rate();
+	set_tra_markov_tree_rate(ti);
 
-	for(auto i = 0u; i < markov_tree_rate.size(); i++){
-		if(dif(markov_tree_rate_store[i],markov_tree_rate[i],dif_thresh)){
-			emsg("markov tree problem"); 
+	for(auto i = 0u; i < tra_markov_tree_rate.size(); i++){
+		if(dif(tra_markov_tree_rate_store[i],tra_markov_tree_rate[i],dif_thresh)){
+			emsg("tra_markov tree problem"); 
 		}
 	}		
 }

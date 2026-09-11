@@ -1395,7 +1395,7 @@ function simulate_genetic_snp(t_start,t_end,ele,head,so)
 function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 {
 	let result = sim_result;
-	
+
 	let mu = so.spec.mut_rate_eqn.te;
 	if(isNaN(mu)){ alert_help("The mutation rate must be a number"); return;}
 	mu = Number(mu);

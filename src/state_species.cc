@@ -26,8 +26,8 @@ StateSpecies::StateSpecies(PV &param_val, const vector <double> &popcombw_value,
 	
 	mode = mode_;
 	
-	nnode = sp.markov_tree.node.size();
-	markov_tree_rate.resize(nnode,UNSET);
+	nnode = sp.tra_markov_tree.node.size();
+	//tra_markov_tree_rate.resize(nnode,UNSET);
 	
 	type = sp.type;
 	
@@ -128,6 +128,20 @@ void StateSpecies::reset_arrays()
 	
 	for(auto n = 0u; n < sp.nm_trans_incomp.size(); n++){
 		for(auto ti = 0u; ti < T; ti++) nm_trans_incomp_ref[n][ti].clear();
+	}
+	
+	tra_ind.clear();
+	tra_ind.resize(sp.tra_gl.size());
+	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+		const auto &trg = sp.tra_gl[tr];
+		auto &ti = tra_ind[tr];
+		ti.indfac_sum = 0; if(trg.i == UNSET) ti.indfac_sum = 1;
+		ti.section.resize(TRA_IND_SECTION);
+		for(auto i = 0u; i < TRA_IND_SECTION; i++){
+			auto &sec = ti.section[i];
+			sec.indfac_sum = 0;
+			sec.max = 0;
+		}
 	}
 	
 	markov_eqn_vari.clear();
@@ -1092,18 +1106,6 @@ void StateSpecies::recalculate_exp_ie(unsigned int ie)
 		ind.exp_ie[ie] = exp_clip(ind.ie[ie]-0.5*var);
 	}
 }
-
-
-/*
-/// Restores values for exp_ie
-void StateSpecies::recalculate_exp_ie_restore(unsigned int ie, const vector <double> &store)
-{
-	auto j = 0u;
-	for(auto &ind : individual){
-		ind.exp_ie[ie] = store[j]; j++;
-	}
-}
-*/
 
 
 /// Initialises sampler used to sample individual effects

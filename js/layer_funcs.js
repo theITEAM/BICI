@@ -1506,9 +1506,9 @@ function copy_back_to_source2(tbs)
 	case "iegrname": inter.bubble.source.name = te; break;
 	case "wild_card": inter.bubble.wildcard = te; break;
 	case "comp_acc": edit_source.comp_acc = te; break;
-	case "thresh": inter.bubble.dynamic_info.thresh = te; break;
-	case "threshmin": inter.bubble.dynamic_info.threshmin = te; break;
-	case "threshmax": inter.bubble.dynamic_info.threshmax = te; break;
+	case "thresh": inter.bubble.dynamic_info.thresh.te = te; break;
+	case "threshmin": inter.bubble.dynamic_info.threshmin.te = te; break;
+	case "threshmax": inter.bubble.dynamic_info.threshmax.te = te; break;
 	case "dist": inter.bubble.dynamic_info.dist = te; break;
 	case "dynamic_weight": inter.bubble.dynamic_info.weight_eqn.te = te; break;
 	case "dynamic_eqn": inter.bubble.dynamic_info.eqn.te = te; break;
@@ -2152,7 +2152,13 @@ function check_error_textbox2(tbs)
 				warn = check_zeroone(te);
 				break;
 				
-			case "thresh": case "threshmin": case "threshmax": case "dist":
+			case "thresh": case "threshmin": case "threshmax": 
+				if(!isNaN(te)){
+					warn = check_nonnegative(te);
+				}
+				break;
+				
+			case "dist":
 				warn = check_nonnegative(te);
 				break;
 			

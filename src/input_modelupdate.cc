@@ -529,7 +529,30 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 					break;
 			
 				case DYNAMIC_PARAM:
-					if(add_param_eqn(par.dynamic_eqn,par,hash_eqn)) flag = true;	
+					{
+						if(add_param_eqn(par.dynamic_eqn,par,hash_eqn)) flag = true;	
+					
+						auto &di = par.dynamic_info;
+						switch(di.type){
+						case BIN_THRESH: case BIN_THRESH_DIST: case BIN_THRESH_REGION: case BIN_THRESH_EQN: 
+							{
+								auto &eqi = di.thresh;
+								if(eqi.eq_ref == UNSET){ flag = true; model.add_eq_ref(eqi,hash_eqn);}
+							}
+							break;
+							
+						case BIN_MIN_MAX: case BIN_MIN_MAX_DIST: case BIN_MIN_MAX_REGION: case BIN_MIN_MAX_EQN:
+							{
+								auto &eqi = di.threshmin;
+								if(eqi.eq_ref == UNSET){ flag = true; model.add_eq_ref(eqi,hash_eqn);}
+							}
+							{
+								auto &eqi = di.threshmax;
+								if(eqi.eq_ref == UNSET){ flag = true; model.add_eq_ref(eqi,hash_eqn);}
+							}
+							break;
+						}
+					}
 					break;
 					
 				case CONST_PARAM: alert_emsg_input("Should not be const"); break;
@@ -1242,7 +1265,8 @@ void Input::global_comp_trans_init()
 						tr_gl.all_branches = tr.all_branches;
 						tr_gl.markov_eqn_ref = UNSET;
 						tr_gl.nm_trans_ref = UNSET;
-							
+						tr_gl.tra_markov_tree_ref = UNSET;
+								
 						tr_gl.infection.type = TRANS_INF_UNCHANGE;
 						if(sp.trans_tree == true){
 							if((ii == UNSET || sp.comp_gl[ii].infected == false) && (ff != UNSET && sp.comp_gl[ff].infected == true)){
@@ -5556,9 +5580,6 @@ void Input::set_dynamic_info_from_text(string te, string region, Param &par)
 	auto fl = false;
 		
 	DynamicInfo di;
-	di.thresh = UNSET;
-	di.threshmin = UNSET;
-	di.threshmax = UNSET;
 
 	string filt_str, index_str, weight_str, eqn_str;
 	double dist = UNSET;
@@ -5647,11 +5668,12 @@ void Input::set_dynamic_info_from_text(string te, string region, Param &par)
 				if(tag == "thresh"){
 					switch(di.type){
 					case BIN_THRESH: case BIN_THRESH_DIST: case BIN_THRESH_REGION: case BIN_THRESH_EQN:
-						{
+						if(num != UNSET){
 							auto warn = check_thresh_value(num,"Threshold",frac);
 							if(warn != "") alert_import("In '"+te+"' for 'dynamic-sim': "+warn); 
 						}
-						di.thresh = num;
+						
+						di.thresh = he(add_equation_info(val,THRESH)); 
 						break;
 					
 					default: 
@@ -5662,11 +5684,11 @@ void Input::set_dynamic_info_from_text(string te, string region, Param &par)
 				else if(tag == "min"){		
 					switch(di.type){
 					case BIN_MIN_MAX: case BIN_MIN_MAX_DIST: case BIN_MIN_MAX_REGION: case BIN_MIN_MAX_EQN:
-						{
+						if(num != UNSET){
 							auto warn = check_thresh_value(num,"Minimum",frac);
 							if(warn != "") alert_import("In '"+te+"' for 'dynamic-sim': "+warn); 
 						}
-						di.threshmin = num;
+						di.threshmin = he(add_equation_info(val,THRESH)); 
 						break;
 					
 					default: 
@@ -5677,11 +5699,11 @@ void Input::set_dynamic_info_from_text(string te, string region, Param &par)
 				else if(tag == "max"){		
 					switch(di.type){
 					case BIN_MIN_MAX: case BIN_MIN_MAX_DIST: case BIN_MIN_MAX_REGION: case BIN_MIN_MAX_EQN:
-						{
+						if(num != UNSET){
 							auto warn = check_thresh_value(num,"Maximum",frac);
 							if(warn != "") alert_import("In '"+te+"' for 'dynamic-sim': "+warn); 
 						}
-						di.threshmax = num;
+						di.threshmax = he(add_equation_info(val,THRESH)); 
 						break;
 					
 					default: 
@@ -5740,8 +5762,12 @@ void Input::set_dynamic_info_from_text(string te, string region, Param &par)
 	
 	switch(di.type){
 	case BIN_MIN_MAX: case BIN_MIN_MAX_DIST: case BIN_MIN_MAX_REGION:
-		if(di.threshmin > di.threshmax){
-			alert_import("For 'dynamic-sim' the minimum must be less than or equal to maximum value");
+		{
+			auto threshmin = number(di.threshmin.te);
+			auto threshmax = number(di.threshmax.te);
+			if(threshmin != UNSET && threshmax != UNSET && threshmin > threshmax){
+				alert_import("For 'dynamic-sim' the minimum must be less than or equal to maximum value");
+			}
 		}
 		break;
 	default: break;

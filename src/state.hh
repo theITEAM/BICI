@@ -115,6 +115,7 @@ class State                                // Stores information about the state
 		void pop_restore();
 		double frac_outside_CI();
 		Like get_like_ch(const Like &like_st) const;
+		void create_inf_node();
 	
 	private:
 		vector <double> calculate_df(const DerFunc &df) const;

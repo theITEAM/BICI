@@ -700,7 +700,7 @@ bool Equation::calc_time_dep(const vector <Calculation> &calc) const
 
 
 /// Determines if a vector of equation items is time dependent
-bool Equation::item_time_dep(const vector <EqItem> item) const 
+bool Equation::item_time_dep(const vector <EqItem> &item) const 
 {
 	const auto N = item.size();
 		

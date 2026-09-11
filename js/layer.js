@@ -1521,9 +1521,9 @@ class Layer
 		case "iegrname": te = String(inter.bubble.source.name); break;
 		case "wild_card": te = String(inter.bubble.wildcard); break;
 		case "comp_acc": te = String(edit_source.comp_acc); break;
-		case "thresh": te = String(inter.bubble.dynamic_info.thresh); break;
-		case "threshmin": te = String(inter.bubble.dynamic_info.threshmin); break;
-		case "threshmax": te = String(inter.bubble.dynamic_info.threshmax); break;
+		case "thresh": eqn = inter.bubble.dynamic_info.thresh; break;
+		case "threshmin": eqn = inter.bubble.dynamic_info.threshmin; break;
+		case "threshmax": eqn = inter.bubble.dynamic_info.threshmax; break;
 		case "dist": te = String(inter.bubble.dynamic_info.dist); break;
 		case "dynamic_weight": eqn = inter.bubble.dynamic_info.weight_eqn; break;
 		case "dynamic_eqn": eqn = inter.bubble.dynamic_info.eqn; break;

@@ -215,7 +215,7 @@ class Equation                             // Stores information about an equati
 		bool two_param_func(Calculation ca, LinearCalculation &lin, const vector <LinearCalculation> &lin_calc) const;
 	
 		bool calc_time_dep(const vector <Calculation> &calc) const;
-		bool item_time_dep(const vector <EqItem> item) const;
+		bool item_time_dep(const vector <EqItem> &item) const;
 		bool it_time_dep(const EqItem &it) const;
 		
 		double calculate_linearise_check(unsigned int ti, const vector <double> &popcomb, const vector <double> &precalc) const;

@@ -1671,7 +1671,7 @@ double mem(const Particle &pa)
 		for(const auto &ind : sp.individual){
 			sum += sizeof(Individual)+mem(ind.name)+ind.ev.size()*sizeof(Event)+mem(ind.ie)+mem(ind.exp_ie)+mem(ind.X)+mem(ind.exp_fe);
 			sum += ind.popnum_ind_ref.size()*sizeof(PopnumIndRef)+ind.incomp_ref.size()*sizeof(IncompNMTransRef);
-			sum += ind.markov_eqn_ref.size()*sizeof(MarkovEqnRef);
+			//sum += ind.markov_eqn_ref.size()*sizeof(MarkovEqnRef);
 		}
 	
 		for(const auto &id : sp.inter_data) sum += mem(id.data);

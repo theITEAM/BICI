@@ -321,6 +321,7 @@ function extract_equation_properties(eqn)
 			switch(eqn.range){
 			case "all": break;
 			case "pos": if(num <= 0) wa = "Must be positive"; break;
+			case "notneg": if(num < 0) wa = "Cannot be negative"; break;
 			case "zeroone": if(num < 0 || num > 1) wa = "Must be between zero and one"; break;
 			case "etarange": if(num < 1 || num > ETA_MAX) wa = "Must be between one and "+ETA_MAX; break;
 			default: error("equation range not recognised:"+eqn.range); break;

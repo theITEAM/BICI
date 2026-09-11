@@ -1,108 +1,13 @@
 UPDATES:
 
 GRANT
-
-- Substantial changes to the code to speed up inference and simulation (by incorporation of a new data representation for linear combinations of populations).
-
-- Corrected clock reset (I think). This was due to integers not being able to store sufficiently large number when BICI is run for many days.
-
-- Improved how memory usage is calculated (it tracks throughout the code, so now any peaks are better identified). It should now be more accurate.
-
-- Regarding the timestep warning... This was calculating what I expected, but I don't think it's the right thing to do for individual-based models. Consequently, I've turned this off (until I can think of a better way of measuring what the best time step is).
-
-- Still to sort out the problem related to extension twice…
-
-- Correction to proposal synchronisation (to stop Cholesky error).
- 
-- Corrected "Dynamic under Simulation" model. Model setup has been sped up.
- 
-- Corrected "Regional Dynamic under Simulation" bug.
+- Added equations to dynamic parameter simulation
  
 
 CHRIS
-
-- Reweighting of proposal to improve efficiency (local proposal were found to slow things down for the large systems).
-
-- Corrected error in equation simplification code.
-
-- Corrected problem with changing classification index in interface.
-
-- Made improvements to README.
-
-- Corrected video compartmental visualisation of loaded tensors.
-
-- Reversed order of compartments when loading with no position information (otherwise appear upside down).
-
-- To avoid the interface becoming too slow parameters are shown with "Too large to edit" and only initial values are displayed. This is for: value, const, define, reparam, dist-spliy, prior-split, prior-const, factor weight, distance, identity matrix, density vector, X vector, A matrix, data files.
-
-- Problem with loading large files into interface
-
-- Allow for large tables to be saved from the menu
-
-- Made it so not possible to put splines within reparameterised parameters (this causes complications, and anyway not very useful).
-
-- Correction to PAS to stop crashing when annealing done very fast.
-
-- In interface when changing parameter type now show first visualisation (makes it easier to see 'graph' view)
-
-- Corrected problem with outputting large sparse matrices
-
-- Added to code to independently check varioous speed up techinues applied (suggests that everything is working)
-
-- Corrected error in interface when error in parameter intialisation caused a crash
-
-- Corrected problem in interface with derived quantities not correctly deleting
-
-- Got time displayed on plots of time-varying parameters
-
-- Sorted out Linux version of software
-
-- Corrected problem with window size being incorrect in Linux version
-
-- Added the possibility of weight into dynamic parameters
-
-- Make proposals that use parameters within splines more efficient (by only updating time window)
-
-- Improved efficiency of update algorithm by accounting by linearity in population combinations 
-
-- Add to profiling for pop_list
-
-- Sorted out outputing underinfed parmeter (e.g. when not all spatial interactions are calculated) 
-
-- Got example F3.8 working
-
-- Incorprated infomation about probability of transition observation into individual sampler
-
-- Corrected problem with seed generation (for some reason on c++ seeds 0 and 1 are the same)
-
-- Corrected problem with parameter associates with intial compartment probvability not appearing on "Prior" page
-
-- Implemented credible interval metric for initial state
-
-- Latin hypercube sampling for initial state of chain 
-
-- Box in interface for the number of initial number of simulated states
-
-- Parameter proposals for bernoulli variables
-
-- Allow for proposals to be in log space or normal space (e.g. for positive parameters with an inverse relations the log transformed distirbution looks much more MVN)
-
-- Dynamic changes to parameters
-
-- When generating simulated data, allow for the possibility of copying the simulation population distribution
-
-- Get determinisitc solver working (using simple Euler approach)
-
-- Update name for ie variance parameter
-
-- Problem when individual effect variances get set to zero
-
-- Got population at specified time (e.g. {I;t=40}’) working
-
-- Add 'bin-thresh-eqn' and 'bin-min-max-eqn' and that allow for an arbitrary equations to be set 
-
-- For transmission tree sample at the end of execution when no genetic data (this is much more efficient because it doesn't require keeping track of transmission during inference)
-
-- Reduced the size of executable but turning off the debugger (-g) flag
-
-- Corrected problem with exporting parameters and state when these are encoded
+- Corrected examples S4.2, S4.3, S4.6 to being population-based models
+- Changed spacing on inference options page to avoid window becoming too small
+- Under simulation changed from individuals attached to markov equations to individuals attached to transitions. This allows for simulation under inference with observed transitions to be much more efficient
+- Added an optimised way of sampling from individuals under simulation (spliting indfac into sections an doing importance sampling on those sections).
+- Corrected mistake when buble was opened on correlation plot errors occured when changing view.
+- Corrected problem when navigating away from page with an animation playing

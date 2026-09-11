@@ -196,13 +196,6 @@ unsigned int Chain::get_nburnin()
 }
 
 
-/// Updates any joint proposals
-void Chain::join_proposal_update()
-{
-	check_join_proposal();
-}
-
-
 /// Iterates chain
 void Chain::pas_burn_update(unsigned int s, unsigned int gen_update, double phi)
 {
@@ -1087,7 +1080,7 @@ void Chain::update_init()
 	print_diag("update_init 9");
 
 	if(model.mode != EXT){
-		for(auto i = 0u; i < 20; i++){
+		for(auto i = 0u; i < INF_INIT_NPARAM_SAMPLE; i++){
 			auto param_val = model.param_sample(true);
 			cor_matrix.add_sample(model.get_param_val_prop(param_val),LARGE);
 		}
@@ -1479,11 +1472,18 @@ void Chain::check_join_proposal()
 	auto pl = false;
 	
 	auto n = cor_matrix.get_n();
-	auto f = exp(-(n/400.0));
-
+	
+	auto nn_max = 400.0;
+	auto nn = n-INF_INIT_NPARAM_SAMPLE;
+	if(nn > nn_max) nn = nn_max;
+	
+	auto num = 1.0;
+	auto ndecay = nn_max/num;
+	auto sh = exp(-num);
+	auto f = (exp(-(nn/ndecay))-sh)/(1-sh);
+	
 	auto thresh = f + (1-f)*PROP_JOIN_COR_MIN;
- 
-	if(n < 50) thresh = LARGE;
+	if(n < 50) thresh = 1;
 	
 	// Switches off all multinomial proposals
 	vector <bool> on_st;
@@ -1512,7 +1512,7 @@ void Chain::check_join_proposal()
 	}
 	
 	//print_matrix("M",M_norm);
-	//print_matrix("M_log",M_norm);
+	//print_matrix("M_log",M_log_trans);
 
 	for(auto loop = 0u; loop < 2; loop++){ // Goes through normal then log transformmed
 		if(pl) cout << loop << " loop" << endl;	

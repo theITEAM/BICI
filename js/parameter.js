@@ -341,6 +341,10 @@ function generate_parameter_list()
 		case "dynamic_weight":
 			mess = "For weight on a dynamic parameter";
 			break;
+		
+		case "thresh":
+			mess = "For threshold on a dynamic parameter";
+			break;
 			
 		case "dynamic_eqn":
 			mess = "For equation on a dynamic parameter";
@@ -2693,11 +2697,29 @@ function find_equation_list()
 	
 	for(let i = 0; i < model.param.length; i++){
 		let par = model.param[i];
+		
 		if(par.variety == "dynamic"){
+			let eqn_info = {i:i, eso:"sim"};
+			
 			let di = par.dynamic_info;
 			if(di.weight.check == true){
-				let eqn_info = {i:i, eso:"dwe"};
+				
 				add_equation_to_list(eqn_list,di.weight_eqn,eqn_info);		
+			}
+			
+			switch(di.type.te){
+			case "bin-thresh": case "bin-thresh-dist": case "bin-thresh-region": case "bin-thresh-eqn":
+				add_equation_to_list(eqn_list,di.thresh,eqn_info);
+				break;
+				
+			case "bin-min-max": case "bin-min-max-dist": case "bin-min-max-region": case "bin-min-max-eqn":
+				add_equation_to_list(eqn_list,di.threshmin,eqn_info);
+				add_equation_to_list(eqn_list,di.threshmax,eqn_info);
+				break;
+			
+			default:	
+				error("option not recognised");
+				break;
 			}
 		}
 	}

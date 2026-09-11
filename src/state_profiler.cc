@@ -184,10 +184,22 @@ void State::profile_memory() const
 				sum += ind.ev.size()*sizeof(Event);
 				sum += ind.popnum_ind_ref.size()*sizeof(PopnumIndRef);
 				sum += ind.incomp_ref.size()*sizeof(IncompNMTransRef);
-				sum += ind.markov_eqn_ref.size()*sizeof(MarkovEqnRef);
+				sum += ind.tra_ind_ref.size()*sizeof(TransIndRef);
 			}				
 			sum_tot += sum;
 			if(sum > sum_min) cout << "individual: " << (unsigned int)(sum*f) << endl;
+		}
+		
+		{
+			auto sum = 0.0;
+			for(const auto &tri : ssp.tra_ind){
+				sum += sizeof(TraInd);
+				for(auto k = 0u; k < TRA_IND_SECTION; k++){
+					sum += sizeof(TraIndSec) + tri.section[k].ind_tra.size()*sizeof(IndTransRef);
+				}
+			}
+			sum_tot += sum;
+			if(sum > sum_min) cout << "tra_ind: " << (unsigned int)(sum*f) << endl;
 		}
 		
 		{
@@ -284,7 +296,7 @@ void State::profile_memory() const
 			auto sum = 0.0;
 			for(const auto &val : ssp.markov_eqn_vari){
 				sum += sizeof(MarkovEqnVariation);
-				sum += val.ind_tra.size()*sizeof(IndTransRef);
+				//sum += val.ind_tra.size()*sizeof(IndTransRef);
 				for(const auto &val2 : val.div){
 					sum += sizeof(MEIndDiv)+val2.ind_trans.size()*sizeof(DivIndRef);
 				}

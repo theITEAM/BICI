@@ -36,12 +36,10 @@ Inference for estimating genetic and non-genetic effects underlying disease spre
 
 TO DO NEXT
 - Make determinisitic/MBP with initial conditions more efficient (by accounting for correlations)
-- Get period distribution working
 - Read paper from ben swallow
 - When doing tornado plots set permissions directly for executable
 - Add filters for compartmental and test data when simulating
--- cannot add midpoints when uploading transitions into interface
-- set-ind-effect-sim has been added, but how about set-ind-effect-inf and set-ind-effect-post-sim
+
 -- For initial conditions view as table or as compartment (good when there are a lot of compartments)
 -- Sort out fixed initial population for individual and population-based models (perhaps convert to Dirichlet?)
 -- Stop file read from loading when one file cannot be loaded
@@ -52,35 +50,29 @@ TO DO NEXT
 -- GWAS
 -- Delay differential equations 
 - Sampling from symmetric matrix
-- Do these exaples work α×{I;t=40}’ as described in the manual?
+
+-- Model evidence
+-- MC3
+-- emulation method
 
 TO DO
-- Turn back on and continue testing:  if(false) check_param(); // This is used fo
+- Do these exaples work α×{I;t=40}’ as described in the manual?
+- Get period distribution working
+-- cannot add midpoints when uploading transitions into interface
+- set-ind-effect-sim has been added, but how about set-ind-effect-inf and set-ind-effect-post-sim
+- Check 95% credible interval is correct.
 - CHeck for values when param weight is added
 changes in compartment and index affecting model (split define etc..)
 
 
 
 TESTING
+- Turn back on and continue testing:  if(false) check_param(); // This is used fo
 change index
 rename species
 rename classification
 postsim
 extend
-
-
-
-Fixed?
-- Problem with extending twice
-- Loading percent seemed to not be right
-- Mac package content larger
--- interface simulate with parameter in observation model
-
-
-FUTURE THINGS TO GET SORTED
--- Model evidence
--- MC3
--- emulation method
 
 
 DONE

@@ -1309,7 +1309,7 @@ void Species::trans_data(const DataSource &so)
 	ob_tr.tra_prob_eqn = create_eqn_vector(prob_str,TRANS_PROB,so);
 	ob_tr.ti_min = ti_min;
 	ob_tr.ti_max = ti_max;
-	ob_tr.single_trans = false;//zz
+	ob_tr.single_trans = false;
 	
 	obs_trans.push_back(ob_tr);
 	

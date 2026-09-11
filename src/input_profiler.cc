@@ -877,11 +877,11 @@ double Input::species_profile() const
 		
 		{
 			auto sum = 0.0;
-			for(const auto &val : sp.markov_tree.node){
-				sum += sizeof(MarkovNode) + mem(val.child);
+			for(const auto &val : sp.tra_markov_tree.node){
+				sum += sizeof(TraMarkovNode) + mem(val.child);
 			}
 			sum_tot += sum;
-			if(sum > sum_min) cout << "markov_tree: " << (unsigned int)(sum*f) << endl;
+			if(sum > sum_min) cout << "tra_markov_tree: " << (unsigned int)(sum*f) << endl;
 		}
 		
 		{

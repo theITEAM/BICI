@@ -124,6 +124,8 @@ void State::check_simp(string ref)
 // Checks everything used in inference
 void State::check(string ref)
 {
+	//cout << ref << " state check";
+	
 	if(testing == false) return;
 	
 	//check_markov_value_dif();
@@ -1018,7 +1020,7 @@ void State::check_like(string ref)
 
 /// Checks that priors are correctly specified
 void State::check_prior(string ref)
-{
+{		
 	check_timer[CHECK_PRIOR] -= clock();
 	
 	// Checks prior_prob is correct

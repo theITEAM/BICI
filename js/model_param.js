@@ -604,7 +604,7 @@ function set_prior_const_bubble(cont,type,ac)
 	}
 	
 	if(fl){
-		bubble_addparagraph(cont,"Select parameter that is going to be set as constant under inferences:",0,cont.dx);
+		bubble_addparagraph(cont,"Select parameter that is going to be set as constant under inference:",0,cont.dx);
 		cont.y += 0.2;
 	
 		bubble_addscrollable(cont,{type:"prior const param sel", ymax:10, ac:ac}); 

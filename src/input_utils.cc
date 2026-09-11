@@ -2029,10 +2029,11 @@ bool Input::add_param_eqn(const EquationInfo &eqn_raw, Param &par, Hash &hash_eq
 {
 	auto ch_flag = false;
 	
-	const auto &depend = par.dep;
-	//const auto &eqn_raw = par.reparam_eqn;
-	//par.reparam_eqn = "";
+	if(par.element.size() == 0) return false;
+	if(par.element[0].value.eq_ref != UNSET) return false;
 	
+	const auto &depend = par.dep;
+
 	if(par.time_dep){
 		if(par.spline_info.type != SQUARE_SPL){
 			if(par.variety == DYNAMIC_PARAM){
@@ -2044,8 +2045,6 @@ bool Input::add_param_eqn(const EquationInfo &eqn_raw, Param &par, Hash &hash_eq
 		}			
 	}
 	
-	//auto eqn_raw = he(add_equation_info(te,REPARAM_EQN),par.line_num);
-		
 	vector <DepConv> dep_conv;
 	for(auto d = 0u; d < depend.size(); d++){
 		const auto &dep = depend[d];

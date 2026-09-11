@@ -953,7 +953,10 @@ class Graph
 			}
 		
 			if(anim.playframe < anim.playframe_max){
-				setTimeout(function(){ inter.graph.playanim();}, 10);
+				inter.graph.plot_timeout = setTimeout(function(){
+					inter.graph.plot_timeout = undefined;
+					inter.graph.playanim();
+					}, 10);
 			}
 		}
 	}
@@ -3337,6 +3340,7 @@ class Graph
 /// Resets the graph
 function reset_graph()
 {
+	clear_graph_anim();
 	inter.graph.init = undefined;
 	generate_screen();
 }

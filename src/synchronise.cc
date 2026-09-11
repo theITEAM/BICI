@@ -71,7 +71,7 @@ void synchronise_proposal(unsigned int s, vector <Chain> &chain, Mpi &mpi)
 		//auto M = cor_m.calculate_cor_matrix();
 		//print_matrix("mat after",M);
 		
-		cha.join_proposal_update();
+		cha.check_join_proposal();
 	}
 
 	// Synchronise proposals

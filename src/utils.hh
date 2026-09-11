@@ -229,7 +229,8 @@ bool param_omega(string name);
 bool contains_space(string te);
 string output_table(const Table &tab);
 Stat get_statistic(vector <double> &vec);
-vector <unsigned int> combine_lists(const vector < vector <unsigned int> > lists);
+vector <unsigned int> remove_repeated(const vector <unsigned int> &list);
+vector <unsigned int> combine_lists(const vector < vector <unsigned int> > &lists);
 void print_random(string te);
 
 // In utils_eqn.cc

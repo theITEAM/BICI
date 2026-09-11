@@ -74,6 +74,7 @@ class StateSpecies                         // Stores information about the state
 	
 		vector <MarkovEqnVariation> markov_eqn_vari; // Store variation in markov equations
 		
+		vector <TraInd> tra_ind;               // Stores which individuals are on which transition
 		
 		//vector <MEUpdate> markov_update;       // Determines if markov is updated (used in simulation)
 	
@@ -157,7 +158,7 @@ class StateSpecies                         // Stores information about the state
 		unsigned int ti_sort;                  // Trigger events which have been sorted
 		
 		unsigned int nnode;                    // The number of nodes
-		vector <double> markov_tree_rate;      // Rates going up Markov tree
+		vector <double> tra_markov_tree_rate;  // Markovian rates going up Markov tree
 	
 		void initialise_arrays();
 		void reset_arrays();
@@ -186,32 +187,34 @@ class StateSpecies                         // Stores information about the state
 		void remove_individual(unsigned int i, vector <InfNode> &inf_node);
 		//string get_new_ind_name(string pre, unsigned int num) const;
 		void calculate_N_unobs();
-		void calculate_indfac_sum();
+		//void calculate_indfac_sum();
 		Event get_event(EventType type, unsigned int i, unsigned int tr_gl, unsigned int move_c, unsigned int cl, unsigned int c_after, double t, const IndInfFrom &inf_from);
 		void update_markov_value(unsigned int ti, const vector <double> &popcomb);
 		
 	private:
 		void implement_test_and_cull(unsigned int index, double tdiv, const vector < vector <double> > &popcomb_t);
 		void add_data_event(unsigned int i, double t, const vector <SimTrigEvent> &trig_vec, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind);
-		bool allow_event(double t, const IndTransRef &itr) const;
+		bool allow_event(double t, const IndTraRef &itr) const;
 		void ie_sampler_init();
 		void update_ind_c(unsigned int i, double t, unsigned int cl_trans, const vector < vector <double> > &popcomb_t);
 		void insert_trigger_event(const SimTrigEvent &trig);
 		SimTrigEvent get_nm_trig_event(double t, unsigned int i,  unsigned int c, unsigned int cl, const vector < vector <double> > &popcomb_t);
 		bool try_insert_data_trans_event(double t, unsigned int cl, unsigned int i);
-		void add_markov_transition(unsigned int i, unsigned int tgl);
+		void add_markov_transition(unsigned int i, unsigned int tgl, double t);
 		void markov_eqn_recalc(unsigned int e, unsigned int ti, const vector <double> &popcomb);
 		void markov_eqn_recalc_sim(MEUpdate me_up, unsigned int e, unsigned int ti, const vector <double> &popcomb);
 		void markov_vari_value_copy(unsigned int ti);
 		void sort_trig_event(unsigned int ti);
 		void sample_infecting_ind(unsigned int i, double t, unsigned int tr_gl, IndInfFrom &inf_from, const vector < vector <double> > &popnum_t, const vector < vector <Poss> > &pop_ind);
 		IndInfFrom get_waifw(unsigned int i, double t) const;
-		void update_ind_trans(double t, const IndTransRef &itr, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind);
-		void remove_markov_trans(unsigned int i);
+		void update_ind_trans(double t, const IndTraRef &itr, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind);
+		void remove_markov_trans(unsigned int i, double t);
 		void update_ind_remove(unsigned int i, double t);
 		void update_ind_move(unsigned int i, double t, unsigned int c_comp, unsigned int cl, const vector < vector <double> > &popcomb_t);
-		void update_markov_tree_rate(unsigned int e, double dif);
-		void set_markov_tree_rate();
+		unsigned int get_section(double fac) const;
+		double prob_event(unsigned int tgl, unsigned int ti) const;
+		void update_tra_markov_tree_rate(unsigned int trg, double dif);
+		void set_tra_markov_tree_rate(unsigned int ti);
 		void add_event(EventType type, unsigned int i, unsigned int tr_gl, unsigned int move_c, unsigned int cl, unsigned int c_after, double t, const IndInfFrom &inf_from);
 		
 	// In 'state_species_check.cc'
@@ -228,11 +231,11 @@ class StateSpecies                         // Stores information about the state
 		void check_obs_inconsitent() const;
 	
 	private:
-		void check_markov_eqn_ref() const;
+		void check_tra_ind_ref() const;
 		void check_cpop() const;
 		void check_markov_indfac_sum();
 		void check_markov_eqn(unsigned int ti, const vector <double> &popcomb) const;
-		void check_markov_tree_rate();
+		void check_tra_markov_tree_rate(unsigned int ti);
 		void check_event() const;
 		void check_erlang() const;
 		void check_trans_num_neg() const;
@@ -258,11 +261,11 @@ class StateSpecies                         // Stores information about the state
 	void print_likelihood_markov();
 		vector <double> likelihood_markov(unsigned int e, const vector <unsigned int> &list, double &like_ch);
 		vector <double> likelihood_nm_trans(unsigned int m, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, double &like_ch);
-		void likelihood_nm_trans_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> store);
+		void likelihood_nm_trans_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> &store);
 		vector <double> likelihood_nm_trans_incomp(unsigned int n, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, double &like_ch);
-		void likelihood_nm_trans_incomp_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> store);
+		void likelihood_nm_trans_incomp_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> &store);
 		vector <double> likelihood_nm_trans_bp(unsigned int m, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t, double &like_ch);
-		void likelihood_nm_trans_bp_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> store);
+		void likelihood_nm_trans_bp_restore(unsigned int m, const vector <unsigned int> &list, const vector <double> &store);
 		double nm_trans_incomp_full_like(const vector <unsigned int> &nmtrans_ref, double dtdiv, double dt, const vector< vector <double> > &ref_val, const vector <double> &bp_val) const;
 		double nm_trans_incomp_like(TransType type, double dtdiv, double dt, const vector <double> &ref_val) const;
 		double nm_trans_incomp_like_no_log(TransType type, double dtdiv, double dt, const vector <double> &ref_val) const;

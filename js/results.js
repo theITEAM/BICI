@@ -1210,6 +1210,7 @@ function initialise_plot_filters(result,source)
 	// Possibilies for parameter view
 	let pres = get_pos_paramview(result);
 	rpf.pos_paramview = pres.ppv;
+
 	if(rpf.pos_paramview.length > 0){
 		rpf.sel_paramview = copy(rpf.pos_paramview[0]);
 	}
@@ -1544,7 +1545,7 @@ function initialise_plot_filters(result,source)
 	if(pos_popdata.length > 0) pos_view.push({te:"Data"});
 	
 	for(let k = 0; k < pos_view.length; k++) pos_view[k].bub_off = true;
-	
+
 	rpf.sel_view = copy(pos_view[0]);
 	rpf.pos_view = pos_view;
 	
@@ -1991,6 +1992,8 @@ function get_pos_paramview(result)
 
 	for(let k = 0; k < pos_paramview.length; k++) pos_paramview[k].select_first_view = true;
 
+	for(let k = 0; k < pos_paramview.length; k++) pos_paramview[k].bub_off = true;
+	
 	return {ppv:pos_paramview, pgv:pos_genview};
 }
 

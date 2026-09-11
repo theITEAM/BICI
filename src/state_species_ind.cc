@@ -17,14 +17,11 @@ using namespace std;
 /// Updates the individuals in the system (using a modified Gillespie algorithm)
 void StateSpecies::update_individual_based(unsigned int ti, const vector < vector <Poss> > &pop_ind, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t)
 {
-	//timer[SORT] -= clock();	
 	sort_trig_event(ti);
-	//timer[SORT] += clock();	
 
-	//timer[ITER] -= clock();	
 	auto i_trig = 0u;                            // This indexes potential trigger events
 	
-	const auto &node = sp.markov_tree.node;
+	const auto &node = sp.tra_markov_tree.node;
 	
 	auto &tri_ev = trig_div[ti].ev;
 	
@@ -32,7 +29,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 	double tnext = ti+1;
 	do{
 		double dtdiv;
-		auto R = 0.0; if(nnode > 0) R = markov_tree_rate[nnode-1];
+		auto R = 0.0; if(nnode > 0) R = tra_markov_tree_rate[nnode-1];
 
 		if(R > -TINY && R < TINY) dtdiv = LARGE;
 		else{
@@ -78,7 +75,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 			
 			case NM_TRANS_SIM_EV:
 				{
-					IndTransRef itr; itr.i = trig.i; itr.index = UNSET; itr.tr_gl = trig.trg;	
+					IndTraRef itr; itr.i = trig.i; itr.tr_gl = trig.trg;	
 					update_ind_trans(tf,itr,popnum_t,popcomb_t,pop_ind);
 				}
 				break;
@@ -101,7 +98,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 				
 			case SOURCE_SIM_EV:
 				{
-					IndTransRef itr; itr.i = trig.i; itr.index = UNSET; itr.tr_gl = trig.trg;	
+					IndTraRef itr; itr.i = trig.i; itr.tr_gl = trig.trg;	
 					update_ind_trans(tf,itr,popnum_t,popcomb_t,pop_ind);
 				}
 				break;
@@ -110,22 +107,22 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 		}
 		else{ 														   				    // Markovian event
 			if(tf > tnext){
-				//timer[ITER] += clock();	
 				return;
 			}
 		
 			auto num = ran()*R;
 		
-			auto e = nnode-1;                             // Randomly selects an equation
+			auto e = nnode-1;                             // Randomly selects a transition
 			
-			while(e >= N){
+			auto emax = sp.ntranode;
+			while(e >= emax){
 				auto &no = node[e];
 				
 				if(no.child.size() == 1) e = no.child[0];
 				else{
 					if(no.child.size() != 2) emsg("prob");
-					auto val0 = markov_tree_rate[no.child[0]];
-					auto val1 = markov_tree_rate[no.child[1]]; 
+					auto val0 = tra_markov_tree_rate[no.child[0]];
+					auto val1 = tra_markov_tree_rate[no.child[1]]; 
 					if(num > val0+val1 || num < -TINY) emsg("Not in range");
 					
 					if(num < val0) e = no.child[0];
@@ -133,65 +130,80 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 				}
 			}
 			
+			auto tr = node[e].tra_gl;
+			if(tr == UNSET) emsg("Transition is unset");
+			
+			const auto &trg = sp.tra_gl[tr];
+		
 			// Randomly selects an individual
-			auto &me = sp.markov_eqn[e];
-			auto &me_vari = markov_eqn_vari[e];
-			if(me.source == true){
-				auto si = me.source_tr_gl.size();
-				if(si == 0) emsg("Source size zero");
-				auto tr_gl = me.source_tr_gl[(unsigned int)(ran()*si)];
-				
+			if(trg.i == UNSET){ // Individual entering
 				auto i = individual.size();
+				IndTraRef itr; itr.i = i; itr.tr_gl = tr;
 				
-				IndTransRef itr; itr.i = i; itr.index = UNSET, itr.tr_gl = tr_gl;
-				
-				if(allow_event(tf,itr)){
-					add_individual(UNOBSERVED_IND);
-					update_ind_trans(tf,itr,popnum_t,popcomb_t,pop_ind);
-				}
+				add_individual(UNOBSERVED_IND);
+				update_ind_trans(tf,itr,popnum_t,popcomb_t,pop_ind);
 			}
 			else{
-				if(me_vari.ind_tra.size() == 0) emsg("should not be zerob");
-				
-				unsigned int j;
-				if(me.ind_variation == false){              // Randomly selects an individual
-					j = (unsigned int)(ran()*me_vari.ind_tra.size());
-				}	
-				else{			                                  // Selects weighted by individual factor
-					auto &it = me_vari.ind_tra;
-					auto sum = 0.0;
-					vector <double> sum_st;
-					for(auto k = 0u; k < it.size(); k++){
-						const auto &itr = it[k];
+				const auto &tri = tra_ind[tr];
 					
-						sum += get_indfac(individual[itr.i],me);
+				auto i = UNSET;
+				
+				const auto &me = sp.markov_eqn[trg.markov_eqn_ref];
+					
+				if(me.ind_variation == false){              // Randomly selects an individual
+					const auto &sec = tri.section[TRA_IND_SEC_OFFSET];
+					if(dif(sec.indfac_sum,tri.indfac_sum,dif_thresh)) emsg("indfac Should be the same");
+					
+					auto N = sec.ind_tra.size();
+					if(N == 0) emsg("N is zero");
+				
+					i = sec.ind_tra[(unsigned int)(ran()*N)].i;
+				}	
+				else{			// Selects weighted by individual factor
+					const auto &section = tri.section;
+					
+					// First samples section
+					auto sum = 0.0; 
+					vector <double> sum_st;
+					for(auto i = 0u; i < TRA_IND_SECTION; i++){
+						sum += section[i].indfac_sum;
 						sum_st.push_back(sum);
 					}
+					
+					if(dif(sum,tri.indfac_sum,dif_thresh)) emsg("Should be the same");
+					
 					if(sum == 0) emsg("zero problem");
 					auto z = ran()*sum;
 					
-					j = 0u; while(j < it.size() && z > sum_st[j]) j++;
-					if(j == it.size()) emsg("erro select");
+					auto s = 0u; while(s < TRA_IND_SECTION && z > sum_st[s]) s++;
+					if(s == TRA_IND_SECTION) emsg("erro select");
 				
-					//if(dif(sum,me_vari.indfac_sum,dif_thresh)){
-						//emsg("Should be the same");
-					//}
+					// Then samples within section using rejection sampling
+					const auto &sec = section[s];
+					auto max = sec.max;
+					
+					auto N = sec.ind_tra.size();
+					if(N == 0) emsg("N is zero");
+					while(true){
+						auto j = (unsigned int)(ran()*N);
+						if(max*ran() <= sec.ind_tra[j].indfac){
+							i = sec.ind_tra[j].i;
+							break;
+						}
+					}
+					
 				}
 			
-				const auto &itr = me_vari.ind_tra[j];
-			
-				if(allow_event(tf,itr)){
-					update_ind_trans(tf,itr,popnum_t,popcomb_t,pop_ind);
-				}
+				IndTraRef itr; itr.i = i; itr.tr_gl = tr;
+		
+				update_ind_trans(tf,itr,popnum_t,popcomb_t,pop_ind);
 			}
 		}
 		
 		if(slow_check) check(ti,popcomb_t);
-		//check(ti,popcomb_t);
 		
 		t = tf;
 	}while(true);
-	//timer[ITER] += clock();	
 
 	timer[CHECK] -= clock();	
 	if(slow_check) check(T,popcomb_t);
@@ -201,8 +213,10 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 						
 /// Allows events or not
 // Under interence this allows initial simulate state to lie close to data
-bool StateSpecies::allow_event(double t, const IndTransRef &itr) const
+bool StateSpecies::allow_event(double t, const IndTraRef &itr) const
 {
+	if(!(mode == INF || mode == EXT)) return true;
+	
 	auto trg = itr.tr_gl;
 	
 	auto ti = get_ti(t);
@@ -323,7 +337,7 @@ void StateSpecies::add_data_event(unsigned int i, double t, const vector <SimTri
 		auto k = 0u; while(k < tra_pos.size() && z > tra_pos[k].probsum) k++;
 		if(k == tra_pos.size()) emsg("tra_pos proble");
 		
-		IndTransRef itr; itr.i = i; itr.index = UNSET; itr.tr_gl = tra_pos[k].trg;
+		IndTraRef itr; itr.i = i; itr.tr_gl = tra_pos[k].trg;
 		update_ind_trans(t,itr,popnum_t,popcomb_t,pop_ind);
 	}
 }
@@ -340,10 +354,11 @@ void StateSpecies::activate_initial_state(double t, const vector < vector <doubl
 	
 	const auto &precalc = param_val.precalc;
 	
-	const auto &node = sp.markov_tree.node;
+	//const auto &node = sp.tra_markov_tree.node;
 
-	markov_tree_rate.clear();
-	markov_tree_rate.resize(node.size(),0);
+	tra_markov_tree_rate.clear();
+	tra_markov_tree_rate.resize(nnode,0);
+	
 	for(auto i = 0u; i < N; i++){
 		auto &me = sp.markov_eqn[i];
 		auto &me_vari = markov_eqn_vari[i];
@@ -359,14 +374,10 @@ void StateSpecies::activate_initial_state(double t, const vector < vector <doubl
 			value = 1/mean;
 		}
 		
-		auto indfac_sum = 0;
-		if(me.source == true) indfac_sum = me.source_tr_gl.size();
-		
 		me_vari.value = value;
-		me_vari.indfac_sum = indfac_sum; 
-
-		update_markov_tree_rate(i,value*indfac_sum);
 	}
+
+	if(sp.contains_source) set_tra_markov_tree_rate(ti);
 	
 	for(auto i = 0u; i < individual.size(); i++){
 		if(ind_sim_c[i] != UNSET){
@@ -400,7 +411,7 @@ void StateSpecies::update_ind_c(unsigned int i, double t, unsigned int cl_trans,
 					if(tr.ev_type != M_TRANS_EV) emsg("Should be exponential"); 
 					if(tr.i != c) emsg("Problem with selected");
 			
-					add_markov_transition(i,tgl);
+					add_markov_transition(i,tgl,t);
 				}
 			}
 			else{
@@ -415,7 +426,7 @@ void StateSpecies::update_ind_c(unsigned int i, double t, unsigned int cl_trans,
 						
 						auto t = trig.tdiv;
 						if(t < T){
-							IndTransRef itr; itr.i = trig.i; itr.index = UNSET; itr.tr_gl = trig.trg;	
+							IndTraRef itr; itr.i = trig.i; itr.tr_gl = trig.trg;	
 							if(allow_event(t,itr)){
 								insert_trigger_event(trig);
 							}
@@ -662,59 +673,100 @@ bool StateSpecies::try_insert_data_trans_event(double t, unsigned int cl, unsign
 
 
 /// Adds an individual the markovian transition corresponding to a global transition
-void StateSpecies::add_markov_transition(unsigned int i, unsigned int tgl)
+void StateSpecies::add_markov_transition(unsigned int i, unsigned int tgl, double t)
 {
 	auto &ind = individual[i];
 	
 	auto mef = sp.tra_gl[tgl].markov_eqn_ref;
 	
 	auto &me = sp.markov_eqn[mef];
-	auto &me_vari = markov_eqn_vari[mef];
+	//auto &me_vari = markov_eqn_vari[mef];
+	auto &tri = tra_ind[tgl];
 	
-	MarkovEqnRef mer; mer.e = mef; mer.index = me_vari.ind_tra.size();
-	IndTransRef itr; itr.i = i; itr.index = ind.markov_eqn_ref.size(); itr.tr_gl = tgl;
+	auto indfac = get_indfac(ind,me);
+	
+	auto s = get_section(indfac);
+	auto &sec = tri.section[s];
+	
+	if(indfac > sec.max) sec.max = indfac;
+	
+	TransIndRef tir; 
+	tir.tra_gl = tgl;
+	tir.section = s;
+	tir.index = sec.ind_tra.size(); 
+	
+	IndTransRef itr; itr.i = i; itr.index = ind.tra_ind_ref.size(); itr.indfac = indfac;
 
-	ind.markov_eqn_ref.push_back(mer);
-	me_vari.ind_tra.push_back(itr);
+	ind.tra_ind_ref.push_back(tir);
+	sec.ind_tra.push_back(itr);
 	
-	auto val = get_indfac(ind,me);
+	sec.indfac_sum += indfac;
+	tri.indfac_sum += indfac;
 	
-	me_vari.indfac_sum += val;
+	const auto &me_vari = markov_eqn_vari[mef];
 	
-	update_markov_tree_rate(mef,me_vari.value*val);
+	auto ti = get_ti(t);
+	
+	update_tra_markov_tree_rate(tgl,me_vari.value*indfac*prob_event(tgl,ti));
 }
 
 
-/// Updates markov_tree_rate
-void StateSpecies::update_markov_tree_rate(unsigned int e, double dif)
+/// Converts from a factor to a section
+unsigned int StateSpecies::get_section(double fac) const 
 {
-	const auto &node = sp.markov_tree.node;
+	auto f = TRA_IND_SEC_OFFSET+log2(fac);
+	if(f < 0) f = 0;
+	if(f >= TRA_IND_SECTION) f = TRA_IND_SECTION-1;
+	
+	return (unsigned int) f;
+}
 
+
+/// Returns the probability of the event (based on observed transitions)
+double StateSpecies::prob_event(unsigned int tgl, unsigned int ti) const
+{
+	if(mode != INF) return 1;
+	
+	return exp(trans_logprob_notobs(tgl,ti));
+}
+
+
+/// Updates tra_markov_tree_rate
+void StateSpecies::update_tra_markov_tree_rate(unsigned int trg, double dif)
+{
+	const auto &node = sp.tra_markov_tree.node;
+	auto e = sp.tra_gl[trg].tra_markov_tree_ref;
+	
 	do{
-		auto va = markov_tree_rate[e]+dif;
+		auto va = tra_markov_tree_rate[e]+dif;
 		//if(va > -TINY && va < TINY) va = 0;
 		if(va < 0) va = 0;
-		markov_tree_rate[e] = va;
+		tra_markov_tree_rate[e] = va;
 		e = node[e].parent;
 	}while(e != UNSET);
 }
 
 
 /// Sets the values for markov_tree_rate
-void StateSpecies::set_markov_tree_rate()
+void StateSpecies::set_tra_markov_tree_rate(unsigned int ti)
 {
-	for(auto i = 0u; i < N; i++){
-		auto &me_vari = markov_eqn_vari[i];
-		if(me_vari.value == UNSET) emsg("Markov unset problem");
-		markov_tree_rate[i] = me_vari.value*me_vari.indfac_sum;
-	}
+	const auto &node = sp.tra_markov_tree.node;
 	
-	const auto &node = sp.markov_tree.node;
-	for(auto i = N; i < node.size(); i++){
+	for(auto i = 0u; i < nnode; i++){
 		const auto &no = node[i];
+			
+		if(i < sp.ntranode){
+			auto tr = no.tra_gl;
+
+			auto me = sp.tra_gl[tr].markov_eqn_ref;
+			if(me == UNSET) emsg("Should not be me unset");
 		
-		auto sum = 0.0; for(auto j : no.child) sum += markov_tree_rate[j];
-		markov_tree_rate[i] = sum;
+			tra_markov_tree_rate[i] = markov_eqn_vari[me].value*tra_ind[tr].indfac_sum*prob_event(tr,ti);
+		}
+		else{
+			auto sum = 0.0; for(auto j : no.child) sum += tra_markov_tree_rate[j];
+			tra_markov_tree_rate[i] = sum;
+		}
 	}
 }
 
@@ -740,6 +792,7 @@ void StateSpecies::insert_trigger_event(const SimTrigEvent &trig)
 }
 
 
+/*
 /// Calculates indfac_sum on each Markov equation
 void StateSpecies::calculate_indfac_sum()
 {
@@ -766,6 +819,7 @@ void StateSpecies::calculate_indfac_sum()
 		}
 	}
 }
+*/
 
 
 /// Recalculates Markov equation value
@@ -883,7 +937,7 @@ void StateSpecies::update_markov_value(unsigned int ti, const vector <double> &p
 	//emsg("hh");
 	
 	markov_vari_value_copy(ti);
-	if(type == INDIVIDUAL) set_markov_tree_rate();
+	if(type == INDIVIDUAL) set_tra_markov_tree_rate(ti);
 }
 
 
@@ -1009,7 +1063,7 @@ IndInfFrom StateSpecies::get_waifw(unsigned int i, double t) const
 
 
 /// Updates an individual with a transition
-void StateSpecies::update_ind_trans(double t, const IndTransRef &itr, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind)
+void StateSpecies::update_ind_trans(double t, const IndTraRef &itr, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind)
 {
 	auto i = itr.i;
 	
@@ -1035,7 +1089,7 @@ void StateSpecies::update_ind_trans(double t, const IndTransRef &itr, const vect
 	
 	add_event(type,i,tr_gl,UNSET,UNSET,tr.f,t,inf_from);
 	
-	remove_markov_trans(i);
+	remove_markov_trans(i,t);
 	
 	// Updates individual based on new compartment
 	if(ind_sim_c[i] != UNSET){
@@ -1046,31 +1100,49 @@ void StateSpecies::update_ind_trans(double t, const IndTransRef &itr, const vect
 
 
 // Removes all current markov transitions for an individual
-void StateSpecies::remove_markov_trans(unsigned int i)
+void StateSpecies::remove_markov_trans(unsigned int i, double t)
 {
-	auto &ind = individual[i];
-	for(const auto &mef : ind.markov_eqn_ref){
-		auto &me = sp.markov_eqn[mef.e];
-		auto &me_vari = markov_eqn_vari[mef.e];
-		
-		auto indfac = get_indfac(ind,me);
-		
-		me_vari.indfac_sum -= indfac;
-		
-		update_markov_tree_rate(mef.e,-me_vari.value*indfac);
-		
-		auto &ind_tra = me_vari.ind_tra;
-		auto k = mef.index;
+	auto ti = get_ti(t);
 	
+	auto &ind = individual[i];
+	for(const auto &tir : ind.tra_ind_ref){
+		auto trg = tir.tra_gl;
+		auto &tri = tra_ind[trg];
+		auto &sec = tri.section[tir.section];
+		
+		auto &ind_tra = sec.ind_tra;
+		auto k = tir.index;
+		const auto &itr = ind_tra[k];
+		
+		auto indfac = itr.indfac;
+	
+		auto recalc_max = false;
+		if(sec.max == indfac) recalc_max = true;
+		
+		sec.indfac_sum -= indfac;
+		tri.indfac_sum -= indfac;
+		
+		const auto &me_vari = markov_eqn_vari[sp.tra_gl[trg].markov_eqn_ref];
+	
+		update_tra_markov_tree_rate(trg,-me_vari.value*indfac*prob_event(trg,ti));
+		
 		if(k+1 < ind_tra.size()){
 			ind_tra[k] = ind_tra[ind_tra.size()-1];
 			
 			const auto &it = ind_tra[k];
-			individual[it.i].markov_eqn_ref[it.index].index = k;
+			individual[it.i].tra_ind_ref[it.index].index = k;
 		}
 		ind_tra.pop_back();
+		
+		if(recalc_max){
+			auto max = 0.0;
+			for(const auto &itr : sec.ind_tra){
+				if(itr.indfac > max) max = itr.indfac;
+			}
+			sec.max = max;
+		}
 	}
-	ind.markov_eqn_ref.clear();
+	ind.tra_ind_ref.clear();
 }
 
 
@@ -1082,7 +1154,7 @@ void StateSpecies::update_ind_remove(unsigned int i, double t)
 	
 		add_event(LEAVE_EV,i,UNSET,UNSET,UNSET,UNSET,t,IndInfFrom());
 	
-		remove_markov_trans(i);
+		remove_markov_trans(i,t);
 	}
 }
 
@@ -1104,7 +1176,7 @@ void StateSpecies::update_ind_move(unsigned int i, double t, unsigned int c_comp
 	
 	add_event(MOVE_EV,i,UNSET,c_comp,cl,cnew,t,iif);	
 
-	remove_markov_trans(i);
+	remove_markov_trans(i,t);
 	
 	update_ind_c(i,t,cl,popcomb_t);
 }

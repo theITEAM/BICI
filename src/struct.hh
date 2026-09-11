@@ -711,9 +711,9 @@ struct Constant {                  // Stores all the constants in the model
 
 struct DynamicInfo {               // Stores any dynamic-sim information
 	DynamicType type;                // Determines the type of dynamic update
-	double thresh;                   // The thresholds
-	double threshmin;                
-	double threshmax;
+	EquationInfo thresh;             // The thresholds
+	EquationInfo threshmin;
+	EquationInfo threshmax;
 };
 
 struct PrTimeRange {        // Gets the time range for a parameter reference
@@ -763,8 +763,8 @@ struct Param {                     // Stores a model parameter
 	vector <IEGref> ieg_ref;         // References if parameter is for cov var in ind effect group
 	
 	//bool dynamic;                    // Determines if dynamic
-	DynamicInfo dynamic_info;        // Stores any dynamic-sim information
-	EquationInfo dynamic_eqn;        // Used to store eqn for dynamic update
+	DynamicInfo dynamic_info;          // Stores any dynamic-sim information
+	EquationInfo dynamic_eqn;          // Used to store eqn for dynamic update
 	
 	unsigned int get_param_vec(unsigned int i) const; 
 	const vector <ParamRef>& get_child(unsigned int i) const;
@@ -885,6 +885,7 @@ struct TransGlobal {               // A global transition (combines all classifi
 	unsigned int nm_trans_ref;       // References nm_trans (if non-Markovian)
 	unsigned int markov_eqn_ref;     // References Markovian equation (if Markovian)
 	vector <unsigned int> tform;     // Transforms transition based on a shift in c
+	unsigned int tra_markov_tree_ref;// References node on tra_markov_tree
 	bool time_vari;                  // Determines if time varying
 	unsigned int line_num;           // Stores the import line (for diagnostic error messages)
 };
@@ -1039,11 +1040,6 @@ struct FixedEffect {               // Stores an individual fixed IndEffMult
 	unsigned int line_num;                 // The line number
 };
 
-struct MarkovEqnRef {              // References when the individul is in the Markov equation
-	unsigned int e;                  // The Markov equation
-	unsigned int index;              // The index in the time division
-};
-
 struct IndEventRef {               // References an individual event
 	unsigned int i;                  // Individual number
 	unsigned int e;                  // Event number
@@ -1144,6 +1140,34 @@ struct NMIncompVal {               // Stores values for inclu
 	vector <double> bp_val;          // Branching probabilities [branching number]
 };
 
+struct IndTraRef {                 // References an individual and a transition 
+	unsigned int i;                  // The individual number 
+	unsigned int tr_gl;              // The global transition number
+};
+
+struct IndTransRef {               // Stores individual transition associated with Markov eqn
+	unsigned int i;                  // The individual number 
+	unsigned int index;              // The index in ind.markov_eqn
+	double indfac;                   // Stores the individual factor
+};
+
+struct TraIndSec {                 
+	vector <IndTransRef> ind_tra;    // The individual transtions associated with equation 
+	double indfac_sum; 
+	double max;
+};
+
+struct TraInd {
+	vector <TraIndSec> section;      // Sections of different ind_tra
+	double indfac_sum;               // The sum of the potential individual effect acting on equation
+};
+
+struct TransIndRef {               // Stores 
+	unsigned int tra_gl;             // The transition
+	unsigned int section;            // The section stored in
+	unsigned int index;              // The index in the time division	
+};
+
 struct Individual {                // Stores information about an individual
 	IndType type;                    // Whether the individual is observed or not
 	string name;                     // The name of the individual
@@ -1157,7 +1181,7 @@ struct Individual {                // Stores information about an individual
 	bool init_c_set;                 // Determines if the individual compartment set
 	
 	// Only used during simulation
-	vector <MarkovEqnRef> markov_eqn_ref;  // References Markov equations that the individual is on
+	vector <TransIndRef> tra_ind_ref;  // References tra_me Markov equations that the individual is on
 };
 
 
@@ -1184,19 +1208,14 @@ struct FutureNMEvent {             // Future  non-Markovian event (in simulation
 	double tdiv;                     // The time the event happens
 };
 
-struct MarkovNode {                // Stores Markov node (used during simulation)
+struct TraMarkovNode {             // Stores Markov node (used during simulation)
 	vector <unsigned int> child;     // Child nodes
 	unsigned int parent;             // Parent node
+	unsigned int tra_gl;             // The transition if a terminal node
 };
 
-struct MarkovTree {                // Stores a tree to be able to sample Markov events
-	vector <MarkovNode> node;        // The nodes in the tree
-};
-
-struct IndTransRef {               // Stores individual transition associated with Markov eqn
-	unsigned int i;                  // The individual number 
-	unsigned int index;              // The index in ind.markov_eqn
-	unsigned int tr_gl;              // The global transition number
+struct TraMarkovTree {             // Stores a tree to be able to sample Markov events
+	vector <TraMarkovNode> node;     // The nodes in the tree
 };
 
 struct DivIndRef {                 // References an individual event on a Markov eqn
@@ -1227,17 +1246,17 @@ struct MarkovEqn {                 // Stores information about the Markov equati
 	bool always_recalc;              // Determines if always needs to be recalculated (else use param_change)
 	vector <bool> param_change;      // Determines if parameter changes as a function of time
 };
-
+	
 struct MarkovEqnVariation {        // Stores variation in Markov equations for a species
 	bool time_vari;                  // Determines if equation has time variation
-	vector <IndTransRef> ind_tra;    // The individual transtions associated with equation 
+	//vector <IndTransRef> ind_tra;    // The individual transtions associated with equation 
 	double dt;                       // The timestep used for divisions (set to UNSET for no time)
 	
 	vector <double> value_t;         // The value of the equation for the division
 	
 	// Used in simulation
 	double value;                    // The value
-	double indfac_sum;               // The sum of the potential individual effect acting on equation
+	//double indfac_sum;               // The sum of the potential individual effect acting on equation
 	
 	// Used in inference
 	vector <MEIndDiv> div;       // Information for each time division

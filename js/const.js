@@ -8,7 +8,7 @@
 // 67000 lines of code (25/02/26)
 // 71740 lines of code (01/07/26)
 
-let bici_version = "v0.91";                       // Sets the BICI version
+let bici_version = "v0.94";                       // Sets the BICI version
 
 let ver="windows";                                // Determines platform
 //let ver="linux";                                // Use this if working on linux
@@ -26,7 +26,7 @@ let load_map_fast = false;                        // If loads up world map from 
 let make_one_chain = false;                       // Make into one chain (for diagnostic purposes) CHECKON
 let inf_leave_one_chain = false;                  // Cuts all but one chain (memory diagnostic)
 
-if(win_linux || false){ testing = true; debug = true; if(ver == "linux") load_map_fast = true;}
+if(win_linux|| false){ testing = true; debug = true; if(ver == "linux") load_map_fast = true;}
 
 let make_file = false;                            // Determines if makes file or runs
 let thick_line = false;                           // Used for making figures
@@ -160,6 +160,7 @@ const eqn_types = [
 {name:"pos", mode:"param only", range:"pos"},
 {name:"zeroone", mode:"param only", range:"zeroone"},
 {name:"etarange", mode:"param only", range:"etarange"},
+{name:"thresh", mode:"param time", range:"notneg"},
 {name:"dynamic_weight", mode:"di_weight", range:"all"},
 {name:"dynamic_eqn", mode:"all", range:"all"}
 ];

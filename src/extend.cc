@@ -101,7 +101,7 @@ void Extend::run()
 		cor_m.log_av = ti.log_av;
 		cor_m.log_av2 = ti.log_av2;
 		
-		cha.join_proposal_update();
+		cha.check_join_proposal();
 		cha.set_prop_info(ti.prop_info_store);
 		
 		for(auto &pro : cha.proposal) pro.update_sampler(cha.cor_matrix);

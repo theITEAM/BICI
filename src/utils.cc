@@ -4464,7 +4464,7 @@ Stat get_statistic(vector <double> &vec)
 
 
 /// Combines several lists into one
-vector <unsigned int> combine_lists(const vector < vector <unsigned int> > lists)
+vector <unsigned int> combine_lists(const vector < vector <unsigned int> > &lists)
 {
 	vector <unsigned int> list;
 	if(lists.size() == 0) return list;
@@ -4491,6 +4491,31 @@ vector <unsigned int> combine_lists(const vector < vector <unsigned int> > lists
 	}
 	
 	return list;
+}
+
+
+/// Removes any repeated elements and orders
+vector <unsigned int> remove_repeated(const vector <unsigned int> &list)
+{
+	vector <unsigned int> vec;
+	
+	auto max = 0u;
+	for(auto va : list){
+		if(va > max) max = va;
+	}
+	
+	auto N = max+1;
+	vector <bool> map(N,false);
+	
+	for(auto va : list){
+		map[va] = true;
+	}
+	
+	for(auto i = 0u; i < N; i++){
+		if(map[i]) vec.push_back(i);
+	}
+	
+	return vec;
 }
 
 

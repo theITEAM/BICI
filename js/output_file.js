@@ -1021,9 +1021,9 @@ function output_param(par,save_type,bscript)
 					display = true;
 				}
 				else{
-					if((par.ndep_cont == 0 && par.value == set_str) || (par.set == false && !(par.variety == "dist" && par.sim_sample.check == true))){
+					if(((par.ndep_cont == 0 && par.value == set_str) || par.set == false) && !(par.variety == "dist" && par.sim_sample.check == true)){
 						if(save_type == "sim"){
-							if(param_needed(par,"sim")){
+							if(param_needed(par,"sim")){	
 								add_warning({mess:"A value for parameter "+par.full_name+" must be set.", mess2:"Parameter values must be set before simulation can be perfomed", warn_type:"SimValue", name:par.name});
 								return;
 							}

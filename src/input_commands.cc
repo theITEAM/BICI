@@ -361,9 +361,9 @@ bool Input::species_command(unsigned int loop)
 	if(sp_type == DETERMINISTIC) model.deterministic = true;
 	
 	auto trans_tree = false;
-	if(sp_type == INDIVIDUAL){
-		auto trans_tree_str = toLower(get_tag_value("trans-tree"));
-		if(trans_tree_str != ""){
+	auto trans_tree_str = toLower(get_tag_value("trans-tree"));
+	if(trans_tree_str != ""){
+		if(sp_type == INDIVIDUAL){
 			if(trans_tree_str == "on") trans_tree = true;
 			else{
 				if(trans_tree_str != "off"){ 
@@ -371,6 +371,10 @@ bool Input::species_command(unsigned int loop)
 					return false;
 				}
 			}
+		}
+		else{
+			alert_import("'trans-tree' can only be on for an individual-based species."); 	
+			return false;
 		}
 	}
 
@@ -2699,6 +2703,11 @@ void Input::test_and_cull_command()
 	auto p = p_current;
 	if(p == UNSET){ 
 		alert_import("To load the data file the species must be set"); 
+		return;
+	}
+	
+	if(model.species[p].type != INDIVIDUAL){ 
+		alert_import("Test-and-cull can only be implemented for an individual-based species.");
 		return;
 	}
 	
