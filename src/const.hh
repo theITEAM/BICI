@@ -24,7 +24,7 @@ const string default_file = "/tmp/BICI_files/init.bici";        // This is used 
 const string default_file = "Execute/init.bici";     // This is used for windows / linux
 #endif
 
-//#define USE_MPI                                    // Sets if code can run in parallel
+#define USE_MPI                                    // Sets if code can run in parallel
 
 const bool linear_markov_value_speedup = true;
 
