@@ -378,14 +378,6 @@ void StateSpecies::set_m_ti_origin(vector <Event> &ev_new) const
 }
 
 
-/// Thresholds the log value	
-double StateSpecies::log_thresh(double val) const
-{
-	if(val > LOG_THRESH) return val;
-	return LOG_THRESH;
-}
-
-
 /// Removes event from old event sequence 
 void StateSpecies::remove_event(Event &ev, const Individual &ind, Like &like_ch, unsigned int i, vector <Event> &event_old)
 {
@@ -468,9 +460,10 @@ void StateSpecies::remove_event(Event &ev, const Individual &ind, Like &like_ch,
 				case ENTER_INF: va = UNSET; emsg("Should not be ENTER_INF"); break;
 				default: va = eq.calculate_pop_grad(iif.pref,ti,popcombw_value,precalc); break;
 				}
-				
+				va = iif.w*dt*log_thresh(va);
 				if(me.ind_variation) va *= get_indfac(ind,me);
-				Li = log(va*iif.w);
+				
+				Li = log(va);
 			}
 			else{			
 				auto val = markov_eqn_vari[e].value_t[ti];
@@ -605,10 +598,10 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee, const vector <
 					va = eq.calculate_pop_grad(iif.pref,ti,popcombw_value,precalc); 
 					break;
 				}
-				
+				va = iif.w*dt*log_thresh(va);	
 				if(me.ind_variation) va *= get_indfac(ind,me);
-				va *= dt;
-				Li = log(va*iif.w);
+				
+				Li = log(va);
 			}
 			else{
 				auto val = markov_eqn_vari[e].value_t[ti];	

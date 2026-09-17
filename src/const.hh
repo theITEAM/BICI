@@ -24,7 +24,7 @@ const string default_file = "/tmp/BICI_files/init.bici";        // This is used 
 const string default_file = "Execute/init.bici";     // This is used for windows / linux
 #endif
 
-#define USE_MPI                                    // Sets if code can run in parallel
+//#define USE_MPI                                    // Sets if code can run in parallel
 
 const bool linear_markov_value_speedup = true;
 
@@ -193,7 +193,7 @@ enum GenChar { A_CH, C_CH, T_CH, G_CH };
 enum InfEventType { INFECT_OTHER, GENETIC_OBS };
  
 // Different types of genetic change
-enum GenChaType { GENCHA_FAIL, NO_GENETIC_CHANGE, REGRAFT_NODE, ADD_NODE, REM_NODE };
+enum TransTreeChaType { TRANS_TREE_FAIL, NO_TRANS_TREE_CHANGE, REGRAFT_NODE, ADD_NODE, REM_NODE };
 
 // Determines how from and add are connected to the inf_node network
 enum ConType { FROM_CON_ADD_CON, FROM_CON_ADD_UNCON, FROM_UNCON_ADD_CON, FROM_UNCON_ADD_UNCON };
@@ -218,7 +218,7 @@ enum Direction { FORWARD, FORWARD_SQ, BACKWARD_SQ };
 enum BackType { REMOVE_LI_MARKOV, ADD_LI_MARKOV, POP_DATA_NUM, LI_OBS_POP, POP_DATA_CGL, POP_TRANS_DATA_NUM, LI_OBS_POP_TRANS, LI_OBS_IND, TI_INDFAC, DLI_INDFAC, DIF_INDFAC, LI_MARKOV, OBS_TRANS_EQN_NUM, VALUE_MARKOV, IND_COND_VAL, CPOP_ST, TRANS_MEAN_ST, LI_MARKOV_POP, TRANS_NUM, LI_MARKOV_POP_SINGLE, LI_OBS_POP_TRANS_SINGLE, POP_TRANS_DATA_NUM_SINGLE, POP_TRANS_DATA_TGL};
 
 // Different ways restore population after an individual change
-enum BackPopType { POP_NUM_T };
+enum BackPopType { POP_NUM_T, PREF_ST, PO_ST};
 
 // Different ways of doing individual update
 enum UpdateType { UP_SINGLE, UP_MULTI, UP_NOLIKE };
@@ -381,8 +381,8 @@ const auto ADD_REM_IND_MAX = 20u;                 // Max number of inds to add/r
 const auto UPDATE_RATE_FAC = 0.9;                 // Determines how quickly rates are estimated  
 //const auto IND_LOCAL_TRANS_MAX = 3u;              // Max number of transition local change
 const auto IND_LOCAL_TRANS_MAX = 2u;              // Max number of transition local change
-const auto LI_WRONG = -100.0;                     // Likelihood penalty for wrong observation
-const auto GEN_OBS_WRONG = -1000.0;               // Likelihood penalty genetic obs not made
+const auto LI_WRONG = -10000.0;                   // Likelihood penalty for wrong observation
+const auto GEN_OBS_WRONG = -10000.0;              // Likelihood penalty genetic obs not made
 const auto COMP_NOISY_MAX = 10u;                  // When simulating noisy compartmental observations gives max number
 const auto LOCAL_SMOOTH = 0.1;                    // Smoothing of transitions rate in local props
 const auto PROP_SIM_NAC_INIT = 10;                // Initial value for nac for ind sim prob 
@@ -424,7 +424,7 @@ const int LARGE_INT = 1000000000;                 // Used to represent a big int
 const double INFY = 1000000001;                   // Used to represent infinity
 const double UNDEF = 1000000002;                  // Used to represent undefined
 const double ALMOST_ONE = 0.9999999999999;        // Almost one   
-const double LOG_THRESH = 0.000000000000001; // The threshold below which logs not calculated
+const double LOG_THRESH = 0.000000000000001;      // The threshold below which logs not calculated
 const double PROB_MOD = 0.001;                    // Avoids zero probability in local event props
 const double LOW_BOUND = 0;                       // The lower bound for observation probability
 const double UP_BOUND = 1;                        // The lower bound for observation probability

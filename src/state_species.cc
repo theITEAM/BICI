@@ -136,6 +136,7 @@ void StateSpecies::reset_arrays()
 		const auto &trg = sp.tra_gl[tr];
 		auto &ti = tra_ind[tr];
 		ti.indfac_sum = 0; if(trg.i == UNSET) ti.indfac_sum = 1;
+		ti.nind = 0;
 		ti.section.resize(TRA_IND_SECTION);
 		for(auto i = 0u; i < TRA_IND_SECTION; i++){
 			auto &sec = ti.section[i];
@@ -171,6 +172,9 @@ void StateSpecies::reset_arrays()
 		
 		//me_vari.pop_change_t.resize(T,false);
 	}
+	
+	tra_markov_tree_rate.clear();
+	tra_markov_tree_rate.resize(nnode,0);
 		
 	trig_div.clear();
 	trig_div.resize(T);
@@ -566,7 +570,7 @@ IndInfFrom StateSpecies::extract_infection_info(string &st) const
 		auto te = spl[1].substr(0,spl[1].size()-1);
 		if(te == "ENT_INF") iif.p = ENTER_INF;
 		else{
-			if(te == "OUT_INF") iif.p = OUTSIDE_INF;
+			if(te == "OUT_INF"){ iif.p = OUTSIDE_INF; iif.w = 1;}
 			else{
 				iif.i = number(te);
 				if(iif.i == UNSET) emsg("Should be number");
@@ -2441,13 +2445,13 @@ void StateSpecies::set_event_change_div()
 
 
 /// Adds transmission tree to the final output
-void StateSpecies::add_trans_tree(vector <Individual> &individual, const vector < vector <double> > &popnum_t, const vector < vector < vector <Poss> > > &pop_ind) const
+void StateSpecies::add_trans_tree(const vector < vector <double> > &popnum_t, const vector < vector < vector <Poss> > > &pop_ind)
 {
 	for(auto &ind : individual){
 		for(auto &ev : ind.ev){
 			auto &iif = ev.ind_inf_from;
 			auto c = ev.c_after;
-			
+	
 			switch(ev.type){
 			case ENTER_EV:
 				if(sp.comp_gl[c].infected) iif.p = ENTER_INF;
@@ -2468,57 +2472,65 @@ void StateSpecies::add_trans_tree(vector <Individual> &individual, const vector 
 						const auto &lin = eq.lin;
 						if(!lin.on) emsg("The equation must be linear");
 
-						auto Npop = eq.pop_ref.size();
-		
-						auto j = UNSET;
-						
-						if(lin.multi_source){ // Samples from available sources (either populations of fro outside)		
-							auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val,popcombw_value);
-					
-							j = ss.sample_inf_source();
-						}
-						else{
-							if(testing){
-								if(Npop > 1) emsg("Npop wrong");
-								if(Npop == 1 && lin.no_pop_precalc.type != ZERO) emsg("Npop wrong");
-							}
-							j = 0;
-						}
-
-						if(j == Npop){   // Selects no population
+						auto tii = ti; 
+						if(!me.time_vari) tii = 0;
+						auto val = markov_eqn_vari[e].value_t[tii];
+						if(val < VTINY){
+							//emsg("A consistent transmission tree cannot be found.");
 							iif.p = OUTSIDE_INF;
 						}
 						else{
-							auto po = eq.pop_ref[j];
-							
-							const auto &pop = model.pop[po];
-							auto p_inf = pop.p;
-							
-							const auto &list = pop_ind[ti][po];
-							if(list.size() == 0) emsg("No individual in pop");
-							
-							unsigned int i;
-							if(pop.ind_variation){
-								auto pos = sample_possibility(list);		
-								i = pos.i;
-								
-								if(testing){
-									auto sum = 0.0;
-									for(const auto &pos : list)	sum += pos.weight;
-									if(dif(sum,popnum_t[ti][po],TINY)) emsg("Population wrong");
-								}
+							auto Npop = eq.pop_ref.size();
+			
+							auto j = UNSET;
+							if(lin.multi_source){ // Samples from available sources (either populations of fro outside)		
+								auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val,popcombw_value);
+								j = ss.sample_inf_source();
+								if(j == UNSET) emsg("Error with source");
 							}
 							else{
-								auto k = (unsigned int)(ran()*list.size());
-								i = list[k].i;
-								
 								if(testing){
-									if(dif(list.size(),popnum_t[ti][po],TINY)) emsg("Population wrong");
+									if(Npop > 1) emsg("Npop wrong");
+									if(Npop == 1 && lin.no_pop_precalc.type != ZERO) emsg("Npop wrong");
 								}
+								j = 0;
 							}
-							
-							iif.p = p_inf;
-							iif.i = i;
+
+							if(j == Npop){   // Selects no population
+								iif.p = OUTSIDE_INF;
+							}
+							else{
+								auto po = eq.pop_ref[j];
+								
+								const auto &pop = model.pop[po];
+								auto p_inf = pop.p;
+								
+								const auto &list = pop_ind[ti][po];
+								if(list.size() == 0) emsg("No individual in pop");
+								
+								unsigned int i;
+								if(pop.ind_variation){
+									auto pos = sample_possibility(list);		
+									i = pos.i;
+									
+									if(testing){
+										auto sum = 0.0;
+										for(const auto &pos : list)	sum += pos.weight;
+										if(dif(sum,popnum_t[ti][po],TINY)) emsg("Population wrong");
+									}
+								}
+								else{
+									auto k = (unsigned int)(ran()*list.size());
+									i = list[k].i;
+									
+									if(testing){
+										if(dif(list.size(),popnum_t[ti][po],TINY)) emsg("Population wrong");
+									}
+								}
+								
+								iif.p = p_inf;
+								iif.i = i;
+							}
 						}
 					}
 				}
@@ -2532,6 +2544,19 @@ void StateSpecies::add_trans_tree(vector <Individual> &individual, const vector 
 				break;
 			default: break;
 			}
+		}
+	}
+}
+
+
+/// Removes transmission tree
+void StateSpecies::remove_trans_tree()
+{
+	for(auto &ind : individual){
+		for(auto &ev : ind.ev){
+			auto &iif = ev.ind_inf_from;
+			iif.p = UNSET;
+			iif.i = UNSET;
 		}
 	}
 }

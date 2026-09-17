@@ -1211,7 +1211,10 @@ function copy_back_to_source2(tbs)
 	
 	switch(so.type){
 	case "equation": inter.equation.te = te; break;
-	case "description": model.description.te = te; break;
+	case "description": 
+		if(!end_str(te,"\n")) te += endl;
+		model.description.te = te; 
+		break;
 	case "compartment": inter.rename_compartment = te; break;
 	case "add_species_name": inter.bubble.species_name = te; break;
 	case "add_classification_name": inter.bubble.classification_name = te; break;

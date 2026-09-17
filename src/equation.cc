@@ -5,6 +5,7 @@
 #include <sstream>
 #include <iostream>
 #include <fstream>
+#include <fstream>
 #include <cmath>
 #include <algorithm> 
  
@@ -2254,6 +2255,7 @@ vector <EqItem> Equation::extract_operations()
 						if(doneflag == false){
 							unsigned int raend;
 							auto fe = get_fe(i,raend); 
+							
 							if(warn != "") return op;
 							if(fe != UNSET){
 								i = raend-1;

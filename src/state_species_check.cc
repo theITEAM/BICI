@@ -285,7 +285,7 @@ string StateSpecies::print_event(const vector <Event> &event, bool str) const
 		else ss << "[" << sp.comp_gl[c].name << "]";
 
 		const auto &iif = ev.ind_inf_from;
-		ss << "<" << iif.p << " " << iif.i << ">";
+		if(iif.p != UNSET) ss << "<" << iif.p << " " << iif.i << ">";
 
 		if(ev.inf_node_ref != UNSET){
 			const auto &iif = ev.ind_inf_from;
@@ -454,4 +454,37 @@ void StateSpecies::print_likelihood_markov()
 	cout << sum << "sum" << endl;
 	*/
 	emsg("Print likelihood");
+}
+
+
+/// Adds transmission tree to the final output
+void StateSpecies::check_trans_tree(const vector < vector <double> > &popnum_t, string ref) const
+{
+	auto num = 0.0;
+	for(auto &ind : individual){
+		for(auto &ev : ind.ev){
+			if(ev.type == M_TRANS_EV){
+				const auto &trg = sp.tra_gl[ev.tr_gl];
+				if(trg.infection.type == TRANS_INFECTION){
+					auto e = trg.markov_eqn_ref;
+					if(e == UNSET) emsg("me not set");
+
+					const auto &me = sp.markov_eqn[e];
+					auto ti = get_ti(ev.tdiv);
+					
+					const auto &eq = eqn[me.eqn_ref];
+					
+					const auto &lin = eq.lin;
+					if(!lin.on) emsg("The equation must be linear"+ref);
+
+					auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val,popcombw_value);
+					if(ss.sum == 0){			
+						num++;
+						//emsg("no prob: "+ref);
+					}	
+				}
+			}
+		}
+	}
+	//cout << num << " num\n";
 }

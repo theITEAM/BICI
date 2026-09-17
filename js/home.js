@@ -85,6 +85,11 @@ function initialise_section()
 		ex_mod.push({mod:"CE4.2", te:"Age-structured COVID-19 model",file:"EX_CE4-2",mod_type:"POP", pic:"covidage"});
 		
 	
+		ex_mod.push({te:"5) Multi-species models",help:"These examples look at a variety of different simple multi-species models."+mod_mess});
+		
+		ex_mod.push({mod:"CE5.1", te:"Two species model",file:"EX_CE5-1",mod_type:"IBM", pic:"twospecies"});
+	
+	
 		let sec = { name:"comp-epi", desc:"Complex epidemiological",  pic:"SIRD_IBM2", ex_mod:ex_mod, help:comp_epi_text+mod_mess};
 		
 		inter.section.push(sec);

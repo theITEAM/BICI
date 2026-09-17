@@ -3542,7 +3542,7 @@ function add_trans_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 
 	let t_start = Number(result.details.t_start);
 
-	// Calcualtes average time when individual is infected
+	// Calculates average time when individual is infected
 	for(let k = 0; k < ind_list.length; k++){
 		percent(10+30*(k/ind_list.length));
 			

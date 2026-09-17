@@ -342,7 +342,10 @@ function get_param_value(i,source,lines,result,warn,mode)
 				
 				i++;
 				while(true){
-					let spl_row = lines[i].split(",");
+					let li = lines[i];
+					if(begin_str(li,"\"")) break;
+					
+					let spl_row = li.split(",");
 					if(spl_row.length != ndep+1) break;
 					
 					let index=[];
@@ -525,6 +528,14 @@ function generate_marg_plot(result,sample)
 						cpop_init_av[c]++;
 						cpop_init[cconv[c]]++;
 					}
+					if(ind.ev.length > 0){
+						let eve = ind.ev[0];
+						if(eve.t == t_start && eve.type == EV_ENTER){
+							c = eve.c;
+							cpop_init_av[c]++;
+							cpop_init[cconv[c]]++;
+						}
+					}
 				}
 			}
 			
@@ -558,8 +569,10 @@ function generate_marg_plot(result,sample)
 							break;
 							
 						case EV_ENTER:
-							if(dpop_list[ti] == undefined) dpop_list[ti]=[];
-							dpop_list[ti].push({c:ev.c,val:1});
+							if(ev.t != t_start){
+								if(dpop_list[ti] == undefined) dpop_list[ti]=[];
+								dpop_list[ti].push({c:ev.c,val:1});
+							}
 							if(c != OUT) error("Should be out");
 							c = ev.c;
 							break;

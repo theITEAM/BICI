@@ -57,6 +57,8 @@ class State                                // Stores information about the state
 		
 		vector <AlgWarn> alg_warn;             // Stores any algorithm warnings
 		
+		bool trans_tree_on;                    // Determines if transmission tree is turned on
+	
 		// Used in simualtion
 		vector <double> dpop;                  // Stores change in population
 		vector <unsigned int> dpop_list;       // Lists changes
@@ -81,14 +83,18 @@ class State                                // Stores information about the state
 		vector <DeriveOutput> derive_calculate(bool store_state);
 		void calculate_likelihood();
 		void calculate_like();
-		void accept(Like like_ch);
+		void accept_update_ind(const UpdateIndInfo &uii);
+		void accept(const Like &like_ch);
 		void change_add(const vector <double> &vec);
 		void change_add(double num);
 		void change_add();
 		Like update_param(const vector <AffectLike> &affect_like);
 		void restore(const vector <AffectLike> &affect_like);
 		void likelihood_from_scratch();
+		void set_inconsistent_ind();
 		Particle generate_particle(unsigned int s, unsigned int chain, bool store_state, bool dir_fl = true);
+		void create_trans_tree();
+		void remove_trans_tree();
 		void set_particle(const Particle &part);
 		void regenerate(unsigned int ti_end, bool calc_markov, bool calc_precalc, bool include_derive=false);
 		vector <double> prior_init_cond(double &like_ch);
@@ -115,7 +121,6 @@ class State                                // Stores information about the state
 		void pop_restore();
 		double frac_outside_CI();
 		Like get_like_ch(const Like &like_st) const;
-		void create_inf_node();
 	
 	private:
 		vector <double> calculate_df(const DerFunc &df) const;
@@ -132,12 +137,16 @@ class State                                // Stores information about the state
 		void recalculate_population(const vector <unsigned int> &list);
 		void recalculate_popcomb(const vector <unsigned int> &popcomb_affect);
 		//void recalculate_population_restore(const vector <unsigned int> &list, const vector <double> &vec);
+		//void check_w() const;
 		void set_ind_inf_from(const vector <string> &ind_key);
 		
 		
 	// In state_update_ind.cc
 	public:
-		Like update_ind(unsigned int p, unsigned int i, vector <Event> &ev_new, UpdateType type);
+		UpdateIndInfo update_ind(unsigned int p, unsigned int i, vector <Event> &ev_ne, UpdateType type, bool update_trans_tree = true);
+		//Like update_ind(unsigned int p, unsigned int i, vector <Event> &ev_new, UpdateType type);
+		void remove_ind_inf_likelihood(const vector <InfPoCha> &ind_po_cha);
+		void add_ind_inf_likelihood(const vector <InfPoCha> &ind_po_cha);
 		void change_pop_t(unsigned int ti, unsigned int ti_next, unsigned int k, double num);
 		void change_population(unsigned int ti, unsigned int ti_next, unsigned int k, double num);
 		void update_pop_change(unsigned int ti, unsigned int ti_next, double &like_ch);
@@ -160,7 +169,7 @@ class State                                // Stores information about the state
 		
 	// In state_genetic.cc
 	public:	
-		GenChange update_tree(unsigned int p, unsigned int i, vector <Event> &ev_new);
+		TransTreeChange update_tree(unsigned int p, unsigned int i, vector <Event> &ev_new);
 		double sample_infection_source(Event &ev, unsigned int p) const;
 		bool set_iif(unsigned int p, unsigned int i, unsigned int e, IndInfFrom &iif, double t, const Event &ev, const Species &sp) const;
 		bool trg_contains_outside(unsigned int p, unsigned int tr_gl) const;
@@ -185,6 +194,7 @@ class State                                // Stores information about the state
 		void set_ind_inf_from_outside(double t, vector <Event> &event);
 		
 		void trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int &nfa, unsigned int &nac, unsigned int &ntr);
+		unsigned int get_e_from_time(double t, const vector <Event> &ev) const;
 		void update_inf_node_ref(unsigned int k);
 		InfNodeAlter no_alter(unsigned int n) const;
 		void trans_tree_mut_proposal(const BurnInfo &burn_info, unsigned int &nac, unsigned int &ntr, double &si);
@@ -198,16 +208,18 @@ class State                                // Stores information about the state
 		
 		void check_pop_ind(vector < vector <unsigned int> > pop_ind, const vector < vector <IndPop> > &ind_pop);
 		NodeRef get_ind_noderef(unsigned int p, unsigned int i, double t) const;
-		GenChange gen_change(GenChaType type, unsigned int n, const InfNodeAlter &node_alter, const IndInfFrom &iif_add) const; 
-		void gen_change_update(const GenChange &gc);
+		TransTreeChange no_trans_tree_change()  const;
+		TransTreeChange trans_tree_fail() const;
+		TransTreeChange trans_tree_change(TransTreeChaType type, unsigned int n, const InfNodeAlter &node_alter, const IndInfFrom &iif_add) const; 
+		void gen_change_update(const TransTreeChange &gc);
 		void remove_node(unsigned int n);
 		void update_inf_ev(unsigned int n);
 		void calculate_popnum_ind();
 		void add_popnum_ind(unsigned int p, unsigned int i);
 		void update_popnum_ind(unsigned int p, unsigned int i);
 		void popnum_ind_recalc_w(unsigned int p, unsigned int i);
-		void change_add_node(double t, const NodeRef &nr_add, GenChange &gc) const;
-		void change_remove_node(double t, const NodeRef &nr_from, GenChange &gc) const;
+		void change_add_node(double t, const NodeRef &nr_add, TransTreeChange &gc) const;
+		void change_remove_node(double t, const NodeRef &nr_from, TransTreeChange &gc) const;
 		vector <unsigned int> get_gen_obs_list(unsigned int n, unsigned int j, unsigned int n_not_allow=UNSET) const;
 		void get_gen_obs_list2(unsigned int n, unsigned int j, vector <unsigned int> &list, unsigned int n_not_allow) const;
 		void output_gen_dif() const;

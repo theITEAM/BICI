@@ -592,7 +592,8 @@ void Chain::update(unsigned int s)
 				
 			//if(op()) cout << s << " " << core() << " " << add_escape_char(pro.name) << " " <<  state.sample << " proposal" << endl;
 			
-			//cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
+			auto ch_on = false;
+		//cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl; ch_on = true;
 			
 			if(true){
 				if(pl) cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
@@ -601,32 +602,9 @@ void Chain::update(unsigned int s)
 			}
 			else{
 				switch(pro.type){
-				case DET_IC_POP_PROP:
-				//case DET_IC_POPTOTAL_PROP:
-				//case DET_IC_RESAMP_PROP:
-				case INIT_COND_FRAC_PROP:
-					
-				//case PARAM_PROP:
-				//case MBP_PROP:
-				//case POP_SINGLE_LOCAL_PROP:
-				//case POP_ADD_REM_LOCAL_PROP: 
-				//case POP_SINGLE_LOCAL_PROP:
-				//case IND_ADD_REM_PROP:
-				//case IND_EVENT_TIME_PROP:   
-				//case IND_MULTI_EVENT_PROP:
-				//case IND_EVENT_ALL_PROP:
-				//case IND_OBS_SAMP_PROP:
-				//case IND_OBS_RESIM_PROP: 
-				//case IND_OBS_RESIM_SINGLE_PROP:
-				//case IND_UNOBS_RESIM_PROP:
-				//case IND_LOCAL_PROP:
-				
-				case PAR_EVENT_FORWARD_PROP:
-				//case PAR_EVENT_FORWARD_SQ_PROP:
-				//case PAR_EVENT_BACKWARD_SQ_PROP:
-				//case IND_ADD_REM_PROP:
-				//case IND_OBS_SWITCH_LEAVE_SINK_PROP:
-				//case IND_OBS_SWITCH_ENTER_SOURCE_PROP:
+				case IND_EVENT_TIME_PROP:
+				//case DET_IC_POP_PROP:
+				//case INIT_COND_FRAC_PROP:
 					if(pl) cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
 			
 					pro.update(state);
@@ -638,7 +616,7 @@ void Chain::update(unsigned int s)
 			}
 
 			//if(core() == 4) 
-			//state.check(" After prop check"); 
+			if(ch_on) state.check(" After prop check"); 
 		 
 			if(pl) state.check(" After prop check");
 			if(pl) state.check_pop_t("hhh");
@@ -1055,6 +1033,7 @@ void Chain::update_init()
 		}
 	}
 		
+	/*
 	// Adds proposals to correct observed transitions
 	for(auto p = 0u; p < model.nspecies; p++){
 		auto &sp = model.species[p];
@@ -1075,7 +1054,8 @@ void Chain::update_init()
 				proposal.push_back(pp);
 			}
 		}
-	}				
+	}	
+	*/	
 	 
 	print_diag("update_init 9");
 

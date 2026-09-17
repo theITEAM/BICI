@@ -16,7 +16,7 @@ using namespace std;
 /// Markov likelihood for a specific equation
 vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <unsigned int> &list, double &like_ch)
 { 
-	auto &me = sp.markov_eqn[e];
+	const auto &me = sp.markov_eqn[e];
 	auto &me_vari = markov_eqn_vari[e];
 	auto &Li_mark = Li_markov[e];
 	
@@ -47,7 +47,7 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 		
 		auto si = div.ind_trans.size();
 			
-		if(me.infection_trans){ // If an infection transition then works out specific probability of specific individual
+		if(me.infection_trans){ // If an infection transition then works out specific probability individual
 			const auto &eq = eqn[me.eqn_ref];
 			const auto &lin = eq.lin;
 			if(!lin.on) emsg("Linearisation should be on");
@@ -67,13 +67,16 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 					break;
 					
 				default:
-					va = eq.calculate_pop_grad(iif.pref,ti,popcombw_value,precalc);
+					{ // Note iif.w takes into account variation in infectivity
+						va = eq.calculate_pop_grad(iif.pref,ti,popcombw_value,precalc);
+					}
 					break;
 				}
 				
+				va = iif.w*dt*log_thresh(va);
 				if(me.ind_variation) va *= get_indfac(ind,me);
-				va *= dt;
-				Li += log(va*iif.w);
+			
+				Li += log(va);	
 			}
 		}
 		else{
@@ -108,6 +111,54 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 }
 
 
+/// Calculates the change in Li_markov from adding/removing infection event from trans tree 
+void StateSpecies::change_trans_tree_Li_markov(unsigned int i, unsigned int e, double sign)
+{
+	const auto &ind = individual[i];
+	const auto &ev = ind.ev[e];
+	const auto &iif = ev.ind_inf_from;
+	
+	auto k = sp.tra_gl[ev.tr_gl].markov_eqn_ref;
+	const auto &me = sp.markov_eqn[k];
+	
+	const auto &precalc = param_val.precalc;
+	
+	auto ti = get_ti(ev.tdiv);
+	
+	const auto &eq = eqn[me.eqn_ref];
+	const auto &lin = eq.lin;
+	if(!lin.on) emsg("Linearisation should be on");
+			
+	auto p = iif.p;
+	
+	double va;
+	
+	switch(p){ 
+	case OUTSIDE_INF:
+		va = eq.calculate_no_pop(ti,precalc);
+		break;
+		
+	case ENTER_INF: 
+		va = UNSET;
+		emsg("Should not be ENTER_INFb");
+		break;
+		
+	default:
+		va = eq.calculate_pop_grad(iif.pref,ti,popcombw_value,precalc);
+		break;
+	}
+	
+	va = iif.w*dt*log_thresh(va);
+	if(me.ind_variation) va *= get_indfac(ind,me);
+
+	auto Li = log(va)*sign;
+	
+	back.push_back(Back(ADD_LI_MARKOV,k,ti,Li));
+	
+	Li_markov[k][ti] += Li;
+}
+
+				
 /// Calculate the value of a markov equation
 vector <double> StateSpecies::markov_value_calc(unsigned int e, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t)
 {
@@ -792,7 +843,7 @@ vector <double> StateSpecies::likelihood_nm_trans_bp(unsigned int m, const vecto
 							Li_new = get_log_zero_one(val);
 						}
 
-						const auto nmti_old = nmt_ref[ti][0];
+						const auto &nmti_old = nmt_ref[ti][0];
 						auto Li_old =	individual[nmti_old.i].ev[nmti_old.e_end].Li_bp; 
 						for(const auto &nmti : nmt_ref[ti]){
 							store.push_back(Li_old);

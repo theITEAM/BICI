@@ -1536,7 +1536,7 @@ vector <string> Species::global_convert(const Filter &filt) const
 			if(fcl.type != COMP_FILT) emsg_input("Should be COMP_FILT");
 			if(te != "") te += "*";
 		
-			const auto cc = cgl.cla_comp[cl];
+			auto cc = cgl.cla_comp[cl];
 			te += "("+fcl.comp_prob_str[cc]+")";
 		}
 	

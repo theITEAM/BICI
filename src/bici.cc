@@ -8,13 +8,13 @@
 // Run: ./bici 
 
 // ssh gaia.bioss.ac.uk  
-// cd "/c/BICI/BICI_v0.9_windows/src"
+// cd "/c/BICI/BICI_v0.9_windows"
 
 // tar -xzf foo.tgz
 
 // Load mpi: module load mpi/openmpi-x86_64
-// ./bici-core.exe ../big2.bici sim
-// ../bici-core.exe ../Execute/init.bici inf
+// ./bici-core.exe big2.bici sim
+// ./bici-core.exe Execute/init.bici inf
 
 // nohup mpirun -n 10 ./bici-para Execute/init.bici inf > op.txt&
 // mpirun -n 10 ./bici-para Execute/init.bici inf 

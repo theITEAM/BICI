@@ -5,6 +5,9 @@
 // working on linux 02/03/26
 // working on windows 11/03/26
 
+problem1 - the infered value fo mI is biased (even when only using simulation proposals
+
+
 CURRENTLY
 run from windows
 
@@ -56,6 +59,8 @@ TO DO NEXT
 -- emulation method
 
 TO DO
+- twospecies model in Execute
+
 - Do these exaples work α×{I;t=40}’ as described in the manual?
 - Get period distribution working
 -- cannot add midpoints when uploading transitions into interface

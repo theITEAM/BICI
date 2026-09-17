@@ -1,13 +1,31 @@
 UPDATES:
+JAMIE 
+- Added error message when fixed effect in model but not explicitly defined
+- Corrected accumulation of numerical errors under simulation
 
 GRANT
-- Added equations to dynamic parameter simulation
- 
+- Corrected error with output of vectors (introduced from a memory-saving approach)
+- Made changes to make inconsistent events less likely (the likelihood of a wrong event has been increased). Error message should flag if inconsistent observations and state.
 
 CHRIS
-- Corrected examples S4.2, S4.3, S4.6 to being population-based models
-- Changed spacing on inference options page to avoid window becoming too small
-- Under simulation changed from individuals attached to markov equations to individuals attached to transitions. This allows for simulation under inference with observed transitions to be much more efficient
-- Added an optimised way of sampling from individuals under simulation (spliting indfac into sections an doing importance sampling on those sections).
-- Corrected mistake when buble was opened on correlation plot errors occured when changing view.
-- Corrected problem when navigating away from page with an animation playing
+- Tested transmission tree models against ones sampled directly to see if they produce the same results. Removed bugs.
+- Placed limitation on analysing genetic data (repeated infection not allowed due to the difficulty of analysis) 
+- Corrected transtree plot in interface (problem with infection entering at start time).
+- Added extra line on interface description if line incomplete (otherwise the file could not be reloaded).
+- Corrected problem with y-label in interface not showing when they are very small.
+
+UPDATES for v0.94:
+
+GRANT
+- Added equations to thresholds in dynamic parameter simulation.
+ 
+JAMIE
+- Got validation example "scen-4-1.bici" working (corrected an issue with joint proposal on individual effect covariances / individual effects).
+
+CHRIS
+- Under simulation, changed from individuals attached to Markov equations to individuals attached to transitions. This allows for simulation of initial state under inference with observed transitions to be much more efficient.
+- Added an optimised way of sampling from individuals under simulation (split ‘indfac’ into sections of different size and do importance sampling on those sections).
+- Corrected examples S4.2, S4.3, S4.6 to being population-based models.
+- Changed spacing on inference options page to avoid window becoming too small.
+- Corrected mistake when bubble was opened on correlation plot errors occurred when changing view.
+- Corrected problem when navigating away from page with an animation playing.

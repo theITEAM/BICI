@@ -19,6 +19,11 @@ State::State(const Model &model) : model(model)
 {
 	dif_thresh = DIF_THRESH;
 	sample = UNSET;
+	
+	genetic_value.mut_rate = UNSET;
+	genetic_value.seq_var = UNSET;
+	genetic_value.nobs_not_infected = UNSET;
+	trans_tree_on = false;
 }
 
 
@@ -1014,8 +1019,17 @@ void State::calculate_like()
 }
 
 
-/// Adds a change in likelihood to the state
-void State::accept(Like like_ch)
+/// Accept changes in update_ind
+void State::accept_update_ind(const UpdateIndInfo &uii)
+{
+	accept(uii.like_ch);
+	gen_change_update(uii.gc); 
+	if(model.species[uii.p].trans_tree) update_popnum_ind(uii.p,uii.i);
+}
+
+
+/// Accepts a change in likelihood to the state
+void State::accept(const Like &like_ch)
 {
 	like.init_cond += like_ch.init_cond;
 	like.init_cond_prior += like_ch.init_cond_prior;
@@ -1536,9 +1550,27 @@ void State::likelihood_from_scratch()
 	}
 
 	calculate_likelihood();
+	
+	set_inconsistent_ind();
 }
 
- 
+
+/// Sets the value for inconsistent_ind
+void State::set_inconsistent_ind()
+{
+ 	for(auto p = 0u; p < species.size(); p++){
+		const auto &sp = model.species[p];
+		auto &ssp = species[p];
+		ssp.inconsistent_ind = false;
+		if(sp.type == INDIVIDUAL){
+			for(auto i = 0u; i < sp.nindividual_in; i++){
+				if(ssp.inconsistent(i)) ssp.inconsistent_ind = true;
+			}
+		}
+	}
+}
+
+
 /// Generates a particle from the state
 Particle State::generate_particle(unsigned int s, unsigned int chain, bool store_state, bool dir_fl)
 {
@@ -1553,8 +1585,11 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 
 	part.like = like;
 
-	if(dir_fl) part.dir_out = derive_calculate(store_state);
-
+	if(dir_fl){
+		part.dir_out = derive_calculate(store_state);
+		if(model.trans_tree_output) create_trans_tree();
+	}
+	
 	for(auto p = 0u; p < species.size(); p++){
 		const auto &sp = model.species[p];
 		auto &ssp = species[p];
@@ -1582,21 +1617,15 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 		part.species.push_back(part_sp);
 	}
 
-	if(model.trans_tree_output){                     // Adds a transition tree onto output
-		auto pop_ind = calculate_pop_ind_total(); 
-		for(auto p = 0u; p < species.size(); p++){
-			const auto &sp = model.species[p];
-			if(sp.trans_tree_output) species[p].add_trans_tree(part.species[p].individual,popnum_t,pop_ind);
-		}		
-		create_inf_node();
-	}
-
-	if(model.trans_tree){ 
+	auto tt_fl = false; 
+	if(dir_fl && (model.trans_tree || model.trans_tree_output)) tt_fl = true;
+	
+	if(tt_fl && store_state){ 
 		part.inf_origin = genetic_value.inf_origin;
 		part.inf_node = genetic_value.inf_node;
 	}
-	
-	if(model.trans_tree){                            // Outputs trans_tree statistics
+
+	if(tt_fl){    // Outputs trans_tree statistics
 		auto &tts = part.trans_tree_stats;
 		const auto &gv = genetic_value;
 		tts.N_mut_tree = 0u;
@@ -1624,7 +1653,41 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 		tts.N_unobs = gv.nobs_not_infected;
 	}
 	
+	if(dir_fl && model.trans_tree_output) remove_trans_tree();
+
 	return part;
+}
+
+
+/// Adds transmission tree (for outputting)
+void State::create_trans_tree()
+{                   
+	auto pop_ind = calculate_pop_ind_total(); 
+	for(auto p = 0u; p < species.size(); p++){
+		const auto &sp = model.species[p];
+		if(sp.trans_tree_output) species[p].add_trans_tree(popnum_t,pop_ind);
+	}		
+	
+	setup_transtree();
+}
+
+
+/// Removes transmission tree (after outputting)
+void State::remove_trans_tree()
+{    
+	for(auto p = 0u; p < species.size(); p++){
+		const auto &sp = model.species[p];
+		if(sp.trans_tree_output) species[p].remove_trans_tree();
+	}	
+	
+	auto &gv = genetic_value;
+	gv.mut_rate = UNSET;
+	gv.seq_var = UNSET;
+	gv.nobs_not_infected = UNSET;
+	gv.obs_node_ref.clear();
+	gv.inf_origin.clear();
+	gv.gen_dif.clear();
+	gv.inf_node.clear();
 }
 
 
@@ -1641,6 +1704,7 @@ void State::set_particle(const Particle &part)
 		ssp.init_cond_val = part_sp.init_cond_val;
 		ssp.trans_num = part_sp.trans_num;
 		ssp.individual = part_sp.individual;
+		
 		//if(ssp.type == POPULATION || ssp.type == DETERMINISTIC) ssp.set_cpop_st();
 	}
 
@@ -1788,6 +1852,12 @@ void State::restore_back()
 		switch(bp.type){
 		case POP_NUM_T:
 			change_pop_t(bp.i,bp.j,bp.k,-bp.value);
+			break;
+		case PREF_ST:
+			species[bp.i].individual[bp.j].ev[bp.k].ind_inf_from.pref = bp.value;
+			break;
+		case PO_ST:
+			species[bp.i].individual[bp.j].ev[bp.k].ind_inf_from.po = bp.value;
 			break;
 		}
 	}
@@ -2794,104 +2864,5 @@ Like State::get_like_ch(const Like &like_st) const
 	like_ch.ie = like.ie - like_st.ie;
 	
 	return like_ch;
-}
-
-
-// When trans_tree_output is set this 
-void State::create_inf_node()
-{
-	/*
-for(auto &ind : individual){
-		for(auto &ev : ind.ev){
-			auto &iif = ev.ind_inf_from;
-			auto c = ev.c_after;
-			
-			switch(ev.type){
-			case ENTER_EV:
-				if(sp.comp_gl[c].infected) iif.p = ENTER_INF;
-				break;
-			
-			case M_TRANS_EV: 
-				{
-					const auto &trg = sp.tra_gl[ev.tr_gl];
-					if(trg.infection.type == TRANS_INFECTION){
-						auto e = trg.markov_eqn_ref;
-						if(e == UNSET) emsg("me not set");
-
-						const auto &me = sp.markov_eqn[e];
-						auto ti = get_ti(ev.tdiv);
-						
-						const auto &eq = eqn[me.eqn_ref];
-						
-						const auto &lin = eq.lin;
-						if(!lin.on) emsg("The equation must be linear");
-
-						auto Npop = eq.pop_ref.size();
-		
-						auto j = UNSET;
-						
-						if(lin.multi_source){ // Samples from available sources (either populations of fro outside)		
-							auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val,popcombw_value);
-					
-							j = ss.sample_inf_source();
-						}
-						else{
-							if(testing){
-								if(Npop > 1) emsg("Npop wrong");
-								if(Npop == 1 && lin.no_pop_precalc.type != ZERO) emsg("Npop wrong");
-							}
-							j = 0;
-						}
-
-						if(j == Npop){   // Selects no population
-							iif.p = OUTSIDE_INF;
-						}
-						else{
-							auto po = eq.pop_ref[j];
-							
-							const auto &pop = model.pop[po];
-							auto p_inf = pop.p;
-							
-							const auto &list = pop_ind[ti][po];
-							if(list.size() == 0) emsg("No individual in pop");
-							
-							unsigned int i;
-							if(pop.ind_variation){
-								auto pos = sample_possibility(list);		
-								i = pos.i;
-								
-								if(testing){
-									auto sum = 0.0;
-									for(const auto &pos : list)	sum += pos.weight;
-									if(dif(sum,popnum_t[ti][po],TINY)) emsg("Population wrong");
-								}
-							}
-							else{
-								auto k = (unsigned int)(ran()*list.size());
-								i = list[k].i;
-								
-								if(testing){
-									if(dif(list.size(),popnum_t[ti][po],TINY)) emsg("Population wrong");
-								}
-							}
-							
-							iif.p = p_inf;
-							iif.i = i;
-						}
-					}
-				}
-				break;
-			
-			case NM_TRANS_EV:
-				{
-					const auto &trg = sp.tra_gl[ev.tr_gl];
-					if(trg.infection.type == TRANS_INFECTION) emsg("Non-Markovian transition cannot be used for infection");
-				}
-				break;
-			default: break;
-			}
-		}
-	}
-	*/
 }
 

@@ -27,14 +27,14 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 	
 	double t = ti;
 	double tnext = ti+1;
-	do{
+	do{		
 		double dtdiv;
 		auto R = 0.0; if(nnode > 0) R = tra_markov_tree_rate[nnode-1];
 
 		if(R > -TINY && R < TINY) dtdiv = LARGE;
 		else{
 			if(R < 0){		
-				emsg("Negative rate2");
+				emsg("Negative rate2"+tstr(R));
 			}
 			auto ra = ran(); if(ra == 0) ra = TINY;
 			dtdiv = -log(ra)/R;
@@ -353,11 +353,6 @@ void StateSpecies::activate_initial_state(double t, const vector < vector <doubl
 	const auto &popcomb = popcomb_t[ti];
 	
 	const auto &precalc = param_val.precalc;
-	
-	//const auto &node = sp.tra_markov_tree.node;
-
-	tra_markov_tree_rate.clear();
-	tra_markov_tree_rate.resize(nnode,0);
 	
 	for(auto i = 0u; i < N; i++){
 		auto &me = sp.markov_eqn[i];
@@ -702,6 +697,7 @@ void StateSpecies::add_markov_transition(unsigned int i, unsigned int tgl, doubl
 	
 	sec.indfac_sum += indfac;
 	tri.indfac_sum += indfac;
+	tri.nind++;
 	
 	const auto &me_vari = markov_eqn_vari[mef];
 	
@@ -1119,8 +1115,13 @@ void StateSpecies::remove_markov_trans(unsigned int i, double t)
 		auto recalc_max = false;
 		if(sec.max == indfac) recalc_max = true;
 		
-		sec.indfac_sum -= indfac;
-		tri.indfac_sum -= indfac;
+		auto &sec_if = sec.indfac_sum;
+		auto &tri_if = tri.indfac_sum;
+		auto &nind = tri.nind;
+		
+		sec_if -= indfac; 
+		tri_if -= indfac;
+		nind--;	
 		
 		const auto &me_vari = markov_eqn_vari[sp.tra_gl[trg].markov_eqn_ref];
 	
@@ -1133,6 +1134,16 @@ void StateSpecies::remove_markov_trans(unsigned int i, double t)
 			individual[it.i].tra_ind_ref[it.index].index = k;
 		}
 		ind_tra.pop_back();
+		
+		if(ind_tra.size() == 0){ // indfac_sum in section down to zero
+			if(sec_if < -SMALL || sec_if > SMALL) emsg("indfac not zero1"); 
+			sec_if = 0;
+		}
+		
+		if(nind == 0){           // indfac_sum for entire transition down to zero
+			if(tri_if < -SMALL || tri_if > SMALL) emsg("indfac not zero2"); 
+			tri_if = 0;
+		}
 		
 		if(recalc_max){
 			auto max = 0.0;

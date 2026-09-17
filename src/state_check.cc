@@ -6,7 +6,7 @@
 #include <fstream>
 #include <cmath>
 #include <algorithm>
- 
+
 using namespace std;
 
 #include "state.hh"
@@ -124,7 +124,14 @@ void State::check_simp(string ref)
 // Checks everything used in inference
 void State::check(string ref)
 {
-	//cout << ref << " state check";
+	//cout << "check\n";
+	//species[0].check_trans_tree(popnum_t,ref); return;
+	
+	//cout << ref << " state check" << endl;
+	
+	//check_genetic_value(ref); //cout << "turn off\n"; return;
+	//check_w();
+	//return;
 	
 	if(testing == false) return;
 	
@@ -591,11 +598,13 @@ void State::check_final_li_wrong()
 	
 	for(auto p = 0u; p < model.species.size(); p++){
 		const auto &sp = model.species[p];
-		const auto &ssp = species[p];
-	
-		for(auto i = 0u; i < sp.nindividual_in; i++){
-			if(ssp.inconsistent(i)){
-				add_alg_warn("Individual '"+sp.individual[i].name+"' does not agree with data");
+		
+		if(sp.type == INDIVIDUAL){
+			const auto &ssp = species[p];
+			for(auto i = 0u; i < sp.nindividual_in; i++){
+				if(ssp.inconsistent(i)){
+					add_alg_warn("Individual '"+sp.individual[i].name+"' does not agree with data");
+				}
 			}
 		}
 	}
@@ -734,7 +743,7 @@ void State::check_markov_trans(unsigned int p, string ref)
 			
 			if(dif(ssp.Li_markov[e][ti],Li_markov_store[ti],THRESH_EXPAND*dif_thresh)){
 				cout << e << " " << ti << " " <<  ssp.Li_markov[e][ti] << " " << Li_markov_store[ti] << " dif" << endl;
-				emsg("Li_markov");
+				emsg("Li_markov: "+ref);
 				add_alg_warn("Li_markov error"+ref);
 			}
 		}
@@ -1551,6 +1560,7 @@ void State::check_init_cond_like(unsigned int p, string ref)
 	check_timer[CHECK_IC] += clock();
 }
 
+
 /// Checks that the initial condition likelihood is correctly specified
 void State::check_init_cond_prior(string ref)
 {
@@ -1596,15 +1606,12 @@ void State::check_linearise()
 /// Checks that quantities in genetic_value are correctly specified
 void State::check_genetic_value(string ref)
 {
-	check_timer[CHECK_GEN] -= clock();
-	
+	if(model.trans_tree == false) return;
+
 	const auto &gen_data = model.genetic_data;
 	const auto &precalc = param_val.precalc;
-
-	if(model.trans_tree == false){
-		check_timer[CHECK_GEN] += clock();
-		return;
-	}
+	
+	check_timer[CHECK_GEN] -= clock();
 
 	if(gen_data.on){                                 // Checks mutation rate 
 		auto mut_rate_store = genetic_value.mut_rate;
@@ -1625,12 +1632,16 @@ void State::check_genetic_value(string ref)
 	/// Checks that ev.ind_inf_from is correctly specified
 	for(auto p = 0u; p < model.species.size(); p++){
 		const auto &sp = model.species[p];
+		
 		if(sp.trans_tree){
-			const auto &ssp = species[p];
+			auto &ssp = species[p];
 
-			for(const auto &ind : ssp.individual){
+			for(auto i = 0u; i < ssp.individual.size(); i++){
+				auto &ind = ssp.individual[i];
+			
 				auto c = UNSET;
-				for(auto ev : ind.ev){
+				for(auto e = 0u; e < ind.ev.size(); e++){
+					auto &ev = ind.ev[e];
 					auto &iif = ev.ind_inf_from;
 				
 					switch(ev.type){
@@ -1676,9 +1687,7 @@ void State::check_genetic_value(string ref)
 								if(iif.p == OUTSIDE_INF){
 									if(iif.po != UNSET) emsg("Should be UNSET1");
 									if(iif.pref != UNSET) emsg("Should be UNSET2");
-									if(iif.w != 1){
-										emsg("Should be UNSET3");
-									}
+									if(iif.w != 1) emsg("Should be UNSET3");
 								}
 								else{                              // Checks pref and po consistent
 									auto m = tra.markov_eqn_ref;
@@ -1697,14 +1706,19 @@ void State::check_genetic_value(string ref)
 									
 									// Checks that the weight is correct
 									auto w = get_w_from_indinffrom(iif);
+									
 									if(dif(w,iif.w,dif_thresh)){ 
-										add_alg_warn("iif.w not right");
+										emsg("iif.w not right");
+										//add_alg_warn("iif.w not right");
 									}
 									iif.w = w;
 								}
 							}
 							else{
-								if(iif.p != UNSET) emsg("Should not be ENTER_INF2");
+								if(iif.p != UNSET){
+									cout << ev.tdiv*0.5 << " ev\n";
+									emsg("Should not be ENTER_INF2");
+								}
 								if(ev.inf_node_ref != UNSET){
 									emsg("Should not be code4");
 								}
@@ -1721,7 +1735,7 @@ void State::check_genetic_value(string ref)
 				}
 			}
 		}
-		
+	
 		// Check iif from the point of view of nodes
 		for(auto n = 0u; n < genetic_value.inf_node.size(); n++){
 			const auto &in = genetic_value.inf_node[n];
@@ -1732,6 +1746,9 @@ void State::check_genetic_value(string ref)
 			
 			if(in.tdiv_start != ev.tdiv) emsg("t_start not agree");
 		
+			//species[0].print_event(event);
+			//cout << in.tdiv_start << " " << in.tdiv_rec << " end\n";
+						
 			auto e = 0u;
 			auto c = UNSET;
 			for(auto k = 0u; k < in.inf_ev.size(); k++){
@@ -1756,11 +1773,24 @@ void State::check_genetic_value(string ref)
 						c = event[e].c_after;
 						e++;
 					}
-		
+
+					if(c == UNSET) emsg("individual is nto alive");
+					if(sp.comp_gl[c].infected == false){
+							for(auto k = 0u; k < in.inf_ev.size(); k++){
+							const auto &ie = in.inf_ev[k];
+							cout << ie.tdiv*0.5 << "inf ev\n";
+						}
+					
+						cout << species[in.p].individual[in.i].name << "ind\n";
+						
+						emsg("Uninfected indivudal causing infection");
+					}
+					
 					const auto &inf_c = model.inf_cause[in_inf.p][ev.tr_gl][in.p][c];
 					if(inf_c.eq_ref == UNSET){
-						//species[0].print_event(event);
-						emsg("Cannot find equation for iif");
+						cout << t*0.5 << " " << sp.tra_gl[ev.tr_gl].name << " trans\n";
+						cout << in_inf.p << " " << ev.tr_gl << " "<< in.p << " " << c << " kkk\n";
+						emsg("Cannot find equation for iif: "+ref);
 					}
 					
 					if(iif.p != in.p) emsg("check p not agree");
@@ -1771,12 +1801,17 @@ void State::check_genetic_value(string ref)
 							cout << j << " " <<model.pop[eq.pop_ref[j]].name << "pop ref" << endl;
 						}
 						cout << iif.pref << " " << inf_c.pref <<" jj" << endl;
+						cout << t*0.5 << "time\n";
+						
+						cout << iif.po << " " << inf_c.po << " check pop\n";
+						cout << in.i << " ind\n";
 						emsg("check pref not agree");
 					}
 					if(iif.po != inf_c.po) emsg("check po not agree");
 					
 					auto w = get_w_from_indinffrom(iif);
 					if(dif(w,iif.w,dif_thresh)){
+						emsg("check w not agree");
 						add_alg_warn("check w not agree");
 					}
 					iif.w = w;
@@ -1785,6 +1820,7 @@ void State::check_genetic_value(string ref)
 		}
 	}
 	
+
 	// Checks obs_node_ref
 	if(genetic_value.obs_node_ref.size() != gen_data.obs.size()){
 		emsg("obs_node_ref wrong size4");
@@ -2490,8 +2526,8 @@ void State::check_markov_value_dif()
 /// Adds an algorithm warning
 void State::add_alg_warn(string te)
 {
-	if(false){
-		cout << "warning create termination" << endl;
+	if(true){
+		cout << "warning create termination\n" << endl;
 		emsg(te+" ALG WARNING"); 
 	}
 	if(debugging) emsg(te+" ALG WARNING"); 

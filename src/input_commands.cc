@@ -2024,7 +2024,7 @@ bool Input::inference_command()
 		auto update = (unsigned int)(genper*details.sample/100.0);
 		if(update < 5){
 			update = 5;
-			alert_warning("'gen-percent' set to "+tstr(update*100/details.sample)+"% because the value "+tstr(genper)+"% was too small.");
+			alert_warning("'gen-percent' set to "+tstr((unsigned int)(update*100.0/details.sample))+"% because the value "+tstr(genper)+"% was too small.");
 		}
 		details.gen_update = update;
 	}

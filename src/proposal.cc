@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <iomanip>
 
-
 using namespace std;
 
 #include "proposal.hh"
@@ -1117,15 +1116,13 @@ void Proposal::MH_event(State &state)
 									cout << "event new:" << endl; ssp.print_event(ev_new);
 								}
 								
-								auto gc = state.update_tree(p_prop,i,ev_new);
+								auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
 								
-								if(gc.type == GENCHA_FAIL){
+								if(!uii.success){
 									samp.nfa++;
 									update_ind_samp_si(tr_gl,REJECT,samp.ntr);
 								}
 								else{
-									auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-								
 									auto dprob = 0.0;
 									if(tr_gl_new != UNSET){  // Accounts for differeces in time sampler
 										const auto &samp_new = ind_sampler[tr_gl_new];
@@ -1133,19 +1130,14 @@ void Proposal::MH_event(State &state)
 										dprob = normal_probability(dt,0,samp_new.si) - normal_probability(dt,0,samp.si); 
 									}
 									
-									gc.update_like_ch(like_ch,dprob);
-									
-									auto al = calculate_al(like_ch,dprob);
+									auto al = calculate_al(uii.like_ch,uii.dprob+dprob);
 							
 									if(pl) cout << i << " " <<  al << " " << e << " al" << endl;
 								
 									if(ran() < al){
 										if(pl) cout << " accept" << endl;
 										samp.nac++;
-										state.accept(like_ch);
-										state.gen_change_update(gc); 
-										if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
-										
+										state.accept_update_ind(uii);
 										update_ind_samp_si(tr_gl,ACCEPT50,samp.ntr);
 									}
 									else{ 
@@ -1154,7 +1146,7 @@ void Proposal::MH_event(State &state)
 										update_ind_samp_si(tr_gl,REJECT,samp.ntr);
 									}
 
-									if(pl) state.check("ind prop");
+									if(pl) state.check("ind prop event");
 	
 									if(pl){
 										state.check_pop_t("Pnum");
@@ -1170,6 +1162,7 @@ void Proposal::MH_event(State &state)
 			}
 		}
 	}
+	
 	if(pl) cout << " done" << endl;
 }
 
@@ -1271,33 +1264,27 @@ void Proposal::MH_multi_event(State &state)
 						update_ind_samp_si(tr_gl,REJECT,samp.ntr);
 					}
 					else{		
-						auto gc = state.update_tree(p_prop,i,ev_new);
-						if(gc.type == GENCHA_FAIL){
+						auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+								
+						if(!uii.success){
 							samp.nfa++;
 							update_ind_samp_si(tr_gl,REJECT,samp.ntr);
 						}
 						else{
-							auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-						
 							auto dprob = 0.0;
 							if(tr_gl_new != tr_gl){  // Accounts for differeces in time sampler
 								const auto &samp_new = ind_sampler[tr_gl_new];
 								dprob = normal_probability(dt,0,samp_new.si) - normal_probability(dt,0,samp.si); 
 							}
 							
-							gc.update_like_ch(like_ch,dprob);
-							
-							auto al = calculate_al(like_ch,dprob);
+							auto al = calculate_al(uii.like_ch,uii.dprob+dprob);
 					
 							if(pl) cout << i << " " <<  al << " " << e << " al" << endl;
 						
 							if(ran() < al){
 								if(pl) cout << " accept" << endl;
 								samp.nac++;
-								state.accept(like_ch);
-								state.gen_change_update(gc); 
-								if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
-								
+								state.accept_update_ind(uii);
 								update_ind_samp_si(tr_gl,ACCEPT50,samp.ntr);
 							}
 							else{ 
@@ -1384,28 +1371,21 @@ void Proposal::MH_event_all(State &state)
 						cout << "event new:" << endl; ssp.print_event(ev_new);
 					}
 					
-					auto gc = state.update_tree(p_prop,i,ev_new);
-					if(gc.type == GENCHA_FAIL){
+					auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+								
+					if(!uii.success){
 						samp.nfa++;
 						update_ind_samp_si(i,REJECT,samp.ntr);
 					}
-					else{
-						auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-					
-						auto dprob = 0.0;
-						gc.update_like_ch(like_ch,dprob);
-						
-						auto al = calculate_al(like_ch,dprob);
+					else{	
+						auto al = calculate_al(uii.like_ch,uii.dprob);
 				
 						if(pl) cout << i << " " <<  al << " al" << endl;
 					
 						if(ran() < al){
 							if(pl) cout << " accept" << endl;
 							samp.nac++;
-							state.accept(like_ch);
-							state.gen_change_update(gc); 
-							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
-							
+							state.accept_update_ind(uii);
 							update_ind_samp_si(i,ACCEPT50,samp.ntr);
 						}
 						else{ 
@@ -1517,22 +1497,15 @@ void Proposal::MH_ind_local(State &state)
 						cout << "event new:" << endl; ssp.print_event(ev_new);
 					}
 				
-				
 					auto i = lich.i;
 				
-					auto gc = state.update_tree(p_prop,i,ev_new);
-					if(gc.type == GENCHA_FAIL){
-						si.nfa++;
-					}
+					auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+								
+					if(!uii.success) si.nfa++;
 					else{
-						auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-					
 						auto add = ssp.local_ind_change(i,cl);
 					
-						auto dprob = 0.0;
-						gc.update_like_ch(like_ch,dprob);
-						
-						auto al = calculate_al(like_ch,dprob);
+						auto al = calculate_al(uii.like_ch,uii.dprob);
 						
 						// Accounts for change in number of potential proposals
 						auto Ni = licha.size();
@@ -1552,9 +1525,7 @@ void Proposal::MH_ind_local(State &state)
 							si.nac++;
 							remove_li_cha(i,licha,lc_ref);
 							add_li_cha(i,add,licha,lc_ref);
-							state.accept(like_ch);
-							state.gen_change_update(gc); 
-							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+							state.accept_update_ind(uii);	
 							if(testing){ if(Nf != licha.size()) emsg("Wrong number");}
 						}
 						else{
@@ -1562,7 +1533,7 @@ void Proposal::MH_ind_local(State &state)
 							state.restore_back();
 						}
 						
-						if(pl) state.check("ind prop");
+						if(pl) state.check("ind local prop");
 					}
 				}		
 			}
@@ -1703,37 +1674,22 @@ void Proposal::sample_ind_obs(State &state)
 								
 								auto ev_store = ind.ev;
 								
-								auto gc = state.update_tree(p_prop,i,ev_new);
+								auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
 								
-								if(gc.type == GENCHA_FAIL) nfa++;
+								if(!uii.success) nfa++;
 								else{
-									auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-								
-									if(pl){
-										cout << "modi: "; ssp.print_event(ev_new);
-									}
-									
 									ind_ev_samp.generate_ind_obs_timeline();
 										
 									auto probfi = ind_ev_samp.sample_events_prob(ev_store);
 									
-									auto dprob = probfi-probif;
+									auto al = calculate_al(uii.like_ch,uii.dprob+probfi-probif);
 								
-									gc.update_like_ch(like_ch,dprob);
-									
-									auto al = calculate_al(like_ch,dprob);
-								
-									if(pl){
-										cout << al << " " << dprob <<  "al" << endl;	
-										print_like(like_ch);
-									}
+									if(pl) cout << al << "al" << endl;	
 								
 									if(ran() < al){
 										if(pl) cout << "ac ind" << endl;
 										nac++; if(burn){ if(event_dif(ev_store,ind.ev)) isp.nac++;}
-										state.accept(like_ch);
-										state.gen_change_update(gc); 	
-										if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+										state.accept_update_ind(uii);
 									}
 									else{ 
 										if(pl) cout << "reject" << endl;
@@ -1807,47 +1763,29 @@ void Proposal::resimulate_ind_obs(State &state)
 					
 					auto ev_store = ind.ev;	
 					
-					auto gc = state.update_tree(p_prop,i,ev_new);
-					if(gc.type == GENCHA_FAIL){
-						nfa++;
+					if(pl){
+						cout << endl << endl << ind.name << "ind " << endl; 
+						cout << "old: "; ssp.print_event(ind.ev);
+						cout << "new: "; ssp.print_event(ev_new);
 					}
+					
+					probfi += ssp.nm_obs_dprob(ind);
+					auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+										
+					if(!uii.success) nfa++;
 					else{		
-						if(pl){
-							cout << endl << endl << ind.name << "ind " << endl; 
-							cout << "old: "; ssp.print_event(ind.ev);
-							/*
-							for(auto i = 0u; i < ind.ev.size(); i++){
-								cout << ind.ev[i].tdiv - int(ind.ev[i].tdiv) << ",";
-							}
-							cout << " dif old " << endl;
-							*/
-						}
-						
-						probfi += ssp.nm_obs_dprob(ind);
-						auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
 						probif += ssp.nm_obs_dprob(ind);
 						
-						if(pl){
-							cout << "new: "; ssp.print_event(ind.ev);
-						}
-							
 						probfi += ind_ev_samp.resample_init_event_prob(i,ev_store[0]) + 
 											ind_ev_samp.simulate_events_prob(i,ev_store,indd.trig_ev_ref);
-				
-						auto dprob = probfi-probif;
-						
-						gc.update_like_ch(like_ch,dprob);
-						if(pl) print_like(like_ch);
-						
-						auto al = calculate_al(like_ch,dprob);
+
+						auto al = calculate_al(uii.like_ch,uii.dprob+probfi-probif);
 
 						if(pl) cout << al << " al try ind" << endl;
 						if(ran() < al){ 
 							if(pl) cout << "ac ind" << endl;
 							nac++; if(burn){ if(event_dif(ev_store,ind.ev)) isp.nac++;}
-							state.accept(like_ch);
-							state.gen_change_update(gc); 	
-							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+							state.accept_update_ind(uii);		
 						}
 						else{ 
 							if(pl) cout << "rej ind" << endl;
@@ -1919,36 +1857,28 @@ void Proposal::resimulate_single_ind_obs(State &state)
 						
 						auto ev_store = ind.ev;	
 						
-						auto gc = state.update_tree(p_prop,i,ev_new);
-						if(gc.type == GENCHA_FAIL){
-							nfa++;
+						if(pl){
+							cout << endl << " " << endl << ind.name << "ind" << endl; 
+							cout << "old: "; ssp.print_event(ind.ev);
+							cout << "new: "; ssp.print_event(ev_new);
 						}
-						else{
-							if(pl){
-								cout << endl << " " << endl << ind.name << "ind" << endl; 
-								cout << "old: "; ssp.print_event(ind.ev);
-								cout << "new: "; ssp.print_event(ev_new);
-							}
 							
-							probfi += ssp.nm_single_obs_dprob(cl,ind);
-							auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+						probfi += ssp.nm_single_obs_dprob(cl,ind);	
+						auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+								
+						if(!uii.success) nfa++;
+						else{
 							probif += ssp.nm_single_obs_dprob(cl,ind);
 							
 							probfi += ind_ev_samp.simulate_single_events_prob(i,cl,ev_store,trig);
 					
-							auto dprob = probfi-probif;
-							
-							gc.update_like_ch(like_ch,dprob);
-										
-							auto al = calculate_al(like_ch,dprob);
+							auto al = calculate_al(uii.like_ch,uii.dprob+probfi-probif);
 						
 							if(pl) cout << al << " al try ind" << endl;
 							if(ran() < al){
 								if(pl) cout << "ac ind" << endl;
 								nac++; if(burn){ if(event_dif(ev_store,ind.ev)) isp.nac++;}
-								state.accept(like_ch);
-								state.gen_change_update(gc); 	
-								if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+								state.accept_update_ind(uii);
 							}
 							else{
 								state.restore_back();
@@ -2023,32 +1953,24 @@ void Proposal::resimulate_ind_unobs(State &state)
 				cout << "end:"; ssp.print_event(ev_new);
 			}
 			
-			auto gc = state.update_tree(p_prop,i,ev_new);
-				
-			if(gc.type == GENCHA_FAIL){
-				nfa++;
-			}
+			probfi += ssp.nm_obs_dprob(ind);		
+			auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+								
+			if(!uii.success) nfa++;
 			else{
-				probfi += ssp.nm_obs_dprob(ind);
-				auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
 				probif += ssp.nm_obs_dprob(ind);
 			
 				probfi += ind_ev_samp.simulate_events_prob(i,ev_store,ste);
 				if(copy == false) probfi += so_samp.sample_prob(ev_store[0]);
 			
-				auto dprob = probfi-probif;
-				gc.update_like_ch(like_ch,dprob);
-				
-				auto al = calculate_al(like_ch,dprob);
+				auto al = calculate_al(uii.like_ch,uii.dprob+probfi-probif);
 			
 				if(pl) cout << al << " try ind" << endl;
 				
 				if(ran() < al){ 
 					if(pl) cout << "ac ind" << endl;
 					nac++;
-					state.accept(like_ch);
-					state.gen_change_update(gc); 	
-					if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+					state.accept_update_ind(uii);	
 				}
 				else{
 					state.restore_back();
@@ -2133,12 +2055,12 @@ void Proposal::add_rem_ind(State &state)
 			
 					i_store.push_back(i);
 					
-					auto li_ch = state.update_ind(p_prop,i,ev_new,UP_MULTI);
+					auto uii = state.update_ind(p_prop,i,ev_new,UP_MULTI,false);
 					probif += ssp.nm_obs_dprob(ssp.individual[i]);
 					
 					if(ssp.source_ind(i)) Nso_unobs_new++;
 					
-					add_on_like(li_ch,like_ch);
+					add_on_like(uii.like_ch,like_ch);
 				}
 				
 				auto probfi = -factorial(nunobs+dN) + factorial(nunobs);
@@ -2212,8 +2134,8 @@ void Proposal::add_rem_ind(State &state)
 						if(so_samp.enter_frac == 1 && e_init.type != ENTER_EV) emsg("prob samp2");
 							
 						probfi += ssp.nm_obs_dprob(ssp.individual[i]);
-						auto li_ch = state.update_ind(p_prop,i,ev_empty,UP_MULTI);
-						add_on_like(li_ch,like_ch);
+						auto uii = state.update_ind(p_prop,i,ev_empty,UP_MULTI,false);
+						add_on_like(uii.like_ch,like_ch);
 					
 						probfi += so_samp.sample_prob(ev_store[0]) + 
 						       ind_ev_samp.simulate_events_prob(i,ev_store,ste);
@@ -2311,11 +2233,10 @@ void Proposal::add_rem_tt_ind(State &state)
 				}
 			}
 		
-			auto gc = state.update_tree(p_prop,i,ev_new);
-					
-			if(gc.type == GENCHA_FAIL) nfa++;
+			auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+								
+			if(!uii.success) nfa++;
 			else{	
-				auto li_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
 				probif += ssp.nm_obs_dprob(ssp.individual[i]);
 				if(ssp.source_ind(i)) Nso_unobs_new++;
 			
@@ -2330,18 +2251,13 @@ void Proposal::add_rem_tt_ind(State &state)
 					probfi += factorial(Nso_unobs_new) - factorial(Nso_unobs); 	
 				}
 				
-				auto dprob = probfi-probif;
-				gc.update_like_ch(li_ch,dprob);
-	
-				auto al = calculate_al(li_ch,dprob);
+				auto al = calculate_al(uii.like_ch,uii.dprob+probfi-probif);
 				
 				if(pl) cout << al << " al" << endl; 
 				if(ran() < al){ 
 					if(pl) cout << "ac ind" << endl;
 					nac++;
-					state.accept(li_ch);
-					state.gen_change_update(gc); 	
-					if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+					state.accept_update_ind(uii);		
 					
 					Nso_unobs = Nso_unobs_new;
 					update_si(ACCEPT50);
@@ -2382,32 +2298,28 @@ void Proposal::add_rem_tt_ind(State &state)
 						
 					auto ev_store = ssp.individual[i].ev;
 						
-					auto gc = state.update_tree(p_prop,i,ev_empty);
-						
-					if(gc.type == GENCHA_FAIL) nfa++;
-					else{	
-						const auto &e_init = ev_store[0];
-						if(so_samp.enter_frac == 0 && e_init.type == ENTER_EV) emsg("prob sampB");
-						if(so_samp.enter_frac == 1 && e_init.type != ENTER_EV) emsg("prob samp2");
+					const auto &e_init = ev_store[0];
+					if(so_samp.enter_frac == 0 && e_init.type == ENTER_EV) emsg("prob sampB");
+					if(so_samp.enter_frac == 1 && e_init.type != ENTER_EV) emsg("prob samp2");
 							
-						probfi += ssp.nm_obs_dprob(ssp.individual[i]);
-						auto li_ch = state.update_ind(p_prop,i,ev_empty,UP_SINGLE);
+					probfi += ssp.nm_obs_dprob(ssp.individual[i]);
 						
+					auto uii = state.update_ind(p_prop,i,ev_empty,UP_SINGLE);
+								
+					if(!uii.success) nfa++;
+					else{	
+					  // Is this right?
 						probfi += so_samp.sample_prob(ev_store[0]) + 
 						       ind_ev_samp.simulate_events_prob(i,ev_store,ste);
-							
-						auto dprob = probfi-probif;
-						gc.update_like_ch(li_ch,dprob);
-					
-						auto al = calculate_al(li_ch,dprob);
+						
+						auto al = calculate_al(uii.like_ch,uii.dprob+probfi-probif);
 						
 						if(pl) cout << al << " al" << endl;
 						if(ran() < al){ 
 							if(pl) cout << "ac ind" << endl;
 							nac++;
-							state.accept(li_ch);
-							state.gen_change_update(gc); 	
-							if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+							
+							state.accept_update_ind(uii);	
 												
 							ssp.remove_individual(i,inf_node);
 							Nso_unobs = Nso_unobs_new;
@@ -2551,7 +2463,7 @@ void Proposal::MH_ie(State &state)
 
 			update_si(REJECT_SMALL);
 		}
-		if(pl) state.check("ind prop");
+		if(pl) state.check("ind ie prop");
 	}
 }
 
@@ -3602,34 +3514,25 @@ void Proposal::switch_enter_source(State &state)
 					cout << "event new:" << endl; ssp.print_event(ev_new);
 				}
 			
-				auto gc = state.update_tree(p_prop,i,ev_new);
-				if(gc.type == GENCHA_FAIL){
-					nfa++;
-				}
-				else{
-					auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-				
-					gc.update_like_ch(like_ch,dprob);
-					
-					auto al = calculate_al(like_ch,dprob);
-			
-					if(pl) print_like(like_ch);
+				auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+								
+				if(!uii.success) nfa++;
+				else{		
+					auto al = calculate_al(uii.like_ch,uii.dprob);
 			
 					if(pl) cout << i << " " <<  al << " al" << endl;
 				
 					if(ran() < al){
 						if(pl) cout << " accept" << endl;
 						nac++;
-						state.accept(like_ch);
-						state.gen_change_update(gc); 
-						if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+						state.accept_update_ind(uii);		
 					}
 					else{ 
 						if(pl) cout << "reject" << endl;
 						state.restore_back();
 					}
 
-					if(pl) state.check("ind prop");
+					if(pl) state.check("ind prop switch enter source");
 				}
 			}
 		}
@@ -3709,25 +3612,18 @@ void Proposal::switch_leave_sink(State &state)
 								
 			ntr++;
 			
-			auto gc = state.update_tree(p_prop,i,ev_new);
-			if(gc.type == GENCHA_FAIL){
-				nfa++;
-			}
+			auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+								
+			if(!uii.success) nfa++;
 			else{
-				auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-			
-				gc.update_like_ch(like_ch,dprob);
-				
-				auto al = calculate_al(like_ch,dprob);
+				auto al = calculate_al(uii.like_ch,uii.dprob);
 		
 				if(pl) cout << i << " " <<  al << " al" << endl;
 			
 				if(ran() < al){
 					if(pl) cout << " accept" << endl;
 					nac++;
-					state.accept(like_ch);
-					state.gen_change_update(gc); 
-					if(sp.trans_tree) state.update_popnum_ind(p_prop,i);
+					state.accept_update_ind(uii);		
 				}
 				else{ 
 					if(pl) cout << "reject" << endl;
@@ -3874,24 +3770,17 @@ void Proposal::basic_ind_update(unsigned int i, vector <Event> &ev_new, State &s
 {
 	auto pl = false;
 	
-	auto gc = state.update_tree(p_prop,i,ev_new);
-	if(gc.type == GENCHA_FAIL){
-	}
+	auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
+								
+	if(!uii.success){ }
 	else{
-		auto like_ch = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
-	
-		double dprob = 0;
-		gc.update_like_ch(like_ch,dprob);
-		
-		auto al = calculate_al(like_ch,dprob);
+		auto al = calculate_al(uii.like_ch,uii.dprob);
 
 		if(pl) cout << i << " " <<  al << " al" << endl;
 
 		if(ran() < al){
 			if(pl) cout << " accept" << endl;
-			state.accept(like_ch);
-			state.gen_change_update(gc); 
-			if(model.species[p_prop].trans_tree) state.update_popnum_ind(p_prop,i);
+			state.accept_update_ind(uii);		
 		}
 		else{ 
 			if(pl) cout << "reject" << endl;
@@ -3973,80 +3862,68 @@ void Proposal::update(State &state)
 	
 	timer[PROP_TIMER] -= clock();
 	switch(type){
-	case TRANS_TREE_PROP: 
-		trans_tree(state); 
-		break;
-	case TRANS_TREE_SWAP_INF_PROP: 
-		trans_tree_swap_inf(state);
-		break;
-	case TRANS_TREE_MUT_PROP: 
-		trans_tree_mut(state); 
-		break;
-	case TRANS_TREE_MUT_LOCAL_PROP: 
-		trans_tree_mut_local(state); 
-		break;
-	case PARAM_PROP: MH(state); break;
-	case LOG_PARAM_PROP: MH(state); break;
+	case TRANS_TREE_PROP: trans_tree(state); break;                     // Tree proposals
+	case TRANS_TREE_SWAP_INF_PROP: trans_tree_swap_inf(state); break;
+	case TRANS_TREE_MUT_PROP: trans_tree_mut(state); break;
+	case TRANS_TREE_MUT_LOCAL_PROP: trans_tree_mut_local(state); break;
+	
+	case PARAM_PROP: MH(state); break;                                  // Parameter proposals
+	case LOG_PARAM_PROP: MH(state); break;            
 	case BERNOULLI_PROP: MH(state); break;
 	case DET_PARAM_PROP: param_det(state); break;
 	case DET_LOG_PARAM_PROP: param_det(state); break;
 	case DET_BERNOULLI_PROP: param_det(state); break;
-	case DET_IC_POP_PROP: param_det(state); break;
+	
+	case IND_EVENT_TIME_PROP: MH_event(state); break;                   // Event proposals
+	case IND_MULTI_EVENT_PROP: MH_multi_event(state);	break;
+	case IND_EVENT_ALL_PROP: MH_event_all(state);	break;
+	case IND_LOCAL_PROP: MH_ind_local(state); break;
+
+	case IND_OBS_SAMP_PROP: sample_ind_obs(state); break;               // Resampling individual events
+	case IND_OBS_RESIM_PROP: resimulate_ind_obs(state); break;
+	case IND_OBS_RESIM_SINGLE_PROP: resimulate_single_ind_obs(state); break;
+	case IND_UNOBS_RESIM_PROP: resimulate_ind_unobs(state); break;
+	
+	case IND_ADD_REM_PROP: add_rem_ind(state); break;                   // Adding / removing individuals
+	case IND_ADD_REM_TT_PROP: add_rem_tt_ind(state); break;
+	
+	case DET_IC_POP_PROP: param_det(state); break;                      // Initial condition proposal
 	case DET_IC_POPTOTAL_PROP: param_det(state); break;
 	case DET_IC_RESAMP_PROP: param_det(state); break;
-	case PAR_EVENT_FORWARD_PROP: param_event_joint(FORWARD,state); break;
-	case PAR_EVENT_FORWARD_SQ_PROP: param_event_joint(FORWARD_SQ,state); break;
-	case PAR_EVENT_BACKWARD_SQ_PROP: param_event_joint(BACKWARD_SQ,state); break;
 	case IND_OBS_SWITCH_ENTER_SOURCE_PROP: switch_enter_source(state); break;
 	case IND_OBS_SWITCH_LEAVE_SINK_PROP: switch_leave_sink(state); break;
-	case CORRECT_OBS_TRANS_PROP: 
-		//correct_obs_trans_events(state); 
-		break;
-	case IND_EVENT_TIME_PROP:  // Ind begin
-		MH_event(state); 
-		break;
-	case IND_MULTI_EVENT_PROP: 
-		MH_multi_event(state); 
-		break;
-	case IND_EVENT_ALL_PROP: 
-		MH_event_all(state); 
-		break;
-	case IND_LOCAL_PROP: 
-		MH_ind_local(state); 
-		break;
-	case IND_OBS_SAMP_PROP:
-		sample_ind_obs(state);
-		break;
-	case IND_OBS_RESIM_PROP: 
-		resimulate_ind_obs(state); 
-		break;
-	case IND_OBS_RESIM_SINGLE_PROP: 
-		resimulate_single_ind_obs(state);
-		break;
-	case IND_UNOBS_RESIM_PROP:  // Ind end
-		resimulate_ind_unobs(state); 
-		break;
-	case IND_ADD_REM_PROP: add_rem_ind(state); break;
-	case IND_ADD_REM_TT_PROP: add_rem_tt_ind(state); break;
-	case MBP_PROP: mbp(state); break;
+	case INIT_COND_FRAC_PROP: init_cond_frac(state); break;
+	
+	case MBP_PROP: mbp(state); break;                                   // Model-based proposals
 	case LOG_MBP_PROP: mbp(state); break;
 	case MBP_BERNOULLI_PROP: mbp(state); break;
 	case MBPII_PROP: mbp(state); break;
 	case MBP_IC_POP_PROP: mbp(state); break;
 	case MBP_IC_POPTOTAL_PROP: mbp(state); break;
 	case MBP_IC_RESAMP_PROP: mbp(state); break;
-	case INIT_COND_FRAC_PROP: init_cond_frac(state); break;
-	case IE_PROP: MH_ie(state); break;
+	
+	case IE_PROP: MH_ie(state); break;                                  // Individual effect proposals
 	case IE_VAR_PROP: MH_ie_var(state); break;
 	case IE_COVAR_PROP: MH_ie_covar(state); break;
 	case IE_VAR_CV_PROP: MH_ie_var_cv(state); break;
-	case POP_ADD_REM_LOCAL_PROP: pop_add_rem_local(state); break;
+	
+	case POP_ADD_REM_LOCAL_PROP: pop_add_rem_local(state); break;       // Local population proposals
 	case POP_MOVE_LOCAL_PROP: pop_move_local(state); break;
 	case POP_IC_LOCAL_PROP: pop_ic_local(state); break;
 	case POP_END_LOCAL_PROP: pop_end_local(state); break;
 	case POP_SINGLE_LOCAL_PROP: pop_single_local(state); break;
 	case POP_IC_PROP: pop_ic(state); break;	
 	case POP_IC_SWAP_PROP: pop_ic_swap(state); break;	
+	
+	case PAR_EVENT_FORWARD_PROP: param_event_joint(FORWARD,state); break; // Joint parameter / event proposals
+	case PAR_EVENT_FORWARD_SQ_PROP: param_event_joint(FORWARD_SQ,state); break;
+	case PAR_EVENT_BACKWARD_SQ_PROP: param_event_joint(BACKWARD_SQ,state); break;
+	
+	case CORRECT_OBS_TRANS_PROP:                                        // No longer used
+		//correct_obs_trans_events(state); 
+		break;
+		
+	default: break;
 	}	
 		 
 	timer[PROP_TIMER] += clock();

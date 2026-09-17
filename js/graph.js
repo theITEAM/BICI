@@ -378,7 +378,7 @@ class Graph
 			tick.push({value:val, te:this.rn(val)}); 
 			val += si;
 		}
-		
+	
 		return tick;
 	}
 	
@@ -981,7 +981,7 @@ class Graph
 		let x = 0;
 		do{
 			let num = n.toFixed(x);
-			if((num-n)*(num-n) < 0.000000000000001) return num
+			if((num-n)*(num-n) < 0.0000000000000000000001) return num
 			x++;
 		}while(true);
 	}
@@ -1028,6 +1028,7 @@ class Graph
 				
 				let da = this.data[this.data.length-1];
 				if(da.type != "Transmission") error("Should be transmission");
+			
 			
 				lay.add_button({x:left_shift, y:0, dx:lay.dx-scrollw-left_shift, dy:y, barh:dy, transmission:da.transmission, type:"TransArrow"});
 				
@@ -1315,7 +1316,7 @@ class Graph
 			
 			let xx = x+fac*(tr.t-ra.xmin);
 			
-			if(xx > x && xx < x+dx){
+			if(xx >= x && xx <= x+dx){
 				{
 					let r = 0.25*barh*Math.sqrt(tr.frac);
 					let yy = y+barh*(tr.k+0.5);

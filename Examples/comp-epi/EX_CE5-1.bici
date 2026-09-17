@@ -1,0 +1,74 @@
+###################### DATA DIRECTORY ######################
+
+data-dir folder="EX_CE5-1-data-files"
+
+####################### DESCRIPTION ########################
+
+description text="description.txt"
+
+######################### DETAILS ##########################
+
+simulation start=0 end=100 timestep=0.5
+
+inference nchain=3
+
+post-sim
+
+########## DEFINE MODEL AND DATA FOR SPECIES COW ###########
+
+species name="Cow" type="individual"
+
+# SPECIES MODEL
+
+class name="DSc" index="a"
+
+comp name="S^c" color="#00bb00" x=-20 y=0
+
+comp name="I^c" color="#bb0000" x=-1 y=0
+
+comp name="R^c" color="#4444ff" x=14 y=0
+
+trans name="S^c->I^c" value="exp(rate:β^cc×{I^c}+β^bc×{Badger:I^b})"
+
+trans name="I^c->R^c" value="exp(rate:γ^c)"
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="DSc" file="init-pop-sim.csv"
+
+######### DEFINE MODEL AND DATA FOR SPECIES BADGER #########
+
+species name="Badger" type="individual"
+
+# SPECIES MODEL
+
+class name="DSb" index="b"
+
+comp name="S^b" color="#22ff22" x=-20 y=0
+
+comp name="I^b" color="#ff2222" x=-1 y=0
+
+comp name="R^b" color="#aaaaff" x=14 y=0
+
+trans name="S^b->I^b" value="exp(rate:β^bb×{I^b}+β^cb×{Cow:I^c})"
+
+trans name="I^b->R^b" value="exp(rate:γ^b)"
+
+# SIMULATION INITIAL CONDITIONS
+
+init-pop-sim type="fixed" focal="DSb" file="init-pop-sim-2.csv"
+
+######################## PARAMETERS ########################
+
+param name="β^bb" value=0.004
+
+param name="β^bc" value=0.0003
+
+param name="β^cb" value=0.0002
+
+param name="β^cc" value=0.002
+
+param name="γ^b" value=0.2
+
+param name="γ^c" value=0.1
+

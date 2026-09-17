@@ -690,10 +690,9 @@ vector <IndRef> State::force_consistent_solution()
 							//ssp.print_event(ev_new);
 						}
 						
-						auto gc = update_tree(p,i,ev_new);
-						if(gc.type != GENCHA_FAIL){
-							auto like_ch = update_ind(p,i,ev_new,UP_SINGLE);
-
+						auto uii = update_ind(p,i,ev_new,UP_SINGLE);
+								
+						if(uii.success){
 							if(pl){
 								cout << endl;
 								cout << "After:" << endl; ssp.print_event(ssp.individual[i].ev);
@@ -702,12 +701,7 @@ vector <IndRef> State::force_consistent_solution()
 
 							if(ssp.inconsistent(i)) emsg("Still not consistent");
 	
-							accept(like_ch);
-
-							//if(pl) check("make consistent");
-
-							gen_change_update(gc); 	
-							if(sp.trans_tree) update_popnum_ind(p,i);
+							accept_update_ind(uii);
 						}
 						
 						if(pl){
@@ -804,7 +798,7 @@ void State::resample_ind(bool if_wrong)
 	//if(if_wrong) pl = true;
 	
 	if(pl) check(" before resample");
-			
+				
 	for(auto p = 0u; p < species.size(); p++){
 		auto &sp = model.species[p];
 		if(sp.type == INDIVIDUAL){
@@ -845,6 +839,11 @@ void State::resample_ind(bool if_wrong)
 
 							if(pl){
 								cout << endl << endl << endl << endl;
+								cout << ssp.individual[i].ev[1].inf_node_ref << "If node" << endl;
+								//inf_node_ref
+								
+								//auto n = 
+								
 								cout << ssp.individual[i].name << endl;
 								cout << "Before:" << endl; ssp.print_event(ssp.individual[i].ev);
 								cout << endl;
@@ -855,31 +854,18 @@ void State::resample_ind(bool if_wrong)
 							}
 					
 							if(ind_ev_samp.illegal == false){
-								auto gc = update_tree(p,i,ev_new);
-								if(gc.type != GENCHA_FAIL){
-									auto like_ch = update_ind(p,i,ev_new,UP_SINGLE);
-
+								auto uii = update_ind(p,i,ev_new,UP_SINGLE);
+								
+								if(uii.success){
 									if(pl){
 										cout << endl;
 										cout << "After:" << endl; ssp.print_event(ssp.individual[i].ev);
 										cout << "Liobs after: " << ssp.Li_obs_ind[i] << endl;
-										
-										/*
-										if(ssp.inconsistent(i)){
-											ind_ev_samp.print_ind_obs_timeline();
-											ind_ev_samp.pr_generate_ind_obs_timeline();
-											
-											model.print_param(param_val);
-											emsg("done");
-										}
-										*/
 									}
 		
-									accept(like_ch);
-
-									gen_change_update(gc); 	
-									if(sp.trans_tree) update_popnum_ind(p,i);
+									accept_update_ind(uii);	
 								
+									//check("during resample");
 									//if(pl) check("during resample");
 									
 									if(std::isnan(like.markov)){

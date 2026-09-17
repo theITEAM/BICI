@@ -23,6 +23,7 @@ Model::Model(Operation mode_, ExtFactor ext_factor_, bool no_question_) : precal
 	deterministic = false;
 	nspecies = 0;
 	genetic_data.on = false;
+	ind_pop_variation = false;
 };
 
 

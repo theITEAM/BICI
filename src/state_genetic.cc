@@ -23,13 +23,13 @@ bool InfEv_ord (const InfEvent &ev1, const InfEvent &ev2)
 
 
 /// Given an initial event sequence works out how to adapt the transmission tree
-GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_new)
+TransTreeChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_new)
 {
 	auto pl = false;
-	
+
 	const auto &sp = model.species[p];
 	
-	if(sp.trans_tree == false) return GenChange(NO_GENETIC_CHANGE);
+	if(sp.trans_tree == false) return no_trans_tree_change();
 	
 	auto &inf_node = genetic_value.inf_node;
 	
@@ -50,46 +50,47 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 		if(n != UNSET) node_old.push_back(n);
 	}
 	
-	if(node_old.size() > 1) return GenChange(GENCHA_FAIL);
-	
-	vector <unsigned int> nodee_new;
+	//if(node_old.size() > 1) return trans_tree_fail();
+	if(node_old.size() > 1) run_error("BICI can only currently perform inference with pathogen genetic data when individuals cannot become reinfected.");
+		
+	vector <unsigned int> node_new;
 	
 	for(auto e = 0u; e < ev_new.size(); e++){
 		const auto &ev = ev_new[e];
 		switch(ev.type){
 		case ENTER_EV:
 			if(sp.comp_gl[ev.c_after].infected == true){
-				nodee_new.push_back(e);
+				node_new.push_back(e);
 			}
 			break;
 			
 		case M_TRANS_EV:
 			if(sp.tra_gl[ev.tr_gl].infection.type == TRANS_INFECTION){
-				nodee_new.push_back(e);
+				node_new.push_back(e);
 			}
 			break;
 			
 		default: break;
 		}
 	}
-
-	if(nodee_new.size() > 1) return GenChange(GENCHA_FAIL);
+	
+	if(node_new.size() > 1) run_error("BICI can only currently perform inference with pathogen genetic data when individuals cannot become reinfected.");
 	
 	switch(node_old.size()){
 	case 0: 
-		switch(nodee_new.size()){
+		switch(node_new.size()){
 		case 0:                                        // No infection -> no infection
-			return GenChange(NO_GENETIC_CHANGE);
+			return no_trans_tree_change();
 	
 		case 1:                                        // No infection -> infection
 			{		
-				auto e_add = nodee_new[0];
+				auto e_add = node_new[0];
 				
 				auto &ev = ev_new[e_add];
 				
 				auto probif = sample_infection_source(ev,p);
 				
-				if(probif == UNSET) return GenChange(GENCHA_FAIL); // Fails to find infection
+				if(probif == UNSET) return trans_tree_fail(); // Fails to find infection
 					
 				if(testing){
 					auto prob = prob_infection_source(ev,p);
@@ -101,7 +102,7 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 			
 				auto ina = get_inf_node_alteration(p,i,UNSET,ev_new,e_add);
 				if(ina.possible == true){ 
-					auto gc = gen_change(ADD_NODE,UNSET,ina,ev.ind_inf_from);
+					auto gc = trans_tree_change(ADD_NODE,UNSET,ina,ev.ind_inf_from);
 				
 					ev.inf_node_ref = inf_node.size();
 					
@@ -118,7 +119,7 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 		break;
 		
 	case 1:
-		switch(nodee_new.size()){
+		switch(node_new.size()){
 		case 0:                                         // Infection -> no infection
 			{		
 				auto n = node_old[0];
@@ -129,7 +130,7 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 					
 					auto probfi = prob_infection_source(ev,in.p);
 					
-					auto gc = gen_change(REM_NODE,n,InfNodeAlter(),ev.ind_inf_from);
+					auto gc = trans_tree_change(REM_NODE,n,InfNodeAlter(),ev.ind_inf_from);
 					
 					gc.probfi += probfi;
 					return gc;
@@ -142,7 +143,7 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 				auto n = node_old[0];
 				const auto &in_old = inf_node[n];
 				
-				auto e_add = nodee_new[0];
+				auto e_add = node_new[0];
 				auto &ev = ev_new[e_add];
 				
 				auto t_old = in_old.tdiv_start;
@@ -152,7 +153,7 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 				if(ina.possible == true){ 
 					if(ina.unchanged){
 						ev = ssp.individual[in_old.i].ev[in_old.e];
-						return GenChange(NO_GENETIC_CHANGE);
+						return no_trans_tree_change();
 					}
 					
 					auto probif = 0.0, probfi = 0.0;
@@ -179,7 +180,7 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 					}
 					
 					auto nn = nr.node;
-					if(nn == UNSET) return GenChange(GENCHA_FAIL);
+					if(nn == UNSET) return trans_tree_fail();
 					
 					IndInfFrom iif_prop;
 					
@@ -187,7 +188,7 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 						auto nn_new = ENTER_INF;
 						if(t_new != 0) nn_new = OUTSIDE_INF;
 						if(nn_new != nn && nn_new == OUTSIDE_INF){
-							if(trg_contains_outside(in_old.p,ev.tr_gl) == false) return GenChange(GENCHA_FAIL);	
+							if(trg_contains_outside(in_old.p,ev.tr_gl) == false) return trans_tree_fail();	
 						}
 					
 						iif_prop.p = nn_new;
@@ -202,7 +203,7 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 					
 						// Checks if new connection point in within infectious range
 						if(t_new < in_new.tdiv_start || t_new > round_up(in_new.tdiv_rec)){
-							return GenChange(GENCHA_FAIL);
+							return trans_tree_fail();
 						}
 						
 						// Works out IndInfFrom for new position on tree
@@ -210,13 +211,13 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 						auto pp = in_new.p;
 						
 						if(!set_iif(pp,in_new.i,in_new.e,iif_prop,t_new,ev,sp)){
-							return GenChange(GENCHA_FAIL);
+							return trans_tree_fail();
 						}
 					}
 					ev.ind_inf_from = iif_prop;
 					ev.inf_node_ref = n;
 					
-					auto gc = gen_change(REGRAFT_NODE,node_old[0],ina,iif_prop);
+					auto gc = trans_tree_change(REGRAFT_NODE,node_old[0],ina,iif_prop);
 				
 					gc.probif += probif;
 					gc.probfi += probfi;
@@ -228,7 +229,7 @@ GenChange State::update_tree(unsigned int p, unsigned int i, vector <Event> &ev_
 		break;
 	}
 	
-	return GenChange(GENCHA_FAIL);
+	return trans_tree_fail();
 }
 
 
@@ -516,14 +517,18 @@ InfNodeAlter State::get_inf_node_alteration(unsigned int p, unsigned int i, unsi
 {			
 	const auto &sp = model.species[p]; 
 	const auto &gen_data = model.genetic_data;
+	const auto &inf_node = genetic_value.inf_node;
 
 	auto on = gen_data.on; if(i >= sp.nindividual_obs) on = false;
 	
-	auto t_start = ev_new[e_add].tdiv;
+	const auto &evn = ev_new[e_add];
+	auto nev = ev_new.size();
+	
+	auto t_start = evn.tdiv;
 	double t_rec = model.details.T;;
-	for(auto ee = e_add+1; ee < ev_new.size(); ee++){
+	for(auto ee = e_add+1; ee < nev; ee++){
 		const auto &ev = ev_new[ee];
-		if(ev.type == M_TRANS_EV){
+		if(ev.type == M_TRANS_EV || ev.type == NM_TRANS_EV){
 			if(sp.tra_gl[ev.tr_gl].infection.type == TRANS_RECOVERY){
 				t_rec = ev.tdiv;
 				break;
@@ -538,12 +543,14 @@ InfNodeAlter State::get_inf_node_alteration(unsigned int p, unsigned int i, unsi
 	ina.tdiv_rec = t_rec;
 
 	if(n != UNSET){
-		const auto &in_old = genetic_value.inf_node[n];
+		const auto &in_old = inf_node[n];
 	
+		/*
 		if(t_start == in_old.tdiv_start && t_rec == in_old.tdiv_rec){
 			ina.unchanged = true;
 			return ina;
 		}	
+		*/
 		
 		// Makes sure that any onward infections are within the time span
 		auto t_rec_ro = round_up(t_rec);
@@ -551,18 +558,48 @@ InfNodeAlter State::get_inf_node_alteration(unsigned int p, unsigned int i, unsi
 		
 		const auto &inf_ev = in_old.inf_ev;
 		
+		auto c = evn.c_after;
+	
+		auto ei = e_add+1;
 		for(auto k = 0u; k < inf_ev.size(); k++){
 			const auto &iev = inf_ev[k];
 			if(iev.type == INFECT_OTHER){
 				auto t = iev.tdiv;
 				if(t < t_start_ro || t > t_rec_ro){
-				//if(t < t_start || t > t_rec_ro){
 					ina.possible = false;
+				}
+				else{ // Looks for any changes in which population is causing infection
+					auto t_do = round_down(t);
+					while(ei < nev && ev_new[ei].tdiv <= t_do){ c = ev_new[ei].c_after; ei++;}
+					
+					const auto &no_inf = inf_node[iev.index];
+					
+					auto pp = no_inf.p;
+					auto ii = no_inf.i;
+					auto ee = no_inf.e;
+					const auto &ev = species[pp].individual[ii].ev[ee];
+					
+					const auto &inf_c = model.inf_cause[pp][ev.tr_gl][p][c];
+					
+					if(inf_c.eq_ref == UNSET) ina.possible = false;
+					else{
+						const auto &iif = ev.ind_inf_from;
+						
+						if(iif.pref != inf_c.pref){
+							InfPoCha ipc;
+							ipc.p = pp;
+							ipc.i = ii;
+							ipc.e = ee;
+							ipc.pref_new = inf_c.pref;
+							ipc.po_new = inf_c.po;
+							ina.ind_po_cha.push_back(ipc);
+						}
+					}
 				}
 			}
 		}
 	
-		if(on){
+		if(on && !(t_start == in_old.tdiv_start && t_rec == in_old.tdiv_rec)){
 			const auto &obs = gen_data.ind_gen_obs[p][i];
 			
 			auto t_start_old = in_old.tdiv_start;
@@ -621,6 +658,8 @@ InfNodeAlter State::get_inf_node_alteration(unsigned int p, unsigned int i, unsi
 /// Sets up the transition tree
 void State::setup_transtree()
 {
+	trans_tree_on = true;
+		
 	auto &inf_node = genetic_value.inf_node;
 	inf_node.clear();
 	
@@ -634,7 +673,7 @@ void State::setup_transtree()
 
 		for(auto i = 0u; i < ssp.individual.size(); i++){
 			auto &ind = ssp.individual[i];
-			
+
 			for(auto e = 0u; e < ind.ev.size(); e++){
 				auto &eve = ind.ev[e];
 				eve.inf_node_ref = UNSET;
@@ -685,7 +724,7 @@ void State::setup_transtree()
 			}
 		}
 	}
-	
+
 	sort(inf_node.begin(),inf_node.end(),InfNode_ord);    
 	
 	for(auto n = 0u; n < inf_node.size(); n++){
@@ -751,7 +790,7 @@ void State::setup_transtree()
 			const auto &eve = species[in.p].individual[in.i].ev[in.e];
 		
 			auto pp = eve.ind_inf_from.p;
-			if(pp == UNSET) emsg("Should not be unset");
+			if(pp == UNSET) emsg("Should not be unset2");
 		
 			if(pp == ENTER_INF || pp == OUTSIDE_INF){	
 				in.from.node = pp;
@@ -802,7 +841,7 @@ double State::find_t_rec(const InfNode &in) const
 	const auto &ev = species[in.p].individual[in.i].ev;
 	 
 	for(auto e = in.e; e < ev.size(); e++){
-		if(ev[e].type == M_TRANS_EV && sp.tra_gl[ev[e].tr_gl].infection.type == TRANS_RECOVERY){
+		if((ev[e].type == M_TRANS_EV || ev[e].type == NM_TRANS_EV) && sp.tra_gl[ev[e].tr_gl].infection.type == TRANS_RECOVERY){
 			return ev[e].tdiv;
 		}
 	}
@@ -939,7 +978,7 @@ vector < vector <unsigned int> > State::calculate_gen_dif()
 				auto num = io[i].mut_num + io[j].mut_num;
 				for(auto ob1 : origin_obs_list[i]){
 					for(auto ob2 : origin_obs_list[j]){
-						if(gen_dif[ob1][ob2] != UNSET) emsg("Should not be unset");
+						if(gen_dif[ob1][ob2] != UNSET) emsg("Should not be unset3");
 						gen_dif[ob1][ob2] = num+root_num[ob1]+root_num[ob2];
 					}
 				}
@@ -1213,6 +1252,8 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 			const auto &sp = model.species[p];
 			auto &ssp = species[p];
 			
+			//check_w();
+			
 			auto &ev = ssp.individual[i].ev[ge.e];
 			if(ev.type == M_TRANS_EV){
 				const auto &tra = sp.tra_gl[ev.tr_gl];
@@ -1260,9 +1301,9 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 						
 						if(k_from != UNSET){
 							const auto &ind_from = species[ii_from.p].individual[ii_from.i];
-				
-							auto pr = pop_ref[k_from];
-								
+			
+							auto pr = ii_from.po;
+							
 							auto num = 1.0;
 							const auto &po = model.pop[pr];
 						
@@ -1270,7 +1311,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 								for(auto ie : po.ind_eff_mult) num *= ind_from.exp_ie[ie];
 								for(auto fe : po.fix_eff_mult) num *= ind_from.exp_fe[fe];
 							}
-							
+				
 							probfi += log(num/popnum[pr]);
 						}
 					}
@@ -1314,7 +1355,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 									
 									vector <Poss> poss;
 									for(auto i : list){
-										const auto &ind  = ssp.individual[i];
+										const auto &ind = ssp.individual[i];
 										auto num = 1.0;
 										for(auto ie : po.ind_eff_mult) num *= ind.exp_ie[ie];
 										for(auto fe : po.fix_eff_mult) num *= ind.exp_fe[fe];
@@ -1344,7 +1385,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 					if(probif != -LARGE && (ii_from.i != ii_prop.i || ii_from.p != ii_prop.p || ii_from.pref != ii_prop.pref)){
 						auto n = ev.inf_node_ref;
 					
-						auto gc = gen_change(REGRAFT_NODE,n,no_alter(n),ii_prop);
+						auto gc = trans_tree_change(REGRAFT_NODE,n,no_alter(n),ii_prop);
 				
 						auto al = exp(burn_info.markov*dlike_markov 
 									+ burn_info.genetic_process*gc.dlike_genetic_process
@@ -1360,6 +1401,7 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 							gen_change_update(gc);
 							
 							like.markov += dlike_markov;
+					
 							ssp.Li_markov[m][ti] += dlike_markov;
 						}
 						
@@ -1386,6 +1428,32 @@ void State::trans_tree_proposal(const BurnInfo &burn_info, unsigned int &nac, un
 }
 
 
+/*
+void State::check_w() const 
+{
+	for(auto p = 0u; p < model.species.size(); p++){
+		const auto &ssp = species[p];
+		for(auto i = 0u; i < ssp.individual.size(); i++){
+			const auto &ind = ssp.individual[i];
+			for(auto e = 0u; e < ind.ev.size(); e++){
+				const auto &ev = ind.ev[e];
+				const auto &iif = ev.ind_inf_from;
+				if(iif.p != UNSET && iif.p != OUTSIDE_INF && iif.p !=  ENTER_INF){
+					auto w = get_w_from_indinffrom(iif);
+					if(dif(w,iif.w,TINY)){
+						cout << iif.w << " " << w << " com";
+						cout << i << " " << e << " ie";
+						emsg("wrong");
+					}
+			
+				}
+			}
+		}
+	}
+}
+*/
+
+
 /// Sets inf_ev_from in event at time t based on infection coming from event_from
 // If not possible then returns false
 bool State::set_ind_inf_from(double t, unsigned int p, vector <Event> &event, unsigned int p_from, unsigned int i_from, const vector <Event> &event_from)
@@ -1395,11 +1463,13 @@ bool State::set_ind_inf_from(double t, unsigned int p, vector <Event> &event, un
 		emsg("Problem");
 	}
 	
-	auto c_from = UNSET;
-	auto e2 = 0u; 
-	while(e2 < event_from.size() && event_from[e2].tdiv < t){ c_from = event_from[e2].c_after; e2++;}
+	auto t_do = round_down(t);
 	
-	if(c_from == UNSET) emsg("Should not be unset");
+	auto c_from = UNSET;
+	auto e2 = 0u;
+	while(e2 < event_from.size() && event_from[e2].tdiv <= t_do){ c_from = event_from[e2].c_after; e2++;}
+	
+	if(c_from == UNSET) emsg("Should not be unset4");
 	
 	auto &ev = event[e];
 	const auto &inf_c = model.inf_cause[p][ev.tr_gl][p_from][c_from];
@@ -1446,6 +1516,8 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 	
 	auto &ind_gen_obs = model.genetic_data.ind_gen_obs;
 	
+	auto dt = model.details.dt;
+	
 	auto loop_max = (unsigned int)(0.3*inf_node.size());
 	if(loop_max < 1) loop_max = 1;
 	
@@ -1455,13 +1527,14 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 		auto &fr_A = in_A.from;
 		auto e_index = in_A.from.index;
 		auto t_A = in_A.tdiv_start;
-		
+	
 		if(fr_A.node != ENTER_INF && fr_A.node != OUTSIDE_INF){
 			auto k_B = fr_A.node;
 			auto &in_B = inf_node[k_B];
+		
 			const auto &inf_evB = in_B.inf_ev;
 			auto t_B = in_B.tdiv_start;
-			
+		
 			if(pl) cout << endl << endl << "START " << t_A << " "<< t_B << endl;
 			
 			// Checks to see if there is an observation
@@ -1471,7 +1544,7 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 			}	
 			
 			// Checks to see if there is an onward infection which
-			// cannot be accounted for deu to finite step size
+			// cannot be accounted for due to finite step size
 
 			auto t_inf_min = round_up(t_A);
 			for(auto e = e_index+1; e < inf_evB.size(); e++){
@@ -1584,11 +1657,18 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 									e_aft++;
 								}
 								
-								if(p_B != p_A || c_bef != c_aft){  // The source has switched
+								if(p_B != p_A || c_bef != c_aft || model.ind_pop_variation){  // The source has switched
 									const auto &in_inf = inf_node[ie.index];
 								
 									auto p_ev = in_inf.p, i_ev = in_inf.i, e_ev = in_inf.e; 
-									const auto &ev = species[p_ev].individual[i_ev].ev[e_ev];
+									const auto &ssp = species[p_ev];
+									const auto &indd = ssp.individual[i_ev];
+									const auto &ev = indd.ev[e_ev];
+									
+									const auto &sp = model.species[p_ev];
+									const auto &me = sp.markov_eqn[sp.tra_gl[ev.tr_gl].markov_eqn_ref];
+	
+									auto inffac = 1.0; if(me.ind_variation) inffac = ssp.get_indfac(indd,me);
 									
 									auto ti = get_ti(tt);
 									
@@ -1599,37 +1679,35 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 									iif_ch.ti = ti;
 									
 									// Looks at before
+									
 									const auto &iif_bef = ev.ind_inf_from;
 									const auto &inf_c_bef = model.inf_cause[p_ev][ev.tr_gl][p_B][c_bef];
 									if(p_B != iif_bef.p) emsg("p not agree");
 									if(i_B != iif_bef.i) emsg("p not agree");
 									if(inf_c_bef.pref != iif_bef.pref) emsg("pref not agree");
 									if(inf_c_bef.po != iif_bef.po) emsg("po not agree");
+									if(inf_c_bef.eq_ref != me.eqn_ref) emsg("eqn not right");
 									
-									const auto &eq_bef = model.eqn[inf_c_bef.eq_ref];
-									auto va_bef = eq_bef.calculate_pop_grad(iif_bef.pref,ti,popcombw_value,precalc);
+									const auto &eq = model.eqn[me.eqn_ref];
 									
-									iif_ch.Li_markov_bef = log(va_bef*iif_bef.w);
+									auto va_bef = eq.calculate_pop_grad(iif_bef.pref,ti,popcombw_value,precalc);
+									iif_ch.Li_markov_bef = log(iif_bef.w*dt*log_thresh(va_bef)*inffac);
 									
 									// Looks at after
 									const auto &inf_c_aft = model.inf_cause[p_ev][ev.tr_gl][p_A][c_aft];
 									auto pref = inf_c_aft.pref;
 									if(pref == UNSET) ill_fl = true;
 									else{
-										//if(pref == UNSET) emsg("Should be p ref");
-								
-										const auto &eq_aft = model.eqn[inf_c_aft.eq_ref];
-										auto va_aft = eq_aft.calculate_pop_grad(pref,ti,popcombw_value,precalc);
-		
 										auto &iif_aft = iif_ch.ind_inf_from;
 										iif_aft.p = p_A;
 										iif_aft.i = i_A;
 										iif_aft.pref = pref;
 										iif_aft.po = inf_c_aft.po;
 										iif_aft.w = get_w_from_indinffrom(iif_aft);
-										
-										iif_ch.Li_markov_aft = log(va_aft*iif_aft.w);
-								
+		
+										auto va_aft = eq.calculate_pop_grad(pref,ti,popcombw_value,precalc);
+										iif_ch.Li_markov_aft = log(iif_aft.w*dt*log_thresh(va_aft)*inffac);
+		
 										iif_change.push_back(iif_ch);							
 									}
 								}
@@ -1638,16 +1716,18 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 						
 						if(ill_fl == false){
 							back_init();
-							auto like_ch = update_ind(p_A,i_A,ev_A_new,UP_MULTI);
+							auto uii = update_ind(p_A,i_A,ev_A_new,UP_MULTI,false);
+							auto &like_ch = uii.like_ch;  
 							
-							auto li_ch = update_ind(p_B,i_B,ev_B_new,UP_MULTI);
+							auto uii2 = update_ind(p_B,i_B,ev_B_new,UP_MULTI,false);
+							auto &li_ch = uii2.like_ch;
 							
 							add_on_like(li_ch,like_ch);
 								
 							for(const auto &iif_ch : iif_change){
 								like_ch.markov += iif_ch.Li_markov_aft - iif_ch.Li_markov_bef;
 							}
-							
+						
 							auto al = calc_al(like_ch,0,burn_info);
 							
 							if(pl) print_like(li_ch);
@@ -1656,14 +1736,15 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 							if(ran() < al){
 								if(pl) cout << "accept" << endl;
 								accept(like_ch);
-							
+						
 								// Updates quantities for inf_node
 								InfNode in_A_new;
 								in_A_new.tdiv_start = t_B;
 								in_A_new.tdiv_rec = in_A.tdiv_rec;
 								in_A_new.p = p_A;
 								in_A_new.i = i_A;
-								in_A_new.e = in_A.e;
+								//in_A_new.e = in_A.e;
+								in_A_new.e = get_e_from_time(t_B,ev_A_new);
 								in_A_new.from = in_B.from;
 								for(auto e = 0u; e <= e_index; e++){
 									in_A_new.inf_ev.push_back(in_B.inf_ev[e]);
@@ -1681,7 +1762,7 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 								in_B_new.tdiv_rec = in_B.tdiv_rec;
 								in_B_new.p = p_B;
 								in_B_new.i = i_B;
-								in_B_new.e = in_B.e;
+								in_B_new.e = get_e_from_time(t_A,ev_B_new);
 								in_B_new.from.node = k_B;
 								in_B_new.from.index = e_index;
 								for(auto e = e_index+1; e < in_B.inf_ev.size(); e++){
@@ -1700,7 +1781,7 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 									auto m = model.species[p_ev].tra_gl[ev.tr_gl].markov_eqn_ref;
 									ssp.Li_markov[m][iif_ch.ti] += iif_ch.Li_markov_aft - iif_ch.Li_markov_bef;
 								}
-								
+							
 								update_inf_node_ref(k_A);
 								update_inf_node_ref(k_B);
 							
@@ -1732,6 +1813,16 @@ void State::trans_tree_swap_inf_proposal(const BurnInfo &burn_info, unsigned int
 			if(pl) check(" transtree update2");
 		}
 	}
+}
+
+
+/// Gets the event number from a time
+unsigned int State::get_e_from_time(double t, const vector <Event> &ev) const
+{
+	auto e = 0u; while(e <ev.size() && ev[e].tdiv != t) e++;
+	if(e == ev.size()) emsg("Cannot find time");
+	
+	return e;
 }
 
 
@@ -2456,7 +2547,7 @@ void State::disconnect_inf_node(unsigned int n)
 void State::connect_inf_node(unsigned int n, const IndInfFrom &iif, unsigned int mut_num_store)
 {
 	if(model.genetic_data.on){
-		if(mut_num_store == UNSET) emsg("Should not be unset");
+		if(mut_num_store == UNSET) emsg("Should not be unset1");
 	}
 	else{
 		if(mut_num_store != UNSET) emsg("Should be unset "+to_string(mut_num_store));
@@ -2619,15 +2710,47 @@ void State::check_pop_ind(vector < vector <unsigned int> > pop_ind, const vector
 }
 
 
+/// Indicates no tranmssion tree change
+TransTreeChange State::no_trans_tree_change() const
+{	
+	TransTreeChange gc;
+	gc.probif = 0; 
+	gc.probfi = 0; 
+	gc.mut_num = UNSET; 
+	gc.dlike_genetic_process = 0; 
+	gc.dlike_genetic_obs = 0;
+	gc.type = NO_TRANS_TREE_CHANGE;
+	
+	return gc;
+}
+
+
+/// Indicates no tranmssion tree change
+TransTreeChange State::trans_tree_fail() const
+{	
+	TransTreeChange gc;
+	gc.type = TRANS_TREE_FAIL;
+	
+	return gc;
+}
+
+	
 /// Works out how genetics change as a result of a node being regraphed / added removed
-GenChange State::gen_change(GenChaType type, unsigned int n, const InfNodeAlter &node_alter, const IndInfFrom &iif_add) const 
+TransTreeChange State::trans_tree_change(TransTreeChaType type, unsigned int n, const InfNodeAlter &node_alter, const IndInfFrom &iif_add) const 
 {			
 	auto data_on = model.genetic_data.on;
 		
 	auto mut_rate = genetic_value.mut_rate*model.details.dt;
 	auto seq_var = genetic_value.seq_var;
 	
-	GenChange gc(type);
+	TransTreeChange gc;
+	gc.probif = 0; 
+	gc.probfi = 0; 
+	gc.mut_num = UNSET; 
+	gc.dlike_genetic_process = 0; 
+	gc.dlike_genetic_obs = 0;
+	gc.type = type; 
+	
 	gc.n = n;
 	gc.iif_add = iif_add;
 	gc.node_alter = node_alter;
@@ -2636,7 +2759,7 @@ GenChange State::gen_change(GenChaType type, unsigned int n, const InfNodeAlter 
 	auto t_add = node_alter.tdiv_start;
 	
 	switch(type){
-	case GENCHA_FAIL: emsg("Should not fail"); break;
+	case TRANS_TREE_FAIL: emsg("Should not fail"); break;
 	
 	case REGRAFT_NODE:
 		{
@@ -3109,7 +3232,7 @@ GenChange State::gen_change(GenChaType type, unsigned int n, const InfNodeAlter 
 		}
 		break;
 		
-	case NO_GENETIC_CHANGE:
+	case NO_TRANS_TREE_CHANGE:
 		break;
 	}
 	
@@ -3118,7 +3241,7 @@ GenChange State::gen_change(GenChaType type, unsigned int n, const InfNodeAlter 
 					
 
 /// Adding node to new branch
-void State::change_add_node(double t, const NodeRef &nr_add, GenChange &gc) const 
+void State::change_add_node(double t, const NodeRef &nr_add, TransTreeChange &gc) const 
 {
 	const auto &inf_node = genetic_value.inf_node;
 	auto mut_rate = genetic_value.mut_rate*model.details.dt;
@@ -3173,7 +3296,7 @@ void State::change_add_node(double t, const NodeRef &nr_add, GenChange &gc) cons
 				
 			
 /// Removing node from branch
-void State::change_remove_node(double t, const NodeRef &nr_from, GenChange &gc) const 		
+void State::change_remove_node(double t, const NodeRef &nr_from, TransTreeChange &gc) const 		
 {	
 	const auto &inf_node = genetic_value.inf_node;
 	auto mut_rate = genetic_value.mut_rate*model.details.dt;
@@ -3391,9 +3514,9 @@ void State::recalculate_popnum_ind_w_undo(unsigned int po, const vector <double>
 
 
 /// Updates the likelihood change and dprob based on changes to transmission tree
-void GenChange::update_like_ch(Like &like_ch, double &dprob)
+void TransTreeChange::update_like_ch(Like &like_ch, double &dprob)
 {
-	if(type != NO_GENETIC_CHANGE){
+	if(type != NO_TRANS_TREE_CHANGE){
 		dprob += probfi-probif;
 									
 		like_ch.genetic_process += dlike_genetic_process;
@@ -3406,9 +3529,9 @@ void GenChange::update_like_ch(Like &like_ch, double &dprob)
 
 
 /// If the update is accepted then this updates state
-void State::gen_change_update(const GenChange &gc) 
+void State::gen_change_update(const TransTreeChange &gc) 
 {
-	if(gc.type == NO_GENETIC_CHANGE) return;
+	if(gc.type == NO_TRANS_TREE_CHANGE) return;
 	
 	auto &inf_node = genetic_value.inf_node;
 	const auto &na = gc.node_alter;	
@@ -3501,9 +3624,9 @@ void State::gen_change_update(const GenChange &gc)
 		remove_node(n);
 		break;
 		
-	case NO_GENETIC_CHANGE: break;
+	case NO_TRANS_TREE_CHANGE: break;
 		
-	case GENCHA_FAIL: emsg("Should not be here20"); break;
+	case TRANS_TREE_FAIL: emsg("Should not be here20"); break;
 	}
 	
 	auto &gen_dif = genetic_value.gen_dif;

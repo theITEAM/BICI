@@ -1052,7 +1052,8 @@ struct NMEventRef {                // References an individual event
 
 struct IndInfFrom {                // Stores information about the indivividual which caused an infection
 	IndInfFrom(){ p = UNSET; i = UNSET; pref = UNSET; po = UNSET; w = UNSET;};
-	unsigned int p;                  // The infecting population
+	//IndInfFrom(){ p = UNSET; i = UNSET; pref = UNSET; w = UNSET;};
+	unsigned int p;                  // The infecting species
 	unsigned int i;                  // The individual doing the infecting
 	unsigned int pref;               // Stores which pop_ref in equation is causing infection
 	unsigned int po;                 // Stores which population is causing infection
@@ -1160,6 +1161,7 @@ struct TraIndSec {
 struct TraInd {
 	vector <TraIndSec> section;      // Sections of different ind_tra
 	double indfac_sum;               // The sum of the potential individual effect acting on equation
+	unsigned int nind;               // The number of individuals 
 };
 
 struct TransIndRef {               // Stores 
@@ -1559,6 +1561,14 @@ struct NodeRef {                   // References an infection node
 	unsigned int index;              // Index of event
 };
 
+struct InfPoCha {                  // Change to the infecting population for those infected by individual
+	unsigned p;                      // Infection event
+	unsigned i;
+	unsigned int e;                  // Index down ind_node	
+	unsigned int pref_new;           // The updated pref
+	unsigned int po_new;          	 // The updated population
+};
+
 struct InfNodeAlter {              // Determines an alternation in an infnode
 	InfNodeAlter(){ possible = true; unchanged = false; e_add = UNSET;}
 
@@ -1569,6 +1579,7 @@ struct InfNodeAlter {              // Determines an alternation in an infnode
 	vector <unsigned int> obs_add_end;   // Genetic observations added at the beginning
 	bool possible;                   // Set if change is possible
 	bool unchanged;                  // Set if alteration leaves unchanged
+	vector <InfPoCha> ind_po_cha;    // Change to the infecting population for those infected by individual
 };
 
 struct InfEvent {                  // Infection event (references genetic observation or infection node)
@@ -1605,15 +1616,10 @@ struct InfNode {                   // Stores information about an infection even
 	vector <InfEvent> inf_ev;        // References nodes which are infected + genetic obs
 };
 
-struct GenChange {                 // Stores information about a change to  
-	GenChange(GenChaType type_) {
-		probif = 0; probfi = 0; mut_num = UNSET; 
-		dlike_genetic_process = 0; dlike_genetic_obs = 0;
-		type = type_; 
-	}
+struct TransTreeChange {                 // Stores information about a change to  
 	void update_like_ch(Like &like_ch, double &dprob);
 	
-	GenChaType type;                 // The type of change
+	TransTreeChaType type;           // The type of change
 	unsigned int n;                  // The node being changed
 	IndInfFrom iif_add;              // Stores iif_add
 	NodeRef nr_add;                  // The node reference to which the node is being added
@@ -1626,6 +1632,15 @@ struct GenChange {                 // Stores information about a change to
 	vector <GenDifCha> gen_dif_cha;  // Change to observation matrix
 	double dlike_genetic_process;    // Change in likelihood for genetic process
 	double dlike_genetic_obs;        // Change in likelijood for genetic observation
+};
+
+struct UpdateIndInfo {             // Stores all the information when updating an individual
+	unsigned int p;                  // The species
+	unsigned int i;                  // Tje individual
+	TransTreeChange gc;              // Information about transmission tree change
+	Like like_ch;                    // Change in likelihood
+	double dprob;                    // Change in probability
+	bool success;                    // Determines if update successful or not
 };
 
 struct ObsGeneticData {            // Store individual genetic data

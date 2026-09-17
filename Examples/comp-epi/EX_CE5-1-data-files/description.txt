@@ -1,0 +1,16 @@
+# Model CE5.1: Two species model
+
+## Objective
+- Introduce a simple two species epidemiological model.
+
+## Model
+- Two individual-based species 'Cow' and 'Badger' are created.
+- They each contain a disease status classification with three compartments: susceptible $S$, infected $I$ and recovered $R$.
+- Transmission rate $β^cc$ determines the rate at which cattle infect other cattle.
+- Transmission rate $β^bb$ determines the rate at which badgers infect other badgers.
+- Transmission rate $β^bc$ determines the rate at which badgers infect cattle.
+- Transmission rate $β^cb$ determines the rate at which cattle infect badgers.
+- Recovery rates $γ^c$ and $γ^b$ determines the rate at which individuals recover.
+
+## Population
+- This consists of 100 initially susceptible cattle and badgers and one infected badger.

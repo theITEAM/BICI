@@ -426,7 +426,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	}
 
 	print_diag("h1i");
-	set_trans_tree_output();           // If no genetic data only apply trans tree at end
+	//set_trans_tree_output();           // zzq If no genetic data only apply trans tree at end
 	
 	for(auto &eqn : model.eqn){        // Sets up reference (pop_ref, param_ref) in equations
 		eqn.setup_references();

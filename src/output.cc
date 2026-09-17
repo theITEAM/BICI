@@ -1286,9 +1286,13 @@ string Output::trace_init() const
 		}
 	}
 	
-	//if(model.trans_tree || model.trans_tree_output){
-	if(model.trans_tree){
-		ss << ",N^origin,N^infected,N^mut-tree,N^mut-origin,N^unobs,t^root";
+	if(model.trans_tree || model.trans_tree_output){
+	//if(model.trans_tree){
+		ss << ",N^origin,N^infected,N^unobs,t^root";
+		
+		if(model.genetic_data.on){
+			ss << ",N^mut-tree,N^mut-origin";	
+		}		
 	}
 	
 	for(const auto &sp : model.species){
@@ -1325,14 +1329,14 @@ string Output::ic_output_head() const
 			else{
 				const auto &claa = sp.cla[ic.focal_cl];
 				for(auto c = 0u; c < claa.comp.size(); c++){
-					const auto co = claa.comp[c];
+					const auto &co = claa.comp[c];
 					if(!co.erlang_hidden) ss << ",N^init_(" << co.name << ")";
 				}
 				for(auto cl = 0u; cl < sp.ncla; cl++){
 					if(cl != ic.focal_cl){
 						const auto &claa = sp.cla[cl];
 						for(auto c = 0u; c < claa.comp.size(); c++){
-							const auto co = claa.comp[c];
+							const auto &co = claa.comp[c];
 							if(!co.erlang_hidden) ss << ",f^init_(" << co.name << ")";
 						}
 					}
@@ -1567,9 +1571,14 @@ string Output::param_output(const Particle &part, const vector < vector <double>
 		}
 	}
 
-	if(model.trans_tree){ 
+	//if(model.trans_tree){ 
+	if(model.trans_tree || model.trans_tree_output){ 
 		const auto &tts = part.trans_tree_stats;
-		ss << "," << tts.N_origin << "," << tts.N_inf << "," << tts.N_mut_tree << "," << tts.N_mut_origin << "," << tts.N_unobs << "," << tts.t_root;
+		ss << "," << tts.N_origin << "," << tts.N_inf <<"," << tts.N_unobs << "," << tts.t_root;
+		
+		if(model.genetic_data.on){
+			ss << "," << tts.N_mut_tree << "," << tts.N_mut_origin;
+		}		
 	}
 	
 	for(auto p = 0u; p < model.species.size(); p++){
@@ -1898,7 +1907,7 @@ string Output::state_output(const Particle &part,	vector <string> &ind_key, Hash
 		}
 	}
 	
-	if(model.trans_tree){                   // Outputs the phylogenetic tree
+	if(model.trans_tree || model.trans_tree_output){     // Outputs the phylogenetic tree
 		ss << "<TRANSTREE>" << endl;
 		//if(part.inf_node.size() == 0) emsg(" zero");
 		for(const auto &in : part.inf_node){

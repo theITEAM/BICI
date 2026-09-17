@@ -185,7 +185,7 @@ function generate_text_from_bscript(bscript,file_list,one_file)
 				
 				if(is_file){
 					if(com.type != "description" && enc == false) val = add_escape_char(val);
-
+					
 					if(one_file || begin_str(com.type,"warning")){
 						te += '"[['+endl+val+']]"';
 					}

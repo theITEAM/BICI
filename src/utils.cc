@@ -3298,14 +3298,14 @@ void print_diag(string te)
 	if(print_diag_on && !com_op && op()) cout << te << endl;
 	
 	//cout << "diag " << te << " "; print_random("random");
- 
-	auto mem = memory_usage();
-	if(mem > mem_usage.mem){
-		mem_usage.mem = mem;
-		mem_usage.name = te;
-	}
 
 	if(false){
+		auto mem = memory_usage();
+		if(mem > mem_usage.mem){
+			mem_usage.mem = mem;
+			mem_usage.name = te;
+		}
+	
 		auto time = clock();
 		
 		cout <<  te << " ";
@@ -4516,6 +4516,14 @@ vector <unsigned int> remove_repeated(const vector <unsigned int> &list)
 	}
 	
 	return vec;
+}
+
+
+/// Thresholds the log value	
+double log_thresh(double val)
+{
+	if(val > LOG_THRESH) return val;
+	return LOG_THRESH;
 }
 
 

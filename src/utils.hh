@@ -231,6 +231,7 @@ string output_table(const Table &tab);
 Stat get_statistic(vector <double> &vec);
 vector <unsigned int> remove_repeated(const vector <unsigned int> &list);
 vector <unsigned int> combine_lists(const vector < vector <unsigned int> > &lists);
+double log_thresh(double val);
 void print_random(string te);
 
 // In utils_eqn.cc

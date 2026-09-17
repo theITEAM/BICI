@@ -1225,10 +1225,10 @@ function read_state_sample(te,chain,result,warning,ind_key)
 										c = hash_compgl[p].find(co);
 										if(c == undefined) alert_sample(warn,35);
 										
-										if(t == t_start) cinit = c;
-										else{
-											ev.push({type:EV_ENTER, t:t, c:c});
-										}
+										//if(t == t_start) cinit = c;
+										//else{
+										ev.push({type:EV_ENTER, t:t, c:c});
+										//}
 									}
 									else{
 										let tr = tspl[0];
@@ -1287,7 +1287,7 @@ function read_state_sample(te,chain,result,warning,ind_key)
 								all_ind_list.push({name:name});
 								hash_all_ind.add(name,ref);
 							}
-								
+							
 							let ind = {all_ind_ref:ref, cinit:cinit, ev:ev, ie:ie, obs:obs};
 							
 							ssp.individual.push(ind);

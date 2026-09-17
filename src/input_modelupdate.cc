@@ -565,12 +565,16 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 	
 	print_diag("Created reparam / dynamic");
 	
+	auto w_fl = false;
 	for(auto eq : model.eqn){
 		if(eq.warn != ""){
 			stringstream ss; ss << endl << "For equation '" << eq.te_raw << "':" << endl << " " << eq.warn;
 			alert_line(ss.str(),eq.line_num);
+			w_fl = true;
 		}
 	}
+	
+	if(w_fl) return;
 	
 	model.npop = model.pop.size();
 	for(auto i = 0u; i < model.derive.size(); i++){            // Derived quantities
@@ -603,7 +607,11 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 			break;
 		}
 	}
-	
+
+	for(const auto &po : model.pop){
+		if(po.ind_variation) model.ind_pop_variation = true;
+	}
+				
 	print_diag("Created derived");
 
 	if(false && profiling){  // Used for timings within equations
@@ -2770,7 +2778,7 @@ void Input::param_affect_likelihood()
 				param_vec_add_affect(model.param_vec[th].affect_like,al);
 				
 				for(const auto &pref : par.get_parent(pv.index)){
-					const auto th_par = model.param[pref.th].get_param_vec(pref.index);				
+					auto th_par = model.param[pref.th].get_param_vec(pref.index);				
 					if(th_par != UNSET){
 						param_vec_add_affect(model.param_vec[th_par].affect_like,al);
 					}
@@ -4129,7 +4137,7 @@ void Input::set_joint_param_event()
 		for(const auto &sp : model.species){ 
 			for(const auto &pej : sp.par_event_joint){
 				cout << model.param_vec_name(pej.th) << ":" << endl; 
-				for(const auto tr : pej.tr_list){
+				for(auto tr : pej.tr_list){
 					cout << sp.tra_gl[tr].name << ",";
 				}
 				cout << " transitions" << endl;
@@ -4649,6 +4657,26 @@ void Input::set_inf_cause()
 				}
 			}		
 		}
+	}
+	
+	if(false){
+		for(auto p = 0u; p < model.species.size(); p++){
+			const auto &sp = model.species[p];
+			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){ 
+				for(auto p2 = 0u; p2 < model.species.size(); p2++){
+					const auto &sp2 = model.species[p2];
+					for(auto c = 0u; c < sp2.comp_gl.size(); c++){
+						const auto &inf_c = model.inf_cause[p][tr][p2][c];
+						
+						if(inf_c.eq_ref != UNSET){
+							cout << sp.tra_gl[tr].name << " <- " << sp2.comp_gl[c].name << " inf cause" << endl;
+						}
+					}
+				}
+			}
+		}
+		
+		emsg("inf cause");
 	}
 }
 

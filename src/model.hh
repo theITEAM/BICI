@@ -56,6 +56,8 @@ class Model                                // Stores information about the model
 		vector <Population> pop;               // Stores information about populations of interest
 		unsigned int npop;                     // Number of pop (excluding those used for derive)
 		
+		bool ind_pop_variation;                // Determines if there is individual population variation      
+		
 		vector <PopComb> popcomb;              // Population combination
 		unsigned int npopcomb;                 // Number of popcomb (excluding those used for derive)
 		

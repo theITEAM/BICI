@@ -116,6 +116,7 @@ bool IndEvSampler::needed(unsigned int i, unsigned int cl)
 	// Works out how c changes over time within the sampler
 	
 	auto c = c_start;
+
 	auto ti = ti_start;
 	for(auto k = 1u; k < ev.size(); k++){
 		const auto &e = ev[k];
@@ -127,7 +128,7 @@ bool IndEvSampler::needed(unsigned int i, unsigned int cl)
 		if(c_next != UNSET) c = c_next;
 	}
 	
-	while(ti < ti_end){ c_timeline[ti] = c; ti++;}
+	while(ti < T){ c_timeline[ti] = c; ti++;}
 	
 	return true;
 }
@@ -665,6 +666,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 	e.ind_inf_from = IndInfFrom();
 	
 	auto c = e.c_after;
+	
 	if(!ind.init_c_set){
 		auto sampler = init_state_sampler_obs(i_store,ti,e);
 	
@@ -756,6 +758,8 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 							if(ti < ti_end) num[l] = ddt*rate_store[ti][cisland][l];
 							else num[l] = ddt*calculate_rate(ind,le,ctime,ti);
 							
+							//if(ti < ti_end) cout << rate_store[ti][cisland][l] << " " << calculate_rate(ind,le,ctime,ti) << "\n";
+					
 							sum += num[l];
 							
 							if(obs_trans_exist){  // Accounts for observation probability on transition
@@ -768,7 +772,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 						}
 					}
 				
-					if(sum_op > 0){     // If any non-zero transitions leaving comprtment
+					if(sum_op > 0){     // If any non-zero transitions leaving compartment
 						// Due to finite discretisation time, this ensure algorithm is stable
 						if(sum > IND_SAMP_THRESH){
 							auto f = IND_SAMP_THRESH/sum;
@@ -830,7 +834,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 							cisland = claa.comp[ci].island_ref.c;
 	
 							enew.c_after = c;
-							
+				
 							ev_new.push_back(enew);
 						
 							tt = t_new;
@@ -907,6 +911,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 						c = trg.f; 
 						
 						enew.c_after = c;
+				
 						ev_new.push_back(enew);
 					}
 					feo--;
@@ -1167,7 +1172,7 @@ double IndEvSampler::sample_events_prob(const vector <Event> &ev) const
 					auto &ob = obs[fixed_event_obs[feo]];
 						
 					if(t == t_event){		
-						const auto tr_gl = ev[list[0]].tr_gl;
+						auto tr_gl = ev[list[0]].tr_gl;
 						if(ob.type != OBS_SINK_EV){
 							// Gets the probability of selecting this event
 							const auto &co = comp[cisland];
@@ -1271,8 +1276,9 @@ double IndEvSampler::calculate_rate(const Individual &ind, const IslandTrans &le
 	}
 	else{                   // Markovian transition
 		const auto &mer = le.markov_eqn_ref[tii][ctime];
-
+		
 		auto rate = markov_eqn_vari[mer.e].value_t[mer.ti];
+		
 		if(rate < TINY) rate = TINY;
 		if(ind_variation == true) rate *= get_indfac(ind,sp.markov_eqn[mer.e]);
 		return rate;
