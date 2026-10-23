@@ -103,7 +103,7 @@ bool Input::add_compartment(string name, unsigned int p, unsigned int cl, double
 		co.erlang_hidden = true;
 		//auto cc = 0u; while(cc < claa.comp.size() && claa.comp[cc].name != erlang_source) cc++;
 		//if(cc == claa.comp.size()) alert_emsg_input("Erlang source problem");
-		if(false){ // turn off
+		if(false){ // TURN OFF
 			auto cc = 0u; while(cc < claa.comp.size() && claa.comp[cc].name != erlang_source) cc++;
 			if(cc != claa.hash_comp.find(erlang_source)) emsg("cc wrong");
 		}
@@ -424,7 +424,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 				ot.obs_eqn_ref = sp.obs_eqn_add_vec(ot.tra_prob_eqn);
 			}
 		}
-	
+
 		for(auto &ind : sp.individual){                    // Individual data 
 			for(auto &ob : ind.obs){
 				switch(ob.type){
@@ -435,7 +435,8 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 							ob.time_vari = ot.time_vari;
 							
 							if(ob.time_vari == true){
-								auto tra_prob_eqn = ot.tra_prob_eqn;
+								//auto tra_prob_eqn = ot.tra_prob_eqn;
+								auto &tra_prob_eqn = ot.tra_prob_eqn;
 								for(auto &tpe : tra_prob_eqn){
 									model.add_eq_ref(tpe,hash_eqn,ob.tdiv,true);
 								}
@@ -565,16 +566,7 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 	
 	print_diag("Created reparam / dynamic");
 	
-	auto w_fl = false;
-	for(auto eq : model.eqn){
-		if(eq.warn != ""){
-			stringstream ss; ss << endl << "For equation '" << eq.te_raw << "':" << endl << " " << eq.warn;
-			alert_line(ss.str(),eq.line_num);
-			w_fl = true;
-		}
-	}
-	
-	if(w_fl) return;
+	if(add_eqn_warnings()) return;
 	
 	model.npop = model.pop.size();
 	for(auto i = 0u; i < model.derive.size(); i++){            // Derived quantities
@@ -630,6 +622,22 @@ void Input::create_equations(unsigned int per_start, unsigned int per_end)
 		}			
 		cout << get_cpu_time(sum)  << " total time" << endl;
 	}
+}
+
+
+/// Adds any equation warnings
+bool Input::add_eqn_warnings()
+{
+	auto w_fl = false;
+	for(auto eq : model.eqn){
+		if(eq.warn != ""){
+			stringstream ss; ss << endl << "For equation '" << eq.te_raw << "':" << endl << " " << eq.warn;
+			alert_line(ss.str(),eq.line_num);
+			w_fl = true;
+		}
+	}
+	
+	return w_fl;
 }
 
 
@@ -1801,7 +1809,7 @@ unsigned int Input::get_spline_i(const ParamRef &pr)
 	auto i = model.hash_spline.existing(vec);
 	if(i == UNSET) alert_emsg_input("Spline could not be found");
 
-	if(false){	 // turn off
+	if(false){	 // TURN OFF
 		auto ii = 0u; while(ii < spl.size() && !(spl[ii].th == th && spl[ii].index == index)) ii++;
 		if(ii != i) emsg("spline prob");
 	}
@@ -2511,7 +2519,7 @@ void Input::create_island()
 						
 						unsigned int isl1, j = UNSET; 
 						for(isl1 = 0u; isl1 < island.size(); isl1++){
-							if(false){ // turn off
+							if(false){ // TURN OFF
 								const auto &co = island[isl1].comp;
 								auto jj = 0u; while(jj < co.size() && co[jj].c != c1) jj++;
 								if(jj < co.size()){
@@ -2539,7 +2547,7 @@ void Input::create_island()
 						auto isl2 = UNSET;
 						if(c2 != UNSET){
 							for(isl2 = 0u; isl2 < island.size(); isl2++){
-								if(false){ // turn off
+								if(false){ // TURN OFF
 									const auto &co = island[isl2].comp;
 									auto jj = 0u; while(jj < co.size() && co[jj].c != c2) jj++;
 									if(jj < co.size()){
@@ -2576,7 +2584,7 @@ void Input::create_island()
 							// Sets cf which gives the final
 							auto f = tra.f;
 							
-							if(false){ // turn off
+							if(false){ // TURN OFF
 								auto jj = 0u; while(jj < isl.comp.size() && isl.comp[jj].c != f) jj++;
 								if(jj != isl.hash_comp.find(f)) emsg("prob");
 							}
@@ -2713,7 +2721,7 @@ void Input::param_affect_likelihood()
 			auto s = model.hash_spline.existing(vec);
 			if(s == UNSET) alert_emsg_input("Cannot find spline");
 		
-			if(false){ // turn off
+			if(false){ // TURN OFF
 				auto ss = 0u;
 				while(ss < model.spline.size() && !(th == model.spline[ss].th && ind/nknot == model.spline[ss].index)) ss++;
 				if(s != ss) emsg("s problem");
@@ -3880,16 +3888,102 @@ void Input::add_genetic_data()
 		}			
 	}
 	
+	set_genetic_obs_scale(gd);
+}
+
+
+/// Sets how strict the genetic observation model should be
+void Input::set_genetic_obs_scale(GeneticData &gd) const 
+{
 	gd.obs_scale = UNSET;
-	if(gd.on){
-		auto nobs = gd.gen_dif.size();
-		
-		auto mean = 0.0;
-		for(auto j = 0u; j < nobs; j++){
-			for(auto i = 0u; i < nobs; i++) mean += gd.gen_dif[j][i];
+	if(!gd.on) return;
+	
+	// Calculate the number of observed individuals
+	auto N = 0u;
+	for(auto p = 0u; p < model.species.size(); p++){
+		for(auto i = 0u; i < gd.ind_gen_obs[p].size(); i++){
+			if(gd.ind_gen_obs[p][i].size() > 0) N++;
 		}
-		mean /= (nobs*nobs);
-		gd.obs_scale = 10.0/(mean*mean);
+	}
+	
+	// Gets the average number of branches passed through between observations
+	auto sum_lim = log2(N);
+	auto B_bar = 0.5*sum_lim*(sum_lim+1);
+	
+	auto nobs = gd.gen_dif.size();
+		
+	auto g_bar = 0.0;
+	for(auto j = 0u; j < nobs; j++){
+		for(auto i = 0u; i < nobs; i++) g_bar += gd.gen_dif[j][i];
+	}
+	g_bar /= (nobs*nobs);
+	
+	double c;
+	
+	switch(2){
+	case 1: // Option 1
+		c = (16.0/(nobs*nobs))*(B_bar/g_bar)*(B_bar/g_bar);
+		break;
+		
+	case 2: // Option 2
+		c = (10.0/(nobs*nobs))*(B_bar/g_bar);
+		break;
+	
+	case 3: // Option 3
+		c = (10.0/(nobs*nobs)); 
+		break;
+	}
+	
+	//cout << "B_bar=" << B_bar <<" g_bar=" << g_bar << endl;
+	//c /= 100.0;
+	
+	gd.obs_scale = c;
+}
+	
+
+/// Adds waifw data (potentially multi-species)
+void Input::add_waifw_data()
+{
+	auto &gd = model.genetic_data;
+	
+	gd.waifw_on = false;
+	for(const auto &sp : model.species){
+		for(const auto &so : sp.source){
+			if(so.cname == WAIFW_DATA){
+				if(gd.waifw_on) alert_import("Only one set of WAIFW data can be used");
+				
+				const auto &tab = so.table;
+				for(auto r = 0u; r < tab.nrow; r++){	
+					WAIFWdata da;
+				
+					for(auto loop = 0u; loop < 2; loop++){
+						auto val = tab.ele[r][loop];
+						
+						auto psel = UNSET;
+						auto isel = UNSET;
+						
+						if(val == "."){
+							if(loop == 1) alert_import("For WAIFW data the value '.' can only be used in the 'From' column, not the 'To' column.");
+						}
+						else{
+							for(auto p = 0u; p < model.species.size(); p++){
+								auto i = model.species[p].find_individual(val);
+								if(i != UNSET){ psel = p; isel = i; break;}
+							}
+							if(psel == UNSET) alert_import("In WAIFW data table cannot find individual '"+val+"' in the system.");
+						}
+					
+						switch(loop){
+						case 0: da.from_p = psel; da.from_i = isel; break;
+						case 1: da.to_p = psel; da.to_i = isel; break;
+						}
+					}
+					
+					model.genetic_data.waifw_data.push_back(da);
+				}
+				gd.waifw_on = true;
+			}
+		}
 	}
 }
 
@@ -5554,13 +5648,15 @@ void Input::set_trans_tree_output()
 		}
 		
 		for(auto &sp : model.species){
-			sp.trans_tree = false;
-			sp.trans_tree_output = true;
+			if(sp.trans_tree){
+				sp.trans_tree = false;
+				sp.trans_tree_output = true;
 			
-			for(auto &me : sp.markov_eqn){
-				if(me.infection_trans){
-					me.infection_trans = false;
-					me.infection_trans_output = true;
+				for(auto &me : sp.markov_eqn){
+					if(me.infection_trans){
+						me.infection_trans = false;
+						me.infection_trans_output = true;
+					}
 				}
 			}
 		}
@@ -5924,5 +6020,48 @@ void Input::set_dynamic_info_from_text(string te, string region, Param &par)
 void Input::check_valid_population(string filt_str) 
 { 
 	auto st = trim(filt_str);
-	//if(begin(
 }
+
+
+/// Checks that infected compartments are correctly specified
+void Input::check_infected_compartments() 
+{
+	for(auto p = 0u; p < model.species.size(); p++){
+		const auto &sp = model.species[p];
+		if(sp.trans_tree || sp.trans_tree_output){
+			for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+				const auto &trg = sp.tra_gl[tr];
+				if(trg.infection.type == TRANS_INFECTION){
+					auto &eq = model.eqn[trg.dist_param[0].eq_ref];	
+				
+					for(auto k : eq.pop_ref){
+						const auto &po = model.pop[k];
+						const auto &sp2 = model.species[po.p];
+						if(sp2.type != INDIVIDUAL){
+							eq.warn = "This transmission tree infection references poplation '"+po.name+"' which in not individual-based";
+						}
+						else{
+							if(!sp2.trans_tree && !sp2.trans_tree_output){
+								eq.warn = "This infection references poplation '"+po.name+"', but a transmission tree has not been set for the species '"+sp2.name+"'";
+							}
+							else{
+								auto cl = sp2.infection_cl;
+								const auto &claa = sp2.cla[cl];
+								for(auto &te : po.term){
+									const auto &cgl = sp2.comp_gl[te.c];
+									auto ci = cgl.cla_comp[cl];
+									const auto &co = claa.comp[ci];
+							
+									if(co.infected != COMP_INFECTED){
+										eq.warn = "This transmission tree infection incorporates compartment '"+co.name+"', but this is not set to be infected.";
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+

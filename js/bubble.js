@@ -795,6 +795,7 @@ function add_bubble_buts(lay)
 				break;
 			case "AddInitPopPrior": initpopprior_data_bubble(cont,"add"); break;
 			case "MoveIndividuals": move_data_bubble(cont,"add"); break;
+			case "ForcedTrans": forced_trans_bubble(cont,"add"); break;
 			case "CompData": comp_data_bubble(cont,"add"); break;
 			case "TransData": trans_data_bubble(cont,"add","TransVar"); break;
 			case "SourceData": trans_data_bubble(cont,"add","SourceVar"); break;
@@ -818,6 +819,7 @@ function add_bubble_buts(lay)
 			case "SetDistribution": set_distribution_bubble(cont); break;
 			case "SetDerived": set_derived_bubble(cont); break;
 			case "AddParamMult": add_param_mult_bubble(cont); break;
+			case "WAIFWData": trans_tree_turn_on(cont); break;
 			default: error("Cannot find source2: "+bu.ac); break;
 			}
 		}
@@ -829,6 +831,7 @@ function add_bubble_buts(lay)
 			switch(edit_source.type){
 			case "Init. Pop.": initpop_data_bubble(cont,"view"); break;
 			case "Move Ind.": move_data_bubble(cont,"view"); break;
+			case "Forced Trans.":forced_trans_bubble(cont,"view"); break;
 			case "Compartment": comp_data_bubble(cont,"view"); break;
 			case "Transition": trans_data_bubble(cont,"view","TransVar"); break;
 			case "Diag. Test": diagtest_data_bubble(cont,"view"); break;
@@ -1797,6 +1800,7 @@ function add_bubble_scrollable_buts(lay)
 	case "ind list": cy = individual_scrollable(lay); break;
 	case "pop list": cy = population_scrollable(lay); break;
 	case "poptrans list": cy = poptrans_scrollable(lay); break;
+	case "forcedtrans list": cy = forcedtrans_scrollable(lay); break;
 	case "param_dynamic": cy = param_dynamic_scrollable(lay); break;
 	case "annotation": cy = annotation_scrollable(lay); break;
 	case "param dynamic sel": cy = param_sel_scrollable(lay,"param_dynamic"); break;

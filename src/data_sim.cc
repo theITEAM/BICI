@@ -1,44 +1,35 @@
 // Simulates data from state
 
+// ./bici-core.exe Execute/init.bici sim
+
+// Population-based model:
+// ./bici-core.exe Execute/init.bici data-sim 'ic'
+// ./bici-core.exe Execute/init.bici data-sim 'init-pop-inf'
+// ./bici-core.exe Execute/init.bici data-sim 'add-pop-inf'
+// ./bici-core.exe Execute/init.bici data-sim 'pop-data name="pop" filter="DS=file" dt=10 error="poisson"'
+// ./bici-core.exe Execute/init.bici data-sim 'pop-trans-data name="poptrans" trans="S->I" dt=10 error="poisson"'
+
+// Individual-based model:
+// ./bici-core.exe Execute/init.bici data-sim 'ic'
+// ./bici-core.exe Execute/init.bici data-sim 'add-ind-inf'
+// ./bici-core.exe Execute/init.bici data-sim 'remove-ind-inf'
+// ./bici-core.exe Execute/init.bici data-sim 'move-ind-inf'
+// ./bici-core.exe Execute/init.bici data-sim 'comp-data name="comp" class="DS" dt="10"'
+// ./bici-core.exe Execute/init.bici data-sim 'trans-data name="trans" trans="S->I"' 
+// ./bici-core.exe Execute/init.bici data-sim 'test-data comp="I[Se:1]" name="test" Sp=1 dt="10"'
+// ./bici-core.exe Execute/init.bici data-sim 'genetic-data name="Genetic data" type="matrix" mut-rate="1.5" seq-var="1.2" dt=20'
+
+// ./bici-core.exe Execute/init.bici data-sim 'ind-effect-data name="iedata" ie="g"'
+// ./bici-core.exe Execute/init.bici data-sim 'ind-group-data name="Progeny" id="sire*"'
+// ./bici-core.exe Execute/init.bici data-sim 'waifw-data name="WAIFW data"'
+
+// Multiple data sources
+// ./bici-core.exe Execute/init.bici data-sim 'ic' 'trans-data name="inf" trans="S->I"' 'trans-data name="rec" trans="I->R"' 'genetic-data name="Genetic data" type="matrix" mut-rate="1.5" seq-var="1.2" data-times="inf,rec" '
+
+// Other command
 //./bici-core.exe Execute/init.bici data-show
-//./bici-core.exe Execute/init.bici data-sim 'ic' 'trans-data name="trans" trans="S->I"' 'genetic-data name="Genetic data" type="matrix" mut-rate="1.5" seq-var="1.2" dt=20 '
 
-//./bici-core.exe Execute/init.bici data-sim 'ic' 'trans-data name="inf" trans="S->I"' 'trans-data name="rec" trans="I->R"' 'genetic-data name="Genetic data" type="matrix" mut-rate="1.5" seq-var="1.2" data-times="inf,rec" '
-
-//./bici-core.exe Execute/init.bici data-sim 'ic' 'trans-data name="trans" trans="S->I"' 'genetic-data name="Genetic data" type="matrix" mut-rate="1.5" seq-var="1.2" dt=20 '
-
-//./bici-core.exe Execute/init.bici data-sim 'ic' 'trans-data name="trans" trans="S->I"' 'genetic-data name="Genetic data" type="matrix" mut-rate="1.5" seq-var="1.2" data-times="trans"'
-
-
-//./bici-core.exe Execute/init.bici data-sim 'ic' 'trans-data name="trans" trans="S->I"' 'genetic-data name="Genetic data" type="snp" mut-rate="1.5" seq-var="1.2" dt=20 root="SNP" nbp="10"'
-// gdb ./bici-core.exe
-// run Execute/init.bici data-sim 'ic' 'trans-data name="trans" trans="S->I"' 'genetic-data name="Genetic data" type="snp" mut-rate="1.5" seq-var="1.2" dt=20 root="SNP" nbp="10"'
-
-// run Execute/init.bici data-sim 'genetic-data name="Genetic data" type="matrix" mut-rate="1.5" seq-var="1.2" dt=10 '
-// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s 
-
-
-// ./bici-para Execute/init.bici data-sim 'init-pop-inf'
-// ./bici-para Execute/init.bici data-show
-// ./bici-para Execute/init.bici data-sim ic
-// ./bici-para Execute/init_0.bici data-sim 'ic' 'pop-data name="pop" filter="DS=file" dt=10 error="poisson"'
-// ./bici-para Execute/init.bici data-sim 'init-pop-inf'
-// ./bici-para Execute/init.bici data-sim 'remove-pop-inf'
-// ./bici-para Execute/init.bici data-sim 'add-pop-inf'
-// ./bici-para Execute/init.bici data-sim 'remove-ind-inf'
-// ./bici-para Execute/init.bici data-sim 'remove-ind-inf'
-// ./bici-para Execute/init.bici data-sim 'comp-data name="comp" class="DS" dt="10"'
-// ./bici-para Execute/init.bici data-sim 'trans-data name="trans" trans="I->R"'
-// ./bici-para Execute/init.bici data-sim 'test-data comp="I[Se:1]" name="test" Sp=1 dt="10"'
-// ./bici-para Execute/init.bici data-sim 'pop-data name="pop" filter="DS=file" dt=10 error="poisson"'
-// ./bici-para Execute/init.bici data-sim 'pop-trans-data name="poptrans"  trans="I->R"  filter="Sex=file" dt=10 error="normal:1"'
-// ./bici-para Execute/init.bici data-sim 'ind-effect-data name="iedata" ie="g"'
-// ./bici-para Execute/init.bici data-sim 'pop-trans-data name="poptrans"  trans="I->R"  filter="DS=file" dt=10 error="poisson"'
-// ./bici-para Execute/init.bici data-sim 'pop-trans-data name="poptrans"  trans="I->R"  filter="DS=file" dt=10 error="poisson"'
-// ./bici-para Execute/init.bici data-sim 'ind-group-data name="Progeny" id="sire*" '
-// ./bici-para Execute/init.bici data-sim 'genetic-data name="Genetic data" type="snp" mut-rate="1.5" seq-var="3.2" dt=10 root="SNP" '
-// ./bici-para Execute/init.bici data-sim 'genetic-data name="Genetic data" type="matrix" mut-rate="1.5" seq-var="3.2" dt=10  '
-
+// Run with debugger
 // gdb ./bici-para Execute/init.bici data-sim 'comp-data'
 // run  Execute/init.bici data-sim 'comp-data'
 // valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s  ./bici-para Execute/init.bici data-sim 'ic'
@@ -48,7 +39,7 @@
 #include <algorithm>
 #include <assert.h>
 #include <math.h>
-
+ 
 using namespace std;
 
 #include "data_sim.hh"
@@ -64,9 +55,8 @@ DataSim::DataSim(Model &model, Output &output, bool sup_) : model(model), output
 
 
 /// Performs a simulation of a data source
-void DataSim::run(string data_sim_line, unsigned int sim_sel)
+void DataSim::run(string data_sim_line, unsigned int sim_sel, bool &replace_data)
 {
-
 	data_sim_line_store = data_sim_line;
 	
 	State state(model);
@@ -75,6 +65,8 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 	line = get_command_tags(data_sim_line,UNSET);
 	if(line.emsg != "") error(line.emsg);
 	
+	param_val_prior.clear();
+	
 	auto cname = line.command;
 	switch(cname){
 	case IC_DATA:
@@ -82,7 +74,9 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 	case ADD_IND: case REMOVE_IND: case MOVE_IND:
 	case COMP_DATA: case TRANS_DATA: case TEST_DATA:
 	case POP_DATA: case POP_TRANS_DATA:
-	case IND_EFFECT_DATA: case IND_GROUP_DATA: case GENETIC_DATA:
+	case IND_EFFECT_DATA: case IND_GROUP_DATA: 
+	case GENETIC_DATA: case WAIFW_DATA:
+	case FORCED_TRANS_IND_INF: 
 		break;
 		
 	default:
@@ -113,7 +107,9 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 	auto file = get_tag_value("file"); 	
 	if(file == ""){
 		if(output.datadir != ""){
-			error("A 'file' tag must be added to give the filename used to store the data.");
+			//if(cname != IC_DATA){
+			//	error("A 'file' tag must be added to give the filename used to store the data.");
+			//}
 		}		
 	}
 	else{	
@@ -130,7 +126,9 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 		switch(cname){
 		case ADD_IND: case REMOVE_IND: case MOVE_IND:
 		case COMP_DATA: case TRANS_DATA: case TEST_DATA:
-		case IND_EFFECT_DATA: case IND_GROUP_DATA: case GENETIC_DATA:
+		case IND_EFFECT_DATA: case IND_GROUP_DATA: 
+		case GENETIC_DATA: case WAIFW_DATA:
+		case FORCED_TRANS_IND_INF: 
 			error("Cannot simulate individual-based data from a population-based species");
 			break;
 			
@@ -143,25 +141,20 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 		vector <unsigned int> existing;
 		for(auto k = 0u; k < sp.source.size(); k++){
 			const auto &so = sp.source[k];
+	
 			switch(so.cname_raw){
 			case INIT_POP: case ADD_POP: case REMOVE_POP:
 			case ADD_IND: case REMOVE_IND: case MOVE_IND:
+			case FORCED_TRANS_IND_INF:
 				existing.push_back(k);
 				break;
 			default: break;
 			}
 		}
-		
-		if(existing.size() > 0){
-			auto res = model.question("This will remove existing data. Is that OK?");
-			
-			if(res == false){
-				cout << "Terminated" << endl; 
-				exit (EXIT_FAILURE);
-			}
-		}
-		
+	
 		// Deletes any existing definitions
+		if(existing.size() > 0) replace_data = true;
+			
 		for(auto k : existing){
 			const auto &so = sp.source[k];
 			output.delete_command(so.name,so.line_num,false);
@@ -172,6 +165,7 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 			switch(so.cname_raw){
 			case INIT_POP_SIM: case ADD_POP_SIM: case REMOVE_POP_SIM:
 			case ADD_IND_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM:
+			case FORCED_TRANS_IND_SIM:
 				{
 					string name;
 					if(so.cname_raw == INIT_POP_SIM && sp.type == INDIVIDUAL){
@@ -183,7 +177,7 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 						auto st = "add-ind-inf";
 						
 						if(tab.ele.size() > 0){
-							output.insert_command(name,p,INF_BANNER,PARAM_BANNER,st,output_table(tab),file); 
+							output.insert_command(name,p,INF_BANNER,PARAM_BANNER,st,output_table(tab),file,replace_data); 
 						}
 					}
 					else{
@@ -195,6 +189,7 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 						case ADD_IND_SIM: name = "add-ind-inf"; break;
 						case REMOVE_IND_SIM: name = "remove-ind-inf"; break;
 						case MOVE_IND_SIM: name = "move-ind-inf"; break;
+						case FORCED_TRANS_IND_SIM: name = "forced-trans-ind-inf"; break;
 						default: break;
 						}
 				
@@ -205,7 +200,7 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 							}
 						}
 						
-						output.insert_command("",p,INF_BANNER,PARAM_BANNER,st,output_table(so.table),file); 
+						output.insert_command("",p,INF_BANNER,PARAM_BANNER,st,output_table(so.table),file,replace_data); 
 					}
 				}
 				break;
@@ -220,6 +215,8 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 			
 		string te="";
 		
+		auto &tags = line.tags;
+		
 		Table tab;
 		
 		switch(cname){
@@ -229,6 +226,7 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 		case REMOVE_POP: copy_from_sim(p,"remove-pop-sim",REMOVE_POP_SIM,tab); break;
 		case REMOVE_IND: copy_from_sim(p,"remove-ind-sim",REMOVE_IND_SIM,tab); break;
 		case MOVE_IND: copy_from_sim(p,"move-ind-sim",MOVE_IND_SIM,tab); break;
+		case FORCED_TRANS_IND_INF: forced_trans_sim(p,"forced-trans-ind-sim",FORCED_TRANS_IND_SIM,tab,tags); break;
 		
 		case COMP_DATA: comp_data_sim(p,state,tab); break;
 		case TRANS_DATA: trans_data_sim(p,state,tab); break;
@@ -238,12 +236,24 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 		case IND_EFFECT_DATA: ind_effect_data_sim(p,state,tab); break; 
 		case IND_GROUP_DATA: ind_group_data_sim(p,tab); break; 
 		case GENETIC_DATA: genetic_data_sim(state,tab); break;
+		case WAIFW_DATA: waifw_data_sim(state,tab); break;
 		default: emsg("Simulation prob"); break;
 		}
 
+		tab.ncol = tab.heading.size();
+		tab.nrow = tab.ele.size();
+	
+		if(tab.nrow == 0){
+			if(cname == TRANS_DATA){
+				warning("This data has been added, but it is an empty data table");
+			}
+			else{
+				warning("This didn't generate any data");
+			}
+		}
+	
 		auto st = line.command_name;
-		auto &tags = line.tags;
-		
+
 		auto i = 0u;
 		while(i < tags.size()){
 			const auto &ta = tags[i];
@@ -259,14 +269,23 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 				auto na = ta.name;
 				if(na != "dt" && na != "times" && na != "frac" && 
 				   na != "ac" && na != "id" && na != "nbp" && na != "data-times"){
-					st += " "+ta.name+"=\""+ta.value+"\"";
+					auto val = ta.value;
+					get_obs_param(val,true);
+					st += " "+ta.name+"=\""+val+"\"";
 				}
 				i++;
 			}
 		}
 		
 		if(tab.ele.size() > 0){	
-			output.insert_command(name,p,INF_BANNER,PARAM_BANNER,st,output_table(tab),file); 
+			output.insert_command(name,p,INF_BANNER,PARAM_BANNER,st,output_table(tab),file,replace_data); 
+		
+			// Adds in any prior for observation parameters
+			bool replace_data;
+			for(const auto &pvp : param_val_prior){
+				auto line = "param name=\""+pvp.name+"\" value=\""+tstr(pvp.val)+"\" prior=\""+pvp.prior+"\"";
+				output.insert_command("",UNSET,PARAM_BANNER,"# OUTPUT",line,"","",replace_data); 
+			}
 		
 			tab.nrow = tab.ele.size();
 			tab.ncol = tab.heading.size();	
@@ -281,8 +300,22 @@ void DataSim::run(string data_sim_line, unsigned int sim_sel)
 }
 
 
+/// Check it its OK to replace existing data
+void DataSim::check_replace(bool replace_data) const
+{	
+	if(replace_data){
+		auto res = model.question("This will replace existing data. Is that OK?");
+	
+		if(res == false){
+			cout << "Terminated" << endl; 
+			exit (EXIT_FAILURE);
+		}
+	}
+}
+
+	
 /// Gets the value of a tag
-string DataSim::get_tag_value(string st)                                  
+string DataSim::get_tag_value(string st) 
 {
 	auto &tags = line.tags;
 
@@ -294,11 +327,56 @@ string DataSim::get_tag_value(string st)
 	return "";
 }
 
+
+/// Sets the value of a tag
+void DataSim::set_tag_value(string st, string val) 
+{
+	auto &tags = line.tags;
+
+	tag_find = st;
+	for(auto i = 0u; i < tags.size(); i++){
+		if(tags[i].name == st){  tags[i].value = val; return;}
+	}
+	
+	emsg("COuld not set tag value");
+}
+
+
 /// Error massage if a tag cannot be found
 void DataSim::cannot_find_tag() const                                 
 {
 	string te = "Cannot find the '"+tag_find+"' tag for '"+line.command_name+"'";
 	error(te);
+}
+
+
+/// Dislays an warning message
+void DataSim::warning(string msg) const
+{
+	if(sup) return;
+		
+	add_full_stop(msg);
+	
+	cout << endl;
+	cout << "\033[32m";
+	cout <<  "'";
+	switch(model.mode){
+	case DATA_SIM: cout << "data-sim"; break;
+	case DATA_SHOW: cout << "data-show"; break;
+	case DATA_DEL: cout << "data-del"; break;
+	case DATA_CLEAR: cout << "clear"; break;
+	case COMPRESS: cout << "compress"; break;
+	case DECOMPRESS: cout << "decompress"; break;
+	default: emsg("Cannot be here"); break;
+	}
+	cout << "': ";
+	cout << "\033[0m";
+	cout << data_sim_line_store << endl;
+				
+	cout << "\033[35m" << "WARNING:";
+	cout << "\033[0m";
+	cout << msg;
+	cout << endl;
 }
 
 
@@ -421,20 +499,24 @@ vector <DataRef> DataSim::get_data_list() const
 				case INIT_POP_SIM:
 				case ADD_POP_SIM: case REMOVE_POP_SIM: 
 				case ADD_IND_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM: 
+				case FORCED_TRANS_IND_SIM:
 					if(type == SIM_DATA) add = true;
 					break;
 					
 				case INIT_POP: 
 				case ADD_POP: case REMOVE_POP:
 				case ADD_IND: case REMOVE_IND: case MOVE_IND: 
+				case FORCED_TRANS_IND_INF:
 				case COMP_DATA: case TRANS_DATA:
 				case TEST_DATA: case POP_DATA: case POP_TRANS_DATA: 
-				case GENETIC_DATA: case IND_GROUP_DATA: case IND_EFFECT_DATA:
+				case GENETIC_DATA: case WAIFW_DATA: 
+				case IND_GROUP_DATA: case IND_EFFECT_DATA:
 					if(type == INF_DATA) add = true;
 					break;
 	
 				case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: 
 				case ADD_IND_POST_SIM: case REMOVE_IND_POST_SIM: case MOVE_IND_POST_SIM: 
+				case FORCED_TRANS_IND_POST_SIM:
 					if(type == POST_SIM_DATA) add = true;
 					break;
 					
@@ -470,9 +552,11 @@ void DataSim::del(string data_sim_line)
 				switch(so.cname_raw){
 				case INIT_POP: case ADD_POP: case REMOVE_POP: 
 				case ADD_IND: case REMOVE_IND: case MOVE_IND:
+				case FORCED_TRANS_IND_INF:
 				case COMP_DATA: case TRANS_DATA: case TEST_DATA:
 				case POP_DATA: case POP_TRANS_DATA:
-				case IND_EFFECT_DATA: case IND_GROUP_DATA: case GENETIC_DATA:
+				case IND_EFFECT_DATA: case IND_GROUP_DATA: 
+				case GENETIC_DATA: case WAIFW_DATA:
 					{
 						IndRef po; po.p = p; po.i = i;
 						list.push_back(po);
@@ -719,7 +803,11 @@ string DataSim::source_description(const Species &sp, const DataSource &so) cons
 		desc = so.filter_str;
 		num = tab.nrow;
 		break;
-		
+	
+	case FORCED_TRANS_IND_SIM: case FORCED_TRANS_IND_INF: case FORCED_TRANS_IND_POST_SIM:
+		desc = so.filter_trans_str;
+		break;
+	
 	case TRANS_DATA: case POP_TRANS_DATA:
 		desc = so.filter_trans_str;
 		break;
@@ -730,7 +818,11 @@ string DataSim::source_description(const Species &sp, const DataSource &so) cons
 		case SNP_DATA: desc = "# SNP "+(tab.ncol-2); break;
 		}
 		break;
-	
+
+	case WAIFW_DATA:
+		desc = "WAIFW data";
+		break;
+		
 	default: desc = "no description"; break;
 	}
 
@@ -743,7 +835,8 @@ string DataSim::source_description(const Species &sp, const DataSource &so) cons
 		if(desc != "") desc += ", ";
 		desc += "number:"+tstr(num);
 	}
-	return desc;
+	
+	return add_escape_char(desc);
 }
 
 
@@ -971,9 +1064,12 @@ double DataSim::obs_model_sample(double mean, const ObsModel &om) const
 			if(om.type == NORMAL_PERCENT_OBSMOD) sd = mean*om.percent/100;
 			else sd = om.sd;
 			
-			auto loop = 0u, loopmax = 1000u;
-			do{ val = normal_sample(mean,sd,warn); loop++;}while(val < 0 && loop < loopmax);
-			if(loop == loopmax) warn = "Negative sampling problem";
+			if(sd == 0) val = mean;
+			else{
+				auto loop = 0u, loopmax = 1000u;
+				do{ val = normal_sample(mean,sd,warn); loop++;}while(val < 0 && loop < loopmax);
+				if(loop == loopmax) warn = "Negative sampling problem";
+			}
 		}
 		break;
 	
@@ -1136,6 +1232,36 @@ void DataSim::copy_from_sim(unsigned int p, string st, Command cname, Table &tab
 	while(i < source.size() && source[i].cname_raw != cname) i++;
 	if(i < source.size()){
 		tab = source[i].table;
+	}
+	else{
+		error("Could not find '"+st+"' data source to copy");
+	}
+}
+
+
+/// Copies a data source from simulation
+void DataSim::forced_trans_sim(unsigned int p, string st, Command cname, Table &tab, vector <Tag> &tags) const 
+{
+	const auto &sp = model.species[p];
+	
+	const auto &source = sp.source;
+	
+	auto i = 0u; 
+	while(i < source.size() && source[i].cname_raw != cname) i++;
+	if(i < source.size()){
+		tab = source[i].table;
+		
+		// Adds transition specification (if needed)
+		auto j = 0u; while(j < tags.size() && tags[j].name != "trans") j++;
+		if(j == tags.size()){
+			Tag ta;
+			ta.name = "trans";
+			ta.pos = UNSET;
+			ta.pos_end = UNSET;
+			ta.value = source[i].filter_trans_str;
+		
+			tags.push_back(ta);
+		}
 	}
 	else{
 		error("Could not find '"+st+"' data source to copy");
@@ -1316,9 +1442,11 @@ void DataSim::trans_data_sim(unsigned int p, const State &state, Table &tab)
 	auto tmax = model.details.t_end;
 	
 	auto filter_str = get_tag_value("filter");
+	get_obs_param(filter_str,false);
 	
 	auto trans = get_tag_value("trans"); if(trans == "") cannot_find_tag(); 
-		
+	get_obs_param(trans,false);
+	
 	auto cl_sel = model.get_cl_from_trans(trans,p);
 	if(cl_sel == UNSET){
 		error("For 'trans' the value '"+trans+"' is not recognised");
@@ -1425,7 +1553,8 @@ void DataSim::test_data_sim(unsigned int p, const State &state, Table &tab)
 	const auto &sp = model.species[p];
 	
 	auto Sp_str = get_tag_value("Sp"); if(Sp_str == "") cannot_find_tag(); 
-		
+	get_obs_param(Sp_str,false);
+	
 	auto pos = get_tag_value("pos");
 	if(pos == "") pos = "1";
 			
@@ -1437,6 +1566,7 @@ void DataSim::test_data_sim(unsigned int p, const State &state, Table &tab)
 	}
 					
 	auto comp = get_tag_value("comp"); if(comp == "") cannot_find_tag(); 
+	get_obs_param(comp,false);
 	
 	string warn;
 	auto dts = model.get_diag_test_sens(comp,p,warn);
@@ -1508,6 +1638,7 @@ void DataSim::pop_data_sim(unsigned int p, const State &state, Table &tab)
 	const auto &sp = model.species[p];
 	
 	auto filter_str = get_tag_value("filter");
+	get_obs_param(filter_str,false);
 	
 	string errmsg;
 	auto cf = sp.set_comp_filt_raw(filter_str,UNSET,LOWER_BOUND,errmsg);
@@ -1593,6 +1724,7 @@ void DataSim::pop_trans_data_sim(unsigned int p, const State &state, Table &tab)
 	const auto &sp = model.species[p];
 	
 	auto filter_str = get_tag_value("filter");
+	get_obs_param(filter_str,false);
 	
 	string errmsg;
 	auto cf = sp.set_comp_filt_raw(filter_str,UNSET,LOWER_BOUND,errmsg);
@@ -1603,7 +1735,8 @@ void DataSim::pop_trans_data_sim(unsigned int p, const State &state, Table &tab)
 	auto om = load_obs_model();
 	
 	auto trans = get_tag_value("trans"); if(trans == "") cannot_find_tag(); 
-		
+	get_obs_param(trans,false);
+	
 	auto cl_sel = model.get_cl_from_trans(trans,p);
 	if(cl_sel == UNSET){
 		error("For 'trans' the value '"+trans+"' is not recognised");
@@ -1761,6 +1894,10 @@ void DataSim::ind_group_data_sim(unsigned int p, Table &tab)
 /// Simulates genetic data
 void DataSim::genetic_data_sim(const State &state, Table &tab)
 {
+	if(!model.trans_tree && !model.trans_tree_output){
+		error("Can only siumlate genetic data if a transmission tree is set for the model.");
+	}
+	
 	auto type = get_tag_value("type"); if(type == ""){ cannot_find_tag(); return;}
 			
 	auto gen_data_type = GenDataType(option_error("type",type,{"snp","matrix"},{ SNP_DATA, MATRIX_DATA}));
@@ -1785,12 +1922,13 @@ void DataSim::genetic_data_sim(const State &state, Table &tab)
 	}
 
 	auto mut_rate_str = get_tag_value("mut-rate"); if(mut_rate_str == ""){ cannot_find_tag(); return;}
-	auto mut_rate = number(mut_rate_str);
+	
+	auto mut_rate = get_param_spec("mut-rate");
 	if(mut_rate == UNSET || mut_rate < 0) error("'mut-rate' must be a non-negative number");
+	
 	mut_rate *= model.details.dt;
 
-	auto seq_var_str = get_tag_value("seq-var"); if(seq_var_str == ""){ cannot_find_tag(); return;}
-	auto seq_var = number(seq_var_str);
+	auto seq_var = get_param_spec("seq-var"); 
 	if(seq_var == UNSET || seq_var < 0) error("'seq-var' must be a non-negative number");
 	
 	auto fr = get_frac();
@@ -1826,7 +1964,7 @@ void DataSim::genetic_data_sim(const State &state, Table &tab)
 			auto &io = gv.inf_origin[from.index];
 			string warn;
 			io.mut_num = poisson_sample(seq_var+(t-t_start)*mut_rate,warn);
-			if(warn != "") run_error("Problem with sampling mutation events: "+warn);
+			if(warn != "") error("Problem with sampling mutation events: "+warn);
 		}
 		else{
 			while(e < ev.size() && ev[e].tdiv != t) e++;
@@ -1886,7 +2024,7 @@ void DataSim::genetic_data_sim(const State &state, Table &tab)
 			auto tt = infn.inf_ev[k].tdiv;
 			string warn;
 			infn.inf_ev[k].mut_num = poisson_sample(mut_rate*(tt-t),warn);
-			if(warn != "") run_error("Problem with sampling mutation events: "+warn);
+			if(warn != "") error("Problem with sampling mutation events: "+warn);
 			t = tt;
 		}
 	}	
@@ -2093,6 +2231,34 @@ void DataSim::genetic_data_sim(const State &state, Table &tab)
 }
 
 
+/// Simulates genetic data
+void DataSim::waifw_data_sim(const State &state, Table &tab)
+{
+	const auto &inf_node = state.genetic_value.inf_node;
+	
+	if(!model.trans_tree && !model.trans_tree_output){
+		error("WAIFW data can only be generated when the transmission tree is turned on");
+	}
+	
+	tab.heading.push_back("From");
+	tab.heading.push_back("To");
+	
+	for(const auto &no : inf_node){
+		vector <string> row;
+		auto no_fr = no.from.node;
+		if(no_fr == OUTSIDE_INF || no_fr == ENTER_INF) row.push_back(".");
+		else{
+			const auto &nof = inf_node[no_fr];
+			row.push_back(state.species[nof.p].individual[nof.i].name);
+		}
+		
+		row.push_back(state.species[no.p].individual[no.i].name);
+	
+		tab.ele.push_back(row);
+	}		
+}
+	
+
 /// Mutates an element of the sequence
 void DataSim::mutate_seq(unsigned int num, vector <unsigned int> &seq) const
 {
@@ -2100,6 +2266,122 @@ void DataSim::mutate_seq(unsigned int num, vector <unsigned int> &seq) const
 		auto i = (unsigned int)(seq.size()*ran());
 		seq[i] = (seq[i]+1+(unsigned int)(3*ran()))%4;
 	}
+}
+
+
+
+/// Checks if a valid parameter name
+bool DataSim::check_valid_param_name(string name)
+{
+	for(auto i = 0u; i < name.length(); i++){
+		auto ch = name.substr(i,1);
+		if(includes(notparam_list,ch)) return false;
+	}
+	
+	return true;
+}
+
+
+/// Strips <<..>> brackets and adds to param_val_prior
+void DataSim::get_obs_param(string &ta, bool substitute) 
+{
+	if(ta.length() < 2) return;
+	
+	auto len = ta.length();
+	
+	auto wa = "In the expression '"+ta+"': "; 
+	
+	string ta_new;
+	
+	auto i = 0u;
+	while(i < len){
+		while(i < len && ta.substr(i,2) != "<<"){
+			ta_new += ta.substr(i,1);
+			i++;
+		}
+		if(i < len){
+			auto i_st = i;
+			while(i < len && ta.substr(i,2) != ">>") i++;
+			if(i == len) error(wa+"The '<<' brackets don't match up");
+			
+			auto cont = ta.substr(i_st+2,i-i_st-2);
+			
+			auto spl = split(cont,'|');
+			if(spl.size() != 3) error(wa+"This does not correspond to the format <<name|value|prior>>");
+			
+			auto name = spl[0];
+			if(!check_valid_param_name(name)) error(wa+"The value '"+name+"' isn't a valid parameter name");
+	
+			for(const auto &par : model.param){
+				if(par.name == name){
+					error(wa+"Parameter '"+name+"' is already defined in the model");
+				}
+			}
+
+			auto val = number(spl[1]);
+			if(val == UNSET) error(wa+"The value '"+spl[1]+"' isn't a valid number");
+
+			auto prior = spl[2];
+			auto pri = convert_text_to_prior(prior,UNSET,name,false);
+			if(pri.error != ""){
+				error(wa+"The prior specification '"+prior+"' contains and error - "+pri.error);
+			}
+
+			if(substitute){
+				ta_new += name;
+			}
+			else{
+				auto already_defined = false;
+				for(const auto &pvp : param_val_prior){
+					if(pvp.name == name){
+						if(pvp.val != val || pvp.prior != prior){
+							error(wa+"Cannot have multiple definitions for parameter '"+name+"'");
+						}
+						already_defined = true;
+					}
+				}
+				
+				if(!already_defined){
+					ParamValPrior pvp;
+					pvp.name = name;
+					pvp.val = val;
+					pvp.prior = prior;
+					param_val_prior.push_back(pvp);
+				}
+				
+				ta_new += tstr(val);
+			}
+			
+			i += 2;
+		}
+	}
+	
+	ta = ta_new;
+}
+
+
+/// Converts from tag name to param specificaion an returns the value
+double DataSim::get_param_spec(string ta)
+{
+	auto value_str = get_tag_value(ta); 
+	if(value_str == "") cannot_find_tag(); 
+	
+	auto num = number(value_str);
+	
+	if(num != UNSET){
+		return num;
+	}
+	
+	auto value_str_st = value_str;
+	get_obs_param(value_str,false);
+	
+	string err;
+	auto val = model.calculate_equation(value_str,0,err);
+	if(err != ""){
+		error("An error was generated for '"+value_str_st+"': "+err);
+	}
+			
+	return val;
 }
 
 
@@ -2296,6 +2578,7 @@ void DataSim::print_inf_node(const vector <InfNode> &inf_node, const State &stat
 		const auto &in = inf_node[n];
 		cout << endl << "Node " << n << ":" << endl;
 		cout << "tstart:" << in.tdiv_start << " trec:" << in.tdiv_rec;
+		cout << " tistart:" << in.ti_start << " tirec:" << in.ti_rec;
 		cout << " p:" << in.p << " i:" << in.i << " e:" << in.e;
 		cout << " name:" << state.species[in.p].individual[in.i].name << endl;
 		cout << " from:" << in.from.node << " " << in.from.index << endl;

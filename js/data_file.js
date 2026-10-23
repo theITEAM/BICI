@@ -1525,7 +1525,7 @@ function add_radio_list(lay,list,prop,so,cy,dx)
 
 
 /////////////////////////// SEQUENCE DATA
-
+		
 function sequence_data_bubble(cont,type)
 {
 	cont.dx = 14;
@@ -1612,6 +1612,7 @@ function sequence_data(bu)
 	
 	for(let i = 0; i < gen_so.length; i++){
 		switch(gen_so[i].type){
+		case "Add Ind.": case "Remove Ind.": case "Move Ind.":
 		case "Compartment": case "Transition": case "Diag. Test":
 			check_list.push({ check:false}); 
 			data_list.push({ name:gen_so[i].name, p:p, i:i}); 
@@ -1956,4 +1957,173 @@ function add_test_and_cull()
 	let sel = rpfsp.sel_test_and_cull;
 	
 	start_worker("Gen. test-and-cull",{p:p,i:sel.i,sel_sim:rpf.sel_sim.i});	
+}
+
+/// Error message for WAIFW data
+function trans_tree_turn_on(cont)
+{
+	cont.dx = 14;	
+	let op = inter.bubble.op;
+	bubble_addtitle(cont,"WAIFW data",{title:op.title, te:op.te});
+	bubble_addparagraph(cont,"The species must have the transmission tree turned on to generate WAIFW data",0,cont.dx);
+	add_end_button(cont,"Close","CloseBubble");
+}
+
+
+///////////////////// Forced transition data
+
+function forced_trans_bubble(cont,type)
+{
+	let disable = false; if(type == "view") disable = true;
+
+	cont.dx = 17;
+	
+	let te = forced_trans_data_text, ti = "Forced transition data";
+	if(edit_source.info.siminf == "gen"){ te = sim_trans_data_text; ti = "Generate individual forced transition data";}			
+	
+	bubble_addtitle(cont,"Forced transition data",{title:ti, te:te});
+	
+	let res = bubble_add_forced_trans_info(cont,disable);
+	
+	if(res.err){
+		bubble_add_minititle(cont,res.msg); 
+		add_end_button(cont,"Next");	
+		return;
+	}
+	
+	let spec = edit_source.spec;
+	let cl_sel = spec.cl_drop.te;
+		
+	let but_name = "Next"; if(type == "view") but_name = "Done";
+
+	let ac; 
+	if(cl_sel != select_drop_str){
+		ac = "AddDataTable"; if(type == "view") ac = "DataTableBack";
+	}	
+	
+	add_end_button(cont,but_name,ac);	
+}
+
+
+/// Loads up the forced transition bubble
+function forced_trans(bu)
+{
+	let p = model.get_p();
+	let filt = load_default_trans_radio(p);
+
+	start_data_source("Forced Trans.",{cl_drop:{te:select_drop_str},filter:filt},bu.op.info);
+	
+	if(edit_source.info.siminf == "gen"){
+		file_add_datatable();		
+	}
+	else select_bubble_over();
+}
+
+
+/// Gets transition which are not sources or sinks
+function get_non_source_sink_trans(p,cl)
+{
+	let sp = model.species[p];
+	
+	let tra_list = [];
+	for(let j = 0; j < sp.cla[cl].ntra; j++){
+		let tr = sp.cla[cl].tra[j];
+		if(tr.i != SOURCE && tr.f != SINK){
+			tra_list.push(tr);
+		}
+	}
+	
+	return tra_list;
+}
+
+
+/// Adds information which specifies forced transition and filter
+function bubble_add_forced_trans_info(cont,disable)
+{		
+	let cl_pos = get_cl_pos();
+	let wmax = get_w_drop(cl_pos);
+
+	let spec = edit_source.spec;
+	
+	let cl_drop = spec.cl_drop;
+
+	if(cl_pos.length == 1) cl_drop.te = cl_pos[0].te;
+	let cl_sel = cl_drop.te;
+	
+	bubble_adddropdown(cont,5.5,wmax,cl_drop,cl_pos); cont.y -= 1.1;
+	bubble_add_minititle(cont,"Classification:");
+
+	if(cl_sel != select_drop_str){
+		let p = model.get_p();
+		let sp = model.get_sp();
+		let cl = find(sp.cla,"name",cl_sel);
+	
+		let tra_list = get_non_source_sink_trans(p,cl);
+	
+		if(sp.cla[cl].ntra == 0){
+			return err("No transitions found for this classification");
+		}
+		else{
+			if(tra_list.length == 0) return err("No non-source/sink transitions found for this classification");
+		}
+
+		bubble_addscrollable(cont,{type:"forcedtrans list", p:p, cl:cl, disable:disable, ymax:bubblescroll_dymax}); 
+		
+		let ch_warn = inter.bubble.check_warning;
+
+		if(ch_warn != undefined){
+			cont.lay.add_button({te:ch_warn, x:0, y:cont.y-0.4, dx:cont.dx, dy:0.8, type:"Warning"});
+			cont.y += 0.8;
+		}
+	}
+	
+	return success();
+}
+
+
+/// The scrollable box which allows the used to specify compartments that make up population
+function forcedtrans_scrollable(lay)
+{
+	let cy = 0;
+	let dx = lay.dx;
+	let w = dx;
+	let op = lay.op;
+	op.back_col = BUBBLE_COL;
+
+	let mar = 0.2;
+	let si = 0.7;
+	let fo = get_font(si,"bold");
+	let fosi = get_font(si);
+
+	lay.add_button({te:"Transitions:", x:mar, y:cy, dx:w, dy:1, type:"Text", si:si, font:fo, col:BLACK, back_col:BUBBLE_COL});
+	cy += 0.8;
+			
+	let spec = edit_source.spec;
+
+	let filt = spec.filter;
+	
+	let p = lay.op.p;
+	let cl = lay.op.cl;
+	let disable = lay.op.disable;
+
+	let sp = model.species[p];
+	let claa = sp.cla[cl];
+	
+	let te = spec.cl_drop.te;
+	
+	let tra_list = get_non_source_sink_trans(p,cl);
+	
+	if(tra_list.length == 0){
+		let fo2 = get_font(si);
+		lay.add_button({te:"No transitions in this classification.", x:mar, y:cy, dx:dx, dy:1, type:"Text", si:si, font:fo2, col:BLACK, back_col:BUBBLE_COL});
+		cy += 1;
+	}
+	else{
+		cy += 0.3;
+		cy = add_radio_list(lay,tra_list,"name",filt.cla[cl].tra,cy,dx);
+	}
+
+	cy += 0.4;
+	
+	return cy;
 }

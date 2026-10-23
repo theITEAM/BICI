@@ -104,7 +104,7 @@ bool equal_vec(const vector <double> &vec1, const vector <double> &vec2);
 vector <unsigned int> get_list(unsigned int num);
 string stringify(const vector <string> &arr);
 string stringify(const vector <EquationInfo> &value, const vector <Dependency> &dep);
-bool includes(string st, string ch);
+bool includes(const string &st, string ch);
 DepInfo get_dep_info(const string &te, unsigned int i, const string &not_allowed);
 bool str_eq(const string &te, unsigned int i, const string &te2);
 SwapResult swap_index(string &te, const vector <DepConv> &dep_conv);
@@ -233,7 +233,8 @@ vector <unsigned int> remove_repeated(const vector <unsigned int> &list);
 vector <unsigned int> combine_lists(const vector < vector <unsigned int> > &lists);
 double log_thresh(double val);
 void print_random(string te);
-
+void check_open(ofstream &fout, string file);
+		
 // In utils_eqn.cc
 EquationInfo add_equation_info(string _te, EqnType _type, unsigned int _p = UNSET, unsigned int _cl = UNSET);
 string check_valid_name(string name, string type);
@@ -293,3 +294,4 @@ double mem(const vector <EquationInfo> &vec);
 double mem(const vector <AffectLike> &vec);
 void check_cdf_function();
 void check_nm_trans_incomp_like_no_log();
+void test_harmonic();

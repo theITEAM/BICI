@@ -37,7 +37,7 @@ PAS::PAS(const Model &model, Output &output, Mpi &mpi) : model(model), output(ou
 		chain.push_back(Chain(nburnin,nsample,model,output));
 	}
 	
-	phi = SMALL;
+	phi = PHI_MIN;
 	phi_final = 1;
 	
 	quench_factor = 1;
@@ -178,13 +178,13 @@ void PAS::sample_op(unsigned int s)
 		}
 	}
 }
-
+ 
 
 // Used to order particles by EF
 bool PartRO_ord (const PartReorder &p1, const PartReorder &p2)                      
 { return (p1.L < p2.L); };  
 
-
+ 
 /// Works out which particles should be copied and sets new inverse temperature
 void PAS::bootstrap()
 {

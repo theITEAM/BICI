@@ -40,6 +40,7 @@ DataTemplate(REMOVE_POP,{"t,the time the individuals are removed","cl_all","rem_
 DataTemplate(ADD_IND,{"ID","t,the time the individuals are added","cl_all_prob"}),
 DataTemplate(REMOVE_IND,{"ID","t,the time the individuals are removed"}),
 DataTemplate(MOVE_IND,{"ID","t,the time the individuals are moved","to"}),
+DataTemplate(FORCED_TRANS_IND_INF,{"ID","t,the time the individuals undergo the forced transition"}),
 DataTemplate(COMP_DATA,{"ID","t,the time the individual's state is measured","cl_prob"}),
 DataTemplate(TRANS_DATA,{"ID","t,the time the individuals undergo the transition"}),
 DataTemplate(TRANS_TIMERANGE_DATA,{"ID","t,the time the individuals undergo the transition","start","end"}),
@@ -47,6 +48,7 @@ DataTemplate(TEST_DATA,{"ID","t,the time the individual's diagnostic test is tak
 DataTemplate(POP_DATA,{"t,the time the population measurement is taken","filt_obspop"}),
 DataTemplate(POP_TRANS_DATA,{"tstart","tend","filt_obspoptrans"}),
 DataTemplate(GENETIC_DATA,{"ID","t,the time the genetic measurement is taken","snp,the first SNP column"}),	
+DataTemplate(WAIFW_DATA,{"IDfrom","IDto"}),	
 DataTemplate(IND_EFFECT_DATA,{"ID","pos_value"}),
 DataTemplate(SET_IND_EFFECT_SIM,{"ID","pos_value"}),
 DataTemplate(IND_GROUP_DATA,{"ID"}),
@@ -177,6 +179,7 @@ class Input                                // Stores information about the model
 		void add_obs_model_eqn(Species &sp);
 		void add_op_store(Define &def, unsigned int eq_ref);
 		void create_equations(unsigned int per_start, unsigned int per_end);
+		bool add_eqn_warnings();
 		void combine_populations();
 		bool equal_pop(const Population &popA, const Population &popB) const;
 		void linearise_eqn(unsigned int per_start, unsigned int per_end);
@@ -227,6 +230,8 @@ class Input                                // Stores information about the model
 		void set_trans_tree();
 		void set_hash_all_ind();
 		void add_genetic_data();
+		void set_genetic_obs_scale(GeneticData &gd) const;
+		void add_waifw_data();
 		void set_contains_source_sink();
 		void create_trig_ev_ref();
 		bool trig_ev_exist(TrigEventType type, double tdiv, const vector <TrigEventRef> &trig_event) const;
@@ -260,6 +265,7 @@ class Input                                // Stores information about the model
 		string check_thresh_value(double num, string tag, bool frac);
 		void set_dynamic_info_from_text(string te, string region, Param &par);
 		void check_valid_population(string filt_str);
+		void check_infected_compartments();
 		
 		// In 'input_utils.cc'
 		
@@ -313,8 +319,7 @@ class Input                                // Stores information about the model
 		void set_data_directory(const vector <CommandLine> &command_line);
 		void compress_command_lines(const vector <CommandLine> &command_line, vector <string> &lines_raw, bool decomp);
 		void get_cols(vector <string> &col_name);
-		
-		Details& get_details();
+	
 		DataSourceType get_data_type(Command cname) const;
 		
 		// In 'input_check.cc'
@@ -363,5 +368,8 @@ class Input                                // Stores information about the model
 		double species_profile() const;
 		double equation_profile() const;
 		double model_profile() const;
+		
+	public:
+		void set_all_files(vector <string> &all_files) const;
 };
 

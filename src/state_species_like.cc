@@ -47,7 +47,7 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 		
 		auto si = div.ind_trans.size();
 			
-		if(me.infection_trans){ // If an infection transition then works out specific probability individual
+		if(me.infection_trans && trans_tree_on){ // If an infection transition then works out specific probability individual
 			const auto &eq = eqn[me.eqn_ref];
 			const auto &lin = eq.lin;
 			if(!lin.on) emsg("Linearisation should be on");
@@ -112,18 +112,24 @@ vector <double> StateSpecies::likelihood_markov(unsigned int e, const vector <un
 
 
 /// Calculates the change in Li_markov from adding/removing infection event from trans tree 
-void StateSpecies::change_trans_tree_Li_markov(unsigned int i, unsigned int e, double sign)
+double StateSpecies::change_trans_tree_Li_markov(unsigned int i, unsigned int e, double sign)
 {
 	const auto &ind = individual[i];
 	const auto &ev = ind.ev[e];
-	const auto &iif = ev.ind_inf_from;
 	
-	auto k = sp.tra_gl[ev.tr_gl].markov_eqn_ref;
+	return change_trans_tree_Li_markov_iif(ev.tr_gl,ev.ind_inf_from,ev.tdiv,ind,sign);
+}
+
+	
+/// Calculates the change in Li_markov from adding/removing a given iif
+double StateSpecies::change_trans_tree_Li_markov_iif(unsigned int tr_gl, const IndInfFrom &iif, double tdiv, const Individual &ind, double sign)
+{
+	auto k = sp.tra_gl[tr_gl].markov_eqn_ref;
 	const auto &me = sp.markov_eqn[k];
 	
 	const auto &precalc = param_val.precalc;
 	
-	auto ti = get_ti(ev.tdiv);
+	auto ti = get_ti(tdiv);
 	
 	const auto &eq = eqn[me.eqn_ref];
 	const auto &lin = eq.lin;
@@ -154,11 +160,13 @@ void StateSpecies::change_trans_tree_Li_markov(unsigned int i, unsigned int e, d
 	auto Li = log(va)*sign;
 	
 	back.push_back(Back(ADD_LI_MARKOV,k,ti,Li));
-	
+
 	Li_markov[k][ti] += Li;
+	
+	return Li;
 }
 
-				
+	
 /// Calculate the value of a markov equation
 vector <double> StateSpecies::markov_value_calc(unsigned int e, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t)
 {

@@ -19,7 +19,7 @@ using namespace std;
 #endif
 
 #ifdef MAC
-const string default_file = "/tmp/BICI_files/init.bici";        // This is used for Mac
+const string default_file = "/tmp/BICI_files/init.bici";// This is used for Mac
 #else
 const string default_file = "Execute/init.bici";     // This is used for windows / linux
 #endif
@@ -93,7 +93,7 @@ enum Operation { SIM, INF, PPC, EXT, DATA_SIM, DATA_SHOW, DATA_DEL, DATA_CLEAR, 
 enum PriorPos { INVERSE_PR, UNIFORM_PR, POWER_PR, EXP_PR, NORMAL_PR, GAMMA_PR, LOG_NORMAL_PR, BETA_PR, BERNOULLI_PR, FIX_PR, DIRICHLET_PR, MDIR_PR, MVN_DEFAULT_PR, MVN_NORM_LKJ_PR, MVN_UNIFORM_LKJ_PR, MVN_INV_WISH_PR, MVN_JEF_PR, MVN_UNIFORM_PR, MVN_COR_PR, UNSET_PR };
  
 // Different possible command types
-enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, DEFINE, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, TEST_AND_CULL_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, SET_IND_EFFECT_SIM, SET_IND_EFFECT_INF, SET_IND_EFFECT_POST_SIM, IND_GROUP_DATA, GENETIC_DATA, IC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, PROPOSAL_INFO, INF_PARAM_STATS, INF_PRED_ACC, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, SIM_WARNING, INF_WARNING, PPC_WARNING,
+enum Command {SPECIES, CLASS, SET, CAMERA, COMP, COMP_ALL, TRANS, TRANS_ALL, CLONE, DATA_DIR, DESC, LABEL, BOX, DEFINE, PARAM, DERIVED, IND_EFFECT, FIXED_EFFECT, INIT_POP, ADD_POP, REMOVE_POP, ADD_IND, REMOVE_IND, MOVE_IND, FORCED_TRANS_IND_INF, INIT_POP_SIM, ADD_POP_SIM, REMOVE_POP_SIM, ADD_IND_SIM, REMOVE_IND_SIM, MOVE_IND_SIM, FORCED_TRANS_IND_SIM, TEST_AND_CULL_SIM, ADD_POP_POST_SIM, REMOVE_POP_POST_SIM, ADD_IND_POST_SIM, REMOVE_IND_POST_SIM, MOVE_IND_POST_SIM, FORCED_TRANS_IND_POST_SIM, COMP_DATA, TRANS_DATA,  TEST_DATA, POP_DATA, POP_TRANS_DATA, IND_EFFECT_DATA, SET_IND_EFFECT_SIM, SET_IND_EFFECT_INF, SET_IND_EFFECT_POST_SIM, IND_GROUP_DATA, GENETIC_DATA, WAIFW_DATA, IC_DATA, SIMULATION, INFERENCE, POST_SIM, SIM_PARAM, SIM_STATE, INF_PARAM, PROPOSAL_INFO, INF_PARAM_STATS, INF_PRED_ACC, INF_STATE, POST_SIM_PARAM, POST_SIM_STATE, INF_DIAGNOSTICS, INF_GEN, MAP, PARAM_MULT, TRANS_DIAG, SIM_WARNING, INF_WARNING, PPC_WARNING,
 
 // These are not commands but varient used when loading data
 TRANS_TIMERANGE_DATA,
@@ -117,7 +117,7 @@ enum Coord { CARTESIAN, LATLNG };
 enum Result { SUCCESS, FAIL };
 
 // Different types of column which can be loaded from data files
-enum ColumnType { ID_COL, T_COL, TSTART_COL, TEND_COL, SNP_COL, GENOBS_COL, CL_PROB_COL, CL_ALL_COL, CL_ALL_PROB_COL, FROM_COL, TO_COL, INIT_POP_COL, ADD_POP_COL, REM_POP_COL, START_COL, END_COL, RESULT_COL, FILT_OBSPOP_COL, FILT_OBSPOPTRANS_COL, COMP_NAME_COL, START_COMP_COL, END_COMP_COL, POS_FLOAT_COL };
+enum ColumnType { ID_COL, T_COL, TSTART_COL, TEND_COL, SNP_COL, GENOBS_COL, CL_PROB_COL, CL_ALL_COL, CL_ALL_PROB_COL, FROM_COL, TO_COL, INIT_POP_COL, ADD_POP_COL, REM_POP_COL, START_COL, END_COL, RESULT_COL, FILT_OBSPOP_COL, FILT_OBSPOPTRANS_COL, COMP_NAME_COL, START_COMP_COL, END_COMP_COL, POS_FLOAT_COL, ID_FROM_COL, ID_TO_COL };
 
 // Different types of element in a table (this helps to spot errors in data tables)
 enum ElementType { TEXT_EL, TIME_FLOAT_EL, FLOAT_EL, COMP_PROB_EL, COMP_PROB_NA_EL, COMP_EL, POS_FLOAT_PERCENT_EL, POS_INT_EL, POS_FLOAT_EL, ZERO_ONE_EL, POS_ZERO_FLOAT_EL, COMP_SOURCE_SINK_EL, COMP_ALL_EL, DIAG_TEST_EL, PRIOR_DIR_EL };
@@ -138,7 +138,7 @@ enum TextType { NORMAL_TEXT, SUB_TEXT, SUP_TEXT };
 enum EventType { ENTER_EV, LEAVE_EV, MOVE_EV, NM_TRANS_EV, M_TRANS_EV };
 
 // Different types of trigger events
-enum SimTrigEventType { ENTER_SIM_EV, LEAVE_SIM_EV, MOVE_SIM_EV, NM_TRANS_SIM_EV, M_TRANS_SIM_EV, DATA_TRANS_SIM_EV, SOURCE_SIM_EV, INTERVENTION_SIM_EV };
+enum SimTrigEventType { ENTER_SIM_EV, LEAVE_SIM_EV, MOVE_SIM_EV, NM_TRANS_SIM_EV, M_TRANS_SIM_EV, DATA_TRANS_SIM_EV, SOURCE_SIM_EV, INTERVENTION_SIM_EV, FORCED_TRANS_SIM_EV };
 
 // Differnt types of event when doing simulation
 enum TrigEventType { TRIG_OBS_TRANS_EV, TRIG_MOVE_EV, TRIG_LEAVE_EV };
@@ -146,12 +146,18 @@ enum TrigEventType { TRIG_OBS_TRANS_EV, TRIG_MOVE_EV, TRIG_LEAVE_EV };
 // Different types of observation
 enum ObsType { OBS_SOURCE_EV, OBS_TRANS_EV, OBS_SINK_EV, OBS_COMP_EV };
 
+// Determines if parameter appears in the observation model 
+enum ModelParam { OBS_MOD_PARAM, MOD_PARAM, MIXED_MOD_PARAM, UNSET_MOD_PARAM };
+
+// Type of validation plot
+enum SpecInfoType { TORNADO_PLOT, SCAN_PLOT };
+
 // Different ways a parameter can affect likelihoods
 enum AffectType { SPLINE_PRIOR_AFFECT, IEG_PRIOR_AFFECT, PRIOR_AFFECT, DIST_AFFECT, EXP_FE_AFFECT, MARKOV_VALUE_AFFECT, MARKOV_LIKE_AFFECT, NM_TRANS_AFFECT, NM_TRANS_BP_AFFECT, NM_TRANS_INCOMP_AFFECT, OMEGA_AFFECT, EXP_IE_AFFECT, LIKE_IE_AFFECT, INDFAC_INT_AFFECT, MARKOV_POP_AFFECT, LIKE_OBS_IND_AFFECT, LIKE_OBS_POP_AFFECT, LIKE_OBS_POP_TRANS_AFFECT, OBS_EQN_AFFECT, LIKE_UNOBS_TRANS_AFFECT, POP_DATA_CGL_TGL_AFFECT, LIKE_INIT_COND_AFFECT, PRIOR_INIT_COND_AFFECT, LIKE_GENETIC_PROCESS_AFFECT, GENETIC_VALUE_AFFECT, LIKE_GENETIC_OBS_AFFECT, IIF_W_AFFECT, POPNUM_IND_W_AFFECT, AFFECT_MAX };
 //POP_AFFECT,
 
 // Different proposal types  
-enum PropType { PARAM_PROP, LOG_PARAM_PROP, BERNOULLI_PROP, DET_PARAM_PROP, DET_LOG_PARAM_PROP, DET_BERNOULLI_PROP, DET_IC_POP_PROP, DET_IC_POPTOTAL_PROP, DET_IC_RESAMP_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT_PROP, IND_EVENT_ALL_PROP, IND_OBS_SAMP_PROP, IND_OBS_RESIM_PROP, IND_OBS_RESIM_SINGLE_PROP, IND_UNOBS_RESIM_PROP, IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, LOG_MBP_PROP, MBP_BERNOULLI_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, IE_VAR_CV_PROP, TRANS_TREE_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP, IND_OBS_SWITCH_LEAVE_SINK_PROP };
+enum PropType { PARAM_PROP, LOG_PARAM_PROP, BERNOULLI_PROP, DET_PARAM_PROP, DET_LOG_PARAM_PROP, DET_BERNOULLI_PROP, DET_IC_POP_PROP, DET_IC_POPTOTAL_PROP, DET_IC_RESAMP_PROP, IND_EVENT_TIME_PROP, IND_MULTI_EVENT_PROP, IND_EVENT_ALL_PROP, IND_OBS_SAMP_PROP, IND_OBS_RESIM_PROP, IND_OBS_RESIM_SINGLE_PROP, IND_UNOBS_RESIM_PROP, IND_ADD_REM_PROP, IND_ADD_REM_TT_PROP, MBP_PROP, LOG_MBP_PROP, MBP_BERNOULLI_PROP, MBPII_PROP, MBP_IC_POP_PROP, MBP_IC_POPTOTAL_PROP, MBP_IC_RESAMP_PROP, INIT_COND_FRAC_PROP, IE_PROP, IE_VAR_PROP, IE_COVAR_PROP, IE_VAR_CV_PROP, TRANS_TREE_PROP, LOCAL_TRANS_TREE_PROP, MAXIMISE_GEN_OBS_PROP, LOCAL_MAXIMISE_GEN_OBS_PROP,  TRANS_TREE_SWAP_INF_PROP, TRANS_TREE_SWAP_INF_EV_PROP, TRANS_TREE_SWAP_INF_EV_PROP2, TRANS_TREE_MUT_PROP, TRANS_TREE_MUT_ORIGIN_PROP, TRANS_TREE_MUT_SAMPLE_PROP, TRANS_TREE_MUT_LOCAL_PROP, POP_ADD_REM_LOCAL_PROP, POP_MOVE_LOCAL_PROP, POP_IC_LOCAL_PROP, POP_END_LOCAL_PROP, POP_SINGLE_LOCAL_PROP, POP_IC_PROP, POP_IC_SWAP_PROP, PAR_EVENT_FORWARD_PROP, PAR_EVENT_FORWARD_SQ_PROP,PAR_EVENT_BACKWARD_SQ_PROP, IND_LOCAL_PROP, CORRECT_OBS_TRANS_PROP, IND_OBS_SWITCH_ENTER_SOURCE_PROP, IND_OBS_SWITCH_LEAVE_SINK_PROP };
 
 // Different types of annealing stratregy
 enum AnnealType { ANNEAL_NONE, ANNEAL_SCAN, ANNEAL_POWERAUTO, ANNEAL_LOGAUTO, ANNEAL_POWER };
@@ -192,14 +198,29 @@ enum GenChar { A_CH, C_CH, T_CH, G_CH };
 // Different infection node event type
 enum InfEventType { INFECT_OTHER, GENETIC_OBS };
  
+// Different events for trans_tree_swap_inf_ev_proposal 
+enum BranchEvType { START_SI, BRANCH_SI, SHIFT_IND_SI, GENETIC_OBS_SI}; 
+ 
 // Different types of genetic change
-enum TransTreeChaType { TRANS_TREE_FAIL, NO_TRANS_TREE_CHANGE, REGRAFT_NODE, ADD_NODE, REM_NODE };
+enum TransTreeChaType { TRANS_TREE_FAIL, NO_TRANS_TREE_CHANGE, REGRAFT_NODE, REGRAFT_GEN_OBS_MAX, ADD_NODE, REM_NODE };
+
+// Determines if information used for a regraft is stored (for checking reverse transitions)
+enum RegraftStore { REGRAFT_NO_STORE, REGRAFT_STORE, REGRAFT_RETRIEVE }; 
+
+// Different type of regrafting connector
+enum RegraftConnect { RG_ADD_END, RG_ADD_MID, RG_ORIGIN };
+
+// Determines if it is a 3d sampler or a 2d sampler
+enum RegraftSamplerType { REGRAFT_1D_SAMPLER, REGRAFT_2D_SAMPLER };
 
 // Determines how from and add are connected to the inf_node network
 enum ConType { FROM_CON_ADD_CON, FROM_CON_ADD_UNCON, FROM_UNCON_ADD_CON, FROM_UNCON_ADD_UNCON };
 
 // Different types of tree regrafting
-enum RegraftType { NORMAL_REGRAFT, ORIGIN_REGRAFT, UNCHANGED_REGRAFT };
+enum RegraftType { NORMAL_REGRAFT, REGRAFT_WITH_OBS, REGRAFT_WITH_OBS2, REGRAFT_WITH_OBS3, ORIGIN_REGRAFT, UNCHANGED_REGRAFT, REGRAFT_NOT_NEEDED };
+
+// Different types observation (RG_OBS1 corresponds to REGRAFT_WITH_OBS etc...)
+enum RegraftObsType { RG_OBS, RG_OBS2, RG_OBS3, RG_NOT_SET};
 
 // Different local changes to a population model
 enum LocalChangeType { REMOVE_EVENT, ADD_EVENT, REMOVE_IC, ADD_IC, ADD_C_IC, REMOVE_C_IC };
@@ -242,7 +263,7 @@ enum SampType { LOCAL_SAMP, SAMP_SAMP, SIM_SAMP, SIM_CL_SAMP, ALL_SAMP };
 enum GenDataType { SNP_DATA, MATRIX_DATA };
 
 // Different ways in which local mutation are update on tree
-enum GenBranchUpdate { OBS_GEN_UPDATE, SINGLE_BRANCH, TWO_BRANCH1, TWO_BRANCH2, TWO_BRANCH3, ORIGIN_GEN_UPDATE, GEN_UPDATE_MAX };
+enum GenBranchUpdate { OBS_GEN_UPDATE, SINGLE_BRANCH, TWO_BRANCH1, TWO_BRANCH2, TWO_BRANCH3,  TWO_BRANCH4, TWO_BRANCH5, TWO_BRANCH6, ORIGIN_GEN_UPDATE, GEN_UPDATE_MAX };
    
 // Different modes when reading in state samples (for PPC)
 enum InfStateMode { MODE_NODE, MODE_PARAM, MODE_PHYLO, MODE_DERIVE, MODE_INITIAL, MODE_POPCHANGE, MODE_TIMEPOINT, MODE_TRANS, MODE_INDIVIDUAL, MODE_TRANSDISTPROB };
@@ -291,6 +312,9 @@ enum DataSourceType { SIM_DATA, INF_DATA, POST_SIM_DATA};
 // Different types of optimisation
 enum Optimise { SPEED, MEMORY, AUTO_OPTIMISE};
 
+// Specifies different statistics to output
+enum StatOut { TT_N_ORIGIN, TT_N_INF, TT_UNOBS, TT_N_MUT_TREE, TT_N_MUT_ORIGIN, TT_TROOT, TT_IPA};	
+	
 // Different types of parameter
 enum ParamType { PARAM_NORMAL, PARAM_DERIVE, PARAM_DEFINE, PARAM_PRESET};
 	
@@ -312,9 +336,10 @@ enum StoreType { POPNUM_STORE, POPCOMBW_STORE, POPCOMB_STORE,EXP_FE_STORE, EXP_I
 
 enum TotalObsType { EVENT_TOTAL, OBS_TOTAL, ILLEGAL_TRANS_TOTAL};
 
+
 /************************** Numeric constants ******************************/
 
-const auto ERR_MSG_MAX = 5u;                     // The maximum number of error messages
+const auto ERR_MSG_MAX = 5u;                      // The maximum number of error messages
 
 const auto CODE = 99999989u;                      // Value above which is a non-numeric number
 const auto UNSET = 99999990u;                     // Indicates an unset number
@@ -331,7 +356,6 @@ const auto TORNADO_NUM = 20u;                     // Number of simulation done f
 const auto UNSET_WILD = 99999980.0;               // Indicates an unset wildcard "*"
 const auto UNSET_F = 99999990.0;                  // Floating point unset
 
-//const auto NO_TIME_STEP = 99999969u;              // Used to represent no time steps
 const auto ALL_TIME_STEP = 99999970u;             // Used to represent all time steps
 const auto TIME_VAR = 99999971u;                  // Indicates time variable t (used in eqnations)
 const auto DIST_MATRIX = 99999972u;               // Distance matrix
@@ -341,20 +365,35 @@ const auto RDEN_VEC = 99999975u;                  // Relative density vector
 
 const auto OUTSIDE_INF = 99999992u;               // Stands for outside infection
 const auto ENTER_INF = 99999993u;                 // Stands for entering infection
+const auto FIND_IIF = 89999993u;                  // Detemines that the infecting individual needs to be found     
 const auto BP_FROM_OTHERS = 99999994u;            // Branch probability is calculated from others
 const auto GEN_PLOT = 99999995u;                  // Used for a generation plot
-const auto LOG_HALF = log(0.5);
+const auto LOG_HALF = log(0.5);                   // Logs of 0.5
 const auto FRAC_COR_UNUSED = 0.33;                // Fraction of samples not used in calculating cor.
 
-const auto SPECIES_MAX = 100;                     // Maximum number of species
+const auto SPECIES_MAX = 100u;                    // Maximum number of species
+
+const auto NODE_MAX_DIST = 3u;                    // Maximum number of nodes for a local node move
 
 const auto LINK_CV_THRESH = 0.3;                  // CV threshold for linking for multi-event
 const auto LINK_WEIBULL_SHAPE = 3.7;              // Shape thresh for linking for multi-event
 
-const auto ESS_THRESH = 200;                      // Threshold for ESS statistic
+const auto ESS_THRESH = 200.0;                    // Threshold for ESS statistic
 const auto GR_THRESH = 1.01;                      // Threshold for GR statistic
 
 const auto N_DISTGRID = 20u;                      // Determines how fine the distance grid should be
+
+//const auto N_REGRAFT_TRY = 5u;                    // Sets the number of regraft trys when sampling mutations
+const auto REGRAPFT_SAMPLER_DIV = 4u;             // How fine the divisions are for regrapf sampler
+const auto REGRAPFT_SAMPLER_NCOR = 20u;           // How many correlation divisions are used   
+const auto REGRAPFT_SAMPLER_NVAR = 50u;           // How many variance divisions are used 
+const auto REGRAPFT_SAMPLER_LOGVAR_MIN = -2.0;    // The minimum value for variance  
+const auto REGRAPFT_SAMPLER_LOGVAR_MAX = 3.0;     // The maximum value for variance 
+const auto REGRAFT_HASH_SHIFT = 1000;             // Used for generating hash number
+const auto REGRAFT_HASH_MULT = 2*REGRAFT_HASH_SHIFT;
+const auto REGRAFT_START_SEARCH_MAX = 10u;        // Used to speed up sampling 
+const auto REGRAFT_THRESH = 0.9999;               // Threshold used for sampling
+const auto REGRAPH_SAMPLER_MIN = 10u;             // Minimum number of elements in sampler
 
 const auto MEM_FRAC_MAX = 0.8;                    // Maximum fraction of memory usable
 const auto MEM_FREE_MIN = 0.1;                    // Minimum fraction of memory available
@@ -375,67 +414,68 @@ const auto LOOP_IC = 10u;                         // Number of initial condition
 const auto LOOP_IC_SWAP = 10u;                    // Number of initial condition swap changes
 const auto LOOP_END_LOCAL = 10u;                  // Number of end local changes
 const auto LOCAL_MOVE_RANGE = 0.1;                // The range over which local moves are made
-const auto LOCAL_SINGLE_DIV = 10;                 // Number of divisions for local single updates
+const auto LOCAL_SINGLE_DIV = 10u;                // Number of divisions for local single updates
 const auto IND_SAMP_THRESH = 0.9;                 // Threshold for individual event sampler
 const auto ADD_REM_IND_MAX = 20u;                 // Max number of inds to add/rem per proposal
 const auto UPDATE_RATE_FAC = 0.9;                 // Determines how quickly rates are estimated  
-//const auto IND_LOCAL_TRANS_MAX = 3u;              // Max number of transition local change
 const auto IND_LOCAL_TRANS_MAX = 2u;              // Max number of transition local change
-const auto LI_WRONG = -10000.0;                   // Likelihood penalty for wrong observation
+const auto LI_WRONG = -100000.0;                  // Likelihood penalty for wrong observation
 const auto GEN_OBS_WRONG = -10000.0;              // Likelihood penalty genetic obs not made
 const auto COMP_NOISY_MAX = 10u;                  // When simulating noisy compartmental observations gives max number
 const auto LOCAL_SMOOTH = 0.1;                    // Smoothing of transitions rate in local props
-const auto PROP_SIM_NAC_INIT = 10;                // Initial value for nac for ind sim prob 
+const auto PROP_SIM_NAC_INIT = 10u;               // Initial value for nac for ind sim prob 
 const auto PROP_SIM_PROB_FADE = 0.98;             // Used for time fading of sim prob
 const auto PROP_SIM_PROB_MIN = 0.05;              // Minimum probability for ind sim proposal
 
-const double TINY = 0.00000000001;                // Used to represent a tiny number
-const double VTINY = 0.00000000000001;            // Used to represent a very tiny number
-const double VVTINY = 0.000000000000000000000001; // Used to represent a very tiny number
+const auto TINY = 0.00000000001;                  // Used to represent a tiny number
+const auto VTINY = 0.00000000000001;              // Used to represent a very tiny number
+const auto VVTINY = 0.000000000000000000000001;   // Used to represent a very tiny number
 
 const auto TRA_IND_SECTION = 20u;                 // Number of sections used in tra_ind
-const auto TRA_IND_SEC_OFFSET = 10u;                 // Number of sections used in tra_ind
-const double EFFECT_MAX = 10000000;               // Sets maximum value for effect
-const double EFFECT_MIN = 0.0000001;              // Sets minimum value for effect
-const double CLIP_MIN = 0.99*log(EFFECT_MIN);     // Clips minimum 
-const double CLIP_MAX = 0.99*log(EFFECT_MAX);     // Clips maximum 
-const double DIF_THRESH = 0.0000001;              // The threshold for a difference
-const double THRESH_EXPAND = 100;                 // Expand threshold for certain quantities
-const double DIF_THRESH_BURNIN = 0.001;           // The threshold during burnin
-const unsigned int RANGE_MIN = 50;                // Minimum number to calc M
-const double COR_MAX = 0.99;                      // Maximum correlation for individual effects
-const double VAR_MAX = 5.0;                       // Maximum variance for individual effect matrix
-const double VAR_MIN = 0.0;                       // Minimum variance for individual effect matrix
-const double ETA_DEFAULT = 1.2;                   // Default value for eta (in LKJ distribution)
-const double SD_DEFAULT = 2;                      // Default value for SD (in LKJ distribution)
-const double SD_VAR_MIN = VAR_MIN;                // The minimum value for sd for covar matrix
-const double SD_VAR_MAX = 3;                      // The maximum value for sd for covar matrix
-const double ETA_MAX = 10;                        // The maximum value for eta in LKJ
+const auto TRA_IND_SEC_OFFSET = 10u;              // Number of sections used in tra_ind
+const auto EFFECT_MAX = 10000000.0;               // Sets maximum value for effect
+const auto EFFECT_MIN = 0.0000001;                // Sets minimum value for effect
+const auto CLIP_MIN = 0.99*log(EFFECT_MIN);       // Clips minimum 
+const auto CLIP_MAX = 0.99*log(EFFECT_MAX);       // Clips maximum 
+const auto DIF_THRESH = 0.0000001;                // The threshold for a difference
+const auto THRESH_EXPAND = 100.0;                 // Expands threshold for certain quantities
+const auto DIF_THRESH_BURNIN = 0.001;             // The threshold during burnin
+const auto RANGE_MIN = 50u;                       // Minimum number to calc M
+const auto COR_MAX = 0.99;                        // Maximum correlation for individual effects
+const auto VAR_MAX = 5.0;                         // Maximum variance for individual effect matrix
+const auto VAR_MIN = 0.0;                         // Minimum variance for individual effect matrix
+const auto ETA_DEFAULT = 1.2;                     // Default value for eta (in LKJ distribution)
+const auto SD_DEFAULT = 2.0;                      // Default value for SD (in LKJ distribution)
+const auto SD_VAR_MIN = VAR_MIN;                  // The minimum value for sd for covar matrix
+const auto SD_VAR_MAX = 3.0;                      // The maximum value for sd for covar matrix
+const auto ETA_MAX = 10.0;                        // The maximum value for eta in LKJ
 
 
-const unsigned int H_BIN = 10;                    // Used for distributions in cumulative prob
+const auto H_BIN = 10u;                           // Used for distributions in cumulative prob
 
-const double SMALLISH = 0.00001;                  // Used to represent quite a small number
-const double SMALL = 0.00001;                     // Used to represent a small number
-const double LARGE = 1000000000;                  // Used to represent a big number
-const double LARGISH = 10000.0;                   // Used to represent a pretty large number 
-const double ALPHA_ZERO = -0.000001;              // Used to represent a zero value for alpha in dirichlet
+const auto PHI_MIN = 0.001;                       // The minimum value for phi
+
+const auto SMALLISH = 0.00001;                    // Used to represent quite a small number
+const auto SMALL = 0.00001;                       // Used to represent a small number
+const auto LARGE = 1000000000.0;                  // Used to represent a big number
+const auto LARGISH = 10000.0;                     // Used to represent a pretty large number 
+const auto ALPHA_ZERO = -0.000001;                // Used to represent a zero value for alpha in dirichlet
 const int LARGE_INT = 1000000000;                 // Used to represent a big integer
-const double INFY = 1000000001;                   // Used to represent infinity
-const double UNDEF = 1000000002;                  // Used to represent undefined
-const double ALMOST_ONE = 0.9999999999999;        // Almost one   
-const double LOG_THRESH = 0.000000000000001;      // The threshold below which logs not calculated
-const double PROB_MOD = 0.001;                    // Avoids zero probability in local event props
-const double LOW_BOUND = 0;                       // The lower bound for observation probability
-const double UP_BOUND = 1;                        // The lower bound for observation probability
-const double OBS_COMP_MIN = VTINY;                // Minimum value for observed compartment
-const unsigned int INF_INIT_NPARAM_SAMPLE = 20;   // Number of parameter samples to set correlation matrix
-const double PROP_JOIN_COR_MIN = 0.7;             // The threshold corrlelation above which proposals join
-const unsigned int SEED_MAX = 10000;              // The maximum seed number
+const auto INFY = 1000000001.0;                   // Used to represent infinity
+const auto UNDEF = 1000000002.0;                  // Used to represent undefined
+const auto ALMOST_ONE = 0.9999999999999;          // Almost one   
+const auto LOG_THRESH = 0.000000000000001;        // The threshold below which logs not calculated
+const auto PROB_MOD = 0.001;                      // Avoids zero probability in local event props
+const auto LOW_BOUND = 0.0;                       // The lower bound for observation probability
+const auto UP_BOUND = 1.0;                        // The lower bound for observation probability
+const auto OBS_COMP_MIN = VTINY;                  // Minimum value for observed compartment
+const auto INF_INIT_NPARAM_SAMPLE = 20u;          // Number of parameter samples to set correlation matrix
+const auto PROP_JOIN_COR_MIN = 0.7;               // The threshold corrlelation above which proposals join
+const auto SEED_MAX = 10000u;                     // The maximum seed number
 
-const double UP_SI_SMALL = 0.0005;                       // Sets rate of adaptation for MCMC proposals
+const auto UP_SI_SMALL = 0.0005;                  // Sets rate of adaptation for MCMC proposals
 
-const unsigned int TRUNC_MAX = 40;                // Truncates strings longer than this
+const auto TRUNC_MAX = 40u;                       // Truncates strings longer than this
 
 const auto PHI_LIM = 1.0;                         // The final inverse temperature
 
@@ -465,17 +505,20 @@ const auto TIME_MIN = TINY;                       // The minimum time
 const auto RATE_MIN = TINY;                       // The minimum rate
 const auto P_MIN = TINY;                          // The minimum probability
 const auto P_MAX = 1-TINY;                        // The maximum probability
- 
-const unsigned int CHAIN_NSIMINIT_DEFAULT = 20;   // The default number of simulation used to initialise chain 
-const unsigned int SIM_NUM_DEFAULT = 1;           // The default simulation number
-const unsigned int PPC_NUM_DEFAULT = 200;         // The default number of ppc simulations
-const auto ALG_DEFAULT = DA_MCMC;                 // Default inference algorithm
-const unsigned int SEED_DEFAULT = 0;              // The default seed
-const double ANNEAL_POWER_DEFAULT = 4;            // Default annealing power
-const double ANNEAL_RATE_DEFAULT = 0.01;          // Rate at which annealing is done
-const unsigned int TI_DIV_MAX = 1000000;          // Maximum number of time divisions
 
-const unsigned int PARAM_OUTPUT_MAX_DEFAULT = 1000;// The default maximum number of tensor elements to be output
+const auto PROP_REGRAFT_WITH_OBS2 = 0.33;          // Proportion of proposals using REGRAFT_WITH_OBS2
+const auto PROP_REGRAFT_WITH_OBS3 = 0.33;          // Proportion of proposals using REGRAFT_WITH_OBS3
+
+const auto CHAIN_NSIMINIT_DEFAULT = 20u;          // The default number of simulation used to initialise chain 
+const auto SIM_NUM_DEFAULT = 1u;                  // The default simulation number
+const auto PPC_NUM_DEFAULT = 200u;                // The default number of ppc simulations
+const auto ALG_DEFAULT = DA_MCMC;                 // Default inference algorithm
+const auto SEED_DEFAULT = 0u;                     // The default seed
+const auto ANNEAL_POWER_DEFAULT = 4.0;            // Default annealing power
+const auto ANNEAL_RATE_DEFAULT = 0.01;            // Rate at which annealing is done
+const auto TI_DIV_MAX = 1000000u;                 // Maximum number of time divisions
+
+const auto PARAM_OUTPUT_MAX_DEFAULT = 1000u;      // The default maximum number of tensor elements to be output
 const auto INDMAX_DEFAULT = 20000u;               // The default maximum number of individuals
 const auto BURNIN_FRAC_DEFAULT = 30.0;            // The default percentage burnin
 const auto MCMC_SAMPLE_DEFAULT = 5000u;           // The default number of MCMC samples
@@ -498,11 +541,11 @@ const auto PROP_MBPII_W = 0.5;                    // The weight given to MBPII
 const auto PROP_MBPIC_W = 0.5;                    // The weight give to MBP IC 
 const auto POP_SI_LIM = 0.5;                      // Minimum proposal size when changing integer populations
 
-const unsigned int NEXT_IND_EVENT_DIV = 100;      // Number of divisions next_event divided into
+const auto NEXT_IND_EVENT_DIV = 100u;             // Number of divisions next_event divided into
 
-# define MM_PI  3.14159265358979323846             // Value for pi
+# define MM_PI  3.14159265358979323846            // Value for pi
 
-const double PERCENT_STEP = 2.5;                  // Percentage per dot in running bar
+const auto PERCENT_STEP = 2.5;                    // Percentage per dot in running bar
 
 const vector <unsigned int> factori = {1,1,2,6,24};// Fatorial N! for first 5 numbers
 
@@ -510,9 +553,7 @@ const vector <unsigned int> factori = {1,1,2,6,24};// Fatorial N! for first 5 nu
 
 const vector <string> alphabet = {"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"};
 
-
-//const string chnotallowed = "\"$&=~#\\→";     // Character not allowed in equations
-const string chnotallowed = "\"$&~#\\→";     // Character not allowed in equations
+const string chnotallowed = "\"$&~#\\→";          // Character not allowed in equations
 const string notparam_list = "+-*×/0123456789.{}<>〈〉() $′→;";   // Sets not a parameter character
 const string paramend_list = "+-*×/|.{<>〈〉}[] $"; // Sets characters which end parameter
 const string name_notallow = "|\"*×_ {<>〈〉}[]()=~′→;$&#\\";// Character not allowed in names
@@ -525,7 +566,6 @@ const string iden_matrix_name2 = "\\delta";       // The name of identity matrix
 const string density_name = "DEN";                // The name of density vector
 const string rdensity_name = "RDEN";              // The name of the relative density vector
 
-												
 const auto density_kernel_max = 4u;               // Sets the maximum radius when calculating density
 const string RN_name = "RN";                      // The name of rep. number function
 const string RNE_name = "RNE";                    // The effective rep number function

@@ -546,11 +546,17 @@ function create_edit_table(lay)
 			ac = "TableEditOn";
 		}
 		else{
-			let nrow;
-			if(tab_source != undefined) nrow = tab_source.nrow;
-			if(tab_dest != undefined) nrow = tab_dest.nrow;
+			let fl = false;
+			if(tab_dest != undefined){
+				let ts = draw_table_size(tab_dest.ncol,tab_dest.nrow);
+				if(ts.too_big_x || ts.too_big_y) fl = true;
+			}
 			
-			if(nrow != undefined && nrow > TABLE_ROW_MAX){
+			//let nrow, ncol;
+			//if(tab_source != undefined) nrow = tab_source.nrow;
+			//if(tab_dest != undefined) nrow = tab_dest.nrow;
+			
+			if(fl){
 				te = "This table is too large to edit. Click 'Done' to complete."; 
 			}
 			else{
@@ -678,12 +684,35 @@ function add_create_edit_table_buts(lay)
 }
 
 
+/// Works out if necessary to reduce table size to draw
+function draw_table_size(ncol,nrow)
+{
+	let too_big_y = false, too_big_x = false;
+	
+	if(nrow*ncol > TABLE_ELEMENT_MAX){
+		let ncol_max = Math.floor(Math.sqrt(TABLE_ELEMENT_MAX));
+		if(ncol > ncol_max){ ncol = ncol_max; too_big_x = true;}
+		
+		let nr = Math.floor(TABLE_ELEMENT_MAX/ncol);
+		if(nr < nrow){ nrow = nr; too_big_y = true;}
+	}
+	
+	if(nrow > TABLE_ROW_MAX){ nrow = TABLE_ROW_MAX; too_big_y = true;}
+	
+	return { ncol:ncol, nrow:nrow, too_big_x:too_big_x, too_big_y:too_big_y};
+}
+
+
 /// Draws a specified data table at a given location
 function draw_data_table(lay,x,y,tab,op)
 {
-	let nrow = tab.nrow;
-	let too_big = false;
-	if(nrow > TABLE_ROW_MAX){ nrow = TABLE_ROW_MAX; too_big = true;}
+	let ts = draw_table_size(tab.ncol,tab.nrow)
+	
+	let nrow = ts.nrow;
+	let ncol = ts.ncol;
+	let too_big_x = ts.too_big_x;
+	let too_big_y = ts.too_big_y;
+	
 	let nr = (nrow+1);
 	
 	let pad = 1;
@@ -709,7 +738,7 @@ function draw_data_table(lay,x,y,tab,op)
 
 	let cx = x+mar;
 	
-	for(let c = 0; c < tab.ncol; c++){
+	for(let c = 0; c < ncol; c++){
 		let flag = false;
 		if(op.col_used != undefined){
 			for(let i = 0; i < op.col_used.length; i++) if(c == op.col_used[i]) flag = true;
@@ -746,7 +775,7 @@ function draw_data_table(lay,x,y,tab,op)
 			
 			let cy = y+mar;
 
-			if(op.edit == true && too_big == false){
+			if(op.edit == true && too_big_x == false && too_big_y == false){
 				lay.add_button({te:head, x:cx, y:cy, dx:wmax, dy:dy_table, type:"Element", c:c, ac:"EditTableHead", head:true, font:get_font(si_table,"bold")}); cy += dy_table;
 				for(let r = 0; r < nrow; r++){
 					let te = get_table_ele_text(tab,r,c); 
@@ -764,7 +793,7 @@ function draw_data_table(lay,x,y,tab,op)
 				lay.add_button({te:column, x:cx, y:cy, dx:wmax, dy:nr*dy_table, type:"Column", space:dy_table, c:c, ac:op.ac});
 			}
 				
-			if(too_big){
+			if(too_big_y){
 				let si_mar = 1;
 				let fo_mar = get_font(si_mar);
 				let mar_col = EDIT_MARGIN_COL;
@@ -772,6 +801,18 @@ function draw_data_table(lay,x,y,tab,op)
 			}
 			cx += wmax;
 		}
+	}
+	
+	if(too_big_x){
+		let si_mar = 1;
+		let fo_mar = get_font(si_mar);
+		let mar_col = EDIT_MARGIN_COL;
+		let cy = y+mar;
+	
+		for(let r = 0; r < nrow; r++){
+			lay.add_button({te:"...", x:cx, y:cy+(r+1)*dy_table-0.5, dx:2, dy:dy_table_param, type:"RightText", si:si_mar, font:fo_mar, col:mar_col});
+		}
+		cx += 2.3;
 	}
 	
 	if(cx == x+mar){
@@ -785,10 +826,11 @@ function draw_data_table(lay,x,y,tab,op)
 	
 	let ww = cx+mar-x;
 	for(let r = 0; r < nr-1; r++){
-		let ac; if(op.edit == true && too_big == false) ac = "RowNumber"
+		let ac; if(op.edit == true && too_big_y == false) ac = "RowNumber"
 		lay.add_button({te:String(r+1), x:x_start, y:y+mar+(1+r)*dy_table, dx:x-x_start-0.1, dy:dy_table, type:"RowNumber", r:r, si:si_num, font:fo_num, col:RED, ac:ac});
 	}
-	let dyout = nr*dy_table+2*mar; if(too_big) dyout += dy_table_param;
+	
+	let dyout = nr*dy_table+2*mar; if(too_big_y) dyout += dy_table_param;
 	
 	lay.add_button({x:x, y:y, dx:ww, dy:dyout, type:"Outline", col:BLACK});
 
@@ -1315,7 +1357,7 @@ function add_table_content(lay,table,back_col,dy)
 				break;
 			
 			case "Source Name":
-				lay.add_button({te:ele.name, x:cx, y:cy+0.1, dx:w-0.5, dy:1.2, type:"NameLink", ac:ele.ac, si:si, font:get_font(si), so:ele.so}); 
+				lay.add_button({te:ele.name, x:cx, y:cy-0., dx:w-0.5, dy:1.2, type:"NameLink", ac:ele.ac, si:si, font:get_font(si), so:ele.so}); 
 				break;
 				
 			case "Delete":
@@ -1648,6 +1690,16 @@ function view_warning(i)
 		change_page({pa:"Simulation", su:"Setup", susu:warn.p});
 		break;
 
+	case "SimSourceProb": 
+		change_page({pa:"Simulation", su:"Setup", susu:warn.p});
+		press_button_prop("TableContent","GreyView",["info","i"],warn.ind);	
+		break;
+		
+	case "PostSimSourceProb": 
+		change_page({pa:"Post. Simulation", su:"Setup", susu:warn.p});
+		press_button_prop("TableContent","GreyView",["info","i"],warn.ind);	
+		break;
+		
 	case "SourceProb": 
 		change_page({pa:"Inference", su:"Data", susu:warn.p});
 		press_button_prop("TableContent","GreyView",["info","i"],warn.ind);	

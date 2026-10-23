@@ -259,16 +259,18 @@ void Equation::setup_comp_pref_convert()
 		
 		for(const auto &te : po.term){
 			auto c = te.c;
-			
+			if(comp_pref_convert[p].size() == 0){
+				warn = "A transmission tree must be set for species '"+species[p].name+"'";
+				return;
+			}
+				
 			if(comp_pref_convert[p][c] != UNSET){
 				warn = "For transition a compartment cannot appear in more than one population";
 			}
-			
+	
 			comp_pref_convert[p][c] = pref; 
 		}
 	}
-	
-	//if(warn == "") te_raw = ""; 
 }
 
 
@@ -2138,7 +2140,7 @@ vector <EqItem> Equation::extract_operations()
 								if(beg == "thre" && doneflag == false){
 									if(te.substr(i,7) == "thresh("){
 										item.type = THRESHFUNC; op.push_back(item); 
-										doneflag = true;
+										doneflag = true; 
 										i += 5;
 									}
 								}
@@ -3476,7 +3478,7 @@ void Equation::setup_references()
 {
 	remove_unused_param_ref();
 	calculate_pop_ref();       
-	if(infection_trans) setup_comp_pref_convert();
+	if(infection_trans || infection_trans_output) setup_comp_pref_convert();
 	set_time_vari();
 
 	if(false){

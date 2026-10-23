@@ -448,7 +448,7 @@ void StateSpecies::remove_event(Event &ev, const Individual &ind, Like &like_ch,
 			auto &me = sp.markov_eqn[e];
 			
 			// If an infection transition then works out specific probability on individual
-			if(me.infection_trans){
+			if(me.infection_trans && trans_tree_on){
 				const auto &eq = eqn[me.eqn_ref];
 				const auto &lin = eq.lin; if(!lin.on) emsg("Linearisation should be on");
 		
@@ -580,7 +580,7 @@ void StateSpecies::add_event_ref(unsigned int i, unsigned int ee, const vector <
 			auto &me = sp.markov_eqn[e];
 			
 			// If an infection transition then works out specific probability on individual
-			if(me.infection_trans){ 
+			if(me.infection_trans && trans_tree_on){ 
 				const auto &eq = eqn[me.eqn_ref];
 				const auto &lin = eq.lin; if(!lin.on) emsg("Linearisation should be on");
 		
@@ -1222,7 +1222,7 @@ void StateSpecies::recalc_markov_value(unsigned int ee, unsigned int ti, unsigne
 				auto dLi = -(value-val)*di.indfac_int;
 		
 				auto n = di.ind_trans.size();	
-				if(n > 0 && !me.infection_trans){
+				if(n > 0 && !(me.infection_trans && trans_tree_on)){
 					dLi += n*log(log_thresh(value)/log_thresh(val));
 				}
 				dLi_store.push_back(dLi); 
@@ -1257,9 +1257,11 @@ void StateSpecies::restore_back()
 				{
 					auto &it = markov_eqn_vari[ev.m].div[ev.ti].ind_trans;
 					auto k = ev.index;
-					if(k != it.size()-1){
+					if(k+1 < it.size()){
 						auto &it_shift = it[it.size()-1];
 						it[k] = it_shift;
+						if(it_shift.i >= individual.size()) emsg("ind out of range");
+						if(it_shift.index >= individual[it_shift.i].ev.size()) emsg("ev out of range");
 						individual[it_shift.i].ev[it_shift.index].index = k;
 					}
 					it.pop_back();
@@ -1356,6 +1358,13 @@ void StateSpecies::restore_back()
 		}
 	}
 	
+	restore_back2();
+}
+
+
+/// Restores the back
+void StateSpecies::restore_back2()
+{
 	if(back.size() > 0){
 		for(int b = back.size()-1; b >= 0; b--){
 			const auto &ba = back[b];

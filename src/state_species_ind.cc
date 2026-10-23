@@ -15,7 +15,7 @@ using namespace std;
 
 	
 /// Updates the individuals in the system (using a modified Gillespie algorithm)
-void StateSpecies::update_individual_based(unsigned int ti, const vector < vector <Poss> > &pop_ind, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t)
+void StateSpecies::update_individual_based(unsigned int ti, const vector < vector <double> > &popcomb_t)
 {
 	sort_trig_event(ti);
 
@@ -48,6 +48,28 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 			auto i = trig.i;
 			
 			switch(trig.type){
+			case FORCED_TRANS_SIM_EV:
+				{
+					const auto &ft = sp.forced_trans[trig.i];
+					
+					auto i = ft.i;
+					auto c = ind_sim_c[i];
+					if(c != UNSET){
+						auto trg = sp.trg_from_tr_func(c,ft.cl,ft.tr); // Converts from tr to trg [cgl][cl][tr]
+						if(trg != UNSET){ 	
+							// Works out rate
+							auto rate = get_tra_rate(tf,trg);
+							if(rate == 0){
+								run_error("A forced transtion has no probability of happening. You might want to add a small external force of infection.");
+							}
+					
+							IndTraRef itr; itr.i = i; itr.tr_gl = trg;	
+							update_ind_trans(tf,itr,popcomb_t);
+						}
+					}
+				}	
+				break;
+				
 			case INTERVENTION_SIM_EV:
 				implement_test_and_cull(trig.i,trig.tdiv,popcomb_t);
 				break;
@@ -76,7 +98,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 			case NM_TRANS_SIM_EV:
 				{
 					IndTraRef itr; itr.i = trig.i; itr.tr_gl = trig.trg;	
-					update_ind_trans(tf,itr,popnum_t,popcomb_t,pop_ind);
+					update_ind_trans(tf,itr,popcomb_t);
 				}
 				break;
 				
@@ -92,14 +114,14 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 						trig_vec.push_back(tri_ev[i_trig]);
 					}
 				
-					add_data_event(i,tf,trig_vec,popnum_t,popcomb_t,pop_ind);
+					add_data_event(i,tf,trig_vec,popcomb_t);
 				}
 				break;
 				
 			case SOURCE_SIM_EV:
 				{
 					IndTraRef itr; itr.i = trig.i; itr.tr_gl = trig.trg;	
-					update_ind_trans(tf,itr,popnum_t,popcomb_t,pop_ind);
+					update_ind_trans(tf,itr,popcomb_t);
 				}
 				break;
 			}
@@ -141,7 +163,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 				IndTraRef itr; itr.i = i; itr.tr_gl = tr;
 				
 				add_individual(UNOBSERVED_IND);
-				update_ind_trans(tf,itr,popnum_t,popcomb_t,pop_ind);
+				update_ind_trans(tf,itr,popcomb_t);
 			}
 			else{
 				const auto &tri = tra_ind[tr];
@@ -196,7 +218,7 @@ void StateSpecies::update_individual_based(unsigned int ti, const vector < vecto
 			
 				IndTraRef itr; itr.i = i; itr.tr_gl = tr;
 		
-				update_ind_trans(tf,itr,popnum_t,popcomb_t,pop_ind);
+				update_ind_trans(tf,itr,popcomb_t);
 			}
 		}
 		
@@ -302,7 +324,7 @@ void StateSpecies::implement_test_and_cull(unsigned int index, double tdiv, cons
 
 
 /// Adds data event to the individual time line
-void StateSpecies::add_data_event(unsigned int i, double t, const vector <SimTrigEvent> &trig_vec, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind)
+void StateSpecies::add_data_event(unsigned int i, double t, const vector <SimTrigEvent> &trig_vec, const vector < vector <double> > &popcomb_t)
 {
 	auto c = ind_sim_c[i];
 
@@ -338,7 +360,7 @@ void StateSpecies::add_data_event(unsigned int i, double t, const vector <SimTri
 		if(k == tra_pos.size()) emsg("tra_pos proble");
 		
 		IndTraRef itr; itr.i = i; itr.tr_gl = tra_pos[k].trg;
-		update_ind_trans(t,itr,popnum_t,popcomb_t,pop_ind);
+		update_ind_trans(t,itr,popcomb_t);
 	}
 }
 
@@ -958,6 +980,7 @@ void StateSpecies::sort_trig_event(unsigned int ti)
 }
 
 
+/*
 /// Samples the infecting individual from those individuals which are infected
 void StateSpecies::sample_infecting_ind(unsigned int i, double t, unsigned int tr_gl, IndInfFrom &inf_from, const vector < vector <double> > &popnum_t, const vector < vector <Poss> > &pop_ind) 
 {
@@ -1017,6 +1040,7 @@ void StateSpecies::sample_infecting_ind(unsigned int i, double t, unsigned int t
 		}
 	}
 }
+*/
 
 
 /// Gets waifw from a file created during simulation (for diagnostic purposes)
@@ -1029,14 +1053,16 @@ IndInfFrom StateSpecies::get_waifw(unsigned int i, double t) const
 		string line;
 		getline(fin,line);
 		
-		if(fin.eof()) break;
-		
-		auto spl = split(line,',');
-		vector <double> num;
-		for(auto i = 0u; i < spl.size(); i++){
-			num.push_back(number(spl[i]));
+		if(line != ""){
+			auto spl = split(line,',');
+			vector <double> num;
+			for(auto i = 0u; i < spl.size(); i++){
+				num.push_back(number(spl[i]));
+			}
+			row.push_back(num);
 		}
-		row.push_back(num);
+		
+		if(fin.eof()) break;
 	}while(true);
 	
 	auto j = 0u;
@@ -1059,18 +1085,13 @@ IndInfFrom StateSpecies::get_waifw(unsigned int i, double t) const
 
 
 /// Updates an individual with a transition
-void StateSpecies::update_ind_trans(double t, const IndTraRef &itr, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind)
+void StateSpecies::update_ind_trans(double t, const IndTraRef &itr, const vector < vector <double> > &popcomb_t)
 {
 	auto i = itr.i;
 	
 	if(ind_sim_c[i] == UNSET && individual[i].ev.size() != 0) return;
 
 	auto tr_gl = itr.tr_gl;
-	
-	// If transmission tree then samples infecting individual 
-	IndInfFrom inf_from;
-	
-	if(sp.trans_tree == true) sample_infecting_ind(i,t,tr_gl,inf_from,popnum_t,pop_ind);
 	
 	// Updates the individual compartment based on transition
 	if(ind_sim_c[i] != sp.tra_gl[tr_gl].i){ // Case when intermediate event has occured
@@ -1083,7 +1104,7 @@ void StateSpecies::update_ind_trans(double t, const IndTraRef &itr, const vector
 	
 	if(ind_sim_c[i] != UNSET) cpop[ind_sim_c[i]]--;
 	
-	add_event(type,i,tr_gl,UNSET,UNSET,tr.f,t,inf_from);
+	add_event(type,i,tr_gl,UNSET,UNSET,tr.f,t,IndInfFrom());
 	
 	remove_markov_trans(i,t);
 	

@@ -25,15 +25,21 @@ UpdateIndInfo State::update_ind(unsigned int p, unsigned int i, vector <Event> &
 
 	uii.success = true;
 		
-	if(update_trans_tree == false) gc.type = NO_TRANS_TREE_CHANGE;
+	if(update_trans_tree == false || !trans_tree_on) gc.type = NO_TRANS_TREE_CHANGE;
 	else{
 		gc = update_tree(p,i,ev_ne);
-		if(gc.type == TRANS_TREE_FAIL){ uii.success = false; return uii;}
+		if(gc.type == TRANS_TREE_FAIL){ 
+			uii.success = false; 
+			restore_back();
+			return uii;
+		}
 	}	
 	
 	//timer[IND_TIMER] -= clock();
 	
-	if(type == UP_SINGLE) back_init();
+	if(true && type == UP_SINGLE){ // TURN OFF
+		check_back("up sing");
+	}
 	
 	auto &sp = model.species[p];
 	auto &ssp = species[p];
@@ -68,7 +74,7 @@ UpdateIndInfo State::update_ind(unsigned int p, unsigned int i, vector <Event> &
 	const auto &ind_po_cha = gc.node_alter.ind_po_cha;
 	auto nind_po_cha = ind_po_cha.size();
 	
-	if(nind_po_cha > 0) remove_ind_inf_likelihood(ind_po_cha);
+	if(nind_po_cha > 0) remove_trans_tree_ind_inf_likelihood(ind_po_cha,like_ch.markov);
 	
 	vector <PopUpdate> pop_update;
 	
@@ -139,7 +145,7 @@ UpdateIndInfo State::update_ind(unsigned int p, unsigned int i, vector <Event> &
 	// Adds in new events
 	for(auto e : add_ev) ssp.add_event_ref(i,e,popcomb_t,like_ch);
 	
-	if(nind_po_cha > 0) add_ind_inf_likelihood(ind_po_cha);
+	if(nind_po_cha > 0) add_trans_tree_ind_inf_likelihood(ind_po_cha,like_ch.markov);
 	
 	if(false) ssp.print_event("end",ind);
 	
@@ -153,21 +159,20 @@ UpdateIndInfo State::update_ind(unsigned int p, unsigned int i, vector <Event> &
 
 
 /// Removes existing liklihood between individual and those it infects 
-void State::remove_ind_inf_likelihood(const vector <InfPoCha> &ind_po_cha)
+void State::remove_trans_tree_ind_inf_likelihood(const vector <InfPoCha> &ind_po_cha, double &dmarkov)
 {
 	for(const auto &ipc : ind_po_cha){
 		auto &ssp = species[ipc.p];
-		ssp.change_trans_tree_Li_markov(ipc.i,ipc.e,-1);
+		dmarkov += ssp.change_trans_tree_Li_markov(ipc.i,ipc.e,-1);
 	}
 }
 
 
-/// Removes existing liklihood between individual and those it infects 
-void State::add_ind_inf_likelihood(const vector <InfPoCha> &ind_po_cha)
+/// Removes existing liklihood between individual and those it infects in transmission tree
+void State::add_trans_tree_ind_inf_likelihood(const vector <InfPoCha> &ind_po_cha, double &dmarkov)
 {
 	for(const auto &ipc : ind_po_cha){
 		auto &ssp = species[ipc.p];
-	
 		auto &iif = ssp.individual[ipc.i].ev[ipc.e].ind_inf_from;
 		
 		back_pop.push_back(BackPop(PREF_ST,ipc.p,ipc.i,ipc.e,iif.pref));
@@ -176,7 +181,7 @@ void State::add_ind_inf_likelihood(const vector <InfPoCha> &ind_po_cha)
 		iif.pref = ipc.pref_new;
 		iif.po = ipc.po_new;
 		
-		ssp.change_trans_tree_Li_markov(ipc.i,ipc.e,1);
+		dmarkov += ssp.change_trans_tree_Li_markov(ipc.i,ipc.e,1);
 	}
 }
 

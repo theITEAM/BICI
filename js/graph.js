@@ -1022,17 +1022,22 @@ class Graph
 					let da = this.data[i];
 					if(da.type ==  "InfBar"){
 						lay.add_button({x:0, y:y, dx:lay.dx-scrollw, dy:dy, name:da.name, tmin:da.tmin, tmax:da.tmax, inf_line:da.inf_line, left_shift:left_shift, type:"InfBarBut"});
+						
+							
+						let si = 0.9*si_transtree;
+						lay.add_button({te:da.name, x:0.3, y:y, dx:left_shift-0.5, dy:si, type:"Link", ac:"SelectIndTT", si:si, font:get_font(si)});
+						
 						y += dy+gap;
 					}
 				}
-				
+
 				let da = this.data[this.data.length-1];
 				if(da.type != "Transmission") error("Should be transmission");
 			
 			
 				lay.add_button({x:left_shift, y:0, dx:lay.dx-scrollw-left_shift, dy:y, barh:dy, transmission:da.transmission, type:"TransArrow"});
 				
-				lay.add_button({x:0, y:0, dx:lay.dx-scrollw, dy:y, ac:"TimelineGrab", type:"Nothing"});
+				lay.add_button({x:left_shift, y:0, dx:lay.dx-scrollw-left_shift, dy:y, ac:"TimelineGrab", type:"Nothing"});
 			}
 			break;
 			
@@ -1298,7 +1303,7 @@ class Graph
 		
 		fill_rectangle(x,y,left_shift,dy,WHITE);
 		
-		plot_text(name,x+0.2,y+dy/2+0.3,get_font(si_transtree),BLACK); 
+		//plot_text(name,x+0.2,y+dy/2+0.3,get_font(si_transtree),BLACK); 
 		
 		let xx = x+left_shift;
 		draw_line(xx,y,xx,y+dy,BLACK,NORMLINE);
@@ -1407,7 +1412,10 @@ class Graph
 		}
 		
 		// Draws text
-		let si; if(barh > 1) si = Math.sqrt(barh); else si = barh;
+		let si; 
+		if(barh > 1) si = Math.sqrt(barh); 
+		else si = barh;
+		if(si > 2) si = 2;
 		
 		let fo = get_font(0.4*si);
 		let fo2 = get_font(0.4*si);
@@ -1426,7 +1434,7 @@ class Graph
 				
 				let dx = xx2-xx;
 				if(dx > 2){
-					center_text(po.label,(xx+xx2)/2,yy-0.2*si,fo2,BLACK,dx-1); 
+					center_text_right_trunc(po.label,(xx+xx2)/2,yy-0.2*si,fo2,BLACK,dx-1); 
 				}
 			}
 			
@@ -1439,7 +1447,7 @@ class Graph
 				let xx2 = x+fac*(ob.t-ra.xmin);
 				let dx = xx2-xx;
 				if(dx > 2){
-					center_text(this.num_text(ob.mnum),(xx+xx2)/2,yy+0.4*si,fo2,BLUE,dx-1); 
+					center_text(this.num_text(ob.mnum),(xx+xx2)/2,yy+0.45*si,fo2,BLUE,dx-1); 
 				}
 			
 				xx = xx2;
@@ -1450,12 +1458,12 @@ class Graph
 		
 				let dx = xx2-xx;
 				if(dx > 2){	
-					center_text(this.num_text(po.branch.mnum),(xx+xx2)/2,yy+0.4*si,fo2,BLUE,dx-1); 
+					center_text(this.num_text(po.branch.mnum),(xx+xx2)/2,yy+0.45*si,fo2,BLUE,dx-1); 
 				}
 				
 				let te = Math.floor(po.branch.frac*100)+"%";
 				
-				plot_text(te,xx2+barh*0.1,yy+0.12*si,fo,DGREEN); 
+				plot_text(te,xx2+si*0.2,yy+0.12*si,fo,DGREEN); 
 			}
 		}
 		

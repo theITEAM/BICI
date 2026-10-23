@@ -136,6 +136,7 @@ void MCMC::sample_op(unsigned int s)
 			for(auto ch = 0u; ch < num_per_core; ch++){
 				output.state_sample(s,base+ch,chain[ch].state);
 			}
+			
 			nstate_op++;
 		}
 	}

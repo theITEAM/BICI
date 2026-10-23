@@ -82,7 +82,7 @@ string check_valid_name(string name, string type)
 					j += len;
 					break;
 				}
-			}
+			} 
 		}
 		
 		if(done == false){
@@ -524,18 +524,21 @@ CommandLine get_command_tags(string trr, unsigned int line_num)
 	if(type == "add-ind-inf") com = ADD_IND;
 	if(type == "remove-ind-inf") com = REMOVE_IND;
 	if(type == "move-ind-inf") com = MOVE_IND;
+	if(type == "forced-trans-ind-inf") com = FORCED_TRANS_IND_INF;
 	if(type == "init-pop-sim") com = INIT_POP_SIM;
 	if(type == "add-pop-sim") com = ADD_POP_SIM;
 	if(type == "remove-pop-sim") com = REMOVE_POP_SIM;
 	if(type == "add-ind-sim") com = ADD_IND_SIM;
 	if(type == "remove-ind-sim") com = REMOVE_IND_SIM;
 	if(type == "move-ind-sim") com = MOVE_IND_SIM;
+	if(type == "forced-trans-ind-sim") com = FORCED_TRANS_IND_SIM;
 	if(type == "test-and-cull-sim") com = TEST_AND_CULL_SIM;
 	if(type == "add-pop-post-sim") com = ADD_POP_POST_SIM;
 	if(type == "remove-pop-post-sim") com = REMOVE_POP_POST_SIM;
 	if(type == "add-ind-post-sim") com = ADD_IND_POST_SIM;
 	if(type == "remove-ind-post-sim") com = REMOVE_IND_POST_SIM;
 	if(type == "move-ind-post-sim") com = MOVE_IND_POST_SIM;
+	if(type == "forced-trans-ind-post-sim") com = FORCED_TRANS_IND_POST_SIM;
 	if(type == "comp-data") com = COMP_DATA;
 	if(type == "trans-data") com = TRANS_DATA;
 	if(type == "test-data") com = TEST_DATA;
@@ -547,6 +550,7 @@ CommandLine get_command_tags(string trr, unsigned int line_num)
 	if(type == "set-ind-effect-post-sim") com = SET_IND_EFFECT_POST_SIM;
 	if(type == "ind-group-data") com = IND_GROUP_DATA;
 	if(type == "genetic-data") com = GENETIC_DATA;
+	if(type == "waifw-data") com = WAIFW_DATA;
 	if(type == "simulation" || type == "sim") com = SIMULATION;
 	if(type == "inference" || type == "inf") com = INFERENCE; 
 	if(type == "posterior-simulation" || type == "post-sim") com = POST_SIM;
@@ -571,6 +575,8 @@ CommandLine get_command_tags(string trr, unsigned int line_num)
 	
 	if(type == "trans-diag-inf") com = TRANS_DIAG;
 	
+	if(type == "waifw-data") com = WAIFW_DATA;
+		
 	if(type == "warning-sim") com = SIM_WARNING;
 	
 	if(type == "warning-inf") com = INF_WARNING;
@@ -580,7 +586,7 @@ CommandLine get_command_tags(string trr, unsigned int line_num)
 	if(type == "ic") com = IC_DATA;
 	
 	if(com == EMPTY){
-		return syntax_error("Command '"+type+"' not recognised2.",true);
+		return syntax_error("Command '"+type+"' not recognised.",true);
 	}
 	
 	auto must_term = false; if(find_in(must_term_str,type) != UNSET) must_term = true;

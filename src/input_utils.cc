@@ -265,7 +265,7 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 	for(auto c = 0u; c < cols.size(); c++){
 		vector <string> spl = split(cols[c],',');
 		
-		auto type = ColumnType(option_error("cols",spl[0],{"ID","t","tstart","tend","snp","cl_prob","cl_all","cl_all_prob","from","to","init_pop","add_pop","rem_pop","start","end","result","filt_obspop","filt_obspoptrans","comp_name","start_comp","end_comp","pos_value"},{ ID_COL, T_COL, TSTART_COL, TEND_COL, SNP_COL, CL_PROB_COL, CL_ALL_COL, CL_ALL_PROB_COL, FROM_COL, TO_COL, INIT_POP_COL, ADD_POP_COL, REM_POP_COL, START_COL, END_COL, RESULT_COL, FILT_OBSPOP_COL, FILT_OBSPOPTRANS_COL, COMP_NAME_COL, START_COMP_COL, END_COMP_COL, POS_FLOAT_COL  }));
+		auto type = ColumnType(option_error("cols",spl[0],{"ID","t","tstart","tend","snp","cl_prob","cl_all","cl_all_prob","from","to","init_pop","add_pop","rem_pop","start","end","result","filt_obspop","filt_obspoptrans","comp_name","start_comp","end_comp","pos_value","IDfrom","IDto"},{ ID_COL, T_COL, TSTART_COL, TEND_COL, SNP_COL, CL_PROB_COL, CL_ALL_COL, CL_ALL_PROB_COL, FROM_COL, TO_COL, INIT_POP_COL, ADD_POP_COL, REM_POP_COL, START_COL, END_COL, RESULT_COL, FILT_OBSPOP_COL, FILT_OBSPOPTRANS_COL, COMP_NAME_COL, START_COMP_COL, END_COMP_COL, POS_FLOAT_COL  , ID_FROM_COL, ID_TO_COL}));
 		if(type == UNSET) return false;
 		
 		if(type == SNP_COL && ds.gen_data_type == MATRIX_DATA) type = GENOBS_COL;
@@ -275,6 +275,14 @@ bool Input::set_loadcol(Command cname, DataSource &ds)
 				load_col.push_back(LoadCol("ID","individual ID",TEXT_EL));
 				break;
 
+			case ID_FROM_COL:
+				load_col.push_back(LoadCol("From","infector ID",TEXT_EL));
+				break;
+			
+			case ID_TO_COL:
+				load_col.push_back(LoadCol("To","infectee ID",TEXT_EL));
+				break;
+						
 			case T_COL:
 				load_col.push_back(LoadCol("t",spl[1],TIME_FLOAT_EL));
 				break;
@@ -523,7 +531,8 @@ void Input::set_genetic_matrix_columns(const Table &tab, DataSource &ds)
 /// Loads up the observation model
 void Input::load_obs_model(ObsModel &om)
 {
-	auto error = get_tag_value("error"); if(error == ""){ cannot_find_tag(); return;}
+	auto error = get_tag_value("error"); 
+	if(error == ""){ om.type = POISSON_OBSMOD; return;}
 			
 	auto spl = split(error,':');
 
@@ -1226,7 +1235,6 @@ void Input::read_state_sample(unsigned int ch, const vector <string> &lines, uns
 						else{
 							auto num = number(spl[0]);
 							if(num == UNSET) alert_sample(warn,26);
-							//spl[0] = ind_key[num];
 							ind_tab.ele.push_back(spl);
 							ind_tab.nrow++;
 						}
@@ -1241,12 +1249,13 @@ void Input::read_state_sample(unsigned int ch, const vector <string> &lines, uns
 		}
 	}
 	
-	/*
-	cout << "Load ind" << endl;
-	for(auto sp : samp.species){
-		print_table(sp.ind_tab);
+	if(false){
+		cout << "Load ind" << endl;
+		for(auto sp : samp.species){
+			print_table(sp.ind_tab);
+		}
+		emsg("Individual table");
 	}
-	*/
 	
 	// Check to see if all parameters have been loaded
 	for(auto th = 0u; th < model.param.size(); th++){
@@ -1498,7 +1507,6 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 				if(ind[i] == UNSET){ 
 					fl = true;
 					
-					// turn off
 					if(par.dep[i].hash_list_out.find(ele) == UNSET){	
 						alert_import(desc+" the element '"+ele+"' is not valid (column '"+subtab.heading[i]+"', row "+tstr(r+2)+")");
 						return;
@@ -1627,8 +1635,6 @@ void Input::load_param_value(const ParamProp &pp, string valu, Param &par, strin
 			else par.element[ref].value.te;
 			cout << " val" << endl;
 		}
-		
-		
 	}
 }
 
@@ -2138,32 +2144,28 @@ unsigned int Input::get_chain()
 }
 
 
-/// Returns a reference to model details
-Details& Input::get_details()
-{
-	if(model.mode == TORNADO_SETUP || model.mode == SCAN_SETUP) return model.inf_details;
-	return model.details;
-}
-
-
 /// Gets the data type
 DataSourceType Input::get_data_type(Command cname) const
 {
 	switch(cname){
 	case ADD_POP_SIM: case REMOVE_POP_SIM: case ADD_IND_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM:
+	case FORCED_TRANS_IND_SIM:
 	case INIT_POP_SIM:
 	case SET_IND_EFFECT_SIM:
 		return SIM_DATA;
 		
 	case ADD_POP: case REMOVE_POP: case ADD_IND: case REMOVE_IND: case MOVE_IND:
+	case FORCED_TRANS_IND_INF:
 	case INIT_POP:
 	case COMP_DATA: case TRANS_DATA: case TEST_DATA: case POP_DATA: 
-	case POP_TRANS_DATA: case IND_EFFECT_DATA: case IND_GROUP_DATA: case GENETIC_DATA: case IC_DATA:
+	case POP_TRANS_DATA: case IND_EFFECT_DATA: case IND_GROUP_DATA: case GENETIC_DATA: case WAIFW_DATA: 
+	case IC_DATA:
 	case SET_IND_EFFECT_INF: 
 		return INF_DATA;
 		
 	case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: case ADD_IND_POST_SIM:
 	case REMOVE_IND_POST_SIM: case MOVE_IND_POST_SIM:
+	case FORCED_TRANS_IND_POST_SIM:
 	case SET_IND_EFFECT_POST_SIM:
 		return POST_SIM_DATA;
 	
@@ -2299,7 +2301,10 @@ void Input::compress_command_lines(const vector <CommandLine> &command_line, vec
 					else{
 						auto full_name = datadir+"/"+file; 		
 						te += " file=\""+file+"\""+endli;
+						
 						ofstream fout(full_name);
+						check_open(fout,full_name);
+						
 						fout << value;
 					}
 					
@@ -2361,3 +2366,9 @@ void Input::get_cols(vector <string> &col_name)
 }
 
 
+/// Sets all_files a list of all files used (used within data-sim)
+void Input::set_all_files(vector <string> &all_files) const
+{
+	all_files.clear();                    // 
+	for(const auto &fi : files) all_files.push_back(fi.name);
+}

@@ -50,7 +50,7 @@ void Equation::calculate_linearise(Precalc &precalc_eqn, const vector <unsigned 
 						const auto &pc = lin_it.popcomb_calc[k];
 						auto pco = pc.pco;
 						
-						if(false){ 	// turn off testing
+						if(false){ 	// TURN OFF
 							auto mm = 0u; while(mm < lin.popcomb_calc.size() && lin.popcomb_calc[mm].pco != pco) mm++;
 							if(mm == lin.popcomb_calc.size()) mm = UNSET;
 							if(mm != lin.hash_simp.find(pco)) emsg("not agree");
@@ -514,7 +514,7 @@ void Equation::calc_div(vector <Calculation> &calc, const vector <Calculation> &
 		emsg_input("here div");
 	}
 	
-	if(calc2.size() == 0) emsg_input("Problem");
+	if(calc2.size() == 0) emsg_input("Problem lin");
 	if(calc.size() == 0) return;
 		
 	auto num = calc.size();
@@ -781,6 +781,7 @@ InfSourceSampler Equation::setup_source_sampler(unsigned int ti, const vector <d
 	for(auto j = 0u; j < Npop; j++){
 		auto po = pop_ref[j];
 		auto val = popnum[po]*calculate_pop_grad(j,ti,popcombw_value,precalc); 
+
 		val_sum += val;
 		val_store.push_back(val);
 		val_sum_store.push_back(val_sum);

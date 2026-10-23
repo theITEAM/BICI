@@ -188,6 +188,18 @@ function vert_text_tsa(tsa,x,y,si,col)
 
 
 /// Centers some text in an area
+function center_text_right_trunc(te,x,y,font,col,width)               
+{
+	let w = text_width(te,font);
+	if(w >= width){
+		te = restrict_width_right_trunc(te,font,width);
+		plot_text(te,x-width/2,y,font,col);
+	}
+	else plot_text(te,x-w/2,y,font,col);
+}
+
+
+/// Centers some text in an area
 function center_text(te,x,y,font,col,width)               
 {
 	let w = text_width(te,font);
@@ -313,6 +325,40 @@ function restrict_width(te,font,width)
 				
 			//if(te == "") error("Space is too small"+" "+te_start+" "+ width_st +"  "+font+" "+width);
 			te += "⋯";
+		}
+	}	
+	return te;
+}
+
+
+/// Ensures that text is not beyond a given width and trucates as "...text"
+function restrict_width_right_trunc(te,font,width)
+{
+	if(width){		
+		let te_start = te, width_st = width;
+		cv.font = font;	
+	
+		width *= inter.sca;
+
+		let rule = cv.measureText("l").width;
+		let max = Math.floor(width/rule);
+
+		if(te.length > max) te = te.substr(te.length-max,max);
+
+		if(cv.measureText(te).width > width){
+			let rule2 = cv.measureText("Z").width;
+			
+			while(te.length > 0){
+				let ww = cv.measureText("⋯"+te).width;
+				if(ww <= width) break;
+				
+				let num = Math.floor(0.9*(ww-width)/rule2);
+				if(num == 0) num = 1;
+				te = te.substr(num,te.length-num);
+			}
+				
+			//if(te == "") error("Space is too small"+" "+te_start+" "+ width_st +"  "+font+" "+width);
+			te = "⋯"+te;
 		}
 	}	
 	return te;

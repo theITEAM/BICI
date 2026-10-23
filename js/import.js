@@ -21,6 +21,9 @@
 	description /desc
 	diagnostics-inf
 	fixed-effect
+	forced-trans-ind-inf
+	forced-trans-ind-sim
+	forced-trans-ind-post-sim
 	generation-inf
 	genetic-data
 	ind-effect
@@ -67,6 +70,7 @@
 	transition / trans
 	transition-all / trans-all
 	view
+	waifw-data
 	warning-inf
 	warning-post-sim
 	warning-sim
@@ -192,7 +196,8 @@ function import_file2(data_file_list)
 			add_non_proc_time(0.1);
 		
 			let bscript = embed_files(imp.pro.bscript,data_file_list);
-			low_mem = set_low_mem();
+		
+			low_mem = set_low_mem(bscript);
 			
 			if(low_mem) bscript = undefined;
 		
@@ -454,21 +459,25 @@ function embed_files(bscript,data_file_list)
 
 
 /// Assesses is low memory mode is needed
-function set_low_mem()
+function set_low_mem(bscript)
 {
 	let sum = 0;
 	
-	let pro = imp.pro;
-	for(let i = 0; i < pro.bscript.length; i++){
-		let pc = pro.bscript[i];
+	for(let i = 0; i < bscript.length; i++){
+		let pc = bscript[i];
 		for(let j = 0; j < pc.tags.length; j++){
 			let tag = pc.tags[j];
 			let val = tag.value;
-			if(val != undefined && val.te != undefined) sum += val.te.length;
+			if(val != undefined){
+				if(typeof val == 'string') sum += val.length;
+				else{
+					if(val.te != undefined) sum += val.te.length;
+				}
+			}
 		}
 	}		
 
-	if(sum > 50000000) return true;
+	if(sum > 200000000) return true;
 	return false;
 }
 

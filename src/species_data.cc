@@ -35,12 +35,14 @@ void Species::initialise_data(Operation mode)
 			case ADD_IND: add_ind_data(so); break;
 			case REMOVE_IND: remove_ind_data(so); break;
 			case MOVE_IND: move_ind_data(so); break;
+			case FORCED_TRANS_IND_INF: forced_trans_ind_inf(so); break;
 			case COMP_DATA: comp_data(so); break;
 			case TEST_DATA: test_data(so); break;
 			case POP_DATA: population_data(so,hash_pop_filter); break;
 			case TRANS_DATA: trans_data(so); break;
 			case POP_TRANS_DATA: popu_trans_data(so,hash_pop_trans_filter); break;
 			case GENETIC_DATA: genetic_data(so); break;
+			case WAIFW_DATA: break;         // This is dealt with in add_waifw_data() in input (because it is potentially multispecies)
 			case SET_IND_EFFECT_SIM: break; // This is done in set_ie_data()
 			case IND_EFFECT_DATA: break;
 			case IND_GROUP_DATA: break;
@@ -955,7 +957,7 @@ void Species::comp_data(const DataSource &so)
 }
 
 
-/// Genetic data command (this makes sure individual is infected when an observation is made
+/// Genetic data command (this makes sure individual is infected when an observation is made)
 void Species::genetic_data(const DataSource &so)
 {
 	if(trans_tree == false) return;
@@ -1009,6 +1011,54 @@ void Species::genetic_data(const DataSource &so)
 		}
 	}
 	
+	data_ignored(so,warn_list);
+}
+
+/// forced_trans_ind_inf command
+void Species::forced_trans_ind_inf(const DataSource &so)
+{
+	const auto &tab = so.table;
+	
+	auto cl = so.cl;
+	
+	const auto &tra = cla[cl].tra;
+	
+	auto tr_name = so.filter_trans_str;
+	
+	auto tr = 0u; 
+	while(tr < tra.size() && tr_name != tra[tr].name) tr++;
+	
+	if(tr == tra.size()){
+		alert_source("Transition '"+tr_name+"' is not recognised",so);
+		return;
+	}
+	
+	vector <string> warn_list;
+	for(auto j = 0u; j < tab.nrow; j++){
+		auto i = find_individual(tab.ele[j][0]);
+		auto &ind = individual[i];
+
+		auto val = tab.ele[j][1];
+		auto t = number(val);
+		if(t == UNSET){
+			alert_source("Value '"+val+"' is not a number3",so,1,j);
+			return;
+		}
+		
+		if(t < details.t_start || t > details.t_end){
+			warn_list.push_back(generate_warn("Test data on individual '"+ind.name+"'",t,details));
+		}
+		else{
+			ForcedTrans ft;
+			ft.i = i;
+			ft.cl = cl;
+			ft.tr = tr;
+			ft.tdiv = calc_tdiv(t,details);
+			
+			forced_trans.push_back(ft);
+		}
+	}
+
 	data_ignored(so,warn_list);
 }
 
@@ -2073,6 +2123,7 @@ void Species::jiggle_data(Operation mode)
 			hash_t.add(0,vec);
 		}
 		
+		/*
 		for(const auto &ob : ind.obs){
 			switch(ob.type){
 			case OBS_SOURCE_EV: case OBS_SINK_EV: case OBS_TRANS_EV: break;
@@ -2084,9 +2135,10 @@ void Species::jiggle_data(Operation mode)
 				break;
 			}
 		}
+		*/
 	}
 	
-	return;//
+	
 	for(auto &ind : individual){	
 		double t_enter = UNSET, t_leave = UNSET;
 		auto enter_so = UNSET, leave_so = UNSET;
@@ -2114,7 +2166,7 @@ void Species::jiggle_data(Operation mode)
 		}
 			
 		double tmin = 0.0, tmax = details.T;
-	
+		
 		// Makes sure move events are in time range
 		for(const auto &ev : ind.ev){
 			switch(ev.type){
@@ -2148,43 +2200,55 @@ void Species::jiggle_data(Operation mode)
 			if(ob.tdiv < tmin || ob.tdiv > tmax){
 				alert_input("Observation at time "+tstr(calc_t(ob.tdiv,details))+" on individual '"+ind.name+"' is out of range");
 			}
-			
-			switch(ob.type){
-			case OBS_SOURCE_EV: case OBS_SINK_EV: case OBS_TRANS_EV: 
-				{
-					double t;
-					const auto loopmax = 100;
-					auto loop = 0u;
-					
-					do{
-						auto d = (double(loop)*range)/loopmax;
+		}
+		
+		if(t_enter != UNSET) tmin = t_enter;
+		if(t_leave != UNSET) tmax = t_leave;
+		
+		//if(trans_tree || trans_tree_output){
+		if(true){
+			for(auto &ob : ind.obs){
+				switch(ob.type){
+				case OBS_SOURCE_EV: case OBS_SINK_EV: case OBS_TRANS_EV: 
+					{
+						auto t = ob.tdiv;
 						
-						t = ob.tdiv + d;
+						if(hash_t.existing(hash_t.get_vec_double(t)) != UNSET || t == (unsigned int)(t)){
+							const auto loopmax = 100;
+							auto loop = 0u;
 							
-						if(t >= tmin && t <= tmax &&
-   						hash_t.existing(hash_t.get_vec_double(t)) == UNSET){
-							break;
+							do{
+								auto d = (double(loop)*range)/loopmax;
+								
+								t = ob.tdiv + d;
+									
+								if(t >= tmin && t <= tmax &&
+									hash_t.existing(hash_t.get_vec_double(t)) == UNSET){
+									break;
+								}
+								
+								t = ob.tdiv - d;
+								if(t >= tmin && t <= tmax &&
+									hash_t.existing(hash_t.get_vec_double(t)) == UNSET){
+									break;
+								}
+								loop++;
+							}while(loop < loopmax);
+							
+							if(loop == loopmax){
+								alert_input("Could not deal with transition event time '"+tstr(t)+"' on individual '"+ind.name+"'");
+							}
+							
+							//cout << ob.tdiv << " -> " << t << " jiggle" << endl;
+							ob.tdiv = t;	
 						}
-						
-						t = ob.tdiv - d;
-						if(t >= tmin && t <= tmax &&
-   						hash_t.existing(hash_t.get_vec_double(t)) == UNSET){
-							break;
-						}
-						loop++;
-					}while(loop < loopmax);
-					
-					if(loop == loopmax){
-						alert_input("Could not deal with transition event time '"+tstr(t)+"' on individual '"+ind.name+"'");
+						auto vec = hash_t.get_vec_double(t);
+						hash_t.add(0,vec);
 					}
+					break;
 					
-					ob.tdiv = t;
-					auto vec = hash_t.get_vec_double(t);
-					hash_t.add(0,vec);
+				default: break;
 				}
-				break;
-				
-			default: break;
 			}
 		}
 	}

@@ -185,7 +185,7 @@ class Hash
 					else po.ind_list.push({num:1,all_ind_ref:ob.all_ind_ref});
 				}
 				else{
-					let add = {ty:"OBS", m:ob.m, num:1, t_sum:ob.t, mnum_sum:ob.mnum, ind_list:[]};
+					let add = {ty:"OBS", m:ob.m, num:1, t_sum:Number(ob.t), mnum_sum:ob.mnum, ind_list:[]};
 					add.ind_list.push({num:1,all_ind_ref:ob.all_ind_ref});
 					pos.push(add);
 				}
@@ -248,13 +248,16 @@ class Hash
 			let po = pos[j];
 			if(po.t_sum/po.num > t_now){
 				if(po.num > max){ max = po.num; pos_sel = po;}
-				num_tot += pos[j].num;
+				if(po.ty == "SPLIT") num_tot += po.num;
 			}
 		}
 		
 		if(pos_sel){
-			pos_sel.frac = pos_sel.num/num_tot;
+			if(pos_sel.ty == "SPLIT"){
+				pos_sel.frac = pos_sel.num/num_tot;
+			}
 		}
+	
 		
 		return pos_sel;
 	}

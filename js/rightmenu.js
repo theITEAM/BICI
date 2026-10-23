@@ -79,7 +79,7 @@ function right_menu_buts(lay)
 		{
 			let inf_eff_pl = false;
 			
-			if(rpf.pos_indview.length > 1 && inter.graph.ind_sel == undefined){
+			if(rpf.pos_indview.length > 1 && inter.graph.ind_sel == undefined && inter.graph.ind_sel_tt == undefined){
 				y = add_filter("View",y,rpf.sel_indview,rpf.pos_indview,lay);
 				y += dygap;	
 				
@@ -92,12 +92,14 @@ function right_menu_buts(lay)
 				}
 			}
 			
-			if(inter.graph.ind_sel){
-				y = add_filter("View",y,rpf.sel_ind_sel_view,rpf.pos_ind_sel_view,lay);
+			let ind_tt_pl = false;
+			if(inter.graph.ind_sel_tt){
+				y = add_filter("View",y,rpf.sel_ind_sel_tt_view,rpf.pos_ind_sel_tt_view,lay);
+				ind_tt_pl = true;
 				y += dygap;	
 			}
 	
-			if(inf_eff_pl){			
+			if(inf_eff_pl || ind_tt_pl){			
 				y = chain_sample_filt(y,rpf,lay);
 			}
 			else{
@@ -130,10 +132,7 @@ function right_menu_buts(lay)
 				y = add_colour_filter(y,rpf,rpf2.col_filt,lay);
 			}
 				
-			if(inter.graph.ind_sel){
-				y = additional_filt(y,rpf,lay);
-			}
-			else{
+			if(!ind_tt_pl){
 				y = additional_filt(y,rpf,lay);
 			}
 			

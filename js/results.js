@@ -148,8 +148,14 @@ function set_genetic_data(result)
 			let source = get_source("inf",p);
 			for(let i = 0; i < source.length; i++){
 				let is = source[i];
-				if(is.type == "Genetic"){				
+				switch(is.type){
+				case "Genetic":				
 					result.genetic_data = copy(is.table.ele);
+					break;
+					
+				case "WAIFW":
+					result.waifw_data = copy(is.table.ele);
+					break;
 				}
 			}
 		}
@@ -1374,6 +1380,10 @@ function initialise_plot_filters(result,source)
 		}
 	}
 	
+	if(result.waifw_data != undefined){
+		rpf.pos_indview.push({te:"Inf. Pred. Acc."});
+	}
+	
 	rpf.sel_indview = copy(rpf.pos_indview[0]);
 	
 	// Colour filter 
@@ -1595,8 +1605,24 @@ function initialise_plot_filters(result,source)
 	pos_ind_sel_view.push({te:"Graph"});
 	pos_ind_sel_view.push({te:"Compartment"});
 	pos_ind_sel_view.push({te:"Density"});
+	
 	rpf.sel_ind_sel_view = copy(pos_ind_sel_view[0]);
 	rpf.pos_ind_sel_view = pos_ind_sel_view;
+	
+	let tt_on = false;
+	for(let p = 0; p < result.species.length; p++){
+		let sp = result.species[p];
+		if(sp.trans_tree.check == true) tt_on = true;
+	}
+	
+	if(tt_on){
+		let pos_ind_sel_tt_view=[];
+		pos_ind_sel_tt_view.push({te:"Infector"});
+		pos_ind_sel_tt_view.push({te:"Infectee"});
+		
+		rpf.sel_ind_sel_tt_view = copy(pos_ind_sel_tt_view[0]);
+		rpf.pos_ind_sel_tt_view = pos_ind_sel_tt_view;
+	}
 	
 	// Possibilities for viewing transitions
 	let pos_trans_view = [];

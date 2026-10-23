@@ -27,6 +27,8 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 	prop_weight = w;
 	number = 0;
 	
+	regraft_obs_type = RG_NOT_SET;
+	
 	name = "PROPOSAL "+prop_type_str(type)+" ";
 
 	auto win = (unsigned int)(model.details.T/10); if(win == 0) win = 1;
@@ -86,16 +88,21 @@ Proposal::Proposal(PropType type_, vector <unsigned int> vec, const Model &model
 		si = 0.1;
 		break;
 		
-	case TRANS_TREE_PROP:
-		si = 0.1;
+	case TRANS_TREE_PROP: case LOCAL_TRANS_TREE_PROP:
+	case MAXIMISE_GEN_OBS_PROP: case LOCAL_MAXIMISE_GEN_OBS_PROP:
+	case TRANS_TREE_SWAP_INF_EV_PROP:
+	case TRANS_TREE_SWAP_INF_EV_PROP2:
 		break;
-		
+	
 	case TRANS_TREE_SWAP_INF_PROP:
 		si = 0.1;
 		break;
-		
-	case TRANS_TREE_MUT_PROP:
+
+	case TRANS_TREE_MUT_PROP: case TRANS_TREE_MUT_ORIGIN_PROP:
 		si = 1;
+		break;
+
+	case TRANS_TREE_MUT_SAMPLE_PROP:
 		break;
 		
 	case TRANS_TREE_MUT_LOCAL_PROP:
@@ -424,12 +431,40 @@ string Proposal::print_info() const
 		ss << "TRANSMISSION TREE SAMPLER";	
 		break;
 		
+	case LOCAL_TRANS_TREE_PROP:
+		ss << "LOCAL TRANSMISSION TREE SAMPLER";	
+		break;
+		
+	case MAXIMISE_GEN_OBS_PROP:
+		ss << "MAXIMISE GENETIC OBSERVATION TREE SAMPLER";	
+		break;
+		
+	case LOCAL_MAXIMISE_GEN_OBS_PROP:
+		ss << "LOCAL MAXIMISE GENETIC OBSERVATION TREE SAMPLER";	
+		break;
+		
 	case TRANS_TREE_SWAP_INF_PROP:
 		ss << "TRANSMISSION TREE SWAP INF SAMPLER";	
 		break;
 		
+	case TRANS_TREE_SWAP_INF_EV_PROP:
+		ss << "TRANSMISSION TREE SWAP INF EV SAMPLER (selected by number)";	
+		break;
+		
+	case TRANS_TREE_SWAP_INF_EV_PROP2:
+		ss << "TRANSMISSION TREE SWAP INF EV SAMPLER (selected by time)";	
+		break;
+		
 	case TRANS_TREE_MUT_PROP:
 		ss << "TRANSMISSION TREE MUTATION NUMBER SAMPLER";	
+		break;
+		
+	case TRANS_TREE_MUT_ORIGIN_PROP:
+		ss << "TRANSMISSION TREE ORIGIN MUTATION NUMBER SAMPLER";	
+		break;
+	
+	case TRANS_TREE_MUT_SAMPLE_PROP:
+		ss << "TRANSMISSION TREE SAMPLE MUTATION NUMBER SAMPLER";	
 		break;
 		
 	case TRANS_TREE_MUT_LOCAL_PROP:
@@ -1115,7 +1150,7 @@ void Proposal::MH_event(State &state)
 									cout << "event old:" << endl; ssp.print_event(ind.ev);
 									cout << "event new:" << endl; ssp.print_event(ev_new);
 								}
-								
+							
 								auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
 								
 								if(!uii.success){
@@ -1145,12 +1180,9 @@ void Proposal::MH_event(State &state)
 										state.restore_back();
 										update_ind_samp_si(tr_gl,REJECT,samp.ntr);
 									}
-
+									
 									if(pl) state.check("ind prop event");
-	
-									if(pl){
-										state.check_pop_t("Pnum");
-									}
+									if(pl) state.check_pop_t("Pnum");
 								}
 							}
 						}
@@ -1501,7 +1533,9 @@ void Proposal::MH_ind_local(State &state)
 				
 					auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
 								
-					if(!uii.success) si.nfa++;
+					if(!uii.success){
+						si.nfa++;
+					}
 					else{
 						auto add = ssp.local_ind_change(i,cl);
 					
@@ -1574,48 +1608,10 @@ void Proposal::MH_ind_local(State &state)
 	}
 }
 
-	
-/// Performs a transmission tree proposal (swaping the individual causing an infection
-void Proposal::trans_tree(State &state)
-{
-	//if(skip_proposal(0.9)) return;
-	
-	state.trans_tree_proposal(burn_info,nac,ntr);
-}
-
-
-/// Performs a transmission tree proposal swapping infectee and infector
-void Proposal::trans_tree_swap_inf(State &state)
-{
-	//if(skip_proposal(0.9)) return;
-	
-	state.trans_tree_swap_inf_proposal(burn_info,nfa,nac,ntr);
-}
-
-
-/// Performs a transmission tree mutation proposal (simple change in mutation number on a link)
-void Proposal::trans_tree_mut(State &state)
-{
-	//if(skip_proposal(0.9)) return;
-	
-	state.trans_tree_mut_proposal(burn_info,nac,ntr,si);
-}
-
-
-/// Performs a local tree proposal (shifts events around a branching point
-void Proposal::trans_tree_mut_local(State &state)
-{
-	//if(skip_proposal(0.9)) return;
-	
-	state.trans_tree_mut_local_proposal(burn_info,gen_mut_info);
-}
-
 
 /// Performs a sampling proposal update for an observed individual 
 void Proposal::sample_ind_obs(State &state)
 {
-	//if(skip_proposal(0.8)) return;
-	
 	auto pl = false;
 	
 	auto burn = burn_info.on;
@@ -1676,12 +1672,19 @@ void Proposal::sample_ind_obs(State &state)
 								
 								auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
 								
-								if(!uii.success) nfa++;
+								if(!uii.success){
+									nfa++;
+									state.restore_back();
+								}
 								else{
+									if(pl){	
+										cout << "update: "; ssp.print_event(ev_new);
+									}
+									
 									ind_ev_samp.generate_ind_obs_timeline();
 										
 									auto probfi = ind_ev_samp.sample_events_prob(ev_store);
-									
+										 
 									auto al = calculate_al(uii.like_ch,uii.dprob+probfi-probif);
 								
 									if(pl) cout << al << "al" << endl;	
@@ -1694,6 +1697,10 @@ void Proposal::sample_ind_obs(State &state)
 									else{ 
 										if(pl) cout << "reject" << endl;
 										state.restore_back();
+									}
+									
+									if(pl){	
+										cout << "finish: "; ssp.print_event(ind.ev);
 									}
 								}
 								
@@ -1885,7 +1892,7 @@ void Proposal::resimulate_single_ind_obs(State &state)
 							}
 						}
 						
-						if(pl) state.check(" After ind prop");
+						//if(pl) state.check(" After ind prop");
 					}
 					
 					if(burn) ind_obs_prob_update(isp);
@@ -2461,6 +2468,7 @@ void Proposal::MH_ie(State &state)
 				state.update_ie_trans_tree(p_prop,i,ie_prop,exp_old/exp_prop,like_ch.markov);
 			}
 
+			state.reject();
 			update_si(REJECT_SMALL);
 		}
 		if(pl) state.check("ind ie prop");
@@ -2859,10 +2867,45 @@ string Proposal::diagnostics(double total_time) const
 	
 	ss << "Prob: " << prop_prob << "  ";
 	
+	string rg_obs="";
+	switch(regraft_obs_type){
+	case RG_OBS: rg_obs = " (RG)"; break;
+	case RG_OBS2: rg_obs = " (RG2)"; break;
+	case RG_OBS3: rg_obs = " (RG3)"; break;
+	case RG_NOT_SET: break;
+	}
+	
 	switch(type){
 	case TRANS_TREE_PROP:
 		{
-			ss << "Transmission tree proposal: " << endl;
+			ss << "Transmission tree proposal: " << rg_obs << endl;
+			if(ntr == 0) ss << "No proposals";
+			else ss << print_ac(nac,ntr);
+			ss << endl;  
+		}
+		break;
+		
+	case LOCAL_TRANS_TREE_PROP:
+		{
+			ss << "Local transmission tree proposal: " << rg_obs << endl;
+			if(ntr == 0) ss << "No proposals";
+			else ss << print_ac(nac,ntr);
+			ss << endl;  
+		}
+		break;
+		
+	case MAXIMISE_GEN_OBS_PROP:
+		{
+			ss << "Maximise genetic obs tree proposal: " << endl;
+			if(ntr == 0) ss << "No proposals";
+			else ss << print_ac(nac,ntr);
+			ss << endl;  
+		}
+		break;
+		
+	case LOCAL_MAXIMISE_GEN_OBS_PROP:
+		{
+			ss << "Local Maximise genetic obs tree proposal: " << endl;
 			if(ntr == 0) ss << "No proposals";
 			else ss << print_ac(nac,ntr);
 			ss << endl;  
@@ -2881,6 +2924,44 @@ string Proposal::diagnostics(double total_time) const
 		}
 		break;
 		
+	case TRANS_TREE_SWAP_INF_EV_PROP:
+	case TRANS_TREE_SWAP_INF_EV_PROP2:
+		{
+			ss << "Transmission tree swap inf ev proposal ";
+			
+			if(type == TRANS_TREE_SWAP_INF_EV_PROP) ss << "(selected by number)";
+			else ss << "(selected by time)";
+			ss << endl;
+			
+			auto ntr_tot = 0u, nac_tot = 0u, nfa_tot = 0u;
+			for(const auto &ts : trans_swap_inf_info){
+				ntr_tot += ts.ntr;
+				nac_tot += ts.nac;
+				nfa_tot += ts.nfa;
+			}
+			
+			if(ntr_tot == 0) ss << "No proposals";
+			else{
+				ss << print_ac(nac_tot,ntr_tot-nfa_tot);
+				ss << print_fa(nfa_tot,ntr_tot);
+				
+				{
+					stringstream ss2;
+					for(auto j = 0u; j < trans_swap_inf_info.size(); j++){
+						const auto &ts = trans_swap_inf_info[j];
+						if(ts.ntr > 0){
+							if(ss2.str() != "") ss2 << ", ";
+							ss2 << j << ":" << ts.nac << "/" << ts.ntr-ts.nfa;
+						}						
+					}
+					auto te = "("+ss2.str()+")";
+					ss << trunc(te,40);
+				}
+			}
+			ss << endl;  
+		}
+		break;
+		
 	case TRANS_TREE_MUT_PROP:
 		{
 			ss << "Transmission tree mutation proposal: " << endl;
@@ -2890,10 +2971,29 @@ string Proposal::diagnostics(double total_time) const
 		}
 		break;
 		
+	case TRANS_TREE_MUT_ORIGIN_PROP:
+		{
+			ss << "Transmission tree origin mutation proposal: " << endl;
+			if(ntr == 0) ss << "No proposals";
+			else	ss << print_ac(nac,ntr) << " Size:" << si;	
+			ss << endl;  
+		}
+		break;
+		
+	case TRANS_TREE_MUT_SAMPLE_PROP:
+		{
+			ss << "Transmission tree mutation sampler: " << endl;
+			if(ntr == 0) ss << "No proposals";
+			else	ss << print_ac(nac,ntr);	
+			ss << endl;  
+		}
+		break;
+		
 	case TRANS_TREE_MUT_LOCAL_PROP:
 		{
 			ss << "Transmission tree local mutation proposal: " << endl;
 			for(auto loop = 0u; loop < GEN_UPDATE_MAX; loop++){
+				if(loop != 0) ss << endl;
 				auto type = GenBranchUpdate(loop);
 				switch(type){
 				case OBS_GEN_UPDATE: ss << "Obs"; break;
@@ -2901,6 +3001,9 @@ string Proposal::diagnostics(double total_time) const
 				case TWO_BRANCH1: ss << "Two branch1"; break;
 				case TWO_BRANCH2: ss << "Two branch2"; break;
 				case TWO_BRANCH3: ss << "Two branch3"; break;
+				case TWO_BRANCH4: ss << "Two branch4"; break;
+				case TWO_BRANCH5: ss << "Two branch5"; break;
+				case TWO_BRANCH6: ss << "Two branch6"; break;
 				case ORIGIN_GEN_UPDATE: ss << "Origin"; break;
 				default: emsg("not opt"); break;
 				}
@@ -3035,7 +3138,7 @@ string Proposal::diagnostics(double total_time) const
 		}
 		break;
 		
-		case DET_IC_POP_PROP:
+	case DET_IC_POP_PROP:
 		{
 			const auto &sp = model.species[p_prop];
 			ss << "deterministic proposal initial population for species "  << sp.name;
@@ -3079,7 +3182,7 @@ string Proposal::diagnostics(double total_time) const
 			
 			if(type == IND_EVENT_TIME_PROP) ss << "Individual event proposals ";
 			else ss << "Individual multi-event proposals ";
-			ss << endl;
+			ss << rg_obs << endl;
 			
 			vector < vector < vector <double> > > ac_list,  fa_list, si_list;
 			ac_list.resize(sp.ncla); fa_list.resize(sp.ncla); si_list.resize(sp.ncla);
@@ -3126,7 +3229,7 @@ string Proposal::diagnostics(double total_time) const
 		{
 			const auto &sp = model.species[p_prop];
 			
-			ss << "Individual all event proposals" << endl;
+			ss << "Individual all event proposals" << rg_obs << endl;
 			
 			vector <double> ac_list, fa_list, si_list;
 		
@@ -3155,7 +3258,7 @@ string Proposal::diagnostics(double total_time) const
 		{
 			ss << "Individual resimulation proposals (for observed)";
 		
-			ss << ":" << endl;	
+			ss << rg_obs << ":" <<  endl;	
 					
 			if(ntr == 0) ss << "No proposals";
 			else{
@@ -3184,7 +3287,7 @@ string Proposal::diagnostics(double total_time) const
 			default: emsg("def op"); break;
 			}
 		
-			ss << ":" << endl;	
+			ss << rg_obs << ":" << endl;	
 			if(ntr == 0) ss << "No proposals";
 			else{
 				ss << print_ac(nac,ntr);
@@ -3219,14 +3322,14 @@ string Proposal::diagnostics(double total_time) const
 		break;
 		
 	case IND_OBS_SWITCH_ENTER_SOURCE_PROP:
-		ss << "Switch enter source prop" << endl;
+		ss << "Switch enter source prop" << rg_obs << endl;
 		if(ntr == 0) ss << "No proposals";
 		else ss << print_ac(nac,ntr);
 		ss << endl;
 		break;
 
 	case IND_OBS_SWITCH_LEAVE_SINK_PROP:
-		ss << "Switch leave sink prop" << endl;
+		ss << "Switch leave sink prop" << rg_obs << endl;
 		if(ntr == 0) ss << "No proposals";
 		else ss << print_ac(nac,ntr);
 		ss << endl;
@@ -3239,7 +3342,7 @@ string Proposal::diagnostics(double total_time) const
 	case IND_LOCAL_PROP: 
 		{
 			auto &claa = model.species[p_prop].cla[cl_prop];
-			ss << "Individual local proposals for " << claa.name << ":" << endl;
+			ss << "Individual local proposals for " << claa.name << rg_obs << ":" << endl;
 			for(auto j = 0u; j < claa.swap_rep.size(); j++){
 				const auto &si = swap_info[j];
 				ss << replace_arrow(claa.swap_rep[j].name) << " ";
@@ -3772,8 +3875,7 @@ void Proposal::basic_ind_update(unsigned int i, vector <Event> &ev_new, State &s
 	
 	auto uii = state.update_ind(p_prop,i,ev_new,UP_SINGLE);
 								
-	if(!uii.success){ }
-	else{
+	if(uii.success){
 		auto al = calculate_al(uii.like_ch,uii.dprob);
 
 		if(pl) cout << i << " " <<  al << " al" << endl;
@@ -3858,14 +3960,23 @@ void Proposal::update(State &state)
 {
 	if(ran() > prop_prob) return;
 	
+	state.regraft_obs_type = regraft_obs_type;
+	
 	number++;
 	
 	timer[PROP_TIMER] -= clock();
 	switch(type){
-	case TRANS_TREE_PROP: trans_tree(state); break;                     // Tree proposals
-	case TRANS_TREE_SWAP_INF_PROP: trans_tree_swap_inf(state); break;
-	case TRANS_TREE_MUT_PROP: trans_tree_mut(state); break;
-	case TRANS_TREE_MUT_LOCAL_PROP: trans_tree_mut_local(state); break;
+	case TRANS_TREE_PROP: state.trans_tree_proposal(burn_info,nac,ntr,false); break;                     // Tree proposals
+	case LOCAL_TRANS_TREE_PROP: state.local_trans_tree_proposal(burn_info,nac,ntr,false); break; 
+	case MAXIMISE_GEN_OBS_PROP: state.trans_tree_proposal(burn_info,nac,ntr,true); break; 
+	case LOCAL_MAXIMISE_GEN_OBS_PROP: state.local_trans_tree_proposal(burn_info,nac,ntr,true); break; 
+	case TRANS_TREE_SWAP_INF_PROP: state.trans_tree_swap_inf_proposal(burn_info,nfa,nac,ntr); break;
+	case TRANS_TREE_SWAP_INF_EV_PROP: state.trans_tree_swap_inf_ev_proposal(burn_info,trans_swap_inf_info,false); break;
+	case TRANS_TREE_SWAP_INF_EV_PROP2: state.trans_tree_swap_inf_ev_proposal(burn_info,trans_swap_inf_info,true); break;
+	case TRANS_TREE_MUT_PROP: state.trans_tree_mut_proposal(burn_info,nac,ntr,si); break;
+	case TRANS_TREE_MUT_ORIGIN_PROP: state.trans_tree_mut_origin_proposal(burn_info,nac,ntr,si); break;
+	case TRANS_TREE_MUT_SAMPLE_PROP: state.trans_tree_mut_sample_proposal(burn_info,nac,ntr); break;
+	case TRANS_TREE_MUT_LOCAL_PROP: state.trans_tree_mut_local_proposal(burn_info,gen_mut_info); break;
 	
 	case PARAM_PROP: MH(state); break;                                  // Parameter proposals
 	case LOG_PARAM_PROP: MH(state); break;            
@@ -3925,7 +4036,9 @@ void Proposal::update(State &state)
 		
 	default: break;
 	}	
-		 
+	
+	state.regraft_obs_type = RG_NOT_SET;
+		
 	timer[PROP_TIMER] += clock();
 }
 

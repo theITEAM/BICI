@@ -67,13 +67,7 @@ void Input::check_initial_pop_error(bool end)
 		case PPC:
 			break;
 			
-	 case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR:
-			break;
-			
-		case TORNADO_SETUP: case TORNADO_RESULT:
-			break;
-			
-		case SCAN_SETUP: case SCAN_RESULT:
+		case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR:
 			break;
 			
 		case COMPRESS: case DECOMPRESS: break;

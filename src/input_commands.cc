@@ -21,10 +21,11 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 	auto cname = cline.command;
 
 	// If not doing INF or EXT then ignore data
-	if(model.mode != INF && model.mode != EXT && model.mode != DATA_SHOW && model.mode != DATA_DEL && model.mode != DATA_SIM && model.mode != TORNADO_SETUP && model.mode != SCAN_SETUP){ 
+	if(model.mode != INF && model.mode != EXT && model.mode != DATA_SHOW && model.mode != DATA_DEL && model.mode != DATA_SIM){ 
 		switch(cname){
 		case COMP_DATA: case TRANS_DATA: case TEST_DATA: case POP_DATA:
-		case POP_TRANS_DATA: case IND_EFFECT_DATA: case IND_GROUP_DATA: case GENETIC_DATA:
+		case POP_TRANS_DATA: case IND_EFFECT_DATA: case IND_GROUP_DATA: 
+		case GENETIC_DATA: case WAIFW_DATA:
 			return;
 		default: break;
 		}
@@ -38,6 +39,7 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 	case ADD_IND_SIM: case ADD_IND_POST_SIM: cname = ADD_IND; break;
 	case REMOVE_IND_SIM: case REMOVE_IND_POST_SIM: cname = REMOVE_IND; break;
 	case MOVE_IND_SIM: case MOVE_IND_POST_SIM: cname = MOVE_IND; break;
+	case FORCED_TRANS_IND_SIM: case FORCED_TRANS_IND_POST_SIM: cname = FORCED_TRANS_IND_INF; break;
 	case INIT_POP_SIM: cname = INIT_POP; break;
 	case SET_IND_EFFECT_INF: case SET_IND_EFFECT_POST_SIM: cname = SET_IND_EFFECT_SIM; break;
 	default: break;
@@ -143,6 +145,24 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 				alert_import("For 'class' the value '"+name+"' is not a classification");
 				return;
 			}
+		}
+		break;
+	
+	case FORCED_TRANS_IND_SIM:
+	case FORCED_TRANS_IND_INF:
+	case FORCED_TRANS_IND_POST_SIM:
+		{
+			auto trans = get_tag_value("trans");
+			ds.filter_trans_str = replace(trans,"->","→"); 
+		
+			auto cl_sel = model.get_cl_from_trans(trans,p);
+		
+			if(cl_sel == UNSET){
+				alert_import("For 'trans' the value '"+trans+"' is not recognised");
+				return;
+			}
+		
+			ds.cl = cl_sel;
 		}
 		break;
 	
@@ -288,6 +308,9 @@ void Input::import_data_table_command(const CommandLine &cline, bool active)
 			auto seq_var = get_tag_value("seq-var"); if(seq_var == ""){ cannot_find_tag(); return;}
 			ds.seq_var_str = seq_var;
 		}
+		break;
+	
+	case WAIFW_DATA:
 		break;
 		
 	case SET_IND_EFFECT_SIM: 
@@ -1299,12 +1322,11 @@ void Input::param_command()
 		if(prior_const != ""){ cons = ""; reparam = "";}
 		break;
 		
-	case PPC: case TORNADO_RESULT: case SCAN_RESULT:
+	case PPC:
 		value = "";
 		break;
 		
 	case SIM: case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: 
-	case TORNADO_SETUP: case SCAN_SETUP:
 	case COMPRESS: case DECOMPRESS:
 		prior = ""; prior_split = ""; prior_const = "";
 		if(par.sim_sample == false){ dist = ""; dist_split = "";}
@@ -1618,11 +1640,11 @@ void Input::param_command()
 	if(par.variety == UNSET_PARAM){
 		if(par.not_set){
 			switch(model.mode){	
-			case INF: case PPC: case EXT: case TORNADO_RESULT: case SCAN_RESULT:
+			case INF: case PPC: case EXT:
 				alert_import("A prior should be set for parameter '"+par.full_name+"'");
 				break;
 	
-			case SIM: case DATA_SIM: case DATA_SHOW: case DATA_DEL: case TORNADO_SETUP: case SCAN_SETUP:
+			case SIM: case DATA_SIM: case DATA_SHOW: case DATA_DEL:
 				alert_warning("A value has not been set for parameter '"+par.full_name+"'. Ignore this warning if this parameter is used in the observation process.");
 				break;
 				
@@ -1836,7 +1858,7 @@ bool Input::simulation_command()
 /// Applies the inference command
 bool Input::inference_command()
 {
-	auto &details = get_details();
+	auto &details = model.details;
 	
 	get_optimise(details);
 	get_compress(details);

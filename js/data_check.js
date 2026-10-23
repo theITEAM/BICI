@@ -405,7 +405,31 @@ function data_source_check_error(out_type,so)
 			}
 			break;
 
-
+		case "Forced Trans.":
+			{
+				let cl = find(sp.cla,"name",so.spec.cl_drop.te);
+				if(cl == undefined) data_error(mess_def,out_type,so,{num:24});
+				else{
+					let claa = sp.cla[cl];
+					
+					let filt = so.spec.filter;
+					
+					let ill = false;
+					if(filt.cla.length <= cl) ill = true;
+					else{
+						if(filt.cla[cl].cl_name_store != claa.name) ill = true;
+						else{
+							let val = filt.cla[cl].tra.value;
+							let i = hash_find(claa.hash_tra,val);
+							if(i == undefined) ill = true;
+						}
+					}
+					
+					if(ill) data_error(mess_def,out_type,so,{num:24});
+				}
+			}
+			break;
+			
 		case "Transition": 
 		case "Pop. Trans.":
 			{
@@ -465,6 +489,7 @@ function data_source_check_error(out_type,so)
 
 		case "Remove Ind.": break;
 		case "Genetic": break;	
+		case "WAIFW": break;
 		case "Test-and-cull": break;
 
 		default: error("Source not checked error: "+so.type); break;

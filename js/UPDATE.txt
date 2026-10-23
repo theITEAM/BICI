@@ -1,3 +1,48 @@
+NEW NEW UPDATE:
+CHRIS
+- In the validation approached introduced an extinction criterion (this is useful because it filters out epidemics which natally die out early o
+n) 
+- Added a way to incorporate observation parameter under data simnulation through the "<<name,value,prior>>" format.
+- Tested 'data-sim' in core core for all data types.
+- Create the file "README_core_code.md" which gives a description of how to interact with the core BICI code.
+- Appendix D has been added to the manual which lists all BICI operations.
+- Wrote a summary of the software at the start of the code (bici.cc)
+- Tested simulation of all different data types using the interface (including new genetic data types)
+- Added two new visualisations givein the "infectors" and "infectees" of a selected individual. 
+- Added two new proposals which switch (potentially) multiple onward infections between two branch coming out of a node: TRANS_TREE_SWAP_INF_EV_PROP (selects certain number of infections to transfer) and TRANS_TREE_SWAP_INF_EV_PROP2 (selects a certain time period over which the swaps occur). 
+- Added in two types of proposals which account for genetic obserations in transmission tree propsoals (REGRAFT_WITH_OBS2, REGRAFT_WITH_OBS3)
+- Added new sampler for improved samping of mutation number on the tree: TRANS_TREE_MUT_ORIGIN_PROP, TRANS_TREE_MUT_SAMPLE_PROP
+- Added a new proposal which act during burnin to push state towards the genetic observations (otherwise this procerss can be very slow)
+- Got "Ext" mode working with transmission trees
+- Check that population within infection transitions are defined as "infected" for transmission trees
+- Only display a subset of a data table when it's very large (found to be a problem for simulated genetic data)
+- Correct problem when two species and only one set with transmission tree
+- A new type of data "WAIFW" data has been added. This store which infector, infectee pair, which allows for calculation of "infector prediction accuracy" (the proportion of time the infectee is correctly infered).
+- Wrote diagnostic code to ensure prob_if and prob_fi are corrrectly calculated for regraft on tree.
+- Test genetic data on all the example models in BICI.
+- Changed how phylogentic tree are output ("...name" is used instead of "name...", labels are sensible scaled, etc..);
+- Corrected bug on phylogentic tree out which was showing 50% instead of 100% at tips. 
+- Added possibility of different data type the the time points at which genetic measurements are made (e.g. immediately after a infection time point)
+- For "First Inf. Comp." added possbilities for entering infection and outside infeciton
+- Got validation (tornado and scan) working on Windows
+- Added statistics for transmission tree parameter (e.g. t^root) into param-stats-inf
+
+NEW UPDATE:
+GRANT
+- Correct issue with saving single file from the interface (new lines were not be created at the end of files)
+- Got memory usage showing again (accidentally turned off a line when working with Mac version!)
+- Got missing BD363 working (script+directory version with no carraige return at end missing last line).
+
+CHRIS
+- Corrected problem with 'set_low_mem' function (it was behaving differently for single file/data directory). Also set the threshold memory allocation for code to be higher (200MB instead of 50MB).
+
+
+
+
+
+
+
+
 UPDATES:
 JAMIE 
 - Added error message when fixed effect in model but not explicitly defined

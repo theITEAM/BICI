@@ -28,6 +28,8 @@ class Proposal                             // Implements a proposal
 		
 		bool on;                               // Determines if proposals is switched on
 		
+		RegraftObsType regraft_obs_type;       // This determines how regrafting is done using genetic observations (with transmission tree)
+		
 		string name;                           // Name of proposal
 		
 		// PARAM_PROP
@@ -44,6 +46,9 @@ class Proposal                             // Implements a proposal
 		unsigned int ntr;                      // Number of times proposal has been performed
 		unsigned int nac;                      // Number of times proposal has been accepted
 		unsigned int nfa;                      // Number of times proposal fails
+		
+		vector <PropAcInfo> trans_swap_inf_info; // Information about trans_tree_swap_inf_proposal
+		
 		double si;                             // Jumping size of proposal
 		vector < vector <double> > M;          // The covariance matrix
 		
@@ -101,10 +106,7 @@ class Proposal                             // Implements a proposal
 		void MH_event_all(State &state);
 		void MH_ind_local(State &state);
 		void sample_ind_obs(State &state);
-		void trans_tree(State &state);
-		void trans_tree_swap_inf(State &state);
-		void trans_tree_mut(State &state);
-		void trans_tree_mut_local(State &state);
+	
 		void resimulate_ind_obs(State &state);
 		void resimulate_single_ind_obs(State &state);
 		void resimulate_ind_unobs(State &state);

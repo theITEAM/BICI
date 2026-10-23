@@ -5,6 +5,14 @@
 // working on linux 02/03/26
 // working on windows 11/03/26
 
+TO DO  
+- SIR model
+- SEIR model
+
+- Test genetic proposal
+- Get diagnostics for three types of proposal 
+
+
 problem1 - the infered value fo mI is biased (even when only using simulation proposals
 
 

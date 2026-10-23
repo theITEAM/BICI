@@ -14,6 +14,7 @@ class Simulate                             // Simulates from the model
 	public:
 		Simulate(const Model &model, Output &output, Mpi &mpi, bool sup=false);
 		void run();
+		bool extinction_criterion(const ExtinctInfo &ei) const;
 		
 	private:
 		const Model &model;

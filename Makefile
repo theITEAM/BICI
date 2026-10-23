@@ -3,8 +3,8 @@
 #CXX = mpicxx
 CXX = mpic++
 #CXXFLAGS = -O3 -std=c++11  -fmax-errors=3 -g -Wall -Wextra 
-#CXXFLAGS = -O3 -std=c++14  -fmax-errors=3 -g  -Wall
-CXXFLAGS =  -O3 -std=c++14  -fmax-errors=3   -Wall
+CXXFLAGS = -O3 -std=c++14  -fmax-errors=3 -g  -Wall
+#CXXFLAGS =  -O3 -std=c++14  -fmax-errors=3   -Wall
 
 #CXXFLAGS = -O3 -std=c++14  -fmax-errors=3 -Wall
 #CXXFLAGS = -O3 -std=c++11  -fmax-errors=3 -Wall -Wextra 
@@ -33,7 +33,7 @@ all: bici-para
 
 bici-para: $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $(LIBRARIES) $^ -o $@
-	cp bici-para ..
+	#scp bici-para ..
 
 clean:
 	rm src/*.o

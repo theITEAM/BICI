@@ -39,13 +39,8 @@ vector <IndRef> State::force_consistent_solution()
 			
 			for(auto i = 0u; i < sp.nindividual_in; i++){
 				if(ssp.inconsistent(i)) ind_list.push_back(i);	
-				//ind_list.push_back(i); // change
 			}
-			//cout << ind_list.size() << " force" << endl;
-			
-			//ind_list.push_back(0);
-			//ind_list.clear();
-			
+		
 			if(ind_list.size() == 0){
 				ssp.inconsistent_ind = false;
 			}
@@ -809,10 +804,11 @@ void State::resample_ind(bool if_wrong)
 			for(auto i = 0u; i < sp.nindividual_in; i++){
 				if(if_wrong == false || ssp.inconsistent(i)) ind_list.push_back(i);
 			}
-			//cout << ind_list.size() << " resample" << endl;
-			//ind_list.push_back(500);
-			
-			if(ind_list.size() > 0){
+		
+			if(ind_list.size() == 0){
+				ssp.inconsistent_ind = false;
+			}
+			else{
 				IndEvSampler ind_ev_samp(ssp.markov_eqn_vari,ssp.individual,model.details,sp,ssp.obs_eqn_value,ssp.obs_trans_eqn_value,model.eqn,genetic_value.inf_node,precalc,popcomb_t,if_wrong);
 
 				ind_ev_samp.setup_nm();
@@ -839,10 +835,6 @@ void State::resample_ind(bool if_wrong)
 
 							if(pl){
 								cout << endl << endl << endl << endl;
-								cout << ssp.individual[i].ev[1].inf_node_ref << "If node" << endl;
-								//inf_node_ref
-								
-								//auto n = 
 								
 								cout << ssp.individual[i].name << endl;
 								cout << "Before:" << endl; ssp.print_event(ssp.individual[i].ev);

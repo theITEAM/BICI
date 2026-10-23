@@ -100,7 +100,7 @@ class StateSpecies                         // Stores information about the state
 		
 		vector <AlgWarn> alg_warn;             // Stores any algorithm warnings
 		
-		StateSpecies(PV &param_val, const vector <double> &popcombw_value, const vector <Equation> &eqn, const Species &sp, const Model &model, const vector <unsigned int> &pop_affect_, Operation mode, const double &dif_thresh, vector <double> &dpop, vector <unsigned int> &dpop_list);
+		StateSpecies(PV &param_val, const vector <double> &popcombw_value, const vector <Equation> &eqn, const Species &sp, const Model &model, const vector <unsigned int> &pop_affect_, Operation mode, const double &dif_thresh, vector <double> &dpop, vector <unsigned int> &dpop_list, const bool &trans_tree_on);
 	
 		void simulate_init();
 		unsigned int get_cinit_to_use(vector <unsigned int> &cinit_to_use) const;
@@ -152,8 +152,11 @@ class StateSpecies                         // Stores information about the state
 		vector <double> store_markov_eqn_vari() const;
 		void restore_markov_eqn_vari(const vector <double> &vec);
 		void set_event_change_div();
-		void add_trans_tree(const vector < vector <double> > &popnum_t, const vector < vector < vector <Poss> > > &pop_ind);
+		void setup_iif(const vector < vector <double> > &popnum_t, const vector < vector < vector <Poss> > > &pop_ind);
+		void calc_poss_link(vector < vector <PossLink> > &poss_link, const vector < vector <double> > &popnum_t, const vector < vector < vector <Poss> > > &pop_ind);
 		void remove_trans_tree();
+		unsigned int get_ind_c(unsigned int i, double ti) const;
+		double get_tra_rate(double tdiv, unsigned int trg) const;
 		
 	private:	
 		unsigned int ti_sort;                  // Trigger events which have been sorted
@@ -177,7 +180,7 @@ class StateSpecies                         // Stores information about the state
 	public:
 		void activate_initial_state(double t,const vector < vector <double> > &popcomb_t);
 		void set_markov_vari_value(unsigned int ti, const vector < vector <double> > &popcomb_t);
-		void update_individual_based(unsigned int ti, const vector < vector <Poss> > &pop_ind, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t);
+		void update_individual_based(unsigned int ti, const vector < vector <double> > &popcomb_t);
 		void calculate_omega(unsigned int g);
 		void calculate_omega_restore(unsigned int g, const vector <double> &store);
 		void remove_me_ev(const Event &ev);
@@ -194,7 +197,7 @@ class StateSpecies                         // Stores information about the state
 		
 	private:
 		void implement_test_and_cull(unsigned int index, double tdiv, const vector < vector <double> > &popcomb_t);
-		void add_data_event(unsigned int i, double t, const vector <SimTrigEvent> &trig_vec, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind);
+		void add_data_event(unsigned int i, double t, const vector <SimTrigEvent> &trig_vec, const vector < vector <double> > &popcomb_t);
 		bool allow_event(double t, const IndTraRef &itr) const;
 		void ie_sampler_init();
 		void update_ind_c(unsigned int i, double t, unsigned int cl_trans, const vector < vector <double> > &popcomb_t);
@@ -206,9 +209,9 @@ class StateSpecies                         // Stores information about the state
 		void markov_eqn_recalc_sim(MEUpdate me_up, unsigned int e, unsigned int ti, const vector <double> &popcomb);
 		void markov_vari_value_copy(unsigned int ti);
 		void sort_trig_event(unsigned int ti);
-		void sample_infecting_ind(unsigned int i, double t, unsigned int tr_gl, IndInfFrom &inf_from, const vector < vector <double> > &popnum_t, const vector < vector <Poss> > &pop_ind);
+		//void sample_infecting_ind(unsigned int i, double t, unsigned int tr_gl, IndInfFrom &inf_from, const vector < vector <double> > &popnum_t, const vector < vector <Poss> > &pop_ind);
 		IndInfFrom get_waifw(unsigned int i, double t) const;
-		void update_ind_trans(double t, const IndTraRef &itr, const vector < vector <double> > &popnum_t, const vector < vector <double> > &popcomb_t, const vector < vector <Poss> > &pop_ind);
+		void update_ind_trans(double t, const IndTraRef &itr, const vector < vector <double> > &popcomb_t);
 		void remove_markov_trans(unsigned int i, double t);
 		void update_ind_remove(unsigned int i, double t);
 		void update_ind_move(unsigned int i, double t, unsigned int c_comp, unsigned int cl, const vector < vector <double> > &popcomb_t);
@@ -250,10 +253,10 @@ class StateSpecies                         // Stores information about the state
 		const Species &sp;                     
 		const Model &model;
 		const double &dif_thresh;
-		vector <double> &dpop;                  // Stores change in population
-		vector <unsigned int> &dpop_list;       // Lists changes
-		
-	
+		vector <double> &dpop;                 // Stores change in population
+		vector <unsigned int> &dpop_list;      // Lists changes
+		const bool &trans_tree_on;             // Determines if transmission tree has been turned on
+		 
 		vector <unsigned int> pop_affect;
 		Operation mode;                        // SIM for simulation and INF for inference	
 		
@@ -271,7 +274,8 @@ class StateSpecies                         // Stores information about the state
 		double nm_trans_incomp_full_like(const vector <unsigned int> &nmtrans_ref, double dtdiv, double dt, const vector< vector <double> > &ref_val, const vector <double> &bp_val) const;
 		double nm_trans_incomp_like(TransType type, double dtdiv, double dt, const vector <double> &ref_val) const;
 		double nm_trans_incomp_like_no_log(TransType type, double dtdiv, double dt, const vector <double> &ref_val) const;
-		void change_trans_tree_Li_markov(unsigned int i, unsigned int e, double sign);
+		double change_trans_tree_Li_markov(unsigned int i, unsigned int e, double sign);
+		double change_trans_tree_Li_markov_iif(unsigned int tr_gl, const IndInfFrom &iif, double tdiv, const Individual &ind, double sign);
 		vector <double> markov_value_calc(unsigned int e, const vector <unsigned int> &list, const vector < vector <double> > &popcomb_t);
 		void markov_value_nopop_restore(const vector <unsigned int> &me_list, const vector <unsigned int> &list, const vector<double> &store);
 		MeanSD get_mean_sd(TransType type, const vector <double> &ref_val) const;
@@ -357,6 +361,7 @@ class StateSpecies                         // Stores information about the state
 		void init_cond_change_back(unsigned int c_enter_old, unsigned int c_enter_new);
 		void recalc_markov_value(unsigned int ee, unsigned int ti, unsigned int ti_next, const vector < vector <double> > &popnum_t, double &like_ch);
 		void restore_back();
+		void restore_back2();
 		
 	// In state_species_local.cc
 		vector <LocalIndChange> local_ind_change(unsigned int i, unsigned int cl) const;

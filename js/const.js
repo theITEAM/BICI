@@ -16,17 +16,17 @@ let ver="windows";                                // Determines platform
 
 let mac_temp_dir = "/tmp/BICI_files/";
 
-let win_linux = false;                            // When working on win running linux 
+let win_linux = true;//false;                            // When working on win running linux 
 
 const try_on = true;                              // Deterimines if try/catch is on (true)   
 const turn_off_random_seed = false;               // Used in testing (false)
 let debug = false;                                // Determines if debugger used (false)
 let testing = false;                              // Used logo to load up results (false)
 let load_map_fast = false;                        // If loads up world map from local computer
-let make_one_chain = false;                       // Make into one chain (for diagnostic purposes) CHECKON
+let make_one_chain = true;//false;                       // Make into one chain (for diagnostic purposes) TURN OFF
 let inf_leave_one_chain = false;                  // Cuts all but one chain (memory diagnostic)
 
-if(win_linux|| false){ testing = true; debug = true; if(ver == "linux") load_map_fast = true;}
+if(win_linux || false){ testing = true; debug = true; if(ver == "linux") load_map_fast = true;}
 
 let make_file = false;                            // Determines if makes file or runs
 let thick_line = false;                           // Used for making figures
@@ -70,6 +70,7 @@ const command_list = [
 {na:"add-ind-inf",ti:0},
 {na:"remove-ind-inf",ti:0},
 {na:"move-ind-inf",ti:0},
+{na:"forced-trans-ind-inf",ti:0},
 {na:"set-ind-effect-inf",ti:0},
 {na:"init-pop-sim",ti:0},
 {na:"add-pop-sim",ti:0},
@@ -77,12 +78,14 @@ const command_list = [
 {na:"add-ind-sim",ti:0},
 {na:"remove-ind-sim",ti:0},
 {na:"move-ind-sim",ti:0},
+{na:"forced-trans-ind-sim",ti:0},
 {na:"add-pop-post-sim",ti:0},
 {na:"remove-pop-post-sim",ti:0},
 {na:"add-ind-post-sim",ti:0},
 {na:"set-ind-effect-sim",ti:0},
 {na:"remove-ind-post-sim",ti:0},
 {na:"move-ind-post-sim",ti:0},
+{na:"forced-trans-ind-post-sim",ti:0},
 {na:"set-ind-effect-post-sim",ti:0},
 {na:"test-and-cull-sim",ti:0},
 {na:"comp-data",ti:0},
@@ -93,6 +96,7 @@ const command_list = [
 {na:"ind-effect-data",ti:0},
 {na:"ind-group-data",ti:0},
 {na:"genetic-data",ti:0},
+{na:"waifw-data",ti:0},
 {na:"simulation",ti:0},
 {na:"sim",ti:0},
 {na:"inference",ti:0},
@@ -123,7 +127,7 @@ const command_list = [
 ];
 
 // Lists all commands which need to load files
-const data_command_list = ["init-pop-inf", "add-pop-inf", "remove-pop-inf", "add-ind-inf", "remove-ind-inf", "move-ind-inf", "init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim","add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", ,"test-and-cull-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data","param-mult","set-ind-effect-sim","set-ind-effect-inf","set-ind-effect-post-sim"];
+const data_command_list = ["init-pop-inf", "add-pop-inf", "remove-pop-inf", "add-ind-inf", "remove-ind-inf", "move-ind-inf", "forced-trans-ind-inf","init-pop-sim", "add-pop-sim", "remove-pop-sim","add-ind-sim", "remove-ind-sim", "move-ind-sim",  "forced-trans-ind-sim", "add-pop-post-sim","remove-pop-post-sim","add-ind-post-sim", "remove-ind-post-sim","move-ind-post-sim", "forced-trans-ind-post-sim", "test-and-cull-sim", "comp-data", "trans-data", "test-data", "pop-data", "pop-trans-data", "ind-effect-data", "ind-group-data", "genetic-data", "waifw-data", "param-mult", "set-ind-effect-sim", "set-ind-effect-inf", "set-ind-effect-post-sim"];
 
 const sim_alg_list = ["gillespie","tau"];
 const inf_alg_list = ["DA-MCMC","PAS-MCMC","MFA","ABC","ABC-SMC","ABC-MBP","PMCMC","HMC"];
@@ -307,6 +311,7 @@ const convert = [
 		{command:"add-ind-inf", type:"Add Ind."},
 		{command:"remove-ind-inf", type:"Remove Ind."},
 		{command:"move-ind-inf", type:"Move Ind."},
+		{command:"forced-trans-ind-inf", type:"Forced Trans."},
 		{command:"fixed-eff", type:"Fixed Eff."},
 		{command:"init-pop-inf", type:"Init. Pop."},
 		{command:"comp-data", type:"Compartment"},
@@ -319,6 +324,7 @@ const convert = [
 		{command:"set-ind-effect-post-sim", type:"Set IE"},
 		{command:"ind-group-data", type:"Ind. Group"},
 		{command:"genetic-data", type:"Genetic"},	
+		{command:"waifw-data", type:"WAIFW"},
 		{command:"pop-data", type:"Population"},	
 		{command:"pop-trans-data", type:"Pop. Trans."},	
 		{command:"param-mult", type:"Parameter Mult."},
@@ -337,6 +343,8 @@ const data_template = [
 {type:"Remove Ind.", is_data:true, title:"Remove individuals", help:rem_ind_text, cols:["ID","t,the time the individuals are removed"]},
 
 {type:"Move Ind.", is_data:true, title:"Move individuals", help:move_ind_text, cols:["ID","t,the time the individuals are moved","to"]},
+
+{type:"Forced Trans.", is_data:true, title:"Forced transition data", help:load_forced_trans_text, cols:["ID","ttrans,the time the individuals undergo the transition"]},
 
 {type:"Ind. Eff.", is_data:true, title:"Individual effect values", help:ind_eff_data_text, cols:["ID","pos_value"]},
 
@@ -361,6 +369,8 @@ const data_template = [
 
 // Genetic
 {type:"Genetic", is_data:true, title:"Genetic data", help:seq_data_text, cols:["ID","t,the time the genetic measurement is taken","snp,the first SNP column"]},
+
+{type:"WAIFW", is_data:true, title:"WAIFW data", help:WAIFW_data_text, cols:["IDfrom","IDto"]},
 
 // Loading directly into model
 {type:"Fixed Effect", title:"Design matrix for fixed effect", help:fixed_eff_text, cols:["ID","value"]},
@@ -578,7 +588,7 @@ const alphabet = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p
 
 const like_name = ["L^markov","L^non-markov","L^ie","L^dist","L^obs","L^genetic-proc","L^genetic-obs","L^init","Prior"];
 
-const trans_tree_name = ["N^origin","N^infected","N^mut-tree","N^mut-origin","N^unobs","t^root"];
+const trans_tree_name = ["N^origin","N^infected","N^mut-tree","N^mut-origin","N^unobs","t^root","α^IPA","L^gen-obs-exp"];
 
 const dic_list = [" ","!","\"","#","$","%","&","'","(",")","*","+",",","-",".","/","0","1","2","3","4","5","6","7","8","9",":",";","<","=",">","?","@","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","[","\\","]","^","_","`","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","{","|","}","~","\t","\n","\r","α","β","γ","Γ","δ","Δ","ε","ζ","η","Η","θ","Θ","ι","κ","λ","Λ","μ","ν","ξ","Ξ","ο","π","Π","ρ","σ","τ","υ","φ","Φ","χ","ψ","Ψ","ω","Ω","Σ","∫","→","〈","〉"];
 
@@ -596,6 +606,7 @@ const ALMOST_ONE = 0.9999999;                      // Denotes almost one
 
 const ELE_REDUCE_FAC = 1;                          // Factor reduction when too many elements
 const TABLE_ROW_MAX = 10000;                       // The maximum number of rows displayed on a table
+const TABLE_ELEMENT_MAX = 10000;                    // The maximum number of rows displayed on a table
 const ELEMENT_MAX = 1000;                          // The maximum number of elements which can be displayed
 const X_ELEMENT_MAX = 1000;                        // The maximum number of elements in design matrix which can be displayed
 const A_ELEMENT_MAX = 1000;                        // The maximum number of elements which can be displayed for A matrix

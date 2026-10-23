@@ -12,7 +12,8 @@ class DataSim                              // Simulates data from state
 {	
 	public:
 		DataSim(Model &model, Output &output, bool sup_=false);
-		void run(string data_sim_line, unsigned int sim_sel);
+		void run(string data_sim_line, unsigned int sim_sel, bool &replace_data);
+		void check_replace(bool replace_data) const;
 		void del(string data_sim_line);
 		void show() const;
 		void clear(string data_sim_line, bool no_question);
@@ -24,9 +25,12 @@ class DataSim                              // Simulates data from state
 		CommandLine line;
 		string tag_find;
 		string data_sim_line_store;
+		vector <ParamValPrior> param_val_prior;
 		
+		void set_tag_value(string st, string val);
 		string get_tag_value(string st);
 		void cannot_find_tag() const;
+		void warning(string msg) const;
 		void error(string msg) const;
 		unsigned int option_error(string na, string te, const vector <string> &pos, const vector <unsigned int> &conv) const;
 		void init_pop_sim(unsigned int p, const State &state, Table &tab);
@@ -42,6 +46,7 @@ class DataSim                              // Simulates data from state
 		vector <double> get_tr_prob(const vector <string> &trans_filt, double tdiv) const;
 		void add_ind_sim(unsigned int p, const State &state, Table &tab);
 		void copy_from_sim(unsigned int p, string st, Command cname, Table &tab) const;
+		void forced_trans_sim(unsigned int p, string st, Command cname, Table &tab, vector <Tag> &tags) const;
 		void comp_data_sim(unsigned int p, const State &state, Table &tab);
 		void trans_data_sim(unsigned int p, const State &state, Table &tab);
 		void test_data_sim(unsigned int p, const State &state, Table &tab);
@@ -50,7 +55,11 @@ class DataSim                              // Simulates data from state
 		void ind_effect_data_sim(unsigned int p, const State &state, Table &tab);
 		void ind_group_data_sim(unsigned int p, Table &tab);
 		void genetic_data_sim(const State &state, Table &tab);
+		void waifw_data_sim(const State &state, Table &tab);
 		void mutate_seq(unsigned int num, vector <unsigned int> &seq) const;
+		bool check_valid_param_name(string name);
+		void get_obs_param(string &ta, bool substitute);
+		double get_param_spec(string ta);
 		bool wildcard_match(const string &name, string filt) const;
 		bool wildcard_match2(const string &name, const vector <string> &spl, bool root) const;
 		vector < vector < vector <double> > > get_ind_times(const State &state);

@@ -127,11 +127,11 @@ vector <LocalIndChange> StateSpecies::local_ind_change(unsigned int i, unsigned 
 			if(num == 0) jmax = timeline.size();
 			for(auto j = 0u; j < jmax; j++){
 				auto c_beg = timeline[j].c_bef;
-				unsigned int c_end;
-				if(num == 0) c_end = c_beg;
-				else c_end = timeline[j+num-1].c_aft;
-				//if(claa.tr_swap[c_beg][c_end].size() > 1){		
-				if(claa.tr_swap_possible[c_beg][c_end]){
+				unsigned int C_GEN_END;
+				if(num == 0) C_GEN_END = c_beg;
+				else C_GEN_END = timeline[j+num-1].c_aft;
+				//if(claa.tr_swap[c_beg][C_GEN_END].size() > 1){		
+				if(claa.tr_swap_possible[c_beg][C_GEN_END]){
 					auto vec = sp.get_vec_tr_swap_mid(j,num,timeline);
 					
 					vector <TrSwap> trs; 

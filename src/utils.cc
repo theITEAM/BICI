@@ -1151,7 +1151,7 @@ double binomial_probability(unsigned int num, double p, unsigned int n)
 			else return LI_WRONG;
 		}
 		else{
-			if(num > n) emsg("Problem");
+			if(num > n) emsg("Problem binimial");
 
 			return lgamma(n+1) - lgamma(num+1) - lgamma(n-num+1) + num*log(p) + (n-num)*log(1-p);
 		}
@@ -1290,7 +1290,7 @@ string stringify(const vector <EquationInfo> &value, const vector <Dependency> &
 
 
 /// Determinets if a string contains a character
-bool includes(string st, string ch)
+bool includes(const string &st, string ch)
 {
 	auto loc = st.find(ch);
 	if(loc != string::npos) return true;
@@ -1643,10 +1643,11 @@ unsigned int add_to_vec(vector <unsigned int> &vec, unsigned int val, HashSimp &
 		vec.push_back(val);
 	}
 	
-	/* turn off
-	auto i = find_in(vec,val);
-	if(i == UNSET){ i = vec.size(); vec.push_back(val);}
-	*/
+	if(false){ // TURN OFF
+		auto i = find_in(vec,val);
+		if(i == UNSET){ i = vec.size(); vec.push_back(val);}
+	}
+	
 	return i;
 }
 
@@ -1663,14 +1664,14 @@ unsigned int add_to_vec(vector <ParamRef> &vec, unsigned int th, unsigned int in
 		vec.push_back(pref);
 	}
 	
-	/* turn off
-	auto i = 0u; 
-	while(i < vec.size() && !(vec[i].th == th && vec[i].index == index)) i++;
-	if(i == vec.size()){
-		ParamRef pref; pref.th = th; pref.index = index; 
-		vec.push_back(pref);
-	}	
-	*/
+	if(false){  // TURN OFF
+		auto i = 0u; 
+		while(i < vec.size() && !(vec[i].th == th && vec[i].index == index)) i++;
+		if(i == vec.size()){
+			ParamRef pref; pref.th = th; pref.index = index; 
+			vec.push_back(pref);
+		}	
+	}
 	
 	return i;
 }
@@ -1688,13 +1689,14 @@ unsigned int add_to_vec(vector <IEGref> &vec, const IEGref &val, Hash &hash)
 		vec.push_back(val);
 	}
 	
-	/* turn off
-	auto i = 0u; 
-	while(i < vec.size() && !(vec[i].p == val.p && vec[i].i == val.i)) i++;
-	if(i == vec.size()){
-		vec.push_back(val);
+	if(false){ // TURN OFF
+		auto i = 0u; 
+		while(i < vec.size() && !(vec[i].p == val.p && vec[i].i == val.i)) i++;
+		if(i == vec.size()){
+			vec.push_back(val);
+		}
 	}
-	*/	
+	
 	return i;
 }
 
@@ -2846,7 +2848,7 @@ bool Frac_ord (const FracSort &fs1, const FracSort &fs2)
 
 
 /// Samples from a multinomial probability distribution
-vector <unsigned int>  multinomial_sample(unsigned int N_total, const vector <double> &frac)
+vector <unsigned int> multinomial_sample(unsigned int N_total, const vector <double> &frac)
 {
 	auto N = frac.size();
 	
@@ -2951,7 +2953,6 @@ unsigned int get_event_before(unsigned int e, const vector <Event> &ev)
 unsigned int get_event_after(unsigned int e, const vector <Event> &ev)
 {
 	auto cl = ev[e].cl;
-
 	e++;
 
 	while(e < ev.size() && !((ev[e].type == M_TRANS_EV || ev[e].type == NM_TRANS_EV)
@@ -3298,17 +3299,17 @@ void print_diag(string te)
 	if(print_diag_on && !com_op && op()) cout << te << endl;
 	
 	//cout << "diag " << te << " "; print_random("random");
-
-	if(false){
-		auto mem = memory_usage();
-		if(mem > mem_usage.mem){
-			mem_usage.mem = mem;
-			mem_usage.name = te;
-		}
 	
+	auto mem = memory_usage(); // This is used to calculate maximum memory usage
+	if(mem > mem_usage.mem){
+		mem_usage.mem = mem;
+		mem_usage.name = te;
+	}
+	
+	if(false){
 		auto time = clock();
 		
-		cout <<  te << " ";
+		cout << te << " ";
 		cout <<  (unsigned int)(double(mem));
 		cout << " time: "<< get_cpu_time(time-time_last) << endl;    
 		time_last = time;
@@ -4274,8 +4275,15 @@ string prop_type_str(PropType type)
 	case IE_COVAR_PROP: return "ie-covar";
 	case IE_VAR_CV_PROP: return "ie-var-cv";
 	case TRANS_TREE_PROP: return "trans-tree";
+	case LOCAL_TRANS_TREE_PROP: return "local-trans-tree";
+	case MAXIMISE_GEN_OBS_PROP: return "max-gen-obs-tree";
+	case LOCAL_MAXIMISE_GEN_OBS_PROP: return "local-max-gen-obs-tree";
   case TRANS_TREE_SWAP_INF_PROP: return "trans-tree-swap-inf";
+	case TRANS_TREE_SWAP_INF_EV_PROP: return "trans-tree-swap-ev-inf";
+	case TRANS_TREE_SWAP_INF_EV_PROP2: return "trans-tree-swap-ev-inf2";
 	case TRANS_TREE_MUT_PROP: return "trans-tree-mut";
+	case TRANS_TREE_MUT_ORIGIN_PROP: return "trans-tree-mut-origin";
+	case TRANS_TREE_MUT_SAMPLE_PROP: return "trans-tree-mut-sample";
 	case TRANS_TREE_MUT_LOCAL_PROP: return "trans-tree-mut";
 	case POP_ADD_REM_LOCAL_PROP: return "pop-add-rem-local";
 	case POP_MOVE_LOCAL_PROP: return "pop-move-local";
@@ -4532,5 +4540,12 @@ void print_random(string te)
 {
 	string warn;
 	cout << ran() << " " << gamma_sample(1,0.1,warn) << " rand " << te << endl;
+}
+
+
+/// Checks that the file has been successfully open
+void check_open(ofstream &fout, string file) 
+{
+	if(!fout) run_error("Could not write to file '"+file+"'. Perhaps it is already open?");
 }
 

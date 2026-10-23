@@ -1,93 +1,11 @@
-// This is start code for BICI
+/*
+BICI (Bayesian individual-based compartmental inference)
 
+© (2026) C. M. Pooley, G. Henderson, J. Prentice, A. Wilson and G. Marion
+Developed at Biomathematics and Statistics Scotland (BioSS)
 
-// BICI (Bayesian individual-based compartmental inference)
-// © C. M. Pooley and G. Marion
-
-// Compilation: make
-// Run: ./bici 
-
-// ssh gaia.bioss.ac.uk  
-// cd "/c/BICI/BICI_v0.9_windows"
-
-// tar -xzf foo.tgz
-
-// Load mpi: module load mpi/openmpi-x86_64
-// ./bici-core.exe big2.bici sim
-// ./bici-core.exe Execute/init.bici inf
-
-// nohup mpirun -n 10 ./bici-para Execute/init.bici inf > op.txt&
-// mpirun -n 10 ./bici-para Execute/init.bici inf 
-// mpirun -n 1 ./bici-para file.bici sim
-// mpirun -n 1 ./bici-para Execute/init.bici sim
-// mpirun --output :raw -n 1 ./bici-para Execute/init.bici sim
-// mpirun -n 3 ./bici-para Execute/init.bici inf
-
-// mpirun -n 1 ./bici-para Examples/EX_A1.bici sim
-// mpirun -n 2 ./bici-para Execute/init.bici inf
-// mpirun -n 16 ./bici-para Jamie/scen-3-1.bici inf
-// mpirun -n 16 ./bici-para Execute/init.bici inf
-// mpirun -n 3 ./bici-para Grant/RealData_1000_DA_5000 inf
-// mpirun -n 3 ./bici-para Grant/RealData_2000_DA_5000 inf
-// mpirun -n 16 ./bici-para Jamie/scen-5-1.bici inf
-// nohup mpirun -n 16 ./bici-para Jamie/scen-1-1b.bici inf > big2.txt&
-// mpirun -n 10 ./bici-para Execute/init.bici inf
-// ./bici-para Geno/SI_catbad_g1.0.bici inf > q1&
-// ./bici-para Geno/farm_f1.0.bici inf > q1&
-// ./bici-para Geno/SI_catbad_m1.bici inf > y1&
-
-// ./bici-core Execute/init.bici inf
-
-// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici sim
-
-// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici inf
-
-// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici post-sim
-
-// ./bici-para Execute/year_varying.bici ext 26000
-// inference start=0 end=1094 timestep=1 update=25000 algorithm="PAS-MCMC" npart=10 gen-percent=1
-
-// nohup mpirun -n 16 ./bici-para Jamie/scen-1-1.bici inf > ddddd.txt&
-// 06d_New_Inf_500.bici
-// nohup mpirun -n 16 ./bici-para Jamie/simp_model.bici inf > eeee.txt&
-// 06d_New_Inf_500.bici
-// ./bici-para Jamie/test.bici post-sim
-// ./bici-para Jamie/testped2.bici post-sim
-// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s  ./bici-para Execute/init.bici inf
-// valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s  ./bici-para Execute/init.bici sim
-// ./bici-para Jamie/temp4/scen-4-11.bici inf
-// mpirun -n 10 ./bici-para Jamie/temp4/scen-4-11.bici inf
-//  valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Jamie/temp4/scen-4-11.bici inf
-
-// nohup valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/mod13.bici inf > moddd13.txt
-
-// nohup gdb -ex=r ./bici-para  --args Execute/mod14.bici inf > moddd14.txt
-
-//nohup  mpirun -n 10  ./bici-para Execute/mod10.bici inf >  modd10.txt&
-// mpirun -n 4  ./bici-para Execute/init.bici inf
-
-// git clone https://github.com/theITEAM/BICI.git
-
-// Different commands
-// -co=0 / -core=0                            Runs the zeroth core
-// -samp=0                                    Sets how sampling is done (for diagnostic purposes)
-// -seed=100                                  This overides seed set in bici file 
-// -sim=1                                     Selects a particular simulation when creating data
-
-// When running in parallel then load mpi using: module load mpi/openmpi-x86_64
-
-// Test: valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici sim
-// Test: valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s ./bici-para Execute/init.bici inf
-// Test:  valgrind --exit-on-first-error=yes --error-exitcode=1 --leak-check=yes -s  ./bici-para simple_model.bici inf
-
-// Compiling for windows: .\make.bat from the directory D:\C_complier_BICI2.0\bin
-
-// 45541 lines of code (15/11/24)
-// 51000 lines of code (18/12/24)
-// 56000 lines of code (16/05/25)
-// 65634 lines of code (17/09/25)
-// 81002 lines of code (25/02/26)
-// 87660 lines of code (01/07/26)
+For a description of how to compile and run this code see the file "README_core_code.md" in the main directory.
+*/
 
 #include <iostream>
 #include <sstream>
@@ -124,7 +42,7 @@ bool com_op = false;                                 // Set to true for command 
 #include "lzw.hh"
 #include "validation.hh"
 
-vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_factor, string &file, vector <string> &data_sim_lines, bool &no_question, bool &test, string &add_info);
+vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_factor, string &file, vector <string> &data_sim_lines, string &spec_file, bool &no_question, bool &test);
 
 int main(int argc, char** argv)
 {		
@@ -144,6 +62,7 @@ int main(int argc, char** argv)
 	// Various functions used to test functionality
 	//string te = "α this"; encode(te); return 0;
 	//test(); return 0;
+	//test_harmonic(); return 0;
 	//check_cdf_function(); return 0;
 	//check_nm_trans_incomp_like_no_log(); return 0;
 	//mvn_prior_check(); return 0;
@@ -165,9 +84,9 @@ int main(int argc, char** argv)
 	vector <string> data_sim_lines;
 	auto no_question = false;
 	auto test = false;
-	string add_info;
+	string spec_file;
 	
-	auto tags = get_tags(sec,mode,ext_factor,file,data_sim_lines,no_question,test,add_info);
+	auto tags = get_tags(sec,mode,ext_factor,file,data_sim_lines,spec_file,no_question,test);
 	
 	print_diag("start model");
 	
@@ -175,28 +94,28 @@ int main(int argc, char** argv)
 	case TORNADO_SETUP:
 		{
 			Validation valid;
-			valid.tornado_setup(add_info,mode,ext_factor,file,data_sim_lines);
+			valid.tornado_setup(spec_file,ext_factor,file);
 		}
 		return 0;
 		
 	case TORNADO_RESULT:
 		{
 			Validation valid;
-			valid.tornado_result(mode,ext_factor,no_question,file);
+			valid.tornado_result(spec_file,ext_factor,no_question,file);
 		}
 		return 0;
 		
 	case SCAN_SETUP:
 		{
 			Validation valid;
-			valid.scan_setup(add_info,mode,ext_factor,file,data_sim_lines,test);
+			valid.scan_setup(spec_file,ext_factor,file);
 		}
 		return 0;
 		
 	case SCAN_RESULT:
 		{
 			Validation valid;
-			valid.scan_result(add_info,mode,ext_factor,no_question,file);
+			valid.scan_result(spec_file,ext_factor,no_question,file);
 		}
 		return 0;
 	
@@ -207,6 +126,8 @@ int main(int argc, char** argv)
 	
 	model.samp_type = ALL_SAMP;
 	
+	auto output_file = file;
+	
 	for(const auto &tag : tags){
 		switch(tag.type){
 		case CORE: core_spec = tag.value; break;  
@@ -215,7 +136,7 @@ int main(int argc, char** argv)
 			if(model.mode != DATA_SIM) alert_input("The 'sim' tag can only be used with 'data-sim'.");
 			sim_sel = tag.value; 
 			break;  
-		case OP: file = tag.te; break;
+		case OP: output_file = tag.te; break;
 		case SAMP_TYPE:
 			switch(tag.value){
 			case 0: model.samp_type = LOCAL_SAMP; break;
@@ -250,7 +171,7 @@ int main(int argc, char** argv)
 	}
 	
 	if(false && op()){
-		cout << " turn off data summary" << endl;
+		cout << "Data summary" << endl;
 		output.summary(model);                // Outputs a text file sumarising the model
 
 		output.data_summary(model);           // Outputs a text file sumarising the data
@@ -326,9 +247,11 @@ int main(int argc, char** argv)
 	case DATA_SIM:                          // Simulates some data and adds to 
 		{
 			DataSim data_sim(model,output);
+			bool replace_data = false;
 			for(const auto &va : data_sim_lines){
-				data_sim.run(va,sim_sel);
+				data_sim.run(va,sim_sel,replace_data);
 			}
+			data_sim.check_replace(replace_data);
 		}
 		break;
 		
@@ -388,7 +311,7 @@ int main(int argc, char** argv)
 		//output.profile_memory();
 	
 		auto op_time = clock();
-		output.end(file,total_cpu);
+		output.end(output_file,total_cpu);
 		auto op_cpu = clock()-op_time;
 		
 		if(!model.data_mode()){
@@ -405,7 +328,7 @@ int main(int argc, char** argv)
 
 
 /// Gets values for tags when BICI is run
-vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_factor, string &file, vector <string> &data_sim_lines, bool &no_question, bool &test, string &add_info)
+vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_factor, string &file, vector <string> &data_sim_lines, string &spec_file, bool &no_question, bool &test)
 {
 	vector <BICITag> tags;
 	
@@ -545,40 +468,27 @@ vector <BICITag> get_tags(vector <string> &sec, Operation &mode, ExtFactor &ext_
 			}
 		}
 		
-		if(te == "tornado" || begin_str(te,"tornado:")){
-			mode_new = TORNADO_SETUP;
-			if(begin_str(te,"tornado:")) add_info = te.substr(8);
+		if(te == "tornado" || te == "tornado-res" || te == "scan" || te == "scan-res"){
+			if(te == "tornado") mode_new = TORNADO_SETUP;
+			if(te == "tornado-res") mode_new = TORNADO_RESULT;
+			if(te == "scan") mode_new = SCAN_SETUP;
+			if(te == "scan-res") mode_new = SCAN_RESULT;
 			
-			if(i+1 == N) alert_input("There must be an expression (or expressions) after 'torndo' that specify the data.");
+			if(i+1 == N) alert_input("There must be a file declaration after '"+te+"' that specifies the data.");
 			else{
+				if(i+2 != N) alert_input("There must only be a file declaration after '"+te+"' that specifies the data.");
+			
 				i++;
-				while(i < N){ data_sim_lines.push_back(sec[i]); i++;}
+				spec_file = sec[i];
 			}
 		}
 			
-		if(te == "tornado-res") mode_new = TORNADO_RESULT;
-	
 		if(te == "compress" || te == "comp"){
 			mode_new = COMPRESS;
 		}
 		
 		if(te == "decompress" || te == "decomp"){
 			mode_new = DECOMPRESS;
-		}
-		
-		if(begin_str(te,"scan:")){
-			mode_new = SCAN_SETUP;
-			if(i+1 == N) alert_input("There must be an expression (or expressions) after 'scan' that specify the data.");
-			else{
-				i++;
-				while(i < N){ data_sim_lines.push_back(sec[i]); i++;}
-			}
-			add_info = te.substr(5);
-		}
-		
-		if(begin_str(te,"scan-res:")){
-			mode_new = SCAN_RESULT;
-			add_info = te.substr(9);
 		}
 		
 		if(end_str(te,".bici")){

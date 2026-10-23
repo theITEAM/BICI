@@ -95,6 +95,8 @@ class Species   	                         // Stores details of a species
 		
 		vector <Intervention> intervention;    // Stores any interventions
 		
+		vector <ForcedTrans> forced_trans;     // Stores any forced transitions
+		
 		vector <DataSource> source;            // Sources of data
 		InitCond init_cond;                    // Stores infomation about the initial conditions
 		
@@ -187,6 +189,7 @@ class Species   	                         // Stores details of a species
 		bool item_equal(const EqItem &it1, const EqItem &it2) const;
 		void set_markov_eqn_update(const vector <Equation> &eqn, const vector <Param> &param);
 		bool trans_illegal(unsigned int tr, unsigned int ti, const vector < vector <bool> > &illegal_trans) const;
+		unsigned int trg_from_tr_func(unsigned int c, unsigned int cl, unsigned int tr) const;
 		
 	// In 'species_data.cc':
 	public: 
@@ -215,6 +218,7 @@ class Species   	                         // Stores details of a species
 		vector < vector <double> > calc_nm_rate(bool calc_bp, const vector <double> &precalc, const vector < vector <double> > &popcomb_t, const vector <Equation> &eqn, vector < vector <double> > &bp_store) const;
 		void set_ob_trans_ev(const vector <Equation> &eqn);
 		vector <string> set_trans_filt(unsigned int cl, string te, BoundType bound, string &emsg) const;
+		unsigned int find_individual(string name, bool create=true);
 
  	private:
 		void set_ind_tmin_tmax();
@@ -229,6 +233,7 @@ class Species   	                         // Stores details of a species
 		void move_ind_data(const DataSource &so);
 		void genetic_data(const DataSource &so);
 		void comp_data(const DataSource &so);
+		void forced_trans_ind_inf(const DataSource &so);
 		void test_data(const DataSource &so);
 		void population_data(const DataSource &so, Hash &hash_pop_filter);
 		ObsModelVariety set_obs_mod_type(const ObsModel &om) const;
@@ -238,7 +243,6 @@ class Species   	                         // Stores details of a species
 		vector <string> global_convert(const Filter &filt) const;
 		vector <string> trans_global_convert(unsigned int cl, const vector <string> &trans_name_str, const Filter &comp_filt);
 		void set_default_enter();
-		unsigned int find_individual(string name, bool create=true);
 		void X_vector_order();
 		void generate_data() const;
 		void alert_source(string st, const DataSource &so, unsigned int c = UNSET, unsigned int r = UNSET);

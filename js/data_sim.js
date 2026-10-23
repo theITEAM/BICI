@@ -84,7 +84,60 @@ function simulate_data(so)
 	let head = [];
 	let ele = [];
 
+	let spec_set;
+
 	switch(so.type){
+	case "Forced Trans.": // Copies across forced transition data
+		{
+			let sim_so = result.species[p].sim_source;
+		
+			head.push("ID");
+			head.push("t");
+			let i = 0; 
+			while(i < sim_so.length && sim_so[i].type != "Forced Trans.") i++;
+			
+			if(i == sim_so.length){
+				alert_help("No forced transition","Forced transitions cannot be found in the simulated system.");
+			}
+			else{
+				let ss = sim_so[i];
+				
+				let tab = ss.table;
+				for(let r = 0; r < tab.nrow; r++){
+					ele.push(tab.ele[r]);
+				}					
+				
+				spec_set = ss.spec;
+			}
+		}
+		break;
+	
+	case "WAIFW":
+		{
+			head.push("From");
+			head.push("To");
+			let result = sim_result;
+			let samp = result.sample[so.sel_sim];
+			let all_ind_list = result.all_ind_list;
+			let inf_node = samp.inf_node;
+			
+			for(let n = 0; n < inf_node.length; n++){
+				let row=[];
+				
+				let no = inf_node[n];
+				let from = no.from;
+				if(from == INFN_ENT || from == INFN_OUT) row.push(".");
+				else{
+					let no_from = inf_node[from];
+					row.push(all_ind_list[no_from.all_ind_ref].name);
+				}
+				row.push(all_ind_list[no.all_ind_ref].name);
+				
+				ele.push(row);
+			}
+		}
+		break;
+		
 	case "Genetic":
 		switch(spec.type_radio.value){
 		case "snp": simulate_genetic_snp(t_start,t_end,ele,head,so); break;
@@ -651,8 +704,8 @@ function simulate_data(so)
 	if(ele.length == 0 && so.type != "Transition"){
 		alert_help("No data","This data is empty.");
 	}
-	
-	post({ type:input.type, head:head, ele:ele});
+
+	post({ type:input.type, head:head, ele:ele, spec:spec_set});
 }
 
 
@@ -1108,13 +1161,13 @@ function get_ind_times(t_start,t_end,so,samp,hash,ind_list,result)
 							c = c_after_event(ind.ev[e],sp);
 							e++;
 						}
-						
-						let dd = 0.001;
+				
+						let dd = result.details.timestep*0.001;
 
-						if(c == OUT || c == SOURCE || sp.comp_gl[c].infected != true){
+						if(c == OUT || c == SOURCE || sp.comp_gl[c].infected != true){	
 							if(e < ind.ev.length && !dif_thresh(ind.ev[e].t,tf,dd)){
 								c = c_after_event(ind.ev[e],sp);
-								if(sp.comp_gl[c].infected == true){
+								if(c != OUT && sp.comp_gl[c].infected == true){
 									tf = round(ind.ev[e].t + dd);
 								}
 							}
@@ -1190,7 +1243,7 @@ function add_gen_data(head,ele)
 	for(let i = 0; i < head.length; i++){
 		transfer_column(i,false);
 	}
-	
+
 	edit_source.table.edit = true;
 }
 
@@ -1437,6 +1490,9 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 	
 	let ind_times = get_ind_times(t_start,t_end,so,samp,hash,ind_list,result);
 	
+	let mut_num_origin = 0;
+	let mut_num_total = 0;
+	
 	// Adds in observations
 	let obs = [];
 	for(let n = 0; n < inf_node.length; n++){
@@ -1456,6 +1512,7 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 	
 		if(infn.from == INFN_ENT || infn.from == INFN_OUT){
 			infn.num = poisson_sample(seq_var+(t-t_start)*mu);
+			mut_num_origin += mut_num_origin;
 		}
 		else{
 			while(e < ev.length && ev[e].t != t) e++;
@@ -1493,6 +1550,7 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 		for(let k = 0; k < infn.inf_ev.length; k++){
 			let tt = infn.inf_ev[k].t;
 			infn.inf_ev[k].num = poisson_sample(mu*(tt-t));
+			mut_num_total += infn.inf_ev[k].num;
 			t = tt;
 		}
 	}	
@@ -1633,6 +1691,9 @@ function simulate_genetic_matrix(t_start,t_end,ele,head,so)
 	}
 
 	set_genetic_matrix_columns(ele,so);
+	
+	prr("mut_num_total: "+mut_num_total);
+	prr("mut_num_origin: "+mut_num_origin);
 }
 
 
@@ -1771,3 +1832,4 @@ function generate_test_and_cull(p,i,sel_sim)
 	
 	post({ edit_source:edit_source});
 }
+

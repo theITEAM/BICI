@@ -45,6 +45,7 @@ private:
 	BurnInfo burn_info;                    // Information about burnin
 		
 	void update_init();
+	void genetic_data_split_obs_proposal();
 	bool is_markov_pop(const AffectLike &al) const;
 	void add_parameter_prop(const vector <unsigned int> &vec, bool log_trans);
 	void set_proposal_prob();

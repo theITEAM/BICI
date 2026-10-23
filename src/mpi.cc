@@ -394,7 +394,10 @@ void Mpi::pack(const Particle &pa)
 	pack_item(tts.N_mut_origin);
 	pack_item(tts.N_unobs);
 	pack_item(tts.t_root);
-
+	pack_item(tts.IPA);
+	pack_item(tts.genetic_obs_expected);
+	pack_item(tts.genetic_obs_reached);
+	
 	pack_num(pa.inf_origin.size());
 	for(auto i = 0u; i < pa.inf_origin.size(); i++){
 		const auto &io = pa.inf_origin[i];
@@ -422,6 +425,8 @@ void Mpi::pack(const Particle &pa)
 			pack_item(ie.mut_num);
 		}
 	}
+	
+	pack_item(pa.maximise_gen_obs);
 	
 	pack_item(pa.w);
 	pack_item(pa.s);
@@ -561,6 +566,9 @@ void Mpi::unpack(Particle &pa)
 	unpack_item(tts.N_mut_origin);
 	unpack_item(tts.N_unobs);
 	unpack_item(tts.t_root);
+	unpack_item(tts.IPA);
+	unpack_item(tts.genetic_obs_expected);
+	unpack_item(tts.genetic_obs_reached);
 
 	auto IO = unpack_num();
 	for(auto i = 0u; i < IO; i++){
@@ -593,6 +601,7 @@ void Mpi::unpack(Particle &pa)
 		
 		pa.inf_node.push_back(in);
 	}
+	unpack_item(pa.maximise_gen_obs);
 	
 	unpack_item(pa.w);
 	unpack_item(pa.s);

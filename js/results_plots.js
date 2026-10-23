@@ -1900,6 +1900,25 @@ function add_individual_buts(res,lay)
 	let cx = corner.x;
 	let cy = corner.y;
 	
+	let ind_sel_tt = inter.graph.ind_sel_tt;
+	if(ind_sel_tt != undefined){
+		cy = lay.add_title(ind_sel_tt,cx,cy,{te:ind_sing_tt_plot_text});
+		cy += 1;
+		
+		if(inter.graph.init != true){
+			inter.graph.init = "loading"; 
+			start_worker("Graph ind sing tt",{res:res_worker(res), ind_sel:ind_sel_tt});
+			return;
+		}
+		
+		let dy = scalable_dy(cy,lay);
+		
+		inter.graph.create(cx,cy,graph_width-right_menu_width,dy,lay);
+		
+		lay.add_corner_button([["Back","Grey","CancelViewInd"]],{x:lay.dx-button_margin.dx, y:lay.dy-button_margin.dy});
+		return;
+	}
+	
 	let ind_sel = inter.graph.ind_sel;
 	if(ind_sel != undefined){
 		cy = lay.add_title(ind_sel,cx,cy,{te:ind_sing_plot_text});
@@ -2081,7 +2100,7 @@ function diagnostics_buts(lay)
 function graph_ind_calculate(result,rpf,burn,p)
 {
 	percent(1);
-	
+
 	// Sets classification
 	let rpf2 = rpf.species[p];
 	let cl = rpf2.sel_class.cl;
@@ -2122,6 +2141,11 @@ function graph_ind_calculate(result,rpf,burn,p)
 	
 	if(rpf.sel_indview.te == "First Inf. Comp."){
 		add_first_inf_comp(imin,imax,tmin,tmax,chsel,result,rpf,burn,p,cl);
+		return;		
+	}
+	
+	if(rpf.sel_indview.te == "Inf. Pred. Acc."){
+		add_infector_prediction_accuracy(imin,imax,tmin,tmax,chsel,result,rpf,burn);
 		return;		
 	}
 	
@@ -2527,6 +2551,176 @@ function get_g_filt(popfilt,sp)
 }
 
 
+/// Plots a histogram of the potential infectors of a given individual
+function graph_ind_infector_calculate(ind_sel,result,burn,p,imin,imax,chsel,i_store)
+{
+	let all_ind_list = result.all_ind_list;
+	
+	let num=[];
+	for(let j = 0; j < all_ind_list.length; j++) num[j] = 0;
+	
+	let ntot = 0, nexternal = 0;
+	for(let samp = imin; samp < imax; samp++){
+		let sampl = result.sample[samp];
+		if(sampl.num >= burn && !(chsel != "All" && sampl.chain != chsel)){		
+			let sa = sampl.species[p];
+			
+			let i = i_store[samp];
+			if(i != undefined){
+				let ind = sa.individual[i];	
+				
+				for(let j = 0; j < ind.ev.length; j++){
+					let ev = ind.ev[j];
+					let inf = ev.infection;
+					if(inf != undefined){
+						if(inf.p == OUTSIDE_INF) nexternal++;
+						else{
+							let infector = sampl.species[inf.p].individual[inf.i];
+							num[infector.all_ind_ref]++;
+						}
+						ntot++;
+					}
+				}
+			}
+		}
+	}
+	
+	let list=[];
+	for(let i = 0; i < all_ind_list.length; i++){
+		let n = num[i];
+		if(n != 0){
+			list.push({name:all_ind_list[i].name, frac:n/ntot});
+		}
+	}
+	
+	if(nexternal != 0){
+		list.push({name:"EXTERNAL", frac:nexternal/ntot, ext:true});
+	}
+	
+	if(list.length == 0){ post(no_graph_msg("No infectors")); return;}
+	
+	list.sort( function(a, b){ return b.frac-a.frac});
+	
+	let data=[];
+	
+	let x = 0;
+	for(let i = 0; i < list.length; i++){
+		let li = list[i];
+		let col = DGREY; if(list.ext == true) col = DDGREY;
+		data.push({type:"Bar", name:li.name, x:x+0.5, y:li.frac, thick:bar_thick, col:col});
+		x++;
+	}
+	
+	post({type:"Graph define", variety:"Histogram", view:"Histogram", data:data, op:{x_label:"Individual", x_param:false, y_label:"Probability"}});
+}
+
+
+/// Plots a histogram of the potential infectee of a given individual
+function graph_ind_infectee_calculate(ind_sel,result,burn,p,imin,imax,chsel,i_store)
+{
+	let all_ind_list = result.all_ind_list;
+	
+	let num=[];
+	for(let j = 0; j < all_ind_list.length; j++) num[j] = 0;
+	
+	let infected = false;
+	
+	let ntot = 0;
+	for(let samp = imin; samp < imax; samp++){
+		let sampl = result.sample[samp];
+		if(sampl.num >= burn && !(chsel != "All" && sampl.chain != chsel)){		
+			let sa = sampl.species[p];
+			
+			let i = i_store[samp];
+			if(i != undefined){
+				if(infected == false){
+					let ind = sa.individual[i];	
+					for(let j = 0; j < ind.ev.length; j++){
+						let ev = ind.ev[j];
+						if(ev.infection != undefined) infected = true;
+					}
+				}
+						
+				for(let p2 = 0; p2 < sampl.species.length; p2++){
+					let sa2 = sampl.species[p2];
+					for(let i2 = 0; i2 < sa2.individual.length; i2++){
+						if(i2 != i){
+							let ind2 = sa2.individual[i2];	
+				
+							for(let j = 0; j < ind2.ev.length; j++){
+								let ev = ind2.ev[j];
+								let inf = ev.infection;
+								if(inf != undefined){
+									if(inf.p == p && inf.i == i){
+										num[ind2.all_ind_ref]++;
+										ntot++;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	if(infected == false){ post(no_graph_msg("Individual doesn't become infected")); return;}
+	
+	let list=[];
+	for(let i = 0; i < all_ind_list.length; i++){
+		let n = num[i];
+		if(n != 0){
+			list.push({name:all_ind_list[i].name, frac:n/ntot});
+		}
+	}
+	
+	if(list.length == 0){ post(no_graph_msg("No infectees")); return;}
+	
+	list.sort( function(a, b){ return b.frac-a.frac});
+	
+	let data=[];
+	
+	let x = 0;
+	for(let i = 0; i < list.length; i++){
+		let li = list[i];
+		let col = DGREY;
+		data.push({type:"Bar", name:li.name, x:x+0.5, y:li.frac, thick:bar_thick, col:col});
+		x++;
+	}
+	
+	post({type:"Graph define", variety:"Histogram", view:"Histogram", data:data, op:{x_label:"Individual", x_param:false, y_label:"Probability"}});
+}
+
+
+/// Gets the individual number for different samples
+function get_i_store(result,burn,p,imin,imax,chsel,ind_sel)
+{
+	let all_ind_list = result.all_ind_list;
+	
+	let i_store = [];
+	let i_ind;
+	for(let samp = imin; samp < imax; samp++){
+		let sampl = result.sample[samp];
+	
+		if(sampl.num >= burn && !(chsel != "All" && sampl.chain != chsel)){		
+			let sa = sampl.species[p];
+			let indiv = sa.individual;
+
+			if(i_ind == undefined || i_ind >= sa.individual.length || all_ind_list[indiv[i_ind].all_ind_ref].name != ind_sel){ 	
+				i_ind = undefined;
+				for(let i = 0; i < indiv.length; i++){
+					if(all_ind_list[indiv[i].all_ind_ref].name == ind_sel){ i_ind = i; break;}
+				}
+			}
+			
+			i_store[samp] = i_ind;
+		}
+	}
+	
+	return i_store;
+}
+
+
 /// Calculates quantities needed for the graph
 function graph_ind_sing_calculate(ind_sel,result,rpf,burn,p)
 {
@@ -2564,26 +2758,8 @@ function graph_ind_sing_calculate(ind_sel,result,rpf,burn,p)
 	let all_ind_list = result.all_ind_list;
 	
 	// Gets the individual number
-	let i_store = [];
-	let i_ind;
-	for(let samp = imin; samp < imax; samp++){
-		let sampl = result.sample[samp];
+	let i_store = get_i_store(result,burn,p,imin,imax,chsel,ind_sel);
 	
-		if(sampl.num >= burn && !(chsel != "All" && sampl.chain != chsel)){		
-			let sa = sampl.species[p];
-			let indiv = sa.individual;
-
-			if(i_ind == undefined || i_ind >= sa.individual.length || all_ind_list[indiv[i_ind].all_ind_ref].name != ind_sel){ 	
-				i_ind = undefined;
-				for(let i = 0; i < indiv.length; i++){
-					if(all_ind_list[indiv[i].all_ind_ref].name == ind_sel){ i_ind = i; break;}
-				}
-			}
-			
-			i_store[samp] = i_ind;
-		}
-	}
-		
 	let stepp = get_percent_step(claa.ncomp);
 	for(let c = 0; c < claa.ncomp; c++){
 		output_percent(stepp,c,claa.ncomp);
@@ -2672,6 +2848,34 @@ function graph_ind_sing_calculate(ind_sel,result,rpf,burn,p)
 	case "Compartment": case "Density": 
 		post({type:"Graph define", variety:"Population", view:view, data:data, op:{p:p, cl:cl, timepoint:result.timepoint, number_comp:true}});
 		break;
+	}
+}
+
+
+/// Calculates quantities needed for the graph
+function graph_ind_sing_tt_calculate(ind_sel,result,rpf,burn,p)
+{
+	percent(1);
+
+	// Sets classification
+	let rpf2 = rpf.species[p];
+
+	// Sets the chain
+	let chsel = rpf.sel_chain.te;
+
+	// Sets samples
+	let imin = 0, imax = result.sample.length;
+	let isel = get_isel(rpf); if(isel != "All"){ imin = isel; imax = isel+1; burn = 0;}
+	
+	// Gets the individual number
+	let i_store = get_i_store(result,burn,p,imin,imax,chsel,ind_sel);
+	
+	let view = rpf.sel_ind_sel_tt_view.te;
+	
+	switch(view){
+	case "Infector": graph_ind_infector_calculate(ind_sel,result,burn,p,imin,imax,chsel,i_store); break;
+	case "Infectee": graph_ind_infectee_calculate(ind_sel,result,burn,p,imin,imax,chsel,i_store); break;
+	default: error("Option problem"); break;
 	}
 }
 
@@ -3530,7 +3734,7 @@ function add_trans_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 					if(j == undefined){
 						j = ind_list.length;
 						hash.add(name,ind_list.length);
-						ind_list.push({ name:name, sa_ref:[], p:p, inf_from:[], inft_av:0, ninft_av:0});
+						ind_list.push({ name:name, sa_ref:[], p:p, inf_from:[], hash_inf_from:new Hash(), inft_av:0, ninft_av:0});
 					}
 					ind_list[j].sa_ref.push({s:samp,i:i});
 				}
@@ -3629,11 +3833,15 @@ function add_trans_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 					else{
 						let kk = ind_ref[sar.s][pp][eve.infection.i];
 						
-						// POTENTIALLY SLOW
-						let j =	find(il.inf_from,"k",kk);
-					
-						if(j == undefined) il.inf_from.push({k:kk, num:1});
-						else il.inf_from[j].num++;
+						let inff = il.inf_from;
+						let hashif = il.hash_inf_from;
+						
+						let j = hashif.find(kk);
+						if(j == undefined){
+							hashif.add(kk,il.inf_from.length);
+							inff.push({k:kk, num:1});
+						}
+						else inff[j].num++;
 					}
 				}
 			}
@@ -3778,22 +3986,36 @@ function get_first_infected_time(sampl)
 
 
 /// Gets transition of first infected individual
-function get_first_infected_tra(sampl)
+function get_first_infected_comp(sampl,result)
 {
 	let tmin = get_first_infected_time(sampl);
+	
 	let res=[];
 	for(let p = 0; p < sampl.species.length; p++){
 		let sa = sampl.species[p];
-
+		
+		let comp_gl = result.species[p].comp_gl;
+		let tra_gl = result.species[p].tra_gl;
+		
 		for(let i = 0; i < sa.individual.length; i++){
 			let ind = sa.individual[i];
 	
 			let ev = ind.ev;
 			for(let e = 0; e < ev.length; e++){
 				let eve = ev[e];
-				if(eve.infection){
-					if(eve.t == tmin){
-						res.push({p:p, tr:eve.trg});
+				if(eve.t == tmin){
+					switch(eve.type){
+					case EV_ENTER:
+						if(comp_gl[eve.c].infected == true){
+							res.push({p:p, c:eve.c});
+						}
+						break;
+						
+					default:
+						if(eve.infection){
+							res.push({p:p, c:tra_gl[eve.trg].f});
+						}
+						break;
 					}
 				}
 			}
@@ -3941,6 +4163,108 @@ function add_first_inf_ind(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 }
 
 
+/// Creates a plot giving the infector prediction accuracy for different individuals
+function add_infector_prediction_accuracy(imin,imax,tmin,tmax,chsel,result,rpf,burn)
+{	
+	let fii_all = [];
+
+	/*
+	let sampl = result.sample[0];
+		
+	{	
+		for(let p = 0; p < sampl.species.length; p++){
+			fii_all[p]=[];
+			
+			let sa = sampl.species[p];
+			for(let i = 0; i < sa.individual.length; i++){
+				fii_all[p][i]=[];
+			}			
+		}
+	}
+	*/
+	
+	let hash = result.hash_all_ind;
+	let all_ind_list = result.all_ind_list;
+	
+	// Works out where infection comes from
+	let inf_from=[];
+	let correct=[];
+	
+	let ele = result.waifw_data;
+	for(let r = 0; r < ele.length; r++){
+		let row = ele[r];
+	
+		let toi = hash.find(row[1]);
+		
+		if(toi != undefined){
+			let from = row[0];
+			if(from == "."){
+				inf_from[toi] = OUTSIDE_INF;
+			}
+			else{
+				let fromi = hash.find(from);
+				if(fromi != undefined){
+					inf_from[toi] = fromi;
+				}
+			}
+			
+			correct[toi] = 0;
+		}
+	}		
+	
+	let num = 0;
+	for(let samp = imin; samp < imax; samp++){
+		let sampl = result.sample[samp];
+		if(sampl.num >= burn && !(chsel != "All" && sampl.chain != chsel)){	
+			let inf_node = sampl.inf_node;
+			for(let n = 0; n < inf_node.length; n++){
+				let no = inf_node[n];
+				let toi = no.all_ind_ref;
+				
+				let fri = inf_from[toi];
+				if(fri != UNSET){
+					let from = no.from;
+					if(from == INFN_ENT || from == INFN_OUT){
+						if(fri == OUTSIDE_INF) correct[toi]++;
+					}
+					else{
+						let no_from = inf_node[from];
+						if(fri == no_from.all_ind_ref) correct[toi]++;
+					}
+				}
+			}
+			num++;
+		}
+	}
+	
+	if(num == 0){
+		post(no_graph_msg("No data"));
+		return;
+	}
+	
+	let list=[];
+	for(let i = 0; i < all_ind_list.length; i++){
+		let cor = correct[i];
+		if(cor != undefined){
+			list.push({name:all_ind_list[i].name, frac:cor/num});
+		}
+	}
+	
+	list.sort( function(a, b){ return b.frac-a.frac});
+	
+	let data=[];
+	
+	let x = 0;
+	for(let i = 0; i < list.length; i++){
+		let li = list[i];
+		data.push({type:"Bar", name:li.name, x:x+0.5, y:li.frac, thick:bar_thick, col:DGREY});
+		x++;
+	}
+	
+	post({type:"Graph define", variety:"Histogram", view:"Histogram", data:data, op:{x_label:"Individual", x_param:false, y_label:"Probability"}});
+}
+
+
 /// Creates a distribution plot for the first infection time
 function add_first_inf_comp(imin,imax,tmin,tmax,chsel,result,rpf,burn,p,cl)
 {	
@@ -3951,18 +4275,18 @@ function add_first_inf_comp(imin,imax,tmin,tmax,chsel,result,rpf,burn,p,cl)
 	for(let c = 0; c < claa.comp.length; c++){
 		dist[c] = 0;
 	}
-	
+	let dist_enter = 0;
+
 	let num = 0;
 	for(let samp = imin; samp < imax; samp++){
 		let sampl = result.sample[samp];
 		if(sampl.num >= burn && !(chsel != "All" && sampl.chain != chsel)){	
-		
-			let res = get_first_infected_tra(sampl);
+			let res = get_first_infected_comp(sampl,result);
 		
 			for(let j = 0; j < res.length; j++){
 				let re = res[j];
 				if(re.p == p){
-					let cfin = sp.tra_gl[re.tr].f;
+					let cfin = re.c;
 					let c = sp.comp_gl[cfin].cla_comp[cl];
 					dist[c]++;
 					num++;
@@ -4129,7 +4453,7 @@ function add_phylo_tree(imin,imax,tmin,tmax,chsel,result,rpf,burn)
 						prr(obs_list)
 						prr(ob);
 					}
-					
+
 					hash_bra.add_phylo_br(String(code_tot),ob);
 				}
 			}
@@ -4215,9 +4539,9 @@ function add_phylo_branch(n,obs_list,pnode,hash_bra)
 	let po = pnode[n];
 	
 	let tnow = po.t; if(po.obs.length > 0) tnow = po.obs[po.obs.length-1].t;
-	
-	let br = hash_bra.get_phylo_br(obs_list,tnow);
 
+	let br = hash_bra.get_phylo_br(obs_list,tnow);
+	
 	if(br != undefined){
 		for(let k = 0; k < br.ind_list.length; k++){
 			let indl = br.ind_list[k];
@@ -5030,6 +5354,7 @@ function close_view_graph()
 function close_view_ind()
 {
 	inter.graph.ind_sel = undefined;
+	inter.graph.ind_sel_tt = undefined;
 	inter.graph.init = undefined;
 	inter.graph.type = undefined;
 }

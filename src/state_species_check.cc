@@ -242,7 +242,8 @@ string StateSpecies::print_event(const vector <Event> &event, bool str) const
 	for(auto &ev : event){
 		auto c_after = ev.c_after;
 	
-		auto t = calc_t(ev.tdiv,model.details);
+		//auto t = calc_t(ev.tdiv,model.details);
+		auto t = ev.tdiv;
 		
 		switch(ev.type){
 		case ENTER_EV: 
@@ -266,7 +267,7 @@ string StateSpecies::print_event(const vector <Event> &event, bool str) const
 			break;
 			
 		case NM_TRANS_EV:
-			ss << " >> " << t << ", " << sp.tra_gl[ev.tr_gl].name;
+			ss << " >> " << t << ", " << add_escape_char(sp.tra_gl[ev.tr_gl].name);
 			ss << " (origin ";
 			if(ev.e_origin == UNSET) cout << "UNSET";
 			else{
@@ -480,11 +481,9 @@ void StateSpecies::check_trans_tree(const vector < vector <double> > &popnum_t, 
 					auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val,popcombw_value);
 					if(ss.sum == 0){			
 						num++;
-						//emsg("no prob: "+ref);
 					}	
 				}
 			}
 		}
 	}
-	//cout << num << " num\n";
 }

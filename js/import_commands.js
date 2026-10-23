@@ -14,12 +14,14 @@ function import_data_table_command(cname)
 	case "add-ind-sim": cname = "add-ind-inf"; siminf = "sim"; break;
 	case "remove-ind-sim": cname = "remove-ind-inf"; siminf = "sim"; break;
 	case "move-ind-sim": cname = "move-ind-inf"; siminf = "sim"; break;
+	case "forced-trans-ind-sim": cname = "forced-trans-ind-inf"; siminf = "sim"; break;
 	case "init-pop-sim": cname = "init-pop-inf"; siminf = "sim"; break;
 	case "add-pop-post-sim": cname = "add-pop-inf"; siminf = "ppc"; break;
 	case "remove-pop-post-sim": cname = "remove-pop-inf"; siminf = "ppc"; break;	
 	case "add-ind-post-sim": cname = "add-ind-inf"; siminf = "ppc"; break;
 	case "remove-ind-post-sim": cname = "remove-ind-inf"; siminf = "ppc"; break;
 	case "move-ind-post-sim": cname = "move-ind-inf"; siminf = "ppc"; break;
+	case "forced-trans-ind-post-sim": cname = "forced-trans-ind-inf"; siminf = "ppc"; break;
 	case "test-and-cull-sim": siminf = "sim"; break;	
 	case "set-ind-effect-sim": siminf = "sim"; break;	
 	case "set-ind-effect-inf": cname = "set-ind-effect-sim"; siminf = "inf"; break;
@@ -28,7 +30,7 @@ function import_data_table_command(cname)
 	
 	let i = find(convert,"command",cname);
 	if(i == undefined){
-		error("Could not not import data table: "+cname);
+		error("Could not import data table: "+cname);
 		return;
 	}
 	
@@ -137,6 +139,26 @@ function import_data_table_command(cname)
 		
 			spec = {cl_drop:{te:sp.cla[cl].name}};
 		}	
+		break;
+		
+	case "Forced Trans.": 
+		{
+			let trans = get_tag_value("trans"); if(trans == ""){ cannot_find_tag(); return;}
+			trans = trans.replace(/->/g,"→");
+			
+			let cl_sel = get_cl_from_trans(trans,p);
+		
+			if(cl_sel == undefined){
+				alert_import("For 'trans' the value '"+trans+"' is not recognised"); return; 
+			}
+			
+			let claa_sel = sp.cla[cl_sel];
+		
+			let filt = load_default_trans_radio(p);
+			filt.cla[cl_sel].tra.value = trans;
+		
+			spec = {cl_drop:{te:claa_sel.name}, filter:filt};
+		}
 		break;
 		
 	case "Transition": 
@@ -1972,7 +1994,7 @@ function inference_command()
 	if(make_one_chain){
 		details.nchain = 1;
 		details.algorithm.value = "DA-MCMC";
-		details.sample = 2000;
+		//details.sample = 10000;
 	}
 	
 	details.burnin_frac = BURNIN_FRAC_DEFAULT;

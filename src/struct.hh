@@ -183,6 +183,11 @@ struct Poss {                      // A possiblity used for sampling
 	double weight;                   // Weight of possibility
 };
 
+struct PopInd {                    // Store information about individuals within a population
+	unsigned int i;                  // The individual number
+	unsigned int index;              // Where on pop_ref
+};
+
 struct IndPop {
 	unsigned int c;                  // The compartment for individual
 	vector <PopRef> pop_ref;         // Stores where on the population index
@@ -729,7 +734,6 @@ struct Param {                     // Stores a model parameter
 	vector <Dependency> dep;         // Dependency for parameter
 	bool time_dep;                   // Time dependency
 	bool reparam_time_dep;           // Set if the parameter is a reparameterisation and time dependent
-	//vector <unsigned int> reparam_time_precalc_affect; // Stores which precalc are affected (used for constants in reparam)
 	SplineInfo spline_info;          // Stores information about spline (if used)
 	vector <PrTimeRange> spline_segment; // Stores the time range for segments of the spline
 	SplineOut spline_out;            // Determines if the spline is restricted
@@ -762,9 +766,10 @@ struct Param {                     // Stores a model parameter
 	
 	vector <IEGref> ieg_ref;         // References if parameter is for cov var in ind effect group
 	
-	//bool dynamic;                    // Determines if dynamic
-	DynamicInfo dynamic_info;          // Stores any dynamic-sim information
-	EquationInfo dynamic_eqn;          // Used to store eqn for dynamic update
+	DynamicInfo dynamic_info;        // Stores any dynamic-sim information
+	EquationInfo dynamic_eqn;        // Used to store eqn for dynamic update
+	
+	ModelParam mod_param;            // Sets if within observation model or not
 	
 	unsigned int get_param_vec(unsigned int i) const; 
 	const vector <ParamRef>& get_child(unsigned int i) const;
@@ -777,7 +782,6 @@ struct Param {                     // Stores a model parameter
 	void add_child(unsigned int i, const ParamRef &pr);
 	double get_value(unsigned int i) const;
 	void set_used(unsigned int i);
-	//void set_value_te(unsigned int i, string te);
 	string get_value_te(unsigned int i) const;
 	void set_value_eqn(unsigned int i, const EquationInfo &val);
 	unsigned int get_prior_ref(unsigned int i) const;
@@ -1066,8 +1070,7 @@ struct IIFChange {                 // Stores changes to iif
 	unsigned int e_ev;               // Event number of infection event
 	IndInfFrom ind_inf_from;         // New information
 	unsigned int ti;                 // Time division
-	double Li_markov_bef;            // The likelihood before
-	double Li_markov_aft;            // The likelihood after
+	double dLi_markov;               // The change in likelihood
 };
 
 struct ExtFactor {                 // Stores an extend factor
@@ -1277,7 +1280,6 @@ struct EventData {                 // Stores individual data
 
 struct ObsData {
 	ObsData(){ so = UNSET; ref = UNSET; cl = UNSET; tdiv = UNSET;}
-	// test_res = UNSET;
 	
 	ObsType type;                    // The type of the observation
 	unsigned int so;                 // References the data source
@@ -1500,14 +1502,20 @@ struct ParticleSpecies {           // Store the species state is a particle
 
 
 struct TransTreeStats {            // Stores statistics about transmission tree
-	TransTreeStats(){ N_origin = UNSET; N_inf = UNSET; N_mut_tree = UNSET; N_mut_origin = UNSET; N_unobs = UNSET; t_root = UNSET;}
+	TransTreeStats(){ 
+		N_origin = UNSET; N_inf = UNSET; N_mut_tree = UNSET; N_mut_origin = UNSET; 
+		N_unobs = UNSET; t_root = UNSET; IPA = UNSET; genetic_obs_expected = UNSET; genetic_obs_reached = UNSET; 
+	}
 	
 	unsigned int N_origin;           // The number of origins of infection entering
 	unsigned int N_inf;              // Number of infected individuals
 	unsigned int N_mut_tree;         // Number of mutations on the tree
 	unsigned int N_mut_origin;       // Number of mutations for origins
 	unsigned int N_unobs;            // Number of unobserved genetic observations
-	unsigned int t_root;             // The time infection first enters 
+	double t_root;                   // The time infection first enters 
+	double IPA;                      // Infector prediction accuracy
+	double genetic_obs_expected;     // The expected value for the genetic observation value
+	bool genetic_obs_reached;        // Determines if expected value reached
 };
 
 struct SourceTransRate {           // Stores rates at which individuals enter system
@@ -1575,11 +1583,16 @@ struct InfNodeAlter {              // Determines an alternation in an infnode
 	unsigned e_add;                  // The event number for infection on new sequence
 	double tdiv_start;               // The time of the addition
 	double tdiv_rec;                 // The recovery time of the added individual 
+	unsigned int ti_start;           // This is tdiv_start rounded up to the nearest integer
+	unsigned int ti_rec;             // This is tdiv_rec rounded up to the nearest integer
+
 	vector <unsigned int> obs_add_begin; // Genetic observations added at the beginning
 	vector <unsigned int> obs_add_end;   // Genetic observations added at the beginning
 	bool possible;                   // Set if change is possible
 	bool unchanged;                  // Set if alteration leaves unchanged
 	vector <InfPoCha> ind_po_cha;    // Change to the infecting population for those infected by individual
+	
+	vector <unsigned int> rev_store; // Store quantities such that a reverse regraft can be done (diagnostic)
 };
 
 struct InfEvent {                  // Infection event (references genetic observation or infection node)
@@ -1589,6 +1602,13 @@ struct InfEvent {                  // Infection event (references genetic observ
 	unsigned int mut_num;            // The number of mutations immediately preceeding
 };
 
+struct NodeMove {                  // Stores the movement of node from one to another
+	unsigned int n;                  // Node
+	unsigned int e;                  // Event (after a given time)
+	unsigned int num;                // Number of nodes passed through
+	bool success;                    // Determines if successful
+};
+
 struct InfOrigin {                 // An origin for a genetic strain 
 	unsigned int node;               // Reference infection node
 	unsigned int mut_num;            // The number of mutation for the source 
@@ -1596,8 +1616,9 @@ struct InfOrigin {                 // An origin for a genetic strain
 
 struct GenDifCha {                 // Stores a change in the genetic difference matrix 
 	unsigned int ob1;                // First observation
-	unsigned int ob2;                // Second observation
+	vector <unsigned int> ob2;       // Second observation
 	int ch;                          // Change in matrix
+	int sign;                        // Sign
 };
 
 struct ObsMut {                    // Used to store genetic observation (used in genetic props)
@@ -1608,12 +1629,23 @@ struct ObsMut {                    // Used to store genetic observation (used in
 struct InfNode {                   // Stores information about an infection events
 	double tdiv_start;               // The time the infection starts
 	double tdiv_rec;                 // The time the individual recovers
+	unsigned int ti_start;           // This is tdiv_start rounded up to the nearest integer
+	unsigned int ti_rec;             // This is tdiv_rec rounded up to the nearest integer
 	unsigned int p;                  // The species of infected individual
 	unsigned int i;                  // Individual number of infected individual
 	unsigned int e;                  // The event number
 	NodeRef from;                    // References node generating infection 
 	                                 // (if entering from.node = ENTER_INF, if from origin from.node = OUTSIDE_INF, from.index gives inf_origin number)
 	vector <InfEvent> inf_ev;        // References nodes which are infected + genetic obs
+};
+
+struct GenObsFunc {                // The store information such than genetic_obs can easily be calculated
+	unsigned int mut_sum;            // The total number of mutation (excluding last segment)
+	double con_mut;                  // Quadratic function for log likelihood
+	double lin_mutA;
+	double lin_mutB;
+	double quad_mutAB;
+	double quad_mut;
 };
 
 struct TransTreeChange {                 // Stores information about a change to  
@@ -1629,9 +1661,13 @@ struct TransTreeChange {                 // Stores information about a change to
  	double probif;                   // Probability of proposing
 	double probfi;                   // Reverse probability of proposing
 	unsigned int mut_num;            // Stores the mutation number of newly inserted connection
+	unsigned int mutA_num;           // The proposed mutation number on A (if changed)
+			
+	vector <unsigned int> rev_store; // Store quantities such that a reverse regraft can be done (diagnostic)
+
 	vector <GenDifCha> gen_dif_cha;  // Change to observation matrix
 	double dlike_genetic_process;    // Change in likelihood for genetic process
-	double dlike_genetic_obs;        // Change in likelijood for genetic observation
+	double dlike_genetic_obs;        // Change in likelihood for genetic observation
 };
 
 struct UpdateIndInfo {             // Stores all the information when updating an individual
@@ -1657,6 +1693,43 @@ struct ObsGenRef{                  // References a genetic observation
 	unsigned int m;                  // The observation number
 };
 
+struct RGsampEle {
+	unsigned int B;
+	unsigned int A;
+	double prob;
+	double sum;
+};
+	
+struct RGsamp {
+	RegraftSamplerType type;
+	vector <RGsampEle> ele;
+	double sum_tot;
+	
+	double sample1D(unsigned int &B, unsigned int &A, double r1, double r2, string &warn, const TransTreeChange &gc, RegraftStore rs) const;
+	double sample2D(unsigned int &B, unsigned int &A, const TransTreeChange &gc, RegraftStore rs) const;
+	double prob1D(unsigned int B, unsigned int A, double r1, double r2, bool &err, TransTreeChange &gc, RegraftStore rs) const;
+	double prob2D(unsigned int B, unsigned int A, bool &err, TransTreeChange &gc, RegraftStore rs) const;
+};
+
+struct RegraftSamplerEle {         // Element in regraft sampler 
+	int di;                          // Relative position 
+	int dj;
+	double prob;                     // Probability of element
+	double sum;                      // Accumulated sum
+};
+	
+struct RegraftSampler {            // A sampler for a regraft event
+	RegraftSamplerType type;
+	vector <RegraftSamplerEle> ele;
+};
+
+struct WAIFWdata {                 // Stores who aquires infection from whom
+	unsigned int from_p;
+	unsigned int from_i;
+	unsigned int to_p;
+	unsigned int to_i;
+};
+
 struct GeneticData {               // Stores genetic data
 	bool on;                         // Determines if genetic data is turned on
 	EquationInfo mut_rate;           // The equation for the mutation rate
@@ -1666,6 +1739,13 @@ struct GeneticData {               // Stores genetic data
 	vector <ObsGeneticData> obs;     // Observed individual genetic data 
 	vector < vector < vector <ObsGenRef> > > ind_gen_obs; // The genetic observations on an individual [p][i][#]
 	vector < vector <unsigned int> > gen_dif; // The genetic difference between sequences 
+	
+	bool waifw_on;                   // Determines if this data source is on
+	vector <WAIFWdata> waifw_data;   // Stores information about who aquires infection from whom
+	
+	vector <RegraftSampler> regraft_sampler; // Samplers used when regrafting transmission tree
+	vector < vector < vector < vector <unsigned int> > > > regraft_sampler_2d_ref; // References sampler [di][dj][logvar][cor]
+	vector < vector <unsigned int> > regraft_sampler_1d_ref; // References sampler [di][logvar]
 };
 
 struct GeneticDataValue {          // Stores state values for genetic data
@@ -1676,6 +1756,7 @@ struct GeneticDataValue {          // Stores state values for genetic data
 	vector <InfOrigin> inf_origin;   // The number of origins of virus
 	vector < vector <unsigned int> > gen_dif; // The state genetic difference 
 	vector <InfNode> inf_node;       // Infection nodes
+	bool maximise_gen_obs;           // Determines if the genetic observation probability needs to be maximised
 };
 
 struct Particle {                  // Stores information from state
@@ -1689,6 +1770,7 @@ struct Particle {                  // Stores information from state
 	TransTreeStats trans_tree_stats; // Statistics about the transmission tree
 	vector <InfOrigin> inf_origin;   // The number of origins of virus
 	vector <InfNode> inf_node;       // The infection nodes
+	bool maximise_gen_obs;           // Determines if the genetic observation probability needs to be maximised
 	
 	double w;                        // Particle weight (used in ABC-SMC)
 	
@@ -1983,7 +2065,7 @@ struct SampleSpecies {             // Used to store information about a posterio
 struct Sample {                    // Stores posterior sample (for PPC)
 	unsigned int ch;                 // The chain number
 	unsigned int num;                // The sample number    
-	unsigned int ind_key_ref;        // References which ind_key to  use
+	unsigned int ind_key_ref;        // References which ind_key to use
 	vector < vector <double> > param_value; // The parameter sample
 	vector <SampleSpecies> species;  // The state sample
 };
@@ -2160,10 +2242,26 @@ struct IndList {                           // Stores individuals in a list
 	unsigned int i;
 };
 
-struct ScanInfo {
-	bool log_on;
-	string param_name;
-	vector <double> value_sim;
+struct ExtinctInfo {                       // This is used to discard simulation which become exticnt under validation
+	ExtinctInfo(){ on = false;}
+	bool on;                                 // Determines if extinction criterion is met 
+	string trans;                            // The name of the infection transition  
+	string comp_i;                           // The initial compartment 
+	string comp_f;                           // The final compartment
+	unsigned int min_trans;                  // The minimum number of transitions required for simulation to be accepted
+};
+
+struct SpecInfo {                          // Stores information about scanning a parameter
+	SpecInfoType type;                       // Determines the type oif specification (tornado or scan)
+	string param_name;                       // The name of the parameter
+	unsigned int n;                          // The number of runs
+	bool log_on;                             // Determines if parameter values are log distributed for scans
+	bool log_plot_on;                        // Determines how plots are made      
+	bool data_param;                         // Set if the parameter appears in the data specification
+	bool para;                               // Determines if results done in parallel
+	ExtinctInfo extinct_info;                // Information about stopping epidemic extinction
+	vector <double> value_sim;               // The values the parameter takes	
+	vector <string> data_sim;                // Stores lines which define data
 };
 
 struct TagRange {
@@ -2405,5 +2503,84 @@ struct TotalObs {                        // Stores observation information in co
 struct CompProb {                        // Stores a compartment along with a probability
 	unsigned int c;                        // Compartment
 	double prob;                           // Probability
+};
+
+struct PossLink {                        // Stores potential links between individual (used for neighbour joining type algorithm)
+	IndInfFrom iif;                        // Where the individual is infected from
+	double prob;                           // The probability of infection
+};
+
+struct BranchEv {                        // Stores information trans_tree_swap_inf_ev_proposal
+	BranchEvType type;                     // The type of event
+	unsigned int n;                        // References the inf_node
+	int e;                                 // References position on inf_ev 
+	unsigned int mut_sum;                  // The sum of all the mutation up until that point
+	double tdiv;                           // The time
+};
+
+struct NewInfEv {                        // Stores new infection events
+	unsigned int n;                        // The node for the new infection events
+	vector <InfEvent> inf_ev;              // The new events
+};
+
+struct ObsMutSum {                       // Stores infomation about observations on a branch
+	unsigned int ob;                       // Observation number
+	int mut_sum;                           // The number of mutations from the branch point
+	int mut_sum_after;                     // The number of mutations from the branch point
+};
+
+struct AddMutSum {                       // Stores information about added branches
+	vector <unsigned int> ob;              // Observation number
+	int mut_sum;                           // The number of mutations from the branch point
+	int mut_sum_after;                     // The number of mutations from the branch point
+};
+
+struct BranchMutInfo {                   // Used in branch_change_genetic_obs
+	vector <ObsMutSum> obs_list;           // Observations down branch
+	vector <AddMutSum> add_list;           // Added branches down branch
+};
+
+struct PropAcInfo {
+	PropAcInfo(){ ntr = 0; nac = 0; nfa = 0;}
+	unsigned int ntr;                      // Number of times proposal has been performed
+	unsigned int nac;                      // Number of times proposal has been accepted
+	unsigned int nfa;                      // Number of times proposal fails	
+};
+
+struct NormalIntEle {                    // An element of the normal integer distribution      
+	unsigned int num;
+	double prob;
+	double prob_sum;
+};
+
+struct NormalIntSampler {                // Used to sample from the integer normal distribution
+	vector <NormalIntEle> ele;
+	
+	void init(double lin, double quad, double lam);
+	unsigned int sample(double &probif) const;
+	double prob(unsigned int i) const;
+};
+
+struct ValidRun {                        // Used for tornado or scan results
+	string file;                           // The file name
+	vector <string> data_sim_lines;        // The data commands used to generate data
+};
+
+struct ForcedTrans {                     // Stores any forced transitions
+	unsigned int i;                        // The individual undergoing the transition
+	unsigned int cl;                       // The classification
+	unsigned int tr;                       // The transition within the classification
+	double tdiv;                           // The time of the transition 
+};
+
+struct ParamValPrior {                   // When simulating this specified a parameter value and prior
+	string name;                           // The name of the parameter
+ 	double val;                            // The value of the parameter
+ 	string prior;                          // The prior specification
+};
+
+struct ParamBound {                      // Sets the bound a parameter can have
+	double min;                            // Minimum
+	double max;                            // Maximum
 };
 

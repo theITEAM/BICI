@@ -23,6 +23,7 @@ State::State(const Model &model) : model(model)
 	genetic_value.mut_rate = UNSET;
 	genetic_value.seq_var = UNSET;
 	genetic_value.nobs_not_infected = UNSET;
+	genetic_value.maximise_gen_obs = true;
 	trans_tree_on = false;
 }
 
@@ -63,7 +64,7 @@ void State::init()
 			if(model.pop[po].p == p) pop_affect.push_back(po);
 		}
 			
-		StateSpecies ss(param_val,popcombw_value,model.eqn,model.species[p],model,pop_affect,model.mode,dif_thresh,dpop,dpop_list);
+		StateSpecies ss(param_val,popcombw_value,model.eqn,model.species[p],model,pop_affect,model.mode,dif_thresh,dpop,dpop_list,trans_tree_on);
 		species.push_back(ss);
 	}
 	
@@ -194,11 +195,22 @@ void State::load_samp(const PV &param_value, const Sample &samp)
 
 	ie_finalise();
 	
-	set_ind_inf_from(ind_key);
+	set_ind_inf_from(ind_key);   // This converts from individual number on key to actual individual 
 	
 	regenerate(T,true,true);
-		
+	
+	setup_transtree(false);
+	
 	likelihood_from_scratch();
+	
+	if(false){
+		for(const auto &ind: species[0].individual){
+			for(auto &ev :ind.ev){
+				cout << ev.ind_inf_from.p << " " << ev.ind_inf_from.i << " iif" << endl; 
+			}
+		}
+		emsg("iif");
+	}
 }
 
 
@@ -240,7 +252,7 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end, double 
 			timer[SIM_UPDATE] -= clock();				
 			switch(ssp.type){
 			case INDIVIDUAL:
-				ssp.update_individual_based(ti,pop_ind,popnum_t,popcomb_t);
+				ssp.update_individual_based(ti,popcomb_t);
 				break;
 				
 			case POPULATION:
@@ -301,10 +313,16 @@ void State::simulate_iterate(unsigned int ti_start, unsigned int ti_end, double 
 		}
 	}
 	
+	// if(model.trans_tree && model.mode == SIM) setup_transtree();
+	
+	print_diag("Start like"); 
+	
 	timer[SIM_LIKE] -= clock();
 	likelihood_from_scratch();
 	timer[SIM_LIKE] += clock();
 
+	print_diag("End like"); 
+		
 	timer[SIM_ITERATE] += clock();
 	//emsg("sim done");
 }
@@ -949,7 +967,7 @@ void State::calculate_likelihood()
 		
 		ssp.likelihood_init_cond(temp);
 	}
-	
+
 	calculate_like();
 }
 
@@ -962,7 +980,7 @@ void State::calculate_like()
 		if(model.is_prior_bounded(i)) like.prior_bounded += prior_prob[i];
 		else like.prior += prior_prob[i];
 	}
-	
+	 
 	like.dist = sum(dist_prob);
 	like.spline_prior = sum(spline_prior);
 	
@@ -972,7 +990,7 @@ void State::calculate_like()
 	like.markov = 0;
 	like.nm_trans = 0;
 	like.genetic_process = likelihood_genetic_process();
-	like.genetic_obs = likelihood_genetic_obs(genetic_value.gen_dif);
+	like.genetic_obs = likelihood_genetic_obs(genetic_value.gen_dif); 
 	like.ie = 0;
 	like.obs = 0;
 	for(auto p = 0u; p < nspecies; p++){
@@ -1023,7 +1041,7 @@ void State::calculate_like()
 void State::accept_update_ind(const UpdateIndInfo &uii)
 {
 	accept(uii.like_ch);
-	gen_change_update(uii.gc); 
+	gen_change_update(uii.gc);
 	if(model.species[uii.p].trans_tree) update_popnum_ind(uii.p,uii.i);
 }
 
@@ -1046,6 +1064,16 @@ void State::accept(const Like &like_ch)
 	
 	param_val.clear();
 	popcomb_store.clear();
+	back_init();
+}
+
+
+/// Accepts a change in likelihood to the state
+void State::reject()
+{
+	param_val.clear();
+	popcomb_store.clear();
+	back_init();
 }
 
 
@@ -1469,6 +1497,7 @@ void State::restore(const vector <AffectLike> &affect_like)
 	
 	param_val.restore();
 	pop_restore();
+	back_init();
 }
 
 
@@ -1542,16 +1571,11 @@ void State::likelihood_from_scratch()
 		ssp.Li_init_cond = 0.0;
 	}
 
-	if(model.trans_tree) setup_transtree();
-
-	if(model.genetic_data.on){
-		set_genetic_param();
-		sample_genetic_value();
-	}
-
 	calculate_likelihood();
-	
+
 	set_inconsistent_ind();
+	
+	back_init();
 }
 
 
@@ -1585,9 +1609,15 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 
 	part.like = like;
 
+	auto tt_switch_on = false;
+
 	if(dir_fl){
 		part.dir_out = derive_calculate(store_state);
-		if(model.trans_tree_output) create_trans_tree();
+
+		if(model.trans_tree_output && trans_tree_on == false){
+			tt_switch_on = true;
+			setup_transtree(true);
+		}
 	}
 	
 	for(auto p = 0u; p < species.size(); p++){
@@ -1617,21 +1647,25 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 		part.species.push_back(part_sp);
 	}
 
-	auto tt_fl = false; 
-	if(dir_fl && (model.trans_tree || model.trans_tree_output)) tt_fl = true;
+	//auto tt_fl = false; 
+	//if(dir_fl && (model.trans_tree || model.trans_tree_output)) tt_fl = true;
+	auto tt_fl = trans_tree_on;
 	
 	if(tt_fl && store_state){ 
 		part.inf_origin = genetic_value.inf_origin;
 		part.inf_node = genetic_value.inf_node;
+		part.maximise_gen_obs = genetic_value.maximise_gen_obs;
 	}
 
+	const auto &gd = model.genetic_data;
+	
 	if(tt_fl){    // Outputs trans_tree statistics
 		auto &tts = part.trans_tree_stats;
 		const auto &gv = genetic_value;
 		tts.N_mut_tree = 0u;
 		tts.N_mut_origin = 0u;
 		
-		if(model.genetic_data.on){
+		if(gd.on){
 			for(const auto &in : gv.inf_node){
 				for(const auto &iev : in.inf_ev){
 					tts.N_mut_tree += iev.mut_num;
@@ -1645,36 +1679,34 @@ Particle State::generate_particle(unsigned int s, unsigned int chain, bool store
 		
 		tts.t_root = LARGE;
 		for(const auto &in : gv.inf_node){
-			if(in.tdiv_start < tts.t_root) tts.t_root = model.calc_t(in.tdiv_start);
+			if(in.tdiv_start < tts.t_root) tts.t_root = in.tdiv_start;
 		}	
+		tts.t_root = model.calc_t(tts.t_root);
+		
+		if(gd.waifw_on) tts.IPA = get_infector_prediction_accuracy();
 		
 		tts.N_origin = gv.inf_origin.size();
 		tts.N_inf = gv.inf_node.size();
 		tts.N_unobs = gv.nobs_not_infected;
+		
+		tts.genetic_obs_expected = calc_genetic_obs_expected();
+		tts.genetic_obs_reached = false;
+		if(like.genetic_obs > tts.genetic_obs_expected) tts.genetic_obs_reached = true;
 	}
 	
-	if(dir_fl && model.trans_tree_output) remove_trans_tree();
+	if(tt_switch_on) remove_trans_tree();
 
 	return part;
 }
 
 
-/// Adds transmission tree (for outputting)
-void State::create_trans_tree()
-{                   
-	auto pop_ind = calculate_pop_ind_total(); 
-	for(auto p = 0u; p < species.size(); p++){
-		const auto &sp = model.species[p];
-		if(sp.trans_tree_output) species[p].add_trans_tree(popnum_t,pop_ind);
-	}		
-	
-	setup_transtree();
-}
-
-
 /// Removes transmission tree (after outputting)
 void State::remove_trans_tree()
-{    
+{   	 
+	if(trans_tree_on != true) emsg("Trans tree should be on");
+	
+	trans_tree_on = false;
+
 	for(auto p = 0u; p < species.size(); p++){
 		const auto &sp = model.species[p];
 		if(sp.trans_tree_output) species[p].remove_trans_tree();
@@ -1697,7 +1729,7 @@ void State::set_particle(const Particle &part)
 	param_val = model.get_param_val(part);
 
 	like = part.like;
-	
+
 	for(auto p = 0u; p < species.size(); p++){
 		auto &ssp = species[p];
 		const auto &part_sp = part.species[p];
@@ -1711,8 +1743,9 @@ void State::set_particle(const Particle &part)
 	if(model.genetic_data.on){
 		genetic_value.inf_origin = part.inf_origin;
 		genetic_value.inf_node = part.inf_node;
+		genetic_value.maximise_gen_obs = part.maximise_gen_obs; 
 	}
-	
+
 	//model.precalc_eqn.calculate(model.spec_precalc_all,param_val,false);
 	
 	regenerate(T,true,true);
@@ -1831,7 +1864,6 @@ void State::update_pop_t_init(unsigned int p, vector <unsigned int> cnum_i, vect
 }
 
 
-
 /// Initialises a way to restore system back to before individual changes
 void State::back_init()
 {
@@ -1861,8 +1893,9 @@ void State::restore_back()
 			break;
 		}
 	}
-	
+
 	param_val.restore();
+	back_init();
 }
 
 
@@ -1960,7 +1993,7 @@ vector < vector <Poss> > State::calculate_pop_ind() const
 				if(c != UNSET){
 					for(const auto &pr : sp.comp_gl[c].pop_ref){
 						const auto &po = model.pop[pr.po];	
-						if(po.term[pr.index].c != c) emsg("Problem");
+						if(po.term[pr.index].c != c) emsg("Problem c");
 					
 						auto num = 1.0; 
 						if(po.ind_variation){
@@ -2009,7 +2042,7 @@ vector < vector < vector <Poss> > > State::calculate_pop_ind_total() const
 						auto ti_start = ti;
 						for(const auto &pr : sp.comp_gl[c].pop_ref){
 							const auto &po = model.pop[pr.po];	
-							if(po.term[pr.index].c != c) emsg("Problem");
+							if(po.term[pr.index].c != c) emsg("Problem c2");
 						
 							auto num = 1.0; 
 							if(po.ind_variation){
@@ -2128,7 +2161,7 @@ void State::add_popnum(unsigned int c, vector <double> &popnum, const Individual
 	for(auto ie : po.ind_eff_mult) num *= ind.exp_ie[ie];
 	for(auto fe : po.fix_eff_mult) num *= ind.exp_fe[fe];
 		
-	if(po.term[pr.index].c != c) emsg("Problem");
+	if(po.term[pr.index].c != c) emsg("Problem cadd");
 	popnum[pr.po] += po.term[pr.index].w*num;
 }
 
@@ -2343,32 +2376,11 @@ void State::recalculate_popcomb(const vector <unsigned int> &popcomb_affect)
 	}
 }
 
-/*
-/// Recalculates popnum_t for populations identified by list and individuals in ssp 
-void State::recalculate_population_restore(const vector <unsigned int> &list, const vector <double> &vec)
-{
-	auto j = 0u;
-	for(auto k : list){
-		for(auto t = 0u; t < T; t++){
-			popnum_t[t][k] = vec[j]; j++; 
-		}
-	}
-	
-	for(auto po : list){
-		for(const auto &pcr : model.pop[po].popcomb_ref){
-			auto pc = pcr.pcref; 
-			for(auto ti = 0u; ti < T; ti++){ popcomb_t[ti][pc] = vec[j]; j++;}
-		}
-	}
-}
-*/
-
 
 /// If transmission tree this sets ind_inf_from for individual events
 void State::set_ind_inf_from(const vector <string> &ind_key)
 {
-	auto p = 0u; while(p < model.nspecies && model.species[p].trans_tree == false) p++;
-	if(p == model.nspecies) return;
+	if(!model.trans_tree && !model.trans_tree_output) return;
 	
 	auto N = ind_key.size();
 	vector <IndRef> ind_ref(N);
@@ -2394,7 +2406,8 @@ void State::set_ind_inf_from(const vector <string> &ind_key)
 		for(auto &ind : ssp.individual){
 			for(auto &ev : ind.ev){
 				auto &iif = ev.ind_inf_from;
-				if(iif.p == UNSET && iif.i != UNSET){
+				if(iif.p == FIND_IIF){
+					if(iif.i == UNSET) emsg("Should not be unset");
 					const auto &ir = ind_ref[iif.i];
 					iif.p = ir.p; iif.i = ir.i;
 					
@@ -2864,5 +2877,86 @@ Like State::get_like_ch(const Like &like_st) const
 	like_ch.ie = like.ie - like_st.ie;
 	
 	return like_ch;
+}
+
+
+/// Determines if the epidemic has undergone extiction
+bool State::extinction_criterion(const ExtinctInfo &ei) const
+{
+	// Works out the transition
+	auto p_sel = UNSET;
+	auto cl_sel = UNSET;
+	auto tr_sel = UNSET;
+	
+	auto ci = ei.comp_i;
+	auto cf = ei.comp_f;
+	for(auto p = 0u; p < model.species.size(); p++){
+		const auto &sp = model.species[p];
+		
+		for(auto cl = 0u; cl < sp.cla.size(); cl++){
+			const auto &claa = sp.cla[cl];
+			
+			for(auto tr = 0u; tr < claa.tra.size(); tr++){
+				const auto &tra = claa.tra[tr];
+				if(tra.i != UNSET && claa.comp[tra.i].name == ci){
+					if(tra.f != UNSET && claa.comp[tra.f].name == cf){
+						p_sel = p; cl_sel = cl; tr_sel = tr;
+					}
+				}
+			}
+		}
+	}
+	
+	if(p_sel == UNSET){
+		run_error("In 'stop-extinction' definition the transition '"+ei.trans+"' is not recognised");
+	}
+
+	const auto &sp = model.species[p_sel];
+	const auto &ssp = species[p_sel];
+
+	// Works out which transitions to count 
+	vector <bool> tra_map(sp.tra_gl.size(),false);
+	vector <unsigned int> tra_list;
+	
+	for(auto tr = 0u; tr < sp.tra_gl.size(); tr++){
+		const auto &tra = sp.tra_gl[tr];
+		if(tra.cl == cl_sel && tra.tr == tr_sel){
+			tra_map[tr] = true;
+			tra_list.push_back(tr);
+		}
+	}
+
+	auto num = 0u;
+	switch(sp.type){
+	case INDIVIDUAL:
+		for(const auto &ind : ssp.individual){
+			for(const auto &ev: ind.ev){
+				switch(ev.type){
+				case NM_TRANS_EV: case M_TRANS_EV:
+					if(tra_map[ev.tr_gl]) num++;
+					break;
+					
+				default: break;
+				}
+			}				
+		}
+		break;
+
+	case POPULATION:
+		for(auto tr : tra_list){
+			for(auto ti = 0u; ti < T; ti++){
+				num += ssp.trans_num[tr][ti];
+			}
+		}
+		break;
+		
+	case DETERMINISTIC:
+		run_error("A deterministic species does not require a 'stop-extiction' definition");
+		break;
+	}
+
+	if(num <= ei.min_trans) return true;
+	
+	return false;
 }
 

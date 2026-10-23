@@ -76,7 +76,7 @@ void Extend::run()
 			}
 		}		
 	}
-	
+
 	// Intialises chains
 	for(auto ch = 0u; ch < chain.size(); ch++){
 		auto ch_tot = mpi.core*num_per_core+ch;

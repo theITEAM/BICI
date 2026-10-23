@@ -37,19 +37,8 @@ void Output::init(const Input &input)
 		case INF: case EXT: sampledir_rel = "output-inf"; break;
 		case PPC: sampledir_rel = "output-post-sim"; break;
 		case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: 
-		case COMPRESS: case DECOMPRESS:
-			sampledir_rel = "output-sim";
-			break;
-	
-		case TORNADO_SETUP: case SCAN_SETUP:
-			sampledir_rel = "output-sim";
-			break;
-	
-		case TORNADO_RESULT: case SCAN_RESULT:
-			sampledir_rel = "output-inf";
-			break;
-	
-		case MODE_UNSET: emsg("Option not recognised"); break;
+		case COMPRESS: case DECOMPRESS: sampledir_rel = "output-sim"; break;
+		default: emsg("Option not recognised"); break;
 		}
 		
 		sampledir = input.datadir+"/"+sampledir_rel;
@@ -68,7 +57,7 @@ void Output::init(const Input &input)
 			LinesRaw lr; lr.st = input.lines_raw[i]; lr.li = i;
 			lines_raw.push_back(lr);
 		}
-		
+			
 		auto i = 0u;
 		while(i < lines_raw.size())
 		{
@@ -119,14 +108,36 @@ void Output::init(const Input &input)
 		case INF: case EXT: lines_raw.push_back(new_lr(OUT_INF_BANNER)); break;
 		case PPC: lines_raw.push_back(new_lr(OUT_POST_SIM_BANNER)); break;
 		case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: break;
-		case TORNADO_SETUP: case TORNADO_RESULT: break;
+		case TORNADO_SETUP: case TORNADO_RESULT: case SCAN_SETUP: case SCAN_RESULT: emsg("Not here"); break;
 		case COMPRESS: case DECOMPRESS: break;
-		case SCAN_SETUP: case SCAN_RESULT: break;
 		case MODE_UNSET: break;
 		}
-		lines_raw.push_back(new_lr(""));
 		
+		lines_raw.push_back(new_lr(""));	
 	}
+	      
+	input.set_all_files(all_files);
+	
+	if(model.trans_tree || model.trans_tree_output){
+		stat_out.push_back(TT_N_ORIGIN);
+		stat_out.push_back(TT_N_INF);
+		stat_out.push_back(TT_UNOBS);
+		stat_out.push_back(TT_TROOT);
+		if(model.genetic_data.waifw_on) stat_out.push_back(TT_IPA);
+		if(model.genetic_data.on){
+			stat_out.push_back(TT_N_MUT_TREE);
+			stat_out.push_back(TT_N_MUT_ORIGIN);
+		}
+	}
+}
+
+
+/// Clears any existing samples
+void Output::clear()
+{
+	param_store.clear();
+	state_store.clear();
+	diagnostic_store.clear();
 }
 
 
@@ -212,13 +223,6 @@ void Output::ensure_directory(const string &path) const
 			run_error("Error creating the directory '"+path+"'");
 		}
 	}
-}
-
-
-/// Checks that the file has been successfully open
-void Output::check_open(ofstream &fout, string file) const 
-{
-	if(!fout) run_error("Could not write to file '"+file+"'");
 }
 
 
@@ -417,23 +421,27 @@ void Output::summary(const Model &model) const
 			case ADD_IND_SIM: fout << "Add ind sim"; break;
 			case REMOVE_IND_SIM: fout << "Remove ind sim"; break;
 			case MOVE_IND_SIM: fout << "Move ind sim"; break; 
+			case FORCED_TRANS_IND_SIM: fout << "Forced trans ind sim"; break; 
 			case ADD_POP_POST_SIM: fout << "Add pop post-sim"; break;
 			case REMOVE_POP_POST_SIM: fout << "Remove pop post-sim"; break;
 			case ADD_IND_POST_SIM: fout << "Add ind post-sim"; break;
 			case REMOVE_IND_POST_SIM: fout << "Remove ind post-sim"; break;
 			case MOVE_IND_POST_SIM: fout << "Move ind post-sim"; break; 
+			case FORCED_TRANS_IND_POST_SIM: fout << "Forced trans ind post-sim"; break; 
 			case INIT_POP: fout << "Init pop"; break; 
 			case ADD_POP: fout << "Add pop"; break; 
 			case REMOVE_POP: fout << "Remove pop"; break;
 			case ADD_IND: fout << "Add ind"; break; 
 			case REMOVE_IND: fout << "Remove ind"; break;
 			case MOVE_IND: fout << "Move ind"; break; 
+			case FORCED_TRANS_IND_INF: fout << "Forced trans ind inf"; break; 
 			case COMP_DATA: fout << "Comp data"; break; 
 			case TRANS_DATA: fout << "Trans data"; break;
 			case TEST_DATA: fout << "Test data"; break; 
 			case POP_DATA: fout << "Pop data"; break; 
 			case POP_TRANS_DATA: fout << "Pop trans data"; break; 
 			case GENETIC_DATA: fout << "Genetic data"; break;
+			case WAIFW_DATA: fout << "WAIFW data"; break;
 			case PARAM_MULT: fout << "Parameter multiply"; break;
 			default: fout << "Unknown data type"; break;
 			}
@@ -648,12 +656,6 @@ void Output::summary(const Model &model) const
 			break;
 			
 		case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR:
-			break;
-
-		case TORNADO_SETUP: case TORNADO_RESULT:
-			break;
-			
-		case SCAN_SETUP: case SCAN_RESULT:
 			break;
 		
 		case COMPRESS: case DECOMPRESS:
@@ -1287,11 +1289,14 @@ string Output::trace_init() const
 	}
 	
 	if(model.trans_tree || model.trans_tree_output){
-	//if(model.trans_tree){
 		ss << ",N^origin,N^infected,N^unobs,t^root";
 		
+		if(model.genetic_data.waifw_on){
+			ss << ",α^IPA";
+		}
+				
 		if(model.genetic_data.on){
-			ss << ",N^mut-tree,N^mut-origin";	
+			ss << ",N^mut-tree,N^mut-origin,L^gen-obs-exp";	
 		}		
 	}
 	
@@ -1451,6 +1456,7 @@ void Output::param_sample(unsigned int s, unsigned int chain, State &state)
 		
 		if(s == 0){
 			ofstream fout(na);
+			check_open(fout,na);
 			fout << trace_init();		
 		}
 		
@@ -1475,7 +1481,7 @@ void Output::param_sample(const Particle &part)
 
 
 /// Gets parameter vector from a row in the loaded table (used for EXT)
-vector < vector <double> > Output::get_param_from_table_row(const vector <string> &row) const
+vector < vector <double> > Output::get_param_from_table_row(const vector <string> &row, const vector <unsigned int> &stat_out_col) const
 {
 	vector <double> vec;
 	
@@ -1489,8 +1495,10 @@ vector < vector <double> > Output::get_param_from_table_row(const vector <string
 	
 	vector < vector <double> > value;
 	
+	auto npar = model.param.size();
+	
 	value.resize(model.param.size());
-	for(auto th = 0u; th < model.param.size(); th++){
+	for(auto th = 0u; th < npar; th++){
 		const auto &par = model.param[th];
 		if(par.trace_output){
 			if(model.is_symmetric(par)){  // Outputs covariance matrix
@@ -1515,6 +1523,13 @@ vector < vector <double> > Output::get_param_from_table_row(const vector <string
 				}
 			}
 		}
+	}
+	
+	for(auto k = 0u; k < stat_out_col.size(); k++){
+		vector <double> vec;
+		vec.push_back(number(row[stat_out_col[k]]));
+	
+		value.push_back(vec);
 	}
 	
 	return value;
@@ -1576,8 +1591,12 @@ string Output::param_output(const Particle &part, const vector < vector <double>
 		const auto &tts = part.trans_tree_stats;
 		ss << "," << tts.N_origin << "," << tts.N_inf <<"," << tts.N_unobs << "," << tts.t_root;
 		
+		if(model.genetic_data.waifw_on){
+			ss << "," << tts.IPA;
+		}
+		
 		if(model.genetic_data.on){
-			ss << "," << tts.N_mut_tree << "," << tts.N_mut_origin;
+			ss << "," << tts.N_mut_tree << "," << tts.N_mut_origin << "," << tts.genetic_obs_expected;
 		}		
 	}
 	
@@ -1615,13 +1634,14 @@ void Output::state_sample(unsigned int s, unsigned int chain, State &state)
 	if(model.deterministic){
 		state.determinisitic_resimulate();
 	}
-	
+
 	auto part = state.generate_particle(s,chain,store_state);
 	state_store.push_back(part);
+
 	timer[STATE_OUTPUT] += clock();
 }
 
-
+ 
 /// Outputs a state sample
 void Output::state_sample(const Particle &part)
 {
@@ -2337,6 +2357,8 @@ void Output::set_diagnostics(unsigned int ch, string diag)
 void Output::copy(string file)
 {
 	ofstream fout(file);
+	check_open(fout,file);
+	
 	for(const auto &lr : lines_raw){
 		fout << lr.st << endl;
 	}
@@ -2384,7 +2406,20 @@ void Output::update_ie_average(vector < vector < vector <Average> > > &ie_averag
 	}
 }
 
-		
+
+// Checks if the genetics has converged or not
+bool Output::genetic_not_converged(const vector <Particle> &part) const
+{
+	for(auto k = part.size()/2; k < part.size(); k++){
+		auto &pa = part[k];
+		const auto &tts = pa.trans_tree_stats;
+		if(tts.genetic_obs_reached) return false;
+	}
+
+	return true;
+}
+
+	
 /// Generates the final outputs
 void Output::end(string file, unsigned int total_cpu)
 {
@@ -2409,6 +2444,7 @@ void Output::end(string file, unsigned int total_cpu)
 	ofstream fout;
 	if(com_op == false && op()){
 		fout.open(file);
+		check_open(fout,file);
 
 		fout << "# PROCESSED USING BICI " << bici_version << endl;
 		for(const auto &lr : lines_raw){
@@ -2449,6 +2485,7 @@ void Output::end(string file, unsigned int total_cpu)
 	
 		vector <string> trans_prob_name;
 		double dt_max_est_min = LARGE;
+		bool genetic_convergence = true;
 		
 		for(auto ch = 0u; ch < model.details.nchain; ch++){
 			auto trans_diag = trans_diag_init(); 
@@ -2463,6 +2500,10 @@ void Output::end(string file, unsigned int total_cpu)
 	#endif
 
 			if(op() && part.size() > 0){
+				if(model.genetic_data.on){    // Looks for genetic convergence
+					if(genetic_not_converged(part)) genetic_convergence = false;
+				}
+				
 				if(false){  // Turned off because timestep error message not reliable
 					for(const auto &pa : part){
 						for(auto p = 0u; p < model.nspecies; p++){
@@ -2491,6 +2532,10 @@ void Output::end(string file, unsigned int total_cpu)
 			} 
 		}
 		
+		if(!genetic_convergence){
+			final_warning.push_back("Convergence of the phylogenetic tree may not have been acheived. Please check trace plots for the genetic observation likelihood.");
+		}
+				
 		if(false){  // Turned off because timestep error message not reliable
 			if(op()){		
 				string err_msg;
@@ -2618,6 +2663,25 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 			emsg("Error loading previous parameter samples due to inconsistency with the model.");
 		}			
 	
+		vector <unsigned int> stat_out_col;
+		for(auto so : stat_out){
+			string name;
+			switch(so){
+			case TT_N_ORIGIN: name = "N^origin"; break;
+			case TT_N_INF: name = "N^infected"; break;
+			case TT_UNOBS: name = "N^unobs"; break;
+			case TT_N_MUT_TREE: name =  "N^mut-tree"; break;
+			case TT_N_MUT_ORIGIN: name = "N^mut-origin"; break;
+			case TT_TROOT: name = "t^root"; break;
+			case TT_IPA: name = "α^IPA"; break;
+			}
+	
+			auto c = find_in(tab.heading,name);
+			if(c == UNSET) emsg("Could not find column");
+			
+			stat_out_col.push_back(c); 
+		}
+	
 		for(auto r = 0u; r < tab.nrow; r++){
 			param_out += stringify(tab.ele[r])+endli;
 			
@@ -2625,7 +2689,7 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 			if(s == UNSET) emsg("Problem with unset");
 			
 			if(s >= burn){
-				auto value = get_param_from_table_row(tab.ele[r]);
+				auto value = get_param_from_table_row(tab.ele[r],stat_out_col);
 				param_samp[ch].push_back(value);				
 			}
 		}
@@ -2633,11 +2697,27 @@ void Output::output_trace(unsigned int ch, const vector <Particle> &part, vector
 
 	for(const auto &pa : part){
 		auto value = param_value_from_vec(pa);
-
+		
+		param_out += param_output(pa,value);
+		
 		if((model.mode == INF && pa.s >= burn) || model.mode == EXT){
+			const auto &tts = pa.trans_tree_stats;
+			for(auto so : stat_out){
+				vector <double> vec;
+				switch(so){
+				case TT_N_ORIGIN: vec.push_back(tts.N_origin); break;
+				case TT_N_INF: vec.push_back(tts.N_inf); break;
+				case TT_UNOBS: vec.push_back(tts.N_unobs); break;
+				case TT_N_MUT_TREE: vec.push_back(tts.N_mut_tree); break;
+				case TT_N_MUT_ORIGIN: vec.push_back(tts.N_mut_origin); break;
+				case TT_TROOT: vec.push_back(tts.t_root); break;
+				case TT_IPA: vec.push_back(tts.IPA); break;
+				}
+				value.push_back(vec);
+			}
+			
 			param_samp[ch].push_back(value);				
 		}
-		param_out += param_output(pa,value);
 	}
 	
 	auto enc = compress_content(param_out);
@@ -2783,7 +2863,7 @@ string Output::param_stat(unsigned int th, unsigned int i, const vector < vector
 	auto GR = get_Gelman_Rubin_statistic(cha);
 	
 	auto ESS_num = number(ESS);
-	if(ESS_num != UNSET && ESS_num < ESS_THRESH){
+	if(ESS_num != UNSET && ESS_num < ESS_THRESH && th < model.param.size()){
 		if(find_in(ESS_warn,th) == UNSET){
 			Warn wa; wa.th = th; wa.num = ESS_num;
 			ESS_warn.push_back(wa);
@@ -2791,7 +2871,7 @@ string Output::param_stat(unsigned int th, unsigned int i, const vector < vector
 	}			
 	
 	auto GR_num = number(GR);
-	if(GR_num != UNSET && GR_num > GR_THRESH){
+	if(GR_num != UNSET && GR_num > GR_THRESH && th < model.param.size()){
 		if(find_in(GR_warn,th) == UNSET){
 			Warn wa; wa.th = th; wa.num = GR_num;
 			GR_warn.push_back(wa);
@@ -2839,7 +2919,9 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 	
 	vector <Warn> ESS_warn, GR_warn;
 	
-	for(auto th = 0u; th < model.param.size(); th++){
+	auto npar = model.param.size();
+	
+	for(auto th = 0u; th < npar; th++){
 		const auto &par = model.param[th];
 		
 		if(par.trace_output){
@@ -2862,6 +2944,23 @@ void Output::output_param_statistics(const vector < vector < vector < vector <do
 				}
 			}
 		}
+	}
+
+	// Outputs transmission tree statistics
+	for(auto k = 0u; k < stat_out.size(); k++){
+		sss << "\"";
+		switch(stat_out[k]){
+		case TT_N_ORIGIN: sss << "N^origin"; break;
+		case TT_N_INF: sss << "N^infected"; break;
+		case TT_UNOBS: sss << "N^unobs"; break;
+		case TT_N_MUT_TREE: sss << "N^mut-tree"; break;
+		case TT_N_MUT_ORIGIN: sss << "N^mut-origin"; break;
+		case TT_TROOT: sss << "t^root"; break;
+		case TT_IPA: sss << "α^IPA"; break;
+		}
+		sss << "\"";
+		
+		sss << param_stat(npar+k,0,param_samp,ESS_warn,GR_warn) << endl;
 	}
 	
 	auto stat_table = sss.str();
@@ -3555,37 +3654,66 @@ void Output::final_memory_usage() const
 	}
 }
 
+
+/// Creates a unique file name from a root 
+string Output::create_filename(string root) const 
+{
+	auto i = 1u;
+	while(true){
+		auto na = root;
+		if(i != 1) na += tstr(i);
+		na += ".csv";
+		
+		auto fl = false;
+		for(auto fi : all_files){
+			if(fi == na) fl = true;
+		}
+		
+		if(fl == false) return na;
+		
+		i++;
+	}
+	
+	return "";
+}
+
 	
 /// Inserts a new command into the BICI-script
-void Output::insert_command(string name, unsigned int p, string insert_pl, string insert_bef, string line, string content, string file)
+void Output::insert_command(string name, unsigned int p, string insert_pl, string insert_bef, string line, string content, string file, bool &replace_data)
 {
 	// Saves file
-	if(datadir != ""){
-		ofstream pout(datadir+"/"+file);
-		check_open(pout,file);
-		pout << content;
-	}
-	else{  // Embeds output into file
-		line +=" file=\"[["+endli+content+"]]\"";
+	if(content != ""){
+		if(datadir != ""){
+			if(file == ""){
+				auto spl = split(line,' ');
+			
+				file = create_filename(spl[0]);	
+				line += " file=\""+file+"\"";
+			}
+				
+			ofstream pout(datadir+"/"+file);
+			check_open(pout,file);
+			pout << content;
+		}
+		else{  // Embeds output into file
+			line +=" file=\"[["+endli+content+"]]\"";
+		}
 	}
 	
 	// Finds where to insert
 	auto li = UNSET;
 	
-	const auto &sp = model.species[p];
-	for(const auto &so : sp.source){
-		if(so.name == name && so.cname == so.cname_raw){
-			li = lr_find(so.line_num);
-		
-			auto res = model.question("This will replace exisiting data. Is that OK?");
+	if(p != UNSET){
+		const auto &sp = model.species[p];
+		for(const auto &so : sp.source){
+			if(so.name == name && so.cname == so.cname_raw){
+				li = lr_find(so.line_num);
 			
-			if(res == false){
-				cout << "Terminated" << endl; 
-				exit (EXIT_FAILURE);
+				replace_data = true;
+			
+				erase_command(li);
+				break;
 			}
-		
-			erase_command(li);
-			break;
 		}
 	}
 

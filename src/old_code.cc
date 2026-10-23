@@ -1,3 +1,217 @@
+/*
+/// Adding node to new branch (accounting for genetic observation)
+void State::change_add_node_with_gobs(double t, const NodeRef &nr_add, TransTreeChange &gc, const GenObsFunc &gof, unsigned int mutBC_num, RegraftStore rs) const 
+{
+	const auto &inf_node = genetic_value.inf_node;
+	auto mut_rate = genetic_value.mut_rate*model.details.dt;
+	
+	string warn;
+	
+	vector <unsigned int> val_samp;
+	
+	RegraftConnect ty;
+	unsigned int num;
+	double t1, t2, t3, frac, lam; 
+	
+	if(nr_add.node != OUTSIDE_INF && nr_add.node != ENTER_INF){
+		const auto &in_add = inf_node[nr_add.node];
+		const auto &inf_ev_add = in_add.inf_ev;
+		auto j_add = nr_add.index;
+		
+		if(j_add > 0) t1 = inf_ev_add[j_add-1].tdiv;
+		else t1 = in_add.tdiv_start;
+		t2 = t;
+		
+		if(j_add == inf_ev_add.size()){                // Adds at the end
+			if(rs == REGRAFT_RETRIEVE){
+				for(auto k = 0u; k < N_REGRAFT_TRY; k++) val_samp.push_back(gc.rev_store[1+k]);
+			}
+			else{
+				for(auto k = 0u; k < N_REGRAFT_TRY; k++) val_samp.push_back(poisson_sample(mut_rate*(t2-t1),warn));
+			}
+			
+			ty = RG_ADD_END;
+		}
+		else{
+			t3 = inf_ev_add[j_add].tdiv;
+			frac = (t2-t1)/(t3-t1);
+			num = inf_ev_add[j_add].mut_num;
+			
+			if(rs == REGRAFT_RETRIEVE){
+				for(auto k = 0u; k < N_REGRAFT_TRY; k++) val_samp.push_back(gc.rev_store[1+k]);
+			}
+			else{
+				for(auto k = 0u; k < N_REGRAFT_TRY; k++) val_samp.push_back(binomial_sample(frac,num,warn));
+			}
+			
+			ty = RG_ADD_MID;
+		}
+	}
+	else{
+		auto seq_var = genetic_value.seq_var;
+		
+		lam = seq_var+mut_rate*t;
+		if(rs == REGRAFT_RETRIEVE){
+			for(auto k = 0u; k < N_REGRAFT_TRY; k++) val_samp.push_back(gc.rev_store[1+k]);
+		}
+		else{
+			for(auto k = 0u; k < N_REGRAFT_TRY; k++) val_samp.push_back(poisson_sample(lam,warn));
+		}
+		
+		ty = RG_ORIGIN;
+	}
+	
+	auto mut_sum = gof.mut_sum;
+	int mutA_num = gc.mutA_num;
+			
+	double pr;
+	
+	vector <unsigned int> mutA_st;
+	
+	auto sum = 0.0;
+	vector <double> pr_st, sum_st;
+	for(auto k = 0u; k < N_REGRAFT_TRY; k++){
+		auto val = val_samp[k];
+					
+		auto ms = mut_sum;
+		if(mutBC_num == UNSET) ms += val;
+		else ms += mutBC_num-val;
+
+		int sh = int(ran()*(2*ms+1))-(int)ms;
+				cout << sh << " " << -sh << " " << mutA_num << " shh\n";
+		if(-sh > (int)mutA_num){
+			pr = 0;
+			mutA_st.push_back(UNSET);
+		}
+		else{
+			auto mutA = mutA_num+sh;
+			mutA_st.push_back(mutA);
+			
+			cout << calc_genetic_obs_fast(val,mutA,gof) << " va\n";
+			pr = exp(calc_genetic_obs_fast(val,mutA,gof));
+		}
+		
+		sum += pr;
+		
+		pr_st.push_back(pr);
+		sum_st.push_back(sum);
+		cout << pr << " prob\n";
+	}
+	
+	if(sum == 0){
+		gc.type = TRANS_TREE_FAIL;
+		return;
+	}
+	
+	auto z = ran()*sum;
+	auto k = 0u; while(k < N_REGRAFT_TRY && z > sum_st[k]) k++;
+	if(k == N_REGRAFT_TRY) emsg("end wrong");
+	
+	gc.probif = log(pr_st[k])/sum;
+	
+	auto val = val_samp[k];
+	gc.mut_num = val;
+	gc.mutA_num = mutA_st[k];
+		
+	switch(ty){
+	case RG_ADD_END:
+		{
+			auto prob = poisson_probability(val,mut_rate*(t2-t1));
+			gc.dlike_genetic_process += prob;
+			gc.probif += prob;
+		}
+		break;
+			
+	case RG_ADD_MID:
+		gc.dlike_genetic_process += poisson_probability(val,mut_rate*(t2-t1)) 
+																+ poisson_probability(num-val,mut_rate*(t3-t2))
+																- poisson_probability(num,mut_rate*(t3-t1));                   
+		gc.probif += binomial_probability(gc.mut_num,frac,num);
+		break;
+	
+	case RG_ORIGIN:
+		{
+			auto prob = poisson_probability(gc.mut_num,lam);
+			gc.dlike_genetic_process += prob;
+			gc.probif += prob;
+		}
+		break;
+		
+	default: emsg("pro op"); break;
+	}
+}
+
+			
+/// Removing node from branch
+void State::change_remove_node_with_gobs(double t, const NodeRef &nr_from, TransTreeChange &gc, const GenObsFunc &gof, RegraftStore rs) const 		
+{	
+	const auto &inf_node = genetic_value.inf_node;
+	auto mut_rate = genetic_value.mut_rate*model.details.dt;
+
+	//RegraftConnect ty;
+	vector <unsigned int> val_samp;
+	
+	if(nr_from.node != OUTSIDE_INF && nr_from.node != ENTER_INF){ // Removing current node position
+		const auto &in_from = inf_node[nr_from.node];
+		const auto &inf_ev_from = in_from.inf_ev;
+		auto j_from = nr_from.index;
+		
+		double t1; 
+		if(j_from > 0) t1 = inf_ev_from[j_from-1].tdiv; 
+		else t1 = in_from.tdiv_start;
+		auto t2 = inf_ev_from[j_from].tdiv;
+		
+		if(j_from+1 == inf_ev_from.size()){            // End event
+			auto num = inf_ev_from[j_from].mut_num;
+			val_samp.push_back(num);
+			
+			//if(rs == REGRAFT_RETRIEVE){
+				//for(auto k = 0u; k < N_REGRAFT_TRY; k++) val_samp.push_back(gc.rev_store[1+k]);
+			//}
+			//else{
+			//for(auto k = 1u; k < N_REGRAFT_TRY; k++) val_samp.push_back(poisson_sample(mut_rate*(t2-t1),warn));
+
+			if(rs == REGRAFT_STORE) gc.rev_store.push_back(num);
+			
+			auto prob = poisson_probability(num,mut_rate*(t2-t1));
+			gc.dlike_genetic_process -= prob; 
+			gc.probfi += prob;
+		}
+		else{
+			auto t3 = inf_ev_from[j_from+1].tdiv;
+			auto numA = inf_ev_from[j_from].mut_num;
+			auto numB = inf_ev_from[j_from+1].mut_num;
+
+			if(rs == REGRAFT_STORE) gc.rev_store.push_back(numA);
+			if(rs == REGRAFT_STORE) gc.rev_store.push_back(gc.mutA_num);
+	
+			gc.dlike_genetic_process += poisson_probability(numA+numB,mut_rate*(t3-t1)) 
+																- poisson_probability(numA,mut_rate*(t2-t1)) 
+																- poisson_probability(numB,mut_rate*(t3-t2)); 
+															
+			auto frac = (t2-t1)/(t3-t1);
+			gc.probfi += binomial_probability(numA,frac,numA+numB);
+		}
+	}
+	else{
+		auto seq_var = genetic_value.seq_var;
+	
+		auto lam = seq_var+mut_rate*t;
+		auto num = genetic_value.inf_origin[nr_from.index].mut_num;
+		if(rs == REGRAFT_STORE) gc.rev_store.push_back(num);
+	
+		auto prob = poisson_probability(num,lam);
+		gc.dlike_genetic_process -= prob;
+		gc.probfi += prob;
+	}
+	
+	}
+*/
+
+
+
+
+
 	for(auto spli : spline_up_list){
 			const auto &spl = model.spline[spli];
 			unsigned int ind_start;

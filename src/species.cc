@@ -24,6 +24,8 @@ Species::Species(unsigned int p, const vector <double> &timepoint, const Details
 	pop_trans_data_exist = false;
 	pop_data_exist = false;
 	set_IE_exist = false;
+	trans_tree = false;
+	trans_tree_output = false;
 };
 
 
@@ -971,3 +973,17 @@ bool Species::trans_illegal(unsigned int tr, unsigned int ti, const vector < vec
 	
 	return false;
 }
+
+
+/// This is a function equivalent to trg_from_tr (which isn't loaded under simulation)
+unsigned int Species::trg_from_tr_func(unsigned int c, unsigned int cl, unsigned int tr) const
+{
+	const auto &cgl = comp_gl[c];
+	for(auto trg : cgl.tra_leave_group[cl].tr_list){
+		const auto &tra = tra_gl[trg];
+		if(tra.tr == tr) return trg;
+	}
+	
+	return UNSET;
+}
+

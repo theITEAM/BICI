@@ -137,7 +137,9 @@ function process(e)
 		if(model.warn.length > 0) update_mod = true;
 	}
 	
-	check_model();
+	if(false){ // TURN OFF
+		check_model();
+	}
 	
 	let itype = input.type;
 	//prr(itype+" type");
@@ -941,6 +943,20 @@ function process(e)
 			case "sim": graph_ind_sing_calculate(ind_sel,sim_result,res.plot_filter,res.burnin,res.p); break;
 			case "inf": graph_ind_sing_calculate(ind_sel,inf_result,res.plot_filter,res.burnin,res.p); break;
 			case "ppc": graph_ind_sing_calculate(ind_sel,ppc_result,res.plot_filter,res.burnin,res.p); break;
+			default: error("Problem sim inf"); break;
+			}
+		}
+		break;
+		
+	case "Graph ind sing tt":
+		{
+			let res = info.res;
+			let ind_sel = info.ind_sel;
+			
+			switch(res.siminf){
+			case "sim": graph_ind_sing_tt_calculate(ind_sel,sim_result,res.plot_filter,res.burnin,res.p); break;
+			case "inf": graph_ind_sing_tt_calculate(ind_sel,inf_result,res.plot_filter,res.burnin,res.p); break;
+			case "ppc": graph_ind_sing_tt_calculate(ind_sel,ppc_result,res.plot_filter,res.burnin,res.p); break;
 			default: error("Problem sim inf"); break;
 			}
 		}

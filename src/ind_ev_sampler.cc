@@ -757,9 +757,7 @@ vector <Event> IndEvSampler::sample_events(double &probif)
 						else{	
 							if(ti < ti_end) num[l] = ddt*rate_store[ti][cisland][l];
 							else num[l] = ddt*calculate_rate(ind,le,ctime,ti);
-							
-							//if(ti < ti_end) cout << rate_store[ti][cisland][l] << " " << calculate_rate(ind,le,ctime,ti) << "\n";
-					
+						
 							sum += num[l];
 							
 							if(obs_trans_exist){  // Accounts for observation probability on transition

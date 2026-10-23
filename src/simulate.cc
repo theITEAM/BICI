@@ -37,9 +37,11 @@ void Simulate::run()
 
 		if(slow_check) state.check("Check state");
 
+		if(model.trans_tree_output) state.setup_transtree(true);
 		output.param_sample(UNSET,0,state);
 		output.state_sample(UNSET,0,state);
-		
+		if(model.trans_tree_output) state.remove_trans_tree();
+			
 #ifdef USE_MPI
 		mpi.sample_barrier(s,smax);
 #endif
@@ -80,4 +82,13 @@ void Simulate::run()
 #endif
 
 	percentage_end(sup);
+}
+
+
+/// Works out if extinction criterion is met
+bool Simulate::extinction_criterion(const ExtinctInfo &ei) const
+{
+	if(!ei.on) return false;
+
+	return state.extinction_criterion(ei);
 }

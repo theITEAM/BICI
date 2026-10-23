@@ -21,6 +21,8 @@ worker.onmessage = function (e)
 
 	if(false){ prr("Worker reply: "+ans.type); prr("ans"); prr(ans);}
 
+	//pr(ans.type+"ty");
+
 	if(inter.worker_mess.active != "stop"){
 		if(ans.type != "Start" && ans.type != "StartPPC" && ans.type != "StartEXT" && ans.type != "Import model files"){
 			stop_loading_symbol();
@@ -385,6 +387,7 @@ worker.onmessage = function (e)
 		case "Sim data": case "Add ind single":
 			{	
 				close_bubble();
+				if(ans.spec != undefined) edit_source.spec = ans.spec;
 				add_gen_data(ans.head,ans.ele);
 				generate_screen();
 			}
@@ -447,7 +450,10 @@ worker.onmessage = function (e)
 		
 		case "Import output": case "Import output2": case "Load Default": 
 			model.load(ans);
-			//prr("Load Change Page"); change_page({pa:"Model", su:"Parameters"});
+			if(false){ // TURN OFF
+				//prr("Load Change Page"); change_page({pa:"Model", su:"Simulation"});
+				prr("Load Change Page"); change_page({pa:"Simulation"});
+			}
 			break;
 		
 		case "Add comp map":

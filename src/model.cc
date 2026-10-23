@@ -27,15 +27,26 @@ Model::Model(Operation mode_, ExtFactor ext_factor_, bool no_question_) : precal
 };
 
 
+/// Determines if time dependant
+bool Model::is_time_dep(const string &st) const
+{
+	if(includes(st,"{")) return true;
+	if(includes(st,"(t)")) return true;
+	if(includes(st,"%t$")) return true;
+
+	return false;
+}
+
+
 /// Adds an equation reference to EquationInfo
 void Model::add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv, bool keep_te)
 {
-	auto ti = UNSET;
-	if(tdiv != UNSET) ti = get_ti(tdiv);
-	
 	auto te_st = eqi.te;
 	
 	if(te_st == "") emsg_input("Equation does not have any text");
+	
+	auto ti = UNSET;
+	if(tdiv != UNSET && is_time_dep(te_st)) ti = get_ti(tdiv); // Note only uses to expression is time dependent 
 	
 	auto vec = hash_eqn.get_vec_eqn(te_st,(unsigned int)eqi.type,eqi.p,eqi.cl,eqi.infection_trans,ti);
 
@@ -46,14 +57,21 @@ void Model::add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv, bool keep
 	else{
 		eqi.eq_ref = eqn.size();	
 		
+		if(false){
+			cout << te_st << ": ";
+			for(auto va : vec) cout << va<< ",";
+			cout << "eqn hash" << endl;
+		}
+		
 		hash_eqn.add(eqi.eq_ref,vec);
 	
 		Equation eq(eqi,ti,species_simp,comp_pos,hash_comp_pos,param,prior,region,derive,spline,param_vec,density,pop,hash_pop,popcomb,popcombw,constant,timepoint,details,define);
 		
-		if(false && eq.warn != ""){ 
-			cout << "TURN OFF" << endl;
-			cout << eq.warn << endl; 
-			emsg_input("warning");
+		if(false){  // TURN OFF
+			if(eq.warn != ""){  
+				cout << eq.warn << endl; 
+				emsg_input("warning");
+			}
 		}
 		
 		eqn.push_back(eq);
@@ -2618,6 +2636,7 @@ PV Model::set_param_val(const vector <double> &value_set) const
 
 Param::Param(Constant &constant) : constant(constant) 
 {
+	mod_param = UNSET_MOD_PARAM;
 }
 
 /// Gets the value for param vec
@@ -2800,15 +2819,6 @@ bool Param::exist(unsigned int i) const
 unsigned int Param::add_cons(double val)
 {					
 	return constant.add(val); 
-	/* turn off
-	auto num = cons.size();
-	if(num < 10){
-		auto i = 0u; while(i < num && cons[i] != val) i++;
-		if(i < num) return i;
-	}
-	cons.push_back(val);
-	return num;
-	*/
 }
 
 
@@ -4154,7 +4164,6 @@ bool Model::is_prior_bounded(unsigned int th) const
 	if(pref == UNSET) return false;
 	
 	switch(prior[param_vec[th].prior_ref].type){
-		// SORT
 	case INVERSE_PR: case UNIFORM_PR: case POWER_PR: case MVN_JEF_PR: case MVN_UNIFORM_PR:
 		return true;	
 		
@@ -5282,3 +5291,363 @@ bool Model::is_strictly_positive(const Prior &pri) const
 }
 
 
+/// Used to order regraft sampler elements
+bool RSEord(const RegraftSamplerEle &rse1, const RegraftSamplerEle &rse2)                      
+{ return (rse1.prob > rse2.prob); };  
+
+
+/// Sets a sampler based on a set of elements
+RegraftSampler Model::set_rg_sampler(RegraftSamplerType type, vector <RegraftSamplerEle> &ele) const 
+{
+	RegraftSampler rs;
+	rs.type = type;
+				
+	sort(ele.begin(),ele.end(),RSEord);
+					
+	// Truncates to only include a certain percentage		
+	{ 
+		auto sum = 0.0;
+		for(auto k = 0u; k < ele.size(); k++){
+			sum += ele[k].prob;
+			ele[k].sum = sum;
+		}
+	
+		auto thresh = REGRAFT_THRESH*sum;
+
+		auto k = 0u; while(k < ele.size() && ele[k].sum < thresh) k++;
+		if(k < REGRAPH_SAMPLER_MIN){ k = REGRAPH_SAMPLER_MIN; if(k > ele.size()) k = ele.size();}
+		
+		ele.resize(k);
+	}
+	
+	{ // Normalises
+		auto max = ele[ele.size()-1].sum;
+		for(auto &el : ele){
+			el.prob /= max;
+			el.sum /= max;
+		}
+	}
+		
+	/*
+	// Convderts to log
+	for(auto &el : ele){
+		if(el.prob == 0) el.prob = -LARGE;
+		else el.prob = log(el.prob);
+	}
+	*/
+	
+	/*
+	// Generate start_search
+	{
+		auto k = 0u;
+		for(auto e = 0u; e < REGRAFT_START_SEARCH_MAX; e++){
+			auto thresh = double(e)/REGRAFT_START_SEARCH_MAX;
+			while(k < ele.size() && ele[k].sum < thresh) k++;
+			rs.start_search.push_back(k);
+		}
+	}
+	
+	// Adds to hash table
+	switch(type){
+	case REGRAFT_1D_SAMPLER:
+		for(auto k = 0u; k < ele.size(); k++){
+			const auto &el = ele[k];
+			auto hnum = el.di+REGRAFT_HASH_SHIFT;
+			rs.hash.add(k,hnum);
+		}
+		break;
+		
+	case REGRAFT_2D_SAMPLER:
+		for(auto k = 0u; k < ele.size(); k++){
+			const auto &el = ele[k];
+			auto hnum = (el.dj+REGRAFT_HASH_SHIFT)*REGRAFT_HASH_MULT+(el.di+REGRAFT_HASH_SHIFT);
+			rs.hash.add(k,hnum);
+		}
+		break;
+	}
+	*/
+	
+	rs.ele = ele;
+	
+	if(false){
+		for(auto k = 0u; k < ele.size(); k++){
+			const auto &el = ele[k];
+			cout << k << " " << el.di << "," << el.dj << " " << el.prob << " " << el.sum << " list" << endl;
+		}
+
+		//for(auto e = 0u; e < rs.start_search.size(); e++){
+			//cout << e << " " << rs.start_search[e] << " start" << endl;
+		//}
+	}
+	
+	return rs;
+}
+			
+					
+/// Sets up a sampler for doing regraphs
+void Model::setup_regraft_sampler()
+{
+	if(!trans_tree || !genetic_data.on) return;
+	
+	auto &regraft_sampler = genetic_data.regraft_sampler;
+
+	// Sets up 2d sampler
+	auto &regraft_sampler_2d_ref = genetic_data.regraft_sampler_2d_ref;
+	
+	regraft_sampler_2d_ref.resize(REGRAPFT_SAMPLER_DIV);
+	for(auto xi = 0u; xi < REGRAPFT_SAMPLER_DIV; xi++){
+		regraft_sampler_2d_ref[xi].resize(REGRAPFT_SAMPLER_DIV);
+		auto x0 = ((xi+0.5)/REGRAPFT_SAMPLER_DIV)-0.5;
+		for(auto yi = 0u; yi < REGRAPFT_SAMPLER_DIV; yi++){
+			regraft_sampler_2d_ref[xi][yi].resize(REGRAPFT_SAMPLER_NVAR);
+			auto y0 = ((yi+0.5)/REGRAPFT_SAMPLER_DIV)-0.5;
+			for(auto vi = 0u; vi < REGRAPFT_SAMPLER_NVAR; vi++){
+				regraft_sampler_2d_ref[xi][yi][vi].resize(REGRAPFT_SAMPLER_NCOR);
+				auto v = exp(REGRAPFT_SAMPLER_LOGVAR_MIN + ((vi+0.5)/REGRAPFT_SAMPLER_NVAR)*(REGRAPFT_SAMPLER_LOGVAR_MAX-REGRAPFT_SAMPLER_LOGVAR_MIN));
+				for(auto ci = 0u; ci < REGRAPFT_SAMPLER_NCOR; ci++){
+					auto c = 2*((ci+0.5)/REGRAPFT_SAMPLER_NCOR)-1;
+					
+					int sh = 3*sqrt(v);
+					
+					// The covariance matrix 
+					auto Sxx = v, Syy = v, Sxy = c*v, Syx = c*v;
+				
+					auto det = Sxx*Syy - Sxy*Syx;
+				
+					auto Sinvxx = Syy/det, Sinvyy = Sxx/det, Sinvxy = -Syx/det, Sinvyx = -Sxy/det;
+					
+					/*
+					auto e = -0.5*Sinvxx;
+					auto d = -0.5*Sinvxy;
+					auto denom = e*e-d*d;
+					auto detinv = 4*denom; 
+					auto v2 = -0.5*e/denom;
+					
+					auto c2 = -d/e;
+					cout << v << " " << v2 <<  " " << c << " " << c2 << " vv" << endl;
+					*/
+					
+					vector <RegraftSamplerEle> ele;
+					for(int i = -sh; i <= sh; i++){
+						for(int j = -sh; j <= sh; j++){
+							auto dx = i-x0;
+							auto dy = j-y0;
+							
+							RegraftSamplerEle rse;
+							rse.di = i;
+							rse.dj = j;
+							rse.prob = exp(-0.5*(dx*Sinvxx*dx + dy*Sinvyy*dy + dx*Sinvxy*dy + dy*Sinvyx*dx));
+								
+							ele.push_back(rse);
+						}
+					}
+					
+					auto rs = set_rg_sampler(REGRAFT_2D_SAMPLER,ele);
+					
+					regraft_sampler_2d_ref[xi][yi][vi][ci] = regraft_sampler.size();
+					
+					regraft_sampler.push_back(rs);
+				}
+			}
+		}
+	}
+	
+	// Sets up 1d sampler
+	auto &regraft_sampler_1d_ref = genetic_data.regraft_sampler_1d_ref;
+	
+	regraft_sampler_1d_ref.resize(REGRAPFT_SAMPLER_DIV);
+	for(auto xi = 0u; xi < REGRAPFT_SAMPLER_DIV; xi++){
+		regraft_sampler_1d_ref[xi].resize(REGRAPFT_SAMPLER_NVAR);
+		auto x0 = ((xi+0.5)/REGRAPFT_SAMPLER_DIV)-0.5;
+		for(auto vi = 0u; vi < REGRAPFT_SAMPLER_NVAR; vi++){	
+			auto v = exp(REGRAPFT_SAMPLER_LOGVAR_MIN + ((vi+0.5)/REGRAPFT_SAMPLER_NVAR)*(REGRAPFT_SAMPLER_LOGVAR_MAX-REGRAPFT_SAMPLER_LOGVAR_MIN));
+				
+			int sh = 3*sqrt(v);
+					
+			// The variance 
+			auto Sxx = v;
+			auto Sinvxx = 1.0/Sxx;
+		
+			vector <RegraftSamplerEle> ele;
+			for(int i = -sh; i <= sh; i++){
+				auto dx = i-x0;
+				
+				RegraftSamplerEle rse;
+				rse.di = i;
+				rse.dj = UNSET;
+				rse.prob = exp(-0.5*(dx*Sinvxx*dx));
+					
+				ele.push_back(rse);
+			}
+			
+			auto rs = set_rg_sampler(REGRAFT_1D_SAMPLER,ele);
+			
+			regraft_sampler_1d_ref[xi][vi] = regraft_sampler.size();
+			
+			regraft_sampler.push_back(rs);
+		}
+	}
+	
+	//emsg("set");
+}
+
+
+/// Analyses a single equation
+void Model::obs_model_param_eqn(unsigned int eq_ref, ModelParam mod_param, vector <bool> &obs_eqn)
+{
+	if(eq_ref == UNSET) return;
+	
+	if(mod_param == OBS_MOD_PARAM) obs_eqn[eq_ref] = true;
+	
+	const auto &eq = eqn[eq_ref];
+	
+	for(const auto &pr : eq.param_ref){
+		auto &par = param[pr.th];
+		if(mod_param != par.mod_param){
+			if(par.mod_param == UNSET_MOD_PARAM) par.mod_param = mod_param;
+			else par.mod_param = MIXED_MOD_PARAM;
+		}
+	}
+}
+
+
+/// Assigns parameters as either part of the normal model or observation model 
+void Model::assign_obs_model_param()
+{
+	vector <bool> obs_eqn(eqn.size(),false);
+	
+	for(const auto &sp : species){
+		for(const auto &pf : sp.pop_filter){                     // Population filter   
+			for(const auto &cpe : pf.comp_prob_eqn){	
+				obs_model_param_eqn(cpe.eq_ref,OBS_MOD_PARAM,obs_eqn);
+			}
+		}
+		
+		for(const auto &pd : sp.pop_data){                       // Population data (time vari obs mod)
+			const auto &pf = sp.pop_filter[pd.ref];
+			if(pd.time_vari){
+				for(const auto &cpe : pf.comp_prob_eqn){
+					obs_model_param_eqn(cpe.eq_ref,OBS_MOD_PARAM,obs_eqn);
+				}
+			}
+		}
+		
+		for(const auto &ptf : sp.pop_trans_filter){              // Population transition filter   
+			for(const auto &tpe : ptf.trans_prob_eqn){	
+				obs_model_param_eqn(tpe.eq_ref,OBS_MOD_PARAM,obs_eqn);
+			}
+		}
+
+		for(const auto &ptd : sp.pop_trans_data){                // Population transition data
+			auto &ptf = sp.pop_trans_filter[ptd.ref];
+			if(ptd.time_vari){
+				for(const auto &tpe : ptf.trans_prob_eqn){		
+					obs_model_param_eqn(tpe.eq_ref,OBS_MOD_PARAM,obs_eqn);
+				}
+			}
+		}
+
+		for(const auto &ecp : sp.enter){                         // Equations for entering probability
+			if(ecp.c_set == UNSET){
+				for(auto cl = 0u; cl < sp.ncla; cl++){
+					const auto &ecp_cl = ecp.cla[cl];
+					if(ecp_cl.c_set == UNSET){
+						for(auto &cop : ecp_cl.eqn){
+							obs_model_param_eqn(cop.eq_ref,OBS_MOD_PARAM,obs_eqn);
+						}						
+					}
+				}
+			}
+		}
+		
+		// Deals with individual observation probabilities with obs model time independent
+		for(const auto &ot : sp.obs_trans){                      // Observed transition data 
+			for(const auto &tpe : ot.tra_prob_eqn){
+				obs_model_param_eqn(tpe.eq_ref,OBS_MOD_PARAM,obs_eqn);
+			}
+		}
+	
+		for(const auto &ind : sp.individual){                    // Individual data 
+			for(const auto &ob : ind.obs){
+				switch(ob.type){
+				case OBS_TRANS_EV: case OBS_SOURCE_EV: case OBS_SINK_EV:  // Ind. transition
+					{
+						if(ob.ref < sp.obs_trans.size()){
+							const auto &ot = sp.obs_trans[ob.ref];	
+							if(ot.time_vari == true){
+								for(auto &tpe : ot.tra_prob_eqn){
+									obs_model_param_eqn(tpe.eq_ref,OBS_MOD_PARAM,obs_eqn);
+								}
+							}
+						}
+					}
+					break;
+					
+				case OBS_COMP_EV:                              // Ind. Compartment
+					if(ob.c_exact == UNSET){
+						for(const auto &cop : ob.c_obs_prob_eqn){
+							obs_model_param_eqn(cop.eq_ref,OBS_MOD_PARAM,obs_eqn);
+						}
+					}
+					break;
+				}
+			}
+		}
+	}
+
+	print_diag("Created observations");
+
+	if(genetic_data.on){                  // Genetic data
+		obs_model_param_eqn(genetic_data.mut_rate.eq_ref,OBS_MOD_PARAM,obs_eqn);
+		obs_model_param_eqn(genetic_data.seq_var.eq_ref,OBS_MOD_PARAM,obs_eqn);
+	}
+	
+	/// For the remaining equations sets to model parameter
+	for(auto eq = 0u; eq < eqn.size(); eq++){
+		if(obs_eqn[eq] == false) obs_model_param_eqn(eq,MOD_PARAM,obs_eqn);
+	}
+	
+	if(false){
+		for(const auto &par : param){
+			cout << add_escape_char(par.name) << ": ";
+			switch(par.mod_param){
+			case OBS_MOD_PARAM: cout << "obs model"; break;
+			case MOD_PARAM: cout << "model"; break;
+			case MIXED_MOD_PARAM: cout << "mixed"; break;
+			case UNSET_MOD_PARAM: cout << "unset"; break; 
+			}
+			cout << endl;
+		}
+		
+		emsg("Parameter status");
+	}
+}
+
+
+/// Gets the bounds for a parameter 
+ParamBound Model::param_bounds(const ParamRef &pr) const 
+{
+	ParamBound pb;
+	pb.min = UNSET;
+	pb.max = UNSET;
+	
+	const auto &par = param[pr.th];
+	const auto &er = par.element_ref[pr.index];
+	if(er.cons == true) return pb;
+	
+	const auto &el = par.element[er.index];
+	if(el.prior_ref == UNSET) return pb;
+	
+	const auto &pri = prior[el.prior_ref];
+	switch(pri.type){
+	case INVERSE_PR: case UNIFORM_PR: case POWER_PR:
+		pb.min = eqn[pri.dist_param[0].eq_ref].is_num();
+		pb.max = eqn[pri.dist_param[1].eq_ref].is_num();
+		break;
+		
+	default: break;
+	}
+		
+	return pb;
+}
+	

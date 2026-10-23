@@ -103,7 +103,8 @@ vector <unsigned int> Hash::get_vec_eqn(const string &te, unsigned int type, uns
 	vec.push_back(p);
 	vec.push_back(cl);
 	vec.push_back(ti);
-	if(infection_trans == true) vec.push_back(1); else vec.push_back(0);
+	if(infection_trans == true) vec.push_back(1); 
+	else vec.push_back(0);
 	
 	return vec;
 }

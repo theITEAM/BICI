@@ -518,7 +518,7 @@ void Precalc::print_calc() const
 
   ss << endl << endl;
 	
-	cout << "TURN OFF PRECALC" << endl;
+	cout << "PRECALC IN FILE" << endl;
 	ofstream fout("precalc.txt");
 	fout << ss.str();
 }

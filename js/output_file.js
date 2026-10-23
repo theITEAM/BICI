@@ -187,7 +187,9 @@ function generate_text_from_bscript(bscript,file_list,one_file)
 					if(com.type != "description" && enc == false) val = add_escape_char(val);
 					
 					if(one_file || begin_str(com.type,"warning")){
-						te += '"[['+endl+val+']]"';
+						te += '"[['+endl+val;
+						if(!end_str(val,"\n")) te += endl;
+						te += ']]"';
 					}
 					else{
 						let fi_name = com.type;
@@ -2104,6 +2106,7 @@ function add_data_table(type,tab,so,p,index,sim_or_inf,bscript)
 		case "add-ind-inf": com = "add-ind-sim"; break;
 		case "remove-ind-inf": com = "remove-ind-sim"; break;
 		case "move-ind-inf": com = "move-ind-sim"; break;
+		case "forced-trans-ind-inf": com = "forced-trans-ind-sim"; break;
 		case "init-pop-inf": com = "init-pop-sim"; break;
 		case "test-and-cull": com = "test-and-cull-sim"; break;
 		}
@@ -2116,6 +2119,7 @@ function add_data_table(type,tab,so,p,index,sim_or_inf,bscript)
 		case "add-ind-inf": com = "add-ind-post-sim"; break;
 		case "remove-ind-inf": com = "remove-ind-post-sim"; break;
 		case "move-ind-inf": com = "move-ind-post-sim"; break;
+		case "forced-trans-ind-inf": com = "force-trans-ind-post-sim"; break;
 		}
 	}
 	
@@ -2140,6 +2144,17 @@ function add_data_table(type,tab,so,p,index,sim_or_inf,bscript)
 		add_tag("class",spec.cl_drop.te,tags); 
 		break;
 	
+	case "Forced Trans.":
+		{
+			let sp = get_so_sp(so.info.siminf,p);
+		
+			let cl = find(sp.cla,"name",spec.cl_drop.te);
+
+			let trans_fi = output_add_trans_radio_filt(spec.filter,p,cl,so,index);
+			if(trans_fi != "") add_tag("trans",trans_fi,tags);
+		}
+		break;
+		
 	case "Transition": 
 		{
 			let sp = get_so_sp(so.info.siminf,p);
@@ -2358,6 +2373,37 @@ function output_add_comp_filt(spec,sp,cl_sel,p,so,index)
 	return filt;
 }
 				
+
+/// Adds the text for 'name' in pop-trans-data
+function output_add_trans_radio_filt(tfilt,p,cl,so,index)
+{
+	let sp = get_so_sp(so.info.siminf,p);
+	
+	let claa = sp.cla[cl];
+	let tra = claa.tra;	
+
+	if(cl < tfilt.cla.length){
+		let fi = tfilt.cla[cl];
+		if(fi.cl_name_store == claa.name){
+			let val = fi.tra.value;
+			
+			let i = hash_find(claa.hash_tra,val);
+			if(i != undefined){
+				return val.replace(/→/g,"->")
+			}
+		}
+	}
+	
+	let type;
+	switch(so.info.siminf){
+	case "sim": case "gen": type = "SimSourceProb"; break;
+	case "inf": type = "SourceProb"; break;
+	case "ppc": type = "PostSimSourceProb"; break; 
+	default: ppr("type not recognised"); break;
+	}
+	add_warning({mess:so.type, mess2:"The transition does not agree with with the model.", warn_type:type, p:p, ind:index});
+}
+
 
 /// Adds the text for 'name' in pop-trans-data
 function output_add_trans_filt(tfilt,p,cl,so,index)

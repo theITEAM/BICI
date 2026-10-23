@@ -1016,9 +1016,16 @@ double Proposal::set_prop_prob()
 	case IND_OBS_RESIM_PROP: return 0.5;
 	case IND_MULTI_EVENT_PROP: return 0.5;
 	case IND_EVENT_ALL_PROP: return 0.5;
-	case TRANS_TREE_PROP: return 0.1;
-	case TRANS_TREE_SWAP_INF_PROP: return 0.1;
-	case TRANS_TREE_MUT_PROP: return 0.1;
+	case TRANS_TREE_PROP: return 0.1;//0;//0.05;
+	case LOCAL_TRANS_TREE_PROP: return 1;//1;//0.2;
+	case MAXIMISE_GEN_OBS_PROP: return 0.1;
+	case LOCAL_MAXIMISE_GEN_OBS_PROP: return 1;
+	case TRANS_TREE_SWAP_INF_PROP: return 0.2;
+	case TRANS_TREE_SWAP_INF_EV_PROP: return 0.2;
+	case TRANS_TREE_SWAP_INF_EV_PROP2: return 0.2;
+	case TRANS_TREE_MUT_PROP: return 0.05;
+	case TRANS_TREE_MUT_ORIGIN_PROP: return 0.05;
+	case TRANS_TREE_MUT_SAMPLE_PROP: return 0.05;
 	case TRANS_TREE_MUT_LOCAL_PROP: return 0.1;
 	case POP_SINGLE_LOCAL_PROP: return 0.5;
 	case POP_ADD_REM_LOCAL_PROP: return 0.5;
@@ -1388,6 +1395,8 @@ vector <unsigned int> Proposal::get_prop_id() const
 		
 	default: emsg("Not dealt with"); break;
 	}
+	
+	if(regraft_obs_type != RG_NOT_SET) id.push_back(regraft_obs_type);
 	
 	for(auto va : id) if(va == UNSET) emsg("id should not be unset");
 	return id;

@@ -1313,6 +1313,7 @@ function button_action(bu,action_type)
 		}
 		break;
 
+	case "ForcedTrans": forced_trans(bu); break;
 	case "CompData": comp_data(bu);	break;
 	case "CompView": comp_data_view(bu); break;
 	case "TransData": trans_data(bu,"Transition"); break;	
@@ -1326,6 +1327,13 @@ function button_action(bu,action_type)
 	case "SeqData": sequence_data(bu); break;
 	case "IndEffData": ind_eff_data(bu); break;
 	case "IndGroupData": ind_group_data(bu); break;
+	case "WAIFWData":
+		if(bu.op.no_trans_tree) select_bubble_over();
+		else{
+			start_data_source("WAIFW",{},bu.op.info);
+			file_add_datatable();
+		}
+		break;
 	case "PopulationData": population_data(bu); break;
 	case "PopTransData": poptrans_data(bu); break;
 	case "TableSlider": case "TableSlider2": break;
@@ -2689,6 +2697,11 @@ function button_action(bu,action_type)
 	
 	case "SelectInd":
 		inter.graph.ind_sel = bu.te;
+		reset_graph();
+		break;
+		
+	case "SelectIndTT":
+		inter.graph.ind_sel_tt = bu.te;
 		reset_graph();
 		break;
 		

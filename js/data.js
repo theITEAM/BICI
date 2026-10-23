@@ -35,11 +35,13 @@ function start_data_source(type,spec,info)
 	case "Move Ind.": name = "Individual move data"; break;
 	case "Compartment": name = "Compartment data"; break;
 	case "Transition": name = "Transition data"; break;
+	case "Forced Trans.": name = "Forced transitions"; break;
 	case "Diag. Test": name = "Diagnostic test data"; break;
 	case "Test-and-cull": name = "Test and cull"; break;
 	case "Population": name = "Pop. data"; break;
 	case "Pop. Trans.": name = "Pop. trans. data"; break;
 	case "Genetic": name = "Genetic data"; break;
+	case "WAIFW": name = "WAIFW data"; break;
 	case "Ind. Eff.": name = "True individual effect"; break;
 	case "Set IE": name = "Set individual effect"; break;
 	case "Ind. Group": name = "Group"; break;
@@ -455,7 +457,7 @@ function add_data_buts(lay,siminf)
 			switch(so.type){
 			case "Add Ind.": case "Remove Ind.": case "Move Ind.":
 			case "Add Pop.": case "Remove Pop.": 
-			case "Ind. Group":
+			case "Ind. Group": case "WAIFW":
 				view_ob.ac = undefined;
 				break;
 			
@@ -591,6 +593,12 @@ function add_data_buts(lay,siminf)
 					w = model.add_object_button(lay,"Move Ind.",x,y,"MoveIndividuals",{back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); x += w+gap;
 				}
 				
+				{
+					let te = forced_trans_text, ti = "Forced transitions";
+					if(siminf == "gen"){ te = sim_move_ind_text; ti = "Generate forced transition data";}			
+					w = model.add_object_button(lay,"Forced trans.",x,y,"ForcedTrans",{back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); x += w+gap;
+				}
+				
 				if(siminf == "sim"){
 					let active2 = active;
 					if(sp.ind_eff_group.length == 0) active2 = false;
@@ -636,9 +644,12 @@ function add_data_buts(lay,siminf)
 			}
 			
 			{
+				let active2 = active;
+				//if(sp.trans_tree.check == false) active2 = false;	
+			
 				let te = seq_data_text, ti = "Genetic data";
 				if(siminf == "gen"){ te = sim_seq_data_text; ti = "Generate pathogen genetic data";}			
-				w = model.add_object_button(lay,"Genetic data",x,y,"SeqData",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
+				w = model.add_object_button(lay,"Genetic data",x,y,"SeqData",{ back:WHITE, active:active2, info:info, title:ti, te:te, siminf:siminf}); 
 				x += w+gap;	
 			}
 		}
@@ -690,6 +701,18 @@ function add_data_buts(lay,siminf)
 			let te = ind_group_data_text, ti = "Individual group data";
 			if(siminf == "gen"){ te = sim_ind_group_data_text; ti = "Generate individual group data";}		
 			w = model.add_object_button(lay,"Ind. Group",x,y,"IndGroupData",{ back:WHITE, active:active, info:info, title:ti, te:te, siminf:siminf}); 
+			x += w+gap;
+		}
+		
+		{
+			let active2 = active;
+			let no_trans_tree = false;
+			if(sp.trans_tree.check == false) no_trans_tree = true;
+			
+			let te = WAIFW_data_text, ti = "WAIFW data";
+			if(siminf == "gen"){ te = sim_WAIFW_data_text; ti = "Generate WAIFW data";}	
+		
+			w = model.add_object_button(lay,"WAIFW",x,y,"WAIFWData",{ back:WHITE, active:active2, info:info, title:ti, te:te, siminf:siminf, no_trans_tree:no_trans_tree}); 
 			x += w+gap;
 		}
 		break;
@@ -866,7 +889,15 @@ function set_loadcol()
 			case "ID":
 				load_col.push({heading:"ID", desc:"individual ID",type:"text"});
 				break;
-
+			
+			case "IDfrom":
+				load_col.push({heading:"From", desc:"infector ID",type:"text"});
+				break;
+			
+			case "IDto":
+				load_col.push({heading:"To", desc:"infectee ID",type:"text"});
+				break;
+				
 			case "sire":
 				load_col.push({heading:"sire", desc:"sire ID",type:"text"});
 				break;
@@ -1497,6 +1528,10 @@ function add_source_description(so)
 		}
 		break;
 
+	case "Forced Trans.":
+		num = so.table.nrow;
+		break;
+		
 	case "Add Ind.": case "Remove Ind.": 
 		num = so.table.nrow;
 		break;
@@ -1627,6 +1662,11 @@ function add_source_description(so)
 		case "matrix": desc = "Matrix"; break;
 		case "snp": desc = "# SNP "+(so.table.ncol-2); break;
 		}
+		num = so.table.nrow;
+		break;
+	
+	case "WAIFW":
+		desc = "Infection transmission";
 		num = so.table.nrow;
 		break;
 		
@@ -1795,6 +1835,24 @@ function load_default_filt(p)
 		filt.cla[cl] = { cl_name_store:claa.name, radio:{value:"All"}, comp:[]};
 		for(let c = 0; c < claa.ncomp; c++){
 			filt.cla[cl].comp[c] = {check:false, prob_eqn:create_equation("0","comp_prob",p,cl), comp_name_store:claa.comp[c].name};
+		}
+	}
+	
+	return filt;
+}
+
+
+/// Sets a default transition filter
+function load_default_trans_radio(p)
+{
+	let sp = model.species[p];
+	let filt={};
+
+	filt.cla=[];	
+	for(let cl = 0; cl < sp.ncla; cl++){
+		let claa = sp.cla[cl];
+		if(claa.tra.length > 0){	
+			filt.cla[cl] = { cl_name_store:claa.name, tra:{value:claa.tra[0].name}};
 		}
 	}
 	

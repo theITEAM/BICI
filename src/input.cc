@@ -42,8 +42,6 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 
 			getline(fin,line);
 		
-			if(fin.eof()) break;
-			
 			remove_cr(line);
 		
 			lines_raw.push_back(line);
@@ -52,6 +50,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 			//replace_tri_brac(line);
 		
 			lines.push_back(line);
+			
+			if(fin.eof()) break;
 		}while(true);
 	}
 	
@@ -62,7 +62,11 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	mpi.bcast(lines_raw);
 #endif
 
-	if(model.mode == DATA_CLEAR) return;
+	switch(model.mode){
+	case TORNADO_SETUP: case TORNADO_RESULT: case SCAN_SETUP: case SCAN_RESULT: emsg("SHould bot be mode"); break;
+	case DATA_CLEAR: return;
+	default: break;
+	}
 
 	auto command_line = extract_command_line(lines); // Converts from text lines to command lines
 
@@ -102,8 +106,6 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 		case SIM: use_sim_ic = true; break;
 		case PPC: if(model.details.param_only) use_sim_ic = true; break;
 		case DATA_SIM: use_sim_ic = true; break;
-		case TORNADO_RESULT: use_sim_ic = true; break;
-		case SCAN_RESULT: use_sim_ic = true; break;
 		default: break;
 		}
 	
@@ -118,7 +120,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 			case 1:  // Gets simulation or inference details
 				switch(cname){
 				case SIMULATION: 
-					if(model.mode != SIM && model.mode != DATA_SIM && model.mode != TORNADO_SETUP && model.mode != SCAN_SETUP){
+					if(model.mode != SIM && model.mode != DATA_SIM){
 						process = false; 
 					}
 					else{
@@ -129,8 +131,7 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 				
 				case INFERENCE:
 					if(model.mode != INF && model.mode != PPC && model.mode != EXT 
-					 && model.mode != DATA_SHOW && model.mode != TORNADO_SETUP && model.mode != TORNADO_RESULT
-					                            && model.mode != SCAN_SETUP && model.mode != SCAN_RESULT){
+					 && model.mode != DATA_SHOW){
 						process = false; 
 					}
 					else{
@@ -217,12 +218,15 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 					break;
 					
 				case INIT_POP_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM:
+				case FORCED_TRANS_IND_SIM:
 					if(!use_sim_ic && model.mode != DATA_SHOW && model.mode != DATA_DEL) process = false;
 					break;
 					
 				case INIT_POP: case REMOVE_IND: case MOVE_IND:
+				case FORCED_TRANS_IND_INF:
 				case COMP_DATA: case TRANS_DATA: case TEST_DATA: case POP_DATA: case POP_TRANS_DATA:
 				case IND_EFFECT_DATA: case IND_GROUP_DATA:
+				case GENETIC_DATA: case WAIFW_DATA:
 					if(use_sim_ic) process = false;
 					break;
 				
@@ -239,12 +243,13 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 				case INIT_POP_SIM: 
 				case ADD_POP_SIM: case REMOVE_POP_SIM: case ADD_IND_SIM:
 				case REMOVE_IND_SIM: case MOVE_IND_SIM:
+				case FORCED_TRANS_IND_SIM:
 					if(!use_sim_ic) process = false;
 					break;
 					
 				case COMP_DATA: case TRANS_DATA: case TEST_DATA:
 				case POP_DATA: case POP_TRANS_DATA: case IND_EFFECT_DATA:
-				case IND_GROUP_DATA: case GENETIC_DATA:
+				case IND_GROUP_DATA: case GENETIC_DATA: case WAIFW_DATA:
 					process = false;
 					break;
 					
@@ -282,9 +287,9 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 			
 			case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: break;
 			
-			case TORNADO_SETUP: case TORNADO_RESULT: break;
-			
-			case SCAN_SETUP: case SCAN_RESULT: break;
+			case TORNADO_SETUP: case TORNADO_RESULT: case SCAN_SETUP: case SCAN_RESULT:
+				emsg("SHould not be here");
+				break;
 			
 			case COMPRESS: case DECOMPRESS: break;
 			
@@ -370,7 +375,9 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	check_memory_too_large();
 	
 	add_genetic_data();                // Adds genetic data (potentially multi-species)
-		
+	
+	add_waifw_data();                  // Adds waifw data (potentially multi-species)
+	
 	source_rate_divide();              // Divides equations for source rates
 	
 	print_diag("h1");
@@ -382,6 +389,8 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	print_diag("h1a");
 	
 	create_equations(30,60);           // Creates equation calculations
+
+	model.assign_obs_model_param();    // Determines if parameters part of the observation model or not
 
 	if(equation_check){                // This is used in debugging to independently check equations correct
 		model.create_equation_check();
@@ -426,12 +435,20 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	}
 
 	print_diag("h1i");
-	//set_trans_tree_output();           // zzq If no genetic data only apply trans tree at end
+	set_trans_tree_output();           // If no genetic data only apply trans tree at end
+	
+	model.setup_regraft_sampler();     // If required, sets up a sampler for regrafting
 	
 	for(auto &eqn : model.eqn){        // Sets up reference (pop_ref, param_ref) in equations
 		eqn.setup_references();
 	}	
 	
+	check_infected_compartments();     // Checks infected compartments are correctly specified
+	
+	add_eqn_warnings();
+	
+	output_error_messages(err_mess);
+
 	check_reparam_time();              // Checks if reparameterised equations involve time
 	
 	model.set_ieg_ref();               // Sets ieg_ref which references ind effect groups
@@ -724,11 +741,12 @@ Input::Input(Model &model, string file, unsigned int seed, Mpi &mpi, bool sup_) 
 	
 	check_memory_too_large();
 	  
-	reduce_memory();                       // Looks at removing things not needed
+	reduce_memory();                         // Looks at removing things not needed
 	
 	print_diag("Reduce memory");
 		
-	model.check_all_linear();   // Use for diagnostics
+	model.check_all_linear();                // Use for diagnostics
+	   
 	//if(true) param_eqn_mem();
 	//wait();
 	
@@ -847,9 +865,9 @@ void Input::load_data_files(vector <CommandLine> &command_line)
 						string line;
 						do{
 							getline(fin,line);
-							if(fin.eof()) break;
 							remove_cr(line);
-							lines.push_back(line);
+							if(line != "") lines.push_back(line);
+							if(fin.eof()) break;
 						}while(true);
 	
 						FileStore file_st;
@@ -965,6 +983,8 @@ void Input::alert(string st)
 /// Adds a new error message to the list
 void Input::add_error_mess(unsigned int line_num, string st, ErrorType type)
 {
+	if(type == ERROR_WARNING && sup) return; // Suppresses warning under validation
+	
 	add_full_stop(st);
 	
 	ErrorMess em;
@@ -1134,6 +1154,7 @@ void Input::process_command(const CommandLine &cline, unsigned int loop, bool us
 	case INIT_POP_SIM:
 	case ADD_POP_SIM: case REMOVE_POP_SIM: 
 	case ADD_IND_SIM: case REMOVE_IND_SIM: case MOVE_IND_SIM: 
+	case FORCED_TRANS_IND_SIM:
 	case SET_IND_EFFECT_SIM:
 		if(use_sim_ic || model.data_mode()) import_data_table_command(cline,true);
 		else alert_warning("Line ignored because not need for simulation");
@@ -1141,6 +1162,7 @@ void Input::process_command(const CommandLine &cline, unsigned int loop, bool us
 	
 	case ADD_POP_POST_SIM: case REMOVE_POP_POST_SIM: 
 	case ADD_IND_POST_SIM: case REMOVE_IND_POST_SIM: case MOVE_IND_POST_SIM:
+	case FORCED_TRANS_IND_POST_SIM:
 	case SET_IND_EFFECT_POST_SIM:
 		if(model.mode == PPC && !use_sim_ic) import_data_table_command(cline,true);
 		else{
@@ -1154,9 +1176,10 @@ void Input::process_command(const CommandLine &cline, unsigned int loop, bool us
 	case INIT_POP: 
 	case ADD_POP: case REMOVE_POP:
 	case ADD_IND: case REMOVE_IND: case MOVE_IND: 
+	case FORCED_TRANS_IND_INF:
 	case COMP_DATA: case TRANS_DATA:
 	case TEST_DATA: case POP_DATA: case POP_TRANS_DATA: 
-	case GENETIC_DATA:
+	case GENETIC_DATA: case WAIFW_DATA:
 	case SET_IND_EFFECT_INF:
 	case IND_EFFECT_DATA:
 	case IND_GROUP_DATA:

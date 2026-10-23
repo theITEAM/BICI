@@ -1939,3 +1939,34 @@ void check_nm_trans_incomp_like_no_log()
 	}
 	cout << num2/num;
 }
+
+
+/// Test harmonic well approximation for transtree calculation
+void test_harmonic()
+{
+	ofstream fout("../Output/harmonic.txt");
+	
+	for(auto sig = 0.01; sig < 1; sig += 0.01){
+		auto sum = 0.0;
+		auto imin = 3*sig; 
+		if(imin < 5) imin = 5;
+		for(double i = -imin; i <= imin; i++){
+			auto p = exp(-i*i/(2*sig*sig));
+			sum += p;
+		}
+		
+		auto c = 1.0/sum;
+
+		auto av = 0.0;
+		for(double i = -imin; i <= imin; i++){
+			auto p = c*exp(-i*i/(2*sig*sig));
+			//av += p*log(p);
+			av += p*(i*i/(2*sig*sig));
+			//av += p;
+		}
+		
+		fout << sig << " "  << av << " " << (1/(sig*sig))*exp(-1.0/(2*sig*sig)) << endl;
+		
+		cout << sig << " " << av << "av" << endl;
+	}
+}

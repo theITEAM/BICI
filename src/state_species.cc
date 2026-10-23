@@ -14,7 +14,7 @@ using namespace std;
 #include "matrix.hh"
 
 /// Initialises the state species
-StateSpecies::StateSpecies(PV &param_val, const vector <double> &popcombw_value, const vector <Equation> &eqn, const Species &sp, const Model &model, const vector <unsigned int> &pop_affect_, Operation mode_, const double &dif_thresh, vector <double> &dpop, vector <unsigned int> &dpop_list) : source_sampler(sp.markov_eqn,sp.tra_gl,sp.comp_gl,model.details,sp.init_cond), rate_mean(), param_val(param_val), popcombw_value(popcombw_value), eqn(eqn), sp(sp), model(model), dif_thresh(dif_thresh), dpop(dpop), dpop_list(dpop_list)
+StateSpecies::StateSpecies(PV &param_val, const vector <double> &popcombw_value, const vector <Equation> &eqn, const Species &sp, const Model &model, const vector <unsigned int> &pop_affect_, Operation mode_, const double &dif_thresh, vector <double> &dpop, vector <unsigned int> &dpop_list, const bool &trans_tree_on) : source_sampler(sp.markov_eqn,sp.tra_gl,sp.comp_gl,model.details,sp.init_cond), rate_mean(), param_val(param_val), popcombw_value(popcombw_value), eqn(eqn), sp(sp), model(model), dif_thresh(dif_thresh), dpop(dpop), dpop_list(dpop_list), trans_tree_on(trans_tree_on)
 {
 	timer.resize(STSP_TIMER_MAX,0);
 	
@@ -209,7 +209,19 @@ void StateSpecies::reset_arrays()
 		}
 	}
 	
-	//species[p].intervention.push_back(inter);
+	// Places forced transition on the time line
+	for(auto i = 0u; i < sp.forced_trans.size(); i++){
+		const auto &ft = sp.forced_trans[i];
+		SimTrigEvent tri;
+		tri.type = FORCED_TRANS_SIM_EV;
+		tri.c = UNSET;
+		tri.trg = UNSET;
+		tri.i = i;
+		tri.tdiv = ft.tdiv;
+		auto ti = get_ti(tri.tdiv);
+	
+		trig_div[ti].ev.push_back(tri);
+	}
 }
 
 
@@ -572,7 +584,8 @@ IndInfFrom StateSpecies::extract_infection_info(string &st) const
 		else{
 			if(te == "OUT_INF"){ iif.p = OUTSIDE_INF; iif.w = 1;}
 			else{
-				iif.i = number(te);
+				iif.p = FIND_IIF;
+				iif.i = number(te); // Note, this number is converted to the actual individual in set_ind_inf_from() 
 				if(iif.i == UNSET) emsg("Should be number");
 			}
 		}
@@ -633,7 +646,7 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 			
 			for(auto r = 0u; r < ind_tab.nrow; r++){
 				const auto &row = ind_tab.ele[r];
-					
+				
 				auto n = number(row[0]);
 				if(n == UNSET) emsg("Cannot find ind_key");
 				
@@ -673,9 +686,9 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 						if(t <= t_end){
 							if(c == UNSET && source == false){
 								auto co = tspl[0];
-								
+										
 								auto inf_from = extract_infection_info(co);
-					
+			
 								c = hash_compgl.find(co);
 								if(c == UNSET){
 									error_load_sample(5);
@@ -689,7 +702,7 @@ void StateSpecies::simulate_sample_init(unsigned int ti_end, const SampleSpecies
 								tr = replace(tr,"->","→");
 							
 								auto inf_from = extract_infection_info(tr);
-						
+					
 								auto trr = hash_tra.find(tr);
 								if(trr == UNSET){
 									error_load_sample(8);
@@ -2444,105 +2457,176 @@ void StateSpecies::set_event_change_div()
 
 
 
-/// Adds transmission tree to the final output
-void StateSpecies::add_trans_tree(const vector < vector <double> > &popnum_t, const vector < vector < vector <Poss> > > &pop_ind)
+/// Adds where infection comes from to individual transitions
+void StateSpecies::setup_iif(const vector < vector <double> > &popnum_t, const vector < vector < vector <Poss> > > &pop_ind)
 {
 	for(auto &ind : individual){
 		for(auto &ev : ind.ev){
 			auto &iif = ev.ind_inf_from;
-			auto c = ev.c_after;
-	
-			switch(ev.type){
-			case ENTER_EV:
-				if(sp.comp_gl[c].infected) iif.p = ENTER_INF;
-				break;
-			
-			case M_TRANS_EV: 
-				{
-					const auto &trg = sp.tra_gl[ev.tr_gl];
-					if(trg.infection.type == TRANS_INFECTION){
-						auto e = trg.markov_eqn_ref;
-						if(e == UNSET) emsg("me not set");
+		
+			if(ev.type == M_TRANS_EV && ev.inf_node_ref != UNSET){
+				const auto &trg = sp.tra_gl[ev.tr_gl];
+				if(trg.infection.type == TRANS_INFECTION){
+					auto e = trg.markov_eqn_ref;
+					if(e == UNSET) emsg("me not set");
 
-						const auto &me = sp.markov_eqn[e];
-						auto ti = get_ti(ev.tdiv);
-						
-						const auto &eq = eqn[me.eqn_ref];
-						
-						const auto &lin = eq.lin;
-						if(!lin.on) emsg("The equation must be linear");
+					const auto &me = sp.markov_eqn[e];
+					auto ti = get_ti(ev.tdiv);
+					
+					const auto &eq = eqn[me.eqn_ref];
+					
+					const auto &lin = eq.lin;
+					if(!lin.on) emsg("The equation must be linear");
 
-						auto tii = ti; 
-						if(!me.time_vari) tii = 0;
-						auto val = markov_eqn_vari[e].value_t[tii];
-						if(val < VTINY){
-							//emsg("A consistent transmission tree cannot be found.");
-							iif.p = OUTSIDE_INF;
+					auto tii = ti; 
+					if(!me.time_vari) tii = 0;
+					auto val = markov_eqn_vari[e].value_t[tii];
+					if(val < VTINY){
+						//emsg("A consistent transmission tree cannot be found.");
+						iif.p = OUTSIDE_INF;
+					}
+					else{
+						auto Npop = eq.pop_ref.size();
+		
+						auto j = UNSET;
+						if(lin.multi_source){ // Samples from available sources (either populations of fro outside)		
+							auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val,popcombw_value);
+							j = ss.sample_inf_source();
+							if(j == UNSET) emsg("Error with source");
 						}
 						else{
-							auto Npop = eq.pop_ref.size();
-			
-							auto j = UNSET;
-							if(lin.multi_source){ // Samples from available sources (either populations of fro outside)		
-								auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val,popcombw_value);
-								j = ss.sample_inf_source();
-								if(j == UNSET) emsg("Error with source");
+							if(testing){
+								if(Npop > 1) emsg("Npop wrong");
+								if(Npop == 1 && lin.no_pop_precalc.type != ZERO) emsg("Npop wrong");
 							}
-							else{
-								if(testing){
-									if(Npop > 1) emsg("Npop wrong");
-									if(Npop == 1 && lin.no_pop_precalc.type != ZERO) emsg("Npop wrong");
-								}
-								j = 0;
-							}
+							j = 0;
+						}
 
-							if(j == Npop){   // Selects no population
-								iif.p = OUTSIDE_INF;
+						if(j == Npop){   // Selects no population
+							iif.p = OUTSIDE_INF;
+							iif.w = 1;
+						}
+						else{
+							auto po = eq.pop_ref[j];
+							
+							const auto &pop = model.pop[po];
+							auto p_inf = pop.p;
+							
+							const auto &list = pop_ind[ti][po];
+							if(list.size() == 0) emsg("No individual in pop1");
+							
+							auto w = 1.0;
+							
+							unsigned int i;
+							if(pop.ind_variation){
+								auto pos = sample_possibility(list);		
+								i = pos.i;
+								w = pos.weight;
+								if(testing){
+									auto sum = 0.0;
+									for(const auto &pos : list)	sum += pos.weight;
+									if(dif(sum,popnum_t[ti][po],TINY)) emsg("Population wrong");
+								}
 							}
 							else{
-								auto po = eq.pop_ref[j];
+								auto k = (unsigned int)(ran()*list.size());
+								i = list[k].i;
 								
-								const auto &pop = model.pop[po];
-								auto p_inf = pop.p;
-								
-								const auto &list = pop_ind[ti][po];
-								if(list.size() == 0) emsg("No individual in pop");
-								
-								unsigned int i;
-								if(pop.ind_variation){
-									auto pos = sample_possibility(list);		
-									i = pos.i;
-									
-									if(testing){
-										auto sum = 0.0;
-										for(const auto &pos : list)	sum += pos.weight;
-										if(dif(sum,popnum_t[ti][po],TINY)) emsg("Population wrong");
-									}
+								if(testing){
+									if(dif(list.size(),popnum_t[ti][po],TINY)) emsg("Population wrong");
 								}
-								else{
-									auto k = (unsigned int)(ran()*list.size());
-									i = list[k].i;
-									
-									if(testing){
-										if(dif(list.size(),popnum_t[ti][po],TINY)) emsg("Population wrong");
-									}
-								}
-								
-								iif.p = p_inf;
-								iif.i = i;
 							}
+							
+							iif.p = p_inf;
+							iif.i = i;
+							iif.po = po;
+							iif.pref = j;
+							iif.w = w;
 						}
 					}
 				}
-				break;
-			
-			case NM_TRANS_EV:
-				{
-					const auto &trg = sp.tra_gl[ev.tr_gl];
-					if(trg.infection.type == TRANS_INFECTION) emsg("Non-Markovian transition cannot be used for infection");
+			}
+		}
+	}
+}
+
+
+/// Calculate potential links between individuals
+void StateSpecies::calc_poss_link(vector < vector <PossLink> > &poss_link, const vector < vector <double> > &popnum_t, const vector < vector < vector <Poss> > > &pop_ind)
+{	
+	for(auto i = 0u; i < individual.size(); i++){
+		auto &ind = individual[i];
+		for(auto &ev : ind.ev){	
+			if(ev.type == M_TRANS_EV && ev.inf_node_ref != UNSET){
+				const auto &trg = sp.tra_gl[ev.tr_gl];
+				if(trg.infection.type == TRANS_INFECTION){
+					auto e = trg.markov_eqn_ref;
+					if(e == UNSET) emsg("me not set");
+
+					const auto &me = sp.markov_eqn[e];
+					auto ti = get_ti(ev.tdiv);
+					
+					const auto &eq = eqn[me.eqn_ref];
+					
+					const auto &lin = eq.lin;
+					if(!lin.on) emsg("The equation must be linear");
+
+					auto tii = ti; 
+					if(!me.time_vari) tii = 0;
+					auto val = markov_eqn_vari[e].value_t[tii];
+					if(val < VTINY){
+						ev.ind_inf_from.p = OUTSIDE_INF;
+						ev.ind_inf_from.i = UNSET;
+						ev.ind_inf_from.po = UNSET;
+						ev.ind_inf_from.pref = UNSET;
+						ev.ind_inf_from.w = 1;
+					}
+					else{
+						auto Npop = eq.pop_ref.size();
+		
+						auto ss = eq.setup_source_sampler(ti,popnum_t[ti],param_val,popcombw_value);
+						
+						auto n = ev.inf_node_ref;
+					
+						if(n == UNSET) emsg("node not set");
+						
+						PossLink pl;
+						auto &pl_iif = pl.iif;
+						
+						for(auto j = 0u; j <= Npop; j++){
+							if(j == Npop){
+								pl.prob = ss.val_store[j];
+								pl_iif.p = OUTSIDE_INF;
+								pl_iif.i = UNSET;
+								pl_iif.po = UNSET;
+								pl_iif.pref = UNSET;
+								pl_iif.w = 1;
+								poss_link[n].push_back(pl);
+							}
+							else{
+								auto po = eq.pop_ref[j];
+							
+								const auto &pop = model.pop[po];
+								auto p_inf = pop.p;
+							
+								const auto &list = pop_ind[ti][po];
+								
+								for(const auto &li : list){     
+									pl_iif.p = p_inf;
+									pl_iif.i = li.i;
+									pl_iif.po = po;
+									pl_iif.pref = j;
+									pl_iif.w = li.weight;
+									
+									pl.prob = ss.val_store[j]*li.weight/list.size();
+									poss_link[n].push_back(pl);
+								}
+							}
+						}
+					
+						if(poss_link[n].size() == 0) emsg("No possible link");
+					}
 				}
-				break;
-			default: break;
 			}
 		}
 	}
@@ -2557,7 +2641,42 @@ void StateSpecies::remove_trans_tree()
 			auto &iif = ev.ind_inf_from;
 			iif.p = UNSET;
 			iif.i = UNSET;
+			iif.po = UNSET;
+			iif.pref = UNSET;
+			iif.w = UNSET;
 		}
 	}
 }
 
+
+/// Gets the compartment value for a given individual at a given time
+unsigned int StateSpecies::get_ind_c(unsigned int i, double ti) const 
+{
+	const auto &ev = individual[i].ev;
+	auto c = UNSET;
+	auto emax = ev.size();
+	auto e = 0u;
+	while(e < emax && (ev[e].tdiv < ti || ev[e].tdiv == 0)){
+		c = ev[e].c_after;
+		e++;
+	}		
+	
+	return c;
+}
+
+
+/// Gets the transition rate for a Markov equation
+double StateSpecies::get_tra_rate(double tdiv, unsigned int trg) const 
+{							
+	const auto &tra = sp.tra_gl[trg];
+	auto m = tra.markov_eqn_ref;
+	if(m == UNSET) return UNSET;
+	
+	const auto &mev = markov_eqn_vari[m];
+	if(mev.time_vari){
+		auto ti = get_ti(tdiv);
+		return mev.value_t[ti];
+	}
+	
+	return mev.value_t[0];
+}

@@ -34,8 +34,6 @@ void Input::reduce_memory()
 {
 	switch(model.mode){
 	case DATA_SIM: case DATA_SHOW: case DATA_DEL: case DATA_CLEAR: 
-	case TORNADO_SETUP: case TORNADO_RESULT:
-	case SCAN_SETUP: case SCAN_RESULT:
 	case COMPRESS: case DECOMPRESS:
 		return;
 	
@@ -353,6 +351,24 @@ double Input::model_profile() const
 		
 		sum_tot += sum;
 		if(sum > sum_min) cout << "genetic_data: " << (unsigned int)(sum*f) << endl;
+	}
+	
+	{
+		const auto &gen = model.genetic_data;
+		auto sum = 0.0;
+		for(const auto &sa : gen.regraft_sampler){
+			sum += sizeof(RegraftSampler);
+			sum += sa.ele.size()*sizeof(RegraftSamplerEle);
+		}
+		
+		for(const auto &ele : gen.regraft_sampler_2d_ref){
+			sum += mem(ele);
+		}
+	
+		sum += mem(gen.regraft_sampler_1d_ref);
+		
+		sum_tot += sum;
+		if(sum > sum_min) cout << "genetic_data -> regraft sampler: " << (unsigned int)(sum*f) << endl;
 	}
 	
 	{

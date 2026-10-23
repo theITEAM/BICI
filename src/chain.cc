@@ -59,6 +59,7 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 		const auto &samp = model.sample[imax];
 		
 		auto param_val = model.post_param(samp);
+	
 		state.load_samp(param_val,samp);
 	}
 	else{                     // Simulates initial state
@@ -109,6 +110,10 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 			 	
 			state.resample_ind(false);    // Resamples individual such that fixed events become correct
 
+			print_diag("resampled");
+
+			//state.check("After resample");
+
 			auto np = state.force_consistent_solution();
 		
 			if(np.size() > 0){  // Some individuals are not possible
@@ -135,6 +140,7 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 			
 				if(fit > fit_max){
 					fit_max = fit;
+				
 					part = state.generate_particle(UNSET,UNSET,true,false);
 				}
 			
@@ -149,14 +155,18 @@ void Chain::init(unsigned int ch, unsigned int ch_max)
 				//state.check("after resample");
 			}
 		}
-		
+
 		if(fit_max == -LARGE) state.no_valid_state(not_possible);
 
 		state.set_particle(part);
+
+		if(!model.trans_tree_output) state.setup_transtree(true);
+
+		state.likelihood_from_scratch();
 	}
 	
 	for(const auto &ssp: state.species) ssp.check_obs_inconsitent();
-	
+		
 	state.check("init");
 	
 	print_diag("done");
@@ -186,13 +196,15 @@ void Chain::burn_update(unsigned int s)
 	else{
 		state.dif_thresh = DIF_THRESH;
 	}
+	
+	if(s%10 == 0) state.check_maximise_gen_obs_off(burn_info.on);
 }
 
 
 /// Gets the value for nburnin
 unsigned int Chain::get_nburnin()
 {
-		return nburnin;
+	return nburnin;
 }
 
 
@@ -213,6 +225,8 @@ void Chain::pas_burn_update(unsigned int s, unsigned int gen_update, double phi)
 	if(s != 0 && s%burn_info.prop_join_step == 0) check_join_proposal();
 
 	//if(adapt_prop_prob && s%UPDATE_PROP_PROB == UPDATE_PROP_PROB-1) set_proposal_prob();
+	
+	if(s%10 == 0) state.check_maximise_gen_obs_off(false);
 }
 
 
@@ -237,6 +251,8 @@ void Chain::pas_burn_update_run(unsigned int s)
 	}
 	
 	state.dif_thresh = DIF_THRESH;
+	
+	if(s%10 == 0) state.check_maximise_gen_obs_off(burn_info.on);
 }
 
 
@@ -318,7 +334,7 @@ void BurnInfo::setup(unsigned int s, unsigned int &nburnin,  unsigned int &nsamp
 		}
 		
 		if(s == 0){
-			phi = 0.0;
+			phi = PHI_MIN;
 			range = 50;
 		}
 		else{
@@ -360,7 +376,7 @@ void BurnInfo::setup(unsigned int s, unsigned int &nburnin,  unsigned int &nsamp
 				}
 			
 				range = 0;
-				phi = 0;
+				phi = PHI_MIN;
 			}
 			else{
 				if(on == true){
@@ -396,7 +412,7 @@ void BurnInfo::setup(unsigned int s, unsigned int &nburnin,  unsigned int &nsamp
 			
 				range = 0;
 				epsilon = 1/(exp(alpha)-1);
-				phi = 0;
+				phi = PHI_MIN;
 			}
 			else{
 				if(on == true){
@@ -420,6 +436,8 @@ void BurnInfo::setup(unsigned int s, unsigned int &nburnin,  unsigned int &nsamp
 		}
 		break;
 	}
+	
+	if(phi < PHI_MIN) phi = PHI_MIN;
 	
 	if(false){ // This code was used when testing different annealing schemes
 		double origin, log_ratio_av;
@@ -593,12 +611,15 @@ void Chain::update(unsigned int s)
 			//if(op()) cout << s << " " << core() << " " << add_escape_char(pro.name) << " " <<  state.sample << " proposal" << endl;
 			
 			auto ch_on = false;
-		//cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl; ch_on = true;
+			//cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl; 
+			//ch_on = true;
 			
 			if(true){
 				if(pl) cout << s << " " << core() << " " << pro.name << " " <<  state.sample << " proposal" << endl;
-		
+			
 				pro.update(state);
+				
+				state.check_back(pro.name);
 			}
 			else{
 				switch(pro.type){
@@ -615,29 +636,38 @@ void Chain::update(unsigned int s)
 				}
 			}
 
-			//if(core() == 4) 
+
 			if(ch_on) state.check(" After prop check"); 
 		 
 			if(pl) state.check(" After prop check");
 			if(pl) state.check_pop_t("hhh");
-		
+	
+			//state.check_markov_inf("prop");
 			//state.check_precalc_eqn("up");
 			//state.check_neg_rate(pro.name);
 			//state.check_markov_div_value(0," after update");
 		}
 	}
-	
+
 	// This resamples to remove any inconsistent indiviudals 
 	if(burn_info.on){
 		auto fl = false;
 		for(const auto &ssp : state.species){
 			if(ssp.inconsistent_ind) fl = true;
 		}
-		if(fl) state.resample_ind(true);   
+		if(fl){
+			if(pl) cout << "Resample to make consistent" << endl;
+			cout << "Resample to make consistent" << endl;
+			state.resample_ind(true);   
+			//emsg("do");
+		}
 	}
 	
 	//if(testing == true && s%10 == 0) state.check("check");
 	if(testing == true && s%CHECK_THIN == CHECK_THIN-1) state.check("end");
+	
+	//state.test_get_genetic_obs_func_from();
+	//state.check_regraft();
 }
 
 
@@ -1016,13 +1046,48 @@ void Chain::update_init()
 		}
 		
 		{
+			Proposal pp(LOCAL_TRANS_TREE_PROP,vec,model,output,1,burn_info);
+			proposal.push_back(pp);
+		}
+		
+		{
 			Proposal pp(TRANS_TREE_SWAP_INF_PROP,vec,model,output,1,burn_info);
+			proposal.push_back(pp);
+		}
+		
+		{
+			Proposal pp(TRANS_TREE_SWAP_INF_EV_PROP,vec,model,output,1,burn_info);
+			proposal.push_back(pp);
+		}
+		
+		{
+			Proposal pp(TRANS_TREE_SWAP_INF_EV_PROP2,vec,model,output,1,burn_info);
 			proposal.push_back(pp);
 		}
 		
 		if(model.genetic_data.on){
 			{
+				Proposal pp(MAXIMISE_GEN_OBS_PROP,vec,model,output,1,burn_info);
+				proposal.push_back(pp);
+			}
+			
+			{
+				Proposal pp(LOCAL_MAXIMISE_GEN_OBS_PROP,vec,model,output,1,burn_info);
+				proposal.push_back(pp);
+			}
+		
+			{
 				Proposal pp(TRANS_TREE_MUT_PROP,vec,model,output,1,burn_info);
+				proposal.push_back(pp);
+			}
+			
+			{
+				Proposal pp(TRANS_TREE_MUT_ORIGIN_PROP,vec,model,output,1,burn_info);
+				proposal.push_back(pp);
+			}
+				
+			{
+				Proposal pp(TRANS_TREE_MUT_SAMPLE_PROP,vec,model,output,1,burn_info);
 				proposal.push_back(pp);
 			}
 			
@@ -1070,6 +1135,8 @@ void Chain::update_init()
 	
 	//print_diag("update_init 10");
 	
+	genetic_data_split_obs_proposal();
+	
 	if(1 == 0) cout << "print_info_turned off in code" << endl;
 	else{
 		string te = "";
@@ -1079,6 +1146,50 @@ void Chain::update_init()
 	}
 	
 	print_diag("update_init end");
+}
+
+
+/// Splits up proposals depending on how regrafting is performed  
+void Chain::genetic_data_split_obs_proposal()
+{
+	if(!model.genetic_data.on) return;
+
+	auto proposal_old = proposal;
+	
+	auto PROP_REGRAFT_WITH_OBS = 1-PROP_REGRAFT_WITH_OBS2-PROP_REGRAFT_WITH_OBS3;     
+	
+	proposal.clear();
+	for(auto prop : proposal_old){
+		switch(prop.type){
+		case IND_EVENT_TIME_PROP: case IND_MULTI_EVENT_PROP: case IND_EVENT_ALL_PROP: case IND_LOCAL_PROP:
+		case IND_OBS_SAMP_PROP: case IND_OBS_RESIM_PROP: case IND_OBS_RESIM_SINGLE_PROP:
+		case TRANS_TREE_PROP: case LOCAL_TRANS_TREE_PROP: 
+	  case IND_OBS_SWITCH_ENTER_SOURCE_PROP:
+			{
+				auto pr = prop.prop_prob;
+				auto name = prop.name;
+			
+				prop.prop_prob = pr*PROP_REGRAFT_WITH_OBS;
+				prop.regraft_obs_type = RG_OBS;
+				proposal.push_back(prop);
+				
+				prop.prop_prob = pr*PROP_REGRAFT_WITH_OBS2;
+				prop.regraft_obs_type = RG_OBS2;
+				prop.name = name+" (RG2)";
+				proposal.push_back(prop);
+				
+				prop.prop_prob = pr*PROP_REGRAFT_WITH_OBS3;
+				prop.regraft_obs_type = RG_OBS3;
+				prop.name = name+" (RG3)";
+				proposal.push_back(prop);
+			}
+			break;
+		
+		default:
+			proposal.push_back(prop);
+			break;
+		}
+	}		
 }
 
 
@@ -1280,7 +1391,14 @@ string Chain::diagnostics(double total_time, double init_time, double anneal_tim
 				sum_joint_prop_precalc += t_precalc;
 				break;
 			
-			case TRANS_TREE_PROP: case TRANS_TREE_SWAP_INF_PROP: case TRANS_TREE_MUT_PROP:
+			case TRANS_TREE_PROP: case LOCAL_TRANS_TREE_PROP: 
+			case MAXIMISE_GEN_OBS_PROP: case LOCAL_MAXIMISE_GEN_OBS_PROP:
+			case TRANS_TREE_SWAP_INF_PROP: 
+			case TRANS_TREE_SWAP_INF_EV_PROP: 
+			case TRANS_TREE_SWAP_INF_EV_PROP2: 
+			case TRANS_TREE_MUT_PROP:
+			case TRANS_TREE_MUT_ORIGIN_PROP:
+			case TRANS_TREE_MUT_SAMPLE_PROP:
 			case TRANS_TREE_MUT_LOCAL_PROP:
 				sum_tree_prop += t;
 				sum_tree_prop_precalc += t_precalc;

@@ -597,11 +597,11 @@ function read_param_samples(chain,te,result,warn,line)
 				
 				for(let i = 1; i < J; i++){
 					let div = spl[i].split("|");
-					if(div.length != 3){ alert_param_sample(warn,-5); return;}
+					if(div.length != 3){ alert_param_sample(warn,-50); return;}
 					
-					let mean = Number(div[0]); if(isNaN(mean)){ alert_param_sample(warn,-5); return;}
-					let CImin = Number(div[1]); if(isNaN(CImin)){ alert_param_sample(warn,-5); return;}
-					let CImax = Number(div[2]); if(isNaN(CImax)){ alert_param_sample(warn,-5); return;}
+					let mean = Number(div[0]); if(isNaN(mean)){ alert_param_sample(warn,-51); return;}
+					let CImin = Number(div[1]); if(isNaN(CImin)){ alert_param_sample(warn,-52); return;}
+					let CImax = Number(div[2]); if(isNaN(CImax)){ alert_param_sample(warn,-53); return;}
 					
 					let th = ref[i].th;
 					if(ref[i].index.length == 0){
@@ -617,12 +617,13 @@ function read_param_samples(chain,te,result,warn,line)
 				}
 
 				sa = { num:Number(spl[0]), mean:par_mean, CImin:par_CImin, CImax:par_CImax};
-	
+
 				result.generation.push(sa); // If this fails it probably means 'make_one_chain' is set
 			}
 			else{
 				for(let i = 1; i < J; i++){
-					let num = Number(spl[i]); if(isNaN(num)){ alert_param_sample(warn,-5); return;}
+					let num = Number(spl[i]); 
+					if(isNaN(num)){ alert_param_sample(warn,-54); return;}
 					
 					let th = ref[i].th;
 					if(ref[i].index.length == 0) param[th] = num;
@@ -1220,15 +1221,13 @@ function read_state_sample(te,chain,result,warning,ind_key)
 									
 									if(c == OUT){                    // Individual enters the system
 										let co = tspl[0];
+									
 										co = extract_infection_info(co,get_inf_from,p,ev,ssp);
 										
 										c = hash_compgl[p].find(co);
 										if(c == undefined) alert_sample(warn,35);
 										
-										//if(t == t_start) cinit = c;
-										//else{
 										ev.push({type:EV_ENTER, t:t, c:c});
-										//}
 									}
 									else{
 										let tr = tspl[0];
@@ -1745,7 +1744,7 @@ function generate_trans_tree(get_inf_from,result,sample,ind_key)
 			hash_vec[p].add(result.all_ind_list[ind.all_ind_ref].name,i);
 		}
 	}
-	
+
 	for(let k = 0; k < get_inf_from.length; k++){
 		let gif = get_inf_from[k];
 		let te = gif.te;

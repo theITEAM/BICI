@@ -1,15 +1,4 @@
-/// Routines related to validation of BICI (tornado plots etc)
-
-// <<< Population-based model >>>
-//./bici-para Execute/init.bici tornado 'ic' 'pop-data name="pop" filter="DS=file" dt=10 error="poisson"'
-// ./bici-para Execute/init.bici scan:'\beta range=0.0005,0.002 n=20 log=false'  'ic' 'pop-data name="pop" filter="DS=file" dt=10 error="poisson"'
-
-
-// <<< Individual-based model >>> 
-//./bici-para Execute/init.bici tornado 'ic' 'pop-data name="pop" filter="DS=file" dt=10 error="poisson"'
-// ./bici-para Execute/init.bici scan:'\beta'  'ic' 'pop-data name="pop" filter="DS=file" dt=10 error="poisson"'
-
-
+/// Routines related to validation of BICI (tornado plots and parameter scans)
 
 #include <string>
 #include <sstream>
@@ -17,7 +6,6 @@
 #include <fstream>
 #include <cmath> 
 #include <algorithm> 
-
  
 using namespace std;
 
@@ -34,8 +22,202 @@ Validation::Validation()
 {
 }
 
+
+/// Loads up a specification file
+SpecInfo Validation::load_spec_info(SpecInfoType type, string spec_file)
+{
+	ifstream fin(spec_file);
+	if(!fin) alert_input("File '"+spec_file+"' could not be loaded");
+	
+	vector <string> lines;
+	
+	string line;
+	do{
+		getline(fin,line);
+		remove_cr(line);
+		line = trim(line);
+		if(line != "") lines.push_back(line);
+		if(fin.eof()) break;
+	}while(true);
+		
+	SpecInfo si;
+	si.type = type;
+	si.n = 20;
+	si.log_on = false;
+	si.data_param = false;
+	si.para = true;
+				
+	double min = UNSET, max = UNSET;
+	string wa = "In the spcification ";
+		
+	for(auto li : lines){
+		if(begin_str(li,"{") && end_str(li,"}")){
+			auto info = li.substr(1,li.length()-2);
+			
+			wa = "In specification '"+info+"' ";
+			
+			auto spl = split(info,' ');
+			
+			
+			for(auto i = 1u; i < spl.size(); i++){
+				auto va = trim(spl[i]);
+				if(va != ""){
+					auto spl2 = split(va,'=');
+					
+					if(spl2.size() != 2){
+						if(spl2.size() == 1) run_error(wa+"syntax error in '"+va+"'. This should contain an '=' sign.");
+						else run_error(wa+"syntax error in '"+va+"'. This should not contain multiple '=' signs.");
+					}
+					
+					auto ta = spl2[0];
+					auto value = trim(remove_quote(spl2[1]));
+
+					auto done = false;
+					
+					if(ta == "param"){
+						done = true;
+						if(type != SCAN_PLOT) run_error(wa+"the 'param' option should only be specified for scan plots");
+						
+						if(begin_str(value,"$")){
+							value = value.substr(1);
+							si.data_param = true;
+						}
+						si.param_name = value;
+					}
+					
+					if(ta == "range"){
+						done = true;
+						if(type != SCAN_PLOT) run_error(wa+"the 'range' option should only be specified for scan plots");
+						
+						auto spl3 = split(value,',');
+						
+						auto fl = false;
+						if(spl3.size() != 2) fl = true;
+						else{
+							min = number(spl3[0]);
+							max = number(spl3[1]);
+							if(min == UNSET || max == UNSET) fl = true;
+						}
+						
+						if(fl){
+							run_error(wa+"the value for range '"+value+"' is not valid.");
+						}
+					}
+					
+					if(ta == "log"){
+						done = true;
+						if(value == "true") si.log_on = true;
+						else{
+							if(value == "false") si.log_on = false;
+							else{
+								run_error(wa+"the value for log '"+value+"' is not valid.");
+							}
+						}
+					}
+				
+					if(ta == "n"){
+						done = true;
+						si.n = number(value);
+						if(si.n == UNSET) run_error(wa+"the value for n '"+value+"' is not valid.");
+						if(si.n <= 0) run_error(wa+"the value for n '"+value+"' must be positive.");
+						if((unsigned int) si.n != si.n) run_error(wa+"the value for n '"+value+"' must be an integer.");
+					}
+					
+					if(ta == "para"){
+						done = true;
+						if(value == "true") si.para = true;
+						else{
+							if(value == "false") si.para = false;
+							else{
+								run_error(wa+"the value for para '"+value+"' is not valid.");
+							}
+						}
+					}	
+							
+					if(ta == "stop-extinction"){
+						done = true;
+						si.extinct_info = load_extinction(value);
+					}
+					
+					if(!done){
+						run_error(wa+"the value '"+spl2[0]+"' is not understood.");
+					}
+				}
+			}
+		}
+		else{
+			si.data_sim.push_back(li);
+		}
+	}
+
+	if(type == SCAN_PLOT){
+		if(si.param_name == "") run_error(wa+"a value for 'param' must be set.");
+		
+		if(min == UNSET || max == UNSET){
+			run_error(wa+"a value for 'range' must be set.");
+		}
+	
+		if(min >= max) run_error(wa+"the minimum must be smaller than the maximum.");
+	
+		if(si.log_on){
+			if(min <= 0) run_error(wa+"the minimum must be positive when log is used.");
+		}
+
+		for(auto i = 0u; i <= si.n; i++){
+			if(si.log_on){
+				si.value_sim.push_back(exp(log(min)+(log(max)-log(min))*double(i)/si.n));	
+			}
+			else{
+				si.value_sim.push_back(min+(max-min)*double(i)/si.n);
+			}
+		}
+	}
+	
+	return si;
+}
+
+
+/// Deletes any exisiting files or observation parameters
+void Validation::delete_files(const Model &model, Output &output, string tor_dir, string run_dir, string op_dir, string spec_file)
+{
+	// Removes any observation model parameters
+	for(const auto &par : model.param){
+		if(par.mod_param == OBS_MOD_PARAM){
+			output.delete_command(par.name,par.line_num,false);
+		}
+	}
+
+	// Removes any existing data 
+	for(auto p = 0u; p < model.nspecies; p++){
+		for(const auto &so : model.species[p].source){
+			output.delete_command(so.name,so.line_num,false);
+		}
+	}
+	
+	
+	output.ensure_directory(tor_dir);
+	output.ensure_directory(run_dir);
+	output.ensure_directory(op_dir);
+	
+	// Copies spec_file into output directory
+	ifstream fin(spec_file);
+	if(!fin) alert_input("File '"+spec_file+"' could not be loaded");
+	
+	ofstream fout(tor_dir+"/spec_file.txt");
+
+	string line;
+	do{
+		getline(fin,line);
+		remove_cr(line);
+		line = trim(line);
+		fout << line << endl;
+		if(fin.eof()) break;
+	}while(true);
+}
+
+		
 /// Sets up a tornado run
-void Validation::tornado_setup(string add_info, Operation mode, ExtFactor ext_factor, string file, const vector <string> &data_sim_lines) 
+void Validation::tornado_setup(string spec_file, ExtFactor ext_factor, string file) 
 {
 	auto nc = num_core();
 	if(nc != 1) run_error("Setup requires only one core");
@@ -50,89 +232,61 @@ void Validation::tornado_setup(string add_info, Operation mode, ExtFactor ext_fa
 	
 	auto ncore_inf = 1u;
 	
-	auto nrun = TORNADO_NUM;
-	auto para_run = true;
-	
-	if(add_info.length() > 0){
-		add_info = remove_quote(add_info);
-		auto spl = split(add_info,' ');
+	auto si = load_spec_info(TORNADO_PLOT,spec_file);
 		
-		for(const auto &va: spl){
-			if(begin_str(va,"n=")){
-				nrun = number(va.substr(2));
-				if(nrun == UNSET) alert_input("After 'tornado' the value "+va+" should set a number");
-			}
-			else{
-				if(va == "para") para_run = true;
-				else{
-					if(va == "series") para_run = false;
-					else{
-						alert_input("After 'tornado' the value "+va+" is not understood");
-					}
-				}
-			}
-		}
-	}
-	
-	auto file_rep = get_file_rep(nrun,run_dir);
+	auto valid_run = get_valid_run(si.n,run_dir,si.data_sim);
 
 	{                                        // Removes data and copies into 
-		Model model(mode,ext_factor,true); 
+		Model model(INF,ext_factor,true); 
 		Mpi mpi(UNSET,model);   
-		Output output(model,mpi);    
+		Output output(model,mpi);  
+	
 		Input input(model,file,UNSET,mpi);     // Imports information from input into model
 
+		if(input.datadir != "") alert_input("Tornado can currently only be run on BICI-script with embedded files (i.e. no separate data directory).");
+	
 		output.init(input);
 
-		const auto &inf_det = model.inf_details;
-		ncore_inf = inf_det.nchain/inf_det.num_per_core;
+		const auto &det = model.details;
 		
-		// Removes any existing data 
-		for(auto p = 0u; p < model.nspecies; p++){
-			for(const auto &so : model.species[p].source){
-				output.delete_command(so.name,so.line_num,false);
-			}
-		}
+		ncore_inf = det.nchain/det.num_per_core;
+			
+		delete_files(model,output,tor_dir,run_dir,op_dir,spec_file);
 		
-		output.ensure_directory(tor_dir);
-		output.ensure_directory(run_dir);
-		output.ensure_directory(op_dir);
-		
-		{
-			ofstream fout(tor_dir+"info.txt");
-			fout << "nrun=" << file_rep.size() << endl;
-		}
-		
-		for(auto r = 0u; r < file_rep.size(); r++){
-			output.copy(file_rep[r]);
+		for(auto r = 0u; r < valid_run.size(); r++){
+			output.copy(valid_run[r].file);
 		}
 	}
 	
-	run_sim_data(name,op_dir,para_run,file_rep,ncore_inf,ext_factor,data_sim_lines,file,"tornado-res");
+	run_sim_data(name,op_dir,si.para,valid_run,ncore_inf,ext_factor,file,"tornado-res",spec_file,si.extinct_info);
 }
 
 
 /// Gets a list of files for replicates
-vector <string> Validation::get_file_rep(unsigned int n, string run_dir) const
+vector <ValidRun> Validation::get_valid_run(unsigned int n, string run_dir, const vector <string> &data_sim_lines) const
 {
-	vector <string> file_rep;
+	vector <ValidRun> valid_run;
 	for(auto r = 0u; r < n; r++){
-		auto fi = run_dir+"Run_"+tstr(r+1)+".bici";
-		file_rep.push_back(fi);
+		ValidRun vr; 
+		vr.file = run_dir+"Run_"+tstr(r+1)+".bici";
+		vr.data_sim_lines = data_sim_lines;
+		valid_run.push_back(vr);
 	}
 	
-	return file_rep;
+	return valid_run;
 }
 
 	
-/// Runs simulates and generates data
-void Validation::run_sim_data(string name, string op_dir, bool para_run, vector <string> file_rep, unsigned int ncore_inf, ExtFactor ext_factor, const vector <string> &data_sim_lines, string file, string com) const
+/// Runs simulations and generates data
+void Validation::run_sim_data(string name, string op_dir, bool para_run, const vector <ValidRun> &valid_run, unsigned int ncore_inf, ExtFactor ext_factor, string file, string com, string spec_file, const ExtinctInfo &extinct_info) const
 {
 	percentage_start(RUN_PER);
-	for(auto r = 0u; r < file_rep.size(); r++){  
-		percentage(r,file_rep.size());
+	for(auto r = 0u; r < valid_run.size(); r++){  
+		percentage(r,valid_run.size());
 		
-		auto fi = file_rep[r]; 
+		const auto &vr = valid_run[r]; 
+		
+		auto fi = vr.file;
 		
 		{   // Simulates state
 			Model model(SIM,ext_factor,true); 
@@ -140,10 +294,17 @@ void Validation::run_sim_data(string name, string op_dir, bool para_run, vector 
 			Output output(model,mpi,true);    
 			Input input(model,fi,r,mpi,true);  
 			output.init(input);
-			
+	
 			Simulate simu(model,output,mpi,true);
-			simu.run();
-		
+			auto loop = 0u, loop_max = 100u;
+			do{
+				simu.run();
+				if(!simu.extinction_criterion(extinct_info)) break;
+				output.clear();
+				loop++;
+			}while(loop < loop_max);
+			if(loop == loop_max) run_error("Could not satisfy 'stop-extinction' criterion within "+tstr(loop_max)+" simulations from the model.");
+				
 			output.end(fi,UNSET);
 		}
 		
@@ -154,11 +315,11 @@ void Validation::run_sim_data(string name, string op_dir, bool para_run, vector 
 			Input input(model,fi,r,mpi,true);  
 			output.init(input);
 			
-			DataSim data_sim(model,output);
-			for(auto &ds : data_sim_lines){
-				data_sim.run(ds,1);
+			DataSim data_sim(model,output,true);
+			bool replace_data = false;
+			for(auto &ds : vr.data_sim_lines){
+				data_sim.run(ds,1,replace_data);
 			}
-			
 			output.end(fi,UNSET);
 		}
 	}
@@ -166,27 +327,43 @@ void Validation::run_sim_data(string name, string op_dir, bool para_run, vector 
 	
 	auto spl = split(name,'/');
 	
-	auto scr = spl[spl.size()-1]+"_script.sh";             // Output the script for running inference
-	ofstream fout(scr);		
+	auto scr = spl[spl.size()-1]+"_script";             // Output the script for running inference
+	scr += ".sh";
 	
-	for(auto r = 0u; r < file_rep.size(); r++){
-		auto fi = file_rep[r]; 
+	string code = "./bici-para";
+#ifdef WINDOWS
+	code = "./bici-core.exe";
+#endif
+	
+	ofstream fout(scr);		
+	check_open(fout,scr);
+	
+	for(auto r = 0u; r < valid_run.size(); r++){
+		auto fi = valid_run[r].file; 
 		
+		fout << "echo ''" << endl;
+		fout << "echo ''" << endl;
 		fout << "echo 'Run " << fi << "'" << endl;
 		if(para_run) fout << "nohup ";
 		if(ncore_inf > 1) fout << "mpirun -n " << ncore_inf << " "; 
-		fout << "./bici-para " << fi << " -seed=" << r << " inf";
+
+		fout << code << " " << fi << " -seed=" << r << " inf";
 		if(para_run) fout << " > " << op_dir << "inf_" << r << ".txt 2>&1&";
 		fout << endl << endl;
 	}
 	
 	fout << "echo ''" << endl;
 	
-	//com = replace(com,"\\","\\\\");
-	fout << "echo \"WHEN INFERENCE COMPLETE: ./bici-para " << file << " " << com << "\"" << endl; 
-	
+	if(para_run) fout << "echo \"WHEN INFERENCE COMPLETE: " << code << " " << file << " " << com << " " << spec_file << "\"" << endl; 
+	else fout << "echo \"COMBINE RESULTS: " << code << " " << file << " " << com << " " << spec_file << "\"" << endl; 
+		
 	cout << endl;
+
+#ifdef WINDOWS
+#else
 	cout << "MAKE EXECUTABLE: chmod +x " << scr << endl;
+#endif
+
 	cout << "RUN SCRIPT: ./" << scr << endl; 
 }
 
@@ -196,14 +373,65 @@ bool Stat_ord (const Stat &st1, const Stat &st2)
 { return (st1.mean < st2.mean); };  
 
 
-/// Combines results from a tornado run
-void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_question, string file)
+/// Makes sure each table has the same row (otherwise missing data could cause different sizes) 
+vector <Table> Validation::consistent_row(const vector <Table> &list) const
 {
+	vector <string> row_sel;
+	
+	for(const auto &ta : list){
+		if(ta.nrow > row_sel.size()){
+			row_sel.clear();
+			for(const auto &row : ta.ele) row_sel.push_back(row[0]);
+		}
+	}
+	
+	auto N = row_sel.size();
+	
+	vector <Table> list_new;
+	
+	for(const auto &ta : list){
+		auto ta_new = ta;
+		ta_new.ele.clear();
+		ta_new.ele.resize(N);
+		
+		for(auto r = 0u; r < ta.nrow; r++){
+			auto j = find_in(row_sel,ta.ele[r][0]);
+			if(j == UNSET) emsg("Cannot find row"); 
+			ta_new.ele[j] = ta.ele[r];
+		}
+		
+		for(auto r = 0u; r < N; r++){
+			if(ta_new.ele[r].size() == 0){
+				ta_new.ele[r].push_back(row_sel[r]);
+				for(auto c = 1u; c < ta.ncol; c++) ta_new.ele[r].push_back("NA");
+			}
+		}
+		
+		list_new.push_back(ta_new);
+	}
+	
+	return list_new;
+}
+
+
+/// Accounts for unset value
+string Validation::us(double val) const
+{
+	if(val == UNSET) return "NA";
+	return tstr(val);
+}	
+	
+
+/// Combines results from a tornado run
+void Validation::tornado_result(string spec_file, ExtFactor ext_factor, bool no_question, string file)
+{
+	auto si = load_spec_info(TORNADO_PLOT,spec_file);
+	
 	Model model_base(SIM,ext_factor,no_question);  
 	Mpi mpi_base(UNSET,model_base);
 	Output op(model_base,mpi_base);      
-	Input input(model_base,file,UNSET,mpi_base);
-		
+	Input input(model_base,file,UNSET,mpi_base,true);
+	
 	if(!end_str(file,".bici")) run_error("The file does not end in '.bici'");
 	auto name = file.substr(0,file.length()-5);
 	
@@ -211,29 +439,28 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 	auto run_dir = tor_dir+"run/";
 	auto op_dir = tor_dir+"op/";
 	
-	auto nrun = TORNADO_NUM;
-	
-	{
-		string info;
-		ifstream fin(tor_dir+"info.txt");
-		getline (fin,info);
-		if(!begin_str(info,"nrun=")) emsg("Problem with loading number of runs");
-		nrun = number(info.substr(5));
-		if(nrun == UNSET) emsg("Problem with loading number of runs");
+	if(!op.directory_exist(tor_dir)){
+		run_error("The directory '"+tor_dir+"' does not exist. Has analysis been performed?");
 	}
 	
-	auto file_rep = get_file_rep(nrun,run_dir);
+	if(!op.directory_exist(run_dir)){
+		run_error("The directory '"+run_dir+"' does not exist. Has analysis been performed?");
+	}
+	
+	auto nrun = si.n;
+	
+	auto valid_run = get_valid_run(nrun,run_dir,vector<string>());
 		
 	vector <Table> param_stats;
 	vector <Table> pred_acc_stats;
 		
 	percentage_start(RUN_PER);
-	for(auto r = 0u; r < file_rep.size(); r++){
-		percentage(r,file_rep.size());
+	for(auto r = 0u; r < valid_run.size(); r++){
+		percentage(r,valid_run.size());
 	
-		auto fi = file_rep[r];
+		auto fi = valid_run[r].file;
 		
-		Model model(mode,ext_factor,no_question);  
+		Model model(INF,ext_factor,no_question);  
 		Mpi mpi(UNSET,model);
 		Output output(model,mpi,true);           
 		Input input(model,fi,UNSET,mpi,true);    
@@ -252,6 +479,9 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 			}
 		}
 	}
+	
+	param_stats = consistent_row(param_stats);
+	
 	percentage_end();
 	
 	{
@@ -260,6 +490,8 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 		const auto &tab0 = param_stats[0];
 		auto N = tab0.nrow;
 		
+		vector <bool> value_unset(N,false);
+
 		vector <double> value;
 		{ // Works out the true value for the parameter
 			for(auto i = 0u; i < N; i++){
@@ -268,19 +500,22 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 				value.push_back(val);
 			}
 		}
-		
+	
 		vector < vector <Stat> > stat;
 		stat.resize(N);
 		
 		{	
-			ofstream fout(tor_dir+"ESS.csv");
+			auto file = tor_dir+"ESS.csv";
+			ofstream fout(file);
+			check_open(fout,file);
+			
 			fout << "Run";
+
 			for(auto i = 0u; i < N; i++) fout << ",\"" << add_escape_char(tab0.ele[i][0]) << " ESS\"";
 			fout << endl;
 			
 			for(auto r = 0u; r < R; r++){
 				const auto &tab = param_stats[r];
-				
 				fout << (r+1);
 				for(auto i = 0u; i < N; i++){
 					Stat st; 
@@ -297,7 +532,10 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 		}
 		
 		{	
-			ofstream fout(tor_dir+"GR.csv");
+			auto file = tor_dir+"GR.csv";
+			ofstream fout(file);
+			check_open(fout,file);
+			
 			fout << "Run";
 			for(auto i = 0u; i < N; i++) fout << ",\"" << add_escape_char(tab0.ele[i][0]) << " GR\"";
 			fout << endl;
@@ -313,7 +551,10 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 		
 		auto tname = "result.csv";
 		{	
-			ofstream fout(tor_dir+tname);
+			auto file = tor_dir+tname;
+			ofstream fout(file);
+			check_open(fout,file);
+			
 			fout << "Sorted Run";
 			for(auto i = 0u; i < N; i++){
 				auto na = add_escape_char(tab0.ele[i][0]);
@@ -328,7 +569,9 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 			for(auto r = 0u; r < R; r++){
 				fout << (r+1);
 				for(auto i = 0u; i < N; i++){
-					fout << "," << value[i] << "," << stat[i][r].mean << "," << stat[i][r].CImin << "," << stat[i][r].CImax;
+					fout << ",";
+					if(value[i] == UNSET) value_unset[i] = true;
+					fout << us(value[i]) << "," << us(stat[i][r].mean) << "," << us(stat[i][r].CImin) << "," << us(stat[i][r].CImax);
 				}
 				fout << endl;
 			}
@@ -336,7 +579,10 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 		
 		auto un_name = "uncertainty.csv";
 		{	
-			ofstream fout(tor_dir+un_name);
+			auto file = tor_dir+un_name;
+			ofstream fout(file);
+			check_open(fout,file);
+			
 			for(auto i = 0u; i < N; i++){
 				auto na = add_escape_char(tab0.ele[i][0]);
 				if(i != 0) fout << ",";
@@ -364,7 +610,10 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 		op.ensure_directory(gp);
 
 		{ // Creates lines for true value
-			ofstream fout(gp+"true_value.csv");
+			auto file = gp+"true_value.csv";
+			ofstream fout(file);
+			check_open(fout,file);
+			
 			fout << "y";
 			for(auto i = 0u; i < N; i++){
 				auto na = add_escape_char(tab0.ele[i][0]);
@@ -372,15 +621,17 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 			}
 			fout << endl;
 			fout << 0;
-			for(auto i = 0u; i < N; i++) fout << "," << value[i];
+			for(auto i = 0u; i < N; i++) fout << "," << us(value[i]);
 			fout << endl;
 			fout << nrun+1;
-			for(auto i = 0u; i < N; i++) fout << "," << value[i];
+			for(auto i = 0u; i < N; i++) fout << "," << us(value[i]);
 			fout << endl;
 		}
 		
 		{  // Creates gp scripts
-			ofstream fout(gp+"gp_single.txt");
+			auto file = gp+"gp_single.txt";
+			ofstream fout(file);
+			check_open(fout,file);
 		
 			fout << gp_header();
 				
@@ -402,7 +653,9 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 		}
 		
 		{  // Creates gp scripts
-			ofstream fout(gp+"gp.txt");
+			auto file = gp+"gp.txt";
+			ofstream fout(file);
+			check_open(fout,file);
 		
 			fout << gp_header_multi();
 				
@@ -444,7 +697,11 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 		}
 		
 		auto tname = "pred_acc.csv";
-		ofstream fout(tor_dir+tname);
+		
+		auto file = tor_dir+tname;
+		ofstream fout(file);
+		check_open(fout,file);
+		
 		fout << output_table(tab0);
 	}
 
@@ -456,7 +713,7 @@ void Validation::tornado_result(Operation mode, ExtFactor ext_factor, bool no_qu
 
 
 /// Sets up a parameter scan
-void Validation::scan_setup(string add_info, Operation mode, ExtFactor ext_factor, string file, const vector <string> &data_sim_lines, bool test) 
+void Validation::scan_setup(string spec_file, ExtFactor ext_factor, string file) 
 {
 	auto nc = num_core();
 	if(nc != 1) run_error("Setup requires only one core");
@@ -465,80 +722,122 @@ void Validation::scan_setup(string add_info, Operation mode, ExtFactor ext_facto
 	
 	auto name = file.substr(0,file.length()-5);
 	
-	string tor_dir, run_dir, op_dir;
+	auto si = load_spec_info(SCAN_PLOT,spec_file);
+		
+	auto na = add_escape_char(si.param_name);
+	na = replace(na,"\\","");
 
+	auto tor_dir = name+"_scan_"+na+"/";
+	auto run_dir = tor_dir+"run/";
+	auto op_dir = tor_dir+"op/";
+		
 	auto ncore_inf = 1u;
 	
-	ScanInfo si;
-	string na;
-	
-	vector <string> file_rep;
+	vector <ValidRun> valid_run;
 	{                                        // Removes data and copies into 
-		Model model(mode,ext_factor,true); 
+		Model model(INF,ext_factor,true); 
 		Mpi mpi(UNSET,model);   
 		Output output(model,mpi);    
 		Input input(model,file,UNSET,mpi);     // Imports information from input into model
-
+		
+		if(input.datadir != "") alert_input("Scanning can currently only be run on BICI-script with embedded files (i.e. no separate data directory).");
+		
 		output.init(input);
 
-		si = get_scan_info(add_info,model);
-
-		auto pr = get_param_ref(si.param_name,model);
-		if(pr.th == UNSET || pr.index == UNSET){
-			run_error("Parameter '"+si.param_name+"' could not be found in the model.");
-		}
-		
-		na = add_escape_char(si.param_name);
-		na = replace(na,"\\","");
-		tor_dir = name+"_scan_"+na+"/";
-		run_dir = tor_dir+"run/";
-		op_dir = tor_dir+"op/";
-	
-		file_rep = get_file_rep(si.value_sim.size(),run_dir);
-		
-		const auto &inf_det = model.inf_details;
-	
-		ncore_inf = inf_det.nchain/inf_det.num_per_core;
-		
-		// Removes any existing data 
-		for(auto p = 0u; p < model.nspecies; p++){
-			for(const auto &so : model.species[p].source){
-				output.delete_command(so.name,so.line_num,false);
+		if(!si.data_param){                    // Checks parameter exists and makes sure values within prior
+			auto pr = get_param_ref(si.param_name,model);
+			if(pr.th == UNSET || pr.index == UNSET){
+				run_error("Parameter '"+si.param_name+"' could not be found in the model.");
+			}
+			
+			auto pb = model.param_bounds(pr);
+			
+			if(pb.min != UNSET && pb.max != UNSET){
+				for(auto va : si.value_sim){
+					if(va <= pb.min || va >= pb.max){
+						run_error("Parameter values for '"+si.param_name+"' are outside of the range ("+tstr(pb.min)+" - "+tstr(pb.max)+") specified by the prior.");
+					}
+				}
 			}
 		}
 		
-		output.ensure_directory(tor_dir);
-		output.ensure_directory(run_dir);
-		output.ensure_directory(op_dir);
+		valid_run = get_valid_run(si.value_sim.size(),run_dir,si.data_sim);
 		
-		for(auto r = 0u; r < file_rep.size(); r++){
-			output.change_sim_value(si.param_name,si.value_sim[r]);
-			output.copy(file_rep[r]);
+		const auto &det = model.details;
+	
+		ncore_inf = det.nchain/det.num_per_core;
+	
+		delete_files(model,output,tor_dir,run_dir,op_dir,spec_file);
+	
+		for(auto r = 0u; r < valid_run.size(); r++){
+			if(si.data_param){ // If parameter in data specification then alters that
+				auto sub = false;
+				auto rep = tstr(si.value_sim[r]);
+				auto na = "$"+si.param_name;
+				auto len = na.length();
+				for(auto &st : valid_run[r].data_sim_lines){			
+					auto i = 0u;
+					while(i+len < st.length()){
+						if(st.substr(i,len) == na){
+							sub = true;
+							st = st.substr(0,i)+rep+st.substr(i+len);
+						}
+						i++;
+					}
+				}
+				
+				if(!sub) run_error("Could not find parameter '"+na+"' in the data specification.");
+			}				
+			else{              // If parameter in BICI-script then alter that
+				output.change_sim_value(si.param_name,si.value_sim[r]);
+			}
+			output.copy(valid_run[r].file);
 		}
 	}
 	
-	{
-		ofstream fout(tor_dir+"info.txt");
-		fout << add_info << endl;
-	}
-	
-	run_sim_data(name+"_"+na,op_dir,test,file_rep,ncore_inf,ext_factor,data_sim_lines,file,"scan-res:'"+si.param_name+"'");
+	run_sim_data(name+"_"+na,op_dir,si.para,valid_run,ncore_inf,ext_factor,file,"scan-res",spec_file,si.extinct_info);
 }
 
 
-/// Combines results from a tornado run
-void Validation::scan_result(string scan_info, Operation mode, ExtFactor ext_factor, bool no_question, string file)
+/// Makes sure not all values are zero (otherwise gnuplot interprets as undefined)
+bool Validation::is_log(const SpecInfo &si, vector <Stat> &stat) const
 {
+	if(si.log_on == false) return false;
+	
+	auto fl = false;
+	for(auto r = 0u; r < stat.size(); r++){
+		if(stat[r].mean <= 0) fl = true;
+		if(stat[r].CImin <= 0) fl = true;
+		if(stat[r].CImax <= 0) fl = true;
+	}
+	
+	if(fl == true) return false;
+	return true;
+}
+
+
+/// Determines label on x axis
+string Validation::get_si_name(const SpecInfo &si) const
+{
+	if(si.data_param) return convert_label(si.param_name);
+	return convert_label("True "+si.param_name);
+}
+
+		
+/// Combines results from scan runs
+void Validation::scan_result(string spec_file, ExtFactor ext_factor, bool no_question, string file)
+{
+	auto si = load_spec_info(SCAN_PLOT,spec_file);
+	
 	Model model_base(SIM,ext_factor,no_question);  
 	Mpi mpi_base(UNSET,model_base);
 	Output op(model_base,mpi_base);      
-	Input input(model_base,file,UNSET,mpi_base);
+	Input input(model_base,file,UNSET,mpi_base,true);
 
 	if(!end_str(file,".bici")) run_error("The file does not end in '.bici'");
 	auto name = file.substr(0,file.length()-5);
 	
-	auto spl = split(scan_info,' ');
-	auto pname = spl[0];
+	auto pname = si.param_name;
 	
 	auto na = add_escape_char(pname);
 	na = replace(na,"\\","");
@@ -552,26 +851,20 @@ void Validation::scan_result(string scan_info, Operation mode, ExtFactor ext_fac
 	if(!op.directory_exist(run_dir)){
 		run_error("The directory '"+run_dir+"' does not exist. Has analysis been performed?");
 	}
-	
-	string sc_inf;
-	ifstream fin(tor_dir+"info.txt");
-	getline (fin,sc_inf);
-	
-	auto si = get_scan_info(sc_inf,model_base);
 
 	auto prop = get_param_prop(si.param_name);
 	
-	auto file_rep = get_file_rep(si.value_sim.size(),run_dir);
+	auto valid_run = get_valid_run(si.value_sim.size(),run_dir,vector<string>());
 		
 	vector <Table> param_stats;
 	
 	percentage_start(RUN_PER);
-	for(auto r = 0u; r < file_rep.size(); r++){
-		percentage(r,file_rep.size());
+	for(auto r = 0u; r < valid_run.size(); r++){
+		percentage(r,valid_run.size());
 	
-		auto fi = file_rep[r];
+		auto fi = valid_run[r].file;
 		
-		Model model(mode,ext_factor,no_question);  
+		Model model(INF,ext_factor,no_question);  
 		Mpi mpi(UNSET,model);
 		Output output(model,mpi,true);           
 		Input input(model,fi,UNSET,mpi,true);    
@@ -581,6 +874,9 @@ void Validation::scan_result(string scan_info, Operation mode, ExtFactor ext_fac
 		
 		param_stats.push_back(tab);
 	}
+	
+	param_stats = consistent_row(param_stats);
+		
 	percentage_end();
 	
 	auto R = param_stats.size(); 
@@ -601,7 +897,10 @@ void Validation::scan_result(string scan_info, Operation mode, ExtFactor ext_fac
 	stat.resize(N);
 	
 	{	
-		ofstream fout(tor_dir+"ESS.csv");
+		auto file = tor_dir+"ESS.csv";
+		ofstream fout(file);
+		check_open(fout,file);
+		
 		fout << "Run,\"" << pname << " value\"";
 		for(auto i = 0u; i < N; i++) fout << ",\"" << add_escape_char(tab0.ele[i][0]) << " ESS\"";
 		fout << endl;
@@ -625,7 +924,10 @@ void Validation::scan_result(string scan_info, Operation mode, ExtFactor ext_fac
 	}
 	
 	{	
-		ofstream fout(tor_dir+"GR.csv");
+		auto file = tor_dir+"GR.csv";
+		ofstream fout(file);
+		check_open(fout,file);
+		
 		fout << "Run,\"" << pname << " value\"";
 		for(auto i = 0u; i < N; i++) fout << ",\"" << add_escape_char(tab0.ele[i][0]) << " GR\"";
 		fout << endl;
@@ -638,32 +940,34 @@ void Validation::scan_result(string scan_info, Operation mode, ExtFactor ext_fac
 			fout << endl;
 		}
 	}
-	
-	auto isel = UNSET;
+
+	vector <bool> value_unset(N,false);		
+
 	auto tname = "result.csv";
 	{	
-		ofstream fout(tor_dir+tname);
-		fout << "Run";
+		auto file = tor_dir+tname;
+		ofstream fout(file);
+		check_open(fout,file);
+		
+		fout << "Run," << si.param_name;
 		for(auto i = 0u; i < N; i++){
 			auto na = add_escape_char(tab0.ele[i][0]);
 			auto prop2 = get_param_prop(na);
-			if(prop2.name == prop.name){
-				auto d = 0u; while(d < prop.dep.size() && prop.dep[d] == prop2.dep[d]) d++;
-				if(d == prop.dep.size()) isel = i;
-			}
+		
 			fout << ",\"" << na << " value\"" << ",\"" << na << " (post. mean)\"" << ",\"" << na << " (CI min)\"" << ",\"" << na << " (CI max)\"";
 		}
 		fout << endl;
-		if(isel == UNSET) emsg("Cannot find selected parameter");
-		
+
 		for(auto r = 0u; r < R; r++){
 			fout << (r+1);
+			fout << "," << si.value_sim[r];
 			for(auto i = 0u; i < N; i++){
-				
 				fout << ",";
-				if(i == isel) fout << si.value_sim[r];
-				else fout << value[i];
-				fout << "," << stat[i][r].mean << "," << stat[i][r].CImin << "," << stat[i][r].CImax;
+				
+				if(value[i] == UNSET)	value_unset[i] = true;
+				fout << us(value[i]); 
+			
+				fout << "," << us(stat[i][r].mean) << "," << us(stat[i][r].CImin) << "," << us(stat[i][r].CImax);
 			}
 			fout << endl;
 		}
@@ -673,33 +977,43 @@ void Validation::scan_result(string scan_info, Operation mode, ExtFactor ext_fac
 	op.ensure_directory(gp);
 	
 	{  // Creates gp scripts
-		ofstream fout(gp+"gp_single.txt");
+		auto file = gp+"gp_single.txt";
+		ofstream fout(file);
+		check_open(fout,file);
 	
 		fout << gp_header();
-		if(si.log_on){
-			fout << "set logscale x" << endl; 
-			fout << "set logscale y" << endl; 
-		}
+
+		if(si.log_on) fout << "set logscale x" << endl; 
+				
 		fout << "set size square" << endl;
 		
-		auto namex = "True "+add_escape_char(tab0.ele[isel][0]);
-		namex = convert_label(namex);
+		auto namex = get_si_name(si);
 			
 		for(auto i = 0u; i < N; i++){
-			auto namey = add_escape_char(tab0.ele[i][0]);
+			auto na = tab0.ele[i][0];
+			auto namey = add_escape_char(na);
 			namey = convert_label(namey);
 			
+			if(!is_tt_stat(na) && is_log(si,stat[i])) fout << "set logscale y" << endl; 
+			else fout << "unset logscale y" << endl; 
+		
 			fout << "set xlabel '"+namex+"' font ',30'" << endl;
 			fout << "set ylabel '"+namey+"' font ',30'" << endl;
 			
-			fout << "plot '../" << tname << "' using " << 2+4*isel << ":" << 3+4*i << " ps 1 lw 4 lc '#000000' notitle,\\" << endl;
-			fout << "'../" << tname << "' using " << 2+4*isel << ":" << 3+4*i << ":" << 3+4*i+1 << ":" << 3+4*i+2 << " with yerrorbars ls 1 lw 4 notitle,\\" << endl;
-			fout << "'../" << tname << "' using " << 2+4*isel << ":" << 2+4*i << " with lines ls 2 notitle" << endl;
+			fout << "plot '../" << tname << "' using " << 2 << ":" << 4+4*i << " ps 1 lw 4 lc '#000000' notitle,\\" << endl;
+			fout << "'../" << tname << "' using " << 2 << ":" << 4+4*i << ":" << 4+4*i+1 << ":" << 4+4*i+2 << " with yerrorbars ls 1 lw 4 notitle";
+			if(!value_unset[i]){			
+				fout << ",\\" << endl;
+				fout << "'../" << tname << "' using " << 2 << ":" << 3+4*i << " with lines ls 2 notitle";
+			}
+			fout << endl;
 		}
 	}
-	
+
 	{  // Creates gp scripts
-		ofstream fout(gp+"gp.txt");
+		auto file = gp+"gp.txt";
+		ofstream fout(file);
+		check_open(fout,file);
 	
 		fout << gp_header_multi();
 		if(si.log_on){
@@ -708,8 +1022,7 @@ void Validation::scan_result(string scan_info, Operation mode, ExtFactor ext_fac
 		}
 		fout << "set size square" << endl;
 		
-		auto namex = "True "+add_escape_char(tab0.ele[isel][0]);
-		namex = convert_label(namex);
+		auto namex = get_si_name(si);
 			
 		for(auto i = 0u; i < N; i++){
 			auto namey = add_escape_char(tab0.ele[i][0]);
@@ -718,16 +1031,15 @@ void Validation::scan_result(string scan_info, Operation mode, ExtFactor ext_fac
 			fout << "set xlabel '"+namex+"' font ',15'" << endl;
 			fout << "set ylabel '"+namey+"' font ',15'" << endl;
 			
-			fout << "plot '../" << tname << "' using " << 2+4*isel << ":" << 3+4*i << " ps 1 lw 2 lc '#000000' notitle,\\" << endl;
-			fout << "'../" << tname << "' using " << 2+4*isel << ":" << 3+4*i << ":" << 3+4*i+1 << ":" << 3+4*i+2 << " with yerrorbars ls 1 lw 2 notitle,\\" << endl;
-			fout << "'../" << tname << "' using " << 2+4*isel << ":" << 2+4*i << " with lines ls 2 lw 2 notitle" << endl;
+			fout << "plot '../" << tname << "' using " << 2 << ":" << 4+4*i << " ps 1 lw 2 lc '#000000' notitle,\\" << endl;
+			fout << "'../" << tname << "' using " << 2 << ":" << 4+4*i << ":" << 4+4*i+1 << ":" << 4+4*i+2 << " with yerrorbars ls 1 lw 2 notitle,\\" << endl;
+			fout << "'../" << tname << "' using " << 2 << ":" << 3+4*i << " with lines ls 2 lw 2 notitle" << endl;
 		}
 	}
 	
 	cout << endl << "RESULTS: In directory '" << tor_dir << "'." << endl;
 	cout << "PLOT: Gnuplot can be used to plot results. Go to the 'gp' sub-directory and type 'gnuplot gp.txt' to generate graphs and 'ps2pdf gp.ps gp.pdf' to convert to pdf." << endl;
 }
-
 
 
 /// Returns a header for a gp file
@@ -809,9 +1121,21 @@ string Validation::convert_label(string name) const
 }
 
 
+/// Determines if a quantity is a statistic
+bool Validation::is_tt_stat(string na) const 
+{
+	if(na == "N^origin" || na == "N^infected" || na == "N^unobs" || 
+	   na == "N^mut-tree" || na == "N^mut-origin" || na == "t^root" || na == "α^IPA") return true;
+	
+	return false;
+}
+
+
 /// Gets tha value of a parameter
 double Validation::get_param_value(string na, const Model &model) const 
 {
+	if(is_tt_stat(na)) return UNSET;
+	
 	auto pr = get_param_ref(na,model);
 	
 	const auto &par = model.param[pr.th];
@@ -856,82 +1180,41 @@ ParamRef Validation::get_param_ref(string na, const Model &model) const
 }
 
 
-/// Gets information for a scan info
-ScanInfo Validation::get_scan_info(string scan_info, const Model &model) const
+/// Loads up information about stopping extinction
+ExtinctInfo Validation::load_extinction(string te) const
 {
-	auto spl = split(scan_info,' ');
-	auto na = spl[0];
+	te =  trim(remove_quote(te));
+	
+	auto spl = split(te,',');
+	
+	if(spl.size() > 2) alert_input("The 'stop-extinction' definition '"+te+"' is not recognised");
+	
+	auto tra = spl[0];
 
-	ScanInfo si;
-	si.param_name = spl[0];
+	auto spl2 = split(tra,'>');
+	if(spl2.size() != 2) alert_input("The 'stop-extinction' transition '"+tra+"' is not recognised");
+	if(!end_str(spl2[0],"-")) alert_input("The 'stop-extinction' transition '"+tra+"' is not recognised");	
 	
-	auto n = 20u;
-	auto log_on = false;//true;
-	
-	auto val = get_param_value(na,model);
-	
-	double min = val/4, max = val*4;
+	ExtinctInfo ei;
+	ei.on = true;
+	ei.trans = tra;
+	ei.comp_i = trim(spl2[0].substr(0,spl2[0].size()-1));
+	ei.comp_f = trim(spl2[1]);
 
-	for(auto i = 1u; i < spl.size(); i++){
-		auto spl2 = split(spl[i],'=');
-		if(spl2.size() != 2){
-			run_error("Syntax error in scan information '"+scan_info+"'.");
-		}
-		if(spl2[0] == "range"){
-			auto spl3 = split(spl2[1],',');
-			
-			auto fl = false;
-			if(spl3.size() != 2) fl = true;
-			else{
-				min = number(spl3[0]);
-				max = number(spl3[1]);
-				if(min == UNSET || max == UNSET) fl = true;
-			}
-			
-			if(fl){
-				run_error("In scan information '"+scan_info+"' the value for range '"+spl2[1]+"' is not valid.");
-			}
-		}
-		else{
-			if(spl2[0] == "log"){
-				if(spl2[1] == "true") log_on = true;
-				else{
-					if(spl2[1] == "false") log_on = false;
-					else{
-						run_error("In scan information '"+scan_info+"' the value for log '"+spl2[1]+"' is not valid.");
-					}
-				}
-			}
-			else{
-				if(spl2[0] == "n"){
-					n = number(spl2[1]);
-					if(n == UNSET) run_error("In scan information '"+scan_info+"' the value for n '"+spl2[1]+"' is not valid.");
-					if(n <= 0) run_error("In scan information '"+scan_info+"' the value for n '"+spl2[1]+"' must be positive.");
-					if((unsigned int) n != n) run_error("In scan information '"+scan_info+"' the value for n '"+spl2[1]+"' must be an integer.");
-				}
-				else{
-					run_error("In scan information '"+scan_info+"' the value '"+spl2[0]+"' is not understood.");
-				}
-			}
-		}
-	}		
-
-	if(min >= max) run_error("In scan information '"+scan_info+"' the minimum must be smaller than the maximum.");
-	
-	if(log_on){
-		if(min <= 0) run_error("In scan information '"+scan_info+"' the minimum must be positive when log is used.");
+	if(spl.size() == 2){
+		auto num_str = spl[1];
+		auto num = number(num_str);
+		if(num == UNSET) alert_input("The 'stop-extinction' transition number '"+num_str+"' is not recognised");
+		if(num <= 0) alert_input("The 'stop-extinction' transition number '"+num_str+"' must be positive");
+		if(num != (int) num) alert_input("The 'stop-extinction' transition number '"+num_str+"' must be an integer");
+		
+		ei.min_trans = num;
+	}
+	else{
+		ei.min_trans = 4;
 	}
 
-	for(auto i = 0u; i <= n; i++){
-		if(log_on){
-			si.value_sim.push_back(exp(log(min)+(log(max)-log(min))*double(i)/n));	
-		}
-		else{
-			si.value_sim.push_back(min+(max-min)*double(i)/n);
-		}
-	}
-	
-	si.log_on = log_on;
-	
-	return si;
+	return ei;
 }
+
+

@@ -12,6 +12,99 @@ using namespace std;
 #include "state.hh"
 #include "utils.hh"
 
+// Checks everything used in inference
+void State::check(string ref)
+{
+	//cout << ref << " state check" << endl;
+	//check_markov_trans(0,ref); return;
+	
+	if(testing == false) return;
+	
+	check_back(ref);
+	
+	//check_markov_value_dif();
+	check_dpop();
+	
+	timer[CHECK_TIMER] -= clock();
+
+	if(param_val.value_ch.size() != 0) emsg("Value_ch problem");
+	if(param_val.precalc_ch.size() != 0) emsg("precalc_ch problem");
+	
+	if(popcomb_store.size() != 0) emsg("popcomb_store not zero:"+ref);
+ 		
+	if(model.deterministic){
+		return;
+	}
+	
+	check_precalc_eqn(ref);
+
+	check_dependent_param(ref);
+	
+	check_prior(ref);
+	
+	//check_markov_trans(0,ref);
+	
+	check_like(ref);
+	
+	check_init_cond_prior(ref);
+		
+	check_cpop_st(ref);
+
+	check_trans_num(ref);
+
+	check_effect_out_of_range();
+
+	check_simp(ref);
+
+	check_popnum_ind(ref);
+	
+	check_genetic_value(ref);
+	
+	//check_spline_store(ref);
+	
+	check_regenerate(ref);
+
+	for(auto p = 0u; p < nspecies; p++){
+		const auto &sp = model.species[p];
+	
+		//check_markov_div_value(p,ref); // This has been replaced by regenerate
+		
+		switch(sp.type){
+		case INDIVIDUAL:
+			check_event_observed(p,ref);
+			check_ref(p,ref);
+			check_ie(p,ref);
+			check_markov_trans(p,ref);
+			check_nm_trans(p,ref);
+			break;
+			
+		case POPULATION:
+			check_pop_like(p,ref);
+			break;
+		
+		case DETERMINISTIC:
+			break;
+		}
+		
+		check_obs_like(p,ref);
+		check_init_cond_like(p,ref);
+		//if(calc_para_speedup) check_para_speedup(p,ref);
+	}
+	
+	//check_spline(ref);
+
+	check_maps(ref);
+
+	check_add_move_rem(ref);
+	
+	if(check_lin) check_linearise();
+
+	back_init();
+
+	timer[CHECK_TIMER] += clock();
+}
+
+
 /// Checks for any transition numbers becoming negative
 void State::check_trans_num(string ref)
 {
@@ -118,99 +211,6 @@ void State::check_simp(string ref)
 	}
 	
 	check_timer[CHECK_SIMP] += clock();
-}
-
-
-// Checks everything used in inference
-void State::check(string ref)
-{
-	//cout << "check\n";
-	//species[0].check_trans_tree(popnum_t,ref); return;
-	
-	//cout << ref << " state check" << endl;
-	
-	//check_genetic_value(ref); //cout << "turn off\n"; return;
-	//check_w();
-	//return;
-	
-	if(testing == false) return;
-	
-	//check_markov_value_dif();
-	check_dpop();
-	
-	timer[CHECK_TIMER] -= clock();
-
-	if(param_val.value_ch.size() != 0) emsg("Value_ch problem");
-	if(param_val.precalc_ch.size() != 0) emsg("precalc_ch problem");
-	
-	if(popcomb_store.size() != 0) emsg("popcomb_store not zero:"+ref);
- 		
-	if(model.deterministic){
-		return;
-	}
-	
-	check_precalc_eqn(ref);
-
-	check_dependent_param(ref);
-	
-	check_prior(ref);
-	
-	check_like(ref);
-	
-	check_init_cond_prior(ref);
-		
-	check_cpop_st(ref);
-
-	check_trans_num(ref);
-
-	check_effect_out_of_range();
-
-	check_simp(ref);
-
-	check_popnum_ind(ref);
-	
-	check_genetic_value(ref);
-	
-	//check_spline_store(ref);
-	
-	check_regenerate(ref);
-
-	for(auto p = 0u; p < nspecies; p++){
-		const auto &sp = model.species[p];
-	
-		//check_markov_div_value(p,ref); // This has been replaced by regenerate
-		
-		switch(sp.type){
-		case INDIVIDUAL:
-			check_event_observed(p,ref);
-			check_ref(p,ref);
-			check_ie(p,ref);
-			check_markov_trans(p,ref);
-			check_nm_trans(p,ref);
-			break;
-			
-		case POPULATION:
-			check_pop_like(p,ref);
-			break;
-		
-		case DETERMINISTIC:
-			break;
-		}
-		
-		check_obs_like(p,ref);
-		check_init_cond_like(p,ref);
-		//if(calc_para_speedup) check_para_speedup(p,ref);
-	}
-	
-	//check_spline(ref);
-
-	check_maps(ref);
-
-	check_add_move_rem(ref);
-	
-	if(check_lin) check_linearise();
-
-	timer[CHECK_TIMER] += clock();
 }
 
 
@@ -743,7 +743,7 @@ void State::check_markov_trans(unsigned int p, string ref)
 			
 			if(dif(ssp.Li_markov[e][ti],Li_markov_store[ti],THRESH_EXPAND*dif_thresh)){
 				cout << e << " " << ti << " " <<  ssp.Li_markov[e][ti] << " " << Li_markov_store[ti] << " dif" << endl;
-				emsg("Li_markov: "+ref);
+				//emsg("Li_markov: "+ref);
 				add_alg_warn("Li_markov error"+ref);
 			}
 		}
@@ -935,6 +935,19 @@ void State::check_like(string ref)
 	if(std::isnan(like.genetic_obs)) emsg("genetic_obs nan");
 	if(std::isnan(like.ie)) emsg("ie nan");
 	
+	if(std::isinf(like.init_cond)) emsg("init_cond inf");
+	if(std::isinf(like.init_cond_prior)) emsg("init_cond_prior inf");
+	if(std::isinf(like.obs)) emsg("obs inf");
+	if(std::isinf(like.prior)) emsg("prior inf");
+	if(std::isinf(like.prior_bounded)) emsg("prior bounded inf");
+	if(std::isinf(like.spline_prior)) emsg("spline_prior inf");
+	if(std::isinf(like.dist)) emsg("dist inf");
+	if(std::isinf(like.markov)) emsg("markov inf"+ref);
+	if(std::isinf(like.nm_trans)) emsg("nm_trans inf");
+	if(std::isinf(like.genetic_process)) emsg("genetic_process inf");
+	if(std::isinf(like.genetic_obs)) emsg("genetic_obs inf");
+	if(std::isinf(like.ie)) emsg("ie inf");
+	
 	auto like_st = like;
 	
 	calculate_like();
@@ -953,6 +966,7 @@ void State::check_like(string ref)
 	}
 	
 	if(dif(like.markov,like_st.markov,THRESH_EXPAND*dif_thresh)){
+		cout << like.markov << " "<< like_st.markov << " like dif" << endl;
 		add_alg_warn("like markov "+ref);
 	}
 	
@@ -986,18 +1000,33 @@ void State::check_like(string ref)
 	
 	const auto &gen_data = model.genetic_data;
 	
-	if(gen_data.on){
+	if(gen_data.on && trans_tree_on){
 		if(dif(like.genetic_process,like_st.genetic_process,dif_thresh)){
-			add_alg_warn("like genetic_process: "+ref);
+			//add_alg_warn("like genetic_process: "+ref);
+			cout << "correct=like genetic_process" << like.genetic_process << "  value" << like_st.genetic_process << " genetic_process" << endl;
+			emsg("like genetic_process: "+ref);
 		}
 		auto gen_dif = calculate_gen_dif();
-		
+		 
 		if(difi(genetic_value.gen_dif,gen_dif)){
+			auto N = genetic_value.gen_dif.size();
+			for(auto j = 0u; j < N; j++){
+				for(auto i = 0u; i < N; i++){
+					if(genetic_value.gen_dif[j][i] != gen_dif[j][i]){
+						cout << genetic_value.gen_dif[j][i] << " "  << gen_dif[j][i] << " dd" << endl;
+						emsg("dif");
+					}
+				}
+			}
+			
+			
 			emsg("gendif prob");
 		}
 		
 		if(dif(like.genetic_obs,like_st.genetic_obs,dif_thresh)){
-			add_alg_warn("like genetic_obs: "+ref);
+			cout << like.genetic_obs << " " << like_st.genetic_obs << "dif" << endl;
+			//add_alg_warn("like genetic_obs: "+ref);
+			emsg("like genetic_obs: "+ref);
 		}
 	}
 	else{
@@ -1606,14 +1635,14 @@ void State::check_linearise()
 /// Checks that quantities in genetic_value are correctly specified
 void State::check_genetic_value(string ref)
 {
-	if(model.trans_tree == false) return;
+	if(model.trans_tree == false || !trans_tree_on) return;
 
 	const auto &gen_data = model.genetic_data;
 	const auto &precalc = param_val.precalc;
 	
 	check_timer[CHECK_GEN] -= clock();
 
-	if(gen_data.on){                                 // Checks mutation rate 
+	if(gen_data.on && trans_tree_on){                                 // Checks mutation rate 
 		auto mut_rate_store = genetic_value.mut_rate;
 		genetic_value.mut_rate = model.eqn[gen_data.mut_rate.eq_ref].calculate_param(precalc);
 		
@@ -1677,7 +1706,7 @@ void State::check_genetic_value(string ref)
 							if(tra.infection.type == TRANS_INFECTION){
 								if(iif.p != OUTSIDE_INF && iif.p > CODE){
 									species[p].print_event(ind.ev);
-									emsg("Should be ENTER_INF2");
+									emsg("Should be ENTER_INF2: "+ref);
 								}
 
 								if(ev.inf_node_ref > CODE){
@@ -1685,9 +1714,15 @@ void State::check_genetic_value(string ref)
 								}
 								
 								if(iif.p == OUTSIDE_INF){
-									if(iif.po != UNSET) emsg("Should be UNSET1");
+									if(iif.po != UNSET){
+										cout << iif.po << " pop" << endl;
+										emsg("Should be UNSET1here"+ref);
+									}
 									if(iif.pref != UNSET) emsg("Should be UNSET2");
-									if(iif.w != 1) emsg("Should be UNSET3");
+									if(iif.w != 1){
+										cout << iif.w << " w" << endl;
+										emsg("Should be UNSET3");
+									}
 								}
 								else{                              // Checks pref and po consistent
 									auto m = tra.markov_eqn_ref;
@@ -1716,7 +1751,6 @@ void State::check_genetic_value(string ref)
 							}
 							else{
 								if(iif.p != UNSET){
-									cout << ev.tdiv*0.5 << " ev\n";
 									emsg("Should not be ENTER_INF2");
 								}
 								if(ev.inf_node_ref != UNSET){
@@ -1747,7 +1781,6 @@ void State::check_genetic_value(string ref)
 			if(in.tdiv_start != ev.tdiv) emsg("t_start not agree");
 		
 			//species[0].print_event(event);
-			//cout << in.tdiv_start << " " << in.tdiv_rec << " end\n";
 						
 			auto e = 0u;
 			auto c = UNSET;
@@ -1776,35 +1809,28 @@ void State::check_genetic_value(string ref)
 
 					if(c == UNSET) emsg("individual is nto alive");
 					if(sp.comp_gl[c].infected == false){
-							for(auto k = 0u; k < in.inf_ev.size(); k++){
-							const auto &ie = in.inf_ev[k];
-							cout << ie.tdiv*0.5 << "inf ev\n";
-						}
-					
-						cout << species[in.p].individual[in.i].name << "ind\n";
-						
 						emsg("Uninfected indivudal causing infection");
 					}
 					
 					const auto &inf_c = model.inf_cause[in_inf.p][ev.tr_gl][in.p][c];
 					if(inf_c.eq_ref == UNSET){
-						cout << t*0.5 << " " << sp.tra_gl[ev.tr_gl].name << " trans\n";
-						cout << in_inf.p << " " << ev.tr_gl << " "<< in.p << " " << c << " kkk\n";
 						emsg("Cannot find equation for iif: "+ref);
 					}
 					
 					if(iif.p != in.p) emsg("check p not agree");
 					if(iif.i != in.i) emsg("check i not agree");
 					if(iif.pref != inf_c.pref){
+						/*
 						const auto &eq = model.eqn[inf_c.eq_ref];
 						for(auto j = 0u; j < eq.pop_ref.size(); j++){
 							cout << j << " " <<model.pop[eq.pop_ref[j]].name << "pop ref" << endl;
 						}
 						cout << iif.pref << " " << inf_c.pref <<" jj" << endl;
-						cout << t*0.5 << "time\n";
+						cout << t*0.5 << "time" << endl;
 						
-						cout << iif.po << " " << inf_c.po << " check pop\n";
-						cout << in.i << " ind\n";
+						cout << iif.po << " " << inf_c.po << " check pop" << endl;
+						cout << in.i << " ind" << endl;
+						*/
 						emsg("check pref not agree");
 					}
 					if(iif.po != inf_c.po) emsg("check po not agree");
@@ -1820,7 +1846,21 @@ void State::check_genetic_value(string ref)
 		}
 	}
 	
-
+	/// Makes sure that infection times are unique
+	for(auto n = 0u; n < genetic_value.inf_node.size(); n++){
+		const auto &inf_ev = genetic_value.inf_node[n].inf_ev;
+		auto emax = inf_ev.size();
+		if(emax > 0){
+			for(auto e = 0u; e < emax-1; e++){
+				if(inf_ev[e].tdiv == inf_ev[e+1].tdiv){
+					if(inf_ev[e].type == INFECT_OTHER || inf_ev[e+1].type == INFECT_OTHER){
+						emsg("inf_node equal time");
+					}
+				}
+			}				
+		}
+	}
+	
 	// Checks obs_node_ref
 	if(genetic_value.obs_node_ref.size() != gen_data.obs.size()){
 		emsg("obs_node_ref wrong size4");
@@ -1905,7 +1945,7 @@ void State::check_genetic_value(string ref)
 	// Checks inf_node
 	const auto &inf_node = genetic_value.inf_node;
 	
-	if(!gen_data.on){ // Checks that mut_num is set to UNSET if no genetic data
+	if(!gen_data.on && trans_tree_on){ // Checks that mut_num is set to UNSET if no genetic data
 		for(auto n = 0u; n < inf_node.size(); n++){
 			const auto &in = inf_node[n];
 			for(const auto &iev : in.inf_ev){
@@ -2139,10 +2179,28 @@ void State::check_genetic_value(string ref)
 		}
 	}
 	
-	// Checks t_rec correctly specified
+	// Checks tdiv_rec correctly specified
 	for(auto n = 0u; n < genetic_value.inf_node.size(); n++){
 		const auto &in = genetic_value.inf_node[n];
 		if(in.tdiv_rec != find_t_rec(in)) emsg("t_rec is wrong");
+	}
+	
+	// Checks ti_start and ti_rec 
+	for(auto n = 0u; n < genetic_value.inf_node.size(); n++){
+		const auto &in = genetic_value.inf_node[n];
+		if(in.ti_start != inf_node_ti_from_tdiv(in.tdiv_start)) emsg("ti_start prob");
+		if(in.ti_rec != inf_node_ti_from_tdiv(in.tdiv_rec)) emsg("ti_rec prob");
+	}
+	
+	// Checks if ENTER_INF / OUTSIDE_INF are correctly set
+	for(auto n = 0u; n < genetic_value.inf_node.size(); n++){
+		const auto &in = genetic_value.inf_node[n];
+		if(in.from.node == ENTER_INF){
+			if(species[in.p].individual[in.i].ev[in.e].type != ENTER_EV) emsg("ENTER_EV problem");
+		}
+		else{
+			if(species[in.p].individual[in.i].ev[in.e].type == ENTER_EV) emsg("OUTSIDE_INF problem");
+		}
 	}
 	
 	// Checks that infections are within the infected periods of individuals
@@ -2150,15 +2208,18 @@ void State::check_genetic_value(string ref)
 		for(auto n = 0u; n < genetic_value.inf_node.size(); n++){
 			const auto &in = genetic_value.inf_node[n];
 			if(in.inf_ev.size() > 0){
-				auto t_rec = round_up(find_t_rec(in));
-
+				auto ti_start = in.ti_start;
+				auto ti_rec = in.ti_rec;
+				
 				for(auto k = 0u; k < in.inf_ev.size(); k++){
 					const auto &iev = in.inf_ev[k];
-					if(iev.type == INFECT_OTHER && iev.tdiv > t_rec){
-						const auto &ssp = species[in.p];
-						const auto &ev = ssp.individual[in.i].ev;
-						ssp.print_event(ev);
-						emsg("Infection not within infectious period "+ref);
+					if(iev.type == INFECT_OTHER){
+						if(iev.tdiv < ti_start || iev.tdiv > ti_rec){
+							const auto &ssp = species[in.p];
+							const auto &ev = ssp.individual[in.i].ev;
+							ssp.print_event(ev);
+							emsg("Infection not within infectious period "+ref);
+						}
 					}
 				}
 			}
@@ -2526,8 +2587,8 @@ void State::check_markov_value_dif()
 /// Adds an algorithm warning
 void State::add_alg_warn(string te)
 {
-	if(true){
-		cout << "warning create termination\n" << endl;
+	if(false){ // TURN OFF
+		cout << "warning create termination" << endl;
 		emsg(te+" ALG WARNING"); 
 	}
 	if(debugging) emsg(te+" ALG WARNING"); 
@@ -2733,5 +2794,89 @@ void State::check_regenerate(string ref)
 		}		
 	}
 	//cout << dmax << " dmax" << endl;
+}
+
+
+/// Checks inf_node times
+void State::check_inf_node_times(string ref) const 
+{
+	cout << "check inf node times" << endl;
+	// Checks ti_start and ti_rec 
+	for(auto n = 0u; n < genetic_value.inf_node.size(); n++){
+		const auto &in = genetic_value.inf_node[n];
+		if(in.p != UNSET){
+			if(species[in.p].individual[in.i].ev[in.e].tdiv != in.tdiv_start){
+		
+				emsg("start time prob"+ref);
+			}
+		}
+	
+		if(in.ti_start != inf_node_ti_from_tdiv(in.tdiv_start)) emsg("ti_start prob");
+		if(in.ti_rec != inf_node_ti_from_tdiv(in.tdiv_rec)) emsg("ti_rec prob");
+	}
+}
+
+
+/// Checks if markov inf
+void State::check_markov_inf(string ref) const
+{
+	if(isinf(like.markov)) emsg("Markov is inf "+ref);
+}
+
+
+/// Checks just the genetic process likelihood
+void State::check_genetic_process()
+{
+	auto gen = likelihood_genetic_process();
+	if(dif(gen,like.genetic_process,TINY)) emsg("prob genetic process");
+}
+
+
+void State::check_iif(string ref) const
+{
+	cout << "CHECK " << ref << endl;
+	for(const auto &ssp : species){
+		for(auto i = 0u; i < ssp.individual.size(); i++){
+			auto &ind = ssp.individual[i];
+		
+			for(auto e = 0u; e < ind.ev.size(); e++){
+				auto &ev = ind.ev[e];
+				auto &iif = ev.ind_inf_from;
+				if(iif.p == OUTSIDE_INF){
+					if(iif.po != UNSET) emsg("iif prob"+ref);
+				}
+			}
+		}
+	}
+}
+
+
+/// CHecks that back is correctly empty
+void State::check_back(string ref) const
+{
+	if(back_pop.size() > 0) emsg("backpop: "+ref);
+	for(auto &ssp : species){
+		if(ssp.back.size() > 0) emsg("back:"+ref);
+		if(ssp.back_ind.size() > 0) emsg("back_ind");
+	}
+}
+
+
+/// Check that events ar all within the range
+void State::check_event_in_range(string ref) const
+{
+	for(auto p = 0u; p < nspecies; p++){
+		const auto &ssp = species[p];
+		if(ssp.type == INDIVIDUAL){
+			for(const auto &ind : ssp.individual){
+				for(const auto &ev : ind.ev){
+					if(ev.tdiv < 0 || ev.tdiv >= T || std::isnan(ev.tdiv)){
+						cout << ev.tdiv << " " << ref << " time out of range" << endl;
+						emsg("Time out of range");
+					}
+				}
+			}
+		}
+	}
 }
 

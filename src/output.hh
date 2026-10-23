@@ -26,14 +26,15 @@ class Output                               // Stores information about the data
 		
 		vector <double> timer;                 // General purpose timers
 		
+		vector <string> all_files;             // A list of all files used 
 		
 		Output(const Model &model, Mpi &mpi, bool sup = false);
 		void init(const Input &input);
-		void check_open(ofstream &fout, string file) const;
 		void summary(const Model &model) const;
 		void prop_summary(string te) const;
 		string print_affect_like(const AffectLike &al) const;
 		void data_summary(const Model &model) const;
+		void clear();
 		void remove_double_space();
 		void erase_command(unsigned int i);
 		void delete_command(string name, unsigned int li, bool check);
@@ -49,7 +50,7 @@ class Output                               // Stores information about the data
 		string to_str(double num) const;
 		void param_sample(unsigned int s, unsigned int chain, State &state);
 		void param_sample(const Particle &part);
-		vector < vector <double> > get_param_from_table_row(const vector <string> &row) const;
+		vector < vector <double> > get_param_from_table_row(const vector <string> &row, const vector <unsigned int> &stat_out_col) const;
 		string param_output(const Particle &part, const vector < vector <double> > &value) const;
 		void state_sample(unsigned int s, unsigned int chain, State &state);
 		void state_sample(const Particle &part);
@@ -63,6 +64,7 @@ class Output                               // Stores information about the data
 		void copy(string file);
 		vector < vector < vector <Average> > > setup_ie_average(bool &pred_acc_on) const;
 		void update_ie_average(vector < vector < vector <Average> > > &ie_average, const vector <Particle> &part) const;
+		bool genetic_not_converged(const vector <Particle> &part) const;
 		void end(string file, unsigned int total_cpu);
 		vector <Particle> get_part_chain(unsigned int chain, vector <Particle> &part) const;
 		void clear_part(Particle &pa) const;
@@ -70,7 +72,7 @@ class Output                               // Stores information about the data
 		void print_individuals(unsigned int N, unsigned int p, const State &state) const;
 		void final_time(double cpu_time, double op_cpu_time) const;
 		void final_memory_usage() const;
-		void insert_command(string name, unsigned int p, string insert_pl, string insert_bef, string line, string content, string file);
+		void insert_command(string name, unsigned int p, string insert_pl, string insert_bef, string line, string content, string file, bool &replace_data);
 		string get_effective_sample_size(vector <double> vec) const;
 		string get_Gelman_Rubin_statistic(const vector < vector <double> > &cha) const;
 		void change_sim_value(string param_name, double value);
@@ -105,6 +107,7 @@ class Output                               // Stores information about the data
 		string generation_average(string head, string content) const;
 		string get_tag_value(const TagRange &tag) const;
 		TagRange get_next_tag(unsigned int i, string tag) const;
+		string create_filename(string root) const;
 		
 		vector <LinesRaw> lines_raw;    
 	
@@ -112,6 +115,8 @@ class Output                               // Stores information about the data
 		vector <Particle> state_store;
 		vector <Diagnostic> diagnostic_store;
 	
+		vector <StatOut> stat_out;         
+		
 		bool sup;                              // Determines if output is supressed
 		
 		const Model &model;	

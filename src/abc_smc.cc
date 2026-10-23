@@ -8,7 +8,7 @@
 #include <cmath>
 
 using namespace std;
-
+ 
 #include "abc_smc.hh"
 #include "utils.hh"
 #include "matrix.hh"
@@ -23,7 +23,7 @@ ABC_SMC::ABC_SMC(const Model &model, Output &output, Mpi &mpi) : cor_matrix(mode
 	state.init();
 }
  
-
+ 
 /// Implements a version of simple ABC rejection algorithm
 void ABC_SMC::run()
 {		

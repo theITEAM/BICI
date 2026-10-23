@@ -114,8 +114,6 @@ class Model                                // Stores information about the model
 		
 		Details details;                       // Details for simulation/inference
 		
-		Details inf_details;                   // Details for inference (used in tornado plot 
-		
 		Constant constant;                     // Stores all the contants in the model
 		
 		Precalc precalc_eqn;                   // The equation which precalculates quantities
@@ -133,6 +131,7 @@ class Model                                // Stores information about the model
 		vector <unsigned long long> spline_refi;      // Stores where spline is on precalc (using i)
 	
 		Model(Operation mode_, ExtFactor ext_factor_, bool no_question_);
+		bool is_time_dep(const string &st) const;
 		void add_eq_ref(EquationInfo &eqi, Hash &hash_eqn, double tdiv = UNSET, bool keep_te = false);
 		void param_val_init(PV &param_val) const;
 		PV param_sample(bool no_precalc = false) const;
@@ -251,6 +250,11 @@ class Model                                // Stores information about the model
 		bool par_ele_set(unsigned int th, unsigned int j) const;
 		bool is_bernoulli(unsigned int th) const;
 		bool is_strictly_positive(const Prior &pri) const;
+		RegraftSampler set_rg_sampler(RegraftSamplerType type,vector <RegraftSamplerEle> &ele) const;
+		void setup_regraft_sampler();
+		void obs_model_param_eqn(unsigned int eq_ref, ModelParam mod_param, vector <bool> &obs_eqn);
+		void assign_obs_model_param();
+		ParamBound param_bounds(const ParamRef &pr) const;
 	
 	private:
 		Hash hash_all_ind;                     // Stores individuals in a hash table
