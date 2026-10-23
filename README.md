@@ -21,7 +21,7 @@ BICI can be working for you in just a few clicks! The following pre-compiled ver
 
 ## Documentation
 
-The manual can be downloaded [here](BICI_Manual_v0.90.pdf). This explains all the features within the software and well as comprehensive documentation for the BICI-script language.  
+The manual can be downloaded [here](BICI_Manual_v0.94.pdf). This explains all the features within the software and well as comprehensive documentation for the BICI-script language.  
 
 ## Features
 
